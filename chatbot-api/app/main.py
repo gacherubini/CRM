@@ -1,9 +1,12 @@
 """API do Chatbot (Plano #2A). n8n consome esta API; não escreve no banco direto."""
+import csv
+import io
 import os
 import uuid
 from typing import Optional
 
 from fastapi import Depends, FastAPI, HTTPException
+from fastapi.responses import Response
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -126,6 +129,38 @@ def listar_leads(
 ):
     leads = servico.listar_leads(db, ctx.loja_id, etapa)
     return {"leads": [servico.para_saida_lead(lead) for lead in leads]}
+
+
+@app.get("/v1/leads.csv")
+def exportar_leads_csv(
+    etapa: Optional[str] = None,
+    ctx: Contexto = Depends(get_contexto),
+    db: Session = Depends(get_db),
+):
+    leads = servico.listar_leads(db, ctx.loja_id, etapa)
+    buffer = io.StringIO()
+    writer = csv.writer(buffer)
+    writer.writerow(
+        ["id", "telefone", "nome", "interesse", "etapa", "consentimento_em", "criada_em"]
+    )
+    for lead in leads:
+        s = servico.para_saida_lead(lead)
+        writer.writerow(
+            [
+                s["id"],
+                s["telefone"],
+                s["nome"] or "",
+                s["interesse"] or "",
+                s["etapa"],
+                s["consentimento_em"] or "",
+                s["criada_em"] or "",
+            ]
+        )
+    return Response(
+        content=buffer.getvalue(),
+        media_type="text/csv",
+        headers={"Content-Disposition": "attachment; filename=leads.csv"},
+    )
 
 
 @app.get("/v1/leads/{lead_id}")

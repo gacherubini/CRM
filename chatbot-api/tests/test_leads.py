@@ -47,3 +47,12 @@ def test_obter_lead_de_outra_loja_404(client, loja_a, loja_b):
         "/v1/leads", json={"telefone": "5511111111111", "interesse": "x"}, headers=loja_a["headers"]
     ).json()["id"]
     assert client.get(f"/v1/leads/{lid}", headers=loja_b["headers"]).status_code == 404
+
+
+def test_exportar_leads_csv(client, loja_a):
+    h = loja_a["headers"]
+    client.post("/v1/leads", json={"telefone": "5511222223333", "interesse": "Onix"}, headers=h)
+    r = client.get("/v1/leads.csv", headers=h)
+    assert r.status_code == 200
+    assert "text/csv" in r.headers["content-type"]
+    assert "telefone" in r.text and "5511222223333" in r.text

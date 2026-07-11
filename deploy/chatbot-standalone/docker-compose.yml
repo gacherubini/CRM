@@ -1,0 +1,82 @@
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: crm
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-crm}
+      POSTGRES_DB: crm
+    volumes:
+      - crm_pg:/var/lib/postgresql/data
+      - ./init-db.sql:/docker-entrypoint-initdb.d/init-db.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U crm -d crm"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+
+  estoque-api:
+    build: ../../estoque-api
+    environment:
+      - DATABASE_URL=postgresql+psycopg://crm:${POSTGRES_PASSWORD:-crm}@postgres:5432/estoque
+      - ESTOQUE_SKIP_INIT=1
+    ports:
+      - "8100:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  chatbot-api:
+    build: ../../chatbot-api
+    environment:
+      - DATABASE_URL=postgresql+psycopg://crm:${POSTGRES_PASSWORD:-crm}@postgres:5432/chatbot
+      - CHATBOT_SKIP_INIT=1
+      - ESTOQUE_PUBLIC_URL=http://estoque-api:8000
+      - SIMULATION_PROVIDER=${SIMULATION_PROVIDER:-mock}
+      - MOTOR_URL=${MOTOR_URL:-}
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  evolution:
+    image: atendai/evolution-api:v2.1.1
+    environment:
+      - AUTHENTICATION_API_KEY=${EVOLUTION_API_KEY}
+      - DATABASE_ENABLED=true
+      - DATABASE_PROVIDER=postgresql
+      - DATABASE_CONNECTION_URI=postgresql://crm:${POSTGRES_PASSWORD:-crm}@postgres:5432/evolution
+      - DATABASE_CONNECTION_CLIENT_NAME=evolution
+      - CACHE_REDIS_ENABLED=true
+      - CACHE_REDIS_URI=redis://redis:6379
+      - CACHE_REDIS_PREFIX_KEY=evolution
+      - CACHE_LOCAL_ENABLED=false
+    ports:
+      - "8080:8080"
+    volumes:
+      - evolution_instances:/evolution/instances
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+
+  n8n:
+    image: docker.n8n.io/n8nio/n8n
+    environment:
+      - N8N_SECURE_COOKIE=false
+      - N8N_ENCRYPTION_KEY=${N8N_ENCRYPTION_KEY:-troque-esta-chave}
+    ports:
+      - "5678:5678"
+    volumes:
+      - n8n_data:/home/node/.n8n
+    depends_on:
+      - chatbot-api
+
+volumes:
+  crm_pg:
+  evolution_instances:
+  n8n_data:
