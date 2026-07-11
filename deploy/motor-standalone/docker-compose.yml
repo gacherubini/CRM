@@ -1,0 +1,30 @@
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: motor
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-motor}
+      POSTGRES_DB: motor
+    volumes:
+      - motor_pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U motor -d motor"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  motor-api:
+    build: ../../motor-simulacao
+    environment:
+      - DATABASE_URL=postgresql+psycopg://motor:${POSTGRES_PASSWORD:-motor}@postgres:5432/motor
+      - MOTOR_SKIP_INIT=1
+      - MOTOR_ENV=production
+      - MOTOR_ENCRYPTION_KEY=${MOTOR_ENCRYPTION_KEY}
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  motor_pg:
