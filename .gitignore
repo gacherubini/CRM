@@ -1,0 +1,16 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+.pytest_cache/
+
+# Docker / dados locais
+pg_data/
+n8n_data/
+
+# Bancos locais
+*.db
+
+# Ambiente
+.env

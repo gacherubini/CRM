@@ -1,0 +1,203 @@
+# Plano #1A — Motor de Simulação Independente
+
+> **Substitui o Plano #1 legado para implementação.** O plano anterior continua como referência
+> dos validadores, fórmula Price e testes unitários, mas sua infraestrutura combinada não é o pacote
+> comercial válido.
+
+**Goal:** Entregar uma API de simulação instalável e vendável separadamente, capaz de operar com
+mock agora e drivers bancários depois, sem depender de WhatsApp, n8n, Portal, Estoque ou Chatbot.
+
+**Stack:** Python 3.12+, FastAPI, Pydantic, SQLAlchemy, Alembic, PostgreSQL, worker Python,
+Playwright nos drivers reais, pytest e Docker Compose.
+
+## Critérios de independência
+
+1. `deploy/motor-standalone/docker-compose.yml` sobe apenas API, worker e Postgres.
+2. A API não conhece lead, conversa, veículo de estoque, vendedor ou campanha.
+3. Todo consumidor usa `/v1/simulacoes`; não há import de código de outro produto.
+4. O mock funciona sem credenciais bancárias.
+5. Cada driver bancário é um adapter e pode ser ativado/desativado por configuração.
+6. Falha de um banco não elimina resultados válidos dos demais.
+7. O pacote possui healthcheck, migrations, backup/restore e versão.
+
+## Contrato público
+
+### Criar simulação
+
+```http
+POST /v1/simulacoes
+Authorization: Bearer <token>
+Idempotency-Key: <uuid>
+```
+
+```json
+{
+  "referencia_externa": "lead-ou-pedido-opcional",
+  "pessoa": {
+    "cpf": "12345678909",
+    "nascimento": "1990-05-20",
+    "renda": 3000
+  },
+  "veiculo": {
+    "categoria": "moto",
+    "valor": 20000
+  },
+  "condicoes": {
+    "entrada": 5000,
+    "prazo_meses": 48
+  },
+  "provedores": ["mock"]
+}
+```
+
+Resposta `202`:
+
+```json
+{
+  "id": "uuid",
+  "status": "recebida",
+  "criada_em": "2026-07-11T12:00:00Z"
+}
+```
+
+### Consultar
+
+```http
+GET /v1/simulacoes/{id}
+```
+
+Estados gerais: `recebida`, `processando`, `parcial`, `concluida`, `falhou`,
+`aguardando_intervencao`, `cancelada`.
+
+Cada resultado contém `provedor`, `status`, parcela, taxa, prazo, valor financiado, timestamps e
+`codigo_erro` estável. Mensagens técnicas e páginas bancárias nunca são devolvidas ao consumidor.
+
+### Outros endpoints
+
+- `POST /v1/simulacoes/{id}/cancelar`
+- `GET /v1/provedores`
+- `GET /health/live`
+- `GET /health/ready`
+- `GET /version`
+
+## Dados pertencentes ao Motor
+
+- `clientes_api`: consumidor, credencial e limites.
+- `simulacoes`: estado do job, referência externa e retenção.
+- `simulacao_resultados`: um registro por provedor/banco.
+- `simulacao_tentativas`: tentativas, duração e erro sanitizado.
+- `idempotencia`: chave por cliente e hash da requisição.
+- `auditoria`: ações administrativas sem payload pessoal em claro.
+
+Payload pessoal necessário ao job é cifrado em aplicação. Logs, métricas e traces usam somente IDs.
+
+## Interface de driver
+
+```python
+class DriverSimulacao(Protocol):
+    nome: str
+
+    async def simular(self, solicitacao: SolicitacaoNormalizada) -> ResultadoDriver: ...
+```
+
+O worker escolhe drivers habilitados, executa com timeout individual e persiste cada resultado.
+Captcha/2FA produz `aguardando_intervencao`; indisponibilidade produz erro transitório com retry
+limitado; rejeição de negócio não sofre retry.
+
+## Tasks
+
+### Task 1: Scaffold e qualidade
+
+Criar `motor-simulacao/` com FastAPI, configuração tipada, pytest, lint, API `/health` e `/version`.
+Fixar dependências e impedir inicialização com segredos default em produção.
+
+**Aceite:** testes rodam localmente e na imagem; API informa commit/versão sem expor segredos.
+
+### Task 2: Validadores e normalização
+
+Reaproveitar do plano legado, com testes:
+
+- CPF com dígitos verificadores;
+- nascimento válido e idade mínima configurável;
+- valores monetários normalizados;
+- entrada entre zero e valor do veículo;
+- prazo dentro dos limites configurados;
+- categorias versionadas (`moto`, `leve`, etc.).
+
+**Aceite:** nenhuma regra depende de LLM ou n8n.
+
+### Task 3: Amortização e driver mock
+
+Implementar fórmula Price em `Decimal`, arredondamento explícito e `MockDriver` determinístico.
+Taxas mock são claramente marcadas como fictícias e nunca habilitadas como oferta real.
+
+**Aceite:** testes cobrem taxa zero, entradas limite, prazos e resultados reprodutíveis.
+
+### Task 4: Schema e migrations
+
+Criar modelos canônicos com Alembic, `TIMESTAMPTZ`, UUIDs externos, índices por cliente/status/data,
+restrições de estado e retenção. Proibir `create_all` em produção.
+
+**Aceite:** banco vazio sobe até a versão atual e downgrade da última migration é testado.
+
+### Task 5: API assíncrona e idempotência
+
+Implementar criação, consulta e cancelamento. A mesma `Idempotency-Key` com o mesmo payload retorna
+o mesmo recurso; com payload diferente retorna conflito. A API autentica e restringe por cliente.
+
+**Aceite:** cliente A não consulta/cancela job do cliente B; reenvio não duplica execução.
+
+### Task 6: Worker e resultados parciais
+
+Worker reserva jobs no Postgres sem execução dupla, controla timeout/retry e atualiza o estado geral.
+O mock pode concluir rapidamente, mas percorre o mesmo pipeline dos drivers reais.
+
+**Aceite:** matar o worker durante um job não perde nem executa indefinidamente a solicitação.
+
+### Task 7: Proteção de dados
+
+Implementar cifra de payload, rotação de chave documentada, sanitização de exceções e expurgo.
+Definir retenção separada para payload pessoal, resultado e auditoria.
+
+**Aceite:** busca por CPF nos logs e banco em claro não encontra o valor usado no teste E2E.
+
+### Task 8: Compose standalone
+
+Criar:
+
+- `deploy/motor-standalone/docker-compose.yml`
+- `deploy/motor-standalone/.env.example`
+- `deploy/motor-standalone/README.md`
+
+Serviços: `motor-api`, `motor-worker`, `postgres`. Playwright entra somente na imagem/profile dos
+drivers reais.
+
+**Aceite:** instalação limpa cria credencial de cliente, executa mock e sobrevive a reinício.
+
+### Task 9: Observabilidade e operação
+
+Métricas: quantidade, latência, resultado por provedor, retry e fila — sem CPF. Documentar backup,
+restore, upgrade, rotação de credenciais e diagnóstico.
+
+### Task 10: Teste final de revenda
+
+Em ambiente vazio, subir somente o pacote Motor, criar dois clientes, executar jobs idempotentes,
+validar isolamento, simular falha parcial, reiniciar worker e restaurar backup.
+
+## Integrações opcionais
+
+- Chatbot Financiamento usa `HttpSimulationProvider`.
+- Portal usa o mesmo contrato para simulação manual.
+- Outros sistemas podem consumir a API sem instalar qualquer produto da suíte.
+
+## Fora de escopo
+
+- Conversa, consentimento comercial e leads.
+- Estoque/catálogo.
+- Vendas, metas e dashboard.
+- Score de crédito, até existir contrato e base legal próprios.
+- Drivers bancários reais no primeiro incremento; cada banco terá plano específico.
+
+## Resultado
+
+Um Motor de Simulação com contrato estável, execução resiliente e pacote comercial autônomo.
