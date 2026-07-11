@@ -1,13 +1,19 @@
-"""Orquestração da simulação: valida, executa provedores e guarda o resultado.
+"""Orquestração da simulação: valida, executa provedores, persiste e aplica idempotência.
 
-Milestone 1: execução síncrona do mock e armazenamento em memória. O pipeline
-assíncrono (worker + Postgres + idempotência) entra nas Tasks 4-6 do Plano #1A.
+Milestone 2 (Plano #1A, Tasks 4-5): resultado gravado em Postgres/SQLite e
+`Idempotency-Key` por requisição. O mock ainda conclui de forma síncrona; o worker
+assíncrono com timeout/retry e resultados parciais entra na Task 6.
 """
+import hashlib
+import json
 import uuid
 from datetime import datetime, timezone
 
+from sqlalchemy.orm import Session
+
 from app import config
-from app.motor.base import SolicitacaoSimulacao, Simulacao
+from app.models_db import IdempotenciaORM, ResultadoORM, SimulacaoORM
+from app.motor.base import ResultadoProvedor, Simulacao, SolicitacaoSimulacao
 from app.motor.mock import simular_mock
 from app.validadores import idade, parse_nascimento, valida_cpf
 
@@ -19,7 +25,14 @@ class ErroValidacao(Exception):
         self.message = message
 
 
-_STORE: dict[str, Simulacao] = {}
+class ErroIdempotencia(Exception):
+    code = "idempotency_key_conflito"
+    message = "Idempotency-Key já usada com um payload diferente"
+
+
+def _hash_payload(sol: SolicitacaoSimulacao) -> str:
+    dados = json.dumps(sol.model_dump(), sort_keys=True, default=str)
+    return hashlib.sha256(dados.encode()).hexdigest()
 
 
 def _validar(sol: SolicitacaoSimulacao) -> None:
@@ -41,18 +54,82 @@ def _validar(sol: SolicitacaoSimulacao) -> None:
         )
 
 
-def criar_simulacao(sol: SolicitacaoSimulacao) -> Simulacao:
+def criar_simulacao(
+    db: Session, sol: SolicitacaoSimulacao, idempotency_key: str | None = None
+) -> tuple[SimulacaoORM, bool]:
+    """Retorna (simulacao, criada). `criada=False` quando reusa por idempotência."""
     _validar(sol)
-    resultados = simular_mock(sol)
-    sim = Simulacao(
+    payload_hash = _hash_payload(sol)
+
+    if idempotency_key:
+        existente = db.get(IdempotenciaORM, idempotency_key)
+        if existente is not None:
+            if existente.request_hash != payload_hash:
+                raise ErroIdempotencia()
+            return db.get(SimulacaoORM, existente.simulacao_id), False
+
+    sim = SimulacaoORM(
         id=str(uuid.uuid4()),
+        referencia_externa=sol.referencia_externa,
         status="concluida",
-        criada_em=datetime.now(timezone.utc).isoformat(),
-        resultados=resultados,
     )
-    _STORE[sim.id] = sim
+    for r in simular_mock(sol):
+        sim.resultados.append(
+            ResultadoORM(
+                provedor=r.provedor,
+                status=r.status,
+                valor_parcela=r.valor_parcela,
+                taxa_am=r.taxa_am,
+                prazo_meses=r.prazo_meses,
+                valor_financiado=r.valor_financiado,
+                codigo_erro=r.codigo_erro,
+            )
+        )
+    db.add(sim)
+    db.flush()
+
+    if idempotency_key:
+        db.add(
+            IdempotenciaORM(
+                chave=idempotency_key, request_hash=payload_hash, simulacao_id=sim.id
+            )
+        )
+    db.commit()
+    db.refresh(sim)
+    return sim, True
+
+
+def obter_simulacao(db: Session, sim_id: str) -> SimulacaoORM | None:
+    return db.get(SimulacaoORM, sim_id)
+
+
+def cancelar_simulacao(db: Session, sim_id: str) -> SimulacaoORM | None:
+    sim = db.get(SimulacaoORM, sim_id)
+    if sim is None:
+        return None
+    if sim.status != "cancelada":
+        sim.status = "cancelada"
+        sim.atualizada_em = datetime.now(timezone.utc)
+        db.commit()
+        db.refresh(sim)
     return sim
 
 
-def obter_simulacao(sim_id: str) -> Simulacao | None:
-    return _STORE.get(sim_id)
+def para_pydantic(sim: SimulacaoORM) -> Simulacao:
+    return Simulacao(
+        id=sim.id,
+        status=sim.status,
+        criada_em=sim.criada_em.isoformat(),
+        resultados=[
+            ResultadoProvedor(
+                provedor=r.provedor,
+                status=r.status,
+                valor_parcela=float(r.valor_parcela),
+                taxa_am=float(r.taxa_am),
+                prazo_meses=r.prazo_meses,
+                valor_financiado=float(r.valor_financiado),
+                codigo_erro=r.codigo_erro,
+            )
+            for r in sim.resultados
+        ],
+    )
