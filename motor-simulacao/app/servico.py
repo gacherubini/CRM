@@ -11,7 +11,7 @@ from datetime import datetime, timezone
 
 from sqlalchemy.orm import Session
 
-from app import config
+from app import config, cripto
 from app.models_db import IdempotenciaORM, ResultadoORM, SimulacaoORM
 from app.motor.base import ResultadoProvedor, Simulacao, SolicitacaoSimulacao
 from app.motor.mock import simular_mock
@@ -68,10 +68,19 @@ def criar_simulacao(
                 raise ErroIdempotencia()
             return db.get(SimulacaoORM, existente.simulacao_id), False
 
+    payload_pessoal = json.dumps(
+        {
+            "cpf": sol.pessoa.cpf,
+            "nascimento": sol.pessoa.nascimento,
+            "renda": sol.pessoa.renda,
+        }
+    )
     sim = SimulacaoORM(
         id=str(uuid.uuid4()),
         referencia_externa=sol.referencia_externa,
         status="concluida",
+        payload_cifrado=cripto.cifrar(payload_pessoal),
+        cpf_indice_cego=cripto.indice_cego(sol.pessoa.cpf),
     )
     for r in simular_mock(sol):
         sim.resultados.append(

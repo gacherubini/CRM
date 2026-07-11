@@ -5,7 +5,7 @@ Timestamps com timezone; UUID externo em `simulacoes`.
 """
 from datetime import datetime, timezone
 
-from sqlalchemy import DateTime, ForeignKey, Integer, Numeric, String
+from sqlalchemy import DateTime, ForeignKey, Integer, Numeric, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db import Base
@@ -25,6 +25,9 @@ class SimulacaoORM(Base):
     atualizada_em: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=_agora, onupdate=_agora
     )
+    # Payload pessoal do job (cpf/nascimento/renda) cifrado em repouso; índice cego para dedup.
+    payload_cifrado: Mapped[str | None] = mapped_column(Text, nullable=True)
+    cpf_indice_cego: Mapped[str | None] = mapped_column(String, nullable=True, index=True)
 
     resultados: Mapped[list["ResultadoORM"]] = relationship(
         back_populates="simulacao", cascade="all, delete-orphan"
