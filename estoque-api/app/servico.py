@@ -1,4 +1,5 @@
 """Regras do Estoque: validação, CRUD escopado por loja e transições de estado."""
+import secrets
 import uuid
 from datetime import datetime, timezone
 
@@ -6,7 +7,24 @@ from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
 from app import config
-from app.models_db import Loja, Veiculo
+from app.auth import hash_token
+from app.models_db import CredencialServico, Loja, Veiculo
+
+
+def criar_loja(
+    db: Session, nome: str, slug: str, whatsapp: str | None = None, papel: str = "dono"
+) -> tuple[Loja, str]:
+    """Cria a loja + uma credencial de serviço. Retorna (loja, token em claro)."""
+    if db.query(Loja).filter(Loja.slug == slug).first():
+        raise HTTPException(status_code=409, detail="slug já existe")
+    loja = Loja(id=str(uuid.uuid4()), nome=nome, slug=slug, whatsapp=whatsapp)
+    db.add(loja)
+    db.flush()
+    token = secrets.token_urlsafe(24)
+    db.add(CredencialServico(token_hash=hash_token(token), loja_id=loja.id, papel=papel))
+    db.commit()
+    db.refresh(loja)
+    return loja, token
 
 
 def _validar(dados: dict) -> None:
