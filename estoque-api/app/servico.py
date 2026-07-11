@@ -6,7 +6,7 @@ from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
 from app import config
-from app.models_db import Veiculo
+from app.models_db import Loja, Veiculo
 
 
 def _validar(dados: dict) -> None:
@@ -119,6 +119,74 @@ def vender(db: Session, loja_id: str, veiculo_id: str) -> Veiculo:
     db.commit()
     db.refresh(v)
     return v
+
+
+# --- API pública (read-only, por slug) ---------------------------------------
+
+
+def obter_loja_por_slug(db: Session, slug: str) -> Loja:
+    loja = db.query(Loja).filter(Loja.slug == slug).first()
+    if loja is None:
+        raise HTTPException(status_code=404, detail="loja não encontrada")
+    return loja
+
+
+def listar_veiculos_publicos(
+    db: Session,
+    slug: str,
+    tipo: str | None = None,
+    preco_min: float | None = None,
+    preco_max: float | None = None,
+    limit: int = 50,
+    offset: int = 0,
+) -> tuple[Loja, list[Veiculo]]:
+    loja = obter_loja_por_slug(db, slug)
+    q = db.query(Veiculo).filter(
+        Veiculo.loja_id == loja.id,
+        Veiculo.status == "disponivel",
+        Veiculo.publicado.is_(True),
+    )
+    if tipo:
+        q = q.filter(Veiculo.tipo == tipo)
+    if preco_min is not None:
+        q = q.filter(Veiculo.preco >= preco_min)
+    if preco_max is not None:
+        q = q.filter(Veiculo.preco <= preco_max)
+    veiculos = q.order_by(Veiculo.criado_em.desc()).offset(offset).limit(min(limit, 100)).all()
+    return loja, veiculos
+
+
+def obter_veiculo_publico(db: Session, slug: str, veiculo_id: str) -> Veiculo:
+    loja = obter_loja_por_slug(db, slug)
+    v = (
+        db.query(Veiculo)
+        .filter(
+            Veiculo.id == veiculo_id,
+            Veiculo.loja_id == loja.id,
+            Veiculo.status == "disponivel",
+            Veiculo.publicado.is_(True),
+        )
+        .first()
+    )
+    if v is None:
+        raise HTTPException(status_code=404, detail="veículo não encontrado")
+    return v
+
+
+def para_saida_publica(v: Veiculo) -> dict:
+    """Saída da API pública — NUNCA inclui custo, código interno ou dados internos."""
+    return {
+        "id": v.id,
+        "tipo": v.tipo,
+        "marca": v.marca,
+        "modelo": v.modelo,
+        "versao": v.versao,
+        "ano_modelo": v.ano_modelo,
+        "cor": v.cor,
+        "km": v.km,
+        "preco": float(v.preco),
+        "foto_url": v.foto_url,
+    }
 
 
 def para_saida_privada(v: Veiculo) -> dict:

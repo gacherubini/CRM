@@ -36,7 +36,7 @@ app.dependency_overrides[get_db] = _override_get_db
 
 def _criar_loja(nome: str, slug: str, token: str, papel: str = "operador") -> str:
     db = _TestSession()
-    loja = models_db.Loja(id=str(uuid.uuid4()), nome=nome, slug=slug)
+    loja = models_db.Loja(id=str(uuid.uuid4()), nome=nome, slug=slug, whatsapp="5511999999999")
     db.add(loja)
     db.add(
         models_db.CredencialServico(
@@ -57,12 +57,14 @@ def client():
 @pytest.fixture
 def loja_a():
     token = f"tok-a-{uuid.uuid4().hex}"
-    loja_id = _criar_loja("Loja A", f"loja-a-{uuid.uuid4().hex[:6]}", token)
-    return {"loja_id": loja_id, "headers": {"Authorization": f"Bearer {token}"}}
+    slug = f"loja-a-{uuid.uuid4().hex[:6]}"
+    loja_id = _criar_loja("Loja A", slug, token)
+    return {"loja_id": loja_id, "slug": slug, "headers": {"Authorization": f"Bearer {token}"}}
 
 
 @pytest.fixture
 def loja_b():
     token = f"tok-b-{uuid.uuid4().hex}"
-    loja_id = _criar_loja("Loja B", f"loja-b-{uuid.uuid4().hex[:6]}", token)
-    return {"loja_id": loja_id, "headers": {"Authorization": f"Bearer {token}"}}
+    slug = f"loja-b-{uuid.uuid4().hex[:6]}"
+    loja_id = _criar_loja("Loja B", slug, token)
+    return {"loja_id": loja_id, "slug": slug, "headers": {"Authorization": f"Bearer {token}"}}

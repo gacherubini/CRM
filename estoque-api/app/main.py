@@ -124,3 +124,39 @@ def vender(
     veiculo_id: str, ctx: Contexto = Depends(get_contexto), db: Session = Depends(get_db)
 ):
     return servico.para_saida_privada(servico.vender(db, ctx.loja_id, veiculo_id))
+
+
+# --- API pública (sem autenticação, resolvida por slug) ----------------------
+
+
+def _loja_publica(loja) -> dict:
+    return {"slug": loja.slug, "nome": loja.nome, "whatsapp": loja.whatsapp}
+
+
+@app.get("/public/v1/lojas/{slug}")
+def loja_publica(slug: str, db: Session = Depends(get_db)):
+    return _loja_publica(servico.obter_loja_por_slug(db, slug))
+
+
+@app.get("/public/v1/lojas/{slug}/veiculos")
+def veiculos_publicos(
+    slug: str,
+    tipo: Optional[str] = None,
+    preco_min: Optional[float] = None,
+    preco_max: Optional[float] = None,
+    limit: int = 50,
+    offset: int = 0,
+    db: Session = Depends(get_db),
+):
+    loja, veiculos = servico.listar_veiculos_publicos(
+        db, slug, tipo, preco_min, preco_max, limit, offset
+    )
+    return {
+        "loja": _loja_publica(loja),
+        "veiculos": [servico.para_saida_publica(v) for v in veiculos],
+    }
+
+
+@app.get("/public/v1/lojas/{slug}/veiculos/{veiculo_id}")
+def veiculo_publico(slug: str, veiculo_id: str, db: Session = Depends(get_db)):
+    return servico.para_saida_publica(servico.obter_veiculo_publico(db, slug, veiculo_id))
