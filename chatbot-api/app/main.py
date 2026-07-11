@@ -1,8 +1,9 @@
 """API do Chatbot (Plano #2A). n8n consome esta API; não escreve no banco direto."""
 import os
+import uuid
 from typing import Optional
 
-from fastapi import Depends, FastAPI
+from fastapi import Depends, FastAPI, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -10,6 +11,7 @@ from app import config, models_db, servico  # noqa: F401 (registra os modelos)
 from app.auth import Contexto, get_contexto
 from app.db import Base, engine, get_db
 from app.inventory import InventoryProvider, get_inventory_provider
+from app.simulation import SimulationProvider, get_simulation_provider
 
 app = FastAPI(title="Chatbot API")
 
@@ -41,6 +43,17 @@ class LeadInput(BaseModel):
     nome: Optional[str] = None
     interesse: Optional[str] = None
     etapa: Optional[str] = None
+
+
+class SimularInput(BaseModel):
+    cpf: str
+    nascimento: str
+    valor: float
+    prazo_meses: int
+    entrada: float = 0
+    renda: Optional[float] = None
+    categoria: str = "moto"
+    referencia_externa: Optional[str] = None
 
 
 @app.get("/health/live")
@@ -139,3 +152,22 @@ def buscar_estoque(
             "mensagem": "Não encontrei veículos correspondentes no estoque agora; posso chamar um atendente.",
         }
     return {"veiculos": veiculos, "fonte": "estoque"}
+
+
+@app.post("/v1/simular")
+def simular(
+    dados: SimularInput,
+    ctx: Contexto = Depends(get_contexto),
+    provider: SimulationProvider = Depends(get_simulation_provider),
+):
+    """Ferramenta do bot: delega ao provider configurado (none|mock|http)."""
+    if not provider.disponivel():
+        raise HTTPException(status_code=409, detail="simulação não habilitada nesta instalação")
+    payload = {
+        "referencia_externa": dados.referencia_externa,
+        "pessoa": {"cpf": dados.cpf, "nascimento": dados.nascimento, "renda": dados.renda},
+        "veiculo": {"categoria": dados.categoria, "valor": dados.valor},
+        "condicoes": {"entrada": dados.entrada, "prazo_meses": dados.prazo_meses},
+        "provedores": ["mock"],
+    }
+    return provider.simular(payload, str(uuid.uuid4()))
