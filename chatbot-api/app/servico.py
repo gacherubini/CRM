@@ -10,7 +10,14 @@ from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
 from app.auth import hash_token
-from app.models_db import Conversa, CredencialServico, Loja, Mensagem
+from app.models_db import (
+    Consentimento,
+    Conversa,
+    CredencialServico,
+    Lead,
+    Loja,
+    Mensagem,
+)
 
 
 def criar_loja(
@@ -117,3 +124,103 @@ def definir_bot_ativo(db: Session, loja_id: str, telefone: str, ativo: bool) -> 
     conversa.atualizada_em = datetime.now(timezone.utc)
     db.commit()
     return {"bot_ativo": conversa.bot_ativo, "status": conversa.status}
+
+
+# --- Leads e consentimento (LGPD) --------------------------------------------
+
+
+def _get_or_create_lead(db: Session, loja_id: str, telefone: str) -> Lead:
+    lead = (
+        db.query(Lead)
+        .filter(Lead.loja_id == loja_id, Lead.telefone == telefone)
+        .first()
+    )
+    if lead is None:
+        lead = Lead(id=str(uuid.uuid4()), loja_id=loja_id, telefone=telefone, etapa="novo")
+        db.add(lead)
+        db.flush()
+    return lead
+
+
+def registrar_consentimento(
+    db: Session,
+    loja_id: str,
+    telefone: str,
+    versao_texto: str,
+    finalidade: str,
+    evidencia: str | None = None,
+) -> Lead:
+    lead = _get_or_create_lead(db, loja_id, telefone)
+    db.add(
+        Consentimento(
+            id=str(uuid.uuid4()),
+            loja_id=loja_id,
+            lead_id=lead.id,
+            telefone=telefone,
+            versao_texto=versao_texto,
+            finalidade=finalidade,
+            evidencia=evidencia,
+            aceito_em=datetime.now(timezone.utc),
+        )
+    )
+    lead.consentimento_em = datetime.now(timezone.utc)
+    lead.atualizada_em = datetime.now(timezone.utc)
+    db.commit()
+    db.refresh(lead)
+    return lead
+
+
+def registrar_lead(
+    db: Session,
+    loja_id: str,
+    telefone: str,
+    nome: str | None = None,
+    interesse: str | None = None,
+    etapa: str | None = None,
+) -> Lead:
+    lead = _get_or_create_lead(db, loja_id, telefone)
+    # Dados pessoais (nome) exigem consentimento prévio (LGPD).
+    if nome and lead.consentimento_em is None:
+        raise HTTPException(
+            status_code=409, detail="consentimento necessário antes de dados pessoais"
+        )
+    if nome is not None:
+        lead.nome = nome
+    if interesse is not None:
+        lead.interesse = interesse
+    if etapa is not None:
+        lead.etapa = etapa
+    lead.atualizada_em = datetime.now(timezone.utc)
+    db.commit()
+    db.refresh(lead)
+    return lead
+
+
+def listar_leads(db: Session, loja_id: str, etapa: str | None = None) -> list[Lead]:
+    q = db.query(Lead).filter(Lead.loja_id == loja_id)
+    if etapa:
+        q = q.filter(Lead.etapa == etapa)
+    return q.order_by(Lead.criada_em.desc()).all()
+
+
+def obter_lead(db: Session, loja_id: str, lead_id: str) -> Lead:
+    lead = (
+        db.query(Lead).filter(Lead.id == lead_id, Lead.loja_id == loja_id).first()
+    )
+    if lead is None:
+        raise HTTPException(status_code=404, detail="lead não encontrado")
+    return lead
+
+
+def para_saida_lead(lead: Lead) -> dict:
+    return {
+        "id": lead.id,
+        "telefone": lead.telefone,
+        "nome": lead.nome,
+        "interesse": lead.interesse,
+        "etapa": lead.etapa,
+        "consentimento_em": lead.consentimento_em.isoformat()
+        if lead.consentimento_em
+        else None,
+        "criada_em": lead.criada_em.isoformat() if lead.criada_em else None,
+    }

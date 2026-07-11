@@ -60,3 +60,32 @@ class Mensagem(Base):
     provider_message_id: Mapped[str | None] = mapped_column(String, nullable=True, index=True)
     texto: Mapped[str | None] = mapped_column(String, nullable=True)
     criada_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_agora)
+
+
+class Lead(Base):
+    __tablename__ = "leads"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    loja_id: Mapped[str] = mapped_column(ForeignKey("lojas.id"), nullable=False, index=True)
+    telefone: Mapped[str] = mapped_column(String, index=True)
+    nome: Mapped[str | None] = mapped_column(String, nullable=True)
+    interesse: Mapped[str | None] = mapped_column(String, nullable=True)
+    etapa: Mapped[str] = mapped_column(String, default="novo")
+    consentimento_em: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    criada_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_agora)
+    atualizada_em: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_agora, onupdate=_agora
+    )
+
+
+class Consentimento(Base):
+    __tablename__ = "consentimentos"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    loja_id: Mapped[str] = mapped_column(ForeignKey("lojas.id"), nullable=False, index=True)
+    lead_id: Mapped[str | None] = mapped_column(ForeignKey("leads.id"), nullable=True)
+    telefone: Mapped[str] = mapped_column(String, index=True)
+    versao_texto: Mapped[str] = mapped_column(String)
+    finalidade: Mapped[str] = mapped_column(String)
+    evidencia: Mapped[str | None] = mapped_column(String, nullable=True)
+    aceito_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_agora)

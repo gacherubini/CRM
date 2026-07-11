@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from app import config, models_db, servico  # noqa: F401 (registra os modelos)
 from app.auth import Contexto, get_contexto
 from app.db import Base, engine, get_db
+from app.inventory import InventoryProvider, get_inventory_provider
 
 app = FastAPI(title="Chatbot API")
 
@@ -26,6 +27,20 @@ class MensagemEntrada(BaseModel):
 
 class EstadoInput(BaseModel):
     bot_ativo: bool
+
+
+class ConsentimentoInput(BaseModel):
+    telefone: str
+    versao_texto: str
+    finalidade: str = "simulação e contato da loja"
+    evidencia: Optional[str] = None
+
+
+class LeadInput(BaseModel):
+    telefone: str
+    nome: Optional[str] = None
+    interesse: Optional[str] = None
+    etapa: Optional[str] = None
 
 
 @app.get("/health/live")
@@ -66,3 +81,61 @@ def definir_estado(
     db: Session = Depends(get_db),
 ):
     return servico.definir_bot_ativo(db, ctx.loja_id, telefone, dados.bot_ativo)
+
+
+@app.post("/v1/consentimentos", status_code=201)
+def registrar_consentimento(
+    dados: ConsentimentoInput,
+    ctx: Contexto = Depends(get_contexto),
+    db: Session = Depends(get_db),
+):
+    lead = servico.registrar_consentimento(
+        db, ctx.loja_id, dados.telefone, dados.versao_texto, dados.finalidade, dados.evidencia
+    )
+    return servico.para_saida_lead(lead)
+
+
+@app.post("/v1/leads", status_code=201)
+def registrar_lead(
+    dados: LeadInput, ctx: Contexto = Depends(get_contexto), db: Session = Depends(get_db)
+):
+    lead = servico.registrar_lead(
+        db, ctx.loja_id, dados.telefone, dados.nome, dados.interesse, dados.etapa
+    )
+    return servico.para_saida_lead(lead)
+
+
+@app.get("/v1/leads")
+def listar_leads(
+    etapa: Optional[str] = None,
+    ctx: Contexto = Depends(get_contexto),
+    db: Session = Depends(get_db),
+):
+    leads = servico.listar_leads(db, ctx.loja_id, etapa)
+    return {"leads": [servico.para_saida_lead(lead) for lead in leads]}
+
+
+@app.get("/v1/leads/{lead_id}")
+def obter_lead(
+    lead_id: str, ctx: Contexto = Depends(get_contexto), db: Session = Depends(get_db)
+):
+    return servico.para_saida_lead(servico.obter_lead(db, ctx.loja_id, lead_id))
+
+
+@app.get("/v1/estoque/buscar")
+def buscar_estoque(
+    termo: Optional[str] = None,
+    ctx: Contexto = Depends(get_contexto),
+    db: Session = Depends(get_db),
+    provider: InventoryProvider = Depends(get_inventory_provider),
+):
+    """Ferramenta do bot: consulta o Estoque Lite; sem resultado, oferece fallback."""
+    loja = db.get(models_db.Loja, ctx.loja_id)
+    veiculos = provider.buscar(loja.slug, termo)
+    if not veiculos:
+        return {
+            "veiculos": [],
+            "fonte": "fallback",
+            "mensagem": "Não encontrei veículos correspondentes no estoque agora; posso chamar um atendente.",
+        }
+    return {"veiculos": veiculos, "fonte": "estoque"}
