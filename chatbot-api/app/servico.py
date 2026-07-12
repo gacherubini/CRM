@@ -8,6 +8,7 @@ import uuid
 from datetime import datetime, timezone
 
 from fastapi import HTTPException
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.auth import hash_token
@@ -97,6 +98,27 @@ def _get_or_create_conversa(db: Session, loja_id: str, telefone: str) -> Convers
     return conversa
 
 
+def _mensagem_existente(
+    db: Session, loja_id: str, provider_message_id: str
+) -> Mensagem | None:
+    return (
+        db.query(Mensagem)
+        .filter(
+            Mensagem.loja_id == loja_id,
+            Mensagem.provider_message_id == provider_message_id,
+        )
+        .first()
+    )
+
+
+def _resposta_duplicada(conversa: Conversa) -> dict:
+    return {
+        "duplicada": True,
+        "conversa_id": conversa.id,
+        "bot_ativo": conversa.bot_ativo,
+    }
+
+
 def registrar_mensagem(
     db: Session,
     instancia: str,
@@ -110,21 +132,8 @@ def registrar_mensagem(
     loja = resolver_loja_por_instancia(db, instancia)
     conversa = _get_or_create_conversa(db, loja.id, telefone)
 
-    if provider_message_id:
-        existe = (
-            db.query(Mensagem)
-            .filter(
-                Mensagem.loja_id == loja.id,
-                Mensagem.provider_message_id == provider_message_id,
-            )
-            .first()
-        )
-        if existe:
-            return {
-                "duplicada": True,
-                "conversa_id": conversa.id,
-                "bot_ativo": conversa.bot_ativo,
-            }
+    if provider_message_id and _mensagem_existente(db, loja.id, provider_message_id):
+        return _resposta_duplicada(conversa)
 
     # Uma saída nova que não foi previamente registrada pelo workflow do bot
     # veio do atendente (celular/web). O humano assumiu: pausa automática.
@@ -143,7 +152,15 @@ def registrar_mensagem(
         )
     )
     conversa.atualizada_em = datetime.now(timezone.utc)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        # Corrida: outra requisição gravou o mesmo (loja_id, provider_message_id)
+        # entre o SELECT acima e o commit. A UNIQUE do banco arbitra; respondemos
+        # idempotente em vez de estourar 500.
+        db.rollback()
+        conversa = _get_or_create_conversa(db, loja.id, telefone)
+        return _resposta_duplicada(conversa)
     return {"duplicada": False, "conversa_id": conversa.id, "bot_ativo": conversa.bot_ativo}
 
 

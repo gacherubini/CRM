@@ -11,7 +11,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app import config, models_db, servico  # noqa: F401 (registra os modelos)
-from app.auth import Contexto, get_contexto
+from app.auth import Contexto, get_contexto, verificar_webhook_token
 from app.db import Base, engine, get_db
 from app.inventory import InventoryProvider, get_inventory_provider
 from app.simulation import SimulationProvider, get_simulation_provider
@@ -76,7 +76,11 @@ def version():
 
 
 @app.post("/webhook/mensagem")
-def webhook_mensagem(msg: MensagemEntrada, db: Session = Depends(get_db)):
+def webhook_mensagem(
+    msg: MensagemEntrada,
+    db: Session = Depends(get_db),
+    _: None = Depends(verificar_webhook_token),
+):
     """Recebe uma mensagem (loja resolvida pela instância) e persiste idempotente."""
     return servico.registrar_mensagem(
         db,
