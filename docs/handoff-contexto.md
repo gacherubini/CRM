@@ -4,6 +4,45 @@
 > Confirme o estado real (containers, `.env`, n8n) antes de editar. Nunca trate números de testes
 > antigos como prova de E2E WhatsApp.
 
+## 0. Atualização — sessão 2026-07-12 (parte 2)
+
+Trabalho todo na branch **`feat/dashboard-leads-conversas`** (pushada em
+`github.com/gacherubini/CRM`). **Ainda NÃO mergeada na `main`.** 8 commits de feature + 2 docs.
+Cada workstream foi verificado (testes) e os do canal/portal também **ao vivo** (login real → dados reais).
+
+Entregue nesta sessão (tudo commitado e pushado):
+- **Chatbot API:** `GET /v1/conversas` + `/v1/conversas/{telefone}/mensagens` (tenancy, sem
+  `provider_message_id`); **remoção da trava de consentimento** (salva nome direto — decisão do dono);
+  **CPF mascarado** no texto das mensagens (ingestão+saída, validado por dígito); **webhook endurecido**
+  (auth opt-in `CHATBOT_WEBHOOK_TOKEN`+header `X-Webhook-Token`; dedupe UNIQUE `mensagens(loja_id,
+  provider_message_id)` migration `0003` + trata IntegrityError). 52 testes.
+- **Portal (#3A.1):** telas reais de **Leads** (lista+detalhe), **Conversas+handoff** (thread +
+  Assumir/Devolver via PATCH), **Simulação manual** (form → `/v1/simular` → parcelas reais, sem
+  consentimento, CPF não re-ecoado). `ChatbotClient` server-side. 45 testes.
+- **Portal (#3B) — fundação do Dashboard do Dono:** domínio `vendas`/`venda_custos_diretos`/`metas`
+  (Numeric/Decimal, migration `0002`), permissões `pode_registrar_venda`/`pode_confirmar_venda`/
+  `pode_ver_financeiro`, rotas de vendas (registrar/listar/confirmar/cancelar auditado, tenancy por
+  `loja_slug`, vendedor não vê custo/lucro), dashboard `/app/financeiro` (faturamento, lucro bruto,
+  nº vendas, atingimento de meta; sem mock). 58 testes. **Deferido:** metas CRUD UI, funil/conversão,
+  campanhas, dashboard do vendedor, CSV, reconciliação (Tasks 4-9 do #3B).
+
+Decisões de produto tomadas: **sem consentimento no chatbot**; CPF mascarado no lugar.
+
+Estado do bot: **DESATIVADO de propósito.** Não vai ao ar ainda. Gate n8n já está fail-closed
+(`isSaved === false`). Para ligar quando o dono decidir: seguir **`docs/go-live-chatbot.md`**
+(subir imagens novas, setar `CHATBOT_WEBHOOK_TOKEN` + header nos 2 nós n8n, `alembic upgrade head`,
+apagar workflow duplicada `yBL8bLMDJW7IRxS0`, validar salvo/não-salvo, ativar workflow).
+
+Config local aplicada nesta sessão: `CHATBOT_API_TOKEN` no `.env` do portal (pra Leads/Conversas
+acenderem); senha do `dono@loja.local` resetada para `demo1234` (dev). n8n com **os 2 workflows de IA
+desativados**.
+
+Próximos passos sugeridos: (1) abrir PR/merge da branch na `main`; (2) rebuildar os containers com o
+código novo (o chatbot rodando ainda não tem o webhook hardening); (3) seguir com #3B (metas UI,
+dashboard do vendedor, funil) ou Catálogo Público #5A (0% — produto novo, exige plano); (4) Playwright
+E2E do portal (Task 15). Follow-up conhecido: **mojibake** em mensagens antigas (double-encoding na
+ingestão do webhook/n8n — corrigir na entrada).
+
 ## 1. Objetivo e arquitetura
 
 Suíte revendível para lojas de carros/motos, produtos instaláveis juntos ou separados:
