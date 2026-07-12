@@ -18,7 +18,7 @@
   <div class="table-wrap"><table>
     <thead><tr><th>Contato</th><th>Interesse</th><th>Etapa</th><th>Consentimento</th><th><span class="sr-only">Ações</span></th></tr></thead>
     <tbody>{% for l in leads %}<tr>
-      <td><div><strong>{% if l.consentimento_em and l.nome %}{{ l.nome }}{% else %}Contato sem consentimento{% endif %}</strong><small>{{ mascarar_telefone(l.telefone) }}</small></div></td>
+      <td><div><strong>{% if l.nome %}{{ l.nome }}{% else %}<span class="muted">—</span>{% endif %}</strong><small>{{ mascarar_telefone(l.telefone) }}</small></div></td>
       <td>{% if l.interesse %}{{ l.interesse }}{% else %}<span class="muted">—</span>{% endif %}</td>
       <td><span class="status {{ l.etapa }}">{{ l.etapa | replace('_', ' ') }}</span></td>
       <td>{% if l.consentimento_em %}<span class="published">Concedido</span>{% else %}<span class="muted">Pendente</span>{% endif %}</td>

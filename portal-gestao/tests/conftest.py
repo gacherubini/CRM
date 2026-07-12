@@ -15,6 +15,7 @@ from app.clients.chatbot import (  # noqa: E402
     ChatbotIndisponivel,
     ConversaNaoEncontrada,
     LeadNaoEncontrado,
+    SimulacaoIndisponivel,
 )
 from app.db import Base, SessionLocal, engine  # noqa: E402
 from app.main import app, get_chatbot_client, get_estoque_client  # noqa: E402
@@ -105,6 +106,8 @@ class ChatbotFake:
             "5511911112222": {"bot_ativo": False, "status": "handoff"},
         }
         self.handoffs = []
+        self.simulacao_indisponivel = False
+        self.simulacoes = []
 
     def listar_leads(self, etapa=None):
         if self.indisponivel:
@@ -146,6 +149,22 @@ class ChatbotFake:
         self.handoffs.append((telefone, bot_ativo))
         self.estados[telefone] = {"bot_ativo": bot_ativo, "status": "aberta" if bot_ativo else "handoff"}
         return self.estados[telefone]
+
+    def simular(self, payload):
+        if self.simulacao_indisponivel:
+            raise SimulacaoIndisponivel("simulação não habilitada nesta instalação")
+        self.simulacoes.append(payload)
+        return {
+            "id": "sim-1",
+            "status": "concluida",
+            "resultados": [
+                {
+                    "provedor": "Banco Teste", "status": "concluida",
+                    "valor_parcela": 796.91, "taxa_am": 1.89, "prazo_meses": 48,
+                    "valor_financiado": 25000.0, "codigo_erro": None,
+                },
+            ],
+        }
 
 
 @pytest.fixture

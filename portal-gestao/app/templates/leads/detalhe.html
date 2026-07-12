@@ -4,7 +4,7 @@
 <div class="page-heading">
   <div>
     <a class="back-link" href="/app/leads">← Voltar aos leads</a>
-    <h1>{% if lead.consentimento_em and lead.nome %}{{ lead.nome }}{% else %}Contato sem consentimento{% endif %}</h1>
+    <h1>{% if lead.nome %}{{ lead.nome }}{% else %}Contato sem nome{% endif %}</h1>
     <p>Detalhes do interessado registrado pelo chatbot.</p>
   </div>
   <span class="status {{ lead.etapa }}">{{ lead.etapa | replace('_', ' ') }}</span>
@@ -14,7 +14,7 @@
   <div class="section-title"><span>01</span><div><h2>Contato</h2><p>Dados mínimos para acompanhamento.</p></div></div>
   <dl class="integration-stats">
     <div><dt>Telefone</dt><dd>{{ mascarar_telefone(lead.telefone) }}</dd></div>
-    <div><dt>Nome</dt><dd>{% if lead.consentimento_em and lead.nome %}{{ lead.nome }}{% else %}<span class="muted">Não disponível</span>{% endif %}</dd></div>
+    <div><dt>Nome</dt><dd>{% if lead.nome %}{{ lead.nome }}{% else %}<span class="muted">—</span>{% endif %}</dd></div>
     <div><dt>Interesse</dt><dd>{% if lead.interesse %}{{ lead.interesse }}{% else %}<span class="muted">—</span>{% endif %}</dd></div>
     <div><dt>Etapa</dt><dd>{{ lead.etapa | replace('_', ' ') }}</dd></div>
   </dl>

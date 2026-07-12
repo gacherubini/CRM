@@ -15,6 +15,10 @@ class ConversaNaoEncontrada(RuntimeError):
     pass
 
 
+class SimulacaoIndisponivel(RuntimeError):
+    pass
+
+
 class ChatbotClient:
     def __init__(self, base_url: str, token: str, timeout: float = 5):
         self.base_url = base_url.rstrip("/")
@@ -25,7 +29,14 @@ class ChatbotClient:
     def configurado(self) -> bool:
         return bool(self.base_url and self.token)
 
-    def _request(self, method: str, path: str, erro_404: type[Exception] | None = None, **kwargs) -> Any:
+    def _request(
+        self,
+        method: str,
+        path: str,
+        erro_404: type[Exception] | None = None,
+        erro_409: type[Exception] | None = None,
+        **kwargs,
+    ) -> Any:
         if not self.configurado:
             raise ChatbotIndisponivel("Integração do chatbot ainda não configurada")
         headers = {"Authorization": f"Bearer {self.token}"}
@@ -34,6 +45,8 @@ class ChatbotClient:
                 resposta = client.request(method, path, **kwargs)
                 if resposta.status_code == 404 and erro_404 is not None:
                     raise erro_404("recurso não encontrado")
+                if resposta.status_code == 409 and erro_409 is not None:
+                    raise erro_409("recurso não habilitado")
                 resposta.raise_for_status()
                 return resposta.json()
         except (httpx.HTTPError, ValueError) as exc:
@@ -69,4 +82,11 @@ class ChatbotClient:
     def definir_bot_ativo(self, telefone: str, bot_ativo: bool) -> dict:
         return self._request(
             "PATCH", f"/v1/conversas/{telefone}/estado", json={"bot_ativo": bot_ativo}
+        )
+
+    # --- Simulação -------------------------------------------------------------
+
+    def simular(self, payload: dict) -> dict:
+        return self._request(
+            "POST", "/v1/simular", erro_409=SimulacaoIndisponivel, json=payload
         )

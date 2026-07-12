@@ -27,6 +27,7 @@ from app.clients.chatbot import (
     ChatbotIndisponivel,
     ConversaNaoEncontrada,
     LeadNaoEncontrado,
+    SimulacaoIndisponivel,
 )
 from app.clients.estoque import EstoqueClient, EstoqueIndisponivel
 from app.config import settings
@@ -53,8 +54,26 @@ def formatar_horario(iso: str | None) -> str:
     return momento.strftime("%d/%m %H:%M")
 
 
+def mascarar_cpf(cpf: str | None) -> str:
+    digitos = "".join(c for c in (cpf or "") if c.isdigit())
+    if len(digitos) < 3:
+        return "•••"
+    return f"•••.•••.•••-{digitos[-2:]}"
+
+
+def formatar_brl(valor) -> str:
+    try:
+        numero = float(valor)
+    except (TypeError, ValueError):
+        return "—"
+    texto = f"{numero:,.2f}".replace(",", "_").replace(".", ",").replace("_", ".")
+    return f"R$ {texto}"
+
+
 templates.env.globals["mascarar_telefone"] = mascarar_telefone
 templates.env.globals["formatar_horario"] = formatar_horario
+templates.env.globals["mascarar_cpf"] = mascarar_cpf
+templates.env.globals["formatar_brl"] = formatar_brl
 
 app = FastAPI(title="Portal de Gestão", docs_url=None, redoc_url=None)
 app.add_middleware(
@@ -498,16 +517,90 @@ async def conversas_handoff(
     return RedirectResponse(f"{destino}?ok={acao}", status_code=303)
 
 
+def pode_simular(usuario) -> bool:
+    return usuario.papel in {"dono", "gerente", "admin_plataforma"}
+
+
+def dados_simulacao(form) -> dict:
+    payload = {
+        "cpf": "".join(c for c in (form.get("cpf") or "") if c.isdigit()),
+        "nascimento": form.get("nascimento", "").strip(),
+        "valor": float(str(form.get("valor")).replace(",", ".")),
+        "prazo_meses": int(form.get("prazo_meses")),
+        "entrada": float(str(form.get("entrada") or 0).replace(",", ".")),
+        "categoria": form.get("categoria") or "moto",
+    }
+    if form.get("renda"):
+        payload["renda"] = float(str(form.get("renda")).replace(",", "."))
+    return payload
+
+
 @app.get("/app/simulacoes", response_class=HTMLResponse)
-def simulacoes_placeholder(request: Request, db: Session = Depends(get_db)):
+def simulacoes_pagina(request: Request, db: Session = Depends(get_db)):
     usuario = usuario_atual(request, db)
     if not usuario:
         return redirecionar_login()
-    if usuario.papel not in {"dono", "gerente", "admin_plataforma"}:
+    if not pode_simular(usuario):
         return RedirectResponse("/app", status_code=303)
     return templates.TemplateResponse(
-        "em-breve.html",
-        contexto(request, usuario, titulo="Simulações", texto="A simulação manual será habilitada quando o provedor estiver disponível."),
+        "simulacoes/form.html",
+        contexto(request, usuario, valores={}),
+    )
+
+
+@app.post("/app/simulacoes", response_class=HTMLResponse)
+async def simulacoes_simular(
+    request: Request,
+    db: Session = Depends(get_db),
+    chatbot: ChatbotClient = Depends(get_chatbot_client),
+):
+    usuario = usuario_atual(request, db)
+    if not usuario:
+        return redirecionar_login()
+    if not pode_simular(usuario):
+        return RedirectResponse("/app", status_code=303)
+    form = await request.form()
+    if not csrf_valido(request, form.get("csrf")):
+        return RedirectResponse("/app/simulacoes", status_code=303)
+    valores = {
+        "nascimento": form.get("nascimento", ""),
+        "valor": form.get("valor", ""),
+        "prazo_meses": form.get("prazo_meses", ""),
+        "entrada": form.get("entrada", ""),
+        "renda": form.get("renda", ""),
+        "categoria": form.get("categoria", "moto"),
+    }
+    try:
+        payload = dados_simulacao(form)
+    except (TypeError, ValueError):
+        return templates.TemplateResponse(
+            "simulacoes/form.html",
+            contexto(request, usuario, valores=valores, erro="Confira os valores informados e tente novamente."),
+            status_code=422,
+        )
+    try:
+        resultado = chatbot.simular(payload)
+    except SimulacaoIndisponivel:
+        return templates.TemplateResponse(
+            "simulacoes/form.html",
+            contexto(request, usuario, valores=valores, erro="Simulação não habilitada nesta instalação."),
+            status_code=409,
+        )
+    except ChatbotIndisponivel as exc:
+        return templates.TemplateResponse(
+            "simulacoes/form.html",
+            contexto(request, usuario, valores=valores, erro=str(exc)),
+            status_code=503,
+        )
+    return templates.TemplateResponse(
+        "simulacoes/resultado.html",
+        contexto(
+            request,
+            usuario,
+            valores=valores,
+            resultado=resultado,
+            cpf_mascarado=mascarar_cpf(payload["cpf"]),
+        ),
     )
 
 

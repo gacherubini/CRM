@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}Simulação manual — Gestão{% endblock %}
+{% block content %}
+<div class="page-heading">
+  <div><span class="eyebrow">Financiamento</span><h1>Simulação manual</h1><p>Consulte parcelas nos bancos parceiros para atender um cliente na hora.</p></div>
+</div>
+
+{% if erro %}<div class="alert error" role="alert">{{ erro }}</div>{% endif %}
+
+<form method="post" class="form-layout">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  <section class="panel form-section">
+    <div class="section-title"><span>01</span><div><h2>Dados do cliente</h2><p>Usados apenas para a consulta, nada é salvo.</p></div></div>
+    <div class="form-grid">
+      <label>CPF<input name="cpf" inputmode="numeric" autocomplete="off" required placeholder="Somente números"></label>
+      <label>Nascimento<input type="date" name="nascimento" value="{{ valores.nascimento }}" required></label>
+      <label>Renda mensal (opcional)<input type="number" step="0.01" min="0" name="renda" value="{{ valores.renda }}"></label>
+    </div>
+  </section>
+  <section class="panel form-section">
+    <div class="section-title"><span>02</span><div><h2>Condições</h2><p>Valor a financiar, entrada e prazo.</p></div></div>
+    <div class="form-grid">
+      <label>Categoria<select name="categoria"><option value="moto" {{ 'selected' if valores.categoria != 'carro' }}>Moto</option><option value="carro" {{ 'selected' if valores.categoria == 'carro' }}>Carro</option></select></label>
+      <label>Valor do bem<input type="number" step="0.01" min="0" name="valor" value="{{ valores.valor }}" required></label>
+      <label>Entrada<input type="number" step="0.01" min="0" name="entrada" value="{{ valores.entrada }}" placeholder="0"></label>
+      <label>Prazo (meses)<input type="number" min="1" max="120" name="prazo_meses" value="{{ valores.prazo_meses }}" required></label>
+    </div>
+  </section>
+  <div class="form-actions"><a class="button ghost" href="/app">Cancelar</a><button class="button primary" type="submit">Simular parcelas</button></div>
+</form>
+{% endblock %}

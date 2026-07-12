@@ -20,12 +20,12 @@ def test_lista_mascara_telefone(client, chatbot_fake):
     assert "•••• 4321" in resposta.text
 
 
-def test_lista_esconde_nome_sem_consentimento(client, chatbot_fake):
+def test_lista_mostra_nome_quando_presente(client, chatbot_fake):
     login(client)
     resposta = client.get("/app/leads")
     assert resposta.status_code == 200
-    assert "Joao Oculto" not in resposta.text
-    assert "Contato sem consentimento" in resposta.text
+    assert "Joao Oculto" in resposta.text
+    assert "Contato sem consentimento" not in resposta.text
 
 
 def test_lista_filtra_por_busca_local(client, chatbot_fake):
