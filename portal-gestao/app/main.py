@@ -21,12 +21,23 @@ from app.auth import (
     pode_ver_custo,
     usuario_atual,
 )
+from app.clients.chatbot import ChatbotClient, ChatbotIndisponivel, LeadNaoEncontrado
 from app.clients.estoque import EstoqueClient, EstoqueIndisponivel
 from app.config import settings
 from app.db import Base, engine, get_db
 
 BASE_DIR = Path(__file__).resolve().parent
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
+
+
+def mascarar_telefone(telefone: str | None) -> str:
+    digitos = "".join(c for c in (telefone or "") if c.isdigit())
+    if len(digitos) < 4:
+        return "•••"
+    return f"•••• {digitos[-4:]}"
+
+
+templates.env.globals["mascarar_telefone"] = mascarar_telefone
 
 app = FastAPI(title="Portal de Gestão", docs_url=None, redoc_url=None)
 app.add_middleware(
@@ -53,6 +64,10 @@ async def headers_seguranca(request: Request, call_next):
 
 def get_estoque_client() -> EstoqueClient:
     return EstoqueClient(settings.estoque_url, settings.estoque_token, settings.request_timeout)
+
+
+def get_chatbot_client() -> ChatbotClient:
+    return ChatbotClient(settings.chatbot_url, settings.chatbot_token, settings.request_timeout)
 
 
 def redirecionar_login() -> RedirectResponse:
@@ -316,14 +331,72 @@ async def estoque_acao(
     return RedirectResponse(f"/app/estoque?ok={acao}", status_code=303)
 
 
+def filtrar_leads(leads: list[dict], busca: str | None) -> list[dict]:
+    if not busca:
+        return leads
+    termo = busca.strip().lower()
+    resultado = []
+    for lead in leads:
+        campos = [lead.get("nome") or "", lead.get("telefone") or "", lead.get("interesse") or ""]
+        if any(termo in campo.lower() for campo in campos):
+            resultado.append(lead)
+    return resultado
+
+
 @app.get("/app/leads", response_class=HTMLResponse)
-def leads_placeholder(request: Request, db: Session = Depends(get_db)):
+def leads_lista(
+    request: Request,
+    etapa: str | None = None,
+    busca: str | None = None,
+    db: Session = Depends(get_db),
+    chatbot: ChatbotClient = Depends(get_chatbot_client),
+):
     usuario = usuario_atual(request, db)
     if not usuario:
         return redirecionar_login()
+    leads, erro = [], None
+    try:
+        leads = filtrar_leads(chatbot.listar_leads(etapa=etapa or None), busca)
+    except ChatbotIndisponivel as exc:
+        erro = str(exc)
     return templates.TemplateResponse(
-        "em-breve.html",
-        contexto(request, usuario, titulo="Leads", texto="A integração de leads será o próximo incremento."),
+        "leads/lista.html",
+        contexto(
+            request,
+            usuario,
+            leads=leads,
+            filtros={"etapa": etapa or "", "busca": busca or ""},
+            integracao_erro=erro,
+        ),
+    )
+
+
+@app.get("/app/leads/{lead_id}", response_class=HTMLResponse)
+def leads_detalhe(
+    request: Request,
+    lead_id: str,
+    db: Session = Depends(get_db),
+    chatbot: ChatbotClient = Depends(get_chatbot_client),
+):
+    usuario = usuario_atual(request, db)
+    if not usuario:
+        return redirecionar_login()
+    try:
+        lead = chatbot.obter_lead(lead_id)
+    except LeadNaoEncontrado:
+        return templates.TemplateResponse(
+            "erro.html",
+            contexto(request, usuario, erro="Lead não encontrado."),
+            status_code=404,
+        )
+    except ChatbotIndisponivel as exc:
+        return templates.TemplateResponse(
+            "leads/lista.html",
+            contexto(request, usuario, leads=[], filtros={"etapa": "", "busca": ""}, integracao_erro=str(exc)),
+        )
+    return templates.TemplateResponse(
+        "leads/detalhe.html",
+        contexto(request, usuario, lead=lead),
     )
 
 

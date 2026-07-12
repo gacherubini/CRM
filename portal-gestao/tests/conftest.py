@@ -8,9 +8,12 @@ os.environ["PORTAL_DATABASE_URL"] = "sqlite+pysqlite:///:memory:"
 os.environ["PORTAL_SESSION_SECRET"] = "segredo-de-teste"
 os.environ["ESTOQUE_API_TOKEN"] = "token-de-teste"
 
+os.environ["CHATBOT_API_TOKEN"] = "token-chatbot-teste"
+
 from app.auth import hash_senha  # noqa: E402
+from app.clients.chatbot import ChatbotIndisponivel, LeadNaoEncontrado  # noqa: E402
 from app.db import Base, SessionLocal, engine  # noqa: E402
-from app.main import app, get_estoque_client  # noqa: E402
+from app.main import app, get_chatbot_client, get_estoque_client  # noqa: E402
 from app.models import Usuario  # noqa: E402
 
 
@@ -58,6 +61,47 @@ class EstoqueFake:
     def acao(self, veiculo_id, acao):
         self.acoes.append((veiculo_id, acao))
         return {"ok": True}
+
+
+class ChatbotFake:
+    def __init__(self):
+        self.leads = [
+            {
+                "id": "l1", "telefone": "5511987654321", "nome": "Maria Silva",
+                "interesse": "Honda Civic 2022", "etapa": "novo",
+                "consentimento_em": "2026-07-10T12:00:00", "criada_em": "2026-07-09T09:00:00",
+            },
+            {
+                "id": "l2", "telefone": "5511911112222", "nome": "Joao Oculto",
+                "interesse": None, "etapa": "em_atendimento",
+                "consentimento_em": None, "criada_em": "2026-07-11T10:00:00",
+            },
+        ]
+        self.indisponivel = False
+
+    def listar_leads(self, etapa=None):
+        if self.indisponivel:
+            raise ChatbotIndisponivel("Não foi possível acessar os leads agora")
+        itens = self.leads
+        if etapa:
+            itens = [lead for lead in itens if lead["etapa"] == etapa]
+        return itens
+
+    def obter_lead(self, lead_id):
+        if self.indisponivel:
+            raise ChatbotIndisponivel("Não foi possível acessar os leads agora")
+        for lead in self.leads:
+            if lead["id"] == lead_id:
+                return lead
+        raise LeadNaoEncontrado("Lead não encontrado")
+
+
+@pytest.fixture
+def chatbot_fake():
+    fake = ChatbotFake()
+    app.dependency_overrides[get_chatbot_client] = lambda: fake
+    yield fake
+    app.dependency_overrides.pop(get_chatbot_client, None)
 
 
 @pytest.fixture(autouse=True)
