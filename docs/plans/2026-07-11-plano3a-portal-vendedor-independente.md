@@ -2,6 +2,10 @@
 
 > **Primeira fatia válida do Portal de Gestão.** Não acessa o banco do Chatbot, Motor ou Estoque.
 > O pacote comercial do Dashboard inclui a Estoque API e a administra exclusivamente por contrato.
+>
+> **Status 2026-07-12:** base + #3A.1 em grande parte entregues (ver #3A.1 para checklist).
+> **Aberto relevante:** Task **9A** (acessos das financeiras — depende Motor Task 11); RBAC simulação
+> para vendedor (#3A.1 Task 13); equipe/config se ainda placeholder.
 
 **Goal:** Entregar um portal revendível em que a loja administra usuários e vendedores, organiza
 leads, registra atividades e administra o estoque incluído; Chatbot e Motor são opcionais.
@@ -107,6 +111,31 @@ Estoque API. Permitir simulação por `SimulationProvider`; sem Motor, ocultar a
 Dono/gerente cadastram vendedores, desativam usuários, configuram etapas, distribuição de leads,
 horários e integrações. Segredos nunca voltam completos para a interface.
 
+### Task 9A: Acessos das financeiras (rotação de senha)
+
+As senhas dos portais lojistas mudam com frequência (ex. **a cada ~2 semanas**). O Dashboard
+precisa permitir atualizar sem redeploy e sem abrir ticket técnico.
+
+**Tela** (só `dono` / `gerente`; vendedor sem acesso):
+
+- Lista de provedores do Motor: nome, modo (`api` / `playwright` / `mock` / `agregador`), se
+  credencial está configurada, data da última atualização, último login ok/erro sanitizado.
+- Ações: **definir/atualizar usuário e senha** (form POST → Portal BFF → Motor
+  `PUT /v1/provedores/{nome}/credenciais`); opcional **testar acesso**.
+- Após salvar: UI mostra apenas “configurado em …” / máscara — **nunca** a senha de volta.
+- Aviso se senha antiga (&gt; N dias) ou falhas recentes de login no Motor.
+
+Regras:
+
+- Tokens do Motor e senhas de banco **só no servidor** (BFF); zero no browser em localStorage.
+- Não logar body com senha; auditar quem alterou.
+- Sem Motor configurado: tela explica que a integração está desligada (não inventa mock de senha).
+
+Detalhe de storage cifrado e API: **Plano #1A** (Tasks 11–12, seção híbrido + credenciais).
+
+**Aceite:** dono troca senha do Pan no Portal; job seguinte usa a nova credencial; vendedor 403;
+GET da tela não contém a senha em HTML.
+
 ### Task 10: Operação e revenda
 
 Documentar instalação, branding, backup/restore, upgrade, criação de usuário, importação e suporte.
@@ -116,7 +145,7 @@ Executar teste E2E standalone e outro com providers falsos.
 
 - Vendas, metas e lucro (Plano #3B).
 - Implementação interna do Estoque (pertence ao Plano #4A); o Portal apenas fornece a interface completa.
-- Execução de conversa ou simulação dentro do Portal.
+- Implementação dos drivers Playwright/API (Plano #1A); o Portal só gerencia credenciais e simulação manual via HTTP.
 - Acesso direto ao banco de outro produto.
 
 ## Resultado

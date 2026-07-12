@@ -1,81 +1,54 @@
 # Contexto compacto para continuidade
 
-Atualizado em 2026-07-12 após entrega do primeiro incremento do CRM financeiro #3B e do
-Catálogo Público #5A. Leia este arquivo primeiro e depois `docs/handoff-contexto.md`.
+Atualizado em **2026-07-12**. Leia isto primeiro; detalhes operacionais em `docs/handoff-contexto.md`.
+Planos válidos: `docs/plans/README.md`. **Ignore** `docs/plans/_archive/`.
 
 ## Regras permanentes
 
 - Workspace: `C:\Users\guilh\Documents\codigo\bot-whatsapp-financiamento`.
-- Preserve arquivos rastreados e novos; não use reset/checkout destrutivo.
-- Não leia/imprima `.env`, tokens, chaves Gemini/Evolution/Motor ou senhas.
-- Estoque é a fonte de verdade. Integrações só por HTTP entre produtos.
-- Ordem válida: #0 → #1A → #4A → #2A → #5A → #3A/#3A.1 → #3B → #6. Ignore `LEGADO`.
-- Simulação com nomes de banco ainda é **mock** (taxas fictícias no Motor). Não é cotação real.
+- Sem reset/checkout destrutivo sem pedido explícito.
+- Não ler/imprimir `.env`, tokens, chaves Gemini/Evolution/Motor ou senhas.
+- Estoque = fonte de verdade. Integrações só por **HTTP** entre produtos.
+- Ordem: `#0 → #1A → #4A → #2A → #5A → #3A/#3A.1 → #3B → #6`.
+- Simulação com nomes de banco = **mock**. Não é cotação real. Caminho real planejado: **híbrido
+  API + Playwright** (agregador opcional); senhas de portal rotacionam no **Dashboard** (~2 semanas)
+  via Motor cifrado — ver Planos #1A e #3A Task 9A.
+- Bot WhatsApp: **desativado de propósito** até `docs/go-live-chatbot.md`.
 
-## Checkpoint verificado (2026-07-12)
+## Estado por produto
 
-### Motor #1A
+| Produto | Pasta / porta | Feito (essencial) | Aberto |
+|---|---|---|---|
+| Motor #1A | `motor-simulacao/` `:8000` | async, auth, worker, mock | Task 10–12; credenciais; 1º driver real |
+| Chatbot #2A | `chatbot-api/` `:8001` | leads, conversas, handoff, atrib. catálogo, sim HTTP | go-live, prompt, mojibake, LGPD; sim por placa |
+| Estoque #4A | `estoque-api/` `:8100` | CRUD, público, RBAC, outbox | **placa + por-placa**; E2E outbox; restore |
+| Portal | `portal-gestao/` `:9000` | leads/conversas/sim, vendas, metas loja, vendedor, funil | sim. p/ vendedor; Task 9A acessos bancos; #3B residual; Playwright E2E |
+| Catálogo #5A | `catalogo-publico/` `:8200` | vitrine, CTA `CAT-*`, outbox | E2E events URL; SEO/tema/standalone |
 
-- API async, auth/tenancy, lease/worker, cifra de payload, métricas.
-- Migrations até `0005_job_lease`.
-- Drivers atuais: **mock** (Pan/BV/Bradesco/Santander/Fontcred com taxas FICTÍCIAS).
-- Deploy: `deploy/motor-standalone` porta host `8000`.
+**Testes:** 267 (Motor 58 · Estoque 45 · Chatbot 59 · Portal 86 · Catálogo 19).  
+**Estimativa:** ~**78%** MVP demonstrável · ~**62%** produção/revenda.
 
-### Chatbot #2A + n8n + Evolution
+## Decisões de produto vigentes
 
-- `SIMULATION_PROVIDER=http` no compose com `MOTOR_URL` / `MOTOR_TOKEN` (só no `.env` ignorado).
-- `HttpSimulationProvider`: Bearer, 202 + polling, fallback seguro.
-- Funil de aquisição: endpoint tenant-scoped `POST /v1/integracoes/catalogo/interesses`, migration
-  `0004_catalog_attribution`, ingestão idempotente e correlação `CAT-*` na primeira inbound.
-- Leads expõem opcionalmente origem/canal, UTMs, veículo e referência do interesse. Suíte: **59 testes**.
-- E2E WhatsApp **validado em runtime**:
-  - Evolution `loja1` open
-  - Workflow n8n `WhatsApp IA - Somente Nao Salvos` (ID `wAiNaoSalvos0001`) ativo
-  - estoque real (Onix) → lead → simulação mock → resposta no WhatsApp
-- Workflow versionado: `n8n/workflow-ai-nao-salvos.json` (placeholders; **sem** tokens reais).
-- Runtime n8n pode ter tokens injetados no SQLite do volume — não exportar isso para o git.
-- Gate “somente não salvos” no runtime pode estar em modo TEMP (atende todos) — reverter para
-  `isSaved === false` antes de produção.
-- Tools no runtime: **Code Tool** (`helpers.httpRequest`), não `toolHttpRequest` (bug supplyData/execute no n8n 2.29).
-- Modelo recomendado: `gemini-3.1-flash-lite` (3.5-flash deu 503 sob carga).
+- **Simulação = mock** até driver `real: true`. Caminho real: híbrido API + Playwright (+ agregador opcional).
+- **Sem trava de consentimento** no chatbot (decisão do dono 2026-07). Schema/tabela de consentimento
+  pode existir; o fluxo **não** bloqueia lead/nome. `design.md` / README raiz ainda citam consentimento
+  antigo — **não reintroduzir** sem pedido.
+- CPF mascarado no texto de mensagens.
+- CRM WhatsApp: simular por **placa** + **telefone**; **sem** renda e **sem** prazo único na coleta
+  (prazos padrão multi-opção). Valor do veículo só do Estoque. *(Planejado nos #4A/#2A/#1A; código ainda no contrato antigo.)*
+- Vendedor **deve** poder simular manualmente, sem ver custo/lucro/tokens (RBAC pendente).
+- Senhas de portal bancário: rotação no **Dashboard** (#3A Task 9A) → Motor cifrado (#1A Task 11).
+  **Nunca** colar login/senha de banco no chat com IA.
+- Funil Catálogo→Chatbot→Portal em código; outbox do catálogo ainda precisa env de deploy.
 
-### Estoque #4A
+## Próxima sequência (sugerida)
 
-- Tenancy/RBAC, CRUD, fotos, CSV, API pública, outbox HMAC, admin parcial.
-- No compose do chatbot: porta `8100`.
-
-### Portal
-
-- `portal-gestao/`: dashboard, estoque, leads, conversas/handoff e simulação manual reais.
-- #3B: vendas e dashboard financeiro; metas de loja agora têm CRUD (quantidade, faturamento e
-  lucro), RBAC/tenancy, validação de período/alvo/sobreposição e migration `0003_adiciona_meta_ativa`.
-- Venda sem custo não gera mais lucro fictício: dashboard sinaliza dados incompletos e suspende o
-  atingimento da meta de lucro.
-- `/app/vendedor`: vendas/metas próprias e atendimentos atribuídos pelo Portal, sem custo/lucro.
-- `/app/financeiro`: primeiro funil auditável com filtros e estado degradado; migration
-  `0004_cria_atendimento_atribuicoes`. Suíte do Portal: **86 testes**.
-- Decisão de produto pendente de implementação: vendedor também pode executar simulação manual,
-  sem receber custo do veículo, lucro, métricas financeiras, tokens ou credenciais do Motor.
-- Equipe/config ainda placeholder. Precisa `CHATBOT_API_TOKEN` no `.env` local do portal.
-
-### Catálogo Público #5A
-
-- Primeiro incremento vertical entregue em `catalogo-publico/` (FastAPI + Jinja + CSS local).
-- Vitrine pública, filtros/paginação, detalhe/galeria, estados 404/422/503 e CTA seguro para WhatsApp.
-- Consome somente a API pública HTTP do Estoque; não compartilha banco/models.
-- Eventos de interesse + UTMs em SQLite próprio; redirect limitado a `https://wa.me`.
-- Referência `CAT-*` no texto do WhatsApp e outbox persistente com Bearer, idempotência, retry e backoff.
-- Deploy conectado em `deploy/catalogo-conectado`, Docker não-root, healthcheck e volume persistente.
-- **19 testes**; vitrine validada ao vivo em `http://localhost:8200/l/demo` contra o Estoque real.
-
-## Próxima sequência recomendada
-
-1. Configurar URL/token do outbox no deploy local e validar E2E real Catálogo → Chatbot → Portal.
-2. #3B: metas individuais UI, eventos externos de handoff, conversão e campanhas.
-3. #5A: exportação, tema por loja, SEO/cache, retenção/rate limit e standalone.
-4. Ajustar prompt n8n (remover consentimento antigo) e corrigir mojibake na entrada.
-5. Fechar E2E Motor Task 10, Estoque outbox/restore e Playwright do Portal.
-6. Drivers bancários reais (ainda em hold) quando sair do mock.
+1. `CATALOGO_EVENTS_URL`/`TOKEN` + E2E clique → Portal.
+2. Estoque **placa** + Chatbot lookup + payload sim (telefone, sem renda/prazo único).
+3. Portal: RBAC sim. vendedor + Task 9A (quando Motor tiver API de credenciais).
+4. #3B residual; #5A residual; prompt n8n; go-live sob demanda.
+5. Motor Task 10 → 11 (credenciais) → 12 (1º driver real híbrido).
 
 ## Verificação mínima
 
@@ -87,7 +60,3 @@ cd ..\portal-gestao; .\.venv\Scripts\python.exe -m pytest -q
 cd ..\catalogo-publico; ..\portal-gestao\.venv\Scripts\python.exe -m pytest -q
 git status --short
 ```
-
-Checkpoint de testes: **267** (Motor 58 + Estoque 45 + Chatbot 59 + Portal 86 + Catálogo 19).
-Estado estimado: suíte ~78% para MVP demonstrável e ~62% para produção/revenda.
-Simulação = mock até plugar driver real.

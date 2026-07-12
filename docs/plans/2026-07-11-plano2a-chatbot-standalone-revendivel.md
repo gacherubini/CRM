@@ -1,12 +1,16 @@
 # Plano #2A — Chatbot Standalone Revendível
 
-> **Este plano substitui o Plano #2 legado para a implementação do produto Chatbot.** O documento
-> antigo permanece como referência de detalhes de n8n/Evolution, mas não deve ser executado porque
-> mistura dados do Chatbot com o Motor de Simulação.
+> Plano válido do Chatbot. Detalhes históricos n8n/Evolution do #2 monolítico: `docs/plans/_archive/`
+> (não executar; mistura Chatbot com Motor).
+>
+> **Status 2026-07-12:** API + providers + funil catálogo em grande parte **entregues**; bot **off**
+> de propósito. **Decisão de produto:** sem trava de consentimento no fluxo (dono); CPF mascarado.
+> Tabelas/endpoints de consentimento podem existir, mas **não** reativar gate 409 de nome sem pedido.
+> **Aberto:** go-live, prompt n8n, simulação por **placa**+telefone (ver #4A), LGPD exclusão.
 
 **Goal:** Entregar um pacote instalável e revendível que conecta um WhatsApp, conversa com clientes,
-registra consentimento, qualifica e exporta leads, consulta o Estoque Lite, executa handoff humano
-e, na edição Financiamento, consulta um Motor plugável — sem Portal ou Catálogo Público.
+qualifica e exporta leads, consulta o Estoque Lite, executa handoff humano e, na edição
+Financiamento, consulta um Motor plugável — sem Portal ou Catálogo Público.
 
 **Produto:**
 
@@ -85,6 +89,23 @@ Implementações obrigatórias:
 - `HttpSimulationProvider` para Motor vendido junto ou externo;
 - `HttpInventoryProvider` apontando por padrão ao Estoque Lite incluído;
 - fallback controlado para registrar interesse em texto livre quando o estoque estiver indisponível.
+
+### Simulação no WhatsApp privado (CRM estoque — alinhar ao Plano #4A)
+
+**Como está hoje (mock):** tool/n8n ou `POST /v1/simular` recebe em geral valor + entrada +
+`prazo_meses` (+ cpf/nascimento/renda no Portal). `MockSimulationProvider` aplica Price com taxas
+demo; `http` repassa ao Motor. **Não** resolve veículo por placa; **não** exige telefone no payload
+de simulação (o telefone existe na conversa Evolution, mas não amarra o job de simulação).
+
+**Alvo do pacote básico (Estoque Lite + Chatbot Financiamento):**
+
+1. Telefone = identidade WhatsApp (sempre presente no lead/conversa).
+2. Cliente informa **placa** → Chatbot consulta Estoque (`por-placa`) → preço/modelo reais.
+3. Coleta: CPF (+ nascimento se necessário), **entrada**. **Sem** prazo desejado e **sem** renda.
+4. Simulação devolve opções em prazos padrão (ex. 12/24/36/48) sobre o valor daquela placa.
+5. Troca mock → Motor HTTP sem o n8n saber a diferença.
+
+Detalhe do payload e tabela de campos: seção *Pacote CRM estoque no WhatsApp privado* no Plano #4A.
 
 ### Saída de lead
 
@@ -171,7 +192,10 @@ Implementar:
 
 **Aceite:** reenviar o mesmo payload três vezes cria uma mensagem e no máximo uma resposta.
 
-### Task 5: Conversa e consentimento
+### Task 5: Conversa e consentimento (opcional / legado de gate)
+
+> **Override:** não bloquear lead/nome por falta de consentimento. Manter capacidade de registrar
+> evidência se o dono quiser; o fluxo WhatsApp atual opera **sem** trava.
 
 O n8n recebe contexto mínimo da Chatbot API e pede ao LLM saída estruturada. A API valida e aplica
 as transições; o LLM nunca grava dados nem chama banco diretamente.

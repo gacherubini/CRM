@@ -217,19 +217,15 @@ ser aplicada por RBAC no backend, não apenas ocultando ou exibindo itens de men
 
 ## 📄 Documentação
 
-- **[docs/design.md](docs/design.md)** — spec de design completo (arquitetura, modelo de
-  dados, pesquisa detalhada por banco, comparativo de agregadores, decisões).
-- **[Índice dos planos válidos](docs/plans/README.md)** — ordem, produtos, pacotes comerciais e legados.
-- **Planos de implementação** (`docs/plans/`):
-  - [Plano #0 — Fundação da Plataforma](docs/plans/2026-07-11-plano0-fundacao-core-dominio-seguranca.md)
-  - [Plano #1A — Motor de Simulação Independente](docs/plans/2026-07-11-plano1a-motor-simulacao-independente.md)
-  - [Plano #2A — Chatbot Standalone Revendível](docs/plans/2026-07-11-plano2a-chatbot-standalone-revendivel.md)
-  - [Plano #3A — Portal do Vendedor Independente](docs/plans/2026-07-11-plano3a-portal-vendedor-independente.md)
-  - [Plano #3A.1 — Frontend do Dashboard MVP](docs/plans/2026-07-11-plano3a1-frontend-dashboard-mvp.md)
-  - [Plano #3B — Dashboard do Dono, Vendas e Metas](docs/plans/2026-07-11-plano3b-dashboard-dono-vendas-metas.md)
-  - [Plano #4A — Estoque API Independente](docs/plans/2026-07-11-plano4a-estoque-api-independente.md)
-  - [Plano #5A — Catálogo Público Independente](docs/plans/2026-07-11-plano5a-catalogo-publico-independente.md)
-  - [Plano #6 — Evoluções (roadmap: handoff auto, áudio, score, multi-agente)](docs/plans/2026-07-11-plano6-evolucoes-roadmap.md)
-
-Os documentos antigos #1–#5 foram mantidos no diretório apenas como referência e estão marcados
-como **LEGADO — NÃO EXECUTAR**.
+- **[docs/contexto-compacto.md](docs/contexto-compacto.md)** — ponto de entrada para agentes (estado + regras).
+- **[docs/handoff-contexto.md](docs/handoff-contexto.md)** — checkpoint operacional.
+- **[Índice dos planos válidos](docs/plans/README.md)** — ordem, status e pacotes comerciais.
+- **Planos de implementação** (`docs/plans/` — só `*A`/`*B` e #0/#6; legados em `_archive/`):
+  - [Plano #0 — Fundação](docs/plans/2026-07-11-plano0-fundacao-core-dominio-seguranca.md)
+  - [Plano #1A — Motor](docs/plans/2026-07-11-plano1a-motor-simulacao-independente.md)
+  - [Plano #2A — Chatbot](docs/plans/2026-07-11-plano2a-chatbot-standalone-revendivel.md)
+  - [Plano #3A / #3A.1 / #3B — Portal](docs/plans/2026-07-11-plano3a-portal-vendedor-independente.md)
+  - [Plano #4A — Estoque](docs/plans/2026-07-11-plano4a-estoque-api-independente.md)
+  - [Plano #5A — Catálogo](docs/plans/2026-07-11-plano5a-catalogo-publico-independente.md)
+  - [Plano #6 — Roadmap](docs/plans/2026-07-11-plano6-evolucoes-roadmap.md)
+- **[docs/design.md](docs/design.md)** — pesquisa e decisões longas (não é ordem de implementação).

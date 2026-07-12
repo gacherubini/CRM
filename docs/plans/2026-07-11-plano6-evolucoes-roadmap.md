@@ -18,7 +18,7 @@ evento, não acesso direto a bancos de dados vizinhos.
 | Evolução | Produto proprietário | Integração opcional |
 |---|---|---|
 | Áudio/multimodal, auto-pausa, multi-agente | Chatbot | provedor de IA/transcrição |
-| Score e drivers bancários | Motor | bureau/banco contratado |
+| Score; drivers API/Playwright/agregador (híbrido) | Motor + UI credenciais no Portal | banco/parceiro/agregador |
 | Cadastro de veículo por WhatsApp | Chatbot | Estoque API |
 | Fotos e galeria | Estoque + Catálogo | storage de objetos |
 | Funil, vendas, metas, campanhas | Portal | eventos do Chatbot/Estoque/Motor |
@@ -57,10 +57,11 @@ oferta de banco confiável.
 **Abordagem:**
 - Novo endpoint no serviço: `POST /score` `{cpf}` → `{score, faixa, ...}`, chamando o provedor
   contratado. Mockável primeiro (igual ao motor).
-- O motor de simulação **real** (quando trocar o mock por RPA/API) usa o score como entrada.
+- O motor real (híbrido API + Playwright + agregador opcional — ver Plano #1A) pode usar o score
+  como entrada do driver.
 
-**Onde pluga:** serviço (novo endpoint) + motor real. O contrato `/simular` pode ganhar um campo
-opcional `score` sem quebrar quem não usa.
+**Onde pluga:** Motor + opcionalmente Chatbot. O contrato de simulação pode ganhar `score`
+opcional sem quebrar quem não usa. Credenciais de portal: UI no Portal (#3A Task 9A).
 
 **Esforço/risco:** médio-alto. Exige **contrato com o bureau** (custo por consulta, LGPD reforçada).
 

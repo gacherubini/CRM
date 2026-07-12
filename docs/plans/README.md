@@ -1,36 +1,47 @@
-# Índice dos planos
+# Índice dos planos (canônico para agentes)
+
+## Como usar (agentes)
+
+1. `docs/contexto-compacto.md` — estado atual e regras (**sempre primeiro**).
+2. `docs/handoff-contexto.md` — checkpoint operacional.
+3. **Somente os planos desta pasta** (não `_archive/`) — o plano do produto a implementar.
+4. `docs/go-live-chatbot.md` — só ao ligar o bot.
+
+**Não** usar como fonte de verdade de implementação atual:
+
+- `docs/plans/_archive/` (LEGADO)
+- `docs/design.md` e trechos antigos do `README.md` raiz (pesquisa/histórico; podem citar
+  consentimento obrigatório, renda/prazo e RPA-only — **superados** por este índice + #1A/#2A/#4A)
+
+Cada plano `*A`/`*B` tem bloco **Status 2026-07-12** no topo: leia antes de reimplementar.
 
 ## Ordem válida de implementação
 
-| Ordem | Plano | Produto | Pode ser vendido sozinho? |
+| Ordem | Plano | Produto | Status resumido |
 |---:|---|---|---|
-| 0 | [Plano #0](2026-07-11-plano0-fundacao-core-dominio-seguranca.md) | Contratos e segurança | Fundação comum, não produto |
-| 1 | [Plano #1A](2026-07-11-plano1a-motor-simulacao-independente.md) | Motor de Simulação | Sim |
-| 2 | [Plano #4A](2026-07-11-plano4a-estoque-api-independente.md) | Estoque API/admin e modo Lite | Sim |
-| 3 | [Plano #2A](2026-07-11-plano2a-chatbot-standalone-revendivel.md) | Chatbot + Estoque Lite | Sim |
-| 4 | [Plano #5A](2026-07-11-plano5a-catalogo-publico-independente.md) | Catálogo Público | Sim, conectado ou bundle com Estoque |
-| 5 | [Plano #3A](2026-07-11-plano3a-portal-vendedor-independente.md) | Portal/CRM do vendedor | Sim |
-| 5.1 | [Plano #3A.1](2026-07-11-plano3a1-frontend-dashboard-mvp.md) | Frontend/BFF do Dashboard MVP | Workstream executável do #3A |
-| 6 | [Plano #3B](2026-07-11-plano3b-dashboard-dono-vendas-metas.md) | Vendas, metas e dashboard | Extensão do Portal #3A |
-| futuro | [Plano #6](2026-07-11-plano6-evolucoes-roadmap.md) | Add-ons por produto | Conforme item |
+| 0 | [Plano #0](2026-07-11-plano0-fundacao-core-dominio-seguranca.md) | Contratos e segurança | Fundação — decisões ainda válidas |
+| 1 | [Plano #1A](2026-07-11-plano1a-motor-simulacao-independente.md) | Motor de Simulação | Demo mock; híbrido API+Playwright planejado; falta Task 10–12 + credenciais |
+| 2 | [Plano #4A](2026-07-11-plano4a-estoque-api-independente.md) | Estoque API/admin | Operacional; falta outbox E2E/restore |
+| 3 | [Plano #2A](2026-07-11-plano2a-chatbot-standalone-revendivel.md) | Chatbot + Estoque Lite | Código pronto; bot off; go-live pendente |
+| 4 | [Plano #5A](2026-07-11-plano5a-catalogo-publico-independente.md) | Catálogo Público | 1º incremento entregue; residual SEO/tema |
+| 5 | [Plano #3A](2026-07-11-plano3a-portal-vendedor-independente.md) | Portal/CRM | Base entregue via #3A.1 |
+| 5.1 | [Plano #3A.1](2026-07-11-plano3a1-frontend-dashboard-mvp.md) | Frontend Dashboard MVP | MVP quase fechado; falta Playwright e RBAC sim. vendedor |
+| 6 | [Plano #3B](2026-07-11-plano3b-dashboard-dono-vendas-metas.md) | Vendas/metas/dono | Parcial (vendas, financeiro, metas loja) |
+| futuro | [Plano #6](2026-07-11-plano6-evolucoes-roadmap.md) | Roadmap add-ons | Não iniciado |
 
-Planos #1A e #4A podem avançar em paralelo depois do Plano #0. O #2A depende da fatia Lite do #4A.
-A numeração representa o histórico do projeto, não uma obrigação de construir Portal antes de
-Estoque/Catálogo.
+Planos #1A e #4A podem avançar em paralelo após #0. #2A depende da fatia Lite do #4A.
+Numeração é histórica; não obriga Portal antes de Estoque/Catálogo.
 
 ## Pacotes comerciais
 
-- **Chatbot Atendimento:** Plano #2A + Estoque Lite; sem Motor obrigatório.
-- **Chatbot Financiamento:** Plano #2A + provider do Plano #1A.
-- **Motor:** Plano #1A sozinho.
-- **Estoque:** Plano #4A sozinho.
-- **Catálogo conectado:** Plano #5A apontando ao Estoque existente.
-- **Catálogo Standalone:** Plano #5A empacotado com a operação mínima do Plano #4A.
-- **Portal do Vendedor:** Plano #3A empacotado com Estoque API; Bot/Motor opcionais.
-- **Gestão completa:** Planos #3A + #3B + Estoque API, podendo integrar Bot/Motor/Catálogo.
+- **Chatbot Atendimento:** #2A + Estoque Lite.
+- **Chatbot Financiamento:** #2A + provider do #1A.
+- **Motor / Estoque / Catálogo conectado:** cada um sozinho (#1A / #4A / #5A→Estoque).
+- **Catálogo Standalone:** #5A + operação mínima #4A.
+- **Portal do Vendedor:** #3A + Estoque; Bot/Motor opcionais.
+- **Gestão completa:** #3A + #3B + Estoque (± Bot/Motor/Catálogo).
 
-## Documentos legados
+## Arquivo (não executar)
 
-Os arquivos originais #1–#5 permanecem para preservar pesquisa, exemplos e histórico. Seus títulos
-estão marcados como `LEGADO — NÃO EXECUTAR`; eles não definem mais arquitetura, propriedade de dados
-ou ordem de implementação.
+Planos monolíticos antigos (#1–#5 sem sufixo) estão em [`_archive/`](_archive/) — ~3k linhas de
+código passo a passo obsoleto. **Não definem arquitetura nem ordem de implementação.**

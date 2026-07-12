@@ -1,6 +1,10 @@
 # Plano #5A — Catálogo Público Independente
 
-> **Substitui o Plano #5 legado.** O catálogo não acessa banco/views de outro produto.
+> Plano válido do Catálogo. #5 legado em `_archive/` (não executar). Sem acesso a banco de outro produto.
+>
+> **Status 2026-07-12:** 1º incremento vertical **entregue** (vitrine, detalhe, CTA `wa.me`+`CAT-*`,
+> outbox, deploy conectado, testes). **Aberto:** E2E env outbox no deploy; tema/SEO/cache/rate limit;
+> compose standalone completo; retenção.
 
 **Goal:** Entregar uma vitrine pública por loja, rápida e personalizada, com estoque publicado,
 página de veículo e interesse via WhatsApp, vendável sem Portal, Chatbot ou Motor.

@@ -1,10 +1,10 @@
 # Design — Bot de WhatsApp para Simulação de Financiamento de Motos
 
 **Data:** 2026-07-11
-**Status:** Planos independentes revisados — o Plano #0 e o índice `docs/plans/README.md` são canônicos
+**Status:** Pesquisa/histórico. Canônico para implementação: `docs/plans/README.md` + Plano #0.
 
-> Este documento preserva pesquisa e decisões originais do bot. Em qualquer conflito de arquitetura,
-> propriedade de dados ou ordem de entrega, prevalecem o Plano #0 e os planos com sufixo `A`/`B`.
+> Agentes: **não comece por este arquivo.** Use `docs/contexto-compacto.md`. Em conflito de
+> arquitetura ou ordem de entrega, prevalecem Plano #0 e planos `*A`/`*B` (não `_archive/`).
 
 ---
 

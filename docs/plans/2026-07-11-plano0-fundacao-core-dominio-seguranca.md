@@ -1,8 +1,12 @@
 # Plano #0 — Fundação da Plataforma (produtos, domínio e segurança)
 
-> **Executar antes dos Planos #1–#5.** Este plano transforma a ideia de “bot de financiamento”
-> em uma plataforma de operação comercial para lojas de veículos, sem antecipar funcionalidades
-> de marketing que ainda não foram validadas.
+> **Fundação canônica** (produtos, tenancy, HTTP-only, segurança). Não reexecutar tasks de
+> “criar docs” se já existirem — use como referência de limites.
+>
+> **Override de produto (2026-07):** o Chatbot **não** exige mais trava de consentimento antes de
+> salvar nome/lead (decisão do dono). LGPD continua valendo (minimização, máscara de CPF em
+> mensagens, sem logar PII). Seção de consentimento abaixo = capacidade opcional / histórico,
+> não gate obrigatório do fluxo WhatsApp.
 
 **Goal:** Fixar os limites do sistema, o domínio mínimo, os contratos e as regras de segurança
 que permitem construir bot, portal, estoque e catálogo sem retrabalho estrutural quando entrarem

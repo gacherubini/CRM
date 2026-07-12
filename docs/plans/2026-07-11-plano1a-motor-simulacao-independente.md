@@ -1,8 +1,10 @@
 # Plano #1A — Motor de Simulação Independente
 
-> **Substitui o Plano #1 legado para implementação.** O plano anterior continua como referência
-> dos validadores, fórmula Price e testes unitários, mas sua infraestrutura combinada não é o pacote
-> comercial válido.
+> Plano válido do Motor. O #1 monolítico está em `docs/plans/_archive/` (não executar).
+>
+> **Status 2026-07-12:** mock async, auth/tenancy, worker/lease, cifra — **entregues**.
+> **Aberto:** Task 10 (revenda), 11 (credenciais por provedor + rotação), 12 (1º driver `real: true`,
+> híbrido API/Playwright). Contrato JSON ainda com `renda`/`prazo_meses`; alvo WhatsApp em #4A.
 
 **Goal:** Entregar uma API de simulação instalável e vendável separadamente, capaz de operar com
 mock agora e drivers bancários depois, sem depender de WhatsApp, n8n, Portal, Estoque ou Chatbot.
@@ -49,6 +51,24 @@ Idempotency-Key: <uuid>
   "provedores": ["mock"]
 }
 ```
+
+> **Estado atual do código (mock):** o contrato acima ainda é o implementado. Taxas fictícias;
+> não é cotação bancária.
+
+### Evolução — CRM WhatsApp privado (Estoque + Chatbot; ver Plano #4A)
+
+Decisão de produto para o pacote básico no WhatsApp:
+
+| Campo | Hoje (mock) | Alvo WhatsApp CRM |
+|---|---|---|
+| `pessoa.renda` | opcional no JSON, ainda aceito | **não coletar / não obrigar** |
+| `condicoes.prazo_meses` | **obrigatório** (um prazo) | **não coletar**; usar `prazos_padrao` multi-opção |
+| `telefone` | **ausente** no Motor | **obrigatório** no Chatbot; no Motor via `referencia_externa` ou campo dedicado |
+| `veiculo.placa` / `veiculo_id` | **ausente** | **obrigatório** no fluxo WhatsApp; valor vem do Estoque |
+| `veiculo.valor` | digitado/livre | **só** após lookup por placa no Estoque |
+
+Mock continua calculando Price; só muda o que o cliente digita e de onde vem o valor do veículo.
+Drivers reais (futuro) podem voltar a exigir renda/prazo se o banco pedir.
 
 Resposta `202`:
 
@@ -104,6 +124,75 @@ O worker escolhe drivers habilitados, executa com timeout individual e persiste 
 Captcha/2FA produz `aguardando_intervencao`; indisponibilidade produz erro transitório com retry
 limitado; rejeição de negócio não sofre retry.
 
+## Estratégia real: híbrido API + Playwright (+ mock)
+
+Decisão de produto (2026-07-12): **não** apostar só em RPA nem só em agregador no dia 1.
+
+```text
+Job de simulação (paralelo, limite de browsers)
+  ├── Driver API      → bancos/parceiros com contrato (ex. BV Open, Pan quando houver)
+  ├── Driver Playwright → portais do lojista sem API (Santander, Bradesco, Fontcred, …)
+  ├── Driver Agregador  → opcional depois (1 HTTP → N bancos da rede deles)
+  └── Driver Mock       → demo / sem credencial / CI
+```
+
+Regras:
+
+1. Cada banco = **um adapter** com a mesma saída (`provedor`, parcela, taxa, prazo, status, `real`).
+2. Preferir **API** quando existir e a loja tiver contrato; Playwright no resto.
+3. Rollout **um banco por vez** (piloto), não os 5 de uma vez.
+4. Credenciais de portal **nunca** no chat com IA, nunca no git, nunca em log; só cofre/DB cifrado
+   + UI do Portal (ver abaixo e Plano #3A).
+5. Playwright roda **só no worker** do Motor (imagem/profile com browser), nunca no n8n.
+6. WhatsApp: ack imediato; resultados **parciais** conforme drivers terminam; timeout comercial
+   ~90–120 s no canal (o que não veio → falhou/timeout, sem silêncio).
+
+### Latência esperada (ordem de grandeza)
+
+| Modo | 1ª oferta útil | Fechamento típico (até 5) |
+|---|---|---|
+| Só mock | &lt; 1–3 s | &lt; 3 s |
+| Só API (2 bancos) | 2–8 s | 5–15 s |
+| Híbrido 2 API + 3 Playwright (sessão quente) | 5–15 s | 45–120 s |
+| 5× Playwright paralelo (sessão quente) | 20–40 s | 60–180 s |
+| Login frio / 2FA / captcha | pode travar | minutos ou `aguardando_intervencao` |
+| **Agregador** (HTTP único) | ver nota abaixo | ver nota abaixo |
+
+**Agregador — tempo:** não há SLA público estável “por simulação”. Na prática:
+
+- **Só grade de simulação** (API do parceiro, sem ficha completa): costuma ficar na casa de
+  **poucos segundos a ~30–60 s** para devolver várias financeiras — melhor que 5 Playwrights.
+- **Marketing de F&I** (ex. “aprova em até 3–6 min”) fala de **processo de ficha/aprovação**,
+  não só do cálculo de parcela. Não use isso como meta do bot de WhatsApp.
+- Trate agregador como **1 driver** com timeout próprio (ex. 45–90 s); se cair, demais drivers
+  (API/Playwright) ainda podem completar em `parcial`.
+
+Medir latência real por `provedor` nas métricas do Motor (sem PII) e ajustar timeouts.
+
+### Credenciais de portal (rotação ~a cada 2 semanas)
+
+As senhas dos portais lojistas **mudam com frequência** (ex. a cada 2 semanas). Por isso:
+
+- **Não** fixar senha só em `.env` de deploy eterno: o dono/gerente precisa **atualizar pelo
+  Dashboard** sem redeploy e sem chamar suporte.
+- Fonte da verdade operacional: Motor guarda por **tenant/cliente da API** + `provedor`:
+  usuário, segredo cifrado, `atualizado_em`, `ultimo_sucesso_em`, `ultimo_erro_sanitizado`,
+  `habilitado`.
+- API administrativa do Motor (Bearer da loja/serviço, nunca browser direto com senha do banco):
+  - `GET /v1/provedores` — lista, `real`, se tem credencial, saúde (sem devolver senha).
+  - `PUT /v1/provedores/{nome}/credenciais` — body `{usuario, senha}` → cifra e grava; senha
+    **nunca** retorna em GET (só máscara `****` / “configurado em …”).
+  - `POST /v1/provedores/{nome}/testar-login` — opcional: valida sessão (Playwright/API) e
+    atualiza `ultimo_sucesso_em` ou erro sanitizado.
+- UI: **Portal** (Plano #3A) — tela “Acessos das financeiras” para dono/gerente; Portal só
+  repassa ao Motor com token de serviço. Vendedor **não** vê nem edita.
+- Auditoria: quem alterou credencial e quando; sem logar a senha nova/antiga.
+- Alerta operacional: se `atualizado_em` &gt; N dias ou N falhas de login → status degradado no
+  ready/dashboard (“atualize a senha do Pan”).
+
+Implementação de drivers Playwright: desenvolvimento com credenciais **só no ambiente local da
+loja** (env ou UI); agentes de IA **não** recebem login/senha no chat.
+
 ## Tasks
 
 ### Task 1: Scaffold e qualidade
@@ -115,7 +204,7 @@ Fixar dependências e impedir inicialização com segredos default em produção
 
 ### Task 2: Validadores e normalização
 
-Reaproveitar do plano legado, com testes:
+Validadores e normalização (já no código; referência histórica em `_archive/` se preciso):
 
 - CPF com dígitos verificadores;
 - nascimento válido e idade mínima configurável;
@@ -184,10 +273,28 @@ restore, upgrade, rotação de credenciais e diagnóstico.
 Em ambiente vazio, subir somente o pacote Motor, criar dois clientes, executar jobs idempotentes,
 validar isolamento, simular falha parcial, reiniciar worker e restaurar backup.
 
+### Task 11: Credenciais de provedor e rotação
+
+Schema cifrado para credenciais por cliente+provedor; endpoints admin de listar/atualizar/testar
+login; métricas de falha de auth; nunca retornar senha em claro. Documentar rotação a cada ~2
+semanas e fluxo via Portal.
+
+**Aceite:** PUT de credencial + simulação Playwright/API usa o valor novo sem restart do compose;
+GET não vaza senha; auditoria registra o ator.
+
+### Task 12: Drivers reais (híbrido) — piloto
+
+Implementar o **primeiro** driver real (API se houver contrato, senão Playwright) com
+`real: true`, timeout, resultado parcial e falha sanitizada. Demais bancos em incrementos
+separados. Agregador fica como adapter opcional quando houver contrato comercial.
+
+**Aceite:** job com mock + 1 real em paralelo; parcial visível; WhatsApp/Chatbot só consomem o
+contrato HTTP existente.
+
 ## Integrações opcionais
 
 - Chatbot Financiamento usa `HttpSimulationProvider`.
-- Portal usa o mesmo contrato para simulação manual.
+- Portal usa o mesmo contrato para simulação manual **e** tela de credenciais de financeiras.
 - Outros sistemas podem consumir a API sem instalar qualquer produto da suíte.
 
 ## Fora de escopo
