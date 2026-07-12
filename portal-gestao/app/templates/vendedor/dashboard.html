@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block title %}Meu painel — Motora{% endblock %}
+{% block content %}
+<div class="page-heading">
+  <div><span class="eyebrow">Desempenho individual</span><h1>Meu painel</h1><p>Somente suas vendas e seus atendimentos identificados com segurança.</p></div>
+</div>
+
+<form class="filter-bar" method="get">
+  <label class="search"><span class="sr-only">Início do período</span><input type="date" name="inicio" value="{{ periodo.inicio }}"></label>
+  <label class="search"><span class="sr-only">Fim do período</span><input type="date" name="fim" value="{{ periodo.fim }}"></label>
+  <button class="button secondary" type="submit">Aplicar período</button>
+</form>
+
+<section class="panel">
+  <div class="metric-grid">
+    <div class="metric"><span>Vendas confirmadas</span><strong>{{ metricas.quantidade }}</strong><small>suas vendas confirmadas no período</small></div>
+    <div class="metric accent"><span>Valor vendido</span><strong>{{ formatar_brl(metricas.faturamento) }}</strong><small>soma do preço das suas vendas confirmadas</small></div>
+  </div>
+</section>
+
+<section class="panel">
+  <div class="panel-heading"><div><span class="mono-label">METAS INDIVIDUAIS</span><h2>Meu atingimento</h2></div></div>
+  {% if metas %}<div class="metric-grid">{% for meta in metas %}<div class="metric">
+    <span>{{ meta.tipo | replace('_', ' ') | capitalize }}</span>
+    <strong>{% if meta.quantidade %}{{ meta.realizado | int }}{% else %}{{ formatar_brl(meta.realizado) }}{% endif %}</strong>
+    <small>meta: {% if meta.quantidade %}{{ meta.alvo | int }}{% else %}{{ formatar_brl(meta.alvo) }}{% endif %} · {{ meta.pct }}%</small>
+    <div class="meta-bar" role="progressbar" aria-valuenow="{{ meta.pct }}" aria-valuemin="0" aria-valuemax="100"><span style="display:block;height:100%;width:{{ meta.pct_barra }}%;background:currentColor"></span></div>
+  </div>{% endfor %}</div>
+  {% else %}<div class="empty"><strong>Nenhuma meta individual aplicável.</strong><p>Metas de lucro não são exibidas ao vendedor. O dono ou gerente pode definir metas individuais em um incremento futuro.</p></div>{% endif %}
+</section>
+
+{% if integracao_erro %}<div class="alert warning" role="alert"><strong>Chatbot desconectado.</strong> Os atendimentos estão indisponíveis agora. {{ integracao_erro }}</div>{% endif %}
+<section class="dashboard-grid">
+  <article class="panel">
+    <div class="panel-heading"><div><span class="mono-label">LEADS IDENTIFICADOS</span><h2>Meus atendimentos</h2></div></div>
+    {% if leads %}<div class="vehicle-list compact">{% for lead in leads %}<a class="vehicle-row" href="/app/leads/{{ lead.id }}">
+      <div><strong>{{ lead.nome or 'Contato' }}</strong><small>{{ mascarar_telefone(lead.telefone) }}{% if lead.origem %} · origem declarada: {{ lead.origem }}{% endif %}{% if lead.utm_campaign %} · campanha: {{ lead.utm_campaign }}{% endif %}</small></div>
+      <span class="status {{ lead.etapa }}">{{ lead.etapa | replace('_', ' ') }}</span>
+    </a>{% endfor %}</div>
+    {% elif not integracao_erro %}<div class="empty"><strong>Nenhum lead assumido identificado.</strong><p>Somente handoffs feitos com sucesso pelo Portal aparecem aqui.</p></div>{% endif %}
+  </article>
+  <article class="panel">
+    <div class="panel-heading"><div><span class="mono-label">CONVERSAS IDENTIFICADAS</span><h2>Conversas sob minha responsabilidade</h2></div></div>
+    {% if conversas %}<div class="vehicle-list compact">{% for conversa in conversas %}<a class="vehicle-row" href="/app/conversas/{{ conversa.telefone }}">
+      <div><strong>{{ mascarar_telefone(conversa.telefone) }}</strong><small>{{ conversa.status | replace('_', ' ') }} · {{ formatar_horario(conversa.atualizada_em) }}</small></div>
+    </a>{% endfor %}</div>
+    {% elif not integracao_erro %}<div class="empty"><strong>Nenhuma conversa assumida identificada.</strong><p>Atendimentos externos sem identidade confiável não são atribuídos a você.</p></div>{% endif %}
+  </article>
+</section>
+<p class="muted">Identidade baseada somente no histórico HMAC de handoffs executados neste Portal. Histórico externo ou anterior está indisponível; o Portal não presume responsável.</p>
+
+<section class="panel flush">
+  <div class="panel-heading"><div><span class="mono-label">VENDAS DO PERÍODO</span><h2>Minhas vendas</h2></div></div>
+  {% if vendas %}<div class="table-wrap"><table><thead><tr><th>Venda</th><th>Status</th><th>Preço</th></tr></thead><tbody>{% for venda in vendas %}<tr>
+    <td><strong>{{ venda.descricao }}</strong></td><td><span class="status {{ venda.status }}">{{ venda.status }}</span></td><td>{{ formatar_brl(venda.preco_venda) }}</td>
+  </tr>{% endfor %}</tbody></table></div>
+  {% else %}<div class="empty"><strong>Nenhuma venda sua no período.</strong><p>Vendas de outros vendedores nunca aparecem neste painel.</p></div>{% endif %}
+</section>
+{% endblock %}

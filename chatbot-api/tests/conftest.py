@@ -57,8 +57,9 @@ def loja_a():
     sufixo = uuid.uuid4().hex[:6]
     token = f"tok-a-{uuid.uuid4().hex}"
     inst = f"inst-a-{sufixo}"
-    loja_id = _criar_loja("Loja A", f"loja-a-{sufixo}", inst, token)
-    return {"loja_id": loja_id, "instance": inst, "headers": {"Authorization": f"Bearer {token}"}}
+    slug = f"loja-a-{sufixo}"
+    loja_id = _criar_loja("Loja A", slug, inst, token)
+    return {"loja_id": loja_id, "slug": slug, "instance": inst, "headers": {"Authorization": f"Bearer {token}"}}
 
 
 @pytest.fixture
@@ -66,5 +67,6 @@ def loja_b():
     sufixo = uuid.uuid4().hex[:6]
     token = f"tok-b-{uuid.uuid4().hex}"
     inst = f"inst-b-{sufixo}"
-    loja_id = _criar_loja("Loja B", f"loja-b-{sufixo}", inst, token)
-    return {"loja_id": loja_id, "instance": inst, "headers": {"Authorization": f"Bearer {token}"}}
+    slug = f"loja-b-{sufixo}"
+    loja_id = _criar_loja("Loja B", slug, inst, token)
+    return {"loja_id": loja_id, "slug": slug, "instance": inst, "headers": {"Authorization": f"Bearer {token}"}}

@@ -14,6 +14,7 @@ from fastapi.templating import Jinja2Templates
 from app.config import settings
 from app.events import InterestStore
 from app.provider import HttpInventoryProvider, InventoryNotFound, InventoryUnavailable
+from app.outbox import OutboxWorker
 
 
 BASE_DIR = Path(__file__).parent
@@ -31,7 +32,19 @@ templates.env.filters["moeda"] = moeda
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     app.state.interest_store.initialize()
-    yield
+    worker = OutboxWorker(
+        app.state.interest_store,
+        url=settings.events_url,
+        token=settings.events_token,
+        timeout=settings.events_timeout,
+        max_attempts=settings.events_max_attempts,
+        interval=settings.events_worker_interval,
+    )
+    worker.start()
+    try:
+        yield
+    finally:
+        worker.stop()
 
 
 app = FastAPI(title="Catálogo Público", lifespan=lifespan)
@@ -207,7 +220,7 @@ def vehicle_detail(
 
     tracking = {
         key: clean_tracking(request.query_params.get(key))
-        for key in ("utm_source", "utm_medium", "utm_campaign")
+        for key in ("utm_source", "utm_medium", "utm_campaign", "utm_content", "utm_term")
     }
     tracking["origem"] = "detalhe_catalogo"
     interest_url = f"/l/{slug}/interesse/{vehicle_id}?{urlencode(tracking)}"
@@ -233,6 +246,8 @@ def register_interest(
     utm_source: Optional[str] = None,
     utm_medium: Optional[str] = None,
     utm_campaign: Optional[str] = None,
+    utm_content: Optional[str] = None,
+    utm_term: Optional[str] = None,
     provider: HttpInventoryProvider = Depends(get_provider),
     store: InterestStore = Depends(get_interest_store),
 ):
@@ -262,7 +277,7 @@ def register_interest(
 
     anonymous_id, is_new = visitor_id(request)
     try:
-        store.record(
+        interest = store.record(
             loja_slug=public_store.slug,
             veiculo_id=vehicle.id,
             visitante_id=anonymous_id,
@@ -270,6 +285,8 @@ def register_interest(
             utm_source=clean_tracking(utm_source),
             utm_medium=clean_tracking(utm_medium),
             utm_campaign=clean_tracking(utm_campaign),
+            utm_content=clean_tracking(utm_content),
+            utm_term=clean_tracking(utm_term),
         )
     except sqlite3.Error:
         return error_page(
@@ -281,7 +298,8 @@ def register_interest(
 
     message = (
         f"Olá! Tenho interesse no {vehicle.marca} {vehicle.modelo} "
-        f"{vehicle.ano_modelo}. Referência: {vehicle.id}"
+        f"{vehicle.ano_modelo}. Código do interesse: {interest.public_ref}. "
+        f"Referência do veículo: {vehicle.id}"
     )
     response = RedirectResponse(
         f"https://wa.me/{phone}?{urlencode({'text': message})}", status_code=302

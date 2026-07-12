@@ -76,3 +76,16 @@ class Meta(Base):
     periodo_fim: Mapped[date] = mapped_column(Date)
     valor_alvo: Mapped[Decimal] = mapped_column(Numeric(14, 2))
     ativa: Mapped[bool] = mapped_column(Boolean, default=True)
+
+
+class AtendimentoAtribuicao(Base):
+    __tablename__ = "atendimento_atribuicoes"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=novo_id)
+    loja_slug: Mapped[str] = mapped_column(String(120), index=True)
+    telefone_hmac: Mapped[str] = mapped_column(String(64), index=True)
+    vendedor_email: Mapped[str] = mapped_column(String(320), index=True)
+    origem: Mapped[str] = mapped_column(String(32), default="handoff_portal")
+    iniciada_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=agora)
+    encerrada_em: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    ativa: Mapped[bool] = mapped_column(Boolean, default=True, index=True)

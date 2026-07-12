@@ -75,6 +75,10 @@ class ChatbotFake:
                 "id": "l1", "telefone": "5511987654321", "nome": "Maria Silva",
                 "interesse": "Honda Civic 2022", "etapa": "novo",
                 "consentimento_em": "2026-07-10T12:00:00", "criada_em": "2026-07-09T09:00:00",
+                "origem": "catalogo", "canal": "site", "utm_source": "google",
+                "utm_medium": "cpc", "utm_campaign": "seminovos-julho",
+                "utm_content": "civic", "utm_term": "honda usado",
+                "veiculo_ref": "v1", "catalog_interest_ref": "CAT-ABC123",
             },
             {
                 "id": "l2", "telefone": "5511911112222", "nome": "Joao Oculto",
@@ -191,7 +195,7 @@ def estoque_fake():
 
 
 @pytest.fixture
-def client(estoque_fake):
+def client(estoque_fake, chatbot_fake):
     with TestClient(app) as cliente:
         yield cliente
 

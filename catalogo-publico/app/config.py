@@ -15,6 +15,13 @@ class Settings:
     page_size: int = max(1, min(48, int(os.getenv("CATALOGO_PAGE_SIZE", "12"))))
     public_base_url: str = os.getenv("CATALOGO_PUBLIC_BASE_URL", "").rstrip("/")
     secure_cookie: bool = os.getenv("CATALOGO_SECURE_COOKIE", "0") == "1"
+    events_url: str = os.getenv("CATALOGO_EVENTS_URL", "").rstrip("/")
+    events_token: str = os.getenv("CATALOGO_EVENTS_TOKEN", "")
+    events_timeout: float = float(os.getenv("CATALOGO_EVENTS_TIMEOUT", "5"))
+    events_max_attempts: int = max(1, int(os.getenv("CATALOGO_EVENTS_MAX_ATTEMPTS", "5")))
+    events_worker_interval: float = max(
+        0.5, float(os.getenv("CATALOGO_EVENTS_WORKER_INTERVAL", "5"))
+    )
 
     @property
     def inventory_url_valid(self) -> bool:

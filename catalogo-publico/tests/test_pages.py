@@ -92,8 +92,15 @@ def test_interesse_grava_evento_e_redireciona_somente_para_whatsapp(
     assert parsed.netloc == "wa.me"
     assert parsed.path == "/5511999999999"
     assert "vehicle-1" in parse_qs(parsed.query)["text"][0]
+    message = parse_qs(parsed.query)["text"][0]
+    assert "CAT-" in message
     assert "evil.example" not in location
     assert interest_store.count() == 1
+    pending = interest_store.pending_outbox()
+    assert len(pending) == 1
+    assert pending[0]["event_id"]
+    assert "visitante_id" not in pending[0]["payload"]
+    assert "telefone" not in pending[0]["payload"]
     assert "catalog_visitor=" in response.headers["set-cookie"]
 
 

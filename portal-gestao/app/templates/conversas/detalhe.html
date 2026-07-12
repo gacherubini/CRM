@@ -16,6 +16,7 @@
 </div>
 
 {% if request.query_params.get('erro') == 'indisponivel' %}<div class="alert warning" role="alert">Não foi possível alterar o atendimento agora.</div>{% endif %}
+{% if request.query_params.get('registro') == 'indisponivel' %}<div class="alert warning" role="alert">O atendimento foi alterado no Chatbot, mas a atribuição local do vendedor não pôde ser registrada.</div>{% endif %}
 
 <section class="panel">
   <div class="handoff-bar">

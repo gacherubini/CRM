@@ -8,8 +8,11 @@
 <form class="filter-bar" method="get">
   <label class="search"><span class="sr-only">Início do período</span><input type="date" name="inicio" value="{{ periodo.inicio }}"></label>
   <label class="search"><span class="sr-only">Fim do período</span><input type="date" name="fim" value="{{ periodo.fim }}"></label>
+  <select name="vendedor" aria-label="Vendedor do funil"><option value="">Todos os vendedores no funil</option>{% for item in vendedores %}<option value="{{ item.email }}" {{ 'selected' if filtros_funil.vendedor == item.email }}>{{ item.nome }}</option>{% endfor %}</select>
+  <select name="origem" aria-label="Origem declarada do lead"><option value="">Todas as origens no funil</option><option value="__sem_origem__" {{ 'selected' if filtros_funil.origem == '__sem_origem__' }}>Sem origem declarada</option>{% for item in origens %}<option value="{{ item }}" {{ 'selected' if filtros_funil.origem == item }}>{{ item }}</option>{% endfor %}</select>
   <button class="button secondary" type="submit">Aplicar período</button>
 </form>
+<p class="muted">Período afeta todo o painel; vendedor e origem declarada filtram somente o funil. Origem descreve aquisição informada e não prova causalidade.</p>
 
 <p class="mono-label">PERÍODO: {{ periodo.inicio }} A {{ periodo.fim }}</p>
 
@@ -57,6 +60,20 @@
   </div>
   {% else %}
   <div class="empty"><strong>Nenhuma meta da loja para o período.</strong><p><a href="/app/metas">Cadastre metas</a> de quantidade, faturamento ou lucro bruto para acompanhar o atingimento.</p></div>
+{% endif %}
+</section>
+
+<section class="panel">
+  <div class="panel-heading"><div><span class="mono-label">FUNIL AUDITÁVEL</span><h2>Leads até vendas vinculadas</h2></div></div>
+  {% if funil.disponivel %}
+  <div class="metric-grid">
+    <div class="metric"><span>Leads elegíveis</span><strong>{{ funil.elegiveis }}</strong><small>leads criados no período após os filtros declarados</small></div>
+    <div class="metric"><span>Atendidos/assumidos</span><strong>{{ funil.atendidos }}</strong><small>leads elegíveis com handoff registrado pelo Portal no período</small></div>
+    <div class="metric accent"><span>Vendas vinculadas</span><strong>{{ funil.vendas_vinculadas }}</strong><small>vendas confirmadas no período com lead_ref elegível</small></div>
+  </div>
+  {% else %}
+  <div class="empty"><strong>Funil indisponível.</strong><p>{{ funil.erro or 'Os dados atuais não permitem uma contagem confiável.' }}</p></div>
   {% endif %}
+  <p class="muted">Handoffs externos ou anteriores ao histórico local do Portal permanecem indisponíveis e não são convertidos em zero. As etapas não representam atribuição causal de venda.</p>
 </section>
 {% endblock %}

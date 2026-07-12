@@ -3,11 +3,14 @@ import csv
 import io
 import os
 import uuid
+from datetime import datetime
 from typing import Optional
+from typing import Literal
+from uuid import UUID
 
-from fastapi import Depends, FastAPI, HTTPException
+from fastapi import Depends, FastAPI, Header, HTTPException
 from fastapi.responses import Response
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, field_validator
 from sqlalchemy.orm import Session
 
 from app import config, models_db, servico  # noqa: F401 (registra os modelos)
@@ -47,6 +50,29 @@ class LeadInput(BaseModel):
     nome: Optional[str] = None
     interesse: Optional[str] = None
     etapa: Optional[str] = None
+
+
+class CatalogInterestInput(BaseModel):
+    event_id: UUID
+    event_type: Literal["catalog.interest_clicked"]
+    occurred_at: datetime
+    loja_slug: str = Field(min_length=1, max_length=120)
+    catalog_interest_ref: str = Field(pattern=r"^CAT-[A-Z2-7]{10,16}$")
+    veiculo_ref: str = Field(min_length=1, max_length=120)
+    origem: Literal["catalogo_publico"]
+    canal: Literal["whatsapp"]
+    utm_source: Optional[str] = Field(default=None, max_length=120)
+    utm_medium: Optional[str] = Field(default=None, max_length=120)
+    utm_campaign: Optional[str] = Field(default=None, max_length=120)
+    utm_content: Optional[str] = Field(default=None, max_length=120)
+    utm_term: Optional[str] = Field(default=None, max_length=120)
+
+    @field_validator("occurred_at")
+    @classmethod
+    def occurred_at_must_have_timezone(cls, value: datetime) -> datetime:
+        if value.tzinfo is None:
+            raise ValueError("occurred_at deve conter timezone")
+        return value
 
 
 class SimularInput(BaseModel):
@@ -160,6 +186,35 @@ def registrar_lead(
     return servico.para_saida_lead(lead)
 
 
+@app.post("/v1/integracoes/catalogo/interesses", status_code=202)
+def ingerir_interesse_catalogo(
+    dados: CatalogInterestInput,
+    idempotency_key: Optional[str] = Header(default=None, alias="Idempotency-Key"),
+    ctx: Contexto = Depends(get_contexto),
+    db: Session = Depends(get_db),
+):
+    event_id = str(dados.event_id)
+    if idempotency_key is not None and idempotency_key != event_id:
+        raise HTTPException(status_code=422, detail="Idempotency-Key difere do event_id")
+    atribuicao, duplicado = servico.ingerir_interesse_catalogo(
+        db,
+        ctx.loja_id,
+        event_id=event_id,
+        loja_slug=dados.loja_slug,
+        catalog_interest_ref=dados.catalog_interest_ref,
+        veiculo_ref=dados.veiculo_ref,
+        origem=dados.origem,
+        canal=dados.canal,
+        occurred_at=dados.occurred_at,
+        utm_source=dados.utm_source,
+        utm_medium=dados.utm_medium,
+        utm_campaign=dados.utm_campaign,
+        utm_content=dados.utm_content,
+        utm_term=dados.utm_term,
+    )
+    return {"duplicado": duplicado, "atribuicao_id": atribuicao.id}
+
+
 @app.get("/v1/leads")
 def listar_leads(
     etapa: Optional[str] = None,
@@ -180,7 +235,11 @@ def exportar_leads_csv(
     buffer = io.StringIO()
     writer = csv.writer(buffer)
     writer.writerow(
-        ["id", "telefone", "nome", "interesse", "etapa", "consentimento_em", "criada_em"]
+        [
+            "id", "telefone", "nome", "interesse", "etapa", "consentimento_em", "criada_em",
+            "origem", "canal", "utm_source", "utm_medium", "utm_campaign", "utm_content",
+            "utm_term", "veiculo_ref", "catalog_interest_ref", "atribuida_em",
+        ]
     )
     for lead in leads:
         s = servico.para_saida_lead(lead)
@@ -193,6 +252,16 @@ def exportar_leads_csv(
                 s["etapa"],
                 s["consentimento_em"] or "",
                 s["criada_em"] or "",
+                s["origem"] or "",
+                s["canal"] or "",
+                s["utm_source"] or "",
+                s["utm_medium"] or "",
+                s["utm_campaign"] or "",
+                s["utm_content"] or "",
+                s["utm_term"] or "",
+                s["veiculo_ref"] or "",
+                s["catalog_interest_ref"] or "",
+                s["atribuida_em"] or "",
             ]
         )
     return Response(

@@ -24,6 +24,14 @@ Configurações:
 - `CATALOGO_PAGE_SIZE`: tamanho padrão da página;
 - `CATALOGO_PUBLIC_BASE_URL`: URL pública da instalação;
 - `CATALOGO_SECURE_COOKIE=1`: cookie anônimo somente por HTTPS.
+- `CATALOGO_EVENTS_URL`: endpoint server-side do Chatbot para eventos do catálogo;
+- `CATALOGO_EVENTS_TOKEN`: Bearer tenant-scoped do Chatbot (nunca enviado ao navegador);
+- `CATALOGO_EVENTS_TIMEOUT`, `CATALOGO_EVENTS_MAX_ATTEMPTS` e
+  `CATALOGO_EVENTS_WORKER_INTERVAL`: entrega persistente da outbox.
+
+Quando URL e token estão configurados, o processo entrega `catalog.interest_clicked` em background.
+Cada tentativa mantém o mesmo `event_id`/`Idempotency-Key`; o clique e sua outbox são gravados na
+mesma transação. O payload não contém telefone nem o identificador anônimo local do visitante.
 
 ## Testes
 

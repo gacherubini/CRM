@@ -1,4 +1,6 @@
 import calendar
+import hashlib
+import hmac
 import os
 from datetime import date, datetime
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
@@ -10,6 +12,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import text
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 from starlette.middleware.sessions import SessionMiddleware
 
@@ -28,7 +31,7 @@ from app.auth import (
     pode_ver_financeiro,
     usuario_atual,
 )
-from app.models import Meta, Venda, VendaCustoDireto, agora
+from app.models import AtendimentoAtribuicao, Meta, Usuario, Venda, VendaCustoDireto, agora
 from app.clients.chatbot import (
     ChatbotClient,
     ChatbotIndisponivel,
@@ -75,6 +78,14 @@ def formatar_brl(valor) -> str:
         return "—"
     texto = f"{numero:,.2f}".replace(",", "_").replace(".", ",").replace("_", ".")
     return f"R$ {texto}"
+
+
+def identidade_telefone(telefone: str | None) -> str | None:
+    digitos = "".join(c for c in (telefone or "") if c.isdigit())
+    if not digitos:
+        return None
+    mensagem = f"portal-handoff:v1:{digitos}".encode()
+    return hmac.new(settings.identity_hmac_secret.encode(), mensagem, hashlib.sha256).hexdigest()
 
 
 templates.env.globals["mascarar_telefone"] = mascarar_telefone
@@ -500,6 +511,35 @@ def conversas_detalhe(
     )
 
 
+def registrar_handoff_local(db: Session, usuario: Usuario, telefone: str, assumir: bool) -> None:
+    telefone_hmac = identidade_telefone(telefone)
+    if not telefone_hmac:
+        raise ValueError("telefone inválido")
+    instante = agora()
+    ativas = db.query(AtendimentoAtribuicao).filter(
+        AtendimentoAtribuicao.loja_slug == usuario.loja_slug,
+        AtendimentoAtribuicao.telefone_hmac == telefone_hmac,
+        AtendimentoAtribuicao.ativa.is_(True),
+    ).all()
+    if assumir and len(ativas) == 1 and ativas[0].vendedor_email == usuario.email:
+        return
+    for atribuicao in ativas:
+        atribuicao.ativa = False
+        atribuicao.encerrada_em = instante
+    if assumir:
+        db.add(
+            AtendimentoAtribuicao(
+                loja_slug=usuario.loja_slug,
+                telefone_hmac=telefone_hmac,
+                vendedor_email=usuario.email,
+                origem="handoff_portal",
+                iniciada_em=instante,
+                ativa=True,
+            )
+        )
+    db.commit()
+
+
 @app.post("/app/conversas/{telefone}/handoff")
 async def conversas_handoff(
     request: Request,
@@ -521,7 +561,14 @@ async def conversas_handoff(
         chatbot.definir_bot_ativo(telefone, bot_ativo=acao == "devolver")
     except ChatbotIndisponivel:
         return RedirectResponse(f"{destino}?erro=indisponivel", status_code=303)
-    return RedirectResponse(f"{destino}?ok={acao}", status_code=303)
+    registro_indisponivel = False
+    try:
+        registrar_handoff_local(db, usuario, telefone, assumir=acao == "assumir")
+    except (SQLAlchemyError, ValueError):
+        db.rollback()
+        registro_indisponivel = True
+    sufixo = "&registro=indisponivel" if registro_indisponivel else ""
+    return RedirectResponse(f"{destino}?ok={acao}{sufixo}", status_code=303)
 
 
 def pode_simular(usuario) -> bool:
@@ -644,6 +691,48 @@ def periodo_padrao(inicio: str | None, fim: str | None) -> tuple[date, date]:
     except ValueError:
         d_fim = ultimo_dia_mes(hoje)
     return d_inicio, d_fim
+
+
+def data_api(valor) -> date | None:
+    if not valor:
+        return None
+    try:
+        return datetime.fromisoformat(str(valor).replace("Z", "+00:00")).date()
+    except (TypeError, ValueError):
+        return None
+
+
+def origem_lead(lead: dict) -> str | None:
+    origem = lead.get("origem")
+    return str(origem).strip() if origem and str(origem).strip() else None
+
+
+def lead_corresponde_origem(lead: dict, origem: str | None) -> bool:
+    if not origem:
+        return True
+    atual = origem_lead(lead)
+    if origem == "__sem_origem__":
+        return atual is None
+    return bool(atual and atual.casefold() == origem.casefold())
+
+
+def atribuicoes_no_periodo(
+    db: Session,
+    loja_slug: str,
+    inicio: date,
+    fim: date,
+    vendedor_email: str | None = None,
+) -> list[AtendimentoAtribuicao]:
+    consulta = db.query(AtendimentoAtribuicao).filter(
+        AtendimentoAtribuicao.loja_slug == loja_slug
+    )
+    if vendedor_email:
+        consulta = consulta.filter(AtendimentoAtribuicao.vendedor_email == vendedor_email)
+    return [
+        atribuicao
+        for atribuicao in consulta.all()
+        if inicio <= _data(atribuicao.iniciada_em) <= fim
+    ]
 
 
 def lucro_bruto_venda(venda: Venda) -> Decimal | None:
@@ -996,12 +1085,113 @@ async def metas_desativar(request: Request, meta_id: str, db: Session = Depends(
     return RedirectResponse("/app/metas?ok=desativada", status_code=303)
 
 
+@app.get("/app/vendedor", response_class=HTMLResponse)
+def vendedor_dashboard(
+    request: Request,
+    inicio: str | None = None,
+    fim: str | None = None,
+    db: Session = Depends(get_db),
+    chatbot: ChatbotClient = Depends(get_chatbot_client),
+):
+    usuario = usuario_atual(request, db)
+    if not usuario:
+        return redirecionar_login()
+    if usuario.papel != "vendedor":
+        destino = "/app/financeiro" if pode_ver_financeiro(usuario) else "/app"
+        return RedirectResponse(destino, status_code=303)
+    d_inicio, d_fim = periodo_padrao(inicio, fim)
+    vendas = [
+        venda
+        for venda in db.query(Venda).filter(
+            Venda.loja_slug == usuario.loja_slug,
+            Venda.vendedor_email == usuario.email,
+        ).order_by(Venda.criada_em.desc()).all()
+        if d_inicio <= _data(venda.criada_em) <= d_fim
+    ]
+    confirmadas = [venda for venda in vendas if venda.status == "confirmada"]
+    faturamento = sum((venda.preco_venda for venda in confirmadas), Decimal("0"))
+    realizado_por_tipo = {
+        "quantidade": Decimal(len(confirmadas)),
+        "faturamento": faturamento,
+    }
+    metas_view = []
+    metas = db.query(Meta).filter(
+        Meta.loja_slug == usuario.loja_slug,
+        Meta.escopo == "vendedor",
+        Meta.vendedor_email == usuario.email,
+        Meta.ativa.is_(True),
+    ).all()
+    for meta in metas:
+        if meta.tipo not in realizado_por_tipo or not (
+            meta.periodo_inicio <= d_fim and meta.periodo_fim >= d_inicio
+        ):
+            continue
+        realizado = realizado_por_tipo[meta.tipo]
+        pct = round(float(realizado / meta.valor_alvo * 100), 1) if meta.valor_alvo else 0.0
+        metas_view.append(
+            {
+                "tipo": meta.tipo,
+                "alvo": meta.valor_alvo,
+                "realizado": realizado,
+                "pct": pct,
+                "pct_barra": min(pct, 100),
+                "quantidade": meta.tipo == "quantidade",
+            }
+        )
+
+    atribuicoes = db.query(AtendimentoAtribuicao).filter(
+        AtendimentoAtribuicao.loja_slug == usuario.loja_slug,
+        AtendimentoAtribuicao.vendedor_email == usuario.email,
+        AtendimentoAtribuicao.ativa.is_(True),
+    ).all()
+    hashes_atribuidos = {atribuicao.telefone_hmac for atribuicao in atribuicoes}
+    leads_atribuidos, conversas_atribuidas = [], []
+    erros_integracao = []
+    try:
+        leads = chatbot.listar_leads()
+        leads_atribuidos = [
+            lead
+            for lead in leads
+            if identidade_telefone(lead.get("telefone")) in hashes_atribuidos
+        ]
+    except ChatbotIndisponivel as exc:
+        erros_integracao.append(str(exc))
+    try:
+        conversas = chatbot.listar_conversas(limit=200)
+        conversas_atribuidas = [
+            conversa
+            for conversa in conversas
+            if identidade_telefone(conversa.get("telefone")) in hashes_atribuidos
+        ]
+    except ChatbotIndisponivel as exc:
+        erros_integracao.append(str(exc))
+
+    return templates.TemplateResponse(
+        "vendedor/dashboard.html",
+        contexto(
+            request,
+            usuario,
+            metricas={"quantidade": len(confirmadas), "faturamento": faturamento},
+            metas=metas_view,
+            vendas=vendas[:8],
+            leads=leads_atribuidos,
+            conversas=conversas_atribuidas,
+            atribuicoes_registradas=len(atribuicoes),
+            integracao_erro="; ".join(dict.fromkeys(erros_integracao)) or None,
+            periodo={"inicio": d_inicio.isoformat(), "fim": d_fim.isoformat()},
+        ),
+    )
+
+
 @app.get("/app/financeiro", response_class=HTMLResponse)
 def financeiro_dashboard(
     request: Request,
     inicio: str | None = None,
     fim: str | None = None,
+    vendedor: str | None = None,
+    origem: str | None = None,
     db: Session = Depends(get_db),
+    chatbot: ChatbotClient = Depends(get_chatbot_client),
 ):
     usuario = usuario_atual(request, db)
     if not usuario:
@@ -1049,6 +1239,75 @@ def financeiro_dashboard(
                 "indisponivel": indisponivel,
             }
         )
+
+    vendedores = db.query(Usuario).filter(
+        Usuario.loja_slug == usuario.loja_slug,
+        Usuario.ativo.is_(True),
+        Usuario.papel.in_(["dono", "gerente", "vendedor"]),
+    ).order_by(Usuario.nome).all()
+    vendedores_por_email = {item.email: item for item in vendedores}
+    vendedor_filtro = vendedor if vendedor in vendedores_por_email else None
+    origens = []
+    funil = {
+        "disponivel": False,
+        "elegiveis": None,
+        "atendidos": None,
+        "vendas_vinculadas": None,
+        "erro": None,
+    }
+    try:
+        leads = chatbot.listar_leads()
+    except ChatbotIndisponivel as exc:
+        funil["erro"] = str(exc)
+    else:
+        origens = sorted({valor for lead in leads if (valor := origem_lead(lead))}, key=str.casefold)
+        candidatos = [lead for lead in leads if lead_corresponde_origem(lead, origem)]
+        leads_sem_data = [lead for lead in candidatos if data_api(lead.get("criada_em")) is None]
+        if leads_sem_data:
+            funil["erro"] = (
+                f"{len(leads_sem_data)} lead(s) sem data de criação confiável; "
+                "as contagens do período estão indisponíveis."
+            )
+        else:
+            elegiveis = [
+                lead
+                for lead in candidatos
+                if d_inicio <= data_api(lead.get("criada_em")) <= d_fim
+            ]
+            atribuicoes_periodo = atribuicoes_no_periodo(
+                db,
+                usuario.loja_slug,
+                d_inicio,
+                d_fim,
+                vendedor_email=vendedor_filtro,
+            )
+            hashes_atendidos = {item.telefone_hmac for item in atribuicoes_periodo}
+            if vendedor_filtro:
+                elegiveis = [
+                    lead
+                    for lead in elegiveis
+                    if identidade_telefone(lead.get("telefone")) in hashes_atendidos
+                ]
+            ids_elegiveis = {str(lead.get("id")) for lead in elegiveis if lead.get("id")}
+            atendidos = {
+                str(lead.get("id"))
+                for lead in elegiveis
+                if lead.get("id") and identidade_telefone(lead.get("telefone")) in hashes_atendidos
+            }
+            vendas_vinculadas = [
+                venda
+                for venda in confirmadas
+                if venda.lead_ref and venda.lead_ref in ids_elegiveis
+                and (not vendedor_filtro or venda.vendedor_email == vendedor_filtro)
+            ]
+            funil.update(
+                {
+                    "disponivel": True,
+                    "elegiveis": len(elegiveis),
+                    "atendidos": len(atendidos),
+                    "vendas_vinculadas": len(vendas_vinculadas),
+                }
+            )
     return templates.TemplateResponse(
         "financeiro/dashboard.html",
         contexto(
@@ -1058,6 +1317,10 @@ def financeiro_dashboard(
             metas=metas_view,
             tem_dados=bool(confirmadas),
             periodo={"inicio": d_inicio.isoformat(), "fim": d_fim.isoformat()},
+            funil=funil,
+            vendedores=vendedores,
+            origens=origens,
+            filtros_funil={"vendedor": vendedor_filtro or "", "origem": origem or ""},
         ),
     )
 

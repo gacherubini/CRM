@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 
 from app.auth import hash_token
 from app.models_db import (
+    CatalogAttribution,
     Consentimento,
     Conversa,
     CredencialServico,
@@ -20,6 +21,9 @@ from app.models_db import (
     Loja,
     Mensagem,
 )
+
+
+_CATALOG_REF_RE = re.compile(r"(?<![A-Z0-9])CAT-[A-Z2-7]{10,16}(?![A-Z0-9])", re.IGNORECASE)
 
 
 # --- Mascaramento de CPF (LGPD, silencioso) ----------------------------------
@@ -119,6 +123,47 @@ def _resposta_duplicada(conversa: Conversa) -> dict:
     }
 
 
+def _correlacionar_catalogo(
+    db: Session, loja_id: str, telefone: str, texto: str | None
+) -> CatalogAttribution | None:
+    """Vincula uma referência pendente apenas uma vez e sempre dentro da loja."""
+    if not texto:
+        return None
+    referencias = dict.fromkeys(ref.upper() for ref in _CATALOG_REF_RE.findall(texto))
+    for referencia in referencias:
+        atribuicao = (
+            db.query(CatalogAttribution)
+            .filter(
+                CatalogAttribution.loja_id == loja_id,
+                CatalogAttribution.catalog_interest_ref == referencia,
+            )
+            .first()
+        )
+        if atribuicao is None:
+            continue
+        if atribuicao.telefone:
+            return atribuicao if atribuicao.telefone == telefone else None
+
+        agora = datetime.now(timezone.utc)
+        lead = _get_or_create_lead(db, loja_id, telefone)
+        atribuicao.telefone = telefone
+        atribuicao.lead_id = lead.id
+        atribuicao.atribuida_em = agora
+
+        # A leitura de lead representa a primeira origem atribuída; o histórico
+        # completo permanece em catalog_attributions.
+        if not lead.catalog_interest_ref:
+            for campo in (
+                "catalog_interest_ref", "veiculo_ref", "origem", "canal",
+                "utm_source", "utm_medium", "utm_campaign", "utm_content", "utm_term",
+            ):
+                setattr(lead, campo, getattr(atribuicao, campo))
+            lead.atribuida_em = agora
+            lead.atualizada_em = agora
+        return atribuicao
+    return None
+
+
 def registrar_mensagem(
     db: Session,
     instancia: str,
@@ -134,6 +179,10 @@ def registrar_mensagem(
 
     if provider_message_id and _mensagem_existente(db, loja.id, provider_message_id):
         return _resposta_duplicada(conversa)
+
+    atribuicao = None
+    if not from_me:
+        atribuicao = _correlacionar_catalogo(db, loja.id, telefone, texto)
 
     # Uma saída nova que não foi previamente registrada pelo workflow do bot
     # veio do atendente (celular/web). O humano assumiu: pausa automática.
@@ -161,7 +210,12 @@ def registrar_mensagem(
         db.rollback()
         conversa = _get_or_create_conversa(db, loja.id, telefone)
         return _resposta_duplicada(conversa)
-    return {"duplicada": False, "conversa_id": conversa.id, "bot_ativo": conversa.bot_ativo}
+    return {
+        "duplicada": False,
+        "conversa_id": conversa.id,
+        "bot_ativo": conversa.bot_ativo,
+        "catalog_interest_ref": atribuicao.catalog_interest_ref if atribuicao else None,
+    }
 
 
 def obter_estado(db: Session, loja_id: str, telefone: str) -> dict:
@@ -338,6 +392,116 @@ def registrar_lead(
     return lead
 
 
+def ingerir_interesse_catalogo(
+    db: Session,
+    loja_id: str,
+    *,
+    event_id: str,
+    loja_slug: str,
+    catalog_interest_ref: str,
+    veiculo_ref: str,
+    origem: str,
+    canal: str,
+    occurred_at: datetime,
+    utm_source: str | None = None,
+    utm_medium: str | None = None,
+    utm_campaign: str | None = None,
+    utm_content: str | None = None,
+    utm_term: str | None = None,
+) -> tuple[CatalogAttribution, bool]:
+    loja = db.get(Loja, loja_id)
+    if loja is None or loja.slug != loja_slug:
+        raise HTTPException(status_code=403, detail="evento não pertence à loja autenticada")
+
+    existente = (
+        db.query(CatalogAttribution)
+        .filter(
+            CatalogAttribution.loja_id == loja_id,
+            CatalogAttribution.event_id == event_id,
+        )
+        .first()
+    )
+    if existente:
+        if not existente.telefone and _correlacionar_atribuicao_tardia(db, existente):
+            db.commit()
+            db.refresh(existente)
+        return existente, True
+
+    referencia = catalog_interest_ref.upper()
+    conflito = (
+        db.query(CatalogAttribution)
+        .filter(
+            CatalogAttribution.loja_id == loja_id,
+            CatalogAttribution.catalog_interest_ref == referencia,
+        )
+        .first()
+    )
+    if conflito:
+        raise HTTPException(status_code=409, detail="referência já usada por outro evento")
+
+    atribuicao = CatalogAttribution(
+        id=str(uuid.uuid4()),
+        loja_id=loja_id,
+        event_id=event_id,
+        catalog_interest_ref=referencia,
+        veiculo_ref=veiculo_ref,
+        origem=origem,
+        canal=canal,
+        utm_source=utm_source,
+        utm_medium=utm_medium,
+        utm_campaign=utm_campaign,
+        utm_content=utm_content,
+        utm_term=utm_term,
+        occurred_at=occurred_at,
+    )
+    db.add(atribuicao)
+    try:
+        db.flush()
+        _correlacionar_atribuicao_tardia(db, atribuicao)
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        existente = (
+            db.query(CatalogAttribution)
+            .filter(
+                CatalogAttribution.loja_id == loja_id,
+                CatalogAttribution.event_id == event_id,
+            )
+            .first()
+        )
+        if existente:
+            return existente, True
+        raise
+    db.refresh(atribuicao)
+    return atribuicao, False
+
+
+def _correlacionar_atribuicao_tardia(
+    db: Session, atribuicao: CatalogAttribution
+) -> CatalogAttribution | None:
+    """Fecha a corrida em que a mensagem chega antes da entrega da outbox."""
+    resultados = (
+        db.query(Mensagem, Conversa)
+        .join(Conversa, Mensagem.conversa_id == Conversa.id)
+        .filter(
+            Mensagem.loja_id == atribuicao.loja_id,
+            Mensagem.direcao == "entrada",
+            Mensagem.texto.ilike(f"%{atribuicao.catalog_interest_ref}%"),
+        )
+        .order_by(Mensagem.criada_em.asc())
+        .limit(100)
+        .all()
+    )
+    for mensagem, conversa in resultados:
+        refs = {ref.upper() for ref in _CATALOG_REF_RE.findall(mensagem.texto or "")}
+        if atribuicao.catalog_interest_ref not in refs:
+            continue
+        return _correlacionar_catalogo(
+            db, atribuicao.loja_id, conversa.telefone, mensagem.texto
+        )
+    return None
+
+
 def listar_leads(db: Session, loja_id: str, etapa: str | None = None) -> list[Lead]:
     q = db.query(Lead).filter(Lead.loja_id == loja_id)
     if etapa:
@@ -365,4 +529,14 @@ def para_saida_lead(lead: Lead) -> dict:
         if lead.consentimento_em
         else None,
         "criada_em": lead.criada_em.isoformat() if lead.criada_em else None,
+        "origem": lead.origem,
+        "canal": lead.canal,
+        "utm_source": lead.utm_source,
+        "utm_medium": lead.utm_medium,
+        "utm_campaign": lead.utm_campaign,
+        "utm_content": lead.utm_content,
+        "utm_term": lead.utm_term,
+        "veiculo_ref": lead.veiculo_ref,
+        "catalog_interest_ref": lead.catalog_interest_ref,
+        "atribuida_em": lead.atribuida_em.isoformat() if lead.atribuida_em else None,
     }

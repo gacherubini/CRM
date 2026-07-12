@@ -25,6 +25,9 @@ Catálogo Público #5A. Leia este arquivo primeiro e depois `docs/handoff-contex
 
 - `SIMULATION_PROVIDER=http` no compose com `MOTOR_URL` / `MOTOR_TOKEN` (só no `.env` ignorado).
 - `HttpSimulationProvider`: Bearer, 202 + polling, fallback seguro.
+- Funil de aquisição: endpoint tenant-scoped `POST /v1/integracoes/catalogo/interesses`, migration
+  `0004_catalog_attribution`, ingestão idempotente e correlação `CAT-*` na primeira inbound.
+- Leads expõem opcionalmente origem/canal, UTMs, veículo e referência do interesse. Suíte: **59 testes**.
 - E2E WhatsApp **validado em runtime**:
   - Evolution `loja1` open
   - Workflow n8n `WhatsApp IA - Somente Nao Salvos` (ID `wAiNaoSalvos0001`) ativo
@@ -47,7 +50,10 @@ Catálogo Público #5A. Leia este arquivo primeiro e depois `docs/handoff-contex
 - #3B: vendas e dashboard financeiro; metas de loja agora têm CRUD (quantidade, faturamento e
   lucro), RBAC/tenancy, validação de período/alvo/sobreposição e migration `0003_adiciona_meta_ativa`.
 - Venda sem custo não gera mais lucro fictício: dashboard sinaliza dados incompletos e suspende o
-  atingimento da meta de lucro. Suíte do Portal: **72 testes**.
+  atingimento da meta de lucro.
+- `/app/vendedor`: vendas/metas próprias e atendimentos atribuídos pelo Portal, sem custo/lucro.
+- `/app/financeiro`: primeiro funil auditável com filtros e estado degradado; migration
+  `0004_cria_atendimento_atribuicoes`. Suíte do Portal: **86 testes**.
 - Equipe/config ainda placeholder. Precisa `CHATBOT_API_TOKEN` no `.env` local do portal.
 
 ### Catálogo Público #5A
@@ -56,14 +62,15 @@ Catálogo Público #5A. Leia este arquivo primeiro e depois `docs/handoff-contex
 - Vitrine pública, filtros/paginação, detalhe/galeria, estados 404/422/503 e CTA seguro para WhatsApp.
 - Consome somente a API pública HTTP do Estoque; não compartilha banco/models.
 - Eventos de interesse + UTMs em SQLite próprio; redirect limitado a `https://wa.me`.
+- Referência `CAT-*` no texto do WhatsApp e outbox persistente com Bearer, idempotência, retry e backoff.
 - Deploy conectado em `deploy/catalogo-conectado`, Docker não-root, healthcheck e volume persistente.
-- **15 testes**; validado ao vivo em `http://localhost:8200/l/demo` contra o Estoque real.
+- **19 testes**; vitrine validada ao vivo em `http://localhost:8200/l/demo` contra o Estoque real.
 
 ## Próxima sequência recomendada
 
-1. Funil comercial ponta a ponta: `catalog.interest_clicked` → lead/origem/UTM → atribuição → venda.
-2. #3B: dashboard do vendedor, funil/conversão e campanhas.
-3. #5A: outbox/webhook de interesse, exportação, tema por loja, SEO/cache e standalone.
+1. Configurar URL/token do outbox no deploy local e validar E2E real Catálogo → Chatbot → Portal.
+2. #3B: metas individuais UI, eventos externos de handoff, conversão e campanhas.
+3. #5A: exportação, tema por loja, SEO/cache, retenção/rate limit e standalone.
 4. Ajustar prompt n8n (remover consentimento antigo) e corrigir mojibake na entrada.
 5. Fechar E2E Motor Task 10, Estoque outbox/restore e Playwright do Portal.
 6. Drivers bancários reais (ainda em hold) quando sair do mock.
@@ -79,5 +86,6 @@ cd ..\catalogo-publico; ..\portal-gestao\.venv\Scripts\python.exe -m pytest -q
 git status --short
 ```
 
-Estado estimado: suíte ~72% para MVP demonstrável e ~58% para produção/revenda.
+Checkpoint de testes: **267** (Motor 58 + Estoque 45 + Chatbot 59 + Portal 86 + Catálogo 19).
+Estado estimado: suíte ~78% para MVP demonstrável e ~62% para produção/revenda.
 Simulação = mock até plugar driver real.

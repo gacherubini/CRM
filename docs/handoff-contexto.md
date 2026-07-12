@@ -4,6 +4,26 @@
 > Confirme o estado real (containers, `.env`, n8n) antes de editar. Nunca trate números de testes
 > antigos como prova de E2E WhatsApp.
 
+## 0.2 Atualização — sessão 2026-07-12 (parte 4)
+
+Entregue o primeiro funil comercial ponta a ponta em código, ainda sem ativar o bot/n8n:
+
+- **Catálogo → Chatbot:** clique gera `CAT-*`, inclui referência no texto pré-preenchido do `wa.me`
+  e grava evento+outbox atomicamente. Outbox persistente usa Bearer server-side, timeout,
+  `Idempotency-Key`, retry exponencial e limite de tentativas; não envia telefone nem `visitor_id`.
+- **Chatbot:** migration `0004_catalog_attribution`, endpoint tenant-scoped
+  `POST /v1/integracoes/catalogo/interesses`, atribuição pendente idempotente e correlação na primeira
+  mensagem inbound. Corrida inversa (mensagem antes do evento), outro tenant, outbound e referência
+  já atribuída estão cobertos. Leads/CSV expõem campos opcionais de origem/UTM/veículo/ref.
+- **Portal:** migration `0004_cria_atendimento_atribuicoes`, histórico de handoff tenant-scoped com
+  telefone em HMAC, dashboard `/app/vendedor` sem custo/lucro e funil inicial em `/app/financeiro`
+  com definições, filtros, estado degradado e aviso de não causalidade.
+- **Verificação independente:** Catálogo **19**, Chatbot **59**, Portal **86**; total conhecido da
+  suíte agora **267 testes** incluindo Motor 58 e Estoque 45.
+
+Pendência operacional deliberada: configurar `CATALOGO_EVENTS_URL` e `CATALOGO_EVENTS_TOKEN` no
+deploy e fazer E2E real do clique até o Portal. Nenhum `.env` foi lido/alterado e o bot permanece off.
+
 ## 0.1 Atualização — sessão 2026-07-12 (parte 3)
 
 Trabalho feito na `main`, ainda sem commit no início desta atualização. Entregas verificadas ao vivo
