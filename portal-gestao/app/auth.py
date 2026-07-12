@@ -65,3 +65,15 @@ def pode_ver_custo(usuario: Usuario) -> bool:
 
 def pode_gerir_estoque(usuario: Usuario) -> bool:
     return usuario.papel in {"dono", "gerente", "admin_plataforma"}
+
+
+def pode_registrar_venda(usuario: Usuario) -> bool:
+    return usuario.papel in {"dono", "gerente", "vendedor"}
+
+
+def pode_confirmar_venda(usuario: Usuario) -> bool:
+    return usuario.papel in {"dono", "gerente"}
+
+
+def pode_ver_financeiro(usuario: Usuario) -> bool:
+    return usuario.papel in {"dono", "gerente", "admin_plataforma"}

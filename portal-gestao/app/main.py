@@ -1,5 +1,7 @@
+import calendar
 import os
-from datetime import datetime
+from datetime import date, datetime
+from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from pathlib import Path
 from typing import Annotated
 
@@ -18,10 +20,14 @@ from app.auth import (
     csrf_valido,
     encerrar_sessao,
     iniciar_sessao,
+    pode_confirmar_venda,
     pode_gerir_estoque,
+    pode_registrar_venda,
     pode_ver_custo,
+    pode_ver_financeiro,
     usuario_atual,
 )
+from app.models import Meta, Venda, VendaCustoDireto, agora
 from app.clients.chatbot import (
     ChatbotClient,
     ChatbotIndisponivel,
@@ -600,6 +606,232 @@ async def simulacoes_simular(
             valores=valores,
             resultado=resultado,
             cpf_mascarado=mascarar_cpf(payload["cpf"]),
+        ),
+    )
+
+
+CATEGORIAS_CUSTO = ["documentacao", "frete", "comissao", "outros"]
+STATUS_VENDA = ["registrada", "confirmada", "cancelada"]
+CENTAVOS = Decimal("0.01")
+
+
+def dinheiro(texto) -> Decimal:
+    return Decimal(str(texto).replace(",", ".")).quantize(CENTAVOS, rounding=ROUND_HALF_UP)
+
+
+def _data(momento):
+    return momento.date() if isinstance(momento, datetime) else momento
+
+
+def ultimo_dia_mes(dia: date) -> date:
+    return date(dia.year, dia.month, calendar.monthrange(dia.year, dia.month)[1])
+
+
+def periodo_padrao(inicio: str | None, fim: str | None) -> tuple[date, date]:
+    hoje = date.today()
+    try:
+        d_inicio = date.fromisoformat(inicio) if inicio else hoje.replace(day=1)
+    except ValueError:
+        d_inicio = hoje.replace(day=1)
+    try:
+        d_fim = date.fromisoformat(fim) if fim else ultimo_dia_mes(hoje)
+    except ValueError:
+        d_fim = ultimo_dia_mes(hoje)
+    return d_inicio, d_fim
+
+
+def lucro_bruto_venda(venda: Venda) -> Decimal:
+    custo = venda.custo_veiculo or Decimal("0")
+    diretos = sum((c.valor for c in venda.custos_diretos), Decimal("0"))
+    return (venda.preco_venda - custo - diretos).quantize(CENTAVOS, rounding=ROUND_HALF_UP)
+
+
+@app.get("/app/vendas", response_class=HTMLResponse)
+def vendas_lista(
+    request: Request,
+    status: str | None = None,
+    inicio: str | None = None,
+    fim: str | None = None,
+    db: Session = Depends(get_db),
+):
+    usuario = usuario_atual(request, db)
+    if not usuario:
+        return redirecionar_login()
+    d_inicio, d_fim = periodo_padrao(inicio, fim)
+    consulta = db.query(Venda).filter(Venda.loja_slug == usuario.loja_slug)
+    if not pode_ver_financeiro(usuario):
+        consulta = consulta.filter(Venda.vendedor_email == usuario.email)
+    if status in STATUS_VENDA:
+        consulta = consulta.filter(Venda.status == status)
+    vendas = [
+        v
+        for v in consulta.order_by(Venda.criada_em.desc()).all()
+        if d_inicio <= _data(v.criada_em) <= d_fim
+    ]
+    return templates.TemplateResponse(
+        "vendas/lista.html",
+        contexto(
+            request,
+            usuario,
+            vendas=vendas,
+            lucro=lucro_bruto_venda,
+            filtros={"status": status or "", "inicio": d_inicio.isoformat(), "fim": d_fim.isoformat()},
+            pode_financeiro=pode_ver_financeiro(usuario),
+            pode_confirmar=pode_confirmar_venda(usuario),
+            pode_registrar=pode_registrar_venda(usuario),
+        ),
+    )
+
+
+@app.get("/app/vendas/nova", response_class=HTMLResponse)
+def vendas_nova(request: Request, db: Session = Depends(get_db)):
+    usuario = usuario_atual(request, db)
+    if not usuario:
+        return redirecionar_login()
+    if not pode_registrar_venda(usuario):
+        return RedirectResponse("/app/vendas", status_code=303)
+    return templates.TemplateResponse(
+        "vendas/form.html",
+        contexto(request, usuario, valores={}, categorias=CATEGORIAS_CUSTO, pode_financeiro=pode_ver_financeiro(usuario)),
+    )
+
+
+@app.post("/app/vendas/nova")
+async def vendas_criar(request: Request, db: Session = Depends(get_db)):
+    usuario = usuario_atual(request, db)
+    if not usuario:
+        return redirecionar_login()
+    form = await request.form()
+    if not pode_registrar_venda(usuario) or not csrf_valido(request, form.get("csrf")):
+        return RedirectResponse("/app/vendas", status_code=303)
+    valores = {
+        campo: (form.get(campo) or "")
+        for campo in ("descricao", "preco_venda", "lead_ref", "veiculo_ref", "custo_veiculo", "custo_categoria", "custo_valor")
+    }
+    descricao = (form.get("descricao") or "").strip()
+    try:
+        preco = dinheiro(form.get("preco_venda"))
+    except (InvalidOperation, TypeError):
+        preco = None
+    if not descricao or preco is None or preco <= 0:
+        return templates.TemplateResponse(
+            "vendas/form.html",
+            contexto(request, usuario, valores=valores, categorias=CATEGORIAS_CUSTO, pode_financeiro=pode_ver_financeiro(usuario), erro="Informe descrição e preço de venda válidos."),
+            status_code=422,
+        )
+    venda = Venda(
+        loja_slug=usuario.loja_slug,
+        vendedor_email=usuario.email,
+        descricao=descricao,
+        preco_venda=preco,
+        lead_ref=(form.get("lead_ref") or "").strip() or None,
+        veiculo_ref=(form.get("veiculo_ref") or "").strip() or None,
+        status="registrada",
+    )
+    if pode_ver_financeiro(usuario):
+        if form.get("custo_veiculo"):
+            try:
+                venda.custo_veiculo = dinheiro(form.get("custo_veiculo"))
+            except (InvalidOperation, TypeError):
+                pass
+        categoria = form.get("custo_categoria")
+        if form.get("custo_valor") and categoria in CATEGORIAS_CUSTO:
+            try:
+                venda.custos_diretos.append(VendaCustoDireto(categoria=categoria, valor=dinheiro(form.get("custo_valor"))))
+            except (InvalidOperation, TypeError):
+                pass
+    db.add(venda)
+    db.commit()
+    return RedirectResponse("/app/vendas?ok=registrada", status_code=303)
+
+
+@app.post("/app/vendas/{venda_id}/confirmar")
+async def vendas_confirmar(request: Request, venda_id: str, db: Session = Depends(get_db)):
+    usuario = usuario_atual(request, db)
+    if not usuario:
+        return redirecionar_login()
+    form = await request.form()
+    if not pode_confirmar_venda(usuario) or not csrf_valido(request, form.get("csrf")):
+        return RedirectResponse("/app/vendas", status_code=303)
+    venda = db.query(Venda).filter(Venda.id == venda_id, Venda.loja_slug == usuario.loja_slug).first()
+    if not venda or venda.status == "cancelada":
+        return RedirectResponse("/app/vendas?erro=acao", status_code=303)
+    venda.status = "confirmada"
+    venda.confirmada_por = usuario.email
+    venda.confirmada_em = agora()
+    venda.atualizada_em = agora()
+    db.commit()
+    return RedirectResponse("/app/vendas?ok=confirmada", status_code=303)
+
+
+@app.post("/app/vendas/{venda_id}/cancelar")
+async def vendas_cancelar(request: Request, venda_id: str, db: Session = Depends(get_db)):
+    usuario = usuario_atual(request, db)
+    if not usuario:
+        return redirecionar_login()
+    form = await request.form()
+    if not pode_confirmar_venda(usuario) or not csrf_valido(request, form.get("csrf")):
+        return RedirectResponse("/app/vendas", status_code=303)
+    venda = db.query(Venda).filter(Venda.id == venda_id, Venda.loja_slug == usuario.loja_slug).first()
+    motivo = (form.get("motivo") or "").strip()
+    if not venda:
+        return RedirectResponse("/app/vendas?erro=acao", status_code=303)
+    if not motivo:
+        return RedirectResponse("/app/vendas?erro=motivo", status_code=303)
+    venda.status = "cancelada"
+    venda.motivo_cancelamento = motivo
+    venda.atualizada_em = agora()
+    db.commit()
+    return RedirectResponse("/app/vendas?ok=cancelada", status_code=303)
+
+
+@app.get("/app/financeiro", response_class=HTMLResponse)
+def financeiro_dashboard(
+    request: Request,
+    inicio: str | None = None,
+    fim: str | None = None,
+    db: Session = Depends(get_db),
+):
+    usuario = usuario_atual(request, db)
+    if not usuario:
+        return redirecionar_login()
+    if not pode_ver_financeiro(usuario):
+        return RedirectResponse("/app", status_code=303)
+    d_inicio, d_fim = periodo_padrao(inicio, fim)
+    confirmadas = [
+        v
+        for v in db.query(Venda).filter(Venda.loja_slug == usuario.loja_slug, Venda.status == "confirmada").all()
+        if d_inicio <= _data(v.criada_em) <= d_fim
+    ]
+    faturamento = sum((v.preco_venda for v in confirmadas), Decimal("0"))
+    lucro = sum((lucro_bruto_venda(v) for v in confirmadas), Decimal("0"))
+    metricas = {"quantidade": len(confirmadas), "faturamento": faturamento, "lucro_bruto": lucro}
+    realizado_por_tipo = {"quantidade": Decimal(len(confirmadas)), "faturamento": faturamento, "lucro_bruto": lucro}
+    metas_view = []
+    for meta in db.query(Meta).filter(Meta.loja_slug == usuario.loja_slug, Meta.escopo == "loja").all():
+        if meta.tipo not in realizado_por_tipo or not (meta.periodo_inicio <= d_fim and meta.periodo_fim >= d_inicio):
+            continue
+        realizado = realizado_por_tipo[meta.tipo]
+        pct = round(float(realizado / meta.valor_alvo * 100), 1) if meta.valor_alvo else 0.0
+        metas_view.append(
+            {
+                "tipo": meta.tipo,
+                "alvo": meta.valor_alvo,
+                "realizado": realizado,
+                "pct": pct,
+                "pct_barra": min(pct, 100),
+                "quantidade": meta.tipo == "quantidade",
+            }
+        )
+    return templates.TemplateResponse(
+        "financeiro/dashboard.html",
+        contexto(
+            request,
+            usuario,
+            metricas=metricas,
+            metas=metas_view,
+            tem_dados=bool(confirmadas),
+            periodo={"inicio": d_inicio.isoformat(), "fim": d_fim.isoformat()},
         ),
     )
 

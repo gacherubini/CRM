@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}Financeiro — Motora{% endblock %}
+{% block content %}
+<div class="page-heading">
+  <div><span class="eyebrow">Painel do dono</span><h1>Financeiro</h1><p>Vendas confirmadas no período. Nenhum número é estimado.</p></div>
+</div>
+
+<form class="filter-bar" method="get">
+  <label class="search"><span class="sr-only">Início do período</span><input type="date" name="inicio" value="{{ periodo.inicio }}"></label>
+  <label class="search"><span class="sr-only">Fim do período</span><input type="date" name="fim" value="{{ periodo.fim }}"></label>
+  <button class="button secondary" type="submit">Aplicar período</button>
+</form>
+
+<p class="mono-label">PERÍODO: {{ periodo.inicio }} A {{ periodo.fim }}</p>
+
+{% if tem_dados %}
+<section class="panel">
+  <div class="metric-grid">
+    <div class="metric"><span>Vendas confirmadas</span><strong>{{ metricas.quantidade }}</strong><small>vendas com status confirmada no período</small></div>
+    <div class="metric"><span>Faturamento</span><strong>{{ formatar_brl(metricas.faturamento) }}</strong><small>soma de preco_venda das confirmadas</small></div>
+    <div class="metric accent"><span>Lucro bruto</span><strong>{{ formatar_brl(metricas.lucro_bruto) }}</strong><small>preço − custo do veículo − custos diretos</small></div>
+  </div>
+</section>
+{% else %}
+<section class="panel flush">
+  <div class="empty"><strong>Nenhuma venda confirmada no período.</strong><p>Assim que uma venda for confirmada, os totais reais aparecem aqui.</p></div>
+</section>
+{% endif %}
+
+<section class="panel">
+  <div class="panel-heading"><div><span class="mono-label">METAS DA LOJA</span><h2>Atingimento</h2></div></div>
+  {% if metas %}
+  <div class="metric-grid">
+    {% for m in metas %}
+    <div class="metric">
+      <span>{{ m.tipo | replace('_', ' ') | capitalize }}</span>
+      <strong>{% if m.quantidade %}{{ m.realizado | int }}{% else %}{{ formatar_brl(m.realizado) }}{% endif %}</strong>
+      <small>meta: {% if m.quantidade %}{{ m.alvo | int }}{% else %}{{ formatar_brl(m.alvo) }}{% endif %} · {{ m.pct }}%</small>
+      <div class="meta-bar" role="progressbar" aria-valuenow="{{ m.pct }}" aria-valuemin="0" aria-valuemax="100" style="height:6px;margin-top:8px;background:rgba(255,255,255,0.08);border-radius:4px;overflow:hidden">
+        <span style="display:block;height:100%;width:{{ m.pct_barra }}%;background:currentColor"></span>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="empty"><strong>Nenhuma meta da loja para o período.</strong><p>Cadastre metas de quantidade, faturamento ou lucro bruto para acompanhar o atingimento.</p></div>
+  {% endif %}
+</section>
+{% endblock %}
