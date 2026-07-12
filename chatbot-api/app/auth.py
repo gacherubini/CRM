@@ -1,10 +1,12 @@
 """Contexto autenticado por token de serviço (loja derivada da credencial)."""
 import hashlib
+import secrets
 from dataclasses import dataclass
 
 from fastapi import Depends, Header, HTTPException
 from sqlalchemy.orm import Session
 
+from app import config
 from app.db import get_db
 from app.models_db import CredencialServico
 
@@ -29,3 +31,16 @@ def get_contexto(
     if cred is None:
         raise HTTPException(status_code=401, detail="credencial inválida")
     return Contexto(loja_id=cred.loja_id, papel=cred.papel)
+
+
+def verificar_webhook_token(x_webhook_token: str = Header(default="")) -> None:
+    """Autentica o webhook por segredo compartilhado (opt-in via CHATBOT_WEBHOOK_TOKEN).
+
+    Vazio => webhook aberto (não quebra o fluxo n8n vivo). Definido => exige header
+    X-Webhook-Token igual, comparado em tempo constante.
+    """
+    esperado = config.WEBHOOK_TOKEN
+    if not esperado:
+        return
+    if not secrets.compare_digest(x_webhook_token, esperado):
+        raise HTTPException(status_code=401, detail="webhook token inválido")

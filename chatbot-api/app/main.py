@@ -11,7 +11,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app import config, models_db, servico  # noqa: F401 (registra os modelos)
-from app.auth import Contexto, get_contexto
+from app.auth import Contexto, get_contexto, verificar_webhook_token
 from app.db import Base, engine, get_db
 from app.inventory import InventoryProvider, get_inventory_provider
 from app.simulation import SimulationProvider, get_simulation_provider
@@ -76,7 +76,11 @@ def version():
 
 
 @app.post("/webhook/mensagem")
-def webhook_mensagem(msg: MensagemEntrada, db: Session = Depends(get_db)):
+def webhook_mensagem(
+    msg: MensagemEntrada,
+    db: Session = Depends(get_db),
+    _: None = Depends(verificar_webhook_token),
+):
     """Recebe uma mensagem (loja resolvida pela instância) e persiste idempotente."""
     return servico.registrar_mensagem(
         db,
@@ -87,6 +91,34 @@ def webhook_mensagem(msg: MensagemEntrada, db: Session = Depends(get_db)):
         msg.from_me,
         msg.origem_bot,
     )
+
+
+@app.get("/v1/conversas")
+def listar_conversas(
+    limit: int = 50,
+    offset: int = 0,
+    busca: Optional[str] = None,
+    ctx: Contexto = Depends(get_contexto),
+    db: Session = Depends(get_db),
+):
+    limit = max(1, min(limit, 200))
+    offset = max(0, offset)
+    conversas = servico.listar_conversas(db, ctx.loja_id, limit, offset, busca)
+    return {"conversas": conversas, "limit": limit, "offset": offset}
+
+
+@app.get("/v1/conversas/{telefone}/mensagens")
+def listar_mensagens(
+    telefone: str,
+    limit: int = 100,
+    offset: int = 0,
+    ctx: Contexto = Depends(get_contexto),
+    db: Session = Depends(get_db),
+):
+    limit = max(1, min(limit, 500))
+    offset = max(0, offset)
+    resultado = servico.listar_mensagens(db, ctx.loja_id, telefone, limit, offset)
+    return {**resultado, "limit": limit, "offset": offset}
 
 
 @app.get("/v1/conversas/{telefone}/estado")

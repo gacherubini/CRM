@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}Conversa — Gestão{% endblock %}
+{% block content %}
+<style>
+  .thread{display:flex;flex-direction:column;gap:.5rem;padding:1rem;max-width:100%}
+  .thread .bolha{max-width:min(80%,42rem);padding:.55rem .8rem;border-radius:.9rem;line-height:1.35;word-break:break-word}
+  .thread .bolha small{display:block;opacity:.6;font-size:.72rem;margin-top:.25rem}
+  .thread .entrada{align-self:flex-start;background:rgba(255,255,255,.06);border-bottom-left-radius:.2rem}
+  .thread .saida{align-self:flex-end;background:rgba(70,130,255,.18);border-bottom-right-radius:.2rem}
+  .handoff-bar{display:flex;flex-wrap:wrap;gap:.75rem;align-items:center}
+</style>
+
+<div class="page-heading">
+  <div><span class="eyebrow">Conversa</span><h1>{{ mascarar_telefone(telefone) }}</h1></div>
+  <a class="back-link" href="/app/conversas">← Voltar às conversas</a>
+</div>
+
+{% if request.query_params.get('erro') == 'indisponivel' %}<div class="alert warning" role="alert">Não foi possível alterar o atendimento agora.</div>{% endif %}
+
+<section class="panel">
+  <div class="handoff-bar">
+    {% if estado.bot_ativo %}
+    <span class="status novo">Bot ativo</span>
+    <form method="post" action="/app/conversas/{{ telefone }}/handoff">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <input type="hidden" name="acao" value="assumir">
+      <button class="button" type="submit">Assumir atendimento</button>
+    </form>
+    <p class="muted">Ao assumir, o bot para de responder este contato.</p>
+    {% else %}
+    <span class="status em_atendimento">Atendimento humano</span>
+    <form method="post" action="/app/conversas/{{ telefone }}/handoff">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <input type="hidden" name="acao" value="devolver">
+      <button class="button secondary" type="submit">Devolver ao bot</button>
+    </form>
+    <p class="muted">O bot volta a responder este contato.</p>
+    {% endif %}
+  </div>
+</section>
+
+<section class="panel flush">
+  {% if mensagens %}
+  <div class="thread">
+    {% for m in mensagens %}
+    <div class="bolha {{ m.direcao }}">{{ m.texto or '—' }}<small>{{ formatar_horario(m.criada_em) }}</small></div>
+    {% endfor %}
+  </div>
+  {% else %}<div class="empty"><strong>Sem mensagens nesta conversa.</strong></div>{% endif %}
+</section>
+{% endblock %}

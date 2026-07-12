@@ -2,11 +2,13 @@
 
 n8n/LLM nunca escrevem no banco direto — passam por esta API (Plano #2A).
 """
+import re
 import secrets
 import uuid
 from datetime import datetime, timezone
 
 from fastapi import HTTPException
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.auth import hash_token
@@ -18,6 +20,39 @@ from app.models_db import (
     Loja,
     Mensagem,
 )
+
+
+# --- Mascaramento de CPF (LGPD, silencioso) ----------------------------------
+
+_RE_CPF_FMT = re.compile(r"(?<!\d)(\d{3})\.(\d{3})\.(\d{3})-(\d{2})(?!\d)")
+_RE_CPF_BARE = re.compile(r"(?<!\d)(\d{11})(?!\d)")
+
+
+def _cpf_valido(digitos: str) -> bool:
+    """Valida os dígitos verificadores; evita mascarar telefones/números comuns."""
+    if len(digitos) != 11 or len(set(digitos)) == 1:
+        return False
+    nums = [int(c) for c in digitos]
+    for i in (9, 10):
+        soma = sum(nums[j] * ((i + 1) - j) for j in range(i))
+        dv = (soma * 10) % 11
+        dv = 0 if dv == 10 else dv
+        if dv != nums[i]:
+            return False
+    return True
+
+
+def mascarar_cpf(texto: str | None) -> str | None:
+    """Mascara CPFs no texto livre: formatado por padrão, avulso só se válido."""
+    if not texto:
+        return texto
+    texto = _RE_CPF_FMT.sub(lambda m: "***.***.***-" + m.group(4), texto)
+
+    def _bare(m):
+        d = m.group(1)
+        return "*" * 9 + d[-2:] if _cpf_valido(d) else d
+
+    return _RE_CPF_BARE.sub(_bare, texto)
 
 
 def criar_loja(
@@ -63,6 +98,27 @@ def _get_or_create_conversa(db: Session, loja_id: str, telefone: str) -> Convers
     return conversa
 
 
+def _mensagem_existente(
+    db: Session, loja_id: str, provider_message_id: str
+) -> Mensagem | None:
+    return (
+        db.query(Mensagem)
+        .filter(
+            Mensagem.loja_id == loja_id,
+            Mensagem.provider_message_id == provider_message_id,
+        )
+        .first()
+    )
+
+
+def _resposta_duplicada(conversa: Conversa) -> dict:
+    return {
+        "duplicada": True,
+        "conversa_id": conversa.id,
+        "bot_ativo": conversa.bot_ativo,
+    }
+
+
 def registrar_mensagem(
     db: Session,
     instancia: str,
@@ -76,21 +132,8 @@ def registrar_mensagem(
     loja = resolver_loja_por_instancia(db, instancia)
     conversa = _get_or_create_conversa(db, loja.id, telefone)
 
-    if provider_message_id:
-        existe = (
-            db.query(Mensagem)
-            .filter(
-                Mensagem.loja_id == loja.id,
-                Mensagem.provider_message_id == provider_message_id,
-            )
-            .first()
-        )
-        if existe:
-            return {
-                "duplicada": True,
-                "conversa_id": conversa.id,
-                "bot_ativo": conversa.bot_ativo,
-            }
+    if provider_message_id and _mensagem_existente(db, loja.id, provider_message_id):
+        return _resposta_duplicada(conversa)
 
     # Uma saída nova que não foi previamente registrada pelo workflow do bot
     # veio do atendente (celular/web). O humano assumiu: pausa automática.
@@ -105,11 +148,19 @@ def registrar_mensagem(
             conversa_id=conversa.id,
             direcao="saida" if from_me else "entrada",
             provider_message_id=provider_message_id,
-            texto=texto,
+            texto=mascarar_cpf(texto),
         )
     )
     conversa.atualizada_em = datetime.now(timezone.utc)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        # Corrida: outra requisição gravou o mesmo (loja_id, provider_message_id)
+        # entre o SELECT acima e o commit. A UNIQUE do banco arbitra; respondemos
+        # idempotente em vez de estourar 500.
+        db.rollback()
+        conversa = _get_or_create_conversa(db, loja.id, telefone)
+        return _resposta_duplicada(conversa)
     return {"duplicada": False, "conversa_id": conversa.id, "bot_ativo": conversa.bot_ativo}
 
 
@@ -131,6 +182,95 @@ def definir_bot_ativo(db: Session, loja_id: str, telefone: str, ativo: bool) -> 
     conversa.atualizada_em = datetime.now(timezone.utc)
     db.commit()
     return {"bot_ativo": conversa.bot_ativo, "status": conversa.status}
+
+
+# --- Conversas e mensagens (handoff/Portal) ----------------------------------
+
+
+_PREVIEW_MAX = 120
+
+
+def listar_conversas(
+    db: Session,
+    loja_id: str,
+    limit: int,
+    offset: int,
+    busca: str | None = None,
+) -> list[dict]:
+    q = db.query(Conversa).filter(Conversa.loja_id == loja_id)
+    if busca:
+        q = q.filter(Conversa.telefone.contains(busca))
+    conversas = (
+        q.order_by(Conversa.atualizada_em.desc()).limit(limit).offset(offset).all()
+    )
+    if not conversas:
+        return []
+
+    ids = [c.id for c in conversas]
+    mensagens = (
+        db.query(Mensagem)
+        .filter(Mensagem.loja_id == loja_id, Mensagem.conversa_id.in_(ids))
+        .order_by(Mensagem.criada_em.asc())
+        .all()
+    )
+    ultima_por_conversa: dict[str, Mensagem] = {}
+    for msg in mensagens:
+        ultima_por_conversa[msg.conversa_id] = msg  # asc => sobrescreve com a mais recente
+
+    return [para_saida_conversa(c, ultima_por_conversa.get(c.id)) for c in conversas]
+
+
+def listar_mensagens(
+    db: Session, loja_id: str, telefone: str, limit: int, offset: int
+) -> dict:
+    conversa = (
+        db.query(Conversa)
+        .filter(Conversa.loja_id == loja_id, Conversa.telefone == telefone)
+        .first()
+    )
+    if conversa is None:
+        raise HTTPException(status_code=404, detail="conversa não encontrada")
+    mensagens = (
+        db.query(Mensagem)
+        .filter(Mensagem.loja_id == loja_id, Mensagem.conversa_id == conversa.id)
+        .order_by(Mensagem.criada_em.asc())
+        .limit(limit)
+        .offset(offset)
+        .all()
+    )
+    return {
+        "telefone": telefone,
+        "mensagens": [para_saida_mensagem(m) for m in mensagens],
+    }
+
+
+def para_saida_mensagem(msg: Mensagem) -> dict:
+    return {
+        "direcao": msg.direcao,
+        "texto": mascarar_cpf(msg.texto),
+        "criada_em": msg.criada_em.isoformat() if msg.criada_em else None,
+    }
+
+
+def para_saida_conversa(conversa: Conversa, ultima: Mensagem | None = None) -> dict:
+    ultima_saida = None
+    if ultima is not None:
+        texto = ultima.texto or ""
+        ultima_saida = {
+            "texto": texto[:_PREVIEW_MAX],
+            "criada_em": ultima.criada_em.isoformat() if ultima.criada_em else None,
+            "direcao": ultima.direcao,
+        }
+    return {
+        "id": conversa.id,
+        "telefone": conversa.telefone,
+        "bot_ativo": conversa.bot_ativo,
+        "status": conversa.status,
+        "atualizada_em": conversa.atualizada_em.isoformat()
+        if conversa.atualizada_em
+        else None,
+        "ultima_mensagem": ultima_saida,
+    }
 
 
 # --- Leads e consentimento (LGPD) --------------------------------------------
@@ -186,11 +326,6 @@ def registrar_lead(
     etapa: str | None = None,
 ) -> Lead:
     lead = _get_or_create_lead(db, loja_id, telefone)
-    # Dados pessoais (nome) exigem consentimento prévio (LGPD).
-    if nome and lead.consentimento_em is None:
-        raise HTTPException(
-            status_code=409, detail="consentimento necessário antes de dados pessoais"
-        )
     if nome is not None:
         lead.nome = nome
     if interesse is not None:

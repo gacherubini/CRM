@@ -4,7 +4,7 @@ leads e consentimentos entram no próximo incremento.
 """
 from datetime import datetime, timezone
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, String
+from sqlalchemy import Boolean, DateTime, ForeignKey, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db import Base
@@ -52,6 +52,12 @@ class Conversa(Base):
 
 class Mensagem(Base):
     __tablename__ = "mensagens"
+    # provider_message_id nulo é permitido em múltiplas linhas; só ids reais deduplicam.
+    __table_args__ = (
+        UniqueConstraint(
+            "loja_id", "provider_message_id", name="uq_mensagens_loja_provider"
+        ),
+    )
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True)
     loja_id: Mapped[str] = mapped_column(ForeignKey("lojas.id"), nullable=False, index=True)

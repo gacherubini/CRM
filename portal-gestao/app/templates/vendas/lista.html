@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}Vendas — Gestão{% endblock %}
+{% block content %}
+<div class="page-heading">
+  <div><span class="eyebrow">Registro comercial</span><h1>Vendas</h1><p>Vendas registradas da loja, confirmadas por gerente ou dono.</p></div>
+  {% if pode_registrar %}<a class="button primary" href="/app/vendas/nova">Registrar venda</a>{% endif %}
+</div>
+
+{% if request.query_params.get('ok') %}<div class="alert success">Ação concluída com sucesso.</div>{% endif %}
+{% if request.query_params.get('erro') == 'motivo' %}<div class="alert error">Informe o motivo para cancelar a venda.</div>
+{% elif request.query_params.get('erro') %}<div class="alert error">Não foi possível concluir essa ação.</div>{% endif %}
+
+<form class="filter-bar" method="get">
+  <select name="status" aria-label="Status"><option value="">Todos os status</option>{% for s in ['registrada','confirmada','cancelada'] %}<option value="{{ s }}" {{ 'selected' if filtros.status == s }}>{{ s | capitalize }}</option>{% endfor %}</select>
+  <label class="search"><span class="sr-only">Início do período</span><input type="date" name="inicio" value="{{ filtros.inicio }}"></label>
+  <label class="search"><span class="sr-only">Fim do período</span><input type="date" name="fim" value="{{ filtros.fim }}"></label>
+  <button class="button secondary" type="submit">Filtrar</button>
+</form>
+
+<section class="panel flush">
+  {% if vendas %}
+  <div class="table-wrap"><table>
+    <thead><tr><th>Venda</th><th>Vendedor</th><th>Status</th><th>Preço</th>{% if pode_financeiro %}<th>Lucro bruto</th>{% endif %}{% if pode_confirmar %}<th><span class="sr-only">Ações</span></th>{% endif %}</tr></thead>
+    <tbody>{% for v in vendas %}<tr>
+      <td><div><strong>{{ v.descricao }}</strong><small>{% if v.veiculo_ref %}Veículo {{ v.veiculo_ref }}{% endif %}{% if v.lead_ref %} · Lead {{ v.lead_ref }}{% endif %}</small>{% if v.status == 'cancelada' and v.motivo_cancelamento %}<small class="muted">Motivo: {{ v.motivo_cancelamento }}</small>{% endif %}</div></td>
+      <td>{{ v.vendedor_email }}</td>
+      <td><span class="status {{ v.status }}">{{ v.status }}</span></td>
+      <td><strong>{{ formatar_brl(v.preco_venda) }}</strong></td>
+      {% if pode_financeiro %}<td class="muted">{% if v.custo_veiculo is not none %}{{ formatar_brl(lucro(v)) }}{% else %}<span title="Sem custo do veículo informado">—</span>{% endif %}</td>{% endif %}
+      {% if pode_confirmar %}<td>
+        {% if v.status == 'registrada' %}
+        <div class="action-grid">
+          <form method="post" action="/app/vendas/{{ v.id }}/confirmar"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="button secondary" type="submit">Confirmar</button></form>
+          <form method="post" action="/app/vendas/{{ v.id }}/cancelar" class="stack-form"><input type="hidden" name="csrf" value="{{ csrf }}"><label class="sr-only" for="motivo-{{ v.id }}">Motivo do cancelamento</label><input id="motivo-{{ v.id }}" name="motivo" placeholder="Motivo" required><button class="button danger" type="submit">Cancelar</button></form>
+        </div>
+        {% elif v.status == 'confirmada' %}
+        <form method="post" action="/app/vendas/{{ v.id }}/cancelar" class="stack-form"><input type="hidden" name="csrf" value="{{ csrf }}"><label class="sr-only" for="motivo-{{ v.id }}">Motivo do cancelamento</label><input id="motivo-{{ v.id }}" name="motivo" placeholder="Motivo" required><button class="button danger" type="submit">Cancelar</button></form>
+        {% else %}<span class="muted">—</span>{% endif %}
+      </td>{% endif %}
+    </tr>{% endfor %}</tbody>
+  </table></div>
+  {% elif filtros.status %}<div class="empty"><strong>Nenhuma venda para esse filtro.</strong><p>Ajuste o status ou o período selecionado.</p></div>
+  {% else %}<div class="empty"><strong>Nenhuma venda no período.</strong><p>Registre a primeira venda para começar a acompanhar o comercial.</p></div>{% endif %}
+</section>
+{% endblock %}

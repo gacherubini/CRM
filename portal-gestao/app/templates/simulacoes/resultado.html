@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block title %}Resultado da simulação — Gestão{% endblock %}
+{% block content %}
+<div class="page-heading">
+  <div><a class="back-link" href="/app/simulacoes">← Nova simulação</a><h1>Parcelas simuladas</h1><p>Valores retornados pelos bancos parceiros. Nada foi salvo.</p></div>
+</div>
+
+<section class="panel form-section">
+  <div class="section-title"><span>01</span><div><h2>Parâmetros</h2><p>Base usada nesta consulta.</p></div></div>
+  <dl class="integration-stats">
+    <div><dt>CPF</dt><dd>{{ cpf_mascarado }}</dd></div>
+    <div><dt>Valor do bem</dt><dd>{{ formatar_brl(valores.valor) }}</dd></div>
+    <div><dt>Entrada</dt><dd>{{ formatar_brl(valores.entrada or 0) }}</dd></div>
+    <div><dt>Prazo</dt><dd>{{ valores.prazo_meses }} meses</dd></div>
+    <div><dt>Categoria</dt><dd>{{ valores.categoria | capitalize }}</dd></div>
+  </dl>
+</section>
+
+{% set resultados = resultado.resultados if resultado and resultado.resultados else [] %}
+<section class="panel flush">
+  {% if resultados %}
+  <div class="table-wrap"><table>
+    <thead><tr><th>Banco</th><th>Parcela</th><th>Taxa a.m.</th><th>Prazo</th><th>Financiado</th><th>Situação</th></tr></thead>
+    <tbody>{% for r in resultados %}<tr>
+      <td><strong>{{ r.provedor or '—' }}</strong></td>
+      <td>{% if r.valor_parcela is not none %}{{ formatar_brl(r.valor_parcela) }}{% else %}<span class="muted">—</span>{% endif %}</td>
+      <td>{% if r.taxa_am is not none %}{{ r.taxa_am }}%{% else %}<span class="muted">—</span>{% endif %}</td>
+      <td>{% if r.prazo_meses %}{{ r.prazo_meses }}x{% else %}<span class="muted">—</span>{% endif %}</td>
+      <td>{% if r.valor_financiado is not none %}{{ formatar_brl(r.valor_financiado) }}{% else %}<span class="muted">—</span>{% endif %}</td>
+      <td>{% if r.codigo_erro %}<span class="status perdido">{{ r.codigo_erro }}</span>{% else %}<span class="status {{ r.status or 'novo' }}">{{ r.status | replace('_', ' ') if r.status else 'ok' }}</span>{% endif %}</td>
+    </tr>{% endfor %}</tbody>
+  </table></div>
+  {% else %}<div class="empty"><strong>Nenhuma parcela retornada.</strong><p>Os bancos não devolveram propostas para esses parâmetros.</p></div>{% endif %}
+</section>
+
+<div class="form-actions"><a class="button primary" href="/app/simulacoes">Fazer outra simulação</a></div>
+{% endblock %}

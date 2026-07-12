@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}Registrar venda — Gestão{% endblock %}
+{% block content %}
+<div class="page-heading">
+  <div><a class="back-link" href="/app/vendas">← Voltar às vendas</a><h1>Registrar venda</h1><p>O registro entra como <strong>registrada</strong> e depende de confirmação do gerente ou dono.</p></div>
+</div>
+{% if erro %}<div class="alert error">{{ erro }}</div>{% endif %}
+
+<form method="post" class="form-layout">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  <section class="panel form-section">
+    <div class="section-title"><span>01</span><div><h2>Dados da venda</h2><p>Descrição, referências e valor de venda.</p></div></div>
+    <div class="form-grid">
+      <label class="wide">Descrição<input name="descricao" value="{{ valores.descricao if valores else '' }}" required></label>
+      <label>Preço de venda<input type="number" step="0.01" min="0" name="preco_venda" value="{{ valores.preco_venda if valores else '' }}" required></label>
+      <label>Referência do veículo<input name="veiculo_ref" value="{{ valores.veiculo_ref if valores else '' }}" placeholder="ID do estoque"></label>
+      <label>Referência do lead<input name="lead_ref" value="{{ valores.lead_ref if valores else '' }}" placeholder="ID do lead"></label>
+    </div>
+  </section>
+  {% if pode_financeiro %}
+  <section class="panel form-section">
+    <div class="section-title"><span>02</span><div><h2>Custos</h2><p>Usados no cálculo do lucro bruto. Visíveis apenas a gerente e dono.</p></div></div>
+    <div class="form-grid">
+      <label>Custo do veículo<input type="number" step="0.01" min="0" name="custo_veiculo" value="{{ valores.custo_veiculo if valores else '' }}"></label>
+      <label>Categoria de custo direto<select name="custo_categoria"><option value="">Nenhum</option>{% for c in categorias %}<option value="{{ c }}" {{ 'selected' if valores and valores.custo_categoria == c }}>{{ c | capitalize }}</option>{% endfor %}</select></label>
+      <label>Valor do custo direto<input type="number" step="0.01" min="0" name="custo_valor" value="{{ valores.custo_valor if valores else '' }}"></label>
+    </div>
+  </section>
+  {% endif %}
+  <div class="form-actions"><a class="button ghost" href="/app/vendas">Cancelar</a><button class="button primary" type="submit">Registrar venda</button></div>
+</form>
+{% endblock %}

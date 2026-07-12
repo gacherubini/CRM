@@ -1,4 +1,7 @@
+import calendar
 import os
+from datetime import date, datetime
+from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from pathlib import Path
 from typing import Annotated
 
@@ -17,9 +20,20 @@ from app.auth import (
     csrf_valido,
     encerrar_sessao,
     iniciar_sessao,
+    pode_confirmar_venda,
     pode_gerir_estoque,
+    pode_registrar_venda,
     pode_ver_custo,
+    pode_ver_financeiro,
     usuario_atual,
+)
+from app.models import Meta, Venda, VendaCustoDireto, agora
+from app.clients.chatbot import (
+    ChatbotClient,
+    ChatbotIndisponivel,
+    ConversaNaoEncontrada,
+    LeadNaoEncontrado,
+    SimulacaoIndisponivel,
 )
 from app.clients.estoque import EstoqueClient, EstoqueIndisponivel
 from app.config import settings
@@ -27,6 +41,45 @@ from app.db import Base, engine, get_db
 
 BASE_DIR = Path(__file__).resolve().parent
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
+
+
+def mascarar_telefone(telefone: str | None) -> str:
+    digitos = "".join(c for c in (telefone or "") if c.isdigit())
+    if len(digitos) < 4:
+        return "•••"
+    return f"•••• {digitos[-4:]}"
+
+
+def formatar_horario(iso: str | None) -> str:
+    if not iso:
+        return ""
+    try:
+        momento = datetime.fromisoformat(iso)
+    except ValueError:
+        return iso
+    return momento.strftime("%d/%m %H:%M")
+
+
+def mascarar_cpf(cpf: str | None) -> str:
+    digitos = "".join(c for c in (cpf or "") if c.isdigit())
+    if len(digitos) < 3:
+        return "•••"
+    return f"•••.•••.•••-{digitos[-2:]}"
+
+
+def formatar_brl(valor) -> str:
+    try:
+        numero = float(valor)
+    except (TypeError, ValueError):
+        return "—"
+    texto = f"{numero:,.2f}".replace(",", "_").replace(".", ",").replace("_", ".")
+    return f"R$ {texto}"
+
+
+templates.env.globals["mascarar_telefone"] = mascarar_telefone
+templates.env.globals["formatar_horario"] = formatar_horario
+templates.env.globals["mascarar_cpf"] = mascarar_cpf
+templates.env.globals["formatar_brl"] = formatar_brl
 
 app = FastAPI(title="Portal de Gestão", docs_url=None, redoc_url=None)
 app.add_middleware(
@@ -53,6 +106,10 @@ async def headers_seguranca(request: Request, call_next):
 
 def get_estoque_client() -> EstoqueClient:
     return EstoqueClient(settings.estoque_url, settings.estoque_token, settings.request_timeout)
+
+
+def get_chatbot_client() -> ChatbotClient:
+    return ChatbotClient(settings.chatbot_url, settings.chatbot_token, settings.request_timeout)
 
 
 def redirecionar_login() -> RedirectResponse:
@@ -316,38 +373,466 @@ async def estoque_acao(
     return RedirectResponse(f"/app/estoque?ok={acao}", status_code=303)
 
 
+def filtrar_leads(leads: list[dict], busca: str | None) -> list[dict]:
+    if not busca:
+        return leads
+    termo = busca.strip().lower()
+    resultado = []
+    for lead in leads:
+        campos = [lead.get("nome") or "", lead.get("telefone") or "", lead.get("interesse") or ""]
+        if any(termo in campo.lower() for campo in campos):
+            resultado.append(lead)
+    return resultado
+
+
 @app.get("/app/leads", response_class=HTMLResponse)
-def leads_placeholder(request: Request, db: Session = Depends(get_db)):
+def leads_lista(
+    request: Request,
+    etapa: str | None = None,
+    busca: str | None = None,
+    db: Session = Depends(get_db),
+    chatbot: ChatbotClient = Depends(get_chatbot_client),
+):
     usuario = usuario_atual(request, db)
     if not usuario:
         return redirecionar_login()
+    leads, erro = [], None
+    try:
+        leads = filtrar_leads(chatbot.listar_leads(etapa=etapa or None), busca)
+    except ChatbotIndisponivel as exc:
+        erro = str(exc)
     return templates.TemplateResponse(
-        "em-breve.html",
-        contexto(request, usuario, titulo="Leads", texto="A integração de leads será o próximo incremento."),
+        "leads/lista.html",
+        contexto(
+            request,
+            usuario,
+            leads=leads,
+            filtros={"etapa": etapa or "", "busca": busca or ""},
+            integracao_erro=erro,
+        ),
+    )
+
+
+@app.get("/app/leads/{lead_id}", response_class=HTMLResponse)
+def leads_detalhe(
+    request: Request,
+    lead_id: str,
+    db: Session = Depends(get_db),
+    chatbot: ChatbotClient = Depends(get_chatbot_client),
+):
+    usuario = usuario_atual(request, db)
+    if not usuario:
+        return redirecionar_login()
+    try:
+        lead = chatbot.obter_lead(lead_id)
+    except LeadNaoEncontrado:
+        return templates.TemplateResponse(
+            "erro.html",
+            contexto(request, usuario, erro="Lead não encontrado."),
+            status_code=404,
+        )
+    except ChatbotIndisponivel as exc:
+        return templates.TemplateResponse(
+            "leads/lista.html",
+            contexto(request, usuario, leads=[], filtros={"etapa": "", "busca": ""}, integracao_erro=str(exc)),
+        )
+    return templates.TemplateResponse(
+        "leads/detalhe.html",
+        contexto(request, usuario, lead=lead),
     )
 
 
 @app.get("/app/conversas", response_class=HTMLResponse)
-def conversas_placeholder(request: Request, db: Session = Depends(get_db)):
+def conversas_lista(
+    request: Request,
+    busca: str | None = None,
+    db: Session = Depends(get_db),
+    chatbot: ChatbotClient = Depends(get_chatbot_client),
+):
     usuario = usuario_atual(request, db)
     if not usuario:
         return redirecionar_login()
+    conversas, erro = [], None
+    try:
+        conversas = chatbot.listar_conversas(busca=busca or None)
+    except ChatbotIndisponivel as exc:
+        erro = str(exc)
     return templates.TemplateResponse(
-        "em-breve.html",
-        contexto(request, usuario, titulo="Conversas", texto="Estamos preparando a lista de conversas e o controle de handoff."),
+        "conversas/lista.html",
+        contexto(
+            request,
+            usuario,
+            conversas=conversas,
+            filtros={"busca": busca or ""},
+            integracao_erro=erro,
+        ),
     )
 
 
-@app.get("/app/simulacoes", response_class=HTMLResponse)
-def simulacoes_placeholder(request: Request, db: Session = Depends(get_db)):
+@app.get("/app/conversas/{telefone}", response_class=HTMLResponse)
+def conversas_detalhe(
+    request: Request,
+    telefone: str,
+    db: Session = Depends(get_db),
+    chatbot: ChatbotClient = Depends(get_chatbot_client),
+):
     usuario = usuario_atual(request, db)
     if not usuario:
         return redirecionar_login()
-    if usuario.papel not in {"dono", "gerente", "admin_plataforma"}:
+    try:
+        mensagens = chatbot.listar_mensagens(telefone)
+        estado = chatbot.obter_estado(telefone)
+    except ConversaNaoEncontrada:
+        return templates.TemplateResponse(
+            "erro.html",
+            contexto(request, usuario, erro="Conversa não encontrada."),
+            status_code=404,
+        )
+    except ChatbotIndisponivel as exc:
+        return templates.TemplateResponse(
+            "conversas/lista.html",
+            contexto(request, usuario, conversas=[], filtros={"busca": ""}, integracao_erro=str(exc)),
+        )
+    return templates.TemplateResponse(
+        "conversas/detalhe.html",
+        contexto(request, usuario, telefone=telefone, mensagens=mensagens, estado=estado),
+    )
+
+
+@app.post("/app/conversas/{telefone}/handoff")
+async def conversas_handoff(
+    request: Request,
+    telefone: str,
+    db: Session = Depends(get_db),
+    chatbot: ChatbotClient = Depends(get_chatbot_client),
+):
+    usuario = usuario_atual(request, db)
+    if not usuario:
+        return redirecionar_login()
+    form = await request.form()
+    destino = f"/app/conversas/{telefone}"
+    if not csrf_valido(request, form.get("csrf")):
+        return RedirectResponse(destino, status_code=303)
+    acao = form.get("acao")
+    if acao not in {"assumir", "devolver"}:
+        return RedirectResponse(f"{destino}?erro=acao", status_code=303)
+    try:
+        chatbot.definir_bot_ativo(telefone, bot_ativo=acao == "devolver")
+    except ChatbotIndisponivel:
+        return RedirectResponse(f"{destino}?erro=indisponivel", status_code=303)
+    return RedirectResponse(f"{destino}?ok={acao}", status_code=303)
+
+
+def pode_simular(usuario) -> bool:
+    return usuario.papel in {"dono", "gerente", "admin_plataforma"}
+
+
+def dados_simulacao(form) -> dict:
+    payload = {
+        "cpf": "".join(c for c in (form.get("cpf") or "") if c.isdigit()),
+        "nascimento": form.get("nascimento", "").strip(),
+        "valor": float(str(form.get("valor")).replace(",", ".")),
+        "prazo_meses": int(form.get("prazo_meses")),
+        "entrada": float(str(form.get("entrada") or 0).replace(",", ".")),
+        "categoria": form.get("categoria") or "moto",
+    }
+    if form.get("renda"):
+        payload["renda"] = float(str(form.get("renda")).replace(",", "."))
+    return payload
+
+
+@app.get("/app/simulacoes", response_class=HTMLResponse)
+def simulacoes_pagina(request: Request, db: Session = Depends(get_db)):
+    usuario = usuario_atual(request, db)
+    if not usuario:
+        return redirecionar_login()
+    if not pode_simular(usuario):
         return RedirectResponse("/app", status_code=303)
     return templates.TemplateResponse(
-        "em-breve.html",
-        contexto(request, usuario, titulo="Simulações", texto="A simulação manual será habilitada quando o provedor estiver disponível."),
+        "simulacoes/form.html",
+        contexto(request, usuario, valores={}),
+    )
+
+
+@app.post("/app/simulacoes", response_class=HTMLResponse)
+async def simulacoes_simular(
+    request: Request,
+    db: Session = Depends(get_db),
+    chatbot: ChatbotClient = Depends(get_chatbot_client),
+):
+    usuario = usuario_atual(request, db)
+    if not usuario:
+        return redirecionar_login()
+    if not pode_simular(usuario):
+        return RedirectResponse("/app", status_code=303)
+    form = await request.form()
+    if not csrf_valido(request, form.get("csrf")):
+        return RedirectResponse("/app/simulacoes", status_code=303)
+    valores = {
+        "nascimento": form.get("nascimento", ""),
+        "valor": form.get("valor", ""),
+        "prazo_meses": form.get("prazo_meses", ""),
+        "entrada": form.get("entrada", ""),
+        "renda": form.get("renda", ""),
+        "categoria": form.get("categoria", "moto"),
+    }
+    try:
+        payload = dados_simulacao(form)
+    except (TypeError, ValueError):
+        return templates.TemplateResponse(
+            "simulacoes/form.html",
+            contexto(request, usuario, valores=valores, erro="Confira os valores informados e tente novamente."),
+            status_code=422,
+        )
+    try:
+        resultado = chatbot.simular(payload)
+    except SimulacaoIndisponivel:
+        return templates.TemplateResponse(
+            "simulacoes/form.html",
+            contexto(request, usuario, valores=valores, erro="Simulação não habilitada nesta instalação."),
+            status_code=409,
+        )
+    except ChatbotIndisponivel as exc:
+        return templates.TemplateResponse(
+            "simulacoes/form.html",
+            contexto(request, usuario, valores=valores, erro=str(exc)),
+            status_code=503,
+        )
+    return templates.TemplateResponse(
+        "simulacoes/resultado.html",
+        contexto(
+            request,
+            usuario,
+            valores=valores,
+            resultado=resultado,
+            cpf_mascarado=mascarar_cpf(payload["cpf"]),
+        ),
+    )
+
+
+CATEGORIAS_CUSTO = ["documentacao", "frete", "comissao", "outros"]
+STATUS_VENDA = ["registrada", "confirmada", "cancelada"]
+CENTAVOS = Decimal("0.01")
+
+
+def dinheiro(texto) -> Decimal:
+    return Decimal(str(texto).replace(",", ".")).quantize(CENTAVOS, rounding=ROUND_HALF_UP)
+
+
+def _data(momento):
+    return momento.date() if isinstance(momento, datetime) else momento
+
+
+def ultimo_dia_mes(dia: date) -> date:
+    return date(dia.year, dia.month, calendar.monthrange(dia.year, dia.month)[1])
+
+
+def periodo_padrao(inicio: str | None, fim: str | None) -> tuple[date, date]:
+    hoje = date.today()
+    try:
+        d_inicio = date.fromisoformat(inicio) if inicio else hoje.replace(day=1)
+    except ValueError:
+        d_inicio = hoje.replace(day=1)
+    try:
+        d_fim = date.fromisoformat(fim) if fim else ultimo_dia_mes(hoje)
+    except ValueError:
+        d_fim = ultimo_dia_mes(hoje)
+    return d_inicio, d_fim
+
+
+def lucro_bruto_venda(venda: Venda) -> Decimal:
+    custo = venda.custo_veiculo or Decimal("0")
+    diretos = sum((c.valor for c in venda.custos_diretos), Decimal("0"))
+    return (venda.preco_venda - custo - diretos).quantize(CENTAVOS, rounding=ROUND_HALF_UP)
+
+
+@app.get("/app/vendas", response_class=HTMLResponse)
+def vendas_lista(
+    request: Request,
+    status: str | None = None,
+    inicio: str | None = None,
+    fim: str | None = None,
+    db: Session = Depends(get_db),
+):
+    usuario = usuario_atual(request, db)
+    if not usuario:
+        return redirecionar_login()
+    d_inicio, d_fim = periodo_padrao(inicio, fim)
+    consulta = db.query(Venda).filter(Venda.loja_slug == usuario.loja_slug)
+    if not pode_ver_financeiro(usuario):
+        consulta = consulta.filter(Venda.vendedor_email == usuario.email)
+    if status in STATUS_VENDA:
+        consulta = consulta.filter(Venda.status == status)
+    vendas = [
+        v
+        for v in consulta.order_by(Venda.criada_em.desc()).all()
+        if d_inicio <= _data(v.criada_em) <= d_fim
+    ]
+    return templates.TemplateResponse(
+        "vendas/lista.html",
+        contexto(
+            request,
+            usuario,
+            vendas=vendas,
+            lucro=lucro_bruto_venda,
+            filtros={"status": status or "", "inicio": d_inicio.isoformat(), "fim": d_fim.isoformat()},
+            pode_financeiro=pode_ver_financeiro(usuario),
+            pode_confirmar=pode_confirmar_venda(usuario),
+            pode_registrar=pode_registrar_venda(usuario),
+        ),
+    )
+
+
+@app.get("/app/vendas/nova", response_class=HTMLResponse)
+def vendas_nova(request: Request, db: Session = Depends(get_db)):
+    usuario = usuario_atual(request, db)
+    if not usuario:
+        return redirecionar_login()
+    if not pode_registrar_venda(usuario):
+        return RedirectResponse("/app/vendas", status_code=303)
+    return templates.TemplateResponse(
+        "vendas/form.html",
+        contexto(request, usuario, valores={}, categorias=CATEGORIAS_CUSTO, pode_financeiro=pode_ver_financeiro(usuario)),
+    )
+
+
+@app.post("/app/vendas/nova")
+async def vendas_criar(request: Request, db: Session = Depends(get_db)):
+    usuario = usuario_atual(request, db)
+    if not usuario:
+        return redirecionar_login()
+    form = await request.form()
+    if not pode_registrar_venda(usuario) or not csrf_valido(request, form.get("csrf")):
+        return RedirectResponse("/app/vendas", status_code=303)
+    valores = {
+        campo: (form.get(campo) or "")
+        for campo in ("descricao", "preco_venda", "lead_ref", "veiculo_ref", "custo_veiculo", "custo_categoria", "custo_valor")
+    }
+    descricao = (form.get("descricao") or "").strip()
+    try:
+        preco = dinheiro(form.get("preco_venda"))
+    except (InvalidOperation, TypeError):
+        preco = None
+    if not descricao or preco is None or preco <= 0:
+        return templates.TemplateResponse(
+            "vendas/form.html",
+            contexto(request, usuario, valores=valores, categorias=CATEGORIAS_CUSTO, pode_financeiro=pode_ver_financeiro(usuario), erro="Informe descrição e preço de venda válidos."),
+            status_code=422,
+        )
+    venda = Venda(
+        loja_slug=usuario.loja_slug,
+        vendedor_email=usuario.email,
+        descricao=descricao,
+        preco_venda=preco,
+        lead_ref=(form.get("lead_ref") or "").strip() or None,
+        veiculo_ref=(form.get("veiculo_ref") or "").strip() or None,
+        status="registrada",
+    )
+    if pode_ver_financeiro(usuario):
+        if form.get("custo_veiculo"):
+            try:
+                venda.custo_veiculo = dinheiro(form.get("custo_veiculo"))
+            except (InvalidOperation, TypeError):
+                pass
+        categoria = form.get("custo_categoria")
+        if form.get("custo_valor") and categoria in CATEGORIAS_CUSTO:
+            try:
+                venda.custos_diretos.append(VendaCustoDireto(categoria=categoria, valor=dinheiro(form.get("custo_valor"))))
+            except (InvalidOperation, TypeError):
+                pass
+    db.add(venda)
+    db.commit()
+    return RedirectResponse("/app/vendas?ok=registrada", status_code=303)
+
+
+@app.post("/app/vendas/{venda_id}/confirmar")
+async def vendas_confirmar(request: Request, venda_id: str, db: Session = Depends(get_db)):
+    usuario = usuario_atual(request, db)
+    if not usuario:
+        return redirecionar_login()
+    form = await request.form()
+    if not pode_confirmar_venda(usuario) or not csrf_valido(request, form.get("csrf")):
+        return RedirectResponse("/app/vendas", status_code=303)
+    venda = db.query(Venda).filter(Venda.id == venda_id, Venda.loja_slug == usuario.loja_slug).first()
+    if not venda or venda.status == "cancelada":
+        return RedirectResponse("/app/vendas?erro=acao", status_code=303)
+    venda.status = "confirmada"
+    venda.confirmada_por = usuario.email
+    venda.confirmada_em = agora()
+    venda.atualizada_em = agora()
+    db.commit()
+    return RedirectResponse("/app/vendas?ok=confirmada", status_code=303)
+
+
+@app.post("/app/vendas/{venda_id}/cancelar")
+async def vendas_cancelar(request: Request, venda_id: str, db: Session = Depends(get_db)):
+    usuario = usuario_atual(request, db)
+    if not usuario:
+        return redirecionar_login()
+    form = await request.form()
+    if not pode_confirmar_venda(usuario) or not csrf_valido(request, form.get("csrf")):
+        return RedirectResponse("/app/vendas", status_code=303)
+    venda = db.query(Venda).filter(Venda.id == venda_id, Venda.loja_slug == usuario.loja_slug).first()
+    motivo = (form.get("motivo") or "").strip()
+    if not venda:
+        return RedirectResponse("/app/vendas?erro=acao", status_code=303)
+    if not motivo:
+        return RedirectResponse("/app/vendas?erro=motivo", status_code=303)
+    venda.status = "cancelada"
+    venda.motivo_cancelamento = motivo
+    venda.atualizada_em = agora()
+    db.commit()
+    return RedirectResponse("/app/vendas?ok=cancelada", status_code=303)
+
+
+@app.get("/app/financeiro", response_class=HTMLResponse)
+def financeiro_dashboard(
+    request: Request,
+    inicio: str | None = None,
+    fim: str | None = None,
+    db: Session = Depends(get_db),
+):
+    usuario = usuario_atual(request, db)
+    if not usuario:
+        return redirecionar_login()
+    if not pode_ver_financeiro(usuario):
+        return RedirectResponse("/app", status_code=303)
+    d_inicio, d_fim = periodo_padrao(inicio, fim)
+    confirmadas = [
+        v
+        for v in db.query(Venda).filter(Venda.loja_slug == usuario.loja_slug, Venda.status == "confirmada").all()
+        if d_inicio <= _data(v.criada_em) <= d_fim
+    ]
+    faturamento = sum((v.preco_venda for v in confirmadas), Decimal("0"))
+    lucro = sum((lucro_bruto_venda(v) for v in confirmadas), Decimal("0"))
+    metricas = {"quantidade": len(confirmadas), "faturamento": faturamento, "lucro_bruto": lucro}
+    realizado_por_tipo = {"quantidade": Decimal(len(confirmadas)), "faturamento": faturamento, "lucro_bruto": lucro}
+    metas_view = []
+    for meta in db.query(Meta).filter(Meta.loja_slug == usuario.loja_slug, Meta.escopo == "loja").all():
+        if meta.tipo not in realizado_por_tipo or not (meta.periodo_inicio <= d_fim and meta.periodo_fim >= d_inicio):
+            continue
+        realizado = realizado_por_tipo[meta.tipo]
+        pct = round(float(realizado / meta.valor_alvo * 100), 1) if meta.valor_alvo else 0.0
+        metas_view.append(
+            {
+                "tipo": meta.tipo,
+                "alvo": meta.valor_alvo,
+                "realizado": realizado,
+                "pct": pct,
+                "pct_barra": min(pct, 100),
+                "quantidade": meta.tipo == "quantidade",
+            }
+        )
+    return templates.TemplateResponse(
+        "financeiro/dashboard.html",
+        contexto(
+            request,
+            usuario,
+            metricas=metricas,
+            metas=metas_view,
+            tem_dados=bool(confirmadas),
+            periodo={"inicio": d_inicio.isoformat(), "fim": d_fim.isoformat()},
+        ),
     )
 
 

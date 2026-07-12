@@ -29,8 +29,16 @@
         <a class="nav-link {{ 'active' if request.url.path.startswith('/app/leads') else '' }}" href="/app/leads" {% if request.url.path.startswith('/app/leads') %}aria-current="page"{% endif %}><span>02</span>Leads</a>
         <a class="nav-link {{ 'active' if request.url.path.startswith('/app/conversas') else '' }}" href="/app/conversas" {% if request.url.path.startswith('/app/conversas') %}aria-current="page"{% endif %}><span>03</span>Conversas</a>
         <a class="nav-link {{ 'active' if request.url.path.startswith('/app/estoque') else '' }}" href="/app/estoque" {% if request.url.path.startswith('/app/estoque') %}aria-current="page"{% endif %}><span>04</span>Estoque</a>
+        {% if usuario.papel in ['dono', 'gerente', 'vendedor'] %}
+        <a class="nav-link {{ 'active' if request.url.path.startswith('/app/vendas') else '' }}" href="/app/vendas" {% if request.url.path.startswith('/app/vendas') %}aria-current="page"{% endif %}><span>05</span>Vendas</a>
+        {% endif %}
         {% if usuario.papel in ['dono', 'gerente', 'admin_plataforma'] %}
-        <a class="nav-link {{ 'active' if request.url.path.startswith('/app/simulacoes') else '' }}" href="/app/simulacoes" {% if request.url.path.startswith('/app/simulacoes') %}aria-current="page"{% endif %}><span>05</span>Simulações</a>
+        <a class="nav-link {{ 'active' if request.url.path.startswith('/app/simulacoes') else '' }}" href="/app/simulacoes" {% if request.url.path.startswith('/app/simulacoes') %}aria-current="page"{% endif %}><span>06</span>Simulações</a>
+        {% endif %}
+
+        {% if usuario.papel in ['dono', 'gerente'] %}
+        <span class="nav-section">Comercial</span>
+        <a class="nav-link {{ 'active' if request.url.path.startswith('/app/financeiro') else '' }}" href="/app/financeiro" {% if request.url.path.startswith('/app/financeiro') %}aria-current="page"{% endif %}><span>07</span>Financeiro</a>
         {% endif %}
 
         {% if usuario.papel in ['dono', 'admin_plataforma'] %}
@@ -40,8 +48,7 @@
         {% endif %}
 
         <span class="nav-section">Próximos módulos</span>
-        <span class="nav-link disabled" aria-disabled="true"><span>08</span>Vendas</span>
-        <span class="nav-link disabled" aria-disabled="true"><span>09</span>Metas</span>
+        <span class="nav-link disabled" aria-disabled="true"><span>10</span>Metas</span>
       </nav>
 
       <div class="sidebar-footer">
@@ -58,7 +65,7 @@
       <header class="topbar">
         <button class="menu-button" type="button" aria-controls="sidebar" aria-expanded="false">Menu</button>
         <div class="page-context">
-          <strong>{% block page_title %}{% if request.url.path == '/app' %}Visão geral{% elif request.url.path.startswith('/app/estoque') %}Estoque{% elif request.url.path.startswith('/app/leads') %}Leads{% elif request.url.path.startswith('/app/conversas') %}Conversas{% elif request.url.path.startswith('/app/simulacoes') %}Simulações{% elif request.url.path.startswith('/app/equipe') %}Equipe{% else %}Configurações{% endif %}{% endblock %}</strong>
+          <strong>{% block page_title %}{% if request.url.path == '/app' %}Visão geral{% elif request.url.path.startswith('/app/estoque') %}Estoque{% elif request.url.path.startswith('/app/leads') %}Leads{% elif request.url.path.startswith('/app/conversas') %}Conversas{% elif request.url.path.startswith('/app/vendas') %}Vendas{% elif request.url.path.startswith('/app/financeiro') %}Financeiro{% elif request.url.path.startswith('/app/simulacoes') %}Simulações{% elif request.url.path.startswith('/app/equipe') %}Equipe{% else %}Configurações{% endif %}{% endblock %}</strong>
           <small>{{ usuario.loja_slug }}</small>
         </div>
         <span class="environment"><i></i>Conectado</span>

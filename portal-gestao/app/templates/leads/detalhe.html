@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}Lead — Gestão{% endblock %}
+{% block content %}
+<div class="page-heading">
+  <div>
+    <a class="back-link" href="/app/leads">← Voltar aos leads</a>
+    <h1>{% if lead.nome %}{{ lead.nome }}{% else %}Contato sem nome{% endif %}</h1>
+    <p>Detalhes do interessado registrado pelo chatbot.</p>
+  </div>
+  <span class="status {{ lead.etapa }}">{{ lead.etapa | replace('_', ' ') }}</span>
+</div>
+
+<section class="panel form-section">
+  <div class="section-title"><span>01</span><div><h2>Contato</h2><p>Dados mínimos para acompanhamento.</p></div></div>
+  <dl class="integration-stats">
+    <div><dt>Telefone</dt><dd>{{ mascarar_telefone(lead.telefone) }}</dd></div>
+    <div><dt>Nome</dt><dd>{% if lead.nome %}{{ lead.nome }}{% else %}<span class="muted">—</span>{% endif %}</dd></div>
+    <div><dt>Interesse</dt><dd>{% if lead.interesse %}{{ lead.interesse }}{% else %}<span class="muted">—</span>{% endif %}</dd></div>
+    <div><dt>Etapa</dt><dd>{{ lead.etapa | replace('_', ' ') }}</dd></div>
+  </dl>
+</section>
+
+<section class="panel form-section">
+  <div class="section-title"><span>02</span><div><h2>Consentimento e registro</h2><p>Base legal para tratamento dos dados.</p></div></div>
+  <dl class="integration-stats">
+    <div><dt>Consentimento</dt><dd>{% if lead.consentimento_em %}<span class="published">Concedido</span> · {{ lead.consentimento_em }}{% else %}<span class="muted">Pendente</span>{% endif %}</dd></div>
+    <div><dt>Criado em</dt><dd>{{ lead.criada_em }}</dd></div>
+  </dl>
+</section>
+{% endblock %}

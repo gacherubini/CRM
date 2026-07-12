@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}Conversas — Gestão{% endblock %}
+{% block content %}
+<div class="page-heading">
+  <div><span class="eyebrow">Atendimento no WhatsApp</span><h1>Conversas</h1><p>Acompanhe os atendimentos e assuma o controle quando precisar.</p></div>
+</div>
+
+{% if integracao_erro %}<div class="alert warning" role="alert"><strong>Conversas desconectadas.</strong> {{ integracao_erro }}</div>{% endif %}
+
+<form class="filter-bar" method="get">
+  <label class="search"><span class="sr-only">Buscar</span><input name="busca" value="{{ filtros.busca }}" placeholder="Buscar por telefone"></label>
+  <button class="button secondary" type="submit">Filtrar</button>
+</form>
+
+<section class="panel flush">
+  {% if conversas %}
+  <div class="table-wrap"><table>
+    <thead><tr><th>Contato</th><th>Última mensagem</th><th>Atendimento</th><th>Atualizada</th><th><span class="sr-only">Ações</span></th></tr></thead>
+    <tbody>{% for c in conversas %}<tr>
+      <td><div><strong>{{ mascarar_telefone(c.telefone) }}</strong></div></td>
+      <td>{% if c.ultima_mensagem %}<span class="muted">{{ '↩' if c.ultima_mensagem.direcao == 'saida' else '↪' }}</span> {{ c.ultima_mensagem.texto }}{% else %}<span class="muted">—</span>{% endif %}</td>
+      <td>{% if c.bot_ativo %}<span class="status novo">Bot ativo</span>{% else %}<span class="status em_atendimento">Humano</span>{% endif %}</td>
+      <td><small>{{ formatar_horario(c.atualizada_em) }}</small></td>
+      <td><a class="table-action" href="/app/conversas/{{ c.telefone }}">Abrir</a></td>
+    </tr>{% endfor %}</tbody>
+  </table></div>
+  {% elif integracao_erro %}<div class="empty"><strong>Não foi possível carregar as conversas.</strong><p>Tente novamente em instantes.</p></div>
+  {% elif filtros.busca %}<div class="empty"><strong>Nenhuma conversa para essa busca.</strong><p>Ajuste o telefone pesquisado.</p></div>
+  {% else %}<div class="empty"><strong>Nenhuma conversa ainda.</strong><p>Assim que o chatbot receber mensagens, elas aparecem aqui.</p></div>{% endif %}
+</section>
+{% endblock %}
