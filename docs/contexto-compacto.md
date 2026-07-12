@@ -54,6 +54,8 @@ Catálogo Público #5A. Leia este arquivo primeiro e depois `docs/handoff-contex
 - `/app/vendedor`: vendas/metas próprias e atendimentos atribuídos pelo Portal, sem custo/lucro.
 - `/app/financeiro`: primeiro funil auditável com filtros e estado degradado; migration
   `0004_cria_atendimento_atribuicoes`. Suíte do Portal: **86 testes**.
+- Decisão de produto pendente de implementação: vendedor também pode executar simulação manual,
+  sem receber custo do veículo, lucro, métricas financeiras, tokens ou credenciais do Motor.
 - Equipe/config ainda placeholder. Precisa `CHATBOT_API_TOKEN` no `.env` local do portal.
 
 ### Catálogo Público #5A

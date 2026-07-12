@@ -205,6 +205,16 @@ versionados. Cada produto funciona sem os demais:
 
 O Estoque API é a fonte única de veículos; bot, portal e vitrine integram-se somente por contratos HTTP/eventos.
 
+### Acesso no Portal por papel
+
+- **Dono/gerente:** estoque completo, vendas, custos, lucro, metas, funil financeiro e simulações.
+- **Vendedor:** painel e vendas próprios, leads/conversas autorizados, estoque sem custos e
+  **simulação manual**. A simulação do vendedor nunca expõe custo do veículo, lucro, métricas
+  financeiras, tokens ou credenciais do Motor.
+
+A liberação da simulação para vendedor é uma decisão de produto registrada no Plano #3A.1 e deve
+ser aplicada por RBAC no backend, não apenas ocultando ou exibindo itens de menu.
+
 ## 📄 Documentação
 
 - **[docs/design.md](docs/design.md)** — spec de design completo (arquitetura, modelo de

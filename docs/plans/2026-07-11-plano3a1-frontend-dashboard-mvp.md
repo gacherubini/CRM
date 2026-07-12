@@ -112,8 +112,8 @@ conforme política da loja. Não administra a plataforma.
 
 ### Vendedor
 
-Leads atribuídos, Conversas autorizadas e Estoque. Não vê custo do veículo nem credenciais; ações
-de publicação/venda dependem de permissão explícita.
+Leads atribuídos, Conversas autorizadas, Estoque e Simulações manuais. Não vê custo do veículo,
+lucro, métricas financeiras nem credenciais; ações de publicação/venda dependem de permissão explícita.
 
 Autorização é aplicada no backend das rotas. Ocultar botão não é controle de acesso suficiente.
 
@@ -310,6 +310,10 @@ Mostrar a rota somente quando `SimulationProvider` estiver disponível. Formulá
 consentimento operacional explícito e resposta real da API. Nunca calcular/inventar parcela no
 frontend.
 
+Dono, gerente e **vendedor** podem executar a simulação. O vendedor recebe somente os dados da
+proposta necessários ao atendimento e nunca vê custo do veículo, lucro, credenciais do Motor ou
+métricas financeiras. RBAC deve ser validado no backend e coberto por testes.
+
 ### Task 14: Docker e composição
 
 Criar `portal-gestao/Dockerfile` e `deploy/portal-standalone/docker-compose.yml`. No pacote Dashboard,
@@ -328,8 +332,9 @@ Com Playwright:
 5. abre lista/detalhe de lead;
 6. abre conversa e assume/devolve ao bot;
 7. vendedor não vê custo/configuração;
-8. indisponibilidade de Chatbot não derruba Estoque;
-9. nenhum token aparece em HTML, storage ou requests do browser.
+8. vendedor consegue executar simulação manual sem receber custo/lucro/credenciais;
+9. indisponibilidade de Chatbot não derruba Estoque;
+10. nenhum token aparece em HTML, storage ou requests do browser.
 
 ## 8. Sequência de entrega
 

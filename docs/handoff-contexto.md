@@ -24,6 +24,11 @@ Entregue o primeiro funil comercial ponta a ponta em código, ainda sem ativar o
 Pendência operacional deliberada: configurar `CATALOGO_EVENTS_URL` e `CATALOGO_EVENTS_TOKEN` no
 deploy e fazer E2E real do clique até o Portal. Nenhum `.env` foi lido/alterado e o bot permanece off.
 
+Decisão de produto registrada para o próximo incremento do Portal: **vendedor pode executar
+simulação manual**. O backend deve autorizar o papel `vendedor`, mantendo custo do veículo, lucro,
+métricas financeiras, tokens e credenciais do Motor invisíveis. Atualizar navegação e testes de RBAC;
+não considerar concluído apenas por exibir o link no menu.
+
 ## 0.1 Atualização — sessão 2026-07-12 (parte 3)
 
 Trabalho feito na `main`, ainda sem commit no início desta atualização. Entregas verificadas ao vivo
