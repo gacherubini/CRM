@@ -11,7 +11,11 @@ os.environ["ESTOQUE_API_TOKEN"] = "token-de-teste"
 os.environ["CHATBOT_API_TOKEN"] = "token-chatbot-teste"
 
 from app.auth import hash_senha  # noqa: E402
-from app.clients.chatbot import ChatbotIndisponivel, LeadNaoEncontrado  # noqa: E402
+from app.clients.chatbot import (  # noqa: E402
+    ChatbotIndisponivel,
+    ConversaNaoEncontrada,
+    LeadNaoEncontrado,
+)
 from app.db import Base, SessionLocal, engine  # noqa: E402
 from app.main import app, get_chatbot_client, get_estoque_client  # noqa: E402
 from app.models import Usuario  # noqa: E402
@@ -78,6 +82,29 @@ class ChatbotFake:
             },
         ]
         self.indisponivel = False
+        self.conversas = [
+            {
+                "id": "c1", "telefone": "5511987654321", "bot_ativo": True,
+                "status": "aberta", "atualizada_em": "2026-07-12T14:00:00+00:00",
+                "ultima_mensagem": {"texto": "Tem Civic disponível?", "criada_em": "2026-07-12T14:00:00+00:00", "direcao": "entrada"},
+            },
+            {
+                "id": "c2", "telefone": "5511911112222", "bot_ativo": False,
+                "status": "handoff", "atualizada_em": "2026-07-12T13:00:00+00:00",
+                "ultima_mensagem": None,
+            },
+        ]
+        self.mensagens = {
+            "5511987654321": [
+                {"direcao": "entrada", "texto": "Tem Civic disponível?", "criada_em": "2026-07-12T14:00:00+00:00"},
+                {"direcao": "saida", "texto": "Temos sim!", "criada_em": "2026-07-12T14:01:00+00:00"},
+            ],
+        }
+        self.estados = {
+            "5511987654321": {"bot_ativo": True, "status": "aberta"},
+            "5511911112222": {"bot_ativo": False, "status": "handoff"},
+        }
+        self.handoffs = []
 
     def listar_leads(self, etapa=None):
         if self.indisponivel:
@@ -94,6 +121,31 @@ class ChatbotFake:
             if lead["id"] == lead_id:
                 return lead
         raise LeadNaoEncontrado("Lead não encontrado")
+
+    def listar_conversas(self, busca=None, limit=50, offset=0):
+        if self.indisponivel:
+            raise ChatbotIndisponivel("Não foi possível acessar o chatbot agora")
+        itens = self.conversas
+        if busca:
+            itens = [c for c in itens if busca in c["telefone"]]
+        return itens
+
+    def listar_mensagens(self, telefone, limit=200, offset=0):
+        if self.indisponivel:
+            raise ChatbotIndisponivel("Não foi possível acessar o chatbot agora")
+        if telefone not in self.mensagens:
+            raise ConversaNaoEncontrada("conversa não encontrada")
+        return self.mensagens[telefone]
+
+    def obter_estado(self, telefone):
+        return self.estados.get(telefone, {"bot_ativo": True, "status": "aberta"})
+
+    def definir_bot_ativo(self, telefone, bot_ativo):
+        if self.indisponivel:
+            raise ChatbotIndisponivel("Não foi possível acessar o chatbot agora")
+        self.handoffs.append((telefone, bot_ativo))
+        self.estados[telefone] = {"bot_ativo": bot_ativo, "status": "aberta" if bot_ativo else "handoff"}
+        return self.estados[telefone]
 
 
 @pytest.fixture

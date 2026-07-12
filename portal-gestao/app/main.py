@@ -1,4 +1,5 @@
 import os
+from datetime import datetime
 from pathlib import Path
 from typing import Annotated
 
@@ -21,7 +22,12 @@ from app.auth import (
     pode_ver_custo,
     usuario_atual,
 )
-from app.clients.chatbot import ChatbotClient, ChatbotIndisponivel, LeadNaoEncontrado
+from app.clients.chatbot import (
+    ChatbotClient,
+    ChatbotIndisponivel,
+    ConversaNaoEncontrada,
+    LeadNaoEncontrado,
+)
 from app.clients.estoque import EstoqueClient, EstoqueIndisponivel
 from app.config import settings
 from app.db import Base, engine, get_db
@@ -37,7 +43,18 @@ def mascarar_telefone(telefone: str | None) -> str:
     return f"•••• {digitos[-4:]}"
 
 
+def formatar_horario(iso: str | None) -> str:
+    if not iso:
+        return ""
+    try:
+        momento = datetime.fromisoformat(iso)
+    except ValueError:
+        return iso
+    return momento.strftime("%d/%m %H:%M")
+
+
 templates.env.globals["mascarar_telefone"] = mascarar_telefone
+templates.env.globals["formatar_horario"] = formatar_horario
 
 app = FastAPI(title="Portal de Gestão", docs_url=None, redoc_url=None)
 app.add_middleware(
@@ -401,14 +418,84 @@ def leads_detalhe(
 
 
 @app.get("/app/conversas", response_class=HTMLResponse)
-def conversas_placeholder(request: Request, db: Session = Depends(get_db)):
+def conversas_lista(
+    request: Request,
+    busca: str | None = None,
+    db: Session = Depends(get_db),
+    chatbot: ChatbotClient = Depends(get_chatbot_client),
+):
     usuario = usuario_atual(request, db)
     if not usuario:
         return redirecionar_login()
+    conversas, erro = [], None
+    try:
+        conversas = chatbot.listar_conversas(busca=busca or None)
+    except ChatbotIndisponivel as exc:
+        erro = str(exc)
     return templates.TemplateResponse(
-        "em-breve.html",
-        contexto(request, usuario, titulo="Conversas", texto="Estamos preparando a lista de conversas e o controle de handoff."),
+        "conversas/lista.html",
+        contexto(
+            request,
+            usuario,
+            conversas=conversas,
+            filtros={"busca": busca or ""},
+            integracao_erro=erro,
+        ),
     )
+
+
+@app.get("/app/conversas/{telefone}", response_class=HTMLResponse)
+def conversas_detalhe(
+    request: Request,
+    telefone: str,
+    db: Session = Depends(get_db),
+    chatbot: ChatbotClient = Depends(get_chatbot_client),
+):
+    usuario = usuario_atual(request, db)
+    if not usuario:
+        return redirecionar_login()
+    try:
+        mensagens = chatbot.listar_mensagens(telefone)
+        estado = chatbot.obter_estado(telefone)
+    except ConversaNaoEncontrada:
+        return templates.TemplateResponse(
+            "erro.html",
+            contexto(request, usuario, erro="Conversa não encontrada."),
+            status_code=404,
+        )
+    except ChatbotIndisponivel as exc:
+        return templates.TemplateResponse(
+            "conversas/lista.html",
+            contexto(request, usuario, conversas=[], filtros={"busca": ""}, integracao_erro=str(exc)),
+        )
+    return templates.TemplateResponse(
+        "conversas/detalhe.html",
+        contexto(request, usuario, telefone=telefone, mensagens=mensagens, estado=estado),
+    )
+
+
+@app.post("/app/conversas/{telefone}/handoff")
+async def conversas_handoff(
+    request: Request,
+    telefone: str,
+    db: Session = Depends(get_db),
+    chatbot: ChatbotClient = Depends(get_chatbot_client),
+):
+    usuario = usuario_atual(request, db)
+    if not usuario:
+        return redirecionar_login()
+    form = await request.form()
+    destino = f"/app/conversas/{telefone}"
+    if not csrf_valido(request, form.get("csrf")):
+        return RedirectResponse(destino, status_code=303)
+    acao = form.get("acao")
+    if acao not in {"assumir", "devolver"}:
+        return RedirectResponse(f"{destino}?erro=acao", status_code=303)
+    try:
+        chatbot.definir_bot_ativo(telefone, bot_ativo=acao == "devolver")
+    except ChatbotIndisponivel:
+        return RedirectResponse(f"{destino}?erro=indisponivel", status_code=303)
+    return RedirectResponse(f"{destino}?ok={acao}", status_code=303)
 
 
 @app.get("/app/simulacoes", response_class=HTMLResponse)
