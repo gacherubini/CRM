@@ -39,3 +39,40 @@ def test_estado_isolado_por_loja(client, loja_a, loja_b):
 
 def test_estado_exige_credencial(client):
     assert client.get("/v1/conversas/5511/estado").status_code == 401
+
+
+def test_resposta_manual_pausa_o_bot(client, loja_a):
+    tel = "5511977700011"
+    r = client.post(
+        "/webhook/mensagem",
+        json={
+            "instance": loja_a["instance"],
+            "telefone": tel,
+            "texto": "Eu continuo daqui",
+            "provider_message_id": "MANUAL-1",
+            "from_me": True,
+        },
+    )
+    assert r.json()["bot_ativo"] is False
+    estado = client.get(f"/v1/conversas/{tel}/estado", headers=loja_a["headers"])
+    assert estado.json() == {"bot_ativo": False, "status": "handoff"}
+
+
+def test_saida_do_bot_e_evento_duplicado_nao_acionam_handoff(client, loja_a):
+    tel = "5511977700022"
+    payload = {
+        "instance": loja_a["instance"],
+        "telefone": tel,
+        "texto": "Mensagem automática",
+        "provider_message_id": "BOT-1",
+        "from_me": True,
+    }
+    registrada = client.post(
+        "/webhook/mensagem", json={**payload, "origem_bot": True}
+    )
+    assert registrada.json()["bot_ativo"] is True
+
+    # A Evolution reentrega a mesma saída como fromMe; a idempotência a reconhece.
+    repetida = client.post("/webhook/mensagem", json=payload)
+    assert repetida.json()["duplicada"] is True
+    assert repetida.json()["bot_ativo"] is True

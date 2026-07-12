@@ -18,11 +18,29 @@ services:
     environment:
       - DATABASE_URL=postgresql+psycopg://estoque:${POSTGRES_PASSWORD:-estoque}@postgres:5432/estoque
       - ESTOQUE_SKIP_INIT=1
+      - ESTOQUE_PUBLIC_RATE_LIMIT=${ESTOQUE_PUBLIC_RATE_LIMIT:-120}
+      - ESTOQUE_OUTBOX_KEY=${ESTOQUE_OUTBOX_KEY:-}
     ports:
       - "8100:8000"
     depends_on:
       postgres:
         condition: service_healthy
+
+  # Worker da outbox: entrega os eventos (vehicle.*) ao webhook de cada loja com
+  # assinatura HMAC e retry. Precisa de ESTOQUE_OUTBOX_KEY quando houver destino configurado.
+  estoque-outbox:
+    build: ../../estoque-api
+    command: ["python", "-m", "app.worker"]
+    environment:
+      - DATABASE_URL=postgresql+psycopg://estoque:${POSTGRES_PASSWORD:-estoque}@postgres:5432/estoque
+      - ESTOQUE_OUTBOX_KEY=${ESTOQUE_OUTBOX_KEY:-}
+      - ESTOQUE_OUTBOX_INTERVALO=${ESTOQUE_OUTBOX_INTERVALO:-5}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      estoque-api:
+        condition: service_started
+    restart: unless-stopped
 
 volumes:
   estoque_pg:

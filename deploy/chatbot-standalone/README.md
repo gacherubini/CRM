@@ -18,7 +18,7 @@ cp .env.example .env
 docker compose up -d --build
 ```
 
-Portas: chatbot-api `:8000`, estoque `:8100`, Evolution `:8080`, n8n `:5678`.
+Portas: chatbot-api `:8001`, estoque `:8100`, Evolution `:8080`, n8n `:5678`.
 
 ## 2. Criar a loja (nos dois serviços, com o MESMO slug)
 
@@ -47,24 +47,35 @@ curl -s -X POST http://localhost:8080/instance/create \
 Abra o **Evolution Manager** em `http://localhost:8080/manager` (login com a API key),
 escaneie o **QR** com o WhatsApp do número dedicado. Status deve virar `open`.
 
-## 4. Montar o fluxo no n8n (`http://localhost:5678`)
+## 4. Importar/configurar o fluxo no n8n (`http://localhost:5678`)
 
-1. Credencial **Google Gemini** → cole sua chave do AI Studio.
-2. Webhook (POST, path `whatsapp`) → registre na Evolution:
-   ```bash
-   curl -s -X POST http://localhost:8080/webhook/set/loja1 \
-     -H "apikey: SUA_EVOLUTION_API_KEY" -H "Content-Type: application/json" \
-     -d '{"webhook":{"enabled":true,"url":"http://n8n:5678/webhook/whatsapp","events":["MESSAGES_UPSERT"]}}'
-   ```
-3. Nó **AI Agent** com **Google Gemini Chat Model** e as ferramentas (HTTP Request Tool)
-   apontando para o `chatbot-api` (`http://chatbot-api:8000`), todas com header
+O template versionado é `n8n/workflow-ai-nao-salvos.json`. Ele aplica, nesta ordem:
+
+1. ignora grupos/status e mensagens sem texto;
+2. registra/deduplica a mensagem na Chatbot API;
+3. respeita `bot_ativo=false` (handoff);
+4. consulta `POST /chat/findChats/{instance}` na Evolution;
+5. chama a IA somente quando `isSaved === false`;
+6. registra a saída do bot para diferenciar respostas automáticas das manuais.
+
+1. Importe o workflow e substitua `__INSTANCE__`, `__EVOLUTION_KEY__` e `__CHATBOT_TOKEN__`.
+2. Selecione a credencial no nó **Google Gemini Chat Model**. As ferramentas
+   HTTP do AI Agent apontam para a `chatbot-api` (`http://chatbot-api:8000`) com header
    `Authorization: Bearer TOKEN_DO_CHATBOT`:
    - `consultar_estoque` → `GET /v1/estoque/buscar?termo={termo}`
    - `registrar_consentimento` → `POST /v1/consentimentos`
    - `registrar_lead` → `POST /v1/leads`
    - `simular` → `POST /v1/simular` (só na edição Financiamento)
-   - gate de handoff → `GET /v1/conversas/{telefone}/estado` antes de responder
-4. Responder no WhatsApp: nó HTTP Request → `POST http://evolution:8080/message/sendText/loja1`.
+   - `solicitar_handoff` → `PATCH /v1/conversas/{telefone}/estado`
+3. Publique o workflow e registre o novo webhook na Evolution:
+   ```bash
+   curl -s -X POST http://localhost:8080/webhook/set/loja1 \
+     -H "apikey: SUA_EVOLUTION_API_KEY" -H "Content-Type: application/json" \
+     -d '{"webhook":{"enabled":true,"url":"http://n8n:5678/webhook/whatsapp-ai","events":["MESSAGES_UPSERT"]}}'
+   ```
+
+Não use o sufixo `@lid` para decidir se o contato é salvo: a Evolution pode ter chats salvos com
+`@lid`. O campo canônico usado pelo gate é `isSaved` retornado por `findChats`.
 
 O system prompt deve exigir **consentimento antes de dados pessoais**, e nunca inventar
 veículo/parcela (sempre usar as ferramentas). O workflow pronto será versionado em `n8n/`.
@@ -78,5 +89,5 @@ veículo/parcela (sempre usar as ferramentas). O workflow pronto será versionad
 ## Operação
 
 - **Logs:** `docker compose logs -f chatbot-api`
-- **Leads (CSV):** `curl -H "Authorization: Bearer TOKEN" http://localhost:8000/v1/leads.csv`
+- **Leads (CSV):** `curl -H "Authorization: Bearer TOKEN" http://localhost:8001/v1/leads.csv`
 - **Parar:** `docker compose down` (dados nos volumes).

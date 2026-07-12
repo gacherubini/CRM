@@ -31,10 +31,11 @@ class SolicitacaoSimulacao(BaseModel):
 class ResultadoProvedor(BaseModel):
     provedor: str
     status: str = "concluida"
-    valor_parcela: float
-    taxa_am: float
-    prazo_meses: int
-    valor_financiado: float
+    # Nulos quando o provedor falhou/rejeitou (sem oferta).
+    valor_parcela: Optional[float] = None
+    taxa_am: Optional[float] = None
+    prazo_meses: Optional[int] = None
+    valor_financiado: Optional[float] = None
     codigo_erro: Optional[str] = None
 
 

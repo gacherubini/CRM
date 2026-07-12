@@ -10,6 +10,7 @@
 | 3 | [Plano #2A](2026-07-11-plano2a-chatbot-standalone-revendivel.md) | Chatbot + Estoque Lite | Sim |
 | 4 | [Plano #5A](2026-07-11-plano5a-catalogo-publico-independente.md) | Catálogo Público | Sim, conectado ou bundle com Estoque |
 | 5 | [Plano #3A](2026-07-11-plano3a-portal-vendedor-independente.md) | Portal/CRM do vendedor | Sim |
+| 5.1 | [Plano #3A.1](2026-07-11-plano3a1-frontend-dashboard-mvp.md) | Frontend/BFF do Dashboard MVP | Workstream executável do #3A |
 | 6 | [Plano #3B](2026-07-11-plano3b-dashboard-dono-vendas-metas.md) | Vendas, metas e dashboard | Extensão do Portal #3A |
 | futuro | [Plano #6](2026-07-11-plano6-evolucoes-roadmap.md) | Add-ons por produto | Conforme item |
 

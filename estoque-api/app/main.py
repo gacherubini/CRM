@@ -1,16 +1,70 @@
 """API privada do Estoque (Plano #4A, `/v1`). API pública `/public/v1` vem depois."""
+import hashlib
+import json
 import os
+import time
+from collections import defaultdict
+from datetime import timezone
+from email.utils import format_datetime
+from pathlib import Path
+from threading import Lock
 from typing import Optional
 
-from fastapi import Depends, FastAPI
-from pydantic import BaseModel
+from fastapi import Body, Depends, FastAPI, HTTPException, Query, Request
+from fastapi.responses import JSONResponse, Response
+from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
+from starlette.middleware.sessions import SessionMiddleware
 
 from app import config, models_db, servico  # noqa: F401 (registra os modelos)
+from app.admin import router as admin_router
 from app.auth import Contexto, get_contexto
 from app.db import Base, engine, get_db
 
 app = FastAPI(title="Estoque API")
+app.add_middleware(
+    SessionMiddleware,
+    secret_key=config.SESSION_SECRET,
+    https_only=config.SESSION_SECURE_COOKIE,
+    same_site="lax",
+    max_age=60 * 60 * 10,
+)
+app.mount(
+    "/admin-static",
+    StaticFiles(directory=str(Path(__file__).parent / "static")),
+    name="admin-static",
+)
+app.include_router(admin_router)
+
+_rate_lock = Lock()
+_rate_publico: dict[tuple[str, int], int] = defaultdict(int)
+
+
+@app.middleware("http")
+async def limitar_api_publica(request: Request, call_next):
+    if not request.url.path.startswith("/public/v1/"):
+        return await call_next(request)
+    limite = config.PUBLIC_RATE_LIMIT_PER_MINUTE
+    minuto = int(time.time() // 60)
+    cliente = request.client.host if request.client else "desconhecido"
+    chave = (cliente, minuto)
+    with _rate_lock:
+        _rate_publico[chave] += 1
+        usados = _rate_publico[chave]
+        if len(_rate_publico) > 10000:
+            for antiga in [k for k in _rate_publico if k[1] < minuto - 1]:
+                _rate_publico.pop(antiga, None)
+    if usados > limite:
+        return JSONResponse(
+            {"detail": "limite de consultas públicas excedido"},
+            status_code=429,
+            headers={"Retry-After": str(60 - int(time.time() % 60))},
+        )
+    resposta = await call_next(request)
+    resposta.headers["X-RateLimit-Limit"] = str(limite)
+    resposta.headers["X-RateLimit-Remaining"] = str(max(limite - usados, 0))
+    return resposta
 
 if os.getenv("ESTOQUE_SKIP_INIT") != "1":
     Base.metadata.create_all(bind=engine)
@@ -44,6 +98,24 @@ class VeiculoUpdate(BaseModel):
     foto_url: Optional[str] = None
 
 
+class FotosInput(BaseModel):
+    urls: list[str] = Field(default_factory=list, max_length=20)
+
+
+def _pode_ver_custo(ctx: Contexto) -> bool:
+    return ctx.papel in {"dono", "gerente"}
+
+
+def _exigir_operacao(ctx: Contexto) -> None:
+    if ctx.papel not in {"dono", "gerente", "operador"}:
+        raise HTTPException(status_code=403, detail="papel sem permissão para alterar estoque")
+
+
+def _exigir_gestao(ctx: Contexto) -> None:
+    if ctx.papel not in {"dono", "gerente"}:
+        raise HTTPException(status_code=403, detail="papel sem permissão de gestão")
+
+
 @app.get("/health/live")
 def live():
     return {"status": "ok"}
@@ -63,8 +135,13 @@ def version():
 def criar_veiculo(
     dados: VeiculoInput, ctx: Contexto = Depends(get_contexto), db: Session = Depends(get_db)
 ):
-    v = servico.criar_veiculo(db, ctx.loja_id, dados.model_dump(exclude_none=True))
-    return servico.para_saida_privada(v)
+    _exigir_operacao(ctx)
+    if dados.custo is not None and not _pode_ver_custo(ctx):
+        raise HTTPException(status_code=403, detail="papel sem permissão para informar custo")
+    v = servico.criar_veiculo(
+        db, ctx.loja_id, dados.model_dump(exclude_none=True), ctx.papel
+    )
+    return servico.para_saida_privada(v, _pode_ver_custo(ctx))
 
 
 @app.get("/v1/veiculos")
@@ -77,14 +154,18 @@ def listar_veiculos(
     db: Session = Depends(get_db),
 ):
     veiculos = servico.listar_veiculos(db, ctx.loja_id, tipo, status, publicado, busca)
-    return {"veiculos": [servico.para_saida_privada(v) for v in veiculos]}
+    return {
+        "veiculos": [servico.para_saida_privada(v, _pode_ver_custo(ctx)) for v in veiculos]
+    }
 
 
 @app.get("/v1/veiculos/{veiculo_id}")
 def obter_veiculo(
     veiculo_id: str, ctx: Contexto = Depends(get_contexto), db: Session = Depends(get_db)
 ):
-    return servico.para_saida_privada(servico.obter_veiculo(db, ctx.loja_id, veiculo_id))
+    return servico.para_saida_privada(
+        servico.obter_veiculo(db, ctx.loja_id, veiculo_id), _pode_ver_custo(ctx)
+    )
 
 
 @app.patch("/v1/veiculos/{veiculo_id}")
@@ -94,36 +175,242 @@ def atualizar_veiculo(
     ctx: Contexto = Depends(get_contexto),
     db: Session = Depends(get_db),
 ):
-    v = servico.atualizar_veiculo(db, ctx.loja_id, veiculo_id, dados.model_dump(exclude_none=True))
-    return servico.para_saida_privada(v)
+    _exigir_operacao(ctx)
+    if dados.custo is not None and not _pode_ver_custo(ctx):
+        raise HTTPException(status_code=403, detail="papel sem permissão para alterar custo")
+    v = servico.atualizar_veiculo(
+        db, ctx.loja_id, veiculo_id, dados.model_dump(exclude_none=True), ctx.papel
+    )
+    return servico.para_saida_privada(v, _pode_ver_custo(ctx))
 
 
 @app.post("/v1/veiculos/{veiculo_id}/publicar")
 def publicar(
     veiculo_id: str, ctx: Contexto = Depends(get_contexto), db: Session = Depends(get_db)
 ):
-    return servico.para_saida_privada(servico.definir_publicado(db, ctx.loja_id, veiculo_id, True))
+    _exigir_operacao(ctx)
+    return servico.para_saida_privada(
+        servico.definir_publicado(db, ctx.loja_id, veiculo_id, True, ctx.papel),
+        _pode_ver_custo(ctx),
+    )
 
 
 @app.post("/v1/veiculos/{veiculo_id}/despublicar")
 def despublicar(
     veiculo_id: str, ctx: Contexto = Depends(get_contexto), db: Session = Depends(get_db)
 ):
-    return servico.para_saida_privada(servico.definir_publicado(db, ctx.loja_id, veiculo_id, False))
+    _exigir_operacao(ctx)
+    return servico.para_saida_privada(
+        servico.definir_publicado(db, ctx.loja_id, veiculo_id, False, ctx.papel),
+        _pode_ver_custo(ctx),
+    )
 
 
 @app.post("/v1/veiculos/{veiculo_id}/reservar")
 def reservar(
     veiculo_id: str, ctx: Contexto = Depends(get_contexto), db: Session = Depends(get_db)
 ):
-    return servico.para_saida_privada(servico.reservar(db, ctx.loja_id, veiculo_id))
+    _exigir_operacao(ctx)
+    return servico.para_saida_privada(
+        servico.reservar(db, ctx.loja_id, veiculo_id, ctx.papel), _pode_ver_custo(ctx)
+    )
 
 
 @app.post("/v1/veiculos/{veiculo_id}/vender")
 def vender(
     veiculo_id: str, ctx: Contexto = Depends(get_contexto), db: Session = Depends(get_db)
 ):
-    return servico.para_saida_privada(servico.vender(db, ctx.loja_id, veiculo_id))
+    _exigir_operacao(ctx)
+    return servico.para_saida_privada(
+        servico.vender(db, ctx.loja_id, veiculo_id, ctx.papel), _pode_ver_custo(ctx)
+    )
+
+
+@app.put("/v1/veiculos/{veiculo_id}/fotos")
+def substituir_fotos(
+    veiculo_id: str,
+    dados: FotosInput,
+    ctx: Contexto = Depends(get_contexto),
+    db: Session = Depends(get_db),
+):
+    _exigir_operacao(ctx)
+    v = servico.substituir_fotos(db, ctx.loja_id, veiculo_id, dados.urls, ctx.papel)
+    return servico.para_saida_privada(v, _pode_ver_custo(ctx))
+
+
+@app.get("/v1/auditoria")
+def auditoria(
+    limit: int = 100,
+    ctx: Contexto = Depends(get_contexto),
+    db: Session = Depends(get_db),
+):
+    _exigir_gestao(ctx)
+    return {
+        "eventos": [
+            {
+                "id": item.id,
+                "recurso": item.recurso,
+                "recurso_id": item.recurso_id,
+                "acao": item.acao,
+                "ator_papel": item.ator_papel,
+                "dados": item.dados,
+                "criada_em": item.criada_em.isoformat(),
+            }
+            for item in servico.listar_auditoria(db, ctx.loja_id, limit)
+        ]
+    }
+
+
+@app.get("/v1/eventos")
+def eventos_saida(
+    status: Optional[str] = None,
+    ctx: Contexto = Depends(get_contexto),
+    db: Session = Depends(get_db),
+):
+    _exigir_gestao(ctx)
+    return {
+        "eventos": [
+            {
+                "id": item.id,
+                "tipo": item.tipo,
+                "agregado_id": item.agregado_id,
+                "payload": item.payload,
+                "status": item.status,
+                "tentativas": item.tentativas,
+                "criada_em": item.criada_em.isoformat(),
+            }
+            for item in servico.listar_eventos(db, ctx.loja_id, status)
+        ]
+    }
+
+
+class WebhookInput(BaseModel):
+    url: str
+    segredo: str
+    ativo: bool = True
+
+
+@app.get("/v1/webhook")
+def obter_webhook(ctx: Contexto = Depends(get_contexto), db: Session = Depends(get_db)):
+    _exigir_gestao(ctx)
+    destino = servico.obter_webhook_destino(db, ctx.loja_id)
+    if destino is None:
+        return {"configurado": False}
+    # Nunca devolve o segredo, nem cifrado.
+    return {
+        "configurado": True,
+        "url": destino.url,
+        "ativo": destino.ativo,
+        "atualizada_em": destino.atualizada_em.isoformat(),
+    }
+
+
+@app.put("/v1/webhook")
+def configurar_webhook(
+    dados: WebhookInput,
+    ctx: Contexto = Depends(get_contexto),
+    db: Session = Depends(get_db),
+):
+    _exigir_gestao(ctx)
+    loja = db.get(models_db.Loja, ctx.loja_id)
+    destino = servico.configurar_webhook_destino(
+        db, loja.slug, dados.url, dados.segredo, dados.ativo
+    )
+    return {"url": destino.url, "ativo": destino.ativo}
+
+
+@app.get("/v1/entregas")
+def listar_entregas(
+    limit: int = Query(default=100, ge=1, le=500),
+    ctx: Contexto = Depends(get_contexto),
+    db: Session = Depends(get_db),
+):
+    _exigir_gestao(ctx)
+    return {
+        "entregas": [
+            {
+                "id": e.id,
+                "evento_id": e.evento_id,
+                "destino_url": e.destino_url,
+                "tentativa": e.tentativa,
+                "status_http": e.status_http,
+                "sucesso": e.sucesso,
+                "erro": e.erro,
+                "criada_em": e.criada_em.isoformat(),
+            }
+            for e in servico.listar_entregas(db, ctx.loja_id, limit)
+        ]
+    }
+
+
+@app.post("/v1/importacoes/csv/preview")
+def preview_csv(
+    conteudo: bytes = Body(media_type="text/csv"),
+    ctx: Contexto = Depends(get_contexto),
+):
+    return servico.previsualizar_csv(conteudo)
+
+
+@app.post("/v1/importacoes/csv", status_code=201)
+def importar_csv(
+    nome_arquivo: str = "estoque.csv",
+    conteudo: bytes = Body(media_type="text/csv"),
+    ctx: Contexto = Depends(get_contexto),
+    db: Session = Depends(get_db),
+):
+    _exigir_operacao(ctx)
+    resultado = servico.importar_csv(
+        db, ctx.loja_id, conteudo, nome_arquivo, ctx.papel, _pode_ver_custo(ctx)
+    )
+    return {
+        "id": resultado.id,
+        "status": resultado.status,
+        "total_linhas": resultado.total_linhas,
+        "importadas": resultado.importadas,
+        "atualizadas": resultado.atualizadas,
+        "erros": resultado.erros,
+    }
+
+
+@app.get("/v1/importacoes")
+def listar_importacoes(
+    ctx: Contexto = Depends(get_contexto), db: Session = Depends(get_db)
+):
+    _exigir_gestao(ctx)
+    itens = (
+        db.query(models_db.Importacao)
+        .filter(models_db.Importacao.loja_id == ctx.loja_id)
+        .order_by(models_db.Importacao.criada_em.desc())
+        .limit(100)
+        .all()
+    )
+    return {
+        "importacoes": [
+            {
+                "id": item.id,
+                "nome_arquivo": item.nome_arquivo,
+                "status": item.status,
+                "total_linhas": item.total_linhas,
+                "importadas": item.importadas,
+                "atualizadas": item.atualizadas,
+                "erros": item.erros,
+                "criada_em": item.criada_em.isoformat(),
+            }
+            for item in itens
+        ]
+    }
+
+
+@app.get("/v1/veiculos.csv")
+def exportar_csv(
+    ctx: Contexto = Depends(get_contexto), db: Session = Depends(get_db)
+):
+    conteudo = servico.exportar_csv(db, ctx.loja_id, _pode_ver_custo(ctx))
+    return Response(
+        content="\ufeff" + conteudo,
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": "attachment; filename=estoque.csv"},
+    )
 
 
 # --- API pública (sem autenticação, resolvida por slug) ----------------------
@@ -133,30 +420,56 @@ def _loja_publica(loja) -> dict:
     return {"slug": loja.slug, "nome": loja.nome, "whatsapp": loja.whatsapp}
 
 
+def _resposta_publica_cache(request: Request, payload: dict, atualizado_em) -> Response:
+    bruto = json.dumps(payload, sort_keys=True, ensure_ascii=False, default=str).encode()
+    etag = f'"{hashlib.sha256(bruto).hexdigest()}"'
+    headers = {"ETag": etag, "Cache-Control": "public, max-age=60, stale-while-revalidate=300"}
+    if atualizado_em:
+        if atualizado_em.tzinfo is None:
+            atualizado_em = atualizado_em.replace(tzinfo=timezone.utc)
+        else:
+            atualizado_em = atualizado_em.astimezone(timezone.utc)
+        headers["Last-Modified"] = format_datetime(atualizado_em, usegmt=True)
+    if request.headers.get("if-none-match") == etag:
+        return Response(status_code=304, headers=headers)
+    return JSONResponse(payload, headers=headers)
+
+
 @app.get("/public/v1/lojas/{slug}")
-def loja_publica(slug: str, db: Session = Depends(get_db)):
-    return _loja_publica(servico.obter_loja_por_slug(db, slug))
+def loja_publica(request: Request, slug: str, db: Session = Depends(get_db)):
+    loja = servico.obter_loja_por_slug(db, slug)
+    return _resposta_publica_cache(request, _loja_publica(loja), loja.criada_em)
 
 
 @app.get("/public/v1/lojas/{slug}/veiculos")
 def veiculos_publicos(
+    request: Request,
     slug: str,
     tipo: Optional[str] = None,
+    marca: Optional[str] = None,
     preco_min: Optional[float] = None,
     preco_max: Optional[float] = None,
-    limit: int = 50,
-    offset: int = 0,
+    limit: int = Query(default=50, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
 ):
     loja, veiculos = servico.listar_veiculos_publicos(
-        db, slug, tipo, preco_min, preco_max, limit, offset
+        db, slug, tipo, marca, preco_min, preco_max, limit, offset
     )
-    return {
+    payload = {
         "loja": _loja_publica(loja),
         "veiculos": [servico.para_saida_publica(v) for v in veiculos],
+        "paginacao": {"limit": limit, "offset": offset, "quantidade": len(veiculos)},
     }
+    atualizado = max((v.atualizado_em for v in veiculos if v.atualizado_em), default=loja.criada_em)
+    return _resposta_publica_cache(request, payload, atualizado)
 
 
 @app.get("/public/v1/lojas/{slug}/veiculos/{veiculo_id}")
-def veiculo_publico(slug: str, veiculo_id: str, db: Session = Depends(get_db)):
-    return servico.para_saida_publica(servico.obter_veiculo_publico(db, slug, veiculo_id))
+def veiculo_publico(
+    request: Request, slug: str, veiculo_id: str, db: Session = Depends(get_db)
+):
+    veiculo = servico.obter_veiculo_publico(db, slug, veiculo_id)
+    return _resposta_publica_cache(
+        request, servico.para_saida_publica(veiculo), veiculo.atualizado_em
+    )

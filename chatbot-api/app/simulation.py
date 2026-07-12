@@ -6,6 +6,7 @@
 
 Trocar de provider é configuração (SIMULATION_PROVIDER), não edição de código/n8n.
 """
+import time
 from typing import Protocol
 
 import httpx
@@ -62,36 +63,82 @@ class MockSimulationProvider:
 
 
 class HttpSimulationProvider:
-    def __init__(self, base_url: str | None = None, timeout: float = 8.0):
+    ESTADOS_TERMINAIS = {
+        "concluida", "parcial", "falhou", "aguardando_intervencao", "cancelada"
+    }
+
+    def __init__(
+        self,
+        base_url: str | None = None,
+        timeout: float | None = None,
+        poll_timeout: float | None = None,
+        poll_interval: float | None = None,
+        token: str | None = None,
+    ):
         self.base_url = (base_url or config.MOTOR_URL).rstrip("/")
-        self.timeout = timeout
+        self.timeout = config.MOTOR_REQUEST_TIMEOUT if timeout is None else timeout
+        self.poll_timeout = config.MOTOR_POLL_TIMEOUT if poll_timeout is None else poll_timeout
+        self.poll_interval = (
+            config.MOTOR_POLL_INTERVAL if poll_interval is None else poll_interval
+        )
+        self.token = config.MOTOR_TOKEN if token is None else token
 
     def disponivel(self) -> bool:
-        return bool(self.base_url)
+        return bool(self.base_url and self.token)
+
+    def _headers(self, idempotency_key: str | None = None) -> dict[str, str]:
+        headers = {"Authorization": f"Bearer {self.token}"}
+        if idempotency_key:
+            headers["Idempotency-Key"] = idempotency_key
+        return headers
+
+    @staticmethod
+    def _fallback(mensagem: str) -> dict:
+        return {"status": "falhou", "resultados": [], "mensagem": mensagem}
 
     def simular(self, payload: dict, idempotency_key: str) -> dict:
         try:
-            r = httpx.post(
+            resposta = httpx.post(
                 f"{self.base_url}/v1/simulacoes",
                 json=payload,
-                headers={"Idempotency-Key": idempotency_key},
+                headers=self._headers(idempotency_key),
                 timeout=self.timeout,
             )
-            r.raise_for_status()
-            sim = r.json()
-            if sim.get("status") in ("concluida", "parcial"):
-                g = httpx.get(
-                    f"{self.base_url}/v1/simulacoes/{sim['id']}", timeout=self.timeout
+            resposta.raise_for_status()
+            criada = resposta.json()
+            sim_id = criada.get("id")
+            if not sim_id:
+                return self._fallback(
+                    "O serviço de simulação respondeu de forma inválida; posso chamar um atendente."
                 )
-                g.raise_for_status()
-                return g.json()
-            return {"status": sim.get("status", "processando"), "id": sim.get("id"), "resultados": []}
+
+            limite = time.monotonic() + self.poll_timeout
+            while True:
+                consulta = httpx.get(
+                    f"{self.base_url}/v1/simulacoes/{sim_id}",
+                    headers=self._headers(),
+                    timeout=self.timeout,
+                )
+                consulta.raise_for_status()
+                atual = consulta.json()
+                status = atual.get("status")
+                if status in self.ESTADOS_TERMINAIS:
+                    if status in {"falhou", "aguardando_intervencao", "cancelada"}:
+                        atual.setdefault(
+                            "mensagem",
+                            "Não consegui concluir a simulação agora; posso chamar um atendente.",
+                        )
+                    return atual
+                if time.monotonic() >= limite:
+                    return self._fallback(
+                        "A simulação está demorando mais que o esperado; posso chamar um atendente."
+                    )
+                if self.poll_interval > 0:
+                    time.sleep(self.poll_interval)
         except Exception:
-            return {
-                "status": "falhou",
-                "resultados": [],
-                "mensagem": "Não consegui simular agora; posso chamar um atendente.",
-            }
+            return self._fallback(
+                "Não consegui simular agora; posso chamar um atendente."
+            )
 
 
 def get_simulation_provider() -> SimulationProvider:

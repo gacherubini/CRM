@@ -22,11 +22,27 @@ services:
     environment:
       - DATABASE_URL=postgresql+psycopg://crm:${POSTGRES_PASSWORD:-crm}@postgres:5432/estoque
       - ESTOQUE_SKIP_INIT=1
+      - ESTOQUE_OUTBOX_KEY=${ESTOQUE_OUTBOX_KEY:-}
     ports:
       - "8100:8000"
     depends_on:
       postgres:
         condition: service_healthy
+
+  # Worker da outbox do Estoque (entrega vehicle.* via webhook assinado com HMAC + retry).
+  estoque-outbox:
+    build: ../../estoque-api
+    command: ["python", "-m", "app.worker"]
+    environment:
+      - DATABASE_URL=postgresql+psycopg://crm:${POSTGRES_PASSWORD:-crm}@postgres:5432/estoque
+      - ESTOQUE_OUTBOX_KEY=${ESTOQUE_OUTBOX_KEY:-}
+      - ESTOQUE_OUTBOX_INTERVALO=${ESTOQUE_OUTBOX_INTERVALO:-5}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      estoque-api:
+        condition: service_started
+    restart: unless-stopped
 
   chatbot-api:
     build: ../../chatbot-api
@@ -36,16 +52,21 @@ services:
       - ESTOQUE_PUBLIC_URL=http://estoque-api:8000
       - SIMULATION_PROVIDER=${SIMULATION_PROVIDER:-mock}
       - MOTOR_URL=${MOTOR_URL:-}
+      - MOTOR_TOKEN=${MOTOR_TOKEN:-}
+      - MOTOR_REQUEST_TIMEOUT=${MOTOR_REQUEST_TIMEOUT:-5}
+      - MOTOR_POLL_TIMEOUT=${MOTOR_POLL_TIMEOUT:-20}
+      - MOTOR_POLL_INTERVAL=${MOTOR_POLL_INTERVAL:-0.5}
     ports:
-      - "8000:8000"
+      - "8001:8000"
     depends_on:
       postgres:
         condition: service_healthy
 
   evolution:
-    image: atendai/evolution-api:v2.1.1
+    image: evoapicloud/evolution-api:latest
     environment:
       - AUTHENTICATION_API_KEY=${EVOLUTION_API_KEY}
+      - CONFIG_SESSION_PHONE_VERSION=${CONFIG_SESSION_PHONE_VERSION:-2.3000.1033773198}
       - DATABASE_ENABLED=true
       - DATABASE_PROVIDER=postgresql
       - DATABASE_CONNECTION_URI=postgresql://crm:${POSTGRES_PASSWORD:-crm}@postgres:5432/evolution

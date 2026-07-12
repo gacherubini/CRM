@@ -6,6 +6,7 @@ from sqlalchemy.pool import StaticPool
 
 from app import cripto, models_db, servico
 from app.db import Base
+from app.models_db import ClienteApiORM
 from app.motor.base import Condicoes, Pessoa, SolicitacaoSimulacao, Veiculo
 
 
@@ -14,7 +15,10 @@ def _db():
         "sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool
     )
     Base.metadata.create_all(engine)
-    return sessionmaker(bind=engine)()
+    db = sessionmaker(bind=engine)()
+    db.add(ClienteApiORM(id="cliente-cripto", nome="Cliente cripto"))
+    db.commit()
+    return db
 
 
 def _sol():
@@ -40,7 +44,7 @@ def test_indice_cego_normaliza_e_discrimina():
 
 def test_cpf_nao_persiste_em_claro():
     db = _db()
-    sim, _ = servico.criar_simulacao(db, _sol())
+    sim, _ = servico.criar_simulacao(db, _sol(), "cliente-cripto")
     row = db.get(models_db.SimulacaoORM, sim.id)
     blob = row.payload_cifrado or ""
     assert "52998224725" not in blob

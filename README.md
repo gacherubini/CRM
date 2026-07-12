@@ -215,6 +215,7 @@ O Estoque API é a fonte única de veículos; bot, portal e vitrine integram-se 
   - [Plano #1A — Motor de Simulação Independente](docs/plans/2026-07-11-plano1a-motor-simulacao-independente.md)
   - [Plano #2A — Chatbot Standalone Revendível](docs/plans/2026-07-11-plano2a-chatbot-standalone-revendivel.md)
   - [Plano #3A — Portal do Vendedor Independente](docs/plans/2026-07-11-plano3a-portal-vendedor-independente.md)
+  - [Plano #3A.1 — Frontend do Dashboard MVP](docs/plans/2026-07-11-plano3a1-frontend-dashboard-mvp.md)
   - [Plano #3B — Dashboard do Dono, Vendas e Metas](docs/plans/2026-07-11-plano3b-dashboard-dono-vendas-metas.md)
   - [Plano #4A — Estoque API Independente](docs/plans/2026-07-11-plano4a-estoque-api-independente.md)
   - [Plano #5A — Catálogo Público Independente](docs/plans/2026-07-11-plano5a-catalogo-publico-independente.md)

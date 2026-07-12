@@ -20,6 +20,19 @@ docker compose exec estoque-api python -m app.cli criar-loja \
 # imprime o TOKEN da loja (guarde: usado no header Authorization)
 ```
 
+Para emitir uma credencial adicional sem revelar as existentes:
+
+```bash
+docker compose exec estoque-api python -m app.cli criar-credencial \
+  --slug moto-center --papel operador
+```
+
+Papéis disponíveis:
+
+- `dono` e `gerente`: operação completa, custo, auditoria e eventos;
+- `operador`: gerencia veículos, mas não acessa custo;
+- `leitor`: somente consulta privada.
+
 ## Usar (API privada — precisa do token)
 
 ```bash
@@ -33,6 +46,17 @@ curl -s -X POST http://localhost:8100/v1/veiculos \
 curl -s -X POST http://localhost:8100/v1/veiculos/<id>/publicar -H "Authorization: Bearer $TOKEN"
 ```
 
+Também estão disponíveis:
+
+- `PUT /v1/veiculos/{id}/fotos` para até 20 URLs ordenadas;
+- `POST /v1/importacoes/csv/preview` para validar um CSV sem gravar;
+- `POST /v1/importacoes/csv` para importar e atualizar por `codigo_interno`;
+- `GET /v1/veiculos.csv` para exportar;
+- `GET /v1/auditoria` e `GET /v1/eventos` para dono/gerente.
+
+O CSV usa `,` ou `;` e exige `tipo`, `marca`, `modelo`, `ano_modelo` e `preco`.
+O conteúdo é enviado como `text/csv` no corpo da requisição.
+
 ## Vitrine pública (sem token, por slug)
 
 ```bash
@@ -40,8 +64,36 @@ curl -s http://localhost:8100/public/v1/lojas/moto-center/veiculos
 # retorna só veículos disponíveis+publicados, sem custo/dados internos
 ```
 
+A listagem pública aceita `tipo`, `marca`, `preco_min`, `preco_max`, `limit` e
+`offset`. As respostas incluem `ETag`, `Last-Modified` e rate limit configurável
+por `ESTOQUE_PUBLIC_RATE_LIMIT`.
+
+## Entrega de eventos (outbox → webhook)
+
+Cada mutação de veículo gera um evento (`vehicle.created/updated/published/reserved/sold`).
+O serviço **`estoque-outbox`** entrega esses eventos ao webhook da loja, com **assinatura
+HMAC-SHA256** no header `X-Assinatura` (formato `sha256=<hex>`), `X-Evento-Id` (idempotência) e
+`X-Entrega-Id` (rastreio por tentativa). Falhas reagendam com backoff exponencial; após 5
+tentativas o evento é **descartado**.
+
+```bash
+# 1) gere a chave que cifra o segredo em repouso e ponha em .env (ESTOQUE_OUTBOX_KEY)
+docker compose run --rm estoque-api python -m app.cli gerar-chave-outbox
+
+# 2) configure o destino da loja (segredo HMAC >= 16 chars; fica cifrado no banco)
+docker compose exec estoque-api python -m app.cli configurar-webhook \
+  --slug moto-center --url https://seu-endpoint/webhook --segredo "um-segredo-bem-grande"
+```
+
+Pela API (dono/gerente): `PUT /v1/webhook` `{ "url", "segredo" }`, `GET /v1/webhook`
+(nunca devolve o segredo) e `GET /v1/entregas` (histórico de tentativas). O receptor deve
+validar a assinatura e deduplicar por `X-Evento-Id`.
+
+O verificador do lado do receptor: `HMAC_SHA256(segredo, corpo_bruto)` deve bater com o header.
+
 ## Operação
 
 - **Backup:** `docker compose exec postgres pg_dump -U estoque estoque > backup.sql`
+- **Restore:** pare a API e aplique `psql -U estoque estoque < backup.sql` no Postgres.
 - **Logs:** `docker compose logs -f estoque-api`
 - **Parar:** `docker compose down` (dados no volume `estoque_pg`)

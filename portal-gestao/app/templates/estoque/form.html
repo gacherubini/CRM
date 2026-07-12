@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}{{ titulo }} — Gestão{% endblock %}
+{% block content %}
+<div class="page-heading">
+  <div><a class="back-link" href="/app/estoque">← Voltar ao estoque</a><h1>{{ titulo }}</h1><p>Informações operacionais e comerciais do veículo.</p></div>
+</div>
+{% if erro %}<div class="alert error">{{ erro }}</div>{% endif %}
+
+<form method="post" class="form-layout">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  <section class="panel form-section">
+    <div class="section-title"><span>01</span><div><h2>Identificação</h2><p>Dados usados na busca e apresentação.</p></div></div>
+    <div class="form-grid">
+      <label>Tipo<select name="tipo" required><option value="moto" {{ 'selected' if veiculo and veiculo.tipo == 'moto' }}>Moto</option><option value="carro" {{ 'selected' if veiculo and veiculo.tipo == 'carro' }}>Carro</option></select></label>
+      <label>Marca<input name="marca" value="{{ veiculo.marca if veiculo else '' }}" required></label>
+      <label>Modelo<input name="modelo" value="{{ veiculo.modelo if veiculo else '' }}" required></label>
+      <label>Versão<input name="versao" value="{{ veiculo.versao if veiculo and veiculo.versao else '' }}"></label>
+      <label>Ano/modelo<input type="number" name="ano_modelo" min="1900" max="2100" value="{{ veiculo.ano_modelo if veiculo else '' }}" required></label>
+      <label>Cor<input name="cor" value="{{ veiculo.cor if veiculo and veiculo.cor else '' }}"></label>
+    </div>
+  </section>
+  <section class="panel form-section">
+    <div class="section-title"><span>02</span><div><h2>Comercial</h2><p>Preço, custo e controle interno.</p></div></div>
+    <div class="form-grid">
+      <label>Preço de venda<input type="number" step="0.01" min="0" name="preco" value="{{ veiculo.preco if veiculo else '' }}" required></label>
+      {% if pode_custo %}<label>Custo do veículo<input type="number" step="0.01" min="0" name="custo" value="{{ veiculo.custo if veiculo and veiculo.custo is not none else '' }}"></label>{% endif %}
+      <label>Quilometragem<input type="number" min="0" name="km" value="{{ veiculo.km if veiculo else 0 }}"></label>
+      <label>Código interno<input name="codigo_interno" value="{{ veiculo.codigo_interno if veiculo and veiculo.codigo_interno else '' }}"></label>
+      <label class="wide">URL da foto<input type="url" name="foto_url" value="{{ veiculo.foto_url if veiculo and veiculo.foto_url else '' }}" placeholder="https://..."></label>
+    </div>
+  </section>
+  <div class="form-actions"><a class="button ghost" href="/app/estoque">Cancelar</a><button class="button primary" type="submit">Salvar veículo</button></div>
+</form>
+
+{% if veiculo and veiculo.id %}
+<section class="panel action-panel">
+  <div><span class="eyebrow">Estado do veículo</span><h2>Ações rápidas</h2><p>Algumas ações alteram o que aparece no catálogo.</p></div>
+  <div class="action-grid">
+    {% if veiculo.publicado %}<form method="post" action="/app/estoque/{{ veiculo.id }}/despublicar"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="button secondary">Despublicar</button></form>{% elif veiculo.status == 'disponivel' %}<form method="post" action="/app/estoque/{{ veiculo.id }}/publicar"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="button secondary">Publicar no catálogo</button></form>{% endif %}
+    {% if veiculo.status == 'disponivel' %}<form method="post" action="/app/estoque/{{ veiculo.id }}/reservar"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="button secondary">Reservar</button></form>{% endif %}
+    {% if veiculo.status in ['disponivel','reservado'] %}<form method="post" action="/app/estoque/{{ veiculo.id }}/vender" onsubmit="return confirm('Marcar este veículo como vendido? Ele será removido do catálogo.')"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="button danger">Marcar vendido</button></form>{% endif %}
+  </div>
+</section>
+{% endif %}
+{% endblock %}

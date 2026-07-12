@@ -32,3 +32,13 @@ def test_slug_duplicado_conflita():
     with pytest.raises(HTTPException) as exc:
         servico.criar_loja(db, "L2", "dup")
     assert exc.value.status_code == 409
+
+
+def test_criar_credencial_adicional_para_loja_existente():
+    db = _db()
+    loja, _ = servico.criar_loja(db, "Loja Credencial", "loja-cred")
+    mesma_loja, token = servico.criar_credencial(db, "loja-cred", "operador")
+    credencial = db.get(models_db.CredencialServico, hash_token(token))
+    assert mesma_loja.id == loja.id
+    assert credencial is not None
+    assert credencial.papel == "operador"

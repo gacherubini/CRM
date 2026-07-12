@@ -1,12 +1,9 @@
-"""Modelos do Estoque (Plano #4A): lojas, credenciais_servico, veiculos.
-
-`usuarios_estoque`, `veiculo_fotos`, `importacoes`, `eventos_saida` e `auditoria`
-entram nos incrementos seguintes.
-"""
+"""Modelos persistentes do Estoque independente (Plano #4A)."""
+import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, Numeric, String
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, JSON, Numeric, String, UniqueConstraint
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db import Base
 
@@ -34,6 +31,23 @@ class CredencialServico(Base):
     criada_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_agora)
 
 
+class UsuarioEstoque(Base):
+    __tablename__ = "usuarios_estoque"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    loja_id: Mapped[str] = mapped_column(ForeignKey("lojas.id"), nullable=False, index=True)
+    email: Mapped[str] = mapped_column(String(320), nullable=False)
+    nome: Mapped[str] = mapped_column(String(160), nullable=False)
+    senha_hash: Mapped[str] = mapped_column(String(255), nullable=False)
+    papel: Mapped[str] = mapped_column(String(32), nullable=False, default="operador")
+    ativo: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    criada_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_agora)
+
+    __table_args__ = (
+        UniqueConstraint("loja_id", "email", name="uq_usuario_estoque_loja_email"),
+    )
+
+
 class Veiculo(Base):
     __tablename__ = "veiculos"
 
@@ -56,3 +70,105 @@ class Veiculo(Base):
     atualizado_em: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=_agora, onupdate=_agora
     )
+    fotos: Mapped[list["VeiculoFoto"]] = relationship(
+        back_populates="veiculo", cascade="all, delete-orphan", order_by="VeiculoFoto.ordem"
+    )
+
+    __table_args__ = (
+        UniqueConstraint("loja_id", "codigo_interno", name="uq_veiculos_loja_codigo"),
+    )
+
+
+class VeiculoFoto(Base):
+    __tablename__ = "veiculo_fotos"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    loja_id: Mapped[str] = mapped_column(ForeignKey("lojas.id"), nullable=False, index=True)
+    veiculo_id: Mapped[str] = mapped_column(
+        ForeignKey("veiculos.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    url: Mapped[str] = mapped_column(String, nullable=False)
+    ordem: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    criada_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_agora)
+    veiculo: Mapped[Veiculo] = relationship(back_populates="fotos")
+
+    __table_args__ = (
+        UniqueConstraint("veiculo_id", "ordem", name="uq_veiculo_foto_ordem"),
+    )
+
+
+class Importacao(Base):
+    __tablename__ = "importacoes"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    loja_id: Mapped[str] = mapped_column(ForeignKey("lojas.id"), nullable=False, index=True)
+    nome_arquivo: Mapped[str] = mapped_column(String, nullable=False)
+    status: Mapped[str] = mapped_column(String, nullable=False, default="processando")
+    total_linhas: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    importadas: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    atualizadas: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    erros: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
+    criada_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_agora)
+
+
+class EventoSaida(Base):
+    __tablename__ = "eventos_saida"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    loja_id: Mapped[str] = mapped_column(ForeignKey("lojas.id"), nullable=False, index=True)
+    tipo: Mapped[str] = mapped_column(String, nullable=False, index=True)
+    agregado_id: Mapped[str] = mapped_column(String(36), nullable=False, index=True)
+    payload: Mapped[dict] = mapped_column(JSON, nullable=False)
+    status: Mapped[str] = mapped_column(String, nullable=False, default="pendente")
+    tentativas: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    criada_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_agora)
+    processada_em: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    proxima_tentativa_em: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True, index=True
+    )
+
+
+class WebhookDestino(Base):
+    """Destino de entrega da outbox por loja. O segredo HMAC fica cifrado (nunca em claro)."""
+
+    __tablename__ = "webhook_destinos"
+
+    loja_id: Mapped[str] = mapped_column(ForeignKey("lojas.id"), primary_key=True)
+    url: Mapped[str] = mapped_column(String, nullable=False)
+    segredo_cifrado: Mapped[str] = mapped_column(String, nullable=False)
+    ativo: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    criada_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_agora)
+    atualizada_em: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_agora, onupdate=_agora
+    )
+
+
+class EntregaEvento(Base):
+    """Registro individual de cada tentativa de entrega. O ``id`` é o delivery/idempotency id."""
+
+    __tablename__ = "entregas_evento"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    evento_id: Mapped[str] = mapped_column(
+        ForeignKey("eventos_saida.id"), nullable=False, index=True
+    )
+    loja_id: Mapped[str] = mapped_column(ForeignKey("lojas.id"), nullable=False, index=True)
+    destino_url: Mapped[str] = mapped_column(String, nullable=False)
+    tentativa: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    status_http: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    sucesso: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    erro: Mapped[str | None] = mapped_column(String, nullable=True)
+    criada_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_agora)
+
+
+class Auditoria(Base):
+    __tablename__ = "auditoria"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    loja_id: Mapped[str] = mapped_column(ForeignKey("lojas.id"), nullable=False, index=True)
+    recurso: Mapped[str] = mapped_column(String, nullable=False)
+    recurso_id: Mapped[str] = mapped_column(String(36), nullable=False, index=True)
+    acao: Mapped[str] = mapped_column(String, nullable=False)
+    ator_papel: Mapped[str] = mapped_column(String, nullable=False)
+    dados: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+    criada_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_agora)

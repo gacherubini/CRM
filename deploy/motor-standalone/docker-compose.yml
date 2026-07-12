@@ -20,11 +20,29 @@ services:
       - MOTOR_SKIP_INIT=1
       - MOTOR_ENV=production
       - MOTOR_ENCRYPTION_KEY=${MOTOR_ENCRYPTION_KEY}
+      - MOTOR_METRICS_TOKEN=${MOTOR_METRICS_TOKEN:-}
     ports:
       - "8000:8000"
     depends_on:
       postgres:
         condition: service_healthy
+
+  # Worker que executa os jobs enfileirados (reserva sem dupla execução, retry, parcial).
+  motor-worker:
+    build: ../../motor-simulacao
+    command: ["python", "-m", "app.worker"]
+    environment:
+      - DATABASE_URL=postgresql+psycopg://motor:${POSTGRES_PASSWORD:-motor}@postgres:5432/motor
+      - MOTOR_ENV=production
+      - MOTOR_ENCRYPTION_KEY=${MOTOR_ENCRYPTION_KEY}
+      - MOTOR_WORKER_INTERVALO=${MOTOR_WORKER_INTERVALO:-2}
+      - MOTOR_JOB_LEASE_SECONDS=${MOTOR_JOB_LEASE_SECONDS:-120}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      motor-api:
+        condition: service_started
+    restart: unless-stopped
 
 volumes:
   motor_pg:

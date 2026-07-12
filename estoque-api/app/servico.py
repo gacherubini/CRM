@@ -1,14 +1,70 @@
 """Regras do Estoque: validação, CRUD escopado por loja e transições de estado."""
 import secrets
 import uuid
+import csv
+import io
 from datetime import datetime, timezone
+from decimal import Decimal
+from urllib.parse import urlparse
 
 from fastapi import HTTPException
+from sqlalchemy import update
 from sqlalchemy.orm import Session
 
 from app import config
 from app.auth import hash_token
-from app.models_db import CredencialServico, Loja, Veiculo
+from app.models_db import (
+    Auditoria, CredencialServico, EntregaEvento, EventoSaida, Importacao, Loja,
+    UsuarioEstoque, Veiculo, VeiculoFoto, WebhookDestino,
+)
+
+
+def _json_seguro(valor):
+    if isinstance(valor, Decimal):
+        return float(valor)
+    if isinstance(valor, datetime):
+        return valor.isoformat()
+    if isinstance(valor, dict):
+        return {k: _json_seguro(v) for k, v in valor.items()}
+    if isinstance(valor, (list, tuple)):
+        return [_json_seguro(v) for v in valor]
+    return valor
+
+
+def _registrar_operacao(
+    db: Session,
+    veiculo: Veiculo,
+    acao: str,
+    ator_papel: str,
+    dados: dict | None = None,
+    evento: str | None = None,
+) -> None:
+    dados_seguros = _json_seguro(dados or {})
+    db.add(
+        Auditoria(
+            loja_id=veiculo.loja_id,
+            recurso="veiculo",
+            recurso_id=veiculo.id,
+            acao=acao,
+            ator_papel=ator_papel,
+            dados=dados_seguros,
+        )
+    )
+    if evento:
+        db.add(
+            EventoSaida(
+                loja_id=veiculo.loja_id,
+                tipo=evento,
+                agregado_id=veiculo.id,
+                payload={
+                    "evento": evento,
+                    "veiculo_id": veiculo.id,
+                    "loja_id": veiculo.loja_id,
+                    "status": veiculo.status,
+                    "publicado": veiculo.publicado,
+                },
+            )
+        )
 
 
 def criar_loja(
@@ -17,6 +73,8 @@ def criar_loja(
     """Cria a loja + uma credencial de serviço. Retorna (loja, token em claro)."""
     if db.query(Loja).filter(Loja.slug == slug).first():
         raise HTTPException(status_code=409, detail="slug já existe")
+    if papel not in config.PAPEIS:
+        raise HTTPException(status_code=422, detail="papel inválido")
     loja = Loja(id=str(uuid.uuid4()), nome=nome, slug=slug, whatsapp=whatsapp)
     db.add(loja)
     db.flush()
@@ -25,6 +83,48 @@ def criar_loja(
     db.commit()
     db.refresh(loja)
     return loja, token
+
+
+def criar_credencial(db: Session, slug: str, papel: str) -> tuple[Loja, str]:
+    """Emite uma credencial adicional sem recriar ou expor segredos anteriores."""
+    if papel not in config.PAPEIS:
+        raise HTTPException(status_code=422, detail="papel inválido")
+    loja = db.query(Loja).filter(Loja.slug == slug).first()
+    if loja is None:
+        raise HTTPException(status_code=404, detail="loja não encontrada")
+    token = secrets.token_urlsafe(32)
+    db.add(CredencialServico(token_hash=hash_token(token), loja_id=loja.id, papel=papel))
+    db.commit()
+    db.refresh(loja)
+    return loja, token
+
+
+def criar_usuario_estoque(
+    db: Session, slug: str, email: str, nome: str, senha: str, papel: str
+) -> UsuarioEstoque:
+    from app.admin_auth import hash_senha
+
+    if papel not in config.PAPEIS:
+        raise HTTPException(status_code=422, detail="papel inválido")
+    loja = db.query(Loja).filter(Loja.slug == slug).first()
+    if loja is None:
+        raise HTTPException(status_code=404, detail="loja não encontrada")
+    email = email.strip().lower()
+    if db.query(UsuarioEstoque).filter(
+        UsuarioEstoque.loja_id == loja.id, UsuarioEstoque.email == email
+    ).first():
+        raise HTTPException(status_code=409, detail="e-mail já cadastrado nesta loja")
+    usuario = UsuarioEstoque(
+        loja_id=loja.id,
+        email=email,
+        nome=nome.strip(),
+        senha_hash=hash_senha(senha),
+        papel=papel,
+    )
+    db.add(usuario)
+    db.commit()
+    db.refresh(usuario)
+    return usuario
 
 
 def _validar(dados: dict) -> None:
@@ -42,10 +142,17 @@ def _validar(dados: dict) -> None:
         raise HTTPException(status_code=422, detail="custo não pode ser negativo")
 
 
-def criar_veiculo(db: Session, loja_id: str, dados: dict) -> Veiculo:
+def criar_veiculo(db: Session, loja_id: str, dados: dict, ator_papel: str = "sistema") -> Veiculo:
     _validar(dados)
+    codigo = dados.get("codigo_interno")
+    if codigo and db.query(Veiculo).filter(
+        Veiculo.loja_id == loja_id, Veiculo.codigo_interno == codigo
+    ).first():
+        raise HTTPException(status_code=409, detail="código interno já existe nesta loja")
     v = Veiculo(id=str(uuid.uuid4()), loja_id=loja_id, **dados)
     db.add(v)
+    db.flush()
+    _registrar_operacao(db, v, "criado", ator_papel, dados, "vehicle.created")
     db.commit()
     db.refresh(v)
     return v
@@ -84,7 +191,9 @@ def obter_veiculo(db: Session, loja_id: str, veiculo_id: str) -> Veiculo:
     return v
 
 
-def atualizar_veiculo(db: Session, loja_id: str, veiculo_id: str, dados: dict) -> Veiculo:
+def atualizar_veiculo(
+    db: Session, loja_id: str, veiculo_id: str, dados: dict, ator_papel: str = "sistema"
+) -> Veiculo:
     v = obter_veiculo(db, loja_id, veiculo_id)
     campos = {k: val for k, val in dados.items() if val is not None}
     # Revalida somente os campos afetados, reaproveitando os valores atuais.
@@ -100,43 +209,320 @@ def atualizar_veiculo(db: Session, loja_id: str, veiculo_id: str, dados: dict) -
     for k, val in campos.items():
         setattr(v, k, val)
     v.atualizado_em = datetime.now(timezone.utc)
+    _registrar_operacao(db, v, "atualizado", ator_papel, {"campos": campos}, "vehicle.updated")
     db.commit()
     db.refresh(v)
     return v
 
 
-def definir_publicado(db: Session, loja_id: str, veiculo_id: str, publicado: bool) -> Veiculo:
+def definir_publicado(
+    db: Session,
+    loja_id: str,
+    veiculo_id: str,
+    publicado: bool,
+    ator_papel: str = "sistema",
+) -> Veiculo:
     v = obter_veiculo(db, loja_id, veiculo_id)
     if publicado and v.status != "disponivel":
         raise HTTPException(status_code=409, detail="só veículo disponível pode ser publicado")
     v.publicado = publicado
     v.atualizado_em = datetime.now(timezone.utc)
+    _registrar_operacao(
+        db,
+        v,
+        "publicado" if publicado else "despublicado",
+        ator_papel,
+        {"publicado": publicado},
+        "vehicle.published" if publicado else "vehicle.updated",
+    )
     db.commit()
     db.refresh(v)
     return v
 
 
-def reservar(db: Session, loja_id: str, veiculo_id: str) -> Veiculo:
-    v = obter_veiculo(db, loja_id, veiculo_id)
-    if v.status != "disponivel":
+def reservar(db: Session, loja_id: str, veiculo_id: str, ator_papel: str = "sistema") -> Veiculo:
+    agora = datetime.now(timezone.utc)
+    resultado = db.execute(
+        update(Veiculo)
+        .where(
+            Veiculo.id == veiculo_id,
+            Veiculo.loja_id == loja_id,
+            Veiculo.status == "disponivel",
+        )
+        .values(status="reservado", publicado=False, atualizado_em=agora)
+        .execution_options(synchronize_session=False)
+    )
+    if resultado.rowcount != 1:
+        obter_veiculo(db, loja_id, veiculo_id)
         raise HTTPException(status_code=409, detail="só veículo disponível pode ser reservado")
-    v.status = "reservado"
-    v.atualizado_em = datetime.now(timezone.utc)
-    db.commit()
-    db.refresh(v)
-    return v
-
-
-def vender(db: Session, loja_id: str, veiculo_id: str) -> Veiculo:
     v = obter_veiculo(db, loja_id, veiculo_id)
-    if v.status not in ("disponivel", "reservado"):
-        raise HTTPException(status_code=409, detail="veículo não pode ser vendido neste estado")
-    v.status = "vendido"
-    v.publicado = False
-    v.atualizado_em = datetime.now(timezone.utc)
+    db.refresh(v)
+    _registrar_operacao(db, v, "reservado", ator_papel, evento="vehicle.reserved")
     db.commit()
     db.refresh(v)
     return v
+
+
+def vender(db: Session, loja_id: str, veiculo_id: str, ator_papel: str = "sistema") -> Veiculo:
+    agora = datetime.now(timezone.utc)
+    resultado = db.execute(
+        update(Veiculo)
+        .where(
+            Veiculo.id == veiculo_id,
+            Veiculo.loja_id == loja_id,
+            Veiculo.status.in_(("disponivel", "reservado")),
+        )
+        .values(status="vendido", publicado=False, atualizado_em=agora)
+        .execution_options(synchronize_session=False)
+    )
+    if resultado.rowcount != 1:
+        obter_veiculo(db, loja_id, veiculo_id)
+        raise HTTPException(status_code=409, detail="veículo não pode ser vendido neste estado")
+    v = obter_veiculo(db, loja_id, veiculo_id)
+    db.refresh(v)
+    _registrar_operacao(db, v, "vendido", ator_papel, evento="vehicle.sold")
+    db.commit()
+    db.refresh(v)
+    return v
+
+
+def substituir_fotos(
+    db: Session,
+    loja_id: str,
+    veiculo_id: str,
+    urls: list[str],
+    ator_papel: str = "sistema",
+) -> Veiculo:
+    v = obter_veiculo(db, loja_id, veiculo_id)
+    if len(urls) > 20:
+        raise HTTPException(status_code=422, detail="limite de 20 fotos por veículo")
+    normalizadas: list[str] = []
+    for url in urls:
+        url = url.strip()
+        parsed = urlparse(url)
+        if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+            raise HTTPException(status_code=422, detail="URL de foto inválida")
+        if url in normalizadas:
+            raise HTTPException(status_code=422, detail="foto duplicada")
+        normalizadas.append(url)
+    v.fotos.clear()
+    db.flush()
+    for ordem, url in enumerate(normalizadas):
+        v.fotos.append(VeiculoFoto(loja_id=loja_id, url=url, ordem=ordem))
+    v.foto_url = normalizadas[0] if normalizadas else None
+    v.atualizado_em = datetime.now(timezone.utc)
+    _registrar_operacao(
+        db, v, "fotos_atualizadas", ator_papel, {"quantidade": len(normalizadas)}, "vehicle.updated"
+    )
+    db.commit()
+    db.refresh(v)
+    return v
+
+
+def listar_auditoria(db: Session, loja_id: str, limit: int = 100) -> list[Auditoria]:
+    return (
+        db.query(Auditoria)
+        .filter(Auditoria.loja_id == loja_id)
+        .order_by(Auditoria.criada_em.desc())
+        .limit(min(max(limit, 1), 500))
+        .all()
+    )
+
+
+def listar_eventos(db: Session, loja_id: str, status: str | None = None) -> list[EventoSaida]:
+    q = db.query(EventoSaida).filter(EventoSaida.loja_id == loja_id)
+    if status:
+        q = q.filter(EventoSaida.status == status)
+    return q.order_by(EventoSaida.criada_em.desc()).limit(500).all()
+
+
+def configurar_webhook_destino(
+    db: Session, slug: str, url: str, segredo: str, ativo: bool = True
+) -> WebhookDestino:
+    """Cria/atualiza o destino de entrega da outbox de uma loja. Segredo fica cifrado."""
+    from app.cripto import cifrar
+
+    if not url.startswith(("http://", "https://")):
+        raise HTTPException(status_code=422, detail="url do webhook deve ser http(s)")
+    if len(segredo) < 16:
+        raise HTTPException(status_code=422, detail="segredo do webhook deve ter >= 16 caracteres")
+    loja = db.query(Loja).filter(Loja.slug == slug).first()
+    if loja is None:
+        raise HTTPException(status_code=404, detail="loja não encontrada")
+    destino = db.get(WebhookDestino, loja.id)
+    if destino is None:
+        destino = WebhookDestino(loja_id=loja.id)
+        db.add(destino)
+    destino.url = url
+    destino.segredo_cifrado = cifrar(segredo)
+    destino.ativo = ativo
+    db.commit()
+    db.refresh(destino)
+    return destino
+
+
+def obter_webhook_destino(db: Session, loja_id: str) -> WebhookDestino | None:
+    return db.get(WebhookDestino, loja_id)
+
+
+def listar_entregas(db: Session, loja_id: str, limit: int = 100) -> list[EntregaEvento]:
+    return (
+        db.query(EntregaEvento)
+        .filter(EntregaEvento.loja_id == loja_id)
+        .order_by(EntregaEvento.criada_em.desc())
+        .limit(limit)
+        .all()
+    )
+
+
+COLUNAS_CSV_OBRIGATORIAS = {"tipo", "marca", "modelo", "ano_modelo", "preco"}
+COLUNAS_CSV = [
+    "codigo_interno", "tipo", "marca", "modelo", "versao", "ano_modelo", "cor",
+    "km", "preco", "custo", "foto_url", "status", "publicado",
+]
+
+
+def _ler_csv(conteudo: bytes) -> tuple[list[str], list[dict[str, str]]]:
+    try:
+        texto = conteudo.decode("utf-8-sig")
+    except UnicodeDecodeError as exc:
+        raise HTTPException(status_code=422, detail="CSV deve estar em UTF-8") from exc
+    try:
+        dialect = csv.Sniffer().sniff(texto[:4096], delimiters=",;")
+    except csv.Error:
+        dialect = csv.excel
+    leitor = csv.DictReader(io.StringIO(texto), dialect=dialect)
+    colunas = [str(c).strip() for c in (leitor.fieldnames or []) if c]
+    faltantes = COLUNAS_CSV_OBRIGATORIAS - set(colunas)
+    if faltantes:
+        raise HTTPException(
+            status_code=422, detail=f"colunas obrigatórias ausentes: {', '.join(sorted(faltantes))}"
+        )
+    linhas = [
+        {str(k).strip(): (v or "").strip() for k, v in linha.items() if k}
+        for linha in leitor
+        if any((v or "").strip() for v in linha.values())
+    ]
+    if len(linhas) > 5000:
+        raise HTTPException(status_code=422, detail="limite de 5000 linhas por importação")
+    return colunas, linhas
+
+
+def _numero_csv(valor: str, inteiro: bool = False):
+    valor = valor.strip().replace("R$", "").replace(" ", "")
+    if not valor:
+        return 0 if inteiro else None
+    if "," in valor:
+        valor = valor.replace(".", "").replace(",", ".")
+    numero = float(valor)
+    return int(numero) if inteiro else numero
+
+
+def _dados_linha_csv(linha: dict[str, str]) -> dict:
+    dados = {
+        "tipo": linha.get("tipo", "").lower(),
+        "marca": linha.get("marca", "").strip(),
+        "modelo": linha.get("modelo", "").strip(),
+        "ano_modelo": _numero_csv(linha.get("ano_modelo", ""), inteiro=True),
+        "preco": _numero_csv(linha.get("preco", "")),
+        "km": _numero_csv(linha.get("km", ""), inteiro=True),
+    }
+    for campo in ("codigo_interno", "versao", "cor", "foto_url"):
+        if linha.get(campo, "").strip():
+            dados[campo] = linha[campo].strip()
+    if linha.get("custo", "").strip():
+        dados["custo"] = _numero_csv(linha["custo"])
+    if not dados["marca"] or not dados["modelo"]:
+        raise HTTPException(status_code=422, detail="marca e modelo são obrigatórios")
+    _validar(dados)
+    return dados
+
+
+def previsualizar_csv(conteudo: bytes) -> dict:
+    colunas, linhas = _ler_csv(conteudo)
+    erros = []
+    for numero, linha in enumerate(linhas, start=2):
+        try:
+            _dados_linha_csv(linha)
+        except (HTTPException, ValueError) as exc:
+            detalhe = exc.detail if isinstance(exc, HTTPException) else "valor numérico inválido"
+            erros.append({"linha": numero, "erro": str(detalhe)})
+    return {
+        "colunas": colunas,
+        "total_linhas": len(linhas),
+        "amostra": linhas[:20],
+        "erros": erros[:100],
+        "valido": not erros,
+    }
+
+
+def importar_csv(
+    db: Session,
+    loja_id: str,
+    conteudo: bytes,
+    nome_arquivo: str,
+    ator_papel: str,
+    permitir_custo: bool,
+) -> Importacao:
+    _, linhas = _ler_csv(conteudo)
+    registro = Importacao(
+        loja_id=loja_id,
+        nome_arquivo=nome_arquivo[:255],
+        status="processando",
+        total_linhas=len(linhas),
+    )
+    db.add(registro)
+    db.commit()
+    erros: list[dict] = []
+    importadas = atualizadas = 0
+    for numero, linha in enumerate(linhas, start=2):
+        try:
+            dados = _dados_linha_csv(linha)
+            if "custo" in dados and not permitir_custo:
+                raise HTTPException(status_code=403, detail="papel sem permissão para importar custo")
+            codigo = dados.get("codigo_interno")
+            existente = None
+            if codigo:
+                existente = db.query(Veiculo).filter(
+                    Veiculo.loja_id == loja_id, Veiculo.codigo_interno == codigo
+                ).first()
+            if existente:
+                atualizar_veiculo(db, loja_id, existente.id, dados, ator_papel)
+                atualizadas += 1
+            else:
+                criar_veiculo(db, loja_id, dados, ator_papel)
+                importadas += 1
+        except (HTTPException, ValueError) as exc:
+            db.rollback()
+            detalhe = exc.detail if isinstance(exc, HTTPException) else "valor numérico inválido"
+            erros.append({"linha": numero, "erro": str(detalhe)})
+    registro = db.get(Importacao, registro.id)
+    registro.importadas = importadas
+    registro.atualizadas = atualizadas
+    registro.erros = erros
+    registro.status = "concluida_com_erros" if erros else "concluida"
+    db.commit()
+    db.refresh(registro)
+    return registro
+
+
+def exportar_csv(db: Session, loja_id: str, incluir_custo: bool) -> str:
+    buffer = io.StringIO()
+    campos = COLUNAS_CSV if incluir_custo else [c for c in COLUNAS_CSV if c != "custo"]
+    writer = csv.DictWriter(buffer, fieldnames=campos, delimiter=";", lineterminator="\n")
+    writer.writeheader()
+    for v in listar_veiculos(db, loja_id):
+        linha = {
+            "codigo_interno": v.codigo_interno or "", "tipo": v.tipo, "marca": v.marca,
+            "modelo": v.modelo, "versao": v.versao or "", "ano_modelo": v.ano_modelo,
+            "cor": v.cor or "", "km": v.km, "preco": f"{float(v.preco):.2f}",
+            "foto_url": v.foto_url or "", "status": v.status,
+            "publicado": "sim" if v.publicado else "nao",
+        }
+        if incluir_custo:
+            linha["custo"] = f"{float(v.custo):.2f}" if v.custo is not None else ""
+        writer.writerow(linha)
+    return buffer.getvalue()
 
 
 # --- API pública (read-only, por slug) ---------------------------------------
@@ -153,6 +539,7 @@ def listar_veiculos_publicos(
     db: Session,
     slug: str,
     tipo: str | None = None,
+    marca: str | None = None,
     preco_min: float | None = None,
     preco_max: float | None = None,
     limit: int = 50,
@@ -166,6 +553,8 @@ def listar_veiculos_publicos(
     )
     if tipo:
         q = q.filter(Veiculo.tipo == tipo)
+    if marca:
+        q = q.filter(Veiculo.marca.ilike(marca.strip()))
     if preco_min is not None:
         q = q.filter(Veiculo.preco >= preco_min)
     if preco_max is not None:
@@ -204,10 +593,11 @@ def para_saida_publica(v: Veiculo) -> dict:
         "km": v.km,
         "preco": float(v.preco),
         "foto_url": v.foto_url,
+        "fotos": [foto.url for foto in v.fotos] if v.fotos else ([v.foto_url] if v.foto_url else []),
     }
 
 
-def para_saida_privada(v: Veiculo) -> dict:
+def para_saida_privada(v: Veiculo, incluir_custo: bool = True) -> dict:
     """Saída da API privada — inclui custo/código interno."""
     return {
         "id": v.id,
@@ -220,11 +610,11 @@ def para_saida_privada(v: Veiculo) -> dict:
         "cor": v.cor,
         "km": v.km,
         "preco": float(v.preco),
-        "custo": float(v.custo) if v.custo is not None else None,
         "status": v.status,
         "publicado": v.publicado,
         "codigo_interno": v.codigo_interno,
         "foto_url": v.foto_url,
+        "fotos": [foto.url for foto in v.fotos] if v.fotos else ([v.foto_url] if v.foto_url else []),
         "criado_em": v.criado_em.isoformat() if v.criado_em else None,
         "atualizado_em": v.atualizado_em.isoformat() if v.atualizado_em else None,
-    }
+    } | ({"custo": float(v.custo) if v.custo is not None else None} if incluir_custo else {})

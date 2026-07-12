@@ -70,6 +70,7 @@ def registrar_mensagem(
     texto: str | None,
     provider_message_id: str | None = None,
     from_me: bool = False,
+    origem_bot: bool = False,
 ) -> dict:
     """Persiste a mensagem de forma idempotente e garante a conversa."""
     loja = resolver_loja_por_instancia(db, instancia)
@@ -90,6 +91,12 @@ def registrar_mensagem(
                 "conversa_id": conversa.id,
                 "bot_ativo": conversa.bot_ativo,
             }
+
+    # Uma saída nova que não foi previamente registrada pelo workflow do bot
+    # veio do atendente (celular/web). O humano assumiu: pausa automática.
+    if from_me and not origem_bot:
+        conversa.bot_ativo = False
+        conversa.status = "handoff"
 
     db.add(
         Mensagem(

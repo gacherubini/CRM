@@ -1,11 +1,12 @@
 """API do Motor de Simulação (contrato público v1)."""
+import hmac
 import os
 
 from fastapi import Depends, FastAPI, Request, Response
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
-from app import config, models_db, servico  # noqa: F401 (registra os modelos)
+from app import auth, config, models_db, observabilidade, servico  # noqa: F401
 from app.db import Base, engine, get_db
 from app.motor.base import SolicitacaoSimulacao
 from app.motor.mock import TAXAS_MOCK
@@ -34,6 +35,19 @@ def version():
     return {"versao": config.VERSAO, "schema": config.SCHEMA_VERSAO}
 
 
+@app.get("/metrics", include_in_schema=False)
+def metrics(request: Request, db: Session = Depends(get_db)):
+    """Métricas Prometheus agregadas; token dedicado e opcional para o scraper."""
+    token = config.METRICS_TOKEN
+    recebido = request.headers.get("Authorization", "")
+    if token and not hmac.compare_digest(recebido, f"Bearer {token}"):
+        return Response(status_code=401, headers={"WWW-Authenticate": "Bearer"})
+    return Response(
+        content=observabilidade.gerar_metricas(db),
+        media_type="text/plain; version=0.0.4; charset=utf-8",
+    )
+
+
 @app.get("/v1/provedores")
 def provedores():
     return {
@@ -49,10 +63,13 @@ def criar_simulacao(
     request: Request,
     response: Response,
     db: Session = Depends(get_db),
+    cliente=Depends(auth.autenticar_cliente),
 ):
+    if isinstance(cliente, JSONResponse):
+        return cliente
     idempotency_key = request.headers.get("Idempotency-Key")
     try:
-        sim, criada = servico.criar_simulacao(db, sol, idempotency_key)
+        sim, criada = servico.criar_simulacao(db, sol, cliente.id, idempotency_key)
     except servico.ErroValidacao as e:
         return JSONResponse(
             status_code=422, content={"erro": {"code": e.code, "message": e.message}}
@@ -61,14 +78,20 @@ def criar_simulacao(
         return JSONResponse(
             status_code=409, content={"erro": {"code": e.code, "message": e.message}}
         )
-    # 201 quando cria de fato; 200 quando reusa por idempotência.
-    response.status_code = 201 if criada else 200
+    # 202 quando enfileira de fato (job assíncrono); 200 quando reusa por idempotência.
+    response.status_code = 202 if criada else 200
     return {"id": sim.id, "status": sim.status, "criada_em": sim.criada_em.isoformat()}
 
 
 @app.get("/v1/simulacoes/{sim_id}")
-def obter_simulacao(sim_id: str, db: Session = Depends(get_db)):
-    sim = servico.obter_simulacao(db, sim_id)
+def obter_simulacao(
+    sim_id: str,
+    db: Session = Depends(get_db),
+    cliente=Depends(auth.autenticar_cliente),
+):
+    if isinstance(cliente, JSONResponse):
+        return cliente
+    sim = servico.obter_simulacao(db, sim_id, cliente.id)
     if sim is None:
         return JSONResponse(
             status_code=404,
@@ -78,8 +101,14 @@ def obter_simulacao(sim_id: str, db: Session = Depends(get_db)):
 
 
 @app.post("/v1/simulacoes/{sim_id}/cancelar")
-def cancelar_simulacao(sim_id: str, db: Session = Depends(get_db)):
-    sim = servico.cancelar_simulacao(db, sim_id)
+def cancelar_simulacao(
+    sim_id: str,
+    db: Session = Depends(get_db),
+    cliente=Depends(auth.autenticar_cliente),
+):
+    if isinstance(cliente, JSONResponse):
+        return cliente
+    sim = servico.cancelar_simulacao(db, sim_id, cliente.id)
     if sim is None:
         return JSONResponse(
             status_code=404,

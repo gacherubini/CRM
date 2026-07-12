@@ -60,17 +60,30 @@ def test_http_provider_delega_ao_motor(monkeypatch):
         def json(self):
             return self._d
 
-    monkeypatch.setattr(
-        simulation.httpx, "post", lambda *a, **k: _Resp({"id": "sim-1", "status": "concluida"})
+    respostas = iter([
+        {"id": "sim-1", "status": "processando", "resultados": []},
+        {"id": "sim-1", "status": "concluida", "resultados": [{"provedor": "BV"}]},
+    ])
+    headers_vistos = []
+
+    def _post(*args, **kwargs):
+        headers_vistos.append(kwargs["headers"])
+        return _Resp({"id": "sim-1", "status": "recebida"})
+
+    def _get(*args, **kwargs):
+        headers_vistos.append(kwargs["headers"])
+        return _Resp(next(respostas))
+
+    monkeypatch.setattr(simulation.httpx, "post", _post)
+    monkeypatch.setattr(simulation.httpx, "get", _get)
+    prov = HttpSimulationProvider(
+        base_url="http://motor", token="token-motor", poll_interval=0
     )
-    monkeypatch.setattr(
-        simulation.httpx,
-        "get",
-        lambda *a, **k: _Resp({"id": "sim-1", "status": "concluida", "resultados": [{"provedor": "BV"}]}),
-    )
-    prov = HttpSimulationProvider(base_url="http://motor")
     out = prov.simular({"veiculo": {"valor": 1}, "condicoes": {"prazo_meses": 12}}, "key")
     assert out["resultados"][0]["provedor"] == "BV"
+    assert len(headers_vistos) == 3
+    assert headers_vistos[0]["Idempotency-Key"] == "key"
+    assert all(h["Authorization"] == "Bearer token-motor" for h in headers_vistos)
 
 
 def test_http_provider_falha_gera_fallback(monkeypatch):
@@ -80,7 +93,45 @@ def test_http_provider_falha_gera_fallback(monkeypatch):
         raise RuntimeError("motor fora do ar")
 
     monkeypatch.setattr(simulation.httpx, "post", _boom)
-    prov = HttpSimulationProvider(base_url="http://motor")
+    prov = HttpSimulationProvider(base_url="http://motor", token="token-motor")
     out = prov.simular({"veiculo": {"valor": 1}, "condicoes": {"prazo_meses": 12}}, "key")
     assert out["status"] == "falhou"
     assert out["resultados"] == []
+
+
+def test_http_provider_exige_url_e_token():
+    assert HttpSimulationProvider(base_url="http://motor", token="").disponivel() is False
+    assert HttpSimulationProvider(base_url="", token="token").disponivel() is False
+    assert HttpSimulationProvider(base_url="http://motor", token="token").disponivel() is True
+
+
+def test_http_provider_timeout_de_polling_gera_fallback(monkeypatch):
+    from app import simulation
+
+    class _Resp:
+        def __init__(self, dados):
+            self._dados = dados
+
+        def raise_for_status(self):
+            pass
+
+        def json(self):
+            return self._dados
+
+    monkeypatch.setattr(
+        simulation.httpx,
+        "post",
+        lambda *a, **k: _Resp({"id": "sim-lenta", "status": "recebida"}),
+    )
+    monkeypatch.setattr(
+        simulation.httpx,
+        "get",
+        lambda *a, **k: _Resp({"id": "sim-lenta", "status": "processando", "resultados": []}),
+    )
+    prov = HttpSimulationProvider(
+        base_url="http://motor", token="token", poll_timeout=0, poll_interval=0
+    )
+    out = prov.simular(_payload(), "key")
+    assert out["status"] == "falhou"
+    assert out["resultados"] == []
+    assert "demorando" in out["mensagem"]

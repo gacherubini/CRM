@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Entrar — Gestão da loja</title>
+  <link rel="stylesheet" href="{{ url_for('static', path='/css/app.css') }}">
+</head>
+<body class="login-page">
+  <main class="login-layout">
+    <section class="login-story">
+      <span class="eyebrow">Sua operação, em um só lugar</span>
+      <h1>Transforme conversas em vendas bem acompanhadas.</h1>
+      <p>Estoque, leads e atendimento conectados sem perder a visão humana da loja.</p>
+      <div class="story-number"><strong>01</strong><span>Comece pelo estoque.<br>O restante cresce junto.</span></div>
+    </section>
+    <section class="login-panel">
+      <div class="login-card">
+        <span class="brand-mark">G</span>
+        <div>
+          <span class="eyebrow">Acesso seguro</span>
+          <h2>Bem-vindo de volta</h2>
+          <p>Entre para acompanhar a operação da sua loja.</p>
+        </div>
+        {% if erro %}<div class="alert error" role="alert">{{ erro }}</div>{% endif %}
+        <form method="post" action="/login" class="stack-form">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          <label>E-mail<input type="email" name="email" autocomplete="email" required></label>
+          <label>Senha<input type="password" name="senha" autocomplete="current-password" required></label>
+          <button class="button primary" type="submit">Entrar no Dashboard</button>
+        </form>
+        <small class="muted">Acesso exclusivo para equipe autorizada.</small>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

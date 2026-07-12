@@ -28,6 +28,7 @@ class MensagemEntrada(BaseModel):
     texto: Optional[str] = None
     provider_message_id: Optional[str] = None
     from_me: bool = False
+    origem_bot: bool = False
 
 
 class EstadoInput(BaseModel):
@@ -78,7 +79,13 @@ def version():
 def webhook_mensagem(msg: MensagemEntrada, db: Session = Depends(get_db)):
     """Recebe uma mensagem (loja resolvida pela instância) e persiste idempotente."""
     return servico.registrar_mensagem(
-        db, msg.instance, msg.telefone, msg.texto, msg.provider_message_id, msg.from_me
+        db,
+        msg.instance,
+        msg.telefone,
+        msg.texto,
+        msg.provider_message_id,
+        msg.from_me,
+        msg.origem_bot,
     )
 
 
