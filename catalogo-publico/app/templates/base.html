@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Veículos disponíveis para compra">
+  <title>{% block title %}Catálogo de veículos{% endblock %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', path='css/catalog.css') }}">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="{% if loja %}/l/{{ loja.slug }}{% else %}/{% endif %}">
+      <span class="brand-mark">M</span>
+      <span>{% if loja %}{{ loja.nome }}{% else %}Catálogo{% endif %}</span>
+    </a>
+  </header>
+  <main class="container">{% block content %}{% endblock %}</main>
+  <footer class="footer">Estoque atualizado pela loja.</footer>
+</body>
+</html>

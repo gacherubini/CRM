@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}{{ veiculo.marca }} {{ veiculo.modelo }} — {{ loja.nome }}{% endblock %}
+{% block content %}
+<a class="back-link" href="/l/{{ loja.slug }}">← Voltar ao estoque</a>
+<article class="detail">
+  <section class="gallery" aria-label="Fotos do veículo">
+    {% if veiculo.imagens %}
+      {% for imagem in veiculo.imagens %}
+      <img src="{{ imagem }}" alt="{{ veiculo.marca }} {{ veiculo.modelo }} — foto {{ loop.index }}" loading="{% if loop.first %}eager{% else %}lazy{% endif %}" width="960" height="640">
+      {% endfor %}
+    {% else %}<div class="image-fallback detail-fallback">Veículo sem foto</div>{% endif %}
+  </section>
+  <section class="detail-info">
+    <p class="eyebrow">{{ veiculo.tipo }} · disponível</p>
+    <h1>{{ veiculo.marca }} {{ veiculo.modelo }}</h1>
+    {% if veiculo.versao %}<p class="lead">{{ veiculo.versao }}</p>{% endif %}
+    <p class="price">{{ veiculo.preco | moeda }}</p>
+    <dl class="specs">
+      <div><dt>Ano</dt><dd>{{ veiculo.ano_modelo }}</dd></div>
+      <div><dt>Quilometragem</dt><dd>{{ "{:,.0f}".format(veiculo.km).replace(',', '.') }} km</dd></div>
+      <div><dt>Cor</dt><dd>{{ veiculo.cor or 'Não informada' }}</dd></div>
+    </dl>
+    {% if whatsapp_disponivel %}
+      <a class="button whatsapp" href="{{ interest_url }}">Tenho interesse pelo WhatsApp</a>
+    {% else %}
+      <p class="notice">A loja ainda não configurou o atendimento por WhatsApp.</p>
+    {% endif %}
+    <small class="muted">Referência do veículo: {{ veiculo.id }}</small>
+  </section>
+</article>
+{% endblock %}

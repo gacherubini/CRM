@@ -77,3 +77,7 @@ def pode_confirmar_venda(usuario: Usuario) -> bool:
 
 def pode_ver_financeiro(usuario: Usuario) -> bool:
     return usuario.papel in {"dono", "gerente", "admin_plataforma"}
+
+
+def pode_gerir_metas(usuario: Usuario) -> bool:
+    return usuario.papel in {"dono", "gerente"}

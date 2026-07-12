@@ -1,0 +1,28 @@
+{
+  "loja": {
+    "slug": "moto-center",
+    "nome": "Moto Center",
+    "whatsapp": "+55 (11) 99999-9999"
+  },
+  "veiculo": {
+    "id": "vehicle-1",
+    "tipo": "moto",
+    "marca": "Honda",
+    "modelo": "CG 160",
+    "versao": "Titan",
+    "ano_modelo": 2025,
+    "cor": "Vermelha",
+    "km": 1200,
+    "preco": 18990.0,
+    "foto_url": "https://images.example/vehicle-1.jpg",
+    "fotos": [
+      "https://images.example/vehicle-1.jpg",
+      "https://images.example/vehicle-1-side.jpg"
+    ]
+  },
+  "paginacao": {
+    "limit": 12,
+    "offset": 0,
+    "quantidade": 1
+  }
+}

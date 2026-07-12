@@ -1,0 +1,25 @@
+services:
+  catalogo-publico:
+    build: ../../catalogo-publico
+    environment:
+      - ESTOQUE_PUBLIC_API_URL=${ESTOQUE_PUBLIC_API_URL:-http://host.docker.internal:8100}
+      - ESTOQUE_PUBLIC_API_TOKEN=${ESTOQUE_PUBLIC_API_TOKEN:-}
+      - CATALOGO_DATABASE_PATH=/data/catalogo.db
+      - CATALOGO_PUBLIC_BASE_URL=${CATALOGO_PUBLIC_BASE_URL:-http://localhost:8200}
+      - CATALOGO_PAGE_SIZE=${CATALOGO_PAGE_SIZE:-12}
+      - CATALOGO_SECURE_COOKIE=${CATALOGO_SECURE_COOKIE:-0}
+    ports:
+      - "${CATALOGO_PORT:-8200}:8000"
+    volumes:
+      - catalogo_data:/data
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health/ready', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+volumes:
+  catalogo_data:

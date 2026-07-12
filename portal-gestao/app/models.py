@@ -75,3 +75,4 @@ class Meta(Base):
     periodo_inicio: Mapped[date] = mapped_column(Date)
     periodo_fim: Mapped[date] = mapped_column(Date)
     valor_alvo: Mapped[Decimal] = mapped_column(Numeric(14, 2))
+    ativa: Mapped[bool] = mapped_column(Boolean, default=True)

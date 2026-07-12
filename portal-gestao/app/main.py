@@ -21,6 +21,7 @@ from app.auth import (
     encerrar_sessao,
     iniciar_sessao,
     pode_confirmar_venda,
+    pode_gerir_metas,
     pode_gerir_estoque,
     pode_registrar_venda,
     pode_ver_custo,
@@ -612,6 +613,11 @@ async def simulacoes_simular(
 
 CATEGORIAS_CUSTO = ["documentacao", "frete", "comissao", "outros"]
 STATUS_VENDA = ["registrada", "confirmada", "cancelada"]
+TIPOS_META = {
+    "quantidade": "Quantidade de vendas",
+    "faturamento": "Faturamento",
+    "lucro_bruto": "Lucro bruto",
+}
 CENTAVOS = Decimal("0.01")
 
 
@@ -640,8 +646,10 @@ def periodo_padrao(inicio: str | None, fim: str | None) -> tuple[date, date]:
     return d_inicio, d_fim
 
 
-def lucro_bruto_venda(venda: Venda) -> Decimal:
-    custo = venda.custo_veiculo or Decimal("0")
+def lucro_bruto_venda(venda: Venda) -> Decimal | None:
+    if venda.custo_veiculo is None:
+        return None
+    custo = venda.custo_veiculo
     diretos = sum((c.valor for c in venda.custos_diretos), Decimal("0"))
     return (venda.preco_venda - custo - diretos).quantize(CENTAVOS, rounding=ROUND_HALF_UP)
 
@@ -785,6 +793,209 @@ async def vendas_cancelar(request: Request, venda_id: str, db: Session = Depends
     return RedirectResponse("/app/vendas?ok=cancelada", status_code=303)
 
 
+def valores_meta_form(form) -> dict[str, str]:
+    return {
+        campo: (form.get(campo) or "")
+        for campo in ("tipo", "periodo_inicio", "periodo_fim", "valor_alvo")
+    }
+
+
+def validar_meta_form(form) -> tuple[str, date, date, Decimal]:
+    tipo = (form.get("tipo") or "").strip()
+    if tipo not in TIPOS_META:
+        raise ValueError("Selecione um tipo de meta válido.")
+    try:
+        inicio = date.fromisoformat(form.get("periodo_inicio") or "")
+        fim = date.fromisoformat(form.get("periodo_fim") or "")
+    except ValueError as exc:
+        raise ValueError("Informe um período válido.") from exc
+    if inicio > fim:
+        raise ValueError("A data inicial não pode ser posterior à data final.")
+    try:
+        alvo = dinheiro(form.get("valor_alvo"))
+    except (InvalidOperation, TypeError) as exc:
+        raise ValueError("Informe um alvo válido.") from exc
+    if alvo <= 0:
+        raise ValueError("O alvo deve ser maior que zero.")
+    if tipo == "quantidade" and alvo != alvo.to_integral_value():
+        raise ValueError("A meta de quantidade deve ser um número inteiro.")
+    return tipo, inicio, fim, alvo
+
+
+def meta_sobreposta(
+    db: Session,
+    loja_slug: str,
+    tipo: str,
+    inicio: date,
+    fim: date,
+    ignorar_id: str | None = None,
+) -> bool:
+    consulta = db.query(Meta).filter(
+        Meta.loja_slug == loja_slug,
+        Meta.escopo == "loja",
+        Meta.tipo == tipo,
+        Meta.ativa.is_(True),
+        Meta.periodo_inicio <= fim,
+        Meta.periodo_fim >= inicio,
+    )
+    if ignorar_id:
+        consulta = consulta.filter(Meta.id != ignorar_id)
+    return consulta.first() is not None
+
+
+def render_meta_form(request: Request, usuario, valores, titulo: str, erro: str | None = None, status_code: int = 200):
+    return templates.TemplateResponse(
+        "metas/form.html",
+        contexto(
+            request,
+            usuario,
+            valores=valores,
+            titulo=titulo,
+            tipos=TIPOS_META,
+            erro=erro,
+        ),
+        status_code=status_code,
+    )
+
+
+@app.get("/app/metas", response_class=HTMLResponse)
+def metas_lista(request: Request, db: Session = Depends(get_db)):
+    usuario = usuario_atual(request, db)
+    if not usuario:
+        return redirecionar_login()
+    metas = (
+        db.query(Meta)
+        .filter(Meta.loja_slug == usuario.loja_slug, Meta.escopo == "loja")
+        .order_by(Meta.ativa.desc(), Meta.periodo_inicio.desc())
+        .all()
+    )
+    return templates.TemplateResponse(
+        "metas/lista.html",
+        contexto(
+            request,
+            usuario,
+            metas=metas,
+            tipos=TIPOS_META,
+            pode_gerir=pode_gerir_metas(usuario),
+        ),
+    )
+
+
+@app.get("/app/metas/nova", response_class=HTMLResponse)
+def metas_nova(request: Request, db: Session = Depends(get_db)):
+    usuario = usuario_atual(request, db)
+    if not usuario:
+        return redirecionar_login()
+    if not pode_gerir_metas(usuario):
+        return RedirectResponse("/app/metas", status_code=303)
+    return render_meta_form(request, usuario, {}, "Cadastrar meta da loja")
+
+
+@app.post("/app/metas/nova")
+async def metas_criar(request: Request, db: Session = Depends(get_db)):
+    usuario = usuario_atual(request, db)
+    if not usuario:
+        return redirecionar_login()
+    form = await request.form()
+    if not pode_gerir_metas(usuario) or not csrf_valido(request, form.get("csrf")):
+        return RedirectResponse("/app/metas", status_code=303)
+    valores = valores_meta_form(form)
+    try:
+        tipo, inicio, fim, alvo = validar_meta_form(form)
+    except ValueError as exc:
+        return render_meta_form(request, usuario, valores, "Cadastrar meta da loja", str(exc), 422)
+    if meta_sobreposta(db, usuario.loja_slug, tipo, inicio, fim):
+        return render_meta_form(
+            request,
+            usuario,
+            valores,
+            "Cadastrar meta da loja",
+            "Já existe uma meta ativa desse tipo sobrepondo o período informado.",
+            422,
+        )
+    db.add(
+        Meta(
+            loja_slug=usuario.loja_slug,
+            escopo="loja",
+            tipo=tipo,
+            periodo_inicio=inicio,
+            periodo_fim=fim,
+            valor_alvo=alvo,
+            ativa=True,
+        )
+    )
+    db.commit()
+    return RedirectResponse("/app/metas?ok=criada", status_code=303)
+
+
+@app.get("/app/metas/{meta_id}/editar", response_class=HTMLResponse)
+def metas_editar_pagina(request: Request, meta_id: str, db: Session = Depends(get_db)):
+    usuario = usuario_atual(request, db)
+    if not usuario:
+        return redirecionar_login()
+    if not pode_gerir_metas(usuario):
+        return RedirectResponse("/app/metas", status_code=303)
+    meta = db.query(Meta).filter(Meta.id == meta_id, Meta.loja_slug == usuario.loja_slug).first()
+    if not meta or not meta.ativa:
+        return RedirectResponse("/app/metas?erro=nao-encontrada", status_code=303)
+    valores = {
+        "tipo": meta.tipo,
+        "periodo_inicio": meta.periodo_inicio.isoformat(),
+        "periodo_fim": meta.periodo_fim.isoformat(),
+        "valor_alvo": str(meta.valor_alvo),
+    }
+    return render_meta_form(request, usuario, valores, "Editar meta da loja")
+
+
+@app.post("/app/metas/{meta_id}/editar")
+async def metas_editar(request: Request, meta_id: str, db: Session = Depends(get_db)):
+    usuario = usuario_atual(request, db)
+    if not usuario:
+        return redirecionar_login()
+    form = await request.form()
+    if not pode_gerir_metas(usuario) or not csrf_valido(request, form.get("csrf")):
+        return RedirectResponse("/app/metas", status_code=303)
+    meta = db.query(Meta).filter(Meta.id == meta_id, Meta.loja_slug == usuario.loja_slug).first()
+    if not meta or not meta.ativa:
+        return RedirectResponse("/app/metas?erro=nao-encontrada", status_code=303)
+    valores = valores_meta_form(form)
+    try:
+        tipo, inicio, fim, alvo = validar_meta_form(form)
+    except ValueError as exc:
+        return render_meta_form(request, usuario, valores, "Editar meta da loja", str(exc), 422)
+    if meta_sobreposta(db, usuario.loja_slug, tipo, inicio, fim, ignorar_id=meta.id):
+        return render_meta_form(
+            request,
+            usuario,
+            valores,
+            "Editar meta da loja",
+            "Já existe uma meta ativa desse tipo sobrepondo o período informado.",
+            422,
+        )
+    meta.tipo = tipo
+    meta.periodo_inicio = inicio
+    meta.periodo_fim = fim
+    meta.valor_alvo = alvo
+    db.commit()
+    return RedirectResponse("/app/metas?ok=editada", status_code=303)
+
+
+@app.post("/app/metas/{meta_id}/desativar")
+async def metas_desativar(request: Request, meta_id: str, db: Session = Depends(get_db)):
+    usuario = usuario_atual(request, db)
+    if not usuario:
+        return redirecionar_login()
+    form = await request.form()
+    if not pode_gerir_metas(usuario) or not csrf_valido(request, form.get("csrf")):
+        return RedirectResponse("/app/metas", status_code=303)
+    meta = db.query(Meta).filter(Meta.id == meta_id, Meta.loja_slug == usuario.loja_slug).first()
+    if not meta:
+        return RedirectResponse("/app/metas?erro=nao-encontrada", status_code=303)
+    meta.ativa = False
+    db.commit()
+    return RedirectResponse("/app/metas?ok=desativada", status_code=303)
+
+
 @app.get("/app/financeiro", response_class=HTMLResponse)
 def financeiro_dashboard(
     request: Request,
@@ -804,15 +1015,29 @@ def financeiro_dashboard(
         if d_inicio <= _data(v.criada_em) <= d_fim
     ]
     faturamento = sum((v.preco_venda for v in confirmadas), Decimal("0"))
-    lucro = sum((lucro_bruto_venda(v) for v in confirmadas), Decimal("0"))
-    metricas = {"quantidade": len(confirmadas), "faturamento": faturamento, "lucro_bruto": lucro}
+    lucros_conhecidos = [valor for venda in confirmadas if (valor := lucro_bruto_venda(venda)) is not None]
+    lucro = sum(lucros_conhecidos, Decimal("0"))
+    vendas_lucro_incompleto = len(confirmadas) - len(lucros_conhecidos)
+    lucro_completo = vendas_lucro_incompleto == 0
+    metricas = {
+        "quantidade": len(confirmadas),
+        "faturamento": faturamento,
+        "lucro_bruto": lucro,
+        "lucro_completo": lucro_completo,
+        "vendas_lucro_incompleto": vendas_lucro_incompleto,
+    }
     realizado_por_tipo = {"quantidade": Decimal(len(confirmadas)), "faturamento": faturamento, "lucro_bruto": lucro}
     metas_view = []
-    for meta in db.query(Meta).filter(Meta.loja_slug == usuario.loja_slug, Meta.escopo == "loja").all():
+    for meta in db.query(Meta).filter(
+        Meta.loja_slug == usuario.loja_slug,
+        Meta.escopo == "loja",
+        Meta.ativa.is_(True),
+    ).all():
         if meta.tipo not in realizado_por_tipo or not (meta.periodo_inicio <= d_fim and meta.periodo_fim >= d_inicio):
             continue
         realizado = realizado_por_tipo[meta.tipo]
-        pct = round(float(realizado / meta.valor_alvo * 100), 1) if meta.valor_alvo else 0.0
+        indisponivel = meta.tipo == "lucro_bruto" and not lucro_completo
+        pct = round(float(realizado / meta.valor_alvo * 100), 1) if meta.valor_alvo and not indisponivel else 0.0
         metas_view.append(
             {
                 "tipo": meta.tipo,
@@ -821,6 +1046,7 @@ def financeiro_dashboard(
                 "pct": pct,
                 "pct_barra": min(pct, 100),
                 "quantidade": meta.tipo == "quantidade",
+                "indisponivel": indisponivel,
             }
         )
     return templates.TemplateResponse(

@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}Metas — Motora{% endblock %}
+{% block content %}
+<div class="page-heading">
+  <div><span class="eyebrow">Planejamento comercial</span><h1>Metas da loja</h1><p>Objetivos por período, comparados somente com vendas confirmadas.</p></div>
+  {% if pode_gerir %}<a class="button primary" href="/app/metas/nova">Cadastrar meta</a>{% endif %}
+</div>
+
+{% if request.query_params.get('ok') %}<div class="alert success">Ação concluída com sucesso.</div>{% endif %}
+{% if request.query_params.get('erro') %}<div class="alert error">Não foi possível localizar essa meta.</div>{% endif %}
+
+<section class="panel flush">
+  {% if metas %}
+  <div class="table-wrap"><table>
+    <thead><tr><th>Tipo</th><th>Período</th><th>Alvo</th><th>Status</th>{% if pode_gerir %}<th><span class="sr-only">Ações</span></th>{% endif %}</tr></thead>
+    <tbody>{% for meta in metas %}<tr>
+      <td><strong>{{ tipos.get(meta.tipo, meta.tipo) }}</strong></td>
+      <td>{{ meta.periodo_inicio.strftime('%d/%m/%Y') }} a {{ meta.periodo_fim.strftime('%d/%m/%Y') }}</td>
+      <td>{% if meta.tipo == 'quantidade' %}{{ meta.valor_alvo | int }} vendas{% else %}{{ formatar_brl(meta.valor_alvo) }}{% endif %}</td>
+      <td><span class="status {{ 'confirmada' if meta.ativa else 'cancelada' }}">{{ 'Ativa' if meta.ativa else 'Inativa' }}</span></td>
+      {% if pode_gerir %}<td>{% if meta.ativa %}<div class="action-grid">
+        <a class="button secondary" href="/app/metas/{{ meta.id }}/editar">Editar</a>
+        <form method="post" action="/app/metas/{{ meta.id }}/desativar"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="button danger" type="submit">Desativar</button></form>
+      </div>{% else %}<span class="muted">—</span>{% endif %}</td>{% endif %}
+    </tr>{% endfor %}</tbody>
+  </table></div>
+  {% else %}<div class="empty"><strong>Nenhuma meta cadastrada.</strong><p>{% if pode_gerir %}Cadastre a primeira meta para acompanhar o atingimento no Financeiro.{% else %}O dono ou gerente ainda não cadastrou metas para a loja.{% endif %}</p></div>{% endif %}
+</section>
+{% endblock %}

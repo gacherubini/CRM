@@ -4,6 +4,28 @@
 > Confirme o estado real (containers, `.env`, n8n) antes de editar. Nunca trate números de testes
 > antigos como prova de E2E WhatsApp.
 
+## 0.1 Atualização — sessão 2026-07-12 (parte 3)
+
+Trabalho feito na `main`, ainda sem commit no início desta atualização. Entregas verificadas ao vivo
+e por testes:
+
+- **Portal #3B:** CRUD de metas de loja (quantidade, faturamento e lucro bruto), RBAC dono/gerente,
+  consulta do vendedor, tenancy, validações de período/alvo/sobreposição e migration
+  `0003_adiciona_meta_ativa`. Lucro com custo ausente agora é incompleto (`None`), não zero; o
+  dashboard mostra subtotal conhecido, quantidade de vendas incompletas e suspende o atingimento da
+  meta de lucro. **72 testes** no Portal; migration validada do zero e sobre banco em `0002`.
+- **Catálogo Público #5A:** criado `catalogo-publico/` com FastAPI/Jinja/CSS local, provider HTTP
+  tipado para `/public/v1` do Estoque, vitrine/filtros/paginação, detalhe/galeria, 404/422/503,
+  CTA que revalida loja+veículo e redireciona somente a `https://wa.me`, eventos/UTMs em SQLite e
+  cookie anônimo UUID. Deploy conectado em `deploy/catalogo-conectado`, Docker não-root, volume e
+  healthcheck. **15 testes** e Compose validado.
+- **Runtime local:** Portal rebuildado em `:9000`, migration aplicada; Catálogo conectado em `:8200`
+  e validado ao vivo na loja pública `demo`. Bot/n8n permanecem desativados.
+
+Próximo marco decidido: **funil comercial ponta a ponta** — Catálogo → evento de interesse com
+origem/UTM → lead/atribuição → dashboard do vendedor → venda/conversão do dono. Preservar HTTP entre
+produtos e alinhar um contrato comum de `origem`, `canal`, UTM, loja, veículo e idempotência.
+
 ## 0. Atualização — sessão 2026-07-12 (parte 2)
 
 Trabalho feito na branch `feat/dashboard-leads-conversas` e **já MERGEADO na `main`**
@@ -57,7 +79,7 @@ Suíte revendível para lojas de carros/motos, produtos instaláveis juntos ou s
 2. Estoque API/admin
 3. Chatbot WhatsApp + Estoque Lite + Motor opcional
 4. Portal/CRM do vendedor
-5. Catálogo público (ainda não)
+5. Catálogo público (primeiro incremento conectado entregue)
 6. Extensões vendas/metas (#3B / #6)
 
 Integrações por **HTTP** apenas. Estoque = fonte de verdade dos veículos. Tokens só no servidor.

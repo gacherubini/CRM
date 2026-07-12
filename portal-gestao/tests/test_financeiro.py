@@ -83,3 +83,26 @@ def test_venda_de_outra_loja_nao_conta(client):
     resposta = client.get("/app/financeiro")
     assert resposta.status_code == 200
     assert "Nenhuma venda confirmada no período." in resposta.text
+
+
+def test_lucro_incompleto_nao_trata_custo_ausente_como_zero(client):
+    criar_venda_confirmada("50000")
+    criar_venda_confirmada("30000", custo="20000")
+    login(client)
+    resposta = client.get("/app/financeiro")
+    assert resposta.status_code == 200
+    assert "Lucro bruto" in resposta.text
+    assert "Incompleto" in resposta.text
+    assert "1 venda confirmada sem custo do veículo" in resposta.text
+    assert "Subtotal conhecido: R$ 10.000,00" in resposta.text
+    assert "R$ 60.000,00" not in resposta.text
+
+
+def test_meta_de_lucro_nao_exibe_atingimento_com_lucro_incompleto(client):
+    criar_venda_confirmada("30000")
+    criar_meta(tipo="lucro_bruto", alvo="10000")
+    login(client)
+    resposta = client.get("/app/financeiro")
+    assert resposta.status_code == 200
+    assert "Informe o custo do veículo em todas as vendas confirmadas" in resposta.text
+    assert "100.0%" not in resposta.text

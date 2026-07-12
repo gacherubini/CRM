@@ -18,7 +18,15 @@
   <div class="metric-grid">
     <div class="metric"><span>Vendas confirmadas</span><strong>{{ metricas.quantidade }}</strong><small>vendas com status confirmada no período</small></div>
     <div class="metric"><span>Faturamento</span><strong>{{ formatar_brl(metricas.faturamento) }}</strong><small>soma de preco_venda das confirmadas</small></div>
-    <div class="metric accent"><span>Lucro bruto</span><strong>{{ formatar_brl(metricas.lucro_bruto) }}</strong><small>preço − custo do veículo − custos diretos</small></div>
+    <div class="metric accent">
+      <span>Lucro bruto</span>
+      {% if metricas.lucro_completo %}
+      <strong>{{ formatar_brl(metricas.lucro_bruto) }}</strong><small>preço − custo do veículo − custos diretos</small>
+      {% else %}
+      <strong>Incompleto</strong>
+      <small>{{ metricas.vendas_lucro_incompleto }} venda{% if metricas.vendas_lucro_incompleto != 1 %}s{% endif %} confirmada{% if metricas.vendas_lucro_incompleto != 1 %}s{% endif %} sem custo do veículo. Subtotal conhecido: {{ formatar_brl(metricas.lucro_bruto) }}.</small>
+      {% endif %}
+    </div>
   </div>
 </section>
 {% else %}
@@ -34,16 +42,21 @@
     {% for m in metas %}
     <div class="metric">
       <span>{{ m.tipo | replace('_', ' ') | capitalize }}</span>
+      {% if m.indisponivel %}
+      <strong>Incompleto</strong>
+      <small>Informe o custo do veículo em todas as vendas confirmadas para calcular o atingimento.</small>
+      {% else %}
       <strong>{% if m.quantidade %}{{ m.realizado | int }}{% else %}{{ formatar_brl(m.realizado) }}{% endif %}</strong>
       <small>meta: {% if m.quantidade %}{{ m.alvo | int }}{% else %}{{ formatar_brl(m.alvo) }}{% endif %} · {{ m.pct }}%</small>
       <div class="meta-bar" role="progressbar" aria-valuenow="{{ m.pct }}" aria-valuemin="0" aria-valuemax="100" style="height:6px;margin-top:8px;background:rgba(255,255,255,0.08);border-radius:4px;overflow:hidden">
         <span style="display:block;height:100%;width:{{ m.pct_barra }}%;background:currentColor"></span>
       </div>
+      {% endif %}
     </div>
     {% endfor %}
   </div>
   {% else %}
-  <div class="empty"><strong>Nenhuma meta da loja para o período.</strong><p>Cadastre metas de quantidade, faturamento ou lucro bruto para acompanhar o atingimento.</p></div>
+  <div class="empty"><strong>Nenhuma meta da loja para o período.</strong><p><a href="/app/metas">Cadastre metas</a> de quantidade, faturamento ou lucro bruto para acompanhar o atingimento.</p></div>
   {% endif %}
 </section>
 {% endblock %}

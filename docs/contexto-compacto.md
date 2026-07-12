@@ -1,7 +1,7 @@
 # Contexto compacto para continuidade
 
-Atualizado em 2026-07-12 após E2E WhatsApp real (estoque + lead + simulação mock via Motor HTTP)
-e estabilização do workflow n8n. Leia este arquivo primeiro e depois `docs/handoff-contexto.md`.
+Atualizado em 2026-07-12 após entrega do primeiro incremento do CRM financeiro #3B e do
+Catálogo Público #5A. Leia este arquivo primeiro e depois `docs/handoff-contexto.md`.
 
 ## Regras permanentes
 
@@ -43,17 +43,29 @@ e estabilização do workflow n8n. Leia este arquivo primeiro e depois `docs/han
 
 ### Portal
 
-- `portal-gestao/`: shell Motora dark-tech, dashboard + estoque reais; leads + conversas/handoff
-  agora reais (Plano #3A.1 Tasks 10,11,12; branch `feat/dashboard-leads-conversas`, verificado ao vivo).
-  Simulações/equipe/config ainda placeholder. Precisa `CHATBOT_API_TOKEN` no `.env` do portal.
+- `portal-gestao/`: dashboard, estoque, leads, conversas/handoff e simulação manual reais.
+- #3B: vendas e dashboard financeiro; metas de loja agora têm CRUD (quantidade, faturamento e
+  lucro), RBAC/tenancy, validação de período/alvo/sobreposição e migration `0003_adiciona_meta_ativa`.
+- Venda sem custo não gera mais lucro fictício: dashboard sinaliza dados incompletos e suspende o
+  atingimento da meta de lucro. Suíte do Portal: **72 testes**.
+- Equipe/config ainda placeholder. Precisa `CHATBOT_API_TOKEN` no `.env` local do portal.
+
+### Catálogo Público #5A
+
+- Primeiro incremento vertical entregue em `catalogo-publico/` (FastAPI + Jinja + CSS local).
+- Vitrine pública, filtros/paginação, detalhe/galeria, estados 404/422/503 e CTA seguro para WhatsApp.
+- Consome somente a API pública HTTP do Estoque; não compartilha banco/models.
+- Eventos de interesse + UTMs em SQLite próprio; redirect limitado a `https://wa.me`.
+- Deploy conectado em `deploy/catalogo-conectado`, Docker não-root, healthcheck e volume persistente.
+- **15 testes**; validado ao vivo em `http://localhost:8200/l/demo` contra o Estoque real.
 
 ## Próxima sequência recomendada
 
-1. Reverter gate n8n para só `isSaved === false` quando Evolution estiver confiável.
-2. Endurecer webhook Evolution (auth, dedupe DB, corrida `origem_bot`).
-3. LGPD: sanitizar/cifrar CPF em mensagens; exclusão de dados.
-4. Fechar E2E Motor Task 10 (kill worker, restore) e outbox Estoque contra receptor real.
-5. Portal: leads + conversas + handoff (#3A.1).
+1. Funil comercial ponta a ponta: `catalog.interest_clicked` → lead/origem/UTM → atribuição → venda.
+2. #3B: dashboard do vendedor, funil/conversão e campanhas.
+3. #5A: outbox/webhook de interesse, exportação, tema por loja, SEO/cache e standalone.
+4. Ajustar prompt n8n (remover consentimento antigo) e corrigir mojibake na entrada.
+5. Fechar E2E Motor Task 10, Estoque outbox/restore e Playwright do Portal.
 6. Drivers bancários reais (ainda em hold) quando sair do mock.
 
 ## Verificação mínima
@@ -63,8 +75,9 @@ cd motor-simulacao; .\.venv\Scripts\python.exe -m pytest -q
 cd ..\chatbot-api; .\.venv\Scripts\python.exe -m pytest -q
 cd ..\estoque-api; .\.venv\Scripts\python.exe -m pytest -q
 cd ..\portal-gestao; .\.venv\Scripts\python.exe -m pytest -q
+cd ..\catalogo-publico; ..\portal-gestao\.venv\Scripts\python.exe -m pytest -q
 git status --short
 ```
 
-Estado estimado: backend ~80% para demo; produção/revenda ainda não.
+Estado estimado: suíte ~72% para MVP demonstrável e ~58% para produção/revenda.
 Simulação = mock até plugar driver real.

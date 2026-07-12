@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block title %}Veículos — {{ loja.nome }}{% endblock %}
+{% block content %}
+<section class="hero">
+  <p class="eyebrow">Estoque disponível</p>
+  <h1>Encontre seu próximo veículo</h1>
+  <p>Consulte os veículos publicados por {{ loja.nome }}.</p>
+</section>
+
+<form class="filters" method="get" action="/l/{{ loja.slug }}">
+  <label>Tipo
+    <select name="tipo">
+      <option value="">Todos</option>
+      <option value="carro" {% if filters.tipo == 'carro' %}selected{% endif %}>Carros</option>
+      <option value="moto" {% if filters.tipo == 'moto' %}selected{% endif %}>Motos</option>
+    </select>
+  </label>
+  <label>Marca<input name="marca" value="{{ filters.marca }}" placeholder="Ex.: Honda"></label>
+  <label>Preço mínimo<input name="preco_min" type="number" min="0" step="0.01" value="{{ filters.preco_min if filters.preco_min is not none else '' }}"></label>
+  <label>Preço máximo<input name="preco_max" type="number" min="0" step="0.01" value="{{ filters.preco_max if filters.preco_max is not none else '' }}"></label>
+  <input type="hidden" name="limit" value="{{ limit }}">
+  <button type="submit">Filtrar estoque</button>
+</form>
+
+{% if veiculos %}
+<section class="vehicle-grid" aria-label="Veículos encontrados">
+  {% for v in veiculos %}
+  <article class="vehicle-card">
+    <a href="/l/{{ loja.slug }}/veiculos/{{ v.id }}" aria-label="Ver {{ v.marca }} {{ v.modelo }}">
+      <div class="card-media">
+        {% if v.imagens %}<img src="{{ v.imagens[0] }}" alt="{{ v.marca }} {{ v.modelo }}" loading="lazy" width="640" height="420">
+        {% else %}<div class="image-fallback">Sem foto</div>{% endif %}
+      </div>
+      <div class="card-body">
+        <p class="eyebrow">{{ v.tipo }} · {{ v.ano_modelo }}</p>
+        <h2>{{ v.marca }} {{ v.modelo }}</h2>
+        {% if v.versao %}<p class="muted">{{ v.versao }}</p>{% endif %}
+        <div class="facts"><span>{{ "{:,.0f}".format(v.km).replace(',', '.') }} km</span><strong>{{ v.preco | moeda }}</strong></div>
+      </div>
+    </a>
+  </article>
+  {% endfor %}
+</section>
+{% else %}
+<section class="empty-state">
+  <h2>Nenhum veículo encontrado</h2>
+  <p>Tente remover algum filtro ou volte mais tarde para ver as novidades.</p>
+  <a class="button secondary" href="/l/{{ loja.slug }}">Limpar filtros</a>
+</section>
+{% endif %}
+
+{% if previous_url or next_url %}
+<nav class="pagination" aria-label="Paginação">
+  {% if previous_url %}<a class="button secondary" href="{{ previous_url }}">Anterior</a>{% else %}<span></span>{% endif %}
+  {% if next_url %}<a class="button secondary" href="{{ next_url }}">Próxima</a>{% endif %}
+</nav>
+{% endif %}
+{% endblock %}

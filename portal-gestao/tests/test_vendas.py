@@ -138,3 +138,8 @@ def test_lucro_bruto_em_decimal_com_arredondamento():
     lucro = lucro_bruto_venda(venda)
     assert lucro == Decimal("16499.50")
     assert str(lucro) == "16499.50"
+
+
+def test_lucro_bruto_indisponivel_sem_custo_do_veiculo():
+    venda = Venda(descricao="x", preco_venda=Decimal("100000.00"), custo_veiculo=None)
+    assert lucro_bruto_venda(venda) is None
