@@ -6,9 +6,10 @@
 
 ## 0. Atualização — sessão 2026-07-12 (parte 2)
 
-Trabalho todo na branch **`feat/dashboard-leads-conversas`** (pushada em
-`github.com/gacherubini/CRM`). **Ainda NÃO mergeada na `main`.** 8 commits de feature + 2 docs.
-Cada workstream foi verificado (testes) e os do canal/portal também **ao vivo** (login real → dados reais).
+Trabalho feito na branch `feat/dashboard-leads-conversas` e **já MERGEADO na `main`**
+(merge commit `9bece21`, pushado em `github.com/gacherubini/CRM`). A `main` contém tudo abaixo.
+Suíte completa verde na main: **chatbot 52 · portal 58 · estoque 45 · motor 58 (213 testes)**.
+Cada workstream foi verificado por testes; canal/portal também **ao vivo** (login real → dados reais).
 
 Entregue nesta sessão (tudo commitado e pushado):
 - **Chatbot API:** `GET /v1/conversas` + `/v1/conversas/{telefone}/mensagens` (tenancy, sem
@@ -33,15 +34,20 @@ Estado do bot: **DESATIVADO de propósito.** Não vai ao ar ainda. Gate n8n já 
 (subir imagens novas, setar `CHATBOT_WEBHOOK_TOKEN` + header nos 2 nós n8n, `alembic upgrade head`,
 apagar workflow duplicada `yBL8bLMDJW7IRxS0`, validar salvo/não-salvo, ativar workflow).
 
+Limpeza n8n desta sessão: apagados os scripts one-off `n8n/_fix_lead_gemini.py` e `_rewrite_tools.py`
+(e `n8n/_*.py` agora no `.gitignore`); **`n8n/workflow-ai-nao-salvos.json` ressincronizado do runtime**
+(gate fail-closed + gemini-3.1-flash-lite) com segredos trocados por placeholders (0 segredos, verificado).
+
 Config local aplicada nesta sessão: `CHATBOT_API_TOKEN` no `.env` do portal (pra Leads/Conversas
 acenderem); senha do `dono@loja.local` resetada para `demo1234` (dev). n8n com **os 2 workflows de IA
 desativados**.
 
-Próximos passos sugeridos: (1) abrir PR/merge da branch na `main`; (2) rebuildar os containers com o
-código novo (o chatbot rodando ainda não tem o webhook hardening); (3) seguir com #3B (metas UI,
-dashboard do vendedor, funil) ou Catálogo Público #5A (0% — produto novo, exige plano); (4) Playwright
-E2E do portal (Task 15). Follow-up conhecido: **mojibake** em mensagens antigas (double-encoding na
-ingestão do webhook/n8n — corrigir na entrada).
+Próximos passos sugeridos: (1) **rebuildar os containers** com o código novo — o chatbot em execução
+ainda NÃO tem o webhook hardening; (2) ajustar o **prompt do bot no n8n**, que ainda menciona
+consentimento apesar da API não exigir mais; (3) seguir #3B (metas UI, dashboard do vendedor, funil,
+campanhas, CSV) ou Catálogo Público #5A (0% — produto novo, exige plano); (4) Playwright E2E do portal
+(Task 15). Follow-up conhecido: **mojibake** em mensagens antigas (double-encoding na ingestão do
+webhook/n8n — corrigir na entrada). Go-live do bot: `docs/go-live-chatbot.md`.
 
 ## 1. Objetivo e arquitetura
 
