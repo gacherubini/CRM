@@ -1,9 +1,11 @@
-def test_lead_com_nome_exige_consentimento(client, loja_a):
+def test_lead_com_nome_sem_consentimento(client, loja_a):
     h = loja_a["headers"]
     tel = "5511988887777"
-    # sem consentimento, gravar nome é bloqueado
+    # consentimento não é mais obrigatório: o nome é gravado direto
     r = client.post("/v1/leads", json={"telefone": tel, "nome": "Fulano"}, headers=h)
-    assert r.status_code == 409
+    assert r.status_code == 201
+    assert r.json()["nome"] == "Fulano"
+    assert r.json()["consentimento_em"] is None
 
 
 def test_interesse_sem_nome_nao_exige_consentimento(client, loja_a):

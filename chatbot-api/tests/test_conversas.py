@@ -107,6 +107,19 @@ def test_conversas_isoladas_por_loja(client, loja_a, loja_b):
     assert r.status_code == 404
 
 
+def test_cpf_mascarado_na_ingestao_e_saida(client, loja_a):
+    inst, h = loja_a["instance"], loja_a["headers"]
+    tel = "5511977778888"
+    _enviar(client, inst, tel, "meu cpf é 111.444.777-35 e o avulso 11144477735", "CPF1")
+
+    body = client.get(f"/v1/conversas/{tel}/mensagens", headers=h).json()
+    texto = body["mensagens"][0]["texto"]
+    assert "111.444.777-35" not in texto
+    assert "11144477735" not in texto
+    assert "***.***.***-35" in texto
+    assert "*********35" in texto
+
+
 def test_saida_nao_expoe_provider_message_id(client, loja_a):
     inst, h = loja_a["instance"], loja_a["headers"]
     tel = "5511955556666"

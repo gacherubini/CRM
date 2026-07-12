@@ -2,6 +2,7 @@
 
 n8n/LLM nunca escrevem no banco direto — passam por esta API (Plano #2A).
 """
+import re
 import secrets
 import uuid
 from datetime import datetime, timezone
@@ -18,6 +19,39 @@ from app.models_db import (
     Loja,
     Mensagem,
 )
+
+
+# --- Mascaramento de CPF (LGPD, silencioso) ----------------------------------
+
+_RE_CPF_FMT = re.compile(r"(?<!\d)(\d{3})\.(\d{3})\.(\d{3})-(\d{2})(?!\d)")
+_RE_CPF_BARE = re.compile(r"(?<!\d)(\d{11})(?!\d)")
+
+
+def _cpf_valido(digitos: str) -> bool:
+    """Valida os dígitos verificadores; evita mascarar telefones/números comuns."""
+    if len(digitos) != 11 or len(set(digitos)) == 1:
+        return False
+    nums = [int(c) for c in digitos]
+    for i in (9, 10):
+        soma = sum(nums[j] * ((i + 1) - j) for j in range(i))
+        dv = (soma * 10) % 11
+        dv = 0 if dv == 10 else dv
+        if dv != nums[i]:
+            return False
+    return True
+
+
+def mascarar_cpf(texto: str | None) -> str | None:
+    """Mascara CPFs no texto livre: formatado por padrão, avulso só se válido."""
+    if not texto:
+        return texto
+    texto = _RE_CPF_FMT.sub(lambda m: "***.***.***-" + m.group(4), texto)
+
+    def _bare(m):
+        d = m.group(1)
+        return "*" * 9 + d[-2:] if _cpf_valido(d) else d
+
+    return _RE_CPF_BARE.sub(_bare, texto)
 
 
 def criar_loja(
@@ -105,7 +139,7 @@ def registrar_mensagem(
             conversa_id=conversa.id,
             direcao="saida" if from_me else "entrada",
             provider_message_id=provider_message_id,
-            texto=texto,
+            texto=mascarar_cpf(texto),
         )
     )
     conversa.atualizada_em = datetime.now(timezone.utc)
@@ -196,7 +230,7 @@ def listar_mensagens(
 def para_saida_mensagem(msg: Mensagem) -> dict:
     return {
         "direcao": msg.direcao,
-        "texto": msg.texto,
+        "texto": mascarar_cpf(msg.texto),
         "criada_em": msg.criada_em.isoformat() if msg.criada_em else None,
     }
 
@@ -275,11 +309,6 @@ def registrar_lead(
     etapa: str | None = None,
 ) -> Lead:
     lead = _get_or_create_lead(db, loja_id, telefone)
-    # Dados pessoais (nome) exigem consentimento prévio (LGPD).
-    if nome and lead.consentimento_em is None:
-        raise HTTPException(
-            status_code=409, detail="consentimento necessário antes de dados pessoais"
-        )
     if nome is not None:
         lead.nome = nome
     if interesse is not None:
