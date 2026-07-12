@@ -133,6 +133,95 @@ def definir_bot_ativo(db: Session, loja_id: str, telefone: str, ativo: bool) -> 
     return {"bot_ativo": conversa.bot_ativo, "status": conversa.status}
 
 
+# --- Conversas e mensagens (handoff/Portal) ----------------------------------
+
+
+_PREVIEW_MAX = 120
+
+
+def listar_conversas(
+    db: Session,
+    loja_id: str,
+    limit: int,
+    offset: int,
+    busca: str | None = None,
+) -> list[dict]:
+    q = db.query(Conversa).filter(Conversa.loja_id == loja_id)
+    if busca:
+        q = q.filter(Conversa.telefone.contains(busca))
+    conversas = (
+        q.order_by(Conversa.atualizada_em.desc()).limit(limit).offset(offset).all()
+    )
+    if not conversas:
+        return []
+
+    ids = [c.id for c in conversas]
+    mensagens = (
+        db.query(Mensagem)
+        .filter(Mensagem.loja_id == loja_id, Mensagem.conversa_id.in_(ids))
+        .order_by(Mensagem.criada_em.asc())
+        .all()
+    )
+    ultima_por_conversa: dict[str, Mensagem] = {}
+    for msg in mensagens:
+        ultima_por_conversa[msg.conversa_id] = msg  # asc => sobrescreve com a mais recente
+
+    return [para_saida_conversa(c, ultima_por_conversa.get(c.id)) for c in conversas]
+
+
+def listar_mensagens(
+    db: Session, loja_id: str, telefone: str, limit: int, offset: int
+) -> dict:
+    conversa = (
+        db.query(Conversa)
+        .filter(Conversa.loja_id == loja_id, Conversa.telefone == telefone)
+        .first()
+    )
+    if conversa is None:
+        raise HTTPException(status_code=404, detail="conversa não encontrada")
+    mensagens = (
+        db.query(Mensagem)
+        .filter(Mensagem.loja_id == loja_id, Mensagem.conversa_id == conversa.id)
+        .order_by(Mensagem.criada_em.asc())
+        .limit(limit)
+        .offset(offset)
+        .all()
+    )
+    return {
+        "telefone": telefone,
+        "mensagens": [para_saida_mensagem(m) for m in mensagens],
+    }
+
+
+def para_saida_mensagem(msg: Mensagem) -> dict:
+    return {
+        "direcao": msg.direcao,
+        "texto": msg.texto,
+        "criada_em": msg.criada_em.isoformat() if msg.criada_em else None,
+    }
+
+
+def para_saida_conversa(conversa: Conversa, ultima: Mensagem | None = None) -> dict:
+    ultima_saida = None
+    if ultima is not None:
+        texto = ultima.texto or ""
+        ultima_saida = {
+            "texto": texto[:_PREVIEW_MAX],
+            "criada_em": ultima.criada_em.isoformat() if ultima.criada_em else None,
+            "direcao": ultima.direcao,
+        }
+    return {
+        "id": conversa.id,
+        "telefone": conversa.telefone,
+        "bot_ativo": conversa.bot_ativo,
+        "status": conversa.status,
+        "atualizada_em": conversa.atualizada_em.isoformat()
+        if conversa.atualizada_em
+        else None,
+        "ultima_mensagem": ultima_saida,
+    }
+
+
 # --- Leads e consentimento (LGPD) --------------------------------------------
 
 

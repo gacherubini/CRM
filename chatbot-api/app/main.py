@@ -89,6 +89,34 @@ def webhook_mensagem(msg: MensagemEntrada, db: Session = Depends(get_db)):
     )
 
 
+@app.get("/v1/conversas")
+def listar_conversas(
+    limit: int = 50,
+    offset: int = 0,
+    busca: Optional[str] = None,
+    ctx: Contexto = Depends(get_contexto),
+    db: Session = Depends(get_db),
+):
+    limit = max(1, min(limit, 200))
+    offset = max(0, offset)
+    conversas = servico.listar_conversas(db, ctx.loja_id, limit, offset, busca)
+    return {"conversas": conversas, "limit": limit, "offset": offset}
+
+
+@app.get("/v1/conversas/{telefone}/mensagens")
+def listar_mensagens(
+    telefone: str,
+    limit: int = 100,
+    offset: int = 0,
+    ctx: Contexto = Depends(get_contexto),
+    db: Session = Depends(get_db),
+):
+    limit = max(1, min(limit, 500))
+    offset = max(0, offset)
+    resultado = servico.listar_mensagens(db, ctx.loja_id, telefone, limit, offset)
+    return {**resultado, "limit": limit, "offset": offset}
+
+
 @app.get("/v1/conversas/{telefone}/estado")
 def obter_estado(
     telefone: str, ctx: Contexto = Depends(get_contexto), db: Session = Depends(get_db)
