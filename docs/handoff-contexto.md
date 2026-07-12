@@ -105,7 +105,14 @@ Pode existir cópia inativa com outro ID — ignorar ou apagar na UI.
 ### Portal (`portal-gestao/`, `:9000`)
 
 - Design Motora, auth/sessão, dashboard + estoque.
-- Leads/Conversas/Simulações/Equipe/Config ainda placeholder ou “em breve”.
+- **Leads** (lista + detalhe) e **Conversas + handoff** (thread + Assumir/Devolver) já reais
+  (Plano #3A.1 Tasks 10,12 + client Task 4) — branch `feat/dashboard-leads-conversas`.
+  Verificado ao vivo (login → conversas/leads reais → handoff PATCH). 36 testes.
+- Requer `CHATBOT_API_TOKEN` no `.env` do portal p/ Leads/Conversas acenderem (setado local).
+- Simulações/Equipe/Config ainda placeholder “em breve”.
+- Chatbot API ganhou `GET /v1/conversas` e `GET /v1/conversas/{telefone}/mensagens`
+  (tenancy, sem provider_message_id) — Plano #3A.1 Task 11, 38 testes.
+- Follow-up: mensagens antigas têm mojibake (double-encoding na ingestão do webhook), corrigir na entrada.
 
 ## 5. Serviços e portas (checkpoint)
 

@@ -43,7 +43,9 @@ e estabilização do workflow n8n. Leia este arquivo primeiro e depois `docs/han
 
 ### Portal
 
-- `portal-gestao/`: shell Motora dark-tech, dashboard + estoque reais; leads/conversas ainda placeholder.
+- `portal-gestao/`: shell Motora dark-tech, dashboard + estoque reais; leads + conversas/handoff
+  agora reais (Plano #3A.1 Tasks 10,11,12; branch `feat/dashboard-leads-conversas`, verificado ao vivo).
+  Simulações/equipe/config ainda placeholder. Precisa `CHATBOT_API_TOKEN` no `.env` do portal.
 
 ## Próxima sequência recomendada
 
