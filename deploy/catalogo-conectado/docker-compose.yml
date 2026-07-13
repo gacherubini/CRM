@@ -8,6 +8,13 @@ services:
       - CATALOGO_PUBLIC_BASE_URL=${CATALOGO_PUBLIC_BASE_URL:-http://localhost:8200}
       - CATALOGO_PAGE_SIZE=${CATALOGO_PAGE_SIZE:-12}
       - CATALOGO_SECURE_COOKIE=${CATALOGO_SECURE_COOKIE:-0}
+      # Funil Catálogo -> Chatbot: vazio = desligado (só guarda eventos localmente).
+      # Preencha para entregar catalog.interest_clicked na ingestão do Chatbot.
+      - CATALOGO_EVENTS_URL=${CATALOGO_EVENTS_URL:-}
+      - CATALOGO_EVENTS_TOKEN=${CATALOGO_EVENTS_TOKEN:-}
+      - CATALOGO_EVENTS_TIMEOUT=${CATALOGO_EVENTS_TIMEOUT:-5}
+      - CATALOGO_EVENTS_MAX_ATTEMPTS=${CATALOGO_EVENTS_MAX_ATTEMPTS:-5}
+      - CATALOGO_EVENTS_WORKER_INTERVAL=${CATALOGO_EVENTS_WORKER_INTERVAL:-5}
     ports:
       - "${CATALOGO_PORT:-8200}:8000"
     volumes:
