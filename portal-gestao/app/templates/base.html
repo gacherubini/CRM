@@ -32,7 +32,7 @@
         {% if usuario.papel in ['dono', 'gerente', 'vendedor'] %}
         <a class="nav-link {{ 'active' if request.url.path.startswith('/app/vendas') else '' }}" href="/app/vendas" {% if request.url.path.startswith('/app/vendas') %}aria-current="page"{% endif %}><span>05</span>Vendas</a>
         {% endif %}
-        {% if usuario.papel in ['dono', 'gerente', 'admin_plataforma'] %}
+        {% if usuario.papel in ['dono', 'gerente', 'vendedor', 'admin_plataforma'] %}
         <a class="nav-link {{ 'active' if request.url.path.startswith('/app/simulacoes') else '' }}" href="/app/simulacoes" {% if request.url.path.startswith('/app/simulacoes') %}aria-current="page"{% endif %}><span>06</span>Simulações</a>
         {% endif %}
 

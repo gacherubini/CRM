@@ -29,11 +29,91 @@ def test_form_renderiza_para_dono(client, chatbot_fake):
     assert "Simulação manual" in resposta.text
 
 
-def test_vendedor_e_redirecionado(client, chatbot_fake):
+def test_vendedor_acessa_o_form(client, chatbot_fake):
     login(client, papel="vendedor")
-    resposta = client.get("/app/simulacoes", follow_redirects=False)
-    assert resposta.status_code == 303
-    assert resposta.headers["location"] == "/app"
+    resposta = client.get("/app/simulacoes")
+    assert resposta.status_code == 200
+    assert "Simulação manual" in resposta.text
+
+
+def test_vendedor_pode_simular(client, chatbot_fake):
+    login(client, papel="vendedor")
+    dados = _dados_validos(_csrf_do_form(client))
+    resposta = client.post("/app/simulacoes", data=dados)
+    assert resposta.status_code == 200
+    assert "Banco Teste" in resposta.text
+    assert "796,91" in resposta.text
+    assert chatbot_fake.simulacoes[0]["cpf"] == "12345678909"
+
+
+def test_vendedor_nao_ve_dados_sensiveis(client, chatbot_fake):
+    login(client, papel="vendedor")
+    dados = _dados_validos(_csrf_do_form(client))
+    resposta = client.post("/app/simulacoes", data=dados)
+    assert resposta.status_code == 200
+    texto = resposta.text
+    # Nenhum custo, lucro, margem, comissão, token ou métrica pode vazar.
+    for sentinela in ("98888", "12345", "SEGREDO", "77777", "6543", "spread", "margem", "lucro"):
+        assert sentinela not in texto
+
+
+def test_dono_continua_com_acesso_completo(client, chatbot_fake):
+    login(client, papel="dono")
+    dados = _dados_validos(_csrf_do_form(client))
+    resposta = client.post("/app/simulacoes", data=dados)
+    assert resposta.status_code == 200
+    assert "Banco Teste" in resposta.text
+    assert "796,91" in resposta.text
+
+
+def test_sanitizador_remove_campos_sensiveis_sem_mutar_original():
+    from app.main import simulacao_sem_dados_sensiveis
+
+    bruto = {
+        "id": "s1",
+        "status": "concluida",
+        "criada_em": "2026-07-13T10:00:00",
+        "custo_veiculo": 98888.0,
+        "lucro": 12345.0,
+        "margem": 0.27,
+        "motor_token": "SEGREDO",
+        "metricas": {"spread": 0.11},
+        "resultados": [
+            {
+                "provedor": "BV",
+                "status": "concluida",
+                "valor_parcela": 700.0,
+                "taxa_am": 1.5,
+                "prazo_meses": 48,
+                "valor_financiado": 25000.0,
+                "codigo_erro": None,
+                "custo": 77777.0,
+                "margem": 0.2,
+                "comissao": 6543.0,
+                "token": "res-tok",
+            }
+        ],
+    }
+    limpo = simulacao_sem_dados_sensiveis(bruto)
+    assert limpo == {
+        "id": "s1",
+        "status": "concluida",
+        "criada_em": "2026-07-13T10:00:00",
+        "resultados": [
+            {
+                "provedor": "BV",
+                "status": "concluida",
+                "valor_parcela": 700.0,
+                "taxa_am": 1.5,
+                "prazo_meses": 48,
+                "valor_financiado": 25000.0,
+                "codigo_erro": None,
+            }
+        ],
+    }
+    # dono/gerente continuam vendo tudo: o dicionário original não é alterado.
+    assert bruto["custo_veiculo"] == 98888.0
+    assert bruto["resultados"][0]["custo"] == 77777.0
 
 
 def test_post_retorna_parcelas_da_api(client, chatbot_fake):

@@ -572,7 +572,44 @@ async def conversas_handoff(
 
 
 def pode_simular(usuario) -> bool:
-    return usuario.papel in {"dono", "gerente", "admin_plataforma"}
+    return usuario.papel in {"dono", "gerente", "vendedor", "admin_plataforma"}
+
+
+# Campos que o vendedor pode ver na simulação. Whitelist é o padrão seguro:
+# qualquer campo novo que um driver real devolva (custo, lucro, margem,
+# spread, comissão, tokens do Motor, métricas financeiras) fica de fora por
+# omissão, sem depender de manter uma lista de campos proibidos atualizada.
+_SIMULACAO_CAMPOS_PUBLICOS = {"id", "status", "criada_em", "resultados", "mensagem"}
+_SIMULACAO_RESULTADO_CAMPOS_PUBLICOS = {
+    "provedor",
+    "status",
+    "valor_parcela",
+    "taxa_am",
+    "prazo_meses",
+    "valor_financiado",
+    "codigo_erro",
+}
+
+
+def simulacao_sem_dados_sensiveis(resultado: dict) -> dict:
+    """Remove dados sensíveis da simulação para papéis sem acesso financeiro.
+
+    Devolve uma cópia contendo apenas os campos públicos (parcelas, taxa,
+    prazo, valor financiado). Não muta o dicionário original — dono/gerente
+    continuam recebendo a resposta completa.
+    """
+    if not isinstance(resultado, dict):
+        return resultado
+    limpo = {k: v for k, v in resultado.items() if k in _SIMULACAO_CAMPOS_PUBLICOS}
+    resultados = limpo.get("resultados")
+    if isinstance(resultados, list):
+        limpo["resultados"] = [
+            {k: v for k, v in item.items() if k in _SIMULACAO_RESULTADO_CAMPOS_PUBLICOS}
+            if isinstance(item, dict)
+            else item
+            for item in resultados
+        ]
+    return limpo
 
 
 def dados_simulacao(form) -> dict:
@@ -646,6 +683,8 @@ async def simulacoes_simular(
             contexto(request, usuario, valores=valores, erro=str(exc)),
             status_code=503,
         )
+    if not pode_ver_custo(usuario):
+        resultado = simulacao_sem_dados_sensiveis(resultado)
     return templates.TemplateResponse(
         "simulacoes/resultado.html",
         contexto(

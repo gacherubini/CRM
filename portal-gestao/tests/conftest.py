@@ -158,14 +158,23 @@ class ChatbotFake:
         if self.simulacao_indisponivel:
             raise SimulacaoIndisponivel("simulação não habilitada nesta instalação")
         self.simulacoes.append(payload)
+        # Campos sensíveis (custo/lucro/tokens/métricas) que um driver real
+        # poderia devolver: o Portal deve escondê-los do vendedor.
         return {
             "id": "sim-1",
             "status": "concluida",
+            "custo_veiculo": 98888.0,
+            "lucro": 12345.0,
+            "margem": 0.27,
+            "motor_token": "tok-motor-SEGREDO",
+            "metricas": {"spread": 0.11},
             "resultados": [
                 {
                     "provedor": "Banco Teste", "status": "concluida",
                     "valor_parcela": 796.91, "taxa_am": 1.89, "prazo_meses": 48,
                     "valor_financiado": 25000.0, "codigo_erro": None,
+                    "custo": 77777.0, "margem": 0.19, "comissao": 6543.0,
+                    "token": "res-tok-SEGREDO",
                 },
             ],
         }

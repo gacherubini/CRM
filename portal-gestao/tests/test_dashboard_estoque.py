@@ -70,7 +70,8 @@ def test_navegacao_respeita_papel_do_vendedor(client):
     resposta = client.get("/app")
     assert resposta.status_code == 200
     assert 'href="/app/estoque"' in resposta.text
-    assert 'href="/app/simulacoes"' not in resposta.text
+    # Vendedor pode simular manualmente (decisão de produto #3A.1 Task 13).
+    assert 'href="/app/simulacoes"' in resposta.text
     assert 'href="/app/equipe"' not in resposta.text
     assert 'href="/app/configuracoes"' not in resposta.text
     restrita = client.get("/app/equipe", follow_redirects=False)
