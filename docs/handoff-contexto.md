@@ -48,7 +48,9 @@ cd ..\catalogo-publico; ..\portal-gestao\.venv\Scripts\python.exe -m pytest -q
   opt-in + dedupe `provider_message_id`, `HttpSimulationProvider`, atribuição catálogo
   `POST /v1/integracoes/catalogo/interesses` + migration `0004`, sem trava de consentimento (decisão),
   E2E de entrega do outbox catálogo→chatbot (`tests/test_e2e_outbox_delivery.py`: headers
-  Bearer/Idempotency-Key/X-Event-Type + retry/idempotência).
+  Bearer/Idempotency-Key/X-Event-Type + retry/idempotência),
+  **E3 auto-pausa** (`from_me` atendente → `bot_ativo=false`; `origem_bot`+dedupe no eco do bot;
+  ack/status/vazio não pausam).
 - **Falta:** go-live (`docs/go-live-chatbot.md`); prompt n8n ainda fala de consentimento; mojibake na
   ingestão; webhooks de domínio; readiness real; LGPD completa (exclusão).
 

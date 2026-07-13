@@ -123,6 +123,23 @@ def _resposta_duplicada(conversa: Conversa) -> dict:
     }
 
 
+# Eventos Evolution sem conteúdo de mensagem (ack/status/reação). Não pausam o bot.
+_TIPOS_SEM_CONTEUDO = frozenset(
+    {"status", "ack", "reaction", "recibo", "receipt", "update", "messages.update"}
+)
+
+
+def _tem_conteudo(texto: str | None) -> bool:
+    return bool(texto and str(texto).strip())
+
+
+def _eh_evento_sem_conteudo(texto: str | None, tipo: str | None = None) -> bool:
+    """True para ack/status/reação ou saída sem texto (não deve alterar bot_ativo)."""
+    if tipo and str(tipo).strip().lower() in _TIPOS_SEM_CONTEUDO:
+        return True
+    return not _tem_conteudo(texto)
+
+
 def _correlacionar_catalogo(
     db: Session, loja_id: str, telefone: str, texto: str | None
 ) -> CatalogAttribution | None:
@@ -172,20 +189,38 @@ def registrar_mensagem(
     provider_message_id: str | None = None,
     from_me: bool = False,
     origem_bot: bool = False,
+    tipo: str | None = None,
 ) -> dict:
-    """Persiste a mensagem de forma idempotente e garante a conversa."""
+    """Persiste a mensagem de forma idempotente e garante a conversa.
+
+    Contrato auto-pausa (E3):
+    - `from_me=True` + `origem_bot=False` + conteúdo → atendente no app → `bot_ativo=False`.
+    - Saída do bot: registrar com `origem_bot=True` e o mesmo `provider_message_id` que a
+      Evolution devolve no envio; o eco `fromMe` chega depois e cai na dedupe (não pausa).
+    - Ack/status/reação ou `from_me` sem texto → não alteram `bot_ativo` (nem poluem histórico).
+    """
     loja = resolver_loja_por_instancia(db, instancia)
     conversa = _get_or_create_conversa(db, loja.id, telefone)
 
     if provider_message_id and _mensagem_existente(db, loja.id, provider_message_id):
         return _resposta_duplicada(conversa)
 
+    # Eventos sem conteúdo (ack/recibo/status/reação ou texto vazio): não pausam e
+    # não gravam mensagem fantasma. O n8n idealmente nem encaminha esses eventos.
+    if from_me and not origem_bot and _eh_evento_sem_conteudo(texto, tipo):
+        return {
+            "duplicada": False,
+            "conversa_id": conversa.id,
+            "bot_ativo": conversa.bot_ativo,
+            "ignorada": True,
+        }
+
     atribuicao = None
     if not from_me:
         atribuicao = _correlacionar_catalogo(db, loja.id, telefone, texto)
 
-    # Uma saída nova que não foi previamente registrada pelo workflow do bot
-    # veio do atendente (celular/web). O humano assumiu: pausa automática.
+    # Uma saída nova com conteúdo que não foi previamente registrada pelo workflow
+    # do bot veio do atendente (celular/web). O humano assumiu: pausa automática.
     if from_me and not origem_bot:
         conversa.bot_ativo = False
         conversa.status = "handoff"

@@ -32,6 +32,8 @@ class MensagemEntrada(BaseModel):
     provider_message_id: Optional[str] = None
     from_me: bool = False
     origem_bot: bool = False
+    # Opcional: status|ack|reaction|... — eventos sem conteúdo não pausam o bot (E3).
+    tipo: Optional[str] = None
 
 
 class EstadoInput(BaseModel):
@@ -116,6 +118,7 @@ def webhook_mensagem(
         msg.provider_message_id,
         msg.from_me,
         msg.origem_bot,
+        msg.tipo,
     )
 
 

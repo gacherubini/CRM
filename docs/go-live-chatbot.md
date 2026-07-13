@@ -12,6 +12,8 @@
 - CPF **mascarado** no texto das mensagens (ingestão e saída). ✅
 - Consentimento **não é exigido** (decisão de produto). ✅
 - Endpoints de conversas/leads e Portal (Leads, Conversas+handoff, Simulação) prontos. ✅
+- **E3 auto-pausa:** `from_me` do atendente → `bot_ativo=false` na conversa; saída do bot com
+  `origem_bot=true` + mesmo `provider_message_id` não pausa (dedupe do eco Evolution). ✅
 
 ## 1. Subir o código novo nos containers
 
@@ -63,6 +65,17 @@ aplicar — de-duplicar essas linhas antes (manter a mais antiga).
 ## 5. Evolution
 
 - Instância `loja1` = **open/connected** (checar no manager `:8080/manager`; reescanear QR se cair).
+- **fromMe / auto-pausa (E3):** a instância precisa **emitir** eventos de mensagem com
+  `key.fromMe=true` (mensagens enviadas pelo próprio número — app ou API). No webhook da
+  Evolution → n8n, **não filtrar** `fromMe` no provedor; o nó `Extrair1` já encaminha
+  `fromMe` com texto para `POST /webhook/mensagem` (`from_me`). Ack/status/reaction são
+  ignorados (sem texto / evento `messages.update`).
+- **Contrato n8n ↔ Chatbot API:**
+  1. Inbound (cliente ou atendente): `{ instance, telefone, texto, provider_message_id, from_me }`
+  2. Saída do bot (após `sendText`): mesmo webhook com
+     `{ ..., from_me: true, origem_bot: true, provider_message_id: <id retornado pela Evolution> }`
+     para o eco `fromMe` cair na dedupe e **não** pausar.
+  3. Gate: se `fromMe` ou `duplicada` ou `bot_ativo !== true` → não chamar o agente.
 
 ## 6. Portal (se o dashboard for junto)
 
@@ -84,8 +97,10 @@ aplicar — de-duplicar essas linhas antes (manter a mais antiga).
 1. Contato **SALVO** na sua agenda manda mensagem → bot **NÃO** responde.
 2. Contato **NÃO salvo** manda mensagem → bot responde.
 3. Fluxo completo: consulta estoque real → cria lead → simulação retorna parcelas.
-4. Handoff: você responde manualmente pelo WhatsApp → conversa **pausa o bot**;
-   no Portal, "Devolver ao bot" reativa.
+4. Handoff auto-pausa (E3, standalone — sem Portal): você responde **1 msg pelo celular**
+   (WhatsApp app) na conversa → bot **para** naquela conversa (`bot_ativo=false`).
+   Mensagem do **próprio bot** não deve pausar. Reativar: Portal "Devolver ao bot" ou
+   `PATCH /v1/conversas/{tel}/estado` com `{ "bot_ativo": true }`.
 5. No Portal: a conversa aparece em `/app/conversas`, a thread abre, o handoff reflete.
 
 ## 9. Go-live

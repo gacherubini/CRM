@@ -76,3 +76,82 @@ def test_saida_do_bot_e_evento_duplicado_nao_acionam_handoff(client, loja_a):
     repetida = client.post("/webhook/mensagem", json=payload)
     assert repetida.json()["duplicada"] is True
     assert repetida.json()["bot_ativo"] is True
+
+
+def test_from_me_vazio_ou_whitespace_nao_pausa(client, loja_a):
+    """Ack/status sem corpo e from_me vazio não devem virar handoff (E3)."""
+    inst, h = loja_a["instance"], loja_a["headers"]
+    for i, texto in enumerate((None, "", "   ", "\n\t")):
+        tel = f"55119777001{i:02d}"
+        r = client.post(
+            "/webhook/mensagem",
+            json={
+                "instance": inst,
+                "telefone": tel,
+                "texto": texto,
+                "provider_message_id": f"EMPTY-{i}",
+                "from_me": True,
+            },
+        )
+        assert r.status_code == 200
+        body = r.json()
+        assert body["bot_ativo"] is True
+        assert body.get("ignorada") is True
+        estado = client.get(f"/v1/conversas/{tel}/estado", headers=h)
+        assert estado.json() == {"bot_ativo": True, "status": "aberta"}
+
+
+def test_ack_status_reaction_nao_pausam_o_bot(client, loja_a):
+    """tipo=status|ack|reaction não altera bot_ativo mesmo com from_me."""
+    inst, h = loja_a["instance"], loja_a["headers"]
+    for i, tipo in enumerate(("status", "ack", "reaction", "messages.update", "receipt")):
+        tel = f"55119777002{i:02d}"
+        r = client.post(
+            "/webhook/mensagem",
+            json={
+                "instance": inst,
+                "telefone": tel,
+                "texto": "READ",  # alguns provedores mandam placeholder
+                "provider_message_id": f"EVT-{tipo}-{i}",
+                "from_me": True,
+                "tipo": tipo,
+            },
+        )
+        assert r.status_code == 200
+        body = r.json()
+        assert body["bot_ativo"] is True
+        assert body.get("ignorada") is True
+        assert client.get(f"/v1/conversas/{tel}/estado", headers=h).json()["bot_ativo"] is True
+
+
+def test_reativacao_apos_auto_pausa(client, loja_a):
+    """PATCH bot_ativo=true devolve o bot depois da auto-pausa por from_me (standalone)."""
+    tel, h = "5511977700033", loja_a["headers"]
+    r = client.post(
+        "/webhook/mensagem",
+        json={
+            "instance": loja_a["instance"],
+            "telefone": tel,
+            "texto": "Atendente no celular",
+            "provider_message_id": "MANUAL-REATIVAR",
+            "from_me": True,
+        },
+    )
+    assert r.json()["bot_ativo"] is False
+
+    devolver = client.patch(
+        f"/v1/conversas/{tel}/estado", json={"bot_ativo": True}, headers=h
+    )
+    assert devolver.json() == {"bot_ativo": True, "status": "aberta"}
+
+    # Próxima entrada do cliente ainda vê bot ativo (gate do n8n usaria bot_ativo).
+    inbound = client.post(
+        "/webhook/mensagem",
+        json={
+            "instance": loja_a["instance"],
+            "telefone": tel,
+            "texto": "oi de novo",
+            "provider_message_id": "IN-APOS-REATIVAR",
+        },
+    )
+    assert inbound.json()["bot_ativo"] is True
