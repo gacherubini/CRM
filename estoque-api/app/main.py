@@ -80,6 +80,7 @@ class VeiculoInput(BaseModel):
     cor: Optional[str] = None
     km: int = 0
     custo: Optional[float] = None
+    placa: Optional[str] = None
     codigo_interno: Optional[str] = None
     foto_url: Optional[str] = None
 
@@ -94,6 +95,7 @@ class VeiculoUpdate(BaseModel):
     cor: Optional[str] = None
     km: Optional[int] = None
     custo: Optional[float] = None
+    placa: Optional[str] = None
     codigo_interno: Optional[str] = None
     foto_url: Optional[str] = None
 
@@ -150,13 +152,24 @@ def listar_veiculos(
     status: Optional[str] = None,
     publicado: Optional[bool] = None,
     busca: Optional[str] = None,
+    placa: Optional[str] = None,
     ctx: Contexto = Depends(get_contexto),
     db: Session = Depends(get_db),
 ):
-    veiculos = servico.listar_veiculos(db, ctx.loja_id, tipo, status, publicado, busca)
+    veiculos = servico.listar_veiculos(db, ctx.loja_id, tipo, status, publicado, busca, placa)
     return {
         "veiculos": [servico.para_saida_privada(v, _pode_ver_custo(ctx)) for v in veiculos]
     }
+
+
+@app.get("/v1/veiculos/por-placa/{placa}")
+def obter_veiculo_por_placa(
+    placa: str, ctx: Contexto = Depends(get_contexto), db: Session = Depends(get_db)
+):
+    """Resolve a unidade da loja autenticada pela placa (privado, escopado por tenancy)."""
+    return servico.para_saida_privada(
+        servico.obter_veiculo_por_placa(db, ctx.loja_id, placa), _pode_ver_custo(ctx)
+    )
 
 
 @app.get("/v1/veiculos/{veiculo_id}")

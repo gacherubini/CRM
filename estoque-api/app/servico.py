@@ -1,4 +1,5 @@
 """Regras do Estoque: validação, CRUD escopado por loja e transições de estado."""
+import re
 import secrets
 import uuid
 import csv
@@ -127,6 +128,39 @@ def criar_usuario_estoque(
     return usuario
 
 
+# Placa Mercosul (ABC1D23) e formato antigo (ABC1234) compartilham o mesmo molde:
+# 3 letras, 1 dígito, 1 letra-ou-dígito, 2 dígitos.
+_PLACA_RE = re.compile(r"^[A-Z]{3}[0-9][0-9A-Z][0-9]{2}$")
+
+
+def normalizar_placa(valor: str | None) -> str | None:
+    """MAIÚSCULAS, sem hífen/espaços. Vazio vira None (placa é opcional)."""
+    if valor is None:
+        return None
+    limpa = re.sub(r"[\s\-]", "", str(valor)).upper()
+    return limpa or None
+
+
+def validar_placa(valor: str | None) -> str | None:
+    placa = normalizar_placa(valor)
+    if placa is None:
+        return None
+    if not _PLACA_RE.match(placa):
+        raise HTTPException(
+            status_code=422, detail="placa inválida (use Mercosul ABC1D23 ou antigo ABC1234)"
+        )
+    return placa
+
+
+def _placa_em_uso(
+    db: Session, loja_id: str, placa: str, ignorar_id: str | None = None
+) -> bool:
+    q = db.query(Veiculo).filter(Veiculo.loja_id == loja_id, Veiculo.placa == placa)
+    if ignorar_id:
+        q = q.filter(Veiculo.id != ignorar_id)
+    return db.query(q.exists()).scalar()
+
+
 def _validar(dados: dict) -> None:
     if dados.get("tipo") not in config.TIPOS:
         raise HTTPException(status_code=422, detail="tipo inválido (moto|carro)")
@@ -144,6 +178,14 @@ def _validar(dados: dict) -> None:
 
 def criar_veiculo(db: Session, loja_id: str, dados: dict, ator_papel: str = "sistema") -> Veiculo:
     _validar(dados)
+    if "placa" in dados:
+        placa = validar_placa(dados["placa"])
+        if placa is None:
+            dados.pop("placa")
+        else:
+            dados["placa"] = placa
+            if _placa_em_uso(db, loja_id, placa):
+                raise HTTPException(status_code=409, detail="placa já cadastrada nesta loja")
     codigo = dados.get("codigo_interno")
     if codigo and db.query(Veiculo).filter(
         Veiculo.loja_id == loja_id, Veiculo.codigo_interno == codigo
@@ -165,6 +207,7 @@ def listar_veiculos(
     status: str | None = None,
     publicado: bool | None = None,
     busca: str | None = None,
+    placa: str | None = None,
 ) -> list[Veiculo]:
     q = db.query(Veiculo).filter(Veiculo.loja_id == loja_id)
     if tipo:
@@ -173,6 +216,9 @@ def listar_veiculos(
         q = q.filter(Veiculo.status == status)
     if publicado is not None:
         q = q.filter(Veiculo.publicado == publicado)
+    placa_norm = normalizar_placa(placa)
+    if placa_norm:
+        q = q.filter(Veiculo.placa == placa_norm)
     if busca:
         termo = f"%{busca}%"
         q = q.filter((Veiculo.modelo.ilike(termo)) | (Veiculo.marca.ilike(termo)))
@@ -191,11 +237,31 @@ def obter_veiculo(db: Session, loja_id: str, veiculo_id: str) -> Veiculo:
     return v
 
 
+def obter_veiculo_por_placa(db: Session, loja_id: str, placa: str) -> Veiculo:
+    """Resolve a unidade da loja autenticada pela placa. 404 se inexistente/outra loja."""
+    placa_norm = normalizar_placa(placa)
+    v = None
+    if placa_norm:
+        v = (
+            db.query(Veiculo)
+            .filter(Veiculo.loja_id == loja_id, Veiculo.placa == placa_norm)
+            .first()
+        )
+    if v is None:
+        raise HTTPException(status_code=404, detail="veículo não encontrado")
+    return v
+
+
 def atualizar_veiculo(
     db: Session, loja_id: str, veiculo_id: str, dados: dict, ator_papel: str = "sistema"
 ) -> Veiculo:
     v = obter_veiculo(db, loja_id, veiculo_id)
     campos = {k: val for k, val in dados.items() if val is not None}
+    if "placa" in campos:
+        placa = validar_placa(campos["placa"])
+        campos["placa"] = placa  # None limpa a placa (opcional)
+        if placa is not None and _placa_em_uso(db, loja_id, placa, ignorar_id=veiculo_id):
+            raise HTTPException(status_code=409, detail="placa já cadastrada nesta loja")
     # Revalida somente os campos afetados, reaproveitando os valores atuais.
     _validar(
         {
@@ -377,7 +443,7 @@ def listar_entregas(db: Session, loja_id: str, limit: int = 100) -> list[Entrega
 
 COLUNAS_CSV_OBRIGATORIAS = {"tipo", "marca", "modelo", "ano_modelo", "preco"}
 COLUNAS_CSV = [
-    "codigo_interno", "tipo", "marca", "modelo", "versao", "ano_modelo", "cor",
+    "codigo_interno", "placa", "tipo", "marca", "modelo", "versao", "ano_modelo", "cor",
     "km", "preco", "custo", "foto_url", "status", "publicado",
 ]
 
@@ -430,6 +496,8 @@ def _dados_linha_csv(linha: dict[str, str]) -> dict:
     for campo in ("codigo_interno", "versao", "cor", "foto_url"):
         if linha.get(campo, "").strip():
             dados[campo] = linha[campo].strip()
+    if linha.get("placa", "").strip():
+        dados["placa"] = validar_placa(linha["placa"])
     if linha.get("custo", "").strip():
         dados["custo"] = _numero_csv(linha["custo"])
     if not dados["marca"] or not dados["modelo"]:
@@ -513,7 +581,8 @@ def exportar_csv(db: Session, loja_id: str, incluir_custo: bool) -> str:
     writer.writeheader()
     for v in listar_veiculos(db, loja_id):
         linha = {
-            "codigo_interno": v.codigo_interno or "", "tipo": v.tipo, "marca": v.marca,
+            "codigo_interno": v.codigo_interno or "", "placa": v.placa or "",
+            "tipo": v.tipo, "marca": v.marca,
             "modelo": v.modelo, "versao": v.versao or "", "ano_modelo": v.ano_modelo,
             "cor": v.cor or "", "km": v.km, "preco": f"{float(v.preco):.2f}",
             "foto_url": v.foto_url or "", "status": v.status,
@@ -612,6 +681,7 @@ def para_saida_privada(v: Veiculo, incluir_custo: bool = True) -> dict:
         "preco": float(v.preco),
         "status": v.status,
         "publicado": v.publicado,
+        "placa": v.placa,
         "codigo_interno": v.codigo_interno,
         "foto_url": v.foto_url,
         "fotos": [foto.url for foto in v.fotos] if v.fotos else ([v.foto_url] if v.foto_url else []),

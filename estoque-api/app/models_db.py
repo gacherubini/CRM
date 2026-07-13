@@ -2,7 +2,9 @@
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, JSON, Numeric, String, UniqueConstraint
+from sqlalchemy import (
+    Boolean, DateTime, ForeignKey, Index, Integer, JSON, Numeric, String, UniqueConstraint, text,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db import Base
@@ -64,6 +66,7 @@ class Veiculo(Base):
     custo: Mapped[float | None] = mapped_column(Numeric(12, 2), nullable=True)  # nunca público
     status: Mapped[str] = mapped_column(String, default="disponivel")
     publicado: Mapped[bool] = mapped_column(Boolean, default=False)
+    placa: Mapped[str | None] = mapped_column(String(7), nullable=True)  # normalizada, sem hífen
     codigo_interno: Mapped[str | None] = mapped_column(String, nullable=True)
     foto_url: Mapped[str | None] = mapped_column(String, nullable=True)
     criado_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_agora)
@@ -76,6 +79,15 @@ class Veiculo(Base):
 
     __table_args__ = (
         UniqueConstraint("loja_id", "codigo_interno", name="uq_veiculos_loja_codigo"),
+        # Unicidade parcial: (loja_id, placa) apenas quando placa preenchida.
+        Index(
+            "uq_veiculos_loja_placa",
+            "loja_id",
+            "placa",
+            unique=True,
+            sqlite_where=text("placa IS NOT NULL"),
+            postgresql_where=text("placa IS NOT NULL"),
+        ),
     )
 
 
