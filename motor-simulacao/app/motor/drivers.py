@@ -100,8 +100,18 @@ DRIVERS: dict[str, Driver] = {
     banco: _driver_banco(banco, taxa) for banco, taxa in TAXAS_MOCK.items()
 }
 
-# Drivers reais (Task 12+): só resolvidos quando há credencial — ver resolver_drivers.
+# Drivers reais (Task 12+): nome -> Driver. Só resolvidos com credencial.
+# Mock usa "Santander" (S maiúsculo); real usa "santander".
 REAL_DRIVERS: dict[str, Driver] = {}
+
+
+def _registrar_drivers_reais() -> None:
+    """Import tardio evita ciclo com santander.py."""
+    if REAL_DRIVERS:
+        return
+    from app.motor.santander import fabrica_santander
+
+    REAL_DRIVERS["santander"] = fabrica_santander()
 
 
 def resolver_drivers(
@@ -112,9 +122,10 @@ def resolver_drivers(
 ) -> list[tuple[str, Driver]]:
     """Expande a lista pedida em pares (nome, driver). ``mock`` = todos os bancos mock.
 
-    Drivers em ``REAL_DRIVERS`` só entram se ``cliente_id``+``db`` tiverem credencial
-    habilitada para o provedor (sem cair em mock silencioso).
+    Drivers em ``REAL_DRIVERS`` só entram se houver credencial habilitada
+    (``obter_segredo_para_uso``). Sem credencial: **não** cai no mock silencioso.
     """
+    _registrar_drivers_reais()
     pedidos = provedores or ["mock"]
     nomes: list[str] = []
     for p in pedidos:
@@ -122,7 +133,7 @@ def resolver_drivers(
             nomes.extend(DRIVERS.keys())
         elif p in DRIVERS:
             nomes.append(p)
-        elif p in REAL_DRIVERS:
+        elif p in REAL_DRIVERS or p == "santander":
             nomes.append(p)
     vistos: set[str] = set()
     pares: list[tuple[str, Driver]] = []
@@ -130,26 +141,17 @@ def resolver_drivers(
         if nome in vistos:
             continue
         vistos.add(nome)
-        if nome in DRIVERS:
-            pares.append((nome, DRIVERS[nome]))
-            continue
+        # Real tem prioridade sobre homônimo mock (não é o caso: Santander vs santander)
         if nome in REAL_DRIVERS:
             if db is not None and cliente_id and _tem_credencial_real(db, cliente_id, nome):
                 pares.append((nome, REAL_DRIVERS[nome]))
-            # sem credencial: não inclui (não vira mock)
+            continue
+        if nome in DRIVERS:
+            pares.append((nome, DRIVERS[nome]))
     return pares
 
 
 def _tem_credencial_real(db: Session, cliente_id: str, provedor: str) -> bool:
-    from app.models_db import CredencialProvedorORM
+    from app.credenciais import obter_segredo_para_uso
 
-    row = (
-        db.query(CredencialProvedorORM)
-        .filter(
-            CredencialProvedorORM.cliente_id == cliente_id,
-            CredencialProvedorORM.provedor == provedor,
-            CredencialProvedorORM.habilitado.is_(True),
-        )
-        .first()
-    )
-    return row is not None
+    return obter_segredo_para_uso(db, cliente_id, provedor) is not None

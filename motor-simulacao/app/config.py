@@ -15,10 +15,17 @@ METRICS_TOKEN = os.getenv("MOTOR_METRICS_TOKEN", "")
 JOB_LEASE_SECONDS = int(os.getenv("MOTOR_JOB_LEASE_SECONDS", "120"))
 
 # Prazos padrão multi-opção (CRM / driver real).
+# Portal Santander costuma listar 12/24/36/48; 60 pode exigir "Simular outro prazo".
 PRAZOS_PADRAO_MESES: list[int] = [24, 36, 48, 60]
-# Screenshots de falha do Playwright (fora do git em produção).
+PRAZOS_PADRAO = PRAZOS_PADRAO_MESES  # alias Task 12
+# Screenshots / sessão browser (fora do git em produção).
 SCREENSHOT_DIR = os.getenv("MOTOR_SCREENSHOT_DIR", "data/screenshots")
 STORAGE_STATE_DIR = os.getenv("MOTOR_STORAGE_STATE_DIR", "data/storage_state")
+BROWSER_TIMEOUT_MS = int(os.getenv("MOTOR_BROWSER_TIMEOUT_MS", "45000"))
+SANTANDER_LOGIN_URL = os.getenv(
+    "MOTOR_SANTANDER_LOGIN_URL",
+    "https://financiamentos.santander.com.br/originacao-auto/login",
+)
 
 # Categorias de veículo versionadas (Plano #1A, Task 2).
 CATEGORIAS = ("moto", "carro", "leve")

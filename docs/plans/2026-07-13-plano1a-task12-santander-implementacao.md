@@ -1,9 +1,9 @@
 # Driver Real Santander — Fase 1 (Motor) — Implementation Plan
 
-> **Status 2026-07-13 (parcial):** Tasks **1–5** + esqueleto Playwright base **feitos** (contrato
-> multi-prazo, migration 0007, API/job, DriverContext, worker multi-resultado, `playwright_base`).
-> **Ainda não:** SantanderDriver real, fixtures HTML do portal, gating smoke live, Docker Chromium.
-> Pré-requisitos OK: Motor Task 11 + Portal Task 9A.
+> **Status 2026-07-13 (parcial+):** Tasks **1–5** + **SantanderDriver** (parse + passos + fixture HTML)
+> + gating `santander` por credencial + config/Dockerfile Chromium. Testes unitários **sem portal live**.
+> **Ainda não:** smoke live com Playwright no portal real; endurecer seletores com codegen;
+> Portal/Chatbot coletando CNH/UF (fase 2).
 >
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
