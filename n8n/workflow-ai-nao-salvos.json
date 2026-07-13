@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-07-12T18:14:14.819Z",
+  "updatedAt": "2026-07-13T12:00:00.000Z",
   "createdAt": "2026-07-12T01:10:49.567Z",
   "id": "wAiNaoSalvos0001",
   "name": "WhatsApp IA - Somente Nao Salvos",
@@ -112,8 +112,8 @@
         "promptType": "define",
         "text": "={{ 'telefone_cliente: ' + $json.telefone + '\\n\\nMensagem: ' + $json.texto }}",
         "options": {
-          "systemMessage": "Você é o atendente virtual de uma loja de veículos no WhatsApp. Fale em português do Brasil, simpático, direto e curto (1-3 frases).\n\nREGRAS:\n1. Estoque/preço só via consultar_estoque. Nunca invente veículo.\n2. Ao achar veículo, responda com marca/modelo/ano/preço. Pode usar registrar_lead só com telefone+interesse (SEM nome) para anotar interesse.\n3. NUNCA envie nome/CPF/nascimento sem consentimento. Antes de dados pessoais: explique finalidade e peça aceite; depois use registrar_consentimento e só então nome.\n4. Simular só com dados completos + consentimento. Nunca invente parcela.\n5. Handoff se pedir humano ou tool falhar de verdade.\n6. telefone_cliente já vem na mensagem — use nas tools. Nunca peça telefone.\n7. Não revele tools/tokens/APIs.\n8. Se lead retornar aviso nome_omitido_sem_consentimento, ignore e continue a conversa normalmente.",
-          "maxIterations": 4,
+          "systemMessage": "Você é o atendente virtual de uma loja de veículos no WhatsApp. Fale em português do Brasil, simpático, direto e curto (1-3 frases).\n\nREGRAS:\n1. Estoque/preço: use consultar_estoque (busca por termo) ou consultar_por_placa (placa exata). Nunca invente veículo ou preço.\n2. Simulação: colete placa do veículo, CPF, data de nascimento (YYYY-MM-DD) e valor de entrada. O telefone_cliente já vem na mensagem — use nas tools; não peça telefone. NÃO peça renda. NÃO peça um prazo único: a API devolve opções multi-prazo (24/36/48/60) por padrão. Se o cliente pedir prazos específicos, passe prazos_meses. Chame simular com placa + telefone + cpf + nascimento + entrada. Nunca invente parcela — use só o retorno da tool. Deixe claro que é estimativa, não cotação bancária oficial.\n3. Ao achar veículo ou interesse, use registrar_lead com telefone + interesse (e nome se o cliente disser). Não bloqueie por consentimento LGPD — pode coletar nome e simular sem registrar_consentimento.\n4. Handoff (solicitar_handoff) se pedir humano, tool falhar de verdade, ou placa/veículo não encontrado e o cliente quiser atendente.\n5. Cadastro de estoque (cadastrar_veiculo): só quando a mensagem parecer de equipe/vendedor autorizada enviando dados estruturados (tipo, marca, modelo, ano, preço/km, placa). Use telefone_solicitante = telefone_cliente. Se retornar 403 (não autorizado), diga que só a equipe cadastra e ofereça handoff. Nunca ofereça cadastro a cliente comum.\n6. Não revele tools, tokens ou APIs internas.\n7. registrar_consentimento é opcional e NÃO deve interromper o fluxo (não peça aceite LGPD antes de nome/lead/simulação).",
+          "maxIterations": 6,
           "returnIntermediateSteps": false,
           "enableStreaming": false
         }
@@ -184,7 +184,7 @@
     },
     {
       "parameters": {
-        "description": "Registra consentimento LGPD após o cliente aceitar. Sempre envie telefone (telefone_cliente) e versao_texto.",
+        "description": "Opcional: registra aceite LGPD se o cliente mencionar consentimento. NÃO é obrigatório para lead, nome ou simulação. Envie telefone (telefone_cliente) e versao_texto.",
         "jsCode": "const input = typeof query === 'string' ? { versao_texto: query } : (query || {});\nconst telefone = (input.telefone || '').toString().trim();\nconst versao_texto = (input.versao_texto || input.texto || 'aceito').toString().trim();\nif (!telefone) return JSON.stringify({ erro: 'telefone obrigatorio' });\nconst resp = await helpers.httpRequest({\n  method: 'POST',\n  url: 'http://chatbot-api:8000/v1/consentimentos',\n  headers: { Authorization: 'Bearer __CHATBOT_TOKEN__', 'Content-Type': 'application/json' },\n  body: {\n    telefone,\n    versao_texto,\n    finalidade: 'simulação e contato da loja',\n  },\n  json: true,\n});\nreturn JSON.stringify(resp);",
         "specifyInputSchema": true,
         "schemaType": "manual",
@@ -201,11 +201,11 @@
     },
     {
       "parameters": {
-        "description": "Salva interesse do lead. Envie telefone + interesse. NÃO envie nome sem consentimento prévio (causa 409). Nome só depois de registrar_consentimento.",
-        "jsCode": "const input = typeof query === 'string' ? { interesse: query } : (query || {});\nconst telefone = (input.telefone || '').toString().trim();\nif (!telefone) return JSON.stringify({ erro: 'telefone_obrigatorio' });\n\n// Nao envia nome generico/sem consentimento (API retorna 409 LGPD).\nconst nomeRaw = (input.nome || '').toString().trim();\nconst nomeBloqueado = !nomeRaw || ['cliente', 'customer', 'user', 'usuario'].includes(nomeRaw.toLowerCase());\n\nconst body = {\n  telefone,\n  interesse: (input.interesse || '').toString().trim(),\n};\nif (input.etapa) body.etapa = String(input.etapa).trim();\nif (!nomeBloqueado) body.nome = nomeRaw;\n\ntry {\n  const resp = await helpers.httpRequest({\n    method: 'POST',\n    url: 'http://chatbot-api:8000/v1/leads',\n    headers: { Authorization: 'Bearer __CHATBOT_TOKEN__', 'Content-Type': 'application/json' },\n    body,\n    json: true,\n  });\n  return JSON.stringify({ ok: true, lead: resp });\n} catch (e) {\n  const status = e.response?.statusCode || e.statusCode || e.status || null;\n  const detail = e.response?.body?.detail || e.message || String(e);\n  // 409 = falta consentimento para nome — tenta de novo so com interesse\n  if (status === 409 && body.nome) {\n    try {\n      delete body.nome;\n      const resp2 = await helpers.httpRequest({\n        method: 'POST',\n        url: 'http://chatbot-api:8000/v1/leads',\n        headers: { Authorization: 'Bearer __CHATBOT_TOKEN__', 'Content-Type': 'application/json' },\n        body,\n        json: true,\n      });\n      return JSON.stringify({\n        ok: true,\n        lead: resp2,\n        aviso: 'nome_omitido_sem_consentimento',\n      });\n    } catch (e2) {\n      return JSON.stringify({\n        ok: false,\n        status: e2.response?.statusCode || 409,\n        erro: e2.response?.body?.detail || e2.message || String(e2),\n      });\n    }\n  }\n  return JSON.stringify({ ok: false, status, erro: detail });\n}",
+        "description": "Salva interesse do lead. Envie telefone + interesse. Nome opcional se o cliente informar. Não exige consentimento prévio.",
+        "jsCode": "const input = typeof query === 'string' ? { interesse: query } : (query || {});\nconst telefone = (input.telefone || '').toString().trim();\nif (!telefone) return JSON.stringify({ erro: 'telefone_obrigatorio' });\n\nconst nomeRaw = (input.nome || '').toString().trim();\nconst nomeGenerico = !nomeRaw || ['cliente', 'customer', 'user', 'usuario'].includes(nomeRaw.toLowerCase());\n\nconst body = {\n  telefone,\n  interesse: (input.interesse || '').toString().trim(),\n};\nif (input.etapa) body.etapa = String(input.etapa).trim();\nif (!nomeGenerico) body.nome = nomeRaw;\n\ntry {\n  const resp = await helpers.httpRequest({\n    method: 'POST',\n    url: 'http://chatbot-api:8000/v1/leads',\n    headers: { Authorization: 'Bearer __CHATBOT_TOKEN__', 'Content-Type': 'application/json' },\n    body,\n    json: true,\n  });\n  return JSON.stringify({ ok: true, lead: resp });\n} catch (e) {\n  const status = e.response?.statusCode || e.statusCode || e.status || null;\n  const detail = e.response?.body?.detail || e.message || String(e);\n  return JSON.stringify({ ok: false, status, erro: detail });\n}",
         "specifyInputSchema": true,
         "schemaType": "manual",
-        "inputSchema": "{\"type\": \"object\", \"properties\": {\"telefone\": {\"type\": \"string\", \"description\": \"telefone_cliente da mensagem\"}, \"interesse\": {\"type\": \"string\", \"description\": \"veiculo ou interesse do cliente\"}, \"etapa\": {\"type\": \"string\", \"description\": \"opcional: etapa do funil\"}, \"nome\": {\"type\": \"string\", \"description\": \"opcional: so apos consentimento\"}}, \"required\": [\"telefone\", \"interesse\"], \"additionalProperties\": true}"
+        "inputSchema": "{\"type\": \"object\", \"properties\": {\"telefone\": {\"type\": \"string\", \"description\": \"telefone_cliente da mensagem\"}, \"interesse\": {\"type\": \"string\", \"description\": \"veículo ou interesse do cliente\"}, \"etapa\": {\"type\": \"string\", \"description\": \"opcional: etapa do funil\"}, \"nome\": {\"type\": \"string\", \"description\": \"opcional: nome do cliente se informado\"}}, \"required\": [\"telefone\", \"interesse\"], \"additionalProperties\": true}"
       },
       "id": "a3652201-3957-421a-9f0e-995dc2cbeaaa",
       "name": "registrar_lead1",
@@ -218,11 +218,11 @@
     },
     {
       "parameters": {
-        "description": "Simula financiamento com dados completos. Nunca invente parcela. Use apenas o retorno desta tool.",
-        "jsCode": "const input = typeof query === 'string' ? {} : (query || {});\nconst body = {\n  cpf: String(input.cpf || ''),\n  nascimento: String(input.nascimento || ''),\n  valor: Number(input.valor),\n  entrada: Number(input.entrada ?? 0),\n  prazo_meses: Number(input.prazo_meses),\n  categoria: String(input.categoria || 'moto'),\n};\nif (input.renda !== undefined && input.renda !== null && input.renda !== '') {\n  body.renda = Number(input.renda);\n}\nconst resp = await helpers.httpRequest({\n  method: 'POST',\n  url: 'http://chatbot-api:8000/v1/simular',\n  headers: { Authorization: 'Bearer __CHATBOT_TOKEN__', 'Content-Type': 'application/json' },\n  body,\n  json: true,\n  timeout: 60000,\n});\nreturn JSON.stringify(resp);",
+        "description": "Simula financiamento preferindo placa + telefone + cpf + nascimento + entrada. Sem renda. Sem prazo único obrigatório (multi-prazo padrão). Nunca invente parcela.",
+        "jsCode": "const input = typeof query === 'string' ? {} : (query || {});\nconst body = {\n  cpf: String(input.cpf || ''),\n  nascimento: String(input.nascimento || ''),\n  entrada: Number(input.entrada ?? 0),\n};\n\nconst placa = (input.placa || '').toString().trim();\nif (placa) body.placa = placa;\n\nconst telefone = (input.telefone || '').toString().trim();\nif (telefone) body.telefone = telefone;\n\n// valor só se não houver placa (legado / fallback)\nif (!placa && input.valor !== undefined && input.valor !== null && input.valor !== '') {\n  body.valor = Number(input.valor);\n}\n\nif (input.categoria) body.categoria = String(input.categoria);\n\n// multi-prazo: só envia se o cliente pediu; senão API usa padrão 24/36/48/60\nif (Array.isArray(input.prazos_meses) && input.prazos_meses.length) {\n  body.prazos_meses = input.prazos_meses.map((p) => Number(p));\n} else if (input.prazo_meses !== undefined && input.prazo_meses !== null && input.prazo_meses !== '') {\n  body.prazo_meses = Number(input.prazo_meses);\n}\n\n// renda não é coletada no fluxo WhatsApp; só repassa se vier explicitamente\nif (input.renda !== undefined && input.renda !== null && input.renda !== '') {\n  body.renda = Number(input.renda);\n}\n\nconst resp = await helpers.httpRequest({\n  method: 'POST',\n  url: 'http://chatbot-api:8000/v1/simular',\n  headers: { Authorization: 'Bearer __CHATBOT_TOKEN__', 'Content-Type': 'application/json' },\n  body,\n  json: true,\n  timeout: 60000,\n});\nreturn JSON.stringify(resp);",
         "specifyInputSchema": true,
         "schemaType": "manual",
-        "inputSchema": "{\"type\": \"object\", \"properties\": {\"cpf\": {\"type\": \"string\"}, \"nascimento\": {\"type\": \"string\"}, \"valor\": {\"type\": \"number\"}, \"entrada\": {\"type\": \"number\"}, \"prazo_meses\": {\"type\": \"number\"}, \"renda\": {\"type\": \"number\"}, \"categoria\": {\"type\": \"string\"}}, \"required\": [\"cpf\", \"nascimento\", \"valor\", \"prazo_meses\", \"categoria\"], \"additionalProperties\": true}"
+        "inputSchema": "{\"type\": \"object\", \"properties\": {\"cpf\": {\"type\": \"string\"}, \"nascimento\": {\"type\": \"string\", \"description\": \"YYYY-MM-DD\"}, \"placa\": {\"type\": \"string\", \"description\": \"placa do veículo no estoque (preferencial)\"}, \"telefone\": {\"type\": \"string\", \"description\": \"telefone_cliente da mensagem\"}, \"entrada\": {\"type\": \"number\", \"description\": \"valor de entrada\"}, \"valor\": {\"type\": \"number\", \"description\": \"só se não houver placa\"}, \"prazos_meses\": {\"type\": \"array\", \"items\": {\"type\": \"number\"}, \"description\": \"opcional; se omitido a API usa multi 24/36/48/60\"}, \"prazo_meses\": {\"type\": \"number\", \"description\": \"opcional legado se o cliente pedir um prazo só\"}, \"categoria\": {\"type\": \"string\", \"description\": \"opcional; com placa a API resolve pelo estoque\"}}, \"required\": [\"cpf\", \"nascimento\", \"placa\", \"telefone\", \"entrada\"], \"additionalProperties\": true}"
       },
       "id": "a21955f3-74f2-4e23-9f1d-f3b78571d848",
       "name": "simular1",
@@ -293,6 +293,40 @@
       "position": [
         2944,
         416
+      ]
+    },
+    {
+      "parameters": {
+        "description": "Consulta um veículo do estoque pela placa exata (Mercosul ou antiga). Use quando o cliente informar a placa. Nunca invente o resultado.",
+        "jsCode": "const input = typeof query === 'string' ? { placa: query } : (query || {});\nconst placa = (input.placa || '').toString().trim();\nif (!placa) return JSON.stringify({ erro: 'placa obrigatoria' });\nconst resp = await helpers.httpRequest({\n  method: 'GET',\n  url: `http://chatbot-api:8000/v1/estoque/por-placa/${encodeURIComponent(placa)}`,\n  headers: { Authorization: 'Bearer __CHATBOT_TOKEN__' },\n  json: true,\n});\nreturn JSON.stringify(resp);",
+        "specifyInputSchema": true,
+        "schemaType": "manual",
+        "inputSchema": "{\"type\": \"object\", \"properties\": {\"placa\": {\"type\": \"string\", \"description\": \"placa Mercosul ABC1D23 ou antiga ABC1234\"}}, \"required\": [\"placa\"], \"additionalProperties\": true}"
+      },
+      "id": "b8e2c1a0-4d5f-4a9b-9c3e-1f7a6d2e0b91",
+      "name": "consultar_por_placa1",
+      "type": "@n8n/n8n-nodes-langchain.toolCode",
+      "typeVersion": 1.3,
+      "position": [
+        3584,
+        720
+      ]
+    },
+    {
+      "parameters": {
+        "description": "Cadastra veículo no estoque (E5). Só para equipe autorizada com dados estruturados (marca, modelo, ano, preço, placa). telefone_solicitante = telefone_cliente. 403 = número não autorizado.",
+        "jsCode": "const input = typeof query === 'string' ? {} : (query || {});\nconst telefone_solicitante = (input.telefone_solicitante || input.telefone || '').toString().trim();\nif (!telefone_solicitante) return JSON.stringify({ erro: 'telefone_solicitante obrigatorio' });\n\nconst body = {\n  telefone_solicitante,\n  tipo: String(input.tipo || 'moto'),\n  marca: String(input.marca || ''),\n  modelo: String(input.modelo || ''),\n  ano_modelo: Number(input.ano_modelo),\n  preco: Number(input.preco),\n  km: Number(input.km ?? 0),\n  placa: String(input.placa || '').trim().toUpperCase(),\n};\nif (input.versao) body.versao = String(input.versao);\nif (input.cor) body.cor = String(input.cor);\nif (input.codigo_interno) body.codigo_interno = String(input.codigo_interno);\nif (input.foto_url) body.foto_url = String(input.foto_url);\n\nconst headers = {\n  Authorization: 'Bearer __CHATBOT_TOKEN__',\n  'Content-Type': 'application/json',\n};\nif (input.idempotency_key) headers['Idempotency-Key'] = String(input.idempotency_key);\n\ntry {\n  const resp = await helpers.httpRequest({\n    method: 'POST',\n    url: 'http://chatbot-api:8000/v1/operacao/veiculos',\n    headers,\n    body,\n    json: true,\n  });\n  return JSON.stringify({ ok: true, veiculo: resp });\n} catch (e) {\n  const status = e.response?.statusCode || e.statusCode || e.status || null;\n  const detail = e.response?.body?.detail || e.message || String(e);\n  return JSON.stringify({ ok: false, status, erro: detail });\n}",
+        "specifyInputSchema": true,
+        "schemaType": "manual",
+        "inputSchema": "{\"type\": \"object\", \"properties\": {\"telefone_solicitante\": {\"type\": \"string\", \"description\": \"telefone_cliente da mensagem (equipe autorizada)\"}, \"tipo\": {\"type\": \"string\", \"description\": \"moto ou carro\"}, \"marca\": {\"type\": \"string\"}, \"modelo\": {\"type\": \"string\"}, \"ano_modelo\": {\"type\": \"number\"}, \"preco\": {\"type\": \"number\"}, \"km\": {\"type\": \"number\"}, \"placa\": {\"type\": \"string\"}, \"versao\": {\"type\": \"string\"}, \"cor\": {\"type\": \"string\"}, \"idempotency_key\": {\"type\": \"string\", \"description\": \"opcional para evitar duplicar\"}}, \"required\": [\"telefone_solicitante\", \"marca\", \"modelo\", \"ano_modelo\", \"preco\", \"placa\"], \"additionalProperties\": true}"
+      },
+      "id": "c9f3d2b1-5e6a-4b0c-8d4f-2a8b7e3f1c02",
+      "name": "cadastrar_veiculo1",
+      "type": "@n8n/n8n-nodes-langchain.toolCode",
+      "typeVersion": 1.3,
+      "position": [
+        3776,
+        720
       ]
     }
   ],
@@ -461,6 +495,28 @@
           }
         ]
       ]
+    },
+    "consultar_por_placa1": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent1",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "cadastrar_veiculo1": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent1",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "settings": {
@@ -475,7 +531,7 @@
   "pinData": {},
   "versionId": "3aac97ca-553d-4e0f-acf7-bb5314530504",
   "activeVersionId": null,
-  "versionCounter": 31,
+  "versionCounter": 32,
   "triggerCount": 1,
   "sourceWorkflowId": null,
   "tags": [],

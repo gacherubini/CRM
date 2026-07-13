@@ -62,6 +62,38 @@ aplicar — de-duplicar essas linhas antes (manter a mais antiga).
 - Conferir que os placeholders foram substituídos no runtime
   (`__INSTANCE__`, `__EVOLUTION_KEY__`, `__CHATBOT_TOKEN__`) — nunca no JSON versionado.
 
+### 4.1 Tools do workflow (pós-import) e env do Chatbot
+
+Após importar `n8n/workflow-ai-nao-salvos.json`, o agente expõe estas tools (todas com
+`Authorization: Bearer __CHATBOT_TOKEN__` no runtime):
+
+| Tool n8n | Endpoint Chatbot | Uso |
+|---|---|---|
+| `consultar_estoque1` | `GET /v1/estoque/buscar?termo=` | busca por marca/modelo |
+| `consultar_por_placa1` | `GET /v1/estoque/por-placa/{placa}` | resolve unidade pela placa |
+| `simular1` | `POST /v1/simular` | payload preferencial: `placa` + `telefone` + `cpf` + `nascimento` + `entrada` (sem renda; multi-prazo 24/36/48/60 se omitir prazos) |
+| `registrar_lead1` | `POST /v1/leads` | telefone + interesse (+ nome opcional; **sem** gate de consentimento) |
+| `registrar_consentimento1` | `POST /v1/consentimentos` | **opcional** — não bloqueia lead/simulação |
+| `solicitar_handoff1` | `PATCH /v1/conversas/{tel}/estado` | `bot_ativo: false` |
+| `cadastrar_veiculo1` | `POST /v1/operacao/veiculos` | E5: só números autorizados; `telefone_solicitante` = telefone do chat |
+
+No `chatbot-api` (compose standalone), para placa + cadastro E5 funcionarem de verdade:
+
+```
+# deploy/chatbot-standalone/.env (nunca commitar segredos)
+ESTOQUE_API_URL=http://estoque-api:8000
+ESTOQUE_API_TOKEN=<token privado do estoque da loja>
+```
+
+Sem `ESTOQUE_API_*`, busca pública pode ainda funcionar (Estoque Lite), mas
+`por-placa` e `POST /v1/operacao/veiculos` falham ou devolvem vazio. Autorize
+telefones de equipe com:
+
+```powershell
+docker compose -f deploy/chatbot-standalone/docker-compose.yml exec chatbot-api `
+  python -m app.cli autorizar-numero --slug <loja> --telefone 5511... --papel dono
+```
+
 ## 5. Evolution
 
 - Instância `loja1` = **open/connected** (checar no manager `:8080/manager`; reescanear QR se cair).
@@ -96,7 +128,8 @@ aplicar — de-duplicar essas linhas antes (manter a mais antiga).
 
 1. Contato **SALVO** na sua agenda manda mensagem → bot **NÃO** responde.
 2. Contato **NÃO salvo** manda mensagem → bot responde.
-3. Fluxo completo: consulta estoque real → cria lead → simulação retorna parcelas.
+3. Fluxo completo: consulta estoque (termo ou **placa**) → cria lead (com nome se quiser) →
+   simulação por **placa+telefone** retorna parcelas multi-prazo (sem renda/prazo único).
 4. Handoff auto-pausa (E3, standalone — sem Portal): você responde **1 msg pelo celular**
    (WhatsApp app) na conversa → bot **para** naquela conversa (`bot_ativo=false`).
    Mensagem do **próprio bot** não deve pausar. Reativar: Portal "Devolver ao bot" ou
