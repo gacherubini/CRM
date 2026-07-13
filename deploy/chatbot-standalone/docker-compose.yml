@@ -50,6 +50,10 @@ services:
       - DATABASE_URL=postgresql+psycopg://crm:${POSTGRES_PASSWORD:-crm}@postgres:5432/chatbot
       - CHATBOT_SKIP_INIT=1
       - ESTOQUE_PUBLIC_URL=http://estoque-api:8000
+      # Escrita no Estoque (E5 cadastro via WhatsApp) — use o TOKEN da loja no estoque-api
+      - ESTOQUE_API_URL=${ESTOQUE_API_URL:-http://estoque-api:8000}
+      - ESTOQUE_API_TOKEN=${ESTOQUE_API_TOKEN:-}
+      - ESTOQUE_REQUEST_TIMEOUT=${ESTOQUE_REQUEST_TIMEOUT:-8}
       - SIMULATION_PROVIDER=${SIMULATION_PROVIDER:-mock}
       - MOTOR_URL=${MOTOR_URL:-}
       - MOTOR_TOKEN=${MOTOR_TOKEN:-}

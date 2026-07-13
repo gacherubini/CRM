@@ -16,10 +16,13 @@ MOTOR_REQUEST_TIMEOUT = float(os.getenv("MOTOR_REQUEST_TIMEOUT", "5"))
 MOTOR_POLL_TIMEOUT = float(os.getenv("MOTOR_POLL_TIMEOUT", "20"))
 MOTOR_POLL_INTERVAL = float(os.getenv("MOTOR_POLL_INTERVAL", "0.5"))
 
-# Estoque: público (busca catálogo) e privado (por-placa / valor do veículo).
+# Estoque: público (busca catálogo) e privado (por-placa + escrita E5).
+# ESTOQUE_PUBLIC_URL: GET /public/v1/... (sem token).
+# ESTOQUE_API_URL + ESTOQUE_API_TOKEN: GET por-placa e POST /v1/veiculos.
 ESTOQUE_PUBLIC_URL = os.getenv("ESTOQUE_PUBLIC_URL", "")
 ESTOQUE_API_URL = os.getenv("ESTOQUE_API_URL", "")
 ESTOQUE_API_TOKEN = os.getenv("ESTOQUE_API_TOKEN", "")
+ESTOQUE_REQUEST_TIMEOUT = float(os.getenv("ESTOQUE_REQUEST_TIMEOUT", "8"))
 
 # Prazos padrão multi-opção quando o cliente não escolhe um único prazo (CRM WhatsApp).
 PRAZOS_PADRAO_MESES: list[int] = [24, 36, 48, 60]

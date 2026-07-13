@@ -133,3 +133,19 @@ class CatalogAttribution(Base):
     lead_id: Mapped[str | None] = mapped_column(ForeignKey("leads.id"), nullable=True, index=True)
     atribuida_em: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     criada_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_agora)
+
+
+class NumeroAutorizado(Base):
+    """Telefones de dono/vendedor autorizados a cadastrar veículo via WhatsApp (E5)."""
+
+    __tablename__ = "numeros_autorizados"
+    __table_args__ = (
+        UniqueConstraint("loja_id", "telefone", name="uq_numeros_autorizados_loja_telefone"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    loja_id: Mapped[str] = mapped_column(ForeignKey("lojas.id"), nullable=False, index=True)
+    telefone: Mapped[str] = mapped_column(String(20), nullable=False, index=True)
+    papel: Mapped[str] = mapped_column(String(40), default="vendedor")  # dono | vendedor
+    ativo: Mapped[bool] = mapped_column(Boolean, default=True)
+    criado_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_agora)

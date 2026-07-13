@@ -67,6 +67,7 @@ O template versionado é `n8n/workflow-ai-nao-salvos.json`. Ele aplica, nesta or
    - `registrar_lead` → `POST /v1/leads`
    - `simular` → `POST /v1/simular` (só na edição Financiamento)
    - `solicitar_handoff` → `PATCH /v1/conversas/{telefone}/estado`
+   - `adicionar_veiculo` → `POST /v1/operacao/veiculos` (só números autorizados; ver E5 abaixo)
 3. Publique o workflow e registre o novo webhook na Evolution:
    ```bash
    curl -s -X POST http://localhost:8080/webhook/set/loja1 \
@@ -79,6 +80,76 @@ Não use o sufixo `@lid` para decidir se o contato é salvo: a Evolution pode te
 
 O system prompt deve exigir **consentimento antes de dados pessoais**, e nunca inventar
 veículo/parcela (sempre usar as ferramentas). O workflow pronto será versionado em `n8n/`.
+
+## E5 — Cadastro de veículo via WhatsApp (Chatbot-only)
+
+Caminho canônico de estoque **sem Portal**: o dono/vendedor manda os dados no WhatsApp;
+o n8n extrai os campos e chama a Chatbot API, que grava no **Estoque** (HTTP privado).
+
+### Env vars (chatbot-api)
+
+| Variável | Uso |
+|----------|-----|
+| `ESTOQUE_PUBLIC_URL` | Leitura da vitrine (`GET /public/v1/...`) |
+| `ESTOQUE_API_URL` | Base da API privada do Estoque (ex.: `http://estoque-api:8000`) |
+| `ESTOQUE_API_TOKEN` | Token de serviço **da loja no estoque-api** (escrita) |
+| `ESTOQUE_REQUEST_TIMEOUT` | Timeout HTTP (default 8s) |
+
+### 1. Autorizar telefones da equipe
+
+```bash
+# CLI
+docker compose exec chatbot-api python -m app.cli autorizar-numero \
+  --slug moto-center --telefone 5511999999999 --papel dono
+
+# ou API (token do chatbot)
+curl -s -X POST http://localhost:8001/v1/operacao/numeros-autorizados \
+  -H "Authorization: Bearer TOKEN_DO_CHATBOT" -H "Content-Type: application/json" \
+  -d '{"telefone":"5511999999999","papel":"dono"}'
+```
+
+### 2. Ferramenta n8n `adicionar_veiculo` (schema)
+
+```http
+POST http://chatbot-api:8000/v1/operacao/veiculos
+Authorization: Bearer TOKEN_DO_CHATBOT
+Idempotency-Key: {{ $json.messageId || uuid }}
+Content-Type: application/json
+
+{
+  "telefone_solicitante": "5511999999999",
+  "tipo": "moto",
+  "marca": "Honda",
+  "modelo": "CG 160",
+  "ano_modelo": 2023,
+  "preco": 16000,
+  "km": 12000,
+  "placa": "ABC1D23",
+  "foto_url": null
+}
+```
+
+**Sucesso (201):**
+```json
+{
+  "ok": true,
+  "mensagem": "Veículo cadastrado: Honda CG 160 2023 — R$ 16.000,00 — placa ABC1D23",
+  "veiculo": {
+    "id": "...", "tipo": "moto", "marca": "Honda", "modelo": "CG 160",
+    "ano_modelo": 2023, "preco": 16000.0, "km": 12000, "placa": "ABC1D23",
+    "status": "disponivel", "publicado": false, "foto_url": null
+  },
+  "solicitante": "5511999999999"
+}
+```
+
+**Erros legíveis (para o bot falar no WhatsApp):**
+- `403` `{"detail":"não autorizado"}` — cliente comum tentou cadastrar
+- `422` `{"detail":"faltou valor"}` / `"placa inválida ..."` / `"faltou marca"`
+- `503` escrita no Estoque não configurada (`ESTOQUE_API_URL`/`TOKEN`)
+
+> Fase 1: só texto + `foto_url` opcional. Upload de mídia WhatsApp = Fase 2 (E6).
+> A extração LLM dos campos fica no n8n; a API só recebe JSON estruturado.
 
 ## Edições
 

@@ -1,14 +1,17 @@
-"""InventoryProvider — consulta o Estoque Lite (Plano #2A Task 2A + por-placa).
+"""InventoryProvider — consulta o Estoque Lite (Plano #2A Task 2A + por-placa + E5 escrita).
 
 - buscar: API pública (ESTOQUE_PUBLIC_URL)
 - obter_por_placa: API privada (ESTOQUE_API_URL + ESTOQUE_API_TOKEN)
+- HttpInventoryWriteClient: POST /v1/veiculos (cadastro WhatsApp E5)
 
 O chatbot só responde com veículos reais. Se o estoque estiver indisponível/vazio,
 o provider devolve lista vazia / None e o chamador oferece fallback/handoff (nunca inventa).
+O Chatbot NÃO é fonte de verdade de veículos.
 """
 from typing import Protocol
 
 import httpx
+from fastapi import HTTPException
 
 from app import config
 
@@ -75,3 +78,95 @@ class HttpInventoryProvider:
 
 def get_inventory_provider() -> InventoryProvider:
     return HttpInventoryProvider()
+
+
+class InventoryWriteClient(Protocol):
+    def disponivel(self) -> bool: ...
+
+    def criar_veiculo(
+        self, dados: dict, idempotency_key: str | None = None
+    ) -> dict: ...
+
+
+class HttpInventoryWriteClient:
+    """Cliente HTTP de escrita no Estoque privado (POST /v1/veiculos)."""
+
+    def __init__(
+        self,
+        base_url: str | None = None,
+        token: str | None = None,
+        timeout: float | None = None,
+    ):
+        self.base_url = (base_url if base_url is not None else config.ESTOQUE_API_URL).rstrip("/")
+        self.token = token if token is not None else config.ESTOQUE_API_TOKEN
+        self.timeout = config.ESTOQUE_REQUEST_TIMEOUT if timeout is None else timeout
+
+    def disponivel(self) -> bool:
+        return bool(self.base_url and self.token)
+
+    def criar_veiculo(
+        self, dados: dict, idempotency_key: str | None = None
+    ) -> dict:
+        if not self.disponivel():
+            raise HTTPException(
+                status_code=503,
+                detail="integração de estoque (escrita) não configurada",
+            )
+        headers = {
+            "Authorization": f"Bearer {self.token}",
+            "Content-Type": "application/json",
+        }
+        if idempotency_key:
+            headers["Idempotency-Key"] = idempotency_key
+        try:
+            r = httpx.post(
+                f"{self.base_url}/v1/veiculos",
+                json=dados,
+                headers=headers,
+                timeout=self.timeout,
+            )
+        except httpx.HTTPError as exc:
+            raise HTTPException(
+                status_code=502, detail="estoque indisponível no momento"
+            ) from exc
+
+        if r.status_code in (200, 201):
+            return r.json()
+
+        detail = _extrair_detail(r)
+        if r.status_code == 422:
+            raise HTTPException(status_code=422, detail=detail or "dados inválidos no estoque")
+        if r.status_code == 409:
+            raise HTTPException(status_code=409, detail=detail or "conflito no estoque")
+        if r.status_code in (401, 403):
+            raise HTTPException(
+                status_code=502,
+                detail="credencial de estoque recusada (verifique ESTOQUE_API_TOKEN)",
+            )
+        raise HTTPException(
+            status_code=502,
+            detail=detail or f"estoque retornou {r.status_code}",
+        )
+
+
+def _extrair_detail(r: httpx.Response) -> str | None:
+    try:
+        body = r.json()
+    except Exception:
+        return None
+    detail = body.get("detail") if isinstance(body, dict) else None
+    if isinstance(detail, str):
+        return detail
+    if isinstance(detail, list):
+        partes = []
+        for item in detail:
+            if isinstance(item, dict):
+                loc = ".".join(str(x) for x in item.get("loc", []) if x != "body")
+                msg = item.get("msg", "")
+                partes.append(f"{loc}: {msg}" if loc else msg)
+        return "; ".join(partes) if partes else None
+    return None
+
+
+def get_inventory_write_client() -> InventoryWriteClient:
+    return HttpInventoryWriteClient()

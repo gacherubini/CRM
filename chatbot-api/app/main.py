@@ -13,10 +13,15 @@ from fastapi.responses import Response
 from pydantic import BaseModel, Field, field_validator, model_validator
 from sqlalchemy.orm import Session
 
-from app import config, models_db, servico  # noqa: F401 (registra os modelos)
+from app import config, models_db, operacao, servico  # noqa: F401 (registra os modelos)
 from app.auth import Contexto, get_contexto, verificar_webhook_token
 from app.db import Base, engine, get_db
-from app.inventory import InventoryProvider, get_inventory_provider
+from app.inventory import (
+    InventoryProvider,
+    InventoryWriteClient,
+    get_inventory_provider,
+    get_inventory_write_client,
+)
 from app.simulation import SimulationProvider, get_simulation_provider
 
 app = FastAPI(title="Chatbot API")
@@ -109,6 +114,29 @@ class SimularInput(BaseModel):
         if self.prazo_meses is not None:
             return [self.prazo_meses]
         return list(config.PRAZOS_PADRAO_MESES)
+
+
+class NumeroAutorizadoInput(BaseModel):
+    telefone: str
+    papel: str = "vendedor"
+    ativo: bool = True
+
+
+class OperacaoVeiculoInput(BaseModel):
+    """Cadastro de veículo via WhatsApp (E5). n8n/LLM preenche os campos extraídos."""
+
+    telefone_solicitante: str
+    tipo: str = "moto"
+    marca: str
+    modelo: str
+    ano_modelo: int
+    preco: float
+    km: int = 0
+    placa: str
+    versao: Optional[str] = None
+    cor: Optional[str] = None
+    codigo_interno: Optional[str] = None
+    foto_url: Optional[str] = None
 
 
 @app.get("/health/live")
@@ -439,3 +467,57 @@ def simular(
     if dados.placa:
         resposta["placa"] = dados.placa.strip()
     return resposta
+
+
+# --- Operação WhatsApp (E5): números autorizados + cadastro de veículo --------
+
+
+@app.get("/v1/operacao/numeros-autorizados")
+def listar_numeros_autorizados(
+    ctx: Contexto = Depends(get_contexto), db: Session = Depends(get_db)
+):
+    return {"numeros": operacao.listar_numeros(db, ctx.loja_id)}
+
+
+@app.post("/v1/operacao/numeros-autorizados", status_code=201)
+def adicionar_numero_autorizado(
+    dados: NumeroAutorizadoInput,
+    ctx: Contexto = Depends(get_contexto),
+    db: Session = Depends(get_db),
+):
+    return operacao.adicionar_numero(
+        db, ctx.loja_id, dados.telefone, dados.papel, dados.ativo
+    )
+
+
+@app.delete("/v1/operacao/numeros-autorizados/{telefone}")
+def remover_numero_autorizado(
+    telefone: str,
+    ctx: Contexto = Depends(get_contexto),
+    db: Session = Depends(get_db),
+):
+    return operacao.remover_numero(db, ctx.loja_id, telefone)
+
+
+@app.post("/v1/operacao/veiculos", status_code=201)
+def criar_veiculo_operacao(
+    dados: OperacaoVeiculoInput,
+    idempotency_key: Optional[str] = Header(default=None, alias="Idempotency-Key"),
+    ctx: Contexto = Depends(get_contexto),
+    db: Session = Depends(get_db),
+    write_client: InventoryWriteClient = Depends(get_inventory_write_client),
+):
+    """Ferramenta do bot: cadastro de veículo no Estoque por número autorizado.
+
+    n8n/LLM extrai marca/modelo/ano/valor/km/placa e chama este endpoint com o
+    telefone do remetente. Clientes comuns recebem 403; dados incompletos 422.
+    """
+    body = dados.model_dump(exclude={"telefone_solicitante"})
+    return operacao.criar_veiculo_autorizado(
+        db,
+        ctx.loja_id,
+        dados.telefone_solicitante,
+        body,
+        write_client,
+        idempotency_key=idempotency_key,
+    )
