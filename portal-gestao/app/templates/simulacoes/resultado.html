@@ -8,13 +8,18 @@
 <section class="panel form-section">
   <div class="section-title"><span>01</span><div><h2>Parâmetros</h2><p>Base usada nesta consulta.</p></div></div>
   <dl class="integration-stats">
+    <div><dt>Modo</dt><dd>{{ valores.modo or 'mock' }}{% if resultado and resultado.status %} · {{ resultado.status }}{% endif %}</dd></div>
     <div><dt>CPF</dt><dd>{{ cpf_mascarado }}</dd></div>
-    <div><dt>Valor do bem</dt><dd>{{ formatar_brl(valores.valor) }}</dd></div>
+    {% if valores.placa %}<div><dt>Placa</dt><dd>{{ valores.placa }}</dd></div>{% endif %}
+    {% if valores.uf_licenciamento %}<div><dt>UF</dt><dd>{{ valores.uf_licenciamento }}</dd></div>{% endif %}
+    <div><dt>Valor do bem</dt><dd>{% if valores.valor %}{{ formatar_brl(valores.valor) }}{% else %}<span class="muted">—</span>{% endif %}</dd></div>
     <div><dt>Entrada</dt><dd>{{ formatar_brl(valores.entrada or 0) }}</dd></div>
-    <div><dt>Prazo</dt><dd>{{ valores.prazo_meses }} meses</dd></div>
+    <div><dt>Prazos</dt><dd>{% if valores.prazos_meses %}{{ valores.prazos_meses }}{% else %}{{ valores.prazo_meses }} meses{% endif %}</dd></div>
     <div><dt>Categoria</dt><dd>{{ valores.categoria | capitalize }}</dd></div>
   </dl>
+  {% if resultado and resultado.mensagem %}<p class="muted">{{ resultado.mensagem }}</p>{% endif %}
 </section>
+
 
 {% set resultados = resultado.resultados if resultado and resultado.resultados else [] %}
 <section class="panel flush">

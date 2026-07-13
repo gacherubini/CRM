@@ -39,6 +39,8 @@ class MotorClient:
         *,
         ator: str | None = None,
         erro_404: type[Exception] | None = None,
+        timeout: float | None = None,
+        headers: dict | None = None,
         **kwargs,
     ) -> Any:
         if not self.configurado:
@@ -46,18 +48,30 @@ class MotorClient:
                 "Integração com o Motor de Simulação ainda não configurada"
             )
         try:
+            req_headers = self._headers(ator)
+            if headers:
+                req_headers.update(headers)
             with httpx.Client(
                 base_url=self.base_url,
-                headers=self._headers(ator),
-                timeout=self.timeout,
+                headers=req_headers,
+                timeout=timeout if timeout is not None else self.timeout,
             ) as client:
                 resposta = client.request(method, path, **kwargs)
                 if resposta.status_code == 404 and erro_404 is not None:
                     raise erro_404("credencial não configurada")
+                if resposta.status_code == 422:
+                    try:
+                        detalhe = resposta.json()
+                        msg = (detalhe.get("erro") or {}).get("message") or str(detalhe)
+                    except Exception:
+                        msg = "dados de simulação inválidos"
+                    raise MotorIndisponivel(msg)
                 resposta.raise_for_status()
                 if resposta.status_code == 204 or not resposta.content:
                     return {}
                 return resposta.json()
+        except MotorIndisponivel:
+            raise
         except (httpx.HTTPError, ValueError) as exc:
             raise MotorIndisponivel(
                 "Não foi possível acessar o Motor de Simulação agora"
@@ -102,3 +116,63 @@ class MotorClient:
             ator=ator,
             erro_404=CredencialNaoEncontrada,
         )
+
+    def criar_simulacao(
+        self,
+        payload: dict,
+        *,
+        ator: str | None = None,
+        idempotency_key: str | None = None,
+    ) -> dict:
+        """POST /v1/simulacoes — enfileira job (202)."""
+        headers = {}
+        if idempotency_key:
+            headers["Idempotency-Key"] = idempotency_key
+        return self._request(
+            "POST",
+            "/v1/simulacoes",
+            ator=ator,
+            json=payload,
+            headers=headers if headers else None,
+        )
+
+    def obter_simulacao(self, sim_id: str, ator: str | None = None) -> dict:
+        return self._request("GET", f"/v1/simulacoes/{sim_id}", ator=ator)
+
+    def simular_e_aguardar(
+        self,
+        payload: dict,
+        *,
+        ator: str | None = None,
+        poll_timeout: float = 90.0,
+        poll_interval: float = 1.0,
+    ) -> dict:
+        """Cria job no Motor e espera estado terminal (dashboard / teste manual)."""
+        import time
+        import uuid
+
+        criada = self.criar_simulacao(
+            payload, ator=ator, idempotency_key=str(uuid.uuid4())
+        )
+        sim_id = criada.get("id")
+        if not sim_id:
+            raise MotorIndisponivel("Motor respondeu sem id de simulação")
+        terminais = {
+            "concluida",
+            "parcial",
+            "falhou",
+            "aguardando_intervencao",
+            "cancelada",
+        }
+        limite = time.monotonic() + poll_timeout
+        while True:
+            atual = self.obter_simulacao(sim_id, ator=ator)
+            if atual.get("status") in terminais:
+                return atual
+            if time.monotonic() >= limite:
+                atual["mensagem"] = (
+                    "Simulação ainda processando no Motor (timeout de espera). "
+                    "Tente consultar de novo ou aumente o timeout."
+                )
+                return atual
+            time.sleep(poll_interval)

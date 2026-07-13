@@ -678,18 +678,77 @@ def simulacao_sem_dados_sensiveis(resultado: dict) -> dict:
     return limpo
 
 
+UFS_BR = [
+    "AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO", "MA", "MT", "MS", "MG",
+    "PA", "PB", "PR", "PE", "PI", "RJ", "RN", "RS", "RO", "RR", "SC", "SP", "SE", "TO",
+]
+
+
+def _valores_form_simulacao(form) -> dict:
+    return {
+        "modo": form.get("modo") or "mock",
+        "cpf": form.get("cpf") or "",
+        "nascimento": form.get("nascimento", ""),
+        "cnh": form.get("cnh") or "sim",
+        "valor": form.get("valor", ""),
+        "prazo_meses": form.get("prazo_meses", ""),
+        "prazos_meses": form.get("prazos_meses", ""),
+        "entrada": form.get("entrada", ""),
+        "renda": form.get("renda", ""),
+        "categoria": form.get("categoria", "moto"),
+        "placa": (form.get("placa") or "").strip().upper(),
+        "uf_licenciamento": form.get("uf_licenciamento") or "SP",
+        "finalidade": form.get("finalidade") or "comum",
+    }
+
+
 def dados_simulacao(form) -> dict:
+    """Payload legado para Chatbot mock (valor + prazo único)."""
     payload = {
         "cpf": "".join(c for c in (form.get("cpf") or "") if c.isdigit()),
         "nascimento": form.get("nascimento", "").strip(),
         "valor": float(str(form.get("valor")).replace(",", ".")),
-        "prazo_meses": int(form.get("prazo_meses")),
+        "prazo_meses": int(form.get("prazo_meses") or 48),
         "entrada": float(str(form.get("entrada") or 0).replace(",", ".")),
         "categoria": form.get("categoria") or "moto",
     }
     if form.get("renda"):
         payload["renda"] = float(str(form.get("renda")).replace(",", "."))
     return payload
+
+
+def dados_simulacao_motor(form) -> dict:
+    """Payload SolicitacaoSimulacao para o Motor (Santander real)."""
+    cpf = "".join(c for c in (form.get("cpf") or "") if c.isdigit())
+    nascimento = form.get("nascimento", "").strip()
+    entrada = float(str(form.get("entrada") or 0).replace(",", "."))
+    placa = (form.get("placa") or "").replace("-", "").strip().upper() or None
+    valor_raw = (form.get("valor") or "").strip()
+    valor = float(valor_raw.replace(",", ".")) if valor_raw else None
+    if valor is None and not placa:
+        raise ValueError("informe placa ou valor")
+    prazos_txt = (form.get("prazos_meses") or "").strip()
+    if prazos_txt:
+        prazos = [int(p.strip()) for p in prazos_txt.split(",") if p.strip()]
+    else:
+        prazos = [int(form.get("prazo_meses") or 48)]
+    cnh = (form.get("cnh") or "sim").lower() != "nao"
+    return {
+        "pessoa": {
+            "cpf": cpf,
+            "nascimento": nascimento,
+            "cnh": cnh,
+        },
+        "veiculo": {
+            "categoria": form.get("categoria") or "moto",
+            "valor": valor,
+            "placa": placa,
+            "uf_licenciamento": form.get("uf_licenciamento") or "SP",
+            "finalidade": form.get("finalidade") or "comum",
+        },
+        "condicoes": {"entrada": entrada, "prazos_meses": prazos},
+        "provedores": ["santander"],
+    }
 
 
 @app.get("/app/simulacoes", response_class=HTMLResponse)
@@ -701,7 +760,7 @@ def simulacoes_pagina(request: Request, db: Session = Depends(get_db)):
         return RedirectResponse("/app", status_code=303)
     return templates.TemplateResponse(
         "simulacoes/form.html",
-        contexto(request, usuario, valores={}),
+        contexto(request, usuario, valores={}, ufs=UFS_BR),
     )
 
 
@@ -710,6 +769,7 @@ async def simulacoes_simular(
     request: Request,
     db: Session = Depends(get_db),
     chatbot: ChatbotClient = Depends(get_chatbot_client),
+    motor: MotorClient = Depends(get_motor_client),
 ):
     usuario = usuario_atual(request, db)
     if not usuario:
@@ -719,20 +779,68 @@ async def simulacoes_simular(
     form = await request.form()
     if not csrf_valido(request, form.get("csrf")):
         return RedirectResponse("/app/simulacoes", status_code=303)
-    valores = {
-        "nascimento": form.get("nascimento", ""),
-        "valor": form.get("valor", ""),
-        "prazo_meses": form.get("prazo_meses", ""),
-        "entrada": form.get("entrada", ""),
-        "renda": form.get("renda", ""),
-        "categoria": form.get("categoria", "moto"),
-    }
+    valores = _valores_form_simulacao(form)
+    modo = (form.get("modo") or "mock").strip().lower()
+
+    # --- Santander real: Portal → Motor (sem chatbot) ---
+    if modo == "santander":
+        try:
+            payload_motor = dados_simulacao_motor(form)
+        except (TypeError, ValueError):
+            return templates.TemplateResponse(
+                "simulacoes/form.html",
+                contexto(
+                    request,
+                    usuario,
+                    valores=valores,
+                    ufs=UFS_BR,
+                    erro="Confira CPF, nascimento, placa/valor, entrada e prazos.",
+                ),
+                status_code=422,
+            )
+        try:
+            resultado = motor.simular_e_aguardar(
+                payload_motor, ator=usuario.email, poll_timeout=120.0
+            )
+        except MotorIndisponivel as exc:
+            return templates.TemplateResponse(
+                "simulacoes/form.html",
+                contexto(
+                    request,
+                    usuario,
+                    valores=valores,
+                    ufs=UFS_BR,
+                    erro=str(exc),
+                ),
+                status_code=503,
+            )
+        if not pode_ver_custo(usuario):
+            resultado = simulacao_sem_dados_sensiveis(resultado)
+        cpf_digits = payload_motor["pessoa"]["cpf"]
+        return templates.TemplateResponse(
+            "simulacoes/resultado.html",
+            contexto(
+                request,
+                usuario,
+                valores=valores,
+                resultado=resultado,
+                cpf_mascarado=mascarar_cpf(cpf_digits),
+            ),
+        )
+
+    # --- Mock legado: Portal → Chatbot ---
     try:
         payload = dados_simulacao(form)
     except (TypeError, ValueError):
         return templates.TemplateResponse(
             "simulacoes/form.html",
-            contexto(request, usuario, valores=valores, erro="Confira os valores informados e tente novamente."),
+            contexto(
+                request,
+                usuario,
+                valores=valores,
+                ufs=UFS_BR,
+                erro="Confira os valores informados e tente novamente.",
+            ),
             status_code=422,
         )
     try:
@@ -740,13 +848,19 @@ async def simulacoes_simular(
     except SimulacaoIndisponivel:
         return templates.TemplateResponse(
             "simulacoes/form.html",
-            contexto(request, usuario, valores=valores, erro="Simulação não habilitada nesta instalação."),
+            contexto(
+                request,
+                usuario,
+                valores=valores,
+                ufs=UFS_BR,
+                erro="Simulação não habilitada nesta instalação.",
+            ),
             status_code=409,
         )
     except ChatbotIndisponivel as exc:
         return templates.TemplateResponse(
             "simulacoes/form.html",
-            contexto(request, usuario, valores=valores, erro=str(exc)),
+            contexto(request, usuario, valores=valores, ufs=UFS_BR, erro=str(exc)),
             status_code=503,
         )
     if not pode_ver_custo(usuario):

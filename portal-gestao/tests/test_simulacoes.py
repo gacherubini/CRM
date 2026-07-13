@@ -66,6 +66,44 @@ def test_dono_continua_com_acesso_completo(client, chatbot_fake):
     assert "796,91" in resposta.text
 
 
+def test_form_tem_modo_santander(client, chatbot_fake, motor_fake):
+    login(client)
+    resposta = client.get("/app/simulacoes")
+    assert resposta.status_code == 200
+    assert "santander" in resposta.text
+    assert "Placa" in resposta.text
+
+
+def test_simular_santander_vai_ao_motor_nao_chatbot(client, chatbot_fake, motor_fake):
+    login(client, papel="dono")
+    csrf = _csrf_do_form(client)
+    dados = {
+        "csrf": csrf,
+        "modo": "santander",
+        "cpf": "52998224725",
+        "nascimento": "1990-05-20",
+        "cnh": "sim",
+        "placa": "FUV7G58",
+        "uf_licenciamento": "SP",
+        "finalidade": "comum",
+        "valor": "21900",
+        "entrada": "1123.20",
+        "prazos_meses": "12,24,36,48",
+        "categoria": "moto",
+        "prazo_meses": "48",
+    }
+    resposta = client.post("/app/simulacoes", data=dados)
+    assert resposta.status_code == 200
+    assert "946,28" in resposta.text or "946.28" in resposta.text
+    assert "santander" in resposta.text.lower()
+    assert chatbot_fake.simulacoes == []
+    assert len(motor_fake.simulacoes) == 1
+    body = motor_fake.simulacoes[0]
+    assert body["provedores"] == ["santander"]
+    assert body["veiculo"]["placa"] == "FUV7G58"
+    assert body["pessoa"]["cnh"] is True
+
+
 def test_sanitizador_remove_campos_sensiveis_sem_mutar_original():
     from app.main import simulacao_sem_dados_sensiveis
 

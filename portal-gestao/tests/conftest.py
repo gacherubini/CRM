@@ -310,6 +310,53 @@ class MotorFake:
                 }
         raise CredencialNaoEncontrada("credencial não configurada")
 
+    def criar_simulacao(self, payload, ator=None, idempotency_key=None):
+        if self.indisponivel:
+            raise MotorIndisponivel("Não foi possível acessar o Motor de Simulação agora")
+        if not hasattr(self, "simulacoes"):
+            self.simulacoes = []
+        self.simulacoes.append(payload)
+        if ator:
+            self.atores.append(("criar_simulacao", ator))
+        return {
+            "id": "sim-motor-1",
+            "status": "recebida",
+            "criada_em": "2026-07-13T12:00:00+00:00",
+        }
+
+    def obter_simulacao(self, sim_id, ator=None):
+        if self.indisponivel:
+            raise MotorIndisponivel("Não foi possível acessar o Motor de Simulação agora")
+        return {
+            "id": sim_id,
+            "status": "concluida",
+            "criada_em": "2026-07-13T12:00:00+00:00",
+            "resultados": [
+                {
+                    "provedor": "santander",
+                    "status": "concluida",
+                    "valor_parcela": 946.28,
+                    "taxa_am": None,
+                    "prazo_meses": 48,
+                    "valor_financiado": 20776.80,
+                    "codigo_erro": None,
+                },
+                {
+                    "provedor": "santander",
+                    "status": "concluida",
+                    "valor_parcela": 1097.45,
+                    "taxa_am": None,
+                    "prazo_meses": 36,
+                    "valor_financiado": 20776.80,
+                    "codigo_erro": None,
+                },
+            ],
+        }
+
+    def simular_e_aguardar(self, payload, ator=None, poll_timeout=90.0, poll_interval=1.0):
+        criada = self.criar_simulacao(payload, ator=ator)
+        return self.obter_simulacao(criada["id"], ator=ator)
+
 
 @pytest.fixture
 def motor_fake():
