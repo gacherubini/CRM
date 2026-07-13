@@ -20,8 +20,8 @@ Planos válidos: `docs/plans/README.md`. **Ignore** `docs/plans/_archive/`.
 | Produto | Pasta / porta | Feito (essencial) | Aberto |
 |---|---|---|---|
 | Motor #1A | `motor-simulacao/` `:8000` | async, auth, worker, mock, **credenciais cifradas (Task 11)** | Task 10 revenda; Task 12 1º driver real |
-| Chatbot #2A | `chatbot-api/` `:8001` | leads, conversas, handoff, atrib. catálogo, sim HTTP, **E2E outbox** | go-live, prompt, mojibake, LGPD; **lookup+sim por placa** |
-| Estoque #4A | `estoque-api/` `:8100` | CRUD, público, RBAC, outbox, **placa + por-placa** | placa na admin HTMX; E2E outbox; restore |
+| Chatbot #2A | `chatbot-api/` `:8001` | leads, conversas, handoff, atrib. catálogo, sim HTTP, E2E outbox, **por-placa+sim multi-prazo**, **E3 auto-pausa**, **E5 cadastro WA** | go-live, prompt n8n (placa/tools), mojibake, LGPD exclusão |
+| Estoque #4A | `estoque-api/` `:8100` | CRUD, público, RBAC, outbox, **placa + por-placa**, **placa no admin HTMX** | E2E outbox; restore |
 | Portal | `portal-gestao/` `:9000` | leads/conversas/sim, **sim. p/ vendedor (RBAC)**, vendas, metas loja, funil | Task 9A UI credenciais bancos; #3B residual; Playwright E2E |
 | Catálogo #5A | `catalogo-publico/` `:8200` | vitrine, CTA `CAT-*`, outbox, **wiring funil + E2E deploy** | validar em containers reais; SEO/tema/standalone |
 
@@ -46,10 +46,10 @@ Planos válidos: `docs/plans/README.md`. **Ignore** `docs/plans/_archive/`.
 
 ## Próxima sequência (sugerida)
 
-1. Validar o funil do catálogo em containers reais (wiring `CATALOGO_EVENTS_URL/TOKEN` + E2E já feitos).
-2. Chatbot lookup **por placa** + payload sim (telefone, sem renda/prazo único) — Estoque já expõe `por-placa`.
+1. Prompt n8n: coletar **placa+telefone**, tools `por-placa` / `simular` multi-prazo / `operacao/veiculos`; go-live sob demanda.
+2. Validar funil catálogo em containers reais (wiring já feito).
 3. Portal: **Task 9A** UI de credenciais — a API do Motor (Task 11) já existe.
-4. #3B residual; #5A residual; prompt n8n; go-live sob demanda.
+4. **E10** Pixel Meta / aba Tráfego; #3B residual; #5A residual.
 5. Motor Task 10 (revenda) → 12 (1º driver real híbrido). Task 11 (credenciais) **feita**.
 
 ## Verificação mínima
