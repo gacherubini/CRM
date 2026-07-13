@@ -1,16 +1,17 @@
 # Handoff técnico — suíte automotiva
 
-> Checkpoint: **2026-07-13 (pós Fases 1–3 + n8n + 9A + E10)**. Estado atual (não diário de sessão).
+> Checkpoint: **2026-07-13 (final sessão — docs + n8n runtime)**. Estado atual (não diário de sessão).
 > Confirme containers/`.env`/n8n antes de editar. Testes unitários ≠ E2E WhatsApp.
 > Leia primeiro: `docs/contexto-compacto.md`. Planos válidos: `docs/plans/README.md`.
+> Código em **`main` = origin/main** (push feito).
 
 ## Estado em uma frase
 
 Suíte **demo forte / quase pronta para operação** (~**90%** MVP demonstrável, ~**75%** produção/revenda).
 Motor/Estoque/Chatbot/Portal/Catálogo integrados por HTTP. Simulação ainda **mock**. Bot WhatsApp
-**off de propósito** (workflow + tools **atualizados**, falta import/publish/go-live). Entregues nesta
-onda: **placa CRM**, **E3 auto-pausa**, **E5 cadastro WA**, **prompt/tools n8n**, **Task 9A financeiras**,
-**E10 Pixel Meta**.
+**off de propósito**. Workflow n8n **já importado no runtime** (18 nós, tools placa/E5; só
+`wAiNaoSalvos0001`; ainda **inactive**). Falta **publish/go-live** + `ESTOQUE_API_*` no chatbot.
+Entregues: placa CRM, E3, E5, n8n tools, Task 9A, E10 Pixel Meta.
 
 ## Verificação
 
@@ -91,9 +92,9 @@ cd ..\catalogo-publico; ..\portal-gestao\.venv\Scripts\python.exe -m pytest test
 
 ## Próximos passos (ordem)
 
-1. **Go-live WhatsApp** sob demanda — import workflow, placeholders, `ESTOQUE_API_*`,
-   `autorizar-numero`, publish (`docs/go-live-chatbot.md`).
-2. Validar funil catálogo + Pixel em **containers reais** (token/slug + `META_PIXEL_ID` = aba Tráfego).
+1. **Go-live WhatsApp** — `ESTOQUE_API_URL`/`TOKEN` no chatbot, `autorizar-numero`, **Publish**
+   do `wAiNaoSalvos0001` (`docs/go-live-chatbot.md`). Workflow já está importado.
+2. Validar funil catálogo + Pixel em **containers reais** (`META_PIXEL_ID` = aba Tráfego).
 3. Motor **Task 12** (1º driver real) + **Task 10** revenda; #3B residual; #5A residual.
 4. CAPI retry worker; E1 áudio / E6 fotos quando operação pedir.
 

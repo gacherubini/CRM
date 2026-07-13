@@ -12,7 +12,8 @@ Atualizado em **2026-07-13** (pós placa/E3/E5/n8n/9A/E10). Leia isto primeiro; 
 - Ordem: `#0 → #1A → #4A → #2A → #5A → #3A/#3A.1 → #3B → #6`.
 - Simulação com nomes de banco = **mock**. Caminho real: **híbrido API + Playwright** (agregador
   opcional). Senhas de portal: Dashboard **Task 9A** → Motor cifrado (Task 11).
-- Bot WhatsApp: **desativado de propósito** até `docs/go-live-chatbot.md` (tools/prompt já atualizados).
+- Bot WhatsApp: **desativado de propósito** até `docs/go-live-chatbot.md` (JSON + runtime n8n já
+  com tools placa/E5; falta **Publish** + `ESTOQUE_API_*`).
 
 ## Estado por produto
 
@@ -41,7 +42,7 @@ Atualizado em **2026-07-13** (pós placa/E3/E5/n8n/9A/E10). Leia isto primeiro; 
 
 ## Próxima sequência (sugerida)
 
-1. Go-live WhatsApp (`docs/go-live-chatbot.md`) — import + publish + env.
+1. Go-live WhatsApp (`docs/go-live-chatbot.md`) — env `ESTOQUE_API_*` + **Publish** (import já feito).
 2. Validar funil + Pixel em containers reais.
 3. Motor Task 12 (driver real) + Task 10; #3B/#5A residual.
 4. E1 áudio / E6 fotos / E8 ROI quando fizer sentido.
