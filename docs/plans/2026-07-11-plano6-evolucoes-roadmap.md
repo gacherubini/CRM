@@ -22,6 +22,7 @@ evento, não acesso direto a bancos de dados vizinhos.
 | Cadastro de veículo por WhatsApp | Chatbot | Estoque API |
 | Fotos e galeria | Estoque + Catálogo | storage de objetos |
 | Funil, vendas, metas, campanhas | Portal | eventos do Chatbot/Estoque/Motor |
+| Pixel Meta / conversões (aba Tráfego) | Portal + Catálogo | Meta Conversions API (CAPI) |
 
 ---
 
@@ -72,20 +73,37 @@ opcional sem quebrar quem não usa. Credenciais de portal: UI no Portal (#3A Tas
 ## E3 — Auto-pausa ao detectar o atendente
 
 **O que é:** completar o handoff (Plano #2A Task 7) para **pausar sozinho** quando o atendente
-responde manualmente pelo WhatsApp — sem precisar clicar no portal.
+responde manualmente pelo WhatsApp — sem precisar clicar no portal. Deve funcionar inclusive no
+**Chatbot Standalone** (sem Portal); o Portal continua podendo assumir/devolver manualmente.
 
 **Por quê:** é o "Parar Resposta Agent" da referência; mais natural que o botão.
 
 **Abordagem:**
-- Detectar mensagens `fromMe = true` no payload da Evolution.
-- Deduplicar: distinguir a resposta **do próprio bot** (enviada via API) da resposta **do atendente**
-  (digitada no app). Estratégia: registrar toda mensagem que o bot envia (hash/ID) e, ao receber um
-  `fromMe`, se **não** casar com uma enviada pelo bot → é o atendente → `PATCH bot_ativo=false`.
-- Opcional: reativar o bot automaticamente após X horas de silêncio do atendente.
+- Detectar mensagens `fromMe = true` no payload da Evolution (a instância precisa **emitir** eventos
+  `fromMe`; hoje o webhook trata inbound → habilitar/encaminhar `fromMe`).
+- Deduplicar bot × humano: **registrar todo envio do bot** guardando o `provider_message_id` que a
+  Evolution devolve ao enviar (reusando o mecanismo de dedupe de `provider_message_id` que o Chatbot
+  já tem no webhook). Ao chegar um `fromMe`: se **casar** com um envio do bot → é eco do próprio bot
+  (ignora); se **não** casar → é o atendente digitando no app → `bot_ativo=false` naquela conversa.
+- Idempotência: **não** alternar o bot a cada eco/ack/status de entrega; ignorar reações/recibos. Só
+  `fromMe` de conteúdo que não seja envio conhecido do bot dispara a pausa.
+- Fase 2 (opcional, documentada): reativar o bot após X horas de silêncio do atendente.
 
-**Onde pluga:** Chatbot (Plano #2A) e seus dados de conversa/handoff.
+**O que muda onde (explícito):**
+- **Chatbot API (#2A) — é aqui que mora a lógica:** (a) ao **enviar** mensagem, persistir o
+  `provider_message_id` do envio; (b) ramo `fromMe` no handler do webhook que consulta esse registro e
+  aplica `bot_ativo=false` pelo mesmo caminho do handoff manual; (c) idempotência de ack/status.
+- **n8n/Evolution:** garantir que a instância **entrega eventos `fromMe`** ao webhook (config Evolution
+  + o nó de webhook não descartar `fromMe`). **Sem regra de negócio no n8n** — só encaminhar.
 
-**Esforço/risco:** médio. A deduplicação `fromMe` é a parte chata (exige rastrear os envios do bot).
+**Aceite:**
+- Atendente manda 1 msg pelo celular → o bot para naquela conversa.
+- Msg enviada pelo **próprio bot** (via API) **não** pausa (dedupe por `provider_message_id`).
+- Ack/recibo/status/reação **não** alteram `bot_ativo`.
+- Reativação manual pelo Portal continua funcionando; funciona no Chatbot Standalone (sem Portal).
+
+**Esforço/risco:** médio. A deduplicação `fromMe` é a parte chata (rastrear os envios do bot com
+confiabilidade do `provider_message_id` da Evolution).
 
 **Gatilho:** quando o handoff manual do portal já estiver em uso e incomodar clicar.
 
@@ -113,22 +131,51 @@ agentes especializados: `financiamento`, `vendas`, `test_drive`, `grupos`, etc.
 
 ## E5 — Cadastro de veículo via WhatsApp
 
-**O que é:** o dono/vendedor **adiciona um veículo ao estoque mandando mensagem** para o bot
-(equivalente ao "Adiciona Veículo BD - Whatsapp" da referência).
+**O que é:** o dono/vendedor **adiciona um veículo ao estoque mandando mensagem** para o bot (texto e,
+se possível, foto) — equivalente ao "Adiciona Veículo BD - Whatsapp" da referência.
 
-**Por quê:** cadastrar estoque sem abrir o portal, direto do celular na loja.
+**Por quê:** cadastrar estoque sem abrir o portal, direto do celular na loja. Disponível para **todos**
+os clientes da suíte.
+
+**Escopo comercial (importante):**
+- **Suíte completa (com Portal):** WhatsApp **e** Portal são caminhos de cadastro; WhatsApp é conveniência.
+- **Chatbot Standalone (sem Portal):** o WhatsApp é o **caminho canônico** de cadastro de estoque — não
+  pode depender do HTML do portal. É o requisito mais forte desta feature.
 
 **Abordagem:**
-- Lista de números autorizados (donos/vendedores).
-- Se a mensagem vier de um número autorizado e for um comando de cadastro (ex.: foto + "CG 160 2023
-  16000"), um agente/tool chama `POST /veiculos` com `loja_id` do remetente.
-- Foto do WhatsApp → upload (ver E6) → `foto_url`.
+- **Números autorizados por loja** (dono/vendedor); número de cliente comum **não** cadastra (recusa).
+  Lista/flag mantida no Chatbot, escopada por loja.
+- `loja_id` do remetente vem da **instância Evolution** (cada loja = instância). Nunca cadastrar em loja
+  errada (tenancy).
+- Intenção clara/comando (ex.: "CG 160 2023 16000 placa ABC1D23") → extração dos campos por LLM
+  (marca/modelo/ano/valor/km/**placa**) → chama **Estoque API `POST /v1/veiculos`** (privada) com a
+  **credencial de serviço de escrita** da loja. Só HTTP; o Chatbot **não** grava veículo no próprio
+  banco como fonte de verdade.
+- **Placa** no desenho desde já (Estoque normaliza e tem `por-placa`); `Idempotency-Key` p/ não duplicar
+  em reenvio.
+- **Foto:** Fase 1 texto (+URL se houver); Fase 2 foto real via WhatsApp → upload/storage (depende de
+  **E6**) → `foto_url`.
+- Resposta no WhatsApp: **resumo do veículo criado/atualizado** ou **erro legível** ("faltou o valor",
+  "placa inválida", "número não autorizado").
 
-**Onde pluga:** `Bot` (nova ferramenta `adicionar_veiculo`, restrita por número) + `/veiculos` (já existe).
+**O que muda onde:**
+- **Chatbot (#2A):** ferramenta/agente `adicionar_veiculo` restrita por número; parsing; cliente HTTP de
+  **escrita** no Estoque (hoje o `HttpInventoryProvider` é de leitura → precisa de credencial/escopo de escrita).
+- **Estoque (#4A):** `POST /v1/veiculos` já existe; garantir escopo de credencial de serviço p/ o Chatbot
+  escrever. Auditoria mínima (quem/quando) já é padrão do Estoque.
 
-**Esforço/risco:** médio (parsing do comando + autorização).
+**Aceite:**
+- Número autorizado + dados válidos → veículo criado no Estoque na loja certa; bot confirma o resumo.
+- Número **não** autorizado → recusa, nada criado.
+- Dados incompletos/ambíguos → erro legível pedindo o que falta; nada criado.
+- Reenvio idêntico não duplica (idempotência). Funciona no Chatbot Standalone (sem Portal).
 
-**Gatilho:** quando o cadastro pelo portal for gargalo para a operação.
+**Riscos:** parsing ambíguo (mitigar pedindo **confirmação antes de gravar**); número não autorizado
+(negar cedo); foto grande/formato (limitar tamanho; Fase 2).
+
+**Esforço/risco:** médio (parsing + autorização + credencial de escrita no Estoque).
+
+**Gatilho:** para Chatbot-only é caminho de **dia 1**; para a suíte, quando o cadastro pelo portal for gargalo.
 
 ---
 
@@ -188,13 +235,78 @@ provar impacto em venda.
 
 ---
 
+## E10 — Pixel Meta / aba Tráfego (eventos de conversão)
+
+**O que é:** dono/gerente configura no **Portal** uma aba **Tráfego** para o **Pixel da Meta**
+(Facebook/Instagram Ads) e dispara eventos de conversão — sobretudo **venda** — para medir e otimizar
+anúncios. **MVP: só Meta.**
+
+**Por quê:** hoje a loja roda anúncio sem devolver conversão à Meta; sem `Purchase`/`Lead` o algoritmo
+do Ads não otimiza. É o building block concreto que alimenta a atribuição do **E8**.
+
+**Decisões de produto:**
+- Aba **Tráfego** no Portal — papéis **dono/gerente**; **vendedor não** vê tokens.
+- Config por loja: **Pixel ID** + **token CAPI** (Conversions API), **Test Event Code** opcional, e
+  liga/desliga por evento.
+- **Site (Catálogo público):** **Pixel browser** — `PageView` no load e, no **CTA WhatsApp**, evento
+  **Lead** (preservar UTM/`CAT-*` já existentes).
+- **Venda:** ao **confirmar venda no Portal (#3B)** → **Purchase via CAPI (servidor)** com valor/moeda
+  quando houver. **Não** tratar clique no WhatsApp como Purchase. Ideal: Lead no clique + Purchase na venda.
+- **Segredos:** token CAPI cifrado no servidor; **nunca** no front do catálogo nem no git. O **Pixel ID**
+  é público (vai no browser); o token CAPI é server-only.
+- **Dedupe de evento:** o mesmo evento pode sair pelo Pixel (browser) e pela CAPI (servidor) → enviar
+  **`event_id` compartilhado** para a Meta deduplicar (obrigatório; senão conta em dobro).
+- **Resiliência:** falha na CAPI **não** pode quebrar o fluxo de venda — envio assíncrono best-effort com
+  retry (padrão outbox, como o do Catálogo), fora do caminho crítico da confirmação.
+
+**Escopo comercial (Chatbot-only vs suíte):**
+- **Suíte (Portal + Catálogo):** feature completa — config, PageView/Lead no site, Purchase na venda.
+- **Chatbot Standalone (sem Portal/Catálogo):** pixel de **site** e **Purchase na venda** ficam
+  **limitados/indisponíveis** (não há vitrine nem confirmação de venda no Portal). Opcional documentado:
+  emitir `Lead` via CAPI quando um lead é criado no Chatbot. Deixar explícito o que **exige Catálogo+Portal**.
+
+**Onde pluga:**
+- **Portal (#3B):** aba Tráfego (config cifrada por loja) + gancho no "confirmar venda" → CAPI `Purchase`.
+- **Catálogo (#5A):** injeta o Pixel (browser) — `PageView` + `Lead` no CTA, com `event_id` e UTM/`CAT-*`.
+- **Meta CAPI:** integração HTTP server-side (Graph API `/events`).
+
+**Tasks (esboço):**
+1. Portal: modelo de config Meta por loja (Pixel ID, token CAPI cifrado, test code, toggles) + aba
+   Tráfego (RBAC dono/gerente; token mascarado na leitura).
+2. Portal: mecanismo de **segredo em repouso** (cifra do token CAPI — o Portal ainda não tem; definir).
+3. Catálogo: injeção do Pixel + `PageView` + `Lead` no CTA com `event_id`/UTM (Pixel ID via config pública da loja).
+4. Portal: no "confirmar venda", enfileirar `Purchase` (valor/moeda, `event_id`, identificadores
+   disponíveis) → worker/outbox CAPI com retry.
+5. Testes: config salva/mascarada; Lead no CTA; Purchase na confirmação; **falha CAPI não quebra a
+   venda**; dedupe por `event_id`.
+
+**Aceite:**
+- Config salva por loja (token **mascarado** na leitura; vendedor sem acesso).
+- Catálogo dispara `PageView` no load e `Lead` no CTA WhatsApp (com UTM/`CAT-*`).
+- Confirmar venda no Portal dispara `Purchase` via CAPI com valor/moeda quando houver.
+- Pixel + CAPI do mesmo evento não contam em dobro (dedupe por `event_id`).
+- Erro/timeout da CAPI **não** impede registrar a venda (vai pra retry).
+
+**Fora (evolução, não MVP):** Google/TikTok; criar campanha no Ads Manager; ROI completo com custo
+importado (→ **E8**).
+
+**Esforço/risco:** médio. Risco de dado (token) e de contagem dupla (mitigados por cifra + `event_id`).
+
+**Gatilho:** quando a loja rodar tráfego pago de verdade e precisar otimizar por conversão.
+
+---
+
 ## Ordem sugerida de ataque (depois do MVP)
 
 1. **E3** (auto-pausa) — completa o handoff standalone.
 2. **E1** (áudio) — grande ganho de UX real.
 3. **E6** (upload real de fotos) — quando o Catálogo entrar em produção.
-4. **E8** (atribuição de campanhas) — antes de automatizar marketing.
-5. **E2** (score) — junto do primeiro fluxo bancário real e contrato com bureau.
-6. **E7** (analytics avançado) — quando relatórios básicos não bastarem.
-7. **E5 / E4** (cadastro via WhatsApp / multi-agente) — quando a operação pedir.
-8. **E9** (redes sociais e tráfego) — somente após medir origem → lead → venda.
+4. **E10** (Pixel Meta / aba Tráfego) — conversão básica (Lead/Purchase) para a Meta otimizar.
+5. **E8** (atribuição de campanhas) — importa custo e fecha origem→lead→venda; depende do E10.
+6. **E2** (score) — junto do primeiro fluxo bancário real e contrato com bureau.
+7. **E7** (analytics avançado) — quando relatórios básicos não bastarem.
+8. **E5 / E4** (cadastro via WhatsApp / multi-agente) — quando a operação pedir.
+9. **E9** (redes sociais e tráfego) — somente após medir origem → lead → venda.
+
+> **Exceção Chatbot-only:** para quem paga só o Chatbot Standalone, **E5 (cadastro por WhatsApp)** é
+> caminho de **dia 1** (único jeito de cadastrar estoque sem Portal), não fim de fila.
