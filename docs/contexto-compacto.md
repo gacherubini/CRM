@@ -1,6 +1,6 @@
 # Contexto compacto para continuidade
 
-Atualizado em **2026-07-12**. Leia isto primeiro; detalhes operacionais em `docs/handoff-contexto.md`.
+Atualizado em **2026-07-13**. Leia isto primeiro; detalhes operacionais em `docs/handoff-contexto.md`.
 Planos válidos: `docs/plans/README.md`. **Ignore** `docs/plans/_archive/`.
 
 ## Regras permanentes
@@ -19,14 +19,14 @@ Planos válidos: `docs/plans/README.md`. **Ignore** `docs/plans/_archive/`.
 
 | Produto | Pasta / porta | Feito (essencial) | Aberto |
 |---|---|---|---|
-| Motor #1A | `motor-simulacao/` `:8000` | async, auth, worker, mock | Task 10–12; credenciais; 1º driver real |
-| Chatbot #2A | `chatbot-api/` `:8001` | leads, conversas, handoff, atrib. catálogo, sim HTTP | go-live, prompt, mojibake, LGPD; sim por placa |
-| Estoque #4A | `estoque-api/` `:8100` | CRUD, público, RBAC, outbox | **placa + por-placa**; E2E outbox; restore |
-| Portal | `portal-gestao/` `:9000` | leads/conversas/sim, vendas, metas loja, vendedor, funil | sim. p/ vendedor; Task 9A acessos bancos; #3B residual; Playwright E2E |
-| Catálogo #5A | `catalogo-publico/` `:8200` | vitrine, CTA `CAT-*`, outbox | E2E events URL; SEO/tema/standalone |
+| Motor #1A | `motor-simulacao/` `:8000` | async, auth, worker, mock, **credenciais cifradas (Task 11)** | Task 10 revenda; Task 12 1º driver real |
+| Chatbot #2A | `chatbot-api/` `:8001` | leads, conversas, handoff, atrib. catálogo, sim HTTP, **E2E outbox** | go-live, prompt, mojibake, LGPD; **lookup+sim por placa** |
+| Estoque #4A | `estoque-api/` `:8100` | CRUD, público, RBAC, outbox, **placa + por-placa** | placa na admin HTMX; E2E outbox; restore |
+| Portal | `portal-gestao/` `:9000` | leads/conversas/sim, **sim. p/ vendedor (RBAC)**, vendas, metas loja, funil | Task 9A UI credenciais bancos; #3B residual; Playwright E2E |
+| Catálogo #5A | `catalogo-publico/` `:8200` | vitrine, CTA `CAT-*`, outbox, **wiring funil + E2E deploy** | validar em containers reais; SEO/tema/standalone |
 
-**Testes:** 267 (Motor 58 · Estoque 45 · Chatbot 59 · Portal 86 · Catálogo 19).  
-**Estimativa:** ~**78%** MVP demonstrável · ~**62%** produção/revenda.
+**Testes:** 305 (Motor 69 · Estoque 65 · Chatbot 62 · Portal 90 · Catálogo 19).  
+**Estimativa:** ~**80%** MVP demonstrável · ~**65%** produção/revenda.
 
 ## Decisões de produto vigentes
 
@@ -36,19 +36,21 @@ Planos válidos: `docs/plans/README.md`. **Ignore** `docs/plans/_archive/`.
   antigo — **não reintroduzir** sem pedido.
 - CPF mascarado no texto de mensagens.
 - CRM WhatsApp: simular por **placa** + **telefone**; **sem** renda e **sem** prazo único na coleta
-  (prazos padrão multi-opção). Valor do veículo só do Estoque. *(Planejado nos #4A/#2A/#1A; código ainda no contrato antigo.)*
-- Vendedor **deve** poder simular manualmente, sem ver custo/lucro/tokens (RBAC pendente).
+  (prazos padrão multi-opção). Valor do veículo só do Estoque. *(Estoque `por-placa` **feito**; falta
+  o lookup+payload no Chatbot #2A.)*
+- Vendedor **deve** poder simular manualmente, sem ver custo/lucro/tokens — **feito** (whitelist, Task 13).
 - Senhas de portal bancário: rotação no **Dashboard** (#3A Task 9A) → Motor cifrado (#1A Task 11).
   **Nunca** colar login/senha de banco no chat com IA.
-- Funil Catálogo→Chatbot→Portal em código; outbox do catálogo ainda precisa env de deploy.
+- Funil Catálogo→Chatbot→Portal com wiring de deploy (`CATALOGO_EVENTS_URL/TOKEN`, desligado por
+  padrão) e E2E da entrega do outbox; falta validar em containers reais.
 
 ## Próxima sequência (sugerida)
 
-1. `CATALOGO_EVENTS_URL`/`TOKEN` + E2E clique → Portal.
-2. Estoque **placa** + Chatbot lookup + payload sim (telefone, sem renda/prazo único).
-3. Portal: RBAC sim. vendedor + Task 9A (quando Motor tiver API de credenciais).
+1. Validar o funil do catálogo em containers reais (wiring `CATALOGO_EVENTS_URL/TOKEN` + E2E já feitos).
+2. Chatbot lookup **por placa** + payload sim (telefone, sem renda/prazo único) — Estoque já expõe `por-placa`.
+3. Portal: **Task 9A** UI de credenciais — a API do Motor (Task 11) já existe.
 4. #3B residual; #5A residual; prompt n8n; go-live sob demanda.
-5. Motor Task 10 → 11 (credenciais) → 12 (1º driver real híbrido).
+5. Motor Task 10 (revenda) → 12 (1º driver real híbrido). Task 11 (credenciais) **feita**.
 
 ## Verificação mínima
 
