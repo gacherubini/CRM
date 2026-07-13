@@ -12,13 +12,41 @@ implementam a mesma interface `Driver`; o resto do Motor não muda.
 
 ## Situação por banco
 
-| Banco | URL de acesso | Login | API? | Caminho | Fluxo mapeado? |
+| Banco | URL de acesso | Login | API? (reconhecimento 2026-07-13) | Caminho provável | Fluxo mapeado? |
 |---|---|---|---|---|---|
-| **Santander** | `financiamentos.santander.com.br/originacao-auto/login` | usuário+senha | **a verificar** | Playwright (piloto) | **Piloto** — Passo 1 conhecido; 2–5 via codegen (ver plano Fase 1) |
-| **Pan** | `veiculos.bancopan.com.br/login` | usuário+senha, sem 2FA | **a verificar** | Playwright *(se não houver API)* | Não — mapear via codegen |
-| **Fontecred** | `app.fontecred.com.br/login` | usuário+senha, sem 2FA | **a verificar** | Playwright *(se não houver API)* | Não — mapear via codegen |
-| **Bradesco** | `turbo.bradesco/originacaolojista/login` | usuário+senha, sem 2FA | **a verificar** | Playwright *(se não houver API)* | Não — mapear via codegen |
-| BV | — | a levantar | a verificar | a definir | Não |
+| **Santander** | `financiamentos.santander.com.br/originacao-auto/login` | usuário+senha | **provável NÃO** — nenhuma API pública achada; integração via plugins/parceiros (ex.: Cockpit) | Playwright (piloto) | **Piloto** — Passo 1 conhecido; 2–5 via codegen |
+| **Pan** | `veiculos.bancopan.com.br/login` | usuário+senha, sem 2FA | **PROVÁVEL SIM** — portal dev com doc de *Financiamento de Veículos* (gated/registro) | **Confirmar API antes** → provável `ApiBankDriver` | Não |
+| **BV** (Votorantim) | portal lojista a levantar | a levantar | **PROVÁVEL SIM** — doc "Iniciar Simulação Financiamento Veículo (V4)" no portal dev | **Confirmar API antes** → provável `ApiBankDriver` | Não |
+| **Bradesco** | `turbo.bradesco/originacaolojista/login` | usuário+senha, sem 2FA | **provável** — portal dev robusto (120+ APIs, teste livre); confirmar produto auto | **Confirmar API antes** → talvez `ApiBankDriver` | Não |
+| **Fontecred** | `app.fontecred.com.br/login` | usuário+senha, sem 2FA | **provável NÃO** — fintech menor (moto/bike), sem doc de API achada | Playwright *(se confirmado sem API)* | Não |
+
+## Achados de reconhecimento (2026-07-13)
+
+Busca pública (não confirma acesso do seu CNPJ nem o endpoint exato — páginas técnicas são gated):
+
+- **Pan** tem Portal do Desenvolvedor com página de *Financiamento de Veículos*:
+  `developers.bancopan.com.br/documentacao/financiamento-veiculos` (deu 403 → exige cadastro).
+- **BV (Banco Votorantim)** documenta uma API "Iniciar Simulação Financiamento Veículo (V4)" e
+  "Incluir Dados Simulação" no portal dev — forte indício de API de simulação.
+- **Bradesco** tem portal dev robusto (`api.bradesco`, `developers.bradesco.com.br`, 120+ APIs, teste
+  livre p/ não-clientes) — confirmar se há produto de originação/simulação auto para lojista.
+- **Santander:** nenhuma API pública de simulação achada; integração aparece via plugins de parceiros
+  (ex.: Cockpit) → reforça o caminho Playwright.
+- **Fontecred:** fintech de crédito (FonteGIRO), sem documentação de API de desenvolvedor achada.
+
+**Implicação:** possivelmente **2–3 desses (Pan, BV, talvez Bradesco) têm API** — não construir robô
+para eles antes de descartar a API. Só Santander (e talvez Fontecred) tende a Playwright.
+
+## Roteiro para o gerente/consultor do banco (copiar e enviar)
+
+> "Somos uma revenda de veículos e queremos **integrar a simulação de financiamento de vocês ao nosso
+> sistema** (não usar o portal na mão). Vocês têm uma **API de simulação** para lojista/parceiro? Se sim:
+> como consigo **acesso/credencial de sandbox e produção**, qual a **documentação** (endpoints de
+> simulação de parcela/taxa por CPF, valor, entrada e prazo), e há **contrato/custo**? Se não houver API,
+> confirmam que a única forma é pelo portal web?"
+
+Trazer de volta, por banco: **tem API? (s/n)**, link da doc, como obter credencial, e se cobre a
+simulação (parcela/taxa) que precisamos.
 
 > Confirmado com o dono em 2026-07-13: a loja **acessa** Pan, Fontecred e Bradesco por **portal web,
 > usuário+senha, sem 2FA**. Isso é como a loja **usa** hoje — **não** confirma ausência de API. A coluna
