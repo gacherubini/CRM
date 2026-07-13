@@ -6,7 +6,7 @@ from fastapi import Depends, FastAPI, Request, Response
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
-from app import auth, config, models_db, observabilidade, servico  # noqa: F401
+from app import auth, config, credenciais, models_db, observabilidade, servico  # noqa: F401
 from app.db import Base, engine, get_db
 from app.motor.base import SolicitacaoSimulacao
 from app.motor.mock import TAXAS_MOCK
@@ -48,6 +48,16 @@ def metrics(request: Request, db: Session = Depends(get_db)):
     )
 
 
+def _nomes_provedores() -> list[str]:
+    """Provedores conhecidos do Motor. Hoje só o mock; drivers reais entram na Task 12."""
+    return list(TAXAS_MOCK)
+
+
+def _ator(request: Request, cliente) -> str:
+    """Identidade de quem alterou a credencial (Portal repassa via header X-Ator)."""
+    return request.headers.get("X-Ator") or getattr(cliente, "nome", "desconhecido")
+
+
 @app.get("/v1/provedores")
 def provedores():
     return {
@@ -55,6 +65,67 @@ def provedores():
             {"nome": banco, "habilitado": True, "real": False} for banco in TAXAS_MOCK
         ]
     }
+
+
+@app.get("/v1/provedores/credenciais")
+def listar_credenciais_provedor(
+    db: Session = Depends(get_db),
+    cliente=Depends(auth.autenticar_cliente),
+):
+    if isinstance(cliente, JSONResponse):
+        return cliente
+    return {
+        "credenciais": credenciais.listar_credenciais(db, cliente.id, _nomes_provedores())
+    }
+
+
+@app.get("/v1/provedores/{nome}/credenciais")
+def obter_credencial_provedor(
+    nome: str,
+    db: Session = Depends(get_db),
+    cliente=Depends(auth.autenticar_cliente),
+):
+    if isinstance(cliente, JSONResponse):
+        return cliente
+    cred = credenciais.obter_credencial_mascarada(db, cliente.id, nome)
+    if cred is None:
+        return JSONResponse(
+            status_code=404,
+            content={"erro": {"code": "sem_credencial", "message": "Credencial não configurada"}},
+        )
+    return cred
+
+
+@app.put("/v1/provedores/{nome}/credenciais")
+def upsert_credencial_provedor(
+    nome: str,
+    dados: credenciais.CredencialEntrada,
+    request: Request,
+    db: Session = Depends(get_db),
+    cliente=Depends(auth.autenticar_cliente),
+):
+    if isinstance(cliente, JSONResponse):
+        return cliente
+    credenciais.upsert_credencial(db, cliente.id, nome, dados, _ator(request, cliente))
+    # Nunca ecoa a senha; devolve só a projeção mascarada.
+    return credenciais.obter_credencial_mascarada(db, cliente.id, nome)
+
+
+@app.post("/v1/provedores/{nome}/testar-login")
+def testar_login_provedor(
+    nome: str,
+    db: Session = Depends(get_db),
+    cliente=Depends(auth.autenticar_cliente),
+):
+    if isinstance(cliente, JSONResponse):
+        return cliente
+    resultado = credenciais.testar_login(db, cliente.id, nome)
+    if resultado is None:
+        return JSONResponse(
+            status_code=404,
+            content={"erro": {"code": "sem_credencial", "message": "Credencial não configurada"}},
+        )
+    return resultado
 
 
 @app.post("/v1/simulacoes")

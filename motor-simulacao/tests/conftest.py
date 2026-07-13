@@ -56,7 +56,7 @@ def _limpar_banco(db):
     # Banco de teste é compartilhado; a fila é global. Cada teste começa sem jobs de outros.
     for tabela in (
         "simulacao_tentativas", "simulacao_resultados", "idempotencia", "simulacoes",
-        "credenciais_api", "clientes_api",
+        "auditoria", "credenciais_provedor", "credenciais_api", "clientes_api",
     ):
         db.execute(text(f"DELETE FROM {tabela}"))
     db.add(ClienteApiORM(id=TEST_CLIENT_ID, nome="Cliente dos testes"))

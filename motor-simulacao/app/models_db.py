@@ -5,7 +5,17 @@ Timestamps com timezone; UUID externo em `simulacoes`.
 """
 from datetime import datetime, timezone
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, JSON, Numeric, String, Text
+from sqlalchemy import (
+    Boolean,
+    DateTime,
+    ForeignKey,
+    Integer,
+    JSON,
+    Numeric,
+    String,
+    Text,
+    UniqueConstraint,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db import Base
@@ -34,6 +44,56 @@ class CredencialApiORM(Base):
     nome: Mapped[str] = mapped_column(String(200), nullable=False)
     token_hash: Mapped[str] = mapped_column(String(64), unique=True, nullable=False, index=True)
     ativo: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    criada_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_agora)
+
+
+class CredencialProvedorORM(Base):
+    """Credencial de portal bancário (login/senha) por cliente + provedor.
+
+    Distinta de ``credenciais_api`` (Bearer de consumo da API): aqui guardamos o
+    acesso do lojista ao portal do banco, com a senha CIFRADA em repouso pela mesma
+    camada de ``app.cripto`` usada no payload pessoal. A senha nunca é devolvida em
+    claro; rotaciona com frequência (~2 semanas) e é lida on-demand pelo worker.
+    """
+
+    __tablename__ = "credenciais_provedor"
+    __table_args__ = (
+        UniqueConstraint("cliente_id", "provedor", name="uq_credenciais_provedor_cliente_provedor"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    cliente_id: Mapped[str] = mapped_column(
+        ForeignKey("clientes_api.id"), nullable=False, index=True
+    )
+    provedor: Mapped[str] = mapped_column(String(100), nullable=False)
+    usuario: Mapped[str] = mapped_column(String(200), nullable=False)
+    # Senha do portal cifrada (Fernet via app.cripto); nunca em claro no storage.
+    senha_cifrada: Mapped[str] = mapped_column(Text, nullable=False)
+    habilitado: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    # Sinais operacionais (sem segredo): saúde da credencial e rotação.
+    falhas_login: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    ultimo_sucesso_em: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    ultimo_erro_sanitizado: Mapped[str | None] = mapped_column(String, nullable=True)
+    criada_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_agora)
+    atualizado_em: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_agora, onupdate=_agora
+    )
+
+
+class AuditoriaORM(Base):
+    """Trilha de ações administrativas (sem payload pessoal nem segredo em claro)."""
+
+    __tablename__ = "auditoria"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    cliente_id: Mapped[str] = mapped_column(
+        ForeignKey("clientes_api.id"), nullable=False, index=True
+    )
+    ator: Mapped[str] = mapped_column(String(200), nullable=False)
+    acao: Mapped[str] = mapped_column(String(100), nullable=False)
+    provedor: Mapped[str | None] = mapped_column(String(100), nullable=True)
     criada_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_agora)
 
 

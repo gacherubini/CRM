@@ -5,7 +5,12 @@ from datetime import datetime, timezone
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from app.models_db import ResultadoORM, SimulacaoORM, SimulacaoTentativaORM
+from app.models_db import (
+    CredencialProvedorORM,
+    ResultadoORM,
+    SimulacaoORM,
+    SimulacaoTentativaORM,
+)
 
 
 def _label(valor: str) -> str:
@@ -100,5 +105,21 @@ def gerar_metricas(db: Session, agora: datetime | None = None) -> str:
         retries[provedor] = quantidade
     for provedor in sorted({linha[0] for linha in tentativas}):
         linhas.append(_amostra("motor_provider_retries", retries[provedor], provider=provedor))
+
+    # Falhas de autenticação no portal por provedor, agregadas do contador da
+    # credencial (sem expor login/senha). Alimenta alerta de rotação da senha.
+    linhas.extend([
+        "# HELP motor_provider_auth_failures Portal auth failures per provider since last success.",
+        "# TYPE motor_provider_auth_failures gauge",
+    ])
+    falhas_auth = (
+        db.query(CredencialProvedorORM.provedor, func.sum(CredencialProvedorORM.falhas_login))
+        .group_by(CredencialProvedorORM.provedor)
+        .all()
+    )
+    for provedor, total in falhas_auth:
+        linhas.append(
+            _amostra("motor_provider_auth_failures", int(total or 0), provider=provedor)
+        )
 
     return "\n".join(linhas) + "\n"
