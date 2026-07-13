@@ -14,14 +14,24 @@ implementam a mesma interface `Driver`; o resto do Motor não muda.
 
 | Banco | URL de acesso | Login | API? | Caminho | Fluxo mapeado? |
 |---|---|---|---|---|---|
-| **Santander** | `financiamentos.santander.com.br/originacao-auto/login` | usuário+senha | não | Playwright | **Piloto** — Passo 1 conhecido; 2–5 via codegen (ver plano Fase 1) |
-| **Pan** | `veiculos.bancopan.com.br/login` | usuário+senha, sem 2FA | não | Playwright | Não — mapear via codegen |
-| **Fontecred** | `app.fontecred.com.br/login` | usuário+senha, sem 2FA | não | Playwright | Não — mapear via codegen |
-| **Bradesco** | `turbo.bradesco/originacaolojista/login` | usuário+senha, sem 2FA | não | Playwright | Não — mapear via codegen |
-| BV | — | a levantar | a levantar | a definir | Não |
+| **Santander** | `financiamentos.santander.com.br/originacao-auto/login` | usuário+senha | **a verificar** | Playwright (piloto) | **Piloto** — Passo 1 conhecido; 2–5 via codegen (ver plano Fase 1) |
+| **Pan** | `veiculos.bancopan.com.br/login` | usuário+senha, sem 2FA | **a verificar** | Playwright *(se não houver API)* | Não — mapear via codegen |
+| **Fontecred** | `app.fontecred.com.br/login` | usuário+senha, sem 2FA | **a verificar** | Playwright *(se não houver API)* | Não — mapear via codegen |
+| **Bradesco** | `turbo.bradesco/originacaolojista/login` | usuário+senha, sem 2FA | **a verificar** | Playwright *(se não houver API)* | Não — mapear via codegen |
+| BV | — | a levantar | a verificar | a definir | Não |
 
-> Confirmado com o dono em 2026-07-13: Pan, Fontecred e Bradesco são **portal web, usuário+senha, sem
-> 2FA e sem API** — os três são Playwright, herdam `PlaywrightBankDriver`, sem estratégia especial de login.
+> Confirmado com o dono em 2026-07-13: a loja **acessa** Pan, Fontecred e Bradesco por **portal web,
+> usuário+senha, sem 2FA**. Isso é como a loja **usa** hoje — **não** confirma ausência de API. A coluna
+> "API?" fica **a verificar** para todos até checar com o gerente/consultor de cada banco. Se algum tiver
+> API de simulação para lojista, aquele banco passa a `ApiBankDriver` (melhor: sem robô, sem ToS/
+> fragilidade). Playwright é o caminho **só se confirmado que não há API**.
+
+## Como verificar se um banco tem API (antes de partir pro robô)
+
+- Perguntar ao **gerente da conta / consultor** do banco se há API de simulação para integração de revenda.
+- Procurar **portal do desenvolvedor / "parceiros" / "integração"** do banco.
+- Pedir ao time comercial o **kit/manual de integração**, se houver.
+- Só depois de confirmar que **não há** API acessível à loja, o banco vai para o caminho Playwright.
 
 ## Ordem sugerida
 
