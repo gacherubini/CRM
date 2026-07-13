@@ -34,7 +34,8 @@ separados. Não reintroduzir mock como "banco real".
 - Portal (form do vendedor) e Chatbot (fluxo WhatsApp) coletam os campos novos e os repassam ao Motor.
 
 **Fora:**
-- Outros bancos (cada um é um incremento próprio).
+- Outros bancos (BV, Pan, Bradesco, Fontcred): cada um é um incremento próprio e futuro, herdando a
+  base `PlaywrightBankDriver`. Sem trabalho especulativo agora — decisão do dono nesta sessão.
 - Agregador.
 - API oficial (não existe para este portal).
 
@@ -52,9 +53,14 @@ separados. Não reintroduzir mock como "banco real".
 
 ### Peças
 
-- **`SantanderDriver`** (novo, em `app/motor/`): implementa a interface `Driver`, usa
-  `playwright.sync_api` (encaixa no worker síncrono atual, sem refactor async). Isola todo o
-  conhecimento do portal (URLs, âncoras, passos).
+- **Base reutilizável `PlaywrightBankDriver`** (novo, em `app/motor/`): concentra tudo que é comum a
+  qualquer portal — abrir/gerir o browser, login, sessão persistente (`storage_state`), screenshot em
+  falha, tradução de exceções (retry/rejeição/intervenção), rate-limit. Os próximos bancos (BV, Pan,
+  Bradesco, Fontcred) **herdam** essa base e só preenchem o fluxo específico deles → cada banco vira um
+  incremento barato, com plano próprio. **Só o Santander é implementado agora.**
+- **`SantanderDriver`** (novo): subclasse da base, implementa a interface `Driver`, usa
+  `playwright.sync_api` (encaixa no worker síncrono atual, sem refactor async). Isola o conhecimento do
+  portal do Santander (URLs, âncoras, os 5 passos). É o único driver real deste incremento.
 - **Sessão persistente:** guarda o `storage_state` autenticado (num caminho por cliente, fora do git),
   reusa entre jobs e re-loga quando expira. Reduz logins e footprint de automação.
 - **Credenciais:** lidas via `credenciais.py` (`obter_segredo_para_uso`), decifradas **só em memória**
