@@ -50,10 +50,10 @@ cd ..\catalogo-publico; ..\portal-gestao\.venv\Scripts\python.exe -m pytest test
   24/36/48/60; sem renda obrigatória), **E3 auto-pausa** (`from_me` sem `origem_bot` → pausa;
   ack/status/vazio ignorados), **E5** números autorizados + `POST /v1/operacao/veiculos` → Estoque
   privado, env `ESTOQUE_API_URL`/`TOKEN`, migration `0005_numeros_autorizados`.
-- **n8n versionado:** prompt/tools atualizados (placa, por-placa, sim, cadastrar_veiculo); workflow
-  **ainda `active: false`**.
-- **Falta:** go-live manual (`docs/go-live-chatbot.md`); LGPD exclusão; readiness real; mojibake residual
-  se ainda aparecer; worker/foto E6 no cadastro.
+- **n8n:** JSON no git + **runtime importado** (18 nós; só `wAiNaoSalvos0001`; Echo/cópia apagados).
+  Ainda **`active: false`**. Segredos só no volume Docker.
+- **Falta:** **Publish**/go-live; `ESTOQUE_API_URL`+`TOKEN` no container chatbot (por-placa/E5);
+  `autorizar-numero`; LGPD exclusão; foto E6.
 
 ### Estoque (`estoque-api/`)
 
