@@ -10,6 +10,19 @@ automatizando o portal `https://financiamentos.santander.com.br/originacao-auto/
 usando a credencial da própria loja. É o 1º driver `real: true` — os demais bancos virão em incrementos
 separados. Não reintroduzir mock como "banco real".
 
+## Princípio: híbrido API-first
+
+Cada banco é integrado pelo caminho **mais limpo disponível**:
+
+1. **Tem API oficial / contrato?** → driver **HTTP** (`ApiBankDriver`), sem browser. Preferência sempre.
+2. **Só tem portal web?** → driver **Playwright** (`PlaywrightBankDriver`), com todo o cuidado de
+   fragilidade/ToS descrito aqui.
+
+Ambos implementam a **mesma** interface `Driver` e o mesmo mapeamento de desfechos, então o resto do
+Motor (worker, contrato, resposta) não sabe nem se importa por qual caminho a cotação veio. Playwright
+é o **último recurso**, não o padrão. O **Santander** é Playwright porque **não tem API**; para os
+próximos bancos, verificar API **antes** de partir pro robô.
+
 ## Decisões fixas (desta sessão)
 
 - **Banco piloto:** Santander (portal auto/originação).
@@ -53,11 +66,15 @@ separados. Não reintroduzir mock como "banco real".
 
 ### Peças
 
-- **Base reutilizável `PlaywrightBankDriver`** (novo, em `app/motor/`): concentra tudo que é comum a
-  qualquer portal — abrir/gerir o browser, login, sessão persistente (`storage_state`), screenshot em
-  falha, tradução de exceções (retry/rejeição/intervenção), rate-limit. Os próximos bancos (BV, Pan,
-  Bradesco, Fontcred) **herdam** essa base e só preenchem o fluxo específico deles → cada banco vira um
-  incremento barato, com plano próprio. **Só o Santander é implementado agora.**
+- **Interface comum `Driver`** (já existe): todo banco — API ou Playwright — implementa a mesma
+  interface e o mesmo mapeamento de desfechos. Duas famílias de base reutilizável:
+  - **`ApiBankDriver`** (futuro): base para bancos **com API** — cliente HTTP, auth por credencial
+    (Task 11), parsing da resposta. Caminho preferido (API-first).
+  - **`PlaywrightBankDriver`** (novo, agora): base para bancos **sem API** — abrir/gerir o browser,
+    login, sessão persistente (`storage_state`), screenshot em falha, tradução de exceções, rate-limit.
+  Os próximos bancos (BV, Pan, Bradesco, Fontcred) **herdam a base adequada** (API se houver, senão
+  Playwright) e só preenchem o específico → incremento barato, plano próprio. **Só o Santander
+  (Playwright) é implementado agora.**
 - **`SantanderDriver`** (novo): subclasse da base, implementa a interface `Driver`, usa
   `playwright.sync_api` (encaixa no worker síncrono atual, sem refactor async). Isola o conhecimento do
   portal do Santander (URLs, âncoras, os 5 passos). É o único driver real deste incremento.
