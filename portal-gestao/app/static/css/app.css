@@ -147,6 +147,8 @@ p { color: var(--ink-soft); line-height: 1.55; }
 .alert.warning { border-color: rgba(242, 184, 75, .28); background: rgba(242, 184, 75, .08); color: #f8ca70; }
 .alert.error { border-color: rgba(255, 107, 107, .28); background: rgba(255, 107, 107, .08); color: var(--red); }
 .alert.success { border-color: rgba(47, 227, 155, .25); background: rgba(47, 227, 155, .08); color: var(--green); }
+.check-row { display: flex; align-items: center; gap: 10px; min-height: 42px; color: var(--ink-soft); font-size: 13px; }
+.check-row input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--accent); }
 .empty { padding: 58px 24px; text-align: center; }
 .empty p { margin: 8px 0 0; }
 .empty-code { display: block; margin-bottom: 8px; color: var(--accent); font: 11px ui-monospace, monospace; }

@@ -10,6 +10,9 @@ class Settings:
         os.getenv("PORTAL_IDENTITY_HMAC_SECRET")
         or os.getenv("PORTAL_SESSION_SECRET", "dev-troque-esta-chave")
     )
+    # Chave Fernet dedicada para token CAPI (E10). Preferir PORTAL_ENCRYPTION_KEY;
+    # em dev o módulo app.cripto usa fallback se ausente (nunca em PORTAL_ENV=production).
+    encryption_key: str = os.getenv("PORTAL_ENCRYPTION_KEY", "")
     secure_cookie: bool = os.getenv("PORTAL_SECURE_COOKIE", "0") == "1"
     estoque_url: str = os.getenv("ESTOQUE_API_URL", "http://estoque-api:8000")
     estoque_token: str = os.getenv("ESTOQUE_API_TOKEN", "")

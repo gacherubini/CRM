@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block title %}Tráfego — Motora{% endblock %}
+{% block content %}
+<div class="page-heading">
+  <div>
+    <span class="eyebrow">Meta Ads</span>
+    <h1>Tráfego</h1>
+    <p>Pixel da Meta e Conversions API (CAPI) por loja. O token CAPI fica cifrado no servidor e nunca vai ao catálogo.</p>
+  </div>
+</div>
+
+{% if ok == 'salvo' %}<div class="alert success">Configuração de tráfego salva.</div>{% endif %}
+{% if erro %}<div class="alert error">{{ erro }}</div>{% endif %}
+
+<section class="panel form-section" style="margin-bottom: 18px;">
+  <div class="section-title"><span>00</span><div><h2>Status</h2><p>Resumo sem expor o token em claro.</p></div></div>
+  <div class="form-grid">
+    <div class="metric">
+      <span>Token CAPI</span>
+      <strong>{% if token_configurado %}Configurado{% else %}Não configurado{% endif %}</strong>
+      <small>{% if token_configurado %}•••••••• (mascarado){% else %}Informe o token ao salvar{% endif %}</small>
+    </div>
+    <div class="metric">
+      <span>Última atualização</span>
+      <strong>{% if atualizada_em %}{{ formatar_horario(atualizada_em.isoformat()) }}{% else %}—{% endif %}</strong>
+      <small>loja {{ usuario.loja_slug }}</small>
+    </div>
+  </div>
+  <p class="muted" style="margin-top: 12px; font-size: 12px; color: var(--ink-soft);">
+    O <strong>Pixel ID</strong> é público (browser do catálogo). Configure o mesmo valor em
+    <code>META_PIXEL_ID</code> no serviço do Catálogo público. O token CAPI é exclusivo do Portal.
+  </p>
+</section>
+
+<form method="post" action="/app/trafego" class="form-layout" autocomplete="off">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  <section class="panel form-section">
+    <div class="section-title"><span>01</span><div><h2>Pixel e CAPI</h2><p>Dados da conta de anúncios Meta da loja.</p></div></div>
+    <div class="form-grid">
+      <label>Pixel ID
+        <input type="text" name="pixel_id" value="{{ pixel_id }}" required placeholder="Ex.: 123456789012345" inputmode="numeric" autocomplete="off">
+      </label>
+      <label>Token CAPI (access token)
+        <input type="password" name="capi_token" value="" placeholder="{% if token_configurado %}Deixe em branco para manter o atual{% else %}Cole o token de acesso{% endif %}" autocomplete="new-password">
+      </label>
+      <label>Test Event Code (opcional)
+        <input type="text" name="test_event_code" value="{{ test_event_code }}" placeholder="Somente para testes no Events Manager" autocomplete="off">
+      </label>
+    </div>
+  </section>
+
+  <section class="panel form-section">
+    <div class="section-title"><span>02</span><div><h2>Eventos</h2><p>Liga ou desliga o envio de cada conversão.</p></div></div>
+    <div class="form-grid">
+      <label class="check-row"><input type="checkbox" name="enviar_page_view" {% if enviar_page_view %}checked{% endif %}> PageView (catálogo — browser)</label>
+      <label class="check-row"><input type="checkbox" name="enviar_lead" {% if enviar_lead %}checked{% endif %}> Lead (CTA WhatsApp — browser)</label>
+      <label class="check-row"><input type="checkbox" name="enviar_purchase" {% if enviar_purchase %}checked{% endif %}> Purchase (confirmação de venda — CAPI servidor)</label>
+    </div>
+  </section>
+
+  <div class="form-actions">
+    <a class="button ghost" href="/app">Cancelar</a>
+    <button class="button primary" type="submit">Salvar configuração</button>
+  </div>
+</form>
+{% endblock %}

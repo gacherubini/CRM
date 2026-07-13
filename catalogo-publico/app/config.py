@@ -22,11 +22,26 @@ class Settings:
     events_worker_interval: float = max(
         0.5, float(os.getenv("CATALOGO_EVENTS_WORKER_INTERVAL", "5"))
     )
+    # Meta Pixel browser (E10). Pixel ID é público; token CAPI NÃO vive no catálogo.
+    # Deve coincidir com o Pixel ID configurado no Portal (aba Tráfego).
+    meta_pixel_id: str = (os.getenv("META_PIXEL_ID") or "").strip()
+    meta_pixel_enabled_raw: str = os.getenv("META_PIXEL_ENABLED", "").strip().lower()
 
     @property
     def inventory_url_valid(self) -> bool:
         parsed = urlparse(self.inventory_url)
         return parsed.scheme in {"http", "https"} and bool(parsed.netloc)
+
+    @property
+    def meta_pixel_enabled(self) -> bool:
+        if not self.meta_pixel_id:
+            return False
+        if self.meta_pixel_enabled_raw in {"0", "false", "no", "off"}:
+            return False
+        if self.meta_pixel_enabled_raw in {"1", "true", "yes", "on"}:
+            return True
+        # default: ligado quando há Pixel ID
+        return True
 
 
 settings = Settings()

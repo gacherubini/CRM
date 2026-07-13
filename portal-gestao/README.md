@@ -11,9 +11,18 @@ Frontend operacional da loja, servido por FastAPI com páginas Jinja. O token da
 - cadastro e edição de veículos;
 - publicar, despublicar, reservar e vender;
 - custo oculto para vendedor;
-- layout responsivo para computador e celular.
+- layout responsivo para computador e celular;
+- aba **Tráfego** (dono/gerente): Pixel ID + token CAPI cifrado, Purchase ao confirmar venda.
 
-Leads e conversas já têm espaço na navegação e serão conectados no próximo incremento.
+### Tráfego / Meta (E10)
+
+| Variável | Onde | Notas |
+|---|---|---|
+| `PORTAL_ENCRYPTION_KEY` | Portal | Fernet urlsafe; gera com `python -m app.cli gerar-chave-cifragem`. **Obrigatória** se `PORTAL_ENV=production`. |
+| `META_PIXEL_ID` | Catálogo público | Pixel ID **público** (browser). Deve coincidir com o configurado no Portal. |
+| `META_PIXEL_ENABLED` | Catálogo | `1`/`0` (default: ligado se houver `META_PIXEL_ID`). |
+
+O token CAPI **nunca** vai ao front do catálogo nem ao git. No Portal ele é gravado cifrado; na leitura aparece só como “Configurado” / mascarado.
 
 ## Executar com Docker
 

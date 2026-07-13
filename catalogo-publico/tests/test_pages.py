@@ -1,6 +1,15 @@
+from dataclasses import fields
 from urllib.parse import parse_qs, urlparse
 
+from app.config import settings
 from app.main import normalize_whatsapp
+
+
+def _settings_com_pixel(base, pixel_id: str):
+    valores = {f.name: getattr(base, f.name) for f in fields(base)}
+    valores["meta_pixel_id"] = pixel_id
+    valores["meta_pixel_enabled_raw"] = "1"
+    return type(base)(**valores)
 
 
 def test_normaliza_whatsapp_brasileiro_local_e_internacional():
@@ -114,3 +123,57 @@ def test_interesse_sem_whatsapp_valido_nao_grava_nem_redireciona(
     assert response.status_code == 422
     assert "WhatsApp indisponível" in response.text
     assert interest_store.count() == 0
+
+
+def test_sem_pixel_por_padrao(client):
+    response = client.get("/l/moto-center")
+    assert response.status_code == 200
+    assert "fbevents.js" not in response.text
+    assert "fbq(" not in response.text
+
+
+def test_pixel_presente_quando_meta_pixel_id_configurado(client, monkeypatch):
+    monkeypatch.setattr(
+        "app.main.settings",
+        _settings_com_pixel(settings, "112233445566778"),
+    )
+    response = client.get("/l/moto-center")
+    assert response.status_code == 200
+    assert "fbevents.js" in response.text
+    assert "112233445566778" in response.text
+    assert "fbq('track', 'PageView')" in response.text
+    assert "access_token" not in response.text.lower()
+    assert "EAAB" not in response.text
+    # CSP liberado para o Pixel quando ativo
+    csp = response.headers.get("content-security-policy", "")
+    assert "connect.facebook.net" in csp
+
+
+def test_detalhe_lead_event_id_no_cta_quando_pixel(client, monkeypatch):
+    monkeypatch.setattr(
+        "app.main.settings",
+        _settings_com_pixel(settings, "998877665544"),
+    )
+    response = client.get(
+        "/l/moto-center/veiculos/vehicle-1?utm_source=meta&utm_campaign=ofertas"
+    )
+    assert response.status_code == 200
+    assert "data-lead-event-id=" in response.text
+    assert "fbq('track', 'Lead'" in response.text
+    assert "event_id=" in response.text
+    assert "utm_source=meta" in response.text
+
+
+def test_interesse_reusa_event_id_do_query(client, interest_store):
+    event_id = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
+    response = client.get(
+        f"/l/moto-center/interesse/vehicle-1?event_id={event_id}&utm_source=meta",
+        follow_redirects=False,
+    )
+    assert response.status_code == 302
+    pending = interest_store.pending_outbox()
+    assert len(pending) == 1
+    assert pending[0]["event_id"] == event_id
+    row = interest_store.get_interest(event_id)
+    assert row is not None
+    assert row["event_id"] == event_id

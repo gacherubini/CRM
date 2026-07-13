@@ -86,3 +86,8 @@ def pode_gerir_metas(usuario: Usuario) -> bool:
 def pode_gerir_financeiras(usuario: Usuario) -> bool:
     """Acessos de portais bancários: só dono/gerente (nunca vendedor)."""
     return usuario.papel in {"dono", "gerente"}
+
+
+def pode_gerir_trafego(usuario: Usuario) -> bool:
+    """Aba Tráfego / tokens CAPI — apenas dono e gerente (E10)."""
+    return usuario.papel in {"dono", "gerente"}

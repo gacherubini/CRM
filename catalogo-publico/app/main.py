@@ -55,18 +55,38 @@ app.state.catalog_provider = HttpInventoryProvider(
 app.state.interest_store = InterestStore(settings.database_path)
 
 
+def _content_security_policy() -> str:
+    # Meta Pixel (browser) precisa de script/connect do connect.facebook.net / facebook.com.
+    if settings.meta_pixel_enabled:
+        return (
+            "default-src 'self'; "
+            "img-src 'self' https: http: data:; "
+            "style-src 'self'; "
+            "script-src 'self' 'unsafe-inline' https://connect.facebook.net; "
+            "connect-src 'self' https://www.facebook.com https://connect.facebook.net; "
+            "base-uri 'none'; frame-ancestors 'none'"
+        )
+    return (
+        "default-src 'self'; img-src 'self' https: http: data:; "
+        "style-src 'self'; base-uri 'none'; frame-ancestors 'none'"
+    )
+
+
 @app.middleware("http")
 async def security_headers(request: Request, call_next):
     response = await call_next(request)
     response.headers.setdefault("X-Content-Type-Options", "nosniff")
     response.headers.setdefault("X-Frame-Options", "DENY")
     response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
-    response.headers.setdefault(
-        "Content-Security-Policy",
-        "default-src 'self'; img-src 'self' https: http: data:; "
-        "style-src 'self'; base-uri 'none'; frame-ancestors 'none'",
-    )
+    response.headers.setdefault("Content-Security-Policy", _content_security_policy())
     return response
+
+
+def pixel_context() -> dict:
+    return {
+        "meta_pixel_enabled": settings.meta_pixel_enabled,
+        "meta_pixel_id": settings.meta_pixel_id if settings.meta_pixel_enabled else "",
+    }
 
 
 def get_provider(request: Request) -> HttpInventoryProvider:
@@ -81,7 +101,13 @@ def error_page(request: Request, status: int, title: str, message: str):
     return templates.TemplateResponse(
         request,
         "error.html",
-        {"request": request, "status": status, "title": title, "message": message},
+        {
+            "request": request,
+            "status": status,
+            "title": title,
+            "message": message,
+            **pixel_context(),
+        },
         status_code=status,
     )
 
@@ -192,6 +218,7 @@ def storefront(
             "offset": offset,
             "previous_url": previous_url,
             "next_url": next_url,
+            **pixel_context(),
         },
     )
 
@@ -223,6 +250,9 @@ def vehicle_detail(
         for key in ("utm_source", "utm_medium", "utm_campaign", "utm_content", "utm_term")
     }
     tracking["origem"] = "detalhe_catalogo"
+    # event_id compartilhado browser Lead ↔ registro de interesse (dedupe Meta).
+    lead_event_id = str(uuid.uuid4())
+    tracking["event_id"] = lead_event_id
     interest_url = f"/l/{slug}/interesse/{vehicle_id}?{urlencode(tracking)}"
     return templates.TemplateResponse(
         request,
@@ -233,6 +263,8 @@ def vehicle_detail(
             "veiculo": vehicle,
             "interest_url": interest_url,
             "whatsapp_disponivel": bool(normalize_whatsapp(store.whatsapp)),
+            "lead_event_id": lead_event_id,
+            **pixel_context(),
         },
     )
 
@@ -248,6 +280,7 @@ def register_interest(
     utm_campaign: Optional[str] = None,
     utm_content: Optional[str] = None,
     utm_term: Optional[str] = None,
+    event_id: Optional[str] = None,
     provider: HttpInventoryProvider = Depends(get_provider),
     store: InterestStore = Depends(get_interest_store),
 ):
@@ -276,6 +309,11 @@ def register_interest(
         )
 
     anonymous_id, is_new = visitor_id(request)
+    shared_event_id = clean_tracking(event_id)
+    try:
+        uuid.UUID(shared_event_id)
+    except (ValueError, TypeError):
+        shared_event_id = ""
     try:
         interest = store.record(
             loja_slug=public_store.slug,
@@ -287,6 +325,7 @@ def register_interest(
             utm_campaign=clean_tracking(utm_campaign),
             utm_content=clean_tracking(utm_content),
             utm_term=clean_tracking(utm_term),
+            event_id=shared_event_id or None,
         )
     except sqlite3.Error:
         return error_page(

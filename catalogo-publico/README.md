@@ -27,7 +27,9 @@ Configurações:
 - `CATALOGO_EVENTS_URL`: endpoint server-side do Chatbot para eventos do catálogo;
 - `CATALOGO_EVENTS_TOKEN`: Bearer tenant-scoped do Chatbot (nunca enviado ao navegador);
 - `CATALOGO_EVENTS_TIMEOUT`, `CATALOGO_EVENTS_MAX_ATTEMPTS` e
-  `CATALOGO_EVENTS_WORKER_INTERVAL`: entrega persistente da outbox.
+  `CATALOGO_EVENTS_WORKER_INTERVAL`: entrega persistente da outbox;
+- `META_PIXEL_ID`: Pixel ID público da Meta (browser). Deve coincidir com o do Portal (aba Tráfego);
+- `META_PIXEL_ENABLED`: `1`/`0` (default: ativo se houver `META_PIXEL_ID`). **Nunca** coloque o token CAPI aqui.
 
 Quando URL e token estão configurados, o processo entrega `catalog.interest_clicked` em background.
 Cada tentativa mantém o mesmo `event_id`/`Idempotency-Key`; o clique e sua outbox são gravados na

@@ -2,7 +2,7 @@ import uuid
 from datetime import date, datetime, timezone
 from decimal import Decimal
 
-from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Numeric, String
+from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, Numeric, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db import Base
@@ -89,3 +89,38 @@ class AtendimentoAtribuicao(Base):
     iniciada_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=agora)
     encerrada_em: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     ativa: Mapped[bool] = mapped_column(Boolean, default=True, index=True)
+
+
+class MetaPixelConfig(Base):
+    """Configuração Meta Pixel / CAPI por loja (E10). Token só em ciphertext."""
+
+    __tablename__ = "meta_pixel_config"
+
+    loja_slug: Mapped[str] = mapped_column(String(120), primary_key=True)
+    pixel_id: Mapped[str] = mapped_column(String(64), default="")
+    token_ciphertext: Mapped[str | None] = mapped_column(String(1024), nullable=True)
+    test_event_code: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    enviar_page_view: Mapped[bool] = mapped_column(Boolean, default=True)
+    enviar_lead: Mapped[bool] = mapped_column(Boolean, default=True)
+    enviar_purchase: Mapped[bool] = mapped_column(Boolean, default=True)
+    atualizada_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=agora)
+
+
+class MetaCapiOutbox(Base):
+    """Outbox best-effort para eventos CAPI (Purchase etc.)."""
+
+    __tablename__ = "meta_capi_outbox"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=novo_id)
+    loja_slug: Mapped[str] = mapped_column(String(120), index=True)
+    venda_id: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
+    event_id: Mapped[str] = mapped_column(String(120), unique=True, index=True)
+    event_name: Mapped[str] = mapped_column(String(40), default="Purchase")
+    payload_json: Mapped[str] = mapped_column(String(4000))
+    status: Mapped[str] = mapped_column(String(20), default="pending", index=True)
+    attempts: Mapped[int] = mapped_column(Integer, default=0)
+    last_error: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    last_http_status: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    delivered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    criada_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=agora)
+    atualizada_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=agora)

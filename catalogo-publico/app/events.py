@@ -121,8 +121,10 @@ class InterestStore:
         utm_campaign: str = "",
         utm_content: str = "",
         utm_term: str = "",
+        event_id: str | None = None,
     ) -> InterestRecord:
-        event_id = str(uuid.uuid4())
+        # Aceita event_id do browser (Lead Pixel) para dedupe Meta; senão gera novo.
+        event_id = (event_id or "").strip() or str(uuid.uuid4())
         interest_id = str(uuid.uuid4())
         public_ref = _public_reference()
         occurred_at = _now().isoformat()

@@ -27,12 +27,23 @@ from app.auth import (
     pode_gerir_financeiras,
     pode_gerir_metas,
     pode_gerir_estoque,
+    pode_gerir_trafego,
     pode_registrar_venda,
     pode_ver_custo,
     pode_ver_financeiro,
     usuario_atual,
 )
-from app.models import AtendimentoAtribuicao, Meta, Usuario, Venda, VendaCustoDireto, agora
+from app.cripto import cifrar
+from app.meta_capi import enfileirar_purchase_venda
+from app.models import (
+    AtendimentoAtribuicao,
+    Meta,
+    MetaPixelConfig,
+    Usuario,
+    Venda,
+    VendaCustoDireto,
+    agora,
+)
 from app.clients.chatbot import (
     ChatbotClient,
     ChatbotIndisponivel,
@@ -952,6 +963,8 @@ async def vendas_confirmar(request: Request, venda_id: str, db: Session = Depend
     venda.confirmada_em = agora()
     venda.atualizada_em = agora()
     db.commit()
+    # E10: Purchase via CAPI — best-effort; falha não desfaz a venda.
+    enfileirar_purchase_venda(db, venda)
     return RedirectResponse("/app/vendas?ok=confirmada", status_code=303)
 
 
@@ -1594,3 +1607,100 @@ def configuracoes_placeholder(request: Request, db: Session = Depends(get_db)):
         "em-breve.html",
         contexto(request, usuario, titulo="Configurações", texto="As integrações serão configuradas sem expor credenciais ao navegador."),
     )
+
+
+def _trafego_contexto(request: Request, usuario, config: MetaPixelConfig | None, *, ok=None, erro=None):
+    token_configurado = bool(config and config.token_ciphertext)
+    return contexto(
+        request,
+        usuario,
+        config=config,
+        token_configurado=token_configurado,
+        pixel_id=(config.pixel_id if config else "") or "",
+        test_event_code=(config.test_event_code if config else "") or "",
+        enviar_page_view=bool(config.enviar_page_view) if config else True,
+        enviar_lead=bool(config.enviar_lead) if config else True,
+        enviar_purchase=bool(config.enviar_purchase) if config else True,
+        atualizada_em=config.atualizada_em if config else None,
+        ok=ok,
+        erro=erro,
+    )
+
+
+@app.get("/app/trafego", response_class=HTMLResponse)
+def trafego_pagina(request: Request, db: Session = Depends(get_db)):
+    usuario = usuario_atual(request, db)
+    if not usuario:
+        return redirecionar_login()
+    if not pode_gerir_trafego(usuario):
+        return RedirectResponse("/app", status_code=303)
+    config = (
+        db.query(MetaPixelConfig)
+        .filter(MetaPixelConfig.loja_slug == usuario.loja_slug)
+        .first()
+    )
+    ok = request.query_params.get("ok")
+    return templates.TemplateResponse(
+        "trafego/form.html",
+        _trafego_contexto(request, usuario, config, ok=ok),
+    )
+
+
+@app.post("/app/trafego")
+async def trafego_salvar(request: Request, db: Session = Depends(get_db)):
+    usuario = usuario_atual(request, db)
+    if not usuario:
+        return redirecionar_login()
+    form = await request.form()
+    if not pode_gerir_trafego(usuario) or not csrf_valido(request, form.get("csrf")):
+        return RedirectResponse("/app", status_code=303)
+
+    pixel_id = (form.get("pixel_id") or "").strip()
+    token_novo = (form.get("capi_token") or "").strip()
+    test_event_code = (form.get("test_event_code") or "").strip() or None
+    enviar_page_view = form.get("enviar_page_view") == "on"
+    enviar_lead = form.get("enviar_lead") == "on"
+    enviar_purchase = form.get("enviar_purchase") == "on"
+
+    config = (
+        db.query(MetaPixelConfig)
+        .filter(MetaPixelConfig.loja_slug == usuario.loja_slug)
+        .first()
+    )
+    if not pixel_id:
+        return templates.TemplateResponse(
+            "trafego/form.html",
+            _trafego_contexto(
+                request,
+                usuario,
+                config,
+                erro="Informe o Pixel ID da Meta.",
+            ),
+            status_code=422,
+        )
+    if not token_novo and not (config and config.token_ciphertext):
+        return templates.TemplateResponse(
+            "trafego/form.html",
+            _trafego_contexto(
+                request,
+                usuario,
+                config,
+                erro="Informe o token de acesso da Conversions API (CAPI).",
+            ),
+            status_code=422,
+        )
+
+    if config is None:
+        config = MetaPixelConfig(loja_slug=usuario.loja_slug, pixel_id=pixel_id)
+        db.add(config)
+
+    config.pixel_id = pixel_id
+    config.test_event_code = test_event_code
+    config.enviar_page_view = enviar_page_view
+    config.enviar_lead = enviar_lead
+    config.enviar_purchase = enviar_purchase
+    config.atualizada_em = agora()
+    if token_novo:
+        config.token_ciphertext = cifrar(token_novo)
+    db.commit()
+    return RedirectResponse("/app/trafego?ok=salvo", status_code=303)
