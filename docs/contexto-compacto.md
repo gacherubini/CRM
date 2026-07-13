@@ -24,7 +24,7 @@ Planos válidos: `docs/plans/README.md`. **Ignore** `docs/plans/_archive/`.
 | Motor #1A | `motor-simulacao/` `:8000` | async, auth, worker, mock, T11, **T12 Santander live** (headed+Xvfb) | outros bancos; 1 PW/banco paralelo; listagem jobs; T10 |
 | Chatbot #2A | `chatbot-api/` `:8001` | leads, handoff, por-placa, E3, E5, n8n tools | go-live manual; LGPD |
 | Estoque #4A | `estoque-api/` `:8100` | CRUD, placa, por-placa | E2E outbox; restore |
-| Portal | `portal-gestao/` `:9000` | CRM, **progresso sim + resultado multi-prazo**, 9A, E10 | lista sims ao vivo; #3B; E2E |
+| Portal | `portal-gestao/` `:9000` | CRM, **progresso sim + resultado multi-prazo**, 9A, E10 | **histórico de sims do usuário** + lista ao vivo; #3B; E2E |
 | Catálogo #5A | `catalogo-publico/` `:8200` | vitrine, CTA, Pixel browser | containers reais; SEO |
 
 **Estimativa:** ~**92%** MVP demonstrável (cotação real Santander) · ~**75%** produção/revenda multi-banco.
@@ -38,9 +38,10 @@ Planos válidos: `docs/plans/README.md`. **Ignore** `docs/plans/_archive/`.
 
 ## Próxima sequência (sugerida)
 
-1. **Próximo banco** — ler lições Santander; API-first (Pan/BV/Bradesco); Fontecred se Playwright.
-2. Go-live WhatsApp se operação priorizar (`docs/go-live-chatbot.md`).
-3. Multi-banco paralelo + lista de jobs no Portal; Task 10 revenda.
+1. **Histórico de simulações por usuário** no Portal (#3A.1 Task 16) + listagem no Motor.
+2. **Próximo banco** — ler lições Santander; API-first (Pan/BV/Bradesco); Fontecred se Playwright.
+3. Go-live WhatsApp se operação priorizar (`docs/go-live-chatbot.md`).
+4. Multi-banco paralelo; Task 10 revenda.
 
 ## Verificação mínima
 

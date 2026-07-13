@@ -50,7 +50,8 @@ docker compose exec -T motor-worker sh -c "pgrep -a Xvfb; pgrep -a python"
 - **Falta:**
   - Demais bancos reais (ver reconhecimento + lições).
   - Multi-banco **paralelo** (1 Playwright por banco no mesmo job).
-  - `GET /v1/simulacoes` listagem ao vivo.
+  - `GET /v1/simulacoes` listagem (histórico + ao vivo) com filtros/paginação.
+  - Persistir **quem pediu** a simulação (`solicitado_por` / ator do Portal) para histórico por usuário.
   - `testar-login` real (hoje **placeholder**).
   - **Task 10** revenda.
 
@@ -60,8 +61,8 @@ docker compose exec -T motor-worker sh -c "pgrep -a Xvfb; pgrep -a python"
   - Simulação: form → **progresso HTMX** (`/app/simulacoes/job/{id}`) → resultado multi-prazo.
   - `MOTOR_URL` + **`MOTOR_TOKEN`** obrigatórios (sem token a tela Acessos fica vazia).
   - Alertas de erro com códigos legíveis (`resultado.html`).
-- **Falta:** lista de simulações ao vivo (#3A.1 Task 16); #3B residual; Playwright E2E;
-  retry outbox CAPI.
+- **Falta:** **histórico de simulações do usuário** + lista ao vivo (#3A.1 Task 16); #3B residual;
+  Playwright E2E; retry outbox CAPI.
 
 ### Chatbot / Estoque / Catálogo
 
@@ -92,10 +93,12 @@ Detalhe operacional: **`docs/plans/2026-07-13-playwright-licoes-santander.md`**.
 ## Próximos passos (ordem sugerida para o próximo agente)
 
 1. **Ler** `docs/plans/2026-07-13-playwright-licoes-santander.md` + `...-bancos-reconhecimento.md`.
-2. Escolher banco (Pan/BV/Bradesco preferir **API**; Fontecred candidato Playwright).
-3. Credencial da loja em Portal → Acessos; worker com Xvfb saudável.
-4. Implementar driver (reutilizar base); **não** copiar seletores do Santander.
-5. Alternativa de produto: go-live WhatsApp (`docs/go-live-chatbot.md`) se operação pedir.
+2. **Histórico de simulações por usuário** no Portal (#3A.1 Task 16) + `GET /v1/simulacoes` no Motor
+   (gravar `solicitado_por` no create; listar minhas sims concluídas/falhas/em andamento).
+3. Escolher banco (Pan/BV/Bradesco preferir **API**; Fontecred candidato Playwright).
+4. Credencial da loja em Portal → Acessos; worker com Xvfb saudável.
+5. Implementar driver (reutilizar base); **não** copiar seletores do Santander.
+6. Alternativa de produto: go-live WhatsApp (`docs/go-live-chatbot.md`) se operação pedir.
 
 ## Avisos operacionais
 

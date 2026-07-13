@@ -5,7 +5,8 @@
 > fora deste checklist original. Use este doc só para o residual, não para reimplementar.
 >
 > **2026-07-13:** progresso de simulação HTMX (`progresso.html` + rota job) + resultado multi-prazo
-> com códigos de erro do Motor (**Santander live**). Ainda aberto: **lista de sims ao vivo** (Task 16).
+> com códigos de erro do Motor (**Santander live**). Ainda aberto: **histórico de simulações do
+> usuário** + lista ao vivo (Task 16).
 
 **Goal:** Dashboard web (dono/gerente/vendedor) com login, estoque via API, leads, handoff e
 simulação manual — tokens só no servidor.
@@ -43,14 +44,35 @@ Browser → sessão/cookie → Portal BFF
 
 - Fluxos críticos login → estoque → leads → handoff → simulação (smoke).
 
-### Task 16 — Simulações ao vivo no Portal (pedido dono 2026-07-13)
+### Task 16 — Histórico + simulações ao vivo no Portal (pedido dono 2026-07-13)
 
-> Parcial: já existe `/app/simulacoes/job/{id}` com progresso auto-refresh (Santander).
-> Falta a **lista** de tudo que está rodando.
+> Parcial: já existe `/app/simulacoes/job/{id}` com progresso auto-refresh e resultado multi-prazo
+> (Santander live). **Não** há ainda lista/histórico — cada simulação some depois de abrir o resultado.
 
-- [ ] Tela/lista “Simulações em andamento” (jobs `recebida`/`processando`) com link para o job.
-- [ ] Multi-banco: status por provedor na lista e no detalhe do job.
-- [ ] Depende de listagem no Motor (`GET /v1/simulacoes`) se ainda não houver.
+#### Histórico por usuário (requisito de produto — dono 2026-07-13)
+
+Cada **usuário do Portal** (vendedor/gerente/dono da loja) precisa ver o **histórico das simulações
+que ele disparou** (não só “jobs em andamento” da loja inteira):
+
+- [ ] Tela **Histórico de simulações** (ex.: `/app/simulacoes/historico` ou aba em Simular).
+- [ ] Escopo: **do usuário logado** (ator/email ou `user_id` do Portal). Dono/gerente podem ter
+      filtro “só eu / toda a loja” (opcional na v1; v1 mínima = pelo menos “minhas sims”).
+- [ ] Colunas mínimas: data/hora, status, placa/CPF mascarado, prazos, bancos, atalho para o
+      resultado/job (reabrir tela de parcelas ou progresso se ainda rodando).
+- [ ] Incluir estados finais: `concluida`, `parcial`, `falhou`, `aguardando_intervencao` — não
+      só `processando`.
+- [ ] Tenancy: só sims do **cliente Motor da loja**; nunca de outro tenant.
+- [ ] Persistência: Motor já guarda `simulacoes`/`simulacao_resultados` por `cliente_id`. Falta:
+      - Motor: `GET /v1/simulacoes` com filtros (status, `desde`/`ate`, paginação) e, se possível,
+        correlacionar **ator** (quem pediu) — hoje o job pode não guardar `usuario_portal`;
+        gravar `referencia_externa` ou campo `solicitado_por` no create (Portal envia email do
+        usuário logado).
+      - Portal BFF: lista filtrada + UI.
+
+#### Ao vivo (complemento)
+
+- [ ] Lista “em andamento” (`recebida`/`processando`) com auto-refresh e link para o job.
+- [ ] Multi-banco: status por provedor na lista e no detalhe.
 - [ ] Alinhado ao Motor: multi-banco RPA = **um Playwright por banco** (ver #1A Task 12).
 
 ### Task 13 — RBAC da simulação (**feito 2026-07-13**)

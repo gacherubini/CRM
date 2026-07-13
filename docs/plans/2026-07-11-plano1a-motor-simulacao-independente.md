@@ -94,6 +94,18 @@ Estados gerais: `recebida`, `processando`, `parcial`, `concluida`, `falhou`,
 Cada resultado contém `provedor`, `status`, parcela, taxa, prazo, valor financiado, timestamps e
 `codigo_erro` estável. Mensagens técnicas e páginas bancárias nunca são devolvidas ao consumidor.
 
+### Listar (histórico / ao vivo) — **pedido dono 2026-07-13, ainda a implementar**
+
+```http
+GET /v1/simulacoes?status=&solicitado_por=&desde=&ate=&limit=&cursor=
+```
+
+- Tenancy: só jobs do `cliente_id` do token.
+- Serve o **histórico de simulações do usuário** no Portal (#3A.1 Task 16): o Portal envia o
+  e-mail/`user_id` do ator no create (`solicitado_por` ou `referencia_externa` estruturada) e
+  filtra a lista por esse campo.
+- Inclui estados finais (`concluida`/`falhou`/…) e em andamento — não só “ao vivo”.
+
 ### Outros endpoints
 
 - `POST /v1/simulacoes/{id}/cancelar`
@@ -299,8 +311,8 @@ contrato HTTP existente.
 
 **Concorrência multi-banco (dono 2026-07-13):** quando o job pede vários bancos RPA, o Motor
 abre **um browser Playwright por banco** (isolado), com teto de paralelismo no worker; API
-drivers sem browser. Portal deve listar jobs ao vivo (`recebida`/`processando`) — ver #3A.1 Task 16
-e seção “Requisitos de produto” no plano de implementação Santander.
+drivers sem browser. Portal deve ter **histórico de simulações do usuário** + jobs ao vivo —
+ver #3A.1 Task 16 (listagem `GET /v1/simulacoes` + `solicitado_por`).
 
 ## Integrações opcionais
 

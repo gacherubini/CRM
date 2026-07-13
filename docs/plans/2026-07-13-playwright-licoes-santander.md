@@ -163,11 +163,13 @@ Screenshots: `/srv/data/screenshots/` no volume do worker (`santander_inesperado
 
 ## Ordem sugerida pós-Santander
 
-1. **Pan / BV / Bradesco** — primeiro **confirmar API** com gerente; se API, implementar HTTP.  
-2. **Fontecred** — candidato Playwright se confirmar sem API.  
-3. Multi-banco paralelo no mesmo job (1 browser por provedor) + lista de jobs ao vivo no Portal.  
-4. `testar-login` real (Playwright short) no Motor.  
-5. Task 10 revenda; go-live WhatsApp em paralelo de produto.
+1. **Histórico de simulações por usuário no Portal** (#3A.1 Task 16) — listagem no Motor + UI
+   “minhas sims” (concluídas/falhas/em andamento), não só progresso do job atual.  
+2. **Pan / BV / Bradesco** — primeiro **confirmar API** com gerente; se API, implementar HTTP.  
+3. **Fontecred** — candidato Playwright se confirmar sem API.  
+4. Multi-banco paralelo no mesmo job (1 browser por provedor).  
+5. `testar-login` real (Playwright short) no Motor.  
+6. Task 10 revenda; go-live WhatsApp em paralelo de produto.
 
 ## Verificação rápida (operador)
 
