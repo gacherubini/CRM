@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+{% block title %}Acessos dos bancos — Motora{% endblock %}
+{% block content %}
+<div class="page-heading">
+  <div>
+    <span class="eyebrow">Administração</span>
+    <h1>Acessos dos bancos</h1>
+    <p>Atualize usuário e senha dos portais das financeiras sem redeploy. As senhas ficam só no Motor, cifradas — nunca voltam para esta tela.</p>
+  </div>
+</div>
+
+{% if ok == 'salvo' %}
+<div class="alert success">Credencial de <strong>{{ provedor_ok or 'provedor' }}</strong> salva. Configurado agora — a senha não é exibida.</div>
+{% endif %}
+{% if teste %}
+<div class="alert success">Teste de login em <strong>{{ provedor_ok or 'provedor' }}</strong>: {{ teste }}{% if teste == 'placeholder' %} (driver real ainda em evolução no Motor){% endif %}.</div>
+{% endif %}
+{% if erro_query == 'csrf' %}<div class="alert error">Sessão expirada. Recarregue a página e tente de novo.</div>{% endif %}
+{% if erro_query == 'campos' %}<div class="alert error">Informe usuário e senha para salvar a credencial{% if provedor_ok %} de {{ provedor_ok }}{% endif %}.</div>{% endif %}
+{% if erro_query == 'motor' %}<div class="alert error">Não foi possível falar com o Motor de Simulação. Tente mais tarde.</div>{% endif %}
+{% if erro_query == 'sem_credencial' %}<div class="alert warning">Não há credencial configurada{% if provedor_ok %} para {{ provedor_ok }}{% endif %} para testar.</div>{% endif %}
+{% if integracao_erro %}<div class="alert warning">{{ integracao_erro }}</div>{% endif %}
+
+{% if motor_configurado and credenciais %}
+<section class="panel flush">
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Financeira</th>
+          <th>Modo</th>
+          <th>Status</th>
+          <th>Última atualização</th>
+          <th>Saúde do login</th>
+          <th><span class="sr-only">Ações</span></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for c in credenciais %}
+        <tr>
+          <td>
+            <strong>{{ c.provedor }}</strong>
+            {% if c.usuario %}<small class="muted">Usuário: {{ c.usuario }}</small>{% endif %}
+          </td>
+          <td><span class="status-chip muted">{{ c.modo or '—' }}</span></td>
+          <td>
+            {% if c.senha_configurada %}
+              <span class="status disponivel">Configurado</span>
+              {% if c.senha_mascara %}<span class="muted">{{ c.senha_mascara }}</span>{% endif %}
+              {% if c.senha_antiga %}<span class="status reservado">Senha antiga (&gt;14 dias)</span>{% endif %}
+            {% else %}
+              <span class="muted">Não configurado</span>
+            {% endif %}
+          </td>
+          <td class="muted">
+            {% if c.atualizado_em %}
+              {{ formatar_horario(c.atualizado_em) }}
+            {% else %}—{% endif %}
+          </td>
+          <td>
+            {% if c.ultimo_sucesso_em %}
+              <span class="published">OK {{ formatar_horario(c.ultimo_sucesso_em) }}</span>
+            {% endif %}
+            {% if c.ultimo_erro_sanitizado %}
+              <span class="status indisponivel">{{ c.ultimo_erro_sanitizado }}</span>
+            {% endif %}
+            {% if c.falhas_login and c.falhas_login > 0 %}
+              <small class="muted">{{ c.falhas_login }} falha(s)</small>
+            {% endif %}
+            {% if not c.ultimo_sucesso_em and not c.ultimo_erro_sanitizado %}
+              <span class="muted">—</span>
+            {% endif %}
+          </td>
+          <td>
+            <details class="cred-form">
+              <summary class="table-action">Atualizar acesso</summary>
+              <form method="post" action="/app/financeiras/{{ c.provedor }}" class="stack-form" autocomplete="off">
+                <input type="hidden" name="csrf" value="{{ csrf }}">
+                <label>Usuário do portal
+                  <input type="text" name="usuario" value="" placeholder="{% if c.usuario %}atual: {{ c.usuario }}{% else %}usuário{% endif %}" required autocomplete="off">
+                </label>
+                <label>Senha do portal
+                  <input type="password" name="senha" value="" placeholder="••••••••" required autocomplete="new-password">
+                </label>
+                <p class="muted" style="font-size:11px;margin:0">A senha atual nunca é exibida. Informe a nova senha completa para rotacionar.</p>
+                <button class="button primary" type="submit">Salvar</button>
+              </form>
+              {% if c.senha_configurada %}
+              <form method="post" action="/app/financeiras/{{ c.provedor }}/testar" style="margin-top:10px">
+                <input type="hidden" name="csrf" value="{{ csrf }}">
+                <button class="button secondary" type="submit">Testar login</button>
+              </form>
+              {% endif %}
+            </details>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% elif motor_configurado and not integracao_erro %}
+<section class="panel">
+  <div class="empty">
+    <strong>Nenhum provedor retornado pelo Motor.</strong>
+    <p>Quando o Motor listar financeiras, elas aparecerão aqui para configurar acesso.</p>
+  </div>
+</section>
+{% endif %}
+{% endblock %}

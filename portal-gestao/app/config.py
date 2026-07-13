@@ -15,6 +15,13 @@ class Settings:
     estoque_token: str = os.getenv("ESTOQUE_API_TOKEN", "")
     chatbot_url: str = os.getenv("CHATBOT_API_URL", "http://chatbot-api:8000")
     chatbot_token: str = os.getenv("CHATBOT_API_TOKEN", "")
+    motor_url: str = (
+        os.getenv("MOTOR_URL")
+        or os.getenv("MOTOR_API_URL", "http://motor-simulacao:8000")
+    )
+    motor_token: str = (
+        os.getenv("MOTOR_TOKEN") or os.getenv("MOTOR_API_TOKEN", "")
+    )
     request_timeout: float = float(os.getenv("PORTAL_HTTP_TIMEOUT", "5"))
     version: str = os.getenv("PORTAL_VERSION", "0.1.0")
 

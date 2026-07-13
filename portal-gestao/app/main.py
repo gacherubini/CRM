@@ -24,6 +24,7 @@ from app.auth import (
     encerrar_sessao,
     iniciar_sessao,
     pode_confirmar_venda,
+    pode_gerir_financeiras,
     pode_gerir_metas,
     pode_gerir_estoque,
     pode_registrar_venda,
@@ -40,6 +41,7 @@ from app.clients.chatbot import (
     SimulacaoIndisponivel,
 )
 from app.clients.estoque import EstoqueClient, EstoqueIndisponivel
+from app.clients.motor import CredencialNaoEncontrada, MotorClient, MotorIndisponivel
 from app.config import settings
 from app.db import Base, engine, get_db
 
@@ -122,6 +124,58 @@ def get_estoque_client() -> EstoqueClient:
 
 def get_chatbot_client() -> ChatbotClient:
     return ChatbotClient(settings.chatbot_url, settings.chatbot_token, settings.request_timeout)
+
+
+def get_motor_client() -> MotorClient:
+    return MotorClient(settings.motor_url, settings.motor_token, settings.request_timeout)
+
+
+# Aviso de senha antiga: portais lojistas costumam rotacionar a cada ~2 semanas.
+DIAS_ALERTA_SENHA_ANTIGA = 14
+
+
+def _parse_iso_dt(valor: str | None) -> datetime | None:
+    if not valor:
+        return None
+    try:
+        return datetime.fromisoformat(valor.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+
+
+def _modo_provedor(meta: dict | None) -> str:
+    """Modo do provedor quando o Motor expõe; senão mock/api a partir de ``real``."""
+    if not meta:
+        return "—"
+    if meta.get("modo"):
+        return str(meta["modo"])
+    if "real" in meta:
+        return "api" if meta.get("real") else "mock"
+    return "—"
+
+
+def enriquecer_credenciais(
+    credenciais: list[dict], provedores: list[dict] | None = None
+) -> list[dict]:
+    """Junta máscara do Motor com metadados de provedor (modo) e flags de UI."""
+    metas = {p.get("nome"): p for p in (provedores or []) if p.get("nome")}
+    agora_utc = datetime.now()
+    itens = []
+    for raw in credenciais:
+        item = dict(raw)
+        # Defesa em profundidade: nunca repassar chave de senha em claro à UI.
+        item.pop("senha", None)
+        nome = item.get("provedor") or ""
+        meta = metas.get(nome)
+        item["modo"] = _modo_provedor(meta)
+        atualizado = _parse_iso_dt(item.get("atualizado_em"))
+        item["senha_antiga"] = False
+        if atualizado is not None:
+            # naive/aware: compara só o delta em dias
+            ref = atualizado.replace(tzinfo=None) if atualizado.tzinfo else atualizado
+            item["senha_antiga"] = (agora_utc - ref).days >= DIAS_ALERTA_SENHA_ANTIGA
+        itens.append(item)
+    return itens
 
 
 def redirecionar_login() -> RedirectResponse:
@@ -1362,6 +1416,157 @@ def financeiro_dashboard(
             origens=origens,
             filtros_funil={"vendedor": vendedor_filtro or "", "origem": origem or ""},
         ),
+    )
+
+
+@app.get("/app/financeiras", response_class=HTMLResponse)
+def financeiras_lista(
+    request: Request,
+    db: Session = Depends(get_db),
+    motor: MotorClient = Depends(get_motor_client),
+):
+    usuario = usuario_atual(request, db)
+    if not usuario:
+        return redirecionar_login()
+    if not pode_gerir_financeiras(usuario):
+        return templates.TemplateResponse(
+            "erro.html",
+            contexto(
+                request,
+                usuario,
+                erro="Você não tem permissão para gerenciar acessos das financeiras.",
+            ),
+            status_code=403,
+        )
+
+    credenciais: list[dict] = []
+    integracao_erro = None
+    motor_configurado = motor.configurado
+    if not motor_configurado:
+        integracao_erro = (
+            "Integração com o Motor de Simulação desligada. "
+            "Configure MOTOR_URL e MOTOR_TOKEN no servidor do Portal para "
+            "gerenciar acessos dos portais bancários. Nenhuma senha é "
+            "armazenada neste portal."
+        )
+    else:
+        try:
+            raw = motor.listar_credenciais(ator=usuario.email)
+            try:
+                provedores = motor.listar_provedores(ator=usuario.email)
+            except MotorIndisponivel:
+                provedores = []
+            credenciais = enriquecer_credenciais(raw, provedores)
+        except MotorIndisponivel as exc:
+            integracao_erro = str(exc)
+
+    return templates.TemplateResponse(
+        "financeiras/lista.html",
+        contexto(
+            request,
+            usuario,
+            credenciais=credenciais,
+            integracao_erro=integracao_erro,
+            motor_configurado=motor_configurado,
+            ok=request.query_params.get("ok"),
+            teste=request.query_params.get("teste"),
+            provedor_ok=request.query_params.get("provedor"),
+            erro_query=request.query_params.get("erro"),
+        ),
+    )
+
+
+@app.post("/app/financeiras/{nome}")
+async def financeiras_upsert(
+    nome: str,
+    request: Request,
+    db: Session = Depends(get_db),
+    motor: MotorClient = Depends(get_motor_client),
+):
+    usuario = usuario_atual(request, db)
+    if not usuario:
+        return redirecionar_login()
+    if not pode_gerir_financeiras(usuario):
+        return templates.TemplateResponse(
+            "erro.html",
+            contexto(
+                request,
+                usuario,
+                erro="Você não tem permissão para gerenciar acessos das financeiras.",
+            ),
+            status_code=403,
+        )
+
+    form = await request.form()
+    if not csrf_valido(request, form.get("csrf")):
+        return RedirectResponse("/app/financeiras?erro=csrf", status_code=303)
+
+    usuario_banco = (form.get("usuario") or "").strip()
+    senha_banco = form.get("senha") or ""
+    if not usuario_banco or not senha_banco:
+        return RedirectResponse(
+            f"/app/financeiras?erro=campos&provedor={nome}", status_code=303
+        )
+
+    if not motor.configurado:
+        return RedirectResponse("/app/financeiras?erro=motor", status_code=303)
+
+    try:
+        # Senha só no BFF → Motor; não logar form/body.
+        motor.upsert_credencial(
+            nome=nome,
+            usuario=usuario_banco,
+            senha=senha_banco,
+            ator=usuario.email,
+        )
+    except MotorIndisponivel:
+        return RedirectResponse("/app/financeiras?erro=motor", status_code=303)
+
+    return RedirectResponse(
+        f"/app/financeiras?ok=salvo&provedor={nome}", status_code=303
+    )
+
+
+@app.post("/app/financeiras/{nome}/testar")
+async def financeiras_testar(
+    nome: str,
+    request: Request,
+    db: Session = Depends(get_db),
+    motor: MotorClient = Depends(get_motor_client),
+):
+    usuario = usuario_atual(request, db)
+    if not usuario:
+        return redirecionar_login()
+    if not pode_gerir_financeiras(usuario):
+        return templates.TemplateResponse(
+            "erro.html",
+            contexto(
+                request,
+                usuario,
+                erro="Você não tem permissão para gerenciar acessos das financeiras.",
+            ),
+            status_code=403,
+        )
+
+    form = await request.form()
+    if not csrf_valido(request, form.get("csrf")):
+        return RedirectResponse("/app/financeiras?erro=csrf", status_code=303)
+
+    if not motor.configurado:
+        return RedirectResponse("/app/financeiras?erro=motor", status_code=303)
+
+    try:
+        resultado = motor.testar_login(nome, ator=usuario.email)
+    except CredencialNaoEncontrada:
+        return RedirectResponse(
+            f"/app/financeiras?erro=sem_credencial&provedor={nome}", status_code=303
+        )
+    except MotorIndisponivel:
+        return RedirectResponse("/app/financeiras?erro=motor", status_code=303)
+
+    status_teste = resultado.get("status") or "ok"
+    return RedirectResponse(
+        f"/app/financeiras?teste={status_teste}&provedor={nome}", status_code=303
     )
 
 

@@ -10,6 +10,8 @@ services:
       ESTOQUE_API_TOKEN: ${ESTOQUE_API_TOKEN:-}
       CHATBOT_API_URL: ${CHATBOT_API_URL:-http://host.docker.internal:8001}
       CHATBOT_API_TOKEN: ${CHATBOT_API_TOKEN:-}
+      MOTOR_URL: ${MOTOR_URL:-http://host.docker.internal:8000}
+      MOTOR_TOKEN: ${MOTOR_TOKEN:-}
     ports:
       - "9000:9000"
     volumes:

@@ -81,3 +81,8 @@ def pode_ver_financeiro(usuario: Usuario) -> bool:
 
 def pode_gerir_metas(usuario: Usuario) -> bool:
     return usuario.papel in {"dono", "gerente"}
+
+
+def pode_gerir_financeiras(usuario: Usuario) -> bool:
+    """Acessos de portais bancários: só dono/gerente (nunca vendedor)."""
+    return usuario.papel in {"dono", "gerente"}

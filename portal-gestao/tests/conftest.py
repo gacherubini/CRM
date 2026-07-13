@@ -17,8 +17,9 @@ from app.clients.chatbot import (  # noqa: E402
     LeadNaoEncontrado,
     SimulacaoIndisponivel,
 )
+from app.clients.motor import CredencialNaoEncontrada, MotorIndisponivel  # noqa: E402
 from app.db import Base, SessionLocal, engine  # noqa: E402
-from app.main import app, get_chatbot_client, get_estoque_client  # noqa: E402
+from app.main import app, get_chatbot_client, get_estoque_client, get_motor_client  # noqa: E402
 from app.models import Usuario  # noqa: E402
 
 
@@ -188,6 +189,136 @@ def chatbot_fake():
     app.dependency_overrides.pop(get_chatbot_client, None)
 
 
+class MotorFake:
+    """Motor de simulação fake: credenciais mascaradas, sem senha em claro."""
+
+    def __init__(self, configurado=True):
+        self._configurado = configurado
+        self.indisponivel = False
+        self.upserts = []
+        self.testes = []
+        self.atores = []
+        self.credenciais = [
+            {
+                "provedor": "Pan",
+                "usuario": "loja42",
+                "senha_configurada": True,
+                "senha_mascara": "****",
+                "habilitado": True,
+                "atualizado_em": "2026-07-10T12:00:00+00:00",
+                "ultimo_sucesso_em": "2026-07-11T09:00:00+00:00",
+                "ultimo_erro_sanitizado": None,
+                "falhas_login": 0,
+                # Campo malicioso: se o Motor um dia vazar, a UI não deve ecoar.
+                "senha": "SENHA-SECRETA-NUNCA-NO-HTML",
+            },
+            {
+                "provedor": "Santander",
+                "usuario": None,
+                "senha_configurada": False,
+                "senha_mascara": None,
+                "habilitado": False,
+                "atualizado_em": None,
+                "ultimo_sucesso_em": None,
+                "ultimo_erro_sanitizado": None,
+                "falhas_login": 0,
+            },
+        ]
+        self.provedores = [
+            {"nome": "Pan", "habilitado": True, "real": False, "modo": "mock"},
+            {"nome": "Santander", "habilitado": True, "real": False, "modo": "mock"},
+        ]
+
+    @property
+    def configurado(self) -> bool:
+        return self._configurado
+
+    def listar_provedores(self, ator=None):
+        if self.indisponivel:
+            raise MotorIndisponivel("Não foi possível acessar o Motor de Simulação agora")
+        if ator:
+            self.atores.append(("listar_provedores", ator))
+        return list(self.provedores)
+
+    def listar_credenciais(self, ator=None):
+        if self.indisponivel:
+            raise MotorIndisponivel("Não foi possível acessar o Motor de Simulação agora")
+        if ator:
+            self.atores.append(("listar_credenciais", ator))
+        return [dict(c) for c in self.credenciais]
+
+    def upsert_credencial(self, nome, usuario, senha, ator, habilitado=True):
+        if self.indisponivel:
+            raise MotorIndisponivel("Não foi possível acessar o Motor de Simulação agora")
+        self.upserts.append(
+            {
+                "nome": nome,
+                "usuario": usuario,
+                "senha": senha,
+                "ator": ator,
+                "habilitado": habilitado,
+            }
+        )
+        self.atores.append(("upsert", ator))
+        for item in self.credenciais:
+            if item["provedor"] == nome:
+                item.update(
+                    {
+                        "usuario": usuario,
+                        "senha_configurada": True,
+                        "senha_mascara": "****",
+                        "habilitado": habilitado,
+                        "atualizado_em": "2026-07-13T15:00:00+00:00",
+                    }
+                )
+                return {
+                    "provedor": nome,
+                    "usuario": usuario,
+                    "senha_configurada": True,
+                    "senha_mascara": "****",
+                    "habilitado": habilitado,
+                    "atualizado_em": item["atualizado_em"],
+                    "ultimo_sucesso_em": item.get("ultimo_sucesso_em"),
+                    "ultimo_erro_sanitizado": item.get("ultimo_erro_sanitizado"),
+                    "falhas_login": item.get("falhas_login", 0),
+                }
+        novo = {
+            "provedor": nome,
+            "usuario": usuario,
+            "senha_configurada": True,
+            "senha_mascara": "****",
+            "habilitado": habilitado,
+            "atualizado_em": "2026-07-13T15:00:00+00:00",
+            "ultimo_sucesso_em": None,
+            "ultimo_erro_sanitizado": None,
+            "falhas_login": 0,
+        }
+        self.credenciais.append(novo)
+        return dict(novo)
+
+    def testar_login(self, nome, ator):
+        if self.indisponivel:
+            raise MotorIndisponivel("Não foi possível acessar o Motor de Simulação agora")
+        self.testes.append({"nome": nome, "ator": ator})
+        self.atores.append(("testar", ator))
+        for item in self.credenciais:
+            if item["provedor"] == nome and item.get("senha_configurada"):
+                return {
+                    "provedor": nome,
+                    "status": "placeholder",
+                    "detalhe": "Teste real de login disponível a partir do driver da Task 12.",
+                }
+        raise CredencialNaoEncontrada("credencial não configurada")
+
+
+@pytest.fixture
+def motor_fake():
+    fake = MotorFake(configurado=True)
+    app.dependency_overrides[get_motor_client] = lambda: fake
+    yield fake
+    app.dependency_overrides.pop(get_motor_client, None)
+
+
 @pytest.fixture(autouse=True)
 def banco_limpo():
     Base.metadata.drop_all(bind=engine)
@@ -204,7 +335,7 @@ def estoque_fake():
 
 
 @pytest.fixture
-def client(estoque_fake, chatbot_fake):
+def client(estoque_fake, chatbot_fake, motor_fake):
     with TestClient(app) as cliente:
         yield cliente
 
