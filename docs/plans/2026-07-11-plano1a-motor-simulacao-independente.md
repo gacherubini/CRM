@@ -2,9 +2,11 @@
 
 > Plano válido do Motor. O #1 monolítico está em `docs/plans/_archive/` (não executar).
 >
-> **Status 2026-07-12:** mock async, auth/tenancy, worker/lease, cifra — **entregues**.
-> **Aberto:** Task 10 (revenda), 11 (credenciais por provedor + rotação), 12 (1º driver `real: true`,
-> híbrido API/Playwright). Contrato JSON ainda com `renda`/`prazo_meses`; alvo WhatsApp em #4A.
+> **Status 2026-07-13:** mock async, auth/tenancy, worker/lease, cifra e **Task 11 (credenciais por
+> provedor + rotação)** — **entregues**. **Aberto:** Task 10 (revenda), Task 12 (1º driver `real: true`).
+> **Task 12 tem design + plano + recon próprios:** `2026-07-13-plano1a-task12-santander-design.md`,
+> `...-santander-implementacao.md`, `...-bancos-reconhecimento.md` (piloto Santander/Playwright; princípio
+> API-first para os demais). Contrato JSON ainda com `renda`/`prazo_meses`; extensão está no plano da Task 12.
 
 **Goal:** Entregar uma API de simulação instalável e vendável separadamente, capaz de operar com
 mock agora e drivers bancários depois, sem depender de WhatsApp, n8n, Portal, Estoque ou Chatbot.
@@ -283,6 +285,10 @@ semanas e fluxo via Portal.
 GET não vaza senha; auditoria registra o ator.
 
 ### Task 12: Drivers reais (híbrido) — piloto
+
+> **Detalhado em** `2026-07-13-plano1a-task12-santander-design.md` (design) + `...-santander-implementacao.md`
+> (plano Fase 1, 11 tasks TDD) + `...-bancos-reconhecimento.md` (mapa por banco). Piloto: Santander via
+> Playwright; princípio **API-first** (Pan/BV/Bradesco provavelmente têm API → `ApiBankDriver`).
 
 Implementar o **primeiro** driver real (API se houver contrato, senão Playwright) com
 `real: true`, timeout, resultado parcial e falha sanitizada. Demais bancos em incrementos

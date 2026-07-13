@@ -20,17 +20,28 @@ Cada plano `*A`/`*B` tem bloco **Status 2026-07-12** no topo: leia antes de reim
 | Ordem | Plano | Produto | Status resumido |
 |---:|---|---|---|
 | 0 | [Plano #0](2026-07-11-plano0-fundacao-core-dominio-seguranca.md) | Contratos e segurança | Fundação — decisões ainda válidas |
-| 1 | [Plano #1A](2026-07-11-plano1a-motor-simulacao-independente.md) | Motor de Simulação | Demo mock; híbrido API+Playwright planejado; falta Task 10–12 + credenciais |
-| 2 | [Plano #4A](2026-07-11-plano4a-estoque-api-independente.md) | Estoque API/admin | Operacional; falta outbox E2E/restore |
+| 1 | [Plano #1A](2026-07-11-plano1a-motor-simulacao-independente.md) | Motor de Simulação | Demo mock; **Task 11 (credenciais) feita**; falta Task 10 e Task 12 (1º driver real — ver sub-planos abaixo) |
+| 2 | [Plano #4A](2026-07-11-plano4a-estoque-api-independente.md) | Estoque API/admin | Operacional; **placa + por-placa feitos**; falta placa na admin HTMX, outbox E2E/restore |
 | 3 | [Plano #2A](2026-07-11-plano2a-chatbot-standalone-revendivel.md) | Chatbot + Estoque Lite | Código pronto; bot off; go-live pendente |
 | 4 | [Plano #5A](2026-07-11-plano5a-catalogo-publico-independente.md) | Catálogo Público | 1º incremento entregue; residual SEO/tema |
 | 5 | [Plano #3A](2026-07-11-plano3a-portal-vendedor-independente.md) | Portal/CRM | Base entregue via #3A.1 |
-| 5.1 | [Plano #3A.1](2026-07-11-plano3a1-frontend-dashboard-mvp.md) | Frontend Dashboard MVP | MVP quase fechado; falta Playwright e RBAC sim. vendedor |
+| 5.1 | [Plano #3A.1](2026-07-11-plano3a1-frontend-dashboard-mvp.md) | Frontend Dashboard MVP | MVP quase fechado; **RBAC sim. vendedor feito**; falta Playwright E2E |
 | 6 | [Plano #3B](2026-07-11-plano3b-dashboard-dono-vendas-metas.md) | Vendas/metas/dono | Parcial (vendas, financeiro, metas loja) |
 | futuro | [Plano #6](2026-07-11-plano6-evolucoes-roadmap.md) | Roadmap add-ons | Não iniciado |
 
 Planos #1A e #4A podem avançar em paralelo após #0. #2A depende da fatia Lite do #4A.
 Numeração é histórica; não obriga Portal antes de Estoque/Catálogo.
+
+### Sub-planos da #1A Task 12 (driver real de simulação)
+
+Detalham a Task 12 do #1A (1º driver `real: true`). Ler junto com o #1A:
+
+- [Design/spec](2026-07-13-plano1a-task12-santander-design.md) — arquitetura, princípio **API-first**,
+  base reutilizável, riscos ToS/fragilidade. **Aprovado pelo dono 2026-07-13.**
+- [Plano de implementação — Fase 1 (Motor)](2026-07-13-plano1a-task12-santander-implementacao.md) —
+  11 tasks TDD; piloto Santander via Playwright. **Não iniciado** (aguarda verificação de APIs).
+- [Mapa dos bancos (reconhecimento)](2026-07-13-plano1a-task12-bancos-reconhecimento.md) — API vs
+  Playwright por banco; Pan/BV/Bradesco **provavelmente têm API** (a confirmar com os bancos).
 
 ## Pacotes comerciais
 

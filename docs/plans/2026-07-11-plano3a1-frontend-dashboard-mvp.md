@@ -29,7 +29,7 @@ Browser → sessão/cookie → Portal BFF
 | 1–5 | Scaffold, auth, clients HTTP, design system | **Feito** |
 | 6–9 | Visão geral + estoque (lista/CRUD/publicar) | **Feito** |
 | 10–12 | Leads, endpoints conversas no Chatbot, handoff UI | **Feito** |
-| 13 | Simulação manual | **Parcial** — form existe; liberar `vendedor` no RBAC + testes (decisão de produto) |
+| 13 | Simulação manual | **Feito** (2026-07-13) — `vendedor` libera via RBAC; whitelist `simulacao_sem_dados_sensiveis` esconde custo/lucro/tokens |
 | 14 | Docker / compose portal | **Feito** (ajustar se faltar standalone empacotado) |
 | 15 | Playwright E2E | **Aberto** |
 
@@ -58,5 +58,5 @@ Vendas, lucro, metas, funil, campanhas, CSV, equipe/config — ver #3B e handoff
 - [x] Login, sessão, RBAC/tenancy e estoque via API.
 - [x] Leads e conversas/handoff reais.
 - [x] Tokens não no navegador (padrão BFF).
-- [ ] Simulação autorizada ao vendedor sem dados sensíveis.
+- [x] Simulação autorizada ao vendedor sem dados sensíveis. (2026-07-13)
 - [ ] Playwright E2E dos fluxos acima.

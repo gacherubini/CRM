@@ -3,9 +3,10 @@
 > **Primeira fatia válida do Portal de Gestão.** Não acessa o banco do Chatbot, Motor ou Estoque.
 > O pacote comercial do Dashboard inclui a Estoque API e a administra exclusivamente por contrato.
 >
-> **Status 2026-07-12:** base + #3A.1 em grande parte entregues (ver #3A.1 para checklist).
-> **Aberto relevante:** Task **9A** (acessos das financeiras — depende Motor Task 11); RBAC simulação
-> para vendedor (#3A.1 Task 13); equipe/config se ainda placeholder.
+> **Status 2026-07-13:** base + #3A.1 em grande parte entregues (ver #3A.1 para checklist);
+> **RBAC simulação para vendedor (#3A.1 Task 13) entregue**.
+> **Aberto relevante:** Task **9A** (UI de acessos das financeiras) — **desbloqueada**: o Motor Task 11
+> (API de credenciais) já existe; equipe/config se ainda placeholder.
 
 **Goal:** Entregar um portal revendível em que a loja administra usuários e vendedores, organiza
 leads, registra atividades e administra o estoque incluído; Chatbot e Motor são opcionais.

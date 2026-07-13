@@ -1,7 +1,7 @@
 # Mapa dos bancos — reconhecimento e caminho por banco
 
 > Situação de cada banco para o driver real de simulação (#1A Task 12+).
-> Complementa `2026-07-13-driver-real-santander-design.md`. Data: 2026-07-13.
+> Complementa `2026-07-13-plano1a-task12-santander-design.md`. Data: 2026-07-13.
 > **Não** é plano de implementação: cada banco ganha o seu quando for atacado (fluxo mapeado via codegen).
 
 ## Princípio (repetido do design)

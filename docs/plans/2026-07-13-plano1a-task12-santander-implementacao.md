@@ -15,7 +15,7 @@
 - **Nunca** ler/imprimir/logar `.env`, `MOTOR_ENCRYPTION_KEY`, credenciais ou `storage_state`.
 - Integrações entre produtos só por HTTP; esta fase é **só Motor**.
 - Simulação com nomes de banco no mock = **fictícia**. Driver real só com `real: true` + credencial.
-- Playwright é **último recurso** (só porque o Santander não tem API) — ver spec `docs/superpowers/specs/2026-07-13-driver-real-santander-design.md`.
+- Playwright é **último recurso** (só porque o Santander não tem API) — ver design `docs/plans/2026-07-13-plano1a-task12-santander-design.md`.
 - Compat retroativa: o mock e o contrato antigo (`prazo_meses` único) continuam funcionando.
 - TDD: teste falha → implementação mínima → teste passa → commit. Commits frequentes.
 
