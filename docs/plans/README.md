@@ -13,21 +13,21 @@
 - `docs/design.md` e trechos antigos do `README.md` raiz (pesquisa/histórico; podem citar
   consentimento obrigatório, renda/prazo e RPA-only — **superados** por este índice + #1A/#2A/#4A)
 
-Cada plano `*A`/`*B` tem bloco **Status 2026-07-12** no topo: leia antes de reimplementar.
+Cada plano `*A`/`*B` tem bloco **Status** no topo: leia antes de reimplementar.
 
 ## Ordem válida de implementação
 
 | Ordem | Plano | Produto | Status resumido |
 |---:|---|---|---|
 | 0 | [Plano #0](2026-07-11-plano0-fundacao-core-dominio-seguranca.md) | Contratos e segurança | Fundação — decisões ainda válidas |
-| 1 | [Plano #1A](2026-07-11-plano1a-motor-simulacao-independente.md) | Motor de Simulação | Demo mock; **Task 11 (credenciais) feita**; falta Task 10 e Task 12 (1º driver real — ver sub-planos abaixo) |
-| 2 | [Plano #4A](2026-07-11-plano4a-estoque-api-independente.md) | Estoque API/admin | Operacional; **placa + por-placa feitos**; falta placa na admin HTMX, outbox E2E/restore |
-| 3 | [Plano #2A](2026-07-11-plano2a-chatbot-standalone-revendivel.md) | Chatbot + Estoque Lite | Código pronto; bot off; go-live pendente |
-| 4 | [Plano #5A](2026-07-11-plano5a-catalogo-publico-independente.md) | Catálogo Público | 1º incremento entregue; residual SEO/tema |
-| 5 | [Plano #3A](2026-07-11-plano3a-portal-vendedor-independente.md) | Portal/CRM | Base entregue via #3A.1 |
-| 5.1 | [Plano #3A.1](2026-07-11-plano3a1-frontend-dashboard-mvp.md) | Frontend Dashboard MVP | MVP quase fechado; **RBAC sim. vendedor feito**; falta Playwright E2E |
-| 6 | [Plano #3B](2026-07-11-plano3b-dashboard-dono-vendas-metas.md) | Vendas/metas/dono | Parcial (vendas, financeiro, metas loja) |
-| futuro | [Plano #6](2026-07-11-plano6-evolucoes-roadmap.md) | Roadmap add-ons | Não iniciado |
+| 1 | [Plano #1A](2026-07-11-plano1a-motor-simulacao-independente.md) | Motor de Simulação | Mock + **Task 11 credenciais**; falta T10 revenda e **T12 driver real** |
+| 2 | [Plano #4A](2026-07-11-plano4a-estoque-api-independente.md) | Estoque API/admin | Operacional; placa+por-placa+**admin HTMX**; falta E2E outbox/restore |
+| 3 | [Plano #2A](2026-07-11-plano2a-chatbot-standalone-revendivel.md) | Chatbot + Estoque Lite | API+E3+E5+por-placa+sim multi-prazo+n8n tools; bot **off** (go-live) |
+| 4 | [Plano #5A](2026-07-11-plano5a-catalogo-publico-independente.md) | Catálogo Público | Vitrine+funil+**Pixel browser**; residual SEO/tema/containers |
+| 5 | [Plano #3A](2026-07-11-plano3a-portal-vendedor-independente.md) | Portal/CRM | Base + **Task 9A financeiras feita** |
+| 5.1 | [Plano #3A.1](2026-07-11-plano3a1-frontend-dashboard-mvp.md) | Frontend Dashboard MVP | MVP fechado exceto Playwright E2E |
+| 6 | [Plano #3B](2026-07-11-plano3b-dashboard-dono-vendas-metas.md) | Vendas/metas/dono | Parcial; Purchase CAPI no confirm (E10) |
+| 6+ | [Plano #6](2026-07-11-plano6-evolucoes-roadmap.md) | Roadmap add-ons | **E3, E5, E10 feitos (MVP)**; resto aberto |
 
 Planos #1A e #4A podem avançar em paralelo após #0. #2A depende da fatia Lite do #4A.
 Numeração é histórica; não obriga Portal antes de Estoque/Catálogo.
@@ -39,18 +39,18 @@ Detalham a Task 12 do #1A (1º driver `real: true`). Ler junto com o #1A:
 - [Design/spec](2026-07-13-plano1a-task12-santander-design.md) — arquitetura, princípio **API-first**,
   base reutilizável, riscos ToS/fragilidade. **Aprovado pelo dono 2026-07-13.**
 - [Plano de implementação — Fase 1 (Motor)](2026-07-13-plano1a-task12-santander-implementacao.md) —
-  11 tasks TDD; piloto Santander via Playwright. **Não iniciado** (aguarda verificação de APIs).
+  11 tasks TDD; piloto Santander via Playwright. **Não iniciado.**
 - [Mapa dos bancos (reconhecimento)](2026-07-13-plano1a-task12-bancos-reconhecimento.md) — API vs
   Playwright por banco; Pan/BV/Bradesco **provavelmente têm API** (a confirmar com os bancos).
 
 ## Pacotes comerciais
 
-- **Chatbot Atendimento:** #2A + Estoque Lite.
-- **Chatbot Financiamento:** #2A + provider do #1A.
+- **Chatbot Atendimento:** #2A + Estoque Lite (+ E5 cadastro WA).
+- **Chatbot Financiamento:** #2A + provider do #1A (+ por-placa/sim).
 - **Motor / Estoque / Catálogo conectado:** cada um sozinho (#1A / #4A / #5A→Estoque).
-- **Catálogo Standalone:** #5A + operação mínima #4A.
-- **Portal do Vendedor:** #3A + Estoque; Bot/Motor opcionais.
-- **Gestão completa:** #3A + #3B + Estoque (± Bot/Motor/Catálogo).
+- **Catálogo Standalone:** #5A + operação mínima #4A (± Pixel env).
+- **Portal do Vendedor:** #3A + Estoque; Bot/Motor opcionais; 9A se Motor.
+- **Gestão completa:** #3A + #3B + Estoque (± Bot/Motor/Catálogo/E10).
 
 ## Arquivo (não executar)
 

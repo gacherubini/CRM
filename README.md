@@ -4,8 +4,9 @@ Bot de WhatsApp para revenda de motos que conversa com o cliente, coleta os dado
 necessários e devolve simulações de financiamento de vários bancos (parcela, taxa,
 nº de parcelas) de forma organizada.
 
-> **Status:** 🟢 Arquitetura e planos independentes revisados — pronto para iniciar a implementação pelo Plano #0/#1A.
-> Documento de design completo em [`docs/design.md`](docs/design.md).
+> **Status:** 🟢 MVP em grande parte **implementado** (~90% demo). Estado canônico:
+> [`docs/contexto-compacto.md`](docs/contexto-compacto.md) · planos em [`docs/plans/README.md`](docs/plans/README.md).
+> Design histórico: [`docs/design.md`](docs/design.md) (pode divergir — prevalece contexto + planos `*A`).
 
 ---
 
@@ -139,15 +140,14 @@ real é **RPA** (automatizar os portais com Playwright). Agregador pago fica com
 
 ## 🚀 Roadmap (MVP em fases)
 
-- [ ] **Fundação** — domínio, contratos v1, multi-loja, papéis e segurança (Plano #0).
-- [ ] **Fase 0** — WhatsApp ↔ n8n conversando com eventos idempotentes.
-- [ ] **Fase 1** ⭐ — Fluxo conversacional + consentimento + **simulação MOCK** + lead.
-- [ ] **Fase 2** — Estoque, catálogo público e portal mínimo do vendedor.
-- [ ] **Fase 3** — Vendas, metas e dashboard do dono.
-- [ ] **Fase 4** — Plugar **1 driver bancário real** com execução assíncrona.
-- [ ] **Fase 5** — Campanhas, atribuição de origem e integrações de marketing.
+- [x] **Fundação** — domínio, contratos v1, multi-loja, papéis e segurança (Plano #0).
+- [x] **Fase 0/1** — Chatbot API + n8n tools + simulação **MOCK** + lead/handoff (bot off até go-live).
+- [x] **Fase 2** — Estoque, catálogo público, portal vendedor, placa CRM, E3/E5.
+- [x] **Fase 3 (parcial)** — Vendas, metas loja, funil, Task 9A financeiras, E10 Pixel Meta.
+- [ ] **Fase 4** — Plugar **1 driver bancário real** (Task 12 — design pronto, código não).
+- [ ] **Fase 5** — Campanhas/ROI (E8), go-live WhatsApp em produção, polish revenda.
 
-A **Fase 1 é o coração**, mas começa somente depois das decisões obrigatórias do Plano #0.
+Estado detalhado: `docs/handoff-contexto.md`.
 
 ---
 

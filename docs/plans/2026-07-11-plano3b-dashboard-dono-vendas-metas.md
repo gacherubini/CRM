@@ -1,9 +1,9 @@
 # Plano #3B — Dashboard do Dono, Vendas e Metas
 
-> **Pré-requisito:** #3A. **Status 2026-07-12:** Tasks 1–3 e 6–7 parciais entregues (vendas, custos,
-> metas de loja, `/app/financeiro`, `/app/vendedor`, funil inicial). Aberto: metas por vendedor UI,
-> eventos externos de handoff, campanhas, CSV, reconciliação E2E (Tasks 4–5, 8–10).
-> Credenciais de banco/portal ficam no **#3A Task 9A** + Motor #1A, não neste plano.
+> **Pré-requisito:** #3A. **Status 2026-07-13:** Tasks 1–3 e 6–7 parciais entregues (vendas, custos,
+> metas de loja, `/app/financeiro`, `/app/vendedor`, funil). **E10:** confirmar venda dispara
+> Purchase CAPI (outbox; não bloqueia venda). Credenciais de banco = **#3A Task 9A** (feita) + Motor.
+> **Aberto:** metas por vendedor UI, campanhas, CSV, reconciliação E2E, equipe/config (Tasks 4–5, 8–10).
 > Não inferir venda/lucro só a partir de mensagens/leads.
 
 **Goal:** Dar ao dono e gerente visão confiável de vendas, metas, desempenho dos vendedores,

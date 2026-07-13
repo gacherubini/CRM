@@ -2,9 +2,10 @@
 
 > Plano válido do Catálogo. #5 legado em `_archive/` (não executar). Sem acesso a banco de outro produto.
 >
-> **Status 2026-07-12:** 1º incremento vertical **entregue** (vitrine, detalhe, CTA `wa.me`+`CAT-*`,
-> outbox, deploy conectado, testes). **Aberto:** E2E env outbox no deploy; tema/SEO/cache/rate limit;
-> compose standalone completo; retenção.
+> **Status 2026-07-13:** 1º incremento vertical **entregue** (vitrine, detalhe, CTA `wa.me`+`CAT-*`,
+> outbox, deploy conectado, wiring funil + E2E entrega). **Pixel Meta browser** (env `META_PIXEL_ID`:
+> PageView + Lead com `event_id` no CTA) — parte do E10. **Aberto:** validar funil/pixel em
+> containers reais; tema/SEO/cache/rate limit; compose standalone; retenção; sync Pixel ID com Portal.
 
 **Goal:** Entregar uma vitrine pública por loja, rápida e personalizada, com estoque publicado,
 página de veículo e interesse via WhatsApp, vendável sem Portal, Chatbot ou Motor.

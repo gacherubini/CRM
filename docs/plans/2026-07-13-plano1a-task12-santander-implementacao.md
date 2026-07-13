@@ -1,5 +1,8 @@
 # Driver Real Santander — Fase 1 (Motor) — Implementation Plan
 
+> **Status 2026-07-13:** design aprovado; **implementação NÃO iniciada** (nenhuma task TDD marcada).
+> Pré-requisitos OK: Motor Task 11 credenciais + Portal Task 9A UI.
+>
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Adicionar o 1º driver de simulação `real: true` — Santander via Playwright, multi-prazo — plugado no motor de drivers existente, sem quebrar o mock.

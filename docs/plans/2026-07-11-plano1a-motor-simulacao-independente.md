@@ -3,10 +3,11 @@
 > Plano válido do Motor. O #1 monolítico está em `docs/plans/_archive/` (não executar).
 >
 > **Status 2026-07-13:** mock async, auth/tenancy, worker/lease, cifra e **Task 11 (credenciais por
-> provedor + rotação)** — **entregues**. **Aberto:** Task 10 (revenda), Task 12 (1º driver `real: true`).
-> **Task 12 tem design + plano + recon próprios:** `2026-07-13-plano1a-task12-santander-design.md`,
-> `...-santander-implementacao.md`, `...-bancos-reconhecimento.md` (piloto Santander/Playwright; princípio
-> API-first para os demais). Contrato JSON ainda com `renda`/`prazo_meses`; extensão está no plano da Task 12.
+> provedor + rotação)** — **entregues**. Portal **Task 9A** consome a API (**UI feita**).
+> **Aberto:** Task 10 (revenda), Task 12 (1º driver `real: true` — **código não iniciado**).
+> **Task 12 tem design + plano + recon:** `2026-07-13-plano1a-task12-santander-design.md`,
+> `...-santander-implementacao.md`, `...-bancos-reconhecimento.md` (piloto Santander/Playwright;
+> API-first para os demais). Motor ainda 1 `prazo_meses`/job; Chatbot agrega multi-prazo no cliente.
 
 **Goal:** Entregar uma API de simulação instalável e vendável separadamente, capaz de operar com
 mock agora e drivers bancários depois, sem depender de WhatsApp, n8n, Portal, Estoque ou Chatbot.

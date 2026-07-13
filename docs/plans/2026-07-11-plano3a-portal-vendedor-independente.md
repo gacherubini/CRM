@@ -3,10 +3,9 @@
 > **Primeira fatia válida do Portal de Gestão.** Não acessa o banco do Chatbot, Motor ou Estoque.
 > O pacote comercial do Dashboard inclui a Estoque API e a administra exclusivamente por contrato.
 >
-> **Status 2026-07-13:** base + #3A.1 em grande parte entregues (ver #3A.1 para checklist);
-> **RBAC simulação para vendedor (#3A.1 Task 13) entregue**.
-> **Aberto relevante:** Task **9A** (UI de acessos das financeiras) — **desbloqueada**: o Motor Task 11
-> (API de credenciais) já existe; equipe/config se ainda placeholder.
+> **Status 2026-07-13:** base + #3A.1 entregues; **RBAC sim. vendedor (Task 13) feito**;
+> **Task 9A** UI `/app/financeiras` (BFF → Motor credenciais) **feita**.
+> **Aberto:** equipe/config real (ainda placeholder), Playwright E2E (#3A.1 Task 15).
 
 **Goal:** Entregar um portal revendível em que a loja administra usuários e vendedores, organiza
 leads, registra atividades e administra o estoque incluído; Chatbot e Motor são opcionais.
@@ -113,6 +112,9 @@ Dono/gerente cadastram vendedores, desativam usuários, configuram etapas, distr
 horários e integrações. Segredos nunca voltam completos para a interface.
 
 ### Task 9A: Acessos das financeiras (rotação de senha)
+
+> **Status: FEITA (2026-07-13).** UI `/app/financeiras`, client Motor, testes `test_financeiras.py`.
+> Vendedor 403; senha nunca reexibida; env `MOTOR_URL`/`MOTOR_TOKEN`.
 
 As senhas dos portais lojistas mudam com frequência (ex. **a cada ~2 semanas**). O Dashboard
 precisa permitir atualizar sem redeploy e sem abrir ticket técnico.

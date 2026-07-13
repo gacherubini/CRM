@@ -7,6 +7,10 @@
 > **Natureza deste documento:** diferente dos Planos #1–#5, este é um **roadmap** de evoluções
 > futuras — cada item é um esboço de abordagem, não uma sequência de tarefas TDD. Quando um item
 > for priorizado, ele vira um plano completo próprio (via a skill de escrita de planos).
+>
+> **Status 2026-07-13:** **E3** (auto-pausa), **E5** (cadastro WA, fase 1 texto) e **E10** (Pixel Meta
+> MVP: aba Tráfego + CAPI Purchase + pixel catálogo) — **entregues em código**. Restante do roadmap
+> **não iniciado** (E1 áudio, E2 score, E4 multi-agente, E6 fotos, E7–E9).
 
 **Origem:** recursos observados em uma plataforma de referência madura (prints do usuário) que
 fazem sentido depois dos produtos-base relevantes estarem de pé.
@@ -72,6 +76,9 @@ opcional sem quebrar quem não usa. Credenciais de portal: UI no Portal (#3A Tas
 
 ## E3 — Auto-pausa ao detectar o atendente
 
+> **Status: FEITA (2026-07-13) — MVP.** `from_me`+`origem_bot`, ignore ack/status, n8n Extrair/Gate,
+> testes handoff. Fase 2 opcional (reativar após X h silêncio) **não** feita.
+
 **O que é:** completar o handoff (Plano #2A Task 7) para **pausar sozinho** quando o atendente
 responde manualmente pelo WhatsApp — sem precisar clicar no portal. Deve funcionar inclusive no
 **Chatbot Standalone** (sem Portal); o Portal continua podendo assumir/devolver manualmente.
@@ -130,6 +137,9 @@ agentes especializados: `financiamento`, `vendas`, `test_drive`, `grupos`, etc.
 ---
 
 ## E5 — Cadastro de veículo via WhatsApp
+
+> **Status: FEITA (2026-07-13) — fase 1 texto.** `POST /v1/operacao/veiculos`, números autorizados,
+> CLI, tool n8n `cadastrar_veiculo1`. Foto real WhatsApp = **E6** (só `foto_url` opcional agora).
 
 **O que é:** o dono/vendedor **adiciona um veículo ao estoque mandando mensagem** para o bot (texto e,
 se possível, foto) — equivalente ao "Adiciona Veículo BD - Whatsapp" da referência.
@@ -237,6 +247,9 @@ provar impacto em venda.
 
 ## E10 — Pixel Meta / aba Tráfego (eventos de conversão)
 
+> **Status: FEITA (2026-07-13) — MVP.** Portal `/app/trafego` + CAPI Purchase no confirm venda +
+> catálogo PageView/Lead. Residual: retry worker outbox, sync Pixel ID, phone hash, toggles no catálogo.
+
 **O que é:** dono/gerente configura no **Portal** uma aba **Tráfego** para o **Pixel da Meta**
 (Facebook/Instagram Ads) e dispara eventos de conversão — sobretudo **venda** — para medir e otimizar
 anúncios. **MVP: só Meta.**
@@ -298,15 +311,20 @@ importado (→ **E8**).
 
 ## Ordem sugerida de ataque (depois do MVP)
 
-1. **E3** (auto-pausa) — completa o handoff standalone.
-2. **E1** (áudio) — grande ganho de UX real.
-3. **E6** (upload real de fotos) — quando o Catálogo entrar em produção.
-4. **E10** (Pixel Meta / aba Tráfego) — conversão básica (Lead/Purchase) para a Meta otimizar.
-5. **E8** (atribuição de campanhas) — importa custo e fecha origem→lead→venda; depende do E10.
-6. **E2** (score) — junto do primeiro fluxo bancário real e contrato com bureau.
-7. **E7** (analytics avançado) — quando relatórios básicos não bastarem.
-8. **E5 / E4** (cadastro via WhatsApp / multi-agente) — quando a operação pedir.
-9. **E9** (redes sociais e tráfego) — somente após medir origem → lead → venda.
+| # | Item | Status 2026-07-13 |
+|---:|---|---|
+| — | **E3** auto-pausa | **Feito** (API + n8n Extrair/Gate + docs go-live) |
+| — | **E5** cadastro WhatsApp fase 1 | **Feito** (API/CLI + tool n8n; foto = E6) |
+| — | **E10** Pixel Meta MVP | **Feito** (Portal Tráfego + CAPI + catálogo browser) |
+| 1 | **E1** áudio | Aberto |
+| 2 | **E6** upload fotos | Aberto (desbloqueia foto no E5) |
+| 3 | **E8** atribuição campanhas / ROI | Aberto (E10 é pré-requisito de conversão) |
+| 4 | **E2** score | Aberto (com driver real + contrato bureau) |
+| 5 | **E7** analytics avançado | Aberto |
+| 6 | **E4** multi-agente | Aberto |
+| 7 | **E9** redes sociais | Aberto (depois de medir origem→venda) |
 
-> **Exceção Chatbot-only:** para quem paga só o Chatbot Standalone, **E5 (cadastro por WhatsApp)** é
-> caminho de **dia 1** (único jeito de cadastrar estoque sem Portal), não fim de fila.
+**Evoluções E10 residual:** worker retry outbox CAPI; hash telefone no Purchase; sync Pixel ID
+Portal↔Catálogo; toggles PageView/Lead lidos pelo catálogo.
+
+> **Chatbot-only:** E5 é caminho canônico de cadastro (sem Portal) — **já disponível** via API/tool.

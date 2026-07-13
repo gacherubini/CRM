@@ -1,7 +1,8 @@
 # Plano #3A.1 — Frontend do Dashboard MVP
 
-> Workstream executável do #3A. **Maior parte entregue** (2026-07-12). Use este doc para o que
-> ainda falta, não para reimplementar do zero. Detalhe de produto #3A: `plano3a-*.md`.
+> Workstream executável do #3A. **MVP entregue** (2026-07-13) exceto Playwright E2E.
+> Task 13 (sim vendedor) **feita**. Task 9A (financeiras) e E10 (Tráfego) vivem no Portal mas
+> fora deste checklist original. Use este doc só para o residual, não para reimplementar.
 
 **Goal:** Dashboard web (dono/gerente/vendedor) com login, estoque via API, leads, handoff e
 simulação manual — tokens só no servidor.
@@ -35,7 +36,11 @@ Browser → sessão/cookie → Portal BFF
 
 ## Aberto (implementar daqui)
 
-### Task 13 — completar RBAC da simulação
+### Task 15 — Playwright E2E
+
+- Fluxos críticos login → estoque → leads → handoff → simulação (smoke).
+
+### Task 13 — RBAC da simulação (**feito 2026-07-13**)
 
 - Papéis `dono`, `gerente` e **`vendedor`** podem `POST` simulação via BFF.
 - Vendedor **não** vê custo do veículo, lucro, tokens Motor nem métricas financeiras.

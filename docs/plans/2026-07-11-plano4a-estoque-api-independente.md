@@ -3,9 +3,9 @@
 > Plano válido do Estoque. Legado em `_archive/`. Estoque não pertence ao Motor nem ao Portal.
 >
 > **Status 2026-07-13:** núcleo (CRUD, tenancy, público, outbox, admin parcial) **entregue**;
-> **`placa` + `GET /v1/veiculos/por-placa` + filtro + CSV com placa + unicidade (loja_id, placa)**
-> **entregues** (migration `0005`). **Aberto:** campo placa na tela admin HTMX (só na API hoje);
-> E2E outbox/restore; admin completo.
+> **`placa` + `GET /v1/veiculos/por-placa` + filtro + CSV + unicidade** **entregues** (migration `0005`);
+> **placa no admin HTMX** (form/painel) e no Portal form/lista **feitos**.
+> **Aberto:** E2E outbox/restore; admin 100% fechado.
 > Seção “CRM WhatsApp privado” = decisão de produto para o pacote Chatbot+Estoque Lite.
 
 **Goal:** Entregar um produto de estoque multi-loja, com API, administração mínima, importação e

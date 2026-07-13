@@ -3,10 +3,11 @@
 > Plano válido do Chatbot. Detalhes históricos n8n/Evolution do #2 monolítico: `docs/plans/_archive/`
 > (não executar; mistura Chatbot com Motor).
 >
-> **Status 2026-07-12:** API + providers + funil catálogo em grande parte **entregues**; bot **off**
-> de propósito. **Decisão de produto:** sem trava de consentimento no fluxo (dono); CPF mascarado.
-> Tabelas/endpoints de consentimento podem existir, mas **não** reativar gate 409 de nome sem pedido.
-> **Aberto:** go-live, prompt n8n, simulação por **placa**+telefone (ver #4A), LGPD exclusão.
+> **Status 2026-07-13:** API + providers + funil catálogo **entregues**. **Por-placa + sim multi-prazo**
+> (valor do Estoque; sem renda obrigatória). **E3 auto-pausa** e **E5 cadastro WA** (números
+> autorizados + proxy Estoque). n8n prompt/tools atualizados (ainda `active: false`). Bot **off**
+> de propósito até go-live. **Decisão:** sem trava de consentimento; CPF mascarado.
+> **Aberto:** go-live manual, LGPD exclusão, readiness real, foto no cadastro (E6).
 
 **Goal:** Entregar um pacote instalável e revendível que conecta um WhatsApp, conversa com clientes,
 qualifica e exporta leads, consulta o Estoque Lite, executa handoff humano e, na edição
