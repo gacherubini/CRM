@@ -100,6 +100,7 @@ def _dados_form(form, pode_custo: bool):
         "ano_modelo": int(form.get("ano_modelo", 0)), "cor": form.get("cor", "").strip() or None,
         "km": int(form.get("km") or 0), "preco": float(str(form.get("preco", "0")).replace(",", ".")),
         "codigo_interno": form.get("codigo_interno", "").strip() or None,
+        "placa": form.get("placa", "").strip() or None,
     }
     if pode_custo and form.get("custo"):
         dados["custo"] = float(str(form.get("custo")).replace(",", "."))

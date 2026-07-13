@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="pt-br">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ titulo }} — Estoque</title>
+  <link rel="stylesheet" href="/admin-static/admin.css">
+</head>
+<body>
+  <header class="topo">
+    <div>
+      <div class="marca">Estoque</div>
+      <div class="loja">{{ loja.nome if loja else '' }}</div>
+    </div>
+    <a class="btn sec" href="/admin">← Voltar</a>
+  </header>
+
+  <main class="container">
+    <div class="card">
+      <h1 style="margin-top:0">{{ titulo }}</h1>
+      {% if not pode_operar %}
+      <p class="readonly-nota">Seu papel não permite editar veículos.</p>
+      {% endif %}
+      {% if erro %}<div class="aviso erro">{{ erro }}</div>{% endif %}
+
+      {% set v = veiculo or {} %}
+      {% set tipo_sel = v.tipo if v.tipo is defined else '' %}
+      {% set fotos_txt %}{% if v.fotos is defined and v.fotos %}{% for f in v.fotos %}{% if f.url is defined %}{{ f.url }}{% else %}{{ f }}{% endif %}
+{% endfor %}{% elif v.fotos is defined %}{{ v.fotos }}{% endif %}{% endset %}
+
+      <form method="post">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <div class="form-grid">
+          <div class="campo">
+            <label for="tipo">Tipo</label>
+            <select id="tipo" name="tipo" required {% if not pode_operar %}disabled{% endif %}>
+              <option value="moto" {% if tipo_sel == 'moto' %}selected{% endif %}>Moto</option>
+              <option value="carro" {% if tipo_sel == 'carro' %}selected{% endif %}>Carro</option>
+            </select>
+          </div>
+          <div class="campo">
+            <label for="marca">Marca</label>
+            <input id="marca" name="marca" required {% if not pode_operar %}disabled{% endif %}
+              value="{{ v.marca or '' }}">
+          </div>
+          <div class="campo">
+            <label for="modelo">Modelo</label>
+            <input id="modelo" name="modelo" required {% if not pode_operar %}disabled{% endif %}
+              value="{{ v.modelo or '' }}">
+          </div>
+          <div class="campo">
+            <label for="versao">Versão</label>
+            <input id="versao" name="versao" {% if not pode_operar %}disabled{% endif %}
+              value="{{ v.versao or '' }}">
+          </div>
+          <div class="campo">
+            <label for="ano_modelo">Ano/modelo</label>
+            <input id="ano_modelo" name="ano_modelo" type="number" min="1900" max="2100" required
+              {% if not pode_operar %}disabled{% endif %}
+              value="{{ v.ano_modelo or '' }}">
+          </div>
+          <div class="campo">
+            <label for="cor">Cor</label>
+            <input id="cor" name="cor" {% if not pode_operar %}disabled{% endif %}
+              value="{{ v.cor or '' }}">
+          </div>
+          <div class="campo">
+            <label for="placa">Placa</label>
+            <input id="placa" name="placa" maxlength="10" placeholder="ABC1D23 ou ABC-1234"
+              autocomplete="off" {% if not pode_operar %}disabled{% endif %}
+              value="{{ v.placa or '' }}">
+          </div>
+          <div class="campo">
+            <label for="km">Quilometragem</label>
+            <input id="km" name="km" type="number" min="0" {% if not pode_operar %}disabled{% endif %}
+              value="{{ v.km if v.km is defined and v.km is not none else 0 }}">
+          </div>
+          <div class="campo">
+            <label for="preco">Preço de venda</label>
+            <input id="preco" name="preco" type="number" step="0.01" min="0" required
+              {% if not pode_operar %}disabled{% endif %}
+              value="{{ v.preco or '' }}">
+          </div>
+          {% if pode_custo %}
+          <div class="campo">
+            <label for="custo">Custo</label>
+            <input id="custo" name="custo" type="number" step="0.01" min="0"
+              {% if not pode_operar %}disabled{% endif %}
+              value="{{ v.custo if v.custo is defined and v.custo is not none else '' }}">
+          </div>
+          {% endif %}
+          <div class="campo">
+            <label for="codigo_interno">Código interno</label>
+            <input id="codigo_interno" name="codigo_interno" {% if not pode_operar %}disabled{% endif %}
+              value="{{ v.codigo_interno or '' }}">
+          </div>
+          <div class="campo" style="grid-column:1/-1">
+            <label for="fotos">URLs de fotos (uma por linha)</label>
+            <textarea id="fotos" name="fotos" {% if not pode_operar %}disabled{% endif %}>{{ fotos_txt }}</textarea>
+          </div>
+        </div>
+        {% if pode_operar %}
+        <div class="form-actions">
+          <a class="btn sec" href="/admin">Cancelar</a>
+          <button class="btn" type="submit">Salvar</button>
+        </div>
+        {% endif %}
+      </form>
+    </div>
+  </main>
+</body>
+</html>

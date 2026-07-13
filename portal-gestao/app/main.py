@@ -285,6 +285,7 @@ def dados_veiculo(form, incluir_custo: bool) -> dict:
         "preco": float(str(form.get("preco")).replace(",", ".")),
         "codigo_interno": form.get("codigo_interno", "").strip() or None,
         "foto_url": form.get("foto_url", "").strip() or None,
+        "placa": form.get("placa", "").strip() or None,
     }
     if incluir_custo and form.get("custo"):
         dados["custo"] = float(str(form.get("custo")).replace(",", "."))

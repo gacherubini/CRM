@@ -10,7 +10,7 @@ from uuid import UUID
 
 from fastapi import Depends, FastAPI, Header, HTTPException
 from fastapi.responses import Response
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 from sqlalchemy.orm import Session
 
 from app import config, models_db, servico  # noqa: F401 (registra os modelos)
@@ -78,14 +78,37 @@ class CatalogInterestInput(BaseModel):
 
 
 class SimularInput(BaseModel):
+    """Payload do bot/n8n para simulação.
+
+    CRM WhatsApp: preferir placa (+ telefone opcional); valor vem do Estoque.
+    Sem renda obrigatória; prazos multi (lista ou padrão 24/36/48/60).
+    Compat: valor + prazo_meses únicos ainda aceitos (testes/portal legado).
+    """
+
     cpf: str
     nascimento: str
-    valor: float
-    prazo_meses: int
+    valor: Optional[float] = None
+    prazo_meses: Optional[int] = None
+    prazos_meses: Optional[list[int]] = None
     entrada: float = 0
     renda: Optional[float] = None
     categoria: str = "moto"
+    placa: Optional[str] = None
+    telefone: Optional[str] = None
     referencia_externa: Optional[str] = None
+
+    @model_validator(mode="after")
+    def exige_placa_ou_valor(self):
+        if self.valor is None and not (self.placa and self.placa.strip()):
+            raise ValueError("informe placa ou valor do veículo")
+        return self
+
+    def resolver_prazos(self) -> list[int]:
+        if self.prazos_meses:
+            return list(self.prazos_meses)
+        if self.prazo_meses is not None:
+            return [self.prazo_meses]
+        return list(config.PRAZOS_PADRAO_MESES)
 
 
 @app.get("/health/live")
@@ -300,20 +323,119 @@ def buscar_estoque(
     return {"veiculos": veiculos, "fonte": "estoque"}
 
 
+@app.get("/v1/estoque/por-placa/{placa}")
+def estoque_por_placa(
+    placa: str,
+    ctx: Contexto = Depends(get_contexto),
+    provider: InventoryProvider = Depends(get_inventory_provider),
+):
+    """Ferramenta do bot: resolve veículo da loja pela placa (Estoque privado)."""
+    veiculo = provider.obter_por_placa(placa)
+    if not veiculo:
+        return {
+            "veiculo": None,
+            "fonte": "fallback",
+            "mensagem": "Não encontrei esse veículo no estoque pela placa; posso chamar um atendente.",
+        }
+    return {"veiculo": veiculo, "fonte": "estoque"}
+
+
+def _montar_payload_motor(
+    dados: SimularInput, valor: float, categoria: str, prazo: int
+) -> dict:
+    pessoa: dict = {"cpf": dados.cpf, "nascimento": dados.nascimento}
+    if dados.renda is not None:
+        pessoa["renda"] = dados.renda
+    payload = {
+        "referencia_externa": dados.referencia_externa,
+        "pessoa": pessoa,
+        "veiculo": {"categoria": categoria, "valor": valor},
+        "condicoes": {"entrada": dados.entrada, "prazo_meses": prazo},
+        "provedores": ["mock"],
+    }
+    if dados.placa:
+        payload["veiculo"]["placa"] = dados.placa.strip()
+    if dados.telefone:
+        payload["telefone"] = dados.telefone
+    return payload
+
+
 @app.post("/v1/simular")
 def simular(
     dados: SimularInput,
     ctx: Contexto = Depends(get_contexto),
     provider: SimulationProvider = Depends(get_simulation_provider),
+    inventory: InventoryProvider = Depends(get_inventory_provider),
 ):
-    """Ferramenta do bot: delega ao provider configurado (none|mock|http)."""
+    """Ferramenta do bot: delega ao provider configurado (none|mock|http).
+
+    Com placa: valor (e categoria/tipo) vêm do Estoque — nunca digitados pelo cliente.
+    Prazos: lista explícita, ou prazo_meses único (compat), ou padrão multi 24/36/48/60.
+    Motor aceita um prazo por job; multi-prazo = um job por prazo e resultados mesclados.
+    """
     if not provider.disponivel():
         raise HTTPException(status_code=409, detail="simulação não habilitada nesta instalação")
-    payload = {
-        "referencia_externa": dados.referencia_externa,
-        "pessoa": {"cpf": dados.cpf, "nascimento": dados.nascimento, "renda": dados.renda},
-        "veiculo": {"categoria": dados.categoria, "valor": dados.valor},
-        "condicoes": {"entrada": dados.entrada, "prazo_meses": dados.prazo_meses},
-        "provedores": ["mock"],
+
+    valor = dados.valor
+    categoria = dados.categoria
+    if dados.placa and dados.placa.strip():
+        veiculo = inventory.obter_por_placa(dados.placa.strip())
+        if not veiculo:
+            raise HTTPException(
+                status_code=404,
+                detail="veículo não encontrado no estoque para esta placa",
+            )
+        preco = veiculo.get("preco")
+        if preco is None:
+            raise HTTPException(
+                status_code=404,
+                detail="veículo sem preço no estoque; posso chamar um atendente.",
+            )
+        valor = float(preco)
+        tipo = veiculo.get("tipo")
+        if tipo in {"moto", "carro"}:
+            categoria = tipo
+
+    if valor is None:
+        raise HTTPException(status_code=422, detail="informe placa ou valor do veículo")
+
+    prazos = dados.resolver_prazos()
+    if not prazos:
+        prazos = list(config.PRAZOS_PADRAO_MESES)
+
+    # Um único prazo (compat com payload legado): resposta idêntica à anterior.
+    if len(prazos) == 1:
+        payload = _montar_payload_motor(dados, valor, categoria, prazos[0])
+        return provider.simular(payload, str(uuid.uuid4()))
+
+    # Multi-prazo: Motor/mock só entendem um prazo por job — agrega resultados.
+    todos: list[dict] = []
+    status_final = "concluida"
+    mensagem = None
+    for prazo in prazos:
+        out = provider.simular(
+            _montar_payload_motor(dados, valor, categoria, prazo),
+            str(uuid.uuid4()),
+        )
+        st = out.get("status")
+        if st and st != "concluida":
+            status_final = st
+        if out.get("mensagem") and not mensagem:
+            mensagem = out["mensagem"]
+        for item in out.get("resultados") or []:
+            if "prazo_meses" not in item:
+                item = {**item, "prazo_meses": prazo}
+            todos.append(item)
+
+    resposta: dict = {
+        "status": status_final,
+        "resultados": todos,
+        "prazos_meses": prazos,
+        "valor": valor,
+        "categoria": categoria,
     }
-    return provider.simular(payload, str(uuid.uuid4()))
+    if mensagem:
+        resposta["mensagem"] = mensagem
+    if dados.placa:
+        resposta["placa"] = dados.placa.strip()
+    return resposta

@@ -17,6 +17,7 @@
       <label>Versão<input name="versao" value="{{ veiculo.versao if veiculo and veiculo.versao else '' }}"></label>
       <label>Ano/modelo<input type="number" name="ano_modelo" min="1900" max="2100" value="{{ veiculo.ano_modelo if veiculo else '' }}" required></label>
       <label>Cor<input name="cor" value="{{ veiculo.cor if veiculo and veiculo.cor else '' }}"></label>
+      <label>Placa<input name="placa" value="{{ veiculo.placa if veiculo and veiculo.placa else '' }}" placeholder="ABC1D23 ou ABC-1234" maxlength="10" autocomplete="off"></label>
     </div>
   </section>
   <section class="panel form-section">

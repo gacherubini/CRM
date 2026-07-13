@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="pt-br">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Estoque — Admin</title>
+  <link rel="stylesheet" href="/admin-static/admin.css">
+</head>
+<body>
+  <header class="topo">
+    <div>
+      <div class="marca">Estoque</div>
+      <div class="loja">{{ loja.nome if loja else '' }} · {{ usuario.email if usuario else '' }}</div>
+    </div>
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+      {% if pode_operar %}
+      <a class="btn" href="/admin/veiculos/novo">Novo veículo</a>
+      {% endif %}
+      <form method="post" action="/admin/logout">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <button class="btn sec" type="submit">Sair</button>
+      </form>
+    </div>
+  </header>
+
+  <main class="container">
+    {% if request.query_params.get('ok') %}
+    <div class="aviso ok">Ação concluída ({{ request.query_params.get('ok') }}).</div>
+    {% endif %}
+    {% if request.query_params.get('erro') %}
+    <div class="aviso erro">Não foi possível concluir a ação.</div>
+    {% endif %}
+    {% if request.query_params.get('importacao') %}
+    <div class="aviso info">Importação: {{ request.query_params.get('importacao') }}.</div>
+    {% endif %}
+
+    <div class="metricas">
+      <div class="metrica"><div class="n">{{ metricas.total }}</div><div class="r">Total</div></div>
+      <div class="metrica"><div class="n">{{ metricas.disponiveis }}</div><div class="r">Disponíveis</div></div>
+      <div class="metrica"><div class="n">{{ metricas.publicados }}</div><div class="r">Publicados</div></div>
+      <div class="metrica"><div class="n">{{ metricas.reservados }}</div><div class="r">Reservados</div></div>
+    </div>
+
+    <div class="barra">
+      <form method="get" action="/admin">
+        <div class="campo" style="margin:0">
+          <label for="busca">Busca</label>
+          <input id="busca" name="busca" value="{{ busca }}" placeholder="Marca, modelo ou placa">
+        </div>
+        <div class="campo" style="margin:0">
+          <label for="status">Status</label>
+          <select id="status" name="status">
+            <option value="">Todos</option>
+            {% for s in ['disponivel','reservado','vendido','indisponivel'] %}
+            <option value="{{ s }}" {% if status == s %}selected{% endif %}>{{ s }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <button class="btn sec" type="submit">Filtrar</button>
+      </form>
+      {% if pode_operar %}
+      <form method="post" action="/admin/importar" enctype="multipart/form-data" style="display:flex;gap:8px;align-items:flex-end">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <div class="campo" style="margin:0">
+          <label for="arquivo">Importar CSV</label>
+          <input id="arquivo" type="file" name="arquivo" accept=".csv,text/csv" required>
+        </div>
+        <button class="btn sec" type="submit">Importar</button>
+      </form>
+      {% endif %}
+    </div>
+
+    {% if veiculos %}
+    <div class="card tabela-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Veículo</th>
+            <th>Placa</th>
+            <th>Status</th>
+            <th>Pub.</th>
+            <th>Preço</th>
+            {% if pode_custo %}<th>Custo</th>{% endif %}
+            <th>Ações</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for v in veiculos %}
+          <tr>
+            <td>
+              <strong>{{ v.marca }} {{ v.modelo }}</strong><br>
+              <span style="color:var(--muted);font-size:.85rem">{{ v.ano_modelo }} · {{ v.tipo }} · {{ v.km }} km</span>
+            </td>
+            <td>{% if v.placa %}{{ v.placa }}{% else %}—{% endif %}</td>
+            <td><span class="pill {{ v.status }}">{{ v.status }}</span></td>
+            <td>{% if v.publicado %}<span class="pill pub">sim</span>{% else %}—{% endif %}</td>
+            <td>R$ {{ "%.2f"|format(v.preco|float) }}</td>
+            {% if pode_custo %}
+            <td>{% if v.custo is not none %}R$ {{ "%.2f"|format(v.custo|float) }}{% else %}—{% endif %}</td>
+            {% endif %}
+            <td class="acoes">
+              <a class="btn mini sec" href="/admin/veiculos/{{ v.id }}">Editar</a>
+              {% if pode_operar %}
+                {% if v.publicado %}
+                <form method="post" action="/admin/veiculos/{{ v.id }}/despublicar">
+                  <input type="hidden" name="csrf" value="{{ csrf }}">
+                  <button class="btn mini sec" type="submit">Despublicar</button>
+                </form>
+                {% elif v.status == 'disponivel' %}
+                <form method="post" action="/admin/veiculos/{{ v.id }}/publicar">
+                  <input type="hidden" name="csrf" value="{{ csrf }}">
+                  <button class="btn mini sec" type="submit">Publicar</button>
+                </form>
+                {% endif %}
+                {% if v.status == 'disponivel' %}
+                <form method="post" action="/admin/veiculos/{{ v.id }}/reservar">
+                  <input type="hidden" name="csrf" value="{{ csrf }}">
+                  <button class="btn mini sec" type="submit">Reservar</button>
+                </form>
+                {% endif %}
+                {% if v.status in ['disponivel','reservado'] %}
+                <form method="post" action="/admin/veiculos/{{ v.id }}/vender" onsubmit="return confirm('Marcar como vendido?')">
+                  <input type="hidden" name="csrf" value="{{ csrf }}">
+                  <button class="btn mini danger" type="submit">Vender</button>
+                </form>
+                {% endif %}
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="vazio">Nenhum veículo encontrado.</div>
+    {% endif %}
+  </main>
+</body>
+</html>

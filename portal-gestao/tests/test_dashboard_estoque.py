@@ -13,13 +13,14 @@ def test_dashboard_resume_estoque_real(client):
 def test_dono_cadastra_veiculo(client, estoque_fake):
     login(client)
     pagina = client.get("/app/estoque/novo")
+    assert 'name="placa"' in pagina.text
     resposta = client.post(
         "/app/estoque/novo",
         data={
             "csrf": csrf_da_resposta(pagina), "tipo": "carro", "marca": "Toyota",
             "modelo": "Corolla", "versao": "GLi", "ano_modelo": "2023", "cor": "Prata",
             "km": "12000", "preco": "129900.50", "custo": "110000",
-            "codigo_interno": "T01", "foto_url": "",
+            "codigo_interno": "T01", "foto_url": "", "placa": "ABC1D23",
         },
         follow_redirects=False,
     )
@@ -27,6 +28,7 @@ def test_dono_cadastra_veiculo(client, estoque_fake):
     assert resposta.headers["location"] == "/app/estoque?ok=criado"
     assert estoque_fake.criados[0]["modelo"] == "Corolla"
     assert estoque_fake.criados[0]["custo"] == 110000.0
+    assert estoque_fake.criados[0]["placa"] == "ABC1D23"
 
 
 def test_vendedor_ve_estoque_sem_custo_e_nao_edita(client):
