@@ -3,6 +3,10 @@
 > Situação de cada banco para o driver real de simulação (#1A Task 12+).
 > Complementa `2026-07-13-plano1a-task12-santander-design.md`. Data: 2026-07-13.
 > **Não** é plano de implementação: cada banco ganha o seu quando for atacado (fluxo mapeado via codegen).
+>
+> **Atualização 2026-07-13:** piloto **Santander LIVE OK**. Antes de codar o próximo Playwright, leia  
+> **`2026-07-13-playwright-licoes-santander.md`** (WAF, Xvfb, Material, modais, parsers).  
+> Base reutilizável: `PlaywrightBankDriver` + worker headed+Xvfb.
 
 ## Princípio (repetido do design)
 
@@ -14,7 +18,7 @@ implementam a mesma interface `Driver`; o resto do Motor não muda.
 
 | Banco | URL de acesso | Login | API? (reconhecimento 2026-07-13) | Caminho provável | Fluxo mapeado? |
 |---|---|---|---|---|---|
-| **Santander** | `financiamentos.santander.com.br/originacao-auto/login` | usuário+senha | **provável NÃO** — nenhuma API pública achada; integração via plugins/parceiros (ex.: Cockpit) | Playwright (piloto) | **Piloto** — Passo 1 conhecido; 2–5 via codegen |
+| **Santander** | `financiamentos.santander.com.br/originacao-auto/login` | usuário+senha | **NÃO** (piloto confirmou só portal) | Playwright **LIVE OK** | **Sim** — login + passo 1 + ofertas multi-prazo (2026-07-13) |
 | **Pan** | `veiculos.bancopan.com.br/login` | usuário+senha, sem 2FA | **PROVÁVEL SIM** — portal dev com doc de *Financiamento de Veículos* (gated/registro) | **Confirmar API antes** → provável `ApiBankDriver` | Não |
 | **BV** (Votorantim) | portal lojista a levantar | a levantar | **PROVÁVEL SIM** — doc "Iniciar Simulação Financiamento Veículo (V4)" no portal dev | **Confirmar API antes** → provável `ApiBankDriver` | Não |
 | **Bradesco** | `turbo.bradesco/originacaolojista/login` | usuário+senha, sem 2FA | **provável** — portal dev robusto (120+ APIs, teste livre); confirmar produto auto | **Confirmar API antes** → talvez `ApiBankDriver` | Não |
@@ -63,9 +67,11 @@ simulação (parcela/taxa) que precisamos.
 
 ## Ordem sugerida
 
-1. **Santander** (piloto) — constrói a base `PlaywrightBankDriver` e prova o fim-a-fim.
-2. Depois, **um banco por vez** (Pan / Fontecred / Bradesco), na ordem de volume da loja. Cada um é um
-   incremento barato porque a base já existe.
+1. ~~**Santander** (piloto)~~ — **feito live 2026-07-13** (base `PlaywrightBankDriver` + worker Xvfb).
+2. **Um banco por vez** na ordem de volume da loja:
+   - Preferir **confirmar API** (Pan, BV, Bradesco) antes de Playwright.
+   - **Fontecred** (e similares sem API) → Playwright reutilizando a base + lições.
+3. Cada banco Playwright: ~4 tasks (codegen → driver → registro REAL_DRIVERS → smoke live).
 
 ## Template do plano por banco (pós-Santander)
 

@@ -111,7 +111,10 @@ def _registrar_drivers_reais() -> None:
         return
     from app.motor.santander import fabrica_santander
 
-    REAL_DRIVERS["santander"] = fabrica_santander()
+    driver = fabrica_santander()
+    # Portal/lista de provedores usa "Santander" (mock); driver canônico é minúsculo.
+    REAL_DRIVERS["santander"] = driver
+    REAL_DRIVERS["Santander"] = driver
 
 
 def resolver_drivers(

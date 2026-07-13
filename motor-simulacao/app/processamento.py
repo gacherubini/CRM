@@ -174,6 +174,25 @@ def _executar_driver(
             _registrar_tentativa(db, sim.id, nome, tentativa, dur, "erro_transitorio", codigo)
             if tentativa >= MAX_TENTATIVAS_DRIVER:
                 return [ResultadoDriver(nome, "erro", prazo_meses=prazo, codigo_erro=codigo)]
+        except Exception as e:
+            # Playwright Error, import quebrado, browser ausente, etc. —
+            # nunca deixar o job eterno em "processando".
+            dur = int((time.perf_counter() - inicio) * 1000)
+            msg = str(e).replace("\n", " ")[:200].lower()
+            if "executable doesn't exist" in msg or "playwright install" in msg:
+                codigo = "browser_ausente"
+            elif (
+                "missing x server" in msg
+                or "xserver" in msg
+                or ("display" in msg and "not" in msg)
+            ):
+                # Xvfb morto / lock órfão após restart do worker.
+                codigo = "display_ausente"
+            else:
+                codigo = "erro_inesperado"
+            _registrar_tentativa(db, sim.id, nome, tentativa, dur, "erro", codigo)
+            if tentativa >= MAX_TENTATIVAS_DRIVER:
+                return [ResultadoDriver(nome, "erro", prazo_meses=prazo, codigo_erro=codigo)]
     return [ResultadoDriver(nome, "erro", prazo_meses=prazo, codigo_erro="desconhecido")]
 
 
@@ -209,6 +228,23 @@ def processar_job(
         if drivers is not None
         else resolver_drivers(sol.provedores, cliente_id=sim.cliente_id, db=db)
     )
+    if not pares:
+        # Nenhum driver resolvido (ex.: santander sem credencial / nome divergente).
+        sim.status = "falhou"
+        sim.atualizada_em = _agora()
+        sim.reserva_token = None
+        sim.reservada_ate = None
+        db.add(
+            ResultadoORM(
+                simulacao_id=sim.id,
+                provedor=(sol.provedores or ["?"])[0],
+                status="erro",
+                codigo_erro="sem_driver_ou_credencial",
+            )
+        )
+        db.commit()
+        db.refresh(sim)
+        return sim
 
     existentes_por_prov: dict[str, list] = {}
     for resultado in sim.resultados:

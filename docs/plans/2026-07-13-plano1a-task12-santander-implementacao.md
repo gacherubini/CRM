@@ -1,9 +1,17 @@
 # Driver Real Santander — Fase 1 (Motor) — Implementation Plan
 
-> **Status 2026-07-13 (parcial+):** Tasks **1–5** + **SantanderDriver** (parse + passos + fixture HTML)
-> + gating `santander` por credencial + config/Dockerfile Chromium. Testes unitários **sem portal live**.
-> **Ainda não:** smoke live com Playwright no portal real; endurecer seletores com codegen;
-> Portal/Chatbot coletando CNH/UF (fase 2).
+> **Status 2026-07-13 (LIVE OK — pause):** piloto Santander **fim-a-fim no portal real** (login →
+> step-personal → step-offers → multi-prazo no Portal). Worker headed+Xvfb; parsers de parcela e
+> financiado corrigidos. **Não reabrir o fluxo Santander** sem ler  
+> `2026-07-13-playwright-licoes-santander.md`.
+>
+> **Entregue na sessão live:** Dockerfile Chromium+Xvfb, entrypoint, stealth anti-Akamai, seletores
+> Material (sem placeholder), modal sims anteriores, progresso HTMX no Portal, códigos de erro.
+> **Aberto:** smoke pytest gated `MOTOR_SANTANDER_LIVE=1`; `testar-login` real; multi-banco paralelo;
+> fase 2 Chatbot CNH/UF se operação pedir.
+>
+> **Próximo agente:** outro banco (API-first) — **não** este checklist do zero. Template em
+> `...-bancos-reconhecimento.md` + lições.
 >
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
@@ -1023,3 +1031,38 @@ git commit -m "test(motor): smoke live gated do Santander + RUNBOOK do driver re
 - **Fase 2 (coleta):** Chatbot (WhatsApp) e Portal coletam CNH/UF/finalidade e repassam ao Motor.
 - **Fase 3 (hardening):** rename do mock para `BancoDemo …`; retenção/mascaramento de screenshots; métricas por banco.
 - **Outros bancos:** cada um herda `PlaywrightBankDriver` (ou `ApiBankDriver` se houver API), plano próprio.
+
+## Requisitos de produto (dono — 2026-07-13, em curso)
+
+### Portal: ver simulações rodando ao vivo
+
+- [ ] **Lista ao vivo** em `/app/simulacoes` (ou aba “Em andamento”): todos os jobs
+  `recebida` / `processando` do cliente, não só o job da aba atual.
+- [ ] Cada linha: id curto, placa/valor, bancos pedidos, status, tempo desde criação,
+  link para `/app/simulacoes/job/{id}` (tela de progresso que já auto-atualiza).
+- [ ] Quando multi-banco: progresso **por provedor** (Santander processando, Bradesco na fila…).
+- [ ] Jobs terminais recentes (concluída/falhou/parcial) na mesma lista com filtro “hoje”.
+- [ ] Fonte: `GET` Motor (lista de simulações do cliente) — se não existir endpoint de listagem,
+  criar no #1A (`GET /v1/simulacoes?status=…`) e consumir no Portal BFF.
+
+### Motor: um Playwright **por banco** (não um browser compartilhado)
+
+- [x] Princípio documentado na base `PlaywrightBankDriver`: cada driver Playwright abre
+  **seu próprio** `chromium.launch` + contexto (isolamento de sessão/cookie/storage).
+- [ ] Em job multi-provedor (ex.: Santander + Bradesco RPA + …), o worker deve poder
+  executar drivers Playwright **em paralelo** (thread/process pool limitado), **um browser
+  por banco**, com teto de concorrência (ex.: max 2–3 Chromium no worker para não estourar RAM).
+- [ ] Drivers `ApiBankDriver` não abrem browser; rodam em paralelo com os RPA sem contenda de sessão.
+- [ ] Rate-limit **por provedor** (não martelar o mesmo portal com N abas no mesmo browser).
+- [ ] Aceite: simulação com 2+ bancos RPA ⇒ N processos/browsers distintos; falha de um banco
+  não derruba os outros (status `parcial`).
+
+### Incidentes operacionais conhecidos
+
+- **2026-07-13:** job Santander live retornou `portal_falhou` / screenshot **Access Denied**
+  (Akamai EdgeSuite) com **headless_shell**. Credencial e Motor OK.
+- **Mitigação aplicada (mesmo dia):** worker com **browser headed + Xvfb**
+  (`MOTOR_BROWSER_HEADLESS=0`, `PLAYWRIGHT_CHROMIUM_USE_HEADLESS_SHELL=0`, entrypoint
+  `scripts/worker-entrypoint.sh`), stealth (UA/CH/webdriver/plugins), digitação com delay,
+  `shm_size=1gb`, volume de `storage_state`. Probe: login **Portal Auto** OK (sem Access Denied).
+  Se ainda bloquear: IP/datacenter na denylist Akamai (proxy residencial / rodar worker no host).

@@ -137,6 +137,15 @@ def obter_credencial_mascarada(
     return _mascarar(cred) if cred is not None else None
 
 
+def _aliases_provedor(provedor: str) -> list[str]:
+    """Nomes equivalentes (lista do mock usa 'Santander'; driver usa 'santander')."""
+    p = (provedor or "").strip()
+    if not p:
+        return []
+    alts = {p, p.lower(), p.capitalize(), p.title()}
+    return list(alts)
+
+
 def obter_segredo_para_uso(
     db: Session, cliente_id: str, provedor: str
 ) -> tuple[str, str] | None:
@@ -146,14 +155,15 @@ def obter_segredo_para_uso(
     É lida do storage a cada chamada (sem cache em memória), então uma rotação via
     PUT vale no próximo uso sem reiniciar o processo. NÃO expor o retorno em logs.
     """
-    cred = (
-        db.query(CredencialProvedorORM)
-        .filter_by(cliente_id=cliente_id, provedor=provedor, habilitado=True)
-        .one_or_none()
-    )
-    if cred is None:
-        return None
-    return cred.usuario, cripto.decifrar(cred.senha_cifrada)
+    for nome in _aliases_provedor(provedor):
+        cred = (
+            db.query(CredencialProvedorORM)
+            .filter_by(cliente_id=cliente_id, provedor=nome, habilitado=True)
+            .one_or_none()
+        )
+        if cred is not None:
+            return cred.usuario, cripto.decifrar(cred.senha_cifrada)
+    return None
 
 
 def registrar_sucesso_login(db: Session, cliente_id: str, provedor: str) -> None:

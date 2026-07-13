@@ -37,8 +37,9 @@ def main() -> None:
         try:
             _uma_rodada()
         except Exception as exc:  # nunca deixa o loop morrer
-            # Exceções externas podem conter PII; registre somente o tipo sanitizado.
-            log.error("falha ao processar rodada (tipo=%s)", type(exc).__name__)
+            # Evitar PII no log; tipo + trecho curto ajuda a diagnosticar (ex.: browser ausente).
+            trecho = str(exc).replace("\n", " ")[:160]
+            log.error("falha ao processar rodada (tipo=%s): %s", type(exc).__name__, trecho)
         time.sleep(intervalo)
 
 

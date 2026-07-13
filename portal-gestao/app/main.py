@@ -2,6 +2,7 @@ import calendar
 import hashlib
 import hmac
 import os
+import uuid
 from datetime import date, datetime
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from pathlib import Path
@@ -747,7 +748,8 @@ def dados_simulacao_motor(form) -> dict:
             "finalidade": form.get("finalidade") or "comum",
         },
         "condicoes": {"entrada": entrada, "prazos_meses": prazos},
-        "provedores": ["santander"],
+        # Nome alinhado à lista do Motor / Acessos bancos ("Santander").
+        "provedores": ["Santander"],
     }
 
 
@@ -782,7 +784,7 @@ async def simulacoes_simular(
     valores = _valores_form_simulacao(form)
     modo = (form.get("modo") or "mock").strip().lower()
 
-    # --- Santander real: Portal → Motor (sem chatbot) ---
+    # --- Santander real: cria job no Motor e mostra progresso ---
     if modo == "santander":
         try:
             payload_motor = dados_simulacao_motor(form)
@@ -799,8 +801,8 @@ async def simulacoes_simular(
                 status_code=422,
             )
         try:
-            resultado = motor.simular_e_aguardar(
-                payload_motor, ator=usuario.email, poll_timeout=120.0
+            criada = motor.criar_simulacao(
+                payload_motor, ator=usuario.email, idempotency_key=str(uuid.uuid4())
             )
         except MotorIndisponivel as exc:
             return templates.TemplateResponse(
@@ -814,19 +816,28 @@ async def simulacoes_simular(
                 ),
                 status_code=503,
             )
-        if not pode_ver_custo(usuario):
-            resultado = simulacao_sem_dados_sensiveis(resultado)
-        cpf_digits = payload_motor["pessoa"]["cpf"]
-        return templates.TemplateResponse(
-            "simulacoes/resultado.html",
-            contexto(
-                request,
-                usuario,
-                valores=valores,
-                resultado=resultado,
-                cpf_mascarado=mascarar_cpf(cpf_digits),
-            ),
-        )
+        sim_id = criada.get("id")
+        if not sim_id:
+            return templates.TemplateResponse(
+                "simulacoes/form.html",
+                contexto(
+                    request,
+                    usuario,
+                    valores=valores,
+                    ufs=UFS_BR,
+                    erro="Motor não devolveu id da simulação.",
+                ),
+                status_code=503,
+            )
+        # Guarda parâmetros na sessão para a tela de progresso/resultado
+        jobs = request.session.get("sim_jobs") or {}
+        jobs[sim_id] = {
+            "valores": valores,
+            "cpf": payload_motor["pessoa"]["cpf"],
+            "criada_em": criada.get("criada_em") or "",
+        }
+        request.session["sim_jobs"] = jobs
+        return RedirectResponse(f"/app/simulacoes/job/{sim_id}", status_code=303)
 
     # --- Mock legado: Portal → Chatbot ---
     try:
@@ -873,6 +884,154 @@ async def simulacoes_simular(
             valores=valores,
             resultado=resultado,
             cpf_mascarado=mascarar_cpf(payload["cpf"]),
+        ),
+    )
+
+
+# Estados do job no Motor (worker Playwright).
+_SIM_STATUS_TERMINAIS = frozenset(
+    {"concluida", "parcial", "falhou", "aguardando_intervencao", "cancelada"}
+)
+
+_SIM_STATUS_LABELS = {
+    "recebida": "Na fila",
+    "processando": "Processando no Santander",
+    "concluida": "Concluída",
+    "parcial": "Parcial (alguns prazos)",
+    "falhou": "Falhou",
+    "aguardando_intervencao": "Aguardando intervenção",
+    "cancelada": "Cancelada",
+}
+
+
+def _passos_progresso_simulacao(status: str) -> list[dict]:
+    """Etapas visíveis na tela de progresso (Santander real)."""
+    ordem = ["recebida", "processando", "terminal"]
+    terminal_ok = status in ("concluida", "parcial")
+    terminal_fail = status in ("falhou", "cancelada", "aguardando_intervencao")
+    idx = {
+        "recebida": 0,
+        "processando": 1,
+    }.get(status, 2 if status in _SIM_STATUS_TERMINAIS else 0)
+
+    def estado(passo_i: int) -> str:
+        if passo_i < idx:
+            return "done"
+        if passo_i == idx:
+            if passo_i == 2 and terminal_fail:
+                return "fail"
+            if passo_i == 2 and terminal_ok:
+                return "done"
+            return "active"
+        return "pending"
+
+    titulo_final = _SIM_STATUS_LABELS.get(status, "Finalizando")
+    if status not in _SIM_STATUS_TERMINAIS:
+        titulo_final = "Aguardando resultado"
+    detalhe_final = {
+        "concluida": "Parcelas lidas com sucesso no portal do Santander.",
+        "parcial": "Parte dos prazos retornou; confira a tabela.",
+        "falhou": "O Motor não conseguiu concluir. Veja o código de erro abaixo ou em Acessos bancos.",
+        "aguardando_intervencao": "O portal pediu ação manual (captcha, 2FA, senha).",
+        "cancelada": "Job cancelado.",
+    }.get(status, "Quando o worker terminar, as parcelas aparecem automaticamente.")
+
+    return [
+        {
+            "num": "01",
+            "titulo": "Simulação enfileirada",
+            "detalhe": "Pedido aceito pelo Motor e colocado na fila do worker.",
+            "estado": estado(0),
+        },
+        {
+            "num": "02",
+            "titulo": "Consultando portal Santander",
+            "detalhe": "Abrindo o portal lojista e lendo as parcelas (costuma levar 30–90s).",
+            "estado": estado(1),
+        },
+        {
+            "num": "03",
+            "titulo": titulo_final,
+            "detalhe": detalhe_final,
+            "estado": estado(2),
+        },
+    ]
+
+
+@app.get("/app/simulacoes/job/{sim_id}", response_class=HTMLResponse)
+def simulacoes_job(
+    sim_id: str,
+    request: Request,
+    db: Session = Depends(get_db),
+    motor: MotorClient = Depends(get_motor_client),
+):
+    """Tela de progresso: mostra o status do job no Motor e atualiza sozinha."""
+    usuario = usuario_atual(request, db)
+    if not usuario:
+        return redirecionar_login()
+    if not pode_simular(usuario):
+        return RedirectResponse("/app", status_code=303)
+
+    jobs = request.session.get("sim_jobs") or {}
+    meta = jobs.get(sim_id) or {}
+    valores = meta.get("valores") or {"modo": "santander"}
+    cpf = meta.get("cpf") or ""
+
+    try:
+        resultado = motor.obter_simulacao(sim_id, ator=usuario.email)
+    except MotorIndisponivel as exc:
+        return templates.TemplateResponse(
+            "simulacoes/progresso.html",
+            contexto(
+                request,
+                usuario,
+                sim_id=sim_id,
+                status="erro_motor",
+                status_label="Motor indisponível",
+                passos=_passos_progresso_simulacao("recebida"),
+                valores=valores,
+                cpf_mascarado=mascarar_cpf(cpf),
+                auto_refresh=True,
+                refresh_segundos=5,
+                erro=str(exc),
+                resultados_parciais=[],
+            ),
+            status_code=503,
+        )
+
+    status = (resultado.get("status") or "recebida").lower()
+    status_label = _SIM_STATUS_LABELS.get(status, status.replace("_", " "))
+
+    if status in _SIM_STATUS_TERMINAIS:
+        if not pode_ver_custo(usuario):
+            resultado = simulacao_sem_dados_sensiveis(resultado)
+        return templates.TemplateResponse(
+            "simulacoes/resultado.html",
+            contexto(
+                request,
+                usuario,
+                valores=valores,
+                resultado=resultado,
+                cpf_mascarado=mascarar_cpf(cpf),
+            ),
+        )
+
+    resultados = resultado.get("resultados") or []
+    return templates.TemplateResponse(
+        "simulacoes/progresso.html",
+        contexto(
+            request,
+            usuario,
+            sim_id=sim_id,
+            status=status,
+            status_label=status_label,
+            passos=_passos_progresso_simulacao(status),
+            valores=valores,
+            cpf_mascarado=mascarar_cpf(cpf),
+            auto_refresh=True,
+            refresh_segundos=3,
+            erro=None,
+            resultados_parciais=resultados,
         ),
     )
 

@@ -327,30 +327,35 @@ class MotorFake:
     def obter_simulacao(self, sim_id, ator=None):
         if self.indisponivel:
             raise MotorIndisponivel("Não foi possível acessar o Motor de Simulação agora")
-        return {
-            "id": sim_id,
-            "status": "concluida",
-            "criada_em": "2026-07-13T12:00:00+00:00",
-            "resultados": [
+        # status_retorno: "concluida" (padrão) | "recebida" | "processando" | "falhou"
+        status = getattr(self, "status_retorno", "concluida")
+        resultados = []
+        if status in ("concluida", "parcial", "falhou"):
+            resultados = [
                 {
                     "provedor": "santander",
-                    "status": "concluida",
-                    "valor_parcela": 946.28,
+                    "status": "concluida" if status != "falhou" else "erro",
+                    "valor_parcela": 946.28 if status != "falhou" else None,
                     "taxa_am": None,
                     "prazo_meses": 48,
-                    "valor_financiado": 20776.80,
-                    "codigo_erro": None,
+                    "valor_financiado": 20776.80 if status != "falhou" else None,
+                    "codigo_erro": None if status != "falhou" else "sem_driver_ou_credencial",
                 },
                 {
                     "provedor": "santander",
-                    "status": "concluida",
-                    "valor_parcela": 1097.45,
+                    "status": "concluida" if status != "falhou" else "erro",
+                    "valor_parcela": 1097.45 if status != "falhou" else None,
                     "taxa_am": None,
                     "prazo_meses": 36,
-                    "valor_financiado": 20776.80,
-                    "codigo_erro": None,
+                    "valor_financiado": 20776.80 if status != "falhou" else None,
+                    "codigo_erro": None if status != "falhou" else "sem_driver_ou_credencial",
                 },
-            ],
+            ]
+        return {
+            "id": sim_id,
+            "status": status,
+            "criada_em": "2026-07-13T12:00:00+00:00",
+            "resultados": resultados,
         }
 
     def simular_e_aguardar(self, payload, ator=None, poll_timeout=90.0, poll_interval=1.0):

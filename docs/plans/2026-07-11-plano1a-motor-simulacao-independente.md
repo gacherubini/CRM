@@ -2,12 +2,11 @@
 
 > Plano válido do Motor. O #1 monolítico está em `docs/plans/_archive/` (não executar).
 >
-> **Status 2026-07-13:** mock async, auth/tenancy, worker/lease, cifra e **Task 11 (credenciais por
-> provedor + rotação)** — **entregues**. Portal **Task 9A** consome a API (**UI feita**).
-> **Aberto:** Task 10 (revenda), Task 12 (1º driver `real: true` — **código não iniciado**).
-> **Task 12 tem design + plano + recon:** `2026-07-13-plano1a-task12-santander-design.md`,
-> `...-santander-implementacao.md`, `...-bancos-reconhecimento.md` (piloto Santander/Playwright;
-> API-first para os demais). Motor ainda 1 `prazo_meses`/job; Chatbot agrega multi-prazo no cliente.
+> **Status 2026-07-13 (final sessão live):** mock async, auth/tenancy, worker/lease, cifra,
+> **Task 11** e **Task 12 piloto Santander LIVE** (Playwright headed+Xvfb, multi-prazo real no Portal).
+> Lições: `2026-07-13-playwright-licoes-santander.md`.
+> **Aberto:** Task 10 (revenda); demais bancos reais (API-first); multi-banco paralelo; listagem jobs;
+> `testar-login` real. Contrato multi-prazo no Motor **já existe**.
 
 **Goal:** Entregar uma API de simulação instalável e vendável separadamente, capaz de operar com
 mock agora e drivers bancários depois, sem depender de WhatsApp, n8n, Portal, Estoque ou Chatbot.
@@ -297,6 +296,11 @@ separados. Agregador fica como adapter opcional quando houver contrato comercial
 
 **Aceite:** job com mock + 1 real em paralelo; parcial visível; WhatsApp/Chatbot só consomem o
 contrato HTTP existente.
+
+**Concorrência multi-banco (dono 2026-07-13):** quando o job pede vários bancos RPA, o Motor
+abre **um browser Playwright por banco** (isolado), com teto de paralelismo no worker; API
+drivers sem browser. Portal deve listar jobs ao vivo (`recebida`/`processando`) — ver #3A.1 Task 16
+e seção “Requisitos de produto” no plano de implementação Santander.
 
 ## Integrações opcionais
 

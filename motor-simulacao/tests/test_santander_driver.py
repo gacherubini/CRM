@@ -51,6 +51,35 @@ def test_parse_parcelas_da_fixture():
     assert parse_valor_liberado(html) == Decimal("20776.80")
 
 
+def test_parse_parcelas_com_quebra_de_linha_do_portal():
+    """Portal Auto real: '48x de' e 'R$ 946,28' em nós/linhas separados."""
+    html = """
+    <div class="card"><span>48x de</span><span>R$ 946,28</span></div>
+    <div class="card"><span>36x de</span><br/><span>R$ 1.097,45</span></div>
+    <div>24x de
+    R$ 1.452,60</div>
+    <div>12x de&nbsp;R$ 2.539,64</div>
+    """
+    pares = parse_parcelas_texto(html)
+    assert pares == [
+        (12, Decimal("2539.64")),
+        (24, Decimal("1452.60")),
+        (36, Decimal("1097.45")),
+        (48, Decimal("946.28")),
+    ]
+
+
+def test_parse_valor_liberado_nao_pega_parcela():
+    """Bug: 'Valor liberado' sem valor caía no R$ da parcela 48x."""
+    texto = (
+        "Valor liberado Entrada Valor do veículo "
+        "Escolha a parcela desejada 48x de R$ 946,28 36x de R$ 1.097,45"
+    )
+    assert parse_valor_liberado(texto) is None
+    texto_ok = "Valor liberado R$ 20.400,00 Entrada R$ 1.500,00 48x de R$ 946,28"
+    assert parse_valor_liberado(texto_ok) == Decimal("20400.00")
+
+
 def test_uf_para_portal():
     assert uf_para_portal("SP") == "SAO PAULO"
     assert uf_para_portal("rj") == "RIO DE JANEIRO"

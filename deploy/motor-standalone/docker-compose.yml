@@ -27,22 +27,34 @@ services:
       postgres:
         condition: service_healthy
 
-  # Worker que executa os jobs enfileirados (reserva sem dupla execução, retry, parcial).
+  # Worker: Playwright headed sob Xvfb (anti-Akamai). Um browser por banco.
   motor-worker:
     build: ../../motor-simulacao
-    command: ["python", "-m", "app.worker"]
+    command: ["/srv/scripts/worker-entrypoint.sh"]
     environment:
       - DATABASE_URL=postgresql+psycopg://motor:${POSTGRES_PASSWORD:-motor}@postgres:5432/motor
       - MOTOR_ENV=production
       - MOTOR_ENCRYPTION_KEY=${MOTOR_ENCRYPTION_KEY}
       - MOTOR_WORKER_INTERVALO=${MOTOR_WORKER_INTERVALO:-2}
-      - MOTOR_JOB_LEASE_SECONDS=${MOTOR_JOB_LEASE_SECONDS:-120}
+      - MOTOR_JOB_LEASE_SECONDS=${MOTOR_JOB_LEASE_SECONDS:-180}
+      # 0 = headed + Xvfb (recomendado). 1 = headless (mais bloqueado).
+      - MOTOR_BROWSER_HEADLESS=${MOTOR_BROWSER_HEADLESS:-0}
+      - PLAYWRIGHT_CHROMIUM_USE_HEADLESS_SHELL=0
+      - MOTOR_SCREENSHOT_DIR=/srv/data/screenshots
+      - MOTOR_STORAGE_STATE_DIR=/srv/data/storage_state
+      - MOTOR_BROWSER_TIMEOUT_MS=${MOTOR_BROWSER_TIMEOUT_MS:-60000}
+      - DISPLAY=:99
+    volumes:
+      - motor_browser_data:/srv/data
     depends_on:
       postgres:
         condition: service_healthy
       motor-api:
         condition: service_started
     restart: unless-stopped
+    # Chromium consome RAM; evita OOM silenciosa em máquinas pequenas.
+    shm_size: "1gb"
 
 volumes:
   motor_pg:
+  motor_browser_data:

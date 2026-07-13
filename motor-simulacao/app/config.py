@@ -22,6 +22,14 @@ PRAZOS_PADRAO = PRAZOS_PADRAO_MESES  # alias Task 12
 SCREENSHOT_DIR = os.getenv("MOTOR_SCREENSHOT_DIR", "data/screenshots")
 STORAGE_STATE_DIR = os.getenv("MOTOR_STORAGE_STATE_DIR", "data/storage_state")
 BROWSER_TIMEOUT_MS = int(os.getenv("MOTOR_BROWSER_TIMEOUT_MS", "45000"))
+# Headless=1 usa chromium headless_shell (muito bloqueado por Akamai).
+# Padrão 0 = headed; no Docker o worker sobe com Xvfb (display virtual).
+BROWSER_HEADLESS = (os.getenv("MOTOR_BROWSER_HEADLESS") or "0").strip().lower() in (
+    "1",
+    "true",
+    "yes",
+    "on",
+)
 SANTANDER_LOGIN_URL = os.getenv(
     "MOTOR_SANTANDER_LOGIN_URL",
     "https://financiamentos.santander.com.br/originacao-auto/login",

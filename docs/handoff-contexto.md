@@ -1,109 +1,107 @@
 # Handoff técnico — suíte automotiva
 
-> Checkpoint: **2026-07-13 (final sessão — docs + n8n runtime)**. Estado atual (não diário de sessão).
-> Confirme containers/`.env`/n8n antes de editar. Testes unitários ≠ E2E WhatsApp.
-> Leia primeiro: `docs/contexto-compacto.md`. Planos válidos: `docs/plans/README.md`.
-> Código em **`main` = origin/main** (push feito).
+> Checkpoint: **2026-07-13 (Santander live OK — pause para próximos bancos)**.  
+> Confirme containers/`.env`/n8n antes de editar. Testes unitários ≠ E2E WhatsApp.  
+> Leia primeiro: `docs/contexto-compacto.md`. Planos válidos: `docs/plans/README.md`.  
+> **Lições Playwright (obrigatório antes do próximo banco):**  
+> `docs/plans/2026-07-13-playwright-licoes-santander.md`.  
+> Código deve estar em **`main` = origin/main** após o push desta sessão.
 
 ## Estado em uma frase
 
-Suíte **demo forte / quase pronta para operação** (~**90%** MVP demonstrável, ~**75%** produção/revenda).
-Motor/Estoque/Chatbot/Portal/Catálogo integrados por HTTP. Simulação ainda **mock**. Bot WhatsApp
-**off de propósito**. Workflow n8n **já importado no runtime** (18 nós, tools placa/E5; só
-`wAiNaoSalvos0001`; ainda **inactive**). Falta **publish/go-live** + `ESTOQUE_API_*` no chatbot.
-Entregues: placa CRM, E3, E5, n8n tools, Task 9A, E10 Pixel Meta.
+Suíte **demo forte**: Motor com **1º driver real (Santander)** fim-a-fim no Portal; mock dos outros
+bancos; Chatbot/Estoque/Catálogo integrados por HTTP. Bot WhatsApp **off de propósito** (n8n importado,
+ainda inactive). Próximo foco de código: **próximos bancos (API-first)** ou go-live WhatsApp — **não**
+reescrever o piloto Santander sem ler as lições.
 
 ## Verificação
 
 | Produto | Testes (aprox.) | Porta host típica |
 |---|---:|---|
-| Motor | 69 | `:8000` |
+| Motor | 69+ | `:8000` |
 | Chatbot | 88 | `:8001` |
 | Estoque | 65 | `:8100` |
 | Catálogo | 23 | `:8200` |
-| Portal | 113 | `:9000` |
-| **Total** | **~358** | Evolution `:8080`, n8n `:5678` |
+| Portal | 113+ | `:9000` |
+| **Total** | **~358+** | Evolution `:8080`, n8n `:5678` |
 
 ```powershell
 cd motor-simulacao; .\.venv\Scripts\python.exe -m pytest tests/ -q
-cd ..\chatbot-api; .\.venv\Scripts\python.exe -m pytest tests/ -q
-cd ..\estoque-api; .\.venv\Scripts\python.exe -m pytest tests/ -q
 cd ..\portal-gestao; .\.venv\Scripts\python.exe -m pytest tests/ -q
-cd ..\catalogo-publico; ..\portal-gestao\.venv\Scripts\python.exe -m pytest tests/ -q
+# Worker live:
+cd ..\deploy\motor-standalone
+docker compose exec -T motor-worker sh -c "pgrep -a Xvfb; pgrep -a python"
 ```
 
 ## Por produto (feito / falta)
 
 ### Motor (`motor-simulacao/`, `deploy/motor-standalone`)
 
-- **Feito:** jobs async, worker/lease, auth+tenancy, cifra, CLI, mock de 5 bancos, compose,
-  **Task 11** (credenciais cifradas por cliente+provedor, listar/upsert/testar-login, GET mascarado,
-  auditoria — `testar-login` placeholder até driver real).
-- **Falta:** **Task 10** revenda; **Task 12** 1º driver real (design Santander aprovado; implementação
-  **não iniciada**). UI Portal 9A **feita** (consome esta API).
-
-### Chatbot (`chatbot-api/`, `deploy/chatbot-standalone`)
-
-- **Feito:** tenancy, leads, conversas/mensagens, handoff, CPF mascarado, webhook auth opt-in +
-  dedupe, sim HTTP/mock, atribuição catálogo + E2E outbox, **sem trava consentimento**,
-  **GET /v1/estoque/por-placa**, **POST /v1/simular** (placa → valor do Estoque; multi-prazo padrão
-  24/36/48/60; sem renda obrigatória), **E3 auto-pausa** (`from_me` sem `origem_bot` → pausa;
-  ack/status/vazio ignorados), **E5** números autorizados + `POST /v1/operacao/veiculos` → Estoque
-  privado, env `ESTOQUE_API_URL`/`TOKEN`, migration `0005_numeros_autorizados`.
-- **n8n:** JSON no git + **runtime importado** (18 nós; só `wAiNaoSalvos0001`; Echo/cópia apagados).
-  Ainda **`active: false`**. Segredos só no volume Docker.
-- **Falta:** **Publish**/go-live; `ESTOQUE_API_URL`+`TOKEN` no container chatbot (por-placa/E5);
-  `autorizar-numero`; LGPD exclusão; foto E6.
-
-### Estoque (`estoque-api/`)
-
-- **Feito:** CRUD, tenancy/RBAC, API pública, outbox HMAC, admin parcial, CSV/fotos, **placa**
-  normalizada + unicidade + `por-placa` + **campo placa no admin HTMX** (form/painel recriados) e
-  Portal form/lista.
-- **Falta:** E2E outbox+receptor em containers; restore/revenda; admin 100% fechado.
-  *(Wart: migrations `0002/0003` não rodam em SQLite; prod Postgres.)*
+- **Feito:**
+  - Jobs async, worker/lease, auth+tenancy, cifra, CLI, mock de 5 bancos.
+  - **Task 11** credenciais cifradas (Portal 9A).
+  - **Task 12 piloto Santander LIVE:**
+    - `SantanderDriver` + `PlaywrightBankDriver` (stealth, storage_state, screenshots).
+    - Worker Docker: Chromium + **Xvfb headed** (`MOTOR_BROWSER_HEADLESS=0`), `shm_size: 1gb`.
+    - Entrypoint limpa lock X órfão (`scripts/worker-entrypoint.sh`).
+    - Multi-prazo parseado da tela real; fallback financiado = valor − entrada.
+    - Códigos: `portal_bloqueado`, `portal_falhou`, `display_ausente`, `login_timeout`, etc.
+  - Processamento não deixa job eterno em `processando` (catch genérico + retry).
+- **Falta:**
+  - Demais bancos reais (ver reconhecimento + lições).
+  - Multi-banco **paralelo** (1 Playwright por banco no mesmo job).
+  - `GET /v1/simulacoes` listagem ao vivo.
+  - `testar-login` real (hoje **placeholder**).
+  - **Task 10** revenda.
 
 ### Portal (`portal-gestao/`)
 
-- **Feito:** auth/RBAC, estoque, leads, conversas+handoff, simulação (vendedor sem lucro/tokens),
-  vendas/financeiro/metas loja/funil, **Task 9A** `/app/financeiras` (BFF Motor), **E10** `/app/trafego`
-  (Pixel + CAPI token cifrado, Purchase ao confirmar venda, outbox best-effort).
-- **Env:** `MOTOR_URL`/`MOTOR_TOKEN`, `PORTAL_ENCRYPTION_KEY`.
-- **Falta:** #3B residual (metas por vendedor UI, campanhas, equipe/config real, CSV reconciliação);
-  Playwright E2E; worker de retry do outbox CAPI; phone hash no Purchase se houver telefone na venda.
+- **Feito:** auth/RBAC, estoque, leads, conversas, **9A Acessos bancos**, E10 Tráfego.
+  - Simulação: form → **progresso HTMX** (`/app/simulacoes/job/{id}`) → resultado multi-prazo.
+  - `MOTOR_URL` + **`MOTOR_TOKEN`** obrigatórios (sem token a tela Acessos fica vazia).
+  - Alertas de erro com códigos legíveis (`resultado.html`).
+- **Falta:** lista de simulações ao vivo (#3A.1 Task 16); #3B residual; Playwright E2E;
+  retry outbox CAPI.
 
-### Catálogo (`catalogo-publico/`, `deploy/catalogo-conectado`)
+### Chatbot / Estoque / Catálogo
 
-- **Feito:** vitrine/detalhe, CTA `wa.me`+`CAT-*`, UTM/eventos, outbox, wiring funil deploy + E2E
-  entrega, **Pixel browser** (`META_PIXEL_ID`: PageView + Lead com `event_id`).
-- **Falta:** validar funil+pixel em containers reais; SEO/cache/tema/standalone; sync automático
-  Pixel ID com Portal (hoje operador alinha manualmente).
+- Sem mudança crítica nesta sessão. Chatbot: go-live WhatsApp ainda pendente
+  (`docs/go-live-chatbot.md`). Estoque = fonte de verdade dos veículos. Catálogo: Pixel browser ok.
+
+## Problemas duros desta sessão (resumo)
+
+1. **Akamai** bloqueia headless_shell → headed + Xvfb.  
+2. **Xvfb lock órfão** após restart → entrypoint limpa.  
+3. **Material UI** sem placeholder → labels / `type=tel` / roles.  
+4. **Falso positivo "Cliente"** na landing → marcadores pós-login específicos.  
+5. **Modal simulações anteriores** + overlays Material → fechar X / Escape / aguardar loading.  
+6. **Parser** de parcelas e "Valor liberado" no HTML quebrado.  
+7. Hot-patch de `.py` exige **restart do worker** (import em memória).
+
+Detalhe operacional: **`docs/plans/2026-07-13-playwright-licoes-santander.md`**.
 
 ## Regras permanentes
 
 - Workspace: `C:\Users\guilh\Documents\codigo\bot-whatsapp-financiamento`.
-- Integrações **só HTTP**. Estoque = fonte de verdade dos veículos. Tokens só no servidor.
-- **Nunca** ler/versionar `.env`, tokens Motor/Chatbot, Evolution, Gemini, `MOTOR_ENCRYPTION_KEY`,
-  `PORTAL_ENCRYPTION_KEY`, token CAPI.
-- n8n versionado: placeholders (`__INSTANCE__`, `__EVOLUTION_KEY__`, `__CHATBOT_TOKEN__`).
-- Ordem dos planos: `#0 → #1A → #4A → #2A → #5A → #3A/#3A.1 → #3B → #6`.
-  Ignore `docs/plans/_archive/` (LEGADO).
-- Parcelas com nomes de banco = **sempre mock** até driver `real: true`.
+- Integrações **só HTTP**. Tokens só no servidor.
+- **Nunca** ler/versionar `.env`, tokens Motor/Chatbot, Evolution, Gemini, chaves de cifra, senhas de portal.
+- n8n versionado: placeholders. Ordem planos: `#0 → #1A → #4A → #2A → #5A → #3A/#3A.1 → #3B → #6`.
+- Parcelas com nome de banco **sem** `real: true` = mock.
+- Próximo banco Playwright: **API-first** — só robô se confirmar sem API.
 
-## Próximos passos (ordem)
+## Próximos passos (ordem sugerida para o próximo agente)
 
-1. **Go-live WhatsApp** — `ESTOQUE_API_URL`/`TOKEN` no chatbot, `autorizar-numero`, **Publish**
-   do `wAiNaoSalvos0001` (`docs/go-live-chatbot.md`). Workflow já está importado.
-2. Validar funil catálogo + Pixel em **containers reais** (`META_PIXEL_ID` = aba Tráfego).
-3. Motor **Task 12** (1º driver real) + **Task 10** revenda; #3B residual; #5A residual.
-4. CAPI retry worker; E1 áudio / E6 fotos quando operação pedir.
+1. **Ler** `docs/plans/2026-07-13-playwright-licoes-santander.md` + `...-bancos-reconhecimento.md`.
+2. Escolher banco (Pan/BV/Bradesco preferir **API**; Fontecred candidato Playwright).
+3. Credencial da loja em Portal → Acessos; worker com Xvfb saudável.
+4. Implementar driver (reutilizar base); **não** copiar seletores do Santander.
+5. Alternativa de produto: go-live WhatsApp (`docs/go-live-chatbot.md`) se operação pedir.
 
 ## Avisos operacionais
 
-1. E2E “sumiu”? Evolution `open`, n8n **Published**, placeholders, `SIMULATION_PROVIDER=http`, token Motor.
-2. Não usar `printenv` em containers com tokens.
-3. Scripts PowerShell em Code nodes n8n: preservar `$('NomeDoNo')`.
-4. Import n8n desativa workflow → `publish:workflow` + restart.
-5. E3: Evolution deve entregar `fromMe` com texto; bot outbound com `origem_bot: true` + `provider_message_id`.
-6. `chatbot-api/`: use `pytest tests/ -q` (evitar dirs `test-tmp-run*`).
-7. Portal produção: definir `PORTAL_ENCRYPTION_KEY` (`python -m app.cli gerar-chave-cifragem`).
+1. `MOTOR_TOKEN` no compose do Portal = mesmo token do cliente Motor.
+2. Após editar `santander.py` / entrypoint no container: `docker compose restart motor-worker` e
+   `pgrep Xvfb`.
+3. Screenshots de falha: volume `motor_browser_data` → `/srv/data/screenshots/`.
+4. Não usar `printenv` em containers com tokens.
+5. Rebuild Docker pode falhar por DNS do Hub; hot-copy + restart é workaround válido em dev.

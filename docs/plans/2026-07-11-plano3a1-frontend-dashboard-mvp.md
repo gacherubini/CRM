@@ -3,6 +3,9 @@
 > Workstream executável do #3A. **MVP entregue** (2026-07-13) exceto Playwright E2E.
 > Task 13 (sim vendedor) **feita**. Task 9A (financeiras) e E10 (Tráfego) vivem no Portal mas
 > fora deste checklist original. Use este doc só para o residual, não para reimplementar.
+>
+> **2026-07-13:** progresso de simulação HTMX (`progresso.html` + rota job) + resultado multi-prazo
+> com códigos de erro do Motor (**Santander live**). Ainda aberto: **lista de sims ao vivo** (Task 16).
 
 **Goal:** Dashboard web (dono/gerente/vendedor) com login, estoque via API, leads, handoff e
 simulação manual — tokens só no servidor.
@@ -39,6 +42,16 @@ Browser → sessão/cookie → Portal BFF
 ### Task 15 — Playwright E2E
 
 - Fluxos críticos login → estoque → leads → handoff → simulação (smoke).
+
+### Task 16 — Simulações ao vivo no Portal (pedido dono 2026-07-13)
+
+> Parcial: já existe `/app/simulacoes/job/{id}` com progresso auto-refresh (Santander).
+> Falta a **lista** de tudo que está rodando.
+
+- [ ] Tela/lista “Simulações em andamento” (jobs `recebida`/`processando`) com link para o job.
+- [ ] Multi-banco: status por provedor na lista e no detalhe do job.
+- [ ] Depende de listagem no Motor (`GET /v1/simulacoes`) se ainda não houver.
+- [ ] Alinhado ao Motor: multi-banco RPA = **um Playwright por banco** (ver #1A Task 12).
 
 ### Task 13 — RBAC da simulação (**feito 2026-07-13**)
 

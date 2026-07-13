@@ -18,6 +18,23 @@
     <div><dt>Categoria</dt><dd>{{ valores.categoria | capitalize }}</dd></div>
   </dl>
   {% if resultado and resultado.mensagem %}<p class="muted">{{ resultado.mensagem }}</p>{% endif %}
+  {% if resultado and resultado.status in ['falhou', 'parcial', 'aguardando_intervencao'] %}
+  <div class="alert {% if resultado.status == 'falhou' %}error{% else %}warning{% endif %}" role="alert" style="margin-top:14px">
+    {% if resultado.status == 'falhou' %}
+      A simulação <strong>falhou</strong>. Código na tabela:
+      <code>portal_bloqueado</code> = WAF/Akamai;
+      <code>portal_falhou</code> = erro no fluxo do portal;
+      <code>display_ausente</code> = browser headed sem Xvfb (reinicie o worker);
+      <code>browser_ausente</code> = Chromium não instalado;
+      <code>sem_credencial</code> = falta login em Acessos bancos;
+      <code>erro_inesperado</code> = falha interna (veja logs do worker).
+    {% elif resultado.status == 'aguardando_intervencao' %}
+      O portal pediu intervenção (captcha, 2FA ou bloqueio). Atualize a senha em Acessos bancos ou tente mais tarde.
+    {% else %}
+      Resultado <strong>parcial</strong>: alguns bancos/prazos ok, outros falharam.
+    {% endif %}
+  </div>
+  {% endif %}
 </section>
 
 

@@ -92,16 +92,77 @@ def test_simular_santander_vai_ao_motor_nao_chatbot(client, chatbot_fake, motor_
         "categoria": "moto",
         "prazo_meses": "48",
     }
-    resposta = client.post("/app/simulacoes", data=dados)
-    assert resposta.status_code == 200
-    assert "946,28" in resposta.text or "946.28" in resposta.text
-    assert "santander" in resposta.text.lower()
+    # POST enfileira e redireciona para tela de progresso do job
+    resposta = client.post("/app/simulacoes", data=dados, follow_redirects=False)
+    assert resposta.status_code == 303
+    loc = resposta.headers["location"]
+    assert loc.startswith("/app/simulacoes/job/")
     assert chatbot_fake.simulacoes == []
     assert len(motor_fake.simulacoes) == 1
     body = motor_fake.simulacoes[0]
-    assert body["provedores"] == ["santander"]
+    assert body["provedores"] == ["Santander"]
     assert body["veiculo"]["placa"] == "FUV7G58"
     assert body["pessoa"]["cnh"] is True
+
+    # GET do job com status concluído mostra resultado (parcelas)
+    job = client.get(loc)
+    assert job.status_code == 200
+    assert "946,28" in job.text or "946.28" in job.text
+    assert "santander" in job.text.lower()
+    assert "FUV7G58" in job.text
+
+
+def test_job_em_processamento_mostra_progresso(client, chatbot_fake, motor_fake):
+    motor_fake.status_retorno = "processando"
+    login(client, papel="dono")
+    csrf = _csrf_do_form(client)
+    dados = {
+        "csrf": csrf,
+        "modo": "santander",
+        "cpf": "52998224725",
+        "nascimento": "1990-05-20",
+        "cnh": "sim",
+        "placa": "FUV7G58",
+        "uf_licenciamento": "SP",
+        "finalidade": "comum",
+        "valor": "21900",
+        "entrada": "1123.20",
+        "prazos_meses": "48",
+        "categoria": "moto",
+        "prazo_meses": "48",
+    }
+    post = client.post("/app/simulacoes", data=dados, follow_redirects=False)
+    assert post.status_code == 303
+    job = client.get(post.headers["location"])
+    assert job.status_code == 200
+    assert "Simulação em andamento" in job.text
+    assert "Processando no Santander" in job.text or "Consultando portal Santander" in job.text
+    assert 'http-equiv="refresh"' in job.text
+    assert "FUV7G58" in job.text
+    # CPF completo não vaza
+    assert "52998224725" not in job.text
+
+
+def test_job_na_fila_mostra_etapa_enfileirada(client, chatbot_fake, motor_fake):
+    motor_fake.status_retorno = "recebida"
+    login(client)
+    csrf = _csrf_do_form(client)
+    dados = {
+        "csrf": csrf,
+        "modo": "santander",
+        "cpf": "52998224725",
+        "nascimento": "1990-05-20",
+        "placa": "ABC1D23",
+        "valor": "20000",
+        "entrada": "0",
+        "prazos_meses": "36",
+        "categoria": "moto",
+    }
+    post = client.post("/app/simulacoes", data=dados, follow_redirects=False)
+    job = client.get(post.headers["location"])
+    assert job.status_code == 200
+    assert "Na fila" in job.text or "enfileirada" in job.text.lower()
+    assert "Atualizar agora" in job.text
 
 
 def test_sanitizador_remove_campos_sensiveis_sem_mutar_original():

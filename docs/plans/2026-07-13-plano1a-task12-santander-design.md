@@ -2,6 +2,10 @@
 
 > Spec de brainstorming. Alimenta o plano de implementação (Motor Task 12 do #1A).
 > Data: 2026-07-13. Decisões de produto do dono nesta sessão.
+>
+> **Atualização 2026-07-13 (fim):** piloto **implementado e validado live**. Lições operacionais e
+> armadilhas para os próximos bancos: `2026-07-13-playwright-licoes-santander.md`.  
+> Decisões abaixo **permanecem válidas** (API-first, multi-prazo, headed anti-WAF na prática).
 
 ## Objetivo
 
@@ -137,8 +141,14 @@ próximos bancos, verificar API **antes** de partir pro robô.
 
 - Imagem Docker do Motor ganha Playwright + Chromium (imagem maior). Worker roda o browser.
 - `storage_state` por cliente em volume fora do git; tratado como segredo.
-- Concorrência: sessão de browser é pesada; respeitar o modelo worker/lease atual (um job por vez por
-  worker) e um rate-limit para não martelar o portal.
+- Concorrência: sessão de browser é pesada. Modelo desejado pelo dono (2026-07-13):
+  - **Um browser Playwright por banco** (nunca reutilizar o mesmo browser/contexto entre
+    Santander, Bradesco RPA, etc. no mesmo job).
+  - Job multi-banco: drivers RPA podem rodar em paralelo com **teto** de Chromium no worker
+    (RAM/CPU); API-drivers em paralelo sem browser.
+  - Lease do job continua 1 job/worker no baseline; paralelismo interno é **entre provedores
+    do mesmo job**, não N jobs pesados sem controle.
+  - Rate-limit **por provedor** para não martelar o mesmo portal.
 
 ## Segurança e privacidade
 

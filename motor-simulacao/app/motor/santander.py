@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import os
 import re
+import time
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Iterable
@@ -69,15 +70,32 @@ UF_PARA_PORTAL: dict[str, str] = {
     "TO": "TOCANTINS",
 }
 
-# Cards: "48x de R$ 946,28" (com ou sem quebra de linha)
+# Cards: "48x de R$ 946,28" — no portal real o "R$" costuma vir em outra tag/linha.
 _RE_PARCELA = re.compile(
     r"(\d+)\s*x\s*de\s*R\$\s*([\d.]+,\d{2})",
     re.IGNORECASE,
 )
+# Só imediatamente após o rótulo — o antigo ".*?" caía no R$ da parcela (ex.: 946,28).
 _RE_VALOR_LIBERADO = re.compile(
-    r"Valor liberado.*?R\$\s*([\d.]+,\d{2})",
-    re.IGNORECASE | re.DOTALL,
+    r"Valor liberado\s+R\$\s*([\d.]+,\d{2})",
+    re.IGNORECASE,
 )
+# Fallback com pouco lixo no meio, sem atravessar cards "Nx de".
+_RE_VALOR_LIBERADO_FROUXO = re.compile(
+    r"Valor liberado\s{0,40}R\$\s*([\d.]+,\d{2})",
+    re.IGNORECASE,
+)
+
+
+def _texto_plano_portal(texto: str) -> str:
+    """Normaliza HTML/texto do portal para parsing (tags e quebras viram espaço)."""
+    s = texto or ""
+    s = re.sub(r"(?is)<script[^>]*>.*?</script>", " ", s)
+    s = re.sub(r"(?is)<style[^>]*>.*?</style>", " ", s)
+    s = re.sub(r"<[^>]+>", " ", s)
+    s = s.replace("\xa0", " ").replace("&nbsp;", " ")
+    s = re.sub(r"\s+", " ", s)
+    return s
 
 
 def parse_moeda_br(texto: str) -> Decimal:
@@ -92,9 +110,14 @@ def parse_moeda_br(texto: str) -> Decimal:
 
 
 def parse_parcelas_texto(texto: str) -> list[tuple[int, Decimal]]:
-    """Extrai (prazo_meses, parcela) de HTML/texto da tela de simulação."""
+    """Extrai (prazo_meses, parcela) de HTML/texto da tela de simulação.
+
+    Aceita layout real do Portal Auto onde o card quebra linha:
+    ``48x de`` + ``R$ 946,28`` em nós separados.
+    """
+    plano = _texto_plano_portal(texto)
     vistos: dict[int, Decimal] = {}
-    for m in _RE_PARCELA.finditer(texto or ""):
+    for m in _RE_PARCELA.finditer(plano):
         prazo = int(m.group(1))
         parcela = parse_moeda_br(m.group(2))
         # mantém a primeira ocorrência de cada prazo
@@ -103,10 +126,24 @@ def parse_parcelas_texto(texto: str) -> list[tuple[int, Decimal]]:
 
 
 def parse_valor_liberado(texto: str) -> Decimal | None:
-    m = _RE_VALOR_LIBERADO.search(texto or "")
-    if not m:
-        return None
-    return parse_moeda_br(m.group(1))
+    """Valor financiado (rótulo 'Valor liberado'). Não confunde com parcela."""
+    plano = _texto_plano_portal(texto)
+    for rx in (_RE_VALOR_LIBERADO, _RE_VALOR_LIBERADO_FROUXO):
+        m = rx.search(plano)
+        if not m:
+            continue
+        # Descarta se o trecho entre rótulo e R$ contém card de parcela.
+        meio = plano[m.start() : m.start(1)]
+        if re.search(r"\d+\s*x\s*de", meio, re.I):
+            continue
+        val = parse_moeda_br(m.group(1))
+        # Financiado real é tipicamente milhares; parcela sozinha ~centenas–2k
+        # e já existe em "Nx de R$". Se o valor bate com uma parcela parseada, ignora.
+        parcelas = {p for _, p in parse_parcelas_texto(plano)}
+        if val in parcelas:
+            continue
+        return val
+    return None
 
 
 def uf_para_portal(uf: str | None) -> str:
@@ -135,7 +172,7 @@ class SantanderDriver(PlaywrightBankDriver):
     def __init__(
         self,
         *,
-        headless: bool = True,
+        headless: bool | None = None,
         storage_state_path: str | Path | None = None,
         screenshot_dir: str | Path | None = None,
         timeout_ms: int | None = None,
@@ -143,7 +180,7 @@ class SantanderDriver(PlaywrightBankDriver):
         html_simulacao: str | None = None,
     ):
         super().__init__(
-            headless=headless,
+            headless=headless,  # None → headed (anti-Akamai); ver browser_headless_padrao
             storage_state_path=storage_state_path,
             screenshot_dir=screenshot_dir
             or getattr(config, "SCREENSHOT_DIR", None),
@@ -193,7 +230,10 @@ class SantanderDriver(PlaywrightBankDriver):
             )
         financiado = parse_valor_liberado(html)
         if financiado is None and sol.veiculo.valor is not None:
-            financiado = Decimal(str(max(sol.veiculo.valor - sol.condicoes.entrada, 0)))
+            entrada = Decimal(str(sol.condicoes.entrada or 0))
+            financiado = Decimal(str(sol.veiculo.valor)) - entrada
+            if financiado < 0:
+                financiado = Decimal("0")
         # Filtra prazos pedidos se a solicitação trouxe lista
         pedidos = set(sol.condicoes.prazos_meses or [])
         out: list[ResultadoDriver] = []
@@ -241,22 +281,33 @@ class SantanderDriver(PlaywrightBankDriver):
         cpf_lojista, senha = cred
 
         with sync_playwright() as p:
-            browser = p.chromium.launch(headless=self.headless)
-            context_kwargs: dict = {}
-            if self.storage_state_path and self.storage_state_path.is_file():
-                context_kwargs["storage_state"] = str(self.storage_state_path)
-            browser_ctx = browser.new_context(**context_kwargs)
+            # Um browser por banco (isolamento multi-provedor).
+            browser = self._launch_browser(p)
+            browser_ctx = self._new_context(browser)
             page = browser_ctx.new_page()
             page.set_default_timeout(self.timeout_ms)
             try:
                 self._passo_login(page, cpf_lojista, senha)
                 self._passo_cliente_veiculo(page, sol)
                 self._passo_termos_e_modal_uf(page)
-                html = self._passo_aguardar_simulacao(page)
+                self._passo_aguardar_simulacao(page)
                 if sol.condicoes.entrada:
                     self._ajustar_entrada(page, sol.condicoes.entrada)
-                    html = page.content()
-                resultados = self._resultados_de_html(html, sol)
+                    # re-espera cards após mudar entrada
+                    try:
+                        page.get_by_text(
+                            re.compile(r"\d+\s*x\s*de", re.I)
+                        ).first.wait_for(timeout=15_000)
+                        page.wait_for_timeout(800)
+                    except Exception:
+                        pass
+                # inner_text é mais estável que HTML cru (cards quebram "de" / "R$")
+                try:
+                    texto = page.inner_text("body") or ""
+                except Exception:
+                    texto = ""
+                html = page.content() or ""
+                resultados = self._resultados_de_html(texto + "\n" + html, sol)
                 self._salvar_storage(browser_ctx)
                 return resultados
             except (RejeicaoNegocio, IntervencaoNecessaria, ErroTransitorio):
@@ -264,8 +315,11 @@ class SantanderDriver(PlaywrightBankDriver):
                 raise
             except Exception as exc:
                 self._screenshot_falha(page, "inesperado")
+                # Não logar stack com PII; mensagem curta só com tipo + trecho.
+                detalhe = str(exc).replace("\n", " ")[:180]
                 raise ErroTransitorio(
-                    "portal_falhou", f"falha no portal Santander: {type(exc).__name__}"
+                    "portal_falhou",
+                    f"falha no portal Santander: {type(exc).__name__}: {detalhe}",
                 ) from exc
             finally:
                 browser_ctx.close()
@@ -287,81 +341,474 @@ class SantanderDriver(PlaywrightBankDriver):
         return segredo
 
     def _passo_login(self, page, cpf_lojista: str, senha: str) -> None:
-        page.goto(self.login_url, wait_until="domcontentloaded")
-        # Placeholders da tela de login
-        page.get_by_placeholder(re.compile("CPF", re.I)).fill(cpf_lojista)
-        page.get_by_placeholder(re.compile("senha", re.I)).fill(senha)
-        page.get_by_role("button", name=re.compile("Entrar", re.I)).click()
-        # Pós-login: menu ou passo 1
-        page.get_by_text(re.compile("Informações básicas|Cliente", re.I)).first.wait_for(
-            timeout=self.timeout_ms
-        )
-
-    def _passo_cliente_veiculo(self, page, sol: SolicitacaoSimulacao) -> None:
-        # CPF / nascimento
-        page.get_by_placeholder(re.compile("CPF ou CNPJ", re.I)).fill(sol.pessoa.cpf)
-        nasc = _formatar_nascimento(sol.pessoa.nascimento)
-        page.get_by_placeholder(re.compile("00/00/0000|nascimento", re.I)).fill(nasc)
-        # CNH
-        if sol.pessoa.cnh is False:
-            page.get_by_text("Não", exact=True).click()
-        else:
-            page.get_by_text("Sim", exact=True).first.click()
-        # Placa
-        page.get_by_text(re.compile("Busca por placa", re.I)).click()
-        placa = (sol.veiculo.placa or "").replace("-", "").upper()
-        page.get_by_placeholder(re.compile("Placa", re.I)).fill(placa)
-        # Aguarda FIPE / marca
-        page.get_by_text(re.compile("Marca|Modelo|FIPE", re.I)).first.wait_for(
-            timeout=self.timeout_ms
-        )
-        # Valor do veículo
-        if sol.veiculo.valor is not None:
-            valor_fmt = _formatar_moeda_input(sol.veiculo.valor)
-            # campo "Valor" / "Valor do veículo"
-            try:
-                page.get_by_label(re.compile("Valor", re.I)).fill(valor_fmt)
-            except Exception:
-                page.locator('input[placeholder*="Valor" i]').first.fill(valor_fmt)
-        # Finalidade
-        fin = (sol.veiculo.finalidade or "comum").lower()
-        if fin == "pcd":
-            page.get_by_text("PCD", exact=True).click()
-        else:
-            page.get_by_text("Comum", exact=True).click()
-        # UF — se o seletor existir
-        uf_label = uf_para_portal(sol.veiculo.uf_licenciamento)
+        # Força HTTPS (WAF às vezes responde Access Denied em http).
+        url = self.login_url
+        if url.startswith("http://"):
+            url = "https://" + url[len("http://") :]
+        # networkidle costuma ajudar a passar desafios JS do WAF; fallback domcontentloaded.
         try:
-            page.get_by_text(re.compile("Licenciamento", re.I)).click()
-            page.get_by_text(uf_label, exact=False).first.click()
+            page.goto(url, wait_until="networkidle", timeout=self.timeout_ms)
         except Exception:
-            pass  # UF já pode vir preenchida pela placa
-
-    def _passo_termos_e_modal_uf(self, page) -> None:
-        btn = page.get_by_role("button", name=re.compile("Concordar e continuar", re.I))
-        btn.wait_for(state="visible", timeout=self.timeout_ms)
-        # botão pode começar disabled até valor OK
-        page.wait_for_timeout(500)
-        btn.click()
-        # Modal: "O licenciamento será feito no estado de ...?"
-        modal = page.get_by_text(re.compile("licenciamento será feito", re.I))
+            page.goto(url, wait_until="domcontentloaded", timeout=self.timeout_ms)
+        # Pausa curta “humana” — bots disparam fill imediato.
+        page.wait_for_timeout(800)
+        self._assert_portal_acessivel(page)
+        # Angular Material: placeholder HTML fica vazio; o texto “Digite o seu CPF”
+        # é label flutuante. get_by_placeholder nunca acha o campo → timeout ~60s.
+        cpf_box = self._campo_login_cpf(page)
+        senha_box = self._campo_login_senha(page)
+        cpf_box.click()
+        cpf_box.fill("")
+        cpf_box.type(re.sub(r"\D", "", cpf_lojista), delay=35)
+        page.wait_for_timeout(200)
+        senha_box.click()
+        senha_box.fill("")
+        senha_box.type(senha, delay=40)
+        page.wait_for_timeout(300)
+        entrar = page.get_by_role("button", name=re.compile(r"^Entrar$", re.I))
+        # Material deixa o botão disabled até validar CPF/senha.
         try:
-            modal.wait_for(timeout=10_000)
-            page.get_by_role("button", name=re.compile("^Continuar$", re.I)).click()
-        except Exception:
-            pass  # alguns fluxos não mostram modal
-
-    def _passo_aguardar_simulacao(self, page) -> str:
-        """AGORA ESPERA — tela de parcelas pode demorar a montar."""
-        page.get_by_text(re.compile("Escolha a parcela desejada", re.I)).wait_for(
-            timeout=max(self.timeout_ms, 60_000)
-        )
-        # preferir aba Padrão
-        try:
-            page.get_by_role("button", name=re.compile("^Padrão$", re.I)).click()
+            page.wait_for_function(
+                """() => {
+                  const bs = [...document.querySelectorAll('button')];
+                  const b = bs.find(x => /^\\s*Entrar\\s*$/i.test(x.textContent || ''));
+                  return b && !b.disabled;
+                }""",
+                timeout=min(self.timeout_ms, 15_000),
+            )
         except Exception:
             pass
-        return page.content()
+        entrar.click()
+        self._aguardar_pos_login(page)
+
+    def _aguardar_pos_login(self, page) -> None:
+        """Espera o login de verdade — não usar 'Cliente' (casa com 'clientes' na landing)."""
+        timeout = max(self.timeout_ms, 60_000)
+        # Overlay "Por favor, aguarde..." após clicar Entrar (pode demorar a aparecer).
+        overlay = page.get_by_text(re.compile(r"Por favor,?\s*aguarde", re.I))
+        try:
+            overlay.first.wait_for(state="visible", timeout=5_000)
+        except Exception:
+            pass
+        try:
+            overlay.first.wait_for(state="hidden", timeout=timeout)
+        except Exception:
+            pass
+        # Marcadores da área logada (passo 1 / menu). Evitar substring genérica.
+        marcadores = re.compile(
+            r"Informações básicas|CPF ou CNPJ|Dados do cliente|"
+            r"Nova proposta|Busca por placa|Simular",
+            re.I,
+        )
+        try:
+            page.get_by_text(marcadores).first.wait_for(state="visible", timeout=timeout)
+            return
+        except Exception:
+            pass
+        # URL saiu de /login?
+        try:
+            page.wait_for_function(
+                "() => !/\\/login\\b/i.test(location.href) && !/\\/login\\b/i.test(location.hash)",
+                timeout=5_000,
+            )
+            return
+        except Exception:
+            pass
+        self._assert_portal_acessivel(page)
+        body = ""
+        try:
+            body = (page.inner_text("body") or "")[:1200]
+        except Exception:
+            body = ""
+        if re.search(
+            r"inv[aá]lid|incorret|n[aã]o autorizado|usu[aá]rio ou senha|"
+            r"credencia|acesso negado|tente novamente",
+            body,
+            re.I,
+        ):
+            raise IntervencaoNecessaria(
+                "login_rejeitado",
+                "Portal rejeitou CPF/senha do lojista. Atualize em Acessos bancos.",
+            )
+        url = page.url or ""
+        if re.search(r"/login", url, re.I) or re.search(
+            r"Por favor,?\s*aguarde|Portal do lojista", body, re.I
+        ):
+            raise ErroTransitorio(
+                "login_timeout",
+                "Login não concluiu a tempo (overlay ou ainda na tela de login).",
+            )
+        raise ErroTransitorio(
+            "portal_falhou",
+            "pós-login: tela esperada não apareceu",
+        )
+
+    def _campo_login_cpf(self, page):
+        """CPF lojista — Material: placeholder HTML vazio; input type=tel com máscara."""
+        # Preferir type=tel (estável no Portal Auto); label flutuante demora a montar.
+        tel = page.locator("input[type=tel]").first
+        try:
+            tel.wait_for(state="visible", timeout=min(self.timeout_ms, 20_000))
+            return tel
+        except Exception:
+            pass
+        loc = page.get_by_label(re.compile(r"^CPF\b", re.I))
+        if loc.count() > 0:
+            return loc.first
+        box = page.get_by_role("textbox").nth(0)
+        box.wait_for(state="visible", timeout=min(self.timeout_ms, 15_000))
+        return box
+
+    def _campo_login_senha(self, page):
+        # Campo senha no portal é type=text (não password), mas tem label "senha".
+        loc = page.get_by_label(re.compile(r"senha", re.I))
+        try:
+            loc.first.wait_for(state="visible", timeout=min(self.timeout_ms, 15_000))
+            return loc.first
+        except Exception:
+            pass
+        box = page.get_by_role("textbox").nth(1)
+        box.wait_for(state="visible", timeout=min(self.timeout_ms, 10_000))
+        return box
+
+    def _aguardar_loading(self, page, timeout_ms: int | None = None) -> None:
+        """Espera sumir o overlay 'Por favor, aguarde...' do portal."""
+        t = timeout_ms or self.timeout_ms
+        overlay = page.locator(
+            ".loading-indicator__text, app-loading-indicator .loading-indicator__text"
+        )
+        try:
+            overlay.first.wait_for(state="visible", timeout=3_000)
+        except Exception:
+            pass
+        try:
+            # pode haver vários; espera todos hidden
+            page.locator(".loading-indicator__text").first.wait_for(
+                state="hidden", timeout=t
+            )
+        except Exception:
+            pass
+        page.wait_for_timeout(200)
+
+    def _fechar_modal_simulacoes_anteriores(self, page) -> None:
+        """Cliente com proposta em andamento abre modal — fecha com X para nova simulação."""
+        titulo = page.get_by_role(
+            "heading", name=re.compile(r"Simula[cç][oõ]es anteriores", re.I)
+        )
+        try:
+            titulo.wait_for(state="visible", timeout=8_000)
+        except Exception:
+            return
+        dialog = page.locator(".cdk-overlay-pane").filter(
+            has=page.get_by_role(
+                "heading", name=re.compile(r"Simula[cç][oõ]es anteriores", re.I)
+            )
+        )
+        # Nunca clicar "Continuar essa simulação" aqui — queremos nova cotação.
+        # Ordem: mat-dialog-close / botão sem "Continuar" (o X) / Escape.
+        for attempt in (
+            lambda: dialog.locator("button[mat-dialog-close]").first.click(
+                timeout=2_000, force=True
+            ),
+            lambda: dialog.locator("[mat-dialog-close]").first.click(
+                timeout=2_000, force=True
+            ),
+            lambda: dialog.get_by_role("button")
+            .filter(has_not_text=re.compile(r"Continuar", re.I))
+            .first.click(timeout=2_000, force=True),
+            lambda: dialog.locator("button").filter(has=page.locator("mat-icon")).first.click(
+                timeout=2_000, force=True
+            ),
+            lambda: page.keyboard.press("Escape"),
+        ):
+            try:
+                attempt()
+            except Exception:
+                continue
+            try:
+                titulo.wait_for(state="hidden", timeout=4_000)
+                break
+            except Exception:
+                continue
+        # Backdrop some quando o dialog fecha de verdade.
+        try:
+            page.locator(".cdk-overlay-backdrop").first.wait_for(
+                state="hidden", timeout=8_000
+            )
+        except Exception:
+            pass
+        try:
+            titulo.wait_for(state="hidden", timeout=5_000)
+        except Exception:
+            # último recurso: force hide via Escape + force click fora
+            try:
+                page.keyboard.press("Escape")
+                page.wait_for_timeout(300)
+                page.keyboard.press("Escape")
+            except Exception:
+                pass
+        self._aguardar_loading(page, timeout_ms=15_000)
+
+    def _preencher_por_label(self, page, padrao: str, valor: str) -> None:
+        """Preenche input Material por label acessível (placeholder HTML costuma vazio)."""
+        rx = re.compile(padrao, re.I)
+        loc = page.get_by_label(rx)
+        if loc.count() == 0:
+            loc = page.get_by_role("textbox", name=rx)
+        if loc.count() == 0:
+            # formcontrolname comum no Portal Auto
+            if re.search(r"nascimento", padrao, re.I):
+                loc = page.locator('input[formcontrolname="dateOfBirth"]')
+            elif re.search(r"placa", padrao, re.I):
+                loc = page.locator(
+                    'input[formcontrolname*="plate" i], input[formcontrolname*="placa" i]'
+                )
+            elif re.search(r"CPF|CNPJ", padrao, re.I):
+                loc = page.locator(
+                    'input[formcontrolname*="document" i], input[formcontrolname*="cpf" i]'
+                )
+        if loc.count() == 0:
+            raise self._falha_campo(padrao)
+        # Preferir textbox real — get_by_label("Placa") às vezes pega o radio
+        # "Busca por placa" (input type=radio).
+        box = loc.first
+        try:
+            tag = (box.evaluate("el => (el.type || el.tagName || '').toLowerCase()") or "")
+            if tag in ("radio", "checkbox"):
+                textbox = page.get_by_role("textbox", name=rx)
+                if textbox.count() > 0:
+                    box = textbox.first
+                else:
+                    # próximo input de texto/tel visível com formcontrol de placa
+                    alt = page.locator(
+                        'input[formcontrolname*="plate" i], '
+                        'input[formcontrolname*="placa" i], '
+                        'input[type="text"]:not([formcontrolname="dateOfBirth"])'
+                    )
+                    if alt.count() > 0:
+                        box = alt.last
+        except Exception:
+            pass
+        # force evita falha se residual do cdk-overlay interceptar hit-test
+        box.click(force=True, timeout=min(self.timeout_ms, 15_000))
+        box.fill("")
+        box.type(str(valor), delay=30)
+
+    def _passo_cliente_veiculo(self, page, sol: SolicitacaoSimulacao) -> None:
+        """Passo 1 real do Portal Auto (2026-07): CPF → (modal) → nasc/CNH → placa → valor."""
+        cpf = re.sub(r"\D", "", sol.pessoa.cpf or "")
+        # 1) CPF/CNPJ do cliente + Tab para disparar consulta
+        self._preencher_por_label(page, r"CPF ou CNPJ", cpf)
+        page.keyboard.press("Tab")
+        self._aguardar_loading(page)
+        # Modal se o cliente já tem proposta em andamento
+        self._fechar_modal_simulacoes_anteriores(page)
+
+        # 2) Nascimento (só aparece após consulta do CPF)
+        nasc = _formatar_nascimento(sol.pessoa.nascimento)
+        try:
+            page.get_by_label(re.compile(r"nascimento", re.I)).first.wait_for(
+                state="visible", timeout=self.timeout_ms
+            )
+        except Exception as exc:
+            raise ErroTransitorio(
+                "portal_falhou",
+                "campo data de nascimento não apareceu após CPF do cliente",
+            ) from exc
+        self._preencher_por_label(page, r"nascimento", nasc)
+
+        # 3) CNH — default do portal é "Sim"; só clica se precisar "Não"
+        if sol.pessoa.cnh is False:
+            try:
+                page.get_by_text(re.compile(r"^Não$", re.I)).first.click(
+                    force=True, timeout=5_000
+                )
+            except Exception:
+                page.locator("mat-radio-button").filter(
+                    has_text=re.compile(r"Não", re.I)
+                ).first.click(force=True)
+
+        # 4) Busca por placa
+        try:
+            page.locator("mat-radio-button").filter(
+                has_text=re.compile(r"Busca por placa", re.I)
+            ).click(force=True, timeout=10_000)
+        except Exception:
+            page.get_by_text(re.compile(r"Busca por placa", re.I)).first.click(
+                force=True
+            )
+        page.wait_for_timeout(600)
+        placa = (sol.veiculo.placa or "").replace("-", "").upper()
+        # Campo de placa só existe após marcar "Busca por placa".
+        placa_box = page.get_by_role("textbox", name=re.compile(r"Placa", re.I))
+        if placa_box.count() == 0:
+            placa_box = page.locator(
+                'input[formcontrolname*="plate" i], input[formcontrolname*="placa" i]'
+            )
+        if placa_box.count() == 0:
+            # fallback: último text input novo (não CPF, não data)
+            placa_box = page.locator(
+                'input[type="text"]:not([formcontrolname="dateOfBirth"])'
+            )
+        try:
+            placa_box.last.wait_for(state="visible", timeout=15_000)
+        except Exception as exc:
+            raise ErroTransitorio(
+                "portal_falhou", "campo Placa não apareceu após Busca por placa"
+            ) from exc
+        pb = placa_box.last
+        pb.click(force=True)
+        pb.fill("")
+        pb.type(placa, delay=40)
+        page.keyboard.press("Tab")
+        self._aguardar_loading(page)
+        # Aguarda retorno de veículo (marca/modelo/FIPE ou valor)
+        try:
+            page.get_by_text(re.compile(r"Marca|Modelo|FIPE|Ano", re.I)).first.wait_for(
+                timeout=self.timeout_ms
+            )
+        except Exception:
+            pass
+
+        # 5) Valor do veículo (se ainda editável)
+        if sol.veiculo.valor is not None:
+            valor_fmt = _formatar_moeda_input(float(sol.veiculo.valor))
+            try:
+                self._preencher_por_label(page, r"Valor", valor_fmt)
+            except Exception:
+                try:
+                    page.locator(
+                        'input[formcontrolname*="value" i], input[formcontrolname*="valor" i]'
+                    ).first.fill(valor_fmt)
+                except Exception:
+                    pass
+
+        # 6) Finalidade (default Comum)
+        fin = (sol.veiculo.finalidade or "comum").lower()
+        if fin == "pcd":
+            page.locator("mat-radio-button").filter(
+                has_text=re.compile(r"PCD", re.I)
+            ).first.click(force=True)
+        else:
+            try:
+                page.locator("mat-radio-button").filter(
+                    has_text=re.compile(r"Comum", re.I)
+                ).first.click(force=True, timeout=5_000)
+            except Exception:
+                pass
+
+        # 7) UF de licenciamento se o seletor existir
+        uf_label = uf_para_portal(sol.veiculo.uf_licenciamento)
+        try:
+            page.get_by_text(re.compile(r"Licenciamento", re.I)).click(timeout=3_000)
+            page.get_by_text(uf_label, exact=False).first.click(timeout=3_000)
+        except Exception:
+            pass
+        # Fecha mat-select / autocomplete que deixam backdrop transparente.
+        self._fechar_overlays_soltos(page)
+
+    def _fechar_overlays_soltos(self, page) -> None:
+        """Remove backdrop transparente de mat-select que bloqueia cliques."""
+        for _ in range(3):
+            try:
+                page.keyboard.press("Escape")
+            except Exception:
+                break
+            page.wait_for_timeout(150)
+        try:
+            page.locator(".cdk-overlay-backdrop.cdk-overlay-backdrop-showing").first.wait_for(
+                state="hidden", timeout=3_000
+            )
+        except Exception:
+            try:
+                page.evaluate(
+                    """() => {
+                      document.querySelectorAll('.cdk-overlay-backdrop').forEach(e => {
+                        e.classList.remove('cdk-overlay-backdrop-showing');
+                        e.style.pointerEvents = 'none';
+                      });
+                    }"""
+                )
+            except Exception:
+                pass
+
+    def _passo_termos_e_modal_uf(self, page) -> None:
+        self._fechar_overlays_soltos(page)
+        btn = page.get_by_role(
+            "button", name=re.compile(r"Concordar e continuar", re.I)
+        )
+        if btn.count() == 0:
+            btn = page.get_by_role(
+                "button", name=re.compile(r"^Continuar$", re.I)
+            )
+        btn.last.wait_for(state="visible", timeout=self.timeout_ms)
+        # botão disabled até campos + termos ok
+        try:
+            page.wait_for_function(
+                """() => {
+                  const bs = [...document.querySelectorAll('button')];
+                  const b = bs.find(x => /Concordar e continuar/i.test(
+                    (x.innerText || '').trim()
+                  ));
+                  return b && !b.disabled;
+                }""",
+                timeout=self.timeout_ms,
+            )
+        except Exception:
+            pass
+        page.wait_for_timeout(400)
+        self._fechar_overlays_soltos(page)
+        btn.last.click(force=True)
+        self._aguardar_loading(page)
+        # Modal: "O licenciamento será feito no estado de ...?"
+        modal = page.get_by_text(re.compile(r"licenciamento será feito", re.I))
+        try:
+            modal.wait_for(timeout=10_000)
+            page.get_by_role("button", name=re.compile(r"^Continuar$", re.I)).click(
+                force=True
+            )
+            self._aguardar_loading(page)
+        except Exception:
+            pass
+
+    def _passo_aguardar_simulacao(self, page) -> None:
+        """AGORA ESPERA — tela de parcelas pode demorar a montar."""
+        timeout = max(self.timeout_ms, 90_000)
+        prazo_fim = time.monotonic() + (timeout / 1000.0)
+        marcador_ok = re.compile(
+            r"Escolha a parcela desejada|\d+\s*x\s*de", re.I
+        )
+        while time.monotonic() < prazo_fim:
+            # Erro do portal no passo 2 (banner vermelho).
+            if page.get_by_text(re.compile(r"Ocorreu um erro", re.I)).count() > 0:
+                detalhe = "ocorreu um erro na simulação do portal"
+                try:
+                    page.get_by_text(re.compile(r"Saiba mais", re.I)).first.click(
+                        force=True, timeout=2_000
+                    )
+                    page.wait_for_timeout(600)
+                    body = (page.inner_text("body") or "")[:500]
+                    detalhe = re.sub(r"\s+", " ", body)[:180]
+                except Exception:
+                    pass
+                raise ErroTransitorio("portal_simulacao_erro", detalhe)
+            if page.get_by_text(marcador_ok).count() > 0:
+                break
+            page.wait_for_timeout(400)
+        else:
+            self._assert_portal_acessivel(page)
+            raise ErroTransitorio(
+                "portal_falhou",
+                "tela de parcelas não apareceu a tempo",
+            )
+        # preferir aba Padrão
+        try:
+            page.get_by_role("button", name=re.compile(r"^Padrão$", re.I)).click(
+                force=True, timeout=3_000
+            )
+            page.wait_for_timeout(500)
+        except Exception:
+            pass
 
     def _ajustar_entrada(self, page, entrada: float) -> None:
         try:
@@ -397,8 +844,11 @@ def _formatar_moeda_input(valor: float) -> str:
 
 
 def fabrica_santander() -> SantanderDriver:
+    from app.motor.playwright_base import browser_headless_padrao
+
     return SantanderDriver(
-        headless=os.getenv("MOTOR_BROWSER_HEADLESS", "1") != "0",
+        # Padrão headed (Xvfb no Docker) — headless_shell é bloqueado pelo Akamai.
+        headless=browser_headless_padrao(),
         screenshot_dir=config.SCREENSHOT_DIR,
         storage_state_path=Path(config.STORAGE_STATE_DIR) / "santander.json",
         timeout_ms=int(getattr(config, "BROWSER_TIMEOUT_MS", 45_000)),

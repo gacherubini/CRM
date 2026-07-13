@@ -39,9 +39,11 @@ Detalham a Task 12 do #1A (1º driver `real: true`). Ler junto com o #1A:
 - [Design/spec](2026-07-13-plano1a-task12-santander-design.md) — arquitetura, princípio **API-first**,
   base reutilizável, riscos ToS/fragilidade. **Aprovado pelo dono 2026-07-13.**
 - [Plano de implementação — Fase 1 (Motor)](2026-07-13-plano1a-task12-santander-implementacao.md) —
-  11 tasks TDD; piloto Santander via Playwright. **Não iniciado.**
+  piloto Santander via Playwright. **LIVE OK 2026-07-13** (pause para outros bancos).
 - [Mapa dos bancos (reconhecimento)](2026-07-13-plano1a-task12-bancos-reconhecimento.md) — API vs
   Playwright por banco; Pan/BV/Bradesco **provavelmente têm API** (a confirmar com os bancos).
+- [**Lições do piloto Santander**](2026-07-13-playwright-licoes-santander.md) — **obrigatório** antes
+  do próximo driver Playwright (WAF, Xvfb, Material, modais, parsers, checklist).
 
 ## Pacotes comerciais
 

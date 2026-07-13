@@ -39,3 +39,21 @@ def test_falha_campo_gera_intervencao():
     exc = d._falha_campo("CPF")
     assert exc.codigo == "campo_nao_encontrado"
     assert "CPF" in str(exc)
+
+
+def test_browser_headless_padrao_e_zero_por_padrao(monkeypatch):
+    from app.motor.playwright_base import browser_headless_padrao
+
+    monkeypatch.delenv("MOTOR_BROWSER_HEADLESS", raising=False)
+    assert browser_headless_padrao() is False
+    monkeypatch.setenv("MOTOR_BROWSER_HEADLESS", "1")
+    assert browser_headless_padrao() is True
+    monkeypatch.setenv("MOTOR_BROWSER_HEADLESS", "0")
+    assert browser_headless_padrao() is False
+
+
+def test_stealth_init_remove_webdriver_flag():
+    from app.motor import playwright_base as pb
+
+    assert "webdriver" in pb._STEALTH_INIT
+    assert "--enable-automation" in pb._IGNORE_DEFAULT_ARGS

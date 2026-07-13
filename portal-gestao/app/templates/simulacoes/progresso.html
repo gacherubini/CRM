@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+{% block title %}Simulação em andamento — Gestão{% endblock %}
+{% block head %}
+{% if auto_refresh %}
+<meta http-equiv="refresh" content="{{ refresh_segundos | default(3) }}">
+{% endif %}
+{% endblock %}
+{% block content %}
+<div class="page-heading">
+  <div>
+    <a class="back-link" href="/app/simulacoes">← Nova simulação</a>
+    <span class="eyebrow"><i></i> Ao vivo</span>
+    <h1>Simulação em andamento</h1>
+    <p>
+      O Motor está consultando o portal do banco. Esta página atualiza sozinha a cada
+      {{ refresh_segundos | default(3) }}s — não feche até ver o resultado.
+    </p>
+  </div>
+</div>
+
+{% if erro %}
+<div class="alert error" role="alert">{{ erro }}</div>
+{% endif %}
+
+<section class="panel form-section">
+  <div class="section-title">
+    <span>00</span>
+    <div>
+      <h2>Status agora</h2>
+      <p>Job <code class="mono-inline">{{ sim_id }}</code></p>
+    </div>
+  </div>
+  <div class="sim-status-banner status-{{ status }}">
+    <span class="sim-pulse" aria-hidden="true"></span>
+    <div>
+      <strong>{{ status_label }}</strong>
+      <p class="muted" style="margin:6px 0 0">
+        {% if status == 'recebida' %}
+          Na fila do worker. Em instantes o navegador automatizado abre o portal lojista.
+        {% elif status == 'processando' %}
+          Login e leitura de parcelas no Santander em curso (Playwright). Pode demorar até ~90s.
+        {% elif status == 'erro_motor' %}
+          Não foi possível consultar o Motor. A página tenta de novo automaticamente.
+        {% else %}
+          Aguardando atualização do job…
+        {% endif %}
+      </p>
+    </div>
+  </div>
+</section>
+
+<section class="panel form-section">
+  <div class="section-title">
+    <span>01</span>
+    <div><h2>O que está acontecendo</h2><p>Etapas do job Santander.</p></div>
+  </div>
+  <ol class="sim-steps">
+    {% for passo in passos %}
+    <li class="sim-step {{ passo.estado }}">
+      <span class="sim-step-num" aria-hidden="true">{{ passo.num }}</span>
+      <div>
+        <strong>{{ passo.titulo }}</strong>
+        <p class="muted" style="margin:4px 0 0">{{ passo.detalhe }}</p>
+      </div>
+    </li>
+    {% endfor %}
+  </ol>
+</section>
+
+<section class="panel form-section">
+  <div class="section-title">
+    <span>02</span>
+    <div><h2>Parâmetros desta consulta</h2><p>Enviados ao Motor.</p></div>
+  </div>
+  <dl class="integration-stats">
+    <div><dt>CPF</dt><dd>{{ cpf_mascarado or '—' }}</dd></div>
+    {% if valores.placa %}<div><dt>Placa</dt><dd>{{ valores.placa }}</dd></div>{% endif %}
+    <div><dt>Valor</dt><dd>{% if valores.valor %}{{ formatar_brl(valores.valor) }}{% else %}—{% endif %}</dd></div>
+    <div><dt>Entrada</dt><dd>{{ formatar_brl(valores.entrada or 0) }}</dd></div>
+    <div><dt>Prazos</dt><dd>{% if valores.prazos_meses %}{{ valores.prazos_meses }}{% else %}{{ valores.prazo_meses or '—' }}{% endif %}</dd></div>
+    <div><dt>UF</dt><dd>{{ valores.uf_licenciamento or '—' }}</dd></div>
+  </dl>
+</section>
+
+{% if resultados_parciais %}
+<section class="panel flush">
+  <div class="table-wrap"><table>
+    <thead><tr><th>Banco</th><th>Parcela</th><th>Prazo</th><th>Situação</th></tr></thead>
+    <tbody>
+      {% for r in resultados_parciais %}
+      <tr>
+        <td><strong>{{ r.provedor or '—' }}</strong></td>
+        <td>{% if r.valor_parcela is not none %}{{ formatar_brl(r.valor_parcela) }}{% else %}—{% endif %}</td>
+        <td>{% if r.prazo_meses %}{{ r.prazo_meses }}x{% else %}—{% endif %}</td>
+        <td><span class="status">{{ r.status or '—' }}</span></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table></div>
+</section>
+{% endif %}
+
+<div class="form-actions">
+  <a class="button ghost" href="/app/simulacoes">Cancelar e voltar</a>
+  <a class="button primary" href="/app/simulacoes/job/{{ sim_id }}">Atualizar agora</a>
+</div>
+{% endblock %}
