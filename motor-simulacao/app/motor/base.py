@@ -1,23 +1,38 @@
-"""Modelos do contrato público v1 (Plano #1A / Plano #0)."""
-from typing import List, Optional
+"""Modelos do contrato público v1 (Plano #1A / Task 12 campos reais)."""
+from typing import List, Literal, Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, model_validator
 
 
 class Pessoa(BaseModel):
     cpf: str
     nascimento: str
     renda: Optional[float] = None
+    cnh: Optional[bool] = None
 
 
 class Veiculo(BaseModel):
     categoria: str = "moto"
-    valor: float
+    # Opcional quando o portal do banco resolve o valor pela placa.
+    valor: Optional[float] = None
+    placa: Optional[str] = None
+    uf_licenciamento: Optional[str] = None
+    finalidade: Optional[Literal["comum", "pcd"]] = None
 
 
 class Condicoes(BaseModel):
     entrada: float = 0
-    prazo_meses: int
+    # Contrato antigo: um prazo. Novo: lista multi-prazo (Santander real).
+    prazo_meses: Optional[int] = None
+    prazos_meses: List[int] = []
+
+    @model_validator(mode="after")
+    def _normaliza_prazos(self) -> "Condicoes":
+        if not self.prazos_meses and self.prazo_meses is not None:
+            object.__setattr__(self, "prazos_meses", [self.prazo_meses])
+        if self.prazo_meses is None and self.prazos_meses:
+            object.__setattr__(self, "prazo_meses", self.prazos_meses[0])
+        return self
 
 
 class SolicitacaoSimulacao(BaseModel):

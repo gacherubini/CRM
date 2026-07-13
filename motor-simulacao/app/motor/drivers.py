@@ -1,16 +1,21 @@
-"""Drivers de simulação (Plano #1A, Task 6).
+"""Drivers de simulação (Plano #1A Task 6 + Task 12).
 
-Cada provedor é um adapter isolado. No incremento atual só há o mock (taxas fictícias),
-mas a interface já distingue os desfechos que o worker precisa tratar:
+Cada provedor é um adapter isolado. No incremento atual há o mock (taxas fictícias);
+drivers reais (Playwright/API) entram com ``real: true`` e credencial.
 
-- sucesso: devolve ``ResultadoDriver`` com status ``concluida``;
-- ``RejeicaoNegocio``: rejeição de negócio — não sofre retry;
-- ``ErroTransitorio`` (ou ``TimeoutError``): indisponibilidade — sofre retry limitado;
-- ``IntervencaoNecessaria``: captcha/2FA — vira ``aguardando_intervencao``.
+Desfechos:
+- sucesso: ``ResultadoDriver`` ou lista (multi-prazo);
+- ``RejeicaoNegocio``: sem retry;
+- ``ErroTransitorio`` / ``TimeoutError``: retry limitado;
+- ``IntervencaoNecessaria``: captcha/2FA → ``aguardando_intervencao``.
 """
+from __future__ import annotations
+
 from dataclasses import dataclass
 from decimal import Decimal
-from typing import Callable, Optional
+from typing import Callable, Optional, Union
+
+from sqlalchemy.orm import Session
 
 from app.motor.amortizacao import calcula_parcela_price
 from app.motor.base import SolicitacaoSimulacao
@@ -46,33 +51,70 @@ class ResultadoDriver:
     codigo_erro: Optional[str] = None
 
 
-Driver = Callable[[SolicitacaoSimulacao], ResultadoDriver]
+@dataclass
+class DriverContext:
+    """Contexto opcional passado aos drivers (DB, cliente, screenshots)."""
+
+    db: Session | None = None
+    cliente_id: str | None = None
+    screenshot_dir: str | None = None
+
+
+# Driver pode devolver um resultado ou lista (multi-prazo).
+Driver = Callable[
+    [SolicitacaoSimulacao, Optional[DriverContext]],
+    Union[ResultadoDriver, list[ResultadoDriver]],
+]
+
+
+def _prazo_unico(sol: SolicitacaoSimulacao) -> int:
+    if sol.condicoes.prazo_meses is not None:
+        return sol.condicoes.prazo_meses
+    if sol.condicoes.prazos_meses:
+        return sol.condicoes.prazos_meses[0]
+    return 0
 
 
 def _driver_banco(banco: str, taxa: Decimal) -> Driver:
-    def _driver(sol: SolicitacaoSimulacao) -> ResultadoDriver:
-        financiado = Decimal(str(max(sol.veiculo.valor - sol.condicoes.entrada, 0)))
-        parcela = calcula_parcela_price(financiado, taxa, sol.condicoes.prazo_meses)
+    def _driver(
+        sol: SolicitacaoSimulacao, ctx: DriverContext | None = None
+    ) -> ResultadoDriver:
+        valor = sol.veiculo.valor or 0
+        financiado = Decimal(str(max(valor - sol.condicoes.entrada, 0)))
+        prazo = _prazo_unico(sol)
+        parcela = calcula_parcela_price(financiado, taxa, prazo)
         return ResultadoDriver(
             provedor=banco,
             status="concluida",
             valor_parcela=parcela,
             taxa_am=taxa * 100,
-            prazo_meses=sol.condicoes.prazo_meses,
+            prazo_meses=prazo,
             valor_financiado=financiado,
         )
 
     return _driver
 
 
-# Registro de drivers habilitados. Cada banco do mock é um provedor distinto.
+# Registro de drivers mock. Cada banco fictício é um provedor distinto.
 DRIVERS: dict[str, Driver] = {
     banco: _driver_banco(banco, taxa) for banco, taxa in TAXAS_MOCK.items()
 }
 
+# Drivers reais (Task 12+): só resolvidos quando há credencial — ver resolver_drivers.
+REAL_DRIVERS: dict[str, Driver] = {}
 
-def resolver_drivers(provedores: list[str] | None) -> list[tuple[str, Driver]]:
-    """Expande a lista pedida em pares (nome, driver). ``mock`` = todos os bancos mock."""
+
+def resolver_drivers(
+    provedores: list[str] | None,
+    *,
+    cliente_id: str | None = None,
+    db: Session | None = None,
+) -> list[tuple[str, Driver]]:
+    """Expande a lista pedida em pares (nome, driver). ``mock`` = todos os bancos mock.
+
+    Drivers em ``REAL_DRIVERS`` só entram se ``cliente_id``+``db`` tiverem credencial
+    habilitada para o provedor (sem cair em mock silencioso).
+    """
     pedidos = provedores or ["mock"]
     nomes: list[str] = []
     for p in pedidos:
@@ -80,10 +122,34 @@ def resolver_drivers(provedores: list[str] | None) -> list[tuple[str, Driver]]:
             nomes.extend(DRIVERS.keys())
         elif p in DRIVERS:
             nomes.append(p)
+        elif p in REAL_DRIVERS:
+            nomes.append(p)
     vistos: set[str] = set()
     pares: list[tuple[str, Driver]] = []
     for nome in nomes:
-        if nome not in vistos:
-            vistos.add(nome)
+        if nome in vistos:
+            continue
+        vistos.add(nome)
+        if nome in DRIVERS:
             pares.append((nome, DRIVERS[nome]))
+            continue
+        if nome in REAL_DRIVERS:
+            if db is not None and cliente_id and _tem_credencial_real(db, cliente_id, nome):
+                pares.append((nome, REAL_DRIVERS[nome]))
+            # sem credencial: não inclui (não vira mock)
     return pares
+
+
+def _tem_credencial_real(db: Session, cliente_id: str, provedor: str) -> bool:
+    from app.models_db import CredencialProvedorORM
+
+    row = (
+        db.query(CredencialProvedorORM)
+        .filter(
+            CredencialProvedorORM.cliente_id == cliente_id,
+            CredencialProvedorORM.provedor == provedor,
+            CredencialProvedorORM.habilitado.is_(True),
+        )
+        .first()
+    )
+    return row is not None

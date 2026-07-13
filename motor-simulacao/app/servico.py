@@ -46,13 +46,29 @@ def _validar(sol: SolicitacaoSimulacao) -> None:
         raise ErroValidacao("idade_minima", f"Idade mínima é {config.IDADE_MINIMA} anos")
     if sol.veiculo.categoria not in config.CATEGORIAS:
         raise ErroValidacao("categoria_invalida", "Categoria de veículo não suportada")
-    if sol.condicoes.entrada < 0 or sol.condicoes.entrada > sol.veiculo.valor:
+    # Driver real: valor pode vir do portal pela placa; mock/HTTP ainda usam valor.
+    if sol.veiculo.valor is None and not sol.veiculo.placa:
+        raise ErroValidacao(
+            "valor_ou_placa", "Informe o valor do veículo ou a placa para cotação"
+        )
+    if sol.condicoes.entrada < 0:
+        raise ErroValidacao("entrada_invalida", "Entrada deve ser >= 0")
+    if sol.veiculo.valor is not None and sol.condicoes.entrada > sol.veiculo.valor:
         raise ErroValidacao("entrada_invalida", "Entrada deve estar entre 0 e o valor do veículo")
-    if not (config.PRAZO_MIN <= sol.condicoes.prazo_meses <= config.PRAZO_MAX):
+    prazos = list(sol.condicoes.prazos_meses or [])
+    if not prazos and sol.condicoes.prazo_meses is not None:
+        prazos = [sol.condicoes.prazo_meses]
+    if not prazos:
         raise ErroValidacao(
             "prazo_invalido",
-            f"Prazo deve estar entre {config.PRAZO_MIN} e {config.PRAZO_MAX} meses",
+            f"Informe prazo_meses ou prazos_meses entre {config.PRAZO_MIN} e {config.PRAZO_MAX}",
         )
+    for prazo in prazos:
+        if not (config.PRAZO_MIN <= prazo <= config.PRAZO_MAX):
+            raise ErroValidacao(
+                "prazo_invalido",
+                f"Prazo deve estar entre {config.PRAZO_MIN} e {config.PRAZO_MAX} meses",
+            )
 
 
 def criar_simulacao(
@@ -80,6 +96,9 @@ def criar_simulacao(
         }
     )
     # Enfileira: status 'recebida'. O worker executa os provedores depois.
+    prazos = list(sol.condicoes.prazos_meses or [])
+    if not prazos and sol.condicoes.prazo_meses is not None:
+        prazos = [sol.condicoes.prazo_meses]
     sim = SimulacaoORM(
         id=str(uuid.uuid4()),
         cliente_id=cliente_id,
@@ -90,8 +109,13 @@ def criar_simulacao(
         categoria=sol.veiculo.categoria,
         valor=sol.veiculo.valor,
         entrada=sol.condicoes.entrada,
-        prazo_meses=sol.condicoes.prazo_meses,
+        prazo_meses=sol.condicoes.prazo_meses or (prazos[0] if prazos else None),
         provedores=sol.provedores,
+        cnh=sol.pessoa.cnh,
+        placa=sol.veiculo.placa,
+        uf_licenciamento=sol.veiculo.uf_licenciamento,
+        finalidade=sol.veiculo.finalidade,
+        prazos_meses=prazos or None,
     )
     db.add(sim)
     db.flush()

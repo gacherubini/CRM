@@ -19,16 +19,20 @@ TAXAS_MOCK = {
 
 
 def simular_mock(sol: SolicitacaoSimulacao) -> list[ResultadoProvedor]:
-    financiado = Decimal(str(max(sol.veiculo.valor - sol.condicoes.entrada, 0)))
+    valor = sol.veiculo.valor or 0
+    financiado = Decimal(str(max(valor - sol.condicoes.entrada, 0)))
+    prazo = sol.condicoes.prazo_meses or (
+        sol.condicoes.prazos_meses[0] if sol.condicoes.prazos_meses else 0
+    )
     resultados: list[ResultadoProvedor] = []
     for banco, taxa in TAXAS_MOCK.items():
-        parcela = calcula_parcela_price(financiado, taxa, sol.condicoes.prazo_meses)
+        parcela = calcula_parcela_price(financiado, taxa, prazo)
         resultados.append(
             ResultadoProvedor(
                 provedor=banco,
                 valor_parcela=float(parcela),
                 taxa_am=float(taxa * 100),
-                prazo_meses=sol.condicoes.prazo_meses,
+                prazo_meses=prazo,
                 valor_financiado=float(financiado),
             )
         )

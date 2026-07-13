@@ -54,6 +54,8 @@ def db():
 @pytest.fixture(autouse=True)
 def _limpar_banco(db):
     # Banco de teste é compartilhado; a fila é global. Cada teste começa sem jobs de outros.
+    # Rollback limpa transação residual (ex.: worker multi-commit no mesmo StaticPool).
+    db.rollback()
     for tabela in (
         "simulacao_tentativas", "simulacao_resultados", "idempotencia", "simulacoes",
         "auditoria", "credenciais_provedor", "credenciais_api", "clientes_api",
@@ -69,4 +71,6 @@ def _limpar_banco(db):
         )
     )
     db.commit()
+    db.expire_all()
     yield
+    db.rollback()

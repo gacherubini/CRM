@@ -1,5 +1,4 @@
-"""Núcleo do worker (Plano #1A, Task 6): reserva de job, execução por provedor,
-resultados parciais, retry/timeout e máquina de estado geral.
+"""Núcleo do worker (Plano #1A Task 6 + Task 12 multi-prazo).
 
 Estados gerais: recebida → processando → (concluida | parcial | falhou |
 aguardando_intervencao). ``cancelada`` é terminal e nunca é reservada.
@@ -17,6 +16,7 @@ from app.models_db import ResultadoORM, SimulacaoORM, SimulacaoTentativaORM
 from app.motor.base import Condicoes, Pessoa, SolicitacaoSimulacao, Veiculo
 from app.motor.drivers import (
     Driver,
+    DriverContext,
     ErroTransitorio,
     IntervencaoNecessaria,
     RejeicaoNegocio,
@@ -57,11 +57,7 @@ def reencaminhar_jobs_expirados(db: Session, agora: datetime | None = None) -> i
 
 
 def reservar_proximo_job(db: Session) -> Optional[SimulacaoORM]:
-    """Reserva atomicamente o próximo job ``recebida`` marcando-o ``processando``.
-
-    O UPDATE condicional (``WHERE status='recebida'``) garante que dois workers não
-    peguem o mesmo job: só quem alterar exatamente 1 linha fica com o job.
-    """
+    """Reserva atomicamente o próximo job ``recebida`` marcando-o ``processando``."""
     sim = (
         db.query(SimulacaoORM)
         .filter(SimulacaoORM.status == "recebida")
@@ -86,67 +82,99 @@ def reservar_proximo_job(db: Session) -> Optional[SimulacaoORM]:
     )
     db.commit()
     if linhas != 1:
-        return None  # outro worker levou o job
+        return None
     db.refresh(sim)
     return sim
 
 
 def _reconstruir_solicitacao(sim: SimulacaoORM) -> SolicitacaoSimulacao:
     pessoal = json.loads(cripto.decifrar(sim.payload_cifrado)) if sim.payload_cifrado else {}
+    prazos = list(sim.prazos_meses) if sim.prazos_meses else (
+        [sim.prazo_meses] if sim.prazo_meses else []
+    )
     return SolicitacaoSimulacao(
         referencia_externa=sim.referencia_externa,
         pessoa=Pessoa(
             cpf=pessoal.get("cpf", ""),
             nascimento=pessoal.get("nascimento", ""),
             renda=pessoal.get("renda"),
+            cnh=sim.cnh,
         ),
-        veiculo=Veiculo(categoria=sim.categoria or "moto", valor=float(sim.valor or 0)),
-        condicoes=Condicoes(entrada=float(sim.entrada or 0), prazo_meses=sim.prazo_meses or 0),
+        veiculo=Veiculo(
+            categoria=sim.categoria or "moto",
+            valor=float(sim.valor) if sim.valor is not None else None,
+            placa=sim.placa,
+            uf_licenciamento=sim.uf_licenciamento,
+            finalidade=sim.finalidade,
+        ),
+        condicoes=Condicoes(entrada=float(sim.entrada or 0), prazos_meses=prazos),
         provedores=sim.provedores or ["mock"],
     )
 
 
 def _registrar_tentativa(
-    db: Session, sim_id: str, provedor: str, tentativa: int,
-    duracao_ms: int, status: str, codigo_erro: Optional[str],
+    db: Session,
+    sim_id: str,
+    provedor: str,
+    tentativa: int,
+    duracao_ms: int,
+    status: str,
+    codigo_erro: Optional[str],
 ) -> None:
     db.add(
         SimulacaoTentativaORM(
-            simulacao_id=sim_id, provedor=provedor, tentativa=tentativa,
-            duracao_ms=duracao_ms, status=status, codigo_erro=codigo_erro,
+            simulacao_id=sim_id,
+            provedor=provedor,
+            tentativa=tentativa,
+            duracao_ms=duracao_ms,
+            status=status,
+            codigo_erro=codigo_erro,
         )
     )
 
 
 def _executar_driver(
-    db: Session, sim: SimulacaoORM, nome: str, driver: Driver, sol: SolicitacaoSimulacao
-) -> ResultadoDriver:
-    """Roda um provedor com retry para erros transitórios; devolve o resultado final."""
+    db: Session,
+    sim: SimulacaoORM,
+    nome: str,
+    driver: Driver,
+    sol: SolicitacaoSimulacao,
+    ctx: DriverContext | None = None,
+) -> list[ResultadoDriver]:
+    """Roda um provedor com retry; devolve lista (normaliza único → lista)."""
     prazo = sol.condicoes.prazo_meses
     for tentativa in range(1, MAX_TENTATIVAS_DRIVER + 1):
         inicio = time.perf_counter()
         try:
-            res = driver(sol)
+            # Drivers novos: (sol, ctx). Legados de teste: (sol,) apenas.
+            try:
+                res = driver(sol, ctx)
+            except TypeError:
+                res = driver(sol)
             dur = int((time.perf_counter() - inicio) * 1000)
             _registrar_tentativa(db, sim.id, nome, tentativa, dur, "concluida", None)
-            return res
+            return res if isinstance(res, list) else [res]
         except IntervencaoNecessaria as e:
             dur = int((time.perf_counter() - inicio) * 1000)
-            _registrar_tentativa(db, sim.id, nome, tentativa, dur, "aguardando_intervencao", e.codigo)
-            return ResultadoDriver(nome, "aguardando_intervencao", prazo_meses=prazo, codigo_erro=e.codigo)
+            _registrar_tentativa(
+                db, sim.id, nome, tentativa, dur, "aguardando_intervencao", e.codigo
+            )
+            return [
+                ResultadoDriver(
+                    nome, "aguardando_intervencao", prazo_meses=prazo, codigo_erro=e.codigo
+                )
+            ]
         except RejeicaoNegocio as e:
             dur = int((time.perf_counter() - inicio) * 1000)
             _registrar_tentativa(db, sim.id, nome, tentativa, dur, "rejeitada", e.codigo)
-            return ResultadoDriver(nome, "rejeitada", prazo_meses=prazo, codigo_erro=e.codigo)
+            return [ResultadoDriver(nome, "rejeitada", prazo_meses=prazo, codigo_erro=e.codigo)]
         except (ErroTransitorio, TimeoutError) as e:
             dur = int((time.perf_counter() - inicio) * 1000)
             codigo = getattr(e, "codigo", "timeout")
             _registrar_tentativa(db, sim.id, nome, tentativa, dur, "erro_transitorio", codigo)
             if tentativa >= MAX_TENTATIVAS_DRIVER:
-                return ResultadoDriver(nome, "erro", prazo_meses=prazo, codigo_erro=codigo)
-            # senão, tenta de novo
-    # inalcançável, mas mantém o tipo
-    return ResultadoDriver(nome, "erro", prazo_meses=prazo, codigo_erro="desconhecido")
+                return [ResultadoDriver(nome, "erro", prazo_meses=prazo, codigo_erro=codigo)]
+    return [ResultadoDriver(nome, "erro", prazo_meses=prazo, codigo_erro="desconhecido")]
 
 
 def _status_geral(resultados: list[ResultadoDriver]) -> str:
@@ -168,50 +196,72 @@ def processar_job(
     drivers: Optional[list[tuple[str, Driver]]] = None,
     reserva_token: str | None = None,
 ) -> Optional[SimulacaoORM]:
-    """Executa cada provedor, grava resultados parciais e define o estado final."""
+    """Executa cada provedor, grava resultados (N por multi-prazo) e define o estado final."""
     sim = db.get(SimulacaoORM, sim_id)
     if sim is None or sim.status != "processando":
-        return sim  # cancelado/terminal: não processa
+        return sim
     token = reserva_token or sim.reserva_token
     if not token or sim.reserva_token != token:
         return sim
     sol = _reconstruir_solicitacao(sim)
-    pares = drivers if drivers is not None else resolver_drivers(sol.provedores)
+    pares = (
+        drivers
+        if drivers is not None
+        else resolver_drivers(sol.provedores, cliente_id=sim.cliente_id, db=db)
+    )
 
-    existentes = {resultado.provedor: resultado for resultado in sim.resultados}
+    existentes_por_prov: dict[str, list] = {}
+    for resultado in sim.resultados:
+        existentes_por_prov.setdefault(resultado.provedor, []).append(resultado)
+
     resultados: list[ResultadoDriver] = [
         ResultadoDriver(
-            resultado.provedor,
-            resultado.status,
-            valor_parcela=resultado.valor_parcela,
-            taxa_am=resultado.taxa_am,
-            prazo_meses=resultado.prazo_meses,
-            valor_financiado=resultado.valor_financiado,
-            codigo_erro=resultado.codigo_erro,
+            r.provedor,
+            r.status,
+            valor_parcela=r.valor_parcela,
+            taxa_am=r.taxa_am,
+            prazo_meses=r.prazo_meses,
+            valor_financiado=r.valor_financiado,
+            codigo_erro=r.codigo_erro,
         )
-        for resultado in existentes.values()
+        for linhas in existentes_por_prov.values()
+        for r in linhas
     ]
+    ctx = DriverContext(
+        db=db,
+        cliente_id=sim.cliente_id,
+        screenshot_dir=config.SCREENSHOT_DIR,
+    )
     for nome, driver in pares:
-        if nome in existentes:
+        if nome in existentes_por_prov:
             continue
         sim.reservada_ate = _agora() + timedelta(seconds=config.JOB_LEASE_SECONDS)
         sim.atualizada_em = _agora()
         db.commit()
-        res = _executar_driver(db, sim, nome, driver, sol)
+        res_lista = _executar_driver(db, sim, nome, driver, sol, ctx)
         db.refresh(sim)
         if sim.status != "processando" or sim.reserva_token != token:
             db.rollback()
             return sim
-        db.add(
-            ResultadoORM(
-                simulacao_id=sim.id, provedor=res.provedor, status=res.status,
-                valor_parcela=res.valor_parcela, taxa_am=res.taxa_am,
-                prazo_meses=res.prazo_meses if res.prazo_meses is not None else sol.condicoes.prazo_meses,
-                valor_financiado=res.valor_financiado, codigo_erro=res.codigo_erro,
+        for res in res_lista:
+            db.add(
+                ResultadoORM(
+                    simulacao_id=sim.id,
+                    provedor=res.provedor,
+                    status=res.status,
+                    valor_parcela=res.valor_parcela,
+                    taxa_am=res.taxa_am,
+                    prazo_meses=(
+                        res.prazo_meses
+                        if res.prazo_meses is not None
+                        else sol.condicoes.prazo_meses
+                    ),
+                    valor_financiado=res.valor_financiado,
+                    codigo_erro=res.codigo_erro,
+                )
             )
-        )
-        db.commit()  # checkpoint: retomada não repete provedor já persistido
-        resultados.append(res)
+        db.commit()
+        resultados.extend(res_lista)
 
     sim.status = _status_geral(resultados)
     sim.atualizada_em = _agora()

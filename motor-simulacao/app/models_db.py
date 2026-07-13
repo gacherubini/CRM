@@ -123,6 +123,12 @@ class SimulacaoORM(Base):
     entrada: Mapped[float | None] = mapped_column(Numeric(12, 2), nullable=True)
     prazo_meses: Mapped[int | None] = mapped_column(Integer, nullable=True)
     provedores: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    # Campos do driver real (Task 12): não sensíveis; CPF/nasc continuam no payload cifrado.
+    cnh: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    placa: Mapped[str | None] = mapped_column(String(7), nullable=True)
+    uf_licenciamento: Mapped[str | None] = mapped_column(String(2), nullable=True)
+    finalidade: Mapped[str | None] = mapped_column(String(8), nullable=True)
+    prazos_meses: Mapped[list | None] = mapped_column(JSON, nullable=True)
 
     resultados: Mapped[list["ResultadoORM"]] = relationship(
         back_populates="simulacao", cascade="all, delete-orphan"
