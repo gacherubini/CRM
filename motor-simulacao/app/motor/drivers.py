@@ -103,7 +103,8 @@ DRIVERS: dict[str, Driver] = {
 }
 
 # Drivers reais (Task 12+): nome -> Driver. Só resolvidos com credencial.
-# Mock usa "Santander" (S maiúsculo); real usa "santander".
+# Mock usa "Santander" (S maiúsculo); real usa "santander" (minúsculo) para não
+# sombrear o provedor mock homônimo.
 REAL_DRIVERS: dict[str, Driver] = {}
 
 
@@ -114,9 +115,13 @@ def _registrar_drivers_reais() -> None:
     from app.motor.santander import fabrica_santander
 
     driver = fabrica_santander()
-    # Portal/lista de provedores usa "Santander" (mock); driver canônico é minúsculo.
+    # Registrado apenas em minúsculo ("santander"): é o nome canônico usado para
+    # pedidos explícitos do driver real. NÃO registrar também "Santander" (maiúsculo)
+    # aqui — esse é o nome do provedor mock (ver TAXAS_MOCK) e, se o real também
+    # ocupasse essa chave, ele sombrearia o mock em `resolver_drivers` (pedido
+    # "mock" resolveria "Santander" para REAL_DRIVERS e, sem credencial, o
+    # provedor seria descartado silenciosamente — quebrando os 5 mocks).
     REAL_DRIVERS["santander"] = driver
-    REAL_DRIVERS["Santander"] = driver
 
 
 def resolver_drivers(
