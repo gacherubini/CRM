@@ -139,6 +139,33 @@ class MotorClient:
     def obter_simulacao(self, sim_id: str, ator: str | None = None) -> dict:
         return self._request("GET", f"/v1/simulacoes/{sim_id}", ator=ator)
 
+    def listar_simulacoes(
+        self,
+        *,
+        ator: str | None = None,
+        status: str | None = None,
+        solicitado_por: str | None = None,
+        desde: str | None = None,
+        ate: str | None = None,
+        limite: int = 20,
+        offset: int = 0,
+    ) -> dict:
+        """GET /v1/simulacoes — histórico do cliente (tenancy no Motor).
+
+        Repassa o token do servidor (BFF) e o ator no header X-Ator. Para "minhas
+        sims", o chamador passa solicitado_por=email do usuário logado.
+        """
+        params: dict[str, object] = {"limite": limite, "offset": offset}
+        if status:
+            params["status"] = status
+        if solicitado_por:
+            params["solicitado_por"] = solicitado_por
+        if desde:
+            params["desde"] = desde
+        if ate:
+            params["ate"] = ate
+        return self._request("GET", "/v1/simulacoes", ator=ator, params=params)
+
     def simular_e_aguardar(
         self,
         payload: dict,

@@ -105,6 +105,10 @@ class SimulacaoORM(Base):
         ForeignKey("clientes_api.id"), nullable=False, index=True
     )
     referencia_externa: Mapped[str | None] = mapped_column(String, nullable=True)
+    # Quem disparou a simulação no Portal (email/identidade do ator via X-Ator).
+    # Não é segredo; habilita o histórico por usuário (Task 16). Nulo em chamadas
+    # diretas à API sem ator.
+    solicitado_por: Mapped[str | None] = mapped_column(String, nullable=True, index=True)
     status: Mapped[str] = mapped_column(String, default="recebida", index=True)
     criada_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_agora)
     atualizada_em: Mapped[datetime] = mapped_column(

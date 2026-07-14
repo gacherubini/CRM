@@ -2,7 +2,7 @@
 import hmac
 import os
 
-from fastapi import Depends, FastAPI, Request, Response
+from fastapi import Depends, FastAPI, Query, Request, Response
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
@@ -139,8 +139,13 @@ def criar_simulacao(
     if isinstance(cliente, JSONResponse):
         return cliente
     idempotency_key = request.headers.get("Idempotency-Key")
+    # Quem disparou (Portal repassa email do usuário logado via X-Ator). Sem
+    # header fica nulo — chamada direta à API não tem "ator" de histórico.
+    solicitado_por = request.headers.get("X-Ator")
     try:
-        sim, criada = servico.criar_simulacao(db, sol, cliente.id, idempotency_key)
+        sim, criada = servico.criar_simulacao(
+            db, sol, cliente.id, idempotency_key, solicitado_por=solicitado_por
+        )
     except servico.ErroValidacao as e:
         return JSONResponse(
             status_code=422, content={"erro": {"code": e.code, "message": e.message}}
@@ -152,6 +157,45 @@ def criar_simulacao(
     # 202 quando enfileira de fato (job assíncrono); 200 quando reusa por idempotência.
     response.status_code = 202 if criada else 200
     return {"id": sim.id, "status": sim.status, "criada_em": sim.criada_em.isoformat()}
+
+
+@app.get("/v1/simulacoes")
+def listar_simulacoes(
+    request: Request,
+    status: str | None = None,
+    solicitado_por: str | None = None,
+    desde: str | None = None,
+    ate: str | None = None,
+    limite: int = Query(servico.LISTAGEM_LIMITE_PADRAO, ge=1),
+    offset: int = Query(0, ge=0),
+    db: Session = Depends(get_db),
+    cliente=Depends(auth.autenticar_cliente),
+):
+    """Histórico de simulações do cliente (tenancy). Filtros e paginação.
+
+    Nunca decifra o payload pessoal — devolve só a projeção não sensível
+    (placa, referência, provedores, prazos, status).
+    """
+    if isinstance(cliente, JSONResponse):
+        return cliente
+    itens, total, limite_aplicado, offset_aplicado = servico.listar_simulacoes(
+        db,
+        cliente.id,
+        status=status,
+        solicitado_por=solicitado_por,
+        desde=desde,
+        ate=ate,
+        limite=limite,
+        offset=offset,
+    )
+    projetados = [servico.simulacao_resumo(s) for s in itens]
+    return {
+        "itens": projetados,
+        "total": total,
+        "limite": limite_aplicado,
+        "offset": offset_aplicado,
+        "resumo": {"total": total, "retornados": len(projetados)},
+    }
 
 
 @app.get("/v1/simulacoes/{sim_id}")

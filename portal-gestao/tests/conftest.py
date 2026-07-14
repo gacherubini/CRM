@@ -228,6 +228,61 @@ class MotorFake:
             {"nome": "Pan", "habilitado": True, "real": False, "modo": "mock"},
             {"nome": "Santander", "habilitado": True, "real": False, "modo": "mock"},
         ]
+        # Histórico de simulações (projeção não sensível do Motor — sem CPF/valores).
+        self.listagens = []
+        self.historico = [
+            {
+                "id": "sim-dono-1", "status": "concluida",
+                "criada_em": "2026-07-13T10:00:00+00:00",
+                "atualizada_em": "2026-07-13T10:02:00+00:00",
+                "solicitado_por": "dono@loja.test", "referencia_externa": None,
+                "placa": "ABC1D23", "categoria": "moto",
+                "provedores": ["Santander"], "prazos_meses": [24, 48],
+                "num_resultados": 2,
+            },
+            {
+                "id": "sim-dono-2", "status": "falhou",
+                "criada_em": "2026-07-12T09:00:00+00:00",
+                "atualizada_em": "2026-07-12T09:01:00+00:00",
+                "solicitado_por": "dono@loja.test", "referencia_externa": "lead-9",
+                "placa": None, "categoria": "carro",
+                "provedores": ["Pan"], "prazos_meses": [36],
+                "num_resultados": 1,
+            },
+            {
+                "id": "sim-outro-1", "status": "concluida",
+                "criada_em": "2026-07-11T08:00:00+00:00",
+                "atualizada_em": "2026-07-11T08:03:00+00:00",
+                "solicitado_por": "outro@loja.test", "referencia_externa": None,
+                "placa": "ZZZ9Z99", "categoria": "moto",
+                "provedores": ["Santander"], "prazos_meses": [48],
+                "num_resultados": 2,
+            },
+        ]
+
+    def listar_simulacoes(
+        self, ator=None, status=None, solicitado_por=None,
+        desde=None, ate=None, limite=20, offset=0,
+    ):
+        if self.indisponivel:
+            raise MotorIndisponivel("Não foi possível acessar o Motor de Simulação agora")
+        self.listagens.append(
+            {
+                "ator": ator, "status": status, "solicitado_por": solicitado_por,
+                "desde": desde, "ate": ate, "limite": limite, "offset": offset,
+            }
+        )
+        itens = list(self.historico)
+        if solicitado_por:
+            itens = [i for i in itens if i["solicitado_por"] == solicitado_por]
+        if status:
+            itens = [i for i in itens if i["status"] == status]
+        total = len(itens)
+        recorte = itens[offset:offset + limite]
+        return {
+            "itens": recorte, "total": total, "limite": limite, "offset": offset,
+            "resumo": {"total": total, "retornados": len(recorte)},
+        }
 
     @property
     def configurado(self) -> bool:
@@ -410,11 +465,11 @@ def csrf_da_resposta(resposta):
     return re.search(r'name="csrf" value="([^"]+)"', resposta.text).group(1)
 
 
-def login(client, papel="dono"):
-    criar_usuario(papel=papel)
+def login(client, papel="dono", email="dono@loja.test"):
+    criar_usuario(papel=papel, email=email)
     pagina = client.get("/login")
     return client.post(
         "/login",
-        data={"email": "dono@loja.test", "senha": "senha-segura", "csrf": csrf_da_resposta(pagina)},
+        data={"email": email, "senha": "senha-segura", "csrf": csrf_da_resposta(pagina)},
         follow_redirects=False,
     )
