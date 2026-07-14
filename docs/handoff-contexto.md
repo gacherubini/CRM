@@ -1,13 +1,63 @@
 # Handoff técnico — suíte automotiva
 
-> Checkpoint: **2026-07-14 (deploy Fly.io lab + Evolution → n8n confirmado; sessão #3B + fixes Motor)**.
+> Checkpoint: **2026-07-14 (registros/prints de simulação + PAN API foundation + deploy + diagnóstico
+> de memória + plano de workers sob demanda)**.
 > Confirme containers/`.env`/n8n antes de editar. Testes unitários ≠ E2E WhatsApp.  
 > Leia primeiro: `docs/contexto-compacto.md`. Planos válidos: `docs/plans/README.md`.  
 > **Lições Playwright (obrigatório antes do próximo banco):**  
 > `docs/plans/2026-07-13-playwright-licoes-santander.md`.  
-> Commits desta sessão estão em **`main` local** (ainda **sem push** — combine antes de enviar).
+> **Próximo plano do Motor:** `docs/plans/2026-07-14-plano1a-workers-playwright-sob-demanda.md`.
+> Commits `0758a9c` e `e55a3c9` estão **commitados e enviados para `origin/main`**.
 
-## Checkpoint 2026-07-14 (sessão #3B + fixes Motor + ops Fly)
+## Checkpoint mais recente — observabilidade, PAN e produção
+
+### Entregue no código
+
+- **Registros por simulação:** timeline sanitizada, endpoints de eventos/print, botão pequeno
+  **Registros** no Portal e tela de diagnóstico ao vivo.
+- **Screenshots protegidos:** capturas em pontos úteis do Playwright, tenancy/RBAC, `no-store` e
+  retenção de 7 dias. Se o browser não chega a abrir página, não há print possível.
+- **Fim de job infinito:** timeout duro do driver em 240 s, lease de 300 s e evento final de erro.
+- **Base Banco PAN via API:** `ApiBankDriver`, `PanDriver`, catálogo de campos e credenciais genéricas
+  cifradas. Ainda exige contrato/credenciais reais do PAN para chamada live.
+- **Santander:** Portal envia o provider canônico `santander` minúsculo; mock homônimo não sombreia o
+  driver real.
+- Migrations Motor: `0010` (credencial/config PAN) e `0011` (eventos/prints). Head atual: **0011**.
+- Testes do checkpoint: **Motor 123 pass** e **Portal 152 pass**.
+
+### Git e deploy
+
+- `0758a9c feat(motor): adiciona registros ao vivo e base API Pan` — `origin/main`.
+- `e55a3c9 fix(motor): reserva memoria para o Chromium` — `origin/main`.
+- `motor2037`: migrations 0010/0011 aplicadas; API, worker e Xvfb ativos; health 1/1.
+- `portal2037`: imagem com Registros publicada; health 1/1 e login público validado.
+
+### Incidente diagnosticado e correção
+
+- Job `42bba895-f0f6-44bb-9b7a-df34cc3e15fd` parou em `browser_iniciando` e foi finalizado por
+  `timeout_driver`; não ficou infinito.
+- Evidência do kernel na Machine de 512 MB: Chrome tentou alocar 536870912 bytes e recebeu
+  `not enough memory for the allocation`.
+- Motor foi aumentado de 512 MB para **2048 MB**. Após o restart: ~1968 MB totais, health OK e probe
+  Chromium headed abriu em **34,41 s**.
+- Produção atual ainda combina API+worker numa Machine **always-on de 2 GB**. Isso resolve o RPA,
+  porém mantém RAM provisionada mesmo ociosa.
+
+### Direção aprovada — workers por banco sob demanda
+
+- Uma simulação vira uma tarefa por banco; resultados chegam incrementalmente.
+- Workers Playwright são pré-criados, ficam `stopped`, iniciam em paralelo via Machines API e saem 0
+  após fila + idle grace, voltando a `stopped`.
+- PAN e outros bancos com API usam pool leve, sem browser de 2 GB.
+- Começar com Santander 2 GB; testar canário de 1,5 GB somente após telemetria. 512 MB é inválido.
+- Screenshots/storage state precisam sair do Fly Volume único para object storage privado antes de
+  escalar para várias Machines.
+- Implementação **não começou**; fonte de verdade é o plano novo citado no topo.
+
+> As seções abaixo registram o checkpoint anterior. Números `108/148`, migration `0009` e Motor
+> `512MB` são históricos e foram superados por este bloco.
+
+## Checkpoint anterior 2026-07-14 (sessão #3B + fixes Motor + ops Fly)
 
 Trabalho feito com 3 agentes paralelos em worktrees, integrado e testado no `main`:
 
