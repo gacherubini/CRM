@@ -2,14 +2,28 @@
 {% block title %}{{ titulo }} — Motora{% endblock %}
 {% block content %}
 <div class="page-heading">
-  <div><a class="back-link" href="/app/metas">← Voltar às metas</a><h1>{{ titulo }}</h1><p>Metas ativas do mesmo tipo não podem ter períodos sobrepostos.</p></div>
+  <div><a class="back-link" href="/app/metas">← Voltar às metas</a><h1>{{ titulo }}</h1><p>Metas ativas do mesmo tipo e escopo não podem ter períodos sobrepostos.</p></div>
 </div>
 {% if erro %}<div class="alert error">{{ erro }}</div>{% endif %}
 
 <form method="post" class="form-layout">
   <input type="hidden" name="csrf" value="{{ csrf }}">
   <section class="panel form-section">
-    <div class="section-title"><span>01</span><div><h2>Objetivo da loja</h2><p>Escolha a métrica, o período e o valor desejado.</p></div></div>
+    <div class="section-title"><span>01</span><div><h2>Escopo</h2><p>A meta pode valer para a loja inteira ou para um vendedor específico.</p></div></div>
+    <div class="form-grid">
+      <label>Escopo<select name="escopo" id="campo-escopo" required>
+        <option value="loja" {{ 'selected' if (valores.escopo or 'loja') == 'loja' }}>Loja</option>
+        <option value="vendedor" {{ 'selected' if valores.escopo == 'vendedor' }}>Vendedor específico</option>
+      </select></label>
+      <label id="campo-vendedor-wrap">Vendedor<select name="vendedor_email" id="campo-vendedor">
+        <option value="">Selecione</option>
+        {% for vendedor in vendedores %}<option value="{{ vendedor.email }}" {{ 'selected' if valores.vendedor_email == vendedor.email }}>{{ vendedor.nome }} ({{ vendedor.email }})</option>{% endfor %}
+      </select></label>
+    </div>
+    {% if not vendedores %}<p class="muted">Nenhum vendedor ativo cadastrado nesta loja ainda.</p>{% endif %}
+  </section>
+  <section class="panel form-section">
+    <div class="section-title"><span>02</span><div><h2>Objetivo</h2><p>Escolha a métrica, o período e o valor desejado.</p></div></div>
     <div class="form-grid">
       <label>Tipo<select name="tipo" required><option value="">Selecione</option>{% for valor, rotulo in tipos.items() %}<option value="{{ valor }}" {{ 'selected' if valores.tipo == valor }}>{{ rotulo }}</option>{% endfor %}</select></label>
       <label>Alvo<input type="number" step="0.01" min="0.01" name="valor_alvo" value="{{ valores.valor_alvo or '' }}" required></label>
@@ -19,4 +33,19 @@
   </section>
   <div class="form-actions"><a class="button ghost" href="/app/metas">Cancelar</a><button class="button primary" type="submit">Salvar meta</button></div>
 </form>
+<script>
+  (() => {
+    const escopo = document.getElementById('campo-escopo');
+    const vendedorWrap = document.getElementById('campo-vendedor-wrap');
+    const vendedorSelect = document.getElementById('campo-vendedor');
+    if (!escopo || !vendedorWrap || !vendedorSelect) return;
+    const atualizar = () => {
+      const ativo = escopo.value === 'vendedor';
+      vendedorWrap.style.display = ativo ? '' : 'none';
+      vendedorSelect.disabled = !ativo;
+    };
+    escopo.addEventListener('change', atualizar);
+    atualizar();
+  })();
+</script>
 {% endblock %}

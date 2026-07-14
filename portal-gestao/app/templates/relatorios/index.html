@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}Relatórios — Motora{% endblock %}
+{% block content %}
+<div class="page-heading">
+  <div><span class="eyebrow">Painel do dono</span><h1>Relatórios</h1><p>Exportações em CSV com os mesmos totais do painel Financeiro para o período selecionado.</p></div>
+</div>
+
+<form class="filter-bar" method="get">
+  <label class="search"><span class="sr-only">Início do período</span><input type="date" name="inicio" value="{{ periodo.inicio }}"></label>
+  <label class="search"><span class="sr-only">Fim do período</span><input type="date" name="fim" value="{{ periodo.fim }}"></label>
+  <select name="vendedor" aria-label="Vendedor do funil"><option value="">Todos os vendedores no funil</option>{% for item in vendedores %}<option value="{{ item.email }}" {{ 'selected' if filtros.vendedor == item.email }}>{{ item.nome }}</option>{% endfor %}</select>
+  <select name="origem" aria-label="Origem declarada do lead"><option value="">Todas as origens no funil</option><option value="__sem_origem__" {{ 'selected' if filtros.origem == '__sem_origem__' }}>Sem origem declarada</option></select>
+  <button class="button secondary" type="submit">Aplicar período</button>
+</form>
+<p class="muted">Vendedor e origem afetam apenas o CSV de funil. Vendas e metas exportam sempre os totais do período completo — os mesmos números do painel <a href="/app/financeiro?{{ query }}">Financeiro</a>.</p>
+
+<p class="mono-label">PERÍODO: {{ periodo.inicio }} A {{ periodo.fim }}</p>
+
+<section class="panel">
+  <div class="panel-heading"><div><span class="mono-label">EXPORTAÇÕES</span><h2>Download em CSV</h2></div></div>
+  <div class="metric-grid">
+    <div class="metric">
+      <span>Vendas confirmadas</span>
+      <strong><a class="button" href="/app/relatorios/vendas.csv?{{ query }}">Baixar vendas.csv</a></strong>
+      <small>faturamento, lucro bruto e contagem — reconciliam com o Financeiro</small>
+    </div>
+    <div class="metric">
+      <span>Metas da loja</span>
+      <strong><a class="button" href="/app/relatorios/metas.csv?{{ query }}">Baixar metas.csv</a></strong>
+      <small>alvo, realizado e percentual de atingimento no período</small>
+    </div>
+    <div class="metric accent">
+      <span>Funil auditável</span>
+      <strong><a class="button" href="/app/relatorios/funil.csv?{{ query_funil }}">Baixar funil.csv</a></strong>
+      <small>leads elegíveis, atendidos e vendas vinculadas</small>
+    </div>
+  </div>
+</section>
+{% endblock %}

@@ -22,9 +22,14 @@
   <div class="panel-heading"><div><span class="mono-label">METAS INDIVIDUAIS</span><h2>Meu atingimento</h2></div></div>
   {% if metas %}<div class="metric-grid">{% for meta in metas %}<div class="metric">
     <span>{{ meta.tipo | replace('_', ' ') | capitalize }}</span>
+    {% if meta.indisponivel %}
+    <strong>Incompleto</strong>
+    <small>Informe o custo do veículo em todas as vendas confirmadas para calcular o atingimento.</small>
+    {% else %}
     <strong>{% if meta.quantidade %}{{ meta.realizado | int }}{% else %}{{ formatar_brl(meta.realizado) }}{% endif %}</strong>
     <small>meta: {% if meta.quantidade %}{{ meta.alvo | int }}{% else %}{{ formatar_brl(meta.alvo) }}{% endif %} · {{ meta.pct }}%</small>
     <div class="meta-bar" role="progressbar" aria-valuenow="{{ meta.pct }}" aria-valuemin="0" aria-valuemax="100"><span style="display:block;height:100%;width:{{ meta.pct_barra }}%;background:currentColor"></span></div>
+    {% endif %}
   </div>{% endfor %}</div>
   {% else %}<div class="empty"><strong>Nenhuma meta individual aplicável.</strong><p>Metas de lucro não são exibidas ao vendedor. O dono ou gerente pode definir metas individuais em um incremento futuro.</p></div>{% endif %}
 </section>

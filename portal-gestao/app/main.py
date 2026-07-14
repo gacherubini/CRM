@@ -1,6 +1,3 @@
-import calendar
-import hashlib
-import hmac
 import os
 import uuid
 from datetime import date, datetime
@@ -56,6 +53,17 @@ from app.clients.estoque import EstoqueClient, EstoqueIndisponivel
 from app.clients.motor import CredencialNaoEncontrada, MotorClient, MotorIndisponivel
 from app.config import settings
 from app.db import Base, engine, get_db
+from app.financeiro_calc import (
+    calcular_metricas_vendas,
+    dinheiro,
+    funil_periodo,
+    identidade_telefone,
+    lucro_bruto_venda,
+    metas_view_periodo,
+    periodo_padrao,
+    ultimo_dia_mes,
+    _data,
+)
 
 BASE_DIR = Path(__file__).resolve().parent
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
@@ -92,14 +100,6 @@ def formatar_brl(valor) -> str:
         return "—"
     texto = f"{numero:,.2f}".replace(",", "_").replace(".", ",").replace("_", ".")
     return f"R$ {texto}"
-
-
-def identidade_telefone(telefone: str | None) -> str | None:
-    digitos = "".join(c for c in (telefone or "") if c.isdigit())
-    if not digitos:
-        return None
-    mensagem = f"portal-handoff:v1:{digitos}".encode()
-    return hmac.new(settings.identity_hmac_secret.encode(), mensagem, hashlib.sha256).hexdigest()
 
 
 templates.env.globals["mascarar_telefone"] = mascarar_telefone
@@ -1107,82 +1107,10 @@ TIPOS_META = {
     "faturamento": "Faturamento",
     "lucro_bruto": "Lucro bruto",
 }
-CENTAVOS = Decimal("0.01")
-
-
-def dinheiro(texto) -> Decimal:
-    return Decimal(str(texto).replace(",", ".")).quantize(CENTAVOS, rounding=ROUND_HALF_UP)
-
-
-def _data(momento):
-    return momento.date() if isinstance(momento, datetime) else momento
-
-
-def ultimo_dia_mes(dia: date) -> date:
-    return date(dia.year, dia.month, calendar.monthrange(dia.year, dia.month)[1])
-
-
-def periodo_padrao(inicio: str | None, fim: str | None) -> tuple[date, date]:
-    hoje = date.today()
-    try:
-        d_inicio = date.fromisoformat(inicio) if inicio else hoje.replace(day=1)
-    except ValueError:
-        d_inicio = hoje.replace(day=1)
-    try:
-        d_fim = date.fromisoformat(fim) if fim else ultimo_dia_mes(hoje)
-    except ValueError:
-        d_fim = ultimo_dia_mes(hoje)
-    return d_inicio, d_fim
-
-
-def data_api(valor) -> date | None:
-    if not valor:
-        return None
-    try:
-        return datetime.fromisoformat(str(valor).replace("Z", "+00:00")).date()
-    except (TypeError, ValueError):
-        return None
-
-
-def origem_lead(lead: dict) -> str | None:
-    origem = lead.get("origem")
-    return str(origem).strip() if origem and str(origem).strip() else None
-
-
-def lead_corresponde_origem(lead: dict, origem: str | None) -> bool:
-    if not origem:
-        return True
-    atual = origem_lead(lead)
-    if origem == "__sem_origem__":
-        return atual is None
-    return bool(atual and atual.casefold() == origem.casefold())
-
-
-def atribuicoes_no_periodo(
-    db: Session,
-    loja_slug: str,
-    inicio: date,
-    fim: date,
-    vendedor_email: str | None = None,
-) -> list[AtendimentoAtribuicao]:
-    consulta = db.query(AtendimentoAtribuicao).filter(
-        AtendimentoAtribuicao.loja_slug == loja_slug
-    )
-    if vendedor_email:
-        consulta = consulta.filter(AtendimentoAtribuicao.vendedor_email == vendedor_email)
-    return [
-        atribuicao
-        for atribuicao in consulta.all()
-        if inicio <= _data(atribuicao.iniciada_em) <= fim
-    ]
-
-
-def lucro_bruto_venda(venda: Venda) -> Decimal | None:
-    if venda.custo_veiculo is None:
-        return None
-    custo = venda.custo_veiculo
-    diretos = sum((c.valor for c in venda.custos_diretos), Decimal("0"))
-    return (venda.preco_venda - custo - diretos).quantize(CENTAVOS, rounding=ROUND_HALF_UP)
+# dinheiro, _data, ultimo_dia_mes, periodo_padrao, data_api, origem_lead,
+# lead_corresponde_origem, atribuicoes_no_periodo, lucro_bruto_venda e CENTAVOS
+# vivem em app.financeiro_calc (importados no topo deste arquivo) para serem
+# compartilhados com app.relatorios sem duplicar a matemática financeira.
 
 
 @app.get("/app/vendas", response_class=HTMLResponse)
@@ -1329,11 +1257,36 @@ async def vendas_cancelar(request: Request, venda_id: str, db: Session = Depends
 def valores_meta_form(form) -> dict[str, str]:
     return {
         campo: (form.get(campo) or "")
-        for campo in ("tipo", "periodo_inicio", "periodo_fim", "valor_alvo")
+        for campo in ("escopo", "vendedor_email", "tipo", "periodo_inicio", "periodo_fim", "valor_alvo")
     }
 
 
-def validar_meta_form(form) -> tuple[str, date, date, Decimal]:
+def vendedores_da_loja(db: Session, loja_slug: str) -> list[Usuario]:
+    return (
+        db.query(Usuario)
+        .filter(Usuario.loja_slug == loja_slug, Usuario.papel == "vendedor", Usuario.ativo.is_(True))
+        .order_by(Usuario.nome)
+        .all()
+    )
+
+
+def validar_meta_form(form, db: Session, loja_slug: str) -> tuple[str, str | None, str, date, date, Decimal]:
+    escopo = (form.get("escopo") or "loja").strip()
+    if escopo not in ("loja", "vendedor"):
+        raise ValueError("Selecione um escopo de meta válido.")
+    vendedor_email = None
+    if escopo == "vendedor":
+        vendedor_email = (form.get("vendedor_email") or "").strip().lower()
+        if not vendedor_email:
+            raise ValueError("Selecione o vendedor para a meta individual.")
+        vendedor = db.query(Usuario).filter(
+            Usuario.email == vendedor_email,
+            Usuario.loja_slug == loja_slug,
+            Usuario.papel == "vendedor",
+            Usuario.ativo.is_(True),
+        ).first()
+        if not vendedor:
+            raise ValueError("Selecione um vendedor ativo desta loja.")
     tipo = (form.get("tipo") or "").strip()
     if tipo not in TIPOS_META:
         raise ValueError("Selecione um tipo de meta válido.")
@@ -1352,12 +1305,14 @@ def validar_meta_form(form) -> tuple[str, date, date, Decimal]:
         raise ValueError("O alvo deve ser maior que zero.")
     if tipo == "quantidade" and alvo != alvo.to_integral_value():
         raise ValueError("A meta de quantidade deve ser um número inteiro.")
-    return tipo, inicio, fim, alvo
+    return escopo, vendedor_email, tipo, inicio, fim, alvo
 
 
 def meta_sobreposta(
     db: Session,
     loja_slug: str,
+    escopo: str,
+    vendedor_email: str | None,
     tipo: str,
     inicio: date,
     fim: date,
@@ -1365,18 +1320,28 @@ def meta_sobreposta(
 ) -> bool:
     consulta = db.query(Meta).filter(
         Meta.loja_slug == loja_slug,
-        Meta.escopo == "loja",
+        Meta.escopo == escopo,
         Meta.tipo == tipo,
         Meta.ativa.is_(True),
         Meta.periodo_inicio <= fim,
         Meta.periodo_fim >= inicio,
     )
+    if escopo == "vendedor":
+        consulta = consulta.filter(Meta.vendedor_email == vendedor_email)
     if ignorar_id:
         consulta = consulta.filter(Meta.id != ignorar_id)
     return consulta.first() is not None
 
 
-def render_meta_form(request: Request, usuario, valores, titulo: str, erro: str | None = None, status_code: int = 200):
+def render_meta_form(
+    request: Request,
+    usuario,
+    valores,
+    titulo: str,
+    db: Session,
+    erro: str | None = None,
+    status_code: int = 200,
+):
     return templates.TemplateResponse(
         "metas/form.html",
         contexto(
@@ -1385,6 +1350,7 @@ def render_meta_form(request: Request, usuario, valores, titulo: str, erro: str 
             valores=valores,
             titulo=titulo,
             tipos=TIPOS_META,
+            vendedores=vendedores_da_loja(db, usuario.loja_slug),
             erro=erro,
         ),
         status_code=status_code,
@@ -1396,12 +1362,20 @@ def metas_lista(request: Request, db: Session = Depends(get_db)):
     usuario = usuario_atual(request, db)
     if not usuario:
         return redirecionar_login()
-    metas = (
-        db.query(Meta)
-        .filter(Meta.loja_slug == usuario.loja_slug, Meta.escopo == "loja")
-        .order_by(Meta.ativa.desc(), Meta.periodo_inicio.desc())
-        .all()
-    )
+    pode_gerir = pode_gerir_metas(usuario)
+    consulta = db.query(Meta).filter(Meta.loja_slug == usuario.loja_slug)
+    # Metas por vendedor expõem escopo individual: só dono/gerente veem a lista completa.
+    # Vendedores continuam vendo somente as metas da loja aqui (o atingimento individual
+    # deles é exibido no próprio painel, em /app/vendedor).
+    if pode_gerir:
+        consulta = consulta.filter(Meta.escopo.in_(["loja", "vendedor"]))
+    else:
+        consulta = consulta.filter(Meta.escopo == "loja")
+    metas = consulta.order_by(Meta.ativa.desc(), Meta.periodo_inicio.desc()).all()
+    vendedores_por_email = {
+        vendedor.email: vendedor
+        for vendedor in db.query(Usuario).filter(Usuario.loja_slug == usuario.loja_slug).all()
+    }
     return templates.TemplateResponse(
         "metas/lista.html",
         contexto(
@@ -1409,7 +1383,8 @@ def metas_lista(request: Request, db: Session = Depends(get_db)):
             usuario,
             metas=metas,
             tipos=TIPOS_META,
-            pode_gerir=pode_gerir_metas(usuario),
+            pode_gerir=pode_gerir,
+            vendedores_por_email=vendedores_por_email,
         ),
     )
 
@@ -1421,7 +1396,7 @@ def metas_nova(request: Request, db: Session = Depends(get_db)):
         return redirecionar_login()
     if not pode_gerir_metas(usuario):
         return RedirectResponse("/app/metas", status_code=303)
-    return render_meta_form(request, usuario, {}, "Cadastrar meta da loja")
+    return render_meta_form(request, usuario, {}, "Cadastrar meta", db)
 
 
 @app.post("/app/metas/nova")
@@ -1434,22 +1409,24 @@ async def metas_criar(request: Request, db: Session = Depends(get_db)):
         return RedirectResponse("/app/metas", status_code=303)
     valores = valores_meta_form(form)
     try:
-        tipo, inicio, fim, alvo = validar_meta_form(form)
+        escopo, vendedor_email, tipo, inicio, fim, alvo = validar_meta_form(form, db, usuario.loja_slug)
     except ValueError as exc:
-        return render_meta_form(request, usuario, valores, "Cadastrar meta da loja", str(exc), 422)
-    if meta_sobreposta(db, usuario.loja_slug, tipo, inicio, fim):
+        return render_meta_form(request, usuario, valores, "Cadastrar meta", db, str(exc), 422)
+    if meta_sobreposta(db, usuario.loja_slug, escopo, vendedor_email, tipo, inicio, fim):
         return render_meta_form(
             request,
             usuario,
             valores,
-            "Cadastrar meta da loja",
+            "Cadastrar meta",
+            db,
             "Já existe uma meta ativa desse tipo sobrepondo o período informado.",
             422,
         )
     db.add(
         Meta(
             loja_slug=usuario.loja_slug,
-            escopo="loja",
+            escopo=escopo,
+            vendedor_email=vendedor_email,
             tipo=tipo,
             periodo_inicio=inicio,
             periodo_fim=fim,
@@ -1472,12 +1449,14 @@ def metas_editar_pagina(request: Request, meta_id: str, db: Session = Depends(ge
     if not meta or not meta.ativa:
         return RedirectResponse("/app/metas?erro=nao-encontrada", status_code=303)
     valores = {
+        "escopo": meta.escopo,
+        "vendedor_email": meta.vendedor_email or "",
         "tipo": meta.tipo,
         "periodo_inicio": meta.periodo_inicio.isoformat(),
         "periodo_fim": meta.periodo_fim.isoformat(),
         "valor_alvo": str(meta.valor_alvo),
     }
-    return render_meta_form(request, usuario, valores, "Editar meta da loja")
+    return render_meta_form(request, usuario, valores, "Editar meta", db)
 
 
 @app.post("/app/metas/{meta_id}/editar")
@@ -1493,18 +1472,21 @@ async def metas_editar(request: Request, meta_id: str, db: Session = Depends(get
         return RedirectResponse("/app/metas?erro=nao-encontrada", status_code=303)
     valores = valores_meta_form(form)
     try:
-        tipo, inicio, fim, alvo = validar_meta_form(form)
+        escopo, vendedor_email, tipo, inicio, fim, alvo = validar_meta_form(form, db, usuario.loja_slug)
     except ValueError as exc:
-        return render_meta_form(request, usuario, valores, "Editar meta da loja", str(exc), 422)
-    if meta_sobreposta(db, usuario.loja_slug, tipo, inicio, fim, ignorar_id=meta.id):
+        return render_meta_form(request, usuario, valores, "Editar meta", db, str(exc), 422)
+    if meta_sobreposta(db, usuario.loja_slug, escopo, vendedor_email, tipo, inicio, fim, ignorar_id=meta.id):
         return render_meta_form(
             request,
             usuario,
             valores,
-            "Editar meta da loja",
+            "Editar meta",
+            db,
             "Já existe uma meta ativa desse tipo sobrepondo o período informado.",
             422,
         )
+    meta.escopo = escopo
+    meta.vendedor_email = vendedor_email
     meta.tipo = tipo
     meta.periodo_inicio = inicio
     meta.periodo_fim = fim
@@ -1554,9 +1536,13 @@ def vendedor_dashboard(
     ]
     confirmadas = [venda for venda in vendas if venda.status == "confirmada"]
     faturamento = sum((venda.preco_venda for venda in confirmadas), Decimal("0"))
+    lucros_conhecidos = [valor for venda in confirmadas if (valor := lucro_bruto_venda(venda)) is not None]
+    lucro = sum(lucros_conhecidos, Decimal("0"))
+    lucro_completo = len(lucros_conhecidos) == len(confirmadas)
     realizado_por_tipo = {
         "quantidade": Decimal(len(confirmadas)),
         "faturamento": faturamento,
+        "lucro_bruto": lucro,
     }
     metas_view = []
     metas = db.query(Meta).filter(
@@ -1566,12 +1552,19 @@ def vendedor_dashboard(
         Meta.ativa.is_(True),
     ).all()
     for meta in metas:
+        # Metas de lucro bruto expõem custo/margem. O vendedor nunca vê esse dado (só
+        # dono/gerente/admin, via pode_ver_custo); mantido explícito aqui — mesmo o
+        # vendedor não acessando esta checagem hoje — para não vazar dado financeiro
+        # sensível caso este painel um dia sirva outro papel.
+        if meta.tipo == "lucro_bruto" and not pode_ver_custo(usuario):
+            continue
         if meta.tipo not in realizado_por_tipo or not (
             meta.periodo_inicio <= d_fim and meta.periodo_fim >= d_inicio
         ):
             continue
         realizado = realizado_por_tipo[meta.tipo]
-        pct = round(float(realizado / meta.valor_alvo * 100), 1) if meta.valor_alvo else 0.0
+        indisponivel = meta.tipo == "lucro_bruto" and not lucro_completo
+        pct = round(float(realizado / meta.valor_alvo * 100), 1) if meta.valor_alvo and not indisponivel else 0.0
         metas_view.append(
             {
                 "tipo": meta.tipo,
@@ -1580,6 +1573,7 @@ def vendedor_dashboard(
                 "pct": pct,
                 "pct_barra": min(pct, 100),
                 "quantidade": meta.tipo == "quantidade",
+                "indisponivel": indisponivel,
             }
         )
 
@@ -1643,46 +1637,20 @@ def financeiro_dashboard(
     if not pode_ver_financeiro(usuario):
         return RedirectResponse("/app", status_code=303)
     d_inicio, d_fim = periodo_padrao(inicio, fim)
-    confirmadas = [
-        v
-        for v in db.query(Venda).filter(Venda.loja_slug == usuario.loja_slug, Venda.status == "confirmada").all()
-        if d_inicio <= _data(v.criada_em) <= d_fim
-    ]
-    faturamento = sum((v.preco_venda for v in confirmadas), Decimal("0"))
-    lucros_conhecidos = [valor for venda in confirmadas if (valor := lucro_bruto_venda(venda)) is not None]
-    lucro = sum(lucros_conhecidos, Decimal("0"))
-    vendas_lucro_incompleto = len(confirmadas) - len(lucros_conhecidos)
-    lucro_completo = vendas_lucro_incompleto == 0
+    resultado_vendas = calcular_metricas_vendas(db, usuario.loja_slug, d_inicio, d_fim)
+    confirmadas = resultado_vendas["confirmadas"]
+    faturamento = resultado_vendas["faturamento"]
+    lucro = resultado_vendas["lucro_bruto"]
+    lucro_completo = resultado_vendas["lucro_completo"]
     metricas = {
-        "quantidade": len(confirmadas),
+        "quantidade": resultado_vendas["quantidade"],
         "faturamento": faturamento,
         "lucro_bruto": lucro,
         "lucro_completo": lucro_completo,
-        "vendas_lucro_incompleto": vendas_lucro_incompleto,
+        "vendas_lucro_incompleto": resultado_vendas["vendas_lucro_incompleto"],
     }
     realizado_por_tipo = {"quantidade": Decimal(len(confirmadas)), "faturamento": faturamento, "lucro_bruto": lucro}
-    metas_view = []
-    for meta in db.query(Meta).filter(
-        Meta.loja_slug == usuario.loja_slug,
-        Meta.escopo == "loja",
-        Meta.ativa.is_(True),
-    ).all():
-        if meta.tipo not in realizado_por_tipo or not (meta.periodo_inicio <= d_fim and meta.periodo_fim >= d_inicio):
-            continue
-        realizado = realizado_por_tipo[meta.tipo]
-        indisponivel = meta.tipo == "lucro_bruto" and not lucro_completo
-        pct = round(float(realizado / meta.valor_alvo * 100), 1) if meta.valor_alvo and not indisponivel else 0.0
-        metas_view.append(
-            {
-                "tipo": meta.tipo,
-                "alvo": meta.valor_alvo,
-                "realizado": realizado,
-                "pct": pct,
-                "pct_barra": min(pct, 100),
-                "quantidade": meta.tipo == "quantidade",
-                "indisponivel": indisponivel,
-            }
-        )
+    metas_view = metas_view_periodo(db, usuario.loja_slug, d_inicio, d_fim, realizado_por_tipo, lucro_completo)
 
     vendedores = db.query(Usuario).filter(
         Usuario.loja_slug == usuario.loja_slug,
@@ -1691,67 +1659,9 @@ def financeiro_dashboard(
     ).order_by(Usuario.nome).all()
     vendedores_por_email = {item.email: item for item in vendedores}
     vendedor_filtro = vendedor if vendedor in vendedores_por_email else None
-    origens = []
-    funil = {
-        "disponivel": False,
-        "elegiveis": None,
-        "atendidos": None,
-        "vendas_vinculadas": None,
-        "erro": None,
-    }
-    try:
-        leads = chatbot.listar_leads()
-    except ChatbotIndisponivel as exc:
-        funil["erro"] = str(exc)
-    else:
-        origens = sorted({valor for lead in leads if (valor := origem_lead(lead))}, key=str.casefold)
-        candidatos = [lead for lead in leads if lead_corresponde_origem(lead, origem)]
-        leads_sem_data = [lead for lead in candidatos if data_api(lead.get("criada_em")) is None]
-        if leads_sem_data:
-            funil["erro"] = (
-                f"{len(leads_sem_data)} lead(s) sem data de criação confiável; "
-                "as contagens do período estão indisponíveis."
-            )
-        else:
-            elegiveis = [
-                lead
-                for lead in candidatos
-                if d_inicio <= data_api(lead.get("criada_em")) <= d_fim
-            ]
-            atribuicoes_periodo = atribuicoes_no_periodo(
-                db,
-                usuario.loja_slug,
-                d_inicio,
-                d_fim,
-                vendedor_email=vendedor_filtro,
-            )
-            hashes_atendidos = {item.telefone_hmac for item in atribuicoes_periodo}
-            if vendedor_filtro:
-                elegiveis = [
-                    lead
-                    for lead in elegiveis
-                    if identidade_telefone(lead.get("telefone")) in hashes_atendidos
-                ]
-            ids_elegiveis = {str(lead.get("id")) for lead in elegiveis if lead.get("id")}
-            atendidos = {
-                str(lead.get("id"))
-                for lead in elegiveis
-                if lead.get("id") and identidade_telefone(lead.get("telefone")) in hashes_atendidos
-            }
-            vendas_vinculadas = [
-                venda
-                for venda in confirmadas
-                if venda.lead_ref and venda.lead_ref in ids_elegiveis
-                and (not vendedor_filtro or venda.vendedor_email == vendedor_filtro)
-            ]
-            funil.update(
-                {
-                    "disponivel": True,
-                    "elegiveis": len(elegiveis),
-                    "atendidos": len(atendidos),
-                    "vendas_vinculadas": len(vendas_vinculadas),
-                }
-            )
+    funil, origens = funil_periodo(
+        chatbot, db, usuario.loja_slug, d_inicio, d_fim, vendedor_filtro, origem, confirmadas
+    )
     return templates.TemplateResponse(
         "financeiro/dashboard.html",
         contexto(
@@ -2041,3 +1951,11 @@ async def trafego_salvar(request: Request, db: Session = Depends(get_db)):
         config.token_ciphertext = cifrar(token_novo)
     db.commit()
     return RedirectResponse("/app/trafego?ok=salvo", status_code=303)
+
+
+# Import tardio (fim do arquivo): app.relatorios reaproveita helpers definidos
+# acima (usuario_atual, contexto, templates, get_chatbot_client etc.) — importar
+# aqui evita ciclo de import, já que app.main é o módulo carregado primeiro.
+from app import relatorios  # noqa: E402
+
+app.include_router(relatorios.router)
