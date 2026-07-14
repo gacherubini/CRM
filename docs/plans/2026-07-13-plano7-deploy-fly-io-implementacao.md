@@ -125,26 +125,36 @@ aparece **uma vez** — copie para o gerenciador de segredos.
 - [ ] **Passo 2: Verificar**
 
 `fly status -a suite-pg` → estado `started`.
-`fly postgres connect -a suite-pg -c "SELECT version();"` → imprime a versão do PostgreSQL.
+
+> ⚠️ **flyctl atual não tem `fly postgres db create` nem `connect -c "SQL"`** (o `-c` é
+> `--config`). Criar bancos e rodar SQL é pelo **console psql interativo** (`fly postgres connect`).
 
 ### Task 1.2: Criar os 4 bancos
 
-**Critério de sucesso:** `\l` lista `motor`, `estoque`, `chatbot`, `evolution`.
+**Critério de sucesso:** `\l` (dentro do psql) lista `motor`, `estoque`, `chatbot`, `evolution`.
 
-- [ ] **Passo 1: Criar bancos**
+- [ ] **Passo 1: Abrir o console psql**
 
 ```bash
-fly postgres db create motor    -a suite-pg
-fly postgres db create estoque  -a suite-pg
-fly postgres db create chatbot  -a suite-pg
-fly postgres db create evolution -a suite-pg
+fly postgres connect -a suite-pg
 ```
 
-- [ ] **Passo 2: Verificar**
+Abre o prompt `postgres=#`.
 
-`fly postgres connect -a suite-pg -c "\l"` → os 4 bancos aparecem.
+- [ ] **Passo 2: Criar os bancos (colar no psql; ele executa a cada `;`)**
 
-- [ ] **Passo 3: Montar as connection strings (guardar, não versionar)**
+```sql
+CREATE DATABASE motor;
+CREATE DATABASE estoque;
+CREATE DATABASE chatbot;
+CREATE DATABASE evolution;
+```
+
+- [ ] **Passo 3: Verificar e sair**
+
+No psql: `\l` (lista os 4 bancos) e `\q` para sair.
+
+- [ ] **Passo 4: Montar as connection strings (guardar, não versionar)**
 
 Substitua `<PG_PASS>` pela senha do Task 1.1 (host interno `suite-pg.internal:5432`, user `postgres`):
 
