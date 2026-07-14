@@ -6,12 +6,33 @@ Precisa de ``DATABASE_URL`` e ``MOTOR_ENCRYPTION_KEY`` no ambiente.
 import logging
 import os
 import time
+from pathlib import Path
 
+from app import config
 from app.db import SessionLocal
 from app.processamento import processar_proximo
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s motor-worker %(message)s")
 log = logging.getLogger("motor-worker")
+
+
+def _limpar_screenshots_expirados() -> int:
+    """Remove prints com PII após a retenção configurada; nunca segue symlinks."""
+    dias = max(1, config.SCREENSHOT_RETENTION_DAYS)
+    limite = time.time() - (dias * 86400)
+    raiz = Path(config.SCREENSHOT_DIR)
+    if not raiz.is_dir():
+        return 0
+    removidos = 0
+    for arquivo in raiz.rglob("*.png"):
+        try:
+            if arquivo.is_symlink() or arquivo.stat().st_mtime >= limite:
+                continue
+            arquivo.unlink()
+            removidos += 1
+        except OSError:
+            continue
+    return removidos
 
 
 def _uma_rodada() -> int:
@@ -33,6 +54,10 @@ def _uma_rodada() -> int:
 def main() -> None:
     intervalo = float(os.getenv("MOTOR_WORKER_INTERVALO", "2"))
     log.info("iniciado (intervalo=%ss)", intervalo)
+    removidos = _limpar_screenshots_expirados()
+    if removidos:
+        log.info("prints expirados removidos=%s", removidos)
+    proxima_limpeza = time.monotonic() + 3600
     while True:
         try:
             _uma_rodada()
@@ -40,6 +65,9 @@ def main() -> None:
             # Evitar PII no log; tipo + trecho curto ajuda a diagnosticar (ex.: browser ausente).
             trecho = str(exc).replace("\n", " ")[:160]
             log.error("falha ao processar rodada (tipo=%s): %s", type(exc).__name__, trecho)
+        if time.monotonic() >= proxima_limpeza:
+            _limpar_screenshots_expirados()
+            proxima_limpeza = time.monotonic() + 3600
         time.sleep(intervalo)
 
 

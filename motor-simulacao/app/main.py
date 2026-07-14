@@ -1,15 +1,20 @@
 """API do Motor de Simulação (contrato público v1)."""
+from __future__ import annotations
+
 import hmac
 import os
+from pathlib import Path
 
 from fastapi import Depends, FastAPI, Query, Request, Response
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
 from sqlalchemy.orm import Session
 
 from app import auth, config, credenciais, models_db, observabilidade, servico  # noqa: F401
 from app.db import Base, engine, get_db
 from app.motor.base import SolicitacaoSimulacao
 from app.motor.mock import TAXAS_MOCK
+from app.motor.providers import listar_provedores as listar_provedores_reais
+from app.motor.providers import nomes_provedores_reais
 
 app = FastAPI(title="Motor de Simulação")
 
@@ -49,8 +54,8 @@ def metrics(request: Request, db: Session = Depends(get_db)):
 
 
 def _nomes_provedores() -> list[str]:
-    """Provedores conhecidos do Motor. Hoje só o mock; drivers reais entram na Task 12."""
-    return list(TAXAS_MOCK)
+    """Provedores reais configuráveis por cliente."""
+    return nomes_provedores_reais()
 
 
 def _ator(request: Request, cliente) -> str:
@@ -62,7 +67,15 @@ def _ator(request: Request, cliente) -> str:
 def provedores():
     return {
         "provedores": [
-            {"nome": banco, "habilitado": True, "real": False} for banco in TAXAS_MOCK
+            {
+                "nome": "mock",
+                "rotulo": "Bancos de demonstração",
+                "habilitado": True,
+                "real": False,
+                "modo": "mock",
+                "campos_credencial": [],
+            },
+            *listar_provedores_reais(),
         ]
     }
 
@@ -213,6 +226,54 @@ def obter_simulacao(
             content={"erro": {"code": "nao_encontrada", "message": "Simulação não encontrada"}},
         )
     return servico.para_pydantic(sim)
+
+
+@app.get("/v1/simulacoes/{sim_id}/eventos")
+def listar_eventos_simulacao(
+    sim_id: str,
+    db: Session = Depends(get_db),
+    cliente=Depends(auth.autenticar_cliente),
+):
+    if isinstance(cliente, JSONResponse):
+        return cliente
+    sim, eventos = servico.listar_eventos_simulacao(db, sim_id, cliente.id)
+    if sim is None:
+        return JSONResponse(
+            status_code=404,
+            content={"erro": {"code": "nao_encontrada", "message": "Simulação não encontrada"}},
+        )
+    return {
+        "simulacao_id": sim.id,
+        "status": sim.status,
+        "eventos": [servico.evento_publico(e) for e in eventos],
+    }
+
+
+@app.get("/v1/simulacoes/{sim_id}/eventos/{evento_id}/print")
+def obter_print_evento(
+    sim_id: str,
+    evento_id: int,
+    db: Session = Depends(get_db),
+    cliente=Depends(auth.autenticar_cliente),
+):
+    if isinstance(cliente, JSONResponse):
+        return cliente
+    sim, eventos = servico.listar_eventos_simulacao(db, sim_id, cliente.id)
+    evento = next((e for e in eventos if e.id == evento_id), None)
+    if sim is None or evento is None or not evento.screenshot_path:
+        return JSONResponse(
+            status_code=404,
+            content={"erro": {"code": "print_nao_encontrado", "message": "Print não encontrado"}},
+        )
+    raiz = Path(config.SCREENSHOT_DIR).resolve()
+    arquivo = Path(evento.screenshot_path).resolve()
+    try:
+        arquivo.relative_to(raiz)
+    except ValueError:
+        return JSONResponse(status_code=404, content={"erro": {"code": "print_invalido"}})
+    if not arquivo.is_file():
+        return JSONResponse(status_code=404, content={"erro": {"code": "print_ausente"}})
+    return FileResponse(arquivo, media_type="image/png", filename=f"simulacao-{sim_id}.png")
 
 
 @app.post("/v1/simulacoes/{sim_id}/cancelar")

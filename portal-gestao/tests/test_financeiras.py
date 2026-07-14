@@ -15,7 +15,7 @@ def test_dono_lista_financeiras(client, motor_fake):
     login(client, papel="dono")
     resposta = client.get("/app/financeiras")
     assert resposta.status_code == 200
-    assert "Pan" in resposta.text
+    assert "PAN" in resposta.text
     assert "Santander" in resposta.text
     assert "Configurado" in resposta.text
     assert "Acessos dos bancos" in resposta.text
@@ -26,7 +26,7 @@ def test_gerente_acessa(client, motor_fake):
     login(client, papel="gerente")
     resposta = client.get("/app/financeiras")
     assert resposta.status_code == 200
-    assert "Pan" in resposta.text
+    assert "PAN" in resposta.text
 
 
 def test_vendedor_proibido(client, motor_fake):
@@ -44,7 +44,7 @@ def test_html_nunca_contem_senha_bruta(client, motor_fake):
     assert resposta.status_code == 200
     assert "SENHA-SECRETA-NUNCA-NO-HTML" not in resposta.text
     # campos de senha do form ficam vazios (placeholder só)
-    assert 'name="senha" value=""' in resposta.text or 'name="senha"' in resposta.text
+    assert 'name="campo__senha"' in resposta.text or 'name="senha"' in resposta.text
     assert "senha-super" not in resposta.text.lower()
 
 
@@ -69,6 +69,7 @@ def test_upsert_chama_motor_com_ator(client, motor_fake):
     assert up["usuario"] == "loja-nova"
     assert up["senha"] == "nova-senha-rotacionada"
     assert up["ator"] == "dono@loja.test"
+    assert up["campos"] is None
 
 
 def test_vendedor_nao_faz_upsert(client, motor_fake):

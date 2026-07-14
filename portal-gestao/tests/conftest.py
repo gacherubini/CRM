@@ -200,7 +200,7 @@ class MotorFake:
         self.atores = []
         self.credenciais = [
             {
-                "provedor": "Pan",
+                "provedor": "pan",
                 "usuario": "loja42",
                 "senha_configurada": True,
                 "senha_mascara": "****",
@@ -213,7 +213,7 @@ class MotorFake:
                 "senha": "SENHA-SECRETA-NUNCA-NO-HTML",
             },
             {
-                "provedor": "Santander",
+                "provedor": "santander",
                 "usuario": None,
                 "senha_configurada": False,
                 "senha_mascara": None,
@@ -225,8 +225,24 @@ class MotorFake:
             },
         ]
         self.provedores = [
-            {"nome": "Pan", "habilitado": True, "real": False, "modo": "mock"},
-            {"nome": "Santander", "habilitado": True, "real": False, "modo": "mock"},
+            {
+                "nome": "pan", "rotulo": "Banco PAN", "habilitado": True,
+                "real": True, "modo": "api",
+                "campos_credencial": [
+                    {"nome": "api_key", "rotulo": "API Key", "secreto": True},
+                    {"nome": "secret_key", "rotulo": "Secret Key", "secreto": True},
+                    {"nome": "usuario", "rotulo": "Usuário NPV", "secreto": False},
+                    {"nome": "senha", "rotulo": "Senha NPV", "secreto": True},
+                ],
+            },
+            {
+                "nome": "santander", "rotulo": "Santander", "habilitado": True,
+                "real": True, "modo": "playwright",
+                "campos_credencial": [
+                    {"nome": "usuario", "rotulo": "CPF/usuário", "secreto": False},
+                    {"nome": "senha", "rotulo": "Senha", "secreto": True},
+                ],
+            },
         ]
         # Histórico de simulações (projeção não sensível do Motor — sem CPF/valores).
         self.listagens = []
@@ -302,7 +318,9 @@ class MotorFake:
             self.atores.append(("listar_credenciais", ator))
         return [dict(c) for c in self.credenciais]
 
-    def upsert_credencial(self, nome, usuario, senha, ator, habilitado=True):
+    def upsert_credencial(
+        self, nome, usuario, senha, ator, habilitado=True, campos=None
+    ):
         if self.indisponivel:
             raise MotorIndisponivel("Não foi possível acessar o Motor de Simulação agora")
         self.upserts.append(
@@ -312,6 +330,7 @@ class MotorFake:
                 "senha": senha,
                 "ator": ator,
                 "habilitado": habilitado,
+                "campos": campos,
             }
         )
         self.atores.append(("upsert", ator))
@@ -357,7 +376,7 @@ class MotorFake:
         self.testes.append({"nome": nome, "ator": ator})
         self.atores.append(("testar", ator))
         for item in self.credenciais:
-            if item["provedor"] == nome and item.get("senha_configurada"):
+            if item["provedor"].lower() == nome.lower() and item.get("senha_configurada"):
                 return {
                     "provedor": nome,
                     "status": "placeholder",
@@ -412,6 +431,37 @@ class MotorFake:
             "criada_em": "2026-07-13T12:00:00+00:00",
             "resultados": resultados,
         }
+
+    def listar_eventos(self, sim_id, ator=None):
+        if self.indisponivel:
+            raise MotorIndisponivel("Não foi possível acessar o Motor de Simulação agora")
+        return {
+            "simulacao_id": sim_id,
+            "status": getattr(self, "status_retorno", "processando"),
+            "eventos": [
+                {
+                    "id": 1,
+                    "etapa": "browser_iniciando",
+                    "nivel": "info",
+                    "mensagem": "Preparando o navegador do Santander.",
+                    "criada_em": "2026-07-14T15:00:00+00:00",
+                    "tem_print": False,
+                },
+                {
+                    "id": 2,
+                    "etapa": "login_confirmado",
+                    "nivel": "sucesso",
+                    "mensagem": "Login confirmado pelo portal.",
+                    "criada_em": "2026-07-14T15:00:10+00:00",
+                    "tem_print": True,
+                },
+            ],
+        }
+
+    def obter_print_evento(self, sim_id, evento_id, ator=None):
+        if self.indisponivel:
+            raise MotorIndisponivel("Não foi possível carregar o print")
+        return b"PNG-FAKE", "image/png"
 
     def simular_e_aguardar(self, payload, ator=None, poll_timeout=90.0, poll_interval=1.0):
         criada = self.criar_simulacao(payload, ator=ator)

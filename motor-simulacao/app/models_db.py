@@ -3,7 +3,10 @@
 `simulacoes` (job), `simulacao_resultados` (um por provedor/banco) e `idempotencia`.
 Timestamps com timezone; UUID externo em `simulacoes`.
 """
+from __future__ import annotations
+
 from datetime import datetime, timezone
+from typing import Optional
 
 from sqlalchemy import (
     Boolean,
@@ -69,13 +72,17 @@ class CredencialProvedorORM(Base):
     usuario: Mapped[str] = mapped_column(String(200), nullable=False)
     # Senha do portal cifrada (Fernet via app.cripto); nunca em claro no storage.
     senha_cifrada: Mapped[str] = mapped_column(Text, nullable=False)
+    # Configuração completa e tipada por provedor (API key, secret, id da loja
+    # etc.), sempre cifrada. usuario/senha acima permanecem para compatibilidade
+    # com credenciais de portais já cadastradas.
+    config_cifrada: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     habilitado: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     # Sinais operacionais (sem segredo): saúde da credencial e rotação.
     falhas_login: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
-    ultimo_sucesso_em: Mapped[datetime | None] = mapped_column(
+    ultimo_sucesso_em: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
-    ultimo_erro_sanitizado: Mapped[str | None] = mapped_column(String, nullable=True)
+    ultimo_erro_sanitizado: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     criada_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_agora)
     atualizado_em: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=_agora, onupdate=_agora
@@ -93,7 +100,7 @@ class AuditoriaORM(Base):
     )
     ator: Mapped[str] = mapped_column(String(200), nullable=False)
     acao: Mapped[str] = mapped_column(String(100), nullable=False)
-    provedor: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    provedor: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     criada_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_agora)
 
 
@@ -104,41 +111,49 @@ class SimulacaoORM(Base):
     cliente_id: Mapped[str] = mapped_column(
         ForeignKey("clientes_api.id"), nullable=False, index=True
     )
-    referencia_externa: Mapped[str | None] = mapped_column(String, nullable=True)
+    referencia_externa: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     # Quem disparou a simulação no Portal (email/identidade do ator via X-Ator).
     # Não é segredo; habilita o histórico por usuário (Task 16). Nulo em chamadas
     # diretas à API sem ator.
-    solicitado_por: Mapped[str | None] = mapped_column(String, nullable=True, index=True)
+    solicitado_por: Mapped[Optional[str]] = mapped_column(String, nullable=True, index=True)
     status: Mapped[str] = mapped_column(String, default="recebida", index=True)
     criada_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_agora)
     atualizada_em: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=_agora, onupdate=_agora
     )
-    reserva_token: Mapped[str | None] = mapped_column(String(36), nullable=True)
-    reservada_ate: Mapped[datetime | None] = mapped_column(
+    reserva_token: Mapped[Optional[str]] = mapped_column(String(36), nullable=True)
+    reservada_ate: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True), nullable=True, index=True
     )
     # Payload pessoal do job (cpf/nascimento/renda) cifrado em repouso; índice cego para dedup.
-    payload_cifrado: Mapped[str | None] = mapped_column(Text, nullable=True)
-    cpf_indice_cego: Mapped[str | None] = mapped_column(String, nullable=True, index=True)
+    payload_cifrado: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    cpf_indice_cego: Mapped[Optional[str]] = mapped_column(String, nullable=True, index=True)
     # Parte não-pessoal da solicitação, necessária ao worker para executar o job depois.
-    categoria: Mapped[str | None] = mapped_column(String, nullable=True)
-    valor: Mapped[float | None] = mapped_column(Numeric(12, 2), nullable=True)
-    entrada: Mapped[float | None] = mapped_column(Numeric(12, 2), nullable=True)
-    prazo_meses: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    provedores: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    categoria: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    valor: Mapped[Optional[float]] = mapped_column(Numeric(12, 2), nullable=True)
+    entrada: Mapped[Optional[float]] = mapped_column(Numeric(12, 2), nullable=True)
+    prazo_meses: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    provedores: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
     # Campos do driver real (Task 12): não sensíveis; CPF/nasc continuam no payload cifrado.
-    cnh: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
-    placa: Mapped[str | None] = mapped_column(String(7), nullable=True)
-    uf_licenciamento: Mapped[str | None] = mapped_column(String(2), nullable=True)
-    finalidade: Mapped[str | None] = mapped_column(String(8), nullable=True)
-    prazos_meses: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    cnh: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True)
+    placa: Mapped[Optional[str]] = mapped_column(String(7), nullable=True)
+    uf_licenciamento: Mapped[Optional[str]] = mapped_column(String(2), nullable=True)
+    finalidade: Mapped[Optional[str]] = mapped_column(String(8), nullable=True)
+    prazos_meses: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
+    # Campos opcionais usados por APIs de financiamento (primeiro: Banco PAN).
+    codigo_veiculo_provedor: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    ano_modelo: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    zero_km: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True)
 
     resultados: Mapped[list["ResultadoORM"]] = relationship(
         back_populates="simulacao", cascade="all, delete-orphan"
     )
     tentativas: Mapped[list["SimulacaoTentativaORM"]] = relationship(
         back_populates="simulacao", cascade="all, delete-orphan"
+    )
+    eventos: Mapped[list["SimulacaoEventoORM"]] = relationship(
+        back_populates="simulacao", cascade="all, delete-orphan",
+        order_by="SimulacaoEventoORM.id",
     )
 
 
@@ -150,13 +165,13 @@ class ResultadoORM(Base):
     provedor: Mapped[str] = mapped_column(String)
     status: Mapped[str] = mapped_column(String, default="concluida")
     # Campos monetários ficam nulos quando o provedor falhou/rejeitou (sem parcela).
-    valor_parcela: Mapped[float | None] = mapped_column(Numeric(12, 2), nullable=True)
-    taxa_am: Mapped[float | None] = mapped_column(Numeric(6, 4), nullable=True)
-    prazo_meses: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    valor_financiado: Mapped[float | None] = mapped_column(Numeric(12, 2), nullable=True)
+    valor_parcela: Mapped[Optional[float]] = mapped_column(Numeric(12, 2), nullable=True)
+    taxa_am: Mapped[Optional[float]] = mapped_column(Numeric(6, 4), nullable=True)
+    prazo_meses: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    valor_financiado: Mapped[Optional[float]] = mapped_column(Numeric(12, 2), nullable=True)
     # Entrada necessaria devolvida pelo banco (ex.: Santander calcula e retorna).
-    entrada: Mapped[float | None] = mapped_column(Numeric(12, 2), nullable=True)
-    codigo_erro: Mapped[str | None] = mapped_column(String, nullable=True)
+    entrada: Mapped[Optional[float]] = mapped_column(Numeric(12, 2), nullable=True)
+    codigo_erro: Mapped[Optional[str]] = mapped_column(String, nullable=True)
 
     simulacao: Mapped["SimulacaoORM"] = relationship(back_populates="resultados")
 
@@ -172,10 +187,27 @@ class SimulacaoTentativaORM(Base):
     tentativa: Mapped[int] = mapped_column(Integer)
     duracao_ms: Mapped[int] = mapped_column(Integer, default=0)
     status: Mapped[str] = mapped_column(String)
-    codigo_erro: Mapped[str | None] = mapped_column(String, nullable=True)
+    codigo_erro: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     criada_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_agora)
 
     simulacao: Mapped["SimulacaoORM"] = relationship(back_populates="tentativas")
+
+
+class SimulacaoEventoORM(Base):
+    """Timeline sanitizada do job; nunca guarda CPF, senha ou HTML do portal."""
+
+    __tablename__ = "simulacao_eventos"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    simulacao_id: Mapped[str] = mapped_column(ForeignKey("simulacoes.id"), index=True)
+    etapa: Mapped[str] = mapped_column(String(80), nullable=False)
+    nivel: Mapped[str] = mapped_column(String(16), nullable=False, default="info")
+    mensagem: Mapped[str] = mapped_column(String(240), nullable=False)
+    # Caminho interno; a API nunca o devolve e só serve o arquivo após checar tenant.
+    screenshot_path: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    criada_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_agora)
+
+    simulacao: Mapped["SimulacaoORM"] = relationship(back_populates="eventos")
 
 
 class IdempotenciaORM(Base):

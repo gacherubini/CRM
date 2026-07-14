@@ -4,6 +4,7 @@ Falha HTTP/rede **nunca** deve interromper a confirmação de venda.
 """
 from __future__ import annotations
 
+
 import hashlib
 import json
 import logging

@@ -3,6 +3,8 @@ os relatórios exportáveis (/app/relatorios). Mantido em módulo próprio, sem
 depender de app.main, para que ambos consumidores usem exatamente a mesma
 matemática — evitando divergência entre o painel e os CSVs exportados.
 """
+from __future__ import annotations
+
 import calendar
 import hashlib
 import hmac

@@ -6,6 +6,8 @@ contexto, autenticação, cliente do chatbot). A matemática financeira em si
 vem de app.financeiro_calc, a MESMA usada por /app/financeiro, então os
 totais exportados aqui reconciliam por construção com o painel.
 """
+from __future__ import annotations
+
 import csv
 import io
 from decimal import Decimal

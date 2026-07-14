@@ -60,6 +60,18 @@ class DriverContext:
     db: Session | None = None
     cliente_id: str | None = None
     screenshot_dir: str | None = None
+    simulacao_id: str | None = None
+    evento: Callable[[str, str, str, str | None], None] | None = None
+
+    def registrar_evento(
+        self,
+        etapa: str,
+        mensagem: str,
+        nivel: str = "info",
+        screenshot_path: str | None = None,
+    ) -> None:
+        if self.evento is not None:
+            self.evento(etapa, mensagem, nivel, screenshot_path)
 
 
 # Driver pode devolver um resultado ou lista (multi-prazo).
@@ -109,10 +121,11 @@ REAL_DRIVERS: dict[str, Driver] = {}
 
 
 def _registrar_drivers_reais() -> None:
-    """Import tardio evita ciclo com santander.py."""
-    if REAL_DRIVERS:
+    """Import tardio evita ciclos com os adapters concretos."""
+    if {"santander", "pan"}.issubset(REAL_DRIVERS):
         return
     from app.motor.santander import fabrica_santander
+    from app.motor.pan import fabrica_pan
 
     driver = fabrica_santander()
     # Registrado apenas em minúsculo ("santander"): é o nome canônico usado para
@@ -122,6 +135,7 @@ def _registrar_drivers_reais() -> None:
     # "mock" resolveria "Santander" para REAL_DRIVERS e, sem credencial, o
     # provedor seria descartado silenciosamente — quebrando os 5 mocks).
     REAL_DRIVERS["santander"] = driver
+    REAL_DRIVERS["pan"] = fabrica_pan()
 
 
 def resolver_drivers(
@@ -143,7 +157,7 @@ def resolver_drivers(
             nomes.extend(DRIVERS.keys())
         elif p in DRIVERS:
             nomes.append(p)
-        elif p in REAL_DRIVERS or p == "santander":
+        elif p in REAL_DRIVERS or p in {"santander", "pan"}:
             nomes.append(p)
     vistos: set[str] = set()
     pares: list[tuple[str, Driver]] = []
@@ -162,6 +176,6 @@ def resolver_drivers(
 
 
 def _tem_credencial_real(db: Session, cliente_id: str, provedor: str) -> bool:
-    from app.credenciais import obter_segredo_para_uso
+    from app.credenciais import configuracao_completa
 
-    return obter_segredo_para_uso(db, cliente_id, provedor) is not None
+    return configuracao_completa(db, cliente_id, provedor)

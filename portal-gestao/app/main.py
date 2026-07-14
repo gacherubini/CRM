@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import os
 import uuid
 from datetime import date, datetime
@@ -5,7 +7,7 @@ from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from pathlib import Path
 from typing import Annotated
 
-from fastapi import Depends, FastAPI, Form, Request
+from fastapi import Depends, FastAPI, Form, Request, Response
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -170,7 +172,11 @@ def enriquecer_credenciais(
     credenciais: list[dict], provedores: list[dict] | None = None
 ) -> list[dict]:
     """Junta máscara do Motor com metadados de provedor (modo) e flags de UI."""
-    metas = {p.get("nome"): p for p in (provedores or []) if p.get("nome")}
+    metas = {
+        str(p.get("nome")).lower(): p
+        for p in (provedores or [])
+        if p.get("nome")
+    }
     agora_utc = datetime.now()
     itens = []
     for raw in credenciais:
@@ -178,8 +184,10 @@ def enriquecer_credenciais(
         # Defesa em profundidade: nunca repassar chave de senha em claro à UI.
         item.pop("senha", None)
         nome = item.get("provedor") or ""
-        meta = metas.get(nome)
+        meta = metas.get(str(nome).lower())
         item["modo"] = _modo_provedor(meta)
+        item["rotulo"] = (meta or {}).get("rotulo") or nome
+        item["campos_credencial"] = (meta or {}).get("campos_credencial") or []
         atualizado = _parse_iso_dt(item.get("atualizado_em"))
         item["senha_antiga"] = False
         if atualizado is not None:
@@ -701,6 +709,12 @@ def _valores_form_simulacao(form) -> dict:
         "placa": (form.get("placa") or "").strip().upper(),
         "uf_licenciamento": form.get("uf_licenciamento") or "SP",
         "finalidade": form.get("finalidade") or "comum",
+        "ddd": form.get("ddd") or "",
+        "celular": form.get("celular") or "",
+        "codigo_natureza_ocupacao": form.get("codigo_natureza_ocupacao") or "",
+        "codigo_provedor": form.get("codigo_provedor") or "",
+        "ano_modelo": form.get("ano_modelo") or "",
+        "zero_km": form.get("zero_km") or "nao",
     }
 
 
@@ -719,8 +733,8 @@ def dados_simulacao(form) -> dict:
     return payload
 
 
-def dados_simulacao_motor(form) -> dict:
-    """Payload SolicitacaoSimulacao para o Motor (Santander real)."""
+def dados_simulacao_motor(form, provedor: str = "santander") -> dict:
+    """Payload SolicitacaoSimulacao para um provedor real do Motor."""
     cpf = "".join(c for c in (form.get("cpf") or "") if c.isdigit())
     nascimento = form.get("nascimento", "").strip()
     entrada = float(str(form.get("entrada") or 0).replace(",", "."))
@@ -740,6 +754,12 @@ def dados_simulacao_motor(form) -> dict:
             "cpf": cpf,
             "nascimento": nascimento,
             "cnh": cnh,
+            "renda": float(str(form.get("renda") or 0).replace(",", ".")),
+            "ddd": (form.get("ddd") or "").strip() or None,
+            "celular": (form.get("celular") or "").strip() or None,
+            "codigo_natureza_ocupacao": (
+                form.get("codigo_natureza_ocupacao") or ""
+            ).strip() or None,
         },
         "veiculo": {
             "categoria": form.get("categoria") or "moto",
@@ -747,10 +767,14 @@ def dados_simulacao_motor(form) -> dict:
             "placa": placa,
             "uf_licenciamento": form.get("uf_licenciamento") or "SP",
             "finalidade": form.get("finalidade") or "comum",
+            "codigo_provedor": (form.get("codigo_provedor") or "").strip() or None,
+            "ano_modelo": int(form.get("ano_modelo")) if form.get("ano_modelo") else None,
+            "zero_km": (form.get("zero_km") or "nao").lower() == "sim",
         },
         "condicoes": {"entrada": entrada, "prazos_meses": prazos},
-        # Nome alinhado à lista do Motor / Acessos bancos ("Santander").
-        "provedores": ["Santander"],
+        # Nome canônico minúsculo seleciona o driver real. "Santander" com
+        # maiúscula é mantido apenas no conjunto de bancos mock do Motor.
+        "provedores": [provedor],
     }
 
 
@@ -785,10 +809,10 @@ async def simulacoes_simular(
     valores = _valores_form_simulacao(form)
     modo = (form.get("modo") or "mock").strip().lower()
 
-    # --- Santander real: cria job no Motor e mostra progresso ---
-    if modo == "santander":
+    # --- Provedor real: cria job no Motor e mostra progresso ---
+    if modo in {"santander", "pan"}:
         try:
-            payload_motor = dados_simulacao_motor(form)
+            payload_motor = dados_simulacao_motor(form, modo)
         except (TypeError, ValueError):
             return templates.TemplateResponse(
                 "simulacoes/form.html",
@@ -896,7 +920,7 @@ _SIM_STATUS_TERMINAIS = frozenset(
 
 _SIM_STATUS_LABELS = {
     "recebida": "Na fila",
-    "processando": "Processando no Santander",
+    "processando": "Processando no banco",
     "concluida": "Concluída",
     "parcial": "Parcial (alguns prazos)",
     "falhou": "Falhou",
@@ -905,8 +929,12 @@ _SIM_STATUS_LABELS = {
 }
 
 
-def _passos_progresso_simulacao(status: str) -> list[dict]:
-    """Etapas visíveis na tela de progresso (Santander real)."""
+def _passos_progresso_simulacao(
+    status: str, provedor: str = "santander"
+) -> list[dict]:
+    """Etapas visíveis na tela de progresso de um provedor real."""
+    rotulo = "Banco PAN" if provedor == "pan" else "Santander"
+    modo = "API oficial" if provedor == "pan" else "portal lojista"
     ordem = ["recebida", "processando", "terminal"]
     terminal_ok = status in ("concluida", "parcial")
     terminal_fail = status in ("falhou", "cancelada", "aguardando_intervencao")
@@ -930,7 +958,7 @@ def _passos_progresso_simulacao(status: str) -> list[dict]:
     if status not in _SIM_STATUS_TERMINAIS:
         titulo_final = "Aguardando resultado"
     detalhe_final = {
-        "concluida": "Parcelas lidas com sucesso no portal do Santander.",
+        "concluida": f"Parcelas recebidas com sucesso do {rotulo}.",
         "parcial": "Parte dos prazos retornou; confira a tabela.",
         "falhou": "O Motor não conseguiu concluir. Veja o código de erro abaixo ou em Acessos bancos.",
         "aguardando_intervencao": "O portal pediu ação manual (captcha, 2FA, senha).",
@@ -946,8 +974,8 @@ def _passos_progresso_simulacao(status: str) -> list[dict]:
         },
         {
             "num": "02",
-            "titulo": "Consultando portal Santander",
-            "detalhe": "Abrindo o portal lojista e lendo as parcelas (costuma levar 30–90s).",
+            "titulo": f"Consultando {rotulo}",
+            "detalhe": f"Conectando pela {modo} e aguardando as condições de financiamento.",
             "estado": estado(1),
         },
         {
@@ -976,6 +1004,7 @@ def simulacoes_job(
     jobs = request.session.get("sim_jobs") or {}
     meta = jobs.get(sim_id) or {}
     valores = meta.get("valores") or {"modo": "santander"}
+    provedor = (valores.get("modo") or "santander").lower()
     cpf = meta.get("cpf") or ""
 
     try:
@@ -989,7 +1018,7 @@ def simulacoes_job(
                 sim_id=sim_id,
                 status="erro_motor",
                 status_label="Motor indisponível",
-                passos=_passos_progresso_simulacao("recebida"),
+                passos=_passos_progresso_simulacao("recebida", provedor),
                 valores=valores,
                 cpf_mascarado=mascarar_cpf(cpf),
                 auto_refresh=True,
@@ -1026,7 +1055,7 @@ def simulacoes_job(
             sim_id=sim_id,
             status=status,
             status_label=status_label,
-            passos=_passos_progresso_simulacao(status),
+            passos=_passos_progresso_simulacao(status, provedor),
             valores=valores,
             cpf_mascarado=mascarar_cpf(cpf),
             auto_refresh=True,
@@ -1097,6 +1126,66 @@ def simulacoes_historico(
             status_labels=_SIM_STATUS_LABELS,
             integracao_erro=erro,
         ),
+    )
+
+
+@app.get("/app/simulacoes/{sim_id}/registros", response_class=HTMLResponse)
+def simulacoes_registros(
+    sim_id: str,
+    request: Request,
+    db: Session = Depends(get_db),
+    motor: MotorClient = Depends(get_motor_client),
+):
+    usuario = usuario_atual(request, db)
+    if not usuario:
+        return redirecionar_login()
+    if not pode_simular(usuario):
+        return RedirectResponse("/app", status_code=303)
+    erro = None
+    dados = {"status": "desconhecido", "eventos": []}
+    try:
+        dados = motor.listar_eventos(sim_id, ator=usuario.email)
+    except MotorIndisponivel as exc:
+        erro = str(exc)
+    status = str(dados.get("status") or "desconhecido").lower()
+    return templates.TemplateResponse(
+        "simulacoes/registros.html",
+        contexto(
+            request,
+            usuario,
+            sim_id=sim_id,
+            status=status,
+            status_label=_SIM_STATUS_LABELS.get(status, status.replace("_", " ")),
+            eventos=dados.get("eventos") or [],
+            pode_ver_print=pode_gerir_financeiras(usuario),
+            auto_refresh=status not in _SIM_STATUS_TERMINAIS,
+            erro=erro,
+        ),
+    )
+
+
+@app.get("/app/simulacoes/{sim_id}/registros/{evento_id}/print")
+def simulacoes_registro_print(
+    sim_id: str,
+    evento_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    motor: MotorClient = Depends(get_motor_client),
+):
+    usuario = usuario_atual(request, db)
+    if not usuario:
+        return redirecionar_login()
+    # Prints podem conter CPF/placa: vendedor vê a timeline, mas não a imagem.
+    if not pode_gerir_financeiras(usuario):
+        return Response(status_code=403)
+    try:
+        conteudo, tipo = motor.obter_print_evento(sim_id, evento_id, ator=usuario.email)
+    except MotorIndisponivel:
+        return Response(status_code=404)
+    return Response(
+        content=conteudo,
+        media_type=tipo,
+        headers={"Cache-Control": "private, no-store, max-age=0"},
     )
 
 
@@ -1761,8 +1850,17 @@ async def financeiras_upsert(
     if not csrf_valido(request, form.get("csrf")):
         return RedirectResponse("/app/financeiras?erro=csrf", status_code=303)
 
-    usuario_banco = (form.get("usuario") or "").strip()
-    senha_banco = form.get("senha") or ""
+    campos = {
+        str(chave)[7:]: str(valor).strip()
+        for chave, valor in form.multi_items()
+        if str(chave).startswith("campo__") and str(valor).strip()
+    }
+    usuario_banco = (campos.get("usuario") or form.get("usuario") or "").strip()
+    senha_banco = campos.get("senha") or form.get("senha") or ""
+    if campos and (not usuario_banco or not senha_banco):
+        return RedirectResponse(
+            f"/app/financeiras?erro=campos&provedor={nome}", status_code=303
+        )
     if not usuario_banco or not senha_banco:
         return RedirectResponse(
             f"/app/financeiras?erro=campos&provedor={nome}", status_code=303
@@ -1778,6 +1876,7 @@ async def financeiras_upsert(
             usuario=usuario_banco,
             senha=senha_banco,
             ator=usuario.email,
+            campos=campos or None,
         )
     except MotorIndisponivel:
         return RedirectResponse("/app/financeiras?erro=motor", status_code=303)

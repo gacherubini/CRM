@@ -3,16 +3,26 @@
 Estados gerais: recebida → processando → (concluida | parcial | falhou |
 aguardando_intervencao). ``cancelada`` é terminal e nunca é reservada.
 """
+from __future__ import annotations
+
 import json
+import signal
+import threading
 import time
 import uuid
+from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from sqlalchemy.orm import Session
 
 from app import config, cripto
-from app.models_db import ResultadoORM, SimulacaoORM, SimulacaoTentativaORM
+from app.models_db import (
+    ResultadoORM,
+    SimulacaoEventoORM,
+    SimulacaoORM,
+    SimulacaoTentativaORM,
+)
 from app.motor.base import Condicoes, Pessoa, SolicitacaoSimulacao, Veiculo
 from app.motor.drivers import (
     Driver,
@@ -25,6 +35,35 @@ from app.motor.drivers import (
 )
 
 MAX_TENTATIVAS_DRIVER = 2
+
+
+class DriverDeadlineExceeded(TimeoutError):
+    pass
+
+
+@contextmanager
+def _limite_total_driver(segundos: int):
+    """Deadline duro no worker Linux; impede Playwright preso para sempre."""
+    if (
+        segundos <= 0
+        or threading.current_thread() is not threading.main_thread()
+        or not hasattr(signal, "SIGALRM")
+    ):
+        yield
+        return
+    anterior = signal.getsignal(signal.SIGALRM)
+
+    def _estourou(signum, frame):
+        raise DriverDeadlineExceeded("driver excedeu o tempo máximo")
+
+    signal.signal(signal.SIGALRM, _estourou)
+    # Repete durante o unwind para também interromper um browser.close() travado.
+    signal.setitimer(signal.ITIMER_REAL, segundos, 5)
+    try:
+        yield
+    finally:
+        signal.setitimer(signal.ITIMER_REAL, 0)
+        signal.signal(signal.SIGALRM, anterior)
 
 
 def _agora() -> datetime:
@@ -84,6 +123,9 @@ def reservar_proximo_job(db: Session) -> Optional[SimulacaoORM]:
     if linhas != 1:
         return None
     db.refresh(sim)
+    _registrar_evento(
+        db, sim, "job_reservado", "Job reservado pelo worker para processamento."
+    )
     return sim
 
 
@@ -99,6 +141,9 @@ def _reconstruir_solicitacao(sim: SimulacaoORM) -> SolicitacaoSimulacao:
             nascimento=pessoal.get("nascimento", ""),
             renda=pessoal.get("renda"),
             cnh=sim.cnh,
+            ddd=pessoal.get("ddd"),
+            celular=pessoal.get("celular"),
+            codigo_natureza_ocupacao=pessoal.get("codigo_natureza_ocupacao"),
         ),
         veiculo=Veiculo(
             categoria=sim.categoria or "moto",
@@ -106,6 +151,9 @@ def _reconstruir_solicitacao(sim: SimulacaoORM) -> SolicitacaoSimulacao:
             placa=sim.placa,
             uf_licenciamento=sim.uf_licenciamento,
             finalidade=sim.finalidade,
+            codigo_provedor=sim.codigo_veiculo_provedor,
+            ano_modelo=sim.ano_modelo,
+            zero_km=sim.zero_km,
         ),
         condicoes=Condicoes(entrada=float(sim.entrada or 0), prazos_meses=prazos),
         provedores=sim.provedores or ["mock"],
@@ -133,6 +181,31 @@ def _registrar_tentativa(
     )
 
 
+def _registrar_evento(
+    db: Session,
+    sim: SimulacaoORM,
+    etapa: str,
+    mensagem: str,
+    nivel: str = "info",
+    screenshot_path: str | None = None,
+) -> None:
+    """Persiste evento imediatamente para o Portal enxergar durante o job."""
+    seguro = " ".join(str(mensagem).replace("\n", " ").split())[:240]
+    db.add(
+        SimulacaoEventoORM(
+            simulacao_id=sim.id,
+            etapa=str(etapa)[:80],
+            nivel=nivel if nivel in {"info", "sucesso", "aviso", "erro"} else "info",
+            mensagem=seguro,
+            screenshot_path=screenshot_path,
+        )
+    )
+    if sim.status == "processando":
+        sim.reservada_ate = _agora() + timedelta(seconds=config.JOB_LEASE_SECONDS)
+        sim.atualizada_em = _agora()
+    db.commit()
+
+
 def _executar_driver(
     db: Session,
     sim: SimulacaoORM,
@@ -147,13 +220,30 @@ def _executar_driver(
         inicio = time.perf_counter()
         try:
             # Drivers novos: (sol, ctx). Legados de teste: (sol,) apenas.
-            try:
-                res = driver(sol, ctx)
-            except TypeError:
-                res = driver(sol)
+            with _limite_total_driver(config.DRIVER_TIMEOUT_SECONDS):
+                try:
+                    res = driver(sol, ctx)
+                except TypeError:
+                    res = driver(sol)
             dur = int((time.perf_counter() - inicio) * 1000)
             _registrar_tentativa(db, sim.id, nome, tentativa, dur, "concluida", None)
             return res if isinstance(res, list) else [res]
+        except DriverDeadlineExceeded:
+            dur = int((time.perf_counter() - inicio) * 1000)
+            _registrar_tentativa(
+                db, sim.id, nome, tentativa, dur, "erro", "timeout_driver"
+            )
+            if ctx is not None:
+                ctx.registrar_evento(
+                    "timeout_driver",
+                    "O banco excedeu o tempo máximo e a execução foi encerrada.",
+                    "erro",
+                )
+            return [
+                ResultadoDriver(
+                    nome, "erro", prazo_meses=prazo, codigo_erro="timeout_driver"
+                )
+            ]
         except IntervencaoNecessaria as e:
             dur = int((time.perf_counter() - inicio) * 1000)
             _registrar_tentativa(
@@ -242,6 +332,14 @@ def processar_job(
                 codigo_erro="sem_driver_ou_credencial",
             )
         )
+        db.add(
+            SimulacaoEventoORM(
+                simulacao_id=sim.id,
+                etapa="sem_driver",
+                nivel="erro",
+                mensagem="Nenhum driver habilitado ou credencial válida foi encontrado.",
+            )
+        )
         db.commit()
         db.refresh(sim)
         return sim
@@ -268,6 +366,10 @@ def processar_job(
         db=db,
         cliente_id=sim.cliente_id,
         screenshot_dir=config.SCREENSHOT_DIR,
+        simulacao_id=sim.id,
+        evento=lambda etapa, mensagem, nivel="info", screenshot_path=None: _registrar_evento(
+            db, sim, etapa, mensagem, nivel, screenshot_path
+        ),
     )
     for nome, driver in pares:
         if nome in existentes_por_prov:
@@ -275,6 +377,9 @@ def processar_job(
         sim.reservada_ate = _agora() + timedelta(seconds=config.JOB_LEASE_SECONDS)
         sim.atualizada_em = _agora()
         db.commit()
+        ctx.registrar_evento(
+            "driver_iniciado", f"Conector {nome} iniciado (tentativas limitadas)."
+        )
         res_lista = _executar_driver(db, sim, nome, driver, sol, ctx)
         db.refresh(sim)
         if sim.status != "processando" or sim.reserva_token != token:
@@ -305,6 +410,14 @@ def processar_job(
     sim.atualizada_em = _agora()
     sim.reserva_token = None
     sim.reservada_ate = None
+    db.add(
+        SimulacaoEventoORM(
+            simulacao_id=sim.id,
+            etapa="job_finalizado",
+            nivel="sucesso" if sim.status in {"concluida", "parcial"} else "erro",
+            mensagem=f"Simulação finalizada com status {sim.status}.",
+        )
+    )
     db.commit()
     db.refresh(sim)
     return sim

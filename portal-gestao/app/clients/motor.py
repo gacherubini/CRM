@@ -3,6 +3,8 @@
 Nunca loga senha/token. Toda leitura/escrita de credencial passa pelo Motor —
 o Portal não guarda senha de portal bancário em banco próprio.
 """
+from __future__ import annotations
+
 from typing import Any
 
 import httpx
@@ -100,13 +102,17 @@ class MotorClient:
         senha: str,
         ator: str,
         habilitado: bool = True,
+        campos: dict[str, str] | None = None,
     ) -> dict:
         # Body com senha só no servidor → Motor; nunca logar este payload.
+        corpo = {"usuario": usuario, "senha": senha, "habilitado": habilitado}
+        if campos:
+            corpo["campos"] = campos
         return self._request(
             "PUT",
             f"/v1/provedores/{nome}/credenciais",
             ator=ator,
-            json={"usuario": usuario, "senha": senha, "habilitado": habilitado},
+            json=corpo,
         )
 
     def testar_login(self, nome: str, ator: str) -> dict:
@@ -138,6 +144,30 @@ class MotorClient:
 
     def obter_simulacao(self, sim_id: str, ator: str | None = None) -> dict:
         return self._request("GET", f"/v1/simulacoes/{sim_id}", ator=ator)
+
+    def listar_eventos(self, sim_id: str, ator: str | None = None) -> dict:
+        return self._request(
+            "GET", f"/v1/simulacoes/{sim_id}/eventos", ator=ator
+        )
+
+    def obter_print_evento(
+        self, sim_id: str, evento_id: int, ator: str | None = None
+    ) -> tuple[bytes, str]:
+        if not self.configurado:
+            raise MotorIndisponivel("Integração com o Motor não configurada")
+        try:
+            with httpx.Client(
+                base_url=self.base_url,
+                headers=self._headers(ator),
+                timeout=max(self.timeout, 15),
+            ) as client:
+                resposta = client.get(
+                    f"/v1/simulacoes/{sim_id}/eventos/{evento_id}/print"
+                )
+                resposta.raise_for_status()
+                return resposta.content, resposta.headers.get("content-type", "image/png")
+        except httpx.HTTPError as exc:
+            raise MotorIndisponivel("Não foi possível carregar o print") from exc
 
     def listar_simulacoes(
         self,

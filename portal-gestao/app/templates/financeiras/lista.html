@@ -39,7 +39,7 @@
         {% for c in credenciais %}
         <tr>
           <td>
-            <strong>{{ c.provedor }}</strong>
+            <strong>{{ c.rotulo or c.provedor }}</strong>
             {% if c.usuario %}<small class="muted">Usuário: {{ c.usuario }}</small>{% endif %}
           </td>
           <td><span class="status-chip muted">{{ c.modo or '—' }}</span></td>
@@ -76,13 +76,21 @@
               <summary class="table-action">Atualizar acesso</summary>
               <form method="post" action="/app/financeiras/{{ c.provedor }}" class="stack-form" autocomplete="off">
                 <input type="hidden" name="csrf" value="{{ csrf }}">
-                <label>Usuário do portal
-                  <input type="text" name="usuario" value="" placeholder="{% if c.usuario %}atual: {{ c.usuario }}{% else %}usuário{% endif %}" required autocomplete="off">
-                </label>
-                <label>Senha do portal
-                  <input type="password" name="senha" value="" placeholder="••••••••" required autocomplete="new-password">
-                </label>
-                <p class="muted" style="font-size:11px;margin:0">A senha atual nunca é exibida. Informe a nova senha completa para rotacionar.</p>
+                {% if c.campos_credencial %}
+                  {% for campo in c.campos_credencial %}
+                  <label>{{ campo.rotulo }}
+                    <input type="{{ 'password' if campo.secreto else 'text' }}" name="campo__{{ campo.nome }}" value="" placeholder="{{ '••••••••' if campo.secreto else campo.rotulo }}" required autocomplete="off">
+                  </label>
+                  {% endfor %}
+                {% else %}
+                  <label>Usuário do portal
+                    <input type="text" name="usuario" value="" placeholder="{% if c.usuario %}atual: {{ c.usuario }}{% else %}usuário{% endif %}" required autocomplete="off">
+                  </label>
+                  <label>Senha do portal
+                    <input type="password" name="senha" value="" placeholder="••••••••" required autocomplete="new-password">
+                  </label>
+                {% endif %}
+                <p class="muted" style="font-size:11px;margin:0">Os segredos atuais nunca são exibidos. Informe todos os campos para cadastrar ou rotacionar o acesso.</p>
                 <button class="button primary" type="submit">Salvar</button>
               </form>
               {% if c.senha_configurada %}

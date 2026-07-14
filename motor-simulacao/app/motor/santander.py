@@ -312,6 +312,7 @@ class SantanderDriver(PlaywrightBankDriver):
 
         cred = self._credencial(ctx)
         cpf_lojista, senha = cred
+        self._evento(ctx, "browser_iniciando", "Preparando o navegador do Santander.")
 
         with sync_playwright() as p:
             # Um browser por banco (isolamento multi-provedor).
@@ -320,10 +321,27 @@ class SantanderDriver(PlaywrightBankDriver):
             page = browser_ctx.new_page()
             page.set_default_timeout(self.timeout_ms)
             try:
+                self._evento(ctx, "browser_pronto", "Navegador iniciado; abrindo o portal.")
                 self._passo_login(page, cpf_lojista, senha)
+                self._evento(
+                    ctx, "login_confirmado", "Login confirmado pelo portal.", page, True
+                )
                 self._passo_cliente_veiculo(page, sol)
+                self._evento(
+                    ctx,
+                    "dados_preenchidos",
+                    "Dados do cliente e do veículo preenchidos.",
+                    page,
+                    True,
+                )
                 self._passo_termos_e_modal_uf(page)
+                self._evento(
+                    ctx, "simulacao_enviada", "Consulta enviada; aguardando ofertas do banco."
+                )
                 self._passo_aguardar_simulacao(page)
+                self._evento(
+                    ctx, "ofertas_recebidas", "Ofertas carregadas na tela do banco.", page, True
+                )
                 # Santander calcula a entrada necessaria e a devolve na tela; nao
                 # enviamos entrada como input (ver parse_entrada / _resultados_de_html).
                 # inner_text é mais estável que HTML cru (cards quebram "de" / "R$")
@@ -334,12 +352,30 @@ class SantanderDriver(PlaywrightBankDriver):
                 html = page.content() or ""
                 resultados = self._resultados_de_html(texto + "\n" + html, sol)
                 self._salvar_storage(browser_ctx)
+                self._evento(
+                    ctx, "parcelas_lidas", "Parcelas interpretadas e prontas para salvar.",
+                    nivel="sucesso",
+                )
                 return resultados
             except (RejeicaoNegocio, IntervencaoNecessaria, ErroTransitorio):
-                self._screenshot_falha(page, "erro")
+                self._evento(
+                    ctx,
+                    "falha_portal",
+                    "O fluxo bancário foi interrompido; consulte o código do resultado.",
+                    page,
+                    True,
+                    "erro",
+                )
                 raise
             except Exception as exc:
-                self._screenshot_falha(page, "inesperado")
+                self._evento(
+                    ctx,
+                    "falha_inesperada",
+                    "O portal apresentou uma falha inesperada.",
+                    page,
+                    True,
+                    "erro",
+                )
                 # Não logar stack com PII; mensagem curta só com tipo + trecho.
                 detalhe = str(exc).replace("\n", " ")[:180]
                 raise ErroTransitorio(
@@ -349,6 +385,37 @@ class SantanderDriver(PlaywrightBankDriver):
             finally:
                 browser_ctx.close()
                 browser.close()
+
+    def _evento(
+        self,
+        ctx: DriverContext | None,
+        etapa: str,
+        mensagem: str,
+        page=None,
+        capturar_print: bool = False,
+        nivel: str = "info",
+    ) -> None:
+        if ctx is None:
+            return
+        screenshot_path = None
+        if capturar_print and page is not None and config.EVENT_SCREENSHOTS:
+            screenshot_path = self._capturar_print_evento(page, ctx, etapa)
+        ctx.registrar_evento(etapa, mensagem, nivel, screenshot_path)
+
+    def _capturar_print_evento(
+        self, page, ctx: DriverContext, etapa: str
+    ) -> str | None:
+        """Print por job/etapa; nome não contém CPF, placa ou outro dado pessoal."""
+        base = Path(ctx.screenshot_dir or self.screenshot_dir or "data/screenshots")
+        sim_id = re.sub(r"[^a-zA-Z0-9_-]", "", ctx.simulacao_id or "sem-id")
+        etapa_segura = re.sub(r"[^a-zA-Z0-9_-]", "_", etapa)[:60]
+        destino = base / sim_id / f"{etapa_segura}_{int(time.time())}.png"
+        try:
+            destino.parent.mkdir(parents=True, exist_ok=True)
+            page.screenshot(path=str(destino), full_page=True)
+            return str(destino)
+        except Exception:
+            return None
 
     def _credencial(self, ctx: DriverContext | None) -> tuple[str, str]:
         if ctx is None or ctx.db is None or not ctx.cliente_id:

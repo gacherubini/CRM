@@ -56,5 +56,5 @@
   {% else %}<div class="empty"><strong>Nenhuma parcela retornada.</strong><p>Os bancos não devolveram propostas para esses parâmetros.</p></div>{% endif %}
 </section>
 
-<div class="form-actions"><a class="button primary" href="/app/simulacoes">Fazer outra simulação</a></div>
+<div class="form-actions">{% if resultado and resultado.id %}<a class="button secondary" href="/app/simulacoes/{{ resultado.id }}/registros">Ver registros e prints</a>{% endif %}<a class="button primary" href="/app/simulacoes">Fazer outra simulação</a></div>
 {% endblock %}
