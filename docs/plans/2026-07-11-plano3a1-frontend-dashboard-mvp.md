@@ -5,8 +5,9 @@
 > fora deste checklist original. Use este doc só para o residual, não para reimplementar.
 >
 > **2026-07-13:** progresso de simulação HTMX (`progresso.html` + rota job) + resultado multi-prazo
-> com códigos de erro do Motor (**Santander live**). Ainda aberto: **histórico de simulações do
-> usuário** + lista ao vivo (Task 16).
+> com códigos de erro do Motor (**Santander live**, coluna **Entrada** necessária). **Task 16 histórico
+> de simulações por usuário: FEITO** (rota `/app/simulacoes/historico` + `GET /v1/simulacoes` no Motor).
+> Ainda aberto: Playwright E2E (Task 15).
 
 **Goal:** Dashboard web (dono/gerente/vendedor) com login, estoque via API, leads, handoff e
 simulação manual — tokens só no servidor.
@@ -37,6 +38,7 @@ Browser → sessão/cookie → Portal BFF
 | 13 | Simulação manual | **Feito** (2026-07-13) — `vendedor` libera via RBAC; whitelist `simulacao_sem_dados_sensiveis` esconde custo/lucro/tokens |
 | 14 | Docker / compose portal | **Feito** (ajustar se faltar standalone empacotado) |
 | 15 | Playwright E2E | **Aberto** |
+| 16 | Histórico de simulações por usuário | **Feito** (2026-07-13) |
 
 ## Aberto (implementar daqui)
 
@@ -44,36 +46,30 @@ Browser → sessão/cookie → Portal BFF
 
 - Fluxos críticos login → estoque → leads → handoff → simulação (smoke).
 
-### Task 16 — Histórico + simulações ao vivo no Portal (pedido dono 2026-07-13)
+### Task 16 — Histórico de simulações por usuário — **FEITO (2026-07-13)**
 
-> Parcial: já existe `/app/simulacoes/job/{id}` com progresso auto-refresh e resultado multi-prazo
-> (Santander live). **Não** há ainda lista/histórico — cada simulação some depois de abrir o resultado.
+Entregue: cada usuário vê o histórico das simulações que **ele** disparou.
 
-#### Histórico por usuário (requisito de produto — dono 2026-07-13)
+- [x] Tela **Histórico de simulações** em `/app/simulacoes/historico` (template `historico.html`, link
+      no form de Simular).
+- [x] Escopo: **do usuário logado** (filtra `solicitado_por`=email); dono/gerente têm toggle
+      **`?escopo=loja`** ("toda a loja"); vendedor forçado a "minhas".
+- [x] Colunas: data/hora, status, placa/referência, prazos, bancos, solicitante (no escopo loja),
+      atalho para `/app/simulacoes/job/{id}`; paginação.
+- [x] Estados finais incluídos (`concluida`/`parcial`/`falhou`/`aguardando_intervencao`) + em andamento.
+- [x] Tenancy: `GET /v1/simulacoes` escopado por `cliente_id`; nunca outro tenant.
+- [x] Persistência: **`solicitado_por`** em `simulacoes` (migration 0009), gravado do header `X-Ator`;
+      `GET /v1/simulacoes` com filtros (`status`/`solicitado_por`/`desde`/`ate`) + paginação
+      (`limite`/`offset`); Portal BFF `MotorClient.listar_simulacoes` + rota + UI.
 
-Cada **usuário do Portal** (vendedor/gerente/dono da loja) precisa ver o **histórico das simulações
-que ele disparou** (não só “jobs em andamento” da loja inteira):
+> **Nota:** sims **anteriores** ao deploy têm `solicitado_por` nulo → não aparecem em "minhas sims";
+> dono vê no escopo "toda a loja". Novas sims populam normalmente.
 
-- [ ] Tela **Histórico de simulações** (ex.: `/app/simulacoes/historico` ou aba em Simular).
-- [ ] Escopo: **do usuário logado** (ator/email ou `user_id` do Portal). Dono/gerente podem ter
-      filtro “só eu / toda a loja” (opcional na v1; v1 mínima = pelo menos “minhas sims”).
-- [ ] Colunas mínimas: data/hora, status, placa/CPF mascarado, prazos, bancos, atalho para o
-      resultado/job (reabrir tela de parcelas ou progresso se ainda rodando).
-- [ ] Incluir estados finais: `concluida`, `parcial`, `falhou`, `aguardando_intervencao` — não
-      só `processando`.
-- [ ] Tenancy: só sims do **cliente Motor da loja**; nunca de outro tenant.
-- [ ] Persistência: Motor já guarda `simulacoes`/`simulacao_resultados` por `cliente_id`. Falta:
-      - Motor: `GET /v1/simulacoes` com filtros (status, `desde`/`ate`, paginação) e, se possível,
-        correlacionar **ator** (quem pediu) — hoje o job pode não guardar `usuario_portal`;
-        gravar `referencia_externa` ou campo `solicitado_por` no create (Portal envia email do
-        usuário logado).
-      - Portal BFF: lista filtrada + UI.
+#### Ao vivo (complemento — parcial/aberto)
 
-#### Ao vivo (complemento)
-
-- [ ] Lista “em andamento” (`recebida`/`processando`) com auto-refresh e link para o job.
-- [ ] Multi-banco: status por provedor na lista e no detalhe.
-- [ ] Alinhado ao Motor: multi-banco RPA = **um Playwright por banco** (ver #1A Task 12).
+- A lista inclui `recebida`/`processando`; **auto-refresh dedicado** da lista e **status por provedor**
+  na listagem ainda não implementados (o job individual já tem progresso). Multi-banco RPA = **um
+  Playwright por banco** (ver #1A Task 12) — ainda a implementar.
 
 ### Task 13 — RBAC da simulação (**feito 2026-07-13**)
 
@@ -99,4 +95,5 @@ Vendas, lucro, metas, funil, campanhas, CSV, equipe/config — ver #3B e handoff
 - [x] Leads e conversas/handoff reais.
 - [x] Tokens não no navegador (padrão BFF).
 - [x] Simulação autorizada ao vendedor sem dados sensíveis. (2026-07-13)
+- [x] Histórico de simulações por usuário (Task 16). (2026-07-13)
 - [ ] Playwright E2E dos fluxos acima.

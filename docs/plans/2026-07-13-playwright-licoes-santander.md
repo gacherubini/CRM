@@ -11,10 +11,12 @@
 |---|---|
 | Driver `santander` live | **OK** (headed + Xvfb no worker Docker) |
 | Portal progresso HTMX + resultado multi-prazo | **OK** |
+| **Entrada necessária devolvida pelo banco** (`parse_entrada`) | **OK** (não é input; coluna Entrada no Portal) |
+| **Fix skeleton dos cards** (`_passo_aguardar_simulacao`) | **OK** (espera texto real `Nx de`) |
 | Credenciais via Portal 9A → Motor cifrado | **OK** |
 | `POST .../testar-login` | ainda **placeholder** (não valida portal de verdade) |
 | Multi-banco paralelo (1 browser por banco) | **não implementado** (arquitetura preparada) |
-| Listagem `GET /v1/simulacoes` ao vivo | **não** |
+| Listagem `GET /v1/simulacoes` + histórico por usuário | **OK** (Task 16, 2026-07-13) |
 
 ### Arquivos-chave
 
@@ -126,6 +128,28 @@ Não assumir campos "como no mock" sem codegen/probe.
 
 Screenshots: `/srv/data/screenshots/` no volume do worker (`santander_inesperado.png`, etc.).
 
+### 11. Cards em **skeleton** (falso `parcelas_nao_encontradas`)
+
+- **Sintoma:** job chega na tela de ofertas (~50 s) mas falha com `parcelas_nao_encontradas`; screenshot
+  mostra "Escolha a parcela desejada" com os cards ainda como **barras cinzas (skeleton)**, sem o texto
+  "48x de R$ …".
+- **Causa:** o **título** "Escolha a parcela desejada" aparece **antes** dos cards; estes nascem como
+  skeleton (sem texto). Esperar só o título → parser lê cards vazios.
+- **Fix:** `_passo_aguardar_simulacao` espera o **texto real do card** (`\d+\s*x\s*de`) com **2 leituras
+  seguidas > 0** (estabilidade) + settle; seleciona a aba **Padrão** antes. Não basta o heading.
+- **Regra p/ próximo banco:** nunca considerar a tela pronta pelo título/heading — aguardar o **dado**
+  que você vai parsear (texto do card, valor), não o container/skeleton.
+
+### 12. Entrada é **devolvida**, não enviada (Santander)
+
+- O Santander **calcula a entrada necessária** e a exibe na tela ("Entrada R$ …", "Valor mínimo",
+  "Entrada recomendada"). Não a enviamos como input: `_ajustar_entrada` foi **removido**.
+- `parse_entrada` lê o rótulo `\bEntrada\b\s+R\$` (o `\b` evita casar "Valor liberado"/"Valor do veículo";
+  descarta se casar o R$ de um card). Vai no campo `entrada` do resultado (por prazo) → coluna Entrada no
+  Portal. Fallback financiado = `valor_bem − entrada(retornada)`.
+- **Regra p/ próximo banco:** confira se o portal **pede** entrada ou **calcula**. Se calcula, leia; não
+  invente input. Campos diferem por banco.
+
 ---
 
 ## Checklist para o próximo banco Playwright
@@ -138,7 +162,9 @@ Screenshots: `/srv/data/screenshots/` no volume do worker (`santander_inesperado
 6. Implementar `<Banco>Driver(PlaywrightBankDriver)`:
    - login estável (sem falso positivo de landing)
    - dismiss de modais/loading
+   - **esperar o dado real** (texto do card), não o título/skeleton (lição 11)
    - parse de ofertas com texto plano (não confiar em HTML cru)
+   - **entrada**: ler se o banco calcula (lição 12); só enviar como input se o portal pedir
 7. Registrar em `REAL_DRIVERS`; nomes canônicos **minúsculos** alinhados à credencial.
 8. Mapear erros específicos → códigos estáveis (como acima).
 9. Testes: parse com HTML real quebrado; fixture offline; smoke live gated por env.
@@ -163,13 +189,14 @@ Screenshots: `/srv/data/screenshots/` no volume do worker (`santander_inesperado
 
 ## Ordem sugerida pós-Santander
 
-1. **Histórico de simulações por usuário no Portal** (#3A.1 Task 16) — listagem no Motor + UI
-   “minhas sims” (concluídas/falhas/em andamento), não só progresso do job atual.  
-2. **Pan / BV / Bradesco** — primeiro **confirmar API** com gerente; se API, implementar HTTP.  
-3. **Fontecred** — candidato Playwright se confirmar sem API.  
-4. Multi-banco paralelo no mesmo job (1 browser por provedor).  
-5. `testar-login` real (Playwright short) no Motor.  
-6. Task 10 revenda; go-live WhatsApp em paralelo de produto.
+1. ~~**Histórico de simulações por usuário no Portal** (#3A.1 Task 16)~~ — **FEITO (2026-07-13)**:
+   `GET /v1/simulacoes` + `solicitado_por` + tela `/app/simulacoes/historico`.
+2. **Corrigir 2 falhas pré-existentes** do Motor (mock `Santander` sombreado pelo driver real homônimo).
+3. **Pan / BV / Bradesco** — primeiro **confirmar API** com gerente; se API, implementar HTTP.  
+4. **Fontecred** — candidato Playwright se confirmar sem API.  
+5. Multi-banco paralelo no mesmo job (1 browser por provedor).  
+6. `testar-login` real (Playwright short) no Motor.  
+7. Task 10 revenda; go-live WhatsApp em paralelo de produto.
 
 ## Verificação rápida (operador)
 

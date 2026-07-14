@@ -2,11 +2,13 @@
 
 > Plano válido do Motor. O #1 monolítico está em `docs/plans/_archive/` (não executar).
 >
-> **Status 2026-07-13 (final sessão live):** mock async, auth/tenancy, worker/lease, cifra,
-> **Task 11** e **Task 12 piloto Santander LIVE** (Playwright headed+Xvfb, multi-prazo real no Portal).
-> Lições: `2026-07-13-playwright-licoes-santander.md`.
-> **Aberto:** Task 10 (revenda); demais bancos reais (API-first); multi-banco paralelo; listagem jobs;
-> `testar-login` real. Contrato multi-prazo no Motor **já existe**.
+> **Status 2026-07-13:** mock async, auth/tenancy, worker/lease, cifra, **Task 11** e **Task 12 piloto
+> Santander LIVE** (Playwright headed+Xvfb, multi-prazo real no Portal, **entrada retornada pelo banco**
+> via `parse_entrada`, **fix skeleton** dos cards). **Listagem `GET /v1/simulacoes` + `solicitado_por`
+> FEITA** (Task 16; migrations head **0009**). Lições: `2026-07-13-playwright-licoes-santander.md`.
+> **Aberto:** Task 10 (revenda); demais bancos reais (API-first); multi-banco paralelo; `testar-login`
+> real; **2 falhas pré-existentes** (mock `Santander` sombreado pelo driver real homônimo). Contrato
+> multi-prazo no Motor **já existe**.
 
 **Goal:** Entregar uma API de simulação instalável e vendável separadamente, capaz de operar com
 mock agora e drivers bancários depois, sem depender de WhatsApp, n8n, Portal, Estoque ou Chatbot.
@@ -91,20 +93,23 @@ GET /v1/simulacoes/{id}
 Estados gerais: `recebida`, `processando`, `parcial`, `concluida`, `falhou`,
 `aguardando_intervencao`, `cancelada`.
 
-Cada resultado contém `provedor`, `status`, parcela, taxa, prazo, valor financiado, timestamps e
-`codigo_erro` estável. Mensagens técnicas e páginas bancárias nunca são devolvidas ao consumidor.
+Cada resultado contém `provedor`, `status`, parcela, taxa, prazo, valor financiado, **`entrada`
+(necessária, devolvida pelo banco — Santander)**, timestamps e `codigo_erro` estável. Mensagens
+técnicas e páginas bancárias nunca são devolvidas ao consumidor.
 
-### Listar (histórico / ao vivo) — **pedido dono 2026-07-13, ainda a implementar**
+### Listar (histórico / ao vivo) — **FEITO (Task 16, 2026-07-13)**
 
 ```http
-GET /v1/simulacoes?status=&solicitado_por=&desde=&ate=&limit=&cursor=
+GET /v1/simulacoes?status=&solicitado_por=&desde=&ate=&limite=&offset=
 ```
 
 - Tenancy: só jobs do `cliente_id` do token.
-- Serve o **histórico de simulações do usuário** no Portal (#3A.1 Task 16): o Portal envia o
-  e-mail/`user_id` do ator no create (`solicitado_por` ou `referencia_externa` estruturada) e
-  filtra a lista por esse campo.
-- Inclui estados finais (`concluida`/`falhou`/…) e em andamento — não só “ao vivo”.
+- Serve o **histórico de simulações do usuário** no Portal (#3A.1 Task 16): o Portal envia o e-mail do
+  ator no create via header **`X-Ator`** → gravado em `simulacoes.solicitado_por` (migration 0009) e a
+  lista filtra por esse campo.
+- Resposta `{itens, total, limite, offset, resumo}`; `simulacao_resumo` **não decifra** payload pessoal
+  (CPF omitido — índice cego não é reversível).
+- Inclui estados finais (`concluida`/`parcial`/`falhou`/`aguardando_intervencao`) e em andamento.
 
 ### Outros endpoints
 
@@ -117,8 +122,8 @@ GET /v1/simulacoes?status=&solicitado_por=&desde=&ate=&limit=&cursor=
 ## Dados pertencentes ao Motor
 
 - `clientes_api`: consumidor, credencial e limites.
-- `simulacoes`: estado do job, referência externa e retenção.
-- `simulacao_resultados`: um registro por provedor/banco.
+- `simulacoes`: estado do job, referência externa, **`solicitado_por`** (ator do Portal) e retenção.
+- `simulacao_resultados`: um registro por provedor/banco (parcela, taxa, prazo, financiado, **`entrada`**).
 - `simulacao_tentativas`: tentativas, duração e erro sanitizado.
 - `idempotencia`: chave por cliente e hash da requisição.
 - `auditoria`: ações administrativas sem payload pessoal em claro.
@@ -311,8 +316,8 @@ contrato HTTP existente.
 
 **Concorrência multi-banco (dono 2026-07-13):** quando o job pede vários bancos RPA, o Motor
 abre **um browser Playwright por banco** (isolado), com teto de paralelismo no worker; API
-drivers sem browser. Portal deve ter **histórico de simulações do usuário** + jobs ao vivo —
-ver #3A.1 Task 16 (listagem `GET /v1/simulacoes` + `solicitado_por`).
+drivers sem browser. **Histórico de simulações do usuário: FEITO** (#3A.1 Task 16 — listagem
+`GET /v1/simulacoes` + `solicitado_por`). Multi-banco paralelo ainda a implementar.
 
 ## Integrações opcionais
 

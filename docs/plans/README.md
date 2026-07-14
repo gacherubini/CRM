@@ -25,7 +25,7 @@ Cada plano `*A`/`*B` tem bloco **Status** no topo: leia antes de reimplementar.
 | 3 | [Plano #2A](2026-07-11-plano2a-chatbot-standalone-revendivel.md) | Chatbot + Estoque Lite | API+E3+E5+por-placa+sim+n8n (runtime importado); bot **off** até Publish |
 | 4 | [Plano #5A](2026-07-11-plano5a-catalogo-publico-independente.md) | Catálogo Público | Vitrine+funil+**Pixel browser**; residual SEO/tema/containers |
 | 5 | [Plano #3A](2026-07-11-plano3a-portal-vendedor-independente.md) | Portal/CRM | Base + **Task 9A financeiras feita** |
-| 5.1 | [Plano #3A.1](2026-07-11-plano3a1-frontend-dashboard-mvp.md) | Frontend Dashboard MVP | MVP fechado exceto Playwright E2E |
+| 5.1 | [Plano #3A.1](2026-07-11-plano3a1-frontend-dashboard-mvp.md) | Frontend Dashboard MVP | MVP fechado; **Task 16 histórico FEITO**; falta Playwright E2E |
 | 6 | [Plano #3B](2026-07-11-plano3b-dashboard-dono-vendas-metas.md) | Vendas/metas/dono | Parcial; Purchase CAPI no confirm (E10) |
 | 6+ | [Plano #6](2026-07-11-plano6-evolucoes-roadmap.md) | Roadmap add-ons | **E3, E5, E10 feitos (MVP)**; resto aberto |
 
@@ -43,7 +43,8 @@ Detalham a Task 12 do #1A (1º driver `real: true`). Ler junto com o #1A:
 - [Mapa dos bancos (reconhecimento)](2026-07-13-plano1a-task12-bancos-reconhecimento.md) — API vs
   Playwright por banco; Pan/BV/Bradesco **provavelmente têm API** (a confirmar com os bancos).
 - [**Lições do piloto Santander**](2026-07-13-playwright-licoes-santander.md) — **obrigatório** antes
-  do próximo driver Playwright (WAF, Xvfb, Material, modais, parsers, checklist).
+  do próximo driver Playwright (WAF, Xvfb, Material, modais, parsers, **skeleton de cards**, entrada
+  retornada, checklist).
 
 ## Pacotes comerciais
 
