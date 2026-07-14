@@ -49,10 +49,8 @@ primary_region = "gru"
 [[vm]]
   processes = ["app"]
   size = "shared-cpu-2x"
-  # Lab always-on: 512MB (API+worker idle). Para RPA Santander (Chromium) subir para 2048:
-  #   fly machine update <id> -a motor2037 --vm-memory 2048
-  # e liberar RAM (parar Portal/Catálogo se der mem_overcommit).
-  memory = "512"
+  # API + worker Playwright headed: o Chromium reserva mais de 512MB ao iniciar.
+  memory = "2048"
 
 # Sessões autenticadas e screenshots do navegador.
 [[mounts]]
