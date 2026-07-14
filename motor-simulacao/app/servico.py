@@ -76,6 +76,7 @@ def criar_simulacao(
     sol: SolicitacaoSimulacao,
     cliente_id: str,
     idempotency_key: str | None = None,
+    solicitado_por: str | None = None,
 ) -> tuple[SimulacaoORM, bool]:
     """Retorna (simulacao, criada). `criada=False` quando reusa por idempotência."""
     _validar(sol)
@@ -103,6 +104,7 @@ def criar_simulacao(
         id=str(uuid.uuid4()),
         cliente_id=cliente_id,
         referencia_externa=sol.referencia_externa,
+        solicitado_por=solicitado_por,
         status="recebida",
         payload_cifrado=cripto.cifrar(payload_pessoal),
         cpf_indice_cego=cripto.indice_cego(sol.pessoa.cpf),
@@ -136,6 +138,94 @@ def criar_simulacao(
 
 def obter_simulacao(db: Session, sim_id: str, cliente_id: str) -> SimulacaoORM | None:
     return db.query(SimulacaoORM).filter_by(id=sim_id, cliente_id=cliente_id).one_or_none()
+
+
+# Paginação da listagem de simulações (histórico). Teto defensivo para não
+# devolver a base inteira num pedido só.
+LISTAGEM_LIMITE_PADRAO = 20
+LISTAGEM_LIMITE_MAX = 100
+
+
+def _parse_dt(valor):
+    """Aceita datetime, date ISO ('2026-07-01') ou datetime ISO. Retorna aware/naive."""
+    if valor is None or isinstance(valor, datetime):
+        return valor
+    try:
+        return datetime.fromisoformat(str(valor).replace("Z", "+00:00"))
+    except ValueError:
+        return None
+
+
+def listar_simulacoes(
+    db: Session,
+    cliente_id: str,
+    *,
+    status: str | None = None,
+    solicitado_por: str | None = None,
+    desde=None,
+    ate=None,
+    limite: int = LISTAGEM_LIMITE_PADRAO,
+    offset: int = 0,
+) -> tuple[list[SimulacaoORM], int, int, int]:
+    """Histórico de simulações do cliente (tenancy), ordenado por criada_em desc.
+
+    Retorna (itens, total, limite_aplicado, offset_aplicado). Não decifra payload
+    pessoal — os campos sensíveis (cpf/nascimento/renda) ficam no blob cifrado.
+    """
+    try:
+        limite = int(limite)
+    except (TypeError, ValueError):
+        limite = LISTAGEM_LIMITE_PADRAO
+    try:
+        offset = int(offset)
+    except (TypeError, ValueError):
+        offset = 0
+    limite = max(1, min(limite, LISTAGEM_LIMITE_MAX))
+    offset = max(0, offset)
+
+    consulta = db.query(SimulacaoORM).filter(SimulacaoORM.cliente_id == cliente_id)
+    if status:
+        consulta = consulta.filter(SimulacaoORM.status == status)
+    if solicitado_por:
+        consulta = consulta.filter(SimulacaoORM.solicitado_por == solicitado_por)
+    d_desde = _parse_dt(desde)
+    if d_desde is not None:
+        consulta = consulta.filter(SimulacaoORM.criada_em >= d_desde)
+    d_ate = _parse_dt(ate)
+    if d_ate is not None:
+        consulta = consulta.filter(SimulacaoORM.criada_em <= d_ate)
+
+    total = consulta.count()
+    itens = (
+        consulta.order_by(SimulacaoORM.criada_em.desc(), SimulacaoORM.id.desc())
+        .limit(limite)
+        .offset(offset)
+        .all()
+    )
+    return itens, total, limite, offset
+
+
+def simulacao_resumo(sim: SimulacaoORM) -> dict:
+    """Projeção não sensível de uma simulação para a listagem/histórico.
+
+    Nunca inclui CPF em claro nem payload cifrado: o CPF fica cifrado em repouso
+    e o índice cego não é reversível para os últimos dígitos, então é omitido.
+    """
+    return {
+        "id": sim.id,
+        "status": sim.status,
+        "criada_em": sim.criada_em.isoformat() if sim.criada_em else None,
+        "atualizada_em": sim.atualizada_em.isoformat() if sim.atualizada_em else None,
+        "solicitado_por": sim.solicitado_por,
+        "referencia_externa": sim.referencia_externa,
+        "placa": sim.placa,
+        "categoria": sim.categoria,
+        "provedores": sim.provedores or [],
+        "prazos_meses": sim.prazos_meses or (
+            [sim.prazo_meses] if sim.prazo_meses is not None else []
+        ),
+        "num_resultados": len(sim.resultados),
+    }
 
 
 def cancelar_simulacao(db: Session, sim_id: str, cliente_id: str) -> SimulacaoORM | None:

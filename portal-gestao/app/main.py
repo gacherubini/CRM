@@ -1037,6 +1037,69 @@ def simulacoes_job(
     )
 
 
+@app.get("/app/simulacoes/historico", response_class=HTMLResponse)
+def simulacoes_historico(
+    request: Request,
+    status: str | None = None,
+    escopo: str | None = None,
+    limite: int = 20,
+    offset: int = 0,
+    db: Session = Depends(get_db),
+    motor: MotorClient = Depends(get_motor_client),
+):
+    """Histórico das simulações do usuário logado (ator/email).
+
+    Escopo padrão = "minhas" (filtra por solicitado_por = email do usuário).
+    Dono/gerente podem alternar para "toda a loja" (mesmo cliente Motor/tenant).
+    A listagem não traz valores financeiros (o Motor projeta só campos não
+    sensíveis), então não há o que esconder do vendedor aqui.
+    """
+    usuario = usuario_atual(request, db)
+    if not usuario:
+        return redirecionar_login()
+    if not pode_simular(usuario):
+        return RedirectResponse("/app", status_code=303)
+
+    pode_ver_loja = pode_ver_financeiro(usuario)
+    ver_loja = escopo == "loja" and pode_ver_loja
+    solicitado_por = None if ver_loja else usuario.email
+
+    limite = max(1, min(int(limite or 20), 100))
+    offset = max(0, int(offset or 0))
+    status_filtro = status if status in _SIM_STATUS_LABELS else None
+
+    itens, total, erro = [], 0, None
+    try:
+        dados = motor.listar_simulacoes(
+            ator=usuario.email,
+            status=status_filtro,
+            solicitado_por=solicitado_por,
+            limite=limite,
+            offset=offset,
+        )
+        itens = dados.get("itens") or []
+        total = dados.get("total") or 0
+    except MotorIndisponivel as exc:
+        erro = str(exc)
+
+    return templates.TemplateResponse(
+        "simulacoes/historico.html",
+        contexto(
+            request,
+            usuario,
+            itens=itens,
+            total=total,
+            limite=limite,
+            offset=offset,
+            escopo="loja" if ver_loja else "minhas",
+            pode_ver_loja=pode_ver_loja,
+            status_filtro=status_filtro or "",
+            status_labels=_SIM_STATUS_LABELS,
+            integracao_erro=erro,
+        ),
+    )
+
+
 CATEGORIAS_CUSTO = ["documentacao", "frete", "comissao", "outros"]
 STATUS_VENDA = ["registrada", "confirmada", "cancelada"]
 TIPOS_META = {

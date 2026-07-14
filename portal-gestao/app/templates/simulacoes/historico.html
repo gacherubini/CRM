@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block title %}Histórico de simulações — Gestão{% endblock %}
+{% block content %}
+<div class="page-heading">
+  <div>
+    <a class="back-link" href="/app/simulacoes">← Nova simulação</a>
+    <h1>Histórico de simulações</h1>
+    <p>{% if escopo == 'loja' %}Simulações de toda a loja.{% else %}Simulações que você disparou.{% endif %} Reabra o resultado ou o progresso pelo atalho.</p>
+  </div>
+</div>
+
+{% if integracao_erro %}<div class="alert warning" role="alert"><strong>Histórico indisponível.</strong> {{ integracao_erro }}</div>{% endif %}
+
+<form class="filter-bar" method="get">
+  <select name="status" aria-label="Status">
+    <option value="">Todos os status</option>
+    {% for chave, rotulo in status_labels.items() %}
+    <option value="{{ chave }}" {{ 'selected' if status_filtro == chave }}>{{ rotulo }}</option>
+    {% endfor %}
+  </select>
+  {% if pode_ver_loja %}
+  <select name="escopo" aria-label="Escopo">
+    <option value="minhas" {{ 'selected' if escopo != 'loja' }}>Só minhas</option>
+    <option value="loja" {{ 'selected' if escopo == 'loja' }}>Toda a loja</option>
+  </select>
+  {% endif %}
+  <button class="button secondary" type="submit">Filtrar</button>
+</form>
+
+<section class="panel flush">
+  {% if itens %}
+  <div class="table-wrap"><table>
+    <thead><tr><th>Data/hora</th><th>Status</th><th>Placa / referência</th><th>Prazos</th><th>Bancos</th>{% if escopo == 'loja' %}<th>Solicitante</th>{% endif %}<th><span class="sr-only">Ações</span></th></tr></thead>
+    <tbody>{% for s in itens %}<tr>
+      <td>{{ formatar_horario(s.criada_em) }}</td>
+      <td><span class="status {{ s.status }}">{{ status_labels.get(s.status, s.status | replace('_', ' ')) }}</span></td>
+      <td>{% if s.placa %}<strong>{{ s.placa }}</strong>{% elif s.referencia_externa %}{{ s.referencia_externa }}{% else %}<span class="muted">—</span>{% endif %}</td>
+      <td>{% if s.prazos_meses %}{{ s.prazos_meses | join(', ') }}x{% else %}<span class="muted">—</span>{% endif %}</td>
+      <td>{% if s.provedores %}{{ s.provedores | join(', ') }}{% else %}<span class="muted">—</span>{% endif %}</td>
+      {% if escopo == 'loja' %}<td>{% if s.solicitado_por %}{{ s.solicitado_por }}{% else %}<span class="muted">—</span>{% endif %}</td>{% endif %}
+      <td><a class="table-action" href="/app/simulacoes/job/{{ s.id }}">Abrir</a></td>
+    </tr>{% endfor %}</tbody>
+  </table></div>
+  {% elif integracao_erro %}<div class="empty"><strong>Não foi possível carregar o histórico.</strong><p>Tente novamente em instantes.</p></div>
+  {% elif status_filtro %}<div class="empty"><strong>Nenhuma simulação com esse status.</strong><p>Ajuste o filtro acima.</p></div>
+  {% else %}<div class="empty"><strong>Nenhuma simulação ainda.</strong><p>As simulações que você fizer aparecem aqui.</p></div>{% endif %}
+</section>
+
+{% if total > limite or offset > 0 %}
+<div class="form-actions" style="justify-content:space-between">
+  {% if offset > 0 %}<a class="button ghost" href="?escopo={{ escopo }}&status={{ status_filtro }}&limite={{ limite }}&offset={{ [offset - limite, 0] | max }}">← Anteriores</a>{% else %}<span></span>{% endif %}
+  <span class="muted">{{ offset + 1 }}–{{ offset + itens|length }} de {{ total }}</span>
+  {% if offset + limite < total %}<a class="button ghost" href="?escopo={{ escopo }}&status={{ status_filtro }}&limite={{ limite }}&offset={{ offset + limite }}">Próximas →</a>{% else %}<span></span>{% endif %}
+</div>
+{% endif %}
+{% endblock %}
