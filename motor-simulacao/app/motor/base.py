@@ -51,6 +51,8 @@ class ResultadoProvedor(BaseModel):
     taxa_am: Optional[float] = None
     prazo_meses: Optional[int] = None
     valor_financiado: Optional[float] = None
+    # Entrada necessaria devolvida pelo banco (Santander calcula e retorna).
+    entrada: Optional[float] = None
     codigo_erro: Optional[str] = None
 
 

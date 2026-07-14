@@ -654,6 +654,7 @@ _SIMULACAO_RESULTADO_CAMPOS_PUBLICOS = {
     "taxa_am",
     "prazo_meses",
     "valor_financiado",
+    "entrada",
     "codigo_erro",
 }
 

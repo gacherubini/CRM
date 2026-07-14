@@ -150,6 +150,8 @@ class ResultadoORM(Base):
     taxa_am: Mapped[float | None] = mapped_column(Numeric(6, 4), nullable=True)
     prazo_meses: Mapped[int | None] = mapped_column(Integer, nullable=True)
     valor_financiado: Mapped[float | None] = mapped_column(Numeric(12, 2), nullable=True)
+    # Entrada necessaria devolvida pelo banco (ex.: Santander calcula e retorna).
+    entrada: Mapped[float | None] = mapped_column(Numeric(12, 2), nullable=True)
     codigo_erro: Mapped[str | None] = mapped_column(String, nullable=True)
 
     simulacao: Mapped["SimulacaoORM"] = relationship(back_populates="resultados")

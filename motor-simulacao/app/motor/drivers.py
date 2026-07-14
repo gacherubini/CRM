@@ -48,6 +48,8 @@ class ResultadoDriver:
     taxa_am: Optional[Decimal] = None
     prazo_meses: Optional[int] = None
     valor_financiado: Optional[Decimal] = None
+    # Entrada necessaria devolvida pelo banco (ex.: Santander calcula e retorna).
+    entrada: Optional[Decimal] = None
     codigo_erro: Optional[str] = None
 
 

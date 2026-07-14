@@ -57,11 +57,11 @@
         </select>
       </label>
       <label>Valor do bem (venda)<input type="number" step="0.01" min="0" name="valor" value="{{ valores.valor }}" placeholder="21900"></label>
-      <label>Entrada<input type="number" step="0.01" min="0" name="entrada" value="{{ valores.entrada }}" placeholder="0"></label>
+      <label>Entrada (mock/outros bancos)<input type="number" step="0.01" min="0" name="entrada" value="{{ valores.entrada }}" placeholder="0"></label>
       <label>Prazo único (mock)<input type="number" min="1" max="120" name="prazo_meses" value="{{ valores.prazo_meses or 48 }}"></label>
       <label class="wide">Prazos multi (Santander, vírgula)<input name="prazos_meses" value="{{ valores.prazos_meses or '12,24,36,48' }}" placeholder="12,24,36,48"></label>
     </div>
-    <p class="muted">No mock, valor e prazo único bastam. No Santander, preencha placa, valor, entrada e prazos multi; o Motor lê as parcelas reais do portal.</p>
+    <p class="muted">No mock, valor e prazo único bastam. No Santander, preencha placa, valor e prazos multi; o Motor lê as parcelas reais do portal. <strong>A entrada no Santander é calculada pelo banco</strong> e aparece na coluna Entrada do resultado — o campo acima é ignorado nesse modo.</p>
   </section>
 
   <div class="form-actions"><a class="button ghost" href="/app">Cancelar</a><button class="button primary" type="submit">Simular parcelas</button></div>

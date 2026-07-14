@@ -168,6 +168,7 @@ def para_pydantic(sim: SimulacaoORM) -> Simulacao:
                 taxa_am=_num(r.taxa_am),
                 prazo_meses=r.prazo_meses,
                 valor_financiado=_num(r.valor_financiado),
+                entrada=_num(r.entrada),
                 codigo_erro=r.codigo_erro,
             )
             for r in sim.resultados

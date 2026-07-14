@@ -85,6 +85,12 @@ _RE_VALOR_LIBERADO_FROUXO = re.compile(
     r"Valor liberado\s{0,40}R\$\s*([\d.]+,\d{2})",
     re.IGNORECASE,
 )
+# Entrada necessaria que o Santander calcula e devolve na tela de ofertas.
+# \b evita casar "Valor liberado"/"Valor do veículo"; ancorado no proprio rotulo.
+_RE_ENTRADA = re.compile(
+    r"\bEntrada\b\s+R\$\s*([\d.]+,\d{2})",
+    re.IGNORECASE,
+)
 
 
 def _texto_plano_portal(texto: str) -> str:
@@ -139,6 +145,27 @@ def parse_valor_liberado(texto: str) -> Decimal | None:
         val = parse_moeda_br(m.group(1))
         # Financiado real é tipicamente milhares; parcela sozinha ~centenas–2k
         # e já existe em "Nx de R$". Se o valor bate com uma parcela parseada, ignora.
+        parcelas = {p for _, p in parse_parcelas_texto(plano)}
+        if val in parcelas:
+            continue
+        return val
+    return None
+
+
+def parse_entrada(texto: str) -> Decimal | None:
+    """Entrada necessaria devolvida pela tela (rotulo 'Entrada').
+
+    O Santander calcula a entrada; nao a recebemos como input. Ancorado no
+    rotulo com \\b para nao confundir com 'Valor liberado'/'Valor do veiculo';
+    descarta se casar o R$ de um card de parcela.
+    """
+    plano = _texto_plano_portal(texto)
+    for m in _RE_ENTRADA.finditer(plano):
+        val = parse_moeda_br(m.group(1))
+        # Um card "Nx de R$ ..." imediatamente antes do valor => nao e a entrada.
+        meio = plano[m.start() : m.start(1)]
+        if re.search(r"\d+\s*x\s*de", meio, re.I):
+            continue
         parcelas = {p for _, p in parse_parcelas_texto(plano)}
         if val in parcelas:
             continue
@@ -228,10 +255,14 @@ class SantanderDriver(PlaywrightBankDriver):
                 "parcelas_nao_encontradas",
                 "nenhum card de parcela encontrado na tela de simulação",
             )
+        # Entrada necessaria: o Santander calcula e devolve na tela (nao e input).
+        entrada_necessaria = parse_entrada(html)
         financiado = parse_valor_liberado(html)
         if financiado is None and sol.veiculo.valor is not None:
-            entrada = Decimal(str(sol.condicoes.entrada or 0))
-            financiado = Decimal(str(sol.veiculo.valor)) - entrada
+            desconto = entrada_necessaria if entrada_necessaria is not None else Decimal(
+                str(sol.condicoes.entrada or 0)
+            )
+            financiado = Decimal(str(sol.veiculo.valor)) - desconto
             if financiado < 0:
                 financiado = Decimal("0")
         # Filtra prazos pedidos se a solicitação trouxe lista
@@ -248,6 +279,7 @@ class SantanderDriver(PlaywrightBankDriver):
                     taxa_am=None,  # portal desta tela não exibe taxa a.m. no card
                     prazo_meses=prazo,
                     valor_financiado=financiado,
+                    entrada=entrada_necessaria,
                 )
             )
         if not out:
@@ -259,6 +291,7 @@ class SantanderDriver(PlaywrightBankDriver):
                     valor_parcela=parcela,
                     prazo_meses=prazo,
                     valor_financiado=financiado,
+                    entrada=entrada_necessaria,
                 )
                 for prazo, parcela in pares
             ]
@@ -291,16 +324,8 @@ class SantanderDriver(PlaywrightBankDriver):
                 self._passo_cliente_veiculo(page, sol)
                 self._passo_termos_e_modal_uf(page)
                 self._passo_aguardar_simulacao(page)
-                if sol.condicoes.entrada:
-                    self._ajustar_entrada(page, sol.condicoes.entrada)
-                    # re-espera cards após mudar entrada
-                    try:
-                        page.get_by_text(
-                            re.compile(r"\d+\s*x\s*de", re.I)
-                        ).first.wait_for(timeout=15_000)
-                        page.wait_for_timeout(800)
-                    except Exception:
-                        pass
+                # Santander calcula a entrada necessaria e a devolve na tela; nao
+                # enviamos entrada como input (ver parse_entrada / _resultados_de_html).
                 # inner_text é mais estável que HTML cru (cards quebram "de" / "R$")
                 try:
                     texto = page.inner_text("body") or ""
@@ -772,12 +797,24 @@ class SantanderDriver(PlaywrightBankDriver):
             pass
 
     def _passo_aguardar_simulacao(self, page) -> None:
-        """AGORA ESPERA — tela de parcelas pode demorar a montar."""
+        """Espera os CARDS de parcela carregarem — nao so o titulo/skeleton.
+
+        O titulo "Escolha a parcela desejada" aparece antes dos cards, que nascem
+        como skeleton (sem texto). So o texto real de parcela ("48x de") conta;
+        exige 2 leituras seguidas para nao pegar o instante do primeiro card sair
+        do skeleton.
+        """
         timeout = max(self.timeout_ms, 90_000)
         prazo_fim = time.monotonic() + (timeout / 1000.0)
-        marcador_ok = re.compile(
-            r"Escolha a parcela desejada|\d+\s*x\s*de", re.I
-        )
+        cards = re.compile(r"\d+\s*x\s*de", re.I)
+        # Seleciona a aba Padrao cedo (default) para os cards certos carregarem.
+        try:
+            page.get_by_role("button", name=re.compile(r"^Padrão$", re.I)).click(
+                force=True, timeout=3_000
+            )
+        except Exception:
+            pass
+        estavel = 0
         while time.monotonic() < prazo_fim:
             # Erro do portal no passo 2 (banner vermelho).
             if page.get_by_text(re.compile(r"Ocorreu um erro", re.I)).count() > 0:
@@ -792,32 +829,19 @@ class SantanderDriver(PlaywrightBankDriver):
                 except Exception:
                     pass
                 raise ErroTransitorio("portal_simulacao_erro", detalhe)
-            if page.get_by_text(marcador_ok).count() > 0:
-                break
-            page.wait_for_timeout(400)
-        else:
-            self._assert_portal_acessivel(page)
-            raise ErroTransitorio(
-                "portal_falhou",
-                "tela de parcelas não apareceu a tempo",
-            )
-        # preferir aba Padrão
-        try:
-            page.get_by_role("button", name=re.compile(r"^Padrão$", re.I)).click(
-                force=True, timeout=3_000
-            )
+            if page.get_by_text(cards).count() > 0:
+                estavel += 1
+                if estavel >= 2:
+                    page.wait_for_timeout(800)  # settle final dos demais cards
+                    return
+            else:
+                estavel = 0
             page.wait_for_timeout(500)
-        except Exception:
-            pass
-
-    def _ajustar_entrada(self, page, entrada: float) -> None:
-        try:
-            page.get_by_label(re.compile("^Entrada$", re.I)).fill(
-                _formatar_moeda_input(entrada)
-            )
-            page.wait_for_timeout(800)
-        except Exception:
-            pass
+        self._assert_portal_acessivel(page)
+        raise ErroTransitorio(
+            "portal_falhou",
+            "cards de parcela não carregaram a tempo (skeleton)",
+        )
 
     def _salvar_storage(self, browser_ctx) -> None:
         if not self.storage_state_path:

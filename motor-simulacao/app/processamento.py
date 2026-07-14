@@ -258,6 +258,7 @@ def processar_job(
             taxa_am=r.taxa_am,
             prazo_meses=r.prazo_meses,
             valor_financiado=r.valor_financiado,
+            entrada=r.entrada,
             codigo_erro=r.codigo_erro,
         )
         for linhas in existentes_por_prov.values()
@@ -293,6 +294,7 @@ def processar_job(
                         else sol.condicoes.prazo_meses
                     ),
                     valor_financiado=res.valor_financiado,
+                    entrada=res.entrada,
                     codigo_erro=res.codigo_erro,
                 )
             )

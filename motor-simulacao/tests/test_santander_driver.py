@@ -7,6 +7,7 @@ from app.motor.base import Condicoes, Pessoa, SolicitacaoSimulacao, Veiculo
 from app.motor.drivers import DriverContext, IntervencaoNecessaria, resolver_drivers
 from app.motor.santander import (
     PROVEDOR,
+    parse_entrada,
     parse_moeda_br,
     parse_parcelas_texto,
     parse_valor_liberado,
@@ -78,6 +79,33 @@ def test_parse_valor_liberado_nao_pega_parcela():
     assert parse_valor_liberado(texto) is None
     texto_ok = "Valor liberado R$ 20.400,00 Entrada R$ 1.500,00 48x de R$ 946,28"
     assert parse_valor_liberado(texto_ok) == Decimal("20400.00")
+
+
+def test_parse_entrada_da_fixture():
+    """Santander calcula a entrada necessaria e devolve na tela (rotulo 'Entrada')."""
+    html = FIXTURE.read_text(encoding="utf-8")
+    assert parse_entrada(html) == Decimal("1123.20")
+
+
+def test_parse_entrada_nao_pega_valor_liberado_nem_veiculo():
+    texto = (
+        "Valor liberado R$ 20.776,80 Entrada R$ 1.123,20 "
+        "Valor do veículo R$ 21.900,00 48x de R$ 946,28"
+    )
+    assert parse_entrada(texto) == Decimal("1123.20")
+
+
+def test_parse_entrada_ausente_retorna_none():
+    assert parse_entrada("<html><body>sem entrada aqui</body></html>") is None
+
+
+def test_driver_fixture_devolve_entrada_necessaria_em_cada_prazo():
+    html = FIXTURE.read_text(encoding="utf-8")
+    d = SantanderDriver(html_simulacao=html)
+    # Mesmo sem informar entrada, o Santander devolve a entrada necessaria da tela.
+    out = d(_sol(condicoes=Condicoes(prazos_meses=[12, 24, 36, 48])))
+    assert len(out) == 4
+    assert all(r.entrada == Decimal("1123.20") for r in out)
 
 
 def test_uf_para_portal():

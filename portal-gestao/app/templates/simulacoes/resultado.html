@@ -13,7 +13,7 @@
     {% if valores.placa %}<div><dt>Placa</dt><dd>{{ valores.placa }}</dd></div>{% endif %}
     {% if valores.uf_licenciamento %}<div><dt>UF</dt><dd>{{ valores.uf_licenciamento }}</dd></div>{% endif %}
     <div><dt>Valor do bem</dt><dd>{% if valores.valor %}{{ formatar_brl(valores.valor) }}{% else %}<span class="muted">—</span>{% endif %}</dd></div>
-    <div><dt>Entrada</dt><dd>{{ formatar_brl(valores.entrada or 0) }}</dd></div>
+    <div><dt>Entrada informada</dt><dd>{{ formatar_brl(valores.entrada or 0) }}<br><span class="muted">no Santander a entrada é calculada pelo banco (coluna Entrada)</span></dd></div>
     <div><dt>Prazos</dt><dd>{% if valores.prazos_meses %}{{ valores.prazos_meses }}{% else %}{{ valores.prazo_meses }} meses{% endif %}</dd></div>
     <div><dt>Categoria</dt><dd>{{ valores.categoria | capitalize }}</dd></div>
   </dl>
@@ -42,12 +42,13 @@
 <section class="panel flush">
   {% if resultados %}
   <div class="table-wrap"><table>
-    <thead><tr><th>Banco</th><th>Parcela</th><th>Taxa a.m.</th><th>Prazo</th><th>Financiado</th><th>Situação</th></tr></thead>
+    <thead><tr><th>Banco</th><th>Parcela</th><th>Taxa a.m.</th><th>Prazo</th><th>Entrada</th><th>Financiado</th><th>Situação</th></tr></thead>
     <tbody>{% for r in resultados %}<tr>
       <td><strong>{{ r.provedor or '—' }}</strong></td>
       <td>{% if r.valor_parcela is not none %}{{ formatar_brl(r.valor_parcela) }}{% else %}<span class="muted">—</span>{% endif %}</td>
       <td>{% if r.taxa_am is not none %}{{ r.taxa_am }}%{% else %}<span class="muted">—</span>{% endif %}</td>
       <td>{% if r.prazo_meses %}{{ r.prazo_meses }}x{% else %}<span class="muted">—</span>{% endif %}</td>
+      <td>{% if r.entrada is defined and r.entrada is not none %}{{ formatar_brl(r.entrada) }}{% else %}<span class="muted">—</span>{% endif %}</td>
       <td>{% if r.valor_financiado is not none %}{{ formatar_brl(r.valor_financiado) }}{% else %}<span class="muted">—</span>{% endif %}</td>
       <td>{% if r.codigo_erro %}<span class="status perdido">{{ r.codigo_erro }}</span>{% else %}<span class="status {{ r.status or 'novo' }}">{{ r.status | replace('_', ' ') if r.status else 'ok' }}</span>{% endif %}</td>
     </tr>{% endfor %}</tbody>

@@ -215,6 +215,32 @@ def test_sanitizador_remove_campos_sensiveis_sem_mutar_original():
     assert bruto["resultados"][0]["custo"] == 77777.0
 
 
+def test_sanitizador_mantem_entrada_necessaria():
+    """Entrada necessaria (calculada pelo banco) nao e sensivel: vendedor pode ver."""
+    from app.main import simulacao_sem_dados_sensiveis
+
+    bruto = {
+        "id": "s2",
+        "status": "concluida",
+        "criada_em": "2026-07-13T10:00:00",
+        "resultados": [
+            {
+                "provedor": "santander",
+                "status": "concluida",
+                "valor_parcela": 946.28,
+                "prazo_meses": 48,
+                "valor_financiado": 20776.80,
+                "entrada": 1123.20,
+                "codigo_erro": None,
+                "custo": 77777.0,
+            }
+        ],
+    }
+    limpo = simulacao_sem_dados_sensiveis(bruto)
+    assert limpo["resultados"][0]["entrada"] == 1123.20
+    assert "custo" not in limpo["resultados"][0]
+
+
 def test_post_retorna_parcelas_da_api(client, chatbot_fake):
     login(client)
     dados = _dados_validos(_csrf_do_form(client))
