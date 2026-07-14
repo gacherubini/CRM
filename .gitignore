@@ -16,6 +16,7 @@ n8n_data/
 
 # Ambiente
 .env
+deploy/fly/.env.production.local
 
 # scripts de patch one-off do n8n (nao versionar)
 n8n/_*.py

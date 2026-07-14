@@ -1,0 +1,40 @@
+app = "estoque2037"
+primary_region = "gru"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[deploy]
+  release_command = "alembic upgrade head"
+
+[env]
+  ESTOQUE_SKIP_INIT = "1"
+  ESTOQUE_PUBLIC_RATE_LIMIT = "120"
+  ESTOQUE_OUTBOX_INTERVALO = "5"
+  ESTOQUE_SESSION_SECURE_COOKIE = "1"
+
+[processes]
+  app = "/srv/scripts/fly-entrypoint.sh"
+
+[[services]]
+  processes = ["app"]
+  internal_port = 8000
+  protocol = "tcp"
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 0
+
+  [[services.ports]]
+    port = 8000
+    handlers = ["http"]
+
+  [[services.http_checks]]
+    path = "/health/ready"
+    interval = "15s"
+    timeout = "5s"
+    grace_period = "20s"
+
+[[vm]]
+  processes = ["app"]
+  size = "shared-cpu-1x"
+  memory = "512"

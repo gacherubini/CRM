@@ -14,6 +14,9 @@ class Settings:
     database_path: str = os.getenv("CATALOGO_DATABASE_PATH", "data/catalogo.db")
     page_size: int = max(1, min(48, int(os.getenv("CATALOGO_PAGE_SIZE", "12"))))
     public_base_url: str = os.getenv("CATALOGO_PUBLIC_BASE_URL", "").rstrip("/")
+    default_store_slug: str = os.getenv(
+        "CATALOGO_DEFAULT_STORE_SLUG", "moto-center"
+    ).strip()
     secure_cookie: bool = os.getenv("CATALOGO_SECURE_COOKIE", "0") == "1"
     events_url: str = os.getenv("CATALOGO_EVENTS_URL", "").rstrip("/")
     events_token: str = os.getenv("CATALOGO_EVENTS_TOKEN", "")

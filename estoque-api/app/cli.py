@@ -22,6 +22,12 @@ def main() -> None:
     cred.add_argument("--slug", required=True)
     cred.add_argument("--papel", default="operador")
 
+    revogar = sub.add_parser(
+        "revogar-credenciais",
+        help="revoga todas as credenciais de serviço de uma loja",
+    )
+    revogar.add_argument("--slug", required=True)
+
     usuario = sub.add_parser("criar-usuario", help="cria usuário da administração web")
     usuario.add_argument("--slug", required=True)
     usuario.add_argument("--email", required=True)
@@ -56,6 +62,23 @@ def main() -> None:
             db.close()
         print(f"Credencial criada para: {loja.nome} (slug={loja.slug}, papel={args.papel})")
         print(f"TOKEN (guarde agora, não será mostrado de novo): {token}")
+    elif args.comando == "revogar-credenciais":
+        from app.models_db import CredencialServico, Loja
+
+        db = SessionLocal()
+        try:
+            loja = db.query(Loja).filter(Loja.slug == args.slug).first()
+            if loja is None:
+                raise SystemExit(f"loja não encontrada: {args.slug}")
+            removidas = (
+                db.query(CredencialServico)
+                .filter(CredencialServico.loja_id == loja.id)
+                .delete(synchronize_session=False)
+            )
+            db.commit()
+        finally:
+            db.close()
+        print(f"Credenciais revogadas: {removidas}")
     elif args.comando == "criar-usuario":
         db = SessionLocal()
         try:

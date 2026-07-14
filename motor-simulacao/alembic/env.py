@@ -2,7 +2,6 @@
 
 Usa DATABASE_URL (ou o default de app.db) e o metadata dos modelos canônicos.
 """
-import os
 from logging.config import fileConfig
 
 from sqlalchemy import engine_from_config, pool
@@ -13,7 +12,7 @@ from app import models_db  # noqa: F401 (registra os modelos no metadata)
 from app.db import DATABASE_URL, Base
 
 config = context.config
-config.set_main_option("sqlalchemy.url", os.getenv("DATABASE_URL", DATABASE_URL))
+config.set_main_option("sqlalchemy.url", DATABASE_URL)
 
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)

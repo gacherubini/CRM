@@ -25,6 +25,12 @@ def test_health_e_version(client):
     assert version["contrato_estoque"] == "public/v1"
 
 
+def test_raiz_redireciona_para_loja_padrao(client):
+    response = client.get("/", follow_redirects=False)
+    assert response.status_code == 307
+    assert response.headers["location"] == "/l/moto-center"
+
+
 def test_vitrine_renderiza_dados_e_preserva_filtros(client, fake_provider):
     response = client.get(
         "/l/moto-center?tipo=moto&marca=Honda&preco_min=10000&preco_max=30000&limit=1"

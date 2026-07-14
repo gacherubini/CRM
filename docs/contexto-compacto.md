@@ -1,9 +1,28 @@
 # Contexto compacto para continuidade
 
-Atualizado em **2026-07-13** (Santander **entrada retornada** + fix skeleton; **Task 16 histórico** live).  
+Atualizado em **2026-07-14** (deploy Fly.io em modo lab + Evolution → n8n confirmado).
 Leia isto primeiro; detalhes em `docs/handoff-contexto.md`.  
 **Playwright / próximos bancos:** `docs/plans/2026-07-13-playwright-licoes-santander.md`.  
 Planos válidos: `docs/plans/README.md`. **Ignore** `docs/plans/_archive/`.
+
+## Checkpoint Fly.io (2026-07-14)
+
+- Org/região: `crm-419` / `gru`; alvo de custo: **US$10/mês**, modo laboratório.
+- Apps: `motor2037`, `estoque2037`, `chatbot2037`, `catalogo2037`, `portal2037`,
+  `evolution2037`, `n8n2037`; banco `suite-pg`; Redis Upstash `suite-redis`.
+- Uma Machine por app. Portal/Catálogo/Chatbot/Estoque/Motor/Evolution usam autostop e, nos eventos
+  observados, param após cerca de **6 min** ociosos. n8n usa `suspend`; Postgres fica ligado.
+- URLs: Portal `https://portal2037.fly.dev`; Catálogo `https://catalogo2037.fly.dev`;
+  Evolution Manager `https://evolution2037.fly.dev/manager`; n8n `https://n8n2037.fly.dev`.
+- n8n `2.26.8`, 1 GB, volume persistente. Workflow `WhatsApp IA - Somente Nao Salvos` importado e
+  webhook de produção `/webhook/whatsapp-ai` registrado. Usuário confirmou mensagem
+  Evolution → n8n; resposta completa da IA ainda não foi validada.
+- Usuário informou ter substituído os tokens Chatbot e adicionado `X-Webhook-Token`. Ainda confirmar
+  a chave Evolution nos nós `Consultar contato na Evolution1`/`Responder WhatsApp1` e a credencial Gemini.
+- Evolution: instância `loja1`; WhatsApp `5551980336365`; mensagem recebida confirmada.
+- Estoque tem 2 veículos disponíveis, ambos **não publicados**; não aparecem no Catálogo até clicar
+  `Publicar no catálogo` no Portal.
+- Segredos ficam somente em `deploy/fly/.env.production.local` (ignorado). Nunca ler/imprimir/versionar.
 
 ## Regras permanentes
 
@@ -16,7 +35,8 @@ Planos válidos: `docs/plans/README.md`. **Ignore** `docs/plans/_archive/`.
   **entrada é calculada pelo banco** e devolvida (campo `entrada` no resultado) — não é input.
   Demais: híbrido **API-first** + Playwright só se não houver API.
 - Senhas de portal: Dashboard **9A** → Motor cifrado (Task 11).
-- Bot WhatsApp: **off** até `docs/go-live-chatbot.md` (n8n importado; falta Publish + `ESTOQUE_API_*`).
+- Bot WhatsApp: transporte Evolution → n8n confirmado, mas go-live da IA ainda depende da credencial
+  Gemini, da chave Evolution nos dois nós HTTP e de um teste E2E com resposta.
 
 ## Estado por produto
 

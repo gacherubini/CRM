@@ -1,0 +1,46 @@
+app = "evolution2037"
+primary_region = "gru"
+
+[build]
+  image = "evoapicloud/evolution-api:v2.3.7"
+
+[env]
+  SERVER_TYPE = "http"
+  SERVER_PORT = "8080"
+  SERVER_URL = "https://evolution2037.fly.dev"
+  CONFIG_SESSION_PHONE_VERSION = "2.3000.1033773198"
+  DATABASE_ENABLED = "true"
+  DATABASE_PROVIDER = "postgresql"
+  DATABASE_CONNECTION_CLIENT_NAME = "evolution2037"
+  DATABASE_SAVE_DATA_INSTANCE = "true"
+  DATABASE_SAVE_DATA_NEW_MESSAGE = "true"
+  DATABASE_SAVE_MESSAGE_UPDATE = "true"
+  DATABASE_SAVE_DATA_CONTACTS = "true"
+  DATABASE_SAVE_DATA_CHATS = "true"
+  CACHE_REDIS_ENABLED = "true"
+  CACHE_REDIS_PREFIX_KEY = "evolution2037"
+  CACHE_REDIS_SAVE_INSTANCES = "true"
+  CACHE_LOCAL_ENABLED = "false"
+  DEL_INSTANCE = "false"
+  TELEMETRY = "false"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 0
+
+  [[http_service.checks]]
+    path = "/"
+    interval = "30s"
+    timeout = "10s"
+    grace_period = "60s"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "1024"
+
+[[mounts]]
+  source = "evolution_instances"
+  destination = "/evolution/instances"

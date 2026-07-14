@@ -144,6 +144,11 @@ def page_url(slug: str, filters: dict, offset: int, limit: int) -> str:
     return f"/l/{slug}?{urlencode(params)}"
 
 
+@app.get("/", include_in_schema=False)
+def root_catalog():
+    return RedirectResponse(f"/l/{settings.default_store_slug}", status_code=307)
+
+
 @app.get("/health/live")
 def health_live():
     return {"status": "ok"}

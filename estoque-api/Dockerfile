@@ -8,6 +8,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY app ./app
 COPY alembic ./alembic
 COPY alembic.ini .
+COPY scripts/fly-entrypoint.sh /srv/scripts/fly-entrypoint.sh
+RUN chmod +x /srv/scripts/fly-entrypoint.sh
 
 EXPOSE 8000
 

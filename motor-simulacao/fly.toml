@@ -1,0 +1,53 @@
+app = "motor2037"
+primary_region = "gru"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[deploy]
+  # Executa a migração uma única vez por deploy, antes de iniciar API e worker.
+  release_command = "alembic upgrade head"
+
+[env]
+  MOTOR_ENV = "production"
+  MOTOR_SKIP_INIT = "1"
+  MOTOR_WORKER_INTERVALO = "2"
+  MOTOR_JOB_LEASE_SECONDS = "180"
+  MOTOR_BROWSER_HEADLESS = "0"
+  MOTOR_BROWSER_TIMEOUT_MS = "60000"
+  PLAYWRIGHT_CHROMIUM_USE_HEADLESS_SHELL = "0"
+  MOTOR_SCREENSHOT_DIR = "/srv/data/screenshots"
+  MOTOR_STORAGE_STATE_DIR = "/srv/data/storage_state"
+  DISPLAY = ":99"
+
+[processes]
+  app = "/srv/scripts/fly-entrypoint.sh"
+
+# API e worker compartilham uma única Machine no modo laboratório.
+[[services]]
+  processes = ["app"]
+  internal_port = 8000
+  protocol = "tcp"
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 0
+
+  [[services.ports]]
+    port = 8000
+    handlers = ["http"]
+
+  [[services.http_checks]]
+    path = "/health/ready"
+    interval = "15s"
+    timeout = "3s"
+
+[[vm]]
+  processes = ["app"]
+  size = "shared-cpu-2x"
+  memory = "2048"
+
+# Sessões autenticadas e screenshots do navegador.
+[[mounts]]
+  source = "motor_data"
+  destination = "/srv/data"
+  processes = ["app"]

@@ -44,7 +44,8 @@ COPY app ./app
 COPY alembic ./alembic
 COPY alembic.ini .
 COPY scripts/worker-entrypoint.sh /srv/scripts/worker-entrypoint.sh
-RUN chmod +x /srv/scripts/worker-entrypoint.sh
+COPY scripts/fly-entrypoint.sh /srv/scripts/fly-entrypoint.sh
+RUN chmod +x /srv/scripts/worker-entrypoint.sh /srv/scripts/fly-entrypoint.sh
 
 # Dados de sessão/screenshots (montados em volume no compose do worker).
 RUN mkdir -p /srv/data/screenshots /srv/data/storage_state

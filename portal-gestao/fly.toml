@@ -1,0 +1,40 @@
+app = "portal2037"
+primary_region = "gru"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  PORTAL_DATABASE_URL = "sqlite:////data/portal.db"
+  PORTAL_ENV = "production"
+  PORTAL_SECURE_COOKIE = "1"
+  MOTOR_URL = "http://motor2037.flycast:8000"
+  ESTOQUE_API_URL = "http://estoque2037.flycast:8000"
+  CHATBOT_API_URL = "http://chatbot2037.flycast:8000"
+
+[processes]
+  web = "sh -c 'alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 9000 --proxy-headers --forwarded-allow-ips=*'"
+
+[http_service]
+  processes = ["web"]
+  internal_port = 9000
+  force_https = true
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 0
+
+  [[http_service.checks]]
+    path = "/health/ready"
+    interval = "15s"
+    timeout = "5s"
+    grace_period = "30s"
+
+[[vm]]
+  processes = ["web"]
+  size = "shared-cpu-1x"
+  memory = "512"
+
+[[mounts]]
+  source = "portal_data"
+  destination = "/data"
+  processes = ["web"]

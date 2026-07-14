@@ -1,19 +1,110 @@
 # Handoff técnico — suíte automotiva
 
-> Checkpoint: **2026-07-13 (Santander entrada retornada + fix skeleton; Task 16 histórico LIVE)**.  
+> Checkpoint: **2026-07-14 (deploy Fly.io lab + Evolution → n8n confirmado)**.
 > Confirme containers/`.env`/n8n antes de editar. Testes unitários ≠ E2E WhatsApp.  
 > Leia primeiro: `docs/contexto-compacto.md`. Planos válidos: `docs/plans/README.md`.  
 > **Lições Playwright (obrigatório antes do próximo banco):**  
 > `docs/plans/2026-07-13-playwright-licoes-santander.md`.  
 > Commits desta sessão estão em **`main` local** (ainda **sem push** — combine antes de enviar).
 
+## Checkpoint de deploy Fly.io — 2026-07-14
+
+### Decisões do ambiente
+
+- Organização `crm-419`, região `gru`, domínios `fly.dev`, uma Machine por aplicação.
+- Loja `Moto Center`, slug `moto-center`, WhatsApp `5551980336365`, instância Evolution `loja1`.
+- E-mail operacional/admin: `bielcheeeeee@gmail.com`.
+- Modo **lab/economia máxima**, alvo informado de **US$10/mês**.
+- Segredos/tokens/senhas gerados ficam em `deploy/fly/.env.production.local`, ignorado pelo Git.
+  Nunca ler, imprimir, copiar para logs ou versionar esse arquivo.
+
+### Recursos implantados
+
+| Componente | App/recurso | Machine | Estado/configuração relevante |
+|---|---|---|---|
+| Motor | `motor2037` | `0807560c916d68` | API+worker na mesma Machine; privado/Flycast; autostop |
+| Estoque | `estoque2037` | `287e35dbd147e8` | API+outbox na mesma Machine; privado/Flycast; autostop |
+| Chatbot | `chatbot2037` | `d8d1375a42e578` | privado/Flycast; autostop |
+| Catálogo | `catalogo2037` | `0807560c916768` | público; autostop; volume `catalogo_data` |
+| Portal | `portal2037` | `6837936c0d73d8` | público; autostop; volume `portal_data` |
+| Evolution | `evolution2037` | `7847926f5d1758` | v2.3.7, 1 GB; autostop; volume `evolution_instances` |
+| n8n | `n8n2037` | `0807564f9034e8` | v2.26.8, 1 GB; autosuspend; volume `n8n_data` |
+| PostgreSQL | `suite-pg` | `d8946d2f320de8` | Postgres Flex 18.1; 256 MB; volume `pg_data`; ligado |
+| Redis | `suite-redis` | Upstash | PAYG; usado pela Evolution |
+
+O volume duplicado do Motor foi removido. Volumes persistentes restantes têm 1 GB e snapshots
+agendados. Não criar segunda Machine/volume sem revisar o teto mensal.
+
+### URLs e acessos
+
+- Portal: `https://portal2037.fly.dev`
+- Catálogo: `https://catalogo2037.fly.dev` (raiz redireciona para `/l/moto-center`)
+- Evolution API: `https://evolution2037.fly.dev/`
+- Evolution Manager: `https://evolution2037.fly.dev/manager`
+- n8n: `https://n8n2037.fly.dev/` (cadastro inicial/login na própria raiz)
+- Portal admin criado com o e-mail acima; senha apenas no arquivo local de segredos.
+- Evolution `loja1` criada; conexão/mensagem recebida confirmada pelo usuário.
+
+### Ajustes de deploy já aplicados
+
+- `fly.toml` criados para os produtos e infraestrutura necessária.
+- URLs `postgres://` normalizadas para SQLAlchemy/psycopg em Motor, Estoque e Chatbot.
+- Motor e Estoque combinam API+worker/outbox para respeitar uma Machine por app.
+- Portal e Catálogo corrigidos para CSS HTTPS; Uvicorn do Portal recebe proxy headers.
+- Catálogo raiz redireciona para `moto-center`; CSS e página pública responderam 200.
+- n8n subiu para 1 GB (512 MB não bastou) e usa `auto_stop_machines = "suspend"`.
+- Portal exibiu o frontend Motora correto depois da correção de CSS.
+
+### Estado do n8n/Evolution
+
+- Workflow correto: `WhatsApp IA - Somente Nao Salvos` (18 nós), webhook `POST /webhook/whatsapp-ai`.
+- A cópia importada foi preparada com Chatbot em `http://chatbot2037.flycast:8000`, Evolution em
+  `https://evolution2037.fly.dev` e instância `loja1`.
+- O GET manual no webhook retorna corretamente “not registered for GET”; o nó aceita **POST**.
+- Usuário informou ter substituído `__CHATBOT_TOKEN__` nos sete Tool Code e configurado
+  `X-Webhook-Token` nos dois nós que chamam `/webhook/mensagem`.
+- Ainda **confirmar** no editor:
+  1. credencial do `Google Gemini Chat Model1`;
+  2. `apikey` Evolution em `Consultar contato na Evolution1`;
+  3. `apikey` Evolution em `Responder WhatsApp1`.
+- Webhook Evolution deve apontar para
+  `https://n8n2037.fly.dev/webhook/whatsapp-ai`, evento `MESSAGES_UPSERT`.
+- Entrega Evolution → n8n foi confirmada pelo usuário em 2026-07-14. Ainda falta teste E2E de resposta
+  com outro número **não salvo**; mensagens `fromMe=true` representam atendente e pausam o bot.
+
+### Autostop e custo observado
+
+- Eventos reais: Portal ~5m37s, Catálogo ~5m45s, Chatbot ~6m03s e Estoque ~6m07s até autostop.
+- Fly não oferece duração customizada de idle; escolhe-se `stop`, `suspend` ou sempre ligado.
+- n8n suspenso retoma mais rápido; manter essa configuração no laboratório.
+- Evolution dormindo não recebe WhatsApp para se acordar sozinha. Para teste, abrir o Manager/API antes.
+- Evolution 1 GB sempre ligada em `gru` foi estimada em ~US$9,20/mês; somada ao Postgres e volumes
+  ultrapassa o teto de US$10. Não tornar always-on sem decisão explícita de orçamento/go-live.
+
+### Dados e pendências funcionais
+
+- Estoque: 1 loja, 2 veículos disponíveis, ambos `publicado=false`; publicar pelo Portal para aparecerem
+  imediatamente no Catálogo. Catálogo lê a API pública do Estoque; não há importação separada.
+- Motor: cliente/credenciais técnicas existem, mas não havia credencial bancária nem simulação no banco
+  no checkpoint. Cadastrar banco em Portal → Acessos bancos para simulação real.
+- Portal é o frontend principal; Motor e Estoque permanecem APIs privadas por segurança.
+
+### Próximo passo operacional
+
+1. Confirmar Gemini + duas chaves Evolution no workflow.
+2. Publicar/salvar o workflow e manter o webhook `MESSAGES_UPSERT` ativo.
+3. Acordar Evolution, confirmar `loja1` como `open`, enviar mensagem de outro número não salvo e revisar
+   a Execution inteira até `Responder WhatsApp1`.
+4. Publicar os veículos desejados no Portal e validar o Catálogo.
+5. Só no go-live decidir Evolution always-on e revisar o orçamento.
+
 ## Estado em uma frase
 
 Suíte **demo forte**: Motor com **1º driver real (Santander)** fim-a-fim no Portal — agora **devolve a
 entrada necessária** (o banco calcula; não é input) e **espera os cards reais** (fix do skeleton). Portal
 tem **histórico de simulações por usuário** (Task 16: `GET /v1/simulacoes` + `solicitado_por`). Mock dos
-outros bancos; Chatbot/Estoque/Catálogo por HTTP. Bot WhatsApp **off de propósito** (n8n importado, ainda
-inactive). Próximo foco de código: **próximos bancos (API-first)** ou go-live WhatsApp — **não** reescrever
+outros bancos; Chatbot/Estoque/Catálogo por HTTP. Transporte WhatsApp Evolution → n8n já foi confirmado,
+mas a resposta IA ainda não teve E2E completo. Próximo foco de código: **próximos bancos (API-first)** ou go-live WhatsApp — **não** reescrever
 o piloto Santander sem ler as lições.
 
 ## Verificação
