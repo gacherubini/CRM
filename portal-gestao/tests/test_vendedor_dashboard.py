@@ -69,6 +69,28 @@ def test_vendedor_ve_meta_individual_segura_mas_nao_meta_de_lucro(client):
     assert "999.999,00" not in resposta.text
 
 
+def test_vendedor_ve_atingimento_de_faturamento_individual(client):
+    criar_venda("dono@loja.test", "Venda confirmada", "20000", status="confirmada")
+    criar_venda("dono@loja.test", "Venda registrada", "50000", status="registrada")
+    criar_venda("outro@loja.test", "Venda de outro", "999999", status="confirmada")
+    criar_meta_individual("faturamento", "40000")
+    login(client, papel="vendedor")
+    resposta = client.get("/app/vendedor")
+    assert resposta.status_code == 200
+    # Só a venda confirmada do próprio vendedor conta: 20000 / 40000 = 50%.
+    assert "50.0%" in resposta.text
+    assert "R$ 20.000,00" in resposta.text
+
+
+def test_meta_individual_de_outro_vendedor_nao_aparece(client):
+    criar_venda("dono@loja.test", "Venda", "10000")
+    criar_meta_individual("quantidade", "2", vendedor_email="outro@loja.test")
+    login(client, papel="vendedor")
+    resposta = client.get("/app/vendedor")
+    assert resposta.status_code == 200
+    assert "Nenhuma meta individual aplicável" in resposta.text
+
+
 def test_dono_nao_acessa_dashboard_de_vendedor(client):
     login(client)
     resposta = client.get("/app/vendedor", follow_redirects=False)

@@ -3,7 +3,7 @@ from decimal import Decimal
 
 import pytest
 
-from conftest import csrf_da_resposta, login
+from conftest import criar_usuario, csrf_da_resposta, login
 
 from app.db import SessionLocal
 from app.main import ultimo_dia_mes
@@ -84,6 +84,27 @@ def test_gerente_edita_meta_ativa(client):
     assert meta.tipo == "faturamento"
     assert meta.valor_alvo == Decimal("125000.00")
     db.close()
+
+
+def test_gerente_converte_meta_da_loja_em_meta_individual(client):
+    criar_usuario(papel="vendedor", email="vendedor@loja.test")
+    meta_id = criar_meta()
+    login(client, papel="gerente")
+    pagina = client.get(f"/app/metas/{meta_id}/editar")
+    assert 'value="loja"' in pagina.text
+    resposta = client.post(
+        f"/app/metas/{meta_id}/editar",
+        data={"csrf": csrf_da_resposta(pagina), **dados_meta_vendedor("vendedor@loja.test")},
+        follow_redirects=False,
+    )
+    assert resposta.status_code == 303
+    db = SessionLocal()
+    meta = db.get(Meta, meta_id)
+    assert meta.escopo == "vendedor"
+    assert meta.vendedor_email == "vendedor@loja.test"
+    db.close()
+    pagina_editada = client.get(f"/app/metas/{meta_id}/editar")
+    assert 'value="vendedor@loja.test" selected' in pagina_editada.text
 
 
 def test_vendedor_consulta_mas_nao_pode_criar_ou_editar(client):
@@ -198,3 +219,160 @@ def test_meta_inativa_nao_aparece_no_dashboard(client):
     login(client)
     resposta = client.get("/app/financeiro")
     assert "Nenhuma meta da loja para o período" in resposta.text
+
+
+def dados_meta_vendedor(vendedor_email, tipo="quantidade", alvo="3", inicio=None, fim=None):
+    dados = dados_meta(tipo=tipo, alvo=alvo, inicio=inicio, fim=fim)
+    dados["escopo"] = "vendedor"
+    dados["vendedor_email"] = vendedor_email
+    return dados
+
+
+def test_dono_cria_meta_por_vendedor(client):
+    criar_usuario(papel="vendedor", email="vendedor@loja.test")
+    login(client)
+    pagina = client.get("/app/metas/nova")
+    assert "vendedor@loja.test" in pagina.text
+    resposta = client.post(
+        "/app/metas/nova",
+        data={"csrf": csrf_da_resposta(pagina), **dados_meta_vendedor("vendedor@loja.test", alvo="5")},
+        follow_redirects=False,
+    )
+    assert resposta.status_code == 303
+    assert resposta.headers["location"] == "/app/metas?ok=criada"
+    db = SessionLocal()
+    meta = db.query(Meta).one()
+    assert meta.escopo == "vendedor"
+    assert meta.vendedor_email == "vendedor@loja.test"
+    assert meta.valor_alvo == Decimal("5.00")
+    db.close()
+    lista = client.get("/app/metas")
+    assert "Vendedor" in lista.text
+    assert "vendedor@loja.test" in lista.text
+
+
+def test_meta_vendedor_exige_selecao_de_vendedor(client):
+    criar_usuario(papel="vendedor", email="vendedor@loja.test")
+    login(client)
+    pagina = client.get("/app/metas/nova")
+    dados = dados_meta_vendedor("", alvo="5")
+    resposta = client.post(
+        "/app/metas/nova",
+        data={"csrf": csrf_da_resposta(pagina), **dados},
+    )
+    assert resposta.status_code == 422
+    assert "Selecione o vendedor" in resposta.text
+    db = SessionLocal()
+    assert db.query(Meta).count() == 0
+    db.close()
+
+
+def test_meta_vendedor_rejeita_vendedor_de_outra_loja(client):
+    db = SessionLocal()
+    from app.auth import hash_senha
+    from app.models import Usuario
+
+    db.add(
+        Usuario(
+            email="forasteiro@outra.test",
+            nome="Forasteiro",
+            senha_hash=hash_senha("senha-segura"),
+            papel="vendedor",
+            loja_slug="outra-loja",
+        )
+    )
+    db.commit()
+    db.close()
+    login(client)
+    pagina = client.get("/app/metas/nova")
+    resposta = client.post(
+        "/app/metas/nova",
+        data={"csrf": csrf_da_resposta(pagina), **dados_meta_vendedor("forasteiro@outra.test", alvo="5")},
+    )
+    assert resposta.status_code == 422
+    assert "vendedor ativo desta loja" in resposta.text
+    db = SessionLocal()
+    assert db.query(Meta).count() == 0
+    db.close()
+
+
+def test_bloqueia_sobreposicao_de_meta_individual_do_mesmo_vendedor(client):
+    criar_usuario(papel="vendedor", email="vendedor@loja.test")
+    inicio, fim = periodo_atual()
+    login(client)
+    pagina = client.get("/app/metas/nova")
+    primeira = client.post(
+        "/app/metas/nova",
+        data={"csrf": csrf_da_resposta(pagina), **dados_meta_vendedor("vendedor@loja.test", inicio=inicio, fim=fim)},
+        follow_redirects=False,
+    )
+    assert primeira.status_code == 303
+    pagina2 = client.get("/app/metas/nova")
+    segunda = client.post(
+        "/app/metas/nova",
+        data={
+            "csrf": csrf_da_resposta(pagina2),
+            **dados_meta_vendedor(
+                "vendedor@loja.test", inicio=inicio + timedelta(days=1), fim=fim
+            ),
+        },
+    )
+    assert segunda.status_code == 422
+    assert "sobrepondo o período" in segunda.text
+    db = SessionLocal()
+    assert db.query(Meta).count() == 1
+    db.close()
+
+
+def test_meta_loja_e_meta_individual_no_mesmo_periodo_nao_conflitam(client):
+    criar_usuario(papel="vendedor", email="vendedor@loja.test")
+    inicio, fim = periodo_atual()
+    login(client)
+    pagina = client.get("/app/metas/nova")
+    loja = client.post(
+        "/app/metas/nova",
+        data={"csrf": csrf_da_resposta(pagina), **dados_meta(inicio=inicio, fim=fim)},
+        follow_redirects=False,
+    )
+    assert loja.status_code == 303
+    pagina2 = client.get("/app/metas/nova")
+    individual = client.post(
+        "/app/metas/nova",
+        data={
+            "csrf": csrf_da_resposta(pagina2),
+            **dados_meta_vendedor("vendedor@loja.test", inicio=inicio, fim=fim),
+        },
+        follow_redirects=False,
+    )
+    assert individual.status_code == 303
+    db = SessionLocal()
+    assert db.query(Meta).count() == 2
+    db.close()
+
+
+def test_vendedor_nao_ve_metas_individuais_de_outros_na_lista_geral(client):
+    criar_meta_individual_para_teste("vendedor@loja.test")
+    login(client, papel="vendedor", email="vendedor@loja.test")
+    lista = client.get("/app/metas")
+    assert lista.status_code == 200
+    # Só há uma meta cadastrada e ela é individual (escopo=vendedor): a lista geral
+    # do vendedor mostra apenas metas de escopo=loja, então deve aparecer vazia.
+    assert "Nenhuma meta cadastrada" in lista.text
+
+
+def criar_meta_individual_para_teste(vendedor_email, tipo="quantidade", alvo="3"):
+    padrao_inicio, padrao_fim = periodo_atual()
+    db = SessionLocal()
+    meta = Meta(
+        loja_slug="loja-teste",
+        escopo="vendedor",
+        vendedor_email=vendedor_email,
+        tipo=tipo,
+        periodo_inicio=padrao_inicio,
+        periodo_fim=padrao_fim,
+        valor_alvo=Decimal(alvo),
+        ativa=True,
+    )
+    db.add(meta)
+    db.commit()
+    db.close()
