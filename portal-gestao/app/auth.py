@@ -91,3 +91,8 @@ def pode_gerir_financeiras(usuario: Usuario) -> bool:
 def pode_gerir_trafego(usuario: Usuario) -> bool:
     """Aba Tráfego / tokens CAPI — apenas dono e gerente (E10)."""
     return usuario.papel in {"dono", "gerente"}
+
+
+def pode_ver_relatorios(usuario: Usuario) -> bool:
+    """Relatórios/exportação CSV (vendas, metas, funil) — apenas dono e gerente."""
+    return usuario.papel in {"dono", "gerente"}

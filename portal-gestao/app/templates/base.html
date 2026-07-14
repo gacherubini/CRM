@@ -42,23 +42,24 @@
         {% endif %}
         {% if usuario.papel in ['dono', 'gerente'] %}
         <a class="nav-link {{ 'active' if request.url.path.startswith('/app/financeiro') else '' }}" href="/app/financeiro" {% if request.url.path.startswith('/app/financeiro') %}aria-current="page"{% endif %}><span>07</span>Financeiro</a>
-        <a class="nav-link {{ 'active' if request.url.path.startswith('/app/trafego') else '' }}" href="/app/trafego" {% if request.url.path.startswith('/app/trafego') %}aria-current="page"{% endif %}><span>08</span>Tráfego</a>
+        <a class="nav-link {{ 'active' if request.url.path.startswith('/app/relatorios') else '' }}" href="/app/relatorios" {% if request.url.path.startswith('/app/relatorios') %}aria-current="page"{% endif %}><span>08</span>Relatórios</a>
+        <a class="nav-link {{ 'active' if request.url.path.startswith('/app/trafego') else '' }}" href="/app/trafego" {% if request.url.path.startswith('/app/trafego') %}aria-current="page"{% endif %}><span>09</span>Tráfego</a>
         {% endif %}
         {% if usuario.papel == 'vendedor' %}
         <a class="nav-link {{ 'active' if request.url.path.startswith('/app/vendedor') else '' }}" href="/app/vendedor" {% if request.url.path.startswith('/app/vendedor') %}aria-current="page"{% endif %}><span>07</span>Meu painel</a>
         {% endif %}
         {% if usuario.papel in ['dono', 'gerente', 'vendedor'] %}
-        <a class="nav-link {{ 'active' if request.url.path.startswith('/app/metas') else '' }}" href="/app/metas" {% if request.url.path.startswith('/app/metas') %}aria-current="page"{% endif %}><span>09</span>Metas</a>
+        <a class="nav-link {{ 'active' if request.url.path.startswith('/app/metas') else '' }}" href="/app/metas" {% if request.url.path.startswith('/app/metas') %}aria-current="page"{% endif %}><span>10</span>Metas</a>
         {% endif %}
 
         {% if usuario.papel in ['dono', 'gerente', 'admin_plataforma'] %}
         <span class="nav-section">Administração</span>
         {% if usuario.papel in ['dono', 'gerente'] %}
-        <a class="nav-link {{ 'active' if request.url.path.startswith('/app/financeiras') else '' }}" href="/app/financeiras" {% if request.url.path.startswith('/app/financeiras') %}aria-current="page"{% endif %}><span>09</span>Acessos bancos</a>
+        <a class="nav-link {{ 'active' if request.url.path.startswith('/app/financeiras') else '' }}" href="/app/financeiras" {% if request.url.path.startswith('/app/financeiras') %}aria-current="page"{% endif %}><span>11</span>Acessos bancos</a>
         {% endif %}
         {% if usuario.papel in ['dono', 'admin_plataforma'] %}
-        <a class="nav-link {{ 'active' if request.url.path.startswith('/app/equipe') else '' }}" href="/app/equipe" {% if request.url.path.startswith('/app/equipe') %}aria-current="page"{% endif %}><span>10</span>Equipe</a>
-        <a class="nav-link {{ 'active' if request.url.path.startswith('/app/configuracoes') else '' }}" href="/app/configuracoes" {% if request.url.path.startswith('/app/configuracoes') %}aria-current="page"{% endif %}><span>11</span>Configurações</a>
+        <a class="nav-link {{ 'active' if request.url.path.startswith('/app/equipe') else '' }}" href="/app/equipe" {% if request.url.path.startswith('/app/equipe') %}aria-current="page"{% endif %}><span>12</span>Equipe</a>
+        <a class="nav-link {{ 'active' if request.url.path.startswith('/app/configuracoes') else '' }}" href="/app/configuracoes" {% if request.url.path.startswith('/app/configuracoes') %}aria-current="page"{% endif %}><span>13</span>Configurações</a>
         {% endif %}
         {% endif %}
 
@@ -78,7 +79,7 @@
       <header class="topbar">
         <button class="menu-button" type="button" aria-controls="sidebar" aria-expanded="false">Menu</button>
         <div class="page-context">
-          <strong>{% block page_title %}{% if request.url.path == '/app' %}Visão geral{% elif request.url.path.startswith('/app/estoque') %}Estoque{% elif request.url.path.startswith('/app/leads') %}Leads{% elif request.url.path.startswith('/app/conversas') %}Conversas{% elif request.url.path.startswith('/app/vendas') %}Vendas{% elif request.url.path.startswith('/app/financeiro') %}Financeiro{% elif request.url.path.startswith('/app/trafego') %}Tráfego{% elif request.url.path.startswith('/app/vendedor') %}Meu painel{% elif request.url.path.startswith('/app/metas') %}Metas{% elif request.url.path.startswith('/app/simulacoes') %}Simulações{% elif request.url.path.startswith('/app/financeiras') %}Acessos bancos{% elif request.url.path.startswith('/app/equipe') %}Equipe{% else %}Configurações{% endif %}{% endblock %}</strong>
+          <strong>{% block page_title %}{% if request.url.path == '/app' %}Visão geral{% elif request.url.path.startswith('/app/estoque') %}Estoque{% elif request.url.path.startswith('/app/leads') %}Leads{% elif request.url.path.startswith('/app/conversas') %}Conversas{% elif request.url.path.startswith('/app/vendas') %}Vendas{% elif request.url.path.startswith('/app/financeiro') %}Financeiro{% elif request.url.path.startswith('/app/relatorios') %}Relatórios{% elif request.url.path.startswith('/app/trafego') %}Tráfego{% elif request.url.path.startswith('/app/vendedor') %}Meu painel{% elif request.url.path.startswith('/app/metas') %}Metas{% elif request.url.path.startswith('/app/simulacoes') %}Simulações{% elif request.url.path.startswith('/app/financeiras') %}Acessos bancos{% elif request.url.path.startswith('/app/equipe') %}Equipe{% else %}Configurações{% endif %}{% endblock %}</strong>
           <small>{{ usuario.loja_slug }}</small>
         </div>
         <span class="environment"><i></i>Conectado</span>
