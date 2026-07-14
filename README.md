@@ -25,7 +25,7 @@ Cliente (WhatsApp)
 │                    n8n                        │  ← orquestrador
 │  1. Recebe mensagem                           │
 │  2. Carrega estado da conversa (Postgres)     │
-│  3. Chama o LLM (Claude) → entende + extrai    │
+│  3. Chama o LLM (Gemini) → entende + extrai    │
 │  4. Valida dados (CPF, data, valores)         │
 │  5. Quando completo → chama o MOTOR (HTTP)     │
 │  6. Formata resposta → devolve no WhatsApp    │
@@ -56,7 +56,7 @@ plugado depois **sem alterar** o fluxo do WhatsApp, a conversa ou o banco de dad
 |---|---|---|
 | Canal WhatsApp | **Evolution API** (self-host) | Recebe/envia mensagens |
 | Orquestração | **n8n** | Roteia, mantém estado, chama LLM e motor |
-| Conversa (NLU) | **Claude** (Anthropic API) | Entende o cliente, extrai e valida dados |
+| Conversa (NLU) | **Google Gemini** (API, via n8n) | Entende o cliente, extrai e valida dados |
 | Motor de simulação | **Python + FastAPI** (mock → Playwright) | Devolve opções por banco |
 | Banco de dados | **PostgreSQL** (container) | Leads, consentimento LGPD, simulações |
 | Hospedagem | **Fly.io** ou **VPS** (ex.: Hetzner) | Tudo num servidor sempre ligado |
@@ -181,7 +181,7 @@ bot-whatsapp-financiamento/
 **MVP (Fases 0–2):**
 1. Servidor (Fly.io ou VPS) — n8n e Evolution precisam ficar **sempre ligados**.
 2. Número de WhatsApp dedicado (um chip só para o bot).
-3. Chave de API do Claude (Anthropic).
+3. Chave de API do Google Gemini (Google AI Studio) — configurada como credencial no n8n.
 4. Postgres (container no mesmo servidor).
 
 **Fase 3+ (quando sair do hold):**
