@@ -10,7 +10,7 @@ from sqlalchemy import engine_from_config, pool
 from alembic import context
 
 from app import models_db  # noqa: F401 (registra os modelos no metadata)
-from app.db import DATABASE_URL, Base
+from app.db import DATABASE_URL, Base, normalizar_database_url
 
 config = context.config
 # Relê os.environ em vez de usar só o DATABASE_URL importado: app.db calcula essa
@@ -18,7 +18,11 @@ config = context.config
 # testes). Se o ambiente mudar DATABASE_URL depois desse import (ex.: testes de
 # migração com monkeypatch.setenv), usar o valor cacheado ignora a troca e o
 # alembic acaba migrando o banco default em vez do banco isolado do teste.
-config.set_main_option("sqlalchemy.url", os.getenv("DATABASE_URL", DATABASE_URL))
+# Normaliza igual ao app.db para não usar `postgres://` cru (rejeitado pelo
+# SQLAlchemy 2.x) quando o Fly injeta a URL curta no deploy.
+config.set_main_option(
+    "sqlalchemy.url", normalizar_database_url(os.getenv("DATABASE_URL", DATABASE_URL))
+)
 
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
