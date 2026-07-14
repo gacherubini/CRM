@@ -141,13 +141,13 @@ real é **RPA** (automatizar os portais com Playwright). Agregador pago fica com
 ## 🚀 Roadmap (MVP em fases)
 
 - [x] **Fundação** — domínio, contratos v1, multi-loja, papéis e segurança (Plano #0).
-- [x] **Fase 0/1** — Chatbot API + n8n tools + simulação **MOCK** + lead/handoff (bot off até go-live).
+- [x] **Fase 0/1** — Chatbot API + n8n tools + simulação **MOCK** + lead/handoff.
 - [x] **Fase 2** — Estoque, catálogo público, portal vendedor, placa CRM, E3/E5.
-- [x] **Fase 3 (parcial)** — Vendas, metas loja, funil, Task 9A financeiras, E10 Pixel Meta.
-- [ ] **Fase 4** — Plugar **1 driver bancário real** (Task 12 — design pronto, código não).
-- [ ] **Fase 5** — Campanhas/ROI (E8), go-live WhatsApp em produção, polish revenda.
+- [x] **Fase 3 (parcial)** — Vendas, metas (loja+vendedor), CSV, Task 9A financeiras, E10 Pixel Meta.
+- [x] **Fase 4 (parcial)** — **1º driver real: Santander LIVE** (Playwright); demais bancos e multi-banco paralelo abertos.
+- [ ] **Fase 5** — Go-live WhatsApp E2E, #3B funil/campanhas (Task 4–5), E8 ROI, outbound E11/E12, polish revenda.
 
-Estado detalhado: `docs/handoff-contexto.md`.
+Estado canônico: [`docs/contexto-compacto.md`](docs/contexto-compacto.md) · planos: [`docs/plans/README.md`](docs/plans/README.md) · handoff: [`docs/handoff-contexto.md`](docs/handoff-contexto.md).
 
 ---
 

@@ -10,9 +10,17 @@ Planos válidos: `docs/plans/README.md`. **Ignore** `docs/plans/_archive/`.
 - Org/região: `crm-419` / `gru`; alvo de custo: **US$10/mês**, modo laboratório.
 - Apps: `motor2037`, `estoque2037`, `chatbot2037`, `catalogo2037`, `portal2037`,
   `evolution2037`, `n8n2037`; banco `suite-pg`; Redis Upstash `suite-redis`.
-- Uma Machine por app. Portal/Catálogo/Chatbot/Estoque/Motor usam autostop (~6 min ociosos → param;
-  acordam sob demanda). **Evolution e n8n agora sempre-ligados** (`autostop=false`,
-  `min_machines_running=1`); Postgres fica ligado.
+- Uma Machine por app. **Opção A aplicada no Fly (2026-07-14):** backends **always-on** —
+  `motor2037`, `estoque2037`, `chatbot2037` (`autostop=false` nas machines; health OK).
+  **Portal e Catálogo** autostop; **Evolution e n8n** always-on; Postgres ligado.
+- **Teto de RAM da org (mem_overcommit):** com backends+n8n+evo+pg always-on (~4.3GB),
+  **Portal e Catálogo não sobem ao mesmo tempo** (só um dos dois + suite). Motor lab em **512MB**
+  (RPA real: subir para 2048 e parar Portal/Catálogo se necessário).
+  Scripts lab:
+  - `bash deploy/fly/down-all.sh` — para tudo (não gasta compute; não apaga volume)
+  - `bash deploy/fly/up-all.sh` — sobe na ordem certa + reaplica always-on nos backends
+  - `bash deploy/fly/up-all.sh --catalogo` — tenta Portal+Catálogo (pode falhar por RAM)
+  - `bash deploy/fly/apply-always-on-backends.sh` — redeploy/imagem always-on (quando preciso)
 - **Volume churn:** o Fly migra máquinas de host e cada migração forka um volume (órfãos cobrados).
   Limpar com `deploy/fly/clean-orphan-volumes.sh --apply`. Não usar keepalive de máquina ociosa.
 - URLs: Portal `https://portal2037.fly.dev`; Catálogo `https://catalogo2037.fly.dev`;
@@ -29,17 +37,20 @@ Planos válidos: `docs/plans/README.md`. **Ignore** `docs/plans/_archive/`.
 
 ## Regras permanentes
 
-- Workspace: `C:\Users\guilh\Documents\codigo\bot-whatsapp-financiamento`.
+- Workspace canônico atual: pasta do repositório CRM (clone local do usuário). Docs antigos podem
+  citar path Windows de outra máquina — **ignorar path absoluto**; use o root do git.
 - Sem reset/checkout destrutivo sem pedido explícito.
 - Não ler/imprimir `.env`, tokens, chaves Gemini/Evolution/Motor/Portal/CAPI ou senhas.
 - Estoque = fonte de verdade. Integrações só por **HTTP** entre produtos.
-- Ordem: `#0 → #1A → #4A → #2A → #5A → #3A/#3A.1 → #3B → #6`.
+- Ordem: `#0 → #1A → #4A → #2A → #5A → #3A/#3A.1 → #3B → #6` (+ ops #7 Fly).
 - Simulação: **mock** até driver `real: true`. **Santander = real** (piloto live). No Santander a
   **entrada é calculada pelo banco** e devolvida (campo `entrada` no resultado) — não é input.
   Demais: híbrido **API-first** + Playwright só se não houver API.
 - Senhas de portal: Dashboard **9A** → Motor cifrado (Task 11).
 - Bot WhatsApp: transporte Evolution → n8n confirmado, mas go-live da IA ainda depende da credencial
   Gemini, da chave Evolution nos dois nós HTTP e de um teste E2E com resposta.
+- Roadmap #6: **E9 fora do core**; E2/E4/E7 adiados; **E13–E18** aprovados (notif, reserva, PDF,
+  troco, onboarding, domínio catálogo); rejeitados C2/C5/C7/C8/C10/C12.
 
 ## Estado por produto
 
@@ -62,10 +73,12 @@ Planos válidos: `docs/plans/README.md`. **Ignore** `docs/plans/_archive/`.
 
 ## Próxima sequência (sugerida)
 
-1. **Próximo banco** — ler lições Santander (inclui skeleton); API-first (Pan/BV/Bradesco); Fontecred se Playwright.
-2. Go-live WhatsApp se operação priorizar (`docs/go-live-chatbot.md`).
-3. #3B **Task 4** (eventos do funil) e **Task 5** (campanhas/atribuição) — o que restou do dashboard do dono.
-4. Multi-banco paralelo; `testar-login` real; Task 10 revenda.
+1. **Go-live WhatsApp** E2E (`docs/go-live-chatbot.md`) + publicar estoque no Catálogo.
+2. #3B **Task 4** (eventos do funil) e **Task 5** (campanhas metadados).
+3. **E1** áudio + **E6** fotos (uso diário loja).
+4. **Próximo banco** / multi-banco — API-first; lições Santander se Playwright.
+5. **E11/E12** outbound (só com WA estável + opt-out).
+6. Backlog C1–C12: **só o que o dono confirmar** (seção no plano #6).
 
 > **Histórico de simulações por usuário (Task 16): FEITO** — não reimplementar.
 

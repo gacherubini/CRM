@@ -2,13 +2,14 @@
 
 > Plano válido do Motor. O #1 monolítico está em `docs/plans/_archive/` (não executar).
 >
-> **Status 2026-07-13:** mock async, auth/tenancy, worker/lease, cifra, **Task 11** e **Task 12 piloto
+> **Status 2026-07-14:** mock async, auth/tenancy, worker/lease, cifra, **Task 11** e **Task 12 piloto
 > Santander LIVE** (Playwright headed+Xvfb, multi-prazo real no Portal, **entrada retornada pelo banco**
 > via `parse_entrada`, **fix skeleton** dos cards). **Listagem `GET /v1/simulacoes` + `solicitado_por`
-> FEITA** (Task 16; migrations head **0009**). Lições: `2026-07-13-playwright-licoes-santander.md`.
-> **Aberto:** Task 10 (revenda); demais bancos reais (API-first); multi-banco paralelo; `testar-login`
-> real; **2 falhas pré-existentes** (mock `Santander` sombreado pelo driver real homônimo). Contrato
-> multi-prazo no Motor **já existe**.
+> FEITA** (Task 16; migrations head **0009**). Suíte de testes **108 verde** (mock `Santander` não
+> sombreia mais o driver real; migrations re-leem/normalizam `DATABASE_URL`). Lições:
+> `2026-07-13-playwright-licoes-santander.md`.
+> **Aberto:** Task 10 (revenda multi-tenant); demais bancos reais (API-first); multi-banco paralelo;
+> `testar-login` real. Contrato multi-prazo no Motor **já existe**.
 
 **Goal:** Entregar uma API de simulação instalável e vendável separadamente, capaz de operar com
 mock agora e drivers bancários depois, sem depender de WhatsApp, n8n, Portal, Estoque ou Chatbot.
