@@ -1,11 +1,37 @@
 # Handoff técnico — suíte automotiva
 
-> Checkpoint: **2026-07-14 (deploy Fly.io lab + Evolution → n8n confirmado)**.
+> Checkpoint: **2026-07-14 (deploy Fly.io lab + Evolution → n8n confirmado; sessão #3B + fixes Motor)**.
 > Confirme containers/`.env`/n8n antes de editar. Testes unitários ≠ E2E WhatsApp.  
 > Leia primeiro: `docs/contexto-compacto.md`. Planos válidos: `docs/plans/README.md`.  
 > **Lições Playwright (obrigatório antes do próximo banco):**  
 > `docs/plans/2026-07-13-playwright-licoes-santander.md`.  
 > Commits desta sessão estão em **`main` local** (ainda **sem push** — combine antes de enviar).
+
+## Checkpoint 2026-07-14 (sessão #3B + fixes Motor + ops Fly)
+
+Trabalho feito com 3 agentes paralelos em worktrees, integrado e testado no `main`:
+
+- **Motor — 6 falhas pré-existentes CORRIGIDAS** (suíte 108 verde):
+  - Mock `Santander` não é mais sombreado pelo driver real (`app/motor/drivers.py`: real registrado só
+    como `"santander"` minúsculo; `"Santander"` fica só no mock).
+  - 4 testes de migration voltaram a passar: `alembic/env.py` re-lê `DATABASE_URL` do ambiente **e
+    normaliza** (`normalizar_database_url`) — satisfaz `monkeypatch.setenv` dos testes **e** o deploy Fly
+    (a URL curta `postgres://` do Fly seria rejeitada pelo SQLAlchemy 2.x sem normalizar).
+- **Portal #3B — Task 8 (CSV export)**: novo módulo `app/financeiro_calc.py` centraliza a agregação de
+  vendas/metas/funil (usado pelo `financeiro_dashboard` **e** pelos CSVs → reconciliação garantida);
+  novo `app/relatorios.py` (`/app/relatorios` + `.../vendas.csv|metas.csv|funil.csv`, dono/gerente via
+  `pode_ver_relatorios`); nav em `base.html`.
+- **Portal #3B — Metas por vendedor (UI)**: form com escopo loja/vendedor + select de vendedores,
+  validação de sobreposição por escopo/vendedor, coluna Escopo na lista, atingimento individual no
+  `/app/vendedor` (lucro fica oculto do vendedor). Sem migration (colunas `escopo`/`vendedor_email` já
+  existiam desde `0002`).
+- **Ops Fly**: `evolution2037` e `n8n2037` agora **sempre-ligados** (`auto_stop_machines=false`,
+  `min_machines_running=1`). Descoberto que o Fly **migra máquinas de host** e cada migração **forka um
+  volume** (deixando órfãos que são cobrados) — agravado por incidente de capacidade em GRU. Scripts em
+  `deploy/fly/`: `up-all.sh`, `scale-check.sh`, `clean-orphan-volumes.sh`. **Não** usar keepalive de
+  máquina ociosa (acelera os forks).
+
+Testes pós-integração: **Motor 108** · **Portal 148** (128 + 9 metas + 11 relatórios).
 
 ## Checkpoint de deploy Fly.io — 2026-07-14
 
@@ -27,8 +53,8 @@
 | Chatbot | `chatbot2037` | `d8d1375a42e578` | privado/Flycast; autostop |
 | Catálogo | `catalogo2037` | `0807560c916768` | público; autostop; volume `catalogo_data` |
 | Portal | `portal2037` | `6837936c0d73d8` | público; autostop; volume `portal_data` |
-| Evolution | `evolution2037` | `7847926f5d1758` | v2.3.7, 1 GB; autostop; volume `evolution_instances` |
-| n8n | `n8n2037` | `0807564f9034e8` | v2.26.8, 1 GB; autosuspend; volume `n8n_data` |
+| Evolution | `evolution2037` | `7847926f5d1758` | v2.3.7, 1 GB; **sempre-ligado** (autostop=false); volume `evolution_instances` |
+| n8n | `n8n2037` | `0807564f9034e8` | v2.26.8, 1 GB; **sempre-ligado** (autostop=false); volume `n8n_data` |
 | PostgreSQL | `suite-pg` | `d8946d2f320de8` | Postgres Flex 18.1; 256 MB; volume `pg_data`; ligado |
 | Redis | `suite-redis` | Upstash | PAYG; usado pela Evolution |
 
@@ -79,7 +105,9 @@ agendados. Não criar segunda Machine/volume sem revisar o teto mensal.
 - n8n suspenso retoma mais rápido; manter essa configuração no laboratório.
 - Evolution dormindo não recebe WhatsApp para se acordar sozinha. Para teste, abrir o Manager/API antes.
 - Evolution 1 GB sempre ligada em `gru` foi estimada em ~US$9,20/mês; somada ao Postgres e volumes
-  ultrapassa o teto de US$10. Não tornar always-on sem decisão explícita de orçamento/go-live.
+  ultrapassa o teto de US$10. **Decisão tomada em 2026-07-14:** Evolution e n8n ficam always-on
+  (`autostop=false`, `min_machines_running=1`) — WhatsApp/automações não podem suspender. O teto de
+  US$10 fica flexibilizado por essa escolha; revisar no go-live.
 
 ### Dados e pendências funcionais
 
@@ -111,19 +139,19 @@ o piloto Santander sem ler as lições.
 
 | Produto | Testes (aprox.) | Porta host típica |
 |---|---:|---|
-| Motor | 106 pass (+**2 falhas pré-existentes**, ver abaixo) | `:8000` |
+| Motor | **108 pass** (2 Santander + 4 migration corrigidos) | `:8000` |
 | Chatbot | 88 | `:8001` |
 | Estoque | 65 | `:8100` |
 | Catálogo | 23 | `:8200` |
-| Portal | 128 | `:9000` |
-| **Total** | **~410+** | Evolution `:8080`, n8n `:5678` |
+| Portal | **148 pass** (+9 metas, +11 relatórios) | `:9000` |
+| **Total** | **~430+** | Evolution `:8080`, n8n `:5678` |
 
-> **2 falhas pré-existentes no Motor** (`test_worker_conclui_com_cinco_provedores`,
-> `test_persistencia_do_resultado_apos_worker`): esperam 5 provedores mock e recebem 4. Causa: o driver
-> real `Santander` (registrado sob `Santander` e `santander`) sombreia o mock homônimo e é derrubado sem
-> credencial em `resolver_drivers`. Confirmado com `git stash` que falham **sem** as mudanças desta sessão.
-> Correção candidata: não registrar o real sob o nome `Santander` (maiúsculo) do mock, ou o mock usar outro
-> rótulo. **Ainda aberto.**
+> **Falhas do Motor RESOLVIDAS nesta sessão** (antes eram 2 Santander + 4 migration):
+> `test_worker_conclui_com_cinco_provedores` / `test_persistencia_do_resultado_apos_worker` esperavam 5
+> provedores mock e recebiam 4 — o driver real `Santander` (registrado sob `Santander` e `santander`)
+> sombreava o mock homônimo e era derrubado sem credencial em `resolver_drivers`; agora o real registra só
+> `"santander"`. Os 4 testes de migration falhavam por `NoSuchTableError` (o `env.py` do commit de deploy
+> deixou de re-ler `DATABASE_URL`); restaurado o re-read **com normalização**. Suíte 108 verde.
 
 ```powershell
 cd motor-simulacao; .\.venv\Scripts\python.exe -m pytest tests/ -q
@@ -162,7 +190,6 @@ docker compose exec -T motor-worker sh -c "pgrep -a Xvfb; pgrep -a python"
   - Multi-banco **paralelo** (1 Playwright por banco no mesmo job).
   - `testar-login` real (hoje **placeholder**).
   - **Task 10** revenda.
-  - **2 falhas pré-existentes** (mock 5 provedores, ver tabela de testes acima).
 
 ### Portal (`portal-gestao/`)
 
@@ -174,7 +201,13 @@ docker compose exec -T motor-worker sh -c "pgrep -a Xvfb; pgrep -a python"
     `MotorClient.listar_simulacoes` repassa token do servidor + `X-Ator`=email.
   - `MOTOR_URL` + **`MOTOR_TOKEN`** obrigatórios (sem token a tela Acessos fica vazia).
   - Alertas de erro com códigos legíveis (`resultado.html`).
-- **Falta:** #3B residual; Playwright E2E; retry outbox CAPI.
+  - **#3B Task 8 CSV export (FEITO):** `app/financeiro_calc.py` (agregação compartilhada,
+    reconciliação garantida), `app/relatorios.py` (`/app/relatorios` + `vendas/metas/funil.csv`,
+    dono/gerente via `pode_ver_relatorios`).
+  - **#3B Metas por vendedor UI (FEITO):** escopo loja/vendedor no form, validação de sobreposição,
+    atingimento individual no `/app/vendedor` (lucro oculto do vendedor).
+- **Falta:** #3B **Task 4** (eventos do funil) e **Task 5** (campanhas/atribuição); Playwright E2E;
+  retry outbox CAPI.
   - **Nota histórico:** sims **anteriores** ao deploy têm `solicitado_por` nulo → não aparecem em "minhas
     sims"; dono vê no escopo "toda a loja". Novas sims populam normalmente.
 
@@ -207,9 +240,7 @@ Detalhe operacional: **`docs/plans/2026-07-13-playwright-licoes-santander.md`**.
 ## Próximos passos (ordem sugerida para o próximo agente)
 
 1. **Ler** `docs/plans/2026-07-13-playwright-licoes-santander.md` + `...-bancos-reconhecimento.md`.
-2. **Corrigir as 2 falhas pré-existentes** do Motor (mock `Santander` vs driver real homônimo) — barato e
-   destrava a suíte verde.
-3. Escolher banco (Pan/BV/Bradesco preferir **API**; Fontecred candidato Playwright).
+2. Escolher banco (Pan/BV/Bradesco preferir **API**; Fontecred candidato Playwright).
 4. Credencial da loja em Portal → Acessos; worker com Xvfb saudável.
 5. Implementar driver (reutilizar base + lição do skeleton); **não** copiar seletores do Santander.
 6. Multi-banco paralelo; `testar-login` real; Task 10 revenda.

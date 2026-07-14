@@ -1,7 +1,7 @@
 # Contexto compacto para continuidade
 
-Atualizado em **2026-07-14** (deploy Fly.io em modo lab + Evolution → n8n confirmado).
-Leia isto primeiro; detalhes em `docs/handoff-contexto.md`.  
+Atualizado em **2026-07-14** (deploy Fly.io lab + Evolution → n8n; **sessão #3B CSV/metas-vendedor + 6
+fixes Motor + evolution/n8n always-on**). Leia isto primeiro; detalhes em `docs/handoff-contexto.md`.  
 **Playwright / próximos bancos:** `docs/plans/2026-07-13-playwright-licoes-santander.md`.  
 Planos válidos: `docs/plans/README.md`. **Ignore** `docs/plans/_archive/`.
 
@@ -10,8 +10,11 @@ Planos válidos: `docs/plans/README.md`. **Ignore** `docs/plans/_archive/`.
 - Org/região: `crm-419` / `gru`; alvo de custo: **US$10/mês**, modo laboratório.
 - Apps: `motor2037`, `estoque2037`, `chatbot2037`, `catalogo2037`, `portal2037`,
   `evolution2037`, `n8n2037`; banco `suite-pg`; Redis Upstash `suite-redis`.
-- Uma Machine por app. Portal/Catálogo/Chatbot/Estoque/Motor/Evolution usam autostop e, nos eventos
-  observados, param após cerca de **6 min** ociosos. n8n usa `suspend`; Postgres fica ligado.
+- Uma Machine por app. Portal/Catálogo/Chatbot/Estoque/Motor usam autostop (~6 min ociosos → param;
+  acordam sob demanda). **Evolution e n8n agora sempre-ligados** (`autostop=false`,
+  `min_machines_running=1`); Postgres fica ligado.
+- **Volume churn:** o Fly migra máquinas de host e cada migração forka um volume (órfãos cobrados).
+  Limpar com `deploy/fly/clean-orphan-volumes.sh --apply`. Não usar keepalive de máquina ociosa.
 - URLs: Portal `https://portal2037.fly.dev`; Catálogo `https://catalogo2037.fly.dev`;
   Evolution Manager `https://evolution2037.fly.dev/manager`; n8n `https://n8n2037.fly.dev`.
 - n8n `2.26.8`, 1 GB, volume persistente. Workflow `WhatsApp IA - Somente Nao Salvos` importado e
@@ -42,10 +45,10 @@ Planos válidos: `docs/plans/README.md`. **Ignore** `docs/plans/_archive/`.
 
 | Produto | Pasta / porta | Feito (essencial) | Aberto |
 |---|---|---|---|
-| Motor #1A | `motor-simulacao/` `:8000` | async, auth, worker, mock, T11, **T12 Santander live** (headed+Xvfb, **entrada retornada**, fix skeleton), **listagem `GET /v1/simulacoes` + `solicitado_por`** (T16), migrations head 0009 | outros bancos; 1 PW/banco paralelo; T10; **2 falhas pré-existentes** (mock Santander) |
+| Motor #1A | `motor-simulacao/` `:8000` | async, auth, worker, mock, T11, **T12 Santander live** (headed+Xvfb, **entrada retornada**, fix skeleton), **listagem `GET /v1/simulacoes` + `solicitado_por`** (T16), migrations head 0009, **suíte 108 verde** | outros bancos; 1 PW/banco paralelo; T10 |
 | Chatbot #2A | `chatbot-api/` `:8001` | leads, handoff, por-placa, E3, E5, n8n tools | go-live manual; LGPD |
 | Estoque #4A | `estoque-api/` `:8100` | CRUD, placa, por-placa | E2E outbox; restore |
-| Portal | `portal-gestao/` `:9000` | CRM, **progresso sim + resultado multi-prazo (coluna Entrada)**, **histórico de sims por usuário (T16)**, 9A, E10 | #3B; E2E |
+| Portal | `portal-gestao/` `:9000` | CRM, **progresso sim + resultado multi-prazo (coluna Entrada)**, **histórico de sims por usuário (T16)**, 9A, E10, **#3B Task 8 CSV export** (`financeiro_calc.py`+`relatorios.py`), **#3B metas por vendedor UI** | #3B Task 4 (funil) e Task 5 (campanhas); E2E |
 | Catálogo #5A | `catalogo-publico/` `:8200` | vitrine, CTA, Pixel browser | containers reais; SEO |
 
 **Estimativa:** ~**93%** MVP demonstrável (cotação real Santander + histórico) · ~**76%** produção/revenda multi-banco.
@@ -59,9 +62,9 @@ Planos válidos: `docs/plans/README.md`. **Ignore** `docs/plans/_archive/`.
 
 ## Próxima sequência (sugerida)
 
-1. **Corrigir 2 falhas pré-existentes** do Motor (mock `Santander` sombreado pelo driver real homônimo).
-2. **Próximo banco** — ler lições Santander (inclui skeleton); API-first (Pan/BV/Bradesco); Fontecred se Playwright.
-3. Go-live WhatsApp se operação priorizar (`docs/go-live-chatbot.md`).
+1. **Próximo banco** — ler lições Santander (inclui skeleton); API-first (Pan/BV/Bradesco); Fontecred se Playwright.
+2. Go-live WhatsApp se operação priorizar (`docs/go-live-chatbot.md`).
+3. #3B **Task 4** (eventos do funil) e **Task 5** (campanhas/atribuição) — o que restou do dashboard do dono.
 4. Multi-banco paralelo; `testar-login` real; Task 10 revenda.
 
 > **Histórico de simulações por usuário (Task 16): FEITO** — não reimplementar.
