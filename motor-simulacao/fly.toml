@@ -24,22 +24,16 @@ primary_region = "gru"
   MOTOR_SCREENSHOT_DIR = "/srv/data/screenshots"
   MOTOR_STORAGE_STATE_DIR = "/srv/data/storage_state"
   DISPLAY = ":99"
-  # Fan-out + workers sob demanda (ligar via secrets/env após slots criados):
-  # MOTOR_FANOUT_ENABLED=1
-  # MOTOR_FLY_AUTOSCALE_ENABLED=1
-  # MOTOR_MAX_BROWSER_WORKERS=1
-  # MOTOR_WORKER_IDLE_STOP_SECONDS=60
-  # FLY_API_TOKEN=<deploy token app-scoped>
-  # FLY_APP_NAME=motor2037
+  # Always-on = orquestrador leve (API + mock/api). Playwright = slots 2GB sob demanda.
+  MOTOR_ORCHESTRATOR_ONLY = "1"
+  MOTOR_WORKER_TIPOS = "api,mock"
+  # Secrets: MOTOR_FANOUT_ENABLED, MOTOR_FLY_AUTOSCALE_ENABLED, FLY_API_TOKEN, etc.
 
 [processes]
   app = "/srv/scripts/fly-entrypoint.sh"
-  # Slots Playwright sob demanda (criar Machines paradas à parte, restart on-failure):
-  # worker_ondemand = "/srv/scripts/on-demand-worker-entrypoint.sh"
-  # Env por machine: MOTOR_WORKER_PROVEDOR=santander MOTOR_FANOUT_ENABLED=1 MOTOR_WORKER_ON_DEMAND=1
+  # Slots Playwright: Machines à parte, on-demand-worker-entrypoint.sh, restart on-failure.
 
-# API + worker always-on (fallback e tarefas API/mock).
-# Playwright sob demanda: machines extras sem [[services]], entrypoint on-demand, exit 0 → stopped.
+# API + worker leve always-on. Playwright: machines extras, exit 0 → stopped.
 [[services]]
   processes = ["app"]
   internal_port = 8000
@@ -59,9 +53,9 @@ primary_region = "gru"
 
 [[vm]]
   processes = ["app"]
-  size = "shared-cpu-2x"
-  # API + worker Playwright headed: o Chromium reserva mais de 512MB ao iniciar.
-  memory = "2048"
+  size = "shared-cpu-1x"
+  # Orquestrador sem Chromium.
+  memory = "512"
 
 # Sessões autenticadas e screenshots do navegador.
 [[mounts]]

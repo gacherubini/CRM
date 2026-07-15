@@ -31,7 +31,8 @@ def test_tipo_driver_provedor():
     assert tipo_driver_provedor("santander") == "playwright"
     assert tipo_driver_provedor("fontecred") == "playwright"
     assert tipo_driver_provedor("bradesco") == "playwright"
-    assert tipo_driver_provedor("pan") == "api"
+    # pan dual-path: slot Playwright sob demanda (não no orquestrador 512MB)
+    assert tipo_driver_provedor("pan") == "playwright"
     assert tipo_driver_provedor("Santander") == "playwright"  # normaliza
 
 
@@ -57,7 +58,7 @@ def test_com_fanout_cria_uma_tarefa_por_banco(db, monkeypatch):
     assert [t.provedor for t in tarefas] == ["bradesco", "pan", "santander"]
     by_p = {t.provedor: t for t in tarefas}
     assert by_p["santander"].tipo_driver == "playwright"
-    assert by_p["pan"].tipo_driver == "api"
+    assert by_p["pan"].tipo_driver == "playwright"
     assert by_p["bradesco"].status == "recebida"
 
 

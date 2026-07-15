@@ -1,5 +1,6 @@
 #!/bin/sh
-# Fly.io modo laboratório: API e worker na mesma Machine.
+# Fly.io: API always-on + worker leve (orquestrador / API / mock).
+# Playwright roda em Machines sob demanda (on-demand-worker-entrypoint.sh).
 set -eu
 
 worker_pid=""
@@ -13,8 +14,25 @@ encerrar() {
 }
 trap encerrar EXIT INT TERM
 
-/srv/scripts/worker-entrypoint.sh &
-worker_pid=$!
+# Orquestrador: sem Xvfb/Chromium. Só processa tipo api/mock (e acorda slots Playwright).
+# Override: MOTOR_ORCHESTRATOR_ONLY=0 volta ao worker headed (não usar com 512MB).
+_orch="${MOTOR_ORCHESTRATOR_ONLY:-1}"
+_tipos="${MOTOR_WORKER_TIPOS:-api,mock}"
+
+if [ "$_orch" = "1" ] || [ "$_orch" = "true" ] || [ "$_orch" = "yes" ]; then
+  export MOTOR_WORKER_TIPOS="${MOTOR_WORKER_TIPOS:-api,mock}"
+  export MOTOR_WORKER_ON_DEMAND=0
+  # Evita subir Xvfb; worker de API não precisa de display.
+  export MOTOR_BROWSER_HEADLESS="${MOTOR_BROWSER_HEADLESS:-1}"
+  echo "fly-entrypoint: modo orquestrador (tipos=${MOTOR_WORKER_TIPOS}, sem Xvfb)"
+  python -m app.worker &
+  worker_pid=$!
+else
+  echo "fly-entrypoint: modo worker headed (Xvfb)"
+  /srv/scripts/worker-entrypoint.sh &
+  worker_pid=$!
+fi
+
 uvicorn app.main:app --host 0.0.0.0 --port 8000 &
 api_pid=$!
 

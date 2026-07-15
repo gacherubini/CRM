@@ -24,10 +24,16 @@ def _agora() -> datetime:
 
 
 def tipo_driver_provedor(nome: str) -> str:
-    """Classifica o conector: mock | api | playwright."""
+    """Classifica o conector: mock | api | playwright.
+
+    ``pan`` é dual-path (API ou portal Playwright): trata como playwright para
+    ir ao slot 2GB sob demanda e nunca rodar Chromium no orquestrador 512MB.
+    """
     canon = normalizar_provedor(nome)
     if canon == "mock" or not canon:
         return "mock"
+    if canon == "pan":
+        return "playwright"
     meta = obter_provedor(canon)
     if meta is None:
         # Bancos fictícios do mock usam rótulos tipo "Santander" (maiúscula).
