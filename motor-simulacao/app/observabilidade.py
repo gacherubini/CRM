@@ -1,4 +1,6 @@
 """Métricas operacionais agregadas e sem dados pessoais."""
+from __future__ import annotations
+
 from collections import defaultdict
 from datetime import datetime, timezone
 

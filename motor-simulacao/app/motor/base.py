@@ -9,6 +9,9 @@ class Pessoa(BaseModel):
     nascimento: str
     renda: Optional[float] = None
     cnh: Optional[bool] = None
+    ddd: Optional[str] = None
+    celular: Optional[str] = None
+    codigo_natureza_ocupacao: Optional[str] = None
 
 
 class Veiculo(BaseModel):
@@ -18,6 +21,10 @@ class Veiculo(BaseModel):
     placa: Optional[str] = None
     uf_licenciamento: Optional[str] = None
     finalidade: Optional[Literal["comum", "pcd"]] = None
+    # Código retornado pelo catálogo do provedor (ex.: versão do veículo PAN).
+    codigo_provedor: Optional[str] = None
+    ano_modelo: Optional[int] = None
+    zero_km: Optional[bool] = None
 
 
 class Condicoes(BaseModel):

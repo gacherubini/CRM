@@ -4,15 +4,18 @@ Plano #1A, Tasks 4-6: a criação apenas valida e enfileira (status ``recebida``
 execução dos provedores, com timeout/retry e resultados parciais, fica a cargo do
 worker (``app.processamento``). Nada de provedor roda de forma síncrona no POST.
 """
+from __future__ import annotations
+
 import hashlib
 import json
 import uuid
 from datetime import datetime, timezone
+from pathlib import Path
 
 from sqlalchemy.orm import Session
 
 from app import config, cripto
-from app.models_db import IdempotenciaORM, SimulacaoORM
+from app.models_db import IdempotenciaORM, SimulacaoEventoORM, SimulacaoORM
 from app.motor.base import ResultadoProvedor, Simulacao, SolicitacaoSimulacao
 from app.validadores import idade, parse_nascimento, valida_cpf
 
@@ -94,6 +97,9 @@ def criar_simulacao(
             "cpf": sol.pessoa.cpf,
             "nascimento": sol.pessoa.nascimento,
             "renda": sol.pessoa.renda,
+            "ddd": sol.pessoa.ddd,
+            "celular": sol.pessoa.celular,
+            "codigo_natureza_ocupacao": sol.pessoa.codigo_natureza_ocupacao,
         }
     )
     # Enfileira: status 'recebida'. O worker executa os provedores depois.
@@ -118,6 +124,9 @@ def criar_simulacao(
         uf_licenciamento=sol.veiculo.uf_licenciamento,
         finalidade=sol.veiculo.finalidade,
         prazos_meses=prazos or None,
+        codigo_veiculo_provedor=sol.veiculo.codigo_provedor,
+        ano_modelo=sol.veiculo.ano_modelo,
+        zero_km=sol.veiculo.zero_km,
     )
     db.add(sim)
     db.flush()
@@ -138,6 +147,34 @@ def criar_simulacao(
 
 def obter_simulacao(db: Session, sim_id: str, cliente_id: str) -> SimulacaoORM | None:
     return db.query(SimulacaoORM).filter_by(id=sim_id, cliente_id=cliente_id).one_or_none()
+
+
+def listar_eventos_simulacao(
+    db: Session, sim_id: str, cliente_id: str
+) -> tuple[SimulacaoORM | None, list[SimulacaoEventoORM]]:
+    sim = obter_simulacao(db, sim_id, cliente_id)
+    if sim is None:
+        return None, []
+    eventos = (
+        db.query(SimulacaoEventoORM)
+        .filter_by(simulacao_id=sim.id)
+        .order_by(SimulacaoEventoORM.id.asc())
+        .all()
+    )
+    return sim, eventos
+
+
+def evento_publico(evento: SimulacaoEventoORM) -> dict:
+    return {
+        "id": evento.id,
+        "etapa": evento.etapa,
+        "nivel": evento.nivel,
+        "mensagem": evento.mensagem,
+        "criada_em": evento.criada_em.isoformat() if evento.criada_em else None,
+        "tem_print": bool(
+            evento.screenshot_path and Path(evento.screenshot_path).is_file()
+        ),
+    }
 
 
 # Paginação da listagem de simulações (histórico). Teto defensivo para não
