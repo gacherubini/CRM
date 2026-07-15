@@ -11,6 +11,11 @@ test-tmp*/
 pg_data/
 n8n_data/
 
+# Dados locais do Motor (screenshots + storage_state com cookies de sessão) — NUNCA versionar
+motor-simulacao/data/
+data/screenshots/
+data/storage_state/
+
 # Bancos locais
 *.db
 

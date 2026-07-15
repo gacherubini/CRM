@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head><meta charset="utf-8"><title>Simulação Fontecred fixture</title></head>
+<body>
+  <!-- Painel esquerdo: dados do cliente/veiculo/financiamento (echo) -->
+  <section class="cliente">
+    <h3>Cliente</h3>
+    <input name="valorVenda" value="21.900,00">
+    <input name="valorEntrada" value="3.956,40">
+    <input name="valorFinanciamento" value="17.943,60">
+  </section>
+
+  <!-- Painel direito: resultado da simulacao -->
+  <section id="resultado">
+    <div id="top_moto_padrao_sem_co">
+      <span class="label">Sua entrada:</span>
+      <span class="valor">3.956,40</span>
+    </div>
+
+    <div class="cards">
+      <button type="button" aria-label="Melhor Condição 24x 1.212,76 Proposta">
+        <span class="tag">Melhor Condição</span>
+        <span class="prazo">24x</span>
+        <span class="parcela">1.212,76</span>
+        <span class="cta">Proposta</span>
+      </button>
+      <button type="button" aria-label="36x 928,95 Proposta">
+        <span class="prazo">36x</span>
+        <span class="parcela">928,95</span>
+        <span class="cta">Proposta</span>
+      </button>
+      <button type="button" aria-label="48x 809,63 Proposta" class="selecionado">
+        <span class="prazo">48x</span>
+        <span class="parcela">809,63</span>
+        <span class="cta">Proposta</span>
+      </button>
+    </div>
+
+    <a href="#">Alterar Prazo</a>
+    <div class="outras-informacoes">Outras informações</div>
+  </section>
+</body>
+</html>

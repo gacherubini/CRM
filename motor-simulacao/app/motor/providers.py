@@ -20,6 +20,17 @@ PROVEDORES_REAIS: dict[str, dict[str, Any]] = {
             {"nome": "senha", "rotulo": "Senha do portal", "secreto": True},
         ],
     },
+    "fontecred": {
+        "nome": "fontecred",
+        "rotulo": "Fontecred",
+        "habilitado": True,
+        "real": True,
+        "modo": "playwright",
+        "campos_credencial": [
+            {"nome": "usuario", "rotulo": "E-mail do portal", "secreto": False},
+            {"nome": "senha", "rotulo": "Senha do portal", "secreto": True},
+        ],
+    },
     "pan": {
         "nome": "pan",
         "rotulo": "Banco PAN",

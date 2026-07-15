@@ -39,6 +39,10 @@ SANTANDER_LOGIN_URL = os.getenv(
     "MOTOR_SANTANDER_LOGIN_URL",
     "https://financiamentos.santander.com.br/originacao-auto/login",
 )
+FONTECRED_LOGIN_URL = os.getenv(
+    "MOTOR_FONTECRED_LOGIN_URL",
+    "https://app.fontecred.com.br/login#step-1",
+)
 
 # Banco PAN OpenAPI Veículos. Sandbox é o default deliberado; produção exige
 # override explícito depois da homologação comercial do parceiro.

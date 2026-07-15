@@ -34,7 +34,7 @@ def test_put_credencial_cifra_e_nao_persiste_senha_em_claro(client, db):
     )
     assert resp.status_code == 200
 
-    row = db.query(CredencialProvedorORM).filter_by(provedor="Pan").one()
+    row = db.query(CredencialProvedorORM).filter_by(provedor="pan").one()
     blob = row.senha_cifrada or ""
     assert "senha-super-secreta" not in blob
     assert row.usuario == "loja42"
@@ -49,7 +49,7 @@ def test_get_nunca_vaza_senha(client):
         json={"usuario": "loja42", "senha": "senha-super-secreta"},
     )
     lista = client.get("/v1/provedores/credenciais").json()
-    item = next(p for p in lista["credenciais"] if p["provedor"] == "Pan")
+    item = next(p for p in lista["credenciais"] if p["provedor"] == "pan")
     assert item["usuario"] == "loja42"
     assert item["senha_configurada"] is True
     assert item["senha_mascara"] == "****"
@@ -81,7 +81,7 @@ def test_auditoria_registra_ator_sem_logar_senha(client, db):
     assert resp.status_code == 200
     registro = db.query(AuditoriaORM).filter_by(acao="credencial_provedor_upsert").one()
     assert registro.ator == "gerente@loja.com"
-    assert registro.provedor == "Pan"
+    assert registro.provedor == "pan"
     # a auditoria não guarda a senha nova nem antiga
     assert "senha-super-secreta" not in str(registro.__dict__)
 
@@ -134,13 +134,13 @@ def test_metrica_de_falha_de_auth_por_provedor_sem_vazar_segredo(client, db):
     credenciais.registrar_falha_login(db, cliente_id, "Pan", "credencial_invalida")
 
     texto = observabilidade.gerar_metricas(db)
-    assert 'motor_provider_auth_failures{provider="Pan"} 2' in texto
+    assert 'motor_provider_auth_failures{provider="pan"} 2' in texto
     assert "pw" not in texto  # segredo nunca aparece nas métricas
 
     # um sucesso zera o contador de falhas
     credenciais.registrar_sucesso_login(db, cliente_id, "Pan")
     texto = observabilidade.gerar_metricas(db)
-    assert 'motor_provider_auth_failures{provider="Pan"} 0' in texto
+    assert 'motor_provider_auth_failures{provider="pan"} 0' in texto
 
 
 def test_rotas_de_credenciais_exigem_bearer():

@@ -105,6 +105,11 @@ class PlaywrightBankDriver(ABC):
 
     provedor: str = "desconhecido"
     real: bool = True
+    # Stealth (UA falso + client hints + spoof navigator) foi feita p/ o Akamai do
+    # Santander. Em portais com reCAPTCHA v3 (ex.: Fontecred) o UA descasado
+    # (Chrome 131 vs Chromium real 149) faz o token não ser gerado e o submit trava.
+    # Nesses casos use ``stealth = False`` (contexto vanilla, como o codegen).
+    stealth: bool = True
 
     def __init__(
         self,
@@ -143,7 +148,9 @@ class PlaywrightBankDriver(ABC):
         )
 
     def _new_context(self, browser):
-        """Contexto isolado com fingerprint de desktop BR."""
+        """Contexto isolado com fingerprint de desktop BR (ou vanilla se stealth off)."""
+        if not self.stealth:
+            return self._new_context_vanilla(browser)
         kwargs: dict = {
             "user_agent": _DEFAULT_UA,
             "locale": "pt-BR",
@@ -172,6 +179,20 @@ class PlaywrightBankDriver(ABC):
         ctx = browser.new_context(**kwargs)
         ctx.add_init_script(_STEALTH_INIT)
         return ctx
+
+    def _new_context_vanilla(self, browser):
+        """Contexto próximo do Chromium real (como o codegen): sem UA falso, sem
+        client hints mentirosos, sem init script. Necessário p/ reCAPTCHA v3 gerar
+        token (UA descasado trava o submit). Mantém só locale/timezone/viewport BR.
+        """
+        kwargs: dict = {
+            "locale": "pt-BR",
+            "timezone_id": "America/Sao_Paulo",
+            "viewport": {"width": 1366, "height": 768},
+        }
+        if self.storage_state_path and self.storage_state_path.is_file():
+            kwargs["storage_state"] = str(self.storage_state_path)
+        return browser.new_context(**kwargs)
 
     def _assert_portal_acessivel(self, page) -> None:
         """Detecta WAF/Akamai Access Denied e falha com código legível."""
