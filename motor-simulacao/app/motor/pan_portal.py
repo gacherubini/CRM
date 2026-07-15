@@ -43,6 +43,19 @@ PROVEDOR = "pan"
 
 LOGIN_URL_DEFAULT = "https://veiculos.bancopan.com.br/login"
 
+# UF -> nome por extenso (o dropdown pode listar sigla ou nome completo).
+_UF_NOME: dict[str, str] = {
+    "AC": "ACRE", "AL": "ALAGOAS", "AP": "AMAPÁ", "AM": "AMAZONAS",
+    "BA": "BAHIA", "CE": "CEARÁ", "DF": "DISTRITO FEDERAL",
+    "ES": "ESPÍRITO SANTO", "GO": "GOIÁS", "MA": "MARANHÃO",
+    "MT": "MATO GROSSO", "MS": "MATO GROSSO DO SUL", "MG": "MINAS GERAIS",
+    "PA": "PARÁ", "PB": "PARAÍBA", "PR": "PARANÁ", "PE": "PERNAMBUCO",
+    "PI": "PIAUÍ", "RJ": "RIO DE JANEIRO", "RN": "RIO GRANDE DO NORTE",
+    "RS": "RIO GRANDE DO SUL", "RO": "RONDÔNIA", "RR": "RORAIMA",
+    "SC": "SANTA CATARINA", "SP": "SÃO PAULO", "SE": "SERGIPE",
+    "TO": "TOCANTINS",
+}
+
 # Cards de parcela: "24x 1.212,76" / "24x de R$ 1.212,76" (R$ pode faltar).
 _RE_PARCELA = re.compile(
     r"(\d{1,3})\s*x\b[^0-9]{0,20}?(?:R\$\s*)?(\d[\d.]*,\d{2})",
@@ -50,7 +63,12 @@ _RE_PARCELA = re.compile(
 )
 # Entrada minima exibida pos-simulacao ("Entrada: R$ 3.956,40").
 _RE_ENTRADA = re.compile(
-    r"(?:Entrada\s+m[ií]nima|Entrada)\s*:?\s*(?:R\$\s*)?(\d[\d.]*,\d{2})",
+    r"(?:Entrada\s+m[ií]nima|Entrada)\s*:?\s*(?:R\$\s*)?(\d[\d.]*,\d{1,2})",
+    re.IGNORECASE,
+)
+# Valor financiado exibido no card ("Financiado: R$ 15.116,80").
+_RE_FINANCIADO = re.compile(
+    r"Financiad[oa]\s*:?\s*(?:R\$\s*)?(\d[\d.]*,\d{1,2})",
     re.IGNORECASE,
 )
 
@@ -95,6 +113,13 @@ def parse_entrada(texto: str) -> Decimal | None:
     """Entrada minima devolvida pelo portal, se exibida."""
     plano = _texto_plano(texto)
     m = _RE_ENTRADA.search(plano)
+    return parse_moeda_br(m.group(1)) if m else None
+
+
+def parse_financiado(texto: str) -> Decimal | None:
+    """Valor financiado exibido no card ('Financiado: R$ ...'), se houver."""
+    plano = _texto_plano(texto)
+    m = _RE_FINANCIADO.search(plano)
     return parse_moeda_br(m.group(1)) if m else None
 
 
@@ -185,8 +210,10 @@ class PanPortalDriver(PlaywrightBankDriver):
         entrada = entrada_minima if entrada_minima is not None else (
             entrada_informada if entrada_informada > 0 else None
         )
-        financiado: Decimal | None = None
-        if sol.veiculo.valor is not None:
+        # Prefere o "Financiado" que o portal exibe; so cai no calculo
+        # (valor - entrada) quando o card nao trouxer o valor.
+        financiado = parse_financiado(html)
+        if financiado is None and sol.veiculo.valor is not None:
             desconto = entrada if entrada is not None else Decimal("0")
             financiado = Decimal(str(sol.veiculo.valor)) - desconto
             if financiado < 0:
@@ -269,10 +296,7 @@ class PanPortalDriver(PlaywrightBankDriver):
                 self._evento(
                     ctx, "ofertas_recebidas", "Ofertas carregadas na tela.", page, True
                 )
-                try:
-                    texto = page.inner_text("body") or ""
-                except Exception:
-                    texto = ""
+                texto = self._texto_ofertas(page)
                 html = page.content() or ""
                 resultados = self._resultados_de_html(texto + "\n" + html, sol)
                 self._salvar_storage(browser_ctx)
@@ -441,12 +465,49 @@ class PanPortalDriver(PlaywrightBankDriver):
         )
         return self._primeiro_visivel(page, candidatos, "Senha (login)")
 
+    def _digitar_mascarado(
+        self, page, box, valor: str, normaliza: str = r"\D"
+    ) -> None:
+        """Digita em campo com mascara (mahoe) e CONFERE. A mascara insere
+        pontuacao sozinha e perde caractere em digitacao rapida, entao:
+        limpa o campo de forma robusta, digita devagar e refaz mais devagar
+        ate os digitos baterem (delays 110 -> 200 -> 300 ms)."""
+        alvo = re.sub(normaliza, "", valor).upper()
+        for delay in (110, 200, 300):
+            try:
+                box.click()
+                # Limpeza robusta: seleciona tudo e apaga (fill('') as vezes nao
+                # limpa mascara).
+                try:
+                    box.press("Control+a")
+                    box.press("Delete")
+                except Exception:
+                    box.fill("")
+                box.press_sequentially(valor, delay=delay)
+                page.wait_for_timeout(150)
+                atual = re.sub(normaliza, "", box.input_value() or "").upper()
+                if atual == alvo:
+                    return
+            except Exception:
+                continue
+        # Ultima tentativa: fill direto (campos sem mascara real).
+        try:
+            box.fill(valor)
+        except Exception:
+            pass
+
     def _primeiro_visivel(self, page, candidatos, campo: str):
-        """Retorna o primeiro locator visivel; senao levanta campo_nao_encontrado."""
+        """Retorna o primeiro locator visivel; senao levanta campo_nao_encontrado.
+
+        Espera curta por tentativa (2,5s): o candidato correto deste portal e
+        sempre o 1o e renderiza rapido; timeout alto so faz o fallback custar
+        6s cada quando o 1o nao casa. Total de 2 passadas cobre render lento.
+        """
+        curto = min(self.timeout_ms, 3_500)
         for gerar in candidatos:
             try:
                 box = gerar()
-                box.wait_for(state="visible", timeout=min(self.timeout_ms, 6_000))
+                box.wait_for(state="visible", timeout=curto)
                 return box
             except Exception:
                 continue
@@ -546,10 +607,7 @@ class PanPortalDriver(PlaywrightBankDriver):
         # Tela /captura/inicio: "informe o CPF do cliente". Campo pan-mahoe com
         # mascara "000.000.000-00" e sem nome acessivel -> ancorar por placeholder
         # da mascara e formcontrolname.
-        cpf_box = self._campo_cpf(page)
-        cpf_box.click()
-        cpf_box.fill("")
-        cpf_box.type(cpf, delay=40)
+        self._digitar_mascarado(page, self._campo_cpf(page), cpf)
         page.keyboard.press("Tab")
         page.wait_for_timeout(600)
         # O portal pode avancar sozinho ao completar o CPF ou exigir um botao
@@ -566,9 +624,13 @@ class PanPortalDriver(PlaywrightBankDriver):
         page.wait_for_timeout(300)
 
     def _campo_cpf(self, page):
-        """CPF do cliente (pan-mahoe, mascara '000.000.000-00')."""
+        """CPF do cliente (pan-mahoe, mascara '000.000.000-00').
+
+        IMPORTANTE: ancorar no <input> interno — o wrapper <pan-mahoe-input>
+        tambem carrega o placeholder e nao e preenchivel (fill quebra nele).
+        """
         candidatos = (
-            lambda: page.get_by_placeholder(re.compile(r"000\.000\.000-00")).first,
+            lambda: page.locator("input[placeholder*='000.000.000-00']").first,
             lambda: page.locator(
                 "input[formcontrolname='cpf'], input[formcontrolname='documento'], "
                 "input[formcontrolname='cpfCliente']"
@@ -576,18 +638,16 @@ class PanPortalDriver(PlaywrightBankDriver):
             lambda: page.locator("input#cpf, input[label='CPF']").first,
             lambda: page.locator("input[inputmode='numeric']").first,
             lambda: page.get_by_role("textbox", name=re.compile(r"CPF", re.I)).first,
-            lambda: page.get_by_role("combobox", name=re.compile(r"CPF", re.I)).first,
         )
         return self._primeiro_visivel(page, candidatos, "CPF do cliente")
 
     def _passo_veiculo(self, page, sol: SolicitacaoSimulacao) -> None:
         # Tela /comparador: celular ("Digite o celular...") + veiculo por placa.
         self._fechar_got_it(page)
-        cel = sol.pessoa.celular or ""
-        cel_box = self._campo_celular(page)
-        cel_box.click()
-        cel_box.fill("")
-        cel_box.type(cel, delay=30)
+        # So digitos: a mascara insere ( ) - sozinha. Digitacao lenta com
+        # verificacao (mascara mahoe perde caractere em type rapido).
+        cel = re.sub(r"\D", "", sol.pessoa.celular or "")
+        self._digitar_mascarado(page, self._campo_celular(page), cel)
         page.keyboard.press("Tab")
         page.wait_for_timeout(400)
 
@@ -602,17 +662,82 @@ class PanPortalDriver(PlaywrightBankDriver):
                 page.wait_for_timeout(400)
         except Exception:
             pass
-        placa_box = self._campo_placa(page)
-        placa_box.click()
-        placa_box.fill("")
-        placa_box.type(placa, delay=40)
+        self._digitar_mascarado(
+            page, self._campo_placa(page), placa, normaliza=r"[^A-Za-z0-9]"
+        )
         page.keyboard.press("Tab")
         page.wait_for_timeout(1_200)
+        # Estado/UF de licenciamento (dropdown na tela do comparador). So troca
+        # se a solicitacao informar a UF; senao mantem o default do portal.
+        self._passo_uf(page, sol)
+
+    def _passo_uf(self, page, sol: SolicitacaoSimulacao) -> None:
+        uf = (sol.veiculo.uf_licenciamento or "").strip().upper()
+        if not uf or uf not in _UF_NOME:
+            return
+        nome = _UF_NOME[uf]
+        # 1) Abrir o dropdown "UF licenciamento" (rotulo visto na tela do
+        #    comparador). O select mahoe mostra a sigla atual (ex.: "SP").
+        abriu = False
+        # xpath case-insensitive: acha o rotulo (UF/licenciamento/estado) e
+        # pega o proximo elemento clicavel de selecao.
+        _lower = (
+            "translate(normalize-space(.),"
+            "'ABCDEFGHIJKLMNOPQRSTUVWXYZ','abcdefghijklmnopqrstuvwxyz')"
+        )
+        abridores = (
+            lambda: page.get_by_role(
+                "combobox", name=re.compile(r"\bUF\b|licenciamento|Estado", re.I)
+            ).first,
+            lambda: page.locator(
+                f"xpath=//*[contains({_lower},'uf licenciamento') "
+                f"or normalize-space({_lower})='uf' "
+                f"or contains({_lower},'licenciamento')]"
+                "/following::*[self::select or self::mat-select "
+                "or @role='combobox' or @role='listbox' "
+                "or contains(@class,'select')][1]"
+            ).first,
+            lambda: page.locator("mat-select, [role='combobox']").last,
+        )
+        for gerar in abridores:
+            try:
+                alvo = gerar()
+                alvo.wait_for(state="visible", timeout=min(self.timeout_ms, 5_000))
+                alvo.click()
+                abriu = True
+                break
+            except Exception:
+                continue
+        if not abriu:
+            return
+        page.wait_for_timeout(300)
+        # 2) Selecionar a opcao pela sigla ou nome por extenso.
+        for gerar in (
+            lambda: page.get_by_role(
+                "option", name=re.compile(rf"^\s*{re.escape(uf)}\s*$", re.I)
+            ).first,
+            lambda: page.get_by_role(
+                "option", name=re.compile(re.escape(nome), re.I)
+            ).first,
+            lambda: page.get_by_text(
+                re.compile(rf"^\s*{re.escape(uf)}\s*$", re.I)
+            ).first,
+            lambda: page.get_by_text(re.compile(re.escape(nome), re.I)).first,
+        ):
+            try:
+                opc = gerar()
+                opc.wait_for(state="visible", timeout=min(self.timeout_ms, 5_000))
+                opc.click()
+                page.wait_for_timeout(300)
+                return
+            except Exception:
+                continue
 
     def _campo_celular(self, page):
         """Celular do cliente (placeholder 'Digite o celular...')."""
         candidatos = (
-            lambda: page.get_by_placeholder(re.compile(r"Digite o celular", re.I)).first,
+            lambda: page.locator("input[placeholder*='Digite o celular']").first,
+            lambda: page.locator("input[placeholder*='celular']").first,
             lambda: page.locator(
                 "input[formcontrolname='celular'], input[formcontrolname='telefone']"
             ).first,
@@ -626,7 +751,8 @@ class PanPortalDriver(PlaywrightBankDriver):
     def _campo_placa(self, page):
         """Placa do veiculo (placeholder 'Digite a placa...')."""
         candidatos = (
-            lambda: page.get_by_placeholder(re.compile(r"Digite a placa", re.I)).first,
+            lambda: page.locator("input[placeholder*='Digite a placa']").first,
+            lambda: page.locator("input[placeholder*='placa']").first,
             lambda: page.locator("input[formcontrolname='placa']").first,
             lambda: page.locator("input[label='Placa']").first,
             lambda: page.get_by_role("combobox", name=re.compile(r"placa", re.I)).first,
@@ -640,15 +766,21 @@ class PanPortalDriver(PlaywrightBankDriver):
         # Campo "Venda" (mahoe, sem nome acessivel). Placa costuma pre-preencher
         # um valor; sobrescrevemos com o valor da solicitacao. Best-effort.
         candidatos = (
-            lambda: page.get_by_placeholder(
-                re.compile(r"Valor de venda|Venda", re.I)
+            lambda: page.locator(
+                "input[placeholder*='Valor de venda'], input[placeholder*='Venda'], "
+                "input[placeholder*='venda']"
             ).first,
             lambda: page.locator(
-                "input[formcontrolname='valorVenda'], input[formcontrolname='venda'], "
-                "input[formcontrolname='valor']"
+                "input[formcontrolname*='venda' i], input[formcontrolname*='valor' i]"
             ).first,
             lambda: page.locator(
                 "input[label='Venda'], input[label='Valor de venda']"
+            ).first,
+            # Rotulo "Venda:" fica ao lado do input (mahoe): pega o input que
+            # segue um elemento com esse texto.
+            lambda: page.locator(
+                "xpath=//*[normalize-space(text())='Venda:' or "
+                "normalize-space(text())='Venda']/following::input[1]"
             ).first,
             lambda: page.get_by_role(
                 "textbox", name=re.compile(r"Valor de venda|Venda", re.I)
@@ -658,14 +790,35 @@ class PanPortalDriver(PlaywrightBankDriver):
             valor_box = self._primeiro_visivel(page, candidatos, "Valor de venda")
         except Exception:
             return  # portal pode resolver o valor pela placa
-        try:
-            valor_box.click()
-            valor_box.fill("")
-            valor_box.type(_formatar_moeda_input(float(sol.veiculo.valor)), delay=25)
-            page.keyboard.press("Tab")
-            page.wait_for_timeout(400)
-        except Exception:
-            pass
+        self._digitar_valor(page, valor_box, float(sol.veiculo.valor))
+        page.keyboard.press("Tab")
+        page.wait_for_timeout(400)
+
+    def _digitar_valor(self, page, box, valor: float) -> None:
+        """Digita moeda auto-detectando a mascara: tenta o inteiro em reais
+        ('21900') e, se o valor lido nao bater, a forma em centavos ('2190000').
+        Confere pelo NUMERO lido, nao pela string (mascara varia por campo)."""
+        alvo = Decimal(str(valor))
+        reais = str(int(round(valor)))          # 21900
+        centavos = str(int(round(valor * 100)))  # 2190000
+        for tentativa in (reais, centavos, reais):
+            try:
+                box.click()
+                try:
+                    box.press("Control+a")
+                    box.press("Delete")
+                except Exception:
+                    box.fill("")
+                box.press_sequentially(tentativa, delay=90)
+                page.wait_for_timeout(150)
+                try:
+                    lido = parse_moeda_br(box.input_value() or "0")
+                except Exception:
+                    lido = None
+                if lido is not None and lido == alvo:
+                    return
+            except Exception:
+                continue
 
     def _passo_simular(self, page, sol: SolicitacaoSimulacao) -> None:
         self._fechar_got_it(page)
@@ -692,7 +845,7 @@ class PanPortalDriver(PlaywrightBankDriver):
         entrada = sol.condicoes.entrada or 0
         if entrada and float(entrada) > 0:
             candidatos = (
-                lambda: page.get_by_placeholder(re.compile(r"Entrada", re.I)).first,
+                lambda: page.locator("input[placeholder*='Entrada']").first,
                 lambda: page.locator("input[formcontrolname='entrada']").first,
                 lambda: page.locator("input[label='Entrada']").first,
                 lambda: page.get_by_role(
@@ -710,29 +863,149 @@ class PanPortalDriver(PlaywrightBankDriver):
                 pass
 
     def _passo_aguardar_ofertas(self, page) -> None:
+        """Espera a simulacao concluir e os valores ESTABILIZAREM antes de ler.
+
+        Por condicao: retorna assim que (a) ha um sinal de conclusao
+        (Aprovado/Reprovado/Financiado) e (b) as parcelas lidas se repetem em
+        duas leituras seguidas. Nao gasta o timeout cheio quando ja esta pronto;
+        o teto so vale se nunca estabilizar.
+        """
         timeout = max(self.timeout_ms, 60_000)
         prazo_fim = time.monotonic() + (timeout / 1000.0)
-        cards = re.compile(r"\d+\s*x\b", re.I)
-        estavel = 0
+        concluido = re.compile(r"Aprovad|Reprovad|Negad|Financiad", re.I)
+        erro = re.compile(r"Ocorreu um erro|indispon[ií]vel|falha", re.I)
+        anterior = None
         while time.monotonic() < prazo_fim:
-            if page.get_by_text(
-                re.compile(r"Ocorreu um erro|indispon[ií]vel|falha", re.I)
-            ).count() > 0:
+            if page.get_by_text(erro).count() > 0:
                 raise ErroTransitorio(
                     "portal_simulacao_erro", "erro exibido na tela de ofertas"
                 )
-            if page.get_by_text(cards).count() > 0:
-                estavel += 1
-                if estavel >= 2:
-                    page.wait_for_timeout(600)
-                    return
-            else:
-                estavel = 0
+            tem_conclusao = page.get_by_text(concluido).count() > 0
+            # parcela vem do textContent (option colapsada e oculta); nao usar
+            # get_by_text (so ve texto visivel). O parse e a fonte de verdade.
+            atual = tuple(parse_parcelas_pan_portal(self._texto_ofertas(page)))
+            # Estavel = mesmas parcelas em duas leituras + sinal de conclusao.
+            if tem_conclusao and atual and atual == anterior:
+                return
+            anterior = atual
             page.wait_for_timeout(500)
         self._assert_portal_acessivel(page)
         raise ErroTransitorio(
-            "portal_falhou", "grade de parcelas nao carregou a tempo"
+            "portal_falhou", "grade de parcelas nao carregou/estabilizou a tempo"
         )
+
+    def _texto_ofertas(self, page) -> str:
+        """Texto da tela + valores dos <input> (entrada/venda ficam em input,
+        que inner_text NAO enxerga) rotulados por um label CURTO ao lado do
+        campo — nunca o texto do card inteiro (isso fazia o regex de entrada
+        grudar num numero errado)."""
+        try:
+            corpo = page.inner_text("body") or ""
+        except Exception:
+            corpo = ""
+        extra = ""
+        try:
+            extra = page.evaluate(
+                """() => {
+                    const curto = (inp) => {
+                        // 1) <label> associado
+                        if (inp.labels && inp.labels.length) {
+                            const t = (inp.labels[0].innerText || '').trim();
+                            if (t) return t;
+                        }
+                        // 2) atributos label/aria-label/placeholder
+                        const a = inp.getAttribute('label')
+                            || inp.getAttribute('aria-label')
+                            || inp.placeholder || '';
+                        if (a.trim()) return a.trim();
+                        // 3) irmao/ancestral proximo com texto curto
+                        let p = inp.previousElementSibling;
+                        for (let i = 0; i < 3 && p; i++, p = p.previousElementSibling) {
+                            const t = (p.innerText || '').replace(/\\s+/g,' ').trim();
+                            if (t && t.length <= 24) return t;
+                        }
+                        let anc = inp.parentElement;
+                        for (let i = 0; i < 3 && anc; i++, anc = anc.parentElement) {
+                            let s = anc.previousElementSibling;
+                            for (let j = 0; j < 2 && s; j++, s = s.previousElementSibling) {
+                                const t = (s.innerText || '').replace(/\\s+/g,' ').trim();
+                                if (t && t.length <= 24) return t;
+                            }
+                        }
+                        return '';
+                    };
+                    const out = [];
+                    document.querySelectorAll('input').forEach(inp => {
+                        const v = (inp.value || '').trim();
+                        if (!v) return;
+                        const lab = curto(inp);
+                        // Rotulo curto (p/ entrada/venda) + valor cru (p/ parcela
+                        // que pode estar num input sem rotulo, ex.: "48x R$ 800,00").
+                        if (lab && lab.length <= 24) out.push(lab + ' ' + v);
+                        out.push(v);
+                    });
+                    // Parcela: componente <app-custom-select id="installment-select">
+                    // com a opcao num <span> dentro de [role=option]. O menu fica
+                    // colapsado (aria-expanded=false), entao o texto NAO entra no
+                    // inner_text; textContent ignora visibilidade e pega. Cobre
+                    // tambem <select> nativo por seguranca.
+                    const seletores = [
+                        'app-custom-select',
+                        '#installment-select',
+                        '[id^="installment"]',
+                        '[role="option"]',
+                        '.vehicle-offer__value__select__option',
+                        '.combo__menu',
+                    ];
+                    document.querySelectorAll(seletores.join(',')).forEach(el => {
+                        const t = (el.textContent || '').replace(/\\s+/g,' ').trim();
+                        if (t) out.push(t);
+                    });
+                    document.querySelectorAll('select').forEach(sel => {
+                        (sel.options ? Array.from(sel.options) : []).forEach(o => {
+                            const t = (o.textContent || '').replace(/\\s+/g,' ').trim();
+                            if (t) out.push(t);
+                        });
+                    });
+                    return out.join('\\n');
+                }"""
+            ) or ""
+        except Exception:
+            extra = ""
+        # Locators do Playwright enxergam texto renderizado (inclusive shadow DOM
+        # aberto): pega elementos que parecem parcela ("Nx R$") e usa o texto real.
+        via_loc = self._parcelas_via_locator(page)
+        texto = corpo + "\n" + extra + "\n" + via_loc
+        # Debug opcional: grava o que o parser enxerga (MOTOR_PAN_PORTAL_DEBUG=1).
+        if os.getenv("MOTOR_PAN_PORTAL_DEBUG"):
+            try:
+                base = Path(self.screenshot_dir or "data/screenshots")
+                base.mkdir(parents=True, exist_ok=True)
+                (base / "pan_ofertas_debug.txt").write_text(texto, encoding="utf-8")
+            except Exception:
+                pass
+        return texto
+
+    def _parcelas_via_locator(self, page) -> str:
+        """Coleta textos de elementos que parecem parcela ('Nx ... R$').
+
+        Usa locators (nao inner_text do body): pegam o texto renderizado de
+        componentes custom/mahoe onde o valor do dropdown nao entra no
+        inner_text nem em querySelectorAll('select')."""
+        partes: list[str] = []
+        try:
+            loc = page.get_by_text(re.compile(r"\d+\s*x\b.*R\$", re.I))
+            n = min(loc.count(), 12)
+            for i in range(n):
+                try:
+                    t = loc.nth(i).inner_text(timeout=1_000)
+                    if t:
+                        partes.append(t.replace("\n", " "))
+                except Exception:
+                    continue
+        except Exception:
+            pass
+        return "\n".join(partes)
 
     def _salvar_storage(self, browser_ctx) -> None:
         if not self.storage_state_path:

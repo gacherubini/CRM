@@ -14,6 +14,7 @@ from app.motor.pan_portal import (
     PROVEDOR,
     PanPortalDriver,
     parse_entrada,
+    parse_financiado,
     parse_moeda_br,
     parse_parcelas_pan_portal,
     _formatar_moeda_input,
@@ -62,6 +63,25 @@ def test_parse_parcelas_spans_separados():
 def test_parse_entrada_da_fixture():
     html = FIXTURE.read_text(encoding="utf-8")
     assert parse_entrada(html) == Decimal("2190.00")
+
+
+def test_parse_financiado():
+    # aceita 1 ou 2 casas (portal as vezes trunca: "15.116,8")
+    assert parse_financiado("Financiado: R$ 15.116,80") == Decimal("15116.80")
+    assert parse_financiado("Financiado R$ 15.116,8") == Decimal("15116.8")
+    assert parse_financiado("sem financiado") is None
+
+
+def test_driver_usa_financiado_do_portal():
+    html = (
+        "<div>48x R$ 800,00</div>"
+        "<div>Financiado: R$ 15.116,80</div>"
+        "<div>Entrada: R$ 6.783,20</div>"
+    )
+    d = PanPortalDriver(html_simulacao=html)
+    out = d(_sol(condicoes=Condicoes(entrada=0, prazos_meses=[48])))
+    assert out[0].valor_financiado == Decimal("15116.80")
+    assert out[0].entrada == Decimal("6783.20")
 
 
 def test_formatar_moeda_input():

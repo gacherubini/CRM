@@ -59,6 +59,7 @@ def main() -> None:
         veiculo=Veiculo(
             placa=os.getenv("PAN_PLACA", ""),
             valor=float(os.getenv("PAN_VALOR", "0") or 0),
+            uf_licenciamento=os.getenv("PAN_UF", ""),  # ex.: RJ (vazio = default do portal)
             categoria="moto",
         ),
         condicoes=Condicoes(
@@ -75,6 +76,7 @@ def main() -> None:
     print(f"headless   {d.headless}   usuario {_mask(usuario)}")
     print(
         f"placa {sol.veiculo.placa or '(sem placa)'}  valor {sol.veiculo.valor}  "
+        f"uf {sol.veiculo.uf_licenciamento or '(default portal)'}  "
         f"entrada {sol.condicoes.entrada}  prazos {prazos}"
     )
     print("-" * 60)
