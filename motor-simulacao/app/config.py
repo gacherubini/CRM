@@ -43,6 +43,10 @@ FONTECRED_LOGIN_URL = os.getenv(
     "MOTOR_FONTECRED_LOGIN_URL",
     "https://app.fontecred.com.br/login#step-1",
 )
+BRADESCO_LOGIN_URL = os.getenv(
+    "MOTOR_BRADESCO_LOGIN_URL",
+    "https://turbo.bradesco/originacaolojista/login",
+)
 
 # Banco PAN OpenAPI Veículos. Sandbox é o default deliberado; produção exige
 # override explícito depois da homologação comercial do parceiro.

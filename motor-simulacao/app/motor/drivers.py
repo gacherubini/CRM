@@ -122,11 +122,12 @@ REAL_DRIVERS: dict[str, Driver] = {}
 
 def _registrar_drivers_reais() -> None:
     """Import tardio evita ciclos com os adapters concretos."""
-    if {"santander", "pan", "fontecred"}.issubset(REAL_DRIVERS):
+    if {"santander", "pan", "fontecred", "bradesco"}.issubset(REAL_DRIVERS):
         return
     from app.motor.santander import fabrica_santander
     from app.motor.pan import fabrica_pan
     from app.motor.fontecred import fabrica_fontecred
+    from app.motor.bradesco import fabrica_bradesco
 
     driver = fabrica_santander()
     # Registrado apenas em minúsculo ("santander"): é o nome canônico usado para
@@ -139,6 +140,8 @@ def _registrar_drivers_reais() -> None:
     REAL_DRIVERS["pan"] = fabrica_pan()
     # Fontecred: nome canônico minúsculo (mock homônimo é "Fontcred", sem 'e').
     REAL_DRIVERS["fontecred"] = fabrica_fontecred()
+    # Bradesco (Turbo Lojista): banco novo, sem homônimo mock.
+    REAL_DRIVERS["bradesco"] = fabrica_bradesco()
 
 
 def resolver_drivers(
@@ -160,7 +163,7 @@ def resolver_drivers(
             nomes.extend(DRIVERS.keys())
         elif p in DRIVERS:
             nomes.append(p)
-        elif p in REAL_DRIVERS or p in {"santander", "pan", "fontecred"}:
+        elif p in REAL_DRIVERS or p in {"santander", "pan", "fontecred", "bradesco"}:
             nomes.append(p)
     vistos: set[str] = set()
     pares: list[tuple[str, Driver]] = []
