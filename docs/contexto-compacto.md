@@ -1,9 +1,11 @@
 # Contexto compacto para continuidade
 
-Atualizado em **2026-07-14** (Motor com **Registros/prints**, base PAN API, timeout duro, deploy e
-**2 GB para Chromium**; design de workers por banco sob demanda). Leia isto primeiro; detalhes em
+Atualizado em **2026-07-15** (Fontecred LIVE, Registros/prints por etapa, sessão persistida endurecida,
+Motor 2 GB e design de workers por banco sob demanda). Leia isto primeiro; detalhes em
 `docs/handoff-contexto.md`.
-**Playwright / próximos bancos:** `docs/plans/2026-07-13-playwright-licoes-santander.md`.  
+**Playwright / próximos bancos:** ler as lições do
+[Santander](plans/2026-07-13-playwright-licoes-santander.md) e do
+[Fontecred](plans/2026-07-15-playwright-licoes-fontecred.md).
 **Próxima arquitetura do Motor:** `docs/plans/2026-07-14-plano1a-workers-playwright-sob-demanda.md`.
 Planos válidos: `docs/plans/README.md`. **Ignore** `docs/plans/_archive/`.
 
@@ -18,6 +20,8 @@ Planos válidos: `docs/plans/README.md`. **Ignore** `docs/plans/_archive/`.
 - **Motor em produção usa 2048 MB**: 512 MB falhou ao iniciar Chrome; probe headed com 2 GB abriu em
   34,41 s. API+worker ainda estão juntos e always-on. O plano aprovado separa API pequena e workers
   Playwright pré-criados/parados, ligados apenas quando houver tarefa por banco.
+- `motor2037` versão **12**: Santander e Fontecred LIVE; Fontecred validado com sessão quente e modal
+  COMUNICADOS no próprio Chromium/Xvfb do worker. Health 1/1 passing após o deploy.
 - **Teto de RAM da org (mem_overcommit):** revisar antes de iniciar vários browsers; o rollout novo
   começa com 1 slot, depois 2, e só chega a 5 após custo/telemetria.
   Scripts lab:
@@ -47,9 +51,10 @@ Planos válidos: `docs/plans/README.md`. **Ignore** `docs/plans/_archive/`.
 - Não ler/imprimir `.env`, tokens, chaves Gemini/Evolution/Motor/Portal/CAPI ou senhas.
 - Estoque = fonte de verdade. Integrações só por **HTTP** entre produtos.
 - Ordem: `#0 → #1A → #4A → #2A → #5A → #3A/#3A.1 → #3B → #6` (+ ops #7 Fly).
-- Simulação: **mock** até driver `real: true`. **Santander = real** (piloto live). No Santander a
+- Simulação: **mock** até driver `real: true`. **Santander e Fontecred = reais**. No Santander a
   **entrada é calculada pelo banco** e devolvida (campo `entrada` no resultado) — não é input.
-  Demais: híbrido **API-first** + Playwright só se não houver API.
+  No Fontecred, celular e placa são obrigatórios; sessão fria e quente precisam de testes separados.
+  Demais bancos: híbrido **API-first** + Playwright só se não houver API.
 - Senhas de portal: Dashboard **9A** → Motor cifrado (Task 11).
 - Bot WhatsApp: transporte Evolution → n8n confirmado, mas go-live da IA ainda depende da credencial
   Gemini, da chave Evolution nos dois nós HTTP e de um teste E2E com resposta.
@@ -60,17 +65,18 @@ Planos válidos: `docs/plans/README.md`. **Ignore** `docs/plans/_archive/`.
 
 | Produto | Pasta / porta | Feito (essencial) | Aberto |
 |---|---|---|---|
-| Motor #1A | `motor-simulacao/` `:8000` | async, auth, worker, mock, T11, **Santander live**, histórico, **timeline/prints**, timeout 240 s, base **PAN API**, migrations head **0011**, **123 testes** | implementar fan-out/workers sob demanda; credenciais PAN; outros bancos; T10 |
+| Motor #1A | `motor-simulacao/` `:8000` | async, auth, worker, mock, T11, **Santander + Fontecred LIVE**, histórico, **timeline/prints**, timeout 240 s, base **PAN API**, migrations head **0011**, **147 testes** | implementar fan-out/workers sob demanda; credenciais PAN; próximo banco API-first; T10 |
 | Chatbot #2A | `chatbot-api/` `:8001` | leads, handoff, por-placa, E3, E5, n8n tools | go-live manual; LGPD |
 | Estoque #4A | `estoque-api/` `:8100` | CRUD, placa, por-placa | E2E outbox; restore |
 | Portal | `portal-gestao/` `:9000` | CRM, progresso/resultado/histórico, **Registros ao vivo + prints protegidos**, 9A, E10, CSV e metas por vendedor, **152 testes** | cards por banco no fan-out; #3B Task 4/5; E2E |
 | Catálogo #5A | `catalogo-publico/` `:8200` | vitrine, CTA, Pixel browser | containers reais; SEO |
 
-**Estimativa:** ~**93%** MVP demonstrável (cotação real Santander + histórico) · ~**76%** produção/revenda multi-banco.
+**Estimativa:** ~**94%** MVP demonstrável (duas cotações reais + histórico) · ~**78%** produção/revenda multi-banco.
 
 ## Decisões vigentes
 
-- Santander: Playwright headed + Xvfb (headless_shell = Akamai).
+- Santander e Fontecred: Playwright headed + Xvfb; Fontecred exige reconhecimento de sessão
+  persistida antes de procurar o formulário de login.
 - 1 browser por banco (isolamento); fan-out paralelo sob demanda aprovado, ainda a implementar.
 - Credenciais só no Motor (Portal só BFF).
 - `testar-login` ainda placeholder — simulação real é a prova de credencial.
@@ -81,6 +87,7 @@ Planos válidos: `docs/plans/README.md`. **Ignore** `docs/plans/_archive/`.
 2. #3B **Task 4** (eventos do funil) e **Task 5** (campanhas metadados).
 3. **E1** áudio + **E6** fotos (uso diário loja).
 4. Implementar o plano de **fan-out/workers sob demanda** em rollout 1→2→5; próximo banco API-first.
+   Antes de qualquer novo Playwright, ler as lições Santander + Fontecred.
 5. **E11/E12** outbound (só com WA estável + opt-out).
 6. Backlog C1–C12: **só o que o dono confirmar** (seção no plano #6).
 
@@ -89,7 +96,8 @@ Planos válidos: `docs/plans/README.md`. **Ignore** `docs/plans/_archive/`.
 ## Verificação mínima
 
 ```powershell
-cd motor-simulacao; .\.venv\Scripts\python.exe -m pytest tests/test_santander_driver.py tests/test_listar_simulacoes.py -q
+cd motor-simulacao; .\.venv\Scripts\python.exe -m pytest tests/test_santander_driver.py tests/test_fontecred_driver.py tests/test_listar_simulacoes.py -q
+# Suíte completa esperada neste checkpoint: 147 pass
 cd ..\portal-gestao; .\.venv\Scripts\python.exe -m pytest tests/test_simulacoes.py tests/test_simulacoes_historico.py -q
 cd ..\deploy\motor-standalone
 docker compose exec -T motor-worker sh -c "pgrep -a Xvfb"

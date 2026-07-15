@@ -2,13 +2,13 @@
 
 > Plano válido do Motor. O #1 monolítico está em `docs/plans/_archive/` (não executar).
 >
-> **Status 2026-07-14:** mock async, auth/tenancy, worker/lease, cifra, **Task 11** e **Task 12 piloto
-> Santander LIVE** (Playwright headed+Xvfb, multi-prazo real no Portal, **entrada retornada pelo banco**
-> via `parse_entrada`, **fix skeleton** dos cards). Histórico por usuário, **Registros/prints ao vivo**,
-> timeout duro de 240 s e base API do PAN entregues; migrations head **0011**. Suíte de testes
-> **123 verde**. Lições:
-> `2026-07-13-playwright-licoes-santander.md`.
-> **Aberto:** Task 10 (revenda multi-tenant); credenciais/contrato PAN; demais bancos reais
+> **Status 2026-07-15:** mock async, auth/tenancy, worker/lease, cifra, **Task 11** e **Task 12 com
+> Santander + Fontecred LIVE**. Ambos usam Playwright headed+Xvfb; Fontecred inclui sessão persistida,
+> modal COMUNICADOS, waits por estado, timeline/prints e multi-prazo/entrada mínima. Histórico por
+> usuário, timeout duro de 240 s e base API do PAN entregues; migrations head **0011**. Suíte de testes
+> **147 verde**. Lições obrigatórias:
+> `2026-07-13-playwright-licoes-santander.md` e `2026-07-15-playwright-licoes-fontecred.md`.
+> **Aberto:** Task 10 (revenda multi-tenant); credenciais/contrato PAN; próximos bancos reais
 > (API-first); fan-out multi-banco e workers sob demanda conforme
 > `2026-07-14-plano1a-workers-playwright-sob-demanda.md`; `testar-login` real. Contrato multi-prazo
 > no Motor **já existe**.
@@ -153,7 +153,7 @@ Decisão de produto (2026-07-12): **não** apostar só em RPA nem só em agregad
 ```text
 Job de simulação (paralelo, limite de browsers)
   ├── Driver API      → bancos/parceiros com contrato (ex. BV Open, Pan quando houver)
-  ├── Driver Playwright → portais do lojista sem API (Santander, Bradesco, Fontcred, …)
+  ├── Driver Playwright → portais do lojista sem API (Santander, Fontecred, Bradesco, …)
   ├── Driver Agregador  → opcional depois (1 HTTP → N bancos da rede deles)
   └── Driver Mock       → demo / sem credencial / CI
 ```
@@ -307,15 +307,28 @@ GET não vaza senha; auditoria registra o ator.
 ### Task 12: Drivers reais (híbrido) — piloto
 
 > **Detalhado em** `2026-07-13-plano1a-task12-santander-design.md` (design) + `...-santander-implementacao.md`
-> (plano Fase 1, 11 tasks TDD) + `...-bancos-reconhecimento.md` (mapa por banco). Piloto: Santander via
-> Playwright; princípio **API-first** (Pan/BV/Bradesco provavelmente têm API → `ApiBankDriver`).
+> (plano Fase 1, 11 tasks TDD) + `...-bancos-reconhecimento.md` (mapa por banco). Piloto Santander e
+> segundo incremento Fontecred estão LIVE via Playwright; princípio **API-first** continua vigente
+> para Pan/BV/Bradesco (`ApiBankDriver` quando houver contrato).
 
-Implementar o **primeiro** driver real (API se houver contrato, senão Playwright) com
-`real: true`, timeout, resultado parcial e falha sanitizada. Demais bancos em incrementos
-separados. Agregador fica como adapter opcional quando houver contrato comercial.
+Implementar drivers reais (API se houver contrato, senão Playwright) com `real: true`, timeout,
+resultado parcial e falha sanitizada. Santander e Fontecred foram entregues em incrementos separados;
+os próximos bancos seguem a mesma regra. Agregador fica como adapter opcional quando houver contrato.
 
-**Aceite:** job com mock + 1 real em paralelo; parcial visível; WhatsApp/Chatbot só consomem o
-contrato HTTP existente.
+**Aceite alcançado no pipeline:** drivers reais percorrem o mesmo contrato HTTP/jobs, falha parcial é
+persistida e consumidores não conhecem Playwright. Fan-out paralelo ainda não foi implementado.
+
+#### Incremento Fontecred — entregue em 2026-07-15
+
+- Login por e-mail/senha e reaproveitamento de `storage_state` válido.
+- Sessão quente é reconhecida por URL autenticada, Dashboard ou COMUNICADOS, inclusive quando
+  `networkidle` expira.
+- Modal COMUNICADOS só é considerado fechado após `hidden` + `is_visible() == false`.
+- Navegação e preenchimento aguardam DOM, visibilidade e actionability; não avançam apenas por sleep.
+- Timeline e screenshots por etapa permitem separar falha de login, modal, proposta e resultado.
+- Smoke no próprio worker confirmou `SESSAO_REUTILIZADA=ok` e `MODAL_DEPOIS=False`; usuário confirmou
+  a simulação real após o deploy.
+- Referência obrigatória: `2026-07-15-playwright-licoes-fontecred.md`.
 
 **Concorrência multi-banco (design aprovado 2026-07-14):** o job cria uma tarefa por banco;
 workers Playwright pré-criados ficam parados, são acordados em paralelo e desligam após esvaziar a
@@ -335,7 +348,8 @@ fila. API drivers não usam browser. Rollout e rollback estão detalhados em
 - Estoque/catálogo.
 - Vendas, metas e dashboard.
 - Score de crédito, até existir contrato e base legal próprios.
-- Drivers bancários reais no primeiro incremento; cada banco terá plano específico.
+- Novos drivers bancários fora dos incrementos já entregues; cada banco deve ter reconhecimento e
+  rollout próprios.
 
 ## Resultado
 

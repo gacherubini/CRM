@@ -20,7 +20,7 @@ Cada plano `*A`/`*B` tem bloco **Status** no topo: leia antes de reimplementar.
 | Ordem | Plano | Produto | Status resumido |
 |---:|---|---|---|
 | 0 | [Plano #0](2026-07-11-plano0-fundacao-core-dominio-seguranca.md) | Contratos e segurança | Fundação — decisões ainda válidas |
-| 1 | [Plano #1A](2026-07-11-plano1a-motor-simulacao-independente.md) | Motor de Simulação | Santander LIVE + histórico + **Registros/prints** + base PAN API; fan-out sob demanda planejado |
+| 1 | [Plano #1A](2026-07-11-plano1a-motor-simulacao-independente.md) | Motor de Simulação | Santander + **Fontecred LIVE**, histórico, Registros/prints e base PAN API; fan-out sob demanda planejado |
 | 2 | [Plano #4A](2026-07-11-plano4a-estoque-api-independente.md) | Estoque API/admin | Operacional; placa+por-placa+**admin HTMX**; falta E2E outbox/restore |
 | 3 | [Plano #2A](2026-07-11-plano2a-chatbot-standalone-revendivel.md) | Chatbot + Estoque Lite | API+E3+E5+por-placa+sim+n8n; go-live WA ainda manual |
 | 4 | [Plano #5A](2026-07-11-plano5a-catalogo-publico-independente.md) | Catálogo Público | Vitrine+funil+**Pixel browser**; residual SEO/tema |
@@ -46,6 +46,9 @@ Detalham a Task 12 do #1A (1º driver `real: true`). Ler junto com o #1A:
 - [**Lições do piloto Santander**](2026-07-13-playwright-licoes-santander.md) — **obrigatório** antes
   do próximo driver Playwright (WAF, Xvfb, Material, modais, parsers, **skeleton de cards**, entrada
   retornada, checklist).
+- [**Lições do Fontecred**](2026-07-15-playwright-licoes-fontecred.md) — **obrigatório** junto das
+  lições Santander: sessão fria/quente, `networkidle` enganoso, modal COMUNICADOS, waits por estado,
+  timeline como evidência e smoke no próprio worker.
 - [**Fan-out multi-banco + workers Playwright sob demanda**](2026-07-14-plano1a-workers-playwright-sob-demanda.md)
   — design aprovado em 2026-07-14; pré-cria slots Fly parados, acorda por banco, agrega resultados
   incrementais e desliga ao esvaziar a fila. **Planejado; ainda não implementado.**

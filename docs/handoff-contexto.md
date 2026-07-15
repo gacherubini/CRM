@@ -1,15 +1,79 @@
 # Handoff técnico — suíte automotiva
 
-> Checkpoint: **2026-07-14 (registros/prints de simulação + PAN API foundation + deploy + diagnóstico
-> de memória + plano de workers sob demanda)**.
+> Checkpoint: **2026-07-15 (Fontecred LIVE + endurecimento de sessão/modal/esperas + deploy validado)**.
 > Confirme containers/`.env`/n8n antes de editar. Testes unitários ≠ E2E WhatsApp.  
 > Leia primeiro: `docs/contexto-compacto.md`. Planos válidos: `docs/plans/README.md`.  
-> **Lições Playwright (obrigatório antes do próximo banco):**  
-> `docs/plans/2026-07-13-playwright-licoes-santander.md`.  
+> **Lições Playwright obrigatórias antes do próximo banco:**
+> `docs/plans/2026-07-13-playwright-licoes-santander.md` e
+> `docs/plans/2026-07-15-playwright-licoes-fontecred.md`.
 > **Próximo plano do Motor:** `docs/plans/2026-07-14-plano1a-workers-playwright-sob-demanda.md`.
-> Commits `0758a9c` e `e55a3c9` estão **commitados e enviados para `origin/main`**.
+> Commits Fontecred `ce75e60`, `8ac4b92` e `1165690` estão em **`origin/main`**.
 
-## Checkpoint mais recente — observabilidade, PAN e produção
+## Checkpoint mais recente — Fontecred LIVE
+
+### Estado entregue
+
+- **Segundo driver real:** Santander e Fontecred estão `real: true`; PAN mantém a base API pronta,
+  mas depende de contrato/credenciais.
+- Fontecred automatiza login/sessão persistida, modal COMUNICADOS, Nova Proposta, cliente, placa,
+  financiamento, SCR, PEP/proteção e leitura multi-prazo/entrada mínima.
+- Validação pré-browser exige celular, placa, CPF, nascimento e valor; falhas usam códigos estáveis.
+- Timeline Fontecred registra etapas do browser até parcelas, com prints protegidos por RBAC/tenancy.
+- Motor: **147 testes verdes**, migrations head **0011**.
+- Produção: `motor2037` **versão 12**, Machine 2 GB, Chromium headed + Xvfb, health **1/1 passing**.
+- Usuário confirmou simulação Fontecred real concluída após o deploy final.
+
+### Incidente Fontecred — resumo para continuidade
+
+O screenshot mostrava Dashboard com COMUNICADOS aberto, mas havia duas causas diferentes:
+
+1. o fechamento antigo não cobria Bootstrap 5 nem confirmava que o modal ficou oculto;
+2. depois, o worker tinha `storage_state` válido e `/login` redirecionava direto ao Dashboard.
+   `networkidle` expirava por conexões abertas e o driver procurava e-mail/senha numa tela já logada.
+
+A timeline separou as causas. Quando a sequência era `browser_pronto → falha_inesperada`, sem
+`login_confirmado`, a falha acontecia **antes** do clique no X. Não diagnosticar somente pelo print.
+
+Correções permanentes:
+
+- reconhecer sessão autenticada por URL fora de `/login`, `COMUNICADOS` ou `Dashboard`;
+- após timeout de `networkidle`, checar se o portal já autenticou antes de recarregar;
+- modal usa `visible → click/escape → hidden → is_visible`, incluindo `.btn-close` e
+  `[data-bs-dismiss="modal"]`;
+- navegação usa `commit` tolerante, seguida de `domcontentloaded`, `readyState`, locator visível e
+  `click(trial=True)`;
+- exceção inesperada registra somente o tipo na timeline, sem PII;
+- testar separadamente sessão fria e sessão quente no Chromium/Xvfb de produção.
+
+Smoke final executado no próprio worker, sem cliente e sem enviar proposta:
+
+```text
+PORTAL_AUTENTICADO=True
+SESSAO_REUTILIZADA=ok
+MODAL_ANTES=True
+MODAL_DEPOIS=False
+SMOKE_WORKER=ok
+```
+
+Detalhes e checklist para próximos bancos:
+`docs/plans/2026-07-15-playwright-licoes-fontecred.md`.
+
+### Git e deploy do checkpoint
+
+- `ce75e60 fix(motor): estabiliza fluxo Fontecred` — modal, navegação e timeline.
+- `8ac4b92 fix(motor): aguarda etapas do Fontecred` — DOM/actionability e ritmo conservador.
+- `1165690 fix(motor): reutiliza sessao Fontecred` — sessão quente e diagnóstico sanitizado.
+- `origin/main` e worktree estavam limpos após o deploy; health HTTP 200/passing.
+
+### Próximo foco do Motor
+
+1. Não reabrir o Fontecred sem evidência nova; usar timeline + lição específica.
+2. Próximo banco continua **API-first**; confirmar contrato PAN/BV/Bradesco antes de Playwright.
+3. Implementar `testar-login` real para validar credencial/sessão sem enviar proposta.
+4. Implementar fan-out/workers sob demanda; storage state/prints precisam de storage privado antes de
+   múltiplas Machines.
+
+## Checkpoint anterior — observabilidade, PAN e produção (2026-07-14)
 
 ### Entregue no código
 
@@ -184,25 +248,25 @@ agendados. Não criar segunda Machine/volume sem revisar o teto mensal.
 
 ## Estado em uma frase
 
-Suíte **demo forte**: Motor com **1º driver real (Santander)** fim-a-fim no Portal — agora **devolve a
-entrada necessária** (o banco calcula; não é input) e **espera os cards reais** (fix do skeleton). Portal
-tem **histórico de simulações por usuário** (Task 16: `GET /v1/simulacoes` + `solicitado_por`). Mock dos
-outros bancos; Chatbot/Estoque/Catálogo por HTTP. Transporte WhatsApp Evolution → n8n já foi confirmado,
-mas a resposta IA ainda não teve E2E completo. Próximo foco de código: **próximos bancos (API-first)** ou go-live WhatsApp — **não** reescrever
-o piloto Santander sem ler as lições.
+Suíte **demo forte**: Motor com **Santander e Fontecred LIVE** fim-a-fim no Portal, histórico por
+usuário e Registros/prints por etapa. Santander devolve a entrada calculada pelo banco; Fontecred
+devolve multi-prazo/entrada mínima e suporta sessão persistida. PAN tem base API, mas aguarda contrato.
+Chatbot/Estoque/Catálogo integram por HTTP. Transporte WhatsApp Evolution → n8n foi confirmado, mas a
+resposta IA ainda não teve E2E completo. Próximo foco: banco **API-first**, fan-out sob demanda ou
+go-live WhatsApp — não alterar os drivers reais sem ler as duas lições Playwright.
 
 ## Verificação
 
 | Produto | Testes (aprox.) | Porta host típica |
 |---|---:|---|
-| Motor | **108 pass** (2 Santander + 4 migration corrigidos) | `:8000` |
+| Motor | **147 pass** | `:8000` |
 | Chatbot | 88 | `:8001` |
 | Estoque | 65 | `:8100` |
 | Catálogo | 23 | `:8200` |
-| Portal | **148 pass** (+9 metas, +11 relatórios) | `:9000` |
-| **Total** | **~430+** | Evolution `:8080`, n8n `:5678` |
+| Portal | **152 pass** | `:9000` |
+| **Total** | **~475** | Evolution `:8080`, n8n `:5678` |
 
-> **Falhas do Motor RESOLVIDAS nesta sessão** (antes eram 2 Santander + 4 migration):
+> **Histórico do checkpoint 2026-07-14:** as falhas abaixo foram resolvidas antes do Fontecred:
 > `test_worker_conclui_com_cinco_provedores` / `test_persistencia_do_resultado_apos_worker` esperavam 5
 > provedores mock e recebiam 4 — o driver real `Santander` (registrado sob `Santander` e `santander`)
 > sombreava o mock homônimo e era derrubado sem credencial em `resolver_drivers`; agora o real registra só
@@ -224,7 +288,7 @@ docker compose exec -T motor-worker sh -c "pgrep -a Xvfb; pgrep -a python"
 - **Feito:**
   - Jobs async, worker/lease, auth+tenancy, cifra, CLI, mock de 5 bancos.
   - **Task 11** credenciais cifradas (Portal 9A).
-  - **Task 12 piloto Santander LIVE:**
+  - **Task 12 — Santander e Fontecred LIVE:**
     - `SantanderDriver` + `PlaywrightBankDriver` (stealth, storage_state, screenshots).
     - Worker Docker: Chromium + **Xvfb headed** (`MOTOR_BROWSER_HEADLESS=0`), `shm_size: 1gb`.
     - Entrypoint limpa lock X órfão (`scripts/worker-entrypoint.sh`).
@@ -236,13 +300,16 @@ docker compose exec -T motor-worker sh -c "pgrep -a Xvfb; pgrep -a python"
     - **Fix skeleton** (`_passo_aguardar_simulacao`): espera o texto **real** do card (`Nx de`) com 2
       leituras estáveis, ignorando o skeleton de carregamento (causa do `parcelas_nao_encontradas`).
     - Códigos: `portal_bloqueado`, `portal_falhou`, `display_ausente`, `login_timeout`, etc.
+    - `FontecredDriver`: login/sessão persistida, modal COMUNICADOS, Nova Proposta, cliente/placa,
+      financiamento, PEP/proteção e parcelas reais; waits por DOM/actionability e timeline própria.
+    - Lições Fontecred: `docs/plans/2026-07-15-playwright-licoes-fontecred.md`.
   - **Listagem `GET /v1/simulacoes`** (Task 16): filtros `status`/`solicitado_por`/`desde`/`ate` +
     paginação `limite`/`offset`, escopada por `cliente_id`; grava `solicitado_por` (header `X-Ator`) no
     create (**migration 0009**). `simulacao_resumo` não decifra payload (CPF omitido).
   - Processamento não deixa job eterno em `processando` (catch genérico + retry).
-  - Migrations lineares até **head 0009** (0007 → 0008 entrada → 0009 solicitado_por).
+  - Migrations lineares até **head 0011** (0010 PAN → 0011 eventos/prints).
 - **Falta:**
-  - Demais bancos reais (ver reconhecimento + lições).
+  - Próximos bancos reais, sempre API-first (ver reconhecimento + duas lições Playwright).
   - Multi-banco **paralelo** (1 Playwright por banco no mesmo job).
   - `testar-login` real (hoje **placeholder**).
   - **Task 10** revenda.
@@ -282,8 +349,14 @@ docker compose exec -T motor-worker sh -c "pgrep -a Xvfb; pgrep -a python"
 5. **Modal simulações anteriores** + overlays Material → fechar X / Escape / aguardar loading.  
 6. **Parser** de parcelas e "Valor liberado" no HTML quebrado.  
 7. Hot-patch de `.py` exige **restart do worker** (import em memória).
+8. **Fontecred `networkidle` enganoso:** sessão quente já estava no Dashboard, mas a navegação expirava.
+9. **Screenshot não define a etapa:** modal aberto não significava que o clique no X havia rodado;
+   ausência de `login_confirmado` mostrou falha anterior.
+10. **Modal deve confirmar estado:** `visible → ação → hidden`, não apenas click sem exceção.
+11. **Local ≠ worker:** sessão local expirada cobriu login frio; storage state válido do Fly revelou o
+    caminho quente. Testar ambos no Chromium/Xvfb.
 
-Detalhe operacional: **`docs/plans/2026-07-13-playwright-licoes-santander.md`**.
+Detalhe operacional: lições **Santander** e **Fontecred** na pasta `docs/plans/`.
 
 ## Regras permanentes
 
@@ -298,12 +371,12 @@ Detalhe operacional: **`docs/plans/2026-07-13-playwright-licoes-santander.md`**.
 
 ## Próximos passos (ordem sugerida para o próximo agente)
 
-1. **Ler** `docs/plans/2026-07-13-playwright-licoes-santander.md` + `...-bancos-reconhecimento.md`.
-2. Escolher banco (Pan/BV/Bradesco preferir **API**; Fontecred candidato Playwright).
-4. Credencial da loja em Portal → Acessos; worker com Xvfb saudável.
-5. Implementar driver (reutilizar base + lição do skeleton); **não** copiar seletores do Santander.
-6. Multi-banco paralelo; `testar-login` real; Task 10 revenda.
-7. Alternativa de produto: go-live WhatsApp (`docs/go-live-chatbot.md`) se operação pedir.
+1. **Ler as duas lições Playwright:** Santander + Fontecred; depois o mapa de reconhecimento.
+2. Escolher o próximo banco (PAN/BV/Bradesco preferir **API**; Fontecred já está LIVE).
+3. Confirmar contrato/credencial e worker saudável antes de implementar.
+4. Não copiar seletores: mapear sessão fria/quente, modais e marcadores do banco escolhido.
+5. Multi-banco paralelo; `testar-login` real; Task 10 revenda.
+6. Alternativa de produto: go-live WhatsApp (`docs/go-live-chatbot.md`) se operação pedir.
 
 > **Histórico de simulações por usuário (#3A.1 Task 16): FEITO** nesta sessão — não reimplementar.
 
