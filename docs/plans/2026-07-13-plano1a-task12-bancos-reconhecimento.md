@@ -2,10 +2,10 @@
 
 > Situação de cada banco para o driver real de simulação (#1A Task 12+).
 > Complementa `2026-07-13-plano1a-task12-santander-design.md`.
-> **Atualizado 2026-07-15:** Fontecred LIVE; planos Bradesco + Pan portal; tabela de campos canônica.
+> **Atualizado 2026-07-15:** Fontecred, **Bradesco e Pan portal (go!PAN) LIVE**; tabela canônica.
 > **Não** é plano de implementação completo: cada banco tem (ou ganha) plano próprio.
 >
-> Antes de codar o próximo Playwright: lições **Santander** + **Fontecred**.
+> Antes de codar o próximo Playwright: lições **Santander** + **Fontecred** + **Pan portal**.
 > Base: `PlaywrightBankDriver` + worker headed+Xvfb; API via `ApiBankDriver` quando houver.
 
 ## Princípio (repetido do design)
@@ -20,8 +20,8 @@ implementam a mesma interface `Driver`; o resto do Motor não muda.
 |---|---|---|---|---|---|---|
 | **Santander** | originacao-auto/login | usuário+senha | **NÃO** (só portal) | Playwright **LIVE** | Sim | lições Santander (impl DONE) |
 | **Fontecred** | app.fontecred.com.br | e-mail+senha | **NÃO** | Playwright **LIVE** | Sim | lições Fontecred |
-| **Pan** | veiculos.bancopan.com.br | usuário+senha | **API no código** (live a validar) | **Dual-path** API se config completa; senão portal | Parcial (falta HTML ofertas) | `…-pan-playwright-implementacao.md` |
-| **Bradesco** | turbo.bradesco/… | CPF lojista+senha | provável API (gate 15 min) | Loja usa Turbo → **Playwright** no plano | Codegen 2026-07-15 | `…-bradesco-implementacao.md` |
+| **Pan** | veiculos.bancopan.com.br | usuário+senha | **API no código** + **portal LIVE** | **Dual-path** API se config completa; senão portal go!PAN | Playwright **LIVE** (lê ofertas) | impl DONE + lições Pan portal |
+| **Bradesco** | turbo.bradesco/… | CPF lojista+senha | Turbo → **Playwright LIVE** | Playwright **LIVE** | Sim | impl DONE (`…-bradesco-implementacao.md`) |
 | **BV** | a levantar | a levantar | **PROVÁVEL** (doc V4 portal dev) | **Backlog** — sem plano de impl | Não | — (não atacar sem reconhecimento) |
 
 ### Campos e regras por provedor (canônico para Portal / Chatbot / Motor)

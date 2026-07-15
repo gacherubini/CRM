@@ -1,11 +1,19 @@
 # Driver Real Bradesco (Turbo Lojista) — Implementation Plan
 
-> **Status 2026-07-15:** plano escrito; **ainda não implementado**.
-> Codegen do dono em arquivo local (`Downloads/Bradesco.txt`) — **não versionar** (pode conter senhas).
+> **Status 2026-07-15:** ✅ **IMPLEMENTADO e validado ao vivo pelo dono.**
+> Commit `e57387e feat(motor): driver real Bradesco (Turbo Lojista) via Playwright`.
+> `BradescoDriver` em `app/motor/bradesco.py`, registrado em `REAL_DRIVERS["bradesco"]`,
+> credencial CPF/senha em `providers.py`, URL em `config.py`. 20 testes novos; suíte do Motor
+> passou de 147 → 167 verdes. Smoke local: `scripts/probe_bradesco.py` (headed).
 >
-> **Ler antes de codar:** `2026-07-13-playwright-licoes-santander.md`,
-> `2026-07-15-playwright-licoes-fontecred.md`,
-> `2026-07-13-plano1a-task12-bancos-reconhecimento.md`.
+> **Ajustes descobertos ao vivo** (além do plano original):
+> - Interstitial pós-login **"Sua senha expira em N dias"** (`first-access/flow-feedback`):
+>   clicar **"Trocar senha depois"** (nunca "Trocar senha"). Ver `_pular_troca_senha`.
+> - Modal **"Foram encontradas diferentes versões para a placa"**: selecionar a **1ª** opção
+>   (radio) e Confirmar. Ver `_selecionar_versao_veiculo`.
+> - Entrada **opcional**: só preenche se `condicoes.entrada > 0`.
+>
+> Codegen do dono em arquivo local (`Downloads/Bradesco.txt`) — **não versionar** (pode conter senhas).
 >
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development
 > (recommended) or superpowers:executing-plans. Steps use checkbox (`- [ ]`) syntax.

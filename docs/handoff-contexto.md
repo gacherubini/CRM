@@ -11,7 +11,57 @@
 > Lições Playwright: `…-playwright-licoes-santander.md` + `…-fontecred.md`.
 > Escolher eixo no contexto antes de codar (não misturar Bradesco + #3B + go-live na mesma PR).
 
-## Checkpoint mais recente — front Revy + planos Bradesco / Pan portal (2026-07-15 noite)
+## Checkpoint mais recente — Bradesco + Pan portal LIVE (2026-07-15)
+
+> **Próximo foco escolhido pelo dono:** implementar os **workers Playwright sob demanda que dormem**
+> — plano `docs/plans/2026-07-14-plano1a-workers-playwright-sob-demanda.md`. Não reabrir os drivers
+> abaixo sem evidência nova; ler as **três** lições Playwright (Santander, Fontecred, **Pan portal**).
+
+### Entregue nesta sessão (dois bancos novos, validados ao vivo pelo dono)
+
+- **Bradesco (Turbo Lojista)** — `BradescoDriver` Playwright. Commit
+  `e57387e feat(motor): driver real Bradesco (Turbo Lojista) via Playwright`.
+  - `app/motor/bradesco.py`, `REAL_DRIVERS["bradesco"]`, credencial CPF/senha em `providers.py`,
+    URL em `config.py`. Entrada **opcional** (só se `> 0`). Multi-prazo `Nx de R$` (ignora
+    "12x Entrada mínima necessária"). Smoke: `scripts/probe_bradesco.py`.
+  - Descobertos ao vivo: interstitial **"Sua senha expira"** → clicar **"Trocar senha depois"**;
+    modal **"diferentes versões para a placa"** → selecionar a **1ª** + Confirmar.
+- **Pan portal (go!PAN)** — `PanPortalDriver` Playwright, **dual-path** com a API existente.
+  Commits `b3a94b1` (fluxo/âncoras) e `fd1a31a` (leitura de ofertas).
+  - `app/motor/pan_portal.py`; dispatcher `_pan_dispatch` em `drivers.py` escolhe **API** (config
+    OpenAPI completa) ou **portal** (só usuario+senha). `providers.py`: campos de API viraram
+    **opcionais** — a API existente **não** regrediu. Smoke: `scripts/probe_pan_portal.py`.
+  - Smoke live OK: **48x R$ 800,00 / financiado 15.116,80 / entrada 6.783,20**; UF (RJ) testada.
+  - Portal é Angular + web components `pan-mahoe`; a parcela ficava em componente **oculto**
+    (`<app-custom-select>`/`[role=option]`) → lida via **`textContent`** + locator. Debug:
+    `MOTOR_PAN_PORTAL_DEBUG=1` → `data/screenshots/pan_ofertas_debug.txt`.
+  - **Lições completas:** `docs/plans/2026-07-15-playwright-licoes-pan-portal.md`.
+- **Suíte do Motor: 183 verdes** (147 → +16 Bradesco +20 Pan portal). Planos dos dois bancos
+  marcados **DONE** no header.
+
+### Estado dos drivers reais (Task 12)
+
+`santander`, `fontecred`, **`bradesco`** = Playwright. **`pan`** = dual-path (API OpenAPI **ou**
+portal go!PAN por credencial). Todos gated por credencial cifrada (Portal → Acessos bancos).
+
+### Próximo passo (workers que dormem)
+
+Seguir `docs/plans/2026-07-14-plano1a-workers-playwright-sob-demanda.md`: uma simulação vira uma
+tarefa por banco; workers Playwright pré-criados ficam `stopped`, sobem sob demanda via Machines
+API e voltam a `stopped` após fila+idle. Bancos com API (pan API) usam pool leve sem browser.
+Pré-requisito de escala: tirar screenshots/storage_state do Fly Volume único → object storage
+privado antes de múltiplas Machines. **Deploy do motor com os 2 bancos novos ainda não foi feito**
+(commitado no `main`; lembrar `fly deploy` usa a árvore local — commitar antes).
+
+### Segurança
+
+- Cadastrar Bradesco/Pan só via `PUT /v1/provedores/<banco>/credenciais` ou Portal 9A.
+- Codegen do dono é local (`Downloads/Bradesco.txt`) — **não versionar**; continha senha do portal
+  Pan em claro → **recomendar troca de senha** do portal.
+
+---
+
+## Checkpoint — front Revy + planos Bradesco / Pan portal (2026-07-15 noite)
 
 ### Entregue nesta sessão (docs + front)
 
@@ -293,18 +343,18 @@ agendados. Não criar segunda Machine/volume sem revisar o teto mensal.
 
 ## Estado em uma frase
 
-Suíte **demo forte**: Motor com **Santander e Fontecred LIVE** fim-a-fim no Portal, histórico por
-usuário e Registros/prints por etapa. Santander devolve a entrada calculada pelo banco; Fontecred
-devolve multi-prazo/entrada mínima e suporta sessão persistida. PAN tem base API, mas aguarda contrato.
-Chatbot/Estoque/Catálogo integram por HTTP. Transporte WhatsApp Evolution → n8n foi confirmado, mas a
-resposta IA ainda não teve E2E completo. Próximo foco: banco **API-first**, fan-out sob demanda ou
-go-live WhatsApp — não alterar os drivers reais sem ler as duas lições Playwright.
+Suíte **demo forte**: Motor com **Santander, Fontecred, Bradesco e Pan portal (go!PAN) LIVE**
+fim-a-fim, histórico por usuário e Registros/prints por etapa. Pan é dual-path (API OpenAPI ou
+portal por credencial). Chatbot/Estoque/Catálogo integram por HTTP. Transporte WhatsApp Evolution →
+n8n confirmado, resposta IA ainda sem E2E completo. **Próximo foco: workers Playwright sob demanda
+que dormem** (plano 2026-07-14) — não alterar os drivers reais sem ler as **três** lições Playwright
+(Santander, Fontecred, Pan portal).
 
 ## Verificação
 
 | Produto | Testes (aprox.) | Porta host típica |
 |---|---:|---|
-| Motor | **147 pass** | `:8000` |
+| Motor | **183 pass** | `:8000` |
 | Chatbot | 88 | `:8001` |
 | Estoque | 65 | `:8100` |
 | Catálogo | 23 | `:8200` |

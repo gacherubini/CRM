@@ -1,14 +1,15 @@
 # Driver Real Pan (portal lojista / “Buscopan”) — Implementation Plan
 
-> **Status 2026-07-15:** plano escrito; **ainda não implementado**.
-> Codegen do dono no mesmo arquivo local que o Bradesco (`Downloads/Bradesco.txt`, seção
-> `buscopan`) — **não versionar** (contém credenciais em texto claro).
+> **Status 2026-07-15:** ✅ **IMPLEMENTADO e validado ao vivo pelo dono** (fim-a-fim, lê ofertas).
+> Commits `b3a94b1` (fluxo/âncoras) e `fd1a31a` (leitura de ofertas). `PanPortalDriver` em
+> `app/motor/pan_portal.py`; dispatcher em `drivers.py` escolhe **API** (config OpenAPI completa)
+> ou **portal** (só usuario+senha). `providers.py`: campos de API viraram opcionais. 20 testes
+> novos; suíte do Motor 183 verdes. Smoke local: `scripts/probe_pan_portal.py` (headed).
+> Smoke live OK: **48x R$ 800,00 / financiado R$ 15.116,80 / entrada R$ 6.783,20**. UF (RJ)
+> testada ao vivo. **Lições: `docs/plans/2026-07-15-playwright-licoes-pan-portal.md`.**
 >
-> **Importante:** já existe `PanDriver(ApiBankDriver)` em `app/motor/pan.py` (OpenAPI v2).
-> Este plano é o **caminho Playwright do portal** `veiculos.bancopan.com.br` para quando a loja
-> opera só com usuário/senha de lojista (sem api_key/secret de developer).
->
-> **Ler antes:** lições Santander + Fontecred; mapa de bancos; código atual `pan.py` e `api_base.py`.
+> **Importante:** já existe `PanDriver(ApiBankDriver)` em `app/motor/pan.py` (OpenAPI v2). Este
+> driver é o **caminho Playwright do portal** `veiculos.bancopan.com.br` (go!PAN) — não removeu a API.
 >
 > **For agentic workers:** REQUIRED SUB-SKILL: subagent-driven-development ou executing-plans.
 
