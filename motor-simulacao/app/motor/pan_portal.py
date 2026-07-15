@@ -246,6 +246,8 @@ class PanPortalDriver(PlaywrightBankDriver):
             try:
                 self._evento(ctx, "browser_pronto", "Navegador iniciado; abrindo o portal.")
                 self._passo_login(page, usuario, senha)
+                # Cookies/LGPD costumam aparecer so depois de autenticar.
+                self._fechar_got_it(page)
                 self._evento(
                     ctx, "login_confirmado", "Login confirmado pelo portal.", page, True
                 )
@@ -365,47 +367,122 @@ class PanPortalDriver(PlaywrightBankDriver):
         url = self.login_url
         if url.startswith("http://"):
             url = "https://" + url[len("http://") :]
+        # go!PAN mantem conexoes abertas (chat/analytics): networkidle NUNCA
+        # estabiliza e trava o timeout inteiro (licao Fontecred). Usamos
+        # domcontentloaded e esperamos o proprio campo de login aparecer.
         try:
-            page.goto(url, wait_until="networkidle", timeout=self.timeout_ms)
+            page.goto(url, wait_until="domcontentloaded", timeout=self.timeout_ms)
+        except Exception:
+            pass
+        page.wait_for_timeout(800)
+        self._assert_portal_acessivel(page)
+        self._aguardar_dom_pronto(page)
+
+        # Decidir por PRESENCA do campo de login, nao pela URL: se o input de
+        # usuario existe, logamos; se nao existe, assumimos sessao ja autenticada.
+        self._fechar_got_it(page)
+        try:
+            usuario_box = self._campo_usuario(page)
         except Exception:
             if self._portal_autenticado(page):
-                self._aguardar_dom_pronto(page)
-                page.wait_for_timeout(600)
+                page.wait_for_timeout(400)
                 return
-            page.goto(url, wait_until="domcontentloaded", timeout=self.timeout_ms)
-        page.wait_for_timeout(700)
-        self._assert_portal_acessivel(page)
-        if self._portal_autenticado(page):
-            self._aguardar_dom_pronto(page)
-            page.wait_for_timeout(600)
-            return
-
-        self._fechar_got_it(page)
-        usuario_box = page.get_by_role(
-            "textbox", name=re.compile(r"Usu[aá]rio", re.I)
-        ).first
-        usuario_box.wait_for(state="visible", timeout=self.timeout_ms)
+            raise
         usuario_box.click()
         usuario_box.fill("")
         usuario_box.type(usuario, delay=35)
         self._fechar_got_it(page)
-        senha_box = page.get_by_role("textbox", name=re.compile(r"Senha", re.I)).first
+        senha_box = self._campo_senha(page)
         senha_box.click()
         senha_box.fill("")
         senha_box.type(senha, delay=40)
         page.wait_for_timeout(300)
+        self._fechar_got_it(page)  # garante que o banner nao intercepta o clique
+        # Botao Entrar fica disabled ate o form validar CPF/senha.
+        try:
+            page.wait_for_function(
+                """() => {
+                  const bs = [...document.querySelectorAll('button')];
+                  const b = bs.find(x => /^\\s*Entrar\\s*$/i.test((x.textContent||'').trim()));
+                  return b && !b.disabled;
+                }""",
+                timeout=min(self.timeout_ms, 12_000),
+            )
+        except Exception:
+            pass
         page.get_by_role("button", name=re.compile(r"^Entrar$", re.I)).first.click()
         self._aguardar_pos_login(page)
 
+    def _campo_usuario(self, page):
+        """Usuario do lojista (pan-mahoe: formcontrolname='login', id='login',
+        label='Usuário' como ATRIBUTO custom — sem nome acessivel via role)."""
+        candidatos = (
+            lambda: page.locator("input#login").first,
+            lambda: page.locator("input[formcontrolname='login']").first,
+            lambda: page.locator("input[name='login']").first,
+            lambda: page.locator("input[label='Usuário'], input[label='Usuario']").first,
+            lambda: page.get_by_role("textbox", name=re.compile(r"Usu[aá]rio", re.I)).first,
+            lambda: page.locator(
+                "input[type='text'], input[type='tel'], input:not([type])"
+            ).first,
+        )
+        return self._primeiro_visivel(page, candidatos, "Usuário (login)")
+
+    def _campo_senha(self, page):
+        """Senha do lojista (pan-mahoe: type=password / formcontrolname)."""
+        candidatos = (
+            lambda: page.locator("input[type='password']").first,
+            lambda: page.locator(
+                "input[formcontrolname='senha'], input[formcontrolname='password']"
+            ).first,
+            lambda: page.locator("input#senha, input#password").first,
+            lambda: page.locator("input[label='Senha']").first,
+            lambda: page.get_by_role("textbox", name=re.compile(r"Senha", re.I)).first,
+        )
+        return self._primeiro_visivel(page, candidatos, "Senha (login)")
+
+    def _primeiro_visivel(self, page, candidatos, campo: str):
+        """Retorna o primeiro locator visivel; senao levanta campo_nao_encontrado."""
+        for gerar in candidatos:
+            try:
+                box = gerar()
+                box.wait_for(state="visible", timeout=min(self.timeout_ms, 6_000))
+                return box
+            except Exception:
+                continue
+        raise self._falha_campo(campo)
+
     def _fechar_got_it(self, page) -> None:
-        """Banner de cookie/onboarding com botao 'Got it!' (best-effort)."""
-        try:
-            page.get_by_role(
-                "button", name=re.compile(r"Got it", re.I)
-            ).first.click(timeout=3_000)
-            page.wait_for_timeout(200)
-        except Exception:
-            pass
+        """Fecha banners que bloqueiam a tela: onboarding 'Got it!' e o
+        aviso de cookies/LGPD ('Aceitar', 'Aceitar todos', 'Concordo', ...).
+
+        Best-effort: cada tentativa tem timeout curto e nunca levanta. Roda
+        depois do login e antes de preencher, porque o overlay de cookies
+        intercepta cliques e faz os passos seguintes estourarem timeout.
+        """
+        nomes = (
+            r"Got it",
+            r"Permitir\s+todos\s+os\s+cookies",  # banner LGPD do go!PAN
+            r"Permitir\s+todos",
+            r"Rejeitar\s+cookies",               # tambem fecha o banner
+            r"Aceitar\s+todos",
+            r"Aceitar\s+cookies",
+            r"^Aceitar$",
+            r"Aceito",
+            r"Concordo",
+            r"^Entendi$",
+            r"Prosseguir",
+        )
+        for padrao in nomes:
+            try:
+                btn = page.get_by_role(
+                    "button", name=re.compile(padrao, re.I)
+                ).first
+                if btn.count() and btn.is_visible():
+                    btn.click(timeout=2_500)
+                    page.wait_for_timeout(250)
+            except Exception:
+                continue
 
     def _portal_autenticado(self, page) -> bool:
         try:
@@ -464,109 +541,166 @@ class PanPortalDriver(PlaywrightBankDriver):
             pass
 
     def _passo_cliente(self, page, sol: SolicitacaoSimulacao) -> None:
+        self._fechar_got_it(page)  # cookies podem cobrir os campos
         cpf = re.sub(r"\D", "", sol.pessoa.cpf or "")
-        # CPF do cliente: no codegen era um combobox com mascara. Preferimos
-        # role=combobox por rotulo CPF; fallback no primeiro combobox/textbox.
-        cpf_box = None
-        for tentativa in (
-            lambda: page.get_by_role("combobox", name=re.compile(r"CPF", re.I)).first,
-            lambda: page.get_by_role("textbox", name=re.compile(r"CPF", re.I)).first,
-            lambda: page.get_by_role("combobox").first,
-        ):
-            try:
-                box = tentativa()
-                box.wait_for(state="visible", timeout=min(self.timeout_ms, 8_000))
-                cpf_box = box
-                break
-            except Exception:
-                continue
-        if cpf_box is None:
-            raise self._falha_campo("CPF do cliente")
+        # Tela /captura/inicio: "informe o CPF do cliente". Campo pan-mahoe com
+        # mascara "000.000.000-00" e sem nome acessivel -> ancorar por placeholder
+        # da mascara e formcontrolname.
+        cpf_box = self._campo_cpf(page)
         cpf_box.click()
         cpf_box.fill("")
-        cpf_box.type(cpf, delay=30)
-        page.wait_for_timeout(300)
-        # Celular: no codegen o rotulo era "Icone do input" (fragil). Tentamos
-        # rotulos melhores; fallback proximo textbox de telefone.
-        cel = sol.pessoa.celular or ""
-        for tentativa in (
-            lambda: page.get_by_role(
-                "textbox", name=re.compile(r"Celular|Telefone|Ícone", re.I)
-            ).first,
-        ):
+        cpf_box.type(cpf, delay=40)
+        page.keyboard.press("Tab")
+        page.wait_for_timeout(600)
+        # O portal pode avancar sozinho ao completar o CPF ou exigir um botao
+        # Continuar/Avancar. Best-effort para seguir.
+        for padrao in (r"^Continuar$", r"^Avan[çc]ar$", r"^Prosseguir$", r"^Simular$"):
             try:
-                box = tentativa()
-                box.wait_for(state="visible", timeout=min(self.timeout_ms, 8_000))
-                box.click()
-                box.fill("")
-                box.type(cel, delay=30)
-                break
+                btn = page.get_by_role("button", name=re.compile(padrao, re.I)).first
+                if btn.count() and btn.is_visible() and btn.is_enabled():
+                    btn.click(timeout=4_000)
+                    self._aguardar_dom_pronto(page, 10_000)
+                    break
             except Exception:
                 continue
         page.wait_for_timeout(300)
 
+    def _campo_cpf(self, page):
+        """CPF do cliente (pan-mahoe, mascara '000.000.000-00')."""
+        candidatos = (
+            lambda: page.get_by_placeholder(re.compile(r"000\.000\.000-00")).first,
+            lambda: page.locator(
+                "input[formcontrolname='cpf'], input[formcontrolname='documento'], "
+                "input[formcontrolname='cpfCliente']"
+            ).first,
+            lambda: page.locator("input#cpf, input[label='CPF']").first,
+            lambda: page.locator("input[inputmode='numeric']").first,
+            lambda: page.get_by_role("textbox", name=re.compile(r"CPF", re.I)).first,
+            lambda: page.get_by_role("combobox", name=re.compile(r"CPF", re.I)).first,
+        )
+        return self._primeiro_visivel(page, candidatos, "CPF do cliente")
+
     def _passo_veiculo(self, page, sol: SolicitacaoSimulacao) -> None:
+        # Tela /comparador: celular ("Digite o celular...") + veiculo por placa.
+        self._fechar_got_it(page)
+        cel = sol.pessoa.celular or ""
+        cel_box = self._campo_celular(page)
+        cel_box.click()
+        cel_box.fill("")
+        cel_box.type(cel, delay=30)
+        page.keyboard.press("Tab")
+        page.wait_for_timeout(400)
+
         placa = (sol.veiculo.placa or "").replace("-", "").upper()
-        # Caminho principal do codegen: botao "Busca placa" -> campo de placa.
+        # "Busca placa" pode ser um toggle/botao antes do campo de placa.
         try:
-            page.get_by_role(
+            btn = page.get_by_role(
                 "button", name=re.compile(r"Busca\s+placa", re.I)
-            ).first.click(timeout=min(self.timeout_ms, 8_000))
-            page.wait_for_timeout(400)
+            ).first
+            if btn.count() and btn.is_visible():
+                btn.click(timeout=min(self.timeout_ms, 6_000))
+                page.wait_for_timeout(400)
         except Exception:
             pass
-        placa_box = None
-        for tentativa in (
-            lambda: page.get_by_role(
-                "combobox", name=re.compile(r"placa", re.I)
-            ).first,
-            lambda: page.get_by_role(
-                "textbox", name=re.compile(r"placa", re.I)
-            ).first,
-        ):
-            try:
-                box = tentativa()
-                box.wait_for(state="visible", timeout=min(self.timeout_ms, 8_000))
-                placa_box = box
-                break
-            except Exception:
-                continue
-        if placa_box is None:
-            raise self._falha_campo("Placa")
+        placa_box = self._campo_placa(page)
         placa_box.click()
         placa_box.fill("")
         placa_box.type(placa, delay=40)
         page.keyboard.press("Tab")
-        page.wait_for_timeout(1_000)
+        page.wait_for_timeout(1_200)
+
+    def _campo_celular(self, page):
+        """Celular do cliente (placeholder 'Digite o celular...')."""
+        candidatos = (
+            lambda: page.get_by_placeholder(re.compile(r"Digite o celular", re.I)).first,
+            lambda: page.locator(
+                "input[formcontrolname='celular'], input[formcontrolname='telefone']"
+            ).first,
+            lambda: page.locator("input[label='Celular'], input[label='Telefone']").first,
+            lambda: page.get_by_role(
+                "textbox", name=re.compile(r"Celular|Telefone", re.I)
+            ).first,
+        )
+        return self._primeiro_visivel(page, candidatos, "Celular do cliente")
+
+    def _campo_placa(self, page):
+        """Placa do veiculo (placeholder 'Digite a placa...')."""
+        candidatos = (
+            lambda: page.get_by_placeholder(re.compile(r"Digite a placa", re.I)).first,
+            lambda: page.locator("input[formcontrolname='placa']").first,
+            lambda: page.locator("input[label='Placa']").first,
+            lambda: page.get_by_role("combobox", name=re.compile(r"placa", re.I)).first,
+            lambda: page.get_by_role("textbox", name=re.compile(r"placa", re.I)).first,
+        )
+        return self._primeiro_visivel(page, candidatos, "Placa")
 
     def _passo_valor(self, page, sol: SolicitacaoSimulacao) -> None:
         if sol.veiculo.valor is None:
             return
+        # Campo "Venda" (mahoe, sem nome acessivel). Placa costuma pre-preencher
+        # um valor; sobrescrevemos com o valor da solicitacao. Best-effort.
+        candidatos = (
+            lambda: page.get_by_placeholder(
+                re.compile(r"Valor de venda|Venda", re.I)
+            ).first,
+            lambda: page.locator(
+                "input[formcontrolname='valorVenda'], input[formcontrolname='venda'], "
+                "input[formcontrolname='valor']"
+            ).first,
+            lambda: page.locator(
+                "input[label='Venda'], input[label='Valor de venda']"
+            ).first,
+            lambda: page.get_by_role(
+                "textbox", name=re.compile(r"Valor de venda|Venda", re.I)
+            ).first,
+        )
         try:
-            valor_box = page.get_by_role(
-                "textbox", name=re.compile(r"Valor de venda", re.I)
-            ).first
-            valor_box.wait_for(state="visible", timeout=min(self.timeout_ms, 10_000))
+            valor_box = self._primeiro_visivel(page, candidatos, "Valor de venda")
+        except Exception:
+            return  # portal pode resolver o valor pela placa
+        try:
             valor_box.click()
             valor_box.fill("")
             valor_box.type(_formatar_moeda_input(float(sol.veiculo.valor)), delay=25)
-            page.wait_for_timeout(300)
+            page.keyboard.press("Tab")
+            page.wait_for_timeout(400)
         except Exception:
             pass
 
     def _passo_simular(self, page, sol: SolicitacaoSimulacao) -> None:
+        self._fechar_got_it(page)
         simular = page.get_by_role("button", name=re.compile(r"^Simular$", re.I)).first
         simular.wait_for(state="visible", timeout=self.timeout_ms)
-        simular.click()
-        page.wait_for_timeout(600)
+        # Botao Simular fica disabled ate placa/valor/veiculo validarem.
+        try:
+            page.wait_for_function(
+                """() => {
+                  const bs = [...document.querySelectorAll('button')];
+                  const b = bs.find(x => /^\\s*Simular\\s*$/i.test((x.textContent||'').trim()));
+                  return b && !b.disabled;
+                }""",
+                timeout=min(self.timeout_ms, 15_000),
+            )
+        except Exception:
+            pass
+        try:
+            simular.click(timeout=min(self.timeout_ms, 8_000))
+        except Exception:
+            simular.click(force=True)
+        page.wait_for_timeout(800)
         # Entrada e OPCIONAL: so preenche apos simular se o usuario mandou > 0.
         entrada = sol.condicoes.entrada or 0
         if entrada and float(entrada) > 0:
-            try:
-                entrada_box = page.get_by_role(
+            candidatos = (
+                lambda: page.get_by_placeholder(re.compile(r"Entrada", re.I)).first,
+                lambda: page.locator("input[formcontrolname='entrada']").first,
+                lambda: page.locator("input[label='Entrada']").first,
+                lambda: page.get_by_role(
                     "textbox", name=re.compile(r"Entrada", re.I)
-                ).first
-                entrada_box.wait_for(state="visible", timeout=min(self.timeout_ms, 8_000))
+                ).first,
+            )
+            try:
+                entrada_box = self._primeiro_visivel(page, candidatos, "Entrada")
                 entrada_box.click()
                 entrada_box.fill("")
                 entrada_box.type(_formatar_moeda_input(float(entrada)), delay=25)

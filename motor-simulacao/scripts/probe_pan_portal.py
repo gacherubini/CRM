@@ -27,6 +27,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from app.motor.base import Condicoes, Pessoa, SolicitacaoSimulacao, Veiculo
 from app.motor.drivers import (
+    DriverContext,
     ErroTransitorio,
     IntervencaoNecessaria,
     RejeicaoNegocio,
@@ -78,8 +79,16 @@ def main() -> None:
     )
     print("-" * 60)
 
+    # Contexto so para observabilidade ao vivo (imprime cada etapa do driver).
+    import time as _t
+
+    def _log(etapa, mensagem, nivel="info", shot=None):
+        print(f"  [{_t.strftime('%H:%M:%S')}] {etapa}: {mensagem}")
+
+    ctx = DriverContext(evento=_log)
+
     try:
-        resultados = d.simular(sol)
+        resultados = d.simular(sol, ctx)
     except (RejeicaoNegocio, IntervencaoNecessaria, ErroTransitorio) as exc:
         print(f"FALHA [{exc.codigo}] {exc}")
         print("RESULT FAIL (veja screenshot em", d.screenshot_dir, ")")
