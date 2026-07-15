@@ -47,6 +47,10 @@ BRADESCO_LOGIN_URL = os.getenv(
     "MOTOR_BRADESCO_LOGIN_URL",
     "https://turbo.bradesco/originacaolojista/login",
 )
+PAN_PORTAL_LOGIN_URL = os.getenv(
+    "MOTOR_PAN_PORTAL_LOGIN_URL",
+    "https://veiculos.bancopan.com.br/login",
+)
 
 # Banco PAN OpenAPI Veículos. Sandbox é o default deliberado; produção exige
 # override explícito depois da homologação comercial do parceiro.

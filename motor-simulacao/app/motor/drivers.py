@@ -137,11 +137,35 @@ def _registrar_drivers_reais() -> None:
     # "mock" resolveria "Santander" para REAL_DRIVERS e, sem credencial, o
     # provedor seria descartado silenciosamente — quebrando os 5 mocks).
     REAL_DRIVERS["santander"] = driver
-    REAL_DRIVERS["pan"] = fabrica_pan()
+    # Pan dual-path: API quando a config OpenAPI esta completa; senao portal web.
+    REAL_DRIVERS["pan"] = _pan_dispatch
     # Fontecred: nome canônico minúsculo (mock homônimo é "Fontcred", sem 'e').
     REAL_DRIVERS["fontecred"] = fabrica_fontecred()
     # Bradesco (Turbo Lojista): banco novo, sem homônimo mock.
     REAL_DRIVERS["bradesco"] = fabrica_bradesco()
+
+
+def _pan_dispatch(
+    sol: SolicitacaoSimulacao, ctx: DriverContext | None = None
+) -> list[ResultadoDriver]:
+    """Escolhe o caminho Pan por credencial: API (OpenAPI completa) ou portal web.
+
+    Se a config tiver todos os campos OpenAPI (api_key/secret/id_loja/...), usa o
+    ``PanDriver`` HTTP. Senao (so usuario+senha de lojista), cai no
+    ``PanPortalDriver`` (Playwright). Instancia sob demanda para nao abrir browser
+    quando a API resolve.
+    """
+    from app.motor.pan import _CAMPOS_CONFIG, fabrica_pan
+    from app.motor.pan_portal import fabrica_pan_portal
+
+    cfg: dict = {}
+    if ctx is not None and ctx.db is not None and ctx.cliente_id:
+        from app.credenciais import obter_configuracao_para_uso
+
+        cfg = obter_configuracao_para_uso(ctx.db, ctx.cliente_id, "pan") or {}
+    tem_api = all(str(cfg.get(c, "")).strip() for c in _CAMPOS_CONFIG)
+    driver = fabrica_pan() if tem_api else fabrica_pan_portal()
+    return driver(sol, ctx)
 
 
 def resolver_drivers(
