@@ -155,6 +155,11 @@ class SimulacaoORM(Base):
         back_populates="simulacao", cascade="all, delete-orphan",
         order_by="SimulacaoEventoORM.id",
     )
+    tarefas_provedor: Mapped[list["SimulacaoProvedorORM"]] = relationship(
+        back_populates="simulacao",
+        cascade="all, delete-orphan",
+        order_by="SimulacaoProvedorORM.criada_em",
+    )
 
 
 class ResultadoORM(Base):
@@ -200,6 +205,8 @@ class SimulacaoEventoORM(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     simulacao_id: Mapped[str] = mapped_column(ForeignKey("simulacoes.id"), index=True)
+    # Opcional: agrupa timeline por banco no fan-out multi-provedor.
+    provedor: Mapped[Optional[str]] = mapped_column(String(100), nullable=True, index=True)
     etapa: Mapped[str] = mapped_column(String(80), nullable=False)
     nivel: Mapped[str] = mapped_column(String(16), nullable=False, default="info")
     mensagem: Mapped[str] = mapped_column(String(240), nullable=False)
@@ -208,6 +215,77 @@ class SimulacaoEventoORM(Base):
     criada_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_agora)
 
     simulacao: Mapped["SimulacaoORM"] = relationship(back_populates="eventos")
+
+
+class SimulacaoProvedorORM(Base):
+    """Tarefa filha: um banco por simulação (fan-out). Migration 0012."""
+
+    __tablename__ = "simulacao_provedores"
+    __table_args__ = (
+        UniqueConstraint(
+            "simulacao_id", "provedor", name="uq_simulacao_provedores_sim_provedor"
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    simulacao_id: Mapped[str] = mapped_column(
+        ForeignKey("simulacoes.id"), nullable=False, index=True
+    )
+    cliente_id: Mapped[str] = mapped_column(
+        ForeignKey("clientes_api.id"), nullable=False, index=True
+    )
+    provedor: Mapped[str] = mapped_column(String(100), nullable=False)
+    # api | playwright | mock
+    tipo_driver: Mapped[str] = mapped_column(String(32), nullable=False, default="mock")
+    # recebida|acordando_worker|reservada|processando|concluida|rejeitada|falhou|cancelada
+    status: Mapped[str] = mapped_column(String(40), nullable=False, default="recebida", index=True)
+    tentativa: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    reserva_token: Mapped[Optional[str]] = mapped_column(String(36), nullable=True)
+    reservada_ate: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    worker_slot_id: Mapped[Optional[str]] = mapped_column(String(36), nullable=True)
+    codigo_erro: Mapped[Optional[str]] = mapped_column(String(120), nullable=True)
+    criada_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_agora)
+    iniciada_em: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    finalizada_em: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    atualizada_em: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_agora, onupdate=_agora
+    )
+
+    simulacao: Mapped["SimulacaoORM"] = relationship(back_populates="tarefas_provedor")
+
+
+class WorkerSlotORM(Base):
+    """Inventário de Machines Fly pré-criadas (workers Playwright/API)."""
+
+    __tablename__ = "worker_slots"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    provedor: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
+    tipo_driver: Mapped[str] = mapped_column(String(32), nullable=False, default="playwright")
+    fly_machine_id: Mapped[str] = mapped_column(String(64), nullable=False, unique=True)
+    regiao: Mapped[str] = mapped_column(String(16), nullable=False, default="gru")
+    memory_mb: Mapped[int] = mapped_column(Integer, nullable=False, default=2048)
+    habilitado: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    estado_observado: Mapped[Optional[str]] = mapped_column(String(40), nullable=True)
+    ultimo_start_em: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    ultimo_stop_em: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    ultima_falha_em: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    criado_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_agora)
+    atualizado_em: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_agora, onupdate=_agora
+    )
 
 
 class IdempotenciaORM(Base):

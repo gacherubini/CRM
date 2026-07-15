@@ -63,8 +63,24 @@ class ResultadoProvedor(BaseModel):
     codigo_erro: Optional[str] = None
 
 
+class TarefaProvedor(BaseModel):
+    """Estado de uma tarefa-filha (um banco) no fan-out."""
+
+    id: str
+    provedor: str
+    tipo_driver: str = "mock"
+    status: str = "recebida"
+    tentativa: int = 0
+    codigo_erro: Optional[str] = None
+    criada_em: Optional[str] = None
+    iniciada_em: Optional[str] = None
+    finalizada_em: Optional[str] = None
+
+
 class Simulacao(BaseModel):
     id: str
     status: str
     criada_em: str
+    provedores: List[str] = []
+    tarefas: List[TarefaProvedor] = []
     resultados: List[ResultadoProvedor] = []

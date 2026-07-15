@@ -17,10 +17,12 @@ from typing import Optional
 from sqlalchemy.orm import Session
 
 from app import config, cripto
+from app.fanout import STATUS_TERMINAIS_TAREFA, marcar_tarefa, obter_tarefa
 from app.models_db import (
     ResultadoORM,
     SimulacaoEventoORM,
     SimulacaoORM,
+    SimulacaoProvedorORM,
     SimulacaoTentativaORM,
 )
 from app.motor.base import Condicoes, Pessoa, SolicitacaoSimulacao, Veiculo
@@ -230,12 +232,14 @@ def _registrar_evento(
     mensagem: str,
     nivel: str = "info",
     screenshot_path: str | None = None,
+    provedor: str | None = None,
 ) -> None:
     """Persiste evento imediatamente para o Portal enxergar durante o job."""
     seguro = " ".join(str(mensagem).replace("\n", " ").split())[:240]
     db.add(
         SimulacaoEventoORM(
             simulacao_id=sim.id,
+            provedor=provedor,
             etapa=str(etapa)[:80],
             nivel=nivel if nivel in {"info", "sucesso", "aviso", "erro"} else "info",
             mensagem=seguro,
@@ -363,10 +367,11 @@ def processar_job(
         sim.atualizada_em = _agora()
         sim.reserva_token = None
         sim.reservada_ate = None
+        falha_prov = (sol.provedores or ["?"])[0]
         db.add(
             ResultadoORM(
                 simulacao_id=sim.id,
-                provedor=(sol.provedores or ["?"])[0],
+                provedor=falha_prov,
                 status="erro",
                 codigo_erro="sem_driver_ou_credencial",
             )
@@ -374,11 +379,16 @@ def processar_job(
         db.add(
             SimulacaoEventoORM(
                 simulacao_id=sim.id,
+                provedor=falha_prov if falha_prov != "?" else None,
                 etapa="sem_driver",
                 nivel="erro",
                 mensagem="Nenhum driver habilitado ou credencial válida foi encontrado.",
             )
         )
+        for nome_p in sol.provedores or []:
+            marcar_tarefa(
+                db, sim.id, nome_p, "falhou", codigo_erro="sem_driver_ou_credencial"
+            )
         db.commit()
         db.refresh(sim)
         return sim
@@ -401,23 +411,45 @@ def processar_job(
         for linhas in existentes_por_prov.values()
         for r in linhas
     ]
+    def _evento_ctx(etapa, mensagem, nivel="info", screenshot_path=None, provedor=None):
+        _registrar_evento(
+            db, sim, etapa, mensagem, nivel, screenshot_path, provedor=provedor
+        )
+
+    def _nome_tarefa(nome_driver: str) -> str | None:
+        """Mock expande em vários bancos; a tarefa pedida pode ser só ``mock``."""
+        if obter_tarefa(db, sim.id, nome_driver) is not None:
+            return nome_driver
+        if obter_tarefa(db, sim.id, "mock") is not None:
+            return "mock"
+        return None
+
     ctx = DriverContext(
         db=db,
         cliente_id=sim.cliente_id,
         screenshot_dir=config.SCREENSHOT_DIR,
         simulacao_id=sim.id,
-        evento=lambda etapa, mensagem, nivel="info", screenshot_path=None: _registrar_evento(
-            db, sim, etapa, mensagem, nivel, screenshot_path
-        ),
+        evento=_evento_ctx,
     )
     for nome, driver in pares:
         if nome in existentes_por_prov:
             continue
         sim.reservada_ate = _agora() + timedelta(seconds=config.JOB_LEASE_SECONDS)
         sim.atualizada_em = _agora()
+        tarefa_nome = _nome_tarefa(nome)
+        if tarefa_nome:
+            tarefa = obter_tarefa(db, sim.id, tarefa_nome)
+            if tarefa is not None and tarefa.status == "recebida":
+                marcar_tarefa(
+                    db, sim.id, tarefa_nome, "processando", incrementar_tentativa=True
+                )
         db.commit()
-        ctx.registrar_evento(
-            "driver_iniciado", f"Conector {nome} iniciado (tentativas limitadas)."
+        _registrar_evento(
+            db,
+            sim,
+            "driver_iniciado",
+            f"Conector {nome} iniciado (tentativas limitadas).",
+            provedor=nome,
         )
         res_lista = _executar_driver(db, sim, nome, driver, sol, ctx)
         db.refresh(sim)
@@ -445,6 +477,9 @@ def processar_job(
         db.commit()
         resultados.extend(res_lista)
 
+    # Consolida tarefas fan-out a partir dos resultados (inclui mock expandido).
+    _sincronizar_tarefas_com_resultados(db, sim, resultados)
+
     sim.status = _status_geral(resultados)
     sim.atualizada_em = _agora()
     sim.reserva_token = None
@@ -462,17 +497,454 @@ def processar_job(
     return sim
 
 
+def _status_de_resultados_tarefa(
+    linhas: list[ResultadoDriver],
+) -> tuple[str, str | None]:
+    if not linhas:
+        return "falhou", "sem_resultado"
+    statuses = {r.status for r in linhas}
+    codigo = next((r.codigo_erro for r in linhas if r.codigo_erro), None)
+    if "concluida" in statuses:
+        return "concluida", codigo
+    if "aguardando_intervencao" in statuses:
+        return "falhou", codigo or "aguardando_intervencao"
+    if "rejeitada" in statuses:
+        return "rejeitada", codigo
+    return "falhou", codigo
+
+
+def _sincronizar_tarefas_com_resultados(
+    db: Session, sim: SimulacaoORM, resultados: list[ResultadoDriver]
+) -> None:
+    """Fecha tarefas abertas com base nos resultados do job (fan-out)."""
+    tarefas = (
+        db.query(SimulacaoProvedorORM).filter_by(simulacao_id=sim.id).all()
+    )
+    if not tarefas:
+        return
+    por_prov: dict[str, list[ResultadoDriver]] = {}
+    for r in resultados:
+        por_prov.setdefault(r.provedor, []).append(r)
+        # nomes canônicos minúsculos também (driver real)
+        por_prov.setdefault((r.provedor or "").lower(), []).append(r)
+
+    for tarefa in tarefas:
+        if tarefa.status in STATUS_TERMINAIS_TAREFA:
+            continue
+        if tarefa.provedor == "mock":
+            linhas = list(resultados)
+        else:
+            linhas = por_prov.get(tarefa.provedor) or por_prov.get(
+                tarefa.provedor.lower(), []
+            )
+        status_t, codigo = _status_de_resultados_tarefa(linhas)
+        marcar_tarefa(db, sim.id, tarefa.provedor, status_t, codigo_erro=codigo)
+
+
+# --- Fan-out: reserva e execução por tarefa (um banco) -------------------------
+
+STATUS_TAREFA_FILA = frozenset({"recebida", "acordando_worker"})
+STATUS_TAREFA_EM_VOO = frozenset({"reservada", "processando", "acordando_worker"})
+
+
+def reencaminhar_tarefas_expiradas(db: Session, agora: datetime | None = None) -> int:
+    """Devolve à fila tarefas cujo lease expirou (crash do worker)."""
+    instante = agora or _agora()
+    linhas = (
+        db.query(SimulacaoProvedorORM)
+        .filter(
+            SimulacaoProvedorORM.status.in_(("reservada", "processando")),
+            SimulacaoProvedorORM.reservada_ate.is_not(None),
+            SimulacaoProvedorORM.reservada_ate < instante,
+        )
+        .update(
+            {
+                "status": "recebida",
+                "reserva_token": None,
+                "reservada_ate": None,
+                "atualizada_em": instante,
+            },
+            synchronize_session=False,
+        )
+    )
+    if linhas:
+        db.commit()
+    return linhas
+
+
+def _filtro_tipos_worker() -> frozenset[str] | None:
+    return config.WORKER_TIPOS
+
+
+def reservar_proxima_tarefa(
+    db: Session,
+    *,
+    provedor: str | None = None,
+    tipos: frozenset[str] | None = None,
+) -> Optional[SimulacaoProvedorORM]:
+    """Reserva atomicamente a próxima tarefa pendente (FIFO)."""
+    reencaminhar_tarefas_expiradas(db)
+    q = (
+        db.query(SimulacaoProvedorORM)
+        .filter(SimulacaoProvedorORM.status.in_(tuple(STATUS_TAREFA_FILA)))
+        .order_by(SimulacaoProvedorORM.criada_em.asc())
+    )
+    filtro_prov = provedor or config.WORKER_PROVEDOR
+    if filtro_prov:
+        q = q.filter(SimulacaoProvedorORM.provedor == filtro_prov)
+    tipos_ok = tipos if tipos is not None else _filtro_tipos_worker()
+    if tipos_ok:
+        q = q.filter(SimulacaoProvedorORM.tipo_driver.in_(tuple(tipos_ok)))
+    tarefa = q.first()
+    if tarefa is None:
+        return None
+    token = str(uuid.uuid4())
+    agora = _agora()
+    lease = agora + timedelta(seconds=config.TASK_LEASE_SECONDS)
+    nova_tentativa = int(tarefa.tentativa or 0) + 1
+    linhas = (
+        db.query(SimulacaoProvedorORM)
+        .filter(
+            SimulacaoProvedorORM.id == tarefa.id,
+            SimulacaoProvedorORM.status.in_(tuple(STATUS_TAREFA_FILA)),
+        )
+        .update(
+            {
+                "status": "processando",
+                "reserva_token": token,
+                "reservada_ate": lease,
+                "iniciada_em": agora,
+                "tentativa": nova_tentativa,
+                "atualizada_em": agora,
+            },
+            synchronize_session=False,
+        )
+    )
+    db.commit()
+    if linhas != 1:
+        return None
+    db.refresh(tarefa)
+    # Job-pai em processando
+    sim = db.get(SimulacaoORM, tarefa.simulacao_id)
+    if sim is not None and sim.status in ("recebida",):
+        sim.status = "processando"
+        sim.atualizada_em = agora
+        db.commit()
+    if sim is not None:
+        _registrar_evento(
+            db,
+            sim,
+            "tarefa_reservada",
+            f"Tarefa {tarefa.provedor} reservada pelo worker.",
+            provedor=tarefa.provedor,
+        )
+    return tarefa
+
+
+def _persistir_resultados_tarefa(
+    db: Session,
+    sim: SimulacaoORM,
+    sol: SolicitacaoSimulacao,
+    res_lista: list[ResultadoDriver],
+) -> None:
+    for res in res_lista:
+        db.add(
+            ResultadoORM(
+                simulacao_id=sim.id,
+                provedor=res.provedor,
+                status=res.status,
+                valor_parcela=res.valor_parcela,
+                taxa_am=res.taxa_am,
+                prazo_meses=(
+                    res.prazo_meses
+                    if res.prazo_meses is not None
+                    else sol.condicoes.prazo_meses
+                ),
+                valor_financiado=res.valor_financiado,
+                entrada=res.entrada,
+                codigo_erro=res.codigo_erro,
+            )
+        )
+
+
+def agregar_status_job_pai(db: Session, sim_id: str) -> Optional[SimulacaoORM]:
+    """Recalcula status do job-pai a partir das tarefas (não apaga resultados)."""
+    sim = db.get(SimulacaoORM, sim_id)
+    if sim is None:
+        return None
+    tarefas = (
+        db.query(SimulacaoProvedorORM).filter_by(simulacao_id=sim_id).all()
+    )
+    if not tarefas:
+        return sim
+    if any(t.status not in STATUS_TERMINAIS_TAREFA for t in tarefas):
+        if sim.status not in STATUS_TERMINAIS_TAREFA | {"processando", "recebida", "aguardando_intervencao"}:
+            pass
+        if sim.status in ("recebida",) or sim.status not in (
+            "concluida",
+            "parcial",
+            "falhou",
+            "cancelada",
+            "aguardando_intervencao",
+        ):
+            # Mantém processando enquanto houver tarefa aberta
+            if sim.status != "cancelada":
+                sim.status = "processando"
+                sim.atualizada_em = _agora()
+                db.commit()
+        return sim
+
+    # Todas terminais: agrega pelos resultados (fonte canônica de oferta)
+    resultados = [
+        ResultadoDriver(
+            r.provedor,
+            r.status,
+            valor_parcela=r.valor_parcela,
+            taxa_am=r.taxa_am,
+            prazo_meses=r.prazo_meses,
+            valor_financiado=r.valor_financiado,
+            entrada=r.entrada,
+            codigo_erro=r.codigo_erro,
+        )
+        for r in sim.resultados
+    ]
+    if not resultados:
+        # Sem linhas de resultado: usa status das tarefas
+        if all(t.status == "cancelada" for t in tarefas):
+            final = "cancelada"
+        elif any(t.status == "concluida" for t in tarefas):
+            final = "parcial" if any(t.status != "concluida" for t in tarefas) else "concluida"
+        else:
+            final = "falhou"
+    else:
+        final = _status_geral(resultados)
+    sim.status = final
+    sim.atualizada_em = _agora()
+    sim.reserva_token = None
+    sim.reservada_ate = None
+    db.add(
+        SimulacaoEventoORM(
+            simulacao_id=sim.id,
+            etapa="job_finalizado",
+            nivel="sucesso" if final in {"concluida", "parcial"} else "erro",
+            mensagem=f"Simulação finalizada com status {final}.",
+        )
+    )
+    db.commit()
+    db.refresh(sim)
+    return sim
+
+
+def processar_tarefa_provedor(
+    db: Session,
+    tarefa_id: str,
+    reserva_token: str | None = None,
+    drivers: Optional[list[tuple[str, Driver]]] = None,
+) -> Optional[SimulacaoProvedorORM]:
+    """Executa um único banco (tarefa-filha) e agrega o job-pai se completo."""
+    tarefa = db.get(SimulacaoProvedorORM, tarefa_id)
+    if tarefa is None or tarefa.status != "processando":
+        return tarefa
+    token = reserva_token or tarefa.reserva_token
+    if not token or tarefa.reserva_token != token:
+        return tarefa
+
+    sim = db.get(SimulacaoORM, tarefa.simulacao_id)
+    if sim is None:
+        marcar_tarefa(db, tarefa.simulacao_id, tarefa.provedor, "falhou", codigo_erro="sim_ausente")
+        db.commit()
+        return tarefa
+    if sim.status == "cancelada":
+        marcar_tarefa(db, sim.id, tarefa.provedor, "cancelada")
+        db.commit()
+        return tarefa
+
+    sol = _reconstruir_solicitacao(sim)
+    # Só este provedor (mock expande internamente em resolver_drivers)
+    pedidos = [tarefa.provedor]
+    pares = (
+        drivers
+        if drivers is not None
+        else resolver_drivers(pedidos, cliente_id=sim.cliente_id, db=db)
+    )
+
+    existentes = {r.provedor for r in sim.resultados}
+    # Se já há resultado para este provedor canônico, fecha tarefa sem reexecutar
+    if tarefa.provedor != "mock" and tarefa.provedor in existentes:
+        marcar_tarefa(db, sim.id, tarefa.provedor, "concluida")
+        db.commit()
+        agregar_status_job_pai(db, sim.id)
+        db.refresh(tarefa)
+        return tarefa
+
+    if not pares:
+        db.add(
+            ResultadoORM(
+                simulacao_id=sim.id,
+                provedor=tarefa.provedor,
+                status="erro",
+                codigo_erro="sem_driver_ou_credencial",
+            )
+        )
+        marcar_tarefa(
+            db, sim.id, tarefa.provedor, "falhou", codigo_erro="sem_driver_ou_credencial"
+        )
+        _registrar_evento(
+            db,
+            sim,
+            "sem_driver",
+            f"Sem driver/credencial para {tarefa.provedor}.",
+            "erro",
+            provedor=tarefa.provedor,
+        )
+        db.commit()
+        agregar_status_job_pai(db, sim.id)
+        db.refresh(tarefa)
+        return tarefa
+
+    def _evento_ctx(etapa, mensagem, nivel="info", screenshot_path=None, provedor=None):
+        _registrar_evento(
+            db,
+            sim,
+            etapa,
+            mensagem,
+            nivel,
+            screenshot_path,
+            provedor=provedor or tarefa.provedor,
+        )
+
+    ctx = DriverContext(
+        db=db,
+        cliente_id=sim.cliente_id,
+        screenshot_dir=config.SCREENSHOT_DIR,
+        simulacao_id=sim.id,
+        evento=_evento_ctx,
+    )
+
+    todos_res: list[ResultadoDriver] = []
+    for nome, driver in pares:
+        if nome in existentes and tarefa.provedor != "mock":
+            continue
+        tarefa.reservada_ate = _agora() + timedelta(seconds=config.TASK_LEASE_SECONDS)
+        tarefa.atualizada_em = _agora()
+        db.commit()
+        _registrar_evento(
+            db,
+            sim,
+            "driver_iniciado",
+            f"Conector {nome} iniciado (tentativas limitadas).",
+            provedor=nome,
+        )
+        res_lista = _executar_driver(db, sim, nome, driver, sol, ctx)
+        db.refresh(tarefa)
+        if tarefa.reserva_token != token or tarefa.status != "processando":
+            db.rollback()
+            return tarefa
+        db.refresh(sim)
+        if sim.status == "cancelada":
+            marcar_tarefa(db, sim.id, tarefa.provedor, "cancelada")
+            db.commit()
+            return tarefa
+        _persistir_resultados_tarefa(db, sim, sol, res_lista)
+        db.commit()
+        todos_res.extend(res_lista)
+
+    status_t, codigo = _status_de_resultados_tarefa(todos_res)
+    marcar_tarefa(db, sim.id, tarefa.provedor, status_t, codigo_erro=codigo)
+    tarefa.reserva_token = None
+    tarefa.reservada_ate = None
+    db.commit()
+    agregar_status_job_pai(db, sim.id)
+    db.refresh(tarefa)
+    return tarefa
+
+
+def processar_proxima_tarefa(
+    db: Session,
+    drivers=None,
+    *,
+    provedor: str | None = None,
+) -> Optional[SimulacaoProvedorORM]:
+    """Reserva e processa uma tarefa. None se fila vazia para este worker."""
+    tarefa = reservar_proxima_tarefa(db, provedor=provedor)
+    if tarefa is None:
+        return None
+    return processar_tarefa_provedor(
+        db, tarefa.id, tarefa.reserva_token, drivers=drivers
+    )
+
+
 def processar_proximo(db: Session, drivers=None) -> Optional[SimulacaoORM]:
-    """Reserva e processa um job. Retorna a simulação processada ou None se a fila vazia."""
+    """Reserva e processa: tarefas (fan-out) ou job legado.
+
+    Com ``FANOUT_ENABLED`` e tarefas na fila, prefere o caminho por banco.
+    Jobs antigos sem tarefas continuam no pipeline sequential.
+    """
     reencaminhar_jobs_expirados(db)
+    reencaminhar_tarefas_expiradas(db)
+
+    if config.FANOUT_ENABLED:
+        tarefa = processar_proxima_tarefa(db, drivers=drivers)
+        if tarefa is not None:
+            return db.get(SimulacaoORM, tarefa.simulacao_id)
+        # Jobs com tarefas-filhas não entram no monólito; só legados sem tarefas.
+        ids_com_tarefa = {
+            row[0]
+            for row in db.query(SimulacaoProvedorORM.simulacao_id).distinct().all()
+        }
+        if ids_com_tarefa:
+            # Reserva seletiva: primeiro "recebida" fora do conjunto fan-out
+            candidatos = (
+                db.query(SimulacaoORM)
+                .filter(
+                    SimulacaoORM.status == "recebida",
+                    ~SimulacaoORM.id.in_(ids_com_tarefa),
+                )
+                .order_by(SimulacaoORM.criada_em.asc())
+                .all()
+            )
+            for cand in candidatos:
+                sim = reservar_proximo_job_id(db, cand.id)
+                if sim is not None:
+                    return processar_job(db, sim.id, drivers, sim.reserva_token)
+            return None
+
     sim = reservar_proximo_job(db)
     if sim is None:
         return None
     return processar_job(db, sim.id, drivers, sim.reserva_token)
 
 
+def reservar_proximo_job_id(db: Session, sim_id: str) -> Optional[SimulacaoORM]:
+    """Reserva um job específico se ainda estiver ``recebida``."""
+    token = str(uuid.uuid4())
+    agora = _agora()
+    linhas = (
+        db.query(SimulacaoORM)
+        .filter(SimulacaoORM.id == sim_id, SimulacaoORM.status == "recebida")
+        .update(
+            {
+                "status": "processando",
+                "reserva_token": token,
+                "reservada_ate": agora + timedelta(seconds=config.JOB_LEASE_SECONDS),
+                "atualizada_em": agora,
+            }
+        )
+    )
+    db.commit()
+    if linhas != 1:
+        return None
+    sim = db.get(SimulacaoORM, sim_id)
+    if sim is None:
+        return None
+    _registrar_evento(
+        db, sim, "job_reservado", "Job reservado pelo worker para processamento."
+    )
+    return sim
+
+
 def drenar_fila(db: Session, drivers=None, limite: int = 1000) -> int:
-    """Processa toda a fila pendente. Retorna quantos jobs foram processados."""
+    """Processa toda a fila pendente. Retorna quantos jobs/tarefas processou."""
     processados = 0
     while processados < limite and processar_proximo(db, drivers) is not None:
         processados += 1

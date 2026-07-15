@@ -12,8 +12,8 @@
     <span class="eyebrow"><i></i> Ao vivo</span>
     <h1>Simulação em andamento</h1>
     <p>
-      O Motor está consultando o banco. Esta página atualiza sozinha a cada
-      {{ refresh_segundos | default(3) }}s — não feche até ver o resultado.
+      O Motor está consultando os bancos. Esta página atualiza sozinha a cada
+      {{ refresh_segundos | default(3) }}s — ofertas parciais aparecem assim que cada banco responder.
     </p>
   </div>
 </div>
@@ -49,10 +49,33 @@
   </div>
 </section>
 
+{% if cards_bancos %}
 <section class="panel form-section">
   <div class="section-title">
     <span>01</span>
-    <div><h2>O que está acontecendo</h2><p>Etapas do job bancário.</p></div>
+    <div><h2>Por banco</h2><p>Cada provedor responde no seu tempo.</p></div>
+  </div>
+  <div class="sim-bank-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px">
+    {% for card in cards_bancos %}
+    <div class="sim-bank-card status-{{ card.status }}" style="border:1px solid var(--border);border-radius:12px;padding:14px 16px">
+      <strong>{{ card.rotulo }}</strong>
+      <p class="muted" style="margin:6px 0 0">{{ card.status_label }}</p>
+      {% if card.parcela_exemplo is not none %}
+      <p style="margin:8px 0 0"><strong>{{ formatar_brl(card.parcela_exemplo) }}</strong> <span class="muted">parcela</span></p>
+      {% elif card.ofertas %}
+      <p class="muted" style="margin:8px 0 0">{{ card.ofertas }} oferta(s)</p>
+      {% endif %}
+      {% if card.codigo_erro %}<p class="muted" style="margin:6px 0 0"><code>{{ card.codigo_erro }}</code></p>{% endif %}
+    </div>
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
+
+<section class="panel form-section">
+  <div class="section-title">
+    <span>02</span>
+    <div><h2>O que está acontecendo</h2><p>Etapas do job no Motor.</p></div>
   </div>
   <ol class="sim-steps">
     {% for passo in passos %}
@@ -69,7 +92,7 @@
 
 <section class="panel form-section">
   <div class="section-title">
-    <span>02</span>
+    <span>03</span>
     <div><h2>Parâmetros desta consulta</h2><p>Enviados ao Motor.</p></div>
   </div>
   <dl class="integration-stats">
@@ -79,6 +102,9 @@
     <div><dt>Entrada</dt><dd>{{ formatar_brl(valores.entrada or 0) }}</dd></div>
     <div><dt>Prazos</dt><dd>{% if valores.prazos_meses %}{{ valores.prazos_meses }}{% else %}{{ valores.prazo_meses or '—' }}{% endif %}</dd></div>
     <div><dt>UF</dt><dd>{{ valores.uf_licenciamento or '—' }}</dd></div>
+    {% if valores.provedores %}
+    <div><dt>Bancos</dt><dd>{{ valores.provedores | join(', ') }}</dd></div>
+    {% endif %}
   </dl>
 </section>
 

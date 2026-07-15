@@ -2,7 +2,7 @@
 {% block title %}Simulação manual — Gestão{% endblock %}
 {% block content %}
 <div class="page-heading">
-  <div><span class="eyebrow">Financiamento</span><h1>Simulação manual</h1><p>Teste mock ou consulte um provedor real pelo Motor.</p></div>
+  <div><span class="eyebrow">Financiamento</span><h1>Simulação manual</h1><p>Uma consulta nos bancos com acesso configurado. Sem escolher banco na mão.</p></div>
   <a class="button ghost" href="/app/simulacoes/historico">Histórico de simulações</a>
 </div>
 
@@ -12,18 +12,28 @@
   <input type="hidden" name="csrf" value="{{ csrf }}">
 
   <section class="panel form-section">
-    <div class="section-title"><span>00</span><div><h2>Modo</h2><p>Dashboard primeiro; WhatsApp depois.</p></div></div>
+    <div class="section-title"><span>00</span><div><h2>Bancos</h2><p>Por padrão consulta todos com login em Acessos dos bancos.</p></div></div>
     <div class="form-grid">
-      <label class="wide">Provedor
+      <label class="wide">Modo
         <select name="modo" id="modo-sim">
-          <option value="mock" {{ 'selected' if valores.modo not in ['santander', 'pan', 'fontecred'] }}>Mock (demo, vários bancos fictícios)</option>
-          <option value="santander" {{ 'selected' if valores.modo == 'santander' }}>Santander real (Motor + portal lojista)</option>
-          <option value="pan" {{ 'selected' if valores.modo == 'pan' }}>Banco PAN real (OpenAPI)</option>
-          <option value="fontecred" {{ 'selected' if valores.modo == 'fontecred' }}>Fontecred real (motos — e-mail + senha)</option>
+          <option value="todos" {{ 'selected' if valores.modo not in ['mock'] }}>Todos os bancos configurados</option>
+          <option value="mock" {{ 'selected' if valores.modo == 'mock' }}>Mock (demo, vários bancos fictícios)</option>
         </select>
       </label>
     </div>
-    <p class="muted">Santander exige credencial do lojista em <a href="/app/financeiras">Acessos bancos</a> (provedor Santander = CPF + senha do portal). Ao simular, a tela mostra o progresso ao vivo (fila → portal → resultado) — não fica em branco.</p>
+    {% if bancos_prontos %}
+    <p class="muted" style="margin-top:10px">Serão consultados:</p>
+    <ul class="sim-bank-chips" style="display:flex;flex-wrap:wrap;gap:8px;margin:8px 0 0;padding:0;list-style:none">
+      {% for b in bancos_prontos %}
+      <li class="status-chip" style="margin:0"><i></i>{{ b.rotulo or b.provedor }}</li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="muted" style="margin-top:10px">
+      Nenhum banco com credencial ainda.
+      Cadastre em <a href="/app/financeiras">Acessos dos bancos</a> (Santander, Fontecred, Bradesco, PAN…).
+    </p>
+    {% endif %}
   </section>
 
   <section class="panel form-section">
@@ -37,15 +47,19 @@
           <option value="nao" {{ 'selected' if valores.cnh == 'nao' }}>Não</option>
         </select>
       </label>
-      <label>Renda mensal (opcional, mock)<input type="number" step="0.01" min="0" name="renda" value="{{ valores.renda }}"></label>
-      <label>DDD (PAN)<input name="ddd" inputmode="numeric" value="{{ valores.ddd }}" placeholder="11"></label>
-      <label>Celular (PAN)<input name="celular" inputmode="numeric" value="{{ valores.celular }}" placeholder="999999999"></label>
-      <label>Natureza da ocupação (PAN)<input name="codigo_natureza_ocupacao" value="{{ valores.codigo_natureza_ocupacao }}" placeholder="Código fornecido pelo PAN"></label>
+      <label>Renda mensal (opcional)<input type="number" step="0.01" min="0" name="renda" value="{{ valores.renda }}"></label>
+      <label>DDD / celular (opcional, PAN e Fontecred)
+        <div style="display:flex;gap:8px">
+          <input name="ddd" inputmode="numeric" value="{{ valores.ddd }}" placeholder="11" style="max-width:5rem">
+          <input name="celular" inputmode="numeric" value="{{ valores.celular }}" placeholder="999999999">
+        </div>
+      </label>
+      <label>Natureza da ocupação (opcional, PAN API)<input name="codigo_natureza_ocupacao" value="{{ valores.codigo_natureza_ocupacao }}" placeholder="Código fornecido pelo PAN"></label>
     </div>
   </section>
 
   <section class="panel form-section">
-    <div class="section-title"><span>02</span><div><h2>Veículo e condições</h2><p>Santander: placa + valor de venda + UF + finalidade.</p></div></div>
+    <div class="section-title"><span>02</span><div><h2>Veículo e condições</h2><p>Form unificado: o Motor usa o que cada banco precisa.</p></div></div>
     <div class="form-grid">
       <label>Categoria<select name="categoria"><option value="moto" {{ 'selected' if valores.categoria != 'carro' }}>Moto</option><option value="carro" {{ 'selected' if valores.categoria == 'carro' }}>Carro</option></select></label>
       <label>Placa<input name="placa" value="{{ valores.placa or '' }}" placeholder="ABC1D23" autocomplete="off"></label>
@@ -63,14 +77,14 @@
         </select>
       </label>
       <label>Valor do bem (venda)<input type="number" step="0.01" min="0" name="valor" value="{{ valores.valor }}" placeholder="21900"></label>
-      <label>Código do veículo (PAN)<input name="codigo_provedor" value="{{ valores.codigo_provedor }}" placeholder="Código da versão no catálogo PAN"></label>
-      <label>Ano modelo (PAN)<input type="number" min="1900" max="2100" name="ano_modelo" value="{{ valores.ano_modelo }}" placeholder="2025"></label>
-      <label>Zero km? (PAN)<select name="zero_km"><option value="nao" {{ 'selected' if valores.zero_km != 'sim' }}>Não</option><option value="sim" {{ 'selected' if valores.zero_km == 'sim' }}>Sim</option></select></label>
-      <label>Entrada (mock/outros bancos)<input type="number" step="0.01" min="0" name="entrada" value="{{ valores.entrada }}" placeholder="0"></label>
+      <label>Código do veículo (opcional, PAN API)<input name="codigo_provedor" value="{{ valores.codigo_provedor }}" placeholder="Código da versão no catálogo PAN"></label>
+      <label>Ano modelo (opcional)<input type="number" min="1900" max="2100" name="ano_modelo" value="{{ valores.ano_modelo }}" placeholder="2025"></label>
+      <label>Zero km?<select name="zero_km"><option value="nao" {{ 'selected' if valores.zero_km != 'sim' }}>Não</option><option value="sim" {{ 'selected' if valores.zero_km == 'sim' }}>Sim</option></select></label>
+      <label>Entrada (quando o banco aceita)<input type="number" step="0.01" min="0" name="entrada" value="{{ valores.entrada }}" placeholder="0"></label>
       <label>Prazo único (mock)<input type="number" min="1" max="120" name="prazo_meses" value="{{ valores.prazo_meses or 48 }}"></label>
-      <label class="wide">Prazos multi (Santander, vírgula)<input name="prazos_meses" value="{{ valores.prazos_meses or '12,24,36,48' }}" placeholder="12,24,36,48"></label>
+      <label class="wide">Prazos multi (vírgula)<input name="prazos_meses" value="{{ valores.prazos_meses or '12,24,36,48' }}" placeholder="12,24,36,48"></label>
     </div>
-    <p class="muted">No mock, valor e prazo único bastam. No Santander, preencha placa, valor e prazos multi; o Motor lê as parcelas reais do portal. <strong>A entrada no Santander é calculada pelo banco</strong> e aparece na coluna Entrada do resultado — o campo acima é ignorado nesse modo.</p>
+    <p class="muted">Santander calcula a entrada no portal (o campo Entrada é ignorado lá). Bradesco/PAN usam entrada se informada. Fontecred exige celular + placa. Cadastre os logins em <a href="/app/financeiras">Acessos dos bancos</a>.</p>
   </section>
 
   <div class="form-actions"><a class="button ghost" href="/app">Cancelar</a><button class="button primary" type="submit">Simular parcelas</button></div>

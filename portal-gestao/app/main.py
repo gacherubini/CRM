@@ -694,9 +694,20 @@ UFS_BR = [
 ]
 
 
+# Bancos reais do Motor; "todos" consulta os que tiverem credencial.
+_PROVEDORES_REAIS = frozenset({"santander", "pan", "fontecred", "bradesco"})
+_ROTULOS_BANCO = {
+    "santander": "Santander",
+    "pan": "Banco PAN",
+    "fontecred": "Fontecred",
+    "bradesco": "Bradesco",
+    "mock": "Mock (demo)",
+}
+
+
 def _valores_form_simulacao(form) -> dict:
     return {
-        "modo": form.get("modo") or "mock",
+        "modo": form.get("modo") or "todos",
         "cpf": form.get("cpf") or "",
         "nascimento": form.get("nascimento", ""),
         "cnh": form.get("cnh") or "sim",
@@ -718,6 +729,41 @@ def _valores_form_simulacao(form) -> dict:
     }
 
 
+def _credenciais_prontas_motor(motor: "MotorClient", ator: str | None) -> list[dict]:
+    """Bancos com login configurado e habilitado (máscara do Motor)."""
+    try:
+        raw = motor.listar_credenciais(ator=ator)
+        provedores = motor.listar_provedores(ator=ator)
+    except MotorIndisponivel:
+        return []
+    itens = enriquecer_credenciais(raw, provedores)
+    return [
+        c
+        for c in itens
+        if c.get("senha_configurada") and c.get("habilitado")
+    ]
+
+
+def _provedores_da_simulacao(
+    form, credenciais_prontas: list[dict]
+) -> list[str]:
+    """Resolve a lista de bancos: todos com credencial, ou um modo explícito."""
+    modo = (form.get("modo") or "todos").strip().lower()
+    if modo == "mock":
+        return []
+    if modo in _PROVEDORES_REAIS:
+        return [modo]
+    # Default "todos": só bancos com credencial pronta.
+    nomes: list[str] = []
+    vistos: set[str] = set()
+    for c in credenciais_prontas:
+        nome = (c.get("provedor") or "").strip().lower()
+        if nome and nome not in vistos:
+            vistos.add(nome)
+            nomes.append(nome)
+    return nomes
+
+
 def dados_simulacao(form) -> dict:
     """Payload legado para Chatbot mock (valor + prazo único)."""
     payload = {
@@ -733,8 +779,19 @@ def dados_simulacao(form) -> dict:
     return payload
 
 
-def dados_simulacao_motor(form, provedor: str = "santander") -> dict:
-    """Payload SolicitacaoSimulacao para um provedor real do Motor."""
+def dados_simulacao_motor(
+    form, provedores: list[str] | str | None = None
+) -> dict:
+    """Payload SolicitacaoSimulacao para um ou mais provedores reais do Motor."""
+    if isinstance(provedores, str):
+        lista = [provedores]
+    elif provedores:
+        lista = list(provedores)
+    else:
+        lista = ["santander"]
+    lista = [p.strip().lower() for p in lista if p and str(p).strip()]
+    if not lista:
+        raise ValueError("informe ao menos um provedor")
     cpf = "".join(c for c in (form.get("cpf") or "") if c.isdigit())
     nascimento = form.get("nascimento", "").strip()
     entrada = float(str(form.get("entrada") or 0).replace(",", "."))
@@ -772,22 +829,32 @@ def dados_simulacao_motor(form, provedor: str = "santander") -> dict:
             "zero_km": (form.get("zero_km") or "nao").lower() == "sim",
         },
         "condicoes": {"entrada": entrada, "prazos_meses": prazos},
-        # Nome canônico minúsculo seleciona o driver real. "Santander" com
-        # maiúscula é mantido apenas no conjunto de bancos mock do Motor.
-        "provedores": [provedor],
+        # Nomes canônicos minúsculos. "Santander" maiúsculo é só o mock interno.
+        "provedores": lista,
     }
 
 
 @app.get("/app/simulacoes", response_class=HTMLResponse)
-def simulacoes_pagina(request: Request, db: Session = Depends(get_db)):
+def simulacoes_pagina(
+    request: Request,
+    db: Session = Depends(get_db),
+    motor: MotorClient = Depends(get_motor_client),
+):
     usuario = usuario_atual(request, db)
     if not usuario:
         return redirecionar_login()
     if not pode_simular(usuario):
         return RedirectResponse("/app", status_code=303)
+    bancos_prontos = _credenciais_prontas_motor(motor, usuario.email)
     return templates.TemplateResponse(
         "simulacoes/form.html",
-        contexto(request, usuario, valores={}, ufs=UFS_BR),
+        contexto(
+            request,
+            usuario,
+            valores={"modo": "todos"},
+            ufs=UFS_BR,
+            bancos_prontos=bancos_prontos,
+        ),
     )
 
 
@@ -807,59 +874,55 @@ async def simulacoes_simular(
     if not csrf_valido(request, form.get("csrf")):
         return RedirectResponse("/app/simulacoes", status_code=303)
     valores = _valores_form_simulacao(form)
-    modo = (form.get("modo") or "mock").strip().lower()
+    modo = (form.get("modo") or "todos").strip().lower()
+    bancos_prontos = _credenciais_prontas_motor(motor, usuario.email)
 
-    # --- Provedor real: cria job no Motor e mostra progresso ---
-    if modo in {"santander", "pan", "fontecred"}:
+    def _rerender(erro: str, status: int = 422):
+        return templates.TemplateResponse(
+            "simulacoes/form.html",
+            contexto(
+                request,
+                usuario,
+                valores=valores,
+                ufs=UFS_BR,
+                bancos_prontos=bancos_prontos,
+                erro=erro,
+            ),
+            status_code=status,
+        )
+
+    # --- Multi-banco (default) ou um banco explícito → Motor ---
+    if modo != "mock":
+        provedores = _provedores_da_simulacao(form, bancos_prontos)
+        if not provedores:
+            return _rerender(
+                "Nenhum banco com acesso configurado. Cadastre login em "
+                "Acessos dos bancos e tente de novo."
+            )
         try:
-            payload_motor = dados_simulacao_motor(form, modo)
+            payload_motor = dados_simulacao_motor(form, provedores)
         except (TypeError, ValueError):
-            return templates.TemplateResponse(
-                "simulacoes/form.html",
-                contexto(
-                    request,
-                    usuario,
-                    valores=valores,
-                    ufs=UFS_BR,
-                    erro="Confira CPF, nascimento, placa/valor, entrada e prazos.",
-                ),
-                status_code=422,
+            return _rerender(
+                "Confira CPF, nascimento, placa/valor, entrada e prazos."
             )
         try:
             criada = motor.criar_simulacao(
                 payload_motor, ator=usuario.email, idempotency_key=str(uuid.uuid4())
             )
         except MotorIndisponivel as exc:
-            return templates.TemplateResponse(
-                "simulacoes/form.html",
-                contexto(
-                    request,
-                    usuario,
-                    valores=valores,
-                    ufs=UFS_BR,
-                    erro=str(exc),
-                ),
-                status_code=503,
-            )
+            return _rerender(str(exc), status=503)
         sim_id = criada.get("id")
         if not sim_id:
-            return templates.TemplateResponse(
-                "simulacoes/form.html",
-                contexto(
-                    request,
-                    usuario,
-                    valores=valores,
-                    ufs=UFS_BR,
-                    erro="Motor não devolveu id da simulação.",
-                ),
-                status_code=503,
-            )
-        # Guarda parâmetros na sessão para a tela de progresso/resultado
+            return _rerender("Motor não devolveu id da simulação.", status=503)
+        valores_job = dict(valores)
+        valores_job["modo"] = "todos" if modo == "todos" else modo
+        valores_job["provedores"] = list(provedores)
         jobs = request.session.get("sim_jobs") or {}
         jobs[sim_id] = {
-            "valores": valores,
+            "valores": valores_job,
             "cpf": payload_motor["pessoa"]["cpf"],
             "criada_em": criada.get("criada_em") or "",
+            "provedores": list(provedores),
         }
         request.session["sim_jobs"] = jobs
         return RedirectResponse(f"/app/simulacoes/job/{sim_id}", status_code=303)
@@ -868,37 +931,13 @@ async def simulacoes_simular(
     try:
         payload = dados_simulacao(form)
     except (TypeError, ValueError):
-        return templates.TemplateResponse(
-            "simulacoes/form.html",
-            contexto(
-                request,
-                usuario,
-                valores=valores,
-                ufs=UFS_BR,
-                erro="Confira os valores informados e tente novamente.",
-            ),
-            status_code=422,
-        )
+        return _rerender("Confira CPF, nascimento, valor, entrada e prazo.")
     try:
         resultado = chatbot.simular(payload)
     except SimulacaoIndisponivel:
-        return templates.TemplateResponse(
-            "simulacoes/form.html",
-            contexto(
-                request,
-                usuario,
-                valores=valores,
-                ufs=UFS_BR,
-                erro="Simulação não habilitada nesta instalação.",
-            ),
-            status_code=409,
-        )
+        return _rerender("Simulação não habilitada nesta instalação.", status=409)
     except ChatbotIndisponivel as exc:
-        return templates.TemplateResponse(
-            "simulacoes/form.html",
-            contexto(request, usuario, valores=valores, ufs=UFS_BR, erro=str(exc)),
-            status_code=503,
-        )
+        return _rerender(str(exc), status=503)
     if not pode_ver_custo(usuario):
         resultado = simulacao_sem_dados_sensiveis(resultado)
     return templates.TemplateResponse(
@@ -929,11 +968,91 @@ _SIM_STATUS_LABELS = {
 }
 
 
+def _cards_bancos_progresso(
+    provedores: list[str],
+    resultados: list[dict] | None,
+    tarefas: list[dict] | None,
+    status_job: str,
+) -> list[dict]:
+    """Um card por banco com estado derivado de tarefas e resultados parciais."""
+    resultados = resultados or []
+    tarefas = tarefas or []
+    por_tarefa = {
+        (t.get("provedor") or "").lower(): t for t in tarefas if t.get("provedor")
+    }
+    por_resultado: dict[str, list[dict]] = {}
+    for r in resultados:
+        chave = (r.get("provedor") or "").lower()
+        por_resultado.setdefault(chave, []).append(r)
+
+    cards = []
+    for nome in provedores:
+        chave = (nome or "").lower()
+        rotulo = _ROTULOS_BANCO.get(chave, nome or "Banco")
+        tarefa = por_tarefa.get(chave)
+        linhas = por_resultado.get(chave) or []
+        # Resultados de mock usam nomes capitalizados; se só há um provedor na lista, usa todos.
+        if not linhas and len(provedores) == 1:
+            linhas = list(resultados)
+
+        if tarefa and tarefa.get("status"):
+            st = (tarefa.get("status") or "").lower()
+        elif linhas:
+            if any(r.get("status") == "concluida" for r in linhas):
+                st = "concluida"
+            elif any(r.get("codigo_erro") for r in linhas):
+                st = "falhou"
+            else:
+                st = (linhas[0].get("status") or "processando").lower()
+        elif status_job in _SIM_STATUS_TERMINAIS:
+            st = "falhou"
+        elif status_job == "processando":
+            st = "processando"
+        else:
+            st = "recebida"
+
+        ofertas_ok = sum(1 for r in linhas if r.get("status") == "concluida")
+        parcela_exemplo = next(
+            (
+                r.get("valor_parcela")
+                for r in linhas
+                if r.get("status") == "concluida" and r.get("valor_parcela") is not None
+            ),
+            None,
+        )
+        label_status = {
+            "recebida": "Na fila",
+            "acordando_worker": "Acordando worker",
+            "reservada": "Reservada",
+            "processando": "Consultando",
+            "concluida": "Com oferta" if ofertas_ok else "Concluída",
+            "parcial": "Parcial",
+            "falhou": "Falhou",
+            "rejeitada": "Rejeitada",
+            "cancelada": "Cancelada",
+        }.get(st, st.replace("_", " "))
+        cards.append(
+            {
+                "provedor": chave,
+                "rotulo": rotulo,
+                "status": st,
+                "status_label": label_status,
+                "ofertas": ofertas_ok,
+                "parcela_exemplo": parcela_exemplo,
+                "codigo_erro": (tarefa or {}).get("codigo_erro")
+                or next((r.get("codigo_erro") for r in linhas if r.get("codigo_erro")), None),
+            }
+        )
+    return cards
+
+
 def _passos_progresso_simulacao(
     status: str, provedor: str = "santander"
 ) -> list[dict]:
     """Etapas visíveis na tela de progresso de um provedor real."""
-    rotulo = {"pan": "Banco PAN", "fontecred": "Fontecred"}.get(provedor, "Santander")
+    rotulo = _ROTULOS_BANCO.get(provedor, provedor.title() if provedor else "Banco")
+    if provedor == "todos":
+        rotulo = "bancos configurados"
     modo = "API oficial" if provedor == "pan" else "portal lojista"
     ordem = ["recebida", "processando", "terminal"]
     terminal_ok = status in ("concluida", "parcial")
@@ -1003,8 +1122,21 @@ def simulacoes_job(
 
     jobs = request.session.get("sim_jobs") or {}
     meta = jobs.get(sim_id) or {}
-    valores = meta.get("valores") or {"modo": "santander"}
-    provedor = (valores.get("modo") or "santander").lower()
+    valores = meta.get("valores") or {"modo": "todos"}
+    provedores = list(
+        meta.get("provedores")
+        or valores.get("provedores")
+        or (
+            [valores["modo"]]
+            if valores.get("modo") in _PROVEDORES_REAIS
+            else []
+        )
+    )
+    provedor_passo = (
+        "todos"
+        if len(provedores) != 1
+        else (provedores[0] if provedores else "santander")
+    )
     cpf = meta.get("cpf") or ""
 
     try:
@@ -1018,19 +1150,24 @@ def simulacoes_job(
                 sim_id=sim_id,
                 status="erro_motor",
                 status_label="Motor indisponível",
-                passos=_passos_progresso_simulacao("recebida", provedor),
+                passos=_passos_progresso_simulacao("recebida", provedor_passo),
                 valores=valores,
                 cpf_mascarado=mascarar_cpf(cpf),
                 auto_refresh=True,
                 refresh_segundos=5,
                 erro=str(exc),
                 resultados_parciais=[],
+                cards_bancos=_cards_bancos_progresso(
+                    provedores, [], [], "erro_motor"
+                ),
             ),
             status_code=503,
         )
 
     status = (resultado.get("status") or "recebida").lower()
     status_label = _SIM_STATUS_LABELS.get(status, status.replace("_", " "))
+    if not provedores:
+        provedores = list(resultado.get("provedores") or [])
 
     if status in _SIM_STATUS_TERMINAIS:
         if not pode_ver_custo(usuario):
@@ -1047,6 +1184,7 @@ def simulacoes_job(
         )
 
     resultados = resultado.get("resultados") or []
+    tarefas = resultado.get("tarefas") or []
     return templates.TemplateResponse(
         "simulacoes/progresso.html",
         contexto(
@@ -1055,13 +1193,16 @@ def simulacoes_job(
             sim_id=sim_id,
             status=status,
             status_label=status_label,
-            passos=_passos_progresso_simulacao(status, provedor),
+            passos=_passos_progresso_simulacao(status, provedor_passo),
             valores=valores,
             cpf_mascarado=mascarar_cpf(cpf),
             auto_refresh=True,
             refresh_segundos=3,
             erro=None,
             resultados_parciais=resultados,
+            cards_bancos=_cards_bancos_progresso(
+                provedores, resultados, tarefas, status
+            ),
         ),
     )
 

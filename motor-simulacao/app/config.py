@@ -59,3 +59,36 @@ PAN_TIMEOUT_SECONDS = float(os.getenv("MOTOR_PAN_TIMEOUT_SECONDS", "30"))
 
 # Categorias de veículo versionadas (Plano #1A, Task 2).
 CATEGORIAS = ("moto", "carro", "leve")
+
+# Fan-out multi-banco + workers sob demanda (plano 2026-07-14).
+# Defaults desligados: com flags off o pipeline se comporta como antes.
+def _flag(nome: str, default: str = "0") -> bool:
+    return (os.getenv(nome) or default).strip().lower() in ("1", "true", "yes", "on")
+
+
+FANOUT_ENABLED = _flag("MOTOR_FANOUT_ENABLED", "0")
+FLY_AUTOSCALE_ENABLED = _flag("MOTOR_FLY_AUTOSCALE_ENABLED", "0")
+MAX_BROWSER_WORKERS = int(os.getenv("MOTOR_MAX_BROWSER_WORKERS", "1"))
+WORKER_IDLE_STOP_SECONDS = int(os.getenv("MOTOR_WORKER_IDLE_STOP_SECONDS", "60"))
+WORKER_PROVEDOR = (os.getenv("MOTOR_WORKER_PROVEDOR") or "").strip().lower() or None
+WORKER_SLOT_ID = (os.getenv("MOTOR_WORKER_SLOT_ID") or "").strip() or None
+# Worker sob demanda: após idle grace encerra com exit 0 (Machine para com restart on-failure).
+WORKER_ON_DEMAND = _flag("MOTOR_WORKER_ON_DEMAND", "0") or bool(WORKER_PROVEDOR)
+# Filtro opcional de tipos: "api,playwright,mock" (vazio = todos).
+_WORKER_TIPOS_RAW = (os.getenv("MOTOR_WORKER_TIPOS") or "").strip().lower()
+WORKER_TIPOS: frozenset[str] | None = (
+    frozenset(p.strip() for p in _WORKER_TIPOS_RAW.split(",") if p.strip())
+    if _WORKER_TIPOS_RAW
+    else None
+)
+TASK_LEASE_SECONDS = int(
+    os.getenv("MOTOR_TASK_LEASE_SECONDS") or os.getenv("MOTOR_JOB_LEASE_SECONDS", "300")
+)
+
+# Fly Machines API (orquestrador na API — nunca no worker on-demand).
+FLY_API_BASE = (os.getenv("FLY_API_BASE") or "https://api.machines.dev").rstrip("/")
+FLY_APP_NAME = (os.getenv("FLY_APP_NAME") or os.getenv("FLY_APP") or "motor2037").strip()
+# Token app-scoped; vazio desliga wake real (fake em testes / lab sem token).
+FLY_API_TOKEN = (os.getenv("FLY_API_TOKEN") or os.getenv("MOTOR_FLY_API_TOKEN") or "").strip()
+FLY_START_TIMEOUT_SECONDS = float(os.getenv("MOTOR_FLY_START_TIMEOUT_SECONDS", "8"))
+FLY_START_BURST = int(os.getenv("MOTOR_FLY_START_BURST", "3"))

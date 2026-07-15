@@ -15,9 +15,23 @@ from pathlib import Path
 from sqlalchemy.orm import Session
 
 from app import config, cripto
+from app.fanout import cancelar_tarefas_abertas, criar_tarefas_provedor, tarefas_publicas
 from app.models_db import IdempotenciaORM, SimulacaoEventoORM, SimulacaoORM
 from app.motor.base import ResultadoProvedor, Simulacao, SolicitacaoSimulacao
 from app.validadores import idade, parse_nascimento, valida_cpf
+
+
+def _acordar_workers_apos_criar(db, sim_id: str) -> None:
+    """Best-effort: acorda slots Playwright se autoscale estiver ligado."""
+    try:
+        from app import config as _cfg
+        from app.orquestrador import acordar_workers
+
+        if _cfg.FANOUT_ENABLED and _cfg.FLY_AUTOSCALE_ENABLED:
+            acordar_workers(db, simulacao_id=sim_id)
+    except Exception:
+        # Nunca falha a criação do job por problema na Fly API.
+        pass
 
 ESTADOS_CANCELAVEIS = {"recebida", "processando"}
 
@@ -130,6 +144,8 @@ def criar_simulacao(
     )
     db.add(sim)
     db.flush()
+    # Fan-out: uma tarefa por banco (idempotente). Flag off = lista vazia, pipeline legado.
+    criar_tarefas_provedor(db, sim, sol.provedores)
 
     if idempotency_key:
         db.add(
@@ -142,6 +158,7 @@ def criar_simulacao(
         )
     db.commit()
     db.refresh(sim)
+    _acordar_workers_apos_criar(db, sim.id)
     return sim, True
 
 
@@ -167,6 +184,7 @@ def listar_eventos_simulacao(
 def evento_publico(evento: SimulacaoEventoORM) -> dict:
     return {
         "id": evento.id,
+        "provedor": getattr(evento, "provedor", None),
         "etapa": evento.etapa,
         "nivel": evento.nivel,
         "mensagem": evento.mensagem,
@@ -273,6 +291,7 @@ def cancelar_simulacao(db: Session, sim_id: str, cliente_id: str) -> SimulacaoOR
     if sim.status in ESTADOS_CANCELAVEIS:
         sim.status = "cancelada"
         sim.atualizada_em = datetime.now(timezone.utc)
+        cancelar_tarefas_abertas(db, sim.id)
         db.commit()
         db.refresh(sim)
     return sim
@@ -287,6 +306,8 @@ def para_pydantic(sim: SimulacaoORM) -> Simulacao:
         id=sim.id,
         status=sim.status,
         criada_em=sim.criada_em.isoformat(),
+        provedores=list(sim.provedores or []),
+        tarefas=tarefas_publicas(sim),
         resultados=[
             ResultadoProvedor(
                 provedor=r.provedor,

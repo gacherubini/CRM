@@ -403,32 +403,49 @@ class MotorFake:
             raise MotorIndisponivel("Não foi possível acessar o Motor de Simulação agora")
         # status_retorno: "concluida" (padrão) | "recebida" | "processando" | "falhou"
         status = getattr(self, "status_retorno", "concluida")
+        ultimo = (self.simulacoes[-1] if getattr(self, "simulacoes", None) else {}) or {}
+        provedores = list(ultimo.get("provedores") or ["santander"])
         resultados = []
         if status in ("concluida", "parcial", "falhou"):
-            resultados = [
-                {
-                    "provedor": "santander",
-                    "status": "concluida" if status != "falhou" else "erro",
-                    "valor_parcela": 946.28 if status != "falhou" else None,
-                    "taxa_am": None,
-                    "prazo_meses": 48,
-                    "valor_financiado": 20776.80 if status != "falhou" else None,
-                    "codigo_erro": None if status != "falhou" else "sem_driver_ou_credencial",
-                },
-                {
-                    "provedor": "santander",
-                    "status": "concluida" if status != "falhou" else "erro",
-                    "valor_parcela": 1097.45 if status != "falhou" else None,
-                    "taxa_am": None,
-                    "prazo_meses": 36,
-                    "valor_financiado": 20776.80 if status != "falhou" else None,
-                    "codigo_erro": None if status != "falhou" else "sem_driver_ou_credencial",
-                },
-            ]
+            for prov in provedores:
+                resultados.append(
+                    {
+                        "provedor": prov,
+                        "status": "concluida" if status != "falhou" else "erro",
+                        "valor_parcela": 946.28 if status != "falhou" else None,
+                        "taxa_am": None,
+                        "prazo_meses": 48,
+                        "valor_financiado": 20776.80 if status != "falhou" else None,
+                        "codigo_erro": None if status != "falhou" else "sem_driver_ou_credencial",
+                    }
+                )
+                resultados.append(
+                    {
+                        "provedor": prov,
+                        "status": "concluida" if status != "falhou" else "erro",
+                        "valor_parcela": 1097.45 if status != "falhou" else None,
+                        "taxa_am": None,
+                        "prazo_meses": 36,
+                        "valor_financiado": 20776.80 if status != "falhou" else None,
+                        "codigo_erro": None if status != "falhou" else "sem_driver_ou_credencial",
+                    }
+                )
         return {
             "id": sim_id,
             "status": status,
             "criada_em": "2026-07-13T12:00:00+00:00",
+            "provedores": provedores,
+            "tarefas": [
+                {
+                    "id": f"t-{p}",
+                    "provedor": p,
+                    "tipo_driver": "api",
+                    "status": "processando" if status == "processando" else status,
+                    "tentativa": 1,
+                    "codigo_erro": None,
+                }
+                for p in provedores
+            ],
             "resultados": resultados,
         }
 
