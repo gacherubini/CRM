@@ -1,10 +1,18 @@
 from decimal import Decimal
 from pathlib import Path
+from unittest.mock import MagicMock
 
 import pytest
 
+from app import config
 from app.motor.base import Condicoes, Pessoa, SolicitacaoSimulacao, Veiculo
-from app.motor.drivers import DriverContext, IntervencaoNecessaria, RejeicaoNegocio, resolver_drivers
+from app.motor.drivers import (
+    DriverContext,
+    ErroTransitorio,
+    IntervencaoNecessaria,
+    RejeicaoNegocio,
+    resolver_drivers,
+)
 from app.motor.fontecred import (
     PROVEDOR,
     FontecredDriver,
@@ -149,6 +157,71 @@ def test_driver_sem_placa_rejeita():
     with pytest.raises(RejeicaoNegocio) as ei:
         d(_sol(veiculo=Veiculo(valor=21900, categoria="moto")))
     assert ei.value.codigo == "placa_obrigatoria"
+
+
+def test_fechar_comunicados_usa_seletor_bootstrap_5():
+    driver = FontecredDriver()
+    page = MagicMock()
+    titulo = MagicMock()
+    titulo.is_visible.side_effect = [True, True, False]
+    page.get_by_text.return_value.first = titulo
+    page.get_by_role.return_value.first.click.side_effect = RuntimeError("sem botão")
+
+    driver._fechar_comunicados(page)
+
+    seletor = page.locator.call_args.args[0]
+    assert ".btn-close" in seletor
+    assert "data-bs-dismiss" in seletor
+    page.locator.return_value.first.click.assert_called_once_with(
+        timeout=3_000, force=True
+    )
+
+
+def test_fechar_comunicados_falha_se_modal_persistir():
+    driver = FontecredDriver()
+    page = MagicMock()
+    page.get_by_text.return_value.first.is_visible.return_value = True
+    page.get_by_role.return_value.first.click.side_effect = RuntimeError("sem botão")
+    page.locator.return_value.first.click.side_effect = RuntimeError("sem X")
+
+    with pytest.raises(ErroTransitorio) as ei:
+        driver._fechar_comunicados(page)
+
+    assert ei.value.codigo == "comunicados_nao_fechou"
+    page.keyboard.press.assert_called_once_with("Escape")
+
+
+def test_nova_proposta_aceita_timeout_se_cpf_ja_apareceu():
+    driver = FontecredDriver(timeout_ms=20_000)
+    page = MagicMock()
+    page.goto.side_effect = RuntimeError("timeout após commit")
+    cpf_box = page.get_by_role.return_value.first
+
+    driver._passo_nova_proposta(page)
+
+    page.goto.assert_called_once_with(
+        "https://app.fontecred.com.br/clientes/criarComProposta",
+        wait_until="commit",
+        timeout=20_000,
+    )
+    cpf_box.wait_for.assert_called_once_with(state="visible", timeout=15_000)
+
+
+def test_evento_registra_print_por_etapa(monkeypatch):
+    driver = FontecredDriver()
+    ctx = MagicMock()
+    page = MagicMock()
+    monkeypatch.setattr(config, "EVENT_SCREENSHOTS", True)
+    driver._capturar_print_evento = MagicMock(return_value="job/login.png")
+
+    driver._evento(ctx, "login_confirmado", "Login confirmado.", page, True)
+
+    driver._capturar_print_evento.assert_called_once_with(
+        page, ctx, "login_confirmado"
+    )
+    ctx.registrar_evento.assert_called_once_with(
+        "login_confirmado", "Login confirmado.", "info", "job/login.png"
+    )
 
 
 def test_gating_fontecred_sem_credencial_nao_resolve(db):

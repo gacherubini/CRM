@@ -269,6 +269,7 @@ class FontecredDriver(PlaywrightBankDriver):
             ) from exc
 
         email_lojista, senha = self._credencial(ctx)
+        self._evento(ctx, "browser_iniciando", "Preparando o navegador do Fontecred.")
 
         with sync_playwright() as p:
             browser = self._launch_browser(p)
@@ -276,14 +277,49 @@ class FontecredDriver(PlaywrightBankDriver):
             page = browser_ctx.new_page()
             page.set_default_timeout(self.timeout_ms)
             try:
+                self._evento(ctx, "browser_pronto", "Navegador iniciado; abrindo o portal.")
                 self._passo_login(page, email_lojista, senha)
+                self._evento(
+                    ctx, "login_confirmado", "Login confirmado pelo portal.", page, True
+                )
                 self._fechar_comunicados(page)
+                self._evento(
+                    ctx,
+                    "comunicados_fechados",
+                    "Comunicados do portal verificados e fechados.",
+                )
                 self._passo_nova_proposta(page)
+                self._evento(
+                    ctx,
+                    "proposta_aberta",
+                    "Tela de criação da proposta carregada.",
+                    page,
+                    True,
+                )
                 self._passo_dados_pessoais(page, sol)
                 self._passo_veiculo(page, sol)
                 self._passo_financiamento(page, sol)
+                self._evento(
+                    ctx,
+                    "dados_preenchidos",
+                    "Dados do cliente, veículo e financiamento preenchidos.",
+                    page,
+                    True,
+                )
                 self._passo_simular_e_modais(page)
+                self._evento(
+                    ctx,
+                    "simulacao_enviada",
+                    "Consulta enviada; aguardando ofertas do banco.",
+                )
                 self._passo_aguardar_resultado(page)
+                self._evento(
+                    ctx,
+                    "ofertas_recebidas",
+                    "Ofertas carregadas na tela do banco.",
+                    page,
+                    True,
+                )
                 try:
                     texto = page.inner_text("body") or ""
                 except Exception:
@@ -291,11 +327,33 @@ class FontecredDriver(PlaywrightBankDriver):
                 html = page.content() or ""
                 resultados = self._resultados_de_html(texto + "\n" + html, sol)
                 self._salvar_storage(browser_ctx)
+                self._evento(
+                    ctx,
+                    "parcelas_lidas",
+                    "Parcelas interpretadas e prontas para salvar.",
+                    nivel="sucesso",
+                )
                 return resultados
             except (RejeicaoNegocio, IntervencaoNecessaria, ErroTransitorio):
+                self._evento(
+                    ctx,
+                    "falha_portal",
+                    "O fluxo bancário foi interrompido; consulte o código do resultado.",
+                    page,
+                    True,
+                    "erro",
+                )
                 self._screenshot_falha(page, "erro")
                 raise
             except Exception as exc:
+                self._evento(
+                    ctx,
+                    "falha_inesperada",
+                    "O portal apresentou uma falha inesperada.",
+                    page,
+                    True,
+                    "erro",
+                )
                 self._screenshot_falha(page, "inesperado")
                 detalhe = str(exc).replace("\n", " ")[:180]
                 raise ErroTransitorio(
@@ -305,6 +363,37 @@ class FontecredDriver(PlaywrightBankDriver):
             finally:
                 browser_ctx.close()
                 browser.close()
+
+    def _evento(
+        self,
+        ctx: DriverContext | None,
+        etapa: str,
+        mensagem: str,
+        page=None,
+        capturar_print: bool = False,
+        nivel: str = "info",
+    ) -> None:
+        if ctx is None:
+            return
+        screenshot_path = None
+        if capturar_print and page is not None and config.EVENT_SCREENSHOTS:
+            screenshot_path = self._capturar_print_evento(page, ctx, etapa)
+        ctx.registrar_evento(etapa, mensagem, nivel, screenshot_path)
+
+    def _capturar_print_evento(
+        self, page, ctx: DriverContext, etapa: str
+    ) -> str | None:
+        """Print por job/etapa; nome não contém CPF, placa ou outro dado pessoal."""
+        base = Path(ctx.screenshot_dir or self.screenshot_dir or "data/screenshots")
+        sim_id = re.sub(r"[^a-zA-Z0-9_-]", "", ctx.simulacao_id or "sem-id")
+        etapa_segura = re.sub(r"[^a-zA-Z0-9_-]", "_", etapa)[:60]
+        destino = base / sim_id / f"{etapa_segura}_{int(time.time())}.png"
+        try:
+            destino.parent.mkdir(parents=True, exist_ok=True)
+            page.screenshot(path=str(destino), full_page=True)
+            return str(destino)
+        except Exception:
+            return None
 
     def _credencial(self, ctx: DriverContext | None) -> tuple[str, str]:
         if ctx is None or ctx.db is None or not ctx.cliente_id:
@@ -398,36 +487,84 @@ class FontecredDriver(PlaywrightBankDriver):
         )
 
     def _fechar_comunicados(self, page) -> None:
-        """Pop-up 'COMUNICADOS' após login — fecha com o botão Fechar/X."""
+        """Fecha o pop-up COMUNICADOS e confirma que não bloqueia mais a tela."""
+        if not self._comunicados_visivel(page):
+            return
+
         for tentativa in (
             lambda: page.get_by_role("button", name=re.compile(r"Fechar", re.I)).first.click(
                 timeout=3_000
             ),
-            lambda: page.locator(".modal button.close, [data-dismiss='modal']").first.click(
-                timeout=2_000, force=True
-            ),
+            lambda: page.locator(
+                ".modal.show .btn-close, .modal.show [data-bs-dismiss='modal'], "
+                ".modal .btn-close, .modal [data-bs-dismiss='modal'], "
+                ".modal button.close, .modal [data-dismiss='modal']"
+            ).first.click(timeout=3_000, force=True),
             lambda: page.keyboard.press("Escape"),
         ):
             try:
                 tentativa()
                 page.wait_for_timeout(300)
-                return
+                if not self._comunicados_visivel(page):
+                    return
             except Exception:
                 continue
+        raise ErroTransitorio(
+            "comunicados_nao_fechou",
+            "modal de comunicados permaneceu aberto após o login",
+        )
+
+    def _comunicados_visivel(self, page) -> bool:
+        try:
+            titulo = page.get_by_text(
+                re.compile(r"^\s*COMUNICADOS\s*$", re.I)
+            ).first
+            return titulo.is_visible()
+        except Exception:
+            return False
 
     def _passo_nova_proposta(self, page) -> None:
-        """Vai direto pra Nova Proposta via URL (não depende do navbar recolhido)."""
-        page.goto(NOVA_PROPOSTA_URL, wait_until="domcontentloaded")
-        page.wait_for_timeout(800)
+        """Abre Nova Proposta por URL e usa o menu como fallback."""
+        cpf_box = page.get_by_role("textbox", name=re.compile(r"^CPF", re.I)).first
         try:
-            page.get_by_role("textbox", name=re.compile(r"^CPF", re.I)).first.wait_for(
-                state="visible", timeout=self.timeout_ms
+            page.goto(
+                NOVA_PROPOSTA_URL,
+                wait_until="commit",
+                timeout=self.timeout_ms,
             )
-        except Exception as exc:
-            raise ErroTransitorio(
-                "nova_proposta_falhou",
-                "tela de Nova Proposta (Criar Proposta) não abriu",
-            ) from exc
+        except Exception:
+            # O portal pode concluir a troca de página e manter requisições pendentes.
+            # Nesse caso o goto lança timeout, mas o formulário já está utilizável.
+            pass
+        try:
+            cpf_box.wait_for(state="visible", timeout=min(self.timeout_ms, 15_000))
+            return
+        except Exception:
+            pass
+
+        for nome in (r"^Propostas$", r"Criar Proposta", r"Nova Proposta"):
+            clicou = False
+            for papel in ("link", "button"):
+                try:
+                    page.get_by_role(
+                        papel, name=re.compile(nome, re.I)
+                    ).first.click(timeout=3_000)
+                    page.wait_for_timeout(400)
+                    clicou = True
+                    break
+                except Exception:
+                    continue
+            if clicou:
+                try:
+                    cpf_box.wait_for(state="visible", timeout=5_000)
+                    return
+                except Exception:
+                    continue
+
+        raise ErroTransitorio(
+            "nova_proposta_falhou",
+            "tela de Nova Proposta (Criar Proposta) não abriu",
+        )
 
     def _passo_dados_pessoais(self, page, sol: SolicitacaoSimulacao) -> None:
         cpf = re.sub(r"\D", "", sol.pessoa.cpf or "")
