@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Revy — Brand Kit Preview</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=IBM+Plex+Mono:wght@400;500&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --revy-ink: #0B0F14;
+      --revy-paper: #F7F5F1;
+      --revy-signal: #FF5A1F;
+      --revy-signal-hover: #E64A12;
+      --revy-slate: #1C2430;
+      --revy-mist: #E8E4DC;
+      --revy-muted: #6B7280;
+      --revy-ok: #0F9F6E;
+      --revy-warn: #D97706;
+      --revy-danger: #DC2626;
+      --revy-info: #2563EB;
+      --revy-radius: 12px;
+      --revy-font-sans: "DM Sans", "Segoe UI", system-ui, sans-serif;
+      --revy-font-display: "Space Grotesk", "DM Sans", system-ui, sans-serif;
+      --revy-font-mono: "IBM Plex Mono", "Consolas", monospace;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: var(--revy-font-sans);
+      background: var(--revy-paper);
+      color: var(--revy-ink);
+      line-height: 1.5;
+    }
+    .wrap { max-width: 960px; margin: 0 auto; padding: 48px 24px 80px; }
+    h1, h2, h3 { font-family: var(--revy-font-display); letter-spacing: -0.02em; }
+    h1 { font-size: 40px; line-height: 1.1; margin: 0 0 8px; }
+    h2 { font-size: 22px; margin: 48px 0 16px; }
+    .tagline { color: var(--revy-muted); font-size: 18px; margin: 0 0 32px; }
+    .hero {
+      display: flex; flex-wrap: wrap; gap: 32px; align-items: center;
+      padding: 32px; border-radius: 16px; background: #fff;
+      border: 1px solid var(--revy-mist);
+    }
+    .hero-dark {
+      background: var(--revy-ink); color: var(--revy-paper);
+      border: none;
+    }
+    .hero-dark .tagline { color: #9CA3AF; }
+    .logos { display: flex; flex-wrap: wrap; gap: 24px; align-items: center; }
+    .logo-card {
+      background: #fff; border: 1px solid var(--revy-mist);
+      border-radius: var(--revy-radius); padding: 24px;
+      display: flex; flex-direction: column; gap: 12px; min-width: 200px;
+    }
+    .logo-card.dark { background: var(--revy-ink); border-color: var(--revy-slate); }
+    .logo-card span { font-size: 12px; color: var(--revy-muted); font-family: var(--revy-font-mono); }
+    .logo-card.dark span { color: #9CA3AF; }
+    .swatches { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 12px; }
+    .swatch {
+      border-radius: var(--revy-radius); overflow: hidden;
+      border: 1px solid var(--revy-mist); background: #fff;
+    }
+    .swatch .chip { height: 72px; }
+    .swatch .meta { padding: 10px 12px; font-size: 13px; }
+    .swatch .meta strong { display: block; font-family: var(--revy-font-display); }
+    .swatch code { font-family: var(--revy-font-mono); font-size: 12px; color: var(--revy-muted); }
+    .type-sample { background: #fff; border: 1px solid var(--revy-mist); border-radius: var(--revy-radius); padding: 24px; }
+    .type-sample .display { font-family: var(--revy-font-display); font-size: 40px; font-weight: 700; letter-spacing: -0.03em; }
+    .type-sample .body { margin-top: 12px; }
+    .type-sample .mono { font-family: var(--revy-font-mono); font-size: 14px; color: var(--revy-muted); margin-top: 8px; }
+    .chat {
+      max-width: 360px; background: #fff; border-radius: 16px;
+      border: 1px solid var(--revy-mist); padding: 16px; display: flex; flex-direction: column; gap: 8px;
+    }
+    .bubble {
+      align-self: flex-start; background: var(--revy-mist); padding: 10px 14px;
+      border-radius: 14px 14px 14px 4px; font-size: 14px; max-width: 92%;
+    }
+    .bubble.me {
+      align-self: flex-end; background: #DCF8C6; border-radius: 14px 14px 4px 14px;
+    }
+    .btn-row { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 16px; }
+    .btn {
+      font-family: var(--revy-font-sans); font-weight: 600; font-size: 14px;
+      border: none; border-radius: 8px; padding: 12px 18px; cursor: default;
+    }
+    .btn-primary { background: var(--revy-signal); color: #fff; }
+    .btn-primary:hover { background: var(--revy-signal-hover); }
+    .btn-ghost { background: transparent; border: 1px solid var(--revy-mist); color: var(--revy-ink); }
+    .kpi-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+    @media (max-width: 640px) { .kpi-row { grid-template-columns: 1fr; } }
+    .kpi {
+      background: #fff; border: 1px solid var(--revy-mist); border-radius: var(--revy-radius);
+      padding: 16px;
+    }
+    .kpi .label { font-size: 13px; color: var(--revy-muted); }
+    .kpi .value { font-family: var(--revy-font-display); font-size: 32px; font-weight: 700; letter-spacing: -0.03em; margin-top: 4px; }
+    .kpi .value.accent { color: var(--revy-signal); }
+    .modules { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 12px; }
+    .mod {
+      background: #fff; border: 1px solid var(--revy-mist); border-radius: var(--revy-radius);
+      padding: 16px;
+    }
+    .mod strong { font-family: var(--revy-font-display); display: block; margin-bottom: 4px; }
+    .mod span { font-size: 13px; color: var(--revy-muted); }
+    .badge {
+      display: inline-block; font-size: 12px; font-weight: 600; padding: 4px 10px;
+      border-radius: 999px; margin-right: 6px;
+    }
+    .badge-ok { background: #D1FAE5; color: #065F46; }
+    .badge-warn { background: #FEF3C7; color: #92400E; }
+    .badge-danger { background: #FEE2E2; color: #991B1B; }
+    footer { margin-top: 64px; font-size: 13px; color: var(--revy-muted); }
+    a { color: var(--revy-info); }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="hero">
+      <img src="assets/revy-logo-full-dark.svg" width="220" height="50" alt="Revy" />
+      <div>
+        <h1>Brand Kit</h1>
+        <p class="tagline">A revenda no ritmo certo. · v1.0</p>
+      </div>
+    </div>
+
+    <h2>Logos</h2>
+    <div class="logos">
+      <div class="logo-card">
+        <img src="assets/revy-logo-full-dark.svg" width="200" height="46" alt="Logo full dark" />
+        <span>full-dark · fundo claro</span>
+      </div>
+      <div class="logo-card dark">
+        <img src="assets/revy-logo-full-light.svg" width="200" height="46" alt="Logo full light" />
+        <span>full-light · fundo escuro</span>
+      </div>
+      <div class="logo-card">
+        <img src="assets/revy-mark.svg" width="64" height="64" alt="Mark" />
+        <span>mark · 64²</span>
+      </div>
+      <div class="logo-card">
+        <img src="assets/revy-wordmark.svg" width="160" height="38" alt="Wordmark" />
+        <span>wordmark</span>
+      </div>
+    </div>
+
+    <h2>Paleta</h2>
+    <div class="swatches">
+      <div class="swatch"><div class="chip" style="background:#0B0F14"></div><div class="meta"><strong>Ink</strong><code>#0B0F14</code></div></div>
+      <div class="swatch"><div class="chip" style="background:#F7F5F1"></div><div class="meta"><strong>Paper</strong><code>#F7F5F1</code></div></div>
+      <div class="swatch"><div class="chip" style="background:#FF5A1F"></div><div class="meta"><strong>Signal</strong><code>#FF5A1F</code></div></div>
+      <div class="swatch"><div class="chip" style="background:#1C2430"></div><div class="meta"><strong>Slate</strong><code>#1C2430</code></div></div>
+      <div class="swatch"><div class="chip" style="background:#E8E4DC"></div><div class="meta"><strong>Mist</strong><code>#E8E4DC</code></div></div>
+      <div class="swatch"><div class="chip" style="background:#0F9F6E"></div><div class="meta"><strong>Ok</strong><code>#0F9F6E</code></div></div>
+      <div class="swatch"><div class="chip" style="background:#D97706"></div><div class="meta"><strong>Warn</strong><code>#D97706</code></div></div>
+      <div class="swatch"><div class="chip" style="background:#DC2626"></div><div class="meta"><strong>Danger</strong><code>#DC2626</code></div></div>
+    </div>
+
+    <h2>Tipografia</h2>
+    <div class="type-sample">
+      <div class="display">Revy · Space Grotesk</div>
+      <div class="body">DM Sans no corpo: simulação, estoque e painel com clareza de loja — sem corporativês.</div>
+      <div class="mono">ABC1D23 · R$ 489,90 · IBM Plex Mono</div>
+    </div>
+
+    <h2>UI — botões e KPIs</h2>
+    <div class="btn-row">
+      <button class="btn btn-primary" type="button">Nova simulação</button>
+      <button class="btn btn-ghost" type="button">Ver estoque</button>
+      <span class="badge badge-ok">Bot ativo</span>
+      <span class="badge badge-warn">Em progresso</span>
+      <span class="badge badge-danger">Falhou</span>
+    </div>
+    <div class="kpi-row" style="margin-top:16px">
+      <div class="kpi"><div class="label">Parcela a partir de</div><div class="value accent">R$ 489</div></div>
+      <div class="kpi"><div class="label">Meta do mês</div><div class="value">72%</div></div>
+      <div class="kpi"><div class="label">Leads abertos</div><div class="value">18</div></div>
+    </div>
+
+    <h2>WhatsApp — tom de voz</h2>
+    <div class="chat">
+      <div class="bubble">Oi! Sou o assistente da Motos Centro. Posso simular o financiamento ou te ajudar com o estoque. O que você prefere?</div>
+      <div class="bubble me">Quero simular uma CG 160</div>
+      <div class="bubble">Beleza. Pra simular com precisão, preciso do CPF e da data de nascimento. Pode enviar?</div>
+      <div class="bubble">Resumo: Honda CG 160 2023 · R$ 16.000 · entrada R$ 4.000 · 48x.<br/>Confirma pra eu buscar as condições?</div>
+    </div>
+
+    <h2>Módulos</h2>
+    <div class="modules">
+      <div class="mod"><strong>Revy Atende</strong><span>WhatsApp</span></div>
+      <div class="mod"><strong>Revy Simula</strong><span>Multi-banco</span></div>
+      <div class="mod"><strong>Revy Estoque</strong><span>Veículos e placa</span></div>
+      <div class="mod"><strong>Revy Vitrine</strong><span>Catálogo público</span></div>
+      <div class="mod"><strong>Revy Painel</strong><span>Vendedor e dono</span></div>
+      <div class="mod"><strong>Revy Tráfego</strong><span>Meta / CAPI</span></div>
+    </div>
+
+    <div class="hero hero-dark" style="margin-top:48px">
+      <img src="assets/revy-logo-full-light.svg" width="220" height="50" alt="Revy" />
+      <div>
+        <h1 style="font-size:28px">A revenda no ritmo certo.</h1>
+        <p class="tagline">Rápido no cliente. Sério no crédito. No controle da loja.</p>
+      </div>
+    </div>
+
+    <footer>
+      Documentação completa:
+      <a href="revy-brand-kit.md">revy-brand-kit.md</a>
+      · Assets em <code>docs/brand/assets/</code>
+    </footer>
+  </div>
+</body>
+</html>

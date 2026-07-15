@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="light">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Revy Painel — mock</title>
+  <link rel="icon" href="assets/revy-mark.svg" type="image/svg+xml" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    :root, [data-theme="light"] {
+      --bg: #ffffff;
+      --bg-side: #fafafa;
+      --fg: #0a0a0a;
+      --muted: #6b6b6b;
+      --line: #e8e8e8;
+      --soft: #f5f5f5;
+      --hover: #f0f0f0;
+      --ok: #0d7a4f;
+      --ok-bg: #e8f6ef;
+      --warn: #8a6d1d;
+      --warn-bg: #f7f1dc;
+      --danger: #b42318;
+      --danger-bg: #fef3f2;
+      --shadow: 0 1px 2px rgba(0,0,0,.04);
+    }
+    [data-theme="dark"] {
+      --bg: #0a0a0a;
+      --bg-side: #111111;
+      --fg: #f5f5f5;
+      --muted: #9a9a9a;
+      --line: #2a2a2a;
+      --soft: #161616;
+      --hover: #1a1a1a;
+      --ok: #3ecf8e;
+      --ok-bg: rgba(62,207,142,.12);
+      --warn: #e3b341;
+      --warn-bg: rgba(227,179,65,.12);
+      --danger: #f97066;
+      --danger-bg: rgba(249,112,102,.12);
+      --shadow: none;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
+      background: var(--bg);
+      color: var(--fg);
+      min-height: 100vh;
+      -webkit-font-smoothing: antialiased;
+    }
+    a { color: inherit; text-decoration: none; }
+    button { font: inherit; cursor: pointer; }
+
+    .shell {
+      display: grid;
+      grid-template-columns: 232px minmax(0, 1fr);
+      min-height: 100vh;
+    }
+    @media (max-width: 860px) {
+      .shell { grid-template-columns: 1fr; }
+      .side { display: none; }
+    }
+
+    .side {
+      border-right: 1px solid var(--line);
+      background: var(--bg-side);
+      padding: 20px 12px;
+      display: flex; flex-direction: column;
+      position: sticky; top: 0; height: 100vh;
+    }
+    .brand {
+      display: flex; align-items: center; gap: 10px;
+      padding: 4px 10px 20px;
+    }
+    .brand img { height: 18px; width: auto; }
+    [data-theme="dark"] .brand img.wm-light { display: block; }
+    [data-theme="dark"] .brand img.wm-dark { display: none; }
+    [data-theme="light"] .brand img.wm-light { display: none; }
+    [data-theme="light"] .brand img.wm-dark { display: block; }
+
+    .store {
+      margin: 0 6px 16px;
+      padding: 10px 12px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: var(--bg);
+    }
+    .store strong { display: block; font-size: 13px; font-weight: 600; }
+    .store span { font-size: 11px; color: var(--muted); }
+
+    .nav-label {
+      margin: 12px 12px 6px;
+      font-size: 11px; font-weight: 600; color: var(--muted);
+      letter-spacing: 0.04em; text-transform: uppercase;
+    }
+    .nav a {
+      display: flex; align-items: center; gap: 10px;
+      min-height: 38px; padding: 0 12px; margin: 1px 4px;
+      border-radius: 8px; font-size: 13px; font-weight: 500; color: var(--muted);
+    }
+    .nav a:hover { background: var(--hover); color: var(--fg); }
+    .nav a.active {
+      background: var(--bg); color: var(--fg);
+      border: 1px solid var(--line); box-shadow: var(--shadow);
+    }
+    .nav a em {
+      font-style: normal; font-size: 11px; color: var(--muted);
+      font-variant-numeric: tabular-nums; width: 18px;
+    }
+
+    .side-foot {
+      margin-top: auto; padding: 14px 10px 4px;
+      border-top: 1px solid var(--line);
+      display: flex; align-items: center; justify-content: space-between;
+      font-size: 12px; color: var(--muted);
+    }
+    .dot {
+      width: 7px; height: 7px; border-radius: 50%;
+      background: var(--ok); display: inline-block; margin-right: 6px;
+    }
+
+    .main { min-width: 0; }
+    .top {
+      height: 60px; display: flex; align-items: center; gap: 12px;
+      padding: 0 28px; border-bottom: 1px solid var(--line);
+      position: sticky; top: 0; background: color-mix(in srgb, var(--bg) 90%, transparent);
+      backdrop-filter: blur(10px); z-index: 10;
+    }
+    .top h1 { font-size: 16px; font-weight: 600; letter-spacing: -0.02em; }
+    .top .sub { font-size: 12px; color: var(--muted); }
+    .spacer { flex: 1; }
+    .chip {
+      display: inline-flex; align-items: center; gap: 6px;
+      height: 32px; padding: 0 12px; border-radius: 8px;
+      border: 1px solid var(--line); background: var(--bg);
+      font-size: 12px; font-weight: 500; color: var(--fg);
+    }
+    .chip:hover { background: var(--soft); }
+    .avatar {
+      width: 32px; height: 32px; border-radius: 8px;
+      background: var(--soft); border: 1px solid var(--line);
+      display: grid; place-items: center; font-size: 11px; font-weight: 600;
+    }
+
+    .content { padding: 28px; max-width: 1200px; }
+    .heading {
+      display: flex; align-items: flex-end; justify-content: space-between;
+      gap: 16px; margin-bottom: 22px;
+    }
+    .heading h2 {
+      font-size: 28px; font-weight: 600; letter-spacing: -0.03em; line-height: 1.1;
+    }
+    .heading p { margin-top: 4px; font-size: 14px; color: var(--muted); }
+    .btn {
+      height: 36px; padding: 0 14px; border-radius: 8px;
+      border: 1px solid transparent; font-size: 13px; font-weight: 600;
+      display: inline-flex; align-items: center;
+    }
+    .btn-primary { background: var(--fg); color: var(--bg); }
+    .btn-primary:hover { opacity: .9; }
+    .btn-line { background: var(--bg); border-color: var(--line); color: var(--fg); }
+    .btn-line:hover { background: var(--soft); }
+
+    .metrics {
+      display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px;
+      margin-bottom: 16px;
+    }
+    @media (max-width: 900px) { .metrics { grid-template-columns: 1fr 1fr; } }
+    .metric {
+      border: 1px solid var(--line); border-radius: 12px;
+      padding: 16px; background: var(--bg);
+    }
+    .metric span { display: block; font-size: 12px; color: var(--muted); }
+    .metric strong {
+      display: block; margin-top: 8px;
+      font-size: 28px; font-weight: 600; letter-spacing: -0.03em;
+    }
+
+    .grid { display: grid; grid-template-columns: 1.6fr 1fr; gap: 12px; }
+    @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } }
+
+    .panel {
+      border: 1px solid var(--line); border-radius: 12px;
+      background: var(--bg); overflow: hidden;
+    }
+    .panel-h {
+      padding: 14px 16px; border-bottom: 1px solid var(--line);
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .panel-h h3 { font-size: 14px; font-weight: 600; }
+    .panel-h a { font-size: 12px; color: var(--muted); font-weight: 500; }
+    .panel-h a:hover { color: var(--fg); }
+
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th {
+      text-align: left; padding: 10px 16px;
+      font-size: 11px; font-weight: 600; color: var(--muted);
+      background: var(--soft); border-bottom: 1px solid var(--line);
+    }
+    td { padding: 14px 16px; border-bottom: 1px solid var(--line); }
+    tr:last-child td { border-bottom: 0; }
+    tr:hover td { background: var(--soft); }
+
+    .pill {
+      display: inline-flex; align-items: center;
+      height: 22px; padding: 0 8px; border-radius: 999px;
+      font-size: 11px; font-weight: 600;
+      background: var(--soft); color: var(--muted);
+    }
+    .pill.ok { background: var(--ok-bg); color: var(--ok); }
+    .pill.warn { background: var(--warn-bg); color: var(--warn); }
+
+    .sim-list { padding: 8px; display: grid; gap: 8px; }
+    .sim-row {
+      display: grid; grid-template-columns: 1fr auto auto;
+      gap: 10px; align-items: center;
+      padding: 12px; border: 1px solid var(--line); border-radius: 10px;
+      font-size: 13px;
+    }
+    .sim-row strong { font-weight: 600; }
+    .sim-row span { color: var(--muted); font-size: 12px; }
+
+    .banner {
+      margin-bottom: 16px; padding: 12px 14px;
+      border: 1px solid var(--line); border-radius: 10px;
+      font-size: 13px; color: var(--muted);
+      background: var(--soft);
+    }
+    .banner a { color: var(--fg); font-weight: 600; text-decoration: underline; text-underline-offset: 2px; }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <aside class="side">
+      <a class="brand" href="index.html" aria-label="Revy">
+        <img class="wm-dark" src="assets/revy-wordmark.svg" alt="Revy" height="18" />
+        <img class="wm-light" src="assets/revy-wordmark-light.svg" alt="Revy" height="18" />
+      </a>
+
+      <div class="store">
+        <strong>motos-centro</strong>
+        <span>Loja conectada</span>
+      </div>
+
+      <nav class="nav" aria-label="Menu">
+        <div class="nav-label">Operação</div>
+        <a class="active" href="#"><em>01</em>Visão geral</a>
+        <a href="#"><em>02</em>Leads</a>
+        <a href="#"><em>03</em>Conversas</a>
+        <a href="#"><em>04</em>Estoque</a>
+        <a href="#"><em>05</em>Vendas</a>
+        <a href="#"><em>06</em>Simulações</a>
+        <div class="nav-label">Comercial</div>
+        <a href="#"><em>07</em>Financeiro</a>
+        <a href="#"><em>08</em>Metas</a>
+        <a href="#"><em>09</em>Tráfego</a>
+      </nav>
+
+      <div class="side-foot">
+        <span><i class="dot"></i>Online</span>
+        <button class="chip" type="button" id="themeBtn" aria-label="Alternar tema">Tema</button>
+      </div>
+    </aside>
+
+    <div class="main">
+      <header class="top">
+        <div>
+          <h1>Visão geral</h1>
+          <div class="sub">Operação de hoje</div>
+        </div>
+        <div class="spacer"></div>
+        <button class="chip" type="button" id="themeBtn2">Claro / escuro</button>
+        <div class="avatar">GU</div>
+      </header>
+
+      <div class="content">
+        <div class="banner">
+          Mock de design do <strong style="color:var(--fg)">Revy Painel</strong> —
+          visual limpo, sem laranja. <a href="index.html">Voltar à landing</a>
+        </div>
+
+        <div class="heading">
+          <div>
+            <h2>Bom trabalho.</h2>
+            <p>Números reais da loja. Se estiver vazio, fica vazio.</p>
+          </div>
+          <div style="display:flex;gap:8px">
+            <button class="btn btn-line" type="button">Exportar</button>
+            <button class="btn btn-primary" type="button">Nova simulação</button>
+          </div>
+        </div>
+
+        <div class="metrics">
+          <div class="metric"><span>Leads abertos</span><strong>18</strong></div>
+          <div class="metric"><span>Simulações</span><strong>7</strong></div>
+          <div class="metric"><span>Vendas</span><strong>2</strong></div>
+          <div class="metric"><span>Meta do mês</span><strong>72%</strong></div>
+        </div>
+
+        <div class="grid">
+          <section class="panel">
+            <div class="panel-h">
+              <h3>Leads recentes</h3>
+              <a href="#">Ver todos</a>
+            </div>
+            <table>
+              <thead>
+                <tr><th>Nome</th><th>Veículo</th><th>Status</th><th></th></tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>Ana Souza</td>
+                  <td>CG 160 2023</td>
+                  <td><span class="pill ok">simulou</span></td>
+                  <td style="color:var(--muted)">abrir</td>
+                </tr>
+                <tr>
+                  <td>Carlos M.</td>
+                  <td>PCX 160</td>
+                  <td><span class="pill">novo</span></td>
+                  <td style="color:var(--muted)">abrir</td>
+                </tr>
+                <tr>
+                  <td>Juliana R.</td>
+                  <td>Biz 125</td>
+                  <td><span class="pill warn">handoff</span></td>
+                  <td style="color:var(--muted)">abrir</td>
+                </tr>
+                <tr>
+                  <td>Pedro A.</td>
+                  <td>CG 160</td>
+                  <td><span class="pill ok">venda</span></td>
+                  <td style="color:var(--muted)">abrir</td>
+                </tr>
+              </tbody>
+            </table>
+          </section>
+
+          <section class="panel">
+            <div class="panel-h">
+              <h3>Últimas simulações</h3>
+              <a href="#">Histórico</a>
+            </div>
+            <div class="sim-list">
+              <div class="sim-row">
+                <div><strong>Santander</strong><br /><span>Ana · 48x</span></div>
+                <strong>R$ 489</strong>
+                <span class="pill ok">ok</span>
+              </div>
+              <div class="sim-row">
+                <div><strong>Pan</strong><br /><span>Ana · 48x</span></div>
+                <strong>R$ 512</strong>
+                <span class="pill ok">ok</span>
+              </div>
+              <div class="sim-row">
+                <div><strong>Fontecred</strong><br /><span>Carlos · 36x</span></div>
+                <strong>—</strong>
+                <span class="pill">timeout</span>
+              </div>
+            </div>
+          </section>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const root = document.documentElement;
+    const saved = localStorage.getItem('revy-theme');
+    if (saved === 'dark' || saved === 'light') root.setAttribute('data-theme', saved);
+
+    function toggle() {
+      const next = root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+      root.setAttribute('data-theme', next);
+      localStorage.setItem('revy-theme', next);
+    }
+    document.getElementById('themeBtn').addEventListener('click', toggle);
+    document.getElementById('themeBtn2').addEventListener('click', toggle);
+  </script>
+</body>
+</html>

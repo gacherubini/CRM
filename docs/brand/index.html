@@ -1,0 +1,660 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Revy — A revenda no ritmo certo</title>
+  <meta name="description" content="Sistema da revenda: WhatsApp, simulação multi-banco, estoque, vitrine e painel." />
+  <link rel="icon" href="assets/revy-mark.svg" type="image/svg+xml" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #ffffff;
+      --fg: #0a0a0a;
+      --muted: #6b6b6b;
+      --line: #e8e8e8;
+      --soft: #f5f5f5;
+      --soft-2: #fafafa;
+      --ok: #0d7a4f;
+      --ok-bg: #e8f6ef;
+      --warn: #8a6d1d;
+      --warn-bg: #f7f1dc;
+      --font: Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body {
+      font-family: var(--font);
+      background: var(--bg);
+      color: var(--fg);
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+    }
+    a { color: inherit; text-decoration: none; }
+    img { display: block; max-width: 100%; }
+
+    /* —— Full-bleed shell —— */
+    .nav {
+      position: fixed; inset: 0 0 auto 0; z-index: 40;
+      height: 64px;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0 clamp(20px, 4vw, 48px);
+      background: rgba(255,255,255,.92);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid transparent;
+    }
+    .nav.scrolled { border-bottom-color: var(--line); }
+    .nav-left, .nav-right { display: flex; align-items: center; gap: 28px; }
+    .nav-links { display: flex; gap: 24px; font-size: 14px; font-weight: 500; color: var(--muted); }
+    .nav-links a:hover { color: var(--fg); }
+    .wordmark { height: 22px; width: auto; }
+    .btn {
+      display: inline-flex; align-items: center; justify-content: center;
+      height: 40px; padding: 0 16px; border-radius: 8px;
+      font-size: 14px; font-weight: 600; border: 1px solid transparent;
+      transition: background .15s, color .15s, border-color .15s;
+    }
+    .btn-black { background: var(--fg); color: #fff; }
+    .btn-black:hover { background: #222; }
+    .btn-line { background: #fff; border-color: var(--line); color: var(--fg); }
+    .btn-line:hover { background: var(--soft); }
+    .btn-lg { height: 48px; padding: 0 22px; font-size: 15px; }
+
+    /* Hero = full viewport */
+    .hero {
+      min-height: 100vh;
+      min-height: 100dvh;
+      display: flex; flex-direction: column;
+      padding: 64px clamp(20px, 4vw, 48px) 0;
+    }
+    .hero-copy {
+      flex: 0 0 auto;
+      max-width: 920px;
+      padding: 72px 0 40px;
+    }
+    .hero h1 {
+      font-size: clamp(40px, 7vw, 72px);
+      font-weight: 600;
+      letter-spacing: -0.04em;
+      line-height: 1.02;
+      max-width: 14ch;
+    }
+    .hero .sub {
+      margin-top: 20px;
+      max-width: 36em;
+      font-size: clamp(16px, 1.6vw, 19px);
+      color: var(--muted);
+      font-weight: 400;
+    }
+    .hero-actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 28px; }
+
+    /* Hero storyboard: Bolha → Parcela → Chave */
+    .hero-stage {
+      flex: 1 1 auto;
+      min-height: 340px;
+      display: grid;
+      grid-template-columns: 1.4fr 1fr;
+      gap: 16px;
+      align-items: stretch;
+      padding-bottom: 32px;
+    }
+    @media (max-width: 900px) {
+      .hero-stage { grid-template-columns: 1fr; }
+      .nav-links { display: none; }
+      .hero-copy { padding-top: 48px; }
+    }
+
+    .hero-media {
+      position: relative;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      overflow: hidden;
+      background: var(--soft-2);
+      min-height: 340px;
+      box-shadow: 0 1px 2px rgba(0,0,0,.04), 0 12px 40px rgba(0,0,0,.06);
+    }
+    .hero-media video,
+    .hero-media .hero-fallback {
+      width: 100%; height: 100%;
+      object-fit: cover;
+      display: block;
+      min-height: 340px;
+    }
+    .hero-fallback {
+      display: flex; flex-direction: column; justify-content: flex-end;
+      padding: 24px;
+      background:
+        linear-gradient(180deg, #fafafa 0%, #f0f0f0 100%);
+      color: var(--muted);
+      font-size: 13px;
+    }
+    .hero-fallback strong {
+      display: block; color: var(--fg); font-size: 15px; font-weight: 600;
+      margin-bottom: 6px; letter-spacing: -0.02em;
+    }
+    .hero-overlay-label {
+      position: absolute; top: 14px; left: 14px;
+      font-size: 11px; font-weight: 600; letter-spacing: 0.04em;
+      text-transform: uppercase; color: var(--muted);
+      background: rgba(255,255,255,.9); border: 1px solid var(--line);
+      border-radius: 999px; padding: 5px 10px;
+    }
+
+    .story-beats {
+      display: flex; flex-direction: column; gap: 10px;
+    }
+    .beat {
+      flex: 1;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 16px 16px 14px;
+      background: #fff;
+      display: flex; flex-direction: column; gap: 8px;
+      min-height: 0;
+    }
+    .beat-num {
+      font-size: 11px; font-weight: 600; letter-spacing: 0.06em;
+      text-transform: uppercase; color: var(--muted);
+    }
+    .beat h3 {
+      font-size: 16px; font-weight: 600; letter-spacing: -0.02em;
+    }
+    .beat p { font-size: 13px; color: var(--muted); line-height: 1.4; margin: 0; }
+    .beat-visual {
+      margin-top: auto;
+      border-radius: 8px;
+      border: 1px solid var(--line);
+      background: var(--soft-2);
+      padding: 12px;
+      font-size: 13px;
+    }
+    .beat-visual .bubble-mini {
+      background: #fff; border-radius: 10px; padding: 8px 10px;
+      box-shadow: 0 1px 1px rgba(0,0,0,.04); max-width: 95%;
+      font-size: 12px; line-height: 1.35;
+    }
+    .beat-visual .num-big {
+      font-size: 22px; font-weight: 600; letter-spacing: -0.03em; color: var(--fg);
+    }
+    .beat-visual .num-sub { font-size: 12px; color: var(--muted); margin-top: 2px; }
+    .beat-visual .key-line {
+      font-size: 13px; color: var(--fg); font-weight: 500;
+    }
+
+    .ui {
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 1px 2px rgba(0,0,0,.04), 0 12px 40px rgba(0,0,0,.06);
+    }
+    .ui-bar {
+      height: 40px; display: flex; align-items: center; justify-content: space-between;
+      padding: 0 14px; border-bottom: 1px solid var(--line);
+      font-size: 12px; color: var(--muted); font-weight: 500;
+    }
+    .ui-dots { display: flex; gap: 5px; }
+    .ui-dots i { width: 8px; height: 8px; border-radius: 50%; background: #ddd; }
+
+    /* WA */
+    .wa { background: #efeae2; min-height: 360px; display: flex; flex-direction: column; }
+    .wa-top {
+      background: #fff; border-bottom: 1px solid var(--line);
+      padding: 10px 14px; display: flex; gap: 10px; align-items: center;
+    }
+    .wa-av {
+      width: 34px; height: 34px; border-radius: 50%; background: var(--fg); color: #fff;
+      display: grid; place-items: center; font-size: 11px; font-weight: 600;
+    }
+    .wa-top strong { display: block; font-size: 13px; font-weight: 600; }
+    .wa-top span { font-size: 11px; color: var(--muted); }
+    .wa-body { flex: 1; padding: 14px; display: flex; flex-direction: column; gap: 8px; }
+    .bubble {
+      max-width: 88%; padding: 9px 12px; border-radius: 10px;
+      font-size: 13px; line-height: 1.4; background: #fff;
+      box-shadow: 0 1px 1px rgba(0,0,0,.04);
+    }
+    .bubble.me { align-self: flex-end; background: #d9fdd3; }
+    .bubble time { display: block; text-align: right; font-size: 10px; color: #888; margin-top: 4px; }
+
+    /* Sim panel — clean like reference screenshot but light-first */
+    .sim-body { padding: 14px; background: #fff; }
+    .kpis { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 12px; }
+    .kpi {
+      border: 1px solid var(--line); border-radius: 10px; padding: 12px;
+      background: var(--soft-2);
+    }
+    .kpi label { display: block; font-size: 11px; color: var(--muted); margin-bottom: 4px; }
+    .kpi strong { font-size: 20px; font-weight: 600; letter-spacing: -0.03em; }
+    .row {
+      display: grid; grid-template-columns: 1.1fr 1fr .7fr auto;
+      gap: 8px; align-items: center;
+      padding: 12px; border: 1px solid var(--line); border-radius: 10px;
+      margin-bottom: 8px; font-size: 13px;
+    }
+    .row .bank { font-weight: 600; }
+    .row .val { font-weight: 600; letter-spacing: -0.02em; }
+    .row .meta { color: var(--muted); font-size: 12px; }
+    .pill {
+      font-size: 11px; font-weight: 600; padding: 3px 8px; border-radius: 999px;
+      background: var(--soft); color: var(--muted);
+    }
+    .pill.ok { background: var(--ok-bg); color: var(--ok); }
+    .note { margin-top: 10px; font-size: 12px; color: var(--muted); }
+
+    /* Full-width bands */
+    .band {
+      min-height: 100vh;
+      min-height: 100dvh;
+      display: flex; flex-direction: column; justify-content: center;
+      padding: clamp(64px, 10vh, 120px) clamp(20px, 4vw, 48px);
+      border-top: 1px solid var(--line);
+    }
+    .band-inner { max-width: 1200px; width: 100%; margin: 0 auto; }
+    .band.dark {
+      background: var(--fg);
+      color: #fff;
+      border-top-color: #0a0a0a;
+    }
+    .band.dark .muted, .band.dark .sub { color: rgba(255,255,255,.62); }
+    .band.soft { background: var(--soft-2); }
+
+    .eyebrow {
+      font-size: 12px; font-weight: 600; letter-spacing: 0.04em;
+      text-transform: uppercase; color: var(--muted); margin-bottom: 16px;
+    }
+    .band h2 {
+      font-size: clamp(32px, 4.5vw, 48px);
+      font-weight: 600; letter-spacing: -0.035em; line-height: 1.08;
+      max-width: 16ch;
+    }
+    .band .sub {
+      margin-top: 16px; max-width: 36em;
+      font-size: 17px; color: var(--muted);
+    }
+
+    .grid-2 {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 40px;
+    }
+    .grid-3 {
+      display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-top: 40px;
+    }
+    @media (max-width: 800px) {
+      .grid-2, .grid-3 { grid-template-columns: 1fr; }
+    }
+
+    .card {
+      background: #fff; border: 1px solid var(--line); border-radius: 12px;
+      padding: 24px; min-height: 180px;
+    }
+    .band.dark .card {
+      background: #141414; border-color: #2a2a2a; color: #fff;
+    }
+    .band.soft .card { background: #fff; }
+    .card h3 {
+      font-size: 18px; font-weight: 600; letter-spacing: -0.02em; margin-bottom: 8px;
+    }
+    .card p { font-size: 14px; color: var(--muted); line-height: 1.5; }
+    .band.dark .card p { color: rgba(255,255,255,.58); }
+
+    .shot {
+      margin-top: 40px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      overflow: hidden;
+      background: #fff;
+      box-shadow: 0 20px 50px rgba(0,0,0,.06);
+    }
+    .band.dark .shot { border-color: #2a2a2a; box-shadow: none; }
+
+    /* Portal mock inside landing */
+    .portal {
+      display: grid; grid-template-columns: 220px 1fr; min-height: 420px;
+      background: #fff; color: var(--fg);
+    }
+    .portal-side {
+      border-right: 1px solid var(--line); padding: 20px 14px;
+      background: #fafafa;
+    }
+    .portal-side .logo { height: 18px; margin-bottom: 28px; padding: 0 8px; }
+    .portal-nav a {
+      display: block; padding: 9px 10px; border-radius: 8px;
+      font-size: 13px; font-weight: 500; color: var(--muted); margin-bottom: 2px;
+    }
+    .portal-nav a.active { background: #fff; color: var(--fg); border: 1px solid var(--line); }
+    .portal-main { padding: 24px; }
+    .portal-main h4 { font-size: 20px; font-weight: 600; letter-spacing: -0.02em; }
+    .portal-main .hint { font-size: 13px; color: var(--muted); margin: 4px 0 20px; }
+    .mgrid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+    @media (max-width: 700px) {
+      .portal { grid-template-columns: 1fr; }
+      .portal-side { display: none; }
+      .mgrid { grid-template-columns: 1fr 1fr; }
+    }
+    .m {
+      border: 1px solid var(--line); border-radius: 10px; padding: 14px;
+    }
+    .m span { display: block; font-size: 11px; color: var(--muted); }
+    .m strong { display: block; margin-top: 6px; font-size: 24px; font-weight: 600; letter-spacing: -0.03em; }
+
+    .matrix {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 40px;
+    }
+    @media (max-width: 700px) { .matrix { grid-template-columns: 1fr; } }
+    .matrix ul { list-style: none; margin-top: 12px; }
+    .matrix li {
+      padding: 12px 0; border-top: 1px solid var(--line);
+      font-size: 14px; color: var(--muted);
+    }
+    .matrix li:first-child { border-top: 0; }
+    .matrix .yes li { color: var(--fg); }
+    .matrix h3 { font-size: 14px; font-weight: 600; }
+
+    .traits { display: grid; gap: 0; margin-top: 40px; max-width: 640px; }
+    .trait {
+      display: grid; grid-template-columns: 120px 1fr; gap: 16px;
+      padding: 16px 0; border-top: 1px solid rgba(255,255,255,.12);
+      font-size: 15px;
+    }
+    .trait strong { font-weight: 600; }
+    .trait span { color: rgba(255,255,255,.58); }
+    @media (max-width: 500px) { .trait { grid-template-columns: 1fr; gap: 4px; } }
+
+    .final {
+      min-height: 70vh;
+      display: flex; flex-direction: column; align-items: flex-start; justify-content: center;
+      padding: clamp(64px, 10vh, 120px) clamp(20px, 4vw, 48px);
+      border-top: 1px solid var(--line);
+    }
+    .final h2 {
+      font-size: clamp(36px, 5vw, 56px);
+      font-weight: 600; letter-spacing: -0.04em; line-height: 1.05;
+      max-width: 14ch;
+    }
+    .final .sub { margin-top: 16px; color: var(--muted); max-width: 32em; font-size: 17px; }
+    .final .hero-actions { margin-top: 28px; }
+
+    footer {
+      border-top: 1px solid var(--line);
+      padding: 24px clamp(20px, 4vw, 48px) 40px;
+      display: flex; flex-wrap: wrap; justify-content: space-between; gap: 16px;
+      font-size: 13px; color: var(--muted);
+    }
+    footer nav { display: flex; gap: 20px; }
+    footer a:hover { color: var(--fg); }
+  </style>
+</head>
+<body>
+  <header class="nav" id="nav">
+    <div class="nav-left">
+      <a href="#topo" aria-label="Revy">
+        <img class="wordmark" src="assets/revy-wordmark.svg" alt="Revy" width="90" height="22" />
+      </a>
+      <nav class="nav-links" aria-label="Principal">
+        <a href="#produto">Produto</a>
+        <a href="#painel">Painel</a>
+        <a href="#personalidade">Personalidade</a>
+        <a href="portal-mock.html">Portal mock</a>
+      </nav>
+    </div>
+    <div class="nav-right">
+      <a class="btn btn-line" href="preview.html">Brand</a>
+      <a class="btn btn-black" href="#cta">Começar</a>
+    </div>
+  </header>
+
+  <main id="topo">
+    <!-- HERO full viewport -->
+    <section class="hero">
+      <div class="hero-copy">
+        <h1>A revenda no ritmo certo.</h1>
+        <p class="sub">
+          WhatsApp, simulação multi-banco, estoque, vitrine e painel —
+          no tempo da loja, sem cara de robô e sem prometer crédito aprovado.
+        </p>
+        <div class="hero-actions">
+          <a class="btn btn-black btn-lg" href="#produto">Ver o produto</a>
+          <a class="btn btn-line btn-lg" href="portal-mock.html">Ver o painel</a>
+        </div>
+      </div>
+
+      <div class="hero-stage">
+        <!-- Slot pro vídeo Seedance: solte assets/hero.mp4 + hero-poster.jpg -->
+        <div class="hero-media" id="hero-media">
+          <span class="hero-overlay-label">Hero · 8–10s loop</span>
+          <video
+            id="hero-video"
+            muted
+            autoplay
+            loop
+            playsinline
+            poster="assets/hero-poster.jpg"
+            style="display:none"
+          >
+            <source src="assets/hero.mp4" type="video/mp4" />
+          </video>
+          <div class="hero-fallback" id="hero-fallback">
+            <strong>Bolha → parcela → chave</strong>
+            Confirma no WhatsApp, vê a condição, fecha o trato.<br />
+            Gere com Nano Banana + Seedance e salve em
+            <code style="font-size:12px">assets/hero.mp4</code>
+          </div>
+        </div>
+
+        <div class="story-beats" aria-label="Storyboard da animação">
+          <article class="beat">
+            <span class="beat-num">01 · 0–3s</span>
+            <h3>Bolha</h3>
+            <p>WhatsApp da loja. Tom Revy: confirma antes de simular.</p>
+            <div class="beat-visual">
+              <div class="bubble-mini">Confirma pra eu buscar as condições?</div>
+            </div>
+          </article>
+          <article class="beat">
+            <span class="beat-num">02 · 3–6s</span>
+            <h3>Parcela</h3>
+            <p>Números reais na tela — sem “aprovado mágico”.</p>
+            <div class="beat-visual">
+              <div class="num-big">R$ 489</div>
+              <div class="num-sub">48x · condições da loja</div>
+            </div>
+          </article>
+          <article class="beat">
+            <span class="beat-num">03 · 6–10s</span>
+            <h3>Chave</h3>
+            <p>Fechamento humano: chave da moto ou aperto sutil.</p>
+            <div class="beat-visual">
+              <div class="key-line">Trato fechado · time da loja</div>
+            </div>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- PRODUTO full band -->
+    <section class="band soft" id="produto">
+      <div class="band-inner">
+        <p class="eyebrow">Produto</p>
+        <h2>Operação da loja, ponta a ponta.</h2>
+        <p class="sub">
+          Atende, simula, organiza estoque e entrega o vendedor na hora certa.
+          Módulos plugáveis — sem monólito mágico.
+        </p>
+        <div class="grid-3">
+          <article class="card">
+            <h3>Atende</h3>
+            <p>WhatsApp com confirmação antes de agir. Handoff limpo quando o humano entra.</p>
+          </article>
+          <article class="card">
+            <h3>Simula</h3>
+            <p>Multi-banco, multi-prazo. Condições reais dos portais/APIs da loja.</p>
+          </article>
+          <article class="card">
+            <h3>Estoque & vitrine</h3>
+            <p>Cadastro por WA ou painel. Publica na vitrine. CTA vira lead com UTM.</p>
+          </article>
+          <article class="card">
+            <h3>Painel</h3>
+            <p>Vendas, metas, simulações e origem. Vazio quando não há dado — sem inventar número.</p>
+          </article>
+          <article class="card">
+            <h3>Tráfego</h3>
+            <p>Pixel Meta e Purchase na venda confirmada. Lead no clique, compra na venda.</p>
+          </article>
+          <article class="card">
+            <h3>Contratos</h3>
+            <p>Cada módulo fala por HTTP. Chatbot standalone não depende do portal.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- PAINEL full band — design reference -->
+    <section class="band" id="painel">
+      <div class="band-inner">
+        <p class="eyebrow">Painel</p>
+        <h2>Simples. Claro. Modo claro de verdade.</h2>
+        <p class="sub">
+          Menos glow de dashboard “IA”. Mais ferramenta de loja —
+          tipografia limpa, bordas finas, preto e branco.
+        </p>
+        <div class="shot">
+          <div class="portal">
+            <aside class="portal-side">
+              <img class="logo" src="assets/revy-wordmark.svg" alt="Revy" height="18" />
+              <nav class="portal-nav">
+                <a class="active" href="#">Visão geral</a>
+                <a href="#">Leads</a>
+                <a href="#">Conversas</a>
+                <a href="#">Estoque</a>
+                <a href="#">Simulações</a>
+                <a href="#">Vendas</a>
+                <a href="#">Metas</a>
+              </nav>
+            </aside>
+            <div class="portal-main">
+              <h4>Visão geral</h4>
+              <p class="hint">Motos Centro · hoje</p>
+              <div class="mgrid">
+                <div class="m"><span>Leads</span><strong>18</strong></div>
+                <div class="m"><span>Simulações</span><strong>7</strong></div>
+                <div class="m"><span>Vendas</span><strong>2</strong></div>
+                <div class="m"><span>Meta</span><strong>72%</strong></div>
+              </div>
+              <div style="margin-top:16px;border:1px solid var(--line);border-radius:10px;overflow:hidden">
+                <div style="display:grid;grid-template-columns:1.4fr 1fr 1fr .8fr;padding:10px 14px;background:var(--soft-2);font-size:11px;color:var(--muted);font-weight:600">
+                  <span>Lead</span><span>Veículo</span><span>Status</span><span></span>
+                </div>
+                <div style="display:grid;grid-template-columns:1.4fr 1fr 1fr .8fr;padding:14px;font-size:13px;border-top:1px solid var(--line)">
+                  <span>Ana Souza</span><span>CG 160 2023</span><span><span class="pill ok">simulou</span></span><span style="color:var(--muted)">abrir</span>
+                </div>
+                <div style="display:grid;grid-template-columns:1.4fr 1fr 1fr .8fr;padding:14px;font-size:13px;border-top:1px solid var(--line)">
+                  <span>Carlos M.</span><span>PCX 160</span><span><span class="pill">novo</span></span><span style="color:var(--muted)">abrir</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="hero-actions" style="margin-top:24px">
+          <a class="btn btn-black" href="portal-mock.html">Abrir mock do portal (claro / escuro)</a>
+        </div>
+      </div>
+    </section>
+
+    <!-- PERSONALIDADE full dark band -->
+    <section class="band dark" id="personalidade">
+      <div class="band-inner">
+        <p class="eyebrow" style="color:rgba(255,255,255,.5)">Personalidade</p>
+        <h2>Co-piloto da loja.<br />Não mascote.</h2>
+        <p class="sub">
+          Fala pouco. Confirma antes de gravar. Não promete aprovação.
+          No WhatsApp é a voz da loja. No painel é ferramenta.
+        </p>
+        <div class="traits">
+          <div class="trait"><strong>Rápido</strong><span>Mensagens curtas. Status explícito.</span></div>
+          <div class="trait"><strong>Preciso</strong><span>Resumo + confirmação antes de simular.</span></div>
+          <div class="trait"><strong>Honesto</strong><span>Taxa real. Timeout sem desculpa.</span></div>
+          <div class="trait"><strong>Parceiro</strong><span>Handoff limpo. Bot pausa pro humano.</span></div>
+          <div class="trait"><strong>Sem teatro</strong><span>Zero hype de IA. Produto pela operação.</span></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="band">
+      <div class="band-inner">
+        <p class="eyebrow">Limites</p>
+        <h2>É Revy. Não é Revy.</h2>
+        <div class="matrix">
+          <div class="card yes">
+            <h3>É Revy</h3>
+            <ul>
+              <li>“Confirma pra eu buscar as condições?”</li>
+              <li>“3 opções dos bancos da loja”</li>
+              <li>“Time humano assumiu — bot pausado”</li>
+              <li>Painel vazio quando não há venda</li>
+            </ul>
+          </div>
+          <div class="card">
+            <h3>Não é Revy</h3>
+            <ul>
+              <li>“Você já está aprovado”</li>
+              <li>Glow laranja e cara de dashboard de IA</li>
+              <li>Bot insistindo depois do vendedor</li>
+              <li>CRM genérico de pipeline SaaS</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="final" id="cta">
+      <h2>A revenda no ritmo certo.</h2>
+      <p class="sub">Marca limpa. Produto operacional. Painel que não grita.</p>
+      <div class="hero-actions">
+        <a class="btn btn-black btn-lg" href="portal-mock.html">Mock do portal</a>
+        <a class="btn btn-line btn-lg" href="revy-brand-kit.md">Brand kit</a>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div>
+      <img src="assets/revy-wordmark.svg" alt="Revy" height="16" style="height:16px;width:auto;display:inline-block;vertical-align:middle;margin-right:8px" />
+      a revenda no ritmo certo
+    </div>
+    <nav>
+      <a href="portal-mock.html">Portal mock</a>
+      <a href="preview.html">Tokens</a>
+      <a href="revy-brand-kit.md">Docs</a>
+    </nav>
+  </footer>
+
+  <script>
+    const nav = document.getElementById('nav');
+    const onScroll = () => nav.classList.toggle('scrolled', window.scrollY > 8);
+    onScroll();
+    window.addEventListener('scroll', onScroll, { passive: true });
+
+    // Mostra o vídeo do Seedance se hero.mp4 existir
+    const video = document.getElementById('hero-video');
+    const fallback = document.getElementById('hero-fallback');
+    if (video) {
+      const probe = () => {
+        video.style.display = 'block';
+        if (fallback) fallback.style.display = 'none';
+        video.play().catch(() => {});
+      };
+      video.addEventListener('loadeddata', probe);
+      video.addEventListener('error', () => {
+        video.style.display = 'none';
+        if (fallback) fallback.style.display = 'flex';
+      });
+      // força tentativa de load
+      video.load();
+    }
+  </script>
+</body>
+</html>
