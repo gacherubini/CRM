@@ -52,6 +52,10 @@ Detalham a Task 12 do #1A (1º driver `real: true`). Ler junto com o #1A:
 - [**Fan-out multi-banco + workers Playwright sob demanda**](2026-07-14-plano1a-workers-playwright-sob-demanda.md)
   — design aprovado em 2026-07-14; pré-cria slots Fly parados, acorda por banco, agrega resultados
   incrementais e desliga ao esvaziar a fila. **Planejado; ainda não implementado.**
+- [**Bradesco Turbo — implementação**](2026-07-15-plano1a-task12-bradesco-implementacao.md) —
+  Playwright a partir do codegen 2026-07-15; entrada opcional; **não implementado**.
+- [**Pan portal (“Buscopan”) — dual-path**](2026-07-15-plano1a-task12-pan-playwright-implementacao.md) —
+  portal lojista quando não há config OpenAPI; API `pan.py` permanece; **não implementado**.
 
 ## Pacotes comerciais
 

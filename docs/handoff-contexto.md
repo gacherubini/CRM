@@ -1,15 +1,61 @@
 # Handoff técnico — suíte automotiva
 
-> Checkpoint: **2026-07-15 (Fontecred LIVE + endurecimento de sessão/modal/esperas + deploy validado)**.
+> Checkpoint: **2026-07-15 (noite) — front Revy no main + planos Bradesco/Pan portal**.
 > Confirme containers/`.env`/n8n antes de editar. Testes unitários ≠ E2E WhatsApp.  
 > Leia primeiro: `docs/contexto-compacto.md`. Planos válidos: `docs/plans/README.md`.  
 > **Lições Playwright obrigatórias antes do próximo banco:**
 > `docs/plans/2026-07-13-playwright-licoes-santander.md` e
 > `docs/plans/2026-07-15-playwright-licoes-fontecred.md`.
-> **Próximo plano do Motor:** `docs/plans/2026-07-14-plano1a-workers-playwright-sob-demanda.md`.
-> Commits Fontecred `ce75e60`, `8ac4b92` e `1165690` estão em **`origin/main`**.
+> **Próximos bancos (planos prontos, código ainda não):**
+> `docs/plans/2026-07-15-plano1a-task12-bradesco-implementacao.md` e
+> `docs/plans/2026-07-15-plano1a-task12-pan-playwright-implementacao.md`.
+> **Arquitetura workers:** `docs/plans/2026-07-14-plano1a-workers-playwright-sob-demanda.md`.
+> Front Revy: commit **`e40cfab`** em **`origin/main`**. Fontecred: `ce75e60`/`8ac4b92`/`1165690`.
 
-## Checkpoint mais recente — Fontecred LIVE
+## Checkpoint mais recente — front Revy + planos Bradesco / Pan portal (2026-07-15 noite)
+
+### Entregue nesta sessão (docs + front)
+
+- **Commit/push front:** `e40cfab feat(front): marca Revy no portal, catálogo e site marketing`
+  - Portal: tema claro/escuro (`data-theme` + localStorage), Inter, nav “Dia a dia/Gestão”,
+    wordmark Revy, login/listagens alinhados.
+  - Catálogo: CSS/templates alinhados à marca.
+  - `site/` versionado: landing marketing + `Dockerfile`/`fly.toml` app **`site2037`**.
+- **Planos Motor (não implementados):**
+  1. Bradesco Turbo Lojista — Playwright; entrada **opcional**; multi-prazo `Nx de R$`.
+  2. Pan “Buscopan” — dual-path: mantém `PanDriver` API; novo `PanPortalDriver` se só
+     usuario/senha; entrada **opcional**; falta HTML da tela de ofertas no codegen.
+- Codegen do dono ficou em arquivo **local** (`Downloads/Bradesco.txt`) — **não versionar**.
+  Continha senha em claro do portal Pan → **recomendar troca de senha** antes do smoke live.
+- Mapa de bancos e `docs/plans/README.md` atualizados com os dois planos.
+
+### Fly lab (estado operacional)
+
+- Scripts: `bash deploy/fly/down-all.sh` (para machines; **não** apaga apps/volumes) e
+  `bash deploy/fly/up-all.sh` (sobe + always-on backends).
+- Apps da suíte no `down-all`: `portal2037`, `catalogo2037`, `motor2037`, `estoque2037`,
+  `chatbot2037`, `n8n2037`, `evolution2037`, `suite-pg`.
+- **`site2037` não está no `down-all.sh`** — se estiver ligado, parar à parte
+  (`fly machine stop -a site2037` / listar machines) ou incluir no script em PR futuro.
+- **Antes de desligar a noite:** o dono pediu confirmação explícita — não rodar `down-all`
+  sem “sim, desliga”.
+
+### Próximo agente (manhã / próximo foco Motor)
+
+1. Implementar **Bradesco** task-by-task pelo plano (API gate → parsers → driver → REAL_DRIVERS → live).
+2. Em paralelo (humano): salvar HTML anonimizado da **tela de ofertas Pan** (Task 0 do plano portal).
+3. Depois Pan dual-path; não misturar no mesmo PR do Bradesco.
+4. Não reabrir Fontecred sem evidência nova.
+5. Fan-out workers sob demanda continua planejado, não bloqueante para 1 banco novo.
+
+### Credenciais / segurança
+
+- Cadastrar Bradesco/Pan só via `PUT /v1/provedores/<banco>/credenciais` ou Portal 9A.
+- Nunca commitar o `.txt` de codegen nem colar senhas em issue/commit.
+
+---
+
+## Checkpoint anterior — Fontecred LIVE
 
 ### Estado entregue
 

@@ -19,10 +19,10 @@ implementam a mesma interface `Driver`; o resto do Motor não muda.
 | Banco | URL de acesso | Login | API? (reconhecimento 2026-07-13) | Caminho provável | Fluxo mapeado? |
 |---|---|---|---|---|---|
 | **Santander** | `financiamentos.santander.com.br/originacao-auto/login` | usuário+senha | **NÃO** (piloto confirmou só portal) | Playwright **LIVE OK** | **Sim** — login + passo 1 + ofertas multi-prazo (2026-07-13) |
-| **Pan** | `veiculos.bancopan.com.br/login` | usuário+senha, sem 2FA | **PROVÁVEL SIM** — portal dev com doc de *Financiamento de Veículos* (gated/registro) | **Confirmar API antes** → provável `ApiBankDriver` | Não |
+| **Pan** | `veiculos.bancopan.com.br/login` | usuário+senha, sem 2FA | **API no código** (`PanDriver` OpenAPI) — credencial developer da loja **a validar live** | **Dual-path:** API se config completa; senão **Playwright portal** (codegen 2026-07-15 parcial) | **Parcial** — login+placa+valor; falta HTML de ofertas multi-prazo. Plano: `2026-07-15-plano1a-task12-pan-playwright-implementacao.md` |
 | **BV** (Votorantim) | portal lojista a levantar | a levantar | **PROVÁVEL SIM** — doc "Iniciar Simulação Financiamento Veículo (V4)" no portal dev | **Confirmar API antes** → provável `ApiBankDriver` | Não |
-| **Bradesco** | `turbo.bradesco/originacaolojista/login` | usuário+senha, sem 2FA | **provável** — portal dev robusto (120+ APIs, teste livre); confirmar produto auto | **Confirmar API antes** → talvez `ApiBankDriver` | Não |
-| **Fontecred** | `app.fontecred.com.br/login` | usuário+senha, sem 2FA | **provável NÃO** — fintech menor (moto/bike), sem doc de API achada | Playwright *(se confirmado sem API)* | Não |
+| **Bradesco** | `turbo.bradesco/originacaolojista/login` | usuário+senha, sem 2FA | **provável** API pública, mas loja usa Turbo web hoje | **Playwright Turbo** (codegen 2026-07-15); gate API rápido no plano | **Sim (codegen)** — login → proposta → pessoa → veículo → simulação multi-prazo. Plano: `2026-07-15-plano1a-task12-bradesco-implementacao.md` |
+| **Fontecred** | `app.fontecred.com.br/login` | usuário+senha, sem 2FA | **NÃO** (piloto Playwright) | Playwright **LIVE OK** | **Sim** — ver lições 2026-07-15 |
 
 ## Achados de reconhecimento (2026-07-13)
 

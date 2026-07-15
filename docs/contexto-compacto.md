@@ -1,19 +1,23 @@
 # Contexto compacto para continuidade
 
-Atualizado em **2026-07-15** (Fontecred LIVE, Registros/prints por etapa, sessão persistida endurecida,
-Motor 2 GB e design de workers por banco sob demanda). Leia isto primeiro; detalhes em
+Atualizado em **2026-07-15 (noite)** (front Revy no main `e40cfab`; planos Bradesco + Pan portal;
+Fontecred LIVE; workers sob demanda planejados). Leia isto primeiro; detalhes em
 `docs/handoff-contexto.md`.
-**Playwright / próximos bancos:** ler as lições do
-[Santander](plans/2026-07-13-playwright-licoes-santander.md) e do
+**Playwright / próximos bancos:** lições
+[Santander](plans/2026-07-13-playwright-licoes-santander.md) e
 [Fontecred](plans/2026-07-15-playwright-licoes-fontecred.md).
-**Próxima arquitetura do Motor:** `docs/plans/2026-07-14-plano1a-workers-playwright-sob-demanda.md`.
+**Implementar em seguida:**
+[Bradesco](plans/2026-07-15-plano1a-task12-bradesco-implementacao.md) e
+[Pan portal dual-path](plans/2026-07-15-plano1a-task12-pan-playwright-implementacao.md).
+**Arquitetura workers:** `docs/plans/2026-07-14-plano1a-workers-playwright-sob-demanda.md`.
 Planos válidos: `docs/plans/README.md`. **Ignore** `docs/plans/_archive/`.
 
 ## Checkpoint Fly.io (2026-07-14)
 
 - Org/região: `crm-419` / `gru`; alvo de custo: **US$10/mês**, modo laboratório.
 - Apps: `motor2037`, `estoque2037`, `chatbot2037`, `catalogo2037`, `portal2037`,
-  `evolution2037`, `n8n2037`; banco `suite-pg`; Redis Upstash `suite-redis`.
+  `site2037` (landing Revy), `evolution2037`, `n8n2037`; banco `suite-pg`; Redis Upstash
+  `suite-redis`. `site2037` ainda **fora** do `down-all.sh` — parar à parte se precisar.
 - Uma Machine por app. **Opção A aplicada no Fly (2026-07-14):** backends **always-on** —
   `motor2037`, `estoque2037`, `chatbot2037` (`autostop=false` nas machines; health OK).
   **Portal e Catálogo** autostop; **Evolution e n8n** always-on; Postgres ligado.
@@ -51,10 +55,11 @@ Planos válidos: `docs/plans/README.md`. **Ignore** `docs/plans/_archive/`.
 - Não ler/imprimir `.env`, tokens, chaves Gemini/Evolution/Motor/Portal/CAPI ou senhas.
 - Estoque = fonte de verdade. Integrações só por **HTTP** entre produtos.
 - Ordem: `#0 → #1A → #4A → #2A → #5A → #3A/#3A.1 → #3B → #6` (+ ops #7 Fly).
-- Simulação: **mock** até driver `real: true`. **Santander e Fontecred = reais**. No Santander a
-  **entrada é calculada pelo banco** e devolvida (campo `entrada` no resultado) — não é input.
-  No Fontecred, celular e placa são obrigatórios; sessão fria e quente precisam de testes separados.
-  Demais bancos: híbrido **API-first** + Playwright só se não houver API.
+- Simulação: **mock** até driver `real: true`. **Santander e Fontecred = reais**. **Pan** = API no
+  código (live depende de credenciais developer); portal lojista planejado como fallback. **Bradesco**
+  planejado Playwright Turbo (codegen). No Santander a **entrada é calculada pelo banco**. Bradesco/
+  Pan portal: **entrada opcional** (só se o user mandar). Fontecred: celular e placa obrigatórios;
+  sessão fria/quente separadas.
 - Senhas de portal: Dashboard **9A** → Motor cifrado (Task 11).
 - Bot WhatsApp: transporte Evolution → n8n confirmado, mas go-live da IA ainda depende da credencial
   Gemini, da chave Evolution nos dois nós HTTP e de um teste E2E com resposta.
