@@ -59,7 +59,7 @@ declare -A FALLBACK_ID=(
   [chatbot2037]=d8d1375a42e578
   [portal2037]=6837936c0d73d8
   [catalogo2037]=0807560c916768
-  [n8n2037]=0807564f9034e8
+  [n8n2037]=d8946d0f703228
   [evolution2037]=7847926f5d1758
 )
 
