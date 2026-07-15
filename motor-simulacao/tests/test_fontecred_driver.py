@@ -163,7 +163,7 @@ def test_fechar_comunicados_usa_seletor_bootstrap_5():
     driver = FontecredDriver()
     page = MagicMock()
     titulo = MagicMock()
-    titulo.is_visible.side_effect = [True, True, False]
+    titulo.is_visible.return_value = False
     page.get_by_text.return_value.first = titulo
     page.get_by_role.return_value.first.click.side_effect = RuntimeError("sem botão")
 
@@ -175,6 +175,8 @@ def test_fechar_comunicados_usa_seletor_bootstrap_5():
     page.locator.return_value.first.click.assert_called_once_with(
         timeout=3_000, force=True
     )
+    titulo.wait_for.assert_any_call(state="visible", timeout=5_000)
+    titulo.wait_for.assert_any_call(state="hidden", timeout=5_000)
 
 
 def test_fechar_comunicados_falha_se_modal_persistir():
@@ -205,6 +207,24 @@ def test_nova_proposta_aceita_timeout_se_cpf_ja_apareceu():
         timeout=20_000,
     )
     cpf_box.wait_for.assert_called_once_with(state="visible", timeout=15_000)
+    cpf_box.click.assert_called_once_with(trial=True, timeout=15_000)
+    page.wait_for_load_state.assert_called_once_with(
+        "domcontentloaded", timeout=20_000
+    )
+
+
+def test_pos_login_aguarda_dashboard_e_dom_pronto():
+    driver = FontecredDriver(timeout_ms=20_000)
+    page = MagicMock()
+
+    driver._aguardar_pos_login(page)
+
+    expressao = page.wait_for_function.call_args_list[0].args[0]
+    assert "COMUNICADOS" in expressao
+    assert "Dashboard" in expressao
+    page.wait_for_load_state.assert_called_once_with(
+        "domcontentloaded", timeout=20_000
+    )
 
 
 def test_evento_registra_print_por_etapa(monkeypatch):

@@ -447,12 +447,21 @@ class FontecredDriver(PlaywrightBankDriver):
 
     def _aguardar_pos_login(self, page) -> None:
         timeout = max(self.timeout_ms, 45_000)
-        # Área logada: saiu de /login e menu com "Propostas"/"Simulador".
+        # O portal pode renderizar o Dashboard antes de atualizar /login. Esperamos
+        # um sinal real da área autenticada, em vez de depender apenas da URL.
         try:
             page.wait_for_function(
-                "() => !/\\/login\\b/i.test(location.pathname)",
+                """() => {
+                    const texto = document.body?.innerText || '';
+                    return !/\\/login\\b/i.test(location.pathname)
+                        || /COMUNICADOS/i.test(texto)
+                        || /Dashboard/i.test(texto);
+                }""",
                 timeout=timeout,
             )
+            self._aguardar_dom_pronto(page)
+            # Dá tempo para o modal concluir a animação de entrada.
+            page.wait_for_timeout(800)
             return
         except Exception:
             pass
@@ -486,10 +495,34 @@ class FontecredDriver(PlaywrightBankDriver):
             "login_timeout", "Login não concluiu a tempo (ainda na tela de login)."
         )
 
+    def _aguardar_dom_pronto(self, page, timeout_ms: int | None = None) -> None:
+        """Aguarda o DOM utilizável sem exigir networkidle do portal."""
+        timeout = min(timeout_ms or self.timeout_ms, 20_000)
+        try:
+            page.wait_for_load_state("domcontentloaded", timeout=timeout)
+        except Exception:
+            pass
+        try:
+            page.wait_for_function(
+                "() => document.readyState === 'interactive' "
+                "|| document.readyState === 'complete'",
+                timeout=timeout,
+            )
+        except Exception:
+            pass
+
     def _fechar_comunicados(self, page) -> None:
         """Fecha o pop-up COMUNICADOS e confirma que não bloqueia mais a tela."""
-        if not self._comunicados_visivel(page):
-            return
+        titulo = page.get_by_text(
+            re.compile(r"^\s*COMUNICADOS\s*$", re.I)
+        ).first
+        try:
+            titulo.wait_for(
+                state="visible", timeout=min(self.timeout_ms, 5_000)
+            )
+        except Exception:
+            if not self._comunicados_visivel(page):
+                return
 
         for tentativa in (
             lambda: page.get_by_role("button", name=re.compile(r"Fechar", re.I)).first.click(
@@ -504,8 +537,12 @@ class FontecredDriver(PlaywrightBankDriver):
         ):
             try:
                 tentativa()
-                page.wait_for_timeout(300)
+                try:
+                    titulo.wait_for(state="hidden", timeout=5_000)
+                except Exception:
+                    pass
                 if not self._comunicados_visivel(page):
+                    page.wait_for_timeout(500)
                     return
             except Exception:
                 continue
@@ -536,8 +573,10 @@ class FontecredDriver(PlaywrightBankDriver):
             # O portal pode concluir a troca de página e manter requisições pendentes.
             # Nesse caso o goto lança timeout, mas o formulário já está utilizável.
             pass
+        self._aguardar_dom_pronto(page)
         try:
             cpf_box.wait_for(state="visible", timeout=min(self.timeout_ms, 15_000))
+            cpf_box.click(trial=True, timeout=min(self.timeout_ms, 15_000))
             return
         except Exception:
             pass
@@ -555,8 +594,10 @@ class FontecredDriver(PlaywrightBankDriver):
                 except Exception:
                     continue
             if clicou:
+                self._aguardar_dom_pronto(page, 10_000)
                 try:
                     cpf_box.wait_for(state="visible", timeout=5_000)
+                    cpf_box.click(trial=True, timeout=5_000)
                     return
                 except Exception:
                     continue
@@ -574,11 +615,14 @@ class FontecredDriver(PlaywrightBankDriver):
         page.wait_for_timeout(800)
         nasc = _formatar_nascimento_iso(sol.pessoa.nascimento)
         nasc_box = page.get_by_role("textbox", name=re.compile(r"Nascimento", re.I)).first
+        nasc_box.wait_for(state="visible", timeout=self.timeout_ms)
+        nasc_box.click(trial=True, timeout=self.timeout_ms)
         nasc_box.fill(nasc)
         # Portal só carrega (habilita o restante) ao SAIR do campo — blur = "clicar fora".
         nasc_box.blur()
-        page.wait_for_timeout(1_500)
         cel_box = page.get_by_role("textbox", name=re.compile(r"Celular", re.I)).first
+        cel_box.wait_for(state="visible", timeout=self.timeout_ms)
+        cel_box.click(trial=True, timeout=self.timeout_ms)
         cel_box.fill(sol.pessoa.celular or "")
         cel_box.blur()
         page.wait_for_timeout(500)
@@ -591,15 +635,19 @@ class FontecredDriver(PlaywrightBankDriver):
             pass
         placa = (sol.veiculo.placa or "").replace("-", "").upper()
         placa_box = page.get_by_role("textbox", name=re.compile(r"^Placa$", re.I))
+        placa_box.first.wait_for(state="visible", timeout=self.timeout_ms)
+        placa_box.first.click(trial=True, timeout=self.timeout_ms)
         placa_box.first.click()
         placa_box.first.fill(placa)
         page.keyboard.press("Tab")
         page.wait_for_timeout(1_200)
         # Portal resolve o veículo pela placa e mostra uma linha p/ selecionar.
         try:
-            page.get_by_role("row").filter(
+            selecionar = page.get_by_role("row").filter(
                 has=page.get_by_role("button")
-            ).first.get_by_role("button").click(timeout=self.timeout_ms)
+            ).first.get_by_role("button")
+            selecionar.wait_for(state="visible", timeout=self.timeout_ms)
+            selecionar.click(timeout=self.timeout_ms)
         except Exception:
             # Sem linha => placa não resolveu.
             raise ErroTransitorio(
@@ -675,8 +723,23 @@ class FontecredDriver(PlaywrightBankDriver):
             pass
 
     def _passo_simular_e_modais(self, page) -> None:
-        page.get_by_role("button", name=re.compile(r"^Simular$", re.I)).first.click()
-        page.wait_for_timeout(800)
+        simular = page.get_by_role("button", name=re.compile(r"^Simular$", re.I)).first
+        simular.wait_for(state="visible", timeout=self.timeout_ms)
+        simular.click(trial=True, timeout=self.timeout_ms)
+        simular.click()
+        # Aguarda o portal reagir: modal PEP, seguro, resultado ou erro. Se a
+        # simulação ainda estiver processando, o passo seguinte mantém a espera.
+        try:
+            page.wait_for_function(
+                r"""() => {
+                    const texto = document.body?.innerText || '';
+                    return /PEP|Continuar sem prote|Ocorreu um erro|falha/i.test(texto)
+                        || /\d+\s*x\b/i.test(texto);
+                }""",
+                timeout=min(self.timeout_ms, 15_000),
+            )
+        except Exception:
+            pass
         # Modal PEP ("Você é um PEP?") — respondemos p/ seguir (não-PEP: "Não").
         try:
             dialog = page.get_by_role("dialog", name=re.compile(r"PEP", re.I))
