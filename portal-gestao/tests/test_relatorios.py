@@ -1,11 +1,20 @@
 import csv
 import io
+from datetime import date, datetime, timezone
 from decimal import Decimal
 
 from conftest import login
 
 from app.db import SessionLocal
+from app.financeiro_calc import _data
 from app.models import Meta, Venda, VendaCustoDireto
+
+
+def test_data_financeira_converte_utc_para_fuso_do_portal():
+    virada_utc = datetime(2026, 7, 15, 1, 30, tzinfo=timezone.utc)
+    assert _data(virada_utc) == date(2026, 7, 14)
+    # SQLite remove o tzinfo na leitura; o valor ingênuo continua representando UTC.
+    assert _data(virada_utc.replace(tzinfo=None)) == date(2026, 7, 14)
 
 
 def criar_venda_confirmada(preco, custo=None, comissao=None, loja_slug="loja-teste", vendedor_email="dono@loja.test"):

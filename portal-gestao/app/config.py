@@ -26,6 +26,7 @@ class Settings:
         os.getenv("MOTOR_TOKEN") or os.getenv("MOTOR_API_TOKEN", "")
     )
     request_timeout: float = float(os.getenv("PORTAL_HTTP_TIMEOUT", "5"))
+    timezone: str = os.getenv("PORTAL_TIMEZONE", "America/Sao_Paulo")
     version: str = os.getenv("PORTAL_VERSION", "0.1.0")
 
 

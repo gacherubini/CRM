@@ -57,7 +57,7 @@ def _limpar_banco(db):
     # Rollback limpa transação residual (ex.: worker multi-commit no mesmo StaticPool).
     db.rollback()
     for tabela in (
-        "simulacao_tentativas", "simulacao_resultados", "idempotencia", "simulacoes",
+        "simulacao_eventos", "simulacao_tentativas", "simulacao_resultados", "idempotencia", "simulacoes",
         "auditoria", "credenciais_provedor", "credenciais_api", "clientes_api",
     ):
         db.execute(text(f"DELETE FROM {tabela}"))

@@ -58,6 +58,27 @@ def test_get_nunca_vaza_senha(client):
     assert "senha" not in item  # a senha em claro nunca é uma chave do payload
 
 
+def test_pan_guarda_configuracao_api_completa_cifrada(client, db):
+    campos = {
+        "api_key": "api-key-secreta",
+        "secret_key": "secret-key-secreta",
+        "usuario": "usuario-npv",
+        "senha": "senha-npv",
+        "id_loja": "98329834",
+        "tipo_id_loja": "CODIGO",
+        "codigo_produto": "MOTOS",
+        "tipo_calculo": "VALOR_ENTRADA",
+    }
+    resp = client.put("/v1/provedores/pan/credenciais", json={"campos": campos})
+    assert resp.status_code == 200
+    assert resp.json()["configuracao_completa"] is True
+    assert "api-key-secreta" not in resp.text
+    row = db.query(CredencialProvedorORM).filter_by(provedor="pan").one()
+    assert "api-key-secreta" not in (row.config_cifrada or "")
+    config = credenciais.obter_configuracao_para_uso(db, row.cliente_id, "pan")
+    assert config == campos
+
+
 def test_credencial_e_isolada_por_cliente(db):
     cliente_a, id_a = _cliente(db, "Loja A", "token-a")
     cliente_b, id_b = _cliente(db, "Loja B", "token-b")

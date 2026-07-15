@@ -12,7 +12,11 @@ primary_region = "gru"
   MOTOR_ENV = "production"
   MOTOR_SKIP_INIT = "1"
   MOTOR_WORKER_INTERVALO = "2"
-  MOTOR_JOB_LEASE_SECONDS = "180"
+  # Lease maior que o deadline do driver evita outro worker reprocessar um job vivo.
+  MOTOR_JOB_LEASE_SECONDS = "300"
+  MOTOR_DRIVER_TIMEOUT_SECONDS = "240"
+  MOTOR_EVENT_SCREENSHOTS = "1"
+  MOTOR_SCREENSHOT_RETENTION_DAYS = "7"
   MOTOR_BROWSER_HEADLESS = "0"
   MOTOR_BROWSER_TIMEOUT_MS = "60000"
   PLAYWRIGHT_CHROMIUM_USE_HEADLESS_SHELL = "0"
@@ -23,14 +27,15 @@ primary_region = "gru"
 [processes]
   app = "/srv/scripts/fly-entrypoint.sh"
 
-# API e worker compartilham uma única Machine no modo laboratório.
+# API e worker compartilham uma única Machine.
+# Always-on: Portal/Catálogo/n8n precisam do Motor sem cold-start (opção A lab/ops).
 [[services]]
   processes = ["app"]
   internal_port = 8000
   protocol = "tcp"
-  auto_stop_machines = "stop"
+  auto_stop_machines = false
   auto_start_machines = true
-  min_machines_running = 0
+  min_machines_running = 1
 
   [[services.ports]]
     port = 8000
@@ -44,6 +49,7 @@ primary_region = "gru"
 [[vm]]
   processes = ["app"]
   size = "shared-cpu-2x"
+  # API + worker Playwright headed: o Chromium reserva mais de 512MB ao iniciar.
   memory = "2048"
 
 # Sessões autenticadas e screenshots do navegador.

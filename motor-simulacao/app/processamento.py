@@ -66,6 +66,48 @@ def _limite_total_driver(segundos: int):
         signal.signal(signal.SIGALRM, anterior)
 
 
+def _invocar_driver(driver: Driver, sol: SolicitacaoSimulacao, ctx: DriverContext | None):
+    """Aceita drivers novos ``(sol, ctx)`` e legados ``(sol,)``."""
+    try:
+        return driver(sol, ctx)
+    except TypeError:
+        return driver(sol)
+
+
+def _invocar_driver_com_deadline(
+    driver: Driver,
+    sol: SolicitacaoSimulacao,
+    ctx: DriverContext | None,
+    segundos: int,
+):
+    """Aplica deadline também onde SIGALRM não existe, como no Windows."""
+    if segundos <= 0:
+        return _invocar_driver(driver, sol, ctx)
+    if threading.current_thread() is threading.main_thread() and hasattr(signal, "SIGALRM"):
+        with _limite_total_driver(segundos):
+            return _invocar_driver(driver, sol, ctx)
+
+    resultado: list[object] = []
+    erro: list[BaseException] = []
+    concluido = threading.Event()
+
+    def executar() -> None:
+        try:
+            resultado.append(_invocar_driver(driver, sol, ctx))
+        except BaseException as exc:
+            erro.append(exc)
+        finally:
+            concluido.set()
+
+    thread = threading.Thread(target=executar, name="motor-driver-deadline", daemon=True)
+    thread.start()
+    if not concluido.wait(segundos):
+        raise DriverDeadlineExceeded("driver excedeu o tempo máximo")
+    if erro:
+        raise erro[0]
+    return resultado[0]
+
+
 def _agora() -> datetime:
     return datetime.now(timezone.utc)
 
@@ -219,12 +261,9 @@ def _executar_driver(
     for tentativa in range(1, MAX_TENTATIVAS_DRIVER + 1):
         inicio = time.perf_counter()
         try:
-            # Drivers novos: (sol, ctx). Legados de teste: (sol,) apenas.
-            with _limite_total_driver(config.DRIVER_TIMEOUT_SECONDS):
-                try:
-                    res = driver(sol, ctx)
-                except TypeError:
-                    res = driver(sol)
+            res = _invocar_driver_com_deadline(
+                driver, sol, ctx, config.DRIVER_TIMEOUT_SECONDS
+            )
             dur = int((time.perf_counter() - inicio) * 1000)
             _registrar_tentativa(db, sim.id, nome, tentativa, dur, "concluida", None)
             return res if isinstance(res, list) else [res]

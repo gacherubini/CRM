@@ -1,13 +1,63 @@
 # Handoff técnico — suíte automotiva
 
-> Checkpoint: **2026-07-14 (deploy Fly.io lab + Evolution → n8n confirmado; sessão #3B + fixes Motor)**.
+> Checkpoint: **2026-07-14 (registros/prints de simulação + PAN API foundation + deploy + diagnóstico
+> de memória + plano de workers sob demanda)**.
 > Confirme containers/`.env`/n8n antes de editar. Testes unitários ≠ E2E WhatsApp.  
 > Leia primeiro: `docs/contexto-compacto.md`. Planos válidos: `docs/plans/README.md`.  
 > **Lições Playwright (obrigatório antes do próximo banco):**  
 > `docs/plans/2026-07-13-playwright-licoes-santander.md`.  
-> Commits desta sessão estão em **`main` local** (ainda **sem push** — combine antes de enviar).
+> **Próximo plano do Motor:** `docs/plans/2026-07-14-plano1a-workers-playwright-sob-demanda.md`.
+> Commits `0758a9c` e `e55a3c9` estão **commitados e enviados para `origin/main`**.
 
-## Checkpoint 2026-07-14 (sessão #3B + fixes Motor + ops Fly)
+## Checkpoint mais recente — observabilidade, PAN e produção
+
+### Entregue no código
+
+- **Registros por simulação:** timeline sanitizada, endpoints de eventos/print, botão pequeno
+  **Registros** no Portal e tela de diagnóstico ao vivo.
+- **Screenshots protegidos:** capturas em pontos úteis do Playwright, tenancy/RBAC, `no-store` e
+  retenção de 7 dias. Se o browser não chega a abrir página, não há print possível.
+- **Fim de job infinito:** timeout duro do driver em 240 s, lease de 300 s e evento final de erro.
+- **Base Banco PAN via API:** `ApiBankDriver`, `PanDriver`, catálogo de campos e credenciais genéricas
+  cifradas. Ainda exige contrato/credenciais reais do PAN para chamada live.
+- **Santander:** Portal envia o provider canônico `santander` minúsculo; mock homônimo não sombreia o
+  driver real.
+- Migrations Motor: `0010` (credencial/config PAN) e `0011` (eventos/prints). Head atual: **0011**.
+- Testes do checkpoint: **Motor 123 pass** e **Portal 152 pass**.
+
+### Git e deploy
+
+- `0758a9c feat(motor): adiciona registros ao vivo e base API Pan` — `origin/main`.
+- `e55a3c9 fix(motor): reserva memoria para o Chromium` — `origin/main`.
+- `motor2037`: migrations 0010/0011 aplicadas; API, worker e Xvfb ativos; health 1/1.
+- `portal2037`: imagem com Registros publicada; health 1/1 e login público validado.
+
+### Incidente diagnosticado e correção
+
+- Job `42bba895-f0f6-44bb-9b7a-df34cc3e15fd` parou em `browser_iniciando` e foi finalizado por
+  `timeout_driver`; não ficou infinito.
+- Evidência do kernel na Machine de 512 MB: Chrome tentou alocar 536870912 bytes e recebeu
+  `not enough memory for the allocation`.
+- Motor foi aumentado de 512 MB para **2048 MB**. Após o restart: ~1968 MB totais, health OK e probe
+  Chromium headed abriu em **34,41 s**.
+- Produção atual ainda combina API+worker numa Machine **always-on de 2 GB**. Isso resolve o RPA,
+  porém mantém RAM provisionada mesmo ociosa.
+
+### Direção aprovada — workers por banco sob demanda
+
+- Uma simulação vira uma tarefa por banco; resultados chegam incrementalmente.
+- Workers Playwright são pré-criados, ficam `stopped`, iniciam em paralelo via Machines API e saem 0
+  após fila + idle grace, voltando a `stopped`.
+- PAN e outros bancos com API usam pool leve, sem browser de 2 GB.
+- Começar com Santander 2 GB; testar canário de 1,5 GB somente após telemetria. 512 MB é inválido.
+- Screenshots/storage state precisam sair do Fly Volume único para object storage privado antes de
+  escalar para várias Machines.
+- Implementação **não começou**; fonte de verdade é o plano novo citado no topo.
+
+> As seções abaixo registram o checkpoint anterior. Números `108/148`, migration `0009` e Motor
+> `512MB` são históricos e foram superados por este bloco.
+
+## Checkpoint anterior 2026-07-14 (sessão #3B + fixes Motor + ops Fly)
 
 Trabalho feito com 3 agentes paralelos em worktrees, integrado e testado no `main`:
 
@@ -48,11 +98,11 @@ Testes pós-integração: **Motor 108** · **Portal 148** (128 + 9 metas + 11 re
 
 | Componente | App/recurso | Machine | Estado/configuração relevante |
 |---|---|---|---|
-| Motor | `motor2037` | `0807560c916d68` | API+worker na mesma Machine; privado/Flycast; autostop |
-| Estoque | `estoque2037` | `287e35dbd147e8` | API+outbox na mesma Machine; privado/Flycast; autostop |
-| Chatbot | `chatbot2037` | `d8d1375a42e578` | privado/Flycast; autostop |
-| Catálogo | `catalogo2037` | `0807560c916768` | público; autostop; volume `catalogo_data` |
-| Portal | `portal2037` | `6837936c0d73d8` | público; autostop; volume `portal_data` |
+| Motor | `motor2037` | `0807560c916d68` | API+worker; Flycast; **always-on (opção A)**; **512MB lab** (2048 p/ RPA) |
+| Estoque | `estoque2037` | `287e35dbd147e8` | API+outbox na mesma Machine; privado/Flycast; **always-on (opção A)** |
+| Chatbot | `chatbot2037` | `d8d1375a42e578` | privado/Flycast; **always-on (opção A)** — n8n não quebra no cold-start |
+| Catálogo | `catalogo2037` | `0807560c916768` | público; autostop ok; volume `catalogo_data` |
+| Portal | `portal2037` | `6837936c0d73d8` | público; autostop ok; volume `portal_data` |
 | Evolution | `evolution2037` | `7847926f5d1758` | v2.3.7, 1 GB; **sempre-ligado** (autostop=false); volume `evolution_instances` |
 | n8n | `n8n2037` | `0807564f9034e8` | v2.26.8, 1 GB; **sempre-ligado** (autostop=false); volume `n8n_data` |
 | PostgreSQL | `suite-pg` | `d8946d2f320de8` | Postgres Flex 18.1; 256 MB; volume `pg_data`; ligado |
@@ -100,14 +150,20 @@ agendados. Não criar segunda Machine/volume sem revisar o teto mensal.
 
 ### Autostop e custo observado
 
-- Eventos reais: Portal ~5m37s, Catálogo ~5m45s, Chatbot ~6m03s e Estoque ~6m07s até autostop.
-- Fly não oferece duração customizada de idle; escolhe-se `stop`, `suspend` ou sempre ligado.
-- n8n suspenso retoma mais rápido; manter essa configuração no laboratório.
-- Evolution dormindo não recebe WhatsApp para se acordar sozinha. Para teste, abrir o Manager/API antes.
-- Evolution 1 GB sempre ligada em `gru` foi estimada em ~US$9,20/mês; somada ao Postgres e volumes
-  ultrapassa o teto de US$10. **Decisão tomada em 2026-07-14:** Evolution e n8n ficam always-on
-  (`autostop=false`, `min_machines_running=1`) — WhatsApp/automações não podem suspender. O teto de
-  US$10 fica flexibilizado por essa escolha; revisar no go-live.
+- **Opção A APLICADA no Fly (2026-07-14):** machines de `motor2037` / `estoque2037` /
+  `chatbot2037` com `autostop=false`, `started`, checks **passing**. Health flycast OK entre eles.
+  `fly.toml` atualizado no repo; redeploy completo falhou em `gru` por capacidade no
+  `release_command` — config live via `fly machine update --autostop=off`.
+- **Motor lab = 512MB** (antes 2048). RPA Santander: `fly machine update … --vm-memory 2048` e
+  liberar RAM (parar Portal/Catálogo) se der `mem_overcommit_exceeded`.
+- **Orçamento de memória da org:** ~4.3GB always-on (pg+3 backends 512 + n8n 1G + evo 1G).
+  **Portal e Catálogo não cabem os dois started juntos** com essa config — um por vez (ou
+  aumentar limite da org / reduzir n8n/evo).
+- Portal validado HTTP **200** `/health/ready` com backends always-on.
+- Custo sobe; teto US$10 do lab já flexibilizado.
+- **Lab stop/start:** `deploy/fly/down-all.sh` (para machines) + `deploy/fly/up-all.sh`
+  (PG → backends always-on → evo/n8n → portal; catálogo só com `--catalogo`).
+  Stop/start **preserva** `autostop=off` nos backends; o `up-all` ainda reaplica.
 
 ### Dados e pendências funcionais
 
@@ -206,8 +262,9 @@ docker compose exec -T motor-worker sh -c "pgrep -a Xvfb; pgrep -a python"
     dono/gerente via `pode_ver_relatorios`).
   - **#3B Metas por vendedor UI (FEITO):** escopo loja/vendedor no form, validação de sobreposição,
     atingimento individual no `/app/vendedor` (lucro oculto do vendedor).
-- **Falta:** #3B **Task 4** (eventos do funil) e **Task 5** (campanhas/atribuição); Playwright E2E;
-  retry outbox CAPI.
+- **Falta:** #3B **Task 4** (eventos do funil) e **Task 5** (campanhas/atribuição metadados);
+  Playwright E2E; retry outbox CAPI. **Disparo** WhatsApp em massa / e-mail: esboço **#6 E11/E12**
+  (não implementar sem priorizar; ver plano6).
   - **Nota histórico:** sims **anteriores** ao deploy têm `solicitado_por` nulo → não aparecem em "minhas
     sims"; dono vê no escopo "toda a loja". Novas sims populam normalmente.
 
@@ -233,9 +290,11 @@ Detalhe operacional: **`docs/plans/2026-07-13-playwright-licoes-santander.md`**.
 - Workspace: `C:\Users\guilh\Documents\codigo\bot-whatsapp-financiamento`.
 - Integrações **só HTTP**. Tokens só no servidor.
 - **Nunca** ler/versionar `.env`, tokens Motor/Chatbot, Evolution, Gemini, chaves de cifra, senhas de portal.
-- n8n versionado: placeholders. Ordem planos: `#0 → #1A → #4A → #2A → #5A → #3A/#3A.1 → #3B → #6`.
+- n8n versionado: placeholders. Ordem planos: `#0 → #1A → #4A → #2A → #5A → #3A/#3A.1 → #3B → #6` (+ #7 ops).
 - Parcelas com nome de banco **sem** `real: true` = mock.
 - Próximo banco Playwright: **API-first** — só robô se confirmar sem API.
+- Roadmap #6 limpo em 2026-07-14: **E9 fora**; E2/E4/E7 adiados; **E13–E18** aprovados (notif,
+  reserva, PDF, troco, onboarding, domínio); rejeitados C2/C5/C7/C8/C10/C12.
 
 ## Próximos passos (ordem sugerida para o próximo agente)
 

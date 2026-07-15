@@ -8,8 +8,9 @@ from __future__ import annotations
 import calendar
 import hashlib
 import hmac
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from decimal import ROUND_HALF_UP, Decimal
+from zoneinfo import ZoneInfo
 
 from sqlalchemy.orm import Session
 
@@ -17,6 +18,7 @@ from app.config import settings
 from app.models import AtendimentoAtribuicao, Meta, Venda
 
 CENTAVOS = Decimal("0.01")
+FUSO_PORTAL = ZoneInfo(settings.timezone)
 
 
 def dinheiro(texto) -> Decimal:
@@ -24,7 +26,17 @@ def dinheiro(texto) -> Decimal:
 
 
 def _data(momento):
-    return momento.date() if isinstance(momento, datetime) else momento
+    if not isinstance(momento, datetime):
+        return momento
+    # SQLite devolve DateTime sem tzinfo mesmo quando a coluna foi declarada com
+    # timezone=True. Os timestamps persistidos pelo Portal são UTC.
+    if momento.tzinfo is None:
+        momento = momento.replace(tzinfo=timezone.utc)
+    return momento.astimezone(FUSO_PORTAL).date()
+
+
+def hoje_portal() -> date:
+    return datetime.now(timezone.utc).astimezone(FUSO_PORTAL).date()
 
 
 def ultimo_dia_mes(dia: date) -> date:
@@ -32,7 +44,7 @@ def ultimo_dia_mes(dia: date) -> date:
 
 
 def periodo_padrao(inicio: str | None, fim: str | None) -> tuple[date, date]:
-    hoje = date.today()
+    hoje = hoje_portal()
     try:
         d_inicio = date.fromisoformat(inicio) if inicio else hoje.replace(day=1)
     except ValueError:
@@ -48,7 +60,11 @@ def data_api(valor) -> date | None:
     if not valor:
         return None
     try:
-        return datetime.fromisoformat(str(valor).replace("Z", "+00:00")).date()
+        texto = str(valor).replace("Z", "+00:00")
+        if len(texto) == 10:
+            return date.fromisoformat(texto)
+        momento = datetime.fromisoformat(texto)
+        return _data(momento) if momento.tzinfo is not None else momento.date()
     except (TypeError, ValueError):
         return None
 

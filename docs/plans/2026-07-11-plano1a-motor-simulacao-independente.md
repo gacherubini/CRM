@@ -2,13 +2,16 @@
 
 > Plano válido do Motor. O #1 monolítico está em `docs/plans/_archive/` (não executar).
 >
-> **Status 2026-07-13:** mock async, auth/tenancy, worker/lease, cifra, **Task 11** e **Task 12 piloto
+> **Status 2026-07-14:** mock async, auth/tenancy, worker/lease, cifra, **Task 11** e **Task 12 piloto
 > Santander LIVE** (Playwright headed+Xvfb, multi-prazo real no Portal, **entrada retornada pelo banco**
-> via `parse_entrada`, **fix skeleton** dos cards). **Listagem `GET /v1/simulacoes` + `solicitado_por`
-> FEITA** (Task 16; migrations head **0009**). Lições: `2026-07-13-playwright-licoes-santander.md`.
-> **Aberto:** Task 10 (revenda); demais bancos reais (API-first); multi-banco paralelo; `testar-login`
-> real; **2 falhas pré-existentes** (mock `Santander` sombreado pelo driver real homônimo). Contrato
-> multi-prazo no Motor **já existe**.
+> via `parse_entrada`, **fix skeleton** dos cards). Histórico por usuário, **Registros/prints ao vivo**,
+> timeout duro de 240 s e base API do PAN entregues; migrations head **0011**. Suíte de testes
+> **123 verde**. Lições:
+> `2026-07-13-playwright-licoes-santander.md`.
+> **Aberto:** Task 10 (revenda multi-tenant); credenciais/contrato PAN; demais bancos reais
+> (API-first); fan-out multi-banco e workers sob demanda conforme
+> `2026-07-14-plano1a-workers-playwright-sob-demanda.md`; `testar-login` real. Contrato multi-prazo
+> no Motor **já existe**.
 
 **Goal:** Entregar uma API de simulação instalável e vendável separadamente, capaz de operar com
 mock agora e drivers bancários depois, sem depender de WhatsApp, n8n, Portal, Estoque ou Chatbot.
@@ -314,10 +317,11 @@ separados. Agregador fica como adapter opcional quando houver contrato comercial
 **Aceite:** job com mock + 1 real em paralelo; parcial visível; WhatsApp/Chatbot só consomem o
 contrato HTTP existente.
 
-**Concorrência multi-banco (dono 2026-07-13):** quando o job pede vários bancos RPA, o Motor
-abre **um browser Playwright por banco** (isolado), com teto de paralelismo no worker; API
-drivers sem browser. **Histórico de simulações do usuário: FEITO** (#3A.1 Task 16 — listagem
-`GET /v1/simulacoes` + `solicitado_por`). Multi-banco paralelo ainda a implementar.
+**Concorrência multi-banco (design aprovado 2026-07-14):** o job cria uma tarefa por banco;
+workers Playwright pré-criados ficam parados, são acordados em paralelo e desligam após esvaziar a
+fila. API drivers não usam browser. Rollout e rollback estão detalhados em
+`2026-07-14-plano1a-workers-playwright-sob-demanda.md`. **Histórico de simulações do usuário: FEITO**
+(#3A.1 Task 16 — listagem `GET /v1/simulacoes` + `solicitado_por`). Fan-out ainda não implementado.
 
 ## Integrações opcionais
 

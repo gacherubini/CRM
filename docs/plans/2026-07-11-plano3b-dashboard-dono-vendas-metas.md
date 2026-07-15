@@ -1,9 +1,11 @@
 # Plano #3B — Dashboard do Dono, Vendas e Metas
 
-> **Pré-requisito:** #3A. **Status 2026-07-13:** Tasks 1–3 e 6–7 parciais entregues (vendas, custos,
+> **Pré-requisito:** #3A. **Status 2026-07-14:** Tasks 1–3 e 6–7 parciais entregues (vendas, custos,
 > metas de loja, `/app/financeiro`, `/app/vendedor`, funil). **E10:** confirmar venda dispara
 > Purchase CAPI (outbox; não bloqueia venda). Credenciais de banco = **#3A Task 9A** (feita) + Motor.
-> **Aberto:** metas por vendedor UI, campanhas, CSV, reconciliação E2E, equipe/config (Tasks 4–5, 8–10).
+> **CSV export (Task 8)** e **metas por vendedor UI** feitos. **Aberto:** eventos funil (Task 4),
+> campanhas metadados/atribuição (Task 5), reconciliação E2E, equipe/config (Tasks 9–10).
+> **Disparo** WA em massa / e-mail = roadmap **#6 E11/E12** (não misturar com Task 5).
 > Não inferir venda/lucro só a partir de mensagens/leads.
 
 **Goal:** Dar ao dono e gerente visão confiável de vendas, metas, desempenho dos vendedores,
@@ -68,6 +70,12 @@ Chatbot são idempotentes; ações manuais geram os mesmos tipos de evento.
 
 Cadastrar/importar campanha, origem, canal, UTM e custo. Primeira versão usa atribuição declarada:
 `first_touch` e `last_touch`, exibidas separadamente. Não prometer causalidade automática.
+
+> **Envio real (outbound):** disparo WhatsApp em massa e campanhas por e-mail **não** são esta task
+> — vivem no roadmap **#6 E11** (WA, envio no Chatbot) e **#6 E12** (e-mail, envio no Portal).
+> Esta Task 5 cria o **cadastro/metadados** de campanha (`canal`, UTM, custo, período) que E11/E12
+> reutilizam como `campanha_id` para atribuição (e depois **E8** ROI). Implementar Task 5 sem envio
+> já permite marcar origem manualmente; E11/E12 plugar o botão “Disparar”.
 
 ### Task 6: Dashboard do vendedor
 
