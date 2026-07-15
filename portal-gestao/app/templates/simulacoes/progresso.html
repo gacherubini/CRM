@@ -12,7 +12,7 @@
     <span class="eyebrow"><i></i> Ao vivo</span>
     <h1>Simulação em andamento</h1>
     <p>
-      O Motor está consultando o portal do banco. Esta página atualiza sozinha a cada
+      O Motor está consultando o banco. Esta página atualiza sozinha a cada
       {{ refresh_segundos | default(3) }}s — não feche até ver o resultado.
     </p>
   </div>
@@ -36,9 +36,9 @@
       <strong>{{ status_label }}</strong>
       <p class="muted" style="margin:6px 0 0">
         {% if status == 'recebida' %}
-          Na fila do worker. Em instantes o navegador automatizado abre o portal lojista.
+          Na fila do worker. Em instantes o conector inicia a consulta.
         {% elif status == 'processando' %}
-          Login e leitura de parcelas no Santander em curso (Playwright). Pode demorar até ~90s.
+          Autenticação e leitura das parcelas em curso. Pode demorar alguns instantes.
         {% elif status == 'erro_motor' %}
           Não foi possível consultar o Motor. A página tenta de novo automaticamente.
         {% else %}
@@ -52,7 +52,7 @@
 <section class="panel form-section">
   <div class="section-title">
     <span>01</span>
-    <div><h2>O que está acontecendo</h2><p>Etapas do job Santander.</p></div>
+    <div><h2>O que está acontecendo</h2><p>Etapas do job bancário.</p></div>
   </div>
   <ol class="sim-steps">
     {% for passo in passos %}
@@ -102,6 +102,7 @@
 
 <div class="form-actions">
   <a class="button ghost" href="/app/simulacoes">Cancelar e voltar</a>
+  <a class="button secondary" href="/app/simulacoes/{{ sim_id }}/registros">Ver registros e prints</a>
   <a class="button primary" href="/app/simulacoes/job/{{ sim_id }}">Atualizar agora</a>
 </div>
 {% endblock %}

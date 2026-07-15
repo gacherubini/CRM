@@ -38,7 +38,7 @@
       <td>{% if s.prazos_meses %}{{ s.prazos_meses | join(', ') }}x{% else %}<span class="muted">—</span>{% endif %}</td>
       <td>{% if s.provedores %}{{ s.provedores | join(', ') }}{% else %}<span class="muted">—</span>{% endif %}</td>
       {% if escopo == 'loja' %}<td>{% if s.solicitado_por %}{{ s.solicitado_por }}{% else %}<span class="muted">—</span>{% endif %}</td>{% endif %}
-      <td><a class="table-action" href="/app/simulacoes/job/{{ s.id }}">Abrir</a></td>
+      <td><a class="table-action" href="/app/simulacoes/job/{{ s.id }}">Abrir</a> <a class="table-action" href="/app/simulacoes/{{ s.id }}/registros">Registros</a></td>
     </tr>{% endfor %}</tbody>
   </table></div>
   {% elif integracao_erro %}<div class="empty"><strong>Não foi possível carregar o histórico.</strong><p>Tente novamente em instantes.</p></div>

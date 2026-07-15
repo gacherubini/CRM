@@ -100,7 +100,7 @@ def test_simular_santander_vai_ao_motor_nao_chatbot(client, chatbot_fake, motor_
     assert chatbot_fake.simulacoes == []
     assert len(motor_fake.simulacoes) == 1
     body = motor_fake.simulacoes[0]
-    assert body["provedores"] == ["Santander"]
+    assert body["provedores"] == ["santander"]
     assert body["veiculo"]["placa"] == "FUV7G58"
     assert body["pessoa"]["cnh"] is True
 
@@ -110,6 +110,37 @@ def test_simular_santander_vai_ao_motor_nao_chatbot(client, chatbot_fake, motor_
     assert "946,28" in job.text or "946.28" in job.text
     assert "santander" in job.text.lower()
     assert "FUV7G58" in job.text
+
+
+def test_simular_pan_monta_payload_da_openapi(client, chatbot_fake, motor_fake):
+    login(client, papel="dono")
+    csrf = _csrf_do_form(client)
+    dados = {
+        "csrf": csrf,
+        "modo": "pan",
+        "cpf": "52998224725",
+        "nascimento": "1990-05-20",
+        "renda": "4000",
+        "ddd": "11",
+        "celular": "999999999",
+        "codigo_natureza_ocupacao": "01",
+        "codigo_provedor": "HONDA-CG-2025",
+        "ano_modelo": "2025",
+        "zero_km": "sim",
+        "uf_licenciamento": "SP",
+        "valor": "22000",
+        "entrada": "5000",
+        "prazos_meses": "24,36,48",
+        "categoria": "moto",
+    }
+    resposta = client.post("/app/simulacoes", data=dados, follow_redirects=False)
+    assert resposta.status_code == 303
+    assert chatbot_fake.simulacoes == []
+    body = motor_fake.simulacoes[0]
+    assert body["provedores"] == ["pan"]
+    assert body["pessoa"]["ddd"] == "11"
+    assert body["veiculo"]["codigo_provedor"] == "HONDA-CG-2025"
+    assert body["veiculo"]["zero_km"] is True
 
 
 def test_job_em_processamento_mostra_progresso(client, chatbot_fake, motor_fake):
@@ -136,11 +167,40 @@ def test_job_em_processamento_mostra_progresso(client, chatbot_fake, motor_fake)
     job = client.get(post.headers["location"])
     assert job.status_code == 200
     assert "Simulação em andamento" in job.text
-    assert "Processando no Santander" in job.text or "Consultando portal Santander" in job.text
+    assert "Processando no banco" in job.text or "Consultando Santander" in job.text
     assert 'http-equiv="refresh"' in job.text
     assert "FUV7G58" in job.text
     # CPF completo não vaza
     assert "52998224725" not in job.text
+
+
+def test_registros_mostram_timeline_e_link_de_print_para_dono(
+    client, chatbot_fake, motor_fake
+):
+    login(client, papel="dono")
+    resposta = client.get("/app/simulacoes/sim-motor-1/registros")
+    assert resposta.status_code == 200
+    assert "Preparando o navegador" in resposta.text
+    assert "Login confirmado" in resposta.text
+    assert "Ver print desta etapa" in resposta.text
+    assert 'http-equiv="refresh"' in resposta.text
+
+
+def test_vendedor_ve_timeline_mas_nao_abre_print(client, chatbot_fake, motor_fake):
+    login(client, papel="vendedor")
+    pagina = client.get("/app/simulacoes/sim-motor-1/registros")
+    assert pagina.status_code == 200
+    assert "Print restrito" in pagina.text
+    imagem = client.get("/app/simulacoes/sim-motor-1/registros/2/print")
+    assert imagem.status_code == 403
+
+
+def test_dono_abre_print_sem_cache(client, chatbot_fake, motor_fake):
+    login(client, papel="dono")
+    imagem = client.get("/app/simulacoes/sim-motor-1/registros/2/print")
+    assert imagem.status_code == 200
+    assert imagem.content == b"PNG-FAKE"
+    assert "no-store" in imagem.headers["cache-control"]
 
 
 def test_job_na_fila_mostra_etapa_enfileirada(client, chatbot_fake, motor_fake):
