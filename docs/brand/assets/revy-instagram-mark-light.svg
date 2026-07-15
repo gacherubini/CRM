@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1080" viewBox="0 0 1080 1080" role="img" aria-label="Revy">
+  <title>Revy — Instagram mark (light)</title>
+  <rect width="1080" height="1080" fill="#FFFFFF"/>
+  <text
+    x="540"
+    y="580"
+    text-anchor="middle"
+    dominant-baseline="middle"
+    font-family="Inter, system-ui, -apple-system, 'Segoe UI', sans-serif"
+    font-size="520"
+    font-weight="600"
+    letter-spacing="-16"
+    fill="#0A0A0A"
+  >R</text>
+</svg>

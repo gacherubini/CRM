@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Revy — Logo Instagram</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@600&display=swap" rel="stylesheet" />
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: Inter, system-ui, sans-serif;
+      background: #f5f5f5;
+      color: #0a0a0a;
+      padding: 32px 20px 64px;
+      line-height: 1.45;
+    }
+    h1 { font-size: 22px; font-weight: 600; letter-spacing: -0.03em; margin-bottom: 6px; }
+    p { color: #6b6b6b; font-size: 14px; margin-bottom: 28px; max-width: 40em; }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: 20px;
+      max-width: 1100px;
+    }
+    .card {
+      background: #fff;
+      border: 1px solid #e8e8e8;
+      border-radius: 12px;
+      padding: 16px;
+    }
+    .card h2 { font-size: 13px; font-weight: 600; margin-bottom: 4px; }
+    .card .meta { font-size: 12px; color: #6b6b6b; margin-bottom: 12px; }
+    .frame {
+      width: 100%;
+      aspect-ratio: 1;
+      border-radius: 50%;
+      overflow: hidden;
+      border: 1px solid #e8e8e8;
+      /* IG profile is circular crop */
+    }
+    .frame.square { border-radius: 12px; }
+    canvas, .render {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+    .actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+    button {
+      font: inherit; font-size: 12px; font-weight: 600;
+      height: 34px; padding: 0 12px; border-radius: 8px;
+      border: 1px solid #e8e8e8; background: #fff; cursor: pointer;
+    }
+    button.primary { background: #0a0a0a; color: #fff; border-color: #0a0a0a; }
+    button:hover { opacity: .88; }
+    .note {
+      max-width: 1100px; margin-top: 28px; padding: 14px 16px;
+      background: #fff; border: 1px solid #e8e8e8; border-radius: 10px;
+      font-size: 13px; color: #6b6b6b;
+    }
+    .note strong { color: #0a0a0a; }
+  </style>
+</head>
+<body>
+  <h1>Revy — logo Instagram</h1>
+  <p>
+    Perfil 1080×1080. O Instagram corta em círculo — o wordmark e o “R” estão
+    centralizados com margem segura. Baixe o PNG e use como foto de perfil.
+  </p>
+
+  <div class="grid" id="grid"></div>
+
+  <div class="note">
+    <strong>Recomendado no perfil:</strong> versão dark wordmark (preto + “Revy” branco)
+    ou mark “R” se o nome do perfil já for @revy / @userevy.<br />
+    Bio sugerida: <strong>A revenda no ritmo certo.</strong>
+  </div>
+
+  <script>
+    const variants = [
+      { id: 'word-dark', label: 'Wordmark dark', meta: 'Perfil · fundo preto', bg: '#0A0A0A', fg: '#FFFFFF', text: 'Revy', size: 0.22 },
+      { id: 'word-light', label: 'Wordmark light', meta: 'Perfil · fundo branco', bg: '#FFFFFF', fg: '#0A0A0A', text: 'Revy', size: 0.22 },
+      { id: 'mark-dark', label: 'Mark R dark', meta: 'Compacto · fundo preto', bg: '#0A0A0A', fg: '#FFFFFF', text: 'R', size: 0.48 },
+      { id: 'mark-light', label: 'Mark R light', meta: 'Compacto · fundo branco', bg: '#FFFFFF', fg: '#0A0A0A', text: 'R', size: 0.48 },
+    ];
+
+    const SIZE = 1080;
+    const grid = document.getElementById('grid');
+
+    function draw(v) {
+      const canvas = document.createElement('canvas');
+      canvas.width = SIZE;
+      canvas.height = SIZE;
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = v.bg;
+      ctx.fillRect(0, 0, SIZE, SIZE);
+      ctx.fillStyle = v.fg;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.font = `600 ${Math.round(SIZE * v.size)}px Inter, system-ui, sans-serif`;
+      // slight optical center
+      ctx.fillText(v.text, SIZE / 2, SIZE / 2 + (v.text === 'R' ? SIZE * 0.02 : 0));
+      return canvas;
+    }
+
+    function download(canvas, name) {
+      const a = document.createElement('a');
+      a.download = name;
+      a.href = canvas.toDataURL('image/png');
+      a.click();
+    }
+
+    document.fonts.ready.then(() => {
+      variants.forEach((v) => {
+        const canvas = draw(v);
+        const card = document.createElement('div');
+        card.className = 'card';
+        card.innerHTML = `
+          <h2>${v.label}</h2>
+          <div class="meta">${v.meta} · 1080×1080 PNG</div>
+          <div class="frame" data-preview></div>
+          <div class="actions"></div>
+        `;
+        const preview = card.querySelector('[data-preview]');
+        const previewCanvas = draw(v);
+        previewCanvas.className = 'render';
+        preview.appendChild(previewCanvas);
+        const actions = card.querySelector('.actions');
+        const btn = document.createElement('button');
+        btn.className = 'primary';
+        btn.textContent = 'Baixar PNG';
+        btn.addEventListener('click', () => download(canvas, `revy-instagram-${v.id}.png`));
+        const btnSq = document.createElement('button');
+        btnSq.textContent = 'Ver quadrado';
+        btnSq.addEventListener('click', () => preview.classList.toggle('square'));
+        actions.append(btn, btnSq);
+        grid.appendChild(card);
+      });
+    });
+  </script>
+</body>
+</html>
