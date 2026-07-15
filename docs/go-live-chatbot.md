@@ -1,146 +1,149 @@
 # Runbook de go-live do Chatbot WhatsApp
 
-> Estado atual: **NÃO no ar** de propósito. Workflow `wAiNaoSalvos0001` **desativado**.
-> Este documento é o checklist para ir ao ar quando você decidir. Nada aqui liga o bot
-> sozinho — o passo final (ativar o workflow) é manual.
+> **Ambiente canônico:** lab Fly.io (`crm-419` / `gru`), não o compose local antigo.
+> Estado típico: bot **NÃO no ar de propósito** até o passo final (ativar workflow no n8n).
+> Nada neste doc liga o bot sozinho — o toggle Active é manual.
+>
+> Estado vivo da suíte: `docs/contexto-compacto.md`. Planos: `docs/plans/README.md`.
+> Código: branch **`main`** (não use branches `feat/*` antigas citadas em docs legados).
 
-## 0. O que já está pronto (não precisa refazer)
+## 0. O que já está pronto (não refazer)
 
 - Gate "somente não salvos" **fail-closed** (`isSaved === false`) no runtime do n8n. ✅
-- Chatbot: webhook com **auth opt-in** (`CHATBOT_WEBHOOK_TOKEN` + header `X-Webhook-Token`)
-  e **dedupe no banco** (UNIQUE `mensagens(loja_id, provider_message_id)`, migration `0003`). ✅
-- CPF **mascarado** no texto das mensagens (ingestão e saída). ✅
+- Chatbot: webhook com auth opt-in (`CHATBOT_WEBHOOK_TOKEN` + header `X-Webhook-Token`) e
+  **dedupe** no banco (`mensagens(loja_id, provider_message_id)`, migration `0003`). ✅
+- CPF **mascarado** no texto das mensagens. ✅
 - Consentimento **não é exigido** (decisão de produto). ✅
-- Endpoints de conversas/leads e Portal (Leads, Conversas+handoff, Simulação) prontos. ✅
-- **E3 auto-pausa:** `from_me` do atendente → `bot_ativo=false` na conversa; saída do bot com
-  `origem_bot=true` + mesmo `provider_message_id` não pausa (dedupe do eco Evolution). ✅
+- Portal: Leads, Conversas + handoff, Simulação. ✅
+- **E3 auto-pausa:** `from_me` do atendente → `bot_ativo=false`; saída do bot com
+  `origem_bot=true` + mesmo `provider_message_id` não pausa. ✅
+- **E5** cadastro de veículo por WA (números autorizados). ✅
+- Motor: **Santander e Fontecred reais** (`real: true`); mock só para provedores sem driver real.
+  Ver tabela de campos em `docs/plans/2026-07-13-plano1a-task12-bancos-reconhecimento.md`.
 
-## 1. Subir o código novo nos containers
+## 1. Apps e URLs (lab Fly)
 
-O código acima está commitado na branch `feat/dashboard-leads-conversas`. Os containers em
-execução podem estar com imagem antiga. Antes de ir ao ar:
+| Papel | App | URL / nota |
+|---|---|---|
+| Chatbot API | `chatbot2037` | privado / flycast (n8n chama internamente) |
+| n8n | `n8n2037` | `https://n8n2037.fly.dev` |
+| Evolution | `evolution2037` | `https://evolution2037.fly.dev/manager` |
+| Portal | `portal2037` | `https://portal2037.fly.dev` |
+| Motor | `motor2037` | simulações reais (Santander/Fontecred) |
+| Estoque | `estoque2037` | fonte de verdade dos veículos |
 
-```powershell
-git checkout feat/dashboard-leads-conversas   # ou após merge na main
-docker compose -f deploy/chatbot-standalone/docker-compose.yml up -d --build chatbot-api
-cd portal-gestao; docker compose up -d --build; cd ..
+Subir a suíte (se estiver parada):
+
+```bash
+bash deploy/fly/up-all.sh
 ```
+
+Segredos só em `deploy/fly/.env.production.local` (ignorado). Nunca commitar tokens.
+
+**Local (opcional):** `deploy/chatbot-standalone/docker-compose.yml` ainda existe para dev isolado;
+go-live da loja no lab = Fly + n8n2037.
 
 ## 2. Segurança do canal (webhook)
 
-1. Gerar um segredo forte:
-   ```powershell
+1. Segredo forte (se ainda não houver no Fly):
+
+   ```bash
    python -c "import secrets; print(secrets.token_urlsafe(32))"
    ```
-2. Colocar em `deploy/chatbot-standalone/.env` (arquivo ignorado pelo git):
-   ```
-   CHATBOT_WEBHOOK_TOKEN=<segredo>
-   ```
-   e recriar o container: `docker compose -f deploy/chatbot-standalone/docker-compose.yml up -d chatbot-api`
-3. No n8n, adicionar o header **`X-Webhook-Token: <segredo>`** nos **dois** nós httpRequest que
-   chamam `POST /webhook/mensagem`:
-   - `Registrar mensagem e ler handoff1` (mensagem que chega)
-   - `Registrar saida do bot1` (resposta do bot)
-   Depois: **Publish** o workflow + `docker restart chatbot-standalone-n8n-1`.
-   > Enquanto `CHATBOT_WEBHOOK_TOKEN` estiver vazio, o webhook fica aberto (comportamento atual).
-   > Definir o segredo SEM adicionar o header no n8n = bot para de registrar mensagens (401).
-   > Faça os dois juntos.
 
-## 3. Aplicar a migration do dedupe
+2. Secret no app Chatbot (`CHATBOT_WEBHOOK_TOKEN`) **e** header `X-Webhook-Token` nos nós n8n
+   que chamam `POST /webhook/mensagem` (entrada e saída do bot). Faça os dois juntos:
+   token no Chatbot sem header no n8n = 401 e bot “morto”.
+3. Token de API do Chatbot (`Authorization: Bearer …`) nos tools do workflow — distinto do
+   webhook token quando configurado assim no lab.
 
-```powershell
-docker compose -f deploy/chatbot-standalone/docker-compose.yml exec chatbot-api alembic upgrade head
+## 3. Migrations Chatbot
+
+No lab, migrations devem estar em head. Se acabou de deployar código novo:
+
+```bash
+# exemplo — ajustar ao processo atual do app chatbot2037
+fly ssh console -a chatbot2037 -C "cd /srv && alembic upgrade head"
 ```
 
-Se o banco já tiver mensagens com `(loja_id, provider_message_id)` repetido, a UNIQUE falha ao
-aplicar — de-duplicar essas linhas antes (manter a mais antiga).
+(Confirme o working dir da imagem se o entrypoint já roda Alembic no boot.)
 
-## 4. Limpeza e config do n8n
+## 4. n8n (lab)
 
-- **Apagar** a workflow duplicada `yBL8bLMDJW7IRxS0` na UI (deixar só `wAiNaoSalvos0001`).
-- Conferir modelo Gemini em runtime: `models/gemini-3.1-flash-lite` (3.5-flash deu 503 sob carga).
-- Conferir que os placeholders foram substituídos no runtime
-  (`__INSTANCE__`, `__EVOLUTION_KEY__`, `__CHATBOT_TOKEN__`) — nunca no JSON versionado.
+- UI: `https://n8n2037.fly.dev`
+- Workflow de produção esperado: **WhatsApp IA - Somente Nao Salvos** (ou id local
+  `wAiNaoSalvos0001` / nome equivalente no volume).
+- Webhook de produção: `/webhook/whatsapp-ai` (confirmar path no workflow ativo).
+- Credencial **Gemini** configurada e testada no n8n (sem ela a mensagem chega e a IA não responde).
+- Nós HTTP Evolution: chave da instância nos nós do tipo
+  “Consultar contato” / “Responder WhatsApp” (nomes podem variar com sufixo `1`).
+- Placeholders `__INSTANCE__`, `__EVOLUTION_KEY__`, `__CHATBOT_TOKEN__` só no **runtime** —
+  nunca commitar valores reais no JSON em `n8n/`.
 
-### 4.1 Tools do workflow (pós-import) e env do Chatbot
+### 4.1 Tools do workflow → Chatbot API
 
-Após importar `n8n/workflow-ai-nao-salvos.json`, o agente expõe estas tools (todas com
-`Authorization: Bearer __CHATBOT_TOKEN__` no runtime):
-
-| Tool n8n | Endpoint Chatbot | Uso |
+| Tool n8n (nome típico) | Endpoint | Uso |
 |---|---|---|
-| `consultar_estoque1` | `GET /v1/estoque/buscar?termo=` | busca por marca/modelo |
-| `consultar_por_placa1` | `GET /v1/estoque/por-placa/{placa}` | resolve unidade pela placa |
-| `simular1` | `POST /v1/simular` | payload preferencial: `placa` + `telefone` + `cpf` + `nascimento` + `entrada` (sem renda; multi-prazo 24/36/48/60 se omitir prazos) |
-| `registrar_lead1` | `POST /v1/leads` | telefone + interesse (+ nome opcional; **sem** gate de consentimento) |
-| `registrar_consentimento1` | `POST /v1/consentimentos` | **opcional** — não bloqueia lead/simulação |
+| `consultar_estoque1` | `GET /v1/estoque/buscar?termo=` | busca marca/modelo |
+| `consultar_por_placa1` | `GET /v1/estoque/por-placa/{placa}` | unidade pela placa |
+| `simular1` | `POST /v1/simular` | preferir `placa` + `telefone` + `cpf` + `nascimento` + `entrada`; multi-prazo se omitir prazos |
+| `registrar_lead1` | `POST /v1/leads` | telefone + interesse (+ nome opcional) |
+| `registrar_consentimento1` | `POST /v1/consentimentos` | opcional — não bloqueia |
 | `solicitar_handoff1` | `PATCH /v1/conversas/{tel}/estado` | `bot_ativo: false` |
-| `cadastrar_veiculo1` | `POST /v1/operacao/veiculos` | E5: só números autorizados; `telefone_solicitante` = telefone do chat |
+| `cadastrar_veiculo1` | `POST /v1/operacao/veiculos` | E5: números autorizados |
 
-No `chatbot-api` (compose standalone), para placa + cadastro E5 funcionarem de verdade:
+Chatbot precisa de `ESTOQUE_API_URL` + `ESTOQUE_API_TOKEN` (e Motor, se a simulação for real)
+nos secrets do Fly. Sem Estoque, `por-placa` e cadastro E5 falham ou esvaziam.
 
-```
-# deploy/chatbot-standalone/.env (nunca commitar segredos)
-ESTOQUE_API_URL=http://estoque-api:8000
-ESTOQUE_API_TOKEN=<token privado do estoque da loja>
-```
+Autorizar telefone de equipe (E5), via CLI no container do Chatbot quando necessário:
 
-Sem `ESTOQUE_API_*`, busca pública pode ainda funcionar (Estoque Lite), mas
-`por-placa` e `POST /v1/operacao/veiculos` falham ou devolvem vazio. Autorize
-telefones de equipe com:
-
-```powershell
-docker compose -f deploy/chatbot-standalone/docker-compose.yml exec chatbot-api `
-  python -m app.cli autorizar-numero --slug <loja> --telefone 5511... --papel dono
+```bash
+python -m app.cli autorizar-numero --slug <loja> --telefone 5511... --papel dono
 ```
 
 ## 5. Evolution
 
-- Instância `loja1` = **open/connected** (checar no manager `:8080/manager`; reescanear QR se cair).
-- **fromMe / auto-pausa (E3):** a instância precisa **emitir** eventos de mensagem com
-  `key.fromMe=true` (mensagens enviadas pelo próprio número — app ou API). No webhook da
-  Evolution → n8n, **não filtrar** `fromMe` no provedor; o nó `Extrair1` já encaminha
-  `fromMe` com texto para `POST /webhook/mensagem` (`from_me`). Ack/status/reaction são
-  ignorados (sem texto / evento `messages.update`).
-- **Contrato n8n ↔ Chatbot API:**
-  1. Inbound (cliente ou atendente): `{ instance, telefone, texto, provider_message_id, from_me }`
+- Instância `loja1` (ou nome do lab) = **open/connected** no Manager.
+- WhatsApp de lab documentado no contexto (não espalhar em commits novos).
+- **fromMe / E3:** a instância deve emitir mensagens com `key.fromMe=true`. No webhook
+  Evolution → n8n, **não filtrar** `fromMe` no provedor.
+- Contrato n8n ↔ Chatbot:
+  1. Inbound: `{ instance, telefone, texto, provider_message_id, from_me }`
   2. Saída do bot (após `sendText`): mesmo webhook com
-     `{ ..., from_me: true, origem_bot: true, provider_message_id: <id retornado pela Evolution> }`
-     para o eco `fromMe` cair na dedupe e **não** pausar.
-  3. Gate: se `fromMe` ou `duplicada` ou `bot_ativo !== true` → não chamar o agente.
+     `from_me: true`, `origem_bot: true`, `provider_message_id` do retorno Evolution
+  3. Gate: se `fromMe` ou `duplicada` ou `bot_ativo !== true` → não chamar o agente
 
-## 6. Portal (se o dashboard for junto)
+## 6. Portal e catálogo (junto com o go-live)
 
-- `.env` do portal em produção com `CHATBOT_API_TOKEN` e `ESTOQUE_API_TOKEN` preenchidos.
-- `PORTAL_SECURE_COOKIE=1` e `PORTAL_SESSION_SECRET` forte.
-- Trocar a senha do usuário `dono@loja.local` (ou criar o dono real via
-  `python -m app.cli criar-dono ...`).
+- Portal com `CHATBOT_API_TOKEN`, `ESTOQUE_API_TOKEN`, `MOTOR_URL` + `MOTOR_TOKEN`.
+- Publicar veículos no catálogo se a demo incluir vitrine (`Publicar no catálogo`).
+- Senha do dono real (não deixar default de lab se for uso externo).
 
 ## 7. Decisões de produto ANTES de ir ao ar
 
-- **Simulação é mock**: parcelas Pan/BV/Bradesco/Santander/Fontcred têm taxas **fictícias**
-  (`motor-simulacao/app/motor/mock.py`). Decidir:
-  - (a) ir ao ar deixando claro no prompt do bot que é **estimativa/simulação**, não cotação oficial; ou
-  - (b) esperar o driver bancário real (hoje em hold).
-- CPF já é mascarado ao armazenar; sem coleta de consentimento (decisão tomada).
+- **Simulação:** Santander e Fontecred podem devolver cotação **real** se credenciais e worker
+  estiverem ok. Outros bancos no mock = estimativa. Prompt do bot deve deixar claro o que é
+  cotação de portal vs estimativa, se misturar provedores.
+- Campos por banco (placa, celular, entrada…) → mapa de reconhecimento; o n8n/Chatbot deve
+  coletar o que o provedor escolhido exige.
+- CPF mascarado; sem gate de consentimento (decisão tomada). Expurgo LGPD ainda é backlog (#2A).
 
-## 8. Validação (usar um número de teste antes de soltar geral)
+## 8. Validação (número de teste antes de soltar geral)
 
-1. Contato **SALVO** na sua agenda manda mensagem → bot **NÃO** responde.
-2. Contato **NÃO salvo** manda mensagem → bot responde.
-3. Fluxo completo: consulta estoque (termo ou **placa**) → cria lead (com nome se quiser) →
-   simulação por **placa+telefone** retorna parcelas multi-prazo (sem renda/prazo único).
-4. Handoff auto-pausa (E3, standalone — sem Portal): você responde **1 msg pelo celular**
-   (WhatsApp app) na conversa → bot **para** naquela conversa (`bot_ativo=false`).
-   Mensagem do **próprio bot** não deve pausar. Reativar: Portal "Devolver ao bot" ou
-   `PATCH /v1/conversas/{tel}/estado` com `{ "bot_ativo": true }`.
-5. No Portal: a conversa aparece em `/app/conversas`, a thread abre, o handoff reflete.
+1. Contato **SALVO** → bot **não** responde.
+2. Contato **NÃO salvo** → bot responde (IA completa, não só eco Evolution).
+3. Fluxo: estoque (termo ou **placa**) → lead → simulação; se Motor real, conferir parcela
+   coerente no Portal/Registros.
+4. Handoff E3: 1 msg pelo celular do lojista → `bot_ativo=false`. Mensagem do próprio bot não pausa.
+5. Portal: conversa em `/app/conversas`, handoff refletido.
 
 ## 9. Go-live
 
-- Ativar o workflow `wAiNaoSalvos0001` (toggle **Active** na UI do n8n — aplica ao vivo).
-- Acompanhar as primeiras conversas.
+- Ativar o workflow no n8n (toggle **Active**).
+- Acompanhar as primeiras conversas (n8n executions + logs Chatbot).
 
-## 10. Rollback imediato (se precisar parar)
+## 10. Rollback imediato
 
-- Desativar o workflow `wAiNaoSalvos0001` (toggle Active off na UI). O bot para de responder na hora.
+- Desativar o workflow no n8n (Active off). O bot para de responder na hora.
+- Opcional: `bash deploy/fly/down-all.sh` só se for desligar a suíte inteira (pede confirmação;
+  **não** rodar sem o dono pedir).

@@ -1,10 +1,11 @@
 # Design — Bot de WhatsApp para Simulação de Financiamento de Motos
 
 **Data:** 2026-07-11
-**Status:** Pesquisa/histórico. Canônico para implementação: `docs/plans/README.md` + Plano #0.
+**Status:** Pesquisa/histórico (**SUPERSEDED** para implementação).
 
-> Agentes: **não comece por este arquivo.** Use `docs/contexto-compacto.md`. Em conflito de
-> arquitetura ou ordem de entrega, prevalecem Plano #0 e planos `*A`/`*B` (não `_archive/`).
+> Agentes: **não implemente a partir deste arquivo.**  
+> Canônico: `docs/contexto-compacto.md` → `docs/plans/README.md` → planos `*A`/`*B`.  
+> Este texto ainda cita Claude, consentimento obrigatório e mock-only — **tudo superado**.
 
 ---
 

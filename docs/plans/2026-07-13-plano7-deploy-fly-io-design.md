@@ -1,8 +1,13 @@
 # Plano #7 — Deploy da suíte no Fly.io (design)
 
-> Data: 2026-07-13 · Status: **design aprovado**, aguardando plano de implementação.
-> Objetivo: subir os 5 produtos em **produção real** no Fly.io, com o bot WhatsApp ligado.
-> Segue a filosofia "produtos vendáveis separadamente" (README): cada produto = deploy próprio.
+> **Status 2026-07-15: DONE (lab no ar)** — design + implementação da 1ª subida concluídos.
+> Ambiente lab Fly (`crm-419` / `gru`) com apps da suíte; ops do dia a dia em
+> `deploy/fly/up-all.sh`, `down-all.sh` e `docs/contexto-compacto.md` (checkpoint Fly).
+> Este arquivo é **referência de arquitetura**, não checklist a reexecutar do zero.
+> Implementação histórica: `2026-07-13-plano7-deploy-fly-io-implementacao.md`.
+>
+> Data original: 2026-07-13 · Objetivo: subir os 5 produtos no Fly.io (WhatsApp ligado).
+> Filosofia: produtos vendáveis separadamente — cada produto = deploy próprio.
 
 ## 1. Objetivo e escopo
 

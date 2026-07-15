@@ -1,12 +1,12 @@
 # Mapa dos bancos — reconhecimento e caminho por banco
 
 > Situação de cada banco para o driver real de simulação (#1A Task 12+).
-> Complementa `2026-07-13-plano1a-task12-santander-design.md`. Data: 2026-07-13.
-> **Não** é plano de implementação: cada banco ganha o seu quando for atacado (fluxo mapeado via codegen).
+> Complementa `2026-07-13-plano1a-task12-santander-design.md`.
+> **Atualizado 2026-07-15:** Fontecred LIVE; planos Bradesco + Pan portal; tabela de campos canônica.
+> **Não** é plano de implementação completo: cada banco tem (ou ganha) plano próprio.
 >
-> **Atualização 2026-07-13:** piloto **Santander LIVE OK**. Antes de codar o próximo Playwright, leia  
-> **`2026-07-13-playwright-licoes-santander.md`** (WAF, Xvfb, Material, modais, parsers).  
-> Base reutilizável: `PlaywrightBankDriver` + worker headed+Xvfb.
+> Antes de codar o próximo Playwright: lições **Santander** + **Fontecred**.
+> Base: `PlaywrightBankDriver` + worker headed+Xvfb; API via `ApiBankDriver` quando houver.
 
 ## Princípio (repetido do design)
 
@@ -16,13 +16,37 @@ implementam a mesma interface `Driver`; o resto do Motor não muda.
 
 ## Situação por banco
 
-| Banco | URL de acesso | Login | API? (reconhecimento 2026-07-13) | Caminho provável | Fluxo mapeado? |
+| Banco | URL de acesso | Login | API? | Caminho / decisão loja | Fluxo | Plano |
+|---|---|---|---|---|---|---|
+| **Santander** | originacao-auto/login | usuário+senha | **NÃO** (só portal) | Playwright **LIVE** | Sim | lições Santander (impl DONE) |
+| **Fontecred** | app.fontecred.com.br | e-mail+senha | **NÃO** | Playwright **LIVE** | Sim | lições Fontecred |
+| **Pan** | veiculos.bancopan.com.br | usuário+senha | **API no código** (live a validar) | **Dual-path** API se config completa; senão portal | Parcial (falta HTML ofertas) | `…-pan-playwright-implementacao.md` |
+| **Bradesco** | turbo.bradesco/… | CPF lojista+senha | provável API (gate 15 min) | Loja usa Turbo → **Playwright** no plano | Codegen 2026-07-15 | `…-bradesco-implementacao.md` |
+| **BV** | a levantar | a levantar | **PROVÁVEL** (doc V4 portal dev) | **Backlog** — sem plano de impl | Não | — (não atacar sem reconhecimento) |
+
+### Campos e regras por provedor (canônico para Portal / Chatbot / Motor)
+
+O payload de simulação é único; cada driver valida o que precisa. Resumo para coletar na UI/bot:
+
+| Campo (contrato Motor) | Santander | Fontecred | Bradesco (plano) | Pan API | Pan portal (plano) |
 |---|---|---|---|---|---|
-| **Santander** | `financiamentos.santander.com.br/originacao-auto/login` | usuário+senha | **NÃO** (piloto confirmou só portal) | Playwright **LIVE OK** | **Sim** — login + passo 1 + ofertas multi-prazo (2026-07-13) |
-| **Pan** | `veiculos.bancopan.com.br/login` | usuário+senha, sem 2FA | **API no código** (`PanDriver` OpenAPI) — credencial developer da loja **a validar live** | **Dual-path:** API se config completa; senão **Playwright portal** (codegen 2026-07-15 parcial) | **Parcial** — login+placa+valor; falta HTML de ofertas multi-prazo. Plano: `2026-07-15-plano1a-task12-pan-playwright-implementacao.md` |
-| **BV** (Votorantim) | portal lojista a levantar | a levantar | **PROVÁVEL SIM** — doc "Iniciar Simulação Financiamento Veículo (V4)" no portal dev | **Confirmar API antes** → provável `ApiBankDriver` | Não |
-| **Bradesco** | `turbo.bradesco/originacaolojista/login` | usuário+senha, sem 2FA | **provável** API pública, mas loja usa Turbo web hoje | **Playwright Turbo** (codegen 2026-07-15); gate API rápido no plano | **Sim (codegen)** — login → proposta → pessoa → veículo → simulação multi-prazo. Plano: `2026-07-15-plano1a-task12-bradesco-implementacao.md` |
-| **Fontecred** | `app.fontecred.com.br/login` | usuário+senha, sem 2FA | **NÃO** (piloto Playwright) | Playwright **LIVE OK** | **Sim** — ver lições 2026-07-15 |
+| CPF cliente | obrig. | obrig. | obrig. | obrig. | obrig. |
+| Nascimento | obrig. | obrig. | típ. obrig. | conf. doc | conf. portal |
+| Valor do bem | obrig. | obrig. | obrig. | obrig. | obrig. (venda) |
+| **Entrada** | **banco calcula** (devolve no resultado) | lida/mínima no portal | **opcional** (só se user mandar) | conf. API | **opcional** |
+| Prazos | multi (ofertas) | multi | multi `Nx de R$` | conf. API | multi (após HTML ofertas) |
+| **Placa** | conforme fluxo | **obrig.** (resolve veículo) | opcional no Turbo | conf. | caminho principal |
+| **Celular** | — | **obrig.** | obrig. no fluxo pessoa | conf. | telefone no fluxo |
+| Renda | opcional no mock; portal real varia | — | — | conf. | — |
+| Credencial loja | usuário+senha portal | e-mail+senha | CPF lojista+senha | api_key/secret (OpenAPI) | usuário+senha portal |
+| Driver slug | `santander` | `fontecred` | `bradesco` | `pan` (API) | `pan` (fábrica dual) |
+
+**Notas:**
+- Mock histórico usa nome `Fontcred` (sem “e”) em alguns fixtures legados — **não** confundir com
+  slug real `fontecred`.
+- Chatbot por-placa: valor/veículo vêm do Estoque; ainda assim Fontecred/Bradesco podem exigir
+  celular no payload de simulação.
+- Antes de prometer “5 bancos reais” no WA: só `real: true` + credencial + worker saudável.
 
 ## Achados de reconhecimento (2026-07-13)
 
@@ -38,8 +62,10 @@ Busca pública (não confirma acesso do seu CNPJ nem o endpoint exato — págin
   (ex.: Cockpit) → reforça o caminho Playwright.
 - **Fontecred:** fintech de crédito (FonteGIRO), sem documentação de API de desenvolvedor achada.
 
-**Implicação:** possivelmente **2–3 desses (Pan, BV, talvez Bradesco) têm API** — não construir robô
-para eles antes de descartar a API. Só Santander (e talvez Fontecred) tende a Playwright.
+**Implicação (atualizada 2026-07-15):** princípio **API-first** permanece. Na prática da loja:
+Santander e Fontecred = Playwright LIVE; Bradesco e Pan portal = Playwright planejados porque a
+operação diária é web (com gate API curto no plano Bradesco e dual-path no Pan). **BV** continua
+só reconhecimento — **sem plano de implementação**.
 
 ## Roteiro para o gerente/consultor do banco (copiar e enviar)
 
@@ -65,13 +91,13 @@ simulação (parcela/taxa) que precisamos.
 - Pedir ao time comercial o **kit/manual de integração**, se houver.
 - Só depois de confirmar que **não há** API acessível à loja, o banco vai para o caminho Playwright.
 
-## Ordem sugerida
+## Ordem sugerida (eixo multi-banco)
 
-1. ~~**Santander** (piloto)~~ — **feito live 2026-07-13** (base `PlaywrightBankDriver` + worker Xvfb).
-2. **Um banco por vez** na ordem de volume da loja:
-   - Preferir **confirmar API** (Pan, BV, Bradesco) antes de Playwright.
-   - **Fontecred** (e similares sem API) → Playwright reutilizando a base + lições.
-3. Cada banco Playwright: ~4 tasks (codegen → driver → registro REAL_DRIVERS → smoke live).
+1. ~~Santander~~ LIVE · ~~Fontecred~~ LIVE.
+2. **Bradesco** — plano pronto (`…-bradesco-implementacao.md`); gate API 15 min depois Playwright.
+3. **Pan portal** — só após HTML de ofertas (Task 0); manter `PanDriver` API intacto.
+4. **BV** — backlog: URL + API antes de qualquer código.
+5. Cada Playwright novo: codegen → driver → `REAL_DRIVERS` → smoke live; **lições** obrigatórias.
 
 ## Template do plano por banco (pós-Santander)
 

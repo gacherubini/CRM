@@ -1,14 +1,22 @@
 # Handoff — Driver Fontecred + resgate de produção (2026-07-14)
 
-## TL;DR
+> **Status 2026-07-15: SUPERSEDED** — não usar como checklist de “o que falta”.
+>
+> O que este doc descreveu já foi absorvido:
+> - Fontecred **LIVE** no Motor (prod + git); sessão fria/quente e modal COMUNICADOS estabilizados.
+> - Código resgatado de prod (Pan API + eventos) está em `main`.
+> - **Lições operacionais (ler isto):** `2026-07-15-playwright-licoes-fontecred.md`
+> - **Estado atual:** `docs/contexto-compacto.md` + `docs/handoff-contexto.md`
+>
+> Texto abaixo permanece só como **histórico** do resgate e do fluxo mapeado. Itens “falta git push /
+> testar reCAPTCHA / cadastrar credencial” no TL;DR original estão **obsoletos** se o handoff
+> atual e o contexto disserem o contrário.
 
-- **Driver Fontecred (Playwright) implementado, testado ao vivo e DEPLOYADO.** Motor e Portal
-  estão em produção com o Fontecred.
-- **Durante o deploy descobrimos um problema grave:** havia trabalho em **produção que nunca foi
-  commitado** (driver Pan + refactor de provedores + eventos, no Motor; UI do Pan + outras
-  features no Portal). Isso foi **resgatado da imagem de produção para o git** e reconciliado.
-- **Resolvido.** Falta: (1) `git push`, (2) testar o Fontecred ao vivo **a partir do IP do Fly**
-  (risco reCAPTCHA de datacenter), (3) cadastrar a credencial em Acessos bancos.
+## TL;DR (histórico 2026-07-14 — não executar)
+
+- Driver Fontecred (Playwright) implementado, testado ao vivo e deployado (na época).
+- Trabalho em produção não commitado foi resgatado para o git e reconciliado.
+- ~~Falta push / smoke Fly / credencial~~ → ver contexto canônico, não esta lista.
 
 ---
 

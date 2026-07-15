@@ -2,10 +2,10 @@
 
 ## Como usar (agentes)
 
-1. `docs/contexto-compacto.md` — estado atual e regras (**sempre primeiro**).
-2. `docs/handoff-contexto.md` — checkpoint operacional.
-3. **Somente os planos desta pasta** (não `_archive/`) — o plano do produto a implementar.
-4. `docs/go-live-chatbot.md` — só ao ligar o bot.
+1. `docs/contexto-compacto.md` — estado atual, **eixos de prioridade** e regras (**sempre primeiro**).
+2. `docs/handoff-contexto.md` — só o **checkpoint do topo** (seções antigas = histórico).
+3. **Somente planos desta pasta com Status ≠ SUPERSEDED/DONE checklist** (não `_archive/`).
+4. `docs/go-live-chatbot.md` — eixo demo/WA (lab Fly + `main`).
 
 **Não** usar como fonte de verdade de implementação atual:
 
@@ -28,7 +28,7 @@ Cada plano `*A`/`*B` tem bloco **Status** no topo: leia antes de reimplementar.
 | 5.1 | [Plano #3A.1](2026-07-11-plano3a1-frontend-dashboard-mvp.md) | Frontend Dashboard MVP | MVP fechado; **Task 16 histórico FEITO**; falta Playwright E2E |
 | 6 | [Plano #3B](2026-07-11-plano3b-dashboard-dono-vendas-metas.md) | Vendas/metas/dono | Parcial; CSV+metas vendedor feitos; falta Task 4/5 |
 | 6+ | [Plano #6](2026-07-11-plano6-evolucoes-roadmap.md) | Roadmap add-ons | E1,E6,E8,E10–**E18** ativos; **E9 fora**; E2/E4/E7 adiados; C1–C12 confirmados |
-| ops | [Plano #7 deploy Fly](2026-07-13-plano7-deploy-fly-io-design.md) | Lab Fly.io | Design + implementação; ambiente lab no ar |
+| ops | [Plano #7 deploy Fly](2026-07-13-plano7-deploy-fly-io-design.md) | Lab Fly.io | **DONE (lab no ar)** — ops = `deploy/fly/*.sh`; impl histórica SUPERSEDED |
 
 Planos #1A e #4A podem avançar em paralelo após #0. #2A depende da fatia Lite do #4A.
 Numeração é histórica; não obriga Portal antes de Estoque/Catálogo.
@@ -37,25 +37,18 @@ Numeração é histórica; não obriga Portal antes de Estoque/Catálogo.
 
 Detalham a Task 12 do #1A (1º driver `real: true`). Ler junto com o #1A:
 
-- [Design/spec](2026-07-13-plano1a-task12-santander-design.md) — arquitetura, princípio **API-first**,
-  base reutilizável, riscos ToS/fragilidade. **Aprovado pelo dono 2026-07-13.**
-- [Plano de implementação — Fase 1 (Motor)](2026-07-13-plano1a-task12-santander-implementacao.md) —
-  piloto Santander via Playwright. **LIVE OK 2026-07-13** (pause para outros bancos).
-- [Mapa dos bancos (reconhecimento)](2026-07-13-plano1a-task12-bancos-reconhecimento.md) — API vs
-  Playwright por banco; Pan/BV/Bradesco **provavelmente têm API** (a confirmar com os bancos).
-- [**Lições do piloto Santander**](2026-07-13-playwright-licoes-santander.md) — **obrigatório** antes
-  do próximo driver Playwright (WAF, Xvfb, Material, modais, parsers, **skeleton de cards**, entrada
-  retornada, checklist).
-- [**Lições do Fontecred**](2026-07-15-playwright-licoes-fontecred.md) — **obrigatório** junto das
-  lições Santander: sessão fria/quente, `networkidle` enganoso, modal COMUNICADOS, waits por estado,
-  timeline como evidência e smoke no próprio worker.
-- [**Fan-out multi-banco + workers Playwright sob demanda**](2026-07-14-plano1a-workers-playwright-sob-demanda.md)
-  — design aprovado em 2026-07-14; pré-cria slots Fly parados, acorda por banco, agrega resultados
-  incrementais e desliga ao esvaziar a fila. **Planejado; ainda não implementado.**
-- [**Bradesco Turbo — implementação**](2026-07-15-plano1a-task12-bradesco-implementacao.md) —
-  Playwright a partir do codegen 2026-07-15; entrada opcional; **não implementado**.
-- [**Pan portal (“Buscopan”) — dual-path**](2026-07-15-plano1a-task12-pan-playwright-implementacao.md) —
-  portal lojista quando não há config OpenAPI; API `pan.py` permanece; **não implementado**.
+- [Design/spec Santander](2026-07-13-plano1a-task12-santander-design.md) — API-first, base reutilizável.
+- [Impl Santander](2026-07-13-plano1a-task12-santander-implementacao.md) — **DONE/SUPERSEDED** (histórico;
+  não reexecutar). Lições: [Santander](2026-07-13-playwright-licoes-santander.md).
+- [Mapa dos bancos + **campos por provedor**](2026-07-13-plano1a-task12-bancos-reconhecimento.md) —
+  decisões LIVE/plano/backlog; tabela de campos canônica (entrada, placa, celular…).
+- [Lições Fontecred](2026-07-15-playwright-licoes-fontecred.md) — **obrigatório** (sessão fria/quente,
+  modal, waits, smoke no worker). Handoff pontual 2026-07-14: **SUPERSEDED**.
+- [Fan-out / workers sob demanda](2026-07-14-plano1a-workers-playwright-sob-demanda.md) — aprovado;
+  **não implementado**.
+- [Bradesco Turbo](2026-07-15-plano1a-task12-bradesco-implementacao.md) — **PLANNED** (eixo multi-banco).
+- [Pan portal dual-path](2026-07-15-plano1a-task12-pan-playwright-implementacao.md) — **PLANNED**
+  (bloqueado até HTML de ofertas).
 
 ## Pacotes comerciais
 

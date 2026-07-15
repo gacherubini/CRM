@@ -4,9 +4,10 @@ Bot de WhatsApp para revenda de motos que conversa com o cliente, coleta os dado
 necessários e devolve simulações de financiamento de vários bancos (parcela, taxa,
 nº de parcelas) de forma organizada.
 
-> **Status:** 🟢 MVP em grande parte **implementado** (~90% demo). Estado canônico:
-> [`docs/contexto-compacto.md`](docs/contexto-compacto.md) · planos em [`docs/plans/README.md`](docs/plans/README.md).
-> Design histórico: [`docs/design.md`](docs/design.md) (pode divergir — prevalece contexto + planos `*A`).
+> **Status:** 🟢 MVP demonstrável (~**94%** demo / ~**78%** multi-banco-revenda).  
+> **Estado canônico:** [`docs/contexto-compacto.md`](docs/contexto-compacto.md) · planos
+> [`docs/plans/README.md`](docs/plans/README.md) · go-live WA [`docs/go-live-chatbot.md`](docs/go-live-chatbot.md).  
+> `docs/design.md` = pesquisa **histórica** (Claude/mock/RPA-only superados) — **não** implementar a partir dele.
 
 ---
 

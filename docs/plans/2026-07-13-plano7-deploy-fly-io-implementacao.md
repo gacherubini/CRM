@@ -1,13 +1,15 @@
 # Plano #7 — Deploy da suíte no Fly.io (implementação)
 
-> **Para operadores/agentes:** SUB-SKILL RECOMENDADA — use `superpowers:executing-plans` para
-> executar este plano tarefa-a-tarefa, com checkpoint de revisão entre fases. Os passos usam
-> checkbox (`- [ ]`) para rastreio.
+> **Status 2026-07-15: SUPERSEDED como checklist** — 1ª subida do lab **já executada**.
+> **Não reexecutar** este documento do zero (muitos steps/checkboxes são históricos).
 >
-> **Fonte da verdade:** `docs/plans/2026-07-13-plano7-deploy-fly-io-design.md`. Este documento
-> DETALHA aquele design (7 apps, região `gru`, Postgres self-managed no teste → MPG no go-live,
-> inventário de secrets §5, ordem de deploy §6, riscos §7). Onde este plano decide algo que o
-> design deixou em aberto, o ponto está marcado com **[DECISÃO — revisar]**.
+> **Ops atuais (use isto):**
+> - `bash deploy/fly/up-all.sh` / `down-all.sh` / `apply-always-on-backends.sh`
+> - Checkpoint: `docs/contexto-compacto.md` (seção Fly)
+> - Design (referência): `2026-07-13-plano7-deploy-fly-io-design.md`
+>
+> Manter este arquivo só para **auditoria** da ordem de secrets, decisões e riscos da 1ª subida.
+> Novos apps (ex.: `site2037` no `down-all`) = PR nos scripts, não “rodar o plano #7 de novo”.
 
 **Objetivo:** subir os 5 produtos + Evolution + n8n em produção real no Fly.io (região `gru`),
 com o bot WhatsApp ligado, seguindo a ordem de deploy que resolve o ovo-e-galinha dos tokens.

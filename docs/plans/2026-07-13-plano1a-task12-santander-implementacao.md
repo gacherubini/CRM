@@ -1,19 +1,17 @@
 # Driver Real Santander — Fase 1 (Motor) — Implementation Plan
 
-> **Status 2026-07-13 (LIVE OK — pause):** piloto Santander **fim-a-fim no portal real** (login →
-> step-personal → step-offers → multi-prazo no Portal). Worker headed+Xvfb; parsers de parcela e
-> financiado corrigidos. **Não reabrir o fluxo Santander** sem ler  
-> `2026-07-13-playwright-licoes-santander.md`.
+> **Status 2026-07-15: DONE / SUPERSEDED como checklist** — piloto Santander **LIVE OK**.
+> **Não reexecutar** este plano task-by-task (checkboxes são histórico da 1ª entrega).
 >
-> **Entregue na sessão live:** Dockerfile Chromium+Xvfb, entrypoint, stealth anti-Akamai, seletores
-> Material (sem placeholder), modal sims anteriores, progresso HTMX no Portal, códigos de erro.
-> **Aberto:** smoke pytest gated `MOTOR_SANTANDER_LIVE=1`; `testar-login` real; multi-banco paralelo;
-> fase 2 Chatbot CNH/UF se operação pedir.
+> **Ler em vez deste arquivo:**
+> - Lições: `2026-07-13-playwright-licoes-santander.md` (obrigatório antes do próximo Playwright)
+> - Estado Motor: `docs/plans/2026-07-11-plano1a-motor-simulacao-independente.md`
+> - Próximos bancos: Bradesco / Pan portal (planos 2026-07-15) + mapa de reconhecimento
 >
-> **Próximo agente:** outro banco (API-first) — **não** este checklist do zero. Template em
-> `...-bancos-reconhecimento.md` + lições.
+> **Não reabrir** o fluxo Santander sem evidência nova e sem as lições acima.
 >
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> Resumo do que ficou: headed+Xvfb, stealth anti-Akamai, Material UI, multi-prazo, progresso Portal.
+> Ainda abertos no **Motor em geral** (não neste checklist): `testar-login` real; fan-out multi-banco.
 
 **Goal:** Adicionar o 1º driver de simulação `real: true` — Santander via Playwright, multi-prazo — plugado no motor de drivers existente, sem quebrar o mock.
 

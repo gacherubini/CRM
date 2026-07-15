@@ -1,16 +1,15 @@
 # Handoff técnico — suíte automotiva
 
-> Checkpoint: **2026-07-15 (noite) — front Revy no main + planos Bradesco/Pan portal**.
-> Confirme containers/`.env`/n8n antes de editar. Testes unitários ≠ E2E WhatsApp.  
-> Leia primeiro: `docs/contexto-compacto.md`. Planos válidos: `docs/plans/README.md`.  
-> **Lições Playwright obrigatórias antes do próximo banco:**
-> `docs/plans/2026-07-13-playwright-licoes-santander.md` e
-> `docs/plans/2026-07-15-playwright-licoes-fontecred.md`.
-> **Próximos bancos (planos prontos, código ainda não):**
-> `docs/plans/2026-07-15-plano1a-task12-bradesco-implementacao.md` e
-> `docs/plans/2026-07-15-plano1a-task12-pan-playwright-implementacao.md`.
-> **Arquitetura workers:** `docs/plans/2026-07-14-plano1a-workers-playwright-sob-demanda.md`.
-> Front Revy: commit **`e40cfab`** em **`origin/main`**. Fontecred: `ce75e60`/`8ac4b92`/`1165690`.
+> **Leia primeiro:** `docs/contexto-compacto.md` (eixos A–E + fonte da verdade).  
+> Este arquivo: checkpoint operacional. Seções **“Checkpoint anterior”** = histórico — não
+> reexecutar. Path Windows no rodapé de seções antigas: **ignorar** (workspace = root do git).
+>
+> Checkpoint docs P0 **2026-07-15:** eixos de prioridade; go-live Fly; banners DONE/SUPERSEDED
+> (#7, Santander impl, Fontecred handoff); tabela campos por banco no mapa.
+>
+> Checkpoint produto anterior: front Revy + planos Bradesco/Pan (`e40cfab`, etc.).
+> Lições Playwright: `…-playwright-licoes-santander.md` + `…-fontecred.md`.
+> Escolher eixo no contexto antes de codar (não misturar Bradesco + #3B + go-live na mesma PR).
 
 ## Checkpoint mais recente — front Revy + planos Bradesco / Pan portal (2026-07-15 noite)
 
@@ -415,16 +414,20 @@ Detalhe operacional: lições **Santander** e **Fontecred** na pasta `docs/plans
 - Roadmap #6 limpo em 2026-07-14: **E9 fora**; E2/E4/E7 adiados; **E13–E18** aprovados (notif,
   reserva, PDF, troco, onboarding, domínio); rejeitados C2/C5/C7/C8/C10/C12.
 
-## Próximos passos (ordem sugerida para o próximo agente)
+## Próximos passos
 
-1. **Ler as duas lições Playwright:** Santander + Fontecred; depois o mapa de reconhecimento.
-2. Escolher o próximo banco (PAN/BV/Bradesco preferir **API**; Fontecred já está LIVE).
-3. Confirmar contrato/credencial e worker saudável antes de implementar.
-4. Não copiar seletores: mapear sessão fria/quente, modais e marcadores do banco escolhido.
-5. Multi-banco paralelo; `testar-login` real; Task 10 revenda.
-6. Alternativa de produto: go-live WhatsApp (`docs/go-live-chatbot.md`) se operação pedir.
+**Escolher um eixo** em `docs/contexto-compacto.md` (tabela A–E). Não seguir lista única abaixo
+como ordem fixa — são atalhos por eixo:
 
-> **Histórico de simulações por usuário (#3A.1 Task 16): FEITO** nesta sessão — não reimplementar.
+| Eixo | Atalho |
+|---|---|
+| A Demo/WA | `docs/go-live-chatbot.md` + publicar estoque |
+| B Multi-banco | Bradesco plano 2026-07-15 (lições antes); Pan após HTML ofertas |
+| C CRM | #3B Task 4 → 5 |
+| D Escala | fan-out workers (plano 2026-07-14) |
+| E Dia a dia | E1 áudio / E6 fotos (#6) |
+
+Task 16 histórico: **FEITO**. Fontecred/Santander: **não reabrir** sem evidência.
 
 ## Avisos operacionais
 
