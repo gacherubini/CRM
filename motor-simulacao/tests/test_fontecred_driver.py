@@ -227,6 +227,26 @@ def test_pos_login_aguarda_dashboard_e_dom_pronto():
     )
 
 
+def test_login_reutiliza_sessao_autenticada_apos_timeout_networkidle():
+    driver = FontecredDriver(timeout_ms=20_000)
+    page = MagicMock()
+    page.url = "https://app.fontecred.com.br/login#step-1"
+    page.goto.side_effect = RuntimeError("networkidle timeout")
+    page.get_by_text.return_value.first.is_visible.return_value = True
+
+    driver._passo_login(page, "nao-deve-usar", "nao-deve-usar")
+
+    page.goto.assert_called_once_with(
+        "https://app.fontecred.com.br/login#step-1",
+        wait_until="networkidle",
+        timeout=20_000,
+    )
+    page.get_by_role.assert_not_called()
+    page.wait_for_load_state.assert_called_once_with(
+        "domcontentloaded", timeout=20_000
+    )
+
+
 def test_evento_registra_print_por_etapa(monkeypatch):
     driver = FontecredDriver()
     ctx = MagicMock()

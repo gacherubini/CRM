@@ -346,10 +346,11 @@ class FontecredDriver(PlaywrightBankDriver):
                 self._screenshot_falha(page, "erro")
                 raise
             except Exception as exc:
+                tipo_erro = type(exc).__name__
                 self._evento(
                     ctx,
                     "falha_inesperada",
-                    "O portal apresentou uma falha inesperada.",
+                    f"O portal apresentou uma falha inesperada ({tipo_erro}).",
                     page,
                     True,
                     "erro",
@@ -417,9 +418,20 @@ class FontecredDriver(PlaywrightBankDriver):
         try:
             page.goto(url, wait_until="networkidle", timeout=self.timeout_ms)
         except Exception:
+            # Storage state válido pode redirecionar /login direto ao Dashboard.
+            # Nesse cenário o portal mantém conexões abertas, networkidle expira,
+            # mas a sessão já está pronta e não devemos procurar e-mail/senha.
+            if self._portal_autenticado(page):
+                self._aguardar_dom_pronto(page)
+                page.wait_for_timeout(800)
+                return
             page.goto(url, wait_until="domcontentloaded", timeout=self.timeout_ms)
         page.wait_for_timeout(600)
         self._assert_portal_acessivel(page)
+        if self._portal_autenticado(page):
+            self._aguardar_dom_pronto(page)
+            page.wait_for_timeout(800)
+            return
 
         email_box = page.get_by_role("textbox", name=re.compile(r"e-?mail", re.I))
         senha_box = page.get_by_role("textbox", name=re.compile(r"senha", re.I))
@@ -444,6 +456,22 @@ class FontecredDriver(PlaywrightBankDriver):
         page.wait_for_timeout(400)
         page.get_by_role("button", name=re.compile(r"^Login$", re.I)).first.click()
         self._aguardar_pos_login(page)
+
+    def _portal_autenticado(self, page) -> bool:
+        """Reconhece Dashboard já aberto por uma sessão persistida válida."""
+        try:
+            url = str(page.url or "")
+            if url and not re.search(r"/login\b", url, re.I):
+                return True
+        except Exception:
+            pass
+        for texto in (r"^\s*COMUNICADOS\s*$", r"^\s*Dashboard\s*$"):
+            try:
+                if page.get_by_text(re.compile(texto, re.I)).first.is_visible():
+                    return True
+            except Exception:
+                continue
+        return False
 
     def _aguardar_pos_login(self, page) -> None:
         timeout = max(self.timeout_ms, 45_000)
