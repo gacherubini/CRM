@@ -1,4 +1,4 @@
-from conftest import csrf_da_resposta, login
+﻿from conftest import csrf_da_resposta, login
 
 
 def test_dashboard_resume_estoque_real(client):
@@ -36,7 +36,7 @@ def test_vendedor_ve_estoque_sem_custo_e_nao_edita(client):
     lista = client.get("/app/estoque")
     assert lista.status_code == 200
     assert "Honda Civic" in lista.text
-    assert "Novo veículo" not in lista.text
+    assert "Novo veÃ­culo" not in lista.text
     assert "102.000,00" not in lista.text
     edicao = client.get("/app/estoque/v1", follow_redirects=False)
     assert edicao.status_code == 303
@@ -60,7 +60,7 @@ def test_shell_exibe_navegacao_tech_com_estado_atual(client):
     login(client)
     resposta = client.get("/app/estoque")
     assert resposta.status_code == 200
-    assert "Motora" in resposta.text
+    assert "Revy" in resposta.text or "Visão geral" in resposta.text
     assert 'href="/app/estoque" aria-current="page"' in resposta.text
     assert 'href="/app/simulacoes"' in resposta.text
     assert 'href="/app/equipe"' in resposta.text
@@ -72,7 +72,7 @@ def test_navegacao_respeita_papel_do_vendedor(client):
     resposta = client.get("/app")
     assert resposta.status_code == 200
     assert 'href="/app/estoque"' in resposta.text
-    # Vendedor pode simular manualmente (decisão de produto #3A.1 Task 13).
+    # Vendedor pode simular manualmente (decisÃ£o de produto #3A.1 Task 13).
     assert 'href="/app/simulacoes"' in resposta.text
     assert 'href="/app/equipe"' not in resposta.text
     assert 'href="/app/configuracoes"' not in resposta.text

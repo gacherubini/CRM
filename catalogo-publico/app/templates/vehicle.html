@@ -11,7 +11,7 @@
     {% else %}<div class="image-fallback detail-fallback">Veículo sem foto</div>{% endif %}
   </section>
   <section class="detail-info">
-    <p class="eyebrow">{{ veiculo.tipo }} · disponível</p>
+    <p class="eyebrow">{{ veiculo.tipo | capitalize }} · disponível</p>
     <h1>{{ veiculo.marca }} {{ veiculo.modelo }}</h1>
     {% if veiculo.versao %}<p class="lead">{{ veiculo.versao }}</p>{% endif %}
     <p class="price">{{ veiculo.preco | moeda }}</p>

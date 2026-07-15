@@ -1,15 +1,23 @@
 {% extends "base.html" %}
-{% block title %}Leads — Gestão{% endblock %}
+{% block title %}Leads — Revy{% endblock %}
 {% block content %}
 <div class="page-heading">
-  <div><span class="eyebrow">Interessados do chatbot</span><h1>Leads</h1><p>Acompanhe quem chegou pelo WhatsApp e em que etapa está.</p></div>
+  <div>
+    <h1>Leads</h1>
+    <p>Quem chegou pelo WhatsApp e em que etapa está.</p>
+  </div>
 </div>
 
-{% if integracao_erro %}<div class="alert warning" role="alert"><strong>Leads desconectados.</strong> {{ integracao_erro }}</div>{% endif %}
+{% if integracao_erro %}<div class="alert warning" role="alert"><strong>Leads offline.</strong> {{ integracao_erro }}</div>{% endif %}
 
 <form class="filter-bar" method="get">
-  <label class="search"><span class="sr-only">Buscar</span><input name="busca" value="{{ filtros.busca }}" placeholder="Buscar nome, telefone ou interesse"></label>
-  <select name="etapa" aria-label="Etapa"><option value="">Todas as etapas</option>{% for e in ['novo','em_atendimento','qualificado','convertido','perdido'] %}<option value="{{ e }}" {{ 'selected' if filtros.etapa == e }}>{{ e | replace('_', ' ') | capitalize }}</option>{% endfor %}</select>
+  <label class="search"><span class="sr-only">Buscar</span><input name="busca" value="{{ filtros.busca }}" placeholder="Nome, telefone ou interesse"></label>
+  <select name="etapa" aria-label="Etapa">
+    <option value="">Todas as etapas</option>
+    {% for e, label in [('novo','Novo'),('em_atendimento','Em atendimento'),('qualificado','Qualificado'),('convertido','Convertido'),('perdido','Perdido')] %}
+    <option value="{{ e }}" {{ 'selected' if filtros.etapa == e }}>{{ label }}</option>
+    {% endfor %}
+  </select>
   <button class="button secondary" type="submit">Filtrar</button>
 </form>
 
@@ -18,15 +26,29 @@
   <div class="table-wrap"><table>
     <thead><tr><th>Contato</th><th>Interesse</th><th>Etapa</th><th>Consentimento</th><th><span class="sr-only">Ações</span></th></tr></thead>
     <tbody>{% for l in leads %}<tr>
-      <td><div><strong>{% if l.nome %}{{ l.nome }}{% else %}<span class="muted">—</span>{% endif %}</strong><small>{{ mascarar_telefone(l.telefone) }}</small></div></td>
+      <td><div class="cell-stack"><strong>{% if l.nome %}{{ l.nome }}{% else %}<span class="muted">Sem nome</span>{% endif %}</strong><small>{{ mascarar_telefone(l.telefone) }}</small></div></td>
       <td>{% if l.interesse %}{{ l.interesse }}{% else %}<span class="muted">—</span>{% endif %}</td>
-      <td><span class="status {{ l.etapa }}">{{ l.etapa | replace('_', ' ') }}</span></td>
+      <td><span class="status {{ l.etapa }}">{{ {'novo':'Novo','em_atendimento':'Em atendimento','qualificado':'Qualificado','convertido':'Convertido','perdido':'Perdido'}.get(l.etapa, l.etapa | replace('_', ' ')) }}</span></td>
       <td>{% if l.consentimento_em %}<span class="published">Concedido</span>{% else %}<span class="muted">Pendente</span>{% endif %}</td>
       <td><a class="table-action" href="/app/leads/{{ l.id }}">Abrir</a></td>
     </tr>{% endfor %}</tbody>
   </table></div>
-  {% elif integracao_erro %}<div class="empty"><strong>Não foi possível carregar os leads.</strong><p>Tente novamente em instantes.</p></div>
-  {% elif filtros.etapa or filtros.busca %}<div class="empty"><strong>Nenhum lead para esse filtro.</strong><p>Ajuste a busca ou a etapa selecionada.</p></div>
-  {% else %}<div class="empty"><strong>Nenhum lead ainda.</strong><p>Assim que o chatbot registrar contatos, eles aparecem aqui.</p></div>{% endif %}
+  {% elif integracao_erro %}
+  <div class="empty">
+    <strong>Não foi possível carregar os leads</strong>
+    <p>Tente de novo em instantes.</p>
+  </div>
+  {% elif filtros.etapa or filtros.busca %}
+  <div class="empty">
+    <strong>Nenhum lead com esse filtro</strong>
+    <p>Ajuste a busca ou a etapa.</p>
+    <a class="button secondary" href="/app/leads">Limpar filtros</a>
+  </div>
+  {% else %}
+  <div class="empty">
+    <strong>Nenhum lead ainda</strong>
+    <p>Quando o chatbot registrar contatos, eles aparecem aqui.</p>
+  </div>
+  {% endif %}
 </section>
 {% endblock %}

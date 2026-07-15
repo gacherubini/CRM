@@ -2,9 +2,9 @@
 {% block title %}Veículos — {{ loja.nome }}{% endblock %}
 {% block content %}
 <section class="hero">
-  <p class="eyebrow">Estoque disponível</p>
-  <h1>Encontre seu próximo veículo</h1>
-  <p>Consulte os veículos publicados por {{ loja.nome }}.</p>
+  <p class="eyebrow">{{ loja.nome }}</p>
+  <h1>Veículos disponíveis</h1>
+  <p class="muted">Estoque publicado pela loja. Fale no WhatsApp quando encontrar o que procura.</p>
 </section>
 
 <form class="filters" method="get" action="/l/{{ loja.slug }}">
@@ -19,7 +19,7 @@
   <label>Preço mínimo<input name="preco_min" type="number" min="0" step="0.01" value="{{ filters.preco_min if filters.preco_min is not none else '' }}"></label>
   <label>Preço máximo<input name="preco_max" type="number" min="0" step="0.01" value="{{ filters.preco_max if filters.preco_max is not none else '' }}"></label>
   <input type="hidden" name="limit" value="{{ limit }}">
-  <button type="submit">Filtrar estoque</button>
+  <button type="submit">Filtrar</button>
 </form>
 
 {% if veiculos %}

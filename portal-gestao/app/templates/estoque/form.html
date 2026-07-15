@@ -9,7 +9,7 @@
 <form method="post" class="form-layout">
   <input type="hidden" name="csrf" value="{{ csrf }}">
   <section class="panel form-section">
-    <div class="section-title"><span>01</span><div><h2>Identificação</h2><p>Dados usados na busca e apresentação.</p></div></div>
+    <div class="section-title"><h2>Identificação</h2><p>Dados usados na busca e na vitrine.</p></div>
     <div class="form-grid">
       <label>Tipo<select name="tipo" required><option value="moto" {{ 'selected' if veiculo and veiculo.tipo == 'moto' }}>Moto</option><option value="carro" {{ 'selected' if veiculo and veiculo.tipo == 'carro' }}>Carro</option></select></label>
       <label>Marca<input name="marca" value="{{ veiculo.marca if veiculo else '' }}" required></label>
@@ -21,7 +21,7 @@
     </div>
   </section>
   <section class="panel form-section">
-    <div class="section-title"><span>02</span><div><h2>Comercial</h2><p>Preço, custo e controle interno.</p></div></div>
+    <div class="section-title"><h2>Comercial</h2><p>Preço, custo e controle interno.</p></div>
     <div class="form-grid">
       <label>Preço de venda<input type="number" step="0.01" min="0" name="preco" value="{{ veiculo.preco if veiculo else '' }}" required></label>
       {% if pode_custo %}<label>Custo do veículo<input type="number" step="0.01" min="0" name="custo" value="{{ veiculo.custo if veiculo and veiculo.custo is not none else '' }}"></label>{% endif %}
@@ -35,7 +35,7 @@
 
 {% if veiculo and veiculo.id %}
 <section class="panel action-panel">
-  <div><span class="eyebrow">Estado do veículo</span><h2>Ações rápidas</h2><p>Algumas ações alteram o que aparece no catálogo.</p></div>
+  <div><h2>Ações</h2><p>Publicação e status no catálogo.</p></div>
   <div class="action-grid">
     {% if veiculo.publicado %}<form method="post" action="/app/estoque/{{ veiculo.id }}/despublicar"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="button secondary">Despublicar</button></form>{% elif veiculo.status == 'disponivel' %}<form method="post" action="/app/estoque/{{ veiculo.id }}/publicar"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="button secondary">Publicar no catálogo</button></form>{% endif %}
     {% if veiculo.status == 'disponivel' %}<form method="post" action="/app/estoque/{{ veiculo.id }}/reservar"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="button secondary">Reservar</button></form>{% endif %}

@@ -1,52 +1,47 @@
 {% extends "base.html" %}
-{% block title %}Visão geral — Motora{% endblock %}
+{% block title %}Visão geral — Revy{% endblock %}
 {% block content %}
 <div class="dashboard-heading">
   <div>
-    <span class="eyebrow"><i></i>Operação em tempo real</span>
-    <h1>Bom dia, {{ usuario.nome.split(' ')[0] }}</h1>
-    <p>Seu estoque está organizado e pronto para avançar.</p>
+    <h1>Visão geral</h1>
+    <p>{{ usuario.loja_slug }} · estoque e operação do dia</p>
   </div>
-  {% if pode_gerir %}<a class="button primary" href="/app/estoque/novo">+ Cadastrar veículo</a>{% endif %}
+  {% if pode_gerir %}<a class="button primary" href="/app/estoque/novo">Cadastrar veículo</a>{% endif %}
 </div>
 
-{% if integracao_erro %}<div class="alert warning" role="alert"><strong>Estoque desconectado.</strong> {{ integracao_erro }}</div>{% endif %}
+{% if integracao_erro %}<div class="alert warning" role="alert"><strong>Estoque offline.</strong> {{ integracao_erro }}</div>{% endif %}
 
 <section class="dashboard-grid" aria-label="Resumo da operação">
   <article class="operations-card">
-    <div class="card-glow" aria-hidden="true"></div>
     <div class="operations-copy">
-      <span class="mono-label">ESTOQUE AGORA</span>
-      <h2>Sua operação em um só painel.</h2>
-      <p>Disponibilidade, publicação e reservas calculadas diretamente pela API de Estoque.</p>
+      <h2>Estoque</h2>
+      <p>Números vindos da API de estoque da loja.</p>
     </div>
     <div class="metric-grid">
       <div class="metric"><span>Disponíveis</span><strong>{{ metricas.disponiveis }}</strong><small>prontos para venda</small></div>
-      <div class="metric"><span>Publicados</span><strong>{{ metricas.publicados }}</strong><small>visíveis no catálogo</small></div>
+      <div class="metric"><span>Publicados</span><strong>{{ metricas.publicados }}</strong><small>no catálogo</small></div>
       <div class="metric"><span>Reservados</span><strong>{{ metricas.reservados }}</strong><small>em negociação</small></div>
-      <div class="metric accent"><span>Total</span><strong>{{ metricas.total }}</strong><small>todos os status</small></div>
+      <div class="metric"><span>Total</span><strong>{{ metricas.total }}</strong><small>todos os status</small></div>
     </div>
   </article>
 
   <aside class="integration-card {{ 'offline' if integracao_erro else '' }}">
     <div class="integration-heading">
-      <span class="integration-icon" aria-hidden="true">AI</span>
-      <div><strong>Central Motora</strong><small>Integrações do Portal</small></div>
-      <span class="status-chip"><i></i>{{ 'Atenção' if integracao_erro else 'Ativa' }}</span>
+      <div>
+        <strong>Estoque API</strong>
+        <small>{{ usuario.loja_slug }}</small>
+      </div>
+      <span class="status-chip"><i></i>{{ 'Atenção' if integracao_erro else 'Conectado' }}</span>
     </div>
-    <p>{{ 'A conexão com o Estoque precisa ser restabelecida.' if integracao_erro else 'O Portal está recebendo os dados operacionais do Estoque.' }}</p>
-    <dl class="integration-stats">
-      <div><dt>Fonte</dt><dd>Estoque API</dd></div>
-      <div><dt>Escopo</dt><dd>{{ usuario.loja_slug }}</dd></div>
-    </dl>
-    <a class="button integration-action" href="/app/estoque">Abrir estoque</a>
+    <p>{{ 'Não foi possível carregar o estoque. Verifique a integração.' if integracao_erro else 'Dados atualizados a partir do serviço de estoque.' }}</p>
+    <a class="button secondary integration-action" href="/app/estoque">Abrir estoque</a>
   </aside>
 </section>
 
 <section class="panel recent-panel">
   <div class="panel-heading">
-    <div><span class="mono-label">MOVIMENTO RECENTE</span><h2>Últimos veículos</h2></div>
-    <a href="/app/estoque">Ver estoque completo →</a>
+    <div><h2>Últimos veículos</h2></div>
+    <a href="/app/estoque">Ver todos</a>
   </div>
   {% if veiculos %}
   <div class="vehicle-list compact">
@@ -59,6 +54,6 @@
     </a>
     {% endfor %}
   </div>
-  {% else %}<div class="empty"><span class="empty-code">00</span><strong>Nenhum veículo cadastrado.</strong><p>Cadastre o primeiro para começar a operar o estoque.</p></div>{% endif %}
+  {% else %}<div class="empty"><strong>Nenhum veículo cadastrado</strong><p>Cadastre o primeiro para começar a operar o estoque.</p></div>{% endif %}
 </section>
 {% endblock %}

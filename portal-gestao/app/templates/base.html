@@ -3,70 +3,83 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#0a0f17">
-  <title>{% block title %}Motora — Central de operação{% endblock %}</title>
+  <meta name="theme-color" content="#ffffff">
+  <title>{% block title %}Revy — Painel{% endblock %}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/static/css/app.css">
+  <script>
+    (() => {
+      const saved = localStorage.getItem('revy-theme');
+      let theme = saved === 'dark' || saved === 'light' ? saved : null;
+      if (!theme) {
+        theme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+      }
+      document.documentElement.setAttribute('data-theme', theme);
+      const meta = document.querySelector('meta[name="theme-color"]');
+      if (meta) meta.setAttribute('content', theme === 'dark' ? '#0a0a0a' : '#ffffff');
+    })();
+  </script>
   {% block head %}{% endblock %}
 </head>
 <body>
+  {% set path = request.url.path %}
   <div class="app-shell">
     <aside class="sidebar" id="sidebar" aria-label="Navegação da aplicação">
       <div class="sidebar-brand-row">
-        <a class="brand" href="/app" aria-label="Motora — página inicial">
-          <span class="brand-mark" aria-hidden="true">M</span>
-          <span><strong>Motora</strong><small>Central de operação</small></span>
+        <a class="brand" href="/app" aria-label="Revy — página inicial">
+          <span class="brand-mark" aria-hidden="true">R</span>
+          <span><strong>Revy</strong><small>{{ usuario.loja_slug }}</small></span>
         </a>
         <button class="drawer-close" type="button" aria-label="Fechar menu">×</button>
       </div>
 
-      <div class="store-switcher" aria-label="Loja atual">
-        <span class="store-mark">{{ usuario.loja_slug[:2] | upper }}</span>
-        <span><strong>{{ usuario.loja_slug }}</strong><small>Operação conectada</small></span>
-      </div>
-
       <nav class="nav" aria-label="Menu principal">
-        <span class="nav-section">Operação</span>
-        <a class="nav-link {{ 'active' if request.url.path == '/app' else '' }}" href="/app" {% if request.url.path == '/app' %}aria-current="page"{% endif %}><span>01</span>Visão geral</a>
-        <a class="nav-link {{ 'active' if request.url.path.startswith('/app/leads') else '' }}" href="/app/leads" {% if request.url.path.startswith('/app/leads') %}aria-current="page"{% endif %}><span>02</span>Leads</a>
-        <a class="nav-link {{ 'active' if request.url.path.startswith('/app/conversas') else '' }}" href="/app/conversas" {% if request.url.path.startswith('/app/conversas') %}aria-current="page"{% endif %}><span>03</span>Conversas</a>
-        <a class="nav-link {{ 'active' if request.url.path.startswith('/app/estoque') else '' }}" href="/app/estoque" {% if request.url.path.startswith('/app/estoque') %}aria-current="page"{% endif %}><span>04</span>Estoque</a>
+        <span class="nav-section">Dia a dia</span>
+        <a class="nav-link {{ 'active' if path == '/app' else '' }}" href="/app" {% if path == '/app' %}aria-current="page"{% endif %}>Visão geral</a>
+        <a class="nav-link {{ 'active' if path.startswith('/app/leads') else '' }}" href="/app/leads" {% if path.startswith('/app/leads') %}aria-current="page"{% endif %}>Leads</a>
+        <a class="nav-link {{ 'active' if path.startswith('/app/conversas') else '' }}" href="/app/conversas" {% if path.startswith('/app/conversas') %}aria-current="page"{% endif %}>Conversas</a>
+        <a class="nav-link {{ 'active' if path.startswith('/app/estoque') else '' }}" href="/app/estoque" {% if path.startswith('/app/estoque') %}aria-current="page"{% endif %}>Estoque</a>
         {% if usuario.papel in ['dono', 'gerente', 'vendedor'] %}
-        <a class="nav-link {{ 'active' if request.url.path.startswith('/app/vendas') else '' }}" href="/app/vendas" {% if request.url.path.startswith('/app/vendas') %}aria-current="page"{% endif %}><span>05</span>Vendas</a>
+        <a class="nav-link {{ 'active' if path.startswith('/app/vendas') else '' }}" href="/app/vendas" {% if path.startswith('/app/vendas') %}aria-current="page"{% endif %}>Vendas</a>
         {% endif %}
         {% if usuario.papel in ['dono', 'gerente', 'vendedor', 'admin_plataforma'] %}
-        <a class="nav-link {{ 'active' if request.url.path.startswith('/app/simulacoes') else '' }}" href="/app/simulacoes" {% if request.url.path.startswith('/app/simulacoes') %}aria-current="page"{% endif %}><span>06</span>Simulações</a>
+        <a class="nav-link {{ 'active' if path.startswith('/app/simulacoes') else '' }}" href="/app/simulacoes" {% if path.startswith('/app/simulacoes') %}aria-current="page"{% endif %}>Simulações</a>
         {% endif %}
 
         {% if usuario.papel in ['dono', 'gerente', 'vendedor'] %}
-        <span class="nav-section">Comercial</span>
+        <span class="nav-section">Gestão</span>
         {% endif %}
         {% if usuario.papel in ['dono', 'gerente'] %}
-        <a class="nav-link {{ 'active' if request.url.path.startswith('/app/financeiro') else '' }}" href="/app/financeiro" {% if request.url.path.startswith('/app/financeiro') %}aria-current="page"{% endif %}><span>07</span>Financeiro</a>
-        <a class="nav-link {{ 'active' if request.url.path.startswith('/app/relatorios') else '' }}" href="/app/relatorios" {% if request.url.path.startswith('/app/relatorios') %}aria-current="page"{% endif %}><span>08</span>Relatórios</a>
-        <a class="nav-link {{ 'active' if request.url.path.startswith('/app/trafego') else '' }}" href="/app/trafego" {% if request.url.path.startswith('/app/trafego') %}aria-current="page"{% endif %}><span>09</span>Tráfego</a>
+        <a class="nav-link {{ 'active' if path.startswith('/app/financeiro') else '' }}" href="/app/financeiro" {% if path.startswith('/app/financeiro') %}aria-current="page"{% endif %}>Financeiro</a>
+        <a class="nav-link {{ 'active' if path.startswith('/app/relatorios') else '' }}" href="/app/relatorios" {% if path.startswith('/app/relatorios') %}aria-current="page"{% endif %}>Relatórios</a>
+        <a class="nav-link {{ 'active' if path.startswith('/app/trafego') else '' }}" href="/app/trafego" {% if path.startswith('/app/trafego') %}aria-current="page"{% endif %}>Tráfego</a>
         {% endif %}
         {% if usuario.papel == 'vendedor' %}
-        <a class="nav-link {{ 'active' if request.url.path.startswith('/app/vendedor') else '' }}" href="/app/vendedor" {% if request.url.path.startswith('/app/vendedor') %}aria-current="page"{% endif %}><span>07</span>Meu painel</a>
+        <a class="nav-link {{ 'active' if path.startswith('/app/vendedor') else '' }}" href="/app/vendedor" {% if path.startswith('/app/vendedor') %}aria-current="page"{% endif %}>Meu painel</a>
         {% endif %}
         {% if usuario.papel in ['dono', 'gerente', 'vendedor'] %}
-        <a class="nav-link {{ 'active' if request.url.path.startswith('/app/metas') else '' }}" href="/app/metas" {% if request.url.path.startswith('/app/metas') %}aria-current="page"{% endif %}><span>10</span>Metas</a>
+        <a class="nav-link {{ 'active' if path.startswith('/app/metas') else '' }}" href="/app/metas" {% if path.startswith('/app/metas') %}aria-current="page"{% endif %}>Metas</a>
         {% endif %}
 
         {% if usuario.papel in ['dono', 'gerente', 'admin_plataforma'] %}
-        <span class="nav-section">Administração</span>
+        <span class="nav-section">Configurações</span>
         {% if usuario.papel in ['dono', 'gerente'] %}
-        <a class="nav-link {{ 'active' if request.url.path.startswith('/app/financeiras') else '' }}" href="/app/financeiras" {% if request.url.path.startswith('/app/financeiras') %}aria-current="page"{% endif %}><span>11</span>Acessos bancos</a>
+        <a class="nav-link {{ 'active' if path.startswith('/app/financeiras') else '' }}" href="/app/financeiras" {% if path.startswith('/app/financeiras') %}aria-current="page"{% endif %}>Acessos dos bancos</a>
         {% endif %}
         {% if usuario.papel in ['dono', 'admin_plataforma'] %}
-        <a class="nav-link {{ 'active' if request.url.path.startswith('/app/equipe') else '' }}" href="/app/equipe" {% if request.url.path.startswith('/app/equipe') %}aria-current="page"{% endif %}><span>12</span>Equipe</a>
-        <a class="nav-link {{ 'active' if request.url.path.startswith('/app/configuracoes') else '' }}" href="/app/configuracoes" {% if request.url.path.startswith('/app/configuracoes') %}aria-current="page"{% endif %}><span>13</span>Configurações</a>
+        <a class="nav-link {{ 'active' if path.startswith('/app/equipe') else '' }}" href="/app/equipe" {% if path.startswith('/app/equipe') %}aria-current="page"{% endif %}>Equipe</a>
+        <a class="nav-link {{ 'active' if path.startswith('/app/configuracoes') else '' }}" href="/app/configuracoes" {% if path.startswith('/app/configuracoes') %}aria-current="page"{% endif %}>Ajustes</a>
         {% endif %}
         {% endif %}
-
       </nav>
 
       <div class="sidebar-footer">
-        <span class="system-status"><i></i>Sistemas operacionais</span>
+        <button class="theme-toggle theme-toggle-sidebar" type="button" id="theme-toggle" aria-label="Alternar tema claro ou escuro" title="Modo claro / escuro">
+          <span class="theme-toggle-icon" aria-hidden="true">☾</span>
+          <span class="theme-toggle-label">Escuro</span>
+        </button>
         <form action="/logout" method="post">
           <input type="hidden" name="csrf" value="{{ csrf }}">
           <button class="link-button" type="submit">Sair</button>
@@ -79,13 +92,19 @@
       <header class="topbar">
         <button class="menu-button" type="button" aria-controls="sidebar" aria-expanded="false">Menu</button>
         <div class="page-context">
-          <strong>{% block page_title %}{% if request.url.path == '/app' %}Visão geral{% elif request.url.path.startswith('/app/estoque') %}Estoque{% elif request.url.path.startswith('/app/leads') %}Leads{% elif request.url.path.startswith('/app/conversas') %}Conversas{% elif request.url.path.startswith('/app/vendas') %}Vendas{% elif request.url.path.startswith('/app/financeiro') %}Financeiro{% elif request.url.path.startswith('/app/relatorios') %}Relatórios{% elif request.url.path.startswith('/app/trafego') %}Tráfego{% elif request.url.path.startswith('/app/vendedor') %}Meu painel{% elif request.url.path.startswith('/app/metas') %}Metas{% elif request.url.path.startswith('/app/simulacoes') %}Simulações{% elif request.url.path.startswith('/app/financeiras') %}Acessos bancos{% elif request.url.path.startswith('/app/equipe') %}Equipe{% else %}Configurações{% endif %}{% endblock %}</strong>
-          <small>{{ usuario.loja_slug }}</small>
+          <strong>{% block page_title %}{% if path == '/app' %}Visão geral{% elif path.startswith('/app/estoque') %}Estoque{% elif path.startswith('/app/leads') %}Leads{% elif path.startswith('/app/conversas') %}Conversas{% elif path.startswith('/app/vendas') %}Vendas{% elif path.startswith('/app/financeiro') %}Financeiro{% elif path.startswith('/app/relatorios') %}Relatórios{% elif path.startswith('/app/trafego') %}Tráfego{% elif path.startswith('/app/vendedor') %}Meu painel{% elif path.startswith('/app/metas') %}Metas{% elif path.startswith('/app/simulacoes') %}Simulações{% elif path.startswith('/app/financeiras') %}Acessos dos bancos{% elif path.startswith('/app/equipe') %}Equipe{% else %}Ajustes{% endif %}{% endblock %}</strong>
+          <small>{{ usuario.nome }} · {{ usuario.papel | replace('_', ' ') }}</small>
         </div>
-        <span class="environment"><i></i>Conectado</span>
-        <div class="topbar-user">
+        <div class="topbar-actions">
+          {% if usuario.papel in ['dono', 'gerente', 'vendedor', 'admin_plataforma'] %}
+          <a class="button secondary topbar-btn" href="/app/simulacoes">Simular</a>
+          {% endif %}
+          {% if usuario.papel in ['dono', 'gerente'] %}
+          <a class="button primary topbar-btn" href="/app/estoque/novo">+ Veículo</a>
+          {% endif %}
+        </div>
+        <div class="topbar-user" title="{{ usuario.email }}">
           <span class="avatar">{{ usuario.nome[:1] | upper }}</span>
-          <span><strong>{{ usuario.nome }}</strong><small>{{ usuario.papel | replace('_', ' ') | capitalize }}</small></span>
         </div>
       </header>
       <main class="content" id="conteudo">
@@ -105,6 +124,33 @@
       closeButtons.forEach((button) => button.addEventListener('click', close));
       navLinks.forEach((link) => link.addEventListener('click', close));
       document.addEventListener('keydown', (event) => { if (event.key === 'Escape' && body.classList.contains('menu-open')) { close(); menu?.focus(); } });
+
+      const root = document.documentElement;
+      const toggle = document.getElementById('theme-toggle');
+      const applyTheme = () => {
+        const dark = root.getAttribute('data-theme') === 'dark';
+        const meta = document.querySelector('meta[name="theme-color"]');
+        if (meta) meta.setAttribute('content', dark ? '#0a0a0a' : '#ffffff');
+        if (toggle) {
+          const label = toggle.querySelector('.theme-toggle-label');
+          const icon = toggle.querySelector('.theme-toggle-icon');
+          if (label) label.textContent = dark ? 'Claro' : 'Escuro';
+          if (icon) icon.textContent = dark ? '☀' : '☾';
+          toggle.setAttribute('aria-pressed', dark ? 'true' : 'false');
+          toggle.title = dark ? 'Mudar para modo claro' : 'Mudar para modo escuro';
+        }
+      };
+      if (!localStorage.getItem('revy-theme')) {
+        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        root.setAttribute('data-theme', prefersDark ? 'dark' : 'light');
+      }
+      applyTheme();
+      toggle?.addEventListener('click', () => {
+        const next = root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+        root.setAttribute('data-theme', next);
+        localStorage.setItem('revy-theme', next);
+        applyTheme();
+      });
     })();
   </script>
 </body>
