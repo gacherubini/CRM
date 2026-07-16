@@ -12,8 +12,8 @@ IDADE_MINIMA = int(os.getenv("IDADE_MINIMA", "18"))
 PRAZO_MIN = int(os.getenv("PRAZO_MIN", "6"))
 PRAZO_MAX = int(os.getenv("PRAZO_MAX", "60"))
 METRICS_TOKEN = os.getenv("MOTOR_METRICS_TOKEN", "")
-JOB_LEASE_SECONDS = int(os.getenv("MOTOR_JOB_LEASE_SECONDS", "120"))
-DRIVER_TIMEOUT_SECONDS = int(os.getenv("MOTOR_DRIVER_TIMEOUT_SECONDS", "240"))
+JOB_LEASE_SECONDS = int(os.getenv("MOTOR_JOB_LEASE_SECONDS", "480"))
+DRIVER_TIMEOUT_SECONDS = int(os.getenv("MOTOR_DRIVER_TIMEOUT_SECONDS", "420"))
 EVENT_SCREENSHOTS = (os.getenv("MOTOR_EVENT_SCREENSHOTS") or "1").strip().lower() in (
     "1", "true", "yes", "on"
 )
@@ -26,7 +26,7 @@ PRAZOS_PADRAO = PRAZOS_PADRAO_MESES  # alias Task 12
 # Screenshots / sessão browser (fora do git em produção).
 SCREENSHOT_DIR = os.getenv("MOTOR_SCREENSHOT_DIR", "data/screenshots")
 STORAGE_STATE_DIR = os.getenv("MOTOR_STORAGE_STATE_DIR", "data/storage_state")
-BROWSER_TIMEOUT_MS = int(os.getenv("MOTOR_BROWSER_TIMEOUT_MS", "45000"))
+BROWSER_TIMEOUT_MS = int(os.getenv("MOTOR_BROWSER_TIMEOUT_MS", "90000"))
 # Headless=1 usa chromium headless_shell (muito bloqueado por Akamai).
 # Padrão 0 = headed; no Docker o worker sobe com Xvfb (display virtual).
 BROWSER_HEADLESS = (os.getenv("MOTOR_BROWSER_HEADLESS") or "0").strip().lower() in (

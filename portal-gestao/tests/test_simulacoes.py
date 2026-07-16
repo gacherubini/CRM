@@ -81,9 +81,23 @@ def test_form_lista_bancos_prontos(client, chatbot_fake, motor_fake):
     login(client)
     resposta = client.get("/app/simulacoes")
     assert resposta.status_code == 200
-    assert "Serão consultados" in resposta.text
+    assert 'name="provedores"' in resposta.text
+    assert "Marcar todos" in resposta.text
     assert "Placa" in resposta.text
     assert "Banco PAN" in resposta.text or "pan" in resposta.text.lower()
+
+
+def test_simular_banco_unico_escolhido(client, chatbot_fake, motor_fake):
+    """Checkbox permite testar 1 banco por vez."""
+    motor_fake.credenciais[1]["senha_configurada"] = True
+    motor_fake.credenciais[1]["habilitado"] = True
+    motor_fake.credenciais[1]["usuario"] = "lojista"
+    login(client, papel="dono")
+    dados = _dados_motor(_csrf_do_form(client), provedores="santander")
+    resposta = client.post("/app/simulacoes", data=dados, follow_redirects=False)
+    assert resposta.status_code == 303
+    body = motor_fake.simulacoes[0]
+    assert body["provedores"] == ["santander"]
 
 
 def test_simular_todos_usa_bancos_com_credencial(client, chatbot_fake, motor_fake):
@@ -119,6 +133,7 @@ def test_simular_todos_com_dois_bancos(client, chatbot_fake, motor_fake):
         valor="20000",
         entrada="0",
         prazos_meses="36",
+        provedores=["pan", "santander"],
     )
     resposta = client.post("/app/simulacoes", data=dados, follow_redirects=False)
     assert resposta.status_code == 303

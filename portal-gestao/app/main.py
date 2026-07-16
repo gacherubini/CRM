@@ -728,9 +728,28 @@ def _parse_celular_form(raw: str | None) -> tuple[str | None, str | None]:
     return None, None
 
 
+def _lista_form(form, nome: str) -> list[str]:
+    """Lê campo multi-valor do form (checkboxes) de forma compatível com testes."""
+    if hasattr(form, "getlist"):
+        vals = form.getlist(nome)
+    else:
+        vals = form.get(nome)
+    if vals is None:
+        return []
+    if isinstance(vals, (str, bytes)):
+        return [str(vals)]
+    return [str(v) for v in vals if v is not None and str(v).strip()]
+
+
 def _valores_form_simulacao(form) -> dict:
+    provedores = [
+        p.strip().lower()
+        for p in _lista_form(form, "provedores")
+        if p and str(p).strip()
+    ]
     return {
-        "modo": "todos",
+        "modo": "selecionados" if provedores else "todos",
+        "provedores": provedores,
         "cpf": form.get("cpf") or "",
         "nascimento": form.get("nascimento", ""),
         "celular": form.get("celular") or "",
@@ -764,15 +783,27 @@ def _credenciais_prontas_motor(motor: "MotorClient", ator: str | None) -> list[d
 def _provedores_da_simulacao(
     form, credenciais_prontas: list[dict]
 ) -> list[str]:
-    """Bancos com credencial pronta (sempre multi-banco)."""
-    nomes: list[str] = []
+    """Bancos escolhidos no form ∩ credencial pronta.
+
+    Se o form não mandar ``provedores``, mantém o comportamento antigo
+    (todos os prontos) para compatibilidade com clientes/testes legados.
+    """
+    prontos: list[str] = []
     vistos: set[str] = set()
     for c in credenciais_prontas:
         nome = (c.get("provedor") or "").strip().lower()
         if nome and nome not in vistos:
             vistos.add(nome)
-            nomes.append(nome)
-    return nomes
+            prontos.append(nome)
+
+    escolhidos = {
+        p.strip().lower()
+        for p in _lista_form(form, "provedores")
+        if p and str(p).strip()
+    }
+    if not escolhidos:
+        return prontos
+    return [p for p in prontos if p in escolhidos]
 
 
 def dados_simulacao_motor(
@@ -885,10 +916,14 @@ async def simulacoes_simular(
         )
 
     provedores = _provedores_da_simulacao(form, bancos_prontos)
-    if not provedores:
+    if not bancos_prontos:
         return _rerender(
             "Nenhum banco com acesso configurado. Cadastre login em "
             "Acessos dos bancos e tente de novo."
+        )
+    if not provedores:
+        return _rerender(
+            "Selecione ao menos um banco com acesso configurado para simular."
         )
     try:
         payload_motor = dados_simulacao_motor(form, provedores)
@@ -906,7 +941,7 @@ async def simulacoes_simular(
     if not sim_id:
         return _rerender("Motor não devolveu id da simulação.", status=503)
     valores_job = dict(valores)
-    valores_job["modo"] = "todos"
+    valores_job["modo"] = "selecionados" if len(provedores) == 1 else "multi"
     valores_job["provedores"] = list(provedores)
     jobs = request.session.get("sim_jobs") or {}
     jobs[sim_id] = {

@@ -2,25 +2,37 @@
 {% block title %}Simulação manual — Gestão{% endblock %}
 {% block content %}
 <div class="page-heading">
-  <div><span class="eyebrow">Financiamento</span><h1>Simulação manual</h1><p>Consulta todos os bancos com acesso configurado.</p></div>
+  <div><span class="eyebrow">Financiamento</span><h1>Simulação manual</h1><p>Escolha um ou mais bancos com acesso configurado.</p></div>
   <a class="button ghost" href="/app/simulacoes/historico">Histórico de simulações</a>
 </div>
 
 {% if erro %}<div class="alert error" role="alert">{{ erro }}</div>{% endif %}
 
-<form method="post" class="form-layout">
+<form method="post" class="form-layout" id="form-simulacao">
   <input type="hidden" name="csrf" value="{{ csrf }}">
-  <input type="hidden" name="modo" value="todos">
 
   <section class="panel form-section">
-    <div class="section-title"><span>00</span><div><h2>Bancos</h2><p>Usa os logins em Acessos dos bancos — sem escolher um a um.</p></div></div>
+    <div class="section-title"><span>00</span><div><h2>Bancos</h2><p>Marque só o que quiser testar (1 por vez reduz timeout e carga no portal).</p></div></div>
     {% if bancos_prontos %}
-    <p class="muted">Serão consultados:</p>
-    <ul class="sim-bank-chips" style="display:flex;flex-wrap:wrap;gap:8px;margin:8px 0 0;padding:0;list-style:none">
+    <div style="display:flex;flex-wrap:wrap;gap:10px 16px;margin:10px 0 6px;align-items:center">
+      <button type="button" class="button ghost" id="bancos-todos" style="padding:6px 12px;font-size:0.85rem">Marcar todos</button>
+      <button type="button" class="button ghost" id="bancos-nenhum" style="padding:6px 12px;font-size:0.85rem">Desmarcar todos</button>
+    </div>
+    <ul class="sim-bank-chips" style="display:flex;flex-wrap:wrap;gap:10px;margin:8px 0 0;padding:0;list-style:none">
       {% for b in bancos_prontos %}
-      <li class="status-chip" style="margin:0"><i></i>{{ b.rotulo or b.provedor }}</li>
+      {% set nome = (b.provedor or '')|lower %}
+      {% set marcado = (not valores.provedores) or (nome in valores.provedores) %}
+      <li style="margin:0">
+        <label class="status-chip" style="margin:0;cursor:pointer;display:inline-flex;align-items:center;gap:6px;user-select:none">
+          <input type="checkbox" name="provedores" value="{{ nome }}"
+            {% if marcado %}checked{% endif %}
+            style="margin:0">
+          <i></i>{{ b.rotulo or b.provedor }}
+        </label>
+      </li>
       {% endfor %}
     </ul>
+    <p class="muted" style="margin-top:10px">Só aparecem bancos com login em <a href="/app/financeiras">Acessos dos bancos</a>.</p>
     {% else %}
     <p class="muted">
       Nenhum banco com credencial ainda.
@@ -76,4 +88,26 @@
 
   <div class="form-actions"><a class="button ghost" href="/app">Cancelar</a><button class="button primary" type="submit">Simular parcelas</button></div>
 </form>
+<script>
+(function () {
+  var form = document.getElementById("form-simulacao");
+  if (!form) return;
+  var boxes = function () { return form.querySelectorAll('input[name="provedores"]'); };
+  var btnTodos = document.getElementById("bancos-todos");
+  var btnNenhum = document.getElementById("bancos-nenhum");
+  if (btnTodos) btnTodos.addEventListener("click", function () {
+    boxes().forEach(function (c) { c.checked = true; });
+  });
+  if (btnNenhum) btnNenhum.addEventListener("click", function () {
+    boxes().forEach(function (c) { c.checked = false; });
+  });
+  form.addEventListener("submit", function (ev) {
+    var algum = Array.prototype.some.call(boxes(), function (c) { return c.checked; });
+    if (boxes().length && !algum) {
+      ev.preventDefault();
+      alert("Marque ao menos um banco para simular.");
+    }
+  });
+})();
+</script>
 {% endblock %}
