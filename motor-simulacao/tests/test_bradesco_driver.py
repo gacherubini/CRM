@@ -14,6 +14,7 @@ from app.motor.drivers import (
 from app.motor.bradesco import (
     PROVEDOR,
     BradescoDriver,
+    corpo_indica_recaptcha_falhou,
     parse_moeda_br,
     parse_parcelas_bradesco,
     _formatar_moeda_input,
@@ -257,3 +258,73 @@ def test_login_reutiliza_sessao_autenticada_apos_timeout_networkidle():
 
     # Nao deve tentar preencher CPF/Senha quando ja esta autenticado.
     page.get_by_role.return_value.first.fill.assert_not_called()
+
+
+# --- reCAPTCHA no login -------------------------------------------------------
+
+
+def test_corpo_indica_recaptcha_banner_exato():
+    """Banner do print do dono: 'Erro ao tentar verificar o reCAPTCHA'."""
+    assert corpo_indica_recaptcha_falhou(
+        "Vamos começar?\nErro ao tentar verificar o reCAPTCHA\nCPF *\nSenha *"
+    )
+
+
+def test_corpo_indica_recaptcha_variantes():
+    assert corpo_indica_recaptcha_falhou("Erro: falha ao verificar o reCAPTCHA")
+    assert corpo_indica_recaptcha_falhou(
+        "reCAPTCHA: Não sou um robô — selecione as imagens"
+    )
+    assert not corpo_indica_recaptcha_falhou("CPF ou senha inválidos")
+    assert not corpo_indica_recaptcha_falhou("Nova proposta")
+    assert not corpo_indica_recaptcha_falhou("")
+
+
+def test_aguardar_pos_login_recaptcha_vira_captcha_login():
+    """Banner rosa de reCAPTCHA deve virar IntervencaoNecessaria(captcha_login)."""
+    driver = BradescoDriver(timeout_ms=5_000)
+    page = MagicMock()
+    page.url = "https://turbo.bradesco/originacaolojista/login"
+    page.wait_for_function.return_value = None
+    page.inner_text.return_value = (
+        "Vamos começar? Informe seu CPF e senha\n"
+        "Erro ao tentar verificar o reCAPTCHA\n"
+        "CPF *\nSenha *\nEntrar"
+    )
+    page.locator.return_value.count.return_value = 0
+    # Ainda na tela de login (sem Nova proposta).
+    page.get_by_role.return_value.first.is_visible.return_value = False
+
+    with pytest.raises(IntervencaoNecessaria) as ei:
+        driver._aguardar_pos_login(page)
+    assert ei.value.codigo == "captcha_login"
+
+
+def test_passo_login_espera_grecaptcha_antes_de_entrar():
+    """Antes de clicar Entrar, deve esperar window.grecaptcha.execute."""
+    driver = BradescoDriver(timeout_ms=20_000)
+    page = MagicMock()
+    page.url = "https://turbo.bradesco/originacaolojista/login"
+    page.goto.return_value = None
+    # Nao autenticado: is_visible False para "Nova proposta".
+    page.get_by_role.return_value.first.is_visible.return_value = False
+    page.get_by_role.return_value.first.click.return_value = None
+    page.get_by_role.return_value.first.fill.return_value = None
+    page.get_by_role.return_value.first.type.return_value = None
+    # _aguardar_pos_login: simula sucesso saindo do login.
+    page.wait_for_function.return_value = None
+    page.inner_text.return_value = "Nova proposta"
+    # Apos "sucesso" do wait, _portal_autenticado deve aceitar.
+    page.get_by_role.return_value.first.is_visible.side_effect = [
+        False,  # _portal_autenticado no inicio do login (apos goto)
+        True,  # _portal_autenticado dentro de _aguardar_pos_login
+    ]
+
+    driver._passo_login(page, "12345678900", "senha-x")
+
+    # Deve ter pedido grecaptcha.execute em algum wait_for_function.
+    scripts = []
+    for call in page.wait_for_function.call_args_list:
+        arg0 = call.args[0] if call.args else ""
+        scripts.append(arg0 if isinstance(arg0, str) else str(arg0))
+    assert any("grecaptcha" in s for s in scripts), scripts

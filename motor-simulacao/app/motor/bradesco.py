@@ -99,6 +99,26 @@ def _formatar_moeda_input(valor: float) -> str:
     return f"{valor:,.2f}".replace(",", "_").replace(".", ",").replace("_", ".")
 
 
+def corpo_indica_recaptcha_falhou(texto: str) -> bool:
+    """Detecta falha de verificacao reCAPTCHA na tela de login do Turbo.
+
+    Banner observado: "Erro ao tentar verificar o reCAPTCHA".
+    Nao e captcha visual de imagens — e falha do token (v3 / anti-bot).
+    """
+    t = texto or ""
+    if re.search(r"Erro ao tentar verificar o reCAPTCHA", t, re.I):
+        return True
+    if re.search(r"verificar o reCAPTCHA", t, re.I) and re.search(
+        r"erro|falha|falhou|n[aã]o foi poss[ií]vel", t, re.I
+    ):
+        return True
+    if re.search(r"reCAPTCHA", t, re.I) and re.search(
+        r"n[aã]o sou um rob[oô]|selecione todas|verifica[cç][aã]o", t, re.I
+    ):
+        return True
+    return False
+
+
 def _html_fixture_path() -> Path | None:
     raw = os.getenv("MOTOR_BRADESCO_FIXTURE_HTML", "").strip()
     if raw:
@@ -402,6 +422,17 @@ class BradescoDriver(PlaywrightBankDriver):
             )
         except Exception:
             pass
+        # reCAPTCHA v3 (invisivel): o Angular so envia o POST apos
+        # grecaptcha.execute() devolver token. Clicar cedo demais gera o banner
+        # "Erro ao tentar verificar o reCAPTCHA" (mesmo com CPF/senha corretos).
+        try:
+            page.wait_for_function(
+                "() => window.grecaptcha && typeof window.grecaptcha.execute === 'function'",
+                timeout=min(self.timeout_ms, 15_000),
+            )
+        except Exception:
+            pass
+        page.wait_for_timeout(400)
         entrar.first.click()
         self._aguardar_pos_login(page)
 
@@ -424,18 +455,41 @@ class BradescoDriver(PlaywrightBankDriver):
 
     def _aguardar_pos_login(self, page) -> None:
         timeout = max(self.timeout_ms, 45_000)
+        # Sai cedo em sucesso OU se o banner de reCAPTCHA ja apareceu
+        # (evita esperar 45s no erro que o print do dono mostrou).
         try:
             page.wait_for_function(
                 """() => {
                     const texto = document.body?.innerText || '';
+                    if (/Erro ao tentar verificar o reCAPTCHA/i.test(texto)) return true;
+                    if (/verificar o reCAPTCHA/i.test(texto) && /erro|falha/i.test(texto))
+                        return true;
                     return !/\\/login\\b/i.test(location.pathname)
                         || /Nova proposta/i.test(texto);
                 }""",
                 timeout=timeout,
             )
             self._aguardar_dom_pronto(page)
-            page.wait_for_timeout(600)
-            return
+            page.wait_for_timeout(400)
+            body_ok = ""
+            try:
+                body_ok = (page.inner_text("body") or "")[:1200]
+            except Exception:
+                body_ok = ""
+            if corpo_indica_recaptcha_falhou(body_ok):
+                raise IntervencaoNecessaria(
+                    "captcha_login",
+                    "Portal Bradesco falhou na verificacao do reCAPTCHA no login "
+                    "(token/anti-bot). Tente de novo; se persistir, login manual "
+                    "headed para renovar a sessao do worker.",
+                )
+            if self._portal_autenticado(page) or re.search(
+                r"Nova proposta", body_ok, re.I
+            ):
+                page.wait_for_timeout(200)
+                return
+        except IntervencaoNecessaria:
+            raise
         except Exception:
             pass
         self._assert_portal_acessivel(page)
@@ -444,9 +498,33 @@ class BradescoDriver(PlaywrightBankDriver):
             body = (page.inner_text("body") or "")[:1200]
         except Exception:
             body = ""
+        if corpo_indica_recaptcha_falhou(body):
+            raise IntervencaoNecessaria(
+                "captcha_login",
+                "Portal Bradesco falhou na verificacao do reCAPTCHA no login "
+                "(token/anti-bot). Tente de novo; se persistir, login manual "
+                "headed para renovar a sessao do worker.",
+            )
+        # Desafio visual (iframe) — intervencao manual, como no Fontecred.
+        try:
+            if page.locator("iframe[src*='recaptcha']").count() > 0:
+                if re.search(
+                    r"n[aã]o sou um rob[oô]|verifica[cç][aã]o|selecione",
+                    body,
+                    re.I,
+                ):
+                    raise IntervencaoNecessaria(
+                        "captcha_login",
+                        "Portal Bradesco exigiu reCAPTCHA visual no login "
+                        "(intervencao manual).",
+                    )
+        except IntervencaoNecessaria:
+            raise
+        except Exception:
+            pass
         if re.search(
             r"inv[aá]lid|incorret|n[aã]o autorizado|usu[aá]rio ou senha|"
-            r"credencia|acesso negado|tente novamente",
+            r"credencia|acesso negado",
             body,
             re.I,
         ):
