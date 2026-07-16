@@ -12,6 +12,7 @@ def _dados_motor(csrf, **extra):
         "modo": "todos",
         "cpf": "52998224725",
         "nascimento": "1990-05-20",
+        "celular": "11987654321",
         "cnh": "sim",
         "placa": "FUV7G58",
         "uf_licenciamento": "SP",
@@ -36,7 +37,7 @@ def test_form_renderiza_para_dono(client, chatbot_fake, motor_fake):
     assert "Código do veículo" not in resposta.text
     assert "Prazo único" not in resposta.text
     assert "Renda mensal" not in resposta.text
-    assert "DDD" not in resposta.text
+    assert "Celular" in resposta.text
 
 
 def test_vendedor_acessa_o_form(client, chatbot_fake, motor_fake):
@@ -97,7 +98,8 @@ def test_simular_todos_usa_bancos_com_credencial(client, chatbot_fake, motor_fak
     assert body["provedores"] == ["pan"]
     assert body["veiculo"]["placa"] == "FUV7G58"
     assert body["pessoa"]["cnh"] is True
-    assert "ddd" not in body["pessoa"] or body["pessoa"].get("ddd") is None
+    assert body["pessoa"]["ddd"] == "11"
+    assert body["pessoa"]["celular"] == "11987654321"
     assert body["veiculo"].get("codigo_provedor") is None
 
     job = client.get(loc)
@@ -124,7 +126,7 @@ def test_simular_todos_com_dois_bancos(client, chatbot_fake, motor_fake):
     assert set(body["provedores"]) == {"pan", "santander"}
 
 
-def test_payload_sem_campos_pan_api(client, chatbot_fake, motor_fake):
+def test_payload_envia_celular_e_sem_campos_pan_api(client, chatbot_fake, motor_fake):
     login(client, papel="dono")
     dados = _dados_motor(
         _csrf_do_form(client),
@@ -132,17 +134,28 @@ def test_payload_sem_campos_pan_api(client, chatbot_fake, motor_fake):
         entrada="5000",
         prazos_meses="24,36,48",
         zero_km="sim",
+        celular="(21) 99876-5432",
     )
     resposta = client.post("/app/simulacoes", data=dados, follow_redirects=False)
     assert resposta.status_code == 303
     body = motor_fake.simulacoes[0]
     assert body["provedores"] == ["pan"]
-    assert body["pessoa"].get("ddd") is None
-    assert body["pessoa"].get("celular") is None
+    assert body["pessoa"]["ddd"] == "21"
+    assert body["pessoa"]["celular"] == "21998765432"
     assert body["pessoa"].get("codigo_natureza_ocupacao") is None
     assert body["veiculo"].get("codigo_provedor") is None
     assert body["veiculo"].get("ano_modelo") is None
     assert body["veiculo"]["zero_km"] is True
+
+
+def test_simular_sem_celular_rejeita(client, chatbot_fake, motor_fake):
+    login(client, papel="dono")
+    antes = len(getattr(motor_fake, "simulacoes", []) or [])
+    dados = _dados_motor(_csrf_do_form(client), celular="")
+    resposta = client.post("/app/simulacoes", data=dados)
+    assert resposta.status_code == 422
+    assert "celular" in resposta.text.lower()
+    assert len(getattr(motor_fake, "simulacoes", []) or []) == antes
 
 
 def test_job_em_processamento_mostra_progresso(client, chatbot_fake, motor_fake):

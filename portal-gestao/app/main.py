@@ -714,11 +714,26 @@ _ROTULOS_BANCO = {
 }
 
 
+def _parse_celular_form(raw: str | None) -> tuple[str | None, str | None]:
+    """Extrai (ddd, celular) de um campo livre com DDD.
+
+    Aceita 10/11 dígitos (com DDD) ou 12/13 com prefixo 55.
+    Devolve celular sem DDD (8–9 dígitos) e ddd com 2 dígitos.
+    """
+    digitos = "".join(c for c in (raw or "") if c.isdigit())
+    if digitos.startswith("55") and len(digitos) >= 12:
+        digitos = digitos[2:]
+    if len(digitos) in (10, 11):
+        return digitos[:2], digitos[2:]
+    return None, None
+
+
 def _valores_form_simulacao(form) -> dict:
     return {
         "modo": "todos",
         "cpf": form.get("cpf") or "",
         "nascimento": form.get("nascimento", ""),
+        "celular": form.get("celular") or "",
         "cnh": form.get("cnh") or "sim",
         "valor": form.get("valor", ""),
         "prazos_meses": form.get("prazos_meses", ""),
@@ -775,6 +790,9 @@ def dados_simulacao_motor(
         raise ValueError("informe ao menos um provedor")
     cpf = "".join(c for c in (form.get("cpf") or "") if c.isdigit())
     nascimento = form.get("nascimento", "").strip()
+    ddd, celular = _parse_celular_form(form.get("celular"))
+    if not ddd or not celular:
+        raise ValueError("informe celular com DDD (10 ou 11 dígitos)")
     entrada = float(str(form.get("entrada") or 0).replace(",", "."))
     placa = (form.get("placa") or "").replace("-", "").strip().upper() or None
     valor_raw = (form.get("valor") or "").strip()
@@ -787,11 +805,16 @@ def dados_simulacao_motor(
     else:
         prazos = [24, 36, 48]
     cnh = (form.get("cnh") or "sim").lower() != "nao"
+    # Portais (Fontecred/Bradesco/PAN) costumam mascarar DDD+número no mesmo campo.
+    # APIs (PAN) usam ddd e celular separados — enviamos os dois formatos úteis.
+    celular_completo = f"{ddd}{celular}"
     return {
         "pessoa": {
             "cpf": cpf,
             "nascimento": nascimento,
             "cnh": cnh,
+            "ddd": ddd,
+            "celular": celular_completo,
         },
         "veiculo": {
             "categoria": form.get("categoria") or "moto",
@@ -871,7 +894,7 @@ async def simulacoes_simular(
         payload_motor = dados_simulacao_motor(form, provedores)
     except (TypeError, ValueError):
         return _rerender(
-            "Confira CPF, nascimento, placa/valor, entrada e prazos."
+            "Confira CPF, nascimento, celular (DDD+número), placa/valor, entrada e prazos."
         )
     try:
         criada = motor.criar_simulacao(

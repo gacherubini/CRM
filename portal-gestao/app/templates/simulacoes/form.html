@@ -34,6 +34,10 @@
     <div class="form-grid">
       <label>CPF<input name="cpf" inputmode="numeric" autocomplete="off" required placeholder="Somente números" value="{{ valores.cpf or '' }}"></label>
       <label>Nascimento<input type="date" name="nascimento" value="{{ valores.nascimento }}" required></label>
+      <label>Celular (com DDD)
+        <input name="celular" inputmode="numeric" autocomplete="tel" required
+          placeholder="11987654321" value="{{ valores.celular or '' }}">
+      </label>
       <label>Possui CNH?
         <select name="cnh">
           <option value="sim" {{ 'selected' if valores.cnh != 'nao' }}>Sim</option>
@@ -41,6 +45,7 @@
         </select>
       </label>
     </div>
+    <p class="muted">Celular é obrigatório em Fontecred, Bradesco e PAN (portal). Informe DDD + número, só dígitos.</p>
   </section>
 
   <section class="panel form-section">
