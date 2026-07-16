@@ -19,7 +19,7 @@ class CredencialNaoEncontrada(RuntimeError):
 
 
 class MotorClient:
-    def __init__(self, base_url: str, token: str, timeout: float = 5):
+    def __init__(self, base_url: str, token: str, timeout: float = 15):
         self.base_url = (base_url or "").rstrip("/")
         self.token = token or ""
         self.timeout = timeout

@@ -270,11 +270,19 @@ def obter_print_evento(
     if blob:
         from fastapi.responses import Response
 
+        raw = bytes(blob)
+        # JPEG (novos) ou PNG (legado) — detecta pelo magic number.
+        if raw[:3] == b"\xff\xd8\xff":
+            media = "image/jpeg"
+            ext = "jpg"
+        else:
+            media = "image/png"
+            ext = "png"
         return Response(
-            content=bytes(blob),
-            media_type="image/png",
+            content=raw,
+            media_type=media,
             headers={
-                "Content-Disposition": f'inline; filename="simulacao-{sim_id}-{evento_id}.png"',
+                "Content-Disposition": f'inline; filename="simulacao-{sim_id}-{evento_id}.{ext}"',
                 "Cache-Control": "private, no-store",
             },
         )

@@ -225,12 +225,12 @@ def _registrar_tentativa(
     )
 
 
-# Teto defensivo: print full-page de portal bancário raramente passa de 3–4 MB.
-_SCREENSHOT_MAX_BYTES = 5 * 1024 * 1024
+# JPEG de portal full-page costuma ficar 200KB–2MB; teto folgado p/ PNG legado.
+_SCREENSHOT_MAX_BYTES = 15 * 1024 * 1024
 
 
 def _ler_screenshot_blob(screenshot_path: str | None) -> bytes | None:
-    """Copia o PNG para o banco (API e workers não compartilham volume Fly)."""
+    """Copia o print para o banco (API e workers não compartilham volume Fly)."""
     if not screenshot_path:
         return None
     try:
@@ -255,9 +255,15 @@ def _registrar_evento(
     nivel: str = "info",
     screenshot_path: str | None = None,
     provedor: str | None = None,
+    screenshot_conteudo: bytes | None = None,
 ) -> None:
     """Persiste evento imediatamente para o Portal enxergar durante o job."""
     seguro = " ".join(str(mensagem).replace("\n", " ").split())[:240]
+    blob = screenshot_conteudo
+    if blob is not None and len(blob) > _SCREENSHOT_MAX_BYTES:
+        blob = None
+    if blob is None:
+        blob = _ler_screenshot_blob(screenshot_path)
     db.add(
         SimulacaoEventoORM(
             simulacao_id=sim.id,
@@ -266,7 +272,7 @@ def _registrar_evento(
             nivel=nivel if nivel in {"info", "sucesso", "aviso", "erro"} else "info",
             mensagem=seguro,
             screenshot_path=screenshot_path,
-            screenshot_conteudo=_ler_screenshot_blob(screenshot_path),
+            screenshot_conteudo=blob,
         )
     )
     if sim.status == "processando":
@@ -434,9 +440,23 @@ def processar_job(
         for linhas in existentes_por_prov.values()
         for r in linhas
     ]
-    def _evento_ctx(etapa, mensagem, nivel="info", screenshot_path=None, provedor=None):
+    def _evento_ctx(
+        etapa,
+        mensagem,
+        nivel="info",
+        screenshot_path=None,
+        provedor=None,
+        screenshot_conteudo=None,
+    ):
         _registrar_evento(
-            db, sim, etapa, mensagem, nivel, screenshot_path, provedor=provedor
+            db,
+            sim,
+            etapa,
+            mensagem,
+            nivel,
+            screenshot_path,
+            provedor=provedor,
+            screenshot_conteudo=screenshot_conteudo,
         )
 
     def _nome_tarefa(nome_driver: str) -> str | None:
@@ -825,7 +845,14 @@ def processar_tarefa_provedor(
         db.refresh(tarefa)
         return tarefa
 
-    def _evento_ctx(etapa, mensagem, nivel="info", screenshot_path=None, provedor=None):
+    def _evento_ctx(
+        etapa,
+        mensagem,
+        nivel="info",
+        screenshot_path=None,
+        provedor=None,
+        screenshot_conteudo=None,
+    ):
         _registrar_evento(
             db,
             sim,
@@ -834,6 +861,7 @@ def processar_tarefa_provedor(
             nivel,
             screenshot_path,
             provedor=provedor or tarefa.provedor,
+            screenshot_conteudo=screenshot_conteudo,
         )
 
     ctx = DriverContext(

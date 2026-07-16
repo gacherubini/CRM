@@ -16,6 +16,7 @@
     <div><dt>Entrada informada</dt><dd>{{ formatar_brl(valores.entrada or 0) }}<br><span class="muted">no Santander a entrada é calculada pelo banco (coluna Entrada)</span></dd></div>
     <div><dt>Prazos</dt><dd>{% if valores.prazos_meses %}{{ valores.prazos_meses }}{% else %}{{ valores.prazo_meses }} meses{% endif %}</dd></div>
     <div><dt>Categoria</dt><dd>{{ valores.categoria | capitalize }}</dd></div>
+    {% if valores.provedores %}<div><dt>Bancos</dt><dd>{{ valores.provedores | join(', ') }}</dd></div>{% endif %}
   </dl>
   {% if resultado and resultado.mensagem %}<p class="muted">{{ resultado.mensagem }}</p>{% endif %}
   {% if resultado and resultado.status in ['falhou', 'parcial', 'aguardando_intervencao'] %}
@@ -27,6 +28,7 @@
       <code>display_ausente</code> = browser headed sem Xvfb (reinicie o worker);
       <code>browser_ausente</code> = Chromium não instalado;
       <code>sem_credencial</code> = falta login em Acessos bancos;
+      <code>celular_obrigatorio</code> = informe celular (alguns bancos exigem);
       <code>erro_inesperado</code> = falha interna (veja logs do worker).
     {% elif resultado.status == 'aguardando_intervencao' %}
       O portal pediu intervenção (captcha, 2FA ou bloqueio). Atualize a senha em Acessos bancos ou tente mais tarde.
@@ -37,24 +39,55 @@
   {% endif %}
 </section>
 
-
-{% set resultados = resultado.resultados if resultado and resultado.resultados else [] %}
-<section class="panel flush">
-  {% if resultados %}
-  <div class="table-wrap"><table>
-    <thead><tr><th>Banco</th><th>Parcela</th><th>Taxa a.m.</th><th>Prazo</th><th>Entrada</th><th>Financiado</th><th>Situação</th></tr></thead>
-    <tbody>{% for r in resultados %}<tr>
-      <td><strong>{{ r.provedor or '—' }}</strong></td>
-      <td>{% if r.valor_parcela is not none %}{{ formatar_brl(r.valor_parcela) }}{% else %}<span class="muted">—</span>{% endif %}</td>
-      <td>{% if r.taxa_am is not none %}{{ r.taxa_am }}%{% else %}<span class="muted">—</span>{% endif %}</td>
-      <td>{% if r.prazo_meses %}{{ r.prazo_meses }}x{% else %}<span class="muted">—</span>{% endif %}</td>
-      <td>{% if r.entrada is defined and r.entrada is not none %}{{ formatar_brl(r.entrada) }}{% else %}<span class="muted">—</span>{% endif %}</td>
-      <td>{% if r.valor_financiado is not none %}{{ formatar_brl(r.valor_financiado) }}{% else %}<span class="muted">—</span>{% endif %}</td>
-      <td>{% if r.codigo_erro %}<span class="status perdido">{{ r.codigo_erro }}</span>{% else %}<span class="status {{ r.status or 'novo' }}">{{ r.status | replace('_', ' ') if r.status else 'ok' }}</span>{% endif %}</td>
-    </tr>{% endfor %}</tbody>
-  </table></div>
-  {% else %}<div class="empty"><strong>Nenhuma parcela retornada.</strong><p>Os bancos não devolveram propostas para esses parâmetros.</p></div>{% endif %}
+{% set grupos = grupos_resultados if grupos_resultados is defined else [] %}
+{% if grupos %}
+  {% for grupo in grupos %}
+  <section class="panel form-section">
+    <div class="section-title">
+      <span>{{ '%02d'|format(loop.index + 1) }}</span>
+      <div>
+        <h2>{{ grupo.rotulo }}</h2>
+        <p>
+          {% if grupo.ofertas_ok %}
+            {{ grupo.ofertas_ok }} oferta(s) retornada(s)
+          {% else %}
+            Sem oferta{% if grupo.codigo_erro %} · <code>{{ grupo.codigo_erro }}</code>{% endif %}
+          {% endif %}
+        </p>
+      </div>
+    </div>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Parcela</th><th>Taxa a.m.</th><th>Prazo</th><th>Entrada</th><th>Financiado</th><th>Situação</th></tr></thead>
+      <tbody>
+        {% for r in grupo.linhas %}
+        <tr>
+          <td>{% if r.valor_parcela is not none %}<strong>{{ formatar_brl(r.valor_parcela) }}</strong>{% else %}<span class="muted">—</span>{% endif %}</td>
+          <td>{% if r.taxa_am is not none %}{{ r.taxa_am }}%{% else %}<span class="muted">—</span>{% endif %}</td>
+          <td>{% if r.prazo_meses %}{{ r.prazo_meses }}x{% else %}<span class="muted">—</span>{% endif %}</td>
+          <td>{% if r.entrada is defined and r.entrada is not none %}{{ formatar_brl(r.entrada) }}{% else %}<span class="muted">—</span>{% endif %}</td>
+          <td>{% if r.valor_financiado is not none %}{{ formatar_brl(r.valor_financiado) }}{% else %}<span class="muted">—</span>{% endif %}</td>
+          <td>{% if r.codigo_erro %}<span class="status perdido">{{ r.codigo_erro }}</span>{% else %}<span class="status {{ r.status or 'novo' }}">{{ r.status | replace('_', ' ') if r.status else 'ok' }}</span>{% endif %}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table></div>
+  </section>
+  {% endfor %}
+{% else %}
+<section class="panel form-section">
+  <div class="empty">
+    <strong>Nenhuma parcela retornada.</strong>
+    <p>
+      {% if resultado and resultado.tarefas %}
+        Tarefas:
+        {% for t in resultado.tarefas %}{{ t.provedor }}={{ t.status }}{% if not loop.last %}, {% endif %}{% endfor %}.
+      {% else %}
+        Os bancos não devolveram propostas para esses parâmetros.
+      {% endif %}
+    </p>
+  </div>
 </section>
+{% endif %}
 
 <div class="form-actions">{% if resultado and resultado.id %}<a class="button secondary" href="/app/simulacoes/{{ resultado.id }}/registros">Ver registros e prints</a>{% endif %}<a class="button primary" href="/app/simulacoes">Fazer outra simulação</a></div>
 {% endblock %}

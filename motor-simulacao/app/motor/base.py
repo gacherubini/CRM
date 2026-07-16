@@ -84,3 +84,6 @@ class Simulacao(BaseModel):
     provedores: List[str] = []
     tarefas: List[TarefaProvedor] = []
     resultados: List[ResultadoProvedor] = []
+    # Metadados não sensíveis para o Portal (histórico/reabertura do resultado).
+    placa: Optional[str] = None
+    prazos_meses: List[int] = []

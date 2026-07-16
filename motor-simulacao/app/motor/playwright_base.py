@@ -9,6 +9,8 @@ Anti-detecção (WAF/Akamai):
 from __future__ import annotations
 
 import os
+import re
+import time
 from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Optional
@@ -19,6 +21,38 @@ from app.motor.drivers import (
     IntervencaoNecessaria,
     ResultadoDriver,
 )
+
+
+def capturar_print_evento(
+    page,
+    *,
+    screenshot_dir: str | Path | None,
+    simulacao_id: str | None,
+    etapa: str,
+) -> tuple[str | None, bytes | None]:
+    """Captura print de diagnóstico e devolve (path, bytes).
+
+    Usa JPEG (menor) para caber no blob Postgres e ser servido pela API
+    em outra Machine (workers sob demanda não compartilham disco).
+    """
+    if page is None:
+        return None, None
+    base = Path(screenshot_dir or "data/screenshots")
+    sim_id = re.sub(r"[^a-zA-Z0-9_-]", "", simulacao_id or "sem-id")
+    etapa_segura = re.sub(r"[^a-zA-Z0-9_-]", "_", etapa)[:60]
+    destino = base / sim_id / f"{etapa_segura}_{int(time.time())}.jpg"
+    try:
+        destino.parent.mkdir(parents=True, exist_ok=True)
+        # JPEG qualidade moderada: full-page PNG de portal facilmente passa de 5–10 MB.
+        dados = page.screenshot(type="jpeg", quality=55, full_page=True)
+        if not dados:
+            dados = page.screenshot(type="jpeg", quality=55, full_page=False)
+        if not dados:
+            return None, None
+        destino.write_bytes(dados)
+        return str(destino), bytes(dados)
+    except Exception:
+        return None, None
 
 # Chrome 131 desktop Windows — alinhado ao build do Playwright.
 _CHROME_MAJOR = "131"

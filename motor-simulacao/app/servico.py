@@ -163,7 +163,17 @@ def criar_simulacao(
 
 
 def obter_simulacao(db: Session, sim_id: str, cliente_id: str) -> SimulacaoORM | None:
-    return db.query(SimulacaoORM).filter_by(id=sim_id, cliente_id=cliente_id).one_or_none()
+    from sqlalchemy.orm import joinedload
+
+    return (
+        db.query(SimulacaoORM)
+        .options(
+            joinedload(SimulacaoORM.resultados),
+            joinedload(SimulacaoORM.tarefas_provedor),
+        )
+        .filter_by(id=sim_id, cliente_id=cliente_id)
+        .one_or_none()
+    )
 
 
 def listar_eventos_simulacao(
@@ -308,10 +318,19 @@ def _num(valor) -> float | None:
 
 
 def para_pydantic(sim: SimulacaoORM) -> Simulacao:
+    # Ordena resultados por provedor + prazo para UI estável multi-banco.
+    ordenados = sorted(
+        list(sim.resultados or []),
+        key=lambda r: (
+            (r.provedor or "").lower(),
+            r.prazo_meses is None,
+            r.prazo_meses or 0,
+        ),
+    )
     return Simulacao(
         id=sim.id,
         status=sim.status,
-        criada_em=sim.criada_em.isoformat(),
+        criada_em=sim.criada_em.isoformat() if sim.criada_em else "",
         provedores=list(sim.provedores or []),
         tarefas=tarefas_publicas(sim),
         resultados=[
@@ -325,6 +344,11 @@ def para_pydantic(sim: SimulacaoORM) -> Simulacao:
                 entrada=_num(r.entrada),
                 codigo_erro=r.codigo_erro,
             )
-            for r in sim.resultados
+            for r in ordenados
         ],
+        placa=sim.placa,
+        prazos_meses=list(
+            sim.prazos_meses
+            or ([sim.prazo_meses] if sim.prazo_meses is not None else [])
+        ),
     )

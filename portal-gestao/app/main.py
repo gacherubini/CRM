@@ -654,7 +654,17 @@ def pode_simular(usuario) -> bool:
 # qualquer campo novo que um driver real devolva (custo, lucro, margem,
 # spread, comissão, tokens do Motor, métricas financeiras) fica de fora por
 # omissão, sem depender de manter uma lista de campos proibidos atualizada.
-_SIMULACAO_CAMPOS_PUBLICOS = {"id", "status", "criada_em", "resultados", "mensagem"}
+_SIMULACAO_CAMPOS_PUBLICOS = {
+    "id",
+    "status",
+    "criada_em",
+    "resultados",
+    "mensagem",
+    "provedores",
+    "tarefas",
+    "placa",
+    "prazos_meses",
+}
 _SIMULACAO_RESULTADO_CAMPOS_PUBLICOS = {
     "provedor",
     "status",
@@ -1106,6 +1116,14 @@ def simulacoes_job(
     if status in _SIM_STATUS_TERMINAIS:
         if not pode_ver_custo(usuario):
             resultado = simulacao_sem_dados_sensiveis(resultado)
+        # Histórico sem sessão: completa parâmetros a partir do job no Motor.
+        if not valores.get("placa") and resultado.get("placa"):
+            valores = {**valores, "placa": resultado.get("placa")}
+        if not valores.get("prazos_meses") and resultado.get("prazos_meses"):
+            valores = {**valores, "prazos_meses": resultado.get("prazos_meses")}
+        if not valores.get("provedores") and resultado.get("provedores"):
+            valores = {**valores, "provedores": resultado.get("provedores")}
+        resultados_lista = resultado.get("resultados") or []
         return templates.TemplateResponse(
             "simulacoes/resultado.html",
             contexto(
@@ -1113,6 +1131,7 @@ def simulacoes_job(
                 usuario,
                 valores=valores,
                 resultado=resultado,
+                grupos_resultados=_grupos_resultados_por_banco(resultados_lista),
                 cpf_mascarado=mascarar_cpf(cpf),
             ),
         )
@@ -1222,6 +1241,43 @@ def _grupos_eventos_por_banco(eventos: list[dict]) -> list[dict]:
             else _ROTULOS_BANCO.get(chave, chave.replace("_", " ").title())
         )
         grupos.append({"provedor": chave, "rotulo": rotulo, "eventos": buckets[chave]})
+    return grupos
+
+
+def _grupos_resultados_por_banco(resultados: list[dict] | None) -> list[dict]:
+    """Agrupa ofertas por provedor para a tela de resultado multi-banco."""
+    ordem: list[str] = []
+    buckets: dict[str, list[dict]] = {}
+    for r in resultados or []:
+        if not isinstance(r, dict):
+            continue
+        chave = (r.get("provedor") or "banco").strip().lower() or "banco"
+        if chave not in buckets:
+            ordem.append(chave)
+            buckets[chave] = []
+        buckets[chave].append(r)
+    grupos = []
+    for chave in ordem:
+        linhas = buckets[chave]
+        ofertas_ok = sum(
+            1
+            for r in linhas
+            if (r.get("status") or "").lower() == "concluida"
+            and r.get("valor_parcela") is not None
+        )
+        codigo_erro = next(
+            (r.get("codigo_erro") for r in linhas if r.get("codigo_erro")),
+            None,
+        )
+        grupos.append(
+            {
+                "provedor": chave,
+                "rotulo": _ROTULOS_BANCO.get(chave, chave.replace("_", " ").title()),
+                "linhas": linhas,
+                "ofertas_ok": ofertas_ok,
+                "codigo_erro": codigo_erro,
+            }
+        )
     return grupos
 
 

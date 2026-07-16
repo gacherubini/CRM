@@ -323,24 +323,23 @@ class BradescoDriver(PlaywrightBankDriver):
         if ctx is None:
             return
         screenshot_path = None
+        screenshot_conteudo = None
         if capturar_print and page is not None and config.EVENT_SCREENSHOTS:
-            screenshot_path = self._capturar_print_evento(page, ctx, etapa)
-        ctx.registrar_evento(etapa, mensagem, nivel, screenshot_path)
+            from app.motor.playwright_base import capturar_print_evento
 
-    def _capturar_print_evento(
-        self, page, ctx: DriverContext, etapa: str
-    ) -> str | None:
-        """Print por job/etapa; nome nao contem CPF, placa ou outro dado pessoal."""
-        base = Path(ctx.screenshot_dir or self.screenshot_dir or "data/screenshots")
-        sim_id = re.sub(r"[^a-zA-Z0-9_-]", "", ctx.simulacao_id or "sem-id")
-        etapa_segura = re.sub(r"[^a-zA-Z0-9_-]", "_", etapa)[:60]
-        destino = base / sim_id / f"{etapa_segura}_{int(time.time())}.png"
-        try:
-            destino.parent.mkdir(parents=True, exist_ok=True)
-            page.screenshot(path=str(destino), full_page=True)
-            return str(destino)
-        except Exception:
-            return None
+            screenshot_path, screenshot_conteudo = capturar_print_evento(
+                page,
+                screenshot_dir=ctx.screenshot_dir or self.screenshot_dir,
+                simulacao_id=ctx.simulacao_id,
+                etapa=etapa,
+            )
+        ctx.registrar_evento(
+            etapa,
+            mensagem,
+            nivel,
+            screenshot_path=screenshot_path,
+            screenshot_conteudo=screenshot_conteudo,
+        )
 
     def _credencial(self, ctx: DriverContext | None) -> tuple[str, str]:
         if ctx is None or ctx.db is None or not ctx.cliente_id:

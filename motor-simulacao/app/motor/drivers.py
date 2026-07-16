@@ -69,8 +69,20 @@ class DriverContext:
         mensagem: str,
         nivel: str = "info",
         screenshot_path: str | None = None,
+        screenshot_conteudo: bytes | None = None,
     ) -> None:
-        if self.evento is not None:
+        if self.evento is None:
+            return
+        # Callbacks do processamento aceitam kwargs; legado só path posicional.
+        try:
+            self.evento(
+                etapa,
+                mensagem,
+                nivel,
+                screenshot_path,
+                screenshot_conteudo=screenshot_conteudo,
+            )
+        except TypeError:
             self.evento(etapa, mensagem, nivel, screenshot_path)
 
 
