@@ -1,19 +1,17 @@
 # Contexto compacto para continuidade
 
-Atualizado em **2026-07-15** (limpeza P0 docs: eixos de prioridade, go-live Fly, banners DONE/SUPERSEDED).
-Leia isto primeiro; detalhe operacional recente em `docs/handoff-contexto.md`.
+Atualizado em **2026-07-16** (workers sob demanda LIVE + sim multi-banco + site hero).
+Leia isto primeiro; detalhe operacional recente em `docs/handoff-contexto.md` (topo).
 Planos válidos: `docs/plans/README.md`. **Ignore** `docs/plans/_archive/`.
 
-**Playwright / próximos bancos:** lições
-[Santander](plans/2026-07-13-playwright-licoes-santander.md) e
-[Fontecred](plans/2026-07-15-playwright-licoes-fontecred.md).
+**Playwright / bancos:** lições
+[Santander](plans/2026-07-13-playwright-licoes-santander.md),
+[Fontecred](plans/2026-07-15-playwright-licoes-fontecred.md),
+[Pan portal](plans/2026-07-15-playwright-licoes-pan-portal.md).
 Campos e decisões por banco:
 [mapa](plans/2026-07-13-plano1a-task12-bancos-reconhecimento.md).
-Planos prontos (código ainda não):
-[Bradesco](plans/2026-07-15-plano1a-task12-bradesco-implementacao.md),
-[Pan portal](plans/2026-07-15-plano1a-task12-pan-playwright-implementacao.md).
-Workers sob demanda (planejado):
-[fan-out](plans/2026-07-14-plano1a-workers-playwright-sob-demanda.md).
+**Workers sob demanda + fan-out:** implementados (ver handoff 2026-07-16) —
+plano [fan-out](plans/2026-07-14-plano1a-workers-playwright-sob-demanda.md).
 
 ## Fonte da verdade (por tema)
 
@@ -33,13 +31,14 @@ Não há uma única “próxima task” universal — depende do objetivo:
 | Eixo | Próximo incremento | Quando escolher | Plano / doc |
 |---|---|---|---|
 | **A · Demo loja / WA** | Go-live E2E + publicar estoque no catálogo | Operação ou demo com cliente real no Zap | `go-live-chatbot.md` |
-| **B · Multi-banco** | Bradesco Turbo (depois Pan portal se houver HTML de ofertas) | Mais cotações reais no Portal | planos 2026-07-15 Bradesco / Pan |
+| **B · Multi-banco** | Estabilizar sim com celular + prints; alinhar âncoras se falhar ao vivo | Mais cotações reais estáveis | handoff topo + lições Playwright |
 | **C · CRM dono** | #3B Task 4 (eventos funil) → Task 5 (campanhas) | Funil, origem, metas confiáveis | `#3B` |
-| **D · Escala Motor** | Fan-out + workers sob demanda (rollout 1→2→5) | Paralelismo / custo RAM no Fly | plano workers 2026-07-14 |
+| **D · Escala Motor** | Observar wake paralelo / idle; object storage se multi-volume | Custo RAM e cold start | plano workers (já no ar) |
 | **E · Dia a dia loja** | E1 áudio, E6 fotos (após ou em paralelo leve a A) | Uso diário sem depender de banco novo | `#6` |
+| **F · Marketing** | Completar landing Tailwind se o dono entregar HTML | Site/hero polish | `site/` + `site2037` |
 
 **Bloqueios conhecidos:**
-- Pan portal: falta HTML anonimizado da **tela de ofertas** (Task 0 do plano).
+- Landing Tailwind nova: HTML do dono ainda incompleto; `desing.txt` chegou vazio.
 - E11/E12 outbound: só com eixo **A** estável + opt-out.
 - Não reabrir Fontecred/Santander sem evidência nova.
 
@@ -51,9 +50,10 @@ Não há uma única “próxima task” universal — depende do objetivo:
 - Apps: `motor2037`, `estoque2037`, `chatbot2037`, `catalogo2037`, `portal2037`,
   `site2037` (landing; **fora** do `down-all.sh` — parar à parte se preciso),
   `evolution2037`, `n8n2037`; Postgres `suite-pg`; Redis Upstash `suite-redis`.
-- Backends always-on (opção A): Motor, Estoque, Chatbot; Evolution + n8n always-on;
-  Portal/Catálogo autostop. Motor ~**2048 MB** (Chrome).
-- Santander + Fontecred LIVE no Motor; API+worker ainda na mesma Machine.
+- Backends always-on: Motor orquestrador **512 MB** (API + mock/api), Estoque, Chatbot;
+  Evolution + n8n always-on; Portal/Catálogo autostop.
+- Playwright: machines **2 GB** por banco (santander/fontecred/bradesco/pan), stopped sob demanda.
+- Santander + Fontecred + Bradesco + Pan portal LIVE; fan-out multi-banco no Portal.
 - Scripts: `bash deploy/fly/down-all.sh` · `up-all.sh` · `up-all.sh --catalogo` ·
   `apply-always-on-backends.sh` · `clean-orphan-volumes.sh --apply`.
 - URLs: Portal `https://portal2037.fly.dev` · Catálogo `https://catalogo2037.fly.dev` ·
@@ -78,24 +78,23 @@ Não há uma única “próxima task” universal — depende do objetivo:
 
 | Produto | Pasta / porta | Feito (essencial) | Aberto |
 |---|---|---|---|
-| Motor #1A | `motor-simulacao/` `:8000` | async, auth, worker, mock, T11, **Santander + Fontecred LIVE**, histórico, timeline/prints, timeout 240s, base **PAN API**, migrations head **0011** | fan-out/workers; credenciais PAN live; Bradesco/Pan portal; `testar-login`; T10 revenda |
+| Motor #1A | `motor-simulacao/` `:8000` | async, auth, fan-out, orquestrador 512 MB, workers on-demand, **Santander/Fontecred/Bradesco/Pan portal LIVE**, histórico, timeline/prints blob JPEG, migrations head **0013** | `testar-login` real; T10 revenda; object storage se multi-volume |
 | Chatbot #2A | `chatbot-api/` `:8001` | leads, handoff, por-placa, E3, E5, n8n tools | go-live manual; LGPD exclusão |
 | Estoque #4A | `estoque-api/` `:8100` | CRUD, placa, por-placa, admin | E2E outbox; restore |
-| Portal | `portal-gestao/` `:9000` | CRM, sim progress/resultado/histórico, Registros, 9A, E10, CSV, metas vendedor | cards por banco (fan-out); #3B T4/T5; E2E |
+| Portal | `portal-gestao/` `:9000` | CRM, sim multi-banco, celular, resultado por banco, Registros/prints, 9A, E10, CSV, metas | #3B T4/T5; E2E |
 | Catálogo #5A | `catalogo-publico/` `:8200` | vitrine, CTA, Pixel browser | SEO/tema; domínio (E18) |
-| Site | `site/` | landing + Fly `site2037` | polish marketing; incluir no down-all se desejado |
+| Site | `site/` | landing + hero poster + Fly `site2037` | landing Tailwind nova (HTML incompleto); down-all opcional |
 
-**Estimativa:** ~**94%** MVP demonstrável (2 cotações reais + histórico) · ~**78%** produção multi-banco/revenda.
+**Estimativa:** ~**96%** MVP multi-banco demonstrável · ~**82%** produção (cold start workers + WA go-live).
 
 Baseline de testes: rodar `pytest -q` no produto; não confiar em contagens antigas de handoff.
-Última contagem citada em handoff (pode drift): Motor ~147 · Portal ~152.
 
 ## Decisões vigentes (simulação)
 
 - Santander / Fontecred: Playwright headed + Xvfb; Fontecred = sessão fria **e** quente.
-- 1 browser por banco; fan-out paralelo aprovado, **não implementado**.
+- 1 browser por banco; fan-out + workers sob demanda **implementados** (wake paralelo).
 - Entrada: Santander **calculada pelo banco**; Bradesco/Pan portal **opcional** se user mandar;
-  Fontecred: celular + placa obrigatórios. Detalhe → mapa de bancos.
+  Fontecred/Bradesco/Pan: **celular** no form do Portal. Detalhe → mapa de bancos.
 - Credenciais só no Motor (Portal é BFF).
 
 ## Verificação mínima

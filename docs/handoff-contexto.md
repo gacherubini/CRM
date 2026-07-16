@@ -4,19 +4,87 @@
 > Este arquivo: checkpoint operacional. Seções **“Checkpoint anterior”** = histórico — não
 > reexecutar. Path Windows no rodapé de seções antigas: **ignorar** (workspace = root do git).
 >
-> Checkpoint docs P0 **2026-07-15:** eixos de prioridade; go-live Fly; banners DONE/SUPERSEDED
-> (#7, Santander impl, Fontecred handoff); tabela campos por banco no mapa.
->
-> Checkpoint produto anterior: front Revy + planos Bradesco/Pan (`e40cfab`, etc.).
-> Lições Playwright: `…-playwright-licoes-santander.md` + `…-fontecred.md`.
-> Escolher eixo no contexto antes de codar (não misturar Bradesco + #3B + go-live na mesma PR).
+> **Checkpoint mais recente: 2026-07-15/16 (workers sob demanda + portal sim + site hero).**  
+> Lições Playwright: Santander, Fontecred, Pan portal. Escolher um eixo por sessão.
 
-## Checkpoint mais recente — Bradesco + Pan portal LIVE (2026-07-15)
+## Checkpoint mais recente — workers sob demanda, sim multi-banco, site hero (2026-07-15→16)
 
-> **Próximo foco escolhido pelo dono:** implementar os **workers Playwright sob demanda que dormem**
-> — plano `docs/plans/2026-07-14-plano1a-workers-playwright-sob-demanda.md`. Não reabrir os drivers
-> abaixo sem evidência nova; ler as **três** lições Playwright (Santander, Fontecred, **Pan portal**).
+> **Estado:** implementado e deployado no Fly lab. Branch `main` em sync com `origin` no
+> momento deste handoff. Workspace limpo (nada pendente de commit além deste doc).
 
+### O que entregamos (ordem cronológica aproximada)
+
+| Área | O que | Commits-chave |
+|---|---|---|
+| Fan-out multi-banco | Job-pai + `simulacao_provedores`; simulação consulta bancos com credencial sem escolher um a um | `f33240f` |
+| Workers que dormem | Orquestrador always-on **512 MB** (`api,mock`); slots Playwright **2 GB** `stopped` sobem sob demanda (Fly Machines API) e param com idle | `d1d3d3d`, `1d7899c` |
+| Form sim enxuto | Sem mock / natureza / renda / código veículo / prazo único / campos PAN API | `d21356b` |
+| PAN no catálogo | PAN tratado como **playwright** (portal go!PAN), não API, nos acessos e fan-out | `af3cc30` |
+| Registros multi-banco | Timeline em seções por banco | `db4249a` |
+| Prints entre machines | Coluna `screenshot_conteudo` (bytea) — path local sozinho **não** serve na API de outra Machine | `db4249a`, `1e8561b` |
+| Prints de verdade | Full-page PNG estourava teto → **JPEG q55** + bytes gravados no evento no momento da captura; teto 15 MB | `1e8561b` |
+| Resultado UI | Ofertas **agrupadas por banco**; reabertura pelo histórico completa placa/prazos; timeout Motor 15 s | `1e8561b` |
+| Celular no form | Campo obrigatório DDD+número → `pessoa.ddd` + `pessoa.celular` (completo) | `8a0d67b` |
+| Site marketing | Hero cinematográfico com `site/assets/hero-poster.jpg` (moto + holograma), full-bleed escuro | `c79e37c` |
+
+Migrations Motor: **0012** fan-out/tarefas/slots · **0013** `screenshot_conteudo`. Head esperado: **0013**.
+
+### Fly lab (estado operacional agora)
+
+| App | Papel | Nota |
+|---|---|---|
+| `motor2037` | Orquestrador + API | Process group `app`, **512 MB**, `MOTOR_ORCHESTRATOR_ONLY` / `WORKER_TIPOS=api,mock`, fan-out + autoscale secrets ON |
+| machines workers | `motor-worker-{santander,fontecred,bradesco,pan}` | ~2 GB, entrypoint on-demand, restart on-failure, imagem alinhada ao último deploy do motor |
+| `portal2037` | BFF + UI | Form com celular; registros por banco; resultado agrupado |
+| `site2037` | Landing | Fora do `down-all.sh`; hero com poster; URL `https://site2037.fly.dev` |
+| `suite-pg` | Postgres | DB `motor` etc. |
+
+**Acordar workers:** `lifecycle` + inventário `worker_slots` (allowlist machine id por provedor). Wake **em paralelo** (`ThreadPoolExecutor`), não serial.
+
+**Secrets relevantes (não imprimir valores):** `MOTOR_FANOUT_ENABLED`, `MOTOR_FLY_AUTOSCALE_ENABLED`, `FLY_API_TOKEN`, `MOTOR_MAX_BROWSER_WORKERS=4`, tokens Portal↔Motor.
+
+### Evidência de bug que já corrigimos
+
+1. **Prints sumidos:** eventos com `screenshot_path` em `/tmp/...` no worker e **0 blobs** no Postgres. API no orquestrador não vê o disco do worker → `tem_print=false`. Fix = blob JPEG no insert do evento + redeploy de **orquestrador e workers**.
+2. **Resultados “não aparecem”:** última sim multi-banco (`parcial`) **tinha** 4 parcelas Santander no DB; Fontecred/Bradesco `celular_obrigatorio`. UI reforçada por banco; celular voltou no form.
+3. **Site “versão errada”:** deploy estava com placeholder do storyboard sem arte; imagem do dono não estava em `site/assets/`.
+
+### Form de simulação (contrato atual)
+
+Campos: CPF, nascimento, **celular (DDD)**, CNH, categoria, placa, UF, finalidade, valor, zero km, entrada, prazos (lista).  
+Payload Motor: `pessoa.{cpf,nascimento,cnh,ddd,celular}` + veículo/condições + `provedores` = bancos com credencial pronta.
+
+### Drivers / regra de entrada (TXT Bradesco do dono)
+
+- **Bradesco / Pan portal:** entrada **opcional** — só preencher se `> 0` (já no driver; codegen em `Downloads/Bradesco.txt` confirma fluxo + “12x Entrada mínima necessária” ignorável).
+- **Não versionar** o TXT do dono — já teve senha Pan em claro → recomendar rotação se ainda for a senha de prod.
+- Codegen Bradesco/PAN no TXT é **âncora de fluxo**, não redesign de site.
+
+### Site / design (aberto)
+
+- Landing live: hero dark com poster; seções produto/painel ainda no visual monocromático antigo.
+- Dono começou a colar HTML Tailwind novo (`Revy | Acelerando as vendas da sua concessionária` + `cdn.tailwindcss.com`) — **incompleto** (só head parcial). `Downloads/desing.txt` chegou **vazio (0 bytes)**.
+- Pasta Downloads “Motora” (dashboard SaaS laranja `#FF854F` / dark `#0A0F17`) é **outro produto/mock** — não aplicar no Revy sem confirmação.
+
+### Próximos passos sugeridos (próximo agente)
+
+1. **Validar ao vivo** sim multi-banco com celular: prints JPEG nos Registros (dono/gerente) + seções de resultado por banco.
+2. Se o dono completar o HTML Tailwind da landing: substituir `site/index.html` (ou adaptar) e redeploy `site2037` **sem** commitar secrets.
+3. Opcional: alinhar âncoras do codegen Bradesco/PAN se falhar ao vivo (Fechar modal simulação, “Busca placa”, etc.) — só com falha nova.
+4. Não reabrir fan-out/orquestrador sem regressão; não misturar go-live WA + redesign site + novo banco na mesma PR.
+5. Celular: se PAN API voltar a ser usada, avaliar enviar `celular` sem DDD separado do `ddd` (hoje manda completo nos portais).
+
+### Segurança
+
+- Nunca commitar `Downloads/*.txt` com credenciais.
+- Prints de portal = PII na imagem — só dono/gerente; `Cache-Control: private, no-store`.
+
+---
+
+## Checkpoint anterior — Bradesco + Pan portal LIVE (2026-07-15)
+
+> **Foco na época:** workers Playwright sob demanda (depois implementado no checkpoint acima).
+> Não reabrir drivers sem evidência nova; ler as **três** lições Playwright.
 ### Entregue nesta sessão (dois bancos novos, validados ao vivo pelo dono)
 
 - **Bradesco (Turbo Lojista)** — `BradescoDriver` Playwright. Commit
