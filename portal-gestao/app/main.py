@@ -987,7 +987,7 @@ def _passos_progresso_simulacao(
     rotulo = _ROTULOS_BANCO.get(provedor, provedor.title() if provedor else "Banco")
     if provedor == "todos":
         rotulo = "bancos configurados"
-    modo = "API oficial" if provedor == "pan" else "portal lojista"
+    modo = "portal lojista"
     ordem = ["recebida", "processando", "terminal"]
     terminal_ok = status in ("concluida", "parcial")
     terminal_fail = status in ("falhou", "cancelada", "aguardando_intervencao")

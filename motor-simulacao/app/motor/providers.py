@@ -47,20 +47,13 @@ PROVEDORES_REAIS: dict[str, dict[str, Any]] = {
         "rotulo": "Banco PAN",
         "habilitado": True,
         "real": True,
-        # Dual-path: API OpenAPI (todos os campos) OU portal do lojista (só
-        # usuario+senha). Só usuario/senha são obrigatórios para o provedor
-        # "estar completo"; os demais são exclusivos do caminho API e o próprio
-        # PanDriver valida a completude deles (pan_configuracao_incompleta).
-        "modo": "api",
+        # Operação atual: portal go!PAN via Playwright (mesmo slot 2GB sob demanda).
+        # O dispatcher ainda aceita config OpenAPI se existir no blob cifrado, mas
+        # a UI de Acessos só pede usuário/senha do portal.
+        "modo": "playwright",
         "campos_credencial": [
-            {"nome": "usuario", "rotulo": "Usuário/CPF do lojista", "secreto": False},
-            {"nome": "senha", "rotulo": "Senha do portal/NPV", "secreto": True},
-            {"nome": "api_key", "rotulo": "API Key", "secreto": True, "obrigatorio": False},
-            {"nome": "secret_key", "rotulo": "Secret Key", "secreto": True, "obrigatorio": False},
-            {"nome": "id_loja", "rotulo": "ID da loja", "secreto": False, "obrigatorio": False},
-            {"nome": "tipo_id_loja", "rotulo": "Tipo do ID da loja", "secreto": False, "obrigatorio": False},
-            {"nome": "codigo_produto", "rotulo": "Código do produto", "secreto": False, "obrigatorio": False},
-            {"nome": "tipo_calculo", "rotulo": "Tipo de cálculo", "secreto": False, "obrigatorio": False},
+            {"nome": "usuario", "rotulo": "Usuário/CPF do portal go!PAN", "secreto": False},
+            {"nome": "senha", "rotulo": "Senha do portal", "secreto": True},
         ],
     },
 }

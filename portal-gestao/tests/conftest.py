@@ -227,12 +227,10 @@ class MotorFake:
         self.provedores = [
             {
                 "nome": "pan", "rotulo": "Banco PAN", "habilitado": True,
-                "real": True, "modo": "api",
+                "real": True, "modo": "playwright",
                 "campos_credencial": [
-                    {"nome": "api_key", "rotulo": "API Key", "secreto": True},
-                    {"nome": "secret_key", "rotulo": "Secret Key", "secreto": True},
-                    {"nome": "usuario", "rotulo": "Usuário NPV", "secreto": False},
-                    {"nome": "senha", "rotulo": "Senha NPV", "secreto": True},
+                    {"nome": "usuario", "rotulo": "Usuário/CPF do portal go!PAN", "secreto": False},
+                    {"nome": "senha", "rotulo": "Senha do portal", "secreto": True},
                 ],
             },
             {

@@ -19,7 +19,7 @@ def test_dono_lista_financeiras(client, motor_fake):
     assert "Santander" in resposta.text
     assert "Configurado" in resposta.text
     assert "Acessos dos bancos" in resposta.text
-    assert "Acessos bancos" in resposta.text  # nav
+    assert "Acessos dos bancos" in resposta.text  # nav
 
 
 def test_gerente_acessa(client, motor_fake):
