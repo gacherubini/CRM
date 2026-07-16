@@ -42,15 +42,23 @@
       height: 64px;
       display: flex; align-items: center; justify-content: space-between;
       padding: 0 clamp(20px, 4vw, 48px);
+      background: transparent;
+      backdrop-filter: none;
+      border-bottom: 1px solid transparent;
+      transition: background .2s, border-color .2s, backdrop-filter .2s;
+    }
+    .nav.scrolled {
       background: rgba(255,255,255,.92);
       backdrop-filter: blur(12px);
-      border-bottom: 1px solid transparent;
+      border-bottom-color: var(--line);
     }
-    .nav.scrolled { border-bottom-color: var(--line); }
     .nav-left, .nav-right { display: flex; align-items: center; gap: 28px; }
-    .nav-links { display: flex; gap: 24px; font-size: 14px; font-weight: 500; color: var(--muted); }
-    .nav-links a:hover { color: var(--fg); }
-    .wordmark { height: 22px; width: auto; }
+    .nav-links { display: flex; gap: 24px; font-size: 14px; font-weight: 500; color: rgba(255,255,255,.72); }
+    .nav.scrolled .nav-links { color: var(--muted); }
+    .nav-links a:hover { color: #fff; }
+    .nav.scrolled .nav-links a:hover { color: var(--fg); }
+    .wordmark { height: 22px; width: auto; filter: brightness(0) invert(1); }
+    .nav.scrolled .wordmark { filter: none; }
     .btn {
       display: inline-flex; align-items: center; justify-content: center;
       height: 40px; padding: 0 16px; border-radius: 8px;
@@ -62,18 +70,62 @@
     .btn-line { background: #fff; border-color: var(--line); color: var(--fg); }
     .btn-line:hover { background: var(--soft); }
     .btn-lg { height: 48px; padding: 0 22px; font-size: 15px; }
+    /* Nav sobre hero escuro */
+    .nav:not(.scrolled) .btn-line {
+      background: transparent; border-color: rgba(255,255,255,.28); color: #fff;
+    }
+    .nav:not(.scrolled) .btn-line:hover { background: rgba(255,255,255,.1); }
+    .nav:not(.scrolled) .btn-black {
+      background: #fff; color: #0a0a0a;
+    }
+    .nav:not(.scrolled) .btn-black:hover { background: #eee; }
 
-    /* Hero = full viewport */
+    /* Hero cinematográfico (imagem moto + holograma) */
     .hero {
+      position: relative;
       min-height: 100vh;
       min-height: 100dvh;
-      display: flex; flex-direction: column;
-      padding: 64px clamp(20px, 4vw, 48px) 0;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+      overflow: hidden;
+      background: #0a0b10;
+      color: #fff;
+    }
+    .hero-bg {
+      position: absolute; inset: 0;
+      z-index: 0;
+    }
+    .hero-bg img,
+    .hero-bg video {
+      width: 100%; height: 100%;
+      object-fit: cover;
+      object-position: center 45%;
+      display: block;
+    }
+    .hero-bg::after {
+      content: "";
+      position: absolute; inset: 0;
+      background:
+        linear-gradient(180deg, rgba(8,9,14,.55) 0%, rgba(8,9,14,.15) 38%, rgba(8,9,14,.75) 78%, rgba(8,9,14,.96) 100%),
+        linear-gradient(90deg, rgba(8,9,14,.72) 0%, rgba(8,9,14,.2) 48%, rgba(8,9,14,.35) 100%);
+      pointer-events: none;
     }
     .hero-copy {
-      flex: 0 0 auto;
-      max-width: 920px;
-      padding: 72px 0 40px;
+      position: relative;
+      z-index: 2;
+      max-width: 720px;
+      padding: 0 clamp(20px, 4vw, 48px) clamp(40px, 8vh, 72px);
+    }
+    .hero .eyebrow-hero {
+      display: inline-flex; align-items: center; gap: 8px;
+      font-size: 12px; font-weight: 600; letter-spacing: 0.08em;
+      text-transform: uppercase; color: rgba(255,255,255,.62);
+      margin-bottom: 16px;
+    }
+    .hero .eyebrow-hero i {
+      width: 6px; height: 6px; border-radius: 50%;
+      background: #25d366; box-shadow: 0 0 12px #25d366;
     }
     .hero h1 {
       font-size: clamp(40px, 7vw, 72px);
@@ -81,107 +133,53 @@
       letter-spacing: -0.04em;
       line-height: 1.02;
       max-width: 14ch;
+      color: #fff;
     }
     .hero .sub {
       margin-top: 20px;
       max-width: 36em;
       font-size: clamp(16px, 1.6vw, 19px);
-      color: var(--muted);
+      color: rgba(255,255,255,.68);
       font-weight: 400;
     }
     .hero-actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 28px; }
+    .hero .btn-black { background: #fff; color: #0a0a0a; }
+    .hero .btn-black:hover { background: #eee; }
+    .hero .btn-line {
+      background: transparent; border-color: rgba(255,255,255,.28); color: #fff;
+    }
+    .hero .btn-line:hover { background: rgba(255,255,255,.1); }
 
-    /* Hero storyboard: Bolha → Parcela → Chave */
-    .hero-stage {
-      flex: 1 1 auto;
-      min-height: 340px;
+    .hero-beats {
+      position: relative; z-index: 2;
       display: grid;
-      grid-template-columns: 1.4fr 1fr;
-      gap: 16px;
-      align-items: stretch;
-      padding-bottom: 32px;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+      padding: 0 clamp(20px, 4vw, 48px) clamp(28px, 5vh, 48px);
+    }
+    .hero-beats .beat {
+      border: 1px solid rgba(255,255,255,.12);
+      border-radius: 12px;
+      padding: 14px 16px;
+      background: rgba(12,14,20,.55);
+      backdrop-filter: blur(10px);
+    }
+    .hero-beats .beat-num {
+      font-size: 11px; font-weight: 600; letter-spacing: 0.06em;
+      text-transform: uppercase; color: rgba(255,255,255,.5);
+    }
+    .hero-beats .beat h3 {
+      margin-top: 6px;
+      font-size: 15px; font-weight: 600; letter-spacing: -0.02em; color: #fff;
+    }
+    .hero-beats .beat p {
+      margin-top: 4px;
+      font-size: 13px; color: rgba(255,255,255,.58); line-height: 1.4;
     }
     @media (max-width: 900px) {
-      .hero-stage { grid-template-columns: 1fr; }
       .nav-links { display: none; }
-      .hero-copy { padding-top: 48px; }
-    }
-
-    .hero-media {
-      position: relative;
-      border: 1px solid var(--line);
-      border-radius: 12px;
-      overflow: hidden;
-      background: var(--soft-2);
-      min-height: 340px;
-      box-shadow: 0 1px 2px rgba(0,0,0,.04), 0 12px 40px rgba(0,0,0,.06);
-    }
-    .hero-media video,
-    .hero-media .hero-fallback {
-      width: 100%; height: 100%;
-      object-fit: cover;
-      display: block;
-      min-height: 340px;
-    }
-    .hero-fallback {
-      display: flex; flex-direction: column; justify-content: flex-end;
-      padding: 24px;
-      background:
-        linear-gradient(180deg, #fafafa 0%, #f0f0f0 100%);
-      color: var(--muted);
-      font-size: 13px;
-    }
-    .hero-fallback strong {
-      display: block; color: var(--fg); font-size: 15px; font-weight: 600;
-      margin-bottom: 6px; letter-spacing: -0.02em;
-    }
-    .hero-overlay-label {
-      position: absolute; top: 14px; left: 14px;
-      font-size: 11px; font-weight: 600; letter-spacing: 0.04em;
-      text-transform: uppercase; color: var(--muted);
-      background: rgba(255,255,255,.9); border: 1px solid var(--line);
-      border-radius: 999px; padding: 5px 10px;
-    }
-
-    .story-beats {
-      display: flex; flex-direction: column; gap: 10px;
-    }
-    .beat {
-      flex: 1;
-      border: 1px solid var(--line);
-      border-radius: 12px;
-      padding: 16px 16px 14px;
-      background: #fff;
-      display: flex; flex-direction: column; gap: 8px;
-      min-height: 0;
-    }
-    .beat-num {
-      font-size: 11px; font-weight: 600; letter-spacing: 0.06em;
-      text-transform: uppercase; color: var(--muted);
-    }
-    .beat h3 {
-      font-size: 16px; font-weight: 600; letter-spacing: -0.02em;
-    }
-    .beat p { font-size: 13px; color: var(--muted); line-height: 1.4; margin: 0; }
-    .beat-visual {
-      margin-top: auto;
-      border-radius: 8px;
-      border: 1px solid var(--line);
-      background: var(--soft-2);
-      padding: 12px;
-      font-size: 13px;
-    }
-    .beat-visual .bubble-mini {
-      background: #fff; border-radius: 10px; padding: 8px 10px;
-      box-shadow: 0 1px 1px rgba(0,0,0,.04); max-width: 95%;
-      font-size: 12px; line-height: 1.35;
-    }
-    .beat-visual .num-big {
-      font-size: 22px; font-weight: 600; letter-spacing: -0.03em; color: var(--fg);
-    }
-    .beat-visual .num-sub { font-size: 12px; color: var(--muted); margin-top: 2px; }
-    .beat-visual .key-line {
-      font-size: 13px; color: var(--fg); font-weight: 500;
+      .hero-beats { grid-template-columns: 1fr; }
+      .hero-copy { padding-top: 96px; }
     }
 
     .ui {
@@ -407,13 +405,36 @@
   </header>
 
   <main id="topo">
-    <!-- HERO full viewport -->
+    <!-- HERO cinematográfico: imagem da moto + painel holográfico -->
     <section class="hero">
+      <div class="hero-bg" aria-hidden="true">
+        <img
+          src="assets/hero-poster.jpg"
+          alt=""
+          width="1920"
+          height="1080"
+          fetchpriority="high"
+        />
+        <video
+          id="hero-video"
+          muted
+          autoplay
+          loop
+          playsinline
+          poster="assets/hero-poster.jpg"
+          style="display:none;position:absolute;inset:0;width:100%;height:100%;object-fit:cover"
+        >
+          <source src="assets/hero.mp4" type="video/mp4" />
+        </video>
+      </div>
+
       <div class="hero-copy">
+        <p class="eyebrow-hero"><i></i> WhatsApp · multi-banco · painel</p>
         <h1>A revenda no ritmo certo.</h1>
         <p class="sub">
-          WhatsApp, simulação multi-banco, estoque, vitrine e painel —
-          no tempo da loja, sem cara de robô e sem prometer crédito aprovado.
+          Atende no WhatsApp, simula nos bancos da loja, organiza estoque e
+          entrega o vendedor na hora certa — sem cara de robô e sem prometer
+          crédito aprovado.
         </p>
         <div class="hero-actions">
           <a class="btn btn-black btn-lg" href="#produto">Ver o produto</a>
@@ -421,56 +442,22 @@
         </div>
       </div>
 
-      <div class="hero-stage">
-        <!-- Slot pro vídeo Seedance: solte assets/hero.mp4 + hero-poster.jpg -->
-        <div class="hero-media" id="hero-media">
-          <span class="hero-overlay-label">Hero · 8–10s loop</span>
-          <video
-            id="hero-video"
-            muted
-            autoplay
-            loop
-            playsinline
-            poster="assets/hero-poster.jpg"
-            style="display:none"
-          >
-            <source src="assets/hero.mp4" type="video/mp4" />
-          </video>
-          <div class="hero-fallback" id="hero-fallback">
-            <strong>Bolha → parcela → chave</strong>
-            Confirma no WhatsApp, vê a condição, fecha o trato.<br />
-            Gere com Nano Banana + Seedance e salve em
-            <code style="font-size:12px">assets/hero.mp4</code>
-          </div>
-        </div>
-
-        <div class="story-beats" aria-label="Storyboard da animação">
-          <article class="beat">
-            <span class="beat-num">01 · 0–3s</span>
-            <h3>Bolha</h3>
-            <p>WhatsApp da loja. Tom Revy: confirma antes de simular.</p>
-            <div class="beat-visual">
-              <div class="bubble-mini">Confirma pra eu buscar as condições?</div>
-            </div>
-          </article>
-          <article class="beat">
-            <span class="beat-num">02 · 3–6s</span>
-            <h3>Parcela</h3>
-            <p>Números reais na tela — sem “aprovado mágico”.</p>
-            <div class="beat-visual">
-              <div class="num-big">R$ 489</div>
-              <div class="num-sub">48x · condições da loja</div>
-            </div>
-          </article>
-          <article class="beat">
-            <span class="beat-num">03 · 6–10s</span>
-            <h3>Chave</h3>
-            <p>Fechamento humano: chave da moto ou aperto sutil.</p>
-            <div class="beat-visual">
-              <div class="key-line">Trato fechado · time da loja</div>
-            </div>
-          </article>
-        </div>
+      <div class="hero-beats" aria-label="Como o Revy opera">
+        <article class="beat">
+          <span class="beat-num">01 · Bolha</span>
+          <h3>Confirma no WhatsApp</h3>
+          <p>Tom da loja. Confirma antes de simular — sem robô insistente.</p>
+        </article>
+        <article class="beat">
+          <span class="beat-num">02 · Parcela</span>
+          <h3>Condições reais</h3>
+          <p>Multi-banco, multi-prazo. Números dos portais — não inventados.</p>
+        </article>
+        <article class="beat">
+          <span class="beat-num">03 · Chave</span>
+          <h3>Fecha o trato</h3>
+          <p>Handoff limpo pro time humano. Bot pausa quando o vendedor entra.</p>
+        </article>
       </div>
     </section>
 
@@ -634,25 +621,20 @@
 
   <script>
     const nav = document.getElementById('nav');
-    const onScroll = () => nav.classList.toggle('scrolled', window.scrollY > 8);
+    const onScroll = () => nav.classList.toggle('scrolled', window.scrollY > 48);
     onScroll();
     window.addEventListener('scroll', onScroll, { passive: true });
 
-    // Mostra o vídeo do Seedance se hero.mp4 existir
+    // Se existir hero.mp4, cobre a imagem de fundo (loop opcional)
     const video = document.getElementById('hero-video');
-    const fallback = document.getElementById('hero-fallback');
     if (video) {
-      const probe = () => {
+      video.addEventListener('loadeddata', () => {
         video.style.display = 'block';
-        if (fallback) fallback.style.display = 'none';
         video.play().catch(() => {});
-      };
-      video.addEventListener('loadeddata', probe);
+      });
       video.addEventListener('error', () => {
         video.style.display = 'none';
-        if (fallback) fallback.style.display = 'flex';
       });
-      // força tentativa de load
       video.load();
     }
   </script>
