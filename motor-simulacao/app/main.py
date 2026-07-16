@@ -260,7 +260,25 @@ def obter_print_evento(
         return cliente
     sim, eventos = servico.listar_eventos_simulacao(db, sim_id, cliente.id)
     evento = next((e for e in eventos if e.id == evento_id), None)
-    if sim is None or evento is None or not evento.screenshot_path:
+    if sim is None or evento is None:
+        return JSONResponse(
+            status_code=404,
+            content={"erro": {"code": "print_nao_encontrado", "message": "Print não encontrado"}},
+        )
+    # Preferência: blob gravado no evento (workers sob demanda em outras Machines).
+    blob = getattr(evento, "screenshot_conteudo", None)
+    if blob:
+        from fastapi.responses import Response
+
+        return Response(
+            content=bytes(blob),
+            media_type="image/png",
+            headers={
+                "Content-Disposition": f'inline; filename="simulacao-{sim_id}-{evento_id}.png"',
+                "Cache-Control": "private, no-store",
+            },
+        )
+    if not evento.screenshot_path:
         return JSONResponse(
             status_code=404,
             content={"erro": {"code": "print_nao_encontrado", "message": "Print não encontrado"}},

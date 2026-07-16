@@ -14,6 +14,7 @@ from sqlalchemy import (
     ForeignKey,
     Integer,
     JSON,
+    LargeBinary,
     Numeric,
     String,
     Text,
@@ -210,8 +211,10 @@ class SimulacaoEventoORM(Base):
     etapa: Mapped[str] = mapped_column(String(80), nullable=False)
     nivel: Mapped[str] = mapped_column(String(16), nullable=False, default="info")
     mensagem: Mapped[str] = mapped_column(String(240), nullable=False)
-    # Caminho interno; a API nunca o devolve e só serve o arquivo após checar tenant.
+    # Caminho interno (legado/local); a API nunca o devolve em claro ao cliente.
     screenshot_path: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    # Bytes do PNG para workers em outras Machines (sem volume compartilhado).
+    screenshot_conteudo: Mapped[Optional[bytes]] = mapped_column(LargeBinary, nullable=True)
     criada_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_agora)
 
     simulacao: Mapped["SimulacaoORM"] = relationship(back_populates="eventos")

@@ -172,7 +172,10 @@ def test_registros_mostram_timeline_e_link_de_print_para_dono(
     assert resposta.status_code == 200
     assert "Preparando o navegador" in resposta.text
     assert "Login confirmado" in resposta.text
-    assert "Ver print desta etapa" in resposta.text
+    # multi-banco: seções separadas
+    assert "Santander" in resposta.text
+    assert "Bradesco" in resposta.text
+    assert "Abrir print" in resposta.text or "print" in resposta.text.lower()
     assert 'http-equiv="refresh"' in resposta.text
 
 

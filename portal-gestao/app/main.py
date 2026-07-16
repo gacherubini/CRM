@@ -1204,6 +1204,27 @@ def simulacoes_historico(
     )
 
 
+def _grupos_eventos_por_banco(eventos: list[dict]) -> list[dict]:
+    """Agrupa timeline por provedor (fan-out multi-banco). Ordem = primeira aparição."""
+    ordem: list[str] = []
+    buckets: dict[str, list[dict]] = {}
+    for ev in eventos or []:
+        chave = (ev.get("provedor") or "").strip().lower() or "geral"
+        if chave not in buckets:
+            ordem.append(chave)
+            buckets[chave] = []
+        buckets[chave].append(ev)
+    grupos = []
+    for chave in ordem:
+        rotulo = (
+            "Geral"
+            if chave == "geral"
+            else _ROTULOS_BANCO.get(chave, chave.replace("_", " ").title())
+        )
+        grupos.append({"provedor": chave, "rotulo": rotulo, "eventos": buckets[chave]})
+    return grupos
+
+
 @app.get("/app/simulacoes/{sim_id}/registros", response_class=HTMLResponse)
 def simulacoes_registros(
     sim_id: str,
@@ -1223,6 +1244,7 @@ def simulacoes_registros(
     except MotorIndisponivel as exc:
         erro = str(exc)
     status = str(dados.get("status") or "desconhecido").lower()
+    eventos = dados.get("eventos") or []
     return templates.TemplateResponse(
         "simulacoes/registros.html",
         contexto(
@@ -1231,7 +1253,8 @@ def simulacoes_registros(
             sim_id=sim_id,
             status=status,
             status_label=_SIM_STATUS_LABELS.get(status, status.replace("_", " ")),
-            eventos=dados.get("eventos") or [],
+            eventos=eventos,
+            grupos_eventos=_grupos_eventos_por_banco(eventos),
             pode_ver_print=pode_gerir_financeiras(usuario),
             auto_refresh=status not in _SIM_STATUS_TERMINAIS,
             erro=erro,

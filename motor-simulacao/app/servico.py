@@ -181,6 +181,14 @@ def listar_eventos_simulacao(
     return sim, eventos
 
 
+def evento_tem_print(evento: SimulacaoEventoORM) -> bool:
+    """True se há bytes no DB ou arquivo local legível (legado single-machine)."""
+    if getattr(evento, "screenshot_conteudo", None):
+        return True
+    path = evento.screenshot_path
+    return bool(path and Path(path).is_file())
+
+
 def evento_publico(evento: SimulacaoEventoORM) -> dict:
     return {
         "id": evento.id,
@@ -189,9 +197,7 @@ def evento_publico(evento: SimulacaoEventoORM) -> dict:
         "nivel": evento.nivel,
         "mensagem": evento.mensagem,
         "criada_em": evento.criada_em.isoformat() if evento.criada_em else None,
-        "tem_print": bool(
-            evento.screenshot_path and Path(evento.screenshot_path).is_file()
-        ),
+        "tem_print": evento_tem_print(evento),
     }
 
 

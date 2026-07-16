@@ -13,25 +13,78 @@
 </div>
 
 {% if erro %}<div class="alert error">{{ erro }}</div>{% endif %}
-<section class="panel form-section">
-  <div class="section-title"><span>01</span><div><h2>Timeline ao vivo</h2><p>Somente eventos sanitizados; senhas e CPF não são registrados.</p></div></div>
-  {% if eventos %}
-  <ol class="sim-steps">
-    {% for evento in eventos %}
-    <li class="sim-step {{ 'fail' if evento.nivel == 'erro' else ('done' if evento.nivel == 'sucesso' else 'active') }}">
-      <span class="sim-step-num" aria-hidden="true">{{ loop.index }}</span>
+
+{% if grupos_eventos %}
+  {% for grupo in grupos_eventos %}
+  <section class="panel form-section">
+    <div class="section-title">
+      <span>{{ '%02d'|format(loop.index) }}</span>
       <div>
-        <strong>{{ evento.etapa | replace('_', ' ') | title }}</strong>
-        <p class="muted" style="margin:4px 0">{{ formatar_horario(evento.criada_em) }} · {{ evento.mensagem }}</p>
-        {% if evento.tem_print %}
-          {% if pode_ver_print %}<a class="table-action" href="/app/simulacoes/{{ sim_id }}/registros/{{ evento.id }}/print" target="_blank" rel="noopener">Ver print desta etapa</a>
-          {% else %}<span class="muted">Print restrito ao dono/gerente</span>{% endif %}
-        {% endif %}
+        <h2>{{ grupo.rotulo }}</h2>
+        <p>
+          {% if grupo.provedor == 'geral' %}
+            Eventos do job (orquestração, fila).
+          {% else %}
+            Timeline do banco <code class="mono-inline">{{ grupo.provedor }}</code>
+            · {{ grupo.eventos | length }} evento(s)
+          {% endif %}
+        </p>
       </div>
-    </li>
-    {% endfor %}
-  </ol>
-  {% else %}<div class="empty"><strong>Ainda não há registros.</strong><p>Se o job estiver na fila, aguarde o worker reservá-lo.</p></div>{% endif %}
+    </div>
+    <ol class="sim-steps">
+      {% for evento in grupo.eventos %}
+      <li class="sim-step {{ 'fail' if evento.nivel == 'erro' else ('done' if evento.nivel == 'sucesso' else 'active') }}">
+        <span class="sim-step-num" aria-hidden="true">{{ loop.index }}</span>
+        <div>
+          <strong>{{ evento.etapa | replace('_', ' ') | title }}</strong>
+          <p class="muted" style="margin:4px 0">{{ formatar_horario(evento.criada_em) }} · {{ evento.mensagem }}</p>
+          {% if evento.tem_print %}
+            {% if pode_ver_print %}
+            <div style="margin-top:8px">
+              <a class="table-action" href="/app/simulacoes/{{ sim_id }}/registros/{{ evento.id }}/print" target="_blank" rel="noopener">Abrir print</a>
+              <div style="margin-top:8px;max-width:420px;border:1px solid var(--border);border-radius:10px;overflow:hidden;background:var(--surface-2, #111)">
+                <img
+                  src="/app/simulacoes/{{ sim_id }}/registros/{{ evento.id }}/print"
+                  alt="Print da etapa {{ evento.etapa }}"
+                  loading="lazy"
+                  style="display:block;width:100%;height:auto"
+                >
+              </div>
+            </div>
+            {% else %}
+            <span class="muted">Print restrito ao dono/gerente</span>
+            {% endif %}
+          {% endif %}
+        </div>
+      </li>
+      {% endfor %}
+    </ol>
+  </section>
+  {% endfor %}
+{% elif eventos %}
+  {# fallback se a view antiga não agrupar #}
+  <section class="panel form-section">
+    <div class="section-title"><span>01</span><div><h2>Timeline ao vivo</h2><p>Eventos sanitizados.</p></div></div>
+    <ol class="sim-steps">
+      {% for evento in eventos %}
+      <li class="sim-step {{ 'fail' if evento.nivel == 'erro' else ('done' if evento.nivel == 'sucesso' else 'active') }}">
+        <span class="sim-step-num" aria-hidden="true">{{ loop.index }}</span>
+        <div>
+          <strong>{% if evento.provedor %}{{ evento.provedor }} · {% endif %}{{ evento.etapa | replace('_', ' ') | title }}</strong>
+          <p class="muted" style="margin:4px 0">{{ formatar_horario(evento.criada_em) }} · {{ evento.mensagem }}</p>
+          {% if evento.tem_print and pode_ver_print %}
+          <a class="table-action" href="/app/simulacoes/{{ sim_id }}/registros/{{ evento.id }}/print" target="_blank" rel="noopener">Ver print</a>
+          {% endif %}
+        </div>
+      </li>
+      {% endfor %}
+    </ol>
+  </section>
+{% else %}
+<section class="panel form-section">
+  <div class="empty"><strong>Ainda não há registros.</strong><p>Se o job estiver na fila, aguarde o worker reservá-lo.</p></div>
 </section>
+{% endif %}
+
 <div class="alert warning">Os prints podem conter dados pessoais da tela bancária. Não compartilhe nem deixe armazenados além do necessário para diagnóstico.</div>
 {% endblock %}

@@ -225,6 +225,28 @@ def _registrar_tentativa(
     )
 
 
+# Teto defensivo: print full-page de portal bancário raramente passa de 3–4 MB.
+_SCREENSHOT_MAX_BYTES = 5 * 1024 * 1024
+
+
+def _ler_screenshot_blob(screenshot_path: str | None) -> bytes | None:
+    """Copia o PNG para o banco (API e workers não compartilham volume Fly)."""
+    if not screenshot_path:
+        return None
+    try:
+        from pathlib import Path
+
+        arquivo = Path(screenshot_path)
+        if not arquivo.is_file():
+            return None
+        dados = arquivo.read_bytes()
+        if not dados or len(dados) > _SCREENSHOT_MAX_BYTES:
+            return None
+        return dados
+    except OSError:
+        return None
+
+
 def _registrar_evento(
     db: Session,
     sim: SimulacaoORM,
@@ -244,6 +266,7 @@ def _registrar_evento(
             nivel=nivel if nivel in {"info", "sucesso", "aviso", "erro"} else "info",
             mensagem=seguro,
             screenshot_path=screenshot_path,
+            screenshot_conteudo=_ler_screenshot_blob(screenshot_path),
         )
     )
     if sim.status == "processando":

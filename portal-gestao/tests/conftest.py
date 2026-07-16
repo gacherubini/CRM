@@ -456,6 +456,7 @@ class MotorFake:
             "eventos": [
                 {
                     "id": 1,
+                    "provedor": "santander",
                     "etapa": "browser_iniciando",
                     "nivel": "info",
                     "mensagem": "Preparando o navegador do Santander.",
@@ -464,11 +465,21 @@ class MotorFake:
                 },
                 {
                     "id": 2,
+                    "provedor": "santander",
                     "etapa": "login_confirmado",
                     "nivel": "sucesso",
                     "mensagem": "Login confirmado pelo portal.",
                     "criada_em": "2026-07-14T15:00:10+00:00",
                     "tem_print": True,
+                },
+                {
+                    "id": 3,
+                    "provedor": "bradesco",
+                    "etapa": "driver_iniciado",
+                    "nivel": "info",
+                    "mensagem": "Conector bradesco iniciado.",
+                    "criada_em": "2026-07-14T15:00:05+00:00",
+                    "tem_print": False,
                 },
             ],
         }
