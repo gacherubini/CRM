@@ -74,14 +74,31 @@ def test_fly_lifecycle_already_started_eh_ok():
     client.close()
 
 
-def test_rate_limited_burst():
+def test_rate_limited_burst_permite_varios_starts():
     inner = FakeLifecycle()
-    rl = RateLimitedLifecycle(inner, burst=2, window_seconds=0.05)
-    assert rl.start("a") and rl.start("b")
-    t0 = time.monotonic()
-    assert rl.start("c")  # espera a janela
-    assert time.monotonic() - t0 >= 0.04
+    rl = RateLimitedLifecycle(inner, burst=4, window_seconds=0.05)
+    assert rl.start("a") and rl.start("b") and rl.start("c")
     assert inner.started == ["a", "b", "c"]
+
+
+def test_acordar_workers_paralelo_chama_todos_os_slots(db, monkeypatch):
+    """Uma simulação multi-banco deve disparar start em todos os slots de uma vez."""
+    monkeypatch.setattr(config, "FANOUT_ENABLED", True)
+    monkeypatch.setattr(config, "FLY_AUTOSCALE_ENABLED", True)
+    monkeypatch.setattr(config, "MAX_BROWSER_WORKERS", 4)
+    for nome, mid in (
+        ("santander", "m-san"),
+        ("fontecred", "m-fon"),
+        ("bradesco", "m-bra"),
+    ):
+        upsert_slot(db, provedor=nome, fly_machine_id=mid, tipo_driver="playwright")
+    sim, _ = servico.criar_simulacao(
+        db, _sol(["santander", "fontecred", "bradesco"]), "c1"
+    )
+    fake = FakeLifecycle()
+    res = acordar_workers(db, simulacao_id=sim.id, lifecycle=fake)
+    assert res["acordados"] == 3
+    assert set(fake.started) == {"m-san", "m-fon", "m-bra"}
 
 
 def test_acordar_workers_inicia_slot_playwright(db, monkeypatch):

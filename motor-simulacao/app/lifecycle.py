@@ -132,7 +132,7 @@ class FlyMachinesLifecycle:
 
 
 class RateLimitedLifecycle:
-    """Envolve outro lifecycle com burst de starts (máx N no intervalo)."""
+    """Envolve outro lifecycle com semáforo de burst (thread-safe, sem sleep em série)."""
 
     def __init__(
         self,
@@ -141,27 +141,30 @@ class RateLimitedLifecycle:
         burst: int | None = None,
         window_seconds: float = 2.0,
     ):
+        import threading
+
         self.inner = inner
-        self.burst = burst if burst is not None else config.FLY_START_BURST
+        self.burst = max(1, burst if burst is not None else config.FLY_START_BURST)
         self.window_seconds = window_seconds
         self._timestamps: list[float] = []
+        self._lock = threading.Lock()
+        self._sem = threading.Semaphore(self.burst)
 
     def start(self, machine_id: str) -> bool:
-        agora = time.monotonic()
-        self._timestamps = [
-            t for t in self._timestamps if agora - t < self.window_seconds
-        ]
-        if len(self._timestamps) >= max(1, self.burst):
-            # Escala: espera a janela e tenta de novo uma vez
-            time.sleep(self.window_seconds)
-            agora = time.monotonic()
-            self._timestamps = [
-                t for t in self._timestamps if agora - t < self.window_seconds
-            ]
-        ok = self.inner.start(machine_id)
-        if ok:
-            self._timestamps.append(time.monotonic())
-        return ok
+        self._sem.acquire()
+        try:
+            with self._lock:
+                agora = time.monotonic()
+                self._timestamps = [
+                    t for t in self._timestamps if agora - t < self.window_seconds
+                ]
+            ok = self.inner.start(machine_id)
+            if ok:
+                with self._lock:
+                    self._timestamps.append(time.monotonic())
+            return ok
+        finally:
+            self._sem.release()
 
     def stop(self, machine_id: str) -> bool:
         return self.inner.stop(machine_id)

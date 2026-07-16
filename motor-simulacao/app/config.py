@@ -68,7 +68,8 @@ def _flag(nome: str, default: str = "0") -> bool:
 
 FANOUT_ENABLED = _flag("MOTOR_FANOUT_ENABLED", "0")
 FLY_AUTOSCALE_ENABLED = _flag("MOTOR_FLY_AUTOSCALE_ENABLED", "0")
-MAX_BROWSER_WORKERS = int(os.getenv("MOTOR_MAX_BROWSER_WORKERS", "1"))
+# Default 4: um slot por banco Playwright (santander/fontecred/bradesco/pan).
+MAX_BROWSER_WORKERS = int(os.getenv("MOTOR_MAX_BROWSER_WORKERS", "4"))
 WORKER_IDLE_STOP_SECONDS = int(os.getenv("MOTOR_WORKER_IDLE_STOP_SECONDS", "60"))
 WORKER_PROVEDOR = (os.getenv("MOTOR_WORKER_PROVEDOR") or "").strip().lower() or None
 WORKER_SLOT_ID = (os.getenv("MOTOR_WORKER_SLOT_ID") or "").strip() or None
@@ -91,4 +92,5 @@ FLY_APP_NAME = (os.getenv("FLY_APP_NAME") or os.getenv("FLY_APP") or "motor2037"
 # Token app-scoped; vazio desliga wake real (fake em testes / lab sem token).
 FLY_API_TOKEN = (os.getenv("FLY_API_TOKEN") or os.getenv("MOTOR_FLY_API_TOKEN") or "").strip()
 FLY_START_TIMEOUT_SECONDS = float(os.getenv("MOTOR_FLY_START_TIMEOUT_SECONDS", "8"))
-FLY_START_BURST = int(os.getenv("MOTOR_FLY_START_BURST", "3"))
+# Quantos starts HTTP em paralelo (acordar todos os bancos de uma simulação).
+FLY_START_BURST = int(os.getenv("MOTOR_FLY_START_BURST", "4"))

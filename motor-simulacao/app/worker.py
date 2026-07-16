@@ -55,10 +55,30 @@ def _limpar_screenshots_expirados() -> int:
 
 
 def _uma_rodada() -> int:
-    """Drena a fila numa rodada; retorna quantos itens processou."""
+    """Drena a fila numa rodada; retorna quantos itens processou.
+
+    No always-on (orquestrador), re-acorda slots Playwright pendentes a cada
+    ciclo — garante paralelismo mesmo se um start falhou ou o worker dormiu cedo.
+    """
     db = SessionLocal()
     processados = 0
     try:
+        if (
+            config.FANOUT_ENABLED
+            and config.FLY_AUTOSCALE_ENABLED
+            and not config.WORKER_ON_DEMAND
+        ):
+            from app.orquestrador import acordar_workers
+
+            res = acordar_workers(db)
+            if res.get("acordados") or res.get("falhas"):
+                log.info(
+                    "orquestrador acordados=%s falhas=%s sem_slot=%s ignorados=%s",
+                    res.get("acordados", 0),
+                    res.get("falhas", 0),
+                    res.get("sem_slot", 0),
+                    res.get("ignorados", 0),
+                )
         while not _encerrar:
             sim = processar_proximo(db)
             if sim is None:

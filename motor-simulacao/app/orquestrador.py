@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 
 from sqlalchemy.orm import Session
@@ -29,7 +30,11 @@ def _allowlist_slots(db: Session) -> set[str]:
 
 
 def _registrar_evento_sim(
-    db: Session, simulacao_id: str, etapa: str, mensagem: str, nivel: str = "info",
+    db: Session,
+    simulacao_id: str,
+    etapa: str,
+    mensagem: str,
+    nivel: str = "info",
     provedor: str | None = None,
 ) -> None:
     db.add(
@@ -61,7 +66,7 @@ def acordar_workers(
     simulacao_id: str | None = None,
     lifecycle: WorkerLifecycle | None = None,
 ) -> dict:
-    """Inicia Machines para tarefas Playwright pendentes.
+    """Inicia Machines para tarefas Playwright pendentes **em paralelo**.
 
     Retorna contadores: acordados, falhas, sem_slot, ignorados.
     Sem ``FLY_AUTOSCALE_ENABLED`` ou sem fan-out: no-op.
@@ -83,42 +88,39 @@ def acordar_workers(
     allow = _allowlist_slots(db)
     lc = lifecycle or lifecycle_padrao(allowlist=allow)
 
-    # Um wake por provedor (respeita MAX_BROWSER_WORKERS)
     por_provedor: dict[str, list[SimulacaoProvedorORM]] = {}
     for t in tarefas:
         por_provedor.setdefault(t.provedor, []).append(t)
 
-    starts = 0
     teto = max(1, config.MAX_BROWSER_WORKERS)
+    # Plano de wake: DB sequencial (session não é thread-safe); HTTP em paralelo.
+    plano: list[tuple[str, list[SimulacaoProvedorORM], WorkerSlotORM]] = []
     for provedor, lista in por_provedor.items():
-        if starts >= teto:
+        if len(plano) >= teto:
             resultado["ignorados"] += len(lista)
             continue
         slots = slots_para_provedor(db, provedor)
         if not slots:
             resultado["sem_slot"] += len(lista)
             for t in lista:
-                if simulacao_id or t.simulacao_id:
-                    _registrar_evento_sim(
-                        db,
-                        t.simulacao_id,
-                        "worker_indisponivel",
-                        f"Sem slot Fly configurado para {provedor}; tarefa fica na fila.",
-                        "aviso",
-                        provedor=provedor,
-                    )
+                _registrar_evento_sim(
+                    db,
+                    t.simulacao_id,
+                    "worker_indisponivel",
+                    f"Sem slot Fly configurado para {provedor}; tarefa fica na fila.",
+                    "aviso",
+                    provedor=provedor,
+                )
             continue
         slot = slots[0]
         if slot.fly_machine_id not in allow:
             resultado["falhas"] += 1
             continue
-
         for t in lista:
             if t.status == "recebida":
                 t.status = "acordando_worker"
                 t.atualizada_em = _agora()
                 t.worker_slot_id = slot.id
-
         _registrar_evento_sim(
             db,
             lista[0].simulacao_id,
@@ -127,16 +129,45 @@ def acordar_workers(
             "info",
             provedor=provedor,
         )
-        db.commit()
+        plano.append((provedor, lista, slot))
 
-        ok = lc.start(slot.fly_machine_id)
-        agora = _agora()
+    db.commit()
+    if not plano:
+        return resultado
+
+    log.info(
+        "acordando %s workers em paralelo: %s",
+        len(plano),
+        ",".join(p for p, _, _ in plano),
+    )
+
+    def _start(machine_id: str) -> tuple[str, bool]:
+        return machine_id, bool(lc.start(machine_id))
+
+    starts_ok: dict[str, bool] = {}
+    workers = min(len(plano), max(1, teto), max(1, config.FLY_START_BURST))
+    with ThreadPoolExecutor(max_workers=workers) as pool:
+        futs = {
+            pool.submit(_start, slot.fly_machine_id): (provedor, lista, slot)
+            for provedor, lista, slot in plano
+        }
+        for fut in as_completed(futs):
+            provedor, lista, slot = futs[fut]
+            try:
+                _mid, ok = fut.result()
+            except Exception as exc:
+                log.warning("wake %s falhou: %s", provedor, type(exc).__name__)
+                ok = False
+            starts_ok[slot.fly_machine_id] = ok
+
+    agora = _agora()
+    for provedor, lista, slot in plano:
+        ok = starts_ok.get(slot.fly_machine_id, False)
         if ok:
             slot.estado_observado = "starting"
             slot.ultimo_start_em = agora
             slot.atualizado_em = agora
             resultado["acordados"] += 1
-            starts += 1
             _registrar_evento_sim(
                 db,
                 lista[0].simulacao_id,
@@ -149,7 +180,6 @@ def acordar_workers(
             slot.ultima_falha_em = agora
             slot.atualizado_em = agora
             resultado["falhas"] += 1
-            # Volta a recebida para o always-on ou retry posterior
             for t in lista:
                 if t.status == "acordando_worker":
                     t.status = "recebida"
@@ -162,8 +192,7 @@ def acordar_workers(
                 "aviso",
                 provedor=provedor,
             )
-        db.commit()
-
+    db.commit()
     return resultado
 
 
