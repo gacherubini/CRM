@@ -701,30 +701,22 @@ _ROTULOS_BANCO = {
     "pan": "Banco PAN",
     "fontecred": "Fontecred",
     "bradesco": "Bradesco",
-    "mock": "Mock (demo)",
 }
 
 
 def _valores_form_simulacao(form) -> dict:
     return {
-        "modo": form.get("modo") or "todos",
+        "modo": "todos",
         "cpf": form.get("cpf") or "",
         "nascimento": form.get("nascimento", ""),
         "cnh": form.get("cnh") or "sim",
         "valor": form.get("valor", ""),
-        "prazo_meses": form.get("prazo_meses", ""),
         "prazos_meses": form.get("prazos_meses", ""),
         "entrada": form.get("entrada", ""),
-        "renda": form.get("renda", ""),
         "categoria": form.get("categoria", "moto"),
         "placa": (form.get("placa") or "").strip().upper(),
         "uf_licenciamento": form.get("uf_licenciamento") or "SP",
         "finalidade": form.get("finalidade") or "comum",
-        "ddd": form.get("ddd") or "",
-        "celular": form.get("celular") or "",
-        "codigo_natureza_ocupacao": form.get("codigo_natureza_ocupacao") or "",
-        "codigo_provedor": form.get("codigo_provedor") or "",
-        "ano_modelo": form.get("ano_modelo") or "",
         "zero_km": form.get("zero_km") or "nao",
     }
 
@@ -747,13 +739,7 @@ def _credenciais_prontas_motor(motor: "MotorClient", ator: str | None) -> list[d
 def _provedores_da_simulacao(
     form, credenciais_prontas: list[dict]
 ) -> list[str]:
-    """Resolve a lista de bancos: todos com credencial, ou um modo explícito."""
-    modo = (form.get("modo") or "todos").strip().lower()
-    if modo == "mock":
-        return []
-    if modo in _PROVEDORES_REAIS:
-        return [modo]
-    # Default "todos": só bancos com credencial pronta.
+    """Bancos com credencial pronta (sempre multi-banco)."""
     nomes: list[str] = []
     vistos: set[str] = set()
     for c in credenciais_prontas:
@@ -762,21 +748,6 @@ def _provedores_da_simulacao(
             vistos.add(nome)
             nomes.append(nome)
     return nomes
-
-
-def dados_simulacao(form) -> dict:
-    """Payload legado para Chatbot mock (valor + prazo único)."""
-    payload = {
-        "cpf": "".join(c for c in (form.get("cpf") or "") if c.isdigit()),
-        "nascimento": form.get("nascimento", "").strip(),
-        "valor": float(str(form.get("valor")).replace(",", ".")),
-        "prazo_meses": int(form.get("prazo_meses") or 48),
-        "entrada": float(str(form.get("entrada") or 0).replace(",", ".")),
-        "categoria": form.get("categoria") or "moto",
-    }
-    if form.get("renda"):
-        payload["renda"] = float(str(form.get("renda")).replace(",", "."))
-    return payload
 
 
 def dados_simulacao_motor(
@@ -804,19 +775,13 @@ def dados_simulacao_motor(
     if prazos_txt:
         prazos = [int(p.strip()) for p in prazos_txt.split(",") if p.strip()]
     else:
-        prazos = [int(form.get("prazo_meses") or 48)]
+        prazos = [24, 36, 48]
     cnh = (form.get("cnh") or "sim").lower() != "nao"
     return {
         "pessoa": {
             "cpf": cpf,
             "nascimento": nascimento,
             "cnh": cnh,
-            "renda": float(str(form.get("renda") or 0).replace(",", ".")),
-            "ddd": (form.get("ddd") or "").strip() or None,
-            "celular": (form.get("celular") or "").strip() or None,
-            "codigo_natureza_ocupacao": (
-                form.get("codigo_natureza_ocupacao") or ""
-            ).strip() or None,
         },
         "veiculo": {
             "categoria": form.get("categoria") or "moto",
@@ -824,12 +789,9 @@ def dados_simulacao_motor(
             "placa": placa,
             "uf_licenciamento": form.get("uf_licenciamento") or "SP",
             "finalidade": form.get("finalidade") or "comum",
-            "codigo_provedor": (form.get("codigo_provedor") or "").strip() or None,
-            "ano_modelo": int(form.get("ano_modelo")) if form.get("ano_modelo") else None,
             "zero_km": (form.get("zero_km") or "nao").lower() == "sim",
         },
         "condicoes": {"entrada": entrada, "prazos_meses": prazos},
-        # Nomes canônicos minúsculos. "Santander" maiúsculo é só o mock interno.
         "provedores": lista,
     }
 
@@ -862,7 +824,6 @@ def simulacoes_pagina(
 async def simulacoes_simular(
     request: Request,
     db: Session = Depends(get_db),
-    chatbot: ChatbotClient = Depends(get_chatbot_client),
     motor: MotorClient = Depends(get_motor_client),
 ):
     usuario = usuario_atual(request, db)
@@ -874,7 +835,6 @@ async def simulacoes_simular(
     if not csrf_valido(request, form.get("csrf")):
         return RedirectResponse("/app/simulacoes", status_code=303)
     valores = _valores_form_simulacao(form)
-    modo = (form.get("modo") or "todos").strip().lower()
     bancos_prontos = _credenciais_prontas_motor(motor, usuario.email)
 
     def _rerender(erro: str, status: int = 422):
@@ -891,65 +851,39 @@ async def simulacoes_simular(
             status_code=status,
         )
 
-    # --- Multi-banco (default) ou um banco explícito → Motor ---
-    if modo != "mock":
-        provedores = _provedores_da_simulacao(form, bancos_prontos)
-        if not provedores:
-            return _rerender(
-                "Nenhum banco com acesso configurado. Cadastre login em "
-                "Acessos dos bancos e tente de novo."
-            )
-        try:
-            payload_motor = dados_simulacao_motor(form, provedores)
-        except (TypeError, ValueError):
-            return _rerender(
-                "Confira CPF, nascimento, placa/valor, entrada e prazos."
-            )
-        try:
-            criada = motor.criar_simulacao(
-                payload_motor, ator=usuario.email, idempotency_key=str(uuid.uuid4())
-            )
-        except MotorIndisponivel as exc:
-            return _rerender(str(exc), status=503)
-        sim_id = criada.get("id")
-        if not sim_id:
-            return _rerender("Motor não devolveu id da simulação.", status=503)
-        valores_job = dict(valores)
-        valores_job["modo"] = "todos" if modo == "todos" else modo
-        valores_job["provedores"] = list(provedores)
-        jobs = request.session.get("sim_jobs") or {}
-        jobs[sim_id] = {
-            "valores": valores_job,
-            "cpf": payload_motor["pessoa"]["cpf"],
-            "criada_em": criada.get("criada_em") or "",
-            "provedores": list(provedores),
-        }
-        request.session["sim_jobs"] = jobs
-        return RedirectResponse(f"/app/simulacoes/job/{sim_id}", status_code=303)
-
-    # --- Mock legado: Portal → Chatbot ---
+    provedores = _provedores_da_simulacao(form, bancos_prontos)
+    if not provedores:
+        return _rerender(
+            "Nenhum banco com acesso configurado. Cadastre login em "
+            "Acessos dos bancos e tente de novo."
+        )
     try:
-        payload = dados_simulacao(form)
+        payload_motor = dados_simulacao_motor(form, provedores)
     except (TypeError, ValueError):
-        return _rerender("Confira CPF, nascimento, valor, entrada e prazo.")
+        return _rerender(
+            "Confira CPF, nascimento, placa/valor, entrada e prazos."
+        )
     try:
-        resultado = chatbot.simular(payload)
-    except SimulacaoIndisponivel:
-        return _rerender("Simulação não habilitada nesta instalação.", status=409)
-    except ChatbotIndisponivel as exc:
+        criada = motor.criar_simulacao(
+            payload_motor, ator=usuario.email, idempotency_key=str(uuid.uuid4())
+        )
+    except MotorIndisponivel as exc:
         return _rerender(str(exc), status=503)
-    if not pode_ver_custo(usuario):
-        resultado = simulacao_sem_dados_sensiveis(resultado)
-    return templates.TemplateResponse(
-        "simulacoes/resultado.html",
-        contexto(
-            request,
-            usuario,
-            valores=valores,
-            resultado=resultado,
-            cpf_mascarado=mascarar_cpf(payload["cpf"]),
-        ),
-    )
+    sim_id = criada.get("id")
+    if not sim_id:
+        return _rerender("Motor não devolveu id da simulação.", status=503)
+    valores_job = dict(valores)
+    valores_job["modo"] = "todos"
+    valores_job["provedores"] = list(provedores)
+    jobs = request.session.get("sim_jobs") or {}
+    jobs[sim_id] = {
+        "valores": valores_job,
+        "cpf": payload_motor["pessoa"]["cpf"],
+        "criada_em": criada.get("criada_em") or "",
+        "provedores": list(provedores),
+    }
+    request.session["sim_jobs"] = jobs
+    return RedirectResponse(f"/app/simulacoes/job/{sim_id}", status_code=303)
 
 
 # Estados do job no Motor (worker Playwright).

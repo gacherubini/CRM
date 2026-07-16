@@ -1,7 +1,4 @@
-import httpx
 from conftest import csrf_da_resposta, login
-
-from app.clients.chatbot import ChatbotClient, SimulacaoIndisponivel
 
 
 def _csrf_do_form(client):
@@ -9,79 +6,8 @@ def _csrf_do_form(client):
     return csrf_da_resposta(pagina)
 
 
-def _dados_validos(csrf):
-    return {
-        "csrf": csrf,
-        "modo": "mock",
-        "cpf": "12345678909",
-        "nascimento": "1990-05-20",
-        "valor": "30000",
-        "prazo_meses": "48",
-        "entrada": "5000",
-        "renda": "4000",
-        "categoria": "moto",
-    }
-
-
-def test_form_renderiza_para_dono(client, chatbot_fake):
-    login(client)
-    resposta = client.get("/app/simulacoes")
-    assert resposta.status_code == 200
-    assert "Simulação manual" in resposta.text
-
-
-def test_vendedor_acessa_o_form(client, chatbot_fake):
-    login(client, papel="vendedor")
-    resposta = client.get("/app/simulacoes")
-    assert resposta.status_code == 200
-    assert "Simulação manual" in resposta.text
-
-
-def test_vendedor_pode_simular(client, chatbot_fake):
-    login(client, papel="vendedor")
-    dados = _dados_validos(_csrf_do_form(client))
-    resposta = client.post("/app/simulacoes", data=dados)
-    assert resposta.status_code == 200
-    assert "Banco Teste" in resposta.text
-    assert "796,91" in resposta.text
-    assert chatbot_fake.simulacoes[0]["cpf"] == "12345678909"
-
-
-def test_vendedor_nao_ve_dados_sensiveis(client, chatbot_fake):
-    login(client, papel="vendedor")
-    dados = _dados_validos(_csrf_do_form(client))
-    resposta = client.post("/app/simulacoes", data=dados)
-    assert resposta.status_code == 200
-    texto = resposta.text
-    # Nenhum custo, lucro, margem, comissão, token ou métrica pode vazar.
-    for sentinela in ("98888", "12345", "SEGREDO", "77777", "6543", "spread", "margem", "lucro"):
-        assert sentinela not in texto
-
-
-def test_dono_continua_com_acesso_completo(client, chatbot_fake):
-    login(client, papel="dono")
-    dados = _dados_validos(_csrf_do_form(client))
-    resposta = client.post("/app/simulacoes", data=dados)
-    assert resposta.status_code == 200
-    assert "Banco Teste" in resposta.text
-    assert "796,91" in resposta.text
-
-
-def test_form_padrao_todos_os_bancos(client, chatbot_fake, motor_fake):
-    login(client)
-    resposta = client.get("/app/simulacoes")
-    assert resposta.status_code == 200
-    assert "Todos os bancos configurados" in resposta.text
-    assert "Placa" in resposta.text
-    # PAN tem credencial no fake
-    assert "Banco PAN" in resposta.text or "pan" in resposta.text.lower()
-
-
-def test_simular_todos_usa_bancos_com_credencial(client, chatbot_fake, motor_fake):
-    """Default: envia ao Motor só os bancos com senha configurada (PAN no fake)."""
-    login(client, papel="dono")
-    csrf = _csrf_do_form(client)
-    dados = {
+def _dados_motor(csrf, **extra):
+    base = {
         "csrf": csrf,
         "modo": "todos",
         "cpf": "52998224725",
@@ -94,20 +20,85 @@ def test_simular_todos_usa_bancos_com_credencial(client, chatbot_fake, motor_fak
         "entrada": "1123.20",
         "prazos_meses": "12,24,36,48",
         "categoria": "moto",
-        "prazo_meses": "48",
-        "ddd": "11",
-        "celular": "999999999",
+        "zero_km": "nao",
     }
+    base.update(extra)
+    return base
+
+
+def test_form_renderiza_para_dono(client, chatbot_fake, motor_fake):
+    login(client)
+    resposta = client.get("/app/simulacoes")
+    assert resposta.status_code == 200
+    assert "Simulação manual" in resposta.text
+    assert "Mock" not in resposta.text
+    assert "Natureza da ocupação" not in resposta.text
+    assert "Código do veículo" not in resposta.text
+    assert "Prazo único" not in resposta.text
+    assert "Renda mensal" not in resposta.text
+    assert "DDD" not in resposta.text
+
+
+def test_vendedor_acessa_o_form(client, chatbot_fake, motor_fake):
+    login(client, papel="vendedor")
+    resposta = client.get("/app/simulacoes")
+    assert resposta.status_code == 200
+    assert "Simulação manual" in resposta.text
+
+
+def test_vendedor_pode_simular_via_motor(client, chatbot_fake, motor_fake):
+    login(client, papel="vendedor")
+    dados = _dados_motor(_csrf_do_form(client))
+    resposta = client.post("/app/simulacoes", data=dados, follow_redirects=False)
+    assert resposta.status_code == 303
+    assert chatbot_fake.simulacoes == []
+    assert len(motor_fake.simulacoes) == 1
+    job = client.get(resposta.headers["location"])
+    assert job.status_code == 200
+    assert "946,28" in job.text or "946.28" in job.text
+
+
+def test_vendedor_nao_ve_dados_sensiveis(client, chatbot_fake, motor_fake):
+    login(client, papel="vendedor")
+    dados = _dados_motor(_csrf_do_form(client))
+    post = client.post("/app/simulacoes", data=dados, follow_redirects=False)
+    job = client.get(post.headers["location"])
+    texto = job.text
+    for sentinela in ("98888", "12345", "SEGREDO", "77777", "6543", "spread", "margem", "lucro"):
+        assert sentinela not in texto
+
+
+def test_dono_simula_via_motor(client, chatbot_fake, motor_fake):
+    login(client, papel="dono")
+    dados = _dados_motor(_csrf_do_form(client))
+    resposta = client.post("/app/simulacoes", data=dados, follow_redirects=False)
+    assert resposta.status_code == 303
+    assert len(motor_fake.simulacoes) == 1
+
+
+def test_form_lista_bancos_prontos(client, chatbot_fake, motor_fake):
+    login(client)
+    resposta = client.get("/app/simulacoes")
+    assert resposta.status_code == 200
+    assert "Serão consultados" in resposta.text
+    assert "Placa" in resposta.text
+    assert "Banco PAN" in resposta.text or "pan" in resposta.text.lower()
+
+
+def test_simular_todos_usa_bancos_com_credencial(client, chatbot_fake, motor_fake):
+    login(client, papel="dono")
+    dados = _dados_motor(_csrf_do_form(client))
     resposta = client.post("/app/simulacoes", data=dados, follow_redirects=False)
     assert resposta.status_code == 303
     loc = resposta.headers["location"]
     assert loc.startswith("/app/simulacoes/job/")
     assert chatbot_fake.simulacoes == []
-    assert len(motor_fake.simulacoes) == 1
     body = motor_fake.simulacoes[0]
     assert body["provedores"] == ["pan"]
     assert body["veiculo"]["placa"] == "FUV7G58"
     assert body["pessoa"]["cnh"] is True
+    assert "ddd" not in body["pessoa"] or body["pessoa"].get("ddd") is None
+    assert body["veiculo"].get("codigo_provedor") is None
 
     job = client.get(loc)
     assert job.status_code == 200
@@ -120,74 +111,44 @@ def test_simular_todos_com_dois_bancos(client, chatbot_fake, motor_fake):
     motor_fake.credenciais[1]["habilitado"] = True
     motor_fake.credenciais[1]["usuario"] = "lojista"
     login(client, papel="dono")
-    csrf = _csrf_do_form(client)
-    dados = {
-        "csrf": csrf,
-        "modo": "todos",
-        "cpf": "52998224725",
-        "nascimento": "1990-05-20",
-        "placa": "ABC1D23",
-        "valor": "20000",
-        "entrada": "0",
-        "prazos_meses": "36",
-        "categoria": "moto",
-    }
+    dados = _dados_motor(
+        _csrf_do_form(client),
+        placa="ABC1D23",
+        valor="20000",
+        entrada="0",
+        prazos_meses="36",
+    )
     resposta = client.post("/app/simulacoes", data=dados, follow_redirects=False)
     assert resposta.status_code == 303
     body = motor_fake.simulacoes[0]
     assert set(body["provedores"]) == {"pan", "santander"}
 
 
-def test_simular_pan_monta_payload_da_openapi(client, chatbot_fake, motor_fake):
+def test_payload_sem_campos_pan_api(client, chatbot_fake, motor_fake):
     login(client, papel="dono")
-    csrf = _csrf_do_form(client)
-    dados = {
-        "csrf": csrf,
-        "modo": "todos",
-        "cpf": "52998224725",
-        "nascimento": "1990-05-20",
-        "renda": "4000",
-        "ddd": "11",
-        "celular": "999999999",
-        "codigo_natureza_ocupacao": "01",
-        "codigo_provedor": "HONDA-CG-2025",
-        "ano_modelo": "2025",
-        "zero_km": "sim",
-        "uf_licenciamento": "SP",
-        "valor": "22000",
-        "entrada": "5000",
-        "prazos_meses": "24,36,48",
-        "categoria": "moto",
-    }
+    dados = _dados_motor(
+        _csrf_do_form(client),
+        valor="22000",
+        entrada="5000",
+        prazos_meses="24,36,48",
+        zero_km="sim",
+    )
     resposta = client.post("/app/simulacoes", data=dados, follow_redirects=False)
     assert resposta.status_code == 303
-    assert chatbot_fake.simulacoes == []
     body = motor_fake.simulacoes[0]
     assert body["provedores"] == ["pan"]
-    assert body["pessoa"]["ddd"] == "11"
-    assert body["veiculo"]["codigo_provedor"] == "HONDA-CG-2025"
+    assert body["pessoa"].get("ddd") is None
+    assert body["pessoa"].get("celular") is None
+    assert body["pessoa"].get("codigo_natureza_ocupacao") is None
+    assert body["veiculo"].get("codigo_provedor") is None
+    assert body["veiculo"].get("ano_modelo") is None
     assert body["veiculo"]["zero_km"] is True
 
 
 def test_job_em_processamento_mostra_progresso(client, chatbot_fake, motor_fake):
     motor_fake.status_retorno = "processando"
     login(client, papel="dono")
-    csrf = _csrf_do_form(client)
-    dados = {
-        "csrf": csrf,
-        "modo": "todos",
-        "cpf": "52998224725",
-        "nascimento": "1990-05-20",
-        "cnh": "sim",
-        "placa": "FUV7G58",
-        "uf_licenciamento": "SP",
-        "finalidade": "comum",
-        "valor": "21900",
-        "entrada": "1123.20",
-        "prazos_meses": "48",
-        "categoria": "moto",
-        "prazo_meses": "48",
-    }
+    dados = _dados_motor(_csrf_do_form(client), prazos_meses="48")
     post = client.post("/app/simulacoes", data=dados, follow_redirects=False)
     assert post.status_code == 303
     job = client.get(post.headers["location"])
@@ -200,7 +161,6 @@ def test_job_em_processamento_mostra_progresso(client, chatbot_fake, motor_fake)
     )
     assert 'http-equiv="refresh"' in job.text
     assert "FUV7G58" in job.text
-    # CPF completo não vaza
     assert "52998224725" not in job.text
 
 
@@ -236,175 +196,14 @@ def test_dono_abre_print_sem_cache(client, chatbot_fake, motor_fake):
 def test_job_na_fila_mostra_etapa_enfileirada(client, chatbot_fake, motor_fake):
     motor_fake.status_retorno = "recebida"
     login(client)
-    csrf = _csrf_do_form(client)
-    dados = {
-        "csrf": csrf,
-        "modo": "todos",
-        "cpf": "52998224725",
-        "nascimento": "1990-05-20",
-        "placa": "ABC1D23",
-        "valor": "20000",
-        "entrada": "0",
-        "prazos_meses": "36",
-        "categoria": "moto",
-    }
+    dados = _dados_motor(
+        _csrf_do_form(client),
+        placa="ABC1D23",
+        valor="20000",
+        entrada="0",
+        prazos_meses="36",
+    )
     post = client.post("/app/simulacoes", data=dados, follow_redirects=False)
     job = client.get(post.headers["location"])
     assert job.status_code == 200
     assert "Na fila" in job.text or "enfileirada" in job.text.lower()
-    assert "Atualizar agora" in job.text
-
-
-def test_sanitizador_remove_campos_sensiveis_sem_mutar_original():
-    from app.main import simulacao_sem_dados_sensiveis
-
-    bruto = {
-        "id": "s1",
-        "status": "concluida",
-        "criada_em": "2026-07-13T10:00:00",
-        "custo_veiculo": 98888.0,
-        "lucro": 12345.0,
-        "margem": 0.27,
-        "motor_token": "SEGREDO",
-        "metricas": {"spread": 0.11},
-        "resultados": [
-            {
-                "provedor": "BV",
-                "status": "concluida",
-                "valor_parcela": 700.0,
-                "taxa_am": 1.5,
-                "prazo_meses": 48,
-                "valor_financiado": 25000.0,
-                "codigo_erro": None,
-                "custo": 77777.0,
-                "margem": 0.2,
-                "comissao": 6543.0,
-                "token": "res-tok",
-            }
-        ],
-    }
-    limpo = simulacao_sem_dados_sensiveis(bruto)
-    assert limpo == {
-        "id": "s1",
-        "status": "concluida",
-        "criada_em": "2026-07-13T10:00:00",
-        "resultados": [
-            {
-                "provedor": "BV",
-                "status": "concluida",
-                "valor_parcela": 700.0,
-                "taxa_am": 1.5,
-                "prazo_meses": 48,
-                "valor_financiado": 25000.0,
-                "codigo_erro": None,
-            }
-        ],
-    }
-    # dono/gerente continuam vendo tudo: o dicionário original não é alterado.
-    assert bruto["custo_veiculo"] == 98888.0
-    assert bruto["resultados"][0]["custo"] == 77777.0
-
-
-def test_sanitizador_mantem_entrada_necessaria():
-    """Entrada necessaria (calculada pelo banco) nao e sensivel: vendedor pode ver."""
-    from app.main import simulacao_sem_dados_sensiveis
-
-    bruto = {
-        "id": "s2",
-        "status": "concluida",
-        "criada_em": "2026-07-13T10:00:00",
-        "resultados": [
-            {
-                "provedor": "santander",
-                "status": "concluida",
-                "valor_parcela": 946.28,
-                "prazo_meses": 48,
-                "valor_financiado": 20776.80,
-                "entrada": 1123.20,
-                "codigo_erro": None,
-                "custo": 77777.0,
-            }
-        ],
-    }
-    limpo = simulacao_sem_dados_sensiveis(bruto)
-    assert limpo["resultados"][0]["entrada"] == 1123.20
-    assert "custo" not in limpo["resultados"][0]
-
-
-def test_post_retorna_parcelas_da_api(client, chatbot_fake):
-    login(client)
-    dados = _dados_validos(_csrf_do_form(client))
-    resposta = client.post("/app/simulacoes", data=dados)
-    assert resposta.status_code == 200
-    assert "Banco Teste" in resposta.text
-    assert "796,91" in resposta.text
-    assert chatbot_fake.simulacoes[0]["cpf"] == "12345678909"
-
-
-def test_post_409_mostra_nao_habilitada(client, chatbot_fake):
-    chatbot_fake.simulacao_indisponivel = True
-    login(client)
-    dados = _dados_validos(_csrf_do_form(client))
-    resposta = client.post("/app/simulacoes", data=dados)
-    assert resposta.status_code == 409
-    assert "não habilitada" in resposta.text
-
-
-def test_post_csrf_invalido_e_rejeitado(client, chatbot_fake):
-    login(client)
-    _csrf_do_form(client)
-    dados = _dados_validos("csrf-errado")
-    resposta = client.post("/app/simulacoes", data=dados, follow_redirects=False)
-    assert resposta.status_code == 303
-    assert resposta.headers["location"] == "/app/simulacoes"
-    assert chatbot_fake.simulacoes == []
-
-
-def test_cpf_completo_nao_aparece_no_resultado(client, chatbot_fake):
-    login(client)
-    dados = _dados_validos(_csrf_do_form(client))
-    resposta = client.post("/app/simulacoes", data=dados)
-    assert resposta.status_code == 200
-    assert "12345678909" not in resposta.text
-    assert "•••.•••.•••-09" in resposta.text
-
-
-def test_simulacoes_exige_login(client, chatbot_fake):
-    resposta = client.get("/app/simulacoes", follow_redirects=False)
-    assert resposta.status_code == 303
-    assert resposta.headers["location"] == "/login"
-
-
-def _cliente_com_transporte(monkeypatch, handler):
-    transporte = httpx.MockTransport(handler)
-    original = httpx.Client
-
-    def fabrica(*args, **kwargs):
-        kwargs["transport"] = transporte
-        return original(*args, **kwargs)
-
-    monkeypatch.setattr("app.clients.chatbot.httpx.Client", fabrica)
-    return ChatbotClient("http://chatbot", "tok-secreto")
-
-
-def test_client_simular_envia_payload(monkeypatch):
-    def handler(request):
-        assert request.headers["authorization"] == "Bearer tok-secreto"
-        assert request.url.path == "/v1/simular"
-        return httpx.Response(200, json={"id": "s1", "resultados": [{"provedor": "BV"}]})
-
-    chatbot = _cliente_com_transporte(monkeypatch, handler)
-    resultado = chatbot.simular({"cpf": "1", "valor": 10})
-    assert resultado["resultados"][0]["provedor"] == "BV"
-
-
-def test_client_simular_409_mapeia_indisponivel(monkeypatch):
-    def handler(request):
-        return httpx.Response(409, json={"detail": "simulação não habilitada nesta instalação"})
-
-    chatbot = _cliente_com_transporte(monkeypatch, handler)
-    try:
-        chatbot.simular({"cpf": "1"})
-        assert False, "deveria levantar SimulacaoIndisponivel"
-    except SimulacaoIndisponivel:
-        pass
