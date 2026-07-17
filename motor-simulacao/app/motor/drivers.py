@@ -61,6 +61,8 @@ class DriverContext:
     cliente_id: str | None = None
     screenshot_dir: str | None = None
     simulacao_id: str | None = None
+    # Path do storage_state desta execução (warm session por cliente/provedor).
+    storage_state_path: str | None = None
     evento: Callable[[str, str, str, str | None], None] | None = None
 
     def registrar_evento(

@@ -5,6 +5,10 @@
 > Pré-requisitos entregues em `main`: observabilidade/prints e base PAN (`0758a9c`), Motor com 2 GB
 > para o Chromium (`e55a3c9`), migrations até `0011`, Motor 123 testes e Portal 152 testes.
 >
+> **Atualização 2026-07-17:** antes de liberar 3–5 browsers, implementar
+> [warm session + batch 2](2026-07-17-plano1a-warm-session-batch2.md). Default de produto:
+> **máx. 2 Playwrights** + reuso de `storage_state`. Este plano de fan-out **herda** esse teto.
+>
 > **Leitura obrigatória:** `docs/contexto-compacto.md`, `docs/handoff-contexto.md` e
 > `docs/plans/2026-07-13-playwright-licoes-santander.md`.
 

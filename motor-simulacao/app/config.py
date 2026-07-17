@@ -3,6 +3,8 @@
 Milestone 1: constantes com override por variável de ambiente. Endurecimento
 (pydantic-settings, proibir defaults em produção) entra na Task de scaffold/qualidade.
 """
+from __future__ import annotations
+
 import os
 
 VERSAO = os.getenv("MOTOR_VERSAO", "0.1.0")
@@ -27,6 +29,14 @@ PRAZOS_PADRAO = PRAZOS_PADRAO_MESES  # alias Task 12
 SCREENSHOT_DIR = os.getenv("MOTOR_SCREENSHOT_DIR", "data/screenshots")
 STORAGE_STATE_DIR = os.getenv("MOTOR_STORAGE_STATE_DIR", "data/storage_state")
 BROWSER_TIMEOUT_MS = int(os.getenv("MOTOR_BROWSER_TIMEOUT_MS", "90000"))
+# Warm session (decisão B+D / plano 2026-07-17): reutiliza cookies/storage_state.
+# Path canônico: {STORAGE_STATE_DIR}/{cliente_id}/{provedor}.json
+WARM_SESSION = (os.getenv("MOTOR_WARM_SESSION") or "1").strip().lower() in (
+    "1",
+    "true",
+    "yes",
+    "on",
+)
 # Headless=1 usa chromium headless_shell (muito bloqueado por Akamai).
 # Padrão 0 = headed; no Docker o worker sobe com Xvfb (display virtual).
 BROWSER_HEADLESS = (os.getenv("MOTOR_BROWSER_HEADLESS") or "0").strip().lower() in (
@@ -68,8 +78,18 @@ def _flag(nome: str, default: str = "0") -> bool:
 
 FANOUT_ENABLED = _flag("MOTOR_FANOUT_ENABLED", "0")
 FLY_AUTOSCALE_ENABLED = _flag("MOTOR_FLY_AUTOSCALE_ENABLED", "0")
-# Default 4: um slot por banco Playwright (santander/fontecred/bradesco/pan).
-MAX_BROWSER_WORKERS = int(os.getenv("MOTOR_MAX_BROWSER_WORKERS", "4"))
+# Decisão B+D (2026-07-16): no máximo 2 Playwrights simultâneos (IP/WAF).
+# MOTOR_BROWSER_CONCURRENCY, se >0, sobrescreve o default de MAX_BROWSER_WORKERS.
+_max_bw_env = (os.getenv("MOTOR_MAX_BROWSER_WORKERS") or "").strip()
+_bc_env = (os.getenv("MOTOR_BROWSER_CONCURRENCY") or "").strip()
+if _bc_env:
+    MAX_BROWSER_WORKERS = max(1, int(_bc_env))
+elif _max_bw_env:
+    MAX_BROWSER_WORKERS = max(1, int(_max_bw_env))
+else:
+    MAX_BROWSER_WORKERS = 2
+# Mantém alias sincronizado para código/docs que leem BROWSER_CONCURRENCY.
+BROWSER_CONCURRENCY = MAX_BROWSER_WORKERS
 WORKER_IDLE_STOP_SECONDS = int(os.getenv("MOTOR_WORKER_IDLE_STOP_SECONDS", "60"))
 WORKER_PROVEDOR = (os.getenv("MOTOR_WORKER_PROVEDOR") or "").strip().lower() or None
 WORKER_SLOT_ID = (os.getenv("MOTOR_WORKER_SLOT_ID") or "").strip() or None
@@ -92,5 +112,6 @@ FLY_APP_NAME = (os.getenv("FLY_APP_NAME") or os.getenv("FLY_APP") or "motor2037"
 # Token app-scoped; vazio desliga wake real (fake em testes / lab sem token).
 FLY_API_TOKEN = (os.getenv("FLY_API_TOKEN") or os.getenv("MOTOR_FLY_API_TOKEN") or "").strip()
 FLY_START_TIMEOUT_SECONDS = float(os.getenv("MOTOR_FLY_START_TIMEOUT_SECONDS", "8"))
-# Quantos starts HTTP em paralelo (acordar todos os bancos de uma simulação).
-FLY_START_BURST = int(os.getenv("MOTOR_FLY_START_BURST", "4"))
+# Burst de starts alinhado ao teto de browsers (default 2).
+_burst_env = (os.getenv("MOTOR_FLY_START_BURST") or "").strip()
+FLY_START_BURST = max(1, int(_burst_env)) if _burst_env else MAX_BROWSER_WORKERS

@@ -25,6 +25,8 @@ class ApiBankDriver(ABC):
 
     provedor = "api"
     real = True
+    # Não consome slot do teto MOTOR_MAX_BROWSER_WORKERS.
+    usa_browser = False
 
     def __init__(
         self,

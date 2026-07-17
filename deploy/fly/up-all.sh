@@ -52,15 +52,16 @@ for arg in "$@"; do
 done
 
 # IDs conhecidos do lab (fallback se list falhar). Atualize se recrear machines.
+# Chaves com aspas: com set -u, [suite-pg] é parseado como aritmética (suite - pg).
 declare -A FALLBACK_ID=(
-  [suite-pg]=d8946d2f320de8
-  [motor2037]=0807560c916d68
-  [estoque2037]=287e35dbd147e8
-  [chatbot2037]=d8d1375a42e578
-  [portal2037]=6837936c0d73d8
-  [catalogo2037]=0807560c916768
-  [n8n2037]=d8946d0f703228
-  [evolution2037]=7847926f5d1758
+  ["suite-pg"]=d8946d2f320de8
+  ["motor2037"]=0807560c916d68
+  ["estoque2037"]=287e35dbd147e8
+  ["chatbot2037"]=d8d1375a42e578
+  ["portal2037"]=6837936c0d73d8
+  ["catalogo2037"]=0807560c916768
+  ["n8n2037"]=d8946d0f703228
+  ["evolution2037"]=7847926f5d1758
 )
 
 machine_ids() {

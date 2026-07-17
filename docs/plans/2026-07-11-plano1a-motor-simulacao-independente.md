@@ -306,7 +306,8 @@ GET não vaza senha; auditoria registra o ator.
 
 ### Task 12: Drivers reais (híbrido) — piloto
 
-> **Detalhado em** `2026-07-13-plano1a-task12-santander-design.md` (design) + `...-santander-implementacao.md`
+> **Detalhado em** `2026-07-13-plano1a-task12-santander-design.md` (design) +
+> `2026-07-13-playwright-licoes-santander.md` (lições). Checklist de impl em `_archive/`.
 > (plano Fase 1, 11 tasks TDD) + `...-bancos-reconhecimento.md` (mapa por banco). Piloto Santander e
 > segundo incremento Fontecred estão LIVE via Playwright; princípio **API-first** continua vigente
 > para Pan/BV/Bradesco (`ApiBankDriver` quando houver contrato).

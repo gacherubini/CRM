@@ -38,8 +38,10 @@ def capturar_print_evento(
     if page is None:
         return None, None
     base = Path(screenshot_dir or "data/screenshots")
-    sim_id = re.sub(r"[^a-zA-Z0-9_-]", "", simulacao_id or "sem-id")
-    etapa_segura = re.sub(r"[^a-zA-Z0-9_-]", "_", etapa)[:60]
+    # MagicMock / tipos estranhos em testes: sempre string.
+    sim_raw = "sem-id" if simulacao_id is None else str(simulacao_id)
+    sim_id = re.sub(r"[^a-zA-Z0-9_-]", "", sim_raw) or "sem-id"
+    etapa_segura = re.sub(r"[^a-zA-Z0-9_-]", "_", str(etapa or "etapa"))[:60]
     destino = base / sim_id / f"{etapa_segura}_{int(time.time())}.jpg"
     try:
         destino.parent.mkdir(parents=True, exist_ok=True)
@@ -135,10 +137,17 @@ class PlaywrightBankDriver(ABC):
     """Base para bancos sem API: browser + sessão + screenshots.
 
     Cada instância de driver = **um** browser (isolamento por banco).
+
+    Contrato de login (decisão B+D):
+    - com ``storage_state`` + portal já autenticado → **não** preencher senha
+      (evento ``login_pulado`` / ``sessao_quente``) e seguir o fluxo;
+    - com tela de login → login frio → ``login_confirmado``.
     """
 
     provedor: str = "desconhecido"
     real: bool = True
+    # Conta no teto MOTOR_MAX_BROWSER_WORKERS / MOTOR_BROWSER_CONCURRENCY.
+    usa_browser: bool = True
     # Stealth (UA falso + client hints + spoof navigator) foi feita p/ o Akamai do
     # Santander. Em portais com reCAPTCHA v3 (ex.: Fontecred) o UA descasado
     # (Chrome 131 vs Chromium real 149) faz o token não ser gerado e o submit trava.
@@ -157,6 +166,45 @@ class PlaywrightBankDriver(ABC):
         self.storage_state_path = Path(storage_state_path) if storage_state_path else None
         self.screenshot_dir = Path(screenshot_dir) if screenshot_dir else None
         self.timeout_ms = timeout_ms
+
+    def _storage_path_efetivo(self, ctx: DriverContext | None = None) -> Path | None:
+        """Path para **leitura**: ctx canônico, ou legado ``{provedor}.json`` se existir."""
+        if ctx is not None and getattr(ctx, "storage_state_path", None):
+            p = Path(ctx.storage_state_path)
+            if p.is_file():
+                return p
+            try:
+                from app import config as _cfg
+
+                legado = Path(_cfg.STORAGE_STATE_DIR) / p.name
+                if legado.is_file():
+                    return legado
+            except Exception:
+                pass
+            return p
+        return self.storage_state_path
+
+    def _storage_path_gravacao(self, ctx: DriverContext | None = None) -> Path | None:
+        """Path para **gravação** (sempre canônico por cliente quando ctx define path)."""
+        if ctx is not None and getattr(ctx, "storage_state_path", None):
+            return Path(ctx.storage_state_path)
+        return self.storage_state_path
+
+    def _salvar_storage_state(self, browser_ctx, ctx: DriverContext | None = None) -> None:
+        destino = self._storage_path_gravacao(ctx)
+        if destino is None:
+            return
+        try:
+            destino.parent.mkdir(parents=True, exist_ok=True)
+            browser_ctx.storage_state(path=str(destino))
+            if ctx is not None:
+                ctx.registrar_evento(
+                    "sessao_gravada",
+                    f"Sessão do portal {self.provedor} persistida para reuso.",
+                    "sucesso",
+                )
+        except Exception:
+            pass
 
     def __call__(
         self, sol: SolicitacaoSimulacao, ctx: DriverContext | None = None
@@ -181,10 +229,10 @@ class PlaywrightBankDriver(ABC):
             chromium_sandbox=False,
         )
 
-    def _new_context(self, browser):
+    def _new_context(self, browser, ctx: DriverContext | None = None):
         """Contexto isolado com fingerprint de desktop BR (ou vanilla se stealth off)."""
         if not self.stealth:
-            return self._new_context_vanilla(browser)
+            return self._new_context_vanilla(browser, ctx)
         kwargs: dict = {
             "user_agent": _DEFAULT_UA,
             "locale": "pt-BR",
@@ -208,13 +256,14 @@ class PlaywrightBankDriver(ABC):
                 "Upgrade-Insecure-Requests": "1",
             },
         }
-        if self.storage_state_path and self.storage_state_path.is_file():
-            kwargs["storage_state"] = str(self.storage_state_path)
-        ctx = browser.new_context(**kwargs)
-        ctx.add_init_script(_STEALTH_INIT)
-        return ctx
+        storage = self._storage_path_efetivo(ctx)
+        if storage is not None and storage.is_file():
+            kwargs["storage_state"] = str(storage)
+        browser_ctx = browser.new_context(**kwargs)
+        browser_ctx.add_init_script(_STEALTH_INIT)
+        return browser_ctx
 
-    def _new_context_vanilla(self, browser):
+    def _new_context_vanilla(self, browser, ctx: DriverContext | None = None):
         """Contexto próximo do Chromium real (como o codegen): sem UA falso, sem
         client hints mentirosos, sem init script. Necessário p/ reCAPTCHA v3 gerar
         token (UA descasado trava o submit). Mantém só locale/timezone/viewport BR.
@@ -224,8 +273,9 @@ class PlaywrightBankDriver(ABC):
             "timezone_id": "America/Sao_Paulo",
             "viewport": {"width": 1366, "height": 768},
         }
-        if self.storage_state_path and self.storage_state_path.is_file():
-            kwargs["storage_state"] = str(self.storage_state_path)
+        storage = self._storage_path_efetivo(ctx)
+        if storage is not None and storage.is_file():
+            kwargs["storage_state"] = str(storage)
         return browser.new_context(**kwargs)
 
     def _assert_portal_acessivel(self, page) -> None:

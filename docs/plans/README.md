@@ -20,7 +20,7 @@ Cada plano `*A`/`*B` tem bloco **Status** no topo: leia antes de reimplementar.
 | Ordem | Plano | Produto | Status resumido |
 |---:|---|---|---|
 | 0 | [Plano #0](2026-07-11-plano0-fundacao-core-dominio-seguranca.md) | Contratos e segurança | Fundação — decisões ainda válidas |
-| 1 | [Plano #1A](2026-07-11-plano1a-motor-simulacao-independente.md) | Motor de Simulação | Santander + **Fontecred LIVE**, histórico, Registros/prints e base PAN API; fan-out sob demanda planejado |
+| 1 | [Plano #1A](2026-07-11-plano1a-motor-simulacao-independente.md) | Motor de Simulação | Santander + Fontecred + Bradesco/Pan portal; fan-out; **B+D teto 2 + warm session** |
 | 2 | [Plano #4A](2026-07-11-plano4a-estoque-api-independente.md) | Estoque API/admin | Operacional; placa+por-placa+**admin HTMX**; falta E2E outbox/restore |
 | 3 | [Plano #2A](2026-07-11-plano2a-chatbot-standalone-revendivel.md) | Chatbot + Estoque Lite | API+E3+E5+por-placa+sim+n8n; go-live WA ainda manual |
 | 4 | [Plano #5A](2026-07-11-plano5a-catalogo-publico-independente.md) | Catálogo Público | Vitrine+funil+**Pixel browser**; residual SEO/tema |
@@ -28,7 +28,7 @@ Cada plano `*A`/`*B` tem bloco **Status** no topo: leia antes de reimplementar.
 | 5.1 | [Plano #3A.1](2026-07-11-plano3a1-frontend-dashboard-mvp.md) | Frontend Dashboard MVP | MVP fechado; **Task 16 histórico FEITO**; falta Playwright E2E |
 | 6 | [Plano #3B](2026-07-11-plano3b-dashboard-dono-vendas-metas.md) | Vendas/metas/dono | Parcial; CSV+metas vendedor feitos; falta Task 4/5 |
 | 6+ | [Plano #6](2026-07-11-plano6-evolucoes-roadmap.md) | Roadmap add-ons | E1,E6,E8,E10–**E18** ativos; **E9 fora**; E2/E4/E7 adiados; C1–C12 confirmados |
-| ops | [Plano #7 deploy Fly](2026-07-13-plano7-deploy-fly-io-design.md) | Lab Fly.io | **DONE (lab no ar)** — ops = `deploy/fly/*.sh`; impl histórica SUPERSEDED |
+| ops | [Plano #7 deploy Fly](2026-07-13-plano7-deploy-fly-io-design.md) | Lab Fly.io | **DONE (lab no ar)** — ops = `deploy/fly/*.sh`; impl checklist em `_archive/` |
 
 Planos #1A e #4A podem avançar em paralelo após #0. #2A depende da fatia Lite do #4A.
 Numeração é histórica; não obriga Portal antes de Estoque/Catálogo.
@@ -38,17 +38,19 @@ Numeração é histórica; não obriga Portal antes de Estoque/Catálogo.
 Detalham a Task 12 do #1A (1º driver `real: true`). Ler junto com o #1A:
 
 - [Design/spec Santander](2026-07-13-plano1a-task12-santander-design.md) — API-first, base reutilizável.
-- [Impl Santander](2026-07-13-plano1a-task12-santander-implementacao.md) — **DONE/SUPERSEDED** (histórico;
-  não reexecutar). Lições: [Santander](2026-07-13-playwright-licoes-santander.md).
+- [Lições Santander](2026-07-13-playwright-licoes-santander.md) — **obrigatório** antes do próximo Playwright.
 - [Mapa dos bancos + **campos por provedor**](2026-07-13-plano1a-task12-bancos-reconhecimento.md) —
   decisões LIVE/plano/backlog; tabela de campos canônica (entrada, placa, celular…).
 - [Lições Fontecred](2026-07-15-playwright-licoes-fontecred.md) — **obrigatório** (sessão fria/quente,
-  modal, waits, smoke no worker). Handoff pontual 2026-07-14: **SUPERSEDED**.
-- [Fan-out / workers sob demanda](2026-07-14-plano1a-workers-playwright-sob-demanda.md) — aprovado;
-  **não implementado**.
-- [Bradesco Turbo](2026-07-15-plano1a-task12-bradesco-implementacao.md) — **PLANNED** (eixo multi-banco).
-- [Pan portal dual-path](2026-07-15-plano1a-task12-pan-playwright-implementacao.md) — **PLANNED**
-  (bloqueado até HTML de ofertas).
+  modal, waits, smoke no worker).
+- [Decisão B+D captcha/IP](2026-07-16-fly-rpa-captcha-opcoes.md) — máx. **2** browsers + sessão quente.
+- [Warm session + batch 2](2026-07-17-plano1a-warm-session-batch2.md) — implementação do teto 2 +
+  `storage_state` canônico (em andamento no código).
+- [Fan-out / workers sob demanda](2026-07-14-plano1a-workers-playwright-sob-demanda.md) — no código;
+  teto default **2** (não 4).
+- [Bradesco Turbo](2026-07-15-plano1a-task12-bradesco-implementacao.md) — driver no código; captcha Fly.
+- [Pan portal dual-path](2026-07-15-plano1a-task12-pan-playwright-implementacao.md) — portal no código.
+- Lições: [Pan portal](2026-07-15-playwright-licoes-pan-portal.md).
 
 ## Pacotes comerciais
 
@@ -61,5 +63,11 @@ Detalham a Task 12 do #1A (1º driver `real: true`). Ler junto com o #1A:
 
 ## Arquivo (não executar)
 
-Planos monolíticos antigos (#1–#5 sem sufixo) estão em [`_archive/`](_archive/) — ~3k linhas de
-código passo a passo obsoleto. **Não definem arquitetura nem ordem de implementação.**
+Tudo em [`_archive/`](_archive/) é **histórico** — não define arquitetura nem ordem de implementação.
+
+| Arquivado | Por quê / ler em vez disso |
+|---|---|
+| Planos monolíticos #1–#5 (2026-07-11) | Substituídos pelos `*A` / `*B` |
+| `…-santander-implementacao.md` | Checklist DONE; usar **lições** + **design** Santander |
+| `…-plano7-deploy-fly-io-implementacao.md` | 1ª subida Fly já feita; ops = `deploy/fly/*.sh` + design #7 |
+| `…-fontecred-deploy-handoff.md` | SUPERSEDED; usar **lições Fontecred** |

@@ -250,18 +250,21 @@ def test_login_reutiliza_sessao_autenticada_apos_timeout_networkidle():
 def test_evento_registra_print_por_etapa(monkeypatch):
     driver = FontecredDriver()
     ctx = MagicMock()
+    ctx.screenshot_dir = None
+    ctx.simulacao_id = "sim-teste"
     page = MagicMock()
+    page.screenshot.return_value = b"fake-jpeg"
     monkeypatch.setattr(config, "EVENT_SCREENSHOTS", True)
-    driver._capturar_print_evento = MagicMock(return_value="job/login.png")
 
     driver._evento(ctx, "login_confirmado", "Login confirmado.", page, True)
 
-    driver._capturar_print_evento.assert_called_once_with(
-        page, ctx, "login_confirmado"
-    )
-    ctx.registrar_evento.assert_called_once_with(
-        "login_confirmado", "Login confirmado.", "info", "job/login.png"
-    )
+    page.screenshot.assert_called()
+    assert ctx.registrar_evento.called
+    kwargs = ctx.registrar_evento.call_args
+    assert kwargs[0][0] == "login_confirmado"
+    assert kwargs[0][1] == "Login confirmado."
+    # path e/ou bytes de print
+    assert kwargs.kwargs.get("screenshot_path") or kwargs.kwargs.get("screenshot_conteudo")
 
 
 def test_gating_fontecred_sem_credencial_nao_resolve(db):

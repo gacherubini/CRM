@@ -10,8 +10,12 @@ Planos válidos: `docs/plans/README.md`. **Ignore** `docs/plans/_archive/`.
 [Pan portal](plans/2026-07-15-playwright-licoes-pan-portal.md).
 Campos e decisões por banco:
 [mapa](plans/2026-07-13-plano1a-task12-bancos-reconhecimento.md).
-**Workers sob demanda + fan-out:** implementados (ver handoff 2026-07-16) —
-plano [fan-out](plans/2026-07-14-plano1a-workers-playwright-sob-demanda.md).
+**Workers sob demanda + fan-out:** implementados (handoff 2026-07-16).
+**B+D (2026-07-16/17):** teto **2** Playwrights (`MOTOR_MAX_BROWSER_WORKERS` /
+`MOTOR_BROWSER_CONCURRENCY`) + warm session (`MOTOR_WARM_SESSION`, path
+`{STORAGE}/{cliente_id}/{provedor}.json`). Docs:
+[decisão captcha](plans/2026-07-16-fly-rpa-captcha-opcoes.md),
+[warm+batch2](plans/2026-07-17-plano1a-warm-session-batch2.md).
 
 ## Fonte da verdade (por tema)
 
@@ -33,7 +37,7 @@ Não há uma única “próxima task” universal — depende do objetivo:
 | **A · Demo loja / WA** | Go-live E2E + publicar estoque no catálogo | Operação ou demo com cliente real no Zap | `go-live-chatbot.md` |
 | **B · Multi-banco** | Estabilizar sim com celular + prints; alinhar âncoras se falhar ao vivo | Mais cotações reais estáveis | handoff topo + lições Playwright |
 | **C · CRM dono** | #3B Task 4 (eventos funil) → Task 5 (campanhas) | Funil, origem, metas confiáveis | `#3B` |
-| **D · Escala Motor** | Observar wake paralelo / idle; object storage se multi-volume | Custo RAM e cold start | plano workers (já no ar) |
+| **D · Escala Motor** | Smoke live sessão quente + teto 2; object storage se multi-volume | Estabilidade multi-banco / IP | B+D + warm-batch2 |
 | **E · Dia a dia loja** | E1 áudio, E6 fotos (após ou em paralelo leve a A) | Uso diário sem depender de banco novo | `#6` |
 | **F · Marketing** | Completar landing Tailwind se o dono entregar HTML | Site/hero polish | `site/` + `site2037` |
 

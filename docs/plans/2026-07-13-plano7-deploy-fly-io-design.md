@@ -4,7 +4,8 @@
 > Ambiente lab Fly (`crm-419` / `gru`) com apps da suíte; ops do dia a dia em
 > `deploy/fly/up-all.sh`, `down-all.sh` e `docs/contexto-compacto.md` (checkpoint Fly).
 > Este arquivo é **referência de arquitetura**, não checklist a reexecutar do zero.
-> Implementação histórica: `2026-07-13-plano7-deploy-fly-io-implementacao.md`.
+> Implementação histórica (checklist SUPERSEDED):  
+> `_archive/2026-07-13-plano7-deploy-fly-io-implementacao.md`.
 >
 > Data original: 2026-07-13 · Objetivo: subir os 5 produtos no Fly.io (WhatsApp ligado).
 > Filosofia: produtos vendáveis separadamente — cada produto = deploy próprio.

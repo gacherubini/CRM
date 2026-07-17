@@ -267,7 +267,7 @@ class PanPortalDriver(PlaywrightBankDriver):
 
         with sync_playwright() as p:
             browser = self._launch_browser(p)
-            browser_ctx = self._new_context(browser)
+            browser_ctx = self._new_context(browser, ctx)
             page = browser_ctx.new_page()
             page.set_default_timeout(self.timeout_ms)
             try:
@@ -299,7 +299,7 @@ class PanPortalDriver(PlaywrightBankDriver):
                 texto = self._texto_ofertas(page)
                 html = page.content() or ""
                 resultados = self._resultados_de_html(texto + "\n" + html, sol)
-                self._salvar_storage(browser_ctx)
+                self._salvar_storage(browser_ctx, ctx)
                 self._evento(
                     ctx,
                     "parcelas_lidas",
@@ -1007,14 +1007,8 @@ class PanPortalDriver(PlaywrightBankDriver):
             pass
         return "\n".join(partes)
 
-    def _salvar_storage(self, browser_ctx) -> None:
-        if not self.storage_state_path:
-            return
-        try:
-            self.storage_state_path.parent.mkdir(parents=True, exist_ok=True)
-            browser_ctx.storage_state(path=str(self.storage_state_path))
-        except Exception:
-            pass
+    def _salvar_storage(self, browser_ctx, ctx=None) -> None:
+        self._salvar_storage_state(browser_ctx, ctx)
 
 
 def fabrica_pan_portal() -> PanPortalDriver:

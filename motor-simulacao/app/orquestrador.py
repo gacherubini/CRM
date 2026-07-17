@@ -93,10 +93,20 @@ def acordar_workers(
         por_provedor.setdefault(t.provedor, []).append(t)
 
     teto = max(1, config.MAX_BROWSER_WORKERS)
+    # Conta tarefas Playwright já em voo (não só o wake deste tick) — decisão B max 2.
+    em_voo = (
+        db.query(SimulacaoProvedorORM)
+        .filter(
+            SimulacaoProvedorORM.tipo_driver == "playwright",
+            SimulacaoProvedorORM.status.in_(("processando", "acordando_worker", "reservada")),
+        )
+        .count()
+    )
+    vagas = max(0, teto - int(em_voo))
     # Plano de wake: DB sequencial (session não é thread-safe); HTTP em paralelo.
     plano: list[tuple[str, list[SimulacaoProvedorORM], WorkerSlotORM]] = []
     for provedor, lista in por_provedor.items():
-        if len(plano) >= teto:
+        if len(plano) >= vagas:
             resultado["ignorados"] += len(lista)
             continue
         slots = slots_para_provedor(db, provedor)

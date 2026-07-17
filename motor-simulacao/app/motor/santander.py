@@ -317,7 +317,7 @@ class SantanderDriver(PlaywrightBankDriver):
         with sync_playwright() as p:
             # Um browser por banco (isolamento multi-provedor).
             browser = self._launch_browser(p)
-            browser_ctx = self._new_context(browser)
+            browser_ctx = self._new_context(browser, ctx)
             page = browser_ctx.new_page()
             page.set_default_timeout(self.timeout_ms)
             try:
@@ -351,7 +351,7 @@ class SantanderDriver(PlaywrightBankDriver):
                     texto = ""
                 html = page.content() or ""
                 resultados = self._resultados_de_html(texto + "\n" + html, sol)
-                self._salvar_storage(browser_ctx)
+                self._salvar_storage(browser_ctx, ctx)
                 self._evento(
                     ctx, "parcelas_lidas", "Parcelas interpretadas e prontas para salvar.",
                     nivel="sucesso",
@@ -909,14 +909,8 @@ class SantanderDriver(PlaywrightBankDriver):
             "cards de parcela não carregaram a tempo (skeleton)",
         )
 
-    def _salvar_storage(self, browser_ctx) -> None:
-        if not self.storage_state_path:
-            return
-        try:
-            self.storage_state_path.parent.mkdir(parents=True, exist_ok=True)
-            browser_ctx.storage_state(path=str(self.storage_state_path))
-        except Exception:
-            pass
+    def _salvar_storage(self, browser_ctx, ctx=None) -> None:
+        self._salvar_storage_state(browser_ctx, ctx)
 
 
 def _formatar_nascimento(nasc: str) -> str:

@@ -35,6 +35,7 @@ from app.motor.drivers import (
     ResultadoDriver,
     resolver_drivers,
 )
+from app.sessao_browser import path_storage_state_gravacao, sessao_parece_quente
 
 MAX_TENTATIVAS_DRIVER = 2
 
@@ -487,6 +488,26 @@ def processar_job(
                     db, sim.id, tarefa_nome, "processando", incrementar_tentativa=True
                 )
         db.commit()
+        if config.WARM_SESSION:
+            ctx.storage_state_path = str(
+                path_storage_state_gravacao(sim.cliente_id, nome)
+            )
+            if sessao_parece_quente(sim.cliente_id, nome):
+                _registrar_evento(
+                    db,
+                    sim,
+                    "sessao_quente",
+                    f"Sessão persistida encontrada para {nome}; tentando reutilizar login.",
+                    provedor=nome,
+                )
+            else:
+                _registrar_evento(
+                    db,
+                    sim,
+                    "sessao_fria",
+                    f"Sem sessão persistida para {nome}; login completo se necessário.",
+                    provedor=nome,
+                )
         _registrar_evento(
             db,
             sim,
@@ -879,6 +900,26 @@ def processar_tarefa_provedor(
         tarefa.reservada_ate = _agora() + timedelta(seconds=config.TASK_LEASE_SECONDS)
         tarefa.atualizada_em = _agora()
         db.commit()
+        if config.WARM_SESSION:
+            ctx.storage_state_path = str(
+                path_storage_state_gravacao(sim.cliente_id, nome)
+            )
+            if sessao_parece_quente(sim.cliente_id, nome):
+                _registrar_evento(
+                    db,
+                    sim,
+                    "sessao_quente",
+                    f"Sessão persistida encontrada para {nome}; tentando reutilizar login.",
+                    provedor=nome,
+                )
+            else:
+                _registrar_evento(
+                    db,
+                    sim,
+                    "sessao_fria",
+                    f"Sem sessão persistida para {nome}; login completo se necessário.",
+                    provedor=nome,
+                )
         _registrar_evento(
             db,
             sim,
