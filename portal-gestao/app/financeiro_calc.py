@@ -83,6 +83,20 @@ def lead_corresponde_origem(lead: dict, origem: str | None) -> bool:
     return bool(atual and atual.casefold() == origem.casefold())
 
 
+def lead_utm_campaign(lead: dict) -> str | None:
+    valor = lead.get("utm_campaign_last") or lead.get("utm_campaign")
+    return str(valor).strip() if valor and str(valor).strip() else None
+
+
+def lead_corresponde_utm_campaign(lead: dict, utm_campaign: str | None) -> bool:
+    if not utm_campaign:
+        return True
+    atual = lead_utm_campaign(lead)
+    if utm_campaign == "__sem_campanha__":
+        return atual is None
+    return bool(atual and atual.casefold() == utm_campaign.casefold())
+
+
 def identidade_telefone(telefone: str | None) -> str | None:
     digitos = "".join(c for c in (telefone or "") if c.isdigit())
     if not digitos:
@@ -187,12 +201,17 @@ def funil_periodo(
     vendedor_filtro: str | None,
     origem: str | None,
     confirmadas: list[Venda],
-) -> tuple[dict, list[str]]:
+    utm_campaign: str | None = None,
+) -> tuple[dict, list[str], list[str]]:
     """Funil auditável (leads elegíveis/atendidos/vendas vinculadas) — mesma
-    lógica usada no painel financeiro e no CSV de funil."""
+    lógica usada no painel financeiro e no CSV de funil.
+
+    Retorna (funil, origens, utm_campaigns).
+    """
     from app.clients.chatbot import ChatbotIndisponivel  # import tardio: evita ciclo com app.clients
 
     origens: list[str] = []
+    campanhas_utm: list[str] = []
     funil = {
         "disponivel": False,
         "elegiveis": None,
@@ -204,17 +223,26 @@ def funil_periodo(
         leads = chatbot.listar_leads()
     except ChatbotIndisponivel as exc:
         funil["erro"] = str(exc)
-        return funil, origens
+        return funil, origens, campanhas_utm
 
     origens = sorted({valor for lead in leads if (valor := origem_lead(lead))}, key=str.casefold)
-    candidatos = [lead for lead in leads if lead_corresponde_origem(lead, origem)]
+    campanhas_utm = sorted(
+        {valor for lead in leads if (valor := lead_utm_campaign(lead))},
+        key=str.casefold,
+    )
+    candidatos = [
+        lead
+        for lead in leads
+        if lead_corresponde_origem(lead, origem)
+        and lead_corresponde_utm_campaign(lead, utm_campaign)
+    ]
     leads_sem_data = [lead for lead in candidatos if data_api(lead.get("criada_em")) is None]
     if leads_sem_data:
         funil["erro"] = (
             f"{len(leads_sem_data)} lead(s) sem data de criação confiável; "
             "as contagens do período estão indisponíveis."
         )
-        return funil, origens
+        return funil, origens, campanhas_utm
 
     elegiveis = [
         lead
@@ -255,4 +283,4 @@ def funil_periodo(
             "vendas_vinculadas": len(vendas_vinculadas),
         }
     )
-    return funil, origens
+    return funil, origens, campanhas_utm

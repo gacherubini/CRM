@@ -252,7 +252,15 @@ def vehicle_detail(
 
     tracking = {
         key: clean_tracking(request.query_params.get(key))
-        for key in ("utm_source", "utm_medium", "utm_campaign", "utm_content", "utm_term")
+        for key in (
+            "utm_source",
+            "utm_medium",
+            "utm_campaign",
+            "utm_content",
+            "utm_term",
+            "fbclid",
+            "gclid",
+        )
     }
     tracking["origem"] = "detalhe_catalogo"
     # event_id compartilhado browser Lead ↔ registro de interesse (dedupe Meta).
@@ -285,6 +293,8 @@ def register_interest(
     utm_campaign: Optional[str] = None,
     utm_content: Optional[str] = None,
     utm_term: Optional[str] = None,
+    fbclid: Optional[str] = None,
+    gclid: Optional[str] = None,
     event_id: Optional[str] = None,
     provider: HttpInventoryProvider = Depends(get_provider),
     store: InterestStore = Depends(get_interest_store),
@@ -330,6 +340,8 @@ def register_interest(
             utm_campaign=clean_tracking(utm_campaign),
             utm_content=clean_tracking(utm_content),
             utm_term=clean_tracking(utm_term),
+            fbclid=clean_tracking(fbclid),
+            gclid=clean_tracking(gclid),
             event_id=shared_event_id or None,
         )
     except sqlite3.Error:

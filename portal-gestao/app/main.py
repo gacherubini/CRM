@@ -37,13 +37,28 @@ from app.cripto import cifrar
 from app.meta_capi import enfileirar_purchase_venda
 from app.models import (
     AtendimentoAtribuicao,
+    Campanha,
+    CampanhaGasto,
     Meta,
     MetaPixelConfig,
     Usuario,
     Venda,
     VendaCustoDireto,
     agora,
+    novo_id,
 )
+from app.campanhas import (
+    CANAIS_ROTULO,
+    STATUS_ROTULO,
+    aplicar_snapshot_venda,
+    campanha_por_utm,
+    normalizar_utm,
+    parse_brl_valor,
+    payload_form as campanha_payload_form,
+    preencher_campanha,
+    validar_campanha_payload,
+)
+from app.roi_calc import calcular_roi_loja, totais_roi
 from app.clients.chatbot import (
     ChatbotClient,
     ChatbotIndisponivel,
@@ -1528,6 +1543,14 @@ async def vendas_confirmar(request: Request, venda_id: str, db: Session = Depend
     venda.confirmada_por = usuario.email
     venda.confirmada_em = agora()
     venda.atualizada_em = agora()
+    # Snapshot de campanha (first/last) a partir do lead — best-effort.
+    if venda.lead_ref:
+        try:
+            chatbot = get_chatbot_client()
+            lead = chatbot.obter_lead(venda.lead_ref)
+            aplicar_snapshot_venda(venda, lead, db, usuario.loja_slug)
+        except (ChatbotIndisponivel, LeadNaoEncontrado):
+            pass
     db.commit()
     # E10: Purchase via CAPI — best-effort; falha não desfaz a venda.
     enfileirar_purchase_venda(db, venda)
@@ -1929,6 +1952,7 @@ def financeiro_dashboard(
     fim: str | None = None,
     vendedor: str | None = None,
     origem: str | None = None,
+    utm_campaign: str | None = None,
     db: Session = Depends(get_db),
     chatbot: ChatbotClient = Depends(get_chatbot_client),
 ):
@@ -1960,8 +1984,16 @@ def financeiro_dashboard(
     ).order_by(Usuario.nome).all()
     vendedores_por_email = {item.email: item for item in vendedores}
     vendedor_filtro = vendedor if vendedor in vendedores_por_email else None
-    funil, origens = funil_periodo(
-        chatbot, db, usuario.loja_slug, d_inicio, d_fim, vendedor_filtro, origem, confirmadas
+    funil, origens, campanhas_utm = funil_periodo(
+        chatbot,
+        db,
+        usuario.loja_slug,
+        d_inicio,
+        d_fim,
+        vendedor_filtro,
+        origem,
+        confirmadas,
+        utm_campaign=utm_campaign,
     )
     return templates.TemplateResponse(
         "financeiro/dashboard.html",
@@ -1975,7 +2007,12 @@ def financeiro_dashboard(
             funil=funil,
             vendedores=vendedores,
             origens=origens,
-            filtros_funil={"vendedor": vendedor_filtro or "", "origem": origem or ""},
+            campanhas_utm=campanhas_utm,
+            filtros_funil={
+                "vendedor": vendedor_filtro or "",
+                "origem": origem or "",
+                "utm_campaign": utm_campaign or "",
+            },
         ),
     )
 
@@ -2182,6 +2219,321 @@ def _trafego_contexto(request: Request, usuario, config: MetaPixelConfig | None,
         atualizada_em=config.atualizada_em if config else None,
         ok=ok,
         erro=erro,
+    )
+
+
+@app.get("/app/campanhas", response_class=HTMLResponse)
+def campanhas_lista(request: Request, db: Session = Depends(get_db)):
+    usuario = usuario_atual(request, db)
+    if not usuario:
+        return redirecionar_login()
+    if not pode_gerir_trafego(usuario):
+        return RedirectResponse("/app", status_code=303)
+    campanhas = (
+        db.query(Campanha)
+        .filter(Campanha.loja_slug == usuario.loja_slug)
+        .order_by(Campanha.criada_em.desc())
+        .all()
+    )
+    gastos_totais: dict[str, Decimal] = {}
+    for g in db.query(CampanhaGasto).filter(CampanhaGasto.loja_slug == usuario.loja_slug).all():
+        gastos_totais[g.campanha_id] = gastos_totais.get(g.campanha_id, Decimal("0")) + g.valor
+    return templates.TemplateResponse(
+        "campanhas/lista.html",
+        contexto(
+            request,
+            usuario,
+            campanhas=campanhas,
+            gastos_totais=gastos_totais,
+            canais=CANAIS_ROTULO,
+            status_rotulo=STATUS_ROTULO,
+        ),
+    )
+
+
+def _campanha_form_ctx(request, usuario, *, titulo, valores, erro=None):
+    return contexto(
+        request,
+        usuario,
+        titulo=titulo,
+        valores=valores,
+        erro=erro,
+        canais=CANAIS_ROTULO,
+        status_rotulo=STATUS_ROTULO,
+    )
+
+
+@app.get("/app/campanhas/nova", response_class=HTMLResponse)
+def campanhas_nova_get(request: Request, db: Session = Depends(get_db)):
+    usuario = usuario_atual(request, db)
+    if not usuario:
+        return redirecionar_login()
+    if not pode_gerir_trafego(usuario):
+        return RedirectResponse("/app", status_code=303)
+    return templates.TemplateResponse(
+        "campanhas/form.html",
+        _campanha_form_ctx(
+            request,
+            usuario,
+            titulo="Nova campanha",
+            valores={"canal": "meta", "status": "ativa"},
+        ),
+    )
+
+
+@app.post("/app/campanhas/nova")
+async def campanhas_nova_post(request: Request, db: Session = Depends(get_db)):
+    usuario = usuario_atual(request, db)
+    if not usuario:
+        return redirecionar_login()
+    form = await request.form()
+    if not pode_gerir_trafego(usuario) or not csrf_valido(request, form.get("csrf")):
+        return RedirectResponse("/app", status_code=303)
+    dados = campanha_payload_form(form)
+    erros = validar_campanha_payload(dados)
+    if erros:
+        return templates.TemplateResponse(
+            "campanhas/form.html",
+            _campanha_form_ctx(
+                request, usuario, titulo="Nova campanha", valores=dados, erro="; ".join(erros)
+            ),
+            status_code=422,
+        )
+    norm = normalizar_utm(dados["utm_campaign"])
+    if campanha_por_utm(db, usuario.loja_slug, norm):
+        return templates.TemplateResponse(
+            "campanhas/form.html",
+            _campanha_form_ctx(
+                request,
+                usuario,
+                titulo="Nova campanha",
+                valores=dados,
+                erro="Já existe uma campanha com este utm_campaign nesta loja.",
+            ),
+            status_code=422,
+        )
+    c = Campanha(
+        id=novo_id(),
+        loja_slug=usuario.loja_slug,
+        utm_campaign=dados["utm_campaign"].strip(),
+        utm_campaign_norm=norm or "",
+        criada_por_email=usuario.email,
+    )
+    preencher_campanha(c, dados, email=usuario.email)
+    db.add(c)
+    db.commit()
+    return RedirectResponse("/app/campanhas?ok=criada", status_code=303)
+
+
+@app.get("/app/campanhas/{campanha_id}", response_class=HTMLResponse)
+def campanhas_detalhe(request: Request, campanha_id: str, db: Session = Depends(get_db)):
+    usuario = usuario_atual(request, db)
+    if not usuario:
+        return redirecionar_login()
+    if not pode_gerir_trafego(usuario):
+        return RedirectResponse("/app", status_code=303)
+    campanha = (
+        db.query(Campanha)
+        .filter(Campanha.id == campanha_id, Campanha.loja_slug == usuario.loja_slug)
+        .first()
+    )
+    if not campanha:
+        return RedirectResponse("/app/campanhas?erro=1", status_code=303)
+    gastos = (
+        db.query(CampanhaGasto)
+        .filter(CampanhaGasto.campanha_id == campanha.id)
+        .order_by(CampanhaGasto.referencia.desc(), CampanhaGasto.criada_em.desc())
+        .all()
+    )
+    gasto_total = sum((g.valor for g in gastos), Decimal("0"))
+    from app.financeiro_calc import hoje_portal
+
+    return templates.TemplateResponse(
+        "campanhas/detalhe.html",
+        contexto(
+            request,
+            usuario,
+            campanha=campanha,
+            gastos=gastos,
+            gasto_total=gasto_total,
+            canais=CANAIS_ROTULO,
+            status_rotulo=STATUS_ROTULO,
+            hoje=hoje_portal().isoformat(),
+            erro=request.query_params.get("erro"),
+        ),
+    )
+
+
+@app.get("/app/campanhas/{campanha_id}/editar", response_class=HTMLResponse)
+def campanhas_editar_get(request: Request, campanha_id: str, db: Session = Depends(get_db)):
+    usuario = usuario_atual(request, db)
+    if not usuario:
+        return redirecionar_login()
+    if not pode_gerir_trafego(usuario):
+        return RedirectResponse("/app", status_code=303)
+    campanha = (
+        db.query(Campanha)
+        .filter(Campanha.id == campanha_id, Campanha.loja_slug == usuario.loja_slug)
+        .first()
+    )
+    if not campanha:
+        return RedirectResponse("/app/campanhas?erro=1", status_code=303)
+    valores = {
+        "nome": campanha.nome,
+        "canal": campanha.canal,
+        "status": campanha.status,
+        "utm_source": campanha.utm_source or "",
+        "utm_medium": campanha.utm_medium or "",
+        "utm_campaign": campanha.utm_campaign,
+        "utm_content": campanha.utm_content or "",
+        "utm_term": campanha.utm_term or "",
+        "periodo_inicio": campanha.periodo_inicio.isoformat() if campanha.periodo_inicio else "",
+        "periodo_fim": campanha.periodo_fim.isoformat() if campanha.periodo_fim else "",
+        "notas": campanha.notas or "",
+    }
+    return templates.TemplateResponse(
+        "campanhas/form.html",
+        _campanha_form_ctx(request, usuario, titulo="Editar campanha", valores=valores),
+    )
+
+
+@app.post("/app/campanhas/{campanha_id}/editar")
+async def campanhas_editar_post(request: Request, campanha_id: str, db: Session = Depends(get_db)):
+    usuario = usuario_atual(request, db)
+    if not usuario:
+        return redirecionar_login()
+    form = await request.form()
+    if not pode_gerir_trafego(usuario) or not csrf_valido(request, form.get("csrf")):
+        return RedirectResponse("/app", status_code=303)
+    campanha = (
+        db.query(Campanha)
+        .filter(Campanha.id == campanha_id, Campanha.loja_slug == usuario.loja_slug)
+        .first()
+    )
+    if not campanha:
+        return RedirectResponse("/app/campanhas?erro=1", status_code=303)
+    dados = campanha_payload_form(form)
+    erros = validar_campanha_payload(dados)
+    if erros:
+        return templates.TemplateResponse(
+            "campanhas/form.html",
+            _campanha_form_ctx(
+                request, usuario, titulo="Editar campanha", valores=dados, erro="; ".join(erros)
+            ),
+            status_code=422,
+        )
+    norm = normalizar_utm(dados["utm_campaign"])
+    outra = campanha_por_utm(db, usuario.loja_slug, norm)
+    if outra and outra.id != campanha.id:
+        return templates.TemplateResponse(
+            "campanhas/form.html",
+            _campanha_form_ctx(
+                request,
+                usuario,
+                titulo="Editar campanha",
+                valores=dados,
+                erro="Já existe uma campanha com este utm_campaign nesta loja.",
+            ),
+            status_code=422,
+        )
+    preencher_campanha(campanha, dados)
+    db.commit()
+    return RedirectResponse(f"/app/campanhas/{campanha.id}?ok=salvo", status_code=303)
+
+
+@app.post("/app/campanhas/{campanha_id}/gastos")
+async def campanhas_gasto_post(request: Request, campanha_id: str, db: Session = Depends(get_db)):
+    usuario = usuario_atual(request, db)
+    if not usuario:
+        return redirecionar_login()
+    form = await request.form()
+    if not pode_gerir_trafego(usuario) or not csrf_valido(request, form.get("csrf")):
+        return RedirectResponse("/app", status_code=303)
+    campanha = (
+        db.query(Campanha)
+        .filter(Campanha.id == campanha_id, Campanha.loja_slug == usuario.loja_slug)
+        .first()
+    )
+    if not campanha:
+        return RedirectResponse("/app/campanhas?erro=1", status_code=303)
+    valor = parse_brl_valor(form.get("valor"))
+    try:
+        referencia = date.fromisoformat((form.get("referencia") or "").strip())
+    except ValueError:
+        referencia = None
+    if valor is None or referencia is None:
+        return RedirectResponse(
+            f"/app/campanhas/{campanha.id}?erro=Informe+valor+e+data+válidos",
+            status_code=303,
+        )
+    db.add(
+        CampanhaGasto(
+            id=novo_id(),
+            campanha_id=campanha.id,
+            loja_slug=usuario.loja_slug,
+            valor=valor,
+            referencia=referencia,
+            nota=(form.get("nota") or "").strip() or None,
+            criada_por=usuario.email,
+        )
+    )
+    db.commit()
+    return RedirectResponse(f"/app/campanhas/{campanha.id}?ok=gasto", status_code=303)
+
+
+@app.get("/app/trafego/roi", response_class=HTMLResponse)
+def trafego_roi(
+    request: Request,
+    inicio: str | None = None,
+    fim: str | None = None,
+    touch: str | None = None,
+    db: Session = Depends(get_db),
+):
+    usuario = usuario_atual(request, db)
+    if not usuario:
+        return redirecionar_login()
+    if not pode_gerir_trafego(usuario):
+        return RedirectResponse("/app", status_code=303)
+    d_inicio, d_fim = periodo_padrao(inicio, fim)
+    modo = touch if touch in ("first", "last") else "last"
+    campanhas = (
+        db.query(Campanha).filter(Campanha.loja_slug == usuario.loja_slug).all()
+    )
+    gastos = (
+        db.query(CampanhaGasto).filter(CampanhaGasto.loja_slug == usuario.loja_slug).all()
+    )
+    metricas = calcular_metricas_vendas(db, usuario.loja_slug, d_inicio, d_fim)
+    chatbot_erro = None
+    leads: list[dict] = []
+    try:
+        leads = get_chatbot_client().listar_leads()
+    except ChatbotIndisponivel:
+        chatbot_erro = "indisponivel"
+    linhas = calcular_roi_loja(
+        campanhas=campanhas,
+        gastos=gastos,
+        leads=leads,
+        vendas_confirmadas=metricas["confirmadas"],
+        d_inicio=d_inicio,
+        d_fim=d_fim,
+        modo_atribuicao=modo,
+    )
+    totais = totais_roi(linhas)
+    return templates.TemplateResponse(
+        "trafego/roi.html",
+        contexto(
+            request,
+            usuario,
+            periodo={"inicio": d_inicio.isoformat(), "fim": d_fim.isoformat()},
+            touch=modo,
+            linhas=linhas,
+            totais=totais,
+            canais=CANAIS_ROTULO,
+            chatbot_erro=chatbot_erro,
+            totais_roas_barra=(
+                min(100.0, float(totais["roas"]) / 5.0 * 100.0) if totais.get("roas") else 0.0
+            ),
+        ),
     )
 
 

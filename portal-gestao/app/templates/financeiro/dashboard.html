@@ -10,9 +10,10 @@
   <label class="search"><span class="sr-only">Fim do período</span><input type="date" name="fim" value="{{ periodo.fim }}"></label>
   <select name="vendedor" aria-label="Vendedor do funil"><option value="">Todos os vendedores no funil</option>{% for item in vendedores %}<option value="{{ item.email }}" {{ 'selected' if filtros_funil.vendedor == item.email }}>{{ item.nome }}</option>{% endfor %}</select>
   <select name="origem" aria-label="Origem declarada do lead"><option value="">Todas as origens no funil</option><option value="__sem_origem__" {{ 'selected' if filtros_funil.origem == '__sem_origem__' }}>Sem origem declarada</option>{% for item in origens %}<option value="{{ item }}" {{ 'selected' if filtros_funil.origem == item }}>{{ item }}</option>{% endfor %}</select>
+  <select name="utm_campaign" aria-label="Campanha UTM do lead"><option value="">Todas as campanhas no funil</option><option value="__sem_campanha__" {{ 'selected' if filtros_funil.utm_campaign == '__sem_campanha__' }}>Sem utm_campaign</option>{% for item in campanhas_utm %}<option value="{{ item }}" {{ 'selected' if filtros_funil.utm_campaign == item }}>{{ item }}</option>{% endfor %}</select>
   <button class="button secondary" type="submit">Aplicar período</button>
 </form>
-<p class="muted">Período afeta todo o painel; vendedor e origem declarada filtram somente o funil. Origem descreve aquisição informada e não prova causalidade.</p>
+<p class="muted">Período afeta todo o painel; vendedor, origem e campanha filtram somente o funil. Origem descreve aquisição informada e não prova causalidade. ROI completo em <a href="/app/trafego/roi">Tráfego → ROI</a>.</p>
 
 <p class="mono-label">PERÍODO: {{ periodo.inicio }} A {{ periodo.fim }}</p>
 

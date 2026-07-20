@@ -47,6 +47,11 @@ class Venda(Base):
     atualizada_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=agora)
     confirmada_por: Mapped[Optional[str]] = mapped_column(String(320), nullable=True)
     confirmada_em: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    # Snapshot de atribuição no confirmar (estável mesmo se UTM do lead mudar depois).
+    campanha_id_first: Mapped[Optional[str]] = mapped_column(String(36), nullable=True, index=True)
+    campanha_id_last: Mapped[Optional[str]] = mapped_column(String(36), nullable=True, index=True)
+    utm_campaign_first: Mapped[Optional[str]] = mapped_column(String(120), nullable=True)
+    utm_campaign_last: Mapped[Optional[str]] = mapped_column(String(120), nullable=True)
 
     custos_diretos: Mapped[list["VendaCustoDireto"]] = relationship(
         back_populates="venda", cascade="all, delete-orphan"
@@ -125,3 +130,46 @@ class MetaCapiOutbox(Base):
     delivered_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     criada_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=agora)
     atualizada_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=agora)
+
+
+class Campanha(Base):
+    """Campanha de marketing/tráfego pago (métrica; não cria anúncio externo)."""
+
+    __tablename__ = "campanhas"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=novo_id)
+    loja_slug: Mapped[str] = mapped_column(String(120), index=True)
+    nome: Mapped[str] = mapped_column(String(160))
+    canal: Mapped[str] = mapped_column(String(32), default="meta")
+    status: Mapped[str] = mapped_column(String(20), default="ativa", index=True)
+    utm_source: Mapped[Optional[str]] = mapped_column(String(120), nullable=True)
+    utm_medium: Mapped[Optional[str]] = mapped_column(String(120), nullable=True)
+    utm_campaign: Mapped[str] = mapped_column(String(120))
+    utm_campaign_norm: Mapped[str] = mapped_column(String(120), index=True)
+    utm_content: Mapped[Optional[str]] = mapped_column(String(120), nullable=True)
+    utm_term: Mapped[Optional[str]] = mapped_column(String(120), nullable=True)
+    periodo_inicio: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    periodo_fim: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    notas: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    criada_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=agora)
+    atualizada_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=agora)
+    criada_por_email: Mapped[str] = mapped_column(String(320))
+
+    gastos: Mapped[list["CampanhaGasto"]] = relationship(
+        back_populates="campanha", cascade="all, delete-orphan"
+    )
+
+
+class CampanhaGasto(Base):
+    __tablename__ = "campanha_gastos"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=novo_id)
+    campanha_id: Mapped[str] = mapped_column(ForeignKey("campanhas.id"), index=True)
+    loja_slug: Mapped[str] = mapped_column(String(120), index=True)
+    valor: Mapped[Decimal] = mapped_column(Numeric(12, 2))
+    referencia: Mapped[date] = mapped_column(Date, index=True)
+    nota: Mapped[Optional[str]] = mapped_column(String(240), nullable=True)
+    criada_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=agora)
+    criada_por: Mapped[str] = mapped_column(String(320))
+
+    campanha: Mapped["Campanha"] = relationship(back_populates="gastos")

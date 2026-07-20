@@ -50,6 +50,7 @@ def test_clique_nao_cria_lead_e_ingestao_e_idempotente(client, loja_a):
 
 def test_primeira_mensagem_correlaciona_ref_e_enriquece_lead(client, loja_a):
     event = _event(loja_a)
+    event["fbclid"] = "IwAR0test"
     client.post("/v1/integracoes/catalogo/interesses", json=event, headers=loja_a["headers"])
 
     inbound = client.post(
@@ -75,11 +76,43 @@ def test_primeira_mensagem_correlaciona_ref_e_enriquece_lead(client, loja_a):
     assert lead["utm_source"] == "instagram"
     assert lead["utm_medium"] == "social"
     assert lead["utm_campaign"] == "feirao"
+    assert lead["utm_campaign_first"] == "feirao"
+    assert lead["utm_campaign_last"] == "feirao"
     assert lead["utm_content"] == "story-a"
     assert lead["utm_term"] == "suv-usado"
+    assert lead["fbclid"] == "IwAR0test"
     assert lead["atribuida_em"]
     detail = client.get(f"/v1/leads/{lead['id']}", headers=loja_a["headers"]).json()
     assert detail["catalog_interest_ref"] == REF
+
+
+def test_segunda_atribuicao_preserva_first_atualiza_last(client, loja_a):
+    # Refs no alfabeto CAT-[A-Z2-7]{10,16}
+    ref1 = "CAT-ABCDEFGH2345"
+    ref2 = "CAT-JKLMNPQRSTUV"
+    e1 = _event(loja_a, ref=ref1)
+    e1["utm_campaign"] = "feirao"
+    e2 = _event(loja_a, ref=ref2)
+    e2["utm_campaign"] = "feirao-blackfriday"
+    e2["utm_source"] = "google"
+    r1 = client.post("/v1/integracoes/catalogo/interesses", json=e1, headers=loja_a["headers"])
+    assert r1.status_code == 202
+    client.post(
+        "/webhook/mensagem",
+        json=_message(loja_a, "5511900002222", f"código {ref1}", "MSG-FT-1"),
+    )
+    r2 = client.post("/v1/integracoes/catalogo/interesses", json=e2, headers=loja_a["headers"])
+    assert r2.status_code == 202
+    client.post(
+        "/webhook/mensagem",
+        json=_message(loja_a, "5511900002222", f"voltei {ref2}", "MSG-FT-2"),
+    )
+    leads = client.get("/v1/leads", headers=loja_a["headers"]).json()["leads"]
+    lead = next(l for l in leads if l["telefone"] == "5511900002222")
+    assert lead["utm_campaign_first"] == "feirao"
+    assert lead["utm_campaign_last"] == "feirao-blackfriday"
+    assert lead["utm_campaign"] == "feirao-blackfriday"
+    assert lead["utm_source_last"] == "google"
 
 
 def test_ref_nao_cruza_tenant_nem_e_transferida_para_outro_telefone(

@@ -167,18 +167,48 @@ def _correlacionar_catalogo(
         atribuicao.lead_id = lead.id
         atribuicao.atribuida_em = agora
 
-        # A leitura de lead representa a primeira origem atribuída; o histórico
-        # completo permanece em catalog_attributions.
+        # Histórico completo em catalog_attributions; lead guarda first/last touch.
         if not lead.catalog_interest_ref:
-            for campo in (
-                "catalog_interest_ref", "veiculo_ref", "origem", "canal",
-                "utm_source", "utm_medium", "utm_campaign", "utm_content", "utm_term",
-            ):
-                setattr(lead, campo, getattr(atribuicao, campo))
+            lead.catalog_interest_ref = atribuicao.catalog_interest_ref
+            lead.veiculo_ref = atribuicao.veiculo_ref
             lead.atribuida_em = agora
-            lead.atualizada_em = agora
+        else:
+            # Novo clique: atualiza ref/veículo "atuais" sem apagar first touch.
+            lead.catalog_interest_ref = atribuicao.catalog_interest_ref
+            lead.veiculo_ref = atribuicao.veiculo_ref or lead.veiculo_ref
+
+        _aplicar_touch_do_atributo(lead, atribuicao)
+        lead.atualizada_em = agora
         return atribuicao
     return None
+
+
+def _aplicar_touch_do_atributo(lead: Lead, atribuicao: CatalogAttribution) -> None:
+    """First touch só se vazio; last + utm_* legado sempre atualizam com valor novo."""
+    pares = (
+        ("origem", "origem"),
+        ("canal", "canal"),
+        ("utm_source", "utm_source"),
+        ("utm_medium", "utm_medium"),
+        ("utm_campaign", "utm_campaign"),
+        ("utm_content", "utm_content"),
+        ("utm_term", "utm_term"),
+    )
+    for attr_lead, attr_attr in pares:
+        valor = getattr(atribuicao, attr_attr, None)
+        if not valor:
+            continue
+        first_name = f"{attr_lead}_first"
+        last_name = f"{attr_lead}_last"
+        if getattr(lead, first_name, None) is None:
+            setattr(lead, first_name, valor)
+        setattr(lead, last_name, valor)
+        # utm_* e origem/canal legados = last touch (compat Portal)
+        setattr(lead, attr_lead, valor)
+    if atribuicao.fbclid:
+        lead.fbclid = atribuicao.fbclid
+    if atribuicao.gclid:
+        lead.gclid = atribuicao.gclid
 
 
 def registrar_mensagem(
@@ -443,6 +473,8 @@ def ingerir_interesse_catalogo(
     utm_campaign: str | None = None,
     utm_content: str | None = None,
     utm_term: str | None = None,
+    fbclid: str | None = None,
+    gclid: str | None = None,
 ) -> tuple[CatalogAttribution, bool]:
     loja = db.get(Loja, loja_id)
     if loja is None or loja.slug != loja_slug:
@@ -487,6 +519,8 @@ def ingerir_interesse_catalogo(
         utm_campaign=utm_campaign,
         utm_content=utm_content,
         utm_term=utm_term,
+        fbclid=fbclid,
+        gclid=gclid,
         occurred_at=occurred_at,
     )
     db.add(atribuicao)
@@ -571,6 +605,22 @@ def para_saida_lead(lead: Lead) -> dict:
         "utm_campaign": lead.utm_campaign,
         "utm_content": lead.utm_content,
         "utm_term": lead.utm_term,
+        "origem_first": lead.origem_first,
+        "canal_first": lead.canal_first,
+        "utm_source_first": lead.utm_source_first,
+        "utm_medium_first": lead.utm_medium_first,
+        "utm_campaign_first": lead.utm_campaign_first,
+        "utm_content_first": lead.utm_content_first,
+        "utm_term_first": lead.utm_term_first,
+        "origem_last": lead.origem_last or lead.origem,
+        "canal_last": lead.canal_last or lead.canal,
+        "utm_source_last": lead.utm_source_last or lead.utm_source,
+        "utm_medium_last": lead.utm_medium_last or lead.utm_medium,
+        "utm_campaign_last": lead.utm_campaign_last or lead.utm_campaign,
+        "utm_content_last": lead.utm_content_last or lead.utm_content,
+        "utm_term_last": lead.utm_term_last or lead.utm_term,
+        "fbclid": lead.fbclid,
+        "gclid": lead.gclid,
         "veiculo_ref": lead.veiculo_ref,
         "catalog_interest_ref": lead.catalog_interest_ref,
         "atribuida_em": lead.atribuida_em.isoformat() if lead.atribuida_em else None,

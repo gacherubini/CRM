@@ -27,7 +27,8 @@ from app.financeiro_calc import (  # noqa: E402
     metas_view_periodo,
     periodo_padrao,
 )
-from app.models import Usuario  # noqa: E402
+from app.models import Campanha, CampanhaGasto, Usuario  # noqa: E402
+from app.roi_calc import calcular_roi_loja, totais_roi  # noqa: E402
 
 # Importado de app.main (não o contrário): quando este módulo é carregado a
 # partir do include_router no fim de app/main.py, todos estes nomes já
@@ -217,7 +218,7 @@ def relatorios_funil_csv(
         )
     }
     vendedor_filtro = vendedor if vendedor in vendedores_por_email else None
-    funil, _origens = funil_periodo(
+    funil, _origens, _campanhas = funil_periodo(
         chatbot, db, usuario.loja_slug, d_inicio, d_fim, vendedor_filtro, origem, resultado["confirmadas"]
     )
 
@@ -247,4 +248,82 @@ def relatorios_funil_csv(
     ]
 
     nome = f"relatorio-funil_{d_inicio.isoformat()}_{d_fim.isoformat()}.csv"
+    return _csv_response(linhas, nome)
+
+
+@router.get("/app/relatorios/roi.csv")
+def relatorios_roi_csv(
+    request: Request,
+    inicio: str | None = None,
+    fim: str | None = None,
+    touch: str | None = None,
+    db: Session = Depends(get_db),
+    chatbot: ChatbotClient = Depends(get_chatbot_client),
+):
+    from app.auth import pode_gerir_trafego
+
+    usuario = usuario_atual(request, db)
+    if not usuario:
+        return redirecionar_login()
+    if not pode_gerir_trafego(usuario):
+        return RedirectResponse("/app", status_code=303)
+    d_inicio, d_fim = periodo_padrao(inicio, fim)
+    modo = touch if touch in ("first", "last") else "last"
+    campanhas = db.query(Campanha).filter(Campanha.loja_slug == usuario.loja_slug).all()
+    gastos = db.query(CampanhaGasto).filter(CampanhaGasto.loja_slug == usuario.loja_slug).all()
+    resultado = calcular_metricas_vendas(db, usuario.loja_slug, d_inicio, d_fim)
+    try:
+        leads = chatbot.listar_leads()
+    except Exception:
+        leads = []
+    linhas_roi = calcular_roi_loja(
+        campanhas=campanhas,
+        gastos=gastos,
+        leads=leads,
+        vendas_confirmadas=resultado["confirmadas"],
+        d_inicio=d_inicio,
+        d_fim=d_fim,
+        modo_atribuicao=modo,
+    )
+    totais = totais_roi(linhas_roi)
+    linhas: list[list] = [
+        [
+            "campanha",
+            "canal",
+            "utm_campaign",
+            "status",
+            "gasto",
+            "leads",
+            "vendas",
+            "faturamento",
+            "cpl",
+            "cpa",
+            "roas",
+            "touch",
+        ]
+    ]
+    for l in linhas_roi:
+        linhas.append(
+            [
+                l.nome,
+                l.canal,
+                l.utm_campaign,
+                l.status,
+                _num(l.gasto),
+                l.leads,
+                l.vendas,
+                _num(l.faturamento),
+                _num(l.cpl),
+                _num(l.cpa),
+                _num(l.roas),
+                modo,
+            ]
+        )
+    linhas.append([])
+    linhas.append(["totais_gasto", _num(totais["gasto"])])
+    linhas.append(["totais_leads", totais["leads"]])
+    linhas.append(["totais_vendas", totais["vendas"]])
+    linhas.append(["totais_faturamento", _num(totais["faturamento"])])
+    linhas.append(["totais_roas", _num(totais["roas"])])
+    nome = f"relatorio-roi_{d_inicio.isoformat()}_{d_fim.isoformat()}_{modo}.csv"
     return _csv_response(linhas, nome)

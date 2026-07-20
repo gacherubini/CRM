@@ -54,7 +54,9 @@
         {% if usuario.papel in ['dono', 'gerente'] %}
         <a class="nav-link {{ 'active' if path.startswith('/app/financeiro') else '' }}" href="/app/financeiro" {% if path.startswith('/app/financeiro') %}aria-current="page"{% endif %}>Financeiro</a>
         <a class="nav-link {{ 'active' if path.startswith('/app/relatorios') else '' }}" href="/app/relatorios" {% if path.startswith('/app/relatorios') %}aria-current="page"{% endif %}>Relatórios</a>
-        <a class="nav-link {{ 'active' if path.startswith('/app/trafego') else '' }}" href="/app/trafego" {% if path.startswith('/app/trafego') %}aria-current="page"{% endif %}>Tráfego</a>
+        <a class="nav-link {{ 'active' if path.startswith('/app/trafego') and not path.startswith('/app/trafego/roi') else '' }}" href="/app/trafego" {% if path == '/app/trafego' %}aria-current="page"{% endif %}>Tráfego</a>
+        <a class="nav-link {{ 'active' if path.startswith('/app/campanhas') else '' }}" href="/app/campanhas" {% if path.startswith('/app/campanhas') %}aria-current="page"{% endif %}>Campanhas</a>
+        <a class="nav-link {{ 'active' if path.startswith('/app/trafego/roi') else '' }}" href="/app/trafego/roi" {% if path.startswith('/app/trafego/roi') %}aria-current="page"{% endif %}>ROI</a>
         {% endif %}
         {% if usuario.papel == 'vendedor' %}
         <a class="nav-link {{ 'active' if path.startswith('/app/vendedor') else '' }}" href="/app/vendedor" {% if path.startswith('/app/vendedor') %}aria-current="page"{% endif %}>Meu painel</a>

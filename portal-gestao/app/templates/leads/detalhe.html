@@ -21,7 +21,19 @@
 </section>
 
 <section class="panel form-section">
-  <div class="section-title"><span>02</span><div><h2>Consentimento e registro</h2><p>Base legal para tratamento dos dados.</p></div></div>
+  <div class="section-title"><span>02</span><div><h2>Origem / tráfego</h2><p>First touch = primeira UTM; last touch = última (utm_* na API = last).</p></div></div>
+  <dl class="integration-stats">
+    <div><dt>Origem</dt><dd>{% if lead.origem %}{{ lead.origem }}{% else %}<span class="muted">—</span>{% endif %}</dd></div>
+    <div><dt>Canal</dt><dd>{% if lead.canal %}{{ lead.canal }}{% else %}<span class="muted">—</span>{% endif %}</dd></div>
+    <div><dt>First campaign</dt><dd>{% if lead.utm_campaign_first or lead.utm_campaign %}<code>{{ lead.utm_campaign_first or lead.utm_campaign }}</code>{% else %}<span class="muted">—</span>{% endif %}</dd></div>
+    <div><dt>Last campaign</dt><dd>{% if lead.utm_campaign_last or lead.utm_campaign %}<code>{{ lead.utm_campaign_last or lead.utm_campaign }}</code>{% else %}<span class="muted">—</span>{% endif %}</dd></div>
+    <div><dt>utm_source</dt><dd>{% if lead.utm_source %}<code>{{ lead.utm_source }}</code>{% else %}<span class="muted">—</span>{% endif %}</dd></div>
+    <div><dt>fbclid / gclid</dt><dd>{% if lead.fbclid or lead.gclid %}<code>{{ lead.fbclid or '—' }}</code> / <code>{{ lead.gclid or '—' }}</code>{% else %}<span class="muted">—</span>{% endif %}</dd></div>
+  </dl>
+</section>
+
+<section class="panel form-section">
+  <div class="section-title"><span>03</span><div><h2>Consentimento e registro</h2><p>Base legal para tratamento dos dados.</p></div></div>
   <dl class="integration-stats">
     <div><dt>Consentimento</dt><dd>{% if lead.consentimento_em %}<span class="published">Concedido</span> · {{ lead.consentimento_em }}{% else %}<span class="muted">Pendente</span>{% endif %}</dd></div>
     <div><dt>Criado em</dt><dd>{{ lead.criada_em }}</dd></div>

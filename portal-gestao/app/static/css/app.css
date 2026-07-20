@@ -384,6 +384,17 @@ p {
 .page-heading p,
 .dashboard-heading p { margin-bottom: 0; }
 
+.heading-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
+.metric-grid-3 {
+  grid-template-columns: repeat(3, 1fr);
+}
+
 .eyebrow,
 .mono-label {
   display: flex;

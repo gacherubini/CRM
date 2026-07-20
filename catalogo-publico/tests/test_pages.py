@@ -155,6 +155,16 @@ def test_pixel_presente_quando_meta_pixel_id_configurado(client, monkeypatch):
     assert "connect.facebook.net" in csp
 
 
+def test_detalhe_propaga_fbclid_no_cta(client):
+    r = client.get(
+        "/l/moto-center/veiculos/vehicle-1"
+        "?utm_source=meta&utm_campaign=ofertas&fbclid=IwAR0abc"
+    )
+    assert r.status_code == 200
+    assert "fbclid=IwAR0abc" in r.text
+    assert "utm_campaign=ofertas" in r.text
+
+
 def test_detalhe_lead_event_id_no_cta_quando_pixel(client, monkeypatch):
     monkeypatch.setattr(
         "app.main.settings",
@@ -166,6 +176,7 @@ def test_detalhe_lead_event_id_no_cta_quando_pixel(client, monkeypatch):
     assert response.status_code == 200
     assert "data-lead-event-id=" in response.text
     assert "fbq('track', 'Lead'" in response.text
+    assert "ViewContent" in response.text
     assert "event_id=" in response.text
     assert "utm_source=meta" in response.text
 

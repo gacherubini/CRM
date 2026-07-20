@@ -36,7 +36,7 @@ Não há uma única “próxima task” universal — depende do objetivo:
 |---|---|---|---|
 | **A · Demo loja / WA** | Go-live E2E + publicar estoque no catálogo | Operação ou demo com cliente real no Zap | `go-live-chatbot.md` |
 | **B · Multi-banco** | Estabilizar sim com celular + prints; alinhar âncoras se falhar ao vivo | Mais cotações reais estáveis | handoff topo + lições Playwright |
-| **C · CRM dono** | #3B Task 4 (eventos funil) → Task 5 (campanhas) | Funil, origem, metas confiáveis | `#3B` |
+| **C · CRM dono** | Campanhas + ROI (feito) → #3B Task 4 funil eventos | Funil, origem, metas, tráfego pago | `#3B` + [trafego pago](plans/2026-07-20-plano-trafego-pago-crm-campanhas-roi.md) + [guia loja](trafego-pago-loja.md) |
 | **D · Escala Motor** | Smoke live sessão quente + teto 2; object storage se multi-volume | Estabilidade multi-banco / IP | B+D + warm-batch2 |
 | **E · Dia a dia loja** | E1 áudio, E6 fotos (após ou em paralelo leve a A) | Uso diário sem depender de banco novo | `#6` |
 | **F · Marketing** | Completar landing Tailwind se o dono entregar HTML | Site/hero polish | `site/` + `site2037` |

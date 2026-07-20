@@ -58,7 +58,7 @@ class InterestStore:
                 """
             )
             columns = {row[1] for row in db.execute("PRAGMA table_info(interest_events)")}
-            for name in ("event_id", "public_ref", "utm_content", "utm_term"):
+            for name in ("event_id", "public_ref", "utm_content", "utm_term", "fbclid", "gclid"):
                 if name not in columns:
                     db.execute(f"ALTER TABLE interest_events ADD COLUMN {name} TEXT")
             legacy = db.execute(
@@ -121,6 +121,8 @@ class InterestStore:
         utm_campaign: str = "",
         utm_content: str = "",
         utm_term: str = "",
+        fbclid: str = "",
+        gclid: str = "",
         event_id: str | None = None,
     ) -> InterestRecord:
         # Aceita event_id do browser (Lead Pixel) para dedupe Meta; senão gera novo.
@@ -142,14 +144,17 @@ class InterestStore:
             "utm_campaign": utm_campaign or None,
             "utm_content": utm_content or None,
             "utm_term": utm_term or None,
+            "fbclid": fbclid or None,
+            "gclid": gclid or None,
         }
         with self._connect() as db:
             db.execute(
                 """
                 INSERT INTO interest_events (
                     id, event_id, public_ref, loja_slug, veiculo_id, ocorrido_em, origem,
-                    utm_source, utm_medium, utm_campaign, utm_content, utm_term, visitante_id
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    utm_source, utm_medium, utm_campaign, utm_content, utm_term,
+                    fbclid, gclid, visitante_id
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     interest_id,
@@ -164,6 +169,8 @@ class InterestStore:
                     utm_campaign or None,
                     utm_content or None,
                     utm_term or None,
+                    fbclid or None,
+                    gclid or None,
                     visitante_id,
                 ),
             )

@@ -73,6 +73,8 @@ class CatalogInterestInput(BaseModel):
     utm_campaign: Optional[str] = Field(default=None, max_length=120)
     utm_content: Optional[str] = Field(default=None, max_length=120)
     utm_term: Optional[str] = Field(default=None, max_length=120)
+    fbclid: Optional[str] = Field(default=None, max_length=255)
+    gclid: Optional[str] = Field(default=None, max_length=255)
 
     @field_validator("occurred_at")
     @classmethod
@@ -265,6 +267,8 @@ def ingerir_interesse_catalogo(
         utm_campaign=dados.utm_campaign,
         utm_content=dados.utm_content,
         utm_term=dados.utm_term,
+        fbclid=dados.fbclid,
+        gclid=dados.gclid,
     )
     return {"duplicado": duplicado, "atribuicao_id": atribuicao.id}
 

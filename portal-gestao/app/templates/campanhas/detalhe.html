@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block title %}{{ campanha.nome }} — Campanhas{% endblock %}
+{% block content %}
+<div class="page-heading">
+  <div>
+    <a class="back-link" href="/app/campanhas">← Voltar às campanhas</a>
+    <h1>{{ campanha.nome }}</h1>
+    <p>{{ canais.get(campanha.canal, campanha.canal) }} · <code>{{ campanha.utm_campaign }}</code></p>
+  </div>
+  <div class="heading-actions">
+    <a class="button secondary" href="/app/campanhas/{{ campanha.id }}/editar">Editar</a>
+    <a class="button primary" href="/app/trafego/roi?touch=last">Ver no ROI</a>
+  </div>
+</div>
+
+{% if request.query_params.get('ok') == 'gasto' %}<div class="alert success">Gasto lançado.</div>{% endif %}
+{% if erro %}<div class="alert error">{{ erro }}</div>{% endif %}
+
+<section class="panel" style="margin-bottom: 18px;">
+  <div class="metric-grid metric-grid-3">
+    <div class="metric"><span>Status</span><strong>{{ status_rotulo.get(campanha.status, campanha.status) }}</strong><small>campanha no CRM</small></div>
+    <div class="metric"><span>Gasto total</span><strong>{{ formatar_brl(gasto_total) }}</strong><small>todos os lançamentos</small></div>
+    <div class="metric accent"><span>utm_campaign</span><strong style="font-size:16px">{{ campanha.utm_campaign }}</strong><small>chave de match com leads</small></div>
+  </div>
+</section>
+
+<section class="panel form-section" style="margin-bottom: 18px;">
+  <div class="section-title"><span>01</span><div><h2>Lançar gasto</h2><p>Copie o valor do Ads Manager (Meta/Google) e registre aqui.</p></div></div>
+  <form method="post" action="/app/campanhas/{{ campanha.id }}/gastos" class="form-grid">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <label>Valor (R$)
+      <input type="text" name="valor" required placeholder="Ex.: 800,00" inputmode="decimal">
+    </label>
+    <label>Data de referência
+      <input type="date" name="referencia" value="{{ hoje }}" required>
+    </label>
+    <label>Nota
+      <input type="text" name="nota" maxlength="240" placeholder="Ex.: semana 2 Ads Manager">
+    </label>
+    <div style="display:flex;align-items:end">
+      <button class="button primary" type="submit">Adicionar gasto</button>
+    </div>
+  </form>
+</section>
+
+<section class="panel flush">
+  <div class="panel-heading"><div><span class="mono-label">HISTÓRICO</span><h2>Gastos lançados</h2></div></div>
+  {% if gastos %}
+  <div class="table-wrap"><table>
+    <thead><tr><th>Data</th><th>Valor</th><th>Nota</th><th>Por</th></tr></thead>
+    <tbody>
+      {% for g in gastos %}
+      <tr>
+        <td>{{ g.referencia.strftime('%d/%m/%Y') }}</td>
+        <td><strong>{{ formatar_brl(g.valor) }}</strong></td>
+        <td>{{ g.nota or '—' }}</td>
+        <td class="muted">{{ g.criada_por }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table></div>
+  {% else %}
+  <div class="empty"><strong>Nenhum gasto lançado.</strong><p>Sem custo, o ROI mostra leads/vendas mas CPL/CPA/ROAS ficam em “—”.</p></div>
+  {% endif %}
+</section>
+{% endblock %}

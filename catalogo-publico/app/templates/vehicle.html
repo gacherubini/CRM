@@ -30,17 +30,30 @@
 </article>
 {% endblock %}
 {% block scripts %}
-{% if meta_pixel_enabled and lead_event_id %}
+{% if meta_pixel_enabled %}
 <script>
   (function () {
+    if (typeof fbq !== 'function') return;
+    try {
+      var payload = {
+        content_ids: ['{{ veiculo.id }}'],
+        content_type: 'product',
+        content_name: '{{ veiculo.marca }} {{ veiculo.modelo }}'.trim(),
+        currency: 'BRL'
+      };
+      {% if veiculo.preco is defined and veiculo.preco is not none %}
+      payload.value = {{ veiculo.preco }};
+      {% endif %}
+      fbq('track', 'ViewContent', payload);
+    } catch (e) { /* best-effort */ }
     var cta = document.getElementById('cta-whatsapp');
-    if (!cta || typeof fbq !== 'function') return;
+    if (!cta) return;
     cta.addEventListener('click', function () {
       var eventId = cta.getAttribute('data-lead-event-id');
       if (!eventId) return;
       try {
         fbq('track', 'Lead', {}, { eventID: eventId });
-      } catch (e) { /* best-effort */ }
+      } catch (e2) { /* best-effort */ }
     });
   })();
 </script>
