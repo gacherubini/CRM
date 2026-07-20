@@ -831,11 +831,19 @@ class BradescoDriver(PlaywrightBankDriver):
             pass
 
     def _passo_aguardar_ofertas(self, page) -> None:
-        """Espera os botoes de prazo ("Nx de R$") aparecerem de fato."""
-        timeout = max(self.timeout_ms, 60_000)
+        """Espera os botoes de prazo ("Nx de R$") aparecerem de fato.
+
+        O Bradesco mostra "Analisando dados..." (analise de credito SCR/Bacen)
+        que costuma passar dos 90s do browser; por isso a espera aqui e maior
+        (config.OFERTAS_TIMEOUT_MS). Enquanto o spinner de analise aparece, o
+        portal esta saudavel — nao e falha.
+        """
+        timeout = max(self.timeout_ms, config.OFERTAS_TIMEOUT_MS)
         prazo_fim = time.monotonic() + (timeout / 1000.0)
         cards = re.compile(r"\d+\s*x\s*de\s*R\$", re.I)
+        analisando_re = re.compile(r"Analisando dados|Aguarde|processando", re.I)
         estavel = 0
+        analisando_visto = False
         while time.monotonic() < prazo_fim:
             if page.get_by_text(
                 re.compile(r"Ocorreu um erro|indispon[ií]vel|falha", re.I)
@@ -850,8 +858,19 @@ class BradescoDriver(PlaywrightBankDriver):
                     return
             else:
                 estavel = 0
+                try:
+                    if page.get_by_text(analisando_re).count() > 0:
+                        analisando_visto = True
+                except Exception:
+                    pass
             page.wait_for_timeout(500)
         self._assert_portal_acessivel(page)
+        # Distingue "banco so demorou na analise" de "fluxo quebrou de fato".
+        if analisando_visto:
+            raise ErroTransitorio(
+                "ofertas_demoraram",
+                "Portal seguiu 'Analisando dados' apos o tempo maximo; SCR/Bacen lento.",
+            )
         raise ErroTransitorio(
             "portal_falhou", "botoes de prazo nao carregaram a tempo"
         )

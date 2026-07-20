@@ -300,6 +300,48 @@ def test_selecionar_uf_escolhe_opcao_por_role():
     assert "option" in roles
 
 
+def _page_ofertas(cards=0, erro=0, analisando=0):
+    """MagicMock de page cujo get_by_text().count() varia por padrao buscado."""
+    page = MagicMock()
+
+    def by_text(rx):
+        m = MagicMock()
+        pat = getattr(rx, "pattern", str(rx))
+        if "Ocorreu um erro" in pat:
+            m.count.return_value = erro
+        elif "R\\$" in pat:
+            m.count.return_value = cards
+        elif "Analisando" in pat:
+            m.count.return_value = analisando
+        else:
+            m.count.return_value = 0
+        return m
+
+    page.get_by_text.side_effect = by_text
+    return page
+
+
+def test_aguardar_ofertas_retorna_quando_cards_aparecem(monkeypatch):
+    from app import config as C
+
+    monkeypatch.setattr(C, "OFERTAS_TIMEOUT_MS", 5_000)
+    driver = BradescoDriver(timeout_ms=100)
+    # Cards de prazo presentes -> retorna sem levantar.
+    driver._passo_aguardar_ofertas(_page_ofertas(cards=1))
+
+
+def test_aguardar_ofertas_analisando_vira_codigo_claro(monkeypatch):
+    """'Analisando dados...' ate o fim -> ErroTransitorio(ofertas_demoraram),
+    nao o generico portal_falhou (banco so demorou na analise SCR)."""
+    from app import config as C
+
+    monkeypatch.setattr(C, "OFERTAS_TIMEOUT_MS", 30)
+    driver = BradescoDriver(timeout_ms=1)
+    with pytest.raises(ErroTransitorio) as ei:
+        driver._passo_aguardar_ofertas(_page_ofertas(cards=0, analisando=1))
+    assert ei.value.codigo == "ofertas_demoraram"
+
+
 def test_login_reutiliza_sessao_autenticada_apos_timeout_networkidle():
     driver = BradescoDriver(timeout_ms=20_000)
     page = MagicMock()

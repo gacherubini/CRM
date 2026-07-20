@@ -29,6 +29,11 @@ PRAZOS_PADRAO = PRAZOS_PADRAO_MESES  # alias Task 12
 SCREENSHOT_DIR = os.getenv("MOTOR_SCREENSHOT_DIR", "data/screenshots")
 STORAGE_STATE_DIR = os.getenv("MOTOR_STORAGE_STATE_DIR", "data/storage_state")
 BROWSER_TIMEOUT_MS = int(os.getenv("MOTOR_BROWSER_TIMEOUT_MS", "90000"))
+# Espera das ofertas/parcelas apos enviar a simulacao. O Bradesco faz analise de
+# credito (SCR/Bacen — tela "Analisando dados...") que passa dos 90s do browser.
+# Folga sob o deadline do driver (MOTOR_DRIVER_TIMEOUT_SECONDS): 240s + ~75s de
+# setup/form ≈ 315s < 420s. Sim d2df1d4e desistia em 90s no meio da analise.
+OFERTAS_TIMEOUT_MS = int(os.getenv("MOTOR_OFERTAS_TIMEOUT_MS", "240000"))
 # Warm session (decisão B+D / plano 2026-07-17): reutiliza cookies/storage_state.
 # Path canônico: {STORAGE_STATE_DIR}/{cliente_id}/{provedor}.json
 WARM_SESSION = (os.getenv("MOTOR_WARM_SESSION") or "1").strip().lower() in (
