@@ -7,6 +7,7 @@ import pytest
 from app.motor.base import Condicoes, Pessoa, SolicitacaoSimulacao, Veiculo
 from app.motor.drivers import (
     DriverContext,
+    ErroTransitorio,
     IntervencaoNecessaria,
     RejeicaoNegocio,
     resolver_drivers,
@@ -244,6 +245,59 @@ def test_selecionar_versao_veiculo_sem_modal_nao_quebra():
     driver._selecionar_versao_veiculo(page)
 
     page.get_by_role.assert_not_called()
+
+
+def test_clicar_avancar_desabilitado_erra_rapido():
+    """Botao 'Avancar' que nao habilita -> ErroTransitorio(form_incompleto),
+    SEM clicar no botao desabilitado (antes travava ~90s no click)."""
+    driver = BradescoDriver(timeout_ms=20_000)
+    page = MagicMock()
+    page.wait_for_function.side_effect = RuntimeError("nao habilitou")
+
+    with pytest.raises(ErroTransitorio) as ei:
+        driver._clicar_avancar(page)
+    assert ei.value.codigo == "form_incompleto"
+    # Nunca clica no botao desabilitado.
+    page.get_by_role.return_value.first.click.assert_not_called()
+
+
+def test_clicar_avancar_habilitado_clica():
+    driver = BradescoDriver(timeout_ms=20_000)
+    page = MagicMock()
+    page.wait_for_function.return_value = None  # habilitou
+
+    driver._clicar_avancar(page)
+
+    page.get_by_role.return_value.first.click.assert_called_once()
+
+
+def test_preencher_placa_confirma_valor():
+    """Le o valor de volta: se a placa entrou, retorna True."""
+    driver = BradescoDriver(timeout_ms=20_000)
+    page = MagicMock()
+    page.get_by_role.return_value.first.input_value.return_value = "FUV7G58"
+
+    assert driver._preencher_placa(page, "FUV7G58") is True
+
+
+def test_preencher_placa_vazia_retorna_false():
+    """Se o campo ficou vazio (type nao pegou), retorna False apos os retries."""
+    driver = BradescoDriver(timeout_ms=20_000)
+    page = MagicMock()
+    page.get_by_role.return_value.first.input_value.return_value = ""
+
+    assert driver._preencher_placa(page, "FUV7G58") is False
+
+
+def test_selecionar_uf_escolhe_opcao_por_role():
+    """UF via role=option (mais estavel que casar texto solto)."""
+    driver = BradescoDriver(timeout_ms=20_000)
+    page = MagicMock()
+
+    driver._selecionar_uf(page, "SP")
+
+    roles = [c.args[0] for c in page.get_by_role.call_args_list if c.args]
+    assert "option" in roles
 
 
 def test_login_reutiliza_sessao_autenticada_apos_timeout_networkidle():

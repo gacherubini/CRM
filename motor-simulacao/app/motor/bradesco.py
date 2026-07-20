@@ -268,6 +268,13 @@ class BradescoDriver(PlaywrightBankDriver):
                 )
                 self._passo_pessoa(page, sol)
                 self._passo_veiculo(page, sol)
+                self._evento(
+                    ctx,
+                    "veiculo_preenchido",
+                    "UF, placa e veiculo preenchidos.",
+                    page,
+                    True,
+                )
                 self._passo_valores(page, sol)
                 self._evento(
                     ctx,
@@ -630,38 +637,82 @@ class BradescoDriver(PlaywrightBankDriver):
             pass
 
     def _passo_veiculo(self, page, sol: SolicitacaoSimulacao) -> None:
-        # UF do licenciamento (mat-select). Default SP se nao informado.
+        # UF do licenciamento (mat-select, obrigatoria). Default SP se nao informado.
         uf = (sol.veiculo.uf_licenciamento or "SP").strip().upper()
-        try:
-            page.locator(".mat-select-placeholder, mat-select").first.click(
-                timeout=min(self.timeout_ms, 10_000)
-            )
-            page.get_by_text(re.compile(rf"^\s*{re.escape(uf)}\s*$", re.I)).first.click(
-                timeout=min(self.timeout_ms, 8_000)
-            )
-        except Exception:
-            pass
+        self._selecionar_uf(page, uf)
         # Placa (opcional no portal, mas usamos quando disponivel para resolver
         # o veiculo). Se ausente, o portal exige selecao manual do modelo.
         placa = (sol.veiculo.placa or "").replace("-", "").upper()
         if placa:
-            try:
-                placa_box = page.get_by_role(
-                    "textbox", name=re.compile(r"Placa", re.I)
-                ).first
-                placa_box.wait_for(state="visible", timeout=min(self.timeout_ms, 10_000))
-                placa_box.click()
-                placa_box.fill("")
-                placa_box.type(placa, delay=40)
-                page.keyboard.press("Tab")
-                page.wait_for_timeout(1_200)
-            except Exception:
-                pass
+            self._preencher_placa(page, placa)
         # Modal "Foram encontradas diferentes versoes para a placa": seleciona a
         # PRIMEIRA versao e confirma (regra do dono). So aparece quando a placa
         # casa varias versoes; e best-effort.
         self._selecionar_versao_veiculo(page)
         self._clicar_confirmar(page)
+
+    def _selecionar_uf(self, page, uf: str) -> None:
+        """Seleciona a UF no mat-select (obrigatoria). Rola ate o campo, abre o
+        painel e clica a opcao pelo papel acessivel (role=option) — mais estavel
+        que casar texto solto na pagina. Best-effort com retry; a validacao de
+        que o form ficou completo fica em _clicar_avancar.
+
+        No Fly (Chromium headed/Xvfb) o clique simples falhava em silencio e o
+        campo obrigatorio ficava vazio -> botao Avancar travava (sim 1da6284b).
+        """
+        for _ in range(2):
+            try:
+                select = page.locator(".mat-select-placeholder, mat-select").first
+                try:
+                    select.scroll_into_view_if_needed(
+                        timeout=min(self.timeout_ms, 5_000)
+                    )
+                except Exception:
+                    pass
+                select.click(timeout=min(self.timeout_ms, 8_000))
+                opcao = page.get_by_role(
+                    "option", name=re.compile(rf"^\s*{re.escape(uf)}\s*$", re.I)
+                ).first
+                opcao.wait_for(state="visible", timeout=min(self.timeout_ms, 8_000))
+                opcao.click(timeout=min(self.timeout_ms, 6_000))
+                page.wait_for_timeout(300)
+                return
+            except Exception:
+                # Fecha painel eventualmente aberto e tenta de novo.
+                try:
+                    page.keyboard.press("Escape")
+                except Exception:
+                    pass
+                page.wait_for_timeout(300)
+
+    def _preencher_placa(self, page, placa: str) -> bool:
+        """Digita a placa e CONFIRMA que o valor entrou (le de volta), com retry.
+        Retorna True se o campo ficou com a placa. No Fly o type as vezes nao
+        pegava e a placa ficava vazia (modelo nao resolvia)."""
+        for _ in range(2):
+            try:
+                placa_box = page.get_by_role(
+                    "textbox", name=re.compile(r"Placa", re.I)
+                ).first
+                placa_box.wait_for(state="visible", timeout=min(self.timeout_ms, 10_000))
+                try:
+                    placa_box.scroll_into_view_if_needed(
+                        timeout=min(self.timeout_ms, 5_000)
+                    )
+                except Exception:
+                    pass
+                placa_box.click()
+                placa_box.fill("")
+                placa_box.type(placa, delay=40)
+                page.keyboard.press("Tab")
+                page.wait_for_timeout(1_200)
+                atual = re.sub(r"\W", "", (placa_box.input_value() or "")).upper()
+                if atual and placa in atual:
+                    return True
+            except Exception:
+                pass
+            page.wait_for_timeout(300)
+        return False
 
     def _selecionar_versao_veiculo(self, page) -> None:
         """No modal de versoes da placa, marca a primeira opcao (radio)."""
@@ -742,6 +793,7 @@ class BradescoDriver(PlaywrightBankDriver):
     def _clicar_avancar(self, page) -> None:
         btn = page.get_by_role("button", name=re.compile(r"^Avan[çc]ar$", re.I)).first
         btn.wait_for(state="visible", timeout=self.timeout_ms)
+        habilitado = False
         try:
             page.wait_for_function(
                 """() => {
@@ -749,10 +801,21 @@ class BradescoDriver(PlaywrightBankDriver):
                   const b = bs.find(x => /^\\s*Avan[çc]ar\\s*$/i.test(x.textContent || ''));
                   return b && !b.disabled;
                 }""",
-                timeout=min(self.timeout_ms, 12_000),
+                timeout=min(self.timeout_ms, 25_000),
             )
+            habilitado = True
         except Exception:
-            pass
+            habilitado = False
+        if not habilitado:
+            # Botao segue desabilitado = campo obrigatorio nao preenchido (ex.: UF/
+            # placa/modelo na tela de veiculo). Falha RAPIDO com codigo claro: antes
+            # o btn.click() esperava ~90s o botao habilitar e estourava TimeoutError
+            # generico (sim 1da6284b travava 150s). O handler captura screenshot.
+            raise ErroTransitorio(
+                "form_incompleto",
+                "Botao 'Avancar' segue desabilitado apos preencher os campos; "
+                "provavel campo obrigatorio vazio (UF/placa/modelo do veiculo).",
+            )
         btn.click()
         self._aguardar_dom_pronto(page, 10_000)
 
