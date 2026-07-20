@@ -48,6 +48,20 @@ def _registrar_evento_sim(
     )
 
 
+def _rewake_stale(slot: WorkerSlotORM) -> bool:
+    """True se o slot pode ser re-acordado como recuperação.
+
+    Sem start registrado → pode acordar. Com start recente (< janela) → não,
+    para não interromper um worker que ainda está subindo/reservando.
+    """
+    ultimo = slot.ultimo_start_em
+    if ultimo is None:
+        return True
+    if ultimo.tzinfo is None:  # SQLite pode devolver naive
+        ultimo = ultimo.replace(tzinfo=timezone.utc)
+    return (_agora() - ultimo).total_seconds() >= config.WORKER_REWAKE_SECONDS
+
+
 def slots_para_provedor(db: Session, provedor: str) -> list[WorkerSlotORM]:
     return (
         db.query(WorkerSlotORM)
@@ -71,7 +85,14 @@ def acordar_workers(
     Retorna contadores: acordados, falhas, sem_slot, ignorados.
     Sem ``FLY_AUTOSCALE_ENABLED`` ou sem fan-out: no-op.
     """
-    resultado = {"acordados": 0, "falhas": 0, "sem_slot": 0, "ignorados": 0}
+    resultado = {
+        "acordados": 0,
+        "falhas": 0,
+        "sem_slot": 0,
+        "ignorados": 0,
+        # Tarefas já acordadas há pouco, aguardando o worker reservar (não re-acorda).
+        "aguardando": 0,
+    }
     if not config.FANOUT_ENABLED or not config.FLY_AUTOSCALE_ENABLED:
         return resultado
 
@@ -126,11 +147,18 @@ def acordar_workers(
         if slot.fly_machine_id not in allow:
             resultado["falhas"] += 1
             continue
-        for t in lista:
-            if t.status == "recebida":
-                t.status = "acordando_worker"
-                t.atualizada_em = _agora()
-                t.worker_slot_id = slot.id
+        # Só (re)acorda quando há tarefa nova (``recebida``) OU o start anterior é
+        # antigo o bastante para ser recuperação. Tarefas ainda ``acordando_worker``
+        # com start recente seguem em voo aguardando o worker reservar — re-acordar
+        # a cada tick só gera spam de start/eventos (bug sim 1da6284b).
+        novas = [t for t in lista if t.status == "recebida"]
+        if not novas and not _rewake_stale(slot):
+            resultado["aguardando"] += len(lista)
+            continue
+        for t in novas:
+            t.status = "acordando_worker"
+            t.atualizada_em = _agora()
+            t.worker_slot_id = slot.id
         _registrar_evento_sim(
             db,
             lista[0].simulacao_id,

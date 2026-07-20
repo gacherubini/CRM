@@ -128,6 +128,70 @@ def test_acordar_workers_inicia_slot_playwright(db, monkeypatch):
     assert t_sant.worker_slot_id == slot.id
 
 
+def test_acordar_nao_reacorda_worker_ja_acordado(db, monkeypatch):
+    """Regressão: tick seguinte não deve re-acordar (start + eventos) um worker
+    cuja tarefa segue em ``acordando_worker`` aguardando o worker reservar.
+
+    Bug observado em produção (sim 1da6284b): 40x worker_acordando/worker_pronto
+    porque STATUS_PENDENTES inclui acordando_worker e o wake era incondicional.
+    """
+    from app.models_db import SimulacaoEventoORM
+
+    monkeypatch.setattr(config, "FANOUT_ENABLED", True)
+    monkeypatch.setattr(config, "FLY_AUTOSCALE_ENABLED", True)
+    monkeypatch.setattr(config, "MAX_BROWSER_WORKERS", 2)
+    upsert_slot(db, provedor="bradesco", fly_machine_id="m-bra", tipo_driver="playwright")
+    sim, _ = servico.criar_simulacao(db, _sol(["bradesco"]), "c1")
+
+    fake = FakeLifecycle()
+    res1 = acordar_workers(db, simulacao_id=sim.id, lifecycle=fake)
+    assert res1["acordados"] == 1
+    assert fake.started == ["m-bra"]
+    t = db.query(SimulacaoProvedorORM).filter_by(simulacao_id=sim.id).one()
+    assert t.status == "acordando_worker"
+
+    def _n_acordando():
+        return (
+            db.query(SimulacaoEventoORM)
+            .filter_by(simulacao_id=sim.id, etapa="worker_acordando")
+            .count()
+        )
+
+    n_antes = _n_acordando()
+    # Segundo tick imediato: worker ainda não reservou; NÃO deve re-acordar.
+    res2 = acordar_workers(db, simulacao_id=sim.id, lifecycle=fake)
+    assert res2["acordados"] == 0
+    assert res2["aguardando"] == 1
+    assert fake.started == ["m-bra"]  # start não foi chamado de novo
+    assert _n_acordando() == n_antes  # nenhum evento novo (sem spam)
+
+
+def test_acordar_reacorda_apos_janela_stale(db, monkeypatch):
+    """Recuperação: se o start antigo não pegou (worker dormiu cedo), re-acorda
+    depois de ``WORKER_REWAKE_SECONDS``."""
+    from datetime import datetime, timedelta, timezone
+
+    monkeypatch.setattr(config, "FANOUT_ENABLED", True)
+    monkeypatch.setattr(config, "FLY_AUTOSCALE_ENABLED", True)
+    monkeypatch.setattr(config, "MAX_BROWSER_WORKERS", 2)
+    monkeypatch.setattr(config, "WORKER_REWAKE_SECONDS", 90)
+    slot = upsert_slot(
+        db, provedor="bradesco", fly_machine_id="m-bra", tipo_driver="playwright"
+    )
+    sim, _ = servico.criar_simulacao(db, _sol(["bradesco"]), "c1")
+
+    fake = FakeLifecycle()
+    acordar_workers(db, simulacao_id=sim.id, lifecycle=fake)
+    assert fake.started == ["m-bra"]
+
+    # Envelhece o último start além da janela → re-acorda (recuperação).
+    slot.ultimo_start_em = datetime.now(timezone.utc) - timedelta(seconds=120)
+    db.commit()
+    res = acordar_workers(db, simulacao_id=sim.id, lifecycle=fake)
+    assert res["acordados"] == 1
+    assert fake.started == ["m-bra", "m-bra"]
+
+
 def test_acordar_sem_flag_eh_noop(db, monkeypatch):
     monkeypatch.setattr(config, "FANOUT_ENABLED", True)
     monkeypatch.setattr(config, "FLY_AUTOSCALE_ENABLED", False)

@@ -91,6 +91,12 @@ else:
 # Mantém alias sincronizado para código/docs que leem BROWSER_CONCURRENCY.
 BROWSER_CONCURRENCY = MAX_BROWSER_WORKERS
 WORKER_IDLE_STOP_SECONDS = int(os.getenv("MOTOR_WORKER_IDLE_STOP_SECONDS", "60"))
+# Janela mínima entre re-starts do mesmo slot enquanto a tarefa segue em
+# ``acordando_worker`` (worker ainda não reservou). Abaixo dela o orquestrador
+# NÃO re-acorda — evita spam de start/eventos a cada tick (bug sim 1da6284b).
+# Acima dela, re-acorda como recuperação (start antigo não pegou / worker dormiu).
+# Folga sobre idle_stop (60s) + boot para não interromper worker legítimo.
+WORKER_REWAKE_SECONDS = int(os.getenv("MOTOR_WORKER_REWAKE_SECONDS", "90"))
 WORKER_PROVEDOR = (os.getenv("MOTOR_WORKER_PROVEDOR") or "").strip().lower() or None
 WORKER_SLOT_ID = (os.getenv("MOTOR_WORKER_SLOT_ID") or "").strip() or None
 # Worker sob demanda: após idle grace encerra com exit 0 (Machine para com restart on-failure).
