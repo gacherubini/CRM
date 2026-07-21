@@ -8,8 +8,9 @@
 > futuras — cada item é um esboço de abordagem, não uma sequência de tarefas TDD. Quando um item
 > for priorizado, ele vira um plano completo próprio (via a skill de escrita de planos).
 >
-> **Status 2026-07-20:** **E3**, **E5**, **E8** (MVP ROI), **E10** entregues.
-> Ativos: **E1**, **E6**, **E11–E12**, **E13–E18** (esboço).  
+> **Status 2026-07-21:** **E1 áudio backend/workflow**, **E3**, **E5**, **E8** (MVP ROI) e **E10** entregues.
+> **E6 mídia/WhatsApp parcial:** galeria segura e envio direto prontos; upload binário e página de detalhe seguem abertos.
+> Ativos: residual operacional de **E1/E6**, **E11–E12**, **E13–E18** (esboço).
 > **Fora do core:** **E9** redes. **Adiados:** **E2**, **E4**, **E7**.  
 > Backlog C1–C12: confirmação **encerrada** (aprovados→E13–E18; rejeitados no fim).
 
@@ -22,12 +23,12 @@ evento, não acesso direto a bancos de dados vizinhos.
 
 | Evolução | Status no roadmap | Produto proprietário |
 |---|---|---|
-| **E1** Áudio/multimodal | Ativo | Chatbot |
+| **E1** Áudio/multimodal | **Áudio backend feito; provider real pendente** | Chatbot |
 | **E2** Score de crédito | **Adiado** (bureau + LGPD) | Motor (+ Portal UI) |
 | **E3** Auto-pausa atendente | **Feito** | Chatbot |
 | **E4** Multi-agente | **Adiado** (só com ≥3 fluxos) | Chatbot / n8n |
 | **E5** Cadastro veículo WA | **Feito** (fase 1 texto) | Chatbot → Estoque |
-| **E6** Fotos / galeria | Ativo | Estoque + Catálogo |
+| **E6** Fotos / galeria | **Parcial: galeria+WhatsApp feitos; upload/detalhe abertos** | Estoque + Catálogo |
 | **E7** Analytics avançado | **Adiado** (precisa volume) | Portal |
 | **E8** Atribuição / ROI campanhas | **Feito (MVP 2026-07-20)** | Portal |
 | **E9** Redes sociais | **Fora do core** (não planejar) | — |
@@ -44,6 +45,10 @@ evento, não acesso direto a bancos de dados vizinhos.
 ---
 
 ## E1 — Áudio / multimodal (transcrição)
+
+> **Status 2026-07-21:** ramo de áudio, download autenticado na Evolution, limites, arquivo
+> temporário, contrato de transcrição HTTP e fallback seguro implementados. Falta somente escolher
+> e homologar o provider real; entendimento de imagem/documento permanece fora desta entrega.
 
 **O que é:** cliente manda **áudio** (ou imagem) no WhatsApp e o bot entende.
 
@@ -212,6 +217,11 @@ os clientes da suíte.
 
 ## E6 — Upload real de fotos + página de detalhe do veículo
 
+> **Status parcial 2026-07-21:** Estoque já possui galeria ordenada, capa única, MIME/tamanho,
+> URL pública ou `storage_key`, validação de host e migration `0006`. O Chatbot resolve a mídia por
+> loja+ID e o n8n envia a foto no próprio WhatsApp pela Evolution, sem URL escolhida pelo modelo.
+> Permanecem abertos o upload do binário para um provedor escolhido e a página de detalhe da vitrine.
+
 **O que é:** hoje `foto_url` é um link manual. Evoluir para **upload** de fotos (portal e/ou
 WhatsApp) e uma página de detalhe na vitrine (`/l/{loja_id}/v/{id}`) com galeria.
 
@@ -251,8 +261,8 @@ o Portal guarda referência/projeção, não copia payload pessoal bancário.
 > **Status: FEITA (2026-07-20) — MVP.** Plano
 > [tráfego pago](2026-07-20-plano-trafego-pago-crm-campanhas-roi.md) + commit `8e7ec5f`.  
 > UI `/app/campanhas` + `/app/trafego/roi` (CPL/CPA/ROAS). CSV/lote, match/retry CAPI e leitura
-> executiva de resultados, backend de eventos do funil e event bus foram concluídos em 2026-07-21;
-> residual: UI do funil e Google.
+> executiva de resultados, funil completo backend+UI e event bus foram concluídos em 2026-07-21;
+> residual: Google.
 
 **O que é:** evoluir campanhas do Plano #3B para importar custos e comparar origem, lead, venda e
 lucro bruto por canal, mantendo `first_touch` e `last_touch` explícitos.
@@ -801,10 +811,10 @@ continua resolvendo o catálogo correto.
 | — | **E5** cadastro WhatsApp fase 1 | **Feito** (foto = E6) |
 | — | **E10** Pixel Meta MVP | **Feito** |
 | 1 | Go-live WhatsApp E2E | Ops (`docs/go-live-chatbot.md`) — base para E11 |
-| 2 | #3B Task 4–5 (funil + campanhas metadados) | Portal — base para E8/E11/E12 |
-| 3 | **E1** áudio | Aberto (uso diário do bot) |
-| 4 | **E6** upload fotos | Aberto (vitrine + E5 foto) |
-| 5 | **E8** atribuição / ROI | Aberto (após Task 5 + volume) |
+| — | #3B Task 4–5 (funil + campanhas metadados) | **Feito** |
+| — | **E1** áudio backend/workflow | **Feito**; configurar/homologar provider real |
+| — | **E6** galeria + envio de foto no WhatsApp | **Feito parcial**; upload binário/detalhe abertos |
+| — | **E8** atribuição / ROI | **Feito (MVP)** |
 | 6 | **E13** notificação interna lead/handoff | **Aprovado** (esboço); priorizar cedo pós go-live |
 | 7 | **E14** reserva / status veículo | **Aprovado** (esboço); Estoque + Catálogo |
 | 8 | **E15** proposta / PDF simulação | **Aprovado** (esboço) |

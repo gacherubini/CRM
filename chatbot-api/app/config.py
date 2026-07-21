@@ -29,6 +29,23 @@ WEBHOOK_RATE_LIMIT_MAX_BUCKETS = int(
     os.getenv("CHATBOT_WEBHOOK_RATE_LIMIT_MAX_BUCKETS", "10000")
 )
 
+# Áudio recebido: download autenticado na Evolution e transcrição opcional.
+AUDIO_EVOLUTION_URL = os.getenv("CHATBOT_AUDIO_EVOLUTION_URL", "")
+AUDIO_EVOLUTION_API_KEY = os.getenv("CHATBOT_AUDIO_EVOLUTION_API_KEY", "")
+AUDIO_TRANSCRIPTION_PROVIDER = os.getenv("CHATBOT_AUDIO_TRANSCRIPTION_PROVIDER", "none")
+AUDIO_TRANSCRIPTION_URL = os.getenv("CHATBOT_AUDIO_TRANSCRIPTION_URL", "")
+AUDIO_TRANSCRIPTION_TOKEN = os.getenv("CHATBOT_AUDIO_TRANSCRIPTION_TOKEN", "")
+AUDIO_MAX_BYTES = int(os.getenv("CHATBOT_AUDIO_MAX_BYTES", str(8 * 1024 * 1024)))
+AUDIO_MAX_DURATION_SECONDS = int(os.getenv("CHATBOT_AUDIO_MAX_DURATION_SECONDS", "180"))
+AUDIO_DOWNLOAD_TIMEOUT = float(os.getenv("CHATBOT_AUDIO_DOWNLOAD_TIMEOUT", "10"))
+AUDIO_TRANSCRIPTION_TIMEOUT = float(
+    os.getenv("CHATBOT_AUDIO_TRANSCRIPTION_TIMEOUT", "15")
+)
+AUDIO_FALLBACK_TEXT = os.getenv(
+    "CHATBOT_AUDIO_FALLBACK_TEXT",
+    "Não consegui entender o áudio. Pode me enviar por texto?",
+)[:160]
+
 # Provider de simulação: none (Atendimento) | mock (demo) | http (Motor real)
 SIMULATION_PROVIDER = os.getenv("SIMULATION_PROVIDER", "none")
 MOTOR_URL = os.getenv("MOTOR_URL", "")
@@ -44,6 +61,11 @@ ESTOQUE_PUBLIC_URL = os.getenv("ESTOQUE_PUBLIC_URL", "")
 ESTOQUE_API_URL = os.getenv("ESTOQUE_API_URL", "")
 ESTOQUE_API_TOKEN = os.getenv("ESTOQUE_API_TOKEN", "")
 ESTOQUE_REQUEST_TIMEOUT = float(os.getenv("ESTOQUE_REQUEST_TIMEOUT", "8"))
+ESTOQUE_MEDIA_ALLOWED_HOSTS = tuple(
+    host.strip().lower().rstrip(".")
+    for host in os.getenv("ESTOQUE_MEDIA_ALLOWED_HOSTS", "").split(",")
+    if host.strip()
+)
 
 # Prazos padrão multi-opção quando o cliente não escolhe um único prazo (CRM WhatsApp).
 PRAZOS_PADRAO_MESES: list[int] = [24, 36, 48, 60]

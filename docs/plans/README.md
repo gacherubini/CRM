@@ -27,10 +27,10 @@ Cada plano `*A`/`*B` tem bloco **Status** no topo: leia antes de reimplementar.
 | 4 | [Plano #5A](2026-07-11-plano5a-catalogo-publico-independente.md) | Catálogo Público | Vitrine+funil+**Pixel browser** (ViewContent); residual SEO/tema |
 | 5 | [Plano #3A](2026-07-11-plano3a-portal-vendedor-independente.md) | Portal/CRM | Base + **Task 9A financeiras + Ajustes reais feitos**; falta Playwright E2E |
 | 5.1 | [Plano #3A.1](2026-07-11-plano3a1-frontend-dashboard-mvp.md) | Frontend Dashboard MVP | MVP fechado; **Task 16 histórico FEITO**; falta Playwright E2E |
-| 6 | [Plano #3B](2026-07-11-plano3b-dashboard-dono-vendas-metas.md) | Vendas/metas/dono | Vendas+metas+CSV+**Task 5 campanhas**; **Task 4 backend pronto, UI aberta** |
+| 6 | [Plano #3B](2026-07-11-plano3b-dashboard-dono-vendas-metas.md) | Vendas/metas/dono | Vendas+metas+CSV+**Task 5 campanhas**; **Task 4 funil DONE** |
 | 6.1 | [Tráfego pago CRM](2026-07-20-plano-trafego-pago-crm-campanhas-roi.md) | Campanhas + atribuição + ROI | **DONE MVP** (`8e7ec5f`) — E8 + #3B T5; CAPI/CSV fechados no plano 6.2 |
-| 6.2 | [Conversões / funil / insights](2026-07-21-plano-conversao-atribuicao-insights.md) | CAPI, gastos, resultados dono, funil, bus, Google | **ATIVO rev.3** — A/B/E/D/H/F + C backend feitos; residual UI C → G |
-| 6+ | [Plano #6](2026-07-11-plano6-evolucoes-roadmap.md) | Roadmap add-ons | E3/E5/**E8**/E10 feitos; ativos E1,E6,E11–E18; **E9 fora**; E2/E4/E7 adiados |
+| 6.2 | [Conversões / funil / insights](2026-07-21-plano-conversao-atribuicao-insights.md) | CAPI, gastos, resultados dono, funil, bus, Google | **ATIVO rev.3** — A/B/E/D/H/C/F feitos; residual G |
+| 6+ | [Plano #6](2026-07-11-plano6-evolucoes-roadmap.md) | Roadmap add-ons | E1 áudio e E6 mídia/WhatsApp com backend feito; configuração externa residual; E3/E5/E8/E10 feitos |
 | ops | [Plano #7 deploy Fly](2026-07-13-plano7-deploy-fly-io-design.md) | Lab Fly.io | **DONE (lab subiu)** — machines **paradas** (uso local 2026-07-20); ops = `deploy/fly/*.sh` |
 
 Planos #1A e #4A podem avançar em paralelo após #0. #2A depende da fatia Lite do #4A.

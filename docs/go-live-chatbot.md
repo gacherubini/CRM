@@ -60,6 +60,9 @@ go-live da loja no lab = Fly + n8n2037.
    configurável antes da autenticação. Ajuste `CHATBOT_WEBHOOK_MAX_*` e
    `CHATBOT_WEBHOOK_RATE_LIMIT_*` somente se o volume real exigir; nunca use rate limit zero em
    produção.
+5. Áudio é baixado pela Chatbot API via Evolution, nunca pelo modelo. Configure
+   `CHATBOT_AUDIO_EVOLUTION_URL` + `CHATBOT_AUDIO_EVOLUTION_API_KEY`; mantenha o provider `none`
+   até homologar um endpoint HTTP de transcrição. O binário é temporário e apagado após a chamada.
 
 ## 3. Migrations Chatbot
 

@@ -48,7 +48,7 @@ curl -s -X POST http://localhost:8100/v1/veiculos/<id>/publicar -H "Authorizatio
 
 Também estão disponíveis:
 
-- `PUT /v1/veiculos/{id}/fotos` para até 20 URLs ordenadas;
+- `PUT /v1/veiculos/{id}/fotos` para fotos ordenadas, com capa, MIME e tamanho;
 - `POST /v1/importacoes/csv/preview` para validar um CSV sem gravar;
 - `POST /v1/importacoes/csv` para importar e atualizar por `codigo_interno`;
 - `GET /v1/veiculos.csv` para exportar;
@@ -56,6 +56,39 @@ Também estão disponíveis:
 
 O CSV usa `,` ou `;` e exige `tipo`, `marca`, `modelo`, `ano_modelo` e `preco`.
 O conteúdo é enviado como `text/csv` no corpo da requisição.
+
+### Fotos para WhatsApp
+
+Fotos ficam em object storage/CDN; o Estoque persiste somente URL pública e
+metadados, nunca base64 ou paths locais. Configure, por exemplo:
+
+```env
+ESTOQUE_MEDIA_PUBLIC_BASE_URL=https://media.seudominio.com/veiculos
+ESTOQUE_MEDIA_MAX_FOTOS=20
+ESTOQUE_MEDIA_MAX_BYTES=10485760
+ESTOQUE_MEDIA_ALLOWED_HOSTS=media.seudominio.com
+```
+
+O contrato recomendado aceita URL HTTPS pública ou `storage_key` relativa à base:
+
+```json
+{
+  "fotos": [
+    {
+      "storage_key": "moto-center/veiculo-123/frente.webp",
+      "content_type": "image/webp",
+      "tamanho_bytes": 245000,
+      "ordem": 0,
+      "capa": true
+    }
+  ]
+}
+```
+
+Tipos aceitos: JPEG, PNG e WebP. Exatamente uma foto deve ser capa. URLs com
+base64, host local/privado, credenciais, fragmento ou query são recusadas. A forma
+legada `{ "urls": ["https://..."] }` continua disponível para integração existente.
+As respostas mantêm `foto_url`/`fotos` e acrescentam `midia_principal`/`midias`.
 
 ## Vitrine pública (sem token, por slug)
 

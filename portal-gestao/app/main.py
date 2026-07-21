@@ -206,10 +206,36 @@ def formatar_brl(valor) -> str:
     return f"R$ {texto}"
 
 
+def formatar_percentual(valor) -> str:
+    if valor is None:
+        return "Sem base"
+    numero = Decimal(str(valor)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+    casas = 0 if numero == numero.to_integral() else 2
+    return f"{numero:.{casas}f}".replace(".", ",") + "%"
+
+
+def formatar_duracao(segundos) -> str:
+    if segundos is None:
+        return "Sem base"
+    total = max(0, int(segundos))
+    if total < 60:
+        return f"{total} s"
+    minutos, resto_segundos = divmod(total, 60)
+    if minutos < 60:
+        return f"{minutos} min" if resto_segundos == 0 else f"{minutos} min {resto_segundos} s"
+    horas, resto_minutos = divmod(minutos, 60)
+    if horas < 24:
+        return f"{horas} h" if resto_minutos == 0 else f"{horas} h {resto_minutos} min"
+    dias, resto_horas = divmod(horas, 24)
+    return f"{dias} d" if resto_horas == 0 else f"{dias} d {resto_horas} h"
+
+
 templates.env.globals["mascarar_telefone"] = mascarar_telefone
 templates.env.globals["formatar_horario"] = formatar_horario
 templates.env.globals["mascarar_cpf"] = mascarar_cpf
 templates.env.globals["formatar_brl"] = formatar_brl
+templates.env.globals["formatar_percentual"] = formatar_percentual
+templates.env.globals["formatar_duracao"] = formatar_duracao
 
 app = FastAPI(title="Portal de Gestão", docs_url=None, redoc_url=None)
 app.add_middleware(
@@ -2345,6 +2371,82 @@ def vendedor_dashboard(
     )
 
 
+@app.get("/app/funil", response_class=HTMLResponse)
+def funil_dashboard(
+    request: Request,
+    inicio: str | None = None,
+    fim: str | None = None,
+    db: Session = Depends(get_db),
+    chatbot: ChatbotClient = Depends(get_chatbot_client),
+):
+    usuario = usuario_atual(request, db)
+    if not usuario:
+        return redirecionar_login()
+    if usuario.papel not in {"dono", "gerente"}:
+        return RedirectResponse("/app", status_code=303)
+
+    sincronizacao_ok = sincronizar_funil_chatbot_best_effort(
+        db,
+        loja_slug=usuario.loja_slug,
+        chatbot=chatbot,
+    )
+    d_inicio, d_fim = periodo_padrao(inicio, fim)
+    periodo_invalido = d_inicio > d_fim
+    if periodo_invalido:
+        d_inicio, d_fim = d_fim, d_inicio
+    inicio_dt = datetime.combine(d_inicio, datetime.min.time(), tzinfo=FUSO_PORTAL)
+    fim_dt = datetime.combine(
+        d_fim + timedelta(days=1),
+        datetime.min.time(),
+        tzinfo=FUSO_PORTAL,
+    ) - timedelta(microseconds=1)
+    funil = resumo_funil(
+        db,
+        loja_slug=usuario.loja_slug,
+        inicio=inicio_dt,
+        fim=fim_dt,
+    )
+    total = funil["total_leads"]
+    etapas = []
+    for tipo, rotulo, detalhe in (
+        ("lead_criado", "Leads criados", "coorte criada no período"),
+        ("primeira_resposta", "Primeira resposta", "leads que receberam uma resposta"),
+        ("etapa_manual", "Movimentação manual", "leads atualizados pela equipe"),
+        ("venda_registrada", "Venda registrada", "leads vinculados a uma venda"),
+        ("venda_confirmada", "Venda confirmada", "leads com venda confirmada"),
+        ("perda", "Perda registrada", "leads marcados como perdidos"),
+    ):
+        quantidade = funil["etapas"].get(tipo, 0)
+        percentual = (
+            Decimal(quantidade) * Decimal("100") / Decimal(total)
+            if total
+            else None
+        )
+        etapas.append(
+            {
+                "tipo": tipo,
+                "rotulo": rotulo,
+                "detalhe": detalhe,
+                "quantidade": quantidade,
+                "percentual": percentual,
+                "barra_pct": min(float(percentual or 0), 100),
+            }
+        )
+
+    return templates.TemplateResponse(
+        "funil/index.html",
+        contexto(
+            request,
+            usuario,
+            periodo={"inicio": d_inicio.isoformat(), "fim": d_fim.isoformat()},
+            periodo_invalido=periodo_invalido,
+            sincronizacao_ok=sincronizacao_ok,
+            funil=funil,
+            etapas=etapas,
+        ),
+    )
+
+
 @app.get("/app/funil/dados")
 def funil_dados(
     request: Request,
@@ -2357,7 +2459,7 @@ def funil_dados(
     usuario = usuario_atual(request, db)
     if not usuario:
         return redirecionar_login()
-    if not pode_ver_financeiro(usuario):
+    if usuario.papel not in {"dono", "gerente"}:
         return RedirectResponse("/app", status_code=303)
     sincronizar_funil_chatbot_best_effort(
         db,

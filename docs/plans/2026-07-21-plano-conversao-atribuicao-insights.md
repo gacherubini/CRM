@@ -1,6 +1,6 @@
 # Plano — Conversões, funil, insights, UX de gastos, resultados do dono e Google
 
-> **Status 2026-07-21: ATIVO — A/B/E/D/H/F + C backend concluídos; UI C e G residuais.**
+> **Status 2026-07-21: ATIVO — A/B/E/D/H/C/F concluídos; somente G residual.**
 > **Rev. 3:** + **UX de resultados do dono** (bloco no dashboard, alertas, drill-down campanha,
 > onboarding de medição). Rev. 2 já tinha gastos lote/CSV, event bus e Google.
 > Origem: conversa Meta + Google + TikTok / Revy Analytics + UX de leitura de resultados.
@@ -303,8 +303,8 @@ Idempotência; UI `/app/funil` (ou seção) com etapas + tempo lead→venda; vaz
 - [x] **C2** Emissores em venda/etapa.
 - [x] **C3** Materialização sanitizada a partir do Chatbot (best-effort).
 - [x] **C4a** Agregações + endpoint backend protegido `/app/funil/dados`.
-- [ ] **C4b** UI do funil + marcar #3B Task 4 quando DONE.
-- [x] Entrega consolidada do backend C; UI permanece em commit futuro.
+- [x] **C4b** UI `/app/funil`, RBAC dono/gerente, período, coorte, etapas, tempos e empty state.
+- [x] Entrega consolidada da Fase C; #3B Task 4 marcada como DONE.
 
 ---
 
@@ -625,8 +625,7 @@ Reutilizar estilos de `trafego/roi.html` (`.roi-card`, `.roas-bar`) via classes 
 - [x] **H2** Alertas operacionais
 - [x] **H5** Drill-down campanha (KPIs + vendas)
 - [x] **H9** Onboarding medição dismissível
-- [x] **C backend** Eventos, tempos, materialização e endpoint
-- [ ] **C UI** Tela/seção do funil; concluir #3B T4
+- [x] **C** Eventos, tempos, materialização, endpoint e UI `/app/funil`; #3B T4 concluída
 - [x] **F** Event bus; fluxo principal publica Meta só via adapter
 - [ ] **G** Google conversion no bus + UI config
 - [ ] Guia loja atualizado (gastos, resultados, Google)

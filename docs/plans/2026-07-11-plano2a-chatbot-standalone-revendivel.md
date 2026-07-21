@@ -9,8 +9,10 @@
 > de propósito até go-live. **Decisão:** sem trava de consentimento; CPF mascarado.
 > **Decisão 2026-07-21:** o bot solicita a simulação, não recebe/exibe o resultado financeiro e
 > faz handoff automático; o vendedor entrega o resultado ao cliente.
-> **Aberto:** go-live manual, retenção/expurgo LGPD administrativo (sem autosserviço do cliente),
-> readiness real, foto no cadastro (E6).
+> **Entrega 2026-07-21:** áudio recebido com download efêmero/transcritor HTTP/fallback e envio da
+> foto principal do Estoque no próprio WhatsApp. **Aberto:** go-live manual, provider real de
+> transcrição, bucket/CDN e ingestão do binário, retenção/expurgo administrativo (sem autosserviço),
+> readiness real.
 
 **Goal:** Entregar um pacote instalável e revendível que conecta um WhatsApp, conversa com clientes,
 qualifica e exporta leads, consulta o Estoque Lite, executa handoff humano e, na edição
@@ -208,7 +210,7 @@ as transições; o LLM nunca grava dados nem chama banco diretamente.
 Fluxo mínimo:
 
 1. saudação e explicação;
-2. consentimento versionado antes de dados pessoais;
+2. consentimento versionado quando informado/necessário, sem bloquear lead ou simulação;
 3. interesse/veículo em texto livre ou catálogo opcional;
 4. qualificação configurável;
 5. confirmação;
@@ -216,8 +218,8 @@ Fluxo mínimo:
 7. simulação apenas quando o provider estiver ativo;
 8. handoff ou encerramento.
 
-**Aceite:** pergunta fora de ordem, correção de dado e rajada de mensagens não duplicam lead nem
-pulam o consentimento.
+**Aceite:** pergunta fora de ordem, correção de dado e rajada de mensagens não duplicam lead; quando
+houver consentimento explícito, a evidência é registrável sem virar controle de exclusão do cliente.
 
 ### Task 6: Simulação plugável
 

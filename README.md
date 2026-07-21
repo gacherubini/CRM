@@ -4,7 +4,7 @@ Bot de WhatsApp para revenda de motos que conversa com o cliente, coleta os dado
 necessários, solicita a simulação internamente e transfere o atendimento para um vendedor.
 Parcelas, taxas e bancos não são enviados automaticamente ao cliente.
 
-> **Status:** 🟢 MVP demonstrável (~**97%** demo / multi-banco + CRM campanhas/ROI).  
+> **Status:** 🟢 MVP demonstrável (~**99%** demo / ~**87%** preparação para produção).
 > **Ambiente:** preferência **local** (Fly lab **parado** desde 2026-07-20).  
 > **Estado canônico:** [`docs/contexto-compacto.md`](docs/contexto-compacto.md) · planos
 > [`docs/plans/README.md`](docs/plans/README.md) · go-live WA [`docs/go-live-chatbot.md`](docs/go-live-chatbot.md).  
@@ -58,7 +58,7 @@ não muda o contrato `/v1/simulacoes`. Estoque é a fonte de verdade de veículo
 
 ## 💬 Fluxo conversacional
 
-1. **Saudação + consentimento LGPD** (antes de qualquer dado pessoal).
+1. **Saudação + identificação do interesse**; consentimento explícito pode ser registrado quando informado, sem bloquear o atendimento.
 2. **Qual moto** → modelo, ano, valor aproximado.
 3. **Condições** → valor de entrada, prazo desejado (meses).
 4. **Dados pessoais** → nome completo, CPF, data de nascimento *(renda opcional)*.
@@ -121,11 +121,11 @@ Mapa de campos e decisões: [`docs/plans/2026-07-13-plano1a-task12-bancos-reconh
 
 ## 🔒 LGPD
 
-- **Consentimento** explícito antes de coletar dado pessoal (guarda texto + timestamp).
+- **Consentimento:** registro disponível, sem criar uma barreira artificial antes de lead/simulação.
 - **Minimização:** coleta só o necessário para simular.
 - **Segurança:** CPF criptografado; segredos/logins de portal fora do código (env/cofre).
-- **Retenção:** lead não convertido expira em **6 meses**; cliente pode pedir exclusão
-  a qualquer momento ("apagar meus dados").
+- **Retenção/exclusão:** somente por processo administrativo autorizado; o cliente não recebe
+  controle de autosserviço para apagar dados.
 
 ---
 
@@ -137,8 +137,9 @@ Mapa de campos e decisões: [`docs/plans/2026-07-13-plano1a-task12-bancos-reconh
 - [x] **Vendas / metas / CSV / E10 Pixel** — + **campanhas + ROI (E8)** DONE 2026-07-20.
 - [x] **Motor multi-banco** — Santander, Fontecred, Bradesco, Pan portal LIVE; fan-out; warm session teto 2.
 - [ ] **Go-live WhatsApp E2E** — Gemini + Evolution + n8n em ambiente estável (eixo A).
-- [x] **Backend #3B Task 4 + event bus** — eventos/tempos e adapter Meta concluídos.
-- [ ] **Residual CRM** — UI do funil; Google; outbound E11/E12; polish revenda.
+- [x] **#3B Task 4 + event bus** — eventos/tempos, UI do funil e adapter Meta concluídos.
+- [x] **Mídia WhatsApp backend** — áudio efêmero com fallback e fotos do Estoque enviadas no WhatsApp.
+- [ ] **Residual CRM/ops** — Google; outbound E11/E12; CDN/transcritor reais; go-live e polish revenda.
 
 Estado canônico: [`docs/contexto-compacto.md`](docs/contexto-compacto.md) · planos: [`docs/plans/README.md`](docs/plans/README.md) · handoff: [`docs/handoff-contexto.md`](docs/handoff-contexto.md).
 

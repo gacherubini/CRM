@@ -66,6 +66,8 @@ O template versionado é `n8n/workflow-ai-nao-salvos.json`. Ele aplica, nesta or
    HTTP do AI Agent apontam para a `chatbot-api` (`http://chatbot-api:8000`) com header
    `Authorization: Bearer TOKEN_DO_CHATBOT`:
    - `consultar_estoque` → `GET /v1/estoque/buscar?termo={termo}`
+   - `enviar_foto_veiculo` → resolve a capa pelo ID e envia mídia pela Evolution,
+     sem mandar o cliente abrir o catálogo/site
    - `registrar_consentimento` → `POST /v1/consentimentos`
    - `registrar_lead` → `POST /v1/leads`
    - `simular` → enfileira internamente em `POST /v1/simulacoes/solicitar`, descarta a resposta
@@ -89,6 +91,19 @@ resultado é entregue por um vendedor. O workflow pronto é versionado em `n8n/`
 O webhook também limita o corpo a 32 KiB, valida telefone/texto/identificadores, não ecoa payloads
 inválidos e aplica rate limit por origem. Os limites podem ser ajustados pelas variáveis
 `CHATBOT_WEBHOOK_MAX_*` e `CHATBOT_WEBHOOK_RATE_LIMIT_*`; não desligue o rate limit em produção.
+
+### Áudio recebido
+
+O ramo `E audio1` envia apenas instância, ID da mensagem, MIME e duração para a Chatbot API.
+A API baixa o conteúdo pela Evolution com `apikey` server-side, aceita somente MIME de áudio,
+limita a 8 MiB/180 s e apaga o diretório temporário ao fim de cada tentativa. O n8n e o banco não
+guardam o binário. Sem provider (`CHATBOT_AUDIO_TRANSCRIPTION_PROVIDER=none`) ou em qualquer falha,
+o cliente recebe um pedido curto para enviar a mensagem por texto.
+
+Para integrar um transcritor real, use `CHATBOT_AUDIO_TRANSCRIPTION_PROVIDER=http`, URL e token.
+O contrato é `multipart/form-data`, campo `file` + `language=pt-BR`, e resposta JSON com `text` ou
+`texto`. A credencial fica somente no Chatbot; não a coloque no workflow. O endpoint real deve ser
+homologado antes de ativar, pois o template versionado não inclui nenhum segredo.
 
 ## E5 — Cadastro de veículo via WhatsApp (Chatbot-only)
 
@@ -157,8 +172,12 @@ Content-Type: application/json
 - `422` `{"detail":"faltou valor"}` / `"placa inválida ..."` / `"faltou marca"`
 - `503` escrita no Estoque não configurada (`ESTOQUE_API_URL`/`TOKEN`)
 
-> Fase 1: só texto + `foto_url` opcional. Upload de mídia WhatsApp = Fase 2 (E6).
-> A extração LLM dos campos fica no n8n; a API só recebe JSON estruturado.
+As fotos são cadastradas no Estoque por `PUT /v1/veiculos/{id}/fotos` e ficam em
+object storage/CDN. Na consulta, o Chatbot projeta somente metadados seguros e o
+workflow usa o ID do veículo para resolver a capa confiável antes de chamar
+`message/sendMedia` na Evolution; o modelo não pode fornecer uma URL arbitrária.
+Veículos sem foto continuam no fluxo normal em texto. A extração LLM dos campos
+de cadastro fica no n8n; a API só recebe JSON estruturado.
 
 ## Edições
 

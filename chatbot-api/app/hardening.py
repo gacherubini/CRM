@@ -103,7 +103,8 @@ class WebhookPayloadLimitMiddleware:
         return (
             scope["type"] == "http"
             and scope.get("method") == "POST"
-            and scope.get("path") == "/webhook/mensagem"
+            and scope.get("path")
+            in {"/webhook/mensagem", "/webhook/audio/transcrever"}
         )
 
     @staticmethod

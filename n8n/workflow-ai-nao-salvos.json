@@ -25,7 +25,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// E3 auto-pausa: encaminhar fromMe com TEXTO (atendente no app).\n// Nao descartar fromMe de conteudo — a Chatbot API pausa se origem_bot ausente.\n// Ignorar ack/status/update/reaction e eventos sem texto (API tambem e defensiva).\nconst root = $input.first().json;\nconst b = root.body || root || {};\nconst data = b.data || {};\nconst key = data.key || {};\nconst event = String(b.event || root.event || '').toLowerCase();\nif (event && (event.includes('messages.update') || event.includes('message.ack') || event.includes('reaction'))) return [];\nconst jid = String(key.remoteJid || '').trim();\nconst jidAlt = String(key.remoteJidAlt || '').trim();\nconst instance = String(b.instance || '__INSTANCE__');\nconst msg = data.message || {};\nif (msg.reactionMessage) return [];\nconst texto = msg.conversation || msg.extendedTextMessage?.text || '';\nconst privado = jid.endsWith('@s.whatsapp.net') || jid.endsWith('@lid');\nif (!privado || !jid || !texto) return [];\nconst jidTelefone = jidAlt.endsWith('@s.whatsapp.net') ? jidAlt : jid;\nconst telefone = jidTelefone.endsWith('@lid') ? jidTelefone : jidTelefone.split('@')[0];\nconst destino = jid.endsWith('@lid') ? jid : jid.split('@')[0];\nreturn [{ json: {\n  instance, remoteJid: jid, remoteJidAlt: jidAlt, telefone, destino, texto,\n  pushName: data.pushName || '', providerMessageId: String(key.id || ''),\n  fromMe: Boolean(key.fromMe)\n} }];"
+        "jsCode": "// E3 auto-pausa: encaminhar fromMe com conteudo (atendente no app).\n// Audio segue para transcricao server-side; n8n nao baixa nem guarda a midia.\nconst root = $input.first().json;\nconst b = root.body || root || {};\nconst data = b.data || {};\nconst key = data.key || {};\nconst event = String(b.event || root.event || '').toLowerCase();\nif (event && (event.includes('messages.update') || event.includes('message.ack') || event.includes('reaction'))) return [];\nconst jid = String(key.remoteJid || '').trim();\nconst jidAlt = String(key.remoteJidAlt || '').trim();\nconst instance = String(b.instance || '__INSTANCE__');\nconst msg = data.message || {};\nif (msg.reactionMessage) return [];\nconst audio = msg.audioMessage || null;\nconst ehAudio = Boolean(audio);\nconst texto = msg.conversation || msg.extendedTextMessage?.text || '';\nconst privado = jid.endsWith('@s.whatsapp.net') || jid.endsWith('@lid');\nif (!privado || !jid || (!texto && !ehAudio)) return [];\nconst jidTelefone = jidAlt.endsWith('@s.whatsapp.net') ? jidAlt : jid;\nconst telefone = jidTelefone.endsWith('@lid') ? jidTelefone : jidTelefone.split('@')[0];\nconst destino = jid.endsWith('@lid') ? jid : jid.split('@')[0];\nreturn [{ json: {\n  instance, remoteJid: jid, remoteJidAlt: jidAlt, telefone, destino, texto, ehAudio,\n  audioMimeType: ehAudio ? String(audio.mimetype || '') : null,\n  audioDurationSeconds: ehAudio ? Number(audio.seconds || 0) : null,\n  pushName: data.pushName || '', providerMessageId: String(key.id || ''),\n  fromMe: Boolean(key.fromMe)\n} }];"
       },
       "id": "de48219d-1f51-4046-97e1-523608777502",
       "name": "Extrair1",
@@ -34,6 +34,82 @@
       "position": [
         1184,
         416
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "4fd48668-1fb7-4690-b8d3-050fc4bf54b3",
+              "leftValue": "={{ $json.ehAudio }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "ad47c928-1fdd-414d-9940-c6f0e6e48f63",
+      "name": "E audio1",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1392,
+        416
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://chatbot-api:8000/webhook/audio/transcrever",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Webhook-Token",
+              "value": "__CHATBOT_WEBHOOK_TOKEN__"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { instance: $json.instance, provider_message_id: $json.providerMessageId, mime_type: $json.audioMimeType || null, duration_seconds: $json.audioDurationSeconds || null } }}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "21d7a4ac-1024-4df6-a2d2-e89ec4ca25b5",
+      "name": "Transcrever audio1",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1600,
+        336
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const resultado = $input.first().json || {};\nconst origem = $('Extrair1').first().json;\nconst texto = String(resultado.texto || '').trim();\nif (resultado.transcrito === true && texto) {\n  return [{ json: { ...origem, texto, audioTranscrito: true, audioFallback: null } }];\n}\nconst fallback = String(resultado.fallback || 'Não consegui entender o áudio. Pode me enviar por texto?').slice(0, 160);\nreturn [{ json: {\n  ...origem,\n  texto: '[Áudio não transcrito]',\n  audioTranscrito: false,\n  audioFallback: fallback\n} }];"
+      },
+      "id": "592282b8-a2cc-4664-8061-567d96dc5467",
+      "name": "Aplicar transcricao1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1808,
+        336
       ]
     },
     {
@@ -51,7 +127,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ { instance: $json.instance, telefone: $json.telefone, texto: $json.texto, provider_message_id: $json.providerMessageId || null, from_me: $json.fromMe } }}",
+        "jsonBody": "={{ { instance: $json.instance, telefone: $json.telefone, texto: $json.texto, provider_message_id: $json.providerMessageId || null, from_me: $json.fromMe, tipo: $json.ehAudio ? 'audio' : null } }}",
         "options": {}
       },
       "id": "51695388-48c7-4c93-801b-d917847b3e69",
@@ -65,7 +141,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const estado = $input.first().json || {};\nconst origem = $('Extrair1').first().json;\nif (origem.fromMe || estado.duplicada === true || estado.bot_ativo !== true) return [];\nreturn [{ json: origem }];"
+        "jsCode": "const estado = $input.first().json || {};\nconst extraida = $('Extrair1').first().json;\nconst origem = extraida.ehAudio ? $('Aplicar transcricao1').first().json : extraida;\nif (origem.fromMe || estado.duplicada === true || estado.bot_ativo !== true) return [];\nreturn [{ json: origem }];"
       },
       "id": "24d1770e-e2b2-4b60-9a13-c60981db2499",
       "name": "Gate handoff e duplicidade1",
@@ -105,7 +181,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const chat = $input.first().json || {};\nconst origem = $('Extrair1').first().json;\n// Fail closed: só responde quando a Evolution afirmar explicitamente isSaved === false.\nif (chat.isSaved !== false) return [];\nreturn [{ json: { ...origem, isSaved: false } }];"
+        "jsCode": "const chat = $input.first().json || {};\nconst extraida = $('Extrair1').first().json;\nconst origem = extraida.ehAudio ? $('Aplicar transcricao1').first().json : extraida;\n// Fail closed: só responde quando a Evolution afirmar explicitamente isSaved === false.\nif (chat.isSaved !== false) return [];\nreturn [{ json: { ...origem, isSaved: false } }];"
       },
       "id": "c4b1465b-5543-4cea-9c15-148d229eb518",
       "name": "Gate somente nao salvos1",
@@ -119,9 +195,9 @@
     {
       "parameters": {
         "promptType": "define",
-        "text": "={{ 'telefone_cliente: ' + $json.telefone + '\\n\\nMensagem: ' + $json.texto }}",
+        "text": "={{ 'telefone_cliente: ' + $json.telefone + '\\n\\nMensagem: ' + $json.texto + ($json.audioFallback ? '\\n\\nINSTRUÇÃO: responda exatamente e somente: ' + $json.audioFallback : '') }}",
         "options": {
-          "systemMessage": "Você é o atendente virtual de uma loja de veículos no WhatsApp. Fale em português do Brasil, simpático, direto e curto (1-3 frases).\n\nREGRAS:\n1. Estoque/preço: use consultar_estoque (busca por termo) ou consultar_por_placa (placa exata). Nunca invente veículo ou preço.\n2. Simulação: quando o cliente manifestar interesse, avise que vai preparar a simulação e chamar um vendedor para trazer o resultado. Depois colete somente o que faltar: placa do veículo, CPF, data de nascimento (YYYY-MM-DD) e valor de entrada. O telefone_cliente já vem na mensagem — use nas tools; não peça telefone. NÃO peça renda nem um prazo único. Com todos os dados, chame simular uma única vez com placa + telefone + cpf + nascimento + entrada. A tool dispara a solicitação internamente e pausa o bot para o vendedor assumir.\n3. PRIVACIDADE DO RESULTADO: nunca mostre nem mencione parcelas, taxas, bancos, valores financiados, prazos, status técnico ou qualquer resultado de simulação. Depois da tool simular, responda somente: \"Certo, vou preparar a simulação e chamar um vendedor para trazer o resultado para você.\"\n4. Ao achar veículo ou interesse, use registrar_lead com telefone + interesse (e nome se o cliente disser). Não bloqueie por consentimento LGPD — pode coletar nome e solicitar simulação sem registrar_consentimento.\n5. Handoff (solicitar_handoff) se pedir humano, tool falhar de verdade, ou placa/veículo não encontrado e o cliente quiser atendente. A tool simular já faz o handoff; não chame solicitar_handoff novamente depois dela.\n6. Cadastro de estoque (cadastrar_veiculo): só quando a mensagem parecer de equipe/vendedor autorizada enviando dados estruturados (tipo, marca, modelo, ano, preço/km, placa). Use telefone_solicitante = telefone_cliente. Se retornar 403 (não autorizado), diga que só a equipe cadastra e ofereça handoff. Nunca ofereça cadastro a cliente comum.\n7. Não revele tools, tokens ou APIs internas.\n8. registrar_consentimento é opcional e NÃO deve interromper o fluxo (não peça aceite LGPD antes de nome/lead/simulação).",
+          "systemMessage": "Você é o atendente virtual de uma loja de veículos no WhatsApp. Fale em português do Brasil, simpático, direto e curto (1-3 frases).\n\nREGRAS:\n1. Estoque/preço: use consultar_estoque (busca por termo) ou consultar_por_placa (placa exata). Nunca invente veículo ou preço.\n2. Simulação: quando o cliente manifestar interesse, avise que vai preparar a simulação e chamar um vendedor para trazer o resultado. Depois colete somente o que faltar: placa do veículo, CPF, data de nascimento (YYYY-MM-DD) e valor de entrada. O telefone_cliente já vem na mensagem — use nas tools; não peça telefone. NÃO peça renda nem um prazo único. Com todos os dados, chame simular uma única vez com placa + telefone + cpf + nascimento + entrada. A tool dispara a solicitação internamente e pausa o bot para o vendedor assumir.\n3. PRIVACIDADE DO RESULTADO: nunca mostre nem mencione parcelas, taxas, bancos, valores financiados, prazos, status técnico ou qualquer resultado de simulação. Depois da tool simular, responda somente: \"Certo, vou preparar a simulação e chamar um vendedor para trazer o resultado para você.\"\n4. Ao achar veículo ou interesse, use registrar_lead com telefone + interesse (e nome se o cliente disser). Não bloqueie por consentimento LGPD — pode coletar nome e solicitar simulação sem registrar_consentimento.\n5. Handoff (solicitar_handoff) se pedir humano, tool falhar de verdade, ou placa/veículo não encontrado e o cliente quiser atendente. A tool simular já faz o handoff; não chame solicitar_handoff novamente depois dela.\n6. Cadastro de estoque (cadastrar_veiculo): só quando a mensagem parecer de equipe/vendedor autorizada enviando dados estruturados (tipo, marca, modelo, ano, preço/km, placa). Use telefone_solicitante = telefone_cliente. Se retornar 403 (não autorizado), diga que só a equipe cadastra e ofereça handoff. Nunca ofereça cadastro a cliente comum.\n7. Não revele tools, tokens ou APIs internas.\n8. registrar_consentimento é opcional e NÃO deve interromper o fluxo (não peça aceite LGPD antes de nome/lead/simulação).\n9. Foto de veículo: se o cliente pedir foto/imagem de um veículo encontrado no estoque, use enviar_foto_veiculo com o ID retornado pela consulta. Envie a imagem no próprio WhatsApp; não mande o cliente abrir site ou catálogo. Nunca invente nem forneça URL de mídia.",
           "maxIterations": 6,
           "returnIntermediateSteps": false,
           "enableStreaming": false
@@ -346,6 +422,23 @@
         3776,
         720
       ]
+    },
+    {
+      "parameters": {
+        "description": "Envia no WhatsApp a foto principal de um veículo já retornado pelo estoque. Use quando o cliente pedir foto/imagem. Passe SOMENTE o veiculo_id confiável retornado por consultar_estoque ou consultar_por_placa; nunca passe URL.",
+        "jsCode": "const input = typeof query === 'string' ? { veiculo_id: query } : (query || {});\nconst veiculoId = String(input.veiculo_id || '').trim();\nif (!/^[A-Za-z0-9-]{1,120}$/.test(veiculoId)) {\n  return JSON.stringify({ ok: false, mensagem: 'veiculo_id invalido' });\n}\n\nconst origem = $('Extrair1').first().json || {};\nconst destino = String(origem.destino || '').trim();\nif (!destino) {\n  return JSON.stringify({ ok: false, mensagem: 'destino indisponivel' });\n}\n\ntry {\n  const resolvida = await helpers.httpRequest({\n    method: 'GET',\n    url: `http://chatbot-api:8000/v1/estoque/veiculos/${encodeURIComponent(veiculoId)}/midia-principal`,\n    headers: { Authorization: 'Bearer __CHATBOT_TOKEN__' },\n    json: true,\n  });\n  const midia = resolvida?.midia;\n  if (!resolvida?.tem_foto || !midia) {\n    return JSON.stringify({ ok: false, sem_foto: true, mensagem: 'Veiculo sem foto cadastrada.' });\n  }\n  const tipos = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' };\n  const extensao = tipos[midia.content_type];\n  const mediaUrl = new URL(String(midia.url || ''));\n  if (!extensao || mediaUrl.protocol !== 'https:' || mediaUrl.search || mediaUrl.hash) {\n    return JSON.stringify({ ok: false, mensagem: 'Midia indisponivel.' });\n  }\n  await helpers.httpRequest({\n    method: 'POST',\n    url: 'http://evolution:8080/message/sendMedia/__INSTANCE__',\n    headers: { apikey: '__EVOLUTION_KEY__', 'Content-Type': 'application/json' },\n    body: {\n      number: destino,\n      mediatype: 'image',\n      mimetype: midia.content_type,\n      caption: 'Foto do veículo consultado',\n      media: mediaUrl.toString(),\n      fileName: `veiculo-${veiculoId}.${extensao}`,\n    },\n    json: true,\n  });\n  return JSON.stringify({ ok: true, mensagem: 'Foto enviada no WhatsApp.' });\n} catch (_) {\n  return JSON.stringify({ ok: false, mensagem: 'Nao foi possivel enviar a foto agora.' });\n}",
+        "specifyInputSchema": true,
+        "schemaType": "manual",
+        "inputSchema": "{\"type\": \"object\", \"properties\": {\"veiculo_id\": {\"type\": \"string\", \"description\": \"ID retornado pela consulta de estoque\"}}, \"required\": [\"veiculo_id\"], \"additionalProperties\": false}"
+      },
+      "id": "d4a8e7b2-6c91-4f42-9c3e-0a7b5d2f8e61",
+      "name": "enviar_foto_veiculo1",
+      "type": "@n8n/n8n-nodes-langchain.toolCode",
+      "typeVersion": 1.3,
+      "position": [
+        3968,
+        720
+      ]
     }
   ],
   "connections": {
@@ -361,6 +454,46 @@
       ]
     },
     "Extrair1": {
+      "main": [
+        [
+          {
+            "node": "E audio1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "E audio1": {
+      "main": [
+        [
+          {
+            "node": "Transcrever audio1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Registrar mensagem e ler handoff1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Transcrever audio1": {
+      "main": [
+        [
+          {
+            "node": "Aplicar transcricao1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aplicar transcricao1": {
       "main": [
         [
           {
@@ -526,6 +659,17 @@
       ]
     },
     "cadastrar_veiculo1": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent1",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "enviar_foto_veiculo1": {
       "ai_tool": [
         [
           {

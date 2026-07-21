@@ -4,10 +4,35 @@
 > Este arquivo: checkpoint operacional. Seções **“Checkpoint anterior”** = histórico — não
 > reexecutar. Path Windows no rodapé de seções antigas: **ignorar** (workspace = root do git).
 >
-> **Checkpoint mais recente: 2026-07-21 (funil backend + event bus + hardening · Fly OFF).**
+> **Checkpoint mais recente: 2026-07-21 (funil UI + fotos WhatsApp + áudio · Fly OFF).**
 > Escolher um eixo por sessão. **Não** religar Fly sem pedido explícito.
 
-## Checkpoint mais recente — funil backend + event bus + hardening (2026-07-21)
+## Checkpoint mais recente — funil UI + fotos WhatsApp + áudio (2026-07-21)
+
+> **Escopo:** Portal, Estoque, Chatbot e workflow n8n. A simulação e os drivers bancários não
+> foram alterados; Fly permaneceu OFF.
+
+- **#3B Task 4 DONE:** nova UI `/app/funil` para dono/gerente com filtro de período, coorte,
+  etapas, taxas, média/mediana, `Sem base`, isolamento por loja e sincronização best-effort.
+- **Fotos no próprio WhatsApp:** Estoque ganhou contrato detalhado de galeria/capa, migration
+  `0006_veiculo_fotos_midias`, URL/storage_key segura e metadados. O Chatbot projeta uma allowlist,
+  resolve a capa por loja+ID e o n8n usa `sendMedia`; o modelo não escolhe URL nem destino.
+- **Áudio recebido:** o n8n reconhece `audioMessage`; a Chatbot API baixa a mídia autenticada da
+  Evolution, valida MIME/tamanho/duração, transcreve por provider HTTP e remove o temporário. Sem
+  provider ou em falha, responde pedindo texto e não retém o áudio.
+- **Segurança:** base64/path local/host privado/query de mídia rejeitados; cliente sem controle de
+  exclusão; simulação continua privada e entregue por vendedor.
+- **Operação externa residual:** configurar bucket/CDN público e homologar URL/token de transcrição.
+  O código não inventa provedor nem persiste arquivos no container.
+- **Validação desta rodada:** Portal **251**, Chatbot **127** e Estoque **70** testes verdes;
+  migration Estoque `0006` validada em upgrade/downgrade/upgrade; workflow n8n, JSON, compose YAML
+  e `git diff --check` verdes.
+- **Percentual estimado:** ~99% demonstrável / ~87% preparação para produção. Restam principalmente
+  go-live WhatsApp, serviços externos reais, Google Conversions e Playwright E2E do Portal.
+
+---
+
+## Checkpoint anterior — funil backend + event bus + hardening (2026-07-21)
 
 > **Escopo:** Chatbot e Portal, totalmente backend. A simulação, o n8n, a UI e os drivers
 > bancários não foram alterados; Fly permaneceu OFF.

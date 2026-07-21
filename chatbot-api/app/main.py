@@ -16,6 +16,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 from sqlalchemy.orm import Session
 
 from app import config, models_db, operacao, servico  # noqa: F401 (registra os modelos)
+from app.audio import AudioProcessor, get_audio_processor
 from app.auth import Contexto, get_contexto, verificar_webhook_token
 from app.db import Base, engine, get_db
 from app.inventory import (
@@ -44,7 +45,7 @@ if os.getenv("CHATBOT_SKIP_INIT") != "1":
 @app.exception_handler(RequestValidationError)
 async def erro_validacao_request(request: Request, exc: RequestValidationError):
     """Não devolve valores sensíveis do payload inválido do webhook."""
-    if request.url.path == "/webhook/mensagem":
+    if request.url.path.startswith("/webhook/"):
         webhook_logger.warning("webhook rejeitado: payload inválido")
         return JSONResponse(
             status_code=422,
@@ -103,6 +104,33 @@ class MensagemEntrada(BaseModel):
             else config.WEBHOOK_MAX_EVENT_TYPE_CHARS
         )
         return validar_identificador(value, nome=info.field_name, limite=limite)
+
+
+class AudioWebhookInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    instance: str
+    provider_message_id: str
+    mime_type: Optional[str] = Field(default=None, max_length=120)
+    duration_seconds: Optional[float] = Field(default=None, ge=0)
+
+    @field_validator("instance")
+    @classmethod
+    def validar_instance(cls, value: str) -> str:
+        return validar_identificador(
+            value,
+            nome="instance",
+            limite=config.WEBHOOK_MAX_INSTANCE_CHARS,
+        )
+
+    @field_validator("provider_message_id")
+    @classmethod
+    def validar_message_id(cls, value: str) -> str:
+        return validar_identificador(
+            value,
+            nome="provider_message_id",
+            limite=config.WEBHOOK_MAX_PROVIDER_MESSAGE_ID_CHARS,
+        )
 
 
 class EstadoInput(BaseModel):
@@ -240,6 +268,38 @@ def webhook_mensagem(
         msg.from_me,
         msg.origem_bot,
         msg.tipo,
+    )
+
+
+@app.post("/webhook/audio/transcrever")
+def webhook_audio_transcrever(
+    dados: AudioWebhookInput,
+    db: Session = Depends(get_db),
+    _: None = Depends(verificar_webhook_token),
+    processor: AudioProcessor = Depends(get_audio_processor),
+):
+    """Baixa/transcreve áudio server-side e sempre falha com fallback seguro."""
+    loja = servico.resolver_loja_por_instancia(db, dados.instance)
+    ja_registrada = (
+        db.query(models_db.Mensagem)
+        .filter(
+            models_db.Mensagem.loja_id == loja.id,
+            models_db.Mensagem.provider_message_id == dados.provider_message_id,
+        )
+        .first()
+    )
+    if ja_registrada:
+        return {
+            "transcrito": False,
+            "texto": None,
+            "fallback": config.AUDIO_FALLBACK_TEXT,
+            "duplicada": True,
+        }
+    return processor.processar(
+        dados.instance,
+        dados.provider_message_id,
+        dados.mime_type,
+        dados.duration_seconds,
     )
 
 
@@ -469,6 +529,30 @@ def estoque_por_placa(
             "mensagem": "Não encontrei esse veículo no estoque pela placa; posso chamar um atendente.",
         }
     return {"veiculo": veiculo, "fonte": "estoque"}
+
+
+@app.get("/v1/estoque/veiculos/{veiculo_id}/midia-principal")
+def estoque_midia_principal(
+    veiculo_id: str,
+    ctx: Contexto = Depends(get_contexto),
+    db: Session = Depends(get_db),
+    provider: InventoryProvider = Depends(get_inventory_provider),
+):
+    """Capa confiável para envio direto no WhatsApp, sem depender do site."""
+    loja = db.get(models_db.Loja, ctx.loja_id)
+    midia = provider.obter_midia_principal(loja.slug, veiculo_id)
+    if not midia:
+        return {"veiculo_id": veiculo_id, "midia": None, "tem_foto": False}
+    return {
+        "veiculo_id": veiculo_id,
+        "midia": {
+            "tipo": "image",
+            "url": midia["url"],
+            "content_type": midia["content_type"],
+            "tamanho_bytes": midia.get("tamanho_bytes"),
+        },
+        "tem_foto": True,
+    }
 
 
 def _montar_payload_motor(

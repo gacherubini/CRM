@@ -62,6 +62,150 @@ def test_fotos_rejeitam_url_invalida_e_duplicada(client, loja_a):
     ).status_code == 422
 
 
+def test_fotos_detalhadas_validam_tipo_tamanho_ordem_e_capa(client, loja_a):
+    h = loja_a["headers"]
+    vid = client.post("/v1/veiculos", json=_novo(), headers=h).json()["id"]
+    fotos = [
+        {
+            "url": "https://cdn.example/traseira.webp",
+            "content_type": "image/webp",
+            "tamanho_bytes": 220_000,
+            "ordem": 2,
+            "capa": False,
+        },
+        {
+            "url": "https://cdn.example/frente.jpg",
+            "content_type": "image/jpeg",
+            "tamanho_bytes": 350_000,
+            "ordem": 1,
+            "capa": True,
+        },
+    ]
+
+    resposta = client.put(
+        f"/v1/veiculos/{vid}/fotos", json={"fotos": fotos}, headers=h
+    )
+    assert resposta.status_code == 200, resposta.text
+    body = resposta.json()
+    assert [item["ordem"] for item in body["midias"]] == [1, 2]
+    assert body["midia_principal"]["url"].endswith("/frente.jpg")
+    assert body["foto_url"] == body["midia_principal"]["url"]
+    assert body["midias"][0]["tamanho_bytes"] == 350_000
+    client.post(f"/v1/veiculos/{vid}/publicar", headers=h)
+    publico = client.get(
+        f"/public/v1/lojas/{loja_a['slug']}/veiculos/{vid}"
+    ).json()
+    assert publico["midia_principal"]["content_type"] == "image/jpeg"
+    assert publico["midia_principal"]["capa"] is True
+    assert "custo" not in publico
+
+    duas_capas = [dict(item, capa=True) for item in fotos]
+    assert client.put(
+        f"/v1/veiculos/{vid}/fotos", json={"fotos": duas_capas}, headers=h
+    ).status_code == 422
+    assert client.put(
+        f"/v1/veiculos/{vid}/fotos",
+        json={
+            "fotos": [
+                {
+                    "url": "https://cdn.example/video.mp4",
+                    "content_type": "video/mp4",
+                    "tamanho_bytes": 10,
+                    "capa": True,
+                }
+            ]
+        },
+        headers=h,
+    ).status_code == 422
+
+
+def test_fotos_bloqueiam_base64_host_interno_query_e_tamanho(client, loja_a, monkeypatch):
+    from app import config
+
+    h = loja_a["headers"]
+    vid = client.post("/v1/veiculos", json=_novo(), headers=h).json()["id"]
+
+    def enviar(url, tamanho=100):
+        return client.put(
+            f"/v1/veiculos/{vid}/fotos",
+            json={
+                "fotos": [
+                    {
+                        "url": url,
+                        "content_type": "image/jpeg",
+                        "tamanho_bytes": tamanho,
+                        "capa": True,
+                    }
+                ]
+            },
+            headers=h,
+        )
+
+    assert enviar("data:image/jpeg;base64,AAAA").status_code == 422
+    assert enviar("https://127.0.0.1/foto.jpg").status_code == 422
+    assert enviar("https://cdn.example/foto.jpg?token=secreto").status_code == 422
+    assert enviar("https://cdn.example/foto.jpg", config.MEDIA_MAX_BYTES + 1).status_code == 422
+
+
+def test_storage_key_vira_url_publica_sem_expor_path_interno(client, loja_a, monkeypatch):
+    from app import config
+
+    monkeypatch.setattr(config, "MEDIA_PUBLIC_BASE_URL", "https://media.example/veiculos")
+    h = loja_a["headers"]
+    vid = client.post("/v1/veiculos", json=_novo(), headers=h).json()["id"]
+    resposta = client.put(
+        f"/v1/veiculos/{vid}/fotos",
+        json={
+            "fotos": [
+                {
+                    "storage_key": "loja-a/cg-160/frente.jpg",
+                    "content_type": "image/jpeg",
+                    "tamanho_bytes": 12345,
+                    "capa": True,
+                }
+            ]
+        },
+        headers=h,
+    )
+    assert resposta.status_code == 200, resposta.text
+    midia = resposta.json()["midia_principal"]
+    assert midia["url"] == "https://media.example/veiculos/loja-a/cg-160/frente.jpg"
+    assert "storage_key" not in midia
+    assert "base64" not in resposta.text
+
+
+def test_allowlist_de_host_restringe_cdn(client, loja_a, monkeypatch):
+    from app import config
+
+    monkeypatch.setattr(config, "MEDIA_ALLOWED_HOSTS", ("media.autorizada.example",))
+    h = loja_a["headers"]
+    vid = client.post("/v1/veiculos", json=_novo(), headers=h).json()["id"]
+    negada = client.put(
+        f"/v1/veiculos/{vid}/fotos",
+        json={"urls": ["https://outro-cdn.example/frente.jpg"]},
+        headers=h,
+    )
+    assert negada.status_code == 422
+    aceita = client.put(
+        f"/v1/veiculos/{vid}/fotos",
+        json={"urls": ["https://media.autorizada.example/frente.jpg"]},
+        headers=h,
+    )
+    assert aceita.status_code == 200
+
+
+def test_fotos_respeitam_tenancy(client, loja_a, loja_b):
+    vid = client.post(
+        "/v1/veiculos", json=_novo(), headers=loja_a["headers"]
+    ).json()["id"]
+    resposta = client.put(
+        f"/v1/veiculos/{vid}/fotos",
+        json={"urls": ["https://cdn.example/frente.jpg"]},
+        headers=loja_b["headers"],
+    )
+    assert resposta.status_code == 404
+
+
 def test_mutacoes_geram_auditoria_e_outbox(client, loja_a, operador_loja_a):
     h = loja_a["headers"]
     vid = client.post("/v1/veiculos", json=_novo(), headers=h).json()["id"]

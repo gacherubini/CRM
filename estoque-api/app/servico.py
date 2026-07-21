@@ -4,9 +4,10 @@ import secrets
 import uuid
 import csv
 import io
+import ipaddress
 from datetime import datetime, timezone
 from decimal import Decimal
-from urllib.parse import urlparse
+from urllib.parse import quote, urlparse
 
 from fastapi import HTTPException
 from sqlalchemy import update
@@ -131,6 +132,128 @@ def criar_usuario_estoque(
 # Placa Mercosul (ABC1D23) e formato antigo (ABC1234) compartilham o mesmo molde:
 # 3 letras, 1 dígito, 1 letra-ou-dígito, 2 dígitos.
 _PLACA_RE = re.compile(r"^[A-Z]{3}[0-9][0-9A-Z][0-9]{2}$")
+_STORAGE_KEY_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._/-]{0,500}$")
+
+
+def _validar_url_midia_publica(valor: str) -> str:
+    """Aceita somente HTTPS público e estável; nunca paths/base64/hosts internos."""
+    url = str(valor or "").strip()
+    if not url or len(url) > config.MEDIA_URL_MAX_CHARS:
+        raise HTTPException(status_code=422, detail="URL de foto inválida")
+    parsed = urlparse(url)
+    host = (parsed.hostname or "").lower().rstrip(".")
+    if (
+        parsed.scheme != "https"
+        or not host
+        or parsed.username is not None
+        or parsed.password is not None
+        or parsed.query
+        or parsed.fragment
+        or host == "localhost"
+        or host.endswith((".localhost", ".local", ".internal"))
+    ):
+        raise HTTPException(
+            status_code=422,
+            detail="foto deve usar URL HTTPS pública e estável, sem credenciais ou query",
+        )
+    try:
+        endereco = ipaddress.ip_address(host)
+    except ValueError:
+        endereco = None
+    if endereco is not None and not endereco.is_global:
+        raise HTTPException(status_code=422, detail="host privado não é permitido para foto")
+    if config.MEDIA_ALLOWED_HOSTS and host not in config.MEDIA_ALLOWED_HOSTS:
+        raise HTTPException(status_code=422, detail="host de foto não autorizado")
+    return url
+
+
+def _url_por_storage_key(storage_key: str) -> str:
+    chave = str(storage_key or "").strip()
+    if (
+        not config.MEDIA_PUBLIC_BASE_URL
+        or not _STORAGE_KEY_RE.fullmatch(chave)
+        or ".." in chave.split("/")
+        or "//" in chave
+    ):
+        raise HTTPException(
+            status_code=422,
+            detail="storage_key inválida ou ESTOQUE_MEDIA_PUBLIC_BASE_URL não configurada",
+        )
+    base = _validar_url_midia_publica(config.MEDIA_PUBLIC_BASE_URL)
+    caminho = "/".join(quote(parte, safe="._-") for parte in chave.split("/"))
+    return _validar_url_midia_publica(f"{base}/{caminho}")
+
+
+def _content_type_legado(url: str) -> str | None:
+    path = urlparse(url).path.lower()
+    if path.endswith((".jpg", ".jpeg")):
+        return "image/jpeg"
+    if path.endswith(".png"):
+        return "image/png"
+    if path.endswith(".webp"):
+        return "image/webp"
+    return None
+
+
+def _normalizar_fotos(fotos: list[dict], *, legado: bool = False) -> list[dict]:
+    if len(fotos) > config.MEDIA_MAX_FOTOS:
+        raise HTTPException(
+            status_code=422,
+            detail=f"limite de {config.MEDIA_MAX_FOTOS} fotos por veículo",
+        )
+    normalizadas: list[dict] = []
+    urls: set[str] = set()
+    ordens: set[int] = set()
+    capas = 0
+    capa_declarada = any("capa" in item for item in fotos)
+    for indice, item in enumerate(fotos):
+        url_recebida = item.get("url")
+        storage_key = item.get("storage_key")
+        if bool(url_recebida) == bool(storage_key):
+            raise HTTPException(
+                status_code=422, detail="informe exatamente url ou storage_key para cada foto"
+            )
+        url = (
+            _validar_url_midia_publica(url_recebida)
+            if url_recebida
+            else _url_por_storage_key(storage_key)
+        )
+        if url in urls:
+            raise HTTPException(status_code=422, detail="foto duplicada")
+        urls.add(url)
+
+        content_type = item.get("content_type") or (_content_type_legado(url) if legado else None)
+        if content_type not in config.MEDIA_CONTENT_TYPES:
+            raise HTTPException(
+                status_code=422,
+                detail="content_type inválido (use image/jpeg, image/png ou image/webp)",
+            )
+        tamanho = item.get("tamanho_bytes")
+        if not legado and tamanho is None:
+            raise HTTPException(status_code=422, detail="tamanho_bytes é obrigatório")
+        if tamanho is not None and not (1 <= int(tamanho) <= config.MEDIA_MAX_BYTES):
+            raise HTTPException(
+                status_code=422,
+                detail=f"foto excede o limite de {config.MEDIA_MAX_BYTES} bytes",
+            )
+        ordem = indice if item.get("ordem") is None else int(item["ordem"])
+        if ordem < 0 or ordem in ordens:
+            raise HTTPException(status_code=422, detail="ordem de foto inválida ou duplicada")
+        ordens.add(ordem)
+        capa = bool(item.get("capa")) if capa_declarada else indice == 0
+        capas += int(capa)
+        normalizadas.append(
+            {
+                "url": url,
+                "content_type": content_type,
+                "tamanho_bytes": int(tamanho) if tamanho is not None else None,
+                "ordem": ordem,
+                "capa": capa,
+            }
+        )
+    if normalizadas and capas != 1:
+        raise HTTPException(status_code=422, detail="defina exatamente uma foto como capa")
+    return sorted(normalizadas, key=lambda foto: foto["ordem"])
 
 
 def normalizar_placa(valor: str | None) -> str | None:
@@ -178,6 +301,8 @@ def _validar(dados: dict) -> None:
 
 def criar_veiculo(db: Session, loja_id: str, dados: dict, ator_papel: str = "sistema") -> Veiculo:
     _validar(dados)
+    if dados.get("foto_url"):
+        dados["foto_url"] = _validar_url_midia_publica(dados["foto_url"])
     if "placa" in dados:
         placa = validar_placa(dados["placa"])
         if placa is None:
@@ -262,6 +387,8 @@ def atualizar_veiculo(
         campos["placa"] = placa  # None limpa a placa (opcional)
         if placa is not None and _placa_em_uso(db, loja_id, placa, ignorar_id=veiculo_id):
             raise HTTPException(status_code=409, detail="placa já cadastrada nesta loja")
+    if campos.get("foto_url"):
+        campos["foto_url"] = _validar_url_midia_publica(campos["foto_url"])
     # Revalida somente os campos afetados, reaproveitando os valores atuais.
     _validar(
         {
@@ -356,29 +483,26 @@ def substituir_fotos(
     db: Session,
     loja_id: str,
     veiculo_id: str,
-    urls: list[str],
+    fotos: list[dict],
     ator_papel: str = "sistema",
+    legado: bool = False,
 ) -> Veiculo:
     v = obter_veiculo(db, loja_id, veiculo_id)
-    if len(urls) > 20:
-        raise HTTPException(status_code=422, detail="limite de 20 fotos por veículo")
-    normalizadas: list[str] = []
-    for url in urls:
-        url = url.strip()
-        parsed = urlparse(url)
-        if parsed.scheme not in {"http", "https"} or not parsed.netloc:
-            raise HTTPException(status_code=422, detail="URL de foto inválida")
-        if url in normalizadas:
-            raise HTTPException(status_code=422, detail="foto duplicada")
-        normalizadas.append(url)
+    normalizadas = _normalizar_fotos(fotos, legado=legado)
     v.fotos.clear()
     db.flush()
-    for ordem, url in enumerate(normalizadas):
-        v.fotos.append(VeiculoFoto(loja_id=loja_id, url=url, ordem=ordem))
-    v.foto_url = normalizadas[0] if normalizadas else None
+    for foto in normalizadas:
+        v.fotos.append(VeiculoFoto(loja_id=loja_id, **foto))
+    capa = next((foto for foto in normalizadas if foto["capa"]), None)
+    v.foto_url = capa["url"] if capa else None
     v.atualizado_em = datetime.now(timezone.utc)
     _registrar_operacao(
-        db, v, "fotos_atualizadas", ator_papel, {"quantidade": len(normalizadas)}, "vehicle.updated"
+        db,
+        v,
+        "fotos_atualizadas",
+        ator_papel,
+        {"quantidade": len(normalizadas), "capa_definida": capa is not None},
+        "vehicle.updated",
     )
     db.commit()
     db.refresh(v)
@@ -651,6 +775,7 @@ def obter_veiculo_publico(db: Session, slug: str, veiculo_id: str) -> Veiculo:
 
 def para_saida_publica(v: Veiculo) -> dict:
     """Saída da API pública — NUNCA inclui custo, código interno ou dados internos."""
+    midias = _midias_saida(v)
     return {
         "id": v.id,
         "tipo": v.tipo,
@@ -661,13 +786,17 @@ def para_saida_publica(v: Veiculo) -> dict:
         "cor": v.cor,
         "km": v.km,
         "preco": float(v.preco),
-        "foto_url": v.foto_url,
-        "fotos": [foto.url for foto in v.fotos] if v.fotos else ([v.foto_url] if v.foto_url else []),
+        "foto_url": _url_capa(v, midias),
+        "fotos": [foto["url"] for foto in midias],
+        "midias": midias,
+        "midia_principal": _midia_principal(v, midias),
+        "tem_foto": bool(midias),
     }
 
 
 def para_saida_privada(v: Veiculo, incluir_custo: bool = True) -> dict:
     """Saída da API privada — inclui custo/código interno."""
+    midias = _midias_saida(v)
     return {
         "id": v.id,
         "loja_id": v.loja_id,
@@ -683,8 +812,47 @@ def para_saida_privada(v: Veiculo, incluir_custo: bool = True) -> dict:
         "publicado": v.publicado,
         "placa": v.placa,
         "codigo_interno": v.codigo_interno,
-        "foto_url": v.foto_url,
-        "fotos": [foto.url for foto in v.fotos] if v.fotos else ([v.foto_url] if v.foto_url else []),
+        "foto_url": _url_capa(v, midias),
+        "fotos": [foto["url"] for foto in midias],
+        "midias": midias,
+        "midia_principal": _midia_principal(v, midias),
+        "tem_foto": bool(midias),
         "criado_em": v.criado_em.isoformat() if v.criado_em else None,
         "atualizado_em": v.atualizado_em.isoformat() if v.atualizado_em else None,
     } | ({"custo": float(v.custo) if v.custo is not None else None} if incluir_custo else {})
+
+
+def _midias_saida(v: Veiculo) -> list[dict]:
+    if v.fotos:
+        return [
+            {
+                "id": foto.id,
+                "url": foto.url,
+                "content_type": foto.content_type,
+                "tamanho_bytes": foto.tamanho_bytes,
+                "ordem": foto.ordem,
+                "capa": foto.capa,
+            }
+            for foto in sorted(v.fotos, key=lambda item: item.ordem)
+        ]
+    if v.foto_url:
+        return [
+            {
+                "id": None,
+                "url": v.foto_url,
+                "content_type": _content_type_legado(v.foto_url),
+                "tamanho_bytes": None,
+                "ordem": 0,
+                "capa": True,
+            }
+        ]
+    return []
+
+
+def _midia_principal(v: Veiculo, midias: list[dict]) -> dict | None:
+    return next((foto for foto in midias if foto["capa"]), midias[0] if midias else None)
+
+
+def _url_capa(v: Veiculo, midias: list[dict]) -> str | None:
+    principal = _midia_principal(v, midias)
+    return principal["url"] if principal else None

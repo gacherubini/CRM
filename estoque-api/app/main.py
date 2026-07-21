@@ -13,7 +13,7 @@ from typing import Optional
 from fastapi import Body, Depends, FastAPI, HTTPException, Query, Request
 from fastapi.responses import JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 from sqlalchemy.orm import Session
 from starlette.middleware.sessions import SessionMiddleware
 
@@ -100,8 +100,30 @@ class VeiculoUpdate(BaseModel):
     foto_url: Optional[str] = None
 
 
+class FotoInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    url: Optional[str] = Field(default=None, max_length=config.MEDIA_URL_MAX_CHARS)
+    storage_key: Optional[str] = Field(default=None, max_length=512)
+    content_type: str
+    tamanho_bytes: int = Field(ge=1)
+    ordem: Optional[int] = Field(default=None, ge=0)
+    capa: Optional[bool] = None
+
+
 class FotosInput(BaseModel):
-    urls: list[str] = Field(default_factory=list, max_length=20)
+    """Contrato detalhado; ``urls`` continua aceito para clientes legados."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    fotos: Optional[list[FotoInput]] = Field(default=None, max_length=config.MEDIA_MAX_FOTOS)
+    urls: Optional[list[str]] = Field(default=None, max_length=config.MEDIA_MAX_FOTOS)
+
+    @model_validator(mode="after")
+    def uma_forma_de_entrada(self):
+        if (self.fotos is None) == (self.urls is None):
+            raise ValueError("informe exatamente fotos ou urls")
+        return self
 
 
 def _pode_ver_custo(ctx: Contexto) -> bool:
@@ -247,7 +269,15 @@ def substituir_fotos(
     db: Session = Depends(get_db),
 ):
     _exigir_operacao(ctx)
-    v = servico.substituir_fotos(db, ctx.loja_id, veiculo_id, dados.urls, ctx.papel)
+    legado = dados.urls is not None
+    fotos = (
+        [{"url": url, "capa": indice == 0, "ordem": indice} for indice, url in enumerate(dados.urls)]
+        if legado
+        else [foto.model_dump(exclude_none=True) for foto in dados.fotos]
+    )
+    v = servico.substituir_fotos(
+        db, ctx.loja_id, veiculo_id, fotos, ctx.papel, legado=legado
+    )
     return servico.para_saida_privada(v, _pode_ver_custo(ctx))
 
 

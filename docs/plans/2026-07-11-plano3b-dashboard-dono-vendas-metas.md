@@ -5,7 +5,7 @@
 > (`8e7ec5f`). **E10** Purchase CAPI na confirmação de venda. Credenciais banco = **#3A Task 9A** + Motor.
 > **CSV export** e **metas por vendedor UI** feitos. **2026-07-21:** etapa manual de lead,
 > seletores lead/veículo na venda e baixa do veículo no Estoque ao confirmar **feitos**.
-> **Task 4:** backend histórico/tempos entregue em 2026-07-21; falta a UI do funil para DONE.
+> **Task 4:** **DONE em 2026-07-21** — histórico/tempos, sincronização best-effort e UI do funil.
 > Também seguem abertos reconciliação/Playwright E2E e configurações.
 > **Disparo** WA em massa / e-mail = roadmap **#6 E11/E12** (não misturar com Task 5).  
 > Não inferir venda/lucro só a partir de mensagens/leads.
@@ -71,12 +71,16 @@ Impedir sobreposição ambígua do mesmo tipo/escopo/período ou definir priorid
 
 > **Detalhada em 2026-07-21** pelo plano
 > [conversões / funil / insights](2026-07-21-plano-conversao-atribuicao-insights.md) **Fase C**.
-> Backend entregue; não reimplementar. Falta somente a UI antes de marcar DONE.
+> **DONE.** Backend e UI entregues; não reimplementar.
 
 Registrar atribuição, primeira resposta, mudanças de etapa, perda e venda. Eventos recebidos do
 Chatbot são idempotentes; ações manuais geram os mesmos tipos de evento.
 
 **Aceite:** tempo de resposta e conversão são recalculáveis a partir do histórico.
+
+> **Entrega UI 2026-07-21:** `/app/funil` para dono/gerente, filtro por período, coorte,
+> taxas honestas, etapas, média/mediana e estado `Sem base`; isolamento por loja e fallback
+> quando o Chatbot estiver indisponível cobertos por testes.
 
 ### Task 5: Campanhas e atribuição
 
@@ -84,7 +88,7 @@ Chatbot são idempotentes; ações manuais geram os mesmos tipos de evento.
 > [tráfego pago / ROI](2026-07-20-plano-trafego-pago-crm-campanhas-roi.md).  
 > Portal: CRUD campanhas + gastos, ROI CPL/CPA/ROAS, filtros. Chatbot: first/last + fbclid/gclid.
 > Catálogo: propaga UTMs/click ids + ViewContent. Import CSV/lote e match/retry CAPI foram
-> concluídos no plano de conversões de 2026-07-21; residual desta frente é a Task 4.
+> concluídos no plano de conversões de 2026-07-21; Task 4 também está concluída.
 
 Cadastrar/importar campanha, origem, canal, UTM e custo. Primeira versão usa atribuição declarada:
 `first_touch` e `last_touch`, exibidas separadamente. Não prometer causalidade automática.

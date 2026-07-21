@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% block title %}Funil comercial — Revy{% endblock %}
+{% block content %}
+<div class="page-heading">
+  <div>
+    <span class="eyebrow">Gestão comercial</span>
+    <h1>Funil comercial</h1>
+    <p>Acompanhe a coorte de leads criados no período e o que aconteceu com eles depois.</p>
+  </div>
+  <a class="button secondary" href="/app/leads">Ver leads</a>
+</div>
+
+<form class="filter-bar funil-filter" method="get">
+  <label class="search"><span class="sr-only">Início do período</span><input type="date" name="inicio" value="{{ periodo.inicio }}"></label>
+  <label class="search"><span class="sr-only">Fim do período</span><input type="date" name="fim" value="{{ periodo.fim }}"></label>
+  <button class="button secondary" type="submit">Aplicar período</button>
+</form>
+<p class="muted">Cada percentual usa como base os leads criados entre {{ periodo.inicio }} e {{ periodo.fim }}. Respostas e vendas posteriores continuam ligadas a essa coorte.</p>
+
+{% if periodo_invalido %}
+<div class="alert warning">As datas estavam invertidas e foram ordenadas para exibir um período válido.</div>
+{% endif %}
+{% if not sincronizacao_ok %}
+<div class="alert warning">O Chatbot não respondeu agora. Os eventos locais já registrados continuam exibidos, mas os dados mais recentes podem ainda não ter sido sincronizados.</div>
+{% endif %}
+
+<section class="funil-summary" aria-label="Resumo do funil">
+  <article class="funil-summary-card">
+    <span>Leads da coorte</span>
+    <strong>{{ funil.total_leads }}</strong>
+    <small>criados no período selecionado</small>
+  </article>
+  <article class="funil-summary-card">
+    <span>Taxa de resposta</span>
+    <strong>{{ formatar_percentual(funil.taxa_resposta_pct) }}</strong>
+    <small>{% if funil.total_leads %}{{ funil.etapas.primeira_resposta }} de {{ funil.total_leads }} leads{% else %}aguardando leads no período{% endif %}</small>
+  </article>
+  <article class="funil-summary-card highlight">
+    <span>Taxa de conversão</span>
+    <strong>{{ formatar_percentual(funil.taxa_conversao_pct) }}</strong>
+    <small>{% if funil.total_leads %}{{ funil.etapas.venda_confirmada }} de {{ funil.total_leads }} leads{% else %}aguardando leads no período{% endif %}</small>
+  </article>
+</section>
+
+<section class="panel funil-panel" aria-labelledby="etapas-titulo">
+  <div class="panel-heading">
+    <div><span class="mono-label">ETAPAS</span><h2 id="etapas-titulo">Avanço da coorte</h2></div>
+  </div>
+  {% if funil.total_leads %}
+  <ol class="funil-stages">
+    {% for etapa in etapas %}
+    <li>
+      <div class="funil-stage-copy">
+        <span class="funil-stage-index">{{ loop.index }}</span>
+        <div><strong>{{ etapa.rotulo }}</strong><small>{{ etapa.detalhe }}</small></div>
+      </div>
+      <div class="funil-stage-value"><strong>{{ etapa.quantidade }}</strong><span>{{ formatar_percentual(etapa.percentual) }}</span></div>
+      <div class="funil-progress" role="progressbar" aria-label="{{ etapa.rotulo }}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ etapa.barra_pct }}"><i style="--funil-progress: {{ etapa.barra_pct }}%"></i></div>
+    </li>
+    {% endfor %}
+  </ol>
+  {% else %}
+  <div class="empty">
+    <strong>Nenhum lead criado neste período.</strong>
+    <p>Escolha outro intervalo ou aguarde a entrada de novos leads. Taxas e tempos permanecem sem base até existir uma coorte.</p>
+  </div>
+  {% endif %}
+</section>
+
+<section class="panel funil-panel" aria-labelledby="tempos-titulo">
+  <div class="panel-heading">
+    <div><span class="mono-label">VELOCIDADE</span><h2 id="tempos-titulo">Tempos do atendimento</h2></div>
+  </div>
+  <div class="funil-time-grid">
+    <article><span>Resposta média</span><strong>{{ formatar_duracao(funil.tempo_medio_primeira_resposta_segundos) }}</strong><small>entre criação e primeira resposta</small></article>
+    <article><span>Resposta mediana</span><strong>{{ formatar_duracao(funil.tempo_mediano_primeira_resposta_segundos) }}</strong><small>reduz o efeito de casos extremos</small></article>
+    <article><span>Conversão média</span><strong>{{ formatar_duracao(funil.tempo_medio_conversao_segundos) }}</strong><small>entre criação e venda confirmada</small></article>
+    <article><span>Conversão mediana</span><strong>{{ formatar_duracao(funil.tempo_mediano_conversao_segundos) }}</strong><small>somente leads que converteram</small></article>
+  </div>
+  <p class="funil-note">“Sem base” significa que não há observações suficientes para calcular a métrica. Nenhum tempo ou percentual é preenchido artificialmente com zero.</p>
+</section>
+{% endblock %}

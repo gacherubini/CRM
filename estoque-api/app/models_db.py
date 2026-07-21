@@ -100,12 +100,22 @@ class VeiculoFoto(Base):
         ForeignKey("veiculos.id", ondelete="CASCADE"), nullable=False, index=True
     )
     url: Mapped[str] = mapped_column(String, nullable=False)
+    content_type: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    tamanho_bytes: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    capa: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     ordem: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     criada_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_agora)
     veiculo: Mapped[Veiculo] = relationship(back_populates="fotos")
 
     __table_args__ = (
         UniqueConstraint("veiculo_id", "ordem", name="uq_veiculo_foto_ordem"),
+        Index(
+            "uq_veiculo_foto_capa",
+            "veiculo_id",
+            unique=True,
+            sqlite_where=text("capa = 1"),
+            postgresql_where=text("capa IS TRUE"),
+        ),
     )
 
 
