@@ -25,6 +25,8 @@ from app.vehicle_photo import VehiclePhotoProcessor
 _PLACA_RE = re.compile(r"^[A-Z]{3}[0-9][0-9A-Z][0-9]{2}$")
 _PAPEIS = frozenset({"dono", "vendedor"})
 _TIPOS = frozenset({"moto", "carro"})
+_GATILHO_CADASTRO = frozenset({"cadastro"})
+_ENCERRAR_CADASTRO = frozenset({"fim", "sair"})
 _PLACA_NA_LEGENDA_RE = re.compile(r"\b([A-Z]{3})[-\s]?([0-9][A-Z0-9][0-9]{2})\b", re.I)
 logger = logging.getLogger("chatbot.operacao")
 
@@ -217,6 +219,68 @@ def _tentar_ativar_sessao_fotos(
 
 def _minutos_sessao_fotos() -> int:
     return max(1, (config.IMAGE_SESSION_TTL_SECONDS + 59) // 60)
+
+
+def _sessao_cadastro_aberta(numero: NumeroAutorizado) -> bool:
+    expira = numero.cadastro_expira_em
+    if expira is None:
+        return False
+    if expira.tzinfo is None:
+        expira = expira.replace(tzinfo=timezone.utc)
+    return expira > datetime.now(timezone.utc)
+
+
+def _abrir_ou_renovar_cadastro(db: Session, numero: NumeroAutorizado) -> None:
+    ttl = max(1, config.CADASTRO_SESSION_TTL_SECONDS)
+    numero.cadastro_expira_em = datetime.now(timezone.utc) + timedelta(seconds=ttl)
+    db.commit()
+
+
+def _fechar_cadastro(db: Session, numero: NumeroAutorizado) -> None:
+    numero.cadastro_expira_em = None
+    db.commit()
+
+
+def decidir_roteamento(
+    db: Session,
+    loja_id: str,
+    telefone: str,
+    texto: str | None,
+    is_saved: bool | None,
+) -> dict:
+    """Decide como o n8n trata a mensagem.
+
+    Retorna acao em {cliente, ignorar, cadastro, cadastro_controle}. Não-salvo é
+    sempre cliente; salvo só entra em cadastro se for número autorizado ativo que
+    mandou o gatilho e mantém a sessão viva. Ver design/plano para os ramos.
+    """
+    if is_saved is False:
+        return {"acao": "cliente", "resposta": None}
+
+    numero = _numero_autorizado_ativo(db, loja_id, telefone)
+    if numero is None:
+        return {"acao": "ignorar", "resposta": None}
+
+    normal = (texto or "").strip().casefold()
+
+    if _sessao_cadastro_aberta(numero):
+        if normal in _ENCERRAR_CADASTRO:
+            _fechar_cadastro(db, numero)
+            return {"acao": "cadastro_controle", "resposta": "Cadastro encerrado."}
+        _abrir_ou_renovar_cadastro(db, numero)
+        return {"acao": "cadastro", "resposta": None}
+
+    if normal in _GATILHO_CADASTRO:
+        _abrir_ou_renovar_cadastro(db, numero)
+        return {
+            "acao": "cadastro_controle",
+            "resposta": (
+                "Modo cadastro aberto. Envie os dados do veículo e as fotos. "
+                "Mande 'fim' para encerrar."
+            ),
+        }
+
+    return {"acao": "ignorar", "resposta": None}
 
 
 def _exigir_autorizado(db: Session, loja_id: str, telefone: str) -> str:
