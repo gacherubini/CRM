@@ -250,7 +250,8 @@ o Portal guarda referência/projeção, não copia payload pessoal bancário.
 
 > **Status: FEITA (2026-07-20) — MVP.** Plano
 > [tráfego pago](2026-07-20-plano-trafego-pago-crm-campanhas-roi.md) + commit `8e7ec5f`.  
-> UI `/app/campanhas` + `/app/trafego/roi` (CPL/CPA/ROAS). Residual: CSV gastos em lote, match CAPI fino.
+> UI `/app/campanhas` + `/app/trafego/roi` (CPL/CPA/ROAS). CSV/lote, match/retry CAPI e leitura
+> executiva de resultados foram concluídos em 2026-07-21; residual: eventos de funil/event bus/Google.
 
 **O que é:** evoluir campanhas do Plano #3B para importar custos e comparar origem, lead, venda e
 lucro bruto por canal, mantendo `first_touch` e `last_touch` explícitos.

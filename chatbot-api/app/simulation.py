@@ -6,6 +6,8 @@
 
 Trocar de provider é configuração (SIMULATION_PROVIDER), não edição de código/n8n.
 """
+from __future__ import annotations
+
 import time
 from typing import Protocol
 
@@ -17,6 +19,7 @@ from app import config
 
 class SimulationProvider(Protocol):
     def disponivel(self) -> bool: ...
+    def solicitar(self, payload: dict, idempotency_key: str) -> dict: ...
     def simular(self, payload: dict, idempotency_key: str) -> dict: ...
 
 
@@ -25,6 +28,9 @@ class NoSimulationProvider:
         return False
 
     def simular(self, payload: dict, idempotency_key: str) -> dict:
+        raise HTTPException(status_code=409, detail="simulação não habilitada nesta instalação")
+
+    def solicitar(self, payload: dict, idempotency_key: str) -> dict:
         raise HTTPException(status_code=409, detail="simulação não habilitada nesta instalação")
 
 
@@ -61,6 +67,11 @@ class MockSimulationProvider:
             )
         return {"status": "concluida", "resultados": resultados}
 
+    def solicitar(self, payload: dict, idempotency_key: str) -> dict:
+        """Executa o mock, mas não devolve seus valores ao canal do WhatsApp."""
+        self.simular(payload, idempotency_key)
+        return {"id": idempotency_key, "status": "concluida"}
+
 
 class HttpSimulationProvider:
     ESTADOS_TERMINAIS = {
@@ -96,21 +107,24 @@ class HttpSimulationProvider:
     def _fallback(mensagem: str) -> dict:
         return {"status": "falhou", "resultados": [], "mensagem": mensagem}
 
+    def solicitar(self, payload: dict, idempotency_key: str) -> dict:
+        """Enfileira no Motor e retorna sem aguardar ou expor o resultado."""
+        resposta = httpx.post(
+            f"{self.base_url}/v1/simulacoes",
+            json=payload,
+            headers=self._headers(idempotency_key),
+            timeout=self.timeout,
+        )
+        resposta.raise_for_status()
+        criada = resposta.json()
+        if not criada.get("id"):
+            raise ValueError("Motor respondeu sem id de simulação")
+        return {"id": criada["id"], "status": criada.get("status", "recebida")}
+
     def simular(self, payload: dict, idempotency_key: str) -> dict:
         try:
-            resposta = httpx.post(
-                f"{self.base_url}/v1/simulacoes",
-                json=payload,
-                headers=self._headers(idempotency_key),
-                timeout=self.timeout,
-            )
-            resposta.raise_for_status()
-            criada = resposta.json()
-            sim_id = criada.get("id")
-            if not sim_id:
-                return self._fallback(
-                    "O serviço de simulação respondeu de forma inválida; posso chamar um atendente."
-                )
+            criada = self.solicitar(payload, idempotency_key)
+            sim_id = criada["id"]
 
             limite = time.monotonic() + self.poll_timeout
             while True:

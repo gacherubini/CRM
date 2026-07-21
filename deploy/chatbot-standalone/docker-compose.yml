@@ -49,6 +49,7 @@ services:
     environment:
       - DATABASE_URL=postgresql+psycopg://crm:${POSTGRES_PASSWORD:-crm}@postgres:5432/chatbot
       - CHATBOT_SKIP_INIT=1
+      - CHATBOT_WEBHOOK_TOKEN=${CHATBOT_WEBHOOK_TOKEN:?defina CHATBOT_WEBHOOK_TOKEN no .env}
       - ESTOQUE_PUBLIC_URL=http://estoque-api:8000
       # Escrita no Estoque (E5 cadastro via WhatsApp) — use o TOKEN da loja no estoque-api
       - ESTOQUE_API_URL=${ESTOQUE_API_URL:-http://estoque-api:8000}

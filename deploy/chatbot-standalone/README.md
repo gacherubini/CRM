@@ -58,14 +58,18 @@ O template versionado é `n8n/workflow-ai-nao-salvos.json`. Ele aplica, nesta or
 5. chama a IA somente quando `isSaved === false`;
 6. registra a saída do bot para diferenciar respostas automáticas das manuais.
 
-1. Importe o workflow e substitua `__INSTANCE__`, `__EVOLUTION_KEY__` e `__CHATBOT_TOKEN__`.
+1. Importe o workflow e substitua `__INSTANCE__`, `__EVOLUTION_KEY__`,
+   `__CHATBOT_TOKEN__` e `__CHATBOT_WEBHOOK_TOKEN__`. O último deve ter exatamente o mesmo
+   valor de `CHATBOT_WEBHOOK_TOKEN` no `.env`; ele autentica tanto a entrada quanto o registro
+   da saída do bot na Chatbot API.
 2. Selecione a credencial no nó **Google Gemini Chat Model**. As ferramentas
    HTTP do AI Agent apontam para a `chatbot-api` (`http://chatbot-api:8000`) com header
    `Authorization: Bearer TOKEN_DO_CHATBOT`:
    - `consultar_estoque` → `GET /v1/estoque/buscar?termo={termo}`
    - `registrar_consentimento` → `POST /v1/consentimentos`
    - `registrar_lead` → `POST /v1/leads`
-   - `simular` → `POST /v1/simular` (só na edição Financiamento)
+   - `simular` → enfileira internamente em `POST /v1/simulacoes/solicitar`, descarta a resposta
+     técnica e pausa o bot para um vendedor responder (só na edição Financiamento)
    - `solicitar_handoff` → `PATCH /v1/conversas/{telefone}/estado`
    - `adicionar_veiculo` → `POST /v1/operacao/veiculos` (só números autorizados; ver E5 abaixo)
 3. Publique o workflow e registre o novo webhook na Evolution:
@@ -78,8 +82,9 @@ O template versionado é `n8n/workflow-ai-nao-salvos.json`. Ele aplica, nesta or
 Não use o sufixo `@lid` para decidir se o contato é salvo: a Evolution pode ter chats salvos com
 `@lid`. O campo canônico usado pelo gate é `isSaved` retornado por `findChats`.
 
-O system prompt deve exigir **consentimento antes de dados pessoais**, e nunca inventar
-veículo/parcela (sempre usar as ferramentas). O workflow pronto será versionado em `n8n/`.
+O system prompt não deve inventar veículo ou parcela. No fluxo de financiamento, o cliente nunca
+recebe parcelas, taxas ou bancos do bot: depois de solicitar a simulação, a conversa é pausada e o
+resultado é entregue por um vendedor. O workflow pronto é versionado em `n8n/`.
 
 ## E5 — Cadastro de veículo via WhatsApp (Chatbot-only)
 

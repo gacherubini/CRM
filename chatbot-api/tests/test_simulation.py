@@ -50,6 +50,73 @@ def test_simular_com_mock_retorna_resultados(client, loja_a):
         app.dependency_overrides.pop(get_simulation_provider, None)
 
 
+def test_solicitar_simulacao_retorna_202_sem_resultado_financeiro(client, loja_a):
+    chaves = []
+
+    class _Spy(MockSimulationProvider):
+        def solicitar(self, payload, idempotency_key):
+            chaves.append(idempotency_key)
+            return super().solicitar(payload, idempotency_key)
+
+    app.dependency_overrides[get_simulation_provider] = lambda: _Spy()
+    try:
+        r = client.post(
+            "/v1/simulacoes/solicitar",
+            json=_payload(prazo_meses=None, prazos_meses=[24, 36]),
+            headers={**loja_a["headers"], "Idempotency-Key": "wa-msg-123"},
+        )
+        assert r.status_code == 202
+        body = r.json()
+        assert body["status"] == "recebida"
+        assert body["quantidade"] == 2
+        assert [item["prazo_meses"] for item in body["solicitacoes"]] == [24, 36]
+        assert chaves == ["wa-msg-123:24", "wa-msg-123:36"]
+        serializado = r.text.lower()
+        for campo_privado in (
+            "resultados",
+            "valor_parcela",
+            "taxa_am",
+            "valor_financiado",
+            "provedor",
+        ):
+            assert campo_privado not in serializado
+    finally:
+        app.dependency_overrides.pop(get_simulation_provider, None)
+
+
+def test_solicitar_http_enfileira_sem_polling(monkeypatch):
+    from app import simulation
+
+    class _Resp:
+        def raise_for_status(self):
+            pass
+
+        def json(self):
+            return {"id": "sim-assincrona", "status": "recebida"}
+
+    chamadas = []
+
+    def _post(*args, **kwargs):
+        chamadas.append((args, kwargs))
+        return _Resp()
+
+    def _get(*args, **kwargs):
+        raise AssertionError("solicitar não deve consultar o resultado")
+
+    monkeypatch.setattr(simulation.httpx, "post", _post)
+    monkeypatch.setattr(simulation.httpx, "get", _get)
+    prov = HttpSimulationProvider(base_url="http://motor", token="token-motor")
+
+    out = prov.solicitar(
+        {"veiculo": {"valor": 1}, "condicoes": {"prazo_meses": 12}},
+        "key-assincrona",
+    )
+
+    assert out == {"id": "sim-assincrona", "status": "recebida"}
+    assert len(chamadas) == 1
+    assert chamadas[0][1]["headers"]["Idempotency-Key"] == "key-assincrona"
+
+
 def test_simular_por_placa_usa_preco_do_estoque(client, loja_a):
     app.dependency_overrides[get_simulation_provider] = lambda: MockSimulationProvider()
     app.dependency_overrides[get_inventory_provider] = lambda: _FakeInventory(

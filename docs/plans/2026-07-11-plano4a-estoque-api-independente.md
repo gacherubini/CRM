@@ -151,14 +151,15 @@ Chatbot: pede placa + dados mínimos do cliente + entrada
         │     (recusa se não existir / vendido / outra loja)
         │
         └── SimulationProvider (mock | http Motor)
-              payload com telefone + placa + veículo resolvido + pessoa + entrada
+              enfileira com telefone + placa + veículo resolvido + pessoa + entrada
+              └── resultado financeiro fica no Motor/Portal; bot faz handoff
 ```
 
 ### O que o bot **não** pede mais (MVP WhatsApp)
 
 | Campo antigo nos planos | Decisão MVP |
 |---|---|
-| `prazo_meses` (“prazo da moto” / prazo desejado) | **Remover da coleta.** Mock/Motor usam prazos padrão configuráveis (ex.: 12/24/36/48) e devolvem opções por prazo no resultado. Cliente não escolhe um prazo único antes de simular. |
+| `prazo_meses` (“prazo da moto” / prazo desejado) | **Remover da coleta.** Mock/Motor usam prazos padrão configuráveis (ex.: 12/24/36/48); as opções ficam disponíveis ao vendedor. Cliente não escolhe um prazo único antes de simular. |
 | `renda` (renda mensal) | **Remover da coleta e do payload obrigatório.** Opcional só em drivers bancários reais futuros, se o banco exigir. |
 
 ### O que o bot **passa a** exigir / enviar

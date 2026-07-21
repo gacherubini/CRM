@@ -1,0 +1,11 @@
+{% if alertas_trafego %}
+<section class="revy-alert-strip" role="status" aria-label="Alertas de medição">
+  {% for alerta in alertas_trafego %}
+  <div class="revy-alert-strip__item">
+    <span>⚠</span>
+    <p>{{ alerta.texto }}</p>
+    <a href="{{ alerta.href }}">{{ alerta.acao }} →</a>
+  </div>
+  {% endfor %}
+</section>
+{% endif %}

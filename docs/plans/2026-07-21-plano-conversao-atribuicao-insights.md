@@ -1,6 +1,6 @@
 # Plano — Conversões, funil, insights, UX de gastos, resultados do dono e Google
 
-> **Status 2026-07-21: ATIVO (planejado, não implementado).**
+> **Status 2026-07-21: ATIVO — A/B/E/D/H concluídas; C/F/G residuais.**
 > **Rev. 3:** + **UX de resultados do dono** (bloco no dashboard, alertas, drill-down campanha,
 > onboarding de medição). Rev. 2 já tinha gastos lote/CSV, event bus e Google.
 > Origem: conversa Meta + Google + TikTok / Revy Analytics + UX de leitura de resultados.
@@ -182,10 +182,10 @@ G  Google
 
 ### Tasks
 
-- [ ] **A1** Testes + enrich telefone (e email opcional) em `montar_payload_purchase` / enqueue best-effort via `lead_ref`.
-- [ ] **A2** fbclid/fbc no payload quando disponível.
-- [ ] **A3** `processar_outbox_pendentes` + POST retentar + métricas na `trafego/form.html`.
-- [ ] Commit(s): `feat(portal): CAPI match e retry na aba Tráfego`.
+- [x] **A1** Testes + enrich telefone (e email opcional) em `montar_payload_purchase` / enqueue best-effort via `lead_ref`.
+- [x] **A2** fbclid/fbc no payload quando disponível.
+- [x] **A3** `processar_outbox_pendentes` + POST retentar + métricas na `trafego/form.html`.
+- [x] Entrega consolidada: CAPI match e retry na aba Tráfego.
 
 ---
 
@@ -197,8 +197,8 @@ Novos valores em `CANAIS_ROTULO`: `tiktok`, `olx`, `marketplace`, `facebook_mark
 
 ### Tasks
 
-- [ ] **B1** Estender `CANAIS_ROTULO` + testes form + parágrafo em `trafego-pago-loja.md`.
-- [ ] Commit: `feat(portal): canais tiktok/olx/marketplace no cadastro`.
+- [x] **B1** Estender `CANAIS_ROTULO` + testes form + parágrafo em `trafego-pago-loja.md`.
+- [x] Entrega consolidada: canais TikTok/OLX/Marketplace no cadastro.
 
 ---
 
@@ -248,11 +248,11 @@ fan-160-google;800;2026-07-14;
 
 ### Tasks
 
-- [ ] **E1.1** Testes lote (2 gastos, skip vazio, RBAC).
-- [ ] **E1.2** Rotas + template `gastos_lote.html` + nav.
-- [ ] **E2.1** Testes parse CSV (ok + utm inválido + valor inválido).
-- [ ] **E2.2** Upload + modelo download + doc guia.
-- [ ] Commits: `feat(portal): lançamento de gastos em lote` · `feat(portal): import CSV de gastos de mídia`.
+- [x] **E1.1** Testes lote (2 gastos, skip vazio, RBAC).
+- [x] **E1.2** Rotas + template `gastos_lote.html` + nav.
+- [x] **E2.1** Testes parse CSV (ok + utm inválido + valor inválido).
+- [x] **E2.2** Upload + modelo download + doc guia.
+- [x] Entrega consolidada: lançamento em lote e import CSV de gastos de mídia.
 
 ### Fora da Fase E
 
@@ -276,8 +276,8 @@ Templates (omitir se zero):
 
 ### Tasks
 
-- [ ] **D1** Testes + função + template ROI.
-- [ ] Commit: `feat(portal): insights automáticos no dashboard ROI`.
+- [x] **D1** Testes + função + template ROI.
+- [x] Entrega consolidada: insights automáticos no dashboard ROI.
 
 ---
 
@@ -515,11 +515,11 @@ Reutilizar estilos de `trafego/roi.html` (`.roi-card`, `.roas-bar`) via classes 
 
 **Aceite:**
 
-- [ ] Dono vê bloco; vendedor não.
-- [ ] Com fixture de campanhas/gastos/vendas, números batem com `/app/trafego/roi` mesmo período.
-- [ ] Empty states conforme tabela.
-- [ ] Layout mobile sem overflow horizontal.
-- [ ] Commit: `feat(portal): bloco Resultados de tráfego no dashboard do dono`.
+- [x] Dono vê bloco; vendedor não.
+- [x] Com fixture de campanhas/gastos/vendas, números batem com `/app/trafego/roi` mesmo período.
+- [x] Empty states conforme tabela.
+- [x] Layout responsivo sem overflow horizontal no bloco.
+- [x] Entrega consolidada: bloco Resultados de tráfego no dashboard do dono.
 
 ---
 
@@ -539,9 +539,9 @@ Reutilizar estilos de `trafego/roi.html` (`.roi-card`, `.roas-bar`) via classes 
 
 **Aceite:**
 
-- [ ] Testes unitários por condição.
-- [ ] UI `revy-alert-strip` acessível (`role="status"`).
-- [ ] Commit: `feat(portal): alertas de tráfego no dashboard`.
+- [x] Testes unitários por condição.
+- [x] UI `revy-alert-strip` acessível (`role="status"`).
+- [x] Entrega consolidada: alertas de tráfego no dashboard.
 
 ---
 
@@ -560,9 +560,9 @@ Reutilizar estilos de `trafego/roi.html` (`.roi-card`, `.roas-bar`) via classes 
 
 **Aceite:**
 
-- [ ] Vendas listadas batem com ROI da campanha no mesmo período.
-- [ ] Campanha sem vendas: empty “Nenhuma venda atribuída neste período”.
-- [ ] Commit: `feat(portal): drill-down de resultados no detalhe da campanha`.
+- [x] Vendas listadas batem com ROI da campanha no mesmo período.
+- [x] Campanha sem vendas: empty “Nenhuma venda atribuída neste período”.
+- [x] Entrega consolidada: drill-down de resultados no detalhe da campanha.
 
 ---
 
@@ -583,21 +583,21 @@ Reutilizar estilos de `trafego/roi.html` (`.roi-card`, `.roas-bar`) via classes 
 
 **Aceite:**
 
-- [ ] Progresso 3/5 renderiza checks corretos com fixture.
-- [ ] Dismiss esconde; não bloqueia uso.
-- [ ] CTA “Continuar setup” vai ao próximo passo pendente (tráfego / campanhas / gastos / vendas).
-- [ ] Commit: `feat(portal): checklist de onboarding de medição de tráfego`.
+- [x] Progresso 3/5 renderiza checks corretos com fixture.
+- [x] Dismiss esconde; não bloqueia uso.
+- [x] CTA “Continuar setup” vai ao próximo passo pendente (tráfego / campanhas / gastos / vendas).
+- [x] Entrega consolidada: checklist de onboarding de medição de tráfego.
 
 ---
 
 ### Tasks H (checklist)
 
-- [ ] **H0** `resultados_dono.py` + testes puros (resumo, alertas, checklist).
-- [ ] **H1** Bloco no `dashboard.html` + CSS + design spec acima.
-- [ ] **H2** Alertas no dashboard.
-- [ ] **H5** Detalhe campanha com KPIs + vendas.
-- [ ] **H9** Checklist + dismiss.
-- [ ] **H-doc** Uma seção em `trafego-pago-loja.md`: “Como ler o bloco Resultados”.
+- [x] **H0** `resultados_dono.py` + testes puros (resumo, alertas, checklist).
+- [x] **H1** Bloco no `dashboard.html` + CSS + design spec acima.
+- [x] **H2** Alertas no dashboard.
+- [x] **H5** Detalhe campanha com KPIs + vendas.
+- [x] **H9** Checklist + dismiss.
+- [x] **H-doc** Uma seção em `trafego-pago-loja.md`: “Como ler o bloco Resultados”.
 
 ---
 
@@ -616,19 +616,19 @@ Reutilizar estilos de `trafego/roi.html` (`.roi-card`, `.roas-bar`) via classes 
 
 ## Critério de DONE (rev. 3)
 
-- [ ] **A** CAPI match + retry + status UI
-- [ ] **B** Canais extras
-- [ ] **E** Lote + CSV de gastos (1-a-1 ainda funciona)
-- [ ] **D** Insights ROI
-- [ ] **H1** Bloco Resultados no dashboard (design + números = ROI)
-- [ ] **H2** Alertas operacionais
-- [ ] **H5** Drill-down campanha (KPIs + vendas)
-- [ ] **H9** Onboarding medição dismissível
+- [x] **A** CAPI match + retry + status UI
+- [x] **B** Canais extras
+- [x] **E** Lote + CSV de gastos (1-a-1 ainda funciona)
+- [x] **D** Insights ROI
+- [x] **H1** Bloco Resultados no dashboard (design + números = ROI)
+- [x] **H2** Alertas operacionais
+- [x] **H5** Drill-down campanha (KPIs + vendas)
+- [x] **H9** Onboarding medição dismissível
 - [ ] **C** Funil eventos + tempos; #3B T4
 - [ ] **F** Event bus; Meta só via adapter
 - [ ] **G** Google conversion no bus + UI config
 - [ ] Guia loja atualizado (gastos, resultados, Google)
-- [ ] **Sem** API de spend; **sem** TikTok API
+- [x] **Sem** API de spend; **sem** TikTok API
 
 ---
 

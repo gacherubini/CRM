@@ -1,0 +1,54 @@
+{% if pode_gerir_trafego and resultados_view %}
+<section class="revy-results" aria-labelledby="resultados-titulo">
+  <header class="revy-results__heading">
+    <div>
+      <span class="eyebrow">Tráfego pago</span>
+      <h2 id="resultados-titulo">Resultados do tráfego</h2>
+      <p>{{ periodo_resultados.inicio.strftime('%d/%m') }} – {{ periodo_resultados.fim.strftime('%d/%m/%Y') }} · last touch · gastos lançados no Revy</p>
+    </div>
+    <div class="revy-results__period" role="group" aria-label="Período dos resultados">
+      <a class="{{ 'active' if periodo_resultados.seletor == '7d' else '' }}" href="/app?resultados=7d">7 dias</a>
+      <a class="{{ 'active' if periodo_resultados.seletor == 'mes' else '' }}" href="/app?resultados=mes">Este mês</a>
+    </div>
+  </header>
+
+  {% if not resultados_view.tem_campanhas %}
+  <div class="empty"><strong>Cadastre a primeira campanha com UTM.</strong><p>O Revy conecta gastos, leads e vendas pela chave <code>utm_campaign</code>.</p><a class="button primary" href="/app/campanhas/nova">Criar campanha</a></div>
+  {% else %}
+  <div class="revy-results__hero">
+    <article class="revy-results__kpi"><span>Gasto</span><strong>{{ formatar_brl(resultados_view.totais.gasto) }}</strong><small>lançado no Revy</small></article>
+    <article class="revy-results__kpi"><span>Leads</span><strong>{% if periodo_resultados.chatbot_offline %}—{% else %}{{ resultados_view.totais.leads }}{% endif %}</strong><small>com campanha</small></article>
+    <article class="revy-results__kpi"><span>Motos</span><strong>{{ resultados_view.totais.vendas }}</strong><small>vendas atribuídas</small></article>
+    <article class="revy-results__kpi revy-results__kpi--accent"><span>ROAS</span><strong>{% if resultados_view.totais.roas is not none %}{{ resultados_view.totais.roas }}x{% else %}—{% endif %}</strong><small>{% if resultados_view.totais.roas is not none %}Cada R$1 virou R${{ resultados_view.totais.roas }}{% else %}Lance o gasto para ver ROAS{% endif %}</small></article>
+  </div>
+
+  {% if resultados_view.canais %}
+  <h3 class="revy-results__subheading">Por canal</h3>
+  <div class="revy-results__channels">
+    {% for item in resultados_view.canais %}
+    <article class="revy-results__channel">
+      <span>{{ canais.get(item.canal, item.canal) }}</span>
+      <strong>{{ formatar_brl(item.gasto) }} · {{ item.vendas }} {{ 'moto' if item.vendas == 1 else 'motos' }}</strong>
+      <small>ROAS {% if item.roas is not none %}{{ item.roas }}x{% else %}—{% endif %}</small>
+      {% if item.roas is not none %}<div class="roas-bar"><i style="width:{{ item.roas_barra_pct }}%"></i></div>{% endif %}
+    </article>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  {% if resultados_view.melhor_campanha %}
+  <div class="revy-results__best">
+    <span>Melhor campanha</span>
+    <strong>{{ resultados_view.melhor_campanha.nome }}</strong>
+    <small>{% if resultados_view.melhor_campanha.roas is not none %}ROAS {{ resultados_view.melhor_campanha.roas }}x · {% endif %}{{ resultados_view.melhor_campanha.vendas }} venda(s)</small>
+    <a href="/app/campanhas/{{ resultados_view.melhor_campanha.campanha_id }}">Abrir →</a>
+  </div>
+  {% endif %}
+  <footer class="revy-results__actions">
+    <a class="button primary" href="/app/campanhas/gastos/lote">Lançar gastos</a>
+    <a class="button secondary" href="/app/trafego/roi">Ver ROI</a>
+    <a class="button ghost" href="/app/campanhas">Campanhas</a>
+  </footer>
+  {% endif %}
+</section>
+{% endif %}

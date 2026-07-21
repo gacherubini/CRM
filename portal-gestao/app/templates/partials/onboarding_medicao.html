@@ -1,0 +1,20 @@
+{% if onboarding_medicao and not onboarding_medicao.completo and not onboarding_medicao.dispensado %}
+<section class="revy-onboarding" aria-labelledby="medicao-titulo">
+  <header>
+    <div><span class="eyebrow">Configuração guiada</span><h2 id="medicao-titulo">Medindo de verdade?</h2></div>
+    <strong>{{ onboarding_medicao.concluidos }}/{{ onboarding_medicao.total }}</strong>
+  </header>
+  <div class="revy-onboarding__progress" aria-label="{{ onboarding_medicao.concluidos }} de {{ onboarding_medicao.total }} passos concluídos">
+    {% for passo in onboarding_medicao.passos %}<i class="{{ 'done' if passo.feito else '' }}"></i>{% endfor %}
+  </div>
+  <ul>
+    {% for passo in onboarding_medicao.passos %}
+    <li class="{{ 'done' if passo.feito else '' }}"><span>{{ '✓' if passo.feito else '○' }}</span>{{ passo.rotulo }}</li>
+    {% endfor %}
+  </ul>
+  <footer>
+    <form method="post" action="/app/trafego/onboarding/dispensar"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="button ghost" type="submit">Dispensar</button></form>
+    <a class="button secondary" href="{{ onboarding_medicao.proximo_href }}">Continuar setup</a>
+  </footer>
+</section>
+{% endif %}

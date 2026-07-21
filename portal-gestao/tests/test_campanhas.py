@@ -104,3 +104,85 @@ def test_roi_pagina_dono(client, chatbot_fake):
     assert r.status_code == 200
     assert "ROI" in r.text
     assert "ROAS" in r.text or "Roas" in r.text or "roas" in r.text.casefold()
+
+
+def _criar_campanhas_lote():
+    db = SessionLocal()
+    campanhas = []
+    for indice in range(3):
+        campanha = Campanha(
+            loja_slug="loja-teste",
+            nome=f"Campanha {indice + 1}",
+            canal="meta",
+            status="ativa",
+            utm_campaign=f"camp-{indice + 1}",
+            utm_campaign_norm=f"camp-{indice + 1}",
+            criada_por_email="dono@loja.test",
+        )
+        db.add(campanha)
+        campanhas.append(campanha)
+    db.commit()
+    ids = [campanha.id for campanha in campanhas]
+    db.close()
+    return ids
+
+
+def test_lancamento_gastos_em_lote_cria_so_valores_preenchidos(client):
+    login(client)
+    ids = _criar_campanhas_lote()
+    pagina = client.get("/app/campanhas/gastos/lote")
+    assert pagina.status_code == 200
+    resposta = client.post(
+        "/app/campanhas/gastos/lote",
+        data={
+            "csrf": csrf_da_resposta(pagina),
+            "referencia": "2026-07-20",
+            f"valor_{ids[0]}": "500,25",
+            f"valor_{ids[1]}": "",
+            f"valor_{ids[2]}": "900",
+            "nota_global": "semana 3",
+        },
+        follow_redirects=False,
+    )
+    assert resposta.status_code == 303
+    db = SessionLocal()
+    gastos = db.query(CampanhaGasto).order_by(CampanhaGasto.valor).all()
+    assert [g.valor for g in gastos] == [Decimal("500.25"), Decimal("900.00")]
+    assert all(g.loja_slug == "loja-teste" for g in gastos)
+    db.close()
+
+
+def test_csv_gastos_importa_ok_e_exibe_erros_sem_abort(client):
+    login(client)
+    _criar_campanhas_lote()
+    pagina = client.get("/app/campanhas/gastos/lote")
+    resposta = client.post(
+        "/app/campanhas/gastos/csv",
+        data={"csrf": csrf_da_resposta(pagina)},
+        files={
+            "arquivo": (
+                "gastos.csv",
+                b"utm_campaign;valor;referencia;nota\ncamp-1;700,00;2026-07-20;ok\nfora;20;2026-07-20;erro\n",
+                "text/csv",
+            )
+        },
+    )
+    assert resposta.status_code == 200
+    assert "1 gasto importado" in resposta.text
+    assert "não cadastrada" in resposta.text
+    db = SessionLocal()
+    assert db.query(CampanhaGasto).count() == 1
+    db.close()
+
+
+def test_vendedor_nao_acessa_gastos_em_lote(client):
+    login(client, papel="vendedor")
+    assert client.get("/app/campanhas/gastos/lote", follow_redirects=False).headers["location"] == "/app"
+
+
+def test_download_modelo_csv(client):
+    login(client)
+    resposta = client.get("/app/campanhas/gastos/csv/modelo")
+    assert resposta.status_code == 200
+    assert resposta.headers["content-type"].startswith("text/csv")
+    assert "utm_campaign;valor;referencia;nota" in resposta.text

@@ -7,6 +7,8 @@
 > (valor do Estoque; sem renda obrigatória). **E3 auto-pausa** e **E5 cadastro WA** (números
 > autorizados + proxy Estoque). n8n prompt/tools atualizados (ainda `active: false`). Bot **off**
 > de propósito até go-live. **Decisão:** sem trava de consentimento; CPF mascarado.
+> **Decisão 2026-07-21:** o bot solicita a simulação, não recebe/exibe o resultado financeiro e
+> faz handoff automático; o vendedor entrega o resultado ao cliente.
 > **Aberto:** go-live manual, LGPD exclusão, readiness real, foto no cadastro (E6).
 
 **Goal:** Entregar um pacote instalável e revendível que conecta um WhatsApp, conversa com clientes,
@@ -66,8 +68,8 @@ Chatbot API. O workflow pode ser trocado sem migrar os dados do produto.
 - `webhook_entregas`: outbox, tentativas e resultado da exportação.
 - `auditoria`: alterações administrativas e exclusões.
 
-Simulações completas pertencem ao Motor. O Chatbot guarda apenas referência, status resumido e os
-resultados necessários para apresentar ao cliente, respeitando retenção configurada.
+Simulações completas pertencem ao Motor. O Chatbot não apresenta nem persiste parcelas, taxas ou
+bancos para responder ao cliente: guarda a conversa/handoff e o vendedor consulta o Motor/Portal.
 
 ## Contratos internos
 
@@ -103,8 +105,9 @@ de simulação (o telefone existe na conversa Evolution, mas não amarra o job d
 1. Telefone = identidade WhatsApp (sempre presente no lead/conversa).
 2. Cliente informa **placa** → Chatbot consulta Estoque (`por-placa`) → preço/modelo reais.
 3. Coleta: CPF (+ nascimento se necessário), **entrada**. **Sem** prazo desejado e **sem** renda.
-4. Simulação devolve opções em prazos padrão (ex. 12/24/36/48) sobre o valor daquela placa.
-5. Troca mock → Motor HTTP sem o n8n saber a diferença.
+4. Chatbot enfileira opções em prazos padrão (ex. 12/24/36/48), sem aguardar o resultado.
+5. A tool descarta a resposta técnica, pausa o bot e informa que um vendedor trará o resultado.
+6. Troca mock → Motor HTTP sem o n8n saber a diferença.
 
 Detalhe do payload e tabela de campos: seção *Pacote CRM estoque no WhatsApp privado* no Plano #4A.
 

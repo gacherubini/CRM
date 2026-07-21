@@ -1,8 +1,8 @@
 # 🏍️ Bot de WhatsApp — Simulação de Financiamento de Motos
 
 Bot de WhatsApp para revenda de motos que conversa com o cliente, coleta os dados
-necessários e devolve simulações de financiamento de vários bancos (parcela, taxa,
-nº de parcelas) de forma organizada.
+necessários, solicita a simulação internamente e transfere o atendimento para um vendedor.
+Parcelas, taxas e bancos não são enviados automaticamente ao cliente.
 
 > **Status:** 🟢 MVP demonstrável (~**97%** demo / multi-banco + CRM campanhas/ROI).  
 > **Ambiente:** preferência **local** (Fly lab **parado** desde 2026-07-20).  
@@ -64,9 +64,9 @@ não muda o contrato `/v1/simulacoes`. Estoque é a fonte de verdade de veículo
 4. **Dados pessoais** → nome completo, CPF, data de nascimento *(renda opcional)*.
 5. **Validação** → CPF (dígito verificador), data real, idade ≥ 18.
 6. **Confirmação** → resume tudo e pede "confirma?".
-7. **Dispara o motor** → `POST /simular`.
-8. **Resposta formatada** → opções por banco.
-9. **Fechamento** → salva lead + oferece falar com vendedor humano.
+7. **Dispara o motor internamente** → a resposta financeira não volta ao cliente pelo bot.
+8. **Handoff automático** → pausa o bot e chama um vendedor.
+9. **Fechamento** → o bot avisa que o vendedor trará o resultado; parcelas/taxas ficam no Portal.
 
 **Validações:** CPF com cálculo de dígito verificador (rejeita sequências inválidas);
 data existente com idade mínima 18; valores como "20 mil"/"R$ 20.000"/"20000" → 20000.
@@ -137,7 +137,7 @@ Mapa de campos e decisões: [`docs/plans/2026-07-13-plano1a-task12-bancos-reconh
 - [x] **Vendas / metas / CSV / E10 Pixel** — + **campanhas + ROI (E8)** DONE 2026-07-20.
 - [x] **Motor multi-banco** — Santander, Fontecred, Bradesco, Pan portal LIVE; fan-out; warm session teto 2.
 - [ ] **Go-live WhatsApp E2E** — Gemini + Evolution + n8n em ambiente estável (eixo A).
-- [ ] **#3B Task 4** — eventos de funil; residual CAPI match; outbound E11/E12; polish revenda.
+- [ ] **#3B Task 4** — eventos de funil; event bus/Google; outbound E11/E12; polish revenda.
 
 Estado canônico: [`docs/contexto-compacto.md`](docs/contexto-compacto.md) · planos: [`docs/plans/README.md`](docs/plans/README.md) · handoff: [`docs/handoff-contexto.md`](docs/handoff-contexto.md).
 

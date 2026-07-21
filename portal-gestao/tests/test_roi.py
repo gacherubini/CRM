@@ -2,7 +2,7 @@ from datetime import date, datetime, timezone
 from decimal import Decimal
 
 from app.models import Campanha, CampanhaGasto, Venda, novo_id
-from app.roi_calc import calcular_roi_loja, totais_roi
+from app.roi_calc import calcular_roi_loja, gerar_insights_roi, totais_roi
 
 
 def _campanha(**kwargs):
@@ -130,3 +130,23 @@ def test_first_vs_last_separa_leads():
     assert next(l for l in first if l.campanha_id == cb.id).leads == 0
     assert next(l for l in last if l.campanha_id == ca.id).leads == 0
     assert next(l for l in last if l.campanha_id == cb.id).leads == 1
+
+
+def test_insights_roi_sao_deterministicos_e_honestos():
+    c = _campanha(nome="Campeã Meta")
+    gasto = CampanhaGasto(
+        id=novo_id(), campanha_id=c.id, loja_slug="loja-teste",
+        valor=Decimal("1000"), referencia=date(2026, 7, 10), criada_por="dono@loja.test",
+    )
+    venda = Venda(
+        id=novo_id(), loja_slug="loja-teste", vendedor_email="v@t.com", descricao="moto",
+        preco_venda=Decimal("8000"), status="confirmada", campanha_id_last=c.id,
+        criada_em=datetime(2026, 7, 11, tzinfo=timezone.utc),
+    )
+    linhas = calcular_roi_loja(
+        campanhas=[c], gastos=[gasto], leads=[], vendas_confirmadas=[venda],
+        d_inicio=date(2026, 7, 1), d_fim=date(2026, 7, 31),
+    )
+    insights = gerar_insights_roi(linhas, totais_roi(linhas))
+    assert any("melhor ROAS" in texto and "8.00x" in texto for texto in insights)
+    assert any("cada R$ 1" in texto for texto in insights)

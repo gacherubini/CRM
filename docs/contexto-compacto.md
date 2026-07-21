@@ -1,6 +1,6 @@
 # Contexto compacto para continuidade
 
-Atualizado em **2026-07-21** (plano conversões/funil/insights ATIVO · tráfego pago DONE · Fly lab **parado** · foco **local**).
+Atualizado em **2026-07-21** (CRM **A/B/E/D/H DONE** · residual **C/F/G** · tráfego pago DONE · Fly lab **parado** · foco **local**).
 Leia isto primeiro; detalhe operacional recente em `docs/handoff-contexto.md` (topo).
 Planos válidos: `docs/plans/README.md`. **Ignore** `docs/plans/_archive/`.
 
@@ -18,9 +18,9 @@ Campos e decisões por banco:
 [warm+batch2](plans/2026-07-17-plano1a-warm-session-batch2.md).
 **CRM tráfego pago (2026-07-20):** campanhas + first/last + ROI **DONE** —
 [plano](plans/2026-07-20-plano-trafego-pago-crm-campanhas-roi.md) · guia [loja](trafego-pago-loja.md).
-**Próximo eixo C (2026-07-21 rev.3):** [conversões / funil / insights](plans/2026-07-21-plano-conversao-atribuicao-insights.md)
-(A→B→E→D→**H resultados dono**→C→F→G); H=bloco dashboard + alertas + drill-down campanha + onboarding;
-TikTok API e API de spend parked.
+**Eixo C (2026-07-21 rev.3):** [conversões / funil / insights](plans/2026-07-21-plano-conversao-atribuicao-insights.md)
+— **A/B/E/D/H concluídas**; próximos incrementos `C → F → G` (eventos de funil → event bus →
+Google Conversions). TikTok API e API de spend parked.
 
 ## Fonte da verdade (por tema)
 
@@ -41,7 +41,7 @@ Não há uma única “próxima task” universal — depende do objetivo:
 |---|---|---|---|
 | **A · Demo loja / WA** | Go-live E2E local (Evolution+n8n+chatbot) + publicar estoque | Operação ou demo com cliente real no Zap | `go-live-chatbot.md` + `deploy/*/docker-compose.yml` |
 | **B · Multi-banco** | Estabilizar sim com celular + prints; alinhar âncoras se falhar ao vivo | Mais cotações reais estáveis | handoff topo + lições Playwright |
-| **C · CRM dono** | [Conversões…](plans/2026-07-21-plano-conversao-atribuicao-insights.md) A→B→E→D→H→C→F→G | Resultados no dashboard + bus + Google | rev.3; spend API fora |
+| **C · CRM dono** | Eventos de funil (C), depois event bus (F) e Google (G) | Tempos do funil + conversões outbound | A/B/E/D/H feitas; spend API fora |
 | **D · Escala Motor** | Smoke live sessão quente + teto 2; object storage se multi-volume | Estabilidade multi-banco / IP | B+D + warm-batch2 |
 | **E · Dia a dia loja** | E1 áudio, E6 fotos (após ou em paralelo leve a A) | Uso diário sem depender de banco novo | `#6` |
 | **F · Marketing** | Completar landing se o dono entregar HTML | Site/hero polish | `site/` |
@@ -71,8 +71,8 @@ Apps Fly (referência, **não ligar** sem pedido): `motor2037`, `estoque2037`, `
 - Scripts: `bash deploy/fly/down-all.sh` · `up-all.sh` · `up-all.sh --catalogo` ·
   `apply-always-on-backends.sh` · `clean-orphan-volumes.sh --apply`.
 - Segredos: só `deploy/fly/.env.production.local` (ignorado). Nunca imprimir/versionar.
-- n8n workflow canônico no repo: `n8n/workflow-ai-nao-salvos.json` (bypass de teste para
-  `51980336365` pode estar no JSON — revisar antes de produção real).
+- n8n workflow canônico no repo: `n8n/workflow-ai-nao-salvos.json` — sem bypass por telefone;
+  webhooks internos usam o placeholder `__CHATBOT_WEBHOOK_TOKEN__`.
 
 ## Regras permanentes
 
@@ -90,9 +90,9 @@ Apps Fly (referência, **não ligar** sem pedido): `motor2037`, `estoque2037`, `
 | Produto | Pasta / porta | Feito (essencial) | Aberto |
 |---|---|---|---|
 | Motor #1A | `motor-simulacao/` `:8000` | async, auth, fan-out, workers on-demand, **Santander/Fontecred/Bradesco/Pan portal LIVE**, warm session teto 2, prints blob JPEG, migrations head **0013** | `testar-login` real; T10 revenda; object storage multi-volume |
-| Chatbot #2A | `chatbot-api/` `:8001` | leads, handoff, por-placa, E3, E5, first/last UTM, fbclid/gclid, n8n tools | go-live manual; LGPD exclusão |
+| Chatbot #2A | `chatbot-api/` `:8001` | leads, handoff, por-placa, E3, E5, first/last UTM, fbclid/gclid; solicitação de sim privada + handoff vendedor | go-live manual; LGPD exclusão |
 | Estoque #4A | `estoque-api/` `:8100` | CRUD, placa, por-placa, admin | E2E outbox; restore |
-| Portal | `portal-gestao/` `:9000` | CRM, sim multi-banco, 9A, E10, CSV, metas, **campanhas + ROI** | #3B T4 funil; E2E Playwright |
+| Portal | `portal-gestao/` `:9000` | CRM, sim multi-banco, 9A, CAPI retry, gastos lote/CSV, campanhas/ROI, resultados/alertas dono | #3B T4 eventos de funil; event bus/Google; E2E Playwright |
 | Catálogo #5A | `catalogo-publico/` `:8200` | vitrine, CTA, Pixel PageView/Lead/ViewContent | SEO/tema; domínio (E18) |
 | Site | `site/` | landing + hero poster | polish visual residual |
 
@@ -114,7 +114,7 @@ Baseline de testes: rodar `pytest -q` no produto; não confiar em contagens anti
 cd motor-simulacao && python -m pytest tests/test_santander_driver.py tests/test_fontecred_driver.py -q
 cd ../portal-gestao && python -m pytest tests/test_campanhas.py tests/test_roi.py -q
 cd ../chatbot-api && python -m pytest tests/test_catalog_attribution.py -q
-# migrations: motor head 0013 · portal 0006 campanhas · chatbot 0006 attribution
+# migrations: motor head 0013 · portal 0007 onboarding_medicao · chatbot 0006 attribution
 git status --short
 ```
 

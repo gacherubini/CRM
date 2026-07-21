@@ -1,7 +1,12 @@
 from datetime import date
 from decimal import Decimal
 
-from app.campanhas import normalizar_utm, parse_brl_valor, validar_campanha_payload
+from app.campanhas import (
+    normalizar_utm,
+    parse_brl_valor,
+    parse_gastos_csv,
+    validar_campanha_payload,
+)
 from app.db import SessionLocal
 from app.models import Campanha, CampanhaGasto, novo_id
 
@@ -29,6 +34,16 @@ def test_validar_ok():
         "status": "ativa",
     })
     assert erros == []
+
+
+def test_validar_canais_extras_e_rejeitar_desconhecido():
+    for canal in ("tiktok", "olx", "marketplace", "facebook_marketplace"):
+        assert validar_campanha_payload(
+            {"nome": "Campanha", "canal": canal, "utm_campaign": f"utm-{canal}"}
+        ) == []
+    assert "canal inválido" in validar_campanha_payload(
+        {"nome": "Campanha", "canal": "rede-x", "utm_campaign": "utm-x"}
+    )
 
 
 def test_parse_brl_valor_br():
@@ -64,3 +79,24 @@ def test_persistir_campanha_e_gasto():
     assert db.query(Campanha).count() == 1
     assert db.query(CampanhaGasto).one().valor == Decimal("500.00")
     db.close()
+
+
+def test_parse_csv_gastos_mantem_linhas_validas_e_reporta_erros():
+    campanha = Campanha(
+        id=novo_id(), loja_slug="loja-teste", nome="Meta", canal="meta", status="ativa",
+        utm_campaign="seminovos-julho", utm_campaign_norm="seminovos-julho",
+        criada_por_email="dono@loja.test",
+    )
+    csv = (
+        "utm_campaign;valor;referencia;nota\n"
+        "seminovos-julho;1.200,50;2026-07-14;semana 2\n"
+        "nao-existe;800;2026-07-14;\n"
+        "seminovos-julho;abc;data;ruim\n"
+    ).encode()
+    linhas, erros = parse_gastos_csv(csv, [campanha])
+    assert len(linhas) == 1
+    assert linhas[0].valor == Decimal("1200.50")
+    assert linhas[0].referencia == date(2026, 7, 14)
+    assert len(erros) == 2
+    assert "não cadastrada" in erros[0]
+    assert "valor inválido" in erros[1]

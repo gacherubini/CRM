@@ -6,7 +6,8 @@
 > **Status 2026-07-21:** base + #3A.1 entregues; **RBAC sim. vendedor (Task 13) feito**;
 > **Task 9A** UI `/app/financeiras` (BFF → Motor credenciais) **feita**; gestão de
 > **Equipe feita** (criar/editar/senha/ativar/desativar com RBAC + tenancy).
-> **Aberto:** Ajustes/configuração real (ainda placeholder) e Playwright E2E (#3A.1 Task 15).
+> **Ajustes/configuração real feita** (`/app/configuracoes`, RBAC e status seguro das integrações).
+> **Aberto:** Playwright E2E (#3A.1 Task 15).
 
 **Goal:** Entregar um portal revendível em que a loja administra usuários e vendedores, organiza
 leads, registra atividades e administra o estoque incluído; Chatbot e Motor são opcionais.

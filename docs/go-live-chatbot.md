@@ -77,8 +77,10 @@ fly ssh console -a chatbot2037 -C "cd /srv && alembic upgrade head"
 - Credencial **Gemini** configurada e testada no n8n (sem ela a mensagem chega e a IA não responde).
 - Nós HTTP Evolution: chave da instância nos nós do tipo
   “Consultar contato” / “Responder WhatsApp” (nomes podem variar com sufixo `1`).
-- Placeholders `__INSTANCE__`, `__EVOLUTION_KEY__`, `__CHATBOT_TOKEN__` só no **runtime** —
-  nunca commitar valores reais no JSON em `n8n/`.
+- Placeholders `__INSTANCE__`, `__EVOLUTION_KEY__`, `__CHATBOT_TOKEN__` e
+  `__CHATBOT_WEBHOOK_TOKEN__` só no **runtime** — nunca commitar valores reais no JSON em `n8n/`.
+- O template versionado não possui bypass por telefone: os gates de handoff, deduplicação e
+  contato não salvo valem para todos os números.
 
 ### 4.1 Tools do workflow → Chatbot API
 
@@ -86,7 +88,7 @@ fly ssh console -a chatbot2037 -C "cd /srv && alembic upgrade head"
 |---|---|---|
 | `consultar_estoque1` | `GET /v1/estoque/buscar?termo=` | busca marca/modelo |
 | `consultar_por_placa1` | `GET /v1/estoque/por-placa/{placa}` | unidade pela placa |
-| `simular1` | `POST /v1/simular` | preferir `placa` + `telefone` + `cpf` + `nascimento` + `entrada`; multi-prazo se omitir prazos |
+| `simular1` | `POST /v1/simulacoes/solicitar` + handoff | enfileira com `placa` + `telefone` + `cpf` + `nascimento` + `entrada`; não espera o resultado e pausa o bot |
 | `registrar_lead1` | `POST /v1/leads` | telefone + interesse (+ nome opcional) |
 | `registrar_consentimento1` | `POST /v1/consentimentos` | opcional — não bloqueia |
 | `solicitar_handoff1` | `PATCH /v1/conversas/{tel}/estado` | `bot_ativo: false` |
@@ -121,9 +123,9 @@ python -m app.cli autorizar-numero --slug <loja> --telefone 5511... --papel dono
 
 ## 7. Decisões de produto ANTES de ir ao ar
 
-- **Simulação:** Santander e Fontecred podem devolver cotação **real** se credenciais e worker
-  estiverem ok. Outros bancos no mock = estimativa. Prompt do bot deve deixar claro o que é
-  cotação de portal vs estimativa, se misturar provedores.
+- **Simulação:** o bot nunca entrega cotação, estimativa, parcelas, taxas ou bancos ao cliente.
+  Ele solicita a simulação internamente, pausa a conversa e informa que um vendedor trará o
+  resultado. Credenciais e detalhes bancários permanecem no Motor/Portal.
 - Campos por banco (placa, celular, entrada…) → mapa de reconhecimento; o n8n/Chatbot deve
   coletar o que o provedor escolhido exige.
 - CPF mascarado; sem gate de consentimento (decisão tomada). Expurgo LGPD ainda é backlog (#2A).
@@ -132,8 +134,8 @@ python -m app.cli autorizar-numero --slug <loja> --telefone 5511... --papel dono
 
 1. Contato **SALVO** → bot **não** responde.
 2. Contato **NÃO salvo** → bot responde (IA completa, não só eco Evolution).
-3. Fluxo: estoque (termo ou **placa**) → lead → simulação; se Motor real, conferir parcela
-   coerente no Portal/Registros.
+3. Fluxo: estoque (termo ou **placa**) → lead → solicitação de simulação → mensagem de espera →
+   `bot_ativo=false`; conferir o resultado somente no Portal/Registros.
 4. Handoff E3: 1 msg pelo celular do lojista → `bot_ativo=false`. Mensagem do próprio bot não pausa.
 5. Portal: conversa em `/app/conversas`, handoff refletido.
 

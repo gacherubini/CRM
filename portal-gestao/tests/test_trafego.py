@@ -1,4 +1,5 @@
 """E10 — aba Tráfego / Meta Pixel + CAPI Purchase."""
+import json
 from decimal import Decimal
 
 import httpx
@@ -7,6 +8,7 @@ from conftest import csrf_da_resposta, login
 
 from app.cripto import cifrar, decifrar
 from app.db import SessionLocal
+from app.meta_capi import montar_payload_purchase
 from app.models import MetaCapiOutbox, MetaPixelConfig, Venda
 
 
@@ -251,6 +253,8 @@ def test_falha_capi_nao_quebra_confirmacao_venda(client, monkeypatch):
     outbox = db.query(MetaCapiOutbox).filter(MetaCapiOutbox.venda_id == venda_id).one()
     assert outbox.status == "failed"
     assert outbox.last_error
+    assert "tok-capi" not in outbox.last_error
+    assert "access_token" not in outbox.last_error
     db.close()
 
 
@@ -280,3 +284,59 @@ def test_purchase_desligado_nao_enfileira(client, monkeypatch):
     assert db.query(MetaCapiOutbox).count() == 0
     db.close()
     assert chamado["n"] == 0
+
+
+def test_payload_purchase_enriquece_telefone_email_e_fbclid(monkeypatch):
+    monkeypatch.setattr("app.meta_capi.time.time", lambda: 1700000000)
+    payload = montar_payload_purchase(
+        event_id="purchase-v1", value="100", phone="+55 (11) 98765-4321",
+        email=" Pessoa@Email.COM ", fbclid="IwAR-abc",
+    )
+    user_data = payload["data"][0]["user_data"]
+    assert user_data["ph"]
+    assert user_data["em"]
+    assert user_data["fbc"] == "fb.1.1700000000.IwAR-abc"
+    assert "+55" not in json.dumps(payload)
+    assert "Pessoa@Email.COM" not in json.dumps(payload)
+
+
+def test_retry_capi_e_status_sem_expor_token(client, monkeypatch):
+    login(client)
+    db = SessionLocal()
+    _configurar_meta(db, token="segredo-retry")
+    db.add(
+        MetaCapiOutbox(
+            loja_slug="loja-teste", event_id="purchase-retry", event_name="Purchase",
+            payload_json=json.dumps(montar_payload_purchase(event_id="purchase-retry", value="10")),
+            status="failed", attempts=1,
+            last_error="Client error '400' for url 'https://graph.facebook.com/events?access_token=segredo-legado'",
+        )
+    )
+    db.commit()
+    db.close()
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json={"events_received": 1})
+
+    original = httpx.Client
+    transporte = httpx.MockTransport(handler)
+    monkeypatch.setattr(
+        "app.meta_capi.httpx.Client",
+        lambda *args, **kwargs: original(*args, transport=transporte, **kwargs),
+    )
+    pagina = client.get("/app/trafego")
+    assert "último envio falhou" in pagina.text
+    assert "segredo-legado" not in pagina.text
+    assert "access_token" not in pagina.text
+    assert "segredo-retry" not in pagina.text
+    resposta = client.post(
+        "/app/trafego/capi/retentar",
+        data={"csrf": csrf_da_resposta(pagina)},
+        follow_redirects=False,
+    )
+    assert resposta.status_code == 303
+    db = SessionLocal()
+    outbox = db.query(MetaCapiOutbox).filter_by(event_id="purchase-retry").one()
+    assert outbox.status == "delivered"
+    assert outbox.attempts == 2
+    db.close()

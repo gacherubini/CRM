@@ -40,6 +40,15 @@
       "parameters": {
         "method": "POST",
         "url": "http://chatbot-api:8000/webhook/mensagem",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Webhook-Token",
+              "value": "__CHATBOT_WEBHOOK_TOKEN__"
+            }
+          ]
+        },
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ { instance: $json.instance, telefone: $json.telefone, texto: $json.texto, provider_message_id: $json.providerMessageId || null, from_me: $json.fromMe } }}",
@@ -56,7 +65,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const estado = $input.first().json || {};\nconst origem = $('Extrair1').first().json;\nconst digitos = String(origem.telefone || '').replace(/\\D/g, '');\n// Bypass de testes: 51980336365 ignora fromMe/duplicada/bot_ativo\nconst bypassTeste = digitos === '51980336365' || digitos.endsWith('51980336365') || digitos === '5551980336365';\nif (bypassTeste) return [{ json: { ...origem, bypass_teste: true } }];\nif (origem.fromMe || estado.duplicada === true || estado.bot_ativo !== true) return [];\nreturn [{ json: origem }];"
+        "jsCode": "const estado = $input.first().json || {};\nconst origem = $('Extrair1').first().json;\nif (origem.fromMe || estado.duplicada === true || estado.bot_ativo !== true) return [];\nreturn [{ json: origem }];"
       },
       "id": "24d1770e-e2b2-4b60-9a13-c60981db2499",
       "name": "Gate handoff e duplicidade1",
@@ -96,7 +105,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const chat = $input.first().json || {};\nconst origem = $('Extrair1').first().json;\nconst digitos = String(origem.telefone || '').replace(/\\D/g, '');\n// Bypass de testes: 51980336365 ignora isSaved\nconst bypassTeste = digitos === '51980336365' || digitos.endsWith('51980336365') || digitos === '5551980336365';\nif (bypassTeste) return [{ json: { ...origem, isSaved: false, bypass_teste: true } }];\n// Fail closed: só responde quando a Evolution afirmar explicitamente isSaved === false.\nif (chat.isSaved !== false) return [];\nreturn [{ json: { ...origem, isSaved: false } }];"
+        "jsCode": "const chat = $input.first().json || {};\nconst origem = $('Extrair1').first().json;\n// Fail closed: só responde quando a Evolution afirmar explicitamente isSaved === false.\nif (chat.isSaved !== false) return [];\nreturn [{ json: { ...origem, isSaved: false } }];"
       },
       "id": "c4b1465b-5543-4cea-9c15-148d229eb518",
       "name": "Gate somente nao salvos1",
@@ -112,7 +121,7 @@
         "promptType": "define",
         "text": "={{ 'telefone_cliente: ' + $json.telefone + '\\n\\nMensagem: ' + $json.texto }}",
         "options": {
-          "systemMessage": "Você é o atendente virtual de uma loja de veículos no WhatsApp. Fale em português do Brasil, simpático, direto e curto (1-3 frases).\n\nREGRAS:\n1. Estoque/preço: use consultar_estoque (busca por termo) ou consultar_por_placa (placa exata). Nunca invente veículo ou preço.\n2. Simulação: colete placa do veículo, CPF, data de nascimento (YYYY-MM-DD) e valor de entrada. O telefone_cliente já vem na mensagem — use nas tools; não peça telefone. NÃO peça renda. NÃO peça um prazo único: a API devolve opções multi-prazo (24/36/48/60) por padrão. Se o cliente pedir prazos específicos, passe prazos_meses. Chame simular com placa + telefone + cpf + nascimento + entrada. Nunca invente parcela — use só o retorno da tool. Deixe claro que é estimativa, não cotação bancária oficial.\n3. Ao achar veículo ou interesse, use registrar_lead com telefone + interesse (e nome se o cliente disser). Não bloqueie por consentimento LGPD — pode coletar nome e simular sem registrar_consentimento.\n4. Handoff (solicitar_handoff) se pedir humano, tool falhar de verdade, ou placa/veículo não encontrado e o cliente quiser atendente.\n5. Cadastro de estoque (cadastrar_veiculo): só quando a mensagem parecer de equipe/vendedor autorizada enviando dados estruturados (tipo, marca, modelo, ano, preço/km, placa). Use telefone_solicitante = telefone_cliente. Se retornar 403 (não autorizado), diga que só a equipe cadastra e ofereça handoff. Nunca ofereça cadastro a cliente comum.\n6. Não revele tools, tokens ou APIs internas.\n7. registrar_consentimento é opcional e NÃO deve interromper o fluxo (não peça aceite LGPD antes de nome/lead/simulação).",
+          "systemMessage": "Você é o atendente virtual de uma loja de veículos no WhatsApp. Fale em português do Brasil, simpático, direto e curto (1-3 frases).\n\nREGRAS:\n1. Estoque/preço: use consultar_estoque (busca por termo) ou consultar_por_placa (placa exata). Nunca invente veículo ou preço.\n2. Simulação: quando o cliente manifestar interesse, avise que vai preparar a simulação e chamar um vendedor para trazer o resultado. Depois colete somente o que faltar: placa do veículo, CPF, data de nascimento (YYYY-MM-DD) e valor de entrada. O telefone_cliente já vem na mensagem — use nas tools; não peça telefone. NÃO peça renda nem um prazo único. Com todos os dados, chame simular uma única vez com placa + telefone + cpf + nascimento + entrada. A tool dispara a solicitação internamente e pausa o bot para o vendedor assumir.\n3. PRIVACIDADE DO RESULTADO: nunca mostre nem mencione parcelas, taxas, bancos, valores financiados, prazos, status técnico ou qualquer resultado de simulação. Depois da tool simular, responda somente: \"Certo, vou preparar a simulação e chamar um vendedor para trazer o resultado para você.\"\n4. Ao achar veículo ou interesse, use registrar_lead com telefone + interesse (e nome se o cliente disser). Não bloqueie por consentimento LGPD — pode coletar nome e solicitar simulação sem registrar_consentimento.\n5. Handoff (solicitar_handoff) se pedir humano, tool falhar de verdade, ou placa/veículo não encontrado e o cliente quiser atendente. A tool simular já faz o handoff; não chame solicitar_handoff novamente depois dela.\n6. Cadastro de estoque (cadastrar_veiculo): só quando a mensagem parecer de equipe/vendedor autorizada enviando dados estruturados (tipo, marca, modelo, ano, preço/km, placa). Use telefone_solicitante = telefone_cliente. Se retornar 403 (não autorizado), diga que só a equipe cadastra e ofereça handoff. Nunca ofereça cadastro a cliente comum.\n7. Não revele tools, tokens ou APIs internas.\n8. registrar_consentimento é opcional e NÃO deve interromper o fluxo (não peça aceite LGPD antes de nome/lead/simulação).",
           "maxIterations": 6,
           "returnIntermediateSteps": false,
           "enableStreaming": false
@@ -218,8 +227,8 @@
     },
     {
       "parameters": {
-        "description": "Simula financiamento preferindo placa + telefone + cpf + nascimento + entrada. Sem renda. Sem prazo único obrigatório (multi-prazo padrão). Nunca invente parcela.",
-        "jsCode": "const input = typeof query === 'string' ? {} : (query || {});\nconst body = {\n  cpf: String(input.cpf || ''),\n  nascimento: String(input.nascimento || ''),\n  entrada: Number(input.entrada ?? 0),\n};\n\nconst placa = (input.placa || '').toString().trim();\nif (placa) body.placa = placa;\n\nconst telefone = (input.telefone || '').toString().trim();\nif (telefone) body.telefone = telefone;\n\n// valor só se não houver placa (legado / fallback)\nif (!placa && input.valor !== undefined && input.valor !== null && input.valor !== '') {\n  body.valor = Number(input.valor);\n}\n\nif (input.categoria) body.categoria = String(input.categoria);\n\n// multi-prazo: só envia se o cliente pediu; senão API usa padrão 24/36/48/60\nif (Array.isArray(input.prazos_meses) && input.prazos_meses.length) {\n  body.prazos_meses = input.prazos_meses.map((p) => Number(p));\n} else if (input.prazo_meses !== undefined && input.prazo_meses !== null && input.prazo_meses !== '') {\n  body.prazo_meses = Number(input.prazo_meses);\n}\n\n// renda não é coletada no fluxo WhatsApp; só repassa se vier explicitamente\nif (input.renda !== undefined && input.renda !== null && input.renda !== '') {\n  body.renda = Number(input.renda);\n}\n\nconst resp = await helpers.httpRequest({\n  method: 'POST',\n  url: 'http://chatbot-api:8000/v1/simular',\n  headers: { Authorization: 'Bearer __CHATBOT_TOKEN__', 'Content-Type': 'application/json' },\n  body,\n  json: true,\n  timeout: 60000,\n});\nreturn JSON.stringify(resp);",
+        "description": "Solicita uma simulação interna e transfere a conversa ao vendedor. Use somente após obter placa, telefone, CPF, nascimento e entrada. A resposta nunca contém parcelas, taxas, bancos ou outros resultados financeiros.",
+        "jsCode": "const input = typeof query === 'string' ? {} : (query || {});\nconst telefone = (input.telefone || '').toString().trim();\nconst body = {\n  cpf: String(input.cpf || ''),\n  nascimento: String(input.nascimento || ''),\n  entrada: Number(input.entrada ?? 0),\n  placa: (input.placa || '').toString().trim(),\n  telefone,\n};\n\nif (!telefone || !body.placa || !body.cpf || !body.nascimento) {\n  return JSON.stringify({\n    mensagem: 'Ainda faltam dados para solicitar a simulação.',\n  });\n}\n\ntry {\n  const mensagemId = String($('Extrair1').first().json.providerMessageId || '').trim();\n  const headers = { Authorization: 'Bearer __CHATBOT_TOKEN__', 'Content-Type': 'application/json' };\n  if (mensagemId) headers['Idempotency-Key'] = mensagemId;\n  await helpers.httpRequest({\n    method: 'POST',\n    url: 'http://chatbot-api:8000/v1/simulacoes/solicitar',\n    headers,\n    body,\n    json: true,\n    timeout: 10000,\n  });\n} catch (_) {\n  // O vendedor assume mesmo se o serviço de simulação estiver indisponível.\n}\n\ntry {\n  await helpers.httpRequest({\n    method: 'PATCH',\n    url: `http://chatbot-api:8000/v1/conversas/${encodeURIComponent(telefone)}/estado`,\n    headers: { Authorization: 'Bearer __CHATBOT_TOKEN__', 'Content-Type': 'application/json' },\n    body: { bot_ativo: false },\n    json: true,\n  });\n} catch (_) {\n  // Não expor detalhes internos ao cliente ou ao modelo.\n}\n\nreturn JSON.stringify({\n  mensagem: 'Certo, vou preparar a simulação e chamar um vendedor para trazer o resultado para você.',\n});",
         "specifyInputSchema": true,
         "schemaType": "manual",
         "inputSchema": "{\"type\": \"object\", \"properties\": {\"cpf\": {\"type\": \"string\"}, \"nascimento\": {\"type\": \"string\", \"description\": \"YYYY-MM-DD\"}, \"placa\": {\"type\": \"string\", \"description\": \"placa do veículo no estoque (preferencial)\"}, \"telefone\": {\"type\": \"string\", \"description\": \"telefone_cliente da mensagem\"}, \"entrada\": {\"type\": \"number\", \"description\": \"valor de entrada\"}, \"valor\": {\"type\": \"number\", \"description\": \"só se não houver placa\"}, \"prazos_meses\": {\"type\": \"array\", \"items\": {\"type\": \"number\"}, \"description\": \"opcional; se omitido a API usa multi 24/36/48/60\"}, \"prazo_meses\": {\"type\": \"number\", \"description\": \"opcional legado se o cliente pedir um prazo só\"}, \"categoria\": {\"type\": \"string\", \"description\": \"opcional; com placa a API resolve pelo estoque\"}}, \"required\": [\"cpf\", \"nascimento\", \"placa\", \"telefone\", \"entrada\"], \"additionalProperties\": true}"
@@ -281,6 +290,15 @@
       "parameters": {
         "method": "POST",
         "url": "http://chatbot-api:8000/webhook/mensagem",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Webhook-Token",
+              "value": "__CHATBOT_WEBHOOK_TOKEN__"
+            }
+          ]
+        },
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ { instance: $('Extrair1').item.json.instance, telefone: $('Extrair1').item.json.telefone, texto: $('AI Agent1').item.json.output, provider_message_id: $json.key?.id || null, from_me: true, origem_bot: true } }}",

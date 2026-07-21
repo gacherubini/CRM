@@ -4,10 +4,26 @@
 > Este arquivo: checkpoint operacional. Seções **“Checkpoint anterior”** = histórico — não
 > reexecutar. Path Windows no rodapé de seções antigas: **ignorar** (workspace = root do git).
 >
-> **Checkpoint mais recente: 2026-07-21 (MVP Equipe + fluxo lead/venda/estoque · Fly OFF).**
+> **Checkpoint mais recente: 2026-07-21 (WhatsApp privado + Ajustes + resultados CRM · Fly OFF).**
 > Escolher um eixo por sessão. **Não** religar Fly sem pedido explícito.
 
-## Checkpoint mais recente — Equipe + fluxo operacional do MVP (2026-07-21)
+## Checkpoint mais recente — WhatsApp privado + Ajustes + resultados CRM (2026-07-21)
+
+> **Escopo:** Chatbot/n8n e Portal. Drivers bancários não foram alterados; Fly permaneceu OFF.
+
+- Workflow sem bypass por telefone e com `X-Webhook-Token` na entrada/saída do Chatbot.
+- Interesse em simulação: coleta dados, enfileira em `/v1/simulacoes/solicitar`, não expõe o
+  resultado financeiro ao modelo/cliente e faz handoff automático para o vendedor.
+- Portal `/app/configuracoes` deixou de ser placeholder; mostra conta e status de integrações sem
+  renderizar URLs internas, tokens ou ciphertexts.
+- CRM fases **A/B/E/D/H** concluídas: match/retry CAPI, canais extras, gastos lote/CSV, insights,
+  resultados/alertas/onboarding no dashboard e drill-down de campanha.
+- Migration Portal head: **`0007_onboarding_medicao`**. Portal: **213 testes verdes**.
+- Residual do plano de conversões: **C** eventos de funil, **F** event bus e **G** Google.
+
+---
+
+## Checkpoint anterior — Equipe + fluxo operacional do MVP (2026-07-21)
 
 > **Escopo:** Portal/Chatbot operacional. A simulação não foi alterada.
 
@@ -28,15 +44,15 @@
 - Chatbot: testes novos adicionados; host local usa Python 3.9 e não importa modelos existentes
   que exigem Python 3.10+/3.12. A imagem oficial do serviço continua em Python 3.12.
 
-### Próximo foco recomendado (simulação continua por último)
+### Continuidade deste checkpoint
 
-1. Go-live WhatsApp local: remover bypass de número no n8n, versionar header seguro do webhook e smoke E2E.
-2. Remover/implementar o placeholder de Ajustes do Portal.
-3. Playwright E2E do fluxo login → equipe → lead → venda → estoque.
+> O bypass do n8n, a autenticação do webhook e o placeholder de Ajustes foram resolvidos no
+> checkpoint do topo. Permanece aberto o Playwright E2E do fluxo login → equipe → lead → venda →
+> estoque.
 
 ---
 
-## Checkpoint mais recente — tráfego pago + local-first + limpeza (2026-07-20)
+## Checkpoint anterior — tráfego pago + local-first + limpeza (2026-07-20)
 
 > **Estado:** CRM campanhas/ROI em `main` (`8e7ec5f`). Fly lab **todas as machines paradas**
 > (apps/volumes preservados). Desenvolvimento **local**. Docs/planos alinhados ao status real;
@@ -52,12 +68,13 @@
 | Pixel catálogo | ViewContent + propaga UTMs/click ids no CTA | além de PageView/Lead |
 | Guia loja | `docs/trafego-pago-loja.md` | operação de mídia |
 | Fly | `down-all` + restart n8n forçado | **OFF** — usar local |
-| n8n | `n8n/workflow-ai-nao-salvos.json` | possível bypass teste `51980336365` |
+| n8n | `n8n/workflow-ai-nao-salvos.json` | bypass removido; entrada/saída autenticadas por placeholder de webhook |
 
 ### Aberto (não misturar na mesma PR)
 
 1. **Eixo A:** go-live WA local (Evolution + n8n + chatbot + Gemini).
-2. **Eixo C residual:** #3B Task 4 eventos de funil; CAPI match phone/fbclid fino.
+2. **Eixo C residual:** #3B Task 4 eventos de funil. O match/retry CAPI foi concluído no
+   checkpoint do topo.
 3. **Eixo B/D:** smoke multi-banco local; warm session; não reabrir drivers sem falha nova.
 4. **Eixo E/F:** E1 áudio, E6 fotos, polish site.
 

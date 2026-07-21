@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block title %}Ajustes — Revy{% endblock %}
+{% block content %}
+<div class="page-heading">
+  <div>
+    <span class="eyebrow">Configuração da operação</span>
+    <h1>Ajustes</h1>
+    <p>Confira os dados da sua conta e quais serviços estão prontos para uso.</p>
+  </div>
+</div>
+
+<div class="form-layout">
+  <section class="panel form-section" aria-labelledby="dados-loja">
+    <div class="section-title">
+      <span>01</span>
+      <div>
+        <h2 id="dados-loja">Loja e conta</h2>
+        <p>Informações usadas para identificar seu acesso no Portal.</p>
+      </div>
+    </div>
+    <dl class="integration-stats">
+      <div><dt>Loja</dt><dd>{{ usuario.loja_slug }}</dd></div>
+      <div><dt>Nome</dt><dd>{{ usuario.nome }}</dd></div>
+      <div><dt>E-mail</dt><dd>{{ usuario.email }}</dd></div>
+      <div><dt>Perfil</dt><dd>{{ papel_rotulo }}</dd></div>
+    </dl>
+  </section>
+
+  <section class="panel form-section" aria-labelledby="status-integracoes">
+    <div class="section-title">
+      <span>02</span>
+      <div>
+        <h2 id="status-integracoes">Integrações</h2>
+        <p>O status indica apenas se a integração foi configurada no servidor.</p>
+      </div>
+    </div>
+    <div class="form-grid">
+      {% for integracao in integracoes %}
+      <article class="integration-card {{ '' if integracao.configurada else 'offline' }}">
+        <div class="integration-heading">
+          <div><strong>{{ integracao.nome }}</strong><small>{{ usuario.loja_slug }}</small></div>
+          <span class="status-chip">
+            <i></i>{{ 'Configurado' if integracao.configurada else 'Não configurado' }}
+          </span>
+        </div>
+        <p>{{ integracao.descricao }}</p>
+      </article>
+      {% endfor %}
+    </div>
+  </section>
+
+  <section class="panel action-panel" aria-labelledby="atalhos-ajustes">
+    <div>
+      <h2 id="atalhos-ajustes">Gerenciar</h2>
+      <p>Abra apenas as áreas permitidas para o seu perfil.</p>
+    </div>
+    <div class="action-grid">
+      {% if pode_equipe %}<a class="button secondary" href="/app/equipe">Equipe</a>{% endif %}
+      {% if pode_trafego %}<a class="button secondary" href="/app/trafego">Tráfego</a>{% endif %}
+      {% if pode_financeiras %}
+      <a class="button secondary" href="/app/financeiras">Acessos dos bancos</a>
+      {% endif %}
+    </div>
+  </section>
+</div>
+{% endblock %}

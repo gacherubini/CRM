@@ -1,6 +1,9 @@
 """Campanhas de tráfego pago: validação, match UTM e helpers de CRUD."""
 from __future__ import annotations
 
+import csv
+import io
+from dataclasses import dataclass
 from datetime import date
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from typing import Any
@@ -9,11 +12,27 @@ from sqlalchemy.orm import Session
 
 from app.models import Campanha, CampanhaGasto, agora
 
-CANAIS = frozenset({"meta", "google", "indicacao", "organico", "outro"})
+CANAIS = frozenset(
+    {
+        "meta",
+        "google",
+        "tiktok",
+        "olx",
+        "marketplace",
+        "facebook_marketplace",
+        "indicacao",
+        "organico",
+        "outro",
+    }
+)
 STATUS = frozenset({"ativa", "pausada", "encerrada"})
 CANAIS_ROTULO = {
     "meta": "Meta (Instagram/Facebook)",
     "google": "Google Ads",
+    "tiktok": "TikTok",
+    "olx": "OLX",
+    "marketplace": "Marketplace",
+    "facebook_marketplace": "Facebook Marketplace",
     "indicacao": "Indicação",
     "organico": "Orgânico",
     "outro": "Outro",
@@ -24,6 +43,15 @@ STATUS_ROTULO = {
     "encerrada": "Encerrada",
 }
 CENTAVOS = Decimal("0.01")
+
+
+@dataclass(frozen=True)
+class LinhaGastoCsv:
+    numero: int
+    campanha: Campanha
+    valor: Decimal
+    referencia: date
+    nota: str | None
 
 
 def normalizar_utm(valor: str | None) -> str | None:
@@ -46,6 +74,65 @@ def parse_brl_valor(texto: str | None) -> Decimal | None:
     if v < 0:
         return None
     return v.quantize(CENTAVOS, rounding=ROUND_HALF_UP)
+
+
+def parse_gastos_csv(
+    conteudo: bytes,
+    campanhas: list[Campanha],
+) -> tuple[list[LinhaGastoCsv], list[str]]:
+    """Lê o template Revy sem abortar linhas válidas por causa de uma inválida."""
+    try:
+        texto = conteudo.decode("utf-8-sig")
+    except UnicodeDecodeError:
+        return [], ["O arquivo precisa estar em UTF-8."]
+    if not texto.strip():
+        return [], ["O arquivo CSV está vazio."]
+    try:
+        dialect = csv.Sniffer().sniff(texto[:4096], delimiters=";,")
+        reader = csv.DictReader(io.StringIO(texto), dialect=dialect)
+    except csv.Error:
+        reader = csv.DictReader(io.StringIO(texto), delimiter=";")
+    headers = {normalizar_utm(h) for h in (reader.fieldnames or [])}
+    obrigatorios = {"utm_campaign", "valor", "referencia"}
+    if not obrigatorios.issubset(headers):
+        return [], ["Cabeçalho inválido. Use: utm_campaign;valor;referencia;nota."]
+
+    por_utm = {c.utm_campaign_norm: c for c in campanhas}
+    linhas: list[LinhaGastoCsv] = []
+    erros: list[str] = []
+    for numero, raw in enumerate(reader, start=2):
+        if not any((v or "").strip() for v in raw.values()):
+            continue
+        utm = normalizar_utm(raw.get("utm_campaign"))
+        campanha = por_utm.get(utm or "")
+        valor = parse_brl_valor(raw.get("valor"))
+        try:
+            referencia = date.fromisoformat((raw.get("referencia") or "").strip())
+        except ValueError:
+            referencia = None
+        motivos: list[str] = []
+        if campanha is None:
+            motivos.append(
+                f"campanha '{(raw.get('utm_campaign') or '').strip()}' não cadastrada"
+            )
+        if valor is None or valor <= 0:
+            motivos.append("valor inválido")
+        if referencia is None:
+            motivos.append("data de referência inválida")
+        if motivos:
+            erros.append(f"Linha {numero}: " + "; ".join(motivos) + ".")
+            continue
+        nota = (raw.get("nota") or "").strip()[:240] or None
+        linhas.append(
+            LinhaGastoCsv(
+                numero=numero,
+                campanha=campanha,
+                valor=valor,
+                referencia=referencia,
+                nota=nota,
+            )
+        )
+    return linhas, erros
 
 
 def validar_campanha_payload(dados: dict) -> list[str]:

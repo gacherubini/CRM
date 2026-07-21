@@ -100,6 +100,7 @@
       <a class="{{ 'active' if touch == 'first' else '' }}" href="?inicio={{ periodo.inicio }}&fim={{ periodo.fim }}&touch=first">First touch</a>
     </div>
     <a class="button secondary" href="/app/campanhas">Campanhas</a>
+    <a class="button secondary" href="/app/campanhas/gastos/lote">Lançar gastos</a>
     <a class="button ghost" href="/app/trafego">Pixel / CAPI</a>
   </div>
 </div>
@@ -115,6 +116,13 @@
 
 {% if chatbot_erro %}
 <div class="alert error">Não foi possível carregar leads do chatbot: números de lead podem estar incompletos. Vendas e gastos locais continuam válidos.</div>
+{% endif %}
+
+{% if insights %}
+<section class="roi-insights" aria-labelledby="insights-roi-titulo">
+  <div><span class="mono-label">LEITURA DO PERÍODO</span><h2 id="insights-roi-titulo">O que os números mostram</h2></div>
+  <ul>{% for insight in insights %}<li>{{ insight }}</li>{% endfor %}</ul>
+</section>
 {% endif %}
 
 <section class="roi-hero" aria-label="Totais do período">

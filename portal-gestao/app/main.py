@@ -3,7 +3,7 @@ from __future__ import annotations
 import os
 import re
 import uuid
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from pathlib import Path
 from typing import Annotated
@@ -37,12 +37,13 @@ from app.auth import (
     usuario_atual,
 )
 from app.cripto import cifrar
-from app.meta_capi import enfileirar_purchase_venda
+from app.meta_capi import enfileirar_purchase_venda, processar_outbox_pendentes
 from app.models import (
     AtendimentoAtribuicao,
     Campanha,
     CampanhaGasto,
     Meta,
+    MetaCapiOutbox,
     MetaPixelConfig,
     Usuario,
     Venda,
@@ -57,11 +58,13 @@ from app.campanhas import (
     campanha_por_utm,
     normalizar_utm,
     parse_brl_valor,
+    parse_gastos_csv,
     payload_form as campanha_payload_form,
     preencher_campanha,
     validar_campanha_payload,
 )
-from app.roi_calc import calcular_roi_loja, totais_roi
+from app.resultados_dono import alertas_trafego, checklist_medicao, resumo_periodo
+from app.roi_calc import calcular_roi_loja, gerar_insights_roi, totais_roi, venda_casa_campanha
 from app.clients.chatbot import (
     ChatbotClient,
     ChatbotIndisponivel,
@@ -292,8 +295,10 @@ def logout(request: Request, csrf: Annotated[str, Form()]):
 @app.get("/app", response_class=HTMLResponse)
 def dashboard(
     request: Request,
+    resultados: str | None = None,
     db: Session = Depends(get_db),
     estoque: EstoqueClient = Depends(get_estoque_client),
+    chatbot: ChatbotClient = Depends(get_chatbot_client),
 ):
     usuario = usuario_atual(request, db)
     if not usuario:
@@ -309,6 +314,61 @@ def dashboard(
         "publicados": sum(bool(v["publicado"]) for v in veiculos),
         "total": len(veiculos),
     }
+    resultados_view = None
+    alertas_view = []
+    onboarding = None
+    periodo_resultados = None
+    if pode_gerir_trafego(usuario):
+        from app.financeiro_calc import hoje_portal
+
+        hoje = hoje_portal()
+        seletor = "mes" if resultados == "mes" else "7d"
+        d_inicio = hoje.replace(day=1) if seletor == "mes" else hoje - timedelta(days=6)
+        d_fim = hoje
+        campanhas = db.query(Campanha).filter(Campanha.loja_slug == usuario.loja_slug).all()
+        gastos = db.query(CampanhaGasto).filter(CampanhaGasto.loja_slug == usuario.loja_slug).all()
+        vendas = calcular_metricas_vendas(db, usuario.loja_slug, d_inicio, d_fim)["confirmadas"]
+        leads: list[dict] = []
+        chatbot_offline = False
+        try:
+            leads = chatbot.listar_leads()
+        except ChatbotIndisponivel:
+            chatbot_offline = True
+        linhas = calcular_roi_loja(
+            campanhas=campanhas,
+            gastos=gastos,
+            leads=leads,
+            vendas_confirmadas=vendas,
+            d_inicio=d_inicio,
+            d_fim=d_fim,
+            modo_atribuicao="last",
+        )
+        resultados_view = resumo_periodo(linhas)
+        config_meta = db.query(MetaPixelConfig).filter(
+            MetaPixelConfig.loja_slug == usuario.loja_slug
+        ).first()
+        outboxes = db.query(MetaCapiOutbox).filter(
+            MetaCapiOutbox.loja_slug == usuario.loja_slug
+        ).order_by(MetaCapiOutbox.criada_em.desc()).all()
+        alertas_view = alertas_trafego(
+            linhas=linhas,
+            config=config_meta,
+            ultimo_outbox=outboxes[0] if outboxes else None,
+            chatbot_offline=chatbot_offline,
+        )
+        onboarding = checklist_medicao(
+            config=config_meta,
+            campanhas=campanhas,
+            gastos=gastos,
+            vendas=db.query(Venda).filter(Venda.loja_slug == usuario.loja_slug).all(),
+            outboxes=outboxes,
+        )
+        periodo_resultados = {
+            "inicio": d_inicio,
+            "fim": d_fim,
+            "seletor": seletor,
+            "chatbot_offline": chatbot_offline,
+        }
     return templates.TemplateResponse(
         "dashboard.html",
         contexto(
@@ -318,6 +378,12 @@ def dashboard(
             veiculos=veiculos[:5],
             integracao_erro=erro,
             pode_gerir=pode_gerir_estoque(usuario),
+            pode_gerir_trafego=pode_gerir_trafego(usuario),
+            resultados_view=resultados_view,
+            alertas_trafego=alertas_view,
+            onboarding_medicao=onboarding,
+            periodo_resultados=periodo_resultados,
+            canais=CANAIS_ROTULO,
         ),
     )
 
@@ -1762,7 +1828,7 @@ async def vendas_confirmar(
         erro = "reconciliacao" if estoque_baixado else "acao"
         return RedirectResponse(f"/app/vendas?erro={erro}", status_code=303)
     # E10: Purchase via CAPI — best-effort; falha não desfaz a venda.
-    enfileirar_purchase_venda(db, venda)
+    enfileirar_purchase_venda(db, venda, lead)
     return RedirectResponse("/app/vendas?ok=confirmada", status_code=303)
 
 
@@ -2785,20 +2851,76 @@ async def equipe_alterar_acesso(
 
 
 @app.get("/app/configuracoes", response_class=HTMLResponse)
-def configuracoes_placeholder(request: Request, db: Session = Depends(get_db)):
+def configuracoes(request: Request, db: Session = Depends(get_db)):
     usuario = usuario_atual(request, db)
     if not usuario:
         return redirecionar_login()
     if usuario.papel not in {"dono", "admin_plataforma"}:
         return RedirectResponse("/app", status_code=303)
+
+    meta_config = (
+        db.query(MetaPixelConfig)
+        .filter(MetaPixelConfig.loja_slug == usuario.loja_slug)
+        .first()
+    )
+    integracoes = [
+        {
+            "nome": "Estoque",
+            "descricao": "Veículos e disponibilidade da loja.",
+            "configurada": bool(settings.estoque_url and settings.estoque_token),
+        },
+        {
+            "nome": "Chatbot",
+            "descricao": "Leads e conversas do atendimento.",
+            "configurada": bool(settings.chatbot_url and settings.chatbot_token),
+        },
+        {
+            "nome": "Motor",
+            "descricao": "Integração server-side com as financeiras.",
+            "configurada": bool(settings.motor_url and settings.motor_token),
+        },
+        {
+            "nome": "Meta / CAPI",
+            "descricao": "Conversões da loja enviadas pelo servidor.",
+            "configurada": bool(
+                meta_config
+                and meta_config.pixel_id
+                and meta_config.token_ciphertext
+            ),
+        },
+    ]
     return templates.TemplateResponse(
-        "em-breve.html",
-        contexto(request, usuario, titulo="Configurações", texto="As integrações serão configuradas sem expor credenciais ao navegador."),
+        "configuracoes/index.html",
+        contexto(
+            request,
+            usuario,
+            integracoes=integracoes,
+            papel_rotulo=PAPEIS_EQUIPE_ROTULO.get(usuario.papel, usuario.papel),
+            pode_equipe=pode_gerir_equipe(usuario),
+            pode_trafego=pode_gerir_trafego(usuario),
+            pode_financeiras=pode_gerir_financeiras(usuario),
+        ),
     )
 
 
-def _trafego_contexto(request: Request, usuario, config: MetaPixelConfig | None, *, ok=None, erro=None):
+def _trafego_contexto(
+    request: Request,
+    usuario,
+    config: MetaPixelConfig | None,
+    *,
+    ultimo_outbox: MetaCapiOutbox | None = None,
+    pendentes: int = 0,
+    ok=None,
+    erro=None,
+):
     token_configurado = bool(config and config.token_ciphertext)
+    ultimo_erro_exibicao = None
+    if ultimo_outbox is not None and ultimo_outbox.status == "failed":
+        ultimo_erro_exibicao = (
+            f"Meta respondeu HTTP {ultimo_outbox.last_http_status}."
+            if ultimo_outbox.last_http_status
+            else "O último envio falhou. Retente para processar novamente."
+        )
     return contexto(
         request,
         usuario,
@@ -2810,6 +2932,9 @@ def _trafego_contexto(request: Request, usuario, config: MetaPixelConfig | None,
         enviar_lead=bool(config.enviar_lead) if config else True,
         enviar_purchase=bool(config.enviar_purchase) if config else True,
         atualizada_em=config.atualizada_em if config else None,
+        ultimo_outbox=ultimo_outbox,
+        ultimo_erro_exibicao=ultimo_erro_exibicao,
+        outbox_pendentes=pendentes,
         ok=ok,
         erro=erro,
     )
@@ -2918,8 +3043,175 @@ async def campanhas_nova_post(request: Request, db: Session = Depends(get_db)):
     return RedirectResponse("/app/campanhas?ok=criada", status_code=303)
 
 
+def _gastos_lote_contexto(
+    request: Request,
+    usuario,
+    db: Session,
+    *,
+    erro: str | None = None,
+    relatorio: dict | None = None,
+):
+    from app.financeiro_calc import hoje_portal
+
+    campanhas = (
+        db.query(Campanha)
+        .filter(Campanha.loja_slug == usuario.loja_slug, Campanha.status == "ativa")
+        .order_by(Campanha.nome)
+        .all()
+    )
+    return contexto(
+        request,
+        usuario,
+        campanhas=campanhas,
+        hoje=hoje_portal().isoformat(),
+        canais=CANAIS_ROTULO,
+        erro=erro,
+        relatorio=relatorio,
+    )
+
+
+@app.get("/app/campanhas/gastos/lote", response_class=HTMLResponse)
+def campanhas_gastos_lote_get(request: Request, db: Session = Depends(get_db)):
+    usuario = usuario_atual(request, db)
+    if not usuario:
+        return redirecionar_login()
+    if not pode_gerir_trafego(usuario):
+        return RedirectResponse("/app", status_code=303)
+    return templates.TemplateResponse(
+        "campanhas/gastos_lote.html",
+        _gastos_lote_contexto(request, usuario, db),
+    )
+
+
+@app.post("/app/campanhas/gastos/lote")
+async def campanhas_gastos_lote_post(request: Request, db: Session = Depends(get_db)):
+    usuario = usuario_atual(request, db)
+    if not usuario:
+        return redirecionar_login()
+    form = await request.form()
+    if not pode_gerir_trafego(usuario) or not csrf_valido(request, form.get("csrf")):
+        return RedirectResponse("/app", status_code=303)
+    try:
+        referencia = date.fromisoformat((form.get("referencia") or "").strip())
+    except ValueError:
+        referencia = None
+    if referencia is None:
+        return templates.TemplateResponse(
+            "campanhas/gastos_lote.html",
+            _gastos_lote_contexto(request, usuario, db, erro="Informe uma data de referência válida."),
+            status_code=422,
+        )
+    campanhas = db.query(Campanha).filter(
+        Campanha.loja_slug == usuario.loja_slug,
+        Campanha.status == "ativa",
+    ).all()
+    nota_global = (form.get("nota_global") or "").strip()[:240] or None
+    novos: list[CampanhaGasto] = []
+    for campanha in campanhas:
+        texto_valor = (form.get(f"valor_{campanha.id}") or "").strip()
+        if not texto_valor:
+            continue
+        valor = parse_brl_valor(texto_valor)
+        if valor is None or valor <= 0:
+            return templates.TemplateResponse(
+                "campanhas/gastos_lote.html",
+                _gastos_lote_contexto(
+                    request,
+                    usuario,
+                    db,
+                    erro=f"Informe um valor maior que zero para {campanha.nome}.",
+                ),
+                status_code=422,
+            )
+        nota = (form.get(f"nota_{campanha.id}") or "").strip()[:240] or nota_global
+        novos.append(
+            CampanhaGasto(
+                id=novo_id(),
+                campanha_id=campanha.id,
+                loja_slug=usuario.loja_slug,
+                valor=valor,
+                referencia=referencia,
+                nota=nota,
+                criada_por=usuario.email,
+            )
+        )
+    db.add_all(novos)
+    db.commit()
+    return RedirectResponse(f"/app/campanhas/gastos/lote?ok={len(novos)}", status_code=303)
+
+
+@app.get("/app/campanhas/gastos/csv/modelo")
+def campanhas_gastos_csv_modelo(request: Request, db: Session = Depends(get_db)):
+    usuario = usuario_atual(request, db)
+    if not usuario:
+        return redirecionar_login()
+    if not pode_gerir_trafego(usuario):
+        return RedirectResponse("/app", status_code=303)
+    conteudo = "\ufeffutm_campaign;valor;referencia;nota\n"
+    return Response(
+        content=conteudo,
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": 'attachment; filename="modelo-gastos-revy.csv"'},
+    )
+
+
+@app.post("/app/campanhas/gastos/csv", response_class=HTMLResponse)
+async def campanhas_gastos_csv_post(request: Request, db: Session = Depends(get_db)):
+    usuario = usuario_atual(request, db)
+    if not usuario:
+        return redirecionar_login()
+    form = await request.form()
+    if not pode_gerir_trafego(usuario) or not csrf_valido(request, form.get("csrf")):
+        return RedirectResponse("/app", status_code=303)
+    arquivo = form.get("arquivo")
+    if arquivo is None or not hasattr(arquivo, "read"):
+        return templates.TemplateResponse(
+            "campanhas/gastos_lote.html",
+            _gastos_lote_contexto(request, usuario, db, erro="Selecione um arquivo CSV."),
+            status_code=422,
+        )
+    conteudo = await arquivo.read()
+    if len(conteudo) > 1024 * 1024:
+        return templates.TemplateResponse(
+            "campanhas/gastos_lote.html",
+            _gastos_lote_contexto(request, usuario, db, erro="O CSV deve ter no máximo 1 MB."),
+            status_code=413,
+        )
+    campanhas = db.query(Campanha).filter(Campanha.loja_slug == usuario.loja_slug).all()
+    linhas, erros = parse_gastos_csv(conteudo, campanhas)
+    for linha in linhas:
+        db.add(
+            CampanhaGasto(
+                id=novo_id(),
+                campanha_id=linha.campanha.id,
+                loja_slug=usuario.loja_slug,
+                valor=linha.valor,
+                referencia=linha.referencia,
+                nota=linha.nota,
+                criada_por=usuario.email,
+            )
+        )
+    db.commit()
+    return templates.TemplateResponse(
+        "campanhas/gastos_lote.html",
+        _gastos_lote_contexto(
+            request,
+            usuario,
+            db,
+            relatorio={"importados": len(linhas), "erros": erros},
+        ),
+    )
+
+
 @app.get("/app/campanhas/{campanha_id}", response_class=HTMLResponse)
-def campanhas_detalhe(request: Request, campanha_id: str, db: Session = Depends(get_db)):
+def campanhas_detalhe(
+    request: Request,
+    campanha_id: str,
+    inicio: str | None = None,
+    fim: str | None = None,
+    db: Session = Depends(get_db),
+    chatbot: ChatbotClient = Depends(get_chatbot_client),
+):
     usuario = usuario_atual(request, db)
     if not usuario:
         return redirecionar_login()
@@ -2934,11 +3226,40 @@ def campanhas_detalhe(request: Request, campanha_id: str, db: Session = Depends(
         return RedirectResponse("/app/campanhas?erro=1", status_code=303)
     gastos = (
         db.query(CampanhaGasto)
-        .filter(CampanhaGasto.campanha_id == campanha.id)
+        .filter(
+            CampanhaGasto.campanha_id == campanha.id,
+            CampanhaGasto.loja_slug == usuario.loja_slug,
+        )
         .order_by(CampanhaGasto.referencia.desc(), CampanhaGasto.criada_em.desc())
         .all()
     )
     gasto_total = sum((g.valor for g in gastos), Decimal("0"))
+    d_inicio, d_fim = periodo_padrao(inicio, fim)
+    metricas_vendas = calcular_metricas_vendas(db, usuario.loja_slug, d_inicio, d_fim)
+    leads: list[dict] = []
+    chatbot_erro = False
+    try:
+        leads = chatbot.listar_leads()
+    except ChatbotIndisponivel:
+        chatbot_erro = True
+    linha_roi = next(
+        linha
+        for linha in calcular_roi_loja(
+            campanhas=[campanha],
+            gastos=gastos,
+            leads=leads,
+            vendas_confirmadas=metricas_vendas["confirmadas"],
+            d_inicio=d_inicio,
+            d_fim=d_fim,
+            modo_atribuicao="last",
+        )
+        if linha.campanha_id == campanha.id
+    )
+    vendas_atribuidas = [
+        venda
+        for venda in metricas_vendas["confirmadas"]
+        if venda_casa_campanha(venda, campanha, modo="last")
+    ]
     from app.financeiro_calc import hoje_portal
 
     return templates.TemplateResponse(
@@ -2951,6 +3272,14 @@ def campanhas_detalhe(request: Request, campanha_id: str, db: Session = Depends(
             gasto_total=gasto_total,
             canais=CANAIS_ROTULO,
             status_rotulo=STATUS_ROTULO,
+            periodo={"inicio": d_inicio.isoformat(), "fim": d_fim.isoformat()},
+            linha_roi=linha_roi,
+            vendas_atribuidas=sorted(
+                vendas_atribuidas,
+                key=lambda venda: venda.confirmada_em or venda.criada_em,
+                reverse=True,
+            )[:10],
+            chatbot_erro=chatbot_erro,
             hoje=hoje_portal().isoformat(),
             erro=request.query_params.get("erro"),
         ),
@@ -3121,6 +3450,7 @@ def trafego_roi(
             touch=modo,
             linhas=linhas,
             totais=totais,
+            insights=gerar_insights_roi(linhas, totais),
             canais=CANAIS_ROTULO,
             chatbot_erro=chatbot_erro,
             totais_roas_barra=(
@@ -3143,10 +3473,57 @@ def trafego_pagina(request: Request, db: Session = Depends(get_db)):
         .first()
     )
     ok = request.query_params.get("ok")
+    outboxes = (
+        db.query(MetaCapiOutbox)
+        .filter(MetaCapiOutbox.loja_slug == usuario.loja_slug)
+        .order_by(MetaCapiOutbox.criada_em.desc())
+        .all()
+    )
     return templates.TemplateResponse(
         "trafego/form.html",
-        _trafego_contexto(request, usuario, config, ok=ok),
+        _trafego_contexto(
+            request,
+            usuario,
+            config,
+            ultimo_outbox=outboxes[0] if outboxes else None,
+            pendentes=sum(o.status in {"pending", "failed"} for o in outboxes),
+            ok=ok,
+        ),
     )
+
+
+@app.post("/app/trafego/capi/retentar")
+async def trafego_capi_retentar(request: Request, db: Session = Depends(get_db)):
+    usuario = usuario_atual(request, db)
+    if not usuario:
+        return redirecionar_login()
+    form = await request.form()
+    if not pode_gerir_trafego(usuario) or not csrf_valido(request, form.get("csrf")):
+        return RedirectResponse("/app", status_code=303)
+    resultado = processar_outbox_pendentes(db, usuario.loja_slug)
+    return RedirectResponse(
+        f"/app/trafego?ok=retry-{resultado['entregues']}-{resultado['falharam']}",
+        status_code=303,
+    )
+
+
+@app.post("/app/trafego/onboarding/dispensar")
+async def trafego_onboarding_dispensar(request: Request, db: Session = Depends(get_db)):
+    usuario = usuario_atual(request, db)
+    if not usuario:
+        return redirecionar_login()
+    form = await request.form()
+    if not pode_gerir_trafego(usuario) or not csrf_valido(request, form.get("csrf")):
+        return RedirectResponse("/app", status_code=303)
+    config = db.query(MetaPixelConfig).filter(
+        MetaPixelConfig.loja_slug == usuario.loja_slug
+    ).first()
+    if config is None:
+        config = MetaPixelConfig(loja_slug=usuario.loja_slug, pixel_id="")
+        db.add(config)
+    config.medicao_onboarding_dismiss_em = agora()
+    db.commit()
+    return RedirectResponse("/app?ok=onboarding-dispensado", status_code=303)
 
 
 @app.post("/app/trafego")

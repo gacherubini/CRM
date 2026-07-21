@@ -109,6 +109,9 @@ class MetaPixelConfig(Base):
     enviar_page_view: Mapped[bool] = mapped_column(Boolean, default=True)
     enviar_lead: Mapped[bool] = mapped_column(Boolean, default=True)
     enviar_purchase: Mapped[bool] = mapped_column(Boolean, default=True)
+    medicao_onboarding_dismiss_em: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     atualizada_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=agora)
 
 

@@ -410,19 +410,11 @@ def _montar_payload_motor(
     return payload
 
 
-@app.post("/v1/simular")
-def simular(
+def _resolver_pedido_simulacao(
     dados: SimularInput,
-    ctx: Contexto = Depends(get_contexto),
-    provider: SimulationProvider = Depends(get_simulation_provider),
-    inventory: InventoryProvider = Depends(get_inventory_provider),
-):
-    """Ferramenta do bot: delega ao provider configurado (none|mock|http).
-
-    Com placa: valor (e categoria/tipo) vêm do Estoque — nunca digitados pelo cliente.
-    Prazos: lista explícita, ou prazo_meses único (compat), ou padrão multi 24/36/48/60.
-    Motor aceita um prazo por job; multi-prazo = um job por prazo e resultados mesclados.
-    """
+    provider: SimulationProvider,
+    inventory: InventoryProvider,
+) -> tuple[float, str, list[int]]:
     if not provider.disponivel():
         raise HTTPException(status_code=409, detail="simulação não habilitada nesta instalação")
 
@@ -449,9 +441,61 @@ def simular(
     if valor is None:
         raise HTTPException(status_code=422, detail="informe placa ou valor do veículo")
 
-    prazos = dados.resolver_prazos()
-    if not prazos:
-        prazos = list(config.PRAZOS_PADRAO_MESES)
+    prazos = dados.resolver_prazos() or list(config.PRAZOS_PADRAO_MESES)
+    return valor, categoria, prazos
+
+
+@app.post("/v1/simulacoes/solicitar", status_code=202)
+def solicitar_simulacao(
+    dados: SimularInput,
+    idempotency_key: Optional[str] = Header(default=None, alias="Idempotency-Key"),
+    ctx: Contexto = Depends(get_contexto),
+    provider: SimulationProvider = Depends(get_simulation_provider),
+    inventory: InventoryProvider = Depends(get_inventory_provider),
+):
+    """Enfileira jobs para o vendedor, sem devolver resultados ao canal do bot."""
+    valor, categoria, prazos = _resolver_pedido_simulacao(dados, provider, inventory)
+
+    solicitacoes = []
+    for prazo in prazos:
+        chave_job = (
+            f"{idempotency_key.strip()}:{prazo}"
+            if idempotency_key and idempotency_key.strip()
+            else str(uuid.uuid4())
+        )
+        criada = provider.solicitar(
+            _montar_payload_motor(dados, valor, categoria, prazo),
+            chave_job,
+        )
+        solicitacoes.append(
+            {
+                "id": criada.get("id"),
+                "status": criada.get("status", "recebida"),
+                "prazo_meses": prazo,
+            }
+        )
+
+    return {
+        "status": "recebida",
+        "quantidade": len(solicitacoes),
+        "solicitacoes": solicitacoes,
+    }
+
+
+@app.post("/v1/simular")
+def simular(
+    dados: SimularInput,
+    ctx: Contexto = Depends(get_contexto),
+    provider: SimulationProvider = Depends(get_simulation_provider),
+    inventory: InventoryProvider = Depends(get_inventory_provider),
+):
+    """Ferramenta do bot: delega ao provider configurado (none|mock|http).
+
+    Com placa: valor (e categoria/tipo) vêm do Estoque — nunca digitados pelo cliente.
+    Prazos: lista explícita, ou prazo_meses único (compat), ou padrão multi 24/36/48/60.
+    Motor aceita um prazo por job; multi-prazo = um job por prazo e resultados mesclados.
+    """
+    valor, categoria, prazos = _resolver_pedido_simulacao(dados, provider, inventory)
 
     # Um único prazo (compat com payload legado): resposta idêntica à anterior.
     if len(prazos) == 1:

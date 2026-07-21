@@ -82,7 +82,8 @@ Chatbot são idempotentes; ações manuais geram os mesmos tipos de evento.
 > **Status 2026-07-20: FEITA (MVP)** — ver plano
 > [tráfego pago / ROI](2026-07-20-plano-trafego-pago-crm-campanhas-roi.md).  
 > Portal: CRUD campanhas + gastos, ROI CPL/CPA/ROAS, filtros. Chatbot: first/last + fbclid/gclid.
-> Catálogo: propaga UTMs/click ids + ViewContent. Residual: import CSV em lote, match CAPI fino.
+> Catálogo: propaga UTMs/click ids + ViewContent. Import CSV/lote e match/retry CAPI foram
+> concluídos no plano de conversões de 2026-07-21; residual desta frente é a Task 4.
 
 Cadastrar/importar campanha, origem, canal, UTM e custo. Primeira versão usa atribuição declarada:
 `first_touch` e `last_touch`, exibidas separadamente. Não prometer causalidade automática.

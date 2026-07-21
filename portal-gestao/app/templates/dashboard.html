@@ -9,6 +9,10 @@
   {% if pode_gerir %}<a class="button primary" href="/app/estoque/novo">Cadastrar veículo</a>{% endif %}
 </div>
 
+{% include "partials/alertas_trafego.html" %}
+{% include "partials/resultados_periodo.html" %}
+{% include "partials/onboarding_medicao.html" %}
+
 {% if integracao_erro %}<div class="alert warning" role="alert"><strong>Estoque offline.</strong> {{ integracao_erro }}</div>{% endif %}
 
 <section class="dashboard-grid" aria-label="Resumo da operação">

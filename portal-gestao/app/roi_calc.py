@@ -73,6 +73,18 @@ def _roas(faturamento: Decimal, gasto: Decimal) -> Decimal | None:
     return (faturamento / gasto).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
 
+def venda_casa_campanha(venda: Venda, campanha: Campanha, *, modo: str = "last") -> bool:
+    if modo == "first":
+        return venda.campanha_id_first == campanha.id or (
+            not venda.campanha_id_first
+            and normalizar_utm(venda.utm_campaign_first) == normalizar_utm(campanha.utm_campaign)
+        )
+    return venda.campanha_id_last == campanha.id or (
+        not venda.campanha_id_last
+        and normalizar_utm(venda.utm_campaign_last) == normalizar_utm(campanha.utm_campaign)
+    )
+
+
 def calcular_roi_loja(
     *,
     campanhas: list[Campanha],
@@ -103,22 +115,8 @@ def calcular_roi_loja(
 
         vendas_c: list[Venda] = []
         for v in vendas_confirmadas:
-            if modo == "first":
-                if v.campanha_id_first == campanha.id:
-                    vendas_c.append(v)
-                    continue
-                if not v.campanha_id_first and normalizar_utm(v.utm_campaign_first) == normalizar_utm(
-                    campanha.utm_campaign
-                ):
-                    vendas_c.append(v)
-            else:
-                if v.campanha_id_last == campanha.id:
-                    vendas_c.append(v)
-                    continue
-                if not v.campanha_id_last and normalizar_utm(v.utm_campaign_last) == normalizar_utm(
-                    campanha.utm_campaign
-                ):
-                    vendas_c.append(v)
+            if venda_casa_campanha(v, campanha, modo=modo):
+                vendas_c.append(v)
         for v in vendas_c:
             vendas_matched_ids.add(v.id)
 
@@ -209,3 +207,66 @@ def totais_roi(linhas: Iterable[LinhaRoiCampanha]) -> dict:
         "cpa": _div(gasto, vendas),
         "roas": _roas(faturamento, gasto),
     }
+
+
+def gerar_insights_roi(
+    linhas: Iterable[LinhaRoiCampanha],
+    totais: dict,
+) -> list[str]:
+    """Gera leitura executiva determinística do ROI, sem atribuição causal."""
+    itens = list(linhas)
+    campanhas = [linha for linha in itens if linha.campanha_id is not None]
+    insights: list[str] = []
+
+    candidatas = [linha for linha in campanhas if linha.gasto > 0 and linha.vendas > 0]
+    com_roas = [linha for linha in candidatas if linha.roas is not None]
+    if com_roas:
+        melhor = max(com_roas, key=lambda linha: (linha.roas or Decimal("0"), linha.vendas))
+        insights.append(
+            f"{melhor.nome} teve o melhor ROAS: {melhor.roas}x com {melhor.vendas} "
+            f"{'venda' if melhor.vendas == 1 else 'vendas'}."
+        )
+
+    canais: dict[str, dict[str, int]] = {}
+    for linha in campanhas:
+        agregado = canais.setdefault(linha.canal, {"leads": 0, "vendas": 0})
+        agregado["leads"] += linha.leads
+        agregado["vendas"] += linha.vendas
+    conversoes = [
+        (canal, Decimal(dados["vendas"]) / Decimal(dados["leads"]))
+        for canal, dados in canais.items()
+        if dados["leads"] > 0
+    ]
+    if len(conversoes) >= 2:
+        melhor_canal, melhor_taxa = max(conversoes, key=lambda item: item[1])
+        pior_canal, pior_taxa = min(conversoes, key=lambda item: item[1])
+        if melhor_canal != pior_canal:
+            insights.append(
+                f"Conversão de leads: {melhor_canal} {melhor_taxa * 100:.1f}% × "
+                f"{pior_canal} {pior_taxa * 100:.1f}%."
+            )
+
+    sem_gasto = sum(1 for linha in campanhas if linha.status == "ativa" and linha.gasto <= 0)
+    if sem_gasto:
+        insights.append(
+            f"{sem_gasto} {'campanha ativa está' if sem_gasto == 1 else 'campanhas ativas estão'} "
+            "sem gasto lançado no período."
+        )
+
+    sem_campanha = next((linha for linha in itens if linha.campanha_id is None), None)
+    if sem_campanha and (sem_campanha.leads or sem_campanha.vendas):
+        insights.append(
+            f"Sem campanha: {sem_campanha.leads} leads e {sem_campanha.vendas} vendas "
+            "não entraram no ROI atribuído."
+        )
+
+    if totais.get("gasto", Decimal("0")) <= 0 and campanhas:
+        insights.append("Lance os gastos do período para calcular CPL, CPA e ROAS.")
+    elif totais.get("roas") is not None:
+        insights.append(f"No total, cada R$ 1 investido virou R$ {totais['roas']} em vendas.")
+    if campanhas:
+        insights.append(
+            f"O período acompanha {len(campanhas)} "
+            f"{'campanha cadastrada' if len(campanhas) == 1 else 'campanhas cadastradas'} no Revy."
+        )
+    return insights[:8]
