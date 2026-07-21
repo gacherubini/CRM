@@ -104,7 +104,7 @@ Apps Fly (referência, **não alterar** sem pedido): `motor2037`, `estoque2037`,
 | Produto | Pasta / porta | Feito (essencial) | Aberto |
 |---|---|---|---|
 | Motor #1A | `motor-simulacao/` `:8000` | async, auth, fan-out, workers on-demand, **Santander/Fontecred/Bradesco/Pan portal LIVE**, warm session teto 2, prints blob JPEG, migrations head **0013** | `testar-login` real; T10 revenda; object storage multi-volume |
-| Chatbot #2A | `chatbot-api/` `:8001` | leads, handoff, por-placa, E3, E5, áudio efêmero/fallback, foto automática com sessão por vendedor, envio da capa via WhatsApp, first/last UTM, sim privada + handoff; webhook endurecido; Fly validado e pausado | E2E WA real; transcritor HTTP real; retenção/expurgo administrativo (sem autosserviço) |
+| Chatbot #2A | `chatbot-api/` `:8001` | leads, handoff, por-placa, E3, E5, áudio efêmero/fallback, foto automática com sessão por vendedor, envio da capa via WhatsApp, first/last UTM, sim privada + handoff; **cadastro por número autorizado via gatilho `cadastro` + `/v1/operacao/roteamento`** (sessão em `cadastro_expira_em`, TTL 30min); webhook endurecido; Fly validado e pausado | E2E WA real; transcritor HTTP real; retenção/expurgo administrativo (sem autosserviço) |
 | Estoque #4A | `estoque-api/` `:8100` | CRUD, idempotência persistente, placa, admin, galeria/capa, upload validado, volume/rota pública HTTPS, snapshots, limpeza periódica e transporte outbox testado; Fly validado e pausado | executar restore drill |
 | Portal | `portal-gestao/` `:9000` | CRM, sim multi-banco, 9A, CAPI retry, gastos/ROI/resultados; funil completo backend+UI; event bus Meta; retry HTTP seguro | Google; E2E Playwright |
 | Catálogo #5A | `catalogo-publico/` `:8200` | vitrine, CTA, Pixel PageView/Lead/ViewContent | SEO/tema; domínio (E18) |
@@ -132,7 +132,7 @@ cd ../portal-gestao && python -m pytest tests/test_campanhas.py tests/test_roi.p
 cd ../chatbot-api && python -m pytest tests/test_audio.py tests/test_inventory.py tests/test_vehicle_photo.py -q
 cd ../estoque-api && python -m pytest tests/test_rbac_fotos_auditoria.py -q
 python ../n8n/validate_workflow.py
-# migrations: motor head 0013 · portal 0008 funil_eventos · chatbot 0007 sessão fotos · estoque 0007 idempotência
+# migrations: motor head 0013 · portal 0008 funil_eventos · chatbot 0008 cadastro/sessão+nome · estoque 0007 idempotência
 git status --short
 ```
 
