@@ -636,4 +636,90 @@ def para_saida_lead(lead: Lead) -> dict:
         "veiculo_ref": lead.veiculo_ref,
         "catalog_interest_ref": lead.catalog_interest_ref,
         "atribuida_em": lead.atribuida_em.isoformat() if lead.atribuida_em else None,
+        "atualizada_em": lead.atualizada_em.isoformat() if lead.atualizada_em else None,
     }
+
+
+def _momento_utc(valor: datetime) -> datetime:
+    if valor.tzinfo is None:
+        return valor.replace(tzinfo=timezone.utc)
+    return valor.astimezone(timezone.utc)
+
+
+def listar_eventos_funil(
+    db: Session,
+    loja_id: str,
+    *,
+    limit: int = 500,
+    offset: int = 0,
+) -> list[dict]:
+    """Projeta eventos analíticos sem expor telefone, texto ou outros dados pessoais."""
+    leads = (
+        db.query(Lead)
+        .filter(Lead.loja_id == loja_id)
+        .order_by(Lead.criada_em.asc(), Lead.id.asc())
+        .limit(max(1, min(limit, 1000)))
+        .offset(max(0, offset))
+        .all()
+    )
+    if not leads:
+        return []
+
+    telefones = {lead.telefone for lead in leads}
+    conversas = (
+        db.query(Conversa)
+        .filter(Conversa.loja_id == loja_id, Conversa.telefone.in_(telefones))
+        .all()
+    )
+    telefone_por_conversa = {conversa.id: conversa.telefone for conversa in conversas}
+    saidas_por_telefone: dict[str, list[Mensagem]] = {}
+    if telefone_por_conversa:
+        mensagens = (
+            db.query(Mensagem)
+            .filter(
+                Mensagem.loja_id == loja_id,
+                Mensagem.conversa_id.in_(telefone_por_conversa),
+                Mensagem.direcao == "saida",
+            )
+            .order_by(Mensagem.criada_em.asc(), Mensagem.id.asc())
+            .all()
+        )
+        for mensagem in mensagens:
+            telefone = telefone_por_conversa[mensagem.conversa_id]
+            saidas_por_telefone.setdefault(telefone, []).append(mensagem)
+
+    eventos: list[dict] = []
+    for lead in leads:
+        criado_em = _momento_utc(lead.criada_em)
+        eventos.append(
+            {
+                "lead_ref": lead.id,
+                "tipo": "lead_criado",
+                "ocorrido_em": criado_em.isoformat(),
+                "idempotency_key": f"chatbot:lead:{lead.id}:criado",
+                # A projeção temporal não precisa de campos livres do lead. Manter
+                # payload vazio evita transportar PII acidental entre produtos.
+                "payload": None,
+            }
+        )
+        primeira_saida = next(
+            (
+                mensagem
+                for mensagem in saidas_por_telefone.get(lead.telefone, [])
+                if _momento_utc(mensagem.criada_em) >= criado_em
+            ),
+            None,
+        )
+        if primeira_saida is None:
+            continue
+        respondido_em = _momento_utc(primeira_saida.criada_em)
+        eventos.append(
+            {
+                "lead_ref": lead.id,
+                "tipo": "primeira_resposta",
+                "ocorrido_em": respondido_em.isoformat(),
+                "idempotency_key": f"chatbot:mensagem:{primeira_saida.id}:primeira-resposta",
+                "payload": None,
+            }
+        )
+    return sorted(eventos, key=lambda item: (item["ocorrido_em"], item["idempotency_key"]))

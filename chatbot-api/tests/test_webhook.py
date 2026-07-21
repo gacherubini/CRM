@@ -1,4 +1,9 @@
+import logging
+
+import pytest
+
 from app import config, servico
+from app.hardening import webhook_rate_limiter
 
 
 def _msg(instance, **over):
@@ -82,3 +87,194 @@ def test_webhook_corrida_retorna_duplicada_nao_500(client, loja_a, monkeypatch):
     assert r2.status_code == 200
     assert r2.json()["duplicada"] is True
     assert r2.json()["conversa_id"] == r1.json()["conversa_id"]
+
+
+@pytest.mark.parametrize(
+    "telefone",
+    ["", "1234567", "1234567890123456", "55abc11999999999"],
+)
+def test_webhook_rejeita_telefone_invalido_sem_ecoa_lo(client, loja_a, telefone):
+    r = client.post(
+        "/webhook/mensagem",
+        json=_msg(loja_a["instance"], telefone=telefone),
+    )
+
+    assert r.status_code == 422
+    assert r.json() == {"detail": "payload do webhook inválido"}
+    if telefone:
+        assert telefone not in r.text
+
+
+@pytest.mark.parametrize(
+    ("entrada", "esperado"),
+    [
+        ("+55 (11) 98888-7777", "5511988887777"),
+        ("5511988887777@s.whatsapp.net", "5511988887777"),
+    ],
+)
+def test_webhook_normaliza_telefone_antes_de_persistir(
+    client, loja_a, entrada, esperado
+):
+    r = client.post(
+        "/webhook/mensagem",
+        json=_msg(loja_a["instance"], telefone=entrada),
+    )
+
+    assert r.status_code == 200
+    conversas = client.get(
+        "/v1/conversas", headers=loja_a["headers"]
+    ).json()["conversas"]
+    assert conversas[0]["telefone"] == esperado
+
+
+def test_webhook_limita_texto_sem_devolver_conteudo(client, loja_a, monkeypatch):
+    monkeypatch.setattr(config, "WEBHOOK_MAX_TEXT_CHARS", 5)
+    texto_sensivel = "segredo-pessoal"
+
+    r = client.post(
+        "/webhook/mensagem",
+        json=_msg(loja_a["instance"], texto=texto_sensivel),
+    )
+
+    assert r.status_code == 422
+    assert r.json() == {"detail": "payload do webhook inválido"}
+    assert texto_sensivel not in r.text
+
+
+def test_webhook_rejeita_campos_fora_do_contrato(client, loja_a):
+    r = client.post(
+        "/webhook/mensagem",
+        json=_msg(loja_a["instance"], token="nao-deveria-estar-aqui"),
+    )
+
+    assert r.status_code == 422
+    assert "nao-deveria-estar-aqui" not in r.text
+
+
+def test_webhook_rejeita_payload_acima_do_limite_antes_do_parse(
+    client, loja_a, monkeypatch
+):
+    monkeypatch.setattr(config, "WEBHOOK_MAX_PAYLOAD_BYTES", 128)
+    texto_sensivel = "dado-pessoal-" * 40
+
+    r = client.post(
+        "/webhook/mensagem",
+        json=_msg(loja_a["instance"], texto=texto_sensivel),
+    )
+
+    assert r.status_code == 413
+    assert r.headers["content-type"].startswith("application/json")
+    assert texto_sensivel not in r.text
+
+
+def test_webhook_rate_limit_configuravel_retorna_retry_after(
+    client, loja_a, monkeypatch
+):
+    monkeypatch.setattr(config, "WEBHOOK_RATE_LIMIT_REQUESTS", 2)
+    monkeypatch.setattr(config, "WEBHOOK_RATE_LIMIT_WINDOW_SECONDS", 60)
+    webhook_rate_limiter.reset()
+
+    try:
+        primeira = client.post(
+            "/webhook/mensagem",
+            json=_msg(loja_a["instance"], provider_message_id="RL-1"),
+        )
+        segunda = client.post(
+            "/webhook/mensagem",
+            json=_msg(loja_a["instance"], provider_message_id="RL-2"),
+        )
+        bloqueada = client.post(
+            "/webhook/mensagem",
+            json=_msg(loja_a["instance"], provider_message_id="RL-3"),
+        )
+    finally:
+        webhook_rate_limiter.reset()
+
+    assert primeira.status_code == 200
+    assert segunda.status_code == 200
+    assert bloqueada.status_code == 429
+    assert int(bloqueada.headers["retry-after"]) >= 1
+
+
+def test_webhook_rate_limit_pode_ser_desligado(client, loja_a, monkeypatch):
+    monkeypatch.setattr(config, "WEBHOOK_RATE_LIMIT_REQUESTS", 0)
+    webhook_rate_limiter.reset()
+
+    respostas = [
+        client.post(
+            "/webhook/mensagem",
+            json=_msg(loja_a["instance"], provider_message_id=f"OFF-{indice}"),
+        )
+        for indice in range(3)
+    ]
+
+    assert [r.status_code for r in respostas] == [200, 200, 200]
+
+
+def test_tentativa_com_token_invalido_tambem_consome_rate_limit(
+    client, loja_a, monkeypatch
+):
+    monkeypatch.setattr(config, "WEBHOOK_TOKEN", "token-correto")
+    monkeypatch.setattr(config, "WEBHOOK_RATE_LIMIT_REQUESTS", 1)
+    monkeypatch.setattr(config, "WEBHOOK_RATE_LIMIT_WINDOW_SECONDS", 60)
+    webhook_rate_limiter.reset()
+
+    try:
+        invalida = client.post(
+            "/webhook/mensagem",
+            json=_msg(loja_a["instance"]),
+            headers={"X-Webhook-Token": "token-incorreto"},
+        )
+        bloqueada = client.post(
+            "/webhook/mensagem",
+            json=_msg(loja_a["instance"]),
+            headers={"X-Webhook-Token": "token-correto"},
+        )
+    finally:
+        webhook_rate_limiter.reset()
+
+    assert invalida.status_code == 401
+    assert bloqueada.status_code == 429
+
+
+def test_logs_de_bloqueio_nao_expoem_pii_instancia_ou_token(
+    client, loja_a, monkeypatch, caplog
+):
+    token = "token-webhook-super-secreto"
+    telefone = "5511987654321"
+    texto = "Maria pediu proposta confidencial"
+    monkeypatch.setattr(config, "WEBHOOK_TOKEN", token)
+    monkeypatch.setattr(config, "WEBHOOK_RATE_LIMIT_REQUESTS", 1)
+    monkeypatch.setattr(config, "WEBHOOK_RATE_LIMIT_WINDOW_SECONDS", 60)
+    webhook_rate_limiter.reset()
+    caplog.set_level(logging.WARNING, logger="chatbot.webhook")
+    headers = {"X-Webhook-Token": token}
+
+    try:
+        client.post(
+            "/webhook/mensagem",
+            json=_msg(
+                loja_a["instance"],
+                telefone=telefone,
+                texto=texto,
+                provider_message_id="LOG-1",
+            ),
+            headers=headers,
+        )
+        bloqueada = client.post(
+            "/webhook/mensagem",
+            json=_msg(
+                loja_a["instance"],
+                telefone=telefone,
+                texto=texto,
+                provider_message_id="LOG-2",
+            ),
+            headers=headers,
+        )
+    finally:
+        webhook_rate_limiter.reset()
+
+    assert bloqueada.status_code == 429
+    assert "limite de requisições excedido" in caplog.text
+    for sensivel in (token, telefone, texto, loja_a["instance"]):
+        assert sensivel not in caplog.text

@@ -137,7 +137,8 @@ Mapa de campos e decisões: [`docs/plans/2026-07-13-plano1a-task12-bancos-reconh
 - [x] **Vendas / metas / CSV / E10 Pixel** — + **campanhas + ROI (E8)** DONE 2026-07-20.
 - [x] **Motor multi-banco** — Santander, Fontecred, Bradesco, Pan portal LIVE; fan-out; warm session teto 2.
 - [ ] **Go-live WhatsApp E2E** — Gemini + Evolution + n8n em ambiente estável (eixo A).
-- [ ] **#3B Task 4** — eventos de funil; event bus/Google; outbound E11/E12; polish revenda.
+- [x] **Backend #3B Task 4 + event bus** — eventos/tempos e adapter Meta concluídos.
+- [ ] **Residual CRM** — UI do funil; Google; outbound E11/E12; polish revenda.
 
 Estado canônico: [`docs/contexto-compacto.md`](docs/contexto-compacto.md) · planos: [`docs/plans/README.md`](docs/plans/README.md) · handoff: [`docs/handoff-contexto.md`](docs/handoff-contexto.md).
 

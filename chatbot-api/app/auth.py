@@ -3,11 +3,12 @@ import hashlib
 import secrets
 from dataclasses import dataclass
 
-from fastapi import Depends, Header, HTTPException
+from fastapi import Depends, Header, HTTPException, Request
 from sqlalchemy.orm import Session
 
 from app import config
 from app.db import get_db
+from app.hardening import aplicar_rate_limit
 from app.models_db import CredencialServico
 
 
@@ -33,12 +34,18 @@ def get_contexto(
     return Contexto(loja_id=cred.loja_id, papel=cred.papel)
 
 
-def verificar_webhook_token(x_webhook_token: str = Header(default="")) -> None:
+def verificar_webhook_token(
+    request: Request, x_webhook_token: str = Header(default="")
+) -> None:
     """Autentica o webhook por segredo compartilhado (opt-in via CHATBOT_WEBHOOK_TOKEN).
 
     Vazio => webhook aberto (não quebra o fluxo n8n vivo). Definido => exige header
     X-Webhook-Token igual, comparado em tempo constante.
     """
+    # Executa antes da comparação do token: tentativas ausentes/inválidas também
+    # consomem a janela e não contornam a proteção. O limite de tamanho do body é
+    # aplicado separadamente pelo middleware antes do parse.
+    aplicar_rate_limit(request)
     esperado = config.WEBHOOK_TOKEN
     if not esperado:
         return

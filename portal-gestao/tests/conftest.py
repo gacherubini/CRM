@@ -136,6 +136,7 @@ class ChatbotFake:
         self.simulacao_indisponivel = False
         self.simulacoes = []
         self.etapas_atualizadas = []
+        self.eventos_funil = []
 
     def listar_leads(self, etapa=None):
         if self.indisponivel:
@@ -160,6 +161,11 @@ class ChatbotFake:
         lead["etapa"] = etapa
         self.etapas_atualizadas.append((lead_id, etapa))
         return lead
+
+    def listar_eventos_funil(self, limit=500, offset=0):
+        if self.indisponivel:
+            raise ChatbotIndisponivel("Não foi possível acessar o chatbot agora")
+        return self.eventos_funil[offset : offset + limit]
 
     def listar_conversas(self, busca=None, limit=50, offset=0):
         if self.indisponivel:

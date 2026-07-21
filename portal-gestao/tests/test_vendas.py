@@ -4,7 +4,7 @@ from conftest import csrf_da_resposta, login
 
 from app.db import SessionLocal
 from app.main import lucro_bruto_venda
-from app.models import Venda, VendaCustoDireto, agora
+from app.models import FunilEvento, Venda, VendaCustoDireto, agora
 
 
 def criar_venda(
@@ -91,6 +91,8 @@ def test_registro_valida_e_persiste_referencias_da_loja(client):
     venda = db.query(Venda).one()
     assert venda.lead_ref == "l1"
     assert venda.veiculo_ref == "v1"
+    evento = db.query(FunilEvento).filter_by(lead_ref="l1", tipo="venda_registrada").one()
+    assert evento.idempotency_key == f"portal:venda:{venda.id}:registrada"
     db.close()
 
 
@@ -222,6 +224,38 @@ def test_dono_confirma_venda(client):
     assert venda.status == "confirmada"
     assert venda.confirmada_por == "dono@loja.test"
     assert venda.confirmada_em is not None
+    db.close()
+
+
+def test_confirmacao_publica_purchase_no_event_bus(client, monkeypatch):
+    venda_id = criar_venda(lead_ref="l1")
+    publicados = []
+
+    def publicar(kind, payload, db):
+        publicados.append((kind, payload, db))
+
+    monkeypatch.setattr("app.main.publish_conversion", publicar)
+    login(client)
+
+    resposta = client.post(
+        f"/app/vendas/{venda_id}/confirmar",
+        data={"csrf": csrf_das_vendas(client)},
+        follow_redirects=False,
+    )
+
+    assert resposta.headers["location"] == "/app/vendas?ok=confirmada"
+    assert len(publicados) == 1
+    kind, payload, _ = publicados[0]
+    assert kind.value == "purchase"
+    assert payload.venda_id == venda_id
+    assert payload.event_id == f"purchase-{venda_id}"
+    assert payload.lead_ref == "l1"
+    assert payload.phone == "5511987654321"
+    db = SessionLocal()
+    evento = db.query(FunilEvento).filter_by(
+        lead_ref="l1", tipo="venda_confirmada"
+    ).one()
+    assert evento.idempotency_key == f"portal:venda:{venda_id}:confirmada"
     db.close()
 
 

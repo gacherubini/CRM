@@ -117,9 +117,31 @@ def enfileirar_purchase_venda(
     venda: Venda,
     lead: dict[str, Any] | None = None,
 ) -> MetaCapiOutbox | None:
+    """Compatibilidade: enfileira Purchase a partir do model de venda."""
+    return enfileirar_purchase(
+        db,
+        loja_slug=venda.loja_slug,
+        venda_id=venda.id,
+        event_id=f"purchase-{venda.id}",
+        value=venda.preco_venda,
+        currency="BRL",
+        lead=lead,
+    )
+
+
+def enfileirar_purchase(
+    db: Session,
+    *,
+    loja_slug: str,
+    venda_id: str,
+    event_id: str,
+    value: Decimal | float | str,
+    currency: str = "BRL",
+    lead: dict[str, Any] | None = None,
+) -> MetaCapiOutbox | None:
     """Persiste outbox Purchase e tenta envio uma vez. Nunca levanta para o caller."""
     try:
-        config = _config_loja(db, venda.loja_slug)
+        config = _config_loja(db, loja_slug)
         if (
             config is None
             or not config.enviar_purchase
@@ -128,7 +150,6 @@ def enfileirar_purchase_venda(
         ):
             return None
 
-        event_id = f"purchase-{venda.id}"
         existente = (
             db.query(MetaCapiOutbox)
             .filter(MetaCapiOutbox.event_id == event_id)
@@ -139,8 +160,8 @@ def enfileirar_purchase_venda(
 
         body = montar_payload_purchase(
             event_id=event_id,
-            value=venda.preco_venda,
-            currency="BRL",
+            value=value,
+            currency=currency,
             phone=(lead or {}).get("telefone"),
             email=(lead or {}).get("email"),
             fbclid=(lead or {}).get("fbclid"),
@@ -149,8 +170,8 @@ def enfileirar_purchase_venda(
         )
         outbox = MetaCapiOutbox(
             id=novo_id(),
-            loja_slug=venda.loja_slug,
-            venda_id=venda.id,
+            loja_slug=loja_slug,
+            venda_id=venda_id,
             event_id=event_id,
             event_name="Purchase",
             payload_json=json.dumps(body, ensure_ascii=False, sort_keys=True),
@@ -166,7 +187,7 @@ def enfileirar_purchase_venda(
     except Exception:
         logger.exception(
             "meta_capi: falha ao enfileirar Purchase da venda %s (venda já confirmada)",
-            getattr(venda, "id", "?"),
+            venda_id,
         )
         try:
             db.rollback()

@@ -8,6 +8,27 @@ SCHEMA_VERSAO = os.getenv("CHATBOT_SCHEMA_VERSAO", "0")
 # Vazio = webhook aberto (comportamento atual); PRODUÇÃO DEVE definir isto.
 WEBHOOK_TOKEN = os.getenv("CHATBOT_WEBHOOK_TOKEN", "")
 
+# Hardening da entrada do webhook. O limite de requisições é por processo e por
+# origem de rede; zero desliga o rate limit (útil somente em desenvolvimento).
+WEBHOOK_MAX_PAYLOAD_BYTES = int(os.getenv("CHATBOT_WEBHOOK_MAX_PAYLOAD_BYTES", "32768"))
+WEBHOOK_MAX_TEXT_CHARS = int(os.getenv("CHATBOT_WEBHOOK_MAX_TEXT_CHARS", "4096"))
+WEBHOOK_MAX_INSTANCE_CHARS = int(os.getenv("CHATBOT_WEBHOOK_MAX_INSTANCE_CHARS", "120"))
+WEBHOOK_MAX_PROVIDER_MESSAGE_ID_CHARS = int(
+    os.getenv("CHATBOT_WEBHOOK_MAX_PROVIDER_MESSAGE_ID_CHARS", "255")
+)
+WEBHOOK_MAX_EVENT_TYPE_CHARS = int(
+    os.getenv("CHATBOT_WEBHOOK_MAX_EVENT_TYPE_CHARS", "64")
+)
+WEBHOOK_RATE_LIMIT_REQUESTS = int(
+    os.getenv("CHATBOT_WEBHOOK_RATE_LIMIT_REQUESTS", "600")
+)
+WEBHOOK_RATE_LIMIT_WINDOW_SECONDS = float(
+    os.getenv("CHATBOT_WEBHOOK_RATE_LIMIT_WINDOW_SECONDS", "60")
+)
+WEBHOOK_RATE_LIMIT_MAX_BUCKETS = int(
+    os.getenv("CHATBOT_WEBHOOK_RATE_LIMIT_MAX_BUCKETS", "10000")
+)
+
 # Provider de simulação: none (Atendimento) | mock (demo) | http (Motor real)
 SIMULATION_PROVIDER = os.getenv("SIMULATION_PROVIDER", "none")
 MOTOR_URL = os.getenv("MOTOR_URL", "")

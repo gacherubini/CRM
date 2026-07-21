@@ -4,6 +4,8 @@ import httpx
 from conftest import csrf_da_resposta, login
 
 from app.clients.chatbot import ChatbotClient, LeadNaoEncontrado
+from app.db import SessionLocal
+from app.models import FunilEvento
 
 
 def test_lista_renderiza_leads(client, chatbot_fake):
@@ -70,6 +72,28 @@ def test_vendedor_atualiza_etapa_com_csrf(client, chatbot_fake):
     assert resposta.status_code == 303
     assert resposta.headers["location"] == "/app/leads/l1?ok=etapa-atualizada"
     assert chatbot_fake.etapas_atualizadas == [("l1", "qualificado")]
+    db = SessionLocal()
+    evento = db.query(FunilEvento).filter_by(lead_ref="l1", tipo="etapa_manual").one()
+    assert evento.loja_slug == "loja-teste"
+    assert json.loads(evento.payload_json) == {"etapa_nova": "qualificado"}
+    db.close()
+
+
+def test_etapa_perdido_registra_movimento_e_perda(client, chatbot_fake):
+    login(client)
+    pagina = client.get("/app/leads/l1")
+
+    resposta = client.post(
+        "/app/leads/l1/etapa",
+        data={"csrf": csrf_da_resposta(pagina), "etapa": "perdido"},
+        follow_redirects=False,
+    )
+
+    assert resposta.headers["location"] == "/app/leads/l1?ok=etapa-atualizada"
+    db = SessionLocal()
+    eventos = db.query(FunilEvento).filter_by(lead_ref="l1").all()
+    assert {evento.tipo for evento in eventos} == {"etapa_manual", "perda"}
+    db.close()
 
 
 def test_atualizar_etapa_rejeita_valor_invalido(client, chatbot_fake):
@@ -148,6 +172,25 @@ def test_client_lista_leads_com_bearer(monkeypatch):
     chatbot = _cliente_com_transporte(monkeypatch, handler)
     leads = chatbot.listar_leads()
     assert leads == [{"id": "l1", "etapa": "novo"}]
+
+
+def test_client_lista_eventos_funil_sanitizados(monkeypatch):
+    evento = {
+        "lead_ref": "l1",
+        "tipo": "lead_criado",
+        "ocorrido_em": "2026-07-09T09:00:00+00:00",
+        "idempotency_key": "chatbot:lead:l1:criado",
+        "payload": None,
+    }
+
+    def handler(request):
+        assert request.url.path == "/v1/funil/eventos"
+        assert request.url.params["limit"] == "500"
+        assert request.url.params["offset"] == "0"
+        return httpx.Response(200, json={"eventos": [evento]})
+
+    chatbot = _cliente_com_transporte(monkeypatch, handler)
+    assert chatbot.listar_eventos_funil() == [evento]
 
 
 def test_client_obter_lead_404_mapeia_nao_encontrado(monkeypatch):

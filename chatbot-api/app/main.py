@@ -8,9 +8,11 @@ from typing import Optional
 from typing import Literal
 from uuid import UUID
 
-from fastapi import Depends, FastAPI, Header, HTTPException
-from fastapi.responses import Response
-from pydantic import BaseModel, Field, field_validator, model_validator
+from fastapi import Depends, FastAPI, Header, HTTPException, Request
+from fastapi.exception_handlers import request_validation_exception_handler
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse, Response
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 from sqlalchemy.orm import Session
 
 from app import config, models_db, operacao, servico  # noqa: F401 (registra os modelos)
@@ -22,9 +24,16 @@ from app.inventory import (
     get_inventory_provider,
     get_inventory_write_client,
 )
+from app.hardening import (
+    WebhookPayloadLimitMiddleware,
+    logger as webhook_logger,
+    normalizar_telefone_webhook,
+    validar_identificador,
+)
 from app.simulation import SimulationProvider, get_simulation_provider
 
 app = FastAPI(title="Chatbot API")
+app.add_middleware(WebhookPayloadLimitMiddleware)
 
 EtapaLead = Literal["novo", "em_atendimento", "qualificado", "convertido", "perdido"]
 
@@ -32,7 +41,21 @@ if os.getenv("CHATBOT_SKIP_INIT") != "1":
     Base.metadata.create_all(bind=engine)
 
 
+@app.exception_handler(RequestValidationError)
+async def erro_validacao_request(request: Request, exc: RequestValidationError):
+    """Não devolve valores sensíveis do payload inválido do webhook."""
+    if request.url.path == "/webhook/mensagem":
+        webhook_logger.warning("webhook rejeitado: payload inválido")
+        return JSONResponse(
+            status_code=422,
+            content={"detail": "payload do webhook inválido"},
+        )
+    return await request_validation_exception_handler(request, exc)
+
+
 class MensagemEntrada(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     instance: str
     telefone: str
     texto: Optional[str] = None
@@ -41,6 +64,45 @@ class MensagemEntrada(BaseModel):
     origem_bot: bool = False
     # Opcional: status|ack|reaction|... — eventos sem conteúdo não pausam o bot (E3).
     tipo: Optional[str] = None
+
+    @field_validator("instance")
+    @classmethod
+    def validar_instance(cls, value: str) -> str:
+        return validar_identificador(
+            value,
+            nome="instance",
+            limite=config.WEBHOOK_MAX_INSTANCE_CHARS,
+        )
+
+    @field_validator("telefone")
+    @classmethod
+    def validar_telefone(cls, value: str) -> str:
+        return normalizar_telefone_webhook(value)
+
+    @field_validator("texto")
+    @classmethod
+    def validar_texto(cls, value: Optional[str]) -> Optional[str]:
+        if value is None:
+            return None
+        if len(value) > max(1, config.WEBHOOK_MAX_TEXT_CHARS):
+            raise ValueError("texto excede o limite permitido")
+        if "\x00" in value:
+            raise ValueError("texto contém caractere inválido")
+        return value
+
+    @field_validator("provider_message_id", "tipo")
+    @classmethod
+    def validar_identificadores_opcionais(
+        cls, value: Optional[str], info
+    ) -> Optional[str]:
+        if value is None or not value.strip():
+            return None
+        limite = (
+            config.WEBHOOK_MAX_PROVIDER_MESSAGE_ID_CHARS
+            if info.field_name == "provider_message_id"
+            else config.WEBHOOK_MAX_EVENT_TYPE_CHARS
+        )
+        return validar_identificador(value, nome=info.field_name, limite=limite)
 
 
 class EstadoInput(BaseModel):
@@ -287,6 +349,25 @@ def listar_leads(
 ):
     leads = servico.listar_leads(db, ctx.loja_id, etapa)
     return {"leads": [servico.para_saida_lead(lead) for lead in leads]}
+
+
+@app.get("/v1/funil/eventos")
+def listar_eventos_funil(
+    limit: int = 500,
+    offset: int = 0,
+    ctx: Contexto = Depends(get_contexto),
+    db: Session = Depends(get_db),
+):
+    """Projeção analítica sanitizada para o Portal, sem telefone ou texto."""
+    limite = max(1, min(limit, 1000))
+    deslocamento = max(0, offset)
+    eventos = servico.listar_eventos_funil(
+        db,
+        ctx.loja_id,
+        limit=limite,
+        offset=deslocamento,
+    )
+    return {"eventos": eventos, "limit": limite, "offset": deslocamento}
 
 
 @app.get("/v1/leads.csv")

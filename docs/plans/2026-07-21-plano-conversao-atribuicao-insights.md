@@ -1,6 +1,6 @@
 # Plano — Conversões, funil, insights, UX de gastos, resultados do dono e Google
 
-> **Status 2026-07-21: ATIVO — A/B/E/D/H concluídas; C/F/G residuais.**
+> **Status 2026-07-21: ATIVO — A/B/E/D/H/F + C backend concluídos; UI C e G residuais.**
 > **Rev. 3:** + **UX de resultados do dono** (bloco no dashboard, alertas, drill-down campanha,
 > onboarding de medição). Rev. 2 já tinha gastos lote/CSV, event bus e Google.
 > Origem: conversa Meta + Google + TikTok / Revy Analytics + UX de leitura de resultados.
@@ -299,11 +299,12 @@ Idempotência; UI `/app/funil` (ou seção) com etapas + tempo lead→venda; vaz
 
 ### Tasks
 
-- [ ] **C1** Model + migration + `registrar_evento` idempotente.
-- [ ] **C2** Emissores em venda/etapa.
-- [ ] **C3** Materialização a partir do Chatbot (best-effort).
-- [ ] **C4** Agregações + UI + marcar #3B Task 4 quando DONE.
-- [ ] Commits por task `feat(portal): …`.
+- [x] **C1** Model + migration + `registrar_evento` idempotente.
+- [x] **C2** Emissores em venda/etapa.
+- [x] **C3** Materialização sanitizada a partir do Chatbot (best-effort).
+- [x] **C4a** Agregações + endpoint backend protegido `/app/funil/dados`.
+- [ ] **C4b** UI do funil + marcar #3B Task 4 quando DONE.
+- [x] Entrega consolidada do backend C; UI permanece em commit futuro.
 
 ---
 
@@ -349,10 +350,10 @@ def publish_conversion(kind: str, payload: PurchaseConversion, db: Session) -> N
 
 ### Tasks
 
-- [ ] **F1** types + bus + teste multi-adapter.
-- [ ] **F2** MetaAdapter; `main` usa só `publish_conversion`; deprecar call direta.
-- [ ] **F3** Garantir testes CAPI/A ainda passam.
-- [ ] Commit: `refactor(portal): event bus de conversões com adapter Meta`.
+- [x] **F1** types + bus + teste multi-adapter.
+- [x] **F2** MetaAdapter; `main` usa só `publish_conversion`; call direta preservada só como compatibilidade.
+- [x] **F3** Garantir testes CAPI/A ainda passam.
+- [x] Entrega consolidada: event bus de conversões com adapter Meta.
 
 ---
 
@@ -624,8 +625,9 @@ Reutilizar estilos de `trafego/roi.html` (`.roi-card`, `.roas-bar`) via classes 
 - [x] **H2** Alertas operacionais
 - [x] **H5** Drill-down campanha (KPIs + vendas)
 - [x] **H9** Onboarding medição dismissível
-- [ ] **C** Funil eventos + tempos; #3B T4
-- [ ] **F** Event bus; Meta só via adapter
+- [x] **C backend** Eventos, tempos, materialização e endpoint
+- [ ] **C UI** Tela/seção do funil; concluir #3B T4
+- [x] **F** Event bus; fluxo principal publica Meta só via adapter
 - [ ] **G** Google conversion no bus + UI config
 - [ ] Guia loja atualizado (gastos, resultados, Google)
 - [x] **Sem** API de spend; **sem** TikTok API

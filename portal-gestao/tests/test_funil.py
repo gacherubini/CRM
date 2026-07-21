@@ -4,7 +4,7 @@ from conftest import criar_usuario, login
 
 from app.db import SessionLocal
 from app.main import identidade_telefone
-from app.models import AtendimentoAtribuicao, Venda
+from app.models import AtendimentoAtribuicao, FunilEvento, Venda
 
 
 def criar_venda_vinculada(lead_ref, vendedor_email="dono@loja.test", loja_slug="loja-teste"):
@@ -100,3 +100,99 @@ def test_funil_ignora_venda_e_handoff_de_outra_loja(client, chatbot_fake):
     assert resposta.status_code == 200
     assert "<strong>0</strong><small>leads elegíveis com handoff" in resposta.text
     assert "<strong>0</strong><small>vendas confirmadas" in resposta.text
+
+
+def test_financeiro_materializa_eventos_sanitizados_do_chatbot(client, chatbot_fake):
+    chatbot_fake.eventos_funil = [
+        {
+            "lead_ref": "l1",
+            "tipo": "lead_criado",
+            "ocorrido_em": "2026-07-09T09:00:00+00:00",
+            "idempotency_key": "chatbot:lead:l1:criado",
+            "payload": {"origem": "catalogo", "canal": "site"},
+        }
+    ]
+    login(client)
+
+    assert client.get("/app/financeiro").status_code == 200
+    assert client.get("/app/financeiro").status_code == 200
+
+    db = SessionLocal()
+    eventos = db.query(FunilEvento).filter_by(loja_slug="loja-teste").all()
+    assert len(eventos) == 1
+    assert eventos[0].lead_ref == "l1"
+    assert "telefone" not in (eventos[0].payload_json or "")
+    db.close()
+
+
+def test_sincronizacao_avanca_pelo_numero_de_leads_nao_de_eventos(client, chatbot_fake):
+    chamadas: list[tuple[int, int]] = []
+
+    def listar_eventos_funil(limit=500, offset=0):
+        chamadas.append((limit, offset))
+        if offset:
+            return []
+        # 500 leads podem produzir 1.000 eventos. Um cursor baseado na quantidade
+        # de eventos avançaria para 1.000 e pularia a página de leads em 500.
+        return [
+            {
+                "lead_ref": f"lead-{indice}",
+                "tipo": tipo,
+                "ocorrido_em": "2026-07-09T09:00:00+00:00",
+                "idempotency_key": f"chatbot:lead:{indice}:{tipo}",
+                "payload": None,
+            }
+            for indice in range(500)
+            for tipo in ("lead_criado", "primeira_resposta")
+        ]
+
+    chatbot_fake.listar_eventos_funil = listar_eventos_funil
+    login(client)
+
+    resposta = client.get(
+        "/app/funil/dados",
+        params={"inicio": "2026-07-09", "fim": "2026-07-09"},
+    )
+
+    assert resposta.status_code == 200
+    assert chamadas == [(500, 0), (500, 500)]
+
+
+def test_backend_funil_retorna_tempos_da_loja_sem_ui_manual(client, chatbot_fake):
+    chatbot_fake.eventos_funil = [
+        {
+            "lead_ref": "lead-tempo",
+            "tipo": "lead_criado",
+            "ocorrido_em": "2026-07-09T12:00:00+00:00",
+            "idempotency_key": "chatbot:lead:lead-tempo:criado",
+            "payload": None,
+        },
+        {
+            "lead_ref": "lead-tempo",
+            "tipo": "primeira_resposta",
+            "ocorrido_em": "2026-07-09T12:03:00+00:00",
+            "idempotency_key": "chatbot:mensagem:lead-tempo:resposta",
+            "payload": None,
+        },
+    ]
+    login(client)
+
+    resposta = client.get(
+        "/app/funil/dados",
+        params={"inicio": "2026-07-09", "fim": "2026-07-09"},
+    )
+
+    assert resposta.status_code == 200
+    funil = resposta.json()["funil"]
+    assert funil["total_leads"] == 1
+    assert funil["etapas"]["primeira_resposta"] == 1
+    assert funil["tempo_medio_primeira_resposta_segundos"] == 180
+
+
+def test_backend_funil_nao_expoe_metricas_ao_vendedor(client, chatbot_fake):
+    login(client, papel="vendedor")
+
+    resposta = client.get("/app/funil/dados", follow_redirects=False)
+
+    assert resposta.status_code == 303
+    assert resposta.headers["location"] == "/app"

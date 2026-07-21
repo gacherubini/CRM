@@ -86,6 +86,10 @@ O system prompt não deve inventar veículo ou parcela. No fluxo de financiament
 recebe parcelas, taxas ou bancos do bot: depois de solicitar a simulação, a conversa é pausada e o
 resultado é entregue por um vendedor. O workflow pronto é versionado em `n8n/`.
 
+O webhook também limita o corpo a 32 KiB, valida telefone/texto/identificadores, não ecoa payloads
+inválidos e aplica rate limit por origem. Os limites podem ser ajustados pelas variáveis
+`CHATBOT_WEBHOOK_MAX_*` e `CHATBOT_WEBHOOK_RATE_LIMIT_*`; não desligue o rate limit em produção.
+
 ## E5 — Cadastro de veículo via WhatsApp (Chatbot-only)
 
 Caminho canônico de estoque **sem Portal**: o dono/vendedor manda os dados no WhatsApp;

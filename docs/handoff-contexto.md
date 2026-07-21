@@ -4,10 +4,36 @@
 > Este arquivo: checkpoint operacional. Seções **“Checkpoint anterior”** = histórico — não
 > reexecutar. Path Windows no rodapé de seções antigas: **ignorar** (workspace = root do git).
 >
-> **Checkpoint mais recente: 2026-07-21 (WhatsApp privado + Ajustes + resultados CRM · Fly OFF).**
+> **Checkpoint mais recente: 2026-07-21 (funil backend + event bus + hardening · Fly OFF).**
 > Escolher um eixo por sessão. **Não** religar Fly sem pedido explícito.
 
-## Checkpoint mais recente — WhatsApp privado + Ajustes + resultados CRM (2026-07-21)
+## Checkpoint mais recente — funil backend + event bus + hardening (2026-07-21)
+
+> **Escopo:** Chatbot e Portal, totalmente backend. A simulação, o n8n, a UI e os drivers
+> bancários não foram alterados; Fly permaneceu OFF.
+
+- **Fase C backend pronta:** `FunilEvento` multi-loja, migration `0008_funil_eventos`, registro
+  idempotente, payload sem PII, emissores de etapa/venda/perda, projeção sanitizada do Chatbot,
+  materialização best-effort e agregações de resposta/conversão com média/mediana. Endpoint
+  protegido `/app/funil/dados`; falta somente a UI para concluir #3B Task 4.
+- **Fase F pronta:** confirmação de venda publica `PurchaseConversion` no event bus; o adapter
+  Meta reutiliza o outbox existente, com falhas isoladas sem reverter a venda.
+- **Integrações mais resilientes:** GETs do Portal para Chatbot/Estoque usam retry conservador e
+  backoff configurável; POST/PATCH não repetem sem `Idempotency-Key`; erros públicos não expõem
+  URL, token ou PII.
+- **Webhook endurecido:** limite de corpo antes do parse, validação/normalização de entrada,
+  resposta 422 sanitizada, rate limit antes da autenticação e logs sem payload/PII.
+- **Decisão LGPD vigente:** nenhum controle/autosserviço de exclusão foi dado ao cliente. Uma
+  futura rotina de retenção/expurgo deve ser administrativa e autorizada.
+- Migration Portal head: **`0008_funil_eventos`**.
+- Validação: Portal **245 testes verdes**; Chatbot **110 testes verdes**; migration Portal até o
+  head e `git diff --check` verdes.
+- Residual do plano de conversões: **UI de C** e **G Google Conversions**. A simulação continua por
+  último, conforme decisão do produto.
+
+---
+
+## Checkpoint anterior — WhatsApp privado + Ajustes + resultados CRM (2026-07-21)
 
 > **Escopo:** Chatbot/n8n e Portal. Drivers bancários não foram alterados; Fly permaneceu OFF.
 
@@ -18,8 +44,8 @@
   renderizar URLs internas, tokens ou ciphertexts.
 - CRM fases **A/B/E/D/H** concluídas: match/retry CAPI, canais extras, gastos lote/CSV, insights,
   resultados/alertas/onboarding no dashboard e drill-down de campanha.
-- Migration Portal head: **`0007_onboarding_medicao`**. Portal: **213 testes verdes**.
-- Residual do plano de conversões: **C** eventos de funil, **F** event bus e **G** Google.
+- Naquele checkpoint, o head era `0007_onboarding_medicao` e o residual era C/F/G; ambos foram
+  atualizados no checkpoint mais recente acima.
 
 ---
 

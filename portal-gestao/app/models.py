@@ -3,7 +3,19 @@ from datetime import date, datetime, timezone
 from decimal import Decimal
 from typing import Optional
 
-from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, Numeric, String
+from sqlalchemy import (
+    Boolean,
+    CheckConstraint,
+    Date,
+    DateTime,
+    ForeignKey,
+    Index,
+    Integer,
+    Numeric,
+    String,
+    Text,
+    UniqueConstraint,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db import Base
@@ -15,6 +27,17 @@ def agora() -> datetime:
 
 def novo_id() -> str:
     return str(uuid.uuid4())
+
+
+FUNIL_EVENTO_TIPOS = (
+    "lead_criado",
+    "primeira_resposta",
+    "simulacao_solicitada",
+    "etapa_manual",
+    "venda_registrada",
+    "venda_confirmada",
+    "perda",
+)
 
 
 class Usuario(Base):
@@ -95,6 +118,47 @@ class AtendimentoAtribuicao(Base):
     iniciada_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=agora)
     encerrada_em: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     ativa: Mapped[bool] = mapped_column(Boolean, default=True, index=True)
+
+
+class FunilEvento(Base):
+    """Evento imutável do funil, sempre isolado por loja e lead."""
+
+    __tablename__ = "funil_eventos"
+    __table_args__ = (
+        UniqueConstraint(
+            "loja_slug",
+            "idempotency_key",
+            name="uq_funil_evento_loja_idempotencia",
+        ),
+        CheckConstraint(
+            "tipo IN ("
+            + ", ".join(f"'{tipo}'" for tipo in FUNIL_EVENTO_TIPOS)
+            + ")",
+            name="ck_funil_evento_tipo",
+        ),
+        Index(
+            "ix_funil_eventos_loja_lead_ocorrido",
+            "loja_slug",
+            "lead_ref",
+            "ocorrido_em",
+        ),
+        Index(
+            "ix_funil_eventos_loja_tipo_ocorrido",
+            "loja_slug",
+            "tipo",
+            "ocorrido_em",
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=novo_id)
+    loja_slug: Mapped[str] = mapped_column(String(120), nullable=False)
+    lead_ref: Mapped[str] = mapped_column(String(120), nullable=False)
+    tipo: Mapped[str] = mapped_column(String(40), nullable=False)
+    ocorrido_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    ator_email: Mapped[Optional[str]] = mapped_column(String(320), nullable=True)
+    payload_json: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    idempotency_key: Mapped[str] = mapped_column(String(160), nullable=False)
+    criado_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=agora)
 
 
 class MetaPixelConfig(Base):

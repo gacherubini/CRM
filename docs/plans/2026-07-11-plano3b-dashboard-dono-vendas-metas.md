@@ -5,7 +5,8 @@
 > (`8e7ec5f`). **E10** Purchase CAPI na confirmação de venda. Credenciais banco = **#3A Task 9A** + Motor.
 > **CSV export** e **metas por vendedor UI** feitos. **2026-07-21:** etapa manual de lead,
 > seletores lead/veículo na venda e baixa do veículo no Estoque ao confirmar **feitos**.
-> **Aberto:** eventos históricos do funil (Task 4), reconciliação/Playwright E2E e configurações.
+> **Task 4:** backend histórico/tempos entregue em 2026-07-21; falta a UI do funil para DONE.
+> Também seguem abertos reconciliação/Playwright E2E e configurações.
 > **Disparo** WA em massa / e-mail = roadmap **#6 E11/E12** (não misturar com Task 5).  
 > Não inferir venda/lucro só a partir de mensagens/leads.
 
@@ -69,8 +70,8 @@ Impedir sobreposição ambígua do mesmo tipo/escopo/período ou definir priorid
 ### Task 4: Eventos do funil
 
 > **Detalhada em 2026-07-21** pelo plano
-> [conversões / funil / insights](2026-07-21-plano-conversao-atribuicao-insights.md) **Fase C**
-> (ainda não DONE). Implementar por lá; não reinventar em paralelo.
+> [conversões / funil / insights](2026-07-21-plano-conversao-atribuicao-insights.md) **Fase C**.
+> Backend entregue; não reimplementar. Falta somente a UI antes de marcar DONE.
 
 Registrar atribuição, primeira resposta, mudanças de etapa, perda e venda. Eventos recebidos do
 Chatbot são idempotentes; ações manuais geram os mesmos tipos de evento.

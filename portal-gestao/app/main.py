@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import os
 import re
 import uuid
@@ -37,7 +38,13 @@ from app.auth import (
     usuario_atual,
 )
 from app.cripto import cifrar
-from app.meta_capi import enfileirar_purchase_venda, processar_outbox_pendentes
+from app.conversions import ConversionKind, PurchaseConversion, publish_conversion
+from app.funil_eventos import (
+    materializar_eventos_chatbot,
+    registrar_evento,
+    resumo_funil,
+)
+from app.meta_capi import processar_outbox_pendentes
 from app.models import (
     AtendimentoAtribuicao,
     Campanha,
@@ -82,6 +89,7 @@ from app.clients.motor import CredencialNaoEncontrada, MotorClient, MotorIndispo
 from app.config import settings
 from app.db import Base, engine, get_db
 from app.financeiro_calc import (
+    FUSO_PORTAL,
     calcular_metricas_vendas,
     dinheiro,
     funil_periodo,
@@ -95,6 +103,74 @@ from app.financeiro_calc import (
 
 BASE_DIR = Path(__file__).resolve().parent
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
+logger = logging.getLogger(__name__)
+
+
+def registrar_evento_funil_best_effort(
+    db: Session,
+    *,
+    loja_slug: str,
+    lead_ref: str | None,
+    tipo: str,
+    idempotency_key: str,
+    ocorrido_em: datetime | None = None,
+    ator_email: str | None = None,
+    payload: dict | None = None,
+) -> None:
+    """Persiste telemetria comercial sem quebrar a operação principal."""
+    if not lead_ref:
+        return
+    try:
+        registrar_evento(
+            db,
+            loja_slug=loja_slug,
+            lead_ref=lead_ref,
+            tipo=tipo,
+            idempotency_key=idempotency_key,
+            ocorrido_em=ocorrido_em,
+            ator_email=ator_email,
+            payload=payload,
+        )
+        db.commit()
+    except Exception as exc:
+        db.rollback()
+        logger.warning(
+            "funil: falha best-effort loja=%s tipo=%s erro=%s",
+            loja_slug,
+            tipo,
+            type(exc).__name__,
+        )
+
+
+def sincronizar_funil_chatbot_best_effort(
+    db: Session,
+    *,
+    loja_slug: str,
+    chatbot: ChatbotClient,
+) -> bool:
+    """Busca a projeção sanitizada do Chatbot sem tornar o dashboard dependente dela."""
+    try:
+        tamanho_pagina = 500
+        offset = 0
+        while True:
+            lote = chatbot.listar_eventos_funil(limit=tamanho_pagina, offset=offset)
+            materializar_eventos_chatbot(db, loja_slug=loja_slug, eventos=lote)
+            if len(lote) < tamanho_pagina:
+                break
+            # O contrato do Chatbot pagina leads, e cada lead projeta um ou dois
+            # eventos. Portanto o cursor avança pelo tamanho solicitado da página,
+            # não pela quantidade variável de eventos retornados.
+            offset += tamanho_pagina
+        db.commit()
+        return True
+    except Exception as exc:
+        db.rollback()
+        logger.warning(
+            "funil: sincronização Chatbot falhou loja=%s erro=%s",
+            loja_slug,
+            type(exc).__name__,
+        )
+        return False
 
 
 def mascarar_telefone(telefone: str | None) -> str:
@@ -661,7 +737,7 @@ async def leads_atualizar_etapa(
             f"/app/leads/{lead_id}?erro=etapa", status_code=303
         )
     try:
-        chatbot.atualizar_etapa_lead(lead_id, etapa)
+        lead_atualizado = chatbot.atualizar_etapa_lead(lead_id, etapa)
     except LeadNaoEncontrado:
         return templates.TemplateResponse(
             "erro.html",
@@ -671,6 +747,26 @@ async def leads_atualizar_etapa(
     except ChatbotIndisponivel:
         return RedirectResponse(
             f"/app/leads/{lead_id}?erro=integracao", status_code=303
+        )
+    evento_origem = str(lead_atualizado.get("atualizada_em") or uuid.uuid4())
+    registrar_evento_funil_best_effort(
+        db,
+        loja_slug=usuario.loja_slug,
+        lead_ref=lead_id,
+        tipo="etapa_manual",
+        idempotency_key=f"portal:lead:{lead_id}:etapa:{evento_origem}",
+        ator_email=usuario.email,
+        payload={"etapa_nova": etapa},
+    )
+    if etapa == "perdido":
+        registrar_evento_funil_best_effort(
+            db,
+            loja_slug=usuario.loja_slug,
+            lead_ref=lead_id,
+            tipo="perda",
+            idempotency_key=f"portal:lead:{lead_id}:perda:{evento_origem}",
+            ator_email=usuario.email,
+            payload={"status": "perdido"},
         )
     return RedirectResponse(
         f"/app/leads/{lead_id}?ok=etapa-atualizada", status_code=303
@@ -1762,6 +1858,16 @@ async def vendas_criar(
                 pass
     db.add(venda)
     db.commit()
+    registrar_evento_funil_best_effort(
+        db,
+        loja_slug=usuario.loja_slug,
+        lead_ref=venda.lead_ref,
+        tipo="venda_registrada",
+        idempotency_key=f"portal:venda:{venda.id}:registrada",
+        ocorrido_em=venda.criada_em,
+        ator_email=usuario.email,
+        payload={"venda_id": venda.id, "status": "registrada"},
+    )
     sufixo = "&aviso=referencias-pendentes" if referencias_pendentes else ""
     return RedirectResponse(f"/app/vendas?ok=registrada{sufixo}", status_code=303)
 
@@ -1827,8 +1933,22 @@ async def vendas_confirmar(
         db.rollback()
         erro = "reconciliacao" if estoque_baixado else "acao"
         return RedirectResponse(f"/app/vendas?erro={erro}", status_code=303)
-    # E10: Purchase via CAPI — best-effort; falha não desfaz a venda.
-    enfileirar_purchase_venda(db, venda, lead)
+    registrar_evento_funil_best_effort(
+        db,
+        loja_slug=usuario.loja_slug,
+        lead_ref=venda.lead_ref,
+        tipo="venda_confirmada",
+        idempotency_key=f"portal:venda:{venda.id}:confirmada",
+        ocorrido_em=venda.confirmada_em,
+        ator_email=usuario.email,
+        payload={"venda_id": venda.id, "status": "confirmada"},
+    )
+    # Conversões outbound — cada adapter é best-effort e nunca desfaz a venda.
+    publish_conversion(
+        ConversionKind.PURCHASE,
+        PurchaseConversion.from_sale(venda, lead),
+        db,
+    )
     return RedirectResponse("/app/vendas?ok=confirmada", status_code=303)
 
 
@@ -2225,6 +2345,43 @@ def vendedor_dashboard(
     )
 
 
+@app.get("/app/funil/dados")
+def funil_dados(
+    request: Request,
+    inicio: str | None = None,
+    fim: str | None = None,
+    db: Session = Depends(get_db),
+    chatbot: ChatbotClient = Depends(get_chatbot_client),
+):
+    """Backend do funil temporal; a UI pode consumir sem recalcular métricas."""
+    usuario = usuario_atual(request, db)
+    if not usuario:
+        return redirecionar_login()
+    if not pode_ver_financeiro(usuario):
+        return RedirectResponse("/app", status_code=303)
+    sincronizar_funil_chatbot_best_effort(
+        db,
+        loja_slug=usuario.loja_slug,
+        chatbot=chatbot,
+    )
+    d_inicio, d_fim = periodo_padrao(inicio, fim)
+    inicio_dt = datetime.combine(d_inicio, datetime.min.time(), tzinfo=FUSO_PORTAL)
+    fim_dt = datetime.combine(
+        d_fim + timedelta(days=1),
+        datetime.min.time(),
+        tzinfo=FUSO_PORTAL,
+    ) - timedelta(microseconds=1)
+    return {
+        "periodo": {"inicio": d_inicio.isoformat(), "fim": d_fim.isoformat()},
+        "funil": resumo_funil(
+            db,
+            loja_slug=usuario.loja_slug,
+            inicio=inicio_dt,
+            fim=fim_dt,
+        ),
+    }
+
+
 @app.get("/app/financeiro", response_class=HTMLResponse)
 def financeiro_dashboard(
     request: Request,
@@ -2241,6 +2398,11 @@ def financeiro_dashboard(
         return redirecionar_login()
     if not pode_ver_financeiro(usuario):
         return RedirectResponse("/app", status_code=303)
+    sincronizar_funil_chatbot_best_effort(
+        db,
+        loja_slug=usuario.loja_slug,
+        chatbot=chatbot,
+    )
     d_inicio, d_fim = periodo_padrao(inicio, fim)
     resultado_vendas = calcular_metricas_vendas(db, usuario.loja_slug, d_inicio, d_fim)
     confirmadas = resultado_vendas["confirmadas"]

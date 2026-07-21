@@ -56,6 +56,10 @@ go-live da loja no lab = Fly + n8n2037.
    token no Chatbot sem header no n8n = 401 e bot “morto”.
 3. Token de API do Chatbot (`Authorization: Bearer …`) nos tools do workflow — distinto do
    webhook token quando configurado assim no lab.
+4. O Chatbot rejeita payloads acima de 32 KiB, normaliza/valida telefone e aplica rate limit
+   configurável antes da autenticação. Ajuste `CHATBOT_WEBHOOK_MAX_*` e
+   `CHATBOT_WEBHOOK_RATE_LIMIT_*` somente se o volume real exigir; nunca use rate limit zero em
+   produção.
 
 ## 3. Migrations Chatbot
 
@@ -128,7 +132,8 @@ python -m app.cli autorizar-numero --slug <loja> --telefone 5511... --papel dono
   resultado. Credenciais e detalhes bancários permanecem no Motor/Portal.
 - Campos por banco (placa, celular, entrada…) → mapa de reconhecimento; o n8n/Chatbot deve
   coletar o que o provedor escolhido exige.
-- CPF mascarado; sem gate de consentimento (decisão tomada). Expurgo LGPD ainda é backlog (#2A).
+- CPF mascarado; sem gate de consentimento (decisão tomada). Retenção/expurgo LGPD ainda é
+  backlog administrativo (#2A), sem controle de exclusão pelo cliente.
 
 ## 8. Validação (número de teste antes de soltar geral)
 

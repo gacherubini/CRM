@@ -1,8 +1,13 @@
 from __future__ import annotations
 
+import time
+from collections.abc import Callable
 from typing import Any
 
 import httpx
+
+from app.clients._retry import requisicao_com_retry
+from app.config import settings
 
 
 class ChatbotIndisponivel(RuntimeError):
@@ -22,10 +27,26 @@ class SimulacaoIndisponivel(RuntimeError):
 
 
 class ChatbotClient:
-    def __init__(self, base_url: str, token: str, timeout: float = 5):
+    def __init__(
+        self,
+        base_url: str,
+        token: str,
+        timeout: float = 5,
+        *,
+        retries: int | None = None,
+        retry_backoff: float | None = None,
+        sleeper: Callable[[float], None] = time.sleep,
+    ):
         self.base_url = base_url.rstrip("/")
         self.token = token
         self.timeout = timeout
+        self.retries = settings.request_retries if retries is None else max(0, retries)
+        self.retry_backoff = (
+            settings.request_retry_backoff
+            if retry_backoff is None
+            else max(0.0, retry_backoff)
+        )
+        self.sleeper = sleeper
 
     @property
     def configurado(self) -> bool:
@@ -44,15 +65,25 @@ class ChatbotClient:
         headers = {"Authorization": f"Bearer {self.token}"}
         try:
             with httpx.Client(base_url=self.base_url, headers=headers, timeout=self.timeout) as client:
-                resposta = client.request(method, path, **kwargs)
+                resposta = requisicao_com_retry(
+                    client,
+                    method,
+                    path,
+                    retries=self.retries,
+                    backoff=self.retry_backoff,
+                    sleeper=self.sleeper,
+                    **kwargs,
+                )
                 if resposta.status_code == 404 and erro_404 is not None:
                     raise erro_404("recurso não encontrado")
                 if resposta.status_code == 409 and erro_409 is not None:
                     raise erro_409("recurso não habilitado")
                 resposta.raise_for_status()
                 return resposta.json()
-        except (httpx.HTTPError, ValueError) as exc:
-            raise ChatbotIndisponivel("Não foi possível acessar o chatbot agora") from exc
+        except (httpx.HTTPError, ValueError):
+            raise ChatbotIndisponivel(
+                "Não foi possível acessar o chatbot agora"
+            ) from None
 
     # --- Leads -----------------------------------------------------------------
 
@@ -70,6 +101,14 @@ class ChatbotClient:
             erro_404=LeadNaoEncontrado,
             json={"etapa": etapa},
         )
+
+    def listar_eventos_funil(self, limit: int = 500, offset: int = 0) -> list[dict]:
+        dados = self._request(
+            "GET",
+            "/v1/funil/eventos",
+            params={"limit": limit, "offset": offset},
+        )
+        return dados["eventos"]
 
     # --- Conversas e handoff ---------------------------------------------------
 

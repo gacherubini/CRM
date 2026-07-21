@@ -9,7 +9,8 @@
 > de propósito até go-live. **Decisão:** sem trava de consentimento; CPF mascarado.
 > **Decisão 2026-07-21:** o bot solicita a simulação, não recebe/exibe o resultado financeiro e
 > faz handoff automático; o vendedor entrega o resultado ao cliente.
-> **Aberto:** go-live manual, LGPD exclusão, readiness real, foto no cadastro (E6).
+> **Aberto:** go-live manual, retenção/expurgo LGPD administrativo (sem autosserviço do cliente),
+> readiness real, foto no cadastro (E6).
 
 **Goal:** Entregar um pacote instalável e revendível que conecta um WhatsApp, conversa com clientes,
 qualifica e exporta leads, consulta o Estoque Lite, executa handoff humano e, na edição
