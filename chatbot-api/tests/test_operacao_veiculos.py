@@ -18,6 +18,20 @@ def _payload(**overrides):
     return base
 
 
+def test_numero_autorizado_guarda_nome(client, loja_a):
+    r = client.post(
+        "/v1/operacao/numeros-autorizados",
+        json={"telefone": "5511988887777", "nome": "João Vendedor"},
+        headers=loja_a["headers"],
+    )
+    assert r.status_code == 201, r.text
+    assert r.json()["nome"] == "João Vendedor"
+    lista = client.get(
+        "/v1/operacao/numeros-autorizados", headers=loja_a["headers"]
+    ).json()["numeros"]
+    assert any(n["nome"] == "João Vendedor" for n in lista)
+
+
 def _autorizar(client, loja, telefone="5511999990001", papel="dono"):
     r = client.post(
         "/v1/operacao/numeros-autorizados",

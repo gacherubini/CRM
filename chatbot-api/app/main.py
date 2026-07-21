@@ -252,6 +252,7 @@ class NumeroAutorizadoInput(BaseModel):
     telefone: str
     papel: str = "vendedor"
     ativo: bool = True
+    nome: Optional[str] = Field(default=None, max_length=120)
 
 
 class OperacaoVeiculoInput(BaseModel):
@@ -772,7 +773,7 @@ def adicionar_numero_autorizado(
     db: Session = Depends(get_db),
 ):
     return operacao.adicionar_numero(
-        db, ctx.loja_id, dados.telefone, dados.papel, dados.ativo
+        db, ctx.loja_id, dados.telefone, dados.papel, dados.ativo, dados.nome
     )
 
 

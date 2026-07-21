@@ -59,6 +59,7 @@ def _para_saida_numero(n: NumeroAutorizado) -> dict:
     return {
         "id": n.id,
         "telefone": n.telefone,
+        "nome": n.nome,
         "papel": n.papel,
         "ativo": n.ativo,
         "criado_em": n.criado_em.isoformat() if n.criado_em else None,
@@ -81,6 +82,7 @@ def adicionar_numero(
     telefone: str,
     papel: str = "vendedor",
     ativo: bool = True,
+    nome: str | None = None,
 ) -> dict:
     tel = normalizar_telefone(telefone)
     if len(tel) < 10:
@@ -88,6 +90,7 @@ def adicionar_numero(
     papel_norm = (papel or "vendedor").strip().lower()
     if papel_norm not in _PAPEIS:
         raise HTTPException(status_code=422, detail="papel inválido (dono|vendedor)")
+    nome_norm = (nome or "").strip() or None
 
     existente = (
         db.query(NumeroAutorizado)
@@ -97,6 +100,8 @@ def adicionar_numero(
     if existente:
         existente.papel = papel_norm
         existente.ativo = ativo
+        if nome is not None:
+            existente.nome = nome_norm
         if not ativo:
             existente.foto_placa_atual = None
             existente.foto_sessao_expira_em = None
@@ -110,6 +115,7 @@ def adicionar_numero(
         telefone=tel,
         papel=papel_norm,
         ativo=ativo,
+        nome=nome_norm,
     )
     db.add(row)
     try:
