@@ -167,6 +167,27 @@ class FotoVeiculoWebhookInput(BaseModel):
         )
 
 
+class RoteamentoInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    instance: str
+    telefone: str
+    texto: Optional[str] = Field(default=None, max_length=config.WEBHOOK_MAX_TEXT_CHARS)
+    is_saved: Optional[bool] = None
+
+    @field_validator("instance")
+    @classmethod
+    def validar_instance(cls, value: str) -> str:
+        return validar_identificador(
+            value, nome="instance", limite=config.WEBHOOK_MAX_INSTANCE_CHARS
+        )
+
+    @field_validator("telefone")
+    @classmethod
+    def validar_telefone(cls, value: str) -> str:
+        return normalizar_telefone_webhook(value)
+
+
 class EstadoInput(BaseModel):
     bot_ativo: bool
 
@@ -252,6 +273,7 @@ class NumeroAutorizadoInput(BaseModel):
     telefone: str
     papel: str = "vendedor"
     ativo: bool = True
+    nome: Optional[str] = Field(default=None, max_length=120)
 
 
 class OperacaoVeiculoInput(BaseModel):
@@ -334,6 +356,19 @@ def webhook_audio_transcrever(
         dados.provider_message_id,
         dados.mime_type,
         dados.duration_seconds,
+    )
+
+
+@app.post("/v1/operacao/roteamento")
+def operacao_roteamento(
+    dados: RoteamentoInput,
+    db: Session = Depends(get_db),
+    _: None = Depends(verificar_webhook_token),
+):
+    """Decide como o n8n trata a mensagem (cliente/ignorar/cadastro/controle)."""
+    loja = servico.resolver_loja_por_instancia(db, dados.instance)
+    return operacao.decidir_roteamento(
+        db, loja.id, dados.telefone, dados.texto, dados.is_saved
     )
 
 
@@ -772,7 +807,7 @@ def adicionar_numero_autorizado(
     db: Session = Depends(get_db),
 ):
     return operacao.adicionar_numero(
-        db, ctx.loja_id, dados.telefone, dados.papel, dados.ativo
+        db, ctx.loja_id, dados.telefone, dados.papel, dados.ativo, dados.nome
     )
 
 

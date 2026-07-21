@@ -139,3 +139,18 @@ class ChatbotClient:
         return self._request(
             "POST", "/v1/simular", erro_409=SimulacaoIndisponivel, json=payload
         )
+
+    # --- Operação: números autorizados a cadastrar ----------------------------
+
+    def listar_numeros_cadastro(self) -> list[dict]:
+        return self._request("GET", "/v1/operacao/numeros-autorizados")["numeros"]
+
+    def adicionar_numero_cadastro(self, telefone: str, nome: str | None = None) -> dict:
+        return self._request(
+            "POST",
+            "/v1/operacao/numeros-autorizados",
+            json={"telefone": telefone, "nome": nome, "ativo": True},
+        )
+
+    def remover_numero_cadastro(self, telefone: str) -> dict:
+        return self._request("DELETE", f"/v1/operacao/numeros-autorizados/{telefone}")

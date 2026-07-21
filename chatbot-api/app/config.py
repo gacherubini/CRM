@@ -59,6 +59,9 @@ IMAGE_DOWNLOAD_TIMEOUT = float(os.getenv("CHATBOT_IMAGE_DOWNLOAD_TIMEOUT", "10")
 IMAGE_SESSION_TTL_SECONDS = max(
     0, int(os.getenv("CHATBOT_IMAGE_SESSION_TTL_SECONDS", "600"))
 )
+CADASTRO_SESSION_TTL_SECONDS = max(
+    0, int(os.getenv("CHATBOT_CADASTRO_SESSION_TTL_SECONDS", "1800"))
+)
 
 # Provider de simulação: none (Atendimento) | mock (demo) | http (Motor real)
 SIMULATION_PROVIDER = os.getenv("SIMULATION_PROVIDER", "none")

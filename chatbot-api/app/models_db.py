@@ -171,4 +171,8 @@ class NumeroAutorizado(Base):
     foto_sessao_expira_em: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
+    nome: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    cadastro_expira_em: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     criado_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_agora)
