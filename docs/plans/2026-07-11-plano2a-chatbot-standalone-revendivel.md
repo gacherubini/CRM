@@ -11,7 +11,8 @@
 > faz handoff automático; o vendedor entrega o resultado ao cliente.
 > **Entrega 2026-07-21:** áudio recebido com download efêmero/transcritor HTTP/fallback; envio da
 > foto principal do Estoque no WhatsApp; e foto automática WhatsApp → volume do Estoque → Catálogo,
-> restrita a números autorizados e idempotente. **Aberto:** go-live manual, provider real de
+> restrita a números autorizados e idempotente. **Hardening 2026-07-21:** telefone/idempotência
+> presos ao webhook real e sessão curta por vendedor para lote de fotos. **Aberto:** go-live manual, provider real de
 > transcrição, URL HTTPS/backup do volume, retenção/expurgo administrativo (sem autosserviço) e
 > readiness real. Object storage externo é evolução de escala, não bloqueio do MVP.
 

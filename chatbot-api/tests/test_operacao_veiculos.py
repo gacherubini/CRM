@@ -116,8 +116,57 @@ def test_autorizado_cria_veiculo(client, loja_a):
         assert fake.chamadas[0]["dados"]["preco"] == 16000.0
         assert fake.chamadas[0]["dados"]["publicado"] is True
         assert body["veiculo"]["publicado"] is True
+        assert "envie as fotos" in body["mensagem"]
     finally:
         app.dependency_overrides.pop(get_inventory_write_client, None)
+
+
+def test_cadastro_ativa_sessao_para_primeira_foto_sem_legenda(client, loja_a):
+    from app.vehicle_photo import get_vehicle_photo_processor
+
+    class _PhotoFake:
+        def __init__(self):
+            self.chamadas = []
+
+        def processar(self, instancia, message_id, placa, mime_type):
+            self.chamadas.append((instancia, message_id, placa, mime_type))
+            return {
+                "ok": True,
+                "mensagem": "Foto adicionada ao estoque e ao catálogo.",
+                "publicado": True,
+            }
+
+    _autorizar(client, loja_a)
+    write_fake = _FakeWriteClient()
+    app.dependency_overrides[get_inventory_write_client] = lambda: write_fake
+    try:
+        criada = client.post(
+            "/v1/operacao/veiculos",
+            json=_payload(),
+            headers=loja_a["headers"],
+        )
+    finally:
+        app.dependency_overrides.pop(get_inventory_write_client, None)
+    assert criada.status_code == 201
+
+    photo_fake = _PhotoFake()
+    app.dependency_overrides[get_vehicle_photo_processor] = lambda: photo_fake
+    try:
+        foto = client.post(
+            "/webhook/operacao/veiculos/foto",
+            json={
+                "instance": loja_a["instance"],
+                "telefone_solicitante": "5511999990001",
+                "provider_message_id": "MSG-SEM-LEGENDA-1",
+                "legenda": None,
+                "mime_type": "image/jpeg",
+            },
+        )
+    finally:
+        app.dependency_overrides.pop(get_vehicle_photo_processor, None)
+
+    assert foto.json()["ok"] is True
+    assert photo_fake.chamadas[0][2] == "ABC1D23"
 
 
 def test_nao_autorizado_recusa_sem_chamar_estoque(client, loja_a):

@@ -5,8 +5,10 @@ import hashlib
 import os
 import re
 import tempfile
+import time
 import uuid
 from pathlib import Path
+from urllib.parse import unquote
 
 from fastapi import HTTPException
 
@@ -120,6 +122,89 @@ def remover_se_novo(caminho: Path, criado: bool) -> None:
             caminho.unlink(missing_ok=True)
         except OSError:
             pass
+
+
+def storage_key_da_url(url: str | None) -> str | None:
+    """Reconhece somente URLs geradas pela base pública configurada."""
+    base = config.MEDIA_PUBLIC_BASE_URL.rstrip("/")
+    valor = str(url or "").strip()
+    prefixo = f"{base}/" if base else ""
+    if not prefixo or not valor.startswith(prefixo):
+        return None
+    chave = unquote(valor[len(prefixo) :])
+    try:
+        caminho_seguro(chave)
+    except HTTPException:
+        return None
+    return chave
+
+
+def remover_por_url(
+    url: str | None, *, idade_minima_segundos: int | None = None
+) -> bool:
+    chave = storage_key_da_url(url)
+    if chave is None:
+        return False
+    caminho = caminho_seguro(chave)
+    idade_minima = (
+        config.MEDIA_ORPHAN_GRACE_SECONDS
+        if idade_minima_segundos is None
+        else max(0, idade_minima_segundos)
+    )
+    try:
+        if caminho.exists() and time.time() - caminho.stat().st_mtime < idade_minima:
+            return False
+        caminho.unlink(missing_ok=True)
+    except OSError:
+        return False
+    return True
+
+
+def listar_storage_keys() -> set[str]:
+    raiz = config.MEDIA_STORAGE_DIR.resolve()
+    if not raiz.is_dir():
+        return set()
+    encontradas: set[str] = set()
+    for caminho in raiz.glob("*/*/*"):
+        if caminho.is_symlink() or not caminho.is_file():
+            continue
+        try:
+            chave = caminho.relative_to(raiz).as_posix()
+            if caminho_seguro(chave) == caminho.resolve():
+                encontradas.add(chave)
+        except (HTTPException, ValueError, OSError):
+            continue
+    return encontradas
+
+
+def limpar_orfas(referenciadas: set[str], *, aplicar: bool = False) -> dict:
+    encontradas = listar_storage_keys()
+    orfas = encontradas - referenciadas
+    elegiveis: set[str] = set()
+    agora = time.time()
+    for chave in orfas:
+        try:
+            caminho = caminho_seguro(chave)
+            if agora - caminho.stat().st_mtime >= config.MEDIA_ORPHAN_GRACE_SECONDS:
+                elegiveis.add(chave)
+        except OSError:
+            continue
+    removidas = 0
+    if aplicar:
+        for chave in elegiveis:
+            try:
+                caminho_seguro(chave).unlink(missing_ok=True)
+                removidas += 1
+            except OSError:
+                continue
+    return {
+        "arquivos": len(encontradas),
+        "referenciados": len(encontradas & referenciadas),
+        "orfaos": len(orfas),
+        "aguardando_carencia": len(orfas - elegiveis),
+        "removidos": removidas,
+        "modo": "aplicar" if aplicar else "previa",
+    }
 
 
 def resolver_publica(loja_id: str, veiculo_id: str, arquivo: str) -> tuple[Path, str]:

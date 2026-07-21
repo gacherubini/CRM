@@ -159,13 +159,22 @@ def version():
 
 @app.post("/v1/veiculos", status_code=201)
 def criar_veiculo(
-    dados: VeiculoInput, ctx: Contexto = Depends(get_contexto), db: Session = Depends(get_db)
+    dados: VeiculoInput,
+    idempotency_key: Optional[str] = Header(
+        default=None, alias="Idempotency-Key", max_length=512
+    ),
+    ctx: Contexto = Depends(get_contexto),
+    db: Session = Depends(get_db),
 ):
     _exigir_operacao(ctx)
     if dados.custo is not None and not _pode_ver_custo(ctx):
         raise HTTPException(status_code=403, detail="papel sem permissão para informar custo")
     v = servico.criar_veiculo(
-        db, ctx.loja_id, dados.model_dump(exclude_none=True), ctx.papel
+        db,
+        ctx.loja_id,
+        dados.model_dump(exclude_none=True),
+        ctx.papel,
+        idempotency_key=idempotency_key,
     )
     return servico.para_saida_privada(v, _pode_ver_custo(ctx))
 

@@ -42,6 +42,16 @@ def main() -> None:
     webhook.add_argument("--url", required=True)
     webhook.add_argument("--segredo", required=True, help="segredo HMAC (>= 16 chars)")
 
+    limpar = sub.add_parser(
+        "limpar-midias-orfas",
+        help="lista arquivos sem referência; use --aplicar para removê-los",
+    )
+    limpar.add_argument(
+        "--aplicar",
+        action="store_true",
+        help="remove os arquivos órfãos encontrados",
+    )
+
     args = parser.parse_args()
 
     if args.comando == "criar-loja":
@@ -105,6 +115,21 @@ def main() -> None:
             db.close()
         print(f"Webhook configurado para slug={args.slug} -> {url_destino}")
         print("Segredo guardado cifrado (Fernet).")
+    elif args.comando == "limpar-midias-orfas":
+        db = SessionLocal()
+        try:
+            resultado = servico.limpar_midias_orfas(db, aplicar=args.aplicar)
+        finally:
+            db.close()
+        print(
+            "Mídias: "
+            f"arquivos={resultado['arquivos']} "
+            f"referenciados={resultado['referenciados']} "
+            f"órfãos={resultado['orfaos']} "
+            f"carência={resultado['aguardando_carencia']} "
+            f"removidos={resultado['removidos']} "
+            f"modo={resultado['modo']}"
+        )
 
 
 if __name__ == "__main__":

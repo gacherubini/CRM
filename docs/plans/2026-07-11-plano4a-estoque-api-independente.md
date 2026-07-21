@@ -5,7 +5,8 @@
 > **Status 2026-07-13:** núcleo (CRUD, tenancy, público, outbox, admin parcial) **entregue**;
 > **`placa` + `GET /v1/veiculos/por-placa` + filtro + CSV + unicidade** **entregues** (migration `0005`);
 > **placa no admin HTMX** (form/painel) e no Portal form/lista **feitos**.
-> **Aberto:** E2E outbox/restore; admin 100% fechado.
+> **Hardening 2026-07-21:** cadastro idempotente persistente, upload em volume e limpeza
+> administrativa/automática de mídias órfãs entregues. **Aberto:** E2E outbox/restore; admin 100% fechado.
 > Seção “CRM WhatsApp privado” = decisão de produto para o pacote Chatbot+Estoque Lite.
 
 **Goal:** Entregar um produto de estoque multi-loja, com API, administração mínima, importação e

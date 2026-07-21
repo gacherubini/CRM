@@ -119,6 +119,7 @@ e já publica o veículo para aparecer no Catálogo.
 | `ESTOQUE_API_URL` | Base da API privada do Estoque (ex.: `http://estoque-api:8000`) |
 | `ESTOQUE_API_TOKEN` | Token de serviço **da loja no estoque-api** (escrita) |
 | `ESTOQUE_REQUEST_TIMEOUT` | Timeout HTTP (default 8s) |
+| `CHATBOT_IMAGE_SESSION_TTL_SECONDS` | Janela para fotos em lote (default 600s) |
 
 ### 1. Autorizar telefones da equipe
 
@@ -133,24 +134,27 @@ curl -s -X POST http://localhost:8001/v1/operacao/numeros-autorizados \
   -d '{"telefone":"5511999999999","papel":"dono"}'
 ```
 
-### 2. Ferramenta n8n `adicionar_veiculo` (schema)
+### 2. Ferramenta n8n `adicionar_veiculo`
+
+O schema exposto ao modelo contém somente os dados comerciais abaixo e rejeita
+campos extras. O Code Tool monta `telefone_solicitante` e `Idempotency-Key` com
+os valores da mensagem real extraídos do webhook; esses dois campos não são
+controlados pelo modelo nem pelo cliente atendido.
 
 ```http
 POST http://chatbot-api:8000/v1/operacao/veiculos
 Authorization: Bearer TOKEN_DO_CHATBOT
-Idempotency-Key: {{ $json.messageId || uuid }}
+Idempotency-Key: {{ providerMessageId_do_webhook }}
 Content-Type: application/json
 
 {
-  "telefone_solicitante": "5511999999999",
   "tipo": "moto",
   "marca": "Honda",
   "modelo": "CG 160",
   "ano_modelo": 2023,
   "preco": 16000,
   "km": 12000,
-  "placa": "ABC1D23",
-  "foto_url": null
+  "placa": "ABC1D23"
 }
 ```
 
@@ -175,9 +179,11 @@ Content-Type: application/json
 
 ### 3. Enviar fotos pelo WhatsApp
 
-Depois do cadastro em texto, o vendedor envia cada foto com a placa na legenda
-(`ABC1D23`). O workflow valida o telefone, baixa a imagem server-side da Evolution,
-faz upload binário no Estoque e confirma quando Estoque+Catálogo estiverem atualizados.
+Depois do cadastro em texto, abre-se uma sessão de 10 minutos para o vendedor
+enviar várias fotos sem repetir a placa. Para um veículo já existente, a primeira
+foto usa a placa na legenda (`ABC1D23`) e as seguintes reutilizam a sessão. O
+workflow valida o telefone, baixa a imagem server-side da Evolution, faz upload
+binário no Estoque e confirma quando Estoque+Catálogo estiverem atualizados.
 O volume `estoque_media` preserva os arquivos; configure:
 
 ```env
@@ -188,6 +194,9 @@ ESTOQUE_MEDIA_ALLOWED_HOSTS=estoque.seudominio.com
 Essa URL precisa ser HTTPS e acessível pelo navegador e pela Evolution. O n8n/LLM
 nunca recebe base64 nem escolhe path/URL. A API aceita somente JPEG/PNG/WebP, até
 10 MiB, e reentrega da mesma mensagem não duplica a foto.
+
+O cadastro do veículo também é idempotente no Estoque. Telefone e chave de
+reentrega vêm do webhook real; o LLM não pode escolher uma identidade autorizada.
 
 Quando o cliente pedir uma imagem, o fluxo inverso resolve a capa pelo ID confiável
 e chama `message/sendMedia` na Evolution, sem obrigar o cliente a abrir o site.

@@ -67,6 +67,7 @@ ESTOQUE_MEDIA_STORAGE_DIR=/data/media
 ESTOQUE_MEDIA_PUBLIC_BASE_URL=https://estoque.seudominio.com/public/v1/media
 ESTOQUE_MEDIA_MAX_FOTOS=20
 ESTOQUE_MEDIA_MAX_BYTES=10485760
+ESTOQUE_MEDIA_ORPHAN_GRACE_SECONDS=3600
 ESTOQUE_MEDIA_ALLOWED_HOSTS=estoque.seudominio.com
 ```
 
@@ -104,6 +105,19 @@ conferem a assinatura do arquivo e têm escrita atômica/idempotente. URLs com
 base64, host local/privado, credenciais, fragmento ou query são recusadas. A forma
 legada `{ "urls": ["https://..."] }` continua disponível para integração existente.
 As respostas mantêm `foto_url`/`fotos` e acrescentam `midia_principal`/`midias`.
+
+Cadastro com `Idempotency-Key` persiste somente hashes e retorna o mesmo veículo
+quando chave+payload forem repetidos. Para remover arquivos locais sem referência,
+primeiro audite e depois aplique:
+
+```bash
+python -m app.cli limpar-midias-orfas
+python -m app.cli limpar-midias-orfas --aplicar
+```
+
+A carência padrão de 3600 segundos protege uploads em andamento. Substituições
+de galeria também tentam limpar arquivos locais que ficaram órfãos; URLs externas
+nunca são apagadas.
 
 ## Vitrine pública (sem token, por slug)
 

@@ -788,7 +788,9 @@ def remover_numero_autorizado(
 @app.post("/v1/operacao/veiculos", status_code=201)
 def criar_veiculo_operacao(
     dados: OperacaoVeiculoInput,
-    idempotency_key: Optional[str] = Header(default=None, alias="Idempotency-Key"),
+    idempotency_key: Optional[str] = Header(
+        default=None, alias="Idempotency-Key", max_length=512
+    ),
     ctx: Contexto = Depends(get_contexto),
     db: Session = Depends(get_db),
     write_client: InventoryWriteClient = Depends(get_inventory_write_client),

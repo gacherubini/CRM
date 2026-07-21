@@ -79,6 +79,47 @@ def main() -> None:
         "prompt não proíbe a divulgação do resultado"
     )
 
+    vehicle_create_node = next(
+        (
+            node
+            for node in data.get("nodes", [])
+            if node.get("name") == "cadastrar_veiculo1"
+        ),
+        None,
+    )
+    assert vehicle_create_node is not None, "tool cadastrar_veiculo1 ausente"
+    vehicle_create_code = vehicle_create_node.get("parameters", {}).get("jsCode", "")
+    vehicle_create_schema = vehicle_create_node.get("parameters", {}).get(
+        "inputSchema", ""
+    )
+    assert "origem.telefone" in vehicle_create_code, (
+        "telefone do cadastro deve vir do webhook"
+    )
+    assert "origem.providerMessageId" in vehicle_create_code, (
+        "idempotência do cadastro deve vir da mensagem real"
+    )
+    assert "input.telefone_solicitante" not in vehicle_create_code, (
+        "modelo ainda controla o telefone autorizado"
+    )
+    assert "input.idempotency_key" not in vehicle_create_code, (
+        "modelo ainda controla a chave idempotente"
+    )
+    assert '"telefone_solicitante"' not in vehicle_create_schema, (
+        "schema não deve pedir telefone ao modelo"
+    )
+    assert '"idempotency_key"' not in vehicle_create_schema, (
+        "schema não deve pedir idempotência ao modelo"
+    )
+    assert '"additionalProperties": false' in vehicle_create_schema, (
+        "schema do cadastro deve rejeitar campos extras do modelo"
+    )
+    assert "input.foto_url" not in vehicle_create_code, (
+        "modelo não pode escolher URL de foto no cadastro"
+    )
+    assert "input.codigo_interno" not in vehicle_create_code, (
+        "modelo não deve enviar campo fora do schema do cadastro"
+    )
+
     photo_node = next(
         (node for node in data.get("nodes", []) if node.get("name") == "enviar_foto_veiculo1"),
         None,

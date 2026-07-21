@@ -15,6 +15,7 @@ primary_region = "gru"
   ESTOQUE_MEDIA_STORAGE_DIR = "/data/media"
   ESTOQUE_MEDIA_PUBLIC_BASE_URL = "https://estoque2037.fly.dev/public/v1/media"
   ESTOQUE_MEDIA_ALLOWED_HOSTS = "estoque2037.fly.dev"
+  ESTOQUE_MEDIA_ORPHAN_GRACE_SECONDS = "3600"
 
 [processes]
   app = "/srv/scripts/fly-entrypoint.sh"

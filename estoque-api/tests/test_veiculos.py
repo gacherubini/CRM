@@ -61,3 +61,71 @@ def test_validacao_tipo_e_preco(client, loja_a):
     h = loja_a["headers"]
     assert client.post("/v1/veiculos", json=_novo() | {"tipo": "aviao"}, headers=h).status_code == 422
     assert client.post("/v1/veiculos", json=_novo() | {"preco": 0}, headers=h).status_code == 422
+
+
+def test_criacao_idempotente_retorna_o_mesmo_veiculo_e_guarda_so_hash(
+    client, loja_a, db
+):
+    from app.models_db import EventoSaida, IdempotenciaCriacaoVeiculo, Veiculo
+
+    headers = loja_a["headers"] | {"Idempotency-Key": "mensagem-wa-secreta-1"}
+    payload = _novo() | {"placa": "IDM1P23"}
+    primeira = client.post("/v1/veiculos", json=payload, headers=headers)
+    repetida = client.post("/v1/veiculos", json=payload, headers=headers)
+
+    assert primeira.status_code == 201
+    assert repetida.status_code == 201
+    assert repetida.json()["id"] == primeira.json()["id"]
+    registros = (
+        db.query(IdempotenciaCriacaoVeiculo)
+        .filter(IdempotenciaCriacaoVeiculo.loja_id == loja_a["loja_id"])
+        .all()
+    )
+    assert len(registros) == 1
+    assert registros[0].chave_hash != "mensagem-wa-secreta-1"
+    assert len(registros[0].chave_hash) == 64
+    assert (
+        db.query(Veiculo).filter(Veiculo.loja_id == loja_a["loja_id"]).count()
+        == 1
+    )
+    assert (
+        db.query(EventoSaida)
+        .filter(
+            EventoSaida.loja_id == loja_a["loja_id"],
+            EventoSaida.tipo == "vehicle.created",
+        )
+        .count()
+        == 1
+    )
+
+
+def test_criacao_idempotente_recusa_mesma_chave_com_payload_diferente(
+    client, loja_a
+):
+    headers = loja_a["headers"] | {"Idempotency-Key": "mensagem-wa-conflito"}
+    payload = _novo() | {"placa": "IDM2P34"}
+    assert client.post("/v1/veiculos", json=payload, headers=headers).status_code == 201
+
+    conflito = client.post(
+        "/v1/veiculos",
+        json=payload | {"preco": 17000},
+        headers=headers,
+    )
+
+    assert conflito.status_code == 409
+    assert "Idempotency-Key" in conflito.json()["detail"]
+
+
+def test_chave_idempotente_e_isolada_por_loja(client, loja_a, loja_b):
+    payload = _novo() | {"placa": "IDM3P45"}
+    chave = {"Idempotency-Key": "mesma-chave-lojas-distintas"}
+    a = client.post(
+        "/v1/veiculos", json=payload, headers=loja_a["headers"] | chave
+    )
+    b = client.post(
+        "/v1/veiculos", json=payload, headers=loja_b["headers"] | chave
+    )
+
+    assert a.status_code == 201
+    assert b.status_code == 201
+    assert a.json()["id"] != b.json()["id"]

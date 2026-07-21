@@ -119,6 +119,35 @@ class VeiculoFoto(Base):
     )
 
 
+class IdempotenciaCriacaoVeiculo(Base):
+    """Resultado persistente de POST /v1/veiculos por loja e chave opaca."""
+
+    __tablename__ = "idempotencias_criacao_veiculo"
+
+    id: Mapped[str] = mapped_column(
+        String(36), primary_key=True, default=lambda: str(uuid.uuid4())
+    )
+    loja_id: Mapped[str] = mapped_column(
+        ForeignKey("lojas.id"), nullable=False, index=True
+    )
+    chave_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    requisicao_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    veiculo_id: Mapped[str] = mapped_column(
+        ForeignKey("veiculos.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    criada_em: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_agora
+    )
+
+    __table_args__ = (
+        UniqueConstraint(
+            "loja_id",
+            "chave_hash",
+            name="uq_idempotencia_veiculo_loja_chave",
+        ),
+    )
+
+
 class Importacao(Base):
     __tablename__ = "importacoes"
 

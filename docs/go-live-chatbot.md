@@ -18,7 +18,7 @@
 - **E3 auto-pausa:** `from_me` do atendente → `bot_ativo=false`; saída do bot com
   `origem_bot=true` + mesmo `provider_message_id` não pausa. ✅
 - **E5** cadastro de veículo por WA (números autorizados). ✅
-- **E6** foto automática WhatsApp → Estoque → Catálogo, com placa na legenda. ✅
+- **E6** foto automática WhatsApp → Estoque → Catálogo, com sessão curta para lote. ✅
 - Motor: **Santander e Fontecred reais** (`real: true`); mock só para provedores sem driver real.
   Ver tabela de campos em `docs/plans/2026-07-13-plano1a-task12-bancos-reconhecimento.md`.
 
@@ -165,10 +165,13 @@ python -m app.cli autorizar-numero --slug <loja> --telefone 5511... --papel dono
    `bot_ativo=false`; conferir o resultado somente no Portal/Registros.
 4. Handoff E3: 1 msg pelo celular do lojista → `bot_ativo=false`. Mensagem do próprio bot não pausa.
 5. Portal: conversa em `/app/conversas`, handoff refletido.
-6. Equipe autorizada: enviar os dados do veículo por texto; confirmar que foi criado como
-   `publicado=true`. Depois enviar JPEG/PNG/WebP com a placa na legenda; conferir a confirmação no
-   WhatsApp e a foto na galeria do Catálogo. Reenviar a mesma mensagem/evento e confirmar que não
-   duplica. Repetir com número não autorizado e confirmar que nada foi baixado ou gravado.
+6. Equipe autorizada: enviar os dados do veículo por texto; confirmar `publicado=true`. Enviar
+   várias JPEG/PNG/WebP sem repetir a placa durante a sessão; para veículo antigo, colocar a placa
+   na primeira foto. Conferir a galeria no Catálogo. Reprocessar a mensagem de cadastro e confirmar
+   o mesmo `veiculo_id`; reprocessar uma foto e confirmar que não duplica. Repetir com número não
+   autorizado e confirmar que nada foi baixado ou gravado.
+7. Estoque: executar `python -m app.cli limpar-midias-orfas` e conferir que é dry-run. Usar
+   `--aplicar` somente com backup e janela operacional.
 
 ## 9. Go-live
 

@@ -1,4 +1,6 @@
 """Regras do Estoque: validação, CRUD escopado por loja e transições de estado."""
+import hashlib
+import json
 import re
 import secrets
 import uuid
@@ -11,13 +13,15 @@ from urllib.parse import quote, urlparse
 
 from fastapi import HTTPException
 from sqlalchemy import update
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app import config
+from app import config, media
 from app.auth import hash_token
 from app.models_db import (
-    Auditoria, CredencialServico, EntregaEvento, EventoSaida, Importacao, Loja,
-    UsuarioEstoque, Veiculo, VeiculoFoto, WebhookDestino,
+    Auditoria, CredencialServico, EntregaEvento, EventoSaida,
+    IdempotenciaCriacaoVeiculo, Importacao, Loja, UsuarioEstoque, Veiculo,
+    VeiculoFoto, WebhookDestino,
 )
 
 
@@ -299,7 +303,52 @@ def _validar(dados: dict) -> None:
         raise HTTPException(status_code=422, detail="custo não pode ser negativo")
 
 
-def criar_veiculo(db: Session, loja_id: str, dados: dict, ator_papel: str = "sistema") -> Veiculo:
+def _hash_idempotencia(valor: str) -> str:
+    return hashlib.sha256(valor.encode("utf-8")).hexdigest()
+
+
+def _hash_requisicao(dados: dict) -> str:
+    serializado = json.dumps(
+        _json_seguro(dados),
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    )
+    return hashlib.sha256(serializado.encode("utf-8")).hexdigest()
+
+
+def _idempotencia_existente(
+    db: Session,
+    loja_id: str,
+    chave_hash: str,
+    requisicao_hash: str,
+) -> Veiculo | None:
+    registro = (
+        db.query(IdempotenciaCriacaoVeiculo)
+        .filter(
+            IdempotenciaCriacaoVeiculo.loja_id == loja_id,
+            IdempotenciaCriacaoVeiculo.chave_hash == chave_hash,
+        )
+        .first()
+    )
+    if registro is None:
+        return None
+    if registro.requisicao_hash != requisicao_hash:
+        raise HTTPException(
+            status_code=409,
+            detail="Idempotency-Key já utilizada com outro cadastro",
+        )
+    return obter_veiculo(db, loja_id, registro.veiculo_id)
+
+
+def criar_veiculo(
+    db: Session,
+    loja_id: str,
+    dados: dict,
+    ator_papel: str = "sistema",
+    idempotency_key: str | None = None,
+) -> Veiculo:
+    dados = dict(dados)
     _validar(dados)
     if dados.get("foto_url"):
         dados["foto_url"] = _validar_url_midia_publica(dados["foto_url"])
@@ -309,8 +358,21 @@ def criar_veiculo(db: Session, loja_id: str, dados: dict, ator_papel: str = "sis
             dados.pop("placa")
         else:
             dados["placa"] = placa
-            if _placa_em_uso(db, loja_id, placa):
-                raise HTTPException(status_code=409, detail="placa já cadastrada nesta loja")
+    chave = str(idempotency_key or "").strip()
+    if len(chave) > 512:
+        raise HTTPException(status_code=422, detail="Idempotency-Key acima do limite")
+    chave_hash = _hash_idempotencia(chave) if chave else None
+    requisicao_hash = _hash_requisicao(dados) if chave_hash else None
+    if chave_hash and requisicao_hash:
+        existente = _idempotencia_existente(
+            db, loja_id, chave_hash, requisicao_hash
+        )
+        if existente is not None:
+            return existente
+
+    placa = dados.get("placa")
+    if placa and _placa_em_uso(db, loja_id, placa):
+        raise HTTPException(status_code=409, detail="placa já cadastrada nesta loja")
     codigo = dados.get("codigo_interno")
     if codigo and db.query(Veiculo).filter(
         Veiculo.loja_id == loja_id, Veiculo.codigo_interno == codigo
@@ -318,9 +380,31 @@ def criar_veiculo(db: Session, loja_id: str, dados: dict, ator_papel: str = "sis
         raise HTTPException(status_code=409, detail="código interno já existe nesta loja")
     v = Veiculo(id=str(uuid.uuid4()), loja_id=loja_id, **dados)
     db.add(v)
-    db.flush()
-    _registrar_operacao(db, v, "criado", ator_papel, dados, "vehicle.created")
-    db.commit()
+    try:
+        db.flush()
+        if chave_hash and requisicao_hash:
+            db.add(
+                IdempotenciaCriacaoVeiculo(
+                    loja_id=loja_id,
+                    chave_hash=chave_hash,
+                    requisicao_hash=requisicao_hash,
+                    veiculo_id=v.id,
+                )
+            )
+        _registrar_operacao(db, v, "criado", ator_papel, dados, "vehicle.created")
+        db.commit()
+    except IntegrityError as exc:
+        db.rollback()
+        if chave_hash and requisicao_hash:
+            existente = _idempotencia_existente(
+                db, loja_id, chave_hash, requisicao_hash
+            )
+            if existente is not None:
+                return existente
+        raise HTTPException(
+            status_code=409,
+            detail="placa, código ou chave idempotente já cadastrada",
+        ) from exc
     db.refresh(v)
     return v
 
@@ -488,6 +572,9 @@ def substituir_fotos(
     legado: bool = False,
 ) -> Veiculo:
     v = obter_veiculo(db, loja_id, veiculo_id)
+    urls_anteriores = {item.url for item in v.fotos}
+    if v.foto_url:
+        urls_anteriores.add(v.foto_url)
     normalizadas = _normalizar_fotos(fotos, legado=legado)
     v.fotos.clear()
     db.flush()
@@ -506,7 +593,37 @@ def substituir_fotos(
     )
     db.commit()
     db.refresh(v)
+    urls_atuais = {item.url for item in v.fotos}
+    if v.foto_url:
+        urls_atuais.add(v.foto_url)
+    for url in urls_anteriores - urls_atuais:
+        _remover_midia_local_se_orfa(db, url)
     return v
+
+
+def _remover_midia_local_se_orfa(db: Session, url: str) -> bool:
+    if media.storage_key_da_url(url) is None:
+        return False
+    em_galeria = db.query(VeiculoFoto.id).filter(VeiculoFoto.url == url).first()
+    em_legado = db.query(Veiculo.id).filter(Veiculo.foto_url == url).first()
+    if em_galeria or em_legado:
+        return False
+    return media.remover_por_url(url)
+
+
+def chaves_midia_referenciadas(db: Session) -> set[str]:
+    urls = {url for (url,) in db.query(VeiculoFoto.url).all() if url}
+    urls.update(url for (url,) in db.query(Veiculo.foto_url).all() if url)
+    return {
+        chave
+        for url in urls
+        if (chave := media.storage_key_da_url(url)) is not None
+    }
+
+
+def limpar_midias_orfas(db: Session, *, aplicar: bool = False) -> dict:
+    """Varredura administrativa; por padrão apenas informa, sem apagar."""
+    return media.limpar_orfas(chaves_midia_referenciadas(db), aplicar=aplicar)
 
 
 def adicionar_foto(

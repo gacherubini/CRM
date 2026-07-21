@@ -6,14 +6,17 @@ como fonte de verdade.
 """
 from __future__ import annotations
 
+import logging
 import re
 import uuid
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from fastapi import HTTPException
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
 
+from app import config
 from app.inventory import InventoryWriteClient
 from app.models_db import NumeroAutorizado
 from app.vehicle_photo import VehiclePhotoProcessor
@@ -23,6 +26,7 @@ _PLACA_RE = re.compile(r"^[A-Z]{3}[0-9][0-9A-Z][0-9]{2}$")
 _PAPEIS = frozenset({"dono", "vendedor"})
 _TIPOS = frozenset({"moto", "carro"})
 _PLACA_NA_LEGENDA_RE = re.compile(r"\b([A-Z]{3})[-\s]?([0-9][A-Z0-9][0-9]{2})\b", re.I)
+logger = logging.getLogger("chatbot.operacao")
 
 
 def normalizar_telefone(valor: str | None) -> str:
@@ -93,6 +97,9 @@ def adicionar_numero(
     if existente:
         existente.papel = papel_norm
         existente.ativo = ativo
+        if not ativo:
+            existente.foto_placa_atual = None
+            existente.foto_sessao_expira_em = None
         db.commit()
         db.refresh(existente)
         return _para_saida_numero(existente)
@@ -142,6 +149,68 @@ def esta_autorizado(db: Session, loja_id: str, telefone: str) -> bool:
         .first()
     )
     return row is not None
+
+
+def _numero_autorizado_ativo(
+    db: Session, loja_id: str, telefone: str
+) -> NumeroAutorizado | None:
+    tel = normalizar_telefone(telefone)
+    if not tel:
+        return None
+    return (
+        db.query(NumeroAutorizado)
+        .filter(
+            NumeroAutorizado.loja_id == loja_id,
+            NumeroAutorizado.telefone == tel,
+            NumeroAutorizado.ativo.is_(True),
+        )
+        .first()
+    )
+
+
+def _ativar_sessao_fotos(
+    db: Session, loja_id: str, telefone: str, placa: str
+) -> bool:
+    ttl = config.IMAGE_SESSION_TTL_SECONDS
+    numero = _numero_autorizado_ativo(db, loja_id, telefone)
+    if numero is None or ttl <= 0:
+        return False
+    numero.foto_placa_atual = validar_placa(placa)
+    numero.foto_sessao_expira_em = datetime.now(timezone.utc) + timedelta(seconds=ttl)
+    db.commit()
+    return True
+
+
+def _placa_da_sessao_fotos(
+    db: Session, loja_id: str, telefone: str
+) -> str | None:
+    numero = _numero_autorizado_ativo(db, loja_id, telefone)
+    if numero is None or not numero.foto_placa_atual or not numero.foto_sessao_expira_em:
+        return None
+    expira = numero.foto_sessao_expira_em
+    if expira.tzinfo is None:
+        expira = expira.replace(tzinfo=timezone.utc)
+    if expira <= datetime.now(timezone.utc):
+        numero.foto_placa_atual = None
+        numero.foto_sessao_expira_em = None
+        db.commit()
+        return None
+    return validar_placa(numero.foto_placa_atual)
+
+
+def _tentar_ativar_sessao_fotos(
+    db: Session, loja_id: str, telefone: str, placa: str
+) -> bool:
+    try:
+        return _ativar_sessao_fotos(db, loja_id, telefone, placa)
+    except SQLAlchemyError:
+        db.rollback()
+        logger.warning("sessão de fotos não persistida")
+        return False
+
+
+def _minutos_sessao_fotos() -> int:
+    return max(1, (config.IMAGE_SESSION_TTL_SECONDS + 59) // 60)
 
 
 def _exigir_autorizado(db: Session, loja_id: str, telefone: str) -> str:
@@ -261,10 +330,19 @@ def criar_veiculo_autorizado(
     key = idempotency_key or f"wa-veiculo:{loja_id}:{payload['placa']}:{payload['marca']}:{payload['modelo']}:{payload['ano_modelo']}"
 
     criado = write_client.criar_veiculo(payload, idempotency_key=key)
+    sessao_ativa = _tentar_ativar_sessao_fotos(
+        db, loja_id, tel, payload["placa"]
+    )
     resumo = _resumo_veiculo(criado)
+    mensagem = f"Veículo cadastrado e publicado no catálogo: {resumo}"
+    if sessao_ativa:
+        mensagem += (
+            " Agora envie as fotos; pelas próximas "
+            f"{_minutos_sessao_fotos()} min não precisa repetir a placa."
+        )
     return {
         "ok": True,
-        "mensagem": f"Veículo cadastrado e publicado no catálogo: {resumo}",
+        "mensagem": mensagem,
         "veiculo": {
             "id": criado.get("id"),
             "tipo": criado.get("tipo"),
@@ -292,22 +370,39 @@ def anexar_foto_whatsapp(
     mime_type: str | None,
     processor: VehiclePhotoProcessor,
 ) -> dict:
-    """Autoriza cedo e vincula imagem pela placa explícita na legenda."""
-    if not esta_autorizado(db, loja_id, telefone_solicitante):
+    """Autoriza cedo e vincula imagem pela placa explícita ou sessão curta."""
+    if _numero_autorizado_ativo(db, loja_id, telefone_solicitante) is None:
         return {
             "ok": False,
             "mensagem": "Somente números autorizados da equipe podem adicionar fotos ao estoque.",
         }
     encontrada = _PLACA_NA_LEGENDA_RE.search(str(legenda or "").upper())
-    if not encontrada:
+    placa_explicita = bool(encontrada)
+    placa = (
+        validar_placa("".join(encontrada.groups()))
+        if encontrada
+        else _placa_da_sessao_fotos(db, loja_id, telefone_solicitante)
+    )
+    if not placa:
         return {
             "ok": False,
-            "mensagem": "Envie a foto novamente colocando a placa do veículo na legenda, por exemplo: ABC1D23.",
+            "mensagem": "Envie a primeira foto com a placa na legenda, por exemplo: ABC1D23. As próximas podem ser enviadas sem repetir a placa.",
         }
-    placa = validar_placa("".join(encontrada.groups()))
-    return processor.processar(
+    resultado = processor.processar(
         instancia,
         provider_message_id,
         placa,
         mime_type,
     )
+    if resultado.get("ok"):
+        sessao_ativa = _tentar_ativar_sessao_fotos(
+            db, loja_id, telefone_solicitante, placa
+        )
+        if placa_explicita and sessao_ativa:
+            resultado["mensagem"] = str(
+                resultado.get("mensagem") or "Foto adicionada ao estoque e ao catálogo."
+            ) + (
+                " As próximas fotos podem ser enviadas sem repetir a placa por "
+                f"{_minutos_sessao_fotos()} min."
+            )
+    return resultado

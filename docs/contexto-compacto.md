@@ -22,8 +22,9 @@ Campos e decisões por banco:
 — **A/B/E/D/H/C/F concluídas**, incluindo a UI `/app/funil`; resta **G** (Google Conversions).
 TikTok API e API de spend seguem parked.
 **Eixo E (2026-07-21):** áudio recebido, envio de foto do Estoque no WhatsApp e cadastro automático
-de fotos WhatsApp → Estoque → Catálogo têm backend/workflow concluídos. O MVP usa volume
-persistente; produção exige URL HTTPS/backup do volume e homologar o transcritor HTTP.
+de fotos WhatsApp → Estoque → Catálogo têm backend/workflow concluídos. Cadastro textual tem
+idempotência persistente; fotos usam sessão curta por vendedor e limpeza administrativa de órfãos.
+O MVP usa volume persistente; produção exige URL HTTPS/backup e homologar o transcritor HTTP.
 
 ## Fonte da verdade (por tema)
 
@@ -96,8 +97,8 @@ Apps Fly (referência, **não ligar** sem pedido): `motor2037`, `estoque2037`, `
 | Produto | Pasta / porta | Feito (essencial) | Aberto |
 |---|---|---|---|
 | Motor #1A | `motor-simulacao/` `:8000` | async, auth, fan-out, workers on-demand, **Santander/Fontecred/Bradesco/Pan portal LIVE**, warm session teto 2, prints blob JPEG, migrations head **0013** | `testar-login` real; T10 revenda; object storage multi-volume |
-| Chatbot #2A | `chatbot-api/` `:8001` | leads, handoff, por-placa, E3, E5, áudio efêmero/fallback, foto automática WhatsApp → Estoque → Catálogo, envio da capa via WhatsApp, first/last UTM, sim privada + handoff; webhook endurecido | go-live; transcritor HTTP real; retenção/expurgo administrativo (sem autosserviço) |
-| Estoque #4A | `estoque-api/` `:8100` | CRUD, placa, por-placa, admin, galeria/capa, upload binário validado, volume persistente e rota pública segura | URL HTTPS/backup do volume; E2E outbox; restore |
+| Chatbot #2A | `chatbot-api/` `:8001` | leads, handoff, por-placa, E3, E5, áudio efêmero/fallback, foto automática com sessão por vendedor, envio da capa via WhatsApp, first/last UTM, sim privada + handoff; webhook endurecido | go-live; transcritor HTTP real; retenção/expurgo administrativo (sem autosserviço) |
+| Estoque #4A | `estoque-api/` `:8100` | CRUD, idempotência persistente, placa, admin, galeria/capa, upload validado, volume/rota pública e limpeza de órfãos | URL HTTPS/backup do volume; E2E outbox; restore |
 | Portal | `portal-gestao/` `:9000` | CRM, sim multi-banco, 9A, CAPI retry, gastos/ROI/resultados; funil completo backend+UI; event bus Meta; retry HTTP seguro | Google; E2E Playwright |
 | Catálogo #5A | `catalogo-publico/` `:8200` | vitrine, CTA, Pixel PageView/Lead/ViewContent | SEO/tema; domínio (E18) |
 | Site | `site/` | landing + hero poster | polish visual residual |
@@ -124,7 +125,7 @@ cd ../portal-gestao && python -m pytest tests/test_campanhas.py tests/test_roi.p
 cd ../chatbot-api && python -m pytest tests/test_audio.py tests/test_inventory.py tests/test_vehicle_photo.py -q
 cd ../estoque-api && python -m pytest tests/test_rbac_fotos_auditoria.py -q
 python ../n8n/validate_workflow.py
-# migrations: motor head 0013 · portal 0008 funil_eventos · chatbot 0006 attribution · estoque 0006 mídias
+# migrations: motor head 0013 · portal 0008 funil_eventos · chatbot 0007 sessão fotos · estoque 0007 idempotência
 git status --short
 ```
 

@@ -394,6 +394,112 @@ def test_upload_whatsapp_nao_sobrescreve_mesma_chave_com_outro_conteudo(
     assert client.get(url.removeprefix("https://estoque.example")).content == b"\xff\xd8\xffprimeira"
 
 
+def test_substituir_galeria_remove_arquivo_local_que_ficou_orfao(
+    client, loja_a, tmp_path, monkeypatch
+):
+    from app import config
+
+    monkeypatch.setattr(config, "MEDIA_STORAGE_DIR", tmp_path)
+    monkeypatch.setattr(
+        config,
+        "MEDIA_PUBLIC_BASE_URL",
+        "https://estoque.example/public/v1/media",
+    )
+    monkeypatch.setattr(config, "MEDIA_ALLOWED_HOSTS", ())
+    monkeypatch.setattr(config, "MEDIA_ORPHAN_GRACE_SECONDS", 0)
+    h = loja_a["headers"]
+    vid = client.post(
+        "/v1/veiculos", json=_novo(placa="ORF1A23"), headers=h
+    ).json()["id"]
+    upload = client.post(
+        f"/v1/veiculos/{vid}/fotos/upload",
+        content=b"\xff\xd8\xffarquivo-local",
+        headers=h
+        | {
+            "Content-Type": "image/jpeg",
+            "Idempotency-Key": "foto-que-sera-removida",
+        },
+    )
+    url = upload.json()["midia_principal"]["url"]
+    caminho_publico = url.removeprefix("https://estoque.example")
+    assert client.get(caminho_publico).status_code == 200
+
+    limpa = client.put(
+        f"/v1/veiculos/{vid}/fotos", json={"urls": []}, headers=h
+    )
+
+    assert limpa.status_code == 200
+    assert limpa.json()["fotos"] == []
+    assert client.get(caminho_publico).status_code == 404
+    assert not list(tmp_path.rglob("*.jpg"))
+
+
+def test_varredura_orfas_e_dry_run_por_padrao(
+    client, loja_a, db, tmp_path, monkeypatch
+):
+    from app import config, media, servico
+
+    monkeypatch.setattr(config, "MEDIA_STORAGE_DIR", tmp_path)
+    monkeypatch.setattr(
+        config,
+        "MEDIA_PUBLIC_BASE_URL",
+        "https://estoque.example/public/v1/media",
+    )
+    monkeypatch.setattr(config, "MEDIA_ALLOWED_HOSTS", ())
+    monkeypatch.setattr(config, "MEDIA_ORPHAN_GRACE_SECONDS", 0)
+    h = loja_a["headers"]
+    vid = client.post(
+        "/v1/veiculos", json=_novo(placa="ORF2A34"), headers=h
+    ).json()["id"]
+    referenciada = client.post(
+        f"/v1/veiculos/{vid}/fotos/upload",
+        content=b"\xff\xd8\xffreferenciada",
+        headers=h
+        | {
+            "Content-Type": "image/jpeg",
+            "Idempotency-Key": "foto-referenciada",
+        },
+    ).json()["midia_principal"]["url"]
+    chave_orfa = f"{loja_a['loja_id']}/{vid}/{'a' * 32}.jpg"
+    caminho_orfao, _ = media.salvar(chave_orfa, b"\xff\xd8\xfforfa")
+
+    simulacao = servico.limpar_midias_orfas(db)
+    assert simulacao == {
+        "arquivos": 2,
+        "referenciados": 1,
+        "orfaos": 1,
+        "aguardando_carencia": 0,
+        "removidos": 0,
+        "modo": "previa",
+    }
+    assert caminho_orfao.exists()
+
+    aplicada = servico.limpar_midias_orfas(db, aplicar=True)
+    assert aplicada["removidos"] == 1
+    assert not caminho_orfao.exists()
+    chave_referenciada = media.storage_key_da_url(referenciada)
+    assert chave_referenciada is not None
+    assert media.caminho_seguro(chave_referenciada).exists()
+
+
+def test_varredura_nao_remove_upload_recente_durante_carencia(
+    tmp_path, monkeypatch
+):
+    from app import config, media
+
+    monkeypatch.setattr(config, "MEDIA_STORAGE_DIR", tmp_path)
+    monkeypatch.setattr(config, "MEDIA_ORPHAN_GRACE_SECONDS", 3600)
+    chave = f"loja-segura/veiculo-seguro/{'b' * 32}.jpg"
+    caminho, _ = media.salvar(chave, b"\xff\xd8\xffrecente")
+
+    resultado = media.limpar_orfas(set(), aplicar=True)
+
+    assert resultado["orfaos"] == 1
+    assert resultado["aguardando_carencia"] == 1
+    assert resultado["removidos"] == 0
+    assert caminho.exists()
+
+
 def test_mutacoes_geram_auditoria_e_outbox(client, loja_a, operador_loja_a):
     h = loja_a["headers"]
     vid = client.post("/v1/veiculos", json=_novo(), headers=h).json()["id"]

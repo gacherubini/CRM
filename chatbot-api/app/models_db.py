@@ -167,4 +167,8 @@ class NumeroAutorizado(Base):
     telefone: Mapped[str] = mapped_column(String(20), nullable=False, index=True)
     papel: Mapped[str] = mapped_column(String(40), default="vendedor")  # dono | vendedor
     ativo: Mapped[bool] = mapped_column(Boolean, default=True)
+    foto_placa_atual: Mapped[str | None] = mapped_column(String(7), nullable=True)
+    foto_sessao_expira_em: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     criado_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_agora)

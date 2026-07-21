@@ -53,6 +53,15 @@ def client():
 
 
 @pytest.fixture
+def db():
+    sessao = _TestSession()
+    try:
+        yield sessao
+    finally:
+        sessao.close()
+
+
+@pytest.fixture
 def loja_a():
     sufixo = uuid.uuid4().hex[:6]
     token = f"tok-a-{uuid.uuid4().hex}"

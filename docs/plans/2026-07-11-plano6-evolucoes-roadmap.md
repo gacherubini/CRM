@@ -188,10 +188,10 @@ os clientes da suíte.
   (marca/modelo/ano/valor/km/**placa**) → chama **Estoque API `POST /v1/veiculos`** (privada) com a
   **credencial de serviço de escrita** da loja. Só HTTP; o Chatbot **não** grava veículo no próprio
   banco como fonte de verdade.
-- **Placa** no desenho desde já (Estoque normaliza e tem `por-placa`); `Idempotency-Key` p/ não duplicar
-  em reenvio.
+- **Placa** no desenho desde já (Estoque normaliza e tem `por-placa`); `Idempotency-Key` persistente
+  retorna o mesmo veículo em reenvio. Telefone/chave vêm do webhook, não do LLM.
 - **Foto:** foto real via WhatsApp → validação do remetente/placa → upload no Estoque → galeria
-  publicada no Catálogo (**E6 MVP concluído**).
+  publicada no Catálogo, com sessão curta para lote (**E6 MVP concluído**).
 - Resposta no WhatsApp: **resumo do veículo criado/atualizado** ou **erro legível** ("faltou o valor",
   "placa inválida", "número não autorizado").
 
@@ -222,7 +222,8 @@ os clientes da suíte.
 > loja+número+placa; o Estoque valida o binário, grava em volume persistente, acrescenta à galeria
 > de forma idempotente e serve a imagem ao detalhe do Catálogo. O n8n nunca recebe base64, e o
 > caminho Estoque → WhatsApp usa URL resolvida pelo backend. Permanecem opcionais o upload pelo
-> Portal e um adapter S3/R2/MinIO para escala horizontal.
+> Portal e um adapter S3/R2/MinIO para escala horizontal. Limpeza de órfãos é administrativa,
+> dry-run por padrão e protegida por carência.
 
 **O que é:** upload de fotos pelo WhatsApp e página de detalhe na vitrine
 (`/l/{loja_id}/v/{id}`) com galeria, entregues no MVP.
