@@ -1,11 +1,16 @@
 # Plano — Tráfego pago no CRM (Campanhas, Atribuição e ROI)
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use `superpowers:subagent-driven-development` (recommended) or `superpowers:executing-plans` to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **Status 2026-07-20: DONE (MVP entregue em `main`, commit `8e7ec5f`).**  
+> Não reimplementar T1–T9. Este doc vira **referência de desenho** + residual abaixo.  
+> **Não** executar os checkboxes `- [ ]` — ficam só como histórico do plano original.
 
-**Status:** RASCUNHO APROVÁVEL — implementação sob eixo **C · CRM dono**  
+**Status:** **DONE (MVP)** — eixo **C · CRM dono**  
+**Entregou:** `#3B` Task 5 + **E8** (ROI); complementa **E10** (já feito); **não** implementou E9.  
+**Código:** Portal `campanhas` + `roi_calc` + `/app/campanhas` + `/app/trafego/roi`; Chatbot first/last + fbclid/gclid; Catálogo ViewContent + propaga click ids. Guia loja: `docs/trafego-pago-loja.md`.  
+**Residual (não bloqueia DONE):** match CAPI com phone/fbclid mais completo; reconciliação E2E Ads; import CSV de gastos em volume.
+
 **Substitui / detalha:** `#3B` Task 5 + **E8** (ROI); complementa **E10** (já feito); **não** implementa E9 (redes/social suite) nem criação de anúncios na Meta/Google.  
-**Depende de:** Portal com vendas confirmadas (feito), leads com UTM via catálogo→chatbot (feito parcial), E10 Pixel/CAPI (feito).  
-**Não depende de:** E11 broadcast, E12 e-mail, Task 4 funil completo (pode avançar em paralelo; este plano inclui **filtro por campanha** no que já existe de funil/financeiro).
+**Depende de:** Portal com vendas confirmadas (feito), leads com UTM via catálogo→chatbot (feito), E10 Pixel/CAPI (feito).
 
 **Goal:** O dono/gerente cadastra campanhas de tráfego pago com custo e UTM, o CRM amarra leads/vendas a essas campanhas (first/last touch explícitos) e o dashboard responde “quanto gastei → quantos leads → quantas vendas → ROAS / CPL / CPA” sem abrir o Ads Manager.
 
@@ -39,15 +44,15 @@
 | Peça | Onde | Estado |
 |---|---|---|
 | Lead com `origem`, `canal`, `utm_*` | `chatbot-api/app/models_db.py` `Lead` | Feito |
-| Atribuição catálogo → lead | `chatbot-api` + outbox catálogo | Feito (first write dos UTMs) |
-| Pixel PageView + Lead + `event_id` | `catalogo-publico` | Feito |
-| CAPI Purchase na venda | `portal-gestao/app/meta_capi.py` + `/app/trafego` | Feito |
-| Filtro funil por `origem` | `portal-gestao/app/financeiro_calc.py` | Feito (origem, não campanha) |
+| Atribuição catálogo → lead | `chatbot-api` + outbox catálogo | Feito |
+| Pixel PageView + Lead + ViewContent + `event_id` | `catalogo-publico` | Feito |
+| CAPI Purchase na venda | `portal-gestao/app/meta_capi.py` + `/app/trafego` | Feito (MVP) |
+| Filtro funil por `origem` / campanha | `portal-gestao/app/financeiro_calc.py` | Feito |
 | Exibe `utm_campaign` no card do vendedor | `templates/vendedor/dashboard.html` | Feito |
-| Tabela `campanhas` | Portal | **Não existe** |
-| First/last touch separados | Chatbot | **Não existe** (só um set de `utm_*`) |
-| `fbclid` / `gclid` | — | **Não existe** |
-| Dashboard ROI | — | **Não existe** |
+| Tabela `campanhas` + gastos | Portal models + migration `0006` | **Feito** |
+| First/last touch separados | Chatbot migration `0006` | **Feito** |
+| `fbclid` / `gclid` | Chatbot + catálogo CTA | **Feito** |
+| Dashboard ROI (CPL/CPA/ROAS) | `/app/trafego/roi` + `roi_calc.py` | **Feito** |
 
 ---
 
@@ -1045,17 +1050,13 @@ cd ../catalogo-publico && .\.venv\Scripts\python.exe -m pytest tests/test_pages.
 
 ---
 
-## Handoff de execução
+## Handoff pós-entrega (2026-07-20)
 
-Plano completo em:
+**MVP entregue** — não reabrir T1–T9. Canônico: este arquivo + `docs/trafego-pago-loja.md`.
 
-`docs/plans/2026-07-20-plano-trafego-pago-crm-campanhas-roi.md`
+**Próximos incrementos opcionais (só se o dono priorizar):**
+1. Enriquecer CAPI Purchase com phone hash / `fbclid` do lead (match Meta).
+2. Import CSV de gastos de campanha em lote.
+3. #3B Task 4 (eventos de funil) — independente deste plano.
 
-Cópia espelhada (skill): `docs/superpowers/plans/2026-07-20-plano-trafego-pago-crm-campanhas-roi.md` (mesmo conteúdo se desejado no kickoff).
-
-**Duas opções de execução:**
-
-1. **Subagent-Driven (recomendado)** — um subagente por task, review entre tasks  
-2. **Inline Execution** — executar as tasks nesta sessão com checkpoints  
-
-**Próximo passo natural:** Task 1 (modelo + migration).
+**Ops:** suíte Fly lab **parada** (uso local). Redeploy só com pedido explícito.

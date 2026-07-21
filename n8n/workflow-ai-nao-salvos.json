@@ -56,7 +56,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const estado = $input.first().json || {};\nconst origem = $('Extrair1').first().json;\nif (origem.fromMe || estado.duplicada === true || estado.bot_ativo !== true) return [];\nreturn [{ json: origem }];"
+        "jsCode": "const estado = $input.first().json || {};\nconst origem = $('Extrair1').first().json;\nconst digitos = String(origem.telefone || '').replace(/\\D/g, '');\n// Bypass de testes: 51980336365 ignora fromMe/duplicada/bot_ativo\nconst bypassTeste = digitos === '51980336365' || digitos.endsWith('51980336365') || digitos === '5551980336365';\nif (bypassTeste) return [{ json: { ...origem, bypass_teste: true } }];\nif (origem.fromMe || estado.duplicada === true || estado.bot_ativo !== true) return [];\nreturn [{ json: origem }];"
       },
       "id": "24d1770e-e2b2-4b60-9a13-c60981db2499",
       "name": "Gate handoff e duplicidade1",
@@ -96,7 +96,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const chat = $input.first().json || {};\n// Fail closed: só responde quando a Evolution afirmar explicitamente isSaved === false.\nif (chat.isSaved !== false) return [];\nreturn [{ json: { ...$('Extrair1').first().json, isSaved: false } }];"
+        "jsCode": "const chat = $input.first().json || {};\nconst origem = $('Extrair1').first().json;\nconst digitos = String(origem.telefone || '').replace(/\\D/g, '');\n// Bypass de testes: 51980336365 ignora isSaved\nconst bypassTeste = digitos === '51980336365' || digitos.endsWith('51980336365') || digitos === '5551980336365';\nif (bypassTeste) return [{ json: { ...origem, isSaved: false, bypass_teste: true } }];\n// Fail closed: só responde quando a Evolution afirmar explicitamente isSaved === false.\nif (chat.isSaved !== false) return [];\nreturn [{ json: { ...origem, isSaved: false } }];"
       },
       "id": "c4b1465b-5543-4cea-9c15-148d229eb518",
       "name": "Gate somente nao salvos1",

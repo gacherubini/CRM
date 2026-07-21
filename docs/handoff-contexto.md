@@ -1,13 +1,52 @@
 # Handoff técnico — suíte automotiva
 
-> **Leia primeiro:** `docs/contexto-compacto.md` (eixos A–E + fonte da verdade).  
+> **Leia primeiro:** `docs/contexto-compacto.md` (eixos A–F + fonte da verdade).  
 > Este arquivo: checkpoint operacional. Seções **“Checkpoint anterior”** = histórico — não
 > reexecutar. Path Windows no rodapé de seções antigas: **ignorar** (workspace = root do git).
 >
-> **Checkpoint mais recente: 2026-07-15/16 (workers sob demanda + portal sim + site hero).**  
-> Lições Playwright: Santander, Fontecred, Pan portal. Escolher um eixo por sessão.
+> **Checkpoint mais recente: 2026-07-20 (tráfego pago DONE · Fly OFF · limpeza docs).**  
+> Escolher um eixo por sessão. **Não** religar Fly sem pedido explícito.
 
-## Checkpoint mais recente — workers sob demanda, sim multi-banco, site hero (2026-07-15→16)
+## Checkpoint mais recente — tráfego pago + local-first + limpeza (2026-07-20)
+
+> **Estado:** CRM campanhas/ROI em `main` (`8e7ec5f`). Fly lab **todas as machines paradas**
+> (apps/volumes preservados). Desenvolvimento **local**. Docs/planos alinhados ao status real;
+> removidos duplicata `docs/superpowers/`, scripts one-off de patch n8n, checklists Bradesco/Pan
+> arquivados.
+
+### Entregue
+
+| Área | O que | Nota |
+|---|---|---|
+| Campanhas + ROI | Portal `/app/campanhas`, gastos, `/app/trafego/roi` (CPL/CPA/ROAS) | #3B T5 + E8 MVP |
+| First/last touch | Chatbot migration `0006` + atribuição catálogo | fbclid/gclid |
+| Pixel catálogo | ViewContent + propaga UTMs/click ids no CTA | além de PageView/Lead |
+| Guia loja | `docs/trafego-pago-loja.md` | operação de mídia |
+| Fly | `down-all` + restart n8n forçado | **OFF** — usar local |
+| n8n | `n8n/workflow-ai-nao-salvos.json` | possível bypass teste `51980336365` |
+
+### Aberto (não misturar na mesma PR)
+
+1. **Eixo A:** go-live WA local (Evolution + n8n + chatbot + Gemini).
+2. **Eixo C residual:** #3B Task 4 eventos de funil; CAPI match phone/fbclid fino.
+3. **Eixo B/D:** smoke multi-banco local; warm session; não reabrir drivers sem falha nova.
+4. **Eixo E/F:** E1 áudio, E6 fotos, polish site.
+
+### Limpeza feita nesta rodada
+
+- Removido espelho idêntico `docs/superpowers/plans/…`.
+- Arquivados checklists DONE Bradesco/Pan em `docs/plans/_archive/`.
+- Apagados scripts one-off: `deploy/fly/_patch_n8n_*`, `_find_sqlite.js`, diags tmp motor.
+- Atualizados: `plans/README.md`, planos #3B/#6/tráfego/workers/warm, `contexto-compacto.md`.
+
+### Segurança
+
+- Não commitar `.env` / `deploy/fly/.env.production.local`.
+- Prints de portal = PII — só dono/gerente.
+
+---
+
+## Checkpoint anterior — workers sob demanda, sim multi-banco, site hero (2026-07-15→16)
 
 > **Estado:** implementado e deployado no Fly lab. Branch `main` em sync com `origin` no
 > momento deste handoff. Workspace limpo (nada pendente de commit além deste doc).

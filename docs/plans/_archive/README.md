@@ -19,5 +19,7 @@
 | `2026-07-13-plano1a-task12-santander-implementacao.md` | `../2026-07-13-playwright-licoes-santander.md` + design Santander |
 | `2026-07-13-plano7-deploy-fly-io-implementacao.md` | `../2026-07-13-plano7-deploy-fly-io-design.md` + `deploy/fly/*.sh` |
 | `2026-07-14-fontecred-deploy-handoff.md` | `../2026-07-15-playwright-licoes-fontecred.md` |
+| `2026-07-15-plano1a-task12-bradesco-implementacao.md` | `../2026-07-13-plano1a-task12-bancos-reconhecimento.md` + código `motor-simulacao/app/motor/bradesco.py` |
+| `2026-07-15-plano1a-task12-pan-playwright-implementacao.md` | `../2026-07-15-playwright-licoes-pan-portal.md` + código `pan_portal.py` |
 
 Índice canônico: [`../README.md`](../README.md).

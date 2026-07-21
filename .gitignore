@@ -28,3 +28,10 @@ n8n/_*.py
 
 # worktrees efêmeros de agentes (Claude Code)
 .claude/
+
+# one-off fly/n8n patch scripts
+deploy/fly/_*.js
+deploy/fly/_*.py
+motor-simulacao/scripts/_diag*.py
+motor-simulacao/scripts/diag_bradesco_recaptcha.py
+

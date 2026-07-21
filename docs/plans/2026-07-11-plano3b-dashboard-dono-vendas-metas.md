@@ -1,11 +1,11 @@
 # Plano #3B — Dashboard do Dono, Vendas e Metas
 
-> **Pré-requisito:** #3A. **Status 2026-07-14:** Tasks 1–3 e 6–7 parciais entregues (vendas, custos,
-> metas de loja, `/app/financeiro`, `/app/vendedor`, funil). **E10:** confirmar venda dispara
-> Purchase CAPI (outbox; não bloqueia venda). Credenciais de banco = **#3A Task 9A** (feita) + Motor.
-> **CSV export (Task 8)** e **metas por vendedor UI** feitos. **Aberto:** eventos funil (Task 4),
-> campanhas metadados/atribuição (Task 5), reconciliação E2E, equipe/config (Tasks 9–10).
-> **Disparo** WA em massa / e-mail = roadmap **#6 E11/E12** (não misturar com Task 5).
+> **Pré-requisito:** #3A. **Status 2026-07-20:** Tasks 1–3 e 6–8 + **Task 5 (campanhas)** +
+> **E8 ROI** entregues via [plano tráfego pago](2026-07-20-plano-trafego-pago-crm-campanhas-roi.md)
+> (`8e7ec5f`). **E10** Purchase CAPI na confirmação de venda. Credenciais banco = **#3A Task 9A** + Motor.
+> **CSV export** e **metas por vendedor UI** feitos.  
+> **Aberto:** eventos funil (Task 4), reconciliação E2E, equipe/config (Tasks 9–10).  
+> **Disparo** WA em massa / e-mail = roadmap **#6 E11/E12** (não misturar com Task 5).  
 > Não inferir venda/lucro só a partir de mensagens/leads.
 
 **Goal:** Dar ao dono e gerente visão confiável de vendas, metas, desempenho dos vendedores,
@@ -67,6 +67,11 @@ Chatbot são idempotentes; ações manuais geram os mesmos tipos de evento.
 **Aceite:** tempo de resposta e conversão são recalculáveis a partir do histórico.
 
 ### Task 5: Campanhas e atribuição
+
+> **Status 2026-07-20: FEITA (MVP)** — ver plano
+> [tráfego pago / ROI](2026-07-20-plano-trafego-pago-crm-campanhas-roi.md).  
+> Portal: CRUD campanhas + gastos, ROI CPL/CPA/ROAS, filtros. Chatbot: first/last + fbclid/gclid.
+> Catálogo: propaga UTMs/click ids + ViewContent. Residual: import CSV em lote, match CAPI fino.
 
 Cadastrar/importar campanha, origem, canal, UTM e custo. Primeira versão usa atribuição declarada:
 `first_touch` e `last_touch`, exibidas separadamente. Não prometer causalidade automática.

@@ -1,11 +1,13 @@
 # Plano #1A — Warm session + batch 2 (latência multi-banco)
 
-> **Status 2026-07-17:** **Fases 0–2 no código** (flags, path canônico, semáforo batch 2 no worker,
-> eventos de sessão/slot). Keep-alive / fan-out Fly (fases 3–4) ainda abertos.  
-> Complementa (não substitui) o [fan-out / workers sob demanda](2026-07-14-plano1a-workers-playwright-sob-demanda.md).  
-> Lições obrigatórias: [Santander](2026-07-13-playwright-licoes-santander.md),
+> **Status 2026-07-17/20: Fases 0–2 DONE no código** (`5dc49f3` + follow-ups).  
+> Flags `MOTOR_WARM_SESSION` / path `{STORAGE}/{cliente_id}/{provedor}.json` + teto
+> `MOTOR_MAX_BROWSER_WORKERS` / `MOTOR_BROWSER_CONCURRENCY` = **2**.  
+> Fan-out Fly já estava DONE; keep-alive agressivo / object storage multi-volume = residual.  
+> Complementa o [fan-out / workers sob demanda](2026-07-14-plano1a-workers-playwright-sob-demanda.md) (**DONE**).  
+> Lições: [Santander](2026-07-13-playwright-licoes-santander.md),
 > [Fontecred](2026-07-15-playwright-licoes-fontecred.md).  
-> Mapa de bancos: [reconhecimento](2026-07-13-plano1a-task12-bancos-reconhecimento.md).
+> Mapa: [reconhecimento](2026-07-13-plano1a-task12-bancos-reconhecimento.md).
 
 ## Problema que este plano resolve
 

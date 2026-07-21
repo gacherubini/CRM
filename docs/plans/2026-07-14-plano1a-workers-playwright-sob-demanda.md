@@ -1,13 +1,9 @@
 # Plano #1A — Fan-out multi-banco e workers Playwright sob demanda
 
-> **Status 2026-07-14:** design aprovado pelo dono; **ainda não implementado**.
-> Implementar em incrementos com feature flags, preservando o worker atual até o canário passar.
-> Pré-requisitos entregues em `main`: observabilidade/prints e base PAN (`0758a9c`), Motor com 2 GB
-> para o Chromium (`e55a3c9`), migrations até `0011`, Motor 123 testes e Portal 152 testes.
->
-> **Atualização 2026-07-17:** antes de liberar 3–5 browsers, implementar
-> [warm session + batch 2](2026-07-17-plano1a-warm-session-batch2.md). Default de produto:
-> **máx. 2 Playwrights** + reuso de `storage_state`. Este plano de fan-out **herda** esse teto.
+> **Status 2026-07-16: DONE (implementado em `main`).** Fan-out multi-banco + workers Playwright
+> sob demanda (Fly Machines wake/idle) + orquestrador 512 MB. **Não reimplementar.**
+> Teto operacional: **máx. 2 Playwrights** — ver [warm session + batch 2](2026-07-17-plano1a-warm-session-batch2.md).
+> Lições e ops: handoff topo + `deploy/fly/*.sh`. Residual: object storage multi-volume se preciso.
 >
 > **Leitura obrigatória:** `docs/contexto-compacto.md`, `docs/handoff-contexto.md` e
 > `docs/plans/2026-07-13-playwright-licoes-santander.md`.

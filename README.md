@@ -4,50 +4,41 @@ Bot de WhatsApp para revenda de motos que conversa com o cliente, coleta os dado
 necessários e devolve simulações de financiamento de vários bancos (parcela, taxa,
 nº de parcelas) de forma organizada.
 
-> **Status:** 🟢 MVP demonstrável (~**94%** demo / ~**78%** multi-banco-revenda).  
+> **Status:** 🟢 MVP demonstrável (~**97%** demo / multi-banco + CRM campanhas/ROI).  
+> **Ambiente:** preferência **local** (Fly lab **parado** desde 2026-07-20).  
 > **Estado canônico:** [`docs/contexto-compacto.md`](docs/contexto-compacto.md) · planos
 > [`docs/plans/README.md`](docs/plans/README.md) · go-live WA [`docs/go-live-chatbot.md`](docs/go-live-chatbot.md).  
-> `docs/design.md` = pesquisa **histórica** (Claude/mock/RPA-only superados) — **não** implementar a partir dele.
+> `docs/design.md` = pesquisa **histórica** — **não** implementar a partir dele.
 
 ---
 
 ## ✨ Visão geral
 
 ```
-Cliente (WhatsApp)
-      │
-      ▼
-┌─────────────────┐
-│  Evolution API  │  ← canal WhatsApp (self-host, gratuito)
+Cliente (WhatsApp)          Catálogo público (UTM/Pixel)
+      │                              │
+      ▼                              ▼
+┌─────────────────┐          Chatbot API (leads, first/last)
+│  Evolution API  │
 └─────────────────┘
       │ webhook
       ▼
 ┌──────────────────────────────────────────────┐
-│                    n8n                        │  ← orquestrador
-│  1. Recebe mensagem                           │
-│  2. Carrega estado da conversa (Postgres)     │
-│  3. Chama o LLM (Gemini) → entende + extrai    │
-│  4. Valida dados (CPF, data, valores)         │
-│  5. Quando completo → chama o MOTOR (HTTP)     │
-│  6. Formata resposta → devolve no WhatsApp    │
+│                    n8n                        │  ← orquestra + LLM (Gemini)
+│  tools HTTP → Chatbot / Motor / Estoque       │
 └──────────────────────────────────────────────┘
-      │  (SQL)                    │  (HTTP POST /simular)
-      ▼                          ▼
-┌───────────────┐      ┌──────────────────────────────┐
-│  Postgres     │      │  Serviço de Simulação (Python)│
-│  leads +      │      │  FastAPI                       │
-│  simulações + │      │   hoje  → MOCK                 │
-│  consentim.   │      │   depois→ drivers Playwright   │
-└───────────────┘      │   (santander.py, pan.py, ...)  │
-                       └──────────────────────────────┘
-                                     │
-                                     ▼
-                       Portais dos bancos (Fase 3+)
+      │                         │
+      ▼                         ▼
+ Chatbot API              Motor de Simulação (FastAPI)
+ (leads, handoff)         mock + Playwright LIVE
+      │                   (Santander, Fontecred, Bradesco, Pan portal)
+      ▼
+ Portal de Gestão  ←→  Estoque API  →  Catálogo
+ (CRM, vendas, metas, campanhas/ROI, CAPI)
 ```
 
-**Princípio central:** o mecanismo de acesso aos bancos é **desacoplado** do resto.
-O bot é construído e validado com um "motor de simulação" mockado; o motor real é
-plugado depois **sem alterar** o fluxo do WhatsApp, a conversa ou o banco de dados.
+**Princípio central:** produtos **independentes** ligados só por HTTP. Motor mock ou real
+não muda o contrato `/v1/simulacoes`. Estoque é a fonte de verdade de veículos.
 
 ---
 
@@ -58,9 +49,10 @@ plugado depois **sem alterar** o fluxo do WhatsApp, a conversa ou o banco de dad
 | Canal WhatsApp | **Evolution API** (self-host) | Recebe/envia mensagens |
 | Orquestração | **n8n** | Roteia, mantém estado, chama LLM e motor |
 | Conversa (NLU) | **Google Gemini** (API, via n8n) | Entende o cliente, extrai e valida dados |
-| Motor de simulação | **Python + FastAPI** (mock → Playwright) | Devolve opções por banco |
-| Banco de dados | **PostgreSQL** (container) | Leads, consentimento LGPD, simulações |
-| Hospedagem | **Fly.io** ou **VPS** (ex.: Hetzner) | Tudo num servidor sempre ligado |
+| Motor de simulação | **Python + FastAPI** + Playwright | Mock + drivers reais (4 bancos LIVE) |
+| CRM / vitrine | Portal FastAPI + Catálogo + Estoque API | Vendas, metas, campanhas/ROI, Pixel |
+| Banco de dados | **PostgreSQL** (container / lab) | Por produto (tenancy) |
+| Hospedagem | **Local (dev)** · Fly.io lab opcional (OFF) | Sempre ligado só o que for demo |
 
 ---
 
@@ -115,17 +107,15 @@ O n8n nunca sabe se por trás é mock ou Playwright — o contrato é sempre o m
 A loja **já tem acesso ao portal do lojista dos 5 bancos**, então o caminho do motor
 real é **RPA** (automatizar os portais com Playwright). Agregador pago fica como plano B.
 
-| Banco | API de parceiro? | Acesso real | Estratégia |
-|---|---|---|---|
-| **Banco BV** | ✅ Sim (BV Open, sandbox público; aceita CPF + categoria moto) | Parceiro BV + API | RPA agora; **API é upgrade** (melhor candidato técnico) |
-| **Banco Pan** | ✅ Sim (`developers.bancopan.com.br`, exige contrato) | go!PAN Veículos + API | RPA agora; API como upgrade |
-| **Santander** (Aymoré) | ❌ Não | Portal "Financiamento Lojista" + Autoline | **RPA no portal** |
-| **Bradesco** | ❌ Não (para veículo) | Portal do lojista + Autoline | **RPA no portal** |
-| **Fontcred** | ❌ Não | Parceiro/correspondente (foco moto) | **RPA no portal** / manual |
+| Banco | Estado no Motor | Estratégia atual |
+|---|---|---|
+| **Santander** (Aymoré) | **LIVE** Playwright | Portal lojista |
+| **Fontecred** | **LIVE** Playwright | Portal + warm session |
+| **Bradesco** (Turbo) | **LIVE** Playwright | Portal lojista |
+| **Pan** | **LIVE** dual-path | Portal go!PAN (default) + API se config completa |
+| **BV** | backlog | API parceiro como upgrade futuro |
 
-> **Decisão de integração bancária: EM HOLD.** A escolha final (RPA vs API vs agregador)
-> está adiada de propósito e **não bloqueia** as fases iniciais. Detalhes e comparativo de
-> agregadores (FANDI, Autoconf, Creditas) em [`docs/design.md`](docs/design.md).
+Mapa de campos e decisões: [`docs/plans/2026-07-13-plano1a-task12-bancos-reconhecimento.md`](docs/plans/2026-07-13-plano1a-task12-bancos-reconhecimento.md).
 
 ---
 
@@ -142,52 +132,50 @@ real é **RPA** (automatizar os portais com Playwright). Agregador pago fica com
 ## 🚀 Roadmap (MVP em fases)
 
 - [x] **Fundação** — domínio, contratos v1, multi-loja, papéis e segurança (Plano #0).
-- [x] **Fase 0/1** — Chatbot API + n8n tools + simulação **MOCK** + lead/handoff.
-- [x] **Fase 2** — Estoque, catálogo público, portal vendedor, placa CRM, E3/E5.
-- [x] **Fase 3 (parcial)** — Vendas, metas (loja+vendedor), CSV, Task 9A financeiras, E10 Pixel Meta.
-- [x] **Fase 4 (parcial)** — **1º driver real: Santander LIVE** (Playwright); demais bancos e multi-banco paralelo abertos.
-- [ ] **Fase 5** — Go-live WhatsApp E2E, #3B funil/campanhas (Task 4–5), E8 ROI, outbound E11/E12, polish revenda.
+- [x] **Chatbot + n8n** — API, handoff, E3/E5, tools, sim mock e real.
+- [x] **Estoque + Catálogo + Portal** — CRUD, vitrine, CRM vendedor, 9A financeiras.
+- [x] **Vendas / metas / CSV / E10 Pixel** — + **campanhas + ROI (E8)** DONE 2026-07-20.
+- [x] **Motor multi-banco** — Santander, Fontecred, Bradesco, Pan portal LIVE; fan-out; warm session teto 2.
+- [ ] **Go-live WhatsApp E2E** — Gemini + Evolution + n8n em ambiente estável (eixo A).
+- [ ] **#3B Task 4** — eventos de funil; residual CAPI match; outbound E11/E12; polish revenda.
 
 Estado canônico: [`docs/contexto-compacto.md`](docs/contexto-compacto.md) · planos: [`docs/plans/README.md`](docs/plans/README.md) · handoff: [`docs/handoff-contexto.md`](docs/handoff-contexto.md).
 
 ---
 
-## 📁 Estrutura planejada
+## 📁 Estrutura do monorepo
 
 ```
 bot-whatsapp-financiamento/
 ├── README.md
-├── docs/
-│   └── design.md              # documento de design completo
-├── n8n/                       # workflows exportados do n8n (JSON)
-├── chatbot-api/               # dados e regras do Chatbot Standalone
-├── servico-simulacao/         # Motor de Simulação independente
-│   ├── app/
-│   │   └── motor/
-│   │       ├── mock.py        # simulação mockada (fórmula Price)
-│   │       └── drivers/       # um conector por banco
-│   └── requirements.txt
-├── estoque-api/               # estoque e publicação, produto independente
-├── portal-dashboards/         # gestão, vendas e metas
-├── catalogo-publico/          # vitrine independente
+├── docs/                      # contexto, planos, brand, guias
+├── n8n/                       # workflows exportados
+├── chatbot-api/               # Chatbot Standalone (FastAPI)
+├── motor-simulacao/           # Motor mock + Playwright
+├── estoque-api/               # Estoque + admin HTMX
+├── portal-gestao/             # CRM, vendas, metas, campanhas/ROI
+├── catalogo-publico/          # vitrine + Pixel
+├── site/                      # landing marketing
 └── deploy/
-    ├── chatbot-standalone/    # pacote revendível sem portal/catálogo
-    └── suite-completa/        # composição opcional dos produtos
+    ├── chatbot-standalone/    # docker-compose local
+    ├── motor-standalone/
+    ├── estoque-standalone/
+    ├── catalogo-conectado/
+    └── fly/                   # scripts lab Fly (OFF por padrão)
 ```
 
 ---
 
-## 🔑 O que providenciar antes de codar
+## 🔑 O que precisa para rodar
 
-**MVP (Fases 0–2):**
-1. Servidor (Fly.io ou VPS) — n8n e Evolution precisam ficar **sempre ligados**.
-2. Número de WhatsApp dedicado (um chip só para o bot).
-3. Chave de API do Google Gemini (Google AI Studio) — configurada como credencial no n8n.
-4. Postgres (container no mesmo servidor).
+**Local (preferido):**
+1. Docker (Postgres / n8n / Evolution conforme o compose do pacote).
+2. Python 3.12+ por produto (`requirements.txt` + venv).
+3. Chave Gemini no n8n (se testar conversa IA).
+4. Credenciais de portal lojista no Motor (cifradas; via Portal 9A ou env de dev).
 
-**Fase 3+ (quando sair do hold):**
-5. Logins dos portais do lojista (a loja já tem) — guardados com segurança.
-6. (Opcional) Contrato de API com BV Open / Pan, se migrar de RPA para API.
+**Lab Fly (opcional, hoje parado):**
+5. `flyctl` + `deploy/fly/up-all.sh` — só com pedido explícito (custo).
 
 ---
 
@@ -208,10 +196,10 @@ O Estoque API é a fonte única de veículos; bot, portal e vitrine integram-se 
 
 ### Acesso no Portal por papel
 
-- **Dono/gerente:** estoque completo, vendas, custos, lucro, metas, funil financeiro e simulações.
+- **Dono/gerente:** estoque completo, vendas, custos, lucro, metas, funil, **campanhas/ROI**,
+  tráfego (Pixel/CAPI) e simulações.
 - **Vendedor:** painel e vendas próprios, leads/conversas autorizados, estoque sem custos e
-  **simulação manual**. A simulação do vendedor nunca expõe custo do veículo, lucro, métricas
-  financeiras, tokens ou credenciais do Motor.
+  **simulação manual**. Nunca expõe custo do veículo, lucro, tokens ou credenciais do Motor.
 
 A liberação da simulação para vendedor é uma decisão de produto registrada no Plano #3A.1 e deve
 ser aplicada por RBAC no backend, não apenas ocultando ou exibindo itens de menu.

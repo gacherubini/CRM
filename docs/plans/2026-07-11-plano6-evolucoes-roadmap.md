@@ -8,10 +8,10 @@
 > futuras — cada item é um esboço de abordagem, não uma sequência de tarefas TDD. Quando um item
 > for priorizado, ele vira um plano completo próprio (via a skill de escrita de planos).
 >
-> **Status 2026-07-14 (limpeza + confirmação dono):** **E3**, **E5**, **E10** entregues.
-> Ativos: **E1**, **E6**, **E8**, **E11–E12**, **E13–E18** (aprovados na rodada de alta aderência).
-> **Fora do core:** **E9** redes. **Adiados:** **E2**, **E4**, **E7**.
-> Backlog C1–C12: confirmação **encerrada** (aprovados→E13–E18; rejeitados registrados no fim).
+> **Status 2026-07-20:** **E3**, **E5**, **E8** (MVP ROI), **E10** entregues.
+> Ativos: **E1**, **E6**, **E11–E12**, **E13–E18** (esboço).  
+> **Fora do core:** **E9** redes. **Adiados:** **E2**, **E4**, **E7**.  
+> Backlog C1–C12: confirmação **encerrada** (aprovados→E13–E18; rejeitados no fim).
 
 **Origem:** revenda de veículos (moto) — WhatsApp, simulação, estoque, vitrine e gestão da loja.
 Não é suite genérica de marketing/redes.
@@ -29,7 +29,7 @@ evento, não acesso direto a bancos de dados vizinhos.
 | **E5** Cadastro veículo WA | **Feito** (fase 1 texto) | Chatbot → Estoque |
 | **E6** Fotos / galeria | Ativo | Estoque + Catálogo |
 | **E7** Analytics avançado | **Adiado** (precisa volume) | Portal |
-| **E8** Atribuição / ROI campanhas | Ativo (após Task 5) | Portal |
+| **E8** Atribuição / ROI campanhas | **Feito (MVP 2026-07-20)** | Portal |
 | **E9** Redes sociais | **Fora do core** (não planejar) | — |
 | **E10** Pixel Meta | **Feito** (MVP) | Portal + Catálogo |
 | **E11** WhatsApp em massa | Ativo (após go-live WA) | Chatbot + Portal UI |
@@ -248,12 +248,16 @@ o Portal guarda referência/projeção, não copia payload pessoal bancário.
 
 ## E8 — Atribuição e retorno de campanhas
 
+> **Status: FEITA (2026-07-20) — MVP.** Plano
+> [tráfego pago](2026-07-20-plano-trafego-pago-crm-campanhas-roi.md) + commit `8e7ec5f`.  
+> UI `/app/campanhas` + `/app/trafego/roi` (CPL/CPA/ROAS). Residual: CSV gastos em lote, match CAPI fino.
+
 **O que é:** evoluir campanhas do Plano #3B para importar custos e comparar origem, lead, venda e
 lucro bruto por canal, mantendo `first_touch` e `last_touch` explícitos.
 
 **Onde pluga:** Portal. Catálogo e Chatbot apenas emitem UTMs/eventos padronizados.
 
-**Gatilho:** quando houver campanhas reais com custos e volume suficiente para decisão.
+**Gatilho:** ~~quando houver campanhas reais~~ — MVP no ar; residual só se o dono priorizar.
 
 ---
 
