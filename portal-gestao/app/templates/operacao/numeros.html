@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block title %}Números de cadastro — Revy{% endblock %}
+{% block page_title %}Números de cadastro{% endblock %}
+{% block content %}
+<section class="page-head">
+  <h1>Números de cadastro</h1>
+  <p class="muted">
+    Números da equipe autorizados a cadastrar veículos pelo WhatsApp. Eles precisam
+    estar salvos na agenda da loja e enviar <strong>cadastro</strong> para abrir a
+    sessão; depois mandam os dados e as fotos, e <strong>fim</strong> para encerrar.
+  </p>
+</section>
+
+{% if integracao_erro %}
+<div class="alert warning">{{ integracao_erro }}</div>
+{% endif %}
+
+<form class="card form-inline" method="post" action="/app/operacao/numeros">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  <label>Telefone
+    <input name="telefone" inputmode="numeric" placeholder="5511999998888" required>
+  </label>
+  <label>Nome (opcional)
+    <input name="nome" maxlength="120" placeholder="João Vendedor">
+  </label>
+  <button class="button primary" type="submit">Adicionar</button>
+</form>
+
+<div class="card">
+  <table class="table">
+    <thead>
+      <tr><th>Telefone</th><th>Nome</th><th>Ativo</th><th></th></tr>
+    </thead>
+    <tbody>
+      {% for n in numeros %}
+      <tr>
+        <td>{{ mascarar_telefone(n.telefone) }}</td>
+        <td>{{ n.nome or "—" }}</td>
+        <td>{{ "sim" if n.ativo else "não" }}</td>
+        <td>
+          <form method="post" action="/app/operacao/numeros/remover"
+                onsubmit="return confirm('Remover este número da lista de cadastro?')">
+            <input type="hidden" name="csrf" value="{{ csrf }}">
+            <input type="hidden" name="telefone" value="{{ n.telefone }}">
+            <button class="button danger" type="submit">Remover</button>
+          </form>
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="4" class="muted">Nenhum número autorizado ainda.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

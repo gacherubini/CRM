@@ -137,6 +137,7 @@ class ChatbotFake:
         self.simulacoes = []
         self.etapas_atualizadas = []
         self.eventos_funil = []
+        self.numeros_cadastro = []
 
     def listar_leads(self, etapa=None):
         if self.indisponivel:
@@ -191,6 +192,26 @@ class ChatbotFake:
         self.handoffs.append((telefone, bot_ativo))
         self.estados[telefone] = {"bot_ativo": bot_ativo, "status": "aberta" if bot_ativo else "handoff"}
         return self.estados[telefone]
+
+    def listar_numeros_cadastro(self):
+        if self.indisponivel:
+            raise ChatbotIndisponivel("Não foi possível acessar o chatbot agora")
+        return self.numeros_cadastro
+
+    def adicionar_numero_cadastro(self, telefone, nome=None):
+        if self.indisponivel:
+            raise ChatbotIndisponivel("Não foi possível acessar o chatbot agora")
+        registro = {"telefone": telefone, "nome": nome, "ativo": True}
+        self.numeros_cadastro.append(registro)
+        return registro
+
+    def remover_numero_cadastro(self, telefone):
+        if self.indisponivel:
+            raise ChatbotIndisponivel("Não foi possível acessar o chatbot agora")
+        self.numeros_cadastro = [
+            n for n in self.numeros_cadastro if n["telefone"] != telefone
+        ]
+        return {"removido": True, "telefone": telefone}
 
     def simular(self, payload):
         if self.simulacao_indisponivel:

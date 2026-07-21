@@ -70,6 +70,7 @@
         <span class="nav-section">Configurações</span>
         {% if usuario.papel in ['dono', 'gerente'] %}
         <a class="nav-link {{ 'active' if path.startswith('/app/financeiras') else '' }}" href="/app/financeiras" {% if path.startswith('/app/financeiras') %}aria-current="page"{% endif %}>Acessos dos bancos</a>
+        <a class="nav-link {{ 'active' if path.startswith('/app/operacao/numeros') else '' }}" href="/app/operacao/numeros" {% if path.startswith('/app/operacao/numeros') %}aria-current="page"{% endif %}>Números de cadastro</a>
         {% endif %}
         {% if usuario.papel in ['dono', 'admin_plataforma'] %}
         <a class="nav-link {{ 'active' if path.startswith('/app/equipe') else '' }}" href="/app/equipe" {% if path.startswith('/app/equipe') %}aria-current="page"{% endif %}>Equipe</a>

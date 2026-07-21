@@ -557,6 +557,75 @@ def dados_veiculo(form, incluir_custo: bool) -> dict:
     return dados
 
 
+@app.get("/app/operacao/numeros", response_class=HTMLResponse)
+def operacao_numeros(
+    request: Request,
+    db: Session = Depends(get_db),
+    chatbot: ChatbotClient = Depends(get_chatbot_client),
+):
+    usuario = usuario_atual(request, db)
+    if not usuario:
+        return redirecionar_login()
+    if usuario.papel not in ("dono", "gerente"):
+        return RedirectResponse("/app", status_code=303)
+    numeros, erro = [], None
+    try:
+        numeros = chatbot.listar_numeros_cadastro()
+    except ChatbotIndisponivel as exc:
+        erro = str(exc)
+    return templates.TemplateResponse(
+        "operacao/numeros.html",
+        contexto(request, usuario, numeros=numeros, integracao_erro=erro),
+    )
+
+
+@app.post("/app/operacao/numeros")
+async def operacao_numeros_add(
+    request: Request,
+    db: Session = Depends(get_db),
+    chatbot: ChatbotClient = Depends(get_chatbot_client),
+):
+    usuario = usuario_atual(request, db)
+    if not usuario:
+        return redirecionar_login()
+    form = await request.form()
+    if usuario.papel not in ("dono", "gerente") or not csrf_valido(
+        request, form.get("csrf")
+    ):
+        return RedirectResponse("/app/operacao/numeros", status_code=303)
+    telefone = (form.get("telefone") or "").strip()
+    nome = (form.get("nome") or "").strip() or None
+    if telefone:
+        try:
+            chatbot.adicionar_numero_cadastro(telefone, nome)
+        except ChatbotIndisponivel:
+            pass
+    return RedirectResponse("/app/operacao/numeros", status_code=303)
+
+
+@app.post("/app/operacao/numeros/remover")
+async def operacao_numeros_remover(
+    request: Request,
+    db: Session = Depends(get_db),
+    chatbot: ChatbotClient = Depends(get_chatbot_client),
+):
+    usuario = usuario_atual(request, db)
+    if not usuario:
+        return redirecionar_login()
+    form = await request.form()
+    if usuario.papel not in ("dono", "gerente") or not csrf_valido(
+        request, form.get("csrf")
+    ):
+        return RedirectResponse("/app/operacao/numeros", status_code=303)
+    telefone = (form.get("telefone") or "").strip()
+    if telefone:
+        try:
+            chatbot.remover_numero_cadastro(telefone)
+        except ChatbotIndisponivel:
+            pass
+    return RedirectResponse("/app/operacao/numeros", status_code=303)
+
+
 @app.post("/app/estoque/novo")
 async def estoque_criar(
     request: Request,
