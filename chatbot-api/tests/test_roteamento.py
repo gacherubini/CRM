@@ -85,3 +85,27 @@ def test_sessao_expirada_volta_a_ignorar(client, loja_a, db):
 def test_is_saved_desconhecido_trata_como_salvo(client, loja_a, db):
     d = operacao.decidir_roteamento(db, loja_a["loja_id"], "5511970000007", "oi", None)
     assert d["acao"] == "ignorar"
+
+
+def test_endpoint_roteamento_fluxo(client, loja_a):
+    inst = loja_a["instance"]
+    client.post(
+        "/v1/operacao/numeros-autorizados",
+        json={"telefone": "5511970000010"},
+        headers=loja_a["headers"],
+    )
+    r = client.post(
+        "/v1/operacao/roteamento",
+        json={"instance": inst, "telefone": "5511970000011", "texto": "oi", "is_saved": False},
+    )
+    assert r.status_code == 200 and r.json()["acao"] == "cliente"
+    r = client.post(
+        "/v1/operacao/roteamento",
+        json={"instance": inst, "telefone": "5511970000010", "texto": "cadastro", "is_saved": True},
+    )
+    assert r.json()["acao"] == "cadastro_controle"
+    r = client.post(
+        "/v1/operacao/roteamento",
+        json={"instance": inst, "telefone": "5511970000010", "texto": "Honda CG 160 2023 ABC1D23", "is_saved": True},
+    )
+    assert r.json()["acao"] == "cadastro"
