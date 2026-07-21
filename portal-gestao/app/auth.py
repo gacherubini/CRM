@@ -95,6 +95,11 @@ def pode_gerir_trafego(usuario: Usuario) -> bool:
     return usuario.papel in {"dono", "gerente"}
 
 
+def pode_gerir_equipe(usuario: Usuario) -> bool:
+    """Cadastro e manutenção de acessos da loja — somente dono ou plataforma."""
+    return usuario.papel in {"dono", "admin_plataforma"}
+
+
 def pode_ver_relatorios(usuario: Usuario) -> bool:
     """Relatórios/exportação CSV (vendas, metas, funil) — apenas dono e gerente."""
     return usuario.papel in {"dono", "gerente"}

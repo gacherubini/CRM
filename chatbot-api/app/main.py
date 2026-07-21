@@ -26,6 +26,8 @@ from app.simulation import SimulationProvider, get_simulation_provider
 
 app = FastAPI(title="Chatbot API")
 
+EtapaLead = Literal["novo", "em_atendimento", "qualificado", "convertido", "perdido"]
+
 if os.getenv("CHATBOT_SKIP_INIT") != "1":
     Base.metadata.create_all(bind=engine)
 
@@ -56,7 +58,11 @@ class LeadInput(BaseModel):
     telefone: str
     nome: Optional[str] = None
     interesse: Optional[str] = None
-    etapa: Optional[str] = None
+    etapa: Optional[EtapaLead] = None
+
+
+class EtapaLeadInput(BaseModel):
+    etapa: EtapaLead
 
 
 class CatalogInterestInput(BaseModel):
@@ -334,6 +340,18 @@ def obter_lead(
     lead_id: str, ctx: Contexto = Depends(get_contexto), db: Session = Depends(get_db)
 ):
     return servico.para_saida_lead(servico.obter_lead(db, ctx.loja_id, lead_id))
+
+
+@app.patch("/v1/leads/{lead_id}/etapa")
+def atualizar_etapa_lead(
+    lead_id: str,
+    dados: EtapaLeadInput,
+    ctx: Contexto = Depends(get_contexto),
+    db: Session = Depends(get_db),
+):
+    """Atualiza o funil de um lead pertencente à loja autenticada."""
+    lead = servico.atualizar_etapa_lead(db, ctx.loja_id, lead_id, dados.etapa)
+    return servico.para_saida_lead(lead)
 
 
 @app.get("/v1/estoque/buscar")

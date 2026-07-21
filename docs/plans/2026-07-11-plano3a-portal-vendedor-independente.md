@@ -3,9 +3,10 @@
 > **Primeira fatia válida do Portal de Gestão.** Não acessa o banco do Chatbot, Motor ou Estoque.
 > O pacote comercial do Dashboard inclui a Estoque API e a administra exclusivamente por contrato.
 >
-> **Status 2026-07-13:** base + #3A.1 entregues; **RBAC sim. vendedor (Task 13) feito**;
-> **Task 9A** UI `/app/financeiras` (BFF → Motor credenciais) **feita**.
-> **Aberto:** equipe/config real (ainda placeholder), Playwright E2E (#3A.1 Task 15).
+> **Status 2026-07-21:** base + #3A.1 entregues; **RBAC sim. vendedor (Task 13) feito**;
+> **Task 9A** UI `/app/financeiras` (BFF → Motor credenciais) **feita**; gestão de
+> **Equipe feita** (criar/editar/senha/ativar/desativar com RBAC + tenancy).
+> **Aberto:** Ajustes/configuração real (ainda placeholder) e Playwright E2E (#3A.1 Task 15).
 
 **Goal:** Entregar um portal revendível em que a loja administra usuários e vendedores, organiza
 leads, registra atividades e administra o estoque incluído; Chatbot e Motor são opcionais.
@@ -110,6 +111,13 @@ Estoque API. Permitir simulação por `SimulationProvider`; sem Motor, ocultar a
 
 Dono/gerente cadastram vendedores, desativam usuários, configuram etapas, distribuição de leads,
 horários e integrações. Segredos nunca voltam completos para a interface.
+
+> **Status parcial 2026-07-21 — Equipe FEITA:** Portal `/app/equipe` permite ao dono/admin da
+> plataforma listar somente a loja atual, criar gerente/vendedor, editar nome/papel, redefinir
+> senha e ativar/desativar sem exclusão física. E-mail é imutável para preservar referências;
+> contas `dono`/`admin_plataforma` são protegidas contra gestão por terceiros. CSRF e testes
+> negativos de tenancy cobrem todas as mutações. Configuração de horários, distribuição e a tela
+> `/app/configuracoes` continuam abertas.
 
 ### Task 9A: Acessos das financeiras (rotação de senha)
 

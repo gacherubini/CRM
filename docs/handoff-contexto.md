@@ -4,8 +4,37 @@
 > Este arquivo: checkpoint operacional. Seções **“Checkpoint anterior”** = histórico — não
 > reexecutar. Path Windows no rodapé de seções antigas: **ignorar** (workspace = root do git).
 >
-> **Checkpoint mais recente: 2026-07-20 (tráfego pago DONE · Fly OFF · limpeza docs).**  
+> **Checkpoint mais recente: 2026-07-21 (MVP Equipe + fluxo lead/venda/estoque · Fly OFF).**
 > Escolher um eixo por sessão. **Não** religar Fly sem pedido explícito.
+
+## Checkpoint mais recente — Equipe + fluxo operacional do MVP (2026-07-21)
+
+> **Escopo:** Portal/Chatbot operacional. A simulação não foi alterada.
+
+### Entregue
+
+| Área | O que | Segurança / comportamento |
+|---|---|---|
+| Equipe | Lista, cria e edita gerente/vendedor; redefine senha; ativa/desativa sem excluir | RBAC dono/admin plataforma, CSRF, tenancy, e-mail imutável, contas protegidas |
+| Leads | `PATCH /v1/leads/{id}/etapa` + seletor no Portal | allowlist de etapas, 404 entre lojas, vendedor autorizado |
+| Registro de venda | Seletores de lead e veículo no lugar de IDs técnicos | referências validadas pela API da própria loja; fallback explícito se integração cair |
+| Confirmação | Veículo vinculado é baixado como vendido no Estoque antes da confirmação local | conflito/offline mantém venda registrada; falha pós-baixa exige reconciliação explícita |
+| Cancelamento | Cancela o registro comercial sem reabrir silenciosamente o veículo | mensagem orienta correção manual de inventário |
+
+### Validação
+
+- Portal: **194 testes verdes**; recorte Equipe/Leads/Vendas: **53 verdes**.
+- `git diff --check` nos arquivos de código e compilação dos arquivos alterados: OK.
+- Chatbot: testes novos adicionados; host local usa Python 3.9 e não importa modelos existentes
+  que exigem Python 3.10+/3.12. A imagem oficial do serviço continua em Python 3.12.
+
+### Próximo foco recomendado (simulação continua por último)
+
+1. Go-live WhatsApp local: remover bypass de número no n8n, versionar header seguro do webhook e smoke E2E.
+2. Remover/implementar o placeholder de Ajustes do Portal.
+3. Playwright E2E do fluxo login → equipe → lead → venda → estoque.
+
+---
 
 ## Checkpoint mais recente — tráfego pago + local-first + limpeza (2026-07-20)
 

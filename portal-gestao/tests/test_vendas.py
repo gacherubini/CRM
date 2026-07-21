@@ -4,10 +4,17 @@ from conftest import csrf_da_resposta, login
 
 from app.db import SessionLocal
 from app.main import lucro_bruto_venda
-from app.models import Venda, VendaCustoDireto
+from app.models import Venda, VendaCustoDireto, agora
 
 
-def criar_venda(loja_slug="loja-teste", status="registrada", vendedor_email="dono@loja.test", custo=None):
+def criar_venda(
+    loja_slug="loja-teste",
+    status="registrada",
+    vendedor_email="dono@loja.test",
+    custo=None,
+    lead_ref=None,
+    veiculo_ref=None,
+):
     db = SessionLocal()
     venda = Venda(
         loja_slug=loja_slug,
@@ -16,6 +23,9 @@ def criar_venda(loja_slug="loja-teste", status="registrada", vendedor_email="don
         preco_venda=Decimal("100000.00"),
         custo_veiculo=Decimal(custo) if custo is not None else None,
         status=status,
+        lead_ref=lead_ref,
+        veiculo_ref=veiculo_ref,
+        confirmada_em=agora() if status == "confirmada" else None,
     )
     db.add(venda)
     db.commit()
@@ -44,6 +54,131 @@ def test_dono_registra_venda(client):
     assert venda.preco_venda == Decimal("120000.50")
     assert venda.custo_veiculo == Decimal("100000.00")
     assert venda.status == "registrada"
+    db.close()
+
+
+def test_formulario_oferece_selecao_de_lead_e_veiculo(client):
+    login(client)
+
+    pagina = client.get("/app/vendas/nova")
+
+    assert pagina.status_code == 200
+    assert '<select name="veiculo_ref">' in pagina.text
+    assert "Honda Civic 2022" in pagina.text
+    assert '<select name="lead_ref">' in pagina.text
+    assert "Maria Silva" in pagina.text
+    assert 'placeholder="ID do estoque"' not in pagina.text
+
+
+def test_registro_valida_e_persiste_referencias_da_loja(client):
+    login(client)
+    pagina = client.get("/app/vendas/nova")
+
+    resposta = client.post(
+        "/app/vendas/nova",
+        data={
+            "csrf": csrf_da_resposta(pagina),
+            "descricao": "Honda Civic 2022",
+            "preco_venda": "118900",
+            "lead_ref": "l1",
+            "veiculo_ref": "v1",
+        },
+        follow_redirects=False,
+    )
+
+    assert resposta.headers["location"] == "/app/vendas?ok=registrada"
+    db = SessionLocal()
+    venda = db.query(Venda).one()
+    assert venda.lead_ref == "l1"
+    assert venda.veiculo_ref == "v1"
+    db.close()
+
+
+def test_registro_rejeita_referencia_de_lead_que_nao_pertence_a_loja(client):
+    login(client)
+    pagina = client.get("/app/vendas/nova")
+
+    resposta = client.post(
+        "/app/vendas/nova",
+        data={
+            "csrf": csrf_da_resposta(pagina),
+            "descricao": "Venda inválida",
+            "preco_venda": "10000",
+            "lead_ref": "lead-de-outra-loja",
+        },
+    )
+
+    assert resposta.status_code == 422
+    assert "lead selecionado não existe nesta loja" in resposta.text
+    db = SessionLocal()
+    assert db.query(Venda).count() == 0
+    db.close()
+
+
+def test_registro_rejeita_referencia_de_veiculo_que_nao_pertence_a_loja(client):
+    login(client)
+    pagina = client.get("/app/vendas/nova")
+
+    resposta = client.post(
+        "/app/vendas/nova",
+        data={
+            "csrf": csrf_da_resposta(pagina),
+            "descricao": "Venda inválida",
+            "preco_venda": "10000",
+            "veiculo_ref": "veiculo-de-outra-loja",
+        },
+    )
+
+    assert resposta.status_code == 422
+    assert "veículo selecionado não existe nesta loja" in resposta.text
+    db = SessionLocal()
+    assert db.query(Venda).count() == 0
+    db.close()
+
+
+def test_formulario_preserva_fallback_quando_integracoes_estao_indisponiveis(
+    client, chatbot_fake, estoque_fake
+):
+    chatbot_fake.indisponivel = True
+    estoque_fake.indisponivel = True
+    login(client)
+
+    pagina = client.get("/app/vendas/nova")
+
+    assert pagina.status_code == 200
+    assert 'name="lead_ref"' in pagina.text
+    assert 'name="veiculo_ref"' in pagina.text
+    assert "Será validada antes da confirmação" in pagina.text
+
+
+def test_fallback_registra_referencias_para_validacao_posterior(
+    client, chatbot_fake, estoque_fake
+):
+    chatbot_fake.indisponivel = True
+    estoque_fake.indisponivel = True
+    login(client)
+    pagina = client.get("/app/vendas/nova")
+
+    resposta = client.post(
+        "/app/vendas/nova",
+        data={
+            "csrf": csrf_da_resposta(pagina),
+            "descricao": "Venda em contingência",
+            "preco_venda": "10000",
+            "lead_ref": "lead-manual",
+            "veiculo_ref": "veiculo-manual",
+        },
+        follow_redirects=False,
+    )
+
+    assert resposta.headers["location"] == (
+        "/app/vendas?ok=registrada&aviso=referencias-pendentes"
+    )
+    db = SessionLocal()
+    venda = db.query(Venda).one()
+    assert venda.status == "registrada"
+    assert venda.lead_ref == "lead-manual"
+    assert venda.veiculo_ref == "veiculo-manual"
     db.close()
 
 
@@ -90,6 +225,81 @@ def test_dono_confirma_venda(client):
     db.close()
 
 
+def test_confirmacao_baixa_veiculo_no_estoque(client, estoque_fake):
+    venda_id = criar_venda(lead_ref="l1", veiculo_ref="v1")
+    login(client)
+
+    resposta = client.post(
+        f"/app/vendas/{venda_id}/confirmar",
+        data={"csrf": csrf_das_vendas(client)},
+        follow_redirects=False,
+    )
+
+    assert resposta.headers["location"] == "/app/vendas?ok=confirmada"
+    assert estoque_fake.acoes == [("v1", "vender")]
+    assert estoque_fake.obter("v1")["status"] == "vendido"
+    db = SessionLocal()
+    assert db.get(Venda, venda_id).status == "confirmada"
+    db.close()
+
+
+def test_confirmacao_mantem_registrada_quando_estoque_indisponivel(
+    client, estoque_fake
+):
+    venda_id = criar_venda(veiculo_ref="v1")
+    estoque_fake.indisponivel = True
+    login(client)
+
+    resposta = client.post(
+        f"/app/vendas/{venda_id}/confirmar",
+        data={"csrf": csrf_das_vendas(client)},
+        follow_redirects=False,
+    )
+
+    assert resposta.headers["location"] == "/app/vendas?erro=estoque-indisponivel"
+    pagina_erro = client.get(resposta.headers["location"])
+    assert "confira o estado do veículo antes de tentar novamente" in pagina_erro.text
+    db = SessionLocal()
+    assert db.get(Venda, venda_id).status == "registrada"
+    db.close()
+
+
+def test_confirmacao_mantem_registrada_em_conflito_de_estoque(
+    client, estoque_fake
+):
+    venda_id = criar_venda(veiculo_ref="v1")
+    estoque_fake.conflito_ao_vender = True
+    login(client)
+
+    resposta = client.post(
+        f"/app/vendas/{venda_id}/confirmar",
+        data={"csrf": csrf_das_vendas(client)},
+        follow_redirects=False,
+    )
+
+    assert resposta.headers["location"] == "/app/vendas?erro=conflito-estoque"
+    assert estoque_fake.acoes == []
+    db = SessionLocal()
+    assert db.get(Venda, venda_id).status == "registrada"
+    db.close()
+
+
+def test_confirmacao_rejeita_veiculo_manual_invalido_quando_integracao_volta(client):
+    venda_id = criar_venda(veiculo_ref="veiculo-de-outra-loja")
+    login(client)
+
+    resposta = client.post(
+        f"/app/vendas/{venda_id}/confirmar",
+        data={"csrf": csrf_das_vendas(client)},
+        follow_redirects=False,
+    )
+
+    assert resposta.headers["location"] == "/app/vendas?erro=veiculo"
+    db = SessionLocal()
+    assert db.get(Venda, venda_id).status == "registrada"
+    db.close()
+
+
 def test_cancelar_exige_motivo(client):
     venda_id = criar_venda()
     login(client)
@@ -105,6 +315,25 @@ def test_cancelar_exige_motivo(client):
     venda = db.get(Venda, venda_id)
     assert venda.status == "cancelada"
     assert venda.motivo_cancelamento == "desistência"
+    db.close()
+
+
+def test_cancelar_confirmada_nao_reabre_veiculo_vendido(client, estoque_fake):
+    venda_id = criar_venda(status="confirmada", veiculo_ref="v1")
+    estoque_fake.veiculos[0]["status"] = "vendido"
+    login(client)
+
+    resposta = client.post(
+        f"/app/vendas/{venda_id}/cancelar",
+        data={"csrf": csrf_das_vendas(client), "motivo": "distrato"},
+        follow_redirects=False,
+    )
+
+    assert resposta.headers["location"] == "/app/vendas?ok=cancelada-estoque-mantido"
+    assert estoque_fake.acoes == []
+    assert estoque_fake.veiculos[0]["status"] == "vendido"
+    db = SessionLocal()
+    assert db.get(Venda, venda_id).status == "cancelada"
     db.close()
 
 

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import re
 import uuid
 from datetime import date, datetime
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
@@ -12,7 +13,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import text
-from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
 from starlette.middleware.sessions import SessionMiddleware
 
@@ -22,8 +23,10 @@ from app.auth import (
     csrf_token,
     csrf_valido,
     encerrar_sessao,
+    hash_senha,
     iniciar_sessao,
     pode_confirmar_venda,
+    pode_gerir_equipe,
     pode_gerir_financeiras,
     pode_gerir_metas,
     pode_gerir_estoque,
@@ -66,7 +69,12 @@ from app.clients.chatbot import (
     LeadNaoEncontrado,
     SimulacaoIndisponivel,
 )
-from app.clients.estoque import EstoqueClient, EstoqueIndisponivel
+from app.clients.estoque import (
+    ConflitoEstoque,
+    EstoqueClient,
+    EstoqueIndisponivel,
+    VeiculoNaoEncontrado,
+)
 from app.clients.motor import CredencialNaoEncontrada, MotorClient, MotorIndisponivel
 from app.config import settings
 from app.db import Base, engine, get_db
@@ -418,6 +426,10 @@ def estoque_editar_pagina(
         return RedirectResponse("/app/estoque", status_code=303)
     try:
         veiculo = estoque.obter(veiculo_id)
+    except VeiculoNaoEncontrado as exc:
+        return templates.TemplateResponse(
+            "erro.html", contexto(request, usuario, erro=str(exc)), status_code=404
+        )
     except EstoqueIndisponivel as exc:
         return templates.TemplateResponse(
             "erro.html", contexto(request, usuario, erro=str(exc)), status_code=503
@@ -470,9 +482,18 @@ async def estoque_acao(
         return RedirectResponse("/app/estoque?erro=acao", status_code=303)
     try:
         estoque.acao(veiculo_id, acao)
-    except (EstoqueIndisponivel, ValueError):
+    except (ConflitoEstoque, EstoqueIndisponivel, VeiculoNaoEncontrado, ValueError):
         return RedirectResponse("/app/estoque?erro=acao", status_code=303)
     return RedirectResponse(f"/app/estoque?ok={acao}", status_code=303)
+
+
+ETAPAS_LEAD = {
+    "novo": "Novo",
+    "em_atendimento": "Em atendimento",
+    "qualificado": "Qualificado",
+    "convertido": "Convertido",
+    "perdido": "Perdido",
+}
 
 
 def filtrar_leads(leads: list[dict], busca: str | None) -> list[dict]:
@@ -540,7 +561,53 @@ def leads_detalhe(
         )
     return templates.TemplateResponse(
         "leads/detalhe.html",
-        contexto(request, usuario, lead=lead),
+        contexto(
+            request,
+            usuario,
+            lead=lead,
+            etapas=ETAPAS_LEAD,
+            pode_atualizar_etapa=usuario.papel
+            in {"dono", "gerente", "vendedor", "admin_plataforma"},
+        ),
+    )
+
+
+@app.post("/app/leads/{lead_id}/etapa")
+async def leads_atualizar_etapa(
+    request: Request,
+    lead_id: str,
+    db: Session = Depends(get_db),
+    chatbot: ChatbotClient = Depends(get_chatbot_client),
+):
+    usuario = usuario_atual(request, db)
+    if not usuario:
+        return redirecionar_login()
+    form = await request.form()
+    if usuario.papel not in {"dono", "gerente", "vendedor", "admin_plataforma"}:
+        return RedirectResponse("/app/leads", status_code=303)
+    if not csrf_valido(request, form.get("csrf")):
+        return RedirectResponse(
+            f"/app/leads/{lead_id}?erro=sessao", status_code=303
+        )
+    etapa = (form.get("etapa") or "").strip()
+    if etapa not in ETAPAS_LEAD:
+        return RedirectResponse(
+            f"/app/leads/{lead_id}?erro=etapa", status_code=303
+        )
+    try:
+        chatbot.atualizar_etapa_lead(lead_id, etapa)
+    except LeadNaoEncontrado:
+        return templates.TemplateResponse(
+            "erro.html",
+            contexto(request, usuario, erro="Lead não encontrado."),
+            status_code=404,
+        )
+    except ChatbotIndisponivel:
+        return RedirectResponse(
+            f"/app/leads/{lead_id}?erro=integracao", status_code=303
+        )
+    return RedirectResponse(
+        f"/app/leads/{lead_id}?ok=etapa-atualizada", status_code=303
     )
 
 
@@ -1429,6 +1496,56 @@ TIPOS_META = {
 # compartilhados com app.relatorios sem duplicar a matemática financeira.
 
 
+def _carregar_opcoes_venda(
+    chatbot: ChatbotClient, estoque: EstoqueClient
+) -> tuple[list[dict] | None, list[dict] | None, list[str]]:
+    """Carrega cada integração isoladamente para o formulário continuar utilizável."""
+    avisos: list[str] = []
+    try:
+        leads = chatbot.listar_leads()
+    except ChatbotIndisponivel:
+        leads = None
+        avisos.append("Leads indisponíveis; a referência manual será validada na confirmação.")
+    try:
+        veiculos = [
+            veiculo
+            for veiculo in estoque.listar()
+            if veiculo.get("status") in {"disponivel", "reservado"}
+        ]
+    except EstoqueIndisponivel:
+        veiculos = None
+        avisos.append("Estoque indisponível; a referência manual será validada na confirmação.")
+    return leads, veiculos, avisos
+
+
+def _render_venda_form(
+    request: Request,
+    usuario: Usuario,
+    chatbot: ChatbotClient,
+    estoque: EstoqueClient,
+    *,
+    valores: dict | None = None,
+    erro: str | None = None,
+    status_code: int = 200,
+):
+    leads, veiculos, avisos = _carregar_opcoes_venda(chatbot, estoque)
+    return templates.TemplateResponse(
+        "vendas/form.html",
+        contexto(
+            request,
+            usuario,
+            valores=valores or {},
+            categorias=CATEGORIAS_CUSTO,
+            pode_financeiro=pode_ver_financeiro(usuario),
+            leads=leads,
+            veiculos=veiculos,
+            integracoes_avisos=avisos,
+            erro=erro,
+        ),
+        status_code=status_code,
+    )
+
+
 @app.get("/app/vendas", response_class=HTMLResponse)
 def vendas_lista(
     request: Request,
@@ -1467,20 +1584,27 @@ def vendas_lista(
 
 
 @app.get("/app/vendas/nova", response_class=HTMLResponse)
-def vendas_nova(request: Request, db: Session = Depends(get_db)):
+def vendas_nova(
+    request: Request,
+    db: Session = Depends(get_db),
+    chatbot: ChatbotClient = Depends(get_chatbot_client),
+    estoque: EstoqueClient = Depends(get_estoque_client),
+):
     usuario = usuario_atual(request, db)
     if not usuario:
         return redirecionar_login()
     if not pode_registrar_venda(usuario):
         return RedirectResponse("/app/vendas", status_code=303)
-    return templates.TemplateResponse(
-        "vendas/form.html",
-        contexto(request, usuario, valores={}, categorias=CATEGORIAS_CUSTO, pode_financeiro=pode_ver_financeiro(usuario)),
-    )
+    return _render_venda_form(request, usuario, chatbot, estoque)
 
 
 @app.post("/app/vendas/nova")
-async def vendas_criar(request: Request, db: Session = Depends(get_db)):
+async def vendas_criar(
+    request: Request,
+    db: Session = Depends(get_db),
+    chatbot: ChatbotClient = Depends(get_chatbot_client),
+    estoque: EstoqueClient = Depends(get_estoque_client),
+):
     usuario = usuario_atual(request, db)
     if not usuario:
         return redirecionar_login()
@@ -1497,18 +1621,65 @@ async def vendas_criar(request: Request, db: Session = Depends(get_db)):
     except (InvalidOperation, TypeError):
         preco = None
     if not descricao or preco is None or preco <= 0:
-        return templates.TemplateResponse(
-            "vendas/form.html",
-            contexto(request, usuario, valores=valores, categorias=CATEGORIAS_CUSTO, pode_financeiro=pode_ver_financeiro(usuario), erro="Informe descrição e preço de venda válidos."),
+        return _render_venda_form(
+            request,
+            usuario,
+            chatbot,
+            estoque,
+            valores=valores,
+            erro="Informe descrição e preço de venda válidos.",
             status_code=422,
         )
+    lead_ref = (form.get("lead_ref") or "").strip() or None
+    veiculo_ref = (form.get("veiculo_ref") or "").strip() or None
+    referencias_pendentes = False
+    if lead_ref:
+        try:
+            chatbot.obter_lead(lead_ref)
+        except LeadNaoEncontrado:
+            return _render_venda_form(
+                request,
+                usuario,
+                chatbot,
+                estoque,
+                valores=valores,
+                erro="O lead selecionado não existe nesta loja.",
+                status_code=422,
+            )
+        except ChatbotIndisponivel:
+            referencias_pendentes = True
+    if veiculo_ref:
+        try:
+            veiculo = estoque.obter(veiculo_ref)
+            if veiculo.get("status") not in {"disponivel", "reservado"}:
+                return _render_venda_form(
+                    request,
+                    usuario,
+                    chatbot,
+                    estoque,
+                    valores=valores,
+                    erro="O veículo selecionado não está disponível para venda.",
+                    status_code=422,
+                )
+        except VeiculoNaoEncontrado:
+            return _render_venda_form(
+                request,
+                usuario,
+                chatbot,
+                estoque,
+                valores=valores,
+                erro="O veículo selecionado não existe nesta loja.",
+                status_code=422,
+            )
+        except EstoqueIndisponivel:
+            referencias_pendentes = True
     venda = Venda(
         loja_slug=usuario.loja_slug,
         vendedor_email=usuario.email,
         descricao=descricao,
         preco_venda=preco,
-        lead_ref=(form.get("lead_ref") or "").strip() or None,
-        veiculo_ref=(form.get("veiculo_ref") or "").strip() or None,
+        lead_ref=lead_ref,
+        veiculo_ref=veiculo_ref,
         status="registrada",
     )
     if pode_ver_financeiro(usuario):
@@ -1525,11 +1696,18 @@ async def vendas_criar(request: Request, db: Session = Depends(get_db)):
                 pass
     db.add(venda)
     db.commit()
-    return RedirectResponse("/app/vendas?ok=registrada", status_code=303)
+    sufixo = "&aviso=referencias-pendentes" if referencias_pendentes else ""
+    return RedirectResponse(f"/app/vendas?ok=registrada{sufixo}", status_code=303)
 
 
 @app.post("/app/vendas/{venda_id}/confirmar")
-async def vendas_confirmar(request: Request, venda_id: str, db: Session = Depends(get_db)):
+async def vendas_confirmar(
+    request: Request,
+    venda_id: str,
+    db: Session = Depends(get_db),
+    chatbot: ChatbotClient = Depends(get_chatbot_client),
+    estoque: EstoqueClient = Depends(get_estoque_client),
+):
     usuario = usuario_atual(request, db)
     if not usuario:
         return redirecionar_login()
@@ -1539,19 +1717,50 @@ async def vendas_confirmar(request: Request, venda_id: str, db: Session = Depend
     venda = db.query(Venda).filter(Venda.id == venda_id, Venda.loja_slug == usuario.loja_slug).first()
     if not venda or venda.status == "cancelada":
         return RedirectResponse("/app/vendas?erro=acao", status_code=303)
+    if venda.status == "confirmada":
+        return RedirectResponse("/app/vendas?ok=ja-confirmada", status_code=303)
+    lead = None
+    if venda.lead_ref:
+        try:
+            lead = chatbot.obter_lead(venda.lead_ref)
+        except LeadNaoEncontrado:
+            return RedirectResponse("/app/vendas?erro=lead", status_code=303)
+        except ChatbotIndisponivel:
+            return RedirectResponse(
+                "/app/vendas?erro=chatbot-indisponivel", status_code=303
+            )
+    estoque_baixado = False
+    if venda.veiculo_ref:
+        try:
+            veiculo = estoque.obter(venda.veiculo_ref)
+            if veiculo.get("status") not in {"disponivel", "reservado"}:
+                return RedirectResponse(
+                    "/app/vendas?erro=conflito-estoque", status_code=303
+                )
+            estoque.acao(venda.veiculo_ref, "vender")
+            estoque_baixado = True
+        except VeiculoNaoEncontrado:
+            return RedirectResponse("/app/vendas?erro=veiculo", status_code=303)
+        except ConflitoEstoque:
+            return RedirectResponse(
+                "/app/vendas?erro=conflito-estoque", status_code=303
+            )
+        except EstoqueIndisponivel:
+            return RedirectResponse(
+                "/app/vendas?erro=estoque-indisponivel", status_code=303
+            )
     venda.status = "confirmada"
     venda.confirmada_por = usuario.email
     venda.confirmada_em = agora()
     venda.atualizada_em = agora()
-    # Snapshot de campanha (first/last) a partir do lead — best-effort.
-    if venda.lead_ref:
-        try:
-            chatbot = get_chatbot_client()
-            lead = chatbot.obter_lead(venda.lead_ref)
-            aplicar_snapshot_venda(venda, lead, db, usuario.loja_slug)
-        except (ChatbotIndisponivel, LeadNaoEncontrado):
-            pass
-    db.commit()
+    if lead:
+        aplicar_snapshot_venda(venda, lead, db, usuario.loja_slug)
+    try:
+        db.commit()
+    except SQLAlchemyError:
+        db.rollback()
+        erro = "reconciliacao" if estoque_baixado else "acao"
+        return RedirectResponse(f"/app/vendas?erro={erro}", status_code=303)
     # E10: Purchase via CAPI — best-effort; falha não desfaz a venda.
     enfileirar_purchase_venda(db, venda)
     return RedirectResponse("/app/vendas?ok=confirmada", status_code=303)
@@ -1575,6 +1784,11 @@ async def vendas_cancelar(request: Request, venda_id: str, db: Session = Depends
     venda.motivo_cancelamento = motivo
     venda.atualizada_em = agora()
     db.commit()
+    # Regra segura: cancelar o registro comercial nunca reabre estoque vendido.
+    if venda.confirmada_em and venda.veiculo_ref:
+        return RedirectResponse(
+            "/app/vendas?ok=cancelada-estoque-mantido", status_code=303
+        )
     return RedirectResponse("/app/vendas?ok=cancelada", status_code=303)
 
 
@@ -2178,17 +2392,396 @@ async def financeiras_testar(
     )
 
 
+PAPEIS_EQUIPE = {"gerente": "Gerente", "vendedor": "Vendedor"}
+PAPEIS_EQUIPE_ROTULO = {
+    "dono": "Dono",
+    "admin_plataforma": "Administrador da plataforma",
+    **PAPEIS_EQUIPE,
+}
+PAPEIS_IMUTAVEIS = {"dono", "admin_plataforma"}
+EMAIL_EQUIPE_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+SENHA_EQUIPE_MINIMA = 10
+
+
+def _membro_da_loja(db: Session, usuario: Usuario, membro_id: str) -> Usuario | None:
+    """Busca por id e loja na mesma consulta para impedir acesso entre tenants."""
+    return (
+        db.query(Usuario)
+        .filter(Usuario.id == membro_id, Usuario.loja_slug == usuario.loja_slug)
+        .first()
+    )
+
+
+def _membros_da_loja(db: Session, loja_slug: str) -> list[Usuario]:
+    return (
+        db.query(Usuario)
+        .filter(Usuario.loja_slug == loja_slug)
+        .order_by(Usuario.ativo.desc(), Usuario.nome, Usuario.email)
+        .all()
+    )
+
+
+def _pode_editar_membro(usuario: Usuario, membro: Usuario) -> bool:
+    """Contas protegidas só podem alterar os próprios dados e senha."""
+    return membro.id == usuario.id or membro.papel in PAPEIS_EQUIPE
+
+
+def _normalizar_nome(valor: str | None) -> str:
+    nome = " ".join((valor or "").split())
+    if len(nome) < 2:
+        raise ValueError("Informe o nome completo do membro.")
+    if len(nome) > 160:
+        raise ValueError("O nome deve ter no máximo 160 caracteres.")
+    return nome
+
+
+def _normalizar_email(valor: str | None) -> str:
+    email = (valor or "").strip().lower()
+    if not email or len(email) > 320 or not EMAIL_EQUIPE_RE.fullmatch(email):
+        raise ValueError("Informe um e-mail válido.")
+    return email
+
+
+def _validar_papel_equipe(valor: str | None) -> str:
+    papel = (valor or "").strip()
+    if papel not in PAPEIS_EQUIPE:
+        raise ValueError("Selecione o papel gerente ou vendedor.")
+    return papel
+
+
+def _validar_nova_senha(senha: str | None, confirmacao: str | None) -> str:
+    senha = senha or ""
+    if len(senha) < SENHA_EQUIPE_MINIMA:
+        raise ValueError(f"A senha deve ter pelo menos {SENHA_EQUIPE_MINIMA} caracteres.")
+    if len(senha) > 256:
+        raise ValueError("A senha deve ter no máximo 256 caracteres.")
+    if senha != (confirmacao or ""):
+        raise ValueError("A confirmação da senha não confere.")
+    return senha
+
+
+def _valores_membro_form(form) -> dict[str, str]:
+    return {
+        "nome": form.get("nome") or "",
+        "email": form.get("email") or "",
+        "papel": form.get("papel") or "vendedor",
+    }
+
+
+def _render_equipe_lista(
+    request: Request,
+    usuario: Usuario,
+    db: Session,
+    *,
+    erro: str | None = None,
+    status_code: int = 200,
+):
+    return templates.TemplateResponse(
+        "equipe/lista.html",
+        contexto(
+            request,
+            usuario,
+            membros=_membros_da_loja(db, usuario.loja_slug),
+            papeis_rotulo=PAPEIS_EQUIPE_ROTULO,
+            erro=erro,
+        ),
+        status_code=status_code,
+    )
+
+
+def _render_membro_form(
+    request: Request,
+    usuario: Usuario,
+    valores: dict[str, str],
+    *,
+    titulo: str,
+    membro: Usuario | None = None,
+    erro: str | None = None,
+    status_code: int = 200,
+):
+    papel_bloqueado = bool(
+        membro and (membro.papel in PAPEIS_IMUTAVEIS or membro.id == usuario.id)
+    )
+    return templates.TemplateResponse(
+        "equipe/form.html",
+        contexto(
+            request,
+            usuario,
+            valores=valores,
+            titulo=titulo,
+            membro=membro,
+            papeis=PAPEIS_EQUIPE,
+            papeis_rotulo=PAPEIS_EQUIPE_ROTULO,
+            papel_bloqueado=papel_bloqueado,
+            erro=erro,
+        ),
+        status_code=status_code,
+    )
+
+
 @app.get("/app/equipe", response_class=HTMLResponse)
-def equipe_placeholder(request: Request, db: Session = Depends(get_db)):
+def equipe_lista(request: Request, db: Session = Depends(get_db)):
     usuario = usuario_atual(request, db)
     if not usuario:
         return redirecionar_login()
-    if usuario.papel not in {"dono", "admin_plataforma"}:
+    if not pode_gerir_equipe(usuario):
         return RedirectResponse("/app", status_code=303)
-    return templates.TemplateResponse(
-        "em-breve.html",
-        contexto(request, usuario, titulo="Equipe", texto="A administração da equipe será conectada ao banco próprio do Portal."),
+    return _render_equipe_lista(request, usuario, db)
+
+
+@app.get("/app/equipe/novo", response_class=HTMLResponse)
+def equipe_novo(request: Request, db: Session = Depends(get_db)):
+    usuario = usuario_atual(request, db)
+    if not usuario:
+        return redirecionar_login()
+    if not pode_gerir_equipe(usuario):
+        return RedirectResponse("/app", status_code=303)
+    return _render_membro_form(
+        request,
+        usuario,
+        {"nome": "", "email": "", "papel": "vendedor"},
+        titulo="Adicionar membro",
     )
+
+
+@app.post("/app/equipe/novo")
+async def equipe_criar(request: Request, db: Session = Depends(get_db)):
+    usuario = usuario_atual(request, db)
+    if not usuario:
+        return redirecionar_login()
+    if not pode_gerir_equipe(usuario):
+        return RedirectResponse("/app", status_code=303)
+    form = await request.form()
+    if not csrf_valido(request, form.get("csrf")):
+        return _render_equipe_lista(
+            request,
+            usuario,
+            db,
+            erro="Sessão expirada. Recarregue a página e tente novamente.",
+            status_code=400,
+        )
+    valores = _valores_membro_form(form)
+    try:
+        nome = _normalizar_nome(form.get("nome"))
+        email = _normalizar_email(form.get("email"))
+        papel = _validar_papel_equipe(form.get("papel"))
+        senha = _validar_nova_senha(
+            form.get("senha"), form.get("senha_confirmacao")
+        )
+    except ValueError as exc:
+        return _render_membro_form(
+            request,
+            usuario,
+            valores,
+            titulo="Adicionar membro",
+            erro=str(exc),
+            status_code=422,
+        )
+    if db.query(Usuario.id).filter(Usuario.email == email).first():
+        return _render_membro_form(
+            request,
+            usuario,
+            valores,
+            titulo="Adicionar membro",
+            erro="Este e-mail não está disponível para cadastro.",
+            status_code=422,
+        )
+    db.add(
+        Usuario(
+            email=email,
+            nome=nome,
+            senha_hash=hash_senha(senha),
+            papel=papel,
+            loja_slug=usuario.loja_slug,
+            ativo=True,
+        )
+    )
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        return _render_membro_form(
+            request,
+            usuario,
+            valores,
+            titulo="Adicionar membro",
+            erro="Este e-mail não está disponível para cadastro.",
+            status_code=422,
+        )
+    return RedirectResponse("/app/equipe?ok=criado", status_code=303)
+
+
+@app.get("/app/equipe/{membro_id}/editar", response_class=HTMLResponse)
+def equipe_editar_pagina(request: Request, membro_id: str, db: Session = Depends(get_db)):
+    usuario = usuario_atual(request, db)
+    if not usuario:
+        return redirecionar_login()
+    if not pode_gerir_equipe(usuario):
+        return RedirectResponse("/app", status_code=303)
+    membro = _membro_da_loja(db, usuario, membro_id)
+    if not membro:
+        return RedirectResponse("/app/equipe?erro=nao-encontrado", status_code=303)
+    if not _pode_editar_membro(usuario, membro):
+        return RedirectResponse("/app/equipe?erro=conta-protegida", status_code=303)
+    valores = {"nome": membro.nome, "email": membro.email, "papel": membro.papel}
+    return _render_membro_form(
+        request,
+        usuario,
+        valores,
+        titulo="Editar membro",
+        membro=membro,
+    )
+
+
+@app.post("/app/equipe/{membro_id}/editar")
+async def equipe_editar(request: Request, membro_id: str, db: Session = Depends(get_db)):
+    usuario = usuario_atual(request, db)
+    if not usuario:
+        return redirecionar_login()
+    if not pode_gerir_equipe(usuario):
+        return RedirectResponse("/app", status_code=303)
+    form = await request.form()
+    if not csrf_valido(request, form.get("csrf")):
+        return _render_equipe_lista(
+            request,
+            usuario,
+            db,
+            erro="Sessão expirada. Recarregue a página e tente novamente.",
+            status_code=400,
+        )
+    membro = _membro_da_loja(db, usuario, membro_id)
+    if not membro:
+        return RedirectResponse("/app/equipe?erro=nao-encontrado", status_code=303)
+    if not _pode_editar_membro(usuario, membro):
+        return RedirectResponse("/app/equipe?erro=conta-protegida", status_code=303)
+    valores = {
+        "nome": form.get("nome") or "",
+        "email": membro.email,
+        "papel": form.get("papel") or membro.papel,
+    }
+    try:
+        nome = _normalizar_nome(form.get("nome"))
+        if membro.papel in PAPEIS_IMUTAVEIS or membro.id == usuario.id:
+            papel = (form.get("papel") or membro.papel).strip()
+            if papel != membro.papel:
+                raise ValueError("O papel desta conta protegida não pode ser alterado.")
+        else:
+            papel = _validar_papel_equipe(form.get("papel"))
+    except ValueError as exc:
+        return _render_membro_form(
+            request,
+            usuario,
+            valores,
+            titulo="Editar membro",
+            membro=membro,
+            erro=str(exc),
+            status_code=422,
+        )
+    membro.nome = nome
+    membro.papel = papel
+    db.commit()
+    return RedirectResponse("/app/equipe?ok=editado", status_code=303)
+
+
+@app.get("/app/equipe/{membro_id}/senha", response_class=HTMLResponse)
+def equipe_senha_pagina(request: Request, membro_id: str, db: Session = Depends(get_db)):
+    usuario = usuario_atual(request, db)
+    if not usuario:
+        return redirecionar_login()
+    if not pode_gerir_equipe(usuario):
+        return RedirectResponse("/app", status_code=303)
+    membro = _membro_da_loja(db, usuario, membro_id)
+    if not membro:
+        return RedirectResponse("/app/equipe?erro=nao-encontrado", status_code=303)
+    if not _pode_editar_membro(usuario, membro):
+        return RedirectResponse("/app/equipe?erro=conta-protegida", status_code=303)
+    return templates.TemplateResponse(
+        "equipe/senha.html",
+        contexto(
+            request,
+            usuario,
+            membro=membro,
+            erro=None,
+            senha_minima=SENHA_EQUIPE_MINIMA,
+        ),
+    )
+
+
+@app.post("/app/equipe/{membro_id}/senha")
+async def equipe_redefinir_senha(request: Request, membro_id: str, db: Session = Depends(get_db)):
+    usuario = usuario_atual(request, db)
+    if not usuario:
+        return redirecionar_login()
+    if not pode_gerir_equipe(usuario):
+        return RedirectResponse("/app", status_code=303)
+    form = await request.form()
+    if not csrf_valido(request, form.get("csrf")):
+        return _render_equipe_lista(
+            request,
+            usuario,
+            db,
+            erro="Sessão expirada. Recarregue a página e tente novamente.",
+            status_code=400,
+        )
+    membro = _membro_da_loja(db, usuario, membro_id)
+    if not membro:
+        return RedirectResponse("/app/equipe?erro=nao-encontrado", status_code=303)
+    if not _pode_editar_membro(usuario, membro):
+        return RedirectResponse("/app/equipe?erro=conta-protegida", status_code=303)
+    try:
+        senha = _validar_nova_senha(
+            form.get("senha"), form.get("senha_confirmacao")
+        )
+    except ValueError as exc:
+        return templates.TemplateResponse(
+            "equipe/senha.html",
+            contexto(
+                request,
+                usuario,
+                membro=membro,
+                erro=str(exc),
+                senha_minima=SENHA_EQUIPE_MINIMA,
+            ),
+            status_code=422,
+        )
+    membro.senha_hash = hash_senha(senha)
+    db.commit()
+    return RedirectResponse("/app/equipe?ok=senha", status_code=303)
+
+
+@app.post("/app/equipe/{membro_id}/{acao}")
+async def equipe_alterar_acesso(
+    request: Request,
+    membro_id: str,
+    acao: str,
+    db: Session = Depends(get_db),
+):
+    usuario = usuario_atual(request, db)
+    if not usuario:
+        return redirecionar_login()
+    if not pode_gerir_equipe(usuario):
+        return RedirectResponse("/app", status_code=303)
+    form = await request.form()
+    if not csrf_valido(request, form.get("csrf")):
+        return _render_equipe_lista(
+            request,
+            usuario,
+            db,
+            erro="Sessão expirada. Recarregue a página e tente novamente.",
+            status_code=400,
+        )
+    membro = _membro_da_loja(db, usuario, membro_id)
+    if not membro:
+        return RedirectResponse("/app/equipe?erro=nao-encontrado", status_code=303)
+    if acao not in {"ativar", "desativar"}:
+        return RedirectResponse("/app/equipe?erro=acao", status_code=303)
+    if acao == "desativar" and membro.id == usuario.id:
+        return RedirectResponse("/app/equipe?erro=auto-desativacao", status_code=303)
+    if membro.papel not in PAPEIS_EQUIPE:
+        return RedirectResponse("/app/equipe?erro=conta-protegida", status_code=303)
+    membro.ativo = acao == "ativar"
+    db.commit()
+    return RedirectResponse(f"/app/equipe?ok={acao}", status_code=303)
 
 
 @app.get("/app/configuracoes", response_class=HTMLResponse)

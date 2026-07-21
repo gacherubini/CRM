@@ -587,6 +587,18 @@ def obter_lead(db: Session, loja_id: str, lead_id: str) -> Lead:
     return lead
 
 
+def atualizar_etapa_lead(
+    db: Session, loja_id: str, lead_id: str, etapa: str
+) -> Lead:
+    """Move um lead no funil sem permitir acesso cruzado entre lojas."""
+    lead = obter_lead(db, loja_id, lead_id)
+    lead.etapa = etapa
+    lead.atualizada_em = datetime.now(timezone.utc)
+    db.commit()
+    db.refresh(lead)
+    return lead
+
+
 def para_saida_lead(lead: Lead) -> dict:
     return {
         "id": lead.id,

@@ -6,9 +6,20 @@
   {% if pode_registrar %}<a class="button primary" href="/app/vendas/nova">Registrar venda</a>{% endif %}
 </div>
 
-{% if request.query_params.get('ok') %}<div class="alert success">Ação concluída com sucesso.</div>{% endif %}
-{% if request.query_params.get('erro') == 'motivo' %}<div class="alert error">Informe o motivo para cancelar a venda.</div>
-{% elif request.query_params.get('erro') %}<div class="alert error">Não foi possível concluir essa ação.</div>{% endif %}
+{% set ok = request.query_params.get('ok') %}
+{% set erro = request.query_params.get('erro') %}
+{% if ok == 'cancelada-estoque-mantido' %}<div class="alert warning" role="status">Venda cancelada no comercial. Por segurança, o veículo continua vendido no Estoque; faça qualquer correção de inventário manualmente.</div>
+{% elif ok == 'ja-confirmada' %}<div class="alert success" role="status">Esta venda já estava confirmada.</div>
+{% elif ok %}<div class="alert success" role="status">Ação concluída com sucesso.</div>{% endif %}
+{% if request.query_params.get('aviso') == 'referencias-pendentes' %}<div class="alert warning" role="alert">Venda registrada. As referências serão validadas antes da confirmação porque uma integração estava indisponível.</div>{% endif %}
+{% if erro == 'motivo' %}<div class="alert error">Informe o motivo para cancelar a venda.</div>
+{% elif erro == 'lead' %}<div class="alert error">O lead vinculado não existe nesta loja. A venda continua registrada.</div>
+{% elif erro == 'veiculo' %}<div class="alert error">O veículo vinculado não existe nesta loja. A venda continua registrada.</div>
+{% elif erro == 'chatbot-indisponivel' %}<div class="alert error">Não foi possível validar o lead agora. A venda continua registrada; tente novamente.</div>
+{% elif erro == 'estoque-indisponivel' %}<div class="alert error">Não foi possível confirmar o resultado no Estoque. A venda continua registrada; confira o estado do veículo antes de tentar novamente.</div>
+{% elif erro == 'conflito-estoque' %}<div class="alert error">O veículo não pode ser baixado porque seu estado mudou. A venda continua registrada para conferência.</div>
+{% elif erro == 'reconciliacao' %}<div class="alert error">O veículo foi baixado no Estoque, mas a confirmação local falhou. Não repita a baixa; faça a reconciliação manual.</div>
+{% elif erro %}<div class="alert error">Não foi possível concluir essa ação.</div>{% endif %}
 
 <form class="filter-bar" method="get">
   <select name="status" aria-label="Status"><option value="">Todos os status</option>{% for s in ['registrada','confirmada','cancelada'] %}<option value="{{ s }}" {{ 'selected' if filtros.status == s }}>{{ s | capitalize }}</option>{% endfor %}</select>
@@ -30,11 +41,11 @@
       {% if pode_confirmar %}<td>
         {% if v.status == 'registrada' %}
         <div class="action-grid">
-          <form method="post" action="/app/vendas/{{ v.id }}/confirmar"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="button secondary" type="submit">Confirmar</button></form>
+          <form method="post" action="/app/vendas/{{ v.id }}/confirmar"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="button secondary" type="submit" title="Confirma a venda e baixa o veículo vinculado no Estoque">Confirmar</button></form>
           <form method="post" action="/app/vendas/{{ v.id }}/cancelar" class="stack-form"><input type="hidden" name="csrf" value="{{ csrf }}"><label class="sr-only" for="motivo-{{ v.id }}">Motivo do cancelamento</label><input id="motivo-{{ v.id }}" name="motivo" placeholder="Motivo" required><button class="button danger" type="submit">Cancelar</button></form>
         </div>
         {% elif v.status == 'confirmada' %}
-        <form method="post" action="/app/vendas/{{ v.id }}/cancelar" class="stack-form"><input type="hidden" name="csrf" value="{{ csrf }}"><label class="sr-only" for="motivo-{{ v.id }}">Motivo do cancelamento</label><input id="motivo-{{ v.id }}" name="motivo" placeholder="Motivo" required><button class="button danger" type="submit">Cancelar</button></form>
+        <form method="post" action="/app/vendas/{{ v.id }}/cancelar" class="stack-form"><input type="hidden" name="csrf" value="{{ csrf }}"><label class="sr-only" for="motivo-{{ v.id }}">Motivo do cancelamento</label><input id="motivo-{{ v.id }}" name="motivo" placeholder="Motivo" required><small class="muted">O veículo continuará vendido no Estoque.</small><button class="button danger" type="submit">Cancelar</button></form>
         {% else %}<span class="muted">—</span>{% endif %}
       </td>{% endif %}
     </tr>{% endfor %}</tbody>

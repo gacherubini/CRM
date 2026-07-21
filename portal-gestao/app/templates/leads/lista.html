@@ -8,7 +8,7 @@
   </div>
 </div>
 
-{% if integracao_erro %}<div class="alert warning" role="alert"><strong>Leads offline.</strong> {{ integracao_erro }}</div>{% endif %}
+{% if integracao_erro %}<div class="alert warning" role="alert"><strong>Leads desconectados.</strong> {{ integracao_erro }}</div>{% endif %}
 
 <form class="filter-bar" method="get">
   <label class="search"><span class="sr-only">Buscar</span><input name="busca" value="{{ filtros.busca }}" placeholder="Nome, telefone ou interesse"></label>

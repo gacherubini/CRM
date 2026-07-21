@@ -3,8 +3,9 @@
 > **Pré-requisito:** #3A. **Status 2026-07-20:** Tasks 1–3 e 6–8 + **Task 5 (campanhas)** +
 > **E8 ROI** entregues via [plano tráfego pago](2026-07-20-plano-trafego-pago-crm-campanhas-roi.md)
 > (`8e7ec5f`). **E10** Purchase CAPI na confirmação de venda. Credenciais banco = **#3A Task 9A** + Motor.
-> **CSV export** e **metas por vendedor UI** feitos.  
-> **Aberto:** eventos funil (Task 4), reconciliação E2E, equipe/config (Tasks 9–10).  
+> **CSV export** e **metas por vendedor UI** feitos. **2026-07-21:** etapa manual de lead,
+> seletores lead/veículo na venda e baixa do veículo no Estoque ao confirmar **feitos**.
+> **Aberto:** eventos históricos do funil (Task 4), reconciliação/Playwright E2E e configurações.
 > **Disparo** WA em massa / e-mail = roadmap **#6 E11/E12** (não misturar com Task 5).  
 > Não inferir venda/lucro só a partir de mensagens/leads.
 
@@ -39,6 +40,12 @@ Implementar criação, confirmação, cancelamento e correção auditada. Vended
 conforme política; gerente/dono confirma valores sensíveis. Venda sempre pertence à mesma loja de
 lead, vendedor e veículo referenciado.
 
+> **Status MVP 2026-07-21:** formulário seleciona lead e veículo pelas APIs, valida referências
+> da loja e mantém fallback explícito quando uma integração está offline. A confirmação baixa o
+> veículo como `vendido` antes do commit local; 404/409/offline preservam a venda como registrada,
+> e falha local posterior à baixa sinaliza reconciliação manual. Cancelar venda confirmada não
+> reabre silenciosamente o Estoque.
+
 **Aceite:** não é possível vincular entidades de lojas diferentes nem apagar venda confirmada.
 
 ### Task 2: Custos e lucro bruto
@@ -60,6 +67,10 @@ Permitir meta por loja/vendedor e período, inicialmente:
 Impedir sobreposição ambígua do mesmo tipo/escopo/período ou definir prioridade explícita.
 
 ### Task 4: Eventos do funil
+
+> **Detalhada em 2026-07-21** pelo plano
+> [conversões / funil / insights](2026-07-21-plano-conversao-atribuicao-insights.md) **Fase C**
+> (ainda não DONE). Implementar por lá; não reinventar em paralelo.
 
 Registrar atribuição, primeira resposta, mudanças de etapa, perda e venda. Eventos recebidos do
 Chatbot são idempotentes; ações manuais geram os mesmos tipos de evento.

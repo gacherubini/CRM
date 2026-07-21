@@ -63,6 +63,14 @@ class ChatbotClient:
     def obter_lead(self, lead_id: str) -> dict:
         return self._request("GET", f"/v1/leads/{lead_id}", erro_404=LeadNaoEncontrado)
 
+    def atualizar_etapa_lead(self, lead_id: str, etapa: str) -> dict:
+        return self._request(
+            "PATCH",
+            f"/v1/leads/{lead_id}/etapa",
+            erro_404=LeadNaoEncontrado,
+            json={"etapa": etapa},
+        )
+
     # --- Conversas e handoff ---------------------------------------------------
 
     def listar_conversas(self, busca: str | None = None, limit: int = 50, offset: int = 0) -> list[dict]:

@@ -5,6 +5,7 @@
   <div><a class="back-link" href="/app/vendas">← Voltar às vendas</a><h1>Registrar venda</h1><p>O registro entra como <strong>registrada</strong> e depende de confirmação do gerente ou dono.</p></div>
 </div>
 {% if erro %}<div class="alert error">{{ erro }}</div>{% endif %}
+{% for aviso in integracoes_avisos %}<div class="alert warning" role="alert">{{ aviso }}</div>{% endfor %}
 
 <form method="post" class="form-layout">
   <input type="hidden" name="csrf" value="{{ csrf }}">
@@ -13,8 +14,32 @@
     <div class="form-grid">
       <label class="wide">Descrição<input name="descricao" value="{{ valores.descricao if valores else '' }}" required></label>
       <label>Preço de venda<input type="number" step="0.01" min="0" name="preco_venda" value="{{ valores.preco_venda if valores else '' }}" required></label>
-      <label>Referência do veículo<input name="veiculo_ref" value="{{ valores.veiculo_ref if valores else '' }}" placeholder="ID do estoque"></label>
-      <label>Referência do lead<input name="lead_ref" value="{{ valores.lead_ref if valores else '' }}" placeholder="ID do lead"></label>
+      {% if veiculos is not none %}
+      <label>Veículo
+        <select name="veiculo_ref">
+          <option value="">Sem veículo vinculado</option>
+          {% for veiculo in veiculos %}
+          <option value="{{ veiculo.id }}" {{ 'selected' if valores and valores.veiculo_ref == veiculo.id }}>{{ veiculo.marca }} {{ veiculo.modelo }} {{ veiculo.ano_modelo }} — {{ formatar_brl(veiculo.preco) }} ({{ veiculo.status }})</option>
+          {% endfor %}
+        </select>
+        {% if not veiculos %}<small class="muted">Não há veículos disponíveis ou reservados.</small>{% endif %}
+      </label>
+      {% else %}
+      <label>Referência manual do veículo<input name="veiculo_ref" value="{{ valores.veiculo_ref if valores else '' }}" placeholder="ID do estoque"><small class="muted">Será validada antes da confirmação.</small></label>
+      {% endif %}
+      {% if leads is not none %}
+      <label>Lead
+        <select name="lead_ref">
+          <option value="">Sem lead vinculado</option>
+          {% for lead in leads %}
+          <option value="{{ lead.id }}" {{ 'selected' if valores and valores.lead_ref == lead.id }}>{{ lead.nome or 'Contato sem nome' }} — {{ mascarar_telefone(lead.telefone) }} ({{ lead.etapa | replace('_', ' ') }})</option>
+          {% endfor %}
+        </select>
+        {% if not leads %}<small class="muted">Ainda não há leads cadastrados.</small>{% endif %}
+      </label>
+      {% else %}
+      <label>Referência manual do lead<input name="lead_ref" value="{{ valores.lead_ref if valores else '' }}" placeholder="ID do lead"><small class="muted">Será validada antes da confirmação.</small></label>
+      {% endif %}
     </div>
   </section>
   {% if pode_financeiro %}

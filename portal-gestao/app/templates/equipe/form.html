@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}{{ titulo }} — Revy{% endblock %}
+{% block content %}
+<div class="page-heading">
+  <div><a class="back-link" href="/app/equipe">← Voltar à equipe</a><h1>{{ titulo }}</h1><p>O e-mail identifica vendas e metas e, por isso, não poderá ser alterado depois do cadastro.</p></div>
+</div>
+{% if erro %}<div class="alert error">{{ erro }}</div>{% endif %}
+
+<form method="post" class="form-layout">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  <section class="panel form-section">
+    <div class="section-title"><h2>Identificação</h2><p>Dados usados para identificar o membro no Portal.</p></div>
+    <div class="form-grid">
+      <label>Nome completo<input name="nome" value="{{ valores.nome }}" maxlength="160" autocomplete="name" required></label>
+      <label>E-mail<input type="email" name="email" value="{{ valores.email }}" maxlength="320" autocomplete="email" {% if membro %}readonly aria-describedby="email-ajuda"{% else %}required{% endif %}></label>
+    </div>
+    {% if membro %}<p class="muted" id="email-ajuda">O e-mail é permanente para manter as referências de vendas e metas.</p>{% endif %}
+  </section>
+  <section class="panel form-section">
+    <div class="section-title"><h2>Papel</h2><p>Gerentes acompanham a gestão; vendedores atuam nos fluxos comerciais.</p></div>
+    <div class="form-grid">
+      {% if papel_bloqueado %}
+      <label>Papel<input value="{{ papeis_rotulo.get(membro.papel, membro.papel) }}" readonly><input type="hidden" name="papel" value="{{ membro.papel }}"></label>
+      {% else %}
+      <label>Papel<select name="papel" required>
+        {% for valor, rotulo in papeis.items() %}<option value="{{ valor }}" {{ 'selected' if valores.papel == valor }}>{{ rotulo }}</option>{% endfor %}
+      </select></label>
+      {% endif %}
+    </div>
+  </section>
+  {% if not membro %}
+  <section class="panel form-section">
+    <div class="section-title"><h2>Acesso inicial</h2><p>Defina uma senha provisória com pelo menos 10 caracteres e entregue-a por um canal seguro.</p></div>
+    <div class="form-grid">
+      <label>Senha<input type="password" name="senha" minlength="10" maxlength="256" autocomplete="new-password" required></label>
+      <label>Confirmar senha<input type="password" name="senha_confirmacao" minlength="10" maxlength="256" autocomplete="new-password" required></label>
+    </div>
+  </section>
+  {% endif %}
+  <div class="form-actions"><a class="button ghost" href="/app/equipe">Cancelar</a><button class="button primary" type="submit">{{ 'Salvar alterações' if membro else 'Adicionar membro' }}</button></div>
+</form>
+{% endblock %}

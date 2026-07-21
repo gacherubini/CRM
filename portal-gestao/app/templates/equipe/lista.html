@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block title %}Equipe — Revy{% endblock %}
+{% block content %}
+<div class="page-heading">
+  <div><span class="eyebrow">Acessos da loja</span><h1>Equipe</h1><p>Gerencie quem pode entrar no Portal sem apagar o histórico comercial.</p></div>
+  <a class="button primary" href="/app/equipe/novo">Adicionar membro</a>
+</div>
+
+{% if erro %}<div class="alert error">{{ erro }}</div>{% endif %}
+{% if request.query_params.get('ok') == 'criado' %}<div class="alert success">Membro adicionado com sucesso.</div>{% endif %}
+{% if request.query_params.get('ok') == 'editado' %}<div class="alert success">Dados do membro atualizados.</div>{% endif %}
+{% if request.query_params.get('ok') == 'senha' %}<div class="alert success">Senha redefinida com sucesso.</div>{% endif %}
+{% if request.query_params.get('ok') == 'ativar' %}<div class="alert success">Acesso ativado.</div>{% endif %}
+{% if request.query_params.get('ok') == 'desativar' %}<div class="alert success">Acesso desativado. O histórico foi preservado.</div>{% endif %}
+{% if request.query_params.get('erro') == 'nao-encontrado' %}<div class="alert error">Não foi possível localizar esse membro nesta loja.</div>{% endif %}
+{% if request.query_params.get('erro') == 'acao' %}<div class="alert error">Ação de acesso inválida.</div>{% endif %}
+{% if request.query_params.get('erro') == 'auto-desativacao' %}<div class="alert error">Você não pode desativar seu próprio acesso.</div>{% endif %}
+{% if request.query_params.get('erro') == 'conta-protegida' %}<div class="alert error">Esta conta protegida só pode alterar os próprios dados.</div>{% endif %}
+
+<section class="panel flush">
+  {% if membros %}
+  <div class="table-wrap"><table>
+    <thead><tr><th>Membro</th><th>Papel</th><th>Acesso</th><th><span class="sr-only">Ações</span></th></tr></thead>
+    <tbody>
+      {% for membro in membros %}
+      <tr>
+        <td><div class="cell-stack"><strong>{{ membro.nome }}{% if membro.id == usuario.id %} <span class="muted">(você)</span>{% endif %}</strong><small>{{ membro.email }}</small></div></td>
+        <td><span class="status">{{ papeis_rotulo.get(membro.papel, membro.papel) }}</span></td>
+        <td><span class="status {{ 'disponivel' if membro.ativo else 'indisponivel' }}">{{ 'Ativo' if membro.ativo else 'Inativo' }}</span></td>
+        <td><div class="action-grid">
+          {% if membro.id == usuario.id or membro.papel in ['gerente', 'vendedor'] %}
+          <a class="button secondary" href="/app/equipe/{{ membro.id }}/editar">Editar</a>
+          <a class="button secondary" href="/app/equipe/{{ membro.id }}/senha">Redefinir senha</a>
+          {% endif %}
+          {% if membro.ativo and membro.id != usuario.id and membro.papel in ['gerente', 'vendedor'] %}
+          <form method="post" action="/app/equipe/{{ membro.id }}/desativar" onsubmit="return confirm('Desativar este acesso? O histórico será preservado.')">
+            <input type="hidden" name="csrf" value="{{ csrf }}"><button class="button danger" type="submit">Desativar</button>
+          </form>
+          {% elif not membro.ativo and membro.papel in ['gerente', 'vendedor'] %}
+          <form method="post" action="/app/equipe/{{ membro.id }}/ativar">
+            <input type="hidden" name="csrf" value="{{ csrf }}"><button class="button secondary" type="submit">Ativar</button>
+          </form>
+          {% endif %}
+        </div></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table></div>
+  {% else %}
+  <div class="empty"><strong>Nenhum membro cadastrado.</strong><p>Adicione um gerente ou vendedor para começar.</p></div>
+  {% endif %}
+</section>
+{% endblock %}

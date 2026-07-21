@@ -10,8 +10,35 @@
   <span class="status {{ lead.etapa }}">{{ lead.etapa | replace('_', ' ') }}</span>
 </div>
 
+{% if request.query_params.get('ok') == 'etapa-atualizada' %}
+<div class="alert success" role="status">Etapa atualizada com sucesso.</div>
+{% elif request.query_params.get('erro') == 'sessao' %}
+<div class="alert error" role="alert">Sua sessão expirou. Recarregue a página e tente novamente.</div>
+{% elif request.query_params.get('erro') == 'etapa' %}
+<div class="alert error" role="alert">Selecione uma etapa válida.</div>
+{% elif request.query_params.get('erro') == 'integracao' %}
+<div class="alert error" role="alert">Não foi possível atualizar o lead agora. A etapa anterior foi preservada.</div>
+{% endif %}
+
+{% if pode_atualizar_etapa %}
 <section class="panel form-section">
-  <div class="section-title"><span>01</span><div><h2>Contato</h2><p>Dados mínimos para acompanhamento.</p></div></div>
+  <div class="section-title"><span>01</span><div><h2>Andamento comercial</h2><p>Atualize a posição deste contato no funil.</p></div></div>
+  <form method="post" action="/app/leads/{{ lead.id }}/etapa" class="form-grid">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <label>Etapa
+      <select name="etapa" required>
+        {% for valor, rotulo in etapas.items() %}
+        <option value="{{ valor }}" {{ 'selected' if lead.etapa == valor }}>{{ rotulo }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <div class="form-actions"><button class="button primary" type="submit">Salvar etapa</button></div>
+  </form>
+</section>
+{% endif %}
+
+<section class="panel form-section">
+  <div class="section-title"><span>02</span><div><h2>Contato</h2><p>Dados mínimos para acompanhamento.</p></div></div>
   <dl class="integration-stats">
     <div><dt>Telefone</dt><dd>{{ mascarar_telefone(lead.telefone) }}</dd></div>
     <div><dt>Nome</dt><dd>{% if lead.nome %}{{ lead.nome }}{% else %}<span class="muted">—</span>{% endif %}</dd></div>
@@ -21,7 +48,7 @@
 </section>
 
 <section class="panel form-section">
-  <div class="section-title"><span>02</span><div><h2>Origem / tráfego</h2><p>First touch = primeira UTM; last touch = última (utm_* na API = last).</p></div></div>
+  <div class="section-title"><span>03</span><div><h2>Origem / tráfego</h2><p>First touch = primeira UTM; last touch = última (utm_* na API = last).</p></div></div>
   <dl class="integration-stats">
     <div><dt>Origem</dt><dd>{% if lead.origem %}{{ lead.origem }}{% else %}<span class="muted">—</span>{% endif %}</dd></div>
     <div><dt>Canal</dt><dd>{% if lead.canal %}{{ lead.canal }}{% else %}<span class="muted">—</span>{% endif %}</dd></div>
@@ -33,7 +60,7 @@
 </section>
 
 <section class="panel form-section">
-  <div class="section-title"><span>03</span><div><h2>Consentimento e registro</h2><p>Base legal para tratamento dos dados.</p></div></div>
+  <div class="section-title"><span>04</span><div><h2>Consentimento e registro</h2><p>Base legal para tratamento dos dados.</p></div></div>
   <dl class="integration-stats">
     <div><dt>Consentimento</dt><dd>{% if lead.consentimento_em %}<span class="published">Concedido</span> · {{ lead.consentimento_em }}{% else %}<span class="muted">Pendente</span>{% endif %}</dd></div>
     <div><dt>Criado em</dt><dd>{{ lead.criada_em }}</dd></div>

@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}Redefinir senha — Revy{% endblock %}
+{% block content %}
+<div class="page-heading">
+  <div><a class="back-link" href="/app/equipe">← Voltar à equipe</a><h1>Redefinir senha</h1><p>Defina uma nova senha para {{ membro.nome }} ({{ membro.email }}).</p></div>
+</div>
+{% if erro %}<div class="alert error">{{ erro }}</div>{% endif %}
+
+<form method="post" class="form-layout">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  <section class="panel form-section">
+    <div class="section-title"><h2>Nova senha</h2><p>Use pelo menos {{ senha_minima }} caracteres e compartilhe a senha por um canal seguro.</p></div>
+    <div class="form-grid">
+      <label>Nova senha<input type="password" name="senha" minlength="{{ senha_minima }}" maxlength="256" autocomplete="new-password" required></label>
+      <label>Confirmar nova senha<input type="password" name="senha_confirmacao" minlength="{{ senha_minima }}" maxlength="256" autocomplete="new-password" required></label>
+    </div>
+  </section>
+  <div class="form-actions"><a class="button ghost" href="/app/equipe">Cancelar</a><button class="button primary" type="submit">Redefinir senha</button></div>
+</form>
+{% endblock %}

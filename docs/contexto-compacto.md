@@ -1,6 +1,6 @@
 # Contexto compacto para continuidade
 
-Atualizado em **2026-07-20** (tráfego pago DONE · Fly lab **parado** · foco **local**).
+Atualizado em **2026-07-21** (plano conversões/funil/insights ATIVO · tráfego pago DONE · Fly lab **parado** · foco **local**).
 Leia isto primeiro; detalhe operacional recente em `docs/handoff-contexto.md` (topo).
 Planos válidos: `docs/plans/README.md`. **Ignore** `docs/plans/_archive/`.
 
@@ -18,6 +18,9 @@ Campos e decisões por banco:
 [warm+batch2](plans/2026-07-17-plano1a-warm-session-batch2.md).
 **CRM tráfego pago (2026-07-20):** campanhas + first/last + ROI **DONE** —
 [plano](plans/2026-07-20-plano-trafego-pago-crm-campanhas-roi.md) · guia [loja](trafego-pago-loja.md).
+**Próximo eixo C (2026-07-21 rev.3):** [conversões / funil / insights](plans/2026-07-21-plano-conversao-atribuicao-insights.md)
+(A→B→E→D→**H resultados dono**→C→F→G); H=bloco dashboard + alertas + drill-down campanha + onboarding;
+TikTok API e API de spend parked.
 
 ## Fonte da verdade (por tema)
 
@@ -38,7 +41,7 @@ Não há uma única “próxima task” universal — depende do objetivo:
 |---|---|---|---|
 | **A · Demo loja / WA** | Go-live E2E local (Evolution+n8n+chatbot) + publicar estoque | Operação ou demo com cliente real no Zap | `go-live-chatbot.md` + `deploy/*/docker-compose.yml` |
 | **B · Multi-banco** | Estabilizar sim com celular + prints; alinhar âncoras se falhar ao vivo | Mais cotações reais estáveis | handoff topo + lições Playwright |
-| **C · CRM dono** | #3B Task 4 funil eventos (campanhas/ROI já feitos) | Funil detalhado, tempos de etapa | `#3B` Task 4 |
+| **C · CRM dono** | [Conversões…](plans/2026-07-21-plano-conversao-atribuicao-insights.md) A→B→E→D→H→C→F→G | Resultados no dashboard + bus + Google | rev.3; spend API fora |
 | **D · Escala Motor** | Smoke live sessão quente + teto 2; object storage se multi-volume | Estabilidade multi-banco / IP | B+D + warm-batch2 |
 | **E · Dia a dia loja** | E1 áudio, E6 fotos (após ou em paralelo leve a A) | Uso diário sem depender de banco novo | `#6` |
 | **F · Marketing** | Completar landing se o dono entregar HTML | Site/hero polish | `site/` |

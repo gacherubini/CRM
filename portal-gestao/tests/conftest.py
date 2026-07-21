@@ -17,6 +17,11 @@ from app.clients.chatbot import (  # noqa: E402
     LeadNaoEncontrado,
     SimulacaoIndisponivel,
 )
+from app.clients.estoque import (  # noqa: E402
+    ConflitoEstoque,
+    EstoqueIndisponivel,
+    VeiculoNaoEncontrado,
+)
 from app.clients.motor import CredencialNaoEncontrada, MotorIndisponivel  # noqa: E402
 from app.db import Base, SessionLocal, engine  # noqa: E402
 from app.main import app, get_chatbot_client, get_estoque_client, get_motor_client  # noqa: E402
@@ -41,8 +46,12 @@ class EstoqueFake:
         ]
         self.criados = []
         self.acoes = []
+        self.indisponivel = False
+        self.conflito_ao_vender = False
 
     def listar(self, **filtros):
+        if self.indisponivel:
+            raise EstoqueIndisponivel("Não foi possível acessar o estoque agora")
         itens = self.veiculos
         for campo in ("tipo", "status"):
             if filtros.get(campo):
@@ -55,7 +64,12 @@ class EstoqueFake:
         return itens
 
     def obter(self, veiculo_id):
-        return next(v for v in self.veiculos if v["id"] == veiculo_id)
+        if self.indisponivel:
+            raise EstoqueIndisponivel("Não foi possível acessar o estoque agora")
+        try:
+            return next(v for v in self.veiculos if v["id"] == veiculo_id)
+        except StopIteration as exc:
+            raise VeiculoNaoEncontrado("veículo não encontrado") from exc
 
     def criar(self, dados):
         self.criados.append(dados)
@@ -65,7 +79,15 @@ class EstoqueFake:
         return {"id": veiculo_id, **dados}
 
     def acao(self, veiculo_id, acao):
+        if self.indisponivel:
+            raise EstoqueIndisponivel("Não foi possível acessar o estoque agora")
+        veiculo = self.obter(veiculo_id)
+        if acao == "vender" and (self.conflito_ao_vender or veiculo["status"] == "vendido"):
+            raise ConflitoEstoque("veículo em estado incompatível")
         self.acoes.append((veiculo_id, acao))
+        if acao == "vender":
+            veiculo["status"] = "vendido"
+            veiculo["publicado"] = False
         return {"ok": True}
 
 
@@ -113,6 +135,7 @@ class ChatbotFake:
         self.handoffs = []
         self.simulacao_indisponivel = False
         self.simulacoes = []
+        self.etapas_atualizadas = []
 
     def listar_leads(self, etapa=None):
         if self.indisponivel:
@@ -129,6 +152,14 @@ class ChatbotFake:
             if lead["id"] == lead_id:
                 return lead
         raise LeadNaoEncontrado("Lead não encontrado")
+
+    def atualizar_etapa_lead(self, lead_id, etapa):
+        if self.indisponivel:
+            raise ChatbotIndisponivel("Não foi possível acessar os leads agora")
+        lead = self.obter_lead(lead_id)
+        lead["etapa"] = etapa
+        self.etapas_atualizadas.append((lead_id, etapa))
+        return lead
 
     def listar_conversas(self, busca=None, limit=50, offset=0):
         if self.indisponivel:
