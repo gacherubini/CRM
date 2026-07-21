@@ -114,6 +114,8 @@ def test_autorizado_cria_veiculo(client, loja_a):
         assert fake.chamadas[0]["idempotency_key"] == "key-abc"
         assert fake.chamadas[0]["dados"]["marca"] == "Honda"
         assert fake.chamadas[0]["dados"]["preco"] == 16000.0
+        assert fake.chamadas[0]["dados"]["publicado"] is True
+        assert body["veiculo"]["publicado"] is True
     finally:
         app.dependency_overrides.pop(get_inventory_write_client, None)
 
@@ -272,3 +274,59 @@ def test_http_write_client_sem_config_503():
 
         assert isinstance(exc, HTTPException)
         assert exc.status_code == 503
+
+
+def test_http_write_client_busca_placa_e_envia_bytes_da_foto(monkeypatch):
+    chamadas = []
+
+    class _FakeResp:
+        def __init__(self, status_code, body):
+            self.status_code = status_code
+            self._body = body
+
+        def json(self):
+            return self._body
+
+        def raise_for_status(self):
+            if self.status_code >= 400:
+                raise RuntimeError("erro")
+
+    def _fake_get(url, headers=None, timeout=None):
+        chamadas.append(("get", url, headers, timeout))
+        return _FakeResp(200, {"id": "veh-1", "placa": "ABC1D23"})
+
+    def _fake_post(url, **kwargs):
+        chamadas.append(("post", url, kwargs))
+        return _FakeResp(
+            201,
+            {
+                "id": "veh-1",
+                "placa": "ABC1D23",
+                "fotos": ["https://estoque.example/foto.jpg"],
+                "publicado": True,
+            },
+        )
+
+    monkeypatch.setattr("app.inventory.httpx.get", _fake_get)
+    monkeypatch.setattr("app.inventory.httpx.post", _fake_post)
+    inventory = HttpInventoryWriteClient(
+        base_url="http://estoque:8000", token="tok-estoque", timeout=3
+    )
+
+    assert inventory.obter_por_placa("ABC1D23")["id"] == "veh-1"
+    resposta = inventory.adicionar_foto(
+        "veh-1",
+        b"\xff\xd8\xfffoto",
+        "image/jpeg",
+        "wa-foto:MSG-1",
+        publicar=True,
+    )
+
+    assert resposta["publicado"] is True
+    metodo, url, kwargs = chamadas[1]
+    assert metodo == "post"
+    assert url.endswith("/v1/veiculos/veh-1/fotos/upload")
+    assert kwargs["content"] == b"\xff\xd8\xfffoto"
+    assert kwargs["params"] == {"publicar": "true"}
+    assert kwargs["headers"]["Authorization"] == "Bearer tok-estoque"
+    assert kwargs["headers"]["Idempotency-Key"] == "wa-foto:MSG-1"

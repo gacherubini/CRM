@@ -12,6 +12,9 @@ primary_region = "gru"
   ESTOQUE_PUBLIC_RATE_LIMIT = "120"
   ESTOQUE_OUTBOX_INTERVALO = "5"
   ESTOQUE_SESSION_SECURE_COOKIE = "1"
+  ESTOQUE_MEDIA_STORAGE_DIR = "/data/media"
+  ESTOQUE_MEDIA_PUBLIC_BASE_URL = "https://estoque2037.fly.dev/public/v1/media"
+  ESTOQUE_MEDIA_ALLOWED_HOSTS = "estoque2037.fly.dev"
 
 [processes]
   app = "/srv/scripts/fly-entrypoint.sh"
@@ -26,8 +29,13 @@ primary_region = "gru"
   min_machines_running = 1
 
   [[services.ports]]
-    port = 8000
+    port = 80
     handlers = ["http"]
+    force_https = true
+
+  [[services.ports]]
+    port = 443
+    handlers = ["tls", "http"]
 
   [[services.http_checks]]
     path = "/health/ready"
@@ -39,3 +47,7 @@ primary_region = "gru"
   processes = ["app"]
   size = "shared-cpu-1x"
   memory = "512"
+
+[[mounts]]
+  source = "estoque_media"
+  destination = "/data"

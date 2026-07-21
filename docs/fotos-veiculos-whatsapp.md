@@ -1,75 +1,83 @@
-# Fotos de veículos no WhatsApp
+# Fotos de veículos: WhatsApp → Estoque → Catálogo
 
-Fluxo implementado para enviar a foto no próprio WhatsApp, sem exigir que o
-cliente abra o catálogo/site:
+Fluxo automático implementado para a equipe cadastrar o veículo e suas fotos sem
+abrir Portal ou site:
 
-1. a foto é hospedada em object storage/CDN público;
-2. o Estoque recebe URL estável ou `storage_key`, valida e grava só metadados;
-3. consultas do Chatbot recebem a projeção `tem_foto`/`midia_principal`;
-4. a tool `enviar_foto_veiculo` recebe somente `veiculo_id`;
-5. o Chatbot resolve a capa pela loja autenticada;
-6. o n8n chama `POST /message/sendMedia/{instance}` na Evolution.
+1. um número autorizado envia os dados do carro/moto por texto;
+2. a tool `cadastrar_veiculo` cria o veículo já publicado no Estoque;
+3. o vendedor envia uma foto com a placa na legenda, por exemplo `ABC1D23`;
+4. o n8n encaminha somente instância, telefone, ID da mensagem, legenda e MIME;
+5. a Chatbot API valida loja+número antes de baixar a imagem da Evolution;
+6. a imagem é enviada em bytes para o Estoque, que valida e grava no volume;
+7. a foto entra na galeria e a API pública passa a entregá-la ao Catálogo;
+8. o bot confirma no WhatsApp que Estoque e Catálogo foram atualizados.
 
-O modelo nunca escolhe a URL enviada para a Evolution. A URL vem da rota
-tenant-scoped `GET /v1/estoque/veiculos/{id}/midia-principal`, que consulta apenas
-veículo disponível e publicado na vitrine daquela loja.
+Para várias fotos, envie cada imagem com a mesma placa na legenda. Reentrega do
+mesmo evento não duplica a foto: o ID da mensagem vira chave idempotente.
 
-## Cadastro no Estoque
+O cliente comum não pode usar esse caminho. Somente telefones ativos em
+`numeros_autorizados` da loja podem anexar fotos; a validação acontece antes do
+download da mídia.
+
+## Armazenamento
+
+No MVP, os arquivos ficam fora do banco, em volume persistente do Estoque
+(`ESTOQUE_MEDIA_STORAGE_DIR`). O banco guarda somente URL e metadados. A rota
+pública usa chave opaca e headers imutáveis:
+
+```text
+GET /public/v1/media/{loja_id}/{veiculo_id}/{hash}.{jpg|png|webp}
+```
+
+Configure uma URL HTTPS pública que aponte para essa rota:
+
+```env
+ESTOQUE_MEDIA_STORAGE_DIR=/data/media
+ESTOQUE_MEDIA_PUBLIC_BASE_URL=https://estoque.seudominio.com/public/v1/media
+ESTOQUE_MEDIA_ALLOWED_HOSTS=estoque.seudominio.com
+ESTOQUE_MEDIA_MAX_FOTOS=20
+ESTOQUE_MEDIA_MAX_BYTES=10485760
+```
+
+Os `docker-compose.yml` montam o volume `estoque_media` em `/data/media`. Em
+produção, o domínio precisa ser acessível pelo navegador do cliente e pela
+Evolution. Backup do volume é responsabilidade operacional. Para múltiplas
+réplicas, migrar o mesmo contrato de `storage_key` para S3/R2/MinIO é evolução de
+escala, sem mudar o Catálogo.
+
+No lab Fly, `estoque-api/fly.toml` já define a URL pública e o mount. Antes do
+primeiro deploy, crie uma vez o volume com `fly volumes create estoque_media
+--app estoque2037 --region gru --size 1`.
+
+## Contrato privado de upload
 
 ```http
-PUT /v1/veiculos/{id}/fotos
+POST /v1/veiculos/{id}/fotos/upload?publicar=true
 Authorization: Bearer TOKEN_DO_ESTOQUE
-Content-Type: application/json
+Content-Type: image/jpeg
+Idempotency-Key: wa-foto:ID_DA_MENSAGEM
+
+<bytes da imagem>
 ```
 
-```json
-{
-  "fotos": [
-    {
-      "storage_key": "moto-center/veiculo-123/frente.webp",
-      "content_type": "image/webp",
-      "tamanho_bytes": 245000,
-      "ordem": 0,
-      "capa": true
-    },
-    {
-      "url": "https://media.example/veiculos/veiculo-123/lateral.jpg",
-      "content_type": "image/jpeg",
-      "tamanho_bytes": 310000,
-      "ordem": 1,
-      "capa": false
-    }
-  ]
-}
-```
-
-`storage_key` exige `ESTOQUE_MEDIA_PUBLIC_BASE_URL`. Tipos permitidos: JPEG,
-PNG e WebP. O limite padrão é 20 fotos e 10 MiB por arquivo. Ordem não pode se
-repetir e deve existir exatamente uma capa. Enviar `{"fotos": []}` remove todas.
-
-A forma anterior `{"urls": ["https://..."]}` continua aceita. Ela deve ser
-usada somente durante a migração, pois não traz tamanho declarado.
+Também permanece disponível o contrato de metadados `PUT
+/v1/veiculos/{id}/fotos`, aceitando URL HTTPS ou `storage_key` para integrações
+externas.
 
 ## Regras de segurança
 
-- nunca persistir binário ou base64 no banco;
-- aceitar apenas URL HTTPS pública e estável;
-- rejeitar host local/privado, credenciais, query e fragmento;
-- não devolver path de filesystem ou `storage_key` na API;
-- projetar por allowlist antes de expor o veículo ao Chatbot;
-- resolver mídia por loja + `veiculo_id`, nunca por URL enviada pelo modelo;
-- veículo sem foto continua respondendo normalmente em texto.
+- somente JPEG, PNG e WebP, com conferência de MIME e assinatura do arquivo;
+- limite padrão de 10 MiB antes de persistir;
+- autorização do remetente e tenancy antes de baixar a mídia;
+- binário não passa pelo LLM e não fica no n8n ou no banco;
+- path público é construído no backend; o modelo nunca escolhe URL ou destino;
+- escrita atômica em volume e nome derivado de hash idempotente;
+- URLs manuais continuam rejeitando base64, host privado, credenciais, query e fragmento;
+- cliente sem controle de exclusão; retenção/remoção continua administrativa.
 
-## Configuração
+## Envio da foto ao cliente
 
-```env
-ESTOQUE_MEDIA_PUBLIC_BASE_URL=https://media.seudominio.com/veiculos
-ESTOQUE_MEDIA_MAX_FOTOS=20
-ESTOQUE_MEDIA_MAX_BYTES=10485760
-ESTOQUE_MEDIA_URL_MAX_CHARS=2048
-ESTOQUE_MEDIA_ALLOWED_HOSTS=media.seudominio.com
-```
-
-O bucket/origem deve permitir leitura pela Evolution. Escrita no storage,
-política de lifecycle, antivírus e remoção de objetos órfãos pertencem à operação
-do provedor escolhido; não devem ser implementadas salvando arquivos no container.
+Quando um cliente pede uma imagem, a tool `enviar_foto_veiculo` recebe somente o
+`veiculo_id`, resolve a capa pela loja autenticada e chama `sendMedia` na
+Evolution. Veículo sem foto continua com resposta em texto; nunca é inventada uma
+imagem.

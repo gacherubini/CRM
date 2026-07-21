@@ -509,6 +509,72 @@ def substituir_fotos(
     return v
 
 
+def adicionar_foto(
+    db: Session,
+    loja_id: str,
+    veiculo_id: str,
+    foto: dict,
+    ator_papel: str = "sistema",
+    publicar: bool = False,
+) -> Veiculo:
+    """Anexa uma mídia idempotente sem apagar a galeria existente."""
+    v = obter_veiculo(db, loja_id, veiculo_id)
+    normalizada = _normalizar_fotos([foto])[0]
+    existente = next((item for item in v.fotos if item.url == normalizada["url"]), None)
+    if existente is not None:
+        if publicar and not v.publicado:
+            if v.status != "disponivel":
+                raise HTTPException(status_code=409, detail="veículo indisponível não pode ser publicado")
+            v.publicado = True
+            _registrar_operacao(db, v, "publicado", ator_papel, evento="vehicle.published")
+            db.commit()
+            db.refresh(v)
+        return v
+    tipo_legado = _content_type_legado(v.foto_url) if not v.fotos and v.foto_url else None
+    quantidade_existente = len(v.fotos) + int(tipo_legado is not None)
+    if quantidade_existente >= config.MEDIA_MAX_FOTOS:
+        raise HTTPException(status_code=422, detail=f"limite de {config.MEDIA_MAX_FOTOS} fotos por veículo")
+    if publicar and v.status != "disponivel":
+        raise HTTPException(status_code=409, detail="veículo indisponível não pode ser publicado")
+
+    # Preserva uma foto legada quando ela tem tipo reconhecível.
+    if tipo_legado:
+        v.fotos.append(
+            VeiculoFoto(
+                loja_id=loja_id,
+                url=v.foto_url,
+                content_type=tipo_legado,
+                tamanho_bytes=None,
+                ordem=0,
+                capa=True,
+            )
+        )
+        db.flush()
+
+    ordem = max((item.ordem for item in v.fotos), default=-1) + 1
+    tem_capa = any(item.capa for item in v.fotos)
+    normalizada["ordem"] = ordem
+    normalizada["capa"] = not tem_capa
+    v.fotos.append(VeiculoFoto(loja_id=loja_id, **normalizada))
+    if normalizada["capa"]:
+        v.foto_url = normalizada["url"]
+    if publicar and not v.publicado:
+        v.publicado = True
+        _registrar_operacao(db, v, "publicado", ator_papel, evento="vehicle.published")
+    v.atualizado_em = datetime.now(timezone.utc)
+    _registrar_operacao(
+        db,
+        v,
+        "foto_adicionada",
+        ator_papel,
+        {"quantidade": len(v.fotos), "capa": normalizada["capa"]},
+        "vehicle.updated",
+    )
+    db.commit()
+    db.refresh(v)
+    return v
+
+
 def listar_auditoria(db: Session, loja_id: str, limit: int = 100) -> list[Auditoria]:
     return (
         db.query(Auditoria)

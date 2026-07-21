@@ -206,6 +206,194 @@ def test_fotos_respeitam_tenancy(client, loja_a, loja_b):
     assert resposta.status_code == 404
 
 
+def test_upload_whatsapp_anexa_publica_e_fica_disponivel_no_catalogo(
+    client, loja_a, tmp_path, monkeypatch
+):
+    from app import config
+
+    monkeypatch.setattr(config, "MEDIA_STORAGE_DIR", tmp_path)
+    monkeypatch.setattr(
+        config,
+        "MEDIA_PUBLIC_BASE_URL",
+        "https://estoque.example/public/v1/media",
+    )
+    monkeypatch.setattr(config, "MEDIA_ALLOWED_HOSTS", ())
+    h, slug = loja_a["headers"], loja_a["slug"]
+    vid = client.post(
+        "/v1/veiculos", json=_novo(placa="ABC1D23"), headers=h
+    ).json()["id"]
+    foto = b"\xff\xd8\xff" + b"imagem-jpeg-segura"
+    headers = h | {
+        "Content-Type": "image/jpeg",
+        "Idempotency-Key": "wa-msg-foto-1",
+    }
+
+    primeira = client.post(
+        f"/v1/veiculos/{vid}/fotos/upload?publicar=true",
+        content=foto,
+        headers=headers,
+    )
+    segunda = client.post(
+        f"/v1/veiculos/{vid}/fotos/upload?publicar=true",
+        content=foto,
+        headers=headers,
+    )
+
+    assert primeira.status_code == 201, primeira.text
+    assert segunda.status_code == 201, segunda.text
+    body = segunda.json()
+    assert body["publicado"] is True
+    assert body["tem_foto"] is True
+    assert len(body["midias"]) == 1
+    url = body["midia_principal"]["url"]
+    assert url.startswith("https://estoque.example/public/v1/media/")
+
+    caminho_publico = url.removeprefix("https://estoque.example")
+    arquivo = client.get(caminho_publico)
+    assert arquivo.status_code == 200
+    assert arquivo.content == foto
+    assert arquivo.headers["content-type"].startswith("image/jpeg")
+    assert arquivo.headers["x-content-type-options"] == "nosniff"
+
+    catalogo = client.get(f"/public/v1/lojas/{slug}/veiculos").json()
+    veiculo = next(item for item in catalogo["veiculos"] if item["id"] == vid)
+    assert veiculo["fotos"] == [url]
+    assert veiculo["midia_principal"]["url"] == url
+
+
+def test_upload_whatsapp_bloqueia_loja_errada_e_conteudo_falso(
+    client, loja_a, loja_b, tmp_path, monkeypatch
+):
+    from app import config
+
+    monkeypatch.setattr(config, "MEDIA_STORAGE_DIR", tmp_path)
+    monkeypatch.setattr(
+        config,
+        "MEDIA_PUBLIC_BASE_URL",
+        "https://estoque.example/public/v1/media",
+    )
+    monkeypatch.setattr(config, "MEDIA_ALLOWED_HOSTS", ())
+    vid = client.post(
+        "/v1/veiculos", json=_novo(placa="DEF2G34"), headers=loja_a["headers"]
+    ).json()["id"]
+
+    outra_loja = client.post(
+        f"/v1/veiculos/{vid}/fotos/upload",
+        content=b"\xff\xd8\xfffoto",
+        headers=loja_b["headers"] | {"Content-Type": "image/jpeg"},
+    )
+    falsa = client.post(
+        f"/v1/veiculos/{vid}/fotos/upload",
+        content=b"nao-e-jpeg",
+        headers=loja_a["headers"] | {"Content-Type": "image/jpeg"},
+    )
+
+    assert outra_loja.status_code == 404
+    assert falsa.status_code == 415
+    assert not list(tmp_path.rglob("*.jpg"))
+
+
+def test_upload_whatsapp_anexa_sem_apagar_galeria_e_restringe_leitor(
+    client, loja_a, leitor_loja_a, tmp_path, monkeypatch
+):
+    from app import config
+
+    monkeypatch.setattr(config, "MEDIA_STORAGE_DIR", tmp_path)
+    monkeypatch.setattr(
+        config,
+        "MEDIA_PUBLIC_BASE_URL",
+        "https://estoque.example/public/v1/media",
+    )
+    monkeypatch.setattr(config, "MEDIA_ALLOWED_HOSTS", ())
+    h = loja_a["headers"]
+    vid = client.post(
+        "/v1/veiculos", json=_novo(placa="GHI3J45"), headers=h
+    ).json()["id"]
+    primeira_url = "https://cdn.example/frente.jpg"
+    client.put(f"/v1/veiculos/{vid}/fotos", json={"urls": [primeira_url]}, headers=h)
+
+    foto = b"\x89PNG\r\n\x1a\n" + b"foto-png"
+    leitor = client.post(
+        f"/v1/veiculos/{vid}/fotos/upload",
+        content=foto,
+        headers=leitor_loja_a["headers"] | {"Content-Type": "image/png"},
+    )
+    resposta = client.post(
+        f"/v1/veiculos/{vid}/fotos/upload",
+        content=foto,
+        headers=h
+        | {
+            "Content-Type": "image/png",
+            "Idempotency-Key": "wa-msg-foto-2",
+        },
+    )
+
+    assert leitor.status_code == 403
+    assert resposta.status_code == 201
+    assert resposta.json()["fotos"][0] == primeira_url
+    assert len(resposta.json()["fotos"]) == 2
+    assert resposta.json()["midia_principal"]["url"] == primeira_url
+
+
+def test_upload_whatsapp_rejeita_tamanho_antes_de_persistir(
+    client, loja_a, tmp_path, monkeypatch
+):
+    from app import config
+
+    monkeypatch.setattr(config, "MEDIA_STORAGE_DIR", tmp_path)
+    monkeypatch.setattr(config, "MEDIA_MAX_BYTES", 8)
+    monkeypatch.setattr(
+        config,
+        "MEDIA_PUBLIC_BASE_URL",
+        "https://estoque.example/public/v1/media",
+    )
+    monkeypatch.setattr(config, "MEDIA_ALLOWED_HOSTS", ())
+    vid = client.post(
+        "/v1/veiculos", json=_novo(placa="JKL4M56"), headers=loja_a["headers"]
+    ).json()["id"]
+    resposta = client.post(
+        f"/v1/veiculos/{vid}/fotos/upload",
+        content=b"\xff\xd8\xff123456789",
+        headers=loja_a["headers"] | {"Content-Type": "image/jpeg"},
+    )
+
+    assert resposta.status_code == 413
+    assert not list(tmp_path.rglob("*.jpg"))
+
+
+def test_upload_whatsapp_nao_sobrescreve_mesma_chave_com_outro_conteudo(
+    client, loja_a, tmp_path, monkeypatch
+):
+    from app import config
+
+    monkeypatch.setattr(config, "MEDIA_STORAGE_DIR", tmp_path)
+    monkeypatch.setattr(
+        config,
+        "MEDIA_PUBLIC_BASE_URL",
+        "https://estoque.example/public/v1/media",
+    )
+    monkeypatch.setattr(config, "MEDIA_ALLOWED_HOSTS", ())
+    vid = client.post(
+        "/v1/veiculos", json=_novo(placa="MNO5P67"), headers=loja_a["headers"]
+    ).json()["id"]
+    headers = loja_a["headers"] | {
+        "Content-Type": "image/jpeg",
+        "Idempotency-Key": "wa-msg-chave-unica",
+    }
+
+    primeira = client.post(
+        f"/v1/veiculos/{vid}/fotos/upload", content=b"\xff\xd8\xffprimeira", headers=headers
+    )
+    conflito = client.post(
+        f"/v1/veiculos/{vid}/fotos/upload", content=b"\xff\xd8\xffdiferente", headers=headers
+    )
+
+    assert primeira.status_code == 201
+    assert conflito.status_code == 409
+    url = primeira.json()["midia_principal"]["url"]
+    assert client.get(url.removeprefix("https://estoque.example")).content == b"\xff\xd8\xffprimeira"
+
+
 def test_mutacoes_geram_auditoria_e_outbox(client, loja_a, operador_loja_a):
     h = loja_a["headers"]
     vid = client.post("/v1/veiculos", json=_novo(), headers=h).json()["id"]

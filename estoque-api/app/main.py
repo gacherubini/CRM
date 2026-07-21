@@ -10,8 +10,8 @@ from pathlib import Path
 from threading import Lock
 from typing import Optional
 
-from fastapi import Body, Depends, FastAPI, HTTPException, Query, Request
-from fastapi.responses import JSONResponse, Response
+from fastapi import Body, Depends, FastAPI, Header, HTTPException, Query, Request
+from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 from sqlalchemy.orm import Session
@@ -21,6 +21,7 @@ from app import config, models_db, servico  # noqa: F401 (registra os modelos)
 from app.admin import router as admin_router
 from app.auth import Contexto, get_contexto
 from app.db import Base, engine, get_db
+from app import media
 
 app = FastAPI(title="Estoque API")
 app.add_middleware(
@@ -83,6 +84,7 @@ class VeiculoInput(BaseModel):
     placa: Optional[str] = None
     codigo_interno: Optional[str] = None
     foto_url: Optional[str] = None
+    publicado: bool = False
 
 
 class VeiculoUpdate(BaseModel):
@@ -281,6 +283,62 @@ def substituir_fotos(
     return servico.para_saida_privada(v, _pode_ver_custo(ctx))
 
 
+@app.post("/v1/veiculos/{veiculo_id}/fotos/upload", status_code=201)
+async def upload_foto(
+    veiculo_id: str,
+    request: Request,
+    publicar: bool = Query(default=False),
+    idempotency_key: Optional[str] = Header(default=None, alias="Idempotency-Key", max_length=512),
+    ctx: Contexto = Depends(get_contexto),
+    db: Session = Depends(get_db),
+):
+    """Recebe bytes autenticados, persiste em volume e anexa à galeria do veículo."""
+    _exigir_operacao(ctx)
+    mime = media.normalizar_mime_imagem(request.headers.get("content-type"))
+    try:
+        declarado = int(request.headers.get("content-length", "0"))
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail="Content-Length inválido") from exc
+    if declarado > config.MEDIA_MAX_BYTES:
+        raise HTTPException(status_code=413, detail="foto acima do limite")
+
+    bruto = bytearray()
+    async for parte in request.stream():
+        bruto.extend(parte)
+        if len(bruto) > config.MEDIA_MAX_BYTES:
+            raise HTTPException(status_code=413, detail="foto acima do limite")
+    conteudo = bytes(bruto)
+    if not conteudo:
+        raise HTTPException(status_code=422, detail="foto vazia")
+    media.validar_assinatura(conteudo, mime)
+
+    storage_key = media.gerar_storage_key(
+        ctx.loja_id, veiculo_id, mime, idempotency_key
+    )
+    # Valida tenancy/estado e a URL pública antes de gravar bytes no volume.
+    servico.obter_veiculo(db, ctx.loja_id, veiculo_id)
+    url = servico._url_por_storage_key(storage_key)
+    caminho, criado = media.salvar(storage_key, conteudo)
+    try:
+        v = servico.adicionar_foto(
+            db,
+            ctx.loja_id,
+            veiculo_id,
+            {
+                "url": url,
+                "content_type": mime,
+                "tamanho_bytes": len(conteudo),
+                "capa": True,
+            },
+            ctx.papel,
+            publicar=publicar,
+        )
+    except Exception:
+        media.remover_se_novo(caminho, criado)
+        raise
+    return servico.para_saida_privada(v, _pode_ver_custo(ctx))
+
+
 @app.get("/v1/auditoria")
 def auditoria(
     limit: int = 100,
@@ -457,6 +515,19 @@ def exportar_csv(
 
 
 # --- API pública (sem autenticação, resolvida por slug) ----------------------
+
+
+@app.get("/public/v1/media/{loja_id}/{veiculo_id}/{arquivo}")
+def media_publica(loja_id: str, veiculo_id: str, arquivo: str):
+    caminho, content_type = media.resolver_publica(loja_id, veiculo_id, arquivo)
+    return FileResponse(
+        caminho,
+        media_type=content_type,
+        headers={
+            "Cache-Control": "public, max-age=31536000, immutable",
+            "X-Content-Type-Options": "nosniff",
+        },
+    )
 
 
 def _loja_publica(loja) -> dict:

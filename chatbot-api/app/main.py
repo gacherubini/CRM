@@ -32,6 +32,7 @@ from app.hardening import (
     validar_identificador,
 )
 from app.simulation import SimulationProvider, get_simulation_provider
+from app.vehicle_photo import VehiclePhotoProcessor, get_vehicle_photo_processor
 
 app = FastAPI(title="Chatbot API")
 app.add_middleware(WebhookPayloadLimitMiddleware)
@@ -122,6 +123,39 @@ class AudioWebhookInput(BaseModel):
             nome="instance",
             limite=config.WEBHOOK_MAX_INSTANCE_CHARS,
         )
+
+    @field_validator("provider_message_id")
+    @classmethod
+    def validar_message_id(cls, value: str) -> str:
+        return validar_identificador(
+            value,
+            nome="provider_message_id",
+            limite=config.WEBHOOK_MAX_PROVIDER_MESSAGE_ID_CHARS,
+        )
+
+
+class FotoVeiculoWebhookInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    instance: str
+    telefone_solicitante: str
+    provider_message_id: str
+    legenda: Optional[str] = Field(default=None, max_length=500)
+    mime_type: Optional[str] = Field(default=None, max_length=120)
+
+    @field_validator("instance")
+    @classmethod
+    def validar_instance(cls, value: str) -> str:
+        return validar_identificador(
+            value,
+            nome="instance",
+            limite=config.WEBHOOK_MAX_INSTANCE_CHARS,
+        )
+
+    @field_validator("telefone_solicitante")
+    @classmethod
+    def validar_telefone(cls, value: str) -> str:
+        return normalizar_telefone_webhook(value)
 
     @field_validator("provider_message_id")
     @classmethod
@@ -300,6 +334,27 @@ def webhook_audio_transcrever(
         dados.provider_message_id,
         dados.mime_type,
         dados.duration_seconds,
+    )
+
+
+@app.post("/webhook/operacao/veiculos/foto")
+def webhook_foto_veiculo(
+    dados: FotoVeiculoWebhookInput,
+    db: Session = Depends(get_db),
+    _: None = Depends(verificar_webhook_token),
+    processor: VehiclePhotoProcessor = Depends(get_vehicle_photo_processor),
+):
+    """Imagem da equipe → Estoque → catálogo, sem binário no n8n/Chatbot."""
+    loja = servico.resolver_loja_por_instancia(db, dados.instance)
+    return operacao.anexar_foto_whatsapp(
+        db,
+        loja.id,
+        dados.instance,
+        dados.telefone_solicitante,
+        dados.provider_message_id,
+        dados.legenda,
+        dados.mime_type,
+        processor,
     )
 
 

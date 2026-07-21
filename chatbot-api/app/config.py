@@ -46,6 +46,17 @@ AUDIO_FALLBACK_TEXT = os.getenv(
     "Não consegui entender o áudio. Pode me enviar por texto?",
 )[:160]
 
+# Imagem de veículo recebida de número autorizado. O binário só transita pela
+# API e é enviado ao Estoque; não é persistido no Chatbot/n8n.
+IMAGE_EVOLUTION_URL = os.getenv(
+    "CHATBOT_IMAGE_EVOLUTION_URL", AUDIO_EVOLUTION_URL
+)
+IMAGE_EVOLUTION_API_KEY = os.getenv(
+    "CHATBOT_IMAGE_EVOLUTION_API_KEY", AUDIO_EVOLUTION_API_KEY
+)
+IMAGE_MAX_BYTES = int(os.getenv("CHATBOT_IMAGE_MAX_BYTES", str(10 * 1024 * 1024)))
+IMAGE_DOWNLOAD_TIMEOUT = float(os.getenv("CHATBOT_IMAGE_DOWNLOAD_TIMEOUT", "10"))
+
 # Provider de simulação: none (Atendimento) | mock (demo) | http (Motor real)
 SIMULATION_PROVIDER = os.getenv("SIMULATION_PROVIDER", "none")
 MOTOR_URL = os.getenv("MOTOR_URL", "")

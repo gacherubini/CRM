@@ -9,10 +9,11 @@
 > de propósito até go-live. **Decisão:** sem trava de consentimento; CPF mascarado.
 > **Decisão 2026-07-21:** o bot solicita a simulação, não recebe/exibe o resultado financeiro e
 > faz handoff automático; o vendedor entrega o resultado ao cliente.
-> **Entrega 2026-07-21:** áudio recebido com download efêmero/transcritor HTTP/fallback e envio da
-> foto principal do Estoque no próprio WhatsApp. **Aberto:** go-live manual, provider real de
-> transcrição, bucket/CDN e ingestão do binário, retenção/expurgo administrativo (sem autosserviço),
-> readiness real.
+> **Entrega 2026-07-21:** áudio recebido com download efêmero/transcritor HTTP/fallback; envio da
+> foto principal do Estoque no WhatsApp; e foto automática WhatsApp → volume do Estoque → Catálogo,
+> restrita a números autorizados e idempotente. **Aberto:** go-live manual, provider real de
+> transcrição, URL HTTPS/backup do volume, retenção/expurgo administrativo (sem autosserviço) e
+> readiness real. Object storage externo é evolução de escala, não bloqueio do MVP.
 
 **Goal:** Entregar um pacote instalável e revendível que conecta um WhatsApp, conversa com clientes,
 qualifica e exporta leads, consulta o Estoque Lite, executa handoff humano e, na edição

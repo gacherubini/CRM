@@ -4,31 +4,35 @@
 > Este arquivo: checkpoint operacional. Seções **“Checkpoint anterior”** = histórico — não
 > reexecutar. Path Windows no rodapé de seções antigas: **ignorar** (workspace = root do git).
 >
-> **Checkpoint mais recente: 2026-07-21 (funil UI + fotos WhatsApp + áudio · Fly OFF).**
+> **Checkpoint mais recente: 2026-07-21 (funil UI + fotos automáticas + áudio · Fly OFF).**
 > Escolher um eixo por sessão. **Não** religar Fly sem pedido explícito.
 
-## Checkpoint mais recente — funil UI + fotos WhatsApp + áudio (2026-07-21)
+## Checkpoint mais recente — funil UI + fotos automáticas + áudio (2026-07-21)
 
 > **Escopo:** Portal, Estoque, Chatbot e workflow n8n. A simulação e os drivers bancários não
 > foram alterados; Fly permaneceu OFF.
 
 - **#3B Task 4 DONE:** nova UI `/app/funil` para dono/gerente com filtro de período, coorte,
   etapas, taxas, média/mediana, `Sem base`, isolamento por loja e sincronização best-effort.
-- **Fotos no próprio WhatsApp:** Estoque ganhou contrato detalhado de galeria/capa, migration
-  `0006_veiculo_fotos_midias`, URL/storage_key segura e metadados. O Chatbot projeta uma allowlist,
-  resolve a capa por loja+ID e o n8n usa `sendMedia`; o modelo não escolhe URL nem destino.
+- **Fotos automáticas até o Catálogo:** número autorizado cadastra o veículo por texto e envia
+  cada imagem com a placa na legenda. O n8n encaminha só metadados; o Chatbot valida remetente+loja
+  antes de baixar da Evolution; o Estoque valida e grava os bytes em volume persistente, acrescenta
+  à galeria, publica o veículo e serve a imagem ao Catálogo. Reentrega não duplica. O caminho
+  inverso Estoque → WhatsApp por `sendMedia` continua pronto.
 - **Áudio recebido:** o n8n reconhece `audioMessage`; a Chatbot API baixa a mídia autenticada da
   Evolution, valida MIME/tamanho/duração, transcreve por provider HTTP e remove o temporário. Sem
   provider ou em falha, responde pedindo texto e não retém o áudio.
 - **Segurança:** base64/path local/host privado/query de mídia rejeitados; cliente sem controle de
   exclusão; simulação continua privada e entregue por vendedor.
-- **Operação externa residual:** configurar bucket/CDN público e homologar URL/token de transcrição.
-  O código não inventa provedor nem persiste arquivos no container.
-- **Validação desta rodada:** Portal **251**, Chatbot **127** e Estoque **70** testes verdes;
-  migration Estoque `0006` validada em upgrade/downgrade/upgrade; workflow n8n, JSON, compose YAML
-  e `git diff --check` verdes.
-- **Percentual estimado:** ~99% demonstrável / ~87% preparação para produção. Restam principalmente
-  go-live WhatsApp, serviços externos reais, Google Conversions e Playwright E2E do Portal.
+- **Operação externa residual:** expor a rota pública do Estoque por HTTPS, incluir o volume
+  `estoque_media` no backup e homologar URL/token de transcrição. S3/R2/MinIO é evolução de
+  escala, não bloqueio do MVP. O `fly.toml` já traz host/mount; no primeiro deploy do lab ainda
+  é necessário criar uma vez o volume `estoque_media`.
+- **Validação desta rodada:** Portal **251** (código não alterado), Chatbot
+  **135**, Estoque **75** e Catálogo **25** testes verdes; workflow n8n, JSON, compose YAML,
+  compilação e `git diff --check` verdes.
+- **Percentual estimado:** ~99% demonstrável / ~90% preparação para produção. Restam principalmente
+  go-live WhatsApp, transcritor real, URL/backup de mídia, Google Conversions e Playwright E2E do Portal.
 
 ---
 

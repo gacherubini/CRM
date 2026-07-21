@@ -4,7 +4,7 @@ Bot de WhatsApp para revenda de motos que conversa com o cliente, coleta os dado
 necessários, solicita a simulação internamente e transfere o atendimento para um vendedor.
 Parcelas, taxas e bancos não são enviados automaticamente ao cliente.
 
-> **Status:** 🟢 MVP demonstrável (~**99%** demo / ~**87%** preparação para produção).
+> **Status:** 🟢 MVP demonstrável (~**99%** demo / ~**90%** preparação para produção).
 > **Ambiente:** preferência **local** (Fly lab **parado** desde 2026-07-20).  
 > **Estado canônico:** [`docs/contexto-compacto.md`](docs/contexto-compacto.md) · planos
 > [`docs/plans/README.md`](docs/plans/README.md) · go-live WA [`docs/go-live-chatbot.md`](docs/go-live-chatbot.md).  
@@ -138,8 +138,8 @@ Mapa de campos e decisões: [`docs/plans/2026-07-13-plano1a-task12-bancos-reconh
 - [x] **Motor multi-banco** — Santander, Fontecred, Bradesco, Pan portal LIVE; fan-out; warm session teto 2.
 - [ ] **Go-live WhatsApp E2E** — Gemini + Evolution + n8n em ambiente estável (eixo A).
 - [x] **#3B Task 4 + event bus** — eventos/tempos, UI do funil e adapter Meta concluídos.
-- [x] **Mídia WhatsApp backend** — áudio efêmero com fallback e fotos do Estoque enviadas no WhatsApp.
-- [ ] **Residual CRM/ops** — Google; outbound E11/E12; CDN/transcritor reais; go-live e polish revenda.
+- [x] **Mídia WhatsApp backend** — áudio efêmero; foto automática WhatsApp → Estoque → Catálogo; envio da capa ao cliente.
+- [ ] **Residual CRM/ops** — Google; outbound E11/E12; transcritor real; URL HTTPS/backup do volume; go-live e polish revenda.
 
 Estado canônico: [`docs/contexto-compacto.md`](docs/contexto-compacto.md) · planos: [`docs/plans/README.md`](docs/plans/README.md) · handoff: [`docs/handoff-contexto.md`](docs/handoff-contexto.md).
 

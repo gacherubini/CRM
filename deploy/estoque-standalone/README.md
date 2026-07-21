@@ -48,7 +48,7 @@ curl -s -X POST http://localhost:8100/v1/veiculos/<id>/publicar -H "Authorizatio
 
 Também estão disponíveis:
 
-- `PUT /v1/veiculos/{id}/fotos` para fotos ordenadas, com capa, MIME e tamanho;
+- `PUT /v1/veiculos/{id}/fotos` para metadados externos e `POST /fotos/upload` para bytes;
 - `POST /v1/importacoes/csv/preview` para validar um CSV sem gravar;
 - `POST /v1/importacoes/csv` para importar e atualizar por `codigo_interno`;
 - `GET /v1/veiculos.csv` para exportar;
@@ -59,15 +59,29 @@ O conteúdo é enviado como `text/csv` no corpo da requisição.
 
 ### Fotos para WhatsApp
 
-Fotos ficam em object storage/CDN; o Estoque persiste somente URL pública e
-metadados, nunca base64 ou paths locais. Configure, por exemplo:
+No MVP, fotos ficam em volume persistente e são servidas pela API pública; o
+banco persiste somente URL e metadados, nunca base64 ou path local. Configure:
 
 ```env
-ESTOQUE_MEDIA_PUBLIC_BASE_URL=https://media.seudominio.com/veiculos
+ESTOQUE_MEDIA_STORAGE_DIR=/data/media
+ESTOQUE_MEDIA_PUBLIC_BASE_URL=https://estoque.seudominio.com/public/v1/media
 ESTOQUE_MEDIA_MAX_FOTOS=20
 ESTOQUE_MEDIA_MAX_BYTES=10485760
-ESTOQUE_MEDIA_ALLOWED_HOSTS=media.seudominio.com
+ESTOQUE_MEDIA_ALLOWED_HOSTS=estoque.seudominio.com
 ```
+
+Upload automático usado pelo WhatsApp:
+
+```bash
+curl -X POST 'http://localhost:8100/v1/veiculos/ID/fotos/upload?publicar=true' \
+  -H 'Authorization: Bearer TOKEN' \
+  -H 'Content-Type: image/jpeg' \
+  -H 'Idempotency-Key: wa-foto:ID-MENSAGEM' \
+  --data-binary '@foto.jpg'
+```
+
+O compose monta `estoque_media:/data/media`. A URL pública deve apontar para o
+mesmo Estoque por HTTPS; o Catálogo consome `fotos` automaticamente.
 
 O contrato recomendado aceita URL HTTPS pública ou `storage_key` relativa à base:
 
@@ -85,7 +99,8 @@ O contrato recomendado aceita URL HTTPS pública ou `storage_key` relativa à ba
 }
 ```
 
-Tipos aceitos: JPEG, PNG e WebP. Exatamente uma foto deve ser capa. URLs com
+Tipos aceitos: JPEG, PNG e WebP. Exatamente uma foto deve ser capa. Uploads
+conferem a assinatura do arquivo e têm escrita atômica/idempotente. URLs com
 base64, host local/privado, credenciais, fragmento ou query são recusadas. A forma
 legada `{ "urls": ["https://..."] }` continua disponível para integração existente.
 As respostas mantêm `foto_url`/`fotos` e acrescentam `midia_principal`/`midias`.

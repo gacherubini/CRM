@@ -21,8 +21,9 @@ Campos e decisões por banco:
 **Eixo C (2026-07-21 rev.3):** [conversões / funil / insights](plans/2026-07-21-plano-conversao-atribuicao-insights.md)
 — **A/B/E/D/H/C/F concluídas**, incluindo a UI `/app/funil`; resta **G** (Google Conversions).
 TikTok API e API de spend seguem parked.
-**Eixo E (2026-07-21):** áudio recebido e envio de foto do Estoque no WhatsApp têm backend/workflow
-concluídos. Produção ainda exige configurar um transcritor HTTP e object storage/CDN reais.
+**Eixo E (2026-07-21):** áudio recebido, envio de foto do Estoque no WhatsApp e cadastro automático
+de fotos WhatsApp → Estoque → Catálogo têm backend/workflow concluídos. O MVP usa volume
+persistente; produção exige URL HTTPS/backup do volume e homologar o transcritor HTTP.
 
 ## Fonte da verdade (por tema)
 
@@ -45,13 +46,14 @@ Não há uma única “próxima task” universal — depende do objetivo:
 | **B · Multi-banco** | Estabilizar sim com celular + prints; alinhar âncoras se falhar ao vivo | Mais cotações reais estáveis | handoff topo + lições Playwright |
 | **C · CRM dono** | Google Conversions (G) | Conversões outbound Google | A/B/E/D/H/C/F feitas; spend API fora |
 | **D · Escala Motor** | Smoke live sessão quente + teto 2; object storage se multi-volume | Estabilidade multi-banco / IP | B+D + warm-batch2 |
-| **E · Dia a dia loja** | Homologar transcritor e CDN/bucket; depois go-live real | Ativar áudio e foto já implementados | `#6` + `fotos-veiculos-whatsapp.md` |
+| **E · Dia a dia loja** | Configurar URL HTTPS/backup do volume e homologar transcritor; depois go-live real | Ativar áudio e foto já implementados | `#6` + `fotos-veiculos-whatsapp.md` |
 | **F · Marketing** | Completar landing se o dono entregar HTML | Site/hero polish | `site/` |
 
 **Bloqueios conhecidos:**
 - Landing Tailwind nova: HTML do dono ainda incompleto.
 - Áudio real: falta URL/token do transcritor HTTP homologado; sem isso há fallback para texto.
-- Fotos: falta escolher/configurar bucket/CDN público; o banco já aceita URL estável ou `storage_key`.
+- Fotos: fluxo automático pronto; falta somente apontar `ESTOQUE_MEDIA_PUBLIC_BASE_URL` para o
+  Estoque por HTTPS e incluir o volume persistente no backup operacional.
 - E11/E12 outbound: só com eixo **A** estável + opt-out.
 - Não reabrir Fontecred/Santander sem evidência nova.
 - Fly lab **intencionalmente parado** — não subir machines sem pedido explícito.
@@ -94,14 +96,14 @@ Apps Fly (referência, **não ligar** sem pedido): `motor2037`, `estoque2037`, `
 | Produto | Pasta / porta | Feito (essencial) | Aberto |
 |---|---|---|---|
 | Motor #1A | `motor-simulacao/` `:8000` | async, auth, fan-out, workers on-demand, **Santander/Fontecred/Bradesco/Pan portal LIVE**, warm session teto 2, prints blob JPEG, migrations head **0013** | `testar-login` real; T10 revenda; object storage multi-volume |
-| Chatbot #2A | `chatbot-api/` `:8001` | leads, handoff, por-placa, E3, E5, áudio efêmero/fallback, foto do estoque via WhatsApp, first/last UTM, sim privada + handoff; webhook endurecido | go-live; transcritor HTTP real; retenção/expurgo administrativo (sem autosserviço) |
-| Estoque #4A | `estoque-api/` `:8100` | CRUD, placa, por-placa, admin, galeria com capa/metadados e URL/storage_key segura | bucket/CDN real; E2E outbox; restore |
+| Chatbot #2A | `chatbot-api/` `:8001` | leads, handoff, por-placa, E3, E5, áudio efêmero/fallback, foto automática WhatsApp → Estoque → Catálogo, envio da capa via WhatsApp, first/last UTM, sim privada + handoff; webhook endurecido | go-live; transcritor HTTP real; retenção/expurgo administrativo (sem autosserviço) |
+| Estoque #4A | `estoque-api/` `:8100` | CRUD, placa, por-placa, admin, galeria/capa, upload binário validado, volume persistente e rota pública segura | URL HTTPS/backup do volume; E2E outbox; restore |
 | Portal | `portal-gestao/` `:9000` | CRM, sim multi-banco, 9A, CAPI retry, gastos/ROI/resultados; funil completo backend+UI; event bus Meta; retry HTTP seguro | Google; E2E Playwright |
 | Catálogo #5A | `catalogo-publico/` `:8200` | vitrine, CTA, Pixel PageView/Lead/ViewContent | SEO/tema; domínio (E18) |
 | Site | `site/` | landing + hero poster | polish visual residual |
 
-**Estimativa:** ~**99%** MVP multi-banco + CRM demonstrável · ~**87%** preparação para produção
-(restam go-live WA, transcritor/CDN reais, Google e polish ops). Percentuais são estimativas de escopo,
+**Estimativa:** ~**99%** MVP multi-banco + CRM demonstrável · ~**90%** preparação para produção
+(restam go-live WA, transcritor real, URL HTTPS/backup do volume, Google e polish ops). Percentuais são estimativas de escopo,
 não cobertura de testes.
 
 Baseline de testes: rodar `pytest -q` no produto; não confiar em contagens antigas de handoff.
@@ -119,7 +121,7 @@ Baseline de testes: rodar `pytest -q` no produto; não confiar em contagens anti
 ```bash
 cd motor-simulacao && python -m pytest tests/test_santander_driver.py tests/test_fontecred_driver.py -q
 cd ../portal-gestao && python -m pytest tests/test_campanhas.py tests/test_roi.py -q
-cd ../chatbot-api && python -m pytest tests/test_audio.py tests/test_inventory.py -q
+cd ../chatbot-api && python -m pytest tests/test_audio.py tests/test_inventory.py tests/test_vehicle_photo.py -q
 cd ../estoque-api && python -m pytest tests/test_rbac_fotos_auditoria.py -q
 python ../n8n/validate_workflow.py
 # migrations: motor head 0013 · portal 0008 funil_eventos · chatbot 0006 attribution · estoque 0006 mídias

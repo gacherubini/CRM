@@ -16,11 +16,13 @@ from sqlalchemy.orm import Session
 
 from app.inventory import InventoryWriteClient
 from app.models_db import NumeroAutorizado
+from app.vehicle_photo import VehiclePhotoProcessor
 
 # Alinhado ao Estoque: Mercosul ABC1D23 ou antigo ABC1234.
 _PLACA_RE = re.compile(r"^[A-Z]{3}[0-9][0-9A-Z][0-9]{2}$")
 _PAPEIS = frozenset({"dono", "vendedor"})
 _TIPOS = frozenset({"moto", "carro"})
+_PLACA_NA_LEGENDA_RE = re.compile(r"\b([A-Z]{3})[-\s]?([0-9][A-Z0-9][0-9]{2})\b", re.I)
 
 
 def normalizar_telefone(valor: str | None) -> str:
@@ -219,6 +221,8 @@ def _validar_campos_veiculo(dados: dict[str, Any]) -> dict[str, Any]:
         "preco": preco,
         "km": km,
         "placa": placa,
+        # Cadastro operacional pelo WhatsApp deve chegar até a vitrine.
+        "publicado": True,
     }
     for opcional in ("versao", "cor", "codigo_interno", "foto_url"):
         val = dados.get(opcional)
@@ -260,7 +264,7 @@ def criar_veiculo_autorizado(
     resumo = _resumo_veiculo(criado)
     return {
         "ok": True,
-        "mensagem": f"Veículo cadastrado: {resumo}",
+        "mensagem": f"Veículo cadastrado e publicado no catálogo: {resumo}",
         "veiculo": {
             "id": criado.get("id"),
             "tipo": criado.get("tipo"),
@@ -276,3 +280,34 @@ def criar_veiculo_autorizado(
         },
         "solicitante": tel,
     }
+
+
+def anexar_foto_whatsapp(
+    db: Session,
+    loja_id: str,
+    instancia: str,
+    telefone_solicitante: str,
+    provider_message_id: str,
+    legenda: str | None,
+    mime_type: str | None,
+    processor: VehiclePhotoProcessor,
+) -> dict:
+    """Autoriza cedo e vincula imagem pela placa explícita na legenda."""
+    if not esta_autorizado(db, loja_id, telefone_solicitante):
+        return {
+            "ok": False,
+            "mensagem": "Somente números autorizados da equipe podem adicionar fotos ao estoque.",
+        }
+    encontrada = _PLACA_NA_LEGENDA_RE.search(str(legenda or "").upper())
+    if not encontrada:
+        return {
+            "ok": False,
+            "mensagem": "Envie a foto novamente colocando a placa do veículo na legenda, por exemplo: ABC1D23.",
+        }
+    placa = validar_placa("".join(encontrada.groups()))
+    return processor.processar(
+        instancia,
+        provider_message_id,
+        placa,
+        mime_type,
+    )

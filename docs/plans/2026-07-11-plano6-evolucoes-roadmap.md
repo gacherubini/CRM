@@ -8,8 +8,9 @@
 > futuras — cada item é um esboço de abordagem, não uma sequência de tarefas TDD. Quando um item
 > for priorizado, ele vira um plano completo próprio (via a skill de escrita de planos).
 >
-> **Status 2026-07-21:** **E1 áudio backend/workflow**, **E3**, **E5**, **E8** (MVP ROI) e **E10** entregues.
-> **E6 mídia/WhatsApp parcial:** galeria segura e envio direto prontos; upload binário e página de detalhe seguem abertos.
+> **Status 2026-07-21:** **E1 áudio backend/workflow**, **E3**, **E5**, **E6** (MVP), **E8** (MVP ROI) e **E10** entregues.
+> **E6 mídia/WhatsApp MVP:** upload binário automático, volume persistente, galeria, detalhe do
+> Catálogo e envio direto prontos. Object storage e upload pelo Portal são upgrades opcionais.
 > Ativos: residual operacional de **E1/E6**, **E11–E12**, **E13–E18** (esboço).
 > **Fora do core:** **E9** redes. **Adiados:** **E2**, **E4**, **E7**.  
 > Backlog C1–C12: confirmação **encerrada** (aprovados→E13–E18; rejeitados no fim).
@@ -189,8 +190,8 @@ os clientes da suíte.
   banco como fonte de verdade.
 - **Placa** no desenho desde já (Estoque normaliza e tem `por-placa`); `Idempotency-Key` p/ não duplicar
   em reenvio.
-- **Foto:** Fase 1 texto (+URL se houver); Fase 2 foto real via WhatsApp → upload/storage (depende de
-  **E6**) → `foto_url`.
+- **Foto:** foto real via WhatsApp → validação do remetente/placa → upload no Estoque → galeria
+  publicada no Catálogo (**E6 MVP concluído**).
 - Resposta no WhatsApp: **resumo do veículo criado/atualizado** ou **erro legível** ("faltou o valor",
   "placa inválida", "número não autorizado").
 
@@ -217,13 +218,14 @@ os clientes da suíte.
 
 ## E6 — Upload real de fotos + página de detalhe do veículo
 
-> **Status parcial 2026-07-21:** Estoque já possui galeria ordenada, capa única, MIME/tamanho,
-> URL pública ou `storage_key`, validação de host e migration `0006`. O Chatbot resolve a mídia por
-> loja+ID e o n8n envia a foto no próprio WhatsApp pela Evolution, sem URL escolhida pelo modelo.
-> Permanecem abertos o upload do binário para um provedor escolhido e a página de detalhe da vitrine.
+> **Status MVP concluído 2026-07-21:** o Chatbot baixa a foto da Evolution somente após validar
+> loja+número+placa; o Estoque valida o binário, grava em volume persistente, acrescenta à galeria
+> de forma idempotente e serve a imagem ao detalhe do Catálogo. O n8n nunca recebe base64, e o
+> caminho Estoque → WhatsApp usa URL resolvida pelo backend. Permanecem opcionais o upload pelo
+> Portal e um adapter S3/R2/MinIO para escala horizontal.
 
-**O que é:** hoje `foto_url` é um link manual. Evoluir para **upload** de fotos (portal e/ou
-WhatsApp) e uma página de detalhe na vitrine (`/l/{loja_id}/v/{id}`) com galeria.
+**O que é:** upload de fotos pelo WhatsApp e página de detalhe na vitrine
+(`/l/{loja_id}/v/{id}`) com galeria, entregues no MVP.
 
 **Abordagem:**
 - Armazenamento de objetos (S3/MinIO/Cloudflare R2) ou volume; guardar a URL em `foto_url`
@@ -813,7 +815,7 @@ continua resolvendo o catálogo correto.
 | 1 | Go-live WhatsApp E2E | Ops (`docs/go-live-chatbot.md`) — base para E11 |
 | — | #3B Task 4–5 (funil + campanhas metadados) | **Feito** |
 | — | **E1** áudio backend/workflow | **Feito**; configurar/homologar provider real |
-| — | **E6** galeria + envio de foto no WhatsApp | **Feito parcial**; upload binário/detalhe abertos |
+| — | **E6** foto automática WhatsApp → Estoque → Catálogo + envio ao cliente | **Feito (MVP)**; object storage/Portal opcionais |
 | — | **E8** atribuição / ROI | **Feito (MVP)** |
 | 6 | **E13** notificação interna lead/handoff | **Aprovado** (esboço); priorizar cedo pós go-live |
 | 7 | **E14** reserva / status veículo | **Aprovado** (esboço); Estoque + Catálogo |

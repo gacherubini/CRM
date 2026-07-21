@@ -30,7 +30,7 @@ Cada plano `*A`/`*B` tem bloco **Status** no topo: leia antes de reimplementar.
 | 6 | [Plano #3B](2026-07-11-plano3b-dashboard-dono-vendas-metas.md) | Vendas/metas/dono | Vendas+metas+CSV+**Task 5 campanhas**; **Task 4 funil DONE** |
 | 6.1 | [Tráfego pago CRM](2026-07-20-plano-trafego-pago-crm-campanhas-roi.md) | Campanhas + atribuição + ROI | **DONE MVP** (`8e7ec5f`) — E8 + #3B T5; CAPI/CSV fechados no plano 6.2 |
 | 6.2 | [Conversões / funil / insights](2026-07-21-plano-conversao-atribuicao-insights.md) | CAPI, gastos, resultados dono, funil, bus, Google | **ATIVO rev.3** — A/B/E/D/H/C/F feitos; residual G |
-| 6+ | [Plano #6](2026-07-11-plano6-evolucoes-roadmap.md) | Roadmap add-ons | E1 áudio e E6 mídia/WhatsApp com backend feito; configuração externa residual; E3/E5/E8/E10 feitos |
+| 6+ | [Plano #6](2026-07-11-plano6-evolucoes-roadmap.md) | Roadmap add-ons | E1 áudio backend feito; E6 automático WhatsApp → Estoque → Catálogo MVP feito; E3/E5/E8/E10 feitos |
 | ops | [Plano #7 deploy Fly](2026-07-13-plano7-deploy-fly-io-design.md) | Lab Fly.io | **DONE (lab subiu)** — machines **paradas** (uso local 2026-07-20); ops = `deploy/fly/*.sh` |
 
 Planos #1A e #4A podem avançar em paralelo após #0. #2A depende da fatia Lite do #4A.

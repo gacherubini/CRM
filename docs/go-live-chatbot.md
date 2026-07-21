@@ -18,6 +18,7 @@
 - **E3 auto-pausa:** `from_me` do atendente → `bot_ativo=false`; saída do bot com
   `origem_bot=true` + mesmo `provider_message_id` não pausa. ✅
 - **E5** cadastro de veículo por WA (números autorizados). ✅
+- **E6** foto automática WhatsApp → Estoque → Catálogo, com placa na legenda. ✅
 - Motor: **Santander e Fontecred reais** (`real: true`); mock só para provedores sem driver real.
   Ver tabela de campos em `docs/plans/2026-07-13-plano1a-task12-bancos-reconhecimento.md`.
 
@@ -30,7 +31,7 @@
 | Evolution | `evolution2037` | `https://evolution2037.fly.dev/manager` |
 | Portal | `portal2037` | `https://portal2037.fly.dev` |
 | Motor | `motor2037` | simulações reais (Santander/Fontecred) |
-| Estoque | `estoque2037` | fonte de verdade dos veículos |
+| Estoque | `estoque2037` | `https://estoque2037.fly.dev` para mídia; Flycast para APIs internas |
 
 Subir a suíte (se estiver parada):
 
@@ -39,6 +40,16 @@ bash deploy/fly/up-all.sh
 ```
 
 Segredos só em `deploy/fly/.env.production.local` (ignorado). Nunca commitar tokens.
+
+Antes do primeiro deploy com fotos, crie uma vez o volume da app Estoque; não recrie
+nem apague em deploys seguintes:
+
+```bash
+fly volumes create estoque_media --app estoque2037 --region gru --size 1
+```
+
+O `estoque-api/fly.toml` já monta esse volume em `/data`, publica somente a URL HTTPS
+`/public/v1/media` e restringe as URLs persistidas ao host `estoque2037.fly.dev`.
 
 **Local (opcional):** `deploy/chatbot-standalone/docker-compose.yml` ainda existe para dev isolado;
 go-live da loja no lab = Fly + n8n2037.
@@ -61,8 +72,14 @@ go-live da loja no lab = Fly + n8n2037.
    `CHATBOT_WEBHOOK_RATE_LIMIT_*` somente se o volume real exigir; nunca use rate limit zero em
    produção.
 5. Áudio é baixado pela Chatbot API via Evolution, nunca pelo modelo. Configure
-   `CHATBOT_AUDIO_EVOLUTION_URL` + `CHATBOT_AUDIO_EVOLUTION_API_KEY`; mantenha o provider `none`
-   até homologar um endpoint HTTP de transcrição. O binário é temporário e apagado após a chamada.
+   `CHATBOT_AUDIO_EVOLUTION_API_KEY` como secret; a URL Flycast já está no `fly.toml`. Mantenha o
+   provider `none` até homologar um endpoint HTTP de transcrição. O binário é temporário e apagado
+   após a chamada.
+6. Foto de estoque também é baixada server-side. No lab, `CHATBOT_IMAGE_EVOLUTION_URL` já aponta
+   para a Evolution via Flycast e a chave reutiliza o secret de áudio; o telefone da equipe é
+   validado antes do download. O Estoque precisa de
+   `ESTOQUE_MEDIA_PUBLIC_BASE_URL=https://<domínio>/public/v1/media`, volume persistente montado em
+   `ESTOQUE_MEDIA_STORAGE_DIR` e backup operacional desse volume.
 
 ## 3. Migrations Chatbot
 
@@ -99,7 +116,8 @@ fly ssh console -a chatbot2037 -C "cd /srv && alembic upgrade head"
 | `registrar_lead1` | `POST /v1/leads` | telefone + interesse (+ nome opcional) |
 | `registrar_consentimento1` | `POST /v1/consentimentos` | opcional — não bloqueia |
 | `solicitar_handoff1` | `PATCH /v1/conversas/{tel}/estado` | `bot_ativo: false` |
-| `cadastrar_veiculo1` | `POST /v1/operacao/veiculos` | E5: números autorizados |
+| `cadastrar_veiculo1` | `POST /v1/operacao/veiculos` | E5: números autorizados; cria publicado |
+| `Salvar foto no estoque1` | `POST /webhook/operacao/veiculos/foto` | E6: metadados da foto; binário fica server-side |
 
 Chatbot precisa de `ESTOQUE_API_URL` + `ESTOQUE_API_TOKEN` (e Motor, se a simulação for real)
 nos secrets do Fly. Sem Estoque, `por-placa` e cadastro E5 falham ou esvaziam.
@@ -125,7 +143,8 @@ python -m app.cli autorizar-numero --slug <loja> --telefone 5511... --papel dono
 ## 6. Portal e catálogo (junto com o go-live)
 
 - Portal com `CHATBOT_API_TOKEN`, `ESTOQUE_API_TOKEN`, `MOTOR_URL` + `MOTOR_TOKEN`.
-- Publicar veículos no catálogo se a demo incluir vitrine (`Publicar no catálogo`).
+- Veículos cadastrados pelo WhatsApp já entram publicados; confirme que a URL pública de mídia
+  aponta para o Estoque e que o Catálogo consegue acessá-la.
 - Senha do dono real (não deixar default de lab se for uso externo).
 
 ## 7. Decisões de produto ANTES de ir ao ar
@@ -146,6 +165,10 @@ python -m app.cli autorizar-numero --slug <loja> --telefone 5511... --papel dono
    `bot_ativo=false`; conferir o resultado somente no Portal/Registros.
 4. Handoff E3: 1 msg pelo celular do lojista → `bot_ativo=false`. Mensagem do próprio bot não pausa.
 5. Portal: conversa em `/app/conversas`, handoff refletido.
+6. Equipe autorizada: enviar os dados do veículo por texto; confirmar que foi criado como
+   `publicado=true`. Depois enviar JPEG/PNG/WebP com a placa na legenda; conferir a confirmação no
+   WhatsApp e a foto na galeria do Catálogo. Reenviar a mesma mensagem/evento e confirmar que não
+   duplica. Repetir com número não autorizado e confirmar que nada foi baixado ou gravado.
 
 ## 9. Go-live
 

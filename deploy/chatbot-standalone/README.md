@@ -108,7 +108,8 @@ homologado antes de ativar, pois o template versionado não inclui nenhum segred
 ## E5 — Cadastro de veículo via WhatsApp (Chatbot-only)
 
 Caminho canônico de estoque **sem Portal**: o dono/vendedor manda os dados no WhatsApp;
-o n8n extrai os campos e chama a Chatbot API, que grava no **Estoque** (HTTP privado).
+o n8n extrai os campos e chama a Chatbot API, que grava no **Estoque** (HTTP privado)
+e já publica o veículo para aparecer no Catálogo.
 
 ### Env vars (chatbot-api)
 
@@ -157,11 +158,11 @@ Content-Type: application/json
 ```json
 {
   "ok": true,
-  "mensagem": "Veículo cadastrado: Honda CG 160 2023 — R$ 16.000,00 — placa ABC1D23",
+  "mensagem": "Veículo cadastrado e publicado no catálogo: Honda CG 160 2023 — R$ 16.000,00 — placa ABC1D23",
   "veiculo": {
     "id": "...", "tipo": "moto", "marca": "Honda", "modelo": "CG 160",
     "ano_modelo": 2023, "preco": 16000.0, "km": 12000, "placa": "ABC1D23",
-    "status": "disponivel", "publicado": false, "foto_url": null
+    "status": "disponivel", "publicado": true, "foto_url": null
   },
   "solicitante": "5511999999999"
 }
@@ -172,12 +173,24 @@ Content-Type: application/json
 - `422` `{"detail":"faltou valor"}` / `"placa inválida ..."` / `"faltou marca"`
 - `503` escrita no Estoque não configurada (`ESTOQUE_API_URL`/`TOKEN`)
 
-As fotos são cadastradas no Estoque por `PUT /v1/veiculos/{id}/fotos` e ficam em
-object storage/CDN. Na consulta, o Chatbot projeta somente metadados seguros e o
-workflow usa o ID do veículo para resolver a capa confiável antes de chamar
-`message/sendMedia` na Evolution; o modelo não pode fornecer uma URL arbitrária.
-Veículos sem foto continuam no fluxo normal em texto. A extração LLM dos campos
-de cadastro fica no n8n; a API só recebe JSON estruturado.
+### 3. Enviar fotos pelo WhatsApp
+
+Depois do cadastro em texto, o vendedor envia cada foto com a placa na legenda
+(`ABC1D23`). O workflow valida o telefone, baixa a imagem server-side da Evolution,
+faz upload binário no Estoque e confirma quando Estoque+Catálogo estiverem atualizados.
+O volume `estoque_media` preserva os arquivos; configure:
+
+```env
+ESTOQUE_MEDIA_PUBLIC_BASE_URL=https://estoque.seudominio.com/public/v1/media
+ESTOQUE_MEDIA_ALLOWED_HOSTS=estoque.seudominio.com
+```
+
+Essa URL precisa ser HTTPS e acessível pelo navegador e pela Evolution. O n8n/LLM
+nunca recebe base64 nem escolhe path/URL. A API aceita somente JPEG/PNG/WebP, até
+10 MiB, e reentrega da mesma mensagem não duplica a foto.
+
+Quando o cliente pedir uma imagem, o fluxo inverso resolve a capa pelo ID confiável
+e chama `message/sendMedia` na Evolution, sem obrigar o cliente a abrir o site.
 
 ## Edições
 

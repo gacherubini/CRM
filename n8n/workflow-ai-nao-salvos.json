@@ -25,7 +25,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// E3 auto-pausa: encaminhar fromMe com conteudo (atendente no app).\n// Audio segue para transcricao server-side; n8n nao baixa nem guarda a midia.\nconst root = $input.first().json;\nconst b = root.body || root || {};\nconst data = b.data || {};\nconst key = data.key || {};\nconst event = String(b.event || root.event || '').toLowerCase();\nif (event && (event.includes('messages.update') || event.includes('message.ack') || event.includes('reaction'))) return [];\nconst jid = String(key.remoteJid || '').trim();\nconst jidAlt = String(key.remoteJidAlt || '').trim();\nconst instance = String(b.instance || '__INSTANCE__');\nconst msg = data.message || {};\nif (msg.reactionMessage) return [];\nconst audio = msg.audioMessage || null;\nconst ehAudio = Boolean(audio);\nconst texto = msg.conversation || msg.extendedTextMessage?.text || '';\nconst privado = jid.endsWith('@s.whatsapp.net') || jid.endsWith('@lid');\nif (!privado || !jid || (!texto && !ehAudio)) return [];\nconst jidTelefone = jidAlt.endsWith('@s.whatsapp.net') ? jidAlt : jid;\nconst telefone = jidTelefone.endsWith('@lid') ? jidTelefone : jidTelefone.split('@')[0];\nconst destino = jid.endsWith('@lid') ? jid : jid.split('@')[0];\nreturn [{ json: {\n  instance, remoteJid: jid, remoteJidAlt: jidAlt, telefone, destino, texto, ehAudio,\n  audioMimeType: ehAudio ? String(audio.mimetype || '') : null,\n  audioDurationSeconds: ehAudio ? Number(audio.seconds || 0) : null,\n  pushName: data.pushName || '', providerMessageId: String(key.id || ''),\n  fromMe: Boolean(key.fromMe)\n} }];"
+        "jsCode": "// E3 auto-pausa: encaminhar fromMe com conteudo (atendente no app).\n// Audio e imagem seguem server-side; n8n nunca baixa nem guarda o binario.\nconst root = $input.first().json;\nconst b = root.body || root || {};\nconst data = b.data || {};\nconst key = data.key || {};\nconst event = String(b.event || root.event || '').toLowerCase();\nif (event && (event.includes('messages.update') || event.includes('message.ack') || event.includes('reaction'))) return [];\nconst jid = String(key.remoteJid || '').trim();\nconst jidAlt = String(key.remoteJidAlt || '').trim();\nconst instance = String(b.instance || '__INSTANCE__');\nconst msg = data.message || {};\nif (msg.reactionMessage) return [];\nconst fromMe = Boolean(key.fromMe);\nconst audio = msg.audioMessage || null;\nconst imagem = msg.imageMessage || null;\nconst ehAudio = Boolean(audio);\nconst ehImagem = Boolean(imagem) && !fromMe;\nconst texto = msg.conversation || msg.extendedTextMessage?.text || (ehImagem ? String(imagem.caption || '') : '');\nconst privado = jid.endsWith('@s.whatsapp.net') || jid.endsWith('@lid');\nif (!privado || !jid || (!texto && !ehAudio && !ehImagem)) return [];\nconst jidTelefone = jidAlt.endsWith('@s.whatsapp.net') ? jidAlt : jid;\nconst telefone = jidTelefone.endsWith('@lid') ? jidTelefone : jidTelefone.split('@')[0];\nconst destino = jid.endsWith('@lid') ? jid : jid.split('@')[0];\nreturn [{ json: {\n  instance, remoteJid: jid, remoteJidAlt: jidAlt, telefone, destino, texto, ehAudio, ehImagem,\n  audioMimeType: ehAudio ? String(audio.mimetype || '') : null,\n  audioDurationSeconds: ehAudio ? Number(audio.seconds || 0) : null,\n  imageMimeType: ehImagem ? String(imagem.mimetype || '') : null,\n  imageCaption: ehImagem ? String(imagem.caption || '') : null,\n  pushName: data.pushName || '', providerMessageId: String(key.id || ''),\n  fromMe\n} }];"
       },
       "id": "de48219d-1f51-4046-97e1-523608777502",
       "name": "Extrair1",
@@ -34,6 +34,96 @@
       "position": [
         1184,
         416
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "8b0e2533-3f8c-4cba-93c8-4b388fd33061",
+              "leftValue": "={{ $json.ehImagem }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "96162269-488e-4f2c-99f9-63001001c577",
+      "name": "E imagem de estoque1",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1392,
+        224
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://chatbot-api:8000/webhook/operacao/veiculos/foto",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Webhook-Token",
+              "value": "__CHATBOT_WEBHOOK_TOKEN__"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { instance: $json.instance, telefone_solicitante: $json.telefone, provider_message_id: $json.providerMessageId, legenda: $json.imageCaption || null, mime_type: $json.imageMimeType || null } }}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "ee44c192-1455-40f6-9045-a3e55b0843b0",
+      "name": "Salvar foto no estoque1",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1600,
+        128
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://evolution:8080/message/sendText/__INSTANCE__",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "__EVOLUTION_KEY__"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { number: $('Extrair1').first().json.destino, text: String($json.mensagem || 'Não consegui processar a foto agora.') } }}",
+        "options": {}
+      },
+      "id": "6b5a9d56-f9c2-4e61-9cb6-65462d37b31e",
+      "name": "Responder cadastro de foto1",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1808,
+        128
       ]
     },
     {
@@ -457,7 +547,36 @@
       "main": [
         [
           {
+            "node": "E imagem de estoque1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "E imagem de estoque1": {
+      "main": [
+        [
+          {
+            "node": "Salvar foto no estoque1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
             "node": "E audio1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Salvar foto no estoque1": {
+      "main": [
+        [
+          {
+            "node": "Responder cadastro de foto1",
             "type": "main",
             "index": 0
           }

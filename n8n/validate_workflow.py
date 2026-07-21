@@ -12,6 +12,7 @@ WEBHOOK_URL = "http://chatbot-api:8000/webhook/mensagem"
 WEBHOOK_HEADER = "X-Webhook-Token"
 WEBHOOK_TOKEN_PLACEHOLDER = "__CHATBOT_WEBHOOK_TOKEN__"
 AUDIO_URL = "http://chatbot-api:8000/webhook/audio/transcrever"
+IMAGE_INGEST_URL = "http://chatbot-api:8000/webhook/operacao/veiculos/foto"
 
 
 def main() -> None:
@@ -127,8 +128,38 @@ def main() -> None:
     assert "audioMessage" in extract_code and "ehAudio" in extract_code, (
         "extração não reconhece áudio recebido"
     )
+    assert "imageMessage" in extract_code and "ehImagem" in extract_code, (
+        "extração não reconhece foto recebida"
+    )
+    assert "Boolean(imagem) && !fromMe" in extract_code, (
+        "eco de imagem enviada pela própria loja entraria como upload"
+    )
     connections = data.get("connections", {})
-    assert connections.get("Extrair1", {}).get("main", [[]])[0][0].get("node") == "E audio1"
+    assert (
+        connections.get("Extrair1", {}).get("main", [[]])[0][0].get("node")
+        == "E imagem de estoque1"
+    )
+    imagem_ramos = connections.get("E imagem de estoque1", {}).get("main", [])
+    assert imagem_ramos[0][0].get("node") == "Salvar foto no estoque1"
+    assert imagem_ramos[1][0].get("node") == "E audio1"
+    imagem_node = nodes_by_name.get("Salvar foto no estoque1")
+    assert imagem_node is not None, "nó de ingestão automática da foto ausente"
+    imagem_params = imagem_node.get("parameters", {})
+    assert imagem_params.get("url") == IMAGE_INGEST_URL
+    imagem_headers = {
+        header.get("name"): header.get("value")
+        for header in imagem_params.get("headerParameters", {}).get("parameters", [])
+    }
+    assert imagem_headers.get(WEBHOOK_HEADER) == WEBHOOK_TOKEN_PLACEHOLDER
+    imagem_body = imagem_params.get("jsonBody", "")
+    assert "provider_message_id" in imagem_body and "telefone_solicitante" in imagem_body
+    assert "base64" not in imagem_body and "media:" not in imagem_body, (
+        "n8n não deve transportar ou guardar o binário da foto"
+    )
+    assert (
+        connections.get("Salvar foto no estoque1", {}).get("main", [[]])[0][0].get("node")
+        == "Responder cadastro de foto1"
+    )
     assert (
         connections.get("Transcrever audio1", {}).get("main", [[]])[0][0].get("node")
         == "Aplicar transcricao1"
@@ -144,7 +175,7 @@ def main() -> None:
 
     print(
         "workflow n8n válido: webhook seguro, áudio efêmero, "
-        "resultado privado e foto tenant-scoped"
+        "foto automática no estoque e resultado privado"
     )
 
 

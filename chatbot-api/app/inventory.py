@@ -217,6 +217,17 @@ class InventoryWriteClient(Protocol):
         self, dados: dict, idempotency_key: str | None = None
     ) -> dict: ...
 
+    def obter_por_placa(self, placa: str) -> dict | None: ...
+
+    def adicionar_foto(
+        self,
+        veiculo_id: str,
+        conteudo: bytes,
+        content_type: str,
+        idempotency_key: str,
+        publicar: bool = True,
+    ) -> dict: ...
+
 
 class HttpInventoryWriteClient:
     """Cliente HTTP de escrita no Estoque privado (POST /v1/veiculos)."""
@@ -277,6 +288,60 @@ class HttpInventoryWriteClient:
             status_code=502,
             detail=detail or f"estoque retornou {r.status_code}",
         )
+
+    def obter_por_placa(self, placa: str) -> dict | None:
+        if not self.disponivel() or not placa:
+            return None
+        try:
+            r = httpx.get(
+                f"{self.base_url}/v1/veiculos/por-placa/{placa}",
+                headers={"Authorization": f"Bearer {self.token}"},
+                timeout=self.timeout,
+            )
+        except httpx.HTTPError as exc:
+            raise HTTPException(status_code=502, detail="estoque indisponível no momento") from exc
+        if r.status_code == 404:
+            return None
+        if r.status_code in (401, 403):
+            raise HTTPException(status_code=502, detail="credencial de estoque recusada")
+        try:
+            r.raise_for_status()
+        except httpx.HTTPError as exc:
+            raise HTTPException(status_code=502, detail="estoque indisponível no momento") from exc
+        return r.json()
+
+    def adicionar_foto(
+        self,
+        veiculo_id: str,
+        conteudo: bytes,
+        content_type: str,
+        idempotency_key: str,
+        publicar: bool = True,
+    ) -> dict:
+        if not self.disponivel():
+            raise HTTPException(status_code=503, detail="integração de estoque não configurada")
+        try:
+            r = httpx.post(
+                f"{self.base_url}/v1/veiculos/{veiculo_id}/fotos/upload",
+                params={"publicar": str(bool(publicar)).lower()},
+                content=conteudo,
+                headers={
+                    "Authorization": f"Bearer {self.token}",
+                    "Content-Type": content_type,
+                    "Idempotency-Key": idempotency_key,
+                },
+                timeout=max(self.timeout, 15),
+            )
+        except httpx.HTTPError as exc:
+            raise HTTPException(status_code=502, detail="estoque indisponível no momento") from exc
+        if r.status_code in (200, 201):
+            return r.json()
+        detail = _extrair_detail(r)
+        if r.status_code in (404, 409, 413, 415, 422):
+            raise HTTPException(status_code=r.status_code, detail=detail or "foto recusada pelo estoque")
+        if r.status_code in (401, 403):
+            raise HTTPException(status_code=502, detail="credencial de estoque recusada")
+        raise HTTPException(status_code=502, detail=detail or "estoque indisponível no momento")
 
 
 def _extrair_detail(r: httpx.Response) -> str | None:
