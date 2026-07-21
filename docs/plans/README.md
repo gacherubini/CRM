@@ -49,6 +49,8 @@ Detalham a Task 12 do #1A (1º driver `real: true`). Ler junto com o #1A:
 - [Decisão B+D captcha/IP](2026-07-16-fly-rpa-captcha-opcoes.md) — máx. **2** browsers + sessão quente.
 - [Warm session + batch 2](2026-07-17-plano1a-warm-session-batch2.md) — **fases 0–2 DONE**; residual keep-alive/object store.
 - [Fan-out / workers sob demanda](2026-07-14-plano1a-workers-playwright-sob-demanda.md) — **DONE** no código; teto default **2**.
+- [Drivers Playwright resilientes](2026-07-21-plano-drivers-resilientes.md) — **BACKLOG / NÃO IMPLEMENTADO**;
+  trace, sessão endurecida, locators resilientes e canários opcionais de IA/browser.
 - Bradesco / Pan portal: checklists em `_archive/` — código LIVE; lições [Pan portal](2026-07-15-playwright-licoes-pan-portal.md).
 
 ## Pacotes comerciais
