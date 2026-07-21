@@ -51,6 +51,7 @@ ESTOQUE_MEDIA_ALLOWED_HOSTS=estoque.seudominio.com
 ESTOQUE_MEDIA_MAX_FOTOS=20
 ESTOQUE_MEDIA_MAX_BYTES=10485760
 ESTOQUE_MEDIA_ORPHAN_GRACE_SECONDS=3600
+ESTOQUE_MEDIA_CLEANUP_INTERVAL_SECONDS=21600
 ```
 
 Os `docker-compose.yml` montam o volume `estoque_media` em `/data/media`. Em
@@ -104,7 +105,9 @@ python -m app.cli limpar-midias-orfas --aplicar
 
 A carência padrão de uma hora impede que uma varredura apague um upload ainda
 entre a gravação do arquivo e o commit no banco. O comando não aceita path/loja
-informado pelo cliente e nunca remove URLs externas.
+informado pelo cliente e nunca remove URLs externas. O worker da outbox executa
+essa manutenção automaticamente a cada seis horas. Se a base pública não estiver
+configurada, a rotina falha fechada e preserva todos os arquivos.
 
 ## Envio da foto ao cliente
 

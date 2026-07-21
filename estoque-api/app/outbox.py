@@ -140,13 +140,14 @@ def processar_pendentes(
     return resumo
 
 
-def poster_httpx(timeout: float = 10.0) -> Poster:
+def poster_httpx(timeout: float = 10.0, transport=None) -> Poster:
     """Poster real baseado em httpx, usado pelo worker."""
     import httpx
 
     def _poster(url: str, corpo: bytes, headers: dict) -> tuple[Optional[int], Optional[str]]:
         try:
-            resposta = httpx.post(url, content=corpo, headers=headers, timeout=timeout)
+            with httpx.Client(timeout=timeout, transport=transport) as client:
+                resposta = client.post(url, content=corpo, headers=headers)
             return resposta.status_code, None
         except httpx.HTTPError as exc:
             return None, f"{type(exc).__name__}: {exc}"

@@ -1,12 +1,14 @@
 """Dispatcher da outbox: entrega, assinatura HMAC, retry com backoff e descarte."""
+import json
 from datetime import datetime, timedelta, timezone
 
+import httpx
 import pytest
 from sqlalchemy import text
 
 from app import servico
 from app.models_db import EntregaEvento, EventoSaida
-from app.outbox import assinar, assinatura_valida, processar_pendentes
+from app.outbox import assinar, assinatura_valida, poster_httpx, processar_pendentes
 
 SEGREDO = "segredo-super-secreto-1234"
 URL = "https://exemplo.test/hook"
@@ -37,14 +39,14 @@ class FakePoster:
         return self.resultado
 
 
-def _preparar_evento(db, loja, com_destino=True):
+def _preparar_evento(db, loja, com_destino=True, url=URL):
     servico.criar_veiculo(
         db, loja["loja_id"],
         {"tipo": "moto", "marca": "Honda", "modelo": "CG 160", "ano_modelo": 2022, "preco": 15000},
         "dono",
     )
     if com_destino:
-        servico.configurar_webhook_destino(db, loja["slug"], URL, SEGREDO)
+        servico.configurar_webhook_destino(db, loja["slug"], url, SEGREDO)
     return db.query(EventoSaida).filter_by(loja_id=loja["loja_id"], tipo="vehicle.created").one()
 
 
@@ -80,6 +82,37 @@ def test_entrega_sucesso_marca_entregue_e_assina(db, loja_a):
     # X-Evento-Id é a chave de idempotência estável; X-Entrega-Id identifica a tentativa.
     assert chamada["headers"]["X-Evento-Id"] == evento.id
     assert chamada["headers"]["X-Entrega-Id"] == entrega.id
+
+
+def test_transporte_http_real_entrega_corpo_assinado(db, loja_a):
+    recebida = {}
+
+    def receptor(request: httpx.Request) -> httpx.Response:
+        recebida["corpo"] = request.content
+        recebida["headers"] = request.headers
+        return httpx.Response(204)
+
+    evento = _preparar_evento(
+        db,
+        loja_a,
+        url="https://receptor.test/eventos",
+    )
+    transporte = httpx.MockTransport(receptor)
+    resumo = processar_pendentes(
+        db,
+        poster_httpx(timeout=2, transport=transporte),
+    )
+
+    assert resumo["entregues"] == 1
+    db.refresh(evento)
+    assert evento.status == "entregue"
+    assert json.loads(recebida["corpo"]) == evento.payload
+    assert recebida["headers"]["X-Evento-Id"] == evento.id
+    assert assinatura_valida(
+        SEGREDO,
+        recebida["corpo"],
+        recebida["headers"]["X-Assinatura"],
+    )
 
 
 def test_falha_500_reagenda_com_backoff(db, loja_a):

@@ -488,6 +488,11 @@ def test_varredura_nao_remove_upload_recente_durante_carencia(
     from app import config, media
 
     monkeypatch.setattr(config, "MEDIA_STORAGE_DIR", tmp_path)
+    monkeypatch.setattr(
+        config,
+        "MEDIA_PUBLIC_BASE_URL",
+        "https://estoque.example/public/v1/media",
+    )
     monkeypatch.setattr(config, "MEDIA_ORPHAN_GRACE_SECONDS", 3600)
     chave = f"loja-segura/veiculo-seguro/{'b' * 32}.jpg"
     caminho, _ = media.salvar(chave, b"\xff\xd8\xffrecente")
@@ -496,6 +501,23 @@ def test_varredura_nao_remove_upload_recente_durante_carencia(
 
     assert resultado["orfaos"] == 1
     assert resultado["aguardando_carencia"] == 1
+    assert resultado["removidos"] == 0
+    assert caminho.exists()
+
+
+def test_varredura_falha_fechada_sem_base_publica(tmp_path, monkeypatch):
+    from app import config, media
+
+    monkeypatch.setattr(config, "MEDIA_STORAGE_DIR", tmp_path)
+    monkeypatch.setattr(config, "MEDIA_PUBLIC_BASE_URL", "")
+    chave = f"loja-segura/veiculo-seguro/{'c' * 32}.jpg"
+    caminho, _ = media.salvar(chave, b"\xff\xd8\xffpreservada")
+
+    resultado = media.limpar_orfas(set(), aplicar=True)
+
+    assert resultado["modo"] == "desativado"
+    assert resultado["arquivos"] == 1
+    assert resultado["orfaos"] == 0
     assert resultado["removidos"] == 0
     assert caminho.exists()
 

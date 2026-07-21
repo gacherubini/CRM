@@ -170,8 +170,9 @@ python -m app.cli autorizar-numero --slug <loja> --telefone 5511... --papel dono
    na primeira foto. Conferir a galeria no Catálogo. Reprocessar a mensagem de cadastro e confirmar
    o mesmo `veiculo_id`; reprocessar uma foto e confirmar que não duplica. Repetir com número não
    autorizado e confirmar que nada foi baixado ou gravado.
-7. Estoque: executar `python -m app.cli limpar-midias-orfas` e conferir que é dry-run. Usar
-   `--aplicar` somente com backup e janela operacional.
+7. Estoque: executar `python -m app.cli limpar-midias-orfas` e conferir a prévia. O worker aplica
+   automaticamente a limpeza a cada seis horas, com carência de uma hora; conferir o backup e os
+   logs antes de alterar esses limites.
 
 ## 9. Go-live
 

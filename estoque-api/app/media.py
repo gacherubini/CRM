@@ -179,6 +179,17 @@ def listar_storage_keys() -> set[str]:
 
 def limpar_orfas(referenciadas: set[str], *, aplicar: bool = False) -> dict:
     encontradas = listar_storage_keys()
+    # Sem a base pública não há como distinguir com segurança uma URL local
+    # referenciada de uma URL externa. Falha fechada para nunca apagar tudo.
+    if not config.MEDIA_PUBLIC_BASE_URL.rstrip("/"):
+        return {
+            "arquivos": len(encontradas),
+            "referenciados": 0,
+            "orfaos": 0,
+            "aguardando_carencia": 0,
+            "removidos": 0,
+            "modo": "desativado",
+        }
     orfas = encontradas - referenciadas
     elegiveis: set[str] = set()
     agora = time.time()

@@ -23,7 +23,8 @@
 - **Hardening operacional:** `POST /v1/veiculos` agora persiste idempotência por loja usando somente
   hashes; mesma chave+payload retorna o mesmo veículo e payload divergente conflita. Telefone e chave
   usados pelo n8n vêm do webhook real, não do modelo. O Estoque remove mídia local órfã ao substituir
-  galeria e oferece CLI administrativa dry-run/apply com carência de 1 h para uploads em andamento.
+  galeria, oferece CLI administrativa preview/apply e executa a limpeza segura a cada 6 h no worker,
+  com carência de 1 h e bloqueio total quando a base pública não está configurada.
 - **Áudio recebido:** o n8n reconhece `audioMessage`; a Chatbot API baixa a mídia autenticada da
   Evolution, valida MIME/tamanho/duração, transcreve por provider HTTP e remove o temporário. Sem
   provider ou em falha, responde pedindo texto e não retém o áudio.
@@ -34,7 +35,7 @@
   escala, não bloqueio do MVP. O `fly.toml` já traz host/mount; no primeiro deploy do lab ainda
   é necessário criar uma vez o volume `estoque_media`.
 - **Validação desta rodada:** Portal **251** (código não alterado), Chatbot **139**, Estoque
-  **81** e Catálogo **25** — **496 testes verdes**; migrations Chatbot/Estoque `0007` validadas em
+  **86** e Catálogo **25** — **501 testes verdes**; migrations Chatbot/Estoque `0007` validadas em
   upgrade/downgrade/upgrade; workflow n8n, JSON, compose YAML, compilação e diff verdes.
 - **Percentual estimado:** ~99% demonstrável / ~90% preparação para produção. Restam principalmente
   go-live WhatsApp, transcritor real, URL/backup de mídia, Google Conversions e Playwright E2E do Portal.

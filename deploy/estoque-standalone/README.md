@@ -68,6 +68,7 @@ ESTOQUE_MEDIA_PUBLIC_BASE_URL=https://estoque.seudominio.com/public/v1/media
 ESTOQUE_MEDIA_MAX_FOTOS=20
 ESTOQUE_MEDIA_MAX_BYTES=10485760
 ESTOQUE_MEDIA_ORPHAN_GRACE_SECONDS=3600
+ESTOQUE_MEDIA_CLEANUP_INTERVAL_SECONDS=21600
 ESTOQUE_MEDIA_ALLOWED_HOSTS=estoque.seudominio.com
 ```
 
@@ -117,7 +118,8 @@ python -m app.cli limpar-midias-orfas --aplicar
 
 A carência padrão de 3600 segundos protege uploads em andamento. Substituições
 de galeria também tentam limpar arquivos locais que ficaram órfãos; URLs externas
-nunca são apagadas.
+nunca são apagadas. O worker executa a limpeza automaticamente a cada seis horas;
+sem `ESTOQUE_MEDIA_PUBLIC_BASE_URL`, ele falha fechado e não remove arquivo algum.
 
 ## Vitrine pública (sem token, por slug)
 
@@ -155,7 +157,6 @@ O verificador do lado do receptor: `HMAC_SHA256(segredo, corpo_bruto)` deve bate
 
 ## Operação
 
-- **Backup:** `docker compose exec postgres pg_dump -U estoque estoque > backup.sql`
-- **Restore:** pare a API e aplique `psql -U estoque estoque < backup.sql` no Postgres.
+- **Backup/restore/upgrade:** siga o [RUNBOOK.md](RUNBOOK.md), que preserva banco e volume de fotos.
 - **Logs:** `docker compose logs -f estoque-api`
 - **Parar:** `docker compose down` (dados no volume `estoque_pg`)
