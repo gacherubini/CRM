@@ -4,13 +4,15 @@
 > Este arquivo: checkpoint operacional. Seções **“Checkpoint anterior”** = histórico — não
 > reexecutar. Path Windows no rodapé de seções antigas: **ignorar** (workspace = root do git).
 >
-> **Checkpoint mais recente: 2026-07-21 (fotos automáticas endurecidas + funil UI + áudio · Fly OFF).**
-> Escolher um eixo por sessão. **Não** religar Fly sem pedido explícito.
+> **Checkpoint mais recente: 2026-07-21 (backend publicado/verificado; Fly pausado pelo dono).**
+> Escolher um eixo por sessão. Todas as Machines estão paradas e os dados preservados; religar
+> ou fazer nova mudança operacional exige pedido explícito.
 
 ## Checkpoint mais recente — fotos automáticas endurecidas + funil UI + áudio (2026-07-21)
 
-> **Escopo:** Portal, Estoque, Chatbot e workflow n8n. A simulação e os drivers bancários não
-> foram alterados; Fly permaneceu OFF.
+> **Escopo:** Portal, Estoque, Chatbot e workflow n8n. O código da simulação, do Motor e dos drivers
+> bancários não foi alterado; a Machine do Motor só foi parada no shutdown geral pedido pelo dono.
+> Nenhuma mensagem ou simulação de teste foi disparada manualmente nesta rodada.
 
 - **#3B Task 4 DONE:** nova UI `/app/funil` para dono/gerente com filtro de período, coorte,
   etapas, taxas, média/mediana, `Sem base`, isolamento por loja e sincronização best-effort.
@@ -30,15 +32,29 @@
   provider ou em falha, responde pedindo texto e não retém o áudio.
 - **Segurança:** base64/path local/host privado/query de mídia rejeitados; sessão isolada por
   loja+telefone autorizado; cliente sem controle de cadastro/exclusão; simulação continua privada.
-- **Operação externa residual:** expor a rota pública do Estoque por HTTPS, incluir o volume
-  `estoque_media` no backup e homologar URL/token de transcrição. S3/R2/MinIO é evolução de
-  escala, não bloqueio do MVP. O `fly.toml` já traz host/mount; no primeiro deploy do lab ainda
-  é necessário criar uma vez o volume `estoque_media`.
+- **Fly publicado e verificado:** Chatbot e Estoque foram deployados a partir da `main`; ambos
+  estão com health passando e migrations `0007 (head)`. O Estoque usa o volume criptografado
+  `estoque_media` de 1 GB, anexado em `/data`, com URL pública HTTPS e snapshots agendados.
+  Catálogo permanece em autostop e acorda sob demanda.
+- **n8n/Evolution:** o workflow ativo `WhatsApp IA - Somente Nao Salvos`
+  (`SBAUPjrUlYa4gtgE`) foi atualizado com backup consistente do SQLite e reinício controlado.
+  Foi conferido saudável e ativo, com **25 nós** e com os ramos de áudio, cadastro e envio de fotos
+  diretamente na versão persistida. Os hosts locais do compose foram substituídos no runtime por
+  `chatbot2037.flycast` e `evolution2037.flycast`; os webhooks passaram a alcançar a rede Fly.
+  A Evolution estava saudável e a instância `loja1` respondeu `open`. Segredos e IDs existentes
+  foram preservados e não foram impressos.
+- **Shutdown solicitado:** depois da validação, Portal, Catálogo, Site, Motor, Estoque, Chatbot,
+  n8n, Evolution e Postgres foram confirmados em `stopped`. Apps, volumes, bancos, sessão WA e
+  backups permanecem intactos. Para retomar, usar o runbook de go-live; não recriar volumes nem
+  reimportar o workflow.
+- **Operação externa residual:** fazer o primeiro E2E por um número autorizado, homologar
+  URL/token de transcrição e executar um restore drill do backup de banco+volume. S3/R2/MinIO é
+  evolução de escala, não bloqueio do MVP.
 - **Validação desta rodada:** Portal **251** (código não alterado), Chatbot **139**, Estoque
   **86** e Catálogo **25** — **501 testes verdes**; migrations Chatbot/Estoque `0007` validadas em
   upgrade/downgrade/upgrade; workflow n8n, JSON, compose YAML, compilação e diff verdes.
-- **Percentual estimado:** ~99% demonstrável / ~90% preparação para produção. Restam principalmente
-  go-live WhatsApp, transcritor real, URL/backup de mídia, Google Conversions e Playwright E2E do Portal.
+- **Percentual estimado:** ~99% demonstrável / ~92% preparação para produção. Restam principalmente
+  E2E WhatsApp real, transcritor real, restore drill, Google Conversions e Playwright E2E do Portal.
 
 ---
 

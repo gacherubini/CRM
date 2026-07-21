@@ -1,6 +1,6 @@
 # Contexto compacto para continuidade
 
-Atualizado em **2026-07-21** (CRM **A/B/E/D/H/C/F DONE** · **G residual** · funil UI DONE · áudio/fotos backend DONE · Fly lab **parado** · foco **local**).
+Atualizado em **2026-07-21** (CRM **A/B/E/D/H/C/F DONE** · **G residual** · funil UI DONE · áudio/fotos backend **publicado e verificado** · Fly **pausado**).
 Leia isto primeiro; detalhe operacional recente em `docs/handoff-contexto.md` (topo).
 Planos válidos: `docs/plans/README.md`. **Ignore** `docs/plans/_archive/`.
 
@@ -24,7 +24,8 @@ TikTok API e API de spend seguem parked.
 **Eixo E (2026-07-21):** áudio recebido, envio de foto do Estoque no WhatsApp e cadastro automático
 de fotos WhatsApp → Estoque → Catálogo têm backend/workflow concluídos. Cadastro textual tem
 idempotência persistente; fotos usam sessão curta por vendedor e limpeza administrativa de órfãos.
-O MVP usa volume persistente; produção exige URL HTTPS/backup e homologar o transcritor HTTP.
+No Fly, o MVP usa volume persistente criptografado, URL HTTPS e snapshots agendados; ainda é
+necessário homologar o transcritor HTTP e executar um restore drill.
 
 ## Fonte da verdade (por tema)
 
@@ -34,7 +35,7 @@ O MVP usa volume persistente; produção exige URL HTTPS/backup e homologar o tr
 | Checkpoint / ops recente | `handoff-contexto.md` (topo) | seções “checkpoint anterior” longas |
 | Qual plano implementar | `plans/README.md` + Status no topo do plano | `_archive/`, planos DONE/SUPERSEDED |
 | Go-live WhatsApp | `go-live-chatbot.md` | compose local legado / branch `feat/*` |
-| Ops Fly lab | `deploy/fly/*.sh` + seção Fly abaixo | checkboxes do plano #7 implementação; **lab está OFF** |
+| Ops Fly lab | `deploy/fly/*.sh` + seção Fly abaixo | checkboxes do plano #7 implementação; conferir estado vivo antes de agir |
 | Lições RPA | `*playwright-licoes-*.md` | reabrir santander/fontecred-impl do zero |
 
 ## Eixos de prioridade (escolher um; não misturar na mesma PR)
@@ -43,43 +44,49 @@ Não há uma única “próxima task” universal — depende do objetivo:
 
 | Eixo | Próximo incremento | Quando escolher | Plano / doc |
 |---|---|---|---|
-| **A · Demo loja / WA** | Go-live E2E local (Evolution+n8n+chatbot) + publicar estoque | Operação ou demo com cliente real no Zap | `go-live-chatbot.md` + `deploy/*/docker-compose.yml` |
+| **A · Demo loja / WA** | E2E real por número autorizado + monitorar primeira conversa | Operação ou demo com cliente real no Zap | `go-live-chatbot.md` |
 | **B · Multi-banco** | Estabilizar sim com celular + prints; alinhar âncoras se falhar ao vivo | Mais cotações reais estáveis | handoff topo + lições Playwright |
 | **C · CRM dono** | Google Conversions (G) | Conversões outbound Google | A/B/E/D/H/C/F feitas; spend API fora |
 | **D · Escala Motor** | Smoke live sessão quente + teto 2; object storage se multi-volume | Estabilidade multi-banco / IP | B+D + warm-batch2 |
-| **E · Dia a dia loja** | Configurar URL HTTPS/backup do volume e homologar transcritor; depois go-live real | Ativar áudio e foto já implementados | `#6` + `fotos-veiculos-whatsapp.md` |
+| **E · Dia a dia loja** | Restore drill do volume/banco e homologar transcritor | Fechar operação de áudio e foto já publicada | `#6` + `fotos-veiculos-whatsapp.md` |
 | **F · Marketing** | Completar landing se o dono entregar HTML | Site/hero polish | `site/` |
 
 **Bloqueios conhecidos:**
 - Landing Tailwind nova: HTML do dono ainda incompleto.
 - Áudio real: falta URL/token do transcritor HTTP homologado; sem isso há fallback para texto.
-- Fotos: fluxo automático pronto; falta somente apontar `ESTOQUE_MEDIA_PUBLIC_BASE_URL` para o
-  Estoque por HTTPS e incluir o volume persistente no backup operacional.
+- Fotos: fluxo automático e URL HTTPS publicados; volume persistente anexado. Falta o restore drill.
 - E11/E12 outbound: só com eixo **A** estável + opt-out.
 - Não reabrir Fontecred/Santander sem evidência nova.
-- Fly lab **intencionalmente parado** — não subir machines sem pedido explícito.
+- Fly WA foi ligado, verificado e depois totalmente parado por pedido explícito em 2026-07-21.
+  Não religar nem ampliar o ambiente sem novo pedido.
 
 > **Histórico de simulações por usuário (Task 16): FEITO** — não reimplementar.  
 > **Campanhas + ROI (E8 / #3B T5): FEITO** — não reimplementar.
 
-## Ambiente de trabalho (2026-07-20)
+## Ambiente de trabalho (2026-07-21)
 
 | Onde | Estado |
 |---|---|
-| **Local** | **Preferido** — `deploy/*/docker-compose.yml` + apps Python nas pastas do monorepo |
-| **Fly.io lab** (`crm-419` / `gru`) | **OFF** — apps/volumes **existem** mas machines **paradas** (custo ~0). Scripts `deploy/fly/down-all.sh` / `up-all.sh` só se o dono pedir lab de novo |
+| **Local** | Continua disponível para desenvolvimento — `deploy/*/docker-compose.yml` + apps Python |
+| **Fly.io lab** (`crm-419` / `gru`) | **OFF** — Portal, Catálogo, Site, Motor, Estoque, Chatbot, n8n, Evolution e Postgres confirmados `stopped`; apps/volumes/dados preservados |
 
-Apps Fly (referência, **não ligar** sem pedido): `motor2037`, `estoque2037`, `chatbot2037`,
+Apps Fly (referência, **não alterar** sem pedido): `motor2037`, `estoque2037`, `chatbot2037`,
 `catalogo2037`, `portal2037`, `site2037`, `evolution2037`, `n8n2037`, Postgres `suite-pg`.
 
-## Checkpoint Fly.io (lab — histórico / reativação)
+## Checkpoint Fly.io (lab — validado e pausado em 2026-07-21)
 
 - Org/região: `crm-419` / `gru`.
 - Scripts: `bash deploy/fly/down-all.sh` · `up-all.sh` · `up-all.sh --catalogo` ·
   `apply-always-on-backends.sh` · `clean-orphan-volumes.sh --apply`.
 - Segredos: só `deploy/fly/.env.production.local` (ignorado). Nunca imprimir/versionar.
-- n8n workflow canônico no repo: `n8n/workflow-ai-nao-salvos.json` — sem bypass por telefone;
-  webhooks internos usam o placeholder `__CHATBOT_WEBHOOK_TOKEN__`.
+- Antes do shutdown, Estoque e Chatbot estavam com health passando e migrations **`0007 (head)`**.
+  Volume `estoque_media` criptografado de 1 GB permanece anexado; limpeza automática executou.
+- n8n persistiu o workflow `SBAUPjrUlYa4gtgE` ativo com **25 nós**; atualização feita com
+  `n8n/update_live_workflow.js` e backup SQLite consistente antes da troca. O canônico no repo é
+  `n8n/workflow-ai-nao-salvos.json`; o publicador troca os hosts compose pelos hosts Fly via flags.
+- Evolution estava saudável e a instância `loja1` estava **open** antes do shutdown.
+- Estado atual: todas as nove Machines da suíte estão **stopped**. Para voltar, executar
+  `bash deploy/fly/up-all.sh` por pedido do dono e conferir o go-live; não recriar/importar dados.
 
 ## Regras permanentes
 
@@ -97,14 +104,14 @@ Apps Fly (referência, **não ligar** sem pedido): `motor2037`, `estoque2037`, `
 | Produto | Pasta / porta | Feito (essencial) | Aberto |
 |---|---|---|---|
 | Motor #1A | `motor-simulacao/` `:8000` | async, auth, fan-out, workers on-demand, **Santander/Fontecred/Bradesco/Pan portal LIVE**, warm session teto 2, prints blob JPEG, migrations head **0013** | `testar-login` real; T10 revenda; object storage multi-volume |
-| Chatbot #2A | `chatbot-api/` `:8001` | leads, handoff, por-placa, E3, E5, áudio efêmero/fallback, foto automática com sessão por vendedor, envio da capa via WhatsApp, first/last UTM, sim privada + handoff; webhook endurecido | go-live; transcritor HTTP real; retenção/expurgo administrativo (sem autosserviço) |
-| Estoque #4A | `estoque-api/` `:8100` | CRUD, idempotência persistente, placa, admin, galeria/capa, upload validado, volume/rota pública, limpeza periódica e transporte outbox testado | URL HTTPS/backup do volume; executar restore drill |
+| Chatbot #2A | `chatbot-api/` `:8001` | leads, handoff, por-placa, E3, E5, áudio efêmero/fallback, foto automática com sessão por vendedor, envio da capa via WhatsApp, first/last UTM, sim privada + handoff; webhook endurecido; Fly validado e pausado | E2E WA real; transcritor HTTP real; retenção/expurgo administrativo (sem autosserviço) |
+| Estoque #4A | `estoque-api/` `:8100` | CRUD, idempotência persistente, placa, admin, galeria/capa, upload validado, volume/rota pública HTTPS, snapshots, limpeza periódica e transporte outbox testado; Fly validado e pausado | executar restore drill |
 | Portal | `portal-gestao/` `:9000` | CRM, sim multi-banco, 9A, CAPI retry, gastos/ROI/resultados; funil completo backend+UI; event bus Meta; retry HTTP seguro | Google; E2E Playwright |
 | Catálogo #5A | `catalogo-publico/` `:8200` | vitrine, CTA, Pixel PageView/Lead/ViewContent | SEO/tema; domínio (E18) |
 | Site | `site/` | landing + hero poster | polish visual residual |
 
-**Estimativa:** ~**99%** MVP multi-banco + CRM demonstrável · ~**90%** preparação para produção
-(restam go-live WA, transcritor real, URL HTTPS/backup do volume, Google e polish ops). Percentuais são estimativas de escopo,
+**Estimativa:** ~**99%** MVP multi-banco + CRM demonstrável · ~**92%** preparação para produção
+(restam E2E WA real, transcritor real, restore drill, Google e polish ops). Percentuais são estimativas de escopo,
 não cobertura de testes.
 
 Baseline de testes: rodar `pytest -q` no produto; não confiar em contagens antigas de handoff.

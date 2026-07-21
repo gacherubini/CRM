@@ -1,8 +1,11 @@
 # Plano #7 — Deploy da suíte no Fly.io (design)
 
 > **Status 2026-07-15: DONE (lab subiu)** — design + implementação da 1ª subida concluídos.  
-> **Atualização 2026-07-20:** lab **parado** (machines stopped, apps/volumes mantidos). Uso
-> preferido = **local**. Reativar só com `deploy/fly/up-all.sh` e pedido explícito do dono.
+> **Atualização 2026-07-21:** o dono autorizou a reativação e validação do backend WhatsApp.
+> Chatbot/Estoque chegaram ao head, o Estoque recebeu volume de mídia e o workflow canônico foi
+> persistido ativo no n8n com os hosts Fly corretos. Depois da validação, o dono pediu shutdown
+> geral: todas as Machines estão paradas, com apps/volumes/dados preservados. O código do
+> Motor/simulação não foi alterado. Qualquer reativação exige novo pedido explícito.
 > Ambiente lab Fly (`crm-419` / `gru`) com apps da suíte; ops do dia a dia em
 > `deploy/fly/up-all.sh`, `down-all.sh` e `docs/contexto-compacto.md` (checkpoint Fly).
 > Este arquivo é **referência de arquitetura**, não checklist a reexecutar do zero.

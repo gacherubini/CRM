@@ -4,7 +4,11 @@
  *
  * Uso dentro do container n8n:
  *   node update_live_workflow.js canonical.json /home/node/.n8n/database.sqlite
- *   node update_live_workflow.js canonical.json /home/node/.n8n/database.sqlite --instance=loja1 --apply
+ *   node update_live_workflow.js canonical.json /home/node/.n8n/database.sqlite \
+ *     --instance=loja1 \
+ *     --chatbot-base-url=http://chatbot2037.flycast:8000 \
+ *     --evolution-base-url=http://evolution2037.flycast:8080 \
+ *     --apply
  *
  * O modo padrão é somente leitura. No apply, cria backup consistente no mesmo
  * diretório do banco, preserva segredos/credenciais/IDs do workflow existente e
@@ -16,10 +20,14 @@ const path = require("path");
 const canonicalPath = process.argv[2];
 const databasePath = process.argv[3];
 const apply = process.argv.includes("--apply");
-const instanceArg = process.argv
-  .find((value) => value.startsWith("--instance="))
-  ?.slice("--instance=".length);
+const argValue = (prefix) =>
+  process.argv.find((value) => value.startsWith(prefix))?.slice(prefix.length);
+const instanceArg = argValue("--instance=");
+const chatbotBaseArg = argValue("--chatbot-base-url=");
+const evolutionBaseArg = argValue("--evolution-base-url=");
 const workflowName = "WhatsApp IA - Somente Nao Salvos";
+const canonicalChatbotBase = "http://chatbot-api:8000";
+const canonicalEvolutionBase = "http://evolution:8080";
 
 if (!canonicalPath || !databasePath) {
   console.error("uso: node update_live_workflow.js CANONICAL DB [--apply]");
@@ -56,12 +64,34 @@ function headerValue(node, headerName) {
   );
 }
 
-function extractFromTemplate(template, actual, placeholder) {
+function tryExtractFromTemplate(template, actual, placeholder) {
   const parts = template.split(placeholder);
   if (parts.length !== 2 || !actual.startsWith(parts[0]) || !actual.endsWith(parts[1])) {
-    throw new Error(`não foi possível preservar ${placeholder}`);
+    return "";
   }
   return actual.slice(parts[0].length, actual.length - parts[1].length);
+}
+
+function normalizeBaseUrl(name, value, fallback) {
+  const candidate = value || fallback;
+  let parsed;
+  try {
+    parsed = new URL(candidate);
+  } catch {
+    throw new Error(`${name} inválida`);
+  }
+  if (
+    !["http:", "https:"].includes(parsed.protocol) ||
+    parsed.username ||
+    parsed.password ||
+    parsed.search ||
+    parsed.hash ||
+    !parsed.hostname ||
+    !["", "/"].includes(parsed.pathname)
+  ) {
+    throw new Error(`${name} deve conter somente protocolo, host e porta opcional`);
+  }
+  return `${parsed.protocol}//${parsed.host}`;
 }
 
 function assertSecret(name, value) {
@@ -90,7 +120,7 @@ async function main() {
   );
   const existingInventory = nodeByName(existingNodes, "consultar_estoque1");
 
-  const extractedInstance = extractFromTemplate(
+  const extractedInstance = tryExtractFromTemplate(
     canonicalEvolution.parameters.url,
     existingEvolution.parameters.url,
     "__INSTANCE__",
@@ -99,6 +129,16 @@ async function main() {
     extractedInstance && !extractedInstance.includes("__")
       ? extractedInstance
       : instanceArg;
+  const chatbotBase = normalizeBaseUrl(
+    "chatbot-base-url",
+    chatbotBaseArg,
+    canonicalChatbotBase,
+  );
+  const evolutionBase = normalizeBaseUrl(
+    "evolution-base-url",
+    evolutionBaseArg,
+    canonicalEvolutionBase,
+  );
   const evolutionKey = headerValue(existingEvolution, "apikey");
   const webhookToken = headerValue(existingWebhook, "X-Webhook-Token");
   const inventoryCode = String(existingInventory?.parameters?.jsCode || "");
@@ -117,6 +157,8 @@ async function main() {
     nodes: canonical.nodes,
     connections: canonical.connections,
   });
+  serialized = serialized.split(canonicalChatbotBase).join(chatbotBase);
+  serialized = serialized.split(canonicalEvolutionBase).join(evolutionBase);
   for (const [placeholder, value] of Object.entries(replacements)) {
     serialized = serialized.split(placeholder).join(value);
   }
@@ -135,6 +177,8 @@ async function main() {
     active: Boolean(workflow.active),
     previousNodes: existingNodes.length,
     canonicalNodes: merged.nodes.length,
+    chatbotBaseCustomized: chatbotBase !== canonicalChatbotBase,
+    evolutionBaseCustomized: evolutionBase !== canonicalEvolutionBase,
     mode: apply ? "apply" : "preview",
   };
   if (!apply) {

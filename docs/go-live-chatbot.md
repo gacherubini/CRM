@@ -1,8 +1,9 @@
 # Runbook de go-live do Chatbot WhatsApp
 
 > **Ambiente canônico:** lab Fly.io (`crm-419` / `gru`), não o compose local antigo.
-> Estado típico: bot **NÃO no ar de propósito** até o passo final (ativar workflow no n8n).
-> Nada neste doc liga o bot sozinho — o toggle Active é manual.
+> **Estado em 2026-07-21:** o ambiente foi publicado e verificado; depois, todas as Machines foram
+> paradas por pedido do dono. O workflow `SBAUPjrUlYa4gtgE` ficou persistido ativo com 25 nós e a
+> instância `loja1` estava `open` antes do shutdown. Não reimporte nem recrie volumes ao retomar.
 >
 > Estado vivo da suíte: `docs/contexto-compacto.md`. Planos: `docs/plans/README.md`.
 > Código: branch **`main`** (não use branches `feat/*` antigas citadas em docs legados).
@@ -41,8 +42,8 @@ bash deploy/fly/up-all.sh
 
 Segredos só em `deploy/fly/.env.production.local` (ignorado). Nunca commitar tokens.
 
-Antes do primeiro deploy com fotos, crie uma vez o volume da app Estoque; não recrie
-nem apague em deploys seguintes:
+Em uma instalação nova, crie uma vez o volume da app Estoque; não recrie nem apague em deploys
+seguintes. No lab `estoque2037`, ele já existe, está anexado e criptografado:
 
 ```bash
 fly volumes create estoque_media --app estoque2037 --region gru --size 1
@@ -95,6 +96,12 @@ fly ssh console -a chatbot2037 -C "cd /srv && alembic upgrade head"
 ## 4. n8n (lab)
 
 - UI: `https://n8n2037.fly.dev`
+- Último estado verificado antes do shutdown: health OK; workflow `SBAUPjrUlYa4gtgE` ativo com
+  25 nós. O backup consistente foi criado no volume antes da atualização. Para futuras atualizações,
+  usar primeiro o preview de
+  `n8n/update_live_workflow.js`; no Fly, informar `--chatbot-base-url=http://chatbot2037.flycast:8000`
+  e `--evolution-base-url=http://evolution2037.flycast:8080`. `--apply` é uma ação operacional
+  explícita. Sem esses parâmetros, o script mantém os nomes do compose local.
 - Workflow de produção esperado: **WhatsApp IA - Somente Nao Salvos** (ou id local
   `wAiNaoSalvos0001` / nome equivalente no volume).
 - Webhook de produção: `/webhook/whatsapp-ai` (confirmar path no workflow ativo).
@@ -176,7 +183,7 @@ python -m app.cli autorizar-numero --slug <loja> --telefone 5511... --papel dono
 
 ## 9. Go-live
 
-- Ativar o workflow no n8n (toggle **Active**).
+- Ao religar o n8n, o workflow já deve carregar **Active**; não repetir importação.
 - Acompanhar as primeiras conversas (n8n executions + logs Chatbot).
 
 ## 10. Rollback imediato

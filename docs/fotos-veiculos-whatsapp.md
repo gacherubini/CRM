@@ -60,9 +60,11 @@ Evolution. Backup do volume é responsabilidade operacional. Para múltiplas
 réplicas, migrar o mesmo contrato de `storage_key` para S3/R2/MinIO é evolução de
 escala, sem mudar o Catálogo.
 
-No lab Fly, `estoque-api/fly.toml` já define a URL pública e o mount. Antes do
-primeiro deploy, crie uma vez o volume com `fly volumes create estoque_media
---app estoque2037 --region gru --size 1`.
+No lab Fly, `estoque-api/fly.toml` já define a URL pública e o mount. O volume
+`estoque_media` de 1 GB foi criado, criptografado e anexado em 2026-07-21; não
+o recrie em deploys seguintes. Snapshots estão agendados e o runbook de
+backup/restore está em `deploy/estoque-standalone/RUNBOOK.md`; falta executar o
+primeiro restore drill.
 
 ## Contrato privado de upload
 
