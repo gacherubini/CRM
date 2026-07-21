@@ -4,7 +4,7 @@
  *
  * Uso dentro do container n8n:
  *   node update_live_workflow.js canonical.json /home/node/.n8n/database.sqlite
- *   node update_live_workflow.js canonical.json /home/node/.n8n/database.sqlite --apply
+ *   node update_live_workflow.js canonical.json /home/node/.n8n/database.sqlite --instance=loja1 --apply
  *
  * O modo padrão é somente leitura. No apply, cria backup consistente no mesmo
  * diretório do banco, preserva segredos/credenciais/IDs do workflow existente e
@@ -16,6 +16,9 @@ const path = require("path");
 const canonicalPath = process.argv[2];
 const databasePath = process.argv[3];
 const apply = process.argv.includes("--apply");
+const instanceArg = process.argv
+  .find((value) => value.startsWith("--instance="))
+  ?.slice("--instance=".length);
 const workflowName = "WhatsApp IA - Somente Nao Salvos";
 
 if (!canonicalPath || !databasePath) {
@@ -87,11 +90,15 @@ async function main() {
   );
   const existingInventory = nodeByName(existingNodes, "consultar_estoque1");
 
-  const instance = extractFromTemplate(
+  const extractedInstance = extractFromTemplate(
     canonicalEvolution.parameters.url,
     existingEvolution.parameters.url,
     "__INSTANCE__",
   );
+  const instance =
+    extractedInstance && !extractedInstance.includes("__")
+      ? extractedInstance
+      : instanceArg;
   const evolutionKey = headerValue(existingEvolution, "apikey");
   const webhookToken = headerValue(existingWebhook, "X-Webhook-Token");
   const inventoryCode = String(existingInventory?.parameters?.jsCode || "");
