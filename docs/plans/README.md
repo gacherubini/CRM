@@ -32,6 +32,7 @@ Cada plano `*A`/`*B` tem bloco **Status** no topo: leia antes de reimplementar.
 | 6.2 | [Conversões / funil / insights](2026-07-21-plano-conversao-atribuicao-insights.md) | CAPI, gastos, resultados dono, funil, bus, Google | **ATIVO rev.3** — A/B/E/D/H/C/F feitos; residual G |
 | 6+ | [Plano #6](2026-07-11-plano6-evolucoes-roadmap.md) | Roadmap add-ons | E1 áudio backend feito; E6 automático WhatsApp → Estoque → Catálogo MVP feito; E3/E5/E8/E10 feitos |
 | ops | [Plano #7 deploy Fly](2026-07-13-plano7-deploy-fly-io-design.md) | Lab Fly.io | **DONE** — backend WA publicado/verificado e depois **pausado** pelo dono em 2026-07-21; dados preservados; ops = `deploy/fly/*.sh` |
+| ops | [Arquitetura 3 VMs](2026-07-21-plano-arquitetura-3-vms.md) | Consolidação Fly (custo) | **ATIVO** — 3 always-on + **VM 4 Playwright** efêmera (2 GB, imagem própria); ~US$ 13–18/mês always-on; sem pedido não implementar |
 
 Planos #1A e #4A podem avançar em paralelo após #0. #2A depende da fatia Lite do #4A.
 Numeração é histórica; não obriga Portal antes de Estoque/Catálogo.

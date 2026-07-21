@@ -1,14 +1,13 @@
 #!/usr/bin/env bash
-# Opção A: backends always-on (motor, estoque, chatbot).
-# Portal e Catálogo continuam com autostop (acordam no browser).
-# Evolution e n8n já são always-on.
+# Always-on em todos os apps principais (sem auto_stop).
+# Inclui backends + front + site. Evolution/n8n já são always-on.
 #
 # Pré-requisito: flyctl autenticado (fly auth login).
 # Uso (a partir da raiz do repo ou desta pasta):
 #   bash deploy/fly/apply-always-on-backends.sh
 #
 # O que faz:
-#   1) Aplica a config dos fly.toml (deploy --ha=false) em motor/estoque/chatbot
+#   1) Aplica a config dos fly.toml (deploy --ha=false)
 #   2) Garante scale count >= 1 e máquinas started
 set -euo pipefail
 
@@ -49,15 +48,17 @@ deploy_app() {
 deploy_app "motor-simulacao" "motor2037"
 deploy_app "estoque-api" "estoque2037"
 deploy_app "chatbot-api" "chatbot2037"
+deploy_app "portal-gestao" "portal2037"
+deploy_app "catalogo-publico" "catalogo2037"
+deploy_app "site" "site2037"
 
 echo ""
 echo "========== checagem rápida =========="
-for app in motor2037 estoque2037 chatbot2037; do
+for app in motor2037 estoque2037 chatbot2037 portal2037 catalogo2037 site2037; do
   echo "--- $app ---"
   "$FLY" status -a "$app" 2>/dev/null | head -40 || true
 done
 
 echo ""
-echo "Pronto. Portal/Catálogo ainda podem dormir; backends ficam always-on."
-echo "Teste: abra https://portal2037.fly.dev e use estoque/leads/simulação."
-echo "Se o front ainda estiver frio, o 1º request só acorda o Portal (~10–30s)."
+echo "Pronto. Todos os apps principais ficam always-on (auto_stop desligado)."
+echo "Teste: https://portal2037.fly.dev  |  https://catalogo2037.fly.dev  |  https://site2037.fly.dev"

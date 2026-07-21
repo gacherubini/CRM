@@ -1,9 +1,8 @@
 #!/usr/bin/env bash
-# Sobe a suíte no Fly no setup lab opção A:
+# Sobe a suíte no Fly (always-on em tudo):
 #   - Postgres, backends (motor/estoque/chatbot), Evolution, n8n → always-on
-#   - Portal sobe agora; Catálogo opcional (teto de RAM da org)
-#   - Portal/Catálogo mantêm autostop=stop (podem dormir depois)
-#   - Backends reaplicam autostop=off a cada up (idempotente)
+#   - Portal, Catálogo e Site → always-on (sem auto_stop)
+#   - Reaplica autostop=off a cada up (idempotente)
 #
 # Uso:
 #   bash deploy/fly/up-all.sh              # suite de teste (sem catálogo)
@@ -157,7 +156,7 @@ print(data[0].get("state") or "?")
   return 1
 }
 
-echo ">> up-all (opção A: backends always-on; front pode dormir)"
+echo ">> up-all (always-on em todos os apps principais)"
 echo "   portal=$WITH_PORTAL  catalogo=$WITH_CATALOGO  keepalive_min=$MINUTES"
 echo ""
 
@@ -188,36 +187,36 @@ start_app evolution2037 || true
 start_app n8n2037 || true
 wait_started evolution2037 20 || true
 wait_started n8n2037 25 || true
+ensure_backend_always_on evolution2037
+ensure_backend_always_on n8n2037
 
-# 4) Front (Portal prioritário; Catálogo opcional por teto de RAM)
+# 4) Front (Portal/Catálogo/Site always-on)
 echo ""
 echo "=== 4/4 Front ==="
 if [ "$WITH_PORTAL" -eq 1 ]; then
   start_app portal2037 || true
   wait_started portal2037 20 || true
-  # Portal deve poder dormir depois (não forçamos always-on)
-  for id in $(machine_ids portal2037); do
-    "$FLY" machine update "$id" -a portal2037 --autostop=stop --autostart=true --yes >/dev/null 2>&1 \
-      && echo "  portal autostop=stop (front dorme quando ocioso)" \
-      || echo "  warn portal: não reaplicou autostop=stop"
-  done
+  ensure_backend_always_on portal2037
 else
   echo "  (portal pulado: --no-portal)"
 fi
 
 if [ "$WITH_CATALOGO" -eq 1 ]; then
-  echo "  tentando catálogo (pode falhar por mem_overcommit com portal+backends on)..."
+  echo "  tentando catálogo..."
   if start_app catalogo2037; then
     wait_started catalogo2037 15 || true
-    for id in $(machine_ids catalogo2037); do
-      "$FLY" machine update "$id" -a catalogo2037 --autostop=stop --autostart=true --yes >/dev/null 2>&1 || true
-    done
+    ensure_backend_always_on catalogo2037
   else
     echo "  tip: se overcommit, use sem --catalogo ou: fly machine stop <portal> && up só catálogo"
   fi
 else
   echo "  (catálogo não subiu de propósito — evita teto de RAM; use --catalogo se precisar)"
 fi
+
+# Site marketing always-on
+start_app site2037 || true
+wait_started site2037 15 || true
+ensure_backend_always_on site2037
 
 echo ""
 echo ">> resumo"
