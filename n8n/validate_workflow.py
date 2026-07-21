@@ -13,6 +13,7 @@ WEBHOOK_HEADER = "X-Webhook-Token"
 WEBHOOK_TOKEN_PLACEHOLDER = "__CHATBOT_WEBHOOK_TOKEN__"
 AUDIO_URL = "http://chatbot-api:8000/webhook/audio/transcrever"
 IMAGE_INGEST_URL = "http://chatbot-api:8000/webhook/operacao/veiculos/foto"
+ROTEAMENTO_URL = "http://chatbot-api:8000/v1/operacao/roteamento"
 
 
 def main() -> None:
@@ -213,6 +214,45 @@ def main() -> None:
         assert "Aplicar transcricao1" in gate_code, (
             f"{gate_name} descarta o texto transcrito"
         )
+
+    # Roteamento de operação: número autorizado salvo entra no cadastro sem bypass no JSON.
+    rota_node = next(
+        (
+            node
+            for node in data.get("nodes", [])
+            if node.get("parameters", {}).get("url") == ROTEAMENTO_URL
+        ),
+        None,
+    )
+    assert rota_node is not None, "nó de roteamento de operação ausente"
+    rota_params = rota_node["parameters"]
+    rota_headers = {
+        header.get("name"): header.get("value")
+        for header in rota_params.get("headerParameters", {}).get("parameters", [])
+    }
+    assert rota_headers.get(WEBHOOK_HEADER) == WEBHOOK_TOKEN_PLACEHOLDER, (
+        "roteamento sem autenticação do webhook"
+    )
+    rota_body = rota_params.get("jsonBody", "")
+    assert "is_saved" in rota_body and "telefone" in rota_body, (
+        "roteamento não envia telefone/is_saved"
+    )
+    assert rota_node.get("continueOnFail") is True, (
+        "roteamento deve permitir fallback (continueOnFail)"
+    )
+    assert (
+        connections.get("Rotear operacao1", {}).get("main", [[]])[0][0].get("node")
+        == "Gate somente nao salvos1"
+    ), "roteamento não alimenta o gate"
+    gate_salvos_code = nodes_by_name["Gate somente nao salvos1"].get(
+        "parameters", {}
+    ).get("jsCode", "")
+    assert "Rotear operacao1" in gate_salvos_code, (
+        "gate não consome a decisão de roteamento"
+    )
+    assert "cadastro_controle" in gate_salvos_code, (
+        "gate não trata a resposta de controle do cadastro"
+    )
 
     print(
         "workflow n8n válido: webhook seguro, áudio efêmero, "

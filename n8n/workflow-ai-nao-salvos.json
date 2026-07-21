@@ -271,14 +271,14 @@
     },
     {
       "parameters": {
-        "jsCode": "const chat = $input.first().json || {};\nconst extraida = $('Extrair1').first().json;\nconst origem = extraida.ehAudio ? $('Aplicar transcricao1').first().json : extraida;\n// Fail closed: só responde quando a Evolution afirmar explicitamente isSaved === false.\nif (chat.isSaved !== false) return [];\nreturn [{ json: { ...origem, isSaved: false } }];"
+        "jsCode": "const chat = $('Consultar contato na Evolution1').first().json || {};\nconst extraida = $('Extrair1').first().json;\nconst origem = extraida.ehAudio ? $('Aplicar transcricao1').first().json : extraida;\nconst rot = $('Rotear operacao1').first().json || {};\nconst acao = rot.acao;\n// Fallback fail-closed se o roteamento nao respondeu: so cliente nao-salvo passa.\nif (!acao) {\n  return chat.isSaved === false ? [{ json: { ...origem, acao: 'cliente' } }] : [];\n}\nif (acao === 'cliente' || acao === 'cadastro') {\n  return [{ json: { ...origem, acao } }];\n}\nif (acao === 'cadastro_controle') {\n  return [{ json: { ...origem, acao, audioFallback: rot.resposta } }];\n}\nreturn []; // ignorar\n"
       },
       "id": "c4b1465b-5543-4cea-9c15-148d229eb518",
       "name": "Gate somente nao salvos1",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        2128,
+        2288,
         416
       ]
     },
@@ -529,6 +529,36 @@
         3968,
         720
       ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://chatbot-api:8000/v1/operacao/roteamento",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Webhook-Token",
+              "value": "__CHATBOT_WEBHOOK_TOKEN__"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ (() => { const ex = $('Extrair1').first().json; const o = ex.ehAudio ? $('Aplicar transcricao1').first().json : ex; const chat = $('Consultar contato na Evolution1').first().json || {}; return { instance: '__INSTANCE__', telefone: o.telefone, texto: o.texto, is_saved: chat.isSaved }; })() }}",
+        "options": {
+          "timeout": 8000
+        }
+      },
+      "id": "a1c0ffee-b0ba-4a11-9d0e-r0teament0001",
+      "name": "Rotear operacao1",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2008,
+        416
+      ],
+      "continueOnFail": true
     }
   ],
   "connections": {
@@ -649,7 +679,7 @@
       "main": [
         [
           {
-            "node": "Gate somente nao salvos1",
+            "node": "Rotear operacao1",
             "type": "main",
             "index": 0
           }
@@ -794,6 +824,17 @@
           {
             "node": "AI Agent1",
             "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Rotear operacao1": {
+      "main": [
+        [
+          {
+            "node": "Gate somente nao salvos1",
+            "type": "main",
             "index": 0
           }
         ]
