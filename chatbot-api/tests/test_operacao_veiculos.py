@@ -136,7 +136,9 @@ def test_autorizado_cria_veiculo(client, loja_a):
         assert fake.chamadas[0]["dados"]["preco"] == 16000.0
         assert fake.chamadas[0]["dados"]["publicado"] is True
         assert body["veiculo"]["publicado"] is True
-        assert "envie as fotos" in body["mensagem"]
+        assert "fotos" in body["mensagem"].lower()
+        assert "legenda" in body["mensagem"].lower()
+        assert "ABC1D23" in body["mensagem"]
     finally:
         app.dependency_overrides.pop(get_inventory_write_client, None)
 

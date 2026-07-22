@@ -58,10 +58,48 @@ def test_opcao_1_entra_modo_cadastrar(client, loja_a, db):
     d = operacao.decidir_roteamento(db, loja_a["loja_id"], "5511970000004", "1", True)
     assert d["acao"] == "cadastro_controle"
     assert "cadastrar" in d["resposta"].lower() or "dados" in d["resposta"].lower()
+    assert "legenda" in d["resposta"].lower()
     d2 = operacao.decidir_roteamento(
         db, loja_a["loja_id"], "5511970000004", "Honda CG 160 2023 placa ABC1D23", True
     )
     assert d2["acao"] == "cadastro"
+
+
+def test_um_de_novo_no_modo_cadastrar_reexplica_sem_llm(client, loja_a, db):
+    _autorizar(client, loja_a, "5511970000030")
+    operacao.decidir_roteamento(db, loja_a["loja_id"], "5511970000030", "menu", True)
+    operacao.decidir_roteamento(db, loja_a["loja_id"], "5511970000030", "1", True)
+    d = operacao.decidir_roteamento(db, loja_a["loja_id"], "5511970000030", "1", True)
+    assert d["acao"] == "cadastro_controle"
+    assert "legenda" in d["resposta"].lower()
+
+
+def test_variantes_telefone_sincronizam_modo_menu_e_um(client, loja_a, db):
+    """Mesmo celular cadastrado em formatos diferentes não pode divergir o modo."""
+    loja = loja_a["loja_id"]
+    _autorizar(client, loja_a, "51980336365")
+    _autorizar(client, loja_a, "555180336365")
+    _autorizar(client, loja_a, "5551980336365")
+
+    d_menu = operacao.decidir_roteamento(db, loja, "5551980336365", "menu", True)
+    assert d_menu["acao"] == "cadastro_controle"
+    # Webhook seguinte com formato sem o 9º dígito ainda deve estar em menu.
+    d1 = operacao.decidir_roteamento(db, loja, "555180336365", "1", True)
+    assert d1["acao"] == "cadastro_controle"
+    assert "cadastrar" in d1["resposta"].lower()
+    assert "legenda" in d1["resposta"].lower()
+
+    rows = (
+        db.query(NumeroAutorizado)
+        .filter(NumeroAutorizado.loja_id == loja)
+        .filter(
+            NumeroAutorizado.telefone.in_(
+                ["51980336365", "555180336365", "5551980336365"]
+            )
+        )
+        .all()
+    )
+    assert {r.operacao_modo for r in rows} == {"cadastrar"}
 
 
 def test_fim_encerra_sessao(client, loja_a, db):

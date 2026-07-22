@@ -48,6 +48,17 @@ _TEXTO_MENU = (
     "Responda com o número ou o nome da opção."
 )
 
+_TEXTO_MODO_CADASTRAR = (
+    "Modo *cadastrar* 📝\n"
+    "Envie os dados em *uma mensagem*:\n"
+    "tipo (moto/carro), marca, modelo, ano, preço, km e placa.\n"
+    "Ex.: Honda CG 160 2018 21900 18mil km ABC1D23\n\n"
+    "Depois envie as *fotos com a placa na legenda* "
+    "(ex.: legenda `ABC1D23`). A 1ª foto precisa da placa; "
+    "as seguintes por 10 min podem ir sem repetir.\n\n"
+    "Digite *menu* para voltar ou *fim* para sair."
+)
+
 
 def normalizar_telefone(valor: str | None) -> str:
     """Mantém só dígitos (DDI/DDD/número). Vazio vira string vazia."""
@@ -196,32 +207,68 @@ def esta_autorizado(db: Session, loja_id: str, telefone: str) -> bool:
     return _numero_autorizado_ativo(db, loja_id, telefone) is not None
 
 
+def _rows_autorizados_variantes(
+    db: Session, loja_id: str, telefone: str, *, so_ativos: bool = True
+) -> list[NumeroAutorizado]:
+    """Todas as linhas do mesmo número (com/sem 55, com/sem 9º dígito)."""
+    cands = variantes_telefone(telefone)
+    if not cands:
+        return []
+    q = db.query(NumeroAutorizado).filter(
+        NumeroAutorizado.loja_id == loja_id,
+        NumeroAutorizado.telefone.in_(cands),
+    )
+    if so_ativos:
+        q = q.filter(NumeroAutorizado.ativo.is_(True))
+    # Preferir forma canônica (mais longa, tipicamente 55+DDD+9+8) e estável.
+    return q.order_by(NumeroAutorizado.telefone.desc()).all()
+
+
+def _escolher_row_autorizado(rows: list[NumeroAutorizado]) -> NumeroAutorizado | None:
+    """Escolhe a linha com sessão mais útil; evita .first() aleatório entre duplicatas."""
+    if not rows:
+        return None
+
+    def _score(r: NumeroAutorizado) -> tuple:
+        sessao = 1 if _sessao_cadastro_aberta(r) else 0
+        modo = 1 if (r.operacao_modo or "").strip() else 0
+        foto = 1 if r.foto_placa_atual else 0
+        return (sessao, modo, foto, len(r.telefone or ""), r.telefone or "")
+
+    return max(rows, key=_score)
+
+
 def _numero_autorizado_ativo(
     db: Session, loja_id: str, telefone: str
 ) -> NumeroAutorizado | None:
-    cands = variantes_telefone(telefone)
-    if not cands:
-        return None
-    return (
-        db.query(NumeroAutorizado)
-        .filter(
-            NumeroAutorizado.loja_id == loja_id,
-            NumeroAutorizado.telefone.in_(cands),
-            NumeroAutorizado.ativo.is_(True),
-        )
-        .first()
-    )
+    return _escolher_row_autorizado(_rows_autorizados_variantes(db, loja_id, telefone))
+
+
+def _siblings_autorizados(
+    db: Session, numero: NumeroAutorizado
+) -> list[NumeroAutorizado]:
+    rows = _rows_autorizados_variantes(db, numero.loja_id, numero.telefone)
+    if not rows:
+        return [numero]
+    # Garante que a instância atual está na lista (mesmo objeto de sessão).
+    ids = {r.id for r in rows}
+    if numero.id not in ids:
+        rows.append(numero)
+    return rows
 
 
 def _ativar_sessao_fotos(
     db: Session, loja_id: str, telefone: str, placa: str
 ) -> bool:
     ttl = config.IMAGE_SESSION_TTL_SECONDS
-    numero = _numero_autorizado_ativo(db, loja_id, telefone)
-    if numero is None or ttl <= 0:
+    rows = _rows_autorizados_variantes(db, loja_id, telefone)
+    if not rows or ttl <= 0:
         return False
-    numero.foto_placa_atual = validar_placa(placa)
-    numero.foto_sessao_expira_em = datetime.now(timezone.utc) + timedelta(seconds=ttl)
+    placa_ok = validar_placa(placa)
+    expira = datetime.now(timezone.utc) + timedelta(seconds=ttl)
+    for row in rows:
+        row.foto_placa_atual = placa_ok
+        row.foto_sessao_expira_em = expira
     db.commit()
     return True
 
@@ -229,18 +276,41 @@ def _ativar_sessao_fotos(
 def _placa_da_sessao_fotos(
     db: Session, loja_id: str, telefone: str
 ) -> str | None:
-    numero = _numero_autorizado_ativo(db, loja_id, telefone)
-    if numero is None or not numero.foto_placa_atual or not numero.foto_sessao_expira_em:
+    rows = _rows_autorizados_variantes(db, loja_id, telefone)
+    if not rows:
         return None
-    expira = numero.foto_sessao_expira_em
-    if expira.tzinfo is None:
-        expira = expira.replace(tzinfo=timezone.utc)
-    if expira <= datetime.now(timezone.utc):
-        numero.foto_placa_atual = None
-        numero.foto_sessao_expira_em = None
+    agora = datetime.now(timezone.utc)
+    placa_valida: str | None = None
+    for numero in rows:
+        if not numero.foto_placa_atual or not numero.foto_sessao_expira_em:
+            continue
+        expira = numero.foto_sessao_expira_em
+        if expira.tzinfo is None:
+            expira = expira.replace(tzinfo=timezone.utc)
+        if expira <= agora:
+            numero.foto_placa_atual = None
+            numero.foto_sessao_expira_em = None
+            continue
+        placa_valida = validar_placa(numero.foto_placa_atual)
+        break
+    if placa_valida is None:
         db.commit()
         return None
-    return validar_placa(numero.foto_placa_atual)
+    # Espelha a sessão válida em todas as variantes (evita sumir se o próximo
+    # webhook vier com outro formato de telefone).
+    for numero in rows:
+        numero.foto_placa_atual = placa_valida
+        if not numero.foto_sessao_expira_em or (
+            (numero.foto_sessao_expira_em.replace(tzinfo=timezone.utc)
+             if numero.foto_sessao_expira_em.tzinfo is None
+             else numero.foto_sessao_expira_em)
+            <= agora
+        ):
+            numero.foto_sessao_expira_em = agora + timedelta(
+                seconds=max(1, config.IMAGE_SESSION_TTL_SECONDS)
+            )
+    db.commit()
+    return placa_valida
 
 
 def _tentar_ativar_sessao_fotos(
@@ -269,14 +339,17 @@ def _sessao_cadastro_aberta(numero: NumeroAutorizado) -> bool:
 
 def _abrir_ou_renovar_cadastro(db: Session, numero: NumeroAutorizado) -> None:
     ttl = max(1, config.CADASTRO_SESSION_TTL_SECONDS)
-    numero.cadastro_expira_em = datetime.now(timezone.utc) + timedelta(seconds=ttl)
+    expira = datetime.now(timezone.utc) + timedelta(seconds=ttl)
+    for row in _siblings_autorizados(db, numero):
+        row.cadastro_expira_em = expira
     db.commit()
 
 
 def _fechar_cadastro(db: Session, numero: NumeroAutorizado) -> None:
-    numero.cadastro_expira_em = None
-    numero.operacao_modo = None
-    numero.operacao_ctx = None
+    for row in _siblings_autorizados(db, numero):
+        row.cadastro_expira_em = None
+        row.operacao_modo = None
+        row.operacao_ctx = None
     db.commit()
 
 
@@ -292,10 +365,9 @@ def _ctx_get(numero: NumeroAutorizado) -> dict[str, Any]:
 
 
 def _ctx_set(db: Session, numero: NumeroAutorizado, ctx: dict[str, Any] | None) -> None:
-    if not ctx:
-        numero.operacao_ctx = None
-    else:
-        numero.operacao_ctx = json.dumps(ctx, ensure_ascii=False)
+    payload = None if not ctx else json.dumps(ctx, ensure_ascii=False)
+    for row in _siblings_autorizados(db, numero):
+        row.operacao_ctx = payload
     db.commit()
 
 
@@ -306,11 +378,12 @@ def _set_modo(
     ctx: dict[str, Any] | None = None,
 ) -> None:
     ttl = max(1, config.CADASTRO_SESSION_TTL_SECONDS)
-    numero.cadastro_expira_em = datetime.now(timezone.utc) + timedelta(seconds=ttl)
-    numero.operacao_modo = modo
-    numero.operacao_ctx = (
-        json.dumps(ctx, ensure_ascii=False) if ctx else None
-    )
+    expira = datetime.now(timezone.utc) + timedelta(seconds=ttl)
+    payload = json.dumps(ctx, ensure_ascii=False) if ctx else None
+    for row in _siblings_autorizados(db, numero):
+        row.cadastro_expira_em = expira
+        row.operacao_modo = modo
+        row.operacao_ctx = payload
     db.commit()
 
 
@@ -632,14 +705,7 @@ def decidir_roteamento(
         opcao = _resolver_opcao_menu(normal)
         if opcao == "cadastrar":
             _set_modo(db, numero, "cadastrar", {})
-            return _ctrl(
-                "Modo *cadastrar* 📝\n"
-                "Envie os dados em uma mensagem:\n"
-                "tipo (moto/carro), marca, modelo, ano, preço, km e placa.\n"
-                "Ex.: Honda CG 160 2018 21900 18mil km ABC1D23\n\n"
-                "Depois pode mandar as *fotos*.\n"
-                "Digite *menu* para voltar ou *fim* para sair."
-            )
+            return _ctrl(_TEXTO_MODO_CADASTRAR)
         if opcao == "listar":
             busca = _extrair_busca_listar(normal)
             _set_modo(db, numero, "menu", {})
@@ -663,6 +729,10 @@ def decidir_roteamento(
         if normal in _GATILHO_MENU or normal == "menu":
             _set_modo(db, numero, "menu", {})
             return _ctrl(_TEXTO_MENU)
+        # Se mandar "1"/"cadastrar" de novo, reexplica em vez de ir pro LLM.
+        if _resolver_opcao_menu(normal) == "cadastrar":
+            _abrir_ou_renovar_cadastro(db, numero)
+            return _ctrl(_TEXTO_MODO_CADASTRAR)
         # Texto livre → LLM extrai e chama cadastrar_veiculo
         _abrir_ou_renovar_cadastro(db, numero)
         return {"acao": "cadastro", "resposta": None}
@@ -792,13 +862,18 @@ def _saida_veiculo_cadastro(
     sessao_ativa = _tentar_ativar_sessao_fotos(db, loja_id, tel, placa) if placa else False
     resumo = _resumo_veiculo(veiculo)
     if ja_existia:
-        mensagem = f"Veículo já estava no estoque: {resumo}"
+        mensagem = f"Veículo já estava no estoque: {resumo}."
     else:
-        mensagem = f"Veículo cadastrado e publicado no catálogo: {resumo}"
+        mensagem = f"Veículo cadastrado e publicado no catálogo: {resumo}."
     if sessao_ativa:
         mensagem += (
-            " Agora envie as fotos; pelas próximas "
-            f"{_minutos_sessao_fotos()} min não precisa repetir a placa."
+            f" Agora envie as *fotos com a placa `{placa}` na legenda* "
+            f"(a 1ª precisa da placa; nas próximas {_minutos_sessao_fotos()} min "
+            "pode mandar sem repetir)."
+        )
+    elif placa:
+        mensagem += (
+            f" Agora envie as *fotos com a placa `{placa}` na legenda* da imagem."
         )
     return {
         "ok": True,

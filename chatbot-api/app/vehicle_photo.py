@@ -202,7 +202,12 @@ class VehiclePhotoProcessor:
             quantidade = len(atualizado.get("fotos") or [])
             return {
                 "ok": True,
-                "mensagem": f"Foto adicionada ao veículo {placa}. Ele já está atualizado no estoque e no catálogo.",
+                "mensagem": (
+                    f"Foto adicionada ao veículo {placa}. "
+                    "Ele já está atualizado no estoque e no catálogo. "
+                    "As próximas fotos podem ser enviadas sem repetir a placa por 10 min "
+                    "(se a sessão cair, reenvie com a placa na legenda)."
+                ),
                 "veiculo_id": atualizado.get("id"),
                 "placa": placa,
                 "quantidade_fotos": quantidade,
