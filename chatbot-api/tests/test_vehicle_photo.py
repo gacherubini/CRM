@@ -309,6 +309,53 @@ def test_downloader_imagem_usa_contrato_oficial_e_limita_tipo():
     assert mime == "image/jpeg"
 
 
+def test_downloader_imagem_aceita_size_long_protobuf_evolution():
+    """Evolution v2 devolve fileLength como Long {low, high, unsigned}."""
+    conteudo = b"\xff\xd8\xfffoto-wa"
+
+    def handler(request: httpx.Request):
+        return httpx.Response(
+            200,
+            json={
+                "mediaType": "imageMessage",
+                "mimetype": "image/jpeg",
+                "size": {
+                    "fileLength": {
+                        "low": len(conteudo),
+                        "high": 0,
+                        "unsigned": True,
+                    },
+                    "height": 878,
+                    "width": 1560,
+                },
+                "base64": base64.b64encode(conteudo).decode(),
+            },
+        )
+
+    downloader = EvolutionImageDownloader(
+        "https://evolution.test",
+        "segredo",
+        transport=httpx.MockTransport(handler),
+    )
+    baixado, mime = downloader.baixar("instancia-a", "MSG-LONG", "image/jpeg")
+
+    assert baixado == conteudo
+    assert mime == "image/jpeg"
+
+
+def test_parse_tamanho_declarado_variantes():
+    from app.vehicle_photo import parse_tamanho_declarado
+
+    assert parse_tamanho_declarado(None) is None
+    assert parse_tamanho_declarado("212702") == 212702
+    assert parse_tamanho_declarado({"fileLength": "100"}) == 100
+    assert parse_tamanho_declarado(
+        {"fileLength": {"low": 212702, "high": 0, "unsigned": True}}
+    ) == 212702
+    assert parse_tamanho_declarado({"low": 10, "high": 1}) == (1 << 32) | 10
+    assert parse_tamanho_declarado({"weird": True}) is None
+
+
 def test_downloader_imagem_rejeita_base64_invalido():
     def handler(request: httpx.Request):
         return httpx.Response(

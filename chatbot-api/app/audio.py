@@ -13,6 +13,7 @@ from urllib.parse import quote
 import httpx
 
 from app import config
+from app.vehicle_photo import parse_tamanho_declarado
 
 
 logger = logging.getLogger("chatbot.audio")
@@ -138,15 +139,9 @@ class EvolutionMediaDownloader:
             or mime_data_uri
             or mime_declarado
         )
-        tamanho = dados.get("size")
-        if isinstance(tamanho, dict):
-            tamanho = tamanho.get("fileLength")
-        if tamanho not in (None, ""):
-            try:
-                if int(tamanho) > config.AUDIO_MAX_BYTES:
-                    raise AudioIndisponivel("áudio acima do limite")
-            except (TypeError, ValueError) as exc:
-                raise AudioIndisponivel("tamanho de áudio inválido") from exc
+        tamanho = parse_tamanho_declarado(dados.get("size"))
+        if tamanho is not None and tamanho > config.AUDIO_MAX_BYTES:
+            raise AudioIndisponivel("áudio acima do limite")
 
         limite_base64 = ((config.AUDIO_MAX_BYTES + 2) // 3 * 4) + 4
         if len(base64_texto) > limite_base64:

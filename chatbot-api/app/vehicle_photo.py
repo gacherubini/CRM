@@ -43,6 +43,38 @@ def normalizar_mime(valor: object) -> str:
     return mime
 
 
+def parse_tamanho_declarado(valor: object) -> int | None:
+    """Normaliza size da Evolution: int/str, {fileLength}, ou Long protobuf {low,high}."""
+    if valor in (None, ""):
+        return None
+    if isinstance(valor, bool):
+        return None
+    if isinstance(valor, (int, float)):
+        n = int(valor)
+        return n if n >= 0 else None
+    if isinstance(valor, str):
+        texto = valor.strip()
+        if not texto:
+            return None
+        try:
+            n = int(texto)
+        except ValueError:
+            return None
+        return n if n >= 0 else None
+    if isinstance(valor, dict):
+        if "fileLength" in valor:
+            return parse_tamanho_declarado(valor.get("fileLength"))
+        if "low" in valor or "high" in valor:
+            try:
+                low = int(valor.get("low") or 0) & 0xFFFFFFFF
+                high = int(valor.get("high") or 0) & 0xFFFFFFFF
+            except (TypeError, ValueError):
+                return None
+            return (high << 32) | low
+        return None
+    return None
+
+
 class EvolutionImageDownloader:
     def __init__(
         self,
@@ -125,15 +157,9 @@ class EvolutionImageDownloader:
             or mime_data_uri
             or mime_declarado
         )
-        tamanho = dados.get("size")
-        if isinstance(tamanho, dict):
-            tamanho = tamanho.get("fileLength")
-        if tamanho not in (None, ""):
-            try:
-                if int(tamanho) > config.IMAGE_MAX_BYTES:
-                    raise ImagemIndisponivel("imagem acima do limite")
-            except (TypeError, ValueError) as exc:
-                raise ImagemIndisponivel("tamanho de imagem inválido") from exc
+        tamanho = parse_tamanho_declarado(dados.get("size"))
+        if tamanho is not None and tamanho > config.IMAGE_MAX_BYTES:
+            raise ImagemIndisponivel("imagem acima do limite")
         limite_base64 = ((config.IMAGE_MAX_BYTES + 2) // 3 * 4) + 4
         if len(base64_texto) > limite_base64:
             raise ImagemIndisponivel("imagem acima do limite")
