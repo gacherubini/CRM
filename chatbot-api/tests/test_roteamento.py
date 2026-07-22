@@ -15,11 +15,13 @@ def _autorizar(client, loja, telefone, ativo=True):
 
 
 def test_nao_salvo_vai_para_cliente(client, loja_a, db):
+    """Contato novo (não salvo) → bot de vendas."""
     d = operacao.decidir_roteamento(db, loja_a["loja_id"], "5511970000000", "oi", False)
     assert d["acao"] == "cliente"
 
 
 def test_salvo_nao_autorizado_ignora(client, loja_a, db):
+    """Contato que já fala (salvo) e não é equipe → sem bot."""
     d = operacao.decidir_roteamento(db, loja_a["loja_id"], "5511970000001", "oi", True)
     assert d["acao"] == "ignorar"
 
@@ -82,9 +84,18 @@ def test_sessao_expirada_volta_a_ignorar(client, loja_a, db):
     assert d["acao"] == "ignorar"
 
 
-def test_is_saved_desconhecido_trata_como_salvo(client, loja_a, db):
+def test_is_saved_desconhecido_nao_autorizado_ignora(client, loja_a, db):
+    """Sem sinal claro de contato novo → fail-closed (não dispara bot)."""
     d = operacao.decidir_roteamento(db, loja_a["loja_id"], "5511970000007", "oi", None)
     assert d["acao"] == "ignorar"
+
+
+def test_autorizado_bate_com_ou_sem_ddi55(client, loja_a, db):
+    _autorizar(client, loja_a, "51980336365")
+    d = operacao.decidir_roteamento(
+        db, loja_a["loja_id"], "555180336365", "cadastro", True
+    )
+    assert d["acao"] == "cadastro_controle"
 
 
 def test_endpoint_roteamento_fluxo(client, loja_a):
@@ -94,11 +105,19 @@ def test_endpoint_roteamento_fluxo(client, loja_a):
         json={"telefone": "5511970000010"},
         headers=loja_a["headers"],
     )
+    # Contato novo → IA
     r = client.post(
         "/v1/operacao/roteamento",
         json={"instance": inst, "telefone": "5511970000011", "texto": "oi", "is_saved": False},
     )
     assert r.status_code == 200 and r.json()["acao"] == "cliente"
+    # Contato que já fala → ignora
+    r = client.post(
+        "/v1/operacao/roteamento",
+        json={"instance": inst, "telefone": "5511970000012", "texto": "oi", "is_saved": True},
+    )
+    assert r.status_code == 200 and r.json()["acao"] == "ignorar"
+    # Equipe: cadastro
     r = client.post(
         "/v1/operacao/roteamento",
         json={"instance": inst, "telefone": "5511970000010", "texto": "cadastro", "is_saved": True},

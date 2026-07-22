@@ -1,0 +1,49 @@
+{
+	auto_https off
+	admin off
+}
+
+:8080 {
+	# Health agregado (processo healthz em :8099)
+	handle /healthz {
+		reverse_proxy 127.0.0.1:8099
+	}
+
+	# Roteamento por Host (vars com default no entrypoint)
+	@n8n host {$N8N_HOST:n8n2037.fly.dev}
+	handle @n8n {
+		reverse_proxy 127.0.0.1:5678
+	}
+
+	@portal host {$PORTAL_HOST:portal2037.fly.dev}
+	handle @portal {
+		reverse_proxy 127.0.0.1:9000
+	}
+
+	@catalogo host {$CATALOGO_HOST:catalogo2037.fly.dev}
+	handle @catalogo {
+		reverse_proxy 127.0.0.1:8003
+	}
+
+	@site host {$SITE_HOST:site2037.fly.dev}
+	handle @site {
+		reverse_proxy 127.0.0.1:8081
+	}
+
+	# Mídia pública do Estoque no hostname do app (e path genérico)
+	@media path /public/*
+	handle @media {
+		reverse_proxy 127.0.0.1:8002
+	}
+
+	@app host {$APP_HOST:app2037.fly.dev}
+	handle @app {
+		# default do app = portal; mídia já capturada acima
+		reverse_proxy 127.0.0.1:9000
+	}
+
+	# Fallback: portal
+	handle {
+		reverse_proxy 127.0.0.1:9000
+	}
+}

@@ -1,0 +1,60 @@
+# VM 4 — Playwright workers (sem HTTP always-on / sem min_machines de serviço web)
+#
+# Deploy (raiz do repo) — SÓ após cutover (motor-api em app2037, clientes
+# apontando para lá). Enquanto motor2037 ainda tiver process group `app`
+# always-on com HTTP :8000, este deploy REMOVE o orquestrador legado.
+#
+#   fly deploy . -a motor2037 -c deploy/fly/3vm/fly.worker.toml --ha=false
+#
+# Pré-cutover (seguro): só valida a imagem, NÃO altera machines:
+#   fly deploy . -a motor2037 -c deploy/fly/3vm/fly.worker.toml --build-only
+#
+# Esta config NÃO sobe orquestrador HTTP. motor-api fica em app2037.
+# Slots reais (motor-worker-*) são Machines à parte (Machines API), com
+# MOTOR_WORKER_PROVEDOR por slot e restart on-failure. A machine Launch do
+# deploy é só “seed” de imagem (MOTOR_WORKER_SEED=1 → exit 0 → stopped).
+# CMD da imagem = /srv/scripts/on-demand-worker-entrypoint.sh
+
+app = "motor2037"
+primary_region = "gru"
+
+kill_timeout = 30
+
+[build]
+  # dockerfile + ignorefile: relativos a ESTE fly.toml (deploy/fly/3vm/).
+  # context = diretório do `fly deploy .` (raiz do repo).
+  dockerfile = "Dockerfile.worker"
+  ignorefile = ".dockerignore.worker"
+
+[env]
+  MOTOR_ENV = "production"
+  MOTOR_SKIP_INIT = "1"
+  MOTOR_WORKER_ON_DEMAND = "1"
+  MOTOR_WORKER_IDLE_STOP_SECONDS = "60"
+  MOTOR_WORKER_SEED = "1"
+  MOTOR_ORCHESTRATOR_ONLY = "0"
+  MOTOR_WORKER_TIPOS = "playwright"
+  MOTOR_FANOUT_ENABLED = "1"
+  MOTOR_BROWSER_HEADLESS = "0"
+  MOTOR_BROWSER_TIMEOUT_MS = "90000"
+  MOTOR_DRIVER_TIMEOUT_SECONDS = "420"
+  MOTOR_JOB_LEASE_SECONDS = "480"
+  MOTOR_TASK_LEASE_SECONDS = "480"
+  PLAYWRIGHT_CHROMIUM_USE_HEADLESS_SHELL = "0"
+  MOTOR_SCREENSHOT_DIR = "/srv/data/screenshots"
+  MOTOR_STORAGE_STATE_DIR = "/srv/data/storage_state"
+  DISPLAY = ":99"
+
+# Intencionalmente SEM:
+#   [[http_service]] / [[services]] / min_machines_running / mounts / release_command
+# Machines de trabalho = slots geridos pelo fan-out (Machines API).
+# Deploy pós-cutover: publica imagem + seed Launch (exit 0 → stopped).
+# Slots motor-worker-* continuam stopped até app2037 acordar.
+
+[[restart]]
+  policy = "on-failure"
+  retries = 3
+
+[[vm]]
+  size = "shared-cpu-2x"
+  memory = "2048"

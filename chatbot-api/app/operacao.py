@@ -38,6 +38,37 @@ def normalizar_telefone(valor: str | None) -> str:
     return re.sub(r"\D", "", str(valor))
 
 
+def variantes_telefone(valor: str | None) -> set[str]:
+    """Gera formas equivalentes (com/sem 55 e com/sem 9º dígito BR) para match de autorizado."""
+    base = normalizar_telefone(valor)
+    if not base:
+        return set()
+    out: set[str] = {base}
+
+    def _add(t: str) -> None:
+        if t and t not in out:
+            out.add(t)
+
+    # com / sem DDI 55
+    if base.startswith("55") and len(base) >= 12:
+        _add(base[2:])
+    elif not base.startswith("55") and 10 <= len(base) <= 11:
+        _add("55" + base)
+
+    # 9º dígito móvel BR: 55 + DDD(2) + [9] + 8 dígitos
+    for cand in list(out):
+        if cand.startswith("55") and len(cand) == 12:
+            # 55 + DDD + 8 dígitos → inserir 9
+            _add(cand[:4] + "9" + cand[4:])
+        if cand.startswith("55") and len(cand) == 13 and cand[4] == "9":
+            _add(cand[:4] + cand[5:])
+        if not cand.startswith("55") and len(cand) == 10:
+            _add(cand[:2] + "9" + cand[2:])
+        if not cand.startswith("55") and len(cand) == 11 and cand[2] == "9":
+            _add(cand[:2] + cand[3:])
+    return out
+
+
 def normalizar_placa(valor: str | None) -> str | None:
     if valor is None:
         return None
@@ -144,32 +175,20 @@ def remover_numero(db: Session, loja_id: str, telefone: str) -> dict:
 
 
 def esta_autorizado(db: Session, loja_id: str, telefone: str) -> bool:
-    tel = normalizar_telefone(telefone)
-    if not tel:
-        return False
-    row = (
-        db.query(NumeroAutorizado)
-        .filter(
-            NumeroAutorizado.loja_id == loja_id,
-            NumeroAutorizado.telefone == tel,
-            NumeroAutorizado.ativo.is_(True),
-        )
-        .first()
-    )
-    return row is not None
+    return _numero_autorizado_ativo(db, loja_id, telefone) is not None
 
 
 def _numero_autorizado_ativo(
     db: Session, loja_id: str, telefone: str
 ) -> NumeroAutorizado | None:
-    tel = normalizar_telefone(telefone)
-    if not tel:
+    cands = variantes_telefone(telefone)
+    if not cands:
         return None
     return (
         db.query(NumeroAutorizado)
         .filter(
             NumeroAutorizado.loja_id == loja_id,
-            NumeroAutorizado.telefone == tel,
+            NumeroAutorizado.telefone.in_(cands),
             NumeroAutorizado.ativo.is_(True),
         )
         .first()
@@ -250,15 +269,23 @@ def decidir_roteamento(
 ) -> dict:
     """Decide como o n8n trata a mensagem.
 
-    Retorna acao em {cliente, ignorar, cadastro, cadastro_controle}. Não-salvo é
-    sempre cliente; salvo só entra em cadastro se for número autorizado ativo que
-    mandou o gatilho e mantém a sessão viva. Ver design/plano para os ramos.
-    """
-    if is_saved is False:
-        return {"acao": "cliente", "resposta": None}
+    Retorna acao em {cliente, ignorar, cadastro, cadastro_controle}.
 
+    Três casos de produto:
+    1. Contato que já fala (salvo na agenda) e **não** é equipe → ``ignorar``
+       (sem bot de vendas).
+    2. Contato **novo** (não salvo) e **não** é equipe → ``cliente`` (IA).
+    3. Número **autorizado** (equipe cadastrada) → modo cadastro com gatilho
+       ``cadastro`` / sessão aberta; texto normal da equipe é ``ignorar``.
+
+    ``is_saved`` vem da Evolution (agenda do WhatsApp). Só ``False`` explícito
+    conta como contato novo; ``True`` ou desconhecido é fail-closed (ignorar).
+    """
     numero = _numero_autorizado_ativo(db, loja_id, telefone)
     if numero is None:
+        # Bot de vendas só para contatos novos (não salvos).
+        if is_saved is False:
+            return {"acao": "cliente", "resposta": None}
         return {"acao": "ignorar", "resposta": None}
 
     normal = (texto or "").strip().casefold()
@@ -280,6 +307,7 @@ def decidir_roteamento(
             ),
         }
 
+    # Equipe autorizada fora do modo cadastro: não aciona o bot de vendas.
     return {"acao": "ignorar", "resposta": None}
 
 

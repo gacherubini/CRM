@@ -1,0 +1,75 @@
+# VM 4 — Playwright worker (Chromium). Sem n8n/portal/API always-on.
+#
+# Build context = raiz do repo:
+#   docker build -f deploy/fly/3vm/Dockerfile.worker -t revy-worker:3vm .
+#
+# Fly (dockerfile path no fly.worker.toml é relativo a deploy/fly/3vm/):
+#   # pré-cutover — só imagem:
+#   fly deploy . -a motor2037 -c deploy/fly/3vm/fly.worker.toml --build-only
+#   # pós-cutover — worker-only (NÃO rodar se motor2037 ainda for a API):
+#   fly deploy . -a motor2037 -c deploy/fly/3vm/fly.worker.toml --ha=false
+#
+# Entrypoint: on-demand (Xvfb + fila do provedor + exit 0 → machine stopped).
+
+FROM python:3.12-slim
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
+
+WORKDIR /srv
+
+# Chromium headed (Xvfb) + libs. procps: pgrep no entrypoint on-demand.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates \
+    fonts-liberation \
+    fonts-noto-color-emoji \
+    procps \
+    xvfb \
+    xauth \
+    dbus-x11 \
+    libcairo2 \
+    libasound2 \
+    libatk-bridge2.0-0 \
+    libatk1.0-0 \
+    libatspi2.0-0 \
+    libcups2 \
+    libdbus-1-3 \
+    libdrm2 \
+    libgbm1 \
+    libglib2.0-0 \
+    libgtk-3-0 \
+    libnspr4 \
+    libnss3 \
+    libpango-1.0-0 \
+    libx11-6 \
+    libxcb1 \
+    libxcomposite1 \
+    libxdamage1 \
+    libxext6 \
+    libxfixes3 \
+    libxkbcommon0 \
+    libxrandr2 \
+    libxshmfence1 \
+    libxss1 \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY motor-simulacao/requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt \
+    && python -m playwright install chromium
+
+COPY motor-simulacao/app ./app
+COPY motor-simulacao/alembic ./alembic
+COPY motor-simulacao/alembic.ini .
+COPY motor-simulacao/scripts/worker-entrypoint.sh /srv/scripts/worker-entrypoint.sh
+COPY motor-simulacao/scripts/fly-entrypoint.sh /srv/scripts/fly-entrypoint.sh
+COPY motor-simulacao/scripts/on-demand-worker-entrypoint.sh /srv/scripts/on-demand-worker-entrypoint.sh
+RUN chmod +x /srv/scripts/*.sh \
+    && mkdir -p /srv/data/screenshots /srv/data/storage_state
+
+ENV MOTOR_WORKER_ON_DEMAND=1 \
+    MOTOR_SCREENSHOT_DIR=/srv/data/screenshots \
+    MOTOR_STORAGE_STATE_DIR=/srv/data/storage_state \
+    DISPLAY=:99
+
+# Machines on-demand sobem com este entrypoint (provedor via env do slot).
+CMD ["/srv/scripts/on-demand-worker-entrypoint.sh"]

@@ -1,0 +1,67 @@
+# Build context = repo root for 3vm images:
+#   docker build -f deploy/fly/3vm/Dockerfile.app -t revy-app:3vm .
+#   fly deploy . -c deploy/fly/3vm/fly.app.toml
+# fly.app.toml / fly.worker.toml can also set [build].ignorefile under deploy/fly/3vm/.
+#
+# Per-app Dockerfiles (chatbot-api/, motor-simulacao/, …) use their own directory as
+# context and their own .dockerignore — this file does not affect those builds.
+
+# VCS / tooling / secrets
+.git
+**/.git
+.claude
+**/.claude
+**/.env
+**/.env.*
+!**/.env.example
+
+# Local Python envs (largest local waste — often 100MB+ each service)
+**/.venv
+**/venv
+**/.venv/**
+**/venv/**
+
+# Bytecode / caches
+**/__pycache__
+**/*.py[cod]
+**/*.pyo
+**/.pytest_cache
+**/.pytest-tmp
+**/test-tmp-*
+**/.mypy_cache
+**/.ruff_cache
+**/node_modules
+
+# Tests (not COPYed by Dockerfile.app / Dockerfile.worker)
+**/tests
+
+# Local DBs and runtime artifacts (never bake into image)
+**/*.db
+motor-simulacao/data
+motor-simulacao/data/**
+**/screenshots
+**/storage_state
+
+# Docs / design assets / n8n workflow JSON
+# n8n runtime is installed via npm in Dockerfile.app; local JSON not needed in image.
+docs
+docs/**
+n8n
+n8n/**
+**/*.md
+**/*.pdf
+
+# Standalone compose stacks not used by 3vm images
+deploy/chatbot-standalone
+deploy/estoque-standalone
+deploy/motor-standalone
+deploy/catalogo-conectado
+
+# Keep required source for Dockerfile.app / Dockerfile.worker:
+#   chatbot-api/{app,alembic,alembic.ini}
+#   estoque-api/{app,alembic,alembic.ini}
+#   portal-gestao/{app,alembic,alembic.ini}
+#   catalogo-publico/app
+#   motor-simulacao/{app,alembic,alembic.ini,requirements.txt,scripts}
+#   site/{index.html,assets}
+#   deploy/fly/3vm/*

@@ -1,0 +1,73 @@
+app = "app2037"
+primary_region = "gru"
+
+[build]
+  # Deploy da raiz do repo (context = .):
+  # fly deploy . -a app2037 -c deploy/fly/3vm/fly.app.toml --ha=false
+  # dockerfile + ignorefile: relativos a ESTE fly.toml (deploy/fly/3vm/).
+  # Sem ignorefile, flyctl usa só o .dockerignore do working directory (raiz).
+  dockerfile = "Dockerfile.app"
+  ignorefile = ".dockerignore"
+
+[env]
+  PORTAL_ENV = "production"
+  PORTAL_SECURE_COOKIE = "1"
+  PORTAL_TIMEZONE = "America/Sao_Paulo"
+  PORTAL_DATABASE_URL = "sqlite:////data/portal/portal.db"
+  CATALOGO_DATABASE_PATH = "/data/catalogo/catalogo.db"
+  CATALOGO_SECURE_COOKIE = "1"
+  CATALOGO_PUBLIC_BASE_URL = "https://catalogo2037.fly.dev"
+  CATALOGO_DEFAULT_STORE_SLUG = "moto-center"
+  SIMULATION_PROVIDER = "http"
+  MOTOR_URL = "http://127.0.0.1:8004"
+  ESTOQUE_API_URL = "http://127.0.0.1:8002"
+  ESTOQUE_PUBLIC_URL = "http://127.0.0.1:8002"
+  ESTOQUE_PUBLIC_API_URL = "http://127.0.0.1:8002"
+  CHATBOT_API_URL = "http://127.0.0.1:8001"
+  CHATBOT_AUDIO_EVOLUTION_URL = "http://evolution2037.flycast:8080"
+  CHATBOT_IMAGE_EVOLUTION_URL = "http://evolution2037.flycast:8080"
+  CHATBOT_SKIP_INIT = "1"
+  ESTOQUE_SKIP_INIT = "1"
+  ESTOQUE_SESSION_SECURE_COOKIE = "1"
+  ESTOQUE_MEDIA_STORAGE_DIR = "/data/estoque/media"
+  # Ajustar host público do app se mídia for servida via cert no app2037
+  ESTOQUE_MEDIA_PUBLIC_BASE_URL = "https://app2037.fly.dev/public/v1/media"
+  ESTOQUE_MEDIA_ALLOWED_HOSTS = "app2037.fly.dev"
+  MOTOR_ENV = "production"
+  MOTOR_SKIP_INIT = "1"
+  MOTOR_ORCHESTRATOR_ONLY = "1"
+  MOTOR_WORKER_TIPOS = "api,mock"
+  N8N_HOST = "n8n2037.fly.dev"
+  N8N_PROTOCOL = "https"
+  N8N_PORT = "5678"
+  N8N_EDITOR_BASE_URL = "https://n8n2037.fly.dev"
+  N8N_SECURE_COOKIE = "true"
+  WEBHOOK_URL = "https://n8n2037.fly.dev/"
+  GENERIC_TIMEZONE = "America/Sao_Paulo"
+  TZ = "America/Sao_Paulo"
+  N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS = "true"
+  PORTAL_HOST = "portal2037.fly.dev"
+  CATALOGO_HOST = "catalogo2037.fly.dev"
+  SITE_HOST = "site2037.fly.dev"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = false
+  auto_start_machines = true
+  min_machines_running = 1
+
+  [[http_service.checks]]
+    path = "/healthz"
+    interval = "20s"
+    timeout = "8s"
+    # n8n cold start + alembic on boot
+    grace_period = "180s"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "1536"
+
+[[mounts]]
+  source = "app_data"
+  destination = "/data"

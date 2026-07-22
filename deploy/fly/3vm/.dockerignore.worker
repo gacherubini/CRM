@@ -1,0 +1,48 @@
+# Build context = repo root. Worker image only COPYs motor-simulacao/.
+# Referenced by fly.worker.toml [build].ignorefile (path relative to fly.toml dir).
+
+# VCS / tooling / secrets
+.git
+**/.git
+.claude
+**/.claude
+**/.env
+**/.env.*
+
+# Local Python envs
+**/.venv
+**/venv
+**/.venv/**
+**/venv/**
+
+# Bytecode / caches
+**/__pycache__
+**/*.py[cod]
+**/*.pyo
+**/.pytest_cache
+**/.pytest-tmp
+**/test-tmp-*
+**/.mypy_cache
+**/.ruff_cache
+**/node_modules
+
+**/tests
+**/*.db
+**/*.md
+**/*.pdf
+
+# Only motor-simulacao source is needed in the worker image.
+portal-gestao
+chatbot-api
+estoque-api
+catalogo-publico
+site
+n8n
+docs
+deploy
+
+# Large local artifacts under motor
+motor-simulacao/data
+motor-simulacao/data/**
+motor-simulacao/motor.db
+motor-simulacao/tests

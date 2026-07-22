@@ -1,0 +1,53 @@
+# Used when fly.app.toml sets [build].ignorefile = ".dockerignore"
+# (path relative to this fly.toml dir). Context is still the repo root.
+# Keep in sync with root .dockerignore for local `docker build -f … .`.
+
+# VCS / tooling / secrets
+.git
+**/.git
+.claude
+**/.claude
+**/.env
+**/.env.*
+!**/.env.example
+
+# Local Python envs (largest local waste — often 100MB+ each service)
+**/.venv
+**/venv
+**/.venv/**
+**/venv/**
+
+# Bytecode / caches
+**/__pycache__
+**/*.py[cod]
+**/*.pyo
+**/.pytest_cache
+**/.pytest-tmp
+**/test-tmp-*
+**/.mypy_cache
+**/.ruff_cache
+**/node_modules
+
+# Tests (not COPYed by Dockerfile.app)
+**/tests
+
+# Local DBs and runtime artifacts
+**/*.db
+motor-simulacao/data
+motor-simulacao/data/**
+**/screenshots
+**/storage_state
+
+# Docs / n8n workflow JSON (n8n via npm in image)
+docs
+docs/**
+n8n
+n8n/**
+**/*.md
+**/*.pdf
+
+# Standalone compose stacks not used by 3vm images
+deploy/chatbot-standalone
+deploy/estoque-standalone
+deploy/motor-standalone
+deploy/catalogo-conectado

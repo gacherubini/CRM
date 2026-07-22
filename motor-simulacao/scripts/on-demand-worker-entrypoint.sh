@@ -10,7 +10,12 @@ export MOTOR_WORKER_ON_DEMAND="${MOTOR_WORKER_ON_DEMAND:-1}"
 export MOTOR_WORKER_IDLE_STOP_SECONDS="${MOTOR_WORKER_IDLE_STOP_SECONDS:-60}"
 
 # Provedor obrigatório em slots dedicados (ex.: santander).
+# MACHINE Launch / seed de imagem: MOTOR_WORKER_SEED=1 → exit 0 (stopped, sem crash-loop).
 if [ -z "${MOTOR_WORKER_PROVEDOR:-}" ]; then
+  if [ "${MOTOR_WORKER_SEED:-}" = "1" ] || [ "${MOTOR_WORKER_SEED:-}" = "true" ]; then
+    echo "on-demand-worker: seed/image machine (sem MOTOR_WORKER_PROVEDOR) — exit 0" >&2
+    exit 0
+  fi
   echo "on-demand-worker: MOTOR_WORKER_PROVEDOR não definido" >&2
   exit 1
 fi

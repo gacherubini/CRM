@@ -1,17 +1,24 @@
 #!/usr/bin/env bash
 # Sobe a suíte no Fly (always-on em tudo):
-#   - Postgres, backends (motor/estoque/chatbot), Evolution, n8n → always-on
-#   - Portal, Catálogo e Site → always-on (sem auto_stop)
-#   - Reaplica autostop=off a cada up (idempotente)
+#
+# Preferido (arquitetura 3-VM — deploy/fly/3vm/):
+#   bash deploy/fly/up-all.sh --3vm
+#     sobe: suite-pg, evolution2037, app2037
+#     NÃO sobe: motor2037 (workers Playwright ficam stopped; sobem on-demand)
+#
+# Inventário operacional (apps monólito legados removidos a pedido do owner):
+#   always-on: suite-pg, evolution2037, app2037
+#   on-demand: motor2037 (workers Playwright; idle stopped)
 #
 # Uso:
-#   bash deploy/fly/up-all.sh              # suite de teste (sem catálogo)
-#   bash deploy/fly/up-all.sh --catalogo   # tenta Portal + Catálogo (pode falhar por RAM)
-#   bash deploy/fly/up-all.sh --no-portal  # só infra + backends + WA (sem front)
-#   bash deploy/fly/up-all.sh 45           # sobe e keepalive 45 min (re-start a cada 2 min)
-#   bash deploy/fly/up-all.sh --catalogo 30
+#   bash deploy/fly/up-all.sh --3vm         # 3-VM always-on (recomendado / único path real)
+#   bash deploy/fly/up-all.sh --3vm 45      # 3-VM + keepalive 45 min
+#   bash deploy/fly/up-all.sh              # legado: apps monólito (provavelmente inexistentes)
+#   bash deploy/fly/up-all.sh --catalogo   # legado
+#   bash deploy/fly/up-all.sh --no-portal  # legado
+#   bash deploy/fly/up-all.sh 45           # legado + keepalive
 #
-# Par: bash deploy/fly/down-all.sh
+# Par: bash deploy/fly/down-all.sh --3vm
 set -euo pipefail
 
 export PATH="${HOME}/.fly/bin:${PATH}"
@@ -27,15 +34,17 @@ fi
 
 WITH_PORTAL=1
 WITH_CATALOGO=0
+MODE_3VM=0
 MINUTES=0
 
 for arg in "$@"; do
   case "$arg" in
+    --3vm) MODE_3VM=1 ;;
     --catalogo|--with-catalogo) WITH_CATALOGO=1 ;;
     --no-portal) WITH_PORTAL=0 ;;
     --no-catalogo) WITH_CATALOGO=0 ;;
     -h|--help)
-      sed -n '2,22p' "$0" | sed 's/^# \?//'
+      sed -n '2,30p' "$0" | sed 's/^# \?//'
       exit 0
       ;;
     '' ) ;;
@@ -51,16 +60,15 @@ for arg in "$@"; do
 done
 
 # IDs conhecidos do lab (fallback se list falhar). Atualize se recrear machines.
+# Apenas apps que permanecem no inventário 3-VM (+ worker on-demand).
+# Legados (portal/catalogo/estoque/chatbot/n8n/site monólito) foram removidos —
+# não listar IDs mortos aqui (evita start em machines inexistentes).
+# app2037: sem fallback estático — use `fly machine list -a app2037`.
 # Chaves com aspas: com set -u, [suite-pg] é parseado como aritmética (suite - pg).
 declare -A FALLBACK_ID=(
   ["suite-pg"]=d8946d2f320de8
-  ["motor2037"]=0807560c916d68
-  ["estoque2037"]=287e35dbd147e8
-  ["chatbot2037"]=d8d1375a42e578
-  ["portal2037"]=6837936c0d73d8
-  ["catalogo2037"]=0807560c916768
-  ["n8n2037"]=d8946d0f703228
   ["evolution2037"]=7847926f5d1758
+  ["motor2037"]=0807560c916d68
 )
 
 machine_ids() {
@@ -156,7 +164,98 @@ print(data[0].get("state") or "?")
   return 1
 }
 
-echo ">> up-all (always-on em todos os apps principais)"
+print_machine_summary() {
+  local app
+  for app in "$@"; do
+    info=$("$FLY" machine list -a "$app" --json 2>/dev/null \
+      | python3 -c '
+import sys, json
+try:
+    data = json.load(sys.stdin)
+except Exception:
+    print("?"); sys.exit(0)
+if not data:
+    print("none"); sys.exit(0)
+parts=[]
+for m in data:
+    st=m.get("state") or "?"
+    mem=(m.get("config") or {}).get("guest",{}).get("memory_mb")
+    auto="?"
+    svcs=(m.get("config") or {}).get("services") or []
+    if svcs:
+        a=svcs[0].get("autostop")
+        auto = "off" if a is False else ("on" if a is True else str(a))
+    parts.append(f"{st} mem={mem} autostop={auto}")
+print(" | ".join(parts))
+' 2>/dev/null || echo "?")
+    printf '  %-16s %s\n' "$app" "$info"
+  done
+}
+
+if [ "$MODE_3VM" -eq 1 ]; then
+  # ---------------------------------------------------------------------------
+  # Arquitetura 3-VM (deploy/fly/3vm/): suite-pg + evolution2037 + app2037
+  # motor2037 (Playwright) fica stopped — sobe on-demand por job.
+  # ---------------------------------------------------------------------------
+  echo ">> up-all --3vm (always-on: suite-pg, evolution2037, app2037)"
+  echo "   motor2037 workers: NÃO iniciados (on-demand / idle stopped)"
+  echo "   keepalive_min=$MINUTES"
+  echo ""
+
+  echo "=== 1/3 Postgres ==="
+  start_app suite-pg || true
+  wait_started suite-pg 15 || true
+  sleep 3
+
+  echo ""
+  echo "=== 2/3 Evolution (canal WhatsApp) ==="
+  start_app evolution2037 || true
+  wait_started evolution2037 20 || true
+  ensure_backend_always_on evolution2037
+
+  echo ""
+  echo "=== 3/3 app2037 (n8n + chatbot + estoque + portal + catálogo + site + motor-api) ==="
+  start_app app2037 || true
+  wait_started app2037 30 || true
+  ensure_backend_always_on app2037
+
+  echo ""
+  echo "  (motor2037: workers deixados stopped — Playwright sobe só sob demanda)"
+
+  echo ""
+  echo ">> resumo"
+  print_machine_summary suite-pg evolution2037 app2037 motor2037
+
+  echo ""
+  echo "URLs: App https://app2037.fly.dev  |  Evolution https://evolution2037.fly.dev/manager"
+  echo "      Site https://site2037.fly.dev/health (se host apontar para app2037)"
+  echo "Down quando acabar:  bash deploy/fly/down-all.sh --3vm --yes"
+
+  if [ "$MINUTES" -gt 0 ] 2>/dev/null; then
+    end=$(( $(date +%s) + MINUTES * 60 ))
+    echo ""
+    echo ">> keepalive ${MINUTES} min (re-start a cada 2 min; Ctrl+C para parar)"
+    while [ "$(date +%s)" -lt "$end" ]; do
+      sleep 120
+      echo ">> keepalive $(date +%H:%M:%S)"
+      start_app suite-pg || true
+      start_app evolution2037 || true
+      start_app app2037 || true
+    done
+    echo ">> keepalive esgotado (always-on com autostop=off devem continuar)."
+  fi
+
+  echo ">> pronto."
+  exit 0
+fi
+
+# ---------------------------------------------------------------------------
+# Legado: apps monólito por serviço (sem --3vm)
+# Apps legados foram removidos do Fly — este path só permanece por compat de CLI.
+# Prefira sempre: bash deploy/fly/up-all.sh --3vm
+# ---------------------------------------------------------------------------
+echo ">> up-all legado (apps monólito — provavelmente destruídos; use --3vm)"
+echo "   tip: bash deploy/fly/up-all.sh --3vm  (suite-pg + evolution2037 + app2037)"
 echo "   portal=$WITH_PORTAL  catalogo=$WITH_CATALOGO  keepalive_min=$MINUTES"
 echo ""
 
@@ -220,35 +319,13 @@ ensure_backend_always_on site2037
 
 echo ""
 echo ">> resumo"
-for app in suite-pg motor2037 estoque2037 chatbot2037 evolution2037 n8n2037 portal2037 catalogo2037; do
-  info=$("$FLY" machine list -a "$app" --json 2>/dev/null \
-    | python3 -c '
-import sys, json
-try:
-    data = json.load(sys.stdin)
-except Exception:
-    print("?"); sys.exit(0)
-if not data:
-    print("none"); sys.exit(0)
-parts=[]
-for m in data:
-    st=m.get("state") or "?"
-    mem=(m.get("config") or {}).get("guest",{}).get("memory_mb")
-    auto="?"
-    svcs=(m.get("config") or {}).get("services") or []
-    if svcs:
-        a=svcs[0].get("autostop")
-        auto = "off" if a is False else ("on" if a is True else str(a))
-    parts.append(f"{st} mem={mem} autostop={auto}")
-print(" | ".join(parts))
-' 2>/dev/null || echo "?")
-  printf '  %-16s %s\n' "$app" "$info"
-done
+print_machine_summary suite-pg motor2037 estoque2037 chatbot2037 evolution2037 n8n2037 portal2037 catalogo2037
 
 echo ""
 echo "URLs: Portal https://portal2037.fly.dev  |  Catálogo https://catalogo2037.fly.dev"
 echo "      n8n https://n8n2037.fly.dev  |  Evolution https://evolution2037.fly.dev/manager"
 echo "Down quando acabar:  bash deploy/fly/down-all.sh --yes"
+echo "(3-VM: bash deploy/fly/up-all.sh --3vm  /  bash deploy/fly/down-all.sh --3vm)"
 
 if [ "$MINUTES" -gt 0 ] 2>/dev/null; then
   end=$(( $(date +%s) + MINUTES * 60 ))
