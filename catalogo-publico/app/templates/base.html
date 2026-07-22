@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/static/css/catalog.css">
+  <link rel="stylesheet" href="{{ url_prefix }}/static/css/catalog.css">
   {% if meta_pixel_enabled and meta_pixel_id %}
   <!-- Meta Pixel (E10). Pixel ID é público; token CAPI nunca no catálogo. -->
   <script>
@@ -31,7 +31,7 @@
 </head>
 <body>
   <header class="topbar">
-    <a class="brand" href="{% if loja %}/l/{{ loja.slug }}{% else %}/{% endif %}">
+    <a class="brand" href="{% if loja %}{{ url_prefix }}/l/{{ loja.slug }}{% else %}{{ url_prefix }}/{% endif %}">
       <span class="brand-mark" aria-hidden="true">{% if loja %}{{ loja.nome[:1] | upper }}{% else %}R{% endif %}</span>
       <span>{% if loja %}{{ loja.nome }}{% else %}Catálogo{% endif %}</span>
     </a>

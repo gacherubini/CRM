@@ -14,6 +14,9 @@ class Settings:
     database_path: str = os.getenv("CATALOGO_DATABASE_PATH", "data/catalogo.db")
     page_size: int = max(1, min(48, int(os.getenv("CATALOGO_PAGE_SIZE", "12"))))
     public_base_url: str = os.getenv("CATALOGO_PUBLIC_BASE_URL", "").rstrip("/")
+    # Prefixo de path quando o catálogo é exposto atrás de reverse-proxy
+    # (ex.: 3-VM em https://app2037.fly.dev/loja → "/loja").
+    url_prefix_raw: str = os.getenv("CATALOGO_URL_PREFIX", "").strip()
     default_store_slug: str = os.getenv(
         "CATALOGO_DEFAULT_STORE_SLUG", "moto-center"
     ).strip()
@@ -34,6 +37,20 @@ class Settings:
     def inventory_url_valid(self) -> bool:
         parsed = urlparse(self.inventory_url)
         return parsed.scheme in {"http", "https"} and bool(parsed.netloc)
+
+    @property
+    def url_prefix(self) -> str:
+        """Prefixo público sem barra final ('' ou '/loja')."""
+        raw = self.url_prefix_raw
+        if not raw and self.public_base_url:
+            path = urlparse(self.public_base_url).path.rstrip("/")
+            if path and path != "/":
+                raw = path
+        if not raw or raw == "/":
+            return ""
+        if not raw.startswith("/"):
+            raw = "/" + raw
+        return raw.rstrip("/")
 
     @property
     def meta_pixel_enabled(self) -> bool:

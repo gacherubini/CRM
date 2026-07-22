@@ -31,6 +31,37 @@ def test_raiz_redireciona_para_loja_padrao(client):
     assert response.headers["location"] == "/l/moto-center"
 
 
+def test_css_e_links_usam_prefixo_quando_configurado(client, monkeypatch):
+    from app import main as main_mod
+    from app.config import Settings
+
+    base = settings
+    valores = {f.name: getattr(base, f.name) for f in fields(base)}
+    valores["url_prefix_raw"] = "/loja"
+    valores["public_base_url"] = "https://app2037.fly.dev/loja"
+    patched = Settings(**valores)
+    monkeypatch.setattr(main_mod, "settings", patched)
+
+    def _pp(path: str) -> str:
+        if not path.startswith("/"):
+            path = "/" + path
+        prefix = patched.url_prefix
+        return f"{prefix}{path}" if prefix else path
+
+    monkeypatch.setattr(main_mod, "public_path", _pp)
+    main_mod.templates.env.globals["url_prefix"] = patched.url_prefix
+    main_mod.templates.env.globals["public_path"] = _pp
+
+    root = client.get("/", follow_redirects=False)
+    assert root.headers["location"] == "/loja/l/moto-center"
+
+    page = client.get("/l/moto-center")
+    assert page.status_code == 200
+    assert 'href="/loja/static/css/catalog.css"' in page.text
+    assert 'href="/loja/l/moto-center/veiculos/vehicle-1"' in page.text
+    assert "fonts.googleapis.com" in page.headers.get("content-security-policy", "")
+
+
 def test_vitrine_renderiza_dados_e_preserva_filtros(client, fake_provider):
     response = client.get(
         "/l/moto-center?tipo=moto&marca=Honda&preco_min=10000&preco_max=30000&limit=1"

@@ -26,7 +26,17 @@ def moeda(valor: float) -> str:
     return "R$ " + texto.replace(",", "X").replace(".", ",").replace("X", ".")
 
 
+def public_path(path: str) -> str:
+    """Monta path absoluto com CATALOGO_URL_PREFIX (ex.: /loja/static/...)."""
+    if not path.startswith("/"):
+        path = "/" + path
+    prefix = settings.url_prefix
+    return f"{prefix}{path}" if prefix else path
+
+
 templates.env.filters["moeda"] = moeda
+templates.env.globals["url_prefix"] = settings.url_prefix
+templates.env.globals["public_path"] = public_path
 
 
 @asynccontextmanager
@@ -56,19 +66,22 @@ app.state.interest_store = InterestStore(settings.database_path)
 
 
 def _content_security_policy() -> str:
-    # Meta Pixel (browser) precisa de script/connect do connect.facebook.net / facebook.com.
+    # Google Fonts (Inter) + Meta Pixel opcional.
+    style = "style-src 'self' https://fonts.googleapis.com; "
+    font = "font-src 'self' https://fonts.gstatic.com data:; "
     if settings.meta_pixel_enabled:
         return (
             "default-src 'self'; "
             "img-src 'self' https: http: data:; "
-            "style-src 'self'; "
+            f"{style}{font}"
             "script-src 'self' 'unsafe-inline' https://connect.facebook.net; "
             "connect-src 'self' https://www.facebook.com https://connect.facebook.net; "
             "base-uri 'none'; frame-ancestors 'none'"
         )
     return (
         "default-src 'self'; img-src 'self' https: http: data:; "
-        "style-src 'self'; base-uri 'none'; frame-ancestors 'none'"
+        f"{style}{font}"
+        "base-uri 'none'; frame-ancestors 'none'"
     )
 
 
@@ -141,12 +154,14 @@ def page_url(slug: str, filters: dict, offset: int, limit: int) -> str:
         for key, value in {**filters, "limit": limit, "offset": max(offset, 0)}.items()
         if value not in (None, "")
     }
-    return f"/l/{slug}?{urlencode(params)}"
+    return public_path(f"/l/{slug}?{urlencode(params)}")
 
 
 @app.get("/", include_in_schema=False)
 def root_catalog():
-    return RedirectResponse(f"/l/{settings.default_store_slug}", status_code=307)
+    return RedirectResponse(
+        public_path(f"/l/{settings.default_store_slug}"), status_code=307
+    )
 
 
 @app.get("/health/live")
@@ -266,7 +281,9 @@ def vehicle_detail(
     # event_id compartilhado browser Lead ↔ registro de interesse (dedupe Meta).
     lead_event_id = str(uuid.uuid4())
     tracking["event_id"] = lead_event_id
-    interest_url = f"/l/{slug}/interesse/{vehicle_id}?{urlencode(tracking)}"
+    interest_url = public_path(
+        f"/l/{slug}/interesse/{vehicle_id}?{urlencode(tracking)}"
+    )
     return templates.TemplateResponse(
         request,
         "vehicle.html",

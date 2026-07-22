@@ -7,7 +7,7 @@
   <p class="muted">Estoque publicado pela loja. Fale no WhatsApp quando encontrar o que procura.</p>
 </section>
 
-<form class="filters" method="get" action="/l/{{ loja.slug }}">
+<form class="filters" method="get" action="{{ url_prefix }}/l/{{ loja.slug }}">
   <label>Tipo
     <select name="tipo">
       <option value="">Todos</option>
@@ -26,7 +26,7 @@
 <section class="vehicle-grid" aria-label="Veículos encontrados">
   {% for v in veiculos %}
   <article class="vehicle-card">
-    <a href="/l/{{ loja.slug }}/veiculos/{{ v.id }}" aria-label="Ver {{ v.marca }} {{ v.modelo }}">
+    <a href="{{ url_prefix }}/l/{{ loja.slug }}/veiculos/{{ v.id }}" aria-label="Ver {{ v.marca }} {{ v.modelo }}">
       <div class="card-media">
         {% if v.imagens %}<img src="{{ v.imagens[0] }}" alt="{{ v.marca }} {{ v.modelo }}" loading="lazy" width="640" height="420">
         {% else %}<div class="image-fallback">Sem foto</div>{% endif %}
@@ -45,7 +45,7 @@
 <section class="empty-state">
   <h2>Nenhum veículo encontrado</h2>
   <p>Tente remover algum filtro ou volte mais tarde para ver as novidades.</p>
-  <a class="button secondary" href="/l/{{ loja.slug }}">Limpar filtros</a>
+  <a class="button secondary" href="{{ url_prefix }}/l/{{ loja.slug }}">Limpar filtros</a>
 </section>
 {% endif %}
 
