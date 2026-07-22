@@ -111,8 +111,16 @@ def main() -> None:
     assert '"idempotency_key"' not in vehicle_create_schema, (
         "schema não deve pedir idempotência ao modelo"
     )
-    assert '"additionalProperties": false' in vehicle_create_schema, (
-        "schema do cadastro deve rejeitar campos extras do modelo"
+    # n8n ToolCode injeta o item pai (telefone, remoteJid, acao, toolCallId…) no
+    # input da tool. additionalProperties:false quebra o cadastro em runtime.
+    # A segurança fica no jsCode: só repassa campos conhecidos + telefone do webhook.
+    assert '"additionalProperties": true' in vehicle_create_schema.replace(
+        " ", ""
+    ) or '"additionalProperties":true' in vehicle_create_schema.replace(" ", ""), (
+        "schema do cadastro deve permitir campos de contexto do n8n (additionalProperties true)"
+    )
+    assert "input.tipo" in vehicle_create_code and "input.placa" in vehicle_create_code, (
+        "jsCode do cadastro deve ler só campos conhecidos do input"
     )
     assert "input.foto_url" not in vehicle_create_code, (
         "modelo não pode escolher URL de foto no cadastro"
@@ -253,10 +261,25 @@ def main() -> None:
     assert "cadastro_controle" in gate_salvos_code, (
         "gate não trata a resposta de controle do cadastro"
     )
+    assert "operacao_controle" in gate_salvos_code or "output" in gate_salvos_code, (
+        "gate deve preparar output de menu/controle sem LLM"
+    )
+    # Menu/controle não passa pelo Agent
+    assert (
+        connections.get("Gate somente nao salvos1", {}).get("main", [[]])[0][0].get("node")
+        == "Se resposta controle1"
+    ), "gate deve alimentar o IF de resposta controle"
+    if_true = connections.get("Se resposta controle1", {}).get("main", [[], []])
+    assert if_true and if_true[0][0].get("node") == "Responder WhatsApp1", (
+        "controle deve ir direto ao WhatsApp"
+    )
+    assert len(if_true) > 1 and if_true[1][0].get("node") == "AI Agent1", (
+        "não-controle deve ir ao AI Agent"
+    )
 
     print(
         "workflow n8n válido: webhook seguro, áudio efêmero, "
-        "foto automática no estoque e resultado privado"
+        "foto automática no estoque, menu de operação e resultado privado"
     )
 
 

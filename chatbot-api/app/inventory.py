@@ -343,6 +343,106 @@ class HttpInventoryWriteClient:
             raise HTTPException(status_code=502, detail="credencial de estoque recusada")
         raise HTTPException(status_code=502, detail=detail or "estoque indisponível no momento")
 
+    def _headers_auth(self) -> dict[str, str]:
+        return {"Authorization": f"Bearer {self.token}", "Content-Type": "application/json"}
+
+    def _exigir_disponivel(self) -> None:
+        if not self.disponivel():
+            raise HTTPException(
+                status_code=503,
+                detail="integração de estoque (escrita) não configurada",
+            )
+
+    def _mapear_erro_http(self, r: "httpx.Response") -> HTTPException:
+        detail = _extrair_detail(r)
+        if r.status_code == 404:
+            return HTTPException(status_code=404, detail=detail or "veículo não encontrado")
+        if r.status_code == 409:
+            return HTTPException(status_code=409, detail=detail or "conflito no estoque")
+        if r.status_code == 422:
+            return HTTPException(status_code=422, detail=detail or "dados inválidos no estoque")
+        if r.status_code in (401, 403):
+            return HTTPException(
+                status_code=502,
+                detail="credencial de estoque recusada (verifique ESTOQUE_API_TOKEN)",
+            )
+        return HTTPException(
+            status_code=502, detail=detail or f"estoque retornou {r.status_code}"
+        )
+
+    def listar_veiculos(
+        self,
+        *,
+        busca: str | None = None,
+        status: str | None = None,
+        publicado: bool | None = None,
+        limit: int = 10,
+    ) -> list[dict]:
+        """Lista privada do estoque da loja (token de serviço)."""
+        self._exigir_disponivel()
+        params: dict[str, object] = {}
+        if busca:
+            params["busca"] = busca
+        if status:
+            params["status"] = status
+        if publicado is not None:
+            params["publicado"] = publicado
+        try:
+            r = httpx.get(
+                f"{self.base_url}/v1/veiculos",
+                params=params,
+                headers={"Authorization": f"Bearer {self.token}"},
+                timeout=self.timeout,
+            )
+        except httpx.HTTPError as exc:
+            raise HTTPException(
+                status_code=502, detail="estoque indisponível no momento"
+            ) from exc
+        if r.status_code != 200:
+            raise self._mapear_erro_http(r)
+        body = r.json() if r.content else {}
+        veiculos = body.get("veiculos") if isinstance(body, dict) else None
+        if not isinstance(veiculos, list):
+            return []
+        lim = max(1, min(int(limit or 10), 30))
+        return veiculos[:lim]
+
+    def atualizar_veiculo(self, veiculo_id: str, campos: dict) -> dict:
+        self._exigir_disponivel()
+        try:
+            r = httpx.patch(
+                f"{self.base_url}/v1/veiculos/{veiculo_id}",
+                json=campos,
+                headers=self._headers_auth(),
+                timeout=self.timeout,
+            )
+        except httpx.HTTPError as exc:
+            raise HTTPException(
+                status_code=502, detail="estoque indisponível no momento"
+            ) from exc
+        if r.status_code not in (200, 201):
+            raise self._mapear_erro_http(r)
+        return r.json()
+
+    def acao_veiculo(self, veiculo_id: str, acao: str) -> dict:
+        """publicar | despublicar | reservar | vender."""
+        self._exigir_disponivel()
+        if acao not in {"publicar", "despublicar", "reservar", "vender"}:
+            raise HTTPException(status_code=422, detail="ação de estoque inválida")
+        try:
+            r = httpx.post(
+                f"{self.base_url}/v1/veiculos/{veiculo_id}/{acao}",
+                headers={"Authorization": f"Bearer {self.token}"},
+                timeout=self.timeout,
+            )
+        except httpx.HTTPError as exc:
+            raise HTTPException(
+                status_code=502, detail="estoque indisponível no momento"
+            ) from exc
+        if r.status_code not in (200, 201):
+            raise self._mapear_erro_http(r)
+        return r.json()
+
 
 def _extrair_detail(r: httpx.Response) -> str | None:
     try:

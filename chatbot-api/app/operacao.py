@@ -6,6 +6,7 @@ como fonte de verdade.
 """
 from __future__ import annotations
 
+import json
 import logging
 import re
 import uuid
@@ -17,7 +18,7 @@ from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app import config
-from app.inventory import InventoryWriteClient
+from app.inventory import InventoryWriteClient, get_inventory_write_client
 from app.models_db import NumeroAutorizado
 from app.vehicle_photo import VehiclePhotoProcessor
 
@@ -25,10 +26,27 @@ from app.vehicle_photo import VehiclePhotoProcessor
 _PLACA_RE = re.compile(r"^[A-Z]{3}[0-9][0-9A-Z][0-9]{2}$")
 _PAPEIS = frozenset({"dono", "vendedor"})
 _TIPOS = frozenset({"moto", "carro"})
-_GATILHO_CADASTRO = frozenset({"cadastro"})
-_ENCERRAR_CADASTRO = frozenset({"fim", "sair"})
+_GATILHO_MENU = frozenset({"cadastro", "menu", "estoque", "operacao", "operação"})
+_ENCERRAR = frozenset({"fim", "sair", "0", "cancelar", "menu"})
+_CONFIRMAR = frozenset({"sim", "s", "yes", "confirmo", "confirma"})
+_NEGAR = frozenset({"nao", "não", "n", "no", "cancelar"})
+_CAMPOS_EDIT = frozenset({"preco", "preço", "km", "cor"})
+_MODOS = frozenset(
+    {"menu", "cadastrar", "listar", "editar", "despublicar", "vender"}
+)
 _PLACA_NA_LEGENDA_RE = re.compile(r"\b([A-Z]{3})[-\s]?([0-9][A-Z0-9][0-9]{2})\b", re.I)
 logger = logging.getLogger("chatbot.operacao")
+
+_TEXTO_MENU = (
+    "Menu de estoque 🛠️\n"
+    "1 - Cadastrar veículo\n"
+    "2 - Ver veículos\n"
+    "3 - Editar veículo\n"
+    "4 - Despublicar (sumir do catálogo)\n"
+    "5 - Marcar como vendido\n"
+    "0 - Sair\n\n"
+    "Responda com o número ou o nome da opção."
+)
 
 
 def normalizar_telefone(valor: str | None) -> str:
@@ -257,7 +275,303 @@ def _abrir_ou_renovar_cadastro(db: Session, numero: NumeroAutorizado) -> None:
 
 def _fechar_cadastro(db: Session, numero: NumeroAutorizado) -> None:
     numero.cadastro_expira_em = None
+    numero.operacao_modo = None
+    numero.operacao_ctx = None
     db.commit()
+
+
+def _ctx_get(numero: NumeroAutorizado) -> dict[str, Any]:
+    raw = numero.operacao_ctx
+    if not raw:
+        return {}
+    try:
+        data = json.loads(raw)
+        return data if isinstance(data, dict) else {}
+    except (TypeError, ValueError, json.JSONDecodeError):
+        return {}
+
+
+def _ctx_set(db: Session, numero: NumeroAutorizado, ctx: dict[str, Any] | None) -> None:
+    if not ctx:
+        numero.operacao_ctx = None
+    else:
+        numero.operacao_ctx = json.dumps(ctx, ensure_ascii=False)
+    db.commit()
+
+
+def _set_modo(
+    db: Session,
+    numero: NumeroAutorizado,
+    modo: str | None,
+    ctx: dict[str, Any] | None = None,
+) -> None:
+    ttl = max(1, config.CADASTRO_SESSION_TTL_SECONDS)
+    numero.cadastro_expira_em = datetime.now(timezone.utc) + timedelta(seconds=ttl)
+    numero.operacao_modo = modo
+    numero.operacao_ctx = (
+        json.dumps(ctx, ensure_ascii=False) if ctx else None
+    )
+    db.commit()
+
+
+def _controle(resposta: str) -> dict:
+    """Resposta fixa para o n8n enviar sem LLM."""
+    return {"acao": "operacao_controle", "resposta": resposta}
+
+
+def _fmt_preco(valor: Any) -> str:
+    try:
+        return (
+            f"R$ {float(valor):,.2f}"
+            .replace(",", "X")
+            .replace(".", ",")
+            .replace("X", ".")
+        )
+    except (TypeError, ValueError):
+        return str(valor)
+
+
+def _fmt_linha_veiculo(v: dict, idx: int | None = None) -> str:
+    placa = v.get("placa") or "s/placa"
+    marca = v.get("marca") or ""
+    modelo = v.get("modelo") or ""
+    ano = v.get("ano_modelo") or ""
+    preco = _fmt_preco(v.get("preco"))
+    status = v.get("status") or ""
+    pub = "pub" if v.get("publicado") else "off"
+    prefix = f"{idx}. " if idx is not None else ""
+    return f"{prefix}{marca} {modelo} {ano} | {preco} | {placa} | {status}/{pub}".strip()
+
+
+def _formatar_lista(veiculos: list[dict], busca: str | None = None) -> str:
+    if not veiculos:
+        titulo = "Nenhum veículo encontrado"
+        if busca:
+            titulo += f" para «{busca}»"
+        return titulo + ".\n\n" + _TEXTO_MENU
+    cab = f"Veículos ({len(veiculos)})"
+    if busca:
+        cab += f" — busca «{busca}»"
+    linhas = [cab, ""]
+    for i, v in enumerate(veiculos, start=1):
+        linhas.append(_fmt_linha_veiculo(v, i))
+    linhas.extend(["", "Digite *menu* para voltar."])
+    return "\n".join(linhas)
+
+
+def _resolver_opcao_menu(normal: str) -> str | None:
+    """Mapeia texto do usuário para modo interno."""
+    if normal in {"1", "cadastrar", "cadastro", "novo", "criar"}:
+        return "cadastrar"
+    if normal in {"2", "ver", "listar", "lista", "veiculos", "veículos", "estoque"}:
+        return "listar"
+    if normal.startswith("2 ") or normal.startswith("listar ") or normal.startswith("ver "):
+        return "listar"
+    if normal in {"3", "editar", "edit", "alterar", "atualizar"}:
+        return "editar"
+    if normal in {"4", "despublicar", "apagar", "remover", "tirar", "ocultar"}:
+        return "despublicar"
+    if normal in {"5", "vender", "vendido", "venda"}:
+        return "vender"
+    return None
+
+
+def _extrair_busca_listar(normal: str) -> str | None:
+    for prefix in ("2 ", "listar ", "ver ", "busca ", "buscar "):
+        if normal.startswith(prefix):
+            termo = normal[len(prefix) :].strip()
+            return termo or None
+    return None
+
+
+def _pedir_placa(acao_label: str) -> str:
+    return (
+        f"{acao_label}\n"
+        "Envie a *placa* do veículo (ex.: ABC1D23).\n"
+        "Ou digite *menu* para voltar."
+    )
+
+
+def _listar_estoque(busca: str | None = None) -> str:
+    try:
+        client = get_inventory_write_client()
+        veiculos = client.listar_veiculos(busca=busca, limit=10)
+    except HTTPException as exc:
+        return f"Não consegui listar o estoque agora ({exc.detail}).\n\n{_TEXTO_MENU}"
+    except Exception:
+        logger.exception("falha ao listar estoque no menu WA")
+        return f"Não consegui listar o estoque agora.\n\n{_TEXTO_MENU}"
+    return _formatar_lista(veiculos, busca)
+
+
+def _resolver_veiculo_por_texto(texto: str) -> tuple[dict | None, str | None]:
+    """Retorna (veiculo, erro_msg)."""
+    try:
+        placa = validar_placa(texto)
+    except HTTPException:
+        return None, "Placa inválida. Use o formato ABC1D23 ou ABC1234."
+    try:
+        client = get_inventory_write_client()
+        v = client.obter_por_placa(placa)
+    except HTTPException as exc:
+        return None, f"Erro ao buscar placa: {exc.detail}"
+    if not v:
+        return None, f"Não encontrei veículo com a placa {placa}."
+    return v, None
+
+
+def _handle_modo_editar(
+    db: Session, numero: NumeroAutorizado, normal: str, texto: str
+) -> dict:
+    ctx = _ctx_get(numero)
+    step = ctx.get("step") or "placa"
+
+    if normal in _GATILHO_MENU or normal == "menu":
+        _set_modo(db, numero, "menu", {})
+        return _controle(_TEXTO_MENU)
+
+    if step == "placa":
+        v, err = _resolver_veiculo_por_texto(texto)
+        if err:
+            return _controle(err + "\nEnvie a placa ou *menu*.")
+        _set_modo(
+            db,
+            numero,
+            "editar",
+            {"step": "campo", "placa": v.get("placa"), "veiculo_id": v.get("id")},
+        )
+        return _controle(
+            f"Veículo: {_fmt_linha_veiculo(v)}\n\n"
+            "O que deseja alterar?\n"
+            "• preco\n• km\n• cor\n\n"
+            "Ou *menu* para voltar."
+        )
+
+    if step == "campo":
+        campo = normal.replace("ç", "c").replace("preço", "preco")
+        if campo not in {"preco", "km", "cor"}:
+            return _controle("Campo inválido. Use: preco, km ou cor.")
+        ctx["step"] = "valor"
+        ctx["campo"] = campo
+        _set_modo(db, numero, "editar", ctx)
+        return _controle(f"Envie o novo valor de *{campo}*.")
+
+    if step == "valor":
+        campo = ctx.get("campo")
+        if campo not in {"preco", "km", "cor"}:
+            _set_modo(db, numero, "menu", {})
+            return _controle("Sessão de edição inconsistente.\n\n" + _TEXTO_MENU)
+        valor_raw = (texto or "").strip()
+        campos: dict[str, Any] = {}
+        if campo == "preco":
+            limpo = (
+                valor_raw.lower()
+                .replace("r$", "")
+                .replace(".", "")
+                .replace(",", ".")
+                .strip()
+            )
+            try:
+                campos["preco"] = float(limpo)
+            except ValueError:
+                return _controle("Preço inválido. Ex.: 21900 ou 21.900,00")
+            if campos["preco"] <= 0:
+                return _controle("Preço deve ser maior que zero.")
+        elif campo == "km":
+            dig = re.sub(r"\D", "", valor_raw)
+            if not dig:
+                return _controle("KM inválido. Ex.: 18000")
+            campos["km"] = int(dig)
+        else:
+            campos["cor"] = valor_raw[:40]
+        ctx["step"] = "confirma"
+        ctx["campos"] = campos
+        ctx["valor_txt"] = valor_raw
+        _set_modo(db, numero, "editar", ctx)
+        return _controle(
+            f"Confirma alterar *{campo}* de {ctx.get('placa')} para *{valor_raw}*?\n"
+            "Responda *SIM* ou *NÃO*."
+        )
+
+    if step == "confirma":
+        if normal in _NEGAR:
+            _set_modo(db, numero, "menu", {})
+            return _controle("Edição cancelada.\n\n" + _TEXTO_MENU)
+        if normal not in _CONFIRMAR:
+            return _controle("Responda *SIM* para confirmar ou *NÃO* para cancelar.")
+        veiculo_id = ctx.get("veiculo_id")
+        campos = ctx.get("campos") or {}
+        try:
+            client = get_inventory_write_client()
+            atualizado = client.atualizar_veiculo(str(veiculo_id), campos)
+        except HTTPException as exc:
+            _set_modo(db, numero, "menu", {})
+            return _controle(f"Não consegui editar: {exc.detail}\n\n{_TEXTO_MENU}")
+        _set_modo(db, numero, "menu", {})
+        return _controle(
+            f"Atualizado: {_fmt_linha_veiculo(atualizado)}\n\n{_TEXTO_MENU}"
+        )
+
+    _set_modo(db, numero, "menu", {})
+    return _controle(_TEXTO_MENU)
+
+
+def _handle_modo_acao(
+    db: Session,
+    numero: NumeroAutorizado,
+    normal: str,
+    texto: str,
+    acao_estoque: str,
+) -> dict:
+    """despublicar ou vender com confirmação."""
+    label = "Despublicar" if acao_estoque == "despublicar" else "Marcar como vendido"
+    ctx = _ctx_get(numero)
+    step = ctx.get("step") or "placa"
+
+    if normal in _GATILHO_MENU or normal == "menu":
+        _set_modo(db, numero, "menu", {})
+        return _controle(_TEXTO_MENU)
+
+    if step == "placa":
+        v, err = _resolver_veiculo_por_texto(texto)
+        if err:
+            return _controle(err + "\nEnvie a placa ou *menu*.")
+        _set_modo(
+            db,
+            numero,
+            acao_estoque,
+            {
+                "step": "confirma",
+                "placa": v.get("placa"),
+                "veiculo_id": v.get("id"),
+            },
+        )
+        return _controle(
+            f"{label} o veículo?\n{_fmt_linha_veiculo(v)}\n\n"
+            "Responda *SIM* ou *NÃO*."
+        )
+
+    if step == "confirma":
+        if normal in _NEGAR:
+            _set_modo(db, numero, "menu", {})
+            return _controle(f"{label} cancelado.\n\n{_TEXTO_MENU}")
+        if normal not in _CONFIRMAR:
+            return _controle("Responda *SIM* para confirmar ou *NÃO* para cancelar.")
+        veiculo_id = ctx.get("veiculo_id")
+        try:
+            client = get_inventory_write_client()
+            atualizado = client.acao_veiculo(str(veiculo_id), acao_estoque)
+        except HTTPException as exc:
+            _set_modo(db, numero, "menu", {})
+            return _controle(f"Não consegui concluir: {exc.detail}\n\n{_TEXTO_MENU}")
+        _set_modo(db, numero, "menu", {})
+        verbo = "despublicado" if acao_estoque == "despublicar" else "marcado como vendido"
+        return _controle(
+            f"Veículo {verbo}: {_fmt_linha_veiculo(atualizado)}\n\n{_TEXTO_MENU}"
+        )
+
+    _set_modo(db, numero, "menu", {})
+    return _controle(_TEXTO_MENU)
 
 
 def decidir_roteamento(
@@ -269,46 +583,101 @@ def decidir_roteamento(
 ) -> dict:
     """Decide como o n8n trata a mensagem.
 
-    Retorna acao em {cliente, ignorar, cadastro, cadastro_controle}.
+    Retorna acao em {cliente, ignorar, cadastro, operacao_controle, cadastro_controle}.
 
     Três casos de produto:
-    1. Contato que já fala (salvo na agenda) e **não** é equipe → ``ignorar``
-       (sem bot de vendas).
-    2. Contato **novo** (não salvo) e **não** é equipe → ``cliente`` (IA).
-    3. Número **autorizado** (equipe cadastrada) → modo cadastro com gatilho
-       ``cadastro`` / sessão aberta; texto normal da equipe é ``ignorar``.
+    1. Contato que já fala (salvo) e **não** é equipe → ``ignorar``
+    2. Contato **novo** (não salvo) e **não** é equipe → ``cliente`` (IA vendas)
+    3. Número **autorizado** → menu de estoque com gatilho ``cadastro``/``menu``
 
-    ``is_saved`` vem da Evolution (agenda do WhatsApp). Só ``False`` explícito
-    conta como contato novo; ``True`` ou desconhecido é fail-closed (ignorar).
+    ``is_saved``: só ``False`` explícito conta como contato novo.
     """
     numero = _numero_autorizado_ativo(db, loja_id, telefone)
     if numero is None:
-        # Bot de vendas só para contatos novos (não salvos).
         if is_saved is False:
             return {"acao": "cliente", "resposta": None}
         return {"acao": "ignorar", "resposta": None}
 
     normal = (texto or "").strip().casefold()
+    # Compat: cadastro_controle ainda aceito no n8n (= operacao_controle)
+    def _ctrl(msg: str) -> dict:
+        r = _controle(msg)
+        # alias legado para o gate do n8n atual
+        r["acao"] = "cadastro_controle"
+        return r
 
-    if _sessao_cadastro_aberta(numero):
-        if normal in _ENCERRAR_CADASTRO:
-            _fechar_cadastro(db, numero)
-            return {"acao": "cadastro_controle", "resposta": "Cadastro encerrado."}
+    # Gatilho abre (ou reabre) o menu
+    if normal in _GATILHO_MENU:
+        _set_modo(db, numero, "menu", {})
+        return _ctrl(_TEXTO_MENU)
+
+    if not _sessao_cadastro_aberta(numero):
+        return {"acao": "ignorar", "resposta": None}
+
+    # Encerrar sessão
+    if normal in {"fim", "sair", "0"}:
+        _fechar_cadastro(db, numero)
+        return _ctrl("Menu encerrado. Envie *cadastro* ou *menu* quando quiser voltar.")
+
+    modo = (numero.operacao_modo or "menu").strip().lower()
+    if modo not in _MODOS:
+        modo = "menu"
+
+    # Voltar ao menu de qualquer subfluxo
+    if normal == "menu" and modo != "menu":
+        _set_modo(db, numero, "menu", {})
+        return _ctrl(_TEXTO_MENU)
+
+    if modo == "menu":
+        opcao = _resolver_opcao_menu(normal)
+        if opcao == "cadastrar":
+            _set_modo(db, numero, "cadastrar", {})
+            return _ctrl(
+                "Modo *cadastrar* 📝\n"
+                "Envie os dados em uma mensagem:\n"
+                "tipo (moto/carro), marca, modelo, ano, preço, km e placa.\n"
+                "Ex.: Honda CG 160 2018 21900 18mil km ABC1D23\n\n"
+                "Depois pode mandar as *fotos*.\n"
+                "Digite *menu* para voltar ou *fim* para sair."
+            )
+        if opcao == "listar":
+            busca = _extrair_busca_listar(normal)
+            _set_modo(db, numero, "menu", {})
+            return _ctrl(_listar_estoque(busca))
+        if opcao == "editar":
+            _set_modo(db, numero, "editar", {"step": "placa"})
+            return _ctrl(_pedir_placa("Editar veículo ✏️"))
+        if opcao == "despublicar":
+            _set_modo(db, numero, "despublicar", {"step": "placa"})
+            return _ctrl(_pedir_placa("Despublicar (some do catálogo) 🙈"))
+        if opcao == "vender":
+            _set_modo(db, numero, "vender", {"step": "placa"})
+            return _ctrl(_pedir_placa("Marcar como vendido ✅"))
+        # texto livre no menu: reexibe opções
+        _abrir_ou_renovar_cadastro(db, numero)
+        return _ctrl(
+            "Não entendi essa opção.\n\n" + _TEXTO_MENU
+        )
+
+    if modo == "cadastrar":
+        if normal in _GATILHO_MENU or normal == "menu":
+            _set_modo(db, numero, "menu", {})
+            return _ctrl(_TEXTO_MENU)
+        # Texto livre → LLM extrai e chama cadastrar_veiculo
         _abrir_ou_renovar_cadastro(db, numero)
         return {"acao": "cadastro", "resposta": None}
 
-    if normal in _GATILHO_CADASTRO:
-        _abrir_ou_renovar_cadastro(db, numero)
-        return {
-            "acao": "cadastro_controle",
-            "resposta": (
-                "Modo cadastro aberto. Envie os dados do veículo e as fotos. "
-                "Mande 'fim' para encerrar."
-            ),
-        }
+    if modo == "editar":
+        return _handle_modo_editar(db, numero, normal, texto or "")
 
-    # Equipe autorizada fora do modo cadastro: não aciona o bot de vendas.
-    return {"acao": "ignorar", "resposta": None}
+    if modo == "despublicar":
+        return _handle_modo_acao(db, numero, normal, texto or "", "despublicar")
+
+    if modo == "vender":
+        return _handle_modo_acao(db, numero, normal, texto or "", "vender")
+
+    _set_modo(db, numero, "menu", {})
+    return _ctrl(_TEXTO_MENU)
 
 
 def _exigir_autorizado(db: Session, loja_id: str, telefone: str) -> str:
@@ -411,6 +780,47 @@ def _resumo_veiculo(v: dict) -> str:
     return f"{marca} {modelo} {ano} — {preco_fmt} — placa {placa}".strip()
 
 
+def _saida_veiculo_cadastro(
+    db: Session,
+    loja_id: str,
+    tel: str,
+    veiculo: dict[str, Any],
+    *,
+    ja_existia: bool,
+) -> dict:
+    placa = str(veiculo.get("placa") or "")
+    sessao_ativa = _tentar_ativar_sessao_fotos(db, loja_id, tel, placa) if placa else False
+    resumo = _resumo_veiculo(veiculo)
+    if ja_existia:
+        mensagem = f"Veículo já estava no estoque: {resumo}"
+    else:
+        mensagem = f"Veículo cadastrado e publicado no catálogo: {resumo}"
+    if sessao_ativa:
+        mensagem += (
+            " Agora envie as fotos; pelas próximas "
+            f"{_minutos_sessao_fotos()} min não precisa repetir a placa."
+        )
+    return {
+        "ok": True,
+        "mensagem": mensagem,
+        "ja_existia": ja_existia,
+        "veiculo": {
+            "id": veiculo.get("id"),
+            "tipo": veiculo.get("tipo"),
+            "marca": veiculo.get("marca"),
+            "modelo": veiculo.get("modelo"),
+            "ano_modelo": veiculo.get("ano_modelo"),
+            "preco": veiculo.get("preco"),
+            "km": veiculo.get("km"),
+            "placa": veiculo.get("placa"),
+            "status": veiculo.get("status"),
+            "publicado": veiculo.get("publicado"),
+            "foto_url": veiculo.get("foto_url"),
+        },
+        "solicitante": tel,
+    }
+
+
 def criar_veiculo_autorizado(
     db: Session,
     loja_id: str,
@@ -427,35 +837,18 @@ def criar_veiculo_autorizado(
     # para reenvios do mesmo cadastro no WhatsApp não duplicarem quando o Estoque suportar.
     key = idempotency_key or f"wa-veiculo:{loja_id}:{payload['placa']}:{payload['marca']}:{payload['modelo']}:{payload['ano_modelo']}"
 
-    criado = write_client.criar_veiculo(payload, idempotency_key=key)
-    sessao_ativa = _tentar_ativar_sessao_fotos(
-        db, loja_id, tel, payload["placa"]
-    )
-    resumo = _resumo_veiculo(criado)
-    mensagem = f"Veículo cadastrado e publicado no catálogo: {resumo}"
-    if sessao_ativa:
-        mensagem += (
-            " Agora envie as fotos; pelas próximas "
-            f"{_minutos_sessao_fotos()} min não precisa repetir a placa."
-        )
-    return {
-        "ok": True,
-        "mensagem": mensagem,
-        "veiculo": {
-            "id": criado.get("id"),
-            "tipo": criado.get("tipo"),
-            "marca": criado.get("marca"),
-            "modelo": criado.get("modelo"),
-            "ano_modelo": criado.get("ano_modelo"),
-            "preco": criado.get("preco"),
-            "km": criado.get("km"),
-            "placa": criado.get("placa"),
-            "status": criado.get("status"),
-            "publicado": criado.get("publicado"),
-            "foto_url": criado.get("foto_url"),
-        },
-        "solicitante": tel,
-    }
+    try:
+        criado = write_client.criar_veiculo(payload, idempotency_key=key)
+    except HTTPException as exc:
+        # Placa já cadastrada: reabre sessão de fotos em vez de falhar o fluxo WA.
+        if exc.status_code == 409:
+            existente = write_client.obter_por_placa(payload["placa"])
+            if existente:
+                return _saida_veiculo_cadastro(
+                    db, loja_id, tel, existente, ja_existia=True
+                )
+        raise
+    return _saida_veiculo_cadastro(db, loja_id, tel, criado, ja_existia=False)
 
 
 def anexar_foto_whatsapp(

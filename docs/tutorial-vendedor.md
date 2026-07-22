@@ -206,8 +206,14 @@ Se uma venda sua não aparecer, confira primeiro o período e o status. Somente 
 
 Este fluxo é usado quando a gestão cadastrou o seu número em **Números de cadastro**. Não tente usar com o número pessoal sem autorização.
 
-1. No WhatsApp autorizado, envie `cadastro`.
-2. Aguarde a confirmação de que a sessão de cadastro está aberta.
+1. No WhatsApp autorizado, envie `cadastro` ou `menu`.
+2. Escolha a opção do menu:
+   - **1** Cadastrar veículo  
+   - **2** Ver veículos  
+   - **3** Editar (preço/km/cor)  
+   - **4** Despublicar (some do catálogo)  
+   - **5** Marcar como vendido  
+   - **0** Sair
 3. Envie os dados solicitados do veículo por texto.
 4. Envie as fotos em sequência; não é preciso repetir a placa em cada uma enquanto a sessão estiver aberta.
 5. Envie `fim` ao terminar.

@@ -34,10 +34,22 @@ $json = $json.Replace("__INSTANCE__", $instance)
 $json = $json.Replace("__CHATBOT_TOKEN__", $secrets["CHATBOT_API_TOKEN"])
 $json = $json.Replace("__CHATBOT_WEBHOOK_TOKEN__", $secrets["CHATBOT_WEBHOOK_TOKEN"])
 
-# Evolution apikey from env EVOLUTION_API_KEY if set (not in secrets.local by default)
-if ($env:EVOLUTION_API_KEY) {
-  # replace placeholder patterns if any remain; also set common apikey header values later in import
-  $json = $json.Replace("__EVOLUTION_KEY__", $env:EVOLUTION_API_KEY)
+# Evolution apikey: env > .evolution_key.local > .secrets.local EVOLUTION_API_KEY
+$evoKey = $env:EVOLUTION_API_KEY
+if (-not $evoKey) {
+  $evoKeyFile = Join-Path $PSScriptRoot ".evolution_key.local"
+  if (Test-Path $evoKeyFile) {
+    $evoKey = (Get-Content $evoKeyFile -Raw).Trim()
+  }
+}
+if (-not $evoKey -and $secrets.ContainsKey("EVOLUTION_API_KEY") -and $secrets["EVOLUTION_API_KEY"]) {
+  $evoKey = $secrets["EVOLUTION_API_KEY"]
+}
+if ($evoKey) {
+  $json = $json.Replace("__EVOLUTION_KEY__", $evoKey)
+  Write-Host "evolution apikey: len=$($evoKey.Length)"
+} else {
+  Write-Warning "EVOLUTION_API_KEY missing - __EVOLUTION_KEY__ left as placeholder (Evolution calls will 401)"
 }
 
 # Activate for import

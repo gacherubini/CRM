@@ -112,7 +112,9 @@ O caminho mais seguro ao fechar é: vendedor registra a venda com veículo e lea
 
 Em **Números de cadastro**, adicione somente telefones da equipe que podem cadastrar veículo ou mandar fotos. O número precisa estar salvo na agenda da loja.
 
-O operador autorizado envia **cadastro**, informa os dados, manda as fotos em sequência e encerra com **fim**. Para anexar foto a veículo já existente, a placa deve estar na primeira mensagem/foto. Remova imediatamente o número de quem não faz mais parte da equipe. Nunca autorize clientes nesse recurso.
+O operador autorizado envia **cadastro** ou **menu** e escolhe a opção:
+1 cadastrar, 2 ver estoque, 3 editar (preço/km/cor), 4 despublicar, 5 marcar vendido, 0 sair.
+No cadastro, envia os dados em uma mensagem, manda as fotos e pode voltar ao menu. Para anexar foto a veículo já existente, use a placa na legenda. Remova imediatamente o número de quem não faz mais parte da equipe. Nunca autorize clientes nesse recurso.
 
 ## 4. WhatsApp, bot e atendimento humano
 

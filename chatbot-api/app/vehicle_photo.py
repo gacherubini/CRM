@@ -17,6 +17,12 @@ from app.inventory import InventoryWriteClient, get_inventory_write_client
 
 logger = logging.getLogger("chatbot.vehicle_photo")
 MIMES_IMAGEM = frozenset({"image/jpeg", "image/png", "image/webp"})
+# WhatsApp / iOS às vezes mandam alias não-padrão.
+_MIME_ALIAS = {
+    "image/jpg": "image/jpeg",
+    "image/pjpeg": "image/jpeg",
+    "image/x-png": "image/png",
+}
 
 
 class ImagemIndisponivel(RuntimeError):
@@ -31,8 +37,9 @@ class ImageDownloader(Protocol):
 
 def normalizar_mime(valor: object) -> str:
     mime = str(valor or "").split(";", 1)[0].strip().lower()
+    mime = _MIME_ALIAS.get(mime, mime)
     if mime not in MIMES_IMAGEM:
-        raise ImagemIndisponivel("tipo de imagem não permitido")
+        raise ImagemIndisponivel(f"tipo de imagem não permitido: {mime or 'vazio'}")
     return mime
 
 
@@ -81,10 +88,22 @@ class EvolutionImageDownloader:
         except ImagemIndisponivel:
             raise
         except (httpx.HTTPError, ValueError) as exc:
+            logger.warning(
+                "download Evolution falhou instancia=%s msg_id=%s err=%s",
+                instancia,
+                message_id,
+                exc,
+            )
             raise ImagemIndisponivel("não foi possível obter a imagem") from exc
         try:
             payload = json.loads(bruto)
         except (json.JSONDecodeError, UnicodeDecodeError) as exc:
+            logger.warning(
+                "resposta Evolution não-JSON instancia=%s msg_id=%s bytes=%s",
+                instancia,
+                message_id,
+                len(bruto),
+            )
             raise ImagemIndisponivel("resposta de imagem inválida") from exc
         return self._decodificar(payload, mime_declarado)
 
@@ -163,8 +182,35 @@ class VehiclePhotoProcessor:
                 "quantidade_fotos": quantidade,
                 "publicado": bool(atualizado.get("publicado")),
             }
-        except (ImagemIndisponivel, HTTPException, KeyError, TypeError, ValueError):
-            logger.warning("foto de veículo não processada")
+        except ImagemIndisponivel as exc:
+            logger.warning(
+                "foto de veículo indisponível placa=%s msg_id=%s motivo=%s",
+                placa,
+                message_id,
+                exc,
+            )
+            return {
+                "ok": False,
+                "mensagem": "Não consegui baixar a imagem do WhatsApp. Reenvie como foto (não documento), JPG/PNG/WebP, com a placa na legenda se for a primeira.",
+            }
+        except HTTPException as exc:
+            logger.warning(
+                "foto recusada pelo estoque placa=%s status=%s detail=%s",
+                placa,
+                exc.status_code,
+                exc.detail,
+            )
+            return {
+                "ok": False,
+                "mensagem": f"Não consegui salvar a foto no estoque ({exc.detail}). Tente de novo com a placa na legenda.",
+            }
+        except (KeyError, TypeError, ValueError) as exc:
+            logger.warning(
+                "foto de veículo não processada placa=%s msg_id=%s err=%s",
+                placa,
+                message_id,
+                exc,
+            )
             return {
                 "ok": False,
                 "mensagem": "Não consegui salvar essa foto. Confira se é JPG, PNG ou WebP e tente novamente com a placa na legenda.",

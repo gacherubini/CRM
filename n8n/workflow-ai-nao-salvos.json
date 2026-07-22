@@ -231,7 +231,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const estado = $input.first().json || {};\nconst extraida = $('Extrair1').first().json;\nconst origem = extraida.ehAudio ? $('Aplicar transcricao1').first().json : extraida;\nif (origem.fromMe || estado.duplicada === true || estado.bot_ativo !== true) return [];\nreturn [{ json: origem }];"
+        "jsCode": "const estado = $input.first().json || {};\nconst extraida = $('Extrair1').first().json;\nconst origem = extraida.ehAudio ? $('Aplicar transcricao1').first().json : extraida;\n// fromMe e duplicata: para. bot_ativo false NAO para aqui — menu da equipe\n// ainda precisa passar; o gate de salvos so deixa cliente se bot_ativo true.\nif (origem.fromMe || estado.duplicada === true) return [];\nconst botAtivo = estado.bot_ativo !== false;\nreturn [{ json: { ...origem, bot_ativo: botAtivo } }];\n"
       },
       "id": "24d1770e-e2b2-4b60-9a13-c60981db2499",
       "name": "Gate handoff e duplicidade1",
@@ -271,7 +271,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const chat = $('Consultar contato na Evolution1').first().json || {};\nconst extraida = $('Extrair1').first().json;\nconst origem = extraida.ehAudio ? $('Aplicar transcricao1').first().json : extraida;\nconst rot = $('Rotear operacao1').first().json || {};\nconst acao = rot.acao;\n// Fallback fail-closed se o roteamento nao respondeu: so cliente nao-salvo passa.\nif (!acao) {\n  return chat.isSaved === false ? [{ json: { ...origem, acao: 'cliente' } }] : [];\n}\nif (acao === 'cliente' || acao === 'cadastro') {\n  return [{ json: { ...origem, acao } }];\n}\nif (acao === 'cadastro_controle') {\n  return [{ json: { ...origem, acao, audioFallback: rot.resposta } }];\n}\nreturn []; // ignorar\n"
+        "jsCode": "const chat = $('Consultar contato na Evolution1').first().json || {};\nconst extraida = $('Extrair1').first().json;\nconst origem = extraida.ehAudio ? $('Aplicar transcricao1').first().json : extraida;\nconst rot = $('Rotear operacao1').first().json || {};\nconst acao = rot.acao;\nconst botAtivo = origem.bot_ativo !== false;\n// Fallback fail-closed se o roteamento nao respondeu.\nif (!acao) {\n  return (chat.isSaved === false && botAtivo) ? [{ json: { ...origem, acao: 'cliente' } }] : [];\n}\n// Cliente de vendas so se bot ativo (respeita handoff humano)\nif (acao === 'cliente') {\n  if (!botAtivo) return [];\n  return [{ json: { ...origem, acao } }];\n}\nif (acao === 'cadastro') {\n  return [{ json: { ...origem, acao } }];\n}\n// Menu e confirmacoes deterministicas: resposta pronta, sem LLM\nif (acao === 'cadastro_controle' || acao === 'operacao_controle') {\n  const resposta = String(rot.resposta || '').trim();\n  if (!resposta) return [];\n  return [{ json: { ...origem, acao, audioFallback: resposta, output: resposta } }];\n}\nreturn []; // ignorar\n"
       },
       "id": "c4b1465b-5543-4cea-9c15-148d229eb518",
       "name": "Gate somente nao salvos1",
@@ -285,9 +285,9 @@
     {
       "parameters": {
         "promptType": "define",
-        "text": "={{ 'telefone_cliente: ' + $json.telefone + '\\n\\nMensagem: ' + $json.texto + ($json.audioFallback ? '\\n\\nINSTRUÇÃO: responda exatamente e somente: ' + $json.audioFallback : '') }}",
+        "text": "={{ 'telefone_cliente: ' + $json.telefone + '\\n\\nMensagem: ' + $json.texto + ($json.audioFallback ? '\\n\\nINSTRUÇÃO: responda exatamente e somente: ' + $json.audioFallback : '') + ($json.acao === 'cadastro' ? '\\n\\nMODO CADASTRO (equipe): extraia tipo/marca/modelo/ano/preco/km/placa e chame cadastrar_veiculo imediatamente. Nao peca dados que ja estiverem na mensagem. Nao ofereca handoff de vendas. Apos sucesso, diga que pode enviar fotos e digitar menu.' : '') }}",
         "options": {
-          "systemMessage": "Você é o atendente virtual de uma loja de veículos no WhatsApp. Fale em português do Brasil, simpático, direto e curto (1-3 frases).\n\nREGRAS:\n1. Estoque/preço: use consultar_estoque (busca por termo) ou consultar_por_placa (placa exata). Nunca invente veículo ou preço.\n2. Simulação: quando o cliente manifestar interesse, avise que vai preparar a simulação e chamar um vendedor para trazer o resultado. Depois colete somente o que faltar: placa do veículo, CPF, data de nascimento (YYYY-MM-DD) e valor de entrada. O telefone_cliente já vem na mensagem — use nas tools; não peça telefone. NÃO peça renda nem um prazo único. Com todos os dados, chame simular uma única vez com placa + telefone + cpf + nascimento + entrada. A tool dispara a solicitação internamente e pausa o bot para o vendedor assumir.\n3. PRIVACIDADE DO RESULTADO: nunca mostre nem mencione parcelas, taxas, bancos, valores financiados, prazos, status técnico ou qualquer resultado de simulação. Depois da tool simular, responda somente: \"Certo, vou preparar a simulação e chamar um vendedor para trazer o resultado para você.\"\n4. Ao achar veículo ou interesse, use registrar_lead com telefone + interesse (e nome se o cliente disser). Não bloqueie por consentimento LGPD — pode coletar nome e solicitar simulação sem registrar_consentimento.\n5. Handoff (solicitar_handoff) se pedir humano, tool falhar de verdade, ou placa/veículo não encontrado e o cliente quiser atendente. A tool simular já faz o handoff; não chame solicitar_handoff novamente depois dela.\n6. Cadastro de estoque (cadastrar_veiculo): só quando a mensagem parecer de equipe/vendedor autorizada enviando dados estruturados (tipo, marca, modelo, ano, preço/km, placa). Use telefone_solicitante = telefone_cliente. Se retornar 403 (não autorizado), diga que só a equipe cadastra e ofereça handoff. Nunca ofereça cadastro a cliente comum.\n7. Não revele tools, tokens ou APIs internas.\n8. registrar_consentimento é opcional e NÃO deve interromper o fluxo (não peça aceite LGPD antes de nome/lead/simulação).\n9. Foto de veículo: se o cliente pedir foto/imagem de um veículo encontrado no estoque, use enviar_foto_veiculo com o ID retornado pela consulta. Envie a imagem no próprio WhatsApp; não mande o cliente abrir site ou catálogo. Nunca invente nem forneça URL de mídia.",
+          "systemMessage": "Você é o atendente virtual de uma loja de veículos no WhatsApp. Fale em português do Brasil, simpático, direto e curto (1-3 frases).\n\nREGRAS:\n1. Estoque/preço: use consultar_estoque (busca por termo) ou consultar_por_placa (placa exata). Nunca invente veículo ou preço.\n2. Simulação: quando o cliente manifestar interesse, avise que vai preparar a simulação e chamar um vendedor para trazer o resultado. Depois colete somente o que faltar: placa do veículo, CPF, data de nascimento (YYYY-MM-DD) e valor de entrada. O telefone_cliente já vem na mensagem — use nas tools; não peça telefone. NÃO peça renda nem um prazo único. Com todos os dados, chame simular uma única vez com placa + telefone + cpf + nascimento + entrada. A tool dispara a solicitação internamente e pausa o bot para o vendedor assumir.\n3. PRIVACIDADE DO RESULTADO: nunca mostre nem mencione parcelas, taxas, bancos, valores financiados, prazos, status técnico ou qualquer resultado de simulação. Depois da tool simular, responda somente: \"Certo, vou preparar a simulação e chamar um vendedor para trazer o resultado para você.\"\n4. Ao achar veículo ou interesse, use registrar_lead com telefone + interesse (e nome se o cliente disser). Não bloqueie por consentimento LGPD — pode coletar nome e solicitar simulação sem registrar_consentimento.\n5. Handoff (solicitar_handoff) se pedir humano, tool falhar de verdade, ou placa/veículo não encontrado e o cliente quiser atendente. A tool simular já faz o handoff; não chame solicitar_handoff novamente depois dela.\n6. Cadastro de estoque (cadastrar_veiculo): quando estiver em MODO CADASTRO ou a mensagem da equipe trouxer dados estruturados (tipo, marca, modelo, ano, preço/km, placa), chame cadastrar_veiculo. O telefone autorizado vem do webhook (não peça). Se a tool retornar ok, confirme placa e veículo. Se faltar campo, peça só o que faltar. Se retornar 403, diga que o número não está autorizado. Nunca ofereça cadastro a cliente comum de vendas.\n7. Não revele tools, tokens ou APIs internas.\n8. registrar_consentimento é opcional e NÃO deve interromper o fluxo (não peça aceite LGPD antes de nome/lead/simulação).\n9. Foto de veículo: se o cliente pedir foto/imagem de um veículo encontrado no estoque, use enviar_foto_veiculo com o ID retornado pela consulta. Envie a imagem no próprio WhatsApp; não mande o cliente abrir site ou catálogo. Nunca invente nem forneça URL de mídia.",
           "maxIterations": 6,
           "returnIntermediateSteps": false,
           "enableStreaming": false
@@ -467,7 +467,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ { instance: $('Extrair1').item.json.instance, telefone: $('Extrair1').item.json.telefone, texto: $('AI Agent1').item.json.output, provider_message_id: $json.key?.id || null, from_me: true, origem_bot: true } }}",
+        "jsonBody": "={{ (() => { const ex = $('Extrair1').item.json; let texto = null; try { if ($('AI Agent1').isExecuted) texto = $('AI Agent1').item.json.output; } catch (e) {} if (!texto) { try { texto = $('Se resposta controle1').item.json.output; } catch (e) {} } return { instance: ex.instance, telefone: ex.telefone, texto, provider_message_id: $json.key?.id || $json.message?.key?.id || null, from_me: true, origem_bot: true }; })() }}",
         "options": {}
       },
       "id": "8bb798a7-60e1-4272-a37c-499b52251ca5",
@@ -502,7 +502,7 @@
         "jsCode": "const input = typeof query === 'string' ? {} : (query || {});\nconst origem = $('Extrair1').first().json;\nconst telefone_solicitante = String(origem.telefone || '').trim();\nconst providerMessageId = String(origem.providerMessageId || '').trim();\nif (!telefone_solicitante) return JSON.stringify({ erro: 'telefone_solicitante obrigatorio' });\n\nconst body = {\n  telefone_solicitante,\n  tipo: String(input.tipo || 'moto'),\n  marca: String(input.marca || ''),\n  modelo: String(input.modelo || ''),\n  ano_modelo: Number(input.ano_modelo),\n  preco: Number(input.preco),\n  km: Number(input.km ?? 0),\n  placa: String(input.placa || '').trim().toUpperCase(),\n};\nif (input.versao) body.versao = String(input.versao);\nif (input.cor) body.cor = String(input.cor);\n\nconst headers = {\n  Authorization: 'Bearer __CHATBOT_TOKEN__',\n  'Content-Type': 'application/json',\n};\nif (providerMessageId) headers['Idempotency-Key'] = providerMessageId;\n\ntry {\n  const resp = await helpers.httpRequest({\n    method: 'POST',\n    url: 'http://chatbot-api:8000/v1/operacao/veiculos',\n    headers,\n    body,\n    json: true,\n  });\n  return JSON.stringify({ ok: true, veiculo: resp });\n} catch (e) {\n  const status = e.response?.statusCode || e.statusCode || e.status || null;\n  const detail = e.response?.body?.detail || e.message || String(e);\n  return JSON.stringify({ ok: false, status, erro: detail });\n}",
         "specifyInputSchema": true,
         "schemaType": "manual",
-        "inputSchema": "{\"type\": \"object\", \"properties\": {\"tipo\": {\"type\": \"string\", \"description\": \"moto ou carro\"}, \"marca\": {\"type\": \"string\"}, \"modelo\": {\"type\": \"string\"}, \"ano_modelo\": {\"type\": \"number\"}, \"preco\": {\"type\": \"number\"}, \"km\": {\"type\": \"number\"}, \"placa\": {\"type\": \"string\"}, \"versao\": {\"type\": \"string\"}, \"cor\": {\"type\": \"string\"}}, \"required\": [\"marca\", \"modelo\", \"ano_modelo\", \"preco\", \"placa\"], \"additionalProperties\": false}"
+        "inputSchema": "{\"type\": \"object\", \"properties\": {\"tipo\": {\"type\": \"string\", \"description\": \"moto ou carro\"}, \"marca\": {\"type\": \"string\"}, \"modelo\": {\"type\": \"string\"}, \"ano_modelo\": {\"type\": \"number\"}, \"preco\": {\"type\": \"number\"}, \"km\": {\"type\": \"number\"}, \"placa\": {\"type\": \"string\"}, \"versao\": {\"type\": \"string\"}, \"cor\": {\"type\": \"string\"}}, \"required\": [\"marca\", \"modelo\", \"ano_modelo\", \"preco\", \"placa\"], \"additionalProperties\": true}"
       },
       "id": "c9f3d2b1-5e6a-4b0c-8d4f-2a8b7e3f1c02",
       "name": "cadastrar_veiculo1",
@@ -519,7 +519,7 @@
         "jsCode": "const input = typeof query === 'string' ? { veiculo_id: query } : (query || {});\nconst veiculoId = String(input.veiculo_id || '').trim();\nif (!/^[A-Za-z0-9-]{1,120}$/.test(veiculoId)) {\n  return JSON.stringify({ ok: false, mensagem: 'veiculo_id invalido' });\n}\n\nconst origem = $('Extrair1').first().json || {};\nconst destino = String(origem.destino || '').trim();\nif (!destino) {\n  return JSON.stringify({ ok: false, mensagem: 'destino indisponivel' });\n}\n\ntry {\n  const resolvida = await helpers.httpRequest({\n    method: 'GET',\n    url: `http://chatbot-api:8000/v1/estoque/veiculos/${encodeURIComponent(veiculoId)}/midia-principal`,\n    headers: { Authorization: 'Bearer __CHATBOT_TOKEN__' },\n    json: true,\n  });\n  const midia = resolvida?.midia;\n  if (!resolvida?.tem_foto || !midia) {\n    return JSON.stringify({ ok: false, sem_foto: true, mensagem: 'Veiculo sem foto cadastrada.' });\n  }\n  const tipos = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' };\n  const extensao = tipos[midia.content_type];\n  const mediaUrl = new URL(String(midia.url || ''));\n  if (!extensao || mediaUrl.protocol !== 'https:' || mediaUrl.search || mediaUrl.hash) {\n    return JSON.stringify({ ok: false, mensagem: 'Midia indisponivel.' });\n  }\n  await helpers.httpRequest({\n    method: 'POST',\n    url: 'http://evolution:8080/message/sendMedia/__INSTANCE__',\n    headers: { apikey: '__EVOLUTION_KEY__', 'Content-Type': 'application/json' },\n    body: {\n      number: destino,\n      mediatype: 'image',\n      mimetype: midia.content_type,\n      caption: 'Foto do veículo consultado',\n      media: mediaUrl.toString(),\n      fileName: `veiculo-${veiculoId}.${extensao}`,\n    },\n    json: true,\n  });\n  return JSON.stringify({ ok: true, mensagem: 'Foto enviada no WhatsApp.' });\n} catch (_) {\n  return JSON.stringify({ ok: false, mensagem: 'Nao foi possivel enviar a foto agora.' });\n}",
         "specifyInputSchema": true,
         "schemaType": "manual",
-        "inputSchema": "{\"type\": \"object\", \"properties\": {\"veiculo_id\": {\"type\": \"string\", \"description\": \"ID retornado pela consulta de estoque\"}}, \"required\": [\"veiculo_id\"], \"additionalProperties\": false}"
+        "inputSchema": "{\"type\": \"object\", \"properties\": {\"veiculo_id\": {\"type\": \"string\", \"description\": \"ID retornado pela consulta de estoque\"}}, \"required\": [\"veiculo_id\"], \"additionalProperties\": true}"
       },
       "id": "d4a8e7b2-6c91-4f42-9c3e-0a7b5d2f8e61",
       "name": "enviar_foto_veiculo1",
@@ -559,6 +559,47 @@
         416
       ],
       "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "ctrl-output",
+              "leftValue": "={{ $json.output }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            },
+            {
+              "id": "ctrl-acao",
+              "leftValue": "={{ $json.acao }}",
+              "rightValue": "controle",
+              "operator": {
+                "type": "string",
+                "operation": "contains"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+      "name": "Se resposta controle1",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        2448,
+        416
+      ]
     }
   ],
   "connections": {
@@ -690,7 +731,7 @@
       "main": [
         [
           {
-            "node": "AI Agent1",
+            "node": "Se resposta controle1",
             "type": "main",
             "index": 0
           }
@@ -834,6 +875,24 @@
         [
           {
             "node": "Gate somente nao salvos1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Se resposta controle1": {
+      "main": [
+        [
+          {
+            "node": "Responder WhatsApp1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "AI Agent1",
             "type": "main",
             "index": 0
           }

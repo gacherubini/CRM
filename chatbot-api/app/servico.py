@@ -251,9 +251,24 @@ def registrar_mensagem(
 
     # Uma saída nova com conteúdo que não foi previamente registrada pelo workflow
     # do bot veio do atendente (celular/web). O humano assumiu: pausa automática.
+    # Exceção: número autorizado (menu de estoque) não entra em handoff de vendas.
     if from_me and not origem_bot:
-        conversa.bot_ativo = False
-        conversa.status = "handoff"
+        from app import operacao as operacao_mod
+
+        if operacao_mod.esta_autorizado(db, loja.id, telefone):
+            # Eco/fromMe da equipe não deve matar o menu de operação.
+            pass
+        else:
+            conversa.bot_ativo = False
+            conversa.status = "handoff"
+    elif not from_me:
+        # Entrada da equipe autorizada: reativa bot (menu de operação).
+        from app import operacao as operacao_mod
+
+        if operacao_mod.esta_autorizado(db, loja.id, telefone) and not conversa.bot_ativo:
+            conversa.bot_ativo = True
+            if conversa.status == "handoff":
+                conversa.status = "aberta"
 
     db.add(
         Mensagem(

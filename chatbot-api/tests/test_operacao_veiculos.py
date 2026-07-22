@@ -71,6 +71,11 @@ class _FakeWriteClient:
             raise self._raise
         return {**self._resposta, **{k: dados.get(k, self._resposta.get(k)) for k in dados}}
 
+    def obter_por_placa(self, placa: str) -> dict | None:
+        if self._raise is not None and getattr(self._raise, "status_code", None) == 409:
+            return {**self._resposta, "placa": placa}
+        return None
+
 
 # --- números autorizados ------------------------------------------------------
 
@@ -121,6 +126,7 @@ def test_autorizado_cria_veiculo(client, loja_a):
         assert r.status_code == 201, r.text
         body = r.json()
         assert body["ok"] is True
+        assert body.get("ja_existia") is False
         assert "Honda CG 160" in body["mensagem"]
         assert body["veiculo"]["placa"] == "ABC1D23"
         assert body["solicitante"] == "5511999990001"
@@ -131,6 +137,30 @@ def test_autorizado_cria_veiculo(client, loja_a):
         assert fake.chamadas[0]["dados"]["publicado"] is True
         assert body["veiculo"]["publicado"] is True
         assert "envie as fotos" in body["mensagem"]
+    finally:
+        app.dependency_overrides.pop(get_inventory_write_client, None)
+
+
+def test_placa_ja_cadastrada_reabre_sessao_fotos(client, loja_a):
+    """409 de placa duplicada no Estoque não deve quebrar o fluxo WA."""
+    from fastapi import HTTPException
+
+    _autorizar(client, loja_a)
+    fake = _FakeWriteClient(raise_exc=HTTPException(status_code=409, detail="placa já cadastrada nesta loja"))
+    app.dependency_overrides[get_inventory_write_client] = lambda: fake
+    try:
+        r = client.post(
+            "/v1/operacao/veiculos",
+            json=_payload(),
+            headers=loja_a["headers"],
+        )
+        assert r.status_code == 201, r.text
+        body = r.json()
+        assert body["ok"] is True
+        assert body.get("ja_existia") is True
+        assert "já estava" in body["mensagem"].lower()
+        assert body["veiculo"]["placa"] == "ABC1D23"
+        assert "fotos" in body["mensagem"].lower()
     finally:
         app.dependency_overrides.pop(get_inventory_write_client, None)
 

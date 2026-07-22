@@ -4,7 +4,7 @@ leads e consentimentos entram no próximo incremento.
 """
 from datetime import datetime, timezone
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, String, UniqueConstraint
+from sqlalchemy import Boolean, DateTime, ForeignKey, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db import Base
@@ -175,4 +175,8 @@ class NumeroAutorizado(Base):
     cadastro_expira_em: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
+    # Menu de operação WA: menu|cadastrar|listar|editar|despublicar|vender
+    operacao_modo: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    # JSON textual: placa, step, campo, valor_pendente, busca…
+    operacao_ctx: Mapped[str | None] = mapped_column(Text, nullable=True)
     criado_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_agora)
