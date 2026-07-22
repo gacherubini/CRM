@@ -4,8 +4,8 @@ Bot de WhatsApp para revenda de motos que conversa com o cliente, coleta os dado
 necessários, solicita a simulação internamente e transfere o atendimento para um vendedor.
 Parcelas, taxas e bancos não são enviados automaticamente ao cliente.
 
-> **Status:** 🟢 MVP demonstrável (~**99%** demo / ~**90%** preparação para produção).
-> **Ambiente:** preferência **local** (Fly lab **parado** desde 2026-07-20).  
+> **Status:** 🟢 MVP demonstrável; lab Fly **3-VM no ar** (`app2037` + `evolution2037` + `suite-pg`; workers Playwright on-demand).  
+> **Ambiente:** local (dev) **ou** Fly consolidado — ver [`deploy/fly/3vm/README.md`](deploy/fly/3vm/README.md).  
 > **Estado canônico:** [`docs/contexto-compacto.md`](docs/contexto-compacto.md) · planos
 > [`docs/plans/README.md`](docs/plans/README.md) · go-live WA [`docs/go-live-chatbot.md`](docs/go-live-chatbot.md).  
 > `docs/design.md` = pesquisa **histórica** — **não** implementar a partir dele.
@@ -52,11 +52,27 @@ não muda o contrato `/v1/simulacoes`. Estoque é a fonte de verdade de veículo
 | Motor de simulação | **Python + FastAPI** + Playwright | Mock + drivers reais (4 bancos LIVE) |
 | CRM / vitrine | Portal FastAPI + Catálogo + Estoque API | Vendas, metas, campanhas/ROI, Pixel |
 | Banco de dados | **PostgreSQL** (container / lab) | Por produto (tenancy) |
-| Hospedagem | **Local (dev)** · Fly.io lab opcional (OFF) | Sempre ligado só o que for demo |
+| Hospedagem | **Local (dev)** · **Fly.io 3-VM** (lab ativo) | Always-on: Postgres + Evolution + app bundle; Playwright on-demand |
 
 ---
 
-## 💬 Fluxo conversacional
+## 🧭 Quem o bot atende (roteamento)
+
+A decisão fica no Chatbot (`POST /v1/operacao/roteamento`), não só no n8n.
+Sinal de “contato novo” = `isSaved === false` na Evolution (agenda do WhatsApp).
+
+| Caso | Quem | Ação |
+|---|---|---|
+| **1** Contato que já fala | Salvo na agenda (`isSaved=true`), **não** é equipe | **Ignora** — sem bot de vendas |
+| **2** Contato **novo** | Não salvo (`isSaved=false`), **não** é equipe | **IA** (único caso de bot de vendas) |
+| **3** Equipe cadastrada | Número em **números autorizados** (Portal / CLI) | **Cadastro** de veículo: gatilho `cadastro` → dados/fotos → `fim` |
+
+Match de telefone da equipe aceita variantes (com/sem DDI `55`, com/sem 9º dígito).
+Sem sinal claro de contato novo → fail-closed (**ignora**).
+
+---
+
+## 💬 Fluxo conversacional (contato novo)
 
 1. **Saudação + identificação do interesse**; consentimento explícito pode ser registrado quando informado, sem bloquear o atendimento.
 2. **Qual moto** → modelo, ano, valor aproximado.
@@ -136,10 +152,12 @@ Mapa de campos e decisões: [`docs/plans/2026-07-13-plano1a-task12-bancos-reconh
 - [x] **Estoque + Catálogo + Portal** — CRUD, vitrine, CRM vendedor, 9A financeiras.
 - [x] **Vendas / metas / CSV / E10 Pixel** — + **campanhas + ROI (E8)** DONE 2026-07-20.
 - [x] **Motor multi-banco** — Santander, Fontecred, Bradesco, Pan portal LIVE; fan-out; warm session teto 2.
-- [ ] **Go-live WhatsApp E2E** — Gemini + Evolution + n8n em ambiente estável (eixo A).
+- [x] **Deploy Fly 3-VM** — `suite-pg` + `evolution2037` + `app2037` (n8n/chatbot/estoque/portal/catálogo/site/motor-api); `motor2037` Playwright on-demand.
+- [x] **Roteamento WA 3 casos** — só contato novo recebe IA; equipe em modo cadastro; match de telefone com variantes.
+- [ ] **Go-live WhatsApp E2E estável** — Gemini no n8n + primeira conversa real monitorada (eixo A).
 - [x] **#3B Task 4 + event bus** — eventos/tempos, UI do funil e adapter Meta concluídos.
 - [x] **Mídia WhatsApp backend** — áudio efêmero; foto automática WhatsApp → Estoque → Catálogo; lote por sessão; envio da capa ao cliente.
-- [ ] **Residual CRM/ops** — Google; outbound E11/E12; transcritor real; URL HTTPS/backup do volume; go-live e polish revenda.
+- [ ] **Residual CRM/ops** — Google; outbound E11/E12; transcritor real; polish revenda.
 
 Estado canônico: [`docs/contexto-compacto.md`](docs/contexto-compacto.md) · planos: [`docs/plans/README.md`](docs/plans/README.md) · handoff: [`docs/handoff-contexto.md`](docs/handoff-contexto.md).
 
@@ -150,8 +168,8 @@ Estado canônico: [`docs/contexto-compacto.md`](docs/contexto-compacto.md) · pl
 ```
 bot-whatsapp-financiamento/
 ├── README.md
-├── docs/                      # contexto, planos, brand, guias
-├── n8n/                       # workflows exportados
+├── docs/                      # contexto, planos, brand, guias, manuais
+├── n8n/                       # workflows exportados (placeholders de token)
 ├── chatbot-api/               # Chatbot Standalone (FastAPI)
 ├── motor-simulacao/           # Motor mock + Playwright
 ├── estoque-api/               # Estoque + admin HTMX
@@ -163,21 +181,27 @@ bot-whatsapp-financiamento/
     ├── motor-standalone/
     ├── estoque-standalone/
     ├── catalogo-conectado/
-    └── fly/                   # scripts lab Fly (OFF por padrão)
+    └── fly/
+        ├── up-all.sh / down-all.sh   # lab: use --3vm
+        └── 3vm/                      # stack Fly consolidada (canônica)
 ```
 
 ---
 
 ## 🔑 O que precisa para rodar
 
-**Local (preferido):**
+**Local:**
 1. Docker (Postgres / n8n / Evolution conforme o compose do pacote).
 2. Python 3.12+ por produto (`requirements.txt` + venv).
 3. Chave Gemini no n8n (se testar conversa IA).
 4. Credenciais de portal lojista no Motor (cifradas; via Portal 9A ou env de dev).
 
-**Lab Fly (opcional, hoje parado):**
-5. `flyctl` + `deploy/fly/up-all.sh` — só com pedido explícito (custo).
+**Lab Fly (3-VM — path atual):**
+5. `flyctl` + org com apps `suite-pg`, `evolution2037`, `app2037` (+ `motor2037` on-demand).
+6. Subir: `bash deploy/fly/up-all.sh --3vm` · desligar: `bash deploy/fly/down-all.sh --3vm --yes`.
+7. Detalhes, secrets e deploy: [`deploy/fly/3vm/README.md`](deploy/fly/3vm/README.md).
+8. Workflow n8n: prepare a partir de `n8n/workflow-ai-nao-salvos.json` + `.secrets.local`
+   (`prepare-workflow.ps1`) — **não** versionar `workflow-fly.ready.json` (tokens reais).
 
 ---
 
@@ -210,6 +234,8 @@ ser aplicada por RBAC no backend, não apenas ocultando ou exibindo itens de men
 
 - **[docs/contexto-compacto.md](docs/contexto-compacto.md)** — ponto de entrada para agentes (estado + regras).
 - **[docs/handoff-contexto.md](docs/handoff-contexto.md)** — checkpoint operacional.
+- **[deploy/fly/3vm/README.md](deploy/fly/3vm/README.md)** — inventário Fly, deploy, secrets, up/down.
+- **[docs/tutorial-dono.md](docs/tutorial-dono.md)** / **[docs/tutorial-vendedor.md](docs/tutorial-vendedor.md)** — manuais de operação.
 - **[Índice dos planos válidos](docs/plans/README.md)** — ordem, status e pacotes comerciais.
 - **Planos de implementação** (`docs/plans/` — só `*A`/`*B` e #0/#6; legados em `_archive/`):
   - [Plano #0 — Fundação](docs/plans/2026-07-11-plano0-fundacao-core-dominio-seguranca.md)

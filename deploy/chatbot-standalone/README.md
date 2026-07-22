@@ -54,9 +54,23 @@ O template versionado é `n8n/workflow-ai-nao-salvos.json`. Ele aplica, nesta or
 1. ignora grupos/status e mensagens sem texto;
 2. registra/deduplica a mensagem na Chatbot API;
 3. respeita `bot_ativo=false` (handoff);
-4. consulta `POST /chat/findChats/{instance}` na Evolution;
-5. chama a IA somente quando `isSaved === false`;
-6. registra a saída do bot para diferenciar respostas automáticas das manuais.
+4. consulta `POST /chat/findChats/{instance}` na Evolution (`isSaved`);
+5. chama `POST /v1/operacao/roteamento` no Chatbot com `{ telefone, texto, is_saved }`;
+6. ramifica pela `acao` retornada (ver tabela abaixo);
+7. registra a saída do bot para diferenciar respostas automáticas das manuais.
+
+### Três casos de produto (roteamento)
+
+| Caso | Condição | `acao` | Efeito |
+|---|---|---|---|
+| Contato que já fala | `isSaved=true`, **não** autorizado | `ignorar` | Sem bot de vendas |
+| Contato **novo** | `isSaved=false`, **não** autorizado | `cliente` | IA (Gemini) + tools |
+| Equipe cadastrada | telefone em **números autorizados** | `cadastro` / `cadastro_controle` | Gatilho `cadastro`, fotos, `fim` |
+
+- Só **contato novo** recebe mensagem de bot de vendas.
+- `is_saved` desconhecido → fail-closed (`ignorar`).
+- Match de autorizado: variantes de telefone (com/sem `55`, com/sem 9º dígito).
+- Fallback se `/roteamento` falhar: mesmo gate antigo (`isSaved === false` → cliente).
 
 1. Importe o workflow e substitua `__INSTANCE__`, `__EVOLUTION_KEY__`,
    `__CHATBOT_TOKEN__` e `__CHATBOT_WEBHOOK_TOKEN__`. O último deve ter exatamente o mesmo
@@ -82,7 +96,8 @@ O template versionado é `n8n/workflow-ai-nao-salvos.json`. Ele aplica, nesta or
    ```
 
 Não use o sufixo `@lid` para decidir se o contato é salvo: a Evolution pode ter chats salvos com
-`@lid`. O campo canônico usado pelo gate é `isSaved` retornado por `findChats`.
+`@lid`. O campo canônico de “contato novo” é `isSaved` retornado por `findChats`, consumido pelo
+endpoint `/v1/operacao/roteamento` (não um gate solto só no n8n).
 
 O system prompt não deve inventar veículo ou parcela. No fluxo de financiamento, o cliente nunca
 recebe parcelas, taxas ou bancos do bot: depois de solicitar a simulação, a conversa é pausada e o

@@ -2,21 +2,45 @@
 
 Plano canônico: `docs/plans/2026-07-21-plano-arquitetura-3-vms.md`.
 
+## Status (2026-07-21+)
+
+Stack **implementada e em uso** no org Fly (`crm-419` / `gru`):
+
+| Host público | App / papel |
+|--------------|-------------|
+| `https://app2037.fly.dev` | Bundle: portal, chatbot, estoque, catálogo, site, motor-api, nginx edge |
+| `https://n8n2037.fly.dev` | n8n (orquestra WhatsApp → tools HTTP no chatbot) |
+| `https://evolution2037.fly.dev` | Evolution (WhatsApp) |
+| (interno) `suite-pg` | Postgres por serviço |
+| (on-demand) `motor2037` | Playwright por banco |
+
+**Feito neste cutover:** monólitos legados removidos; bundle `app2037` + Evolution isolada;
+workflow n8n importado/publicado; webhook Evolution → `n8n2037` `/webhook/whatsapp-ai`;
+roteamento de mensagens no chatbot (3 casos); portal dono; `MOTOR_ENCRYPTION_KEY` no Motor
+para Acessos bancos.
+
+**Ainda operacional (não de deploy):** credencial Gemini no n8n (UI); E2E estável de 1ª
+conversa; transcritor de áudio real (hoje fallback para texto).
+
 ## Realidade operacional (atual)
 
 Apps monólito legados (`portal2037`, `catalogo2037`, `estoque2037`,
-`chatbot2037`, `n8n2037`, `site2037` como app separado, etc.) foram **removidos
-a pedido do owner**. O inventário Fly válido é só:
+`chatbot2037`, `n8n2037` como monólito separado, `site2037` isolado, etc.) foram
+**removidos a pedido do owner**. O inventário Fly válido é só:
 
 | Papel | App | Estado típico |
 |-------|-----|----------------|
 | Postgres | `suite-pg` | **always-on** |
 | WhatsApp (Evolution) | `evolution2037` | **always-on** (isolada) |
-| Bundle app | `app2037` | **always-on** — n8n + chatbot + estoque + portal + catálogo + site + motor-api |
+| Bundle app | `app2037` | **always-on** — chatbot + estoque + portal + catálogo + site + motor-api (supervisord + nginx edge) |
+| Orquestração | `n8n2037` | **always-on** quando o lab está ativo — workflow WhatsApp → tools no chatbot |
 | Workers Playwright | `motor2037` | **on-demand** — idle **stopped**; acordados via Machines API pelo fan-out em `app2037` |
 
-**Always-on = 3 apps** (`suite-pg` + `evolution2037` + `app2037`).  
-**Worker = 4ª app**, sobe só sob job e volta a stopped no idle.
+**Always-on típico:** `suite-pg` + `evolution2037` + `app2037` + `n8n2037`.  
+**Worker = app extra**, sobe só sob job e volta a stopped no idle.
+
+> `up-all.sh --3vm` sobe Postgres + Evolution + app; se o n8n estiver em app separado,
+> confira `fly status -a n8n2037` e suba/reinicie se o webhook não responder.
 
 ### Subir / desligar o lab
 
@@ -74,16 +98,33 @@ fly image show -a motor2037
 **Depois** do cutover: deploy completo com `fly.worker.toml` torna `motor2037`
 worker-only (sem HTTP `min_machines`).
 
+## Roteamento WhatsApp (3 casos)
+
+Endpoint: `POST /v1/operacao/roteamento` (chatbot em `app2037`).
+O n8n consulta `isSaved` na Evolution e manda `{ telefone, texto, is_saved }`.
+
+| Caso | Condição | `acao` |
+|------|----------|--------|
+| Contato que já fala | `is_saved=true` e **não** autorizado | `ignorar` (sem bot) |
+| Contato **novo** | `is_saved=false` e **não** autorizado | `cliente` (IA Gemini) |
+| Equipe | número em **números autorizados** | `cadastro` / `cadastro_controle` com gatilho `cadastro` e `fim`; fora da sessão → `ignorar` |
+
+Telefone da equipe: match com variantes (55 / 9º dígito).  
+`is_saved` desconhecido → **ignorar** (fail-closed).
+
+Equipe se cadastra no Portal (números de cadastro) ou CLI
+`python -m app.cli autorizar-numero`.
+
 ## Critérios de aceite
 
 1. Evolution `loja1` (ou instância ativa) state `open`.
-2. WhatsApp número não salvo → resposta via n8n/chatbot.
-3. Foto de número autorizado → Estoque → Catálogo.
-4. Portal login + listagem básica.
-5. Simulação **mock** 2xx sem subir worker Playwright.
-6. Always-on = 3 machines started; workers stopped fora de job.
-7. Site / health no host apontando para `app2037` (ex.: `https://app2037.fly.dev`
-   ou `https://site2037.fly.dev/health` se o host ainda apontar para o bundle).
+2. WhatsApp **contato novo** (`isSaved=false`) → resposta IA via n8n/chatbot.
+3. Contato **já salvo** e não autorizado → **sem** resposta de bot.
+4. Número autorizado: `cadastro` → fotos → Estoque → Catálogo; `fim` encerra.
+5. Portal login + listagem básica + Acessos bancos (com `MOTOR_ENCRYPTION_KEY`).
+6. Simulação **mock** 2xx sem subir worker Playwright.
+7. Always-on machines started; workers Playwright stopped fora de job.
+8. Health: `https://app2037.fly.dev/health` (e paths nginx do bundle).
 
 ## Deploy (raiz do repo)
 
@@ -178,9 +219,29 @@ bash deploy/fly/sync-motor-worker-machines.sh \
   pan:080e207bed0068
 ```
 
+## Workflow n8n (sem secrets no git)
+
+1. Canônico versionado: `n8n/workflow-ai-nao-salvos.json` (placeholders `__CHATBOT_TOKEN__` etc.).
+2. Local: preencha `deploy/fly/3vm/.secrets.local` (gitignored).
+3. Gere o JSON com tokens: `pwsh deploy/fly/3vm/prepare-workflow.ps1`
+   → saída `workflow-fly.ready.json` (**gitignored** — tem Bearer reais).
+4. Importe/publique: `pwsh deploy/fly/3vm/upload-and-import-workflow.ps1`
+   (CLI n8n precisa `HOME=/home/node` no container; workflow deve estar **published**
+   para o webhook `/webhook/whatsapp-ai` responder 200).
+
+Hosts preferidos no workflow preparado: HTTPS públicos
+`https://app2037.fly.dev` e `https://evolution2037.fly.dev` (flycast IPv6 exige
+nginx ouvindo `[::]` no edge).
+
 ## Secrets / env
 
 Ver também `env.example`. **Não versionar valores.** Não imprimir secrets em logs/chat.
+
+Arquivos **gitignored** nesta pasta:
+
+- `.secrets.local` — tokens de prepare-workflow / ops local
+- `.evolution_key.local` — apikey Evolution
+- `workflow-fly.ready.json` — workflow com tokens embutidos
 
 ### `app2037` (orquestrador + fan-out)
 

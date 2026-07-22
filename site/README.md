@@ -22,16 +22,17 @@ site/
 
 ## Deploy Fly.io
 
-App: `site2037` · região `gru`
+No path **3-VM**, o site vai **dentro do bundle** `app2037` (nginx edge), não como app
+isolado. Ver `deploy/fly/3vm/README.md`.
 
 ```powershell
-cd site
-fly deploy --app site2037 --remote-only
+# raiz do monorepo
+fly deploy . -a app2037 -c deploy/fly/3vm/fly.app.toml --ha=false
 ```
 
-URL: https://site2037.fly.dev
+URL pública típica: `https://app2037.fly.dev` (path do site no edge).
 
-Autostop ligado (custa pouco em idle).
+> App monólito legado `site2037` foi removido do inventário.
 
 ## Relação com o monorepo
 

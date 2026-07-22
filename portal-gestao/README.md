@@ -12,7 +12,11 @@ Frontend operacional da loja, servido por FastAPI com páginas Jinja. O token da
 - publicar, despublicar, reservar e vender;
 - custo oculto para vendedor;
 - layout responsivo para computador e celular;
-- aba **Tráfego** (dono/gerente): Pixel ID + token CAPI cifrado, Purchase ao confirmar venda.
+- aba **Tráfego** (dono/gerente): Pixel ID + token CAPI cifrado, Purchase ao confirmar venda;
+- **Números de cadastro** (autorizados): telefones da equipe que podem cadastrar veículo
+  pelo WhatsApp (`cadastro` / fotos / `fim`) — BFF para a Chatbot API
+  `/v1/operacao/numeros-autorizados`;
+- **Acessos bancos** (credenciais do Motor cifradas; exige `MOTOR_ENCRYPTION_KEY` no Motor).
 
 ### Tráfego / Meta (E10)
 
