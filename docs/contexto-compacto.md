@@ -1,9 +1,10 @@
 # Contexto compacto para continuidade
 
-Atualizado em **2026-07-21** (CRM **A/B/E/D/H/C/F DONE** · **G residual** · funil UI DONE · áudio/fotos backend · **Fly 3-VM no ar** · roteamento WA 3 casos).
+Atualizado em **2026-07-22** (CRM **A/B/E/D/H/C/F DONE** · **G residual** · funil UI DONE · **menu estoque WA + fotos Evolution** · **Fly 3-VM no ar** · roteamento WA 3 casos).
 Leia isto primeiro; detalhe operacional recente em `docs/handoff-contexto.md` (topo).
 Planos válidos: `docs/plans/README.md`. **Ignore** `docs/plans/_archive/`.
 Ops Fly canônico: `deploy/fly/3vm/README.md` + `bash deploy/fly/up-all.sh --3vm`.
+Sessão menu/fotos: [plano 2026-07-22](plans/2026-07-22-plano-menu-estoque-wa-e-fotos-fix.md).
 
 **Playwright / bancos:** lições
 [Santander](plans/2026-07-13-playwright-licoes-santander.md),
@@ -45,7 +46,7 @@ Não há uma única “próxima task” universal — depende do objetivo:
 
 | Eixo | Próximo incremento | Quando escolher | Plano / doc |
 |---|---|---|---|
-| **A · Demo loja / WA** | E2E contato **novo** (`isSaved=false`) + Gemini no n8n; cadastro equipe com `cadastro`/`fim` | Demo/operação real no Zap | `go-live-chatbot.md` + `deploy/fly/3vm/README.md` |
+| **A · Demo loja / WA** | **(1)** E2E **menu/cadastro/fotos** da equipe; **(2)** depois E2E contato **novo** (IA vendas) | Demo/operação real no Zap | [plano 2026-07-22](plans/2026-07-22-plano-menu-estoque-wa-e-fotos-fix.md) + `go-live-chatbot.md` + `deploy/fly/3vm/README.md` |
 | **B · Multi-banco** | Estabilizar sim com celular + prints; alinhar âncoras se falhar ao vivo | Mais cotações reais estáveis | handoff topo + lições Playwright |
 | **C · CRM dono** | Google Conversions (G) | Conversões outbound Google | A/B/E/D/H/C/F feitas; spend API fora |
 | **D · Escala Motor** | Smoke live sessão quente + teto 2; object storage se multi-volume | Estabilidade multi-banco / IP | B+D + warm-batch2 |
@@ -55,11 +56,14 @@ Não há uma única “próxima task” universal — depende do objetivo:
 **Bloqueios conhecidos:**
 - Landing Tailwind nova: HTML do dono ainda incompleto.
 - Áudio real: falta URL/token do transcritor HTTP homologado; sem isso há fallback para texto.
-- Fotos: fluxo automático e URL HTTPS publicados; volume persistente anexado. Falta o restore drill.
+- Fotos: download Evolution via **HTTPS público** (não flycast no bundle); parser Long size OK.
+  Falta E2E humano completo + restore drill do volume.
+- Menu cadastro: código/sync telefone DONE; falta o dono fechar o checklist E2E (step A do plano 22).
 - E11/E12 outbound: só com eixo **A** estável + opt-out.
 - Não reabrir Fontecred/Santander sem evidência nova.
 - Stack 3-VM **no ar** (pedido do dono). Subir/desligar: `up-all.sh --3vm` / `down-all.sh --3vm`.
   Não destruir apps/volumes sem pedido explícito.
+- Preferir **um** telefone autorizado canônico (`55`+DDD+9); evitar triplicar no Portal.
 
 > **Histórico de simulações por usuário (Task 16): FEITO** — não reimplementar.  
 > **Campanhas + ROI (E8 / #3B T5): FEITO** — não reimplementar.  

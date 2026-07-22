@@ -1,5 +1,10 @@
 # Cadastro por WhatsApp para números autorizados — Implementation Plan
 
+> **Status 2026-07-22:** base E5 + menu estoque **implementados na main**.  
+> Continuação (bugs foto/telefone/menu + próximos E2E):  
+> `docs/plans/2026-07-22-plano-menu-estoque-wa-e-fotos-fix.md`.  
+> Este arquivo = histórico de tasks da feature original.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Permitir que um número salvo e autorizado (gerido no Portal) mande `cadastro` no WhatsApp, abra uma sessão e cadastre veículos por texto, sem alterar o fluxo de atendimento ao cliente.

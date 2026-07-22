@@ -7,6 +7,9 @@ venv/
 test-tmp*/
 .pytest-tmp/
 
+# Scratch / hotpatch / probes de sessão (nunca versionar)
+tmp/
+
 # Docker / dados locais
 pg_data/
 n8n_data/

@@ -1,11 +1,11 @@
 # Plano — Arquitetura 3 VMs (Fly.io lab / loja)
 
-> **Status:** ATIVO — design + plano de migração (não implementado).  
-> **Data:** 2026-07-21  
+> **Status:** IMPLEMENTADO / OPERANDO (2026-07-21+) — runtime 3-VM no ar.  
+> **Data:** 2026-07-21 (design); revisão 2026-07-22 (menu WA + fotos em prod).  
 > **Origem:** custo always-on de 9 VMs (~US$ 35–45/mês); dono pediu arquitetura com menos VMs.  
-> **Para agentes:** implementar só com pedido explícito; preferir
-> `superpowers:subagent-driven-development` ou `executing-plans` task a task.  
-> Steps usam checkbox (`- [ ]`) para tracking.
+> **Ops canônico:** `deploy/fly/3vm/` + `bash deploy/fly/up-all.sh --3vm`.  
+> **Residual de produto (não é migração 3-VM):** E2E menu/cadastro + E2E cliente — ver
+> [plano 2026-07-22](2026-07-22-plano-menu-estoque-wa-e-fotos-fix.md).
 
 **Goal:** Reduzir o runtime Fly de **9 machines always-on** para **3 machines always-on**
 + **classe de VM Playwright própria (efêmera)**, mantendo bot WhatsApp, Portal, Estoque,

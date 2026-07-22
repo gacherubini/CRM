@@ -1,9 +1,9 @@
 # Runbook de go-live do Chatbot WhatsApp
 
-> **Ambiente canônico:** lab Fly.io (`crm-419` / `gru`), não o compose local antigo.
-> **Estado em 2026-07-21:** o ambiente foi publicado e verificado; depois, todas as Machines foram
-> paradas por pedido do dono. O workflow `SBAUPjrUlYa4gtgE` ficou persistido ativo com 25 nós e a
-> instância `loja1` estava `open` antes do shutdown. Não reimporte nem recrie volumes ao retomar.
+> **Ambiente canônico:** lab Fly.io (`crm-419` / `gru`), stack **3-VM** (`deploy/fly/3vm/`).
+> **Estado em 2026-07-22:** 3-VM **no ar**; menu de estoque + fotos Evolution em produção;
+> workflow `wAiNaoSalvos0001` ativo. Próximo: E2E humano (menu/cadastro, depois cliente).
+> Detalhe: `docs/plans/2026-07-22-plano-menu-estoque-wa-e-fotos-fix.md`.
 >
 > Estado vivo da suíte: `docs/contexto-compacto.md`. Planos: `docs/plans/README.md`.
 > Código: branch **`main`** (não use branches `feat/*` antigas citadas em docs legados).
@@ -27,12 +27,14 @@
 
 | Papel | App | URL / nota |
 |---|---|---|
-| Chatbot API | `chatbot2037` | privado / flycast (n8n chama internamente) |
+| App bundle (chatbot+estoque+portal+catálogo+n8n* ) | `app2037` | suíte no supervisord; n8n pode ser app separado |
 | n8n | `n8n2037` | `https://n8n2037.fly.dev` |
-| Evolution | `evolution2037` | `https://evolution2037.fly.dev/manager` |
-| Portal | `portal2037` | `https://portal2037.fly.dev` |
-| Motor | `motor2037` | simulações reais (Santander/Fontecred) |
-| Estoque | `estoque2037` | `https://estoque2037.fly.dev` para mídia; Flycast para APIs internas |
+| Evolution | `evolution2037` | `https://evolution2037.fly.dev` (mídia do chatbot usa HTTPS, não só flycast) |
+| Postgres | `suite-pg` | always-on |
+| Motor API / worker | `motor2037` (+ workers on-demand) | simulações reais |
+| Portal / Catálogo | hosts no bundle `app2037` | ver `deploy/fly/3vm/README.md` |
+
+\* Layout exato: `deploy/fly/3vm/README.md`. Legado monólito `chatbot2037`/`estoque2037` só se ainda existir no org.
 
 Subir a suíte (se estiver parada):
 

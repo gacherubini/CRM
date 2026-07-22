@@ -4,11 +4,36 @@
 > Este arquivo: checkpoint operacional. Seções **“Checkpoint anterior”** = histórico — não
 > reexecutar. Path Windows no rodapé de seções antigas: **ignorar** (workspace = root do git).
 >
-> **Checkpoint mais recente: 2026-07-21 (backend publicado/verificado; Fly pausado pelo dono).**
-> Escolher um eixo por sessão. Todas as Machines estão paradas e os dados preservados; religar
-> ou fazer nova mudança operacional exige pedido explícito.
+> **Checkpoint mais recente: 2026-07-22 (menu estoque WA + fotos Evolution em prod; 3-VM no ar).**
+> Escolher um eixo por sessão. Próximo pedido do dono: **E2E menu/cadastro**, depois **E2E cliente**.
 
-## Checkpoint mais recente — fotos automáticas endurecidas + funil UI + áudio (2026-07-21)
+## Checkpoint mais recente — menu estoque WA + fixes foto/telefone (2026-07-22)
+
+> **Escopo:** Chatbot (`operacao` / `vehicle_photo` / `audio`), n8n workflow, secrets Evolution no
+> `app2037`. Stack 3-VM já estava no ar. Sem mudanças em Motor/Portal drivers.
+
+- **Menu de estoque no WhatsApp** para número autorizado (`cadastro`/`menu`): cadastrar, listar,
+  editar, despublicar, vender, sair — state machine `operacao_modo` / `operacao_ctx` (migration 0009).
+- **Foto WA → Estoque:** Evolution `getBase64` via **HTTPS** `evolution2037.fly.dev` (não flycast no
+  bundle). Parser de `size.fileLength` Long protobuf (`low`/`high`) — era o erro
+  `tamanho de imagem inválido`.
+- **Telefone duplicado:** o mesmo celular em 3 formatos fazia o `1` do menu ir pro LLM na 1ª vez;
+  sessão agora **espelha em todas as variantes**; duplicados de prod mesclados para
+  `5551980336365`.
+- **UX:** modo cadastrar e pós-cadastro pedem **foto com a placa na legenda**; digitar `1` de novo
+  reexplica sem LLM.
+- **n8n:** gate permite menu/cadastro com `bot_ativo=false`; prompt de cadastro alinhado à legenda.
+- **main:** `aca96c9`, `983f140`, `6892917`. Plano detalhado:
+  `docs/plans/2026-07-22-plano-menu-estoque-wa-e-fotos-fix.md`.
+- **Próximos steps (humano):**
+  1. E2E menu/cadastro/fotos (checklist do plano 22, Step A).
+  2. E2E cliente novo (IA vendas / estoque / sim / handoff — Step B).
+  3. Deploy imagem limpa 3-VM a partir da main (tirar dependência de hotpatch).
+- **Não fazer sem pedido:** recriar volumes, reimportar n8n do zero, mexer em drivers bancários.
+
+---
+
+## Checkpoint anterior — fotos automáticas endurecidas + funil UI + áudio (2026-07-21)
 
 > **Escopo:** Portal, Estoque, Chatbot e workflow n8n. O código da simulação, do Motor e dos drivers
 > bancários não foi alterado; a Machine do Motor só foi parada no shutdown geral pedido pelo dono.
