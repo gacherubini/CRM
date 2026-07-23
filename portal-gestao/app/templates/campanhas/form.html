@@ -52,6 +52,14 @@
       <label>utm_term (opcional)
         <input type="text" name="utm_term" value="{{ valores.utm_term or '' }}" maxlength="120">
       </label>
+      <label style="grid-column:1/-1">ID da campanha no Meta Ads (gasto + CTWA)
+        <input type="text" name="meta_campaign_id" value="{{ valores.meta_campaign_id or '' }}" maxlength="64" placeholder="Ex.: 120330000000000000" inputmode="numeric" autocomplete="off">
+        <small class="muted">Gerenciador de Anúncios → campanha → copiar ID. Serve para gasto automático e match CTWA.</small>
+      </label>
+      <label style="grid-column:1/-1">Código CTWA na mensagem do anúncio
+        <input type="text" name="codigo_ctwa" value="{{ valores.codigo_ctwa or '' }}" maxlength="40" placeholder="Ex.: RV-JUL" autocomplete="off">
+        <small class="muted">Coloque na mensagem pré-preenchida do anúncio: <code>Cód: RV-JUL</code>. Fallback se o WhatsApp não mandar o click id.</small>
+      </label>
     </div>
   </section>
   <section class="panel form-section">

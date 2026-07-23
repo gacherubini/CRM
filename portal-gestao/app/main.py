@@ -3,14 +3,16 @@ from __future__ import annotations
 import logging
 import os
 import re
+import secrets
 import uuid
+from contextlib import asynccontextmanager
 from datetime import date, datetime, timedelta
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from pathlib import Path
 from typing import Annotated
 
-from fastapi import Depends, FastAPI, Form, Request, Response
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi import Depends, FastAPI, Form, Header, Request, Response
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import text
@@ -50,6 +52,7 @@ from app.models import (
     Campanha,
     CampanhaGasto,
     Meta,
+    MetaAdsConfig,
     MetaCapiOutbox,
     MetaPixelConfig,
     Usuario,
@@ -58,6 +61,11 @@ from app.models import (
     agora,
     novo_id,
 )
+from app.meta_ads_spend import (
+    normalizar_ad_account_id,
+    sincronizar_gastos_meta,
+)
+from app import meta_ads_spend_job
 from app.campanhas import (
     CANAIS_ROTULO,
     STATUS_ROTULO,
@@ -87,7 +95,7 @@ from app.clients.estoque import (
 )
 from app.clients.motor import CredencialNaoEncontrada, MotorClient, MotorIndisponivel
 from app.config import settings
-from app.db import Base, engine, get_db
+from app.db import Base, SessionLocal, engine, get_db
 from app.financeiro_calc import (
     FUSO_PORTAL,
     calcular_metricas_vendas,
@@ -237,7 +245,23 @@ templates.env.globals["formatar_brl"] = formatar_brl
 templates.env.globals["formatar_percentual"] = formatar_percentual
 templates.env.globals["formatar_duracao"] = formatar_duracao
 
-app = FastAPI(title="Portal de Gestão", docs_url=None, redoc_url=None)
+@asynccontextmanager
+async def _lifespan(_app: FastAPI):
+    # Em testes (PORTAL_SKIP_INIT / pytest) o job fica off via env no conftest.
+    if os.getenv("PORTAL_SKIP_INIT") != "1":
+        meta_ads_spend_job.start_worker(SessionLocal)
+    try:
+        yield
+    finally:
+        meta_ads_spend_job.stop_worker()
+
+
+app = FastAPI(
+    title="Portal de Gestão",
+    docs_url=None,
+    redoc_url=None,
+    lifespan=_lifespan,
+)
 app.add_middleware(
     SessionMiddleware,
     secret_key=settings.session_secret,
@@ -249,6 +273,7 @@ app.mount("/static", StaticFiles(directory=str(BASE_DIR / "static")), name="stat
 
 if os.getenv("PORTAL_SKIP_INIT") != "1":
     Base.metadata.create_all(bind=engine)
+
 
 
 @app.middleware("http")
@@ -3241,12 +3266,15 @@ def _trafego_contexto(
     usuario,
     config: MetaPixelConfig | None,
     *,
+    ads_config: MetaAdsConfig | None = None,
     ultimo_outbox: MetaCapiOutbox | None = None,
     pendentes: int = 0,
     ok=None,
     erro=None,
+    sync_resumo=None,
 ):
     token_configurado = bool(config and config.token_ciphertext)
+    ads_token_configurado = bool(ads_config and ads_config.token_ciphertext)
     ultimo_erro_exibicao = None
     if ultimo_outbox is not None and ultimo_outbox.status == "failed":
         ultimo_erro_exibicao = (
@@ -3258,18 +3286,27 @@ def _trafego_contexto(
         request,
         usuario,
         config=config,
+        ads_config=ads_config,
         token_configurado=token_configurado,
+        ads_token_configurado=ads_token_configurado,
         pixel_id=(config.pixel_id if config else "") or "",
         test_event_code=(config.test_event_code if config else "") or "",
         enviar_page_view=bool(config.enviar_page_view) if config else True,
         enviar_lead=bool(config.enviar_lead) if config else True,
         enviar_purchase=bool(config.enviar_purchase) if config else True,
         atualizada_em=config.atualizada_em if config else None,
+        ad_account_id=(ads_config.ad_account_id if ads_config else "") or "",
+        ads_sync_enabled=bool(ads_config.sync_enabled) if ads_config else True,
+        ads_ultima_sync_em=ads_config.ultima_sync_em if ads_config else None,
+        ads_ultima_sync_status=(ads_config.ultima_sync_status if ads_config else None),
+        ads_ultima_sync_erro=(ads_config.ultima_sync_erro if ads_config else None),
+        ads_ultima_sync_resumo=(ads_config.ultima_sync_resumo if ads_config else None),
         ultimo_outbox=ultimo_outbox,
         ultimo_erro_exibicao=ultimo_erro_exibicao,
         outbox_pendentes=pendentes,
         ok=ok,
         erro=erro,
+        sync_resumo=sync_resumo,
     )
 
 
@@ -3465,6 +3502,7 @@ async def campanhas_gastos_lote_post(request: Request, db: Session = Depends(get
                 valor=valor,
                 referencia=referencia,
                 nota=nota,
+                origem="manual",
                 criada_por=usuario.email,
             )
         )
@@ -3521,6 +3559,7 @@ async def campanhas_gastos_csv_post(request: Request, db: Session = Depends(get_
                 valor=linha.valor,
                 referencia=linha.referencia,
                 nota=linha.nota,
+                origem="manual",
                 criada_por=usuario.email,
             )
         )
@@ -3642,6 +3681,8 @@ def campanhas_editar_get(request: Request, campanha_id: str, db: Session = Depen
         "utm_campaign": campanha.utm_campaign,
         "utm_content": campanha.utm_content or "",
         "utm_term": campanha.utm_term or "",
+        "meta_campaign_id": campanha.meta_campaign_id or "",
+        "codigo_ctwa": campanha.codigo_ctwa or "",
         "periodo_inicio": campanha.periodo_inicio.isoformat() if campanha.periodo_inicio else "",
         "periodo_fim": campanha.periodo_fim.isoformat() if campanha.periodo_fim else "",
         "notas": campanha.notas or "",
@@ -3729,6 +3770,7 @@ async def campanhas_gasto_post(request: Request, campanha_id: str, db: Session =
             valor=valor,
             referencia=referencia,
             nota=(form.get("nota") or "").strip() or None,
+            origem="manual",
             criada_por=usuario.email,
         )
     )
@@ -3793,6 +3835,68 @@ def trafego_roi(
     )
 
 
+@app.get("/app/trafego/pixel-auditoria", response_class=HTMLResponse)
+def trafego_pixel_auditoria(
+    request: Request,
+    db: Session = Depends(get_db),
+    origem: str | None = None,
+):
+    """Auditoria de chaves Pixel/CAPI (Event Match Quality flags)."""
+    usuario = usuario_atual(request, db)
+    if not usuario:
+        return redirecionar_login()
+    if not pode_gerir_trafego(usuario):
+        return RedirectResponse("/app", status_code=303)
+    from app.pixel_capi_auditoria import listar_auditoria_pixel
+
+    origem_filtro = (origem or "").strip() or None
+    itens = listar_auditoria_pixel(
+        db, usuario.loja_slug, limit=100, origem=origem_filtro
+    )
+    return templates.TemplateResponse(
+        "trafego/pixel_auditoria.html",
+        contexto(
+            request,
+            usuario,
+            itens=itens,
+            origem_filtro=origem_filtro or "",
+        ),
+    )
+
+
+@app.get("/app/trafego/ctwa-auditoria", response_class=HTMLResponse)
+def trafego_ctwa_auditoria(
+    request: Request,
+    db: Session = Depends(get_db),
+    so_com_clid: str | None = None,
+    chatbot: ChatbotClient = Depends(get_chatbot_client),
+):
+    """Auditoria de sinais CTWA recebidos no webhook (via Chatbot API)."""
+    usuario = usuario_atual(request, db)
+    if not usuario:
+        return redirecionar_login()
+    if not pode_gerir_trafego(usuario):
+        return RedirectResponse("/app", status_code=303)
+    filtro_clid = (so_com_clid or "").strip() in {"1", "true", "on", "sim"}
+    itens: list = []
+    erro_chatbot = None
+    try:
+        dados = chatbot.listar_auditoria_ctwa(limit=80, so_com_clid=filtro_clid)
+        itens = dados.get("itens") or []
+    except ChatbotIndisponivel:
+        erro_chatbot = "Chatbot indisponível — não foi possível carregar a auditoria CTWA."
+    return templates.TemplateResponse(
+        "trafego/ctwa_auditoria.html",
+        contexto(
+            request,
+            usuario,
+            itens=itens,
+            so_com_clid=filtro_clid,
+            erro_chatbot=erro_chatbot,
+        ),
+    )
+
+
 @app.get("/app/trafego", response_class=HTMLResponse)
 def trafego_pagina(request: Request, db: Session = Depends(get_db)):
     usuario = usuario_atual(request, db)
@@ -3803,6 +3907,11 @@ def trafego_pagina(request: Request, db: Session = Depends(get_db)):
     config = (
         db.query(MetaPixelConfig)
         .filter(MetaPixelConfig.loja_slug == usuario.loja_slug)
+        .first()
+    )
+    ads_config = (
+        db.query(MetaAdsConfig)
+        .filter(MetaAdsConfig.loja_slug == usuario.loja_slug)
         .first()
     )
     ok = request.query_params.get("ok")
@@ -3818,9 +3927,11 @@ def trafego_pagina(request: Request, db: Session = Depends(get_db)):
             request,
             usuario,
             config,
+            ads_config=ads_config,
             ultimo_outbox=outboxes[0] if outboxes else None,
             pendentes=sum(o.status in {"pending", "failed"} for o in outboxes),
             ok=ok,
+            sync_resumo=request.query_params.get("sync"),
         ),
     )
 
@@ -3859,6 +3970,116 @@ async def trafego_onboarding_dispensar(request: Request, db: Session = Depends(g
     return RedirectResponse("/app?ok=onboarding-dispensado", status_code=303)
 
 
+@app.post("/app/trafego/ads/salvar")
+async def trafego_ads_salvar(request: Request, db: Session = Depends(get_db)):
+    """Salva conta de anúncios Meta (Marketing API / spend) — separado do CAPI."""
+    usuario = usuario_atual(request, db)
+    if not usuario:
+        return redirecionar_login()
+    form = await request.form()
+    if not pode_gerir_trafego(usuario) or not csrf_valido(request, form.get("csrf")):
+        return RedirectResponse("/app", status_code=303)
+
+    ads_config = (
+        db.query(MetaAdsConfig)
+        .filter(MetaAdsConfig.loja_slug == usuario.loja_slug)
+        .first()
+    )
+    config = (
+        db.query(MetaPixelConfig)
+        .filter(MetaPixelConfig.loja_slug == usuario.loja_slug)
+        .first()
+    )
+    account = normalizar_ad_account_id(form.get("ad_account_id"))
+    token_novo = (form.get("ads_token") or "").strip()
+    sync_enabled = form.get("ads_sync_enabled") == "on"
+
+    if not account:
+        return templates.TemplateResponse(
+            "trafego/form.html",
+            _trafego_contexto(
+                request,
+                usuario,
+                config,
+                ads_config=ads_config,
+                erro="Informe o ID da conta de anúncios Meta (act_… ou só números).",
+            ),
+            status_code=422,
+        )
+    if not token_novo and not (ads_config and ads_config.token_ciphertext):
+        return templates.TemplateResponse(
+            "trafego/form.html",
+            _trafego_contexto(
+                request,
+                usuario,
+                config,
+                ads_config=ads_config,
+                erro="Informe o token com permissão ads_read (Marketing API).",
+            ),
+            status_code=422,
+        )
+
+    if ads_config is None:
+        ads_config = MetaAdsConfig(loja_slug=usuario.loja_slug, ad_account_id=account)
+        db.add(ads_config)
+    ads_config.ad_account_id = account
+    ads_config.sync_enabled = sync_enabled
+    if token_novo:
+        ads_config.token_ciphertext = cifrar(token_novo)
+    ads_config.atualizada_em = agora()
+    db.commit()
+    return RedirectResponse("/app/trafego?ok=ads-salvo", status_code=303)
+
+
+@app.post("/app/trafego/ads/sincronizar")
+async def trafego_ads_sincronizar(request: Request, db: Session = Depends(get_db)):
+    usuario = usuario_atual(request, db)
+    if not usuario:
+        return redirecionar_login()
+    form = await request.form()
+    if not pode_gerir_trafego(usuario) or not csrf_valido(request, form.get("csrf")):
+        return RedirectResponse("/app", status_code=303)
+    result = sincronizar_gastos_meta(db, usuario.loja_slug, janela_dias=7)
+    if result.status == "erro":
+        return RedirectResponse("/app/trafego?ok=sync-erro", status_code=303)
+    return RedirectResponse("/app/trafego?ok=sync-ok", status_code=303)
+
+
+@app.post("/internal/jobs/meta-spend-sync")
+def job_meta_spend_sync(
+    x_job_token: str = Header(default="", alias="X-Job-Token"),
+):
+    """Dispara sync de todas as lojas (cron externo ou health-ops).
+
+    Autentica com ``PORTAL_META_SPEND_JOB_SECRET``. Se o segredo estiver vazio,
+    o endpoint responde 503 (desligado de propósito).
+    """
+    esperado = (os.getenv("PORTAL_META_SPEND_JOB_SECRET") or "").strip()
+    if not esperado:
+        return JSONResponse(
+            {"detail": "job desabilitado (PORTAL_META_SPEND_JOB_SECRET vazio)"},
+            status_code=503,
+        )
+    if not secrets.compare_digest(x_job_token or "", esperado):
+        return JSONResponse({"detail": "não autorizado"}, status_code=401)
+
+    worker = meta_ads_spend_job.get_worker()
+    if worker is None:
+        # Processo sem lifespan worker (ex.: testes) — executa uma vez direto.
+        janela = int(os.getenv("PORTAL_META_SPEND_SYNC_JANELA_DIAS", "3") or "3")
+        runner = meta_ads_spend_job.MetaSpendSyncWorker(
+            db_factory=SessionLocal,
+            enabled=True,
+            interval_seconds=86400,
+            initial_delay_seconds=0,
+            janela_dias=janela,
+        )
+        payload = runner.run_once()
+    else:
+        payload = worker.run_once()
+    return JSONResponse(payload)
+
+
 @app.post("/app/trafego")
 async def trafego_salvar(request: Request, db: Session = Depends(get_db)):
     usuario = usuario_atual(request, db)
@@ -3880,6 +4101,11 @@ async def trafego_salvar(request: Request, db: Session = Depends(get_db)):
         .filter(MetaPixelConfig.loja_slug == usuario.loja_slug)
         .first()
     )
+    ads_config = (
+        db.query(MetaAdsConfig)
+        .filter(MetaAdsConfig.loja_slug == usuario.loja_slug)
+        .first()
+    )
     if not pixel_id:
         return templates.TemplateResponse(
             "trafego/form.html",
@@ -3887,6 +4113,7 @@ async def trafego_salvar(request: Request, db: Session = Depends(get_db)):
                 request,
                 usuario,
                 config,
+                ads_config=ads_config,
                 erro="Informe o Pixel ID da Meta.",
             ),
             status_code=422,
@@ -3898,6 +4125,7 @@ async def trafego_salvar(request: Request, db: Session = Depends(get_db)):
                 request,
                 usuario,
                 config,
+                ads_config=ads_config,
                 erro="Informe o token de acesso da Conversions API (CAPI).",
             ),
             status_code=422,
@@ -3915,6 +4143,24 @@ async def trafego_salvar(request: Request, db: Session = Depends(get_db)):
     config.atualizada_em = agora()
     if token_novo:
         config.token_ciphertext = cifrar(token_novo)
+    try:
+        from app.pixel_capi_auditoria import registrar_auditoria_pixel
+
+        registrar_auditoria_pixel(
+            db,
+            loja_slug=usuario.loja_slug,
+            origem="config_salva",
+            pixel_id=pixel_id,
+            modo="config",
+            tem_test_event_code=bool(test_event_code),
+            enviar_page_view=enviar_page_view,
+            enviar_lead=enviar_lead,
+            enviar_purchase=enviar_purchase,
+            status="ok",
+            detalhe="token_atualizado" if token_novo else "token_mantido",
+        )
+    except Exception:
+        pass
     db.commit()
     return RedirectResponse("/app/trafego?ok=salvo", status_code=303)
 

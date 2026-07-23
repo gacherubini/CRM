@@ -110,6 +110,23 @@ class ChatbotClient:
         )
         return dados["eventos"]
 
+    def listar_auditoria_ctwa(
+        self,
+        *,
+        limit: int = 50,
+        offset: int = 0,
+        so_com_clid: bool = False,
+    ) -> dict:
+        return self._request(
+            "GET",
+            "/v1/auditoria/ctwa",
+            params={
+                "limit": limit,
+                "offset": offset,
+                "so_com_clid": so_com_clid,
+            },
+        )
+
     # --- Conversas e handoff ---------------------------------------------------
 
     def listar_conversas(self, busca: str | None = None, limit: int = 50, offset: int = 0) -> list[dict]:

@@ -56,6 +56,15 @@
     <div><dt>Last campaign</dt><dd>{% if lead.utm_campaign_last or lead.utm_campaign %}<code>{{ lead.utm_campaign_last or lead.utm_campaign }}</code>{% else %}<span class="muted">—</span>{% endif %}</dd></div>
     <div><dt>utm_source</dt><dd>{% if lead.utm_source %}<code>{{ lead.utm_source }}</code>{% else %}<span class="muted">—</span>{% endif %}</dd></div>
     <div><dt>fbclid / gclid</dt><dd>{% if lead.fbclid or lead.gclid %}<code>{{ lead.fbclid or '—' }}</code> / <code>{{ lead.gclid or '—' }}</code>{% else %}<span class="muted">—</span>{% endif %}</dd></div>
+    <div><dt>WhatsApp Ads (CTWA)</dt><dd>
+      {% if lead.ctwa_clid or lead.ctwa_codigo or lead.meta_campaign_id or lead.origem == 'meta_ctwa' %}
+        {% if lead.origem == 'meta_ctwa' %}<span class="status confirmada">meta_ctwa</span>{% endif %}
+        {% if lead.ctwa_clid %}<br><small>click id …{{ lead.ctwa_clid[-6:] }}</small>{% endif %}
+        {% if lead.ctwa_codigo %}<br><small>código <code>{{ lead.ctwa_codigo }}</code></small>{% endif %}
+        {% if lead.meta_campaign_id %}<br><small>campaign <code>{{ lead.meta_campaign_id }}</code></small>{% endif %}
+        {% if lead.meta_ad_id %}<br><small>ad <code>{{ lead.meta_ad_id }}</code></small>{% endif %}
+      {% else %}<span class="muted">—</span>{% endif %}
+    </dd></div>
   </dl>
 </section>
 

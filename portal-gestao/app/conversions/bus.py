@@ -63,8 +63,9 @@ def default_adapters() -> tuple[ConversionAdapter, ...]:
 
     # Import tardio evita ciclos e permite acrescentar adapters sem acoplar types.
     from app.conversions.meta import MetaAdapter
+    from app.conversions.meta_messaging import MetaMessagingAdapter
 
-    return (MetaAdapter(),)
+    return (MetaAdapter(), MetaMessagingAdapter())
 
 
 def publish_conversion(

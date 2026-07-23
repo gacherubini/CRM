@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+{% block title %}Auditoria Pixel / CAPI — Revy{% endblock %}
+{% block content %}
+<div class="page-heading">
+  <div>
+    <a class="back-link" href="/app/trafego">← Tráfego</a>
+    <span class="eyebrow">Meta Pixel</span>
+    <h1>Auditoria Pixel / CAPI</h1>
+    <p>Chaves de match enviadas ao Meta (telefone hash, fbclid→fbc, ctwa_clid, etc.). Sem dados pessoais em claro.</p>
+  </div>
+  <div class="heading-actions">
+    <a class="button secondary" href="/app/trafego/ctwa-auditoria">Auditoria CTWA</a>
+    <a class="button primary" href="/app/trafego">Config</a>
+  </div>
+</div>
+
+<form class="filter-bar" method="get">
+  <label>Origem
+    <select name="origem" onchange="this.form.submit()">
+      <option value="" {{ 'selected' if not origem_filtro }}>Todas</option>
+      <option value="config_salva" {{ 'selected' if origem_filtro == 'config_salva' }}>Config salva</option>
+      <option value="purchase_web" {{ 'selected' if origem_filtro == 'purchase_web' }}>Purchase web</option>
+      <option value="purchase_messaging" {{ 'selected' if origem_filtro == 'purchase_messaging' }}>Purchase messaging</option>
+      <option value="envio_outbox" {{ 'selected' if origem_filtro == 'envio_outbox' }}>Envio outbox</option>
+    </select>
+  </label>
+</form>
+
+<section class="panel flush">
+  <div class="panel-heading">
+    <div><span class="mono-label">EVENTOS</span><h2>Últimas chaves registradas</h2></div>
+  </div>
+  {% if itens %}
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Quando</th>
+          <th>Origem</th>
+          <th>Evento</th>
+          <th>Modo</th>
+          <th>Pixel …</th>
+          <th>ph</th>
+          <th>em</th>
+          <th>fbclid</th>
+          <th>fbc</th>
+          <th>ctwa</th>
+          <th>ext_id</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for e in itens %}
+        <tr>
+          <td class="muted">{{ formatar_horario(e.criada_em.isoformat()) if e.criada_em else '—' }}</td>
+          <td><code>{{ e.origem }}</code></td>
+          <td>{{ e.event_name or '—' }}{% if e.event_id %}<br><small class="muted">{{ e.event_id[:28] }}{% if e.event_id|length > 28 %}…{% endif %}</small>{% endif %}</td>
+          <td>{{ e.modo or '—' }}</td>
+          <td>{% if e.pixel_id_sufixo %}<code>…{{ e.pixel_id_sufixo }}</code>{% else %}—{% endif %}</td>
+          <td>{% if e.tem_ph %}<span class="status confirmada">sim</span>{% else %}<span class="muted">não</span>{% endif %}</td>
+          <td>{% if e.tem_em %}<span class="status confirmada">sim</span>{% else %}<span class="muted">não</span>{% endif %}</td>
+          <td>{% if e.tem_fbclid %}<span class="status confirmada">sim</span>{% else %}<span class="muted">não</span>{% endif %}</td>
+          <td>{% if e.tem_fbc %}<span class="status confirmada">sim</span>{% else %}<span class="muted">não</span>{% endif %}</td>
+          <td>{% if e.tem_ctwa_clid %}<span class="status confirmada">sim</span>{% else %}<span class="muted">não</span>{% endif %}</td>
+          <td>{% if e.tem_external_id %}<span class="status confirmada">sim</span>{% else %}<span class="muted">não</span>{% endif %}</td>
+          <td>
+            {{ e.status or '—' }}
+            {% if e.http_status %}<br><small class="muted">HTTP {{ e.http_status }}</small>{% endif %}
+            {% if e.origem == 'config_salva' %}
+              <br><small class="muted">
+                PV={{ 'on' if e.enviar_page_view else 'off' }}
+                Lead={{ 'on' if e.enviar_lead else 'off' }}
+                Purch={{ 'on' if e.enviar_purchase else 'off' }}
+                {% if e.tem_test_event_code %} test{% endif %}
+              </small>
+            {% endif %}
+            {% if e.detalhe %}<br><small class="muted">{{ e.detalhe }}</small>{% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty">
+    <strong>Nenhum evento ainda.</strong>
+    <p>Salve o Pixel em Tráfego ou confirme uma venda com CAPI ativo para gerar auditoria de chaves.</p>
+  </div>
+  {% endif %}
+</section>
+
+<section class="panel form-section" style="margin-top:18px">
+  <div class="section-title"><span>01</span><div><h2>Como ler as chaves</h2><p>Quanto mais “sim”, melhor o match na Meta.</p></div></div>
+  <ul class="muted" style="margin:0;padding-left:1.2rem;font-size:13px;line-height:1.55">
+    <li><strong>ph</strong> — telefone hash (ótimo para match)</li>
+    <li><strong>em</strong> — e-mail hash</li>
+    <li><strong>fbclid / fbc</strong> — clique no site (funil catálogo)</li>
+    <li><strong>ctwa</strong> — click id de WhatsApp Ads (funil CTWA messaging)</li>
+    <li><strong>ext_id</strong> — fallback estável do event_id</li>
+    <li><strong>config_salva</strong> — quais eventos browser (PageView/Lead) e Purchase estão ligados</li>
+  </ul>
+  <p class="muted" style="font-size:12px;margin-top:10px">Logs do Portal: linha <code>pixel_capi_auditoria … ph=sim|nao fbclid=…</code></p>
+</section>
+{% endblock %}

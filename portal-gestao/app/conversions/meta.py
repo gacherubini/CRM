@@ -26,6 +26,7 @@ class MetaAdapter:
             "email": payload.email,
             "fbclid": payload.fbclid,
             "fbc": payload.fbc,
+            # ctwa_clid não vai no CAPI web; messaging adapter trata à parte
         }
         return meta_capi.enfileirar_purchase(
             db,

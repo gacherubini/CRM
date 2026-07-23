@@ -180,6 +180,32 @@ def enfileirar_purchase(
             atualizada_em=agora(),
         )
         db.add(outbox)
+        # Auditoria de chaves (EMQ) antes do envio.
+        try:
+            from app.pixel_capi_auditoria import flags_do_payload_capi, registrar_auditoria_pixel
+
+            flags = flags_do_payload_capi(body)
+            lead_data = lead or {}
+            registrar_auditoria_pixel(
+                db,
+                loja_slug=loja_slug,
+                origem="purchase_web",
+                event_name="Purchase",
+                event_id=event_id,
+                pixel_id=config.pixel_id,
+                modo="web",
+                tem_ph=flags["tem_ph"],
+                tem_em=flags["tem_em"],
+                tem_fbclid=bool((lead_data.get("fbclid") or "").strip()),
+                tem_fbc=flags["tem_fbc"],
+                tem_ctwa_clid=False,
+                tem_external_id=flags["tem_external_id"],
+                tem_test_event_code=bool(config.test_event_code),
+                status="enfileirado",
+                venda_id=venda_id,
+            )
+        except Exception:
+            logger.warning("meta_capi: falha ao registrar auditoria pixel (ignored)")
         db.commit()
         db.refresh(outbox)
         tentar_enviar_outbox(db, outbox, config)
@@ -226,6 +252,36 @@ def tentar_enviar_outbox(
         outbox.last_error = None
         outbox.delivered_at = agora()
         outbox.atualizada_em = agora()
+        try:
+            from app.pixel_capi_auditoria import flags_do_payload_capi, registrar_auditoria_pixel
+
+            body_aud = json.loads(outbox.payload_json)
+            flags = flags_do_payload_capi(body_aud)
+            modo = (
+                "messaging"
+                if (body_aud.get("data") or [{}])[0].get("action_source")
+                == "business_messaging"
+                else "web"
+            )
+            registrar_auditoria_pixel(
+                db,
+                loja_slug=outbox.loja_slug,
+                origem="envio_outbox",
+                event_name=outbox.event_name,
+                event_id=outbox.event_id,
+                pixel_id=config.pixel_id,
+                modo=modo,
+                tem_ph=flags["tem_ph"],
+                tem_em=flags["tem_em"],
+                tem_fbc=flags["tem_fbc"],
+                tem_ctwa_clid=flags["tem_ctwa_clid"],
+                tem_external_id=flags["tem_external_id"],
+                status="delivered",
+                http_status=resposta.status_code,
+                venda_id=outbox.venda_id,
+            )
+        except Exception:
+            logger.warning("meta_capi: auditoria envio delivered ignored")
         db.commit()
         return True
     except Exception as exc:
@@ -247,6 +303,34 @@ def tentar_enviar_outbox(
             if isinstance(exc, httpx.HTTPStatusError) and exc.response is not None:
                 outbox.last_http_status = exc.response.status_code
             outbox.atualizada_em = agora()
+            try:
+                from app.pixel_capi_auditoria import flags_do_payload_capi, registrar_auditoria_pixel
+
+                body_aud = json.loads(outbox.payload_json)
+                flags = flags_do_payload_capi(body_aud)
+                registrar_auditoria_pixel(
+                    db,
+                    loja_slug=outbox.loja_slug,
+                    origem="envio_outbox",
+                    event_name=outbox.event_name,
+                    event_id=outbox.event_id,
+                    pixel_id=(config.pixel_id if config else None),
+                    modo="messaging"
+                    if (body_aud.get("data") or [{}])[0].get("action_source")
+                    == "business_messaging"
+                    else "web",
+                    tem_ph=flags["tem_ph"],
+                    tem_em=flags["tem_em"],
+                    tem_fbc=flags["tem_fbc"],
+                    tem_ctwa_clid=flags["tem_ctwa_clid"],
+                    tem_external_id=flags["tem_external_id"],
+                    status="failed",
+                    http_status=status_http,
+                    venda_id=outbox.venda_id,
+                    detalhe=outbox.last_error,
+                )
+            except Exception:
+                pass
             db.commit()
         except Exception:
             logger.exception("meta_capi: não foi possível marcar outbox como failed")

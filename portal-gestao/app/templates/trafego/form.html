@@ -8,12 +8,17 @@
     <p>Pixel da Meta e Conversions API (CAPI) por loja. O token CAPI fica cifrado no servidor e nunca vai ao catálogo.</p>
   </div>
   <div class="heading-actions">
+    <a class="button secondary" href="/app/trafego/pixel-auditoria">Auditoria Pixel</a>
+    <a class="button secondary" href="/app/trafego/ctwa-auditoria">Auditoria CTWA</a>
     <a class="button secondary" href="/app/campanhas">Campanhas</a>
     <a class="button primary" href="/app/trafego/roi">ROI</a>
   </div>
 </div>
 
 {% if ok == 'salvo' %}<div class="alert success">Configuração de tráfego salva.</div>{% endif %}
+{% if ok == 'ads-salvo' %}<div class="alert success">Conta de anúncios Meta salva. Agora vincule o ID da campanha em cada campanha do Revy e sincronize.</div>{% endif %}
+{% if ok == 'sync-ok' %}<div class="alert success">Gastos sincronizados{% if ads_ultima_sync_resumo %}: {{ ads_ultima_sync_resumo }}{% endif %}.</div>{% endif %}
+{% if ok == 'sync-erro' %}<div class="alert error">Falha ao sincronizar gastos{% if ads_ultima_sync_erro %}: {{ ads_ultima_sync_erro }}{% endif %}</div>{% endif %}
 {% if ok and ok.startswith('retry-') %}<div class="alert success">Fila Meta processada. Confira o status do último Purchase abaixo.</div>{% endif %}
 {% if erro %}<div class="alert error">{{ erro }}</div>{% endif %}
 
@@ -87,7 +92,67 @@
 
   <div class="form-actions">
     <a class="button ghost" href="/app">Cancelar</a>
-    <button class="button primary" type="submit">Salvar configuração</button>
+    <button class="button primary" type="submit">Salvar Pixel / CAPI</button>
   </div>
 </form>
+
+<section class="panel form-section" style="margin-top: 18px;">
+  <div class="section-title"><span>03</span><div><h2>Gasto automático (Marketing API)</h2><p>Puxa o spend do Meta Ads para o ROI. Token <strong>diferente</strong> do CAPI — precisa de permissão <code>ads_read</code>.</p></div></div>
+  <div class="form-grid" style="margin-bottom: 12px;">
+    <div class="metric">
+      <span>Token Ads</span>
+      <strong>{% if ads_token_configurado %}Configurado{% else %}Não configurado{% endif %}</strong>
+      <small>{% if ads_token_configurado %}••••••••{% else %}Cole o token com ads_read{% endif %}</small>
+    </div>
+    <div class="metric">
+      <span>Última sync</span>
+      <strong>
+        {% if ads_ultima_sync_status %}
+          {{ {'ok':'Ok', 'partial':'Parcial', 'erro':'Erro'}.get(ads_ultima_sync_status, ads_ultima_sync_status) }}
+        {% else %}—{% endif %}
+      </strong>
+      <small>
+        {% if ads_ultima_sync_em %}{{ formatar_horario(ads_ultima_sync_em.isoformat()) }}{% else %}Ainda não sincronizou{% endif %}
+      </small>
+    </div>
+    <div class="metric">
+      <span>Resumo</span>
+      <strong style="font-size:13px">{% if ads_ultima_sync_resumo %}{{ ads_ultima_sync_resumo }}{% else %}—{% endif %}</strong>
+      <small>últimos 7 dias no botão</small>
+    </div>
+  </div>
+  {% if ads_ultima_sync_erro and ads_ultima_sync_status == 'erro' %}
+  <div class="alert warning" style="margin-bottom:12px">{{ ads_ultima_sync_erro }}</div>
+  {% endif %}
+  <form method="post" action="/app/trafego/ads/salvar" class="form-layout" autocomplete="off">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <div class="form-grid">
+      <label>Ad Account ID
+        <input type="text" name="ad_account_id" value="{{ ad_account_id }}" placeholder="act_1234567890 ou só os números" autocomplete="off">
+      </label>
+      <label>Token Marketing API (ads_read)
+        <input type="password" name="ads_token" value="" placeholder="{% if ads_token_configurado %}Deixe em branco para manter{% else %}System User ou token long-lived{% endif %}" autocomplete="new-password">
+      </label>
+      <label class="check-row"><input type="checkbox" name="ads_sync_enabled" {% if ads_sync_enabled %}checked{% endif %}> Sincronização habilitada</label>
+    </div>
+    <p class="muted" style="font-size:12px;margin:8px 0 12px">
+      Em cada campanha do Revy, preencha o <strong>ID da campanha no Meta Ads</strong>.
+      Sem esse vínculo o gasto da Meta não entra no ROI.
+    </p>
+    <div class="form-actions">
+      <button class="button secondary" type="submit">Salvar conta de anúncios</button>
+    </div>
+  </form>
+  <form method="post" action="/app/trafego/ads/sincronizar" style="margin-top:12px">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <button class="button primary" type="submit" {% if not ads_token_configurado %}disabled title="Configure a conta primeiro"{% endif %}>
+      Sincronizar gastos agora (7 dias)
+    </button>
+    <a class="button ghost" href="/app/campanhas">Ir às campanhas</a>
+  </form>
+  <p class="muted" style="font-size:12px;margin-top:12px">
+    O Portal também roda um <strong>job automático</strong> (padrão: a cada 24h, janela de 3 dias)
+    para todas as lojas com conta Meta e sync ligada. O botão acima força a sincronização imediata desta loja.
+  </p>
+</section>
 {% endblock %}

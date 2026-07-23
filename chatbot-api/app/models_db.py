@@ -102,6 +102,18 @@ class Lead(Base):
     utm_term_last: Mapped[str | None] = mapped_column(String(120), nullable=True)
     fbclid: Mapped[str | None] = mapped_column(String(255), nullable=True)
     gclid: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    # Click-to-WhatsApp (CTWA) — last touch nos campos sem sufixo; first_* separado
+    ctwa_clid: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
+    ctwa_clid_first: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    meta_ad_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    meta_ad_id_first: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    meta_campaign_id: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+    meta_campaign_id_first: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    meta_adset_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    ctwa_source_type: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    ctwa_codigo: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    ctwa_codigo_first: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    ctwa_atribuido_em: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     veiculo_ref: Mapped[str | None] = mapped_column(String(120), nullable=True)
     catalog_interest_ref: Mapped[str | None] = mapped_column(String(32), nullable=True)
     atribuida_em: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
@@ -151,6 +163,29 @@ class CatalogAttribution(Base):
     telefone: Mapped[str | None] = mapped_column(String, nullable=True, index=True)
     lead_id: Mapped[str | None] = mapped_column(ForeignKey("leads.id"), nullable=True, index=True)
     atribuida_em: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    criada_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_agora)
+
+
+class CtwaAuditoria(Base):
+    """Sinais CTWA recebidos no webhook (auditoria sem PII completo)."""
+
+    __tablename__ = "ctwa_auditoria"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    loja_id: Mapped[str] = mapped_column(ForeignKey("lojas.id"), nullable=False, index=True)
+    lead_id: Mapped[str | None] = mapped_column(ForeignKey("leads.id"), nullable=True)
+    telefone_mascarado: Mapped[str] = mapped_column(String(20), nullable=False)
+    provider_message_id: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    tem_ctwa_clid: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
+    ctwa_clid_sufixo: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    meta_ad_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    meta_campaign_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    meta_adset_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    ctwa_source_type: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    ctwa_codigo: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    codigo_extraido_texto: Mapped[bool] = mapped_column(Boolean, default=False)
+    atribuido_lead: Mapped[bool] = mapped_column(Boolean, default=False)
+    sinais_json: Mapped[str | None] = mapped_column(String(500), nullable=True)
     criada_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_agora)
 
 

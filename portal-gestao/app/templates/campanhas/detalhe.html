@@ -58,7 +58,12 @@
 </section>
 
 <section class="panel form-section" style="margin-bottom: 18px;">
-  <div class="section-title"><span>02</span><div><h2>Lançar gasto</h2><p>Copie o valor do Ads Manager (Meta/Google) e registre aqui, ou use o lote.</p></div></div>
+  <div class="section-title"><span>02</span><div><h2>Lançar gasto manual</h2><p>Opcional se a campanha tem ID Meta e a sync em Tráfego está ativa. Use manual para correção ou canais sem API.</p></div></div>
+  {% if campanha.meta_campaign_id %}
+  <p class="muted" style="margin-bottom:12px;font-size:13px">ID Meta: <code>{{ campanha.meta_campaign_id }}</code> · <a href="/app/trafego">Sincronizar gastos</a></p>
+  {% else %}
+  <div class="alert warning" style="margin-bottom:12px">Sem ID da campanha Meta — o gasto automático não entra aqui. <a href="/app/campanhas/{{ campanha.id }}/editar">Editar campanha</a></div>
+  {% endif %}
   <form method="post" action="/app/campanhas/{{ campanha.id }}/gastos" class="form-grid">
     <input type="hidden" name="csrf" value="{{ csrf }}">
     <label>Valor (R$)
@@ -80,12 +85,13 @@
   <div class="panel-heading"><div><span class="mono-label">HISTÓRICO</span><h2>Gastos lançados</h2></div></div>
   {% if gastos %}
   <div class="table-wrap"><table>
-    <thead><tr><th>Data</th><th>Valor</th><th>Nota</th><th>Por</th></tr></thead>
+    <thead><tr><th>Data</th><th>Valor</th><th>Origem</th><th>Nota</th><th>Por</th></tr></thead>
     <tbody>
       {% for g in gastos %}
       <tr>
         <td>{{ g.referencia.strftime('%d/%m/%Y') }}</td>
         <td><strong>{{ formatar_brl(g.valor) }}</strong></td>
+        <td>{% if g.origem == 'meta_api' %}<span class="status confirmada">Meta</span>{% else %}Manual{% endif %}</td>
         <td>{{ g.nota or '—' }}</td>
         <td class="muted">{{ g.criada_por }}</td>
       </tr>

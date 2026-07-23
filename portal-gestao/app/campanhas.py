@@ -161,7 +161,7 @@ def validar_campanha_payload(dados: dict) -> list[str]:
 
 
 def lead_casa_campanha(lead: dict, campanha: Campanha, *, modo: str) -> bool:
-    """modo: 'first' | 'last'."""
+    """modo: 'first' | 'last'. UTM, meta_campaign_id (CTWA) ou codigo_ctwa."""
     assert modo in ("first", "last")
     if modo == "first":
         camp_key = normalizar_utm(
@@ -170,6 +170,15 @@ def lead_casa_campanha(lead: dict, campanha: Campanha, *, modo: str) -> bool:
         content_key = normalizar_utm(
             lead.get("utm_content_first") or lead.get("utm_content")
         )
+        meta_id = (
+            lead.get("meta_campaign_id_first") or lead.get("meta_campaign_id") or ""
+        )
+        codigo = normalizar_utm(
+            lead.get("ctwa_codigo_first")
+            or lead.get("ctwa_codigo")
+            or lead.get("utm_campaign_first")
+            or lead.get("utm_campaign")
+        )
     else:
         camp_key = normalizar_utm(
             lead.get("utm_campaign_last") or lead.get("utm_campaign")
@@ -177,14 +186,35 @@ def lead_casa_campanha(lead: dict, campanha: Campanha, *, modo: str) -> bool:
         content_key = normalizar_utm(
             lead.get("utm_content_last") or lead.get("utm_content")
         )
-    if not camp_key:
-        return False
-    if camp_key != normalizar_utm(campanha.utm_campaign):
-        return False
-    if campanha.utm_content:
-        if content_key != normalizar_utm(campanha.utm_content):
-            return False
-    return True
+        meta_id = lead.get("meta_campaign_id_last") or lead.get("meta_campaign_id") or ""
+        codigo = normalizar_utm(
+            lead.get("ctwa_codigo")
+            or lead.get("ctwa_codigo_last")
+            or lead.get("utm_campaign_last")
+            or lead.get("utm_campaign")
+        )
+
+    # 1) UTM clássico (catálogo)
+    if camp_key and camp_key == normalizar_utm(campanha.utm_campaign):
+        if campanha.utm_content:
+            if content_key != normalizar_utm(campanha.utm_content):
+                return False
+        return True
+
+    # 2) ID de campanha Meta (CTWA / Ads)
+    from app.meta_ads_spend import normalizar_meta_campaign_id
+
+    camp_meta = normalizar_meta_campaign_id(getattr(campanha, "meta_campaign_id", None))
+    lead_meta = normalizar_meta_campaign_id(str(meta_id) if meta_id else None)
+    if camp_meta and lead_meta and camp_meta == lead_meta:
+        return True
+
+    # 3) Código CTWA na mensagem pré-preenchida
+    camp_cod = normalizar_utm(getattr(campanha, "codigo_ctwa", None))
+    if camp_cod and codigo and camp_cod == codigo:
+        return True
+
+    return False
 
 
 def campanha_por_utm(
@@ -261,6 +291,8 @@ def payload_form(form: Any) -> dict[str, str]:
         "utm_campaign",
         "utm_content",
         "utm_term",
+        "meta_campaign_id",
+        "codigo_ctwa",
         "periodo_inicio",
         "periodo_fim",
         "notas",
@@ -269,6 +301,8 @@ def payload_form(form: Any) -> dict[str, str]:
 
 
 def preencher_campanha(campanha: Campanha, dados: dict, *, email: str | None = None) -> None:
+    from app.meta_ads_spend import normalizar_meta_campaign_id
+
     campanha.nome = dados["nome"].strip()
     campanha.canal = dados["canal"].strip().casefold()
     campanha.status = (dados.get("status") or "ativa").strip().casefold()
@@ -278,6 +312,9 @@ def preencher_campanha(campanha: Campanha, dados: dict, *, email: str | None = N
     campanha.utm_campaign_norm = normalizar_utm(campanha.utm_campaign) or ""
     campanha.utm_content = (dados.get("utm_content") or "").strip() or None
     campanha.utm_term = (dados.get("utm_term") or "").strip() or None
+    campanha.meta_campaign_id = normalizar_meta_campaign_id(dados.get("meta_campaign_id"))
+    cod = (dados.get("codigo_ctwa") or "").strip()
+    campanha.codigo_ctwa = cod[:40] if cod else None
     campanha.notas = (dados.get("notas") or "").strip() or None
     pi = (dados.get("periodo_inicio") or "").strip()
     pf = (dados.get("periodo_fim") or "").strip()

@@ -22,12 +22,18 @@ Campos e decisões por banco:
 [plano](plans/2026-07-20-plano-trafego-pago-crm-campanhas-roi.md) · guia [loja](trafego-pago-loja.md).
 **Eixo C (2026-07-21 rev.3):** [conversões / funil / insights](plans/2026-07-21-plano-conversao-atribuicao-insights.md)
 — **A/B/E/D/H/C/F concluídas**, incluindo a UI `/app/funil`; resta **G** (Google Conversions).
-TikTok API e API de spend seguem parked.
+**CTWA (2026-07-22):** [atribuição + CAPI messaging](plans/2026-07-22-plano-ctwa-atribuicao-capi-messaging.md) — **MVP código**
+(lead CTWA, match, Purchase messaging, n8n); residual E2E lab Evolution com anúncio real.
+**Spend Meta (2026-07-22):** [gasto automático](plans/2026-07-22-plano-meta-spend-api.md) — **MVP + job 24h**;
+Google spend fora. TikTok spend parked.
 **Eixo E (2026-07-21):** áudio recebido, envio de foto do Estoque no WhatsApp e cadastro automático
 de fotos WhatsApp → Estoque → Catálogo têm backend/workflow concluídos. Cadastro textual tem
 idempotência persistente; fotos usam sessão curta por vendedor e limpeza administrativa de órfãos.
 No Fly, o MVP usa volume persistente criptografado, URL HTTPS e snapshots agendados; ainda é
 necessário homologar o transcritor HTTP e executar um restore drill.
+**Eixo G (2026-07-22):** [Multi-WhatsApp por vendedor](plans/2026-07-22-plano-multi-whatsapp-vendedores-campanhas.md)
+está **planejado e não implementado**. O desenho mantém um lead por loja/telefone e cria uma conversa
+por canal/telefone, liga campanhas a vendedor/canal e preserva o número atual como canal legado.
 
 ## Fonte da verdade (por tema)
 
@@ -48,10 +54,11 @@ Não há uma única “próxima task” universal — depende do objetivo:
 |---|---|---|---|
 | **A · Demo loja / WA** | **(1)** E2E **menu/cadastro/fotos** da equipe; **(2)** depois E2E contato **novo** (IA vendas) | Demo/operação real no Zap | [plano 2026-07-22](plans/2026-07-22-plano-menu-estoque-wa-e-fotos-fix.md) + `go-live-chatbot.md` + `deploy/fly/3vm/README.md` |
 | **B · Multi-banco** | Estabilizar sim com celular + prints; alinhar âncoras se falhar ao vivo | Mais cotações reais estáveis | handoff topo + lições Playwright |
-| **C · CRM dono** | Google Conversions (G) | Conversões outbound Google | A/B/E/D/H/C/F feitas; spend API fora |
+| **C · CRM dono** | **CTWA** (6.2b) e/ou **spend Meta** (6.2c) | WA medido + gasto automático; Google (G) residual | 6.2 A–F feitos; **6.2b+6.2c planos ATIVOS** |
 | **D · Escala Motor** | Smoke live sessão quente + teto 2; object storage se multi-volume | Estabilidade multi-banco / IP | B+D + warm-batch2 |
 | **E · Dia a dia loja** | Restore drill do volume/banco e homologar transcritor | Fechar operação de áudio e foto já publicada | `#6` + `fotos-veiculos-whatsapp.md` |
 | **F · Marketing** | Completar landing se o dono entregar HTML | Site/hero polish | `site/` |
+| **G · Multi-WhatsApp** | Task 0: validar contrato real Evolution/CTWA, sessões e capacidade | Vários números de vendedores com leads centralizados | [plano multi-WhatsApp](plans/2026-07-22-plano-multi-whatsapp-vendedores-campanhas.md) |
 
 **Bloqueios conhecidos:**
 - Landing Tailwind nova: HTML do dono ainda incompleto.
@@ -116,7 +123,7 @@ Monólitos legados (`portal2037`, `catalogo2037`, `estoque2037`, `chatbot2037`, 
 | Produto | Pasta / porta | Feito (essencial) | Aberto |
 |---|---|---|---|
 | Motor #1A | `motor-simulacao/` `:8000` | async, auth, fan-out, workers on-demand, **Santander/Fontecred/Bradesco/Pan portal LIVE**, warm session teto 2, prints blob JPEG, migrations head **0013** | `testar-login` real; T10 revenda; object storage multi-volume |
-| Chatbot #2A | `chatbot-api/` `:8001` (Fly: `app2037`) | leads, handoff, por-placa, E3, E5, áudio efêmero/fallback, foto automática com sessão por vendedor, envio da capa via WhatsApp, first/last UTM, sim privada + handoff; **`/v1/operacao/roteamento` 3 casos** (novo=`cliente`, salvo=`ignorar`, autorizado=`cadastro`); variantes telefone 55/9º dígito; webhook endurecido | E2E WA estável + Gemini; transcritor HTTP real; retenção/expurgo administrativo |
+| Chatbot #2A | `chatbot-api/` `:8001` (Fly: `app2037`) | leads, handoff, por-placa, E3, E5, áudio efêmero/fallback, foto automática com sessão por vendedor, envio da capa via WhatsApp, first/last UTM, sim privada + handoff; **`/v1/operacao/roteamento` 3 casos** (novo=`cliente`, salvo=`ignorar`, autorizado=`cadastro`); variantes telefone 55/9º dígito; webhook endurecido | E2E WA estável + Gemini; transcritor HTTP real; retenção/expurgo administrativo; multi-WhatsApp por vendedor planejado, não implementado |
 | Estoque #4A | `estoque-api/` `:8100` (Fly: `app2037`) | CRUD, idempotência persistente, placa, admin, galeria/capa, upload validado, volume/rota pública HTTPS, snapshots, limpeza periódica e transporte outbox testado | executar restore drill |
 | Portal | `portal-gestao/` `:9000` | CRM, sim multi-banco, 9A, CAPI retry, gastos/ROI/resultados; funil completo backend+UI; event bus Meta; retry HTTP seguro | Google; E2E Playwright |
 | Catálogo #5A | `catalogo-publico/` `:8200` | vitrine, CTA, Pixel PageView/Lead/ViewContent | SEO/tema; domínio (E18) |

@@ -140,11 +140,15 @@ def test_bus_padrao_usa_meta_adapter(monkeypatch):
     calls = []
 
     def fake_handle(self, kind, payload, db):
-        calls.append((kind, payload.event_id, db))
+        calls.append((self.name, kind, payload.event_id, db))
 
     monkeypatch.setattr(MetaAdapter, "handle", fake_handle)
+    from app.conversions.meta_messaging import MetaMessagingAdapter
+
+    monkeypatch.setattr(MetaMessagingAdapter, "handle", fake_handle)
     db = object()
     result = publish_conversion(ConversionKind.PURCHASE, _purchase(), db)
 
-    assert calls == [(ConversionKind.PURCHASE, "purchase-venda-1", db)]
-    assert result.accepted == 1
+    assert ("meta", ConversionKind.PURCHASE, "purchase-venda-1", db) in calls
+    assert ("meta_messaging", ConversionKind.PURCHASE, "purchase-venda-1", db) in calls
+    assert result.accepted == 2

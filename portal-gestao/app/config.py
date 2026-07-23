@@ -32,6 +32,21 @@ class Settings:
     )
     timezone: str = os.getenv("PORTAL_TIMEZONE", "America/Sao_Paulo")
     version: str = os.getenv("PORTAL_VERSION", "0.1.0")
+    # Job diário de spend Meta (Marketing API). Segredo para POST /internal/jobs/...
+    meta_spend_sync_enabled: bool = (
+        os.getenv("PORTAL_META_SPEND_SYNC_ENABLED", "1").strip().lower()
+        in {"1", "true", "yes", "on"}
+    )
+    meta_spend_sync_interval_seconds: float = float(
+        os.getenv("PORTAL_META_SPEND_SYNC_INTERVAL_SECONDS", "86400")
+    )
+    meta_spend_sync_initial_delay_seconds: float = float(
+        os.getenv("PORTAL_META_SPEND_SYNC_INITIAL_DELAY_SECONDS", "120")
+    )
+    meta_spend_sync_janela_dias: int = int(
+        os.getenv("PORTAL_META_SPEND_SYNC_JANELA_DIAS", "3")
+    )
+    meta_spend_job_secret: str = os.getenv("PORTAL_META_SPEND_JOB_SECRET", "").strip()
 
 
 settings = Settings()

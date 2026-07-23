@@ -2,6 +2,9 @@
 
 n8n/LLM nunca escrevem no banco direto — passam por esta API (Plano #2A).
 """
+import json
+import logging
+import os
 import re
 import secrets
 import uuid
@@ -17,13 +20,254 @@ from app.models_db import (
     Consentimento,
     Conversa,
     CredencialServico,
+    CtwaAuditoria,
     Lead,
     Loja,
     Mensagem,
 )
 
+logger = logging.getLogger("chatbot.ctwa")
+
 
 _CATALOG_REF_RE = re.compile(r"(?<![A-Z0-9])CAT-[A-Z2-7]{10,16}(?![A-Z0-9])", re.IGNORECASE)
+# Código curto em mensagem pré-preenchida do CTWA (fallback sem ctwa_clid).
+_CTWA_CODIGO_RE = re.compile(
+    r"(?:c[oó]d(?:igo)?|ref)\s*[:=]\s*([A-Za-z0-9][A-Za-z0-9_-]{1,39})",
+    re.IGNORECASE,
+)
+_UTM_CAMPAIGN_IN_TEXT_RE = re.compile(
+    r"utm_campaign=([A-Za-z0-9][A-Za-z0-9_-]{1,119})",
+    re.IGNORECASE,
+)
+
+
+def _limpar_tracking(valor: str | None, *, limite: int = 255) -> str | None:
+    if valor is None:
+        return None
+    s = str(valor).strip()
+    if not s:
+        return None
+    return s[:limite]
+
+
+def extrair_codigo_ctwa_do_texto(texto: str | None) -> str | None:
+    """Extrai código da mensagem (Cód: X / ref: X / utm_campaign=X)."""
+    if not texto:
+        return None
+    m = _CTWA_CODIGO_RE.search(texto)
+    if m:
+        return m.group(1).strip()[:40]
+    m2 = _UTM_CAMPAIGN_IN_TEXT_RE.search(texto)
+    if m2:
+        return m2.group(1).strip()[:40]
+    return None
+
+
+def _set_first_last(lead: Lead, campo: str, valor: str | None) -> None:
+    if not valor:
+        return
+    first_name = f"{campo}_first"
+    if hasattr(lead, first_name) and getattr(lead, first_name) is None:
+        setattr(lead, first_name, valor)
+    if hasattr(lead, campo):
+        setattr(lead, campo, valor)
+
+
+def aplicar_touch_ctwa(
+    lead: Lead,
+    *,
+    ctwa_clid: str | None = None,
+    meta_ad_id: str | None = None,
+    meta_campaign_id: str | None = None,
+    meta_adset_id: str | None = None,
+    ctwa_source_type: str | None = None,
+    ctwa_codigo: str | None = None,
+    texto: str | None = None,
+) -> bool:
+    """Aplica sinais CTWA no lead (first/last). Retorna True se algo mudou de origem CTWA."""
+    clid = _limpar_tracking(ctwa_clid, limite=255)
+    ad_id = _limpar_tracking(meta_ad_id, limite=64)
+    camp_id = _limpar_tracking(meta_campaign_id, limite=64)
+    adset = _limpar_tracking(meta_adset_id, limite=64)
+    source = _limpar_tracking(ctwa_source_type, limite=40)
+    codigo = _limpar_tracking(ctwa_codigo, limite=40) or extrair_codigo_ctwa_do_texto(texto)
+
+    tem_sinal = bool(clid or ad_id or camp_id or codigo)
+    if not tem_sinal and not source:
+        return False
+
+    if clid:
+        if lead.ctwa_clid_first is None:
+            lead.ctwa_clid_first = clid
+        lead.ctwa_clid = clid
+    if ad_id:
+        if lead.meta_ad_id_first is None:
+            lead.meta_ad_id_first = ad_id
+        lead.meta_ad_id = ad_id
+    if camp_id:
+        if lead.meta_campaign_id_first is None:
+            lead.meta_campaign_id_first = camp_id
+        lead.meta_campaign_id = camp_id
+    if adset:
+        lead.meta_adset_id = adset
+    if source:
+        lead.ctwa_source_type = source
+    if codigo:
+        if lead.ctwa_codigo_first is None:
+            lead.ctwa_codigo_first = codigo
+        lead.ctwa_codigo = codigo
+        # Também preenche utm_campaign last se vazio — ajuda ROI por utm.
+        if not lead.utm_campaign:
+            _set_first_last(lead, "utm_campaign", codigo)
+
+    # Origem tipada quando há sinal de anúncio WA
+    if clid or ad_id or camp_id or codigo:
+        if lead.origem_first is None:
+            lead.origem_first = "meta_ctwa"
+        lead.origem_last = "meta_ctwa"
+        lead.origem = "meta_ctwa"
+        if lead.canal_first is None:
+            lead.canal_first = "whatsapp"
+        lead.canal_last = "whatsapp"
+        lead.canal = "whatsapp"
+        if lead.ctwa_atribuido_em is None:
+            lead.ctwa_atribuido_em = datetime.now(timezone.utc)
+    return True
+
+
+def _mascarar_telefone_curto(telefone: str) -> str:
+    digitos = "".join(c for c in (telefone or "") if c.isdigit())
+    if len(digitos) >= 4:
+        return f"***{digitos[-4:]}"
+    return "***"
+
+
+def _sufixo_seguro(valor: str | None, n: int = 8) -> str | None:
+    if not valor:
+        return None
+    s = str(valor).strip()
+    if not s:
+        return None
+    return s[-n:] if len(s) > n else s
+
+
+def registrar_auditoria_ctwa(
+    db: Session,
+    *,
+    loja_id: str,
+    telefone: str,
+    lead_id: str | None,
+    provider_message_id: str | None,
+    ctwa_clid: str | None,
+    meta_ad_id: str | None,
+    meta_campaign_id: str | None,
+    meta_adset_id: str | None,
+    ctwa_source_type: str | None,
+    ctwa_codigo: str | None,
+    codigo_do_texto: str | None,
+    atribuido_lead: bool,
+    forcar: bool = False,
+) -> CtwaAuditoria | None:
+    """Persiste linha de auditoria + log estruturado (sem telefone/clid completos)."""
+    clid = _limpar_tracking(ctwa_clid, limite=255)
+    ad_id = _limpar_tracking(meta_ad_id, limite=64)
+    camp_id = _limpar_tracking(meta_campaign_id, limite=64)
+    adset = _limpar_tracking(meta_adset_id, limite=64)
+    source = _limpar_tracking(ctwa_source_type, limite=40)
+    codigo = _limpar_tracking(ctwa_codigo, limite=40) or _limpar_tracking(
+        codigo_do_texto, limite=40
+    )
+    tem_sinal = bool(clid or ad_id or camp_id or adset or source or codigo)
+    audit_all = (os.getenv("CHATBOT_CTWA_AUDIT_ALL") or "").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
+    if not tem_sinal and not forcar and not audit_all:
+        return None
+
+    sinais = {
+        "tem_ctwa_clid": bool(clid),
+        "tem_meta_ad_id": bool(ad_id),
+        "tem_meta_campaign_id": bool(camp_id),
+        "tem_meta_adset_id": bool(adset),
+        "tem_source_type": bool(source),
+        "tem_codigo": bool(codigo),
+        "codigo_do_texto": bool(codigo_do_texto),
+        "atribuido_lead": atribuido_lead,
+    }
+    # Log operacional: confirma chegada sem vazar identificadores longos.
+    logger.info(
+        "ctwa_auditoria loja=%s tel=%s clid=%s ad=%s camp=%s codigo=%s atribuido=%s",
+        loja_id[:8],
+        _mascarar_telefone_curto(telefone),
+        "sim" if clid else "nao",
+        "sim" if ad_id else "nao",
+        "sim" if camp_id else "nao",
+        codigo or "-",
+        "sim" if atribuido_lead else "nao",
+    )
+
+    row = CtwaAuditoria(
+        id=str(uuid.uuid4()),
+        loja_id=loja_id,
+        lead_id=lead_id,
+        telefone_mascarado=_mascarar_telefone_curto(telefone),
+        provider_message_id=_limpar_tracking(provider_message_id, limite=120),
+        tem_ctwa_clid=bool(clid),
+        ctwa_clid_sufixo=_sufixo_seguro(clid, 8),
+        meta_ad_id=ad_id,
+        meta_campaign_id=camp_id,
+        meta_adset_id=adset,
+        ctwa_source_type=source,
+        ctwa_codigo=codigo,
+        codigo_extraido_texto=bool(codigo_do_texto),
+        atribuido_lead=atribuido_lead,
+        sinais_json=json.dumps(sinais, ensure_ascii=False, sort_keys=True)[:500],
+        criada_em=datetime.now(timezone.utc),
+    )
+    db.add(row)
+    return row
+
+
+def listar_auditoria_ctwa(
+    db: Session,
+    loja_id: str,
+    *,
+    limit: int = 50,
+    offset: int = 0,
+    so_com_clid: bool = False,
+) -> list[dict]:
+    q = db.query(CtwaAuditoria).filter(CtwaAuditoria.loja_id == loja_id)
+    if so_com_clid:
+        q = q.filter(CtwaAuditoria.tem_ctwa_clid.is_(True))
+    rows = (
+        q.order_by(CtwaAuditoria.criada_em.desc())
+        .offset(max(0, offset))
+        .limit(max(1, min(limit, 200)))
+        .all()
+    )
+    return [
+        {
+            "id": r.id,
+            "lead_id": r.lead_id,
+            "telefone_mascarado": r.telefone_mascarado,
+            "provider_message_id": r.provider_message_id,
+            "tem_ctwa_clid": r.tem_ctwa_clid,
+            "ctwa_clid_sufixo": r.ctwa_clid_sufixo,
+            "meta_ad_id": r.meta_ad_id,
+            "meta_campaign_id": r.meta_campaign_id,
+            "meta_adset_id": r.meta_adset_id,
+            "ctwa_source_type": r.ctwa_source_type,
+            "ctwa_codigo": r.ctwa_codigo,
+            "codigo_extraido_texto": r.codigo_extraido_texto,
+            "atribuido_lead": r.atribuido_lead,
+            "sinais": json.loads(r.sinais_json) if r.sinais_json else {},
+            "criada_em": r.criada_em.isoformat() if r.criada_em else None,
+        }
+        for r in rows
+    ]
 
 
 # --- Mascaramento de CPF (LGPD, silencioso) ----------------------------------
@@ -220,6 +464,13 @@ def registrar_mensagem(
     from_me: bool = False,
     origem_bot: bool = False,
     tipo: str | None = None,
+    *,
+    ctwa_clid: str | None = None,
+    meta_ad_id: str | None = None,
+    meta_campaign_id: str | None = None,
+    meta_adset_id: str | None = None,
+    ctwa_source_type: str | None = None,
+    ctwa_codigo: str | None = None,
 ) -> dict:
     """Persiste a mensagem de forma idempotente e garante a conversa.
 
@@ -246,8 +497,44 @@ def registrar_mensagem(
         }
 
     atribuicao = None
+    ctwa_ok = False
+    lead_ctwa_id = None
     if not from_me:
         atribuicao = _correlacionar_catalogo(db, loja.id, telefone, texto)
+        # CTWA: cria/enriquece lead com click id ou código na mensagem.
+        lead_ctwa = _get_or_create_lead(db, loja.id, telefone)
+        codigo_txt = extrair_codigo_ctwa_do_texto(texto)
+        ctwa_ok = aplicar_touch_ctwa(
+            lead_ctwa,
+            ctwa_clid=ctwa_clid,
+            meta_ad_id=meta_ad_id,
+            meta_campaign_id=meta_campaign_id,
+            meta_adset_id=meta_adset_id,
+            ctwa_source_type=ctwa_source_type,
+            ctwa_codigo=ctwa_codigo,
+            texto=texto,
+        )
+        if ctwa_ok:
+            lead_ctwa.atualizada_em = datetime.now(timezone.utc)
+            lead_ctwa_id = lead_ctwa.id
+        # Auditoria: sempre que houver sinal CTWA (ou CHATBOT_CTWA_AUDIT_ALL=1).
+        registrar_auditoria_ctwa(
+            db,
+            loja_id=loja.id,
+            telefone=telefone,
+            lead_id=lead_ctwa.id if (ctwa_ok or lead_ctwa) else None,
+            provider_message_id=provider_message_id,
+            ctwa_clid=ctwa_clid,
+            meta_ad_id=meta_ad_id,
+            meta_campaign_id=meta_campaign_id,
+            meta_adset_id=meta_adset_id,
+            ctwa_source_type=ctwa_source_type,
+            ctwa_codigo=ctwa_codigo,
+            codigo_do_texto=codigo_txt,
+            atribuido_lead=ctwa_ok,
+        )
+        if not ctwa_ok:
+            lead_ctwa_id = lead_ctwa.id
 
     # Uma saída nova com conteúdo que não foi previamente registrada pelo workflow
     # do bot veio do atendente (celular/web). O humano assumiu: pausa automática.
@@ -295,6 +582,8 @@ def registrar_mensagem(
         "conversa_id": conversa.id,
         "bot_ativo": conversa.bot_ativo,
         "catalog_interest_ref": atribuicao.catalog_interest_ref if atribuicao else None,
+        "ctwa_atribuido": bool(ctwa_ok) if not from_me else False,
+        "lead_id": lead_ctwa_id if not from_me else None,
     }
 
 
@@ -648,6 +937,19 @@ def para_saida_lead(lead: Lead) -> dict:
         "utm_term_last": lead.utm_term_last or lead.utm_term,
         "fbclid": lead.fbclid,
         "gclid": lead.gclid,
+        "ctwa_clid": lead.ctwa_clid,
+        "ctwa_clid_first": lead.ctwa_clid_first,
+        "meta_ad_id": lead.meta_ad_id,
+        "meta_ad_id_first": lead.meta_ad_id_first,
+        "meta_campaign_id": lead.meta_campaign_id,
+        "meta_campaign_id_first": lead.meta_campaign_id_first,
+        "meta_adset_id": lead.meta_adset_id,
+        "ctwa_source_type": lead.ctwa_source_type,
+        "ctwa_codigo": lead.ctwa_codigo,
+        "ctwa_codigo_first": lead.ctwa_codigo_first,
+        "ctwa_atribuido_em": lead.ctwa_atribuido_em.isoformat()
+        if lead.ctwa_atribuido_em
+        else None,
         "veiculo_ref": lead.veiculo_ref,
         "catalog_interest_ref": lead.catalog_interest_ref,
         "atribuida_em": lead.atribuida_em.isoformat() if lead.atribuida_em else None,

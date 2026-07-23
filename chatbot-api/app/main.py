@@ -66,6 +66,13 @@ class MensagemEntrada(BaseModel):
     origem_bot: bool = False
     # Opcional: status|ack|reaction|... — eventos sem conteúdo não pausam o bot (E3).
     tipo: Optional[str] = None
+    # Click-to-WhatsApp (repasse n8n a partir do webhook Evolution, quando existir).
+    ctwa_clid: Optional[str] = Field(default=None, max_length=255)
+    meta_ad_id: Optional[str] = Field(default=None, max_length=64)
+    meta_campaign_id: Optional[str] = Field(default=None, max_length=64)
+    meta_adset_id: Optional[str] = Field(default=None, max_length=64)
+    ctwa_source_type: Optional[str] = Field(default=None, max_length=40)
+    ctwa_codigo: Optional[str] = Field(default=None, max_length=40)
 
     @field_validator("instance")
     @classmethod
@@ -324,6 +331,12 @@ def webhook_mensagem(
         msg.from_me,
         msg.origem_bot,
         msg.tipo,
+        ctwa_clid=msg.ctwa_clid,
+        meta_ad_id=msg.meta_ad_id,
+        meta_campaign_id=msg.meta_campaign_id,
+        meta_adset_id=msg.meta_adset_id,
+        ctwa_source_type=msg.ctwa_source_type,
+        ctwa_codigo=msg.ctwa_codigo,
     )
 
 
@@ -518,6 +531,30 @@ def listar_eventos_funil(
         offset=deslocamento,
     )
     return {"eventos": eventos, "limit": limite, "offset": deslocamento}
+
+
+@app.get("/v1/auditoria/ctwa")
+def listar_auditoria_ctwa(
+    limit: int = 50,
+    offset: int = 0,
+    so_com_clid: bool = False,
+    ctx: Contexto = Depends(get_contexto),
+    db: Session = Depends(get_db),
+):
+    """Eventos CTWA recebidos (sufixo de clid, ids Meta, código) — sem PII completo."""
+    itens = servico.listar_auditoria_ctwa(
+        db,
+        ctx.loja_id,
+        limit=limit,
+        offset=offset,
+        so_com_clid=so_com_clid,
+    )
+    return {
+        "itens": itens,
+        "limit": max(1, min(limit, 200)),
+        "offset": max(0, offset),
+        "total_pagina": len(itens),
+    }
 
 
 @app.get("/v1/leads.csv")

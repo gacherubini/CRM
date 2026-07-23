@@ -179,6 +179,54 @@ class MetaPixelConfig(Base):
     atualizada_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=agora)
 
 
+class MetaAdsConfig(Base):
+    """Conta de anúncios Meta para importar spend (Marketing API / ads_read)."""
+
+    __tablename__ = "meta_ads_config"
+
+    loja_slug: Mapped[str] = mapped_column(String(120), primary_key=True)
+    ad_account_id: Mapped[str] = mapped_column(String(64), default="")
+    token_ciphertext: Mapped[Optional[str]] = mapped_column(String(1024), nullable=True)
+    sync_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    ultima_sync_em: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    ultima_sync_status: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    ultima_sync_erro: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    ultima_sync_resumo: Mapped[Optional[str]] = mapped_column(String(240), nullable=True)
+    atualizada_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=agora)
+
+
+class PixelCapiAuditoria(Base):
+    """Auditoria de chaves Pixel/CAPI (flags de match, sem PII)."""
+
+    __tablename__ = "pixel_capi_auditoria"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=novo_id)
+    loja_slug: Mapped[str] = mapped_column(String(120), index=True)
+    # config_salva | purchase_web | purchase_messaging | envio_outbox
+    origem: Mapped[str] = mapped_column(String(40), index=True)
+    event_name: Mapped[Optional[str]] = mapped_column(String(40), nullable=True)
+    event_id: Mapped[Optional[str]] = mapped_column(String(120), nullable=True)
+    pixel_id_sufixo: Mapped[Optional[str]] = mapped_column(String(12), nullable=True)
+    modo: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)  # web | messaging
+    tem_ph: Mapped[bool] = mapped_column(Boolean, default=False)
+    tem_em: Mapped[bool] = mapped_column(Boolean, default=False)
+    tem_fbclid: Mapped[bool] = mapped_column(Boolean, default=False)
+    tem_fbc: Mapped[bool] = mapped_column(Boolean, default=False)
+    tem_ctwa_clid: Mapped[bool] = mapped_column(Boolean, default=False)
+    tem_external_id: Mapped[bool] = mapped_column(Boolean, default=False)
+    tem_test_event_code: Mapped[bool] = mapped_column(Boolean, default=False)
+    enviar_page_view: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True)
+    enviar_lead: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True)
+    enviar_purchase: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True)
+    status: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    http_status: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    venda_id: Mapped[Optional[str]] = mapped_column(String(36), nullable=True)
+    detalhe: Mapped[Optional[str]] = mapped_column(String(240), nullable=True)
+    criada_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=agora)
+
+
 class MetaCapiOutbox(Base):
     """Outbox best-effort para eventos CAPI (Purchase etc.)."""
 
@@ -215,6 +263,10 @@ class Campanha(Base):
     utm_campaign_norm: Mapped[str] = mapped_column(String(120), index=True)
     utm_content: Mapped[Optional[str]] = mapped_column(String(120), nullable=True)
     utm_term: Mapped[Optional[str]] = mapped_column(String(120), nullable=True)
+    # ID da campanha no Meta Ads (Insights) — vínculo para importar spend e CTWA.
+    meta_campaign_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True, index=True)
+    # Código curto na mensagem pré-preenchida do anúncio CTWA (fallback sem ctwa_clid).
+    codigo_ctwa: Mapped[Optional[str]] = mapped_column(String(40), nullable=True, index=True)
     periodo_inicio: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
     periodo_fim: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
     notas: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
@@ -229,6 +281,9 @@ class Campanha(Base):
 
 class CampanhaGasto(Base):
     __tablename__ = "campanha_gastos"
+    __table_args__ = (
+        UniqueConstraint("external_key", name="uq_campanha_gasto_external_key"),
+    )
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=novo_id)
     campanha_id: Mapped[str] = mapped_column(ForeignKey("campanhas.id"), index=True)
@@ -236,6 +291,8 @@ class CampanhaGasto(Base):
     valor: Mapped[Decimal] = mapped_column(Numeric(12, 2))
     referencia: Mapped[date] = mapped_column(Date, index=True)
     nota: Mapped[Optional[str]] = mapped_column(String(240), nullable=True)
+    origem: Mapped[str] = mapped_column(String(20), default="manual")
+    external_key: Mapped[Optional[str]] = mapped_column(String(120), nullable=True)
     criada_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=agora)
     criada_por: Mapped[str] = mapped_column(String(320))
 

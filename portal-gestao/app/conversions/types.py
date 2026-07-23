@@ -29,6 +29,7 @@ class PurchaseConversion:
     fbclid: str | None = None
     fbc: str | None = None
     gclid: str | None = None
+    ctwa_clid: str | None = None
 
     @classmethod
     def from_sale(
@@ -51,4 +52,5 @@ class PurchaseConversion:
             fbclid=lead_data.get("fbclid"),
             fbc=lead_data.get("fbc"),
             gclid=lead_data.get("gclid"),
+            ctwa_clid=lead_data.get("ctwa_clid"),
         )
