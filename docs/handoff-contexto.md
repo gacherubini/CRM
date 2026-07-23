@@ -4,10 +4,56 @@
 > Este arquivo: checkpoint operacional. Seções **“Checkpoint anterior”** = histórico — não
 > reexecutar. Path Windows no rodapé de seções antigas: **ignorar** (workspace = root do git).
 >
-> **Checkpoint mais recente: 2026-07-22 (menu estoque WA + fotos Evolution em prod; 3-VM no ar).**
-> Escolher um eixo por sessão. Próximo pedido do dono: **E2E menu/cadastro**, depois **E2E cliente**.
+> **Checkpoint mais recente: 2026-07-22/23 (tráfego Meta: Pixel auto catálogo + PDFs setup/fluxos; plano multi-WA).**
+> Escolher um eixo por sessão. Próximos naturais: **config dono Tráfego E2E**, **plano multi-WhatsApp**, ou E2E menu/cadastro.
 
-## Checkpoint mais recente — menu estoque WA + fixes foto/telefone (2026-07-22)
+## Checkpoint mais recente — tráfego Meta + PDFs + plano multi-WA (2026-07-22/23)
+
+> **Escopo:** Portal, Catálogo, docs/PDFs de tráfego, handoff. Deploy `app2037` com Pixel pull.
+> **Não implementado:** multi-WhatsApp por vendedor (só plano).
+
+### Pixel do catálogo = Portal (dono não precisa de secret Fly)
+
+- Portal expõe `GET /public/v1/lojas/{slug}/pixel` (só `pixel_id` público; sem token CAPI).
+- Catálogo resolve Pixel **por loja** via `PORTAL_PUBLIC_URL` (`http://127.0.0.1:9000` no 3-VM),
+  cache ~60s; `META_PIXEL_ID` fica só como fallback se o Portal cair.
+- UI Tráfego e docs: “salvou no Portal = vale na vitrine”.
+- Deploy: commit `f94a304` + `fly deploy` app2037 OK; endpoint interno confere
+  `{"loja_slug":"moto-center","pixel_id":"","enabled":false}` até o dono salvar Pixel.
+
+### PDFs de tráfego (2 arquivos)
+
+| PDF | Conteúdo |
+|---|---|
+| `docs/tutorial-revy-trafego-setup.pdf` | Arrumar Pixel, CAPI, ads_read, campanha, link, checklist |
+| `docs/tutorial-revy-trafego-fluxos.pdf` | Fluxos dia a dia + **o que dono/vendedor fazem e por quê** |
+
+- Gerador: `python docs/gerar_pdf_tutorial_trafego_revy.py` → também `output/pdf/`.
+- PDF único antigo `tutorial-revy-trafego-meta.pdf` **removido** (evitar confusão).
+- `docs/trafego-pago-loja.md` aponta para os dois PDFs.
+
+### Plano multi-WhatsApp (não codado)
+
+- `docs/plans/2026-07-22-plano-multi-whatsapp-vendedores-campanhas.md`
+- Status: **ATIVO / NÃO IMPLEMENTADO**
+- Objetivo: canal WhatsApp por vendedor, campanha → vendedor → número, lead da loja único,
+  conversas por canal; fora do MVP: Evolution major, número pessoal, catálogo por campanha.
+
+### Histórico próximo (ainda válido)
+
+- Menu estoque WA + fotos Evolution: commits `aca96c9`…; E2E menu/cliente ainda pendentes.
+- Stack CTWA / CAPI messaging / gasto Meta / auditorias: `e792233`, `ee00da5`.
+
+### Próximos steps (humano / sessão)
+
+1. Dono: preencher **Tráfego** (Pixel + CAPI + ads_read) e validar Pixel na vitrine + 1 lead teste.
+2. Se for o eixo: implementar **multi-WhatsApp** a partir do plano (não começar sem ler o plano).
+3. E2E menu/cadastro WA e E2E cliente (checklist planos 22).
+4. **Não fazer sem pedido:** recriar volumes, reimportar n8n do zero, mexer em drivers bancários.
+
+---
+
+## Checkpoint anterior — menu estoque WA + fixes foto/telefone (2026-07-22)
 
 > **Escopo:** Chatbot (`operacao` / `vehicle_photo` / `audio`), n8n workflow, secrets Evolution no
 > `app2037`. Stack 3-VM já estava no ar. Sem mudanças em Motor/Portal drivers.

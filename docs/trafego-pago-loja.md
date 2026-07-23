@@ -2,9 +2,14 @@
 
 Como medir se o anúncio **pagou a conta**: anúncio → UTM → lead → venda → ROI.
 
-**Tutorial completo em PDF** (o que é cada campo, o que colar e como usar):  
-[`tutorial-revy-trafego-meta.pdf`](tutorial-revy-trafego-meta.pdf) · também em `output/pdf/tutorial-revy-trafego-meta.pdf`.  
-Regenerar: `python docs/gerar_pdf_tutorial_trafego_revy.py`.
+**PDFs de tráfego** (regenerar: `python docs/gerar_pdf_tutorial_trafego_revy.py`):
+
+| PDF | Conteúdo |
+|---|---|
+| [`tutorial-revy-trafego-setup.pdf`](tutorial-revy-trafego-setup.pdf) | Como arrumar Pixel, CAPI, gasto e campanhas |
+| [`tutorial-revy-trafego-fluxos.pdf`](tutorial-revy-trafego-fluxos.pdf) | Fluxos do dia a dia (diagramas) |
+
+Cópias em `output/pdf/` com os mesmos nomes.
 
 ## 1. Configurar Pixel (uma vez)
 
