@@ -3,6 +3,7 @@ from unittest.mock import MagicMock
 
 from app.campanhas import lead_casa_campanha
 from app.conversions.bus import publish_conversion
+from app.conversions.meta import MetaAdapter
 from app.conversions.meta_messaging import MetaMessagingAdapter
 from app.conversions.types import ConversionKind, PurchaseConversion
 from app.meta_capi_messaging import montar_payload_purchase_messaging
@@ -108,6 +109,35 @@ def test_bus_chama_web_e_messaging(monkeypatch):
     )
     publish_conversion(ConversionKind.PURCHASE, p, object(), adapters=[A(), B()])
     assert seen == ["web", "msg"]
+
+
+def test_adapters_meta_enfileiram_um_unico_purchase_ctwa(monkeypatch):
+    web = []
+    messaging = []
+
+    monkeypatch.setattr(
+        "app.conversions.meta.meta_capi.enfileirar_purchase",
+        lambda *args, **kwargs: web.append(kwargs),
+    )
+    monkeypatch.setattr(
+        "app.conversions.meta_messaging.meta_capi_messaging.enfileirar_purchase_messaging",
+        lambda *args, **kwargs: messaging.append(kwargs),
+    )
+
+    payload = PurchaseConversion(
+        loja_slug="loja",
+        venda_id="venda-ctwa",
+        event_id="purchase-venda-ctwa",
+        value=Decimal("25000"),
+        ctwa_clid="ARA-click",
+        phone="5511999999999",
+    )
+    MetaAdapter().handle(ConversionKind.PURCHASE, payload, object())
+    MetaMessagingAdapter().handle(ConversionKind.PURCHASE, payload, object())
+
+    assert web == []
+    assert len(messaging) == 1
+    assert messaging[0]["event_id"] == "purchase-msg-venda-ctwa"
 
 
 def test_from_sale_carrega_ctwa_clid():

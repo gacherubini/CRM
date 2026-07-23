@@ -136,6 +136,24 @@ def test_meta_adapter_traduz_evento_para_outbox_existente(monkeypatch):
     }
 
 
+def test_meta_web_nao_enfileira_purchase_ctwa(monkeypatch):
+    chamadas = []
+
+    monkeypatch.setattr(
+        "app.conversions.meta.meta_capi.enfileirar_purchase",
+        lambda *args, **kwargs: chamadas.append(kwargs),
+    )
+
+    resultado = MetaAdapter().handle(
+        ConversionKind.PURCHASE,
+        _purchase(ctwa_clid="ARA-click-whatsapp"),
+        object(),
+    )
+
+    assert resultado is None
+    assert chamadas == []
+
+
 def test_bus_padrao_usa_meta_adapter(monkeypatch):
     calls = []
 

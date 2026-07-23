@@ -5,7 +5,25 @@ def test_extrair_codigo_ctwa_do_texto():
     assert extrair_codigo_ctwa_do_texto("Olá! Cód: RV-JUL") == "RV-JUL"
     assert extrair_codigo_ctwa_do_texto("ref:seminovos") == "seminovos"
     assert extrair_codigo_ctwa_do_texto("utm_campaign=feirao-ago") == "feirao-ago"
+    assert extrair_codigo_ctwa_do_texto("Código: CAT-ABCDEFGH2345") is None
     assert extrair_codigo_ctwa_do_texto("só oi") is None
+
+
+def test_mensagem_comum_nao_cria_lead(client, loja_a):
+    r = client.post(
+        "/webhook/mensagem",
+        json={
+            "instance": loja_a["instance"],
+            "telefone": "5511900009090",
+            "texto": "Olá, gostaria de saber o horário.",
+            "provider_message_id": "wamid-sem-tracking-1",
+            "from_me": False,
+        },
+    )
+    assert r.status_code == 200
+    assert r.json()["lead_id"] is None
+    assert r.json()["ctwa_atribuido"] is False
+    assert client.get("/v1/leads", headers=loja_a["headers"]).json()["leads"] == []
 
 
 def test_webhook_ctwa_enriquece_lead(client, loja_a):

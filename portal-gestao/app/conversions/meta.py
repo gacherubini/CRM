@@ -21,6 +21,10 @@ class MetaAdapter:
     ) -> object:
         if kind is not ConversionKind.PURCHASE:
             return None
+        # Uma venda CTWA pertence ao canal Business Messaging. Enviar também o
+        # Purchase web criaria duas conversões com event_ids distintos.
+        if (payload.ctwa_clid or "").strip():
+            return None
         lead = {
             "telefone": payload.phone,
             "email": payload.email,

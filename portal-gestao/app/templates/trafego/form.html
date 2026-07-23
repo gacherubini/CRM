@@ -70,7 +70,7 @@
     <div class="section-title"><span>01</span><div><h2>Pixel e CAPI</h2><p>Dados da conta de anúncios Meta da loja.</p></div></div>
     <div class="form-grid">
       <label>Pixel ID
-        <input type="text" name="pixel_id" value="{{ pixel_id }}" required placeholder="Ex.: 123456789012345" inputmode="numeric" autocomplete="off">
+        <input type="text" name="pixel_id" value="{{ pixel_id }}" required placeholder="Ex.: 123456789012345" inputmode="numeric" pattern="[0-9]{5,32}" maxlength="32" autocomplete="off">
       </label>
       <label>Token CAPI (access token)
         <input type="password" name="capi_token" value="" placeholder="{% if token_configurado %}Deixe em branco para manter o atual{% else %}Cole o token de acesso{% endif %}" autocomplete="new-password">

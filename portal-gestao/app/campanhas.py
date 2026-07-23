@@ -10,7 +10,7 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
-from app.models import Campanha, CampanhaGasto, agora
+from app.models import Campanha, CampanhaGasto, agora, novo_id
 
 CANAIS = frozenset(
     {
@@ -133,6 +133,56 @@ def parse_gastos_csv(
             )
         )
     return linhas, erros
+
+
+def salvar_gasto_manual(
+    db: Session,
+    *,
+    campanha: Campanha,
+    loja_slug: str,
+    valor: Decimal,
+    referencia: date,
+    nota: str | None,
+    criada_por: str,
+) -> CampanhaGasto:
+    """Mantém um total diário por campanha, com o manual prevalecendo sobre a API."""
+    if campanha.loja_slug != loja_slug:
+        raise ValueError("campanha não pertence à loja")
+
+    existentes = (
+        db.query(CampanhaGasto)
+        .filter(
+            CampanhaGasto.campanha_id == campanha.id,
+            CampanhaGasto.loja_slug == loja_slug,
+            CampanhaGasto.referencia == referencia,
+        )
+        .order_by(CampanhaGasto.criada_em.asc())
+        .all()
+    )
+    manual = next((g for g in existentes if g.origem == "manual"), None)
+    if manual is None:
+        manual = CampanhaGasto(
+            id=novo_id(),
+            campanha_id=campanha.id,
+            loja_slug=loja_slug,
+            valor=valor,
+            referencia=referencia,
+            nota=nota,
+            origem="manual",
+            criada_por=criada_por,
+        )
+        db.add(manual)
+    else:
+        manual.valor = valor
+        manual.nota = nota
+        manual.criada_por = criada_por
+
+    # Um lançamento manual é a fonte da verdade daquele dia. Remove tanto o
+    # registro automático anterior quanto duplicatas manuais legadas.
+    for gasto in existentes:
+        if gasto is not manual:
+            db.delete(gasto)
+    return manual
 
 
 def validar_campanha_payload(dados: dict) -> list[str]:

@@ -22,11 +22,15 @@
     s.parentNode.insertBefore(t,s)}(window, document,'script',
     'https://connect.facebook.net/en_US/fbevents.js');
     fbq('init', '{{ meta_pixel_id }}');
+    {% if meta_pixel_page_view_enabled %}
     fbq('track', 'PageView');
+    {% endif %}
   </script>
+  {% if meta_pixel_page_view_enabled %}
   <noscript><img height="1" width="1" style="display:none"
     src="https://www.facebook.com/tr?id={{ meta_pixel_id }}&ev=PageView&noscript=1"
     alt=""></noscript>
+  {% endif %}
   {% endif %}
 </head>
 <body>

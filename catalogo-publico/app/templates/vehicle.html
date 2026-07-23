@@ -21,7 +21,7 @@
       <div><dt>Cor</dt><dd>{{ veiculo.cor or 'Não informada' }}</dd></div>
     </dl>
     {% if whatsapp_disponivel %}
-      <a class="button whatsapp" id="cta-whatsapp" href="{{ interest_url }}"{% if meta_pixel_enabled and lead_event_id %} data-lead-event-id="{{ lead_event_id }}"{% endif %}>Tenho interesse pelo WhatsApp</a>
+      <a class="button whatsapp" id="cta-whatsapp" href="{{ interest_url }}"{% if meta_pixel_lead_enabled and lead_event_id %} data-lead-event-id="{{ lead_event_id }}"{% endif %}>Tenho interesse pelo WhatsApp</a>
     {% else %}
       <p class="notice">A loja ainda não configurou o atendimento por WhatsApp.</p>
     {% endif %}
@@ -46,6 +46,7 @@
       {% endif %}
       fbq('track', 'ViewContent', payload);
     } catch (e) { /* best-effort */ }
+    {% if meta_pixel_lead_enabled %}
     var cta = document.getElementById('cta-whatsapp');
     if (!cta) return;
     cta.addEventListener('click', function () {
@@ -55,6 +56,7 @@
         fbq('track', 'Lead', {}, { eventID: eventId });
       } catch (e2) { /* best-effort */ }
     });
+    {% endif %}
   })();
 </script>
 {% endif %}

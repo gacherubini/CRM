@@ -1,3 +1,4 @@
+from datetime import date
 from decimal import Decimal
 
 from conftest import csrf_da_resposta, login
@@ -95,6 +96,58 @@ def test_lancar_gasto(client):
     db = SessionLocal()
     g = db.query(CampanhaGasto).one()
     assert g.valor == Decimal("350.50")
+    db.close()
+
+
+def test_gasto_manual_substitui_meta_api_do_mesmo_dia(client):
+    login(client)
+    db = SessionLocal()
+    campanha = Campanha(
+        loja_slug="loja-teste",
+        nome="Gasto sem duplicidade",
+        canal="meta",
+        status="ativa",
+        utm_campaign="gasto-sem-duplicidade",
+        utm_campaign_norm="gasto-sem-duplicidade",
+        meta_campaign_id="12030001",
+        criada_por_email="dono@loja.test",
+    )
+    db.add(campanha)
+    db.flush()
+    db.add(
+        CampanhaGasto(
+            campanha_id=campanha.id,
+            loja_slug="loja-teste",
+            valor=Decimal("100.00"),
+            referencia=date(2026, 7, 20),
+            origem="meta_api",
+            external_key="meta:loja-teste:12030001:2026-07-20",
+            criada_por="meta_api",
+        )
+    )
+    db.commit()
+    campanha_id = campanha.id
+    db.close()
+
+    pagina = client.get(f"/app/campanhas/{campanha_id}")
+    resposta = client.post(
+        f"/app/campanhas/{campanha_id}/gastos",
+        data={
+            "csrf": csrf_da_resposta(pagina),
+            "valor": "125,50",
+            "referencia": "2026-07-20",
+            "nota": "ajuste manual",
+        },
+        follow_redirects=False,
+    )
+    assert resposta.status_code == 303
+
+    db = SessionLocal()
+    gastos = db.query(CampanhaGasto).filter_by(campanha_id=campanha_id).all()
+    assert len(gastos) == 1
+    assert gastos[0].origem == "manual"
+    assert gastos[0].valor == Decimal("125.50")
+    assert gastos[0].external_key is None
     db.close()
 
 

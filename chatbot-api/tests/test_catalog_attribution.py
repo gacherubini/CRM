@@ -86,6 +86,29 @@ def test_primeira_mensagem_correlaciona_ref_e_enriquece_lead(client, loja_a):
     assert detail["catalog_interest_ref"] == REF
 
 
+def test_referencia_catalogo_com_rotulo_codigo_nao_vira_ctwa(client, loja_a):
+    event = _event(loja_a)
+    client.post("/v1/integracoes/catalogo/interesses", json=event, headers=loja_a["headers"])
+
+    inbound = client.post(
+        "/webhook/mensagem",
+        json=_message(
+            loja_a,
+            "5511900001212",
+            f"Olá! Código: {REF}",
+            "CAT-NAO-CTWA-1",
+        ),
+    )
+    assert inbound.status_code == 200
+    assert inbound.json()["catalog_interest_ref"] == REF
+    assert inbound.json()["ctwa_atribuido"] is False
+
+    lead = client.get("/v1/leads", headers=loja_a["headers"]).json()["leads"][0]
+    assert lead["origem"] == "catalogo_publico"
+    assert lead["ctwa_codigo"] is None
+    assert lead["ctwa_atribuido_em"] is None
+
+
 def test_segunda_atribuicao_preserva_first_atualiza_last(client, loja_a):
     # Refs no alfabeto CAT-[A-Z2-7]{10,16}
     ref1 = "CAT-ABCDEFGH2345"

@@ -9,13 +9,15 @@ import hashlib
 import json
 import logging
 import time
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
-from typing import Any
+from typing import Any, Callable
 
 import httpx
 from sqlalchemy.orm import Session
 
 from app.cripto import decifrar
+from app.meta_pixel import normalizar_pixel_id
 from app.models import MetaCapiOutbox, MetaPixelConfig, Venda, agora, novo_id
 
 logger = logging.getLogger(__name__)
@@ -142,10 +144,11 @@ def enfileirar_purchase(
     """Persiste outbox Purchase e tenta envio uma vez. Nunca levanta para o caller."""
     try:
         config = _config_loja(db, loja_slug)
+        pixel_id = normalizar_pixel_id(config.pixel_id if config else None)
         if (
             config is None
             or not config.enviar_purchase
-            or not (config.pixel_id or "").strip()
+            or not pixel_id
             or not config.token_ciphertext
         ):
             return None
@@ -192,7 +195,7 @@ def enfileirar_purchase(
                 origem="purchase_web",
                 event_name="Purchase",
                 event_id=event_id,
-                pixel_id=config.pixel_id,
+                pixel_id=pixel_id,
                 modo="web",
                 tem_ph=flags["tem_ph"],
                 tem_em=flags["tem_em"],
@@ -231,7 +234,8 @@ def tentar_enviar_outbox(
     try:
         if config is None:
             config = _config_loja(db, outbox.loja_slug)
-        if config is None or not config.token_ciphertext or not config.pixel_id:
+        pixel_id = normalizar_pixel_id(config.pixel_id if config else None)
+        if config is None or not config.token_ciphertext or not pixel_id:
             outbox.status = "failed"
             outbox.last_error = "config Meta incompleta"
             outbox.attempts = (outbox.attempts or 0) + 1
@@ -242,7 +246,7 @@ def tentar_enviar_outbox(
         token = decifrar(config.token_ciphertext)
         body = json.loads(outbox.payload_json)
         resposta = enviar_eventos_capi(
-            pixel_id=config.pixel_id.strip(),
+            pixel_id=pixel_id,
             access_token=token,
             body=body,
         )
@@ -269,7 +273,7 @@ def tentar_enviar_outbox(
                 origem="envio_outbox",
                 event_name=outbox.event_name,
                 event_id=outbox.event_id,
-                pixel_id=config.pixel_id,
+                pixel_id=pixel_id,
                 modo=modo,
                 tem_ph=flags["tem_ph"],
                 tem_em=flags["tem_em"],
@@ -314,7 +318,7 @@ def tentar_enviar_outbox(
                     origem="envio_outbox",
                     event_name=outbox.event_name,
                     event_id=outbox.event_id,
-                    pixel_id=(config.pixel_id if config else None),
+                    pixel_id=normalizar_pixel_id(config.pixel_id if config else None),
                     modo="messaging"
                     if (body_aud.get("data") or [{}])[0].get("action_source")
                     == "business_messaging"
@@ -364,3 +368,60 @@ def processar_outbox_pendentes(
         if tentar_enviar_outbox(db, item, config):
             entregues += 1
     return {"processados": len(itens), "entregues": entregues, "falharam": len(itens) - entregues}
+
+
+def _em_utc(valor: datetime) -> datetime:
+    if valor.tzinfo is None:
+        return valor.replace(tzinfo=timezone.utc)
+    return valor.astimezone(timezone.utc)
+
+
+def processar_outbox_automatico(
+    db_factory: Callable[[], Session],
+    *,
+    limite: int = 100,
+    max_tentativas: int = 8,
+    backoff_base_seconds: float = 60,
+    instante: datetime | None = None,
+) -> dict[str, int]:
+    """Processa pendências globais com backoff, sem exigir ação no Portal."""
+    agora_utc = _em_utc(instante or datetime.now(timezone.utc))
+    db = db_factory()
+    try:
+        itens = (
+            db.query(MetaCapiOutbox)
+            .filter(MetaCapiOutbox.status.in_(("pending", "failed")))
+            .order_by(MetaCapiOutbox.atualizada_em.asc())
+            .limit(max(1, min(limite, 500)))
+            .all()
+        )
+        resultado = {
+            "encontrados": len(itens),
+            "processados": 0,
+            "entregues": 0,
+            "falharam": 0,
+            "aguardando_backoff": 0,
+            "esgotados": 0,
+        }
+        for item in itens:
+            tentativas = int(item.attempts or 0)
+            if tentativas >= max_tentativas:
+                resultado["esgotados"] += 1
+                continue
+            if item.status == "failed" and item.atualizada_em is not None:
+                atraso = min(
+                    float(backoff_base_seconds) * (2 ** max(tentativas - 1, 0)),
+                    3600.0,
+                )
+                proxima = _em_utc(item.atualizada_em) + timedelta(seconds=atraso)
+                if proxima > agora_utc:
+                    resultado["aguardando_backoff"] += 1
+                    continue
+            resultado["processados"] += 1
+            if tentar_enviar_outbox(db, item):
+                resultado["entregues"] += 1
+            else:
+                resultado["falharam"] += 1
+        return resultado
+    finally:
+        db.close()

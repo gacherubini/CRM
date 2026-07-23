@@ -47,6 +47,7 @@ from app.funil_eventos import (
     resumo_funil,
 )
 from app.meta_capi import processar_outbox_pendentes
+from app.meta_pixel import normalizar_pixel_id
 from app.models import (
     AtendimentoAtribuicao,
     Campanha,
@@ -65,7 +66,7 @@ from app.meta_ads_spend import (
     normalizar_ad_account_id,
     sincronizar_gastos_meta,
 )
-from app import meta_ads_spend_job
+from app import meta_ads_spend_job, meta_capi_job
 from app.campanhas import (
     CANAIS_ROTULO,
     STATUS_ROTULO,
@@ -76,6 +77,7 @@ from app.campanhas import (
     parse_gastos_csv,
     payload_form as campanha_payload_form,
     preencher_campanha,
+    salvar_gasto_manual,
     validar_campanha_payload,
 )
 from app.resultados_dono import alertas_trafego, checklist_medicao, resumo_periodo
@@ -250,10 +252,12 @@ async def _lifespan(_app: FastAPI):
     # Em testes (PORTAL_SKIP_INIT / pytest) o job fica off via env no conftest.
     if os.getenv("PORTAL_SKIP_INIT") != "1":
         meta_ads_spend_job.start_worker(SessionLocal)
+        meta_capi_job.start_worker(SessionLocal)
     try:
         yield
     finally:
         meta_ads_spend_job.stop_worker()
+        meta_capi_job.stop_worker()
 
 
 app = FastAPI(
@@ -389,7 +393,13 @@ def public_pixel_da_loja(loja_slug: str, db: Session = Depends(get_db)):
     slug = (loja_slug or "").strip()
     if not slug or len(slug) > 120:
         return JSONResponse(
-            {"loja_slug": slug, "pixel_id": "", "enabled": False},
+            {
+                "loja_slug": slug,
+                "pixel_id": "",
+                "enabled": False,
+                "enviar_page_view": False,
+                "enviar_lead": False,
+            },
             status_code=404,
         )
     config = (
@@ -397,11 +407,14 @@ def public_pixel_da_loja(loja_slug: str, db: Session = Depends(get_db)):
         .filter(MetaPixelConfig.loja_slug == slug)
         .first()
     )
-    pixel_id = ((config.pixel_id if config else "") or "").strip()
+    # Nunca devolve conteúdo arbitrário salvo por engano no campo público.
+    pixel_id = normalizar_pixel_id(config.pixel_id if config else None)
     return {
         "loja_slug": slug,
         "pixel_id": pixel_id,
         "enabled": bool(pixel_id),
+        "enviar_page_view": bool(config.enviar_page_view) if config else True,
+        "enviar_lead": bool(config.enviar_lead) if config else True,
     }
 
 
@@ -3268,7 +3281,7 @@ def configuracoes(request: Request, db: Session = Depends(get_db)):
             "descricao": "Conversões da loja enviadas pelo servidor.",
             "configurada": bool(
                 meta_config
-                and meta_config.pixel_id
+                and normalizar_pixel_id(meta_config.pixel_id)
                 and meta_config.token_ciphertext
             ),
         },
@@ -3315,7 +3328,7 @@ def _trafego_contexto(
         ads_config=ads_config,
         token_configurado=token_configurado,
         ads_token_configurado=ads_token_configurado,
-        pixel_id=(config.pixel_id if config else "") or "",
+        pixel_id=normalizar_pixel_id(config.pixel_id if config else None),
         test_event_code=(config.test_event_code if config else "") or "",
         enviar_page_view=bool(config.enviar_page_view) if config else True,
         enviar_lead=bool(config.enviar_lead) if config else True,
@@ -3502,7 +3515,7 @@ async def campanhas_gastos_lote_post(request: Request, db: Session = Depends(get
         Campanha.status == "ativa",
     ).all()
     nota_global = (form.get("nota_global") or "").strip()[:240] or None
-    novos: list[CampanhaGasto] = []
+    novos: list[tuple[Campanha, Decimal, str | None]] = []
     for campanha in campanhas:
         texto_valor = (form.get(f"valor_{campanha.id}") or "").strip()
         if not texto_valor:
@@ -3520,19 +3533,17 @@ async def campanhas_gastos_lote_post(request: Request, db: Session = Depends(get
                 status_code=422,
             )
         nota = (form.get(f"nota_{campanha.id}") or "").strip()[:240] or nota_global
-        novos.append(
-            CampanhaGasto(
-                id=novo_id(),
-                campanha_id=campanha.id,
-                loja_slug=usuario.loja_slug,
-                valor=valor,
-                referencia=referencia,
-                nota=nota,
-                origem="manual",
-                criada_por=usuario.email,
-            )
+        novos.append((campanha, valor, nota))
+    for campanha, valor, nota in novos:
+        salvar_gasto_manual(
+            db,
+            campanha=campanha,
+            loja_slug=usuario.loja_slug,
+            valor=valor,
+            referencia=referencia,
+            nota=nota,
+            criada_por=usuario.email,
         )
-    db.add_all(novos)
     db.commit()
     return RedirectResponse(f"/app/campanhas/gastos/lote?ok={len(novos)}", status_code=303)
 
@@ -3577,17 +3588,14 @@ async def campanhas_gastos_csv_post(request: Request, db: Session = Depends(get_
     campanhas = db.query(Campanha).filter(Campanha.loja_slug == usuario.loja_slug).all()
     linhas, erros = parse_gastos_csv(conteudo, campanhas)
     for linha in linhas:
-        db.add(
-            CampanhaGasto(
-                id=novo_id(),
-                campanha_id=linha.campanha.id,
-                loja_slug=usuario.loja_slug,
-                valor=linha.valor,
-                referencia=linha.referencia,
-                nota=linha.nota,
-                origem="manual",
-                criada_por=usuario.email,
-            )
+        salvar_gasto_manual(
+            db,
+            campanha=linha.campanha,
+            loja_slug=usuario.loja_slug,
+            valor=linha.valor,
+            referencia=linha.referencia,
+            nota=linha.nota,
+            criada_por=usuario.email,
         )
     db.commit()
     return templates.TemplateResponse(
@@ -3788,17 +3796,14 @@ async def campanhas_gasto_post(request: Request, campanha_id: str, db: Session =
             f"/app/campanhas/{campanha.id}?erro=Informe+valor+e+data+válidos",
             status_code=303,
         )
-    db.add(
-        CampanhaGasto(
-            id=novo_id(),
-            campanha_id=campanha.id,
-            loja_slug=usuario.loja_slug,
-            valor=valor,
-            referencia=referencia,
-            nota=(form.get("nota") or "").strip() or None,
-            origem="manual",
-            criada_por=usuario.email,
-        )
+    salvar_gasto_manual(
+        db,
+        campanha=campanha,
+        loja_slug=usuario.loja_slug,
+        valor=valor,
+        referencia=referencia,
+        nota=(form.get("nota") or "").strip() or None,
+        criada_por=usuario.email,
     )
     db.commit()
     return RedirectResponse(f"/app/campanhas/{campanha.id}?ok=gasto", status_code=303)
@@ -4115,7 +4120,8 @@ async def trafego_salvar(request: Request, db: Session = Depends(get_db)):
     if not pode_gerir_trafego(usuario) or not csrf_valido(request, form.get("csrf")):
         return RedirectResponse("/app", status_code=303)
 
-    pixel_id = (form.get("pixel_id") or "").strip()
+    pixel_id_informado = (form.get("pixel_id") or "").strip()
+    pixel_id = normalizar_pixel_id(pixel_id_informado)
     token_novo = (form.get("capi_token") or "").strip()
     test_event_code = (form.get("test_event_code") or "").strip() or None
     enviar_page_view = form.get("enviar_page_view") == "on"
@@ -4140,7 +4146,7 @@ async def trafego_salvar(request: Request, db: Session = Depends(get_db)):
                 usuario,
                 config,
                 ads_config=ads_config,
-                erro="Informe o Pixel ID da Meta.",
+                erro="Informe um Pixel ID válido, contendo somente números.",
             ),
             status_code=422,
         )

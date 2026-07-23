@@ -80,7 +80,7 @@ def test_configuracoes_nao_expoe_urls_tokens_ou_segredos(client):
     db.add(
         MetaPixelConfig(
             loja_slug="loja-teste",
-            pixel_id="pixel-secreto-nao-renderizar",
+            pixel_id="123456789012345",
             token_ciphertext="capi-ciphertext-nao-renderizar",
             test_event_code="evento-secreto-nao-renderizar",
         )

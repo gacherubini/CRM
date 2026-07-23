@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from decimal import Decimal
 
 from app.models import Campanha, CampanhaGasto, MetaCapiOutbox, MetaPixelConfig, Venda
+from app.meta_pixel import normalizar_pixel_id
 from app.roi_calc import LinhaRoiCampanha, totais_roi
 
 
@@ -94,7 +95,11 @@ def alertas_trafego(
                 "Retentar",
             )
         )
-    if config is None or not (config.pixel_id or "").strip() or not config.token_ciphertext:
+    if (
+        config is None
+        or not normalizar_pixel_id(config.pixel_id)
+        or not config.token_ciphertext
+    ):
         alertas.append(
             AlertaTrafego(
                 "pixel_nao_config",
@@ -163,7 +168,11 @@ def checklist_medicao(
     passos = [
         {
             "rotulo": "Pixel / CAPI configurado",
-            "feito": bool(config and config.pixel_id and config.token_ciphertext),
+            "feito": bool(
+                config
+                and normalizar_pixel_id(config.pixel_id)
+                and config.token_ciphertext
+            ),
             "href": "/app/trafego",
         },
         {

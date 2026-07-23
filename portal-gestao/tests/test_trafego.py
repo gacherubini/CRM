@@ -1,5 +1,6 @@
 """E10 — aba Tráfego / Meta Pixel + CAPI Purchase."""
 import json
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
 import httpx
@@ -8,7 +9,7 @@ from conftest import csrf_da_resposta, login
 
 from app.cripto import cifrar, decifrar
 from app.db import SessionLocal
-from app.meta_capi import montar_payload_purchase
+from app.meta_capi import montar_payload_purchase, processar_outbox_automatico
 from app.models import MetaCapiOutbox, MetaPixelConfig, Venda
 
 
@@ -57,6 +58,8 @@ def test_public_pixel_endpoint_sem_auth(client):
         "loja_slug": "loja-teste",
         "pixel_id": "",
         "enabled": False,
+        "enviar_page_view": True,
+        "enviar_lead": True,
     }
 
     login(client)
@@ -80,8 +83,46 @@ def test_public_pixel_endpoint_sem_auth(client):
     assert body["loja_slug"] == "loja-teste"
     assert body["pixel_id"] == "112233445566778"
     assert body["enabled"] is True
+    assert body["enviar_page_view"] is False
+    assert body["enviar_lead"] is False
     assert "token" not in body
     assert "EAAB" not in r.text
+
+
+def test_public_pixel_nao_expoe_valor_invalido(client):
+    db = SessionLocal()
+    db.add(
+        MetaPixelConfig(
+            loja_slug="loja-invalida",
+            pixel_id="EAAB-token-colado-no-campo-errado",
+            enviar_page_view=True,
+            enviar_lead=True,
+        )
+    )
+    db.commit()
+    db.close()
+
+    resposta = client.get("/public/v1/lojas/loja-invalida/pixel")
+    assert resposta.status_code == 200
+    assert resposta.json()["pixel_id"] == ""
+    assert resposta.json()["enabled"] is False
+    assert "EAAB" not in resposta.text
+
+
+def test_form_rejeita_pixel_id_nao_numerico(client):
+    login(client)
+    pagina = client.get("/app/trafego")
+    resposta = client.post(
+        "/app/trafego",
+        data={
+            "csrf": csrf_da_resposta(pagina),
+            "pixel_id": "token-nao-e-pixel-id",
+            "capi_token": "token-capi",
+            "enviar_purchase": "on",
+        },
+    )
+    assert resposta.status_code == 422
+    assert "Pixel ID válido" in resposta.text
 
 
 def test_salva_config_e_mascara_token_no_get(client):
@@ -128,7 +169,7 @@ def test_salvar_sem_token_novo_mantem_existente(client):
         "/app/trafego",
         data={
             "csrf": csrf_da_resposta(pagina),
-            "pixel_id": "111",
+            "pixel_id": "111222333444555",
             "capi_token": "token-original",
             "enviar_purchase": "on",
         },
@@ -139,7 +180,7 @@ def test_salvar_sem_token_novo_mantem_existente(client):
         "/app/trafego",
         data={
             "csrf": csrf_da_resposta(pagina2),
-            "pixel_id": "222",
+            "pixel_id": "222333444555666",
             "capi_token": "",
             "enviar_purchase": "on",
         },
@@ -147,7 +188,7 @@ def test_salvar_sem_token_novo_mantem_existente(client):
     )
     db = SessionLocal()
     config = db.query(MetaPixelConfig).one()
-    assert config.pixel_id == "222"
+    assert config.pixel_id == "222333444555666"
     assert decifrar(config.token_ciphertext) == "token-original"
     db.close()
 
@@ -160,7 +201,7 @@ def test_gerente_pode_salvar(client):
         "/app/trafego",
         data={
             "csrf": csrf_da_resposta(pagina),
-            "pixel_id": "555",
+            "pixel_id": "555666777888999",
             "capi_token": "tok-gerente",
             "enviar_purchase": "on",
         },
@@ -375,3 +416,63 @@ def test_retry_capi_e_status_sem_expor_token(client, monkeypatch):
     assert outbox.status == "delivered"
     assert outbox.attempts == 2
     db.close()
+
+
+def test_retry_automatico_respeita_backoff(client, monkeypatch):
+    instante = datetime(2026, 7, 23, 12, 0, tzinfo=timezone.utc)
+    db = SessionLocal()
+    db.add(
+        MetaCapiOutbox(
+            loja_slug="loja-teste",
+            event_id="purchase-auto-retry",
+            event_name="Purchase",
+            payload_json=json.dumps(
+                montar_payload_purchase(event_id="purchase-auto-retry", value="10")
+            ),
+            status="failed",
+            attempts=1,
+            atualizada_em=instante,
+        )
+    )
+    db.commit()
+    db.close()
+
+    chamadas = []
+
+    def fake_tentar(db, item, config=None):
+        chamadas.append(item.event_id)
+        item.status = "delivered"
+        db.commit()
+        return True
+
+    monkeypatch.setattr("app.meta_capi.tentar_enviar_outbox", fake_tentar)
+    cedo = processar_outbox_automatico(
+        SessionLocal,
+        instante=instante + timedelta(seconds=59),
+        backoff_base_seconds=60,
+    )
+    assert cedo["processados"] == 0
+    assert cedo["aguardando_backoff"] == 1
+
+    devido = processar_outbox_automatico(
+        SessionLocal,
+        instante=instante + timedelta(seconds=60),
+        backoff_base_seconds=60,
+    )
+    assert devido["processados"] == 1
+    assert devido["entregues"] == 1
+    assert chamadas == ["purchase-auto-retry"]
+
+
+def test_worker_capi_desligado_nao_cria_thread():
+    from app.meta_capi_job import MetaCapiRetryWorker
+
+    worker = MetaCapiRetryWorker(
+        db_factory=SessionLocal,
+        enabled=False,
+        interval_seconds=1,
+        initial_delay_seconds=0,
+    )
+    worker.start()
+    assert worker._thread is None
+    worker.stop()

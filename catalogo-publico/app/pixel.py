@@ -10,13 +10,29 @@ Fallback: ``META_PIXEL_ID`` (env) se o Portal estiver offline ou não configurad
 from __future__ import annotations
 
 import logging
+import re
 import threading
 import time
+from dataclasses import dataclass
 from typing import Optional
 
 import httpx
 
 logger = logging.getLogger(__name__)
+_PIXEL_ID_RE = re.compile(r"^[0-9]{5,32}$")
+
+
+def _pixel_id_publico(valor: object) -> str:
+    pixel_id = str(valor or "").strip()
+    return pixel_id if _PIXEL_ID_RE.fullmatch(pixel_id) else ""
+
+
+@dataclass(frozen=True)
+class PixelConfig:
+    pixel_id: str = ""
+    enabled: bool = False
+    enviar_page_view: bool = True
+    enviar_lead: bool = True
 
 
 class PixelResolver:
@@ -34,9 +50,9 @@ class PixelResolver:
         self.portal_url = (portal_url or "").rstrip("/")
         self.timeout = timeout
         self.cache_ttl = max(1.0, float(cache_ttl))
-        self.fallback_pixel_id = (fallback_pixel_id or "").strip()
+        self.fallback_pixel_id = _pixel_id_publico(fallback_pixel_id)
         self.transport = transport
-        self._cache: dict[str, tuple[float, Optional[str]]] = {}
+        self._cache: dict[str, tuple[float, Optional[PixelConfig]]] = {}
         self._lock = threading.Lock()
 
     def clear_cache(self) -> None:
@@ -44,10 +60,14 @@ class PixelResolver:
             self._cache.clear()
 
     def resolve(self, loja_slug: str) -> str:
-        """Retorna Pixel ID para a loja (string vazia = sem pixel)."""
+        """Compatibilidade: retorna somente o Pixel ID da loja."""
+        return self.resolve_config(loja_slug).pixel_id
+
+    def resolve_config(self, loja_slug: str) -> PixelConfig:
+        """Retorna Pixel ID e os eventos browser habilitados no Portal."""
         slug = (loja_slug or "").strip()
         if not slug:
-            return self.fallback_pixel_id
+            return self._fallback()
 
         now = time.monotonic()
         with self._lock:
@@ -56,7 +76,7 @@ class PixelResolver:
                 cached = hit[1]
                 if cached is not None:
                     return cached
-                return self.fallback_pixel_id
+                return self._fallback()
 
         from_portal = self._fetch(slug)
         with self._lock:
@@ -66,9 +86,15 @@ class PixelResolver:
 
         if from_portal is not None:
             return from_portal
-        return self.fallback_pixel_id
+        return self._fallback()
 
-    def _fetch(self, slug: str) -> Optional[str]:
+    def _fallback(self) -> PixelConfig:
+        return PixelConfig(
+            pixel_id=self.fallback_pixel_id,
+            enabled=bool(self.fallback_pixel_id),
+        )
+
+    def _fetch(self, slug: str) -> Optional[PixelConfig]:
         if not self.portal_url:
             return None
         url = f"{self.portal_url}/public/v1/lojas/{slug}/pixel"
@@ -93,4 +119,10 @@ class PixelResolver:
             return None
         if not isinstance(payload, dict):
             return None
-        return str(payload.get("pixel_id") or "").strip()
+        pixel_id = _pixel_id_publico(payload.get("pixel_id"))
+        return PixelConfig(
+            pixel_id=pixel_id,
+            enabled=bool(payload.get("enabled", bool(pixel_id))) and bool(pixel_id),
+            enviar_page_view=bool(payload.get("enviar_page_view", True)),
+            enviar_lead=bool(payload.get("enviar_lead", True)),
+        )

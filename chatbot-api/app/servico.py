@@ -56,10 +56,16 @@ def extrair_codigo_ctwa_do_texto(texto: str | None) -> str | None:
         return None
     m = _CTWA_CODIGO_RE.search(texto)
     if m:
-        return m.group(1).strip()[:40]
+        codigo = m.group(1).strip()[:40]
+        # Referências CAT pertencem ao fluxo do catálogo e nunca devem mudar a
+        # origem do lead para meta_ctwa.
+        if not _CATALOG_REF_RE.fullmatch(codigo):
+            return codigo
     m2 = _UTM_CAMPAIGN_IN_TEXT_RE.search(texto)
     if m2:
-        return m2.group(1).strip()[:40]
+        codigo = m2.group(1).strip()[:40]
+        if not _CATALOG_REF_RE.fullmatch(codigo):
+            return codigo
     return None
 
 
@@ -92,8 +98,8 @@ def aplicar_touch_ctwa(
     source = _limpar_tracking(ctwa_source_type, limite=40)
     codigo = _limpar_tracking(ctwa_codigo, limite=40) or extrair_codigo_ctwa_do_texto(texto)
 
-    tem_sinal = bool(clid or ad_id or camp_id or codigo)
-    if not tem_sinal and not source:
+    tem_sinal = bool(clid or ad_id or camp_id or adset or source or codigo)
+    if not tem_sinal:
         return False
 
     if clid:
@@ -121,7 +127,7 @@ def aplicar_touch_ctwa(
             _set_first_last(lead, "utm_campaign", codigo)
 
     # Origem tipada quando há sinal de anúncio WA
-    if clid or ad_id or camp_id or codigo:
+    if tem_sinal:
         if lead.origem_first is None:
             lead.origem_first = "meta_ctwa"
         lead.origem_last = "meta_ctwa"
@@ -498,31 +504,46 @@ def registrar_mensagem(
 
     atribuicao = None
     ctwa_ok = False
+    lead_ctwa = None
     lead_ctwa_id = None
     if not from_me:
         atribuicao = _correlacionar_catalogo(db, loja.id, telefone, texto)
-        # CTWA: cria/enriquece lead com click id ou código na mensagem.
-        lead_ctwa = _get_or_create_lead(db, loja.id, telefone)
         codigo_txt = extrair_codigo_ctwa_do_texto(texto)
-        ctwa_ok = aplicar_touch_ctwa(
-            lead_ctwa,
-            ctwa_clid=ctwa_clid,
-            meta_ad_id=meta_ad_id,
-            meta_campaign_id=meta_campaign_id,
-            meta_adset_id=meta_adset_id,
-            ctwa_source_type=ctwa_source_type,
-            ctwa_codigo=ctwa_codigo,
-            texto=texto,
+        tem_sinal_ctwa = any(
+            _limpar_tracking(valor)
+            for valor in (
+                ctwa_clid,
+                meta_ad_id,
+                meta_campaign_id,
+                meta_adset_id,
+                ctwa_source_type,
+                ctwa_codigo,
+                codigo_txt,
+            )
         )
-        if ctwa_ok:
-            lead_ctwa.atualizada_em = datetime.now(timezone.utc)
+        # Só cria lead quando há sinal CTWA real. Mensagem comum deve criar apenas
+        # a conversa; o lead nasce por catálogo, CTWA, cadastro ou consentimento.
+        if tem_sinal_ctwa:
+            lead_ctwa = _get_or_create_lead(db, loja.id, telefone)
+            ctwa_ok = aplicar_touch_ctwa(
+                lead_ctwa,
+                ctwa_clid=ctwa_clid,
+                meta_ad_id=meta_ad_id,
+                meta_campaign_id=meta_campaign_id,
+                meta_adset_id=meta_adset_id,
+                ctwa_source_type=ctwa_source_type,
+                ctwa_codigo=ctwa_codigo,
+                texto=texto,
+            )
+            if ctwa_ok:
+                lead_ctwa.atualizada_em = datetime.now(timezone.utc)
             lead_ctwa_id = lead_ctwa.id
         # Auditoria: sempre que houver sinal CTWA (ou CHATBOT_CTWA_AUDIT_ALL=1).
         registrar_auditoria_ctwa(
             db,
             loja_id=loja.id,
             telefone=telefone,
-            lead_id=lead_ctwa.id if (ctwa_ok or lead_ctwa) else None,
+            lead_id=lead_ctwa.id if lead_ctwa is not None else None,
             provider_message_id=provider_message_id,
             ctwa_clid=ctwa_clid,
             meta_ad_id=meta_ad_id,
@@ -533,8 +554,6 @@ def registrar_mensagem(
             codigo_do_texto=codigo_txt,
             atribuido_lead=ctwa_ok,
         )
-        if not ctwa_ok:
-            lead_ctwa_id = lead_ctwa.id
 
     # Uma saída nova com conteúdo que não foi previamente registrada pelo workflow
     # do bot veio do atendente (celular/web). O humano assumiu: pausa automática.
@@ -583,7 +602,12 @@ def registrar_mensagem(
         "bot_ativo": conversa.bot_ativo,
         "catalog_interest_ref": atribuicao.catalog_interest_ref if atribuicao else None,
         "ctwa_atribuido": bool(ctwa_ok) if not from_me else False,
-        "lead_id": lead_ctwa_id if not from_me else None,
+        "lead_id": (
+            lead_ctwa_id
+            or (atribuicao.lead_id if atribuicao is not None else None)
+        )
+        if not from_me
+        else None,
     }
 
 

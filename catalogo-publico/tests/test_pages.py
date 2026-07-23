@@ -230,6 +230,71 @@ def test_pixel_vem_do_portal_por_loja(client, monkeypatch):
     assert "access_token" not in response.text.lower()
 
 
+def test_pixel_respeita_page_view_e_lead_desabilitados_no_portal(client, monkeypatch):
+    import httpx
+
+    from app.config import Settings
+    from app.pixel import PixelResolver
+
+    valores = {f.name: getattr(settings, f.name) for f in fields(settings)}
+    valores["portal_public_url"] = "http://portal.test"
+    valores["meta_pixel_id"] = ""
+    monkeypatch.setattr("app.main.settings", Settings(**valores))
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            json={
+                "loja_slug": "moto-center",
+                "pixel_id": "555666777888999",
+                "enabled": True,
+                "enviar_page_view": False,
+                "enviar_lead": False,
+            },
+        )
+
+    client.app.state.pixel_resolver = PixelResolver(
+        "http://portal.test",
+        transport=httpx.MockTransport(handler),
+    )
+    vitrine = client.get("/l/moto-center")
+    detalhe = client.get("/l/moto-center/veiculos/vehicle-1")
+    assert "fbevents.js" in vitrine.text
+    assert "fbq('init', '555666777888999')" in vitrine.text
+    assert "fbq('track', 'PageView')" not in vitrine.text
+    assert "ev=PageView" not in vitrine.text
+    assert "ViewContent" in detalhe.text
+    assert "fbq('track', 'Lead'" not in detalhe.text
+    assert "data-lead-event-id=" not in detalhe.text
+
+
+def test_pixel_pode_usar_slug_equivalente_do_portal(client, monkeypatch):
+    import httpx
+
+    from app.config import Settings
+    from app.pixel import PixelResolver
+
+    valores = {f.name: getattr(settings, f.name) for f in fields(settings)}
+    valores["portal_public_url"] = "http://portal.test"
+    valores["portal_store_slug"] = "loja1"
+    valores["meta_pixel_id"] = ""
+    monkeypatch.setattr("app.main.settings", Settings(**valores))
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert str(request.url).endswith("/public/v1/lojas/loja1/pixel")
+        return httpx.Response(
+            200,
+            json={"pixel_id": "123456789012345", "enabled": True},
+        )
+
+    client.app.state.pixel_resolver = PixelResolver(
+        "http://portal.test",
+        transport=httpx.MockTransport(handler),
+    )
+    resposta = client.get("/l/moto-center")
+    assert "123456789012345" in resposta.text
+
+
 def test_pixel_fallback_env_se_portal_cai(client, monkeypatch):
     import httpx
 

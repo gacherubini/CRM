@@ -118,18 +118,27 @@ def get_pixel_resolver(request: Request) -> PixelResolver:
 def pixel_context(loja_slug: Optional[str] = None, request: Optional[Request] = None) -> dict:
     """Pixel por loja: Portal (pull) com fallback META_PIXEL_ID."""
     if settings.meta_pixel_disabled:
-        return {"meta_pixel_enabled": False, "meta_pixel_id": ""}
-    pixel_id = ""
+        return {
+            "meta_pixel_enabled": False,
+            "meta_pixel_id": "",
+            "meta_pixel_page_view_enabled": False,
+            "meta_pixel_lead_enabled": False,
+        }
+    config = None
+    resolver_slug = settings.portal_store_slug or loja_slug
     if request is not None and loja_slug:
-        pixel_id = get_pixel_resolver(request).resolve(loja_slug)
+        config = get_pixel_resolver(request).resolve_config(resolver_slug)
     elif loja_slug and getattr(app.state, "pixel_resolver", None):
-        pixel_id = app.state.pixel_resolver.resolve(loja_slug)
+        config = app.state.pixel_resolver.resolve_config(resolver_slug)
     else:
-        pixel_id = settings.meta_pixel_id
-    pixel_id = (pixel_id or "").strip()
+        config = _build_pixel_resolver().resolve_config("")
+    pixel_id = (config.pixel_id or "").strip()
+    enabled = bool(pixel_id) and config.enabled
     return {
-        "meta_pixel_enabled": bool(pixel_id),
-        "meta_pixel_id": pixel_id if pixel_id else "",
+        "meta_pixel_enabled": enabled,
+        "meta_pixel_id": pixel_id if enabled else "",
+        "meta_pixel_page_view_enabled": enabled and config.enviar_page_view,
+        "meta_pixel_lead_enabled": enabled and config.enviar_lead,
     }
 
 

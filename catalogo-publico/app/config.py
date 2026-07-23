@@ -22,7 +22,14 @@ class Settings:
     ).strip()
     secure_cookie: bool = os.getenv("CATALOGO_SECURE_COOKIE", "0") == "1"
     events_url: str = os.getenv("CATALOGO_EVENTS_URL", "").rstrip("/")
-    events_token: str = os.getenv("CATALOGO_EVENTS_TOKEN", "")
+    # No bundle 3-VM, Portal e Catálogo podem reutilizar a credencial interna
+    # tenant-scoped do Chatbot. Deploys separados continuam podendo fornecer uma
+    # credencial dedicada por CATALOGO_EVENTS_TOKEN.
+    events_token: str = (
+        os.getenv("CATALOGO_EVENTS_TOKEN")
+        or os.getenv("CHATBOT_API_TOKEN")
+        or ""
+    )
     events_timeout: float = float(os.getenv("CATALOGO_EVENTS_TIMEOUT", "5"))
     events_max_attempts: int = max(1, int(os.getenv("CATALOGO_EVENTS_MAX_ATTEMPTS", "5")))
     events_worker_interval: float = max(
@@ -34,6 +41,9 @@ class Settings:
     portal_public_url: str = (
         os.getenv("PORTAL_PUBLIC_URL") or os.getenv("PORTAL_PIXEL_URL") or ""
     ).strip().rstrip("/")
+    # Compatibilidade para instalações antigas em que Portal e Catálogo usam
+    # slugs diferentes para a mesma loja.
+    portal_store_slug: str = os.getenv("CATALOGO_PORTAL_STORE_SLUG", "").strip()
     portal_pixel_timeout: float = float(os.getenv("CATALOGO_PORTAL_PIXEL_TIMEOUT", "2"))
     portal_pixel_cache_ttl: float = float(
         os.getenv("CATALOGO_PORTAL_PIXEL_CACHE_TTL", "60")

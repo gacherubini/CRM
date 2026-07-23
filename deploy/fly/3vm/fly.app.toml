@@ -19,6 +19,9 @@ primary_region = "gru"
   CATALOGO_PUBLIC_BASE_URL = "https://app2037.fly.dev/loja"
   CATALOGO_URL_PREFIX = "/loja"
   CATALOGO_DEFAULT_STORE_SLUG = "moto-center"
+  CATALOGO_EVENTS_URL = "http://127.0.0.1:8001/v1/integracoes/catalogo/interesses"
+  # Compat legado: Portal usa loja1; Estoque/Chatbot/Catálogo usam moto-center.
+  CATALOGO_PORTAL_STORE_SLUG = "loja1"
   # Catálogo puxa Pixel ID do Portal (dono configura em Tráfego; sem secret Fly).
   PORTAL_PUBLIC_URL = "http://127.0.0.1:9000"
   SIMULATION_PROVIDER = "http"

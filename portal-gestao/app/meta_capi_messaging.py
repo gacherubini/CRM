@@ -22,6 +22,7 @@ from app.meta_capi import (
     hash_sha256_normalizado,
     tentar_enviar_outbox,
 )
+from app.meta_pixel import normalizar_pixel_id
 from app.models import MetaCapiOutbox, MetaPixelConfig, agora, novo_id
 
 logger = logging.getLogger(__name__)
@@ -91,10 +92,11 @@ def enfileirar_purchase_messaging(
             .filter(MetaPixelConfig.loja_slug == loja_slug)
             .first()
         )
+        pixel_id = normalizar_pixel_id(config.pixel_id if config else None)
         if (
             config is None
             or not config.enviar_purchase
-            or not (config.pixel_id or "").strip()
+            or not pixel_id
             or not config.token_ciphertext
         ):
             return None
@@ -138,7 +140,7 @@ def enfileirar_purchase_messaging(
                 origem="purchase_messaging",
                 event_name="Purchase",
                 event_id=event_id,
-                pixel_id=config.pixel_id,
+                pixel_id=pixel_id,
                 modo="messaging",
                 tem_ph=flags["tem_ph"],
                 tem_em=flags["tem_em"],

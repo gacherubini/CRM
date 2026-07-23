@@ -11,6 +11,7 @@ os.environ["ESTOQUE_API_TOKEN"] = "token-de-teste"
 os.environ["CHATBOT_API_TOKEN"] = "token-chatbot-teste"
 # Job de spend Meta não deve rodar em background nos testes.
 os.environ["PORTAL_META_SPEND_SYNC_ENABLED"] = "0"
+os.environ["PORTAL_CAPI_RETRY_ENABLED"] = "0"
 
 from app.auth import hash_senha  # noqa: E402
 from app.clients.chatbot import (  # noqa: E402
