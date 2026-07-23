@@ -1,7 +1,7 @@
 """Campos CTWA (Click-to-WhatsApp) no lead.
 
 Revision ID: 0010_lead_ctwa
-Revises: 0009_operacao_menu_sessao
+Revises: 0009
 """
 
 from alembic import op
@@ -9,7 +9,7 @@ import sqlalchemy as sa
 
 
 revision = "0010_lead_ctwa"
-down_revision = "0009_operacao_menu_sessao"
+down_revision = "0009"
 branch_labels = None
 depends_on = None
 
