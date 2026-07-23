@@ -531,7 +531,7 @@ DONO                          VENDEDOR                      CLIENTE
     pdf.bullet("Backends: portal, chatbot, estoque, motor, postgres up")
     pdf.bullet("WA: evolution + n8n up; instância conectada; workflow Gemini")
     pdf.bullet("Catálogo: veículos publicados no estoque")
-    pdf.bullet("Tráfego: Pixel ID igual no Portal e META_PIXEL_ID do catálogo")
+    pdf.bullet("Tráfego: Pixel ID + CAPI no Portal (Catálogo puxa Pixel sozinho)")
     pdf.bullet("Campanha: utm_campaign idêntico no anúncio e no Revy")
     pdf.bullet("Teste: lead com UTM → venda com lead_ref → confirmar → ROI + Events Manager")
 

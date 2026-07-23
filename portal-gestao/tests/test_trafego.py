@@ -49,6 +49,41 @@ def test_dono_ve_aba_trafego(client):
     assert "Não configurado" in form.text
 
 
+def test_public_pixel_endpoint_sem_auth(client):
+    """Catálogo puxa Pixel ID sem login; token CAPI nunca aparece."""
+    vazio = client.get("/public/v1/lojas/loja-teste/pixel")
+    assert vazio.status_code == 200
+    assert vazio.json() == {
+        "loja_slug": "loja-teste",
+        "pixel_id": "",
+        "enabled": False,
+    }
+
+    login(client)
+    pagina = client.get("/app/trafego")
+    client.post(
+        "/app/trafego",
+        data={
+            "csrf": csrf_da_resposta(pagina),
+            "pixel_id": "112233445566778",
+            "capi_token": "EAAB-token-secreto",
+            "enviar_purchase": "on",
+        },
+        follow_redirects=False,
+    )
+
+    # Sem cookie de sessão
+    client.cookies.clear()
+    r = client.get("/public/v1/lojas/loja-teste/pixel")
+    assert r.status_code == 200
+    body = r.json()
+    assert body["loja_slug"] == "loja-teste"
+    assert body["pixel_id"] == "112233445566778"
+    assert body["enabled"] is True
+    assert "token" not in body
+    assert "EAAB" not in r.text
+
+
 def test_salva_config_e_mascara_token_no_get(client):
     login(client)
     pagina = client.get("/app/trafego")

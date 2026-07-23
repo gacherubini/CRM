@@ -28,8 +28,10 @@ Configurações:
 - `CATALOGO_EVENTS_TOKEN`: Bearer tenant-scoped do Chatbot (nunca enviado ao navegador);
 - `CATALOGO_EVENTS_TIMEOUT`, `CATALOGO_EVENTS_MAX_ATTEMPTS` e
   `CATALOGO_EVENTS_WORKER_INTERVAL`: entrega persistente da outbox;
-- `META_PIXEL_ID`: Pixel ID público da Meta (browser). Deve coincidir com o do Portal (aba Tráfego);
-- `META_PIXEL_ENABLED`: `1`/`0` (default: ativo se houver `META_PIXEL_ID`). **Nunca** coloque o token CAPI aqui.
+- `PORTAL_PUBLIC_URL`: URL do Portal (ex.: `http://127.0.0.1:9000` no bundle 3-VM). O catálogo consulta `GET /public/v1/lojas/{slug}/pixel` e usa o Pixel ID que o dono salvou em Tráfego;
+- `META_PIXEL_ID`: fallback opcional se o Portal estiver offline/indisponível;
+- `META_PIXEL_ENABLED`: `1`/`0` (default: ativo quando há Pixel). **Nunca** coloque o token CAPI aqui;
+- `CATALOGO_PORTAL_PIXEL_CACHE_TTL`: cache em segundos do Pixel por loja (default 60).
 
 Quando URL e token estão configurados, o processo entrega `catalog.interest_clicked` em background.
 Cada tentativa mantém o mesmo `event_id`/`Idempotency-Key`; o clique e sua outbox são gravados na

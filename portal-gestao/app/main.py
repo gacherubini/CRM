@@ -379,6 +379,32 @@ def health_ready(db: Session = Depends(get_db)):
     }
 
 
+@app.get("/public/v1/lojas/{loja_slug}/pixel")
+def public_pixel_da_loja(loja_slug: str, db: Session = Depends(get_db)):
+    """Pixel ID público da loja (browser do catálogo).
+
+    Fonte da verdade do Portal → Tráfego. Não expõe token CAPI.
+    O catálogo consulta este endpoint por loja (sem auth; ID é público).
+    """
+    slug = (loja_slug or "").strip()
+    if not slug or len(slug) > 120:
+        return JSONResponse(
+            {"loja_slug": slug, "pixel_id": "", "enabled": False},
+            status_code=404,
+        )
+    config = (
+        db.query(MetaPixelConfig)
+        .filter(MetaPixelConfig.loja_slug == slug)
+        .first()
+    )
+    pixel_id = ((config.pixel_id if config else "") or "").strip()
+    return {
+        "loja_slug": slug,
+        "pixel_id": pixel_id,
+        "enabled": bool(pixel_id),
+    }
+
+
 @app.get("/", include_in_schema=False)
 def raiz():
     return RedirectResponse("/app", status_code=303)

@@ -170,9 +170,13 @@ def test_sem_pixel_por_padrao(client):
 
 
 def test_pixel_presente_quando_meta_pixel_id_configurado(client, monkeypatch):
-    monkeypatch.setattr(
-        "app.main.settings",
-        _settings_com_pixel(settings, "112233445566778"),
+    from app.pixel import PixelResolver
+
+    patched = _settings_com_pixel(settings, "112233445566778")
+    monkeypatch.setattr("app.main.settings", patched)
+    client.app.state.pixel_resolver = PixelResolver(
+        "",
+        fallback_pixel_id="112233445566778",
     )
     response = client.get("/l/moto-center")
     assert response.status_code == 200
@@ -186,6 +190,72 @@ def test_pixel_presente_quando_meta_pixel_id_configurado(client, monkeypatch):
     assert "connect.facebook.net" in csp
 
 
+def test_pixel_vem_do_portal_por_loja(client, monkeypatch):
+    """Dono salva no Portal; catálogo puxa sem META_PIXEL_ID de env."""
+    import httpx
+
+    from app.config import Settings
+    from app.pixel import PixelResolver
+
+    base = settings
+    valores = {f.name: getattr(base, f.name) for f in fields(base)}
+    valores["portal_public_url"] = "http://portal.test"
+    valores["meta_pixel_id"] = ""
+    valores["meta_pixel_enabled_raw"] = ""
+    patched = Settings(**valores)
+    monkeypatch.setattr("app.main.settings", patched)
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert "/public/v1/lojas/moto-center/pixel" in str(request.url)
+        return httpx.Response(
+            200,
+            json={
+                "loja_slug": "moto-center",
+                "pixel_id": "555666777888999",
+                "enabled": True,
+            },
+        )
+
+    transport = httpx.MockTransport(handler)
+    client.app.state.pixel_resolver = PixelResolver(
+        "http://portal.test",
+        transport=transport,
+        fallback_pixel_id="",
+        cache_ttl=60,
+    )
+    response = client.get("/l/moto-center")
+    assert response.status_code == 200
+    assert "555666777888999" in response.text
+    assert "fbevents.js" in response.text
+    assert "access_token" not in response.text.lower()
+
+
+def test_pixel_fallback_env_se_portal_cai(client, monkeypatch):
+    import httpx
+
+    from app.config import Settings
+    from app.pixel import PixelResolver
+
+    base = settings
+    valores = {f.name: getattr(base, f.name) for f in fields(base)}
+    valores["portal_public_url"] = "http://portal.test"
+    valores["meta_pixel_id"] = "111222333444555"
+    patched = Settings(**valores)
+    monkeypatch.setattr("app.main.settings", patched)
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(503, json={"detail": "down"})
+
+    client.app.state.pixel_resolver = PixelResolver(
+        "http://portal.test",
+        transport=httpx.MockTransport(handler),
+        fallback_pixel_id="111222333444555",
+    )
+    response = client.get("/l/moto-center")
+    assert response.status_code == 200
+    assert "111222333444555" in response.text
+
+
 def test_detalhe_propaga_fbclid_no_cta(client):
     r = client.get(
         "/l/moto-center/veiculos/vehicle-1"
@@ -197,9 +267,15 @@ def test_detalhe_propaga_fbclid_no_cta(client):
 
 
 def test_detalhe_lead_event_id_no_cta_quando_pixel(client, monkeypatch):
+    from app.pixel import PixelResolver
+
     monkeypatch.setattr(
         "app.main.settings",
         _settings_com_pixel(settings, "998877665544"),
+    )
+    client.app.state.pixel_resolver = PixelResolver(
+        "",
+        fallback_pixel_id="998877665544",
     )
     response = client.get(
         "/l/moto-center/veiculos/vehicle-1?utm_source=meta&utm_campaign=ofertas"

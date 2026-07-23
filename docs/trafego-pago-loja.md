@@ -2,10 +2,14 @@
 
 Como medir se o anúncio **pagou a conta**: anúncio → UTM → lead → venda → ROI.
 
+**Tutorial completo em PDF** (o que é cada campo, o que colar e como usar):  
+[`tutorial-revy-trafego-meta.pdf`](tutorial-revy-trafego-meta.pdf) · também em `output/pdf/tutorial-revy-trafego-meta.pdf`.  
+Regenerar: `python docs/gerar_pdf_tutorial_trafego_revy.py`.
+
 ## 1. Configurar Pixel (uma vez)
 
 1. No Portal: **Tráfego** → informe **Pixel ID** + **token CAPI**.
-2. No serviço do **Catálogo**, env `META_PIXEL_ID` = o mesmo Pixel ID.
+2. O **Catálogo** puxa o Pixel ID sozinho do Portal (por loja). O dono não precisa de secret Fly.
 3. Confirme eventos: PageView / Lead no site, Purchase ao **confirmar venda**.
 
 ## 2. Criar campanha no Ads com UTM

@@ -13,6 +13,7 @@ from fastapi.templating import Jinja2Templates
 
 from app.config import settings
 from app.events import InterestStore
+from app.pixel import PixelResolver
 from app.provider import HttpInventoryProvider, InventoryNotFound, InventoryUnavailable
 from app.outbox import OutboxWorker
 
@@ -39,9 +40,19 @@ templates.env.globals["url_prefix"] = settings.url_prefix
 templates.env.globals["public_path"] = public_path
 
 
+def _build_pixel_resolver() -> PixelResolver:
+    return PixelResolver(
+        settings.portal_public_url,
+        timeout=settings.portal_pixel_timeout,
+        cache_ttl=settings.portal_pixel_cache_ttl,
+        fallback_pixel_id=settings.meta_pixel_id,
+    )
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     app.state.interest_store.initialize()
+    app.state.pixel_resolver = _build_pixel_resolver()
     worker = OutboxWorker(
         app.state.interest_store,
         url=settings.events_url,
@@ -63,13 +74,14 @@ app.state.catalog_provider = HttpInventoryProvider(
     settings.inventory_url, settings.inventory_token, settings.provider_timeout
 )
 app.state.interest_store = InterestStore(settings.database_path)
+app.state.pixel_resolver = _build_pixel_resolver()
 
 
 def _content_security_policy() -> str:
-    # Google Fonts (Inter) + Meta Pixel opcional.
+    # Google Fonts (Inter) + Meta Pixel opcional (Portal por loja ou env).
     style = "style-src 'self' https://fonts.googleapis.com; "
     font = "font-src 'self' https://fonts.gstatic.com data:; "
-    if settings.meta_pixel_enabled:
+    if settings.meta_pixel_csp_needed:
         return (
             "default-src 'self'; "
             "img-src 'self' https: http: data:; "
@@ -95,10 +107,29 @@ async def security_headers(request: Request, call_next):
     return response
 
 
-def pixel_context() -> dict:
+def get_pixel_resolver(request: Request) -> PixelResolver:
+    resolver = getattr(request.app.state, "pixel_resolver", None)
+    if resolver is None:
+        resolver = _build_pixel_resolver()
+        request.app.state.pixel_resolver = resolver
+    return resolver
+
+
+def pixel_context(loja_slug: Optional[str] = None, request: Optional[Request] = None) -> dict:
+    """Pixel por loja: Portal (pull) com fallback META_PIXEL_ID."""
+    if settings.meta_pixel_disabled:
+        return {"meta_pixel_enabled": False, "meta_pixel_id": ""}
+    pixel_id = ""
+    if request is not None and loja_slug:
+        pixel_id = get_pixel_resolver(request).resolve(loja_slug)
+    elif loja_slug and getattr(app.state, "pixel_resolver", None):
+        pixel_id = app.state.pixel_resolver.resolve(loja_slug)
+    else:
+        pixel_id = settings.meta_pixel_id
+    pixel_id = (pixel_id or "").strip()
     return {
-        "meta_pixel_enabled": settings.meta_pixel_enabled,
-        "meta_pixel_id": settings.meta_pixel_id if settings.meta_pixel_enabled else "",
+        "meta_pixel_enabled": bool(pixel_id),
+        "meta_pixel_id": pixel_id if pixel_id else "",
     }
 
 
@@ -110,7 +141,13 @@ def get_interest_store(request: Request) -> InterestStore:
     return request.app.state.interest_store
 
 
-def error_page(request: Request, status: int, title: str, message: str):
+def error_page(
+    request: Request,
+    status: int,
+    title: str,
+    message: str,
+    loja_slug: Optional[str] = None,
+):
     return templates.TemplateResponse(
         request,
         "error.html",
@@ -119,7 +156,7 @@ def error_page(request: Request, status: int, title: str, message: str):
             "status": status,
             "title": title,
             "message": message,
-            **pixel_context(),
+            **pixel_context(loja_slug, request),
         },
         status_code=status,
     )
@@ -211,13 +248,20 @@ def storefront(
             offset=offset,
         )
     except InventoryNotFound:
-        return error_page(request, 404, "Loja não encontrada", "Confira o endereço da vitrine.")
+        return error_page(
+            request,
+            404,
+            "Loja não encontrada",
+            "Confira o endereço da vitrine.",
+            loja_slug=slug,
+        )
     except InventoryUnavailable:
         return error_page(
             request,
             503,
             "Vitrine temporariamente indisponível",
             "Não foi possível consultar o estoque agora. Tente novamente em instantes.",
+            loja_slug=slug,
         )
 
     previous_url = page_url(slug, filters, offset - limit, limit) if offset else None
@@ -238,7 +282,7 @@ def storefront(
             "offset": offset,
             "previous_url": previous_url,
             "next_url": next_url,
-            **pixel_context(),
+            **pixel_context(slug, request),
         },
     )
 
@@ -255,7 +299,11 @@ def vehicle_detail(
         vehicle = provider.get_vehicle(slug, vehicle_id)
     except InventoryNotFound:
         return error_page(
-            request, 404, "Veículo não encontrado", "Ele pode não estar mais disponível."
+            request,
+            404,
+            "Veículo não encontrado",
+            "Ele pode não estar mais disponível.",
+            loja_slug=slug,
         )
     except InventoryUnavailable:
         return error_page(
@@ -263,6 +311,7 @@ def vehicle_detail(
             503,
             "Detalhe temporariamente indisponível",
             "Não foi possível consultar o estoque agora. Tente novamente em instantes.",
+            loja_slug=slug,
         )
 
     tracking = {
@@ -294,7 +343,7 @@ def vehicle_detail(
             "interest_url": interest_url,
             "whatsapp_disponivel": bool(normalize_whatsapp(store.whatsapp)),
             "lead_event_id": lead_event_id,
-            **pixel_context(),
+            **pixel_context(slug, request),
         },
     )
 
@@ -321,7 +370,11 @@ def register_interest(
         vehicle = provider.get_vehicle(slug, vehicle_id)
     except InventoryNotFound:
         return error_page(
-            request, 404, "Veículo não encontrado", "Ele pode não estar mais disponível."
+            request,
+            404,
+            "Veículo não encontrado",
+            "Ele pode não estar mais disponível.",
+            loja_slug=slug,
         )
     except InventoryUnavailable:
         return error_page(
@@ -329,6 +382,7 @@ def register_interest(
             503,
             "Contato temporariamente indisponível",
             "Não foi possível confirmar os dados do veículo agora.",
+            loja_slug=slug,
         )
 
     phone = normalize_whatsapp(public_store.whatsapp)
@@ -338,6 +392,7 @@ def register_interest(
             422,
             "WhatsApp indisponível",
             "Esta loja ainda não configurou um número de WhatsApp válido.",
+            loja_slug=slug,
         )
 
     anonymous_id, is_new = visitor_id(request)

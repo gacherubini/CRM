@@ -184,7 +184,7 @@ Faça esta configuração uma vez por loja e revise quando trocar Pixel ou conta
 3. Cole o Pixel ID, o token CAPI e, apenas em teste, o **Test Event Code**.
 4. Marque os eventos desejados: **PageView**, **Lead** e **Purchase**.
 5. Salve.
-6. Garanta que o serviço do Catálogo esteja configurado com o mesmo Pixel ID. O Pixel é público e roda no navegador; o token CAPI fica somente no Portal, cifrado.
+6. Pronto: o **Catálogo puxa o Pixel ID sozinho** do Portal (por loja). Não precisa de secret no servidor. O Pixel é público e roda no navegador; o token CAPI fica somente no Portal, cifrado.
 
 O **Test Event Code** serve somente para validação no Events Manager. Use durante o teste e retire depois, para não continuar marcando eventos reais como eventos de teste.
 

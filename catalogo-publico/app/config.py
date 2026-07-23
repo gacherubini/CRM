@@ -28,8 +28,16 @@ class Settings:
     events_worker_interval: float = max(
         0.5, float(os.getenv("CATALOGO_EVENTS_WORKER_INTERVAL", "5"))
     )
-    # Meta Pixel browser (E10). Pixel ID é público; token CAPI NÃO vive no catálogo.
-    # Deve coincidir com o Pixel ID configurado no Portal (aba Tráfego).
+    # Meta Pixel browser (E10). Fonte da verdade: Portal → Tráfego (por loja).
+    # Catálogo consulta PORTAL_PUBLIC_URL; META_PIXEL_ID é só fallback de ops.
+    # Token CAPI NÃO vive no catálogo.
+    portal_public_url: str = (
+        os.getenv("PORTAL_PUBLIC_URL") or os.getenv("PORTAL_PIXEL_URL") or ""
+    ).strip().rstrip("/")
+    portal_pixel_timeout: float = float(os.getenv("CATALOGO_PORTAL_PIXEL_TIMEOUT", "2"))
+    portal_pixel_cache_ttl: float = float(
+        os.getenv("CATALOGO_PORTAL_PIXEL_CACHE_TTL", "60")
+    )
     meta_pixel_id: str = (os.getenv("META_PIXEL_ID") or "").strip()
     meta_pixel_enabled_raw: str = os.getenv("META_PIXEL_ENABLED", "").strip().lower()
 
@@ -53,14 +61,21 @@ class Settings:
         return raw.rstrip("/")
 
     @property
+    def meta_pixel_disabled(self) -> bool:
+        return self.meta_pixel_enabled_raw in {"0", "false", "no", "off"}
+
+    @property
+    def meta_pixel_csp_needed(self) -> bool:
+        """CSP do Facebook se o catálogo pode servir Pixel (Portal ou env)."""
+        if self.meta_pixel_disabled:
+            return False
+        return bool(self.meta_pixel_id or self.portal_public_url)
+
+    @property
     def meta_pixel_enabled(self) -> bool:
-        if not self.meta_pixel_id:
+        """Compat: True se env fallback tem Pixel e não foi desligado."""
+        if self.meta_pixel_disabled or not self.meta_pixel_id:
             return False
-        if self.meta_pixel_enabled_raw in {"0", "false", "no", "off"}:
-            return False
-        if self.meta_pixel_enabled_raw in {"1", "true", "yes", "on"}:
-            return True
-        # default: ligado quando há Pixel ID
         return True
 
 
