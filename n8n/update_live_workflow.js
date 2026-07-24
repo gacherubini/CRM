@@ -107,7 +107,8 @@ async function main() {
     [workflowName],
   );
   if (!workflow) throw new Error("workflow ativo não encontrado");
-  if (!workflow.activeVersionId) throw new Error("workflow sem versão ativa");
+  const targetVersionId = workflow.activeVersionId || workflow.versionId;
+  if (!targetVersionId) throw new Error("workflow sem versão editável");
 
   const existingNodes = JSON.parse(workflow.nodes);
   const canonicalNodes = canonical.nodes;
@@ -175,6 +176,7 @@ async function main() {
   const summary = {
     workflowId: workflow.id,
     active: Boolean(workflow.active),
+    versionSource: workflow.activeVersionId ? "published" : "draft",
     previousNodes: existingNodes.length,
     canonicalNodes: merged.nodes.length,
     chatbotBaseCustomized: chatbotBase !== canonicalChatbotBase,
@@ -206,7 +208,7 @@ async function main() {
         connectionsJson,
         workflow.id,
         workflow.versionId,
-        workflow.activeVersionId,
+        targetVersionId,
       ],
     );
     if (workflowChanges !== 1 || historyChanges < 1) {
@@ -220,7 +222,7 @@ async function main() {
 
   const verified = await get(
     "SELECT nodes FROM workflow_history WHERE versionId=?",
-    [workflow.activeVersionId],
+    [targetVersionId],
   );
   if (!verified || JSON.parse(verified.nodes).length !== merged.nodes.length) {
     throw new Error("verificação da versão ativa falhou");

@@ -98,33 +98,36 @@ fly image show -a motor2037
 **Depois** do cutover: deploy completo com `fly.worker.toml` torna `motor2037`
 worker-only (sem HTTP `min_machines`).
 
-## Roteamento WhatsApp (3 casos)
+## Roteamento WhatsApp (grupo do estoque)
 
 Endpoint: `POST /v1/operacao/roteamento` (chatbot em `app2037`).
-O n8n consulta `isSaved` na Evolution e manda `{ telefone, texto, is_saved }`.
+O n8n consulta `isSaved` na Evolution e manda
+`{ telefone, texto, is_saved, grupo_jid }`.
 
 | Caso | Condição | `acao` |
 |------|----------|--------|
 | Contato que já fala | `is_saved=true` e **não** autorizado | `ignorar` (sem bot) |
 | Contato **novo** | `is_saved=false` e **não** autorizado | `cliente` (IA Gemini) |
-| Equipe | número em **números autorizados** | `cadastro` / `cadastro_controle` com gatilho `cadastro` e `fim`; fora da sessão → `ignorar` |
+| Grupo do estoque | `grupo_jid` igual ao grupo selecionado no Portal | menu, cadastro e fotos do estoque |
+| Outro grupo ou imagem privada | não é o grupo selecionado | `ignorar` silenciosamente |
 
-Telefone da equipe: match com variantes (55 / 9º dígito).  
 `is_saved` desconhecido → **ignorar** (fail-closed).
 
-Equipe se cadastra no Portal (números de cadastro) ou CLI
-`python -m app.cli autorizar-numero`.
+O grupo é selecionado no Portal em **Operação → Grupo do estoque**. A lista de
+números autorizados permanece somente para compatibilidade com instalações que
+ainda não escolheram um grupo.
 
 ## Critérios de aceite
 
 1. Evolution `loja1` (ou instância ativa) state `open`.
 2. WhatsApp **contato novo** (`isSaved=false`) → resposta IA via n8n/chatbot.
 3. Contato **já salvo** e não autorizado → **sem** resposta de bot.
-4. Número autorizado: `cadastro` → fotos → Estoque → Catálogo; `fim` encerra.
-5. Portal login + listagem básica + Acessos bancos (com `MOTOR_ENCRYPTION_KEY`).
-6. Simulação **mock** 2xx sem subir worker Playwright.
-7. Always-on machines started; workers Playwright stopped fora de job.
-8. Health: `https://app2037.fly.dev/health` (e paths nginx do bundle).
+4. Grupo selecionado: `menu` abre as opções; cadastro e fotos alimentam Estoque → Catálogo.
+5. Imagem privada ou enviada em outro grupo → nenhuma resposta e nenhum cadastro.
+6. Portal login + listagem básica + Acessos bancos (com `MOTOR_ENCRYPTION_KEY`).
+7. Simulação **mock** 2xx sem subir worker Playwright.
+8. Always-on machines started; workers Playwright stopped fora de job.
+9. Health: `https://app2037.fly.dev/health` (e paths nginx do bundle).
 
 ## Deploy (raiz do repo)
 
