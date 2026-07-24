@@ -65,9 +65,11 @@ Sinal de “contato novo” = `isSaved === false` na Evolution (agenda do WhatsA
 |---|---|---|
 | **1** Contato que já fala | Salvo na agenda (`isSaved=true`), **não** é equipe | **Ignora** — sem bot de vendas |
 | **2** Contato **novo** | Não salvo (`isSaved=false`), **não** é equipe | **IA** (único caso de bot de vendas) |
-| **3** Equipe cadastrada | Número em **números autorizados** (Portal / CLI) | **Cadastro** de veículo: gatilho `cadastro` → dados/fotos → `fim` |
+| **3** Grupo do estoque | Mensagem no único grupo escolhido no Portal | **Menu e estoque**: cadastrar, consultar, editar e enviar fotos |
+| **4** Privado ou outro grupo | Imagem fora do grupo escolhido | **Ignora silenciosamente**; não baixa nem cadastra a foto |
 
-Match de telefone da equipe aceita variantes (com/sem DDI `55`, com/sem 9º dígito).
+Qualquer participante do grupo escolhido pode operar o estoque. A lista de números da equipe é
+apenas compatibilidade/identificação e não abre o menu no privado quando existe um grupo configurado.
 Sem sinal claro de contato novo → fail-closed (**ignora**).
 
 ---

@@ -34,6 +34,11 @@ O cliente comum não pode usar esse caminho. A loja possui um único JID em
 ignoradas sem resposta. A validação acontece novamente no backend antes do
 download da mídia, mesmo que o workflow seja alterado por engano.
 
+A lista **Números da equipe** não participa da autorização das fotos quando há
+um grupo escolhido. Ela permanece apenas para compatibilidade e para evitar que
+um funcionário seja tratado como cliente novo no privado. Qualquer participante
+do grupo selecionado pode continuar a sessão compartilhada do estoque.
+
 ## Armazenamento
 
 No MVP, os arquivos ficam fora do banco, em volume persistente do Estoque

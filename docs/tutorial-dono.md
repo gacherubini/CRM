@@ -322,7 +322,7 @@ Se qualquer elo falhar, corrija antes de aumentar o orçamento. Um anúncio pode
 | Todos os dias | Conferir conversas, leads sem avanço, estoque reservado, vendas registradas e status do WhatsApp. |
 | Semanalmente | Confirmar vendas, completar custos, revisar metas, lançar gastos sem duplicar valores, comparar funil e ROI. |
 | Mensalmente | Exportar relatórios, fechar resultado, ajustar orçamento no Ads Manager e desativar campanhas encerradas. |
-| Quando houver mudança | Revisar equipe, números autorizados, senha dos bancos, Pixel/CAPI e permissões. |
+| Quando houver mudança | Revisar equipe, Grupo do estoque, números legados, senha dos bancos, Pixel/CAPI e permissões. |
 
 ## 14. Diagnóstico rápido
 
@@ -344,12 +344,12 @@ Se qualquer elo falhar, corrija antes de aumentar o orçamento. Um anúncio pode
 - Dê a cada pessoa um usuário individual; nunca use uma conta coletiva.
 - Não envie CPF, nascimento, senhas bancárias ou token CAPI em grupos ou planilhas sem controle.
 - O token CAPI e credenciais bancárias devem ser cadastrados somente nas telas próprias; o Revy os armazena cifrados e não os revela depois.
-- Autorize para cadastro via WhatsApp apenas telefones de funcionários ativos e remova quem sair.
+- Use um grupo interno, sem clientes, como **Grupo do estoque**; remova ex-funcionários do grupo.
 - Trate os dados dos clientes apenas para atendimento, venda e simulação necessários. Para solicitação administrativa de dados, siga o processo definido pela loja.
 
 ## 16. Checklist de fechamento do dono
 
-- [ ] Usuários e números autorizados pertencem somente à equipe ativa.
+- [ ] Usuários e participantes do Grupo do estoque pertencem somente à equipe ativa.
 - [ ] Veículos vendidos não estão publicados e reservas antigas foram revisadas.
 - [ ] Vendas reais estão confirmadas com veículo e lead corretos.
 - [ ] Custos dos veículos e custos diretos foram preenchidos.

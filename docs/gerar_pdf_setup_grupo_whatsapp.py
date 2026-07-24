@@ -2,12 +2,14 @@
 """Gera o guia visual de configuração do grupo de estoque no WhatsApp."""
 
 from pathlib import Path
+from shutil import copyfile
 
 from fpdf import FPDF
 
 
 ROOT = Path(__file__).resolve().parent.parent
-OUT = ROOT / "output" / "pdf" / "setup-grupo-whatsapp-estoque.pdf"
+OUT = ROOT / "docs" / "setup-grupo-whatsapp-estoque.pdf"
+PREVIEW_OUT = ROOT / "output" / "pdf" / OUT.name
 FONT_DIR = Path(r"C:\Windows\Fonts")
 
 
@@ -211,6 +213,8 @@ def build():
     )
 
     pdf.output(str(OUT))
+    PREVIEW_OUT.parent.mkdir(parents=True, exist_ok=True)
+    copyfile(OUT, PREVIEW_OUT)
     print(OUT)
 
 

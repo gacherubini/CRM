@@ -102,13 +102,13 @@ aprovado com certeza · melhor do Brasil · IA revolucionária · pipeline (no c
 **Erro de banco / timeout**
 > Não consegui retornar com esse banco agora. Posso tentar de novo ou chamar alguém da loja.
 
-**Cadastro de veículo (número autorizado)**
+**Cadastro de veículo (grupo do estoque)**
 > Veículo montado:  
 > {marca} {modelo} {ano} · R$ {valor} · placa {placa}  
 > Confirma o cadastro?
 
-**Número não autorizado**
-> Esse número não está autorizado a cadastrar veículos. Fala com o dono da loja no painel Revy.
+**Imagem fora do grupo do estoque**
+> Não enviar resposta. A mensagem é ignorada silenciosamente.
 
 ### Tom no Painel (B2B)
 - Labels curtos: *Em andamento*, *Concluída*, *Falhou*, *Bot pausado*

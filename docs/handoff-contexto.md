@@ -4,10 +4,53 @@
 > Este arquivo: checkpoint operacional. Seções **“Checkpoint anterior”** = histórico — não
 > reexecutar. Path Windows no rodapé de seções antigas: **ignorar** (workspace = root do git).
 >
-> **Checkpoint mais recente: 2026-07-22/23 (tráfego Meta: Pixel auto catálogo + PDFs setup/fluxos; plano multi-WA).**
-> Escolher um eixo por sessão. Próximos naturais: **config dono Tráfego E2E**, **plano multi-WhatsApp**, ou E2E menu/cadastro.
+> **Checkpoint mais recente: 2026-07-24 (estoque WhatsApp restrito a um grupo escolhido no Portal).**
+> Próxima ação operacional: escolher o grupo e executar o E2E `menu` → cadastro → fotos.
 
-## Checkpoint mais recente — tráfego Meta + PDFs + plano multi-WA (2026-07-22/23)
+## Checkpoint mais recente — grupo do estoque no WhatsApp (2026-07-24)
+
+> **Escopo:** Chatbot, Portal, workflow n8n, migration, documentação/PDF e deploy Fly 3-VM.
+> **Resultado:** imagens privadas e de grupos não selecionados são ignoradas sem resposta.
+
+### O que foi implementado
+
+- O Portal ganhou **Configurações → Grupo do estoque**. Dono/gerente escolhe exatamente um grupo
+  encontrado na instância Evolution; trocar ou remover o grupo encerra as sessões anteriores.
+- A migration Chatbot `0012_grupo_estoque_whatsapp` cria `grupos_estoque`, com um JID por loja e
+  estado compartilhado do menu/cadastro/fotos.
+- O Chatbot valida o JID exato em roteamento, cadastro de veículo e upload de foto. Qualquer
+  participante do grupo escolhido pode operar; conversa privada e qualquer outro grupo não podem.
+- Uma imagem fora do grupo retorna `ignorar=true` e `mensagem=null`: não baixa mídia, não altera o
+  Estoque/Catálogo e não envia “Somente números autorizados...”.
+- A lista **Números da equipe** ficou apenas como compatibilidade até um grupo ser escolhido e para
+  impedir que um funcionário seja tratado como cliente novo no privado. Com grupo configurado,
+  esses números não abrem menu nem cadastram fotos em conversa privada.
+- O workflow canônico n8n passou de 27 para **31 nós**: reconhece `@g.us`/participante `@lid`, separa
+  o ramo do grupo do CRM de clientes, ignora mensagens do próprio bot/áudio de grupo e só responde
+  a fotos quando o backend autoriza. `update_live_workflow.js` também atualiza workflows em draft.
+- Docs atualizados: `README.md`, `docs/contexto-compacto.md`, `docs/go-live-chatbot.md`, tutoriais,
+  `docs/fotos-veiculos-whatsapp.md` e PDF `docs/setup-grupo-whatsapp-estoque.pdf`.
+
+### Validação e produção
+
+- Chatbot: **168 testes verdes**; Portal: **282 testes verdes**; `n8n/validate_workflow.py` válido.
+- Migration de produção: `0012_grupo_estoque_whatsapp (head)`.
+- `app2037` e `n8n2037`: machines `started`, health **1/1 passing** em 24/07/2026.
+- Workflow `wAiNaoSalvos0001` publicado; webhook `/webhook/whatsapp-ai` respondeu HTTP 200.
+- Backup n8n antes da troca: `database.before-workflow-20260724201055365.sqlite`.
+- Commits de implementação/deploy: `63d3f6f` e `a198350`.
+
+### Única ação humana pendente
+
+1. Abrir `https://app2037.fly.dev/app/operacao/numeros`.
+2. Selecionar **Grupo autorizado** e salvar. Se não aparecer, adicionar o WhatsApp conectado ao
+   grupo e recarregar a tela.
+3. No grupo escolhido, enviar `menu` e homologar cadastro + lote de fotos.
+4. Não recriar volume, banco, instância Evolution ou workflow n8n.
+
+---
+
+## Checkpoint anterior — tráfego Meta + PDFs + plano multi-WA (2026-07-22/23)
 
 > **Escopo:** Portal, Catálogo, docs/PDFs de tráfego, handoff. Deploy `app2037` com Pixel pull.
 > **Não implementado:** multi-WhatsApp por vendedor (só plano).

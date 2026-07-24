@@ -248,7 +248,7 @@ Esse exemplo mostra a regra mais importante do Revy: **conversa, lead, veículo 
 | Venda não entra no resultado | Ela ainda pode estar como **registrada**. Peça a confirmação do dono/gerente e confira se o lead e veículo foram vinculados. |
 | Não vejo custo, lucro ou campanhas | É esperado: esses dados pertencem à gestão. |
 | Meu atendimento não aparece em **Meu painel** | O handoff pode ter sido feito fora do Portal. Da próxima vez, use **Assumir atendimento** na conversa. |
-| Um número autorizado não consegue cadastrar veículo | Confirme com a gestão se o telefone está ativo e salvo na agenda da loja; inicie com `cadastro`. |
+| O menu do estoque não abre no WhatsApp | Confirme com a gestão qual é o **Grupo do estoque** selecionado; envie `menu` dentro dele. Privado e outros grupos são ignorados. |
 
 ## 12. Segurança e privacidade
 

@@ -1,8 +1,8 @@
 # Runbook de go-live do Chatbot WhatsApp
 
 > **Ambiente canônico:** lab Fly.io (`crm-419` / `gru`), stack **3-VM** (`deploy/fly/3vm/`).
-> **Estado em 2026-07-22:** 3-VM **no ar**; menu de estoque + fotos Evolution em produção;
-> workflow `wAiNaoSalvos0001` ativo. Próximo: E2E humano (menu/cadastro, depois cliente).
+> **Estado em 2026-07-24:** 3-VM **no ar**; estoque restrito ao grupo escolhido no Portal;
+> workflow `wAiNaoSalvos0001` publicado com 31 nós. Próximo: selecionar o grupo e fazer o E2E.
 > Detalhe: `docs/plans/2026-07-22-plano-menu-estoque-wa-e-fotos-fix.md`.
 >
 > Estado vivo da suíte: `docs/contexto-compacto.md`. Planos: `docs/plans/README.md`.
@@ -18,7 +18,7 @@
 - Portal: Leads, Conversas + handoff, Simulação. ✅
 - **E3 auto-pausa:** `from_me` do atendente → `bot_ativo=false`; saída do bot com
   `origem_bot=true` + mesmo `provider_message_id` não pausa. ✅
-- **E5** cadastro de veículo por WA (números autorizados). ✅
+- **E5** cadastro de veículo por WA somente no grupo de estoque escolhido. ✅
 - **E6** foto automática WhatsApp → Estoque → Catálogo, com sessão curta para lote. ✅
 - Motor: **Santander e Fontecred reais** (`real: true`); mock só para provedores sem driver real.
   Ver tabela de campos em `docs/plans/2026-07-13-plano1a-task12-bancos-reconhecimento.md`.
@@ -79,8 +79,8 @@ go-live da loja no lab = Fly + n8n2037.
    provider `none` até homologar um endpoint HTTP de transcrição. O binário é temporário e apagado
    após a chamada.
 6. Foto de estoque também é baixada server-side. No lab, `CHATBOT_IMAGE_EVOLUTION_URL` já aponta
-   para a Evolution via Flycast e a chave reutiliza o secret de áudio; o telefone da equipe é
-   validado antes do download. O Estoque precisa de
+   para a Evolution configurada e a chave reutiliza o secret de áudio; o JID do grupo é validado
+   antes do download. Privado e outros grupos são ignorados sem resposta. O Estoque precisa de
    `ESTOQUE_MEDIA_PUBLIC_BASE_URL=https://<domínio>/public/v1/media`, volume persistente montado em
    `ESTOQUE_MEDIA_STORAGE_DIR` e backup operacional desse volume.
 
@@ -98,8 +98,8 @@ fly ssh console -a chatbot2037 -C "cd /srv && alembic upgrade head"
 ## 4. n8n (lab)
 
 - UI: `https://n8n2037.fly.dev`
-- Último estado verificado antes do shutdown: health OK; workflow `SBAUPjrUlYa4gtgE` ativo com
-  25 nós. O backup consistente foi criado no volume antes da atualização. Para futuras atualizações,
+- Estado verificado em 24/07/2026: health OK; workflow `wAiNaoSalvos0001` publicado com
+  31 nós. O backup consistente foi criado no volume antes da atualização. Para futuras atualizações,
   usar primeiro o preview de
   `n8n/update_live_workflow.js`; no Fly, informar `--chatbot-base-url=http://chatbot2037.flycast:8000`
   e `--evolution-base-url=http://evolution2037.flycast:8080`. `--apply` é uma ação operacional
@@ -125,17 +125,21 @@ fly ssh console -a chatbot2037 -C "cd /srv && alembic upgrade head"
 | `registrar_lead1` | `POST /v1/leads` | telefone + interesse (+ nome opcional) |
 | `registrar_consentimento1` | `POST /v1/consentimentos` | opcional — não bloqueia |
 | `solicitar_handoff1` | `PATCH /v1/conversas/{tel}/estado` | `bot_ativo: false` |
-| `cadastrar_veiculo1` | `POST /v1/operacao/veiculos` | E5: números autorizados; cria publicado |
-| `Salvar foto no estoque1` | `POST /webhook/operacao/veiculos/foto` | E6: metadados da foto; binário fica server-side |
+| `cadastrar_veiculo1` | `POST /v1/operacao/veiculos` | E5: exige o `grupo_jid` escolhido; cria publicado |
+| `Salvar foto no estoque1` | `POST /webhook/operacao/veiculos/foto` | E6: exige grupo escolhido; binário fica server-side |
 
 Chatbot precisa de `ESTOQUE_API_URL` + `ESTOQUE_API_TOKEN` (e Motor, se a simulação for real)
 nos secrets do Fly. Sem Estoque, `por-placa` e cadastro E5 falham ou esvaziam.
 
-Autorizar telefone de equipe (E5), via CLI no container do Chatbot quando necessário:
+Configurar o grupo de estoque:
 
-```bash
-python -m app.cli autorizar-numero --slug <loja> --telefone 5511... --papel dono
-```
+1. Entre no Portal como dono/gerente.
+2. Abra **Configurações → Grupo do estoque**.
+3. Escolha um grupo da instância Evolution e salve.
+4. Envie `menu` no grupo escolhido.
+
+Os números da equipe são legado/identificação. Depois de selecionar um grupo, não concedem acesso
+ao menu em conversa privada.
 
 ## 5. Evolution
 

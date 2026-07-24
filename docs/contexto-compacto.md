@@ -1,6 +1,6 @@
 # Contexto compacto para continuidade
 
-Atualizado em **2026-07-22** (CRM **A/B/E/D/H/C/F DONE** · **G residual** · funil UI DONE · **menu estoque WA + fotos Evolution** · **Fly 3-VM no ar** · roteamento WA 3 casos).
+Atualizado em **2026-07-24** (CRM **A/B/E/D/H/C/F DONE** · **G residual** · funil UI DONE · **grupo único do estoque WA + fotos Evolution** · **Fly 3-VM no ar**).
 Leia isto primeiro; detalhe operacional recente em `docs/handoff-contexto.md` (topo).
 Planos válidos: `docs/plans/README.md`. **Ignore** `docs/plans/_archive/`.
 Ops Fly canônico: `deploy/fly/3vm/README.md` + `bash deploy/fly/up-all.sh --3vm`.
@@ -28,9 +28,12 @@ Campos e decisões por banco:
 Google spend fora. TikTok spend parked.
 **Eixo E (2026-07-21):** áudio recebido, envio de foto do Estoque no WhatsApp e cadastro automático
 de fotos WhatsApp → Estoque → Catálogo têm backend/workflow concluídos. Cadastro textual tem
-idempotência persistente; fotos usam sessão curta por vendedor e limpeza administrativa de órfãos.
+idempotência persistente; fotos usam sessão curta por grupo e limpeza administrativa de órfãos.
 No Fly, o MVP usa volume persistente criptografado, URL HTTPS e snapshots agendados; ainda é
 necessário homologar o transcritor HTTP e executar um restore drill.
+**Grupo do estoque (2026-07-24):** dono/gerente escolhe um único grupo no Portal; só o JID exato
+abre menu, cadastra veículos e envia fotos. Privado/outros grupos são ignorados silenciosamente.
+Migration Chatbot `0012`; workflow n8n com 31 nós publicado; app+n8n health passando.
 **Eixo G (2026-07-22):** [Multi-WhatsApp por vendedor](plans/2026-07-22-plano-multi-whatsapp-vendedores-campanhas.md)
 está **planejado e não implementado**. O desenho mantém um lead por loja/telefone e cria uma conversa
 por canal/telefone, liga campanhas a vendedor/canal e preserva o número atual como canal legado.
@@ -52,7 +55,7 @@ Não há uma única “próxima task” universal — depende do objetivo:
 
 | Eixo | Próximo incremento | Quando escolher | Plano / doc |
 |---|---|---|---|
-| **A · Demo loja / WA** | **(1)** E2E **menu/cadastro/fotos** da equipe; **(2)** depois E2E contato **novo** (IA vendas) | Demo/operação real no Zap | [plano 2026-07-22](plans/2026-07-22-plano-menu-estoque-wa-e-fotos-fix.md) + `go-live-chatbot.md` + `deploy/fly/3vm/README.md` |
+| **A · Demo loja / WA** | **(1)** escolher Grupo do estoque; **(2)** E2E `menu`/cadastro/fotos no grupo; **(3)** E2E contato novo (IA vendas) | Demo/operação real no Zap | `setup-grupo-whatsapp-estoque.pdf` + `go-live-chatbot.md` + `deploy/fly/3vm/README.md` |
 | **B · Multi-banco** | Estabilizar sim com celular + prints; alinhar âncoras se falhar ao vivo | Mais cotações reais estáveis | handoff topo + lições Playwright |
 | **C · CRM dono** | **CTWA** (6.2b) e/ou **spend Meta** (6.2c) | WA medido + gasto automático; Google (G) residual | 6.2 A–F feitos; **6.2b+6.2c planos ATIVOS** |
 | **D · Escala Motor** | Smoke live sessão quente + teto 2; object storage se multi-volume | Estabilidade multi-banco / IP | B+D + warm-batch2 |
@@ -63,18 +66,18 @@ Não há uma única “próxima task” universal — depende do objetivo:
 **Bloqueios conhecidos:**
 - Landing Tailwind nova: HTML do dono ainda incompleto.
 - Áudio real: falta URL/token do transcritor HTTP homologado; sem isso há fallback para texto.
-- Fotos: download Evolution via **HTTPS público** (não flycast no bundle); parser Long size OK.
-  Falta E2E humano completo + restore drill do volume.
-- Menu cadastro: código/sync telefone DONE; falta o dono fechar o checklist E2E (step A do plano 22).
+- Fotos: download Evolution via **HTTPS público**; parser Long size OK; grupo validado antes do
+  download. Falta E2E humano completo + restore drill do volume.
+- Menu cadastro: código/deploy DONE; falta escolher o grupo no Portal e fechar o E2E.
 - E11/E12 outbound: só com eixo **A** estável + opt-out.
 - Não reabrir Fontecred/Santander sem evidência nova.
 - Stack 3-VM **no ar** (pedido do dono). Subir/desligar: `up-all.sh --3vm` / `down-all.sh --3vm`.
   Não destruir apps/volumes sem pedido explícito.
-- Preferir **um** telefone autorizado canônico (`55`+DDD+9); evitar triplicar no Portal.
+- Números da equipe são legado/identificação; com grupo escolhido não autorizam menu no privado.
 
 > **Histórico de simulações por usuário (Task 16): FEITO** — não reimplementar.  
 > **Campanhas + ROI (E8 / #3B T5): FEITO** — não reimplementar.  
-> **Roteamento 3 casos (contato novo / já fala / equipe): FEITO** — IA só `isSaved=false`.
+> **Roteamento por grupo: FEITO** — IA só `isSaved=false`; estoque só no JID selecionado.
 
 ## Ambiente de trabalho (2026-07-21+)
 
@@ -103,8 +106,8 @@ Monólitos legados (`portal2037`, `catalogo2037`, `estoque2037`, `chatbot2037`, 
   **Nunca** versionar `workflow-fly.ready.json` (tokens reais).
 - Workflow canônico: `n8n/workflow-ai-nao-salvos.json` + `prepare-workflow.ps1` (HTTPS
   `app2037.fly.dev` / `evolution2037.fly.dev`).
-- Roteamento: `POST /v1/operacao/roteamento` — cliente só se `is_saved=false` e não autorizado;
-  equipe via números autorizados + gatilho `cadastro`.
+- Roteamento: `POST /v1/operacao/roteamento` — cliente só se `is_saved=false`; estoque somente
+  quando `grupo_jid` é igual ao grupo escolhido no Portal. Outros grupos/imagens privadas ignoram.
 - Hosts: `https://app2037.fly.dev` · `https://n8n2037.fly.dev` · `https://evolution2037.fly.dev`.
 
 ## Regras permanentes
@@ -123,7 +126,7 @@ Monólitos legados (`portal2037`, `catalogo2037`, `estoque2037`, `chatbot2037`, 
 | Produto | Pasta / porta | Feito (essencial) | Aberto |
 |---|---|---|---|
 | Motor #1A | `motor-simulacao/` `:8000` | async, auth, fan-out, workers on-demand, **Santander/Fontecred/Bradesco/Pan portal LIVE**, warm session teto 2, prints blob JPEG, migrations head **0013** | `testar-login` real; T10 revenda; object storage multi-volume |
-| Chatbot #2A | `chatbot-api/` `:8001` (Fly: `app2037`) | leads, handoff, por-placa, E3, E5, áudio efêmero/fallback, foto automática com sessão por vendedor, envio da capa via WhatsApp, first/last UTM, sim privada + handoff; **`/v1/operacao/roteamento` 3 casos** (novo=`cliente`, salvo=`ignorar`, autorizado=`cadastro`); variantes telefone 55/9º dígito; webhook endurecido | E2E WA estável + Gemini; transcritor HTTP real; retenção/expurgo administrativo; multi-WhatsApp por vendedor planejado, não implementado |
+| Chatbot #2A | `chatbot-api/` `:8001` (Fly: `app2037`) | leads, handoff, por-placa, E3/E5, áudio efêmero/fallback, foto automática com sessão por grupo, envio da capa, first/last UTM, sim privada + handoff; grupo único do estoque por loja; privado/outros grupos ignorados; webhook endurecido | escolher grupo + E2E WA; transcritor HTTP real; retenção/expurgo; multi-WhatsApp por vendedor planejado |
 | Estoque #4A | `estoque-api/` `:8100` (Fly: `app2037`) | CRUD, idempotência persistente, placa, admin, galeria/capa, upload validado, volume/rota pública HTTPS, snapshots, limpeza periódica e transporte outbox testado | executar restore drill |
 | Portal | `portal-gestao/` `:9000` | CRM, sim multi-banco, 9A, CAPI retry, gastos/ROI/resultados; funil completo backend+UI; event bus Meta; retry HTTP seguro | Google; E2E Playwright |
 | Catálogo #5A | `catalogo-publico/` `:8200` | vitrine, CTA, Pixel PageView/Lead/ViewContent | SEO/tema; domínio (E18) |
@@ -151,7 +154,7 @@ cd ../portal-gestao && python -m pytest tests/test_campanhas.py tests/test_roi.p
 cd ../chatbot-api && python -m pytest tests/test_audio.py tests/test_inventory.py tests/test_vehicle_photo.py -q
 cd ../estoque-api && python -m pytest tests/test_rbac_fotos_auditoria.py -q
 python ../n8n/validate_workflow.py
-# migrations: motor head 0013 · portal 0008 funil_eventos · chatbot 0008 cadastro/sessão+nome · estoque 0007 idempotência
+# migrations: motor head 0013 · portal 0008 funil_eventos · chatbot 0012 grupo_estoque · estoque 0007 idempotência
 git status --short
 ```
 
