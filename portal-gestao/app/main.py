@@ -633,14 +633,47 @@ def operacao_numeros(
     if usuario.papel not in ("dono", "gerente"):
         return RedirectResponse("/app", status_code=303)
     numeros, erro = [], None
+    grupo_config = {"selecionado": None, "grupos": [], "aviso": None}
     try:
+        grupo_config = chatbot.obter_grupo_estoque()
         numeros = chatbot.listar_numeros_cadastro()
     except ChatbotIndisponivel as exc:
         erro = str(exc)
     return templates.TemplateResponse(
         "operacao/numeros.html",
-        contexto(request, usuario, numeros=numeros, integracao_erro=erro),
+        contexto(
+            request,
+            usuario,
+            numeros=numeros,
+            grupo_config=grupo_config,
+            integracao_erro=erro,
+        ),
     )
+
+
+@app.post("/app/operacao/grupo")
+async def operacao_grupo_salvar(
+    request: Request,
+    db: Session = Depends(get_db),
+    chatbot: ChatbotClient = Depends(get_chatbot_client),
+):
+    usuario = usuario_atual(request, db)
+    if not usuario:
+        return redirecionar_login()
+    form = await request.form()
+    if usuario.papel not in ("dono", "gerente") or not csrf_valido(
+        request, form.get("csrf")
+    ):
+        return RedirectResponse("/app/operacao/numeros", status_code=303)
+    grupo_jid = (form.get("grupo_jid") or "").strip()
+    try:
+        if grupo_jid:
+            chatbot.definir_grupo_estoque(grupo_jid)
+        else:
+            chatbot.remover_grupo_estoque()
+    except ChatbotIndisponivel:
+        pass
+    return RedirectResponse("/app/operacao/numeros", status_code=303)
 
 
 @app.post("/app/operacao/numeros")

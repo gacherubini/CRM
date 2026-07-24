@@ -141,6 +141,14 @@ class ChatbotFake:
         self.etapas_atualizadas = []
         self.eventos_funil = []
         self.numeros_cadastro = []
+        self.grupo_estoque = {
+            "selecionado": None,
+            "grupos": [
+                {"jid": "120363001@g.us", "nome": "Equipe Estoque"},
+                {"jid": "120363002@g.us", "nome": "Vendas"},
+            ],
+            "aviso": None,
+        }
 
     def listar_leads(self, etapa=None):
         if self.indisponivel:
@@ -200,6 +208,22 @@ class ChatbotFake:
         if self.indisponivel:
             raise ChatbotIndisponivel("Não foi possível acessar o chatbot agora")
         return self.numeros_cadastro
+
+    def obter_grupo_estoque(self):
+        if self.indisponivel:
+            raise ChatbotIndisponivel("Não foi possível acessar o chatbot agora")
+        return self.grupo_estoque
+
+    def definir_grupo_estoque(self, grupo_jid):
+        grupo = next(
+            item for item in self.grupo_estoque["grupos"] if item["jid"] == grupo_jid
+        )
+        self.grupo_estoque["selecionado"] = dict(grupo)
+        return grupo
+
+    def remover_grupo_estoque(self):
+        self.grupo_estoque["selecionado"] = None
+        return {"removido": True}
 
     def adicionar_numero_cadastro(self, telefone, nome=None):
         if self.indisponivel:

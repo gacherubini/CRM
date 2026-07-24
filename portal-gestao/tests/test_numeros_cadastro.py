@@ -31,6 +31,34 @@ def test_listar_numeros_cadastro(monkeypatch):
     assert cliente.listar_numeros_cadastro()[0]["nome"] == "Ana"
 
 
+def test_configurar_grupo_estoque_no_cliente(monkeypatch):
+    requisicoes = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requisicoes.append((request.method, request.url.path))
+        if request.method == "GET":
+            return httpx.Response(
+                200,
+                json={
+                    "selecionado": None,
+                    "grupos": [{"jid": "120363001@g.us", "nome": "Equipe Estoque"}],
+                    "aviso": None,
+                },
+            )
+        return httpx.Response(
+            200, json={"jid": "120363001@g.us", "nome": "Equipe Estoque"}
+        )
+
+    _instalar_transporte(monkeypatch, handler)
+    cliente = ChatbotClient("http://chatbot", "tok", retries=0)
+    assert cliente.obter_grupo_estoque()["grupos"][0]["nome"] == "Equipe Estoque"
+    assert cliente.definir_grupo_estoque("120363001@g.us")["jid"] == "120363001@g.us"
+    assert requisicoes == [
+        ("GET", "/v1/operacao/grupo-estoque"),
+        ("PUT", "/v1/operacao/grupo-estoque"),
+    ]
+
+
 def test_adicionar_numero_cadastro(monkeypatch):
     capturado = {}
 
@@ -68,6 +96,19 @@ def test_pagina_lista_numeros(client, chatbot_fake):
     r = client.get("/app/operacao/numeros")
     assert r.status_code == 200
     assert "Ana" in r.text
+    assert "Equipe Estoque" in r.text
+
+
+def test_pagina_seleciona_grupo(client, chatbot_fake):
+    login(client)
+    pagina = client.get("/app/operacao/numeros")
+    r = client.post(
+        "/app/operacao/grupo",
+        data={"csrf": csrf_da_resposta(pagina), "grupo_jid": "120363001@g.us"},
+        follow_redirects=False,
+    )
+    assert r.status_code == 303
+    assert chatbot_fake.grupo_estoque["selecionado"]["nome"] == "Equipe Estoque"
 
 
 def test_pagina_adiciona_numero(client, chatbot_fake):

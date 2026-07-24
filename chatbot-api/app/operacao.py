@@ -19,8 +19,10 @@ from sqlalchemy.orm import Session
 
 from app import config
 from app.inventory import InventoryWriteClient, get_inventory_write_client
-from app.models_db import NumeroAutorizado
+from app.models_db import GrupoEstoque, NumeroAutorizado
 from app.vehicle_photo import VehiclePhotoProcessor
+
+AtorOperacao = NumeroAutorizado | GrupoEstoque
 
 # Alinhado ao Estoque: Mercosul ABC1D23 ou antigo ABC1234.
 _PLACA_RE = re.compile(r"^[A-Z]{3}[0-9][0-9A-Z][0-9]{2}$")
@@ -203,6 +205,84 @@ def remover_numero(db: Session, loja_id: str, telefone: str) -> dict:
     return {"removido": True, "telefone": tel}
 
 
+def normalizar_grupo_jid(valor: str | None) -> str:
+    jid = str(valor or "").strip().lower()
+    if (
+        not jid
+        or not jid.endswith("@g.us")
+        or len(jid) > 120
+        or any(char.isspace() or ord(char) < 32 for char in jid)
+    ):
+        raise HTTPException(status_code=422, detail="grupo de WhatsApp invalido")
+    return jid
+
+
+def obter_grupo_estoque(db: Session, loja_id: str) -> GrupoEstoque | None:
+    return db.get(GrupoEstoque, loja_id)
+
+
+def _para_saida_grupo(grupo: GrupoEstoque | None) -> dict | None:
+    if grupo is None:
+        return None
+    return {
+        "jid": grupo.grupo_jid,
+        "nome": grupo.grupo_nome or grupo.grupo_jid,
+        "atualizado_em": grupo.atualizado_em.isoformat() if grupo.atualizado_em else None,
+    }
+
+
+def salvar_grupo_estoque(
+    db: Session,
+    loja_id: str,
+    grupo_jid: str,
+    grupo_nome: str | None = None,
+) -> dict:
+    jid = normalizar_grupo_jid(grupo_jid)
+    nome = str(grupo_nome or "").strip()[:160] or None
+    grupo = obter_grupo_estoque(db, loja_id)
+    if grupo is None:
+        grupo = GrupoEstoque(loja_id=loja_id, grupo_jid=jid, grupo_nome=nome)
+        db.add(grupo)
+    else:
+        mudou = grupo.grupo_jid != jid
+        grupo.grupo_jid = jid
+        grupo.grupo_nome = nome
+        if mudou:
+            grupo.foto_placa_atual = None
+            grupo.foto_sessao_expira_em = None
+            grupo.cadastro_expira_em = None
+            grupo.operacao_modo = None
+            grupo.operacao_ctx = None
+    db.commit()
+    db.refresh(grupo)
+    return _para_saida_grupo(grupo) or {}
+
+
+def remover_grupo_estoque(db: Session, loja_id: str) -> dict:
+    grupo = obter_grupo_estoque(db, loja_id)
+    if grupo is None:
+        return {"removido": False}
+    jid = grupo.grupo_jid
+    db.delete(grupo)
+    db.commit()
+    return {"removido": True, "jid": jid}
+
+
+def grupo_estoque_selecionado(db: Session, loja_id: str) -> dict | None:
+    return _para_saida_grupo(obter_grupo_estoque(db, loja_id))
+
+
+def _grupo_estoque_corresponde(
+    grupo: GrupoEstoque | None, grupo_jid: str | None
+) -> bool:
+    if grupo is None or not grupo_jid:
+        return False
+    try:
+        return grupo.grupo_jid == normalizar_grupo_jid(grupo_jid)
+    except HTTPException:
+        return False
+
+
 def esta_autorizado(db: Session, loja_id: str, telefone: str) -> bool:
     return _numero_autorizado_ativo(db, loja_id, telefone) is not None
 
@@ -257,11 +337,17 @@ def _siblings_autorizados(
     return rows
 
 
+def _alvos_sessao(db: Session, ator: AtorOperacao) -> list[AtorOperacao]:
+    if isinstance(ator, NumeroAutorizado):
+        return list(_siblings_autorizados(db, ator))
+    return [ator]
+
+
 def _ativar_sessao_fotos(
-    db: Session, loja_id: str, telefone: str, placa: str
+    db: Session, ator: AtorOperacao, placa: str
 ) -> bool:
     ttl = config.IMAGE_SESSION_TTL_SECONDS
-    rows = _rows_autorizados_variantes(db, loja_id, telefone)
+    rows = _alvos_sessao(db, ator)
     if not rows or ttl <= 0:
         return False
     placa_ok = validar_placa(placa)
@@ -274,9 +360,9 @@ def _ativar_sessao_fotos(
 
 
 def _placa_da_sessao_fotos(
-    db: Session, loja_id: str, telefone: str
+    db: Session, ator: AtorOperacao
 ) -> str | None:
-    rows = _rows_autorizados_variantes(db, loja_id, telefone)
+    rows = _alvos_sessao(db, ator)
     if not rows:
         return None
     agora = datetime.now(timezone.utc)
@@ -314,10 +400,10 @@ def _placa_da_sessao_fotos(
 
 
 def _tentar_ativar_sessao_fotos(
-    db: Session, loja_id: str, telefone: str, placa: str
+    db: Session, ator: AtorOperacao, placa: str
 ) -> bool:
     try:
-        return _ativar_sessao_fotos(db, loja_id, telefone, placa)
+        return _ativar_sessao_fotos(db, ator, placa)
     except SQLAlchemyError:
         db.rollback()
         logger.warning("sessão de fotos não persistida")
@@ -328,8 +414,8 @@ def _minutos_sessao_fotos() -> int:
     return max(1, (config.IMAGE_SESSION_TTL_SECONDS + 59) // 60)
 
 
-def _sessao_cadastro_aberta(numero: NumeroAutorizado) -> bool:
-    expira = numero.cadastro_expira_em
+def _sessao_cadastro_aberta(ator: AtorOperacao) -> bool:
+    expira = ator.cadastro_expira_em
     if expira is None:
         return False
     if expira.tzinfo is None:
@@ -337,24 +423,24 @@ def _sessao_cadastro_aberta(numero: NumeroAutorizado) -> bool:
     return expira > datetime.now(timezone.utc)
 
 
-def _abrir_ou_renovar_cadastro(db: Session, numero: NumeroAutorizado) -> None:
+def _abrir_ou_renovar_cadastro(db: Session, ator: AtorOperacao) -> None:
     ttl = max(1, config.CADASTRO_SESSION_TTL_SECONDS)
     expira = datetime.now(timezone.utc) + timedelta(seconds=ttl)
-    for row in _siblings_autorizados(db, numero):
+    for row in _alvos_sessao(db, ator):
         row.cadastro_expira_em = expira
     db.commit()
 
 
-def _fechar_cadastro(db: Session, numero: NumeroAutorizado) -> None:
-    for row in _siblings_autorizados(db, numero):
+def _fechar_cadastro(db: Session, ator: AtorOperacao) -> None:
+    for row in _alvos_sessao(db, ator):
         row.cadastro_expira_em = None
         row.operacao_modo = None
         row.operacao_ctx = None
     db.commit()
 
 
-def _ctx_get(numero: NumeroAutorizado) -> dict[str, Any]:
-    raw = numero.operacao_ctx
+def _ctx_get(ator: AtorOperacao) -> dict[str, Any]:
+    raw = ator.operacao_ctx
     if not raw:
         return {}
     try:
@@ -364,23 +450,23 @@ def _ctx_get(numero: NumeroAutorizado) -> dict[str, Any]:
         return {}
 
 
-def _ctx_set(db: Session, numero: NumeroAutorizado, ctx: dict[str, Any] | None) -> None:
+def _ctx_set(db: Session, ator: AtorOperacao, ctx: dict[str, Any] | None) -> None:
     payload = None if not ctx else json.dumps(ctx, ensure_ascii=False)
-    for row in _siblings_autorizados(db, numero):
+    for row in _alvos_sessao(db, ator):
         row.operacao_ctx = payload
     db.commit()
 
 
 def _set_modo(
     db: Session,
-    numero: NumeroAutorizado,
+    ator: AtorOperacao,
     modo: str | None,
     ctx: dict[str, Any] | None = None,
 ) -> None:
     ttl = max(1, config.CADASTRO_SESSION_TTL_SECONDS)
     expira = datetime.now(timezone.utc) + timedelta(seconds=ttl)
     payload = json.dumps(ctx, ensure_ascii=False) if ctx else None
-    for row in _siblings_autorizados(db, numero):
+    for row in _alvos_sessao(db, ator):
         row.cadastro_expira_em = expira
         row.operacao_modo = modo
         row.operacao_ctx = payload
@@ -494,7 +580,7 @@ def _resolver_veiculo_por_texto(texto: str) -> tuple[dict | None, str | None]:
 
 
 def _handle_modo_editar(
-    db: Session, numero: NumeroAutorizado, normal: str, texto: str
+    db: Session, numero: AtorOperacao, normal: str, texto: str
 ) -> dict:
     ctx = _ctx_get(numero)
     step = ctx.get("step") or "placa"
@@ -591,7 +677,7 @@ def _handle_modo_editar(
 
 def _handle_modo_acao(
     db: Session,
-    numero: NumeroAutorizado,
+    numero: AtorOperacao,
     normal: str,
     texto: str,
     acao_estoque: str,
@@ -653,19 +739,36 @@ def decidir_roteamento(
     telefone: str,
     texto: str | None,
     is_saved: bool | None,
+    grupo_jid: str | None = None,
 ) -> dict:
     """Decide como o n8n trata a mensagem.
 
     Retorna acao em {cliente, ignorar, cadastro, operacao_controle, cadastro_controle}.
 
-    Três casos de produto:
-    1. Contato que já fala (salvo) e **não** é equipe → ``ignorar``
-    2. Contato **novo** (não salvo) e **não** é equipe → ``cliente`` (IA vendas)
-    3. Número **autorizado** → menu de estoque com gatilho ``cadastro``/``menu``
+    Quando existe um grupo de estoque configurado, somente esse JID pode abrir
+    o menu. O telefone do participante nao concede acesso fora do grupo.
 
     ``is_saved``: só ``False`` explícito conta como contato novo.
     """
-    numero = _numero_autorizado_ativo(db, loja_id, telefone)
+    grupo = obter_grupo_estoque(db, loja_id)
+    numero: AtorOperacao | None
+    if grupo_jid is not None:
+        if not _grupo_estoque_corresponde(grupo, grupo_jid):
+            return {"acao": "ignorar", "resposta": None}
+        numero = grupo
+    elif grupo is not None:
+        # Com grupo selecionado, o menu nunca opera no privado, nem para numeros
+        # que continuam cadastrados na lista legada da equipe.
+        if _numero_autorizado_ativo(db, loja_id, telefone) is not None:
+            return {"acao": "ignorar", "resposta": None}
+        if is_saved is False:
+            return {"acao": "cliente", "resposta": None}
+        return {"acao": "ignorar", "resposta": None}
+    else:
+        # Compatibilidade de implantacao: ate o grupo ser escolhido, o menu
+        # textual antigo ainda funciona para numeros autorizados.
+        numero = _numero_autorizado_ativo(db, loja_id, telefone)
+
     if numero is None:
         if is_saved is False:
             return {"acao": "cliente", "resposta": None}
@@ -852,14 +955,14 @@ def _resumo_veiculo(v: dict) -> str:
 
 def _saida_veiculo_cadastro(
     db: Session,
-    loja_id: str,
-    tel: str,
+    ator: AtorOperacao,
+    solicitante: str,
     veiculo: dict[str, Any],
     *,
     ja_existia: bool,
 ) -> dict:
     placa = str(veiculo.get("placa") or "")
-    sessao_ativa = _tentar_ativar_sessao_fotos(db, loja_id, tel, placa) if placa else False
+    sessao_ativa = _tentar_ativar_sessao_fotos(db, ator, placa) if placa else False
     resumo = _resumo_veiculo(veiculo)
     if ja_existia:
         mensagem = f"Veículo já estava no estoque: {resumo}."
@@ -892,7 +995,7 @@ def _saida_veiculo_cadastro(
             "publicado": veiculo.get("publicado"),
             "foto_url": veiculo.get("foto_url"),
         },
-        "solicitante": tel,
+        "solicitante": solicitante,
     }
 
 
@@ -903,9 +1006,24 @@ def criar_veiculo_autorizado(
     dados_veiculo: dict[str, Any],
     write_client: InventoryWriteClient,
     idempotency_key: str | None = None,
+    grupo_jid: str | None = None,
 ) -> dict:
     """Autoriza o telefone, valida campos e cria no Estoque via HTTP."""
-    tel = _exigir_autorizado(db, loja_id, telefone_solicitante)
+    grupo = obter_grupo_estoque(db, loja_id)
+    tel = normalizar_telefone(telefone_solicitante)
+    if grupo is not None:
+        if not _grupo_estoque_corresponde(grupo, grupo_jid):
+            raise HTTPException(
+                status_code=403,
+                detail="cadastro permitido somente no grupo de estoque configurado",
+            )
+        ator: AtorOperacao = grupo
+    else:
+        tel = _exigir_autorizado(db, loja_id, telefone_solicitante)
+        ator_numero = _numero_autorizado_ativo(db, loja_id, tel)
+        if ator_numero is None:
+            raise HTTPException(status_code=403, detail="nao autorizado")
+        ator = ator_numero
     payload = _validar_campos_veiculo(dados_veiculo)
 
     # Idempotency-Key: se o caller não mandar, deriva de loja+placa+campos estáveis
@@ -920,10 +1038,10 @@ def criar_veiculo_autorizado(
             existente = write_client.obter_por_placa(payload["placa"])
             if existente:
                 return _saida_veiculo_cadastro(
-                    db, loja_id, tel, existente, ja_existia=True
+                    db, ator, tel, existente, ja_existia=True
                 )
         raise
-    return _saida_veiculo_cadastro(db, loja_id, tel, criado, ja_existia=False)
+    return _saida_veiculo_cadastro(db, ator, tel, criado, ja_existia=False)
 
 
 def anexar_foto_whatsapp(
@@ -935,19 +1053,22 @@ def anexar_foto_whatsapp(
     legenda: str | None,
     mime_type: str | None,
     processor: VehiclePhotoProcessor,
+    grupo_jid: str | None = None,
 ) -> dict:
-    """Autoriza cedo e vincula imagem pela placa explícita ou sessão curta."""
-    if _numero_autorizado_ativo(db, loja_id, telefone_solicitante) is None:
+    """Vincula imagem somente quando veio do grupo de estoque selecionado."""
+    grupo = obter_grupo_estoque(db, loja_id)
+    if not _grupo_estoque_corresponde(grupo, grupo_jid):
         return {
             "ok": False,
-            "mensagem": "Somente números autorizados da equipe podem adicionar fotos ao estoque.",
+            "ignorar": True,
+            "mensagem": None,
         }
     encontrada = _PLACA_NA_LEGENDA_RE.search(str(legenda or "").upper())
     placa_explicita = bool(encontrada)
     placa = (
         validar_placa("".join(encontrada.groups()))
         if encontrada
-        else _placa_da_sessao_fotos(db, loja_id, telefone_solicitante)
+        else _placa_da_sessao_fotos(db, grupo)
     )
     if not placa:
         return {
@@ -962,7 +1083,7 @@ def anexar_foto_whatsapp(
     )
     if resultado.get("ok"):
         sessao_ativa = _tentar_ativar_sessao_fotos(
-            db, loja_id, telefone_solicitante, placa
+            db, grupo, placa
         )
         if placa_explicita and sessao_ativa:
             resultado["mensagem"] = str(

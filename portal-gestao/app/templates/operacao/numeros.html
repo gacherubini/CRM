@@ -1,19 +1,58 @@
 {% extends "base.html" %}
-{% block title %}Números de cadastro — Revy{% endblock %}
-{% block page_title %}Números de cadastro{% endblock %}
+{% block title %}Grupo do estoque — Revy{% endblock %}
+{% block page_title %}Grupo do estoque{% endblock %}
 {% block content %}
+{% set selecionado = grupo_config.selecionado %}
 <section class="page-head">
-  <h1>Números de cadastro</h1>
+  <h1>WhatsApp do estoque</h1>
   <p class="muted">
-    Números da equipe autorizados a cadastrar veículos pelo WhatsApp. Eles precisam
-    estar salvos na agenda da loja e enviar <strong>cadastro</strong> para abrir a
-    sessão; depois mandam os dados e as fotos, e <strong>fim</strong> para encerrar.
+    Escolha o único grupo em que o bot aceitará o menu e as fotos do catálogo.
+    Imagens enviadas no privado ou em qualquer outro grupo serão ignoradas.
   </p>
 </section>
 
 {% if integracao_erro %}
 <div class="alert warning">{{ integracao_erro }}</div>
 {% endif %}
+{% if grupo_config.aviso %}
+<div class="alert warning">{{ grupo_config.aviso }}</div>
+{% endif %}
+
+<form class="card" method="post" action="/app/operacao/grupo">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  <label>Grupo autorizado
+    <select name="grupo_jid">
+      <option value="">Nenhum grupo (menu do estoque desativado)</option>
+      {% for grupo in grupo_config.grupos %}
+      <option value="{{ grupo.jid }}" {{ 'selected' if selecionado and selecionado.jid == grupo.jid else '' }}>
+        {{ grupo.nome }}
+      </option>
+      {% endfor %}
+    </select>
+  </label>
+  <p class="muted">
+    Depois de salvar, envie <strong>menu</strong> nesse grupo. O cadastro de veículos,
+    a consulta do estoque e o envio de fotos passam a funcionar somente ali.
+  </p>
+  <button class="button primary" type="submit">Salvar grupo</button>
+</form>
+
+<div class="card">
+  <strong>Status:</strong>
+  {% if selecionado %}
+    {{ selecionado.nome }} <span class="muted">({{ selecionado.jid }})</span>
+  {% else %}
+    <span class="muted">nenhum grupo selecionado</span>
+  {% endif %}
+</div>
+
+<section class="page-head">
+  <h2>Números da equipe</h2>
+  <p class="muted">
+    Lista mantida para identificação da equipe e compatibilidade. Quando um grupo
+    estiver selecionado, estes números não abrem o menu em conversa privada.
+  </p>
+</section>
 
 <form class="card form-inline" method="post" action="/app/operacao/numeros">
   <input type="hidden" name="csrf" value="{{ csrf }}">
@@ -47,7 +86,7 @@
         </td>
       </tr>
       {% else %}
-      <tr><td colspan="4" class="muted">Nenhum número autorizado ainda.</td></tr>
+      <tr><td colspan="4" class="muted">Nenhum número cadastrado.</td></tr>
       {% endfor %}
     </tbody>
   </table>

@@ -99,6 +99,9 @@ def main() -> None:
     assert "origem.providerMessageId" in vehicle_create_code, (
         "idempotência do cadastro deve vir da mensagem real"
     )
+    assert "grupo_jid" in vehicle_create_code and "origem.grupoJid" in vehicle_create_code, (
+        "cadastro deve encaminhar o grupo real extraído do webhook"
+    )
     assert "input.telefone_solicitante" not in vehicle_create_code, (
         "modelo ainda controla o telefone autorizado"
     )
@@ -184,6 +187,12 @@ def main() -> None:
     assert "Boolean(imagem) && !fromMe" in extract_code, (
         "eco de imagem enviada pela própria loja entraria como upload"
     )
+    assert "ehGrupo" in extract_code and "@g.us" in extract_code, (
+        "extração não reconhece mensagens do grupo de estoque"
+    )
+    assert "participantAlt" in extract_code and "ehImagemEstoque" in extract_code, (
+        "extração não separa participante e fotos do grupo"
+    )
     connections = data.get("connections", {})
     assert (
         connections.get("Extrair1", {}).get("main", [[]])[0][0].get("node")
@@ -203,13 +212,20 @@ def main() -> None:
     assert imagem_headers.get(WEBHOOK_HEADER) == WEBHOOK_TOKEN_PLACEHOLDER
     imagem_body = imagem_params.get("jsonBody", "")
     assert "provider_message_id" in imagem_body and "telefone_solicitante" in imagem_body
+    assert "grupo_jid" in imagem_body and "grupoJid" in imagem_body, (
+        "ingestão da foto não informa o grupo ao backend"
+    )
     assert "base64" not in imagem_body and "media:" not in imagem_body, (
         "n8n não deve transportar ou guardar o binário da foto"
     )
     assert (
         connections.get("Salvar foto no estoque1", {}).get("main", [[]])[0][0].get("node")
-        == "Responder cadastro de foto1"
+        == "Foto deve responder1"
     )
+    assert (
+        connections.get("Foto deve responder1", {}).get("main", [[]])[0][0].get("node")
+        == "Responder cadastro de foto1"
+    ), "foto ignorada pode gerar resposta indevida"
     assert (
         connections.get("Transcrever audio1", {}).get("main", [[]])[0][0].get("node")
         == "Aplicar transcricao1"
@@ -223,30 +239,32 @@ def main() -> None:
             f"{gate_name} descarta o texto transcrito"
         )
 
-    # Roteamento de operação: número autorizado salvo entra no cadastro sem bypass no JSON.
-    rota_node = next(
-        (
-            node
-            for node in data.get("nodes", [])
-            if node.get("parameters", {}).get("url") == ROTEAMENTO_URL
-        ),
-        None,
-    )
-    assert rota_node is not None, "nó de roteamento de operação ausente"
-    rota_params = rota_node["parameters"]
-    rota_headers = {
-        header.get("name"): header.get("value")
-        for header in rota_params.get("headerParameters", {}).get("parameters", [])
-    }
-    assert rota_headers.get(WEBHOOK_HEADER) == WEBHOOK_TOKEN_PLACEHOLDER, (
-        "roteamento sem autenticação do webhook"
-    )
-    rota_body = rota_params.get("jsonBody", "")
-    assert "is_saved" in rota_body and "telefone" in rota_body, (
-        "roteamento não envia telefone/is_saved"
-    )
-    assert rota_node.get("continueOnFail") is True, (
-        "roteamento deve permitir fallback (continueOnFail)"
+    # Roteamento de operação: privado e grupo usam a mesma validação tenant-scoped.
+    rota_nodes = [
+        node
+        for node in data.get("nodes", [])
+        if node.get("parameters", {}).get("url") == ROTEAMENTO_URL
+    ]
+    assert len(rota_nodes) == 2, "esperados roteamentos separados para privado e grupo"
+    for rota_node in rota_nodes:
+        rota_params = rota_node["parameters"]
+        rota_headers = {
+            header.get("name"): header.get("value")
+            for header in rota_params.get("headerParameters", {}).get("parameters", [])
+        }
+        assert rota_headers.get(WEBHOOK_HEADER) == WEBHOOK_TOKEN_PLACEHOLDER, (
+            "roteamento sem autenticação do webhook"
+        )
+        rota_body = rota_params.get("jsonBody", "")
+        assert "is_saved" in rota_body and "telefone" in rota_body, (
+            "roteamento não envia telefone/is_saved"
+        )
+        assert rota_node.get("continueOnFail") is True, (
+            "roteamento deve permitir fallback (continueOnFail)"
+        )
+    grupo_rota_body = nodes_by_name["Rotear grupo de estoque1"]["parameters"]["jsonBody"]
+    assert "grupo_jid" in grupo_rota_body and "grupoJid" in grupo_rota_body, (
+        "roteamento do grupo não encaminha o JID"
     )
     assert (
         connections.get("Rotear operacao1", {}).get("main", [[]])[0][0].get("node")
@@ -255,9 +273,7 @@ def main() -> None:
     gate_salvos_code = nodes_by_name["Gate somente nao salvos1"].get(
         "parameters", {}
     ).get("jsCode", "")
-    assert "Rotear operacao1" in gate_salvos_code, (
-        "gate não consome a decisão de roteamento"
-    )
+    assert "$input.first()" in gate_salvos_code, "gate não consome a decisão de roteamento"
     assert "cadastro_controle" in gate_salvos_code, (
         "gate não trata a resposta de controle do cadastro"
     )
@@ -276,6 +292,16 @@ def main() -> None:
     assert len(if_true) > 1 and if_true[1][0].get("node") == "AI Agent1", (
         "não-controle deve ir ao AI Agent"
     )
+    grupo_ramos = connections.get("E grupo de estoque1", {}).get("main", [[], []])
+    assert grupo_ramos[0][0].get("node") == "Rotear grupo de estoque1"
+    assert grupo_ramos[1][0].get("node") == "Registrar mensagem e ler handoff1"
+    assert (
+        connections.get("Rotear grupo de estoque1", {}).get("main", [[]])[0][0].get("node")
+        == "Gate somente nao salvos1"
+    )
+    saida_ramos = connections.get("E resposta de grupo1", {}).get("main", [[], []])
+    assert not saida_ramos[0], "resposta do grupo não deve ser registrada como conversa de cliente"
+    assert saida_ramos[1][0].get("node") == "Registrar saida do bot1"
 
     print(
         "workflow n8n válido: webhook seguro, áudio efêmero, "

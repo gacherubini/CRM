@@ -25,7 +25,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// E3 auto-pausa: encaminhar fromMe com conteudo (atendente no app).\n// Audio e imagem seguem server-side; n8n nunca baixa nem guarda o binario.\n// CTWA: repassa ctwa_clid / ids de ad quando o webhook Evolution expuser contextInfo.\nconst root = $input.first().json;\nconst b = root.body || root || {};\nconst data = b.data || {};\nconst key = data.key || {};\nconst event = String(b.event || root.event || '').toLowerCase();\nif (event && (event.includes('messages.update') || event.includes('message.ack') || event.includes('reaction'))) return [];\nconst jid = String(key.remoteJid || '').trim();\nconst jidAlt = String(key.remoteJidAlt || '').trim();\nconst instance = String(b.instance || '__INSTANCE__');\nconst msg = data.message || {};\nif (msg.reactionMessage) return [];\nconst fromMe = Boolean(key.fromMe);\nconst audio = msg.audioMessage || null;\nconst imagem = msg.imageMessage || null;\nconst ehAudio = Boolean(audio);\nconst ehImagem = Boolean(imagem) && !fromMe;\nconst texto = msg.conversation || msg.extendedTextMessage?.text || (ehImagem ? String(imagem.caption || '') : '');\nconst privado = jid.endsWith('@s.whatsapp.net') || jid.endsWith('@lid');\nif (!privado || !jid || (!texto && !ehAudio && !ehImagem)) return [];\nconst jidTelefone = jidAlt.endsWith('@s.whatsapp.net') ? jidAlt : jid;\nconst telefone = jidTelefone.endsWith('@lid') ? jidTelefone : jidTelefone.split('@')[0];\nconst destino = jid.endsWith('@lid') ? jid : jid.split('@')[0];\nconst ctx = msg.extendedTextMessage?.contextInfo\n  || msg.imageMessage?.contextInfo\n  || data.contextInfo\n  || {};\nconst ad = ctx.externalAdReply || ctx.externalAdReplyInfo || {};\nconst referral = data.referral || msg.referral || ctx.referral || {};\nconst pick = (...vals) => {\n  for (const v of vals) {\n    const s = (v == null ? '' : String(v)).trim();\n    if (s) return s;\n  }\n  return null;\n};\nconst ctwa_clid = pick(\n  ctx.ctwaClid, ctx.ctwa_clid, ad.ctwaClid, ad.ctwa_clid,\n  referral.ctwa_clid, referral.ctwaClid, data.ctwaClid, data.ctwa_clid\n);\nconst meta_ad_id = pick(\n  ad.sourceId, ad.advertisementId, ad.adId, ctx.sourceId,\n  referral.source_id, referral.ad_id, data.sourceId\n);\nconst meta_campaign_id = pick(\n  ad.campaignId, ctx.campaignId, referral.campaign_id, data.campaignId\n);\nconst meta_adset_id = pick(ad.adsetId, ctx.adsetId, referral.adset_id);\nconst ctwa_source_type = pick(\n  ctx.conversionSource, ctx.entryPointConversionSource,\n  ad.sourceType, referral.source_type, data.conversionSource\n);\nreturn [{ json: {\n  instance, remoteJid: jid, remoteJidAlt: jidAlt, telefone, destino, texto, ehAudio, ehImagem,\n  audioMimeType: ehAudio ? String(audio.mimetype || '') : null,\n  audioDurationSeconds: ehAudio ? Number(audio.seconds || 0) : null,\n  imageMimeType: ehImagem ? String(imagem.mimetype || '') : null,\n  imageCaption: ehImagem ? String(imagem.caption || '') : null,\n  pushName: data.pushName || '', providerMessageId: String(key.id || ''),\n  fromMe,\n  ctwa_clid, meta_ad_id, meta_campaign_id, meta_adset_id, ctwa_source_type\n} }];\n"
+        "jsCode": "// Extrai mensagens privadas de clientes e o grupo oficial de estoque.\n// Imagem so entra no fluxo de estoque quando veio de um grupo; o backend valida o JID exato.\nconst root = $input.first().json;\nconst b = root.body || root || {};\nconst data = b.data || {};\nconst key = data.key || {};\nconst event = String(b.event || root.event || '').toLowerCase();\nif (event && (event.includes('messages.update') || event.includes('message.ack') || event.includes('reaction'))) return [];\nconst jid = String(key.remoteJid || '').trim();\nconst jidAlt = String(key.remoteJidAlt || '').trim();\nconst instance = String(b.instance || '__INSTANCE__');\nconst msg = data.message || {};\nif (msg.reactionMessage) return [];\nconst fromMe = Boolean(key.fromMe);\nconst privado = jid.endsWith('@s.whatsapp.net') || jid.endsWith('@lid');\nconst ehGrupo = jid.endsWith('@g.us');\nif (!jid || (!privado && !ehGrupo) || (ehGrupo && fromMe)) return [];\nconst audio = msg.audioMessage || null;\nconst imagem = msg.imageMessage || null;\nconst ehAudio = Boolean(audio) && privado;\nconst ehImagem = Boolean(imagem) && !fromMe;\nconst ehImagemEstoque = ehImagem && ehGrupo;\nconst texto = msg.conversation || msg.extendedTextMessage?.text || (ehImagem ? String(imagem.caption || '') : '');\nif (!texto && !ehAudio && !ehImagemEstoque) return [];\nconst participantes = [key.participantAlt, key.participant, data.participant, data.sender]\n  .map((value) => String(value || '').trim());\nconst participante = participantes.find((value) => value.endsWith('@s.whatsapp.net'))\n  || participantes.find((value) => value.endsWith('@lid'))\n  || '';\nconst jidTelefone = ehGrupo ? participante : (jidAlt.endsWith('@s.whatsapp.net') ? jidAlt : jid);\nif (ehGrupo && !jidTelefone) return [];\nconst telefone = jidTelefone.endsWith('@lid') ? jidTelefone : jidTelefone.split('@')[0];\nconst destino = ehGrupo ? jid : (jid.endsWith('@lid') ? jid : jid.split('@')[0]);\nconst ctx = msg.extendedTextMessage?.contextInfo\n  || msg.imageMessage?.contextInfo\n  || data.contextInfo\n  || {};\nconst ad = ctx.externalAdReply || ctx.externalAdReplyInfo || {};\nconst referral = data.referral || msg.referral || ctx.referral || {};\nconst pick = (...vals) => {\n  for (const v of vals) {\n    const s = (v == null ? '' : String(v)).trim();\n    if (s) return s;\n  }\n  return null;\n};\nconst ctwa_clid = pick(\n  ctx.ctwaClid, ctx.ctwa_clid, ad.ctwaClid, ad.ctwa_clid,\n  referral.ctwa_clid, referral.ctwaClid, data.ctwaClid, data.ctwa_clid\n);\nconst meta_ad_id = pick(\n  ad.sourceId, ad.advertisementId, ad.adId, ctx.sourceId,\n  referral.source_id, referral.ad_id, data.sourceId\n);\nconst meta_campaign_id = pick(\n  ad.campaignId, ctx.campaignId, referral.campaign_id, data.campaignId\n);\nconst meta_adset_id = pick(ad.adsetId, ctx.adsetId, referral.adset_id);\nconst ctwa_source_type = pick(\n  ctx.conversionSource, ctx.entryPointConversionSource,\n  ad.sourceType, referral.source_type, data.conversionSource\n);\nreturn [{ json: {\n  instance, remoteJid: jid, remoteJidAlt: jidAlt, telefone, destino, texto,\n  ehGrupo, grupoJid: ehGrupo ? jid : null, ehAudio, ehImagem, ehImagemEstoque,\n  audioMimeType: ehAudio ? String(audio.mimetype || '') : null,\n  audioDurationSeconds: ehAudio ? Number(audio.seconds || 0) : null,\n  imageMimeType: ehImagem ? String(imagem.mimetype || '') : null,\n  imageCaption: ehImagem ? String(imagem.caption || '') : null,\n  pushName: data.pushName || '', providerMessageId: String(key.id || ''),\n  fromMe,\n  ctwa_clid, meta_ad_id, meta_campaign_id, meta_adset_id, ctwa_source_type\n} }];\n"
       },
       "id": "de48219d-1f51-4046-97e1-523608777502",
       "name": "Extrair1",
@@ -48,7 +48,7 @@
           "conditions": [
             {
               "id": "8b0e2533-3f8c-4cba-93c8-4b388fd33061",
-              "leftValue": "={{ $json.ehImagem }}",
+              "leftValue": "={{ $json.ehImagemEstoque }}",
               "rightValue": true,
               "operator": {
                 "type": "boolean",
@@ -85,7 +85,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ { instance: $json.instance, telefone_solicitante: $json.telefone, provider_message_id: $json.providerMessageId, legenda: $json.imageCaption || null, mime_type: $json.imageMimeType || null } }}",
+        "jsonBody": "={{ { instance: $json.instance, telefone_solicitante: $json.telefone, grupo_jid: $json.grupoJid, provider_message_id: $json.providerMessageId, legenda: $json.imageCaption || null, mime_type: $json.imageMimeType || null } }}",
         "options": {
           "timeout": 30000
         }
@@ -122,7 +122,7 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        1808,
+        2016,
         128
       ]
     },
@@ -271,7 +271,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const chat = $('Consultar contato na Evolution1').first().json || {};\nconst extraida = $('Extrair1').first().json;\nconst origem = extraida.ehAudio ? $('Aplicar transcricao1').first().json : extraida;\nconst rot = $('Rotear operacao1').first().json || {};\nconst acao = rot.acao;\nconst botAtivo = origem.bot_ativo !== false;\n// Fallback fail-closed se o roteamento nao respondeu.\nif (!acao) {\n  return (chat.isSaved === false && botAtivo) ? [{ json: { ...origem, acao: 'cliente' } }] : [];\n}\n// Cliente de vendas so se bot ativo (respeita handoff humano)\nif (acao === 'cliente') {\n  if (!botAtivo) return [];\n  return [{ json: { ...origem, acao } }];\n}\nif (acao === 'cadastro') {\n  return [{ json: { ...origem, acao } }];\n}\n// Menu e confirmacoes deterministicas: resposta pronta, sem LLM\nif (acao === 'cadastro_controle' || acao === 'operacao_controle') {\n  const resposta = String(rot.resposta || '').trim();\n  if (!resposta) return [];\n  return [{ json: { ...origem, acao, audioFallback: resposta, output: resposta } }];\n}\nreturn []; // ignorar\n"
+        "jsCode": "let chat = {};\ntry { chat = $('Consultar contato na Evolution1').first().json || {}; } catch (e) {}\nconst extraida = $('Extrair1').first().json;\nlet origem = extraida;\nif (extraida.ehAudio) {\n  try { origem = $('Aplicar transcricao1').first().json; } catch (e) {}\n}\nconst rot = $input.first().json || {};\nconst acao = rot.acao;\nconst botAtivo = origem.bot_ativo !== false;\nif (!acao) {\n  if (origem.ehGrupo) return [];\n  return (chat.isSaved === false && botAtivo) ? [{ json: { ...origem, acao: 'cliente' } }] : [];\n}\nif (acao === 'cliente') {\n  if (origem.ehGrupo || !botAtivo) return [];\n  return [{ json: { ...origem, acao } }];\n}\nif (acao === 'cadastro') {\n  return [{ json: { ...origem, acao } }];\n}\nif (acao === 'cadastro_controle' || acao === 'operacao_controle') {\n  const resposta = String(rot.resposta || '').trim();\n  if (!resposta) return [];\n  return [{ json: { ...origem, acao, audioFallback: resposta, output: resposta } }];\n}\nreturn [];\n"
       },
       "id": "c4b1465b-5543-4cea-9c15-148d229eb518",
       "name": "Gate somente nao salvos1",
@@ -287,7 +287,7 @@
         "promptType": "define",
         "text": "={{ 'telefone_cliente: ' + $json.telefone + '\\n\\nMensagem: ' + $json.texto + ($json.audioFallback ? '\\n\\nINSTRUÇÃO: responda exatamente e somente: ' + $json.audioFallback : '') + ($json.acao === 'cadastro' ? '\\n\\nMODO CADASTRO (equipe): extraia tipo/marca/modelo/ano/preco/km/placa e chame cadastrar_veiculo imediatamente. Nao peca dados que ja estiverem na mensagem. Nao ofereca handoff de vendas. Apos sucesso, confirme o veiculo e diga para enviar as FOTOS COM A PLACA NA LEGENDA (ex.: ABC1D23). Se a tool ja trouxe essa instrucao, repita-a. Nao invente dados.' : '') }}",
         "options": {
-          "systemMessage": "Você é o atendente virtual de uma loja de veículos no WhatsApp. Fale em português do Brasil, simpático, direto e curto (1-3 frases).\n\nREGRAS:\n1. Estoque/preço: use consultar_estoque (busca por termo) ou consultar_por_placa (placa exata). Nunca invente veículo ou preço.\n2. Simulação: quando o cliente manifestar interesse, avise que vai preparar a simulação e chamar um vendedor para trazer o resultado. Depois colete somente o que faltar: placa do veículo, CPF, data de nascimento (YYYY-MM-DD) e valor de entrada. O telefone_cliente já vem na mensagem — use nas tools; não peça telefone. NÃO peça renda nem um prazo único. Com todos os dados, chame simular uma única vez com placa + telefone + cpf + nascimento + entrada. A tool dispara a solicitação internamente e pausa o bot para o vendedor assumir.\n3. PRIVACIDADE DO RESULTADO: nunca mostre nem mencione parcelas, taxas, bancos, valores financiados, prazos, status técnico ou qualquer resultado de simulação. Depois da tool simular, responda somente: \"Certo, vou preparar a simulação e chamar um vendedor para trazer o resultado para você.\"\n4. Ao achar veículo ou interesse, use registrar_lead com telefone + interesse (e nome se o cliente disser). Não bloqueie por consentimento LGPD — pode coletar nome e solicitar simulação sem registrar_consentimento.\n5. Handoff (solicitar_handoff) se pedir humano, tool falhar de verdade, ou placa/veículo não encontrado e o cliente quiser atendente. A tool simular já faz o handoff; não chame solicitar_handoff novamente depois dela.\n6. Cadastro de estoque (cadastrar_veiculo): quando estiver em MODO CADASTRO ou a mensagem da equipe trouxer dados estruturados (tipo, marca, modelo, ano, preço/km, placa), chame cadastrar_veiculo. O telefone autorizado vem do webhook (não peça). Se a tool retornar ok, confirme placa e veículo. Se faltar campo, peça só o que faltar. Se retornar 403, diga que o número não está autorizado. Nunca ofereça cadastro a cliente comum de vendas.\n7. Não revele tools, tokens ou APIs internas.\n8. registrar_consentimento é opcional e NÃO deve interromper o fluxo (não peça aceite LGPD antes de nome/lead/simulação).\n9. Foto de veículo: se o cliente pedir foto/imagem de um veículo encontrado no estoque, use enviar_foto_veiculo com o ID retornado pela consulta. Envie a imagem no próprio WhatsApp; não mande o cliente abrir site ou catálogo. Nunca invente nem forneça URL de mídia.",
+          "systemMessage": "Você é o atendente virtual de uma loja de veículos no WhatsApp. Fale em português do Brasil, simpático, direto e curto (1-3 frases).\n\nREGRAS:\n1. Estoque/preço: use consultar_estoque (busca por termo) ou consultar_por_placa (placa exata). Nunca invente veículo ou preço.\n2. Simulação: quando o cliente manifestar interesse, avise que vai preparar a simulação e chamar um vendedor para trazer o resultado. Depois colete somente o que faltar: placa do veículo, CPF, data de nascimento (YYYY-MM-DD) e valor de entrada. O telefone_cliente já vem na mensagem — use nas tools; não peça telefone. NÃO peça renda nem um prazo único. Com todos os dados, chame simular uma única vez com placa + telefone + cpf + nascimento + entrada. A tool dispara a solicitação internamente e pausa o bot para o vendedor assumir.\n3. PRIVACIDADE DO RESULTADO: nunca mostre nem mencione parcelas, taxas, bancos, valores financiados, prazos, status técnico ou qualquer resultado de simulação. Depois da tool simular, responda somente: \"Certo, vou preparar a simulação e chamar um vendedor para trazer o resultado para você.\"\n4. Ao achar veículo ou interesse, use registrar_lead com telefone + interesse (e nome se o cliente disser). Não bloqueie por consentimento LGPD — pode coletar nome e solicitar simulação sem registrar_consentimento.\n5. Handoff (solicitar_handoff) se pedir humano, tool falhar de verdade, ou placa/veículo não encontrado e o cliente quiser atendente. A tool simular já faz o handoff; não chame solicitar_handoff novamente depois dela.\n6. Cadastro de estoque (cadastrar_veiculo): quando estiver em MODO CADASTRO ou a mensagem da equipe trouxer dados estruturados (tipo, marca, modelo, ano, preço/km, placa), chame cadastrar_veiculo. O telefone autorizado vem do webhook (não peça). Se a tool retornar ok, confirme placa e veículo. Se faltar campo, peça só o que faltar. Se retornar 403, diga que o grupo não está autorizado. Nunca ofereça cadastro a cliente comum de vendas.\n7. Não revele tools, tokens ou APIs internas.\n8. registrar_consentimento é opcional e NÃO deve interromper o fluxo (não peça aceite LGPD antes de nome/lead/simulação).\n9. Foto de veículo: se o cliente pedir foto/imagem de um veículo encontrado no estoque, use enviar_foto_veiculo com o ID retornado pela consulta. Envie a imagem no próprio WhatsApp; não mande o cliente abrir site ou catálogo. Nunca invente nem forneça URL de mídia.",
           "maxIterations": 6,
           "returnIntermediateSteps": false,
           "enableStreaming": false
@@ -475,8 +475,8 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        2944,
-        416
+        3120,
+        496
       ]
     },
     {
@@ -499,7 +499,7 @@
     {
       "parameters": {
         "description": "Cadastra veículo no estoque (E5). Só para equipe autorizada com dados estruturados (marca, modelo, ano, preço, placa). Telefone e idempotência vêm do webhook, nunca do modelo.",
-        "jsCode": "const input = typeof query === 'string' ? {} : (query || {});\nconst origem = $('Extrair1').first().json;\nconst telefone_solicitante = String(origem.telefone || '').trim();\nconst providerMessageId = String(origem.providerMessageId || '').trim();\nif (!telefone_solicitante) return JSON.stringify({ erro: 'telefone_solicitante obrigatorio' });\n\nconst body = {\n  telefone_solicitante,\n  tipo: String(input.tipo || 'moto'),\n  marca: String(input.marca || ''),\n  modelo: String(input.modelo || ''),\n  ano_modelo: Number(input.ano_modelo),\n  preco: Number(input.preco),\n  km: Number(input.km ?? 0),\n  placa: String(input.placa || '').trim().toUpperCase(),\n};\nif (input.versao) body.versao = String(input.versao);\nif (input.cor) body.cor = String(input.cor);\n\nconst headers = {\n  Authorization: 'Bearer __CHATBOT_TOKEN__',\n  'Content-Type': 'application/json',\n};\nif (providerMessageId) headers['Idempotency-Key'] = providerMessageId;\n\ntry {\n  const resp = await helpers.httpRequest({\n    method: 'POST',\n    url: 'http://chatbot-api:8000/v1/operacao/veiculos',\n    headers,\n    body,\n    json: true,\n  });\n  return JSON.stringify({ ok: true, veiculo: resp });\n} catch (e) {\n  const status = e.response?.statusCode || e.statusCode || e.status || null;\n  const detail = e.response?.body?.detail || e.message || String(e);\n  return JSON.stringify({ ok: false, status, erro: detail });\n}",
+        "jsCode": "const input = typeof query === 'string' ? {} : (query || {});\nconst origem = $('Extrair1').first().json;\nconst telefone_solicitante = String(origem.telefone || '').trim();\nconst providerMessageId = String(origem.providerMessageId || '').trim();\nif (!telefone_solicitante) return JSON.stringify({ erro: 'telefone_solicitante obrigatorio' });\n\nconst body = {\n  telefone_solicitante,\n  grupo_jid: origem.ehGrupo ? origem.grupoJid : null,\n  tipo: String(input.tipo || 'moto'),\n  marca: String(input.marca || ''),\n  modelo: String(input.modelo || ''),\n  ano_modelo: Number(input.ano_modelo),\n  preco: Number(input.preco),\n  km: Number(input.km ?? 0),\n  placa: String(input.placa || '').trim().toUpperCase(),\n};\nif (input.versao) body.versao = String(input.versao);\nif (input.cor) body.cor = String(input.cor);\n\nconst headers = {\n  Authorization: 'Bearer __CHATBOT_TOKEN__',\n  'Content-Type': 'application/json',\n};\nif (providerMessageId) headers['Idempotency-Key'] = providerMessageId;\n\ntry {\n  const resp = await helpers.httpRequest({\n    method: 'POST',\n    url: 'http://chatbot-api:8000/v1/operacao/veiculos',\n    headers,\n    body,\n    json: true,\n  });\n  return JSON.stringify({ ok: true, veiculo: resp });\n} catch (e) {\n  const status = e.response?.statusCode || e.statusCode || e.status || null;\n  const detail = e.response?.body?.detail || e.message || String(e);\n  return JSON.stringify({ ok: false, status, erro: detail });\n}",
         "specifyInputSchema": true,
         "schemaType": "manual",
         "inputSchema": "{\"type\": \"object\", \"properties\": {\"tipo\": {\"type\": \"string\", \"description\": \"moto ou carro\"}, \"marca\": {\"type\": \"string\"}, \"modelo\": {\"type\": \"string\"}, \"ano_modelo\": {\"type\": \"number\"}, \"preco\": {\"type\": \"number\"}, \"km\": {\"type\": \"number\"}, \"placa\": {\"type\": \"string\"}, \"versao\": {\"type\": \"string\"}, \"cor\": {\"type\": \"string\"}}, \"required\": [\"marca\", \"modelo\", \"ano_modelo\", \"preco\", \"placa\"], \"additionalProperties\": true}"
@@ -600,6 +600,117 @@
         2448,
         416
       ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const resultado = $input.first().json || {};\nif (resultado.ignorar === true || !String(resultado.mensagem || '').trim()) return [];\nreturn [{ json: resultado }];\n"
+      },
+      "id": "stock-photo-response-gate",
+      "name": "Foto deve responder1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1808,
+        128
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "stock-group-condition",
+              "leftValue": "={{ $json.ehGrupo }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "stock-group-if",
+      "name": "E grupo de estoque1",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1584,
+        496
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://chatbot-api:8000/v1/operacao/roteamento",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Webhook-Token",
+              "value": "__CHATBOT_WEBHOOK_TOKEN__"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { instance: $json.instance, telefone: $json.telefone, texto: $json.texto, grupo_jid: $json.grupoJid, is_saved: null } }}",
+        "options": {
+          "timeout": 8000
+        }
+      },
+      "id": "stock-group-route",
+      "name": "Rotear grupo de estoque1",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2008,
+        544
+      ],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "stock-group-output-condition",
+              "leftValue": "={{ $('Extrair1').first().json.ehGrupo }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "stock-group-output-if",
+      "name": "E resposta de grupo1",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        2912,
+        416
+      ]
     }
   ],
   "connections": {
@@ -647,7 +758,7 @@
       "main": [
         [
           {
-            "node": "Responder cadastro de foto1",
+            "node": "Foto deve responder1",
             "type": "main",
             "index": 0
           }
@@ -665,7 +776,7 @@
         ],
         [
           {
-            "node": "Registrar mensagem e ler handoff1",
+            "node": "E grupo de estoque1",
             "type": "main",
             "index": 0
           }
@@ -830,7 +941,7 @@
       "main": [
         [
           {
-            "node": "Registrar saida do bot1",
+            "node": "E resposta de grupo1",
             "type": "main",
             "index": 0
           }
@@ -893,6 +1004,58 @@
         [
           {
             "node": "AI Agent1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Foto deve responder1": {
+      "main": [
+        [
+          {
+            "node": "Responder cadastro de foto1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "E grupo de estoque1": {
+      "main": [
+        [
+          {
+            "node": "Rotear grupo de estoque1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Registrar mensagem e ler handoff1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Rotear grupo de estoque1": {
+      "main": [
+        [
+          {
+            "node": "Gate somente nao salvos1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "E resposta de grupo1": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Registrar saida do bot1",
             "type": "main",
             "index": 0
           }

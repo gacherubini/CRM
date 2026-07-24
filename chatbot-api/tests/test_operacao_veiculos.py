@@ -182,13 +182,19 @@ def test_cadastro_ativa_sessao_para_primeira_foto_sem_legenda(client, loja_a):
                 "publicado": True,
             }
 
-    _autorizar(client, loja_a)
+    grupo_jid = "120363001@g.us"
+    selecionado = client.put(
+        "/v1/operacao/grupo-estoque",
+        json={"grupo_jid": grupo_jid, "grupo_nome": "Equipe Estoque"},
+        headers=loja_a["headers"],
+    )
+    assert selecionado.status_code == 200
     write_fake = _FakeWriteClient()
     app.dependency_overrides[get_inventory_write_client] = lambda: write_fake
     try:
         criada = client.post(
             "/v1/operacao/veiculos",
-            json=_payload(),
+            json=_payload(grupo_jid=grupo_jid),
             headers=loja_a["headers"],
         )
     finally:
@@ -203,6 +209,7 @@ def test_cadastro_ativa_sessao_para_primeira_foto_sem_legenda(client, loja_a):
             json={
                 "instance": loja_a["instance"],
                 "telefone_solicitante": "5511999990001",
+                "grupo_jid": grupo_jid,
                 "provider_message_id": "MSG-SEM-LEGENDA-1",
                 "legenda": None,
                 "mime_type": "image/jpeg",

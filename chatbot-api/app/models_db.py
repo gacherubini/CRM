@@ -215,3 +215,19 @@ class NumeroAutorizado(Base):
     # JSON textual: placa, step, campo, valor_pendente, busca…
     operacao_ctx: Mapped[str | None] = mapped_column(Text, nullable=True)
     criado_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_agora)
+
+
+class GrupoEstoque(Base):
+    """Grupo de WhatsApp autorizado a operar o estoque da loja."""
+
+    __tablename__ = "grupos_estoque"
+
+    loja_id: Mapped[str] = mapped_column(ForeignKey("lojas.id"), primary_key=True)
+    grupo_jid: Mapped[str] = mapped_column(String(120), nullable=False, index=True)
+    grupo_nome: Mapped[str | None] = mapped_column(String(160), nullable=True)
+    foto_placa_atual: Mapped[str | None] = mapped_column(String(7), nullable=True)
+    foto_sessao_expira_em: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    cadastro_expira_em: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    operacao_modo: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    operacao_ctx: Mapped[str | None] = mapped_column(Text, nullable=True)
+    atualizado_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_agora, onupdate=_agora)

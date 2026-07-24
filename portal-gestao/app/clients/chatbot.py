@@ -159,6 +159,19 @@ class ChatbotClient:
 
     # --- Operação: números autorizados a cadastrar ----------------------------
 
+    def obter_grupo_estoque(self) -> dict:
+        return self._request("GET", "/v1/operacao/grupo-estoque")
+
+    def definir_grupo_estoque(self, grupo_jid: str) -> dict:
+        return self._request(
+            "PUT",
+            "/v1/operacao/grupo-estoque",
+            json={"grupo_jid": grupo_jid},
+        )
+
+    def remover_grupo_estoque(self) -> dict:
+        return self._request("DELETE", "/v1/operacao/grupo-estoque")
+
     def listar_numeros_cadastro(self) -> list[dict]:
         return self._request("GET", "/v1/operacao/numeros-autorizados")["numeros"]
 

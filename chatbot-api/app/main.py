@@ -28,11 +28,13 @@ from app.inventory import (
 from app.hardening import (
     WebhookPayloadLimitMiddleware,
     logger as webhook_logger,
+    normalizar_participante_whatsapp,
     normalizar_telefone_webhook,
     validar_identificador,
 )
 from app.simulation import SimulationProvider, get_simulation_provider
 from app.vehicle_photo import VehiclePhotoProcessor, get_vehicle_photo_processor
+from app.whatsapp_groups import GruposWhatsappIndisponiveis, listar_grupos_whatsapp
 
 app = FastAPI(title="Chatbot API")
 app.add_middleware(WebhookPayloadLimitMiddleware)
@@ -146,6 +148,7 @@ class FotoVeiculoWebhookInput(BaseModel):
 
     instance: str
     telefone_solicitante: str
+    grupo_jid: Optional[str] = Field(default=None, max_length=120)
     provider_message_id: str
     legenda: Optional[str] = Field(default=None, max_length=500)
     mime_type: Optional[str] = Field(default=None, max_length=120)
@@ -162,7 +165,7 @@ class FotoVeiculoWebhookInput(BaseModel):
     @field_validator("telefone_solicitante")
     @classmethod
     def validar_telefone(cls, value: str) -> str:
-        return normalizar_telefone_webhook(value)
+        return normalizar_participante_whatsapp(value)
 
     @field_validator("provider_message_id")
     @classmethod
@@ -181,6 +184,7 @@ class RoteamentoInput(BaseModel):
     telefone: str
     texto: Optional[str] = Field(default=None, max_length=config.WEBHOOK_MAX_TEXT_CHARS)
     is_saved: Optional[bool] = None
+    grupo_jid: Optional[str] = Field(default=None, max_length=120)
 
     @field_validator("instance")
     @classmethod
@@ -192,7 +196,7 @@ class RoteamentoInput(BaseModel):
     @field_validator("telefone")
     @classmethod
     def validar_telefone(cls, value: str) -> str:
-        return normalizar_telefone_webhook(value)
+        return normalizar_participante_whatsapp(value)
 
 
 class EstadoInput(BaseModel):
@@ -283,10 +287,16 @@ class NumeroAutorizadoInput(BaseModel):
     nome: Optional[str] = Field(default=None, max_length=120)
 
 
+class GrupoEstoqueInput(BaseModel):
+    grupo_jid: str = Field(min_length=1, max_length=120)
+    grupo_nome: Optional[str] = Field(default=None, max_length=160)
+
+
 class OperacaoVeiculoInput(BaseModel):
     """Cadastro de veículo via WhatsApp (E5). n8n/LLM preenche os campos extraídos."""
 
     telefone_solicitante: str
+    grupo_jid: Optional[str] = Field(default=None, max_length=120)
     tipo: str = "moto"
     marca: str
     modelo: str
@@ -381,7 +391,12 @@ def operacao_roteamento(
     """Decide como o n8n trata a mensagem (cliente/ignorar/cadastro/controle)."""
     loja = servico.resolver_loja_por_instancia(db, dados.instance)
     return operacao.decidir_roteamento(
-        db, loja.id, dados.telefone, dados.texto, dados.is_saved
+        db,
+        loja.id,
+        dados.telefone,
+        dados.texto,
+        dados.is_saved,
+        grupo_jid=dados.grupo_jid,
     )
 
 
@@ -403,6 +418,7 @@ def webhook_foto_veiculo(
         dados.legenda,
         dados.mime_type,
         processor,
+        grupo_jid=dados.grupo_jid,
     )
 
 
@@ -830,6 +846,57 @@ def simular(
 # --- Operação WhatsApp (E5): números autorizados + cadastro de veículo --------
 
 
+@app.get("/v1/operacao/grupo-estoque")
+def obter_grupo_estoque(
+    ctx: Contexto = Depends(get_contexto), db: Session = Depends(get_db)
+):
+    """Lista os grupos da instancia e informa qual opera o estoque."""
+    loja = db.get(models_db.Loja, ctx.loja_id)
+    selecionado = operacao.grupo_estoque_selecionado(db, ctx.loja_id)
+    grupos: list[dict[str, str]] = []
+    aviso = None
+    try:
+        grupos = listar_grupos_whatsapp(loja.evolution_instance)
+    except GruposWhatsappIndisponiveis as exc:
+        aviso = str(exc)
+    if selecionado and not any(item["jid"] == selecionado["jid"] for item in grupos):
+        grupos.insert(0, {"jid": selecionado["jid"], "nome": selecionado["nome"]})
+    return {"selecionado": selecionado, "grupos": grupos, "aviso": aviso}
+
+
+@app.put("/v1/operacao/grupo-estoque")
+def definir_grupo_estoque(
+    dados: GrupoEstoqueInput,
+    ctx: Contexto = Depends(get_contexto),
+    db: Session = Depends(get_db),
+):
+    nome = dados.grupo_nome
+    if not nome:
+        loja = db.get(models_db.Loja, ctx.loja_id)
+        try:
+            encontrado = next(
+                (
+                    grupo
+                    for grupo in listar_grupos_whatsapp(loja.evolution_instance)
+                    if grupo["jid"] == dados.grupo_jid.strip().lower()
+                ),
+                None,
+            )
+            nome = encontrado["nome"] if encontrado else None
+        except GruposWhatsappIndisponiveis:
+            nome = None
+    return operacao.salvar_grupo_estoque(
+        db, ctx.loja_id, dados.grupo_jid, nome
+    )
+
+
+@app.delete("/v1/operacao/grupo-estoque")
+def excluir_grupo_estoque(
+    ctx: Contexto = Depends(get_contexto), db: Session = Depends(get_db)
+):
+    return operacao.remover_grupo_estoque(db, ctx.loja_id)
+
+
 @app.get("/v1/operacao/numeros-autorizados")
 def listar_numeros_autorizados(
     ctx: Contexto = Depends(get_contexto), db: Session = Depends(get_db)
@@ -872,7 +939,7 @@ def criar_veiculo_operacao(
     n8n/LLM extrai marca/modelo/ano/valor/km/placa e chama este endpoint com o
     telefone do remetente. Clientes comuns recebem 403; dados incompletos 422.
     """
-    body = dados.model_dump(exclude={"telefone_solicitante"})
+    body = dados.model_dump(exclude={"telefone_solicitante", "grupo_jid"})
     return operacao.criar_veiculo_autorizado(
         db,
         ctx.loja_id,
@@ -880,4 +947,5 @@ def criar_veiculo_operacao(
         body,
         write_client,
         idempotency_key=idempotency_key,
+        grupo_jid=dados.grupo_jid,
     )

@@ -12,19 +12,23 @@ from app.vehicle_photo import (
 )
 
 
-def _autorizar(client, loja, telefone="5511999990001"):
-    resposta = client.post(
-        "/v1/operacao/numeros-autorizados",
-        json={"telefone": telefone, "papel": "vendedor"},
+GRUPO_JID = "120363001@g.us"
+
+
+def _selecionar_grupo(client, loja, jid=GRUPO_JID):
+    resposta = client.put(
+        "/v1/operacao/grupo-estoque",
+        json={"grupo_jid": jid, "grupo_nome": "Equipe Estoque"},
         headers=loja["headers"],
     )
-    assert resposta.status_code == 201
+    assert resposta.status_code == 200
 
 
 def _payload(loja, **extra):
     body = {
         "instance": loja["instance"],
         "telefone_solicitante": "5511999990001",
+        "grupo_jid": GRUPO_JID,
         "provider_message_id": "MSG-FOTO-1",
         "legenda": "Foto frontal ABC1D23",
         "mime_type": "image/jpeg",
@@ -49,8 +53,8 @@ class ProcessorFake:
         }
 
 
-def test_webhook_foto_autorizada_extrai_placa_e_processa(client, loja_a):
-    _autorizar(client, loja_a)
+def test_webhook_foto_do_grupo_extrai_placa_e_processa(client, loja_a):
+    _selecionar_grupo(client, loja_a)
     fake = ProcessorFake()
     app.dependency_overrides[get_vehicle_photo_processor] = lambda: fake
     try:
@@ -72,7 +76,7 @@ def test_webhook_foto_autorizada_extrai_placa_e_processa(client, loja_a):
 def test_webhook_sessao_permite_fotos_seguintes_sem_repetir_placa(
     client, loja_a
 ):
-    _autorizar(client, loja_a)
+    _selecionar_grupo(client, loja_a)
     fake = ProcessorFake()
     app.dependency_overrides[get_vehicle_photo_processor] = lambda: fake
     try:
@@ -101,9 +105,9 @@ def test_webhook_sessao_permite_fotos_seguintes_sem_repetir_placa(
 
 
 def test_webhook_nao_usa_sessao_expirada(client, loja_a, db):
-    from app.models_db import NumeroAutorizado
+    from app.models_db import GrupoEstoque
 
-    _autorizar(client, loja_a)
+    _selecionar_grupo(client, loja_a)
     fake = ProcessorFake()
     app.dependency_overrides[get_vehicle_photo_processor] = lambda: fake
     try:
@@ -112,8 +116,8 @@ def test_webhook_nao_usa_sessao_expirada(client, loja_a, db):
             json=_payload(loja_a, provider_message_id="MSG-EXPIRA-1"),
         )
         numero = (
-            db.query(NumeroAutorizado)
-            .filter(NumeroAutorizado.loja_id == loja_a["loja_id"])
+            db.query(GrupoEstoque)
+            .filter(GrupoEstoque.loja_id == loja_a["loja_id"])
             .one()
         )
         numero.foto_sessao_expira_em = datetime.now(timezone.utc) - timedelta(
@@ -137,11 +141,10 @@ def test_webhook_nao_usa_sessao_expirada(client, loja_a, db):
     assert len(fake.chamadas) == 1
 
 
-def test_sessao_de_fotos_e_isolada_por_numero_autorizado(client, loja_a):
+def test_sessao_de_fotos_e_compartilhada_no_grupo(client, loja_a):
     telefone_a = "5511999990001"
     telefone_b = "5511999990002"
-    _autorizar(client, loja_a, telefone_a)
-    _autorizar(client, loja_a, telefone_b)
+    _selecionar_grupo(client, loja_a)
     fake = ProcessorFake()
     app.dependency_overrides[get_vehicle_photo_processor] = lambda: fake
     try:
@@ -165,18 +168,23 @@ def test_sessao_de_fotos_e_isolada_por_numero_autorizado(client, loja_a):
     finally:
         app.dependency_overrides.pop(get_vehicle_photo_processor, None)
 
-    assert vendedor_b.json()["ok"] is False
-    assert len(fake.chamadas) == 1
+    assert vendedor_b.json()["ok"] is True
+    assert len(fake.chamadas) == 2
 
 
-def test_webhook_foto_recusa_numero_ou_legenda_antes_do_download(client, loja_a):
+def test_webhook_foto_ignora_privado_e_outro_grupo_antes_do_download(client, loja_a):
     fake = ProcessorFake()
     app.dependency_overrides[get_vehicle_photo_processor] = lambda: fake
     try:
-        nao_autorizado = client.post(
-            "/webhook/operacao/veiculos/foto", json=_payload(loja_a)
+        sem_grupo = client.post(
+            "/webhook/operacao/veiculos/foto",
+            json=_payload(loja_a, grupo_jid=None),
         )
-        _autorizar(client, loja_a)
+        _selecionar_grupo(client, loja_a)
+        outro_grupo = client.post(
+            "/webhook/operacao/veiculos/foto",
+            json=_payload(loja_a, grupo_jid="120363999@g.us"),
+        )
         sem_placa = client.post(
             "/webhook/operacao/veiculos/foto",
             json=_payload(loja_a, provider_message_id="MSG-FOTO-2", legenda="foto lateral"),
@@ -184,8 +192,10 @@ def test_webhook_foto_recusa_numero_ou_legenda_antes_do_download(client, loja_a)
     finally:
         app.dependency_overrides.pop(get_vehicle_photo_processor, None)
 
-    assert nao_autorizado.status_code == 200
-    assert "Somente números autorizados" in nao_autorizado.json()["mensagem"]
+    assert sem_grupo.status_code == 200
+    assert sem_grupo.json() == {"ok": False, "ignorar": True, "mensagem": None}
+    assert outro_grupo.json()["ignorar"] is True
+    assert outro_grupo.json()["mensagem"] is None
     assert sem_placa.status_code == 200
     assert "placa" in sem_placa.json()["mensagem"].lower()
     assert fake.chamadas == []
@@ -194,7 +204,7 @@ def test_webhook_foto_recusa_numero_ou_legenda_antes_do_download(client, loja_a)
 def test_webhook_foto_mantem_autorizacao_isolada_por_loja(
     client, loja_a, loja_b
 ):
-    _autorizar(client, loja_a)
+    _selecionar_grupo(client, loja_a)
     fake = ProcessorFake()
     app.dependency_overrides[get_vehicle_photo_processor] = lambda: fake
     try:

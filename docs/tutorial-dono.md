@@ -2,7 +2,7 @@
 
 Este guia explica como operar a loja no Revy do primeiro acesso ao acompanhamento de resultado. O sistema une estoque, catálogo, WhatsApp, leads, simulações, vendas, metas e medição de tráfego.
 
-**Versão deste manual:** 21/07/2026, conferida com as telas e permissões atuais do projeto.
+**Versão deste manual:** 24/07/2026, conferida com as telas e permissões atuais do projeto.
 
 > **Em uma frase:** o Ads Manager cria e veicula anúncios; o Revy liga o link do anúncio ao lead, à venda e ao retorno financeiro. O WhatsApp gera oportunidade; o vendedor conclui o atendimento; o Portal registra o que realmente aconteceu.
 
@@ -52,7 +52,7 @@ Para o resultado ser confiável, as quatro pontas precisam estar preenchidas: li
 1. Abra **Ajustes** e confira se Estoque, Chatbot e Motor aparecem como configurados.
 2. Cadastre os usuários em **Equipe**.
 3. Cadastre e publique pelo menos um veículo em **Estoque**.
-4. Autorize, se necessário, os telefones de cadastro em **Números de cadastro**.
+4. Em **Grupo do estoque**, escolha o único grupo de WhatsApp usado pela operação.
 5. Cadastre e teste as credenciais em **Acessos dos bancos**.
 6. Configure Pixel e CAPI em **Tráfego**.
 7. Crie a campanha no Revy e copie a UTM para o link do anúncio.
@@ -78,7 +78,7 @@ O e-mail do membro não pode ser alterado depois do cadastro, pois identifica ve
 |---|---|
 | **Dia a dia** | Visão geral, Leads, Conversas, Estoque, Vendas e Simulações. |
 | **Gestão** | Funil, Financeiro, Relatórios, Tráfego, Campanhas, ROI e Metas. |
-| **Configurações** | Acessos dos bancos, Números de cadastro, Equipe e Ajustes. |
+| **Configurações** | Acessos dos bancos, Grupo do estoque, Equipe e Ajustes. |
 
 No celular, toque em **Menu** para abrir a barra lateral. O botão **Simular** inicia uma simulação; o botão **+ Veículo** abre o cadastro de estoque. Use o ícone de tema para alternar claro/escuro e **Sair** ao encerrar uma sessão em aparelho compartilhado.
 
@@ -110,11 +110,11 @@ O caminho mais seguro ao fechar é: vendedor registra a venda com veículo e lea
 
 ### Fotos e cadastro pelo WhatsApp
 
-Em **Números de cadastro**, adicione somente telefones da equipe que podem cadastrar veículo ou mandar fotos. O número precisa estar salvo na agenda da loja.
+Em **Grupo do estoque**, escolha um único grupo da instância de WhatsApp da loja. Esse é o filtro principal: o bot não aceita cadastro nem foto em conversa privada e ignora silenciosamente qualquer outro grupo. A lista de números da equipe permanece apenas para identificação e compatibilidade.
 
-O operador autorizado envia **cadastro** ou **menu** e escolhe a opção:
+Qualquer participante do grupo escolhido envia **cadastro** ou **menu** e escolhe a opção:
 1 cadastrar, 2 ver estoque, 3 editar (preço/km/cor), 4 despublicar, 5 marcar vendido, 0 sair.
-No cadastro, envia os dados em uma mensagem, manda as fotos e pode voltar ao menu. Para anexar foto a veículo já existente, use a placa na legenda. Remova imediatamente o número de quem não faz mais parte da equipe. Nunca autorize clientes nesse recurso.
+No cadastro, envia os dados em uma mensagem, manda as fotos no mesmo grupo e pode voltar ao menu. Para anexar foto a veículo já existente, use a placa na legenda. Ao trocar o grupo no Portal, as sessões anteriores são encerradas. Não use um grupo com clientes.
 
 ## 4. WhatsApp, bot e atendimento humano
 

@@ -21,6 +21,7 @@ logger = logging.getLogger("chatbot.webhook")
 
 _TELEFONE_FORMATADO_RE = re.compile(r"^[+\d\s().-]+$")
 _SUFIXOS_WHATSAPP = ("@s.whatsapp.net", "@c.us")
+_PARTICIPANTE_LID_RE = re.compile(r"^\d{8,32}@lid$", re.IGNORECASE)
 
 
 def normalizar_telefone_webhook(valor: str) -> str:
@@ -38,6 +39,13 @@ def normalizar_telefone_webhook(valor: str) -> str:
     if not 8 <= len(digitos) <= 15:
         raise ValueError("telefone deve conter entre 8 e 15 dígitos")
     return digitos
+
+
+def normalizar_participante_whatsapp(valor: str) -> str:
+    """Aceita telefone comum ou o identificador LID de um participante de grupo."""
+    if isinstance(valor, str) and _PARTICIPANTE_LID_RE.fullmatch(valor.strip()):
+        return valor.strip().lower()
+    return normalizar_telefone_webhook(valor)
 
 
 def validar_identificador(valor: str, *, nome: str, limite: int) -> str:
