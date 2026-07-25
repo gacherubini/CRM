@@ -56,6 +56,9 @@ Detalham a Task 12 do #1A (1º driver `real: true`). Ler junto com o #1A:
 - [Fan-out / workers sob demanda](2026-07-14-plano1a-workers-playwright-sob-demanda.md) — **DONE** no código; teto default **2**.
 - [Drivers Playwright resilientes](2026-07-21-plano-drivers-resilientes.md) — **BACKLOG / NÃO IMPLEMENTADO**;
   trace, sessão endurecida, locators resilientes e canários opcionais de IA/browser.
+- [Estabilidade Bradesco Playwright](2026-07-24-plano-estabilidade-bradesco-playwright.md) —
+  **BACKLOG PRIORIZADO / NÃO IMPLEMENTADO**; diagnóstico específico de sessão, login,
+  máquina de estados, retry pós-envio e concorrência por credencial.
 - Bradesco / Pan portal: checklists em `_archive/` — código LIVE; lições [Pan portal](2026-07-15-playwright-licoes-pan-portal.md).
 
 ## Pacotes comerciais

@@ -10,6 +10,8 @@ Sessão menu/fotos: [plano 2026-07-22](plans/2026-07-22-plano-menu-estoque-wa-e-
 [Santander](plans/2026-07-13-playwright-licoes-santander.md),
 [Fontecred](plans/2026-07-15-playwright-licoes-fontecred.md),
 [Pan portal](plans/2026-07-15-playwright-licoes-pan-portal.md).
+Diagnóstico e plano de correção do Bradesco:
+[estabilidade Bradesco Playwright](plans/2026-07-24-plano-estabilidade-bradesco-playwright.md).
 Campos e decisões por banco:
 [mapa](plans/2026-07-13-plano1a-task12-bancos-reconhecimento.md).
 **Workers sob demanda + fan-out:** **DONE** (handoff 2026-07-16).
