@@ -11,6 +11,10 @@
   <div class="heading-actions">
     <a class="button secondary" href="/app/campanhas/{{ campanha.id }}/editar">Editar</a>
     <a class="button primary" href="/app/trafego/roi?touch=last">Ver no ROI</a>
+    <form method="post" action="/app/campanhas/{{ campanha.id }}/apagar" onsubmit="return confirm('Apagar esta campanha e todos os gastos vinculados? Esta ação não pode ser desfeita.')">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <button class="button danger" type="submit">Apagar campanha</button>
+    </form>
   </div>
 </div>
 

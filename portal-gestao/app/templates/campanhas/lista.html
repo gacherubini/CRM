@@ -14,7 +14,8 @@
   </div>
 </div>
 
-{% if request.query_params.get('ok') %}<div class="alert success">Ação concluída com sucesso.</div>{% endif %}
+{% if request.query_params.get('ok') == 'apagada' %}<div class="alert success">Campanha apagada com sucesso.</div>
+{% elif request.query_params.get('ok') %}<div class="alert success">Ação concluída com sucesso.</div>{% endif %}
 {% if request.query_params.get('erro') %}<div class="alert error">Não foi possível localizar essa campanha.</div>{% endif %}
 
 <section class="panel flush">
@@ -42,6 +43,10 @@
           <div class="action-grid">
             <a class="button secondary" href="/app/campanhas/{{ c.id }}">Detalhe</a>
             <a class="button ghost" href="/app/campanhas/{{ c.id }}/editar">Editar</a>
+            <form method="post" action="/app/campanhas/{{ c.id }}/apagar" onsubmit="return confirm('Apagar esta campanha e todos os gastos vinculados? Esta ação não pode ser desfeita.')">
+              <input type="hidden" name="csrf" value="{{ csrf }}">
+              <button class="button danger" type="submit">Apagar</button>
+            </form>
           </div>
         </td>
       </tr>

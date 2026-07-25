@@ -3804,6 +3804,26 @@ async def campanhas_editar_post(request: Request, campanha_id: str, db: Session 
     return RedirectResponse(f"/app/campanhas/{campanha.id}?ok=salvo", status_code=303)
 
 
+@app.post("/app/campanhas/{campanha_id}/apagar")
+async def campanhas_apagar_post(request: Request, campanha_id: str, db: Session = Depends(get_db)):
+    usuario = usuario_atual(request, db)
+    if not usuario:
+        return redirecionar_login()
+    form = await request.form()
+    if not pode_gerir_trafego(usuario) or not csrf_valido(request, form.get("csrf")):
+        return RedirectResponse("/app", status_code=303)
+    campanha = (
+        db.query(Campanha)
+        .filter(Campanha.id == campanha_id, Campanha.loja_slug == usuario.loja_slug)
+        .first()
+    )
+    if not campanha:
+        return RedirectResponse("/app/campanhas?erro=1", status_code=303)
+    db.delete(campanha)
+    db.commit()
+    return RedirectResponse("/app/campanhas?ok=apagada", status_code=303)
+
+
 @app.post("/app/campanhas/{campanha_id}/gastos")
 async def campanhas_gasto_post(request: Request, campanha_id: str, db: Session = Depends(get_db)):
     usuario = usuario_atual(request, db)

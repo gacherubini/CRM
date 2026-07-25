@@ -39,6 +39,101 @@ def test_dono_cria_campanha_e_lista(client):
     assert 'href="/app/campanhas"' in client.get("/app").text
 
 
+def test_dono_apaga_campanha_e_gastos_vinculados(client):
+    login(client)
+    db = SessionLocal()
+    campanha = Campanha(
+        loja_slug="loja-teste",
+        nome="Campanha para apagar",
+        canal="meta",
+        status="ativa",
+        utm_campaign="campanha-apagar",
+        utm_campaign_norm="campanha-apagar",
+        criada_por_email="dono@loja.test",
+    )
+    db.add(campanha)
+    db.flush()
+    db.add(
+        CampanhaGasto(
+            campanha_id=campanha.id,
+            loja_slug="loja-teste",
+            valor=Decimal("250.00"),
+            referencia=date(2026, 7, 20),
+            criada_por="dono@loja.test",
+        )
+    )
+    db.commit()
+    campanha_id = campanha.id
+    db.close()
+
+    lista = client.get("/app/campanhas")
+    assert f'action="/app/campanhas/{campanha_id}/apagar"' in lista.text
+    detalhe = client.get(f"/app/campanhas/{campanha_id}")
+    assert "Apagar campanha" in detalhe.text
+
+    resposta = client.post(
+        f"/app/campanhas/{campanha_id}/apagar",
+        data={"csrf": csrf_da_resposta(lista)},
+        follow_redirects=False,
+    )
+
+    assert resposta.status_code == 303
+    assert resposta.headers["location"] == "/app/campanhas?ok=apagada"
+    db = SessionLocal()
+    assert db.query(Campanha).filter_by(id=campanha_id).first() is None
+    assert db.query(CampanhaGasto).filter_by(campanha_id=campanha_id).count() == 0
+    db.close()
+
+
+def test_apagar_campanha_exige_csrf_e_respeita_loja(client):
+    login(client)
+    db = SessionLocal()
+    propria = Campanha(
+        loja_slug="loja-teste",
+        nome="Campanha própria",
+        canal="meta",
+        status="ativa",
+        utm_campaign="campanha-propria",
+        utm_campaign_norm="campanha-propria",
+        criada_por_email="dono@loja.test",
+    )
+    outra = Campanha(
+        loja_slug="outra-loja",
+        nome="Campanha de outra loja",
+        canal="meta",
+        status="ativa",
+        utm_campaign="campanha-outra-loja",
+        utm_campaign_norm="campanha-outra-loja",
+        criada_por_email="outra@loja.test",
+    )
+    db.add_all([propria, outra])
+    db.commit()
+    propria_id = propria.id
+    outra_id = outra.id
+    db.close()
+
+    csrf = csrf_da_resposta(client.get("/app/campanhas"))
+    sem_csrf = client.post(
+        f"/app/campanhas/{propria_id}/apagar",
+        data={"csrf": "invalido"},
+        follow_redirects=False,
+    )
+    outra_loja = client.post(
+        f"/app/campanhas/{outra_id}/apagar",
+        data={"csrf": csrf},
+        follow_redirects=False,
+    )
+
+    assert sem_csrf.status_code == 303
+    assert sem_csrf.headers["location"] == "/app"
+    assert outra_loja.status_code == 303
+    assert outra_loja.headers["location"] == "/app/campanhas?erro=1"
+    db = SessionLocal()
+    assert db.query(Campanha).filter_by(id=propria_id).first() is not None
+    assert db.query(Campanha).filter_by(id=outra_id).first() is not None
+    db.close()
+
+
 def test_utm_campaign_duplicado_mesma_loja_rejeita(client):
     login(client)
     payload = {
