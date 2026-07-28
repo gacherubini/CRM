@@ -12,22 +12,32 @@ Frontend operacional da loja, servido por FastAPI com páginas Jinja. O token da
 - publicar, despublicar, reservar e vender;
 - custo oculto para vendedor;
 - layout responsivo para computador e celular;
-- aba **Tráfego** (dono/gerente): Pixel ID + token CAPI cifrado, Purchase ao confirmar venda;
+- **Resultados de tráfego** (dono/gerente): gasto/leads/ROAS na visão geral — config técnica (Pixel/CAPI/campanhas) migrou para o app **`revy-trafego`** (equipe Revy);
+- Purchase CAPI ao confirmar venda (worker no portal até cutover; ver plano 6.4);
 - **Números de cadastro** (autorizados): telefones da equipe que podem cadastrar veículo
   pelo WhatsApp (`cadastro` / fotos / `fim`) — BFF para a Chatbot API
   `/v1/operacao/numeros-autorizados`;
 - **Acessos bancos** (credenciais do Motor cifradas; exige `MOTOR_ENCRYPTION_KEY` no Motor).
 
-### Tráfego / Meta (E10)
+### Tráfego / Meta (E10 + Revy Tráfego)
+
+Config técnica (Pixel, CAPI, campanhas, spend) é operada no app **`revy-trafego`**.  
+Runbook completo: [`docs/plans/2026-07-28-plano-revy-trafego-separacao.md`](../docs/plans/2026-07-28-plano-revy-trafego-separacao.md).
 
 | Variável | Onde | Notas |
 |---|---|---|
-| `PORTAL_ENCRYPTION_KEY` | Portal | Fernet urlsafe; gera com `python -m app.cli gerar-chave-cifragem`. **Obrigatória** se `PORTAL_ENV=production`. |
-| `PORTAL_PUBLIC_URL` | Catálogo público | URL do Portal; catálogo puxa Pixel ID por loja (`/public/v1/lojas/{slug}/pixel`). |
-| `META_PIXEL_ID` | Catálogo | Fallback se o Portal estiver offline. |
+| `PORTAL_ENCRYPTION_KEY` | Portal (+ Revy Tráfego) | Fernet; **mesma** chave nos dois se shared DB. |
+| `PORTAL_TRAFEGO_UI_LEGACY` | Portal | `1` = devolve menus técnicos ao dono (rollback). Default: off. |
+| `REVY_TRAFEGO_URL` | Portal | Base do app tráfego (cutover API). |
+| `REVY_TRAFEGO_SERVICE_TOKEN` | Portal | Mesmo token do Revy Tráfego. |
+| `PORTAL_REVY_TRAFEGO_RESULTADOS` | Portal | `1` = cards ROI via API (default `0` = local). |
+| `PORTAL_REVY_TRAFEGO_VENDA_EVENTS` | Portal | `1` = notifica venda-confirmada (default `0`). |
+| `PORTAL_PUBLIC_URL` | Catálogo | Pixel por loja (até cutover). |
+| `REVY_TRAFEGO_PUBLIC_URL` | Catálogo | Prioridade sobre `PORTAL_PUBLIC_URL` se set. |
+| `META_PIXEL_ID` | Catálogo | Fallback se API offline. |
 | `META_PIXEL_ENABLED` | Catálogo | `1`/`0` (default: ligado quando há Pixel). |
 
-O token CAPI **nunca** vai ao front do catálogo nem ao git. No Portal ele é gravado cifrado; na leitura aparece só como “Configurado” / mascarado.
+O token CAPI **nunca** vai ao front do catálogo nem ao git.
 
 ## Executar com Docker
 
