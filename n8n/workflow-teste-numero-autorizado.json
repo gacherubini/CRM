@@ -1,16 +1,16 @@
 {
-  "updatedAt": "2026-07-13T12:00:00.000Z",
-  "createdAt": "2026-07-12T01:10:49.567Z",
-  "id": "wAiNaoSalvos0001",
-  "name": "WhatsApp IA - Somente Nao Salvos",
-  "description": "Workflow principal simplificado: texto, imagens de estoque, atendimento com IA e simulação. Áudios são ignorados na entrada.",
+  "updatedAt": "2026-07-27T12:00:00.000Z",
+  "createdAt": "2026-07-27T12:00:00.000Z",
+  "id": "wAiTesteRestrito01",
+  "name": "WhatsApp IA - TESTE 5551980336365",
+  "description": "Copia de teste do workflow canonico. Processa somente mensagens privadas recebidas de 5551980336365.",
   "active": false,
   "isArchived": false,
   "nodes": [
     {
       "parameters": {
         "httpMethod": "POST",
-        "path": "whatsapp-ai",
+        "path": "whatsapp-ai-teste",
         "options": {}
       },
       "id": "50d03457-4f50-4389-9394-83c97e303cc1",
@@ -21,11 +21,11 @@
         600,
         400
       ],
-      "webhookId": "whatsapp-ai"
+      "webhookId": "whatsapp-ai-teste"
     },
     {
       "parameters": {
-        "jsCode": "// Extrai mensagens privadas de clientes e o grupo oficial de estoque.\n// Imagem so entra no fluxo de estoque quando veio de um grupo; o backend valida o JID exato.\nconst root = $input.first().json;\nconst b = root.body || root || {};\nconst data = b.data || {};\nconst key = data.key || {};\nconst event = String(b.event || root.event || '').toLowerCase();\nif (event && (event.includes('messages.update') || event.includes('message.ack') || event.includes('reaction'))) return [];\nconst jid = String(key.remoteJid || '').trim();\nconst jidAlt = String(key.remoteJidAlt || '').trim();\nconst instance = String(b.instance || '__INSTANCE__');\nconst msg = data.message || {};\nif (msg.reactionMessage) return [];\nconst fromMe = Boolean(key.fromMe);\nconst privado = jid.endsWith('@s.whatsapp.net') || jid.endsWith('@lid');\nconst ehGrupo = jid.endsWith('@g.us');\nif (!jid || (!privado && !ehGrupo) || (ehGrupo && fromMe)) return [];\nconst audio = msg.audioMessage || null;\n// Áudio desativado por enquanto: não registra, não chama IA e não responde.\nif (audio) return [];\nconst imagem = msg.imageMessage || null;\nconst ehImagem = Boolean(imagem) && !fromMe;\nconst ehImagemEstoque = ehImagem && ehGrupo;\nconst texto = msg.conversation || msg.extendedTextMessage?.text || (ehImagem ? String(imagem.caption || '') : '');\nif (!texto && !ehImagemEstoque) return [];\nconst participantes = [key.participantAlt, key.participant, data.participant, data.sender]\n  .map((value) => String(value || '').trim());\nconst participante = participantes.find((value) => value.endsWith('@s.whatsapp.net'))\n  || participantes.find((value) => value.endsWith('@lid'))\n  || '';\nconst jidTelefone = ehGrupo ? participante : (jidAlt.endsWith('@s.whatsapp.net') ? jidAlt : jid);\nif (ehGrupo && !jidTelefone) return [];\nconst telefone = jidTelefone.endsWith('@lid') ? jidTelefone : jidTelefone.split('@')[0];\nconst destino = ehGrupo ? jid : (jid.endsWith('@lid') ? jid : jid.split('@')[0]);\nconst ctx = msg.extendedTextMessage?.contextInfo\n  || msg.imageMessage?.contextInfo\n  || data.contextInfo\n  || {};\nconst ad = ctx.externalAdReply || ctx.externalAdReplyInfo || {};\nconst referral = data.referral || msg.referral || ctx.referral || {};\nconst pick = (...vals) => {\n  for (const v of vals) {\n    const s = (v == null ? '' : String(v)).trim();\n    if (s) return s;\n  }\n  return null;\n};\nconst ctwa_clid = pick(\n  ctx.ctwaClid, ctx.ctwa_clid, ad.ctwaClid, ad.ctwa_clid,\n  referral.ctwa_clid, referral.ctwaClid, data.ctwaClid, data.ctwa_clid\n);\nconst meta_ad_id = pick(\n  ad.sourceId, ad.advertisementId, ad.adId, ctx.sourceId,\n  referral.source_id, referral.ad_id, data.sourceId\n);\nconst meta_campaign_id = pick(\n  ad.campaignId, ctx.campaignId, referral.campaign_id, data.campaignId\n);\nconst meta_adset_id = pick(ad.adsetId, ctx.adsetId, referral.adset_id);\nconst ctwa_source_type = pick(\n  ctx.conversionSource, ctx.entryPointConversionSource,\n  ad.sourceType, referral.source_type, data.conversionSource\n);\nconst anuncioTitulo = pick(ad.title, ad.headline, referral.title, referral.headline);\nconst anuncioDescricao = pick(ad.body, ad.description, ad.caption, referral.body, referral.description);\nconst veioDeAnuncio = Boolean(\n  ctwa_clid || meta_ad_id || meta_campaign_id || meta_adset_id || ctwa_source_type\n  || anuncioTitulo || anuncioDescricao || Object.keys(referral).length\n);\nreturn [{ json: {\n  instance, remoteJid: jid, remoteJidAlt: jidAlt, telefone, destino, texto,\n  ehGrupo, grupoJid: ehGrupo ? jid : null, ehImagem, ehImagemEstoque,\n  imageMimeType: ehImagem ? String(imagem.mimetype || '') : null,\n  imageCaption: ehImagem ? String(imagem.caption || '') : null,\n  pushName: data.pushName || '', providerMessageId: String(key.id || ''),\n  fromMe,\n  ctwa_clid, meta_ad_id, meta_campaign_id, meta_adset_id, ctwa_source_type,\n  veioDeAnuncio, anuncioTitulo, anuncioDescricao\n} }];\n"
+        "jsCode": "// Extrai mensagens privadas de clientes e o grupo oficial de estoque.\n// Imagem so entra no fluxo de estoque quando veio de um grupo; o backend valida o JID exato.\nconst root = $input.first().json;\nconst b = root.body || root || {};\nconst data = b.data || {};\nconst key = data.key || {};\nconst event = String(b.event || root.event || '').toLowerCase();\nif (event && (event.includes('messages.update') || event.includes('message.ack') || event.includes('reaction'))) return [];\nconst jid = String(key.remoteJid || '').trim();\nconst jidAlt = String(key.remoteJidAlt || '').trim();\nconst instance = String(b.instance || '__INSTANCE__');\nconst msg = data.message || {};\nif (msg.reactionMessage) return [];\nconst fromMe = Boolean(key.fromMe);\nconst privado = jid.endsWith('@s.whatsapp.net') || jid.endsWith('@lid');\nconst ehGrupo = jid.endsWith('@g.us');\nif (!jid || (!privado && !ehGrupo) || (ehGrupo && fromMe)) return [];\nconst audio = msg.audioMessage || null;\n// Áudio desativado por enquanto: não registra, não chama IA e não responde.\nif (audio) return [];\nconst imagem = msg.imageMessage || null;\nconst ehImagem = Boolean(imagem) && !fromMe;\nconst ehImagemEstoque = ehImagem && ehGrupo;\nconst texto = msg.conversation || msg.extendedTextMessage?.text || (ehImagem ? String(imagem.caption || '') : '');\nif (!texto && !ehImagemEstoque) return [];\nconst participantes = [key.participantAlt, key.participant, data.participant, data.sender]\n  .map((value) => String(value || '').trim());\nconst participante = participantes.find((value) => value.endsWith('@s.whatsapp.net'))\n  || participantes.find((value) => value.endsWith('@lid'))\n  || '';\nconst jidTelefone = ehGrupo ? participante : (jidAlt.endsWith('@s.whatsapp.net') ? jidAlt : jid);\nif (ehGrupo && !jidTelefone) return [];\nconst telefone = jidTelefone.endsWith('@lid') ? jidTelefone : jidTelefone.split('@')[0];\nconst destino = ehGrupo ? jid : (jid.endsWith('@lid') ? jid : jid.split('@')[0]);\nconst telefonesTeste = [\"5551980336365\",\"555180336365\"];\nconst remetentesPossiveis = [jid, jidAlt, jidTelefone, telefone, ...participantes]\n  .map((value) => String(value || '').split('@')[0].replace(/\\D/g, ''))\n  .filter(Boolean);\n// Fail-closed: este workflow nao processa saidas do bot, grupos ou outro remetente.\nif (fromMe || ehGrupo || !remetentesPossiveis.some((numero) => telefonesTeste.includes(numero))) return [];\nconst ctx = msg.extendedTextMessage?.contextInfo\n  || msg.imageMessage?.contextInfo\n  || data.contextInfo\n  || {};\nconst ad = ctx.externalAdReply || ctx.externalAdReplyInfo || {};\nconst referral = data.referral || msg.referral || ctx.referral || {};\nconst pick = (...vals) => {\n  for (const v of vals) {\n    const s = (v == null ? '' : String(v)).trim();\n    if (s) return s;\n  }\n  return null;\n};\nconst ctwa_clid = pick(\n  ctx.ctwaClid, ctx.ctwa_clid, ad.ctwaClid, ad.ctwa_clid,\n  referral.ctwa_clid, referral.ctwaClid, data.ctwaClid, data.ctwa_clid\n);\nconst meta_ad_id = pick(\n  ad.sourceId, ad.advertisementId, ad.adId, ctx.sourceId,\n  referral.source_id, referral.ad_id, data.sourceId\n);\nconst meta_campaign_id = pick(\n  ad.campaignId, ctx.campaignId, referral.campaign_id, data.campaignId\n);\nconst meta_adset_id = pick(ad.adsetId, ctx.adsetId, referral.adset_id);\nconst ctwa_source_type = pick(\n  ctx.conversionSource, ctx.entryPointConversionSource,\n  ad.sourceType, referral.source_type, data.conversionSource\n);\nconst anuncioTitulo = pick(ad.title, ad.headline, referral.title, referral.headline);\nconst anuncioDescricao = pick(ad.body, ad.description, ad.caption, referral.body, referral.description);\nconst veioDeAnuncio = Boolean(\n  ctwa_clid || meta_ad_id || meta_campaign_id || meta_adset_id || ctwa_source_type\n  || anuncioTitulo || anuncioDescricao || Object.keys(referral).length\n);\nreturn [{ json: {\n  instance, remoteJid: jid, remoteJidAlt: jidAlt, telefone, destino, texto,\n  ehGrupo, grupoJid: ehGrupo ? jid : null, ehImagem, ehImagemEstoque,\n  imageMimeType: ehImagem ? String(imagem.mimetype || '') : null,\n  imageCaption: ehImagem ? String(imagem.caption || '') : null,\n  pushName: data.pushName || '', providerMessageId: String(key.id || ''),\n  fromMe,\n  ctwa_clid, meta_ad_id, meta_campaign_id, meta_adset_id, ctwa_source_type,\n  veioDeAnuncio, anuncioTitulo, anuncioDescricao\n} }];\n"
       },
       "id": "de48219d-1f51-4046-97e1-523608777502",
       "name": "Extrair1",
@@ -195,7 +195,7 @@
     },
     {
       "parameters": {
-        "jsCode": "let chat = {};\ntry { chat = $('Consultar contato na Evolution1').first().json || {}; } catch (e) {}\nlet origem = $('Extrair1').first().json;\nconst rot = $input.first().json || {};\nconst acao = rot.acao;\nlet estadoMensagem = {};\ntry { estadoMensagem = $('Registrar mensagem e ler handoff1').first().json || {}; } catch (e) {}\norigem = { ...origem, primeiraMensagem: estadoMensagem.primeira_mensagem === true };\nconst botAtivo = origem.bot_ativo !== false;\nif (!acao) {\n  if (origem.ehGrupo) return [];\n  return (chat.isSaved === false && botAtivo) ? [{ json: { ...origem, acao: 'cliente' } }] : [];\n}\nif (acao === 'cliente') {\n  if (origem.ehGrupo || !botAtivo) return [];\n  return [{ json: { ...origem, acao } }];\n}\nif (acao === 'cadastro') {\n  return [{ json: { ...origem, acao } }];\n}\nif (acao === 'cadastro_controle' || acao === 'operacao_controle') {\n  const resposta = String(rot.resposta || '').trim();\n  if (!resposta) return [];\n  return [{ json: { ...origem, acao, output: resposta } }];\n}\nreturn [];\n"
+        "jsCode": "let chat = {};\ntry { chat = $('Consultar contato na Evolution1').first().json || {}; } catch (e) {}\nlet origem = $('Extrair1').first().json;\nconst rot = $input.first().json || {};\nconst acao = rot.acao;\nlet estadoMensagem = {};\ntry { estadoMensagem = $('Registrar mensagem e ler handoff1').first().json || {}; } catch (e) {}\norigem = { ...origem, primeiraMensagem: estadoMensagem.primeira_mensagem === true };\nconst botAtivo = origem.bot_ativo !== false;\nconst ehTelefoneTeste = [\"5551980336365\",\"555180336365\"].includes(String(origem.telefone || '').replace(/\\D/g, ''));\n// No fluxo de teste, o numero permitido sempre entra como cliente da IA.\nif (ehTelefoneTeste && !origem.ehGrupo && botAtivo) {\n  // Permite testar uma vez o primeiro contato mesmo com conversa antiga no CRM.\n  let primeiraMensagemTeste = origem.primeiraMensagem === true;\n  try {\n    const estadoTeste = $getWorkflowStaticData('global');\n    const chavePrimeiroContato = 'vitorMotosFirstContact20260727v2';\n    if (!estadoTeste[chavePrimeiroContato]) {\n      primeiraMensagemTeste = true;\n      estadoTeste[chavePrimeiroContato] = true;\n    }\n  } catch (e) {}\n  return [{ json: { ...origem, acao: 'cliente', primeiraMensagem: primeiraMensagemTeste } }];\n}\nif (!acao) {\n  if (origem.ehGrupo) return [];\n  return (chat.isSaved === false && botAtivo) ? [{ json: { ...origem, acao: 'cliente' } }] : [];\n}\nif (acao === 'cliente') {\n  if (origem.ehGrupo || !botAtivo) return [];\n  return [{ json: { ...origem, acao } }];\n}\nif (acao === 'cadastro') {\n  return [{ json: { ...origem, acao } }];\n}\nif (acao === 'cadastro_controle' || acao === 'operacao_controle') {\n  const resposta = String(rot.resposta || '').trim();\n  if (!resposta) return [];\n  return [{ json: { ...origem, acao, output: resposta } }];\n}\nreturn [];\n"
       },
       "id": "c4b1465b-5543-4cea-9c15-148d229eb518",
       "name": "Gate somente nao salvos1",
@@ -252,7 +252,7 @@
     {
       "parameters": {
         "sessionIdType": "customKey",
-        "sessionKey": "={{ $('Extrair1').item.json.instance + ':' + $('Extrair1').item.json.telefone }}",
+        "sessionKey": "={{ $('Extrair1').first().json.instance + ':' + $('Extrair1').first().json.telefone }}",
         "contextWindowLength": 20
       },
       "id": "2467d39d-7435-408a-bb02-30a70c74f723",
@@ -330,7 +330,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ (() => { const fluxo = $('Gate somente nao salvos1').first().json || {}; const texto = String($json.output || ''); const limpo = texto.toLocaleLowerCase('pt-BR').replace(/[\\p{Extended_Pictographic}\\uFE0F\\u200D]/gu, '').replace(/!+/g, '.').replace(/\\bme conta[:,]?\\s*/g, '').replace(/\\s{2,}/g, ' ').replace(/\\s+([.,?])/g, '$1').trim(); return { number: $('Extrair1').item.json.destino, text: fluxo.acao === 'cliente' ? limpo : texto }; })() }}",
+        "jsonBody": "={{ (() => { const fluxo = $('Gate somente nao salvos1').first().json || {}; const texto = String($json.output || ''); const limpo = texto.toLocaleLowerCase('pt-BR').replace(/[\\p{Extended_Pictographic}\\uFE0F\\u200D]/gu, '').replace(/!+/g, '.').replace(/\\bme conta[:,]?\\s*/g, '').replace(/\\s{2,}/g, ' ').replace(/\\s+([.,?])/g, '$1').trim(); return { number: $('Extrair1').first().json.destino, text: fluxo.acao === 'cliente' ? limpo : texto }; })() }}",
         "options": {}
       },
       "id": "c7573fcf-2ffb-443a-a324-bf33cf005668",
@@ -357,7 +357,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ (() => { const ex = $('Extrair1').item.json; let texto = null; try { if ($('AI Agent1').isExecuted) texto = $('AI Agent1').item.json.output; } catch (e) {} if (!texto) { try { texto = $('Se resposta controle1').item.json.output; } catch (e) {} } return { instance: ex.instance, telefone: ex.telefone, texto, provider_message_id: $json.key?.id || $json.message?.key?.id || null, from_me: true, origem_bot: true }; })() }}",
+        "jsonBody": "={{ (() => { const ex = $('Extrair1').first().json; let texto = null; try { if ($('AI Agent1').isExecuted) texto = $('AI Agent1').item.json.output; } catch (e) {} if (!texto) { try { texto = $('Se resposta controle1').item.json.output; } catch (e) {} } return { instance: ex.instance, telefone: ex.telefone, texto, provider_message_id: $json.key?.id || $json.message?.key?.id || null, from_me: true, origem_bot: true }; })() }}",
         "options": {}
       },
       "id": "8bb798a7-60e1-4272-a37c-499b52251ca5",
@@ -873,18 +873,18 @@
   },
   "nodeGroups": [],
   "pinData": {},
-  "versionId": "3aac97ca-553d-4e0f-acf7-bb5314530504",
+  "versionId": "8f463988-e552-4a61-acee-555198033635",
   "activeVersionId": null,
-  "versionCounter": 32,
-  "triggerCount": 1,
+  "versionCounter": 1,
+  "triggerCount": 0,
   "sourceWorkflowId": null,
   "tags": [],
   "shared": [
     {
-      "updatedAt": "2026-07-12T01:10:49.582Z",
-      "createdAt": "2026-07-12T01:10:49.582Z",
+      "updatedAt": "2026-07-27T12:00:00.000Z",
+      "createdAt": "2026-07-27T12:00:00.000Z",
       "role": "workflow:owner",
-      "workflowId": "wAiNaoSalvos0001",
+      "workflowId": "wAiTesteRestrito01",
       "projectId": "6Z5ECjwCu8bD7RzI",
       "project": {
         "updatedAt": "2026-07-11T23:42:06.692Z",
@@ -900,7 +900,7 @@
     }
   ],
   "versionMetadata": {
-    "name": "Version 3aac97ca",
-    "description": "Fluxo simplificado sem áudio, atraso ou ferramentas órfãs"
+    "name": "Teste restrito 5551980336365",
+    "description": "Gerado de n8n/workflow-ai-nao-salvos.json"
   }
 }

@@ -1,3 +1,8 @@
+param(
+  [ValidateSet("production", "test")]
+  [string]$Mode = "production"
+)
+
 # Prepares n8n workflow JSON with Fly hosts + tokens from .secrets.local
 # Does NOT print secret values.
 $ErrorActionPreference = "Stop"
@@ -5,9 +10,19 @@ $root = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
 if (-not (Test-Path (Join-Path $root "n8n\workflow-ai-nao-salvos.json"))) {
   $root = (Get-Location).Path
 }
-$canonical = Join-Path $root "n8n\workflow-ai-nao-salvos.json"
+$canonicalName = if ($Mode -eq "test") {
+  "workflow-teste-numero-autorizado.json"
+} else {
+  "workflow-ai-nao-salvos.json"
+}
+$outputName = if ($Mode -eq "test") {
+  "workflow-fly-test.ready.json"
+} else {
+  "workflow-fly.ready.json"
+}
+$canonical = Join-Path $root "n8n\$canonicalName"
 $secretsFile = Join-Path $PSScriptRoot ".secrets.local"
-$outFile = Join-Path $PSScriptRoot "workflow-fly.ready.json"
+$outFile = Join-Path $PSScriptRoot $outputName
 
 if (-not (Test-Path $canonical)) { throw "canonical workflow not found: $canonical" }
 if (-not (Test-Path $secretsFile)) { throw "missing $secretsFile" }
@@ -56,5 +71,5 @@ if ($evoKey) {
 $json = $json.Replace('"active": false', '"active": true')
 
 [System.IO.File]::WriteAllText($outFile, $json, [System.Text.UTF8Encoding]::new($false))
-Write-Host "wrote $outFile (len=$($json.Length)) chatbot=$chatbotBase evolution=$evolutionBase instance=$instance"
+Write-Host "wrote $outFile (len=$($json.Length)) mode=$Mode chatbot=$chatbotBase evolution=$evolutionBase instance=$instance"
 Write-Host "tokens: chatbot_api=$($secrets['CHATBOT_API_TOKEN'].Length) webhook=$($secrets['CHATBOT_WEBHOOK_TOKEN'].Length)"

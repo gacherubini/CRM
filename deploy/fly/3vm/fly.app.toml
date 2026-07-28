@@ -75,5 +75,5 @@ primary_region = "gru"
   memory = "1536"
 
 [[mounts]]
-  source = "app_data"
+  source = "app_data_recovery"
   destination = "/data"

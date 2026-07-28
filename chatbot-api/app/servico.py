@@ -141,6 +141,77 @@ def aplicar_touch_ctwa(
     return True
 
 
+def _carregar_tracking_pendente(conversa: Conversa) -> dict:
+    if not conversa.tracking_pendente_json:
+        return {}
+    try:
+        dados = json.loads(conversa.tracking_pendente_json)
+        return dados if isinstance(dados, dict) else {}
+    except (TypeError, ValueError):
+        return {}
+
+
+def _registrar_touch_ctwa_pendente(
+    conversa: Conversa,
+    *,
+    ctwa_clid: str | None = None,
+    meta_ad_id: str | None = None,
+    meta_campaign_id: str | None = None,
+    meta_adset_id: str | None = None,
+    ctwa_source_type: str | None = None,
+    ctwa_codigo: str | None = None,
+    texto: str | None = None,
+) -> bool:
+    """Preserva o anúncio na conversa sem transformar interesse em lead."""
+    valores = {
+        "ctwa_clid": _limpar_tracking(ctwa_clid, limite=255),
+        "meta_ad_id": _limpar_tracking(meta_ad_id, limite=64),
+        "meta_campaign_id": _limpar_tracking(meta_campaign_id, limite=64),
+        "meta_adset_id": _limpar_tracking(meta_adset_id, limite=64),
+        "ctwa_source_type": _limpar_tracking(ctwa_source_type, limite=40),
+        "ctwa_codigo": _limpar_tracking(ctwa_codigo, limite=40)
+        or extrair_codigo_ctwa_do_texto(texto),
+    }
+    if not any(valores.values()):
+        return False
+    dados = _carregar_tracking_pendente(conversa)
+    for campo, valor in valores.items():
+        if not valor:
+            continue
+        primeiro = f"{campo}_first"
+        if campo in {"ctwa_clid", "meta_ad_id", "meta_campaign_id", "ctwa_codigo"}:
+            dados.setdefault(primeiro, valor)
+        dados[campo] = valor
+    conversa.tracking_pendente_json = json.dumps(
+        dados, ensure_ascii=False, sort_keys=True
+    )
+    return True
+
+
+def _aplicar_tracking_pendente_no_lead(conversa: Conversa, lead: Lead) -> bool:
+    dados = _carregar_tracking_pendente(conversa)
+    if not dados:
+        return False
+    aplicar_touch_ctwa(
+        lead,
+        ctwa_clid=dados.get("ctwa_clid_first"),
+        meta_ad_id=dados.get("meta_ad_id_first"),
+        meta_campaign_id=dados.get("meta_campaign_id_first"),
+        ctwa_codigo=dados.get("ctwa_codigo_first"),
+    )
+    aplicado = aplicar_touch_ctwa(
+        lead,
+        ctwa_clid=dados.get("ctwa_clid"),
+        meta_ad_id=dados.get("meta_ad_id"),
+        meta_campaign_id=dados.get("meta_campaign_id"),
+        meta_adset_id=dados.get("meta_adset_id"),
+        ctwa_source_type=dados.get("ctwa_source_type"),
+        ctwa_codigo=dados.get("ctwa_codigo"),
+    )
+    conversa.tracking_pendente_json = None
+    return aplicado
+
+
 def _mascarar_telefone_curto(telefone: str) -> str:
     digitos = "".join(c for c in (telefone or "") if c.isdigit())
     if len(digitos) >= 4:
@@ -390,10 +461,29 @@ def _eh_evento_sem_conteudo(texto: str | None, tipo: str | None = None) -> bool:
     return not _tem_conteudo(texto)
 
 
+def _vincular_catalogo_ao_lead(
+    lead: Lead, atribuicao: CatalogAttribution
+) -> None:
+    """Vincula um clique já correlacionado somente a um lead qualificado."""
+    agora = datetime.now(timezone.utc)
+    atribuicao.lead_id = lead.id
+    if atribuicao.atribuida_em is None:
+        atribuicao.atribuida_em = agora
+    if not lead.catalog_interest_ref:
+        lead.catalog_interest_ref = atribuicao.catalog_interest_ref
+        lead.veiculo_ref = atribuicao.veiculo_ref
+        lead.atribuida_em = atribuicao.atribuida_em
+    else:
+        lead.catalog_interest_ref = atribuicao.catalog_interest_ref
+        lead.veiculo_ref = atribuicao.veiculo_ref or lead.veiculo_ref
+    _aplicar_touch_do_atributo(lead, atribuicao)
+    lead.atualizada_em = agora
+
+
 def _correlacionar_catalogo(
     db: Session, loja_id: str, telefone: str, texto: str | None
 ) -> CatalogAttribution | None:
-    """Vincula uma referência pendente apenas uma vez e sempre dentro da loja."""
+    """Guarda a referência no telefone; só cria vínculo com lead já qualificado."""
     if not texto:
         return None
     referencias = dict.fromkeys(ref.upper() for ref in _CATALOG_REF_RE.findall(texto))
@@ -408,31 +498,23 @@ def _correlacionar_catalogo(
         )
         if atribuicao is None:
             continue
-        if atribuicao.telefone:
-            return atribuicao if atribuicao.telefone == telefone else None
+        if atribuicao.telefone and atribuicao.telefone != telefone:
+            return None
 
         agora = datetime.now(timezone.utc)
-        lead = _get_or_create_lead(db, loja_id, telefone)
-        atribuicao.telefone = telefone
-        atribuicao.lead_id = lead.id
-        atribuicao.atribuida_em = agora
+        if not atribuicao.telefone:
+            atribuicao.telefone = telefone
+            atribuicao.atribuida_em = agora
 
-        # Histórico completo em catalog_attributions; lead guarda first/last touch.
-        if not lead.catalog_interest_ref:
-            lead.catalog_interest_ref = atribuicao.catalog_interest_ref
-            lead.veiculo_ref = atribuicao.veiculo_ref
-            lead.atribuida_em = agora
-        else:
-            # Novo clique: atualiza ref/veículo "atuais" sem apagar first touch.
-            lead.catalog_interest_ref = atribuicao.catalog_interest_ref
-            lead.veiculo_ref = atribuicao.veiculo_ref or lead.veiculo_ref
-
-        _aplicar_touch_do_atributo(lead, atribuicao)
-        lead.atualizada_em = agora
+        lead = (
+            db.query(Lead)
+            .filter(Lead.loja_id == loja_id, Lead.telefone == telefone)
+            .first()
+        )
+        if lead is not None and not atribuicao.lead_id:
+            _vincular_catalogo_ao_lead(lead, atribuicao)
         return atribuicao
     return None
-
-
 def _aplicar_touch_do_atributo(lead: Lead, atribuicao: CatalogAttribution) -> None:
     """First touch só se vazio; last + utm_* legado sempre atualizam com valor novo."""
     pares = (
@@ -492,6 +574,19 @@ def registrar_mensagem(
     if provider_message_id and _mensagem_existente(db, loja.id, provider_message_id):
         return _resposta_duplicada(conversa)
 
+    # O workflow usa este sinal para humanizar somente a primeira resposta.
+    # Consideramos a primeira entrada real do cliente, mesmo que ja exista uma
+    # saida anterior na conversa.
+    primeira_mensagem = (
+        db.query(Mensagem.id)
+        .filter(
+            Mensagem.conversa_id == conversa.id,
+            Mensagem.direcao == "entrada",
+        )
+        .first()
+        is None
+    )
+
     # Eventos sem conteúdo (ack/recibo/status/reação ou texto vazio): não pausam e
     # não gravam mensagem fantasma. O n8n idealmente nem encaminha esses eventos.
     if from_me and not origem_bot and _eh_evento_sem_conteudo(texto, tipo):
@@ -504,6 +599,7 @@ def registrar_mensagem(
 
     atribuicao = None
     ctwa_ok = False
+    ctwa_pendente = False
     lead_ctwa = None
     lead_ctwa_id = None
     if not from_me:
@@ -521,29 +617,44 @@ def registrar_mensagem(
                 codigo_txt,
             )
         )
-        # Só cria lead quando há sinal CTWA real. Mensagem comum deve criar apenas
-        # a conversa; o lead nasce por catálogo, CTWA, cadastro ou consentimento.
+        # Interesse em anúncio não é lead. Se já houver lead qualificado, enriquece;
+        # caso contrário, guarda o tracking na conversa até a etapa da simulação.
         if tem_sinal_ctwa:
-            lead_ctwa = _get_or_create_lead(db, loja.id, telefone)
-            ctwa_ok = aplicar_touch_ctwa(
-                lead_ctwa,
-                ctwa_clid=ctwa_clid,
-                meta_ad_id=meta_ad_id,
-                meta_campaign_id=meta_campaign_id,
-                meta_adset_id=meta_adset_id,
-                ctwa_source_type=ctwa_source_type,
-                ctwa_codigo=ctwa_codigo,
-                texto=texto,
+            lead_ctwa = (
+                db.query(Lead)
+                .filter(Lead.loja_id == loja.id, Lead.telefone == telefone)
+                .first()
             )
-            if ctwa_ok:
-                lead_ctwa.atualizada_em = datetime.now(timezone.utc)
-            lead_ctwa_id = lead_ctwa.id
-        # Auditoria: sempre que houver sinal CTWA (ou CHATBOT_CTWA_AUDIT_ALL=1).
+            if lead_ctwa is not None:
+                ctwa_ok = aplicar_touch_ctwa(
+                    lead_ctwa,
+                    ctwa_clid=ctwa_clid,
+                    meta_ad_id=meta_ad_id,
+                    meta_campaign_id=meta_campaign_id,
+                    meta_adset_id=meta_adset_id,
+                    ctwa_source_type=ctwa_source_type,
+                    ctwa_codigo=ctwa_codigo,
+                    texto=texto,
+                )
+                if ctwa_ok:
+                    lead_ctwa.atualizada_em = datetime.now(timezone.utc)
+                lead_ctwa_id = lead_ctwa.id
+            else:
+                ctwa_pendente = _registrar_touch_ctwa_pendente(
+                    conversa,
+                    ctwa_clid=ctwa_clid,
+                    meta_ad_id=meta_ad_id,
+                    meta_campaign_id=meta_campaign_id,
+                    meta_adset_id=meta_adset_id,
+                    ctwa_source_type=ctwa_source_type,
+                    ctwa_codigo=ctwa_codigo,
+                    texto=texto,
+                )
         registrar_auditoria_ctwa(
             db,
             loja_id=loja.id,
             telefone=telefone,
-            lead_id=lead_ctwa.id if lead_ctwa is not None else None,
+            lead_id=lead_ctwa_id,
             provider_message_id=provider_message_id,
             ctwa_clid=ctwa_clid,
             meta_ad_id=meta_ad_id,
@@ -600,8 +711,10 @@ def registrar_mensagem(
         "duplicada": False,
         "conversa_id": conversa.id,
         "bot_ativo": conversa.bot_ativo,
+        "primeira_mensagem": primeira_mensagem,
         "catalog_interest_ref": atribuicao.catalog_interest_ref if atribuicao else None,
         "ctwa_atribuido": bool(ctwa_ok) if not from_me else False,
+        "ctwa_pendente": bool(ctwa_pendente) if not from_me else False,
         "lead_id": (
             lead_ctwa_id
             or (atribuicao.lead_id if atribuicao is not None else None)
@@ -764,6 +877,31 @@ def registrar_consentimento(
     return lead
 
 
+def _vincular_tracking_pendente_ao_lead(
+    db: Session, loja_id: str, telefone: str, lead: Lead
+) -> None:
+    atribuicoes = (
+        db.query(CatalogAttribution)
+        .filter(
+            CatalogAttribution.loja_id == loja_id,
+            CatalogAttribution.telefone == telefone,
+            CatalogAttribution.lead_id.is_(None),
+        )
+        .order_by(CatalogAttribution.occurred_at.asc())
+        .all()
+    )
+    for atribuicao in atribuicoes:
+        _vincular_catalogo_ao_lead(lead, atribuicao)
+
+    conversa = (
+        db.query(Conversa)
+        .filter(Conversa.loja_id == loja_id, Conversa.telefone == telefone)
+        .first()
+    )
+    if conversa is not None:
+        _aplicar_tracking_pendente_no_lead(conversa, lead)
+
+
 def registrar_lead(
     db: Session,
     loja_id: str,
@@ -773,6 +911,7 @@ def registrar_lead(
     etapa: str | None = None,
 ) -> Lead:
     lead = _get_or_create_lead(db, loja_id, telefone)
+    _vincular_tracking_pendente_ao_lead(db, loja_id, telefone, lead)
     if nome is not None:
         lead.nome = nome
     if interesse is not None:

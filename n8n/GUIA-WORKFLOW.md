@@ -1,0 +1,162 @@
+# Guia do workflow da Vitor Motos
+
+Este guia descreve o arquivo `workflow-ai-nao-salvos.json`, que é a fonte principal.
+O fluxo de teste é gerado a partir dele e atende somente o número configurado em
+`build_test_workflow.js`.
+
+## Regra mais importante
+
+Edite o arquivo principal. Não edite os arquivos `workflow-fly*.ready.json`: eles
+são gerados com endereços e credenciais locais apenas na hora da publicação.
+
+O fluxo atual tem 25 nós e trabalha com:
+
+- mensagens de texto de clientes;
+- contexto de anúncios;
+- consulta e fotos do estoque;
+- cadastro de estoque pela equipe;
+- simulação e criação de lead qualificado;
+- encaminhamento para atendimento humano.
+
+Áudios estão desativados. O nó `Extrair1` identifica `audioMessage` e encerra a
+execução sem registrar, chamar a IA ou responder.
+
+## Visão geral
+
+```mermaid
+flowchart LR
+    A[Webhook1] --> B[Extrair1]
+    B --> C{E imagem de estoque1}
+    C -- foto do grupo --> D[Salvar foto no estoque1]
+    D --> E[Foto deve responder1]
+    E --> F[Responder cadastro de foto1]
+    C -- texto --> G{E grupo de estoque1}
+    G -- grupo --> H[Rotear grupo de estoque1]
+    G -- cliente --> I[Registrar mensagem e ler handoff1]
+    I --> J[Gate handoff e duplicidade1]
+    J --> K[Consultar contato na Evolution1]
+    K --> L[Rotear operacao1]
+    H --> M[Gate somente nao salvos1]
+    L --> M
+    M --> N{Se resposta controle1}
+    N -- menu da equipe --> O[Responder WhatsApp1]
+    N -- cliente --> P[AI Agent1]
+    P --> O
+    O --> Q{E resposta de grupo1}
+    Q -- cliente --> R[Registrar saida do bot1]
+```
+
+## O caminho de uma mensagem de cliente
+
+1. `Webhook1` recebe o evento da Evolution.
+2. `Extrair1` aceita apenas mensagem privada ou o grupo autorizado, ignora
+   eventos técnicos, reações, saídas do próprio bot e áudios.
+3. `E imagem de estoque1` separa fotos do grupo de estoque.
+4. `E grupo de estoque1` separa operação da equipe de conversa de cliente.
+5. `Registrar mensagem e ler handoff1` grava a entrada no CRM e informa se ela é
+   duplicada, se é a primeira mensagem e se o bot está ativo.
+6. `Gate handoff e duplicidade1` encerra duplicatas e mensagens que não devem
+   continuar.
+7. `Consultar contato na Evolution1` verifica se o contato está salvo.
+8. `Rotear operacao1` pergunta ao backend se o número pertence à equipe ou se é
+   cliente.
+9. `Gate somente nao salvos1` aplica a decisão de roteamento.
+10. `Se resposta controle1` manda menus da equipe direto ao WhatsApp; clientes
+    seguem para a IA.
+11. `AI Agent1` decide a resposta e pode usar as ferramentas.
+12. `Responder WhatsApp1` envia a resposta.
+13. `Registrar saida do bot1` grava no CRM a mensagem enviada ao cliente.
+
+## O caminho da equipe e das fotos
+
+- Mensagem no grupo autorizado: `Rotear grupo de estoque1`.
+- Foto no grupo: `Salvar foto no estoque1`.
+- `Foto deve responder1` evita confirmação quando a foto foi ignorada.
+- `Responder cadastro de foto1` confirma somente uma foto aceita.
+- Menus e respostas de controle não passam pela IA.
+
+Essa separação é intencional: impede que uma mensagem comum altere o estoque.
+
+## O Agent e suas ferramentas
+
+O texto de comportamento fica em:
+
+`AI Agent1` → `Options` → `System Message`
+
+Ferramentas conectadas:
+
+| Ferramenta | Responsabilidade |
+|---|---|
+| `consultar_estoque1` | Consulta estoque real e guarda uma moto quando a busca específica retorna uma única opção. |
+| `enviar_foto_veiculo1` | Envia até quatro fotos usando somente o ID retornado pelo estoque. |
+| `simular1` | Recupera a moto escolhida, valida CPF/nascimento/entrada, cria o lead qualificado e avisa o vendedor. |
+| `solicitar_handoff1` | Pausa o bot, avisa o vendedor ativo e envia o link do CRM quando o cliente pede uma pessoa ou ocorre uma falha real. |
+| `cadastrar_veiculo1` | Cadastra veículo quando a mensagem veio da equipe autorizada. |
+
+O modelo usado fica em `Google Gemini Chat Model1`. A memória fica em
+`Memoria da conversa1` e guarda as últimas 20 mensagens da sessão.
+
+## Regras da simulação
+
+- Antes de uma moto específica ser escolhida, o bot pergunta somente qual moto o
+  cliente quer simular.
+- CPF, nascimento e entrada só são pedidos depois da escolha.
+- Uma busca específica com resultado único guarda os dados internos da moto.
+- Uma mensagem com CPF, data e entrada é normalizada pela ferramenta.
+- A placa é interna e nunca deve ser pedida ao cliente.
+- O lead nasce somente dentro de `simular1`, já como `qualificado`.
+- O bot continua ativo e o vendedor recebe um aviso sem CPF ou nascimento.
+- No handoff explícito, o bot é pausado e o vendedor recebe o link da conversa.
+
+## Onde mexer
+
+| Mudança desejada | Local |
+|---|---|
+| Tom de voz, frases e regras | `AI Agent1` → `System Message` |
+| Primeira mensagem | seção `primeiro contato` do `System Message` |
+| Comportamento de anúncio | seção `mensagem de anúncio` |
+| Busca e seleção da moto | `consultar_estoque1` |
+| Criação do lead e aviso ao vendedor | `simular1` |
+| Resposta final no WhatsApp | `Responder WhatsApp1` |
+| Filtro do número de teste | constantes no início de `build_test_workflow.js` |
+| Reativar áudio no futuro | criar um ramo depois de `Extrair1`; não misturar com o caminho de texto |
+
+## Arquivos do workflow
+
+- `workflow-ai-nao-salvos.json`: fonte principal.
+- `build_test_workflow.js`: gera a cópia restrita.
+- `workflow-teste-numero-autorizado.json`: cópia de teste gerada.
+- `validate_workflow.py`: protege as regras do fluxo principal.
+- `validate_test_workflow.py`: garante que o teste continue restrito.
+
+## Validar e publicar
+
+Na raiz do projeto:
+
+```powershell
+python n8n\validate_workflow.py
+node n8n\build_test_workflow.js
+python n8n\validate_test_workflow.py
+```
+
+Para preparar e publicar o teste:
+
+```powershell
+& 'deploy\fly\3vm\prepare-workflow.ps1' -Mode test
+& 'deploy\fly\3vm\upload-and-import-workflow.ps1' -Mode test
+fly apps restart n8n2037
+```
+
+Sempre valide antes de publicar. O workflow de teste deve continuar limitado ao
+número definido no gerador.
+
+## Roteiro de teste
+
+1. Envie uma saudação: deve apresentar a Vitor Motos.
+2. Peça para ver motos: não deve criar lead.
+3. Escolha uma moto específica.
+4. Confirme que quer simular.
+5. Envie CPF, nascimento e entrada juntos.
+6. O bot não deve repetir a pergunta.
+7. O CRM deve criar um lead `qualificado`.
+8. O vendedor deve receber o aviso interno.

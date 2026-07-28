@@ -93,7 +93,16 @@ def test_outbox_entrega_com_headers_corretos_e_atribui_lead(client, loja_a, tmp_
         },
     )
     assert inbound.json()["catalog_interest_ref"] == click.public_ref
-    lead = client.get("/v1/leads", headers=loja_a["headers"]).json()["leads"][0]
+    assert client.get("/v1/leads", headers=loja_a["headers"]).json()["leads"] == []
+    lead = client.post(
+        "/v1/leads",
+        json={
+            "telefone": "5511977777777",
+            "interesse": "simulação de financiamento",
+            "etapa": "qualificado",
+        },
+        headers=loja_a["headers"],
+    ).json()
     assert lead["telefone"] == "5511977777777"
     assert lead["veiculo_ref"] == "vehicle-outbox"
     assert lead["catalog_interest_ref"] == click.public_ref

@@ -23,7 +23,24 @@ def test_webhook_cria_conversa_e_registra(client, loja_a):
     body = r.json()
     assert body["duplicada"] is False
     assert body["bot_ativo"] is True
+    assert body["primeira_mensagem"] is True
     assert body["conversa_id"]
+
+
+def test_webhook_marca_apenas_a_primeira_entrada_do_cliente(client, loja_a):
+    inst = loja_a["instance"]
+
+    primeira = client.post(
+        "/webhook/mensagem",
+        json=_msg(inst, provider_message_id="FIRST-1", texto="oi"),
+    )
+    segunda = client.post(
+        "/webhook/mensagem",
+        json=_msg(inst, provider_message_id="FIRST-2", texto="quero ver as motos"),
+    )
+
+    assert primeira.json()["primeira_mensagem"] is True
+    assert segunda.json()["primeira_mensagem"] is False
 
 
 def test_webhook_idempotente_por_provider_message_id(client, loja_a):

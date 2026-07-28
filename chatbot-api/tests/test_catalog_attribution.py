@@ -36,6 +36,20 @@ def _message(loja, phone, text, message_id):
     }
 
 
+def _qualify(client, loja, phone):
+    response = client.post(
+        "/v1/leads",
+        json={
+            "telefone": phone,
+            "interesse": "simulação de financiamento",
+            "etapa": "qualificado",
+        },
+        headers=loja["headers"],
+    )
+    assert response.status_code == 201
+    return response.json()
+
+
 def test_clique_nao_cria_lead_e_ingestao_e_idempotente(client, loja_a):
     event = _event(loja_a)
     headers = loja_a["headers"] | {"Idempotency-Key": event["event_id"]}
@@ -65,6 +79,8 @@ def test_primeira_mensagem_correlaciona_ref_e_enriquece_lead(client, loja_a):
     assert inbound.status_code == 200
     assert inbound.json()["catalog_interest_ref"] == REF
 
+    assert client.get("/v1/leads", headers=loja_a["headers"]).json()["leads"] == []
+    _qualify(client, loja_a, "5511900001111")
     leads = client.get("/v1/leads", headers=loja_a["headers"]).json()["leads"]
     assert len(leads) == 1
     lead = leads[0]
@@ -103,7 +119,8 @@ def test_referencia_catalogo_com_rotulo_codigo_nao_vira_ctwa(client, loja_a):
     assert inbound.json()["catalog_interest_ref"] == REF
     assert inbound.json()["ctwa_atribuido"] is False
 
-    lead = client.get("/v1/leads", headers=loja_a["headers"]).json()["leads"][0]
+    assert client.get("/v1/leads", headers=loja_a["headers"]).json()["leads"] == []
+    lead = _qualify(client, loja_a, "5511900001212")
     assert lead["origem"] == "catalogo_publico"
     assert lead["ctwa_codigo"] is None
     assert lead["ctwa_atribuido_em"] is None
@@ -124,6 +141,8 @@ def test_segunda_atribuicao_preserva_first_atualiza_last(client, loja_a):
         "/webhook/mensagem",
         json=_message(loja_a, "5511900002222", f"código {ref1}", "MSG-FT-1"),
     )
+    assert client.get("/v1/leads", headers=loja_a["headers"]).json()["leads"] == []
+    _qualify(client, loja_a, "5511900002222")
     r2 = client.post("/v1/integracoes/catalogo/interesses", json=e2, headers=loja_a["headers"])
     assert r2.status_code == 202
     client.post(
@@ -160,6 +179,8 @@ def test_ref_nao_cruza_tenant_nem_e_transferida_para_outro_telefone(
         json=_message(loja_a, "5511933333333", f"Código {REF}", "FORWARDED-1"),
     )
     assert forwarded.json()["catalog_interest_ref"] is None
+    assert client.get("/v1/leads", headers=loja_a["headers"]).json()["leads"] == []
+    _qualify(client, loja_a, "5511922222222")
     leads = client.get("/v1/leads", headers=loja_a["headers"]).json()["leads"]
     assert [lead["telefone"] for lead in leads] == ["5511922222222"]
 
@@ -220,6 +241,8 @@ def test_evento_atrasado_correlaciona_mensagem_inbound_ja_persistida(client, loj
         "/v1/integracoes/catalogo/interesses", json=event, headers=loja_a["headers"]
     )
     assert response.status_code == 202
+    assert client.get("/v1/leads", headers=loja_a["headers"]).json()["leads"] == []
+    _qualify(client, loja_a, "5511955555555")
     leads = client.get("/v1/leads", headers=loja_a["headers"]).json()["leads"]
     assert len(leads) == 1
     assert leads[0]["telefone"] == "5511955555555"
@@ -266,7 +289,8 @@ def test_e2e_fake_clique_evento_mensagem_lead(client, loja_a, tmp_path):
         ),
     )
     assert inbound.json()["catalog_interest_ref"] == click.public_ref
-    lead = client.get("/v1/leads", headers=loja_a["headers"]).json()["leads"][0]
+    assert client.get("/v1/leads", headers=loja_a["headers"]).json()["leads"] == []
+    lead = _qualify(client, loja_a, "5511966666666")
     assert lead["telefone"] == "5511966666666"
     assert lead["veiculo_ref"] == "vehicle-e2e"
     assert lead["utm_campaign"] == "e2e"

@@ -44,10 +44,19 @@ def test_webhook_ctwa_enriquece_lead(client, loja_a):
         },
     )
     assert r.status_code == 200
-    assert r.json().get("ctwa_atribuido") is True
+    assert r.json().get("ctwa_atribuido") is False
+    assert r.json().get("ctwa_pendente") is True
+    assert client.get("/v1/leads", headers=headers).json()["leads"] == []
 
-    leads = client.get("/v1/leads", headers=headers).json()["leads"]
-    lead = next(x for x in leads if "988877665" in x["telefone"])
+    lead = client.post(
+        "/v1/leads",
+        json={
+            "telefone": "5511988877665",
+            "interesse": "simulação de financiamento",
+            "etapa": "qualificado",
+        },
+        headers=headers,
+    ).json()
     assert lead["ctwa_clid"] == "ARActwaClick123"
     assert lead["ctwa_clid_first"] == "ARActwaClick123"
     assert lead["meta_campaign_id"] == "12033999"
@@ -67,6 +76,8 @@ def test_webhook_ctwa_enriquece_lead(client, loja_a):
         },
     )
     assert r2.status_code == 200
+    assert r2.json().get("ctwa_atribuido") is True
+    assert r2.json().get("ctwa_pendente") is False
     lead2 = client.get(f"/v1/leads/{lead['id']}", headers=headers).json()
     assert lead2["ctwa_clid_first"] == "ARActwaClick123"
     assert lead2["ctwa_clid"] == "ARActwaClick999"
@@ -85,9 +96,14 @@ def test_webhook_so_codigo_sem_clid(client, loja_a):
         },
     )
     assert r.status_code == 200
-    assert r.json().get("ctwa_atribuido") is True
-    leads = client.get("/v1/leads", headers=loja_a["headers"]).json()["leads"]
-    lead = next(x for x in leads if "77766554" in x["telefone"])
+    assert r.json().get("ctwa_atribuido") is False
+    assert r.json().get("ctwa_pendente") is True
+    assert client.get("/v1/leads", headers=loja_a["headers"]).json()["leads"] == []
+    lead = client.post(
+        "/v1/leads",
+        json={"telefone": "5511977766554", "etapa": "qualificado"},
+        headers=loja_a["headers"],
+    ).json()
     assert lead["ctwa_codigo"] == "FAN160"
     assert lead["origem"] == "meta_ctwa"
 
@@ -117,7 +133,8 @@ def test_auditoria_ctwa_lista_evento(client, loja_a):
     assert ev["meta_campaign_id"] == "camp-77"
     assert ev["meta_ad_id"] == "ad-88"
     assert "****" in ev["telefone_mascarado"] or "***" in ev["telefone_mascarado"]
-    assert ev["atribuido_lead"] is True
+    assert ev["atribuido_lead"] is False
+    assert client.get("/v1/leads", headers=loja_a["headers"]).json()["leads"] == []
 
     so_clid = client.get(
         "/v1/auditoria/ctwa",

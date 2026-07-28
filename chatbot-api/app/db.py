@@ -16,7 +16,11 @@ DATABASE_URL = normalizar_database_url(
 )
 
 _connect_args = {"check_same_thread": False} if DATABASE_URL.startswith("sqlite") else {}
-engine = create_engine(DATABASE_URL, connect_args=_connect_args, future=True)
+_engine_kwargs = {"connect_args": _connect_args, "future": True}
+if not DATABASE_URL.startswith("sqlite"):
+    # Fly Proxy pode encerrar conexoes ociosas; valide antes de reutilizar o pool.
+    _engine_kwargs.update(pool_pre_ping=True, pool_recycle=300)
+engine = create_engine(DATABASE_URL, **_engine_kwargs)
 SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
 Base = declarative_base()
 

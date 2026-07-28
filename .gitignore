@@ -29,6 +29,7 @@ deploy/fly/3vm/.secrets.local
 deploy/fly/3vm/.evolution_key.local
 # Workflow gerado com tokens reais (prepare-workflow.ps1) — NUNCA versionar
 deploy/fly/3vm/workflow-fly.ready.json
+deploy/fly/3vm/workflow-fly-test.ready.json
 
 # PDFs/artefatos gerados de manuais (fonte é docs/tutorial-*.md)
 output/

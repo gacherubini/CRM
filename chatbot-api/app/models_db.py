@@ -44,6 +44,8 @@ class Conversa(Base):
     bot_ativo: Mapped[bool] = mapped_column(Boolean, default=True)
     status: Mapped[str] = mapped_column(String, default="aberta")  # aberta | handoff | encerrada
     responsavel: Mapped[str | None] = mapped_column(String, nullable=True)
+    # Sinais de anúncio ficam pendentes aqui até o cliente qualificar a simulação.
+    tracking_pendente_json: Mapped[str | None] = mapped_column(Text, nullable=True)
     criada_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_agora)
     atualizada_em: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=_agora, onupdate=_agora

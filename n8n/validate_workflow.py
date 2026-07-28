@@ -11,7 +11,6 @@ WORKFLOW = Path(__file__).with_name("workflow-ai-nao-salvos.json")
 WEBHOOK_URL = "http://chatbot-api:8000/webhook/mensagem"
 WEBHOOK_HEADER = "X-Webhook-Token"
 WEBHOOK_TOKEN_PLACEHOLDER = "__CHATBOT_WEBHOOK_TOKEN__"
-AUDIO_URL = "http://chatbot-api:8000/webhook/audio/transcrever"
 IMAGE_INGEST_URL = "http://chatbot-api:8000/webhook/operacao/veiculos/foto"
 ROTEAMENTO_URL = "http://chatbot-api:8000/v1/operacao/roteamento"
 
@@ -51,8 +50,26 @@ def main() -> None:
     assert "/v1/simulacoes/solicitar" in simulation_code, (
         "tool não usa a solicitação assíncrona e privada"
     )
-    assert "/estado" in simulation_code and "bot_ativo: false" in simulation_code, (
-        "tool de simulação não força handoff para o vendedor"
+    assert "/estado" not in simulation_code and "bot_ativo: false" not in simulation_code, (
+        "tool de simulação não deve desligar o bot"
+    )
+    assert "/v1/leads" in simulation_code and "etapa: 'qualificado'" in simulation_code, (
+        "tool de simulação não cria o lead qualificado"
+    )
+    assert "cpfDigitos.length !== 11" in simulation_code, (
+        "tool cria lead sem confirmar a presença de CPF"
+    )
+    assert "/v1/operacao/numeros-autorizados" in simulation_code, (
+        "tool não consulta os vendedores autorizados"
+    )
+    assert "/message/sendText/__INSTANCE__" in simulation_code, (
+        "tool não avisa o vendedor pela Evolution"
+    )
+    assert "cpf e data de nascimento recebidos" in simulation_code, (
+        "aviso interno não informa que os dados foram recebidos"
+    )
+    assert "body: { number: numero, text: textoVendedor }" in simulation_code, (
+        "aviso ao vendedor deve conter somente o texto interno seguro"
     )
     assert "Idempotency-Key" in simulation_code and "providerMessageId" in simulation_code, (
         "tool de simulação não deduplica pela mensagem do WhatsApp"
@@ -76,8 +93,176 @@ def main() -> None:
         if agent_node
         else ""
     )
-    assert "PRIVACIDADE DO RESULTADO" in system_message, (
+    system_message_lower = system_message.lower()
+    assert "privacidade do resultado" in system_message_lower, (
         "prompt não proíbe a divulgação do resultado"
+    )
+    assert "nunca crie lead por cumprimento" in system_message_lower, (
+        "prompt ainda permite criar lead antes da qualificação"
+    )
+    assert "o lead só nasce dentro da tool simular" in system_message_lower, (
+        "prompt não restringe a criação ao ponto da simulação"
+    )
+    assert "mantém o bot ativo" in system_message_lower, (
+        "prompt ainda pode desligar o bot após a simulação"
+    )
+    assert "nunca peça placa ao cliente" in system_message_lower, (
+        "prompt ainda permite pedir a placa ao cliente"
+    )
+    assert "consulte o estoque novamente" in system_message_lower, (
+        "prompt não recupera a placa internamente quando necessário"
+    )
+    assert "só fale em enviar cpf" in system_message_lower, (
+        "prompt ainda pode pedir dados antes da escolha da moto"
+    )
+    assert "qual moto você quer simular?" in system_message_lower, (
+        "prompt não pede a escolha da moto antes dos dados"
+    )
+    assert "nunca repita a solicitação desses dados" in system_message_lower, (
+        "prompt ainda permite repetir CPF, nascimento e entrada"
+    )
+    assert "11 dígitos de cpf, uma data e um valor de entrada" in system_message_lower, (
+        "prompt não reconhece os três dados na mesma mensagem"
+    )
+    assert "quer dar uma olhada nas motos disponíveis?" in system_message_lower, (
+        "primeiro contato ainda oferece simulação antes da escolha"
+    )
+    assert "certinho" in system_message_lower and "minimalista" in system_message_lower, (
+        "prompt não aplica o tom brasileiro minimalista"
+    )
+    assert "gostaria de seguir com uma simulação?" in system_message_lower, (
+        "prompt não bloqueia a frase engessada"
+    )
+    assert "vitor motos" in system_message_lower and "primeira_mensagem" in system_message, (
+        "primeiro contato não apresenta a vitor motos"
+    )
+    assert "letras minúsculas" in system_message_lower and "não use emojis" in system_message_lower, (
+        "prompt não força a conversa leve em minúsculas e sem emojis"
+    )
+    assert "exclamações" in system_message_lower and "me conta" in system_message_lower, (
+        "prompt não bloqueia exclamações e o convite desnecessário"
+    )
+    assert "oi, [primeiro nome]. aqui é da vitor motos." in system_message_lower, (
+        "abertura minimalista da vitor motos ausente"
+    )
+    assert "veio_de_anuncio" in system_message and "enviar_foto_veiculo automaticamente" in system_message_lower, (
+        "prompt não trata automaticamente a mensagem de anúncio"
+    )
+    assert "até 4 fotos do catálogo" in system_message_lower, (
+        "prompt não orienta o envio das fotos do catálogo"
+    )
+    stock_node = next(
+        (node for node in data.get("nodes", []) if node.get("name") == "consultar_estoque1"),
+        None,
+    )
+    stock_code = stock_node.get("parameters", {}).get("jsCode", "") if stock_node else ""
+    assert "veiculos.length === 1" in stock_code and "moto-escolhida:" in stock_code, (
+        "consulta específica não preserva a moto escolhida"
+    )
+    memory_node = next(
+        (node for node in data.get("nodes", []) if node.get("name") == "Memoria da conversa1"),
+        None,
+    )
+    assert memory_node.get("parameters", {}).get("contextWindowLength", 0) >= 20, (
+        "memória curta pode perder a moto antes da chegada dos dados"
+    )
+
+    responder_node = next(
+        (node for node in data.get("nodes", []) if node.get("name") == "Responder WhatsApp1"),
+        None,
+    )
+    responder_body = responder_node.get("parameters", {}).get("jsonBody", "") if responder_node else ""
+    assert "toLocaleLowerCase('pt-BR')" in responder_body and "acao === 'cliente'" in responder_body, (
+        "saída do cliente não garante letras minúsculas"
+    )
+    assert "Extended_Pictographic" in responder_body and "replace(/!+/g, '.')" in responder_body, (
+        "saída do cliente não remove emojis e exclamações"
+    )
+    assert "me conta" in responder_body, "saída do cliente não remove o bordão rejeitado"
+    agent_text = agent_node.get("parameters", {}).get("text", "")
+    assert all(field in agent_text for field in (
+        "nome_whatsapp", "primeira_mensagem", "veio_de_anuncio",
+        "titulo_anuncio", "descricao_anuncio",
+    )), "contexto do primeiro contato/anúncio não chega ao Agent"
+
+    simulation_schema = json.loads(
+        simulation_node.get("parameters", {}).get("inputSchema", "{}")
+    )
+    assert "placa" not in simulation_schema.get("required", []), (
+        "schema ainda obriga o modelo a obter placa do cliente"
+    )
+    assert "anyOf" not in simulation_schema, (
+        "schema não pode bloquear a recuperação automática da moto escolhida"
+    )
+    assert "moto-escolhida:" in simulation_code and "$getWorkflowStaticData('global')" in simulation_code, (
+        "tool de simulação não recupera a moto escolhida"
+    )
+    assert "precisa_escolher_moto: true" in simulation_code, (
+        "tool não bloqueia simulação sem escolha de moto"
+    )
+    assert "não repita dados que ele já enviou" in simulation_code, (
+        "fallback da tool ainda permite repetir CPF, nascimento e entrada"
+    )
+    assert "dataBr" in simulation_code and "cpf: cpfDigitos" in simulation_code, (
+        "tool não normaliza os dados enviados na mesma mensagem"
+    )
+    assert "temValorEstoque" in simulation_code and "categoriaValida" in simulation_code, (
+        "tool não implementa fallback interno para estoque sem placa"
+    )
+    assert "não peça cpf, nascimento, entrada ou placa agora" in simulation_code, (
+        "tool não bloqueia coleta de dados antes da escolha do veículo"
+    )
+    assert "certinho. vou preparar a simulação pra você." in simulation_code, (
+        "confirmação minimalista da simulação está ausente"
+    )
+    assert "chamar um vendedor" not in simulation_code and "pra trazer" not in simulation_code, (
+        "resposta ao cliente ainda promete chamar vendedor"
+    )
+    assert "certinho!" not in simulation_code, "confirmação ainda usa exclamação"
+    assert "telefone" not in simulation_schema.get("required", []), (
+        "schema não deve pedir telefone que já veio do webhook"
+    )
+    assert "interesse" in simulation_schema.get("properties", {}), (
+        "schema deve registrar o veículo escolhido no lead qualificado"
+    )
+    assert "origem.telefone" in simulation_code and "input.telefone" not in simulation_code, (
+        "telefone do lead deve vir do webhook, não do modelo"
+    )
+    for tool_name in ("registrar_lead1", "registrar_consentimento1"):
+        assert tool_name not in data.get("connections", {}), (
+            f"{tool_name} não pode ficar disponível antes da simulação"
+        )
+
+    handoff_node = next(
+        (node for node in data.get("nodes", []) if node.get("name") == "solicitar_handoff1"),
+        None,
+    )
+    assert handoff_node is not None, "tool solicitar_handoff1 ausente"
+    handoff_code = handoff_node.get("parameters", {}).get("jsCode", "")
+    handoff_schema = json.loads(handoff_node.get("parameters", {}).get("inputSchema", "{}"))
+    assert "origem.telefone" in handoff_code and "input.telefone" not in handoff_code, (
+        "telefone do handoff deve vir do webhook, não do modelo"
+    )
+    assert "/estado" in handoff_code and "bot_ativo: false" in handoff_code, (
+        "handoff não pausa o bot"
+    )
+    assert "/v1/operacao/numeros-autorizados" in handoff_code, (
+        "handoff não consulta o vendedor ativo"
+    )
+    assert "/message/sendText/__INSTANCE__" in handoff_code, (
+        "handoff não avisa o vendedor pela Evolution"
+    )
+    assert "https://app2037.fly.dev/app/conversas/" in handoff_code, (
+        "handoff não inclui o link seguro do CRM"
+    )
+    assert "certo. vou encaminhar seu atendimento." in handoff_code, (
+        "resposta curta do handoff está ausente"
+    )
+    assert "telefone" not in handoff_schema.get("properties", {}), (
+        "schema do handoff ainda deixa o modelo escolher o telefone"
+    )
+    assert "depois da tool solicitar_handoff" in system_message_lower, (
+        "prompt não fixa a resposta após o handoff"
     )
 
     vehicle_create_node = next(
@@ -139,8 +324,11 @@ def main() -> None:
     assert photo_node is not None, "tool enviar_foto_veiculo1 ausente"
     photo_code = photo_node.get("parameters", {}).get("jsCode", "")
     photo_schema = photo_node.get("parameters", {}).get("inputSchema", "")
-    assert "/v1/estoque/veiculos/" in photo_code and "/midia-principal" in photo_code, (
-        "tool não resolve a foto confiável no backend tenant-scoped"
+    assert "/v1/estoque/buscar" in photo_code and "String(item?.id || '') === veiculoId" in photo_code, (
+        "tool não resolve as fotos pelo id confiável no estoque tenant-scoped"
+    )
+    assert "slice(0, 4)" in photo_code and "for (const midia of midias)" in photo_code, (
+        "tool não envia até quatro fotos do catálogo"
     )
     assert "/message/sendMedia/__INSTANCE__" in photo_code, (
         "tool não envia mídia pela Evolution"
@@ -148,6 +336,10 @@ def main() -> None:
     assert "mediatype: 'image'" in photo_code and "media: mediaUrl.toString()" in photo_code, (
         "payload de imagem da Evolution incompleto"
     )
+    assert "fotos_enviadas" in photo_code and "foto da moto" in photo_code, (
+        "tool não confirma o lote de fotos com legenda minimalista"
+    )
+    assert "👇" not in photo_code, "legenda de foto ainda usa emoji"
     assert '"veiculo_id"' in photo_schema and '"url"' not in photo_schema, (
         "modelo deve informar somente veiculo_id, nunca URL de mídia"
     )
@@ -155,7 +347,7 @@ def main() -> None:
         "destino da foto deve vir do webhook, não do modelo"
     )
     system_prompt = agent_node.get("parameters", {}).get("options", {}).get("systemMessage", "")
-    assert "enviar_foto_veiculo" in system_prompt and "não mande o cliente abrir site" in system_prompt, (
+    assert "enviar_foto_veiculo" in system_prompt and "envie no próprio whatsapp" in system_prompt, (
         "prompt não prioriza o envio da foto no próprio WhatsApp"
     )
     photo_connections = data.get("connections", {}).get("enviar_foto_veiculo1", {})
@@ -166,20 +358,20 @@ def main() -> None:
     ), "tool de foto não está conectada ao AI Agent"
 
     nodes_by_name = {node.get("name"): node for node in data.get("nodes", [])}
-    audio_node = nodes_by_name.get("Transcrever audio1")
-    assert audio_node is not None, "nó de transcrição de áudio ausente"
-    audio_params = audio_node.get("parameters", {})
-    assert audio_params.get("url") == AUDIO_URL, "áudio não passa pela Chatbot API"
-    audio_headers = {
-        header.get("name"): header.get("value")
-        for header in audio_params.get("headerParameters", {}).get("parameters", [])
+    assert len(nodes_by_name) == 25, "workflow simplificado deve ter 25 nós"
+    removidos = {
+        "E audio1", "Transcrever audio1", "Aplicar transcricao1",
+        "registrar_consentimento1", "registrar_lead1", "consultar_por_placa1",
+        "E primeira mensagem1", "Aguardar 60 segundos1",
     }
-    assert audio_headers.get(WEBHOOK_HEADER) == WEBHOOK_TOKEN_PLACEHOLDER, (
-        "transcrição de áudio sem autenticação do webhook"
-    )
+    assert removidos.isdisjoint(nodes_by_name), "workflow ainda contém nós removidos"
+
     extract_code = nodes_by_name["Extrair1"].get("parameters", {}).get("jsCode", "")
-    assert "audioMessage" in extract_code and "ehAudio" in extract_code, (
-        "extração não reconhece áudio recebido"
+    assert "audioMessage" in extract_code and "if (audio) return []" in extract_code, (
+        "áudio deve ser ignorado imediatamente na entrada"
+    )
+    assert "ehAudio" not in extract_code and "audioMimeType" not in extract_code, (
+        "extração ainda transporta dados de áudio desnecessários"
     )
     assert "imageMessage" in extract_code and "ehImagem" in extract_code, (
         "extração não reconhece foto recebida"
@@ -193,14 +385,15 @@ def main() -> None:
     assert "participantAlt" in extract_code and "ehImagemEstoque" in extract_code, (
         "extração não separa participante e fotos do grupo"
     )
+    assert all(field in extract_code for field in (
+        "veioDeAnuncio", "anuncioTitulo", "anuncioDescricao", "externalAdReply",
+    )), "extração não reconhece o contexto da mensagem de anúncio"
+
     connections = data.get("connections", {})
-    assert (
-        connections.get("Extrair1", {}).get("main", [[]])[0][0].get("node")
-        == "E imagem de estoque1"
-    )
+    assert connections.get("Extrair1", {}).get("main", [[]])[0][0].get("node") == "E imagem de estoque1"
     imagem_ramos = connections.get("E imagem de estoque1", {}).get("main", [])
     assert imagem_ramos[0][0].get("node") == "Salvar foto no estoque1"
-    assert imagem_ramos[1][0].get("node") == "E audio1"
+    assert imagem_ramos[1][0].get("node") == "E grupo de estoque1"
     imagem_node = nodes_by_name.get("Salvar foto no estoque1")
     assert imagem_node is not None, "nó de ingestão automática da foto ausente"
     imagem_params = imagem_node.get("parameters", {})
@@ -218,25 +411,17 @@ def main() -> None:
     assert "base64" not in imagem_body and "media:" not in imagem_body, (
         "n8n não deve transportar ou guardar o binário da foto"
     )
-    assert (
-        connections.get("Salvar foto no estoque1", {}).get("main", [[]])[0][0].get("node")
-        == "Foto deve responder1"
+    assert connections.get("Salvar foto no estoque1", {}).get("main", [[]])[0][0].get("node") == "Foto deve responder1"
+    assert connections.get("Foto deve responder1", {}).get("main", [[]])[0][0].get("node") == "Responder cadastro de foto1", (
+        "foto ignorada pode gerar resposta indevida"
     )
-    assert (
-        connections.get("Foto deve responder1", {}).get("main", [[]])[0][0].get("node")
-        == "Responder cadastro de foto1"
-    ), "foto ignorada pode gerar resposta indevida"
-    assert (
-        connections.get("Transcrever audio1", {}).get("main", [[]])[0][0].get("node")
-        == "Aplicar transcricao1"
-    )
-    assert "audioFallback" in agent_node.get("parameters", {}).get("text", ""), (
-        "fallback de áudio não chega ao fluxo conversacional"
+    assert "audioFallback" not in agent_node.get("parameters", {}).get("text", ""), (
+        "prompt ainda contém fallback de áudio"
     )
     for gate_name in ("Gate handoff e duplicidade1", "Gate somente nao salvos1"):
         gate_code = nodes_by_name[gate_name].get("parameters", {}).get("jsCode", "")
-        assert "Aplicar transcricao1" in gate_code, (
-            f"{gate_name} descarta o texto transcrito"
+        assert "Aplicar transcricao1" not in gate_code, (
+            f"{gate_name} ainda depende do ramo removido de áudio"
         )
 
     # Roteamento de operação: privado e grupo usam a mesma validação tenant-scoped.
@@ -290,7 +475,10 @@ def main() -> None:
         "controle deve ir direto ao WhatsApp"
     )
     assert len(if_true) > 1 and if_true[1][0].get("node") == "AI Agent1", (
-        "não-controle deve ir ao AI Agent"
+        "mensagem de cliente deve ir direto ao Agent, sem atraso"
+    )
+    assert "estadoMensagem.primeira_mensagem === true" in gate_salvos_code, (
+        "sinal de primeira mensagem não chega ao Agent"
     )
     grupo_ramos = connections.get("E grupo de estoque1", {}).get("main", [[], []])
     assert grupo_ramos[0][0].get("node") == "Rotear grupo de estoque1"
@@ -304,8 +492,8 @@ def main() -> None:
     assert saida_ramos[1][0].get("node") == "Registrar saida do bot1"
 
     print(
-        "workflow n8n válido: webhook seguro, áudio efêmero, "
-        "foto automática no estoque, menu de operação e resultado privado"
+        "workflow n8n válido: 25 nós, áudio ignorado, webhook seguro, "
+        "foto automática, menu de operação e resultado privado"
     )
 
 
