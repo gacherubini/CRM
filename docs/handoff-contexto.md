@@ -4,11 +4,152 @@
 > Este arquivo: checkpoint operacional. Seções **“Checkpoint anterior”** = histórico — não
 > reexecutar. Path Windows no rodapé de seções antigas: **ignorar** (workspace = root do git).
 >
-> **Checkpoint mais recente: 2026-07-28 (Revy Tráfego 6.4 DONE + smoke final + lab Fly desligado).**  
-> Código na `main`. Plataforma cutover completa. Residual: dados reais de mídia; eixo A WA.  
-> **Lab Fly:** desligado com `down-all.sh --3vm` (pedido dono) — **não** destruir apps/volumes.
+> **Checkpoint mais recente: 2026-07-28 noite (lab religado + `motor2037` reconstruído + slug
+> unificado + cobertura de testes do Revy Tráfego).**  
+> Código na `main`. **Lab Fly LIGADO** (`suite-pg`, `evolution2037`, `n8n2037`, `app2037` started;
+> workers `motor2037` stopped no idle, que é o correto). Bug aberto em `api_v1.py` — ver abaixo.
 
-## Checkpoint mais recente — Revy Tráfego 6.4 DONE (2026-07-28)
+## Checkpoint mais recente — recuperação do lab + slug único + testes (2026-07-28, noite)
+
+> **Escopo:** subir lab, auditar o projeto, reconstruir `motor2037`, unificar slug da loja,
+> portar cobertura de testes para o `revy-trafego`.
+
+### Entrega
+
+- **Lab religado na ordem certa** (Postgres → canal → orquestrador). Todos os always-on estavam
+  `stopped`; `n8n2037` e `evolution2037` devolviam **503** porque o `suite-pg` estava parado.
+- **`motor2037` reconstruído do zero.** Estava **VAZIO** — zero machines, zero volumes, sem imagem
+  (último release v31 de 21/07). Os 4 slots Playwright tinham sido destruídos e a tabela
+  `worker_slots` seguia apontando para machine IDs mortos, todos travados em
+  `estado_observado='starting'` desde 17–20/07. **Simulação real de banco estava quebrada.**
+  Ações: release v32 (imagem worker), os **12 secrets saíram de `Staged` → `Deployed`**, 4 slots
+  recriados (`shared-cpu-2x`/2048MB, restart `on-failure`) e `worker_slots` atualizada **no lugar**.
+  Cada worker sobe, loga `on-demand-worker: provedor=<banco> idle=60s` e volta a `stopped`.
+  IDs novos: santander `7817961a621518` · fontecred `48e7453c2d1dd8` · bradesco `784ede55b11428` ·
+  pan `28630e2a0d6948` · seed `7847905a30de28`.
+- **Slug da loja unificado em `moto-center`** (commit `fb73dda`, bundle redeployado). Removido o
+  shim `CATALOGO_PORTAL_STORE_SLUG="loja1"` e `REVY_TRAFEGO_LOJAS` passou a `"moto-center"`.
+  Verificado em produção: `listar_loja_slugs()` devolve `['moto-center']`.
+- **Cobertura do `revy-trafego`: 13 → 78 passando + 2 `xfail(strict)`** (suítes portadas do
+  `portal-gestao`, cuja cópia testada estava desligada em produção pelo cutover B5). Arquivos novos:
+  `test_trafego.py` (16), `test_meta_ads_spend.py` (27), `test_ctwa_match_e_messaging.py` (14),
+  `test_pixel_capi_auditoria.py` (3), `test_campanhas_model.py` (7).
+  `portal-gestao` segue **289 passando**, sem regressão. Os 2 `xfail` são bugs reais documentados
+  (abaixo), não testes quebrados — ambos `strict=True`, então viram falha quando forem corrigidos.
+
+### 🔴 Bug aberto — perda silenciosa de conversão (`revy-trafego/app/api_v1.py`)
+
+Confirmado por leitura de código e por dois agentes independentes. **Não corrigido** (decisão de
+produto pendente).
+
+- Linha **194–197**: idempotência confere o `event_id` **puro**.
+- Linha **212**: caminho CTWA enfileira com `{event_id}-msg`.
+- Linha **229–243**: sem config CAPI, grava marcador `skipped` com `event_id` **puro**.
+- `processar_outbox_pendentes` só varre `pending|failed` (`app/meta_capi.py:360`).
+
+**Efeito:** venda que chega **antes** de a loja configurar o Pixel/CAPI grava `skipped`; o reenvio
+posterior (já com config) casa esse marcador na linha 195, devolve `idempotent: true` e **o Purchase
+nunca sai**. Vale para o caminho web também, não só CTWA. Decidir: reprocessar `skipped` após
+config? janela de carência? O teste `test_venda_confirmada_ctwa_e_idempotente` está `xfail(strict=True)`
+— vira falha automática quando a linha 195 for corrigida.
+
+### 🔴 Bug aberto 2 — sync de gasto Meta morre com `IntegrityError`
+
+Encontrado ao portar `test_meta_ads_spend.py`, reproduzido isolado antes de virar teste.
+**Não corrigido.**
+
+Duas linhas da Meta para a **mesma campanha + mesmo dia no mesmo batch** derrubam o sync:
+
+- o dedupe consulta o banco (`revy-trafego/app/meta_ads_spend.py:235-238`),
+- mas `SessionLocal` usa `autoflush=False` (`revy-trafego/app/db.py:14`), então o `db.add()` da
+  linha anterior (`meta_ads_spend.py:254`) fica pendente e a query **não o enxerga**,
+- o `db.commit()` (`meta_ads_spend.py:287`) estoura `UNIQUE(external_key)` (`models.py:206`),
+- e a exceção **escapa** de `sincronizar_gastos_meta`, contrariando o docstring do próprio módulo
+  ("falha nunca deve quebrar o fluxo").
+
+**Efeito:** pela UI (`main.py:529`) vira 500 para o gestor; pelo job, o `except` por loja segura,
+mas o batch inteiro daquela loja se perde. Coberto por `xfail(strict=True, raises=IntegrityError)`.
+
+Observação secundária (especulativa, não testada): o laço de paginação em `fetch_campaign_insights`
+não tem limite de páginas nem set de URLs visitadas — um `paging.next` cíclico laçaria indefinidamente.
+
+### Contrato de env do worker de spend (travado em teste)
+
+`revy-trafego/app/meta_ads_spend_job.py:57,62,67,72` lê **só** os nomes `PORTAL_*`. É intencional
+(o `run-revy-trafego.sh` força `PORTAL_*=1` só no processo do tráfego), mas significa que
+`REVY_TRAFEGO_META_SPEND_SYNC_INTERVAL_SECONDS` / `_JANELA_DIAS` **não existem**, apesar de o prefixo
+sugerir que sim. Travado em `test_worker_default_le_env_do_processo` para renomeação de env não passar
+silenciosa.
+
+### Correção a levantamentos anteriores (não repetir o erro)
+
+- **Os módulos duplicados portal↔revy-trafego NÃO divergiram.** 11 são idênticos
+  (`meta_capi`, `campanhas`, `roi_calc`, `meta_capi_messaging`, `meta_capi_job`, `meta_pixel`,
+  `meta_ads_spend`, `meta_ads_spend_job`, `pixel_capi_auditoria`, `clients/_retry`,
+  `clients/chatbot`). Um relatório anterior apontou "4 divergentes" por **falso-positivo de CRLF**.
+  Sempre compare com `diff --strip-trailing-cr`.
+- `financeiro_calc.py` é o único que difere de verdade — e é **subset intencional** (76 linhas vs
+  286, só o necessário para ROI). `cripto.py` difere só em env var aceita.
+
+### Arquitetura — o que de fato falta (Fase 3 do plano de separação)
+
+O acoplamento restante **não** é o código de tráfego no portal; é **dado**:
+
+- ✅ O caminho de CAPI **já está desacoplado** — `/eventos/venda-confirmada` (`api_v1.py:182`)
+  recebe tudo por HTTP e não lê a tabela `vendas`.
+- ❌ O caminho de **relatório** ainda lê `Venda` direto do banco compartilhado:
+  `roi_calc.py`, `financeiro_calc.py:58`, `resultados.py`, `lojas.py:50`.
+- `lojas.py:59` lê a tabela `usuarios` do portal com SQL cru — a violação mais explícita do "só HTTP".
+
+**Momento ideal para o split:** `campanhas`, `campanha_gastos`, `meta_pixel_config`,
+`meta_ads_config`, `vendas` e `usuarios` estão **todas com 0 linhas**. Split de banco com **zero
+migração de dados** — não se repete depois que a operação começar.
+
+### Outros achados (auditoria, não corrigidos)
+
+- `entrypoint-app.sh:42-45` engole falha do alembic com `|| return 0` → container sobe "saudável"
+  com schema velho e `/healthz` passa. É a mecânica que gerou `tmp/fix_portal_schema.py`.
+- `upsert_slot` (`motor-simulacao/app/orquestrador.py:237`) casa por `fly_machine_id`, então
+  `deploy/fly/sync-motor-worker-machines.sh` **duplica linhas** quando o ID da machine muda,
+  deixando slot morto com `habilitado=true` na allowlist. Atualize as linhas no lugar.
+- `fly.toml` órfãos em `portal-gestao/`, `chatbot-api/`, `estoque-api/`, `catalogo-publico/`,
+  `site/` apontam para apps do modelo pré-bundle; `portal-gestao/fly.toml:8` usa
+  `sqlite:////data/portal.db` (path diferente do bundle). Risco de subir portal paralelo.
+- `MOTOR_STORAGE_STATE_DIR` não tem limpeza — cookies de sessão de portal bancário acumulam
+  indefinidamente (screenshots têm retenção de 7 dias; storage_state não).
+- `revy-trafego` não tem RBAC: o campo `papel` existe e vai para a sessão mas **nunca é verificado**.
+- Sem CI (`.github/` não existe).
+- `pytest` na raiz de `chatbot-api` **aborta** por `PermissionError` em `test-tmp-run4/5` (sobras
+  não versionadas). Rode com alvo explícito `tests`.
+- Docs: README cita `/health` mas o real é `/healthz`; o "contrato fixo" do Motor está **plano**
+  (`cpf`, `valor_moto`) e a API real exige **aninhado** (`pessoa`/`veiculo`/`condicoes`).
+
+### Não fazer
+
+- **Não renomear a instância `loja1` da Evolution.** `loja1` deixou de ser slug de loja, mas
+  continua sendo o **nome da sessão de WhatsApp** (`prepare-workflow.ps1:43`,
+  `set-evolution-webhook.ps1:4`). Renomear derruba/zera a sessão.
+- **Não ligar o workflow de produção do n8n sem pedido.** O WhatsApp está **deliberadamente em modo
+  teste**: só `wAiTesteRestrito01` (restrito ao 5551980336365) está ativo, o de produção
+  `wAiNaoSalvos0001` está inativo, e o webhook da Evolution aponta para `/webhook/whatsapp-ai-teste`.
+- Não reescrever `gestor_audit_log` para trocar `loja1` por `moto-center` — é trilha de auditoria;
+  aquelas 12 ações aconteceram sob `loja1`.
+
+### Próximo
+
+1. Corrigir os **dois bugs abertos** acima (marcador `skipped` em `api_v1.py`; `IntegrityError` no
+   sync de spend). Os dois já têm teste `xfail(strict=True)` esperando — o teste vira verde sozinho
+   e avisa quando o fix estiver certo.
+2. Fase 3: banco próprio para o `revy-trafego` no `suite-pg` + Alembic próprio (matar o
+   `create_all` de `main.py:125`) + projeção de vendas alimentada por evento, para `roi_calc` e
+   `financeiro_calc` pararem de ler `Venda` do banco do portal.
+3. Itens baratos: falhar boot em alembic quebrado, apagar `fly.toml` órfãos, retenção em
+   `storage_state`, CI.
+4. Validar um banco real no motor (só mock foi validado após a reconstrução dos workers).
+
+---
+
+## Checkpoint anterior — Revy Tráfego 6.4 DONE (2026-07-28)
 
 > **Escopo:** deploy + cutover B1–B5 + UI + smoke final + push `main` + down lab.  
 > **README canônico:** [`revy-trafego/README.md`](../revy-trafego/README.md).
