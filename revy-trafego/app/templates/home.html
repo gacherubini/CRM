@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block title %}Lojas — Revy Tráfego{% endblock %}
+{% block page_title %}Selecionar loja{% endblock %}
+{% block content %}
+<div class="page-heading">
+  <div>
+    <span class="eyebrow">Multi-loja</span>
+    <h1>Escolha a loja</h1>
+    <p>Todas as lojas conhecidas no banco (campanhas, pixel, vendas). Você também pode digitar um slug novo.</p>
+  </div>
+</div>
+
+{% if erro == 'loja' %}<div class="alert error">Informe um slug de loja válido.</div>{% endif %}
+
+<section class="panel form-section">
+  <form method="post" action="/app/loja" class="form-layout">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    {% if lojas %}
+    <label>Lojas existentes
+      <select name="loja_slug" id="loja-select">
+        <option value="">— selecione —</option>
+        {% for slug in lojas %}
+        <option value="{{ slug }}" {% if loja_selecionada == slug %}selected{% endif %}>{{ slug }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    {% endif %}
+    <label>Ou digite o slug
+      <input type="text" name="loja_slug_manual" id="loja-manual" placeholder="ex.: loja-centro" maxlength="120" value="">
+    </label>
+    <button class="button primary" type="submit" onclick="
+      const m = document.getElementById('loja-manual');
+      const s = document.getElementById('loja-select');
+      if (m && m.value.trim()) {
+        if (s) s.name = '';
+        m.name = 'loja_slug';
+      } else if (m) {
+        m.name = '';
+      }
+    ">Abrir loja</button>
+  </form>
+</section>
+
+{% if loja_selecionada %}
+<p class="muted">Loja ativa: <strong>{{ loja_selecionada }}</strong> — <a href="/app/trafego">ir para Config</a></p>
+{% endif %}
+{% endblock %}

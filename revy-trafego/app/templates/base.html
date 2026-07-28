@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#ffffff">
+  <title>{% block title %}Revy Tráfego{% endblock %}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/css/app.css">
+  <script>
+    (() => {
+      const saved = localStorage.getItem('revy-theme');
+      let theme = saved === 'dark' || saved === 'light' ? saved : null;
+      if (!theme) {
+        theme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+      }
+      document.documentElement.setAttribute('data-theme', theme);
+    })();
+  </script>
+  {% block head %}{% endblock %}
+</head>
+<body>
+  {% set path = request.url.path %}
+  <div class="app-shell">
+    <aside class="sidebar" id="sidebar" aria-label="Navegação Revy Tráfego">
+      <div class="sidebar-brand-row">
+        <a class="brand" href="/app" aria-label="Revy Tráfego">
+          <span class="brand-mark" aria-hidden="true">T</span>
+          <span><strong>Revy Tráfego</strong><small>{{ usuario.loja_slug or 'selecione loja' }}</small></span>
+        </a>
+        <button class="drawer-close" type="button" aria-label="Fechar menu">×</button>
+      </div>
+
+      <nav class="nav" aria-label="Menu principal">
+        <span class="nav-section">Loja</span>
+        <a class="nav-link {{ 'active' if path == '/app' else '' }}" href="/app">Selecionar loja</a>
+        {% if usuario.loja_slug %}
+        <span class="nav-section">Mídia</span>
+        <a class="nav-link {{ 'active' if path == '/app/trafego' else '' }}" href="/app/trafego">Config / Pixel</a>
+        <a class="nav-link {{ 'active' if path.startswith('/app/campanhas') else '' }}" href="/app/campanhas">Campanhas</a>
+        <a class="nav-link {{ 'active' if path.startswith('/app/trafego/roi') else '' }}" href="/app/trafego/roi">ROI</a>
+        <a class="nav-link {{ 'active' if path.startswith('/app/trafego/ctwa') else '' }}" href="/app/trafego/ctwa-auditoria">CTWA</a>
+        <a class="nav-link {{ 'active' if path.startswith('/app/trafego/pixel') else '' }}" href="/app/trafego/pixel-auditoria">Pixel audit</a>
+        <span class="nav-section">Diagnóstico</span>
+        <a class="nav-link {{ 'active' if path.startswith('/app/diagnostico') else '' }}" href="/app/diagnostico/leads">Leads</a>
+        {% endif %}
+      </nav>
+
+      <div class="sidebar-footer">
+        <form action="/logout" method="post">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          <button class="link-button" type="submit">Sair</button>
+        </form>
+      </div>
+    </aside>
+    <button class="drawer-backdrop" type="button" aria-label="Fechar menu" tabindex="-1"></button>
+
+    <div class="main">
+      <header class="topbar">
+        <button class="menu-button" type="button" aria-controls="sidebar" aria-expanded="false">Menu</button>
+        <div class="page-context">
+          <strong>{% block page_title %}Tráfego{% endblock %}</strong>
+          <small>{{ usuario.nome }} · {{ usuario.papel }}{% if usuario.loja_slug %} · {{ usuario.loja_slug }}{% endif %}</small>
+        </div>
+        <div class="topbar-user" title="{{ usuario.email }}">
+          <span class="avatar">{{ usuario.nome[:1] | upper }}</span>
+        </div>
+      </header>
+      <main class="content" id="conteudo">
+        {% block content %}{% endblock %}
+      </main>
+    </div>
+  </div>
+  <script>
+    (() => {
+      const shell = document.querySelector('.app-shell');
+      const openBtn = document.querySelector('.menu-button');
+      const closeBtn = document.querySelector('.drawer-close');
+      const backdrop = document.querySelector('.drawer-backdrop');
+      const setOpen = (open) => {
+        if (!shell) return;
+        shell.classList.toggle('drawer-open', open);
+        if (openBtn) openBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
+      };
+      openBtn && openBtn.addEventListener('click', () => setOpen(true));
+      closeBtn && closeBtn.addEventListener('click', () => setOpen(false));
+      backdrop && backdrop.addEventListener('click', () => setOpen(false));
+    })();
+  </script>
+</body>
+</html>

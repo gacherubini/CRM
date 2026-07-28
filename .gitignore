@@ -46,3 +46,6 @@ deploy/fly/_*.py
 motor-simulacao/scripts/_diag*.py
 motor-simulacao/scripts/diag_bradesco_recaptcha.py
 
+
+# local venvs
+**/.venv/

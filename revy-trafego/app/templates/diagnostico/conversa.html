@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}Conversa — Revy Tráfego{% endblock %}
+{% block page_title %}Conversa{% endblock %}
+{% block content %}
+<div class="page-heading">
+  <div>
+    <span class="eyebrow">Diagnóstico</span>
+    <h1>Conversa {{ mascarar_telefone(telefone) }}</h1>
+  </div>
+  <a class="button secondary" href="/app/diagnostico/leads">Voltar</a>
+</div>
+{% if erro %}<div class="alert error">{{ erro }}</div>{% endif %}
+<section class="panel">
+  {% for m in mensagens %}
+  <div style="margin-bottom:10px;padding:8px;border-left:3px solid var(--border)">
+    <small class="muted">{{ m.direcao }} · {{ formatar_horario(m.criada_em) }}</small>
+    <div>{{ m.texto }}</div>
+  </div>
+  {% else %}
+  <p class="muted">Sem mensagens.</p>
+  {% endfor %}
+</section>
+{% endblock %}

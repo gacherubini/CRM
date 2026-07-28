@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block title %}Lead — Revy Tráfego{% endblock %}
+{% block page_title %}Lead{% endblock %}
+{% block content %}
+<div class="page-heading">
+  <div>
+    <span class="eyebrow">Diagnóstico</span>
+    <h1>Detalhe do lead</h1>
+  </div>
+  <a class="button secondary" href="/app/diagnostico/leads">Voltar</a>
+</div>
+{% if erro %}<div class="alert error">{{ erro }}</div>{% endif %}
+{% if lead %}
+<section class="panel">
+  <pre style="white-space:pre-wrap;font-size:13px">{{ lead | tojson(indent=2) }}</pre>
+  {% if lead.telefone %}
+  <p><a class="button secondary" href="/app/diagnostico/conversas/{{ lead.telefone }}">Ver conversa</a></p>
+  {% endif %}
+</section>
+{% endif %}
+{% endblock %}

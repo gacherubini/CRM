@@ -81,39 +81,11 @@ def alertas_trafego(
     config: MetaPixelConfig | None,
     ultimo_outbox: MetaCapiOutbox | None,
     chatbot_offline: bool = False,
-    modo_cliente: bool = False,
 ) -> list[AlertaTrafego]:
-    """Alertas de mídia.
-
-    ``modo_cliente=True``: só linguagem de negócio, sem links de config técnica
-    (equipe Revy opera no app Revy Tráfego).
-    """
     itens = list(linhas)
     campanhas = [linha for linha in itens if linha.campanha_id is not None]
     sem_campanha = next((linha for linha in itens if linha.campanha_id is None), None)
     alertas: list[AlertaTrafego] = []
-    if modo_cliente:
-        if sem_campanha and sem_campanha.vendas:
-            n = sem_campanha.vendas
-            alertas.append(
-                AlertaTrafego(
-                    "vendas_sem_utm",
-                    f"{n} {'venda está' if n == 1 else 'vendas estão'} sem campanha atribuída.",
-                    "/app/vendas",
-                    "Ver vendas",
-                )
-            )
-        if chatbot_offline:
-            alertas.append(
-                AlertaTrafego(
-                    "chatbot_offline",
-                    "Contagem de leads pode estar incompleta no momento.",
-                    "/app/leads",
-                    "Ver leads",
-                )
-            )
-        return alertas[:4]
-
     if ultimo_outbox is not None and ultimo_outbox.status == "failed":
         alertas.append(
             AlertaTrafego(

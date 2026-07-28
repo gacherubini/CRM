@@ -37,6 +37,7 @@ from app.auth import (
     pode_registrar_venda,
     pode_ver_custo,
     pode_ver_financeiro,
+    pode_ver_resultados_midia,
     usuario_atual,
 )
 from app.cripto import cifrar
@@ -484,7 +485,8 @@ def dashboard(
     alertas_view = []
     onboarding = None
     periodo_resultados = None
-    if pode_gerir_trafego(usuario):
+    # Resultados de mídia: dono/gerente (leitura). Config técnica: só legacy / Revy Tráfego.
+    if pode_ver_resultados_midia(usuario):
         from app.financeiro_calc import hoje_portal
 
         hoje = hoje_portal()
@@ -521,14 +523,17 @@ def dashboard(
             config=config_meta,
             ultimo_outbox=outboxes[0] if outboxes else None,
             chatbot_offline=chatbot_offline,
+            modo_cliente=not pode_gerir_trafego(usuario),
         )
-        onboarding = checklist_medicao(
-            config=config_meta,
-            campanhas=campanhas,
-            gastos=gastos,
-            vendas=db.query(Venda).filter(Venda.loja_slug == usuario.loja_slug).all(),
-            outboxes=outboxes,
-        )
+        # Checklist técnico de medição só na UI legacy (dono configurando no portal).
+        if pode_gerir_trafego(usuario):
+            onboarding = checklist_medicao(
+                config=config_meta,
+                campanhas=campanhas,
+                gastos=gastos,
+                vendas=db.query(Venda).filter(Venda.loja_slug == usuario.loja_slug).all(),
+                outboxes=outboxes,
+            )
         periodo_resultados = {
             "inicio": d_inicio,
             "fim": d_fim,
@@ -545,6 +550,7 @@ def dashboard(
             integracao_erro=erro,
             pode_gerir=pode_gerir_estoque(usuario),
             pode_gerir_trafego=pode_gerir_trafego(usuario),
+            pode_ver_resultados_midia=pode_ver_resultados_midia(usuario),
             resultados_view=resultados_view,
             alertas_trafego=alertas_view,
             onboarding_medicao=onboarding,

@@ -40,6 +40,7 @@ def test_vendedor_sem_link_trafego_na_nav(client):
 
 
 def test_dono_ve_aba_trafego(client):
+    # Com PORTAL_TRAFEGO_UI_LEGACY=1 (conftest) a UI técnica ainda é testável.
     login(client)
     pagina = client.get("/app")
     assert 'href="/app/trafego"' in pagina.text
@@ -48,6 +49,15 @@ def test_dono_ve_aba_trafego(client):
     assert "Pixel ID" in form.text
     assert "Token CAPI" in form.text
     assert "Não configurado" in form.text
+
+
+def test_sem_legacy_dono_nao_acessa_ui_tecnica(client, monkeypatch):
+    monkeypatch.setenv("PORTAL_TRAFEGO_UI_LEGACY", "0")
+    login(client)
+    pagina = client.get("/app")
+    assert 'href="/app/trafego"' not in pagina.text
+    form = client.get("/app/trafego", follow_redirects=False)
+    assert form.status_code == 303
 
 
 def test_public_pixel_endpoint_sem_auth(client):

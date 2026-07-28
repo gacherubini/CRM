@@ -1,0 +1,209 @@
+{% extends "base.html" %}
+{% block title %}ROI de tráfego — Revy{% endblock %}
+{% block head %}
+<style>
+  .roi-hero {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+    margin-bottom: 18px;
+  }
+  .roi-card {
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--surface);
+    padding: 18px 16px;
+    box-shadow: var(--shadow);
+    min-width: 0;
+  }
+  .roi-card span {
+    display: block;
+    color: var(--ink-muted);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+  .roi-card strong {
+    display: block;
+    font-size: 26px;
+    letter-spacing: -.03em;
+    line-height: 1.1;
+  }
+  .roi-card small {
+    display: block;
+    margin-top: 8px;
+    color: var(--ink-soft);
+    font-size: 12px;
+  }
+  .roi-card.highlight {
+    background: var(--ink);
+    color: var(--paper);
+    border-color: var(--ink);
+  }
+  .roi-card.highlight span,
+  .roi-card.highlight small { color: color-mix(in srgb, var(--paper) 70%, transparent); }
+  .roi-card.good strong { color: var(--green); }
+  .roi-card.highlight.good strong { color: #3ecf8e; }
+  .roas-bar {
+    height: 8px;
+    margin-top: 10px;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--ink) 8%, var(--line));
+    overflow: hidden;
+  }
+  .roas-bar > i {
+    display: block;
+    height: 100%;
+    border-radius: 999px;
+    background: linear-gradient(90deg, var(--amber), var(--green));
+  }
+  tr.roi-sem-campanha td { color: var(--ink-soft); }
+  .touch-toggle {
+    display: inline-flex;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    overflow: hidden;
+    background: var(--surface);
+  }
+  .touch-toggle a {
+    padding: 8px 14px;
+    font-size: 12px;
+    font-weight: 700;
+    text-decoration: none;
+    color: var(--ink-soft);
+  }
+  .touch-toggle a.active {
+    background: var(--ink);
+    color: var(--paper);
+  }
+  .heading-actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+  @media (max-width: 960px) {
+    .roi-hero { grid-template-columns: repeat(2, 1fr); }
+  }
+  @media (max-width: 560px) {
+    .roi-hero { grid-template-columns: 1fr; }
+  }
+</style>
+{% endblock %}
+{% block content %}
+<div class="page-heading">
+  <div>
+    <span class="eyebrow">Tráfego pago</span>
+    <h1>ROI de campanhas</h1>
+    <p>Gasto lançado no Revy × leads e vendas com a mesma UTM. Atribuição {{ 'first touch' if touch == 'first' else 'last touch' }} — sem prometer causalidade multi-touch.</p>
+  </div>
+  <div class="heading-actions">
+    <div class="touch-toggle" role="group" aria-label="Modo de atribuição">
+      <a class="{{ 'active' if touch == 'last' else '' }}" href="?inicio={{ periodo.inicio }}&fim={{ periodo.fim }}&touch=last">Last touch</a>
+      <a class="{{ 'active' if touch == 'first' else '' }}" href="?inicio={{ periodo.inicio }}&fim={{ periodo.fim }}&touch=first">First touch</a>
+    </div>
+    <a class="button secondary" href="/app/campanhas">Campanhas</a>
+    <a class="button secondary" href="/app/campanhas/gastos/lote">Lançar gastos</a>
+    <a class="button ghost" href="/app/trafego">Pixel / CAPI</a>
+  </div>
+</div>
+
+<form class="filter-bar" method="get">
+  <input type="hidden" name="touch" value="{{ touch }}">
+  <label class="search"><span class="sr-only">Início</span><input type="date" name="inicio" value="{{ periodo.inicio }}"></label>
+  <label class="search"><span class="sr-only">Fim</span><input type="date" name="fim" value="{{ periodo.fim }}"></label>
+  <button class="button secondary" type="submit">Aplicar período</button>
+  <a class="button ghost" href="/app/relatorios/roi.csv?inicio={{ periodo.inicio }}&fim={{ periodo.fim }}&touch={{ touch }}">Exportar CSV</a>
+</form>
+<p class="muted">CPL = gasto ÷ leads · CPA = gasto ÷ vendas · ROAS = faturamento ÷ gasto. Leads sem UTM caem em “Sem campanha”.</p>
+
+{% if chatbot_erro %}
+<div class="alert error">Não foi possível carregar leads do chatbot: números de lead podem estar incompletos. Vendas e gastos locais continuam válidos.</div>
+{% endif %}
+
+{% if insights %}
+<section class="roi-insights" aria-labelledby="insights-roi-titulo">
+  <div><span class="mono-label">LEITURA DO PERÍODO</span><h2 id="insights-roi-titulo">O que os números mostram</h2></div>
+  <ul>{% for insight in insights %}<li>{{ insight }}</li>{% endfor %}</ul>
+</section>
+{% endif %}
+
+<section class="roi-hero" aria-label="Totais do período">
+  <div class="roi-card">
+    <span>Gasto em mídia</span>
+    <strong>{{ formatar_brl(totais.gasto) }}</strong>
+    <small>soma dos lançamentos no período</small>
+  </div>
+  <div class="roi-card">
+    <span>Leads atribuídos</span>
+    <strong>{{ totais.leads }}</strong>
+    <small>com match de campanha ({{ touch }})</small>
+  </div>
+  <div class="roi-card">
+    <span>Vendas</span>
+    <strong>{{ totais.vendas }}</strong>
+    <small>faturamento {{ formatar_brl(totais.faturamento) }}</small>
+  </div>
+  <div class="roi-card highlight {% if totais.roas and totais.roas >= 1 %}good{% endif %}">
+    <span>ROAS / CPL</span>
+    <strong>{% if totais.roas %}{{ totais.roas }}x{% else %}—{% endif %}</strong>
+    <small>CPL {% if totais.cpl %}{{ formatar_brl(totais.cpl) }}{% else %}—{% endif %} · CPA {% if totais.cpa %}{{ formatar_brl(totais.cpa) }}{% else %}—{% endif %}</small>
+    {% if totais.roas %}
+    <div class="roas-bar" title="Barra: ROAS até 5x = cheia"><i style="width: {{ totais_roas_barra }}%"></i></div>
+    {% endif %}
+  </div>
+</section>
+
+<section class="panel flush">
+  <div class="panel-heading">
+    <div><span class="mono-label">POR CAMPANHA</span><h2>Performance</h2></div>
+  </div>
+  {% if linhas %}
+  <div class="table-wrap"><table>
+    <thead>
+      <tr>
+        <th>Campanha</th>
+        <th>Canal</th>
+        <th>Gasto</th>
+        <th>Leads</th>
+        <th>Vendas</th>
+        <th>Faturamento</th>
+        <th>CPL</th>
+        <th>CPA</th>
+        <th>ROAS</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for l in linhas %}
+      <tr class="{{ 'roi-sem-campanha' if not l.campanha_id else '' }}">
+        <td>
+          {% if l.campanha_id %}
+          <a href="/app/campanhas/{{ l.campanha_id }}"><strong>{{ l.nome }}</strong></a>
+          <br><small class="muted"><code>{{ l.utm_campaign }}</code></small>
+          {% else %}
+          <strong>{{ l.nome }}</strong>
+          <br><small class="muted">sem UTM / sem match</small>
+          {% endif %}
+        </td>
+        <td>{{ canais.get(l.canal, l.canal) if l.canal != '—' else '—' }}</td>
+        <td>{{ formatar_brl(l.gasto) if l.campanha_id else '—' }}</td>
+        <td>{{ l.leads }}</td>
+        <td>{{ l.vendas }}</td>
+        <td>{{ formatar_brl(l.faturamento) }}</td>
+        <td>{% if l.cpl %}{{ formatar_brl(l.cpl) }}{% else %}—{% endif %}</td>
+        <td>{% if l.cpa %}{{ formatar_brl(l.cpa) }}{% else %}—{% endif %}</td>
+        <td>
+          {% if l.roas %}
+          <strong>{{ l.roas }}x</strong>
+          <div class="roas-bar" title="ROAS {{ l.roas }}x (barra cheia = 5x+)"><i style="width: {{ l.roas_barra_pct }}%"></i></div>
+          {% else %}—{% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table></div>
+  {% else %}
+  <div class="empty">
+    <strong>Nada para mostrar neste período.</strong>
+    <p><a href="/app/campanhas/nova">Cadastre uma campanha</a>, lance o custo e use UTMs nos links do catálogo.</p>
+  </div>
+  {% endif %}
+</section>
+{% endblock %}

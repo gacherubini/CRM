@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% block title %}Gastos em lote — Revy{% endblock %}
+{% block content %}
+<div class="page-heading">
+  <div>
+    <a class="back-link" href="/app/campanhas">← Voltar às campanhas</a>
+    <span class="eyebrow">Tráfego pago</span>
+    <h1>Lançar gastos em lote</h1>
+    <p>Registre a semana de todas as campanhas ativas sem abrir uma por uma.</p>
+  </div>
+  <a class="button secondary" href="/app/campanhas/gastos/csv/modelo">Baixar modelo CSV</a>
+</div>
+
+{% if request.query_params.get('ok') is not none %}
+<div class="alert success">{{ request.query_params.get('ok') }} gasto(s) lançado(s).</div>
+{% endif %}
+{% if erro %}<div class="alert error">{{ erro }}</div>{% endif %}
+{% if relatorio %}
+<div class="alert {{ 'warning' if relatorio.erros else 'success' }}" role="status">
+  <strong>{{ relatorio.importados }} {{ 'gasto importado' if relatorio.importados == 1 else 'gastos importados' }}.</strong>
+  {% if relatorio.erros %}
+  <ul>{% for item in relatorio.erros %}<li>{{ item }}</li>{% endfor %}</ul>
+  {% endif %}
+</div>
+{% endif %}
+
+<section class="panel form-section" style="margin-bottom:18px">
+  <div class="section-title"><span>01</span><div><h2>Preencher campanhas</h2><p>Valor vazio pula a linha. Nenhuma campanha é alterada.</p></div></div>
+  <form method="post" action="/app/campanhas/gastos/lote">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <div class="form-grid" style="margin-bottom:16px">
+      <label>Data de referência
+        <input type="date" name="referencia" value="{{ hoje }}" required>
+      </label>
+      <label>Nota para todas (opcional)
+        <input type="text" name="nota_global" maxlength="240" placeholder="Ex.: semana 3 Ads Manager">
+      </label>
+    </div>
+    {% if campanhas %}
+    <div class="table-wrap"><table>
+      <thead><tr><th>Campanha ativa</th><th>Canal</th><th>Valor (R$)</th><th>Nota da linha (opcional)</th></tr></thead>
+      <tbody>
+      {% for campanha in campanhas %}
+        <tr>
+          <td><strong>{{ campanha.nome }}</strong><br><small><code>{{ campanha.utm_campaign }}</code></small></td>
+          <td>{{ canais.get(campanha.canal, campanha.canal) }}</td>
+          <td><input aria-label="Valor de {{ campanha.nome }}" type="text" inputmode="decimal" name="valor_{{ campanha.id }}" placeholder="0,00"></td>
+          <td><input aria-label="Nota de {{ campanha.nome }}" type="text" maxlength="240" name="nota_{{ campanha.id }}" placeholder="Usa a nota geral se vazio"></td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table></div>
+    <div class="form-actions"><button class="button primary" type="submit">Salvar gastos preenchidos</button></div>
+    {% else %}
+    <div class="empty"><strong>Nenhuma campanha ativa.</strong><p><a href="/app/campanhas/nova">Cadastre ou ative uma campanha</a> para lançar gastos.</p></div>
+    {% endif %}
+  </form>
+</section>
+
+<section class="panel form-section">
+  <div class="section-title"><span>02</span><div><h2>Importar CSV Revy</h2><p>Aceita UTF-8 com ponto e vírgula ou vírgula. Linhas válidas entram; erros são listados.</p></div></div>
+  <form method="post" action="/app/campanhas/gastos/csv" enctype="multipart/form-data" class="form-grid">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <label>Arquivo CSV
+      <input type="file" name="arquivo" accept=".csv,text/csv" required>
+    </label>
+    <div style="display:flex;align-items:end"><button class="button secondary" type="submit">Importar gastos</button></div>
+  </form>
+  <p class="muted" style="margin-top:12px">Formato: <code>utm_campaign;valor;referencia;nota</code>. O importador não cria campanhas automaticamente.</p>
+</section>
+{% endblock %}

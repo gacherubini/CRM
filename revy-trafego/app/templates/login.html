@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Login — Revy Tráfego</title>
+  <link rel="stylesheet" href="/static/css/app.css">
+</head>
+<body class="login-page">
+  <main class="login-card panel">
+    <h1>Revy Tráfego</h1>
+    <p class="muted">Acesso da equipe Revy (multi-loja).</p>
+    {% if erro %}<div class="alert error">{{ erro }}</div>{% endif %}
+    <form method="post" action="/login" class="form-layout">
+      <label>E-mail
+        <input type="email" name="email" required autocomplete="username">
+      </label>
+      <label>Senha
+        <input type="password" name="senha" required autocomplete="current-password">
+      </label>
+      <button class="button primary" type="submit">Entrar</button>
+    </form>
+  </main>
+</body>
+</html>

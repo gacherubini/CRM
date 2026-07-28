@@ -1,0 +1,114 @@
+{% extends "base.html" %}
+{% block title %}{{ campanha.nome }} — Campanhas{% endblock %}
+{% block content %}
+<div class="page-heading">
+  <div>
+    <a class="back-link" href="/app/campanhas">← Voltar às campanhas</a>
+    <span class="eyebrow">{{ canais.get(campanha.canal, campanha.canal) }}</span>
+    <h1>{{ campanha.nome }}</h1>
+    <p><span class="status {{ 'confirmada' if campanha.status == 'ativa' else '' }}">{{ status_rotulo.get(campanha.status, campanha.status) }}</span> · <code>{{ campanha.utm_campaign }}</code>{% if campanha.periodo_inicio or campanha.periodo_fim %} · {{ campanha.periodo_inicio.strftime('%d/%m/%Y') if campanha.periodo_inicio else '…' }} – {{ campanha.periodo_fim.strftime('%d/%m/%Y') if campanha.periodo_fim else '…' }}{% endif %}</p>
+  </div>
+  <div class="heading-actions">
+    <a class="button secondary" href="/app/campanhas/{{ campanha.id }}/editar">Editar</a>
+    <a class="button primary" href="/app/trafego/roi?touch=last">Ver no ROI</a>
+    <form method="post" action="/app/campanhas/{{ campanha.id }}/apagar" onsubmit="return confirm('Apagar esta campanha e todos os gastos vinculados? Esta ação não pode ser desfeita.')">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <button class="button danger" type="submit">Apagar campanha</button>
+    </form>
+  </div>
+</div>
+
+{% if request.query_params.get('ok') == 'gasto' %}<div class="alert success">Gasto lançado.</div>{% endif %}
+{% if erro %}<div class="alert error">{{ erro }}</div>{% endif %}
+{% if chatbot_erro %}<div class="alert warning">Chatbot offline: leads podem estar incompletos. Vendas e gastos locais continuam válidos.</div>{% endif %}
+
+<form class="filter-bar" method="get">
+  <label class="search"><span class="sr-only">Início</span><input type="date" name="inicio" value="{{ periodo.inicio }}"></label>
+  <label class="search"><span class="sr-only">Fim</span><input type="date" name="fim" value="{{ periodo.fim }}"></label>
+  <button class="button secondary" type="submit">Aplicar período</button>
+</form>
+
+<section class="panel" style="margin-bottom: 18px;">
+  <div class="metric-grid">
+    <div class="metric"><span>Gasto no período</span><strong>{{ formatar_brl(linha_roi.gasto) }}</strong><small>total histórico {{ formatar_brl(gasto_total) }}</small></div>
+    <div class="metric"><span>Leads</span><strong>{% if chatbot_erro %}—{% else %}{{ linha_roi.leads }}{% endif %}</strong><small>com match de UTM</small></div>
+    <div class="metric"><span>Vendas</span><strong>{{ linha_roi.vendas }}</strong><small>faturamento {{ formatar_brl(linha_roi.faturamento) }}</small></div>
+    <div class="metric accent"><span>ROAS / custo por moto</span><strong>{% if linha_roi.roas is not none %}{{ linha_roi.roas }}x{% else %}—{% endif %}</strong><small>CPA {% if linha_roi.cpa is not none %}{{ formatar_brl(linha_roi.cpa) }}{% else %}—{% endif %}</small></div>
+  </div>
+</section>
+
+<section class="panel form-section" style="margin-bottom:18px">
+  <div class="section-title"><span>01</span><div><h2>Funil atribuído</h2><p>Last touch no período selecionado.</p></div></div>
+  <div class="metric-grid metric-grid-3">
+    <div class="metric"><span>Leads</span><strong>{% if chatbot_erro %}—{% else %}{{ linha_roi.leads }}{% endif %}</strong><small>interessados</small></div>
+    <div class="metric"><span>Vendas</span><strong>{{ linha_roi.vendas }}</strong><small>confirmadas</small></div>
+    <div class="metric accent"><span>Conversão</span><strong>{% if linha_roi.leads %}{{ '%.1f'|format(linha_roi.vendas / linha_roi.leads * 100) }}%{% else %}—{% endif %}</strong><small>vendas ÷ leads</small></div>
+  </div>
+</section>
+
+<section class="panel flush" style="margin-bottom:18px">
+  <div class="panel-heading"><div><span class="mono-label">RESULTADOS</span><h2>Últimas vendas atribuídas</h2></div></div>
+  {% if vendas_atribuidas %}
+  <div class="table-wrap"><table>
+    <thead><tr><th>Data</th><th>Veículo / descrição</th><th>Valor</th><th>Vendedor</th></tr></thead>
+    <tbody>{% for venda in vendas_atribuidas %}<tr>
+      <td>{{ (venda.confirmada_em or venda.criada_em).strftime('%d/%m/%Y') }}</td>
+      <td><strong>{{ venda.descricao }}</strong></td>
+      <td>{{ formatar_brl(venda.preco_venda) }}</td>
+      <td class="muted">{{ venda.vendedor_email }}</td>
+    </tr>{% endfor %}</tbody>
+  </table></div>
+  {% else %}<div class="empty"><strong>Nenhuma venda atribuída neste período.</strong><p>Confirme uma venda vinculada a um lead com esta UTM.</p></div>{% endif %}
+</section>
+
+<section class="panel form-section" style="margin-bottom: 18px;">
+  <div class="section-title"><span>02</span><div><h2>Lançar gasto manual</h2><p>Opcional se a campanha tem ID Meta e a sync em Tráfego está ativa. Use manual para correção ou canais sem API.</p></div></div>
+  {% if campanha.meta_campaign_id %}
+  <p class="muted" style="margin-bottom:12px;font-size:13px">ID Meta: <code>{{ campanha.meta_campaign_id }}</code> · <a href="/app/trafego">Sincronizar gastos</a></p>
+  {% else %}
+  <div class="alert warning" style="margin-bottom:12px">Sem ID da campanha Meta — o gasto automático não entra aqui. <a href="/app/campanhas/{{ campanha.id }}/editar">Editar campanha</a></div>
+  {% endif %}
+  <form method="post" action="/app/campanhas/{{ campanha.id }}/gastos" class="form-grid">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <label>Valor (R$)
+      <input type="text" name="valor" required placeholder="Ex.: 800,00" inputmode="decimal">
+    </label>
+    <label>Data de referência
+      <input type="date" name="referencia" value="{{ hoje }}" required>
+    </label>
+    <label>Nota
+      <input type="text" name="nota" maxlength="240" placeholder="Ex.: semana 2 Ads Manager">
+    </label>
+    <div style="display:flex;align-items:end;gap:8px">
+      <button class="button primary" type="submit">Adicionar gasto</button><a class="button secondary" href="/app/campanhas/gastos/lote">Lançar em lote</a>
+    </div>
+  </form>
+</section>
+
+<section class="panel flush">
+  <div class="panel-heading"><div><span class="mono-label">HISTÓRICO</span><h2>Gastos lançados</h2></div></div>
+  {% if gastos %}
+  <div class="table-wrap"><table>
+    <thead><tr><th>Data</th><th>Valor</th><th>Origem</th><th>Nota</th><th>Por</th></tr></thead>
+    <tbody>
+      {% for g in gastos %}
+      <tr>
+        <td>{{ g.referencia.strftime('%d/%m/%Y') }}</td>
+        <td><strong>{{ formatar_brl(g.valor) }}</strong></td>
+        <td>{% if g.origem == 'meta_api' %}<span class="status confirmada">Meta</span>{% else %}Manual{% endif %}</td>
+        <td>{{ g.nota or '—' }}</td>
+        <td class="muted">{{ g.criada_por }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table></div>
+  {% else %}
+  <div class="empty"><strong>Nenhum gasto lançado.</strong><p>Sem custo, o ROI mostra leads/vendas mas CPL/CPA/ROAS ficam em “—”.</p></div>
+  {% endif %}
+</section>
+
+<section class="panel form-section" style="margin-top:18px">
+  <div class="section-title"><span>03</span><div><h2>Link com atribuição</h2><p>Use estes parâmetros no link do catálogo publicado no anúncio.</p></div></div>
+  <code style="display:block;overflow-wrap:anywhere">?utm_source={{ campanha.utm_source or campanha.canal }}&amp;utm_medium={{ campanha.utm_medium or 'paid' }}&amp;utm_campaign={{ campanha.utm_campaign }}{% if campanha.utm_content %}&amp;utm_content={{ campanha.utm_content }}{% endif %}</code>
+</section>
+{% endblock %}

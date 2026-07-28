@@ -91,8 +91,26 @@ def pode_gerir_financeiras(usuario: Usuario) -> bool:
 
 
 def pode_gerir_trafego(usuario: Usuario) -> bool:
-    """Aba Tráfego / tokens CAPI — apenas dono e gerente (E10)."""
-    return usuario.papel in {"dono", "gerente"}
+    """UI técnica de tráfego (Pixel/CAPI/campanhas).
+
+    A partir da separação Revy Tráfego, o dono **não** gerencia config no portal.
+    Rollback: ``PORTAL_TRAFEGO_UI_LEGACY=1`` restaura o menu técnico para dono/gerente.
+    """
+    import os
+
+    if os.getenv("PORTAL_TRAFEGO_UI_LEGACY", "").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }:
+        return usuario.papel in {"dono", "gerente"}
+    return False
+
+
+def pode_ver_resultados_midia(usuario: Usuario) -> bool:
+    """Cards de resultados de mídia (gasto/leads/ROAS) — dono e gerente."""
+    return usuario.papel in {"dono", "gerente", "admin_plataforma"}
 
 
 def pode_gerir_equipe(usuario: Usuario) -> bool:

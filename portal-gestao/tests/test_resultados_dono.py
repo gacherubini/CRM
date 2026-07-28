@@ -49,6 +49,7 @@ def test_dashboard_resultados_somente_dono_gerente(client, chatbot_fake):
     login(client)
     pagina = client.get("/app")
     assert "Resultados do tráfego" in pagina.text
+    # Com PORTAL_TRAFEGO_UI_LEGACY=1 (conftest) o checklist técnico ainda aparece.
     assert "Medindo de verdade" in pagina.text
 
 
@@ -70,3 +71,18 @@ def test_dono_pode_dispensar_checklist_medicao(client):
     )
     assert resposta.status_code == 303
     assert "Medindo de verdade" not in client.get("/app").text
+
+
+def test_slim_portal_sem_menus_tecnicos_de_trafego(client, monkeypatch):
+    """Produção (sem LEGACY): dono vê resultados, sem Tráfego/Campanhas na nav."""
+    monkeypatch.delenv("PORTAL_TRAFEGO_UI_LEGACY", raising=False)
+    monkeypatch.setenv("PORTAL_TRAFEGO_UI_LEGACY", "0")
+    login(client)
+    pagina = client.get("/app")
+    assert "Resultados do tráfego" in pagina.text
+    assert 'href="/app/trafego"' not in pagina.text
+    assert 'href="/app/campanhas"' not in pagina.text
+    assert "Medindo de verdade" not in pagina.text
+    r = client.get("/app/trafego", follow_redirects=False)
+    assert r.status_code == 303
+    assert r.headers["location"] == "/app"

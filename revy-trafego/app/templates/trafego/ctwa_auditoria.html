@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+{% block title %}Auditoria CTWA — Revy{% endblock %}
+{% block content %}
+<div class="page-heading">
+  <div>
+    <a class="back-link" href="/app/trafego">← Tráfego</a>
+    <span class="eyebrow">Click-to-WhatsApp</span>
+    <h1>Auditoria CTWA</h1>
+    <p>Sinais de campanha/ad que chegaram no webhook. Telefone e click id completos não são exibidos (LGPD).</p>
+  </div>
+  <div class="heading-actions">
+    <a class="button secondary" href="/app/campanhas">Campanhas</a>
+    <a class="button primary" href="/app/trafego">Config tráfego</a>
+  </div>
+</div>
+
+{% if erro_chatbot %}<div class="alert error">{{ erro_chatbot }}</div>{% endif %}
+
+<form class="filter-bar" method="get">
+  <label class="check-row">
+    <input type="checkbox" name="so_com_clid" value="1" {% if so_com_clid %}checked{% endif %} onchange="this.form.submit()">
+    Só com <code>ctwa_clid</code>
+  </label>
+</form>
+
+<section class="panel flush">
+  <div class="panel-heading">
+    <div>
+      <span class="mono-label">EVENTOS</span>
+      <h2>Últimos sinais recebidos</h2>
+    </div>
+  </div>
+  {% if itens %}
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Quando</th>
+          <th>Tel.</th>
+          <th>clid?</th>
+          <th>Sufixo clid</th>
+          <th>Campaign / Ad</th>
+          <th>Código</th>
+          <th>Lead</th>
+          <th>Sinais</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for e in itens %}
+        <tr>
+          <td class="muted">{{ formatar_horario(e.criada_em) if e.criada_em else '—' }}</td>
+          <td><code>{{ e.telefone_mascarado }}</code></td>
+          <td>
+            {% if e.tem_ctwa_clid %}
+              <span class="status confirmada">sim</span>
+            {% else %}
+              <span class="muted">não</span>
+            {% endif %}
+          </td>
+          <td>{% if e.ctwa_clid_sufixo %}<code>…{{ e.ctwa_clid_sufixo }}</code>{% else %}—{% endif %}</td>
+          <td>
+            {% if e.meta_campaign_id %}<div><small>camp</small> <code>{{ e.meta_campaign_id }}</code></div>{% endif %}
+            {% if e.meta_ad_id %}<div><small>ad</small> <code>{{ e.meta_ad_id }}</code></div>{% endif %}
+            {% if e.meta_adset_id %}<div><small>adset</small> <code>{{ e.meta_adset_id }}</code></div>{% endif %}
+            {% if e.ctwa_source_type %}<div class="muted">{{ e.ctwa_source_type }}</div>{% endif %}
+            {% if not e.meta_campaign_id and not e.meta_ad_id and not e.meta_adset_id %}—{% endif %}
+          </td>
+          <td>
+            {% if e.ctwa_codigo %}<code>{{ e.ctwa_codigo }}</code>{% if e.codigo_extraido_texto %} <small class="muted">(texto)</small>{% endif %}{% else %}—{% endif %}
+          </td>
+          <td>
+            {% if e.atribuido_lead and e.lead_id %}
+              <a href="/app/leads/{{ e.lead_id }}">sim</a>
+            {% elif e.atribuido_lead %}
+              sim
+            {% else %}
+              <span class="muted">não</span>
+            {% endif %}
+          </td>
+          <td class="muted" style="font-size:11px">
+            {% if e.sinais %}
+              {% for k, v in e.sinais.items() if v %}{{ k }}{% if not loop.last %}, {% endif %}{% endfor %}
+            {% else %}—{% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty">
+    <strong>Nenhum evento CTWA ainda.</strong>
+    <p>Quando um anúncio de WhatsApp mandar click id ou a mensagem trouxer <code>Cód: …</code>, o evento aparece aqui. Se a Evolution não enviar referral, a coluna “clid?” fica em não.</p>
+  </div>
+  {% endif %}
+</section>
+
+<section class="panel form-section" style="margin-top:18px">
+  <div class="section-title"><span>01</span><div><h2>Como ler</h2><p>Confiança operacional, não pixel do site.</p></div></div>
+  <ul class="muted" style="margin:0;padding-left:1.2rem;font-size:13px;line-height:1.5">
+    <li><strong>clid? = sim</strong> → o WhatsApp/Evolution entregou <code>ctwa_clid</code> (melhor para CAPI messaging).</li>
+    <li><strong>clid? = não</strong> + código → ainda dá match de campanha pelo código da mensagem.</li>
+    <li><strong>Tudo vazio</strong> em msgs de anúncio → webhook não está repassando referral (conferir n8n/Evolution).</li>
+    <li>Logs do Chatbot: linha <code>ctwa_auditoria</code> com clid=sim/nao (sem PII completo).</li>
+  </ul>
+</section>
+{% endblock %}

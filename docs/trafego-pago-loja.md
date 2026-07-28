@@ -13,9 +13,12 @@ Cópias em `output/pdf/` com os mesmos nomes.
 
 ## 1. Configurar Pixel (uma vez)
 
-1. No Portal: **Tráfego** → informe **Pixel ID** + **token CAPI**.
-2. O **Catálogo** puxa o Pixel ID sozinho do Portal (por loja). O dono não precisa de secret Fly.
-3. Confirme eventos: PageView / Lead no site, Purchase ao **confirmar venda**.
+> **Quem configura:** a **equipe Revy** no app **Revy Tráfego** (multi-loja).  
+> No portal da loja o dono **não** vê mais tokens, Pixel ID nem CRUD de campanhas — só **resultados**.
+
+1. Revy Tráfego → selecione a loja → **Config / Pixel** → **Pixel ID** + **token CAPI**.
+2. O **Catálogo** puxa o Pixel ID (por loja; na Fase 1 ainda via endpoint do Portal ou do Revy Tráfego se apontado).
+3. Confirme eventos: PageView / Lead no site, Purchase ao **confirmar venda** no portal.
 
 ## 2. Criar campanha no Ads com UTM
 

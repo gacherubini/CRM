@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}Diagnóstico leads — Revy Tráfego{% endblock %}
+{% block page_title %}Leads{% endblock %}
+{% block content %}
+<div class="page-heading">
+  <div>
+    <span class="eyebrow">Diagnóstico</span>
+    <h1>Leads da loja</h1>
+    <p>Proxy do Chatbot. Acesso auditado.</p>
+  </div>
+</div>
+{% if erro %}<div class="alert error">{{ erro }}</div>{% endif %}
+<form method="get" class="form-layout" style="margin-bottom:16px">
+  <label>Filtrar utm_campaign
+    <input type="text" name="utm" value="{{ utm }}" placeholder="parte do utm">
+  </label>
+  <button class="button secondary" type="submit">Filtrar</button>
+</form>
+<section class="panel">
+  <table class="data-table">
+    <thead>
+      <tr><th>Nome</th><th>Telefone</th><th>Etapa</th><th>UTM</th><th></th></tr>
+    </thead>
+    <tbody>
+      {% for l in leads %}
+      <tr>
+        <td>{{ l.nome or '—' }}</td>
+        <td>{{ mascarar_telefone(l.telefone) }}</td>
+        <td>{{ l.etapa or '—' }}</td>
+        <td>{{ l.utm_campaign_last or l.utm_campaign or '—' }}</td>
+        <td><a href="/app/diagnostico/leads/{{ l.id }}">abrir</a>
+          {% if l.telefone %} · <a href="/app/diagnostico/conversas/{{ l.telefone }}">conversa</a>{% endif %}
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="5">Nenhum lead.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endblock %}

@@ -1,4 +1,4 @@
-{% if pode_gerir_trafego and resultados_view %}
+{% if pode_ver_resultados_midia and resultados_view %}
 <section class="revy-results" aria-labelledby="resultados-titulo">
   <header class="revy-results__heading">
     <div>
@@ -13,7 +13,7 @@
   </header>
 
   {% if not resultados_view.tem_campanhas %}
-  <div class="empty"><strong>Cadastre a primeira campanha com UTM.</strong><p>O Revy conecta gastos, leads e vendas pela chave <code>utm_campaign</code>.</p><a class="button primary" href="/app/campanhas/nova">Criar campanha</a></div>
+  <div class="empty"><strong>Ainda sem campanhas no período.</strong><p>A equipe Revy configura a medição e as campanhas. Os números aparecem aqui quando houver dados.</p></div>
   {% else %}
   <div class="revy-results__hero">
     <article class="revy-results__kpi"><span>Gasto</span><strong>{{ formatar_brl(resultados_view.totais.gasto) }}</strong><small>lançado no Revy</small></article>
@@ -41,14 +41,18 @@
     <span>Melhor campanha</span>
     <strong>{{ resultados_view.melhor_campanha.nome }}</strong>
     <small>{% if resultados_view.melhor_campanha.roas is not none %}ROAS {{ resultados_view.melhor_campanha.roas }}x · {% endif %}{{ resultados_view.melhor_campanha.vendas }} venda(s)</small>
+    {% if pode_gerir_trafego %}
     <a href="/app/campanhas/{{ resultados_view.melhor_campanha.campanha_id }}">Abrir →</a>
+    {% endif %}
   </div>
   {% endif %}
+  {% if pode_gerir_trafego %}
   <footer class="revy-results__actions">
     <a class="button primary" href="/app/campanhas/gastos/lote">Lançar gastos</a>
     <a class="button secondary" href="/app/trafego/roi">Ver ROI</a>
     <a class="button ghost" href="/app/campanhas">Campanhas</a>
   </footer>
+  {% endif %}
   {% endif %}
 </section>
 {% endif %}
