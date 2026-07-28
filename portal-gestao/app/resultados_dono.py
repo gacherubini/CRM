@@ -18,6 +18,68 @@ class AlertaTrafego:
     acao: str
 
 
+def resumo_from_api(payload: dict) -> dict:
+    """Adapta JSON da API Revy Tráfego ao shape usado pelo partial de resultados."""
+    from types import SimpleNamespace
+
+    totais_raw = payload.get("totais") or {}
+
+    def _d(v):
+        if v is None or v == "":
+            return None
+        try:
+            return Decimal(str(v))
+        except Exception:
+            return None
+
+    totais = {
+        "gasto": _d(totais_raw.get("gasto")) or Decimal("0.00"),
+        "leads": int(totais_raw.get("leads") or 0),
+        "vendas": int(totais_raw.get("vendas") or 0),
+        "faturamento": _d(totais_raw.get("faturamento")) or Decimal("0.00"),
+        "cpl": _d(totais_raw.get("cpl")),
+        "cpa": _d(totais_raw.get("cpa")),
+        "roas": _d(totais_raw.get("roas")),
+    }
+    canais = []
+    for item in payload.get("canais") or []:
+        roas = _d(item.get("roas"))
+        canais.append(
+            {
+                "canal": item.get("canal") or "outro",
+                "gasto": _d(item.get("gasto")) or Decimal("0.00"),
+                "vendas": int(item.get("vendas") or 0),
+                "faturamento": _d(item.get("faturamento")) or Decimal("0.00"),
+                "roas": roas,
+                "roas_barra_pct": item.get("roas_barra_pct")
+                or (
+                    min(100.0, float(roas) / 5.0 * 100.0) if roas is not None else 0.0
+                ),
+            }
+        )
+    melhor_raw = payload.get("melhor_campanha")
+    melhor = None
+    if melhor_raw:
+        melhor = SimpleNamespace(
+            campanha_id=melhor_raw.get("id"),
+            nome=melhor_raw.get("nome") or "—",
+            canal=melhor_raw.get("canal") or "—",
+            roas=_d(melhor_raw.get("roas")),
+            vendas=int(melhor_raw.get("vendas") or 0),
+            leads=int(melhor_raw.get("leads") or 0),
+            gasto=_d(melhor_raw.get("gasto")) or Decimal("0.00"),
+        )
+    return {
+        "totais": totais,
+        "canais": canais,
+        "melhor_campanha": melhor,
+        "tem_campanhas": bool(payload.get("tem_campanhas")),
+        "vendas_sem_campanha": int(payload.get("vendas_sem_campanha") or 0),
+        "leads_sem_campanha": int(payload.get("leads_sem_campanha") or 0),
+        "fonte": "api",
+    }
+
+
 def resumo_periodo(linhas: Iterable[LinhaRoiCampanha]) -> dict:
     itens = list(linhas)
     campanhas = [linha for linha in itens if linha.campanha_id is not None]

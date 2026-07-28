@@ -38,6 +38,8 @@ class Settings:
         in {"1", "true", "yes", "on"}
     )
     job_secret: str = os.getenv("REVY_TRAFEGO_JOB_SECRET", "").strip()
+    # Token entre portal/catálogo e este app (header X-Service-Token).
+    service_token: str = os.getenv("REVY_TRAFEGO_SERVICE_TOKEN", "").strip()
 
 
 settings = Settings()

@@ -61,6 +61,7 @@ from app.models import (
     novo_id,
 )
 from app.roi_calc import calcular_roi_loja, gerar_insights_roi, totais_roi, venda_casa_campanha
+from app.api_v1 import router as api_v1_router
 
 BASE_DIR = Path(__file__).resolve().parent
 logger = logging.getLogger(__name__)
@@ -112,6 +113,8 @@ templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
 
 if os.getenv("REVY_TRAFEGO_SKIP_INIT") != "1":
     Base.metadata.create_all(bind=engine)
+
+app.include_router(api_v1_router)
 
 
 def mascarar_telefone(telefone: str | None) -> str:

@@ -35,11 +35,14 @@ class Settings:
     events_worker_interval: float = max(
         0.5, float(os.getenv("CATALOGO_EVENTS_WORKER_INTERVAL", "5"))
     )
-    # Meta Pixel browser (E10). Fonte da verdade: Portal → Tráfego (por loja).
-    # Catálogo consulta PORTAL_PUBLIC_URL; META_PIXEL_ID é só fallback de ops.
+    # Meta Pixel browser (E10). Fonte da verdade: config por loja.
+    # Preferência: REVY_TRAFEGO_PUBLIC_URL (Fase 2) → PORTAL_PUBLIC_URL → PORTAL_PIXEL_URL.
     # Token CAPI NÃO vive no catálogo.
     portal_public_url: str = (
-        os.getenv("PORTAL_PUBLIC_URL") or os.getenv("PORTAL_PIXEL_URL") or ""
+        os.getenv("REVY_TRAFEGO_PUBLIC_URL")
+        or os.getenv("PORTAL_PUBLIC_URL")
+        or os.getenv("PORTAL_PIXEL_URL")
+        or ""
     ).strip().rstrip("/")
     # Compatibilidade para instalações antigas em que Portal e Catálogo usam
     # slugs diferentes para a mesma loja.

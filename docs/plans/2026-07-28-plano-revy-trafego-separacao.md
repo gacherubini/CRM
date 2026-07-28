@@ -1,7 +1,7 @@
 # Plano — Revy Tráfego separado do Portal da loja
 
-> **Status 2026-07-28: FASE 1 CÓDIGO FEITO** — app `revy-trafego/` + slim portal (sem UI técnica no dono por default).  
-> Fase 2 (API resultados + cutover CAPI/pixel) ainda **não** implementada.  
+> **Status 2026-07-28: FASE 1+2 CÓDIGO FEITO** — app multi-loja, slim portal, API `/v1` resultados + venda-confirmada, client portal (flags), catálogo prioriza `REVY_TRAFEGO_PUBLIC_URL`.  
+> **Deploy lab** e cutover de workers (ligar só no Revy Tráfego) ainda pendentes.  
 > Spec: [`docs/superpowers/specs/2026-07-28-revy-trafego-separacao-portal-design.md`](../superpowers/specs/2026-07-28-revy-trafego-separacao-portal-design.md)
 
 **Eixo:** C · CRM / marketing  
@@ -33,7 +33,7 @@
 | Fase | Plano detalhado | Entrega | Status |
 |---:|---|---|---|
 | **1** | [Fase 1 — app multi-loja + slim portal](../superpowers/plans/2026-07-28-revy-trafego-fase1-app-multi-loja.md) | Cockpit Revy + cliente sem menus técnicos | **CÓDIGO FEITO** — falta deploy lab |
-| **2** | [Fase 2 — API + cutover](../superpowers/plans/2026-07-28-revy-trafego-fase2-api-cutover.md) | Resultados via API; pixel/CAPI/venda no Revy Tráfego | **NÃO IMPLEMENTADO** |
+| **2** | [Fase 2 — API + cutover](../superpowers/plans/2026-07-28-revy-trafego-fase2-api-cutover.md) | Resultados via API; pixel/CAPI/venda no Revy Tráfego | **CÓDIGO FEITO** (flags off por default; workers ainda no portal até cutover ops) |
 | **3** | (opcional, sem plano detalhado ainda) | Split DB, atribuição por gestor, audit PII completo | Backlog |
 
 ### Critério de pronto Fase 1

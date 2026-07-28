@@ -47,6 +47,22 @@ class Settings:
         os.getenv("PORTAL_META_SPEND_SYNC_JANELA_DIAS", "3")
     )
     meta_spend_job_secret: str = os.getenv("PORTAL_META_SPEND_JOB_SECRET", "").strip()
+    # Revy Tráfego (Fase 2): resultados e notificação de venda via HTTP.
+    revy_trafego_url: str = (
+        os.getenv("REVY_TRAFEGO_URL") or os.getenv("PORTAL_REVY_TRAFEGO_URL") or ""
+    ).strip().rstrip("/")
+    revy_trafego_service_token: str = os.getenv(
+        "REVY_TRAFEGO_SERVICE_TOKEN", ""
+    ).strip()
+    revy_trafego_timeout: float = float(os.getenv("PORTAL_REVY_TRAFEGO_TIMEOUT", "4"))
+    revy_trafego_resultados_enabled: bool = (
+        os.getenv("PORTAL_REVY_TRAFEGO_RESULTADOS", "0").strip().lower()
+        in {"1", "true", "yes", "on"}
+    )
+    revy_trafego_venda_events_enabled: bool = (
+        os.getenv("PORTAL_REVY_TRAFEGO_VENDA_EVENTS", "0").strip().lower()
+        in {"1", "true", "yes", "on"}
+    )
 
 
 settings = Settings()

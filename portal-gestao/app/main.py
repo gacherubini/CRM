@@ -81,7 +81,13 @@ from app.campanhas import (
     salvar_gasto_manual,
     validar_campanha_payload,
 )
-from app.resultados_dono import alertas_trafego, checklist_medicao, resumo_periodo
+from app.resultados_dono import (
+    alertas_trafego,
+    checklist_medicao,
+    resumo_from_api,
+    resumo_periodo,
+)
+from app.config import settings
 from app.roi_calc import calcular_roi_loja, gerar_insights_roi, totais_roi, venda_casa_campanha
 from app.clients.chatbot import (
     ChatbotClient,
@@ -97,7 +103,6 @@ from app.clients.estoque import (
     VeiculoNaoEncontrado,
 )
 from app.clients.motor import CredencialNaoEncontrada, MotorClient, MotorIndisponivel
-from app.config import settings
 from app.db import Base, SessionLocal, engine, get_db
 from app.financeiro_calc import (
     FUSO_PORTAL,
@@ -488,30 +493,50 @@ def dashboard(
     # Resultados de mídia: dono/gerente (leitura). Config técnica: só legacy / Revy Tráfego.
     if pode_ver_resultados_midia(usuario):
         from app.financeiro_calc import hoje_portal
+        from app.clients.revy_trafego import RevyTrafegoClient
 
         hoje = hoje_portal()
         seletor = "mes" if resultados == "mes" else "7d"
         d_inicio = hoje.replace(day=1) if seletor == "mes" else hoje - timedelta(days=6)
         d_fim = hoje
-        campanhas = db.query(Campanha).filter(Campanha.loja_slug == usuario.loja_slug).all()
-        gastos = db.query(CampanhaGasto).filter(CampanhaGasto.loja_slug == usuario.loja_slug).all()
-        vendas = calcular_metricas_vendas(db, usuario.loja_slug, d_inicio, d_fim)["confirmadas"]
-        leads: list[dict] = []
         chatbot_offline = False
-        try:
-            leads = chatbot.listar_leads()
-        except ChatbotIndisponivel:
-            chatbot_offline = True
-        linhas = calcular_roi_loja(
-            campanhas=campanhas,
-            gastos=gastos,
-            leads=leads,
-            vendas_confirmadas=vendas,
-            d_inicio=d_inicio,
-            d_fim=d_fim,
-            modo_atribuicao="last",
-        )
-        resultados_view = resumo_periodo(linhas)
+        linhas = []
+        api_ok = False
+        if settings.revy_trafego_resultados_enabled:
+            api_payload = RevyTrafegoClient().fetch_resultados(
+                loja_slug=usuario.loja_slug,
+                periodo=seletor,
+                modo="last",
+            )
+            if api_payload is not None:
+                resultados_view = resumo_from_api(api_payload)
+                periodo_api = api_payload.get("periodo") or {}
+                chatbot_offline = bool(periodo_api.get("chatbot_offline"))
+                api_ok = True
+                try:
+                    d_inicio = date.fromisoformat(periodo_api.get("inicio") or d_inicio.isoformat())
+                    d_fim = date.fromisoformat(periodo_api.get("fim") or d_fim.isoformat())
+                except ValueError:
+                    pass
+        if not api_ok:
+            campanhas = db.query(Campanha).filter(Campanha.loja_slug == usuario.loja_slug).all()
+            gastos = db.query(CampanhaGasto).filter(CampanhaGasto.loja_slug == usuario.loja_slug).all()
+            vendas = calcular_metricas_vendas(db, usuario.loja_slug, d_inicio, d_fim)["confirmadas"]
+            leads: list[dict] = []
+            try:
+                leads = chatbot.listar_leads()
+            except ChatbotIndisponivel:
+                chatbot_offline = True
+            linhas = calcular_roi_loja(
+                campanhas=campanhas,
+                gastos=gastos,
+                leads=leads,
+                vendas_confirmadas=vendas,
+                d_inicio=d_inicio,
+                d_fim=d_fim,
+                modo_atribuicao="last",
+            )
+            resultados_view = resumo_periodo(linhas)
         config_meta = db.query(MetaPixelConfig).filter(
             MetaPixelConfig.loja_slug == usuario.loja_slug
         ).first()
@@ -519,7 +544,7 @@ def dashboard(
             MetaCapiOutbox.loja_slug == usuario.loja_slug
         ).order_by(MetaCapiOutbox.criada_em.desc()).all()
         alertas_view = alertas_trafego(
-            linhas=linhas,
+            linhas=linhas if not api_ok else [],
             config=config_meta,
             ultimo_outbox=outboxes[0] if outboxes else None,
             chatbot_offline=chatbot_offline,
@@ -527,10 +552,12 @@ def dashboard(
         )
         # Checklist técnico de medição só na UI legacy (dono configurando no portal).
         if pode_gerir_trafego(usuario):
+            campanhas_ob = db.query(Campanha).filter(Campanha.loja_slug == usuario.loja_slug).all()
+            gastos_ob = db.query(CampanhaGasto).filter(CampanhaGasto.loja_slug == usuario.loja_slug).all()
             onboarding = checklist_medicao(
                 config=config_meta,
-                campanhas=campanhas,
-                gastos=gastos,
+                campanhas=campanhas_ob,
+                gastos=gastos_ob,
                 vendas=db.query(Venda).filter(Venda.loja_slug == usuario.loja_slug).all(),
                 outboxes=outboxes,
             )
@@ -539,6 +566,7 @@ def dashboard(
             "fim": d_fim,
             "seletor": seletor,
             "chatbot_offline": chatbot_offline,
+            "api_indisponivel": settings.revy_trafego_resultados_enabled and not api_ok,
         }
     return templates.TemplateResponse(
         "dashboard.html",
@@ -2142,11 +2170,33 @@ async def vendas_confirmar(
         payload={"venda_id": venda.id, "status": "confirmada"},
     )
     # Conversões outbound — cada adapter é best-effort e nunca desfaz a venda.
+    purchase = PurchaseConversion.from_sale(venda, lead)
     publish_conversion(
         ConversionKind.PURCHASE,
-        PurchaseConversion.from_sale(venda, lead),
+        purchase,
         db,
     )
+    # Fase 2: notifica Revy Tráfego (idempotente). Flag off = no-op.
+    if settings.revy_trafego_venda_events_enabled:
+        from app.clients.revy_trafego import RevyTrafegoClient
+
+        RevyTrafegoClient().notificar_venda_confirmada(
+            loja_slug=usuario.loja_slug,
+            payload={
+                "venda_id": venda.id,
+                "lead_ref": venda.lead_ref,
+                "valor": str(venda.preco_venda),
+                "moeda": "BRL",
+                "event_id": purchase.event_id,
+                "cliente_telefone": purchase.phone,
+                "cliente_email": purchase.email,
+                "fbclid": purchase.fbclid,
+                "fbc": purchase.fbc,
+                "ctwa_clid": purchase.ctwa_clid,
+                "campanha_id_first": venda.campanha_id_first,
+                "campanha_id_last": venda.campanha_id_last,
+            },
+        )
     return RedirectResponse("/app/vendas?ok=confirmada", status_code=303)
 
 
