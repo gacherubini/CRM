@@ -28,8 +28,8 @@
         <td>{{ mascarar_telefone(l.telefone) }}</td>
         <td>{{ l.etapa or '—' }}</td>
         <td>{{ l.utm_campaign_last or l.utm_campaign or '—' }}</td>
-        <td><a href="/app/diagnostico/leads/{{ l.id }}">abrir</a>
-          {% if l.telefone %} · <a href="/app/diagnostico/conversas/{{ l.telefone }}">conversa</a>{% endif %}
+        <td><a href="{{ public_path('/app/diagnostico/leads/' ~ (l.id)) }}">abrir</a>
+          {% if l.telefone %} · <a href="{{ public_path('/app/diagnostico/conversas/' ~ url_telefone(l.telefone)) }}">conversa</a>{% endif %}
         </td>
       </tr>
       {% else %}

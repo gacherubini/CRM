@@ -3,23 +3,76 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Login — Revy Tráfego</title>
-  <link rel="stylesheet" href="/static/css/app.css">
+  <meta name="theme-color" content="#ffffff">
+  <title>Entrar — Revy Tráfego</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ public_path('/static/css/app.css') }}">
+  <script>
+    (() => {
+      const saved = localStorage.getItem('revy-theme');
+      let theme = saved === 'dark' || saved === 'light' ? saved : null;
+      if (!theme) {
+        theme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+      }
+      document.documentElement.setAttribute('data-theme', theme);
+      const meta = document.querySelector('meta[name="theme-color"]');
+      if (meta) meta.setAttribute('content', theme === 'dark' ? '#0a0a0a' : '#ffffff');
+    })();
+  </script>
 </head>
 <body class="login-page">
-  <main class="login-card panel">
-    <h1>Revy Tráfego</h1>
-    <p class="muted">Acesso da equipe Revy (multi-loja).</p>
-    {% if erro %}<div class="alert error">{{ erro }}</div>{% endif %}
-    <form method="post" action="/login" class="form-layout">
-      <label>E-mail
-        <input type="email" name="email" required autocomplete="username">
-      </label>
-      <label>Senha
-        <input type="password" name="senha" required autocomplete="current-password">
-      </label>
-      <button class="button primary" type="submit">Entrar</button>
-    </form>
+  <div class="login-theme-bar">
+    <button class="theme-toggle" type="button" id="theme-toggle" aria-label="Alternar tema">
+      <span class="theme-toggle-icon" aria-hidden="true">☾</span>
+      <span class="theme-toggle-label">Escuro</span>
+    </button>
+  </div>
+  <main class="login-layout">
+    <section class="login-story">
+      <span class="eyebrow">Revy Tráfego</span>
+      <h1>Mídia paga, multi-loja.</h1>
+      <p>Pixel, CAPI, campanhas, ROI e diagnóstico de leads — a operação de tráfego da equipe Revy.</p>
+    </section>
+    <section class="login-panel">
+      <div class="login-card">
+        <span class="brand-mark" style="display:inline-grid;margin-bottom:16px" aria-hidden="true">T</span>
+        <div>
+          <h2>Entrar</h2>
+          <p>Acesso da equipe Revy (todas as lojas).</p>
+        </div>
+        {% if erro %}<div class="alert error" role="alert">{{ erro }}</div>{% endif %}
+        <form method="post" action="{{ public_path('/login') }}" class="stack-form">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          <label>E-mail<input type="email" name="email" autocomplete="email" required></label>
+          <label>Senha<input type="password" name="senha" autocomplete="current-password" required></label>
+          <button class="button primary" type="submit">Entrar</button>
+        </form>
+      </div>
+    </section>
   </main>
+  <script>
+    (() => {
+      const root = document.documentElement;
+      const toggle = document.getElementById('theme-toggle');
+      const apply = () => {
+        const dark = root.getAttribute('data-theme') === 'dark';
+        const label = toggle?.querySelector('.theme-toggle-label');
+        const icon = toggle?.querySelector('.theme-toggle-icon');
+        if (label) label.textContent = dark ? 'Claro' : 'Escuro';
+        if (icon) icon.textContent = dark ? '☀' : '☾';
+        const meta = document.querySelector('meta[name="theme-color"]');
+        if (meta) meta.setAttribute('content', dark ? '#0a0a0a' : '#ffffff');
+      };
+      apply();
+      toggle?.addEventListener('click', () => {
+        const next = root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+        root.setAttribute('data-theme', next);
+        localStorage.setItem('revy-theme', next);
+        apply();
+      });
+    })();
+  </script>
 </body>
 </html>

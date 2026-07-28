@@ -8,7 +8,7 @@ FROM python:3.12-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    REVY_APP_IMAGE_REV=7
+    REVY_APP_IMAGE_REV=8
 
 WORKDIR /srv
 
@@ -35,6 +35,8 @@ COPY estoque-api/alembic.ini /srv/estoque/alembic.ini
 COPY portal-gestao/app /srv/portal/app
 COPY portal-gestao/alembic /srv/portal/alembic
 COPY portal-gestao/alembic.ini /srv/portal/alembic.ini
+
+COPY revy-trafego/app /srv/revy-trafego/app
 
 COPY catalogo-publico/app /srv/catalogo/app
 
@@ -63,6 +65,7 @@ COPY deploy/fly/3vm/motor-entrypoint.sh /srv/scripts/motor-entrypoint.sh
 COPY deploy/fly/3vm/run-chatbot.sh /srv/scripts/run-chatbot.sh
 COPY deploy/fly/3vm/run-estoque.sh /srv/scripts/run-estoque.sh
 COPY deploy/fly/3vm/run-portal.sh /srv/scripts/run-portal.sh
+COPY deploy/fly/3vm/run-revy-trafego.sh /srv/scripts/run-revy-trafego.sh
 COPY deploy/fly/3vm/run-catalogo.sh /srv/scripts/run-catalogo.sh
 COPY deploy/fly/3vm/run-motor.sh /srv/scripts/run-motor.sh
 

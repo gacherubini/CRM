@@ -3,12 +3,12 @@
 {% block content %}
 <div class="page-heading">
   <div>
-    <a class="back-link" href="/app/campanhas">← Voltar às campanhas</a>
+    <a class="back-link" href="{{ public_path('/app/campanhas') }}">← Voltar às campanhas</a>
     <span class="eyebrow">Tráfego pago</span>
     <h1>Lançar gastos em lote</h1>
     <p>Registre a semana de todas as campanhas ativas sem abrir uma por uma.</p>
   </div>
-  <a class="button secondary" href="/app/campanhas/gastos/csv/modelo">Baixar modelo CSV</a>
+  <a class="button secondary" href="{{ public_path('/app/campanhas/gastos/csv/modelo') }}">Baixar modelo CSV</a>
 </div>
 
 {% if request.query_params.get('ok') is not none %}
@@ -26,7 +26,7 @@
 
 <section class="panel form-section" style="margin-bottom:18px">
   <div class="section-title"><span>01</span><div><h2>Preencher campanhas</h2><p>Valor vazio pula a linha. Nenhuma campanha é alterada.</p></div></div>
-  <form method="post" action="/app/campanhas/gastos/lote">
+  <form method="post" action="{{ public_path('/app/campanhas/gastos/lote') }}">
     <input type="hidden" name="csrf" value="{{ csrf }}">
     <div class="form-grid" style="margin-bottom:16px">
       <label>Data de referência
@@ -52,14 +52,14 @@
     </table></div>
     <div class="form-actions"><button class="button primary" type="submit">Salvar gastos preenchidos</button></div>
     {% else %}
-    <div class="empty"><strong>Nenhuma campanha ativa.</strong><p><a href="/app/campanhas/nova">Cadastre ou ative uma campanha</a> para lançar gastos.</p></div>
+    <div class="empty"><strong>Nenhuma campanha ativa.</strong><p><a href="{{ public_path('/app/campanhas/nova') }}">Cadastre ou ative uma campanha</a> para lançar gastos.</p></div>
     {% endif %}
   </form>
 </section>
 
 <section class="panel form-section">
   <div class="section-title"><span>02</span><div><h2>Importar CSV Revy</h2><p>Aceita UTF-8 com ponto e vírgula ou vírgula. Linhas válidas entram; erros são listados.</p></div></div>
-  <form method="post" action="/app/campanhas/gastos/csv" enctype="multipart/form-data" class="form-grid">
+  <form method="post" action="{{ public_path('/app/campanhas/gastos/csv') }}" enctype="multipart/form-data" class="form-grid">
     <input type="hidden" name="csrf" value="{{ csrf }}">
     <label>Arquivo CSV
       <input type="file" name="arquivo" accept=".csv,text/csv" required>

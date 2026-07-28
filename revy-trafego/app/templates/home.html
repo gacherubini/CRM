@@ -6,42 +6,62 @@
   <div>
     <span class="eyebrow">Multi-loja</span>
     <h1>Escolha a loja</h1>
-    <p>Todas as lojas conhecidas no banco (campanhas, pixel, vendas). Você também pode digitar um slug novo.</p>
+    <p>Selecione a loja no dropdown para operar Pixel, campanhas, ROI e diagnóstico.</p>
   </div>
 </div>
 
-{% if erro == 'loja' %}<div class="alert error">Informe um slug de loja válido.</div>{% endif %}
+{% if erro == 'loja' %}<div class="alert error">Selecione ou digite um slug de loja válido.</div>{% endif %}
 
 <section class="panel form-section">
-  <form method="post" action="/app/loja" class="form-layout">
+  <form method="post" action="{{ public_path('/app/loja') }}" class="form-layout" id="form-loja">
     <input type="hidden" name="csrf" value="{{ csrf }}">
-    {% if lojas %}
-    <label>Lojas existentes
-      <select name="loja_slug" id="loja-select">
-        <option value="">— selecione —</option>
+    <label>Loja
+      <select name="loja_slug" id="loja-select" required>
+        <option value="">— selecione a loja —</option>
         {% for slug in lojas %}
         <option value="{{ slug }}" {% if loja_selecionada == slug %}selected{% endif %}>{{ slug }}</option>
         {% endfor %}
+        <option value="__manual__">Outra loja (digitar slug)…</option>
       </select>
     </label>
-    {% endif %}
-    <label>Ou digite o slug
-      <input type="text" name="loja_slug_manual" id="loja-manual" placeholder="ex.: loja-centro" maxlength="120" value="">
+    <label id="loja-manual-wrap" style="display:none">Slug da loja
+      <input type="text" name="loja_slug_manual" id="loja-manual" placeholder="ex.: loja-centro" maxlength="120" autocomplete="off">
     </label>
-    <button class="button primary" type="submit" onclick="
-      const m = document.getElementById('loja-manual');
-      const s = document.getElementById('loja-select');
-      if (m && m.value.trim()) {
-        if (s) s.name = '';
-        m.name = 'loja_slug';
-      } else if (m) {
-        m.name = '';
-      }
-    ">Abrir loja</button>
+    <button class="button primary" type="submit">Abrir loja</button>
   </form>
 </section>
 
 {% if loja_selecionada %}
-<p class="muted">Loja ativa: <strong>{{ loja_selecionada }}</strong> — <a href="/app/trafego">ir para Config</a></p>
+<p class="muted">Loja ativa: <strong>{{ loja_selecionada }}</strong> —
+  <a href="{{ public_path('/app/trafego') }}">Config</a> ·
+  <a href="{{ public_path('/app/campanhas') }}">Campanhas</a> ·
+  <a href="{{ public_path('/app/trafego/roi') }}">ROI</a> ·
+  <a href="{{ public_path('/app/diagnostico/leads') }}">Leads</a>
+</p>
 {% endif %}
+
+<script>
+(() => {
+  const sel = document.getElementById('loja-select');
+  const wrap = document.getElementById('loja-manual-wrap');
+  const manual = document.getElementById('loja-manual');
+  const form = document.getElementById('form-loja');
+  const sync = () => {
+    const isManual = sel && sel.value === '__manual__';
+    if (wrap) wrap.style.display = isManual ? '' : 'none';
+    if (manual) manual.required = !!isManual;
+    if (sel) sel.required = !isManual;
+  };
+  sel && sel.addEventListener('change', sync);
+  sync();
+  form && form.addEventListener('submit', () => {
+    if (sel && sel.value === '__manual__' && manual) {
+      sel.name = '';
+      manual.name = 'loja_slug';
+    } else if (manual) {
+      manual.name = '';
+    }
+  });
+})();
+</script>
 {% endblock %}

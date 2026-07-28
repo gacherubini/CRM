@@ -34,7 +34,10 @@ Cliente (WhatsApp)          Catálogo público (UTM/Pixel)
       │                   (Santander, Fontecred, Bradesco, Pan portal)
       ▼
  Portal de Gestão  ←→  Estoque API  →  Catálogo
- (CRM, vendas, metas, campanhas/ROI, CAPI)
+ (CRM, vendas, metas; resultados de mídia)
+      │
+      ▼ (equipe Revy)
+ Revy Tráfego  `/trafego`  (Pixel, CAPI, campanhas, ROI técnico, leads)
 ```
 
 **Princípio central:** produtos **independentes** ligados só por HTTP. Motor mock ou real
@@ -50,7 +53,7 @@ não muda o contrato `/v1/simulacoes`. Estoque é a fonte de verdade de veículo
 | Orquestração | **n8n** | Roteia, mantém estado, chama LLM e motor |
 | Conversa (NLU) | **Google Gemini** (API, via n8n) | Entende o cliente, extrai e valida dados |
 | Motor de simulação | **Python + FastAPI** + Playwright | Mock + drivers reais (4 bancos LIVE) |
-| CRM / vitrine | Portal FastAPI + Catálogo + Estoque API | Vendas, metas, campanhas/ROI, Pixel |
+| CRM / vitrine | Portal + **Revy Tráfego** + Catálogo + Estoque | Portal: CRM/resultados · Tráfego: Pixel/CAPI/campanhas |
 | Banco de dados | **PostgreSQL** (container / lab) | Por produto (tenancy) |
 | Hospedagem | **Local (dev)** · **Fly.io 3-VM** (lab ativo) | Always-on: Postgres + Evolution + app bundle; Playwright on-demand |
 

@@ -3,7 +3,7 @@
 {% block content %}
 <div class="page-heading">
   <div>
-    <a class="back-link" href="/app/campanhas">← Voltar às campanhas</a>
+    <a class="back-link" href="{{ public_path('/app/campanhas') }}">← Voltar às campanhas</a>
     <h1>{{ titulo }}</h1>
     <p>Use exatamente o mesmo <code>utm_campaign</code> da URL do anúncio para o match funcionar.</p>
   </div>
@@ -73,7 +73,7 @@
     </div>
   </section>
   <div class="form-actions">
-    <a class="button ghost" href="/app/campanhas">Cancelar</a>
+    <a class="button ghost" href="{{ public_path('/app/campanhas') }}">Cancelar</a>
     <button class="button primary" type="submit">Salvar campanha</button>
   </div>
 </form>

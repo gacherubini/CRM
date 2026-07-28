@@ -1,8 +1,8 @@
 # Plano — Revy Tráfego separado do Portal da loja
 
-> **Status 2026-07-28: FASE 1+2 CÓDIGO FEITO (main)** — falta **deploy lab** + smoke + cutover opcional de flags/workers.  
+> **Status 2026-07-28: FASE 1+2 + DEPLOY + CUTOVER B5 DONE** — UI `https://app2037.fly.dev/trafego`; flags API ON; workers CAPI/spend **só** no Revy Tráfego (`:9010`).  
 > Spec: [`docs/superpowers/specs/2026-07-28-revy-trafego-separacao-portal-design.md`](../superpowers/specs/2026-07-28-revy-trafego-separacao-portal-design.md)  
-> App: `revy-trafego/` · README ops: [`revy-trafego/README.md`](../../revy-trafego/README.md)
+> App: `revy-trafego/` · README ops (canônico): [`revy-trafego/README.md`](../../revy-trafego/README.md)
 
 **Eixo:** C · CRM / marketing  
 **Depende de:** campanhas+ROI DONE, Meta spend MVP, CTWA MVP, resultados dono no dashboard  
@@ -40,7 +40,7 @@
 |---:|---|---|---|
 | **1** | [Fase 1](../superpowers/plans/2026-07-28-revy-trafego-fase1-app-multi-loja.md) | Cockpit Revy + cliente sem menus técnicos | **CÓDIGO FEITO** |
 | **2** | [Fase 2](../superpowers/plans/2026-07-28-revy-trafego-fase2-api-cutover.md) | API + flags portal + pixel URL catálogo | **CÓDIGO FEITO** (flags off) |
-| **ops** | **Seção abaixo** | Deploy lab + smoke + cutover | **PENDENTE — fazer em casa** |
+| **ops** | **Seção abaixo** + README | Deploy lab + smoke + cutover B1–B5 | **DONE no lab** |
 | **3** | (opcional) | Split DB, atribuição por gestor, audit PII completo | Backlog |
 
 ### Critério de pronto código (já atendido)
@@ -51,18 +51,18 @@
 - [x] Client portal + flags
 - [x] Catálogo: `REVY_TRAFEGO_PUBLIC_URL` prioriza Pixel
 
-### Critério de pronto ops (ainda aberto)
+### Critério de pronto ops
 
-- [ ] `revy-trafego` no ar no lab (porta **9010**)
-- [ ] Smoke checklist abaixo verde
-- [ ] (Opcional) flags API ligadas
-- [ ] (Opcional) workers CAPI/spend **só** no Revy Tráfego
+- [x] `revy-trafego` no ar no lab (porta **9010**, path `/trafego`)
+- [x] Smoke checklist (login, loja, config, leads/conversas, API)
+- [x] Flags API ligadas (`RESULTADOS` + `VENDA_EVENTS`)
+- [x] Workers CAPI/spend **só** no Revy Tráfego (B5; portal `PORTAL_*_ENABLED=0`)
 
 ---
 
-# O que fazer daqui (runbook ops) — CONTINUAR EM CASA
+# Runbook ops (lab DONE 2026-07-28; B5 opcional)
 
-Código já está na **main**. Não precisa reimplementar. Falta **deploy + validação**.
+Código + deploy lab na **main**/Fly. Detalhe operacional atual: [`revy-trafego/README.md`](../../revy-trafego/README.md).
 
 ## A) Deploy mínimo seguro (recomendado primeiro)
 
@@ -267,7 +267,8 @@ Local multi-processo: mesmo `PORTAL_DATABASE_URL` / encryption key; portal `:900
 ```text
 Fase 1  scaffold + auth + multi-loja + port UI + slim portal     DONE
 Fase 2  API v1 + client portal + flags + catálogo URL             DONE
-Ops     deploy lab + smoke A + cutover B opcional                 PENDENTE
+Ops     deploy lab + smoke A + flags B1–B3                        DONE (2026-07-28)
+B5      workers CAPI/spend só no Revy Tráfego                     DONE (2026-07-28)
 ```
 
 ---

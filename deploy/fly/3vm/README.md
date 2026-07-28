@@ -8,7 +8,7 @@ Stack **implementada e em uso** no org Fly (`crm-419` / `gru`):
 
 | Host público | App / papel |
 |--------------|-------------|
-| `https://app2037.fly.dev` | Bundle: portal, chatbot, estoque, catálogo, site, motor-api, nginx edge |
+| `https://app2037.fly.dev` | Bundle: portal, **revy-trafego (`/trafego`)**, chatbot, estoque, catálogo, site, motor-api, nginx edge |
 | `https://n8n2037.fly.dev` | n8n (orquestra WhatsApp → tools HTTP no chatbot) |
 | `https://evolution2037.fly.dev` | Evolution (WhatsApp) |
 | (interno) `suite-pg` | Postgres por serviço |
@@ -69,7 +69,7 @@ mais existir no org — use sempre `--3vm`.
 |---|-----|----------|
 | 1 | `suite-pg` | Postgres (DBs por serviço) |
 | 2 | `evolution2037` | WhatsApp (Evolution) — **isolada** |
-| 3 | `app2037` | n8n + chatbot + estoque + portal + catálogo + site + **motor-api** |
+| 3 | `app2037` | chatbot + estoque + portal + **revy-trafego (:9010, path `/trafego`)** + catálogo + site + **motor-api** · n8n em `n8n2037` |
 | 4 | `motor2037` | Playwright only · 2 GB · stopped idle |
 
 **Alvo 3vm:** `motor2037` **não** roda HTTP/orquestrador. A API do Motor fica em

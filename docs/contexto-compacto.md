@@ -1,10 +1,11 @@
 # Contexto compacto para continuidade
 
-Atualizado em **2026-07-24** (CRM **A/B/E/D/H/C/F DONE** · **G residual** · funil UI DONE · **grupo único do estoque WA + fotos Evolution** · **Fly 3-VM no ar**).
+Atualizado em **2026-07-28** (**Revy Tráfego 6.4 DONE** na `main` · cutover B5 · smoke final PASS · lab Fly pode estar **down** com `down-all.sh --3vm`).
 Leia isto primeiro; detalhe operacional recente em `docs/handoff-contexto.md` (topo).
 Planos válidos: `docs/plans/README.md`. **Ignore** `docs/plans/_archive/`.
 Ops Fly canônico: `deploy/fly/3vm/README.md` + `bash deploy/fly/up-all.sh --3vm`.
 Sessão menu/fotos: [plano 2026-07-22](plans/2026-07-22-plano-menu-estoque-wa-e-fotos-fix.md).
+Revy Tráfego: [plano 6.4](plans/2026-07-28-plano-revy-trafego-separacao.md) · [`revy-trafego/README.md`](../revy-trafego/README.md).
 
 **Playwright / bancos:** lições
 [Santander](plans/2026-07-13-playwright-licoes-santander.md),
@@ -59,7 +60,7 @@ Não há uma única “próxima task” universal — depende do objetivo:
 |---|---|---|---|
 | **A · Demo loja / WA** | **(1)** escolher Grupo do estoque; **(2)** E2E `menu`/cadastro/fotos no grupo; **(3)** E2E contato novo (IA vendas) | Demo/operação real no Zap | `setup-grupo-whatsapp-estoque.pdf` + `go-live-chatbot.md` + `deploy/fly/3vm/README.md` |
 | **B · Multi-banco** | Estabilizar sim com celular + prints; alinhar âncoras se falhar ao vivo | Mais cotações reais estáveis | handoff topo + lições Playwright |
-| **C · CRM dono** | **Revy Tráfego** (6.4): seguir runbook ops no plano (deploy → smoke A → cutover B) | Código DONE; falta lab | [plano 6.4](plans/2026-07-28-plano-revy-trafego-separacao.md) § runbook · [`revy-trafego/README.md`](../revy-trafego/README.md) |
+| **C · CRM dono** | Lab **cutover completo**; residual = **dados** de mídia (Pixel/campanha reais) | Plataforma DONE | [plano 6.4](plans/2026-07-28-plano-revy-trafego-separacao.md) · [`revy-trafego/README.md`](../revy-trafego/README.md) |
 | **D · Escala Motor** | Smoke live sessão quente + teto 2; object storage se multi-volume | Estabilidade multi-banco / IP | B+D + warm-batch2 |
 | **E · Dia a dia loja** | Restore drill do volume/banco e homologar transcritor | Fechar operação de áudio e foto já publicada | `#6` + `fotos-veiculos-whatsapp.md` |
 | **F · Marketing** | Completar landing se o dono entregar HTML | Site/hero polish | `site/` |

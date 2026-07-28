@@ -3,15 +3,15 @@
 {% block content %}
 <div class="page-heading">
   <div>
-    <a class="back-link" href="/app/campanhas">← Voltar às campanhas</a>
+    <a class="back-link" href="{{ public_path('/app/campanhas') }}">← Voltar às campanhas</a>
     <span class="eyebrow">{{ canais.get(campanha.canal, campanha.canal) }}</span>
     <h1>{{ campanha.nome }}</h1>
     <p><span class="status {{ 'confirmada' if campanha.status == 'ativa' else '' }}">{{ status_rotulo.get(campanha.status, campanha.status) }}</span> · <code>{{ campanha.utm_campaign }}</code>{% if campanha.periodo_inicio or campanha.periodo_fim %} · {{ campanha.periodo_inicio.strftime('%d/%m/%Y') if campanha.periodo_inicio else '…' }} – {{ campanha.periodo_fim.strftime('%d/%m/%Y') if campanha.periodo_fim else '…' }}{% endif %}</p>
   </div>
   <div class="heading-actions">
-    <a class="button secondary" href="/app/campanhas/{{ campanha.id }}/editar">Editar</a>
-    <a class="button primary" href="/app/trafego/roi?touch=last">Ver no ROI</a>
-    <form method="post" action="/app/campanhas/{{ campanha.id }}/apagar" onsubmit="return confirm('Apagar esta campanha e todos os gastos vinculados? Esta ação não pode ser desfeita.')">
+    <a class="button secondary" href="{{ public_path('/app/campanhas/' ~ (campanha.id) ~ '/editar') }}">Editar</a>
+    <a class="button primary" href="{{ public_path('/app/trafego/roi?touch=last') }}">Ver no ROI</a>
+    <form method="post" action="{{ public_path('/app/campanhas/' ~ (campanha.id) ~ '/apagar') }}" onsubmit="return confirm('Apagar esta campanha e todos os gastos vinculados? Esta ação não pode ser desfeita.')">
       <input type="hidden" name="csrf" value="{{ csrf }}">
       <button class="button danger" type="submit">Apagar campanha</button>
     </form>
@@ -64,11 +64,11 @@
 <section class="panel form-section" style="margin-bottom: 18px;">
   <div class="section-title"><span>02</span><div><h2>Lançar gasto manual</h2><p>Opcional se a campanha tem ID Meta e a sync em Tráfego está ativa. Use manual para correção ou canais sem API.</p></div></div>
   {% if campanha.meta_campaign_id %}
-  <p class="muted" style="margin-bottom:12px;font-size:13px">ID Meta: <code>{{ campanha.meta_campaign_id }}</code> · <a href="/app/trafego">Sincronizar gastos</a></p>
+  <p class="muted" style="margin-bottom:12px;font-size:13px">ID Meta: <code>{{ campanha.meta_campaign_id }}</code> · <a href="{{ public_path('/app/trafego') }}">Sincronizar gastos</a></p>
   {% else %}
-  <div class="alert warning" style="margin-bottom:12px">Sem ID da campanha Meta — o gasto automático não entra aqui. <a href="/app/campanhas/{{ campanha.id }}/editar">Editar campanha</a></div>
+  <div class="alert warning" style="margin-bottom:12px">Sem ID da campanha Meta — o gasto automático não entra aqui. <a href="{{ public_path('/app/campanhas/' ~ (campanha.id) ~ '/editar') }}">Editar campanha</a></div>
   {% endif %}
-  <form method="post" action="/app/campanhas/{{ campanha.id }}/gastos" class="form-grid">
+  <form method="post" action="{{ public_path('/app/campanhas/' ~ (campanha.id) ~ '/gastos') }}" class="form-grid">
     <input type="hidden" name="csrf" value="{{ csrf }}">
     <label>Valor (R$)
       <input type="text" name="valor" required placeholder="Ex.: 800,00" inputmode="decimal">
@@ -80,7 +80,7 @@
       <input type="text" name="nota" maxlength="240" placeholder="Ex.: semana 2 Ads Manager">
     </label>
     <div style="display:flex;align-items:end;gap:8px">
-      <button class="button primary" type="submit">Adicionar gasto</button><a class="button secondary" href="/app/campanhas/gastos/lote">Lançar em lote</a>
+      <button class="button primary" type="submit">Adicionar gasto</button><a class="button secondary" href="{{ public_path('/app/campanhas/gastos/lote') }}">Lançar em lote</a>
     </div>
   </form>
 </section>

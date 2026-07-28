@@ -8,9 +8,9 @@
     <p>Cadastre a campanha com o mesmo <code>utm_campaign</code> do anúncio e lance o custo da mídia.</p>
   </div>
   <div class="heading-actions">
-    <a class="button secondary" href="/app/trafego/roi">Ver ROI</a>
-    <a class="button secondary" href="/app/campanhas/gastos/lote">Lançar gastos</a>
-    <a class="button primary" href="/app/campanhas/nova">Nova campanha</a>
+    <a class="button secondary" href="{{ public_path('/app/trafego/roi') }}">Ver ROI</a>
+    <a class="button secondary" href="{{ public_path('/app/campanhas/gastos/lote') }}">Lançar gastos</a>
+    <a class="button primary" href="{{ public_path('/app/campanhas/nova') }}">Nova campanha</a>
   </div>
 </div>
 
@@ -41,9 +41,9 @@
         <td>{{ formatar_brl(gastos_totais.get(c.id, 0)) }}</td>
         <td>
           <div class="action-grid">
-            <a class="button secondary" href="/app/campanhas/{{ c.id }}">Detalhe</a>
-            <a class="button ghost" href="/app/campanhas/{{ c.id }}/editar">Editar</a>
-            <form method="post" action="/app/campanhas/{{ c.id }}/apagar" onsubmit="return confirm('Apagar esta campanha e todos os gastos vinculados? Esta ação não pode ser desfeita.')">
+            <a class="button secondary" href="{{ public_path('/app/campanhas/' ~ (c.id)) }}">Detalhe</a>
+            <a class="button ghost" href="{{ public_path('/app/campanhas/' ~ (c.id) ~ '/editar') }}">Editar</a>
+            <form method="post" action="{{ public_path('/app/campanhas/' ~ (c.id) ~ '/apagar') }}" onsubmit="return confirm('Apagar esta campanha e todos os gastos vinculados? Esta ação não pode ser desfeita.')">
               <input type="hidden" name="csrf" value="{{ csrf }}">
               <button class="button danger" type="submit">Apagar</button>
             </form>

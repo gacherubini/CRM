@@ -7,7 +7,7 @@
     <span class="eyebrow">Diagnóstico</span>
     <h1>Conversa {{ mascarar_telefone(telefone) }}</h1>
   </div>
-  <a class="button secondary" href="/app/diagnostico/leads">Voltar</a>
+  <a class="button secondary" href="{{ public_path('/app/diagnostico/leads') }}">Voltar</a>
 </div>
 {% if erro %}<div class="alert error">{{ erro }}</div>{% endif %}
 <section class="panel">

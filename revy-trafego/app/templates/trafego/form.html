@@ -8,10 +8,10 @@
     <p>Pixel da Meta e Conversions API (CAPI) por loja. O token CAPI fica cifrado no servidor e nunca vai ao catálogo.</p>
   </div>
   <div class="heading-actions">
-    <a class="button secondary" href="/app/trafego/pixel-auditoria">Auditoria Pixel</a>
-    <a class="button secondary" href="/app/trafego/ctwa-auditoria">Auditoria CTWA</a>
-    <a class="button secondary" href="/app/campanhas">Campanhas</a>
-    <a class="button primary" href="/app/trafego/roi">ROI</a>
+    <a class="button secondary" href="{{ public_path('/app/trafego/pixel-auditoria') }}">Auditoria Pixel</a>
+    <a class="button secondary" href="{{ public_path('/app/trafego/ctwa-auditoria') }}">Auditoria CTWA</a>
+    <a class="button secondary" href="{{ public_path('/app/campanhas') }}">Campanhas</a>
+    <a class="button primary" href="{{ public_path('/app/trafego/roi') }}">ROI</a>
   </div>
 </div>
 
@@ -53,7 +53,7 @@
   <div class="alert warning" style="margin-top:12px">{{ ultimo_erro_exibicao }}</div>
   {% endif %}
   {% if outbox_pendentes %}
-  <form method="post" action="/app/trafego/capi/retentar" style="margin-top:12px">
+  <form method="post" action="{{ public_path('/app/trafego/capi/retentar') }}" style="margin-top:12px">
     <input type="hidden" name="csrf" value="{{ csrf }}">
     <button class="button secondary" type="submit">Retentar {{ outbox_pendentes }} envio(s)</button>
   </form>
@@ -64,7 +64,7 @@
   </p>
 </section>
 
-<form method="post" action="/app/trafego" class="form-layout" autocomplete="off">
+<form method="post" action="{{ public_path('/app/trafego') }}" class="form-layout" autocomplete="off">
   <input type="hidden" name="csrf" value="{{ csrf }}">
   <section class="panel form-section">
     <div class="section-title"><span>01</span><div><h2>Pixel e CAPI</h2><p>Dados da conta de anúncios Meta da loja.</p></div></div>
@@ -91,7 +91,7 @@
   </section>
 
   <div class="form-actions">
-    <a class="button ghost" href="/app">Cancelar</a>
+    <a class="button ghost" href="{{ public_path('/app') }}">Cancelar</a>
     <button class="button primary" type="submit">Salvar Pixel / CAPI</button>
   </div>
 </form>
@@ -124,7 +124,7 @@
   {% if ads_ultima_sync_erro and ads_ultima_sync_status == 'erro' %}
   <div class="alert warning" style="margin-bottom:12px">{{ ads_ultima_sync_erro }}</div>
   {% endif %}
-  <form method="post" action="/app/trafego/ads/salvar" class="form-layout" autocomplete="off">
+  <form method="post" action="{{ public_path('/app/trafego/ads/salvar') }}" class="form-layout" autocomplete="off">
     <input type="hidden" name="csrf" value="{{ csrf }}">
     <div class="form-grid">
       <label>Ad Account ID
@@ -143,12 +143,12 @@
       <button class="button secondary" type="submit">Salvar conta de anúncios</button>
     </div>
   </form>
-  <form method="post" action="/app/trafego/ads/sincronizar" style="margin-top:12px">
+  <form method="post" action="{{ public_path('/app/trafego/ads/sincronizar') }}" style="margin-top:12px">
     <input type="hidden" name="csrf" value="{{ csrf }}">
     <button class="button primary" type="submit" {% if not ads_token_configurado %}disabled title="Configure a conta primeiro"{% endif %}>
       Sincronizar gastos agora (7 dias)
     </button>
-    <a class="button ghost" href="/app/campanhas">Ir às campanhas</a>
+    <a class="button ghost" href="{{ public_path('/app/campanhas') }}">Ir às campanhas</a>
   </form>
   <p class="muted" style="font-size:12px;margin-top:12px">
     O Portal também roda um <strong>job automático</strong> (padrão: a cada 24h, janela de 3 dias)

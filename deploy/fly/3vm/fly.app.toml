@@ -22,8 +22,25 @@ primary_region = "gru"
   CATALOGO_EVENTS_URL = "http://127.0.0.1:8001/v1/integracoes/catalogo/interesses"
   # Compat legado: Portal usa loja1; Estoque/Chatbot/Catálogo usam moto-center.
   CATALOGO_PORTAL_STORE_SLUG = "loja1"
-  # Catálogo puxa Pixel ID do Portal (dono configura em Tráfego; sem secret Fly).
+  # Catálogo puxa Pixel ID (dono/equipe configura no Revy Tráfego; sem secret Fly).
   PORTAL_PUBLIC_URL = "http://127.0.0.1:9000"
+  # Revy Tráfego no bundle (mesmo DB do portal, porta 9010, UI em /trafego)
+  REVY_TRAFEGO_URL = "http://127.0.0.1:9010"
+  REVY_TRAFEGO_PUBLIC_URL = "http://127.0.0.1:9010"
+  REVY_TRAFEGO_URL_PREFIX = "/trafego"
+  REVY_TRAFEGO_SECURE_COOKIE = "1"
+  # Dropdown de lojas mesmo sem campanha/pixel no DB
+  REVY_TRAFEGO_LOJAS = "loja1,moto-center"
+  # Cutover completo (B1–B5): API + workers CAPI/spend só no Revy Tráfego.
+  PORTAL_REVY_TRAFEGO_RESULTADOS = "1"
+  PORTAL_REVY_TRAFEGO_VENDA_EVENTS = "1"
+  PORTAL_TRAFEGO_UI_LEGACY = "0"
+  # Portal NÃO processa outbox/spend (evita double-send no shared DB).
+  PORTAL_CAPI_RETRY_ENABLED = "0"
+  PORTAL_META_SPEND_SYNC_ENABLED = "0"
+  # Revy Tráfego assume workers (força PORTAL_*=1 só no processo :9010).
+  REVY_TRAFEGO_CAPI_WORKER = "1"
+  REVY_TRAFEGO_META_SPEND_SYNC_ENABLED = "1"
   SIMULATION_PROVIDER = "http"
   MOTOR_URL = "http://127.0.0.1:8004"
   ESTOQUE_API_URL = "http://127.0.0.1:8002"
@@ -75,5 +92,5 @@ primary_region = "gru"
   memory = "1536"
 
 [[mounts]]
-  source = "app_data_recovery"
+  source = "app_data"
   destination = "/data"

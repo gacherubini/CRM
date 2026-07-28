@@ -4,10 +4,54 @@
 > Este arquivo: checkpoint operacional. Seções **“Checkpoint anterior”** = histórico — não
 > reexecutar. Path Windows no rodapé de seções antigas: **ignorar** (workspace = root do git).
 >
-> **Checkpoint mais recente: 2026-07-24 (estoque WhatsApp restrito a um grupo escolhido no Portal).**
-> Próxima ação operacional: escolher o grupo e executar o E2E `menu` → cadastro → fotos.
+> **Checkpoint mais recente: 2026-07-28 (Revy Tráfego 6.4 DONE + smoke final + lab Fly desligado).**  
+> Código na `main`. Plataforma cutover completa. Residual: dados reais de mídia; eixo A WA.  
+> **Lab Fly:** desligado com `down-all.sh --3vm` (pedido dono) — **não** destruir apps/volumes.
 
-## Checkpoint mais recente — grupo do estoque no WhatsApp (2026-07-24)
+## Checkpoint mais recente — Revy Tráfego 6.4 DONE (2026-07-28)
+
+> **Escopo:** deploy + cutover B1–B5 + UI + smoke final + push `main` + down lab.  
+> **README canônico:** [`revy-trafego/README.md`](../revy-trafego/README.md).
+
+### Entrega (código + ops)
+
+- Bundle `app2037`: processo `:9010`, nginx `/trafego`, `REVY_TRAFEGO_URL_PREFIX=/trafego`.
+- Secrets: session, service token, bootstrap gestor.
+- Flags API: `RESULTADOS=1`, `VENDA_EVENTS=1`, `PORTAL_TRAFEGO_UI_LEGACY=0`.
+- **B5:** workers CAPI/spend **só** no tráfego; portal `PORTAL_CAPI_RETRY_ENABLED=0` + spend `=0`.
+- UI: login estilo portal; dropdown loja; links leads/conversas/campanhas corrigidos.
+- Schema volume: Alembic portal head + `codigo_ctwa`.
+- Catálogo Pixel: `REVY_TRAFEGO_PUBLIC_URL=http://127.0.0.1:9010`.
+
+### Smoke final (antes do down) — todos PASS
+
+healthz, `/trafego` redirect (sem `:8080`), login UI, auth + dropdown lojas, config/campanhas/ROI/CTWA/pixel-audit/leads 200, conversa de lead, API resultados + token, pixel public, portal login, catálogo.
+
+### URLs (quando lab up)
+
+- https://app2037.fly.dev/trafego · Portal https://app2037.fly.dev  
+
+### Subir / desligar lab
+
+```bash
+bash deploy/fly/up-all.sh --3vm
+bash deploy/fly/down-all.sh --3vm --yes
+```
+
+### Próximo (operacional, não de código)
+
+1. Subir lab se for demo: `up-all.sh --3vm`.  
+2. Configurar Pixel/CAPI/campanha reais na UI.  
+3. Eixo A: grupo do estoque WA + E2E.
+
+### Não fazer
+
+- Dois workers CAPI no mesmo outbox.  
+- `fly apps destroy` / apagar volumes sem pedido.
+
+---
+
+## Checkpoint anterior — grupo do estoque no WhatsApp (2026-07-24)
 
 > **Escopo:** Chatbot, Portal, workflow n8n, migration, documentação/PDF e deploy Fly 3-VM.
 > **Resultado:** imagens privadas e de grupos não selecionados são ignoradas sem resposta.

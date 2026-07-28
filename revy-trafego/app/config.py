@@ -40,6 +40,17 @@ class Settings:
     job_secret: str = os.getenv("REVY_TRAFEGO_JOB_SECRET", "").strip()
     # Token entre portal/catálogo e este app (header X-Service-Token).
     service_token: str = os.getenv("REVY_TRAFEGO_SERVICE_TOKEN", "").strip()
+    # Prefixo público no edge (ex.: /trafego no app2037). Vazio em local puro.
+    url_prefix_raw: str = os.getenv("REVY_TRAFEGO_URL_PREFIX", "").strip()
+
+    @property
+    def url_prefix(self) -> str:
+        raw = (self.url_prefix_raw or "").strip()
+        if not raw:
+            return ""
+        if not raw.startswith("/"):
+            raw = "/" + raw
+        return raw.rstrip("/")
 
 
 settings = Settings()

@@ -99,9 +99,9 @@
       <a class="{{ 'active' if touch == 'last' else '' }}" href="?inicio={{ periodo.inicio }}&fim={{ periodo.fim }}&touch=last">Last touch</a>
       <a class="{{ 'active' if touch == 'first' else '' }}" href="?inicio={{ periodo.inicio }}&fim={{ periodo.fim }}&touch=first">First touch</a>
     </div>
-    <a class="button secondary" href="/app/campanhas">Campanhas</a>
-    <a class="button secondary" href="/app/campanhas/gastos/lote">Lançar gastos</a>
-    <a class="button ghost" href="/app/trafego">Pixel / CAPI</a>
+    <a class="button secondary" href="{{ public_path('/app/campanhas') }}">Campanhas</a>
+    <a class="button secondary" href="{{ public_path('/app/campanhas/gastos/lote') }}">Lançar gastos</a>
+    <a class="button ghost" href="{{ public_path('/app/trafego') }}">Pixel / CAPI</a>
   </div>
 </div>
 
@@ -110,7 +110,7 @@
   <label class="search"><span class="sr-only">Início</span><input type="date" name="inicio" value="{{ periodo.inicio }}"></label>
   <label class="search"><span class="sr-only">Fim</span><input type="date" name="fim" value="{{ periodo.fim }}"></label>
   <button class="button secondary" type="submit">Aplicar período</button>
-  <a class="button ghost" href="/app/relatorios/roi.csv?inicio={{ periodo.inicio }}&fim={{ periodo.fim }}&touch={{ touch }}">Exportar CSV</a>
+  <a class="button ghost" href="{{ public_path('/app/relatorios/roi.csv?inicio=' ~ (periodo.inicio) ~ '&fim=' ~ (periodo.fim) ~ '&touch=' ~ (touch)) }}">Exportar CSV</a>
 </form>
 <p class="muted">CPL = gasto ÷ leads · CPA = gasto ÷ vendas · ROAS = faturamento ÷ gasto. Leads sem UTM caem em “Sem campanha”.</p>
 
@@ -175,7 +175,7 @@
       <tr class="{{ 'roi-sem-campanha' if not l.campanha_id else '' }}">
         <td>
           {% if l.campanha_id %}
-          <a href="/app/campanhas/{{ l.campanha_id }}"><strong>{{ l.nome }}</strong></a>
+          <a href="{{ public_path('/app/campanhas/' ~ (l.campanha_id)) }}"><strong>{{ l.nome }}</strong></a>
           <br><small class="muted"><code>{{ l.utm_campaign }}</code></small>
           {% else %}
           <strong>{{ l.nome }}</strong>
@@ -202,7 +202,7 @@
   {% else %}
   <div class="empty">
     <strong>Nada para mostrar neste período.</strong>
-    <p><a href="/app/campanhas/nova">Cadastre uma campanha</a>, lance o custo e use UTMs nos links do catálogo.</p>
+    <p><a href="{{ public_path('/app/campanhas/nova') }}">Cadastre uma campanha</a>, lance o custo e use UTMs nos links do catálogo.</p>
   </div>
   {% endif %}
 </section>

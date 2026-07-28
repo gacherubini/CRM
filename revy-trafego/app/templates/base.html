@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/static/css/app.css">
+  <link rel="stylesheet" href="{{ public_path('/static/css/app.css') }}">
   <script>
     (() => {
       const saved = localStorage.getItem('revy-theme');
@@ -26,7 +26,7 @@
   <div class="app-shell">
     <aside class="sidebar" id="sidebar" aria-label="Navegação Revy Tráfego">
       <div class="sidebar-brand-row">
-        <a class="brand" href="/app" aria-label="Revy Tráfego">
+        <a class="brand" href="{{ public_path('/app') }}" aria-label="Revy Tráfego">
           <span class="brand-mark" aria-hidden="true">T</span>
           <span><strong>Revy Tráfego</strong><small>{{ usuario.loja_slug or 'selecione loja' }}</small></span>
         </a>
@@ -35,21 +35,32 @@
 
       <nav class="nav" aria-label="Menu principal">
         <span class="nav-section">Loja</span>
-        <a class="nav-link {{ 'active' if path == '/app' else '' }}" href="/app">Selecionar loja</a>
+        <form method="post" action="{{ public_path('/app/loja') }}" class="loja-switch" style="margin:0 0 10px;padding:0 4px">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          <input type="hidden" name="next" value="{{ path if path.startswith('/app') else '/app/trafego' }}">
+          <label class="sr-only" for="loja-switch-select">Loja</label>
+          <select name="loja_slug" id="loja-switch-select" onchange="this.form.submit()" style="width:100%">
+            <option value="">— selecione loja —</option>
+            {% for slug in lojas %}
+            <option value="{{ slug }}" {% if usuario.loja_slug == slug %}selected{% endif %}>{{ slug }}</option>
+            {% endfor %}
+          </select>
+        </form>
+        <a class="nav-link {{ 'active' if path == '/app' else '' }}" href="{{ public_path('/app') }}">Todas as lojas</a>
         {% if usuario.loja_slug %}
         <span class="nav-section">Mídia</span>
-        <a class="nav-link {{ 'active' if path == '/app/trafego' else '' }}" href="/app/trafego">Config / Pixel</a>
-        <a class="nav-link {{ 'active' if path.startswith('/app/campanhas') else '' }}" href="/app/campanhas">Campanhas</a>
-        <a class="nav-link {{ 'active' if path.startswith('/app/trafego/roi') else '' }}" href="/app/trafego/roi">ROI</a>
-        <a class="nav-link {{ 'active' if path.startswith('/app/trafego/ctwa') else '' }}" href="/app/trafego/ctwa-auditoria">CTWA</a>
-        <a class="nav-link {{ 'active' if path.startswith('/app/trafego/pixel') else '' }}" href="/app/trafego/pixel-auditoria">Pixel audit</a>
+        <a class="nav-link {{ 'active' if path == '/app/trafego' else '' }}" href="{{ public_path('/app/trafego') }}">Config / Pixel</a>
+        <a class="nav-link {{ 'active' if path.startswith('/app/campanhas') else '' }}" href="{{ public_path('/app/campanhas') }}">Campanhas</a>
+        <a class="nav-link {{ 'active' if path.startswith('/app/trafego/roi') else '' }}" href="{{ public_path('/app/trafego/roi') }}">ROI</a>
+        <a class="nav-link {{ 'active' if path.startswith('/app/trafego/ctwa') else '' }}" href="{{ public_path('/app/trafego/ctwa-auditoria') }}">CTWA</a>
+        <a class="nav-link {{ 'active' if path.startswith('/app/trafego/pixel') else '' }}" href="{{ public_path('/app/trafego/pixel-auditoria') }}">Pixel audit</a>
         <span class="nav-section">Diagnóstico</span>
-        <a class="nav-link {{ 'active' if path.startswith('/app/diagnostico') else '' }}" href="/app/diagnostico/leads">Leads</a>
+        <a class="nav-link {{ 'active' if path.startswith('/app/diagnostico') else '' }}" href="{{ public_path('/app/diagnostico/leads') }}">Leads</a>
         {% endif %}
       </nav>
 
       <div class="sidebar-footer">
-        <form action="/logout" method="post">
+        <form action="{{ public_path('/logout') }}" method="post">
           <input type="hidden" name="csrf" value="{{ csrf }}">
           <button class="link-button" type="submit">Sair</button>
         </form>

@@ -30,10 +30,10 @@ Runbook completo: [`docs/plans/2026-07-28-plano-revy-trafego-separacao.md`](../d
 | `PORTAL_TRAFEGO_UI_LEGACY` | Portal | `1` = devolve menus técnicos ao dono (rollback). Default: off. |
 | `REVY_TRAFEGO_URL` | Portal | Base do app tráfego (cutover API). |
 | `REVY_TRAFEGO_SERVICE_TOKEN` | Portal | Mesmo token do Revy Tráfego. |
-| `PORTAL_REVY_TRAFEGO_RESULTADOS` | Portal | `1` = cards ROI via API (default `0` = local). |
-| `PORTAL_REVY_TRAFEGO_VENDA_EVENTS` | Portal | `1` = notifica venda-confirmada (default `0`). |
-| `PORTAL_PUBLIC_URL` | Catálogo | Pixel por loja (até cutover). |
-| `REVY_TRAFEGO_PUBLIC_URL` | Catálogo | Prioridade sobre `PORTAL_PUBLIC_URL` se set. |
+| `PORTAL_REVY_TRAFEGO_RESULTADOS` | Portal | `1` = cards ROI via API (default código `0`; **lab Fly = 1**). |
+| `PORTAL_REVY_TRAFEGO_VENDA_EVENTS` | Portal | `1` = notifica venda-confirmada (default código `0`; **lab Fly = 1**). |
+| `PORTAL_PUBLIC_URL` | Catálogo | Pixel por loja (fallback). |
+| `REVY_TRAFEGO_PUBLIC_URL` | Catálogo | Prioridade sobre `PORTAL_PUBLIC_URL` (**lab = loopback :9010**). |
 | `META_PIXEL_ID` | Catálogo | Fallback se API offline. |
 | `META_PIXEL_ENABLED` | Catálogo | `1`/`0` (default: ligado quando há Pixel). |
 

@@ -42,7 +42,13 @@ from app.campanhas import (
     salvar_gasto_manual,
     validar_campanha_payload,
 )
-from app.clients.chatbot import ChatbotClient, ChatbotIndisponivel, LeadNaoEncontrado
+from app.clients.chatbot import (
+    ChatbotClient,
+    ChatbotIndisponivel,
+    ConversaNaoEncontrada,
+    LeadNaoEncontrado,
+)
+from urllib.parse import quote
 from app.config import settings
 from app.cripto import cifrar
 from app.db import Base, SessionLocal, engine, get_db
@@ -70,13 +76,17 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def _lifespan(_app: FastAPI):
     if os.getenv("REVY_TRAFEGO_SKIP_INIT") != "1":
-        # Workers opt-in (default off) — evita double-send com o portal na Fase 1.
+        # Workers opt-in. No bundle Fly o env é o mesmo do portal: se o portal
+        # tem PORTAL_*_ENABLED=0 no machine env, setdefault NÃO reativa o worker.
+        # Por isso forçamos "1" só neste processo quando o cutover está ligado.
         if settings.meta_spend_sync_enabled:
-            os.environ.setdefault("PORTAL_META_SPEND_SYNC_ENABLED", "1")
+            os.environ["PORTAL_META_SPEND_SYNC_ENABLED"] = "1"
             meta_ads_spend_job.start_worker(SessionLocal)
+            logger.info("revy-trafego: meta_spend worker ON")
         if settings.run_capi_worker:
-            os.environ.setdefault("PORTAL_CAPI_RETRY_ENABLED", "1")
+            os.environ["PORTAL_CAPI_RETRY_ENABLED"] = "1"
             meta_capi_job.start_worker(SessionLocal)
+            logger.info("revy-trafego: capi retry worker ON")
         db = SessionLocal()
         try:
             bootstrap_gestor_se_vazio(
@@ -117,6 +127,26 @@ if os.getenv("REVY_TRAFEGO_SKIP_INIT") != "1":
 app.include_router(api_v1_router)
 
 
+def public_path(path: str) -> str:
+    """Path absoluto com REVY_TRAFEGO_URL_PREFIX (ex.: /trafego/app)."""
+    if path is None:
+        path = "/"
+    path = str(path)
+    if not path.startswith("/"):
+        path = "/" + path
+    prefix = settings.url_prefix
+    return f"{prefix}{path}" if prefix else path
+
+
+def redirect(path: str, status_code: int = 303) -> RedirectResponse:
+    return RedirectResponse(public_path(path), status_code=status_code)
+
+
+def url_telefone(telefone: str | None) -> str:
+    """Telefone seguro para path (evita quebrar com + / espaços)."""
+    return quote((telefone or "").strip(), safe="")
+
+
 def mascarar_telefone(telefone: str | None) -> str:
     digitos = "".join(c for c in (telefone or "") if c.isdigit())
     if len(digitos) < 4:
@@ -148,6 +178,9 @@ def formatar_brl(valor) -> str:
 templates.env.globals["mascarar_telefone"] = mascarar_telefone
 templates.env.globals["formatar_horario"] = formatar_horario
 templates.env.globals["formatar_brl"] = formatar_brl
+templates.env.globals["url_prefix"] = settings.url_prefix
+templates.env.globals["public_path"] = public_path
+templates.env.globals["url_telefone"] = url_telefone
 
 
 def get_chatbot_client() -> ChatbotClient:
@@ -158,18 +191,29 @@ def get_chatbot_client() -> ChatbotClient:
     )
 
 
-def contexto(request: Request, usuario=None, **extra):
+def contexto(request: Request, usuario=None, db: Session | None = None, **extra):
+    lojas = extra.pop("lojas", None)
+    if lojas is None:
+        if db is not None:
+            lojas = listar_loja_slugs(db)
+        else:
+            # Dropdown de loja em todas as telas autenticadas.
+            sess = SessionLocal()
+            try:
+                lojas = listar_loja_slugs(sess)
+            finally:
+                sess.close()
     return {
         "request": request,
         "usuario": usuario,
         "csrf": csrf_token(request) if usuario else "",
-        "lojas": extra.pop("lojas", None),
+        "lojas": lojas or [],
         **extra,
     }
 
 
 def redirecionar_login():
-    return RedirectResponse("/login", status_code=303)
+    return redirect("/login")
 
 
 def exigir_loja(request: Request, db: Session):
@@ -178,7 +222,7 @@ def exigir_loja(request: Request, db: Session):
     if not usuario:
         return None, redirecionar_login()
     if not usuario.loja_slug:
-        return None, RedirectResponse("/app?erro=loja", status_code=303)
+        return None, redirect("/app?erro=loja")
     return usuario, None
 
 
@@ -214,13 +258,13 @@ def public_pixel_da_loja(loja_slug: str, db: Session = Depends(get_db)):
 
 @app.get("/", include_in_schema=False)
 def raiz():
-    return RedirectResponse("/app", status_code=303)
+    return redirect("/app", status_code=303)
 
 
 @app.get("/login", response_class=HTMLResponse)
 def login_get(request: Request, db: Session = Depends(get_db)):
     if gestor_atual(request, db):
-        return RedirectResponse("/app", status_code=303)
+        return redirect("/app", status_code=303)
     return templates.TemplateResponse(
         "login.html",
         {"request": request, "erro": None, "csrf": csrf_token(request)},
@@ -242,7 +286,7 @@ async def login_post(request: Request, db: Session = Depends(get_db)):
             status_code=401,
         )
     iniciar_sessao(request, gestor)
-    return RedirectResponse("/app", status_code=303)
+    return redirect("/app", status_code=303)
 
 
 @app.post("/logout")
@@ -250,7 +294,7 @@ async def logout(request: Request):
     form = await request.form()
     if csrf_valido(request, form.get("csrf")):
         encerrar_sessao(request)
-    return RedirectResponse("/login", status_code=303)
+    return redirect("/login", status_code=303)
 
 
 @app.get("/app", response_class=HTMLResponse)
@@ -261,13 +305,15 @@ def app_home(request: Request, db: Session = Depends(get_db)):
     lojas = listar_loja_slugs(db)
     usuario = sessao_gestor(request, db)
     assert usuario is not None
+    # Se só há uma loja e nenhuma selecionada, pré-seleciona no dropdown.
+    loja_sel = usuario.loja_slug or (lojas[0] if len(lojas) == 1 else None)
     return templates.TemplateResponse(
         "home.html",
         contexto(
             request,
             usuario,
             lojas=lojas,
-            loja_selecionada=usuario.loja_slug or None,
+            loja_selecionada=loja_sel,
             erro=request.query_params.get("erro"),
         ),
     )
@@ -280,13 +326,18 @@ async def app_selecionar_loja(request: Request, db: Session = Depends(get_db)):
         return redirecionar_login()
     form = await request.form()
     if not csrf_valido(request, form.get("csrf")):
-        return RedirectResponse("/app", status_code=303)
-    slug = (form.get("loja_slug") or "").strip()
+        return redirect("/app", status_code=303)
+    slug = (form.get("loja_slug") or form.get("loja_slug_manual") or "").strip()
+    if slug == "__manual__":
+        slug = (form.get("loja_slug_manual") or "").strip()
     # Permite digitar loja nova (ainda sem campanhas) para bootstrap.
-    if not slug or len(slug) > 120:
-        return RedirectResponse("/app?erro=loja", status_code=303)
+    if not slug or slug == "__manual__" or len(slug) > 120:
+        return redirect("/app?erro=loja", status_code=303)
     definir_loja(request, slug)
-    return RedirectResponse("/app/trafego", status_code=303)
+    next_path = (form.get("next") or "").strip()
+    if next_path.startswith("/app"):
+        return redirect(next_path, status_code=303)
+    return redirect("/app/trafego", status_code=303)
 
 
 # ---------- Tráfego / Pixel / Ads ----------
@@ -364,7 +415,7 @@ async def trafego_salvar(request: Request, db: Session = Depends(get_db)):
         return redir
     form = await request.form()
     if not csrf_valido(request, form.get("csrf")):
-        return RedirectResponse("/app", status_code=303)
+        return redirect("/app", status_code=303)
     pixel_id = normalizar_pixel_id((form.get("pixel_id") or "").strip())
     token_novo = (form.get("capi_token") or "").strip()
     test_event_code = (form.get("test_event_code") or "").strip() or None
@@ -421,7 +472,7 @@ async def trafego_salvar(request: Request, db: Session = Depends(get_db)):
     except Exception:
         pass
     db.commit()
-    return RedirectResponse("/app/trafego?ok=salvo", status_code=303)
+    return redirect("/app/trafego?ok=salvo", status_code=303)
 
 
 @app.post("/app/trafego/ads/salvar")
@@ -431,7 +482,7 @@ async def trafego_ads_salvar(request: Request, db: Session = Depends(get_db)):
         return redir
     form = await request.form()
     if not csrf_valido(request, form.get("csrf")):
-        return RedirectResponse("/app", status_code=303)
+        return redirect("/app", status_code=303)
     ads_config = db.query(MetaAdsConfig).filter(MetaAdsConfig.loja_slug == usuario.loja_slug).first()
     config = db.query(MetaPixelConfig).filter(MetaPixelConfig.loja_slug == usuario.loja_slug).first()
     account = normalizar_ad_account_id(form.get("ad_account_id"))
@@ -464,7 +515,7 @@ async def trafego_ads_salvar(request: Request, db: Session = Depends(get_db)):
         ads_config.token_ciphertext = cifrar(token_novo)
     ads_config.atualizada_em = agora()
     db.commit()
-    return RedirectResponse("/app/trafego?ok=ads-salvo", status_code=303)
+    return redirect("/app/trafego?ok=ads-salvo", status_code=303)
 
 
 @app.post("/app/trafego/ads/sincronizar")
@@ -474,11 +525,11 @@ async def trafego_ads_sincronizar(request: Request, db: Session = Depends(get_db
         return redir
     form = await request.form()
     if not csrf_valido(request, form.get("csrf")):
-        return RedirectResponse("/app", status_code=303)
+        return redirect("/app", status_code=303)
     result = sincronizar_gastos_meta(db, usuario.loja_slug, janela_dias=7)
     if result.status == "erro":
-        return RedirectResponse("/app/trafego?ok=sync-erro", status_code=303)
-    return RedirectResponse("/app/trafego?ok=sync-ok", status_code=303)
+        return redirect("/app/trafego?ok=sync-erro", status_code=303)
+    return redirect("/app/trafego?ok=sync-ok", status_code=303)
 
 
 @app.post("/app/trafego/capi/retentar")
@@ -488,11 +539,10 @@ async def trafego_capi_retentar(request: Request, db: Session = Depends(get_db))
         return redir
     form = await request.form()
     if not csrf_valido(request, form.get("csrf")):
-        return RedirectResponse("/app", status_code=303)
+        return redirect("/app", status_code=303)
     resultado = processar_outbox_pendentes(db, usuario.loja_slug)
-    return RedirectResponse(
+    return redirect(
         f"/app/trafego?ok=retry-{resultado['entregues']}-{resultado['falharam']}",
-        status_code=303,
     )
 
 
@@ -654,7 +704,7 @@ async def campanhas_nova_post(request: Request, db: Session = Depends(get_db)):
         return redir
     form = await request.form()
     if not csrf_valido(request, form.get("csrf")):
-        return RedirectResponse("/app", status_code=303)
+        return redirect("/app", status_code=303)
     dados = campanha_payload_form(form)
     erros = validar_campanha_payload(dados)
     if erros:
@@ -688,7 +738,7 @@ async def campanhas_nova_post(request: Request, db: Session = Depends(get_db)):
     preencher_campanha(c, dados, email=usuario.email)
     db.add(c)
     db.commit()
-    return RedirectResponse("/app/campanhas?ok=criada", status_code=303)
+    return redirect("/app/campanhas?ok=criada", status_code=303)
 
 
 @app.get("/app/campanhas/gastos/lote", response_class=HTMLResponse)
@@ -723,7 +773,7 @@ async def campanhas_gastos_lote_post(request: Request, db: Session = Depends(get
         return redir
     form = await request.form()
     if not csrf_valido(request, form.get("csrf")):
-        return RedirectResponse("/app", status_code=303)
+        return redirect("/app", status_code=303)
     try:
         referencia = date.fromisoformat((form.get("referencia") or "").strip())
     except ValueError:
@@ -774,7 +824,7 @@ async def campanhas_gastos_lote_post(request: Request, db: Session = Depends(get
             criada_por=usuario.email,
         )
     db.commit()
-    return RedirectResponse(f"/app/campanhas/gastos/lote?ok={len(novos)}", status_code=303)
+    return redirect(f"/app/campanhas/gastos/lote?ok={len(novos)}")
 
 
 @app.get("/app/campanhas/gastos/csv/modelo")
@@ -797,7 +847,7 @@ async def campanhas_gastos_csv_post(request: Request, db: Session = Depends(get_
         return redir
     form = await request.form()
     if not csrf_valido(request, form.get("csrf")):
-        return RedirectResponse("/app", status_code=303)
+        return redirect("/app", status_code=303)
     arquivo = form.get("arquivo")
     campanhas = db.query(Campanha).filter(Campanha.loja_slug == usuario.loja_slug).all()
     if arquivo is None or not hasattr(arquivo, "read"):
@@ -863,7 +913,7 @@ def campanhas_detalhe(
         .first()
     )
     if not campanha:
-        return RedirectResponse("/app/campanhas?erro=1", status_code=303)
+        return redirect("/app/campanhas?erro=1", status_code=303)
     gastos = (
         db.query(CampanhaGasto)
         .filter(
@@ -935,7 +985,7 @@ def campanhas_editar_get(request: Request, campanha_id: str, db: Session = Depen
         .first()
     )
     if not campanha:
-        return RedirectResponse("/app/campanhas?erro=1", status_code=303)
+        return redirect("/app/campanhas?erro=1", status_code=303)
     valores = {
         "nome": campanha.nome,
         "canal": campanha.canal,
@@ -964,14 +1014,14 @@ async def campanhas_editar_post(request: Request, campanha_id: str, db: Session 
         return redir
     form = await request.form()
     if not csrf_valido(request, form.get("csrf")):
-        return RedirectResponse("/app", status_code=303)
+        return redirect("/app", status_code=303)
     campanha = (
         db.query(Campanha)
         .filter(Campanha.id == campanha_id, Campanha.loja_slug == usuario.loja_slug)
         .first()
     )
     if not campanha:
-        return RedirectResponse("/app/campanhas?erro=1", status_code=303)
+        return redirect("/app/campanhas?erro=1", status_code=303)
     dados = campanha_payload_form(form)
     erros = validar_campanha_payload(dados)
     if erros:
@@ -998,7 +1048,7 @@ async def campanhas_editar_post(request: Request, campanha_id: str, db: Session 
         )
     preencher_campanha(campanha, dados)
     db.commit()
-    return RedirectResponse(f"/app/campanhas/{campanha.id}?ok=salvo", status_code=303)
+    return redirect(f"/app/campanhas/{campanha.id}?ok=salvo")
 
 
 @app.post("/app/campanhas/{campanha_id}/apagar")
@@ -1008,17 +1058,17 @@ async def campanhas_apagar_post(request: Request, campanha_id: str, db: Session 
         return redir
     form = await request.form()
     if not csrf_valido(request, form.get("csrf")):
-        return RedirectResponse("/app", status_code=303)
+        return redirect("/app", status_code=303)
     campanha = (
         db.query(Campanha)
         .filter(Campanha.id == campanha_id, Campanha.loja_slug == usuario.loja_slug)
         .first()
     )
     if not campanha:
-        return RedirectResponse("/app/campanhas?erro=1", status_code=303)
+        return redirect("/app/campanhas?erro=1", status_code=303)
     db.delete(campanha)
     db.commit()
-    return RedirectResponse("/app/campanhas?ok=apagada", status_code=303)
+    return redirect("/app/campanhas?ok=apagada", status_code=303)
 
 
 @app.post("/app/campanhas/{campanha_id}/gastos")
@@ -1028,23 +1078,22 @@ async def campanhas_gasto_post(request: Request, campanha_id: str, db: Session =
         return redir
     form = await request.form()
     if not csrf_valido(request, form.get("csrf")):
-        return RedirectResponse("/app", status_code=303)
+        return redirect("/app", status_code=303)
     campanha = (
         db.query(Campanha)
         .filter(Campanha.id == campanha_id, Campanha.loja_slug == usuario.loja_slug)
         .first()
     )
     if not campanha:
-        return RedirectResponse("/app/campanhas?erro=1", status_code=303)
+        return redirect("/app/campanhas?erro=1", status_code=303)
     valor = parse_brl_valor(form.get("valor"))
     try:
         referencia = date.fromisoformat((form.get("referencia") or "").strip())
     except ValueError:
         referencia = None
     if valor is None or referencia is None:
-        return RedirectResponse(
+        return redirect(
             f"/app/campanhas/{campanha.id}?erro=Informe+valor+e+data+válidos",
-            status_code=303,
         )
     salvar_gasto_manual(
         db,
@@ -1056,7 +1105,7 @@ async def campanhas_gasto_post(request: Request, campanha_id: str, db: Session =
         criada_por=usuario.email,
     )
     db.commit()
-    return RedirectResponse(f"/app/campanhas/{campanha.id}?ok=gasto", status_code=303)
+    return redirect(f"/app/campanhas/{campanha.id}?ok=gasto")
 
 
 # ---------- Diagnóstico ----------
@@ -1146,22 +1195,28 @@ def diagnostico_conversa(
         return redir
     mensagens: list[dict] = []
     erro = None
+    # Path pode vir URL-encoded (+ → %2B etc.)
+    from urllib.parse import unquote
+
+    tel = unquote(telefone or "").strip()
     try:
-        mensagens = chatbot.listar_mensagens(telefone)
+        mensagens = chatbot.listar_mensagens(tel)
+    except ConversaNaoEncontrada:
+        erro = "Conversa não encontrada para este telefone."
     except ChatbotIndisponivel:
         erro = "Chatbot indisponível."
     except Exception:
-        erro = "Conversa não encontrada ou erro ao carregar."
+        erro = "Erro ao carregar conversa."
     registrar_audit(
         db,
         gestor_email=usuario.email,
         loja_slug=usuario.loja_slug,
         acao="ver_conversa",
-        recurso_id=telefone,
+        recurso_id=tel,
     )
     return templates.TemplateResponse(
         "diagnostico/conversa.html",
-        contexto(request, usuario, telefone=telefone, mensagens=mensagens, erro=erro),
+        contexto(request, usuario, telefone=tel, mensagens=mensagens, erro=erro),
     )
 
 

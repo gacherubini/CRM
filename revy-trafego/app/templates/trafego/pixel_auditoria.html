@@ -3,14 +3,14 @@
 {% block content %}
 <div class="page-heading">
   <div>
-    <a class="back-link" href="/app/trafego">← Tráfego</a>
+    <a class="back-link" href="{{ public_path('/app/trafego') }}">← Tráfego</a>
     <span class="eyebrow">Meta Pixel</span>
     <h1>Auditoria Pixel / CAPI</h1>
     <p>Chaves de match enviadas ao Meta (telefone hash, fbclid→fbc, ctwa_clid, etc.). Sem dados pessoais em claro.</p>
   </div>
   <div class="heading-actions">
-    <a class="button secondary" href="/app/trafego/ctwa-auditoria">Auditoria CTWA</a>
-    <a class="button primary" href="/app/trafego">Config</a>
+    <a class="button secondary" href="{{ public_path('/app/trafego/ctwa-auditoria') }}">Auditoria CTWA</a>
+    <a class="button primary" href="{{ public_path('/app/trafego') }}">Config</a>
   </div>
 </div>
 
