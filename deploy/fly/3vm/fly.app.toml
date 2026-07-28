@@ -20,8 +20,11 @@ primary_region = "gru"
   CATALOGO_URL_PREFIX = "/loja"
   CATALOGO_DEFAULT_STORE_SLUG = "moto-center"
   CATALOGO_EVENTS_URL = "http://127.0.0.1:8001/v1/integracoes/catalogo/interesses"
-  # Compat legado: Portal usa loja1; Estoque/Chatbot/Catálogo usam moto-center.
-  CATALOGO_PORTAL_STORE_SLUG = "loja1"
+  # Slug único da loja: moto-center (o mesmo em Estoque, Chatbot e Catálogo).
+  # O shim CATALOGO_PORTAL_STORE_SLUG="loja1" foi removido — com ele a vitrine
+  # buscava o Pixel no Revy Tráfego sob "loja1" ignorando o próprio slug, então
+  # Pixel configurado em moto-center nunca era encontrado (silenciosamente).
+  # NÃO confundir com a instância da Evolution, que continua se chamando loja1.
   # Catálogo puxa Pixel ID (dono/equipe configura no Revy Tráfego; sem secret Fly).
   PORTAL_PUBLIC_URL = "http://127.0.0.1:9000"
   # Revy Tráfego no bundle (mesmo DB do portal, porta 9010, UI em /trafego)
@@ -30,7 +33,7 @@ primary_region = "gru"
   REVY_TRAFEGO_URL_PREFIX = "/trafego"
   REVY_TRAFEGO_SECURE_COOKIE = "1"
   # Dropdown de lojas mesmo sem campanha/pixel no DB
-  REVY_TRAFEGO_LOJAS = "loja1,moto-center"
+  REVY_TRAFEGO_LOJAS = "moto-center"
   # Cutover completo (B1–B5): API + workers CAPI/spend só no Revy Tráfego.
   PORTAL_REVY_TRAFEGO_RESULTADOS = "1"
   PORTAL_REVY_TRAFEGO_VENDA_EVENTS = "1"
