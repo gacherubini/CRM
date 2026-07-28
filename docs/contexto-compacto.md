@@ -59,7 +59,7 @@ Não há uma única “próxima task” universal — depende do objetivo:
 |---|---|---|---|
 | **A · Demo loja / WA** | **(1)** escolher Grupo do estoque; **(2)** E2E `menu`/cadastro/fotos no grupo; **(3)** E2E contato novo (IA vendas) | Demo/operação real no Zap | `setup-grupo-whatsapp-estoque.pdf` + `go-live-chatbot.md` + `deploy/fly/3vm/README.md` |
 | **B · Multi-banco** | Estabilizar sim com celular + prints; alinhar âncoras se falhar ao vivo | Mais cotações reais estáveis | handoff topo + lições Playwright |
-| **C · CRM dono** | **CTWA** (6.2b) e/ou **spend Meta** (6.2c) | WA medido + gasto automático; Google (G) residual | 6.2 A–F feitos; **6.2b+6.2c planos ATIVOS** |
+| **C · CRM dono** | **Revy Tráfego** (6.4) separar config multi-loja do portal; cliente só resultados | Equipe Revy opera mídia; dono sem tokens/Pixel UI | [plano 6.4](plans/2026-07-28-plano-revy-trafego-separacao.md) · [spec](superpowers/specs/2026-07-28-revy-trafego-separacao-portal-design.md); 6.2b/6.2c MVP já no ar |
 | **D · Escala Motor** | Smoke live sessão quente + teto 2; object storage se multi-volume | Estabilidade multi-banco / IP | B+D + warm-batch2 |
 | **E · Dia a dia loja** | Restore drill do volume/banco e homologar transcritor | Fechar operação de áudio e foto já publicada | `#6` + `fotos-veiculos-whatsapp.md` |
 | **F · Marketing** | Completar landing se o dono entregar HTML | Site/hero polish | `site/` |
