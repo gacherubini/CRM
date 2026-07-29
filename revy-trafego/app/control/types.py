@@ -108,6 +108,17 @@ class StoreRole(str, Enum):
     SELLER = "vendedor"
 
 
+class ControlAccountRole(str, Enum):
+    ADMIN = "admin"
+    MANAGER = "gestor"
+
+
+class ControlAccountStatus(str, Enum):
+    PENDING = "pendente"
+    ACTIVE = "ativo"
+    DISABLED = "desativado"
+
+
 class AuditResult(str, Enum):
     SUCCESS = "sucesso"
     DENIED = "negado"
@@ -168,6 +179,18 @@ class PersonView:
     id: str
     name: str
     email: str
+    created_at: datetime
+    updated_at: datetime
+
+
+@dataclass(frozen=True)
+class ControlAccountView:
+    id: str
+    person_id: str
+    person_name: str
+    person_email: str
+    role: ControlAccountRole
+    status: ControlAccountStatus
     created_at: datetime
     updated_at: datetime
 

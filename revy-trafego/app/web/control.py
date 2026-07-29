@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from app.auth import gestor_atual
 from app.config import settings
 from app.control.access import AccessControl
+from app.control.accounts import ControlAccounts
 from app.control.audit import AuditTrail
 from app.control.people import PeopleDirectory
 from app.control.roles import StoreRoles
@@ -23,6 +24,7 @@ from app.control.types import (
     AuditEventView,
     AuditQuery,
     ControlError,
+    ControlAccountView,
     CreateStore,
     GrantTrafficAccess,
     InvalidPersonEmail,
@@ -160,6 +162,15 @@ class TrafficRevokeBody(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     motivo: str | None = Field(default=None, max_length=1000)
+
+
+@router.get("/acessos")
+def list_control_accounts(actor: Actor = Depends(_current_actor)):
+    try:
+        accounts = ControlAccounts(SessionLocal).list(actor)
+    except ControlError as exc:
+        _raise_domain_error(exc)
+    return {"items": [_control_account_json(account) for account in accounts]}
 
 
 @router.post("/pessoas", status_code=201)
@@ -388,6 +399,21 @@ def _person_json(person: PersonView) -> dict[str, str]:
         "email": person.email,
         "criado_em": person.created_at.isoformat(),
         "atualizado_em": person.updated_at.isoformat(),
+    }
+
+
+def _control_account_json(account: ControlAccountView) -> dict[str, object]:
+    return {
+        "id": account.id,
+        "pessoa": {
+            "id": account.person_id,
+            "nome": account.person_name,
+            "email": account.person_email,
+        },
+        "papel": account.role.value,
+        "estado": account.status.value,
+        "criado_em": account.created_at.isoformat(),
+        "atualizado_em": account.updated_at.isoformat(),
     }
 
 

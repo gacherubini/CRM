@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 from app.auth import csrf_token, csrf_valido, gestor_atual, sessao_gestor
 from app.config import settings
 from app.control.access import AccessControl
+from app.control.accounts import ControlAccounts
 from app.control.audit import AuditTrail
 from app.control.people import PeopleDirectory
 from app.control.roles import StoreRoles
@@ -73,6 +74,47 @@ def list_stores_page(
     if manager is None:
         return RedirectResponse(_public_path("/login"), status_code=303)
     return _render_stores_page(request, db, manager)
+
+
+@router.get("/app/control/acessos", response_class=HTMLResponse)
+def list_control_accounts_page(
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    if not settings.revy_control_enabled:
+        return HTMLResponse("Página não encontrada.", status_code=404)
+    manager = gestor_atual(request, db)
+    if manager is None:
+        return RedirectResponse(_public_path("/login"), status_code=303)
+    if manager.papel != "admin":
+        return HTMLResponse(
+            "<h1>Acesso negado</h1>"
+            "<p>Você não tem permissão para consultar acessos do Control.</p>",
+            status_code=403,
+        )
+
+    actor = actor_from_user(manager)
+    user = sessao_gestor(request, db)
+    assert user is not None
+    stores = AccessControl(SessionLocal).scope(actor)
+    nav_stores = (
+        stores
+        if settings.revy_control_rbac_enabled
+        else [item.store.slug for item in stores]
+    )
+    accounts = ControlAccounts(SessionLocal).list(actor)
+    return templates.TemplateResponse(
+        request=request,
+        name="control/acessos.html",
+        context={
+            "usuario": user,
+            "csrf": csrf_token(request),
+            "lojas": nav_stores,
+            "control_enabled": settings.revy_control_enabled,
+            "control_rbac_enabled": settings.revy_control_rbac_enabled,
+            "accounts": accounts,
+        },
+    )
 
 
 @router.post("/app/control/lojas", response_class=HTMLResponse)

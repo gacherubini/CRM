@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}Acessos — Revy Control{% endblock %}
+{% block page_title %}Acessos do Control{% endblock %}
+{% block content %}
+<div class="page-heading">
+  <div>
+    <span class="eyebrow">Revy Control</span>
+    <h1>Acessos</h1>
+    <p>Identidades globais autorizadas a usar o painel técnico.</p>
+  </div>
+</div>
+
+<section class="panel">
+  {% if accounts %}
+  <div style="overflow-x:auto">
+    <table id="tabela-acessos-control">
+      <thead>
+        <tr>
+          <th>Nome</th>
+          <th>E-mail</th>
+          <th>Papel</th>
+          <th>Estado</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for account in accounts %}
+        <tr>
+          <td>{{ account.person_name }}</td>
+          <td>{{ account.person_email }}</td>
+          <td>{{ account.role.value }}</td>
+          <td>{{ account.status.value }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty"><strong>Nenhum acesso cadastrado.</strong></div>
+  {% endif %}
+</section>
+{% endblock %}
