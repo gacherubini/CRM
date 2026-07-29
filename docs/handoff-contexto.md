@@ -1,12 +1,40 @@
 # Handoff técnico — suíte automotiva
 
-> **Leia primeiro:** `docs/contexto-compacto.md` (eixos A–F + fonte da verdade).  
+> **Leia primeiro:** `docs/contexto-compacto.md` (eixos + fonte da verdade).
 > Este arquivo: checkpoint operacional. Seções **“Checkpoint anterior”** = histórico — não
 > reexecutar. Path Windows no rodapé de seções antigas: **ignorar** (workspace = root do git).
 >
-> **Checkpoint mais recente: 2026-07-28/29 — Fase 3 Portal ↔ Revy implantada no lab.**
-> Código em `origin/main` (`98cefe4`) e release Fly `app2037` **v28** saudável. Snapshot do volume
-> criado antes da migração: `vs_K1n4oBDw96vHZngBNaNy` (retenção de 5 dias).
+> **Checkpoint de produto mais recente: 2026-07-29 — planos Revy Control × Revy Loja
+> revisados e alinhados; ainda não implementados.**
+> **Checkpoint operacional mais recente: 2026-07-28/29 — Fase 3 Portal ↔ Revy no lab.**
+> Código operacional em `origin/main` (`98cefe4`) e release Fly `app2037` **v28** saudável.
+> Snapshot pré-migração: `vs_K1n4oBDw96vHZngBNaNy` (retenção de 5 dias).
+>
+> Este checkpoint descreve o que está implantado. Para evolução futura, prevalecem os
+> planos [Revy Control](plans/2026-07-29-plano-revy-control.md) e
+> [Revy Loja](plans/2026-07-29-plano-revy-loja.md).
+
+## Checkpoint de produto — Revy Control × Revy Loja (2026-07-29)
+
+- **Revy Control:** evolução de `revy-trafego`; Admin Revy e gestores configuram lojas,
+  pessoas/cargos, módulos, Meta/Google, números WhatsApp, aquisição, saúde e auditoria.
+- **Revy Loja:** evolução de `portal-gestao`; dono, gerente e vendedor operam somente
+  Vendas e Estoque. Chatbot, Multibanco e Seller AI ficam embutidos em Vendas.
+- Control administra números, mas o Chatbot continua dono dos canais e mensagens.
+- Acessos bancários continuam no Motor, administrados contextualmente pela Loja somente
+  por dono/gerente; não entram no Control nem bloqueiam a ativação estrutural.
+- Campanhas na Revy são registros para atribuição/medição; o produto não cria, pausa ou
+  otimiza anúncios externos.
+- **Ordem conjunta:** Control 0–3 + Loja 0–5 formam o MVP base; Control 4 adiciona Google;
+  Control 5 + Loja 6 adicionam Multi-WhatsApp; Loja 7 adiciona follow-ups, propostas e Seller AI.
+- O Atendimento do MVP inclui composer humano de texto via Chatbot; mídia fica posterior.
+- Planos antigos de ownership no Portal e Multi-WhatsApp por vendedor são históricos ou
+  superseded. O índice canônico é `docs/plans/README.md`.
+- Revisão somente documental: nenhum código da aplicação ou deploy foi alterado.
+
+**Próximo passo de implementação:** executar as Fases 0 dos dois planos e só então
+iniciar Control 1. A política exata de visibilidade do vendedor continua como decisão
+de produto obrigatória antes do corte de RBAC do Atendimento.
 
 ## Checkpoint mais recente — Fase 3 de separação de dados (produção lab)
 

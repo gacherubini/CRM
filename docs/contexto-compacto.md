@@ -1,12 +1,19 @@
 # Contexto compacto para continuidade
 
-Atualizado em **2026-07-28/29** (**Fase 3 Portal ↔ Revy implantada no Fly**; commit `98cefe4`,
-`app2037` v28; banco próprio + projeção de vendas + outbox criptografado).
+Atualizado em **2026-07-29**. Estado implantado: **Fase 3 Portal ↔ Revy no Fly**
+(commit `98cefe4`, `app2037` v28; banco próprio + projeção de vendas + outbox
+criptografado). Evolução aprovada, ainda não implementada: Revy Control + Revy Loja.
+
+**Checkpoint de produto 2026-07-29:** planos Control e Loja revisados em conjunto. O
+MVP base é Control 0–3 + Loja 0–5; Google é Control 4; Multi-WhatsApp é Control 5 +
+Loja 6; Seller AI é Loja 7. Próxima implementação começa pelas Fases 0, não pelo frontend.
 Leia isto primeiro; detalhe operacional recente em `docs/handoff-contexto.md` (topo).
 Planos válidos: `docs/plans/README.md`. **Ignore** `docs/plans/_archive/`.
 Ops Fly canônico: `deploy/fly/3vm/README.md` + `bash deploy/fly/up-all.sh --3vm`.
 Sessão menu/fotos: [plano 2026-07-22](plans/2026-07-22-plano-menu-estoque-wa-e-fotos-fix.md).
-Revy Tráfego: [plano 6.4](plans/2026-07-28-plano-revy-trafego-separacao.md) · [`revy-trafego/README.md`](../revy-trafego/README.md).
+Revy Tráfego implantado: [plano histórico 6.4](plans/2026-07-28-plano-revy-trafego-separacao.md)
+· [`revy-trafego/README.md`](../revy-trafego/README.md). Evolução: [Revy Control](plans/2026-07-29-plano-revy-control.md)
+e [Revy Loja](plans/2026-07-29-plano-revy-loja.md).
 
 **Playwright / bancos:** lições
 [Santander](plans/2026-07-13-playwright-licoes-santander.md),
@@ -25,11 +32,12 @@ Campos e decisões por banco:
 **CRM tráfego pago (2026-07-20):** campanhas + first/last + ROI **DONE** —
 [plano](plans/2026-07-20-plano-trafego-pago-crm-campanhas-roi.md) · guia [loja](trafego-pago-loja.md).
 **Eixo C (2026-07-21 rev.3):** [conversões / funil / insights](plans/2026-07-21-plano-conversao-atribuicao-insights.md)
-— **A/B/E/D/H/C/F concluídas**, incluindo a UI `/app/funil`; resta **G** (Google Conversions).
+— **A/B/E/D/H/C/F concluídas**, incluindo a UI `/app/funil`; Google foi movido para a
+Fase 4 do Revy Control.
 **CTWA (2026-07-22):** [atribuição + CAPI messaging](plans/2026-07-22-plano-ctwa-atribuicao-capi-messaging.md) — **MVP código**
 (lead CTWA, match, Purchase messaging, n8n); residual E2E lab Evolution com anúncio real.
 **Spend Meta (2026-07-22):** [gasto automático](plans/2026-07-22-plano-meta-spend-api.md) — **MVP + job 24h**;
-Google spend fora. TikTok spend parked.
+o alvo futuro administra Meta e Google no Revy Control. TikTok permanece fora.
 **Eixo E (2026-07-21):** áudio recebido, envio de foto do Estoque no WhatsApp e cadastro automático
 de fotos WhatsApp → Estoque → Catálogo têm backend/workflow concluídos. Cadastro textual tem
 idempotência persistente; fotos usam sessão curta por grupo e limpeza administrativa de órfãos.
@@ -38,9 +46,10 @@ necessário homologar o transcritor HTTP e executar um restore drill.
 **Grupo do estoque (2026-07-24):** dono/gerente escolhe um único grupo no Portal; só o JID exato
 abre menu, cadastra veículos e envia fotos. Privado/outros grupos são ignorados silenciosamente.
 Migration Chatbot `0012`; workflow n8n com 31 nós publicado; app+n8n health passando.
-**Eixo G (2026-07-22):** [Multi-WhatsApp por vendedor](plans/2026-07-22-plano-multi-whatsapp-vendedores-campanhas.md)
-está **planejado e não implementado**. O desenho mantém um lead por loja/telefone e cria uma conversa
-por canal/telefone, liga campanhas a vendedor/canal e preserva o número atual como canal legado.
+**Multi-WhatsApp:** o plano antigo “por vendedor” foi **substituído**. A Fase 5 do
+[Revy Control](plans/2026-07-29-plano-revy-control.md#fase-5--múltiplos-números-whatsapp-por-loja)
+usa vários números equivalentes por loja, sem vínculo fixo a vendedor/campanha; mantém
+um lead por loja/telefone e uma conversa por canal/telefone.
 
 ## Fonte da verdade (por tema)
 
@@ -49,6 +58,7 @@ por canal/telefone, liga campanhas a vendedor/canal e preserva o número atual c
 | Estado do produto | **este arquivo** | README %, `design.md`, handoffs pontuais antigos |
 | Checkpoint / ops recente | `handoff-contexto.md` (topo) | seções “checkpoint anterior” longas |
 | Qual plano implementar | `plans/README.md` + Status no topo do plano | `_archive/`, planos DONE/SUPERSEDED |
+| Fronteiras futuras do produto | `CONTEXT.md` + planos/specs Revy Control e Revy Loja | ownership/RBAC descritos em planos DONE |
 | Go-live WhatsApp | `go-live-chatbot.md` | compose local legado / branch `feat/*` |
 | Ops Fly lab | `deploy/fly/3vm/` + `up-all.sh --3vm` + seção Fly abaixo | monólitos legados / plano #7 só como histórico |
 | Lições RPA | `*playwright-licoes-*.md` | reabrir santander/fontecred-impl do zero |
@@ -61,11 +71,12 @@ Não há uma única “próxima task” universal — depende do objetivo:
 |---|---|---|---|
 | **A · Demo loja / WA** | **(1)** escolher Grupo do estoque; **(2)** E2E `menu`/cadastro/fotos no grupo; **(3)** E2E contato novo (IA vendas) | Demo/operação real no Zap | `setup-grupo-whatsapp-estoque.pdf` + `go-live-chatbot.md` + `deploy/fly/3vm/README.md` |
 | **B · Multi-banco** | Estabilizar sim com celular + prints; alinhar âncoras se falhar ao vivo | Mais cotações reais estáveis | handoff topo + lições Playwright |
-| **C · CRM dono** | Lab **cutover completo**; residual = **dados** de mídia (Pixel/campanha reais) | Plataforma DONE | [plano 6.4](plans/2026-07-28-plano-revy-trafego-separacao.md) · [`revy-trafego/README.md`](../revy-trafego/README.md) |
+| **C · CRM atual** | Lab **cutover completo**; residual = **dados** de mídia (Pixel/campanha reais) | Operar o que já está implantado | [plano histórico 6.4](plans/2026-07-28-plano-revy-trafego-separacao.md) · [`revy-trafego/README.md`](../revy-trafego/README.md) |
 | **D · Escala Motor** | Smoke live sessão quente + teto 2; object storage se multi-volume | Estabilidade multi-banco / IP | B+D + warm-batch2 |
 | **E · Dia a dia loja** | Restore drill do volume/banco e homologar transcritor | Fechar operação de áudio e foto já publicada | `#6` + `fotos-veiculos-whatsapp.md` |
 | **F · Marketing** | Completar landing se o dono entregar HTML | Site/hero polish | `site/` |
-| **G · Multi-WhatsApp** | Task 0: validar contrato real Evolution/CTWA, sessões e capacidade | Vários números de vendedores com leads centralizados | [plano multi-WhatsApp](plans/2026-07-22-plano-multi-whatsapp-vendedores-campanhas.md) |
+| **G · Revy Control** | Fase 0; depois Lojas/RBAC (1), estrutura comercial (2) e integrações (3) | Começar a nova arquitetura administrativa | [plano Control](plans/2026-07-29-plano-revy-control.md) |
+| **H · Revy Loja** | Fase 0 pode iniciar; corte de identidade espera Control 2; MVP segue até Loja 5 | Transformar o Portal no produto comercial | [plano Loja](plans/2026-07-29-plano-revy-loja.md) |
 
 **Bloqueios conhecidos:**
 - Landing Tailwind nova: HTML do dono ainda incompleto.
@@ -73,7 +84,8 @@ Não há uma única “próxima task” universal — depende do objetivo:
 - Fotos: download Evolution via **HTTPS público**; parser Long size OK; grupo validado antes do
   download. Falta E2E humano completo + restore drill do volume.
 - Menu cadastro: código/deploy DONE; falta escolher o grupo no Portal e fechar o E2E.
-- E11/E12 outbound: só com eixo **A** estável + opt-out.
+- E11/E12 outbound: fora do MVP atual; revalidar produto, consentimento e opt-out antes
+  de criar um plano próprio.
 - Não reabrir Fontecred/Santander sem evidência nova.
 - Stack 3-VM **no ar** (pedido do dono). Subir/desligar: `up-all.sh --3vm` / `down-all.sh --3vm`.
   Não destruir apps/volumes sem pedido explícito.
@@ -123,25 +135,27 @@ Monólitos legados (`portal2037`, `catalogo2037`, `estoque2037`, `chatbot2037`, 
 - Sem reset/checkout destrutivo sem pedido explícito.
 - Não ler/imprimir `.env`, tokens, chaves Gemini/Evolution/Motor/Portal/CAPI ou senhas.
 - Estoque = fonte de verdade de veículos. Integrações **só HTTP** entre produtos.
-- Ordem estrutural de planos: `#0 → #1A → #4A → #2A → #5A → #3A/#3A.1 → #3B → #6` (+ ops #7).
-  Isso **não** substitui a tabela de eixos acima para escolher o trabalho da sessão.
+- Ordem histórica da base já construída: `#0 → #1A → #4A → #2A → #5A → #3A/#3A.1 → #3B`.
+- Ordem da evolução atual: Control 0–3 + Loja 0–5 para o MVP base; Control 4 (Google)
+  e Control 5 + Loja 6 (Multi-WhatsApp) são incrementos independentes; Loja 7 adiciona Seller AI.
 - Credenciais de banco: Portal **9A** → Motor cifrado. `testar-login` ainda placeholder.
-- Roadmap #6: **E9 fora**; E2/E4/E7 adiados; **E8/E10 feitos**; **E13–E18** aprovados (esboço).
+- Roadmap #6 é histórico; itens não entregues precisam ser revalidados dentro de Control/Loja.
 
 ## Estado por produto
 
 | Produto | Pasta / porta | Feito (essencial) | Aberto |
 |---|---|---|---|
 | Motor #1A | `motor-simulacao/` `:8000` | async, auth, fan-out, workers on-demand, **Santander/Fontecred/Bradesco/Pan portal LIVE**, warm session teto 2, prints blob JPEG, migrations head **0013** | `testar-login` real; T10 revenda; object storage multi-volume |
-| Chatbot #2A | `chatbot-api/` `:8001` (Fly: `app2037`) | leads, handoff, por-placa, E3/E5, áudio efêmero/fallback, foto automática com sessão por grupo, envio da capa, first/last UTM, sim privada + handoff; grupo único do estoque por loja; privado/outros grupos ignorados; webhook endurecido | escolher grupo + E2E WA; transcritor HTTP real; retenção/expurgo; multi-WhatsApp por vendedor planejado |
+| Chatbot #2A | `chatbot-api/` `:8001` (Fly: `app2037`) | leads, handoff, por-placa, E3/E5, áudio efêmero/fallback, foto automática com sessão por grupo, envio da capa, first/last UTM, sim privada + handoff; grupo único do estoque por loja; privado/outros grupos ignorados; webhook endurecido | escolher grupo + E2E WA; transcritor HTTP real; retenção/expurgo; canais da Fase 5 do Control |
 | Estoque #4A | `estoque-api/` `:8100` (Fly: `app2037`) | CRUD, idempotência persistente, placa, admin, galeria/capa, upload validado, volume/rota pública HTTPS, snapshots, limpeza periódica e transporte outbox testado | executar restore drill |
-| Portal | `portal-gestao/` `:9000` | CRM, sim multi-banco, 9A, CAPI retry, gastos/ROI/resultados; funil completo backend+UI; event bus Meta; retry HTTP seguro | Google; E2E Playwright |
+| Portal → Revy Loja | `portal-gestao/` `:9000` | CRM, sim multi-banco, 9A, CAPI retry, gastos/ROI/resultados; funil completo backend+UI; event bus Meta; retry HTTP seguro | fases Loja 0–5; E2E Playwright; Google pertence ao Control |
+| Revy Tráfego → Control | `revy-trafego/` | banco próprio, projeção de vendas, mídia/ROI e app multi-loja legado | fases Control 0–7, começando por Loja de primeira classe + RBAC |
 | Catálogo #5A | `catalogo-publico/` `:8200` | vitrine, CTA, Pixel PageView/Lead/ViewContent | SEO/tema; domínio (E18) |
 | Site | `site/` | landing + hero poster | polish visual residual |
 
-**Estimativa:** ~**99%** MVP multi-banco + CRM demonstrável · ~**92%** preparação para produção
-(restam E2E WA real, transcritor real, restore drill, Google e polish ops). Percentuais são estimativas de escopo,
-não cobertura de testes.
+**Estimativa da suíte atual:** ~**99%** MVP multi-banco + CRM demonstrável · ~**92%**
+preparação para produção. Esses percentuais não incluem a nova evolução Control/Loja e
+não representam cobertura de testes.
 
 Baseline de testes: rodar `pytest -q` no produto; não confiar em contagens antigas de handoff.
 
@@ -161,7 +175,7 @@ cd ../portal-gestao && python -m pytest tests/test_campanhas.py tests/test_roi.p
 cd ../chatbot-api && python -m pytest tests/test_audio.py tests/test_inventory.py tests/test_vehicle_photo.py -q
 cd ../estoque-api && python -m pytest tests/test_rbac_fotos_auditoria.py -q
 python ../n8n/validate_workflow.py
-# migrations: motor head 0013 · portal 0008 funil_eventos · chatbot 0012 grupo_estoque · estoque 0007 idempotência
+# migrations atuais: motor 0013 · portal 0012 · chatbot 0013 · estoque 0007 · revy-trafego 0001
 git status --short
 ```
 

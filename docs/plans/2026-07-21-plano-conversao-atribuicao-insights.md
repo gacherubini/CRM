@@ -1,21 +1,26 @@
 # Plano — Conversões, funil, insights, UX de gastos, resultados do dono e Google
 
-> **Status 2026-07-21: ATIVO — A/B/E/D/H/C/F concluídos; somente G residual.**
+> **FRONTEIRA FUTURA:** arquitetura e RBAC abaixo registram o que foi entregue no Portal.
+> Configuração técnica, mídia e conversões outbound migram ao [Revy Control](2026-07-29-plano-revy-control.md);
+> o [Revy Loja](2026-07-29-plano-revy-loja.md) conserva apenas a visão comercial.
+
+> **Status 2026-07-29: CONCLUÍDO NO ESCOPO — A/B/E/D/H/C/F feitos; Fase G movida
+> para o [plano do Revy Control](2026-07-29-plano-revy-control.md#fase-4--google-ads-conexão-leitura-e-conversões).**
 > **Rev. 3:** + **UX de resultados do dono** (bloco no dashboard, alertas, drill-down campanha,
 > onboarding de medição). Rev. 2 já tinha gastos lote/CSV, event bus e Google.
 > Origem: conversa Meta + Google + TikTok / Revy Analytics + UX de leitura de resultados.
 > **Não** reimplementar E8/E10 MVP nem campanhas/ROI já em `main` (`8e7ec5f`).
 
-**Status:** **ATIVO** — eixo **C · CRM dono**
-**Detalha / estende:** `#3B` Task 4; residual **E10**; **E8** (insights + UX gastos + leitura de ROI); Google + event bus.
+**Status:** **DONE NO ESCOPO / GOOGLE MOVIDO AO CONTROL** — eixo **C · CRM dono**
+**Detalha / estende:** `#3B` Task 4; **E10**; **E8** (insights + UX gastos + leitura de ROI); event bus.
 **Não implementa:** E9 redes; Ad Manager; TikTok Events API; **API de spend**.
 **Depende de:** campanhas + ROI (feito), CAPI Purchase MVP (feito), first/last + fbclid/gclid (feito).
 
-**Goal:** O dono (1) confia no Purchase Meta, (2) lança gastos com UX boa, (3) **enxerga resultado em 30s no dashboard**, (4) vê funil/insights/drill-down, (5) publica `purchase` via event bus para Meta e Google, (6) completa checklist de medição na 1ª semana.
+**Goal:** O dono (1) confia no Purchase Meta, (2) lança gastos com UX boa, (3) **enxerga resultado em 30s no dashboard**, (4) vê funil/insights/drill-down, (5) publica `purchase` para Meta e projeta a venda ao Control, (6) completa checklist de medição na 1ª semana.
 
 **Architecture:** Portal dono de métricas, gastos e conversões outbound. Camada de **leitura** (`resultados_dono.py` ou helpers em `roi_calc`) agrega ROI por canal/período e alertas sem duplicar SQL solto nas views. `confirm_sale` → `publish_conversion` → adapters. Design visual alinhado a `docs/brand/revy-brand-kit.md` (sem neon/gradiente “IA”; métricas honestas).
 
-**Tech Stack:** Python 3.12+, FastAPI, SQLAlchemy, Alembic, Jinja2, pytest, httpx; Google Ads API (fase G); CSS do Portal (`app.css` + blocos scoped no template quando necessário).
+**Tech Stack:** Python 3.12+, FastAPI, SQLAlchemy, Alembic, Jinja2, pytest, httpx; CSS do Portal (`app.css` + blocos scoped no template quando necessário). Google pertence agora ao plano do Control.
 
 ---
 
@@ -35,7 +40,7 @@ Isto responde direto à pergunta *“o que seria apenas UX? eu gostaria disso”
 | **Onboarding medição** | **Só UX** | Checklist 5 passos até “medindo de verdade” | Flags derivados |
 | Status “último Purchase” na Tráfego | UX sobre integração | Verde/vermelho | Outbox já existe |
 | **Event bus** | **Arquitetura** | Quase invisível | Refator + testes |
-| **Google Conversions** | **Integração API** | Config Google + venda treina Ads | Token/OAuth, upload conversão |
+| **Google Conversions** | **Movido ao Control** | Resultado comercial treina Ads | OAuth, leitura e upload fora do Portal |
 | API **puxar spend** do Ads | Integração pesada | Gasto sozinho | **Fora deste plano** |
 | TikTok Events API | Integração | Idem Meta | **Parked** |
 
@@ -50,7 +55,7 @@ Isto responde direto à pergunta *“o que seria apenas UX? eu gostaria disso”
 | Drill-down campanha | **Sim** (**H5**) | **Apenas UX** |
 | Onboarding medição | **Sim** (**H9**) | **Apenas UX** |
 | Event bus | **Sim** (**F**) | Arquitetura |
-| Google conversion | **Sim** (**G**) | Integração API |
+| Google conversion | **Sim, no Control** (**G movida**) | Integração API |
 | Puxar gasto via API | **Não** (parked) | Não é UX |
 | TikTok API | **Não** ainda | Parked |
 
@@ -139,7 +144,7 @@ F  Event bus
 G  Google
 ```
 
-**Dependências H:** H1/H2 usam ROI atual; melhoram após E+D. H5 usa vendas+gastos. H9: CAPI após A; Google opcional após G.
+**Dependências H:** H1/H2 usam ROI atual; melhoram após E+D. H5 usa vendas+gastos. H9 usa CAPI após A; Google segue o plano do Control.
 
 ---
 
@@ -148,8 +153,8 @@ G  Google
 | Arquivo | Fases | Papel |
 |---|---|---|
 | `app/meta_capi.py` | A, F | match/retry; MetaAdapter |
-| `app/conversions/*` | F, G | bus + adapters |
-| `app/models.py` | C, G, H9 | FunilEvento; Google; flag dismiss onboarding se server-side |
+| `app/conversions/*` | F | bus + adapters atuais |
+| `app/models.py` | C, H9 | FunilEvento; flag dismiss onboarding se server-side |
 | `app/campanhas.py` | B, E, H5 | canais; lote/CSV; detalhe |
 | `app/roi_calc.py` | D, H1 | insights; por canal |
 | `app/resultados_dono.py` (novo) | H | `resumo_periodo`, `alertas_trafego`, `checklist_medicao` |
@@ -357,55 +362,20 @@ def publish_conversion(kind: str, payload: PurchaseConversion, db: Session) -> N
 
 ---
 
-## Fase G — Google Ads Conversions
+## Fase G — Google Ads Conversions — movida
 
-### Objetivo
+Esta fase não deve mais ser implementada no Portal. A separação do Revy Tráfego e a
+arquitetura atual do Google mudaram sua fronteira:
 
-Mesma venda confirmada envia conversão ao Google (priorizar **Offline Conversion Upload** com `gclid` quando houver; Enhanced se encaixar no fluxo web+consent — documentar escolha na implementação).
+- OAuth, contas, métricas, saúde e mapeamento ficam no **Revy Control**;
+- Google Ads API faz leitura; Data Manager API recebe as conversões;
+- o Revy Loja apenas publica o evento comercial versionado;
+- configuração técnica não é responsabilidade de dono/gerente no Portal.
 
-### Config por loja (UI em `/app/trafego` ou seção Google)
-
-Campos mínimos (cifrados onde segredo):
-
-- customer id / conversion action id (ou resource name);
-- credencial (refresh token OAuth **ou** caminho de service account — **uma** estratégia no MVP, documentada);
-- toggle `enviar_conversion_google`;
-- status último envio (espelho da outbox Meta).
-
-### Fluxo
-
-```text
-confirm_sale
-  → publish purchase
-      → MetaAdapter
-      → GoogleAdapter  # se gclid (ou enhanced ids) e config ok
-```
-
-- Sem `gclid` e sem identificadores enhanced: outbox `skipped` ou não cria item (preferir log/status “sem gclid”).
-- Valor = `preco_venda`; moeda BRL; tempo da confirmação.
-- Idempotência: `event_id` / order id = `venda_id`.
-
-### Aceite
-
-- Testes com httpx/google client mock.
-- Falha Google não reverte venda.
-- Guia loja: como obter conversion action + colar config (sem tutorial de 20 páginas).
-- RBAC: só dono/gerente.
-
-### Tasks
-
-- [ ] **G1** Model config + migration + cifra (reusar `cripto` do Portal).
-- [ ] **G2** GoogleAdapter + outbox + testes mock.
-- [ ] **G3** UI Tráfego (bloco Google) + status.
-- [ ] **G4** Registrar no bus; E2E teste: publish chama Meta + Google mocks.
-- [ ] **G5** Doc `trafego-pago-loja.md` seção Google.
-- [ ] Commits: `feat(portal): Google Ads offline conversions via event bus`.
-
-### Riscos / notas G
-
-- Aprovação developer token Google pode ser **ops do dono**, não código.
-- MVP pode exigir “colar refresh token” gerado offline se OAuth full for pesado demais — **aceitar** se documentado; evoluir OAuth na UI depois.
-- Não importar gasto pela Google Ads API nesta fase.
+Implementar somente pela
+[Fase 4 do plano Revy Control](2026-07-29-plano-revy-control.md#fase-4--google-ads-conexão-leitura-e-conversões)
+e pela
+[pesquisa oficial](../research/2026-07-29-google-ads-revy-control.md).
 
 ---
 
@@ -627,8 +597,8 @@ Reutilizar estilos de `trafego/roi.html` (`.roi-card`, `.roas-bar`) via classes 
 - [x] **H9** Onboarding medição dismissível
 - [x] **C** Eventos, tempos, materialização, endpoint e UI `/app/funil`; #3B T4 concluída
 - [x] **F** Event bus; fluxo principal publica Meta só via adapter
-- [ ] **G** Google conversion no bus + UI config
-- [ ] Guia loja atualizado (gastos, resultados, Google)
+- [x] **G movida** para a Fase 4 do Revy Control; não implementar no Portal
+- [x] Guia Google passa a pertencer à entrega do Revy Control
 - [x] **Sem** API de spend; **sem** TikTok API
 
 ---
@@ -640,6 +610,8 @@ Reutilizar estilos de `trafego/roi.html` (`.roi-card`, `.roas-bar`) via classes 
 - [Plano #6](2026-07-11-plano6-evolucoes-roadmap.md)
 - [Brand kit](../brand/revy-brand-kit.md)
 - [Guia loja](../trafego-pago-loja.md)
+- [Plano Revy Control](2026-07-29-plano-revy-control.md)
+- [Pesquisa Google](../research/2026-07-29-google-ads-revy-control.md)
 - [Contexto](../contexto-compacto.md)
 
 ---

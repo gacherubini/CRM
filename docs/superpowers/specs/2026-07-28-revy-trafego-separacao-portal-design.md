@@ -1,7 +1,13 @@
 # Design — Revy Tráfego separado do Portal da loja
 
+> **HISTÓRICO / IMPLEMENTADO.** Este documento continua válido como registro da
+> separação Revy Tráfego × Portal concluída em 2026-07-28. Para evolução futura,
+> especialmente acesso por loja, gestores externos, Revy Control e Multi-WhatsApp,
+> usar o [design Revy Control de 2026-07-29](2026-07-29-revy-control-design.md).
+> As decisões D1 e D7 abaixo foram substituídas.
+
 **Data:** 2026-07-28  
-**Status:** Aprovado (brainstorming) — aguardando execução dos planos  
+**Status:** HISTÓRICO / IMPLEMENTADO — substituído para evolução futura pelo Revy Control
 **Eixo:** C · CRM / marketing (evolução pós campanhas+ROI DONE)
 
 ## Problema

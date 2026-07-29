@@ -1,5 +1,10 @@
 # Plano #6 — Evoluções (roadmap)
 
+> **STATUS DE ARQUITETURA 2026-07-29:** histórico de ideias e entregas. Rótulos “Ativo”
+> dentro deste arquivo não autorizam implementação direta. Toda ideia ainda aberta deve
+> ser revalidada e ganhar plano próprio sob [Revy Control](2026-07-29-plano-revy-control.md)
+> ou [Revy Loja](2026-07-29-plano-revy-loja.md). E11/E12 não fazem parte do MVP atual.
+
 > **Regra de produto:** toda evolução declara em qual produto vive e integra os demais somente por
 > contrato. Nenhum item futuro pode transformar Portal, Catálogo ou Motor em dependência obrigatória
 > do Chatbot Standalone.

@@ -1,5 +1,9 @@
 # Plano — Tráfego pago no CRM (Campanhas, Atribuição e ROI)
 
+> **FRONTEIRA FUTURA:** este documento descreve o MVP entregue no Portal. Para novo
+> desenvolvimento, Registros de Campanha, integrações e ROI técnico pertencem ao
+> [Revy Control](2026-07-29-plano-revy-control.md); a Loja recebe resumo comercial.
+
 > **Status 2026-07-20: DONE (MVP entregue em `main`, commit `8e7ec5f`).**  
 > Não reimplementar T1–T9. Este doc vira **referência de desenho** + residual abaixo.  
 > **Não** executar os checkboxes `- [ ]` — ficam só como histórico do plano original.

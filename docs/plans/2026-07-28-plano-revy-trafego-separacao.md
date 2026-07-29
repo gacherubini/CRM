@@ -1,5 +1,10 @@
 # Plano — Revy Tráfego separado do Portal da loja
 
+> **SUCESSOR PARA NOVO DESENVOLVIMENTO:** [Plano Revy Control de 2026-07-29](2026-07-29-plano-revy-control.md).
+> Este plano documenta a separação já implantada e continua válido como histórico e
+> runbook do cutover. A regra antiga “todo gestor vê todas as lojas” não deve ser usada
+> em novas implementações.
+
 > **Status 2026-07-28/29: FASE 3 IMPLANTADA NO LAB** — banco próprio, projeção de vendas e
 > outbox Portal → Revy em `origin/main` (`98cefe4`) e no Fly `app2037` v28. Portal no head `0012`;
 > Revy no head `0001`; snapshot e smoke registrados no handoff.
@@ -23,7 +28,10 @@
 
 ---
 
-## Decisões (não reabrir sem motivo)
+## Decisões históricas do corte
+
+As decisões abaixo explicam a implementação de 2026-07-28. Para novo desenvolvimento,
+as regras de acesso e perfis do Revy Control prevalecem.
 
 1. Gestor = **equipe Revy** (todas as lojas no seletor).
 2. Cliente = **só resultados** (gasto, leads, vendas, CPL, CPA, ROAS).

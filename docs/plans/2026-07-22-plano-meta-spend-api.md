@@ -1,5 +1,9 @@
 # Plano — Sincronizar gasto de mídia via Meta Marketing API (sem lançamento manual)
 
+> **FRONTEIRA FUTURA:** este é o desenho do MVP já entregue no Portal. OAuth/token,
+> sincronização e diagnóstico Meta passam a ser administrados pelo
+> [Revy Control](2026-07-29-plano-revy-control.md); dono e gerente não configuram isso no Revy Loja.
+
 > **Status 2026-07-22: MVP CÓDIGO (S1–S4)** — botão 7d + job background 24h + endpoint interno + UI + testes.  
 > Residual: listar campanhas Meta para vincular (S6), App Review multi-tenant, OAuth.  
 > Pedido: o dono **não** deve precisar digitar quanto gastou na campanha; o Revy puxa da Meta.  

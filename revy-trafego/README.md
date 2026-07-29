@@ -1,5 +1,11 @@
 # Revy Tráfego
 
+> **Evolução aprovada:** este app será ampliado e sua UI passará a se chamar
+> **Revy Control**, mantendo Tráfego como módulo interno. Ver
+> [design](../docs/superpowers/specs/2026-07-29-revy-control-design.md) e
+> [plano por fases](../docs/plans/2026-07-29-plano-revy-control.md). O estado operacional
+> descrito neste README continua sendo o estado atualmente implantado.
+
 Cockpit multi-loja da **equipe Revy** para operação de mídia paga (Pixel, CAPI, Ads spend, campanhas, ROI, auditorias e diagnóstico de leads).
 
 O **portal da loja** (`portal-gestao`) mostra só resultados de negócio ao dono; a config técnica fica aqui.

@@ -1,9 +1,14 @@
 # Plano: Multi-WhatsApp por vendedor e campanhas centralizadas no Revy
 
-**Status:** ATIVO / NAO IMPLEMENTADO  
+**Status:** SUPERSEDED / NÃO IMPLEMENTAR
 **Data:** 2026-07-22  
 **Escopo:** Chatbot API, Evolution API, n8n, Portal/CRM, campanhas, inbox e deploy Fly 3-VM  
 **Fora do MVP:** mudar a versao da Evolution, compartilhar numero pessoal do vendedor e rotear o Catalogo por campanha
+
+> Substituído pelo [design Revy Control](../superpowers/specs/2026-07-29-revy-control-design.md)
+> e pela [Fase 5 do plano Revy Control](2026-07-29-plano-revy-control.md#fase-5--múltiplos-números-whatsapp-por-loja).
+> A nova decisão usa vários números equivalentes por loja, sem vínculo fixo a vendedor,
+> campanha ou finalidade. Este arquivo permanece apenas como diagnóstico técnico histórico.
 
 ## 1. Objetivo
 

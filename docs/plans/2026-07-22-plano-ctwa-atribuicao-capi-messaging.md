@@ -1,5 +1,10 @@
 # Plano — CTWA (Click-to-WhatsApp): atribuição, persona→CTWA e CAPI messaging
 
+> **FRONTEIRA FUTURA:** o fluxo CTWA implementado continua válido, mas configuração,
+> Registros de Campanha e CAPI técnica migram ao [Revy Control](2026-07-29-plano-revy-control.md).
+> Multi-WhatsApp por vendedor e o “Google residual” citados abaixo foram substituídos
+> respectivamente pelas Fases 5 e 4 do Control.
+
 > **Status 2026-07-22: MVP CÓDIGO** — ingestão CTWA no lead, match campanha, CAPI messaging Purchase, n8n passthrough, UI.  
 > Residual: fixture real Evolution (Task 0 lab), Lead early CAPI (B2), E2E anúncio pago.  
 > Origem: conversa de produto (Pixel monta persona → CTWA converte → ROI no Revy).  
@@ -523,7 +528,7 @@ Não automatizar Playwright Ads; checklist manual no `go-live` ou no guia loja.
 | Plano | Relação |
 |---|---|
 | 6.1 Tráfego pago | Base ROI/campanha — não reabrir |
-| 6.2 Conversões | Bus + Meta web — estender; G Google permanece residual |
+| 6.2 Conversões | Bus + Meta web — estender; Google foi movido para Control 4 |
 | 6.2c Meta spend | Import automático de gasto — compartilha `meta_campaign_id`; faz ROI CTWA sem digitação |
 | 6.3 Multi-WA | Task 0 payload compartilhada; canais multi-número **depois** |
 | #5A Catálogo | Persona Pixel permanece lá |
