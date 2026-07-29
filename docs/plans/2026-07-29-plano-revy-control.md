@@ -92,8 +92,9 @@ Conhecer o estado real antes de criar tabelas ou alterar autorização.
 - [ ] Inventariar instâncias Evolution e números atuais sem expor tokens.
 - [ ] Capturar fixtures sanitizadas de webhook inbound, `fromMe`, mídia e CTWA.
 - [ ] Confirmar backup/snapshot e ensaio de restauração dos bancos afetados.
-- [ ] Definir matriz de suspensão por serviço e módulo: leitura histórica, novas escritas,
-      webhooks inbound, automações, jobs e visibilidade do Catálogo Público.
+- [x] Definir matriz de suspensão por serviço e módulo: leitura histórica, novas escritas,
+      webhooks inbound, automações, jobs e visibilidade do Catálogo Público
+      ([ADR 0001](../adr/0001-suspensao-distribuida.md)).
 - [x] Criar flag default off `REVY_CONTROL_ENABLED` para proteger as superfícies
       administrativas do Control.
 - [x] Criar flag default off `REVY_CONTROL_RBAC_ENABLED` para o cutover do escopo por

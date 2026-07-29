@@ -78,6 +78,21 @@ _Avoid_: Loja excluída, loja encerrada
 Loja cujo relacionamento com a Revy foi finalizado, com o histórico preservado.
 _Avoid_: Loja excluída, loja suspensa
 
+**Estado Operacional Efetivo**:
+Resultado mais restritivo entre o Status da Loja e o estado do Módulo Contratado,
+usado para decidir se um novo efeito operacional pode ocorrer.
+_Avoid_: Visibilidade do menu, situação da cobrança, status da integração
+
+**Leitura Histórica**:
+Consulta autorizada de fatos já registrados, permitida mesmo durante suspensão sem
+reativar automações ou autorizar novas operações.
+_Avoid_: Continuação da operação, replay automático
+
+**Captura Passiva de Ingresso**:
+Registro autenticado e deduplicado de um fato externo recebido durante suspensão,
+sem criar atendimento, executar automação ou produzir saída externa.
+_Avoid_: Atendimento ativo, descarte do webhook, replay automático
+
 **Ativação da Loja**:
 Confirmação do Admin Revy de que uma loja tecnicamente pronta pode iniciar sua
 operação. Requisitos obrigatórios bloqueiam a ativação; alertas aceitos ficam auditados.
