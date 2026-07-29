@@ -105,24 +105,21 @@ class ControlAccounts:
                 raise ControlAccountConflict(
                     "somente acesso desativado pode ser reativado"
                 )
-            if not access.senha_hash or not access.gestor_legado_id:
+            if not access.senha_hash:
                 raise ControlAccountConflict(
-                    "acesso não possui credencial e gestor legado para reativação"
+                    "acesso não possui credencial para reativação"
                 )
             person = db.get(Pessoa, access.pessoa_id)
             if person is None:
                 raise PersonNotFound("Pessoa Revy não encontrada")
             legacy_manager = _legacy_manager(db, access)
-            if legacy_manager is None:
-                raise ControlAccountConflict(
-                    "gestor legado do acesso não encontrado"
-                )
 
             previous_version = access.sessao_versao
             access.estado = ControlAccountStatus.ACTIVE.value
             access.sessao_versao = previous_version + 1
             access.atualizada_em = agora()
-            legacy_manager.ativo = True
+            if legacy_manager is not None:
+                legacy_manager.ativo = True
             _append_event(
                 db,
                 actor=actor,

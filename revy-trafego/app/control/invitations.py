@@ -6,7 +6,6 @@ from collections.abc import Callable
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
-from sqlalchemy import or_
 from sqlalchemy.exc import IntegrityError
 
 from app.auth import hash_senha
@@ -28,7 +27,6 @@ from app.control.types import (
 from app.models import (
     AcessoControl,
     ConviteAcessoControl,
-    GestorRevy,
     Pessoa,
     agora,
 )
@@ -174,43 +172,19 @@ class ControlInvitations:
             if person is None:
                 raise ControlInvitationInvalid("convite inválido ou expirado")
 
-            existing_manager = (
-                db.query(GestorRevy)
-                .filter(
-                    or_(
-                        GestorRevy.id == access.id,
-                        GestorRevy.email == person.email,
-                    )
-                )
-                .first()
-            )
-            if existing_manager is not None:
-                raise ControlInvitationInvalid("convite inválido ou expirado")
-
             password_hash = hash_senha(password)
-            manager = GestorRevy(
-                id=access.id,
-                email=person.email,
-                nome=person.nome,
-                senha_hash=password_hash,
-                papel=access.papel,
-                ativo=True,
-                criado_em=now,
-            )
-            db.add(manager)
-            db.flush()
             access.senha_hash = password_hash
             access.estado = ControlAccountStatus.ACTIVE.value
-            access.gestor_legado_id = manager.id
+            access.gestor_legado_id = None
             access.atualizada_em = now
             invitation.usado_em = now
             _append_event(
                 db,
                 actor=Actor(
-                    id=manager.id,
-                    email=manager.email,
-                    name=manager.nome,
-                    role=manager.papel,
+                    id=access.id,
+                    email=person.email,
+                    name=person.nome,
+                    role=access.papel,
                 ),
                 store_id=None,
                 action="control_access.activated",

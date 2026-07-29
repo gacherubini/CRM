@@ -9,11 +9,22 @@ from fastapi import Request
 from sqlalchemy.orm import Session
 
 from app.control.access_backfill import backfill_acessos_control
-from app.models import AcessoControl, GestorRevy
+from app.models import AcessoControl, GestorRevy, Pessoa
 
 _hasher = PasswordHasher()
 _SESSION_VERSION_KEY = "sessao_versao"
 _MANAGER_SESSION_VERSION_ATTR = "_control_session_version"
+
+
+@dataclass
+class AuthPrincipal:
+    """Identidade autenticável do Control (canônica ou legada)."""
+
+    id: str
+    email: str
+    nome: str
+    papel: str
+    ativo: bool = True
 
 
 @dataclass
@@ -38,36 +49,68 @@ def verifica_senha(hash_atual: str, senha: str) -> bool:
         return False
 
 
-def autenticar(db: Session, email: str, senha: str) -> GestorRevy | None:
-    gestor = db.query(GestorRevy).filter(GestorRevy.email == email.strip().lower()).first()
+def autenticar(db: Session, email: str, senha: str) -> AuthPrincipal | None:
+    email_norm = email.strip().lower()
+    if not email_norm or not senha:
+        return None
+
+    projected = _acesso_por_email(db, email_norm)
+    if projected is not None:
+        acesso, pessoa = projected
+        if acesso.estado != "ativo" or not acesso.senha_hash:
+            return None
+        if not verifica_senha(acesso.senha_hash, senha):
+            return None
+        principal = AuthPrincipal(
+            id=acesso.id,
+            email=pessoa.email,
+            nome=pessoa.nome,
+            papel=acesso.papel,
+            ativo=True,
+        )
+        setattr(principal, _MANAGER_SESSION_VERSION_ATTR, acesso.sessao_versao)
+        return principal
+
+    gestor = (
+        db.query(GestorRevy)
+        .filter(GestorRevy.email == email_norm)
+        .first()
+    )
     if gestor is None or not gestor.ativo or not verifica_senha(gestor.senha_hash, senha):
         return None
-    acesso = _acesso_projetado(db, gestor.id)
-    if acesso is not None:
-        if acesso.estado != "ativo":
-            return None
-        setattr(gestor, _MANAGER_SESSION_VERSION_ATTR, acesso.sessao_versao)
-    return gestor
+    return AuthPrincipal(
+        id=gestor.id,
+        email=gestor.email,
+        nome=gestor.nome,
+        papel=gestor.papel,
+        ativo=True,
+    )
 
 
-def gestor_atual(request: Request, db: Session) -> GestorRevy | None:
+def gestor_atual(request: Request, db: Session) -> AuthPrincipal | None:
     gestor_id = request.session.get("gestor_id")
     if not gestor_id:
         return None
+
+    acesso = db.get(AcessoControl, gestor_id)
+    if acesso is not None:
+        return _principal_de_acesso(db, request, acesso)
+
     gestor = db.get(GestorRevy, gestor_id)
     if gestor is None or not gestor.ativo:
         return None
-    acesso = _acesso_projetado(db, gestor.id)
+    acesso = _acesso_por_gestor_legado(db, gestor.id)
     if acesso is not None and acesso.estado != "ativo":
         return None
-    if acesso is not None:
-        session_version = request.session.get(_SESSION_VERSION_KEY)
-        if session_version is None:
-            if acesso.sessao_versao != 1:
-                return None
-        elif session_version != acesso.sessao_versao:
-            return None
-    return gestor
+    if acesso is not None and not _sessao_compativel(request, acesso.sessao_versao):
+        return None
+    return AuthPrincipal(
+        id=gestor.id,
+        email=gestor.email,
+        nome=gestor.nome,
+        papel=gestor.papel,
+        ativo=True,
+    )
 
 
 def loja_atual(request: Request) -> str | None:
@@ -89,7 +132,7 @@ def sessao_gestor(request: Request, db: Session) -> SessaoGestor | None:
     )
 
 
-def iniciar_sessao(request: Request, gestor: GestorRevy) -> None:
+def iniciar_sessao(request: Request, gestor: AuthPrincipal | GestorRevy) -> None:
     request.session.clear()
     request.session["gestor_id"] = gestor.id
     session_version = getattr(gestor, _MANAGER_SESSION_VERSION_ATTR, None)
@@ -149,9 +192,57 @@ def bootstrap_gestor_se_vazio(db: Session, *, email: str, senha: str, nome: str)
     return gestor
 
 
-def _acesso_projetado(db: Session, gestor_id: str) -> AcessoControl | None:
+def _acesso_por_email(
+    db: Session,
+    email_norm: str,
+) -> tuple[AcessoControl, Pessoa] | None:
+    return (
+        db.query(AcessoControl, Pessoa)
+        .join(Pessoa, Pessoa.id == AcessoControl.pessoa_id)
+        .filter(Pessoa.email == email_norm)
+        .first()
+    )
+
+
+def _principal_de_acesso(
+    db: Session,
+    request: Request,
+    acesso: AcessoControl,
+) -> AuthPrincipal | None:
+    if acesso.estado != "ativo":
+        return None
+    if not _sessao_compativel(request, acesso.sessao_versao):
+        return None
+    pessoa = db.get(Pessoa, acesso.pessoa_id)
+    if pessoa is None:
+        return None
+    return AuthPrincipal(
+        id=acesso.id,
+        email=pessoa.email,
+        nome=pessoa.nome,
+        papel=acesso.papel,
+        ativo=True,
+    )
+
+
+def _sessao_compativel(request: Request, sessao_versao: int) -> bool:
+    session_version = request.session.get(_SESSION_VERSION_KEY)
+    if session_version is None:
+        return sessao_versao == 1
+    return session_version == sessao_versao
+
+
+def _acesso_por_gestor_legado(db: Session, gestor_id: str) -> AcessoControl | None:
     return (
         db.query(AcessoControl)
         .filter(AcessoControl.gestor_legado_id == gestor_id)
         .first()
     )
+
+
+def _acesso_projetado(db: Session, gestor_id: str) -> AcessoControl | None:
+    """Compat: resolução por id de acesso ou gestor legado."""
+    acesso = db.get(AcessoControl, gestor_id)
+    if acesso is not None:
+        return acesso
+    return _acesso_por_gestor_legado(db, gestor_id)

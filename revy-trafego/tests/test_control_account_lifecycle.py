@@ -163,7 +163,7 @@ def test_lifecycle_exige_admin_bloqueia_auto_desativacao_e_transicoes_repetidas(
     ]
 
 
-def test_reativacao_exige_credencial_e_gestor_legado():
+def test_reativacao_exige_credencial():
     _project_manager("gestor.setup@revy.local")
     admin = _admin_actor()
     person = PeopleDirectory(SessionLocal).register(
@@ -190,7 +190,7 @@ def test_reativacao_exige_credencial_e_gestor_legado():
     accounts = ControlAccounts(SessionLocal)
     with pytest.raises(
         ControlAccountConflict,
-        match="não possui credencial e gestor legado",
+        match="não possui credencial para reativação",
     ):
         accounts.enable(admin, "acesso-sem-credencial")
 

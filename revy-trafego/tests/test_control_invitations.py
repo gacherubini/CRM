@@ -3,7 +3,7 @@ from dataclasses import replace
 
 from app.config import settings
 from app.db import SessionLocal
-from app.models import ConviteAcessoControl
+from app.models import AcessoControl, ConviteAcessoControl, GestorRevy
 from app.web import control as control_mod
 
 
@@ -72,6 +72,18 @@ def test_admin_convida_pessoa_que_ativa_senha_e_entra_no_control(
     }
 
     _login(client, "gestora.convidada@example.com", "senha-nova-segura")
+    with SessionLocal() as db:
+        access = db.get(AcessoControl, invitation["acesso_id"])
+        assert access is not None
+        assert access.gestor_legado_id is None
+        assert access.estado == "ativo"
+        assert (
+            db.query(GestorRevy)
+            .filter(GestorRevy.email == "gestora.convidada@example.com")
+            .count()
+            == 0
+        )
+
     reused = client.post(
         "/control/v1/convites/ativar",
         json={

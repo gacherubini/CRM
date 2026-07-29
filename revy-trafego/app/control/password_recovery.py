@@ -65,14 +65,12 @@ class ControlPasswordRecovery:
                     ControlAccountStatus.DISABLED.value,
                 }
                 or not access.senha_hash
-                or not access.gestor_legado_id
             ):
                 raise ControlAccountConflict(
                     "o acesso ainda não possui credencial recuperável"
                 )
             person = db.get(Pessoa, access.pessoa_id)
-            manager = db.get(GestorRevy, access.gestor_legado_id)
-            if person is None or manager is None:
+            if person is None:
                 raise ControlAccountConflict(
                     "o acesso não possui identidade compatível para recuperação"
                 )
@@ -159,33 +157,38 @@ class ControlPasswordRecovery:
                     ControlAccountStatus.ACTIVE.value,
                     ControlAccountStatus.DISABLED.value,
                 }
-                or not access.gestor_legado_id
+                or not access.senha_hash
             ):
                 raise ControlRecoveryInvalid(
                     "recuperação de senha inválida ou expirada"
                 )
             person = db.get(Pessoa, access.pessoa_id)
-            manager = db.get(GestorRevy, access.gestor_legado_id)
-            if person is None or manager is None:
+            if person is None:
                 raise ControlRecoveryInvalid(
                     "recuperação de senha inválida ou expirada"
                 )
+            manager = (
+                db.get(GestorRevy, access.gestor_legado_id)
+                if access.gestor_legado_id
+                else None
+            )
 
             password_hash = hash_senha(password)
             previous_version = access.sessao_versao
             access.senha_hash = password_hash
             access.sessao_versao = previous_version + 1
             access.atualizada_em = now
-            manager.senha_hash = password_hash
-            manager.ativo = access.estado == ControlAccountStatus.ACTIVE.value
+            if manager is not None:
+                manager.senha_hash = password_hash
+                manager.ativo = access.estado == ControlAccountStatus.ACTIVE.value
             recovery.usado_em = now
             _append_event(
                 db,
                 actor=Actor(
-                    id=manager.id,
-                    email=manager.email,
-                    name=manager.nome,
-                    role=manager.papel,
+                    id=access.id,
+                    email=person.email,
+                    name=person.nome,
+                    role=access.papel,
                 ),
                 store_id=None,
                 action="control_password_recovery.consumed",
