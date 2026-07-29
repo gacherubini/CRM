@@ -21,6 +21,7 @@ from app.control.contracts import (
     ContractNotFound,
     UpsertContract,
 )
+from app.control.dashboard import DashboardControl
 from app.control.people import PeopleDirectory
 from app.control.portfolio import (
     InvalidModuleSelection,
@@ -90,6 +91,49 @@ def _format_brl(value: Decimal) -> str:
     return f"R$ {integer.replace(',', '.')},{decimal}"
 
 
+def _dashboard_surface_enabled() -> bool:
+    return (
+        settings.revy_control_enabled
+        and settings.revy_control_dashboard_enabled
+    )
+
+
+@router.get("/app/control/dashboard", response_class=HTMLResponse)
+def dashboard_page(
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    if not _dashboard_surface_enabled():
+        return HTMLResponse("Página não encontrada.", status_code=404)
+    manager = gestor_atual(request, db)
+    if manager is None:
+        return RedirectResponse(_public_path("/login"), status_code=303)
+
+    actor = actor_from_user(manager)
+    user = sessao_gestor(request, db)
+    assert user is not None
+    stores = AccessControl(SessionLocal).scope(actor)
+    nav_stores = (
+        stores
+        if settings.revy_control_rbac_enabled
+        else [item.store.slug for item in stores]
+    )
+    items = DashboardControl(SessionLocal).summary(actor)
+    return templates.TemplateResponse(
+        request=request,
+        name="control/dashboard.html",
+        context={
+            "usuario": user,
+            "csrf": csrf_token(request),
+            "lojas": nav_stores,
+            "control_enabled": settings.revy_control_enabled,
+            "control_rbac_enabled": settings.revy_control_rbac_enabled,
+            "control_dashboard_enabled": True,
+            "items": items,
+        },
+    )
+
+
 @router.get("/app/control/lojas", response_class=HTMLResponse)
 def list_stores_page(
     request: Request,
@@ -139,6 +183,7 @@ def list_control_accounts_page(
             "lojas": nav_stores,
             "control_enabled": settings.revy_control_enabled,
             "control_rbac_enabled": settings.revy_control_rbac_enabled,
+            "control_dashboard_enabled": _dashboard_surface_enabled(),
             "accounts": accounts,
         },
     )
@@ -732,6 +777,7 @@ def _render_stores_page(
             "lojas": nav_stores,
             "control_enabled": settings.revy_control_enabled,
             "control_rbac_enabled": settings.revy_control_rbac_enabled,
+            "control_dashboard_enabled": _dashboard_surface_enabled(),
             "stores": stores,
             "is_admin": manager.papel == "admin",
             "created": request.query_params.get("created") == "1",
@@ -848,6 +894,7 @@ def _render_store_detail(
             "lojas": nav_stores,
             "control_enabled": settings.revy_control_enabled,
             "control_rbac_enabled": settings.revy_control_rbac_enabled,
+            "control_dashboard_enabled": _dashboard_surface_enabled(),
             "store": store,
             "modules": modules,
             "module_options": tuple(ModuleCode),

@@ -132,6 +132,24 @@ class StoreControl:
                     raise StoreNotFound("Loja não encontrada")
             return _store_view(row)
 
+    def list(self, actor: Actor) -> tuple[StoreView, ...]:
+        """Lista lojas no escopo do ator (admin: todas; gestor: vínculo ativo)."""
+        with self._session_factory() as db:
+            if actor.is_admin:
+                rows = db.query(Loja).order_by(Loja.nome, Loja.id).all()
+                return tuple(_store_view(row) for row in rows)
+            rows = (
+                db.query(Loja)
+                .join(VinculoTrafego, VinculoTrafego.loja_id == Loja.id)
+                .filter(
+                    VinculoTrafego.gestor_id == actor.id,
+                    VinculoTrafego.encerrado_em.is_(None),
+                )
+                .order_by(Loja.nome, Loja.id)
+                .all()
+            )
+            return tuple(_store_view(row) for row in rows)
+
     def transition(self, actor: Actor, command: TransitionStore) -> StoreView:
         if not actor.is_admin:
             raise AccessDenied("somente Admin Revy pode alterar o estado da Loja")

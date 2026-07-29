@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}Visão geral — Revy Control{% endblock %}
+{% block page_title %}Visão geral{% endblock %}
+{% block content %}
+<div class="page-heading">
+  <div>
+    <span class="eyebrow">Revy Control</span>
+    <h1>Prontidão das lojas</h1>
+    <p>Resumo de status e prontidão no seu escopo.</p>
+  </div>
+</div>
+
+<section class="panel">
+  <h2>Lojas</h2>
+  {% if items %}
+  <div style="overflow-x:auto">
+    <table id="tabela-dashboard-prontidao">
+      <thead>
+        <tr>
+          <th>Nome</th>
+          <th>Slug</th>
+          <th>Status</th>
+          <th>Pronta</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in items %}
+        <tr data-store-id="{{ item.store_id }}">
+          <td>
+            {% if control_enabled %}
+            <a href="{{ public_path('/app/control/lojas/' + item.store_id) }}">{{ item.name }}</a>
+            {% else %}
+            {{ item.name }}
+            {% endif %}
+          </td>
+          <td><code>{{ item.slug }}</code></td>
+          <td>{{ item.status.value }}</td>
+          <td>{% if item.ready %}sim{% else %}não{% endif %}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p class="muted" id="dashboard-vazio">Nenhuma loja no seu escopo.</p>
+  {% endif %}
+</section>
+{% endblock %}

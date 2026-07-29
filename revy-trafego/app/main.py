@@ -224,6 +224,10 @@ def contexto(request: Request, usuario=None, db: Session | None = None, **extra)
         "lojas": lojas or [],
         "control_enabled": settings.revy_control_enabled,
         "control_rbac_enabled": settings.revy_control_rbac_enabled,
+        "control_dashboard_enabled": (
+            settings.revy_control_enabled
+            and settings.revy_control_dashboard_enabled
+        ),
         **extra,
     }
 

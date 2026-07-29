@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#ffffff">
-  <title>{% block title %}Revy Tráfego{% endblock %}</title>
+  <title>{% block title %}Revy Control{% endblock %}</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -24,11 +24,11 @@
 <body>
   {% set path = request.url.path %}
   <div class="app-shell">
-    <aside class="sidebar" id="sidebar" aria-label="Navegação Revy Tráfego">
+    <aside class="sidebar" id="sidebar" aria-label="Navegação Revy Control">
       <div class="sidebar-brand-row">
-        <a class="brand" href="{{ public_path('/app') }}" aria-label="Revy Tráfego">
-          <span class="brand-mark" aria-hidden="true">T</span>
-          <span><strong>Revy Tráfego</strong><small>{{ usuario.loja_slug or 'selecione loja' }}</small></span>
+        <a class="brand" href="{{ public_path('/app') }}" aria-label="Revy Control">
+          <span class="brand-mark" aria-hidden="true">C</span>
+          <span><strong>Revy Control</strong><small>{{ usuario.loja_slug or 'selecione loja' }}</small></span>
         </a>
         <button class="drawer-close" type="button" aria-label="Fechar menu">×</button>
       </div>
@@ -36,6 +36,9 @@
       <nav class="nav" aria-label="Menu principal">
         {% if control_enabled %}
         <span class="nav-section">Control</span>
+        {% if control_dashboard_enabled %}
+        <a id="nav-control-dashboard" class="nav-link {{ 'active' if path == '/app/control/dashboard' else '' }}" href="{{ public_path('/app/control/dashboard') }}">Visão geral</a>
+        {% endif %}
         <a id="nav-control-lojas" class="nav-link {{ 'active' if path.startswith('/app/control/lojas') else '' }}" href="{{ public_path('/app/control/lojas') }}">Lojas</a>
         {% if usuario.papel == 'admin' %}
         <a id="nav-control-acessos" class="nav-link {{ 'active' if path == '/app/control/acessos' else '' }}" href="{{ public_path('/app/control/acessos') }}">Acessos</a>
@@ -85,7 +88,7 @@
       <header class="topbar">
         <button class="menu-button" type="button" aria-controls="sidebar" aria-expanded="false">Menu</button>
         <div class="page-context">
-          <strong>{% block page_title %}Tráfego{% endblock %}</strong>
+          <strong>{% block page_title %}Control{% endblock %}</strong>
           <small>{{ usuario.nome }} · {{ usuario.papel }}{% if usuario.loja_slug %} · {{ usuario.loja_slug }}{% endif %}</small>
         </div>
         <div class="topbar-user" title="{{ usuario.email }}">

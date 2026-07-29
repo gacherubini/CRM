@@ -53,6 +53,7 @@ from app.control.portfolio import (
     PortfolioConflict,
     PortfolioControl,
 )
+from app.control.dashboard import DashboardControl, StoreReadinessSummary
 from app.control.readiness import ReadinessReport, StoreReadiness
 from app.control.roles import StoreRoles
 from app.control.stores import StoreControl
@@ -140,6 +141,15 @@ def _control_enabled() -> None:
 def _google_ads_enabled() -> None:
     _control_enabled()
     if not settings.google_ads_sync_enabled:
+        raise HTTPException(
+            status_code=404,
+            detail={"code": "not_found", "message": "recurso não encontrado"},
+        )
+
+
+def _control_dashboard_enabled() -> None:
+    _control_enabled()
+    if not settings.revy_control_dashboard_enabled:
         raise HTTPException(
             status_code=404,
             detail={"code": "not_found", "message": "recurso não encontrado"},
@@ -537,6 +547,12 @@ def get_store(
     except ControlError as exc:
         _raise_domain_error(exc)
     return _store_json(store)
+
+
+@router.get("/dashboard", dependencies=[Depends(_control_dashboard_enabled)])
+def get_dashboard_summary(actor: Actor = Depends(_current_actor)):
+    items = DashboardControl(SessionLocal).summary(actor)
+    return {"items": [_dashboard_item_json(item) for item in items]}
 
 
 @router.get("/lojas/{loja_id}/prontidao")
@@ -1119,6 +1135,16 @@ def _integration_json(view: IntegrationView) -> dict[str, object]:
             view.updated_at.isoformat() if view.updated_at is not None else None
         ),
         "saude": view.health_message,
+    }
+
+
+def _dashboard_item_json(item: StoreReadinessSummary) -> dict[str, object]:
+    return {
+        "store_id": item.store_id,
+        "slug": item.slug,
+        "name": item.name,
+        "status": item.status.value,
+        "ready": item.ready,
     }
 
 
