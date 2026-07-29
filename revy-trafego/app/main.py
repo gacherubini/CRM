@@ -71,6 +71,7 @@ from app.models import (
 )
 from app.roi_calc import calcular_roi_loja, gerar_insights_roi, totais_roi, venda_casa_campanha
 from app.api_v1 import router as api_v1_router
+from app.web.control import router as control_router
 
 BASE_DIR = Path(__file__).resolve().parent
 logger = logging.getLogger(__name__)
@@ -125,6 +126,7 @@ app.mount("/static", StaticFiles(directory=str(BASE_DIR / "static")), name="stat
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
 
 app.include_router(api_v1_router)
+app.include_router(control_router)
 
 
 def public_path(path: str) -> str:

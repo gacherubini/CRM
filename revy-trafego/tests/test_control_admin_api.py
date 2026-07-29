@@ -1,0 +1,258 @@
+from dataclasses import replace
+
+from app.auth import hash_senha
+from app.config import settings
+from app.db import SessionLocal
+from app.models import GestorRevy, Loja, VinculoTrafego
+from app.web import control as control_mod
+
+
+def _enable_control(monkeypatch):
+    monkeypatch.setattr(
+        control_mod,
+        "settings",
+        replace(settings, revy_control_enabled=True),
+    )
+
+
+def _login(client, email: str, password: str) -> None:
+    response = client.post(
+        "/login",
+        data={"email": email, "senha": password},
+        follow_redirects=False,
+    )
+    assert response.status_code == 303
+
+
+def test_control_api_fica_oculta_por_padrao(client):
+    assert settings.revy_control_enabled is False
+
+    response = client.get("/control/v1/lojas")
+
+    assert response.status_code == 404
+
+
+def test_control_api_exige_sessao_quando_habilitada(client, monkeypatch):
+    _enable_control(monkeypatch)
+
+    response = client.get("/control/v1/lojas")
+
+    assert response.status_code == 401
+    assert response.json()["detail"]["code"] == "authentication_required"
+
+
+def test_listagem_respeita_escopo_do_admin_e_do_gestor(client, monkeypatch):
+    with SessionLocal() as db:
+        manager = GestorRevy(
+            email="gestor.api@revy.local",
+            nome="Gestor API",
+            senha_hash=hash_senha("senha-gestor-api"),
+            papel="gestor",
+            ativo=True,
+        )
+        allowed = Loja(nome="Loja API Permitida", slug="loja-api-permitida")
+        other = Loja(nome="Loja API Alheia", slug="loja-api-alheia")
+        db.add_all([manager, allowed, other])
+        db.flush()
+        db.add(
+            VinculoTrafego(
+                loja_id=allowed.id,
+                gestor_id=manager.id,
+                tipo="responsavel",
+            )
+        )
+        db.commit()
+        allowed_id = allowed.id
+        other_id = other.id
+
+    _enable_control(monkeypatch)
+    _login(client, "trafego@revy.local", "secret-teste")
+
+    admin_response = client.get("/control/v1/lojas")
+
+    assert admin_response.status_code == 200
+    assert {
+        (item["id"], item["vinculo"])
+        for item in admin_response.json()["items"]
+    } == {(allowed_id, None), (other_id, None)}
+
+    client.cookies.clear()
+    _login(client, "gestor.api@revy.local", "senha-gestor-api")
+    manager_response = client.get("/control/v1/lojas")
+
+    assert manager_response.status_code == 200
+    assert manager_response.json()["items"] == [
+        {
+            "id": allowed_id,
+            "nome": "Loja API Permitida",
+            "slug": "loja-api-permitida",
+            "estado": "rascunho",
+            "vinculo": "responsavel",
+        }
+    ]
+
+
+def test_admin_cria_loja_e_gestor_nao_pode_criar(client, monkeypatch):
+    with SessionLocal() as db:
+        manager = GestorRevy(
+            email="gestor.sem-mutar@revy.local",
+            nome="Gestor Sem Mutar",
+            senha_hash=hash_senha("senha-sem-mutar"),
+            papel="gestor",
+            ativo=True,
+        )
+        db.add(manager)
+        db.commit()
+
+    _enable_control(monkeypatch)
+    _login(client, "trafego@revy.local", "secret-teste")
+
+    created = client.post(
+        "/control/v1/lojas",
+        json={"nome": "Loja Criada pela API", "slug": "loja-criada-api"},
+    )
+
+    assert created.status_code == 201
+    created_body = created.json()
+    assert created_body["nome"] == "Loja Criada pela API"
+    assert created_body["slug"] == "loja-criada-api"
+    assert created_body["estado"] == "rascunho"
+    assert created_body["id"]
+
+    client.cookies.clear()
+    _login(client, "gestor.sem-mutar@revy.local", "senha-sem-mutar")
+    forbidden = client.post(
+        "/control/v1/lojas",
+        json={"nome": "Loja Negada", "slug": "loja-negada"},
+    )
+
+    assert forbidden.status_code == 403
+    assert forbidden.json()["detail"]["code"] == "access_denied"
+
+
+def test_gestor_consulta_somente_loja_do_proprio_escopo(client, monkeypatch):
+    with SessionLocal() as db:
+        manager = GestorRevy(
+            email="gestor.consulta@revy.local",
+            nome="Gestor Consulta",
+            senha_hash=hash_senha("senha-consulta"),
+            papel="gestor",
+            ativo=True,
+        )
+        allowed = Loja(nome="Loja Consultável", slug="loja-consultavel")
+        denied = Loja(nome="Loja Não Consultável", slug="loja-nao-consultavel")
+        db.add_all([manager, allowed, denied])
+        db.flush()
+        db.add(
+            VinculoTrafego(
+                loja_id=allowed.id,
+                gestor_id=manager.id,
+                tipo="colaborador",
+            )
+        )
+        db.commit()
+        allowed_id = allowed.id
+        denied_id = denied.id
+
+    _enable_control(monkeypatch)
+    _login(client, "gestor.consulta@revy.local", "senha-consulta")
+
+    visible = client.get(f"/control/v1/lojas/{allowed_id}")
+    hidden = client.get(f"/control/v1/lojas/{denied_id}")
+
+    assert visible.status_code == 200
+    assert visible.json() == {
+        "id": allowed_id,
+        "nome": "Loja Consultável",
+        "slug": "loja-consultavel",
+        "estado": "rascunho",
+    }
+    assert hidden.status_code == 404
+    assert hidden.json()["detail"]["code"] == "store_not_found"
+
+
+def test_admin_transiciona_loja_e_salto_invalido_retorna_conflito(
+    client,
+    monkeypatch,
+):
+    _enable_control(monkeypatch)
+    _login(client, "trafego@revy.local", "secret-teste")
+    created = client.post(
+        "/control/v1/lojas",
+        json={"nome": "Loja em Onboarding", "slug": "loja-em-onboarding"},
+    ).json()
+
+    transitioned = client.post(
+        f"/control/v1/lojas/{created['id']}/estado",
+        json={"estado": "em_configuracao", "motivo": "onboarding iniciado"},
+    )
+    invalid = client.post(
+        f"/control/v1/lojas/{created['id']}/estado",
+        json={"estado": "ativa"},
+    )
+
+    assert transitioned.status_code == 200
+    assert transitioned.json()["estado"] == "em_configuracao"
+    assert invalid.status_code == 409
+    assert invalid.json()["detail"]["code"] == "invalid_store_transition"
+
+
+def test_admin_concede_revoga_e_consulta_auditoria_da_loja(
+    client,
+    monkeypatch,
+):
+    with SessionLocal() as db:
+        first = GestorRevy(
+            email="primeiro.api@revy.local",
+            nome="Primeiro Gestor",
+            senha_hash=hash_senha("senha-primeiro"),
+            papel="gestor",
+            ativo=True,
+        )
+        second = GestorRevy(
+            email="segundo.api@revy.local",
+            nome="Segundo Gestor",
+            senha_hash=hash_senha("senha-segundo"),
+            papel="gestor",
+            ativo=True,
+        )
+        db.add_all([first, second])
+        db.commit()
+        first_id = first.id
+        second_id = second.id
+
+    _enable_control(monkeypatch)
+    _login(client, "trafego@revy.local", "secret-teste")
+    store = client.post(
+        "/control/v1/lojas",
+        json={"nome": "Loja com Gestores", "slug": "loja-com-gestores"},
+    ).json()
+
+    granted = client.post(
+        f"/control/v1/lojas/{store['id']}/gestores",
+        json={"gestor_id": first_id, "tipo": "responsavel"},
+    )
+    conflict = client.post(
+        f"/control/v1/lojas/{store['id']}/gestores",
+        json={"gestor_id": second_id, "tipo": "responsavel"},
+    )
+    revoked = client.post(
+        f"/control/v1/lojas/{store['id']}/gestores/{first_id}/revogar",
+        json={"motivo": "troca operacional"},
+    )
+    audit = client.get(f"/control/v1/lojas/{store['id']}/auditoria")
+
+    assert granted.status_code == 201
+    assert granted.json()["tipo"] == "responsavel"
+    assert granted.json()["ativo"] is True
+    assert conflict.status_code == 409
+    assert conflict.json()["detail"]["code"] == "active_responsible_conflict"
+    assert revoked.status_code == 200
+    assert revoked.json()["ativo"] is False
+    assert audit.status_code == 200
+    assert [event["acao"] for event in audit.json()["items"]] == [
+        "store.created",
+        "traffic_access.granted",
+        "traffic_access.revoked",
+    ]
+    assert audit.json()["items"][-1]["motivo"] == "troca operacional"

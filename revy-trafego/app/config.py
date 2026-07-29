@@ -44,6 +44,10 @@ class Settings:
         os.getenv("REVY_TRAFEGO_CAPI_WORKER", "0").strip().lower()
         in {"1", "true", "yes", "on"}
     )
+    revy_control_enabled: bool = (
+        os.getenv("REVY_CONTROL_ENABLED", "0").strip().lower()
+        in {"1", "true", "yes", "on"}
+    )
     revy_control_rbac_enabled: bool = (
         os.getenv("REVY_CONTROL_RBAC_ENABLED", "0").strip().lower()
         in {"1", "true", "yes", "on"}
