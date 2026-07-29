@@ -46,13 +46,22 @@ class StoreReadinessBlocked(ControlError):
     def __init__(self, store_id: str, requirement: str) -> None:
         self.store_id = store_id
         self.requirement = requirement
-        if requirement == "activatable_owner":
-            message = (
+        messages = {
+            "active_owner": (
+                "Loja precisa manter ao menos um Dono ativo neste estado"
+            ),
+            "activatable_owner": (
                 "Loja precisa de ao menos um Dono com acesso ativável "
                 "(pendente ou ativo) neste estado"
-            )
-        else:
-            message = "Loja precisa manter ao menos um Dono ativo neste estado"
+            ),
+            "module_selected": (
+                "Loja precisa de ao menos um módulo vendas ou estoque ativo"
+            ),
+        }
+        message = messages.get(
+            requirement,
+            f"Loja não atende requisito de prontidão: {requirement}",
+        )
         super().__init__(message)
 
 

@@ -36,6 +36,7 @@ from app.control.portfolio import (
     PortfolioConflict,
     PortfolioControl,
 )
+from app.control.readiness import ReadinessReport, StoreReadiness
 from app.control.roles import StoreRoles
 from app.control.stores import StoreControl
 from app.control.types import (
@@ -461,6 +462,21 @@ def get_store(
     return _store_json(store)
 
 
+@router.get("/lojas/{loja_id}/prontidao")
+def get_store_readiness(
+    loja_id: str,
+    actor: Actor = Depends(_current_actor),
+):
+    try:
+        report = StoreReadiness(SessionLocal).evaluate(
+            actor,
+            StoreRef(id=loja_id),
+        )
+    except ControlError as exc:
+        _raise_domain_error(exc)
+    return _readiness_json(report)
+
+
 @router.patch("/lojas/{loja_id}")
 def update_store(
     loja_id: str,
@@ -751,6 +767,23 @@ def _store_json(store: StoreView) -> dict[str, str]:
         "nome": store.name,
         "slug": store.slug,
         "estado": store.status.value,
+    }
+
+
+def _readiness_json(report: ReadinessReport) -> dict[str, object]:
+    return {
+        "loja_id": report.store_id,
+        "estado": report.status.value,
+        "pronta": report.ready,
+        "checks": [
+            {
+                "codigo": check.code,
+                "ok": check.ok,
+                "severidade": check.severity,
+                "mensagem": check.message,
+            }
+            for check in report.checks
+        ],
     }
 
 

@@ -5,6 +5,7 @@ import pytest
 from app.control.access import AccessControl
 from app.control.audit import AuditTrail
 from app.control.people import PeopleDirectory
+from app.control.portfolio import PortfolioControl
 from app.control.roles import StoreRoles
 from app.control.stores import StoreControl
 from app.control.types import (
@@ -32,7 +33,19 @@ from app.control.types import (
     TransitionStore,
 )
 from app.db import SessionLocal
-from app.models import AcessoControl, GestorRevy, agora
+from app.models import AcessoControl, GestorRevy, ModuloRevy, agora
+
+
+def _seed_catalog() -> None:
+    with SessionLocal() as db:
+        if db.query(ModuloRevy).count() == 0:
+            db.add_all(
+                [
+                    ModuloRevy(id="vendas", codigo="vendas", nome="Vendas"),
+                    ModuloRevy(id="estoque", codigo="estoque", nome="Estoque"),
+                ]
+            )
+            db.commit()
 
 
 def _admin_actor() -> Actor:
@@ -110,6 +123,7 @@ def _grant_activatable_access(person_id: str, *, estado: str = "pendente") -> No
 
 
 def _store_with_owners(admin, *, slug, status, owner_count=1):
+    _seed_catalog()
     stores = StoreControl(SessionLocal)
     people = PeopleDirectory(SessionLocal)
     roles = StoreRoles(SessionLocal)
@@ -147,6 +161,11 @@ def _store_with_owners(admin, *, slug, status, owner_count=1):
     if needs_ready:
         for owner in owners:
             _grant_activatable_access(owner.id)
+        PortfolioControl(SessionLocal).configure(
+            admin,
+            StoreRef(id=store.id),
+            {"vendas"},
+        )
     for target in _TRANSITIONS_TO[status]:
         stores.transition(
             admin,
@@ -246,6 +265,7 @@ def test_dono_ativo_sem_acesso_ativavel_nao_permite_loja_ficar_pronta():
 
 
 def test_dono_com_acesso_ativavel_permite_loja_ficar_pronta():
+    _seed_catalog()
     admin = _admin_actor()
     stores, _, store, owners, _ = _store_with_owners(
         admin,
@@ -253,6 +273,11 @@ def test_dono_com_acesso_ativavel_permite_loja_ficar_pronta():
         status=StoreStatus.CONFIGURING,
     )
     _grant_activatable_access(owners[0].id)
+    PortfolioControl(SessionLocal).configure(
+        admin,
+        StoreRef(id=store.id),
+        {"vendas"},
+    )
 
     ready = stores.transition(
         admin,

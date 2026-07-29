@@ -8,6 +8,7 @@ from sqlalchemy.exc import IntegrityError
 
 from app.control.audit import _append_event
 from app.control.provisioning_hooks import safe_enqueue_store_snapshot
+from app.control.readiness import build_readiness_report, first_failed_required
 from app.control.types import (
     AccessDenied,
     Actor,
@@ -18,14 +19,13 @@ from app.control.types import (
     StoreNotFound,
     StoreRef,
     StoreReadinessBlocked,
-    StoreRole,
     StoreSlugConflict,
     StoreStatus,
     StoreView,
     TransitionStore,
     UpdateStore,
 )
-from app.models import AcessoControl, CargoLoja, Loja, VinculoTrafego, agora
+from app.models import Loja, VinculoTrafego, agora
 
 _ALLOWED_TRANSITIONS = {
     StoreStatus.DRAFT: frozenset({StoreStatus.CONFIGURING}),
@@ -147,28 +147,11 @@ class StoreControl:
                 current is StoreStatus.CONFIGURING
                 and command.target is StoreStatus.READY
             ):
-                owner_person_ids = [
-                    row[0]
-                    for row in db.query(CargoLoja.pessoa_id)
-                    .filter(
-                        CargoLoja.loja_id == store.id,
-                        CargoLoja.cargo == StoreRole.OWNER.value,
-                        CargoLoja.encerrado_em.is_(None),
-                    )
-                    .all()
-                ]
-                if not owner_person_ids:
-                    raise StoreReadinessBlocked(store.id, "active_owner")
-                activatable = (
-                    db.query(AcessoControl.id)
-                    .filter(
-                        AcessoControl.pessoa_id.in_(owner_person_ids),
-                        AcessoControl.estado.in_(("pendente", "ativo")),
-                    )
-                    .first()
-                )
-                if activatable is None:
-                    raise StoreReadinessBlocked(store.id, "activatable_owner")
+                report = build_readiness_report(db, store)
+                if not report.ready:
+                    failed = first_failed_required(report)
+                    requirement = failed.code if failed is not None else "ready"
+                    raise StoreReadinessBlocked(store.id, requirement)
             store.status = command.target.value
             store.versao += 1
             store.atualizada_em = agora()
