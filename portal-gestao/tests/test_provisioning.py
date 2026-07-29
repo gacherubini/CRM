@@ -1,4 +1,6 @@
 """Projeção operacional do Control e gate de registro de vendas no Portal."""
+from decimal import Decimal
+
 from conftest import csrf_da_resposta, login, seed_loja_operacional
 
 from app import provisioning
@@ -256,3 +258,72 @@ def test_leitura_vendas_permanece_aberta_sem_projecao(client, db):
     db.commit()
     r = client.get("/app/vendas")
     assert r.status_code == 200
+
+
+def _criar_venda_registrada(db, loja_slug="loja-teste"):
+    venda = Venda(
+        loja_slug=loja_slug,
+        vendedor_email="dono@loja.test",
+        descricao="Honda Civic 2022",
+        preco_venda=Decimal("100000.00"),
+        status="registrada",
+    )
+    db.add(venda)
+    db.commit()
+    db.refresh(venda)
+    return venda.id
+
+
+def test_vendas_confirmar_bloqueada_sem_projecao(client, db):
+    login(client)
+    venda_id = _criar_venda_registrada(db)
+    db.query(LojaOperacionalProjecao).filter_by(loja_slug="loja-teste").delete()
+    db.commit()
+
+    csrf = csrf_da_resposta(client.get("/app/vendas"))
+    resposta = client.post(
+        f"/app/vendas/{venda_id}/confirmar",
+        data={"csrf": csrf},
+        follow_redirects=False,
+    )
+    assert resposta.status_code == 303
+    assert resposta.headers["location"] == "/app/vendas?erro=loja-nao-operacional"
+    db.expire_all()
+    assert db.get(Venda, venda_id).status == "registrada"
+
+
+def test_vendas_confirmar_bloqueada_quando_suspensa(client, db):
+    login(client)
+    venda_id = _criar_venda_registrada(db)
+    proj = db.get(LojaOperacionalProjecao, ("loja-teste", "loja"))
+    assert proj is not None
+    proj.state = "suspensa"
+    proj.version = 9
+    db.commit()
+
+    csrf = csrf_da_resposta(client.get("/app/vendas"))
+    resposta = client.post(
+        f"/app/vendas/{venda_id}/confirmar",
+        data={"csrf": csrf},
+        follow_redirects=False,
+    )
+    assert resposta.status_code == 303
+    assert resposta.headers["location"] == "/app/vendas?erro=loja-nao-operacional"
+    db.expire_all()
+    assert db.get(Venda, venda_id).status == "registrada"
+
+
+def test_vendas_confirmar_permitida_quando_loja_ativa(client, db):
+    login(client)
+    venda_id = _criar_venda_registrada(db)
+
+    csrf = csrf_da_resposta(client.get("/app/vendas"))
+    resposta = client.post(
+        f"/app/vendas/{venda_id}/confirmar",
+        data={"csrf": csrf},
+        follow_redirects=False,
+    )
+    assert resposta.status_code == 303
+    assert resposta.headers["location"] == "/app/vendas?ok=confirmada"
+    db.expire_all()
+    assert db.get(Venda, venda_id).status == "confirmada"

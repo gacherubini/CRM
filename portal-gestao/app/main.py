@@ -2120,6 +2120,10 @@ async def vendas_confirmar(
     form = await request.form()
     if not pode_confirmar_venda(usuario) or not csrf_valido(request, form.get("csrf")):
         return RedirectResponse("/app/vendas", status_code=303)
+    if not provisioning.allows_processing(db, usuario.loja_slug):
+        return RedirectResponse(
+            "/app/vendas?erro=loja-nao-operacional", status_code=303
+        )
     venda = db.query(Venda).filter(Venda.id == venda_id, Venda.loja_slug == usuario.loja_slug).first()
     if not venda or venda.status == "cancelada":
         return RedirectResponse("/app/vendas?erro=acao", status_code=303)
