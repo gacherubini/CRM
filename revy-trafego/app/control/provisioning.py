@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import uuid
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
@@ -105,15 +106,27 @@ def _envelope(
         .first()
     )
     if event is None:
-        raise RuntimeError("estado operacional sem evento de auditoria")
+        event_id = str(
+            uuid.uuid5(
+                uuid.NAMESPACE_URL,
+                "urn:revy:operational-state:"
+                f"{resource_type}:{resource_id}:{version}",
+            )
+        )
+        occurred_at = effective_at
+        reason = None
+    else:
+        event_id = event.id
+        occurred_at = event.criado_em
+        reason = event.motivo
     return OperationalStateEnvelope(
         schema_version=1,
-        event_id=event.id,
+        event_id=event_id,
         loja_id=loja_id,
         aggregate=aggregate,
         version=version,
         state=state,
         effective_at=effective_at,
-        occurred_at=event.criado_em,
-        reason=event.motivo,
+        occurred_at=occurred_at,
+        reason=reason,
     )
