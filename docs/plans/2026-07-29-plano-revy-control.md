@@ -235,7 +235,9 @@ Adicionar:
 > versão/reativação da Loja (`d218da3`, `f55677a`). O primeiro snapshot operacional
 > versionado de Loja/Vendas/Estoque está em `728b356`; transporte, pessoas/cargos e
 > consumo nos destinos ainda não fazem parte desse corte. O Alembic head local é
-> `0008_revy_control_loja_versao` e a suíte Revy tem **207 testes passando**.
+> `0008_revy_control_loja_versao` e a suíte Revy tem **209 testes passando**. A UI
+> base navega da lista ao detalhe (`914f45a`) e apresenta versão, módulos e contrato
+> read-only (`dfb793c`); formulários de portfólio/contrato continuam pendentes.
 >
 > `REVY_CONTROL_ENABLED=0` e `REVY_CONTROL_RBAC_ENABLED=0` continuam sendo os defaults,
 > e não houve migration nem rollout desse corte no lab. Sessões já validam o estado e

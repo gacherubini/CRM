@@ -17,8 +17,10 @@ Pessoas/cargos/acessos, módulos Vendas/Estoque, contrato, versão monotônica e
 explícita `suspensa → ativa`; o JSON padrão continua sem `versao`. O
 [ADR 0001](docs/adr/0001-suspensao-distribuida.md) define a suspensão distribuída e
 o primeiro snapshot operacional versionado de Loja/Vendas/Estoque já existe.
-`revy-trafego` tem **207 testes passando**. UI/rebrand, entrega das projeções, gates
-nos destinos, rollout/migrations no lab e deploy do Control ainda não estão concluídos.
+`revy-trafego` tem **209 testes passando**. A UI base já navega da lista ao detalhe e
+mostra versão, módulos e contrato read-only. Rebrand, formulários de portfólio/contrato,
+entrega das projeções, gates nos destinos, rollout/migrations no lab e deploy do
+Control ainda não estão concluídos.
 
 ---
 
