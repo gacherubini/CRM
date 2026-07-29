@@ -101,6 +101,16 @@ class Settings:
     google_conversions_enabled: bool = field(
         default_factory=lambda: _env_flag("GOOGLE_CONVERSIONS_ENABLED")
     )
+    # OAuth multiusuário Google Ads (secret manager / env; nunca no repositório).
+    google_ads_oauth_client_id: str = os.getenv(
+        "GOOGLE_ADS_OAUTH_CLIENT_ID", ""
+    ).strip()
+    google_ads_oauth_client_secret: str = os.getenv(
+        "GOOGLE_ADS_OAUTH_CLIENT_SECRET", ""
+    ).strip()
+    google_ads_oauth_redirect_uri: str = os.getenv(
+        "GOOGLE_ADS_OAUTH_REDIRECT_URI", ""
+    ).strip()
     multi_whatsapp_enabled: bool = field(
         default_factory=lambda: _env_flag("MULTI_WHATSAPP_ENABLED")
     )

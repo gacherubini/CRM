@@ -28,6 +28,16 @@ from app.control.integrations import (
     UpsertMetaAds,
     UpsertPixel,
 )
+from app.control.google_ads import (
+    FakeGoogleAdsTokenExchanger,
+    GoogleAdsConnectionControl,
+    GoogleAdsConnectionNotFound,
+    GoogleAdsConnectionView,
+    GoogleAdsOAuthMisconfigured,
+    GoogleAdsOAuthStateInvalid,
+    GoogleAdsTokenExchangeError,
+    OAuthTokenBundle,
+)
 from app.control.invitations import ControlInvitations
 from app.control.password_recovery import ControlPasswordRecovery
 from app.control.people import PeopleDirectory
@@ -102,6 +112,14 @@ from app.control.types import (
 )
 from app.db import SessionLocal, get_db
 
+# Injetável em testes para complete_oauth sem chamar Google.
+_google_ads_token_exchanger = FakeGoogleAdsTokenExchanger(
+    default_bundle=OAuthTokenBundle(
+        refresh_token="test-refresh-token-not-for-prod",
+        access_token="test-access-token",
+    )
+)
+
 
 def _control_enabled() -> None:
     if not settings.revy_control_enabled:
@@ -109,6 +127,25 @@ def _control_enabled() -> None:
             status_code=404,
             detail={"code": "not_found", "message": "recurso não encontrado"},
         )
+
+
+def _google_ads_enabled() -> None:
+    _control_enabled()
+    if not settings.google_ads_sync_enabled:
+        raise HTTPException(
+            status_code=404,
+            detail={"code": "not_found", "message": "recurso não encontrado"},
+        )
+
+
+def _google_ads_control() -> GoogleAdsConnectionControl:
+    return GoogleAdsConnectionControl(
+        SessionLocal,
+        client_id=settings.google_ads_oauth_client_id,
+        client_secret=settings.google_ads_oauth_client_secret,
+        redirect_uri=settings.google_ads_oauth_redirect_uri,
+        token_exchanger=_google_ads_token_exchanger,
+    )
 
 
 def _current_actor(
@@ -889,6 +926,100 @@ def list_store_audit(
     return {"items": [_audit_event_json(event) for event in page.items]}
 
 
+@router.post(
+    "/lojas/{loja_id}/google-ads/oauth/start",
+    dependencies=[Depends(_google_ads_enabled)],
+)
+def start_google_ads_oauth(
+    loja_id: str,
+    actor: Actor = Depends(_current_actor),
+):
+    try:
+        result = _google_ads_control().start_oauth(
+            actor,
+            StoreRef(id=loja_id),
+        )
+    except ControlError as exc:
+        _raise_domain_error(exc)
+    return {
+        "auth_url": result.auth_url,
+        "state": result.state,
+        "expira_em": result.expires_at.isoformat(),
+    }
+
+
+@router.get(
+    "/google-ads/oauth/callback",
+    dependencies=[Depends(_google_ads_enabled)],
+)
+def google_ads_oauth_callback(
+    state: str = Query(min_length=1, max_length=128),
+    code: str = Query(min_length=1, max_length=512),
+):
+    """Callback OAuth do Google — valida state e troca code (sem expor token)."""
+    try:
+        connection = _google_ads_control().complete_oauth(
+            state=state,
+            code=code,
+        )
+    except ControlError as exc:
+        _raise_domain_error(exc)
+    return _google_ads_connection_json(connection)
+
+
+@router.get(
+    "/lojas/{loja_id}/google-ads/connection",
+    dependencies=[Depends(_google_ads_enabled)],
+)
+def get_google_ads_connection(
+    loja_id: str,
+    actor: Actor = Depends(_current_actor),
+):
+    try:
+        connection = _google_ads_control().get(
+            actor,
+            StoreRef(id=loja_id),
+        )
+    except ControlError as exc:
+        _raise_domain_error(exc)
+    return _google_ads_connection_json(connection)
+
+
+@router.delete(
+    "/lojas/{loja_id}/google-ads/connection",
+    dependencies=[Depends(_google_ads_enabled)],
+)
+def disconnect_google_ads_connection(
+    loja_id: str,
+    actor: Actor = Depends(_current_actor),
+):
+    try:
+        connection = _google_ads_control().disconnect(
+            actor,
+            StoreRef(id=loja_id),
+        )
+    except ControlError as exc:
+        _raise_domain_error(exc)
+    return _google_ads_connection_json(connection)
+
+
+def _google_ads_connection_json(
+    connection: GoogleAdsConnectionView,
+) -> dict[str, object]:
+    # Nunca incluir refresh token (nem ciphertext) na resposta HTTP.
+    return {
+        "id": connection.id,
+        "loja_id": connection.loja_id,
+        "status": connection.status,
+        "customer_id": connection.customer_id,
+        "login_customer_id": connection.login_customer_id,
+        "scopes": connection.scopes,
+        "has_refresh_token": connection.has_refresh_token,
+        "created_at": connection.created_at.isoformat(),
+        "updated_at": connection.updated_at.isoformat(),
+    }
+
+
 def _store_json(store: StoreView) -> dict[str, str]:
     return {
         "id": store.id,
@@ -1104,6 +1235,14 @@ def _raise_domain_error(exc: ControlError) -> NoReturn:
         status_code, code = 404, "manager_not_found"
     elif isinstance(exc, TrafficLinkNotFound):
         status_code, code = 404, "traffic_link_not_found"
+    elif isinstance(exc, GoogleAdsConnectionNotFound):
+        status_code, code = 404, "google_ads_connection_not_found"
+    elif isinstance(exc, GoogleAdsOAuthStateInvalid):
+        status_code, code = 400, "google_ads_oauth_state_invalid"
+    elif isinstance(exc, GoogleAdsOAuthMisconfigured):
+        status_code, code = 503, "google_ads_oauth_misconfigured"
+    elif isinstance(exc, GoogleAdsTokenExchangeError):
+        status_code, code = 502, "google_ads_token_exchange_error"
     elif isinstance(exc, StoreSlugConflict):
         status_code, code = 409, "store_slug_conflict"
     elif isinstance(exc, StoreEditConflict):

@@ -734,3 +734,67 @@ class ControlProvisioningOutbox(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=agora
     )
+
+
+class GoogleAdsConnection(Base):
+    """Conexão OAuth Google Ads de uma Loja (refresh token cifrado)."""
+
+    __tablename__ = "google_ads_connections"
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ("
+            "'conectado', 'atencao', 'expirado', 'revogado', 'erro'"
+            ")",
+            name="ck_google_ads_connections_status",
+        ),
+        UniqueConstraint(
+            "loja_id",
+            name="uq_google_ads_connections_loja_id",
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=novo_id)
+    loja_id: Mapped[str] = mapped_column(
+        ForeignKey("lojas.id", ondelete="RESTRICT"), index=True
+    )
+    status: Mapped[str] = mapped_column(String(20), index=True)
+    customer_id: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    login_customer_id: Mapped[Optional[str]] = mapped_column(
+        String(20), nullable=True
+    )
+    refresh_token_ciphertext: Mapped[Optional[str]] = mapped_column(
+        Text, nullable=True
+    )
+    scopes: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=agora
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=agora
+    )
+
+
+class GoogleAdsOAuthState(Base):
+    """State CSRF de curta duração para o fluxo OAuth multiusuário Google Ads."""
+
+    __tablename__ = "google_ads_oauth_states"
+    __table_args__ = (
+        CheckConstraint(
+            "expires_at >= created_at",
+            name="ck_google_ads_oauth_states_expiracao",
+        ),
+    )
+
+    state: Mapped[str] = mapped_column(String(64), primary_key=True)
+    loja_id: Mapped[str] = mapped_column(
+        ForeignKey("lojas.id", ondelete="RESTRICT"), index=True
+    )
+    actor_id: Mapped[str] = mapped_column(
+        ForeignKey("gestores_revy.id", ondelete="RESTRICT"), index=True
+    )
+    expires_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), index=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=agora
+    )
