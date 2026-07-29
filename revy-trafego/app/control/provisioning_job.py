@@ -62,6 +62,8 @@ class ProvisioningDeliveryWorker:
             chatbot_token_for_slug=settings.chatbot_token_para,
             estoque_url=settings.estoque_url,
             estoque_token_for_slug=settings.estoque_token_para,
+            portal_url=settings.portal_url,
+            portal_service_token=settings.portal_service_token,
         )
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None

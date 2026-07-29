@@ -212,13 +212,18 @@ def multi_destination_poster(
     estoque_url: str = "",
     estoque_token_for_slug: Callable[[str], str] | None = None,
     estoque_client_factory: Callable[..., Any] | None = None,
+    portal_url: str = "",
+    portal_service_token: str = "",
+    portal_client_factory: Callable[..., Any] | None = None,
 ) -> Callable[[str, dict[str, Any]], None]:
-    """Poster HTTP para destinos ``chatbot`` e ``estoque``."""
+    """Poster HTTP para destinos ``chatbot``, ``estoque`` e ``portal``."""
     from app.clients.chatbot import ChatbotClient
     from app.clients.estoque import EstoqueClient
+    from app.clients.portal import PortalClient
 
     chatbot_factory = chatbot_client_factory or ChatbotClient
     estoque_factory = estoque_client_factory or EstoqueClient
+    portal_factory = portal_client_factory or PortalClient
     estoque_token = estoque_token_for_slug or (lambda _slug: "")
 
     def poster(destination: str, payload: dict[str, Any]) -> None:
@@ -231,6 +236,10 @@ def multi_destination_poster(
             return
         if destination == "estoque":
             client = estoque_factory(estoque_url, estoque_token(slug))
+            client.aplicar_estado_operacional(payload)
+            return
+        if destination == "portal":
+            client = portal_factory(portal_url, portal_service_token)
             client.aplicar_estado_operacional(payload)
             return
         raise ValueError(f"destino de provisionamento não suportado: {destination}")

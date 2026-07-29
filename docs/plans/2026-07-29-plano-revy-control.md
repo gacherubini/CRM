@@ -197,16 +197,18 @@ Adicionar:
 ### Migração de identidade
 
 - [x] Backfill de `GestorRevy` para `pessoas` + `acessos_control` sem invalidar sessões.
-- [ ] Importar usuários atuais do Portal como pessoas/cargos, registrando conflitos.
-- [ ] Manter `portal-gestao.usuarios` como projeção/legado até o plano do Revy Loja.
+- [x] Importar usuários atuais do Portal como pessoas/cargos, registrando conflitos
+      (`POST /control/v1/imports/portal-usuarios`, push-style, origem=portal).
+- [x] Manter `portal-gestao.usuarios` como projeção/legado até o plano do Revy Loja
+      (import não corta auth nem apaga usuários do Portal).
 - [ ] Definir contrato versionado de provisionamento de pessoa, cargo e entitlement.
 - [x] Definir ciclo de acesso: convite de uso único com expiração, criação da própria
       senha, recuperação, desativação e revogação de sessões. Admin nunca lê senha.
 - [ ] Projetar estado da Loja e dos Módulos Contratados para Revy Loja, Chatbot, Motor,
       Estoque e Catálogo por entrega idempotente; nenhum serviço confia só no menu.
-      **Parcial local:** snapshot + outbox + enqueue (`chatbot`+`estoque`) + retry failed
-      (max 5) + worker opt-in; Chatbot e Estoque consomem projeção e aplicam 423 em
-      escritas; falta Portal/Motor/Catálogo e rollout no lab.
+      **Parcial local:** enqueue `chatbot`+`estoque`+`portal`, retry failed (max 5),
+      worker opt-in; consumidores Chatbot/Estoque/Portal com gates; falta Motor/Catálogo
+      e rollout no lab.
 - [ ] Não cortar autenticação do Portal neste plano.
 
 ### Interface administrativa
@@ -232,8 +234,9 @@ Adicionar:
       (apply monotônico no Control + Chatbot).
 - [ ] Loja/Módulo suspenso bloqueia novo processamento nos serviços de destino e mantém
       leitura do histórico conforme o cargo autorizado.
-      **Parcial:** Chatbot (simular, leads, interesses, operacao/veiculos, consentimentos)
-      e Estoque (`POST /v1/veiculos`) retornam 423 sem projeção ou loja/módulo inoperante.
+      **Parcial:** Chatbot (várias escritas), Estoque (create/edit/publicar/reservar/vender/fotos)
+      e Portal (`POST /app/vendas/nova`) bloqueiam sem projeção ou loja inoperante;
+      `despublicar` no Estoque permanece aberto (ação redutora).
 
 > **Evidência local — Fase 2 parcial (pós-configuração comercial):** Pessoas/Cargos,
 > convite/ativação, recuperação, lifecycle e versão de sessão (`fda42fb` a `17a0963`),
@@ -253,17 +256,16 @@ Adicionar:
 > Chatbot tem `0014_loja_operacional_projecao`. Flags de delivery e Control seguem
 > default off; sem migration/rollout no lab.
 >
-> Entrega (parcial): mutações enfileiram para `chatbot` e `estoque`; worker opt-in
-> com `multi_destination_poster` e reprocessamento de `failed` (teto 5 tentativas);
-> Chatbot e Estoque aplicam projeção monotônica e gates 423. Portal/Motor/Catálogo
-> e import de usuários do Portal ainda abertos.
+> Entrega (parcial): mutações enfileiram para `chatbot`, `estoque` e `portal`;
+> worker + retry failed; import push de usuários Portal → Pessoa/Cargo; gates nos
+> três destinos. Motor/Catálogo, isolamento Control×Loja e rollout lab ainda abertos.
 
 Pendências para concluir a Fase 2:
 
-- importar usuários atuais do Portal como pessoas/cargos, registrando conflitos;
-- fan-out Portal/Motor/Catálogo;
+- fan-out Motor e Catálogo;
 - isolamento explícito de permissões Control × cargos da Loja na mesma pessoa;
-- expandir gates (WA inbound/outbound no Chatbot; mais escritas no Estoque).
+- expandir gates (WA inbound/outbound; confirmar venda no Portal);
+- rollout lab (migrations + flags + tokens).
 
 ### Critério de pronto
 

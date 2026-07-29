@@ -40,6 +40,15 @@ class Settings:
     estoque_tokens_json: str = os.getenv(
         "REVY_TRAFEGO_ESTOQUE_TOKENS_JSON", ""
     ).strip()
+    portal_url: str = os.getenv(
+        "PORTAL_API_URL",
+        os.getenv("PORTAL_PUBLIC_URL", "http://portal-gestao:8000"),
+    )
+    portal_service_token: str = (
+        os.getenv("PORTAL_SERVICE_TOKEN")
+        or os.getenv("PORTAL_PROVISIONING_TOKEN")
+        or ""
+    ).strip()
     request_timeout: float = float(os.getenv("REVY_TRAFEGO_HTTP_TIMEOUT", "5"))
     request_retries: int = int(os.getenv("REVY_TRAFEGO_HTTP_RETRIES", "1"))
     request_retry_backoff: float = float(

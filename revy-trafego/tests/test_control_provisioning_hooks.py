@@ -112,6 +112,7 @@ def test_transicao_de_loja_enfileira_outbox_para_chatbot():
         destinations = {row.destination for row in rows}
         assert "chatbot" in destinations
         assert "estoque" in destinations
+        assert "portal" in destinations
         assert all(row.status == "pending" for row in rows)
         assert any(store_id in row.event_id for row in rows)
         assert any("loja-hook" in row.payload_json for row in rows)
@@ -164,7 +165,11 @@ def test_worker_run_once_entrega_pendentes_com_poster_injetavel():
     assert result["ok"] is True
     assert result["delivered"] >= 1
     assert posted
-    assert {destination for destination, _ in posted} >= {"chatbot", "estoque"}
+    assert {destination for destination, _ in posted} >= {
+        "chatbot",
+        "estoque",
+        "portal",
+    }
     assert all(payload["loja_slug"] == "loja-hook" for _, payload in posted)
     with SessionLocal() as db:
         remaining = (
