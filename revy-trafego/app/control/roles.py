@@ -44,11 +44,19 @@ class StoreRoles:
             if _active_role(db, store.id, person.id, command.role) is not None:
                 raise StoreRoleConflict(store.id, person.id, command.role)
 
+            origem = (command.origem or "control").strip().lower()
+            if origem not in {"control", "portal"}:
+                raise ValueError("origem de cargo deve ser 'control' ou 'portal'")
+            origem_id = command.origem_id
+            if origem_id is not None:
+                origem_id = origem_id.strip() or None
+
             role = CargoLoja(
                 loja_id=store.id,
                 pessoa_id=person.id,
                 cargo=command.role.value,
-                origem="control",
+                origem=origem,
+                origem_id=origem_id,
             )
             db.add(role)
             try:
@@ -63,6 +71,8 @@ class StoreRoles:
                     after={
                         "person_id": person.id,
                         "role": command.role.value,
+                        "origem": origem,
+                        "origem_id": origem_id,
                     },
                 )
                 db.commit()

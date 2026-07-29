@@ -24,6 +24,11 @@ from app.control.contracts import (
 from app.control.invitations import ControlInvitations
 from app.control.password_recovery import ControlPasswordRecovery
 from app.control.people import PeopleDirectory
+from app.control.portal_import import (
+    PortalImportResult,
+    PortalUserImporter,
+    PortalUserImportRow,
+)
 from app.control.portfolio import (
     InvalidModuleSelection,
     ModuleCode,
@@ -261,6 +266,23 @@ class StoreRoleRevokeBody(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     motivo: str | None = Field(default=None, max_length=1000)
+
+
+class PortalUserImportItemBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    email: str = Field(min_length=1, max_length=320)
+    nome: str = Field(default="", max_length=160)
+    loja_slug: str = Field(min_length=1, max_length=120)
+    cargo: str = Field(min_length=1, max_length=20)
+    origem_id: str = Field(min_length=1, max_length=160)
+    ativo: bool = True
+
+
+class PortalUsersImportBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    usuarios: list[PortalUserImportItemBody] = Field(default_factory=list)
 
 
 class TrafficRevokeBody(BaseModel):
@@ -566,6 +588,30 @@ def upsert_store_contract(
     return _contract_json(contract)
 
 
+@router.post("/imports/portal-usuarios")
+def import_portal_users(
+    body: PortalUsersImportBody,
+    actor: Actor = Depends(_current_actor),
+):
+    """Importa usuários do Portal como Pessoa + CargoLoja (push, Admin)."""
+    rows = tuple(
+        PortalUserImportRow(
+            email=item.email,
+            name=item.nome,
+            store_slug=item.loja_slug,
+            role=item.cargo,
+            origem_id=item.origem_id,
+            active=item.ativo,
+        )
+        for item in body.usuarios
+    )
+    try:
+        result = PortalUserImporter(SessionLocal).import_rows(actor, rows)
+    except ControlError as exc:
+        _raise_domain_error(exc)
+    return _portal_import_json(result)
+
+
 @router.post("/lojas/{loja_id}/cargos", status_code=201)
 def assign_store_role(
     loja_id: str,
@@ -811,6 +857,22 @@ def _store_role_json(role: StoreRoleView) -> dict[str, object]:
         "ativo": role.active,
         "iniciado_em": role.started_at.isoformat(),
         "encerrado_em": role.ended_at.isoformat() if role.ended_at else None,
+    }
+
+
+def _portal_import_json(result: PortalImportResult) -> dict[str, object]:
+    return {
+        "importados": result.imported,
+        "ignorados": result.skipped,
+        "conflitos": [
+            {
+                "email": conflict.email,
+                "loja_slug": conflict.store_slug,
+                "code": conflict.code,
+                "message": conflict.message,
+            }
+            for conflict in result.conflicts
+        ],
     }
 
 

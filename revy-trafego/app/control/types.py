@@ -292,6 +292,8 @@ class AssignStoreRole:
     store: StoreRef
     person: PersonRef
     role: StoreRole
+    origem: str = "control"
+    origem_id: str | None = None
 
 
 @dataclass(frozen=True)
