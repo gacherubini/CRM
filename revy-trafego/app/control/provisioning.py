@@ -8,7 +8,7 @@ from typing import Any
 
 from app.control.stores import _find_store
 from app.control.types import StoreNotFound, StoreRef
-from app.models import AuditoriaEvento, LojaModulo, ModuloRevy
+from app.models import AuditoriaEvento, CargoLoja, LojaModulo, ModuloRevy, Pessoa
 
 
 @dataclass(frozen=True)
@@ -24,22 +24,44 @@ class OperationalStateEnvelope:
     reason: str | None
 
 
+@dataclass(frozen=True)
+class ProvisionedPerson:
+    person_id: str
+    email: str
+    name: str
+
+
+@dataclass(frozen=True)
+class ProvisionedRole:
+    assignment_id: str
+    person_id: str
+    role: str
+    state: str
+    started_at: datetime
+    ended_at: datetime | None
+
+
+@dataclass(frozen=True)
+class StoreProvisioningSnapshot:
+    schema_version: int
+    operational: tuple[OperationalStateEnvelope, ...]
+    people: tuple[ProvisionedPerson, ...]
+    roles: tuple[ProvisionedRole, ...]
+
+
 class ProvisioningControl:
-    """Snapshot do estado operacional projetável de uma Loja."""
+    """Snapshot do estado operacional e da identidade projetável de uma Loja."""
 
     def __init__(self, session_factory: Callable[[], Any]) -> None:
         self._session_factory = session_factory
 
-    def snapshot(
-        self,
-        store_ref: StoreRef,
-    ) -> tuple[OperationalStateEnvelope, ...]:
+    def snapshot(self, store_ref: StoreRef) -> StoreProvisioningSnapshot:
         with self._session_factory() as db:
             store = _find_store(db, store_ref)
             if store is None:
                 raise StoreNotFound("Loja não encontrada")
 
-            items = [
+            operational = [
                 _envelope(
                     db,
                     loja_id=store.id,
@@ -66,7 +88,7 @@ class ProvisioningControl:
                 if match is None:
                     continue
                 assignment, module = match
-                items.append(
+                operational.append(
                     _envelope(
                         db,
                         loja_id=store.id,
@@ -78,7 +100,50 @@ class ProvisioningControl:
                         resource_id=assignment.id,
                     )
                 )
-            return tuple(items)
+
+            role_rows = (
+                db.query(CargoLoja, Pessoa)
+                .join(Pessoa, Pessoa.id == CargoLoja.pessoa_id)
+                .filter(
+                    CargoLoja.loja_id == store.id,
+                    CargoLoja.encerrado_em.is_(None),
+                )
+                .order_by(Pessoa.email, CargoLoja.cargo, CargoLoja.id)
+                .all()
+            )
+            people_by_id: dict[str, ProvisionedPerson] = {}
+            roles: list[ProvisionedRole] = []
+            for role, person in role_rows:
+                people_by_id.setdefault(
+                    person.id,
+                    ProvisionedPerson(
+                        person_id=person.id,
+                        email=person.email,
+                        name=person.nome,
+                    ),
+                )
+                roles.append(
+                    ProvisionedRole(
+                        assignment_id=role.id,
+                        person_id=person.id,
+                        role=role.cargo,
+                        state="ativo",
+                        started_at=role.iniciado_em,
+                        ended_at=None,
+                    )
+                )
+            people = tuple(
+                sorted(
+                    people_by_id.values(),
+                    key=lambda item: (item.email, item.person_id),
+                )
+            )
+            return StoreProvisioningSnapshot(
+                schema_version=1,
+                operational=tuple(operational),
+                people=people,
+                roles=tuple(roles),
+            )
 
 
 def _envelope(
