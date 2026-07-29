@@ -8,6 +8,14 @@
 Este documento registra somente evidências verificadas no repositório. Ele ainda não é o
 inventário final de dados do lab e não autoriza iniciar backfill ou migration da Fase 1.
 
+## Atualização local do Revy Control
+
+Após o baseline fixado acima, o corte local do Control avançou para o head Alembic
+`0008_revy_control_loja_versao`, com **207 testes passando**. As seis flags planejadas
+já existem com default off. O snapshot operacional versionado cobre Loja, Vendas e
+Estoque, inclusive Loja legada sem evento de auditoria. Isso não equivale a migration
+ou rollout no lab, nem implementa ainda o transporte Control → serviços.
+
 ## Baseline reproduzível
 
 As cinco suítes passaram no commit auditado:
@@ -88,6 +96,9 @@ Quando implementadas, devem ter default **off**:
 - `MULTI_WHATSAPP_ENABLED`;
 - `REVY_CONTROL_DASHBOARD_ENABLED`.
 
+No corte local atual, todas já existem com default off. O inventário remoto continua
+necessário antes de alterar os valores do lab.
+
 As flags atuais de cutover continuam fazendo parte do rollback:
 
 | Flag | Default no código | Lab 3-VM |
@@ -119,14 +130,63 @@ Revy cria risco de processamento duplicado.
 - Há testes de webhook e outbox, mas os exemplos de inbound, `fromMe`, mídia e CTWA
   ainda não formam um conjunto de fixtures sanitizadas reutilizáveis.
 
+## Inventário local de identidade de Loja
+
+| Superfície | Identidade atual | Compatibilidade e risco |
+|---|---|---|
+| Revy Control/Tráfego | `Loja.id` + slug canônico; sete tabelas legadas mantêm `loja_slug` e `loja_id` opcional | o backfill local é idempotente, mas não reconcilia outros bancos |
+| Portal | `loja_slug` em toda a operação | maior fonte sem `loja_id`; importar usuários/dados sem renomear slugs ou filas |
+| Chatbot | UUID local + slug; credencial e instância Evolution resolvem `loja_id` | o UUID ainda não é o ID do Control; mapear ambos durante o cutover |
+| Estoque | UUID local + slug; credencial resolve `loja_id` | unicidade é apenas local e o slug não é canonicalizado no banco |
+| Catálogo | `loja_slug` em rota, configuração e eventos | manter slug público e adicionar ID de forma compatível |
+| Motor | `cliente_id`, sem Loja canônica | vincular Cliente, Simulação e Tarefa a `loja_id` antes do gate |
+| n8n/deploy | instância, token e defaults por slug | configuração manual pode divergir dos bancos |
+
+Não existe detector federado de colisão. O Control detecta slug canônico e colisão de
+e-mail apenas no próprio banco; Portal, Chatbot e Estoque têm regras locais diferentes.
+Telefones também divergem: variações `55`/nono dígito e HMAC dos dígitos exatos podem
+representar a mesma pessoa de maneiras distintas. O gate remoto continua exigindo um
+relatório `origem → valor bruto → valor normalizado → loja_id`.
+
+## Contratos vivos que o cutover deve preservar
+
+| Fluxo | Contrato atual | Regra de compatibilidade |
+|---|---|---|
+| Portal/Tráfego → Chatbot | `/v1/leads`, conversas, funil, simulação e operação; Bearer define a Loja | não exigir novo `loja_id` no body/path no primeiro deploy |
+| Portal/Chatbot → Estoque privado | `/v1/veiculos...`; Bearer tenant-scoped e `Idempotency-Key` | preservar 401/404/409, payloads e dedupe |
+| Chatbot/Catálogo → Estoque público | `/public/v1/lojas/{slug}...` | manter slug e response shape; suspensão coordenada pode responder 404 |
+| Catálogo → Chatbot | `POST /v1/integracoes/catalogo/interesses` | preservar `event_id`, `Idempotency-Key`, retries e `loja_slug` durante o cutover |
+| Portal → Control/Tráfego | resultados e eventos de venda por slug + `X-Service-Token` | não reescrever itens pendentes nem IDs idempotentes que contêm slug |
+| Portal/Chatbot → Motor | simulações e credenciais por Bearer/`ClienteApi` | adicionar `loja_id` sem invalidar token, histórico ou idempotência |
+| Catálogo → Pixel | `/public/v1/lojas/{slug}/pixel`, com Portal e Tráfego compatíveis | manter ambos os owners até o cutover conjunto |
+| Estoque → webhook | HMAC e `X-Evento-Id`, `X-Evento-Tipo`, `X-Entrega-Id` | preservar bytes e IDs de entregas estacionadas |
+
+O contrato novo Control → serviços ainda não existe. `ProvisioningControl.snapshot`
+é somente o seam de domínio. A entrega deverá coexistir com slugs, tokens e chaves
+idempotentes atuais até que consumidores e filas pendentes tenham migrado.
+
+## Evolution, WhatsApp e fixtures
+
+- O Chatbot modela uma `evolution_instance` única e um `whatsapp` opcional na Loja.
+  Ainda não existe entidade first-class de canal, provedor, estado ou múltiplos números.
+- `numeros_autorizados` é allowlist da equipe para operar Estoque; não representa o
+  número comercial conectado.
+- O inbound resolve a Loja pela instância e o webhook usa segredo global.
+- O workflow n8n canônico ainda possui cinco saídas diretas para a Evolution: duas
+  respostas de texto, avisos de simulação/handoff e envio de mídia. O gate final deve
+  ficar no port do Chatbot antes do side effect.
+- Testes já contêm payloads normalizados sanitizáveis de inbound, `fromMe`, CTWA,
+  áudio e imagem. Ainda faltam arquivos de fixture raw Evolution sanitizados e
+  reutilizáveis.
+
 Ainda faltam, portanto:
 
 - relatório atual do lab mapeando IDs e slugs em todos os bancos e envs;
 - comparação por `lower(trim(slug))` entre serviços;
 - colisões de e-mail normalizado e telefone brasileiro normalizado;
-- inventário sanitizado de instâncias Evolution e números;
-- fixtures sanitizadas dos quatro tipos exigidos;
-- snapshot versionado dos contratos HTTP que não podem quebrar.
+- confirmação sanitizada das instâncias Evolution e números reais do lab;
+- fixtures raw sanitizadas dos quatro tipos exigidos;
+- contrato e transporte versionados Control → serviços.
 
 Tokens e segredos nunca devem entrar no relatório. Para
 `REVY_TRAFEGO_CHATBOT_TOKENS_JSON`, registrar apenas as chaves de loja.
@@ -206,6 +266,7 @@ Antes da primeira migration da Fase 1 ainda é obrigatório:
 
 ## Gate
 
-O baseline de testes está comprovado. Inventário de dados, colisões, fixtures,
-contratos HTTP, matriz de suspensão e restore drill continuam abertos; nenhum deles
-deve ser inferido como concluído a partir deste documento.
+O baseline, o inventário estrutural local, os contratos vivos e a matriz de suspensão
+estão comprovados. Valores reais do lab, colisões federadas, fixtures raw e restore
+drill continuam abertos; nenhum deles deve ser inferido como concluído a partir deste
+documento.

@@ -86,10 +86,14 @@ Conhecer o estado real antes de criar tabelas ou alterar autorização.
 
 - [x] Registrar baseline das suítes Revy Tráfego, Portal, Chatbot, Estoque e Catálogo
       (682 testes no commit auditado; comandos e resultados na evidência canônica).
-- [ ] Inventariar todos os `loja_slug` presentes em mídia, vendas, Portal, Chatbot,
-      Estoque, Catálogo e envs.
+- [x] Inventariar no código todos os `loja_slug`/`loja_id`, shims e nomes de env
+      presentes em mídia, vendas, Portal, Chatbot, Motor, Estoque e Catálogo.
+- [ ] Reconciliar os valores reais do lab em um mapa
+      `origem → slug bruto → slug normalizado → loja_id`.
 - [ ] Detectar colisões de slug, e-mail e telefone antes do backfill.
-- [ ] Inventariar instâncias Evolution e números atuais sem expor tokens.
+- [x] Inventariar schemas, nomes de env e pontos de envio direto da Evolution sem
+      expor tokens.
+- [ ] Confirmar no lab as instâncias Evolution e números atuais mascarados.
 - [ ] Capturar fixtures sanitizadas de webhook inbound, `fromMe`, mídia e CTWA.
 - [ ] Confirmar backup/snapshot e ensaio de restauração dos bancos afetados.
 - [x] Definir matriz de suspensão por serviço e módulo: leitura histórica, novas escritas,
@@ -103,7 +107,7 @@ Conhecer o estado real antes de criar tabelas ou alterar autorização.
 - [x] Criar flag default off `GOOGLE_CONVERSIONS_ENABLED`.
 - [x] Criar flag default off `MULTI_WHATSAPP_ENABLED`.
 - [x] Criar flag default off `REVY_CONTROL_DASHBOARD_ENABLED`.
-- [ ] Documentar contratos HTTP atuais que não podem quebrar.
+- [x] Documentar contratos HTTP/evento atuais que não podem quebrar.
 
 ### Saída
 
