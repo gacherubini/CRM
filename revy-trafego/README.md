@@ -24,14 +24,16 @@ O **portal da loja** (`portal-gestao`) mostra só resultados de negócio ao dono
 - Commit `98cefe4` em `origin/main`; Fly `app2037` v28 com banco dedicado e checks 1/1.
 - Lab anteriormente no Portal `0012_revy_trafego_event_outbox` e Revy
   `0001_revy_trafego_baseline`; o código local agora possui
-  `0002_revy_control_lojas_rbac` e `0003_revy_control_pessoas_cargos`, ainda não
-  aplicados no lab.
+  `0002_revy_control_lojas_rbac`, `0003_revy_control_pessoas_cargos` e
+  `0004_revy_control_acessos_control`, ainda não aplicados no lab.
 - Corte local de Pessoas/Cargos nos commits `2ecaa6b`, `94a0f51`, `3988fe7`,
   `02eb29d`, `9d2d550`, `4fa1d54` e `c766477`.
+- Schema e backfill aditivos de `AcessoControl` no commit `d64b24b`, com projeção pelo
+  bootstrap no commit `09326f6`.
 - Snapshot pré-deploy `vs_K1n4oBDw96vHZngBNaNy`; smoke `/healthz` e readiness Revy em HTTP 200.
-- Validação local atual do app: **158 testes Revy passando**. A cobertura inclui a Fase 1
-  e o corte local de Pessoas/Cargos da Fase 2; as migrations e o rollout do Control no
-  lab ainda não ocorreram.
+- Validação local atual do app: **163 testes Revy passando**. A cobertura inclui a Fase 1,
+  Pessoas/Cargos e o schema, backfill e bootstrap aditivos de `AcessoControl`; as
+  migrations e o rollout do Control no lab ainda não ocorreram.
 
 ## Status anterior (2026-07-28 — Fase 1/2 no lab)
 
@@ -147,7 +149,8 @@ alembic upgrade head
 uvicorn app.main:app --reload --port 9010
 ```
 
-Login: se `gestores_revy` estiver vazia, o bootstrap cria o primeiro admin.
+Login: se `gestores_revy` estiver vazia, o bootstrap cria o primeiro admin legado e
+projeta sua `Pessoa` e seu `AcessoControl`; a autenticação ainda usa `GestorRevy`.
 
 Testes:
 
@@ -224,14 +227,22 @@ Lojas, vínculos de gestores, auditoria e o corte de Pessoas/Cargos:
 Lojas. No detalhe da Loja, o Admin busca ou cadastra a pessoa por e-mail, atribui vários
 cargos e revoga cada atribuição pelo seu `cargo_id`. A regra local exige ao menos um Dono
 ativo para marcar a Loja como pronta e protege o último Dono ativo nos estados que
-dependem dessa prontidão. Convite e acesso ativável ainda não existem.
+dependem dessa prontidão.
+
+O schema local `acessos_control` e seu backfill são aditivos e idempotentes. Para cada
+gestor legado, a reconciliação reutiliza ou cria a `Pessoa`, preserva o ID de
+`GestorRevy` em `AcessoControl.id` e `gestor_legado_id` e copia o hash de senha sem
+alterá-lo ou expor senha em texto puro. O bootstrap também mantém essa projeção.
+Autenticação, cookie e construção do `Actor` ainda usam `GestorRevy`; `sessao_versao`
+é armazenada em `AcessoControl`, mas ainda é ignorada. Um acesso sem vínculo legado não
+é autenticável. Convite, acesso ativável e cutover da identidade ainda não existem.
 
 Com `REVY_CONTROL_ENABLED=0`, as superfícies Control respondem 404.
 
 `REVY_CONTROL_RBAC_ENABLED=1` aplica o escopo de vínculos ao seletor e às requisições
 existentes. As duas flags permanecem default off; não ativar no lab antes de concluir
 inventário, restore drill, migrations/backfills e o gate de isolamento. O Alembic head
-local é `0003_revy_control_pessoas_cargos`; o lab permanece sem essas migrations e sem
+local é `0004_revy_control_acessos_control`; o lab permanece sem essas migrations e sem
 rollout do Control.
 
 Público via edge: prefixar `/trafego` (ex.: `/trafego/health/live`, `/trafego/v1/...`).  

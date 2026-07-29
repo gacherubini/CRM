@@ -191,7 +191,7 @@ Adicionar:
 
 ### Migração de identidade
 
-- [ ] Backfill de `GestorRevy` para `pessoas` + `acessos_control` sem invalidar sessões.
+- [x] Backfill de `GestorRevy` para `pessoas` + `acessos_control` sem invalidar sessões.
 - [ ] Importar usuários atuais do Portal como pessoas/cargos, registrando conflitos.
 - [ ] Manter `portal-gestao.usuarios` como projeção/legado até o plano do Revy Loja.
 - [ ] Definir contrato versionado de provisionamento de pessoa, cargo e entitlement.
@@ -223,20 +223,32 @@ Adicionar:
 - [ ] Loja/Módulo suspenso bloqueia novo processamento nos serviços de destino e mantém
       leitura do histórico conforme o cargo autorizado.
 
-> **Evidência local — corte Pessoas/Cargos:** implementação nos commits `2ecaa6b`,
-> `94a0f51`, `3988fe7`, `02eb29d`, `9d2d550`, `4fa1d54` e `c766477`; Alembic head
-> local `0003_revy_control_pessoas_cargos`; suíte Revy com **158 testes passando**.
+> **Evidência local — corte Pessoas/Cargos/AcessoControl:** implementação de
+> Pessoas/Cargos nos commits `2ecaa6b`, `94a0f51`, `3988fe7`, `02eb29d`, `9d2d550`,
+> `4fa1d54` e `c766477`, seguida pelo schema e backfill aditivos de `AcessoControl` em
+> `d64b24b` e sua projeção pelo bootstrap em `09326f6`. O Alembic head local é
+> `0004_revy_control_acessos_control`; a suíte Revy tem **163 testes passando**.
 > `REVY_CONTROL_ENABLED=0` e `REVY_CONTROL_RBAC_ENABLED=0` continuam sendo os defaults.
 > Não houve aplicação da migration nem rollout desse corte no lab.
 >
+> O backfill é idempotente e mantém `GestorRevy` como legado: reutiliza ou cria a
+> `Pessoa`, preserva o ID do gestor em `AcessoControl.id` e `gestor_legado_id` e copia
+> o hash de senha sem alterá-lo ou expor senha em texto puro. O bootstrap faz a mesma
+> reconciliação aditiva para o primeiro gestor. Por compatibilidade, autenticação,
+> cookie e construção do `Actor` ainda usam `GestorRevy`; `sessao_versao` já é
+> armazenada em `AcessoControl`, mas ainda é ignorada. Um acesso sem vínculo legado
+> ainda não é autenticável. Portanto este corte não representa convite, ativação de
+> acesso nem cutover da identidade.
+>
 > A regra local provisória exige ao menos um Dono ativo para a transição a `pronta` e
 > protege o último Dono ativo enquanto a Loja requer prontidão. Isso ainda não demonstra
-> “acesso ativável”: `acessos_control`, convite e ativação não existem, portanto o item
-> correspondente permanece aberto.
+> “acesso ativável”: convite, ativação e autenticação canônica por `AcessoControl` não
+> existem, portanto o item correspondente permanece aberto.
 
 Pendências para concluir Pessoas/Cargos e a Fase 2:
 
-- criar `acessos_control` e fazer o backfill de `GestorRevy` sem invalidar sessões;
+- cortar autenticação, cookie e `Actor` para `AcessoControl`, aplicando
+  `sessao_versao` e definindo o fluxo seguro para acessos sem vínculo legado;
 - importar usuários atuais do Portal como pessoas/cargos, registrando conflitos;
 - implementar convite, ativação, recuperação, desativação e revogação de sessões;
 - implementar módulos, contratos e projeções versionadas aos serviços operacionais.
