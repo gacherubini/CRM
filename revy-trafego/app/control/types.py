@@ -76,6 +76,18 @@ class PersonEmailConflict(ControlError):
         super().__init__("já existe Pessoa Revy com este e-mail")
 
 
+class ControlAccountConflict(ControlError):
+    pass
+
+
+class ControlInvitationInvalid(ControlError):
+    pass
+
+
+class WeakControlPassword(ControlError):
+    pass
+
+
 class StoreRoleConflict(ControlError):
     def __init__(self, store_id: str, person_id: str, role: "StoreRole") -> None:
         self.store_id = store_id
@@ -193,6 +205,34 @@ class ControlAccountView:
     status: ControlAccountStatus
     created_at: datetime
     updated_at: datetime
+
+
+@dataclass(frozen=True)
+class InviteControlAccess:
+    person: PersonRef
+    role: ControlAccountRole
+
+
+@dataclass(frozen=True)
+class ActivateControlAccess:
+    token: str
+    password: str
+
+
+@dataclass(frozen=True)
+class IssuedControlInvitation:
+    access_id: str
+    person_email: str
+    token: str
+    expires_at: datetime
+
+
+@dataclass(frozen=True)
+class ActivatedControlAccount:
+    access_id: str
+    person_email: str
+    role: ControlAccountRole
+    status: ControlAccountStatus
 
 
 @dataclass(frozen=True)

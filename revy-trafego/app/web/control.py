@@ -12,11 +12,14 @@ from app.config import settings
 from app.control.access import AccessControl
 from app.control.accounts import ControlAccounts
 from app.control.audit import AuditTrail
+from app.control.invitations import ControlInvitations
 from app.control.people import PeopleDirectory
 from app.control.roles import StoreRoles
 from app.control.stores import StoreControl
 from app.control.types import (
     AccessDenied,
+    ActivateControlAccess,
+    ActivatedControlAccount,
     AccessibleStore,
     ActiveResponsibleConflict,
     Actor,
@@ -24,11 +27,16 @@ from app.control.types import (
     AuditEventView,
     AuditQuery,
     ControlError,
+    ControlAccountConflict,
+    ControlAccountRole,
     ControlAccountView,
+    ControlInvitationInvalid,
     CreateStore,
     GrantTrafficAccess,
     InvalidPersonEmail,
     InvalidStoreTransition,
+    InviteControlAccess,
+    IssuedControlInvitation,
     ManagerNotFound,
     PersonEmailConflict,
     PersonNotFound,
@@ -53,6 +61,7 @@ from app.control.types import (
     TrafficLinkNotFound,
     TrafficRole,
     TransitionStore,
+    WeakControlPassword,
 )
 from app.db import SessionLocal, get_db
 
@@ -131,6 +140,20 @@ class PersonCreateBody(BaseModel):
         return normalized
 
 
+class ControlInvitationBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    pessoa_id: str = Field(min_length=1, max_length=36)
+    papel: ControlAccountRole
+
+
+class ActivateControlInvitationBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    token: str = Field(min_length=1, max_length=256)
+    senha: str = Field(min_length=1, max_length=256)
+
+
 class StoreTransitionBody(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -171,6 +194,35 @@ def list_control_accounts(actor: Actor = Depends(_current_actor)):
     except ControlError as exc:
         _raise_domain_error(exc)
     return {"items": [_control_account_json(account) for account in accounts]}
+
+
+@router.post("/convites", status_code=201)
+def issue_control_invitation(
+    body: ControlInvitationBody,
+    actor: Actor = Depends(_current_actor),
+):
+    try:
+        invitation = ControlInvitations(SessionLocal).issue(
+            actor,
+            InviteControlAccess(
+                person=PersonRef(id=body.pessoa_id),
+                role=body.papel,
+            ),
+        )
+    except ControlError as exc:
+        _raise_domain_error(exc)
+    return _issued_invitation_json(invitation)
+
+
+@router.post("/convites/ativar")
+def activate_control_invitation(body: ActivateControlInvitationBody):
+    try:
+        account = ControlInvitations(SessionLocal).activate(
+            ActivateControlAccess(token=body.token, password=body.senha)
+        )
+    except ControlError as exc:
+        _raise_domain_error(exc)
+    return _activated_account_json(account)
 
 
 @router.post("/pessoas", status_code=201)
@@ -417,6 +469,28 @@ def _control_account_json(account: ControlAccountView) -> dict[str, object]:
     }
 
 
+def _issued_invitation_json(
+    invitation: IssuedControlInvitation,
+) -> dict[str, str]:
+    return {
+        "acesso_id": invitation.access_id,
+        "pessoa_email": invitation.person_email,
+        "token": invitation.token,
+        "expira_em": invitation.expires_at.isoformat(),
+    }
+
+
+def _activated_account_json(
+    account: ActivatedControlAccount,
+) -> dict[str, str]:
+    return {
+        "acesso_id": account.access_id,
+        "pessoa_email": account.person_email,
+        "papel": account.role.value,
+        "estado": account.status.value,
+    }
+
+
 def _store_role_json(role: StoreRoleView) -> dict[str, object]:
     return {
         "id": role.id,
@@ -482,6 +556,12 @@ def _raise_domain_error(exc: ControlError) -> NoReturn:
         status_code, code = 409, "store_slug_conflict"
     elif isinstance(exc, PersonEmailConflict):
         status_code, code = 409, "person_email_conflict"
+    elif isinstance(exc, ControlAccountConflict):
+        status_code, code = 409, "control_account_conflict"
+    elif isinstance(exc, ControlInvitationInvalid):
+        status_code, code = 409, "control_invitation_invalid"
+    elif isinstance(exc, WeakControlPassword):
+        status_code, code = 400, "weak_control_password"
     elif isinstance(exc, StoreRoleNotFound):
         status_code, code = 404, "store_role_not_found"
     elif isinstance(exc, StoreRoleConflict):
