@@ -34,7 +34,7 @@ O `entrypoint-app.sh` roda `alembic upgrade head` fail-fast em:
 | Estoque | `/srv/estoque` | `0008_loja_operacional_projecao` |
 | Motor | `/srv/motor` | `0014_cliente_operacional_projecao` |
 | Portal | `/srv/portal` | `0013_loja_operacional_projecao` |
-| Revy Control | `/srv/revy-trafego` | `0009_revy_control_provisioning_outbox` |
+| Revy Control | `/srv/revy-trafego` | `0013_revy_control_readiness_alert_acceptances` (após `0011` metrics + `0012` conversions) |
 
 Catálogo **não** usa Alembic: SQLite em `CATALOGO_DATABASE_PATH` (tabela criada no
 primeiro `apply` / boot do módulo de provisioning).
@@ -210,6 +210,79 @@ Não apagar tabelas de projeção em massa sem snapshot.
 5. Mutação → outbox delivered  
 6. Gate suspensa → reativa  
 7. Só então considerar `REVY_CONTROL_RBAC_ENABLED=1`  
+
+---
+
+## 6. Flags e smoke — superfícies Revy Control (código F0–6 lean)
+
+Checklist de **feature flags** (todas default off no código) e endpoints de smoke
+para validar no lab **depois** das migrations. Não liga tudo de uma vez.
+
+### 6.1 Flags
+
+| Flag | Superfície | Smoke mínimo |
+|---|---|---|
+| `REVY_CONTROL_ENABLED=1` | API `/control/v1/*` e UI `/app/control/*` (exceto dashboard se flag própria) | login + `GET /trafego/control/v1/lojas` (com sessão) |
+| `REVY_CONTROL_RBAC_ENABLED=1` | Escopo por vínculo em listagens/mutações de gestor | gestor A não vê loja B (403/404) |
+| `REVY_CONTROL_DASHBOARD_ENABLED=1` | `GET /control/v1/dashboard` + `/app/control/dashboard` | JSON com `counts`, `items`, `pending_readiness`, `integrations` |
+| `REVY_CONTROL_PROVISIONING_DELIVERY_ENABLED=1` | Worker outbox → 5 destinos | ver §3 |
+| `GOOGLE_ADS_SYNC_ENABLED=1` | OAuth/conexão Google Ads | rotas Google sob `/control/v1/...` (sem métricas F4B) |
+| `GOOGLE_CONVERSIONS_ENABLED=1` | Devolução de conversões (F4D; ainda stub) | não ligar sem F4D |
+| `MULTI_WHATSAPP_ENABLED=1` | Canais WA no Control (port Chatbot) | listagem de canais se Chatbot expuser |
+
+```bash
+# Exemplo: painel + dashboard, sem RBAC rígido nem Google/WA
+fly secrets set --stage \
+  REVY_CONTROL_ENABLED=1 \
+  REVY_CONTROL_DASHBOARD_ENABLED=1 \
+  REVY_CONTROL_RBAC_ENABLED=0 \
+  GOOGLE_ADS_SYNC_ENABLED=0 \
+  GOOGLE_CONVERSIONS_ENABLED=0 \
+  MULTI_WHATSAPP_ENABLED=0 \
+  -a app2037
+fly secrets deploy -a app2037
+```
+
+### 6.2 Endpoints de smoke (base `https://app2037.fly.dev/trafego`)
+
+Autenticado (cookie de sessão admin/gestor após `POST /login`):
+
+| Método | Path | Esperado |
+|---|---|---|
+| GET | `/health/live` e `/health/ready` | 200 |
+| GET | `/control/v1/lojas` | 200 lista no escopo |
+| GET | `/control/v1/lojas/{id}/prontidao` | 200 `pronta` + `checks[]` com `aceito` |
+| POST | `/control/v1/lojas/{id}/prontidao/alertas/{code}/aceitar` | 200 com `motivo`; 400 se check required |
+| GET | `/control/v1/lojas/{id}/integracoes` | 200 pixel/capi/meta_ads **sem** token cru |
+| POST | `/control/v1/lojas/{id}/integracoes/pixel/desconectar` | 403 colaborador; 200 admin/responsável |
+| GET | `/control/v1/dashboard` | 200 com `counts.ativas|em_configuracao|suspensas|erro` |
+| GET | `/app/control/dashboard` | 200 HTML cards + tabela |
+| POST | `/control/v1/lojas/{id}/estado` body `{"estado":"ativa"}` | 409 `store_readiness_blocked` se required falhar |
+
+```bash
+# Live/ready (sem auth)
+curl -sS https://app2037.fly.dev/trafego/health/live
+curl -sS https://app2037.fly.dev/trafego/health/ready
+
+# Dashboard (precisa cookie de sessão — usar browser ou curl -c/-b após login)
+# Esperado com flag off: HTTP 404
+# Esperado com flags on + sessão: HTTP 200 + counts
+```
+
+### 6.3 Alembic head Control (lab)
+
+Após deploy do código com F3 aceite de alerta:
+
+- Head esperado: `0013_revy_control_readiness_alert_acceptances`
+- Tabela nova: `readiness_alert_acceptances` (`loja_id`, `check_code`, `accepted_by`, `reason`, `accepted_at`)
+
+### 6.4 Residual F7 (ainda não fazer neste checklist)
+
+- [ ] Suíte completa pré/pós migration no lab  
+- [ ] Piloto multi-WA (2 números)  
+- [ ] Restore drill com tabelas novas  
+- [ ] Cutover `REVY_CONTROL_RBAC_ENABLED=1` após vínculos  
+- [ ] Remover seletor manual de slug / fallbacks legados  
 
 ---
 

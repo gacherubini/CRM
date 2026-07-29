@@ -69,6 +69,19 @@ def _create_active_store(
     *,
     slug: str,
 ):
+    from app.control.portfolio import PortfolioControl
+    from app.models import AcessoControl, ModuloRevy, agora
+
+    with SessionLocal() as db:
+        if db.query(ModuloRevy).count() == 0:
+            db.add_all(
+                [
+                    ModuloRevy(id="vendas", codigo="vendas", nome="Vendas"),
+                    ModuloRevy(id="estoque", codigo="estoque", nome="Estoque"),
+                ]
+            )
+            db.commit()
+
     store = stores.create(
         admin,
         CreateStore(name=f"Loja {slug}", slug=slug),
@@ -88,8 +101,6 @@ def _create_active_store(
             role=StoreRole.OWNER,
         ),
     )
-    from app.models import AcessoControl, agora
-
     now = agora()
     with SessionLocal() as db:
         db.add(
@@ -105,6 +116,11 @@ def _create_active_store(
             )
         )
         db.commit()
+    PortfolioControl(SessionLocal).configure(
+        admin,
+        StoreRef(id=store.id),
+        {"vendas"},
+    )
     for target in (
         StoreStatus.CONFIGURING,
         StoreStatus.READY,

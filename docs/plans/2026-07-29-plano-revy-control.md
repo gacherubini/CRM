@@ -1,6 +1,6 @@
 # Plano — Evolução do Revy Tráfego para Revy Control
 
-**Status:** ATIVO / CÓDIGO F0–6 PARCIAL (integrações Meta, Google OAuth skeleton, multi-WA canais, dashboard; lab + F4 métricas/conversões + F5 connect ainda abertos)
+**Status:** ATIVO / CÓDIGO F0–6 LEAN COMPLETE (Meta, readiness+aceite, Google 4A–D ports/fakes, click IDs 4C, multi-WA canal_id+connect, dashboard rico; F7 lab/rollout e adapters GCP reais ainda abertos)
 **Data:** 2026-07-29
 **Spec:** [`docs/superpowers/specs/2026-07-29-revy-control-design.md`](../superpowers/specs/2026-07-29-revy-control-design.md)
 **Vocabulário:** [`CONTEXT.md`](../../CONTEXT.md)
@@ -300,19 +300,29 @@ ser chamadas pela interface da Central de Integrações.
 
 ### Testes obrigatórios
 
-- [ ] Colaborador recebe 403 ao desconectar integração.
-- [ ] Erro obrigatório impede estado Pronta e Ativa.
-- [ ] Alerta aceito não bloqueia e gera auditoria.
+- [x] Colaborador recebe 403 ao desconectar integração
+      (`test_control_integrations.py::test_colaborador_nao_pode_desconectar_pixel`).
+- [x] Erro obrigatório impede estado Pronta e Ativa
+      (`StoreReadinessBlocked` em `CONFIGURING→READY` e `*→ACTIVE`;
+      `test_control_readiness.py`).
+- [x] Alerta aceito não bloqueia e gera auditoria
+      (`readiness_alert_acceptances` + `readiness.alert.accepted`;
+      aceite não inventa `ready=True` se required falhar).
 - [ ] Suspensão interrompe jobs da loja sem apagar filas/histórico.
-- [ ] Falha externa é sanitizada e não vaza segredo.
+- [x] Falha externa é sanitizada e não vaza segredo
+      (token nunca no JSON de integrações; auditoria sem ciphertext cru).
 - [x] Readiness é determinístico e testado pela interface
-      (`StoreReadiness` + `GET /control/v1/lojas/{id}/prontidao`; slice lean sem
-      Central de Integrações Meta completa).
+      (`StoreReadiness` + `GET /control/v1/lojas/{id}/prontidao` +
+      `POST .../prontidao/alertas/{code}/aceitar`; Central Meta lean).
 
 ### Critério de pronto
 
 O dashboard consegue explicar exatamente por que cada loja está configurando, pronta,
 ativa ou com erro.
+
+**Estado código (lean):** Meta Pixel/CAPI/Ads na Central; readiness determinístico;
+aceite de alerta durable + auditado; ativação bloqueada sem required. Residual lab =
+flags + smoke; jobs de suspensão finos ainda abertos.
 
 ---
 
@@ -482,13 +492,20 @@ correto; o mesmo cliente pode ter duas conversas e um único lead da loja.
 
 ### Admin
 
-- Cards: lojas ativas, configurando, suspensas e com erro.
-- Onboardings e requisitos pendentes.
-- Módulos contratados e falhas de integração.
-- Gestor Responsável por loja.
-- Alterações recentes.
+- [x] Cards: lojas ativas, configurando, suspensas e com erro
+      (`DashboardControl.overview` + `GET /control/v1/dashboard` + UI
+      `/app/control/dashboard`).
+- [x] Onboardings e requisitos pendentes (`pending_readiness` com failing codes).
+- [x] Saúde de integrações por loja (pixel/meta_ads/google_status/whatsapp stub).
+- [ ] Módulos contratados e falhas de integração (detalhe rico além do stub).
+- [ ] Gestor Responsável por loja no card do dashboard.
+- [ ] Alterações recentes (trilha de auditoria no painel).
 
 Usuários e números ficam no detalhe da loja, não como cards do dashboard.
+
+**Estado código (lean):** overview com contagens + lista de pendências + health stubs;
+isolamento gestor coberto por testes. Residual visual = detalhe acionável completo e
+métricas Meta/Google de aquisição (dependem F4B).
 
 ### Linguagem visual
 
@@ -530,7 +547,13 @@ suas lojas; dono, gerente e vendedor continuam fora do Control.
 - [ ] Ativar flags gradualmente e manter rollback somente por flag/código compatível.
 - [ ] Remover seletor manual e fallback de env após todos os slugs estarem cadastrados.
 - [ ] Remover campos legados de uma instância por loja apenas em release posterior.
-- [ ] Atualizar README operacional e runbooks de deploy.
+- [x] Atualizar README operacional e runbooks de deploy
+      (checklist de flags/smoke Control no
+      [runbook de provisionamento](2026-07-29-runbook-rollout-lab-provisionamento.md);
+      **sem deploy lab neste corte**).
+
+**Estado:** docs/checklist de flags e smoke endpoints do Control atualizados no
+código; execução no lab permanece pendente (F7 operacional).
 
 ## Matriz mínima de testes
 

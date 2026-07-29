@@ -4,7 +4,7 @@ from app.auth import hash_senha
 from app.config import settings
 from app.control.dashboard import DashboardControl
 from app.control.stores import StoreControl
-from app.control.types import Actor, CreateStore
+from app.control.types import Actor, CreateStore, StoreStatus, TransitionStore
 from app.db import SessionLocal
 from app.models import GestorRevy, Loja, VinculoTrafego
 from app.web import control as control_mod
@@ -162,28 +162,126 @@ def test_dashboard_api_admin_e_gestor_respeitam_escopo(client, monkeypatch):
     admin_response = client.get("/control/v1/dashboard")
 
     assert admin_response.status_code == 200
-    admin_ids = {item["store_id"] for item in admin_response.json()["items"]}
+    body = admin_response.json()
+    assert "counts" in body
+    assert set(body["counts"]) == {
+        "ativas",
+        "em_configuracao",
+        "suspensas",
+        "erro",
+    }
+    assert "pending_readiness" in body
+    assert "integrations" in body
+    admin_ids = {item["store_id"] for item in body["items"]}
     assert allowed_id in admin_ids
     assert other_id in admin_ids
     sample = next(
-        item
-        for item in admin_response.json()["items"]
-        if item["store_id"] == allowed_id
+        item for item in body["items"] if item["store_id"] == allowed_id
     )
     assert set(sample) == {"store_id", "slug", "name", "status", "ready"}
     assert sample["slug"] == "loja-dashboard-permitida"
     assert sample["name"] == "Loja Dashboard Permitida"
     assert sample["status"] == "rascunho"
     assert sample["ready"] is False
+    pending_ids = {item["store_id"] for item in body["pending_readiness"]}
+    assert allowed_id in pending_ids
+    assert other_id in pending_ids
+    integ = next(
+        item for item in body["integrations"] if item["store_id"] == allowed_id
+    )
+    assert set(integ) >= {
+        "store_id",
+        "slug",
+        "pixel_connected",
+        "meta_ads_connected",
+        "google_status",
+        "whatsapp_channels",
+    }
+    assert integ["pixel_connected"] is False
 
     client.cookies.clear()
     _login(client, "gestor.dashboard@revy.local", "senha-gestor-dashboard")
     gestor_response = client.get("/control/v1/dashboard")
 
     assert gestor_response.status_code == 200
-    gestor_items = gestor_response.json()["items"]
+    gestor_body = gestor_response.json()
+    gestor_items = gestor_body["items"]
     assert [item["store_id"] for item in gestor_items] == [allowed_id]
     assert other_id not in {item["store_id"] for item in gestor_items}
+    assert [item["store_id"] for item in gestor_body["pending_readiness"]] == [
+        allowed_id
+    ]
+    assert other_id not in {
+        item["store_id"] for item in gestor_body["integrations"]
+    }
+
+
+def test_dashboard_overview_counts_e_isolamento_gestor():
+    from app.control.types import StoreRef
+
+    admin = _admin_actor()
+    stores = StoreControl(SessionLocal)
+    configuring = stores.create(
+        admin,
+        CreateStore(name="Dash Config", slug="dash-config"),
+    )
+    suspended = stores.create(
+        admin,
+        CreateStore(name="Dash Suspensa", slug="dash-suspensa"),
+    )
+    stores.transition(
+        admin,
+        TransitionStore(
+            store=StoreRef(id=configuring.id),
+            target=StoreStatus.CONFIGURING,
+        ),
+    )
+    # Suspensa via DB para não depender do caminho pronta→ativa.
+    with SessionLocal() as db:
+        row = db.query(Loja).filter(Loja.id == suspended.id).one()
+        row.status = StoreStatus.SUSPENDED.value
+        db.commit()
+
+    with SessionLocal() as db:
+        manager = GestorRevy(
+            email="gestor.counts@revy.local",
+            nome="Gestor Counts",
+            senha_hash=hash_senha("senha-counts"),
+            papel="gestor",
+            ativo=True,
+        )
+        db.add(manager)
+        db.flush()
+        db.add(
+            VinculoTrafego(
+                loja_id=configuring.id,
+                gestor_id=manager.id,
+                tipo="colaborador",
+            )
+        )
+        db.commit()
+        manager_actor = Actor(
+            id=manager.id,
+            email=manager.email,
+            name=manager.nome,
+            role=manager.papel,
+        )
+
+    dashboard = DashboardControl(SessionLocal)
+    admin_overview = dashboard.overview(admin)
+    assert admin_overview.counts.em_configuracao >= 1
+    assert admin_overview.counts.suspensas >= 1
+    admin_ids = {item.store_id for item in admin_overview.items}
+    assert configuring.id in admin_ids
+    assert suspended.id in admin_ids
+
+    gestor_overview = dashboard.gestor_overview(manager_actor)
+    assert [item.store_id for item in gestor_overview.items] == [configuring.id]
+    assert gestor_overview.counts.em_configuracao == 1
+    assert gestor_overview.counts.suspensas == 0
+    assert suspended.id not in {
+        item.store_id for item in gestor_overview.pending_readiness
+    }
 
 
 def test_dashboard_html_404_sem_flags(client, client_logado):
@@ -201,11 +299,17 @@ def test_dashboard_html_lista_prontidao_no_escopo(client, monkeypatch):
     assert admin_page.status_code == 200
     assert "Revy Control" in admin_page.text
     assert 'id="tabela-dashboard-prontidao"' in admin_page.text
+    assert 'id="dashboard-counts"' in admin_page.text
+    assert "Ativas" in admin_page.text
+    assert "Configurando" in admin_page.text
+    assert "Suspensas" in admin_page.text
+    assert "Com erro" in admin_page.text
     assert "Loja Dashboard Permitida" in admin_page.text
     assert "Loja Dashboard Alheia" in admin_page.text
     assert f'data-store-id="{allowed_id}"' in admin_page.text
     assert f'data-store-id="{other_id}"' in admin_page.text
     assert 'id="nav-control-dashboard"' in admin_page.text
+    assert 'id="dashboard-pendencias"' in admin_page.text
 
     client.cookies.clear()
     _login(client, "gestor.dashboard@revy.local", "senha-gestor-dashboard")

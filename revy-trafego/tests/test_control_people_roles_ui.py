@@ -398,9 +398,26 @@ def test_revogar_ultimo_dono_de_loja_pronta_retorna_erro_no_detalhe(
     client,
     monkeypatch,
 ):
+    from app.control.portfolio import PortfolioControl
+    from app.control.types import StoreRef
+    from app.models import ModuloRevy
+
+    admin = _admin_actor()
+    with SessionLocal() as db:
+        if db.query(ModuloRevy).count() == 0:
+            db.add_all(
+                [
+                    ModuloRevy(id="vendas", codigo="vendas", nome="Vendas"),
+                    ModuloRevy(id="estoque", codigo="estoque", nome="Estoque"),
+                ]
+            )
+            db.commit()
     store = StoreControl(SessionLocal).create(
-        _admin_actor(),
+        admin,
         CreateStore(name="Loja Pronta UI", slug="loja-pronta-cargos-ui"),
+    )
+    PortfolioControl(SessionLocal).configure(
+        admin, StoreRef(id=store.id), {"estoque"}
     )
     _enable_control_ui(monkeypatch)
     _login(client, "trafego@revy.local", "secret-teste")

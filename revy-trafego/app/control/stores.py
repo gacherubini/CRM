@@ -164,7 +164,9 @@ class StoreControl:
             if (
                 current is StoreStatus.CONFIGURING
                 and command.target is StoreStatus.READY
-            ):
+            ) or command.target is StoreStatus.ACTIVE:
+                # Pronta e Ativa exigem checks required ok. Aceite de alerta
+                # não inventa ready=True se required falhar.
                 report = build_readiness_report(db, store)
                 if not report.ready:
                     failed = first_failed_required(report)

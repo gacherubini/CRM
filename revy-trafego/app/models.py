@@ -1006,3 +1006,37 @@ class GoogleAdsUploadAttempt(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=agora
     )
+
+
+class ReadinessAlertAcceptance(Base):
+    """Aceite auditavel de alerta de prontidao (nao contorna checks required)."""
+
+    __tablename__ = "readiness_alert_acceptances"
+    __table_args__ = (
+        UniqueConstraint(
+            "loja_id",
+            "check_code",
+            name="uq_readiness_alert_acceptances_loja_check",
+        ),
+        CheckConstraint(
+            "length(trim(check_code)) > 0",
+            name="ck_readiness_alert_acceptances_check_code",
+        ),
+        CheckConstraint(
+            "length(trim(reason)) > 0",
+            name="ck_readiness_alert_acceptances_reason",
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=novo_id)
+    loja_id: Mapped[str] = mapped_column(
+        ForeignKey("lojas.id", ondelete="RESTRICT"), index=True
+    )
+    check_code: Mapped[str] = mapped_column(String(64))
+    accepted_by: Mapped[str] = mapped_column(
+        ForeignKey("gestores_revy.id", ondelete="RESTRICT"), index=True
+    )
+    reason: Mapped[str] = mapped_column(Text)
+    accepted_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=agora, index=True
+    )

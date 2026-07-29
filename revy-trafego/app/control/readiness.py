@@ -4,8 +4,18 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
+from app.control.audit import _append_event
 from app.control.integrations import pixel_configured, vendas_module_active
-from app.control.types import Actor, StoreNotFound, StoreRef, StoreRole, StoreStatus
+from app.control.types import (
+    AccessDenied,
+    Actor,
+    InvalidAlertAcceptance,
+    StoreNotFound,
+    StoreRef,
+    StoreRole,
+    StoreStatus,
+    TrafficRole,
+)
 from app.models import (
     AcessoControl,
     CargoLoja,
@@ -13,14 +23,15 @@ from app.models import (
     Loja,
     LojaModulo,
     ModuloRevy,
+    ReadinessAlertAcceptance,
     VinculoTrafego,
+    agora,
 )
 
 # Ordem determinística estável (não alfabética pura: active_owner precede
 # activatable_owner por dependência lógica). meta_pixel só entra quando o
 # módulo vendas está ativo (alerta, não bloqueia prontidão).
-# whatsapp_channel: alerta opcional multi-WA (sem projeção local; ver evaluate
-# com active_whatsapp_channels quando injetado).
+# whatsapp_channel: alerta opcional multi-WA (contagem injetada).
 _CHECK_ORDER = (
     "active_owner",
     "activatable_owner",
@@ -45,6 +56,7 @@ class ReadinessCheck:
     ok: bool
     severity: str
     message: str
+    accepted: bool = False
 
     def __post_init__(self) -> None:
         if self.severity not in {"required", "alert"}:
@@ -59,6 +71,15 @@ class ReadinessReport:
     checks: tuple[ReadinessCheck, ...]
 
 
+@dataclass(frozen=True)
+class AlertAcceptanceView:
+    store_id: str
+    check_code: str
+    accepted_by: str
+    reason: str
+    accepted_at: object
+
+
 class StoreReadiness:
     """Calcula por que a Loja está ou não pronta (interface determinística)."""
 
@@ -69,6 +90,104 @@ class StoreReadiness:
         with self._session_factory() as db:
             store = _authorized_store(db, actor, store_ref)
             return build_readiness_report(db, store)
+
+    def accept_alert(
+        self,
+        actor: Actor,
+        store_ref: StoreRef,
+        check_code: str,
+        reason: str,
+    ) -> AlertAcceptanceView:
+        """Aceita alerta não bloqueante com motivo obrigatório (auditado).
+
+        Não contorna checks ``required`` nem marca a loja como pronta.
+        """
+        code = (check_code or "").strip()
+        motivo = (reason or "").strip()
+        if not code:
+            raise InvalidAlertAcceptance("informe o código do alerta")
+        if not motivo:
+            raise InvalidAlertAcceptance(
+                "informe o motivo do aceite do alerta"
+            )
+
+        with self._session_factory() as db:
+            store = _authorized_store(db, actor, store_ref)
+            _require_can_manage_readiness(db, actor, store)
+            report = build_readiness_report(db, store)
+            target = next(
+                (check for check in report.checks if check.code == code),
+                None,
+            )
+            if target is None:
+                raise InvalidAlertAcceptance(
+                    f"check de prontidão desconhecido: {code}"
+                )
+            if target.severity != "alert":
+                raise InvalidAlertAcceptance(
+                    "somente alertas não bloqueantes podem ser aceitos; "
+                    "requisitos obrigatórios não são contornáveis"
+                )
+            if target.ok:
+                raise InvalidAlertAcceptance(
+                    "check já está ok; não há alerta para aceitar"
+                )
+
+            row = (
+                db.query(ReadinessAlertAcceptance)
+                .filter(
+                    ReadinessAlertAcceptance.loja_id == store.id,
+                    ReadinessAlertAcceptance.check_code == code,
+                )
+                .first()
+            )
+            before = (
+                {
+                    "check_code": row.check_code,
+                    "reason": row.reason,
+                    "accepted_by": row.accepted_by,
+                }
+                if row is not None
+                else None
+            )
+            now = agora()
+            if row is None:
+                row = ReadinessAlertAcceptance(
+                    loja_id=store.id,
+                    check_code=code,
+                    accepted_by=actor.id,
+                    reason=motivo,
+                    accepted_at=now,
+                )
+                db.add(row)
+            else:
+                row.accepted_by = actor.id
+                row.reason = motivo
+                row.accepted_at = now
+            _append_event(
+                db,
+                actor=actor,
+                store_id=store.id,
+                action="readiness.alert.accepted",
+                resource_type="readiness_alert",
+                resource_id=code,
+                before=before,
+                after={
+                    "check_code": code,
+                    "reason": motivo,
+                    "accepted_by": actor.id,
+                },
+                reason=motivo,
+            )
+            db.commit()
+            db.refresh(row)
+            return AlertAcceptanceView(
+                store_id=store.id,
+                check_code=row.check_code,
+                accepted_by=row.accepted_by,
+                reason=row.reason,
+                accepted_at=row.accepted_at,
+            )
 
 
 def build_readiness_report(
@@ -81,8 +200,7 @@ def build_readiness_report(
     """Monta o relatório de prontidão a partir de uma sessão/loja já carregadas.
 
     ``active_whatsapp_channels``: quando multi-WA está ligado e o valor é
-    conhecido (ex.: proxy Chatbot), zero canais ativos vira alerta lean.
-    Se None, o check whatsapp_channel é omitido (sem projeção local).
+    conhecido, inclui alerta whatsapp_channel. Se None, o check é omitido.
     """
     owner_person_ids = [
         row[0]
@@ -149,7 +267,17 @@ def build_readiness_report(
     if not multi_whatsapp_enabled or active_whatsapp_channels is None:
         skip.add("whatsapp_channel")
     order = tuple(code for code in _CHECK_ORDER if code not in skip)
-    checks = tuple(_check_for(code, facts[code]) for code in order)
+    accepted_codes = {
+        row[0]
+        for row in db.query(ReadinessAlertAcceptance.check_code)
+        .filter(ReadinessAlertAcceptance.loja_id == store.id)
+        .all()
+    }
+    checks = tuple(
+        _check_for(code, facts[code], accepted=code in accepted_codes)
+        for code in order
+    )
+    # Aceite de alerta NUNCA inventa ready=True se required falhar.
     ready = all(check.ok for check in checks if check.severity == "required")
     return ReadinessReport(
         store_id=store.id,
@@ -166,13 +294,14 @@ def first_failed_required(report: ReadinessReport) -> ReadinessCheck | None:
     return None
 
 
-def _check_for(code: str, ok: bool) -> ReadinessCheck:
+def _check_for(code: str, ok: bool, *, accepted: bool = False) -> ReadinessCheck:
     severity = "required" if code in _REQUIRED_CODES else "alert"
     return ReadinessCheck(
         code=code,
         ok=ok,
         severity=severity,
         message=_message_for(code, ok),
+        accepted=bool(accepted) if severity == "alert" and not ok else False,
     )
 
 
@@ -210,6 +339,27 @@ def _message_for(code: str, ok: bool) -> str:
         ),
     }
     return messages[code]
+
+
+def _require_can_manage_readiness(db: Any, actor: Actor, store: Loja) -> None:
+    """Admin ou Gestor Responsável; colaborador → AccessDenied."""
+    if actor.is_admin:
+        return
+    link = (
+        db.query(VinculoTrafego)
+        .filter(
+            VinculoTrafego.loja_id == store.id,
+            VinculoTrafego.gestor_id == actor.id,
+            VinculoTrafego.encerrado_em.is_(None),
+        )
+        .first()
+    )
+    if link is None:
+        raise StoreNotFound("Loja não encontrada")
+    if link.tipo != TrafficRole.RESPONSIBLE.value:
+        raise AccessDenied(
+            "somente Admin Revy ou Gestor Responsável pode aceitar alertas"
+        )
 
 
 def _authorized_store(db: Any, actor: Actor, store_ref: StoreRef) -> Any:

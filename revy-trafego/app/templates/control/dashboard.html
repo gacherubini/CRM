@@ -6,12 +6,71 @@
   <div>
     <span class="eyebrow">Revy Control</span>
     <h1>Prontidão das lojas</h1>
-    <p>Resumo de status e prontidão no seu escopo.</p>
+    <p>Resumo de status, alertas e saúde de integrações no seu escopo.</p>
   </div>
 </div>
 
+<section class="funil-summary" id="dashboard-counts" aria-label="Contagens por status">
+  <div class="funil-summary-card{% if overview and overview.counts.ativas %} highlight{% endif %}">
+    <span>Ativas</span>
+    <strong>{{ overview.counts.ativas if overview else 0 }}</strong>
+    <small>em operação</small>
+  </div>
+  <div class="funil-summary-card">
+    <span>Configurando</span>
+    <strong>{{ overview.counts.em_configuracao if overview else 0 }}</strong>
+    <small>em configuração</small>
+  </div>
+  <div class="funil-summary-card">
+    <span>Suspensas</span>
+    <strong>{{ overview.counts.suspensas if overview else 0 }}</strong>
+    <small>pausadas</small>
+  </div>
+  <div class="funil-summary-card">
+    <span>Com erro</span>
+    <strong>{{ overview.counts.erro if overview else 0 }}</strong>
+    <small>ativas sem prontidão</small>
+  </div>
+</section>
+
+{% if overview and overview.pending_readiness %}
+<section class="panel" id="dashboard-pendencias">
+  <div class="panel-heading">
+    <h2>Lojas com pendência de prontidão</h2>
+  </div>
+  <div style="overflow-x:auto">
+    <table id="tabela-dashboard-pendencias">
+      <thead>
+        <tr>
+          <th>Nome</th>
+          <th>Status</th>
+          <th>Checks falhando</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in overview.pending_readiness %}
+        <tr data-store-id="{{ item.store_id }}" class="dashboard-pendencia">
+          <td>
+            {% if control_enabled %}
+            <a href="{{ public_path('/app/control/lojas/' + item.store_id) }}">{{ item.name }}</a>
+            {% else %}
+            {{ item.name }}
+            {% endif %}
+          </td>
+          <td>{{ item.status.value }}</td>
+          <td><code>{{ item.failing_codes | join(', ') }}</code></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endif %}
+
 <section class="panel">
-  <h2>Lojas</h2>
+  <div class="panel-heading">
+    <h2>Lojas</h2>
+  </div>
   {% if items %}
   <div style="overflow-x:auto">
     <table id="tabela-dashboard-prontidao">
@@ -21,10 +80,13 @@
           <th>Slug</th>
           <th>Status</th>
           <th>Pronta</th>
+          <th>Pixel</th>
+          <th>Google</th>
         </tr>
       </thead>
       <tbody>
         {% for item in items %}
+        {% set health = integration_by_store.get(item.store_id) if integration_by_store else none %}
         <tr data-store-id="{{ item.store_id }}">
           <td>
             {% if control_enabled %}
@@ -36,6 +98,12 @@
           <td><code>{{ item.slug }}</code></td>
           <td>{{ item.status.value }}</td>
           <td>{% if item.ready %}sim{% else %}não{% endif %}</td>
+          <td>
+            {% if health and health.pixel_connected %}conectado{% else %}—{% endif %}
+          </td>
+          <td>
+            {% if health and health.google_status %}{{ health.google_status }}{% else %}—{% endif %}
+          </td>
         </tr>
         {% endfor %}
       </tbody>

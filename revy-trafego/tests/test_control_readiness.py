@@ -3,6 +3,7 @@ from decimal import Decimal
 
 import pytest
 
+from app.control.audit import AuditTrail
 from app.control.contracts import (
     ContractBillingStatus,
     ContractControl,
@@ -14,9 +15,12 @@ from app.control.readiness import StoreReadiness
 from app.control.roles import StoreRoles
 from app.control.stores import StoreControl
 from app.control.types import (
+    AccessDenied,
     Actor,
     AssignStoreRole,
+    AuditQuery,
     CreateStore,
+    InvalidAlertAcceptance,
     PersonRef,
     RegisterPerson,
     StoreReadinessBlocked,
@@ -26,7 +30,7 @@ from app.control.types import (
     TransitionStore,
 )
 from app.db import SessionLocal
-from app.models import AcessoControl, GestorRevy, ModuloRevy, agora
+from app.models import AcessoControl, AuditoriaEvento, GestorRevy, ModuloRevy, agora
 
 
 def _seed_catalog() -> None:
@@ -254,3 +258,200 @@ def test_transicao_para_pronta_bloqueada_quando_nao_ready():
         ),
     )
     assert ready.status is StoreStatus.READY
+
+
+def test_alerta_aceito_audita_e_nao_inventa_ready():
+    """Aceite de alerta gera auditoria e não contorna checks required."""
+    _seed_catalog()
+    admin = _admin_actor()
+    stores = StoreControl(SessionLocal)
+    store = stores.create(
+        admin,
+        CreateStore(name="Loja Aceite Alerta", slug="loja-aceite-alerta"),
+    )
+    PortfolioControl(SessionLocal).configure(
+        admin,
+        StoreRef(id=store.id),
+        {"estoque"},
+    )
+    readiness = StoreReadiness(SessionLocal)
+
+    before = readiness.evaluate(admin, StoreRef(id=store.id))
+    assert before.ready is False
+    assert _checks_by_code(before)["contract_present"].ok is False
+    assert _checks_by_code(before)["contract_present"].severity == "alert"
+    assert _checks_by_code(before)["contract_present"].accepted is False
+
+    acceptance = readiness.accept_alert(
+        admin,
+        StoreRef(id=store.id),
+        "contract_present",
+        "piloto comercial sem contrato formal ainda",
+    )
+    assert acceptance.check_code == "contract_present"
+    assert "piloto" in acceptance.reason
+
+    after = readiness.evaluate(admin, StoreRef(id=store.id))
+    # Aceite não inventa ready se required (dono/módulos) ainda falham.
+    assert after.ready is False
+    assert _checks_by_code(after)["contract_present"].accepted is True
+    assert _checks_by_code(after)["active_owner"].ok is False
+
+    with SessionLocal() as db:
+        events = (
+            db.query(AuditoriaEvento)
+            .filter(
+                AuditoriaEvento.loja_id == store.id,
+                AuditoriaEvento.acao == "readiness.alert.accepted",
+            )
+            .all()
+        )
+        assert len(events) == 1
+        assert events[0].motivo == "piloto comercial sem contrato formal ainda"
+        assert events[0].recurso_id == "contract_present"
+
+    trail = AuditTrail(SessionLocal).list(
+        admin,
+        AuditQuery(store_id=store.id, limit=50),
+    )
+    assert "readiness.alert.accepted" in [e.action for e in trail.items]
+
+
+def test_nao_aceita_check_required_nem_motivo_vazio():
+    _seed_catalog()
+    admin = _admin_actor()
+    store = StoreControl(SessionLocal).create(
+        admin,
+        CreateStore(name="Loja Aceite Inválido", slug="loja-aceite-invalido"),
+    )
+    readiness = StoreReadiness(SessionLocal)
+
+    with pytest.raises(InvalidAlertAcceptance):
+        readiness.accept_alert(
+            admin,
+            StoreRef(id=store.id),
+            "active_owner",
+            "tentativa de contornar dono",
+        )
+
+    with pytest.raises(InvalidAlertAcceptance):
+        readiness.accept_alert(
+            admin,
+            StoreRef(id=store.id),
+            "contract_present",
+            "   ",
+        )
+
+
+def test_colaborador_nao_aceita_alerta():
+    from app.auth import hash_senha
+    from app.models import Loja, VinculoTrafego
+
+    _seed_catalog()
+    admin = _admin_actor()
+    store = StoreControl(SessionLocal).create(
+        admin,
+        CreateStore(name="Loja Colab Alerta", slug="loja-colab-alerta"),
+    )
+    with SessionLocal() as db:
+        collab = GestorRevy(
+            email="colab.alerta@revy.local",
+            nome="Colab Alerta",
+            senha_hash=hash_senha("senha-colab"),
+            papel="gestor",
+            ativo=True,
+        )
+        db.add(collab)
+        db.flush()
+        db.add(
+            VinculoTrafego(
+                loja_id=store.id,
+                gestor_id=collab.id,
+                tipo="colaborador",
+            )
+        )
+        db.commit()
+        collab_actor = Actor(
+            id=collab.id,
+            email=collab.email,
+            name=collab.nome,
+            role=collab.papel,
+        )
+
+    with pytest.raises(AccessDenied):
+        StoreReadiness(SessionLocal).accept_alert(
+            collab_actor,
+            StoreRef(id=store.id),
+            "contract_present",
+            "colaborador não pode",
+        )
+
+
+def test_transicao_para_ativa_bloqueada_sem_required():
+    """Ativação (pronta→ativa) revalida checks required."""
+    _seed_catalog()
+    admin = _admin_actor()
+    stores = StoreControl(SessionLocal)
+    store = stores.create(
+        admin,
+        CreateStore(name="Loja Ativação", slug="loja-ativacao-block"),
+    )
+    owner = _create_owner(admin, store.id, slug="loja-ativacao-block")
+    _grant_activatable_access(owner.id)
+    PortfolioControl(SessionLocal).configure(
+        admin,
+        StoreRef(id=store.id),
+        {"vendas"},
+    )
+    stores.transition(
+        admin,
+        TransitionStore(
+            store=StoreRef(id=store.id),
+            target=StoreStatus.CONFIGURING,
+        ),
+    )
+    stores.transition(
+        admin,
+        TransitionStore(
+            store=StoreRef(id=store.id),
+            target=StoreStatus.READY,
+        ),
+    )
+
+    # Suspender módulo deixa ready=False; ativação deve bloquear.
+    PortfolioControl(SessionLocal).suspend(
+        admin,
+        StoreRef(id=store.id),
+        "vendas",
+        reason="teste bloqueio ativação",
+    )
+    report = StoreReadiness(SessionLocal).evaluate(admin, StoreRef(id=store.id))
+    assert report.ready is False
+
+    with pytest.raises(StoreReadinessBlocked) as error:
+        stores.transition(
+            admin,
+            TransitionStore(
+                store=StoreRef(id=store.id),
+                target=StoreStatus.ACTIVE,
+            ),
+        )
+
+    assert error.value.requirement == "module_selected"
+    assert stores.get(admin, StoreRef(id=store.id)).status is StoreStatus.READY
+
+    # Restaura módulo e ativa com sucesso.
+    PortfolioControl(SessionLocal).activate(
+        admin,
+        StoreRef(id=store.id),
+        "vendas",
+        reason="restaurar para ativar",
+    )
+    active = stores.transition(
+        admin,
+        TransitionStore(
+            store=StoreRef(id=store.id),
+            target=StoreStatus.ACTIVE,
+        ),
+    )
+    assert active.status is StoreStatus.ACTIVE

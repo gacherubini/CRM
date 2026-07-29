@@ -65,6 +65,13 @@ class StoreReadinessBlocked(ControlError):
         super().__init__(message)
 
 
+class InvalidAlertAcceptance(ControlError):
+    """Aceite de alerta inválido (check required, inexistente ou sem motivo)."""
+
+    def __init__(self, message: str) -> None:
+        super().__init__(message)
+
+
 class ActiveResponsibleConflict(ControlError):
     def __init__(self, store_id: str, manager_id: str) -> None:
         self.store_id = store_id

@@ -118,7 +118,11 @@ def dashboard_page(
         if settings.revy_control_rbac_enabled
         else [item.store.slug for item in stores]
     )
-    items = DashboardControl(SessionLocal).summary(actor)
+    overview = DashboardControl(SessionLocal).overview(actor)
+    items = overview.items
+    integration_by_store = {
+        item.store_id: item for item in overview.integrations
+    }
     return templates.TemplateResponse(
         request=request,
         name="control/dashboard.html",
@@ -130,6 +134,8 @@ def dashboard_page(
             "control_rbac_enabled": settings.revy_control_rbac_enabled,
             "control_dashboard_enabled": True,
             "items": items,
+            "overview": overview,
+            "integration_by_store": integration_by_store,
         },
     )
 

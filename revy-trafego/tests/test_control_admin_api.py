@@ -261,19 +261,104 @@ def test_admin_reativa_loja_suspensa_sem_expor_versao(
     client,
     monkeypatch,
 ):
+    """Reativação exige prontidão (required ok); payload não expõe versão."""
+    from app.control.people import PeopleDirectory
+    from app.control.portfolio import PortfolioControl
+    from app.control.roles import StoreRoles
+    from app.control.stores import StoreControl
+    from app.control.types import (
+        Actor,
+        AssignStoreRole,
+        CreateStore,
+        PersonRef,
+        RegisterPerson,
+        StoreRef,
+        StoreRole,
+        StoreStatus,
+        TransitionStore,
+    )
+    from app.models import AcessoControl, ModuloRevy, agora
+
     with SessionLocal() as db:
-        store = Loja(
-            nome="Loja Suspensa API",
-            slug="loja-suspensa-api",
-            status="suspensa",
+        row = db.query(GestorRevy).filter(GestorRevy.papel == "admin").one()
+        admin = Actor(
+            id=row.id, email=row.email, name=row.nome, role=row.papel
         )
-        db.add(store)
+        if db.query(ModuloRevy).count() == 0:
+            db.add_all(
+                [
+                    ModuloRevy(id="vendas", codigo="vendas", nome="Vendas"),
+                    ModuloRevy(id="estoque", codigo="estoque", nome="Estoque"),
+                ]
+            )
+            db.commit()
+
+    stores = StoreControl(SessionLocal)
+    store = stores.create(
+        admin,
+        CreateStore(name="Loja Suspensa API", slug="loja-suspensa-api"),
+    )
+    person = PeopleDirectory(SessionLocal).register(
+        admin,
+        RegisterPerson(
+            name="Dono Suspensa API",
+            email="dono.suspensa.api@example.com",
+        ),
+    )
+    StoreRoles(SessionLocal).assign(
+        admin,
+        AssignStoreRole(
+            store=StoreRef(id=store.id),
+            person=PersonRef(id=person.id),
+            role=StoreRole.OWNER,
+        ),
+    )
+    now = agora()
+    with SessionLocal() as db:
+        db.add(
+            AcessoControl(
+                pessoa_id=person.id,
+                papel="gestor",
+                estado="pendente",
+                senha_hash=None,
+                sessao_versao=1,
+                gestor_legado_id=None,
+                criada_em=now,
+                atualizada_em=now,
+            )
+        )
         db.commit()
-        store_id = store.id
+    PortfolioControl(SessionLocal).configure(
+        admin, StoreRef(id=store.id), {"estoque"}
+    )
+    for target in (
+        StoreStatus.CONFIGURING,
+        StoreStatus.READY,
+        StoreStatus.ACTIVE,
+        StoreStatus.SUSPENDED,
+    ):
+        stores.transition(
+            admin,
+            TransitionStore(store=StoreRef(id=store.id), target=target),
+        )
+    store_id = store.id
 
     _enable_control(monkeypatch)
     _login(client, "trafego@revy.local", "secret-teste")
 
+    PortfolioControl(SessionLocal).suspend(
+        admin, StoreRef(id=store_id), "estoque", reason="teste"
+    )
+    blocked = client.post(
+        f"/control/v1/lojas/{store_id}/estado",
+        json={"estado": "ativa", "motivo": "sem prontidão"},
+    )
+    assert blocked.status_code == 409
+    assert blocked.json()["detail"]["code"] == "store_readiness_blocked"
+
+    PortfolioControl(SessionLocal).activate(
+        admin, StoreRef(id=store_id), "estoque", reason="restaurar"
+    )
     reactivated = client.post(
         f"/control/v1/lojas/{store_id}/estado",
         json={"estado": "ativa", "motivo": "reativação explícita"},
@@ -286,6 +371,7 @@ def test_admin_reativa_loja_suspensa_sem_expor_versao(
         "slug": "loja-suspensa-api",
         "estado": "ativa",
     }
+    assert "versao" not in reactivated.json()
 
 
 def test_loja_encerrada_permanece_terminal_na_api(

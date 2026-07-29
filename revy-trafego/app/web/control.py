@@ -70,8 +70,12 @@ from app.control.portfolio import (
     PortfolioConflict,
     PortfolioControl,
 )
-from app.control.dashboard import DashboardControl, StoreReadinessSummary
-from app.control.readiness import ReadinessReport, StoreReadiness
+from app.control.dashboard import (
+    DashboardControl,
+    DashboardOverview,
+    StoreReadinessSummary,
+)
+from app.control.readiness import AlertAcceptanceView, ReadinessReport, StoreReadiness
 from app.control.roles import StoreRoles
 from app.control.stores import StoreControl
 from app.control.whatsapp_channels import (
@@ -87,6 +91,7 @@ from app.control.types import (
     AccessDenied,
     ActivateControlAccess,
     ActivatedControlAccount,
+    InvalidAlertAcceptance,
     AccessibleStore,
     ActiveResponsibleConflict,
     Actor,
@@ -346,6 +351,12 @@ class StoreTransitionBody(BaseModel):
     motivo: str | None = Field(default=None, max_length=1000)
 
 
+class AlertAcceptanceBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    motivo: str = Field(min_length=1, max_length=1000)
+
+
 class TrafficGrantBody(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -586,8 +597,8 @@ def get_store(
 
 @router.get("/dashboard", dependencies=[Depends(_control_dashboard_enabled)])
 def get_dashboard_summary(actor: Actor = Depends(_current_actor)):
-    items = DashboardControl(SessionLocal).summary(actor)
-    return {"items": [_dashboard_item_json(item) for item in items]}
+    overview = DashboardControl(SessionLocal).overview(actor)
+    return _dashboard_overview_json(overview)
 
 
 @router.get("/lojas/{loja_id}/prontidao")
@@ -603,6 +614,25 @@ def get_store_readiness(
     except ControlError as exc:
         _raise_domain_error(exc)
     return _readiness_json(report)
+
+
+@router.post("/lojas/{loja_id}/prontidao/alertas/{check_code}/aceitar")
+def accept_store_readiness_alert(
+    loja_id: str,
+    check_code: str,
+    body: AlertAcceptanceBody,
+    actor: Actor = Depends(_current_actor),
+):
+    try:
+        acceptance = StoreReadiness(SessionLocal).accept_alert(
+            actor,
+            StoreRef(id=loja_id),
+            check_code,
+            body.motivo,
+        )
+    except ControlError as exc:
+        _raise_domain_error(exc)
+    return _alert_acceptance_json(acceptance)
 
 
 @router.get("/lojas/{loja_id}/integracoes")
@@ -1460,9 +1490,25 @@ def _readiness_json(report: ReadinessReport) -> dict[str, object]:
                 "ok": check.ok,
                 "severidade": check.severity,
                 "mensagem": check.message,
+                "aceito": check.accepted,
             }
             for check in report.checks
         ],
+    }
+
+
+def _alert_acceptance_json(view: AlertAcceptanceView) -> dict[str, object]:
+    accepted_at = view.accepted_at
+    return {
+        "loja_id": view.store_id,
+        "check_code": view.check_code,
+        "aceito_por": view.accepted_by,
+        "motivo": view.reason,
+        "aceito_em": (
+            accepted_at.isoformat()
+            if hasattr(accepted_at, "isoformat")
+            else str(accepted_at)
+        ),
     }
 
 
@@ -1487,6 +1533,39 @@ def _dashboard_item_json(item: StoreReadinessSummary) -> dict[str, object]:
         "name": item.name,
         "status": item.status.value,
         "ready": item.ready,
+    }
+
+
+def _dashboard_overview_json(overview: DashboardOverview) -> dict[str, object]:
+    return {
+        "counts": {
+            "ativas": overview.counts.ativas,
+            "em_configuracao": overview.counts.em_configuracao,
+            "suspensas": overview.counts.suspensas,
+            "erro": overview.counts.erro,
+        },
+        "items": [_dashboard_item_json(item) for item in overview.items],
+        "pending_readiness": [
+            {
+                "store_id": item.store_id,
+                "slug": item.slug,
+                "name": item.name,
+                "status": item.status.value,
+                "failing_codes": list(item.failing_codes),
+            }
+            for item in overview.pending_readiness
+        ],
+        "integrations": [
+            {
+                "store_id": item.store_id,
+                "slug": item.slug,
+                "pixel_connected": item.pixel_connected,
+                "meta_ads_connected": item.meta_ads_connected,
+                "google_status": item.google_status,
+                "whatsapp_channels": item.whatsapp_channels,
+            }
+            for item in overview.integrations
+        ],
     }
 
 
@@ -1709,6 +1788,8 @@ def _raise_domain_error(exc: ControlError) -> NoReturn:
         status_code, code = 409, "store_role_conflict"
     elif isinstance(exc, StoreReadinessBlocked):
         status_code, code = 409, "store_readiness_blocked"
+    elif isinstance(exc, InvalidAlertAcceptance):
+        status_code, code = 400, "invalid_alert_acceptance"
     elif isinstance(exc, InvalidStoreTransition):
         status_code, code = 409, "invalid_store_transition"
     elif isinstance(exc, ActiveResponsibleConflict):
