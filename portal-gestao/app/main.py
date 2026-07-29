@@ -20,7 +20,7 @@ from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
 from starlette.middleware.sessions import SessionMiddleware
 
-from app import models  # noqa: F401
+from app import models, provisioning  # noqa: F401
 from app.auth import (
     autenticar,
     csrf_token,
@@ -2003,6 +2003,10 @@ async def vendas_criar(
     form = await request.form()
     if not pode_registrar_venda(usuario) or not csrf_valido(request, form.get("csrf")):
         return RedirectResponse("/app/vendas", status_code=303)
+    if not provisioning.allows_processing(db, usuario.loja_slug):
+        return RedirectResponse(
+            "/app/vendas?erro=loja-nao-operacional", status_code=303
+        )
     valores = {
         campo: (form.get(campo) or "")
         for campo in ("descricao", "preco_venda", "lead_ref", "veiculo_ref", "custo_veiculo", "custo_categoria", "custo_valor")
@@ -4172,6 +4176,49 @@ async def trafego_ads_sincronizar(request: Request, db: Session = Depends(get_db
     if result.status == "erro":
         return RedirectResponse("/app/trafego?ok=sync-erro", status_code=303)
     return RedirectResponse("/app/trafego?ok=sync-ok", status_code=303)
+
+
+@app.post("/internal/v1/provisioning/state")
+def receber_estado_provisionamento(
+    payload: dict,
+    db: Session = Depends(get_db),
+    x_service_token: str = Header(default="", alias="X-Service-Token"),
+):
+    """Recebe snapshot operacional do Control e aplica projeção monotônica local.
+
+    Autentica com ``X-Service-Token`` vs ``PORTAL_SERVICE_TOKEN`` (ou
+    ``PORTAL_PROVISIONING_TOKEN``). Token vazio → 503; incorreto → 401.
+    Multi-tenant por ``loja_slug`` no body (sem sessão de usuário).
+    """
+    esperado = (
+        os.getenv("PORTAL_SERVICE_TOKEN")
+        or os.getenv("PORTAL_PROVISIONING_TOKEN")
+        or ""
+    ).strip()
+    if not esperado:
+        return JSONResponse(
+            {
+                "detail": (
+                    "provisioning desabilitado "
+                    "(PORTAL_SERVICE_TOKEN / PORTAL_PROVISIONING_TOKEN vazio)"
+                )
+            },
+            status_code=503,
+        )
+    if not secrets.compare_digest(x_service_token or "", esperado):
+        return JSONResponse({"detail": "não autorizado"}, status_code=401)
+
+    loja_slug = str(payload.get("loja_slug") or "").strip()
+    if not loja_slug:
+        return JSONResponse({"detail": "loja_slug obrigatório"}, status_code=422)
+
+    reasons = provisioning.apply_payload(db, loja_slug, payload)
+    db.commit()
+    return {
+        "ok": True,
+        "reasons": reasons,
+        "allows_processing": provisioning.allows_processing(db, loja_slug),
+    }
 
 
 @app.post("/internal/jobs/meta-spend-sync")

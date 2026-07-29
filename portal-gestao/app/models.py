@@ -53,6 +53,24 @@ class Usuario(Base):
     criado_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=agora)
 
 
+class LojaOperacionalProjecao(Base):
+    """Projeção monotônica do estado operacional vindo do Control (Loja / módulos).
+
+    Portal multi-tenant por ``loja_slug`` (não há tabela de lojas com UUID local).
+    """
+
+    __tablename__ = "loja_operacional_projecao"
+
+    loja_slug: Mapped[str] = mapped_column(String(120), primary_key=True, nullable=False)
+    aggregate: Mapped[str] = mapped_column(String(40), primary_key=True, nullable=False)
+    version: Mapped[int] = mapped_column(Integer, nullable=False)
+    state: Mapped[str] = mapped_column(String(40), nullable=False)
+    event_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    atualizado_em: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=agora, onupdate=agora
+    )
+
+
 class Venda(Base):
     __tablename__ = "vendas"
 

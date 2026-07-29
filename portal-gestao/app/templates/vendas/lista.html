@@ -13,6 +13,7 @@
 {% elif ok %}<div class="alert success" role="status">Ação concluída com sucesso.</div>{% endif %}
 {% if request.query_params.get('aviso') == 'referencias-pendentes' %}<div class="alert warning" role="alert">Venda registrada. As referências serão validadas antes da confirmação porque uma integração estava indisponível.</div>{% endif %}
 {% if erro == 'motivo' %}<div class="alert error">Informe o motivo para cancelar a venda.</div>
+{% elif erro == 'loja-nao-operacional' %}<div class="alert error">A loja não está operacional. Novos registros de venda estão bloqueados.</div>
 {% elif erro == 'lead' %}<div class="alert error">O lead vinculado não existe nesta loja. A venda continua registrada.</div>
 {% elif erro == 'veiculo' %}<div class="alert error">O veículo vinculado não existe nesta loja. A venda continua registrada.</div>
 {% elif erro == 'chatbot-indisponivel' %}<div class="alert error">Não foi possível validar o lead agora. A venda continua registrada; tente novamente.</div>

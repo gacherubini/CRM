@@ -63,6 +63,13 @@ class Settings:
         os.getenv("PORTAL_REVY_TRAFEGO_VENDA_EVENTS", "0").strip().lower()
         in {"1", "true", "yes", "on"}
     )
+    # Token de serviço para POST /internal/v1/provisioning/state (Control → Portal).
+    # Preferir PORTAL_SERVICE_TOKEN; PORTAL_PROVISIONING_TOKEN é alias.
+    service_token: str = (
+        os.getenv("PORTAL_SERVICE_TOKEN")
+        or os.getenv("PORTAL_PROVISIONING_TOKEN")
+        or ""
+    ).strip()
 
 
 settings = Settings()

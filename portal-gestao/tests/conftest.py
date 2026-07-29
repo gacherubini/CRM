@@ -31,7 +31,7 @@ from app.clients.estoque import (  # noqa: E402
 from app.clients.motor import CredencialNaoEncontrada, MotorIndisponivel  # noqa: E402
 from app.db import Base, SessionLocal, engine  # noqa: E402
 from app.main import app, get_chatbot_client, get_estoque_client, get_motor_client  # noqa: E402
-from app.models import Usuario  # noqa: E402
+from app.models import LojaOperacionalProjecao, Usuario  # noqa: E402
 
 
 class EstoqueFake:
@@ -611,16 +611,37 @@ def client(estoque_fake, chatbot_fake, motor_fake):
         yield cliente
 
 
-def criar_usuario(papel="dono", email="dono@loja.test"):
+def seed_loja_operacional(db, loja_slug="loja-teste", state="ativa", version=1):
+    """Suite de regressão assume loja operacional; testes do gate sobrescrevem."""
+    existente = db.get(LojaOperacionalProjecao, (loja_slug, "loja"))
+    if existente is not None:
+        existente.state = state
+        existente.version = version
+        existente.event_id = f"seed-{state}"
+        return
+    db.add(
+        LojaOperacionalProjecao(
+            loja_slug=loja_slug,
+            aggregate="loja",
+            version=version,
+            state=state,
+            event_id=f"seed-{state}",
+        )
+    )
+
+
+def criar_usuario(papel="dono", email="dono@loja.test", loja_slug="loja-teste"):
     db = SessionLocal()
     usuario = Usuario(
         email=email,
         nome="Ana Loja",
         senha_hash=hash_senha("senha-segura"),
         papel=papel,
-        loja_slug="loja-teste",
+        loja_slug=loja_slug,
     )
     db.add(usuario)
+    # Gate fail-closed: sem projeção, POST /app/vendas/nova bloqueia.
+    seed_loja_operacional(db, loja_slug=loja_slug)
     db.commit()
     db.close()
 
@@ -629,11 +650,20 @@ def csrf_da_resposta(resposta):
     return re.search(r'name="csrf" value="([^"]+)"', resposta.text).group(1)
 
 
-def login(client, papel="dono", email="dono@loja.test"):
-    criar_usuario(papel=papel, email=email)
+def login(client, papel="dono", email="dono@loja.test", loja_slug="loja-teste"):
+    criar_usuario(papel=papel, email=email, loja_slug=loja_slug)
     pagina = client.get("/login")
     return client.post(
         "/login",
         data={"email": email, "senha": "senha-segura", "csrf": csrf_da_resposta(pagina)},
         follow_redirects=False,
     )
+
+
+@pytest.fixture
+def db():
+    sessao = SessionLocal()
+    try:
+        yield sessao
+    finally:
+        sessao.close()
