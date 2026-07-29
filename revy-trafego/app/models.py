@@ -5,13 +5,17 @@ from typing import Optional
 
 from sqlalchemy import (
     Boolean,
+    CheckConstraint,
     Date,
     DateTime,
     ForeignKey,
+    Index,
     Integer,
     Numeric,
     String,
+    Text,
     UniqueConstraint,
+    text,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -26,6 +30,28 @@ def novo_id() -> str:
     return str(uuid.uuid4())
 
 
+class Loja(Base):
+    __tablename__ = "lojas"
+    __table_args__ = (
+        CheckConstraint(
+            "slug = lower(trim(slug)) AND length(slug) BETWEEN 1 AND 120",
+            name="ck_lojas_slug_canonico",
+        ),
+        CheckConstraint(
+            "status IN ('rascunho', 'em_configuracao', 'pronta', 'ativa', "
+            "'suspensa', 'encerrada')",
+            name="ck_lojas_status",
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=novo_id)
+    slug: Mapped[str] = mapped_column(String(120), unique=True, index=True)
+    nome: Mapped[str] = mapped_column(String(160))
+    status: Mapped[str] = mapped_column(String(32), default="rascunho", index=True)
+    criada_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=agora)
+    atualizada_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=agora)
+
+
 class GestorRevy(Base):
     """Usuário interno da equipe Revy (não é o dono da loja)."""
 
@@ -38,6 +64,83 @@ class GestorRevy(Base):
     papel: Mapped[str] = mapped_column(String(32), default="gestor")  # gestor | admin
     ativo: Mapped[bool] = mapped_column(Boolean, default=True)
     criado_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=agora)
+
+
+class VinculoTrafego(Base):
+    __tablename__ = "vinculos_trafego"
+    __table_args__ = (
+        CheckConstraint(
+            "tipo IN ('responsavel', 'colaborador')",
+            name="ck_vinculos_trafego_tipo",
+        ),
+        CheckConstraint(
+            "encerrado_em IS NULL OR encerrado_em >= iniciado_em",
+            name="ck_vinculos_trafego_periodo",
+        ),
+        Index(
+            "uq_vinculos_trafego_gestor_ativo",
+            "loja_id",
+            "gestor_id",
+            unique=True,
+            sqlite_where=text("encerrado_em IS NULL"),
+            postgresql_where=text("encerrado_em IS NULL"),
+        ),
+        Index(
+            "uq_vinculos_trafego_responsavel_ativo",
+            "loja_id",
+            unique=True,
+            sqlite_where=text(
+                "encerrado_em IS NULL AND tipo = 'responsavel'"
+            ),
+            postgresql_where=text(
+                "encerrado_em IS NULL AND tipo = 'responsavel'"
+            ),
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=novo_id)
+    loja_id: Mapped[str] = mapped_column(
+        ForeignKey("lojas.id", ondelete="RESTRICT"), index=True
+    )
+    gestor_id: Mapped[str] = mapped_column(
+        ForeignKey("gestores_revy.id", ondelete="RESTRICT"), index=True
+    )
+    tipo: Mapped[str] = mapped_column(String(20))
+    iniciado_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=agora)
+    encerrado_em: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+
+
+class AuditoriaEvento(Base):
+    __tablename__ = "auditoria_eventos"
+    __table_args__ = (
+        CheckConstraint(
+            "resultado IN ('sucesso', 'negado', 'erro')",
+            name="ck_auditoria_eventos_resultado",
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=novo_id)
+    loja_id: Mapped[Optional[str]] = mapped_column(
+        ForeignKey("lojas.id", ondelete="RESTRICT"), nullable=True, index=True
+    )
+    ator_gestor_id: Mapped[Optional[str]] = mapped_column(
+        ForeignKey("gestores_revy.id", ondelete="RESTRICT"),
+        nullable=True,
+        index=True,
+    )
+    ator_email: Mapped[Optional[str]] = mapped_column(String(320), nullable=True)
+    acao: Mapped[str] = mapped_column(String(100), index=True)
+    recurso_tipo: Mapped[str] = mapped_column(String(80))
+    recurso_id: Mapped[Optional[str]] = mapped_column(String(160), nullable=True)
+    resultado: Mapped[str] = mapped_column(String(20), default="sucesso")
+    antes_json: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    depois_json: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    motivo: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    criado_em: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=agora, index=True
+    )
 
 
 class GestorAuditLog(Base):
@@ -62,6 +165,9 @@ class VendaProjetada(Base):
     id: Mapped[str] = mapped_column(String(36), primary_key=True)
     loja_slug: Mapped[str] = mapped_column(
         String(120), primary_key=True, index=True
+    )
+    loja_id: Mapped[Optional[str]] = mapped_column(
+        ForeignKey("lojas.id", ondelete="RESTRICT"), nullable=True, index=True
     )
     lead_ref: Mapped[Optional[str]] = mapped_column(String(120), nullable=True)
     preco_venda: Mapped[Decimal] = mapped_column(Numeric(12, 2))
@@ -97,6 +203,9 @@ class MetaPixelConfig(Base):
     __tablename__ = "meta_pixel_config"
 
     loja_slug: Mapped[str] = mapped_column(String(120), primary_key=True)
+    loja_id: Mapped[Optional[str]] = mapped_column(
+        ForeignKey("lojas.id", ondelete="RESTRICT"), nullable=True, index=True
+    )
     pixel_id: Mapped[str] = mapped_column(String(64), default="")
     token_ciphertext: Mapped[Optional[str]] = mapped_column(String(1024), nullable=True)
     test_event_code: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
@@ -113,6 +222,9 @@ class MetaAdsConfig(Base):
     __tablename__ = "meta_ads_config"
 
     loja_slug: Mapped[str] = mapped_column(String(120), primary_key=True)
+    loja_id: Mapped[Optional[str]] = mapped_column(
+        ForeignKey("lojas.id", ondelete="RESTRICT"), nullable=True, index=True
+    )
     ad_account_id: Mapped[str] = mapped_column(String(64), default="")
     token_ciphertext: Mapped[Optional[str]] = mapped_column(String(1024), nullable=True)
     sync_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
@@ -130,6 +242,9 @@ class PixelCapiAuditoria(Base):
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=novo_id)
     loja_slug: Mapped[str] = mapped_column(String(120), index=True)
+    loja_id: Mapped[Optional[str]] = mapped_column(
+        ForeignKey("lojas.id", ondelete="RESTRICT"), nullable=True, index=True
+    )
     origem: Mapped[str] = mapped_column(String(40), index=True)
     event_name: Mapped[Optional[str]] = mapped_column(String(40), nullable=True)
     event_id: Mapped[Optional[str]] = mapped_column(String(120), nullable=True)
@@ -164,6 +279,9 @@ class MetaCapiOutbox(Base):
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=novo_id)
     loja_slug: Mapped[str] = mapped_column(String(120), index=True)
+    loja_id: Mapped[Optional[str]] = mapped_column(
+        ForeignKey("lojas.id", ondelete="RESTRICT"), nullable=True, index=True
+    )
     venda_id: Mapped[Optional[str]] = mapped_column(String(36), nullable=True, index=True)
     event_id: Mapped[str] = mapped_column(String(120), index=True)
     event_name: Mapped[str] = mapped_column(String(40), default="Purchase")
@@ -182,6 +300,9 @@ class Campanha(Base):
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=novo_id)
     loja_slug: Mapped[str] = mapped_column(String(120), index=True)
+    loja_id: Mapped[Optional[str]] = mapped_column(
+        ForeignKey("lojas.id", ondelete="RESTRICT"), nullable=True, index=True
+    )
     nome: Mapped[str] = mapped_column(String(160))
     canal: Mapped[str] = mapped_column(String(32), default="meta")
     status: Mapped[str] = mapped_column(String(20), default="ativa", index=True)
@@ -214,6 +335,9 @@ class CampanhaGasto(Base):
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=novo_id)
     campanha_id: Mapped[str] = mapped_column(ForeignKey("campanhas.id"), index=True)
     loja_slug: Mapped[str] = mapped_column(String(120), index=True)
+    loja_id: Mapped[Optional[str]] = mapped_column(
+        ForeignKey("lojas.id", ondelete="RESTRICT"), nullable=True, index=True
+    )
     valor: Mapped[Decimal] = mapped_column(Numeric(12, 2))
     referencia: Mapped[date] = mapped_column(Date, index=True)
     nota: Mapped[Optional[str]] = mapped_column(String(240), nullable=True)
