@@ -73,6 +73,12 @@ class Settings:
     revy_control_dashboard_enabled: bool = field(
         default_factory=lambda: _env_flag("REVY_CONTROL_DASHBOARD_ENABLED")
     )
+    # Worker de entrega da outbox de provisionamento (default off; sem thread nesta fatia).
+    revy_control_provisioning_delivery_enabled: bool = field(
+        default_factory=lambda: _env_flag(
+            "REVY_CONTROL_PROVISIONING_DELIVERY_ENABLED"
+        )
+    )
     job_secret: str = os.getenv("REVY_TRAFEGO_JOB_SECRET", "").strip()
     # Token entre portal/catálogo e este app (header X-Service-Token).
     service_token: str = os.getenv("REVY_TRAFEGO_SERVICE_TOKEN", "").strip()

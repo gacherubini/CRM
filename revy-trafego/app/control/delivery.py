@@ -11,6 +11,10 @@ from app.control.provisioning import (
     ProvisioningControl,
     StoreProvisioningSnapshot,
 )
+from app.control.provisioning_outbox import (
+    enqueue_delivery,
+    resolve_loja_slug,
+)
 from app.control.types import StoreRef
 
 
@@ -33,6 +37,29 @@ class InMemoryProvisioningDelivery:
         self.deliveries.append((target, snapshot))
 
 
+@dataclass
+class DurableProvisioningDelivery:
+    """Adapter durável: enfileira na outbox em vez de HTTP síncrono.
+
+    Resolve ``loja_slug`` via sessão (não estende a assinatura de ``deliver``).
+    """
+
+    session_factory: Callable[[], Any]
+
+    def deliver(self, target: str, snapshot: StoreProvisioningSnapshot) -> None:
+        loja_id = _snapshot_loja_id(snapshot)
+        with self.session_factory() as db:
+            loja_slug = resolve_loja_slug(db, loja_id)
+            enqueue_delivery(
+                db,
+                loja_id=loja_id,
+                loja_slug=loja_slug,
+                destination=target,
+                snapshot=snapshot,
+            )
+            db.commit()
+
+
 class ProvisioningPublisher:
     """Monta o snapshot e publica para todos os destinos configurados."""
 
@@ -42,15 +69,32 @@ class ProvisioningPublisher:
         *,
         delivery: ProvisioningDeliveryPort,
         targets: Sequence[str] = (),
+        outbox_session_factory: Callable[[], Any] | None = None,
     ) -> None:
+        self._session_factory = session_factory
         self._provisioning = ProvisioningControl(session_factory)
         self._delivery = delivery
         self._targets = tuple(targets)
+        # Quando configurado, enfileira na outbox após o snapshot (além do delivery).
+        self._outbox_session_factory = outbox_session_factory
 
     def publish(self, store_ref: StoreRef) -> StoreProvisioningSnapshot:
         snapshot = self._provisioning.snapshot(store_ref)
         for target in self._targets:
             self._delivery.deliver(target, snapshot)
+        if self._outbox_session_factory is not None and self._targets:
+            loja_id = _snapshot_loja_id(snapshot)
+            with self._outbox_session_factory() as db:
+                loja_slug = resolve_loja_slug(db, loja_id)
+                for target in self._targets:
+                    enqueue_delivery(
+                        db,
+                        loja_id=loja_id,
+                        loja_slug=loja_slug,
+                        destination=target,
+                        snapshot=snapshot,
+                    )
+                db.commit()
         return snapshot
 
 

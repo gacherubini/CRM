@@ -697,3 +697,40 @@ class CampanhaGasto(Base):
     criada_por: Mapped[str] = mapped_column(String(320))
 
     campanha: Mapped["Campanha"] = relationship(back_populates="gastos")
+
+
+class ControlProvisioningOutbox(Base):
+    """Outbox durável de snapshots de provisionamento do Revy Control."""
+
+    __tablename__ = "control_provisioning_outbox"
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('pending', 'delivered', 'failed')",
+            name="ck_control_provisioning_outbox_status",
+        ),
+        CheckConstraint(
+            "attempts >= 0",
+            name="ck_control_provisioning_outbox_attempts",
+        ),
+        UniqueConstraint(
+            "event_id",
+            name="uq_control_provisioning_outbox_event_id",
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=novo_id)
+    loja_id: Mapped[str] = mapped_column(
+        ForeignKey("lojas.id", ondelete="RESTRICT"), index=True
+    )
+    destination: Mapped[str] = mapped_column(String(80), index=True)
+    event_id: Mapped[str] = mapped_column(String(240), index=True)
+    payload_json: Mapped[str] = mapped_column(Text)
+    status: Mapped[str] = mapped_column(String(20), default="pending", index=True)
+    attempts: Mapped[int] = mapped_column(Integer, default=0)
+    last_error: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=agora
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=agora
+    )

@@ -33,6 +33,7 @@ def test_flags_futuras_do_control_iniciam_desligadas(monkeypatch):
         "GOOGLE_CONVERSIONS_ENABLED",
         "MULTI_WHATSAPP_ENABLED",
         "REVY_CONTROL_DASHBOARD_ENABLED",
+        "REVY_CONTROL_PROVISIONING_DELIVERY_ENABLED",
     )
     for variable in variables:
         monkeypatch.delenv(variable, raising=False)
@@ -43,6 +44,7 @@ def test_flags_futuras_do_control_iniciam_desligadas(monkeypatch):
     assert config.google_conversions_enabled is False
     assert config.multi_whatsapp_enabled is False
     assert config.revy_control_dashboard_enabled is False
+    assert config.revy_control_provisioning_delivery_enabled is False
 
 
 def test_flags_futuras_do_control_aceitam_valores_verdadeiros(monkeypatch):
@@ -51,6 +53,7 @@ def test_flags_futuras_do_control_aceitam_valores_verdadeiros(monkeypatch):
         "GOOGLE_CONVERSIONS_ENABLED",
         "MULTI_WHATSAPP_ENABLED",
         "REVY_CONTROL_DASHBOARD_ENABLED",
+        "REVY_CONTROL_PROVISIONING_DELIVERY_ENABLED",
     ):
         monkeypatch.setenv(variable, "true")
 
@@ -60,3 +63,4 @@ def test_flags_futuras_do_control_aceitam_valores_verdadeiros(monkeypatch):
     assert config.google_conversions_enabled is True
     assert config.multi_whatsapp_enabled is True
     assert config.revy_control_dashboard_enabled is True
+    assert config.revy_control_provisioning_delivery_enabled is True
