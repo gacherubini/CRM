@@ -9,9 +9,11 @@ from fastapi import Request
 from sqlalchemy.orm import Session
 
 from app.control.access_backfill import backfill_acessos_control
-from app.models import GestorRevy
+from app.models import AcessoControl, GestorRevy
 
 _hasher = PasswordHasher()
+_SESSION_VERSION_KEY = "sessao_versao"
+_MANAGER_SESSION_VERSION_ATTR = "_control_session_version"
 
 
 @dataclass
@@ -40,6 +42,11 @@ def autenticar(db: Session, email: str, senha: str) -> GestorRevy | None:
     gestor = db.query(GestorRevy).filter(GestorRevy.email == email.strip().lower()).first()
     if gestor is None or not gestor.ativo or not verifica_senha(gestor.senha_hash, senha):
         return None
+    acesso = _acesso_projetado(db, gestor.id)
+    if acesso is not None:
+        if acesso.estado != "ativo":
+            return None
+        setattr(gestor, _MANAGER_SESSION_VERSION_ATTR, acesso.sessao_versao)
     return gestor
 
 
@@ -48,7 +55,19 @@ def gestor_atual(request: Request, db: Session) -> GestorRevy | None:
     if not gestor_id:
         return None
     gestor = db.get(GestorRevy, gestor_id)
-    return gestor if gestor and gestor.ativo else None
+    if gestor is None or not gestor.ativo:
+        return None
+    acesso = _acesso_projetado(db, gestor.id)
+    if acesso is not None and acesso.estado != "ativo":
+        return None
+    if acesso is not None:
+        session_version = request.session.get(_SESSION_VERSION_KEY)
+        if session_version is None:
+            if acesso.sessao_versao != 1:
+                return None
+        elif session_version != acesso.sessao_versao:
+            return None
+    return gestor
 
 
 def loja_atual(request: Request) -> str | None:
@@ -73,6 +92,9 @@ def sessao_gestor(request: Request, db: Session) -> SessaoGestor | None:
 def iniciar_sessao(request: Request, gestor: GestorRevy) -> None:
     request.session.clear()
     request.session["gestor_id"] = gestor.id
+    session_version = getattr(gestor, _MANAGER_SESSION_VERSION_ATTR, None)
+    if session_version is not None:
+        request.session[_SESSION_VERSION_KEY] = session_version
     request.session["csrf"] = secrets.token_urlsafe(24)
 
 
@@ -125,3 +147,11 @@ def bootstrap_gestor_se_vazio(db: Session, *, email: str, senha: str, nome: str)
         raise
     db.refresh(gestor)
     return gestor
+
+
+def _acesso_projetado(db: Session, gestor_id: str) -> AcessoControl | None:
+    return (
+        db.query(AcessoControl)
+        .filter(AcessoControl.gestor_legado_id == gestor_id)
+        .first()
+    )
