@@ -204,9 +204,10 @@ Adicionar:
       senha, recuperação, desativação e revogação de sessões. Admin nunca lê senha.
 - [ ] Projetar estado da Loja e dos Módulos Contratados para Revy Loja, Chatbot, Motor,
       Estoque e Catálogo por entrega idempotente; nenhum serviço confia só no menu.
-      **Parcial local:** snapshot + outbox `control_provisioning_outbox` + apply monotônico;
+      **Parcial local:** snapshot + outbox + enqueue automático em transition/módulos/cargos;
+      worker atrás de `REVY_CONTROL_PROVISIONING_DELIVERY_ENABLED` (default off);
       piloto Chatbot (`POST /v1/internal/provisioning/state` + gate 423 em simular);
-      falta worker automático, enqueue nas transições e fan-out Estoque/Portal/Motor/Catálogo.
+      falta fan-out Estoque/Portal/Motor/Catálogo e retry de failed.
 - [ ] Não cortar autenticação do Portal neste plano.
 
 ### Interface administrativa
@@ -252,15 +253,14 @@ Adicionar:
 > Chatbot tem `0014_loja_operacional_projecao`. Flags de delivery e Control seguem
 > default off; sem migration/rollout no lab.
 >
-> Entrega (parcial): `ProvisioningPublisher` + outbox durável + `process_pending` com
-> poster injetável; Chatbot aplica projeção e bloqueia simulação quando a loja não
-> está operacional. Ainda falta enfileirar nas transições de estado, worker e demais
-> destinos.
+> Entrega (parcial): mutações de loja/módulo/cargo enfileiram snapshot na outbox;
+> worker daemon opcional processa com `chatbot_poster`; Chatbot aplica projeção e
+> bloqueia simulação. Demais destinos e retry de `failed` ainda abertos.
 
 Pendências para concluir a Fase 2:
 
 - importar usuários atuais do Portal como pessoas/cargos, registrando conflitos;
-- enqueue automático nas transições + worker de outbox + fan-out Estoque/Portal/Motor/Catálogo;
+- fan-out Estoque/Portal/Motor/Catálogo + retry de outbox failed;
 - isolamento explícito de permissões Control × cargos da Loja na mesma pessoa;
 - expandir gates de suspensão além do piloto de simulação no Chatbot.
 
