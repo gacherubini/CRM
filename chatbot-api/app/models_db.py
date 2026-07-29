@@ -59,6 +59,8 @@ class WhatsAppCanal(Base):
         String(120), unique=True, nullable=False, index=True
     )
     ativo: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    # pendente | conectado | desconectado | inativo
+    estado: Mapped[str] = mapped_column(String(20), default="pendente", nullable=False)
     criado_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_agora)
 
 
@@ -73,9 +75,17 @@ class CredencialServico(Base):
 
 class Conversa(Base):
     __tablename__ = "conversas"
+    # Multi-WA: conversa única por (canal_id, telefone) quando canal_id está setado.
+    __table_args__ = (
+        UniqueConstraint("canal_id", "telefone", name="uq_conversas_canal_telefone"),
+    )
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True)
     loja_id: Mapped[str] = mapped_column(ForeignKey("lojas.id"), nullable=False, index=True)
+    # Nullable na expand: legado sem canal; novos fluxos preenchem via instância.
+    canal_id: Mapped[str | None] = mapped_column(
+        ForeignKey("whatsapp_canais.id"), nullable=True, index=True
+    )
     telefone: Mapped[str] = mapped_column(String, index=True)
     bot_ativo: Mapped[bool] = mapped_column(Boolean, default=True)
     status: Mapped[str] = mapped_column(String, default="aberta")  # aberta | handoff | encerrada
@@ -90,15 +100,20 @@ class Conversa(Base):
 
 class Mensagem(Base):
     __tablename__ = "mensagens"
-    # provider_message_id nulo é permitido em múltiplas linhas; só ids reais deduplicam.
+    # Multi-WA: dedupe por (canal_id, provider_message_id). provider nulo não deduplica.
+    # Unique legado (loja_id, provider_message_id) removido na 0017 para permitir
+    # o mesmo id de provedor em canais distintos da mesma loja.
     __table_args__ = (
         UniqueConstraint(
-            "loja_id", "provider_message_id", name="uq_mensagens_loja_provider"
+            "canal_id", "provider_message_id", name="uq_mensagens_canal_provider"
         ),
     )
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True)
     loja_id: Mapped[str] = mapped_column(ForeignKey("lojas.id"), nullable=False, index=True)
+    canal_id: Mapped[str | None] = mapped_column(
+        ForeignKey("whatsapp_canais.id"), nullable=True, index=True
+    )
     conversa_id: Mapped[str] = mapped_column(ForeignKey("conversas.id"), index=True)
     direcao: Mapped[str] = mapped_column(String)  # entrada | saida
     provider_message_id: Mapped[str | None] = mapped_column(String, nullable=True, index=True)

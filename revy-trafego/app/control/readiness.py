@@ -19,12 +19,15 @@ from app.models import (
 # Ordem determinística estável (não alfabética pura: active_owner precede
 # activatable_owner por dependência lógica). meta_pixel só entra quando o
 # módulo vendas está ativo (alerta, não bloqueia prontidão).
+# whatsapp_channel: alerta opcional multi-WA (sem projeção local; ver evaluate
+# com active_whatsapp_channels quando injetado).
 _CHECK_ORDER = (
     "active_owner",
     "activatable_owner",
     "module_selected",
     "contract_present",
     "meta_pixel",
+    "whatsapp_channel",
 )
 
 _REQUIRED_CODES = frozenset(
@@ -68,8 +71,19 @@ class StoreReadiness:
             return build_readiness_report(db, store)
 
 
-def build_readiness_report(db: Any, store: Any) -> ReadinessReport:
-    """Monta o relatório de prontidão a partir de uma sessão/loja já carregadas."""
+def build_readiness_report(
+    db: Any,
+    store: Any,
+    *,
+    multi_whatsapp_enabled: bool = False,
+    active_whatsapp_channels: int | None = None,
+) -> ReadinessReport:
+    """Monta o relatório de prontidão a partir de uma sessão/loja já carregadas.
+
+    ``active_whatsapp_channels``: quando multi-WA está ligado e o valor é
+    conhecido (ex.: proxy Chatbot), zero canais ativos vira alerta lean.
+    Se None, o check whatsapp_channel é omitido (sem projeção local).
+    """
     owner_person_ids = [
         row[0]
         for row in db.query(CargoLoja.pessoa_id)
@@ -114,6 +128,11 @@ def build_readiness_report(db: Any, store: Any) -> ReadinessReport:
     )
     has_vendas = vendas_module_active(db, store.id)
     has_pixel = pixel_configured(db, store) if has_vendas else True
+    has_whatsapp = (
+        (active_whatsapp_channels or 0) > 0
+        if multi_whatsapp_enabled and active_whatsapp_channels is not None
+        else True
+    )
 
     facts = {
         "active_owner": has_active_owner,
@@ -121,13 +140,15 @@ def build_readiness_report(db: Any, store: Any) -> ReadinessReport:
         "module_selected": has_module,
         "contract_present": has_contract,
         "meta_pixel": has_pixel,
+        "whatsapp_channel": has_whatsapp,
     }
-    # meta_pixel só aparece quando o módulo vendas está contratado/ativo.
-    order = (
-        _CHECK_ORDER
-        if has_vendas
-        else tuple(code for code in _CHECK_ORDER if code != "meta_pixel")
-    )
+    # meta_pixel só com módulo vendas; whatsapp_channel só com multi-WA + contagem.
+    skip: set[str] = set()
+    if not has_vendas:
+        skip.add("meta_pixel")
+    if not multi_whatsapp_enabled or active_whatsapp_channels is None:
+        skip.add("whatsapp_channel")
+    order = tuple(code for code in _CHECK_ORDER if code not in skip)
     checks = tuple(_check_for(code, facts[code]) for code in order)
     ready = all(check.ok for check in checks if check.severity == "required")
     return ReadinessReport(
@@ -181,6 +202,11 @@ def _message_for(code: str, ok: bool) -> str:
             "Pixel Meta e CAPI configurados"
             if ok
             else "Módulo vendas ativo sem Pixel/CAPI (alerta de medição)"
+        ),
+        "whatsapp_channel": (
+            "Loja possui canal WhatsApp ativo"
+            if ok
+            else "Multi-WhatsApp ativo sem canal configurado (alerta)"
         ),
     }
     return messages[code]

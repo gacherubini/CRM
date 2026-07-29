@@ -404,32 +404,83 @@ def criar_loja(
 
 
 def resolver_loja_por_instancia(db: Session, instancia: str) -> Loja:
-    """Resolve loja pela instância Evolution.
+    """Resolve loja pela instância Evolution (compat).
 
     Preferência: canal em ``whatsapp_canais`` (multi-WA); fallback legado em
     ``Loja.evolution_instance``.
     """
-    from app.models_db import WhatsAppCanal
-
-    canal = (
-        db.query(WhatsAppCanal)
-        .filter(WhatsAppCanal.evolution_instance == instancia)
-        .first()
-    )
-    if canal is not None:
-        loja = db.get(Loja, canal.loja_id)
-        if loja is not None:
-            return loja
-    loja = db.query(Loja).filter(Loja.evolution_instance == instancia).first()
-    if loja is None:
-        raise HTTPException(status_code=404, detail="instância não reconhecida")
+    loja, _canal = resolver_loja_e_canal_por_instancia(db, instancia)
     return loja
 
 
-def _get_or_create_conversa(db: Session, loja_id: str, telefone: str) -> Conversa:
+def resolver_loja_e_canal_por_instancia(
+    db: Session, instancia: str
+) -> tuple[Loja, "WhatsAppCanal"]:
+    """Resolve loja + canal pela instância; rejeita instância desconhecida.
+
+    Garante canal (backfill legado se necessário) para conversas multi-WA.
+    """
+    from app import channels
+    from app.models_db import WhatsAppCanal
+
+    canal = channels.resolve_canal_for_instance(db, instancia)
+    loja = db.get(Loja, canal.loja_id)
+    if loja is None:
+        raise HTTPException(status_code=404, detail="instância não reconhecida")
+    return loja, canal
+
+
+def _get_or_create_conversa(
+    db: Session,
+    loja_id: str,
+    telefone: str,
+    *,
+    canal_id: str | None = None,
+) -> Conversa:
+    """Cria/localiza conversa.
+
+    Com ``canal_id``: chave (canal_id, telefone) — dois números da mesma loja
+    geram conversas distintas para o mesmo cliente. Adota conversa legada
+    (canal_id nulo) na primeira mensagem do canal, preservando handoff/estado.
+    Sem canal: (loja_id, telefone) como antes.
+    """
+    if canal_id:
+        conversa = (
+            db.query(Conversa)
+            .filter(Conversa.canal_id == canal_id, Conversa.telefone == telefone)
+            .first()
+        )
+        if conversa is not None:
+            return conversa
+        # Primeira mensagem neste canal: adota conversa legada sem canal_id.
+        legado = (
+            db.query(Conversa)
+            .filter(
+                Conversa.loja_id == loja_id,
+                Conversa.telefone == telefone,
+                Conversa.canal_id.is_(None),
+            )
+            .order_by(Conversa.criada_em.asc())
+            .first()
+        )
+        if legado is not None:
+            legado.canal_id = canal_id
+            db.flush()
+            return legado
+        conversa = Conversa(
+            id=str(uuid.uuid4()),
+            loja_id=loja_id,
+            canal_id=canal_id,
+            telefone=telefone,
+        )
+        db.add(conversa)
+        db.flush()
+        return conversa
+
     conversa = (
         db.query(Conversa)
         .filter(Conversa.loja_id == loja_id, Conversa.telefone == telefone)
+        .order_by(Conversa.criada_em.asc())
         .first()
     )
     if conversa is None:
@@ -440,8 +491,22 @@ def _get_or_create_conversa(db: Session, loja_id: str, telefone: str) -> Convers
 
 
 def _mensagem_existente(
-    db: Session, loja_id: str, provider_message_id: str
+    db: Session,
+    loja_id: str,
+    provider_message_id: str,
+    *,
+    canal_id: str | None = None,
 ) -> Mensagem | None:
+    """Dedupe: por canal quando há canal_id; senão por loja (legado)."""
+    if canal_id:
+        return (
+            db.query(Mensagem)
+            .filter(
+                Mensagem.canal_id == canal_id,
+                Mensagem.provider_message_id == provider_message_id,
+            )
+            .first()
+        )
     return (
         db.query(Mensagem)
         .filter(
@@ -453,21 +518,29 @@ def _mensagem_existente(
 
 
 def _resposta_duplicada(
-    conversa: Conversa, *, captura_passiva: bool = False
+    conversa: Conversa,
+    *,
+    captura_passiva: bool = False,
+    evolution_instance: str | None = None,
 ) -> dict:
-    if captura_passiva:
-        return {
-            "duplicada": True,
-            "conversa_id": conversa.id,
-            "bot_ativo": False,
-            "captura_passiva": True,
-            "loja_operacional": False,
-        }
-    return {
+    base: dict = {
         "duplicada": True,
         "conversa_id": conversa.id,
-        "bot_ativo": conversa.bot_ativo,
     }
+    if evolution_instance:
+        base["evolution_instance"] = evolution_instance
+        base["canal_id"] = conversa.canal_id
+    if captura_passiva:
+        base.update(
+            {
+                "bot_ativo": False,
+                "captura_passiva": True,
+                "loja_operacional": False,
+            }
+        )
+        return base
+    base["bot_ativo"] = conversa.bot_ativo
+    return base
 
 
 # Eventos Evolution sem conteúdo de mensagem (ack/status/reação). Não pausam o bot.
@@ -603,13 +676,21 @@ def registrar_mensagem(
     """
     from app import provisioning
 
-    loja = resolver_loja_por_instancia(db, instancia)
+    loja, canal = resolver_loja_e_canal_por_instancia(db, instancia)
+    canal_id = canal.id
+    evolution_instance = canal.evolution_instance
     loja_operacional = provisioning.is_store_operational(db, loja.id)
     captura_passiva = not loja_operacional
-    conversa = _get_or_create_conversa(db, loja.id, telefone)
+    conversa = _get_or_create_conversa(db, loja.id, telefone, canal_id=canal_id)
 
-    if provider_message_id and _mensagem_existente(db, loja.id, provider_message_id):
-        return _resposta_duplicada(conversa, captura_passiva=captura_passiva)
+    if provider_message_id and _mensagem_existente(
+        db, loja.id, provider_message_id, canal_id=canal_id
+    ):
+        return _resposta_duplicada(
+            conversa,
+            captura_passiva=captura_passiva,
+            evolution_instance=evolution_instance,
+        )
 
     # O workflow usa este sinal para humanizar somente a primeira resposta.
     # Consideramos a primeira entrada real do cliente, mesmo que ja exista uma
@@ -635,12 +716,16 @@ def registrar_mensagem(
                 "ignorada": True,
                 "captura_passiva": True,
                 "loja_operacional": False,
+                "evolution_instance": evolution_instance,
+                "canal_id": canal_id,
             }
         return {
             "duplicada": False,
             "conversa_id": conversa.id,
             "bot_ativo": conversa.bot_ativo,
             "ignorada": True,
+            "evolution_instance": evolution_instance,
+            "canal_id": canal_id,
         }
 
     atribuicao = None
@@ -774,6 +859,7 @@ def registrar_mensagem(
         Mensagem(
             id=str(uuid.uuid4()),
             loja_id=loja.id,
+            canal_id=canal_id,
             conversa_id=conversa.id,
             direcao="saida" if from_me else "entrada",
             provider_message_id=provider_message_id,
@@ -784,12 +870,19 @@ def registrar_mensagem(
     try:
         db.commit()
     except IntegrityError:
-        # Corrida: outra requisição gravou o mesmo (loja_id, provider_message_id)
+        # Corrida: outra requisição gravou o mesmo (canal_id, provider_message_id)
         # entre o SELECT acima e o commit. A UNIQUE do banco arbitra; respondemos
         # idempotente em vez de estourar 500.
         db.rollback()
-        conversa = _get_or_create_conversa(db, loja.id, telefone)
-        return _resposta_duplicada(conversa, captura_passiva=captura_passiva)
+        conversa = _get_or_create_conversa(
+            db, loja.id, telefone, canal_id=canal_id
+        )
+        return _resposta_duplicada(
+            conversa,
+            captura_passiva=captura_passiva,
+            evolution_instance=evolution_instance,
+        )
+    # Outbound (n8n) deve usar a instância do canal da conversa.
     if captura_passiva:
         return {
             "duplicada": False,
@@ -802,6 +895,8 @@ def registrar_mensagem(
             "ctwa_atribuido": False,
             "ctwa_pendente": False,
             "lead_id": None,
+            "evolution_instance": evolution_instance,
+            "canal_id": canal_id,
         }
     return {
         "duplicada": False,
@@ -817,6 +912,8 @@ def registrar_mensagem(
         )
         if not from_me
         else None,
+        "evolution_instance": evolution_instance,
+        "canal_id": canal_id,
     }
 
 

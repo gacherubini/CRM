@@ -358,7 +358,7 @@ def webhook_audio_transcrever(
     processor: AudioProcessor = Depends(get_audio_processor),
 ):
     """Baixa/transcreve áudio server-side e sempre falha com fallback seguro."""
-    loja = servico.resolver_loja_por_instancia(db, dados.instance)
+    loja, canal = servico.resolver_loja_e_canal_por_instancia(db, dados.instance)
     if provisioning.capture_only(db, loja.id):
         # CAPTURE: 200 sem trabalho caro de download/transcrição.
         return {
@@ -368,13 +368,8 @@ def webhook_audio_transcrever(
             "captura_passiva": True,
             "loja_operacional": False,
         }
-    ja_registrada = (
-        db.query(models_db.Mensagem)
-        .filter(
-            models_db.Mensagem.loja_id == loja.id,
-            models_db.Mensagem.provider_message_id == dados.provider_message_id,
-        )
-        .first()
+    ja_registrada = servico._mensagem_existente(
+        db, loja.id, dados.provider_message_id, canal_id=canal.id
     )
     if ja_registrada:
         return {
@@ -952,6 +947,43 @@ def inativar_canal_whatsapp(
 ):
     """Inativa o canal (sem apagar). loja_id do contexto deve bater."""
     return channels.inactivate_channel(db, ctx.loja_id, canal_id)
+
+
+@app.post("/v1/whatsapp/canais/{canal_id}/connect")
+def conectar_canal_whatsapp(
+    canal_id: str,
+    ctx: Contexto = Depends(get_contexto),
+    db: Session = Depends(get_db),
+):
+    """Inicia pareamento; QR efêmero com Cache-Control: no-store (MULTI_WHATSAPP)."""
+    body = channels.connect_channel(db, ctx.loja_id, canal_id)
+    return JSONResponse(
+        content=body,
+        headers={
+            "Cache-Control": "no-store, no-cache, must-revalidate, private",
+            "Pragma": "no-cache",
+        },
+    )
+
+
+@app.get("/v1/whatsapp/canais/{canal_id}/status")
+def status_canal_whatsapp(
+    canal_id: str,
+    ctx: Contexto = Depends(get_contexto),
+    db: Session = Depends(get_db),
+):
+    """Estado do canal (pendente|conectado|desconectado|inativo)."""
+    return channels.channel_status(db, ctx.loja_id, canal_id)
+
+
+@app.post("/v1/whatsapp/canais/{canal_id}/disconnect")
+def desconectar_canal_whatsapp(
+    canal_id: str,
+    ctx: Contexto = Depends(get_contexto),
+    db: Session = Depends(get_db),
+):
+    """Desconecta o canal (permanece na loja; reconectável)."""
+    return channels.disconnect_channel(db, ctx.loja_id, canal_id)
 
 
 # --- Operação WhatsApp (E5): números autorizados + cadastro de veículo --------

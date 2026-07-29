@@ -6,6 +6,7 @@ from decimal import Decimal
 from typing import NoReturn
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 from sqlalchemy.orm import Session
 
@@ -75,6 +76,7 @@ from app.control.roles import StoreRoles
 from app.control.stores import StoreControl
 from app.control.whatsapp_channels import (
     HttpWhatsAppChannels,
+    WhatsAppChannelNotFound,
     WhatsAppChannelView,
     WhatsAppChannelsControl,
     WhatsAppChannelsError,
@@ -719,22 +721,37 @@ def _whatsapp_channels_port_or_default() -> WhatsAppChannelsPort:
     )
 
 
+class WhatsAppCanalRegisterBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    evolution_instance: str = Field(min_length=1, max_length=120)
+    e164_or_label: str = Field(min_length=1, max_length=80)
+
+
+def _whatsapp_control() -> WhatsAppChannelsControl:
+    return WhatsAppChannelsControl(
+        SessionLocal,
+        _whatsapp_channels_port_or_default(),
+    )
+
+
+def _require_multi_whatsapp() -> None:
+    if not settings.multi_whatsapp_enabled:
+        raise HTTPException(
+            status_code=404,
+            detail={"code": "not_found", "message": "recurso não encontrado"},
+        )
+
+
 @router.get("/lojas/{loja_id}/whatsapp-canais")
 def list_store_whatsapp_channels(
     loja_id: str,
     actor: Actor = Depends(_current_actor),
 ):
     """Lista canais WhatsApp da loja (proxy Chatbot). Exige MULTI_WHATSAPP."""
-    if not settings.multi_whatsapp_enabled:
-        raise HTTPException(
-            status_code=404,
-            detail={"code": "not_found", "message": "recurso não encontrado"},
-        )
+    _require_multi_whatsapp()
     try:
-        channels = WhatsAppChannelsControl(
-            SessionLocal,
-            _whatsapp_channels_port_or_default(),
-        ).list_channels(actor, StoreRef(id=loja_id))
+        channels = _whatsapp_control().list_channels(actor, StoreRef(id=loja_id))
     except ControlError as exc:
         _raise_domain_error(exc)
     return {
@@ -742,15 +759,98 @@ def list_store_whatsapp_channels(
     }
 
 
+@router.post("/lojas/{loja_id}/whatsapp-canais", status_code=201)
+def register_store_whatsapp_channel(
+    loja_id: str,
+    body: WhatsAppCanalRegisterBody,
+    actor: Actor = Depends(_current_actor),
+):
+    """Cadastra canal (proxy). Admin/Responsável; colaborador → 403."""
+    _require_multi_whatsapp()
+    try:
+        channel = _whatsapp_control().register(
+            actor,
+            StoreRef(id=loja_id),
+            instance=body.evolution_instance,
+            label=body.e164_or_label,
+        )
+    except ControlError as exc:
+        _raise_domain_error(exc)
+    return _whatsapp_channel_json(channel)
+
+
+@router.post("/lojas/{loja_id}/whatsapp-canais/{canal_id}/connect")
+def connect_store_whatsapp_channel(
+    loja_id: str,
+    canal_id: str,
+    actor: Actor = Depends(_current_actor),
+):
+    """Conecta/pareia canal; QR com Cache-Control: no-store."""
+    _require_multi_whatsapp()
+    try:
+        channel = _whatsapp_control().connect(
+            actor, StoreRef(id=loja_id), canal_id
+        )
+    except ControlError as exc:
+        _raise_domain_error(exc)
+    return JSONResponse(
+        content=_whatsapp_channel_json(channel),
+        headers={
+            "Cache-Control": "no-store, no-cache, must-revalidate, private",
+            "Pragma": "no-cache",
+        },
+    )
+
+
+@router.post("/lojas/{loja_id}/whatsapp-canais/{canal_id}/disconnect")
+def disconnect_store_whatsapp_channel(
+    loja_id: str,
+    canal_id: str,
+    actor: Actor = Depends(_current_actor),
+):
+    """Desconecta canal. Admin/Responsável; colaborador → 403."""
+    _require_multi_whatsapp()
+    try:
+        channel = _whatsapp_control().disconnect(
+            actor, StoreRef(id=loja_id), canal_id
+        )
+    except ControlError as exc:
+        _raise_domain_error(exc)
+    return _whatsapp_channel_json(channel)
+
+
+@router.post("/lojas/{loja_id}/whatsapp-canais/{canal_id}/inativar")
+def inactivate_store_whatsapp_channel(
+    loja_id: str,
+    canal_id: str,
+    actor: Actor = Depends(_current_actor),
+):
+    """Inativa canal. Admin/Responsável; colaborador → 403."""
+    _require_multi_whatsapp()
+    try:
+        channel = _whatsapp_control().inactivate(
+            actor, StoreRef(id=loja_id), canal_id
+        )
+    except ControlError as exc:
+        _raise_domain_error(exc)
+    return _whatsapp_channel_json(channel)
+
+
 def _whatsapp_channel_json(channel: WhatsAppChannelView) -> dict[str, object]:
-    return {
+    out: dict[str, object] = {
         "id": channel.id,
         "loja_id": channel.loja_id,
         "e164_or_label": channel.e164_or_label,
         "evolution_instance": channel.evolution_instance,
         "ativo": channel.ativo,
+        "estado": channel.estado,
         "criado_em": channel.criado_em,
     }
+    if channel.qr_payload is not None:
+        out["qr_payload"] = channel.qr_payload
+    if channel.expires_in_seconds is not None:
+        out["expires_in_seconds"] = channel.expires_in_seconds
+    return out
 
 
 @router.patch("/lojas/{loja_id}")
@@ -1615,6 +1715,8 @@ def _raise_domain_error(exc: ControlError) -> NoReturn:
         status_code, code = 409, "active_responsible_conflict"
     elif isinstance(exc, TrafficLinkConflict):
         status_code, code = 409, "traffic_link_conflict"
+    elif isinstance(exc, WhatsAppChannelNotFound):
+        status_code, code = 404, "whatsapp_channel_not_found"
     elif isinstance(exc, WhatsAppChannelsUnavailable):
         status_code, code = 503, "whatsapp_channels_unavailable"
     elif isinstance(exc, WhatsAppChannelsError):
