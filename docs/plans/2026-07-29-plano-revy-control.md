@@ -98,10 +98,10 @@ Conhecer o estado real antes de criar tabelas ou alterar autorização.
       administrativas do Control.
 - [x] Criar flag default off `REVY_CONTROL_RBAC_ENABLED` para o cutover do escopo por
       vínculo após o gate de isolamento da Fase 1.
-- [ ] Criar flag default off `GOOGLE_ADS_SYNC_ENABLED`.
-- [ ] Criar flag default off `GOOGLE_CONVERSIONS_ENABLED`.
-- [ ] Criar flag default off `MULTI_WHATSAPP_ENABLED`.
-- [ ] Criar flag default off `REVY_CONTROL_DASHBOARD_ENABLED`.
+- [x] Criar flag default off `GOOGLE_ADS_SYNC_ENABLED`.
+- [x] Criar flag default off `GOOGLE_CONVERSIONS_ENABLED`.
+- [x] Criar flag default off `MULTI_WHATSAPP_ENABLED`.
+- [x] Criar flag default off `REVY_CONTROL_DASHBOARD_ENABLED`.
 - [ ] Documentar contratos HTTP atuais que não podem quebrar.
 
 ### Saída

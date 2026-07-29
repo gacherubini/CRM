@@ -1,6 +1,15 @@
 import os
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+
+
+def _env_flag(name: str) -> bool:
+    return os.getenv(name, "0").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
 
 
 @dataclass(frozen=True)
@@ -51,6 +60,18 @@ class Settings:
     revy_control_rbac_enabled: bool = (
         os.getenv("REVY_CONTROL_RBAC_ENABLED", "0").strip().lower()
         in {"1", "true", "yes", "on"}
+    )
+    google_ads_sync_enabled: bool = field(
+        default_factory=lambda: _env_flag("GOOGLE_ADS_SYNC_ENABLED")
+    )
+    google_conversions_enabled: bool = field(
+        default_factory=lambda: _env_flag("GOOGLE_CONVERSIONS_ENABLED")
+    )
+    multi_whatsapp_enabled: bool = field(
+        default_factory=lambda: _env_flag("MULTI_WHATSAPP_ENABLED")
+    )
+    revy_control_dashboard_enabled: bool = field(
+        default_factory=lambda: _env_flag("REVY_CONTROL_DASHBOARD_ENABLED")
     )
     job_secret: str = os.getenv("REVY_TRAFEGO_JOB_SECRET", "").strip()
     # Token entre portal/catálogo e este app (header X-Service-Token).
