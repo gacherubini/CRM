@@ -53,6 +53,34 @@ class ManagerNotFound(ControlError):
     pass
 
 
+class PersonNotFound(ControlError):
+    pass
+
+
+class InvalidPersonEmail(ControlError):
+    def __init__(self, email: str) -> None:
+        self.email = email
+        super().__init__("e-mail da Pessoa Revy inválido")
+
+
+class PersonEmailConflict(ControlError):
+    def __init__(self, email: str) -> None:
+        self.email = email
+        super().__init__("já existe Pessoa Revy com este e-mail")
+
+
+class StoreRoleConflict(ControlError):
+    def __init__(self, store_id: str, person_id: str, role: "StoreRole") -> None:
+        self.store_id = store_id
+        self.person_id = person_id
+        self.role = role
+        super().__init__("a Pessoa Revy já possui este cargo ativo na Loja")
+
+
+class StoreRoleNotFound(ControlError):
+    pass
+
+
 class StoreStatus(str, Enum):
     DRAFT = "rascunho"
     CONFIGURING = "em_configuracao"
@@ -65,6 +93,12 @@ class StoreStatus(str, Enum):
 class TrafficRole(str, Enum):
     RESPONSIBLE = "responsavel"
     COLLABORATOR = "colaborador"
+
+
+class StoreRole(str, Enum):
+    OWNER = "dono"
+    MANAGER = "gerente"
+    SELLER = "vendedor"
 
 
 class AuditResult(str, Enum):
@@ -109,6 +143,57 @@ class StoreView:
     status: StoreStatus
     created_at: datetime
     updated_at: datetime
+
+
+@dataclass(frozen=True)
+class RegisterPerson:
+    name: str
+    email: str
+
+
+@dataclass(frozen=True)
+class PersonRef:
+    id: str
+
+
+@dataclass(frozen=True)
+class PersonView:
+    id: str
+    name: str
+    email: str
+    created_at: datetime
+    updated_at: datetime
+
+
+@dataclass(frozen=True)
+class AssignStoreRole:
+    store: StoreRef
+    person: PersonRef
+    role: StoreRole
+
+
+@dataclass(frozen=True)
+class RevokeStoreRole:
+    store: StoreRef
+    person: PersonRef
+    role: StoreRole
+    reason: str | None = None
+
+
+@dataclass(frozen=True)
+class StoreRoleView:
+    id: str
+    store_id: str
+    person_id: str
+    role: StoreRole
+    source: str
+    source_id: str | None
+    started_at: datetime
+    ended_at: datetime | None
+
+    @property
+    def active(self) -> bool:
+        return self.ended_at is None
 
 
 @dataclass(frozen=True)
