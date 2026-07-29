@@ -131,15 +131,70 @@ Ainda faltam, portanto:
 Tokens e segredos nunca devem entrar no relatório. Para
 `REVY_TRAFEGO_CHATBOT_TOKENS_JSON`, registrar apenas as chaves de loja.
 
+## Consulta read-only do lab Fly 3-VM
+
+Uma consulta real à plataforma Fly foi executada em 2026-07-29 sem iniciar máquinas,
+fazer deploy ou montar volumes em processos temporários.
+
+Comandos read-only usados:
+
+```bash
+flyctl status -a <app>
+flyctl machine list -a <app>
+flyctl volumes list -a <app>
+flyctl secrets list -a <app>
+flyctl volumes snapshots list <volume-id> -a <app>
+```
+
+Os valores e digests dos secrets não foram copiados para este relatório. A evidência
+operacional sanitizada foi:
+
+| App | Máquinas | Volume persistente | Estado comprovado |
+|---|---:|---|---|
+| `app2037` | 0 | `app_data`, 1 GB, cifrado, desanexado | sem processo disponível para consultar Portal, Revy ou Catálogo |
+| `suite-pg` | 1 | `pg_data`, 1 GB, cifrado, anexado | máquina parada; bancos PostgreSQL indisponíveis para consulta sem start |
+| `evolution2037` | 0 | `evolution_instances`, 1 GB, cifrado, desanexado | API e banco da Evolution indisponíveis |
+| `n8n2037` | 0 | `n8n_data`, 1 GB, cifrado, desanexado | sem processo ativo |
+
+Os secrets relevantes encontrados por **nome**, todos com status `Staged`, foram:
+
+- `app2037`: `CHATBOT_API_TOKEN`, `CHATBOT_DATABASE_URL`,
+  `CHATBOT_WEBHOOK_TOKEN`, `ESTOQUE_API_TOKEN`, `ESTOQUE_DATABASE_URL`,
+  `ESTOQUE_PUBLIC_API_TOKEN`, `PORTAL_ENCRYPTION_KEY`,
+  `PORTAL_IDENTITY_HMAC_SECRET`, `PORTAL_SESSION_SECRET`,
+  `CHATBOT_AUDIO_EVOLUTION_API_KEY`, `CHATBOT_IMAGE_EVOLUTION_API_KEY`,
+  `CHATBOT_AUDIO_EVOLUTION_URL`, `CHATBOT_IMAGE_EVOLUTION_URL`,
+  `REVY_TRAFEGO_BOOTSTRAP_EMAIL`, `REVY_TRAFEGO_BOOTSTRAP_NOME`,
+  `REVY_TRAFEGO_BOOTSTRAP_SENHA`, `REVY_TRAFEGO_SERVICE_TOKEN` e
+  `REVY_TRAFEGO_SESSION_SECRET`;
+- `evolution2037`: `DATABASE_CONNECTION_URI`, `AUTHENTICATION_API_KEY` e
+  `CACHE_REDIS_URI`.
+
+`Staged` não comprova que esses valores estejam aplicados a uma máquina. Como não há
+máquina em `app2037` ou `evolution2037`, não foi possível consultar:
+
+- slugs persistidos por banco e colisões por `lower(trim(slug))`;
+- contagens ou colisões normalizadas de e-mail e telefone;
+- heads Alembic efetivamente gravados no lab;
+- nomes/quantidade das instâncias Evolution e números mascarados;
+- chaves efetivas de env dentro dos processos.
+
+A configuração versionada continua apontando para o slug canônico `moto-center` e
+para a instância Evolution legada `loja1`, mas isso não prova o conteúdo atual dos
+volumes. “Sem máquina consultável” também não significa “sem dados persistidos”.
+Obter esses dados exigiria iniciar ou recriar infraestrutura, o que é mutação e ficou
+fora desta auditoria.
+
 ## Backup, restore e rollback
 
-Os documentos operacionais citam o snapshot `vs_K1n4oBDw96vHZngBNaNy`, criado antes
-do cutover com retenção de cinco dias. Esta auditoria não verificou o snapshot na
-plataforma nem comprovou restauração.
+O snapshot `vs_K1n4oBDw96vHZngBNaNy` do volume `app_data` foi verificado diretamente
+na plataforma: status `created`, 37 MiB armazenados para um volume de 1 GB e retenção
+de cinco dias. Isso comprova somente a existência do snapshot, não sua restauração.
 
 O volume `app_data` contém Portal, Revy, Catálogo e mídia do Estoque. Chatbot e o
 banco do Estoque usam o PostgreSQL `suite-pg` e exigem confirmação de backup
-separada. O runbook de Estoque standalone não comprova restore do ambiente 3-VM.
+separada. O volume `pg_data` existe, mas snapshots dele não foram validados nesta
+consulta. O runbook de Estoque standalone não comprova restore do ambiente 3-VM.
 
 Antes da primeira migration da Fase 1 ainda é obrigatório:
 
