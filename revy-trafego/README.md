@@ -22,9 +22,13 @@ O **portal da loja** (`portal-gestao`) mostra só resultados de negócio ao dono
 - ROI/CAPI não leem mais tabelas do Portal.
 - CAPI assíncrona, `blocked_config`, cancelamento seguro, lease e dedupe por loja.
 - Commit `98cefe4` em `origin/main`; Fly `app2037` v28 com banco dedicado e checks 1/1.
-- Portal no head `0012_revy_trafego_event_outbox`; Revy no head `0001_revy_trafego_baseline`.
+- Lab anteriormente no Portal `0012_revy_trafego_event_outbox` e Revy
+  `0001_revy_trafego_baseline`; o código local agora possui
+  `0002_revy_control_lojas_rbac`, ainda não aplicado no lab.
 - Snapshot pré-deploy `vs_K1n4oBDw96vHZngBNaNy`; smoke `/healthz` e readiness Revy em HTTP 200.
-- Validação local: **95 testes Revy + 293 Portal + 170 Chatbot + 87 Estoque**.
+- Validação local atual: **125 testes Revy + 293 Portal + 170 Chatbot + 87 Estoque**.
+  Os 30 testes novos cobrem a Fase 1 do Control localmente; migration e rollout no
+  lab ainda não ocorreram.
 
 ## Status anterior (2026-07-28 — Fase 1/2 no lab)
 
@@ -199,6 +203,17 @@ pytest -q
 - `POST /v1/lojas/{slug}/eventos/venda-confirmada` — CAPI (idempotente)
 - `POST /v1/lojas/{slug}/eventos/venda-atualizada` — projeção/cancelamento idempotente
 - `GET /public/v1/lojas/{slug}/pixel` — Pixel público (sem auth)
+
+### Revy Control — Fase 1 local
+
+Com `REVY_CONTROL_ENABLED=1`, `/control/v1` expõe cadastro, consulta e transição de
+Lojas, vínculos de gestores e auditoria. `/app/control/lojas` oferece a interface
+administrativa equivalente para listar, criar e administrar Lojas. Com a flag
+desligada, ambas as superfícies respondem 404.
+
+`REVY_CONTROL_RBAC_ENABLED=1` aplica o escopo de vínculos ao seletor e às requisições
+existentes. As duas flags permanecem default off; não ativar no lab antes de concluir
+inventário, restore drill, migration/backfill e o gate de isolamento.
 
 Público via edge: prefixar `/trafego` (ex.: `/trafego/health/live`, `/trafego/v1/...`).  
 No bundle, portal/catálogo usam `http://127.0.0.1:9010` **sem** prefixo.

@@ -150,19 +150,29 @@ Backfill:
 - Sessão pode selecionar somente loja retornada por `AccessControl`.
 - Campo manual de slug deixa de existir na UI.
 
+> **Evidência local:** implementação protegida por `REVY_CONTROL_ENABLED=0` e
+> `REVY_CONTROL_RBAC_ENABLED=0` nos commits `377e2f1`, `c10a637`, `f603a69`,
+> `13d7400`, `93ffd16`, `0fc9850`, `335aa8c`, `4c72e22`; suíte Revy com **125 testes
+> passando**. Não houve migration nem rollout no lab. O inventário e o restore
+> drill pendentes da Fase 0 bloqueiam a ativação remota.
+
 ### Testes obrigatórios
 
-- [ ] Gestor A não lista, abre nem altera Loja B.
-- [ ] Digitar URL/slug de Loja B retorna 403/404 seguro.
-- [ ] Admin acessa qualquer loja e suas ações são auditadas.
-- [ ] Segunda atribuição de responsável ativo falha de forma explícita.
-- [ ] Remover vínculo encerra acesso na próxima requisição.
-- [ ] Backfill é idempotente.
-- [ ] Rotas e APIs atuais de ROI/CAPI continuam passando.
+- [x] Gestor A não lista, abre nem altera Loja B.
+- [x] Digitar URL/slug de Loja B retorna 403/404 seguro.
+- [x] Admin acessa qualquer loja e suas ações são auditadas.
+- [x] Segunda atribuição de responsável ativo falha de forma explícita.
+- [x] Remover vínculo encerra acesso na próxima requisição.
+- [x] Backfill é idempotente.
+- [x] Rotas e APIs atuais de ROI/CAPI continuam passando.
 
 ### Critério de pronto
 
 Não existe mais autorização baseada apenas em conhecer ou digitar `loja_slug`.
+
+**Estado:** cobertura local concluída; Fase 1 ainda não está pronta em produção.
+O critério acima precisa ser validado no lab depois dos gates pendentes da Fase 0,
+da migration/backfill e da ativação controlada das flags.
 
 ---
 
