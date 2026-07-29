@@ -95,6 +95,10 @@ def enfileirar_venda_confirmada(
             "cliente_email": purchase.email,
             "fbclid": purchase.fbclid,
             "fbc": purchase.fbc,
+            # Click IDs Google: opacos; payload já vai cifrado no outbox.
+            "gclid": purchase.gclid,
+            "gbraid": purchase.gbraid,
+            "wbraid": purchase.wbraid,
             "ctwa_clid": purchase.ctwa_clid,
         }
     )

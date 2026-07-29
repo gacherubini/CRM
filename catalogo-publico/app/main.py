@@ -210,6 +210,16 @@ def clean_tracking(value: Optional[str]) -> str:
     return re.sub(r"[\x00-\x1f\x7f]", "", value).strip()[:120]
 
 
+def clean_click_id(value: Optional[str]) -> str:
+    """Click IDs Google (gclid/gbraid/wbraid): opacos, case-sensitive, sem normalizar.
+
+    Apenas remove caracteres de controle e limita ao tamanho do contrato (255).
+    """
+    if not value:
+        return ""
+    return re.sub(r"[\x00-\x1f\x7f]", "", value).strip()[:255]
+
+
 def normalize_whatsapp(value: Optional[str]) -> Optional[str]:
     digits = re.sub(r"\D", "", value or "")
     if len(digits) in {10, 11}:
@@ -417,9 +427,10 @@ def vehicle_detail(
             "utm_content",
             "utm_term",
             "fbclid",
-            "gclid",
         )
     }
+    for key in ("gclid", "gbraid", "wbraid"):
+        tracking[key] = clean_click_id(request.query_params.get(key))
     tracking["origem"] = "detalhe_catalogo"
     # event_id compartilhado browser Lead ↔ registro de interesse (dedupe Meta).
     lead_event_id = str(uuid.uuid4())
@@ -455,6 +466,8 @@ def register_interest(
     utm_term: Optional[str] = None,
     fbclid: Optional[str] = None,
     gclid: Optional[str] = None,
+    gbraid: Optional[str] = None,
+    wbraid: Optional[str] = None,
     event_id: Optional[str] = None,
     provider: HttpInventoryProvider = Depends(get_provider),
     store: InterestStore = Depends(get_interest_store),
@@ -510,7 +523,9 @@ def register_interest(
             utm_content=clean_tracking(utm_content),
             utm_term=clean_tracking(utm_term),
             fbclid=clean_tracking(fbclid),
-            gclid=clean_tracking(gclid),
+            gclid=clean_click_id(gclid),
+            gbraid=clean_click_id(gbraid),
+            wbraid=clean_click_id(wbraid),
             event_id=shared_event_id or None,
         )
     except sqlite3.Error:

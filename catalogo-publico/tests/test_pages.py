@@ -1,3 +1,4 @@
+import json
 from dataclasses import fields
 from urllib.parse import parse_qs, urlparse
 
@@ -329,6 +330,46 @@ def test_detalhe_propaga_fbclid_no_cta(client):
     assert r.status_code == 200
     assert "fbclid=IwAR0abc" in r.text
     assert "utm_campaign=ofertas" in r.text
+
+
+def test_detalhe_propaga_click_ids_google_exatos_no_cta(client):
+    """gclid/gbraid/wbraid passam opacos e case-sensitive no CTA de interesse."""
+    gclid = "Cj0KCQjwExactGclid-AbC123_xyZ"
+    gbraid = "0AAAAAExactGbraid-AbC"
+    wbraid = "0AAAAAExactWbraid-XyZ"
+    r = client.get(
+        "/l/moto-center/veiculos/vehicle-1"
+        f"?utm_source=google&utm_campaign=seminovos"
+        f"&gclid={gclid}&gbraid={gbraid}&wbraid={wbraid}"
+    )
+    assert r.status_code == 200
+    assert f"gclid={gclid}" in r.text
+    assert f"gbraid={gbraid}" in r.text
+    assert f"wbraid={wbraid}" in r.text
+    assert "utm_campaign=seminovos" in r.text
+
+
+def test_interesse_preserva_click_ids_google_no_outbox(client, interest_store):
+    gclid = "Cj0KCQjwExactGclid-AbC123_xyZ"
+    gbraid = "0AAAAAExactGbraid-AbC"
+    wbraid = "0AAAAAExactWbraid-XyZ"
+    response = client.get(
+        "/l/moto-center/interesse/vehicle-1"
+        f"?utm_source=google&gclid={gclid}&gbraid={gbraid}&wbraid={wbraid}",
+        follow_redirects=False,
+    )
+    assert response.status_code == 302
+    pending = interest_store.pending_outbox()
+    assert len(pending) == 1
+    payload = json.loads(pending[0]["payload"])
+    assert payload["gclid"] == gclid
+    assert payload["gbraid"] == gbraid
+    assert payload["wbraid"] == wbraid
+    assert payload["utm_source"] == "google"
+    row = interest_store.get_interest(pending[0]["event_id"])
+    assert row["gclid"] == gclid
+    assert row["gbraid"] == gbraid
+    assert row["wbraid"] == wbraid
 
 
 def test_detalhe_lead_event_id_no_cta_quando_pixel(client, monkeypatch):

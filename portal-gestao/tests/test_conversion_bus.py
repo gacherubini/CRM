@@ -20,6 +20,8 @@ def _purchase(**overrides):
         "fbclid": "fb-click",
         "fbc": "fb.1.123.fb-click",
         "gclid": "google-click",
+        "gbraid": "gbraid-click",
+        "wbraid": "wbraid-click",
     }
     data.update(overrides)
     return PurchaseConversion(**data)
@@ -46,7 +48,13 @@ def test_purchase_conversion_from_sale_cria_event_id_estavel_e_snapshot():
     )
     evento = PurchaseConversion.from_sale(
         sale,
-        {"telefone": "5511999", "fbclid": "fb-1", "gclid": "g-1"},
+        {
+            "telefone": "5511999",
+            "fbclid": "fb-1",
+            "gclid": "g-1",
+            "gbraid": "gb-1",
+            "wbraid": "wb-1",
+        },
     )
 
     assert evento.event_id == "purchase-v-42"
@@ -56,6 +64,8 @@ def test_purchase_conversion_from_sale_cria_event_id_estavel_e_snapshot():
     assert evento.phone == "5511999"
     assert evento.fbclid == "fb-1"
     assert evento.gclid == "g-1"
+    assert evento.gbraid == "gb-1"
+    assert evento.wbraid == "wb-1"
 
 
 def test_bus_publica_em_multiplos_adapters_sem_rede():

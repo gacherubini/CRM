@@ -64,6 +64,9 @@ def test_outbox_confirmacao_criptografa_pii_e_e_idempotente():
                 "telefone": "5511999999999",
                 "email": "cliente@example.com",
                 "fbclid": "fbclid-secreto",
+                "gclid": "Cj0KCQjwExactGclid",
+                "gbraid": "0AAAAAExactGbraid",
+                "wbraid": "0AAAAAExactWbraid",
                 "ctwa_clid": "ctwa-secreto",
             },
         )
@@ -76,11 +79,16 @@ def test_outbox_confirmacao_criptografa_pii_e_e_idempotente():
         assert db.query(RevyTrafegoEventOutbox).count() == 1
         assert "5511999999999" not in item.payload_ciphertext
         assert "cliente@example.com" not in item.payload_ciphertext
+        assert "Cj0KCQjwExactGclid" not in item.payload_ciphertext
 
         payload = json.loads(decifrar(item.payload_ciphertext))
         assert payload["cliente_telefone"] == "5511999999999"
         assert payload["custos_diretos_total"] == "500.00"
         assert payload["confirmada_em"].startswith("2026-07-28T12:00:00")
+        assert payload["gclid"] == "Cj0KCQjwExactGclid"
+        assert payload["gbraid"] == "0AAAAAExactGbraid"
+        assert payload["wbraid"] == "0AAAAAExactWbraid"
+        assert payload["fbclid"] == "fbclid-secreto"
 
         destino = RevyFake({"ok": True})
         assert tentar_entregar(db, item, client=destino) is True
@@ -88,6 +96,9 @@ def test_outbox_confirmacao_criptografa_pii_e_e_idempotente():
         assert item.status == "delivered"
         assert item.attempts == 1
         assert destino.confirmadas[0][1]["event_id"] == purchase.event_id
+        assert destino.confirmadas[0][1]["gclid"] == "Cj0KCQjwExactGclid"
+        assert destino.confirmadas[0][1]["gbraid"] == "0AAAAAExactGbraid"
+        assert destino.confirmadas[0][1]["wbraid"] == "0AAAAAExactWbraid"
     finally:
         db.close()
 

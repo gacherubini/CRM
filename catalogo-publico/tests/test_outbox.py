@@ -4,7 +4,7 @@ from datetime import datetime, timedelta, timezone
 from app.outbox import process_pending
 
 
-def _record(store):
+def _record(store, **extras):
     store.initialize()
     return store.record(
         loja_slug="moto-center",
@@ -16,6 +16,7 @@ def _record(store):
         utm_campaign="feirao",
         utm_content="story-a",
         utm_term="moto",
+        **extras,
     )
 
 
@@ -34,6 +35,26 @@ def test_clique_e_outbox_sao_atomicos_e_payload_nao_tem_identidade(interest_stor
     assert payload["utm_content"] == "story-a"
     assert "visitante_id" not in payload
     assert "telefone" not in payload
+
+
+def test_outbox_inclui_click_ids_google_opacos(interest_store):
+    gclid = "Cj0KCQjwExactGclid-AbC123"
+    gbraid = "0AAAAAExactGbraid"
+    wbraid = "0AAAAAExactWbraid"
+    record = _record(
+        interest_store,
+        gclid=gclid,
+        gbraid=gbraid,
+        wbraid=wbraid,
+    )
+    payload = json.loads(interest_store.get_outbox(record.event_id)["payload"])
+    assert payload["gclid"] == gclid
+    assert payload["gbraid"] == gbraid
+    assert payload["wbraid"] == wbraid
+    interest = interest_store.get_interest(record.event_id)
+    assert interest["gclid"] == gclid
+    assert interest["gbraid"] == gbraid
+    assert interest["wbraid"] == wbraid
 
 
 def test_outbox_entrega_com_bearer_e_idempotency_key(interest_store):

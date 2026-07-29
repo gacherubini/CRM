@@ -140,6 +140,8 @@ class Lead(Base):
     utm_term_last: Mapped[str | None] = mapped_column(String(120), nullable=True)
     fbclid: Mapped[str | None] = mapped_column(String(255), nullable=True)
     gclid: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    gbraid: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    wbraid: Mapped[str | None] = mapped_column(String(255), nullable=True)
     # Click-to-WhatsApp (CTWA) — last touch nos campos sem sufixo; first_* separado
     ctwa_clid: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
     ctwa_clid_first: Mapped[str | None] = mapped_column(String(255), nullable=True)
@@ -197,6 +199,8 @@ class CatalogAttribution(Base):
     utm_term: Mapped[str | None] = mapped_column(String(120), nullable=True)
     fbclid: Mapped[str | None] = mapped_column(String(255), nullable=True)
     gclid: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    gbraid: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    wbraid: Mapped[str | None] = mapped_column(String(255), nullable=True)
     occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     telefone: Mapped[str | None] = mapped_column(String, nullable=True, index=True)
     lead_id: Mapped[str | None] = mapped_column(ForeignKey("leads.id"), nullable=True, index=True)

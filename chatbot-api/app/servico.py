@@ -567,6 +567,10 @@ def _aplicar_touch_do_atributo(lead: Lead, atribuicao: CatalogAttribution) -> No
         lead.fbclid = atribuicao.fbclid
     if atribuicao.gclid:
         lead.gclid = atribuicao.gclid
+    if atribuicao.gbraid:
+        lead.gbraid = atribuicao.gbraid
+    if atribuicao.wbraid:
+        lead.wbraid = atribuicao.wbraid
 
 
 def registrar_mensagem(
@@ -1063,6 +1067,8 @@ def ingerir_interesse_catalogo(
     utm_term: str | None = None,
     fbclid: str | None = None,
     gclid: str | None = None,
+    gbraid: str | None = None,
+    wbraid: str | None = None,
 ) -> tuple[CatalogAttribution, bool]:
     loja = db.get(Loja, loja_id)
     if loja is None or loja.slug != loja_slug:
@@ -1109,6 +1115,8 @@ def ingerir_interesse_catalogo(
         utm_term=utm_term,
         fbclid=fbclid,
         gclid=gclid,
+        gbraid=gbraid,
+        wbraid=wbraid,
         occurred_at=occurred_at,
     )
     db.add(atribuicao)
@@ -1221,6 +1229,8 @@ def para_saida_lead(lead: Lead) -> dict:
         "utm_term_last": lead.utm_term_last or lead.utm_term,
         "fbclid": lead.fbclid,
         "gclid": lead.gclid,
+        "gbraid": lead.gbraid,
+        "wbraid": lead.wbraid,
         "ctwa_clid": lead.ctwa_clid,
         "ctwa_clid_first": lead.ctwa_clid_first,
         "meta_ad_id": lead.meta_ad_id,

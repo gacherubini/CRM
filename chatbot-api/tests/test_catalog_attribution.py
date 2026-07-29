@@ -65,6 +65,9 @@ def test_clique_nao_cria_lead_e_ingestao_e_idempotente(client, loja_a):
 def test_primeira_mensagem_correlaciona_ref_e_enriquece_lead(client, loja_a):
     event = _event(loja_a)
     event["fbclid"] = "IwAR0test"
+    event["gclid"] = "Cj0KCQjwExactGclid-AbC"
+    event["gbraid"] = "0AAAAAExactGbraid"
+    event["wbraid"] = "0AAAAAExactWbraid"
     client.post("/v1/integracoes/catalogo/interesses", json=event, headers=loja_a["headers"])
 
     inbound = client.post(
@@ -97,9 +100,15 @@ def test_primeira_mensagem_correlaciona_ref_e_enriquece_lead(client, loja_a):
     assert lead["utm_content"] == "story-a"
     assert lead["utm_term"] == "suv-usado"
     assert lead["fbclid"] == "IwAR0test"
+    assert lead["gclid"] == "Cj0KCQjwExactGclid-AbC"
+    assert lead["gbraid"] == "0AAAAAExactGbraid"
+    assert lead["wbraid"] == "0AAAAAExactWbraid"
     assert lead["atribuida_em"]
     detail = client.get(f"/v1/leads/{lead['id']}", headers=loja_a["headers"]).json()
     assert detail["catalog_interest_ref"] == REF
+    assert detail["gclid"] == "Cj0KCQjwExactGclid-AbC"
+    assert detail["gbraid"] == "0AAAAAExactGbraid"
+    assert detail["wbraid"] == "0AAAAAExactWbraid"
 
 
 def test_referencia_catalogo_com_rotulo_codigo_nao_vira_ctwa(client, loja_a):

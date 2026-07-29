@@ -186,6 +186,10 @@ class VendaConfirmadaBody(VendaSnapshotBody):
     cliente_email: str | None = None
     fbclid: str | None = None
     fbc: str | None = None
+    # Click IDs Google (opacos, opcionais) — F4D usará para Data Manager.
+    gclid: str | None = None
+    gbraid: str | None = None
+    wbraid: str | None = None
     ctwa_clid: str | None = None
 
 

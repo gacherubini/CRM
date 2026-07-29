@@ -91,3 +91,37 @@ def test_venda_confirmada_idempotente(client, monkeypatch):
     )
     assert r2.status_code == 200
     assert r2.json().get("idempotent") is True
+
+
+def test_venda_confirmada_aceita_click_ids_google_opcionais(client, monkeypatch):
+    """Contrato F4C: gclid/gbraid/wbraid opacos e opcionais no evento de venda."""
+    headers = _token(monkeypatch)
+    payload = {
+        "venda_id": "venda-google-ids",
+        "valor": "2500.00",
+        "moeda": "BRL",
+        "event_id": "purchase-venda-google-ids",
+        "gclid": "Cj0KCQjwExactGclid-AbC",
+        "gbraid": "0AAAAAExactGbraid",
+        "wbraid": "0AAAAAExactWbraid",
+    }
+    r = client.post(
+        "/v1/lojas/loja-demo/eventos/venda-confirmada",
+        json=payload,
+        headers=headers,
+    )
+    assert r.status_code == 200, r.text
+    assert r.json()["ok"] is True
+
+    # Sem click IDs a confirmação continua válida (conversão offline opcional).
+    r_sem = client.post(
+        "/v1/lojas/loja-demo/eventos/venda-confirmada",
+        json={
+            "venda_id": "venda-sem-click-id",
+            "valor": "100.00",
+            "event_id": "purchase-venda-sem-click-id",
+        },
+        headers=headers,
+    )
+    assert r_sem.status_code == 200, r_sem.text
+    assert r_sem.json()["ok"] is True
