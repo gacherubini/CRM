@@ -200,3 +200,136 @@ def test_simular_permitido_quando_loja_ativa(client, loja_a):
 def test_leitura_permanece_aberta_sem_projecao(client, loja_sem_projecao):
     r = client.get("/v1/conversas", headers=loja_sem_projecao["headers"])
     assert r.status_code == 200
+
+
+def test_leads_bloqueado_sem_projecao(client, loja_sem_projecao):
+    r = client.post(
+        "/v1/leads",
+        json={"telefone": "5511988887777", "nome": "Fulano"},
+        headers=loja_sem_projecao["headers"],
+    )
+    assert r.status_code == 423
+    assert r.json()["detail"]["code"] == "store_not_operational"
+
+
+def test_leads_bloqueado_quando_suspensa(client, loja_a, db):
+    loja_id = loja_a["loja_id"]
+    proj = db.get(models_db.LojaOperacionalProjecao, (loja_id, "loja"))
+    proj.state = "suspensa"
+    proj.version = 9
+    db.commit()
+
+    r = client.post(
+        "/v1/leads",
+        json={"telefone": "5511988887777", "nome": "Fulano"},
+        headers=loja_a["headers"],
+    )
+    assert r.status_code == 423
+    assert r.json()["detail"]["code"] == "store_not_operational"
+
+
+def test_leads_permitido_quando_loja_ativa(client, loja_a):
+    r = client.post(
+        "/v1/leads",
+        json={"telefone": "5511988887777", "nome": "Fulano"},
+        headers=loja_a["headers"],
+    )
+    assert r.status_code == 201
+    assert r.json()["nome"] == "Fulano"
+
+
+def test_operacao_veiculos_bloqueado_sem_projecao(client, loja_sem_projecao):
+    r = client.post(
+        "/v1/operacao/veiculos",
+        json={
+            "telefone_solicitante": "5511999990001",
+            "tipo": "moto",
+            "marca": "Honda",
+            "modelo": "CG 160",
+            "ano_modelo": 2023,
+            "preco": 16000,
+            "km": 12000,
+            "placa": "ABC1D23",
+        },
+        headers=loja_sem_projecao["headers"],
+    )
+    assert r.status_code == 423
+    assert r.json()["detail"]["code"] == "store_not_operational"
+
+
+def test_operacao_veiculos_bloqueado_quando_suspensa(client, loja_a, db):
+    loja_id = loja_a["loja_id"]
+    proj = db.get(models_db.LojaOperacionalProjecao, (loja_id, "loja"))
+    proj.state = "suspensa"
+    proj.version = 9
+    db.commit()
+
+    r = client.post(
+        "/v1/operacao/veiculos",
+        json={
+            "telefone_solicitante": "5511999990001",
+            "tipo": "moto",
+            "marca": "Honda",
+            "modelo": "CG 160",
+            "ano_modelo": 2023,
+            "preco": 16000,
+            "km": 12000,
+            "placa": "ABC1D23",
+        },
+        headers=loja_a["headers"],
+    )
+    assert r.status_code == 423
+    assert r.json()["detail"]["code"] == "store_not_operational"
+
+
+def test_operacao_veiculos_permitido_quando_loja_ativa(client, loja_a):
+    from app.inventory import get_inventory_write_client
+
+    client.post(
+        "/v1/operacao/numeros-autorizados",
+        json={"telefone": "5511999990001", "papel": "dono"},
+        headers=loja_a["headers"],
+    )
+
+    class _FakeWrite:
+        def disponivel(self):
+            return True
+
+        def criar_veiculo(self, dados, idempotency_key=None):
+            return {
+                "id": "veh-gate",
+                "tipo": "moto",
+                "marca": "Honda",
+                "modelo": "CG 160",
+                "ano_modelo": 2023,
+                "preco": 16000.0,
+                "km": 12000,
+                "placa": "ABC1D23",
+                "status": "disponivel",
+                "publicado": True,
+                "foto_url": None,
+            }
+
+        def obter_por_placa(self, placa):
+            return None
+
+    app.dependency_overrides[get_inventory_write_client] = lambda: _FakeWrite()
+    try:
+        r = client.post(
+            "/v1/operacao/veiculos",
+            json={
+                "telefone_solicitante": "5511999990001",
+                "tipo": "moto",
+                "marca": "Honda",
+                "modelo": "CG 160",
+                "ano_modelo": 2023,
+                "preco": 16000,
+                "km": 12000,
+                "placa": "ABC1D23",
+            },
+            headers=loja_a["headers"],
+        )
+        assert r.status_code == 201, r.text
+        assert r.json()["ok"] is True
+    finally:
+        app.dependency_overrides.pop(get_inventory_write_client, None)

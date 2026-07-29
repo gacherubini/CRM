@@ -471,6 +471,7 @@ def registrar_consentimento(
     ctx: Contexto = Depends(get_contexto),
     db: Session = Depends(get_db),
 ):
+    _exigir_loja_operacional(db, ctx.loja_id)
     lead = servico.registrar_consentimento(
         db, ctx.loja_id, dados.telefone, dados.versao_texto, dados.finalidade, dados.evidencia
     )
@@ -481,6 +482,7 @@ def registrar_consentimento(
 def registrar_lead(
     dados: LeadInput, ctx: Contexto = Depends(get_contexto), db: Session = Depends(get_db)
 ):
+    _exigir_loja_operacional(db, ctx.loja_id)
     lead = servico.registrar_lead(
         db, ctx.loja_id, dados.telefone, dados.nome, dados.interesse, dados.etapa
     )
@@ -494,6 +496,7 @@ def ingerir_interesse_catalogo(
     ctx: Contexto = Depends(get_contexto),
     db: Session = Depends(get_db),
 ):
+    _exigir_loja_operacional(db, ctx.loja_id)
     event_id = str(dados.event_id)
     if idempotency_key is not None and idempotency_key != event_id:
         raise HTTPException(status_code=422, detail="Idempotency-Key difere do event_id")
@@ -971,6 +974,7 @@ def criar_veiculo_operacao(
     n8n/LLM extrai marca/modelo/ano/valor/km/placa e chama este endpoint com o
     telefone do remetente. Clientes comuns recebem 403; dados incompletos 422.
     """
+    _exigir_loja_operacional(db, ctx.loja_id)
     body = dados.model_dump(exclude={"telefone_solicitante", "grupo_jid"})
     return operacao.criar_veiculo_autorizado(
         db,
