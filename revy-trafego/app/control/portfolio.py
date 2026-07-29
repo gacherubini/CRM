@@ -6,6 +6,7 @@ from enum import Enum
 from typing import Any
 
 from app.control.audit import _append_event
+from app.control.provisioning_hooks import safe_enqueue_store_snapshot
 from app.control.stores import _find_store
 from app.control.types import (
     AccessDenied,
@@ -178,7 +179,11 @@ class PortfolioControl:
                     )
 
             db.commit()
-            return _list_views(db, store.id)
+            views = _list_views(db, store.id)
+            safe_enqueue_store_snapshot(
+                self._session_factory, StoreRef(id=store.id)
+            )
+            return views
 
     def suspend(
         self,
@@ -286,6 +291,9 @@ class PortfolioControl:
             )
             db.commit()
             db.refresh(assignment)
+            safe_enqueue_store_snapshot(
+                self._session_factory, StoreRef(id=store.id)
+            )
             return ModuleView(
                 code=code,
                 name=module.nome,

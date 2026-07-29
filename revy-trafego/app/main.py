@@ -92,6 +92,11 @@ async def _lifespan(_app: FastAPI):
             os.environ["PORTAL_CAPI_RETRY_ENABLED"] = "1"
             meta_capi_job.start_worker(SessionLocal)
             logger.info("revy-trafego: capi retry worker ON")
+        if settings.revy_control_provisioning_delivery_enabled:
+            from app.control import provisioning_job
+
+            provisioning_job.start_worker(SessionLocal)
+            logger.info("revy-trafego: provisioning delivery worker ON")
         db = SessionLocal()
         try:
             bootstrap_gestor_se_vazio(
@@ -107,6 +112,9 @@ async def _lifespan(_app: FastAPI):
     finally:
         meta_ads_spend_job.stop_worker()
         meta_capi_job.stop_worker()
+        from app.control import provisioning_job
+
+        provisioning_job.stop_worker()
 
 
 app = FastAPI(

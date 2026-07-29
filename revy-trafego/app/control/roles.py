@@ -6,6 +6,7 @@ from typing import Any
 from sqlalchemy.exc import IntegrityError
 
 from app.control.audit import _append_event
+from app.control.provisioning_hooks import safe_enqueue_store_snapshot
 from app.control.stores import _find_store
 from app.control.types import (
     AccessDenied,
@@ -69,6 +70,9 @@ class StoreRoles:
                 db.rollback()
                 raise StoreRoleConflict(store.id, person.id, command.role) from exc
             db.refresh(role)
+            safe_enqueue_store_snapshot(
+                self._session_factory, StoreRef(id=store.id)
+            )
             return _role_view(role)
 
     def revoke(self, actor: Actor, command: RevokeStoreRole) -> StoreRoleView:
@@ -133,6 +137,9 @@ class StoreRoles:
             )
             db.commit()
             db.refresh(role)
+            safe_enqueue_store_snapshot(
+                self._session_factory, StoreRef(id=store.id)
+            )
             return _role_view(role)
 
     def list_for_store(

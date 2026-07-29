@@ -7,6 +7,7 @@ from typing import Any
 from sqlalchemy.exc import IntegrityError
 
 from app.control.audit import _append_event
+from app.control.provisioning_hooks import safe_enqueue_store_snapshot
 from app.control.types import (
     AccessDenied,
     Actor,
@@ -184,7 +185,11 @@ class StoreControl:
             )
             db.commit()
             db.refresh(store)
-            return _store_view(store)
+            view = _store_view(store)
+            safe_enqueue_store_snapshot(
+                self._session_factory, StoreRef(id=view.id)
+            )
+            return view
 
 
 def _normalize_name(name: str) -> str:
