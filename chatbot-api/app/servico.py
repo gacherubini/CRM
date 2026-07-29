@@ -436,7 +436,17 @@ def _mensagem_existente(
     )
 
 
-def _resposta_duplicada(conversa: Conversa) -> dict:
+def _resposta_duplicada(
+    conversa: Conversa, *, captura_passiva: bool = False
+) -> dict:
+    if captura_passiva:
+        return {
+            "duplicada": True,
+            "conversa_id": conversa.id,
+            "bot_ativo": False,
+            "captura_passiva": True,
+            "loja_operacional": False,
+        }
     return {
         "duplicada": True,
         "conversa_id": conversa.id,
@@ -567,12 +577,19 @@ def registrar_mensagem(
     - Saída do bot: registrar com `origem_bot=True` e o mesmo `provider_message_id` que a
       Evolution devolve no envio; o eco `fromMe` chega depois e cai na dedupe (não pausa).
     - Ack/status/reação ou `from_me` sem texto → não alteram `bot_ativo` (nem poluem histórico).
+
+    Gate operacional (ADR 0001): loja não operacional → CAPTURE (persiste/dedupe),
+    força ``bot_ativo: false`` e ``captura_passiva: true`` para o n8n não atender.
     """
+    from app import provisioning
+
     loja = resolver_loja_por_instancia(db, instancia)
+    loja_operacional = provisioning.is_store_operational(db, loja.id)
+    captura_passiva = not loja_operacional
     conversa = _get_or_create_conversa(db, loja.id, telefone)
 
     if provider_message_id and _mensagem_existente(db, loja.id, provider_message_id):
-        return _resposta_duplicada(conversa)
+        return _resposta_duplicada(conversa, captura_passiva=captura_passiva)
 
     # O workflow usa este sinal para humanizar somente a primeira resposta.
     # Consideramos a primeira entrada real do cliente, mesmo que ja exista uma
@@ -590,6 +607,15 @@ def registrar_mensagem(
     # Eventos sem conteúdo (ack/recibo/status/reação ou texto vazio): não pausam e
     # não gravam mensagem fantasma. O n8n idealmente nem encaminha esses eventos.
     if from_me and not origem_bot and _eh_evento_sem_conteudo(texto, tipo):
+        if captura_passiva:
+            return {
+                "duplicada": False,
+                "conversa_id": conversa.id,
+                "bot_ativo": False,
+                "ignorada": True,
+                "captura_passiva": True,
+                "loja_operacional": False,
+            }
         return {
             "duplicada": False,
             "conversa_id": conversa.id,
@@ -602,7 +628,8 @@ def registrar_mensagem(
     ctwa_pendente = False
     lead_ctwa = None
     lead_ctwa_id = None
-    if not from_me:
+    if not from_me and loja_operacional:
+        # Correlação e touch de lead só quando a loja processa (não só captura).
         atribuicao = _correlacionar_catalogo(db, loja.id, telefone, texto)
         codigo_txt = extrair_codigo_ctwa_do_texto(texto)
         tem_sinal_ctwa = any(
@@ -665,27 +692,63 @@ def registrar_mensagem(
             codigo_do_texto=codigo_txt,
             atribuido_lead=ctwa_ok,
         )
+    elif not from_me and captura_passiva:
+        # Captura passiva: auditoria de tracking permanece; sem enriquecer lead.
+        codigo_txt = extrair_codigo_ctwa_do_texto(texto)
+        tem_sinal_ctwa = any(
+            _limpar_tracking(valor)
+            for valor in (
+                ctwa_clid,
+                meta_ad_id,
+                meta_campaign_id,
+                meta_adset_id,
+                ctwa_source_type,
+                ctwa_codigo,
+                codigo_txt,
+            )
+        )
+        if tem_sinal_ctwa:
+            registrar_auditoria_ctwa(
+                db,
+                loja_id=loja.id,
+                telefone=telefone,
+                lead_id=None,
+                provider_message_id=provider_message_id,
+                ctwa_clid=ctwa_clid,
+                meta_ad_id=meta_ad_id,
+                meta_campaign_id=meta_campaign_id,
+                meta_adset_id=meta_adset_id,
+                ctwa_source_type=ctwa_source_type,
+                ctwa_codigo=ctwa_codigo,
+                codigo_do_texto=codigo_txt,
+                atribuido_lead=False,
+            )
 
     # Uma saída nova com conteúdo que não foi previamente registrada pelo workflow
     # do bot veio do atendente (celular/web). O humano assumiu: pausa automática.
     # Exceção: número autorizado (menu de estoque) não entra em handoff de vendas.
-    if from_me and not origem_bot:
-        from app import operacao as operacao_mod
+    # Em captura passiva: não reativa bot para números autorizados (sem atendimento).
+    if loja_operacional:
+        if from_me and not origem_bot:
+            from app import operacao as operacao_mod
 
-        if operacao_mod.esta_autorizado(db, loja.id, telefone):
-            # Eco/fromMe da equipe não deve matar o menu de operação.
-            pass
-        else:
-            conversa.bot_ativo = False
-            conversa.status = "handoff"
-    elif not from_me:
-        # Entrada da equipe autorizada: reativa bot (menu de operação).
-        from app import operacao as operacao_mod
+            if operacao_mod.esta_autorizado(db, loja.id, telefone):
+                # Eco/fromMe da equipe não deve matar o menu de operação.
+                pass
+            else:
+                conversa.bot_ativo = False
+                conversa.status = "handoff"
+        elif not from_me:
+            # Entrada da equipe autorizada: reativa bot (menu de operação).
+            from app import operacao as operacao_mod
 
-        if operacao_mod.esta_autorizado(db, loja.id, telefone) and not conversa.bot_ativo:
-            conversa.bot_ativo = True
-            if conversa.status == "handoff":
-                conversa.status = "aberta"
+            if (
+                operacao_mod.esta_autorizado(db, loja.id, telefone)
+                and not conversa.bot_ativo
+            ):
+                conversa.bot_ativo = True
+                if conversa.status == "handoff":
+                    conversa.status = "aberta"
 
     db.add(
         Mensagem(
@@ -706,7 +769,20 @@ def registrar_mensagem(
         # idempotente em vez de estourar 500.
         db.rollback()
         conversa = _get_or_create_conversa(db, loja.id, telefone)
-        return _resposta_duplicada(conversa)
+        return _resposta_duplicada(conversa, captura_passiva=captura_passiva)
+    if captura_passiva:
+        return {
+            "duplicada": False,
+            "conversa_id": conversa.id,
+            "bot_ativo": False,
+            "primeira_mensagem": primeira_mensagem,
+            "captura_passiva": True,
+            "loja_operacional": False,
+            "catalog_interest_ref": None,
+            "ctwa_atribuido": False,
+            "ctwa_pendente": False,
+            "lead_id": None,
+        }
     return {
         "duplicada": False,
         "conversa_id": conversa.id,

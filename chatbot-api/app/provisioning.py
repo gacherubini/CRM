@@ -43,6 +43,32 @@ def allows_processing(
     return assigned is not None and assigned.state == "ativo"
 
 
+def is_store_operational(db: Session, loja_id: str) -> bool:
+    """True quando a Loja está projetada como ``ativa`` (fail-closed)."""
+    return allows_processing(db, loja_id)
+
+
+def is_module_operational(db: Session, loja_id: str, module: str) -> bool:
+    """True quando Loja ativa e o módulo está contratado e ``ativo``."""
+    return allows_processing(db, loja_id, module=module)
+
+
+def allows_outbound_whatsapp(db: Session, loja_id: str) -> bool:
+    """Envio WhatsApp (bot/humano via automação): exige Loja operacional (v1)."""
+    return is_store_operational(db, loja_id)
+
+
+def capture_only(
+    db: Session, loja_id: str, *, module: str | None = None
+) -> bool:
+    """True quando o ingresso deve ser só capturado, sem processar o domínio.
+
+    ``module`` restringe ao módulo exigido (ex.: ``estoque`` para grupo/cadastro).
+    Sem módulo, basta a Loja não operacional.
+    """
+    return not allows_processing(db, loja_id, module)
+
+
 def _apply_envelope(
     db: Session,
     loja_id: str,

@@ -749,10 +749,36 @@ def decidir_roteamento(
     o menu. O telefone do participante nao concede acesso fora do grupo.
 
     ``is_saved``: só ``False`` explícito conta como contato novo.
+
+    Gate operacional (ADR 0001):
+    - Loja não operacional → ``ignorar`` com captura passiva (sem atendimento).
+    - Caminho de estoque (grupo_jid / cadastro / operação) exige módulo estoque ativo.
+    - Caminho ``cliente`` exige apenas Loja operacional.
     """
+    from app import provisioning
+
+    if not provisioning.is_store_operational(db, loja_id):
+        return {
+            "acao": "ignorar",
+            "resposta": None,
+            "captura_passiva": True,
+            "loja_operacional": False,
+        }
+
+    def _ignorar_estoque_inoperante() -> dict:
+        return {
+            "acao": "ignorar",
+            "resposta": None,
+            "captura_passiva": True,
+            "loja_operacional": True,
+        }
+
     grupo = obter_grupo_estoque(db, loja_id)
     numero: AtorOperacao | None
     if grupo_jid is not None:
+        # Grupo de estoque: precisa do módulo estoque operacional.
+        if not provisioning.is_module_operational(db, loja_id, "estoque"):
+            return _ignorar_estoque_inoperante()
         if not _grupo_estoque_corresponde(grupo, grupo_jid):
             return {"acao": "ignorar", "resposta": None}
         numero = grupo
@@ -773,6 +799,10 @@ def decidir_roteamento(
         if is_saved is False:
             return {"acao": "cliente", "resposta": None}
         return {"acao": "ignorar", "resposta": None}
+
+    # A partir daqui: menu/cadastro/operação de estoque.
+    if not provisioning.is_module_operational(db, loja_id, "estoque"):
+        return _ignorar_estoque_inoperante()
 
     normal = (texto or "").strip().casefold()
     # Compat: cadastro_controle ainda aceito no n8n (= operacao_controle)

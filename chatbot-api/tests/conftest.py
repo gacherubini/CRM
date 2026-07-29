@@ -42,7 +42,8 @@ def _criar_loja(nome, slug, instancia, token, *, operacional_ativa: bool = True)
     db.add(loja)
     db.add(models_db.CredencialServico(token_hash=hash_token(token), loja_id=loja.id))
     if operacional_ativa:
-        # Suite de regressão assume loja operacional; testes do gate sobrescrevem.
+        # Suite de regressão assume loja + módulos operacionais; testes do gate
+        # sobrescrevem (suspensão / fail-closed sem projeção).
         db.add(
             models_db.LojaOperacionalProjecao(
                 loja_id=loja.id,
@@ -50,6 +51,24 @@ def _criar_loja(nome, slug, instancia, token, *, operacional_ativa: bool = True)
                 version=1,
                 state="ativa",
                 event_id="seed-ativa",
+            )
+        )
+        db.add(
+            models_db.LojaOperacionalProjecao(
+                loja_id=loja.id,
+                aggregate="vendas",
+                version=1,
+                state="ativo",
+                event_id="seed-vendas",
+            )
+        )
+        db.add(
+            models_db.LojaOperacionalProjecao(
+                loja_id=loja.id,
+                aggregate="estoque",
+                version=1,
+                state="ativo",
+                event_id="seed-estoque",
             )
         )
     db.commit()

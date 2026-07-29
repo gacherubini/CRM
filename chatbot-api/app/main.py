@@ -357,6 +357,15 @@ def webhook_audio_transcrever(
 ):
     """Baixa/transcreve áudio server-side e sempre falha com fallback seguro."""
     loja = servico.resolver_loja_por_instancia(db, dados.instance)
+    if provisioning.capture_only(db, loja.id):
+        # CAPTURE: 200 sem trabalho caro de download/transcrição.
+        return {
+            "transcrito": False,
+            "texto": None,
+            "fallback": config.AUDIO_FALLBACK_TEXT,
+            "captura_passiva": True,
+            "loja_operacional": False,
+        }
     ja_registrada = (
         db.query(models_db.Mensagem)
         .filter(
@@ -407,6 +416,17 @@ def webhook_foto_veiculo(
 ):
     """Imagem da equipe → Estoque → catálogo, sem binário no n8n/Chatbot."""
     loja = servico.resolver_loja_por_instancia(db, dados.instance)
+    loja_ok = provisioning.is_store_operational(db, loja.id)
+    estoque_ok = provisioning.is_module_operational(db, loja.id, "estoque")
+    if not loja_ok or not estoque_ok:
+        # CAPTURE: 200 sem processar foto no estoque.
+        return {
+            "ok": False,
+            "ignorar": True,
+            "mensagem": None,
+            "captura_passiva": True,
+            "loja_operacional": loja_ok,
+        }
     return operacao.anexar_foto_whatsapp(
         db,
         loja.id,
@@ -462,6 +482,9 @@ def definir_estado(
     ctx: Contexto = Depends(get_contexto),
     db: Session = Depends(get_db),
 ):
+    # Reativar bot é efeito de saída/atendimento — bloqueado se loja inoperante.
+    if dados.bot_ativo:
+        _exigir_loja_operacional(db, ctx.loja_id)
     return servico.definir_bot_ativo(db, ctx.loja_id, telefone, dados.bot_ativo)
 
 
