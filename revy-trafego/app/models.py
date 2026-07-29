@@ -4,6 +4,7 @@ from decimal import Decimal
 from typing import Optional
 
 from sqlalchemy import (
+    BigInteger,
     Boolean,
     CheckConstraint,
     Date,
@@ -795,6 +796,213 @@ class GoogleAdsOAuthState(Base):
     expires_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), index=True
     )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=agora
+    )
+
+
+class GoogleAdsAccount(Base):
+    """Conta Google Ads descoberta/selecionável por Loja (não manager como anunciante)."""
+
+    __tablename__ = "google_ads_accounts"
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ("
+            "'ativo', 'inativo', 'erro', 'desconhecido'"
+            ")",
+            name="ck_google_ads_accounts_status",
+        ),
+        UniqueConstraint(
+            "loja_id",
+            "customer_id",
+            name="uq_google_ads_accounts_loja_customer",
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=novo_id)
+    loja_id: Mapped[str] = mapped_column(
+        ForeignKey("lojas.id", ondelete="RESTRICT"), index=True
+    )
+    customer_id: Mapped[str] = mapped_column(String(20), index=True)
+    login_customer_id: Mapped[Optional[str]] = mapped_column(
+        String(20), nullable=True
+    )
+    is_manager: Mapped[bool] = mapped_column(Boolean, default=False)
+    currency_code: Mapped[Optional[str]] = mapped_column(String(8), nullable=True)
+    time_zone: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    descriptive_name: Mapped[Optional[str]] = mapped_column(
+        String(240), nullable=True
+    )
+    selected: Mapped[bool] = mapped_column(Boolean, default=False)
+    status: Mapped[str] = mapped_column(String(20), default="desconhecido")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=agora
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=agora
+    )
+
+
+class GoogleAdsCampaignDaily(Base):
+    """Métricas diárias por campanha (upsert idempotente por customer/campaign/date)."""
+
+    __tablename__ = "google_ads_campaign_daily"
+    __table_args__ = (
+        CheckConstraint(
+            "impressions >= 0",
+            name="ck_google_ads_campaign_daily_impressions",
+        ),
+        CheckConstraint(
+            "clicks >= 0",
+            name="ck_google_ads_campaign_daily_clicks",
+        ),
+        CheckConstraint(
+            "cost_micros >= 0",
+            name="ck_google_ads_campaign_daily_cost_micros",
+        ),
+        UniqueConstraint(
+            "customer_id",
+            "campaign_id",
+            "date",
+            name="uq_google_ads_campaign_daily_customer_campaign_date",
+        ),
+        Index(
+            "ix_google_ads_campaign_daily_loja_date",
+            "loja_id",
+            "date",
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=novo_id)
+    loja_id: Mapped[str] = mapped_column(
+        ForeignKey("lojas.id", ondelete="RESTRICT"), index=True
+    )
+    customer_id: Mapped[str] = mapped_column(String(20), index=True)
+    campaign_id: Mapped[str] = mapped_column(String(40))
+    date: Mapped[date] = mapped_column(Date, index=True)
+    impressions: Mapped[int] = mapped_column(Integer, default=0)
+    clicks: Mapped[int] = mapped_column(Integer, default=0)
+    cost_micros: Mapped[int] = mapped_column(BigInteger, default=0)
+    conversions: Mapped[Decimal] = mapped_column(
+        Numeric(18, 6), default=Decimal("0")
+    )
+    conversions_value: Mapped[Decimal] = mapped_column(
+        Numeric(18, 6), default=Decimal("0")
+    )
+    currency_code: Mapped[Optional[str]] = mapped_column(String(8), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=agora
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=agora
+    )
+
+
+class GoogleAdsConversionBinding(Base):
+    """Mapeia evento Revy → conversion action existente no Google (nunca cria ação)."""
+
+    __tablename__ = "google_ads_conversion_bindings"
+    __table_args__ = (
+        UniqueConstraint(
+            "loja_id",
+            "revy_event_type",
+            name="uq_google_ads_conversion_bindings_loja_event",
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=novo_id)
+    loja_id: Mapped[str] = mapped_column(
+        ForeignKey("lojas.id", ondelete="RESTRICT"), index=True
+    )
+    revy_event_type: Mapped[str] = mapped_column(String(80))
+    conversion_action_resource_name: Mapped[str] = mapped_column(String(240))
+    customer_id: Mapped[str] = mapped_column(String(20), index=True)
+    active: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=agora
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=agora
+    )
+
+
+class GoogleAdsConversionOutbox(Base):
+    """Outbox de conversões para Data Manager API (transaction_id determinístico)."""
+
+    __tablename__ = "google_ads_conversion_outbox"
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ("
+            "'pending', 'sent', 'failed', 'dead'"
+            ")",
+            name="ck_google_ads_conversion_outbox_status",
+        ),
+        CheckConstraint(
+            "attempts >= 0",
+            name="ck_google_ads_conversion_outbox_attempts",
+        ),
+        UniqueConstraint(
+            "transaction_id",
+            name="uq_google_ads_conversion_outbox_transaction_id",
+        ),
+        Index(
+            "ix_google_ads_conversion_outbox_domain_event",
+            "loja_id",
+            "domain_event_id",
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=novo_id)
+    loja_id: Mapped[str] = mapped_column(
+        ForeignKey("lojas.id", ondelete="RESTRICT"), index=True
+    )
+    domain_event_id: Mapped[str] = mapped_column(String(120))
+    event_type: Mapped[str] = mapped_column(String(80))
+    transaction_id: Mapped[str] = mapped_column(String(240))
+    payload_json: Mapped[str] = mapped_column(Text)
+    status: Mapped[str] = mapped_column(String(20), default="pending", index=True)
+    next_attempt_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), index=True
+    )
+    request_id: Mapped[Optional[str]] = mapped_column(String(120), nullable=True)
+    attempts: Mapped[int] = mapped_column(Integer, default=0)
+    last_error: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=agora
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=agora
+    )
+
+
+class GoogleAdsUploadAttempt(Base):
+    """Diagnóstico lean de cada tentativa de upload (request_id, status, erro)."""
+
+    __tablename__ = "google_ads_upload_attempts"
+    __table_args__ = (
+        CheckConstraint(
+            "attempt >= 1",
+            name="ck_google_ads_upload_attempts_attempt",
+        ),
+        CheckConstraint(
+            "status IN ("
+            "'accepted', 'rejected', 'error'"
+            ")",
+            name="ck_google_ads_upload_attempts_status",
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=novo_id)
+    outbox_id: Mapped[str] = mapped_column(
+        ForeignKey("google_ads_conversion_outbox.id", ondelete="RESTRICT"),
+        index=True,
+    )
+    request_id: Mapped[Optional[str]] = mapped_column(
+        String(120), nullable=True, index=True
+    )
+    attempt: Mapped[int] = mapped_column(Integer)
+    status: Mapped[str] = mapped_column(String(20))
+    error_code: Mapped[Optional[str]] = mapped_column(String(80), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=agora
     )

@@ -12,11 +12,16 @@ from sqlalchemy.orm import Session
 
 from app.clients.chatbot import ChatbotClient, ChatbotIndisponivel
 from app.config import settings
-from app.db import get_db
+from app.control.google_ads_conversions import (
+    EVENT_VENDA_CONFIRMADA,
+    EnqueueConversion,
+    GoogleAdsConversionsControl,
+)
+from app.db import SessionLocal, get_db
 from app.financeiro_calc import calcular_metricas_vendas, hoje_portal, periodo_padrao
 from app.meta_capi import enfileirar_purchase
 from app.meta_capi_messaging import enfileirar_purchase_messaging
-from app.models import Campanha, CampanhaGasto, MetaCapiOutbox, agora
+from app.models import Campanha, CampanhaGasto, Loja, MetaCapiOutbox, agora
 from app.resultados import resumo_periodo
 from app.roi_calc import calcular_roi_loja, totais_roi
 from app.service_auth import exigir_service_token
@@ -190,6 +195,7 @@ class VendaConfirmadaBody(VendaSnapshotBody):
     gclid: str | None = None
     gbraid: str | None = None
     wbraid: str | None = None
+    consent_ad_user_data: bool = False
     ctwa_clid: str | None = None
 
 
@@ -342,8 +348,55 @@ def api_venda_confirmada(
             status_code=503,
         )
     db.commit()
+
+    # Hook lean Google Ads (fire-and-forget): não bloqueia nem reverte a venda.
+    google_outbox_id = _maybe_enqueue_google_conversion(slug, body)
+
     return {
         "ok": True,
         "outbox_id": outbox.id,
         "idempotent": False,
+        "google_ads_outbox_id": google_outbox_id,
     }
+
+
+def _maybe_enqueue_google_conversion(
+    loja_slug: str,
+    body: VendaConfirmadaBody,
+) -> str | None:
+    if not settings.google_conversions_enabled:
+        return None
+    gclid = (body.gclid or "").strip() or None
+    gbraid = (body.gbraid or "").strip() or None
+    wbraid = (body.wbraid or "").strip() or None
+    if not gclid and not gbraid and not wbraid:
+        return None
+    try:
+        with SessionLocal() as session:
+            loja = (
+                session.query(Loja)
+                .filter(Loja.slug == loja_slug.strip())
+                .first()
+            )
+            if loja is None:
+                return None
+            loja_id = loja.id
+        view = GoogleAdsConversionsControl(SessionLocal).enqueue_conversion(
+            EnqueueConversion(
+                loja_id=loja_id,
+                event_type=EVENT_VENDA_CONFIRMADA,
+                domain_event_id=(body.event_id or body.venda_id).strip(),
+                gclid=gclid,
+                gbraid=gbraid,
+                wbraid=wbraid,
+                value=body.valor,
+                currency=body.moeda or "BRL",
+                consent=bool(body.consent_ad_user_data),
+                email=body.cliente_email,
+                phone=body.cliente_telefone,
+                conversion_time=body.confirmada_em,
+            )
+        )
+        return view.id if view is not None else None
+    except Exception:
+        return None

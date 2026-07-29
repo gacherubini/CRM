@@ -38,6 +38,22 @@ from app.control.google_ads import (
     GoogleAdsTokenExchangeError,
     OAuthTokenBundle,
 )
+from app.control.google_ads_conversions import (
+    ConversionBindingView,
+    GoogleAdsConversionsControl,
+    GoogleAdsConversionBindingNotFound,
+    GoogleAdsInvalidConversionBinding,
+)
+from app.control.google_ads_metrics import (
+    GoogleAdsAccountNotFound,
+    GoogleAdsAccountView,
+    GoogleAdsManagerAccountNotSelectable,
+    GoogleAdsMetricsControl,
+    GoogleAdsNoSelectedAccount,
+    GoogleAdsNotConnected,
+    MetricsSummary,
+    SyncMetricsResult,
+)
 from app.control.invitations import ControlInvitations
 from app.control.password_recovery import ControlPasswordRecovery
 from app.control.people import PeopleDirectory
@@ -147,6 +163,15 @@ def _google_ads_enabled() -> None:
         )
 
 
+def _google_conversions_enabled() -> None:
+    _control_enabled()
+    if not settings.google_conversions_enabled:
+        raise HTTPException(
+            status_code=404,
+            detail={"code": "not_found", "message": "recurso não encontrado"},
+        )
+
+
 def _control_dashboard_enabled() -> None:
     _control_enabled()
     if not settings.revy_control_dashboard_enabled:
@@ -164,6 +189,14 @@ def _google_ads_control() -> GoogleAdsConnectionControl:
         redirect_uri=settings.google_ads_oauth_redirect_uri,
         token_exchanger=_google_ads_token_exchanger,
     )
+
+
+def _google_ads_metrics_control() -> GoogleAdsMetricsControl:
+    return GoogleAdsMetricsControl(SessionLocal)
+
+
+def _google_ads_conversions_control() -> GoogleAdsConversionsControl:
+    return GoogleAdsConversionsControl(SessionLocal)
 
 
 def _current_actor(
@@ -1098,6 +1131,215 @@ def _google_ads_connection_json(
     }
 
 
+class GoogleAdsSyncMetricsBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    date_from: str = Field(min_length=10, max_length=10)
+    date_to: str = Field(min_length=10, max_length=10)
+
+
+class GoogleAdsBindConversionBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    revy_event_type: str = Field(min_length=1, max_length=80)
+    conversion_action_resource_name: str = Field(min_length=1, max_length=240)
+    customer_id: str = Field(min_length=1, max_length=20)
+    active: bool = True
+
+
+@router.get(
+    "/lojas/{loja_id}/google-ads/accounts",
+    dependencies=[Depends(_google_ads_enabled)],
+)
+def list_google_ads_accounts(
+    loja_id: str,
+    actor: Actor = Depends(_current_actor),
+):
+    try:
+        items = _google_ads_metrics_control().list_accounts(
+            actor,
+            StoreRef(id=loja_id),
+        )
+    except ControlError as exc:
+        _raise_domain_error(exc)
+    return {"items": [_google_ads_account_json(a) for a in items]}
+
+
+@router.post(
+    "/lojas/{loja_id}/google-ads/accounts/sync",
+    dependencies=[Depends(_google_ads_enabled)],
+)
+def sync_google_ads_accounts(
+    loja_id: str,
+    actor: Actor = Depends(_current_actor),
+):
+    try:
+        items = _google_ads_metrics_control().sync_accounts(
+            actor,
+            StoreRef(id=loja_id),
+        )
+    except ControlError as exc:
+        _raise_domain_error(exc)
+    return {"items": [_google_ads_account_json(a) for a in items]}
+
+
+@router.post(
+    "/lojas/{loja_id}/google-ads/accounts/{customer_id}/select",
+    dependencies=[Depends(_google_ads_enabled)],
+)
+def select_google_ads_account(
+    loja_id: str,
+    customer_id: str,
+    actor: Actor = Depends(_current_actor),
+):
+    try:
+        account = _google_ads_metrics_control().select_account(
+            actor,
+            StoreRef(id=loja_id),
+            customer_id,
+        )
+    except ControlError as exc:
+        _raise_domain_error(exc)
+    return _google_ads_account_json(account)
+
+
+@router.post(
+    "/lojas/{loja_id}/google-ads/metrics/sync",
+    dependencies=[Depends(_google_ads_enabled)],
+)
+def sync_google_ads_metrics(
+    loja_id: str,
+    body: GoogleAdsSyncMetricsBody,
+    actor: Actor = Depends(_current_actor),
+):
+    try:
+        result = _google_ads_metrics_control().sync_metrics(
+            actor,
+            StoreRef(id=loja_id),
+            date_from=body.date_from,
+            date_to=body.date_to,
+        )
+    except ControlError as exc:
+        _raise_domain_error(exc)
+    return _google_ads_sync_metrics_json(result)
+
+
+@router.get(
+    "/lojas/{loja_id}/google-ads/metrics/summary",
+    dependencies=[Depends(_google_ads_enabled)],
+)
+def get_google_ads_metrics_summary(
+    loja_id: str,
+    date_from: str = Query(min_length=10, max_length=10),
+    date_to: str = Query(min_length=10, max_length=10),
+    actor: Actor = Depends(_current_actor),
+):
+    try:
+        summary = _google_ads_metrics_control().metrics_summary(
+            actor,
+            StoreRef(id=loja_id),
+            date_from=date_from,
+            date_to=date_to,
+        )
+    except ControlError as exc:
+        _raise_domain_error(exc)
+    return _google_ads_metrics_summary_json(summary)
+
+
+@router.get(
+    "/lojas/{loja_id}/google-ads/conversion-bindings",
+    dependencies=[Depends(_google_conversions_enabled)],
+)
+def list_google_ads_conversion_bindings(
+    loja_id: str,
+    actor: Actor = Depends(_current_actor),
+):
+    try:
+        items = _google_ads_conversions_control().list_bindings(
+            actor,
+            StoreRef(id=loja_id),
+        )
+    except ControlError as exc:
+        _raise_domain_error(exc)
+    return {"items": [_google_ads_binding_json(b) for b in items]}
+
+
+@router.post(
+    "/lojas/{loja_id}/google-ads/conversion-bindings",
+    dependencies=[Depends(_google_conversions_enabled)],
+)
+def bind_google_ads_conversion_action(
+    loja_id: str,
+    body: GoogleAdsBindConversionBody,
+    actor: Actor = Depends(_current_actor),
+):
+    try:
+        binding = _google_ads_conversions_control().bind_conversion_action(
+            actor,
+            StoreRef(id=loja_id),
+            revy_event_type=body.revy_event_type,
+            conversion_action_resource_name=body.conversion_action_resource_name,
+            customer_id=body.customer_id,
+            active=body.active,
+        )
+    except ControlError as exc:
+        _raise_domain_error(exc)
+    return _google_ads_binding_json(binding)
+
+
+def _google_ads_account_json(account: GoogleAdsAccountView) -> dict[str, object]:
+    return {
+        "id": account.id,
+        "loja_id": account.loja_id,
+        "customer_id": account.customer_id,
+        "login_customer_id": account.login_customer_id,
+        "is_manager": account.is_manager,
+        "currency_code": account.currency_code,
+        "time_zone": account.time_zone,
+        "descriptive_name": account.descriptive_name,
+        "selected": account.selected,
+        "status": account.status,
+    }
+
+
+def _google_ads_sync_metrics_json(result: SyncMetricsResult) -> dict[str, object]:
+    return {
+        "loja_id": result.loja_id,
+        "customer_id": result.customer_id,
+        "rows_upserted": result.rows_upserted,
+        "date_from": result.date_from,
+        "date_to": result.date_to,
+    }
+
+
+def _google_ads_metrics_summary_json(summary: MetricsSummary) -> dict[str, object]:
+    # Sem tokens/segredos; apenas agregados de medição.
+    return {
+        "loja_id": summary.loja_id,
+        "customer_id": summary.customer_id,
+        "date_from": summary.date_from,
+        "date_to": summary.date_to,
+        "impressions": summary.impressions,
+        "clicks": summary.clicks,
+        "cost_micros": summary.cost_micros,
+        "cost": str(summary.cost),
+        "conversions": str(summary.conversions),
+        "conversions_value": str(summary.conversions_value),
+        "currency_code": summary.currency_code,
+        "ctr": str(summary.ctr) if summary.ctr is not None else None,
+        "cpc": str(summary.cpc) if summary.cpc is not None else None,
+    }
+
+
+def _google_ads_binding_json(binding: ConversionBindingView) -> dict[str, object]:
+    return {
+        "id": binding.id,
+        "loja_id": binding.loja_id,
+        "revy_event_type": binding.revy_event_type,
+        "conversion_action_resource_name": binding.conversion_action_resource_name,
+        "customer_id": binding.customer_id,
+        "active": binding.active,
+    }
+
+
 def _store_json(store: StoreView) -> dict[str, str]:
     return {
         "id": store.id,
@@ -1331,6 +1573,18 @@ def _raise_domain_error(exc: ControlError) -> NoReturn:
         status_code, code = 503, "google_ads_oauth_misconfigured"
     elif isinstance(exc, GoogleAdsTokenExchangeError):
         status_code, code = 502, "google_ads_token_exchange_error"
+    elif isinstance(exc, GoogleAdsManagerAccountNotSelectable):
+        status_code, code = 400, "google_ads_manager_not_selectable"
+    elif isinstance(exc, GoogleAdsAccountNotFound):
+        status_code, code = 404, "google_ads_account_not_found"
+    elif isinstance(exc, GoogleAdsNotConnected):
+        status_code, code = 409, "google_ads_not_connected"
+    elif isinstance(exc, GoogleAdsNoSelectedAccount):
+        status_code, code = 409, "google_ads_no_selected_account"
+    elif isinstance(exc, GoogleAdsConversionBindingNotFound):
+        status_code, code = 404, "google_ads_conversion_binding_not_found"
+    elif isinstance(exc, GoogleAdsInvalidConversionBinding):
+        status_code, code = 400, "google_ads_invalid_conversion_binding"
     elif isinstance(exc, StoreSlugConflict):
         status_code, code = 409, "store_slug_conflict"
     elif isinstance(exc, StoreEditConflict):
