@@ -262,10 +262,10 @@ Adicionar:
 
 Pendências para concluir a Fase 2:
 
-- expandir gates finos (WA inbound/outbound; confirmar venda no Portal);
-- rollout lab: seguir
-  [runbook de provisionamento](2026-07-29-runbook-rollout-lab-provisionamento.md)
-  (migrations + flags + tokens + smoke 423/404).
+- ~~expandir gates finos (WA / confirmar venda)~~ **feito no código**
+  (`feat(chatbot): captura passiva…`, `feat(portal): bloqueia confirmar venda…`);
+- rollout lab residual: recriar Evolution/n8n se precisar de WA E2E; smoke reativar loja;
+  ver [runbook](2026-07-29-runbook-rollout-lab-provisionamento.md).
 
 ### Critério de pronto
 
@@ -305,7 +305,9 @@ ser chamadas pela interface da Central de Integrações.
 - [ ] Alerta aceito não bloqueia e gera auditoria.
 - [ ] Suspensão interrompe jobs da loja sem apagar filas/histórico.
 - [ ] Falha externa é sanitizada e não vaza segredo.
-- [ ] Readiness é determinístico e testado pela interface.
+- [x] Readiness é determinístico e testado pela interface
+      (`StoreReadiness` + `GET /control/v1/lojas/{id}/prontidao`; slice lean sem
+      Central de Integrações Meta completa).
 
 ### Critério de pronto
 
