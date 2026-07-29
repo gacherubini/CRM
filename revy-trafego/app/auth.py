@@ -8,6 +8,7 @@ from argon2.exceptions import InvalidHashError, VerifyMismatchError
 from fastapi import Request
 from sqlalchemy.orm import Session
 
+from app.control.access_backfill import backfill_acessos_control
 from app.models import GestorRevy
 
 _hasher = PasswordHasher()
@@ -98,6 +99,12 @@ def csrf_valido(request: Request, enviado: str | None) -> bool:
 
 def bootstrap_gestor_se_vazio(db: Session, *, email: str, senha: str, nome: str) -> GestorRevy | None:
     if db.query(GestorRevy).count() > 0:
+        try:
+            backfill_acessos_control(db.connection())
+            db.commit()
+        except Exception:
+            db.rollback()
+            raise
         return None
     if not email or not senha:
         return None
@@ -109,6 +116,12 @@ def bootstrap_gestor_se_vazio(db: Session, *, email: str, senha: str, nome: str)
         ativo=True,
     )
     db.add(gestor)
-    db.commit()
+    try:
+        db.flush()
+        backfill_acessos_control(db.connection())
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
     db.refresh(gestor)
     return gestor
