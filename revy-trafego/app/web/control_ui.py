@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, Request
@@ -13,7 +14,9 @@ from app.config import settings
 from app.control.access import AccessControl
 from app.control.accounts import ControlAccounts
 from app.control.audit import AuditTrail
+from app.control.contracts import ContractControl, ContractNotFound
 from app.control.people import PeopleDirectory
+from app.control.portfolio import PortfolioControl
 from app.control.roles import StoreRoles
 from app.control.session import actor_from_user
 from app.control.stores import StoreControl
@@ -61,6 +64,18 @@ def _public_path(path: str) -> str:
 
 
 templates.env.globals["public_path"] = _public_path
+
+
+def _format_brl(value: Decimal) -> str:
+    try:
+        amount = Decimal(value)
+        if not amount.is_finite():
+            return "—"
+        formatted = f"{amount:,.2f}"
+    except (InvalidOperation, TypeError, ValueError):
+        return "—"
+    integer, decimal = formatted.split(".")
+    return f"R$ {integer.replace(',', '.')},{decimal}"
 
 
 @router.get("/app/control/lojas", response_class=HTMLResponse)
@@ -618,14 +633,20 @@ def _render_store_detail(
     status_code: int = 200,
 ):
     actor = actor_from_user(manager)
+    store_ref = StoreRef(id=loja_id)
     try:
-        store = StoreControl(SessionLocal).get(actor, StoreRef(id=loja_id))
+        store = StoreControl(SessionLocal).get(actor, store_ref)
+        modules = PortfolioControl(SessionLocal).list_modules(actor, store_ref)
         audit = AuditTrail(SessionLocal).list(
             actor,
             AuditQuery(store_id=loja_id, limit=100),
         )
     except StoreNotFound:
         return HTMLResponse("Loja não encontrada.", status_code=404)
+    try:
+        contract = ContractControl(SessionLocal).get(actor, store_ref)
+    except ContractNotFound:
+        contract = None
 
     store_people = ()
     if manager.papel == "admin":
@@ -660,6 +681,13 @@ def _render_store_detail(
             "control_enabled": settings.revy_control_enabled,
             "control_rbac_enabled": settings.revy_control_rbac_enabled,
             "store": store,
+            "modules": modules,
+            "contract": contract,
+            "contract_amount_brl": (
+                _format_brl(contract.monthly_amount)
+                if contract is not None
+                else None
+            ),
             "audit_events": audit.items,
             "store_statuses": tuple(StoreStatus),
             "store_roles": tuple(StoreRole),

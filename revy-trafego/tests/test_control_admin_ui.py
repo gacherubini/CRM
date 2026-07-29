@@ -1,8 +1,17 @@
+import re
 from dataclasses import replace
+from datetime import date
+from decimal import Decimal
 
 from app.auth import hash_senha
 from app.config import settings
 from app.control.access import AccessControl
+from app.control.contracts import (
+    ContractBillingStatus,
+    ContractControl,
+    UpsertContract,
+)
+from app.control.portfolio import PortfolioControl
 from app.control.stores import StoreControl
 from app.control.types import (
     Actor,
@@ -12,7 +21,7 @@ from app.control.types import (
     TrafficRole,
 )
 from app.db import SessionLocal
-from app.models import GestorRevy, Loja, VinculoTrafego
+from app.models import GestorRevy, Loja, ModuloRevy, VinculoTrafego
 from app.web import control_ui as control_ui_mod
 from tests.conftest import csrf_da_resposta
 
@@ -43,6 +52,17 @@ def _admin_actor() -> Actor:
             name=admin.nome,
             role=admin.papel,
         )
+
+
+def _seed_module_catalog() -> None:
+    with SessionLocal() as db:
+        db.add_all(
+            [
+                ModuloRevy(id="vendas", codigo="vendas", nome="Vendas"),
+                ModuloRevy(id="estoque", codigo="estoque", nome="Estoque"),
+            ]
+        )
+        db.commit()
 
 
 def test_control_ui_fica_oculta_e_redireciona_sem_sessao(client, monkeypatch):
@@ -242,6 +262,60 @@ def test_detalhe_mostra_estado_e_auditoria_somente_no_escopo(
     assert 'id="form-conceder-gestor"' not in manager_page.text
     assert 'id="form-revogar-gestor"' not in manager_page.text
     assert hidden.status_code == 404
+
+
+def test_detalhe_exibe_versoes_modulos_e_contrato_ativo(client, monkeypatch):
+    _seed_module_catalog()
+    admin = _admin_actor()
+    store = StoreControl(SessionLocal).create(
+        admin,
+        CreateStore(name="Loja Configurada", slug="loja-configurada"),
+    )
+    store_ref = StoreRef(id=store.id)
+    portfolio = PortfolioControl(SessionLocal)
+    portfolio.configure(admin, store_ref, {"vendas", "estoque"})
+    portfolio.suspend(
+        admin,
+        store_ref,
+        "estoque",
+        reason="pausa de inventário",
+    )
+    ContractControl(SessionLocal).upsert(
+        admin,
+        UpsertContract(
+            store=store_ref,
+            monthly_amount=Decimal("1299.90"),
+            starts_on=date(2026, 8, 1),
+            ends_on=date(2027, 7, 31),
+            due_day=12,
+            billing_status=ContractBillingStatus.OVERDUE,
+        ),
+    )
+    _enable_control_ui(monkeypatch)
+    _login(client, "trafego@revy.local", "secret-teste")
+
+    page = client.get(f"/app/control/lojas/{store.id}")
+
+    assert page.status_code == 200
+    assert re.search(
+        r'id="loja-versao"[^>]*>\s*Versão 1\s*<',
+        page.text,
+    )
+    assert re.search(
+        r'id="modulo-vendas".*?<td>Vendas</td>.*?<td>ativo</td>.*?<td>1</td>',
+        page.text,
+        re.DOTALL,
+    )
+    assert re.search(
+        r'id="modulo-estoque".*?<td>Estoque</td>.*?<td>suspenso</td>.*?<td>2</td>',
+        page.text,
+        re.DOTALL,
+    )
+    assert 'id="contrato-ativo"' in page.text
+    assert "R$ 1.299,90" in page.text
+    assert "01/08/2026 a 31/07/2027" in page.text
+    assert "Dia 12" in page.text
+    assert "atrasada" in page.text
 
 
 def test_admin_transiciona_concede_revoga_e_gestor_nao_muta(

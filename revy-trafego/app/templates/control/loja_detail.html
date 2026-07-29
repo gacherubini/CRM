@@ -7,7 +7,10 @@
     <a class="back-link" href="{{ public_path('/app/control/lojas') }}">← Lojas</a>
     <span class="eyebrow">Revy Control</span>
     <h1>{{ store.name }}</h1>
-    <p><code>{{ store.slug }}</code> · Estado: <strong>{{ store.status.value }}</strong></p>
+    <p>
+      <code>{{ store.slug }}</code> · Estado: <strong>{{ store.status.value }}</strong>
+      · <span id="loja-versao">Versão {{ store.version }}</span>
+    </p>
   </div>
 </div>
 
@@ -25,6 +28,64 @@
 {% if erro %}
 <div class="alert error" role="alert">{{ erro }}</div>
 {% endif %}
+
+<section class="panel" id="modulos-contratados">
+  <h2>Módulos contratados</h2>
+  {% if modules %}
+  <div style="overflow-x:auto">
+    <table>
+      <thead>
+        <tr>
+          <th>Módulo</th>
+          <th>Estado</th>
+          <th>Versão</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for module in modules %}
+        <tr id="modulo-{{ module.code.value }}">
+          <td>{{ module.name }}</td>
+          <td>{{ module.status.value }}</td>
+          <td>{{ module.version }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty"><strong>Nenhum módulo contratado.</strong></div>
+  {% endif %}
+</section>
+
+<section class="panel" id="{{ 'contrato-ativo' if contract else 'contrato-ausente' }}">
+  <h2>Contrato</h2>
+  {% if contract %}
+  <div style="overflow-x:auto">
+    <table>
+      <tbody>
+        <tr>
+          <th>Valor mensal</th>
+          <td>{{ contract_amount_brl }}</td>
+        </tr>
+        <tr>
+          <th>Vigência</th>
+          <td>{{ contract.starts_on.strftime('%d/%m/%Y') }} a {{ contract.ends_on.strftime('%d/%m/%Y') if contract.ends_on else 'sem término' }}</td>
+        </tr>
+        <tr>
+          <th>Vencimento</th>
+          <td>Dia {{ contract.due_day }}</td>
+        </tr>
+        <tr>
+          <th>Cobrança</th>
+          <td>{{ contract.billing_status.value }}</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty"><strong>Nenhum contrato ativo.</strong></div>
+  {% endif %}
+</section>
 
 {% if is_admin %}
 <section class="panel form-section" id="pessoas-cargos">
