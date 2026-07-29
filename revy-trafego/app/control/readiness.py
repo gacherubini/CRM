@@ -4,6 +4,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
+from app.control.integrations import pixel_configured, vendas_module_active
 from app.control.types import Actor, StoreNotFound, StoreRef, StoreRole, StoreStatus
 from app.models import (
     AcessoControl,
@@ -16,12 +17,14 @@ from app.models import (
 )
 
 # Ordem determinística estável (não alfabética pura: active_owner precede
-# activatable_owner por dependência lógica).
+# activatable_owner por dependência lógica). meta_pixel só entra quando o
+# módulo vendas está ativo (alerta, não bloqueia prontidão).
 _CHECK_ORDER = (
     "active_owner",
     "activatable_owner",
     "module_selected",
     "contract_present",
+    "meta_pixel",
 )
 
 _REQUIRED_CODES = frozenset(
@@ -109,14 +112,23 @@ def build_readiness_report(db: Any, store: Any) -> ReadinessReport:
         .first()
         is not None
     )
+    has_vendas = vendas_module_active(db, store.id)
+    has_pixel = pixel_configured(db, store) if has_vendas else True
 
     facts = {
         "active_owner": has_active_owner,
         "activatable_owner": has_activatable_owner,
         "module_selected": has_module,
         "contract_present": has_contract,
+        "meta_pixel": has_pixel,
     }
-    checks = tuple(_check_for(code, facts[code]) for code in _CHECK_ORDER)
+    # meta_pixel só aparece quando o módulo vendas está contratado/ativo.
+    order = (
+        _CHECK_ORDER
+        if has_vendas
+        else tuple(code for code in _CHECK_ORDER if code != "meta_pixel")
+    )
+    checks = tuple(_check_for(code, facts[code]) for code in order)
     ready = all(check.ok for check in checks if check.severity == "required")
     return ReadinessReport(
         store_id=store.id,
@@ -164,6 +176,11 @@ def _message_for(code: str, ok: bool) -> str:
             "Loja possui contrato ativo"
             if ok
             else "Loja sem contrato ativo (alerta)"
+        ),
+        "meta_pixel": (
+            "Pixel Meta e CAPI configurados"
+            if ok
+            else "Módulo vendas ativo sem Pixel/CAPI (alerta de medição)"
         ),
     }
     return messages[code]

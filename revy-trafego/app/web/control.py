@@ -21,6 +21,13 @@ from app.control.contracts import (
     ContractView,
     UpsertContract,
 )
+from app.control.integrations import (
+    IntegrationView,
+    IntegrationsControl,
+    InvalidIntegrationConfig,
+    UpsertMetaAds,
+    UpsertPixel,
+)
 from app.control.invitations import ControlInvitations
 from app.control.password_recovery import ControlPasswordRecovery
 from app.control.people import PeopleDirectory
@@ -292,6 +299,31 @@ class TrafficRevokeBody(BaseModel):
     motivo: str | None = Field(default=None, max_length=1000)
 
 
+class PixelUpsertBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    pixel_id: str = Field(min_length=1, max_length=64)
+    token: str | None = Field(default=None, max_length=512)
+    test_event_code: str | None = Field(default=None, max_length=64)
+    enviar_page_view: bool = True
+    enviar_lead: bool = True
+    enviar_purchase: bool = True
+
+
+class MetaAdsUpsertBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    ad_account_id: str = Field(min_length=1, max_length=64)
+    token: str | None = Field(default=None, max_length=512)
+    sync_enabled: bool = True
+
+
+class IntegrationDisconnectBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    motivo: str | None = Field(default=None, max_length=1000)
+
+
 @router.get("/acessos")
 def list_control_accounts(actor: Actor = Depends(_current_actor)):
     try:
@@ -475,6 +507,102 @@ def get_store_readiness(
     except ControlError as exc:
         _raise_domain_error(exc)
     return _readiness_json(report)
+
+
+@router.get("/lojas/{loja_id}/integracoes")
+def list_store_integrations(
+    loja_id: str,
+    actor: Actor = Depends(_current_actor),
+):
+    try:
+        items = IntegrationsControl(SessionLocal).list(
+            actor,
+            StoreRef(id=loja_id),
+        )
+    except ControlError as exc:
+        _raise_domain_error(exc)
+    return {"items": [_integration_json(item) for item in items]}
+
+
+@router.put("/lojas/{loja_id}/integracoes/pixel")
+def upsert_store_pixel(
+    loja_id: str,
+    body: PixelUpsertBody,
+    actor: Actor = Depends(_current_actor),
+):
+    try:
+        view = IntegrationsControl(SessionLocal).upsert_pixel(
+            actor,
+            UpsertPixel(
+                store=StoreRef(id=loja_id),
+                pixel_id=body.pixel_id,
+                token=body.token,
+                test_event_code=body.test_event_code,
+                enviar_page_view=body.enviar_page_view,
+                enviar_lead=body.enviar_lead,
+                enviar_purchase=body.enviar_purchase,
+            ),
+        )
+    except ControlError as exc:
+        _raise_domain_error(exc)
+    return _integration_json(view)
+
+
+@router.post("/lojas/{loja_id}/integracoes/pixel/desconectar")
+def disconnect_store_pixel(
+    loja_id: str,
+    body: IntegrationDisconnectBody | None = None,
+    actor: Actor = Depends(_current_actor),
+):
+    payload = body or IntegrationDisconnectBody()
+    try:
+        view = IntegrationsControl(SessionLocal).disconnect_pixel(
+            actor,
+            StoreRef(id=loja_id),
+            reason=payload.motivo,
+        )
+    except ControlError as exc:
+        _raise_domain_error(exc)
+    return _integration_json(view)
+
+
+@router.put("/lojas/{loja_id}/integracoes/meta-ads")
+def upsert_store_meta_ads(
+    loja_id: str,
+    body: MetaAdsUpsertBody,
+    actor: Actor = Depends(_current_actor),
+):
+    try:
+        view = IntegrationsControl(SessionLocal).upsert_meta_ads(
+            actor,
+            UpsertMetaAds(
+                store=StoreRef(id=loja_id),
+                ad_account_id=body.ad_account_id,
+                token=body.token,
+                sync_enabled=body.sync_enabled,
+            ),
+        )
+    except ControlError as exc:
+        _raise_domain_error(exc)
+    return _integration_json(view)
+
+
+@router.post("/lojas/{loja_id}/integracoes/meta-ads/desconectar")
+def disconnect_store_meta_ads(
+    loja_id: str,
+    body: IntegrationDisconnectBody | None = None,
+    actor: Actor = Depends(_current_actor),
+):
+    payload = body or IntegrationDisconnectBody()
+    try:
+        view = IntegrationsControl(SessionLocal).disconnect_meta_ads(
+            actor,
+            StoreRef(id=loja_id),
+            reason=payload.motivo,
+        )
+    except ControlError as exc:
+        _raise_domain_error(exc)
+    return _integration_json(view)
 
 
 @router.patch("/lojas/{loja_id}")
@@ -787,6 +915,20 @@ def _readiness_json(report: ReadinessReport) -> dict[str, object]:
     }
 
 
+def _integration_json(view: IntegrationView) -> dict[str, object]:
+    return {
+        "tipo": view.kind.value,
+        "status": view.status.value,
+        "loja_id": view.store_id,
+        "loja_slug": view.store_slug,
+        "campos": view.fields,
+        "atualizada_em": (
+            view.updated_at.isoformat() if view.updated_at is not None else None
+        ),
+        "saude": view.health_message,
+    }
+
+
 def _person_json(person: PersonView) -> dict[str, str]:
     return {
         "id": person.id,
@@ -950,6 +1092,8 @@ def _raise_domain_error(exc: ControlError) -> NoReturn:
         status_code, code = 403, "access_denied"
     elif isinstance(exc, InvalidPersonEmail):
         status_code, code = 400, "invalid_person_email"
+    elif isinstance(exc, InvalidIntegrationConfig):
+        status_code, code = 400, "invalid_integration_config"
     elif isinstance(exc, PersonNotFound):
         status_code, code = 404, "person_not_found"
     elif isinstance(exc, StoreNotFound):
