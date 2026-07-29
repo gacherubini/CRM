@@ -800,6 +800,13 @@ def registrar_mensagem(
     }
 
 
+def _bot_ativo_efetivo(db: Session, loja_id: str, bot_ativo: bool) -> bool:
+    """n8n só deve enviar se bot_ativo e loja operacional (ADR outbound BLOCK)."""
+    from app import provisioning
+
+    return bool(bot_ativo) and provisioning.allows_outbound_whatsapp(db, loja_id)
+
+
 def obter_estado(db: Session, loja_id: str, telefone: str) -> dict:
     conversa = (
         db.query(Conversa)
@@ -807,17 +814,39 @@ def obter_estado(db: Session, loja_id: str, telefone: str) -> dict:
         .first()
     )
     if conversa is None:
-        return {"bot_ativo": True, "status": "aberta"}
-    return {"bot_ativo": conversa.bot_ativo, "status": conversa.status}
+        return {
+            "bot_ativo": _bot_ativo_efetivo(db, loja_id, True),
+            "status": "aberta",
+        }
+    return {
+        "bot_ativo": _bot_ativo_efetivo(db, loja_id, conversa.bot_ativo),
+        "status": conversa.status,
+    }
 
 
 def definir_bot_ativo(db: Session, loja_id: str, telefone: str, ativo: bool) -> dict:
+    from app import provisioning
+
+    if ativo and not provisioning.allows_outbound_whatsapp(db, loja_id):
+        from fastapi import HTTPException
+
+        raise HTTPException(
+            status_code=423,
+            detail={
+                "code": "store_not_operational",
+                "message": "loja não operacional",
+                "loja_operacional": False,
+            },
+        )
     conversa = _get_or_create_conversa(db, loja_id, telefone)
     conversa.bot_ativo = ativo
     conversa.status = "aberta" if ativo else "handoff"
     conversa.atualizada_em = datetime.now(timezone.utc)
     db.commit()
-    return {"bot_ativo": conversa.bot_ativo, "status": conversa.status}
+    return {
+        "bot_ativo": _bot_ativo_efetivo(db, loja_id, conversa.bot_ativo),
+        "status": conversa.status,
+    }
 
 
 # --- Conversas e mensagens (handoff/Portal) ----------------------------------
