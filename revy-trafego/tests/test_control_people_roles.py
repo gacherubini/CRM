@@ -23,8 +23,11 @@ from app.control.types import (
     StoreRef,
     StoreRole,
     StoreRoleConflict,
+    StoreReadinessBlocked,
     StoreNotFound,
     TrafficRole,
+    StoreStatus,
+    TransitionStore,
 )
 from app.db import SessionLocal
 from app.models import GestorRevy
@@ -59,6 +62,258 @@ def _manager_actor(email: str) -> Actor:
             name=manager.nome,
             role=manager.papel,
         )
+
+
+_TRANSITIONS_TO = {
+    StoreStatus.DRAFT: (),
+    StoreStatus.CONFIGURING: (StoreStatus.CONFIGURING,),
+    StoreStatus.READY: (StoreStatus.CONFIGURING, StoreStatus.READY),
+    StoreStatus.ACTIVE: (
+        StoreStatus.CONFIGURING,
+        StoreStatus.READY,
+        StoreStatus.ACTIVE,
+    ),
+    StoreStatus.SUSPENDED: (
+        StoreStatus.CONFIGURING,
+        StoreStatus.READY,
+        StoreStatus.ACTIVE,
+        StoreStatus.SUSPENDED,
+    ),
+    StoreStatus.CLOSED: (
+        StoreStatus.CONFIGURING,
+        StoreStatus.READY,
+        StoreStatus.ACTIVE,
+        StoreStatus.SUSPENDED,
+        StoreStatus.CLOSED,
+    ),
+}
+
+
+def _store_with_owners(admin, *, slug, status, owner_count=1):
+    stores = StoreControl(SessionLocal)
+    people = PeopleDirectory(SessionLocal)
+    roles = StoreRoles(SessionLocal)
+    store = stores.create(
+        admin,
+        CreateStore(name=f"Loja {slug}", slug=slug),
+    )
+    owners = [
+        people.register(
+            admin,
+            RegisterPerson(
+                name=f"Dono {index}",
+                email=f"{slug}.dono-{index}@example.com",
+            ),
+        )
+        for index in range(1, owner_count + 1)
+    ]
+    assigned = [
+        roles.assign(
+            admin,
+            AssignStoreRole(
+                store=StoreRef(id=store.id),
+                person=PersonRef(id=owner.id),
+                role=StoreRole.OWNER,
+            ),
+        )
+        for owner in owners
+    ]
+    for target in _TRANSITIONS_TO[status]:
+        stores.transition(
+            admin,
+            TransitionStore(
+                store=StoreRef(id=store.id),
+                target=target,
+            ),
+        )
+    return stores, roles, store, owners, assigned
+
+
+def test_loja_em_configuracao_sem_dono_nao_pode_ficar_pronta():
+    admin = _admin_actor()
+    stores = StoreControl(SessionLocal)
+    store = stores.create(
+        admin,
+        CreateStore(name="Loja sem Dono", slug="loja-sem-dono"),
+    )
+    configuring = stores.transition(
+        admin,
+        TransitionStore(
+            store=StoreRef(id=store.id),
+            target=StoreStatus.CONFIGURING,
+        ),
+    )
+
+    with pytest.raises(StoreReadinessBlocked) as error:
+        stores.transition(
+            admin,
+            TransitionStore(
+                store=StoreRef(id=store.id),
+                target=StoreStatus.READY,
+            ),
+        )
+
+    current = stores.get(admin, StoreRef(id=store.id))
+    events = AuditTrail(SessionLocal).list(
+        admin,
+        AuditQuery(store_id=store.id),
+    ).items
+    assert configuring.status is StoreStatus.CONFIGURING
+    assert error.value.store_id == store.id
+    assert error.value.requirement == "active_owner"
+    assert current.status is StoreStatus.CONFIGURING
+    assert [event.action for event in events] == [
+        "store.created",
+        "store.status_changed",
+    ]
+
+
+def test_dono_revogado_nao_satisfaz_prontidao_da_loja():
+    admin = _admin_actor()
+    stores, roles, store, owners, _ = _store_with_owners(
+        admin,
+        slug="loja-sem-dono-ativo",
+        status=StoreStatus.CONFIGURING,
+    )
+    roles.revoke(
+        admin,
+        RevokeStoreRole(
+            store=StoreRef(id=store.id),
+            person=PersonRef(id=owners[0].id),
+            role=StoreRole.OWNER,
+        ),
+    )
+
+    with pytest.raises(StoreReadinessBlocked):
+        stores.transition(
+            admin,
+            TransitionStore(
+                store=StoreRef(id=store.id),
+                target=StoreStatus.READY,
+            ),
+        )
+
+    assert stores.get(admin, StoreRef(id=store.id)).status is StoreStatus.CONFIGURING
+
+
+def test_dono_ativo_permite_loja_ficar_pronta():
+    admin = _admin_actor()
+    stores, _, store, _, _ = _store_with_owners(
+        admin,
+        slug="loja-com-dono",
+        status=StoreStatus.CONFIGURING,
+    )
+
+    ready = stores.transition(
+        admin,
+        TransitionStore(
+            store=StoreRef(id=store.id),
+            target=StoreStatus.READY,
+        ),
+    )
+
+    assert ready.status is StoreStatus.READY
+
+
+@pytest.mark.parametrize(
+    "protected_status",
+    (
+        StoreStatus.READY,
+        StoreStatus.ACTIVE,
+        StoreStatus.SUSPENDED,
+    ),
+)
+def test_revogar_ultimo_dono_de_loja_operacional_preserva_estado_e_historico(
+    protected_status,
+):
+    admin = _admin_actor()
+    audit = AuditTrail(SessionLocal)
+    stores, roles, store, owners, assigned = _store_with_owners(
+        admin,
+        slug="loja-operacional-protegida",
+        status=protected_status,
+    )
+    events_before = audit.list(admin, AuditQuery(store_id=store.id)).items
+
+    with pytest.raises(StoreReadinessBlocked) as error:
+        roles.revoke(
+            admin,
+            RevokeStoreRole(
+                store=StoreRef(id=store.id),
+                person=PersonRef(id=owners[0].id),
+                role=StoreRole.OWNER,
+            ),
+        )
+
+    current = stores.get(admin, StoreRef(id=store.id))
+    role_history = roles.list_for_store(
+        admin,
+        StoreRef(id=store.id),
+        include_ended=True,
+    )
+    events_after = audit.list(admin, AuditQuery(store_id=store.id)).items
+    assert error.value.store_id == store.id
+    assert error.value.requirement == "active_owner"
+    assert current.status is protected_status
+    assert [(item.id, item.active) for item in role_history] == [
+        (assigned[0].id, True),
+    ]
+    assert events_after == events_before
+
+
+@pytest.mark.parametrize(
+    "permissive_status",
+    (
+        StoreStatus.DRAFT,
+        StoreStatus.CONFIGURING,
+        StoreStatus.CLOSED,
+    ),
+)
+def test_ultimo_dono_pode_ser_revogado_em_estado_permissivo(permissive_status):
+    admin = _admin_actor()
+    stores, roles, store, owners, _ = _store_with_owners(
+        admin,
+        slug="loja-permissiva",
+        status=permissive_status,
+    )
+
+    revoked = roles.revoke(
+        admin,
+        RevokeStoreRole(
+            store=StoreRef(id=store.id),
+            person=PersonRef(id=owners[0].id),
+            role=StoreRole.OWNER,
+        ),
+    )
+
+    assert revoked.active is False
+    assert stores.get(admin, StoreRef(id=store.id)).status is permissive_status
+
+
+def test_loja_pronta_permite_revogar_dono_quando_outro_permanece_ativo():
+    admin = _admin_actor()
+    _, roles, store, owners, assigned = _store_with_owners(
+        admin,
+        slug="loja-dois-donos",
+        status=StoreStatus.READY,
+        owner_count=2,
+    )
+
+    revoked = roles.revoke(
+        admin,
+        RevokeStoreRole(
+            store=StoreRef(id=store.id),
+            person=PersonRef(id=owners[0].id),
+            role=StoreRole.OWNER,
+        ),
+    )
+
+    active = roles.list_for_store(admin, StoreRef(id=store.id))
+    assert revoked.id == assigned[0].id
+    assert revoked.active is False
+    assert [(item.id, item.person_id) for item in active] == [
+        (assigned[1].id, owners[1].id),
+    ]
 
 
 def test_admin_registra_pessoa_e_atribui_multiplos_cargos_na_loja():

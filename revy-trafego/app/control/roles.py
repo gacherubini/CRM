@@ -14,11 +14,13 @@ from app.control.types import (
     PersonNotFound,
     RevokeStoreRole,
     StoreNotFound,
+    StoreReadinessBlocked,
     StoreRef,
     StoreRole,
     StoreRoleConflict,
     StoreRoleNotFound,
     StoreRoleView,
+    StoreStatus,
 )
 from app.models import CargoLoja, Pessoa, VinculoTrafego, agora
 
@@ -72,7 +74,9 @@ class StoreRoles:
     def revoke(self, actor: Actor, command: RevokeStoreRole) -> StoreRoleView:
         _require_admin(actor)
         with self._session_factory() as db:
-            store = _find_store(db, command.store)
+            # Serializa a proteção do último Dono no PostgreSQL. SQLite aceita
+            # ``FOR UPDATE`` como no-op, mantendo o mesmo caminho nos testes.
+            store = _find_store(db, command.store, for_update=True)
             if store is None:
                 raise StoreNotFound("Loja não encontrada")
             person = db.get(Pessoa, command.person.id)
@@ -81,6 +85,25 @@ class StoreRoles:
             role = _active_role(db, store.id, person.id, command.role)
             if role is None:
                 raise StoreRoleNotFound("cargo ativo não encontrado na Loja")
+            if (
+                command.role is StoreRole.OWNER
+                and StoreStatus(store.status)
+                in {
+                    StoreStatus.READY,
+                    StoreStatus.ACTIVE,
+                    StoreStatus.SUSPENDED,
+                }
+                and db.query(CargoLoja.id)
+                .filter(
+                    CargoLoja.loja_id == store.id,
+                    CargoLoja.cargo == StoreRole.OWNER.value,
+                    CargoLoja.encerrado_em.is_(None),
+                    CargoLoja.id != role.id,
+                )
+                .first()
+                is None
+            ):
+                raise StoreReadinessBlocked(store.id, "active_owner")
 
             role.encerrado_em = agora()
             _append_event(

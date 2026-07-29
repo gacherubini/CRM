@@ -197,6 +197,33 @@ def test_admin_transiciona_loja_e_salto_invalido_retorna_conflito(
     assert invalid.json()["detail"]["code"] == "invalid_store_transition"
 
 
+def test_transicao_para_pronta_sem_dono_mapeia_bloqueio_de_prontidao(
+    client,
+    monkeypatch,
+):
+    _enable_control(monkeypatch)
+    _login(client, "trafego@revy.local", "secret-teste")
+    store = client.post(
+        "/control/v1/lojas",
+        json={"nome": "Loja sem Dono API", "slug": "loja-sem-dono-api"},
+    ).json()
+    client.post(
+        f"/control/v1/lojas/{store['id']}/estado",
+        json={"estado": "em_configuracao"},
+    )
+
+    blocked = client.post(
+        f"/control/v1/lojas/{store['id']}/estado",
+        json={"estado": "pronta"},
+    )
+    current = client.get(f"/control/v1/lojas/{store['id']}")
+
+    assert blocked.status_code == 409
+    assert blocked.json()["detail"]["code"] == "store_readiness_blocked"
+    assert current.status_code == 200
+    assert current.json()["estado"] == "em_configuracao"
+
+
 def test_admin_concede_revoga_e_consulta_auditoria_da_loja(
     client,
     monkeypatch,

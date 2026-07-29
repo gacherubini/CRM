@@ -15,12 +15,14 @@ from app.control.types import (
     InvalidStoreTransition,
     StoreNotFound,
     StoreRef,
+    StoreReadinessBlocked,
+    StoreRole,
     StoreSlugConflict,
     StoreStatus,
     StoreView,
     TransitionStore,
 )
-from app.models import Loja, VinculoTrafego, agora
+from app.models import CargoLoja, Loja, VinculoTrafego, agora
 
 _ALLOWED_TRANSITIONS = {
     StoreStatus.DRAFT: frozenset({StoreStatus.CONFIGURING}),
@@ -105,6 +107,19 @@ class StoreControl:
             current = StoreStatus(store.status)
             if command.target not in _ALLOWED_TRANSITIONS[current]:
                 raise InvalidStoreTransition(current, command.target)
+            if (
+                current is StoreStatus.CONFIGURING
+                and command.target is StoreStatus.READY
+                and db.query(CargoLoja.id)
+                .filter(
+                    CargoLoja.loja_id == store.id,
+                    CargoLoja.cargo == StoreRole.OWNER.value,
+                    CargoLoja.encerrado_em.is_(None),
+                )
+                .first()
+                is None
+            ):
+                raise StoreReadinessBlocked(store.id, "active_owner")
             store.status = command.target.value
             store.atualizada_em = agora()
             _append_event(
@@ -123,8 +138,15 @@ class StoreControl:
             return _store_view(store)
 
 
-def _find_store(db: Any, store: StoreRef) -> Loja | None:
+def _find_store(
+    db: Any,
+    store: StoreRef,
+    *,
+    for_update: bool = False,
+) -> Loja | None:
     query = db.query(Loja)
+    if for_update:
+        query = query.with_for_update()
     if store.id:
         return query.filter(Loja.id == store.id).first()
     return query.filter(Loja.slug == store.slug.strip().lower()).first()

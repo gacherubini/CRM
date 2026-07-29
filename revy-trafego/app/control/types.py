@@ -34,6 +34,13 @@ class InvalidStoreTransition(ControlError):
         super().__init__(f"transição de {current.value} para {target.value} não permitida")
 
 
+class StoreReadinessBlocked(ControlError):
+    def __init__(self, store_id: str, requirement: str) -> None:
+        self.store_id = store_id
+        self.requirement = requirement
+        super().__init__("Loja precisa manter ao menos um Dono ativo neste estado")
+
+
 class ActiveResponsibleConflict(ControlError):
     def __init__(self, store_id: str, manager_id: str) -> None:
         self.store_id = store_id

@@ -36,6 +36,7 @@ from app.control.types import (
     RevokeStoreRole,
     RevokeTrafficAccess,
     StoreNotFound,
+    StoreReadinessBlocked,
     StoreRef,
     StoreSlugConflict,
     StoreStatus,
@@ -448,6 +449,8 @@ def _raise_domain_error(exc: ControlError) -> NoReturn:
         status_code, code = 404, "store_role_not_found"
     elif isinstance(exc, StoreRoleConflict):
         status_code, code = 409, "store_role_conflict"
+    elif isinstance(exc, StoreReadinessBlocked):
+        status_code, code = 409, "store_readiness_blocked"
     elif isinstance(exc, InvalidStoreTransition):
         status_code, code = 409, "invalid_store_transition"
     elif isinstance(exc, ActiveResponsibleConflict):
