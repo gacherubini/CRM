@@ -228,6 +228,51 @@ class ConviteAcessoControl(Base):
     criado_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=agora)
 
 
+class RecuperacaoSenhaControl(Base):
+    """Token de uso único para recuperar a senha de um acesso ao Revy Control."""
+
+    __tablename__ = "recuperacoes_senha_control"
+    __table_args__ = (
+        CheckConstraint(
+            "expira_em >= criado_em",
+            name="ck_recuperacoes_senha_control_expiracao",
+        ),
+        CheckConstraint(
+            "usado_em IS NULL OR usado_em >= criado_em",
+            name="ck_recuperacoes_senha_control_uso",
+        ),
+        CheckConstraint(
+            "revogado_em IS NULL OR revogado_em >= criado_em",
+            name="ck_recuperacoes_senha_control_revogacao",
+        ),
+        UniqueConstraint(
+            "token_hash",
+            name="uq_recuperacoes_senha_control_token_hash",
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=novo_id)
+    acesso_id: Mapped[str] = mapped_column(
+        ForeignKey("acessos_control.id", ondelete="RESTRICT"),
+        index=True,
+    )
+    token_hash: Mapped[str] = mapped_column(String(64))
+    expira_em: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    usado_em: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+    revogado_em: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+    criado_por_gestor_id: Mapped[str] = mapped_column(
+        ForeignKey("gestores_revy.id", ondelete="RESTRICT"),
+        index=True,
+    )
+    criado_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=agora)
+
+
 class VinculoTrafego(Base):
     __tablename__ = "vinculos_trafego"
     __table_args__ = (
