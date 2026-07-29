@@ -417,6 +417,127 @@ def test_admin_configura_modulos_e_gestor_permanece_read_only(
     assert "permissão" in forbidden.text
 
 
+def test_admin_configura_contrato_e_gestor_permanece_read_only(
+    client,
+    monkeypatch,
+):
+    with SessionLocal() as db:
+        manager = GestorRevy(
+            email="gestor.contrato-ui@revy.local",
+            nome="Gestor Contrato UI",
+            senha_hash=hash_senha("senha-contrato-ui"),
+            papel="gestor",
+            ativo=True,
+        )
+        db.add(manager)
+        db.commit()
+        manager_id = manager.id
+
+    admin = _admin_actor()
+    store = StoreControl(SessionLocal).create(
+        admin,
+        CreateStore(name="Loja Contrato UI", slug="loja-contrato-ui"),
+    )
+    AccessControl(SessionLocal).grant(
+        admin,
+        GrantTrafficAccess(
+            store=StoreRef(id=store.id),
+            manager_id=manager_id,
+            role=TrafficRole.COLLABORATOR,
+        ),
+    )
+
+    _enable_control_ui(monkeypatch)
+    _login(client, "trafego@revy.local", "secret-teste")
+    admin_page = client.get(f"/app/control/lojas/{store.id}")
+
+    assert admin_page.status_code == 200
+    assert 'id="form-configurar-contrato"' in admin_page.text
+
+    created = client.post(
+        f"/app/control/lojas/{store.id}/contrato",
+        data={
+            "csrf": csrf_da_resposta(admin_page),
+            "valor_mensal": "2199.90",
+            "vigencia_inicio": "2026-09-01",
+            "vigencia_fim": "2027-08-31",
+            "vencimento_dia": "18",
+            "situacao_cobranca": "atrasada",
+        },
+        follow_redirects=False,
+    )
+
+    assert created.status_code == 303
+    assert "ok=contrato" in created.headers["location"]
+    created_page = client.get(created.headers["location"])
+    assert "Contrato da Loja atualizado." in created_page.text
+    assert 'id="contrato-ativo"' in created_page.text
+    assert "R$ 2.199,90" in created_page.text
+    assert "01/09/2026 a 31/08/2027" in created_page.text
+    assert "Dia 18" in created_page.text
+    assert "atrasada" in created_page.text
+    assert "store_contract.upserted" in created_page.text
+    assert (
+        'id="contrato-valor-mensal" type="number" '
+        'name="valor_mensal" value="2199.90"'
+    ) in created_page.text
+    assert (
+        'id="contrato-vigencia-inicio" type="date" '
+        'name="vigencia_inicio" value="2026-09-01"'
+    ) in created_page.text
+    assert (
+        'id="contrato-vigencia-fim" type="date" '
+        'name="vigencia_fim" value="2027-08-31"'
+    ) in created_page.text
+    assert (
+        'id="contrato-vencimento-dia" type="number" '
+        'name="vencimento_dia" value="18"'
+    ) in created_page.text
+    assert '<option value="atrasada" selected>atrasada</option>' in (
+        created_page.text
+    )
+
+    invalid = client.post(
+        f"/app/control/lojas/{store.id}/contrato",
+        data={
+            "csrf": csrf_da_resposta(created_page),
+            "valor_mensal": "2300.50",
+            "vigencia_inicio": "2027-09-01",
+            "vigencia_fim": "2027-08-31",
+            "vencimento_dia": "19",
+            "situacao_cobranca": "isenta",
+        },
+    )
+
+    assert invalid.status_code == 422
+    assert "Revise os dados do contrato da Loja." in invalid.text
+    assert 'name="valor_mensal" value="2300.50"' in invalid.text
+    assert 'name="vigencia_inicio" value="2027-09-01"' in invalid.text
+    assert 'name="vigencia_fim" value="2027-08-31"' in invalid.text
+    assert 'name="vencimento_dia" value="19"' in invalid.text
+    assert '<option value="isenta" selected>isenta</option>' in invalid.text
+
+    client.cookies.clear()
+    _login(client, "gestor.contrato-ui@revy.local", "senha-contrato-ui")
+    manager_page = client.get(f"/app/control/lojas/{store.id}")
+    forbidden = client.post(
+        f"/app/control/lojas/{store.id}/contrato",
+        data={
+            "csrf": csrf_da_resposta(manager_page),
+            "valor_mensal": "2500.00",
+            "vigencia_inicio": "2026-10-01",
+            "vigencia_fim": "",
+            "vencimento_dia": "20",
+            "situacao_cobranca": "em_dia",
+        },
+    )
+
+    assert manager_page.status_code == 200
+    assert 'id="form-configurar-contrato"' not in manager_page.text
+    assert forbidden.status_code == 403
+    assert "permissão" in forbidden.text
+
+
 def test_admin_transiciona_concede_revoga_e_gestor_nao_muta(
     client,
     monkeypatch,

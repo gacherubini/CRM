@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+from datetime import date
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
@@ -14,7 +15,12 @@ from app.config import settings
 from app.control.access import AccessControl
 from app.control.accounts import ControlAccounts
 from app.control.audit import AuditTrail
-from app.control.contracts import ContractControl, ContractNotFound
+from app.control.contracts import (
+    ContractBillingStatus,
+    ContractControl,
+    ContractNotFound,
+    UpsertContract,
+)
 from app.control.people import PeopleDirectory
 from app.control.portfolio import (
     InvalidModuleSelection,
@@ -262,6 +268,91 @@ async def configure_store_modules_page(
         )
     return RedirectResponse(
         _detail_path(loja_id, "modulos"),
+        status_code=303,
+    )
+
+
+@router.post(
+    "/app/control/lojas/{loja_id}/contrato",
+    response_class=HTMLResponse,
+)
+async def configure_store_contract_page(
+    loja_id: str,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    manager, denied = _admin_for_mutation(request, db)
+    if denied is not None:
+        return denied
+    form = await request.form()
+    if not csrf_valido(request, form.get("csrf")):
+        return _csrf_denied()
+
+    form_values = {
+        "valor_mensal": (form.get("valor_mensal") or "").strip(),
+        "vigencia_inicio": (form.get("vigencia_inicio") or "").strip(),
+        "vigencia_fim": (form.get("vigencia_fim") or "").strip(),
+        "vencimento_dia": (form.get("vencimento_dia") or "").strip(),
+        "situacao_cobranca": (
+            form.get("situacao_cobranca") or ""
+        ).strip(),
+    }
+    try:
+        if not re.fullmatch(
+            r"[0-9]{1,10}(?:\.[0-9]{1,2})?",
+            form_values["valor_mensal"],
+        ):
+            raise ValueError
+        monthly_amount = Decimal(form_values["valor_mensal"])
+        if not re.fullmatch(
+            r"[0-9]{4}-[0-9]{2}-[0-9]{2}",
+            form_values["vigencia_inicio"],
+        ):
+            raise ValueError
+        starts_on = date.fromisoformat(form_values["vigencia_inicio"])
+        ends_on = None
+        if form_values["vigencia_fim"]:
+            if not re.fullmatch(
+                r"[0-9]{4}-[0-9]{2}-[0-9]{2}",
+                form_values["vigencia_fim"],
+            ):
+                raise ValueError
+            ends_on = date.fromisoformat(form_values["vigencia_fim"])
+        if ends_on is not None and ends_on < starts_on:
+            raise ValueError
+        if not re.fullmatch(r"[0-9]{1,2}", form_values["vencimento_dia"]):
+            raise ValueError
+        due_day = int(form_values["vencimento_dia"])
+        if not 1 <= due_day <= 31:
+            raise ValueError
+        billing_status = ContractBillingStatus(
+            form_values["situacao_cobranca"]
+        )
+        ContractControl(SessionLocal).upsert(
+            actor_from_user(manager),
+            UpsertContract(
+                store=StoreRef(id=loja_id),
+                monthly_amount=monthly_amount,
+                starts_on=starts_on,
+                ends_on=ends_on,
+                due_day=due_day,
+                billing_status=billing_status,
+            ),
+        )
+    except (InvalidOperation, ValueError):
+        return _render_store_detail(
+            request,
+            db,
+            manager,
+            loja_id,
+            error="Revise os dados do contrato da Loja.",
+            contract_form_values=form_values,
+            status_code=422,
+        )
+    except StoreNotFound:
+        return HTMLResponse("Loja não encontrada.", status_code=404)
+    return RedirectResponse(
+        _detail_path(loja_id, "contrato"),
         status_code=303,
     )
 
@@ -684,6 +775,7 @@ def _render_store_detail(
     *,
     error: str | None = None,
     person_form_values: dict[str, str] | None = None,
+    contract_form_values: dict[str, str] | None = None,
     status_code: int = 200,
 ):
     actor = actor_from_user(manager)
@@ -701,6 +793,28 @@ def _render_store_detail(
         contract = ContractControl(SessionLocal).get(actor, store_ref)
     except ContractNotFound:
         contract = None
+    if contract_form_values is None:
+        contract_form_values = (
+            {
+                "valor_mensal": f"{contract.monthly_amount:.2f}",
+                "vigencia_inicio": contract.starts_on.isoformat(),
+                "vigencia_fim": (
+                    contract.ends_on.isoformat()
+                    if contract.ends_on is not None
+                    else ""
+                ),
+                "vencimento_dia": str(contract.due_day),
+                "situacao_cobranca": contract.billing_status.value,
+            }
+            if contract is not None
+            else {
+                "valor_mensal": "",
+                "vigencia_inicio": "",
+                "vigencia_fim": "",
+                "vencimento_dia": "",
+                "situacao_cobranca": ContractBillingStatus.CURRENT.value,
+            }
+        )
 
     store_people = ()
     if manager.papel == "admin":
@@ -743,6 +857,8 @@ def _render_store_detail(
                 if module.status == ModuleStatus.ACTIVE
             ),
             "contract": contract,
+            "contract_statuses": tuple(ContractBillingStatus),
+            "contract_form_values": contract_form_values,
             "contract_amount_brl": (
                 _format_brl(contract.monthly_amount)
                 if contract is not None

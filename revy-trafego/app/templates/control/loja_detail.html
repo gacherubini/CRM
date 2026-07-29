@@ -26,6 +26,8 @@
 <div class="alert success" role="status">Cargo da Pessoa Revy revogado.</div>
 {% elif ok == 'modulos' %}
 <div class="alert success" role="status">Módulos da Loja atualizados.</div>
+{% elif ok == 'contrato' %}
+<div class="alert success" role="status">Contrato da Loja atualizado.</div>
 {% endif %}
 {% if erro %}
 <div class="alert error" role="alert">{{ erro }}</div>
@@ -107,6 +109,32 @@
   </div>
   {% else %}
   <div class="empty"><strong>Nenhum contrato ativo.</strong></div>
+  {% endif %}
+  {% if is_admin %}
+  <form method="post" action="{{ public_path('/app/control/lojas/' ~ store.id ~ '/contrato') }}" class="form-layout" id="form-configurar-contrato">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <label>Valor mensal
+      <input id="contrato-valor-mensal" type="number" name="valor_mensal" value="{{ contract_form_values.valor_mensal }}" min="0" max="9999999999.99" step="0.01" required>
+    </label>
+    <label>Início da vigência
+      <input id="contrato-vigencia-inicio" type="date" name="vigencia_inicio" value="{{ contract_form_values.vigencia_inicio }}" required>
+    </label>
+    <label>Fim da vigência
+      <input id="contrato-vigencia-fim" type="date" name="vigencia_fim" value="{{ contract_form_values.vigencia_fim }}">
+      <small>Opcional; deve ser igual ou posterior ao início.</small>
+    </label>
+    <label>Dia do vencimento
+      <input id="contrato-vencimento-dia" type="number" name="vencimento_dia" value="{{ contract_form_values.vencimento_dia }}" min="1" max="31" required>
+    </label>
+    <label>Situação da cobrança
+      <select id="contrato-situacao-cobranca" name="situacao_cobranca" required>
+        {% for contract_status in contract_statuses %}
+        <option value="{{ contract_status.value }}" {% if contract_form_values.situacao_cobranca == contract_status.value %}selected{% endif %}>{{ contract_status.value }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <button class="button primary" type="submit">Salvar contrato</button>
+  </form>
   {% endif %}
 </section>
 
