@@ -2,21 +2,27 @@ import pytest
 
 from app.control.access import AccessControl
 from app.control.audit import AuditTrail
+from app.control.people import PeopleDirectory
+from app.control.roles import StoreRoles
 from app.control.stores import StoreControl
 from app.control.types import (
     ActiveResponsibleConflict,
     AccessDenied,
     Actor,
+    AssignStoreRole,
     AuditQuery,
     CreateStore,
     GrantTrafficAccess,
     InvalidStoreSlug,
     InvalidStoreTransition,
     ManagerNotFound,
+    PersonRef,
+    RegisterPerson,
     RevokeTrafficAccess,
     StoreEditConflict,
     StoreRef,
     StoreNotFound,
+    StoreRole,
     StoreStatus,
     TrafficRole,
     TransitionStore,
@@ -57,6 +63,46 @@ def _manager_actor(email: str, *, active: bool = True) -> Actor:
         )
 
 
+def _create_active_store(
+    stores: StoreControl,
+    admin: Actor,
+    *,
+    slug: str,
+):
+    store = stores.create(
+        admin,
+        CreateStore(name=f"Loja {slug}", slug=slug),
+    )
+    owner = PeopleDirectory(SessionLocal).register(
+        admin,
+        RegisterPerson(
+            name=f"Dono {slug}",
+            email=f"dono.{slug}@example.com",
+        ),
+    )
+    StoreRoles(SessionLocal).assign(
+        admin,
+        AssignStoreRole(
+            store=StoreRef(id=store.id),
+            person=PersonRef(id=owner.id),
+            role=StoreRole.OWNER,
+        ),
+    )
+    for target in (
+        StoreStatus.CONFIGURING,
+        StoreStatus.READY,
+        StoreStatus.ACTIVE,
+    ):
+        store = stores.transition(
+            admin,
+            TransitionStore(
+                store=StoreRef(id=store.id),
+                target=target,
+            ),
+        )
+    return store
+
+
 def test_admin_cria_e_consulta_loja_em_rascunho():
     stores = StoreControl(SessionLocal)
     admin = _admin_actor()
@@ -71,6 +117,7 @@ def test_admin_cria_e_consulta_loja_em_rascunho():
     assert retrieved.name == "Loja Centro"
     assert retrieved.slug == "loja-centro"
     assert retrieved.status is StoreStatus.DRAFT
+    assert retrieved.version == 1
 
 
 @pytest.mark.parametrize(
@@ -352,6 +399,7 @@ def test_transicao_atualiza_loja_e_auditoria_na_mesma_mutacao():
     events = audit.list(admin, AuditQuery(store_id=store.id)).items
 
     assert transitioned.status is StoreStatus.CONFIGURING
+    assert transitioned.version == store.version + 1
     assert transitioned.updated_at > store.updated_at
     assert [event.action for event in events] == [
         "store.created",
@@ -360,6 +408,75 @@ def test_transicao_atualiza_loja_e_auditoria_na_mesma_mutacao():
     assert events[1].before == {"status": "rascunho"}
     assert events[1].after == {"status": "em_configuracao"}
     assert events[1].reason == "início do onboarding"
+
+
+def test_loja_suspensa_pode_ser_reativada_com_nova_versao():
+    stores = StoreControl(SessionLocal)
+    admin = _admin_actor()
+    active = _create_active_store(
+        stores,
+        admin,
+        slug="loja-reativada",
+    )
+    suspended = stores.transition(
+        admin,
+        TransitionStore(
+            store=StoreRef(id=active.id),
+            target=StoreStatus.SUSPENDED,
+        ),
+    )
+
+    reactivated = stores.transition(
+        admin,
+        TransitionStore(
+            store=StoreRef(id=active.id),
+            target=StoreStatus.ACTIVE,
+            reason="reativação explícita",
+        ),
+    )
+
+    assert suspended.status is StoreStatus.SUSPENDED
+    assert suspended.version == active.version + 1
+    assert reactivated.status is StoreStatus.ACTIVE
+    assert reactivated.version == suspended.version + 1
+
+
+def test_loja_encerrada_permanece_terminal_sem_incrementar_versao():
+    stores = StoreControl(SessionLocal)
+    admin = _admin_actor()
+    active = _create_active_store(
+        stores,
+        admin,
+        slug="loja-encerrada",
+    )
+    suspended = stores.transition(
+        admin,
+        TransitionStore(
+            store=StoreRef(id=active.id),
+            target=StoreStatus.SUSPENDED,
+        ),
+    )
+    closed = stores.transition(
+        admin,
+        TransitionStore(
+            store=StoreRef(id=active.id),
+            target=StoreStatus.CLOSED,
+        ),
+    )
+
+    with pytest.raises(InvalidStoreTransition):
+        stores.transition(
+            admin,
+            TransitionStore(
+                store=StoreRef(id=active.id),
+                target=StoreStatus.ACTIVE,
+            ),
+        )
+
+    current = stores.get(admin, StoreRef(id=active.id))
+    assert closed.version == suspended.version + 1
+    assert current.status is StoreStatus.CLOSED
+    assert current.version == closed.version
 
 
 def test_admin_edita_loja_em_rascunho_com_auditoria():
@@ -390,7 +507,9 @@ def test_admin_edita_loja_em_rascunho_com_auditoria():
     assert updated.name == "Loja Depois"
     assert updated.slug == "loja-antes"
     assert updated.status is StoreStatus.DRAFT
+    assert updated.version == store.version + 1
     assert repeated == updated
+    assert repeated.version == updated.version
     events = audit.list(admin, AuditQuery(store_id=store.id)).items
     assert [event.action for event in events] == [
         "store.created",

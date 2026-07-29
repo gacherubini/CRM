@@ -257,6 +257,66 @@ def test_admin_transiciona_loja_e_salto_invalido_retorna_conflito(
     assert invalid.json()["detail"]["code"] == "invalid_store_transition"
 
 
+def test_admin_reativa_loja_suspensa_sem_expor_versao(
+    client,
+    monkeypatch,
+):
+    with SessionLocal() as db:
+        store = Loja(
+            nome="Loja Suspensa API",
+            slug="loja-suspensa-api",
+            status="suspensa",
+        )
+        db.add(store)
+        db.commit()
+        store_id = store.id
+
+    _enable_control(monkeypatch)
+    _login(client, "trafego@revy.local", "secret-teste")
+
+    reactivated = client.post(
+        f"/control/v1/lojas/{store_id}/estado",
+        json={"estado": "ativa", "motivo": "reativação explícita"},
+    )
+
+    assert reactivated.status_code == 200
+    assert reactivated.json() == {
+        "id": store_id,
+        "nome": "Loja Suspensa API",
+        "slug": "loja-suspensa-api",
+        "estado": "ativa",
+    }
+
+
+def test_loja_encerrada_permanece_terminal_na_api(
+    client,
+    monkeypatch,
+):
+    with SessionLocal() as db:
+        store = Loja(
+            nome="Loja Encerrada API",
+            slug="loja-encerrada-api",
+            status="encerrada",
+        )
+        db.add(store)
+        db.commit()
+        store_id = store.id
+
+    _enable_control(monkeypatch)
+    _login(client, "trafego@revy.local", "secret-teste")
+
+    blocked = client.post(
+        f"/control/v1/lojas/{store_id}/estado",
+        json={"estado": "ativa"},
+    )
+    current = client.get(f"/control/v1/lojas/{store_id}")
+
+    assert blocked.status_code == 409
+    assert blocked.json()["detail"]["code"] == "invalid_store_transition"
+    assert current.status_code == 200
+    assert current.json()["estado"] == "encerrada"
+
+
 def test_transicao_para_pronta_sem_dono_mapeia_bloqueio_de_prontidao(
     client,
     monkeypatch,

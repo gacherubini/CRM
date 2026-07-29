@@ -189,6 +189,7 @@ class StoreView:
     name: str
     slug: str
     status: StoreStatus
+    version: int
     created_at: datetime
     updated_at: datetime
 

@@ -31,7 +31,7 @@ _ALLOWED_TRANSITIONS = {
     StoreStatus.CONFIGURING: frozenset({StoreStatus.READY}),
     StoreStatus.READY: frozenset({StoreStatus.ACTIVE}),
     StoreStatus.ACTIVE: frozenset({StoreStatus.SUSPENDED}),
-    StoreStatus.SUSPENDED: frozenset({StoreStatus.CLOSED}),
+    StoreStatus.SUSPENDED: frozenset({StoreStatus.ACTIVE, StoreStatus.CLOSED}),
     StoreStatus.CLOSED: frozenset(),
 }
 _CANONICAL_SLUG = re.compile(r"[a-z0-9]+(?:-[a-z0-9]+)*")
@@ -96,6 +96,7 @@ class StoreControl:
 
             before = {"name": store.nome}
             store.nome = name
+            store.versao += 1
             store.atualizada_em = agora()
             _append_event(
                 db,
@@ -135,7 +136,7 @@ class StoreControl:
             raise AccessDenied("somente Admin Revy pode alterar o estado da Loja")
 
         with self._session_factory() as db:
-            store = _find_store(db, command.store)
+            store = _find_store(db, command.store, for_update=True)
             if store is None:
                 raise StoreNotFound("Loja não encontrada")
             current = StoreStatus(store.status)
@@ -155,6 +156,7 @@ class StoreControl:
             ):
                 raise StoreReadinessBlocked(store.id, "active_owner")
             store.status = command.target.value
+            store.versao += 1
             store.atualizada_em = agora()
             _append_event(
                 db,
@@ -199,6 +201,7 @@ def _store_view(store: Loja) -> StoreView:
         name=store.nome,
         slug=store.slug,
         status=StoreStatus(store.status),
+        version=store.versao,
         created_at=store.criada_em,
         updated_at=store.atualizada_em,
     )
