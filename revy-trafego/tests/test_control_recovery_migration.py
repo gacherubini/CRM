@@ -88,10 +88,7 @@ def test_migration_recuperacoes_senha_cria_schema_aditivo_e_restritivo(
             {"agora": agora},
         )
 
-    assert _alembic(database_url, "heads").stdout.strip() == (
-        "0006_revy_control_recuperacoes (head)"
-    )
-    _alembic(database_url, "upgrade", "head")
+    _alembic(database_url, "upgrade", "0006_revy_control_recuperacoes")
 
     inspector = sa.inspect(engine)
     assert "recuperacoes_senha_control" in inspector.get_table_names()

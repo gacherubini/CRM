@@ -52,6 +52,140 @@ class Loja(Base):
     atualizada_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=agora)
 
 
+class ModuloRevy(Base):
+    """Módulo comercializável do portfólio Revy."""
+
+    __tablename__ = "modulos_revy"
+    __table_args__ = (
+        CheckConstraint(
+            "codigo IN ('vendas', 'estoque')",
+            name="ck_modulos_revy_codigo",
+        ),
+        UniqueConstraint(
+            "codigo",
+            name="uq_modulos_revy_codigo",
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=novo_id)
+    codigo: Mapped[str] = mapped_column(String(32))
+    nome: Mapped[str] = mapped_column(String(160))
+    criado_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=agora)
+
+
+class LojaModulo(Base):
+    """Estado contratado de um módulo para uma Loja."""
+
+    __tablename__ = "loja_modulos"
+    __table_args__ = (
+        CheckConstraint(
+            "estado IN ('ativo', 'suspenso')",
+            name="ck_loja_modulos_estado",
+        ),
+        CheckConstraint(
+            "versao >= 1",
+            name="ck_loja_modulos_versao",
+        ),
+        CheckConstraint(
+            "(estado = 'ativo' AND suspenso_em IS NULL) OR "
+            "(estado = 'suspenso' AND suspenso_em IS NOT NULL)",
+            name="ck_loja_modulos_suspensao",
+        ),
+        UniqueConstraint(
+            "loja_id",
+            "modulo_id",
+            name="uq_loja_modulos_loja_modulo",
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=novo_id)
+    loja_id: Mapped[str] = mapped_column(
+        ForeignKey("lojas.id", ondelete="RESTRICT")
+    )
+    modulo_id: Mapped[str] = mapped_column(
+        ForeignKey("modulos_revy.id", ondelete="RESTRICT")
+    )
+    estado: Mapped[str] = mapped_column(String(20))
+    versao: Mapped[int] = mapped_column(
+        Integer,
+        default=1,
+        server_default=text("1"),
+    )
+    contratado_em: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=agora,
+    )
+    suspenso_em: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+    atualizado_em: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=agora,
+    )
+
+
+class ContratoLoja(Base):
+    """Condição comercial vigente de uma Loja."""
+
+    __tablename__ = "contratos_loja"
+    __table_args__ = (
+        CheckConstraint(
+            "valor_mensal >= 0",
+            name="ck_contratos_loja_valor_mensal",
+        ),
+        CheckConstraint(
+            "moeda = 'BRL'",
+            name="ck_contratos_loja_moeda",
+        ),
+        CheckConstraint(
+            "vigencia_fim IS NULL OR vigencia_fim >= vigencia_inicio",
+            name="ck_contratos_loja_vigencia",
+        ),
+        CheckConstraint(
+            "vencimento_dia BETWEEN 1 AND 31",
+            name="ck_contratos_loja_vencimento_dia",
+        ),
+        CheckConstraint(
+            "situacao_cobranca IN ('em_dia', 'atrasada', 'isenta')",
+            name="ck_contratos_loja_situacao_cobranca",
+        ),
+        CheckConstraint(
+            "estado IN ('ativo', 'encerrado')",
+            name="ck_contratos_loja_estado",
+        ),
+        Index(
+            "uq_contratos_loja_ativo",
+            "loja_id",
+            unique=True,
+            sqlite_where=text("estado = 'ativo'"),
+            postgresql_where=text("estado = 'ativo'"),
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=novo_id)
+    loja_id: Mapped[str] = mapped_column(
+        ForeignKey("lojas.id", ondelete="RESTRICT"),
+        index=True,
+    )
+    valor_mensal: Mapped[Decimal] = mapped_column(Numeric(12, 2))
+    moeda: Mapped[str] = mapped_column(
+        String(3),
+        default="BRL",
+        server_default=text("'BRL'"),
+    )
+    vigencia_inicio: Mapped[date] = mapped_column(Date)
+    vigencia_fim: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    vencimento_dia: Mapped[int] = mapped_column(Integer)
+    situacao_cobranca: Mapped[str] = mapped_column(String(20))
+    estado: Mapped[str] = mapped_column(String(20))
+    criado_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=agora)
+    atualizado_em: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=agora,
+    )
+
+
 class Pessoa(Base):
     __tablename__ = "pessoas"
     __table_args__ = (
