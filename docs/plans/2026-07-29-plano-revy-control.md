@@ -1,6 +1,6 @@
 # Plano — Evolução do Revy Tráfego para Revy Control
 
-**Status:** ATIVO / IMPLEMENTAÇÃO PARCIAL LOCAL
+**Status:** ATIVO / FASE 2 LOCAL AVANÇADA (identidade + prontidão; entrega pendente)
 **Data:** 2026-07-29
 **Spec:** [`docs/superpowers/specs/2026-07-29-revy-control-design.md`](../superpowers/specs/2026-07-29-revy-control-design.md)
 **Vocabulário:** [`CONTEXT.md`](../../CONTEXT.md)
@@ -204,6 +204,8 @@ Adicionar:
       senha, recuperação, desativação e revogação de sessões. Admin nunca lê senha.
 - [ ] Projetar estado da Loja e dos Módulos Contratados para Revy Loja, Chatbot, Motor,
       Estoque e Catálogo por entrega idempotente; nenhum serviço confia só no menu.
+      Snapshot local já inclui loja/módulos e pessoas/cargos ativos; falta transporte e
+      consumo nos destinos.
 - [ ] Não cortar autenticação do Portal neste plano.
 
 ### Interface administrativa
@@ -214,7 +216,7 @@ Adicionar:
       permissões de uma superfície na outra.
 - [x] Admin escolhe Vendas, Estoque ou ambos para a loja pela API e UI.
 - [x] Admin registra valor, vigência, vencimento e situação da cobrança pela API e UI.
-- [ ] Exigir pelo menos um Dono da Loja com acesso ativável antes de marcar a loja pronta.
+- [x] Exigir pelo menos um Dono da Loja com acesso ativável antes de marcar a loja pronta.
 - [x] Suspender/reativar módulo preserva estado, versão, histórico e auditoria locais.
 - [ ] Aplicar o bloqueio de novos processamentos nos serviços de destino.
 - [x] Cobrança atrasada gera alerta, mas não suspende automaticamente.
@@ -229,33 +231,30 @@ Adicionar:
 - [ ] Loja/Módulo suspenso bloqueia novo processamento nos serviços de destino e mantém
       leitura do histórico conforme o cargo autorizado.
 
-> **Evidência local — Fase 2 parcial:** Pessoas/Cargos e o backfill aditivo de
-> `AcessoControl` foram seguidos por convite/ativação, recuperação, lifecycle e versão
-> de sessão (`fda42fb` a `17a0963`), portfólio/contrato (`08fd64e` a `52b4796`) e
-> versão/reativação da Loja (`d218da3`, `f55677a`). O primeiro snapshot operacional
-> versionado de Loja/Vendas/Estoque está em `728b356`; transporte, pessoas/cargos e
-> consumo nos destinos ainda não fazem parte desse corte. O Alembic head local é
-> `0008_revy_control_loja_versao` e a suíte Revy tem **211 testes passando**. A UI
-> base navega da lista ao detalhe (`914f45a`) e apresenta versão, módulos e contrato
-> read-only (`dfb793c`); os formulários Admin de módulos e contrato estão em
-> `39e9f38` e `fa83257`.
+> **Evidência local — Fase 2 parcial (pós-configuração comercial):** Pessoas/Cargos,
+> convite/ativação, recuperação, lifecycle e versão de sessão (`fda42fb` a `17a0963`),
+> portfólio/contrato/UI (`08fd64e` a `fa83257`) e versão/reativação da Loja
+> (`d218da3`, `f55677a`) permanecem. O corte seguinte fecha identidade canônica e
+> prontidão:
 >
-> `REVY_CONTROL_ENABLED=0` e `REVY_CONTROL_RBAC_ENABLED=0` continuam sendo os defaults,
-> e não houve migration nem rollout desse corte no lab. Sessões já validam o estado e
-> a versão de `AcessoControl`, mas login e construção do `Actor` ainda mantêm
-> compatibilidade com o vínculo legado de `GestorRevy`; um acesso sem esse vínculo
-> ainda não completa todo o fluxo de autenticação.
+> - login e `Actor` via `AcessoControl` sem exigir `GestorRevy` (convite deixa de
+>   dual-escrever gestor legado; recuperação/reativação só sincronizam o legado se
+>   existir);
+> - snapshot de provisionamento versionado com loja/módulos **e** pessoas/cargos ativos;
+> - transição a `pronta` exige Dono ativo **com** `AcessoControl` em `pendente` ou
+>   `ativo` (`activatable_owner`); o último Dono ativo continua protegido em estados
+>   operacionais.
 >
-> A regra local exige ao menos um Dono ativo para a transição a `pronta` e protege o
-> último Dono ativo enquanto a Loja requer prontidão. Isso ainda não demonstra “acesso
-> ativável” do Dono, por isso o item correspondente permanece aberto.
+> O Alembic head local continua `0008_revy_control_loja_versao` e a suíte Revy tem
+> **215 testes passando**. `REVY_CONTROL_ENABLED=0` e `REVY_CONTROL_RBAC_ENABLED=0`
+> seguem default off; sem migration/rollout no lab.
 
-Pendências para concluir Pessoas/Cargos e a Fase 2:
+Pendências para concluir a Fase 2:
 
-- concluir login e `Actor` canônicos para acessos sem vínculo legado;
 - importar usuários atuais do Portal como pessoas/cargos, registrando conflitos;
-- completar o contrato de provisionamento com pessoas/cargos e entrega idempotente;
-- aplicar as projeções e os gates nos serviços operacionais.
+- entrega idempotente do snapshot aos serviços de destino e gates de suspensão neles;
+- isolamento explícito de permissões Control × cargos da Loja na mesma pessoa;
+- projeção repetida/fora de ordem e bloqueio de novo processamento nos destinos.
 
 ### Critério de pronto
 

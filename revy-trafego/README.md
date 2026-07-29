@@ -229,24 +229,30 @@ Lojas, vínculos de gestores, auditoria e o corte de Pessoas/Cargos:
 
 `/app/control/lojas` oferece o painel administrativo para listar, criar e administrar
 Lojas. No detalhe da Loja, o Admin busca ou cadastra a pessoa por e-mail, atribui vários
-cargos e revoga cada atribuição pelo seu `cargo_id`. A regra local exige ao menos um Dono
-ativo para marcar a Loja como pronta e protege o último Dono ativo nos estados que
-dependem dessa prontidão.
+cargos e revoga cada atribuição pelo seu `cargo_id`. A Loja só vira `pronta` com ao
+menos um Dono ativo **e** com acesso ativável (`AcessoControl` em `pendente` ou
+`ativo`); o último Dono ativo fica protegido nos estados operacionais.
 
 O schema local `acessos_control` e seu backfill são aditivos e idempotentes. Para cada
 gestor legado, a reconciliação reutiliza ou cria a `Pessoa`, preserva o ID de
 `GestorRevy` em `AcessoControl.id` e `gestor_legado_id` e copia o hash de senha sem
 alterá-lo ou expor senha em texto puro. O bootstrap também mantém essa projeção.
-Autenticação, cookie e construção do `Actor` ainda usam `GestorRevy`; `sessao_versao`
-é armazenada em `AcessoControl`, mas ainda é ignorada. Um acesso sem vínculo legado não
-é autenticável. Convite, acesso ativável e cutover da identidade ainda não existem.
+
+Login, sessão e `Actor` preferem `AcessoControl` + `Pessoa`. Um acesso ativo sem
+`gestor_legado_id` autentica e opera o Control; convite de ativação não cria mais
+`GestorRevy`. Gestores legados sem projeção continuam autenticáveis; quando a projeção
+existe, o estado/versão de `AcessoControl` mandam. Recuperação e reativação sincronizam
+o legado somente se houver vínculo.
+
+O snapshot de provisionamento local expõe loja/módulos versionados e pessoas/cargos
+ativos; ainda não há entrega HTTP/outbox aos serviços de destino.
 
 Com `REVY_CONTROL_ENABLED=0`, as superfícies Control respondem 404.
 
 `REVY_CONTROL_RBAC_ENABLED=1` aplica o escopo de vínculos ao seletor e às requisições
 existentes. As duas flags permanecem default off; não ativar no lab antes de concluir
 inventário, restore drill, migrations/backfills e o gate de isolamento. O Alembic head
-local é `0004_revy_control_acessos_control`; o lab permanece sem essas migrations e sem
+local é `0008_revy_control_loja_versao`; o lab permanece sem essas migrations e sem
 rollout do Control.
 
 Público via edge: prefixar `/trafego` (ex.: `/trafego/health/live`, `/trafego/v1/...`).  
