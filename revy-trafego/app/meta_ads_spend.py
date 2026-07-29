@@ -26,6 +26,7 @@ CENTAVOS = Decimal("0.01")
 ORIGEM_META = "meta_api"
 ORIGEM_MANUAL = "manual"
 DEFAULT_TIMEOUT = 30.0
+NOTA_META = "Meta API (gasto automático)"
 
 
 @dataclass
@@ -143,6 +144,21 @@ def _config_loja(db: Session, loja_slug: str) -> MetaAdsConfig | None:
     return db.query(MetaAdsConfig).filter(MetaAdsConfig.loja_slug == loja_slug).first()
 
 
+@dataclass
+class _LinhaBatch:
+    """Rastreia o que já foi decidido para uma ``external_key`` neste batch.
+
+    ``SessionLocal`` usa ``autoflush=False``: um ``db.add()`` continua pendente
+    e a query de dedupe não o enxerga. Sem esta memória em processo, duas linhas
+    da Meta para a mesma campanha+dia (paginação sobreposta, linha corrigida)
+    virariam dois INSERTs e o commit estouraria ``UNIQUE(external_key)``.
+    """
+
+    gasto: CampanhaGasto | None  # None = linha ignorada (gasto manual do dia)
+    novo: bool = False
+    atualizado: bool = False
+
+
 def sincronizar_gastos_meta(
     db: Session,
     loja_slug: str,
@@ -195,6 +211,24 @@ def sincronizar_gastos_meta(
         db.commit()
         return result
 
+    try:
+        _aplicar_rows(db, loja_slug, rows, result)
+        _definir_status(result)
+        _persistir_status(config, result)
+        db.commit()
+    except Exception as exc:
+        # Contrato do módulo: falha aqui nunca pode escapar e quebrar o fluxo
+        # do chamador (UI vira 500, job perde o batch da loja).
+        _tratar_falha_persistencia(db, loja_slug, result, exc)
+    return result
+
+
+def _aplicar_rows(
+    db: Session,
+    loja_slug: str,
+    rows: list[dict[str, Any]],
+    result: SyncResult,
+) -> None:
     campanhas = (
         db.query(Campanha)
         .filter(
@@ -208,6 +242,9 @@ def sincronizar_gastos_meta(
         for c in campanhas
         if c.meta_campaign_id
     }
+
+    # Dedupe intra-batch: external_key -> decisão já tomada nesta rodada.
+    processados: dict[str, _LinhaBatch] = {}
 
     for row in rows:
         meta_id = normalizar_meta_campaign_id(row.get("campaign_id"))
@@ -232,6 +269,22 @@ def sincronizar_gastos_meta(
             continue
 
         key = external_key_meta(loja_slug, meta_id, ref)
+
+        anterior = processados.get(key)
+        if anterior is not None:
+            # Mesma campanha+dia repetida no batch: a ÚLTIMA linha prevalece.
+            # Somar inflaria o gasto (a Meta já manda o total do dia) e
+            # distorceria o ROI.
+            if anterior.gasto is None:
+                continue  # manual preservado, já contabilizado
+            if anterior.gasto.valor != spend:
+                anterior.gasto.valor = spend
+                anterior.gasto.nota = NOTA_META
+                if not anterior.novo and not anterior.atualizado:
+                    result.updated += 1
+                    anterior.atualizado = True
+            continue
+
         existente = (
             db.query(CampanhaGasto)
             .filter(CampanhaGasto.external_key == key)
@@ -250,32 +303,39 @@ def sincronizar_gastos_meta(
             )
             if manual is not None:
                 result.skipped_manual += 1
+                processados[key] = _LinhaBatch(gasto=None)
                 continue
-            db.add(
-                CampanhaGasto(
-                    id=novo_id(),
-                    campanha_id=campanha.id,
-                    loja_slug=loja_slug,
-                    valor=spend,
-                    referencia=ref,
-                    nota="Meta API (gasto automático)",
-                    origem=ORIGEM_META,
-                    external_key=key,
-                    criada_por="meta_api",
-                )
+            gasto = CampanhaGasto(
+                id=novo_id(),
+                campanha_id=campanha.id,
+                loja_slug=loja_slug,
+                valor=spend,
+                referencia=ref,
+                nota=NOTA_META,
+                origem=ORIGEM_META,
+                external_key=key,
+                criada_por="meta_api",
             )
+            db.add(gasto)
             result.imported += 1
+            processados[key] = _LinhaBatch(gasto=gasto, novo=True)
             continue
 
         if existente.origem == ORIGEM_MANUAL:
             result.skipped_manual += 1
+            processados[key] = _LinhaBatch(gasto=None)
             continue
+        registro = _LinhaBatch(gasto=existente)
         if existente.valor != spend:
             existente.valor = spend
-            existente.nota = "Meta API (gasto automático)"
+            existente.nota = NOTA_META
             result.updated += 1
+            registro.atualizado = True
         # se igual, no-op silencioso
+        processados[key] = registro
 
+
+def _definir_status(result: SyncResult) -> None:
     if result.errors:
         result.status = "partial" if (result.imported or result.updated) else "erro"
     elif result.orphans and not (result.imported or result.updated):
@@ -283,9 +343,39 @@ def sincronizar_gastos_meta(
     else:
         result.status = "ok"
 
-    _persistir_status(config, result)
-    db.commit()
-    return result
+
+def _tratar_falha_persistencia(
+    db: Session,
+    loja_slug: str,
+    result: SyncResult,
+    exc: Exception,
+) -> None:
+    """Rollback + status ``erro``; nada escapa para o chamador."""
+    logger.warning(
+        "meta_ads_spend: falha ao gravar loja=%s tipo=%s",
+        loja_slug,
+        type(exc).__name__,
+    )
+    try:
+        db.rollback()
+    except Exception:  # pragma: no cover - sessão já inutilizável
+        pass
+    # Nada foi persistido: não contabilize o que voltou atrás.
+    result.imported = 0
+    result.updated = 0
+    result.skipped_manual = 0
+    result.status = "erro"
+    result.errors.append("Falha ao gravar os gastos importados da Meta.")
+    try:
+        config = _config_loja(db, loja_slug)
+        if config is not None:
+            _persistir_status(config, result)
+            db.commit()
+    except Exception:  # pragma: no cover - best effort
+        try:
+            db.rollback()
+        except Exception:
+            pass
 
 
 def _persistir_status(config: MetaAdsConfig, result: SyncResult) -> None:

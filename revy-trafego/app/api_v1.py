@@ -192,9 +192,43 @@ def api_venda_confirmada(
         return JSONResponse({"detail": "loja_slug inválido"}, status_code=400)
 
     event_id = (body.event_id or f"purchase-{body.venda_id}").strip()
-    existente = db.query(MetaCapiOutbox).filter(MetaCapiOutbox.event_id == event_id).first()
-    if existente is not None:
-        return {"ok": True, "outbox_id": existente.id, "idempotent": True}
+    ctwa = (body.ctwa_clid or "").strip()
+    # O caminho messaging grava a outbox com sufixo "-msg": a idempotência tem
+    # que conferir exatamente o event_id que este caminho vai gravar, senão o
+    # reenvio de uma venda CTWA já enfileirada devolve idempotent=False.
+    if ctwa and not event_id.endswith("-msg"):
+        event_id_efetivo = f"{event_id}-msg"
+    else:
+        event_id_efetivo = event_id
+
+    # O marcador de "sem config CAPI" é sempre gravado com o event_id puro
+    # (serve aos dois caminhos), então a busca considera os dois ids: o do
+    # caminho atual e o puro.
+    ids_possiveis = [event_id_efetivo]
+    if event_id not in ids_possiveis:
+        ids_possiveis.append(event_id)
+    linhas = (
+        db.query(MetaCapiOutbox)
+        .filter(MetaCapiOutbox.event_id.in_(ids_possiveis))
+        .all()
+    )
+    por_id = {linha.event_id: linha for linha in linhas}
+    # Só conta como "já enviado" quem virou evento de verdade; um marcador
+    # "skipped" significa que o Purchase nunca chegou ao Meta.
+    for candidato in ids_possiveis:
+        linha = por_id.get(candidato)
+        if linha is not None and linha.status != "skipped":
+            return {"ok": True, "outbox_id": linha.id, "idempotent": True}
+
+    marcadores = [linha for linha in linhas if linha.status == "skipped"]
+    # Se a loja configurou o Pixel/CAPI depois, o reenvio tem que enfileirar de
+    # verdade. Removemos o marcador para não bloquear a dedupe interna do
+    # enfileirar (event_id é único) — se continuar sem config, é regravado abaixo.
+    marcador_id = marcadores[0].id if marcadores else None
+    if marcadores:
+        for marcador in marcadores:
+            db.delete(marcador)
+        db.commit()
 
     lead = {
         "telefone": body.cliente_telefone,
@@ -203,13 +237,12 @@ def api_venda_confirmada(
         "fbc": body.fbc,
     }
     outbox = None
-    ctwa = (body.ctwa_clid or "").strip()
     if ctwa:
         outbox = enfileirar_purchase_messaging(
             db,
             loja_slug=slug,
             venda_id=body.venda_id,
-            event_id=event_id if event_id.endswith("-msg") else f"{event_id}-msg",
+            event_id=event_id_efetivo,
             value=body.valor,
             currency=body.moeda or "BRL",
             ctwa_clid=ctwa,
@@ -221,15 +254,16 @@ def api_venda_confirmada(
             db,
             loja_slug=slug,
             venda_id=body.venda_id,
-            event_id=event_id,
+            event_id=event_id_efetivo,
             value=body.valor,
             currency=body.moeda or "BRL",
             lead=lead,
         )
-    # Sem config CAPI: grava marcador skipped para idempotência futura.
+    # Continua sem config CAPI: regrava o marcador skipped (event_id puro, comum
+    # aos dois caminhos) para não perder o rastro da venda.
     if outbox is None:
         outbox = MetaCapiOutbox(
-            id=novo_id(),
+            id=marcador_id or novo_id(),
             loja_slug=slug,
             venda_id=body.venda_id,
             event_id=event_id,
@@ -241,9 +275,16 @@ def api_venda_confirmada(
             atualizada_em=agora(),
         )
         db.add(outbox)
+        db.commit()
+        # Nada mudou desde a chamada anterior: segue idempotente para o caller.
+        return {
+            "ok": True,
+            "outbox_id": outbox.id,
+            "idempotent": marcador_id is not None,
+        }
     db.commit()
     return {
         "ok": True,
-        "outbox_id": outbox.id if outbox else None,
+        "outbox_id": outbox.id,
         "idempotent": False,
     }

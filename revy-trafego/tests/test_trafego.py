@@ -386,17 +386,10 @@ def test_purchase_desligado_nao_envia_capi(client, monkeypatch):
         db.close()
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "BUG revy-trafego: no caminho CTWA a idempotência é conferida pelo event_id "
-        "sem sufixo (app/api_v1.py:195) mas a outbox é gravada com '-msg' "
-        "(app/api_v1.py:212), então a 2ª chamada devolve idempotent=False. "
-        "Não duplica evento nem reenvia, mas quebra o contrato que o caminho web "
-        "cumpre (ver tests/test_api_resultados.py::test_venda_confirmada_idempotente)."
-    ),
-)
 def test_venda_confirmada_ctwa_e_idempotente(client, monkeypatch):
+    """No caminho CTWA a idempotência confere o event_id com sufixo '-msg' —
+    o mesmo que a outbox grava — então o reenvio devolve idempotent=True sem
+    duplicar evento (mesmo contrato do caminho web)."""
     headers = _headers_servico(monkeypatch)
     _configurar_meta()
 
@@ -429,6 +422,120 @@ def test_venda_confirmada_ctwa_e_idempotente(client, monkeypatch):
         db.close()
 
     assert r2.json()["idempotent"] is True
+
+
+def test_venda_sem_config_capi_reenviada_apos_configurar_pixel(client, monkeypatch):
+    """Marcador `skipped` não pode virar 'já enviado'.
+
+    Venda confirmada ANTES de a loja configurar o Pixel/CAPI grava um marcador
+    `skipped` (que `processar_outbox_pendentes` nunca reprocessa). Quando a loja
+    configura o Pixel e a venda é reenviada, o Purchase precisa ser enfileirado
+    de verdade — não devolver idempotent=True sem fazer nada.
+    """
+    headers = _headers_servico(monkeypatch)
+
+    envios = {"n": 0}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        envios["n"] += 1
+        return httpx.Response(200, json={"events_received": 1})
+
+    _mock_capi(monkeypatch, handler)
+
+    payload = {"venda_id": "venda-tardia", "valor": "1500.00"}
+    url = f"/v1/lojas/{LOJA}/eventos/venda-confirmada"
+
+    # 1) loja ainda sem Pixel/CAPI: nada é enviado, fica só o marcador.
+    r1 = client.post(url, json=payload, headers=headers)
+    assert r1.status_code == 200, r1.text
+    assert r1.json()["idempotent"] is False
+    assert envios["n"] == 0
+
+    db = SessionLocal()
+    try:
+        marcador = db.query(MetaCapiOutbox).one()
+        assert marcador.event_id == "purchase-venda-tardia"
+        assert marcador.status == "skipped"
+    finally:
+        db.close()
+
+    # 2) loja configura o Pixel/CAPI e a mesma venda é reenviada.
+    _configurar_meta()
+    r2 = client.post(url, json=payload, headers=headers)
+    assert r2.status_code == 200, r2.text
+    assert r2.json()["idempotent"] is False
+    assert envios["n"] == 1
+
+    db = SessionLocal()
+    try:
+        outbox = db.query(MetaCapiOutbox).one()
+        assert outbox.event_id == "purchase-venda-tardia"
+        assert outbox.status == "delivered"
+        assert outbox.attempts >= 1
+    finally:
+        db.close()
+
+    # 3) agora sim é idempotente: nem duplica linha nem reenvia ao Meta.
+    r3 = client.post(url, json=payload, headers=headers)
+    assert r3.status_code == 200, r3.text
+    assert r3.json()["idempotent"] is True
+    assert envios["n"] == 1
+
+    db = SessionLocal()
+    try:
+        assert db.query(MetaCapiOutbox).count() == 1
+    finally:
+        db.close()
+
+
+def test_marcador_skipped_ctwa_nao_bloqueia_purchase_apos_configurar(client, monkeypatch):
+    """Mesmo cenário no caminho CTWA.
+
+    O marcador `skipped` é gravado com o event_id puro (é comum aos dois
+    caminhos, ver tests/test_ctwa_match_e_messaging.py), mas não pode ser
+    confundido com envio: depois de configurar o Pixel o reenvio precisa
+    enfileirar o Purchase messaging (event_id com sufixo '-msg').
+    """
+    headers = _headers_servico(monkeypatch)
+
+    envios = {"n": 0}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        envios["n"] += 1
+        return httpx.Response(200, json={"events_received": 1})
+
+    _mock_capi(monkeypatch, handler)
+
+    payload = {"venda_id": "venda-ctwa-tardia", "valor": "700.00", "ctwa_clid": "ARxyz"}
+    url = f"/v1/lojas/{LOJA}/eventos/venda-confirmada"
+
+    r1 = client.post(url, json=payload, headers=headers)
+    assert r1.status_code == 200, r1.text
+    assert envios["n"] == 0
+
+    db = SessionLocal()
+    try:
+        marcador = db.query(MetaCapiOutbox).one()
+        assert marcador.event_id == "purchase-venda-ctwa-tardia"
+        assert marcador.status == "skipped"
+    finally:
+        db.close()
+
+    _configurar_meta()
+    r2 = client.post(url, json=payload, headers=headers)
+    assert r2.status_code == 200, r2.text
+    assert r2.json()["idempotent"] is False
+    assert envios["n"] == 1
+
+    db = SessionLocal()
+    try:
+        outbox = db.query(MetaCapiOutbox).one()
+        assert outbox.event_id == "purchase-venda-ctwa-tardia-msg"
+        assert outbox.status == "delivered"
+        corpo = json.loads(outbox.payload_json)["data"][0]
+        assert corpo["action_source"] == "business_messaging"
+    finally:
+        db.close()
 
 
 def test_payload_purchase_enriquece_telefone_email_e_fbclid(monkeypatch):

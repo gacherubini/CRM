@@ -267,38 +267,33 @@ def test_sincronizar_ignora_linhas_invalidas():
     db.close()
 
 
-@pytest.mark.xfail(
-    strict=True,
-    raises=IntegrityError,
-    reason=(
-        "BUG REAL: duas linhas da Meta para a mesma campanha+dia no MESMO batch "
-        "estouram UNIQUE(external_key) (app/models.py:206). A dedupe em "
-        "app/meta_ads_spend.py:235-238 consulta o banco, mas SessionLocal usa "
-        "autoflush=False (app/db.py:14), então o db.add() da linha anterior "
-        "(app/meta_ads_spend.py:254) ainda está pendente e não é visto. "
-        "O db.commit() em app/meta_ads_spend.py:287 levanta IntegrityError, que "
-        "escapa de sincronizar_gastos_meta e vira 500 na UI "
-        "(app/main.py:529). Contraria o docstring do módulo "
-        "('Falha de rede/API nunca deve quebrar o fluxo')."
-    ),
-)
-def test_linhas_duplicadas_no_mesmo_batch_nao_devem_explodir():
+def test_linhas_duplicadas_no_mesmo_batch_consolidam_ultima_linha():
+    """Mesma campanha+dia repetida no batch vira UMA linha, com o último valor.
+
+    A dedupe contra o banco não bastava: ``SessionLocal`` usa ``autoflush=False``
+    (``app/db.py:14``), então o ``db.add()`` da linha anterior seguia pendente e
+    o commit estourava ``UNIQUE(external_key)`` (``app/models.py:206``).
+    A consolidação é por substituição (última prevalece), nunca soma — a Meta
+    já manda o total do dia, somar inflaria o gasto e distorceria o ROI.
+    """
     db = SessionLocal()
     db.add(_campanha())
     db.add(_ads_config())
     db.commit()
     db.close()
 
-    linha = {
-        "campaign_id": "111",
-        "spend": "10.00",
-        "date_start": "2026-07-20",
-        "date_stop": "2026-07-20",
-    }
+    def linha(spend: str) -> dict:
+        return {
+            "campaign_id": "111",
+            "spend": spend,
+            "date_start": "2026-07-20",
+            "date_stop": "2026-07-20",
+        }
 
     def fake_fetch(**kwargs):
-        # paginação da Graph API pode repetir a mesma linha entre páginas
-        return [dict(linha), dict(linha)]
+        # paginação da Graph API pode repetir a mesma campanha+dia entre páginas,
+        # às vezes com o valor já corrigido na 2ª ocorrência
+        return [linha("10.00"), linha("12.50")]
 
     db = SessionLocal()
     try:
@@ -310,7 +305,161 @@ def test_linhas_duplicadas_no_mesmo_batch_nao_devem_explodir():
             fetch=fake_fetch,
         )
         assert r.imported == 1
+        assert r.updated == 0
+        assert r.errors == []
         assert r.status == "ok"
+    finally:
+        db.close()
+
+    key = external_key_meta(LOJA, "111", date(2026, 7, 20))
+    db = SessionLocal()
+    try:
+        gastos = db.query(CampanhaGasto).filter(CampanhaGasto.external_key == key).all()
+        assert len(gastos) == 1
+        # última linha prevalece; jamais 22.50 (soma) nem 10.00 (primeira)
+        assert gastos[0].valor == Decimal("12.50")
+    finally:
+        db.close()
+
+
+def test_duplicata_no_batch_sobre_gasto_ja_existente_conta_um_update():
+    """Duplicata sobre linha já persistida: 1 update, valor da última linha."""
+    db = SessionLocal()
+    db.add(_campanha())
+    db.add(_ads_config())
+    db.commit()
+    db.close()
+
+    valores = ["10.00"]
+
+    def fake_fetch(**kwargs):
+        return [
+            {
+                "campaign_id": "111",
+                "spend": v,
+                "date_start": "2026-07-20",
+                "date_stop": "2026-07-20",
+            }
+            for v in valores
+        ]
+
+    db = SessionLocal()
+    try:
+        primeira = sincronizar_gastos_meta(
+            db, LOJA, since=date(2026, 7, 20), until=date(2026, 7, 20), fetch=fake_fetch
+        )
+        assert primeira.imported == 1
+    finally:
+        db.close()
+
+    valores = ["10.00", "33.00", "40.00"]
+    db = SessionLocal()
+    try:
+        segunda = sincronizar_gastos_meta(
+            db, LOJA, since=date(2026, 7, 20), until=date(2026, 7, 20), fetch=fake_fetch
+        )
+        assert segunda.imported == 0
+        assert segunda.updated == 1  # uma linha física atualizada, não três
+        assert segunda.status == "ok"
+    finally:
+        db.close()
+
+    key = external_key_meta(LOJA, "111", date(2026, 7, 20))
+    db = SessionLocal()
+    try:
+        g = db.query(CampanhaGasto).filter(CampanhaGasto.external_key == key).one()
+        assert g.valor == Decimal("40.00")
+    finally:
+        db.close()
+
+
+def test_duplicata_no_batch_com_gasto_manual_preserva_manual_uma_vez():
+    db = SessionLocal()
+    campanha = _campanha(meta_campaign_id="444", utm_campaign_norm="dup-manual")
+    db.add(campanha)
+    db.add(
+        CampanhaGasto(
+            id=novo_id(),
+            campanha_id=campanha.id,
+            loja_slug=LOJA,
+            valor=Decimal("7.00"),
+            referencia=date(2026, 7, 22),
+            origem="manual",
+            criada_por="gestor@revy.local",
+        )
+    )
+    db.add(_ads_config())
+    db.commit()
+    cid = campanha.id
+    db.close()
+
+    def fake_fetch(**kwargs):
+        return [
+            {
+                "campaign_id": "444",
+                "spend": s,
+                "date_start": "2026-07-22",
+                "date_stop": "2026-07-22",
+            }
+            for s in ("50.00", "60.00")
+        ]
+
+    db = SessionLocal()
+    try:
+        r = sincronizar_gastos_meta(
+            db, LOJA, since=date(2026, 7, 22), until=date(2026, 7, 22), fetch=fake_fetch
+        )
+        assert r.imported == 0
+        assert r.skipped_manual == 1  # contabiliza a linha protegida uma única vez
+    finally:
+        db.close()
+
+    db = SessionLocal()
+    try:
+        g = db.query(CampanhaGasto).filter(CampanhaGasto.campanha_id == cid).one()
+        assert g.valor == Decimal("7.00")
+        assert g.origem == "manual"
+    finally:
+        db.close()
+
+
+def test_falha_ao_gravar_nao_escapa_para_o_chamador(monkeypatch):
+    """Contrato do módulo: erro de persistência vira status ``erro``, não exceção."""
+    db = SessionLocal()
+    db.add(_campanha())
+    db.add(_ads_config())
+    db.commit()
+    db.close()
+
+    def fake_fetch(**kwargs):
+        return [
+            {
+                "campaign_id": "111",
+                "spend": "10.00",
+                "date_start": "2026-07-20",
+                "date_stop": "2026-07-20",
+            }
+        ]
+
+    db = SessionLocal()
+    try:
+        def commit_explode():
+            raise IntegrityError("INSERT INTO campanha_gastos", {}, Exception("uq"))
+
+        monkeypatch.setattr(db, "commit", commit_explode)
+        r = sincronizar_gastos_meta(
+            db, LOJA, since=date(2026, 7, 20), until=date(2026, 7, 20), fetch=fake_fetch
+        )
+        assert r.status == "erro"
+        assert r.imported == 0
+        assert r.errors  # mensagem amigável, sem stacktrace
+    finally:
+        monkeypatch.undo()
+        db.close()
+
+    db = SessionLocal()
+    try:
+        assert db.query(CampanhaGasto).count() == 0
     finally:
         db.close()
 

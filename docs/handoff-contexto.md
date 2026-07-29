@@ -34,13 +34,29 @@
   `portal-gestao`, cuja cópia testada estava desligada em produção pelo cutover B5). Arquivos novos:
   `test_trafego.py` (16), `test_meta_ads_spend.py` (27), `test_ctwa_match_e_messaging.py` (14),
   `test_pixel_capi_auditoria.py` (3), `test_campanhas_model.py` (7).
-  `portal-gestao` segue **289 passando**, sem regressão. Os 2 `xfail` são bugs reais documentados
-  (abaixo), não testes quebrados — ambos `strict=True`, então viram falha quando forem corrigidos.
+  `portal-gestao` segue **289 passando**, sem regressão.
+- **Os 2 bugs foram corrigidos em seguida** (detalhe abaixo) e os `xfail` viraram testes normais:
+  **`revy-trafego` fechou em 85 passed / 0 xfailed**, `portal-gestao` em 289 passed.
 
-### 🔴 Bug aberto — perda silenciosa de conversão (`revy-trafego/app/api_v1.py`)
+### ✅ Bug 1 CORRIGIDO — perda silenciosa de conversão (`revy-trafego/app/api_v1.py`)
 
-Confirmado por leitura de código e por dois agentes independentes. **Não corrigido** (decisão de
-produto pendente).
+Confirmado por leitura de código e por dois agentes independentes. **Corrigido nesta sessão.**
+
+**Fix:** `api_venda_confirmada` agora calcula `event_id_efetivo` (com `-msg` quando há `ctwa_clid`)
+**antes** da checagem, busca `in_([event_id_efetivo, event_id])` e só devolve `idempotent: True` se a
+linha encontrada tiver `status != "skipped"`. Quando a linha é `skipped`, ela é apagada e o evento é
+reenfileirado de verdade. A dedupe interna de `enfileirar_purchase*` continua ativa e não foi
+contornada. O marcador `skipped` segue chaveado pelo `event_id` **puro** (comum aos dois caminhos) —
+tentar usar `-msg` quebra `test_ctwa_match_e_messaging.py:397` e `test_api_resultados.py:73`.
+
+**Efeito colateral aceito:** o `outbox_id` devolvido para venda que segue sem config agora é estável
+entre chamadas (o id do marcador é reaproveitado); antes era novo a cada reenvio.
+
+**Não feito (Parte B, decisão de produto adiada):** varredura retroativa de marcadores `skipped`
+antigos. Hoje é inócuo — a outbox está vazia — e a Meta rejeita evento com mais de 7 dias. Venda
+antiga que nunca for reenviada segue perdida.
+
+**Descrição original do bug, para contexto:**
 
 - Linha **194–197**: idempotência confere o `event_id` **puro**.
 - Linha **212**: caminho CTWA enfileira com `{event_id}-msg`.
@@ -53,10 +69,31 @@ nunca sai**. Vale para o caminho web também, não só CTWA. Decidir: reprocessa
 config? janela de carência? O teste `test_venda_confirmada_ctwa_e_idempotente` está `xfail(strict=True)`
 — vira falha automática quando a linha 195 for corrigida.
 
-### 🔴 Bug aberto 2 — sync de gasto Meta morre com `IntegrityError`
+### ✅ Bug 2 CORRIGIDO — sync de gasto Meta morria com `IntegrityError`
 
 Encontrado ao portar `test_meta_ads_spend.py`, reproduzido isolado antes de virar teste.
-**Não corrigido.**
+**Corrigido nesta sessão.**
+
+**Fix:** dedupe **intra-batch** via dict `processados` em `_aplicar_rows` — chave repetida no mesmo
+lote substitui o valor no objeto já pendente em vez de novo `db.add()`, e não recontabiliza
+`imported`. `sincronizar_gastos_meta` passou a envolver persistência em `try/except` com
+`_tratar_falha_persistencia` (rollback, zera contadores, `status="erro"`), honrando o docstring de
+que falha não escapa. Schema intocado: o `UNIQUE(external_key)` continua como última defesa, e
+`db.py` (`autoflush=False` global) **não** foi tocado.
+
+**Regra de consolidação: última linha prevalece, não soma.** O Insights com `time_increment=1`
+entrega o total do dia por campanha, não incrementos — repetição vem de páginas sobrepostas ou de
+correção da Meta, então as duas linhas descrevem o mesmo fato. Somar inflaria o gasto e derrubaria
+o ROAS, de forma cumulativa a cada re-sync da janela.
+
+### 🔴 Aberto — paginação sem teto em `fetch_campaign_insights`
+
+Confirmado por leitura (`revy-trafego/app/meta_ads_spend.py:126-136`): `while url:` com
+`url = body["paging"]["next"]`, **sem set de URLs visitadas e sem limite de páginas**. Única parada é
+a Meta deixar de mandar `paging.next`; um `next` cíclico laça indefinidamente acumulando `rows` em
+memória. Mitigação sugerida: cap de páginas (~50, coerente com `limit=500`) + set de URLs visitadas.
+
+**Descrição original do bug 2, para contexto:**
 
 Duas linhas da Meta para a **mesma campanha + mesmo dia no mesmo batch** derrubam o sync:
 
@@ -137,9 +174,8 @@ migração de dados** — não se repete depois que a operação começar.
 
 ### Próximo
 
-1. Corrigir os **dois bugs abertos** acima (marcador `skipped` em `api_v1.py`; `IntegrityError` no
-   sync de spend). Os dois já têm teste `xfail(strict=True)` esperando — o teste vira verde sozinho
-   e avisa quando o fix estiver certo.
+1. Paginação sem teto em `fetch_campaign_insights` (cap + set de URLs visitadas). Único bug
+   conhecido ainda aberto.
 2. Fase 3: banco próprio para o `revy-trafego` no `suite-pg` + Alembic próprio (matar o
    `create_all` de `main.py:125`) + projeção de vendas alimentada por evento, para `roi_calc` e
    `financeiro_calc` pararem de ler `Venda` do banco do portal.
