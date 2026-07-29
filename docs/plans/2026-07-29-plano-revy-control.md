@@ -206,9 +206,8 @@ Adicionar:
       senha, recuperação, desativação e revogação de sessões. Admin nunca lê senha.
 - [ ] Projetar estado da Loja e dos Módulos Contratados para Revy Loja, Chatbot, Motor,
       Estoque e Catálogo por entrega idempotente; nenhum serviço confia só no menu.
-      **Parcial local:** enqueue `chatbot`+`estoque`+`portal`, retry failed (max 5),
-      worker opt-in; consumidores Chatbot/Estoque/Portal com gates; falta Motor/Catálogo
-      e rollout no lab.
+      **Local:** enqueue para chatbot/estoque/portal/motor/catalogo + retry failed +
+      worker opt-in; todos os destinos consomem projeção; falta rollout lab.
 - [ ] Não cortar autenticação do Portal neste plano.
 
 ### Interface administrativa
@@ -228,15 +227,16 @@ Adicionar:
 
 - [x] Convite expirado/usado, reset e usuário desativado falham de forma segura.
 - [x] Admin atribui cargos sem criar, conhecer ou reapresentar a senha da pessoa.
-- [ ] Múltiplos cargos ativos somam permissões somente dentro da loja selecionada;
-      nenhum cargo ou acesso ao Control vaza para outra loja/superfície.
+- [x] Múltiplos cargos ativos somam permissões somente dentro da loja selecionada;
+      nenhum cargo ou acesso ao Control vaza para outra loja/superfície
+      (`control/permissions.py` + testes de isolamento).
 - [x] Projeção repetida ou fora de ordem não reativa loja/módulo suspenso
       (apply monotônico no Control + Chatbot).
 - [ ] Loja/Módulo suspenso bloqueia novo processamento nos serviços de destino e mantém
       leitura do histórico conforme o cargo autorizado.
-      **Parcial:** Chatbot (várias escritas), Estoque (create/edit/publicar/reservar/vender/fotos)
-      e Portal (`POST /app/vendas/nova`) bloqueiam sem projeção ou loja inoperante;
-      `despublicar` no Estoque permanece aberto (ação redutora).
+      **Local:** Chatbot, Estoque, Portal, Motor (nova simulação) e Catálogo (vitrine
+      404/HIDE, fail-open sem projeção) aplicam gates; `despublicar` Estoque e cancel
+      Motor permanecem abertos (ações redutoras).
 
 > **Evidência local — Fase 2 parcial (pós-configuração comercial):** Pessoas/Cargos,
 > convite/ativação, recuperação, lifecycle e versão de sessão (`fda42fb` a `17a0963`),
@@ -256,16 +256,14 @@ Adicionar:
 > Chatbot tem `0014_loja_operacional_projecao`. Flags de delivery e Control seguem
 > default off; sem migration/rollout no lab.
 >
-> Entrega (parcial): mutações enfileiram para `chatbot`, `estoque` e `portal`;
-> worker + retry failed; import push de usuários Portal → Pessoa/Cargo; gates nos
-> três destinos. Motor/Catálogo, isolamento Control×Loja e rollout lab ainda abertos.
+> Entrega local da projeção operacional está fechada no código: fan-out completo,
+> import Portal, isolamento Control×Loja e gates nos cinco destinos. Residual de
+> Fase 2 = rollout lab e gates finos (WA, confirmar venda).
 
 Pendências para concluir a Fase 2:
 
-- fan-out Motor e Catálogo;
-- isolamento explícito de permissões Control × cargos da Loja na mesma pessoa;
-- expandir gates (WA inbound/outbound; confirmar venda no Portal);
-- rollout lab (migrations + flags + tokens).
+- expandir gates finos (WA inbound/outbound; confirmar venda no Portal);
+- rollout lab (migrations + flags + tokens por destino).
 
 ### Critério de pronto
 

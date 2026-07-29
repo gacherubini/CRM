@@ -49,6 +49,23 @@ class Settings:
         or os.getenv("PORTAL_PROVISIONING_TOKEN")
         or ""
     ).strip()
+    motor_url: str = os.getenv(
+        "MOTOR_URL", os.getenv("MOTOR_API_URL", "http://motor-simulacao:8000")
+    )
+    motor_token: str = (
+        os.getenv("MOTOR_TOKEN") or os.getenv("MOTOR_API_TOKEN") or ""
+    ).strip()
+    motor_token_loja: str = os.getenv("REVY_TRAFEGO_MOTOR_TOKEN_LOJA", "").strip()
+    motor_tokens_json: str = os.getenv("REVY_TRAFEGO_MOTOR_TOKENS_JSON", "").strip()
+    catalogo_url: str = os.getenv(
+        "CATALOGO_PUBLIC_URL",
+        os.getenv("CATALOGO_API_URL", "http://catalogo-publico:8000"),
+    )
+    catalogo_service_token: str = (
+        os.getenv("CATALOGO_SERVICE_TOKEN")
+        or os.getenv("CATALOGO_PROVISIONING_TOKEN")
+        or ""
+    ).strip()
     request_timeout: float = float(os.getenv("REVY_TRAFEGO_HTTP_TIMEOUT", "5"))
     request_retries: int = int(os.getenv("REVY_TRAFEGO_HTTP_RETRIES", "1"))
     request_retry_backoff: float = float(
@@ -127,6 +144,15 @@ class Settings:
             tokens_json=self.estoque_tokens_json,
             token_loja=self.estoque_token_loja,
             token=self.estoque_token,
+        )
+
+    def motor_token_para(self, loja_slug: str) -> str:
+        """Resolve credencial Motor por loja (Bearer do cliente API)."""
+        return self._token_para_slug(
+            loja_slug,
+            tokens_json=self.motor_tokens_json,
+            token_loja=self.motor_token_loja,
+            token=self.motor_token,
         )
 
     def _token_para_slug(

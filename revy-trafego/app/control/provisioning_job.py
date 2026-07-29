@@ -64,6 +64,10 @@ class ProvisioningDeliveryWorker:
             estoque_token_for_slug=settings.estoque_token_para,
             portal_url=settings.portal_url,
             portal_service_token=settings.portal_service_token,
+            motor_url=settings.motor_url,
+            motor_token_for_slug=settings.motor_token_para,
+            catalogo_url=settings.catalogo_url,
+            catalogo_service_token=settings.catalogo_service_token,
         )
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None

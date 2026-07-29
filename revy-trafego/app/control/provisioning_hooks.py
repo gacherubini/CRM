@@ -14,7 +14,13 @@ from app.control.types import StoreRef
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_PROVISIONING_TARGETS: tuple[str, ...] = ("chatbot", "estoque", "portal")
+DEFAULT_PROVISIONING_TARGETS: tuple[str, ...] = (
+    "chatbot",
+    "estoque",
+    "portal",
+    "motor",
+    "catalogo",
+)
 
 
 def enqueue_store_snapshot(

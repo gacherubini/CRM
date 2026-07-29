@@ -244,12 +244,14 @@ Login, sessão e `Actor` preferem `AcessoControl` + `Pessoa`. Um acesso ativo se
 existe, o estado/versão de `AcessoControl` mandam. Recuperação e reativação sincronizam
 o legado somente se houver vínculo.
 
-O snapshot de provisionamento local expõe loja/módulos versionados e pessoas/cargos
-ativos. Mutações enfileiram na outbox (`0009`) para `chatbot`, `estoque` e `portal`.
-Worker opt-in (`REVY_CONTROL_PROVISIONING_DELIVERY_ENABLED`) entrega e reprocessa
-`failed` (máx. 5). Tokens: Chatbot Bearer, Estoque Bearer, Portal
-`PORTAL_SERVICE_TOKEN` / `PORTAL_API_URL`. Import push de usuários Portal:
-`POST /control/v1/imports/portal-usuarios` (origem=`portal`, não corta auth do Portal).
+O snapshot de provisionamento enfileira para **chatbot, estoque, portal, motor e
+catalogo** (`control_provisioning_outbox` / migration `0009`). Worker opt-in
+(`REVY_CONTROL_PROVISIONING_DELIVERY_ENABLED`) entrega e reprocessa `failed` (máx. 5).
+
+Tokens por destino: Chatbot/Estoque/Motor Bearer (por slug ou JSON);
+Portal/Catálogo `X-Service-Token` (`PORTAL_SERVICE_TOKEN`, `CATALOGO_SERVICE_TOKEN`).
+Import push: `POST /control/v1/imports/portal-usuarios`. Isolamento de permissões:
+`control:*` vs `store:*` em `app/control/permissions.py`.
 
 Com `REVY_CONTROL_ENABLED=0`, as superfícies Control respondem 404.
 
