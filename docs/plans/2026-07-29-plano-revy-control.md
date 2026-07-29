@@ -212,8 +212,8 @@ Adicionar:
 - [x] Admin cadastra pessoa uma vez e atribui vários cargos/lojas.
 - [ ] Permitir que a mesma pessoa tenha acesso ao Control e cargo na Loja sem herdar
       permissões de uma superfície na outra.
-- [x] Admin escolhe Vendas, Estoque ou ambos para a loja pela API.
-- [x] Admin registra valor, vigência, vencimento e situação da cobrança pela API.
+- [x] Admin escolhe Vendas, Estoque ou ambos para a loja pela API e UI.
+- [x] Admin registra valor, vigência, vencimento e situação da cobrança pela API e UI.
 - [ ] Exigir pelo menos um Dono da Loja com acesso ativável antes de marcar a loja pronta.
 - [x] Suspender/reativar módulo preserva estado, versão, histórico e auditoria locais.
 - [ ] Aplicar o bloqueio de novos processamentos nos serviços de destino.
@@ -235,9 +235,10 @@ Adicionar:
 > versão/reativação da Loja (`d218da3`, `f55677a`). O primeiro snapshot operacional
 > versionado de Loja/Vendas/Estoque está em `728b356`; transporte, pessoas/cargos e
 > consumo nos destinos ainda não fazem parte desse corte. O Alembic head local é
-> `0008_revy_control_loja_versao` e a suíte Revy tem **209 testes passando**. A UI
+> `0008_revy_control_loja_versao` e a suíte Revy tem **211 testes passando**. A UI
 > base navega da lista ao detalhe (`914f45a`) e apresenta versão, módulos e contrato
-> read-only (`dfb793c`); formulários de portfólio/contrato continuam pendentes.
+> read-only (`dfb793c`); os formulários Admin de módulos e contrato estão em
+> `39e9f38` e `fa83257`.
 >
 > `REVY_CONTROL_ENABLED=0` e `REVY_CONTROL_RBAC_ENABLED=0` continuam sendo os defaults,
 > e não houve migration nem rollout desse corte no lab. Sessões já validam o estado e

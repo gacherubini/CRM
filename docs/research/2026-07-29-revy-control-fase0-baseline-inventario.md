@@ -11,7 +11,7 @@ inventário final de dados do lab e não autoriza iniciar backfill ou migration 
 ## Atualização local do Revy Control
 
 Após o baseline fixado acima, o corte local do Control avançou para o head Alembic
-`0008_revy_control_loja_versao`, com **209 testes passando**. As seis flags planejadas
+`0008_revy_control_loja_versao`, com **211 testes passando**. As seis flags planejadas
 já existem com default off. O snapshot operacional versionado cobre Loja, Vendas e
 Estoque, inclusive Loja legada sem evento de auditoria. Isso não equivale a migration
 ou rollout no lab, nem implementa ainda o transporte Control → serviços.
