@@ -11,24 +11,38 @@ from app.auth import gestor_atual
 from app.config import settings
 from app.control.access import AccessControl
 from app.control.audit import AuditTrail
+from app.control.people import PeopleDirectory
+from app.control.roles import StoreRoles
 from app.control.stores import StoreControl
 from app.control.types import (
     AccessDenied,
     AccessibleStore,
     ActiveResponsibleConflict,
     Actor,
+    AssignStoreRole,
     AuditEventView,
     AuditQuery,
     ControlError,
     CreateStore,
     GrantTrafficAccess,
+    InvalidPersonEmail,
     InvalidStoreTransition,
     ManagerNotFound,
+    PersonEmailConflict,
+    PersonNotFound,
+    PersonRef,
+    PersonView,
+    RegisterPerson,
+    RevokeStoreRole,
     RevokeTrafficAccess,
     StoreNotFound,
     StoreRef,
     StoreSlugConflict,
     StoreStatus,
+    StoreRole,
+    StoreRoleConflict,
+    StoreRoleNotFound,
+    StoreRoleView,
     StoreView,
     TrafficLinkView,
     TrafficLinkConflict,
@@ -98,6 +112,21 @@ class StoreCreateBody(BaseModel):
         return normalized
 
 
+class PersonCreateBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    nome: str = Field(min_length=1, max_length=160)
+    email: str = Field(min_length=3, max_length=320)
+
+    @field_validator("nome")
+    @classmethod
+    def validate_name(cls, value: str) -> str:
+        normalized = value.strip()
+        if not normalized:
+            raise ValueError("nome é obrigatório")
+        return normalized
+
+
 class StoreTransitionBody(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -112,10 +141,53 @@ class TrafficGrantBody(BaseModel):
     tipo: TrafficRole
 
 
+class StoreRoleAssignBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    pessoa_id: str = Field(min_length=1, max_length=36)
+    cargo: StoreRole
+
+
+class StoreRoleRevokeBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    motivo: str | None = Field(default=None, max_length=1000)
+
+
 class TrafficRevokeBody(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     motivo: str | None = Field(default=None, max_length=1000)
+
+
+@router.post("/pessoas", status_code=201)
+def create_person(
+    body: PersonCreateBody,
+    actor: Actor = Depends(_current_actor),
+):
+    try:
+        person = PeopleDirectory(SessionLocal).register(
+            actor,
+            RegisterPerson(name=body.nome, email=body.email),
+        )
+    except ControlError as exc:
+        _raise_domain_error(exc)
+    return _person_json(person)
+
+
+@router.get("/pessoas/{pessoa_id}")
+def get_person(
+    pessoa_id: str,
+    actor: Actor = Depends(_current_actor),
+):
+    try:
+        person = PeopleDirectory(SessionLocal).get(
+            actor,
+            PersonRef(id=pessoa_id),
+        )
+    except ControlError as exc:
+        _raise_domain_error(exc)
+    return _person_json(person)
 
 
 @router.get("/lojas")
@@ -149,6 +221,64 @@ def get_store(
     except ControlError as exc:
         _raise_domain_error(exc)
     return _store_json(store)
+
+
+@router.post("/lojas/{loja_id}/cargos", status_code=201)
+def assign_store_role(
+    loja_id: str,
+    body: StoreRoleAssignBody,
+    actor: Actor = Depends(_current_actor),
+):
+    try:
+        role = StoreRoles(SessionLocal).assign(
+            actor,
+            AssignStoreRole(
+                store=StoreRef(id=loja_id),
+                person=PersonRef(id=body.pessoa_id),
+                role=body.cargo,
+            ),
+        )
+    except ControlError as exc:
+        _raise_domain_error(exc)
+    return _store_role_json(role)
+
+
+@router.get("/lojas/{loja_id}/cargos")
+def list_store_roles(
+    loja_id: str,
+    actor: Actor = Depends(_current_actor),
+):
+    try:
+        roles = StoreRoles(SessionLocal).list_for_store(
+            actor,
+            StoreRef(id=loja_id),
+        )
+    except ControlError as exc:
+        _raise_domain_error(exc)
+    return {"items": [_store_role_json(role) for role in roles]}
+
+
+@router.post("/lojas/{loja_id}/cargos/{pessoa_id}/{cargo}/revogar")
+def revoke_store_role(
+    loja_id: str,
+    pessoa_id: str,
+    cargo: StoreRole,
+    body: StoreRoleRevokeBody,
+    actor: Actor = Depends(_current_actor),
+):
+    try:
+        role = StoreRoles(SessionLocal).revoke(
+            actor,
+            RevokeStoreRole(
+                store=StoreRef(id=loja_id),
+                person=PersonRef(id=pessoa_id),
+                role=cargo,
+                reason=body.motivo,
+            ),
+        )
+    except ControlError as exc:
+        _raise_domain_error(exc)
+    return _store_role_json(role)
 
 
 @router.post("/lojas/{loja_id}/estado")
@@ -237,6 +367,30 @@ def _store_json(store: StoreView) -> dict[str, str]:
     }
 
 
+def _person_json(person: PersonView) -> dict[str, str]:
+    return {
+        "id": person.id,
+        "nome": person.name,
+        "email": person.email,
+        "criado_em": person.created_at.isoformat(),
+        "atualizado_em": person.updated_at.isoformat(),
+    }
+
+
+def _store_role_json(role: StoreRoleView) -> dict[str, object]:
+    return {
+        "id": role.id,
+        "loja_id": role.store_id,
+        "pessoa_id": role.person_id,
+        "cargo": role.role.value,
+        "origem": role.source,
+        "origem_id": role.source_id,
+        "ativo": role.active,
+        "iniciado_em": role.started_at.isoformat(),
+        "encerrado_em": role.ended_at.isoformat() if role.ended_at else None,
+    }
+
+
 def _traffic_link_json(link: TrafficLinkView) -> dict[str, object]:
     return {
         "id": link.id,
@@ -276,6 +430,10 @@ def _accessible_store_json(item: AccessibleStore) -> dict[str, str | None]:
 def _raise_domain_error(exc: ControlError) -> NoReturn:
     if isinstance(exc, AccessDenied):
         status_code, code = 403, "access_denied"
+    elif isinstance(exc, InvalidPersonEmail):
+        status_code, code = 400, "invalid_person_email"
+    elif isinstance(exc, PersonNotFound):
+        status_code, code = 404, "person_not_found"
     elif isinstance(exc, StoreNotFound):
         status_code, code = 404, "store_not_found"
     elif isinstance(exc, ManagerNotFound):
@@ -284,6 +442,12 @@ def _raise_domain_error(exc: ControlError) -> NoReturn:
         status_code, code = 404, "traffic_link_not_found"
     elif isinstance(exc, StoreSlugConflict):
         status_code, code = 409, "store_slug_conflict"
+    elif isinstance(exc, PersonEmailConflict):
+        status_code, code = 409, "person_email_conflict"
+    elif isinstance(exc, StoreRoleNotFound):
+        status_code, code = 404, "store_role_not_found"
+    elif isinstance(exc, StoreRoleConflict):
+        status_code, code = 409, "store_role_conflict"
     elif isinstance(exc, InvalidStoreTransition):
         status_code, code = 409, "invalid_store_transition"
     elif isinstance(exc, ActiveResponsibleConflict):
