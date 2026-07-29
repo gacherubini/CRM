@@ -196,18 +196,43 @@ def chatbot_poster(
     token_for_slug: Callable[[str], str],
     client_factory: Callable[..., Any] | None = None,
 ) -> Callable[[str, dict[str, Any]], None]:
-    """Poster HTTP para o destino ``chatbot`` (outros destinos falham explicitamente)."""
-    from app.clients.chatbot import ChatbotClient
+    """Poster HTTP só para o destino ``chatbot`` (compat)."""
+    return multi_destination_poster(
+        chatbot_url=base_url,
+        chatbot_token_for_slug=token_for_slug,
+        chatbot_client_factory=client_factory,
+    )
 
-    factory = client_factory or ChatbotClient
+
+def multi_destination_poster(
+    *,
+    chatbot_url: str,
+    chatbot_token_for_slug: Callable[[str], str],
+    chatbot_client_factory: Callable[..., Any] | None = None,
+    estoque_url: str = "",
+    estoque_token_for_slug: Callable[[str], str] | None = None,
+    estoque_client_factory: Callable[..., Any] | None = None,
+) -> Callable[[str, dict[str, Any]], None]:
+    """Poster HTTP para destinos ``chatbot`` e ``estoque``."""
+    from app.clients.chatbot import ChatbotClient
+    from app.clients.estoque import EstoqueClient
+
+    chatbot_factory = chatbot_client_factory or ChatbotClient
+    estoque_factory = estoque_client_factory or EstoqueClient
+    estoque_token = estoque_token_for_slug or (lambda _slug: "")
 
     def poster(destination: str, payload: dict[str, Any]) -> None:
-        if destination != "chatbot":
-            raise ValueError(f"destino de provisionamento não suportado: {destination}")
         slug = str(payload.get("loja_slug") or "").strip()
         if not slug:
             raise ValueError("payload sem loja_slug")
-        client = factory(base_url, token_for_slug(slug))
-        client.aplicar_estado_operacional(payload)
+        if destination == "chatbot":
+            client = chatbot_factory(chatbot_url, chatbot_token_for_slug(slug))
+            client.aplicar_estado_operacional(payload)
+            return
+        if destination == "estoque":
+            client = estoque_factory(estoque_url, estoque_token(slug))
+            client.aplicar_estado_operacional(payload)
+            return
+        raise ValueError(f"destino de provisionamento não suportado: {destination}")
 
     return poster

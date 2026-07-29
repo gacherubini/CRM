@@ -245,12 +245,14 @@ existe, o estado/versão de `AcessoControl` mandam. Recuperação e reativação
 o legado somente se houver vínculo.
 
 O snapshot de provisionamento local expõe loja/módulos versionados e pessoas/cargos
-ativos. Mutações de estado da loja, módulos e cargos enfileiram na outbox
-(`control_provisioning_outbox`, migration `0009`). Com
-`REVY_CONTROL_PROVISIONING_DELIVERY_ENABLED=1` o worker periodicamente entrega ao
-Chatbot (`POST /v1/internal/provisioning/state`) via `chatbot_poster`. Intervalo:
-`REVY_CONTROL_PROVISIONING_INTERVAL_SECONDS` (default 30). O Chatbot aplica projeção
-monotônica e bloqueia simulação (423) quando a loja não está `ativa`.
+ativos. Mutações de loja/módulos/cargos enfileiram na outbox
+(`control_provisioning_outbox`, migration `0009`) para destinos `chatbot` e
+`estoque`. Com `REVY_CONTROL_PROVISIONING_DELIVERY_ENABLED=1` o worker entrega via
+`multi_destination_poster` e reprocessa `failed` até 5 tentativas. Intervalo:
+`REVY_CONTROL_PROVISIONING_INTERVAL_SECONDS` (default 30). Tokens: Chatbot
+(`CHATBOT_API_*` / `REVY_TRAFEGO_CHATBOT_TOKENS_JSON`) e Estoque
+(`ESTOQUE_API_*` / `REVY_TRAFEGO_ESTOQUE_TOKENS_JSON`). Destinos aplicam projeção
+monotônica e bloqueiam escritas (423) quando a loja/módulo não está operacional.
 
 Com `REVY_CONTROL_ENABLED=0`, as superfícies Control respondem 404.
 

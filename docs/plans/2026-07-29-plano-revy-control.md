@@ -204,10 +204,9 @@ Adicionar:
       senha, recuperação, desativação e revogação de sessões. Admin nunca lê senha.
 - [ ] Projetar estado da Loja e dos Módulos Contratados para Revy Loja, Chatbot, Motor,
       Estoque e Catálogo por entrega idempotente; nenhum serviço confia só no menu.
-      **Parcial local:** snapshot + outbox + enqueue automático em transition/módulos/cargos;
-      worker atrás de `REVY_CONTROL_PROVISIONING_DELIVERY_ENABLED` (default off);
-      piloto Chatbot (`POST /v1/internal/provisioning/state` + gate 423 em simular);
-      falta fan-out Estoque/Portal/Motor/Catálogo e retry de failed.
+      **Parcial local:** snapshot + outbox + enqueue (`chatbot`+`estoque`) + retry failed
+      (max 5) + worker opt-in; Chatbot e Estoque consomem projeção e aplicam 423 em
+      escritas; falta Portal/Motor/Catálogo e rollout no lab.
 - [ ] Não cortar autenticação do Portal neste plano.
 
 ### Interface administrativa
@@ -233,7 +232,8 @@ Adicionar:
       (apply monotônico no Control + Chatbot).
 - [ ] Loja/Módulo suspenso bloqueia novo processamento nos serviços de destino e mantém
       leitura do histórico conforme o cargo autorizado.
-      **Parcial:** Chatbot bloqueia simular/solicitar (423) sem projeção ou loja ≠ ativa.
+      **Parcial:** Chatbot (simular, leads, interesses, operacao/veiculos, consentimentos)
+      e Estoque (`POST /v1/veiculos`) retornam 423 sem projeção ou loja/módulo inoperante.
 
 > **Evidência local — Fase 2 parcial (pós-configuração comercial):** Pessoas/Cargos,
 > convite/ativação, recuperação, lifecycle e versão de sessão (`fda42fb` a `17a0963`),
@@ -253,16 +253,17 @@ Adicionar:
 > Chatbot tem `0014_loja_operacional_projecao`. Flags de delivery e Control seguem
 > default off; sem migration/rollout no lab.
 >
-> Entrega (parcial): mutações de loja/módulo/cargo enfileiram snapshot na outbox;
-> worker daemon opcional processa com `chatbot_poster`; Chatbot aplica projeção e
-> bloqueia simulação. Demais destinos e retry de `failed` ainda abertos.
+> Entrega (parcial): mutações enfileiram para `chatbot` e `estoque`; worker opt-in
+> com `multi_destination_poster` e reprocessamento de `failed` (teto 5 tentativas);
+> Chatbot e Estoque aplicam projeção monotônica e gates 423. Portal/Motor/Catálogo
+> e import de usuários do Portal ainda abertos.
 
 Pendências para concluir a Fase 2:
 
 - importar usuários atuais do Portal como pessoas/cargos, registrando conflitos;
-- fan-out Estoque/Portal/Motor/Catálogo + retry de outbox failed;
+- fan-out Portal/Motor/Catálogo;
 - isolamento explícito de permissões Control × cargos da Loja na mesma pessoa;
-- expandir gates de suspensão além do piloto de simulação no Chatbot.
+- expandir gates (WA inbound/outbound no Chatbot; mais escritas no Estoque).
 
 ### Critério de pronto
 

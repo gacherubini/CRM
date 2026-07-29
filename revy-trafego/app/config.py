@@ -32,6 +32,14 @@ class Settings:
     chatbot_tokens_json: str = os.getenv(
         "REVY_TRAFEGO_CHATBOT_TOKENS_JSON", ""
     ).strip()
+    estoque_url: str = os.getenv("ESTOQUE_API_URL", "http://estoque-api:8000")
+    estoque_token: str = os.getenv("ESTOQUE_API_TOKEN", "")
+    estoque_token_loja: str = os.getenv(
+        "REVY_TRAFEGO_ESTOQUE_TOKEN_LOJA", ""
+    ).strip()
+    estoque_tokens_json: str = os.getenv(
+        "REVY_TRAFEGO_ESTOQUE_TOKENS_JSON", ""
+    ).strip()
     request_timeout: float = float(os.getenv("REVY_TRAFEGO_HTTP_TIMEOUT", "5"))
     request_retries: int = int(os.getenv("REVY_TRAFEGO_HTTP_RETRIES", "1"))
     request_retry_backoff: float = float(
@@ -96,24 +104,48 @@ class Settings:
 
     def chatbot_token_para(self, loja_slug: str) -> str:
         """Resolve credencial por loja; falha fechado se o escopo for ambiguo."""
+        return self._token_para_slug(
+            loja_slug,
+            tokens_json=self.chatbot_tokens_json,
+            token_loja=self.chatbot_token_loja,
+            token=self.chatbot_token,
+        )
+
+    def estoque_token_para(self, loja_slug: str) -> str:
+        """Resolve credencial Estoque por loja (mesmo modelo do Chatbot)."""
+        return self._token_para_slug(
+            loja_slug,
+            tokens_json=self.estoque_tokens_json,
+            token_loja=self.estoque_token_loja,
+            token=self.estoque_token,
+        )
+
+    def _token_para_slug(
+        self,
+        loja_slug: str,
+        *,
+        tokens_json: str,
+        token_loja: str,
+        token: str,
+    ) -> str:
         slug = (loja_slug or "").strip()
-        if self.chatbot_tokens_json:
+        if tokens_json:
             try:
-                tokens = json.loads(self.chatbot_tokens_json)
+                tokens = json.loads(tokens_json)
             except (TypeError, ValueError):
                 return ""
             if isinstance(tokens, dict):
                 return str(tokens.get(slug) or "").strip()
             return ""
-        if self.chatbot_token_loja:
-            return self.chatbot_token if self.chatbot_token_loja == slug else ""
+        if token_loja:
+            return token if token_loja == slug else ""
         lojas = {
             item.strip()
             for item in (os.getenv("REVY_TRAFEGO_LOJAS") or "").replace(";", ",").split(",")
             if item.strip()
         }
         if len(lojas) == 1 and slug in lojas:
-            return self.chatbot_token
+            return token
         return ""
 
 

@@ -13,7 +13,7 @@ from typing import Any
 from sqlalchemy.orm import Session
 
 from app.config import settings
-from app.control.provisioning_outbox import chatbot_poster, process_pending
+from app.control.provisioning_outbox import multi_destination_poster, process_pending
 
 logger = logging.getLogger(__name__)
 
@@ -57,9 +57,11 @@ class ProvisioningDeliveryWorker:
             else settings.revy_control_provisioning_delivery_enabled
         )
         self.batch_limit = batch_limit
-        self.poster = poster or chatbot_poster(
-            base_url=settings.chatbot_url,
-            token_for_slug=settings.chatbot_token_para,
+        self.poster = poster or multi_destination_poster(
+            chatbot_url=settings.chatbot_url,
+            chatbot_token_for_slug=settings.chatbot_token_para,
+            estoque_url=settings.estoque_url,
+            estoque_token_for_slug=settings.estoque_token_para,
         )
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None

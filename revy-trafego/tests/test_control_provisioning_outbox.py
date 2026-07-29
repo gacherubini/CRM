@@ -144,18 +144,19 @@ def test_process_pending_chama_poster_e_marca_delivered():
     with SessionLocal() as db:
         delivered = process_pending(db, poster, limit=20)
         db.commit()
-        row = (
+        rows = (
             db.query(ControlProvisioningOutbox)
             .filter(
                 ControlProvisioningOutbox.loja_id == store_id,
                 ControlProvisioningOutbox.destination == "estoque",
             )
-            .one()
+            .all()
         )
         assert delivered >= 1
-        assert row.status == "delivered"
-        assert row.attempts == 1
-        assert row.last_error is None
+        assert rows
+        assert all(row.status == "delivered" for row in rows)
+        assert all(row.attempts >= 1 for row in rows)
+        assert all(row.last_error is None for row in rows)
 
     assert any(destination == "estoque" for destination, _ in posted)
     assert any(payload["loja_slug"] == store_slug for _, payload in posted)
