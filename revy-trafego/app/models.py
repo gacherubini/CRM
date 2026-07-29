@@ -52,6 +52,76 @@ class Loja(Base):
     atualizada_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=agora)
 
 
+class Pessoa(Base):
+    __tablename__ = "pessoas"
+    __table_args__ = (
+        CheckConstraint(
+            "email = lower(trim(email)) AND length(email) BETWEEN 3 AND 320",
+            name="ck_pessoas_email_normalizado",
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=novo_id)
+    email: Mapped[str] = mapped_column(String(320), unique=True, index=True)
+    nome: Mapped[str] = mapped_column(String(160))
+    criada_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=agora)
+    atualizada_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=agora)
+
+
+class CargoLoja(Base):
+    __tablename__ = "cargos_loja"
+    __table_args__ = (
+        CheckConstraint(
+            "cargo IN ('dono', 'gerente', 'vendedor')",
+            name="ck_cargos_loja_cargo",
+        ),
+        CheckConstraint(
+            "origem IN ('control', 'portal')",
+            name="ck_cargos_loja_origem",
+        ),
+        CheckConstraint(
+            "encerrado_em IS NULL OR encerrado_em >= iniciado_em",
+            name="ck_cargos_loja_periodo",
+        ),
+        Index(
+            "uq_cargos_loja_cargo_ativo",
+            "loja_id",
+            "pessoa_id",
+            "cargo",
+            unique=True,
+            sqlite_where=text("encerrado_em IS NULL"),
+            postgresql_where=text("encerrado_em IS NULL"),
+        ),
+        Index(
+            "uq_cargos_loja_origem_ativa",
+            "origem",
+            "origem_id",
+            unique=True,
+            sqlite_where=text(
+                "origem_id IS NOT NULL AND encerrado_em IS NULL"
+            ),
+            postgresql_where=text(
+                "origem_id IS NOT NULL AND encerrado_em IS NULL"
+            ),
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=novo_id)
+    loja_id: Mapped[str] = mapped_column(
+        ForeignKey("lojas.id", ondelete="RESTRICT"), index=True
+    )
+    pessoa_id: Mapped[str] = mapped_column(
+        ForeignKey("pessoas.id", ondelete="RESTRICT"), index=True
+    )
+    cargo: Mapped[str] = mapped_column(String(20))
+    iniciado_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=agora)
+    encerrado_em: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    origem: Mapped[str] = mapped_column(String(20), default="control")
+    origem_id: Mapped[Optional[str]] = mapped_column(String(160), nullable=True)
+
+
 class GestorRevy(Base):
     """Usuário interno da equipe Revy (não é o dono da loja)."""
 
