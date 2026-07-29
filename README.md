@@ -10,6 +10,15 @@ Parcelas, taxas e bancos não são enviados automaticamente ao cliente.
 > [`docs/plans/README.md`](docs/plans/README.md) · go-live WA [`docs/go-live-chatbot.md`](docs/go-live-chatbot.md).  
 > `docs/design.md` = pesquisa **histórica** — **não** implementar a partir dele.
 
+### Estado atual do Revy Control
+
+Fases 0–2 em corte local **parcial/avançado**: domínio, migrations e APIs de Loja/RBAC,
+Pessoas/cargos/acessos, módulos Vendas/Estoque, contrato, versão monotônica e reativação
+explícita `suspensa → ativa`; o JSON padrão continua sem `versao`. O
+[ADR 0001](docs/adr/0001-suspensao-distribuida.md) define a suspensão distribuída e
+`revy-trafego` tem **205 testes passando**. UI/rebrand, projeções, gates nos destinos,
+rollout/migrations no lab e deploy do Control ainda não estão concluídos.
+
 ---
 
 ## ✨ Visão geral
