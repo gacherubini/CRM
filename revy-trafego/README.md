@@ -245,7 +245,12 @@ existe, o estado/versão de `AcessoControl` mandam. Recuperação e reativação
 o legado somente se houver vínculo.
 
 O snapshot de provisionamento local expõe loja/módulos versionados e pessoas/cargos
-ativos; ainda não há entrega HTTP/outbox aos serviços de destino.
+ativos. Há outbox durável (`control_provisioning_outbox`, migration `0009`) com
+`enqueue_delivery` / `process_pending` e poster HTTP para o Chatbot
+(`POST /v1/internal/provisioning/state`). A flag
+`REVY_CONTROL_PROVISIONING_DELIVERY_ENABLED` fica default off; ainda não há worker
+automático nem enqueue nas transições. O Chatbot aplica projeção monotônica e
+bloqueia simulação (423) quando a loja não está `ativa`.
 
 Com `REVY_CONTROL_ENABLED=0`, as superfícies Control respondem 404.
 

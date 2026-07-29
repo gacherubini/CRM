@@ -169,3 +169,26 @@ def resolve_loja_slug(db: Any, loja_id: str) -> str:
     if store is None:
         return ""
     return store.slug
+
+
+def chatbot_poster(
+    *,
+    base_url: str,
+    token_for_slug: Callable[[str], str],
+    client_factory: Callable[..., Any] | None = None,
+) -> Callable[[str, dict[str, Any]], None]:
+    """Poster HTTP para o destino ``chatbot`` (outros destinos falham explicitamente)."""
+    from app.clients.chatbot import ChatbotClient
+
+    factory = client_factory or ChatbotClient
+
+    def poster(destination: str, payload: dict[str, Any]) -> None:
+        if destination != "chatbot":
+            raise ValueError(f"destino de provisionamento não suportado: {destination}")
+        slug = str(payload.get("loja_slug") or "").strip()
+        if not slug:
+            raise ValueError("payload sem loja_slug")
+        client = factory(base_url, token_for_slug(slug))
+        client.aplicar_estado_operacional(payload)
+
+    return poster

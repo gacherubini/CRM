@@ -204,8 +204,9 @@ Adicionar:
       senha, recuperação, desativação e revogação de sessões. Admin nunca lê senha.
 - [ ] Projetar estado da Loja e dos Módulos Contratados para Revy Loja, Chatbot, Motor,
       Estoque e Catálogo por entrega idempotente; nenhum serviço confia só no menu.
-      Snapshot local já inclui loja/módulos e pessoas/cargos ativos; falta transporte e
-      consumo nos destinos.
+      **Parcial local:** snapshot + outbox `control_provisioning_outbox` + apply monotônico;
+      piloto Chatbot (`POST /v1/internal/provisioning/state` + gate 423 em simular);
+      falta worker automático, enqueue nas transições e fan-out Estoque/Portal/Motor/Catálogo.
 - [ ] Não cortar autenticação do Portal neste plano.
 
 ### Interface administrativa
@@ -227,9 +228,11 @@ Adicionar:
 - [x] Admin atribui cargos sem criar, conhecer ou reapresentar a senha da pessoa.
 - [ ] Múltiplos cargos ativos somam permissões somente dentro da loja selecionada;
       nenhum cargo ou acesso ao Control vaza para outra loja/superfície.
-- [ ] Projeção repetida ou fora de ordem não reativa loja/módulo suspenso.
+- [x] Projeção repetida ou fora de ordem não reativa loja/módulo suspenso
+      (apply monotônico no Control + Chatbot).
 - [ ] Loja/Módulo suspenso bloqueia novo processamento nos serviços de destino e mantém
       leitura do histórico conforme o cargo autorizado.
+      **Parcial:** Chatbot bloqueia simular/solicitar (423) sem projeção ou loja ≠ ativa.
 
 > **Evidência local — Fase 2 parcial (pós-configuração comercial):** Pessoas/Cargos,
 > convite/ativação, recuperação, lifecycle e versão de sessão (`fda42fb` a `17a0963`),
@@ -245,16 +248,21 @@ Adicionar:
 >   `ativo` (`activatable_owner`); o último Dono ativo continua protegido em estados
 >   operacionais.
 >
-> O Alembic head local continua `0008_revy_control_loja_versao` e a suíte Revy tem
-> **215 testes passando**. `REVY_CONTROL_ENABLED=0` e `REVY_CONTROL_RBAC_ENABLED=0`
-> seguem default off; sem migration/rollout no lab.
+> O Alembic head local do Control é `0009_revy_control_provisioning_outbox`; o
+> Chatbot tem `0014_loja_operacional_projecao`. Flags de delivery e Control seguem
+> default off; sem migration/rollout no lab.
+>
+> Entrega (parcial): `ProvisioningPublisher` + outbox durável + `process_pending` com
+> poster injetável; Chatbot aplica projeção e bloqueia simulação quando a loja não
+> está operacional. Ainda falta enfileirar nas transições de estado, worker e demais
+> destinos.
 
 Pendências para concluir a Fase 2:
 
 - importar usuários atuais do Portal como pessoas/cargos, registrando conflitos;
-- entrega idempotente do snapshot aos serviços de destino e gates de suspensão neles;
+- enqueue automático nas transições + worker de outbox + fan-out Estoque/Portal/Motor/Catálogo;
 - isolamento explícito de permissões Control × cargos da Loja na mesma pessoa;
-- projeção repetida/fora de ordem e bloqueio de novo processamento nos destinos.
+- expandir gates de suspensão além do piloto de simulação no Chatbot.
 
 ### Critério de pronto
 

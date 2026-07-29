@@ -157,6 +157,16 @@ class ChatbotClient:
             "POST", "/v1/simular", erro_409=SimulacaoIndisponivel, json=payload
         )
 
+    # --- Provisionamento operacional (Control → Chatbot) -----------------------
+
+    def aplicar_estado_operacional(self, payload: dict) -> dict:
+        """POST do snapshot de provisionamento do Control."""
+        return self._request(
+            "POST",
+            "/v1/internal/provisioning/state",
+            json=payload,
+        )
+
     # --- Operação: números autorizados a cadastrar ----------------------------
 
     def obter_grupo_estoque(self) -> dict:
