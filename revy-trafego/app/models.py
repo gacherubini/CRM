@@ -42,12 +42,21 @@ class Loja(Base):
             "'suspensa', 'encerrada')",
             name="ck_lojas_status",
         ),
+        CheckConstraint(
+            "versao >= 1",
+            name="ck_lojas_versao",
+        ),
     )
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=novo_id)
     slug: Mapped[str] = mapped_column(String(120), unique=True, index=True)
     nome: Mapped[str] = mapped_column(String(160))
     status: Mapped[str] = mapped_column(String(32), default="rascunho", index=True)
+    versao: Mapped[int] = mapped_column(
+        Integer,
+        default=1,
+        server_default=text("1"),
+    )
     criada_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=agora)
     atualizada_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=agora)
 
