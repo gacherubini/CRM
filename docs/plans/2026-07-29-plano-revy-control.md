@@ -80,9 +80,12 @@ nem Chatbot, Seller AI e Simulação Multibanco embutidos em Vendas.
 
 Conhecer o estado real antes de criar tabelas ou alterar autorização.
 
+**Evidência canônica:** [`2026-07-29-revy-control-fase0-baseline-inventario.md`](../research/2026-07-29-revy-control-fase0-baseline-inventario.md).
+
 ### Tarefas
 
-- [ ] Registrar baseline das suítes Revy Tráfego, Portal, Chatbot, Estoque e Catálogo.
+- [x] Registrar baseline das suítes Revy Tráfego, Portal, Chatbot, Estoque e Catálogo
+      (682 testes no commit auditado; comandos e resultados na evidência canônica).
 - [ ] Inventariar todos os `loja_slug` presentes em mídia, vendas, Portal, Chatbot,
       Estoque, Catálogo e envs.
 - [ ] Detectar colisões de slug, e-mail e telefone antes do backfill.
