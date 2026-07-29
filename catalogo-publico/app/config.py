@@ -12,6 +12,17 @@ class Settings:
     inventory_token: str = os.getenv("ESTOQUE_PUBLIC_API_TOKEN", "")
     provider_timeout: float = float(os.getenv("CATALOGO_PROVIDER_TIMEOUT", "5"))
     database_path: str = os.getenv("CATALOGO_DATABASE_PATH", "data/catalogo.db")
+    # Projeção operacional do Control (pode reutilizar o mesmo SQLite).
+    provisioning_db: str = os.getenv(
+        "CATALOGO_PROVISIONING_DB",
+        os.getenv("CATALOGO_DATABASE_PATH", "data/catalogo.db"),
+    )
+    # Token de serviço Control → Catálogo (header X-Service-Token).
+    service_token: str = (
+        os.getenv("CATALOGO_SERVICE_TOKEN")
+        or os.getenv("CATALOGO_PROVISIONING_TOKEN")
+        or ""
+    ).strip()
     page_size: int = max(1, min(48, int(os.getenv("CATALOGO_PAGE_SIZE", "12"))))
     public_base_url: str = os.getenv("CATALOGO_PUBLIC_BASE_URL", "").rstrip("/")
     # Prefixo de path quando o catálogo é exposto atrás de reverse-proxy

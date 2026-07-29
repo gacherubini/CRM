@@ -8,6 +8,7 @@ from app.contracts import Pagination, Store, Vehicle, VehiclePage
 from app.events import InterestStore
 from app.main import app
 from app.provider import InventoryNotFound, InventoryUnavailable
+from app.provisioning import ProvisioningStore
 
 
 @pytest.fixture
@@ -63,12 +64,23 @@ def interest_store(tmp_path):
 
 
 @pytest.fixture
-def client(fake_provider, interest_store):
+def provisioning_store(tmp_path):
+    store = ProvisioningStore(str(tmp_path / "provisioning.db"))
+    store.initialize()
+    return store
+
+
+@pytest.fixture
+def client(fake_provider, interest_store, provisioning_store):
     previous_provider = app.state.catalog_provider
     previous_store = app.state.interest_store
+    previous_prov = getattr(app.state, "provisioning_store", None)
     app.state.catalog_provider = fake_provider
     app.state.interest_store = interest_store
+    app.state.provisioning_store = provisioning_store
     with TestClient(app) as test_client:
         yield test_client
     app.state.catalog_provider = previous_provider
     app.state.interest_store = previous_store
+    if previous_prov is not None:
+        app.state.provisioning_store = previous_prov

@@ -1,4 +1,6 @@
+import os
 import re
+import secrets
 import sqlite3
 import uuid
 from contextlib import asynccontextmanager
@@ -6,7 +8,7 @@ from pathlib import Path
 from typing import Optional
 from urllib.parse import urlencode
 
-from fastapi import Depends, FastAPI, Query, Request
+from fastapi import Depends, FastAPI, Header, Query, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -16,6 +18,7 @@ from app.events import InterestStore
 from app.pixel import PixelResolver
 from app.provider import HttpInventoryProvider, InventoryNotFound, InventoryUnavailable
 from app.outbox import OutboxWorker
+from app.provisioning import ProvisioningStore
 
 
 BASE_DIR = Path(__file__).parent
@@ -52,6 +55,7 @@ def _build_pixel_resolver() -> PixelResolver:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     app.state.interest_store.initialize()
+    app.state.provisioning_store.initialize()
     app.state.pixel_resolver = _build_pixel_resolver()
     worker = OutboxWorker(
         app.state.interest_store,
@@ -74,6 +78,7 @@ app.state.catalog_provider = HttpInventoryProvider(
     settings.inventory_url, settings.inventory_token, settings.provider_timeout
 )
 app.state.interest_store = InterestStore(settings.database_path)
+app.state.provisioning_store = ProvisioningStore(settings.provisioning_db)
 app.state.pixel_resolver = _build_pixel_resolver()
 
 
@@ -148,6 +153,34 @@ def get_provider(request: Request) -> HttpInventoryProvider:
 
 def get_interest_store(request: Request) -> InterestStore:
     return request.app.state.interest_store
+
+
+def get_provisioning_store(request: Request) -> ProvisioningStore:
+    return request.app.state.provisioning_store
+
+
+def storefront_hidden(
+    request: Request,
+    slug: str,
+    store: Optional[ProvisioningStore] = None,
+) -> bool:
+    """True quando a projeção do Control manda ocultar a vitrine (404/HIDE).
+
+    Fail-open se não houver projeção — ver ``ProvisioningStore.allows_processing``.
+    """
+    prov = store or get_provisioning_store(request)
+    return not prov.allows_processing(slug, module="estoque")
+
+
+def hidden_store_page(request: Request, slug: str):
+    """404 genérico: não revela suspensão/encerramento (ADR respostas estáveis)."""
+    return error_page(
+        request,
+        404,
+        "Loja não encontrada",
+        "Confira o endereço da vitrine.",
+        loja_slug=slug,
+    )
 
 
 def error_page(
@@ -228,6 +261,52 @@ def version():
     return {"versao": settings.version, "contrato_estoque": "public/v1"}
 
 
+@app.post("/internal/v1/provisioning/state")
+def receber_estado_provisionamento(
+    request: Request,
+    payload: dict,
+    x_service_token: str = Header(default="", alias="X-Service-Token"),
+):
+    """Recebe snapshot operacional do Control e aplica projeção monotônica local.
+
+    Autentica com ``X-Service-Token`` vs ``CATALOGO_SERVICE_TOKEN`` (ou
+    ``CATALOGO_PROVISIONING_TOKEN``). Token vazio → 503; incorreto → 401.
+    Multi-tenant por ``loja_slug`` no body.
+    """
+    esperado = (
+        os.getenv("CATALOGO_SERVICE_TOKEN")
+        or os.getenv("CATALOGO_PROVISIONING_TOKEN")
+        or settings.service_token
+        or ""
+    ).strip()
+    if not esperado:
+        return JSONResponse(
+            {
+                "detail": (
+                    "provisioning desabilitado "
+                    "(CATALOGO_SERVICE_TOKEN / CATALOGO_PROVISIONING_TOKEN vazio)"
+                )
+            },
+            status_code=503,
+        )
+    if not secrets.compare_digest(x_service_token or "", esperado):
+        return JSONResponse({"detail": "não autorizado"}, status_code=401)
+
+    loja_slug = str(payload.get("loja_slug") or "").strip()
+    if not loja_slug:
+        return JSONResponse({"detail": "loja_slug obrigatório"}, status_code=422)
+
+    store = get_provisioning_store(request)
+    reasons = store.apply_payload(loja_slug, payload)
+    return {
+        "ok": True,
+        "reasons": reasons,
+        "allows_processing": store.allows_processing(
+            loja_slug, module="estoque"
+        ),
+    }
+
+
 @app.get("/l/{slug}", response_class=HTMLResponse)
 def storefront(
     request: Request,
@@ -240,6 +319,9 @@ def storefront(
     offset: int = Query(default=0, ge=0),
     provider: HttpInventoryProvider = Depends(get_provider),
 ):
+    if storefront_hidden(request, slug):
+        return hidden_store_page(request, slug)
+
     filters = {
         "tipo": tipo or "",
         "marca": marca or "",
@@ -303,6 +385,9 @@ def vehicle_detail(
     vehicle_id: str,
     provider: HttpInventoryProvider = Depends(get_provider),
 ):
+    if storefront_hidden(request, slug):
+        return hidden_store_page(request, slug)
+
     try:
         store = provider.get_store(slug)
         vehicle = provider.get_vehicle(slug, vehicle_id)
@@ -374,6 +459,9 @@ def register_interest(
     provider: HttpInventoryProvider = Depends(get_provider),
     store: InterestStore = Depends(get_interest_store),
 ):
+    if storefront_hidden(request, slug):
+        return hidden_store_page(request, slug)
+
     try:
         public_store = provider.get_store(slug)
         vehicle = provider.get_vehicle(slug, vehicle_id)
