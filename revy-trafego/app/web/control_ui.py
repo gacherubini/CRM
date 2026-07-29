@@ -12,21 +12,34 @@ from app.auth import csrf_token, csrf_valido, gestor_atual, sessao_gestor
 from app.config import settings
 from app.control.access import AccessControl
 from app.control.audit import AuditTrail
+from app.control.people import PeopleDirectory
+from app.control.roles import StoreRoles
 from app.control.session import actor_from_user
 from app.control.stores import StoreControl
 from app.control.types import (
     ActiveResponsibleConflict,
+    AssignStoreRole,
     AuditQuery,
     ControlError,
     CreateStore,
     GrantTrafficAccess,
+    InvalidPersonEmail,
     InvalidStoreTransition,
     ManagerNotFound,
+    PersonEmailConflict,
+    PersonNotFound,
+    PersonRef,
+    RegisterPerson,
+    RevokeStoreRole,
     RevokeTrafficAccess,
     StoreNotFound,
+    StoreReadinessBlocked,
     StoreRef,
     StoreSlugConflict,
     StoreStatus,
+    StoreRole,
+    StoreRoleConflict,
+    StoreRoleNotFound,
     TrafficLinkConflict,
     TrafficLinkNotFound,
     TrafficRole,
@@ -142,6 +155,214 @@ def store_detail_page(
 
 
 @router.post(
+    "/app/control/lojas/{loja_id}/cargos",
+    response_class=HTMLResponse,
+)
+async def assign_store_role_page(
+    loja_id: str,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    manager, denied = _admin_for_mutation(request, db)
+    if denied is not None:
+        return denied
+    form = await request.form()
+    if not csrf_valido(request, form.get("csrf")):
+        return _csrf_denied()
+
+    email = (form.get("email") or "").strip()
+    name = (form.get("nome") or "").strip()
+    role_value = (form.get("cargo") or "").strip()
+    form_values = {"email": email, "nome": name, "cargo": role_value}
+    try:
+        role = StoreRole(role_value)
+    except ValueError:
+        return _render_store_detail(
+            request,
+            db,
+            manager,
+            loja_id,
+            error="Selecione um cargo válido para a Loja.",
+            person_form_values=form_values,
+            status_code=422,
+        )
+    if len(name) > 160:
+        return _render_store_detail(
+            request,
+            db,
+            manager,
+            loja_id,
+            error="O nome da Pessoa Revy deve ter até 160 caracteres.",
+            person_form_values=form_values,
+            status_code=422,
+        )
+
+    actor = actor_from_user(manager)
+    try:
+        StoreControl(SessionLocal).get(actor, StoreRef(id=loja_id))
+    except StoreNotFound:
+        return HTMLResponse("Loja não encontrada.", status_code=404)
+    people = PeopleDirectory(SessionLocal)
+    try:
+        person = people.find_by_email(actor, email)
+    except InvalidPersonEmail:
+        return _render_store_detail(
+            request,
+            db,
+            manager,
+            loja_id,
+            error="Informe um e-mail válido para a Pessoa Revy.",
+            person_form_values=form_values,
+            status_code=422,
+        )
+    if person is None:
+        if not name:
+            return _render_store_detail(
+                request,
+                db,
+                manager,
+                loja_id,
+                error="Informe o nome para cadastrar uma nova Pessoa Revy.",
+                person_form_values=form_values,
+                status_code=422,
+            )
+        try:
+            person = people.register(
+                actor,
+                RegisterPerson(name=name, email=email),
+            )
+        except PersonEmailConflict:
+            return _render_store_detail(
+                request,
+                db,
+                manager,
+                loja_id,
+                error="Já existe uma Pessoa Revy com esse e-mail.",
+                person_form_values=form_values,
+                status_code=409,
+            )
+
+    try:
+        StoreRoles(SessionLocal).assign(
+            actor,
+            AssignStoreRole(
+                store=StoreRef(id=loja_id),
+                person=PersonRef(id=person.id),
+                role=role,
+            ),
+        )
+    except StoreNotFound:
+        return HTMLResponse("Loja não encontrada.", status_code=404)
+    except PersonNotFound:
+        return _render_store_detail(
+            request,
+            db,
+            manager,
+            loja_id,
+            error="Pessoa Revy não encontrada.",
+            person_form_values=form_values,
+            status_code=404,
+        )
+    except StoreRoleConflict:
+        return _render_store_detail(
+            request,
+            db,
+            manager,
+            loja_id,
+            error="Essa pessoa já possui esse cargo ativo na Loja.",
+            person_form_values=form_values,
+            status_code=409,
+        )
+    return RedirectResponse(
+        _detail_path(loja_id, "cargo"),
+        status_code=303,
+    )
+
+
+@router.post(
+    "/app/control/lojas/{loja_id}/cargos/{pessoa_id}/{cargo}/revogar",
+    response_class=HTMLResponse,
+)
+async def revoke_store_role_page(
+    loja_id: str,
+    pessoa_id: str,
+    cargo: str,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    manager, denied = _admin_for_mutation(request, db)
+    if denied is not None:
+        return denied
+    form = await request.form()
+    if not csrf_valido(request, form.get("csrf")):
+        return _csrf_denied()
+    try:
+        role = StoreRole(cargo)
+    except ValueError:
+        return _render_store_detail(
+            request,
+            db,
+            manager,
+            loja_id,
+            error="Selecione um cargo válido para revogar.",
+            status_code=422,
+        )
+    if not pessoa_id or len(pessoa_id) > 36:
+        return _render_store_detail(
+            request,
+            db,
+            manager,
+            loja_id,
+            error="Pessoa Revy não encontrada.",
+            status_code=404,
+        )
+
+    try:
+        StoreRoles(SessionLocal).revoke(
+            actor_from_user(manager),
+            RevokeStoreRole(
+                store=StoreRef(id=loja_id),
+                person=PersonRef(id=pessoa_id),
+                role=role,
+                reason=(form.get("motivo") or "").strip() or None,
+            ),
+        )
+    except StoreNotFound:
+        return HTMLResponse("Loja não encontrada.", status_code=404)
+    except PersonNotFound:
+        return _render_store_detail(
+            request,
+            db,
+            manager,
+            loja_id,
+            error="Pessoa Revy não encontrada.",
+            status_code=404,
+        )
+    except StoreRoleNotFound:
+        return _render_store_detail(
+            request,
+            db,
+            manager,
+            loja_id,
+            error="Cargo ativo não encontrado na Loja.",
+            status_code=404,
+        )
+    except StoreReadinessBlocked as exc:
+        return _render_store_detail(
+            request,
+            db,
+            manager,
+            loja_id,
+            error=str(exc),
+            status_code=409,
+        )
+    return RedirectResponse(
+        _detail_path(loja_id, "cargo_revogado"),
+        status_code=303,
+    )
+
+
+@router.post(
     "/app/control/lojas/{loja_id}/estado",
     response_class=HTMLResponse,
 )
@@ -178,7 +399,7 @@ async def transition_store_page(
         )
     except StoreNotFound:
         return HTMLResponse("Loja não encontrada.", status_code=404)
-    except InvalidStoreTransition as exc:
+    except (InvalidStoreTransition, StoreReadinessBlocked) as exc:
         return _render_store_detail(
             request,
             db,
@@ -381,6 +602,7 @@ def _render_store_detail(
     loja_id: str,
     *,
     error: str | None = None,
+    person_form_values: dict[str, str] | None = None,
     status_code: int = 200,
 ):
     actor = actor_from_user(manager)
@@ -392,6 +614,21 @@ def _render_store_detail(
         )
     except StoreNotFound:
         return HTMLResponse("Loja não encontrada.", status_code=404)
+
+    store_people = ()
+    if manager.papel == "admin":
+        roles = StoreRoles(SessionLocal).list_for_store(
+            actor,
+            StoreRef(id=loja_id),
+        )
+        people = PeopleDirectory(SessionLocal)
+        store_people = tuple(
+            {
+                "person": people.get(actor, PersonRef(id=role.person_id)),
+                "role": role,
+            }
+            for role in roles
+        )
 
     user = sessao_gestor(request, db)
     assert user is not None
@@ -413,9 +650,13 @@ def _render_store_detail(
             "store": store,
             "audit_events": audit.items,
             "store_statuses": tuple(StoreStatus),
+            "store_roles": tuple(StoreRole),
+            "store_people": store_people,
             "is_admin": manager.papel == "admin",
             "ok": request.query_params.get("ok"),
             "erro": error,
+            "person_form_values": person_form_values
+            or {"email": "", "nome": "", "cargo": StoreRole.SELLER.value},
         },
         status_code=status_code,
     )

@@ -17,12 +17,71 @@
 <div class="alert success" role="status">Gestor vinculado à Loja.</div>
 {% elif ok == 'revogado' %}
 <div class="alert success" role="status">Vínculo do gestor revogado.</div>
+{% elif ok == 'cargo' %}
+<div class="alert success" role="status">Cargo atribuído à Pessoa Revy.</div>
+{% elif ok == 'cargo_revogado' %}
+<div class="alert success" role="status">Cargo da Pessoa Revy revogado.</div>
 {% endif %}
 {% if erro %}
 <div class="alert error" role="alert">{{ erro }}</div>
 {% endif %}
 
 {% if is_admin %}
+<section class="panel form-section" id="pessoas-cargos">
+  <h2>Pessoas e cargos</h2>
+  <p class="muted">Cadastre a Pessoa Revy uma vez e atribua somente o cargo estrutural desta Loja.</p>
+  {% if store_people %}
+  <div style="overflow-x:auto">
+    <table id="tabela-cargos-loja">
+      <thead>
+        <tr>
+          <th>Nome</th>
+          <th>E-mail</th>
+          <th>Cargo</th>
+          <th>Ação</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in store_people %}
+        <tr>
+          <td>{{ item.person.name }}</td>
+          <td>{{ item.person.email }}</td>
+          <td>{{ item.role.role.value }}</td>
+          <td>
+            <form method="post" action="{{ public_path('/app/control/lojas/' ~ store.id ~ '/cargos/' ~ item.person.id ~ '/' ~ item.role.role.value ~ '/revogar') }}" id="form-revogar-cargo-{{ item.role.id }}">
+              <input type="hidden" name="csrf" value="{{ csrf }}">
+              <button class="button secondary" type="submit">Revogar cargo</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty"><strong>Nenhum cargo ativo nesta Loja.</strong></div>
+  {% endif %}
+
+  <form method="post" action="{{ public_path('/app/control/lojas/' ~ store.id ~ '/cargos') }}" class="form-layout" id="form-atribuir-cargo">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <label>E-mail da Pessoa Revy
+      <input type="email" name="email" maxlength="320" value="{{ person_form_values.email }}" required>
+    </label>
+    <label>Nome
+      <input type="text" name="nome" maxlength="160" value="{{ person_form_values.nome }}">
+      <small>Obrigatório somente para uma pessoa ainda não cadastrada.</small>
+    </label>
+    <label>Cargo na Loja
+      <select name="cargo" required>
+        {% for role in store_roles %}
+        <option value="{{ role.value }}" {% if person_form_values.cargo == role.value %}selected{% endif %}>{{ role.value }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <button class="button primary" type="submit">Atribuir cargo</button>
+  </form>
+</section>
+
 <section class="panel form-section">
   <h2>Estado da loja</h2>
   <form method="post" action="{{ public_path('/app/control/lojas/' ~ store.id ~ '/estado') }}" class="form-layout" id="form-alterar-estado">
