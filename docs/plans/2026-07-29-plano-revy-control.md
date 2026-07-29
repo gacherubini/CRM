@@ -94,9 +94,14 @@ Conhecer o estado real antes de criar tabelas ou alterar autorização.
 - [ ] Confirmar backup/snapshot e ensaio de restauração dos bancos afetados.
 - [ ] Definir matriz de suspensão por serviço e módulo: leitura histórica, novas escritas,
       webhooks inbound, automações, jobs e visibilidade do Catálogo Público.
-- [ ] Criar flags default off: `REVY_CONTROL_ENABLED`, `REVY_CONTROL_RBAC_ENABLED`,
-      `GOOGLE_ADS_SYNC_ENABLED`, `GOOGLE_CONVERSIONS_ENABLED`,
-      `MULTI_WHATSAPP_ENABLED` e `REVY_CONTROL_DASHBOARD_ENABLED`.
+- [x] Criar flag default off `REVY_CONTROL_ENABLED` para proteger as superfícies
+      administrativas do Control.
+- [x] Criar flag default off `REVY_CONTROL_RBAC_ENABLED` para o cutover do escopo por
+      vínculo após o gate de isolamento da Fase 1.
+- [ ] Criar flag default off `GOOGLE_ADS_SYNC_ENABLED`.
+- [ ] Criar flag default off `GOOGLE_CONVERSIONS_ENABLED`.
+- [ ] Criar flag default off `MULTI_WHATSAPP_ENABLED`.
+- [ ] Criar flag default off `REVY_CONTROL_DASHBOARD_ENABLED`.
 - [ ] Documentar contratos HTTP atuais que não podem quebrar.
 
 ### Saída
