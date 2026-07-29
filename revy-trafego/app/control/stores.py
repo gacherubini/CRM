@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from collections.abc import Callable
 from typing import Any
 
@@ -10,6 +11,7 @@ from app.control.types import (
     AccessDenied,
     Actor,
     CreateStore,
+    InvalidStoreSlug,
     InvalidStoreTransition,
     StoreNotFound,
     StoreRef,
@@ -28,6 +30,7 @@ _ALLOWED_TRANSITIONS = {
     StoreStatus.SUSPENDED: frozenset({StoreStatus.CLOSED}),
     StoreStatus.CLOSED: frozenset(),
 }
+_CANONICAL_SLUG = re.compile(r"[a-z0-9]+(?:-[a-z0-9]+)*")
 
 
 class StoreControl:
@@ -44,6 +47,8 @@ class StoreControl:
         slug = command.slug.strip().lower()
         if not name or not slug:
             raise ValueError("nome e slug da Loja são obrigatórios")
+        if len(slug) > 120 or not _CANONICAL_SLUG.fullmatch(slug):
+            raise InvalidStoreSlug(command.slug)
 
         with self._session_factory() as db:
             store = Loja(nome=name, slug=slug, status=StoreStatus.DRAFT.value)

@@ -9,6 +9,7 @@ from app.control.types import (
     AuditQuery,
     CreateStore,
     GrantTrafficAccess,
+    InvalidStoreSlug,
     InvalidStoreTransition,
     ManagerNotFound,
     RevokeTrafficAccess,
@@ -67,6 +68,40 @@ def test_admin_cria_e_consulta_loja_em_rascunho():
     assert retrieved.name == "Loja Centro"
     assert retrieved.slug == "loja-centro"
     assert retrieved.status is StoreStatus.DRAFT
+
+
+@pytest.mark.parametrize(
+    "slug",
+    (
+        "loja centro",
+        "loja_centro",
+        "loja-cêntro",
+        "loja--centro",
+    ),
+)
+def test_criar_loja_rejeita_slug_nao_canonico(slug):
+    stores = StoreControl(SessionLocal)
+    admin = _admin_actor()
+
+    with pytest.raises(InvalidStoreSlug) as error:
+        stores.create(
+            admin,
+            CreateStore(name="Loja Centro", slug=slug),
+        )
+
+    assert error.value.slug == slug
+
+
+def test_criar_loja_normaliza_espacos_externos_e_caixa_do_slug():
+    stores = StoreControl(SessionLocal)
+    admin = _admin_actor()
+
+    created = stores.create(
+        admin,
+        CreateStore(name="Loja Centro", slug="  Loja-Centro  "),
+    )
+
+    assert created.slug == "loja-centro"
 
 
 def test_loja_rascunho_nao_pode_saltar_direto_para_ativa():

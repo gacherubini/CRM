@@ -21,6 +21,12 @@ class StoreSlugConflict(ControlError):
     pass
 
 
+class InvalidStoreSlug(ControlError):
+    def __init__(self, slug: str) -> None:
+        self.slug = slug
+        super().__init__("slug de Loja inválido")
+
+
 class InvalidStoreTransition(ControlError):
     def __init__(self, current: "StoreStatus", target: "StoreStatus") -> None:
         self.current = current
