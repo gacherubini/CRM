@@ -10,23 +10,31 @@
   </div>
 </div>
 
-{% if erro == 'loja' %}<div class="alert error">Selecione ou digite um slug de loja válido.</div>{% endif %}
+{% if erro == 'loja' %}<div class="alert error">Selecione uma loja válida.</div>{% endif %}
 
 <section class="panel form-section">
   <form method="post" action="{{ public_path('/app/loja') }}" class="form-layout" id="form-loja">
     <input type="hidden" name="csrf" value="{{ csrf }}">
     <label>Loja
-      <select name="loja_slug" id="loja-select" required>
+      <select name="{{ 'loja_id' if control_rbac_enabled else 'loja_slug' }}" id="loja-select" required>
         <option value="">— selecione a loja —</option>
+        {% if control_rbac_enabled %}
+        {% for item in lojas %}
+        <option value="{{ item.store.id }}" {% if loja_selecionada == item.store.slug %}selected{% endif %}>{{ item.store.name }}</option>
+        {% endfor %}
+        {% else %}
         {% for slug in lojas %}
         <option value="{{ slug }}" {% if loja_selecionada == slug %}selected{% endif %}>{{ slug }}</option>
         {% endfor %}
         <option value="__manual__">Outra loja (digitar slug)…</option>
+        {% endif %}
       </select>
     </label>
+    {% if not control_rbac_enabled %}
     <label id="loja-manual-wrap" style="display:none">Slug da loja
       <input type="text" name="loja_slug_manual" id="loja-manual" placeholder="ex.: loja-centro" maxlength="120" autocomplete="off">
     </label>
+    {% endif %}
     <button class="button primary" type="submit">Abrir loja</button>
   </form>
 </section>
@@ -40,7 +48,7 @@
 </p>
 {% endif %}
 
-<script>
+{% if not control_rbac_enabled %}<script>
 (() => {
   const sel = document.getElementById('loja-select');
   const wrap = document.getElementById('loja-manual-wrap');
@@ -63,5 +71,5 @@
     }
   });
 })();
-</script>
+</script>{% endif %}
 {% endblock %}

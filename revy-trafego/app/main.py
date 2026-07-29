@@ -51,6 +51,8 @@ from app.clients.chatbot import (
 )
 from urllib.parse import quote
 from app.config import settings
+from app.control.session import current_store, select_store, visible_stores
+from app.control.types import StoreNotFound
 from app.cripto import cifrar
 from app.db import SessionLocal, get_db
 from app.financeiro_calc import calcular_metricas_vendas, hoje_portal, periodo_padrao
@@ -192,7 +194,9 @@ def get_chatbot_client(loja_slug: str) -> ChatbotClient:
 def contexto(request: Request, usuario=None, db: Session | None = None, **extra):
     lojas = extra.pop("lojas", None)
     if lojas is None:
-        if db is not None:
+        if settings.revy_control_rbac_enabled and usuario is not None:
+            lojas = visible_stores(SessionLocal, usuario)
+        elif db is not None:
             lojas = listar_loja_slugs(db)
         else:
             # Dropdown de loja em todas as telas autenticadas.
@@ -206,6 +210,7 @@ def contexto(request: Request, usuario=None, db: Session | None = None, **extra)
         "usuario": usuario,
         "csrf": csrf_token(request) if usuario else "",
         "lojas": lojas or [],
+        "control_rbac_enabled": settings.revy_control_rbac_enabled,
         **extra,
     }
 
@@ -216,9 +221,18 @@ def redirecionar_login():
 
 def exigir_loja(request: Request, db: Session):
     """Retorna (gestor_sessao, redirect) — redirect se faltar auth ou loja."""
-    usuario = sessao_gestor(request, db)
-    if not usuario:
+    gestor = gestor_atual(request, db)
+    if not gestor:
         return None, redirecionar_login()
+    if settings.revy_control_rbac_enabled:
+        try:
+            authorized = current_store(request, SessionLocal, gestor)
+        except StoreNotFound:
+            return None, Response(status_code=404)
+        if authorized is None:
+            return None, redirect("/app?erro=loja")
+    usuario = sessao_gestor(request, db)
+    assert usuario is not None
     if not usuario.loja_slug:
         return None, redirect("/app?erro=loja")
     return usuario, None
@@ -306,11 +320,20 @@ def app_home(request: Request, db: Session = Depends(get_db)):
     gestor = gestor_atual(request, db)
     if not gestor:
         return redirecionar_login()
-    lojas = listar_loja_slugs(db)
     usuario = sessao_gestor(request, db)
     assert usuario is not None
+    lojas = (
+        visible_stores(SessionLocal, gestor)
+        if settings.revy_control_rbac_enabled
+        else listar_loja_slugs(db)
+    )
     # Se só há uma loja e nenhuma selecionada, pré-seleciona no dropdown.
-    loja_sel = usuario.loja_slug or (lojas[0] if len(lojas) == 1 else None)
+    if settings.revy_control_rbac_enabled:
+        loja_sel = usuario.loja_slug or (
+            lojas[0].store.slug if len(lojas) == 1 else None
+        )
+    else:
+        loja_sel = usuario.loja_slug or (lojas[0] if len(lojas) == 1 else None)
     return templates.TemplateResponse(
         "home.html",
         contexto(
@@ -331,6 +354,18 @@ async def app_selecionar_loja(request: Request, db: Session = Depends(get_db)):
     form = await request.form()
     if not csrf_valido(request, form.get("csrf")):
         return redirect("/app", status_code=303)
+    if settings.revy_control_rbac_enabled:
+        store_id = (form.get("loja_id") or "").strip()
+        if not store_id:
+            return redirect("/app?erro=loja", status_code=303)
+        try:
+            select_store(request, SessionLocal, gestor, store_id)
+        except StoreNotFound:
+            return Response(status_code=404)
+        next_path = (form.get("next") or "").strip()
+        if next_path.startswith("/app"):
+            return redirect(next_path, status_code=303)
+        return redirect("/app/trafego", status_code=303)
     slug = (form.get("loja_slug") or form.get("loja_slug_manual") or "").strip()
     if slug == "__manual__":
         slug = (form.get("loja_slug_manual") or "").strip()

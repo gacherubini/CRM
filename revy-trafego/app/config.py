@@ -44,6 +44,10 @@ class Settings:
         os.getenv("REVY_TRAFEGO_CAPI_WORKER", "0").strip().lower()
         in {"1", "true", "yes", "on"}
     )
+    revy_control_rbac_enabled: bool = (
+        os.getenv("REVY_CONTROL_RBAC_ENABLED", "0").strip().lower()
+        in {"1", "true", "yes", "on"}
+    )
     job_secret: str = os.getenv("REVY_TRAFEGO_JOB_SECRET", "").strip()
     # Token entre portal/catálogo e este app (header X-Service-Token).
     service_token: str = os.getenv("REVY_TRAFEGO_SERVICE_TOKEN", "").strip()

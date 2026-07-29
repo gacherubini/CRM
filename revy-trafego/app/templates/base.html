@@ -39,11 +39,17 @@
           <input type="hidden" name="csrf" value="{{ csrf }}">
           <input type="hidden" name="next" value="{{ path if path.startswith('/app') else '/app/trafego' }}">
           <label class="sr-only" for="loja-switch-select">Loja</label>
-          <select name="loja_slug" id="loja-switch-select" onchange="this.form.submit()" style="width:100%">
+          <select name="{{ 'loja_id' if control_rbac_enabled else 'loja_slug' }}" id="loja-switch-select" onchange="this.form.submit()" style="width:100%">
             <option value="">— selecione loja —</option>
+            {% if control_rbac_enabled %}
+            {% for item in lojas %}
+            <option value="{{ item.store.id }}" {% if usuario.loja_slug == item.store.slug %}selected{% endif %}>{{ item.store.name }}</option>
+            {% endfor %}
+            {% else %}
             {% for slug in lojas %}
             <option value="{{ slug }}" {% if usuario.loja_slug == slug %}selected{% endif %}>{{ slug }}</option>
             {% endfor %}
+            {% endif %}
           </select>
         </form>
         <a class="nav-link {{ 'active' if path == '/app' else '' }}" href="{{ public_path('/app') }}">Todas as lojas</a>
