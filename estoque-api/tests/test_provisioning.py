@@ -211,6 +211,56 @@ def test_criar_veiculo_permitido_quando_loja_e_estoque_ativos(client, loja_a):
     assert r.json()["status"] == "disponivel"
 
 
+def _criar_veiculo_ativo(client, loja_a) -> str:
+    r = client.post(
+        "/v1/veiculos",
+        json=_novo_veiculo(),
+        headers=loja_a["headers"],
+    )
+    assert r.status_code == 201
+    return r.json()["id"]
+
+
+def test_publicar_bloqueado_sem_projecao(client, loja_a, db):
+    vid = _criar_veiculo_ativo(client, loja_a)
+    loja_id = loja_a["loja_id"]
+    db.query(models_db.LojaOperacionalProjecao).filter_by(loja_id=loja_id).delete()
+    db.commit()
+
+    r = client.post(
+        f"/v1/veiculos/{vid}/publicar",
+        headers=loja_a["headers"],
+    )
+    assert r.status_code == 423
+    assert r.json()["detail"]["code"] == "store_not_operational"
+
+
+def test_publicar_bloqueado_quando_suspensa(client, loja_a, db):
+    vid = _criar_veiculo_ativo(client, loja_a)
+    loja_id = loja_a["loja_id"]
+    proj = db.get(models_db.LojaOperacionalProjecao, (loja_id, "loja"))
+    proj.state = "suspensa"
+    proj.version = 9
+    db.commit()
+
+    r = client.post(
+        f"/v1/veiculos/{vid}/publicar",
+        headers=loja_a["headers"],
+    )
+    assert r.status_code == 423
+    assert r.json()["detail"]["code"] == "store_not_operational"
+
+
+def test_publicar_permitido_quando_loja_e_estoque_ativos(client, loja_a):
+    vid = _criar_veiculo_ativo(client, loja_a)
+    r = client.post(
+        f"/v1/veiculos/{vid}/publicar",
+        headers=loja_a["headers"],
+    )
+    assert r.status_code == 200
+    assert r.json()["publicado"] is True
+
+
 def test_leitura_permanece_aberta_sem_projecao(client, loja_sem_projecao):
     r = client.get("/v1/veiculos", headers=loja_sem_projecao["headers"])
     assert r.status_code == 200

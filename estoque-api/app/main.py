@@ -253,6 +253,7 @@ def atualizar_veiculo(
     db: Session = Depends(get_db),
 ):
     _exigir_operacao(ctx)
+    _exigir_loja_operacional(db, ctx.loja_id)
     if dados.custo is not None and not _pode_ver_custo(ctx):
         raise HTTPException(status_code=403, detail="papel sem permissão para alterar custo")
     v = servico.atualizar_veiculo(
@@ -266,6 +267,7 @@ def publicar(
     veiculo_id: str, ctx: Contexto = Depends(get_contexto), db: Session = Depends(get_db)
 ):
     _exigir_operacao(ctx)
+    _exigir_loja_operacional(db, ctx.loja_id)
     return servico.para_saida_privada(
         servico.definir_publicado(db, ctx.loja_id, veiculo_id, True, ctx.papel),
         _pode_ver_custo(ctx),
@@ -276,6 +278,7 @@ def publicar(
 def despublicar(
     veiculo_id: str, ctx: Contexto = Depends(get_contexto), db: Session = Depends(get_db)
 ):
+    # Despublicar permanece permitido sob suspensão (ação de redução de risco / ADR).
     _exigir_operacao(ctx)
     return servico.para_saida_privada(
         servico.definir_publicado(db, ctx.loja_id, veiculo_id, False, ctx.papel),
@@ -288,6 +291,7 @@ def reservar(
     veiculo_id: str, ctx: Contexto = Depends(get_contexto), db: Session = Depends(get_db)
 ):
     _exigir_operacao(ctx)
+    _exigir_loja_operacional(db, ctx.loja_id)
     return servico.para_saida_privada(
         servico.reservar(db, ctx.loja_id, veiculo_id, ctx.papel), _pode_ver_custo(ctx)
     )
@@ -298,6 +302,7 @@ def vender(
     veiculo_id: str, ctx: Contexto = Depends(get_contexto), db: Session = Depends(get_db)
 ):
     _exigir_operacao(ctx)
+    _exigir_loja_operacional(db, ctx.loja_id)
     return servico.para_saida_privada(
         servico.vender(db, ctx.loja_id, veiculo_id, ctx.papel), _pode_ver_custo(ctx)
     )
@@ -311,6 +316,7 @@ def substituir_fotos(
     db: Session = Depends(get_db),
 ):
     _exigir_operacao(ctx)
+    _exigir_loja_operacional(db, ctx.loja_id)
     legado = dados.urls is not None
     fotos = (
         [{"url": url, "capa": indice == 0, "ordem": indice} for indice, url in enumerate(dados.urls)]
@@ -334,6 +340,7 @@ async def upload_foto(
 ):
     """Recebe bytes autenticados, persiste em volume e anexa à galeria do veículo."""
     _exigir_operacao(ctx)
+    _exigir_loja_operacional(db, ctx.loja_id)
     mime = media.normalizar_mime_imagem(request.headers.get("content-type"))
     try:
         declarado = int(request.headers.get("content-length", "0"))
