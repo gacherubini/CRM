@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import re
+from datetime import date
+from decimal import Decimal
 from typing import NoReturn
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 from sqlalchemy.orm import Session
 
 from app.auth import gestor_atual
@@ -12,9 +14,23 @@ from app.config import settings
 from app.control.access import AccessControl
 from app.control.accounts import ControlAccounts
 from app.control.audit import AuditTrail
+from app.control.contracts import (
+    ContractBillingStatus,
+    ContractControl,
+    ContractNotFound,
+    ContractView,
+    UpsertContract,
+)
 from app.control.invitations import ControlInvitations
 from app.control.password_recovery import ControlPasswordRecovery
 from app.control.people import PeopleDirectory
+from app.control.portfolio import (
+    InvalidModuleSelection,
+    ModuleCode,
+    ModuleView,
+    PortfolioConflict,
+    PortfolioControl,
+)
 from app.control.roles import StoreRoles
 from app.control.stores import StoreControl
 from app.control.types import (
@@ -171,6 +187,37 @@ class ConsumeControlPasswordRecoveryBody(BaseModel):
 
     token: str = Field(min_length=1, max_length=256)
     senha: str = Field(min_length=1, max_length=256)
+
+
+class ModuleConfigurationBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    modulos: list[ModuleCode] = Field(min_length=1, max_length=2)
+
+
+class ModuleTransitionBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    motivo: str | None = Field(default=None, max_length=1000)
+
+
+class ContractUpsertBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    valor_mensal: Decimal = Field(ge=0, max_digits=12, decimal_places=2)
+    vigencia_inicio: date
+    vigencia_fim: date | None = None
+    vencimento_dia: int = Field(ge=1, le=31)
+    situacao_cobranca: ContractBillingStatus
+
+    @model_validator(mode="after")
+    def validate_term(self):
+        if (
+            self.vigencia_fim is not None
+            and self.vigencia_fim < self.vigencia_inicio
+        ):
+            raise ValueError("vigência do contrato inválida")
+        return self
 
 
 class StoreTransitionBody(BaseModel):
@@ -376,6 +423,114 @@ def get_store(
     return _store_json(store)
 
 
+@router.get("/lojas/{loja_id}/modulos")
+def list_store_modules(
+    loja_id: str,
+    actor: Actor = Depends(_current_actor),
+):
+    try:
+        modules = PortfolioControl(SessionLocal).list_modules(
+            actor,
+            StoreRef(id=loja_id),
+        )
+    except ControlError as exc:
+        _raise_domain_error(exc)
+    return {"items": [_module_json(module) for module in modules]}
+
+
+@router.put("/lojas/{loja_id}/modulos")
+def configure_store_modules(
+    loja_id: str,
+    body: ModuleConfigurationBody,
+    actor: Actor = Depends(_current_actor),
+):
+    try:
+        modules = PortfolioControl(SessionLocal).configure(
+            actor,
+            StoreRef(id=loja_id),
+            tuple(module.value for module in body.modulos),
+        )
+    except ControlError as exc:
+        _raise_domain_error(exc)
+    return {"items": [_module_json(module) for module in modules]}
+
+
+@router.post("/lojas/{loja_id}/modulos/{modulo}/suspender")
+def suspend_store_module(
+    loja_id: str,
+    modulo: str,
+    body: ModuleTransitionBody,
+    actor: Actor = Depends(_current_actor),
+):
+    try:
+        module = PortfolioControl(SessionLocal).suspend(
+            actor,
+            StoreRef(id=loja_id),
+            modulo,
+            reason=body.motivo,
+        )
+    except ControlError as exc:
+        _raise_domain_error(exc)
+    return _module_json(module)
+
+
+@router.post("/lojas/{loja_id}/modulos/{modulo}/reativar")
+def activate_store_module(
+    loja_id: str,
+    modulo: str,
+    body: ModuleTransitionBody,
+    actor: Actor = Depends(_current_actor),
+):
+    try:
+        module = PortfolioControl(SessionLocal).activate(
+            actor,
+            StoreRef(id=loja_id),
+            modulo,
+            reason=body.motivo,
+        )
+    except ControlError as exc:
+        _raise_domain_error(exc)
+    return _module_json(module)
+
+
+@router.get("/lojas/{loja_id}/contrato")
+def get_store_contract(
+    loja_id: str,
+    actor: Actor = Depends(_current_actor),
+):
+    try:
+        contract = ContractControl(SessionLocal).get(
+            actor,
+            StoreRef(id=loja_id),
+        )
+    except ControlError as exc:
+        _raise_domain_error(exc)
+    return _contract_json(contract)
+
+
+@router.put("/lojas/{loja_id}/contrato")
+def upsert_store_contract(
+    loja_id: str,
+    body: ContractUpsertBody,
+    actor: Actor = Depends(_current_actor),
+):
+    try:
+        contract = ContractControl(SessionLocal).upsert(
+            actor,
+            UpsertContract(
+                store=StoreRef(id=loja_id),
+                monthly_amount=body.valor_mensal,
+                starts_on=body.vigencia_inicio,
+                ends_on=body.vigencia_fim,
+                due_day=body.vencimento_dia,
+                billing_status=body.situacao_cobranca,
+            ),
+        )
+    except ControlError as exc:
+        _raise_domain_error(exc)
+    return _contract_json(contract)
+
+
 @router.post("/lojas/{loja_id}/cargos", status_code=201)
 def assign_store_role(
     loja_id: str,
@@ -543,6 +698,32 @@ def _control_account_json(account: ControlAccountView) -> dict[str, object]:
     }
 
 
+def _module_json(module: ModuleView) -> dict[str, object]:
+    return {
+        "codigo": module.code.value,
+        "nome": module.name,
+        "estado": module.status.value,
+        "versao": module.version,
+    }
+
+
+def _contract_json(contract: ContractView) -> dict[str, object]:
+    return {
+        "id": contract.id,
+        "loja_id": contract.store_id,
+        "valor_mensal": f"{contract.monthly_amount:.2f}",
+        "moeda": contract.currency,
+        "vigencia_inicio": contract.starts_on.isoformat(),
+        "vigencia_fim": (
+            contract.ends_on.isoformat()
+            if contract.ends_on is not None
+            else None
+        ),
+        "vencimento_dia": contract.due_day,
+        "situacao_cobranca": contract.billing_status.value,
+    }
+
+
 def _issued_invitation_json(
     invitation: IssuedControlInvitation,
 ) -> dict[str, str]:
@@ -643,6 +824,8 @@ def _raise_domain_error(exc: ControlError) -> NoReturn:
         status_code, code = 404, "person_not_found"
     elif isinstance(exc, StoreNotFound):
         status_code, code = 404, "store_not_found"
+    elif isinstance(exc, ContractNotFound):
+        status_code, code = 404, "contract_not_found"
     elif isinstance(exc, ManagerNotFound):
         status_code, code = 404, "manager_not_found"
     elif isinstance(exc, TrafficLinkNotFound):
@@ -659,6 +842,10 @@ def _raise_domain_error(exc: ControlError) -> NoReturn:
         status_code, code = 409, "control_recovery_invalid"
     elif isinstance(exc, WeakControlPassword):
         status_code, code = 400, "weak_control_password"
+    elif isinstance(exc, InvalidModuleSelection):
+        status_code, code = 400, "invalid_module_selection"
+    elif isinstance(exc, PortfolioConflict):
+        status_code, code = 409, "portfolio_conflict"
     elif isinstance(exc, StoreRoleNotFound):
         status_code, code = 404, "store_role_not_found"
     elif isinstance(exc, StoreRoleConflict):
