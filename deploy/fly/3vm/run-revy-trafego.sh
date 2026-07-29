@@ -1,11 +1,11 @@
 #!/bin/sh
 set -eu
-# Mesmo SQLite/Postgres do portal — fonte única de campanhas/ROI/CAPI.
-export REVY_TRAFEGO_DATABASE_URL="${REVY_TRAFEGO_DATABASE_URL:-${PORTAL_DATABASE_URL:-sqlite:////data/portal/portal.db}}"
+# Banco próprio: vendas chegam por projeção HTTP/outbox; nunca ler o schema do Portal.
+export REVY_TRAFEGO_DATABASE_URL="${REVY_TRAFEGO_DATABASE_URL:-sqlite:////data/revy-trafego/revy_trafego.db}"
 export PORTAL_DATABASE_URL="${PORTAL_DATABASE_URL:-sqlite:////data/portal/portal.db}"
 export REVY_TRAFEGO_SECURE_COOKIE="${REVY_TRAFEGO_SECURE_COOKIE:-1}"
 export REVY_TRAFEGO_URL_PREFIX="${REVY_TRAFEGO_URL_PREFIX:-/trafego}"
-# Cutover B5: este processo é o dono dos workers (shared DB com o portal).
+# Este processo é o único dono dos workers de mídia.
 export REVY_TRAFEGO_CAPI_WORKER="${REVY_TRAFEGO_CAPI_WORKER:-1}"
 export REVY_TRAFEGO_META_SPEND_SYNC_ENABLED="${REVY_TRAFEGO_META_SPEND_SYNC_ENABLED:-1}"
 # O código do worker lê PORTAL_* — forçar ON aqui (portal shell força OFF).

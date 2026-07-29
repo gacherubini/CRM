@@ -4,7 +4,7 @@ from decimal import Decimal
 
 from app import config as config_mod
 from app.db import SessionLocal
-from app.models import Campanha, CampanhaGasto, Venda, novo_id
+from app.models import Campanha, CampanhaGasto, VendaProjetada, novo_id
 
 
 def _token(monkeypatch, valor: str = "tok-teste-svc"):
@@ -44,17 +44,17 @@ def test_resultados_ok(client, monkeypatch):
             )
         )
         db.add(
-            Venda(
+            VendaProjetada(
                 id=novo_id(),
                 loja_slug="loja-teste",
-                vendedor_email="v@t.com",
-                descricao="moto",
                 preco_venda=Decimal("5000.00"),
+                custos_diretos_total=Decimal("0"),
                 status="confirmada",
                 campanha_id_last=c.id,
                 utm_campaign_last="seminovos-julho",
                 criada_em=datetime.now(timezone.utc),
                 confirmada_em=datetime.now(timezone.utc),
+                atualizada_em=datetime.now(timezone.utc),
             )
         )
         db.commit()

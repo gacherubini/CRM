@@ -15,7 +15,10 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    op.create_unique_constraint("uq_veiculos_loja_codigo", "veiculos", ["loja_id", "codigo_interno"])
+    with op.batch_alter_table("veiculos") as batch_op:
+        batch_op.create_unique_constraint(
+            "uq_veiculos_loja_codigo", ["loja_id", "codigo_interno"]
+        )
     op.create_table(
         "veiculo_fotos",
         sa.Column("id", sa.String(36), primary_key=True),
@@ -76,4 +79,5 @@ def downgrade() -> None:
     op.drop_table("eventos_saida")
     op.drop_table("importacoes")
     op.drop_table("veiculo_fotos")
-    op.drop_constraint("uq_veiculos_loja_codigo", "veiculos", type_="unique")
+    with op.batch_alter_table("veiculos") as batch_op:
+        batch_op.drop_constraint("uq_veiculos_loja_codigo", type_="unique")

@@ -15,6 +15,8 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 CHECKS = [
     ("chatbot", os.getenv("HEALTH_CHATBOT_URL", "http://127.0.0.1:8001/health/ready")),
     ("estoque", os.getenv("HEALTH_ESTOQUE_URL", "http://127.0.0.1:8002/health/ready")),
+    ("portal", os.getenv("HEALTH_PORTAL_URL", "http://127.0.0.1:9000/health/ready")),
+    ("revy-trafego", os.getenv("HEALTH_REVY_TRAFEGO_URL", "http://127.0.0.1:9010/health/ready")),
 ]
 if os.getenv("HEALTH_REQUIRE_N8N", "0").strip() in {"1", "true", "yes", "on"}:
     CHECKS.append(
@@ -27,7 +29,7 @@ PORT = int(os.getenv("HEALTHZ_PORT", "8099"))
 def _ok(url: str) -> bool:
     try:
         with urllib.request.urlopen(url, timeout=2.5) as resp:
-            return 200 <= getattr(resp, "status", 200) < 500
+            return 200 <= getattr(resp, "status", 200) < 300
     except (urllib.error.URLError, TimeoutError, OSError):
         return False
 

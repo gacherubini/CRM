@@ -247,6 +247,27 @@ class MetaCapiOutbox(Base):
     atualizada_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=agora)
 
 
+class RevyTrafegoEventOutbox(Base):
+    """Entrega duravel de snapshots de venda ao Revy Trafego."""
+
+    __tablename__ = "revy_trafego_event_outbox"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=novo_id)
+    loja_slug: Mapped[str] = mapped_column(String(120), index=True)
+    venda_id: Mapped[str] = mapped_column(String(36), index=True)
+    event_id: Mapped[str] = mapped_column(String(180), unique=True, index=True)
+    event_type: Mapped[str] = mapped_column(String(32), index=True)
+    payload_ciphertext: Mapped[str] = mapped_column(String(9000))
+    status: Mapped[str] = mapped_column(String(20), default="pending", index=True)
+    attempts: Mapped[int] = mapped_column(Integer, default=0)
+    last_error: Mapped[Optional[str]] = mapped_column(String(240), nullable=True)
+    delivered_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    criada_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=agora)
+    atualizada_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=agora)
+
+
 class Campanha(Base):
     """Campanha de marketing/tráfego pago (métrica; não cria anúncio externo)."""
 

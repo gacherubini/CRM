@@ -13,7 +13,8 @@ Frontend operacional da loja, servido por FastAPI com páginas Jinja. O token da
 - custo oculto para vendedor;
 - layout responsivo para computador e celular;
 - **Resultados de tráfego** (dono/gerente): gasto/leads/ROAS na visão geral — config técnica (Pixel/CAPI/campanhas) migrou para o app **`revy-trafego`** (equipe Revy);
-- Purchase CAPI ao confirmar venda (worker no portal até cutover; ver plano 6.4);
+- confirmação/cancelamento de venda publicados no Revy por outbox transacional criptografado;
+  o Portal não chama a Meta nem o Revy dentro da requisição;
 - **Números de cadastro** (autorizados): telefones da equipe que podem cadastrar veículo
   pelo WhatsApp (`cadastro` / fotos / `fim`) — BFF para a Chatbot API
   `/v1/operacao/numeros-autorizados`;
@@ -26,18 +27,32 @@ Runbook completo: [`docs/plans/2026-07-28-plano-revy-trafego-separacao.md`](../d
 
 | Variável | Onde | Notas |
 |---|---|---|
-| `PORTAL_ENCRYPTION_KEY` | Portal (+ Revy Tráfego) | Fernet; **mesma** chave nos dois se shared DB. |
+| `PORTAL_ENCRYPTION_KEY` | Portal | Fernet do outbox Portal → Revy e demais segredos locais. |
 | `PORTAL_TRAFEGO_UI_LEGACY` | Portal | `1` = devolve menus técnicos ao dono (rollback). Default: off. |
 | `REVY_TRAFEGO_URL` | Portal | Base do app tráfego (cutover API). |
 | `REVY_TRAFEGO_SERVICE_TOKEN` | Portal | Mesmo token do Revy Tráfego. |
 | `PORTAL_REVY_TRAFEGO_RESULTADOS` | Portal | `1` = cards ROI via API (default código `0`; **lab Fly = 1**). |
 | `PORTAL_REVY_TRAFEGO_VENDA_EVENTS` | Portal | `1` = notifica venda-confirmada (default código `0`; **lab Fly = 1**). |
+| `PORTAL_REVY_TRAFEGO_RETRY_INTERVAL_SECONDS` | Portal | Intervalo do worker do outbox; default `60`. |
 | `PORTAL_PUBLIC_URL` | Catálogo | Pixel por loja (fallback). |
 | `REVY_TRAFEGO_PUBLIC_URL` | Catálogo | Prioridade sobre `PORTAL_PUBLIC_URL` (**lab = loopback :9010**). |
 | `META_PIXEL_ID` | Catálogo | Fallback se API offline. |
 | `META_PIXEL_ENABLED` | Catálogo | `1`/`0` (default: ligado quando há Pixel). |
 
 O token CAPI **nunca** vai ao front do catálogo nem ao git.
+
+### Banco e migrações
+
+O Portal continua fonte da verdade de CRM/vendas. O Revy mantém uma projeção própria alimentada
+por eventos; não há leitura SQL cruzada entre os produtos.
+
+```powershell
+.\.venv\Scripts\python.exe -m alembic upgrade head
+.\.venv\Scripts\python.exe -m alembic current
+```
+
+Head esperado: `0012_revy_trafego_event_outbox`. O app não executa `create_all` no boot: falha de
+migração deve impedir readiness/deploy.
 
 ## Executar com Docker
 

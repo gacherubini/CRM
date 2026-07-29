@@ -1,8 +1,23 @@
 from datetime import date, datetime, timezone
 from decimal import Decimal
 
-from app.models import Campanha, CampanhaGasto, Venda, novo_id
+from app.models import Campanha, CampanhaGasto, novo_id
 from app.roi_calc import calcular_roi_loja, gerar_insights_roi, totais_roi
+
+
+class Venda:
+    """Fake estrutural: os calculos nao dependem do ORM do Portal."""
+
+    def __init__(self, **campos):
+        campos.setdefault("custo_veiculo", None)
+        campos.setdefault("lead_ref", None)
+        campos.setdefault("campanha_id_first", None)
+        campos.setdefault("campanha_id_last", None)
+        campos.setdefault("utm_campaign_first", None)
+        campos.setdefault("utm_campaign_last", None)
+        for nome, valor in campos.items():
+            setattr(self, nome, valor)
+        self.custos_diretos = campos.get("custos_diretos", [])
 
 
 def _campanha(**kwargs):

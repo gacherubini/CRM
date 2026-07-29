@@ -98,6 +98,38 @@ class RevyTrafegoClient:
             )
             return None
 
+    def notificar_venda_atualizada(
+        self,
+        *,
+        loja_slug: str,
+        payload: dict[str, Any],
+    ) -> dict[str, Any] | None:
+        """POST snapshot de estado; None em falha ou configuracao ausente."""
+        if not self.configurado:
+            return None
+        try:
+            with httpx.Client(base_url=self.base_url, timeout=self.timeout) as client:
+                r = client.post(
+                    f"/v1/lojas/{loja_slug}/eventos/venda-atualizada",
+                    json=payload,
+                    headers=self._headers(),
+                )
+                if r.status_code != 200:
+                    logger.warning(
+                        "revy_trafego venda-atualizada status=%s loja=%s",
+                        r.status_code,
+                        loja_slug,
+                    )
+                    return None
+                return r.json()
+        except (httpx.HTTPError, ValueError) as exc:
+            logger.warning(
+                "revy_trafego venda-atualizada falhou loja=%s err=%s",
+                loja_slug,
+                type(exc).__name__,
+            )
+            return None
+
 
 def fetch_resultados(
     *,

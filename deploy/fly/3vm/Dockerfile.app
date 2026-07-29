@@ -37,6 +37,8 @@ COPY portal-gestao/alembic /srv/portal/alembic
 COPY portal-gestao/alembic.ini /srv/portal/alembic.ini
 
 COPY revy-trafego/app /srv/revy-trafego/app
+COPY revy-trafego/alembic /srv/revy-trafego/alembic
+COPY revy-trafego/alembic.ini /srv/revy-trafego/alembic.ini
 
 COPY catalogo-publico/app /srv/catalogo/app
 
@@ -50,7 +52,7 @@ COPY deploy/fly/3vm/site-nginx.conf /etc/nginx/sites-available/site.conf
 COPY deploy/fly/3vm/nginx-edge.conf /etc/nginx/edge.conf
 COPY deploy/fly/3vm/nginx.conf /etc/nginx/nginx.conf
 RUN mkdir -p /etc/nginx/sites-enabled /etc/nginx/sites-available \
-               /data/portal /data/catalogo /data/estoque/media \
+               /data/portal /data/revy-trafego /data/catalogo /data/estoque/media \
                /data/motor/screenshots /data/motor/storage_state \
                /var/log/nginx /var/lib/nginx /run \
     && rm -f /etc/nginx/sites-enabled/default \

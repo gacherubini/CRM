@@ -1,6 +1,7 @@
 # Contexto compacto para continuidade
 
-Atualizado em **2026-07-28** (**Revy Tráfego 6.4 DONE** na `main` · cutover B5 · smoke final PASS · lab Fly pode estar **down** com `down-all.sh --3vm`).
+Atualizado em **2026-07-28** (**Fase 3 Portal ↔ Revy pronta no código local, ainda sem commit/deploy**;
+banco próprio + projeção de vendas + outbox criptografado; confirmar o estado Fly antes de operar).
 Leia isto primeiro; detalhe operacional recente em `docs/handoff-contexto.md` (topo).
 Planos válidos: `docs/plans/README.md`. **Ignore** `docs/plans/_archive/`.
 Ops Fly canônico: `deploy/fly/3vm/README.md` + `bash deploy/fly/up-all.sh --3vm`.

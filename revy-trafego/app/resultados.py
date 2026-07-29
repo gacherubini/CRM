@@ -5,7 +5,8 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from decimal import Decimal
 
-from app.models import Campanha, CampanhaGasto, MetaCapiOutbox, MetaPixelConfig, Venda
+from app.financeiro_calc import VendaRoi
+from app.models import Campanha, CampanhaGasto, MetaCapiOutbox, MetaPixelConfig
 from app.meta_pixel import normalizar_pixel_id
 from app.roi_calc import LinhaRoiCampanha, totais_roi
 
@@ -157,7 +158,7 @@ def checklist_medicao(
     config: MetaPixelConfig | None,
     campanhas: Iterable[Campanha],
     gastos: Iterable[CampanhaGasto],
-    vendas: Iterable[Venda],
+    vendas: Iterable[VendaRoi],
     outboxes: Iterable[MetaCapiOutbox],
 ) -> dict:
     campanhas_lista = list(campanhas)

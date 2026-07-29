@@ -4,7 +4,11 @@ import pytest
 
 from app.cripto import cifrar
 from app.db import SessionLocal
-from app.meta_capi import enfileirar_purchase, montar_payload_purchase
+from app.meta_capi import (
+    enfileirar_purchase,
+    montar_payload_purchase,
+    processar_outbox_pendentes,
+)
 from app.models import MetaPixelConfig, PixelCapiAuditoria, agora
 from app.pixel_capi_auditoria import flags_do_payload_capi, listar_auditoria_pixel
 from tests.conftest import csrf_da_resposta
@@ -71,6 +75,7 @@ def test_enfileirar_purchase_gera_auditoria(monkeypatch):
             lead={"telefone": "551188887777", "fbclid": "fbclidXYZ"},
         )
         assert out is not None
+        processar_outbox_pendentes(db, LOJA)
         rows = listar_auditoria_pixel(db, LOJA)
         origens = {r.origem for r in rows}
         assert "purchase_web" in origens

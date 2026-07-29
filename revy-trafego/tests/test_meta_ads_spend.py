@@ -161,6 +161,23 @@ def test_fetch_campaign_insights_valida_argumentos():
         )
 
 
+def test_fetch_campaign_insights_interrompe_paginacao_ciclica():
+    proxima = "https://graph.facebook.com/v21.0/repetida?after=abc"
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json={"data": [], "paging": {"next": proxima}})
+
+    with httpx.Client(transport=httpx.MockTransport(handler)) as http:
+        with pytest.raises(RuntimeError, match="cíclica"):
+            fetch_campaign_insights(
+                ad_account_id="1234",
+                access_token="tok-secreto",
+                since=date(2026, 7, 20),
+                until=date(2026, 7, 20),
+                client=http,
+            )
+
+
 # ---------- sincronização por loja ----------
 
 

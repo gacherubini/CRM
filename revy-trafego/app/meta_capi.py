@@ -18,9 +18,11 @@ from sqlalchemy.orm import Session
 
 from app.cripto import decifrar
 from app.meta_pixel import normalizar_pixel_id
-from app.models import MetaCapiOutbox, MetaPixelConfig, Venda, agora, novo_id
+from app.financeiro_calc import VendaRoi
+from app.models import MetaCapiOutbox, MetaPixelConfig, agora, novo_id
 
 logger = logging.getLogger(__name__)
+OUTBOX_LEASE_SECONDS = 300
 
 GRAPH_EVENTS_URL = "https://graph.facebook.com/v21.0/{pixel_id}/events"
 DEFAULT_TIMEOUT = 5.0
@@ -56,6 +58,7 @@ def montar_payload_purchase(
     fbclid: str | None = None,
     fbc: str | None = None,
     test_event_code: str | None = None,
+    event_time: int | datetime | None = None,
 ) -> dict[str, Any]:
     user_data: dict[str, Any] = {}
     ph = hash_sha256_normalizado(phone)
@@ -64,10 +67,15 @@ def montar_payload_purchase(
     em = hash_email_normalizado(email)
     if em:
         user_data["em"] = [em]
-    event_time = int(time.time())
+    if isinstance(event_time, datetime):
+        event_time_epoch = int(_em_utc(event_time).timestamp())
+    elif event_time is not None:
+        event_time_epoch = int(event_time)
+    else:
+        event_time_epoch = int(time.time())
     fbc_normalizado = (fbc or "").strip() or None
     if not fbc_normalizado and (fbclid or "").strip():
-        fbc_normalizado = f"fb.1.{event_time}.{fbclid.strip()}"
+        fbc_normalizado = f"fb.1.{event_time_epoch}.{fbclid.strip()}"
     if fbc_normalizado:
         user_data["fbc"] = fbc_normalizado
     # Meta exige ao menos um identificador; external_id estável serve como fallback.
@@ -77,7 +85,7 @@ def montar_payload_purchase(
     )
     event = {
         "event_name": "Purchase",
-        "event_time": event_time,
+        "event_time": event_time_epoch,
         "event_id": event_id,
         "action_source": "system_generated",
         "user_data": user_data,
@@ -116,7 +124,7 @@ def _config_loja(db: Session, loja_slug: str) -> MetaPixelConfig | None:
 
 def enfileirar_purchase_venda(
     db: Session,
-    venda: Venda,
+    venda: VendaRoi,
     lead: dict[str, Any] | None = None,
 ) -> MetaCapiOutbox | None:
     """Compatibilidade: enfileira Purchase a partir do model de venda."""
@@ -140,22 +148,25 @@ def enfileirar_purchase(
     value: Decimal | float | str,
     currency: str = "BRL",
     lead: dict[str, Any] | None = None,
+    event_time: int | datetime | None = None,
 ) -> MetaCapiOutbox | None:
     """Persiste outbox Purchase e tenta envio uma vez. Nunca levanta para o caller."""
     try:
         config = _config_loja(db, loja_slug)
         pixel_id = normalizar_pixel_id(config.pixel_id if config else None)
-        if (
-            config is None
-            or not config.enviar_purchase
-            or not pixel_id
-            or not config.token_ciphertext
-        ):
-            return None
+        config_pronta = bool(
+            config
+            and config.enviar_purchase
+            and pixel_id
+            and config.token_ciphertext
+        )
 
         existente = (
             db.query(MetaCapiOutbox)
-            .filter(MetaCapiOutbox.event_id == event_id)
+            .filter(
+                MetaCapiOutbox.loja_slug == loja_slug,
+                MetaCapiOutbox.event_id == event_id,
+            )
             .first()
         )
         if existente is not None:
@@ -169,7 +180,8 @@ def enfileirar_purchase(
             email=(lead or {}).get("email"),
             fbclid=(lead or {}).get("fbclid"),
             fbc=(lead or {}).get("fbc"),
-            test_event_code=(config.test_event_code or None),
+            test_event_code=(config.test_event_code or None) if config else None,
+            event_time=event_time,
         )
         outbox = MetaCapiOutbox(
             id=novo_id(),
@@ -178,7 +190,7 @@ def enfileirar_purchase(
             event_id=event_id,
             event_name="Purchase",
             payload_json=json.dumps(body, ensure_ascii=False, sort_keys=True),
-            status="pending",
+            status="pending" if config_pronta else "blocked_config",
             criada_em=agora(),
             atualizada_em=agora(),
         )
@@ -203,15 +215,14 @@ def enfileirar_purchase(
                 tem_fbc=flags["tem_fbc"],
                 tem_ctwa_clid=False,
                 tem_external_id=flags["tem_external_id"],
-                tem_test_event_code=bool(config.test_event_code),
-                status="enfileirado",
+                tem_test_event_code=bool(config and config.test_event_code),
+                status="enfileirado" if config_pronta else "blocked_config",
                 venda_id=venda_id,
             )
         except Exception:
             logger.warning("meta_capi: falha ao registrar auditoria pixel (ignored)")
         db.commit()
         db.refresh(outbox)
-        tentar_enviar_outbox(db, outbox, config)
         return outbox
     except Exception:
         logger.exception(
@@ -232,19 +243,40 @@ def tentar_enviar_outbox(
 ) -> bool:
     """Tenta enviar um item da outbox. Retorna True se entregue. Não propaga erro."""
     try:
+        if outbox.venda_id:
+            from app.models import VendaProjetada
+
+            venda = db.get(
+                VendaProjetada,
+                (outbox.venda_id, outbox.loja_slug),
+            )
+            if venda is not None and venda.status != "confirmada":
+                outbox.status = "cancelled"
+                outbox.last_error = "venda nao esta confirmada"
+                outbox.atualizada_em = agora()
+                db.commit()
+                return False
         if config is None:
             config = _config_loja(db, outbox.loja_slug)
         pixel_id = normalizar_pixel_id(config.pixel_id if config else None)
-        if config is None or not config.token_ciphertext or not pixel_id:
-            outbox.status = "failed"
-            outbox.last_error = "config Meta incompleta"
-            outbox.attempts = (outbox.attempts or 0) + 1
+        if (
+            config is None
+            or not config.enviar_purchase
+            or not config.token_ciphertext
+            or not pixel_id
+        ):
+            outbox.status = "blocked_config"
+            outbox.last_error = "aguardando config Meta"
             outbox.atualizada_em = agora()
             db.commit()
             return False
 
         token = decifrar(config.token_ciphertext)
         body = json.loads(outbox.payload_json)
+        if config.test_event_code:
+            body["test_event_code"] = config.test_event_code
+        else:
+            body.pop("test_event_code", None)
         resposta = enviar_eventos_capi(
             pixel_id=pixel_id,
             access_token=token,
@@ -350,6 +382,7 @@ def processar_outbox_pendentes(
     loja_slug: str,
     *,
     limite: int = 50,
+    lease_seconds: int = OUTBOX_LEASE_SECONDS,
 ) -> dict[str, int]:
     """Retenta somente itens da loja, mantendo erros isolados por evento."""
     config = _config_loja(db, loja_slug)
@@ -357,23 +390,74 @@ def processar_outbox_pendentes(
         db.query(MetaCapiOutbox)
         .filter(
             MetaCapiOutbox.loja_slug == loja_slug,
-            MetaCapiOutbox.status.in_(("pending", "failed")),
+            MetaCapiOutbox.status.in_(
+                ("pending", "failed", "blocked_config", "processing")
+            ),
         )
         .order_by(MetaCapiOutbox.criada_em.asc())
         .limit(max(1, min(limite, 100)))
         .all()
     )
+    instante = datetime.now(timezone.utc)
+    processados = 0
     entregues = 0
+    falharam = 0
+    aguardando_lease = 0
+    concorrentes = 0
     for item in itens:
-        if tentar_enviar_outbox(db, item, config):
+        if item.status == "processing" and item.atualizada_em is not None:
+            if _em_utc(item.atualizada_em) + timedelta(
+                seconds=max(1, lease_seconds)
+            ) > instante:
+                aguardando_lease += 1
+                continue
+        reivindicado = _reivindicar_outbox(db, item, instante=instante)
+        if reivindicado is None:
+            concorrentes += 1
+            continue
+        processados += 1
+        if tentar_enviar_outbox(db, reivindicado, config):
             entregues += 1
-    return {"processados": len(itens), "entregues": entregues, "falharam": len(itens) - entregues}
+        else:
+            falharam += 1
+    return {
+        "processados": processados,
+        "entregues": entregues,
+        "falharam": falharam,
+        "aguardando_lease": aguardando_lease,
+        "concorrentes": concorrentes,
+    }
 
 
 def _em_utc(valor: datetime) -> datetime:
     if valor.tzinfo is None:
         return valor.replace(tzinfo=timezone.utc)
     return valor.astimezone(timezone.utc)
+
+
+def _reivindicar_outbox(
+    db: Session,
+    item: MetaCapiOutbox,
+    *,
+    instante: datetime,
+) -> MetaCapiOutbox | None:
+    """Reivindica um evento por compare-and-swap, sem lock específico de banco."""
+    status_anterior = item.status
+    query = db.query(MetaCapiOutbox).filter(
+        MetaCapiOutbox.id == item.id,
+        MetaCapiOutbox.status == status_anterior,
+    )
+    if item.atualizada_em is not None:
+        query = query.filter(MetaCapiOutbox.atualizada_em == item.atualizada_em)
+    alteradas = query.update(
+        {"status": "processing", "atualizada_em": instante},
+        synchronize_session=False,
+    )
+    db.commit()
+    if alteradas != 1:
+        db.expire_all()
+        return None
+    return db.get(MetaCapiOutbox, item.id)
 
 
 def processar_outbox_automatico(
@@ -383,6 +467,7 @@ def processar_outbox_automatico(
     max_tentativas: int = 8,
     backoff_base_seconds: float = 60,
     instante: datetime | None = None,
+    lease_seconds: int = OUTBOX_LEASE_SECONDS,
 ) -> dict[str, int]:
     """Processa pendências globais com backoff, sem exigir ação no Portal."""
     agora_utc = _em_utc(instante or datetime.now(timezone.utc))
@@ -390,7 +475,11 @@ def processar_outbox_automatico(
     try:
         itens = (
             db.query(MetaCapiOutbox)
-            .filter(MetaCapiOutbox.status.in_(("pending", "failed")))
+            .filter(
+                MetaCapiOutbox.status.in_(
+                    ("pending", "failed", "blocked_config", "processing")
+                )
+            )
             .order_by(MetaCapiOutbox.atualizada_em.asc())
             .limit(max(1, min(limite, 500)))
             .all()
@@ -401,9 +490,18 @@ def processar_outbox_automatico(
             "entregues": 0,
             "falharam": 0,
             "aguardando_backoff": 0,
+            "aguardando_lease": 0,
+            "concorrentes": 0,
             "esgotados": 0,
         }
         for item in itens:
+            if item.status == "processing" and item.atualizada_em is not None:
+                expira_em = _em_utc(item.atualizada_em) + timedelta(
+                    seconds=max(1, lease_seconds)
+                )
+                if expira_em > agora_utc:
+                    resultado["aguardando_lease"] += 1
+                    continue
             tentativas = int(item.attempts or 0)
             if tentativas >= max_tentativas:
                 resultado["esgotados"] += 1
@@ -417,8 +515,12 @@ def processar_outbox_automatico(
                 if proxima > agora_utc:
                     resultado["aguardando_backoff"] += 1
                     continue
+            reivindicado = _reivindicar_outbox(db, item, instante=agora_utc)
+            if reivindicado is None:
+                resultado["concorrentes"] += 1
+                continue
             resultado["processados"] += 1
-            if tentar_enviar_outbox(db, item):
+            if tentar_enviar_outbox(db, reivindicado):
                 resultado["entregues"] += 1
             else:
                 resultado["falharam"] += 1

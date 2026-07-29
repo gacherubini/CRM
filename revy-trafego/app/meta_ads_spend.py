@@ -26,6 +26,7 @@ CENTAVOS = Decimal("0.01")
 ORIGEM_META = "meta_api"
 ORIGEM_MANUAL = "manual"
 DEFAULT_TIMEOUT = 30.0
+MAX_INSIGHTS_PAGES = 100
 NOTA_META = "Meta API (gasto automático)"
 
 
@@ -102,6 +103,7 @@ def fetch_campaign_insights(
     until: date,
     timeout: float = DEFAULT_TIMEOUT,
     client: httpx.Client | None = None,
+    max_pages: int = MAX_INSIGHTS_PAGES,
 ) -> list[dict[str, Any]]:
     """Busca spend diário por campanha no ad account."""
     account = normalizar_ad_account_id(ad_account_id)
@@ -109,6 +111,8 @@ def fetch_campaign_insights(
         raise ValueError("ad_account_id inválido")
     if until < since:
         raise ValueError("período inválido")
+    if max_pages < 1:
+        raise ValueError("max_pages inválido")
 
     params = {
         "level": "campaign",
@@ -122,8 +126,14 @@ def fetch_campaign_insights(
     rows: list[dict[str, Any]] = []
     owns_client = client is None
     http = client or httpx.Client(timeout=timeout)
+    visitadas: set[str] = set()
     try:
         while url:
+            if url in visitadas:
+                raise RuntimeError("Meta Insights retornou paginação cíclica")
+            if len(visitadas) >= max_pages:
+                raise RuntimeError("Meta Insights excedeu o limite de páginas")
+            visitadas.add(url)
             if url.startswith("http"):
                 response = http.get(url, params=params if "access_token" not in url else None)
             else:

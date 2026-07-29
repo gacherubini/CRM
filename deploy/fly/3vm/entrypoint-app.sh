@@ -4,6 +4,7 @@ set -euo pipefail
 
 mkdir -p \
   /data/portal \
+  /data/revy-trafego \
   /data/catalogo \
   /data/estoque/media \
   /data/motor/screenshots \
@@ -30,20 +31,19 @@ export PORTAL_PUBLIC_URL="${PORTAL_PUBLIC_URL:-http://127.0.0.1:9000}"
 export REVY_TRAFEGO_URL="${REVY_TRAFEGO_URL:-http://127.0.0.1:9010}"
 export REVY_TRAFEGO_PUBLIC_URL="${REVY_TRAFEGO_PUBLIC_URL:-http://127.0.0.1:9010}"
 export REVY_TRAFEGO_URL_PREFIX="${REVY_TRAFEGO_URL_PREFIX:-/trafego}"
-export REVY_TRAFEGO_DATABASE_URL="${REVY_TRAFEGO_DATABASE_URL:-${PORTAL_DATABASE_URL:-sqlite:////data/portal/portal.db}}"
+export REVY_TRAFEGO_DATABASE_URL="${REVY_TRAFEGO_DATABASE_URL:-sqlite:////data/revy-trafego/revy_trafego.db}"
 export ESTOQUE_MEDIA_STORAGE_DIR="${ESTOQUE_MEDIA_STORAGE_DIR:-/data/estoque/media}"
 export MOTOR_SCREENSHOT_DIR="${MOTOR_SCREENSHOT_DIR:-/data/motor/screenshots}"
 export MOTOR_STORAGE_STATE_DIR="${MOTOR_STORAGE_STATE_DIR:-/data/motor/storage_state}"
 
 run_alembic() {
   local dir="$1"
-  if [ -f "$dir/alembic.ini" ]; then
-    echo ">> alembic upgrade head ($dir)"
-    (cd "$dir" && alembic upgrade head) || {
-      echo "WARN: alembic falhou em $dir" >&2
-      return 0
-    }
+  if [ ! -f "$dir/alembic.ini" ]; then
+    echo ">> ERRO: alembic.ini ausente em $dir" >&2
+    return 1
   fi
+  echo ">> alembic upgrade head ($dir)"
+  (cd "$dir" && alembic upgrade head)
 }
 
 if [ -n "${CHATBOT_DATABASE_URL:-}" ]; then
@@ -62,6 +62,10 @@ if [ -n "${PORTAL_DATABASE_URL:-}" ]; then
   # Portal alembic env costuma usar PORTAL_DATABASE_URL ou DATABASE_URL
   export DATABASE_URL="$PORTAL_DATABASE_URL"
   run_alembic /srv/portal
+fi
+if [ -n "${REVY_TRAFEGO_DATABASE_URL:-}" ]; then
+  export DATABASE_URL="$REVY_TRAFEGO_DATABASE_URL"
+  run_alembic /srv/revy-trafego
 fi
 
 echo ">> starting supervisord"

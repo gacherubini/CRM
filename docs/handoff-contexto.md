@@ -4,12 +4,56 @@
 > Este arquivo: checkpoint operacional. Seções **“Checkpoint anterior”** = histórico — não
 > reexecutar. Path Windows no rodapé de seções antigas: **ignorar** (workspace = root do git).
 >
-> **Checkpoint mais recente: 2026-07-28 noite (lab religado + `motor2037` reconstruído + slug
-> unificado + cobertura de testes do Revy Tráfego).**  
-> Código na `main`. **Lab Fly LIGADO** (`suite-pg`, `evolution2037`, `n8n2037`, `app2037` started;
-> workers `motor2037` stopped no idle, que é o correto). Bug aberto em `api_v1.py` — ver abaixo.
+> **Checkpoint mais recente: 2026-07-28 — Fase 3 Portal ↔ Revy implementada localmente.**
+> Mudanças ainda **não commitadas, não enviadas e não implantadas**. O checkpoint de lab abaixo é
+> histórico operacional; confirmar estado Fly antes de qualquer ação.
 
-## Checkpoint mais recente — recuperação do lab + slug único + testes (2026-07-28, noite)
+## Checkpoint mais recente — Fase 3 de separação de dados (código local)
+
+### Entrega
+
+- `revy-trafego` agora tem **banco e Alembic próprios** (`0001_revy_trafego_baseline`). O default do
+  bundle é `/data/revy-trafego/revy_trafego.db`; não há fallback para o banco do Portal.
+- O Portal continua dono da venda e publica snapshots por **outbox transacional criptografado**
+  (`portal` head `0012_revy_trafego_event_outbox`). Confirmação e cancelamento não fazem HTTP no
+  request; o worker entrega com backoff, lease atômica e expurgo após 30 dias.
+- O Revy materializa `vendas_projetadas` e ROI/relatórios não leem mais `vendas`,
+  `venda_custos_diretos` ou `usuarios` do Portal.
+- CAPI ficou durável e assíncrona: falta de configuração vira `blocked_config`, cancelamento
+  terminaliza evento pendente, `event_time` usa `confirmada_em`, dedupe é `(loja_slug,event_id)` e
+  workers concorrentes usam lease recuperável.
+- Chatbot no Revy resolve token por loja com `REVY_TRAFEGO_CHATBOT_TOKENS_JSON` (ou
+  `REVY_TRAFEGO_CHATBOT_TOKEN_LOJA` para legado de uma loja) e falha fechado quando ambíguo.
+- Meta Insights detecta paginação cíclica e limita a 100 páginas.
+- Alembic é a única autoridade de schema em Portal, Revy, Chatbot e Estoque; `create_all` de boot foi
+  removido. Readiness consulta tabela essencial e o health agregado só aceita HTTP 2xx.
+- Corrigidas migrações históricas SQLite: Portal `0009` e Estoque `0002` usam batch mode.
+
+### Validação local
+
+- Revy Tráfego: **95 passed**.
+- Portal: **293 passed**.
+- Chatbot: **170 passed**.
+- Estoque: **87 passed**.
+- Migração limpa: Revy `0001` head, Portal `0012` head, Chatbot `0013` head e Estoque `0007` head.
+
+### Cutover ainda não executado
+
+1. Fazer backup do volume/banco atual antes do deploy.
+2. Garantir `REVY_TRAFEGO_DATABASE_URL` dedicado e rodar os quatro Alembics fail-fast.
+3. Configurar `REVY_TRAFEGO_CHATBOT_TOKENS_JSON` para cada loja antes de testar diagnóstico.
+4. Ligar `PORTAL_REVY_TRAFEGO_VENDA_EVENTS=1` e manter workers de mídia somente no Revy.
+5. Fazer backfill de vendas históricas se o banco atual já tiver dados; o outbox cobre eventos novos.
+6. Só depois validar smoke e decidir commit/push/deploy.
+
+### Riscos residuais conhecidos
+
+- `REVY_TRAFEGO_SERVICE_TOKEN` ainda é global; migrar para credencial por loja reduz blast radius.
+- Outbox entrega **at-least-once**: lease reduz concorrência, e `event_id` fornece idempotência no
+  destino, mas não há transação distribuída com Meta.
+- Nenhum deploy foi feito nesta sessão; não assumir que o lab já usa o schema separado.
+
+## Checkpoint anterior — recuperação do lab + slug único + testes (2026-07-28, noite)
 
 > **Escopo:** subir lab, auditar o projeto, reconstruir `motor2037`, unificar slug da loja,
 > portar cobertura de testes para o `revy-trafego`.

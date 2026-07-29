@@ -7,8 +7,8 @@ from decimal import Decimal, ROUND_HALF_UP
 from typing import Iterable
 
 from app.campanhas import gasto_no_periodo, lead_casa_campanha, normalizar_utm
-from app.financeiro_calc import _data, lucro_bruto_venda
-from app.models import Campanha, CampanhaGasto, Venda
+from app.financeiro_calc import VendaRoi, _data, lucro_bruto_venda
+from app.models import Campanha, CampanhaGasto
 
 CENTAVOS = Decimal("0.01")
 QUATRO = Decimal("0.0001")
@@ -73,7 +73,9 @@ def _roas(faturamento: Decimal, gasto: Decimal) -> Decimal | None:
     return (faturamento / gasto).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
 
-def venda_casa_campanha(venda: Venda, campanha: Campanha, *, modo: str = "last") -> bool:
+def venda_casa_campanha(
+    venda: VendaRoi, campanha: Campanha, *, modo: str = "last"
+) -> bool:
     if modo == "first":
         return venda.campanha_id_first == campanha.id or (
             not venda.campanha_id_first
@@ -90,7 +92,7 @@ def calcular_roi_loja(
     campanhas: list[Campanha],
     gastos: list[CampanhaGasto],
     leads: list[dict],
-    vendas_confirmadas: list[Venda],
+    vendas_confirmadas: list[VendaRoi],
     d_inicio: date,
     d_fim: date,
     modo_atribuicao: str = "last",
@@ -113,7 +115,7 @@ def calcular_roi_loja(
             if l.get("id"):
                 leads_matched_ids.add(str(l["id"]))
 
-        vendas_c: list[Venda] = []
+        vendas_c: list[VendaRoi] = []
         for v in vendas_confirmadas:
             if venda_casa_campanha(v, campanha, modo=modo):
                 vendas_c.append(v)

@@ -37,27 +37,34 @@ def upgrade() -> None:
         "ix_campanhas_meta_campaign_id", "campanhas", ["meta_campaign_id"]
     )
 
-    op.add_column(
-        "campanha_gastos",
-        sa.Column("origem", sa.String(length=20), nullable=False, server_default="manual"),
-    )
-    op.add_column(
-        "campanha_gastos",
-        sa.Column("external_key", sa.String(length=120), nullable=True),
-    )
+    with op.batch_alter_table("campanha_gastos") as batch_op:
+        batch_op.add_column(
+            sa.Column(
+                "origem",
+                sa.String(length=20),
+                nullable=False,
+                server_default="manual",
+            )
+        )
+        batch_op.add_column(
+            sa.Column("external_key", sa.String(length=120), nullable=True)
+        )
+        batch_op.create_unique_constraint(
+            "uq_campanha_gasto_external_key", ["external_key"]
+        )
     op.create_index(
         "ix_campanha_gastos_origem", "campanha_gastos", ["origem"]
-    )
-    op.create_unique_constraint(
-        "uq_campanha_gasto_external_key", "campanha_gastos", ["external_key"]
     )
 
 
 def downgrade() -> None:
-    op.drop_constraint("uq_campanha_gasto_external_key", "campanha_gastos", type_="unique")
     op.drop_index("ix_campanha_gastos_origem", table_name="campanha_gastos")
-    op.drop_column("campanha_gastos", "external_key")
-    op.drop_column("campanha_gastos", "origem")
+    with op.batch_alter_table("campanha_gastos") as batch_op:
+        batch_op.drop_constraint(
+            "uq_campanha_gasto_external_key", type_="unique"
+        )
+        batch_op.drop_column("external_key")
+        batch_op.drop_column("origem")
     op.drop_index("ix_campanhas_meta_campaign_id", table_name="campanhas")
     op.drop_column("campanhas", "meta_campaign_id")
     op.drop_table("meta_ads_config")

@@ -9,6 +9,7 @@ import hashlib
 import json
 import logging
 import time
+from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Any
 
@@ -37,6 +38,7 @@ def montar_payload_purchase_messaging(
     phone: str | None = None,
     email: str | None = None,
     test_event_code: str | None = None,
+    event_time: int | datetime | None = None,
 ) -> dict[str, Any]:
     """Payload Graph Events com action_source business_messaging + ctwa_clid."""
     user_data: dict[str, Any] = {
@@ -52,9 +54,18 @@ def montar_payload_purchase_messaging(
         "external_id",
         [hashlib.sha256(event_id.encode("utf-8")).hexdigest()],
     )
+    if isinstance(event_time, datetime):
+        instante = event_time
+        if instante.tzinfo is None:
+            instante = instante.replace(tzinfo=timezone.utc)
+        event_time_epoch = int(instante.timestamp())
+    elif event_time is not None:
+        event_time_epoch = int(event_time)
+    else:
+        event_time_epoch = int(time.time())
     event = {
         "event_name": "Purchase",
-        "event_time": int(time.time()),
+        "event_time": event_time_epoch,
         "event_id": event_id,
         "action_source": "business_messaging",
         "messaging_channel": "whatsapp",
@@ -81,6 +92,7 @@ def enfileirar_purchase_messaging(
     ctwa_clid: str | None,
     phone: str | None = None,
     email: str | None = None,
+    event_time: int | datetime | None = None,
 ) -> MetaCapiOutbox | None:
     """Outbox Purchase messaging. No-op se não houver ctwa_clid ou config CAPI."""
     try:
@@ -93,17 +105,19 @@ def enfileirar_purchase_messaging(
             .first()
         )
         pixel_id = normalizar_pixel_id(config.pixel_id if config else None)
-        if (
-            config is None
-            or not config.enviar_purchase
-            or not pixel_id
-            or not config.token_ciphertext
-        ):
-            return None
+        config_pronta = bool(
+            config
+            and config.enviar_purchase
+            and pixel_id
+            and config.token_ciphertext
+        )
 
         existente = (
             db.query(MetaCapiOutbox)
-            .filter(MetaCapiOutbox.event_id == event_id)
+            .filter(
+                MetaCapiOutbox.loja_slug == loja_slug,
+                MetaCapiOutbox.event_id == event_id,
+            )
             .first()
         )
         if existente is not None:
@@ -116,7 +130,8 @@ def enfileirar_purchase_messaging(
             ctwa_clid=clid,
             phone=phone,
             email=email,
-            test_event_code=(config.test_event_code or None),
+            test_event_code=(config.test_event_code or None) if config else None,
+            event_time=event_time,
         )
         outbox = MetaCapiOutbox(
             id=novo_id(),
@@ -125,7 +140,7 @@ def enfileirar_purchase_messaging(
             event_id=event_id,
             event_name="Purchase",
             payload_json=json.dumps(body, ensure_ascii=False, sort_keys=True),
-            status="pending",
+            status="pending" if config_pronta else "blocked_config",
             criada_em=agora(),
             atualizada_em=agora(),
         )
@@ -148,8 +163,8 @@ def enfileirar_purchase_messaging(
                 tem_fbc=flags["tem_fbc"],
                 tem_ctwa_clid=flags["tem_ctwa_clid"],
                 tem_external_id=flags["tem_external_id"],
-                tem_test_event_code=bool(config.test_event_code),
-                status="enfileirado",
+                tem_test_event_code=bool(config and config.test_event_code),
+                status="enfileirado" if config_pronta else "blocked_config",
                 venda_id=venda_id,
             )
         except Exception:
@@ -157,7 +172,6 @@ def enfileirar_purchase_messaging(
         db.commit()
         db.refresh(outbox)
         # Reusa envio HTTP do meta_capi (mesmo endpoint Graph /events).
-        tentar_enviar_outbox(db, outbox, config)
         return outbox
     except Exception:
         logger.exception(

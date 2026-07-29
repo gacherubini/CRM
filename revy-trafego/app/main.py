@@ -13,6 +13,7 @@ from fastapi import Depends, FastAPI, Header, Request, Response
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 from starlette.middleware.sessions import SessionMiddleware
 
@@ -51,7 +52,7 @@ from app.clients.chatbot import (
 from urllib.parse import quote
 from app.config import settings
 from app.cripto import cifrar
-from app.db import Base, SessionLocal, engine, get_db
+from app.db import SessionLocal, get_db
 from app.financeiro_calc import calcular_metricas_vendas, hoje_portal, periodo_padrao
 from app.lojas import listar_loja_slugs
 from app.meta_ads_spend import normalizar_ad_account_id, sincronizar_gastos_meta
@@ -121,9 +122,6 @@ app.add_middleware(
 app.mount("/static", StaticFiles(directory=str(BASE_DIR / "static")), name="static")
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
 
-if os.getenv("REVY_TRAFEGO_SKIP_INIT") != "1":
-    Base.metadata.create_all(bind=engine)
-
 app.include_router(api_v1_router)
 
 
@@ -183,10 +181,10 @@ templates.env.globals["public_path"] = public_path
 templates.env.globals["url_telefone"] = url_telefone
 
 
-def get_chatbot_client() -> ChatbotClient:
+def get_chatbot_client(loja_slug: str) -> ChatbotClient:
     return ChatbotClient(
         settings.chatbot_url,
-        settings.chatbot_token,
+        settings.chatbot_token_para(loja_slug),
         settings.request_timeout,
     )
 
@@ -229,6 +227,12 @@ def exigir_loja(request: Request, db: Session):
 @app.get("/health/live")
 def health_live():
     return {"status": "ok", "service": "revy-trafego", "version": settings.version}
+
+
+@app.get("/health/ready")
+def health_ready(db: Session = Depends(get_db)):
+    db.execute(text("SELECT 1 FROM vendas_projetadas LIMIT 1"))
+    return {"status": "ready", "service": "revy-trafego"}
 
 
 @app.get("/public/v1/lojas/{loja_slug}/pixel")
@@ -566,11 +570,11 @@ def trafego_ctwa_auditoria(
     request: Request,
     db: Session = Depends(get_db),
     so_com_clid: str | None = None,
-    chatbot: ChatbotClient = Depends(get_chatbot_client),
 ):
     usuario, redir = exigir_loja(request, db)
     if redir:
         return redir
+    chatbot = get_chatbot_client(usuario.loja_slug)
     filtro_clid = (so_com_clid or "").strip() in {"1", "true", "on", "sim"}
     itens: list = []
     erro_chatbot = None
@@ -610,7 +614,7 @@ def trafego_roi(
     chatbot_erro = None
     leads: list[dict] = []
     try:
-        leads = get_chatbot_client().listar_leads()
+        leads = get_chatbot_client(usuario.loja_slug).listar_leads()
     except ChatbotIndisponivel:
         chatbot_erro = "indisponivel"
     linhas = calcular_roi_loja(
@@ -902,11 +906,11 @@ def campanhas_detalhe(
     inicio: str | None = None,
     fim: str | None = None,
     db: Session = Depends(get_db),
-    chatbot: ChatbotClient = Depends(get_chatbot_client),
 ):
     usuario, redir = exigir_loja(request, db)
     if redir:
         return redir
+    chatbot = get_chatbot_client(usuario.loja_slug)
     campanha = (
         db.query(Campanha)
         .filter(Campanha.id == campanha_id, Campanha.loja_slug == usuario.loja_slug)
@@ -1115,12 +1119,12 @@ async def campanhas_gasto_post(request: Request, campanha_id: str, db: Session =
 def diagnostico_leads(
     request: Request,
     db: Session = Depends(get_db),
-    chatbot: ChatbotClient = Depends(get_chatbot_client),
     utm: str | None = None,
 ):
     usuario, redir = exigir_loja(request, db)
     if redir:
         return redir
+    chatbot = get_chatbot_client(usuario.loja_slug)
     leads: list[dict] = []
     erro = None
     try:
@@ -1157,11 +1161,11 @@ def diagnostico_lead_detalhe(
     request: Request,
     lead_id: str,
     db: Session = Depends(get_db),
-    chatbot: ChatbotClient = Depends(get_chatbot_client),
 ):
     usuario, redir = exigir_loja(request, db)
     if redir:
         return redir
+    chatbot = get_chatbot_client(usuario.loja_slug)
     lead = None
     erro = None
     try:
@@ -1188,11 +1192,11 @@ def diagnostico_conversa(
     request: Request,
     telefone: str,
     db: Session = Depends(get_db),
-    chatbot: ChatbotClient = Depends(get_chatbot_client),
 ):
     usuario, redir = exigir_loja(request, db)
     if redir:
         return redir
+    chatbot = get_chatbot_client(usuario.loja_slug)
     mensagens: list[dict] = []
     erro = None
     # Path pode vir URL-encoded (+ → %2B etc.)

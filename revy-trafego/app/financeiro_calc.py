@@ -4,12 +4,13 @@ from __future__ import annotations
 import calendar
 from datetime import date, datetime, timezone
 from decimal import ROUND_HALF_UP, Decimal
+from typing import Protocol
 from zoneinfo import ZoneInfo
 
 from sqlalchemy.orm import Session
 
 from app.config import settings
-from app.models import Venda
+from app.models import VendaProjetada
 
 CENTAVOS = Decimal("0.01")
 FUSO_PORTAL = ZoneInfo(settings.timezone)
@@ -44,19 +45,42 @@ def periodo_padrao(inicio: str | None, fim: str | None) -> tuple[date, date]:
     return d_inicio, d_fim
 
 
-def lucro_bruto_venda(venda: Venda) -> Decimal | None:
+class VendaRoi(Protocol):
+    id: str
+    loja_slug: str
+    lead_ref: str | None
+    preco_venda: Decimal
+    custo_veiculo: Decimal | None
+    status: str
+    criada_em: datetime
+    campanha_id_first: str | None
+    campanha_id_last: str | None
+    utm_campaign_first: str | None
+    utm_campaign_last: str | None
+
+
+def lucro_bruto_venda(venda: VendaRoi) -> Decimal | None:
     if venda.custo_veiculo is None:
         return None
     custo = venda.custo_veiculo
-    diretos = sum((c.valor for c in venda.custos_diretos), Decimal("0"))
+    if hasattr(venda, "custos_diretos_total"):
+        diretos = Decimal(str(getattr(venda, "custos_diretos_total") or 0))
+    else:
+        diretos = sum(
+            (c.valor for c in getattr(venda, "custos_diretos", [])),
+            Decimal("0"),
+        )
     return (venda.preco_venda - custo - diretos).quantize(CENTAVOS, rounding=ROUND_HALF_UP)
 
 
 def calcular_metricas_vendas(db: Session, loja_slug: str, d_inicio: date, d_fim: date) -> dict:
     confirmadas = [
         v
-        for v in db.query(Venda)
-        .filter(Venda.loja_slug == loja_slug, Venda.status == "confirmada")
+        for v in db.query(VendaProjetada)
+        .filter(
+            VendaProjetada.loja_slug == loja_slug,
+            VendaProjetada.status == "confirmada",
+        )
         .all()
         if d_inicio <= _data(v.criada_em) <= d_fim
     ]

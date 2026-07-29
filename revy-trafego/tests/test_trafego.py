@@ -20,7 +20,11 @@ from tests.conftest import csrf_da_resposta
 from app import config as config_mod
 from app.cripto import cifrar, decifrar
 from app.db import SessionLocal
-from app.meta_capi import montar_payload_purchase, processar_outbox_automatico
+from app.meta_capi import (
+    montar_payload_purchase,
+    processar_outbox_automatico,
+    processar_outbox_pendentes,
+)
 from app.models import MetaCapiOutbox, MetaPixelConfig
 
 LOJA = "loja-teste"
@@ -63,12 +67,14 @@ def _mock_capi(monkeypatch, handler):
     monkeypatch.setattr("app.meta_capi.httpx.Client", fabrica)
 
 
-def _configurar_meta(*, purchase=True, pixel_id="1234567890", token="tok-capi"):
+def _configurar_meta(
+    *, loja_slug=LOJA, purchase=True, pixel_id="1234567890", token="tok-capi"
+):
     db = SessionLocal()
     try:
         db.add(
             MetaPixelConfig(
-                loja_slug=LOJA,
+                loja_slug=loja_slug,
                 pixel_id=pixel_id,
                 token_ciphertext=cifrar(token),
                 test_event_code="TESTCODE",
@@ -78,6 +84,14 @@ def _configurar_meta(*, purchase=True, pixel_id="1234567890", token="tok-capi"):
             )
         )
         db.commit()
+    finally:
+        db.close()
+
+
+def _processar_outbox(loja_slug=LOJA):
+    db = SessionLocal()
+    try:
+        return processar_outbox_pendentes(db, loja_slug)
     finally:
         db.close()
 
@@ -298,6 +312,7 @@ def test_venda_confirmada_dispara_capi_purchase(client, monkeypatch):
     assert resposta.status_code == 200, resposta.text
     assert resposta.json()["ok"] is True
     assert resposta.json()["idempotent"] is False
+    _processar_outbox()
 
     db = SessionLocal()
     try:
@@ -340,6 +355,7 @@ def test_falha_capi_nao_quebra_evento_de_venda(client, monkeypatch):
     )
     assert resposta.status_code == 200, resposta.text
     assert resposta.json()["ok"] is True
+    _processar_outbox()
 
     db = SessionLocal()
     try:
@@ -352,6 +368,20 @@ def test_falha_capi_nao_quebra_evento_de_venda(client, monkeypatch):
         assert "access_token" not in outbox.last_error
     finally:
         db.close()
+
+
+def test_falha_ao_persistir_outbox_faz_portal_retentar(client, monkeypatch):
+    headers = _headers_servico(monkeypatch)
+    monkeypatch.setattr("app.api_v1.enfileirar_purchase", lambda *a, **k: None)
+
+    resposta = client.post(
+        f"/v1/lojas/{LOJA}/eventos/venda-confirmada",
+        json={"venda_id": "venda-sem-outbox", "valor": "1000.00"},
+        headers=headers,
+    )
+
+    assert resposta.status_code == 503
+    assert "persistir" in resposta.json()["detail"]
 
 
 def test_purchase_desligado_nao_envia_capi(client, monkeypatch):
@@ -376,12 +406,10 @@ def test_purchase_desligado_nao_envia_capi(client, monkeypatch):
 
     db = SessionLocal()
     try:
-        # Divergência vs. portal: aqui a API grava um marcador `skipped`
-        # (idempotência futura) em vez de não criar linha nenhuma.
         outbox = db.query(MetaCapiOutbox).one()
-        assert outbox.status == "skipped"
+        assert outbox.status == "blocked_config"
         assert outbox.attempts == 0
-        assert json.loads(outbox.payload_json)["reason"] == "sem_config_capi"
+        assert json.loads(outbox.payload_json)["data"][0]["event_name"] == "Purchase"
     finally:
         db.close()
 
@@ -405,6 +433,7 @@ def test_venda_confirmada_ctwa_e_idempotente(client, monkeypatch):
     r1 = client.post(
         f"/v1/lojas/{LOJA}/eventos/venda-confirmada", json=payload, headers=headers
     )
+    _processar_outbox()
     r2 = client.post(
         f"/v1/lojas/{LOJA}/eventos/venda-confirmada", json=payload, headers=headers
     )
@@ -424,14 +453,41 @@ def test_venda_confirmada_ctwa_e_idempotente(client, monkeypatch):
     assert r2.json()["idempotent"] is True
 
 
-def test_venda_sem_config_capi_reenviada_apos_configurar_pixel(client, monkeypatch):
-    """Marcador `skipped` não pode virar 'já enviado'.
+def test_mesmo_event_id_em_lojas_diferentes_nao_colide(client, monkeypatch):
+    headers = _headers_servico(monkeypatch)
+    _configurar_meta()
+    _configurar_meta(loja_slug="loja-dois", pixel_id="9876543210")
+    payload = {
+        "venda_id": "venda-compartilhada",
+        "event_id": "purchase-id-externo-igual",
+        "valor": "500.00",
+    }
 
-    Venda confirmada ANTES de a loja configurar o Pixel/CAPI grava um marcador
-    `skipped` (que `processar_outbox_pendentes` nunca reprocessa). Quando a loja
-    configura o Pixel e a venda é reenviada, o Purchase precisa ser enfileirado
-    de verdade — não devolver idempotent=True sem fazer nada.
-    """
+    primeira = client.post(
+        f"/v1/lojas/{LOJA}/eventos/venda-confirmada",
+        json=payload,
+        headers=headers,
+    )
+    segunda = client.post(
+        "/v1/lojas/loja-dois/eventos/venda-confirmada",
+        json=payload,
+        headers=headers,
+    )
+
+    assert primeira.status_code == 200 and segunda.status_code == 200
+    assert primeira.json()["idempotent"] is False
+    assert segunda.json()["idempotent"] is False
+    db = SessionLocal()
+    try:
+        itens = db.query(MetaCapiOutbox).order_by(MetaCapiOutbox.loja_slug).all()
+        assert len(itens) == 2
+        assert {item.loja_slug for item in itens} == {LOJA, "loja-dois"}
+    finally:
+        db.close()
+
+
+def test_venda_sem_config_capi_e_entregue_apos_configurar_pixel(client, monkeypatch):
+    """Venda anterior à configuração fica durável e o worker a entrega depois."""
     headers = _headers_servico(monkeypatch)
 
     envios = {"n": 0}
@@ -445,7 +501,7 @@ def test_venda_sem_config_capi_reenviada_apos_configurar_pixel(client, monkeypat
     payload = {"venda_id": "venda-tardia", "valor": "1500.00"}
     url = f"/v1/lojas/{LOJA}/eventos/venda-confirmada"
 
-    # 1) loja ainda sem Pixel/CAPI: nada é enviado, fica só o marcador.
+    # 1) loja ainda sem Pixel/CAPI: o payload fica bloqueado, mas durável.
     r1 = client.post(url, json=payload, headers=headers)
     assert r1.status_code == 200, r1.text
     assert r1.json()["idempotent"] is False
@@ -453,17 +509,18 @@ def test_venda_sem_config_capi_reenviada_apos_configurar_pixel(client, monkeypat
 
     db = SessionLocal()
     try:
-        marcador = db.query(MetaCapiOutbox).one()
-        assert marcador.event_id == "purchase-venda-tardia"
-        assert marcador.status == "skipped"
+        outbox = db.query(MetaCapiOutbox).one()
+        assert outbox.event_id == "purchase-venda-tardia"
+        assert outbox.status == "blocked_config"
     finally:
         db.close()
 
-    # 2) loja configura o Pixel/CAPI e a mesma venda é reenviada.
+    # 2) após configurar o Pixel/CAPI, o worker entrega sem repost da venda.
     _configurar_meta()
+    _processar_outbox()
     r2 = client.post(url, json=payload, headers=headers)
     assert r2.status_code == 200, r2.text
-    assert r2.json()["idempotent"] is False
+    assert r2.json()["idempotent"] is True
     assert envios["n"] == 1
 
     db = SessionLocal()
@@ -488,14 +545,8 @@ def test_venda_sem_config_capi_reenviada_apos_configurar_pixel(client, monkeypat
         db.close()
 
 
-def test_marcador_skipped_ctwa_nao_bloqueia_purchase_apos_configurar(client, monkeypatch):
-    """Mesmo cenário no caminho CTWA.
-
-    O marcador `skipped` é gravado com o event_id puro (é comum aos dois
-    caminhos, ver tests/test_ctwa_match_e_messaging.py), mas não pode ser
-    confundido com envio: depois de configurar o Pixel o reenvio precisa
-    enfileirar o Purchase messaging (event_id com sufixo '-msg').
-    """
+def test_purchase_ctwa_bloqueado_e_entregue_apos_configurar(client, monkeypatch):
+    """O caminho CTWA também preserva o payload até a configuração existir."""
     headers = _headers_servico(monkeypatch)
 
     envios = {"n": 0}
@@ -515,16 +566,17 @@ def test_marcador_skipped_ctwa_nao_bloqueia_purchase_apos_configurar(client, mon
 
     db = SessionLocal()
     try:
-        marcador = db.query(MetaCapiOutbox).one()
-        assert marcador.event_id == "purchase-venda-ctwa-tardia"
-        assert marcador.status == "skipped"
+        outbox = db.query(MetaCapiOutbox).one()
+        assert outbox.event_id == "purchase-venda-ctwa-tardia-msg"
+        assert outbox.status == "blocked_config"
     finally:
         db.close()
 
     _configurar_meta()
+    _processar_outbox()
     r2 = client.post(url, json=payload, headers=headers)
     assert r2.status_code == 200, r2.text
-    assert r2.json()["idempotent"] is False
+    assert r2.json()["idempotent"] is True
     assert envios["n"] == 1
 
     db = SessionLocal()
@@ -652,6 +704,53 @@ def test_retry_automatico_respeita_backoff(client, monkeypatch):
     assert devido["processados"] == 1
     assert devido["entregues"] == 1
     assert chamadas == ["purchase-auto-retry"]
+
+
+def test_retry_automatico_respeita_lease_e_recupera_item_abandonado(monkeypatch):
+    instante = datetime(2026, 7, 23, 12, 0, tzinfo=timezone.utc)
+    db = SessionLocal()
+    try:
+        db.add(
+            MetaCapiOutbox(
+                loja_slug=LOJA,
+                event_id="purchase-auto-lease",
+                event_name="Purchase",
+                payload_json=json.dumps(
+                    montar_payload_purchase(event_id="purchase-auto-lease", value="10")
+                ),
+                status="processing",
+                attempts=0,
+                atualizada_em=instante,
+            )
+        )
+        db.commit()
+    finally:
+        db.close()
+
+    chamadas = []
+
+    def fake_tentar(db, item, config=None):
+        chamadas.append(item.event_id)
+        item.status = "delivered"
+        db.commit()
+        return True
+
+    monkeypatch.setattr("app.meta_capi.tentar_enviar_outbox", fake_tentar)
+    ocupado = processar_outbox_automatico(
+        SessionLocal,
+        instante=instante + timedelta(seconds=30),
+        lease_seconds=60,
+    )
+    assert ocupado["processados"] == 0
+    assert ocupado["aguardando_lease"] == 1
+
+    recuperado = processar_outbox_automatico(
+        SessionLocal,
+        instante=instante + timedelta(seconds=61),
+        lease_seconds=60,
+    )
+    assert recuperado["entregues"] == 1
+    assert chamadas == ["purchase-auto-lease"]
 
 
 def test_worker_capi_desligado_nao_cria_thread():

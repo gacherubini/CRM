@@ -20,6 +20,7 @@ from app import config as config_mod
 from app.campanhas import lead_casa_campanha
 from app.cripto import cifrar
 from app.db import SessionLocal
+from app.meta_capi import processar_outbox_pendentes
 from app.meta_capi_messaging import (
     enfileirar_purchase_messaging,
     montar_payload_purchase_messaging,
@@ -95,6 +96,14 @@ def _outbox(event_id: str) -> MetaCapiOutbox | None:
             .filter(MetaCapiOutbox.event_id == event_id)
             .first()
         )
+    finally:
+        db.close()
+
+
+def _processar(loja_slug: str = "loja-demo") -> None:
+    db = SessionLocal()
+    try:
+        processar_outbox_pendentes(db, loja_slug)
     finally:
         db.close()
 
@@ -205,18 +214,17 @@ def test_enfileirar_messaging_noop_sem_ctwa_clid(client, capi_http):
 def test_enfileirar_messaging_noop_sem_config_capi(client, capi_http):
     db = SessionLocal()
     try:
-        assert (
-            enfileirar_purchase_messaging(
-                db,
-                loja_slug="loja-sem-pixel",
-                venda_id="v1",
-                event_id="purchase-v1-msg",
-                value=Decimal("100"),
-                ctwa_clid="ARA1",
-            )
-            is None
+        outbox = enfileirar_purchase_messaging(
+            db,
+            loja_slug="loja-sem-pixel",
+            venda_id="v1",
+            event_id="purchase-v1-msg",
+            value=Decimal("100"),
+            ctwa_clid="ARA1",
         )
-        assert db.query(MetaCapiOutbox).count() == 0
+        assert outbox is not None
+        assert outbox.status == "blocked_config"
+        assert db.query(MetaCapiOutbox).count() == 1
     finally:
         db.close()
     assert capi_http == []
@@ -226,18 +234,17 @@ def test_enfileirar_messaging_noop_com_purchase_desligado(client, capi_http):
     _configurar_pixel(enviar_purchase=False)
     db = SessionLocal()
     try:
-        assert (
-            enfileirar_purchase_messaging(
-                db,
-                loja_slug="loja-demo",
-                venda_id="v1",
-                event_id="purchase-v1-msg",
-                value=Decimal("100"),
-                ctwa_clid="ARA1",
-            )
-            is None
+        outbox = enfileirar_purchase_messaging(
+            db,
+            loja_slug="loja-demo",
+            venda_id="v1",
+            event_id="purchase-v1-msg",
+            value=Decimal("100"),
+            ctwa_clid="ARA1",
         )
-        assert db.query(MetaCapiOutbox).count() == 0
+        assert outbox is not None
+        assert outbox.status == "blocked_config"
+        assert db.query(MetaCapiOutbox).count() == 1
     finally:
         db.close()
     assert capi_http == []
@@ -263,6 +270,8 @@ def test_enfileirar_messaging_grava_outbox_envia_e_audita(client, capi_http):
             email="Cliente@Exemplo.COM",
         )
         assert outbox is not None
+        _processar()
+        db.refresh(outbox)
         assert outbox.status == "delivered"
         assert outbox.last_http_status == 200
 
@@ -309,6 +318,7 @@ def test_enfileirar_messaging_idempotente_por_event_id(client, capi_http):
         assert db.query(MetaCapiOutbox).count() == 1
     finally:
         db.close()
+    _processar()
     assert len(capi_http) == 1
 
 
@@ -331,6 +341,8 @@ def test_enfileirar_messaging_nao_propaga_falha_de_envio(client, monkeypatch):
             ctwa_clid="ARA1",
         )
         assert outbox is not None
+        _processar()
+        db.refresh(outbox)
         assert outbox.status == "failed"
         assert outbox.attempts == 1
         assert outbox.last_error == "Falha de rede ao contatar a Meta."
@@ -360,6 +372,7 @@ def test_venda_confirmada_com_ctwa_clid_usa_messaging(
     )
     assert r.status_code == 200, r.text
     assert r.json()["ok"] is True
+    _processar()
 
     outbox = _outbox("purchase-venda-1-msg")
     assert outbox is not None, "messaging deve usar event_id com sufixo -msg"
@@ -383,6 +396,7 @@ def test_venda_confirmada_sem_ctwa_clid_usa_web(client, headers_servico, capi_ht
         headers=headers_servico,
     )
     assert r.status_code == 200, r.text
+    _processar()
 
     assert _outbox("purchase-venda-2-msg") is None
     outbox = _outbox("purchase-venda-2")
@@ -394,7 +408,7 @@ def test_venda_confirmada_sem_ctwa_clid_usa_web(client, headers_servico, capi_ht
     assert len(capi_http) == 1
 
 
-def test_venda_confirmada_ctwa_sem_config_grava_skipped(
+def test_venda_confirmada_ctwa_sem_config_fica_bloqueada(
     client, headers_servico, capi_http
 ):
     r = client.post(
@@ -408,10 +422,10 @@ def test_venda_confirmada_ctwa_sem_config_grava_skipped(
     )
     assert r.status_code == 200, r.text
 
-    outbox = _outbox("purchase-venda-3")
+    outbox = _outbox("purchase-venda-3-msg")
     assert outbox is not None
-    assert outbox.status == "skipped"
-    assert json.loads(outbox.payload_json)["reason"] == "sem_config_capi"
+    assert outbox.status == "blocked_config"
+    assert json.loads(outbox.payload_json)["data"][0]["user_data"]["ctwa_clid"] == "ARA-x"
     assert capi_http == []
 
 
@@ -437,6 +451,7 @@ def test_venda_confirmada_com_ctwa_nao_duplica_outbox(
     )
     assert r1.status_code == 200 and r2.status_code == 200, r2.text
     assert r1.json()["outbox_id"] == r2.json()["outbox_id"]
+    _processar()
 
     db = SessionLocal()
     try:

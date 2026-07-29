@@ -14,13 +14,14 @@ from fastapi import Body, Depends, FastAPI, Header, HTTPException, Query, Reques
 from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ConfigDict, Field, model_validator
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 from starlette.middleware.sessions import SessionMiddleware
 
 from app import config, models_db, servico  # noqa: F401 (registra os modelos)
 from app.admin import router as admin_router
 from app.auth import Contexto, get_contexto
-from app.db import Base, engine, get_db
+from app.db import get_db
 from app import media
 
 app = FastAPI(title="Estoque API")
@@ -66,10 +67,6 @@ async def limitar_api_publica(request: Request, call_next):
     resposta.headers["X-RateLimit-Limit"] = str(limite)
     resposta.headers["X-RateLimit-Remaining"] = str(max(limite - usados, 0))
     return resposta
-
-if os.getenv("ESTOQUE_SKIP_INIT") != "1":
-    Base.metadata.create_all(bind=engine)
-
 
 class VeiculoInput(BaseModel):
     tipo: str
@@ -148,7 +145,8 @@ def live():
 
 
 @app.get("/health/ready")
-def ready():
+def ready(db: Session = Depends(get_db)):
+    db.execute(text("SELECT 1 FROM idempotencias_criacao_veiculo LIMIT 1"))
     return {"status": "ok"}
 
 

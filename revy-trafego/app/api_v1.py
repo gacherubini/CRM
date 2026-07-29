@@ -1,7 +1,7 @@
 """API v1 serviço: resultados de mídia e eventos de venda."""
 from __future__ import annotations
 
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 from typing import Any
 
@@ -16,12 +16,11 @@ from app.db import get_db
 from app.financeiro_calc import calcular_metricas_vendas, hoje_portal, periodo_padrao
 from app.meta_capi import enfileirar_purchase
 from app.meta_capi_messaging import enfileirar_purchase_messaging
-from app.models import Campanha, CampanhaGasto, MetaCapiOutbox, agora, novo_id
+from app.models import Campanha, CampanhaGasto, MetaCapiOutbox, agora
 from app.resultados import resumo_periodo
 from app.roi_calc import calcular_roi_loja, totais_roi
 from app.service_auth import exigir_service_token
-import json
-
+from app.vendas_projection import VendaSnapshot, projetar_venda
 router = APIRouter(prefix="/v1", tags=["v1"])
 
 
@@ -66,10 +65,10 @@ def _serializar_linha(linha) -> dict[str, Any]:
     }
 
 
-def get_chatbot() -> ChatbotClient:
+def get_chatbot(loja_slug: str) -> ChatbotClient:
     return ChatbotClient(
         settings.chatbot_url,
-        settings.chatbot_token,
+        settings.chatbot_token_para(loja_slug),
         settings.request_timeout,
     )
 
@@ -96,7 +95,7 @@ def api_resultados(
     leads: list[dict] = []
     chatbot_offline = False
     try:
-        leads = get_chatbot().listar_leads()
+        leads = get_chatbot(slug).listar_leads()
     except ChatbotIndisponivel:
         chatbot_offline = True
 
@@ -164,19 +163,95 @@ def api_resultados(
     }
 
 
-class VendaConfirmadaBody(BaseModel):
+class VendaSnapshotBody(BaseModel):
     venda_id: str
     lead_ref: str | None = None
     valor: str | float | Decimal
     moeda: str = "BRL"
+    status: str = "confirmada"
+    criada_em: datetime | None = None
+    confirmada_em: datetime | None = None
+    atualizada_em: datetime | None = None
+    custo_veiculo: str | float | Decimal | None = None
+    custos_diretos_total: str | float | Decimal = Decimal("0")
+    campanha_id_first: str | None = None
+    campanha_id_last: str | None = None
+    utm_campaign_first: str | None = None
+    utm_campaign_last: str | None = None
+
+
+class VendaConfirmadaBody(VendaSnapshotBody):
     event_id: str | None = None
     cliente_telefone: str | None = None
     cliente_email: str | None = None
     fbclid: str | None = None
     fbc: str | None = None
     ctwa_clid: str | None = None
-    campanha_id_first: str | None = None
-    campanha_id_last: str | None = None
+
+
+def _snapshot(
+    loja_slug: str,
+    body: VendaSnapshotBody,
+    *,
+    status: str | None = None,
+) -> VendaSnapshot:
+    instante = body.atualizada_em or body.confirmada_em or datetime.now(timezone.utc)
+    return VendaSnapshot(
+        venda_id=body.venda_id,
+        loja_slug=loja_slug,
+        status=status or body.status,
+        valor=Decimal(str(body.valor)),
+        atualizada_em=instante,
+        lead_ref=body.lead_ref,
+        criada_em=body.criada_em,
+        confirmada_em=body.confirmada_em,
+        custo_veiculo=(
+            Decimal(str(body.custo_veiculo))
+            if body.custo_veiculo is not None
+            else None
+        ),
+        custos_diretos_total=Decimal(str(body.custos_diretos_total or 0)),
+        campanha_id_first=body.campanha_id_first,
+        campanha_id_last=body.campanha_id_last,
+        utm_campaign_first=body.utm_campaign_first,
+        utm_campaign_last=body.utm_campaign_last,
+    )
+
+
+@router.post("/lojas/{loja_slug}/eventos/venda-atualizada")
+def api_venda_atualizada(
+    loja_slug: str,
+    body: VendaSnapshotBody,
+    db: Session = Depends(get_db),
+    _: None = Depends(exigir_service_token),
+):
+    """Atualiza a projecao de ROI sem disparar efeitos externos."""
+    slug = (loja_slug or "").strip()
+    if not slug or body.status not in {"confirmada", "cancelada"}:
+        return JSONResponse({"detail": "evento de venda invalido"}, status_code=400)
+    resultado = projetar_venda(db, _snapshot(slug, body))
+    if body.status == "cancelada":
+        pendentes = (
+            db.query(MetaCapiOutbox)
+            .filter(
+                MetaCapiOutbox.loja_slug == slug,
+                MetaCapiOutbox.venda_id == body.venda_id,
+                MetaCapiOutbox.status.in_(
+                    ("pending", "failed", "blocked_config", "processing", "skipped")
+                ),
+            )
+            .all()
+        )
+        for item in pendentes:
+            item.status = "cancelled"
+            item.last_error = "venda cancelada no Portal"
+            item.atualizada_em = agora()
+    db.commit()
+    return {
+        "ok": True,
+        "venda_id": body.venda_id,
+        "projecao": resultado.motivo,
+    }
 
 
 @router.post("/lojas/{loja_slug}/eventos/venda-confirmada")
@@ -191,6 +266,18 @@ def api_venda_confirmada(
     if not slug:
         return JSONResponse({"detail": "loja_slug inválido"}, status_code=400)
 
+    projecao = projetar_venda(db, _snapshot(slug, body, status="confirmada"))
+    db.commit()
+    # Um cancelamento mais novo nao pode ser revertido por retry atrasado da
+    # confirmacao, nem voltar a disparar Purchase.
+    if not projecao.aplicada and projecao.venda.status != "confirmada":
+        return {
+            "ok": True,
+            "outbox_id": None,
+            "idempotent": True,
+            "projecao": projecao.motivo,
+        }
+
     event_id = (body.event_id or f"purchase-{body.venda_id}").strip()
     ctwa = (body.ctwa_clid or "").strip()
     # O caminho messaging grava a outbox com sufixo "-msg": a idempotência tem
@@ -201,34 +288,18 @@ def api_venda_confirmada(
     else:
         event_id_efetivo = event_id
 
-    # O marcador de "sem config CAPI" é sempre gravado com o event_id puro
-    # (serve aos dois caminhos), então a busca considera os dois ids: o do
-    # caminho atual e o puro.
     ids_possiveis = [event_id_efetivo]
-    if event_id not in ids_possiveis:
-        ids_possiveis.append(event_id)
     linhas = (
         db.query(MetaCapiOutbox)
-        .filter(MetaCapiOutbox.event_id.in_(ids_possiveis))
+        .filter(
+            MetaCapiOutbox.loja_slug == slug,
+            MetaCapiOutbox.event_id.in_(ids_possiveis),
+        )
         .all()
     )
-    por_id = {linha.event_id: linha for linha in linhas}
-    # Só conta como "já enviado" quem virou evento de verdade; um marcador
-    # "skipped" significa que o Purchase nunca chegou ao Meta.
-    for candidato in ids_possiveis:
-        linha = por_id.get(candidato)
-        if linha is not None and linha.status != "skipped":
-            return {"ok": True, "outbox_id": linha.id, "idempotent": True}
-
-    marcadores = [linha for linha in linhas if linha.status == "skipped"]
-    # Se a loja configurou o Pixel/CAPI depois, o reenvio tem que enfileirar de
-    # verdade. Removemos o marcador para não bloquear a dedupe interna do
-    # enfileirar (event_id é único) — se continuar sem config, é regravado abaixo.
-    marcador_id = marcadores[0].id if marcadores else None
-    if marcadores:
-        for marcador in marcadores:
-            db.delete(marcador)
-        db.commit()
+    if linhas:
+        linha = linhas[0]
+        return {"ok": True, "outbox_id": linha.id, "idempotent": True}
 
     lead = {
         "telefone": body.cliente_telefone,
@@ -248,6 +319,7 @@ def api_venda_confirmada(
             ctwa_clid=ctwa,
             phone=body.cliente_telefone,
             email=body.cliente_email,
+            event_time=body.confirmada_em,
         )
     else:
         outbox = enfileirar_purchase(
@@ -258,30 +330,13 @@ def api_venda_confirmada(
             value=body.valor,
             currency=body.moeda or "BRL",
             lead=lead,
+            event_time=body.confirmada_em,
         )
-    # Continua sem config CAPI: regrava o marcador skipped (event_id puro, comum
-    # aos dois caminhos) para não perder o rastro da venda.
     if outbox is None:
-        outbox = MetaCapiOutbox(
-            id=marcador_id or novo_id(),
-            loja_slug=slug,
-            venda_id=body.venda_id,
-            event_id=event_id,
-            event_name="Purchase",
-            payload_json=json.dumps({"skipped": True, "reason": "sem_config_capi"}),
-            status="skipped",
-            attempts=0,
-            criada_em=agora(),
-            atualizada_em=agora(),
+        return JSONResponse(
+            {"detail": "nao foi possivel persistir o evento de venda"},
+            status_code=503,
         )
-        db.add(outbox)
-        db.commit()
-        # Nada mudou desde a chamada anterior: segue idempotente para o caller.
-        return {
-            "ok": True,
-            "outbox_id": outbox.id,
-            "idempotent": marcador_id is not None,
-        }
     db.commit()
     return {
         "ok": True,

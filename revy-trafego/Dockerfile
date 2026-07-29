@@ -3,5 +3,7 @@ WORKDIR /srv
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 COPY app ./app
+COPY alembic ./alembic
+COPY alembic.ini .
 COPY pytest.ini .
-CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port 9010 --proxy-headers --forwarded-allow-ips=*"]
+CMD ["sh", "-c", "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 9010 --proxy-headers --forwarded-allow-ips=*"]

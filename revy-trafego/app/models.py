@@ -53,46 +53,44 @@ class GestorAuditLog(Base):
     em: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=agora, index=True)
 
 
-# --- Tabelas compartilhadas com portal-gestao (mesmos nomes) ---
+class VendaProjetada(Base):
+    """Snapshot de venda recebido do Portal; fonte local para ROI no Revy."""
 
+    __tablename__ = "vendas_projetadas"
 
-class Venda(Base):
-    __tablename__ = "vendas"
-
-    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=novo_id)
-    loja_slug: Mapped[str] = mapped_column(String(120), index=True)
-    lead_ref: Mapped[Optional[str]] = mapped_column(String(120), nullable=True)
-    vendedor_email: Mapped[str] = mapped_column(String(320), index=True)
-    veiculo_ref: Mapped[Optional[str]] = mapped_column(String(120), nullable=True)
-    descricao: Mapped[str] = mapped_column(String(240))
-    preco_venda: Mapped[Decimal] = mapped_column(Numeric(12, 2))
-    custo_veiculo: Mapped[Optional[Decimal]] = mapped_column(Numeric(12, 2), nullable=True)
-    status: Mapped[str] = mapped_column(String(20), default="registrada", index=True)
-    motivo_cancelamento: Mapped[Optional[str]] = mapped_column(String(240), nullable=True)
-    criada_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=agora)
-    atualizada_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=agora)
-    confirmada_por: Mapped[Optional[str]] = mapped_column(String(320), nullable=True)
-    confirmada_em: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
-    campanha_id_first: Mapped[Optional[str]] = mapped_column(String(36), nullable=True, index=True)
-    campanha_id_last: Mapped[Optional[str]] = mapped_column(String(36), nullable=True, index=True)
-    utm_campaign_first: Mapped[Optional[str]] = mapped_column(String(120), nullable=True)
-    utm_campaign_last: Mapped[Optional[str]] = mapped_column(String(120), nullable=True)
-
-    custos_diretos: Mapped[list["VendaCustoDireto"]] = relationship(
-        back_populates="venda", cascade="all, delete-orphan"
+    # O id do Portal e estavel e torna a projecao naturalmente idempotente.
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    loja_slug: Mapped[str] = mapped_column(
+        String(120), primary_key=True, index=True
     )
-
-
-class VendaCustoDireto(Base):
-    __tablename__ = "venda_custos_diretos"
-
-    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=novo_id)
-    venda_id: Mapped[str] = mapped_column(ForeignKey("vendas.id"), index=True)
-    categoria: Mapped[str] = mapped_column(String(20))
-    valor: Mapped[Decimal] = mapped_column(Numeric(12, 2))
-    criada_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=agora)
-
-    venda: Mapped["Venda"] = relationship(back_populates="custos_diretos")
+    lead_ref: Mapped[Optional[str]] = mapped_column(String(120), nullable=True)
+    preco_venda: Mapped[Decimal] = mapped_column(Numeric(12, 2))
+    custo_veiculo: Mapped[Optional[Decimal]] = mapped_column(
+        Numeric(12, 2), nullable=True
+    )
+    custos_diretos_total: Mapped[Decimal] = mapped_column(
+        Numeric(12, 2), default=Decimal("0")
+    )
+    status: Mapped[str] = mapped_column(String(20), index=True)
+    criada_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    confirmada_em: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    atualizada_em: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), index=True
+    )
+    campanha_id_first: Mapped[Optional[str]] = mapped_column(
+        String(36), nullable=True, index=True
+    )
+    campanha_id_last: Mapped[Optional[str]] = mapped_column(
+        String(36), nullable=True, index=True
+    )
+    utm_campaign_first: Mapped[Optional[str]] = mapped_column(
+        String(120), nullable=True
+    )
+    utm_campaign_last: Mapped[Optional[str]] = mapped_column(
+        String(120), nullable=True
+    )
 
 
 class MetaPixelConfig(Base):
@@ -156,11 +154,18 @@ class PixelCapiAuditoria(Base):
 
 class MetaCapiOutbox(Base):
     __tablename__ = "meta_capi_outbox"
+    __table_args__ = (
+        UniqueConstraint(
+            "loja_slug",
+            "event_id",
+            name="uq_meta_capi_outbox_loja_event_id",
+        ),
+    )
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=novo_id)
     loja_slug: Mapped[str] = mapped_column(String(120), index=True)
     venda_id: Mapped[Optional[str]] = mapped_column(String(36), nullable=True, index=True)
-    event_id: Mapped[str] = mapped_column(String(120), unique=True, index=True)
+    event_id: Mapped[str] = mapped_column(String(120), index=True)
     event_name: Mapped[str] = mapped_column(String(40), default="Purchase")
     payload_json: Mapped[str] = mapped_column(String(4000))
     status: Mapped[str] = mapped_column(String(20), default="pending", index=True)

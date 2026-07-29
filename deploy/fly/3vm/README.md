@@ -22,6 +22,15 @@ para Acessos bancos.
 **Ainda operacional (não de deploy):** credencial Gemini no n8n (UI); E2E estável de 1ª
 conversa; transcritor de áudio real (hoje fallback para texto).
 
+### Revy Tráfego — Fase 3
+
+- Portal e Revy têm bancos SQLite separados no mesmo volume persistente:
+  `/data/portal/portal.db` e `/data/revy-trafego/revy_trafego.db`.
+- O Portal publica confirmação/cancelamento por outbox criptografado; o Revy materializa
+  `vendas_projetadas` e calcula ROI sem ler tabelas do Portal.
+- O entrypoint executa Alembic de Chatbot, Estoque, Motor, Portal e Revy em modo fail-fast.
+- O health agregado exige resposta 2xx de Chatbot, Estoque, Portal e Revy.
+
 ## Realidade operacional (atual)
 
 Apps monólito legados (`portal2037`, `catalogo2037`, `estoque2037`,
@@ -127,9 +136,13 @@ ainda não escolheram um grupo.
 6. Portal login + listagem básica + Acessos bancos (com `MOTOR_ENCRYPTION_KEY`).
 7. Simulação **mock** 2xx sem subir worker Playwright.
 8. Always-on machines started; workers Playwright stopped fora de job.
-9. Health: `https://app2037.fly.dev/health` (e paths nginx do bundle).
+9. Health agregado: `https://app2037.fly.dev/healthz`; Revy:
+   `https://app2037.fly.dev/trafego/health/ready`.
 
 ## Deploy (raiz do repo)
+
+Antes do deploy que altera schema, crie snapshot do volume do `app2037` e confira os secrets pelo
+nome (nunca imprima valores). O deploy do bundle roda todas as migrações antes de iniciar serviços.
 
 ```bash
 # 1) App bundle (motor-api + n8n + …)
@@ -262,6 +275,15 @@ workers no app `motor2037`:
 | `MOTOR_MAX_BROWSER_WORKERS=2` | opcional | teto de Playwrights simultâneos |
 | `MOTOR_FLY_START_BURST` | opcional | default alinhado ao teto |
 | demais (`CHATBOT_*`, `ESTOQUE_*`, portal, n8n) | secret | ver `env.example` |
+
+Para o Revy no bundle:
+
+| Env/secret | Notas |
+|---|---|
+| `REVY_TRAFEGO_DATABASE_URL` | default canônico `sqlite:////data/revy-trafego/revy_trafego.db` |
+| `REVY_TRAFEGO_SERVICE_TOKEN` | autentica Portal → Revy |
+| `REVY_TRAFEGO_CHATBOT_TOKENS_JSON` | recomendado em multi-loja; JSON `loja_slug → token` |
+| `CHATBOT_API_TOKEN` + `REVY_TRAFEGO_LOJAS` | compatibilidade segura quando existe exatamente uma loja |
 
 No `fly.app.toml` o processo motor já roda com `MOTOR_ORCHESTRATOR_ONLY=1` e
 `MOTOR_WORKER_TIPOS=api,mock` (mock/API **não** sobem VM 4).

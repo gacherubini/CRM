@@ -13,12 +13,13 @@ from fastapi.exception_handlers import request_validation_exception_handler
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app import config, models_db, operacao, servico  # noqa: F401 (registra os modelos)
 from app.audio import AudioProcessor, get_audio_processor
 from app.auth import Contexto, get_contexto, verificar_webhook_token
-from app.db import Base, engine, get_db
+from app.db import get_db
 from app.inventory import (
     InventoryProvider,
     InventoryWriteClient,
@@ -40,10 +41,6 @@ app = FastAPI(title="Chatbot API")
 app.add_middleware(WebhookPayloadLimitMiddleware)
 
 EtapaLead = Literal["novo", "em_atendimento", "qualificado", "convertido", "perdido"]
-
-if os.getenv("CHATBOT_SKIP_INIT") != "1":
-    Base.metadata.create_all(bind=engine)
-
 
 @app.exception_handler(RequestValidationError)
 async def erro_validacao_request(request: Request, exc: RequestValidationError):
@@ -316,7 +313,8 @@ def live():
 
 
 @app.get("/health/ready")
-def ready():
+def ready(db: Session = Depends(get_db)):
+    db.execute(text("SELECT 1 FROM grupos_estoque LIMIT 1"))
     return {"status": "ok"}
 
 

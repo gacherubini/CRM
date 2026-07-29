@@ -1,4 +1,5 @@
 import os
+import json
 from dataclasses import dataclass
 
 
@@ -6,7 +7,7 @@ from dataclasses import dataclass
 class Settings:
     database_url: str = os.getenv(
         "REVY_TRAFEGO_DATABASE_URL",
-        os.getenv("PORTAL_DATABASE_URL", "sqlite:///./revy_trafego.db"),
+        "sqlite:///./revy_trafego.db",
     )
     session_secret: str = os.getenv("REVY_TRAFEGO_SESSION_SECRET", "dev-trafego-troque")
     encryption_key: str = (
@@ -16,6 +17,12 @@ class Settings:
     secure_cookie: bool = os.getenv("REVY_TRAFEGO_SECURE_COOKIE", "0") == "1"
     chatbot_url: str = os.getenv("CHATBOT_API_URL", "http://chatbot-api:8000")
     chatbot_token: str = os.getenv("CHATBOT_API_TOKEN", "")
+    chatbot_token_loja: str = os.getenv(
+        "REVY_TRAFEGO_CHATBOT_TOKEN_LOJA", ""
+    ).strip()
+    chatbot_tokens_json: str = os.getenv(
+        "REVY_TRAFEGO_CHATBOT_TOKENS_JSON", ""
+    ).strip()
     request_timeout: float = float(os.getenv("REVY_TRAFEGO_HTTP_TIMEOUT", "5"))
     request_retries: int = int(os.getenv("REVY_TRAFEGO_HTTP_RETRIES", "1"))
     request_retry_backoff: float = float(
@@ -51,6 +58,28 @@ class Settings:
         if not raw.startswith("/"):
             raw = "/" + raw
         return raw.rstrip("/")
+
+    def chatbot_token_para(self, loja_slug: str) -> str:
+        """Resolve credencial por loja; falha fechado se o escopo for ambiguo."""
+        slug = (loja_slug or "").strip()
+        if self.chatbot_tokens_json:
+            try:
+                tokens = json.loads(self.chatbot_tokens_json)
+            except (TypeError, ValueError):
+                return ""
+            if isinstance(tokens, dict):
+                return str(tokens.get(slug) or "").strip()
+            return ""
+        if self.chatbot_token_loja:
+            return self.chatbot_token if self.chatbot_token_loja == slug else ""
+        lojas = {
+            item.strip()
+            for item in (os.getenv("REVY_TRAFEGO_LOJAS") or "").replace(";", ",").split(",")
+            if item.strip()
+        }
+        if len(lojas) == 1 and slug in lojas:
+            return self.chatbot_token
+        return ""
 
 
 settings = Settings()

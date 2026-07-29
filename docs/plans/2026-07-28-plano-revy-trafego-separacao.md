@@ -1,6 +1,8 @@
 # Plano — Revy Tráfego separado do Portal da loja
 
-> **Status 2026-07-28: FASE 1+2 + DEPLOY + CUTOVER B5 DONE** — UI `https://app2037.fly.dev/trafego`; flags API ON; workers CAPI/spend **só** no Revy Tráfego (`:9010`).  
+> **Status 2026-07-28: FASE 3 IMPLEMENTADA LOCALMENTE, CUTOVER PENDENTE** — banco próprio,
+> projeção de vendas e outbox Portal → Revy prontos; ainda sem commit/deploy. O deploy anterior de
+> Fase 1+2/B5 usava banco compartilhado.
 > Spec: [`docs/superpowers/specs/2026-07-28-revy-trafego-separacao-portal-design.md`](../superpowers/specs/2026-07-28-revy-trafego-separacao-portal-design.md)  
 > App: `revy-trafego/` · README ops (canônico): [`revy-trafego/README.md`](../../revy-trafego/README.md)
 
@@ -41,7 +43,19 @@
 | **1** | [Fase 1](../superpowers/plans/2026-07-28-revy-trafego-fase1-app-multi-loja.md) | Cockpit Revy + cliente sem menus técnicos | **CÓDIGO FEITO** |
 | **2** | [Fase 2](../superpowers/plans/2026-07-28-revy-trafego-fase2-api-cutover.md) | API + flags portal + pixel URL catálogo | **CÓDIGO FEITO** (flags off) |
 | **ops** | **Seção abaixo** + README | Deploy lab + smoke + cutover B1–B5 | **DONE no lab** |
-| **3** | (opcional) | Split DB, atribuição por gestor, audit PII completo | Backlog |
+| **3** | seção abaixo | Split DB, projeção de vendas e outbox criptografado | **CÓDIGO FEITO; CUTOVER PENDENTE** |
+
+## Fase 3 — contrato implementado
+
+- Revy tem Alembic e banco próprios; o Portal não é mais consultado por SQL.
+- Portal grava evento de venda no mesmo commit e um worker o entrega ao Revy.
+- Revy rejeita snapshots antigos e mantém projeção idempotente por `(venda_id, loja_slug)`.
+- CAPI é persistida mesmo sem configuração e enviada somente por worker.
+- Cancelamento mais novo impede confirmação atrasada e terminaliza CAPI ainda pendente.
+- Payload Portal → Revy é cifrado em repouso; retry usa backoff e lease recuperável.
+
+O restante deste runbook descreve o cutover anterior com banco compartilhado e deve ser tratado
+como histórico. Para o novo cutover, usar o checklist do topo de `docs/handoff-contexto.md`.
 
 ### Critério de pronto código (já atendido)
 

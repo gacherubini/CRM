@@ -67,7 +67,11 @@ from app.meta_ads_spend import (
     normalizar_ad_account_id,
     sincronizar_gastos_meta,
 )
-from app import meta_ads_spend_job, meta_capi_job
+from app import meta_ads_spend_job, meta_capi_job, revy_trafego_outbox_job
+from app.revy_trafego_outbox import (
+    enfileirar_venda_atualizada,
+    enfileirar_venda_confirmada,
+)
 from app.campanhas import (
     CANAIS_ROTULO,
     STATUS_ROTULO,
@@ -103,7 +107,7 @@ from app.clients.estoque import (
     VeiculoNaoEncontrado,
 )
 from app.clients.motor import CredencialNaoEncontrada, MotorClient, MotorIndisponivel
-from app.db import Base, SessionLocal, engine, get_db
+from app.db import SessionLocal, get_db
 from app.financeiro_calc import (
     FUSO_PORTAL,
     calcular_metricas_vendas,
@@ -259,11 +263,16 @@ async def _lifespan(_app: FastAPI):
     if os.getenv("PORTAL_SKIP_INIT") != "1":
         meta_ads_spend_job.start_worker(SessionLocal)
         meta_capi_job.start_worker(SessionLocal)
+        revy_trafego_outbox_job.start_worker(
+            SessionLocal,
+            enabled=settings.revy_trafego_venda_events_enabled,
+        )
     try:
         yield
     finally:
         meta_ads_spend_job.stop_worker()
         meta_capi_job.stop_worker()
+        revy_trafego_outbox_job.stop_worker()
 
 
 app = FastAPI(
@@ -280,11 +289,6 @@ app.add_middleware(
     max_age=60 * 60 * 10,
 )
 app.mount("/static", StaticFiles(directory=str(BASE_DIR / "static")), name="static")
-
-if os.getenv("PORTAL_SKIP_INIT") != "1":
-    Base.metadata.create_all(bind=engine)
-
-
 
 @app.middleware("http")
 async def headers_seguranca(request: Request, call_next):
@@ -382,7 +386,7 @@ def health_live():
 
 @app.get("/health/ready")
 def health_ready(db: Session = Depends(get_db)):
-    db.execute(text("SELECT 1"))
+    db.execute(text("SELECT 1 FROM revy_trafego_event_outbox LIMIT 1"))
     return {
         "status": "ok",
         "estoque_configurado": bool(settings.estoque_token),
@@ -2153,6 +2157,9 @@ async def vendas_confirmar(
     venda.atualizada_em = agora()
     if lead:
         aplicar_snapshot_venda(venda, lead, db, usuario.loja_slug)
+    purchase = PurchaseConversion.from_sale(venda, lead)
+    if settings.revy_trafego_venda_events_enabled:
+        enfileirar_venda_confirmada(db, venda, purchase)
     try:
         db.commit()
     except SQLAlchemyError:
@@ -2169,33 +2176,13 @@ async def vendas_confirmar(
         ator_email=usuario.email,
         payload={"venda_id": venda.id, "status": "confirmada"},
     )
-    # Conversões outbound — cada adapter é best-effort e nunca desfaz a venda.
-    purchase = PurchaseConversion.from_sale(venda, lead)
-    publish_conversion(
-        ConversionKind.PURCHASE,
-        purchase,
-        db,
-    )
-    # Fase 2: notifica Revy Tráfego (idempotente). Flag off = no-op.
-    if settings.revy_trafego_venda_events_enabled:
-        from app.clients.revy_trafego import RevyTrafegoClient
-
-        RevyTrafegoClient().notificar_venda_confirmada(
-            loja_slug=usuario.loja_slug,
-            payload={
-                "venda_id": venda.id,
-                "lead_ref": venda.lead_ref,
-                "valor": str(venda.preco_venda),
-                "moeda": "BRL",
-                "event_id": purchase.event_id,
-                "cliente_telefone": purchase.phone,
-                "cliente_email": purchase.email,
-                "fbclid": purchase.fbclid,
-                "fbc": purchase.fbc,
-                "ctwa_clid": purchase.ctwa_clid,
-                "campanha_id_first": venda.campanha_id_first,
-                "campanha_id_last": venda.campanha_id_last,
-            },
+    # Durante o cutover o Revy e o unico dono da CAPI. Com a flag off, o
+    # comportamento legado local permanece intacto.
+    if not settings.revy_trafego_venda_events_enabled:
+        publish_conversion(
+            ConversionKind.PURCHASE,
+            purchase,
+            db,
         )
     return RedirectResponse("/app/vendas?ok=confirmada", status_code=303)
 
@@ -2217,6 +2204,8 @@ async def vendas_cancelar(request: Request, venda_id: str, db: Session = Depends
     venda.status = "cancelada"
     venda.motivo_cancelamento = motivo
     venda.atualizada_em = agora()
+    if settings.revy_trafego_venda_events_enabled:
+        enfileirar_venda_atualizada(db, venda)
     db.commit()
     # Regra segura: cancelar o registro comercial nunca reabre estoque vendido.
     if venda.confirmada_em and venda.veiculo_ref:
