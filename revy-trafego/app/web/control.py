@@ -176,6 +176,20 @@ def create_person(
     return _person_json(person)
 
 
+@router.get("/pessoas")
+def find_person_by_email(
+    email: str,
+    actor: Actor = Depends(_current_actor),
+):
+    try:
+        person = PeopleDirectory(SessionLocal).find_by_email(actor, email)
+        if person is None:
+            raise PersonNotFound("Pessoa Revy não encontrada")
+    except ControlError as exc:
+        _raise_domain_error(exc)
+    return _person_json(person)
+
+
 @router.get("/pessoas/{pessoa_id}")
 def get_person(
     pessoa_id: str,
@@ -384,8 +398,6 @@ def _store_role_json(role: StoreRoleView) -> dict[str, object]:
         "loja_id": role.store_id,
         "pessoa_id": role.person_id,
         "cargo": role.role.value,
-        "origem": role.source,
-        "origem_id": role.source_id,
         "ativo": role.active,
         "iniciado_em": role.started_at.isoformat(),
         "encerrado_em": role.ended_at.isoformat() if role.ended_at else None,

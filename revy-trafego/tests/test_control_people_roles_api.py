@@ -73,6 +73,44 @@ def test_admin_registra_e_consulta_pessoa_sem_expor_acesso_ou_senha(
     assert retrieved.json() == person
 
 
+def test_admin_busca_pessoa_por_email_exato_normalizado(
+    client,
+    monkeypatch,
+):
+    _enable_control(monkeypatch)
+    _login(client, "trafego@revy.local", "secret-teste")
+    person = client.post(
+        "/control/v1/pessoas",
+        json={"nome": "Ana Busca", "email": "ana.busca@example.com"},
+    ).json()
+
+    found = client.get(
+        "/control/v1/pessoas",
+        params={"email": "  ANA.BUSCA@EXAMPLE.COM  "},
+    )
+    missing = client.get(
+        "/control/v1/pessoas",
+        params={"email": "ausente@example.com"},
+    )
+    invalid = client.get(
+        "/control/v1/pessoas",
+        params={"email": "email-invalido"},
+    )
+
+    assert found.status_code == 200
+    assert found.json() == person
+    assert missing.status_code == 404
+    assert missing.json()["detail"] == {
+        "code": "person_not_found",
+        "message": "Pessoa Revy não encontrada",
+    }
+    assert invalid.status_code == 400
+    assert invalid.json()["detail"] == {
+        "code": "invalid_person_email",
+        "message": "e-mail da Pessoa Revy inválido",
+    }
+
+
 def test_admin_atribui_lista_e_revoga_cargos_ativos_da_loja(
     client,
     monkeypatch,
@@ -122,12 +160,17 @@ def test_admin_atribui_lista_e_revoga_cargos_ativos_da_loja(
         "loja_id",
         "pessoa_id",
         "cargo",
-        "origem",
-        "origem_id",
         "ativo",
         "iniciado_em",
         "encerrado_em",
     }
+    for payload in (
+        owner.json(),
+        manager.json(),
+        *listed.json()["items"],
+    ):
+        assert "origem" not in payload
+        assert "origem_id" not in payload
 
     revoked = client.post(
         (
@@ -140,6 +183,8 @@ def test_admin_atribui_lista_e_revoga_cargos_ativos_da_loja(
     assert revoked.status_code == 200
     assert revoked.json()["ativo"] is False
     assert revoked.json()["encerrado_em"] is not None
+    assert "origem" not in revoked.json()
+    assert "origem_id" not in revoked.json()
     assert [
         (item["pessoa_id"], item["cargo"])
         for item in active_after_revoke.json()["items"]
@@ -258,6 +303,10 @@ def test_gestor_lista_cargos_so_da_loja_vinculada_e_nao_pode_mutar(
         json={},
     )
     forbidden_person = client.get(f"/control/v1/pessoas/{person['id']}")
+    forbidden_search = client.get(
+        "/control/v1/pessoas",
+        params={"email": person["email"]},
+    )
 
     assert visible.status_code == 200
     assert [
@@ -266,6 +315,11 @@ def test_gestor_lista_cargos_so_da_loja_vinculada_e_nao_pode_mutar(
     ] == [(person["id"], "dono")]
     assert hidden_response.status_code == 404
     assert hidden_response.json()["detail"]["code"] == "store_not_found"
-    for response in (forbidden_assign, forbidden_revoke, forbidden_person):
+    for response in (
+        forbidden_assign,
+        forbidden_revoke,
+        forbidden_person,
+        forbidden_search,
+    ):
         assert response.status_code == 403
         assert response.json()["detail"]["code"] == "access_denied"
