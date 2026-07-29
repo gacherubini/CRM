@@ -24,7 +24,7 @@ from app.control.types import (
     TransitionStore,
     UpdateStore,
 )
-from app.models import CargoLoja, Loja, VinculoTrafego, agora
+from app.models import AcessoControl, CargoLoja, Loja, VinculoTrafego, agora
 
 _ALLOWED_TRANSITIONS = {
     StoreStatus.DRAFT: frozenset({StoreStatus.CONFIGURING}),
@@ -145,16 +145,29 @@ class StoreControl:
             if (
                 current is StoreStatus.CONFIGURING
                 and command.target is StoreStatus.READY
-                and db.query(CargoLoja.id)
-                .filter(
-                    CargoLoja.loja_id == store.id,
-                    CargoLoja.cargo == StoreRole.OWNER.value,
-                    CargoLoja.encerrado_em.is_(None),
-                )
-                .first()
-                is None
             ):
-                raise StoreReadinessBlocked(store.id, "active_owner")
+                owner_person_ids = [
+                    row[0]
+                    for row in db.query(CargoLoja.pessoa_id)
+                    .filter(
+                        CargoLoja.loja_id == store.id,
+                        CargoLoja.cargo == StoreRole.OWNER.value,
+                        CargoLoja.encerrado_em.is_(None),
+                    )
+                    .all()
+                ]
+                if not owner_person_ids:
+                    raise StoreReadinessBlocked(store.id, "active_owner")
+                activatable = (
+                    db.query(AcessoControl.id)
+                    .filter(
+                        AcessoControl.pessoa_id.in_(owner_person_ids),
+                        AcessoControl.estado.in_(("pendente", "ativo")),
+                    )
+                    .first()
+                )
+                if activatable is None:
+                    raise StoreReadinessBlocked(store.id, "activatable_owner")
             store.status = command.target.value
             store.versao += 1
             store.atualizada_em = agora()

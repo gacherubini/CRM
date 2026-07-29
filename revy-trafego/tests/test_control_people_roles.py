@@ -32,7 +32,7 @@ from app.control.types import (
     TransitionStore,
 )
 from app.db import SessionLocal
-from app.models import GestorRevy
+from app.models import AcessoControl, GestorRevy, agora
 
 
 def _admin_actor() -> Actor:
@@ -91,6 +91,24 @@ _TRANSITIONS_TO = {
 }
 
 
+def _grant_activatable_access(person_id: str, *, estado: str = "pendente") -> None:
+    now = agora()
+    with SessionLocal() as db:
+        db.add(
+            AcessoControl(
+                pessoa_id=person_id,
+                papel="gestor",
+                estado=estado,
+                senha_hash=None if estado == "pendente" else "hash-teste",
+                sessao_versao=1,
+                gestor_legado_id=None,
+                criada_em=now,
+                atualizada_em=now,
+            )
+        )
+        db.commit()
+
+
 def _store_with_owners(admin, *, slug, status, owner_count=1):
     stores = StoreControl(SessionLocal)
     people = PeopleDirectory(SessionLocal)
@@ -120,6 +138,15 @@ def _store_with_owners(admin, *, slug, status, owner_count=1):
         )
         for owner in owners
     ]
+    needs_ready = status in {
+        StoreStatus.READY,
+        StoreStatus.ACTIVE,
+        StoreStatus.SUSPENDED,
+        StoreStatus.CLOSED,
+    }
+    if needs_ready:
+        for owner in owners:
+            _grant_activatable_access(owner.id)
     for target in _TRANSITIONS_TO[status]:
         stores.transition(
             admin,
@@ -197,13 +224,35 @@ def test_dono_revogado_nao_satisfaz_prontidao_da_loja():
     assert stores.get(admin, StoreRef(id=store.id)).status is StoreStatus.CONFIGURING
 
 
-def test_dono_ativo_permite_loja_ficar_pronta():
+def test_dono_ativo_sem_acesso_ativavel_nao_permite_loja_ficar_pronta():
     admin = _admin_actor()
     stores, _, store, _, _ = _store_with_owners(
+        admin,
+        slug="loja-dono-sem-acesso",
+        status=StoreStatus.CONFIGURING,
+    )
+
+    with pytest.raises(StoreReadinessBlocked) as error:
+        stores.transition(
+            admin,
+            TransitionStore(
+                store=StoreRef(id=store.id),
+                target=StoreStatus.READY,
+            ),
+        )
+
+    assert error.value.requirement == "activatable_owner"
+    assert stores.get(admin, StoreRef(id=store.id)).status is StoreStatus.CONFIGURING
+
+
+def test_dono_com_acesso_ativavel_permite_loja_ficar_pronta():
+    admin = _admin_actor()
+    stores, _, store, owners, _ = _store_with_owners(
         admin,
         slug="loja-com-dono",
         status=StoreStatus.CONFIGURING,
     )
+    _grant_activatable_access(owners[0].id)
 
     ready = stores.transition(
         admin,

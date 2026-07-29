@@ -46,7 +46,14 @@ class StoreReadinessBlocked(ControlError):
     def __init__(self, store_id: str, requirement: str) -> None:
         self.store_id = store_id
         self.requirement = requirement
-        super().__init__("Loja precisa manter ao menos um Dono ativo neste estado")
+        if requirement == "activatable_owner":
+            message = (
+                "Loja precisa de ao menos um Dono com acesso ativável "
+                "(pendente ou ativo) neste estado"
+            )
+        else:
+            message = "Loja precisa manter ao menos um Dono ativo neste estado"
+        super().__init__(message)
 
 
 class ActiveResponsibleConflict(ControlError):

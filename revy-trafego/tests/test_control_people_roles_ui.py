@@ -13,7 +13,7 @@ from app.control.types import (
     TrafficRole,
 )
 from app.db import SessionLocal
-from app.models import GestorRevy
+from app.models import AcessoControl, GestorRevy, Pessoa, agora
 from app.web import control_ui as control_ui_mod
 from tests.conftest import csrf_da_resposta
 
@@ -422,6 +422,26 @@ def test_revogar_ultimo_dono_de_loja_pronta_retorna_erro_no_detalhe(
         assigned_page.text,
     )
     assert revoke_match is not None
+    now = agora()
+    with SessionLocal() as db:
+        person = (
+            db.query(Pessoa)
+            .filter(Pessoa.email == "ultimo.dono.ui@example.com")
+            .one()
+        )
+        db.add(
+            AcessoControl(
+                pessoa_id=person.id,
+                papel="gestor",
+                estado="pendente",
+                senha_hash=None,
+                sessao_versao=1,
+                gestor_legado_id=None,
+                criada_em=now,
+                atualizada_em=now,
+            )
+        )
+        db.commit()
     configuring = client.post(
         f"{detail_url}/estado",
         data={

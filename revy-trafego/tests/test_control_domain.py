@@ -88,6 +88,23 @@ def _create_active_store(
             role=StoreRole.OWNER,
         ),
     )
+    from app.models import AcessoControl, agora
+
+    now = agora()
+    with SessionLocal() as db:
+        db.add(
+            AcessoControl(
+                pessoa_id=owner.id,
+                papel="gestor",
+                estado="pendente",
+                senha_hash=None,
+                sessao_versao=1,
+                gestor_legado_id=None,
+                criada_em=now,
+                atualizada_em=now,
+            )
+        )
+        db.commit()
     for target in (
         StoreStatus.CONFIGURING,
         StoreStatus.READY,
