@@ -1,8 +1,8 @@
 # Plano — Revy Tráfego separado do Portal da loja
 
-> **Status 2026-07-28: FASE 3 IMPLEMENTADA LOCALMENTE, CUTOVER PENDENTE** — banco próprio,
-> projeção de vendas e outbox Portal → Revy prontos; ainda sem commit/deploy. O deploy anterior de
-> Fase 1+2/B5 usava banco compartilhado.
+> **Status 2026-07-28/29: FASE 3 IMPLANTADA NO LAB** — banco próprio, projeção de vendas e
+> outbox Portal → Revy em `origin/main` (`98cefe4`) e no Fly `app2037` v28. Portal no head `0012`;
+> Revy no head `0001`; snapshot e smoke registrados no handoff.
 > Spec: [`docs/superpowers/specs/2026-07-28-revy-trafego-separacao-portal-design.md`](../superpowers/specs/2026-07-28-revy-trafego-separacao-portal-design.md)  
 > App: `revy-trafego/` · README ops (canônico): [`revy-trafego/README.md`](../../revy-trafego/README.md)
 
@@ -43,7 +43,7 @@
 | **1** | [Fase 1](../superpowers/plans/2026-07-28-revy-trafego-fase1-app-multi-loja.md) | Cockpit Revy + cliente sem menus técnicos | **CÓDIGO FEITO** |
 | **2** | [Fase 2](../superpowers/plans/2026-07-28-revy-trafego-fase2-api-cutover.md) | API + flags portal + pixel URL catálogo | **CÓDIGO FEITO** (flags off) |
 | **ops** | **Seção abaixo** + README | Deploy lab + smoke + cutover B1–B5 | **DONE no lab** |
-| **3** | seção abaixo | Split DB, projeção de vendas e outbox criptografado | **CÓDIGO FEITO; CUTOVER PENDENTE** |
+| **3** | seção abaixo | Split DB, projeção de vendas e outbox criptografado | **DONE NO LAB** |
 
 ## Fase 3 — contrato implementado
 
@@ -55,7 +55,8 @@
 - Payload Portal → Revy é cifrado em repouso; retry usa backoff e lease recuperável.
 
 O restante deste runbook descreve o cutover anterior com banco compartilhado e deve ser tratado
-como histórico. Para o novo cutover, usar o checklist do topo de `docs/handoff-contexto.md`.
+como histórico. O resultado do cutover Fase 3 está registrado no topo de
+`docs/handoff-contexto.md`.
 
 ### Critério de pronto código (já atendido)
 
@@ -71,6 +72,9 @@ como histórico. Para o novo cutover, usar o checklist do topo de `docs/handoff-
 - [x] Smoke checklist (login, loja, config, leads/conversas, API)
 - [x] Flags API ligadas (`RESULTADOS` + `VENDA_EVENTS`)
 - [x] Workers CAPI/spend **só** no Revy Tráfego (B5; portal `PORTAL_*_ENABLED=0`)
+- [x] Snapshot pré-cutover e migrações fail-fast
+- [x] Portal em `0012`, Revy em banco próprio no head `0001`
+- [x] Release `app2037` v28 com health/checks passando
 
 ---
 

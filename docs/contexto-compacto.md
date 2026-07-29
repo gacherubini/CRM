@@ -1,7 +1,7 @@
 # Contexto compacto para continuidade
 
-Atualizado em **2026-07-28** (**Fase 3 Portal ↔ Revy pronta no código local, ainda sem commit/deploy**;
-banco próprio + projeção de vendas + outbox criptografado; confirmar o estado Fly antes de operar).
+Atualizado em **2026-07-28/29** (**Fase 3 Portal ↔ Revy implantada no Fly**; commit `98cefe4`,
+`app2037` v28; banco próprio + projeção de vendas + outbox criptografado).
 Leia isto primeiro; detalhe operacional recente em `docs/handoff-contexto.md` (topo).
 Planos válidos: `docs/plans/README.md`. **Ignore** `docs/plans/_archive/`.
 Ops Fly canônico: `deploy/fly/3vm/README.md` + `bash deploy/fly/up-all.sh --3vm`.
@@ -105,6 +105,9 @@ Monólitos legados (`portal2037`, `catalogo2037`, `estoque2037`, `chatbot2037`, 
 ## Checkpoint Fly.io (3-VM — 2026-07-21+)
 
 - Org/região: `crm-419` / `gru`.
+- Fase 3 Portal ↔ Revy: `app2037` v28, Machine `080752dad70618`, check 1/1; Portal Alembic
+  `0012_revy_trafego_event_outbox`, Revy Alembic `0001_revy_trafego_baseline`.
+- Snapshot pré-cutover: `vs_K1n4oBDw96vHZngBNaNy` (criado em 2026-07-29, retenção de 5 dias).
 - Docs/ops: `deploy/fly/3vm/README.md` · scripts `up-all.sh --3vm` · `down-all.sh --3vm --yes`.
 - Segredos: `deploy/fly/3vm/.secrets.local` e `deploy/fly/.env.production.local` (gitignored).
   **Nunca** versionar `workflow-fly.ready.json` (tokens reais).

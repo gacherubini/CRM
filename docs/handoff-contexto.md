@@ -4,11 +4,11 @@
 > Este arquivo: checkpoint operacional. Seções **“Checkpoint anterior”** = histórico — não
 > reexecutar. Path Windows no rodapé de seções antigas: **ignorar** (workspace = root do git).
 >
-> **Checkpoint mais recente: 2026-07-28 — Fase 3 Portal ↔ Revy implementada localmente.**
-> Mudanças ainda **não commitadas, não enviadas e não implantadas**. O checkpoint de lab abaixo é
-> histórico operacional; confirmar estado Fly antes de qualquer ação.
+> **Checkpoint mais recente: 2026-07-28/29 — Fase 3 Portal ↔ Revy implantada no lab.**
+> Código em `origin/main` (`98cefe4`) e release Fly `app2037` **v28** saudável. Snapshot do volume
+> criado antes da migração: `vs_K1n4oBDw96vHZngBNaNy` (retenção de 5 dias).
 
-## Checkpoint mais recente — Fase 3 de separação de dados (código local)
+## Checkpoint mais recente — Fase 3 de separação de dados (produção lab)
 
 ### Entrega
 
@@ -37,21 +37,31 @@
 - Estoque: **87 passed**.
 - Migração limpa: Revy `0001` head, Portal `0012` head, Chatbot `0013` head e Estoque `0007` head.
 
-### Cutover ainda não executado
+### Cutover executado
 
-1. Fazer backup do volume/banco atual antes do deploy.
-2. Garantir `REVY_TRAFEGO_DATABASE_URL` dedicado e rodar os quatro Alembics fail-fast.
-3. Configurar `REVY_TRAFEGO_CHATBOT_TOKENS_JSON` para cada loja antes de testar diagnóstico.
-4. Ligar `PORTAL_REVY_TRAFEGO_VENDA_EVENTS=1` e manter workers de mídia somente no Revy.
-5. Fazer backfill de vendas históricas se o banco atual já tiver dados; o outbox cobre eventos novos.
-6. Só depois validar smoke e decidir commit/push/deploy.
+- Commit de implementação/documentação `98cefe4` enviado para `origin/main`.
+- Snapshot pré-deploy `vs_K1n4oBDw96vHZngBNaNy`: estado `created`, cerca de 39 MB, retenção de 5 dias.
+- Inventário pré-cutover confirmou banco Portal no head `0011` e nenhuma venda, usuário ou
+  configuração de mídia a migrar; portanto não foi necessário backfill.
+- Release Fly `app2037` **v28** (`deployment-01KYNPA2GSV1FJDEKBXXB19F16`) concluída em
+  `2026-07-29T01:03:36Z`; Machine `080752dad70618`, região `gru`, check **1/1 passing**.
+- Portal migrou para `0012_revy_trafego_event_outbox`; Revy criou o banco dedicado
+  `/data/revy-trafego/revy_trafego.db` no head `0001_revy_trafego_baseline`.
+- `supervisorctl status`: nginx, healthz, chatbot, estoque, portal, Revy, catálogo e motor
+  **RUNNING**.
+- Smoke: `/healthz`, `/trafego/health/live`, `/trafego/health/ready` e readiness interno do Portal
+  responderam HTTP 200.
+- O lab possui exatamente uma loja (`moto-center`), então o fallback de token global do Chatbot é
+  não ambíguo. Antes de adicionar uma segunda loja, configurar
+  `REVY_TRAFEGO_CHATBOT_TOKENS_JSON`.
 
 ### Riscos residuais conhecidos
 
 - `REVY_TRAFEGO_SERVICE_TOKEN` ainda é global; migrar para credencial por loja reduz blast radius.
 - Outbox entrega **at-least-once**: lease reduz concorrência, e `event_id` fornece idempotência no
   destino, mas não há transação distribuída com Meta.
-- Nenhum deploy foi feito nesta sessão; não assumir que o lab já usa o schema separado.
+- Configuração de Pixel/CAPI/campanhas continua vazia até a operação cadastrar os dados reais de
+  mídia; isso não bloqueia o novo schema nem a projeção de vendas.
 
 ## Checkpoint anterior — recuperação do lab + slug único + testes (2026-07-28, noite)
 

@@ -9,13 +9,15 @@ O **portal da loja** (`portal-gestao`) mostra só resultados de negócio ao dono
 
 ---
 
-## Status atual — Fase 3 no código local
+## Status atual — Fase 3 implantada no lab
 
 - Banco próprio e Alembic `0001_revy_trafego_baseline`.
 - Vendas chegam pelo outbox criptografado do Portal e são materializadas em `vendas_projetadas`.
 - ROI/CAPI não leem mais tabelas do Portal.
 - CAPI assíncrona, `blocked_config`, cancelamento seguro, lease e dedupe por loja.
-- **Ainda sem commit/deploy**; o ambiente publicado pode continuar no desenho antigo.
+- Commit `98cefe4` em `origin/main`; Fly `app2037` v28 com banco dedicado e checks 1/1.
+- Portal no head `0012_revy_trafego_event_outbox`; Revy no head `0001_revy_trafego_baseline`.
+- Snapshot pré-deploy `vs_K1n4oBDw96vHZngBNaNy`; smoke `/healthz` e readiness Revy em HTTP 200.
 - Validação local: **95 testes Revy + 293 Portal + 170 Chatbot + 87 Estoque**.
 
 ## Status anterior (2026-07-28 — Fase 1/2 no lab)
