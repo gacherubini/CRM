@@ -18,7 +18,7 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 from starlette.middleware.sessions import SessionMiddleware
 
-from app import config, models_db, servico  # noqa: F401 (registra os modelos)
+from app import config, models_db, provisioning, servico  # noqa: F401 (registra os modelos)
 from app.admin import router as admin_router
 from app.auth import Contexto, get_contexto
 from app.db import get_db
@@ -139,6 +139,15 @@ def _exigir_gestao(ctx: Contexto) -> None:
         raise HTTPException(status_code=403, detail="papel sem permissão de gestão")
 
 
+def _exigir_loja_operacional(db: Session, loja_id: str) -> None:
+    """Bloqueia novos efeitos quando a projeção do Control não autoriza o módulo estoque."""
+    if not provisioning.allows_processing(db, loja_id, module="estoque"):
+        raise HTTPException(
+            status_code=423,
+            detail={"code": "store_not_operational", "message": "loja não operacional"},
+        )
+
+
 @app.get("/health/live")
 def live():
     return {"status": "ok"}
@@ -155,6 +164,29 @@ def version():
     return {"versao": config.VERSAO, "schema": config.SCHEMA_VERSAO}
 
 
+@app.post("/v1/internal/provisioning/state")
+def receber_estado_provisionamento(
+    payload: dict,
+    ctx: Contexto = Depends(get_contexto),
+    db: Session = Depends(get_db),
+):
+    """Recebe snapshot operacional do Control e aplica projeção monotônica local."""
+    loja = db.get(models_db.Loja, ctx.loja_id)
+    if loja is None:
+        raise HTTPException(status_code=404, detail="loja não encontrada")
+    if payload.get("loja_slug") != loja.slug:
+        raise HTTPException(status_code=403, detail="slug da loja não confere")
+    reasons = provisioning.apply_payload(db, ctx.loja_id, payload)
+    db.commit()
+    return {
+        "ok": True,
+        "reasons": reasons,
+        "allows_processing": provisioning.allows_processing(
+            db, ctx.loja_id, module="estoque"
+        ),
+    }
+
+
 @app.post("/v1/veiculos", status_code=201)
 def criar_veiculo(
     dados: VeiculoInput,
@@ -165,6 +197,7 @@ def criar_veiculo(
     db: Session = Depends(get_db),
 ):
     _exigir_operacao(ctx)
+    _exigir_loja_operacional(db, ctx.loja_id)
     if dados.custo is not None and not _pode_ver_custo(ctx):
         raise HTTPException(status_code=403, detail="papel sem permissão para informar custo")
     v = servico.criar_veiculo(

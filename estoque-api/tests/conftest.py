@@ -38,7 +38,14 @@ def _override_get_db():
 app.dependency_overrides[get_db] = _override_get_db
 
 
-def _criar_loja(nome: str, slug: str, token: str, papel: str = "dono") -> str:
+def _criar_loja(
+    nome: str,
+    slug: str,
+    token: str,
+    papel: str = "dono",
+    *,
+    operacional_ativa: bool = True,
+) -> str:
     db = _TestSession()
     loja = models_db.Loja(id=str(uuid.uuid4()), nome=nome, slug=slug, whatsapp="5511999999999")
     db.add(loja)
@@ -47,6 +54,26 @@ def _criar_loja(nome: str, slug: str, token: str, papel: str = "dono") -> str:
             token_hash=hash_token(token), loja_id=loja.id, papel=papel
         )
     )
+    if operacional_ativa:
+        # Suite de regressão assume loja+estoque operacionais; testes do gate sobrescrevem.
+        db.add(
+            models_db.LojaOperacionalProjecao(
+                loja_id=loja.id,
+                aggregate="loja",
+                version=1,
+                state="ativa",
+                event_id="seed-ativa",
+            )
+        )
+        db.add(
+            models_db.LojaOperacionalProjecao(
+                loja_id=loja.id,
+                aggregate="estoque",
+                version=1,
+                state="ativo",
+                event_id="seed-estoque-ativo",
+            )
+        )
     db.commit()
     loja_id = loja.id
     db.close()
@@ -81,6 +108,19 @@ def loja_b():
     slug = f"loja-b-{uuid.uuid4().hex[:6]}"
     loja_id = _criar_loja("Loja B", slug, token)
     return {"loja_id": loja_id, "slug": slug, "headers": {"Authorization": f"Bearer {token}"}}
+
+
+@pytest.fixture
+def loja_sem_projecao():
+    """Loja autenticável sem projeção operacional (fail-closed)."""
+    token = f"tok-sem-{uuid.uuid4().hex}"
+    slug = f"loja-sem-{uuid.uuid4().hex[:6]}"
+    loja_id = _criar_loja("Loja Sem Proj", slug, token, operacional_ativa=False)
+    return {
+        "loja_id": loja_id,
+        "slug": slug,
+        "headers": {"Authorization": f"Bearer {token}"},
+    }
 
 
 @pytest.fixture

@@ -24,6 +24,23 @@ class Loja(Base):
     criada_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_agora)
 
 
+class LojaOperacionalProjecao(Base):
+    """Projeção monotônica do estado operacional vindo do Control (Loja / módulos)."""
+
+    __tablename__ = "loja_operacional_projecao"
+
+    loja_id: Mapped[str] = mapped_column(
+        ForeignKey("lojas.id"), primary_key=True, nullable=False
+    )
+    aggregate: Mapped[str] = mapped_column(String(40), primary_key=True, nullable=False)
+    version: Mapped[int] = mapped_column(Integer, nullable=False)
+    state: Mapped[str] = mapped_column(String(40), nullable=False)
+    event_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    atualizado_em: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_agora, onupdate=_agora
+    )
+
+
 class CredencialServico(Base):
     __tablename__ = "credenciais_servico"
 
