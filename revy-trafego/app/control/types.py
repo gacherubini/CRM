@@ -88,6 +88,10 @@ class WeakControlPassword(ControlError):
     pass
 
 
+class ControlRecoveryInvalid(ControlError):
+    pass
+
+
 class StoreRoleConflict(ControlError):
     def __init__(self, store_id: str, person_id: str, role: "StoreRole") -> None:
         self.store_id = store_id
@@ -232,6 +236,32 @@ class ActivatedControlAccount:
     access_id: str
     person_email: str
     role: ControlAccountRole
+    status: ControlAccountStatus
+
+
+@dataclass(frozen=True)
+class IssueControlPasswordRecovery:
+    access_id: str
+
+
+@dataclass(frozen=True)
+class ConsumeControlPasswordRecovery:
+    token: str
+    password: str
+
+
+@dataclass(frozen=True)
+class IssuedControlPasswordRecovery:
+    access_id: str
+    person_email: str
+    token: str
+    expires_at: datetime
+
+
+@dataclass(frozen=True)
+class RecoveredControlAccount:
+    access_id: str
+    person_email: str
     status: ControlAccountStatus
 
 

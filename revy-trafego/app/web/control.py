@@ -13,6 +13,7 @@ from app.control.access import AccessControl
 from app.control.accounts import ControlAccounts
 from app.control.audit import AuditTrail
 from app.control.invitations import ControlInvitations
+from app.control.password_recovery import ControlPasswordRecovery
 from app.control.people import PeopleDirectory
 from app.control.roles import StoreRoles
 from app.control.stores import StoreControl
@@ -31,10 +32,14 @@ from app.control.types import (
     ControlAccountRole,
     ControlAccountView,
     ControlInvitationInvalid,
+    ControlRecoveryInvalid,
+    ConsumeControlPasswordRecovery,
     CreateStore,
     GrantTrafficAccess,
     InvalidPersonEmail,
     InvalidStoreTransition,
+    IssueControlPasswordRecovery,
+    IssuedControlPasswordRecovery,
     InviteControlAccess,
     IssuedControlInvitation,
     ManagerNotFound,
@@ -43,6 +48,7 @@ from app.control.types import (
     PersonRef,
     PersonView,
     RegisterPerson,
+    RecoveredControlAccount,
     RevokeStoreRole,
     RevokeTrafficAccess,
     StoreNotFound,
@@ -154,6 +160,19 @@ class ActivateControlInvitationBody(BaseModel):
     senha: str = Field(min_length=1, max_length=256)
 
 
+class ControlPasswordRecoveryBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    acesso_id: str = Field(min_length=1, max_length=36)
+
+
+class ConsumeControlPasswordRecoveryBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    token: str = Field(min_length=1, max_length=256)
+    senha: str = Field(min_length=1, max_length=256)
+
+
 class StoreTransitionBody(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -196,6 +215,30 @@ def list_control_accounts(actor: Actor = Depends(_current_actor)):
     return {"items": [_control_account_json(account) for account in accounts]}
 
 
+@router.post("/acessos/{acesso_id}/desativar")
+def disable_control_account(
+    acesso_id: str,
+    actor: Actor = Depends(_current_actor),
+):
+    try:
+        account = ControlAccounts(SessionLocal).disable(actor, acesso_id)
+    except ControlError as exc:
+        _raise_domain_error(exc)
+    return _control_account_json(account)
+
+
+@router.post("/acessos/{acesso_id}/reativar")
+def enable_control_account(
+    acesso_id: str,
+    actor: Actor = Depends(_current_actor),
+):
+    try:
+        account = ControlAccounts(SessionLocal).enable(actor, acesso_id)
+    except ControlError as exc:
+        _raise_domain_error(exc)
+    return _control_account_json(account)
+
+
 @router.post("/convites", status_code=201)
 def issue_control_invitation(
     body: ControlInvitationBody,
@@ -223,6 +266,37 @@ def activate_control_invitation(body: ActivateControlInvitationBody):
     except ControlError as exc:
         _raise_domain_error(exc)
     return _activated_account_json(account)
+
+
+@router.post("/recuperacoes", status_code=201)
+def issue_control_password_recovery(
+    body: ControlPasswordRecoveryBody,
+    actor: Actor = Depends(_current_actor),
+):
+    try:
+        recovery = ControlPasswordRecovery(SessionLocal).issue(
+            actor,
+            IssueControlPasswordRecovery(access_id=body.acesso_id),
+        )
+    except ControlError as exc:
+        _raise_domain_error(exc)
+    return _issued_recovery_json(recovery)
+
+
+@router.post("/recuperacoes/consumir")
+def consume_control_password_recovery(
+    body: ConsumeControlPasswordRecoveryBody,
+):
+    try:
+        account = ControlPasswordRecovery(SessionLocal).consume(
+            ConsumeControlPasswordRecovery(
+                token=body.token,
+                password=body.senha,
+            )
+        )
+    except ControlError as exc:
+        _raise_domain_error(exc)
+    return _recovered_account_json(account)
 
 
 @router.post("/pessoas", status_code=201)
@@ -491,6 +565,27 @@ def _activated_account_json(
     }
 
 
+def _issued_recovery_json(
+    recovery: IssuedControlPasswordRecovery,
+) -> dict[str, str]:
+    return {
+        "acesso_id": recovery.access_id,
+        "pessoa_email": recovery.person_email,
+        "token": recovery.token,
+        "expira_em": recovery.expires_at.isoformat(),
+    }
+
+
+def _recovered_account_json(
+    account: RecoveredControlAccount,
+) -> dict[str, str]:
+    return {
+        "acesso_id": account.access_id,
+        "pessoa_email": account.person_email,
+        "estado": account.status.value,
+    }
+
+
 def _store_role_json(role: StoreRoleView) -> dict[str, object]:
     return {
         "id": role.id,
@@ -560,6 +655,8 @@ def _raise_domain_error(exc: ControlError) -> NoReturn:
         status_code, code = 409, "control_account_conflict"
     elif isinstance(exc, ControlInvitationInvalid):
         status_code, code = 409, "control_invitation_invalid"
+    elif isinstance(exc, ControlRecoveryInvalid):
+        status_code, code = 409, "control_recovery_invalid"
     elif isinstance(exc, WeakControlPassword):
         status_code, code = 400, "weak_control_password"
     elif isinstance(exc, StoreRoleNotFound):
