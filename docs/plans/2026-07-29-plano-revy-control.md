@@ -1,6 +1,6 @@
 # Plano — Evolução do Revy Tráfego para Revy Control
 
-**Status:** ATIVO / NÃO IMPLEMENTADO
+**Status:** ATIVO / IMPLEMENTAÇÃO PARCIAL LOCAL
 **Data:** 2026-07-29
 **Spec:** [`docs/superpowers/specs/2026-07-29-revy-control-design.md`](../superpowers/specs/2026-07-29-revy-control-design.md)
 **Vocabulário:** [`CONTEXT.md`](../../CONTEXT.md)
@@ -204,7 +204,7 @@ Adicionar:
 ### Interface administrativa
 
 - [ ] Admin cria/edita loja em estado Rascunho.
-- [ ] Admin cadastra pessoa uma vez e atribui vários cargos/lojas.
+- [x] Admin cadastra pessoa uma vez e atribui vários cargos/lojas.
 - [ ] Permitir que a mesma pessoa tenha acesso ao Control e cargo na Loja sem herdar
       permissões de uma superfície na outra.
 - [ ] Admin escolhe Vendas, Estoque ou ambos para a loja.
@@ -216,12 +216,30 @@ Adicionar:
 ### Testes obrigatórios
 
 - [ ] Convite expirado/usado, reset e usuário desativado falham de forma segura.
-- [ ] Admin atribui cargos sem criar, conhecer ou reapresentar a senha da pessoa.
+- [x] Admin atribui cargos sem criar, conhecer ou reapresentar a senha da pessoa.
 - [ ] Múltiplos cargos ativos somam permissões somente dentro da loja selecionada;
       nenhum cargo ou acesso ao Control vaza para outra loja/superfície.
 - [ ] Projeção repetida ou fora de ordem não reativa loja/módulo suspenso.
 - [ ] Loja/Módulo suspenso bloqueia novo processamento nos serviços de destino e mantém
       leitura do histórico conforme o cargo autorizado.
+
+> **Evidência local — corte Pessoas/Cargos:** implementação nos commits `2ecaa6b`,
+> `94a0f51`, `3988fe7`, `02eb29d`, `9d2d550`, `4fa1d54` e `c766477`; Alembic head
+> local `0003_revy_control_pessoas_cargos`; suíte Revy com **158 testes passando**.
+> `REVY_CONTROL_ENABLED=0` e `REVY_CONTROL_RBAC_ENABLED=0` continuam sendo os defaults.
+> Não houve aplicação da migration nem rollout desse corte no lab.
+>
+> A regra local provisória exige ao menos um Dono ativo para a transição a `pronta` e
+> protege o último Dono ativo enquanto a Loja requer prontidão. Isso ainda não demonstra
+> “acesso ativável”: `acessos_control`, convite e ativação não existem, portanto o item
+> correspondente permanece aberto.
+
+Pendências para concluir Pessoas/Cargos e a Fase 2:
+
+- criar `acessos_control` e fazer o backfill de `GestorRevy` sem invalidar sessões;
+- importar usuários atuais do Portal como pessoas/cargos, registrando conflitos;
+- implementar convite, ativação, recuperação, desativação e revogação de sessões;
+- implementar módulos, contratos e projeções versionadas aos serviços operacionais.
 
 ### Critério de pronto
 
