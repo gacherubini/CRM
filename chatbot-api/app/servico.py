@@ -404,6 +404,22 @@ def criar_loja(
 
 
 def resolver_loja_por_instancia(db: Session, instancia: str) -> Loja:
+    """Resolve loja pela instância Evolution.
+
+    Preferência: canal em ``whatsapp_canais`` (multi-WA); fallback legado em
+    ``Loja.evolution_instance``.
+    """
+    from app.models_db import WhatsAppCanal
+
+    canal = (
+        db.query(WhatsAppCanal)
+        .filter(WhatsAppCanal.evolution_instance == instancia)
+        .first()
+    )
+    if canal is not None:
+        loja = db.get(Loja, canal.loja_id)
+        if loja is not None:
+            return loja
     loja = db.query(Loja).filter(Loja.evolution_instance == instancia).first()
     if loja is None:
         raise HTTPException(status_code=404, detail="instância não reconhecida")

@@ -16,7 +16,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from app import config, models_db, operacao, provisioning, servico  # noqa: F401 (registra os modelos)
+from app import channels, config, models_db, operacao, provisioning, servico  # noqa: F401 (registra os modelos)
 from app.audio import AudioProcessor, get_audio_processor
 from app.auth import Contexto, get_contexto, verificar_webhook_token
 from app.db import get_db
@@ -899,6 +899,55 @@ def simular(
     if dados.placa:
         resposta["placa"] = dados.placa.strip()
     return resposta
+
+
+# --- Canais WhatsApp (multi-WA skeleton) --------------------------------------
+
+
+class CanalWhatsAppInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    evolution_instance: str = Field(min_length=1, max_length=120)
+    e164_or_label: str = Field(min_length=1, max_length=80)
+
+
+@app.get("/v1/whatsapp/canais")
+def listar_canais_whatsapp(
+    ctx: Contexto = Depends(get_contexto), db: Session = Depends(get_db)
+):
+    """Lista canais da loja autenticada (backfill legado se ainda não houver)."""
+    canais = channels.list_channels(db, ctx.loja_id)
+    if not canais:
+        channels.backfill_legacy_from_loja(db, ctx.loja_id)
+        canais = channels.list_channels(db, ctx.loja_id)
+    return {"canais": canais}
+
+
+@app.post("/v1/whatsapp/canais", status_code=201)
+def registrar_canal_whatsapp(
+    dados: CanalWhatsAppInput,
+    ctx: Contexto = Depends(get_contexto),
+    db: Session = Depends(get_db),
+):
+    """Cadastra canal adicional. 404 se MULTI_WHATSAPP desligado."""
+    if not config.MULTI_WHATSAPP_ENABLED:
+        raise HTTPException(status_code=404, detail="multi-whatsapp desabilitado")
+    return channels.register_channel(
+        db,
+        ctx.loja_id,
+        dados.evolution_instance,
+        dados.e164_or_label,
+    )
+
+
+@app.post("/v1/whatsapp/canais/{canal_id}/inativar")
+def inativar_canal_whatsapp(
+    canal_id: str,
+    ctx: Contexto = Depends(get_contexto),
+    db: Session = Depends(get_db),
+):
+    """Inativa o canal (sem apagar). loja_id do contexto deve bater."""
+    return channels.inactivate_channel(db, ctx.loja_id, canal_id)
 
 
 # --- Operação WhatsApp (E5): números autorizados + cadastro de veículo --------

@@ -56,6 +56,14 @@ from app.control.portfolio import (
 from app.control.readiness import ReadinessReport, StoreReadiness
 from app.control.roles import StoreRoles
 from app.control.stores import StoreControl
+from app.control.whatsapp_channels import (
+    HttpWhatsAppChannels,
+    WhatsAppChannelView,
+    WhatsAppChannelsControl,
+    WhatsAppChannelsError,
+    WhatsAppChannelsPort,
+    WhatsAppChannelsUnavailable,
+)
 from app.control.types import (
     AccessDenied,
     ActivateControlAccess,
@@ -640,6 +648,60 @@ def disconnect_store_meta_ads(
     except ControlError as exc:
         _raise_domain_error(exc)
     return _integration_json(view)
+
+
+# Port injetável em testes (InMemory); None → adapter HTTP do Chatbot.
+_whatsapp_channels_port: WhatsAppChannelsPort | None = None
+
+
+def set_whatsapp_channels_port(port: WhatsAppChannelsPort | None) -> None:
+    """Sobrescreve o adapter de canais (testes). None restaura o HTTP padrão."""
+    global _whatsapp_channels_port
+    _whatsapp_channels_port = port
+
+
+def _whatsapp_channels_port_or_default() -> WhatsAppChannelsPort:
+    if _whatsapp_channels_port is not None:
+        return _whatsapp_channels_port
+    return HttpWhatsAppChannels(
+        base_url=settings.chatbot_url,
+        token_for_slug=settings.chatbot_token_para,
+        session_factory=SessionLocal,
+    )
+
+
+@router.get("/lojas/{loja_id}/whatsapp-canais")
+def list_store_whatsapp_channels(
+    loja_id: str,
+    actor: Actor = Depends(_current_actor),
+):
+    """Lista canais WhatsApp da loja (proxy Chatbot). Exige MULTI_WHATSAPP."""
+    if not settings.multi_whatsapp_enabled:
+        raise HTTPException(
+            status_code=404,
+            detail={"code": "not_found", "message": "recurso não encontrado"},
+        )
+    try:
+        channels = WhatsAppChannelsControl(
+            SessionLocal,
+            _whatsapp_channels_port_or_default(),
+        ).list_channels(actor, StoreRef(id=loja_id))
+    except ControlError as exc:
+        _raise_domain_error(exc)
+    return {
+        "items": [_whatsapp_channel_json(c) for c in channels],
+    }
+
+
+def _whatsapp_channel_json(channel: WhatsAppChannelView) -> dict[str, object]:
+    return {
+        "id": channel.id,
+        "loja_id": channel.loja_id,
+        "e164_or_label": channel.e164_or_label,
+        "evolution_instance": channel.evolution_instance,
+        "ativo": channel.ativo,
+        "criado_em": channel.criado_em,
+    }
 
 
 @router.patch("/lojas/{loja_id}")
@@ -1273,6 +1335,10 @@ def _raise_domain_error(exc: ControlError) -> NoReturn:
         status_code, code = 409, "active_responsible_conflict"
     elif isinstance(exc, TrafficLinkConflict):
         status_code, code = 409, "traffic_link_conflict"
+    elif isinstance(exc, WhatsAppChannelsUnavailable):
+        status_code, code = 503, "whatsapp_channels_unavailable"
+    elif isinstance(exc, WhatsAppChannelsError):
+        status_code, code = 502, "whatsapp_channels_error"
     else:
         status_code, code = 409, "control_conflict"
     raise HTTPException(

@@ -43,6 +43,25 @@ class LojaOperacionalProjecao(Base):
     )
 
 
+class WhatsAppCanal(Base):
+    """Canal WhatsApp da loja (Fase 5 multi-WA). loja_id é imutável após criação."""
+
+    __tablename__ = "whatsapp_canais"
+    __table_args__ = (
+        UniqueConstraint("evolution_instance", name="uq_whatsapp_canais_instance"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    loja_id: Mapped[str] = mapped_column(ForeignKey("lojas.id"), nullable=False, index=True)
+    # Número E.164 ou rótulo operacional (ex.: "legado", "linha-2").
+    e164_or_label: Mapped[str] = mapped_column(String(80), nullable=False)
+    evolution_instance: Mapped[str] = mapped_column(
+        String(120), unique=True, nullable=False, index=True
+    )
+    ativo: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    criado_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_agora)
+
+
 class CredencialServico(Base):
     __tablename__ = "credenciais_servico"
 

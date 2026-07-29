@@ -86,3 +86,11 @@ ESTOQUE_MEDIA_ALLOWED_HOSTS = tuple(
 
 # Prazos padrão multi-opção quando o cliente não escolhe um único prazo (CRM WhatsApp).
 PRAZOS_PADRAO_MESES: list[int] = [24, 36, 48, 60]
+
+# Multi-WhatsApp: vários canais por loja. Default off — só 1 canal legado permitido.
+MULTI_WHATSAPP_ENABLED = os.getenv("MULTI_WHATSAPP_ENABLED", "0").strip().lower() in {
+    "1",
+    "true",
+    "yes",
+    "on",
+}
