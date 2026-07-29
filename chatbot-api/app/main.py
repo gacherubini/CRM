@@ -16,7 +16,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from app import config, models_db, operacao, servico  # noqa: F401 (registra os modelos)
+from app import config, models_db, operacao, provisioning, servico  # noqa: F401 (registra os modelos)
 from app.audio import AudioProcessor, get_audio_processor
 from app.auth import Contexto, get_contexto, verificar_webhook_token
 from app.db import get_db
@@ -751,15 +751,47 @@ def _resolver_pedido_simulacao(
     return valor, categoria, prazos
 
 
+def _exigir_loja_operacional(db: Session, loja_id: str) -> None:
+    """Bloqueia novos efeitos quando a projeção do Control não autoriza processamento."""
+    if not provisioning.allows_processing(db, loja_id):
+        raise HTTPException(
+            status_code=423,
+            detail={"code": "store_not_operational", "message": "loja não operacional"},
+        )
+
+
+@app.post("/v1/internal/provisioning/state")
+def receber_estado_provisionamento(
+    payload: dict,
+    ctx: Contexto = Depends(get_contexto),
+    db: Session = Depends(get_db),
+):
+    """Recebe snapshot operacional do Control e aplica projeção monotônica local."""
+    loja = db.get(models_db.Loja, ctx.loja_id)
+    if loja is None:
+        raise HTTPException(status_code=404, detail="loja não encontrada")
+    if payload.get("loja_slug") != loja.slug:
+        raise HTTPException(status_code=403, detail="slug da loja não confere")
+    reasons = provisioning.apply_payload(db, ctx.loja_id, payload)
+    db.commit()
+    return {
+        "ok": True,
+        "reasons": reasons,
+        "allows_processing": provisioning.allows_processing(db, ctx.loja_id),
+    }
+
+
 @app.post("/v1/simulacoes/solicitar", status_code=202)
 def solicitar_simulacao(
     dados: SimularInput,
     idempotency_key: Optional[str] = Header(default=None, alias="Idempotency-Key"),
     ctx: Contexto = Depends(get_contexto),
+    db: Session = Depends(get_db),
     provider: SimulationProvider = Depends(get_simulation_provider),
     inventory: InventoryProvider = Depends(get_inventory_provider),
 ):
     """Enfileira jobs para o vendedor, sem devolver resultados ao canal do bot."""
+    _exigir_loja_operacional(db, ctx.loja_id)
     valor, categoria, prazos = _resolver_pedido_simulacao(dados, provider, inventory)
 
     solicitacoes = []
@@ -792,6 +824,7 @@ def solicitar_simulacao(
 def simular(
     dados: SimularInput,
     ctx: Contexto = Depends(get_contexto),
+    db: Session = Depends(get_db),
     provider: SimulationProvider = Depends(get_simulation_provider),
     inventory: InventoryProvider = Depends(get_inventory_provider),
 ):
@@ -801,6 +834,7 @@ def simular(
     Prazos: lista explícita, ou prazo_meses único (compat), ou padrão multi 24/36/48/60.
     Motor aceita um prazo por job; multi-prazo = um job por prazo e resultados mesclados.
     """
+    _exigir_loja_operacional(db, ctx.loja_id)
     valor, categoria, prazos = _resolver_pedido_simulacao(dados, provider, inventory)
 
     # Um único prazo (compat com payload legado): resposta idêntica à anterior.

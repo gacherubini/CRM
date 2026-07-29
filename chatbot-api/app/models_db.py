@@ -4,7 +4,7 @@ leads e consentimentos entram no próximo incremento.
 """
 from datetime import datetime, timezone
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, String, Text, UniqueConstraint
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db import Base
@@ -24,6 +24,23 @@ class Loja(Base):
     evolution_instance: Mapped[str] = mapped_column(String, unique=True, index=True)
     whatsapp: Mapped[str | None] = mapped_column(String, nullable=True)
     criada_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_agora)
+
+
+class LojaOperacionalProjecao(Base):
+    """Projeção monotônica do estado operacional vindo do Control (Loja / módulos)."""
+
+    __tablename__ = "loja_operacional_projecao"
+
+    loja_id: Mapped[str] = mapped_column(
+        ForeignKey("lojas.id"), primary_key=True, nullable=False
+    )
+    aggregate: Mapped[str] = mapped_column(String(40), primary_key=True, nullable=False)
+    version: Mapped[int] = mapped_column(Integer, nullable=False)
+    state: Mapped[str] = mapped_column(String(40), nullable=False)
+    event_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    atualizado_em: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_agora, onupdate=_agora
+    )
 
 
 class CredencialServico(Base):
