@@ -106,6 +106,29 @@ def test_control_ui_lista_escopo_e_mostra_formulario_somente_para_admin(
     assert 'id="form-criar-loja"' not in manager_page.text
 
 
+def test_lista_de_lojas_linka_cada_loja_ao_detalhe(client, monkeypatch):
+    admin = _admin_actor()
+    stores = StoreControl(SessionLocal)
+    first = stores.create(
+        admin,
+        CreateStore(name="Loja Navegável Um", slug="loja-navegavel-um"),
+    )
+    second = stores.create(
+        admin,
+        CreateStore(name="Loja Navegável Dois", slug="loja-navegavel-dois"),
+    )
+    _enable_control_ui(monkeypatch)
+    _login(client, "trafego@revy.local", "secret-teste")
+
+    page = client.get("/app/control/lojas")
+
+    assert page.status_code == 200
+    assert all(
+        f'href="/app/control/lojas/{store.id}"' in page.text
+        for store in (first, second)
+    )
+
+
 def test_admin_cria_loja_com_csrf_e_gestor_recebe_403(client, monkeypatch):
     with SessionLocal() as db:
         manager = GestorRevy(

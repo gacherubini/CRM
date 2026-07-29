@@ -49,7 +49,7 @@
       <tbody>
         {% for item in stores %}
         <tr>
-          <td><strong>{{ item.store.name }}</strong></td>
+          <td><a href="{{ public_path('/app/control/lojas/' ~ item.store.id) }}"><strong>{{ item.store.name }}</strong></a></td>
           <td><code>{{ item.store.slug }}</code></td>
           <td>{{ item.store.status.value | replace('_', ' ') }}</td>
           <td>{{ item.role.value if item.role else 'Admin Revy' }}</td>
