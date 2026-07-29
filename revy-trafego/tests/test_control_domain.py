@@ -5,6 +5,7 @@ from app.control.audit import AuditTrail
 from app.control.stores import StoreControl
 from app.control.types import (
     ActiveResponsibleConflict,
+    AccessDenied,
     Actor,
     AuditQuery,
     CreateStore,
@@ -13,11 +14,13 @@ from app.control.types import (
     InvalidStoreTransition,
     ManagerNotFound,
     RevokeTrafficAccess,
+    StoreEditConflict,
     StoreRef,
     StoreNotFound,
     StoreStatus,
     TrafficRole,
     TransitionStore,
+    UpdateStore,
 )
 from app.db import SessionLocal
 from app.models import GestorRevy
@@ -357,6 +360,73 @@ def test_transicao_atualiza_loja_e_auditoria_na_mesma_mutacao():
     assert events[1].before == {"status": "rascunho"}
     assert events[1].after == {"status": "em_configuracao"}
     assert events[1].reason == "início do onboarding"
+
+
+def test_admin_edita_loja_em_rascunho_com_auditoria():
+    stores = StoreControl(SessionLocal)
+    audit = AuditTrail(SessionLocal)
+    admin = _admin_actor()
+    store = stores.create(
+        admin,
+        CreateStore(name="Loja Antes", slug="loja-antes"),
+    )
+
+    updated = stores.update(
+        admin,
+        UpdateStore(
+            store=StoreRef(id=store.id),
+            name="  Loja Depois  ",
+        ),
+    )
+    repeated = stores.update(
+        admin,
+        UpdateStore(
+            store=StoreRef(id=store.id),
+            name="Loja Depois",
+        ),
+    )
+
+    assert updated.id == store.id
+    assert updated.name == "Loja Depois"
+    assert updated.slug == "loja-antes"
+    assert updated.status is StoreStatus.DRAFT
+    assert repeated == updated
+    events = audit.list(admin, AuditQuery(store_id=store.id)).items
+    assert [event.action for event in events] == [
+        "store.created",
+        "store.updated",
+    ]
+    assert events[-1].action == "store.updated"
+    assert events[-1].before == {"name": "Loja Antes"}
+    assert events[-1].after == {"name": "Loja Depois"}
+
+
+def test_edicao_de_loja_exige_admin_e_estado_rascunho():
+    stores = StoreControl(SessionLocal)
+    admin = _admin_actor()
+    manager = _manager_actor("gestor.edicao@revy.local")
+    store = stores.create(
+        admin,
+        CreateStore(name="Loja Protegida", slug="loja-protegida"),
+    )
+    command = UpdateStore(
+        store=StoreRef(id=store.id),
+        name="Loja Alterada",
+    )
+
+    with pytest.raises(AccessDenied):
+        stores.update(manager, command)
+
+    stores.transition(
+        admin,
+        TransitionStore(
+            store=StoreRef(id=store.id),
+            target=StoreStatus.CONFIGURING,
+        ),
+    )
+    with pytest.raises(StoreEditConflict):
+        stores.update(admin, command)
+    assert stores.get(admin, StoreRef(id=store.id)).name == "Loja Protegida"
 
 
 def test_autorizacao_resolve_apenas_loja_no_escopo_do_gestor():

@@ -68,6 +68,7 @@ from app.control.types import (
     RevokeStoreRole,
     RevokeTrafficAccess,
     StoreNotFound,
+    StoreEditConflict,
     StoreReadinessBlocked,
     StoreRef,
     StoreSlugConflict,
@@ -83,6 +84,7 @@ from app.control.types import (
     TrafficLinkNotFound,
     TrafficRole,
     TransitionStore,
+    UpdateStore,
     WeakControlPassword,
 )
 from app.db import SessionLocal, get_db
@@ -144,6 +146,20 @@ class StoreCreateBody(BaseModel):
         normalized = value.strip().lower()
         if not re.fullmatch(r"[a-z0-9]+(?:-[a-z0-9]+)*", normalized):
             raise ValueError("slug deve ser canônico")
+        return normalized
+
+
+class StoreUpdateBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    nome: str = Field(min_length=1, max_length=160)
+
+    @field_validator("nome")
+    @classmethod
+    def validate_name(cls, value: str) -> str:
+        normalized = value.strip()
+        if not normalized:
+            raise ValueError("nome é obrigatório")
         return normalized
 
 
@@ -418,6 +434,25 @@ def get_store(
 ):
     try:
         store = StoreControl(SessionLocal).get(actor, StoreRef(id=loja_id))
+    except ControlError as exc:
+        _raise_domain_error(exc)
+    return _store_json(store)
+
+
+@router.patch("/lojas/{loja_id}")
+def update_store(
+    loja_id: str,
+    body: StoreUpdateBody,
+    actor: Actor = Depends(_current_actor),
+):
+    try:
+        store = StoreControl(SessionLocal).update(
+            actor,
+            UpdateStore(
+                store=StoreRef(id=loja_id),
+                name=body.nome,
+            ),
+        )
     except ControlError as exc:
         _raise_domain_error(exc)
     return _store_json(store)
@@ -832,6 +867,8 @@ def _raise_domain_error(exc: ControlError) -> NoReturn:
         status_code, code = 404, "traffic_link_not_found"
     elif isinstance(exc, StoreSlugConflict):
         status_code, code = 409, "store_slug_conflict"
+    elif isinstance(exc, StoreEditConflict):
+        status_code, code = 409, "store_edit_conflict"
     elif isinstance(exc, PersonEmailConflict):
         status_code, code = 409, "person_email_conflict"
     elif isinstance(exc, ControlAccountConflict):

@@ -21,6 +21,14 @@ class StoreSlugConflict(ControlError):
     pass
 
 
+class StoreEditConflict(ControlError):
+    def __init__(self, current: "StoreStatus") -> None:
+        self.current = current
+        super().__init__(
+            f"Loja em {current.value} não pode mais editar dados cadastrais"
+        )
+
+
 class InvalidStoreSlug(ControlError):
     def __init__(self, slug: str) -> None:
         self.slug = slug
@@ -167,6 +175,12 @@ class StoreRef:
     def __post_init__(self) -> None:
         if bool(self.id) == bool(self.slug):
             raise ValueError("informe exatamente um identificador da Loja")
+
+
+@dataclass(frozen=True)
+class UpdateStore:
+    store: StoreRef
+    name: str
 
 
 @dataclass(frozen=True)

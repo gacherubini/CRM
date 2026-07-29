@@ -13,6 +13,7 @@ from app.control.types import (
     CreateStore,
     InvalidStoreSlug,
     InvalidStoreTransition,
+    StoreEditConflict,
     StoreNotFound,
     StoreRef,
     StoreReadinessBlocked,
@@ -21,6 +22,7 @@ from app.control.types import (
     StoreStatus,
     StoreView,
     TransitionStore,
+    UpdateStore,
 )
 from app.models import CargoLoja, Loja, VinculoTrafego, agora
 
@@ -45,10 +47,10 @@ class StoreControl:
         if not actor.is_admin:
             raise AccessDenied("somente Admin Revy pode criar Loja")
 
-        name = command.name.strip()
+        name = _normalize_name(command.name)
         slug = command.slug.strip().lower()
-        if not name or not slug:
-            raise ValueError("nome e slug da Loja são obrigatórios")
+        if not slug:
+            raise ValueError("slug da Loja é obrigatório")
         if len(slug) > 120 or not _CANONICAL_SLUG.fullmatch(slug):
             raise InvalidStoreSlug(command.slug)
 
@@ -74,6 +76,38 @@ class StoreControl:
             except IntegrityError as exc:
                 db.rollback()
                 raise StoreSlugConflict(f"slug de Loja já existe: {slug}") from exc
+            db.refresh(store)
+            return _store_view(store)
+
+    def update(self, actor: Actor, command: UpdateStore) -> StoreView:
+        if not actor.is_admin:
+            raise AccessDenied("somente Admin Revy pode editar Loja")
+        name = _normalize_name(command.name)
+
+        with self._session_factory() as db:
+            store = _find_store(db, command.store, for_update=True)
+            if store is None:
+                raise StoreNotFound("Loja não encontrada")
+            current = StoreStatus(store.status)
+            if current is not StoreStatus.DRAFT:
+                raise StoreEditConflict(current)
+            if store.nome == name:
+                return _store_view(store)
+
+            before = {"name": store.nome}
+            store.nome = name
+            store.atualizada_em = agora()
+            _append_event(
+                db,
+                actor=actor,
+                store_id=store.id,
+                action="store.updated",
+                resource_type="loja",
+                resource_id=store.id,
+                before=before,
+                after={"name": store.nome},
+            )
+            db.commit()
             db.refresh(store)
             return _store_view(store)
 
@@ -136,6 +170,13 @@ class StoreControl:
             db.commit()
             db.refresh(store)
             return _store_view(store)
+
+
+def _normalize_name(name: str) -> str:
+    normalized = name.strip()
+    if not normalized or len(normalized) > 160:
+        raise ValueError("nome da Loja deve ter entre 1 e 160 caracteres")
+    return normalized
 
 
 def _find_store(

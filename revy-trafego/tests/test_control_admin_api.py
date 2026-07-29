@@ -130,6 +130,66 @@ def test_admin_cria_loja_e_gestor_nao_pode_criar(client, monkeypatch):
     assert forbidden.json()["detail"]["code"] == "access_denied"
 
 
+def test_admin_edita_somente_loja_em_rascunho(client, monkeypatch):
+    with SessionLocal() as db:
+        manager = GestorRevy(
+            email="gestor.sem-editar@revy.local",
+            nome="Gestor Sem Editar",
+            senha_hash=hash_senha("senha-sem-editar"),
+            papel="gestor",
+            ativo=True,
+        )
+        db.add(manager)
+        db.commit()
+
+    _enable_control(monkeypatch)
+    _login(client, "trafego@revy.local", "secret-teste")
+    store = client.post(
+        "/control/v1/lojas",
+        json={"nome": "Loja Antes API", "slug": "loja-antes-api"},
+    ).json()
+
+    updated = client.patch(
+        f"/control/v1/lojas/{store['id']}",
+        json={"nome": "Loja Depois API"},
+    )
+    assert updated.status_code == 200
+    assert updated.json() == {
+        "id": store["id"],
+        "nome": "Loja Depois API",
+        "slug": "loja-antes-api",
+        "estado": "rascunho",
+    }
+    immutable_slug = client.patch(
+        f"/control/v1/lojas/{store['id']}",
+        json={"nome": "Loja Depois API", "slug": "loja-nova-api"},
+    )
+    assert immutable_slug.status_code == 422
+
+    client.cookies.clear()
+    _login(client, "gestor.sem-editar@revy.local", "senha-sem-editar")
+    forbidden = client.patch(
+        f"/control/v1/lojas/{store['id']}",
+        json={"nome": "Loja Negada"},
+    )
+    assert forbidden.status_code == 403
+    assert forbidden.json()["detail"]["code"] == "access_denied"
+
+    client.cookies.clear()
+    _login(client, "trafego@revy.local", "secret-teste")
+    transitioned = client.post(
+        f"/control/v1/lojas/{store['id']}/estado",
+        json={"estado": "em_configuracao"},
+    )
+    assert transitioned.status_code == 200
+    blocked = client.patch(
+        f"/control/v1/lojas/{store['id']}",
+        json={"nome": "Loja Tardia"},
+    )
+    assert blocked.status_code == 409
+    assert blocked.json()["detail"]["code"] == "store_edit_conflict"
+
+
 def test_gestor_consulta_somente_loja_do_proprio_escopo(client, monkeypatch):
     with SessionLocal() as db:
         manager = GestorRevy(
