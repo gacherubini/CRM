@@ -200,6 +200,109 @@ def test_process_pending_falha_marca_failed_e_incrementa_attempts():
         assert delivered >= 0
 
 
+def test_process_pending_retenta_failed_e_marca_delivered():
+    admin = _admin_actor()
+    store_id, store_slug = _store_with_snapshot(admin)
+    snapshot = ProvisioningControl(SessionLocal).snapshot(StoreRef(id=store_id))
+
+    with SessionLocal() as db:
+        row = enqueue_delivery(
+            db,
+            loja_id=store_id,
+            loja_slug=store_slug,
+            destination="motor-retry",
+            snapshot=snapshot,
+        )
+        row.status = "failed"
+        row.attempts = 1
+        row.last_error = "RuntimeError: falha anterior"
+        db.commit()
+        row_id = row.id
+
+    with SessionLocal() as db:
+        delivered = process_pending(db, lambda d, p: None, limit=20)
+        db.commit()
+        row = db.query(ControlProvisioningOutbox).filter_by(id=row_id).one()
+        assert delivered >= 1
+        assert row.status == "delivered"
+        assert row.attempts == 2
+        assert row.last_error is None
+
+
+def test_process_pending_nao_retenta_failed_no_max_attempts():
+    admin = _admin_actor()
+    store_id, store_slug = _store_with_snapshot(admin)
+    snapshot = ProvisioningControl(SessionLocal).snapshot(StoreRef(id=store_id))
+
+    with SessionLocal() as db:
+        row = enqueue_delivery(
+            db,
+            loja_id=store_id,
+            loja_slug=store_slug,
+            destination="motor-exhausted",
+            snapshot=snapshot,
+        )
+        row.status = "failed"
+        row.attempts = 5
+        row.last_error = "RuntimeError: esgotado"
+        db.commit()
+        row_id = row.id
+        attempts_before = row.attempts
+
+    posted: list[str] = []
+
+    def poster(destination: str, payload: dict) -> None:
+        posted.append(destination)
+
+    with SessionLocal() as db:
+        process_pending(db, poster, limit=20, max_attempts=5)
+        db.commit()
+        row = db.query(ControlProvisioningOutbox).filter_by(id=row_id).one()
+        assert row.status == "failed"
+        assert row.attempts == attempts_before
+        assert "motor-exhausted" not in posted
+
+
+def test_process_pending_prioriza_pending_sobre_failed():
+    admin = _admin_actor()
+    store_id, store_slug = _store_with_snapshot(admin)
+    snapshot = ProvisioningControl(SessionLocal).snapshot(StoreRef(id=store_id))
+
+    with SessionLocal() as db:
+        failed = enqueue_delivery(
+            db,
+            loja_id=store_id,
+            loja_slug=store_slug,
+            destination="motor-order-failed",
+            snapshot=snapshot,
+        )
+        failed.status = "failed"
+        failed.attempts = 1
+        db.flush()
+        enqueue_delivery(
+            db,
+            loja_id=store_id,
+            loja_slug=store_slug,
+            destination="motor-order-pending",
+            snapshot=snapshot,
+        )
+        db.commit()
+
+    order: list[str] = []
+
+    def poster(destination: str, payload: dict) -> None:
+        if destination.startswith("motor-order-"):
+            order.append(destination)
+
+    with SessionLocal() as db:
+        process_pending(db, poster, limit=20)
+        db.commit()
+
+    assert "motor-order-pending" in order
+    assert "motor-order-failed" in order
+    assert order.index("motor-order-pending") < order.index("motor-order-failed")
+
+
 def test_payload_inclui_loja_slug_e_agregados_operacionais():
     admin = _admin_actor()
     store_id, store_slug = _store_with_snapshot(admin)

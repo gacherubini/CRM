@@ -10,6 +10,8 @@ import json
 from collections.abc import Callable
 from typing import Any
 
+from sqlalchemy import case, or_
+
 from app.control.provisioning import StoreProvisioningSnapshot
 from app.models import ControlProvisioningOutbox, Loja, agora, novo_id
 
@@ -127,15 +129,32 @@ def process_pending(
     poster: Callable[[str, dict[str, Any]], None],
     *,
     limit: int = 20,
+    max_attempts: int = 5,
 ) -> int:
-    """Processa pendentes: chama ``poster(destination, payload)`` e marca status.
+    """Processa pendentes e falhas retentáveis.
+
+    Claim: ``status=="pending"`` ou ``status=="failed"`` com
+    ``attempts < max_attempts``. Pending tem prioridade sobre failed.
+    Sucesso → ``delivered``; falha → ``failed`` e ``attempts+=1``.
 
     Retorna quantos foram marcados como ``delivered``.
     """
     rows = (
         db.query(ControlProvisioningOutbox)
-        .filter(ControlProvisioningOutbox.status == "pending")
+        .filter(
+            or_(
+                ControlProvisioningOutbox.status == "pending",
+                (
+                    (ControlProvisioningOutbox.status == "failed")
+                    & (ControlProvisioningOutbox.attempts < max_attempts)
+                ),
+            )
+        )
         .order_by(
+            case(
+                (ControlProvisioningOutbox.status == "pending", 0),
+                else_=1,
+            ).asc(),
             ControlProvisioningOutbox.created_at.asc(),
             ControlProvisioningOutbox.id.asc(),
         )
