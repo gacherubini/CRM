@@ -16,8 +16,9 @@ Fases 0–2 em corte local **parcial/avançado**: domínio, migrations e APIs de
 Pessoas/cargos/acessos, módulos Vendas/Estoque, contrato, versão monotônica e reativação
 explícita `suspensa → ativa`; o JSON padrão continua sem `versao`. O
 [ADR 0001](docs/adr/0001-suspensao-distribuida.md) define a suspensão distribuída e
-`revy-trafego` tem **205 testes passando**. UI/rebrand, projeções, gates nos destinos,
-rollout/migrations no lab e deploy do Control ainda não estão concluídos.
+o primeiro snapshot operacional versionado de Loja/Vendas/Estoque já existe.
+`revy-trafego` tem **206 testes passando**. UI/rebrand, entrega das projeções, gates
+nos destinos, rollout/migrations no lab e deploy do Control ainda não estão concluídos.
 
 ---
 

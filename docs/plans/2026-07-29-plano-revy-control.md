@@ -196,7 +196,7 @@ Adicionar:
 - [ ] Importar usuários atuais do Portal como pessoas/cargos, registrando conflitos.
 - [ ] Manter `portal-gestao.usuarios` como projeção/legado até o plano do Revy Loja.
 - [ ] Definir contrato versionado de provisionamento de pessoa, cargo e entitlement.
-- [ ] Definir ciclo de acesso: convite de uso único com expiração, criação da própria
+- [x] Definir ciclo de acesso: convite de uso único com expiração, criação da própria
       senha, recuperação, desativação e revogação de sessões. Admin nunca lê senha.
 - [ ] Projetar estado da Loja e dos Módulos Contratados para Revy Loja, Chatbot, Motor,
       Estoque e Catálogo por entrega idempotente; nenhum serviço confia só no menu.
@@ -204,19 +204,20 @@ Adicionar:
 
 ### Interface administrativa
 
-- [ ] Admin cria/edita loja em estado Rascunho.
+- [x] Admin cria/edita loja em estado Rascunho pela API.
 - [x] Admin cadastra pessoa uma vez e atribui vários cargos/lojas.
 - [ ] Permitir que a mesma pessoa tenha acesso ao Control e cargo na Loja sem herdar
       permissões de uma superfície na outra.
-- [ ] Admin escolhe Vendas, Estoque ou ambos para a loja.
-- [ ] Admin registra valor, vigência, vencimento e situação da cobrança.
+- [x] Admin escolhe Vendas, Estoque ou ambos para a loja pela API.
+- [x] Admin registra valor, vigência, vencimento e situação da cobrança pela API.
 - [ ] Exigir pelo menos um Dono da Loja com acesso ativável antes de marcar a loja pronta.
-- [ ] Suspender módulo preserva dados e bloqueia novos processamentos daquele módulo.
-- [ ] Cobrança atrasada gera alerta, mas não suspende automaticamente.
+- [x] Suspender/reativar módulo preserva estado, versão, histórico e auditoria locais.
+- [ ] Aplicar o bloqueio de novos processamentos nos serviços de destino.
+- [x] Cobrança atrasada gera alerta, mas não suspende automaticamente.
 
 ### Testes obrigatórios
 
-- [ ] Convite expirado/usado, reset e usuário desativado falham de forma segura.
+- [x] Convite expirado/usado, reset e usuário desativado falham de forma segura.
 - [x] Admin atribui cargos sem criar, conhecer ou reapresentar a senha da pessoa.
 - [ ] Múltiplos cargos ativos somam permissões somente dentro da loja selecionada;
       nenhum cargo ou acesso ao Control vaza para outra loja/superfície.
@@ -224,35 +225,30 @@ Adicionar:
 - [ ] Loja/Módulo suspenso bloqueia novo processamento nos serviços de destino e mantém
       leitura do histórico conforme o cargo autorizado.
 
-> **Evidência local — corte Pessoas/Cargos/AcessoControl:** implementação de
-> Pessoas/Cargos nos commits `2ecaa6b`, `94a0f51`, `3988fe7`, `02eb29d`, `9d2d550`,
-> `4fa1d54` e `c766477`, seguida pelo schema e backfill aditivos de `AcessoControl` em
-> `d64b24b` e sua projeção pelo bootstrap em `09326f6`. O Alembic head local é
-> `0004_revy_control_acessos_control`; a suíte Revy tem **163 testes passando**.
-> `REVY_CONTROL_ENABLED=0` e `REVY_CONTROL_RBAC_ENABLED=0` continuam sendo os defaults.
-> Não houve aplicação da migration nem rollout desse corte no lab.
+> **Evidência local — Fase 2 parcial:** Pessoas/Cargos e o backfill aditivo de
+> `AcessoControl` foram seguidos por convite/ativação, recuperação, lifecycle e versão
+> de sessão (`fda42fb` a `17a0963`), portfólio/contrato (`08fd64e` a `52b4796`) e
+> versão/reativação da Loja (`d218da3`, `f55677a`). O primeiro snapshot operacional
+> versionado de Loja/Vendas/Estoque está em `728b356`; transporte, pessoas/cargos e
+> consumo nos destinos ainda não fazem parte desse corte. O Alembic head local é
+> `0008_revy_control_loja_versao` e a suíte Revy tem **206 testes passando**.
 >
-> O backfill é idempotente e mantém `GestorRevy` como legado: reutiliza ou cria a
-> `Pessoa`, preserva o ID do gestor em `AcessoControl.id` e `gestor_legado_id` e copia
-> o hash de senha sem alterá-lo ou expor senha em texto puro. O bootstrap faz a mesma
-> reconciliação aditiva para o primeiro gestor. Por compatibilidade, autenticação,
-> cookie e construção do `Actor` ainda usam `GestorRevy`; `sessao_versao` já é
-> armazenada em `AcessoControl`, mas ainda é ignorada. Um acesso sem vínculo legado
-> ainda não é autenticável. Portanto este corte não representa convite, ativação de
-> acesso nem cutover da identidade.
+> `REVY_CONTROL_ENABLED=0` e `REVY_CONTROL_RBAC_ENABLED=0` continuam sendo os defaults,
+> e não houve migration nem rollout desse corte no lab. Sessões já validam o estado e
+> a versão de `AcessoControl`, mas login e construção do `Actor` ainda mantêm
+> compatibilidade com o vínculo legado de `GestorRevy`; um acesso sem esse vínculo
+> ainda não completa todo o fluxo de autenticação.
 >
-> A regra local provisória exige ao menos um Dono ativo para a transição a `pronta` e
-> protege o último Dono ativo enquanto a Loja requer prontidão. Isso ainda não demonstra
-> “acesso ativável”: convite, ativação e autenticação canônica por `AcessoControl` não
-> existem, portanto o item correspondente permanece aberto.
+> A regra local exige ao menos um Dono ativo para a transição a `pronta` e protege o
+> último Dono ativo enquanto a Loja requer prontidão. Isso ainda não demonstra “acesso
+> ativável” do Dono, por isso o item correspondente permanece aberto.
 
 Pendências para concluir Pessoas/Cargos e a Fase 2:
 
-- cortar autenticação, cookie e `Actor` para `AcessoControl`, aplicando
-  `sessao_versao` e definindo o fluxo seguro para acessos sem vínculo legado;
+- concluir login e `Actor` canônicos para acessos sem vínculo legado;
 - importar usuários atuais do Portal como pessoas/cargos, registrando conflitos;
-- implementar convite, ativação, recuperação, desativação e revogação de sessões;
-- implementar módulos, contratos e projeções versionadas aos serviços operacionais.
+- completar o contrato de provisionamento com pessoas/cargos e entrega idempotente;
+- aplicar as projeções e os gates nos serviços operacionais.
 
 ### Critério de pronto
 
