@@ -318,6 +318,105 @@ def test_detalhe_exibe_versoes_modulos_e_contrato_ativo(client, monkeypatch):
     assert "atrasada" in page.text
 
 
+def test_admin_configura_modulos_e_gestor_permanece_read_only(
+    client,
+    monkeypatch,
+):
+    _seed_module_catalog()
+    with SessionLocal() as db:
+        manager = GestorRevy(
+            email="gestor.modulos-ui@revy.local",
+            nome="Gestor Módulos UI",
+            senha_hash=hash_senha("senha-modulos-ui"),
+            papel="gestor",
+            ativo=True,
+        )
+        db.add(manager)
+        db.commit()
+        manager_id = manager.id
+
+    admin = _admin_actor()
+    store = StoreControl(SessionLocal).create(
+        admin,
+        CreateStore(name="Loja Módulos UI", slug="loja-modulos-ui"),
+    )
+    store_ref = StoreRef(id=store.id)
+    PortfolioControl(SessionLocal).configure(admin, store_ref, {"vendas"})
+    AccessControl(SessionLocal).grant(
+        admin,
+        GrantTrafficAccess(
+            store=store_ref,
+            manager_id=manager_id,
+            role=TrafficRole.COLLABORATOR,
+        ),
+    )
+
+    _enable_control_ui(monkeypatch)
+    _login(client, "trafego@revy.local", "secret-teste")
+    admin_page = client.get(f"/app/control/lojas/{store.id}")
+
+    assert admin_page.status_code == 200
+    assert 'id="form-configurar-modulos"' in admin_page.text
+    assert re.search(
+        r'id="selecao-modulo-vendas"[^>]*checked',
+        admin_page.text,
+    )
+    assert not re.search(
+        r'id="selecao-modulo-estoque"[^>]*checked',
+        admin_page.text,
+    )
+
+    updated = client.post(
+        f"/app/control/lojas/{store.id}/modulos",
+        data={
+            "csrf": csrf_da_resposta(admin_page),
+            "modulos": "estoque",
+        },
+        follow_redirects=False,
+    )
+
+    assert updated.status_code == 303
+    assert "ok=modulos" in updated.headers["location"]
+    updated_page = client.get(updated.headers["location"])
+    assert "Módulos da Loja atualizados." in updated_page.text
+    assert not re.search(
+        r'id="selecao-modulo-vendas"[^>]*checked',
+        updated_page.text,
+    )
+    assert re.search(
+        r'id="selecao-modulo-estoque"[^>]*checked',
+        updated_page.text,
+    )
+    assert re.search(
+        r'id="modulo-vendas".*?<td>Vendas</td>.*?'
+        r"<td>suspenso</td>.*?<td>2</td>",
+        updated_page.text,
+        re.DOTALL,
+    )
+    assert re.search(
+        r'id="modulo-estoque".*?<td>Estoque</td>.*?'
+        r"<td>ativo</td>.*?<td>1</td>",
+        updated_page.text,
+        re.DOTALL,
+    )
+
+    client.cookies.clear()
+    _login(client, "gestor.modulos-ui@revy.local", "senha-modulos-ui")
+    manager_page = client.get(f"/app/control/lojas/{store.id}")
+    forbidden = client.post(
+        f"/app/control/lojas/{store.id}/modulos",
+        data={
+            "csrf": csrf_da_resposta(manager_page),
+            "modulos": "vendas",
+        },
+    )
+
+    assert manager_page.status_code == 200
+    assert 'id="form-configurar-modulos"' not in manager_page.text
+    assert forbidden.status_code == 403
+    assert "permissão" in forbidden.text
+
+
 def test_admin_transiciona_concede_revoga_e_gestor_nao_muta(
     client,
     monkeypatch,

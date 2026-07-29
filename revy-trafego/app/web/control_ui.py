@@ -16,7 +16,13 @@ from app.control.accounts import ControlAccounts
 from app.control.audit import AuditTrail
 from app.control.contracts import ContractControl, ContractNotFound
 from app.control.people import PeopleDirectory
-from app.control.portfolio import PortfolioControl
+from app.control.portfolio import (
+    InvalidModuleSelection,
+    ModuleCode,
+    ModuleStatus,
+    PortfolioConflict,
+    PortfolioControl,
+)
 from app.control.roles import StoreRoles
 from app.control.session import actor_from_user
 from app.control.stores import StoreControl
@@ -210,6 +216,54 @@ def store_detail_page(
     if manager is None:
         return RedirectResponse(_public_path("/login"), status_code=303)
     return _render_store_detail(request, db, manager, loja_id)
+
+
+@router.post(
+    "/app/control/lojas/{loja_id}/modulos",
+    response_class=HTMLResponse,
+)
+async def configure_store_modules_page(
+    loja_id: str,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    manager, denied = _admin_for_mutation(request, db)
+    if denied is not None:
+        return denied
+    form = await request.form()
+    if not csrf_valido(request, form.get("csrf")):
+        return _csrf_denied()
+
+    try:
+        PortfolioControl(SessionLocal).configure(
+            actor_from_user(manager),
+            StoreRef(id=loja_id),
+            tuple(form.getlist("modulos")),
+        )
+    except StoreNotFound:
+        return HTMLResponse("Loja não encontrada.", status_code=404)
+    except InvalidModuleSelection:
+        return _render_store_detail(
+            request,
+            db,
+            manager,
+            loja_id,
+            error="Selecione ao menos um módulo para a Loja.",
+            status_code=422,
+        )
+    except PortfolioConflict:
+        return _render_store_detail(
+            request,
+            db,
+            manager,
+            loja_id,
+            error="Não foi possível configurar os módulos da Loja.",
+            status_code=409,
+        )
+    return RedirectResponse(
+        _detail_path(loja_id, "modulos"),
+        status_code=303,
+    )
 
 
 @router.post(
@@ -682,6 +736,12 @@ def _render_store_detail(
             "control_rbac_enabled": settings.revy_control_rbac_enabled,
             "store": store,
             "modules": modules,
+            "module_options": tuple(ModuleCode),
+            "active_module_codes": frozenset(
+                module.code.value
+                for module in modules
+                if module.status == ModuleStatus.ACTIVE
+            ),
             "contract": contract,
             "contract_amount_brl": (
                 _format_brl(contract.monthly_amount)
