@@ -136,6 +136,53 @@ class GestorRevy(Base):
     criado_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=agora)
 
 
+class AcessoControl(Base):
+    """Autenticação e papel global de uma Pessoa Revy no Revy Control."""
+
+    __tablename__ = "acessos_control"
+    __table_args__ = (
+        CheckConstraint(
+            "papel IN ('admin', 'gestor')",
+            name="ck_acessos_control_papel",
+        ),
+        CheckConstraint(
+            "estado IN ('pendente', 'ativo', 'desativado')",
+            name="ck_acessos_control_estado",
+        ),
+        CheckConstraint(
+            "sessao_versao >= 1",
+            name="ck_acessos_control_sessao_versao",
+        ),
+        UniqueConstraint(
+            "pessoa_id",
+            name="uq_acessos_control_pessoa_id",
+        ),
+        UniqueConstraint(
+            "gestor_legado_id",
+            name="uq_acessos_control_gestor_legado_id",
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=novo_id)
+    pessoa_id: Mapped[str] = mapped_column(
+        ForeignKey("pessoas.id", ondelete="RESTRICT")
+    )
+    papel: Mapped[str] = mapped_column(String(32))
+    estado: Mapped[str] = mapped_column(String(20))
+    senha_hash: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    sessao_versao: Mapped[int] = mapped_column(
+        Integer,
+        default=1,
+        server_default=text("1"),
+    )
+    gestor_legado_id: Mapped[Optional[str]] = mapped_column(
+        ForeignKey("gestores_revy.id", ondelete="RESTRICT"),
+        nullable=True,
+    )
+    criada_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=agora)
+    atualizada_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=agora)
+
+
 class VinculoTrafego(Base):
     __tablename__ = "vinculos_trafego"
     __table_args__ = (
