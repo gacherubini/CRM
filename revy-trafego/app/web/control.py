@@ -43,6 +43,7 @@ from app.control.types import (
     StoreRole,
     StoreRoleConflict,
     StoreRoleNotFound,
+    StoreRoleRef,
     StoreRoleView,
     StoreView,
     TrafficLinkView,
@@ -273,11 +274,10 @@ def list_store_roles(
     return {"items": [_store_role_json(role) for role in roles]}
 
 
-@router.post("/lojas/{loja_id}/cargos/{pessoa_id}/{cargo}/revogar")
+@router.post("/lojas/{loja_id}/cargos/{cargo_id}/revogar")
 def revoke_store_role(
     loja_id: str,
-    pessoa_id: str,
-    cargo: StoreRole,
+    cargo_id: str,
     body: StoreRoleRevokeBody,
     actor: Actor = Depends(_current_actor),
 ):
@@ -286,8 +286,7 @@ def revoke_store_role(
             actor,
             RevokeStoreRole(
                 store=StoreRef(id=loja_id),
-                person=PersonRef(id=pessoa_id),
-                role=cargo,
+                assignment=StoreRoleRef(id=cargo_id),
                 reason=body.motivo,
             ),
         )

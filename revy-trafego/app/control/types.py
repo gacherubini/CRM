@@ -180,10 +180,14 @@ class AssignStoreRole:
 
 
 @dataclass(frozen=True)
+class StoreRoleRef:
+    id: str
+
+
+@dataclass(frozen=True)
 class RevokeStoreRole:
     store: StoreRef
-    person: PersonRef
-    role: StoreRole
+    assignment: StoreRoleRef
     reason: str | None = None
 
 

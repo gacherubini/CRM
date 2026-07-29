@@ -79,14 +79,20 @@ class StoreRoles:
             store = _find_store(db, command.store, for_update=True)
             if store is None:
                 raise StoreNotFound("Loja não encontrada")
-            person = db.get(Pessoa, command.person.id)
-            if person is None:
-                raise PersonNotFound("Pessoa Revy não encontrada")
-            role = _active_role(db, store.id, person.id, command.role)
+            role = (
+                db.query(CargoLoja)
+                .filter(
+                    CargoLoja.id == command.assignment.id,
+                    CargoLoja.loja_id == store.id,
+                    CargoLoja.encerrado_em.is_(None),
+                )
+                .first()
+            )
             if role is None:
                 raise StoreRoleNotFound("cargo ativo não encontrado na Loja")
+            role_kind = StoreRole(role.cargo)
             if (
-                command.role is StoreRole.OWNER
+                role_kind is StoreRole.OWNER
                 and StoreStatus(store.status)
                 in {
                     StoreStatus.READY,
@@ -114,13 +120,13 @@ class StoreRoles:
                 resource_type="cargo_loja",
                 resource_id=role.id,
                 before={
-                    "person_id": person.id,
-                    "role": command.role.value,
+                    "person_id": role.pessoa_id,
+                    "role": role_kind.value,
                     "active": True,
                 },
                 after={
-                    "person_id": person.id,
-                    "role": command.role.value,
+                    "person_id": role.pessoa_id,
+                    "role": role_kind.value,
                     "active": False,
                 },
                 reason=command.reason,

@@ -23,6 +23,8 @@ from app.control.types import (
     StoreRef,
     StoreRole,
     StoreRoleConflict,
+    StoreRoleNotFound,
+    StoreRoleRef,
     StoreReadinessBlocked,
     StoreNotFound,
     TrafficRole,
@@ -170,7 +172,7 @@ def test_loja_em_configuracao_sem_dono_nao_pode_ficar_pronta():
 
 def test_dono_revogado_nao_satisfaz_prontidao_da_loja():
     admin = _admin_actor()
-    stores, roles, store, owners, _ = _store_with_owners(
+    stores, roles, store, _, assigned = _store_with_owners(
         admin,
         slug="loja-sem-dono-ativo",
         status=StoreStatus.CONFIGURING,
@@ -179,8 +181,7 @@ def test_dono_revogado_nao_satisfaz_prontidao_da_loja():
         admin,
         RevokeStoreRole(
             store=StoreRef(id=store.id),
-            person=PersonRef(id=owners[0].id),
-            role=StoreRole.OWNER,
+            assignment=StoreRoleRef(id=assigned[0].id),
         ),
     )
 
@@ -228,7 +229,7 @@ def test_revogar_ultimo_dono_de_loja_operacional_preserva_estado_e_historico(
 ):
     admin = _admin_actor()
     audit = AuditTrail(SessionLocal)
-    stores, roles, store, owners, assigned = _store_with_owners(
+    stores, roles, store, _, assigned = _store_with_owners(
         admin,
         slug="loja-operacional-protegida",
         status=protected_status,
@@ -240,8 +241,7 @@ def test_revogar_ultimo_dono_de_loja_operacional_preserva_estado_e_historico(
             admin,
             RevokeStoreRole(
                 store=StoreRef(id=store.id),
-                person=PersonRef(id=owners[0].id),
-                role=StoreRole.OWNER,
+                assignment=StoreRoleRef(id=assigned[0].id),
             ),
         )
 
@@ -271,7 +271,7 @@ def test_revogar_ultimo_dono_de_loja_operacional_preserva_estado_e_historico(
 )
 def test_ultimo_dono_pode_ser_revogado_em_estado_permissivo(permissive_status):
     admin = _admin_actor()
-    stores, roles, store, owners, _ = _store_with_owners(
+    stores, roles, store, _, assigned = _store_with_owners(
         admin,
         slug="loja-permissiva",
         status=permissive_status,
@@ -281,8 +281,7 @@ def test_ultimo_dono_pode_ser_revogado_em_estado_permissivo(permissive_status):
         admin,
         RevokeStoreRole(
             store=StoreRef(id=store.id),
-            person=PersonRef(id=owners[0].id),
-            role=StoreRole.OWNER,
+            assignment=StoreRoleRef(id=assigned[0].id),
         ),
     )
 
@@ -303,8 +302,7 @@ def test_loja_pronta_permite_revogar_dono_quando_outro_permanece_ativo():
         admin,
         RevokeStoreRole(
             store=StoreRef(id=store.id),
-            person=PersonRef(id=owners[0].id),
-            role=StoreRole.OWNER,
+            assignment=StoreRoleRef(id=assigned[0].id),
         ),
     )
 
@@ -527,8 +525,7 @@ def test_revogacao_preserva_historico_e_permitem_nova_atribuicao_auditada():
         admin,
         RevokeStoreRole(
             store=command.store,
-            person=command.person,
-            role=command.role,
+            assignment=StoreRoleRef(id=first.id),
             reason="troca temporária de dono",
         ),
     )
@@ -570,3 +567,65 @@ def test_revogacao_preserva_historico_e_permitem_nova_atribuicao_auditada():
         "role": "dono",
     }
     assert events[2].reason == "troca temporária de dono"
+
+
+def test_repetir_revogacao_antiga_nao_revoga_cargo_reatribuido():
+    admin = _admin_actor()
+    _, roles, store, owners, assigned = _store_with_owners(
+        admin,
+        slug="loja-sem-aba",
+        status=StoreStatus.DRAFT,
+    )
+    old_role = assigned[0]
+    command = RevokeStoreRole(
+        store=StoreRef(id=store.id),
+        assignment=StoreRoleRef(id=old_role.id),
+        reason="troca temporária",
+    )
+    roles.revoke(admin, command)
+    new_role = roles.assign(
+        admin,
+        AssignStoreRole(
+            store=StoreRef(id=store.id),
+            person=PersonRef(id=owners[0].id),
+            role=StoreRole.OWNER,
+        ),
+    )
+
+    with pytest.raises(StoreRoleNotFound):
+        roles.revoke(admin, command)
+
+    active = roles.list_for_store(admin, StoreRef(id=store.id))
+    assert new_role.id != old_role.id
+    assert [(item.id, item.active) for item in active] == [(new_role.id, True)]
+
+
+def test_id_de_cargo_de_outra_loja_parece_inexistente():
+    admin = _admin_actor()
+    _, roles, source_store, _, source_roles = _store_with_owners(
+        admin,
+        slug="loja-origem-cargo",
+        status=StoreStatus.DRAFT,
+    )
+    _, _, target_store, _, _ = _store_with_owners(
+        admin,
+        slug="loja-destino-cargo",
+        status=StoreStatus.DRAFT,
+    )
+
+    with pytest.raises(StoreRoleNotFound):
+        roles.revoke(
+            admin,
+            RevokeStoreRole(
+                store=StoreRef(id=target_store.id),
+                assignment=StoreRoleRef(id=source_roles[0].id),
+            ),
+        )
+
+    source_active = roles.list_for_store(
+        admin,
+        StoreRef(id=source_store.id),
+    )
+    assert [(item.id, item.active) for item in source_active] == [
+        (source_roles[0].id, True),
+    ]

@@ -124,7 +124,7 @@ def test_admin_revoga_cargo_pela_linha_e_segunda_revogacao_falha_explicita(
     )
     assigned_page = client.get(assigned.headers["location"])
     match = re.search(
-        rf'action="([^"]*/app/control/lojas/{store.id}/cargos/[^"]+/dono/revogar)"',
+        rf'action="([^"]*/app/control/lojas/{store.id}/cargos/[^"]+/revogar)"',
         assigned_page.text,
     )
     assert match is not None
@@ -296,8 +296,8 @@ def test_formularios_de_cargo_validam_csrf_email_pessoa_e_duplicidade(
             "cargo": "gerente",
         },
     )
-    missing_person = client.post(
-        f"{detail_url}/cargos/pessoa-ausente/dono/revogar",
+    missing_role = client.post(
+        f"{detail_url}/cargos/cargo-ausente/revogar",
         data={"csrf": csrf_da_resposta(assigned_page)},
     )
 
@@ -309,8 +309,8 @@ def test_formularios_de_cargo_validam_csrf_email_pessoa_e_duplicidade(
     assert "Informe o nome para cadastrar uma nova Pessoa Revy." in absent_person.text
     assert duplicate.status_code == 409
     assert "Essa pessoa já possui esse cargo ativo na Loja." in duplicate.text
-    assert missing_person.status_code == 404
-    assert "Pessoa Revy não encontrada." in missing_person.text
+    assert missing_role.status_code == 404
+    assert "Cargo ativo não encontrado na Loja." in missing_role.text
 
 
 def test_gestor_vinculado_nao_ve_pii_formularios_nem_pode_postar_cargos(
@@ -358,7 +358,7 @@ def test_gestor_vinculado_nao_ve_pii_formularios_nem_pode_postar_cargos(
     )
     admin_page = client.get(assigned.headers["location"])
     revoke_match = re.search(
-        rf'action="([^"]*/app/control/lojas/{store.id}/cargos/[^"]+/dono/revogar)"',
+        rf'action="([^"]*/app/control/lojas/{store.id}/cargos/[^"]+/revogar)"',
         admin_page.text,
     )
     assert revoke_match is not None
@@ -418,7 +418,7 @@ def test_revogar_ultimo_dono_de_loja_pronta_retorna_erro_no_detalhe(
     )
     assigned_page = client.get(assigned.headers["location"])
     revoke_match = re.search(
-        rf'action="([^"]*/app/control/lojas/{store.id}/cargos/[^"]+/dono/revogar)"',
+        rf'action="([^"]*/app/control/lojas/{store.id}/cargos/[^"]+/revogar)"',
         assigned_page.text,
     )
     assert revoke_match is not None

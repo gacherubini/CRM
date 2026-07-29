@@ -40,6 +40,7 @@ from app.control.types import (
     StoreRole,
     StoreRoleConflict,
     StoreRoleNotFound,
+    StoreRoleRef,
     TrafficLinkConflict,
     TrafficLinkNotFound,
     TrafficRole,
@@ -280,13 +281,12 @@ async def assign_store_role_page(
 
 
 @router.post(
-    "/app/control/lojas/{loja_id}/cargos/{pessoa_id}/{cargo}/revogar",
+    "/app/control/lojas/{loja_id}/cargos/{cargo_id}/revogar",
     response_class=HTMLResponse,
 )
 async def revoke_store_role_page(
     loja_id: str,
-    pessoa_id: str,
-    cargo: str,
+    cargo_id: str,
     request: Request,
     db: Session = Depends(get_db),
 ):
@@ -296,48 +296,18 @@ async def revoke_store_role_page(
     form = await request.form()
     if not csrf_valido(request, form.get("csrf")):
         return _csrf_denied()
-    try:
-        role = StoreRole(cargo)
-    except ValueError:
-        return _render_store_detail(
-            request,
-            db,
-            manager,
-            loja_id,
-            error="Selecione um cargo válido para revogar.",
-            status_code=422,
-        )
-    if not pessoa_id or len(pessoa_id) > 36:
-        return _render_store_detail(
-            request,
-            db,
-            manager,
-            loja_id,
-            error="Pessoa Revy não encontrada.",
-            status_code=404,
-        )
 
     try:
         StoreRoles(SessionLocal).revoke(
             actor_from_user(manager),
             RevokeStoreRole(
                 store=StoreRef(id=loja_id),
-                person=PersonRef(id=pessoa_id),
-                role=role,
+                assignment=StoreRoleRef(id=cargo_id),
                 reason=(form.get("motivo") or "").strip() or None,
             ),
         )
     except StoreNotFound:
         return HTMLResponse("Loja não encontrada.", status_code=404)
-    except PersonNotFound:
-        return _render_store_detail(
-            request,
-            db,
-            manager,
-            loja_id,
-            error="Pessoa Revy não encontrada.",
-            status_code=404,
-        )
     except StoreRoleNotFound:
         return _render_store_detail(
             request,

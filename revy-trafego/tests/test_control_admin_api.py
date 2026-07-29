@@ -224,6 +224,71 @@ def test_transicao_para_pronta_sem_dono_mapeia_bloqueio_de_prontidao(
     assert current.json()["estado"] == "em_configuracao"
 
 
+def test_api_revoga_cargo_pelo_id_da_atribuicao(client, monkeypatch):
+    _enable_control(monkeypatch)
+    _login(client, "trafego@revy.local", "secret-teste")
+    store = client.post(
+        "/control/v1/lojas",
+        json={"nome": "Loja Cargo por ID", "slug": "loja-cargo-id"},
+    ).json()
+    person = client.post(
+        "/control/v1/pessoas",
+        json={"nome": "Pessoa Cargo API", "email": "cargo.api@example.com"},
+    ).json()
+    role = client.post(
+        f"/control/v1/lojas/{store['id']}/cargos",
+        json={"pessoa_id": person["id"], "cargo": "dono"},
+    ).json()
+
+    revoked = client.post(
+        f"/control/v1/lojas/{store['id']}/cargos/{role['id']}/revogar",
+        json={"motivo": "troca comercial"},
+    )
+    repeated = client.post(
+        f"/control/v1/lojas/{store['id']}/cargos/{role['id']}/revogar",
+        json={},
+    )
+
+    assert revoked.status_code == 200
+    assert revoked.json()["id"] == role["id"]
+    assert revoked.json()["ativo"] is False
+    assert repeated.status_code == 404
+    assert repeated.json()["detail"]["code"] == "store_role_not_found"
+
+
+def test_api_nao_revela_cargo_de_outra_loja(client, monkeypatch):
+    _enable_control(monkeypatch)
+    _login(client, "trafego@revy.local", "secret-teste")
+    source = client.post(
+        "/control/v1/lojas",
+        json={"nome": "Loja Origem API", "slug": "loja-origem-api"},
+    ).json()
+    target = client.post(
+        "/control/v1/lojas",
+        json={"nome": "Loja Destino API", "slug": "loja-destino-api"},
+    ).json()
+    person = client.post(
+        "/control/v1/pessoas",
+        json={"nome": "Pessoa Isolada", "email": "isolada.api@example.com"},
+    ).json()
+    role = client.post(
+        f"/control/v1/lojas/{source['id']}/cargos",
+        json={"pessoa_id": person["id"], "cargo": "dono"},
+    ).json()
+
+    hidden = client.post(
+        f"/control/v1/lojas/{target['id']}/cargos/{role['id']}/revogar",
+        json={},
+    )
+    source_roles = client.get(f"/control/v1/lojas/{source['id']}/cargos")
+
+    assert hidden.status_code == 404
+    assert hidden.json()["detail"]["code"] == "store_role_not_found"
+    assert [(item["id"], item["ativo"]) for item in source_roles.json()["items"]] == [
+        (role["id"], True),
+    ]
+
+
 def test_admin_concede_revoga_e_consulta_auditoria_da_loja(
     client,
     monkeypatch,

@@ -173,9 +173,7 @@ def test_admin_atribui_lista_e_revoga_cargos_ativos_da_loja(
         assert "origem_id" not in payload
 
     revoked = client.post(
-        (
-            f"{roles_url}/{person['id']}/dono/revogar"
-        ),
+        f"{roles_url}/{owner.json()['id']}/revogar",
         json={"motivo": "troca de proprietário"},
     )
     active_after_revoke = client.get(roles_url)
@@ -216,10 +214,7 @@ def test_api_mapeia_erros_de_pessoa_e_cargo_sem_expor_detalhes_internos(
     )
     missing_person = client.get("/control/v1/pessoas/pessoa-inexistente")
     missing_role = client.post(
-        (
-            f"/control/v1/lojas/{store['id']}/cargos/"
-            f"{person['id']}/dono/revogar"
-        ),
+        f"/control/v1/lojas/{store['id']}/cargos/cargo-inexistente/revogar",
         json={},
     )
 
@@ -280,10 +275,11 @@ def test_gestor_lista_cargos_so_da_loja_vinculada_e_nao_pode_mutar(
     ).json()
     allowed_roles_url = f"/control/v1/lojas/{allowed_id}/cargos"
     hidden_roles_url = f"/control/v1/lojas/{hidden_id}/cargos"
-    assert client.post(
+    allowed_role = client.post(
         allowed_roles_url,
         json={"pessoa_id": person["id"], "cargo": "dono"},
-    ).status_code == 201
+    )
+    assert allowed_role.status_code == 201
     assert client.post(
         hidden_roles_url,
         json={"pessoa_id": person["id"], "cargo": "vendedor"},
@@ -299,7 +295,7 @@ def test_gestor_lista_cargos_so_da_loja_vinculada_e_nao_pode_mutar(
         json={"pessoa_id": person["id"], "cargo": "gerente"},
     )
     forbidden_revoke = client.post(
-        f"{allowed_roles_url}/{person['id']}/dono/revogar",
+        f"{allowed_roles_url}/{allowed_role.json()['id']}/revogar",
         json={},
     )
     forbidden_person = client.get(f"/control/v1/pessoas/{person['id']}")
