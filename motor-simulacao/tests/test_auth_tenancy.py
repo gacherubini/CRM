@@ -4,7 +4,13 @@ from fastapi.testclient import TestClient
 
 from app.auth import hash_token
 from app.main import app
-from app.models_db import ClienteApiORM, CredencialApiORM, IdempotenciaORM, SimulacaoORM
+from app.models_db import (
+    ClienteApiORM,
+    ClienteOperacionalProjecao,
+    CredencialApiORM,
+    IdempotenciaORM,
+    SimulacaoORM,
+)
 
 
 def _payload(prazo=48):
@@ -22,6 +28,15 @@ def _cliente(db, nome, token):
         CredencialApiORM(
             id=str(uuid.uuid4()), cliente_id=cliente_id, nome="principal",
             token_hash=hash_token(token),
+        )
+    )
+    db.add(
+        ClienteOperacionalProjecao(
+            cliente_id=cliente_id,
+            aggregate="loja",
+            version=1,
+            state="ativa",
+            event_id="seed-ativa",
         )
     )
     db.commit()

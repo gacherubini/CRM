@@ -38,6 +38,27 @@ class ClienteApiORM(Base):
     criado_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_agora)
 
 
+class ClienteOperacionalProjecao(Base):
+    """Projeção monotônica do estado operacional do Control por cliente_api.
+
+    Tenancy do Motor é ``cliente_id`` (sem loja_slug). PK composta
+    ``(cliente_id, aggregate)`` — aggregates: ``loja``, ``vendas``, ``estoque``.
+    """
+
+    __tablename__ = "cliente_operacional_projecao"
+
+    cliente_id: Mapped[str] = mapped_column(
+        ForeignKey("clientes_api.id"), primary_key=True, nullable=False
+    )
+    aggregate: Mapped[str] = mapped_column(String(40), primary_key=True, nullable=False)
+    version: Mapped[int] = mapped_column(Integer, nullable=False)
+    state: Mapped[str] = mapped_column(String(40), nullable=False)
+    event_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    atualizado_em: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_agora, onupdate=_agora
+    )
+
+
 class CredencialApiORM(Base):
     __tablename__ = "credenciais_api"
 

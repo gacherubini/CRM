@@ -9,7 +9,7 @@ from fastapi import Depends, FastAPI, Query, Request, Response
 from fastapi.responses import FileResponse, JSONResponse
 from sqlalchemy.orm import Session
 
-from app import auth, config, credenciais, models_db, observabilidade, servico  # noqa: F401
+from app import auth, config, credenciais, models_db, observabilidade, provisioning, servico  # noqa: F401
 from app.db import Base, engine, get_db
 from app.motor.base import SolicitacaoSimulacao
 from app.motor.mock import TAXAS_MOCK
@@ -141,6 +141,43 @@ def testar_login_provedor(
     return resultado
 
 
+def _exigir_cliente_operacional(db: Session, cliente_id: str) -> JSONResponse | None:
+    """Bloqueia novas simulações quando a projeção do Control não autoriza."""
+    if not provisioning.allows_processing(db, cliente_id):
+        return JSONResponse(
+            status_code=423,
+            content={
+                "erro": {
+                    "code": "store_not_operational",
+                    "message": "loja não operacional",
+                }
+            },
+        )
+    return None
+
+
+@app.post("/v1/internal/provisioning/state")
+def receber_estado_provisionamento(
+    payload: dict,
+    db: Session = Depends(get_db),
+    cliente=Depends(auth.autenticar_cliente),
+):
+    """Recebe snapshot operacional do Control e aplica projeção monotônica local.
+
+    Autentica com Bearer de cliente (mesmo padrão das rotas /v1/*). A projeção
+    fica amarrada ao ``cliente.id`` autenticado — o Motor não tem loja_slug.
+    """
+    if isinstance(cliente, JSONResponse):
+        return cliente
+    reasons = provisioning.apply_payload(db, cliente.id, payload)
+    db.commit()
+    return {
+        "ok": True,
+        "reasons": reasons,
+        "allows_processing": provisioning.allows_processing(db, cliente.id),
+    }
+
+
 @app.post("/v1/simulacoes")
 def criar_simulacao(
     sol: SolicitacaoSimulacao,
@@ -151,6 +188,9 @@ def criar_simulacao(
 ):
     if isinstance(cliente, JSONResponse):
         return cliente
+    bloqueio = _exigir_cliente_operacional(db, cliente.id)
+    if bloqueio is not None:
+        return bloqueio
     idempotency_key = request.headers.get("Idempotency-Key")
     # Quem disparou (Portal repassa email do usuário logado via X-Ator). Sem
     # header fica nulo — chamada direta à API não tem "ator" de histórico.

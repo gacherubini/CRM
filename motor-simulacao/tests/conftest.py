@@ -14,7 +14,11 @@ from app import models_db  # noqa: E402,F401 (registra os modelos antes do creat
 from app.auth import hash_token  # noqa: E402
 from app.db import Base, get_db  # noqa: E402
 from app.main import app  # noqa: E402
-from app.models_db import ClienteApiORM, CredencialApiORM  # noqa: E402
+from app.models_db import (  # noqa: E402
+    ClienteApiORM,
+    ClienteOperacionalProjecao,
+    CredencialApiORM,
+)
 
 TEST_CLIENT_ID = "10000000-0000-0000-0000-000000000001"
 TEST_TOKEN = "token-teste-cliente-principal"
@@ -66,6 +70,7 @@ def _limpar_banco(db):
         "simulacoes",
         "auditoria",
         "credenciais_provedor",
+        "cliente_operacional_projecao",
         "credenciais_api",
         "clientes_api",
     ):
@@ -77,6 +82,16 @@ def _limpar_banco(db):
             cliente_id=TEST_CLIENT_ID,
             nome="Credencial dos testes",
             token_hash=hash_token(TEST_TOKEN),
+        )
+    )
+    # Suite de regressão assume cliente operacional; testes do gate sobrescrevem.
+    db.add(
+        ClienteOperacionalProjecao(
+            cliente_id=TEST_CLIENT_ID,
+            aggregate="loja",
+            version=1,
+            state="ativa",
+            event_id="seed-ativa",
         )
     )
     db.commit()
