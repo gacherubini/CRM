@@ -94,6 +94,7 @@ def test_control_ui_lista_escopo_e_mostra_formulario_somente_para_admin(
     assert "Loja UI Permitida" in admin_page.text
     assert "Loja UI Alheia" in admin_page.text
     assert 'id="form-criar-loja"' in admin_page.text
+    assert 'id="nav-control-lojas"' in admin_page.text
 
     client.cookies.clear()
     _login(client, "gestor.ui@revy.local", "senha-gestor-ui")

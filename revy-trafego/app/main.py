@@ -214,6 +214,7 @@ def contexto(request: Request, usuario=None, db: Session | None = None, **extra)
         "usuario": usuario,
         "csrf": csrf_token(request) if usuario else "",
         "lojas": lojas or [],
+        "control_enabled": settings.revy_control_enabled,
         "control_rbac_enabled": settings.revy_control_rbac_enabled,
         **extra,
     }

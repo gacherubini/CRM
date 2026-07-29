@@ -34,6 +34,10 @@
       </div>
 
       <nav class="nav" aria-label="Menu principal">
+        {% if control_enabled %}
+        <span class="nav-section">Control</span>
+        <a id="nav-control-lojas" class="nav-link {{ 'active' if path.startswith('/app/control/lojas') else '' }}" href="{{ public_path('/app/control/lojas') }}">Lojas</a>
+        {% endif %}
         <span class="nav-section">Loja</span>
         <form method="post" action="{{ public_path('/app/loja') }}" class="loja-switch" style="margin:0 0 10px;padding:0 4px">
           <input type="hidden" name="csrf" value="{{ csrf }}">
