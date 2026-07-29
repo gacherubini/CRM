@@ -263,7 +263,9 @@ Adicionar:
 Pendências para concluir a Fase 2:
 
 - expandir gates finos (WA inbound/outbound; confirmar venda no Portal);
-- rollout lab (migrations + flags + tokens por destino).
+- rollout lab: seguir
+  [runbook de provisionamento](2026-07-29-runbook-rollout-lab-provisionamento.md)
+  (migrations + flags + tokens + smoke 423/404).
 
 ### Critério de pronto
 
