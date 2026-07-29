@@ -1,6 +1,6 @@
 # Plano — Evolução do Revy Tráfego para Revy Control
 
-**Status:** ATIVO / FASE 2 LOCAL AVANÇADA (identidade + prontidão; entrega pendente)
+**Status:** ATIVO / CÓDIGO F0–6 PARCIAL (integrações Meta, Google OAuth skeleton, multi-WA canais, dashboard; lab + F4 métricas/conversões + F5 connect ainda abertos)
 **Data:** 2026-07-29
 **Spec:** [`docs/superpowers/specs/2026-07-29-revy-control-design.md`](../superpowers/specs/2026-07-29-revy-control-design.md)
 **Vocabulário:** [`CONTEXT.md`](../../CONTEXT.md)
