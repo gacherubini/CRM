@@ -196,7 +196,9 @@ Ordem de enablement Loja (canônica): shell → entitlements (após projeção e
 ### 3.1 Operacionais / humanos
 
 1. **Google OAuth precisa de secrets GCP**  
-   Código de OAuth, ports HTTP, outbox e UI existem; **não há** projeto GCP/consent/developer token configurados no lab por este repositório. Sem `GOOGLE_ADS_*` secrets, conexão falha com `GoogleAdsOAuthMisconfigured`.
+   Código de OAuth, ports HTTP e outbox existem; a **UI de operação** (conectar, escolher conta, vincular conversões, sincronizar métricas) é a Parte B de `docs/superpowers/specs/2026-07-29-telas-canais-wa-google-design.md` e ainda não está mergeada. **Não há** projeto GCP/consent/developer token configurados no lab por este repositório. Sem `GOOGLE_ADS_*` secrets, conexão falha com `GoogleAdsOAuthMisconfigured`.
+
+   Pendência de ops junto com a Parte B: o `redirect_uri` registrado no Google Cloud Console e o secret `GOOGLE_ADS_OAUTH_REDIRECT_URI` apontam para o callback JSON `/control/v1/google-ads/oauth/callback` e precisam ser repontados **à mão** para a rota HTML `/app/control/google-ads/oauth/callback` (detalhes em `revy-trafego/README.md`, "Operação Google Ads no Control"). Sem isso o admin volta do Google em JSON cru ou toma `redirect_uri_mismatch`.
 
 2. **Motor on-demand**  
    Workers Playwright sob demanda (`WORKER_ON_DEMAND`, Machines Fly, `on-demand-worker-entrypoint.sh`) são **infra do Motor**, não do Control/Loja. A Loja embute simulação via atalhos/rotas legadas; cold-start e slots são pendência operacional do deploy Motor, não de produto Control/Loja.

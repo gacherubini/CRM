@@ -178,8 +178,8 @@ pytest -q
 | `REVY_TRAFEGO_CAPI_WORKER` | `0` | Retry outbox |
 | `REVY_CONTROL_ENABLED` | `0` | Habilita as superfícies `/control/v1` e `/app/control`; desligada, elas respondem 404 |
 | `REVY_CONTROL_RBAC_ENABLED` | `0` | Aplica escopo de lojas por vínculo no backend e no seletor; ligar somente após migration/backfill e gate de isolamento da Fase 1 |
-| `GOOGLE_ADS_SYNC_ENABLED` | `0` | Liga rotas Control de OAuth/contas/métricas Google Ads; no lifespan também sobe o worker de métricas |
-| `GOOGLE_CONVERSIONS_ENABLED` | `0` | Liga bindings/outbox, hook venda→conversão e worker de outbox Google |
+| `GOOGLE_ADS_SYNC_ENABLED` | `0` | Liga rotas Control de OAuth/contas/métricas Google Ads e (Parte B, em construção) os painéis Google no detalhe da loja em `/app/control`; no lifespan também sobe o worker de métricas |
+| `GOOGLE_CONVERSIONS_ENABLED` | `0` | Liga bindings/outbox, hook venda→conversão e worker de outbox Google; também gate do painel de conversões da UI (Parte B) |
 | `GOOGLE_CONVERSIONS_WORKER_ENABLED` | = conversions | Override do worker; default segue `GOOGLE_CONVERSIONS_ENABLED` |
 | `GOOGLE_CONVERSIONS_WORKER_INTERVAL_SECONDS` | `60` | Intervalo do outbox Google |
 | `GOOGLE_CONVERSIONS_WORKER_INITIAL_DELAY_SECONDS` | `30` | Delay inicial do outbox Google |
@@ -190,7 +190,7 @@ pytest -q
 | `GOOGLE_ADS_METRICS_WORKER_TIME_WINDOW_DAYS` | `7` | Janela de datas no sync |
 | `GOOGLE_ADS_OAUTH_CLIENT_ID` | vazio | OAuth Web client (GCP) |
 | `GOOGLE_ADS_OAUTH_CLIENT_SECRET` | vazio | Secret do client OAuth (secret manager) |
-| `GOOGLE_ADS_OAUTH_REDIRECT_URI` | vazio | Callback HTTPS do Control |
+| `GOOGLE_ADS_OAUTH_REDIRECT_URI` | vazio | Callback HTTPS do Control; ver "Operação Google Ads no Control" — precisa ser repontado à mão para a rota HTML nova (passo de ops pendente) |
 | `GOOGLE_ADS_DEVELOPER_TOKEN` | vazio | Developer token (API Center do manager Revy); sem ele o app usa Fake* |
 | `GOOGLE_ADS_API_VERSION` | `v19` | Versão REST da Google Ads API |
 | `MULTI_WHATSAPP_ENABLED` | `0` | `1` = libera os endpoints proxy de canais WhatsApp e faz a prontidão contar canais ativos |
@@ -273,6 +273,35 @@ existentes. As duas flags permanecem default off; não ativar no lab antes de co
 inventário, restore drill, migrations/backfills e o gate de isolamento. O Alembic head
 local é `0008_revy_control_loja_versao`; o lab permanece sem essas migrations e sem
 rollout do Control.
+
+### Operação Google Ads no Control (Parte B — em construção)
+
+Desenho em `docs/superpowers/specs/2026-07-29-telas-canais-wa-google-design.md` (Parte B).
+Hoje o dashboard mostra a coluna "Google" e o painel de aquisição, mas **não existe caminho
+de UI** para conectar OAuth, escolher a conta, vincular conversion actions ou disparar sync:
+tudo isso só por `curl` em `/control/v1/.../google-ads/*`. A Parte B acrescenta quatro
+painéis no detalhe da loja (`/app/control/lojas/{id}`), sem endpoint novo de API, gated por
+`GOOGLE_ADS_SYNC_ENABLED` (o painel de conversões, também por `GOOGLE_CONVERSIONS_ENABLED`).
+Autorização segue no domínio: admin Revy **ou** gestor responsável pela loja.
+
+**Passo manual de ops — obrigatório e ainda não feito.** O callback OAuth atual é
+`GET /control/v1/google-ads/oauth/callback` e responde **JSON**; é essa a URL registrada no
+Google e no `GOOGLE_ADS_OAUTH_REDIRECT_URI`, então quem conectar pela UI volta do Google
+numa página de JSON cru. A Parte B adiciona
+`GET /app/control/google-ads/oauth/callback`, que completa o OAuth e redireciona para
+`/app/control/lojas/{id}?ok=google_conectado`. Para a UI funcionar é preciso, antes do
+rollout:
+
+1. registrar a rota HTML nova como URI de redirecionamento autorizado no **Google Cloud
+   Console** (no lab, com o prefixo do edge:
+   `https://app2037.fly.dev/trafego/app/control/google-ads/oauth/callback`);
+2. repontar o secret `GOOGLE_ADS_OAUTH_REDIRECT_URI` para a mesma URL
+   (`fly secrets set GOOGLE_ADS_OAUTH_REDIRECT_URI=... -a app2037`).
+
+Os dois têm de casar exatamente — divergência dá `redirect_uri_mismatch` no Google, sem
+pista no log do Control. O endpoint JSON continua existindo para compatibilidade e não deve
+ser removido. Segue valendo o gap de secrets GCP (client id/secret, developer token): sem
+eles a conexão falha com `GoogleAdsOAuthMisconfigured`.
 
 Público via edge: prefixar `/trafego` (ex.: `/trafego/health/live`, `/trafego/v1/...`).  
 No bundle, portal/catálogo usam `http://127.0.0.1:9010` **sem** prefixo.
