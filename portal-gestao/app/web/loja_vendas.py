@@ -25,16 +25,15 @@ from app.loja.sales_overview import (  # noqa: E402
     build_sales_overview,
 )
 from app.main import (  # noqa: E402
-    MSG_EQUIPE_CONTROL,
     contexto,
     enriquecer_credenciais,
     get_chatbot_client,
     get_motor_client,
     redirecionar_login,
     templates,
-    _membros_da_loja,
     PAPEIS_EQUIPE_ROTULO,
 )
+from app.web.equipe import MSG_EQUIPE_CONTROL, _membros_da_loja  # noqa: E402
 from app.clients.motor import MotorClient, MotorIndisponivel  # noqa: E402
 from app.models import Usuario  # noqa: E402
 

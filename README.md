@@ -12,6 +12,9 @@ Parcelas, taxas e bancos não são enviados automaticamente ao cliente.
 
 ### Estado atual do Revy Control
 
+> **Agentes e manutencao:** comece por [`CLAUDE.md`](CLAUDE.md) para o mapa dos sete produtos,
+> acoplamentos HTTP, arquivos certos e comandos de teste/deploy com baixo uso de contexto.
+
 Fases 0–2 em corte local **parcial/avançado**: domínio, migrations e APIs de Loja/RBAC,
 Pessoas/cargos/acessos, módulos Vendas/Estoque, contrato, versão monotônica e reativação
 explícita `suspensa → ativa`; o JSON padrão continua sem `versao`. O
