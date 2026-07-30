@@ -3,6 +3,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
+from typing import Literal
+
+# Estados de um read model de tela: nunca inventar métrica quando a fonte falha.
+StatusReadModel = Literal["ok", "vazio", "erro", "parcial"]
 
 
 class Role(str, Enum):

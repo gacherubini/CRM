@@ -160,32 +160,41 @@ depende apenas de `loja_slug` ou do papel legado.
 
 Criar um read model determinístico com:
 
-- total disponível, reservado e vendido;
-- idade do estoque em faixas;
-- veículos sem preço, foto ou campo obrigatório;
-- procura por modelo com base em interesses registrados;
-- reservas e vendas recentes.
+- [x] total disponível, reservado e vendido;
+- [x] idade do estoque em faixas (`criado_em`/`entrada`; omitido se sem datas);
+- [x] veículos sem preço, foto ou campo obrigatório;
+- [ ] procura por modelo com base em interesses registrados *(adiado: depende de interesses/Atendimento; não inventar métrica)*;
+- [x] reservas e vendas recentes *(a partir do status + `atualizado_em` da Estoque API)*.
+
+Implementação: `portal-gestao/app/loja/estoque_overview.py`, rotas em
+`portal-gestao/app/web/loja_estoque.py`, template `templates/loja/estoque_visao.html`.
+Flag `REVY_LOJA_SHELL_ENABLED` (default off).
 
 ### Veículos
 
-- [ ] Reaproveitar CRUD, fotos, preço, custo, disponibilidade, reserva e venda.
-- [ ] Manter Estoque API como fonte de verdade.
-- [ ] Integrar publicação no Catálogo como ação/estado do veículo.
-- [ ] Abrir interessados no Atendimento, sem criar CRM dentro do Estoque.
-- [ ] Aplicar campos sensíveis por cargo; vendedor não recebe custo/margem se essa for
-      a política aprovada.
-- [ ] Redirecionar rotas antigas somente após equivalência funcional.
+- [x] Reaproveitar CRUD, fotos, preço, custo, disponibilidade, reserva e venda
+      (`GET /app/loja/estoque/veiculos` → redirect para `/app/estoque*`).
+- [x] Manter Estoque API como fonte de verdade.
+- [x] Integrar publicação no Catálogo como ação/estado do veículo
+      *(permanece nas ações legadas `/app/estoque/{id}/{publicar|despublicar}`)*.
+- [ ] Abrir interessados no Atendimento, sem criar CRM dentro do Estoque *(Fase 4)*.
+- [x] Aplicar campos sensíveis por cargo; vendedor não recebe custo/margem se essa for
+      a política aprovada *(visão geral não exibe custo; lista legada já oculta)*.
+- [ ] Redirecionar rotas antigas somente após equivalência funcional
+      *(legado `/app/estoque*` permanece; shell novo gated por flag)*.
 
 ### Testes
 
-- [ ] Indicadores têm fixtures e fórmulas explícitas.
-- [ ] Sem dados retorna estado vazio, não métricas inventadas.
-- [ ] Publicar/despublicar preserva integração atual do Catálogo.
-- [ ] Falha de Catálogo não corrompe o veículo.
-- [ ] Nenhum caminho chama provedor de IA.
+- [x] Indicadores têm fixtures e fórmulas explícitas.
+- [x] Sem dados retorna estado vazio, não métricas inventadas.
+- [x] Publicar/despublicar preserva integração atual do Catálogo
+      *(sem alteração de caminho; testes legados de estoque cobrem)*.
+- [x] Falha de Catálogo não corrompe o veículo *(inalterado no legado)*.
+- [x] Nenhum caminho chama provedor de IA.
 
 **Critério de pronto:** toda operação atual de estoque e catálogo cabe em Visão geral
-ou Veículos, sem IA e sem perda funcional.
+ou Veículos, sem IA e sem perda funcional. *(Parcial: visão + entrada de veículos
+entregues; procura por modelo e cutover de rotas antigas ficam para fases seguintes.)*
 
 ---
 

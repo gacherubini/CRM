@@ -4407,5 +4407,8 @@ async def trafego_salvar(request: Request, db: Session = Depends(get_db)):
 # acima (usuario_atual, contexto, templates, get_chatbot_client etc.) — importar
 # aqui evita ciclo de import, já que app.main é o módulo carregado primeiro.
 from app import relatorios  # noqa: E402
+from app.web import loja_estoque  # noqa: E402
 
 app.include_router(relatorios.router)
+# Revy Loja Fase 2: visão geral de estoque + entrada de veículos (flag off por padrão).
+app.include_router(loja_estoque.router)
