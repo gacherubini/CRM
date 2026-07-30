@@ -1015,7 +1015,9 @@ def simular(
 class CanalWhatsAppInput(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    evolution_instance: str = Field(min_length=1, max_length=120)
+    # Opcional: ausente, o Chatbot gera o nome. Expand-only — o proxy do
+    # Control continua enviando o campo e segue funcionando.
+    evolution_instance: str | None = Field(default=None, max_length=120)
     e164_or_label: str = Field(min_length=1, max_length=80)
 
 

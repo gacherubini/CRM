@@ -5,6 +5,7 @@ Chatbot é dono de `whatsapp_canais`. Número/instância nunca muda de loja:
 """
 from __future__ import annotations
 
+import re
 import uuid
 from typing import Any
 
@@ -18,6 +19,7 @@ from app.whatsapp_provider import (
     ESTADO_INATIVO,
     ESTADO_PENDENTE,
     WhatsAppProvider,
+    WhatsAppProvisionError,
     get_whatsapp_provider,
 )
 
@@ -45,27 +47,53 @@ def list_channels(db: Session, loja_id: str) -> list[dict[str, Any]]:
     return [_canal_dict(c) for c in rows]
 
 
+def _sanitizar_nome(bruto: str) -> str:
+    """Reduz a [a-z0-9-]: o nome vira segmento de URL na Evolution."""
+    limpo = re.sub(r"[^a-z0-9-]+", "-", (bruto or "").strip().lower())
+    return re.sub(r"-{2,}", "-", limpo).strip("-")
+
+
+def gerar_nome_instancia(db: Session, loja: Loja) -> str:
+    """Nome novo e livre: {slug}-{4 hex}. Colisão é improvável mas tratada."""
+    base = _sanitizar_nome(loja.slug) or "loja"
+    for _ in range(10):
+        candidato = f"{base}-{uuid.uuid4().hex[:4]}"
+        ja_existe = (
+            db.query(WhatsAppCanal)
+            .filter(WhatsAppCanal.evolution_instance == candidato)
+            .first()
+        )
+        if ja_existe is None:
+            return candidato
+    raise HTTPException(
+        status_code=503,
+        detail="não foi possível gerar nome de instância; tente novamente",
+    )
+
+
 def register_channel(
     db: Session,
     loja_id: str,
-    instance: str,
+    instance: str | None,
     label: str,
 ) -> dict[str, Any]:
-    """Registra um canal na loja.
+    """Registra um canal na loja. Não toca a Evolution — só persiste.
 
+    ``instance`` ausente faz o Chatbot gerar o nome (a Loja nunca escolhe).
     Com MULTI_WHATSAPP desligado, só permite 1 canal ativo por loja.
-    Instância já existente em qualquer loja → 409 (número nunca troca de loja).
+    Instância já existente em qualquer loja → 409.
     """
     instance = (instance or "").strip()
     label = (label or "").strip()
-    if not instance:
-        raise HTTPException(status_code=422, detail="evolution_instance é obrigatório")
     if not label:
         raise HTTPException(status_code=422, detail="e164_or_label é obrigatório")
 
     loja = db.get(Loja, loja_id)
     if loja is None:
         raise HTTPException(status_code=404, detail="loja não encontrada")
+
+    if not instance:
+        instance = gerar_nome_instancia(db, loja)
 
     existente = (
         db.query(WhatsAppCanal)
@@ -143,7 +171,18 @@ def connect_channel(
     if not canal.ativo or canal.estado == ESTADO_INATIVO:
         raise HTTPException(status_code=409, detail="canal inativo")
     prov = provider or get_whatsapp_provider()
-    result = prov.connect(canal)
+    # getattr porque MemoryWhatsAppProvider e o stub não têm ensure_instance
+    # — e não devem ganhar.
+    ensure = getattr(prov, "ensure_instance", None)
+    try:
+        if callable(ensure):
+            ensure(canal)
+        result = prov.connect(canal)
+    except WhatsAppProvisionError as exc:
+        # Estado persistido não muda: o canal segue pendente e o botão
+        # "conectar" é o retry natural.
+        db.rollback()
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
     db.commit()
     db.refresh(canal)
     out = _canal_dict(canal)

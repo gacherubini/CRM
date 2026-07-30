@@ -1,9 +1,11 @@
 """Canais WhatsApp (multi-WA skeleton): list/register/inactivate + backfill + resolver."""
+import re
 import uuid
 
 import pytest
 
 from app import channels, config, models_db, servico
+from app.whatsapp_provider import WhatsAppProvisionError
 from fastapi import HTTPException
 
 
@@ -148,3 +150,69 @@ def test_http_isolamento_loja(client, loja_a, loja_b, monkeypatch):
         headers=loja_b["headers"],
     )
     assert r2.status_code == 404
+
+
+def test_register_sem_instance_gera_nome_do_slug(db, loja_a, monkeypatch):
+    monkeypatch.setattr(config, "MULTI_WHATSAPP_ENABLED", True)
+    canal = channels.register_channel(db, loja_a["loja_id"], None, "linha 2")
+    inst = canal["evolution_instance"]
+    assert inst.startswith(loja_a["slug"] + "-")
+    assert re.fullmatch(r"[a-z0-9-]+", inst)
+
+
+def test_register_sem_instance_duas_vezes_gera_nomes_distintos(db, loja_a, monkeypatch):
+    monkeypatch.setattr(config, "MULTI_WHATSAPP_ENABLED", True)
+    a = channels.register_channel(db, loja_a["loja_id"], None, "linha 2")
+    b = channels.register_channel(db, loja_a["loja_id"], None, "linha 3")
+    assert a["evolution_instance"] != b["evolution_instance"]
+
+
+def test_register_com_instance_continua_idempotente(db, loja_a, monkeypatch):
+    monkeypatch.setattr(config, "MULTI_WHATSAPP_ENABLED", True)
+    a = channels.register_channel(db, loja_a["loja_id"], "fixa-1", "linha 2")
+    b = channels.register_channel(db, loja_a["loja_id"], "fixa-1", "outro label")
+    assert a["id"] == b["id"]
+
+
+def test_http_post_canal_sem_instance(client, loja_a, monkeypatch):
+    monkeypatch.setattr(config, "MULTI_WHATSAPP_ENABLED", True)
+    r = client.post(
+        "/v1/whatsapp/canais",
+        headers=loja_a["headers"],
+        json={"e164_or_label": "linha 2"},
+    )
+    assert r.status_code == 201
+    assert r.json()["evolution_instance"]
+
+
+class _ProviderQueFalha:
+    def __init__(self):
+        self.ensure_chamado = 0
+
+    def ensure_instance(self, canal):
+        self.ensure_chamado += 1
+        raise WhatsAppProvisionError("evolution fora", code="evolution_unreachable")
+
+    def connect(self, canal):
+        raise AssertionError("connect não deve ser chamado se o ensure falhou")
+
+    def status(self, canal):
+        raise NotImplementedError
+
+    def disconnect(self, canal):
+        raise NotImplementedError
+
+
+def test_connect_chama_ensure_e_502_quando_evolution_fora(db, loja_a, monkeypatch):
+    monkeypatch.setattr(config, "MULTI_WHATSAPP_ENABLED", True)
+    canal = channels.register_channel(db, loja_a["loja_id"], None, "linha 2")
+    prov = _ProviderQueFalha()
+
+    with pytest.raises(Exception) as exc:
+        channels.connect_channel(db, loja_a["loja_id"], canal["id"], provider=prov)
+
+    assert getattr(exc.value, "status_code", None) == 502
+    assert prov.ensure_chamado == 1
+    atual = channels.list_channels(db, loja_a["loja_id"])
+    alvo = [c for c in atual if c["id"] == canal["id"]][0]
+    assert alvo["estado"] == "pendente"

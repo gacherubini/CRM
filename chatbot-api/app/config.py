@@ -104,3 +104,8 @@ MULTI_WHATSAPP_ENABLED = os.getenv("MULTI_WHATSAPP_ENABLED", "0").strip().lower(
     "yes",
     "on",
 }
+
+# Provider de conexão de canal: stub (default, sem rede) | evolution (real).
+WHATSAPP_PROVIDER = os.getenv("CHATBOT_WHATSAPP_PROVIDER", "stub").strip().lower()
+# URL do webhook n8n gravada em instância nova. Um workflow serve N instâncias.
+EVOLUTION_WEBHOOK_URL = os.getenv("CHATBOT_EVOLUTION_WEBHOOK_URL", "").strip()
