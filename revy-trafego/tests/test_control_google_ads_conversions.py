@@ -8,6 +8,9 @@ from decimal import Decimal
 
 from app.config import settings
 from app.control.google_ads import (
+    DM_STATUS_FAILURE,
+    DM_STATUS_PENDING,
+    DM_STATUS_SUCCESS,
     FakeGoogleAdsTokenExchanger,
     FakeGoogleDataManagerPort,
     GOOGLE_ADS_SCOPES,
@@ -18,6 +21,8 @@ from app.control.google_ads_conversions import (
     EVENT_VENDA_CONFIRMADA,
     EnqueueConversion,
     GoogleAdsConversionsControl,
+    OUTBOX_DEAD,
+    OUTBOX_FAILED,
     OUTBOX_SENT,
     build_transaction_id,
     hash_user_value,
@@ -287,6 +292,207 @@ def test_enqueue_never_raises_to_caller():
         )
         is None
     )
+
+
+def _enqueue_and_send(
+    loja_id: str,
+    *,
+    port: FakeGoogleDataManagerPort,
+    domain_event_id: str = "venda-rec",
+    now: datetime | None = None,
+) -> GoogleAdsConversionsControl:
+    admin = _admin_actor()
+    fixed = now or datetime(2026, 7, 29, 18, 0, 0, tzinfo=timezone.utc)
+    control = GoogleAdsConversionsControl(
+        SessionLocal,
+        data_manager_port=port,
+        now=lambda: fixed,
+        auto_reconcile=False,
+    )
+    control.bind_conversion_action(
+        admin,
+        StoreRef(id=loja_id),
+        revy_event_type=EVENT_VENDA_CONFIRMADA,
+        conversion_action_resource_name="customers/1112223333/conversionActions/7",
+        customer_id="1112223333",
+    )
+    view = control.enqueue_conversion(
+        EnqueueConversion(
+            loja_id=loja_id,
+            event_type=EVENT_VENDA_CONFIRMADA,
+            domain_event_id=domain_event_id,
+            gclid="Cj0KCQjw-reconcile",
+            value=Decimal("1000.00"),
+            currency="BRL",
+            consent=False,
+        )
+    )
+    assert view is not None
+    assert control.process_outbox_once(loja_id=loja_id, reconcile=False) == 1
+    return control
+
+
+def test_reconcile_success_noop_when_already_sent():
+    loja_id = _create_store("loja-rec-success")
+    _connect_store(loja_id)
+    port = FakeGoogleDataManagerPort(
+        next_request_id="req-ok",
+        next_status=DM_STATUS_SUCCESS,
+    )
+    control = _enqueue_and_send(loja_id, port=port)
+
+    changed = control.reconcile_outbox_once(loja_id=loja_id)
+    assert changed == 0
+    assert len(port.retrieve_status_calls) == 1
+    assert port.retrieve_status_calls[0]["request_id"] == "req-ok"
+    # nunca logar token — só garantir que a call registrou (testes não imprimem)
+    assert port.retrieve_status_calls[0]["refresh_token"] == "rt-conv-secret"
+
+    with SessionLocal() as db:
+        row = db.query(GoogleAdsConversionOutbox).one()
+        assert row.status == OUTBOX_SENT
+        assert row.request_id == "req-ok"
+        # 1 attempt do ingest; reconcile SUCCESS em sent é no-op
+        assert db.query(GoogleAdsUploadAttempt).count() == 1
+
+
+def test_reconcile_failure_demotes_sent_to_failed():
+    loja_id = _create_store("loja-rec-fail")
+    _connect_store(loja_id)
+    port = FakeGoogleDataManagerPort(
+        next_request_id="req-bad",
+        next_status=DM_STATUS_FAILURE,
+        error_summary="PROCESSING_ERROR_REASON_INVALID_GCLID:1",
+    )
+    control = _enqueue_and_send(loja_id, port=port, domain_event_id="venda-fail")
+
+    changed = control.reconcile_outbox_once(loja_id=loja_id)
+    assert changed == 1
+    assert len(port.retrieve_status_calls) == 1
+
+    with SessionLocal() as db:
+        row = db.query(GoogleAdsConversionOutbox).one()
+        assert row.status == OUTBOX_FAILED
+        assert "INVALID_GCLID" in (row.last_error or "")
+        attempts = (
+            db.query(GoogleAdsUploadAttempt)
+            .order_by(GoogleAdsUploadAttempt.created_at.asc())
+            .all()
+        )
+        assert len(attempts) == 2
+        assert attempts[-1].status == "rejected"
+        assert attempts[-1].error_code == "retrieve_failure"
+        assert attempts[-1].request_id == "req-bad"
+
+
+def test_reconcile_pending_leaves_status():
+    loja_id = _create_store("loja-rec-pending")
+    _connect_store(loja_id)
+    port = FakeGoogleDataManagerPort(
+        next_request_id="req-pend",
+        next_status=DM_STATUS_PENDING,
+    )
+    control = _enqueue_and_send(loja_id, port=port, domain_event_id="venda-pend")
+
+    changed = control.reconcile_outbox_once(loja_id=loja_id)
+    assert changed == 0
+    assert len(port.retrieve_status_calls) == 1
+
+    with SessionLocal() as db:
+        row = db.query(GoogleAdsConversionOutbox).one()
+        assert row.status == OUTBOX_SENT
+        assert row.request_id == "req-pend"
+        assert db.query(GoogleAdsUploadAttempt).count() == 1
+
+
+def test_reconcile_promotes_failed_to_sent_on_late_success():
+    loja_id = _create_store("loja-rec-late-ok")
+    _connect_store(loja_id)
+    port = FakeGoogleDataManagerPort(
+        next_request_id="req-late",
+        next_status=DM_STATUS_SUCCESS,
+    )
+    control = _enqueue_and_send(loja_id, port=port, domain_event_id="venda-late")
+
+    with SessionLocal() as db:
+        row = db.query(GoogleAdsConversionOutbox).one()
+        row.status = OUTBOX_FAILED
+        row.last_error = "temporary"
+        db.commit()
+
+    changed = control.reconcile_outbox_once(loja_id=loja_id)
+    assert changed == 1
+
+    with SessionLocal() as db:
+        row = db.query(GoogleAdsConversionOutbox).one()
+        assert row.status == OUTBOX_SENT
+        assert row.last_error is None
+        assert db.query(GoogleAdsUploadAttempt).count() == 2
+
+
+def test_process_outbox_auto_reconciles_failure():
+    """process_outbox_once chama reconcile ao final por default."""
+    loja_id = _create_store("loja-rec-auto")
+    _connect_store(loja_id)
+    admin = _admin_actor()
+    port = FakeGoogleDataManagerPort(
+        next_request_id="req-auto",
+        next_status=DM_STATUS_FAILURE,
+        error_summary="FAILED",
+    )
+    fixed = datetime(2026, 7, 29, 19, 0, 0, tzinfo=timezone.utc)
+    control = GoogleAdsConversionsControl(
+        SessionLocal,
+        data_manager_port=port,
+        now=lambda: fixed,
+    )
+    control.bind_conversion_action(
+        admin,
+        StoreRef(id=loja_id),
+        revy_event_type=EVENT_VENDA_CONFIRMADA,
+        conversion_action_resource_name="customers/1112223333/conversionActions/1",
+        customer_id="1112223333",
+    )
+    control.enqueue_conversion(
+        EnqueueConversion(
+            loja_id=loja_id,
+            event_type=EVENT_VENDA_CONFIRMADA,
+            domain_event_id="auto-1",
+            gclid="gclid-auto",
+            value="10",
+        )
+    )
+    # ingest marca sent, reconcile demote para failed
+    sent = control.process_outbox_once(loja_id=loja_id)
+    assert sent == 1
+    assert len(port.retrieve_status_calls) == 1
+
+    with SessionLocal() as db:
+        row = db.query(GoogleAdsConversionOutbox).one()
+        assert row.status == OUTBOX_FAILED
+        assert row.request_id == "req-auto"
+
+
+def test_reconcile_failure_to_dead_when_attempts_exhausted():
+    loja_id = _create_store("loja-rec-dead")
+    _connect_store(loja_id)
+    port = FakeGoogleDataManagerPort(
+        next_request_id="req-dead",
+        next_status=DM_STATUS_FAILURE,
+    )
+    control = _enqueue_and_send(loja_id, port=port, domain_event_id="venda-dead")
+    control._max_attempts = 1  # type: ignore[attr-defined]
+
+    with SessionLocal() as db:
+        row = db.query(GoogleAdsConversionOutbox).one()
+        row.attempts = 1
+        db.commit()
+
+    changed = control.reconcile_outbox_once(loja_id=loja_id)
+    assert changed == 1
+    with SessionLocal() as db:
+        row = db.query(GoogleAdsConversionOutbox).one()
+        assert row.status == OUTBOX_DEAD
 
 
 def test_http_bind_conversion_under_flag(client, monkeypatch):

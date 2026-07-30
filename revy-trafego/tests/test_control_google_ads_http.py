@@ -439,3 +439,127 @@ def test_data_manager_empty_events():
     result = port.ingest(refresh_token="rt", customer_id="1", events=[])
     assert result.accepted == 0
     assert result.request_id == ""
+
+
+def test_data_manager_retrieve_status_success():
+    from app.control.google_ads import DM_STATUS_SUCCESS
+
+    captured: dict[str, object] = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path.endswith("/token"):
+            return httpx.Response(200, json={"access_token": "at-status"})
+        if "requestStatus:retrieve" in str(request.url):
+            captured["url"] = str(request.url)
+            captured["auth"] = request.headers.get("Authorization")
+            qs = parse_qs(request.url.query.decode() if isinstance(request.url.query, bytes) else request.url.query)
+            assert qs.get("requestId") == ["req-xyz"]
+            assert request.method == "GET"
+            # developer-token NÃO deve aparecer
+            assert "developer-token" not in {
+                k.lower() for k in request.headers.keys()
+            }
+            return httpx.Response(
+                200,
+                json={
+                    "requestStatusPerDestination": [
+                        {"requestStatus": "SUCCESS"}
+                    ]
+                },
+            )
+        return httpx.Response(404, json={})
+
+    port = HttpGoogleDataManagerPort(
+        client_id="cid",
+        client_secret="csecret",
+        base_url="https://datamanager.test",
+        token_url="https://oauth.test/token",
+        transport=httpx.MockTransport(handler),
+    )
+    result = port.retrieve_status(
+        refresh_token="rt-secret-never-log",
+        request_id="req-xyz",
+    )
+    assert result.status == DM_STATUS_SUCCESS
+    assert result.request_id == "req-xyz"
+    assert captured["auth"] == "Bearer at-status"
+    assert "requestStatus:retrieve" in str(captured["url"])
+
+
+def test_data_manager_retrieve_status_failed_and_pending():
+    from app.control.google_ads import (
+        DM_STATUS_FAILURE,
+        DM_STATUS_PENDING,
+    )
+
+    def make_handler(api_status: str, extra: dict | None = None):
+        def handler(request: httpx.Request) -> httpx.Response:
+            if request.url.path.endswith("/token"):
+                return httpx.Response(200, json={"access_token": "at"})
+            body: dict = {
+                "requestStatusPerDestination": [
+                    {
+                        "requestStatus": api_status,
+                        **(extra or {}),
+                    }
+                ]
+            }
+            return httpx.Response(200, json=body)
+
+        return handler
+
+    port_fail = HttpGoogleDataManagerPort(
+        client_id="cid",
+        client_secret="csecret",
+        base_url="https://datamanager.test",
+        token_url="https://oauth.test/token",
+        transport=httpx.MockTransport(
+            make_handler(
+                "FAILED",
+                {
+                    "errorInfo": {
+                        "errorCounts": [
+                            {
+                                "reason": "PROCESSING_ERROR_REASON_INVALID_GCLID",
+                                "recordCount": "1",
+                            }
+                        ]
+                    }
+                },
+            )
+        ),
+    )
+    failed = port_fail.retrieve_status(refresh_token="rt", request_id="r1")
+    assert failed.status == DM_STATUS_FAILURE
+    assert "INVALID_GCLID" in (failed.error_summary or "")
+
+    port_pend = HttpGoogleDataManagerPort(
+        client_id="cid",
+        client_secret="csecret",
+        base_url="https://datamanager.test",
+        token_url="https://oauth.test/token",
+        transport=httpx.MockTransport(make_handler("PROCESSING")),
+    )
+    pending = port_pend.retrieve_status(refresh_token="rt", request_id="r2")
+    assert pending.status == DM_STATUS_PENDING
+
+
+def test_data_manager_retrieve_status_soft_fail_unknown():
+    from app.control.google_ads import DM_STATUS_UNKNOWN
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path.endswith("/token"):
+            return httpx.Response(200, json={"access_token": "at"})
+        return httpx.Response(503, json={"error": "unavailable"})
+
+    port = HttpGoogleDataManagerPort(
+        client_id="cid",
+        client_secret="csecret",
+        base_url="https://datamanager.test",
+        token_url="https://oauth.test/token",
+        transport=httpx.MockTransport(handler),
+    )
+    result = port.retrieve_status(refresh_token="rt", request_id="req-soft")
+    assert result.status == DM_STATUS_UNKNOWN
+    assert result.request_id == "req-soft"
+    assert "503" in (result.error_summary or "")

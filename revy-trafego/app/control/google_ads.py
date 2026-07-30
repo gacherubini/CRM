@@ -106,6 +106,34 @@ class GoogleDataManagerIngestResult:
     rejected: int = 0
 
 
+# Status canônicos Revy (mapeados a partir de RequestStatus da Data Manager API).
+DM_STATUS_SUCCESS = "SUCCESS"
+DM_STATUS_PARTIAL_SUCCESS = "PARTIAL_SUCCESS"
+DM_STATUS_FAILURE = "FAILURE"
+DM_STATUS_PENDING = "PENDING"
+DM_STATUS_UNKNOWN = "UNKNOWN"
+
+_DM_STATUS_VALUES = frozenset(
+    {
+        DM_STATUS_SUCCESS,
+        DM_STATUS_PARTIAL_SUCCESS,
+        DM_STATUS_FAILURE,
+        DM_STATUS_PENDING,
+        DM_STATUS_UNKNOWN,
+    }
+)
+
+
+@dataclass(frozen=True)
+class GoogleDataManagerStatusResult:
+    """Resultado de RetrieveRequestStatus (diagnóstico assíncrono)."""
+
+    request_id: str
+    status: str  # SUCCESS | PARTIAL_SUCCESS | FAILURE | PENDING | UNKNOWN
+    raw_status: str | None = None
+    error_summary: str | None = None
+
+
 @dataclass(frozen=True)
 class OAuthTokenBundle:
     refresh_token: str
@@ -153,7 +181,7 @@ class GoogleAdsReadPort(Protocol):
 
 
 class GoogleDataManagerPort(Protocol):
-    """Envio de conversões via Data Manager API (IngestEvents)."""
+    """Envio de conversões via Data Manager API (IngestEvents + RetrieveRequestStatus)."""
 
     def ingest(
         self,
@@ -162,7 +190,15 @@ class GoogleDataManagerPort(Protocol):
         customer_id: str,
         events: Sequence[dict[str, Any]],
     ) -> GoogleDataManagerIngestResult:
-        """Stub de ingestão de eventos de conversão."""
+        """Ingestão de eventos de conversão; retorna request_id para diagnóstico."""
+
+    def retrieve_status(
+        self,
+        *,
+        refresh_token: str,
+        request_id: str,
+    ) -> GoogleDataManagerStatusResult:
+        """Consulta status assíncrono de um request_id (RetrieveRequestStatus)."""
 
 
 class GoogleAdsTokenExchanger(Protocol):
@@ -213,10 +249,14 @@ class FakeGoogleAdsReadPort:
 
 @dataclass
 class FakeGoogleDataManagerPort:
-    """Adapter de teste: registra ingestões sem chamar Google."""
+    """Adapter de teste: registra ingestões/status sem chamar Google."""
 
     ingests: list[dict[str, Any]] = field(default_factory=list)
+    retrieve_status_calls: list[dict[str, str]] = field(default_factory=list)
     next_request_id: str = "fake-request-1"
+    next_status: str = DM_STATUS_SUCCESS
+    status_by_request_id: dict[str, str] = field(default_factory=dict)
+    error_summary: str | None = None
 
     def ingest(
         self,
@@ -236,6 +276,30 @@ class FakeGoogleDataManagerPort:
             request_id=self.next_request_id,
             accepted=len(events),
             rejected=0,
+        )
+
+    def retrieve_status(
+        self,
+        *,
+        refresh_token: str,
+        request_id: str,
+    ) -> GoogleDataManagerStatusResult:
+        self.retrieve_status_calls.append(
+            {
+                "refresh_token": refresh_token,
+                "request_id": request_id,
+            }
+        )
+        status = self.status_by_request_id.get(request_id, self.next_status)
+        if status not in _DM_STATUS_VALUES:
+            status = DM_STATUS_UNKNOWN
+        return GoogleDataManagerStatusResult(
+            request_id=request_id,
+            status=status,
+            raw_status=status,
+            error_summary=self.error_summary
+            if status == DM_STATUS_FAILURE
+            else None,
         )
 
 

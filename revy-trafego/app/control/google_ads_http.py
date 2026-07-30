@@ -22,10 +22,17 @@ from app.control.google_ads import (
     GoogleAdsMetricRow,
     GoogleAdsTokenExchangeError,
     GoogleDataManagerIngestResult,
+    GoogleDataManagerStatusResult,
     GoogleAdsReadPort,
     GoogleAdsTokenExchanger,
+    GoogleDataManagerPort,
     OAuthTokenBundle,
     GOOGLE_ADS_SCOPES,
+    DM_STATUS_FAILURE,
+    DM_STATUS_PARTIAL_SUCCESS,
+    DM_STATUS_PENDING,
+    DM_STATUS_SUCCESS,
+    DM_STATUS_UNKNOWN,
     _normalize_customer_id,
 )
 from app.control.types import ControlError
@@ -743,6 +750,92 @@ class HttpGoogleDataManagerPort:
             rejected=0,
         )
 
+    def retrieve_status(
+        self,
+        *,
+        refresh_token: str,
+        request_id: str,
+    ) -> GoogleDataManagerStatusResult:
+        """GET /v1/requestStatus:retrieve?requestId=...
+
+        Soft-fail: erros de rede/HTTP/parse → UNKNOWN (não interrompe worker).
+        Tokens nunca são logados.
+        """
+        rid = (request_id or "").strip()
+        if not rid:
+            return GoogleDataManagerStatusResult(
+                request_id="",
+                status=DM_STATUS_UNKNOWN,
+                raw_status=None,
+                error_summary="request_id ausente",
+            )
+
+        try:
+            access = self._access_token(refresh_token)
+        except GoogleDataManagerApiError as exc:
+            logger.warning(
+                "google_data_manager retrieve_status token failed request_id=%s",
+                rid,
+            )
+            return GoogleDataManagerStatusResult(
+                request_id=rid,
+                status=DM_STATUS_UNKNOWN,
+                raw_status=None,
+                error_summary=str(exc)[:200],
+            )
+
+        # Documentado: GET https://datamanager.googleapis.com/v1/requestStatus:retrieve
+        url = self.base_url.rstrip("/") + "/v1/requestStatus:retrieve"
+        try:
+            with httpx.Client(
+                timeout=self.timeout, transport=self.transport
+            ) as client:
+                response = client.get(
+                    url,
+                    params={"requestId": rid},
+                    headers={"Authorization": f"Bearer {access}"},
+                )
+        except httpx.HTTPError:
+            logger.warning(
+                "google_data_manager retrieve_status network failed request_id=%s",
+                rid,
+            )
+            return GoogleDataManagerStatusResult(
+                request_id=rid,
+                status=DM_STATUS_UNKNOWN,
+                raw_status=None,
+                error_summary="falha de rede em requestStatus:retrieve",
+            )
+
+        if response.status_code >= 400:
+            logger.warning(
+                "google_data_manager retrieve_status HTTP %s request_id=%s",
+                response.status_code,
+                rid,
+            )
+            return GoogleDataManagerStatusResult(
+                request_id=rid,
+                status=DM_STATUS_UNKNOWN,
+                raw_status=None,
+                error_summary=f"requestStatus:retrieve HTTP {response.status_code}",
+            )
+
+        try:
+            payload = response.json()
+        except ValueError:
+            logger.warning(
+                "google_data_manager retrieve_status invalid json request_id=%s",
+                rid,
+            )
+            return GoogleDataManagerStatusResult(
+                request_id=rid,
+                status=DM_STATUS_UNKNOWN,
+                raw_status=None,
+                error_summary="requestStatus:retrieve resposta inválida",
+            )
+
+        return _parse_request_status_response(rid, payload)
+
     def _access_token(self, refresh_token: str) -> str:
         token = (refresh_token or "").strip()
         if not token:
@@ -785,6 +878,114 @@ class HttpGoogleDataManagerPort:
         if not access:
             raise GoogleDataManagerApiError("resposta sem access_token")
         return access
+
+
+def _map_dm_request_status(raw: str | None) -> str:
+    """Mapeia RequestStatus da API → status canônico Revy."""
+    value = (raw or "").strip().upper()
+    if value in {"SUCCESS"}:
+        return DM_STATUS_SUCCESS
+    if value in {"PARTIAL_SUCCESS"}:
+        return DM_STATUS_PARTIAL_SUCCESS
+    if value in {"FAILED", "FAILURE"}:
+        return DM_STATUS_FAILURE
+    if value in {"PROCESSING", "PENDING"}:
+        return DM_STATUS_PENDING
+    if value in {"REQUEST_STATUS_UNKNOWN", "UNKNOWN", ""}:
+        return DM_STATUS_UNKNOWN
+    return DM_STATUS_UNKNOWN
+
+
+def _error_summary_from_status_payload(payload: dict[str, Any]) -> str | None:
+    """Extrai resumo curto de erros por destino (sem PII/tokens)."""
+    destinations = payload.get("requestStatusPerDestination") or payload.get(
+        "request_status_per_destination"
+    )
+    if not isinstance(destinations, list):
+        return None
+    parts: list[str] = []
+    for dest in destinations:
+        if not isinstance(dest, dict):
+            continue
+        err = dest.get("errorInfo") or dest.get("error_info") or {}
+        counts = err.get("errorCounts") or err.get("error_counts") or []
+        if not isinstance(counts, list):
+            continue
+        for item in counts:
+            if not isinstance(item, dict):
+                continue
+            reason = str(item.get("reason") or "").strip()
+            record_count = item.get("recordCount") or item.get("record_count")
+            if reason:
+                if record_count is not None:
+                    parts.append(f"{reason}:{record_count}")
+                else:
+                    parts.append(reason)
+            if len(parts) >= 5:
+                break
+        if len(parts) >= 5:
+            break
+    if not parts:
+        return None
+    return ";".join(parts)[:300]
+
+
+def _parse_request_status_response(
+    request_id: str,
+    payload: dict[str, Any],
+) -> GoogleDataManagerStatusResult:
+    """Agrega requestStatusPerDestination[] em um status canônico.
+
+    Precedência: FAILURE > PARTIAL_SUCCESS > PENDING > SUCCESS > UNKNOWN.
+    """
+    destinations = payload.get("requestStatusPerDestination") or payload.get(
+        "request_status_per_destination"
+    )
+    raw_statuses: list[str] = []
+    if isinstance(destinations, list) and destinations:
+        for dest in destinations:
+            if not isinstance(dest, dict):
+                continue
+            raw = dest.get("requestStatus") or dest.get("request_status")
+            if raw is not None:
+                raw_statuses.append(str(raw))
+    else:
+        # fallback: campo de topo (se API/mock devolver assim)
+        top = payload.get("requestStatus") or payload.get("request_status")
+        if top is not None:
+            raw_statuses.append(str(top))
+
+    if not raw_statuses:
+        return GoogleDataManagerStatusResult(
+            request_id=request_id,
+            status=DM_STATUS_UNKNOWN,
+            raw_status=None,
+            error_summary=_error_summary_from_status_payload(payload),
+        )
+
+    mapped = [_map_dm_request_status(s) for s in raw_statuses]
+    if DM_STATUS_FAILURE in mapped:
+        status = DM_STATUS_FAILURE
+    elif DM_STATUS_PARTIAL_SUCCESS in mapped:
+        status = DM_STATUS_PARTIAL_SUCCESS
+    elif DM_STATUS_PENDING in mapped:
+        status = DM_STATUS_PENDING
+    elif DM_STATUS_SUCCESS in mapped and all(
+        m == DM_STATUS_SUCCESS for m in mapped
+    ):
+        status = DM_STATUS_SUCCESS
+    elif DM_STATUS_SUCCESS in mapped:
+        # mistura SUCCESS + UNKNOWN → SUCCESS se não houver falha/pending
+        status = DM_STATUS_SUCCESS
+    else:
+        status = DM_STATUS_UNKNOWN
+
+    return GoogleDataManagerStatusResult(
+        request_id=request_id,
+        status=status,
+        raw_status=",".join(raw_statuses)[:200],
+        error_summary=_error_summary_from_status_payload(payload),
+    )
 
 
 def build_data_manager_ingest_request(

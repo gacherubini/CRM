@@ -17,6 +17,11 @@ from typing import Any
 from app.control.audit import _append_event
 from app.control.google_ads import (
     CONNECTION_STATUS_CONNECTED,
+    DM_STATUS_FAILURE,
+    DM_STATUS_PARTIAL_SUCCESS,
+    DM_STATUS_PENDING,
+    DM_STATUS_SUCCESS,
+    DM_STATUS_UNKNOWN,
     FakeGoogleDataManagerPort,
     GoogleAdsConnectionNotFound,
     GoogleDataManagerPort,
@@ -54,8 +59,13 @@ ATTEMPT_ERROR = "error"
 
 DEFAULT_MAX_ATTEMPTS = 8
 RETRY_BASE = timedelta(minutes=5)
+# Janela de reconciliação de request_id (Google recomenda até 24h de processamento).
+DEFAULT_RECONCILE_LOOKBACK = timedelta(hours=48)
 
 EVENT_VENDA_CONFIRMADA = "venda_confirmada"
+
+ATTEMPT_RECONCILE_OK = "accepted"
+ATTEMPT_RECONCILE_FAIL = "rejected"
 
 
 class GoogleAdsConversionBindingNotFound(ControlError):
@@ -129,11 +139,15 @@ class GoogleAdsConversionsControl:
         data_manager_port: GoogleDataManagerPort | None = None,
         now: Callable[[], datetime] | None = None,
         max_attempts: int = DEFAULT_MAX_ATTEMPTS,
+        reconcile_lookback: timedelta = DEFAULT_RECONCILE_LOOKBACK,
+        auto_reconcile: bool = True,
     ) -> None:
         self._session_factory = session_factory
         self._data_manager_port = data_manager_port or FakeGoogleDataManagerPort()
         self._now = now or (lambda: datetime.now(timezone.utc))
         self._max_attempts = max_attempts
+        self._reconcile_lookback = reconcile_lookback
+        self._auto_reconcile = auto_reconcile
 
     @property
     def data_manager_port(self) -> GoogleDataManagerPort:
@@ -357,8 +371,13 @@ class GoogleAdsConversionsControl:
         *,
         loja_id: str | None = None,
         limit: int = 20,
+        reconcile: bool | None = None,
     ) -> int:
-        """Processa itens pending/failed elegíveis. Retorna quantos foram sent."""
+        """Processa itens pending/failed elegíveis. Retorna quantos foram sent.
+
+        Ao final (default), chama reconcile_outbox_once para polir request_ids
+        ambíguos via RetrieveRequestStatus.
+        """
         now = self._now()
         if now.tzinfo is None:
             now = now.replace(tzinfo=timezone.utc)
@@ -394,7 +413,197 @@ class GoogleAdsConversionsControl:
         for item in work:
             if self._process_one(item, now=now):
                 sent += 1
+
+        do_reconcile = self._auto_reconcile if reconcile is None else reconcile
+        if do_reconcile:
+            self.reconcile_outbox_once(loja_id=loja_id, limit=limit)
         return sent
+
+    def reconcile_outbox_once(
+        self,
+        *,
+        loja_id: str | None = None,
+        limit: int = 20,
+    ) -> int:
+        """Consulta RetrieveRequestStatus para outbox recentes com request_id.
+
+        Seleciona SENT/FAILED com request_id na janela de lookback.
+        - SUCCESS / PARTIAL_SUCCESS → garante status sent
+        - FAILURE → failed (retryable) ou dead se esgotar tentativas
+        - PENDING / UNKNOWN → deixa como está (UNKNOWN falha soft)
+
+        Retorna quantos rows tiveram status alterado.
+        """
+        now = self._now()
+        if now.tzinfo is None:
+            now = now.replace(tzinfo=timezone.utc)
+        since = now - self._reconcile_lookback
+
+        with self._session_factory() as db:
+            q = db.query(GoogleAdsConversionOutbox).filter(
+                GoogleAdsConversionOutbox.status.in_(
+                    (OUTBOX_SENT, OUTBOX_FAILED)
+                ),
+                GoogleAdsConversionOutbox.request_id.isnot(None),
+                GoogleAdsConversionOutbox.request_id != "",
+                GoogleAdsConversionOutbox.updated_at >= since,
+            )
+            if loja_id:
+                q = q.filter(GoogleAdsConversionOutbox.loja_id == loja_id)
+            rows = (
+                q.order_by(GoogleAdsConversionOutbox.updated_at.asc())
+                .limit(limit)
+                .all()
+            )
+            work = [
+                {
+                    "id": r.id,
+                    "loja_id": r.loja_id,
+                    "request_id": r.request_id,
+                    "status": r.status,
+                    "attempts": int(r.attempts or 0),
+                }
+                for r in rows
+                if r.request_id
+            ]
+
+        changed = 0
+        for item in work:
+            if self._reconcile_one(item, now=now):
+                changed += 1
+        return changed
+
+    def _reconcile_one(self, item: dict[str, Any], *, now: datetime) -> bool:
+        loja_id = item["loja_id"]
+        request_id = (item.get("request_id") or "").strip()
+        if not request_id:
+            return False
+
+        try:
+            with self._session_factory() as db:
+                from app.control.stores import store_blocks_traffic_jobs
+
+                if store_blocks_traffic_jobs(db, loja_id=loja_id):
+                    return False
+                connection = (
+                    db.query(GoogleAdsConnection)
+                    .filter(GoogleAdsConnection.loja_id == loja_id)
+                    .first()
+                )
+                if (
+                    connection is None
+                    or connection.status != CONNECTION_STATUS_CONNECTED
+                    or not connection.refresh_token_ciphertext
+                ):
+                    return False
+                refresh_token = decifrar(connection.refresh_token_ciphertext)
+
+            status_result = self._data_manager_port.retrieve_status(
+                refresh_token=refresh_token,
+                request_id=request_id,
+            )
+            dm_status = (status_result.status or DM_STATUS_UNKNOWN).upper()
+
+            if dm_status in (DM_STATUS_PENDING, DM_STATUS_UNKNOWN):
+                return False
+
+            with self._session_factory() as db:
+                row = (
+                    db.query(GoogleAdsConversionOutbox)
+                    .filter(GoogleAdsConversionOutbox.id == item["id"])
+                    .first()
+                )
+                if row is None:
+                    return False
+
+                attempt_n = int(row.attempts or 0)
+
+                if dm_status in (DM_STATUS_SUCCESS, DM_STATUS_PARTIAL_SUCCESS):
+                    # Já confirmado: no-op (evita spam de attempts).
+                    if row.status == OUTBOX_SENT:
+                        return False
+                    row.status = OUTBOX_SENT
+                    row.last_error = (
+                        None
+                        if dm_status == DM_STATUS_SUCCESS
+                        else (
+                            status_result.error_summary
+                            or "data_manager partial_success"
+                        )[:500]
+                    )
+                    row.updated_at = now
+                    db.add(
+                        GoogleAdsUploadAttempt(
+                            id=novo_id(),
+                            outbox_id=row.id,
+                            request_id=request_id,
+                            attempt=max(1, attempt_n),
+                            status=ATTEMPT_RECONCILE_OK,
+                            error_code=(
+                                None
+                                if dm_status == DM_STATUS_SUCCESS
+                                else "partial_success"
+                            ),
+                            created_at=now,
+                        )
+                    )
+                    db.commit()
+                    return True
+
+                if dm_status == DM_STATUS_FAILURE:
+                    # Já terminal ou já failed aguardando re-ingest: no-op.
+                    if row.status in (OUTBOX_DEAD, OUTBOX_FAILED):
+                        if (
+                            row.status == OUTBOX_FAILED
+                            and attempt_n >= self._max_attempts
+                        ):
+                            row.status = OUTBOX_DEAD
+                            row.updated_at = now
+                            row.last_error = (
+                                status_result.error_summary
+                                or "data_manager request failure"
+                            )[:500]
+                            db.commit()
+                            return True
+                        return False
+
+                    # sent → failed (retryable) ou dead se esgotou tentativas.
+                    if attempt_n >= self._max_attempts:
+                        new_status = OUTBOX_DEAD
+                    else:
+                        new_status = OUTBOX_FAILED
+                        row.next_attempt_at = now + _retry_delay(
+                            max(1, attempt_n)
+                        )
+                    row.status = new_status
+                    row.last_error = (
+                        status_result.error_summary
+                        or "data_manager request failure"
+                    )[:500]
+                    row.updated_at = now
+                    db.add(
+                        GoogleAdsUploadAttempt(
+                            id=novo_id(),
+                            outbox_id=row.id,
+                            request_id=request_id,
+                            attempt=max(1, attempt_n),
+                            status=ATTEMPT_RECONCILE_FAIL,
+                            error_code="retrieve_failure",
+                            created_at=now,
+                        )
+                    )
+                    db.commit()
+                    return True
+
+                return False
+
+        except Exception as exc:  # pragma: no cover - defensive
+            logger.warning(
+                "google_ads reconcile_outbox falhou id=%s: %s",
+                item["id"],
+                exc,
+            )
+            return False
 
     def _process_one(self, item: dict[str, Any], *, now: datetime) -> bool:
         loja_id = item["loja_id"]
