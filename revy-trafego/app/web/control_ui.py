@@ -3,9 +3,10 @@ from __future__ import annotations
 import re
 from datetime import date
 from decimal import Decimal, InvalidOperation
+from html import escape
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Query, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
@@ -22,6 +23,11 @@ from app.control.contracts import (
     UpsertContract,
 )
 from app.control.dashboard import DashboardControl
+from app.control.google_ads import (
+    GoogleAdsOAuthMisconfigured,
+    GoogleAdsOAuthStateInvalid,
+    GoogleAdsTokenExchangeError,
+)
 from app.control.people import PeopleDirectory
 from app.control.portfolio import (
     InvalidModuleSelection,
@@ -34,6 +40,7 @@ from app.control.roles import StoreRoles
 from app.control.session import actor_from_user
 from app.control.stores import StoreControl
 from app.control.types import (
+    AccessDenied,
     ActiveResponsibleConflict,
     AssignStoreRole,
     AuditQuery,
@@ -64,6 +71,12 @@ from app.control.types import (
     TransitionStore,
 )
 from app.db import SessionLocal, get_db
+from app.models import GoogleAdsOAuthState
+
+# redirect_uri registrado no Google Cloud Console (GOOGLE_ADS_OAUTH_REDIRECT_URI)
+# deve apontar para esta rota HTML; o endpoint JSON equivalente
+# (/control/v1/google-ads/oauth/callback) segue existindo para compatibilidade.
+GOOGLE_ADS_OAUTH_CALLBACK_PATH = "/app/control/google-ads/oauth/callback"
 
 router = APIRouter(tags=["control-ui"])
 templates = Jinja2Templates(
@@ -95,6 +108,19 @@ def _dashboard_surface_enabled() -> bool:
     return (
         settings.revy_control_enabled
         and settings.revy_control_dashboard_enabled
+    )
+
+
+def _google_ads_surface_enabled() -> bool:
+    """Superfície Google Ads do Control: flag do produto + flag do módulo."""
+    return settings.revy_control_enabled and settings.google_ads_sync_enabled
+
+
+def _google_oauth_configured() -> bool:
+    """Client OAuth presente no ambiente (evita botão que só sabe falhar)."""
+    return bool(
+        settings.google_ads_oauth_client_id
+        and settings.google_ads_oauth_redirect_uri
     )
 
 
@@ -764,6 +790,72 @@ async def revoke_traffic_access_page(
     )
 
 
+@router.get(GOOGLE_ADS_OAUTH_CALLBACK_PATH, response_class=HTMLResponse)
+def google_ads_oauth_callback_page(
+    request: Request,
+    state: str = Query(default="", max_length=128),
+    code: str = Query(default="", max_length=512),
+    error: str | None = Query(default=None, max_length=200),
+    db: Session = Depends(get_db),
+):
+    """Callback OAuth do Google em HTML — é aqui que um humano volta do consent.
+
+    O `loja_id` sai da connection devolvida por `complete_oauth` (resolvida a
+    partir do `state`): o Google não permite variar o `redirect_uri`, então não
+    há parâmetro extra na URL. O endpoint JSON equivalente em
+    `app/web/control.py` continua existindo para compatibilidade.
+    """
+    if not _google_ads_surface_enabled():
+        return HTMLResponse("Página não encontrada.", status_code=404)
+    manager, denied = _actor_for_store_mutation(request, db)
+    if denied is not None:
+        return denied
+    if not _google_oauth_configured():
+        return _google_oauth_failure(
+            request,
+            db,
+            manager,
+            state,
+            "Google Ads não está configurado neste ambiente.",
+        )
+    if error:
+        return _google_oauth_failure(
+            request,
+            db,
+            manager,
+            state,
+            "Autorização do Google não concluída. Tente conectar novamente.",
+        )
+
+    from app.web.control import _google_ads_control
+
+    try:
+        connection = _google_ads_control().complete_oauth(state=state, code=code)
+    except AccessDenied:
+        return _access_denied()
+    except GoogleAdsOAuthStateInvalid:
+        return _google_oauth_failure(
+            request,
+            db,
+            manager,
+            state,
+            "Link de conexão do Google expirado ou já utilizado. "
+            "Comece a conexão novamente.",
+        )
+    except (GoogleAdsTokenExchangeError, GoogleAdsOAuthMisconfigured, ControlError):
+        return _google_oauth_failure(
+            request,
+            db,
+            manager,
+            state,
+            "O Google não confirmou a autorização. Tente conectar novamente.",
+        )
+    return RedirectResponse(
+        _detail_path(connection.loja_id, "google_conectado"),
+        status_code=303,
+    )
+
+
 def _render_stores_page(
     request: Request,
     db: Session,
@@ -808,17 +900,90 @@ def _admin_for_mutation(request: Request, db: Session):
     if manager is None:
         return None, RedirectResponse(_public_path("/login"), status_code=303)
     if manager.papel != "admin":
-        return None, HTMLResponse(
-            "<h1>Acesso negado</h1><p>Você não tem permissão para alterar esta Loja.</p>",
-            status_code=403,
-        )
+        return None, _access_denied()
     return manager, None
+
+
+def _actor_for_store_mutation(request: Request, db: Session):
+    """Gate de mutação de Loja sem exigir Admin Revy.
+
+    Igual a `_admin_for_mutation` menos o bloqueio por papel: quem decide se um
+    gestor pode agir na Loja é o domínio, num lugar só
+    (`_assert_can_manage_connection` em `app/control/google_ads.py`, que aceita
+    Admin Revy ou Gestor Responsável e recusa colaborador com `AccessDenied`).
+    Handlers que usam este gate devem capturar `AccessDenied` e devolver
+    `_access_denied()`. `_admin_for_mutation` segue valendo para os handlers
+    que são de admin por natureza.
+    """
+    if not settings.revy_control_enabled:
+        return None, HTMLResponse("Página não encontrada.", status_code=404)
+    manager = gestor_atual(request, db)
+    if manager is None:
+        return None, RedirectResponse(_public_path("/login"), status_code=303)
+    return manager, None
+
+
+def _access_denied(
+    mensagem: str = "Você não tem permissão para alterar esta Loja.",
+) -> HTMLResponse:
+    """403 padrão do Control (mesma página para gate e para `AccessDenied`)."""
+    return HTMLResponse(
+        f"<h1>Acesso negado</h1><p>{escape(mensagem)}</p>",
+        status_code=403,
+    )
 
 
 def _csrf_denied() -> HTMLResponse:
     return HTMLResponse(
         "<h1>Requisição negada</h1><p>Token CSRF inválido.</p>",
         status_code=403,
+    )
+
+
+def _google_oauth_state_store_id(state: str) -> str | None:
+    """Loja do state OAuth — leitura só para escolher onde mostrar o banner.
+
+    Validação (expiração, consumo) permanece em `complete_oauth`; aqui não há
+    decisão de autorização nem de fluxo.
+    """
+    value = (state or "").strip()
+    if not value or len(value) > 128:
+        return None
+    with SessionLocal() as db:
+        row = (
+            db.query(GoogleAdsOAuthState)
+            .filter(GoogleAdsOAuthState.state == value)
+            .first()
+        )
+        return row.loja_id if row is not None else None
+
+
+def _google_oauth_failure(
+    request: Request,
+    db: Session,
+    manager,
+    state: str,
+    mensagem: str,
+    *,
+    status_code: int = 400,
+):
+    """Banner de erro no detalhe da Loja; página avulsa quando o state não resolve."""
+    loja_id = _google_oauth_state_store_id(state)
+    if loja_id is None:
+        return HTMLResponse(
+            "<h1>Conexão com o Google Ads não concluída</h1>"
+            f"<p>{escape(mensagem)}</p>"
+            f'<p><a href="{escape(_public_path("/app/control/lojas"))}">'
+            "Voltar para as Lojas</a></p>",
+            status_code=status_code,
+        )
+    return _render_store_detail(
+        request,
+        db,
+        manager,
+        loja_id,
+        error=mensagem,
+        status_code=status_code,
     )
 
 
