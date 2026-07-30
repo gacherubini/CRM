@@ -107,21 +107,27 @@ def test_shell_on_exibe_brand_e_nav_modulos(client, monkeypatch):
     assert 'href="/app/equipe"' not in r.text
 
 
-def test_shell_stubs_redirecionam(client, monkeypatch):
+def test_shell_on_estoque_veiculos_redireciona_legado(client, monkeypatch):
     monkeypatch.setenv("REVY_LOJA_SHELL_ENABLED", "1")
     monkeypatch.setenv("REVY_LOJA_ENTITLEMENTS_ENABLED", "0")
     login(client)
-    r = client.get("/app/loja/atendimento", follow_redirects=False)
-    assert r.status_code == 303
-    assert r.headers["location"] == "/app/leads"
     r2 = client.get("/app/loja/estoque/veiculos", follow_redirects=False)
     assert r2.status_code == 303
     assert r2.headers["location"] == "/app/estoque"
 
 
-def test_shell_off_stubs_ainda_redirecionam_legado(client, monkeypatch):
+def test_atendimento_sem_flag_retorna_404(client, monkeypatch):
+    """Atendimento real exige REVY_LOJA_ATENDIMENTO_ENABLED (F4)."""
+    monkeypatch.setenv("REVY_LOJA_SHELL_ENABLED", "1")
+    monkeypatch.setenv("REVY_LOJA_ATENDIMENTO_ENABLED", "0")
+    login(client)
+    r = client.get("/app/loja/atendimento", follow_redirects=False)
+    assert r.status_code == 404
+
+
+def test_shell_off_vendas_retorna_404(client, monkeypatch):
+    """Overview F3 não expõe path novo com shell off."""
     monkeypatch.setenv("REVY_LOJA_SHELL_ENABLED", "0")
     login(client)
     r = client.get("/app/loja/vendas", follow_redirects=False)
-    assert r.status_code == 303
-    assert r.headers["location"] == "/app"
+    assert r.status_code == 404

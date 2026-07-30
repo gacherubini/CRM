@@ -1,6 +1,6 @@
 # Plano — Evolução do Portal para Revy Loja
 
-**Status:** ATIVO / F0–F1 em código (flags default OFF)
+**Status:** ATIVO / CÓDIGO F0–F4 LEAN (shell, identity, estoque overview, vendas overview, atendimento; flags default OFF; residual F5 equipe/bancos, F6 multi-canal, F7 Seller AI, F8 rollout)
 **Data:** 2026-07-29
 **Spec:** [`docs/superpowers/specs/2026-07-29-revy-loja-design.md`](../superpowers/specs/2026-07-29-revy-loja-design.md)
 **Depende por gates de:** [`Plano Revy Control`](2026-07-29-plano-revy-control.md) —
