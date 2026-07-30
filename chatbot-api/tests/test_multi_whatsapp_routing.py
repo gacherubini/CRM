@@ -191,6 +191,38 @@ def test_connect_qr_no_store(client, loja_a, monkeypatch):
     assert "estado" in body
 
 
+def test_listar_conversas_expoe_canal_e_filtra(client, db, loja_a, monkeypatch):
+    """Saída de conversas inclui canal_id/label; filtro ?canal_id= isola o canal."""
+    legado, extra = _register_two_channels(db, loja_a, monkeypatch)
+    tel = "5511988000010"
+    servico.registrar_mensagem(
+        db, legado["evolution_instance"], tel, "no legado", "LIST-C1"
+    )
+    servico.registrar_mensagem(
+        db, extra["evolution_instance"], tel, "no extra", "LIST-C2"
+    )
+
+    h = loja_a["headers"]
+    todas = client.get("/v1/conversas", headers=h).json()["conversas"]
+    do_tel = [c for c in todas if c["telefone"] == tel]
+    assert len(do_tel) == 2
+    for c in do_tel:
+        assert c["canal_id"] in {legado["id"], extra["id"]}
+        assert c["evolution_instance"]
+        assert c["canal_label"]
+        assert c["canal_ativo"] is True
+        assert c["canal_estado"]
+
+    filtradas = client.get(
+        f"/v1/conversas?canal_id={extra['id']}", headers=h
+    ).json()["conversas"]
+    assert all(c["canal_id"] == extra["id"] for c in filtradas)
+    assert any(c["telefone"] == tel for c in filtradas)
+    assert not any(
+        c["telefone"] == tel and c["canal_id"] == legado["id"] for c in filtradas
+    )
+
+
 def test_http_unknown_instance_webhook(client):
     r = client.post(
         "/webhook/mensagem",

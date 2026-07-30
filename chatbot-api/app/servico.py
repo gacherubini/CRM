@@ -24,6 +24,7 @@ from app.models_db import (
     Lead,
     Loja,
     Mensagem,
+    WhatsAppCanal,
 )
 
 logger = logging.getLogger("chatbot.ctwa")
@@ -1009,10 +1010,13 @@ def listar_conversas(
     limit: int,
     offset: int,
     busca: str | None = None,
+    canal_id: str | None = None,
 ) -> list[dict]:
     q = db.query(Conversa).filter(Conversa.loja_id == loja_id)
     if busca:
         q = q.filter(Conversa.telefone.contains(busca))
+    if canal_id:
+        q = q.filter(Conversa.canal_id == canal_id)
     conversas = (
         q.order_by(Conversa.atualizada_em.desc()).limit(limit).offset(offset).all()
     )
@@ -1030,7 +1034,22 @@ def listar_conversas(
     for msg in mensagens:
         ultima_por_conversa[msg.conversa_id] = msg  # asc => sobrescreve com a mais recente
 
-    return [para_saida_conversa(c, ultima_por_conversa.get(c.id)) for c in conversas]
+    canal_ids = {c.canal_id for c in conversas if c.canal_id}
+    canais_por_id: dict[str, WhatsAppCanal] = {}
+    if canal_ids:
+        for canal in (
+            db.query(WhatsAppCanal).filter(WhatsAppCanal.id.in_(canal_ids)).all()
+        ):
+            canais_por_id[canal.id] = canal
+
+    return [
+        para_saida_conversa(
+            c,
+            ultima_por_conversa.get(c.id),
+            canal=canais_por_id.get(c.canal_id) if c.canal_id else None,
+        )
+        for c in conversas
+    ]
 
 
 def listar_mensagens(
@@ -1279,7 +1298,22 @@ def para_saida_mensagem(msg: Mensagem) -> dict:
     }
 
 
-def para_saida_conversa(conversa: Conversa, ultima: Mensagem | None = None) -> dict:
+def _rotulo_canal_operacional(canal: WhatsAppCanal) -> str:
+    """Rótulo seguro para UI: mascara E.164; mantém labels operacionais."""
+    bruto = (canal.e164_or_label or "").strip()
+    digitos = "".join(c for c in bruto if c.isdigit())
+    # Número longo parece telefone — mascara; "legado"/"linha-2" passam intactos.
+    if len(digitos) >= 8 and len(digitos) >= len(bruto) - 2:
+        return _mascarar_telefone_curto(bruto)
+    return bruto or canal.evolution_instance or canal.id
+
+
+def para_saida_conversa(
+    conversa: Conversa,
+    ultima: Mensagem | None = None,
+    *,
+    canal: WhatsAppCanal | None = None,
+) -> dict:
     ultima_saida = None
     if ultima is not None:
         texto = ultima.texto or ""
@@ -1288,7 +1322,7 @@ def para_saida_conversa(conversa: Conversa, ultima: Mensagem | None = None) -> d
             "criada_em": ultima.criada_em.isoformat() if ultima.criada_em else None,
             "direcao": ultima.direcao,
         }
-    return {
+    saida: dict = {
         "id": conversa.id,
         "telefone": conversa.telefone,
         "bot_ativo": conversa.bot_ativo,
@@ -1297,7 +1331,26 @@ def para_saida_conversa(conversa: Conversa, ultima: Mensagem | None = None) -> d
         if conversa.atualizada_em
         else None,
         "ultima_mensagem": ultima_saida,
+        # Multi-WA expand: campos nulos se conversa legada sem canal.
+        "canal_id": conversa.canal_id,
+        "evolution_instance": None,
+        "canal_label": None,
+        "numero_mascarado": None,
+        "canal_ativo": None,
+        "canal_estado": None,
     }
+    if canal is not None:
+        digitos = "".join(c for c in (canal.e164_or_label or "") if c.isdigit())
+        saida["evolution_instance"] = canal.evolution_instance
+        saida["canal_label"] = _rotulo_canal_operacional(canal)
+        saida["numero_mascarado"] = (
+            _mascarar_telefone_curto(canal.e164_or_label)
+            if len(digitos) >= 4
+            else None
+        )
+        saida["canal_ativo"] = bool(canal.ativo)
+        saida["canal_estado"] = canal.estado
+    return saida
 
 
 # --- Leads e consentimento (LGPD) --------------------------------------------

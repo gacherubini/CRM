@@ -1,4 +1,4 @@
-"""Atendimento unificado (Revy Loja Fase 4 lean).
+"""Atendimento unificado (Revy Loja Fase 4 + multi-canal F6 lean).
 
 Composição read-model: lead + conversa + atribuição local + interesse +
 venda. Não duplica propriedade — Chatbot/Estoque/Motor/Portal permanecem
@@ -6,10 +6,10 @@ donos de seus dados.
 
 Identificador do workspace
 --------------------------
-O ``id`` do workspace é o **telefone** (somente dígitos). Motivo: leads e
-conversas já se correlacionam por telefone na loja; a lista unificada e o
-composer humano usam o mesmo eixo. ``lead_id`` aparece como campo opcional
-quando houver lead correspondente.
+O ``id`` do workspace é o **telefone** (somente dígitos). Com multi-WA,
+a disambiguação de canal usa ``canal_id`` (query param / campo no item).
+Leads permanecem por ``(loja, telefone)``; conversas por ``(canal_id,
+telefone)`` no Chatbot.
 """
 from __future__ import annotations
 
@@ -57,6 +57,9 @@ _LEAD_ETAPA_PARA_ESTADO: dict[str, AttendanceState] = {
     "perdido": AttendanceState.PERDIDO,
 }
 
+# Canal inativo / desconectado: histórico visível, envio bloqueado.
+_CANAL_ESTADOS_BLOQUEIAM_ENVIO = frozenset({"inativo", "desconectado"})
+
 
 def mapear_estado_de_lead(etapa: str | None) -> AttendanceState:
     if not etapa:
@@ -66,6 +69,34 @@ def mapear_estado_de_lead(etapa: str | None) -> AttendanceState:
 
 def normalizar_telefone(telefone: str | None) -> str:
     return "".join(c for c in (telefone or "") if c.isdigit())
+
+
+def rotulo_canal_de_conversa(conv: Mapping[str, Any] | None) -> str | None:
+    """Preferência: canal_label → numero_mascarado → instance → canal_id."""
+    if not conv:
+        return None
+    for chave in ("canal_label", "numero_mascarado", "evolution_instance", "instance"):
+        valor = conv.get(chave)
+        if valor:
+            return str(valor)
+    canal_id = conv.get("canal_id")
+    return str(canal_id) if canal_id else None
+
+
+def canal_permite_envio(
+    *,
+    canal_ativo: bool | None = None,
+    canal_estado: str | None = None,
+) -> bool:
+    """False somente quando status de canal está disponível e inoperante.
+
+    Se a API não envia status (legado), permite envio (comportamento F4).
+    """
+    if canal_ativo is False:
+        return False
+    if canal_estado and canal_estado in _CANAL_ESTADOS_BLOQUEIAM_ENVIO:
+        return False
+    return True
 
 
 # ---------------------------------------------------------------------------
@@ -111,7 +142,11 @@ class AttendanceListItem:
     ultima_mensagem: str | None
     atualizada_em: str | None
     atribuido_a: str | None
+    canal_id: str | None = None
     canal_label: str | None = None
+    canal_ativo: bool | None = None
+    canal_estado: str | None = None
+    evolution_instance: str | None = None
     origem: str | None = None
 
 
@@ -131,7 +166,12 @@ class AttendanceWorkspace:
     ultima_simulacao_ref: str | None = None
     venda_status: str | None = None
     venda_id: str | None = None
+    canal_id: str | None = None
     canal_label: str | None = None
+    canal_ativo: bool | None = None
+    canal_estado: str | None = None
+    evolution_instance: str | None = None
+    envio_bloqueado_canal: bool = False
     erros_bloco: dict[str, str] = field(default_factory=dict)
 
     def to_template_dict(self) -> dict[str, Any]:
@@ -159,7 +199,12 @@ class AttendanceWorkspace:
             "ultima_simulacao_ref": self.ultima_simulacao_ref,
             "venda_status": self.venda_status,
             "venda_id": self.venda_id,
+            "canal_id": self.canal_id,
             "canal_label": self.canal_label,
+            "canal_ativo": self.canal_ativo,
+            "canal_estado": self.canal_estado,
+            "evolution_instance": self.evolution_instance,
+            "envio_bloqueado_canal": self.envio_bloqueado_canal,
             "erros_bloco": self.erros_bloco,
         }
 
@@ -238,6 +283,31 @@ def _preview_mensagem(ultima: dict | None) -> str | None:
     return str(texto) if texto else None
 
 
+def _campos_canal(conv: Mapping[str, Any] | None) -> dict[str, Any]:
+    if not conv:
+        return {
+            "canal_id": None,
+            "canal_label": None,
+            "canal_ativo": None,
+            "canal_estado": None,
+            "evolution_instance": None,
+        }
+    ativo = conv.get("canal_ativo")
+    if ativo is not None:
+        ativo = bool(ativo)
+    return {
+        "canal_id": str(conv["canal_id"]) if conv.get("canal_id") else None,
+        "canal_label": rotulo_canal_de_conversa(conv),
+        "canal_ativo": ativo,
+        "canal_estado": (
+            str(conv["canal_estado"]) if conv.get("canal_estado") else None
+        ),
+        "evolution_instance": (
+            str(conv.get("evolution_instance") or conv.get("instance") or "") or None
+        ),
+    }
+
+
 def unificar_lista(
     *,
     leads: list[dict],
@@ -246,42 +316,35 @@ def unificar_lista(
     vendas_por_telefone: Mapping[str, Venda] | None = None,
     usuario: Usuario,
 ) -> list[AttendanceListItem]:
-    """Merge leads + conversas por telefone; aplica visibilidade."""
+    """Merge leads + conversas; multi-WA: uma linha por (telefone, canal_id)."""
     vendas_por_telefone = vendas_por_telefone or {}
-    por_tel: dict[str, dict[str, Any]] = {}
-
+    leads_por_tel: dict[str, dict] = {}
     for lead in leads:
         tel = normalizar_telefone(lead.get("telefone"))
-        if not tel:
-            continue
-        por_tel.setdefault(tel, {})["lead"] = lead
-        por_tel[tel]["telefone"] = tel
+        if tel:
+            leads_por_tel[tel] = lead
+
+    itens: list[AttendanceListItem] = []
+    telefones_com_conversa: set[str] = set()
 
     for conv in conversas:
         tel = normalizar_telefone(conv.get("telefone"))
         if not tel:
             continue
-        por_tel.setdefault(tel, {})["conversa"] = conv
-        por_tel[tel]["telefone"] = tel
-
-    itens: list[AttendanceListItem] = []
-    for tel, bloco in por_tel.items():
-        lead = bloco.get("lead") or {}
-        conv = bloco.get("conversa") or {}
+        telefones_com_conversa.add(tel)
+        lead = leads_por_tel.get(tel) or {}
         atr = atribuicao_para_telefone(atribuicoes, tel)
         if not visivel_para_usuario(usuario, atribuicao=atr):
             continue
         venda = vendas_por_telefone.get(tel)
-        bot_ativo = conv.get("bot_ativo") if conv else None
+        bot_ativo = conv.get("bot_ativo")
         estado = resolver_estado(
             lead_etapa=lead.get("etapa") if lead else None,
             bot_ativo=bot_ativo,
             venda_status=venda.status if venda else None,
         )
-        ultima = conv.get("ultima_mensagem") if conv else None
-        canal_label = None
-        if conv:
-            canal_label = conv.get("canal_label") or conv.get("canal_id")
+        canal = _campos_canal(conv)
+        ultima = conv.get("ultima_mensagem")
         itens.append(
             AttendanceListItem(
                 id=tel,
@@ -291,7 +354,7 @@ def unificar_lista(
                 interesse=(lead.get("interesse") if lead else None) or None,
                 lead_id=(lead.get("id") if lead else None) or None,
                 bot_ativo=bot_ativo,
-                status_conversa=conv.get("status") if conv else None,
+                status_conversa=conv.get("status"),
                 ultima_mensagem=_preview_mensagem(ultima),
                 atualizada_em=(
                     conv.get("atualizada_em")
@@ -299,8 +362,38 @@ def unificar_lista(
                     or (lead.get("criada_em") if lead else None)
                 ),
                 atribuido_a=atr.vendedor_email if atr else None,
-                canal_label=str(canal_label) if canal_label else None,
                 origem=(lead.get("origem") if lead else None) or None,
+                **canal,
+            )
+        )
+
+    # Leads sem conversa correspondente.
+    for tel, lead in leads_por_tel.items():
+        if tel in telefones_com_conversa:
+            continue
+        atr = atribuicao_para_telefone(atribuicoes, tel)
+        if not visivel_para_usuario(usuario, atribuicao=atr):
+            continue
+        venda = vendas_por_telefone.get(tel)
+        estado = resolver_estado(
+            lead_etapa=lead.get("etapa"),
+            bot_ativo=None,
+            venda_status=venda.status if venda else None,
+        )
+        itens.append(
+            AttendanceListItem(
+                id=tel,
+                telefone=tel,
+                nome=lead.get("nome"),
+                estado=estado,
+                interesse=lead.get("interesse"),
+                lead_id=lead.get("id"),
+                bot_ativo=None,
+                status_conversa=None,
+                ultima_mensagem=None,
+                atualizada_em=lead.get("atualizada_em") or lead.get("criada_em"),
+                atribuido_a=atr.vendedor_email if atr else None,
+                origem=lead.get("origem"),
             )
         )
 
@@ -330,13 +423,11 @@ def montar_workspace(
         bot_ativo=bot_ativo,
         venda_status=venda.status if venda else None,
     )
-    canal_label = None
-    if conversa_resumo:
-        canal_label = (
-            conversa_resumo.get("canal_label")
-            or conversa_resumo.get("canal_id")
-            or conversa_resumo.get("evolution_instance")
-        )
+    canal = _campos_canal(conversa_resumo)
+    bloqueado = not canal_permite_envio(
+        canal_ativo=canal["canal_ativo"],
+        canal_estado=canal["canal_estado"],
+    )
     return AttendanceWorkspace(
         id=tel,
         telefone=tel,
@@ -358,7 +449,12 @@ def montar_workspace(
         ultima_simulacao_ref=None,  # lean: ref opcional futura (Motor)
         venda_status=venda.status if venda else None,
         venda_id=venda.id if venda else None,
-        canal_label=str(canal_label) if canal_label else None,
+        canal_id=canal["canal_id"],
+        canal_label=canal["canal_label"],
+        canal_ativo=canal["canal_ativo"],
+        canal_estado=canal["canal_estado"],
+        evolution_instance=canal["evolution_instance"],
+        envio_bloqueado_canal=bloqueado,
         erros_bloco=dict(erros_bloco or {}),
     )
 
@@ -380,9 +476,15 @@ def buscar_venda_por_telefone(
 
 
 def filtrar_itens(
-    itens: list[AttendanceListItem], *, busca: str | None = None, estado: str | None = None
+    itens: list[AttendanceListItem],
+    *,
+    busca: str | None = None,
+    estado: str | None = None,
+    canal_id: str | None = None,
 ) -> list[AttendanceListItem]:
     resultado = itens
+    if canal_id:
+        resultado = [i for i in resultado if i.canal_id == canal_id]
     if estado:
         resultado = [i for i in resultado if i.estado.value == estado]
     if busca:
@@ -395,8 +497,31 @@ def filtrar_itens(
                     i.telefone or "",
                     i.interesse or "",
                     i.atribuido_a or "",
+                    i.canal_label or "",
                 ]
                 if any(termo in c.lower() for c in campos):
                     filtrados.append(i)
             resultado = filtrados
     return resultado
+
+
+def rotulos_canais_para_filtro(
+    canais: list[dict],
+) -> list[dict[str, str]]:
+    """Opções do dropdown de canal (somente canais conhecidos da loja)."""
+    opcoes: list[dict[str, str]] = []
+    for c in canais or []:
+        cid = c.get("id")
+        if not cid:
+            continue
+        label_bruto = (c.get("e164_or_label") or c.get("evolution_instance") or cid)
+        digitos = "".join(ch for ch in str(label_bruto) if ch.isdigit())
+        if len(digitos) >= 8 and len(digitos) >= len(str(label_bruto).strip()) - 2:
+            label = f"***{digitos[-4:]}"
+        else:
+            label = str(label_bruto)
+        estado = c.get("estado") or ("ativo" if c.get("ativo", True) else "inativo")
+        if not c.get("ativo", True) or estado == "inativo":
+            label = f"{label} (inativo)"
+        opcoes.append({"id": str(cid), "label": label})
+    return opcoes

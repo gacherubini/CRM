@@ -24,11 +24,13 @@ from app.loja.attendance import (
     ATTENDANCE_STATE_LABELS,
     AttendanceState,
     buscar_venda_por_telefone,
+    canal_permite_envio,
     carregar_atribuicoes_ativas,
     filtrar_itens,
     montar_workspace,
     normalizar_telefone,
     pode_usar_atendimento,
+    rotulos_canais_para_filtro,
     unificar_lista,
     visivel_para_usuario,
     atribuicao_para_telefone,
@@ -92,17 +94,25 @@ def _lead_por_telefone(chatbot: ChatbotClient, telefone: str) -> dict | None:
 
 
 def _conversa_por_telefone(
-    chatbot: ChatbotClient, telefone: str
+    chatbot: ChatbotClient,
+    telefone: str,
+    *,
+    canal_id: str | None = None,
 ) -> tuple[dict | None, list[dict], str | None]:
-    """Retorna (resumo, mensagens, erro)."""
+    """Retorna (resumo, mensagens, erro). Prefere conversa do ``canal_id``."""
     tel = normalizar_telefone(telefone)
     try:
-        conversas = chatbot.listar_conversas(busca=tel)
+        conversas = chatbot.listar_conversas(busca=tel, canal_id=canal_id)
         resumo = None
         for c in conversas:
-            if normalizar_telefone(c.get("telefone")) == tel:
-                resumo = c
-                break
+            if normalizar_telefone(c.get("telefone")) != tel:
+                continue
+            if canal_id and c.get("canal_id") and c.get("canal_id") != canal_id:
+                continue
+            resumo = c
+            # Com canal_id, primeira match já é a desejada; sem, preferir mais recente
+            # (listar_conversas já vem ordenada por atualizada_em desc).
+            break
         try:
             mensagens = chatbot.listar_mensagens(tel)
         except ConversaNaoEncontrada:
@@ -114,6 +124,7 @@ def _conversa_por_telefone(
                     "telefone": tel,
                     "bot_ativo": estado.get("bot_ativo"),
                     "status": estado.get("status"),
+                    "canal_id": canal_id,
                 }
             except ChatbotIndisponivel:
                 pass
@@ -122,11 +133,24 @@ def _conversa_por_telefone(
         return None, [], str(exc)
 
 
+def _canais_para_filtro(chatbot: ChatbotClient) -> list[dict]:
+    if not hasattr(chatbot, "listar_canais_whatsapp"):
+        return []
+    try:
+        return chatbot.listar_canais_whatsapp()
+    except ChatbotIndisponivel:
+        return []
+    except Exception:
+        # Fake/client sem endpoint — filtro some, lista continua.
+        return []
+
+
 @router.get("/app/loja/atendimento", response_class=HTMLResponse)
 def atendimento_lista(
     request: Request,
     busca: str | None = None,
     estado: str | None = None,
+    canal_id: str | None = None,
     db: Session = Depends(get_db),
     chatbot: ChatbotClient = Depends(get_chatbot_client),
 ):
@@ -150,9 +174,13 @@ def atendimento_lista(
     except ChatbotIndisponivel as exc:
         erro_integracao = str(exc)
     try:
-        conversas = chatbot.listar_conversas(limit=100)
+        # Filtro no chatbot quando possível (menos payload); UI refiltra por segurança.
+        conversas = chatbot.listar_conversas(limit=100, canal_id=canal_id or None)
     except ChatbotIndisponivel as exc:
         erro_integracao = erro_integracao or str(exc)
+
+    canais_raw = _canais_para_filtro(chatbot)
+    opcoes_canal = rotulos_canais_para_filtro(canais_raw)
 
     atribuicoes = carregar_atribuicoes_ativas(db, usuario.loja_slug)
     itens = unificar_lista(
@@ -161,7 +189,7 @@ def atendimento_lista(
         atribuicoes=atribuicoes,
         usuario=usuario,
     )
-    itens = filtrar_itens(itens, busca=busca, estado=estado)
+    itens = filtrar_itens(itens, busca=busca, estado=estado, canal_id=canal_id)
 
     return templates.TemplateResponse(
         "loja/atendimento_lista.html",
@@ -170,7 +198,12 @@ def atendimento_lista(
             usuario,
             itens=itens,
             estados=ATTENDANCE_STATE_LABELS,
-            filtros={"busca": busca or "", "estado": estado or ""},
+            filtros={
+                "busca": busca or "",
+                "estado": estado or "",
+                "canal_id": canal_id or "",
+            },
+            canais=opcoes_canal,
             integracao_erro=erro_integracao,
             atendimento_enabled=True,
         ),
@@ -181,12 +214,13 @@ def atendimento_lista(
 def atendimento_workspace(
     request: Request,
     workspace_id: str,
+    canal_id: str | None = None,
     db: Session = Depends(get_db),
     chatbot: ChatbotClient = Depends(get_chatbot_client),
 ):
     """Detalhe do workspace.
 
-    ``workspace_id`` = telefone (dígitos). Ver docstring de ``attendance.py``.
+    ``workspace_id`` = telefone (dígitos). ``canal_id`` opcional multi-WA.
     """
     usuario = usuario_atual(request, db)
     if not usuario:
@@ -233,7 +267,9 @@ def atendimento_workspace(
     except ChatbotIndisponivel as exc:
         erros["lead"] = str(exc)
 
-    conversa_resumo, mensagens, err_conv = _conversa_por_telefone(chatbot, telefone)
+    conversa_resumo, mensagens, err_conv = _conversa_por_telefone(
+        chatbot, telefone, canal_id=canal_id
+    )
     if err_conv:
         erros["conversa"] = err_conv
 
@@ -260,6 +296,13 @@ def atendimento_workspace(
         venda=venda,
         erros_bloco=erros,
     )
+    pode_papel = usuario.papel in {
+        "dono",
+        "gerente",
+        "vendedor",
+        "admin_plataforma",
+    }
+    pode_enviar = pode_papel and not workspace.envio_bloqueado_canal
 
     return templates.TemplateResponse(
         "loja/atendimento_workspace.html",
@@ -270,8 +313,8 @@ def atendimento_workspace(
             estados=ATTENDANCE_STATE_LABELS,
             AttendanceState=AttendanceState,
             atendimento_enabled=True,
-            pode_enviar=usuario.papel
-            in {"dono", "gerente", "vendedor", "admin_plataforma"},
+            pode_enviar=pode_enviar,
+            canal_id_filtro=canal_id or workspace.canal_id,
         ),
     )
 
@@ -297,10 +340,17 @@ async def atendimento_enviar_mensagem(
         )
 
     telefone = normalizar_telefone(workspace_id)
-    destino = f"/app/loja/atendimento/{telefone}"
     form = await request.form()
+    # canal_id do form (hidden) — só o da conversa aberta, nunca seletor livre.
+    canal_id_form = (form.get("canal_id") or "").strip() or None
+    # Ignora instance/canal arbitrário do cliente: nunca confiar em seletor UI.
+    # Canal vem só do resumo da conversa no servidor.
+    destino = f"/app/loja/atendimento/{telefone}"
+    if canal_id_form:
+        destino = f"{destino}?canal_id={canal_id_form}"
+
     if not csrf_valido(request, form.get("csrf")):
-        return RedirectResponse(f"{destino}?erro=sessao", status_code=303)
+        return RedirectResponse(f"{destino}&erro=sessao" if "?" in destino else f"{destino}?erro=sessao", status_code=303)
 
     atribuicoes = carregar_atribuicoes_ativas(db, usuario.loja_slug)
     atr = atribuicao_para_telefone(atribuicoes, telefone)
@@ -313,9 +363,29 @@ async def atendimento_enviar_mensagem(
 
     texto = (form.get("texto") or "").strip()
     if not texto:
-        return RedirectResponse(f"{destino}?erro=texto", status_code=303)
+        sep = "&" if "?" in destino else "?"
+        return RedirectResponse(f"{destino}{sep}erro=texto", status_code=303)
     if len(texto) > 4000:
-        return RedirectResponse(f"{destino}?erro=texto", status_code=303)
+        sep = "&" if "?" in destino else "?"
+        return RedirectResponse(f"{destino}{sep}erro=texto", status_code=303)
+
+    # Resolve canal da conversa no servidor — sem aceitar instance do form.
+    conversa_resumo, _, _ = _conversa_por_telefone(
+        chatbot, telefone, canal_id=canal_id_form
+    )
+    if conversa_resumo and not canal_permite_envio(
+        canal_ativo=conversa_resumo.get("canal_ativo"),
+        canal_estado=conversa_resumo.get("canal_estado"),
+    ):
+        sep = "&" if "?" in destino else "?"
+        return RedirectResponse(f"{destino}{sep}erro=canal", status_code=303)
+
+    instance_conversa = None
+    if conversa_resumo:
+        instance_conversa = (
+            conversa_resumo.get("evolution_instance")
+            or conversa_resumo.get("instance")
+        )
 
     # Idempotência: cliente pode reenviar a mesma chave; senão gera uma nova.
     idem = (form.get("idempotency_key") or "").strip()
@@ -327,10 +397,13 @@ async def atendimento_enviar_mensagem(
             telefone,
             texto,
             idempotency_key=idem,
+            # Apenas instance da conversa aberta (não picker da UI).
+            instance=instance_conversa,
             ator=usuario.email,
         )
     except MensagemHumanaNaoEncontrada:
-        return RedirectResponse(f"{destino}?erro=conversa", status_code=303)
+        sep = "&" if "?" in destino else "?"
+        return RedirectResponse(f"{destino}{sep}erro=conversa", status_code=303)
     except MensagemHumanaNaoAutorizada:
         return templates.TemplateResponse(
             "erro.html",
@@ -338,7 +411,8 @@ async def atendimento_enviar_mensagem(
             status_code=403,
         )
     except (MensagemHumanaErro, ChatbotIndisponivel):
-        return RedirectResponse(f"{destino}?erro=envio", status_code=303)
+        sep = "&" if "?" in destino else "?"
+        return RedirectResponse(f"{destino}{sep}erro=envio", status_code=303)
 
     # Espelha no fake de mensagens do chatbot client se expuser o histórico
     # (testes com ChatbotFake + InMemory port).
@@ -357,4 +431,5 @@ async def atendimento_enviar_mensagem(
             chatbot.estados[telefone] = {"bot_ativo": False, "status": "handoff"}
 
     sufixo = "duplicada" if resultado.duplicada else "enviada"
-    return RedirectResponse(f"{destino}?ok={sufixo}", status_code=303)
+    sep = "&" if "?" in destino else "?"
+    return RedirectResponse(f"{destino}{sep}ok={sufixo}", status_code=303)

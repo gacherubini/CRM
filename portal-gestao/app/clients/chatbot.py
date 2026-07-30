@@ -129,11 +129,21 @@ class ChatbotClient:
 
     # --- Conversas e handoff ---------------------------------------------------
 
-    def listar_conversas(self, busca: str | None = None, limit: int = 50, offset: int = 0) -> list[dict]:
+    def listar_conversas(
+        self,
+        busca: str | None = None,
+        limit: int = 50,
+        offset: int = 0,
+        *,
+        canal_id: str | None = None,
+    ) -> list[dict]:
         params: dict[str, Any] = {"limit": limit, "offset": offset}
         if busca:
             params["busca"] = busca
-        return self._request("GET", "/v1/conversas", params=params)["conversas"]
+        if canal_id:
+            params["canal_id"] = canal_id
+        conversas = self._request("GET", "/v1/conversas", params=params)["conversas"]
+        return [self._mapear_conversa(c) for c in conversas]
 
     def listar_mensagens(self, telefone: str, limit: int = 200, offset: int = 0) -> list[dict]:
         params = {"limit": limit, "offset": offset}
@@ -150,6 +160,11 @@ class ChatbotClient:
             "PATCH", f"/v1/conversas/{telefone}/estado", json={"bot_ativo": bot_ativo}
         )
 
+    def listar_canais_whatsapp(self) -> list[dict]:
+        """Lista canais da loja (read-only; Loja não conecta/desconecta)."""
+        dados = self._request("GET", "/v1/whatsapp/canais")
+        return list(dados.get("canais") or [])
+
     def enviar_mensagem_humana(
         self,
         telefone: str,
@@ -159,7 +174,11 @@ class ChatbotClient:
         instance: str | None = None,
         ator: str | None = None,
     ) -> dict:
-        """Envia texto humano via Chatbot (persistência + canal da loja)."""
+        """Envia texto humano via Chatbot (persistência + canal da conversa).
+
+        ``instance`` só deve vir do resumo da conversa já aberta — nunca de
+        seletor arbitrário no UI da Loja.
+        """
         payload: dict[str, Any] = {
             "texto": texto,
             "idempotency_key": idempotency_key,
@@ -174,6 +193,19 @@ class ChatbotClient:
             erro_404=ConversaNaoEncontrada,
             json=payload,
         )
+
+    @staticmethod
+    def _mapear_conversa(raw: dict) -> dict:
+        """Normaliza campos multi-WA se a API os devolver (expand-only)."""
+        if not isinstance(raw, dict):
+            return raw
+        out = dict(raw)
+        # Aliases estáveis para o read-model de Atendimento.
+        if out.get("canal_label") is None and out.get("numero_mascarado"):
+            out["canal_label"] = out["numero_mascarado"]
+        if out.get("instance") is None and out.get("evolution_instance"):
+            out["instance"] = out["evolution_instance"]
+        return out
 
     # --- Simulação -------------------------------------------------------------
 

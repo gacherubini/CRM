@@ -51,7 +51,7 @@ def test_lista_unifica_leads_e_conversas(client, chatbot_fake, atendimento_on):
     assert "Maria Silva" in r.text
     # telefone completo só no href do workspace; UI mascara o display
     assert "•••• 4321" in r.text
-    assert 'href="/app/loja/atendimento/5511987654321"' in r.text
+    assert 'href="/app/loja/atendimento/5511987654321' in r.text
     assert ">5511987654321<" not in r.text
 
 
@@ -199,3 +199,176 @@ def test_unificar_isola_por_visibilidade():
     )
     assert len(itens_v) == 2
     assert len(itens_d) == 2
+
+
+def test_filtro_canal_id_na_lista(client, chatbot_fake, atendimento_on):
+    """F6: ?canal_id= isola conversas do canal; dropdown só se multi-canal."""
+    chatbot_fake.conversas.append(
+        {
+            "id": "c3",
+            "telefone": "5511933334444",
+            "bot_ativo": True,
+            "status": "aberta",
+            "atualizada_em": "2026-07-12T15:00:00+00:00",
+            "ultima_mensagem": {
+                "texto": "Oi no canal 2",
+                "criada_em": "2026-07-12T15:00:00+00:00",
+                "direcao": "entrada",
+            },
+            "canal_id": "canal-secundario",
+            "evolution_instance": "loja-teste-wa-2",
+            "canal_label": "linha-2",
+            "canal_ativo": True,
+            "canal_estado": "conectado",
+        }
+    )
+    login(client)
+    r = client.get("/app/loja/atendimento")
+    assert r.status_code == 200
+    assert 'name="canal_id"' in r.text
+    assert "linha-2" in r.text or "canal-secundario" in r.text
+    assert "***0001" in r.text
+
+    r2 = client.get("/app/loja/atendimento?canal_id=canal-secundario")
+    assert r2.status_code == 200
+    assert "Oi no canal 2" in r2.text
+    # Maria (canal principal) some do filtro do secundário
+    assert "Tem Civic disponível?" not in r2.text
+
+
+def test_badge_canal_no_workspace(client, chatbot_fake, atendimento_on):
+    login(client)
+    r = client.get("/app/loja/atendimento/5511987654321?canal_id=canal-principal")
+    assert r.status_code == 200
+    assert "***0001" in r.text
+    assert 'name="canal_id" value="canal-principal"' in r.text
+    # Sem seletor arbitrário de canal/instance no composer
+    assert 'name="instance"' not in r.text
+    assert 'name="canal_id"' in r.text
+    assert r.text.count("<select") == 0
+
+
+def test_envio_usa_instance_da_conversa_nao_do_form(
+    client, chatbot_fake, messaging_fake, atendimento_on
+):
+    """F6: payload não aceita canal arbitrário do form; usa o da conversa."""
+    login(client, papel="vendedor", email="vendedor@loja.test")
+    pagina = client.get("/app/loja/atendimento/5511987654321")
+    csrf = csrf_da_resposta(pagina)
+    r = client.post(
+        "/app/loja/atendimento/5511987654321/mensagem",
+        data={
+            "csrf": csrf,
+            "texto": "Resposta no canal certo",
+            "idempotency_key": "idem-canal-1",
+            # Tentativa de forjar outro canal — deve ser ignorada.
+            "instance": "instancia-arbitraria-hack",
+            "canal_id": "canal-principal",
+        },
+        follow_redirects=False,
+    )
+    assert r.status_code == 303
+    assert "ok=enviada" in r.headers["location"]
+    assert len(messaging_fake.enviadas) == 1
+    envio = messaging_fake.enviadas[0]
+    assert envio["instance"] == "loja-teste-wa"
+    assert envio["instance"] != "instancia-arbitraria-hack"
+    assert envio["texto"] == "Resposta no canal certo"
+
+
+def test_envio_bloqueado_canal_inativo(
+    client, chatbot_fake, messaging_fake, atendimento_on
+):
+    chatbot_fake.conversas[0]["canal_ativo"] = False
+    chatbot_fake.conversas[0]["canal_estado"] = "inativo"
+    login(client)
+    r = client.get("/app/loja/atendimento/5511987654321")
+    assert r.status_code == 200
+    assert "Envio bloqueado" in r.text
+    assert 'action="/app/loja/atendimento/5511987654321/mensagem"' not in r.text
+
+    pagina = client.get("/app/leads")
+    r2 = client.post(
+        "/app/loja/atendimento/5511987654321/mensagem",
+        data={
+            "csrf": csrf_da_resposta(pagina),
+            "texto": "não deve enviar",
+            "idempotency_key": "bloqueado-1",
+        },
+        follow_redirects=False,
+    )
+    assert r2.status_code == 303
+    assert "erro=canal" in r2.headers["location"]
+    assert messaging_fake.enviadas == []
+
+
+def test_unificar_dois_canais_mesmo_telefone():
+    """Mesmo cliente em dois canais → duas linhas; lead único por telefone."""
+    dono = Usuario(
+        email="dono@x", nome="D", senha_hash="x", papel="dono", loja_slug="l"
+    )
+    leads = [
+        {
+            "id": "l1",
+            "telefone": "5511988000001",
+            "nome": "Cliente Dual",
+            "etapa": "novo",
+        }
+    ]
+    conversas = [
+        {
+            "id": "c1",
+            "telefone": "5511988000001",
+            "bot_ativo": True,
+            "status": "aberta",
+            "atualizada_em": "2026-07-12T14:00:00+00:00",
+            "ultima_mensagem": {"texto": "no 1", "direcao": "entrada"},
+            "canal_id": "ca",
+            "canal_label": "***0001",
+            "canal_ativo": True,
+            "canal_estado": "conectado",
+        },
+        {
+            "id": "c2",
+            "telefone": "5511988000001",
+            "bot_ativo": True,
+            "status": "aberta",
+            "atualizada_em": "2026-07-12T15:00:00+00:00",
+            "ultima_mensagem": {"texto": "no 2", "direcao": "entrada"},
+            "canal_id": "cb",
+            "canal_label": "linha-2",
+            "canal_ativo": True,
+            "canal_estado": "conectado",
+        },
+    ]
+    itens = unificar_lista(
+        leads=leads, conversas=conversas, atribuicoes={}, usuario=dono
+    )
+    assert len(itens) == 2
+    assert {i.canal_id for i in itens} == {"ca", "cb"}
+    assert all(i.nome == "Cliente Dual" for i in itens)
+    assert all(i.lead_id == "l1" for i in itens)
+
+
+def test_filtrar_itens_por_canal():
+    from app.loja.attendance import AttendanceListItem, filtrar_itens
+
+    base = dict(
+        id="5511",
+        telefone="5511",
+        nome=None,
+        estado=AttendanceState.NOVO,
+        interesse=None,
+        lead_id=None,
+        bot_ativo=True,
+        status_conversa="aberta",
+        ultima_mensagem=None,
+        atualizada_em=None,
+        atribuido_a=None,
+    )
+    itens = [
+        AttendanceListItem(**base, canal_id="a", canal_label="A"),
+        AttendanceListItem(**base, canal_id="b", canal_label="B"),
+    ]
+    assert len(filtrar_itens(itens, canal_id="a")) == 1
+    assert filtrar_itens(itens, canal_id="a")[0].canal_id == "a"

@@ -16,6 +16,8 @@
   .meta-list{display:grid;gap:.4rem;font-size:.92rem}
   .meta-list dt{font-weight:600;margin:0}
   .meta-list dd{margin:0 0 .5rem;opacity:.9}
+  .canal-badge{display:inline-flex;align-items:center;gap:.35rem;padding:.15rem .55rem;border-radius:999px;font-size:.8rem;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12)}
+  .canal-badge.inativo,.canal-badge.desconectado{opacity:.75;border-color:rgba(255,180,80,.4)}
 </style>
 
 <div class="page-heading">
@@ -24,7 +26,14 @@
     <h1>{% if workspace.lead and workspace.lead.nome %}{{ workspace.lead.nome }}{% else %}{{ mascarar_telefone(workspace.telefone) }}{% endif %}</h1>
     <p>
       <span class="status {{ workspace.estado }}">{{ workspace.estado_label }}</span>
-      {% if workspace.canal_label %} · Canal: {{ workspace.canal_label }}{% endif %}
+      {% if workspace.canal_label %}
+      · <span class="canal-badge {{ workspace.canal_estado or '' }}{% if workspace.canal_ativo is sameas false %} inativo{% endif %}">
+        {{ workspace.canal_label }}
+        {% if workspace.canal_ativo is sameas false or workspace.canal_estado in ['inativo', 'desconectado'] %}
+        · canal indisponível
+        {% endif %}
+      </span>
+      {% endif %}
     </p>
   </div>
   <a class="back-link" href="/app/loja/atendimento">← Voltar à lista</a>
@@ -36,6 +45,7 @@
 {% if request.query_params.get('erro') == 'texto' %}<div class="alert warning" role="alert">Informe um texto válido.</div>{% endif %}
 {% if request.query_params.get('erro') == 'sessao' %}<div class="alert warning" role="alert">Sessão expirada. Atualize a página e tente de novo.</div>{% endif %}
 {% if request.query_params.get('erro') == 'conversa' %}<div class="alert warning" role="alert">Conversa não encontrada no Chatbot.</div>{% endif %}
+{% if request.query_params.get('erro') == 'canal' %}<div class="alert warning" role="alert">Este canal WhatsApp está inativo. O histórico permanece visível; novos envios ficam bloqueados.</div>{% endif %}
 
 {% if workspace.erros_bloco %}
 <div class="alert warning" role="alert">
@@ -58,15 +68,27 @@
       {% endif %}
     </section>
 
-    {% if pode_enviar %}
+    {% if workspace.envio_bloqueado_canal %}
+    <section class="panel">
+      <div class="alert warning" role="status" style="margin:0">
+        <strong>Envio bloqueado</strong>
+        <p style="margin:.35rem 0 0">O canal desta conversa está inativo ou desconectado. Ajuste no Revy Control; a Loja não conecta nem desconecta números.</p>
+      </div>
+    </section>
+    {% elif pode_enviar %}
     <section class="panel">
       <form class="composer" method="post" action="/app/loja/atendimento/{{ workspace.id }}/mensagem">
         <input type="hidden" name="csrf" value="{{ csrf }}">
+        {# canal_id somente da conversa aberta — sem seletor de canal #}
+        {% if workspace.canal_id %}<input type="hidden" name="canal_id" value="{{ workspace.canal_id }}">{% endif %}
         <label for="texto-msg"><strong>Responder ao cliente</strong></label>
         <textarea id="texto-msg" name="texto" maxlength="4000" placeholder="Escreva a mensagem de texto…" required></textarea>
         <div class="handoff-bar" style="display:flex;gap:.75rem;align-items:center;flex-wrap:wrap">
           <button class="button" type="submit">Enviar</button>
-          <p class="muted" style="margin:0">O envio pausa o bot neste contato. Mídia ainda não está disponível.</p>
+          <p class="muted" style="margin:0">
+            Resposta sai pelo canal desta conversa{% if workspace.canal_label %} ({{ workspace.canal_label }}){% endif %}.
+            O envio pausa o bot neste contato. Mídia ainda não está disponível.
+          </p>
         </div>
       </form>
     </section>
@@ -79,6 +101,15 @@
       <dl class="meta-list">
         <dt>Telefone</dt>
         <dd>{{ mascarar_telefone(workspace.telefone) }}</dd>
+        <dt>Canal</dt>
+        <dd>
+          {% if workspace.canal_label %}
+            {{ workspace.canal_label }}
+            {% if workspace.canal_estado %}<span class="muted"> · {{ workspace.canal_estado }}</span>{% endif %}
+          {% else %}
+            <span class="muted">WhatsApp</span>
+          {% endif %}
+        </dd>
         <dt>Responsável</dt>
         <dd>{% if workspace.assignment and workspace.assignment.vendedor_email %}{{ workspace.assignment.vendedor_email }}{% else %}<span class="muted">Fila (sem responsável)</span>{% endif %}</dd>
         <dt>Interesse</dt>

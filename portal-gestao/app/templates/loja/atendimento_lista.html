@@ -1,6 +1,10 @@
 {% extends "base.html" %}
 {% block title %}Atendimento — Revy Loja{% endblock %}
 {% block content %}
+<style>
+  .canal-badge{display:inline-flex;align-items:center;gap:.35rem;padding:.15rem .5rem;border-radius:999px;font-size:.78rem;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.1)}
+  .canal-badge.inativo,.canal-badge.desconectado{opacity:.7;border-color:rgba(255,180,80,.35)}
+</style>
 <div class="page-heading">
   <div>
     <span class="eyebrow">Vendas</span>
@@ -19,6 +23,14 @@
     <option value="{{ key }}" {{ 'selected' if filtros.estado == key }}>{{ label }}</option>
     {% endfor %}
   </select>
+  {% if canais and canais|length > 1 %}
+  <select name="canal_id" aria-label="Canal WhatsApp">
+    <option value="">Todos os canais</option>
+    {% for c in canais %}
+    <option value="{{ c.id }}" {{ 'selected' if filtros.canal_id == c.id }}>{{ c.label }}</option>
+    {% endfor %}
+  </select>
+  {% endif %}
   <button class="button secondary" type="submit">Filtrar</button>
 </form>
 
@@ -48,9 +60,22 @@
         <td>{% if i.interesse %}{{ i.interesse }}{% else %}<span class="muted">—</span>{% endif %}</td>
         <td><span class="status {{ i.estado.value }}">{{ estados.get(i.estado.value, i.estado.value) }}</span></td>
         <td>{% if i.atribuido_a %}<small>{{ i.atribuido_a }}</small>{% else %}<span class="muted">Fila</span>{% endif %}</td>
-        <td>{% if i.canal_label %}<small>{{ i.canal_label }}</small>{% else %}<span class="muted">WhatsApp</span>{% endif %}</td>
+        <td>
+          {% if i.canal_label %}
+          <span class="canal-badge {{ i.canal_estado or '' }}{% if i.canal_ativo is sameas false %} inativo{% endif %}">
+            {{ i.canal_label }}
+            {% if i.canal_ativo is sameas false or i.canal_estado in ['inativo', 'desconectado'] %}
+            <span class="muted">· off</span>
+            {% endif %}
+          </span>
+          {% else %}
+          <span class="muted">WhatsApp</span>
+          {% endif %}
+        </td>
         <td>{% if i.ultima_mensagem %}<span class="muted">{{ i.ultima_mensagem[:80] }}</span>{% else %}<span class="muted">—</span>{% endif %}</td>
-        <td><a class="table-action" href="/app/loja/atendimento/{{ i.id }}">Abrir</a></td>
+        <td>
+          <a class="table-action" href="/app/loja/atendimento/{{ i.id }}{% if i.canal_id %}?canal_id={{ i.canal_id }}{% endif %}">Abrir</a>
+        </td>
       </tr>
       {% endfor %}
     </tbody>
@@ -60,10 +85,10 @@
     <strong>Não foi possível carregar o atendimento</strong>
     <p>Tente de novo em instantes. As telas de Leads e Conversas continuam disponíveis.</p>
   </div>
-  {% elif filtros.estado or filtros.busca %}
+  {% elif filtros.estado or filtros.busca or filtros.canal_id %}
   <div class="empty">
     <strong>Nenhum atendimento com esse filtro</strong>
-    <p>Ajuste a busca ou o estado.</p>
+    <p>Ajuste a busca, o estado ou o canal.</p>
     <a class="button secondary" href="/app/loja/atendimento">Limpar filtros</a>
   </div>
   {% else %}

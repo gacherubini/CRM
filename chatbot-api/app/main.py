@@ -456,12 +456,15 @@ def listar_conversas(
     limit: int = 50,
     offset: int = 0,
     busca: Optional[str] = None,
+    canal_id: Optional[str] = None,
     ctx: Contexto = Depends(get_contexto),
     db: Session = Depends(get_db),
 ):
     limit = max(1, min(limit, 200))
     offset = max(0, offset)
-    conversas = servico.listar_conversas(db, ctx.loja_id, limit, offset, busca)
+    conversas = servico.listar_conversas(
+        db, ctx.loja_id, limit, offset, busca, canal_id=canal_id
+    )
     return {"conversas": conversas, "limit": limit, "offset": offset}
 
 

@@ -34,6 +34,12 @@ def test_listar_conversas_ordenadas_com_preview(client, loja_a):
         "status",
         "atualizada_em",
         "ultima_mensagem",
+        "canal_id",
+        "evolution_instance",
+        "canal_label",
+        "numero_mascarado",
+        "canal_ativo",
+        "canal_estado",
     }
 
 

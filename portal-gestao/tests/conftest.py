@@ -121,11 +121,39 @@ class ChatbotFake:
                 "id": "c1", "telefone": "5511987654321", "bot_ativo": True,
                 "status": "aberta", "atualizada_em": "2026-07-12T14:00:00+00:00",
                 "ultima_mensagem": {"texto": "Tem Civic disponível?", "criada_em": "2026-07-12T14:00:00+00:00", "direcao": "entrada"},
+                "canal_id": "canal-principal",
+                "evolution_instance": "loja-teste-wa",
+                "canal_label": "***0001",
+                "numero_mascarado": "***0001",
+                "canal_ativo": True,
+                "canal_estado": "conectado",
             },
             {
                 "id": "c2", "telefone": "5511911112222", "bot_ativo": False,
                 "status": "handoff", "atualizada_em": "2026-07-12T13:00:00+00:00",
                 "ultima_mensagem": None,
+                "canal_id": "canal-principal",
+                "evolution_instance": "loja-teste-wa",
+                "canal_label": "***0001",
+                "numero_mascarado": "***0001",
+                "canal_ativo": True,
+                "canal_estado": "conectado",
+            },
+        ]
+        self.canais = [
+            {
+                "id": "canal-principal",
+                "e164_or_label": "5511999990001",
+                "evolution_instance": "loja-teste-wa",
+                "ativo": True,
+                "estado": "conectado",
+            },
+            {
+                "id": "canal-secundario",
+                "e164_or_label": "linha-2",
+                "evolution_instance": "loja-teste-wa-2",
+                "ativo": True,
+                "estado": "conectado",
             },
         ]
         self.mensagens = {
@@ -182,13 +210,20 @@ class ChatbotFake:
             raise ChatbotIndisponivel("Não foi possível acessar o chatbot agora")
         return self.eventos_funil[offset : offset + limit]
 
-    def listar_conversas(self, busca=None, limit=50, offset=0):
+    def listar_conversas(self, busca=None, limit=50, offset=0, *, canal_id=None):
         if self.indisponivel:
             raise ChatbotIndisponivel("Não foi possível acessar o chatbot agora")
         itens = self.conversas
         if busca:
             itens = [c for c in itens if busca in c["telefone"]]
+        if canal_id:
+            itens = [c for c in itens if c.get("canal_id") == canal_id]
         return itens
+
+    def listar_canais_whatsapp(self):
+        if self.indisponivel:
+            raise ChatbotIndisponivel("Não foi possível acessar o chatbot agora")
+        return list(self.canais)
 
     def listar_mensagens(self, telefone, limit=200, offset=0):
         if self.indisponivel:
