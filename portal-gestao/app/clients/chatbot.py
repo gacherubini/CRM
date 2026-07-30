@@ -150,6 +150,31 @@ class ChatbotClient:
             "PATCH", f"/v1/conversas/{telefone}/estado", json={"bot_ativo": bot_ativo}
         )
 
+    def enviar_mensagem_humana(
+        self,
+        telefone: str,
+        texto: str,
+        *,
+        idempotency_key: str,
+        instance: str | None = None,
+        ator: str | None = None,
+    ) -> dict:
+        """Envia texto humano via Chatbot (persistência + canal da loja)."""
+        payload: dict[str, Any] = {
+            "texto": texto,
+            "idempotency_key": idempotency_key,
+        }
+        if instance:
+            payload["instance"] = instance
+        if ator:
+            payload["ator"] = ator
+        return self._request(
+            "POST",
+            f"/v1/conversas/{telefone}/mensagens",
+            erro_404=ConversaNaoEncontrada,
+            json=payload,
+        )
+
     # --- Simulação -------------------------------------------------------------
 
     def simular(self, payload: dict) -> dict:

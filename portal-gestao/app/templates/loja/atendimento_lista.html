@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% block title %}Atendimento — Revy Loja{% endblock %}
+{% block content %}
+<div class="page-heading">
+  <div>
+    <span class="eyebrow">Vendas</span>
+    <h1>Atendimento</h1>
+    <p>Leads e conversas em um só lugar. Workspace por telefone do cliente.</p>
+  </div>
+</div>
+
+{% if integracao_erro %}<div class="alert warning" role="alert"><strong>Dados parciais.</strong> {{ integracao_erro }}</div>{% endif %}
+
+<form class="filter-bar" method="get">
+  <label class="search"><span class="sr-only">Buscar</span><input name="busca" value="{{ filtros.busca }}" placeholder="Nome, telefone ou interesse"></label>
+  <select name="estado" aria-label="Estado">
+    <option value="">Todos os estados</option>
+    {% for key, label in estados.items() %}
+    <option value="{{ key }}" {{ 'selected' if filtros.estado == key }}>{{ label }}</option>
+    {% endfor %}
+  </select>
+  <button class="button secondary" type="submit">Filtrar</button>
+</form>
+
+<section class="panel flush">
+  {% if itens %}
+  <div class="table-wrap"><table>
+    <thead>
+      <tr>
+        <th>Contato</th>
+        <th>Interesse</th>
+        <th>Estado</th>
+        <th>Responsável</th>
+        <th>Canal</th>
+        <th>Última msg</th>
+        <th><span class="sr-only">Ações</span></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for i in itens %}
+      <tr>
+        <td>
+          <div class="cell-stack">
+            <strong>{% if i.nome %}{{ i.nome }}{% else %}<span class="muted">Sem nome</span>{% endif %}</strong>
+            <small>{{ mascarar_telefone(i.telefone) }}</small>
+          </div>
+        </td>
+        <td>{% if i.interesse %}{{ i.interesse }}{% else %}<span class="muted">—</span>{% endif %}</td>
+        <td><span class="status {{ i.estado.value }}">{{ estados.get(i.estado.value, i.estado.value) }}</span></td>
+        <td>{% if i.atribuido_a %}<small>{{ i.atribuido_a }}</small>{% else %}<span class="muted">Fila</span>{% endif %}</td>
+        <td>{% if i.canal_label %}<small>{{ i.canal_label }}</small>{% else %}<span class="muted">WhatsApp</span>{% endif %}</td>
+        <td>{% if i.ultima_mensagem %}<span class="muted">{{ i.ultima_mensagem[:80] }}</span>{% else %}<span class="muted">—</span>{% endif %}</td>
+        <td><a class="table-action" href="/app/loja/atendimento/{{ i.id }}">Abrir</a></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table></div>
+  {% elif integracao_erro %}
+  <div class="empty">
+    <strong>Não foi possível carregar o atendimento</strong>
+    <p>Tente de novo em instantes. As telas de Leads e Conversas continuam disponíveis.</p>
+  </div>
+  {% elif filtros.estado or filtros.busca %}
+  <div class="empty">
+    <strong>Nenhum atendimento com esse filtro</strong>
+    <p>Ajuste a busca ou o estado.</p>
+    <a class="button secondary" href="/app/loja/atendimento">Limpar filtros</a>
+  </div>
+  {% else %}
+  <div class="empty">
+    <strong>Nenhum atendimento ainda</strong>
+    <p>Quando o chatbot registrar contatos ou conversas, eles aparecem aqui.</p>
+  </div>
+  {% endif %}
+</section>
+{% endblock %}

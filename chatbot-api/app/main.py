@@ -510,6 +510,69 @@ def definir_estado(
     )
 
 
+class MensagemHumanaInput(BaseModel):
+    """Envio humano de texto (Portal Atendimento). Escopo: loja do token + telefone."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    texto: str = Field(min_length=1, max_length=4096)
+    idempotency_key: str = Field(min_length=1, max_length=120)
+    instance: Optional[str] = None
+    ator: Optional[str] = Field(default=None, max_length=320)
+
+    @field_validator("texto")
+    @classmethod
+    def validar_texto_humano(cls, value: str) -> str:
+        if "\x00" in value:
+            raise ValueError("texto contém caractere inválido")
+        return value.strip()
+
+    @field_validator("idempotency_key")
+    @classmethod
+    def validar_idem_key(cls, value: str) -> str:
+        texto = value.strip()
+        if not texto:
+            raise ValueError("idempotency_key vazia")
+        if "\x00" in texto:
+            raise ValueError("idempotency_key inválida")
+        return texto
+
+    @field_validator("instance")
+    @classmethod
+    def validar_instance_humana(cls, value: Optional[str]) -> Optional[str]:
+        if value is None:
+            return None
+        texto = str(value).strip()
+        if not texto:
+            return None
+        return validar_identificador(
+            texto, nome="instance", limite=config.WEBHOOK_MAX_INSTANCE_CHARS
+        )
+
+
+@app.post("/v1/conversas/{telefone}/mensagens")
+def enviar_mensagem_humana(
+    telefone: str,
+    dados: MensagemHumanaInput,
+    ctx: Contexto = Depends(get_contexto),
+    db: Session = Depends(get_db),
+):
+    """Persiste mensagem humana na conversa da loja autenticada (idempotente).
+
+    Não aceita loja/telefone de outro tenant: loja vem do token de serviço.
+    """
+    _exigir_loja_operacional(db, ctx.loja_id)
+    return servico.enviar_mensagem_humana(
+        db,
+        ctx.loja_id,
+        telefone,
+        dados.texto,
+        idempotency_key=dados.idempotency_key,
+        instance=dados.instance,
+        ator=dados.ator,
+    )
+
+
 @app.post("/v1/consentimentos", status_code=201)
 def registrar_consentimento(
     dados: ConsentimentoInput,

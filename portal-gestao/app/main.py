@@ -383,6 +383,8 @@ def contexto(request: Request, usuario=None, db: Session | None = None, **extra)
         "usuario": usuario,
         "csrf": csrf_token(request),
         "versao": settings.version,
+        "revy_loja_atendimento_enabled": settings.revy_loja_atendimento_enabled,
+        "revy_loja_shell_enabled": settings.revy_loja_shell_enabled,
         **extra,
     }
     # Shell Revy Loja (flag off → sem loja_nav; base.html mantém nav legado).
@@ -4409,8 +4411,10 @@ async def trafego_salvar(request: Request, db: Session = Depends(get_db)):
 from app import relatorios  # noqa: E402
 from app.web import loja_estoque  # noqa: E402
 from app.web import loja_vendas  # noqa: E402
+from app.loja import routes as loja_routes  # noqa: E402
 
 app.include_router(relatorios.router)
-# Revy Loja: overview modules (flags default off).
+# Revy Loja modules (flags default off).
 app.include_router(loja_estoque.router)
 app.include_router(loja_vendas.router)
+app.include_router(loja_routes.router)

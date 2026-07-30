@@ -1057,6 +1057,147 @@ def listar_mensagens(
     }
 
 
+def _provider_id_humano(idempotency_key: str) -> str:
+    """Chave estável para dedupe de envio humano (Portal → Chatbot)."""
+    chave = (idempotency_key or "").strip()
+    if not chave:
+        raise HTTPException(status_code=422, detail="idempotency_key obrigatória")
+    # Prefixo evita colisão com ids nativos do provedor WhatsApp.
+    return f"human:{chave}"[:255]
+
+
+def enviar_mensagem_humana(
+    db: Session,
+    loja_id: str,
+    telefone: str,
+    texto: str,
+    *,
+    idempotency_key: str,
+    instance: str | None = None,
+    ator: str | None = None,
+) -> dict:
+    """Persiste saída humana na conversa da loja e pausa o bot.
+
+    Escopo: somente a loja autenticada (token de serviço) + telefone.
+    Idempotente por ``idempotency_key`` (provider_message_id = human:…).
+    Envio real ao WhatsApp fica best-effort/fora deste corte se Evolution
+    não estiver configurada — a mensagem já aparece no histórico.
+    """
+    from app import provisioning
+    from app.hardening import normalizar_telefone_webhook
+
+    if not provisioning.allows_outbound_whatsapp(db, loja_id):
+        raise HTTPException(
+            status_code=423,
+            detail={
+                "code": "store_not_operational",
+                "message": "loja não operacional",
+                "loja_operacional": False,
+            },
+        )
+
+    try:
+        telefone_norm = normalizar_telefone_webhook(telefone)
+    except Exception:
+        raise HTTPException(status_code=422, detail="telefone inválido") from None
+
+    texto_limpo = (texto or "").strip()
+    if not texto_limpo:
+        raise HTTPException(status_code=422, detail="texto vazio")
+    if len(texto_limpo) > 4096:
+        raise HTTPException(status_code=422, detail="texto excede o limite permitido")
+    if "\x00" in texto_limpo:
+        raise HTTPException(status_code=422, detail="texto inválido")
+
+    provider_message_id = _provider_id_humano(idempotency_key)
+    canal_id = _canal_id_opcional_por_instance(db, loja_id, instance)
+
+    # Se já existe conversa, reutiliza o canal dela quando instance não veio.
+    conversa_existente = (
+        db.query(Conversa)
+        .filter(Conversa.loja_id == loja_id, Conversa.telefone == telefone_norm)
+        .order_by(Conversa.criada_em.asc())
+        .first()
+    )
+    if canal_id is None and conversa_existente is not None:
+        canal_id = conversa_existente.canal_id
+
+    existente = _mensagem_existente(
+        db, loja_id, provider_message_id, canal_id=canal_id
+    )
+    if existente is not None:
+        conversa = db.get(Conversa, existente.conversa_id)
+        return {
+            "duplicada": True,
+            "mensagem_id": existente.id,
+            "telefone": telefone_norm,
+            "texto": existente.texto,
+            "bot_ativo": bool(conversa.bot_ativo) if conversa else False,
+            "status": conversa.status if conversa else "handoff",
+            "enviado": True,
+            "canal_id": existente.canal_id,
+            "ator": ator,
+        }
+
+    conversa = _get_or_create_conversa(
+        db, loja_id, telefone_norm, canal_id=canal_id
+    )
+    # Humano assume: pausa bot (mesmo contrato do from_me atendente).
+    conversa.bot_ativo = False
+    conversa.status = "handoff"
+    conversa.atualizada_em = datetime.now(timezone.utc)
+    if ator and not conversa.responsavel:
+        conversa.responsavel = ator[:120]
+
+    mensagem_id = str(uuid.uuid4())
+    texto_persistido = mascarar_cpf(texto_limpo) or texto_limpo
+
+    db.add(
+        Mensagem(
+            id=mensagem_id,
+            loja_id=loja_id,
+            canal_id=conversa.canal_id,
+            conversa_id=conversa.id,
+            direcao="saida",
+            provider_message_id=provider_message_id,
+            texto=texto_persistido,
+        )
+    )
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        existente = _mensagem_existente(
+            db, loja_id, provider_message_id, canal_id=conversa.canal_id
+        )
+        if existente is None:
+            raise
+        conversa = db.get(Conversa, existente.conversa_id)
+        return {
+            "duplicada": True,
+            "mensagem_id": existente.id,
+            "telefone": telefone_norm,
+            "texto": existente.texto,
+            "bot_ativo": bool(conversa.bot_ativo) if conversa else False,
+            "status": conversa.status if conversa else "handoff",
+            "enviado": True,
+            "canal_id": existente.canal_id,
+            "ator": ator,
+        }
+
+    return {
+        "duplicada": False,
+        "mensagem_id": mensagem_id,
+        "telefone": telefone_norm,
+        "texto": texto_persistido,
+        "bot_ativo": False,
+        "status": "handoff",
+        "enviado": True,  # persistido; push Evolution é opcional/n8n
+        "canal_id": conversa.canal_id,
+        "ator": ator,
+    }
+
+
 def para_saida_mensagem(msg: Mensagem) -> dict:
     return {
         "direcao": msg.direcao,

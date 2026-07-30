@@ -62,6 +62,9 @@
         {% else %}
         <span class="nav-section">Dia a dia</span>
         <a class="nav-link {{ 'active' if path == '/app' else '' }}" href="/app" {% if path == '/app' %}aria-current="page"{% endif %}>Visão geral</a>
+        {% if revy_loja_atendimento_enabled and usuario.papel in ['dono', 'gerente', 'vendedor', 'admin_plataforma'] %}
+        <a class="nav-link {{ 'active' if path.startswith('/app/loja/atendimento') else '' }}" href="/app/loja/atendimento" {% if path.startswith('/app/loja/atendimento') %}aria-current="page"{% endif %}>Atendimento</a>
+        {% endif %}
         <a class="nav-link {{ 'active' if path.startswith('/app/leads') else '' }}" href="/app/leads" {% if path.startswith('/app/leads') %}aria-current="page"{% endif %}>Leads</a>
         <a class="nav-link {{ 'active' if path.startswith('/app/conversas') else '' }}" href="/app/conversas" {% if path.startswith('/app/conversas') %}aria-current="page"{% endif %}>Conversas</a>
         <a class="nav-link {{ 'active' if path.startswith('/app/estoque') else '' }}" href="/app/estoque" {% if path.startswith('/app/estoque') %}aria-current="page"{% endif %}>Estoque</a>
@@ -118,7 +121,7 @@
       <header class="topbar">
         <button class="menu-button" type="button" aria-controls="sidebar" aria-expanded="false">Menu</button>
         <div class="page-context">
-          <strong>{% block page_title %}{% if path == '/app' %}Visão geral{% elif path == '/app/funil' %}Funil{% elif path.startswith('/app/estoque') %}Estoque{% elif path.startswith('/app/leads') %}Leads{% elif path.startswith('/app/conversas') %}Conversas{% elif path.startswith('/app/vendas') %}Vendas{% elif path.startswith('/app/financeiro') %}Financeiro{% elif path.startswith('/app/relatorios') %}Relatórios{% elif path.startswith('/app/trafego') %}Tráfego{% elif path.startswith('/app/vendedor') %}Meu painel{% elif path.startswith('/app/metas') %}Metas{% elif path.startswith('/app/simulacoes') %}Simulações{% elif path.startswith('/app/financeiras') %}Acessos dos bancos{% elif path.startswith('/app/equipe') %}Equipe{% else %}Ajustes{% endif %}{% endblock %}</strong>
+          <strong>{% block page_title %}{% if path == '/app' %}Visão geral{% elif path == '/app/funil' %}Funil{% elif path.startswith('/app/estoque') %}Estoque{% elif path.startswith('/app/loja/atendimento') %}Atendimento{% elif path.startswith('/app/leads') %}Leads{% elif path.startswith('/app/conversas') %}Conversas{% elif path.startswith('/app/vendas') %}Vendas{% elif path.startswith('/app/financeiro') %}Financeiro{% elif path.startswith('/app/relatorios') %}Relatórios{% elif path.startswith('/app/trafego') %}Tráfego{% elif path.startswith('/app/vendedor') %}Meu painel{% elif path.startswith('/app/metas') %}Metas{% elif path.startswith('/app/simulacoes') %}Simulações{% elif path.startswith('/app/financeiras') %}Acessos dos bancos{% elif path.startswith('/app/equipe') %}Equipe{% else %}Ajustes{% endif %}{% endblock %}</strong>
           <small>{{ usuario.nome }} · {{ usuario.papel | replace('_', ' ') }}</small>
         </div>
         <div class="topbar-actions">

@@ -146,62 +146,7 @@ def redirecionar_login() -> RedirectResponse:
     return RedirectResponse("/login", status_code=303)
 
 
-# --- Rotas do shell (stubs F1; rotas legadas permanecem) ---
-
-
-@router.get("/app/loja/vendas", response_class=HTMLResponse)
-def loja_vendas_visao(request: Request, db: Session = Depends(get_db)):
-    usuario = usuario_atual(request, db)
-    if not usuario:
-        return redirecionar_login()
-    if not revy_loja_shell_enabled():
-        return RedirectResponse("/app", status_code=303)
-    blocked = check_module_access(request, usuario, db, Module.VENDAS)
-    if blocked is not None:
-        return blocked
-    # Visão geral de Vendas ainda é o dashboard legado (F3 consolidará).
-    return RedirectResponse("/app", status_code=303)
-
-
-@router.get("/app/loja/atendimento", response_class=HTMLResponse)
-def loja_atendimento(request: Request, db: Session = Depends(get_db)):
-    usuario = usuario_atual(request, db)
-    if not usuario:
-        return redirecionar_login()
-    if not revy_loja_shell_enabled():
-        return RedirectResponse("/app/leads", status_code=303)
-    blocked = check_module_access(request, usuario, db, Module.VENDAS)
-    if blocked is not None:
-        return blocked
-    # Stub F1: workspace unificado entra na F4.
-    return RedirectResponse("/app/leads", status_code=303)
-
-
-@router.get("/app/loja/estoque", response_class=HTMLResponse)
-def loja_estoque_visao(request: Request, db: Session = Depends(get_db)):
-    usuario = usuario_atual(request, db)
-    if not usuario:
-        return redirecionar_login()
-    if not revy_loja_shell_enabled():
-        return RedirectResponse("/app/estoque", status_code=303)
-    blocked = check_module_access(request, usuario, db, Module.ESTOQUE)
-    if blocked is not None:
-        return blocked
-    # Visão consolidada na F2; por ora lista de veículos.
-    return RedirectResponse("/app/estoque", status_code=303)
-
-
-@router.get("/app/loja/estoque/veiculos", response_class=HTMLResponse)
-def loja_estoque_veiculos(request: Request, db: Session = Depends(get_db)):
-    usuario = usuario_atual(request, db)
-    if not usuario:
-        return redirecionar_login()
-    if not revy_loja_shell_enabled():
-        return RedirectResponse("/app/estoque", status_code=303)
-    blocked = check_module_access(request, usuario, db, Module.ESTOQUE)
-    if blocked is not None:
-        return blocked
-    return RedirectResponse("/app/estoque", status_code=303)
+# --- Rotas do shell (seleção multi-loja; overviews em loja_vendas/estoque/routes) ---
 
 
 @router.post("/app/loja/selecionar")
