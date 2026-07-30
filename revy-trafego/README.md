@@ -274,20 +274,22 @@ inventário, restore drill, migrations/backfills e o gate de isolamento. O Alemb
 local é `0008_revy_control_loja_versao`; o lab permanece sem essas migrations e sem
 rollout do Control.
 
-### Operação Google Ads no Control (Parte B — em construção)
+### Operação Google Ads no Control (Parte B — implementada)
 
 Desenho em `docs/superpowers/specs/2026-07-29-telas-canais-wa-google-design.md` (Parte B).
-Hoje o dashboard mostra a coluna "Google" e o painel de aquisição, mas **não existe caminho
-de UI** para conectar OAuth, escolher a conta, vincular conversion actions ou disparar sync:
-tudo isso só por `curl` em `/control/v1/.../google-ads/*`. A Parte B acrescenta quatro
-painéis no detalhe da loja (`/app/control/lojas/{id}`), sem endpoint novo de API, gated por
-`GOOGLE_ADS_SYNC_ENABLED` (o painel de conversões, também por `GOOGLE_CONVERSIONS_ENABLED`).
-Autorização segue no domínio: admin Revy **ou** gestor responsável pela loja.
+O detalhe da Loja (`/app/control/lojas/{id}`) oferece o fluxo conexão → conta →
+conversões → métricas, sem endpoint novo de API e gated por
+`GOOGLE_ADS_SYNC_ENABLED`; o painel de conversões também exige
+`GOOGLE_CONVERSIONS_ENABLED`. Contas MCC aparecem desabilitadas, conversion actions
+vêm da lista do Google e métricas usam por padrão os últimos sete dias. Autorização
+segue no domínio: admin Revy **ou** gestor responsável pela Loja; colaborador recebe
+403. Sem client id, client secret, redirect URI ou developer token, a tela informa que
+o Google não está configurado e não oferece o botão de conexão.
 
 **Passo manual de ops — obrigatório e ainda não feito.** O callback OAuth atual é
 `GET /control/v1/google-ads/oauth/callback` e responde **JSON**; é essa a URL registrada no
 Google e no `GOOGLE_ADS_OAUTH_REDIRECT_URI`, então quem conectar pela UI volta do Google
-numa página de JSON cru. A Parte B adiciona
+numa página de JSON cru. A rota HTML implementada é
 `GET /app/control/google-ads/oauth/callback`, que completa o OAuth e redireciona para
 `/app/control/lojas/{id}?ok=google_conectado`. Para a UI funcionar é preciso, antes do
 rollout:
@@ -301,7 +303,7 @@ rollout:
 Os dois têm de casar exatamente — divergência dá `redirect_uri_mismatch` no Google, sem
 pista no log do Control. O endpoint JSON continua existindo para compatibilidade e não deve
 ser removido. Segue valendo o gap de secrets GCP (client id/secret, developer token): sem
-eles a conexão falha com `GoogleAdsOAuthMisconfigured`.
+eles o painel permanece indisponível para conexão.
 
 Público via edge: prefixar `/trafego` (ex.: `/trafego/health/live`, `/trafego/v1/...`).  
 No bundle, portal/catálogo usam `http://127.0.0.1:9010` **sem** prefixo.

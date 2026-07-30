@@ -405,10 +405,19 @@ Dados:
       bancários nunca entram no payload.
 - [x] Enviar via `IngestEvents` (HTTP Data Manager + fake) + worker
       `google_ads_conversions_job` / `POST /internal/jobs/google-conversions-outbox`.
-- [ ] Guardar `request_id` e consultar `RetrieveRequestStatus` até terminal
+- [x] Guardar `request_id` e consultar `RetrieveRequestStatus` até terminal
       (`reconcile_outbox_once` + `retrieve_status` HTTP/Fake; auto no process_outbox).
 - [x] Falha Google nunca reverte confirmação de venda nem bloqueia o Revy Loja
       (enqueue fire-and-forget).
+
+### Superfície operacional no Control
+
+- [x] Callback OAuth HTML retorna o humano ao detalhe da Loja sem expor token.
+- [x] Quatro painéis seguem o fluxo conexão → conta → conversões → métricas.
+- [x] Conta MCC aparece desabilitada com motivo visível.
+- [x] Conversion action vem de lista remota, não de campo livre.
+- [x] Admin Revy e Gestor Responsável podem operar; colaborador recebe 403.
+- [x] Flags, CSRF, estados vazios e ambiente sem credenciais têm cobertura HTTP.
 
 ### Saúde e testes obrigatórios
 
@@ -434,8 +443,9 @@ caminho cria, edita, pausa ou otimiza campanha.
 ## Fase 5 — Múltiplos números WhatsApp por loja
 
 Esta fase substitui o plano de 2026-07-22 que vinculava canais a vendedor/campanha.
-A configuração aparece no Revy Control, mas o Chatbot permanece dono dos registros e
-da operação dos canais; o Control chama sua interface e projeta saúde/prontidão.
+A configuração operacional aparece em Ajustes no Revy Loja, enquanto o Chatbot permanece
+dono dos registros e da operação dos canais; o Control só consome/projeta
+saúde e prontidão.
 
 ### Chatbot API — dados
 
@@ -466,8 +476,9 @@ Adapters:
 - adapter em memória nos testes;
 - `CloudApiAdapter` apenas em trabalho futuro.
 
-No Revy Control, criar port `WhatsAppChannelsPort`, adapter HTTP para o Chatbot e
-adapter em memória para testes. O navegador nunca chama Evolution diretamente.
+No Revy Control, manter o port `WhatsAppChannelsPort`, adapter HTTP para o Chatbot e
+adapter em memória para saúde/prontidão. No Revy Loja, `ChatbotClient` comanda o mesmo
+contrato HTTP. Nenhum navegador chama Evolution diretamente.
 
 ### Regras
 
@@ -476,7 +487,8 @@ adapter em memória para testes. O navegador nunca chama Evolution diretamente.
 - Estados: pendente, conectado, desconectado e inativo.
 - Apenas uma conexão/provedor ativo por número.
 - Desconectar permite reconectar na mesma loja; inativar preserva histórico.
-- Admin e Gestor Responsável alteram; colaborador apenas consulta.
+- Dono e gerente operam os números na Loja; vendedor não acessa a tela.
+- O Control não oferece tela de pareamento e apenas consome a saúde dos canais.
 - QR e credenciais usam `Cache-Control: no-store` e não entram em logs.
 
 ### Conversas, mensagens e leads
@@ -523,7 +535,8 @@ correto; o mesmo cliente pode ter duas conversas e um único lead da loja.
 - [x] Gestor Responsável por loja no card do dashboard.
 - [x] Alterações recentes (trilha de auditoria no painel).
 
-Usuários e números ficam no detalhe da loja, não como cards do dashboard.
+Pessoas e cargos ficam no detalhe da Loja no Control; números ficam em Ajustes no
+Revy Loja, não como cards do dashboard.
 
 **Estado código:** overview com contagens + pendências + health (pixel/meta/google) +
 auditoria recente + **aquisição Google 7d** (`google_by_store` no JSON e seção no

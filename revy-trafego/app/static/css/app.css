@@ -705,6 +705,27 @@ p { color: var(--ink-soft); }
 }
 .panel > :is(h2, h3) + :is(form, dl, p, ul, ol) { padding-top: var(--space-4); }
 
+.google-step {
+  padding: var(--space-5);
+  border-top: 1px solid var(--line);
+}
+.google-step > *:last-child { margin-bottom: 0; }
+.google-step > h3 {
+  margin-bottom: var(--space-4);
+  font-size: var(--text-base);
+}
+.google-step > form + form,
+.google-step > form + .table-wrap,
+.google-step > form + .empty,
+.google-step > .table-wrap + form {
+  margin-top: var(--space-4);
+}
+.google-step small {
+  display: block;
+  margin-top: var(--space-1);
+  color: var(--ink-muted);
+}
+
 .panel-heading {
   padding: var(--space-4) var(--space-5);
   display: flex;

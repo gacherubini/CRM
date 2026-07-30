@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import re
-from datetime import date
+from datetime import date, timedelta
 from decimal import Decimal, InvalidOperation
 from html import escape
 from pathlib import Path
@@ -24,9 +24,16 @@ from app.control.contracts import (
 )
 from app.control.dashboard import DashboardControl
 from app.control.google_ads import (
+    GoogleAdsConnectionNotFound,
     GoogleAdsOAuthMisconfigured,
     GoogleAdsOAuthStateInvalid,
     GoogleAdsTokenExchangeError,
+)
+from app.control.google_ads_conversions import GoogleAdsInvalidConversionBinding
+from app.control.google_ads_metrics import (
+    GoogleAdsAccountNotFound,
+    GoogleAdsManagerAccountNotSelectable,
+    GoogleAdsNotConnected,
 )
 from app.control.people import PeopleDirectory
 from app.control.portfolio import (
@@ -117,10 +124,19 @@ def _google_ads_surface_enabled() -> bool:
 
 
 def _google_oauth_configured() -> bool:
-    """Client OAuth presente no ambiente (evita botão que só sabe falhar)."""
+    """Credenciais da operação Google presentes (evita adapter Fake em produção)."""
     return bool(
         settings.google_ads_oauth_client_id
+        and settings.google_ads_oauth_client_secret
         and settings.google_ads_oauth_redirect_uri
+        and settings.google_ads_developer_token
+    )
+
+
+def _google_conversions_surface_enabled() -> bool:
+    return (
+        _google_ads_surface_enabled()
+        and settings.google_conversions_enabled
     )
 
 
@@ -790,6 +806,390 @@ async def revoke_traffic_access_page(
     )
 
 
+@router.post(
+    "/app/control/lojas/{loja_id}/google-ads/oauth/start",
+    response_class=HTMLResponse,
+)
+async def start_google_ads_oauth_page(
+    loja_id: str,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    if not _google_ads_surface_enabled():
+        return HTMLResponse("Página não encontrada.", status_code=404)
+    manager, denied = _actor_for_store_mutation(request, db)
+    if denied is not None:
+        return denied
+    form = await request.form()
+    if not csrf_valido(request, form.get("csrf")):
+        return _csrf_denied()
+    if not _google_oauth_configured():
+        return _render_store_detail(
+            request,
+            db,
+            manager,
+            loja_id,
+            error="Google Ads não está configurado neste ambiente.",
+            status_code=409,
+        )
+
+    from app.web.control import _google_ads_control
+
+    try:
+        result = _google_ads_control().start_oauth(
+            actor_from_user(manager),
+            StoreRef(id=loja_id),
+        )
+    except AccessDenied:
+        return _access_denied()
+    except StoreNotFound:
+        return HTMLResponse("Loja não encontrada.", status_code=404)
+    except (GoogleAdsOAuthMisconfigured, ControlError):
+        return _render_store_detail(
+            request,
+            db,
+            manager,
+            loja_id,
+            error="Não foi possível iniciar a conexão com o Google Ads.",
+            status_code=409,
+        )
+    return RedirectResponse(result.auth_url, status_code=303)
+
+
+@router.post(
+    "/app/control/lojas/{loja_id}/google-ads/desconectar",
+    response_class=HTMLResponse,
+)
+async def disconnect_google_ads_page(
+    loja_id: str,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    if not _google_ads_surface_enabled():
+        return HTMLResponse("Página não encontrada.", status_code=404)
+    manager, denied = _actor_for_store_mutation(request, db)
+    if denied is not None:
+        return denied
+    form = await request.form()
+    if not csrf_valido(request, form.get("csrf")):
+        return _csrf_denied()
+
+    from app.web.control import _google_ads_control
+
+    try:
+        _google_ads_control().disconnect(
+            actor_from_user(manager),
+            StoreRef(id=loja_id),
+        )
+    except AccessDenied:
+        return _access_denied()
+    except StoreNotFound:
+        return HTMLResponse("Loja não encontrada.", status_code=404)
+    except GoogleAdsConnectionNotFound:
+        return _render_store_detail(
+            request,
+            db,
+            manager,
+            loja_id,
+            error="A Loja não possui conexão Google Ads para desconectar.",
+            status_code=404,
+        )
+    except ControlError:
+        return _render_store_detail(
+            request,
+            db,
+            manager,
+            loja_id,
+            error="Não foi possível desconectar o Google Ads.",
+            status_code=409,
+        )
+    return RedirectResponse(
+        _detail_path(loja_id, "google_desconectado"),
+        status_code=303,
+    )
+
+
+@router.post(
+    "/app/control/lojas/{loja_id}/google-ads/accounts/sync",
+    response_class=HTMLResponse,
+)
+async def sync_google_ads_accounts_page(
+    loja_id: str,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    if not _google_ads_surface_enabled():
+        return HTMLResponse("Página não encontrada.", status_code=404)
+    manager, denied = _actor_for_store_mutation(request, db)
+    if denied is not None:
+        return denied
+    form = await request.form()
+    if not csrf_valido(request, form.get("csrf")):
+        return _csrf_denied()
+
+    from app.web.control import _google_ads_metrics_control
+
+    try:
+        _google_ads_metrics_control().sync_accounts(
+            actor_from_user(manager),
+            StoreRef(id=loja_id),
+        )
+    except AccessDenied:
+        return _access_denied()
+    except StoreNotFound:
+        return HTMLResponse("Loja não encontrada.", status_code=404)
+    except GoogleAdsNotConnected:
+        return _render_store_detail(
+            request,
+            db,
+            manager,
+            loja_id,
+            error="Conecte o Google Ads antes de sincronizar as contas.",
+            status_code=409,
+        )
+    except ControlError:
+        return _render_store_detail(
+            request,
+            db,
+            manager,
+            loja_id,
+            error="Não foi possível sincronizar as contas do Google Ads.",
+            status_code=409,
+        )
+    return RedirectResponse(
+        _detail_path(loja_id, "google_contas_sincronizadas"),
+        status_code=303,
+    )
+
+
+@router.post(
+    "/app/control/lojas/{loja_id}/google-ads/accounts/select",
+    response_class=HTMLResponse,
+)
+async def select_google_ads_account_page(
+    loja_id: str,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    if not _google_ads_surface_enabled():
+        return HTMLResponse("Página não encontrada.", status_code=404)
+    manager, denied = _actor_for_store_mutation(request, db)
+    if denied is not None:
+        return denied
+    form = await request.form()
+    if not csrf_valido(request, form.get("csrf")):
+        return _csrf_denied()
+    customer_id = (form.get("customer_id") or "").strip()
+    if not customer_id or len(customer_id) > 20:
+        return _render_store_detail(
+            request,
+            db,
+            manager,
+            loja_id,
+            error="Selecione uma conta anunciante do Google Ads.",
+            status_code=422,
+        )
+
+    from app.web.control import _google_ads_metrics_control
+
+    try:
+        _google_ads_metrics_control().select_account(
+            actor_from_user(manager),
+            StoreRef(id=loja_id),
+            customer_id,
+        )
+    except AccessDenied:
+        return _access_denied()
+    except StoreNotFound:
+        return HTMLResponse("Loja não encontrada.", status_code=404)
+    except GoogleAdsManagerAccountNotSelectable:
+        return _render_store_detail(
+            request,
+            db,
+            manager,
+            loja_id,
+            error="Conta gerenciadora (MCC) não pode ser selecionada.",
+            status_code=422,
+        )
+    except GoogleAdsAccountNotFound:
+        return _render_store_detail(
+            request,
+            db,
+            manager,
+            loja_id,
+            error="Conta Google Ads não encontrada para esta Loja.",
+            status_code=404,
+        )
+    except ControlError:
+        return _render_store_detail(
+            request,
+            db,
+            manager,
+            loja_id,
+            error="Não foi possível selecionar a conta do Google Ads.",
+            status_code=409,
+        )
+    return RedirectResponse(
+        _detail_path(loja_id, "google_conta_selecionada"),
+        status_code=303,
+    )
+
+
+@router.post(
+    "/app/control/lojas/{loja_id}/google-ads/conversion-bindings",
+    response_class=HTMLResponse,
+)
+async def bind_google_ads_conversion_page(
+    loja_id: str,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    if not _google_conversions_surface_enabled():
+        return HTMLResponse("Página não encontrada.", status_code=404)
+    manager, denied = _actor_for_store_mutation(request, db)
+    if denied is not None:
+        return denied
+    form = await request.form()
+    if not csrf_valido(request, form.get("csrf")):
+        return _csrf_denied()
+
+    event_type = (form.get("revy_event_type") or "").strip()
+    resource_name = (
+        form.get("conversion_action_resource_name") or ""
+    ).strip()
+    customer_id = (form.get("customer_id") or "").strip()
+    if (
+        not event_type
+        or len(event_type) > 80
+        or not resource_name
+        or len(resource_name) > 240
+        or not customer_id
+        or len(customer_id) > 20
+    ):
+        return _render_store_detail(
+            request,
+            db,
+            manager,
+            loja_id,
+            error="Selecione o evento Revy e uma ação de conversão válida.",
+            status_code=422,
+        )
+
+    from app.web.control import _google_ads_conversions_control
+
+    try:
+        _google_ads_conversions_control().bind_conversion_action(
+            actor_from_user(manager),
+            StoreRef(id=loja_id),
+            revy_event_type=event_type,
+            conversion_action_resource_name=resource_name,
+            customer_id=customer_id,
+            active=True,
+        )
+    except AccessDenied:
+        return _access_denied()
+    except StoreNotFound:
+        return HTMLResponse("Loja não encontrada.", status_code=404)
+    except GoogleAdsInvalidConversionBinding:
+        return _render_store_detail(
+            request,
+            db,
+            manager,
+            loja_id,
+            error="Não foi possível validar o vínculo de conversão.",
+            status_code=422,
+        )
+    except ControlError:
+        return _render_store_detail(
+            request,
+            db,
+            manager,
+            loja_id,
+            error="Não foi possível vincular a ação de conversão.",
+            status_code=409,
+        )
+    return RedirectResponse(
+        _detail_path(loja_id, "google_conversao_vinculada"),
+        status_code=303,
+    )
+
+
+@router.post(
+    "/app/control/lojas/{loja_id}/google-ads/metrics/sync",
+    response_class=HTMLResponse,
+)
+async def sync_google_ads_metrics_page(
+    loja_id: str,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    if not _google_ads_surface_enabled():
+        return HTMLResponse("Página não encontrada.", status_code=404)
+    manager, denied = _actor_for_store_mutation(request, db)
+    if denied is not None:
+        return denied
+    form = await request.form()
+    if not csrf_valido(request, form.get("csrf")):
+        return _csrf_denied()
+
+    date_from = (form.get("date_from") or "").strip()
+    date_to = (form.get("date_to") or "").strip()
+    try:
+        parsed_from = date.fromisoformat(date_from)
+        parsed_to = date.fromisoformat(date_to)
+        if parsed_from > parsed_to:
+            raise ValueError
+    except ValueError:
+        return _render_store_detail(
+            request,
+            db,
+            manager,
+            loja_id,
+            error="Informe um período válido para sincronizar as métricas.",
+            status_code=422,
+        )
+
+    from app.web.control import _google_ads_metrics_control
+
+    try:
+        _google_ads_metrics_control().sync_metrics(
+            actor_from_user(manager),
+            StoreRef(id=loja_id),
+            date_from=date_from,
+            date_to=date_to,
+        )
+    except AccessDenied:
+        return _access_denied()
+    except StoreNotFound:
+        return HTMLResponse("Loja não encontrada.", status_code=404)
+    except GoogleAdsNotConnected:
+        return _render_store_detail(
+            request,
+            db,
+            manager,
+            loja_id,
+            error="Conecte o Google Ads antes de sincronizar as métricas.",
+            status_code=409,
+        )
+    except ControlError:
+        return _render_store_detail(
+            request,
+            db,
+            manager,
+            loja_id,
+            error="Não foi possível sincronizar as métricas do Google Ads.",
+            status_code=409,
+        )
+    return RedirectResponse(
+        _public_path(
+            f"/app/control/lojas/{loja_id}"
+            f"?ok=google_metricas_sincronizadas"
+            f"&date_from={date_from}&date_to={date_to}"
+        ),
+        status_code=303,
+    )
+
+
 @router.get(GOOGLE_ADS_OAUTH_CALLBACK_PATH, response_class=HTMLResponse)
 def google_ads_oauth_callback_page(
     request: Request,
@@ -991,6 +1391,22 @@ def _detail_path(loja_id: str, success: str) -> str:
     return _public_path(f"/app/control/lojas/{loja_id}?ok={success}")
 
 
+def _google_metrics_period(request: Request) -> tuple[str, str]:
+    today = date.today()
+    default_from = today - timedelta(days=6)
+    raw_from = request.query_params.get("date_from")
+    raw_to = request.query_params.get("date_to")
+    try:
+        date_from = date.fromisoformat(raw_from) if raw_from else default_from
+        date_to = date.fromisoformat(raw_to) if raw_to else today
+        if date_from > date_to:
+            raise ValueError
+    except ValueError:
+        date_from = default_from
+        date_to = today
+    return date_from.isoformat(), date_to.isoformat()
+
+
 def _render_store_detail(
     request: Request,
     db: Session,
@@ -1055,6 +1471,91 @@ def _render_store_detail(
             for role in roles
         )
 
+    google_connection = None
+    google_accounts = ()
+    google_conversion_actions = ()
+    google_conversion_bindings = ()
+    google_metrics_summary = None
+    google_metrics_date_from, google_metrics_date_to = _google_metrics_period(
+        request
+    )
+    if _google_ads_surface_enabled() and _google_oauth_configured():
+        from app.web.control import (
+            _google_ads_control,
+            _google_ads_metrics_control,
+        )
+
+        try:
+            google_connection = _google_ads_control().get(actor, store_ref)
+        except GoogleAdsConnectionNotFound:
+            pass
+        except ControlError:
+            pass
+        if google_connection is not None and google_connection.has_refresh_token:
+            try:
+                google_accounts = _google_ads_metrics_control().list_accounts(
+                    actor,
+                    store_ref,
+                )
+            except ControlError:
+                pass
+
+    google_has_selected_account = any(
+        account.selected and not account.is_manager
+        for account in google_accounts
+    )
+    google_selected_account = next(
+        (
+            account
+            for account in google_accounts
+            if account.selected and not account.is_manager
+        ),
+        None,
+    )
+    if (
+        _google_conversions_surface_enabled()
+        and google_selected_account is not None
+    ):
+        from app.web.control import (
+            _google_ads_conversions_control,
+            _google_ads_metrics_control,
+        )
+
+        try:
+            google_conversion_actions = (
+                _google_ads_metrics_control().list_conversion_actions(
+                    actor,
+                    store_ref,
+                )
+            )
+            google_conversion_bindings = (
+                _google_ads_conversions_control().list_bindings(
+                    actor,
+                    store_ref,
+                )
+            )
+        except ControlError:
+            pass
+    if google_selected_account is not None:
+        from app.web.control import _google_ads_metrics_control
+
+        try:
+            google_metrics_summary = (
+                _google_ads_metrics_control().metrics_summary(
+                    actor,
+                    store_ref,
+                    date_from=google_metrics_date_from,
+                    date_to=google_metrics_date_to,
+                )
+            )
+        except ControlError:
+            pass
+    google_next_step = None
+    if google_connection is None or not google_connection.has_refresh_token:
+        google_next_step = "connection"
+    elif not google_has_selected_account:
+        google_next_step = "account"
+
     user = sessao_gestor(request, db)
     assert user is not None
     stores = AccessControl(SessionLocal).scope(actor)
@@ -1073,6 +1574,36 @@ def _render_store_detail(
             "control_enabled": settings.revy_control_enabled,
             "control_rbac_enabled": settings.revy_control_rbac_enabled,
             "control_dashboard_enabled": _dashboard_surface_enabled(),
+            "google_ads_enabled": _google_ads_surface_enabled(),
+            "google_oauth_configured": _google_oauth_configured(),
+            "google_connection": google_connection,
+            "google_accounts": google_accounts,
+            "google_selected_account": google_selected_account,
+            "google_next_step": google_next_step,
+            "google_conversions_enabled": (
+                _google_conversions_surface_enabled()
+            ),
+            "google_conversion_actions": google_conversion_actions,
+            "google_conversion_bindings": google_conversion_bindings,
+            "google_revy_event_types": ("venda_confirmada",),
+            "google_metrics_summary": google_metrics_summary,
+            "google_metrics_date_from": google_metrics_date_from,
+            "google_metrics_date_to": google_metrics_date_to,
+            "google_metrics_cost_brl": (
+                _format_brl(google_metrics_summary.cost)
+                if google_metrics_summary is not None
+                else None
+            ),
+            "google_metrics_impressions": (
+                f"{google_metrics_summary.impressions:,}".replace(",", ".")
+                if google_metrics_summary is not None
+                else None
+            ),
+            "google_metrics_conversions": (
+                f"{google_metrics_summary.conversions:f}".rstrip("0").rstrip(".")
+                if google_metrics_summary is not None
+                else None
+            ),
             "store": store,
             "modules": modules,
             "module_options": tuple(ModuleCode),

@@ -1,14 +1,13 @@
-"""Parte B (fundação): callback OAuth Google em HTML + seam de autorização.
+"""Parte B: operação Google Ads no detalhe da Loja.
 
-Cobre a rota HTML `/app/control/google-ads/oauth/callback` (o `redirect_uri`
-que um humano alcança) e `_actor_for_store_mutation`, o gate que os painéis
-Google vão consumir. A regra "Admin Revy ou Gestor Responsável" continua no
-domínio (`_assert_can_manage_connection`), então aqui ela é exercida via
-composição: gate da UI + chamada de domínio.
+Cobre callback HTML, conexão, contas, vínculos de conversão, métricas, flags,
+CSRF e autorização no seam HTTP. A regra "Admin Revy ou Gestor Responsável"
+continua no domínio (`_assert_can_manage_connection`).
 """
 from __future__ import annotations
 
 from dataclasses import replace
+from datetime import date
 
 import pytest
 from starlette.requests import Request
@@ -18,9 +17,15 @@ from app.config import settings
 from app.control.google_ads import (
     GOOGLE_ADS_SCOPES,
     FakeGoogleAdsTokenExchanger,
+    FakeGoogleAdsReadPort,
+    GoogleAdsAccount,
     GoogleAdsConnectionControl,
+    GoogleAdsConversionAction,
+    GoogleAdsMetricRow,
     OAuthTokenBundle,
 )
+from app.control.google_ads_conversions import GoogleAdsConversionsControl
+from app.control.google_ads_metrics import GoogleAdsMetricsControl
 from app.control.session import actor_from_user
 from app.control.stores import StoreControl
 from app.control.types import AccessDenied, Actor, CreateStore, StoreRef
@@ -28,6 +33,7 @@ from app.db import SessionLocal
 from app.models import GestorRevy, VinculoTrafego
 from app.web import control as control_mod
 from app.web import control_ui as control_ui_mod
+from tests.conftest import csrf_da_resposta
 
 CALLBACK_PATH = control_ui_mod.GOOGLE_ADS_OAUTH_CALLBACK_PATH
 REFRESH_TOKEN_SECRETO = "rt-nunca-renderizado"
@@ -40,6 +46,7 @@ def _enable(
     control: bool = True,
     google: bool = True,
     configured: bool = True,
+    conversions: bool = False,
 ) -> None:
     monkeypatch.setattr(
         control_ui_mod,
@@ -48,9 +55,11 @@ def _enable(
             settings,
             revy_control_enabled=control,
             google_ads_sync_enabled=google,
+            google_conversions_enabled=conversions,
             google_ads_oauth_client_id="ui-client-id" if configured else "",
             google_ads_oauth_client_secret="ui-client-secret" if configured else "",
             google_ads_oauth_redirect_uri=REDIRECT_URI if configured else "",
+            google_ads_developer_token="ui-developer-token" if configured else "",
         ),
     )
 
@@ -385,3 +394,508 @@ def test_actor_for_store_mutation_respeita_flag_e_sessao(monkeypatch):
         assert sem_sessao is None
         assert redirecionado.status_code == 303
         assert redirecionado.headers["location"].endswith("/login")
+
+
+# --- painéis e ações Google Ads no detalhe da Loja ---
+
+
+def test_detalhe_mostra_google_nao_configurado_sem_botao_que_falha(
+    client,
+    monkeypatch,
+):
+    loja_id = _create_store(slug="loja-google-nao-configurado")
+    _enable(monkeypatch, configured=False)
+    _login(client)
+
+    detalhe = client.get(f"/app/control/lojas/{loja_id}")
+
+    assert detalhe.status_code == 200
+    assert 'id="google-ads-operacao"' in detalhe.text
+    assert "Google não configurado neste ambiente" in detalhe.text
+    assert 'id="form-google-oauth-start"' not in detalhe.text
+
+
+def test_admin_inicia_oauth_pelo_detalhe_e_vai_para_o_google(
+    client,
+    monkeypatch,
+):
+    loja_id = _create_store(slug="loja-google-iniciar")
+    control = _domain_control()
+    _enable(monkeypatch)
+    monkeypatch.setattr(control_mod, "_google_ads_control", lambda: control)
+    _login(client)
+    detalhe = client.get(f"/app/control/lojas/{loja_id}")
+
+    assert detalhe.status_code == 200
+    assert 'id="google-conexao"' in detalhe.text
+    assert 'id="google-proximo-passo-conexao"' in detalhe.text
+    assert 'id="form-google-oauth-start"' in detalhe.text
+
+    iniciado = client.post(
+        f"/app/control/lojas/{loja_id}/google-ads/oauth/start",
+        data={"csrf": csrf_da_resposta(detalhe)},
+        follow_redirects=False,
+    )
+
+    assert iniciado.status_code == 303
+    assert iniciado.headers["location"].startswith(
+        "https://accounts.google.com/o/oauth2/v2/auth?"
+    )
+    assert "refresh_token" not in iniciado.text
+
+
+def test_admin_desconecta_google_sem_expor_refresh_token(
+    client,
+    monkeypatch,
+):
+    loja_id = _create_store(slug="loja-google-desconectar")
+    control = _domain_control()
+    inicio = control.start_oauth(_admin_actor(), StoreRef(id=loja_id))
+    control.complete_oauth(state=inicio.state, code="code-ok")
+    _enable(monkeypatch)
+    monkeypatch.setattr(control_mod, "_google_ads_control", lambda: control)
+    _login(client)
+    detalhe = client.get(f"/app/control/lojas/{loja_id}")
+
+    assert detalhe.status_code == 200
+    assert 'id="form-google-desconectar"' in detalhe.text
+    assert "Credencial disponível:" in detalhe.text
+    assert REFRESH_TOKEN_SECRETO not in detalhe.text
+
+    desconectado = client.post(
+        f"/app/control/lojas/{loja_id}/google-ads/desconectar",
+        data={"csrf": csrf_da_resposta(detalhe)},
+        follow_redirects=False,
+    )
+
+    assert desconectado.status_code == 303
+    assert desconectado.headers["location"].endswith(
+        f"/app/control/lojas/{loja_id}?ok=google_desconectado"
+    )
+    conexao = control.get(_admin_actor(), StoreRef(id=loja_id))
+    assert conexao.has_refresh_token is False
+    assert REFRESH_TOKEN_SECRETO not in desconectado.text
+
+
+def test_admin_sincroniza_contas_ve_mcc_desabilitada_e_seleciona_anunciante(
+    client,
+    monkeypatch,
+):
+    loja_id = _create_store(slug="loja-google-contas")
+    connection_control = _domain_control()
+    inicio = connection_control.start_oauth(_admin_actor(), StoreRef(id=loja_id))
+    connection_control.complete_oauth(state=inicio.state, code="code-ok")
+    metrics_control = GoogleAdsMetricsControl(
+        SessionLocal,
+        read_port=FakeGoogleAdsReadPort(
+            accounts=[
+                GoogleAdsAccount(
+                    customer_id="1112223333",
+                    descriptive_name="Conta da Loja",
+                    is_manager=False,
+                    currency_code="BRL",
+                    time_zone="America/Sao_Paulo",
+                    login_customer_id="5556667777",
+                ),
+                GoogleAdsAccount(
+                    customer_id="5556667777",
+                    descriptive_name="Gestora MCC",
+                    is_manager=True,
+                    currency_code="BRL",
+                ),
+            ]
+        ),
+    )
+    _enable(monkeypatch)
+    monkeypatch.setattr(
+        control_mod,
+        "_google_ads_control",
+        lambda: connection_control,
+    )
+    monkeypatch.setattr(
+        control_mod,
+        "_google_ads_metrics_control",
+        lambda: metrics_control,
+    )
+    _login(client)
+    detalhe = client.get(f"/app/control/lojas/{loja_id}")
+
+    assert 'id="google-conta"' in detalhe.text
+    assert 'id="google-proximo-passo-conta"' in detalhe.text
+    sincronizado = client.post(
+        f"/app/control/lojas/{loja_id}/google-ads/accounts/sync",
+        data={"csrf": csrf_da_resposta(detalhe)},
+        follow_redirects=False,
+    )
+    assert sincronizado.status_code == 303
+
+    contas = client.get(sincronizado.headers["location"])
+    assert "Conta da Loja" in contas.text
+    assert "Gestora MCC" in contas.text
+    assert 'id="google-conta-5556667777"' in contas.text
+    html_normalizado = " ".join(contas.text.split())
+    assert 'id="google-conta-5556667777" disabled' in html_normalizado
+    assert "Conta gerenciadora (MCC) não pode ser selecionada" in contas.text
+
+    selecionada = client.post(
+        f"/app/control/lojas/{loja_id}/google-ads/accounts/select",
+        data={
+            "csrf": csrf_da_resposta(contas),
+            "customer_id": "1112223333",
+        },
+        follow_redirects=False,
+    )
+    assert selecionada.status_code == 303
+    assert selecionada.headers["location"].endswith(
+        f"/app/control/lojas/{loja_id}?ok=google_conta_selecionada"
+    )
+    items = metrics_control.list_accounts(
+        _admin_actor(),
+        StoreRef(id=loja_id),
+    )
+    assert [item.customer_id for item in items if item.selected] == ["1112223333"]
+
+
+def test_admin_vincula_evento_revy_a_conversion_action_listada(
+    client,
+    monkeypatch,
+):
+    loja_id = _create_store(slug="loja-google-conversoes-ui")
+    connection_control = _domain_control()
+    inicio = connection_control.start_oauth(_admin_actor(), StoreRef(id=loja_id))
+    connection_control.complete_oauth(state=inicio.state, code="code-ok")
+    metrics_control = GoogleAdsMetricsControl(
+        SessionLocal,
+        read_port=FakeGoogleAdsReadPort(
+            accounts=[
+                GoogleAdsAccount(
+                    customer_id="1112223333",
+                    descriptive_name="Conta da Loja",
+                    is_manager=False,
+                    currency_code="BRL",
+                )
+            ],
+            conversion_actions=[
+                GoogleAdsConversionAction(
+                    resource_name=(
+                        "customers/1112223333/conversionActions/42"
+                    ),
+                    id="42",
+                    name="Compra confirmada",
+                    type="UPLOAD_CLICKS",
+                    status="ENABLED",
+                    category="PURCHASE",
+                    primary_for_goal=True,
+                )
+            ],
+        ),
+    )
+    metrics_control.sync_accounts(_admin_actor(), StoreRef(id=loja_id))
+    metrics_control.select_account(
+        _admin_actor(),
+        StoreRef(id=loja_id),
+        "1112223333",
+    )
+    conversions_control = GoogleAdsConversionsControl(SessionLocal)
+    _enable(monkeypatch, conversions=True)
+    monkeypatch.setattr(
+        control_mod,
+        "_google_ads_control",
+        lambda: connection_control,
+    )
+    monkeypatch.setattr(
+        control_mod,
+        "_google_ads_metrics_control",
+        lambda: metrics_control,
+    )
+    monkeypatch.setattr(
+        control_mod,
+        "_google_ads_conversions_control",
+        lambda: conversions_control,
+    )
+    _login(client)
+    detalhe = client.get(f"/app/control/lojas/{loja_id}")
+
+    assert 'id="google-conversoes"' in detalhe.text
+    assert 'name="conversion_action_resource_name"' in detalhe.text
+    assert "<select" in detalhe.text
+    assert "Compra confirmada" in detalhe.text
+    assert (
+        'type="text" name="conversion_action_resource_name"'
+        not in detalhe.text
+    )
+
+    vinculado = client.post(
+        f"/app/control/lojas/{loja_id}/google-ads/conversion-bindings",
+        data={
+            "csrf": csrf_da_resposta(detalhe),
+            "revy_event_type": "venda_confirmada",
+            "conversion_action_resource_name": (
+                "customers/1112223333/conversionActions/42"
+            ),
+            "customer_id": "1112223333",
+        },
+        follow_redirects=False,
+    )
+
+    assert vinculado.status_code == 303
+    assert vinculado.headers["location"].endswith(
+        f"/app/control/lojas/{loja_id}?ok=google_conversao_vinculada"
+    )
+    bindings = conversions_control.list_bindings(
+        _admin_actor(),
+        StoreRef(id=loja_id),
+    )
+    assert [
+        (item.revy_event_type, item.conversion_action_resource_name)
+        for item in bindings
+    ] == [
+        ("venda_confirmada", "customers/1112223333/conversionActions/42"),
+    ]
+
+
+def test_admin_sincroniza_metricas_e_ve_resumo_de_sete_dias(
+    client,
+    monkeypatch,
+):
+    loja_id = _create_store(slug="loja-google-metricas-ui")
+    connection_control = _domain_control()
+    inicio = connection_control.start_oauth(_admin_actor(), StoreRef(id=loja_id))
+    connection_control.complete_oauth(state=inicio.state, code="code-ok")
+    metrics_control = GoogleAdsMetricsControl(
+        SessionLocal,
+        read_port=FakeGoogleAdsReadPort(
+            accounts=[
+                GoogleAdsAccount(
+                    customer_id="1112223333",
+                    descriptive_name="Conta Métricas",
+                    is_manager=False,
+                    currency_code="BRL",
+                )
+            ],
+            metrics=[
+                GoogleAdsMetricRow(
+                    customer_id="1112223333",
+                    campaign_id="campanha-1",
+                    date="2026-07-29",
+                    impressions=1000,
+                    clicks=50,
+                    cost_micros=25_000_000,
+                    conversions=2,
+                    conversions_value=100,
+                )
+            ],
+        ),
+    )
+    metrics_control.sync_accounts(_admin_actor(), StoreRef(id=loja_id))
+    metrics_control.select_account(
+        _admin_actor(),
+        StoreRef(id=loja_id),
+        "1112223333",
+    )
+
+    class DataFixa(date):
+        @classmethod
+        def today(cls):
+            return cls(2026, 7, 30)
+
+    _enable(monkeypatch)
+    monkeypatch.setattr(control_ui_mod, "date", DataFixa)
+    monkeypatch.setattr(
+        control_mod,
+        "_google_ads_control",
+        lambda: connection_control,
+    )
+    monkeypatch.setattr(
+        control_mod,
+        "_google_ads_metrics_control",
+        lambda: metrics_control,
+    )
+    _login(client)
+    detalhe = client.get(f"/app/control/lojas/{loja_id}")
+
+    assert 'id="google-metricas"' in detalhe.text
+    assert 'name="date_from" value="2026-07-24"' in detalhe.text
+    assert 'name="date_to" value="2026-07-30"' in detalhe.text
+
+    sincronizado = client.post(
+        f"/app/control/lojas/{loja_id}/google-ads/metrics/sync",
+        data={
+            "csrf": csrf_da_resposta(detalhe),
+            "date_from": "2026-07-24",
+            "date_to": "2026-07-30",
+        },
+        follow_redirects=False,
+    )
+
+    assert sincronizado.status_code == 303
+    resumo = client.get(sincronizado.headers["location"])
+    assert "1.000 impressões" in resumo.text
+    assert "50 cliques" in resumo.text
+    assert "R$ 25,00" in resumo.text
+    assert "2 conversões" in resumo.text
+    assert "ROAS 4.00" in resumo.text
+
+
+def test_paineis_google_ficam_ocultos_com_flag_off(client, monkeypatch):
+    loja_id = _create_store(slug="loja-google-flag-off")
+    _enable(monkeypatch, google=False)
+    _login(client)
+
+    detalhe = client.get(f"/app/control/lojas/{loja_id}")
+
+    assert detalhe.status_code == 200
+    assert 'id="google-ads-operacao"' not in detalhe.text
+
+
+def test_inicio_oauth_nega_csrf_invalido(client, monkeypatch):
+    loja_id = _create_store(slug="loja-google-csrf")
+    _enable(monkeypatch)
+    _login(client)
+
+    negado = client.post(
+        f"/app/control/lojas/{loja_id}/google-ads/oauth/start",
+        data={"csrf": "token-invalido"},
+        follow_redirects=False,
+    )
+
+    assert negado.status_code == 403
+    assert "CSRF" in negado.text
+
+
+def test_gestor_responsavel_inicia_oauth_pela_tela(client, monkeypatch):
+    loja_id = _create_store(slug="loja-google-responsavel-ui")
+    responsavel_id = _gestor(
+        "responsavel.tela.google@revy.local",
+        "Responsável Google UI",
+        "senha-responsavel-ui",
+    )
+    _vincular(loja_id, responsavel_id, "responsavel")
+    control = _domain_control()
+    _enable(monkeypatch)
+    monkeypatch.setattr(control_mod, "_google_ads_control", lambda: control)
+    _login(
+        client,
+        "responsavel.tela.google@revy.local",
+        "senha-responsavel-ui",
+    )
+    detalhe = client.get(f"/app/control/lojas/{loja_id}")
+
+    iniciado = client.post(
+        f"/app/control/lojas/{loja_id}/google-ads/oauth/start",
+        data={"csrf": csrf_da_resposta(detalhe)},
+        follow_redirects=False,
+    )
+
+    assert iniciado.status_code == 303
+    assert iniciado.headers["location"].startswith(
+        "https://accounts.google.com/o/oauth2/v2/auth?"
+    )
+
+
+def test_gestor_colaborador_nao_muta_operacao_google(client, monkeypatch):
+    loja_id = _create_store(slug="loja-google-colaborador-ui")
+    colaborador_id = _gestor(
+        "colaborador.tela.google@revy.local",
+        "Colaborador Google UI",
+        "senha-colaborador-ui",
+    )
+    _vincular(loja_id, colaborador_id, "colaborador")
+    connection_control = _domain_control()
+    inicio = connection_control.start_oauth(_admin_actor(), StoreRef(id=loja_id))
+    connection_control.complete_oauth(state=inicio.state, code="code-ok")
+    metrics_control = GoogleAdsMetricsControl(
+        SessionLocal,
+        read_port=FakeGoogleAdsReadPort(
+            accounts=[
+                GoogleAdsAccount(
+                    customer_id="1112223333",
+                    descriptive_name="Conta Protegida",
+                    is_manager=False,
+                    currency_code="BRL",
+                )
+            ],
+            conversion_actions=[
+                GoogleAdsConversionAction(
+                    resource_name=(
+                        "customers/1112223333/conversionActions/7"
+                    ),
+                    id="7",
+                    name="Venda",
+                    status="ENABLED",
+                )
+            ],
+        ),
+    )
+    metrics_control.sync_accounts(_admin_actor(), StoreRef(id=loja_id))
+    metrics_control.select_account(
+        _admin_actor(),
+        StoreRef(id=loja_id),
+        "1112223333",
+    )
+    conversions_control = GoogleAdsConversionsControl(SessionLocal)
+    _enable(monkeypatch, conversions=True)
+    monkeypatch.setattr(
+        control_mod,
+        "_google_ads_control",
+        lambda: connection_control,
+    )
+    monkeypatch.setattr(
+        control_mod,
+        "_google_ads_metrics_control",
+        lambda: metrics_control,
+    )
+    monkeypatch.setattr(
+        control_mod,
+        "_google_ads_conversions_control",
+        lambda: conversions_control,
+    )
+    _login(
+        client,
+        "colaborador.tela.google@revy.local",
+        "senha-colaborador-ui",
+    )
+    detalhe = client.get(f"/app/control/lojas/{loja_id}")
+    csrf = csrf_da_resposta(detalhe)
+    requests = (
+        (
+            f"/app/control/lojas/{loja_id}/google-ads/oauth/start",
+            {"csrf": csrf},
+        ),
+        (
+            f"/app/control/lojas/{loja_id}/google-ads/desconectar",
+            {"csrf": csrf},
+        ),
+        (
+            f"/app/control/lojas/{loja_id}/google-ads/accounts/sync",
+            {"csrf": csrf},
+        ),
+        (
+            f"/app/control/lojas/{loja_id}/google-ads/accounts/select",
+            {"csrf": csrf, "customer_id": "1112223333"},
+        ),
+        (
+            f"/app/control/lojas/{loja_id}/google-ads/conversion-bindings",
+            {
+                "csrf": csrf,
+                "revy_event_type": "venda_confirmada",
+                "conversion_action_resource_name": (
+                    "customers/1112223333/conversionActions/7"
+                ),
+                "customer_id": "1112223333",
+            },
+        ),
+        (
+            f"/app/control/lojas/{loja_id}/google-ads/metrics/sync",
+            {
+                "csrf": csrf,
+                "date_from": "2026-07-24",
+                "date_to": "2026-07-30",
+            },
+        ),
+    )
+
+    for path, data in requests:
+        response = client.post(path, data=data, follow_redirects=False)
+        assert response.status_code == 403, path
+        assert "Acesso negado" in response.text

@@ -28,9 +28,232 @@
 <div class="alert success" role="status">Módulos da Loja atualizados.</div>
 {% elif ok == 'contrato' %}
 <div class="alert success" role="status">Contrato da Loja atualizado.</div>
+{% elif ok == 'google_conectado' %}
+<div class="alert success" role="status">Google Ads conectado à Loja.</div>
+{% elif ok == 'google_desconectado' %}
+<div class="alert success" role="status">Google Ads desconectado da Loja.</div>
+{% elif ok == 'google_contas_sincronizadas' %}
+<div class="alert success" role="status">Contas Google Ads sincronizadas.</div>
+{% elif ok == 'google_conta_selecionada' %}
+<div class="alert success" role="status">Conta anunciante selecionada.</div>
+{% elif ok == 'google_conversao_vinculada' %}
+<div class="alert success" role="status">Ação de conversão vinculada.</div>
+{% elif ok == 'google_metricas_sincronizadas' %}
+<div class="alert success" role="status">Métricas Google Ads sincronizadas.</div>
 {% endif %}
 {% if erro %}
 <div class="alert error" role="alert">{{ erro }}</div>
+{% endif %}
+
+{% if google_ads_enabled %}
+<section class="panel" id="google-ads-operacao">
+  <div class="panel-heading">
+    <div>
+      <span class="eyebrow">Aquisição</span>
+      <h2>Google Ads</h2>
+    </div>
+  </div>
+  {% if not google_oauth_configured %}
+  <div class="empty">
+    <strong>Google não configurado neste ambiente.</strong>
+    <p>Configure as credenciais OAuth do Control para habilitar a conexão.</p>
+  </div>
+  {% else %}
+  <section class="google-step" id="google-conexao">
+    <h3>1. Conexão</h3>
+    {% if google_next_step == 'connection' %}
+    <div class="alert warning" id="google-proximo-passo-conexao">
+      Próximo passo: conecte uma conta Google autorizada.
+    </div>
+    {% endif %}
+    {% if google_connection %}
+    <p>
+      Status: <strong>{{ google_connection.status }}</strong>
+      · Conta selecionada:
+      <strong>{{ google_connection.customer_id or 'nenhuma' }}</strong>
+      · Credencial disponível:
+      <strong>{{ 'sim' if google_connection.has_refresh_token else 'não' }}</strong>
+    </p>
+    {% else %}
+    <p class="muted">Esta Loja ainda não possui uma conexão Google Ads.</p>
+    {% endif %}
+    {% if not google_connection or not google_connection.has_refresh_token %}
+    <form method="post" action="{{ public_path('/app/control/lojas/' ~ store.id ~ '/google-ads/oauth/start') }}" id="form-google-oauth-start">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <button class="button primary" type="submit">Conectar Google Ads</button>
+    </form>
+    {% else %}
+    <form method="post" action="{{ public_path('/app/control/lojas/' ~ store.id ~ '/google-ads/desconectar') }}" id="form-google-desconectar">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <button class="button secondary" type="submit">Desconectar</button>
+    </form>
+    {% endif %}
+  </section>
+
+  {% if google_connection and google_connection.has_refresh_token %}
+  <section class="google-step" id="google-conta">
+    <h3>2. Conta</h3>
+    {% if google_next_step == 'account' %}
+    <div class="alert warning" id="google-proximo-passo-conta">
+      Próximo passo: sincronize e selecione uma conta anunciante.
+    </div>
+    {% endif %}
+    <form method="post" action="{{ public_path('/app/control/lojas/' ~ store.id ~ '/google-ads/accounts/sync') }}" id="form-google-contas-sync">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <button class="button secondary" type="submit">Sincronizar contas</button>
+    </form>
+    {% if google_accounts %}
+    <form method="post" action="{{ public_path('/app/control/lojas/' ~ store.id ~ '/google-ads/accounts/select') }}" id="form-google-conta-select">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Selecionar</th>
+              <th>Conta</th>
+              <th>Customer ID</th>
+              <th>Moeda</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for account in google_accounts %}
+            <tr>
+              <td>
+                <input
+                  id="google-conta-{{ account.customer_id }}"
+                  {% if account.is_manager %}disabled{% endif %}
+                  type="radio"
+                  name="customer_id"
+                  value="{{ account.customer_id }}"
+                  {% if account.selected %}checked{% endif %}
+                >
+              </td>
+              <td>
+                {{ account.descriptive_name or 'Conta sem nome' }}
+                {% if account.is_manager %}
+                <small>Conta gerenciadora (MCC) não pode ser selecionada.</small>
+                {% endif %}
+              </td>
+              <td><code>{{ account.customer_id }}</code></td>
+              <td>{{ account.currency_code or '—' }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <button class="button primary" type="submit">Selecionar</button>
+    </form>
+    {% else %}
+    <div class="empty"><strong>Nenhuma conta sincronizada.</strong></div>
+    {% endif %}
+  </section>
+  {% endif %}
+
+  {% if google_conversions_enabled and google_selected_account %}
+  <section class="google-step" id="google-conversoes">
+    <h3>3. Conversões</h3>
+    {% if google_conversion_bindings %}
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Evento Revy</th>
+            <th>Ação Google</th>
+            <th>Estado</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for binding in google_conversion_bindings %}
+          <tr>
+            <td><code>{{ binding.revy_event_type }}</code></td>
+            <td><code>{{ binding.conversion_action_resource_name }}</code></td>
+            <td>{{ 'ativo' if binding.active else 'inativo' }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% endif %}
+    {% if google_conversion_actions %}
+    <form method="post" action="{{ public_path('/app/control/lojas/' ~ store.id ~ '/google-ads/conversion-bindings') }}" class="form-layout" id="form-google-conversao">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <input type="hidden" name="customer_id" value="{{ google_selected_account.customer_id }}">
+      <label>Evento Revy
+        <select name="revy_event_type" required>
+          {% for event_type in google_revy_event_types %}
+          <option value="{{ event_type }}">{{ event_type | replace('_', ' ') }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label>Ação de conversão existente
+        <select name="conversion_action_resource_name" required>
+          {% for action in google_conversion_actions %}
+          <option value="{{ action.resource_name }}">
+            {{ action.name }} · {{ action.category }} · {{ action.status }}
+          </option>
+          {% endfor %}
+        </select>
+      </label>
+      <button class="button primary" type="submit">Salvar vínculo</button>
+    </form>
+    {% else %}
+    <div class="empty">
+      <strong>Nenhuma ação de conversão disponível.</strong>
+      <p>Crie a ação no Google Ads e recarregue esta página.</p>
+    </div>
+    {% endif %}
+  </section>
+  {% endif %}
+
+  {% if google_selected_account %}
+  <section class="google-step" id="google-metricas">
+    <h3>4. Métricas</h3>
+    <form method="post" action="{{ public_path('/app/control/lojas/' ~ store.id ~ '/google-ads/metrics/sync') }}" class="form-layout" id="form-google-metricas">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <label>Data inicial
+        <input type="date" name="date_from" value="{{ google_metrics_date_from }}" required>
+      </label>
+      <label>Data final
+        <input type="date" name="date_to" value="{{ google_metrics_date_to }}" required>
+      </label>
+      <button class="button secondary" type="submit">Sincronizar agora</button>
+    </form>
+    {% if google_metrics_summary and (
+      google_metrics_summary.impressions
+      or google_metrics_summary.clicks
+      or google_metrics_summary.cost_micros
+      or google_metrics_summary.conversions
+    ) %}
+    <div class="table-wrap">
+      <table>
+        <tbody>
+          <tr>
+            <th>Alcance e tráfego</th>
+            <td>{{ google_metrics_impressions }} impressões · {{ google_metrics_summary.clicks }} cliques</td>
+          </tr>
+          <tr>
+            <th>Investimento</th>
+            <td>{{ google_metrics_cost_brl }} {{ google_metrics_summary.currency_code or '' }}</td>
+          </tr>
+          <tr>
+            <th>Resultado Google</th>
+            <td>
+              {{ google_metrics_conversions }} conversões
+              {% if google_metrics_summary.roas is not none %}
+              · ROAS {{ '%.2f' | format(google_metrics_summary.roas) }}
+              {% endif %}
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="empty"><strong>Sem métricas no período selecionado.</strong></div>
+    {% endif %}
+  </section>
+  {% endif %}
+  {% endif %}
+</section>
 {% endif %}
 
 <section class="panel" id="modulos-contratados">

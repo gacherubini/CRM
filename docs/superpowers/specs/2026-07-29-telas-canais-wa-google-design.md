@@ -1,6 +1,7 @@
 # Telas de Canais WhatsApp (Loja) e Operação Google Ads (Control) — Design
 
 Data: 2026-07-29
+Status: Partes A e B implementadas em código; rollout/E2E real permanecem operacionais.
 
 ## Problema
 
