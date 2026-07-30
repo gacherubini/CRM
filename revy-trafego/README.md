@@ -1,39 +1,39 @@
-# Revy Tráfego
+# Revy Control (diretório `revy-trafego`)
 
-> **Evolução aprovada:** este app será ampliado e sua UI passará a se chamar
-> **Revy Control**, mantendo Tráfego como módulo interno. Ver
+> O nome técnico do diretório, do processo e do prefixo público (`/trafego`) continua
+> `revy-trafego` durante a migração. A UI e o produto operacional já se chamam
+> **Revy Control**, mantendo Tráfego como um módulo interno. Ver
 > [design](../docs/superpowers/specs/2026-07-29-revy-control-design.md) e
-> [plano por fases](../docs/plans/2026-07-29-plano-revy-control.md). O estado operacional
-> descrito neste README continua sendo o estado atualmente implantado.
+> [plano por fases](../docs/plans/2026-07-29-plano-revy-control.md).
 
 Cockpit multi-loja da **equipe Revy** para operação de mídia paga (Pixel, CAPI, Ads spend, campanhas, ROI, auditorias e diagnóstico de leads).
 
-O **portal da loja** (`portal-gestao`) mostra só resultados de negócio ao dono; a config técnica fica aqui.
+A **Revy Loja** (`portal-gestao`) mostra resultados e rotinas da loja; configuração
+técnica, prontidão e operação multi-loja ficam aqui.
 
 **Plano canônico:**  
 [`docs/plans/2026-07-28-plano-revy-trafego-separacao.md`](../docs/plans/2026-07-28-plano-revy-trafego-separacao.md)
 
 ---
 
-## Status atual — Fase 3 implantada no lab
+## Status atual — Control F0–F6 concluído no código
 
-- Banco próprio e Alembic `0001_revy_trafego_baseline`.
-- Vendas chegam pelo outbox criptografado do Portal e são materializadas em `vendas_projetadas`.
-- ROI/CAPI não leem mais tabelas do Portal.
+- Banco próprio; o Alembic head do código é
+  `0013_revy_control_readiness_alert_acceptances`.
+- Vendas chegam pelo outbox criptografado da Loja e são materializadas em
+  `vendas_projetadas`; ROI/CAPI não leem tabelas do Portal.
 - CAPI assíncrona, `blocked_config`, cancelamento seguro, lease e dedupe por loja.
-- Commit `98cefe4` em `origin/main`; Fly `app2037` v28 com banco dedicado e checks 1/1.
-- Lab anteriormente no Portal `0012_revy_trafego_event_outbox` e Revy
-  `0001_revy_trafego_baseline`; o código local agora possui
-  `0002_revy_control_lojas_rbac`, `0003_revy_control_pessoas_cargos` e
-  `0004_revy_control_acessos_control`, ainda não aplicados no lab.
-- Corte local de Pessoas/Cargos nos commits `2ecaa6b`, `94a0f51`, `3988fe7`,
-  `02eb29d`, `9d2d550`, `4fa1d54` e `c766477`.
-- Schema e backfill aditivos de `AcessoControl` no commit `d64b24b`, com projeção pelo
-  bootstrap no commit `09326f6`.
-- Snapshot pré-deploy `vs_K1n4oBDw96vHZngBNaNy`; smoke `/healthz` e readiness Revy em HTTP 200.
-- Validação local atual do app: **163 testes Revy passando**. A cobertura inclui a Fase 1,
-  Pessoas/Cargos e o schema, backfill e bootstrap aditivos de `AcessoControl`; as
-  migrations e o rollout do Control no lab ainda não ocorreram.
+- Shell Control, Pessoas/Cargos, `AcessoControl`, RBAC, convites, recuperação,
+  portfólio, provisionamento e prontidão estão implementados.
+- O detalhe da Loja oferece a operação Google Ads em quatro passos: conexão OAuth,
+  conta, conversões e métricas.
+- As superfícies de canais WhatsApp e Google continuam protegidas por flags default
+  off. O rollout no lab, os secrets Google e o E2E real com Evolution são passos de
+  operação, não trabalho de código pendente.
+- Validação da entrega de Google: **19 testes** da UI e **62 testes** focados de
+  Control/Google passando. Na suíte Revy completa, 361 testes passam e permanece um
+  teste legado já falhando antes desta entrega, por assumir um único item no outbox
+  de provisionamento.
 
 ## Status anterior (2026-07-28 — Fase 1/2 no lab)
 
@@ -150,7 +150,9 @@ uvicorn app.main:app --reload --port 9010
 ```
 
 Login: se `gestores_revy` estiver vazia, o bootstrap cria o primeiro admin legado e
-projeta sua `Pessoa` e seu `AcessoControl`; a autenticação ainda usa `GestorRevy`.
+projeta sua `Pessoa` e seu `AcessoControl`. A autenticação prefere
+`AcessoControl` + `Pessoa`; `GestorRevy` permanece apenas como fallback de
+compatibilidade quando ainda não existe projeção.
 
 Testes:
 
@@ -178,7 +180,7 @@ pytest -q
 | `REVY_TRAFEGO_CAPI_WORKER` | `0` | Retry outbox |
 | `REVY_CONTROL_ENABLED` | `0` | Habilita as superfícies `/control/v1` e `/app/control`; desligada, elas respondem 404 |
 | `REVY_CONTROL_RBAC_ENABLED` | `0` | Aplica escopo de lojas por vínculo no backend e no seletor; ligar somente após migration/backfill e gate de isolamento da Fase 1 |
-| `GOOGLE_ADS_SYNC_ENABLED` | `0` | Liga rotas Control de OAuth/contas/métricas Google Ads e (Parte B, em construção) os painéis Google no detalhe da loja em `/app/control`; no lifespan também sobe o worker de métricas |
+| `GOOGLE_ADS_SYNC_ENABLED` | `0` | Liga rotas Control de OAuth/contas/métricas e os quatro passos Google Ads no detalhe da loja em `/app/control`; no lifespan também sobe o worker de métricas |
 | `GOOGLE_CONVERSIONS_ENABLED` | `0` | Liga bindings/outbox, hook venda→conversão e worker de outbox Google; também gate do painel de conversões da UI (Parte B) |
 | `GOOGLE_CONVERSIONS_WORKER_ENABLED` | = conversions | Override do worker; default segue `GOOGLE_CONVERSIONS_ENABLED` |
 | `GOOGLE_CONVERSIONS_WORKER_INTERVAL_SECONDS` | `60` | Intervalo do outbox Google |
@@ -191,10 +193,10 @@ pytest -q
 | `GOOGLE_ADS_OAUTH_CLIENT_ID` | vazio | OAuth Web client (GCP) |
 | `GOOGLE_ADS_OAUTH_CLIENT_SECRET` | vazio | Secret do client OAuth (secret manager) |
 | `GOOGLE_ADS_OAUTH_REDIRECT_URI` | vazio | Callback HTTPS do Control; ver "Operação Google Ads no Control" — precisa ser repontado à mão para a rota HTML nova (passo de ops pendente) |
-| `GOOGLE_ADS_DEVELOPER_TOKEN` | vazio | Developer token (API Center do manager Revy); sem ele o app usa Fake* |
+| `GOOGLE_ADS_DEVELOPER_TOKEN` | vazio | Developer token (API Center do manager Revy); sem ele a UI bloqueia a conexão real. Os adapters fake continuam disponíveis para testes |
 | `GOOGLE_ADS_API_VERSION` | `v19` | Versão REST da Google Ads API |
 | `MULTI_WHATSAPP_ENABLED` | `0` | `1` = libera os endpoints proxy de canais WhatsApp e faz a prontidão contar canais ativos |
-| `REVY_CONTROL_DASHBOARD_ENABLED` | `0` | Reserva o rollout dos dashboards do Control; ainda sem efeito operacional |
+| `REVY_CONTROL_DASHBOARD_ENABLED` | `0` | Com `REVY_CONTROL_ENABLED=1`, habilita dashboard/resumo e os painéis operacionais no Control |
 | `REVY_TRAFEGO_JOB_SECRET` | vazio | `POST /internal/jobs/*` (`meta-spend-sync`, `google-conversions-outbox`, `google-ads-metrics-sync`) |
 | `REVY_TRAFEGO_SERVICE_TOKEN` | vazio | Header `X-Service-Token` nas APIs `/v1/*` |
 
@@ -271,8 +273,8 @@ Com `REVY_CONTROL_ENABLED=0`, as superfícies Control respondem 404.
 `REVY_CONTROL_RBAC_ENABLED=1` aplica o escopo de vínculos ao seletor e às requisições
 existentes. As duas flags permanecem default off; não ativar no lab antes de concluir
 inventário, restore drill, migrations/backfills e o gate de isolamento. O Alembic head
-local é `0008_revy_control_loja_versao`; o lab permanece sem essas migrations e sem
-rollout do Control.
+local é `0013_revy_control_readiness_alert_acceptances`; confirme o estado do lab antes
+do rollout do Control.
 
 ### Operação Google Ads no Control (Parte B — implementada)
 
@@ -286,13 +288,9 @@ segue no domínio: admin Revy **ou** gestor responsável pela Loja; colaborador 
 403. Sem client id, client secret, redirect URI ou developer token, a tela informa que
 o Google não está configurado e não oferece o botão de conexão.
 
-**Passo manual de ops — obrigatório e ainda não feito.** O callback OAuth atual é
-`GET /control/v1/google-ads/oauth/callback` e responde **JSON**; é essa a URL registrada no
-Google e no `GOOGLE_ADS_OAUTH_REDIRECT_URI`, então quem conectar pela UI volta do Google
-numa página de JSON cru. A rota HTML implementada é
+**Passo manual de ops — obrigatório antes do rollout.** A rota HTML implementada é
 `GET /app/control/google-ads/oauth/callback`, que completa o OAuth e redireciona para
-`/app/control/lojas/{id}?ok=google_conectado`. Para a UI funcionar é preciso, antes do
-rollout:
+`/app/control/lojas/{id}?ok=google_conectado`. Para a UI funcionar:
 
 1. registrar a rota HTML nova como URI de redirecionamento autorizado no **Google Cloud
    Console** (no lab, com o prefixo do edge:
@@ -301,9 +299,10 @@ rollout:
    (`fly secrets set GOOGLE_ADS_OAUTH_REDIRECT_URI=... -a app2037`).
 
 Os dois têm de casar exatamente — divergência dá `redirect_uri_mismatch` no Google, sem
-pista no log do Control. O endpoint JSON continua existindo para compatibilidade e não deve
-ser removido. Segue valendo o gap de secrets GCP (client id/secret, developer token): sem
-eles o painel permanece indisponível para conexão.
+pista no log do Control. O endpoint JSON legado
+`GET /control/v1/google-ads/oauth/callback` continua existindo para compatibilidade;
+se algum ambiente ainda apontar para ele, o admin voltará do Google para JSON cru.
+Sem client id/secret e developer token, o painel permanece indisponível para conexão.
 
 Público via edge: prefixar `/trafego` (ex.: `/trafego/health/live`, `/trafego/v1/...`).  
 No bundle, portal/catálogo usam `http://127.0.0.1:9010` **sem** prefixo.
@@ -334,8 +333,10 @@ Subir/desligar lab: `bash deploy/fly/up-all.sh --3vm` / `down-all.sh --3vm`.
 
 ### Schemas no volume
 
-- Portal: `/data/portal/portal.db`, Alembic head `0012_revy_trafego_event_outbox`.
-- Revy: `/data/revy-trafego/revy_trafego.db`, Alembic head `0001_revy_trafego_baseline`.
+- Revy Loja: `/data/portal/portal.db`; head esperado pelo código:
+  `0015_auditoria_dominio_canal`.
+- Revy Control: `/data/revy-trafego/revy_trafego.db`; head esperado pelo código:
+  `0013_revy_control_readiness_alert_acceptances`.
 
 O entrypoint executa ambos os Alembics em modo fail-fast antes do supervisord. Readiness do Revy
 consulta `vendas_projetadas`; schema incompleto não deve ser anunciado como saudável.
@@ -360,8 +361,8 @@ Rollback workers: inverter os `PORTAL_*_ENABLED` / `REVY_TRAFEGO_*_WORKER`.
 
 | Superfície | Onde |
 |---|---|
-| Pixel, CAPI token, Ads, campanhas, ROI técnico, CTWA audit, leads | **Revy Tráfego** |
-| Resultados de mídia (leitura) no dashboard do dono | Portal (API ou local conforme flags) |
-| Confirmar venda / CRM / estoque | Portal |
+| Pixel, CAPI token, Ads, campanhas, ROI técnico, CTWA audit, leads | **Revy Control** |
+| Resultados de mídia (leitura) no dashboard do dono | Revy Loja (API ou local conforme flags) |
+| Confirmar venda / CRM / estoque | Revy Loja |
 
 Detalhe de flags e runbook: plano 6.4 em `docs/plans/`.

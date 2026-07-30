@@ -22,7 +22,7 @@ para Acessos bancos.
 **Ainda operacional (não de deploy):** credencial Gemini no n8n (UI); E2E estável de 1ª
 conversa; transcritor de áudio real (hoje fallback para texto).
 
-### Revy Tráfego — Fase 3
+### Revy Control (`revy-trafego`) — data plane da Fase 3
 
 - Portal e Revy têm bancos SQLite separados no mesmo volume persistente:
   `/data/portal/portal.db` e `/data/revy-trafego/revy_trafego.db`.
@@ -112,6 +112,26 @@ worker-only (sem HTTP `min_machines`).
 **Regra:** um único workflow atende todos os números da loja (e do lab). Não
 copie o JSON por número.
 
+O código permite que dono/gerente faça a operação em
+`/app/loja/whatsapp`: cadastrar um número, obter QR efêmero, reconectar e
+desconectar. API key e payload bruto da Evolution não chegam ao navegador.
+
+O rollout continua **default off**. Antes de habilitar a tela:
+
+1. configure `CHATBOT_WHATSAPP_PROVIDER=evolution` e
+   `CHATBOT_EVOLUTION_WEBHOOK_URL=https://n8n2037.fly.dev/webhook/whatsapp-ai`;
+2. confira a URL e a API key da Evolution. O provider aceita
+   `CHATBOT_EVOLUTION_URL` / `CHATBOT_EVOLUTION_API_KEY` e, se ausentes, reutiliza
+   os `CHATBOT_IMAGE_EVOLUTION_*` já usados pelo bundle;
+3. habilite `MULTI_WHATSAPP_ENABLED=1` e valide os endpoints de canais no Chatbot;
+4. só então habilite `REVY_LOJA_SHELL_ENABLED=1` e
+   `REVY_LOJA_WHATSAPP_ENABLED=1`.
+
+No Control, a prontidão multi-WhatsApp também exige `REVY_CONTROL_ENABLED=1`.
+O QR usa `Cache-Control: no-store`; não o copie para logs, tickets ou screenshots.
+Rollback: desligue primeiro `REVY_LOJA_WHATSAPP_ENABLED`, depois
+`MULTI_WHATSAPP_ENABLED`, sem apagar instâncias na Evolution.
+
 | Peça | Comportamento |
 |------|----------------|
 | Evolution webhook | cada evento traz `body.instance` (nome da instância) |
@@ -126,6 +146,21 @@ Placeholders ainda necessários no JSON canônico: `__EVOLUTION_KEY__`,
 `__CHATBOT_TOKEN__`, `__CHATBOT_WEBHOOK_TOKEN__`. Instance **não** é placeholder.
 
 Validação: `python n8n/validate_workflow.py` (rejeita qualquer `__INSTANCE__` residual).
+
+## Google Ads no Control
+
+O detalhe da Loja no Control já implementa conexão OAuth, escolha da conta, bindings
+de conversão e métricas. Para o rollout, mantenha `GOOGLE_ADS_SYNC_ENABLED=0` e
+`GOOGLE_CONVERSIONS_ENABLED=0` até:
+
+1. cadastrar client id/secret e developer token nos secrets do `app2037`;
+2. registrar no Google Cloud Console exatamente
+   `https://app2037.fly.dev/trafego/app/control/google-ads/oauth/callback`;
+3. usar a mesma URL em `GOOGLE_ADS_OAUTH_REDIRECT_URI`;
+4. validar OAuth e sync numa loja de teste; só depois ligar as duas flags.
+
+O callback `/control/v1/google-ads/oauth/callback` retorna JSON e permanece apenas
+por compatibilidade. A UI deve usar o callback HTML em `/app/control/...`.
 
 ## Roteamento WhatsApp (grupo do estoque)
 

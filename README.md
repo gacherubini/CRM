@@ -46,11 +46,11 @@ Cliente (WhatsApp)          Catálogo público (UTM/Pixel)
  (leads, handoff)         mock + Playwright LIVE
       │                   (Santander, Fontecred, Bradesco, Pan portal)
       ▼
- Portal de Gestão  ←→  Estoque API  →  Catálogo
+ Revy Loja (`portal-gestao`) ←→ Estoque API → Catálogo
  (CRM, vendas, metas; resultados de mídia)
       │ outbox transacional de vendas (HTTP)
       ▼
- Revy Tráfego  `/trafego`  (banco próprio; Pixel, CAPI, campanhas, ROI, leads)
+ Revy Control `/trafego` (banco próprio; Pixel, CAPI, Ads, ROI, canais, leads)
 ```
 
 **Princípio central:** produtos **independentes** ligados só por HTTP. Motor mock ou real
@@ -66,7 +66,7 @@ não muda o contrato `/v1/simulacoes`. Estoque é a fonte de verdade de veículo
 | Orquestração | **n8n** | Roteia, mantém estado, chama LLM e motor |
 | Conversa (NLU) | **Google Gemini** (API, via n8n) | Entende o cliente, extrai e valida dados |
 | Motor de simulação | **Python + FastAPI** + Playwright | Mock + drivers reais (4 bancos LIVE) |
-| CRM / vitrine | Portal + **Revy Tráfego** + Catálogo + Estoque | Portal: CRM/resultados · Tráfego: Pixel/CAPI/campanhas |
+| CRM / vitrine | **Revy Loja** + **Revy Control** + Catálogo + Estoque | Loja: CRM/resultados · Control: Pixel/CAPI/Ads e operação multi-loja |
 | Banco de dados | **PostgreSQL** (container / lab) | Por produto (tenancy) |
 | Hospedagem | **Local (dev)** · **Fly.io 3-VM** (lab ativo) | Always-on: Postgres + Evolution + app bundle; Playwright on-demand |
 
@@ -176,8 +176,11 @@ Mapa de campos e decisões: [`docs/plans/2026-07-13-plano1a-task12-bancos-reconh
 - [x] **#3B Task 4 + event bus** — eventos/tempos, UI do funil e adapter Meta concluídos.
 - [x] **Revy Tráfego Fase 3** — banco/Alembic próprios, projeção de vendas e outbox
   criptografado Portal → Revy; CAPI assíncrona e isolada por loja.
+- [x] **Revy Control/Loja lean** — shells, RBAC, prontidão, operação Google Ads e
+  números multi-WhatsApp com QR efêmero.
 - [x] **Mídia WhatsApp backend** — áudio efêmero; foto automática WhatsApp → Estoque → Catálogo; lote por sessão; envio da capa ao cliente.
-- [ ] **Residual CRM/ops** — Google; outbound E11/E12; transcritor real; polish revenda.
+- [ ] **Residual CRM/ops** — rollout/secrets/E2E Google e multi-WhatsApp; outbound
+  E11/E12; transcritor real; polish revenda.
 
 Estado canônico: [`docs/contexto-compacto.md`](docs/contexto-compacto.md) · planos: [`docs/plans/README.md`](docs/plans/README.md) · handoff: [`docs/handoff-contexto.md`](docs/handoff-contexto.md).
 
@@ -235,8 +238,8 @@ versionados. Cada produto funciona sem os demais:
 |---|---|---|
 | **Chatbot Standalone** | Evolution + n8n + Chatbot API + Estoque Lite; responde veículos disponíveis | funciona sem Portal/Catálogo Público |
 | **Motor de Simulação** | Jobs mock ou bancários; pode ser acoplado ao chatbot ou vendido sozinho | `/v1/simulacoes` |
-| **Portal de Gestão** | Dono, gerente, vendedor, estoque incluído, vendas e metas | Estoque API incluída; Bot/Motor opcionais |
-| **Revy Tráfego** | Operação técnica multi-loja de Pixel, CAPI, campanhas e ROI | recebe projeções de venda do Portal por HTTP/outbox |
+| **Revy Loja** (`portal-gestao`) | Dono, gerente, vendedor, estoque incluído, vendas e metas | Estoque API incluída; Bot/Motor opcionais |
+| **Revy Control** (`revy-trafego`) | Operação multi-loja de Pixel, CAPI, Google Ads, campanhas, ROI e prontidão | recebe projeções de venda da Loja por HTTP/outbox |
 | **Estoque API** | Fonte oficial dos veículos; incluída em modo Lite no Chatbot e completa no Dashboard | API privada e pública |
 | **Catálogo Público** | Vitrine opcional, alimentada somente pelos veículos publicados no Estoque | API pública read-only |
 
@@ -245,7 +248,7 @@ O Estoque API é a fonte única de veículos; bot, portal e vitrine integram-se 
 ### Acesso no Portal por papel
 
 - **Dono/gerente:** estoque completo, vendas, custos, lucro, metas, funil, resultados de mídia
-  e simulações. Configuração técnica de Pixel/CAPI/campanhas fica no Revy Tráfego.
+  e simulações. Configuração técnica de Pixel/CAPI/campanhas fica no Revy Control.
 - **Vendedor:** painel e vendas próprios, leads/conversas autorizados, estoque sem custos e
   **simulação manual**. Nunca expõe custo do veículo, lucro, tokens ou credenciais do Motor.
 

@@ -1,6 +1,8 @@
-# Portal de Gestão
+# Revy Loja (diretório `portal-gestao`)
 
-Frontend operacional da loja, servido por FastAPI com páginas Jinja. O token das APIs fica somente no servidor; o navegador recebe uma sessão assinada.
+Frontend operacional da loja, servido por FastAPI com páginas Jinja. O diretório
+mantém o nome histórico `portal-gestao`; a UI nova usa a marca **Revy Loja**. Tokens
+das APIs ficam somente no servidor e o navegador recebe uma sessão assinada.
 
 ## O que já funciona
 
@@ -18,6 +20,8 @@ Frontend operacional da loja, servido por FastAPI com páginas Jinja. O token da
 - **Números de cadastro** (autorizados): telefones da equipe que podem cadastrar veículo
   pelo WhatsApp (`cadastro` / fotos / `fim`) — BFF para a Chatbot API
   `/v1/operacao/numeros-autorizados`;
+- **Números de WhatsApp da loja** (flag): lista canais, adiciona número, mostra QR
+  efêmero, reconecta e desconecta sem expor a API key da Evolution;
 - **Acessos bancos** (credenciais do Motor cifradas; exige `MOTOR_ENCRYPTION_KEY` no Motor).
 
 ### Revy Loja (shell / entitlements — default OFF)
@@ -35,8 +39,8 @@ desligadas a UI legada permanece idêntica. Mapa de rotas:
 | `REVY_LOJA_REDIRECT_LEGACY` | `0` | `1` = 303 de paths legados → shell (exige shell on); ver cutover |
 | `SELLER_AI_ENABLED` | `0` | Seller AI (F7+); ainda não altera rotas |
 
-Backend: `app/loja/*` (domínio) + `app/web/loja_shell.py` (router/hooks) +
-`app/loja/redirects.py` (cutover F8).  
+Backend: `app/loja/*` (domínio) + `app/web/loja_shell.py` (shell/hooks) +
+`app/web/loja_whatsapp.py` (canais) + `app/loja/redirects.py` (cutover F8).
 Projeção: reutiliza `app.provisioning.allows_processing` / `LojaOperacionalProjecao`.  
 Cutover / rollback: [`docs/revy-loja-cutover.md`](docs/revy-loja-cutover.md).
 
@@ -71,8 +75,8 @@ por eventos; não há leitura SQL cruzada entre os produtos.
 .\.venv\Scripts\python.exe -m alembic current
 ```
 
-Head esperado: `0012_revy_trafego_event_outbox`. O app não executa `create_all` no boot: falha de
-migração deve impedir readiness/deploy.
+Head esperado pelo código: `0015_auditoria_dominio_canal`. O app não executa
+`create_all` no boot: falha de migração deve impedir readiness/deploy.
 
 ## Executar com Docker
 
