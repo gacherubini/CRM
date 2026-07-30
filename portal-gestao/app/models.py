@@ -147,7 +147,7 @@ class LojaOperacaoAuditoria(Base):
     __tablename__ = "loja_operacao_auditoria"
     __table_args__ = (
         CheckConstraint(
-            "dominio IN ('atendimento', 'financeira')",
+            "dominio IN ('atendimento', 'financeira', 'canal')",
             name="ck_loja_operacao_auditoria_dominio",
         ),
         Index(
@@ -163,6 +163,7 @@ class LojaOperacaoAuditoria(Base):
     dominio: Mapped[str] = mapped_column(String(20), nullable=False, index=True)
     # atendimento: assumir|devolver|reatribuir
     # financeira: upsert|testar|revogar
+    # canal: criar|conectar|desconectar|inativar
     acao: Mapped[str] = mapped_column(String(40), nullable=False, index=True)
     ator_email: Mapped[str] = mapped_column(String(320), nullable=False)
     telefone_hmac: Mapped[Optional[str]] = mapped_column(String(64), nullable=True, index=True)

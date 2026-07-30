@@ -1,13 +1,17 @@
 """Auditoria formal de operações Loja (handoff + financeiras) — F5 residual."""
 from __future__ import annotations
 
+import pytest
+
 from conftest import csrf_da_resposta, login
 from app.db import SessionLocal
 from app.financeiro_calc import identidade_telefone
 from app.loja_operacao_auditoria import (
     DOMINIO_ATENDIMENTO,
+    DOMINIO_CANAL,
     DOMINIO_FINANCEIRA,
     listar_auditoria_operacao,
+    registrar_auditoria_canal,
     registrar_auditoria_operacao,
 )
 from app.models import AtendimentoAtribuicao, LojaOperacaoAuditoria, agora
@@ -288,3 +292,24 @@ def test_listar_auditoria_helper(db):
     )
     assert len(so_fin) == 1
     assert so_fin[0].provedor == "Pan"
+
+
+def test_auditoria_canal_persiste(db):
+    row = registrar_auditoria_canal(
+        db,
+        loja_slug="loja-teste",
+        acao="conectar",
+        ator_email="dono@loja.test",
+        success=True,
+        commit=True,
+    )
+    assert row.dominio == DOMINIO_CANAL
+    assert row.acao == "conectar"
+    assert row.telefone_hmac is None
+
+
+def test_auditoria_canal_recusa_acao_invalida(db):
+    with pytest.raises(ValueError):
+        registrar_auditoria_canal(
+            db, loja_slug="loja-teste", acao="explodir", ator_email="a@b.c"
+        )
