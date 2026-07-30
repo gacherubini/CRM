@@ -213,30 +213,35 @@ Criar `SalesOverview` como interface única de leitura, compondo:
 
 ### Tarefas
 
-- [ ] Reaproveitar cálculos existentes de dashboard, financeiro, funil, relatórios,
+- [x] Reaproveitar cálculos existentes de dashboard, financeiro, funil, relatórios,
       metas e painel do vendedor.
-- [ ] Separar consulta/agregação de template e rota.
-- [ ] Normalizar período, timezone e semântica dos KPIs.
-- [ ] Criar cards com estados carregando, vazio, parcial, atualizado e erro.
-- [ ] Aplicar a linguagem visual do brand kit em um grid responsivo, com hierarquia clara,
+- [x] Separar consulta/agregação de template e rota.
+- [x] Normalizar período, timezone e semântica dos KPIs.
+- [x] Criar cards com estados carregando, vazio, parcial, atualizado e erro.
+- [x] Aplicar a linguagem visual do brand kit em um grid responsivo, com hierarquia clara,
       gráficos acessíveis e destaque para ações — sem tema decorativo genérico de “IA”.
 - [ ] Manter componentes visuais reutilizáveis entre Vendas e Estoque sem misturar as
       fórmulas ou os read models de cada módulo.
-- [ ] Mostrar origem e resultado; não mostrar OAuth, tokens, Pixel, webhook ou
+- [x] Mostrar origem e resultado; não mostrar OAuth, tokens, Pixel, webhook ou
       diagnóstico técnico.
-- [ ] Omitir ou marcar Google como indisponível enquanto o gate Control 4 não estiver
+- [x] Omitir ou marcar Google como indisponível enquanto o gate Control 4 não estiver
       pronto; nunca renderizar ausência de integração como gasto zero.
-- [ ] Manter detalhe de mídia no Control e contrato read-only para a Loja.
+- [x] Manter detalhe de mídia no Control e contrato read-only para a Loja.
 
 ### Testes
 
-- [ ] KPIs batem com vendas e funil existentes no mesmo período.
-- [ ] ROAS sem investimento aparece como indisponível, nunca infinito.
-- [ ] Falha do Control deixa aquisição como parcial sem derrubar Vendas.
-- [ ] Dono/gerente e vendedor recebem apenas métricas autorizadas.
+- [x] KPIs batem com vendas e funil existentes no mesmo período.
+- [x] ROAS sem investimento aparece como indisponível, nunca infinito.
+- [x] Falha do Control deixa aquisição como parcial sem derrubar Vendas.
+- [x] Dono/gerente e vendedor recebem apenas métricas autorizadas.
 
 **Critério de pronto:** dono entende operação e resultado até venda em uma tela, sem
 entrar no painel técnico.
+
+**Implementação (código):** `app/loja/sales_overview.py`, rotas `GET /app/loja/vendas`
+e `/dados` (flag `REVY_LOJA_SHELL_ENABLED`, default off), template
+`templates/loja/vendas_visao.html`, testes em `tests/test_loja_sales_overview.py`.
+Shell/navegação unificada e componentes compartilhados com Estoque ficam para F0/F1/F2.
 
 ---
 

@@ -1,0 +1,238 @@
+{% extends "base.html" %}
+{% block title %}Vendas — Visão geral — Revy Loja{% endblock %}
+{% block content %}
+<div class="page-heading">
+  <div>
+    <span class="eyebrow">Vendas</span>
+    <h1>Visão geral</h1>
+    <p>
+      {% if overview.escopo == 'vendedor' %}
+      Seus resultados no período. Números reais — nada estimado.
+      {% else %}
+      Operação e resultado até a venda, em uma tela. Sem configuração técnica.
+      {% endif %}
+    </p>
+  </div>
+</div>
+
+<form class="filter-bar" method="get">
+  <label class="search"><span class="sr-only">Início do período</span>
+    <input type="date" name="inicio" value="{{ periodo.inicio }}">
+  </label>
+  <label class="search"><span class="sr-only">Fim do período</span>
+    <input type="date" name="fim" value="{{ periodo.fim }}">
+  </label>
+  <button class="button secondary" type="submit">Aplicar período</button>
+</form>
+<p class="mono-label">PERÍODO: {{ periodo.inicio }} A {{ periodo.fim }} · {{ overview.timezone }} · estado {{ overview.status }}</p>
+
+{# --- Vendas / resultado --- #}
+<section class="panel" aria-labelledby="bloco-resultado">
+  <div class="panel-heading">
+    <div><span class="mono-label">RESULTADO</span><h2 id="bloco-resultado">Receita e vendas</h2></div>
+  </div>
+  {% if overview.vendas_status == 'vazio' %}
+  <div class="empty">
+    <strong>Nenhuma venda confirmada no período.</strong>
+    <p>Quando houver vendas confirmadas, os totais reais aparecem aqui.</p>
+  </div>
+  {% else %}
+  <div class="metric-grid">
+    <div class="metric">
+      <span>Vendas confirmadas</span>
+      <strong>{{ overview.qtd_vendas }}</strong>
+      <small>status confirmada no período</small>
+    </div>
+    <div class="metric">
+      <span>Receita</span>
+      <strong>{{ formatar_brl(overview.receita) }}</strong>
+      <small>soma do preço de venda</small>
+    </div>
+    {% if pode_ver_margem %}
+    <div class="metric accent">
+      <span>Margem (lucro bruto)</span>
+      {% if overview.margem_completa %}
+      <strong>{{ formatar_brl(overview.margem) }}</strong>
+      <small>preço − custo − custos diretos</small>
+      {% else %}
+      <strong>Incompleto</strong>
+      <small>
+        {{ overview.vendas_lucro_incompleto }} venda{% if overview.vendas_lucro_incompleto != 1 %}s{% endif %}
+        sem custo. Subtotal conhecido: {{ formatar_brl(overview.margem) }}.
+      </small>
+      {% endif %}
+    </div>
+    {% endif %}
+  </div>
+  {% endif %}
+</section>
+
+{# --- Metas --- #}
+<section class="panel" aria-labelledby="bloco-metas">
+  <div class="panel-heading">
+    <div><span class="mono-label">METAS</span><h2 id="bloco-metas">Atingimento</h2></div>
+  </div>
+  {% if overview.metas_status == 'vazio' or not overview.metas %}
+  <div class="empty">
+    <strong>Nenhuma meta no período.</strong>
+    <p><a href="/app/metas">Cadastre metas</a> de quantidade, faturamento ou lucro bruto.</p>
+  </div>
+  {% else %}
+  <div class="metric-grid">
+    {% for m in overview.metas %}
+    <div class="metric">
+      <span>{{ m.tipo | replace('_', ' ') | capitalize }}</span>
+      {% if m.indisponivel %}
+      <strong>Incompleto</strong>
+      <small>Informe o custo do veículo nas vendas confirmadas.</small>
+      {% else %}
+      <strong>{% if m.quantidade %}{{ m.realizado | int }}{% else %}{{ formatar_brl(m.realizado) }}{% endif %}</strong>
+      <small>meta: {% if m.quantidade %}{{ m.alvo | int }}{% else %}{{ formatar_brl(m.alvo) }}{% endif %} · {{ m.pct }}%</small>
+      <div class="meta-bar" role="progressbar" aria-valuenow="{{ m.pct }}" aria-valuemin="0" aria-valuemax="100"
+           style="height:6px;margin-top:8px;background:rgba(128,128,128,0.15);border-radius:4px;overflow:hidden">
+        <span style="display:block;height:100%;width:{{ m.pct_barra }}%;background:currentColor"></span>
+      </div>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+</section>
+
+{# --- Funil / leads --- #}
+<section class="panel" aria-labelledby="bloco-funil">
+  <div class="panel-heading">
+    <div><span class="mono-label">FUNIL</span><h2 id="bloco-funil">Leads e conversão</h2></div>
+  </div>
+  {% if overview.funil_status == 'erro' %}
+  <div class="empty"><strong>Funil indisponível.</strong><p>Não foi possível agregar os eventos do período.</p></div>
+  {% elif overview.funil_status == 'indisponivel' %}
+  <div class="empty"><strong>Funil indisponível.</strong><p>Sem base de eventos para este escopo.</p></div>
+  {% elif overview.funil_status == 'vazio' and not overview.leads_count %}
+  <div class="empty"><strong>Nenhum lead no período.</strong><p>Novos contatos aparecem aqui assim que entrarem no funil.</p></div>
+  {% else %}
+  <div class="metric-grid">
+    <div class="metric">
+      <span>{% if overview.escopo == 'vendedor' %}Leads atribuídos{% else %}Leads no período{% endif %}</span>
+      <strong>{% if overview.leads_count is not none %}{{ overview.leads_count }}{% else %}—{% endif %}</strong>
+      <small>{% if overview.funil_status == 'parcial' %}dados parciais{% else %}coorte do período{% endif %}</small>
+    </div>
+    {% if overview.funil and overview.funil.taxa_resposta_pct is defined and overview.funil.taxa_resposta_pct is not none %}
+    <div class="metric">
+      <span>Taxa de resposta</span>
+      <strong>{{ overview.funil.taxa_resposta_pct }}%</strong>
+      <small>primeira resposta na coorte</small>
+    </div>
+    {% endif %}
+    {% if overview.funil and overview.funil.taxa_conversao_pct is defined and overview.funil.taxa_conversao_pct is not none %}
+    <div class="metric accent">
+      <span>Conversão em venda</span>
+      <strong>{{ overview.funil.taxa_conversao_pct }}%</strong>
+      <small>venda confirmada na coorte</small>
+    </div>
+    {% endif %}
+    {% if overview.funil and overview.funil.auditavel and overview.funil.auditavel.disponivel %}
+    <div class="metric">
+      <span>Atendidos</span>
+      <strong>{{ overview.funil.auditavel.atendidos }}</strong>
+      <small>handoff no período</small>
+    </div>
+    <div class="metric">
+      <span>Vendas vinculadas</span>
+      <strong>{{ overview.funil.auditavel.vendas_vinculadas }}</strong>
+      <small>lead elegível + venda confirmada</small>
+    </div>
+    {% endif %}
+  </div>
+  {% endif %}
+</section>
+
+{# --- Aquisição (dono/gerente) --- #}
+{% if pode_ver_aquisicao %}
+<section class="panel" aria-labelledby="bloco-aquisicao">
+  <div class="panel-heading">
+    <div><span class="mono-label">AQUISIÇÃO</span><h2 id="bloco-aquisicao">Investimento e retorno</h2></div>
+  </div>
+  {% set aq = overview.aquisicao %}
+  {% if not aq or overview.aquisicao_status == 'indisponivel' %}
+  <div class="empty">
+    <strong>Aquisição indisponível.</strong>
+    <p>{{ (aq.mensagem if aq and aq.mensagem else 'Sem dados de mídia confiáveis no período.') }} Google Ads permanece indisponível — não contamos como zero.</p>
+  </div>
+  {% else %}
+  <div class="metric-grid">
+    <div class="metric">
+      <span>Investimento</span>
+      {% if aq.investimento_disponivel %}
+      <strong>{{ formatar_brl(aq.investimento) }}</strong>
+      <small>gasto de mídia no período</small>
+      {% else %}
+      <strong>Indisponível</strong>
+      <small>sem investimento informado — não exibimos zero</small>
+      {% endif %}
+    </div>
+    <div class="metric">
+      <span>CAC</span>
+      {% if aq.cac_disponivel %}
+      <strong>{{ formatar_brl(aq.cac) }}</strong>
+      <small>custo por venda atribuída</small>
+      {% else %}
+      <strong>Indisponível</strong>
+      <small>precisa de investimento e vendas</small>
+      {% endif %}
+    </div>
+    <div class="metric accent">
+      <span>ROAS</span>
+      {% if aq.roas_disponivel and aq.roas is not none %}
+      <strong>{{ aq.roas }}x</strong>
+      <small>receita atribuída / investimento</small>
+      {% else %}
+      <strong>Indisponível</strong>
+      <small>sem investimento não calculamos ROAS</small>
+      {% endif %}
+    </div>
+    <div class="metric">
+      <span>Google Ads</span>
+      <strong>Indisponível</strong>
+      <small>integração ainda não liberada — não conta como zero</small>
+    </div>
+  </div>
+  {% if aq.mensagem %}
+  <p class="muted" style="margin:12px 16px 16px">{{ aq.mensagem }}</p>
+  {% endif %}
+  {% if overview.aquisicao_status == 'parcial' %}
+  <p class="muted" style="margin:0 16px 16px">Estado parcial: as vendas acima seguem válidas; a aquisição pode estar incompleta.</p>
+  {% endif %}
+  {% endif %}
+</section>
+{% endif %}
+
+{# --- Pendências --- #}
+<section class="panel" aria-labelledby="bloco-pendencias">
+  <div class="panel-heading">
+    <div><span class="mono-label">PENDÊNCIAS</span><h2 id="bloco-pendencias">Ações do período</h2></div>
+  </div>
+  {% if not overview.pendencias %}
+  <div class="empty">
+    <strong>Nada pendente nos dados atuais.</strong>
+    <p>Próximas ações persistentes entram em uma fase posterior.</p>
+  </div>
+  {% else %}
+  <ul class="list-plain" style="margin:0;padding:12px 16px;list-style:none">
+    {% for p in overview.pendencias %}
+    <li style="padding:10px 0;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;gap:12px;align-items:center">
+      <span>{{ p.texto }}</span>
+      <a class="button ghost" href="{{ p.href }}">Abrir</a>
+    </li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+</section>
+
+<p class="muted" style="margin-top:8px">
+  Atalhos: <a href="/app/vendas">Vendas</a> ·
+  <a href="/app/leads">Leads</a> ·
+  {% if overview.escopo == 'vendedor' %}<a href="/app/vendedor">Meu painel</a>{% else %}<a href="/app/financeiro">Financeiro</a> · <a href="/app/funil">Funil</a>{% endif %}
+  · <a href="/app">Painel clássico</a>
+</p>
+{% endblock %}
