@@ -401,6 +401,11 @@ class GoogleAdsConversionsControl:
         payload = json.loads(item["payload_json"])
         try:
             with self._session_factory() as db:
+                from app.control.stores import store_blocks_traffic_jobs
+
+                # Loja suspensa/encerrada: não envia e não apaga a fila.
+                if store_blocks_traffic_jobs(db, loja_id=loja_id):
+                    return False
                 connection = (
                     db.query(GoogleAdsConnection)
                     .filter(GoogleAdsConnection.loja_id == loja_id)

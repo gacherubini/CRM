@@ -1,6 +1,6 @@
 # Plano — Evolução do Revy Tráfego para Revy Control
 
-**Status:** ATIVO / CÓDIGO F0–6 LEAN COMPLETE (Meta, readiness+aceite, Google 4A–D ports/fakes, click IDs 4C, multi-WA canal_id+connect+n8n instance dinâmica, RBAC sem slug manual; F7 lab/rollout e adapters GCP reais ainda abertos)
+**Status:** ATIVO / CÓDIGO F0–6 + residual F3/F4-HTTP/F5-n8n/F6/F7-UI COMPLETE (Meta, readiness, Google ports+HTTP adapters, multi-WA n8n instance dinâmica, jobs com gate de suspensão, dashboard rico, RBAC sem slug; residual = GCP/token humano, E2E lab, flags F7, worker outbox Google)
 **Data:** 2026-07-29
 **Spec:** [`docs/superpowers/specs/2026-07-29-revy-control-design.md`](../superpowers/specs/2026-07-29-revy-control-design.md)
 **Vocabulário:** [`CONTEXT.md`](../../CONTEXT.md)
@@ -308,7 +308,9 @@ ser chamadas pela interface da Central de Integrações.
 - [x] Alerta aceito não bloqueia e gera auditoria
       (`readiness_alert_acceptances` + `readiness.alert.accepted`;
       aceite não inventa `ready=True` se required falhar).
-- [ ] Suspensão interrompe jobs da loja sem apagar filas/histórico.
+- [x] Suspensão interrompe jobs da loja sem apagar filas/histórico
+      (Meta spend skip + CAPI park pending + Google conversion outbox skip;
+      `store_blocks_traffic_jobs` em `stores.py`).
 - [x] Falha externa é sanitizada e não vaza segredo
       (token nunca no JSON de integrações; auditoria sem ciphertext cru).
 - [x] Readiness é determinístico e testado pela interface
@@ -340,16 +342,18 @@ nova e não implementar nenhum método de mutação de campanhas.
 ### Fase 4A — Fundação e conexão
 
 - [ ] Criar projeto Google Cloud de teste e produção, consent screen, domínios,
-      política, termos e redirect URIs HTTPS.
+      política, termos e redirect URIs HTTPS. (**humano / GCP**)
 - [ ] Solicitar developer token da Google Ads API pelo manager account da Revy.
-- [ ] Habilitar Google Ads API e Data Manager API.
-- [ ] Criar `GoogleAdsReadPort`, `GoogleDataManagerPort` e adapters falsos para testes.
-- [ ] Implementar OAuth multiusuário no backend com `state`, acesso offline e escopos
+      (**humano**)
+- [ ] Habilitar Google Ads API e Data Manager API. (**humano / GCP**)
+- [x] Criar `GoogleAdsReadPort`, `GoogleDataManagerPort` e adapters falsos para testes
+      + HTTP reais em `google_ads_http.py` (`build_google_ads_ports`).
+- [x] Implementar OAuth multiusuário no backend com `state`, acesso offline e escopos
       `adwords` e `datamanager`.
-- [ ] Cifrar refresh token; client secret e developer token ficam no secret manager.
-- [ ] Descobrir contas diretas e hierarquia, distinguindo `customer_id` de
+- [x] Cifrar refresh token; client secret e developer token via env/secret manager.
+- [x] Descobrir contas diretas e hierarquia, distinguindo `customer_id` de
       `login_customer_id`; impedir seleção de manager como conta anunciante.
-- [ ] Tratar conexão como `conectado`, `atenção`, `expirado`, `revogado` ou `erro`.
+- [x] Tratar conexão como `conectado`, `atenção`, `expirado`, `revogado` ou `erro`.
 
 Dados:
 
@@ -504,9 +508,9 @@ correto; o mesmo cliente pode ter duas conversas e um único lead da loja.
       `/app/control/dashboard`).
 - [x] Onboardings e requisitos pendentes (`pending_readiness` com failing codes).
 - [x] Saúde de integrações por loja (pixel/meta_ads/google_status/whatsapp stub).
-- [ ] Módulos contratados e falhas de integração (detalhe rico além do stub).
-- [ ] Gestor Responsável por loja no card do dashboard.
-- [ ] Alterações recentes (trilha de auditoria no painel).
+- [x] Módulos contratados e falhas de integração (detalhe rico além do stub).
+- [x] Gestor Responsável por loja no card do dashboard.
+- [x] Alterações recentes (trilha de auditoria no painel).
 
 Usuários e números ficam no detalhe da loja, não como cards do dashboard.
 
