@@ -2,8 +2,8 @@
 
 Use este arquivo como mapa antes de abrir codigo grande. O estado atual do produto fica em
 `docs/contexto-compacto.md`; o checkpoint operacional, em `docs/handoff-contexto.md`; e os
-planos validos, em `docs/plans/README.md`. Ignore `docs/plans/_archive/` e nao implemente a
-partir de `docs/design.md`.
+planos validos, em `docs/plans/README.md`. Ignore `docs/plans/_archive/`; para Control e
+Loja, consulte tambem `docs/design/2026-07-30-revy-control-loja-asbuilt-e-melhorias.md`.
 
 ## Como explorar com poucos tokens
 

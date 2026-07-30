@@ -28,6 +28,14 @@
 **/.ruff_cache
 **/node_modules
 
+# Local analysis, scratch and generated manuals
+graphify-out
+graphify-out/**
+tmp
+tmp/**
+output
+output/**
+
 # Tests (not COPYed by Dockerfile.app)
 **/tests
 

@@ -8,22 +8,20 @@ Parcelas, taxas e bancos não são enviados automaticamente ao cliente.
 > **Ambiente:** local (dev) **ou** Fly consolidado — ver [`deploy/fly/3vm/README.md`](deploy/fly/3vm/README.md).  
 > **Estado canônico:** [`docs/contexto-compacto.md`](docs/contexto-compacto.md) · planos
 > [`docs/plans/README.md`](docs/plans/README.md) · go-live WA [`docs/go-live-chatbot.md`](docs/go-live-chatbot.md).  
-> `docs/design.md` = pesquisa **histórica** — **não** implementar a partir dele.
+> **As-built Control/Loja:** [`docs/design/2026-07-30-revy-control-loja-asbuilt-e-melhorias.md`](docs/design/2026-07-30-revy-control-loja-asbuilt-e-melhorias.md).
 
 ### Estado atual do Revy Control
 
 > **Agentes e manutencao:** comece por [`CLAUDE.md`](CLAUDE.md) para o mapa dos sete produtos,
 > acoplamentos HTTP, arquivos certos e comandos de teste/deploy com baixo uso de contexto.
 
-Fases 0–2 em corte local **parcial/avançado**: domínio, migrations e APIs de Loja/RBAC,
-Pessoas/cargos/acessos, módulos Vendas/Estoque, contrato, versão monotônica e reativação
-explícita `suspensa → ativa`; o JSON padrão continua sem `versao`. O
-[ADR 0001](docs/adr/0001-suspensao-distribuida.md) define a suspensão distribuída e
-o primeiro snapshot operacional versionado de Loja/Vendas/Estoque já existe.
-`revy-trafego` tem **211 testes passando**. A UI base já navega da lista ao detalhe,
-mostra versão, módulos e contrato e permite configurar os módulos e o contrato por
-Loja. Rebrand, entrega das projeções, gates nos destinos, rollout/migrations no lab e
-deploy do Control ainda não estão concluídos.
+O corte lean está implementado no código: **Control F0–F6** e **Loja F0–F6 + F8**,
+com shells, RBAC, projeções, Vendas/Estoque, Atendimento, Multibanco e contratos.
+As flags continuam desligadas por padrão para permitir cutover gradual. Restam tarefas
+operacionais de lab — rollout, credenciais Google, E2E Evolution/multi-WhatsApp e
+smokes bancários. Seller AI (F7) segue explicitamente adiado. Consulte o
+[as-built atual](docs/design/2026-07-30-revy-control-loja-asbuilt-e-melhorias.md)
+antes de reabrir trabalho já entregue.
 
 ---
 
@@ -269,4 +267,4 @@ ser aplicada por RBAC no backend, não apenas ocultando ou exibindo itens de men
   - [Plano #4A — Estoque](docs/plans/2026-07-11-plano4a-estoque-api-independente.md)
   - [Plano #5A — Catálogo](docs/plans/2026-07-11-plano5a-catalogo-publico-independente.md)
   - [Plano #6 — Roadmap](docs/plans/2026-07-11-plano6-evolucoes-roadmap.md)
-- **[docs/design.md](docs/design.md)** — pesquisa e decisões longas (não é ordem de implementação).
+- **[As-built Control/Loja](docs/design/2026-07-30-revy-control-loja-asbuilt-e-melhorias.md)** — estado real, gaps e próximos incrementos.

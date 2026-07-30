@@ -3,7 +3,7 @@
 ## Como usar (agentes)
 
 1. `docs/contexto-compacto.md` — estado atual, **eixos de prioridade** e regras (**sempre primeiro**).
-2. `docs/handoff-contexto.md` — só o **checkpoint do topo** (seções antigas = histórico).
+2. `docs/handoff-contexto.md` — checkpoint operacional atual e conciso.
 3. Para evolução de produto, ler primeiro **Revy Control (6.5)** e **Revy Loja (6.6)**;
    planos DONE explicam o código atual, mas não redefinem as fronteiras futuras.
 4. **Somente planos desta pasta com Status ≠ SUPERSEDED/DONE checklist** (não `_archive/`).
@@ -12,8 +12,6 @@
 **Não** usar como fonte de verdade de implementação atual:
 
 - `docs/plans/_archive/` (LEGADO / checklists DONE)
-- `docs/design.md` e trechos antigos do `README.md` raiz (pesquisa/histórico; podem citar
-  consentimento obrigatório, renda/prazo e RPA-only — **superados** por este índice + #1A/#2A/#4A)
 - `docs/superpowers/plans/` como fila principal (são planos auxiliares/históricos);
   `docs/superpowers/specs/` continua válido quando o plano canônico o referencia
 
@@ -36,7 +34,7 @@ Cada plano `*A`/`*B` tem bloco **Status** no topo: leia antes de reimplementar.
 | 6.2b | [CTWA atribuição + CAPI messaging](2026-07-22-plano-ctwa-atribuicao-capi-messaging.md) | Click-to-WhatsApp no CRM, match campanha, Purchase messaging | **MVP CÓDIGO** — lead CTWA + match + CAPI messaging; residual E2E lab Evolution |
 | 6.2c | [Meta spend API (gasto automático)](2026-07-22-plano-meta-spend-api.md) | Puxar `spend` do Ads via Marketing API → `CampanhaGasto` | **MVP + job 24h** — botão + thread + `/internal/jobs/meta-spend-sync`; residual OAuth / App Review |
 | 6.3 | [Multi-WhatsApp por vendedor](2026-07-22-plano-multi-whatsapp-vendedores-campanhas.md) | Proposta histórica de canais por vendedor | **SUPERSEDED** pelo Revy Control; não implementar |
-| 6.4 | [Revy Tráfego × Portal loja](2026-07-28-plano-revy-trafego-separacao.md) | App gestor multi-loja + slim resultados no portal | **FASE 3 pronta**: banco próprio, projeção de vendas e outbox; deploy/cutover registrado no handoff |
+| 6.4 | [Revy Tráfego × Portal loja](2026-07-28-plano-revy-trafego-separacao.md) | App gestor multi-loja + slim resultados no portal | **FASE 3 pronta**: banco próprio, projeção de vendas e outbox; arquitetura no as-built e operação em `deploy/fly/3vm/` |
 | 6.5 | [Revy Control](2026-07-29-plano-revy-control.md) | Lojas, RBAC, módulos, Google Ads, integrações, auditoria e Multi-WhatsApp | **CÓDIGO PRODUTO COMPLETE** — workers outbox/métricas Google, reconcile status, HTTP adapters, UI/API aquisição, multi-WA n8n; residual = GCP humano + lab F7/E2E |
 | 6.6 | [Revy Loja](2026-07-29-plano-revy-loja.md) | Portal → Vendas + Estoque; Atendimento, Chatbot, Multibanco e Seller AI | **CÓDIGO F0–F6+F8 COMPLETE (lean)** — shell, overviews, atendimento multi-canal, equipe, bancos, fixtures contratos; **F7 Seller AI deferred**; residual = lab ops only |
 | 6+ | [Plano #6](2026-07-11-plano6-evolucoes-roadmap.md) | Roadmap histórico de ideias | Entregas antigas continuam válidas; itens ainda “ativos” exigem revalidação em Control/Loja |

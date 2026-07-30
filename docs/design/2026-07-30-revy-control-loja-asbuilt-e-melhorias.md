@@ -114,7 +114,8 @@ Routers:
 - `portal-gestao/app/web/loja_estoque.py` — `/app/loja/estoque*`
 - `portal-gestao/app/loja/routes.py` — `/app/loja/atendimento*`
 - Middleware `revy_loja_legacy_redirects` em `main.py`
-- **`main.py` continua dono** de leads/conversas/vendas/estoque/simulações/equipe legados
+- **`main.py` continua dono** de auth/dashboard e blocos legados de leads, conversas,
+  vendas, estoque e financeiro; simulações, metas, equipe e tráfego já têm routers próprios
 
 ### 2.4 Chatbot vs Control vs Loja (ownership)
 
@@ -227,7 +228,9 @@ Ordem de enablement Loja (canônica): shell → entitlements (após projeção e
    Gap de clareza de produto: UI nem sempre separa visualmente “bloqueia ativação” vs “pendência de operação”.
 
 10. **main.py ainda grande**  
-    Planos pediam main só montagem; as-built extraiu Control/Loja shell mas **não** esvaziou tráfego/portal legado.
+    O Portal caiu de cerca de 4.627 para 2.230 linhas ao extrair simulações, metas,
+    equipe e tráfego. Ainda concentra auth/dashboard, estoque, leads, conversas,
+    vendas e financeiro; a separação deve continuar em incrementos mecânicos.
 
 11. **Fase 0 inventário lab**  
     Mapa slug real lab, colisões e fixtures Evolution mascaradas ainda abertos no plano Control (bloqueiam ativação remota segura, não o código).
@@ -376,7 +379,7 @@ UI alvo: badges distintos (`Bloqueio` / `Alerta` / `Operação` / `Integração`
 2. **Documentar e versionar contratos** de provisioning e venda em artefato único (não só fixtures soltas).  
 3. **Identidade Loja: caminho B→D** (membership multi-loja real na sessão sem depender só de `Usuario.papel`).  
 4. **Atendimento: deep-link simulação + venda no workspace** (fechar residual F4).  
-5. **Extrair tráfego de `main.py`** para routers `app/web/trafego.py` (simetria com Control).  
+5. **Continuar a extração do Portal** por vendas/leads/conversas, mantendo os paths atuais.
 6. **Readiness UI** com classes Required/Alert/Ops.  
 7. **Checklist de secrets Google** no runbook F7 (ops) separado do “código complete”.  
 8. **Telemetria de flags** (qual loja/piloto com shell/entitlements/atendimento) antes de remover menus legados.  
@@ -437,8 +440,9 @@ Ordem pensada para **risco baixo** e valor de clareza/produto. Cada PR deve mant
 **Escopo:** garantir preservação gclid/gbraid/wbraid Catálogo→Chatbot→Portal outbox→Control Google outbox; testes de contrato.  
 **Gate:** unit + se possível lab.
 
-### PR-7 — Extrair tráfego de `revy-trafego/app/main.py`  
-**Escopo:** `app/web/trafego_*.py` routers; main só montagem/lifespan/auth.  
+### PR-7 — Consolidar os routers de tráfego já extraídos
+**Escopo:** revisar fronteiras de `app/web/trafego.py`, montagem/lifespan/auth e remover
+somente duplicações comprovadas após telemetria.
 **Gate:** diff mecânico + suite revy-trafego.
 
 ### PR-8 — Extrair blocos legados de `portal-gestao/app/main.py` (fase 1)  
