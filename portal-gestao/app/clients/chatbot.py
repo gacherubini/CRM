@@ -168,7 +168,7 @@ class ChatbotClient:
         )
         return dados["mensagens"]
 
-def obter_estado(
+    def obter_estado(
         self,
         telefone: str,
         *,

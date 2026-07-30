@@ -1,6 +1,6 @@
 # Plano — Evolução do Portal para Revy Loja
 
-**Status:** CÓDIGO F0–F6 + F8 COMPLETE (lean) — shell, overviews, atendimento multi-canal, equipe read-only, bancos, Evolution send, redirects, fixtures de contratos; flags default OFF. **F7 Seller AI deferred.** Residual = lab ops only (backup drill F0, piloto E2E F8).
+**Status:** CÓDIGO F0–F6 + F8 COMPLETE (lean) — shell, overviews, atendimento multi-canal (histórico/handoff/etapa por canal), equipe read-only, auditoria handoff/bancos, Evolution send, redirects, fixtures; flags default OFF. **F7 Seller AI deferred.** Residual = lab ops only (backup drill F0, piloto E2E F8).
 **Data:** 2026-07-29
 **Spec:** [`docs/superpowers/specs/2026-07-29-revy-loja-design.md`](../superpowers/specs/2026-07-29-revy-loja-design.md)
 **Depende por gates de:** [`Plano Revy Control`](2026-07-29-plano-revy-control.md) —
