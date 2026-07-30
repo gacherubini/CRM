@@ -24,6 +24,14 @@ def revy_loja_atendimento_enabled() -> bool:
     return _env_bool("REVY_LOJA_ATENDIMENTO_ENABLED", "0")
 
 
+def revy_loja_whatsapp_enabled() -> bool:
+    """Tela de números de WhatsApp em Ajustes da Loja. Default off.
+
+    Só age com ``REVY_LOJA_SHELL_ENABLED=1`` (gate duplo nas rotas).
+    """
+    return _env_bool("REVY_LOJA_WHATSAPP_ENABLED", "0")
+
+
 def revy_loja_redirect_legacy_enabled() -> bool:
     """Redirects 303 de rotas legadas → shell Loja (F8 cutover). Default off.
 
@@ -114,6 +122,7 @@ class Settings:
     revy_loja_atendimento_enabled: bool = _env_bool(
         "REVY_LOJA_ATENDIMENTO_ENABLED", "0"
     )
+    revy_loja_whatsapp_enabled: bool = _env_bool("REVY_LOJA_WHATSAPP_ENABLED", "0")
     revy_loja_redirect_legacy_enabled: bool = _env_bool(
         "REVY_LOJA_REDIRECT_LEGACY", "0"
     )

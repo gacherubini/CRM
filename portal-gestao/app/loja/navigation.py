@@ -1,6 +1,7 @@
 """Navegação permitida do shell Revy Loja (somente Vendas e Estoque)."""
 from __future__ import annotations
 
+from app.config import revy_loja_whatsapp_enabled
 from app.loja.types import (
     ROLES_GESTAO,
     ROLES_OPERACIONAIS,
@@ -17,14 +18,22 @@ def build_nav(
     entitlements: EntitlementState,
     *,
     shell_enabled: bool = True,
+    whatsapp_enabled: bool | None = None,
 ) -> tuple[NavSection, ...]:
     """Produz seções de navegação conforme contrato e cargos.
 
     Com shell desligado o chamador não deve usar este resultado (UI legada).
-    Não inclui Meta/Google/WhatsApp nem configurações técnicas.
+    Inclui os números de WhatsApp em Ajustes (dono/gerente) quando a flag está
+    ligada. Não inclui Meta nem Google — configuração de tráfego é do Control.
+
+    ``whatsapp_enabled=None`` consulta a flag em runtime; passar o booleano
+    explicitamente mantém a função pura (usado nos testes de navegação).
     """
     if not shell_enabled:
         return ()
+
+    if whatsapp_enabled is None:
+        whatsapp_enabled = revy_loja_whatsapp_enabled()
 
     roles = store.roles & ROLES_OPERACIONAIS
     if not roles:
@@ -90,6 +99,16 @@ def build_nav(
                     section="Ajustes",
                     module=None,
                     active_prefix="/app/financeiras",
+                )
+            )
+        if whatsapp_enabled:
+            ajustes.append(
+                NavItem(
+                    label="Números de WhatsApp",
+                    href="/app/loja/whatsapp",
+                    section="Ajustes",
+                    module=None,
+                    active_prefix="/app/loja/whatsapp",
                 )
             )
         ajustes.append(
