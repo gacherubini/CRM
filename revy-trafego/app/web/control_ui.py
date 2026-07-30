@@ -123,6 +123,11 @@ def dashboard_page(
     integration_by_store = {
         item.store_id: item for item in overview.integrations
     }
+    google_by_store = None
+    if settings.google_ads_sync_enabled:
+        from app.web.control import _dashboard_google_by_store
+
+        google_by_store = _dashboard_google_by_store(overview)
     return templates.TemplateResponse(
         request=request,
         name="control/dashboard.html",
@@ -133,9 +138,11 @@ def dashboard_page(
             "control_enabled": settings.revy_control_enabled,
             "control_rbac_enabled": settings.revy_control_rbac_enabled,
             "control_dashboard_enabled": True,
+            "google_ads_sync_enabled": settings.google_ads_sync_enabled,
             "items": items,
             "overview": overview,
             "integration_by_store": integration_by_store,
+            "google_by_store": google_by_store,
         },
     )
 

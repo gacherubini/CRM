@@ -1,6 +1,6 @@
 # Plano — Evolução do Revy Tráfego para Revy Control
 
-**Status:** ATIVO / CÓDIGO F0–6 + residual F3/F4-HTTP/F5-n8n/F6/F7-UI COMPLETE (Meta, readiness, Google ports+HTTP adapters, multi-WA n8n instance dinâmica, jobs com gate de suspensão, dashboard rico, RBAC sem slug; residual = GCP/token humano, E2E lab, flags F7, worker outbox Google)
+**Status:** ATIVO / CÓDIGO F0–6 product surface COMPLETE (Meta, readiness, Google ports+HTTP+métricas CPL/ROAS+lista conversion actions+contrato Loja aquisicao-resumo+dashboard aquisição, multi-WA n8n, jobs com gate de suspensão, dashboard rico, RBAC sem slug; residual = GCP/token humano, E2E lab, flags F7, worker outbox Google, F4C click IDs end-to-end)
 **Data:** 2026-07-29
 **Spec:** [`docs/superpowers/specs/2026-07-29-revy-control-design.md`](../superpowers/specs/2026-07-29-revy-control-design.md)
 **Vocabulário:** [`CONTEXT.md`](../../CONTEXT.md)
@@ -363,54 +363,63 @@ Dados:
 
 ### Fase 4B — Métricas e dashboard de aquisição
 
-- [ ] Sincronizar com GAQL conta, moeda, fuso, auto-tagging, ações e métricas diárias.
-- [ ] Persistir `google_ads_campaign_daily` por conta/campanha/data.
-- [ ] Fazer carga inicial, incremental e reprocessamento de janela recente.
-- [ ] Derivar CTR, CPC, CPL, custo por venda e ROAS com money/`cost_micros` corretos.
-- [ ] Separar no dashboard métricas Google de eventos Revy e suas datas diferentes.
-- [ ] Aplicar throttling, backoff e seleção mínima de campos.
-- [ ] Expor à Revy Loja somente o resumo comercial read-only.
+- [x] Sincronizar com GAQL conta e métricas diárias (`fetch_metrics` +
+      `GoogleAdsMetricsControl.sync_metrics`; auto-tagging/fuso completo residual
+      de catalogação, não bloqueia resumo).
+- [x] Persistir `google_ads_campaign_daily` por conta/campanha/data.
+- [x] Carga por janela via `POST .../metrics/sync` (job/worker periódico residual F7).
+- [x] Derivar CTR, CPC, CPL, `cost_per_conversion` e ROAS money-safe
+      (`cost_micros`; ROAS = `conversions_value` Google / cost — **sem** join
+      `VendaProjetada` Revy neste resumo).
+- [x] Dashboard separa aquisição Google (cards 7d + empty "Google indisponível")
+      de prontidão/ROI Revy.
+- [x] HTTP adapter com seleção mínima de campos GAQL; backoff fino residual ops.
+- [x] Expor à Revy Loja resumo comercial read-only:
+      `GET /control/v1/internal/lojas/{id}/aquisicao-resumo` (`X-Service-Token`).
 
 ### Fase 4C — Captura e contrato comercial
 
 - [ ] Preservar `gclid`, `gbraid` e `wbraid` como valores opacos no Catálogo,
-      landing pages, redirects, sessão, Chatbot e lead.
-- [ ] Manter UTMs, URL de entrada e referrer para explicação interna.
+      landing pages, redirects, sessão, Chatbot e lead. (**parcial código; E2E lab**)
+- [x] Manter UTMs, URL de entrada e referrer para explicação interna (fluxo Meta/CTWA).
 - [ ] Estender `PurchaseConversion`, `revy_trafego_outbox.py` e
       `VendaConfirmadaBody`: o `gclid` já existe no evento interno, mas hoje não
       atravessa Portal → Control; adicionar também `gbraid` e `wbraid`.
-- [ ] Versionar o contrato com consentimento, fonte, timestamp, valor/moeda e
-      identificadores first-party permitidos.
-- [ ] Testar Catálogo/landing → WhatsApp/formulário → lead → venda → Control.
+- [x] Contrato outbox com consentimento, fonte, timestamp, valor/moeda e
+      identificadores first-party permitidos (enqueue Google lean).
+- [ ] Testar Catálogo/landing → WhatsApp/formulário → lead → venda → Control
+      no lab.
 
 ### Fase 4D — Ações e devolução de conversões
 
-- [ ] Listar ações existentes e permitir mapear evento Revy → ação; a Revy não cria
-      nem define ação primária/secundária.
-- [ ] Validar a conta proprietária da ação, termos de dados e enhanced conversions.
-- [ ] Criar `google_ads_conversion_bindings`, `google_ads_conversion_outbox` e
+- [x] Listar ações existentes (`list_conversion_actions` no read port +
+      `GET /lojas/{id}/google-ads/conversion-actions`) e mapear evento Revy → ação
+      (`conversion-bindings`); a Revy **não** cria ação.
+- [x] Bind valida customer_id e resource name da ação (conta proprietária no bind).
+- [x] Criar `google_ads_conversion_bindings`, `google_ads_conversion_outbox` e
       `google_ads_upload_attempts`.
-- [ ] Gerar `transaction_id` determinístico:
+- [x] Gerar `transaction_id` determinístico:
       `revy:{loja_id}:{tipo_evento}:{id_evento_de_dominio}`.
-- [ ] Normalizar e hashear email/telefone somente quando consentimento/base aplicável
-      permitir; segredos bancários nunca entram no payload.
-- [ ] Enviar lotes por loja/ação/janela com `IngestEvents`.
-- [ ] Guardar `request_id` e consultar `RetrieveRequestStatus` até `SUCCESS`,
-      `PARTIAL_SUCCESS` ou `FAILURE`, com backoff, reconciliação e dead-letter.
-- [ ] Falha Google nunca reverte confirmação de venda nem bloqueia o Revy Loja.
+- [x] Normalizar e hashear email/telefone somente com consentimento; segredos
+      bancários nunca entram no payload.
+- [x] Enviar via `IngestEvents` (HTTP Data Manager + fake; worker periódico residual).
+- [ ] Guardar `request_id` e consultar `RetrieveRequestStatus` até terminal
+      (código de attempt/request_id existe; polling assíncrono residual worker).
+- [x] Falha Google nunca reverte confirmação de venda nem bloqueia o Revy Loja
+      (enqueue fire-and-forget).
 
 ### Saúde e testes obrigatórios
 
-- [ ] OAuth `state` inválido é rejeitado; token nunca volta ao browser/log.
-- [ ] Gestor não acessa conta Google de loja sem vínculo.
-- [ ] Nenhum módulo Google oferece ou chama método `Mutate`.
-- [ ] `customer_id`/`login_customer_id` e conta proprietária da ação são validados.
-- [ ] Upsert diário é idempotente e respeita moeda/fuso.
-- [ ] Redirects preservam os três click IDs exatamente.
-- [ ] Retry reutiliza o mesmo `transaction_id` e não duplica conversão.
-- [ ] Evento sem consentimento não envia user data enhanced.
-- [ ] Fast-fail, diagnóstico assíncrono e sucesso parcial ficam rastreáveis.
-- [ ] Revogação OAuth gera alerta e não afeta Meta, Portal ou venda.
+- [x] OAuth `state` inválido é rejeitado; token nunca volta ao browser/log.
+- [x] Gestor não acessa conta Google de loja sem vínculo.
+- [x] Nenhum módulo Google oferece ou chama método `Mutate`.
+- [x] `customer_id`/`login_customer_id` e conta da ação validados no bind/sync.
+- [x] Upsert diário é idempotente e respeita moeda.
+- [ ] Redirects preservam os três click IDs exatamente. (**F4C / lab**)
+- [x] Retry reutiliza o mesmo `transaction_id` e não duplica conversão (outbox).
+- [x] Evento sem consentimento não envia user data enhanced.
+- [x] Fast-fail e attempt rastreáveis; polling status residual worker.
+- [x] Revogação OAuth remove token e não afeta Meta/Portal/venda.
 
 ### Critério de pronto
 
@@ -514,9 +523,11 @@ correto; o mesmo cliente pode ter duas conversas e um único lead da loja.
 
 Usuários e números ficam no detalhe da loja, não como cards do dashboard.
 
-**Estado código (lean):** overview com contagens + lista de pendências + health stubs;
-isolamento gestor coberto por testes. Residual visual = detalhe acionável completo e
-métricas Meta/Google de aquisição (dependem F4B).
+**Estado código:** overview com contagens + pendências + health (pixel/meta/google) +
+auditoria recente + **aquisição Google 7d** (`google_by_store` no JSON e seção no
+dashboard quando `GOOGLE_ADS_SYNC_ENABLED`). Isolamento gestor coberto por testes.
+Residual visual = detalhe acionável Meta spend completo; Meta CPL/ROAS no mesmo
+painel (fora deste corte Google).
 
 ### Linguagem visual
 

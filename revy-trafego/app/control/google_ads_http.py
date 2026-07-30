@@ -19,6 +19,7 @@ from app.control.google_ads import (
     FakeGoogleAdsTokenExchanger,
     FakeGoogleDataManagerPort,
     GoogleAdsAccount,
+    GoogleAdsConversionAction,
     GoogleAdsMetricRow,
     GoogleAdsTokenExchangeError,
     GoogleDataManagerIngestResult,
@@ -365,6 +366,70 @@ class HttpGoogleAdsReadPort:
                         metrics.get("conversionsValue")
                         or metrics.get("conversions_value")
                     ),
+                )
+            )
+        return tuple(out)
+
+    def list_conversion_actions(
+        self,
+        *,
+        refresh_token: str,
+        customer_id: str,
+        login_customer_id: str | None,
+    ) -> Sequence[GoogleAdsConversionAction]:
+        """Lista conversion actions da conta (somente leitura; sem Mutate)."""
+        cid = _normalize_customer_id(customer_id) or customer_id
+        login = _normalize_customer_id(login_customer_id)
+        access = self._access_token(refresh_token)
+        query = (
+            "SELECT "
+            "conversion_action.resource_name, "
+            "conversion_action.id, "
+            "conversion_action.name, "
+            "conversion_action.type, "
+            "conversion_action.status, "
+            "conversion_action.category, "
+            "conversion_action.primary_for_goal "
+            "FROM conversion_action "
+            "WHERE conversion_action.status != 'REMOVED'"
+        )
+        rows_raw = self._search(
+            access_token=access,
+            customer_id=cid,
+            login_customer_id=login,
+            query=query,
+        )
+        out: list[GoogleAdsConversionAction] = []
+        for item in rows_raw:
+            action = item.get("conversionAction") or item.get("conversion_action") or {}
+            resource = str(
+                action.get("resourceName") or action.get("resource_name") or ""
+            ).strip()
+            action_id = str(action.get("id") or "").strip()
+            name = str(action.get("name") or "").strip()
+            if not resource and action_id:
+                resource = f"customers/{cid}/conversionActions/{action_id}"
+            if not resource and not action_id:
+                continue
+            if not action_id and resource:
+                action_id = _conversion_action_product_id(resource)
+            primary = action.get("primaryForGoal")
+            if primary is None:
+                primary = action.get("primary_for_goal")
+            primary_bool: bool | None
+            if primary is None:
+                primary_bool = None
+            else:
+                primary_bool = bool(primary)
+            out.append(
+                GoogleAdsConversionAction(
+                    resource_name=resource,
+                    id=action_id or resource,
+                    name=name or action_id or resource,
+                    type=_optional_str(action.get("type")),
+                    status=_optional_str(action.get("status")),
+                    category=_optional_str(action.get("category")),
+                    primary_for_goal=primary_bool,
                 )
             )
         return tuple(out)
@@ -1172,6 +1237,13 @@ def _as_int(value: Any) -> int:
             return 0
 
 
+def _optional_str(value: Any) -> str | None:
+    if value is None:
+        return None
+    text = str(value).strip()
+    return text or None
+
+
 def _as_float(value: Any) -> float:
     if value is None or value == "":
         return 0.0
@@ -1179,10 +1251,3 @@ def _as_float(value: Any) -> float:
         return float(value)
     except (TypeError, ValueError):
         return 0.0
-
-
-def _optional_str(value: Any) -> str | None:
-    if value is None:
-        return None
-    text = str(value).strip()
-    return text or None

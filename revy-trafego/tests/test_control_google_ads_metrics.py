@@ -15,16 +15,20 @@ from app.control.google_ads import (
     GOOGLE_ADS_SCOPES,
     GoogleAdsAccount as AccountDTO,
     GoogleAdsConnectionControl,
+    GoogleAdsConversionAction,
     GoogleAdsMetricRow,
     OAuthTokenBundle,
 )
 from app.control.google_ads_metrics import (
     GoogleAdsManagerAccountNotSelectable,
     GoogleAdsMetricsControl,
+    compute_cpl,
     compute_cpc,
     compute_ctr,
+    compute_roas,
     cost_from_micros,
 )
+from app import config as config_mod
 from app.control.stores import StoreControl
 from app.control.types import (
     AccessDenied,
@@ -38,6 +42,7 @@ from app.models import (
     GestorRevy,
     GoogleAdsAccount,
     GoogleAdsCampaignDaily,
+    GoogleAdsConnection,
     VinculoTrafego,
 )
 from app.web import control as control_mod
@@ -105,6 +110,15 @@ def test_cost_micros_math_money_safe():
     assert compute_ctr(0, 1) is None
     assert compute_cpc(1_500_000, 2) == Decimal("0.75")
     assert compute_cpc(1_000_000, 0) is None
+    # CPL = cost / conversions Google
+    assert compute_cpl(3_000_000, Decimal("2")) == Decimal("1.50")
+    assert compute_cpl(1_000_000, 0) is None
+    assert compute_cpl(1_000_000, Decimal("0")) is None
+    # ROAS = conversions_value / cost (Google only)
+    assert compute_roas(2_000_000, Decimal("10")) == Decimal("5.00")
+    assert compute_roas(0, Decimal("10")) is None
+    assert compute_roas(1_000_000, Decimal("0")) is None
+    assert compute_roas(1_000_000, 0) is None
 
 
 def test_sync_accounts_e_select_rejeita_manager():
@@ -247,6 +261,12 @@ def test_sync_metrics_upsert_idempotent():
     assert summary.cost_micros == 3_000_000
     assert summary.ctr == Decimal("0.2000")
     assert summary.cpc == Decimal("0.75")
+    assert summary.conversions == Decimal("2.0")
+    assert summary.conversions_value == Decimal("200.0")
+    # cost 3.00 / 2 conv = 1.50; value 200 / cost 3 = 66.67
+    assert summary.cpl == Decimal("1.50")
+    assert summary.cost_per_conversion == Decimal("1.50")
+    assert summary.roas == Decimal("66.67")
 
 
 def test_colaborador_le_metricas_mas_nao_sincroniza():
@@ -441,6 +461,9 @@ def test_http_metrics_summary_sem_secrets(client, monkeypatch):
     assert body["impressions"] == 100
     assert body["cost"] == "2.50"
     assert body["cost_micros"] == 2_500_000
+    assert body["cpl"] == "2.50"  # 2.50 / 1 conv
+    assert body["cost_per_conversion"] == "2.50"
+    assert body["roas"] == "20.00"  # 50 / 2.50
     assert "refresh_token" not in str(body).lower()
     assert "ciphertext" not in str(body).lower()
     assert "secret" not in str(body).lower()
@@ -448,3 +471,213 @@ def test_http_metrics_summary_sem_secrets(client, monkeypatch):
     accounts = client.get(f"/control/v1/lojas/{loja_id}/google-ads/accounts")
     assert accounts.status_code == 200
     assert "items" in accounts.json()
+
+
+def test_list_conversion_actions_fake_port_e_http():
+    loja_id = _create_store("loja-metrics-conv-actions")
+    _connect_store(loja_id, customer_id="1112223333")
+    admin = _admin_actor()
+    actions = [
+        GoogleAdsConversionAction(
+            resource_name="customers/1112223333/conversionActions/7",
+            id="7",
+            name="Compra",
+            type="UPLOAD_CLICKS",
+            status="ENABLED",
+            category="PURCHASE",
+            primary_for_goal=True,
+        )
+    ]
+    port = FakeGoogleAdsReadPort(
+        accounts=[
+            AccountDTO(
+                customer_id="1112223333",
+                descriptive_name="Anunciante",
+                is_manager=False,
+                currency_code="BRL",
+            )
+        ],
+        conversion_actions=actions,
+    )
+    control = _metrics_control(port)
+    control.sync_accounts(admin, StoreRef(id=loja_id))
+    control.select_account(admin, StoreRef(id=loja_id), "1112223333")
+
+    listed = control.list_conversion_actions(admin, StoreRef(id=loja_id))
+    assert len(listed) == 1
+    assert listed[0].resource_name.endswith("/conversionActions/7")
+    assert listed[0].name == "Compra"
+    assert port.list_conversion_actions_calls
+    assert port.list_conversion_actions_calls[0]["customer_id"] == "1112223333"
+
+
+def test_http_conversion_actions_endpoint(client, monkeypatch):
+    _enable_flags(monkeypatch)
+    _login_admin(client)
+    created = client.post(
+        "/control/v1/lojas",
+        json={"nome": "Loja Conv Actions", "slug": "loja-http-conv-actions"},
+    )
+    assert created.status_code == 201
+    loja_id = created.json()["id"]
+
+    start = client.post(f"/control/v1/lojas/{loja_id}/google-ads/oauth/start")
+    assert start.status_code == 200
+    cb = client.get(
+        "/control/v1/google-ads/oauth/callback",
+        params={"state": start.json()["state"], "code": "c"},
+    )
+    assert cb.status_code == 200
+
+    # fake port default tem conversion_actions vazio — list retorna items []
+    with SessionLocal() as db:
+        conn = (
+            db.query(GoogleAdsConnection)
+            .filter(GoogleAdsConnection.loja_id == loja_id)
+            .one()
+        )
+        conn.customer_id = "1112223333"
+        row = (
+            db.query(GoogleAdsAccount)
+            .filter(GoogleAdsAccount.loja_id == loja_id)
+            .first()
+        )
+        if row is None:
+            db.add(
+                GoogleAdsAccount(
+                    loja_id=loja_id,
+                    customer_id="1112223333",
+                    is_manager=False,
+                    selected=True,
+                    status="ativo",
+                )
+            )
+        else:
+            row.selected = True
+            row.is_manager = False
+        db.commit()
+
+    response = client.get(
+        f"/control/v1/lojas/{loja_id}/google-ads/conversion-actions"
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert "items" in body
+    assert isinstance(body["items"], list)
+
+
+def test_service_aquisicao_resumo(client, monkeypatch):
+    _enable_flags(monkeypatch)
+    token = "svc-aquisicao-tok"
+    monkeypatch.setattr(
+        config_mod,
+        "settings",
+        replace(config_mod.settings, service_token=token),
+    )
+    monkeypatch.setattr(
+        control_mod,
+        "settings",
+        replace(
+            settings,
+            revy_control_enabled=True,
+            google_ads_sync_enabled=True,
+            service_token=token,
+            google_ads_oauth_client_id="http-client-id",
+            google_ads_oauth_client_secret="http-client-secret",
+            google_ads_oauth_redirect_uri=(
+                "https://control.revy.test/control/v1/google-ads/oauth/callback"
+            ),
+        ),
+    )
+    headers = {"X-Service-Token": token}
+
+    # sem token
+    r = client.get(
+        "/control/v1/internal/lojas/x/aquisicao-resumo",
+        params={"date_from": "2026-07-01", "date_to": "2026-07-31"},
+    )
+    assert r.status_code == 401
+
+    # loja inexistente
+    missing = client.get(
+        "/control/v1/internal/lojas/nao-existe/aquisicao-resumo",
+        params={"date_from": "2026-07-01", "date_to": "2026-07-31"},
+        headers=headers,
+    )
+    assert missing.status_code == 404
+
+    _login_admin(client)
+    created = client.post(
+        "/control/v1/lojas",
+        json={"nome": "Loja Aquisicao", "slug": "loja-aquisicao-svc"},
+    )
+    assert created.status_code == 201
+    loja_id = created.json()["id"]
+
+    # sem Google: disponivel false, sem inventar zeros
+    empty = client.get(
+        f"/control/v1/internal/lojas/{loja_id}/aquisicao-resumo",
+        params={"date_from": "2026-07-01", "date_to": "2026-07-31"},
+        headers=headers,
+    )
+    assert empty.status_code == 200
+    body = empty.json()
+    assert body["loja_id"] == loja_id
+    assert body["google_disponivel"] is False
+    assert body["google"] is None
+    assert "refresh_token" not in str(body).lower()
+
+    # conecta + seed métricas
+    start = client.post(f"/control/v1/lojas/{loja_id}/google-ads/oauth/start")
+    assert start.status_code == 200
+    cb = client.get(
+        "/control/v1/google-ads/oauth/callback",
+        params={"state": start.json()["state"], "code": "c"},
+    )
+    assert cb.status_code == 200
+
+    with SessionLocal() as db:
+        conn = (
+            db.query(GoogleAdsConnection)
+            .filter(GoogleAdsConnection.loja_id == loja_id)
+            .one()
+        )
+        conn.customer_id = "1112223333"
+        db.add(
+            GoogleAdsCampaignDaily(
+                loja_id=loja_id,
+                customer_id="1112223333",
+                campaign_id="c1",
+                date=datetime(2026, 7, 5).date(),
+                impressions=200,
+                clicks=20,
+                cost_micros=4_000_000,
+                conversions=Decimal("2"),
+                conversions_value=Decimal("80"),
+                currency_code="BRL",
+            )
+        )
+        acct = (
+            db.query(GoogleAdsAccount)
+            .filter(GoogleAdsAccount.loja_id == loja_id)
+            .first()
+        )
+        if acct is not None:
+            acct.selected = True
+            acct.is_manager = False
+        db.commit()
+
+    ok = client.get(
+        f"/control/v1/internal/lojas/{loja_id}/aquisicao-resumo",
+        params={"date_from": "2026-07-01", "date_to": "2026-07-31"},
+        headers=headers,
+    )
+    assert ok.status_code == 200
+    payload = ok.json()
+    assert payload["google_disponivel"] is True
+    assert payload["google"] is not None
+    assert payload["google"]["cost"] == "4.00"
+    assert payload["google"]["cpl"] == "2.00"
+    assert payload["google"]["roas"] == "20.00"
+    assert "secret" not in str(payload).lower()
+    assert "ciphertext" not in str(payload).lower()

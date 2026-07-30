@@ -141,6 +141,61 @@
   {% endif %}
 </section>
 
+{% if google_ads_sync_enabled %}
+<section class="panel" id="dashboard-aquisicao-google" aria-label="Aquisição Google Ads">
+  <div class="panel-heading">
+    <h2>Aquisição Google (7 dias)</h2>
+    <p class="muted">Investimento e conversões da conta Google Ads conectada. ROAS usa valor de conversão Google, não vendas Revy.</p>
+  </div>
+  {% if google_by_store %}
+  <div style="overflow-x:auto">
+    <table id="tabela-dashboard-google">
+      <thead>
+        <tr>
+          <th>Loja</th>
+          <th>Status</th>
+          <th>Custo</th>
+          <th>Cliques</th>
+          <th>CTR</th>
+          <th>CPC</th>
+          <th>Conversões</th>
+          <th>ROAS</th>
+          <th>CPL</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in google_by_store %}
+        <tr data-store-id="{{ row.loja_id }}" class="dashboard-google-row">
+          <td>
+            {% if control_enabled %}
+            <a href="{{ public_path('/app/control/lojas/' + row.loja_id) }}">{{ row.name }}</a>
+            {% else %}
+            {{ row.name }}
+            {% endif %}
+          </td>
+          {% if row.google_disponivel and row.google %}
+          <td>conectado</td>
+          <td>{{ row.google.cost }}{% if row.google.currency_code %} {{ row.google.currency_code }}{% endif %}</td>
+          <td>{{ row.google.clicks }}</td>
+          <td>{% if row.google.ctr is not none %}{{ row.google.ctr }}{% else %}—{% endif %}</td>
+          <td>{% if row.google.cpc is not none %}{{ row.google.cpc }}{% else %}—{% endif %}</td>
+          <td>{{ row.google.conversions }}</td>
+          <td>{% if row.google.roas is not none %}{{ row.google.roas }}x{% else %}—{% endif %}</td>
+          <td>{% if row.google.cpl is not none %}{{ row.google.cpl }}{% else %}—{% endif %}</td>
+          {% else %}
+          <td colspan="8" class="muted">Google indisponível</td>
+          {% endif %}
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p class="muted" id="dashboard-google-vazio">Google indisponível — nenhuma loja no escopo ou sync desligado.</p>
+  {% endif %}
+</section>
+{% endif %}
+
 {% if overview and overview.recent_audit %}
 <section class="panel" id="dashboard-auditoria">
   <div class="panel-heading">

@@ -85,7 +85,7 @@ class GoogleAdsAccount:
 
 @dataclass(frozen=True)
 class GoogleAdsMetricRow:
-    """Stub de métrica diária — preenchido em fatias posteriores (GAQL)."""
+    """Métrica diária por campanha (GAQL Search)."""
 
     customer_id: str
     campaign_id: str
@@ -95,6 +95,19 @@ class GoogleAdsMetricRow:
     cost_micros: int = 0
     conversions: float = 0.0
     conversions_value: float = 0.0
+
+
+@dataclass(frozen=True)
+class GoogleAdsConversionAction:
+    """Ação de conversão remota (somente leitura — nunca criar)."""
+
+    resource_name: str
+    id: str
+    name: str
+    type: str | None = None
+    status: str | None = None
+    category: str | None = None
+    primary_for_goal: bool | None = None
 
 
 @dataclass(frozen=True)
@@ -177,7 +190,16 @@ class GoogleAdsReadPort(Protocol):
         date_from: str,
         date_to: str,
     ) -> Sequence[GoogleAdsMetricRow]:
-        """Stub de métricas diárias por campanha (GAQL Search/SearchStream)."""
+        """Métricas diárias por campanha (GAQL Search/SearchStream)."""
+
+    def list_conversion_actions(
+        self,
+        *,
+        refresh_token: str,
+        customer_id: str,
+        login_customer_id: str | None,
+    ) -> Sequence[GoogleAdsConversionAction]:
+        """Lista conversion actions existentes na conta (GAQL; sem create)."""
 
 
 class GoogleDataManagerPort(Protocol):
@@ -210,12 +232,18 @@ class GoogleAdsTokenExchanger(Protocol):
 
 @dataclass
 class FakeGoogleAdsReadPort:
-    """Adapter de teste: contas e métricas em memória."""
+    """Adapter de teste: contas, métricas e conversion actions em memória."""
 
     accounts: list[GoogleAdsAccount] = field(default_factory=list)
     metrics: list[GoogleAdsMetricRow] = field(default_factory=list)
+    conversion_actions: list[GoogleAdsConversionAction] = field(
+        default_factory=list
+    )
     list_accounts_calls: list[str] = field(default_factory=list)
     fetch_metrics_calls: list[dict[str, Any]] = field(default_factory=list)
+    list_conversion_actions_calls: list[dict[str, Any]] = field(
+        default_factory=list
+    )
 
     def list_accounts(self, refresh_token: str) -> Sequence[GoogleAdsAccount]:
         self.list_accounts_calls.append(refresh_token)
@@ -245,6 +273,22 @@ class FakeGoogleAdsReadPort:
             if row.customer_id == customer_id
             and date_from <= row.date <= date_to
         )
+
+    def list_conversion_actions(
+        self,
+        *,
+        refresh_token: str,
+        customer_id: str,
+        login_customer_id: str | None,
+    ) -> Sequence[GoogleAdsConversionAction]:
+        self.list_conversion_actions_calls.append(
+            {
+                "refresh_token": refresh_token,
+                "customer_id": customer_id,
+                "login_customer_id": login_customer_id,
+            }
+        )
+        return tuple(self.conversion_actions)
 
 
 @dataclass

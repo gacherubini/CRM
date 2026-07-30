@@ -16,6 +16,7 @@ from app.control.google_ads import (
     FakeGoogleAdsReadPort,
     GoogleAdsAccount as GoogleAdsAccountDTO,
     GoogleAdsConnectionNotFound,
+    GoogleAdsConversionAction,
     GoogleAdsMetricRow,
     GoogleAdsReadPort,
     _assert_can_manage_connection,
@@ -92,6 +93,12 @@ class MetricsSummary:
     currency_code: str | None
     ctr: Decimal | None
     cpc: Decimal | None
+    # CPL = cost / Google conversions (não junta VendaProjetada Revy).
+    cpl: Decimal | None
+    # ROAS = conversions_value Google / cost (não usa faturamento Revy).
+    roas: Decimal | None
+    # Alias de cpl (custo por conversão Google).
+    cost_per_conversion: Decimal | None
 
 
 @dataclass(frozen=True)
@@ -101,6 +108,17 @@ class SyncMetricsResult:
     rows_upserted: int
     date_from: str
     date_to: str
+
+
+@dataclass(frozen=True)
+class AcquisitionGoogleResumo:
+    """Contrato read-only de aquisição Google para Revy Loja / dashboard."""
+
+    loja_id: str
+    date_from: str
+    date_to: str
+    google_disponivel: bool
+    summary: MetricsSummary | None
 
 
 def cost_from_micros(cost_micros: int | Decimal) -> Decimal:
@@ -123,6 +141,35 @@ def compute_cpc(cost_micros: int, clicks: int) -> Decimal | None:
     return (cost_from_micros(cost_micros) / Decimal(clicks)).quantize(
         CENTAVOS, rounding=ROUND_HALF_UP
     )
+
+
+def compute_cpl(
+    cost_micros: int,
+    conversions: Decimal | float | int,
+) -> Decimal | None:
+    """Custo por conversão Google (CPL) quando conversions > 0."""
+    conv = Decimal(str(conversions))
+    if conv <= 0:
+        return None
+    return (cost_from_micros(cost_micros) / conv).quantize(
+        CENTAVOS, rounding=ROUND_HALF_UP
+    )
+
+
+def compute_roas(
+    cost_micros: int,
+    conversions_value: Decimal | float | int,
+) -> Decimal | None:
+    """ROAS = conversions_value / cost quando cost > 0 e value > 0.
+
+    Usa apenas métricas Google (conversions_value). Não junta VendaProjetada
+    Revy — datas e atribuição diferem; join fica fora deste resumo.
+    """
+    cost = cost_from_micros(cost_micros)
+    value = Decimal(str(conversions_value))
+    if cost <= 0 or value <= 0:
+        return None
+    return (value / cost).quantize(CENTAVOS, rounding=ROUND_HALF_UP)
 
 
 class GoogleAdsMetricsControl:
@@ -406,16 +453,102 @@ class GoogleAdsMetricsControl:
             if loja is None:
                 raise StoreNotFound("Loja não encontrada")
             _assert_can_view_connection(db, actor, loja.id)
+            loja_id = loja.id
 
+        return self._metrics_summary_unscoped(
+            loja_id=loja_id,
+            date_from=d_from,
+            date_to=d_to,
+        )
+
+    def list_conversion_actions(
+        self,
+        actor: Actor,
+        store: StoreRef,
+    ) -> tuple[GoogleAdsConversionAction, ...]:
+        """Lista conversion actions remotas da conta selecionada (sem create)."""
+        with self._session_factory() as db:
+            loja = _find_store(db, store)
+            if loja is None:
+                raise StoreNotFound("Loja não encontrada")
+            _assert_can_view_connection(db, actor, loja.id)
+            refresh_token, connection = _require_connected(db, loja.id)
+            selected = _selected_account(db, loja.id, connection)
+            customer_id = selected.customer_id
+            login_customer_id = selected.login_customer_id
+
+        actions = self._read_port.list_conversion_actions(
+            refresh_token=refresh_token,
+            customer_id=customer_id,
+            login_customer_id=login_customer_id,
+        )
+        return tuple(actions)
+
+    def acquisition_resumo(
+        self,
+        store: StoreRef,
+        *,
+        date_from: str,
+        date_to: str,
+    ) -> AcquisitionGoogleResumo:
+        """Resumo comercial Google read-only (service token / Loja).
+
+        Sem actor de browser: loja ausente → StoreNotFound.
+        google_disponivel exige conexão connected + conta anunciante selecionada
+        (ou customer_id na conexão). Não expõe tokens.
+        """
+        d_from = _parse_date(date_from)
+        d_to = _parse_date(date_to)
+        if d_from > d_to:
+            raise ControlError("date_from deve ser <= date_to")
+
+        with self._session_factory() as db:
+            loja = _find_store(db, store)
+            if loja is None:
+                raise StoreNotFound("Loja não encontrada")
+            loja_id = loja.id
+            disponivel = _google_disponivel(db, loja_id)
+
+        if not disponivel:
+            return AcquisitionGoogleResumo(
+                loja_id=loja_id,
+                date_from=d_from.isoformat(),
+                date_to=d_to.isoformat(),
+                google_disponivel=False,
+                summary=None,
+            )
+
+        summary = self._metrics_summary_unscoped(
+            loja_id=loja_id,
+            date_from=d_from,
+            date_to=d_to,
+        )
+        return AcquisitionGoogleResumo(
+            loja_id=loja_id,
+            date_from=d_from.isoformat(),
+            date_to=d_to.isoformat(),
+            google_disponivel=True,
+            summary=summary,
+        )
+
+    def _metrics_summary_unscoped(
+        self,
+        *,
+        loja_id: str,
+        date_from: date,
+        date_to: date,
+    ) -> MetricsSummary:
+        """Agrega métricas diárias sem checagem de actor (uso service/dashboard)."""
+        with self._session_factory() as db:
             connection = (
                 db.query(GoogleAdsConnection)
-                .filter(GoogleAdsConnection.loja_id == loja.id)
+                .filter(GoogleAdsConnection.loja_id == loja_id)
                 .first()
             )
             selected = (
                 db.query(GoogleAdsAccount)
                 .filter(
-                    GoogleAdsAccount.loja_id == loja.id,
+                    GoogleAdsAccount.loja_id == loja_id,
                     GoogleAdsAccount.selected.is_(True),
                 )
                 .first()
@@ -427,9 +560,9 @@ class GoogleAdsMetricsControl:
             )
 
             q = db.query(GoogleAdsCampaignDaily).filter(
-                GoogleAdsCampaignDaily.loja_id == loja.id,
-                GoogleAdsCampaignDaily.date >= d_from,
-                GoogleAdsCampaignDaily.date <= d_to,
+                GoogleAdsCampaignDaily.loja_id == loja_id,
+                GoogleAdsCampaignDaily.date >= date_from,
+                GoogleAdsCampaignDaily.date <= date_to,
             )
             if customer_id:
                 q = q.filter(GoogleAdsCampaignDaily.customer_id == customer_id)
@@ -450,11 +583,12 @@ class GoogleAdsMetricsControl:
             if selected is not None and not currency:
                 currency = selected.currency_code
 
+            cpl = compute_cpl(cost_micros, conversions)
             return MetricsSummary(
-                loja_id=loja.id,
+                loja_id=loja_id,
                 customer_id=customer_id,
-                date_from=d_from.isoformat(),
-                date_to=d_to.isoformat(),
+                date_from=date_from.isoformat(),
+                date_to=date_to.isoformat(),
                 impressions=impressions,
                 clicks=clicks,
                 cost_micros=cost_micros,
@@ -464,6 +598,9 @@ class GoogleAdsMetricsControl:
                 currency_code=currency,
                 ctr=compute_ctr(impressions, clicks),
                 cpc=compute_cpc(cost_micros, clicks),
+                cpl=cpl,
+                roas=compute_roas(cost_micros, conversions_value),
+                cost_per_conversion=cpl,
             )
 
     def _upsert_metric_rows(
@@ -580,6 +717,34 @@ def _upsert_account(
         existing.updated_at = now
     db.flush()
     return _account_view(existing)
+
+
+def _google_disponivel(db: Any, loja_id: str) -> bool:
+    """Conexão connected + refresh token + conta anunciante (selected ou customer_id)."""
+    connection = (
+        db.query(GoogleAdsConnection)
+        .filter(GoogleAdsConnection.loja_id == loja_id)
+        .first()
+    )
+    if connection is None:
+        return False
+    if (
+        connection.status != CONNECTION_STATUS_CONNECTED
+        or not connection.refresh_token_ciphertext
+    ):
+        return False
+    selected = (
+        db.query(GoogleAdsAccount)
+        .filter(
+            GoogleAdsAccount.loja_id == loja_id,
+            GoogleAdsAccount.selected.is_(True),
+            GoogleAdsAccount.is_manager.is_(False),
+        )
+        .first()
+    )
+    if selected is not None:
+        return True
+    return bool(connection.customer_id)
 
 
 def _require_connected(

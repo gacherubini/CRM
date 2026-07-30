@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import re
-from datetime import date
+from datetime import date, timedelta
 from decimal import Decimal
 from typing import NoReturn
 
@@ -45,6 +45,7 @@ from app.control.google_ads_conversions import (
 )
 from app.control.google_ads_http import build_google_ads_ports
 from app.control.google_ads_metrics import (
+    AcquisitionGoogleResumo,
     GoogleAdsAccountNotFound,
     GoogleAdsAccountView,
     GoogleAdsManagerAccountNotSelectable,
@@ -54,6 +55,8 @@ from app.control.google_ads_metrics import (
     MetricsSummary,
     SyncMetricsResult,
 )
+from app.control.google_ads import GoogleAdsConversionAction
+from app.service_auth import exigir_service_token
 from app.control.invitations import ControlInvitations
 from app.control.password_recovery import ControlPasswordRecovery
 from app.control.people import PeopleDirectory
@@ -604,7 +607,8 @@ def get_store(
 @router.get("/dashboard", dependencies=[Depends(_control_dashboard_enabled)])
 def get_dashboard_summary(actor: Actor = Depends(_current_actor)):
     overview = DashboardControl(SessionLocal).overview(actor)
-    return _dashboard_overview_json(overview)
+    google_by_store = _dashboard_google_by_store(overview)
+    return _dashboard_overview_json(overview, google_by_store=google_by_store)
 
 
 @router.get("/lojas/{loja_id}/prontidao")
@@ -1381,6 +1385,49 @@ def get_google_ads_metrics_summary(
 
 
 @router.get(
+    "/internal/lojas/{loja_id}/aquisicao-resumo",
+    dependencies=[Depends(_google_ads_enabled)],
+)
+def get_aquisicao_resumo_service(
+    loja_id: str,
+    date_from: str = Query(min_length=10, max_length=10),
+    date_to: str = Query(min_length=10, max_length=10),
+    _: None = Depends(exigir_service_token),
+):
+    """Contrato read-only para Revy Loja (X-Service-Token; sem sessão browser)."""
+    try:
+        resumo = _google_ads_metrics_control().acquisition_resumo(
+            StoreRef(id=loja_id),
+            date_from=date_from,
+            date_to=date_to,
+        )
+    except ControlError as exc:
+        _raise_domain_error(exc)
+    return _aquisicao_resumo_json(resumo)
+
+
+@router.get(
+    "/lojas/{loja_id}/google-ads/conversion-actions",
+    dependencies=[Depends(_google_ads_enabled)],
+)
+def list_google_ads_conversion_actions(
+    loja_id: str,
+    actor: Actor = Depends(_current_actor),
+):
+    """Lista conversion actions remotas da conta selecionada (somente leitura)."""
+    try:
+        items = _google_ads_metrics_control().list_conversion_actions(
+            actor,
+            StoreRef(id=loja_id),
+        )
+    except ControlError as exc:
+        _raise_domain_error(exc)
+    return {
+        "items": [_google_ads_conversion_action_json(a) for a in items]
+    }
+
+
+@router.get(
     "/lojas/{loja_id}/google-ads/conversion-bindings",
     dependencies=[Depends(_google_conversions_enabled)],
 )
@@ -1448,6 +1495,7 @@ def _google_ads_sync_metrics_json(result: SyncMetricsResult) -> dict[str, object
 
 def _google_ads_metrics_summary_json(summary: MetricsSummary) -> dict[str, object]:
     # Sem tokens/segredos; apenas agregados de medição.
+    # ROAS/CPL usam conversions_value e conversions do Google (não VendaProjetada).
     return {
         "loja_id": summary.loja_id,
         "customer_id": summary.customer_id,
@@ -1462,6 +1510,42 @@ def _google_ads_metrics_summary_json(summary: MetricsSummary) -> dict[str, objec
         "currency_code": summary.currency_code,
         "ctr": str(summary.ctr) if summary.ctr is not None else None,
         "cpc": str(summary.cpc) if summary.cpc is not None else None,
+        "cpl": str(summary.cpl) if summary.cpl is not None else None,
+        "roas": str(summary.roas) if summary.roas is not None else None,
+        "cost_per_conversion": (
+            str(summary.cost_per_conversion)
+            if summary.cost_per_conversion is not None
+            else None
+        ),
+    }
+
+
+def _aquisicao_resumo_json(resumo: AcquisitionGoogleResumo) -> dict[str, object]:
+    return {
+        "loja_id": resumo.loja_id,
+        "date_from": resumo.date_from,
+        "date_to": resumo.date_to,
+        "google_disponivel": resumo.google_disponivel,
+        "google": (
+            _google_ads_metrics_summary_json(resumo.summary)
+            if resumo.summary is not None
+            else None
+        ),
+        "meta": None,
+    }
+
+
+def _google_ads_conversion_action_json(
+    action: GoogleAdsConversionAction,
+) -> dict[str, object]:
+    return {
+        "resource_name": action.resource_name,
+        "id": action.id,
+        "name": action.name,
+        "type": action.type,
+        "status": action.status,
+        "category": action.category,
+        "primary_for_goal": action.primary_for_goal,
     }
 
 
@@ -1561,8 +1645,66 @@ def _dashboard_item_json(item: StoreReadinessSummary) -> dict[str, object]:
     }
 
 
-def _dashboard_overview_json(overview: DashboardOverview) -> dict[str, object]:
-    return {
+def _dashboard_google_window() -> tuple[str, str]:
+    """Últimos 7 dias inclusivos (hoje − 6 → hoje) para cards de aquisição."""
+    today = date.today()
+    start = today - timedelta(days=6)
+    return start.isoformat(), today.isoformat()
+
+
+def _dashboard_google_by_store(
+    overview: DashboardOverview,
+) -> list[dict[str, object]] | None:
+    """Resumo Google por loja visível; None quando flag de sync desligada."""
+    if not settings.google_ads_sync_enabled:
+        return None
+    date_from, date_to = _dashboard_google_window()
+    control = _google_ads_metrics_control()
+    items: list[dict[str, object]] = []
+    for store in overview.items:
+        try:
+            resumo = control.acquisition_resumo(
+                StoreRef(id=store.store_id),
+                date_from=date_from,
+                date_to=date_to,
+            )
+        except ControlError:
+            items.append(
+                {
+                    "loja_id": store.store_id,
+                    "slug": store.slug,
+                    "name": store.name,
+                    "date_from": date_from,
+                    "date_to": date_to,
+                    "google_disponivel": False,
+                    "google": None,
+                }
+            )
+            continue
+        items.append(
+            {
+                "loja_id": store.store_id,
+                "slug": store.slug,
+                "name": store.name,
+                "date_from": resumo.date_from,
+                "date_to": resumo.date_to,
+                "google_disponivel": resumo.google_disponivel,
+                "google": (
+                    _google_ads_metrics_summary_json(resumo.summary)
+                    if resumo.summary is not None
+                    else None
+                ),
+            }
+        )
+    return items
+
+
+def _dashboard_overview_json(
+    overview: DashboardOverview,
+    *,
+    google_by_store: list[dict[str, object]] | None = None,
+) -> dict[str, object]:
+    payload: dict[str, object] = {
         "counts": {
             "ativas": overview.counts.ativas,
             "em_configuracao": overview.counts.em_configuracao,
@@ -1610,6 +1752,9 @@ def _dashboard_overview_json(overview: DashboardOverview) -> dict[str, object]:
             for event in overview.recent_audit
         ],
     }
+    if google_by_store is not None:
+        payload["google_by_store"] = google_by_store
+    return payload
 
 
 def _person_json(person: PersonView) -> dict[str, str]:

@@ -302,6 +302,48 @@ def test_read_port_fetch_metrics_sucesso():
     assert rows[0].conversions == 3.5
 
 
+def test_read_port_list_conversion_actions_sucesso():
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path.endswith("/token"):
+            return httpx.Response(200, json={"access_token": "at-ca"})
+        if "googleAds:search" in request.url.path:
+            body = request.read().decode("utf-8")
+            assert "conversion_action" in body
+            return httpx.Response(
+                200,
+                json={
+                    "results": [
+                        {
+                            "conversionAction": {
+                                "resourceName": (
+                                    "customers/1112223333/conversionActions/42"
+                                ),
+                                "id": "42",
+                                "name": "Lead form",
+                                "type": "WEBPAGE",
+                                "status": "ENABLED",
+                                "category": "SUBMIT_LEAD_FORM",
+                                "primaryForGoal": True,
+                            }
+                        }
+                    ]
+                },
+            )
+        return httpx.Response(500, json={})
+
+    port = _read_port(httpx.MockTransport(handler))
+    actions = port.list_conversion_actions(
+        refresh_token="rt",
+        customer_id="1112223333",
+        login_customer_id="5556667777",
+    )
+    assert len(actions) == 1
+    assert actions[0].id == "42"
+    assert actions[0].name == "Lead form"
+    assert actions[0].resource_name.endswith("/conversionActions/42")
+    assert actions[0].primary_for_goal is True
+
+
 def test_read_port_401_no_access_token():
     def handler(request: httpx.Request) -> httpx.Response:
         return httpx.Response(401, json={"error": "invalid_grant"})
