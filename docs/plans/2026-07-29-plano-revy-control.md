@@ -1,6 +1,6 @@
 # Plano — Evolução do Revy Tráfego para Revy Control
 
-**Status:** ATIVO / CÓDIGO F0–6 product surface COMPLETE (Meta, readiness, Google ports+HTTP+métricas CPL/ROAS+lista conversion actions+contrato Loja aquisicao-resumo+dashboard aquisição, multi-WA n8n, jobs com gate de suspensão, dashboard rico, RBAC sem slug; residual = GCP/token humano, E2E lab, flags F7, worker outbox Google, F4C click IDs end-to-end)
+**Status:** CÓDIGO PRODUTO COMPLETE (F0–6 + workers Google outbox/métricas + reconcile RetrieveRequestStatus + HTTP adapters + aquisição UI/API Loja + multi-WA n8n + suspensão jobs + RBAC; residual operacional = GCP/token humano, flags/smoke lab F7, E2E multi-WA/Google real)
 **Data:** 2026-07-29
 **Spec:** [`docs/superpowers/specs/2026-07-29-revy-control-design.md`](../superpowers/specs/2026-07-29-revy-control-design.md)
 **Vocabulário:** [`CONTEXT.md`](../../CONTEXT.md)
@@ -367,7 +367,8 @@ Dados:
       `GoogleAdsMetricsControl.sync_metrics`; auto-tagging/fuso completo residual
       de catalogação, não bloqueia resumo).
 - [x] Persistir `google_ads_campaign_daily` por conta/campanha/data.
-- [x] Carga por janela via `POST .../metrics/sync` (job/worker periódico residual F7).
+- [x] Carga por janela via `POST .../metrics/sync` + worker
+      `google_ads_metrics_job` / `POST /internal/jobs/google-ads-metrics-sync`.
 - [x] Derivar CTR, CPC, CPL, `cost_per_conversion` e ROAS money-safe
       (`cost_micros`; ROAS = `conversions_value` Google / cost — **sem** join
       `VendaProjetada` Revy neste resumo).
@@ -402,9 +403,10 @@ Dados:
       `revy:{loja_id}:{tipo_evento}:{id_evento_de_dominio}`.
 - [x] Normalizar e hashear email/telefone somente com consentimento; segredos
       bancários nunca entram no payload.
-- [x] Enviar via `IngestEvents` (HTTP Data Manager + fake; worker periódico residual).
+- [x] Enviar via `IngestEvents` (HTTP Data Manager + fake) + worker
+      `google_ads_conversions_job` / `POST /internal/jobs/google-conversions-outbox`.
 - [ ] Guardar `request_id` e consultar `RetrieveRequestStatus` até terminal
-      (código de attempt/request_id existe; polling assíncrono residual worker).
+      (`reconcile_outbox_once` + `retrieve_status` HTTP/Fake; auto no process_outbox).
 - [x] Falha Google nunca reverte confirmação de venda nem bloqueia o Revy Loja
       (enqueue fire-and-forget).
 
@@ -418,7 +420,7 @@ Dados:
 - [ ] Redirects preservam os três click IDs exatamente. (**F4C / lab**)
 - [x] Retry reutiliza o mesmo `transaction_id` e não duplica conversão (outbox).
 - [x] Evento sem consentimento não envia user data enhanced.
-- [x] Fast-fail e attempt rastreáveis; polling status residual worker.
+- [x] Fast-fail e attempt rastreáveis; polling status via reconcile.
 - [x] Revogação OAuth remove token e não afeta Meta/Portal/venda.
 
 ### Critério de pronto
