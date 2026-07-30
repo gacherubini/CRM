@@ -124,11 +124,14 @@ Routers:
 | Loja, contrato, módulos, pessoas/cargos | Control | Control | Loja (projeção) |
 | Vínculos gestor de tráfego | Control | Control | — |
 | Pixel, CAPI, Meta Ads, Google OAuth | Control (configs no banco tráfego) | Control | Loja (resumo aquisição) |
-| Canais WhatsApp / conexões | **Chatbot** | Control (port HTTP) | Loja (label/canal_id) |
+| Canais WhatsApp / conexões | **Chatbot** | Loja (dono/gerente) | Control (saúde no dashboard) |
 | Leads, conversas, mensagens | Chatbot | Loja (atendimento) | Control (diagnóstico) |
 | Vendas, metas, atribuição | Loja/Portal | Loja | Control (projeção venda) |
 | Credenciais bancárias | Motor (+ UI Loja) | Loja (dono/gerente) | **nunca Control** |
 | Veículos | Estoque API | Loja | Catálogo |
+
+Nota: cadastrar/parear/reconectar número de WhatsApp é UI da Loja porque o QR precisa ser lido
+no celular da própria loja; o Control só consome a saúde dos canais no dashboard.
 
 ### 2.5 Contratos HTTP / evento (as-built)
 

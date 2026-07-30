@@ -31,6 +31,7 @@ desligadas a UI legada permanece idêntica. Mapa de rotas:
 | `REVY_LOJA_SHELL_ENABLED` | `0` | `1` = brand/nav Vendas·Estoque; `0` = menu legado |
 | `REVY_LOJA_ENTITLEMENTS_ENABLED` | `0` | `1` = 403 se módulo não contratado/ativo; `0` = fail-open |
 | `REVY_LOJA_ATENDIMENTO_ENABLED` | `0` | Workspace unificado `/app/loja/atendimento` |
+| `REVY_LOJA_WHATSAPP_ENABLED` | `0` | `1` = tela de números de WhatsApp em Ajustes (`/app/loja/whatsapp`); cadastro/QR/reconexão pela própria loja |
 | `REVY_LOJA_REDIRECT_LEGACY` | `0` | `1` = 303 de paths legados → shell (exige shell on); ver cutover |
 | `SELLER_AI_ENABLED` | `0` | Seller AI (F7+); ainda não altera rotas |
 

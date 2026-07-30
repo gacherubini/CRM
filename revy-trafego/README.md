@@ -193,7 +193,7 @@ pytest -q
 | `GOOGLE_ADS_OAUTH_REDIRECT_URI` | vazio | Callback HTTPS do Control |
 | `GOOGLE_ADS_DEVELOPER_TOKEN` | vazio | Developer token (API Center do manager Revy); sem ele o app usa Fake* |
 | `GOOGLE_ADS_API_VERSION` | `v19` | Versão REST da Google Ads API |
-| `MULTI_WHATSAPP_ENABLED` | `0` | Reserva o rollout de múltiplos canais WhatsApp; ainda sem efeito operacional |
+| `MULTI_WHATSAPP_ENABLED` | `0` | `1` = libera os endpoints proxy de canais WhatsApp e faz a prontidão contar canais ativos |
 | `REVY_CONTROL_DASHBOARD_ENABLED` | `0` | Reserva o rollout dos dashboards do Control; ainda sem efeito operacional |
 | `REVY_TRAFEGO_JOB_SECRET` | vazio | `POST /internal/jobs/*` (`meta-spend-sync`, `google-conversions-outbox`, `google-ads-metrics-sync`) |
 | `REVY_TRAFEGO_SERVICE_TOKEN` | vazio | Header `X-Service-Token` nas APIs `/v1/*` |
