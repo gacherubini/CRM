@@ -297,12 +297,74 @@ class GoogleAdsMetricsControl:
             if loja is None:
                 raise StoreNotFound("Loja não encontrada")
             _assert_can_manage_connection(db, actor, loja.id)
-            refresh_token, connection = _require_connected(db, loja.id)
-            selected = _selected_account(db, loja.id, connection)
+            loja_id = loja.id
+
+        result = self._sync_metrics_core(
+            loja_id,
+            date_from=d_from.isoformat(),
+            date_to=d_to.isoformat(),
+        )
+
+        with self._session_factory() as db:
+            _append_event(
+                db,
+                actor=actor,
+                store_id=result.loja_id,
+                action="google_ads.metrics_synced",
+                resource_type="google_ads_campaign_daily",
+                resource_id=result.customer_id,
+                after={
+                    "customer_id": result.customer_id,
+                    "date_from": result.date_from,
+                    "date_to": result.date_to,
+                    "rows_upserted": result.rows_upserted,
+                },
+            )
+            db.commit()
+
+        return result
+
+    def sync_metrics_for_store_id(
+        self,
+        loja_id: str,
+        *,
+        date_from: str,
+        date_to: str,
+    ) -> SyncMetricsResult:
+        """Sincroniza métricas para job interno (sem Actor/RBAC).
+
+        Confia no caller (worker). Só exige conexão ativa + conta selecionada.
+        Não grava auditoria de ator humano.
+        """
+        lid = (loja_id or "").strip()
+        if not lid:
+            raise StoreNotFound("Loja não encontrada")
+        d_from = _parse_date(date_from)
+        d_to = _parse_date(date_to)
+        if d_from > d_to:
+            raise ControlError("date_from deve ser <= date_to")
+        return self._sync_metrics_core(
+            lid,
+            date_from=d_from.isoformat(),
+            date_to=d_to.isoformat(),
+        )
+
+    def _sync_metrics_core(
+        self,
+        loja_id: str,
+        *,
+        date_from: str,
+        date_to: str,
+    ) -> SyncMetricsResult:
+        d_from = _parse_date(date_from)
+        d_to = _parse_date(date_to)
+
+        with self._session_factory() as db:
+            refresh_token, connection = _require_connected(db, loja_id)
+            selected = _selected_account(db, loja_id, connection)
             customer_id = selected.customer_id
             login_customer_id = selected.login_customer_id
             currency = selected.currency_code
-            loja_id = loja.id
 
         rows = self._read_port.fetch_metrics(
             refresh_token=refresh_token,
@@ -317,23 +379,6 @@ class GoogleAdsMetricsControl:
             rows=rows,
             default_currency=currency,
         )
-
-        with self._session_factory() as db:
-            _append_event(
-                db,
-                actor=actor,
-                store_id=loja_id,
-                action="google_ads.metrics_synced",
-                resource_type="google_ads_campaign_daily",
-                resource_id=customer_id,
-                after={
-                    "customer_id": customer_id,
-                    "date_from": d_from.isoformat(),
-                    "date_to": d_to.isoformat(),
-                    "rows_upserted": upserted,
-                },
-            )
-            db.commit()
 
         return SyncMetricsResult(
             loja_id=loja_id,

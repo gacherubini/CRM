@@ -101,6 +101,10 @@ class Settings:
     google_conversions_enabled: bool = field(
         default_factory=lambda: _env_flag("GOOGLE_CONVERSIONS_ENABLED")
     )
+    # Worker métricas Google Ads: default off; main liga quando SYNC on (padrão meta).
+    google_ads_metrics_worker_enabled: bool = field(
+        default_factory=lambda: _env_flag("GOOGLE_ADS_METRICS_WORKER_ENABLED")
+    )
     # OAuth multiusuário Google Ads (secret manager / env; nunca no repositório).
     google_ads_oauth_client_id: str = os.getenv(
         "GOOGLE_ADS_OAUTH_CLIENT_ID", ""

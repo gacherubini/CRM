@@ -178,8 +178,16 @@ pytest -q
 | `REVY_TRAFEGO_CAPI_WORKER` | `0` | Retry outbox |
 | `REVY_CONTROL_ENABLED` | `0` | Habilita as superfícies `/control/v1` e `/app/control`; desligada, elas respondem 404 |
 | `REVY_CONTROL_RBAC_ENABLED` | `0` | Aplica escopo de lojas por vínculo no backend e no seletor; ligar somente após migration/backfill e gate de isolamento da Fase 1 |
-| `GOOGLE_ADS_SYNC_ENABLED` | `0` | Liga rotas Control de OAuth/contas/métricas Google Ads |
-| `GOOGLE_CONVERSIONS_ENABLED` | `0` | Liga bindings/outbox e hook de venda→conversão Google |
+| `GOOGLE_ADS_SYNC_ENABLED` | `0` | Liga rotas Control de OAuth/contas/métricas Google Ads; no lifespan também sobe o worker de métricas |
+| `GOOGLE_CONVERSIONS_ENABLED` | `0` | Liga bindings/outbox, hook venda→conversão e worker de outbox Google |
+| `GOOGLE_CONVERSIONS_WORKER_ENABLED` | = conversions | Override do worker; default segue `GOOGLE_CONVERSIONS_ENABLED` |
+| `GOOGLE_CONVERSIONS_WORKER_INTERVAL_SECONDS` | `60` | Intervalo do outbox Google |
+| `GOOGLE_CONVERSIONS_WORKER_INITIAL_DELAY_SECONDS` | `30` | Delay inicial do outbox Google |
+| `GOOGLE_CONVERSIONS_WORKER_MAX_ATTEMPTS` | `8` | Máx. tentativas por item da outbox |
+| `GOOGLE_ADS_METRICS_WORKER_ENABLED` | `0` | Worker diário de métricas (forçado `1` se `GOOGLE_ADS_SYNC_ENABLED`) |
+| `GOOGLE_ADS_METRICS_WORKER_INTERVAL_SECONDS` | `86400` | Intervalo (default diário) |
+| `GOOGLE_ADS_METRICS_WORKER_INITIAL_DELAY_SECONDS` | `120` | Delay inicial |
+| `GOOGLE_ADS_METRICS_WORKER_TIME_WINDOW_DAYS` | `7` | Janela de datas no sync |
 | `GOOGLE_ADS_OAUTH_CLIENT_ID` | vazio | OAuth Web client (GCP) |
 | `GOOGLE_ADS_OAUTH_CLIENT_SECRET` | vazio | Secret do client OAuth (secret manager) |
 | `GOOGLE_ADS_OAUTH_REDIRECT_URI` | vazio | Callback HTTPS do Control |
@@ -187,7 +195,7 @@ pytest -q
 | `GOOGLE_ADS_API_VERSION` | `v19` | Versão REST da Google Ads API |
 | `MULTI_WHATSAPP_ENABLED` | `0` | Reserva o rollout de múltiplos canais WhatsApp; ainda sem efeito operacional |
 | `REVY_CONTROL_DASHBOARD_ENABLED` | `0` | Reserva o rollout dos dashboards do Control; ainda sem efeito operacional |
-| `REVY_TRAFEGO_JOB_SECRET` | vazio | `POST /internal/jobs/meta-spend-sync` |
+| `REVY_TRAFEGO_JOB_SECRET` | vazio | `POST /internal/jobs/*` (`meta-spend-sync`, `google-conversions-outbox`, `google-ads-metrics-sync`) |
 | `REVY_TRAFEGO_SERVICE_TOKEN` | vazio | Header `X-Service-Token` nas APIs `/v1/*` |
 
 ### Portal (flags cutover)

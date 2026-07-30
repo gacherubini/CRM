@@ -97,6 +97,21 @@ async def _lifespan(_app: FastAPI):
 
             provisioning_job.start_worker(SessionLocal)
             logger.info("revy-trafego: provisioning delivery worker ON")
+        if settings.google_conversions_enabled:
+            from app.control import google_ads_conversions_job
+
+            google_ads_conversions_job.start_worker(SessionLocal)
+            logger.info("revy-trafego: google conversions outbox worker ON")
+        if (
+            settings.google_ads_sync_enabled
+            or settings.google_ads_metrics_worker_enabled
+        ):
+            # Força o flag do worker (default off) quando SYNC ou worker explicit on.
+            os.environ["GOOGLE_ADS_METRICS_WORKER_ENABLED"] = "1"
+            from app.control import google_ads_metrics_job
+
+            google_ads_metrics_job.start_worker(SessionLocal)
+            logger.info("revy-trafego: google ads metrics worker ON")
         db = SessionLocal()
         try:
             bootstrap_gestor_se_vazio(
@@ -113,8 +128,12 @@ async def _lifespan(_app: FastAPI):
         meta_ads_spend_job.stop_worker()
         meta_capi_job.stop_worker()
         from app.control import provisioning_job
+        from app.control import google_ads_conversions_job
+        from app.control import google_ads_metrics_job
 
         provisioning_job.stop_worker()
+        google_ads_conversions_job.stop_worker()
+        google_ads_metrics_job.stop_worker()
 
 
 app = FastAPI(
@@ -1276,9 +1295,14 @@ def diagnostico_conversa(
     )
 
 
-@app.post("/internal/jobs/meta-spend-sync")
-def job_meta_spend_sync(x_job_token: str = Header(default="", alias="X-Job-Token")):
-    esperado = settings.job_secret or (os.getenv("PORTAL_META_SPEND_JOB_SECRET") or "").strip()
+def _authorize_job_token(x_job_token: str) -> JSONResponse | None:
+    """Auth compartilhada dos POST /internal/jobs/* (X-Job-Token).
+
+    Retorna JSONResponse de erro ou None se autorizado.
+    """
+    esperado = settings.job_secret or (
+        os.getenv("PORTAL_META_SPEND_JOB_SECRET") or ""
+    ).strip()
     if not esperado:
         return JSONResponse(
             {"detail": "job desabilitado (REVY_TRAFEGO_JOB_SECRET vazio)"},
@@ -1286,6 +1310,14 @@ def job_meta_spend_sync(x_job_token: str = Header(default="", alias="X-Job-Token
         )
     if not secrets.compare_digest(x_job_token or "", esperado):
         return JSONResponse({"detail": "não autorizado"}, status_code=401)
+    return None
+
+
+@app.post("/internal/jobs/meta-spend-sync")
+def job_meta_spend_sync(x_job_token: str = Header(default="", alias="X-Job-Token")):
+    denied = _authorize_job_token(x_job_token)
+    if denied is not None:
+        return denied
     worker = meta_ads_spend_job.get_worker()
     if worker is None:
         janela = int(os.getenv("PORTAL_META_SPEND_SYNC_JANELA_DIAS", "3") or "3")
@@ -1295,6 +1327,56 @@ def job_meta_spend_sync(x_job_token: str = Header(default="", alias="X-Job-Token
             interval_seconds=86400,
             initial_delay_seconds=0,
             janela_dias=janela,
+        )
+        payload = runner.run_once()
+    else:
+        payload = worker.run_once()
+    return JSONResponse(payload)
+
+
+@app.post("/internal/jobs/google-conversions-outbox")
+def job_google_conversions_outbox(
+    x_job_token: str = Header(default="", alias="X-Job-Token"),
+):
+    denied = _authorize_job_token(x_job_token)
+    if denied is not None:
+        return denied
+    from app.control import google_ads_conversions_job
+
+    worker = google_ads_conversions_job.get_worker()
+    if worker is None:
+        runner = google_ads_conversions_job.GoogleAdsConversionsWorker(
+            db_factory=SessionLocal,
+            enabled=True,
+            interval_seconds=60,
+            initial_delay_seconds=0,
+        )
+        payload = runner.run_once()
+    else:
+        payload = worker.run_once()
+    return JSONResponse(payload)
+
+
+@app.post("/internal/jobs/google-ads-metrics-sync")
+def job_google_ads_metrics_sync(
+    x_job_token: str = Header(default="", alias="X-Job-Token"),
+):
+    denied = _authorize_job_token(x_job_token)
+    if denied is not None:
+        return denied
+    from app.control import google_ads_metrics_job
+
+    worker = google_ads_metrics_job.get_worker()
+    if worker is None:
+        window = int(
+            os.getenv("GOOGLE_ADS_METRICS_WORKER_TIME_WINDOW_DAYS", "7") or "7"
+        )
+        runner = google_ads_metrics_job.GoogleAdsMetricsSyncWorker(
+            db_factory=SessionLocal,
+            enabled=True,
+            interval_seconds=86400,
+            initial_delay_seconds=0,
+            time_window_days=window,
         )
         payload = runner.run_once()
     else:
