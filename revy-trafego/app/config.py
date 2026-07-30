@@ -111,6 +111,24 @@ class Settings:
     google_ads_oauth_redirect_uri: str = os.getenv(
         "GOOGLE_ADS_OAUTH_REDIRECT_URI", ""
     ).strip()
+    # Developer token da Google Ads API (API Center do manager Revy).
+    google_ads_developer_token: str = os.getenv(
+        "GOOGLE_ADS_DEVELOPER_TOKEN", ""
+    ).strip()
+    # Versão REST da Google Ads API (ex.: v19). Data Manager usa /v1 fixo.
+    google_ads_api_version: str = (
+        os.getenv("GOOGLE_ADS_API_VERSION", "v19").strip() or "v19"
+    )
+    # Bases HTTP injetáveis (testes / proxy). Vazias usam defaults oficiais.
+    google_ads_api_base_url: str = os.getenv(
+        "GOOGLE_ADS_API_BASE_URL", ""
+    ).strip()
+    google_data_manager_base_url: str = os.getenv(
+        "GOOGLE_DATA_MANAGER_BASE_URL", ""
+    ).strip()
+    google_oauth_token_url: str = os.getenv(
+        "GOOGLE_OAUTH_TOKEN_URL", ""
+    ).strip()
     multi_whatsapp_enabled: bool = field(
         default_factory=lambda: _env_flag("MULTI_WHATSAPP_ENABLED")
     )

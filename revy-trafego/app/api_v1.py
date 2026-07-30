@@ -17,6 +17,7 @@ from app.control.google_ads_conversions import (
     EnqueueConversion,
     GoogleAdsConversionsControl,
 )
+from app.control.google_ads_http import build_google_ads_ports
 from app.db import SessionLocal, get_db
 from app.financeiro_calc import calcular_metricas_vendas, hoje_portal, periodo_padrao
 from app.meta_capi import enfileirar_purchase
@@ -381,7 +382,11 @@ def _maybe_enqueue_google_conversion(
             if loja is None:
                 return None
             loja_id = loja.id
-        view = GoogleAdsConversionsControl(SessionLocal).enqueue_conversion(
+        ports = build_google_ads_ports(settings)
+        view = GoogleAdsConversionsControl(
+            SessionLocal,
+            data_manager_port=ports.data_manager_port,
+        ).enqueue_conversion(
             EnqueueConversion(
                 loja_id=loja_id,
                 event_type=EVENT_VENDA_CONFIRMADA,

@@ -178,8 +178,13 @@ pytest -q
 | `REVY_TRAFEGO_CAPI_WORKER` | `0` | Retry outbox |
 | `REVY_CONTROL_ENABLED` | `0` | Habilita as superfícies `/control/v1` e `/app/control`; desligada, elas respondem 404 |
 | `REVY_CONTROL_RBAC_ENABLED` | `0` | Aplica escopo de lojas por vínculo no backend e no seletor; ligar somente após migration/backfill e gate de isolamento da Fase 1 |
-| `GOOGLE_ADS_SYNC_ENABLED` | `0` | Reserva o rollout da sincronização Google Ads; ainda sem efeito operacional |
-| `GOOGLE_CONVERSIONS_ENABLED` | `0` | Reserva o rollout de conversões Google; ainda sem efeito operacional |
+| `GOOGLE_ADS_SYNC_ENABLED` | `0` | Liga rotas Control de OAuth/contas/métricas Google Ads |
+| `GOOGLE_CONVERSIONS_ENABLED` | `0` | Liga bindings/outbox e hook de venda→conversão Google |
+| `GOOGLE_ADS_OAUTH_CLIENT_ID` | vazio | OAuth Web client (GCP) |
+| `GOOGLE_ADS_OAUTH_CLIENT_SECRET` | vazio | Secret do client OAuth (secret manager) |
+| `GOOGLE_ADS_OAUTH_REDIRECT_URI` | vazio | Callback HTTPS do Control |
+| `GOOGLE_ADS_DEVELOPER_TOKEN` | vazio | Developer token (API Center do manager Revy); sem ele o app usa Fake* |
+| `GOOGLE_ADS_API_VERSION` | `v19` | Versão REST da Google Ads API |
 | `MULTI_WHATSAPP_ENABLED` | `0` | Reserva o rollout de múltiplos canais WhatsApp; ainda sem efeito operacional |
 | `REVY_CONTROL_DASHBOARD_ENABLED` | `0` | Reserva o rollout dos dashboards do Control; ainda sem efeito operacional |
 | `REVY_TRAFEGO_JOB_SECRET` | vazio | `POST /internal/jobs/meta-spend-sync` |

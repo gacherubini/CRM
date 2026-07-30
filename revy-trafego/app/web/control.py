@@ -30,14 +30,12 @@ from app.control.integrations import (
     UpsertPixel,
 )
 from app.control.google_ads import (
-    FakeGoogleAdsTokenExchanger,
     GoogleAdsConnectionControl,
     GoogleAdsConnectionNotFound,
     GoogleAdsConnectionView,
     GoogleAdsOAuthMisconfigured,
     GoogleAdsOAuthStateInvalid,
     GoogleAdsTokenExchangeError,
-    OAuthTokenBundle,
 )
 from app.control.google_ads_conversions import (
     ConversionBindingView,
@@ -45,6 +43,7 @@ from app.control.google_ads_conversions import (
     GoogleAdsConversionBindingNotFound,
     GoogleAdsInvalidConversionBinding,
 )
+from app.control.google_ads_http import build_google_ads_ports
 from app.control.google_ads_metrics import (
     GoogleAdsAccountNotFound,
     GoogleAdsAccountView,
@@ -144,15 +143,6 @@ from app.control.types import (
 )
 from app.db import SessionLocal, get_db
 
-# Injetável em testes para complete_oauth sem chamar Google.
-_google_ads_token_exchanger = FakeGoogleAdsTokenExchanger(
-    default_bundle=OAuthTokenBundle(
-        refresh_token="test-refresh-token-not-for-prod",
-        access_token="test-access-token",
-    )
-)
-
-
 def _control_enabled() -> None:
     if not settings.revy_control_enabled:
         raise HTTPException(
@@ -188,22 +178,38 @@ def _control_dashboard_enabled() -> None:
         )
 
 
+def _google_ads_ports():
+    """Ports Google: Fake* sem credenciais; HTTP quando env configurado."""
+    return build_google_ads_ports(settings)
+
+
 def _google_ads_control() -> GoogleAdsConnectionControl:
+    ports = _google_ads_ports()
     return GoogleAdsConnectionControl(
         SessionLocal,
         client_id=settings.google_ads_oauth_client_id,
         client_secret=settings.google_ads_oauth_client_secret,
         redirect_uri=settings.google_ads_oauth_redirect_uri,
-        token_exchanger=_google_ads_token_exchanger,
+        token_exchanger=ports.token_exchanger,
+        read_port=ports.read_port,
+        data_manager_port=ports.data_manager_port,
     )
 
 
 def _google_ads_metrics_control() -> GoogleAdsMetricsControl:
-    return GoogleAdsMetricsControl(SessionLocal)
+    ports = _google_ads_ports()
+    return GoogleAdsMetricsControl(
+        SessionLocal,
+        read_port=ports.read_port,
+    )
 
 
 def _google_ads_conversions_control() -> GoogleAdsConversionsControl:
-    return GoogleAdsConversionsControl(SessionLocal)
+    ports = _google_ads_ports()
+    return GoogleAdsConversionsControl(
+        SessionLocal,
+        data_manager_port=ports.data_manager_port,
+    )
 
 
 def _current_actor(

@@ -338,7 +338,17 @@ def test_gestor_sem_vinculo_nao_ve_conexao():
 
 def test_ports_nao_tem_mutate():
     """Contrato de fronteira: ports de leitura/ingest não expõem Mutate."""
-    for cls in (FakeGoogleAdsReadPort, FakeGoogleDataManagerPort):
+    from app.control.google_ads_http import (
+        HttpGoogleAdsReadPort,
+        HttpGoogleDataManagerPort,
+    )
+
+    for cls in (
+        FakeGoogleAdsReadPort,
+        FakeGoogleDataManagerPort,
+        HttpGoogleAdsReadPort,
+        HttpGoogleDataManagerPort,
+    ):
         methods = {name for name in dir(cls) if not name.startswith("_")}
         assert not any("mutate" in name.lower() for name in methods)
 
