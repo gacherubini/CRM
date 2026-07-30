@@ -1133,8 +1133,11 @@ def registrar_handoff_local(db: Session, usuario: Usuario, telefone: str, assumi
 
     Contas e cargos estruturais migram para o Revy Control; assumir/devolver
     e ``AtendimentoAtribuicao`` continuam operacionais aqui (não são cadastro
-    de equipe nem números WhatsApp/tokens).
+    de equipe nem números WhatsApp/tokens). Grava trilha formal em
+    ``loja_operacao_auditoria`` (telefone só como HMAC).
     """
+    from app.loja_operacao_auditoria import registrar_auditoria_atendimento
+
     telefone_hmac = identidade_telefone(telefone)
     if not telefone_hmac:
         raise ValueError("telefone inválido")
@@ -1146,20 +1149,45 @@ def registrar_handoff_local(db: Session, usuario: Usuario, telefone: str, assumi
     ).all()
     if assumir and len(ativas) == 1 and ativas[0].vendedor_email == usuario.email:
         return
+
+    de_email: str | None = None
+    if ativas:
+        # Preferência: responsável distinto do ator (reatribuição).
+        outros = [a.vendedor_email for a in ativas if a.vendedor_email != usuario.email]
+        de_email = outros[0] if outros else ativas[0].vendedor_email
+
     for atribuicao in ativas:
         atribuicao.ativa = False
         atribuicao.encerrada_em = instante
+
+    origem = "handoff_portal"
     if assumir:
+        acao_audit = "reatribuir" if de_email and de_email != usuario.email else "assumir"
+        para_email = usuario.email
         db.add(
             AtendimentoAtribuicao(
                 loja_slug=usuario.loja_slug,
                 telefone_hmac=telefone_hmac,
                 vendedor_email=usuario.email,
-                origem="handoff_portal",
+                origem=origem,
                 iniciada_em=instante,
                 ativa=True,
             )
         )
+    else:
+        acao_audit = "devolver"
+        para_email = None
+
+    registrar_auditoria_atendimento(
+        db,
+        loja_slug=usuario.loja_slug,
+        acao=acao_audit,
+        ator_email=usuario.email,
+        telefone_hmac=telefone_hmac,
+        de_email=de_email,
+        para_email=para_email,
+        origem=origem,
+    )
     db.commit()
 
 
@@ -2956,11 +2984,26 @@ async def financeiras_upsert(
             f"/app/financeiras?erro=campos&provedor={nome}", status_code=303
         )
 
+    from app.loja_operacao_auditoria import registrar_auditoria_financeira
+
     if not motor.configurado:
+        try:
+            registrar_auditoria_financeira(
+                db,
+                loja_slug=usuario.loja_slug,
+                acao="upsert",
+                ator_email=usuario.email,
+                provedor=nome,
+                success=False,
+                error_code="motor_nao_configurado",
+                commit=True,
+            )
+        except Exception:
+            db.rollback()
         return RedirectResponse("/app/financeiras?erro=motor", status_code=303)
 
     try:
-        # Senha só no BFF → Motor; não logar form/body.
+        # Senha só no BFF → Motor; não logar form/body nem gravar na auditoria.
         motor.upsert_credencial(
             nome=nome,
             usuario=usuario_banco,
@@ -2969,7 +3012,34 @@ async def financeiras_upsert(
             campos=campos or None,
         )
     except MotorIndisponivel:
+        try:
+            registrar_auditoria_financeira(
+                db,
+                loja_slug=usuario.loja_slug,
+                acao="upsert",
+                ator_email=usuario.email,
+                provedor=nome,
+                success=False,
+                error_code="motor_indisponivel",
+                commit=True,
+            )
+        except Exception:
+            db.rollback()
         return RedirectResponse("/app/financeiras?erro=motor", status_code=303)
+
+    try:
+        registrar_auditoria_financeira(
+            db,
+            loja_slug=usuario.loja_slug,
+            acao="upsert",
+            ator_email=usuario.email,
+            provedor=nome,
+            success=True,
+            commit=True,
+        )
+    except Exception:
+        db.rollback()
+        logger.exception("falha ao auditar upsert financeira provedor=%s", nome)
 
     return RedirectResponse(
         f"/app/financeiras?ok=salvo&provedor={nome}", status_code=303
@@ -3001,19 +3071,76 @@ async def financeiras_testar(
     if not csrf_valido(request, form.get("csrf")):
         return RedirectResponse("/app/financeiras?erro=csrf", status_code=303)
 
+    from app.loja_operacao_auditoria import registrar_auditoria_financeira
+
     if not motor.configurado:
+        try:
+            registrar_auditoria_financeira(
+                db,
+                loja_slug=usuario.loja_slug,
+                acao="testar",
+                ator_email=usuario.email,
+                provedor=nome,
+                success=False,
+                error_code="motor_nao_configurado",
+                commit=True,
+            )
+        except Exception:
+            db.rollback()
         return RedirectResponse("/app/financeiras?erro=motor", status_code=303)
 
     try:
         resultado = motor.testar_login(nome, ator=usuario.email)
     except CredencialNaoEncontrada:
+        try:
+            registrar_auditoria_financeira(
+                db,
+                loja_slug=usuario.loja_slug,
+                acao="testar",
+                ator_email=usuario.email,
+                provedor=nome,
+                success=False,
+                error_code="sem_credencial",
+                commit=True,
+            )
+        except Exception:
+            db.rollback()
         return RedirectResponse(
             f"/app/financeiras?erro=sem_credencial&provedor={nome}", status_code=303
         )
     except MotorIndisponivel:
+        try:
+            registrar_auditoria_financeira(
+                db,
+                loja_slug=usuario.loja_slug,
+                acao="testar",
+                ator_email=usuario.email,
+                provedor=nome,
+                success=False,
+                error_code="motor_indisponivel",
+                commit=True,
+            )
+        except Exception:
+            db.rollback()
         return RedirectResponse("/app/financeiras?erro=motor", status_code=303)
 
     status_teste = resultado.get("status") or "ok"
+    sucesso = status_teste in {"ok", "sucesso", "success", "placeholder"}
+    try:
+        registrar_auditoria_financeira(
+            db,
+            loja_slug=usuario.loja_slug,
+            acao="testar",
+            ator_email=usuario.email,
+            provedor=nome,
+            success=sucesso,
+            error_code=None if sucesso else str(status_teste)[:80],
+            commit=True,
+        )
+    except Exception:
+        db.rollback()
+        logger.exception("falha ao auditar teste financeira provedor=%s", nome)
+
     return RedirectResponse(
         f"/app/financeiras?teste={status_teste}&provedor={nome}", status_code=303
     )

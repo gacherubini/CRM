@@ -138,6 +138,45 @@ class AtendimentoAtribuicao(Base):
     ativa: Mapped[bool] = mapped_column(Boolean, default=True, index=True)
 
 
+class LojaOperacaoAuditoria(Base):
+    """Trilha append-only de operações da Loja (atendimento + financeiras).
+
+    Nunca grava telefone em claro (só HMAC) nem senha/token de banco.
+    """
+
+    __tablename__ = "loja_operacao_auditoria"
+    __table_args__ = (
+        CheckConstraint(
+            "dominio IN ('atendimento', 'financeira')",
+            name="ck_loja_operacao_auditoria_dominio",
+        ),
+        Index(
+            "ix_loja_operacao_auditoria_loja_dominio_criado",
+            "loja_slug",
+            "dominio",
+            "criado_em",
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=novo_id)
+    loja_slug: Mapped[str] = mapped_column(String(120), nullable=False, index=True)
+    dominio: Mapped[str] = mapped_column(String(20), nullable=False, index=True)
+    # atendimento: assumir|devolver|reatribuir
+    # financeira: upsert|testar|revogar
+    acao: Mapped[str] = mapped_column(String(40), nullable=False, index=True)
+    ator_email: Mapped[str] = mapped_column(String(320), nullable=False)
+    telefone_hmac: Mapped[Optional[str]] = mapped_column(String(64), nullable=True, index=True)
+    de_email: Mapped[Optional[str]] = mapped_column(String(320), nullable=True)
+    para_email: Mapped[Optional[str]] = mapped_column(String(320), nullable=True)
+    origem: Mapped[Optional[str]] = mapped_column(String(40), nullable=True)
+    provedor: Mapped[Optional[str]] = mapped_column(String(80), nullable=True, index=True)
+    success: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True)
+    error_code: Mapped[Optional[str]] = mapped_column(String(80), nullable=True)
+    criado_em: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=agora, nullable=False, index=True
+    )
+
+
 class FunilEvento(Base):
     """Evento imutável do funil, sempre isolado por loja e lead."""
 

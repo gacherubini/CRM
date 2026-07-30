@@ -299,8 +299,9 @@ separadas de lead, conversa, simulação e venda.
       *(`/app/equipe` e `/app/loja/equipe` read-only para dono/gerente; nav Ajustes → Equipe)*
 - [x] Manter distribuição, reatribuição, fila e produtividade no Revy Loja.
       *(`registrar_handoff_local` / AtendimentoAtribuicao / assumir-devolver — documentado em código)*
-- [ ] Auditar mudança de responsável por atendimento.
-      *(atribuicao já grava histórico ativo/encerrado; trilha de auditoria formal fica residual)*
+- [x] Auditar mudança de responsável por atendimento.
+      *(`loja_operacao_auditoria` dominio=atendimento: assumir|devolver|reatribuir;
+      telefone só HMAC; escrito em `registrar_handoff_local`)*
 - [x] Não mostrar números WhatsApp, tokens ou integrações como cadastro de equipe.
       *(lista só nome/papel/ativo; sem e-mail em modo leitura shell)*
 
@@ -314,8 +315,9 @@ separadas de lead, conversa, simulação e venda.
 - [x] Autorizar somente dono e gerente. *(`pode_gerir_financeiras`; vendedor 403)*
 - [x] Nunca reapresentar segredo em claro; permitir substituir e testar.
       *(templates + testes; redirect pós-save sem senha no HTML)*
-- [~] Auditar criação, troca, teste e revogação sem registrar o segredo.
-      *(Motor já recebe `ator` no upsert/teste; auditoria formal de revogação no Control residual)*
+- [x] Auditar criação, troca, teste e revogação sem registrar o segredo.
+      *(`loja_operacao_auditoria` dominio=financeira: upsert|testar; success/error_code;
+      nunca senha; revogar endpoint ausente no Portal — ação reservada na tabela)*
 - [ ] Confirmar que Admin Revy e gestor de tráfego não recebem esse payload pelo Control.
       *(gate Control; fora do escopo de código Portal F5 lean)*
 - [x] Tratar banco ainda não configurado como pendência operacional de Vendas, sem
@@ -324,8 +326,8 @@ separadas de lead, conversa, simulação e venda.
 
 **Critério de pronto:** Control define quem compõe a loja; Loja distribui o trabalho;
 somente dono/gerente administram acesso aos bancos.
-*(Lean F5: limite Control/Loja aplicado no Portal com flag; projeção Control completa e
-auditoria formal residual F6–F8 / plano Control.)*
+*(F5: limite Control/Loja + auditoria formal de handoff e acessos bancários no Portal;
+gate Admin Revy / tráfego permanece no plano Control.)*
 
 Esse é o corte mínimo recomendado para o primeiro MVP comercial do Revy Loja.
 
