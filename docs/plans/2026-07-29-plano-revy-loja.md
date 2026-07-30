@@ -1,11 +1,12 @@
 # Plano — Evolução do Portal para Revy Loja
 
-**Status:** ATIVO / NÃO IMPLEMENTADO
+**Status:** ATIVO / F0–F1 em código (flags default OFF)
 **Data:** 2026-07-29
 **Spec:** [`docs/superpowers/specs/2026-07-29-revy-loja-design.md`](../superpowers/specs/2026-07-29-revy-loja-design.md)
 **Depende por gates de:** [`Plano Revy Control`](2026-07-29-plano-revy-control.md) —
 o desenvolvimento não espera o Control inteiro terminar.
 **Vocabulário:** [`CONTEXT.md`](../../CONTEXT.md)
+**Mapa de rotas F0:** [`portal-gestao/docs/revy-loja-route-map.md`](../../portal-gestao/docs/revy-loja-route-map.md)
 
 ## Objetivo
 
@@ -89,16 +90,18 @@ produção respeita esses gates.
 
 ## Fase 0 — Baseline e segurança de migração
 
-- [ ] Registrar os 809 testes e comandos exatos por serviço.
+- [x] Registrar os 809 testes e comandos exatos por serviço.
+      (comandos no mapa de rotas; contagens de referência do plano — reexecução integral opcional)
 - [ ] Versionar fixtures sanitizadas dos contratos Portal → Chatbot, Motor, Estoque
       e Revy Control.
-- [ ] Mapear todas as rotas, templates e itens de navegação atuais para um destino.
-- [ ] Classificar cada configuração como estrutural, técnica, operacional ou financeira.
-- [ ] Criar flags default off:
+- [x] Mapear todas as rotas, templates e itens de navegação atuais para um destino.
+      → `portal-gestao/docs/revy-loja-route-map.md`
+- [x] Classificar cada configuração como estrutural, técnica, operacional ou financeira.
+- [x] Criar flags default off:
       `REVY_LOJA_SHELL_ENABLED`, `REVY_LOJA_ENTITLEMENTS_ENABLED`,
       `REVY_LOJA_ATENDIMENTO_ENABLED` e `SELLER_AI_ENABLED`.
 - [ ] Confirmar backup e restauração do banco do Portal.
-- [ ] Definir redirects e rollback antes da primeira remoção visual.
+- [x] Definir redirects e rollback antes da primeira remoção visual.
 
 **Critério de pronto:** nenhuma função atual fica sem destino, e o shell antigo pode
 ser restaurado apenas desligando flags.
@@ -115,33 +118,36 @@ Criar interfaces em `portal-gestao/app/loja/`:
 - `entitlements.py`: resolve Vendas/Estoque habilitados;
 - `navigation.py`: produz navegação permitida;
 - `types.py`: contratos independentes de FastAPI/SQLAlchemy.
+- `control_projection.py`, `permissions.py` (+ wiring `app/web/loja_shell.py`).
 
 ### Tarefas
 
-- [ ] Criar port `ControlProjectionPort` com adapter HTTP e adapter em memória.
-- [ ] Aceitar contrato versionado e idempotente de pessoa, cargo, estado da loja e entitlement.
-- [ ] Manter `Usuario` atual como projeção compatível durante o cutover.
-- [ ] Permitir que uma pessoa escolha entre lojas autorizadas.
-- [ ] Permitir múltiplos cargos na mesma loja sem papel global implícito.
-- [ ] Calcular permissões pela união dos cargos ativos da loja selecionada; acesso da
+- [x] Criar port `ControlProjectionPort` com adapter HTTP e adapter em memória.
+- [x] Aceitar contrato versionado e idempotente de pessoa, cargo, estado da loja e entitlement.
+- [x] Manter `Usuario` atual como projeção compatível durante o cutover.
+- [x] Permitir que uma pessoa escolha entre lojas autorizadas.
+- [x] Permitir múltiplos cargos na mesma loja sem papel global implícito.
+- [x] Calcular permissões pela união dos cargos ativos da loja selecionada; acesso da
       mesma pessoa ao Revy Control não concede nenhuma permissão operacional extra.
-- [ ] Renderizar somente Vendas e/ou Estoque conforme contrato.
-- [ ] Manter autorização no backend; menu oculto não é controle de acesso.
-- [ ] Definir degradação segura quando o Control estiver indisponível: sessão e
+- [x] Renderizar somente Vendas e/ou Estoque conforme contrato.
+- [x] Manter autorização no backend; menu oculto não é controle de acesso.
+- [~] Definir degradação segura quando o Control estiver indisponível: sessão e
       entitlement previamente válidos podem usar cache curto; mudança estrutural não.
+      (fail-open por flag + projeção local; cache curto de sessão fica para F1+/Control HTTP)
 
 ### Testes
 
-- [ ] Pessoa alterna entre duas lojas sem misturar sessão ou dados.
-- [ ] Cargo de uma loja não concede acesso em outra.
-- [ ] Pessoa que também é gestora no Control continua limitada aos cargos da Loja ao
+- [x] Pessoa alterna entre duas lojas sem misturar sessão ou dados.
+- [x] Cargo de uma loja não concede acesso em outra.
+- [x] Pessoa que também é gestora no Control continua limitada aos cargos da Loja ao
       entrar no Revy Loja.
-- [ ] Loja sem Estoque recebe 403 nas rotas de Estoque.
-- [ ] Entitlement suspenso bloqueia novo processamento e preserva histórico.
-- [ ] Loja suspensa não inicia atendimento, simulação, venda ou alteração de estoque,
+- [x] Loja sem Estoque recebe 403 nas rotas de Estoque.
+- [x] Entitlement suspenso bloqueia novo processamento e preserva histórico.
+- [~] Loja suspensa não inicia atendimento, simulação, venda ou alteração de estoque,
       mesmo por URL/API direta; histórico autorizado continua legível.
-- [ ] Convite ainda não ativado e acesso revogado não criam sessão na Loja.
-- [ ] Payload repetido do Control é idempotente.
+      (gate estoque+vendas write com flag; cobertura total de simulação/atendimento F2–F4)
+- [x] Convite ainda não ativado e acesso revogado não criam sessão na Loja.
+- [x] Payload repetido do Control é idempotente.
 
 **Critério de pronto:** a navegação possui somente dois módulos e nenhuma autorização
 depende apenas de `loja_slug` ou do papel legado.

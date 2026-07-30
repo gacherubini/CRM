@@ -28,14 +28,38 @@
   <div class="app-shell">
     <aside class="sidebar" id="sidebar" aria-label="Navegação da aplicação">
       <div class="sidebar-brand-row">
-        <a class="brand" href="/app" aria-label="Revy — página inicial">
+        <a class="brand" href="/app" aria-label="{% if loja_shell %}{{ loja_brand }}{% else %}Revy{% endif %} — página inicial">
           <span class="brand-mark" aria-hidden="true">R</span>
-          <span><strong>Revy</strong><small>{{ usuario.loja_slug }}</small></span>
+          <span>
+            <strong>{% if loja_shell %}{{ loja_brand }}{% else %}Revy{% endif %}</strong>
+            <small>{% if store_context %}{{ store_context.loja_slug }}{% else %}{{ usuario.loja_slug }}{% endif %}</small>
+          </span>
         </a>
         <button class="drawer-close" type="button" aria-label="Fechar menu">×</button>
       </div>
 
       <nav class="nav" aria-label="Menu principal">
+        {% if loja_shell and loja_nav %}
+        {# Shell Revy Loja: somente Vendas / Estoque (+ acessos bancários contextuais). #}
+        {% for section in loja_nav %}
+        <span class="nav-section">{{ section.title }}</span>
+        {% for item in section.items %}
+        {% set item_active = (path == item.href) or (item.active_prefix and path.startswith(item.active_prefix) and not (item.href == '/app/loja/estoque' and path.startswith('/app/loja/estoque/veiculos'))) %}
+        <a class="nav-link {{ 'active' if item_active else '' }}" href="{{ item.href }}" {% if item_active %}aria-current="page"{% endif %}>{{ item.label }}</a>
+        {% endfor %}
+        {% endfor %}
+        {% if lojas_disponiveis and lojas_disponiveis|length > 1 %}
+        <span class="nav-section">Loja</span>
+        <form action="/app/loja/selecionar" method="post" class="nav-loja-switch">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          <select name="loja_slug" onchange="this.form.submit()" aria-label="Selecionar loja">
+            {% for slug in lojas_disponiveis %}
+            <option value="{{ slug }}" {% if store_context and store_context.loja_slug == slug %}selected{% endif %}>{{ slug }}</option>
+            {% endfor %}
+          </select>
+        </form>
+        {% endif %}
+        {% else %}
         <span class="nav-section">Dia a dia</span>
         <a class="nav-link {{ 'active' if path == '/app' else '' }}" href="/app" {% if path == '/app' %}aria-current="page"{% endif %}>Visão geral</a>
         <a class="nav-link {{ 'active' if path.startswith('/app/leads') else '' }}" href="/app/leads" {% if path.startswith('/app/leads') %}aria-current="page"{% endif %}>Leads</a>
@@ -74,6 +98,7 @@
         <a class="nav-link {{ 'active' if path.startswith('/app/configuracoes') else '' }}" href="/app/configuracoes" {% if path.startswith('/app/configuracoes') %}aria-current="page"{% endif %}>Ajustes</a>
         {% endif %}
         {% endif %}
+        {% endif %}
       </nav>
 
       <div class="sidebar-footer">
@@ -97,11 +122,20 @@
           <small>{{ usuario.nome }} · {{ usuario.papel | replace('_', ' ') }}</small>
         </div>
         <div class="topbar-actions">
+          {% if loja_shell %}
+          {% if entitlements is defined and entitlements and entitlements.vendas_enabled %}
+          <a class="button secondary topbar-btn" href="/app/loja/atendimento">Atendimento</a>
+          {% endif %}
+          {% if usuario.papel in ['dono', 'gerente'] and entitlements is defined and entitlements and entitlements.estoque_enabled %}
+          <a class="button primary topbar-btn" href="/app/estoque/novo">+ Veículo</a>
+          {% endif %}
+          {% else %}
           {% if usuario.papel in ['dono', 'gerente', 'vendedor', 'admin_plataforma'] %}
           <a class="button secondary topbar-btn" href="/app/simulacoes">Simular</a>
           {% endif %}
           {% if usuario.papel in ['dono', 'gerente'] %}
           <a class="button primary topbar-btn" href="/app/estoque/novo">+ Veículo</a>
+          {% endif %}
           {% endif %}
         </div>
         <div class="topbar-user" title="{{ usuario.email }}">

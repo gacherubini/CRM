@@ -20,6 +20,22 @@ Frontend operacional da loja, servido por FastAPI com páginas Jinja. O token da
   `/v1/operacao/numeros-autorizados`;
 - **Acessos bancos** (credenciais do Motor cifradas; exige `MOTOR_ENCRYPTION_KEY` no Motor).
 
+### Revy Loja (shell / entitlements — default OFF)
+
+Evolução do portal para o shell operacional **Revy Loja** (Vendas + Estoque). Com flags
+desligadas a UI legada permanece idêntica. Mapa de rotas:
+[`docs/revy-loja-route-map.md`](docs/revy-loja-route-map.md).
+
+| Variável | Default | Efeito |
+|---|---|---|
+| `REVY_LOJA_SHELL_ENABLED` | `0` | `1` = brand/nav Vendas·Estoque; `0` = menu legado |
+| `REVY_LOJA_ENTITLEMENTS_ENABLED` | `0` | `1` = 403 se módulo não contratado/ativo; `0` = fail-open |
+| `REVY_LOJA_ATENDIMENTO_ENABLED` | `0` | Workspace unificado (F4+); ainda não altera rotas |
+| `SELLER_AI_ENABLED` | `0` | Seller AI (F7+); ainda não altera rotas |
+
+Backend: `app/loja/*` (domínio) + `app/web/loja_shell.py` (router/hooks).  
+Projeção: reutiliza `app.provisioning.allows_processing` / `LojaOperacionalProjecao`.
+
 ### Tráfego / Meta (E10 + Revy Tráfego)
 
 Config técnica (Pixel, CAPI, campanhas, spend) é operada no app **`revy-trafego`**.  

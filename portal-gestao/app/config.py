@@ -2,6 +2,33 @@ import os
 from dataclasses import dataclass
 
 
+def _env_bool(name: str, default: str = "0") -> bool:
+    return os.getenv(name, default).strip().lower() in {"1", "true", "yes", "on"}
+
+
+# --- Revy Loja (flags default OFF; leem env em runtime para testes/monkeypatch) ---
+
+
+def revy_loja_shell_enabled() -> bool:
+    """Shell com nav Vendas/Estoque. Default off = UI legada do portal."""
+    return _env_bool("REVY_LOJA_SHELL_ENABLED", "0")
+
+
+def revy_loja_entitlements_enabled() -> bool:
+    """Gates de módulo via projeção/Control. Default off = fail-open legado."""
+    return _env_bool("REVY_LOJA_ENTITLEMENTS_ENABLED", "0")
+
+
+def revy_loja_atendimento_enabled() -> bool:
+    """Workspace unificado de Atendimento (F4+). Default off."""
+    return _env_bool("REVY_LOJA_ATENDIMENTO_ENABLED", "0")
+
+
+def seller_ai_enabled() -> bool:
+    """Seller AI (F7+). Default off."""
+    return _env_bool("SELLER_AI_ENABLED", "0")
+
+
 @dataclass(frozen=True)
 class Settings:
     database_url: str = os.getenv("PORTAL_DATABASE_URL", "sqlite:///./portal.db")
@@ -70,6 +97,15 @@ class Settings:
         or os.getenv("PORTAL_PROVISIONING_TOKEN")
         or ""
     ).strip()
+    # Revy Loja — snapshot no boot (preferir helpers revy_loja_*_enabled() em runtime).
+    revy_loja_shell_enabled: bool = _env_bool("REVY_LOJA_SHELL_ENABLED", "0")
+    revy_loja_entitlements_enabled: bool = _env_bool(
+        "REVY_LOJA_ENTITLEMENTS_ENABLED", "0"
+    )
+    revy_loja_atendimento_enabled: bool = _env_bool(
+        "REVY_LOJA_ATENDIMENTO_ENABLED", "0"
+    )
+    seller_ai_enabled: bool = _env_bool("SELLER_AI_ENABLED", "0")
 
 
 settings = Settings()

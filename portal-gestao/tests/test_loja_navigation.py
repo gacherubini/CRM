@@ -1,0 +1,127 @@
+"""Shell de navegação Revy Loja (F0/F1) — flags default off preservam legado."""
+from conftest import csrf_da_resposta, login
+
+from app.loja.navigation import build_nav, flatten_nav, nav_item_is_active
+from app.loja.types import EntitlementState, NavItem, StoreContext
+
+
+def _store(roles=("dono",), slug="loja-teste"):
+    return StoreContext(loja_slug=slug, roles=frozenset(roles), loja_state="ativa")
+
+
+def _ents(vendas=True, estoque=True, ativa=True, slug="loja-teste"):
+    return EntitlementState(
+        loja_slug=slug,
+        loja_ativa=ativa,
+        vendas_enabled=vendas,
+        estoque_enabled=estoque,
+        source="test",
+    )
+
+
+def test_nav_somente_vendas_e_estoque_com_acessos_bancarios():
+    sections = build_nav(_store(), _ents(), shell_enabled=True)
+    titles = [s.title for s in sections]
+    assert titles == ["Vendas", "Estoque", "Ajustes"]
+    items = flatten_nav(sections)
+    labels = [i.label for i in items]
+    assert labels == [
+        "Visão geral",
+        "Atendimento",
+        "Visão geral",
+        "Veículos",
+        "Acessos bancários",
+    ]
+    hrefs = {i.href for i in items}
+    assert "/app/loja/vendas" in hrefs
+    assert "/app/loja/atendimento" in hrefs
+    assert "/app/loja/estoque" in hrefs
+    assert "/app/loja/estoque/veiculos" in hrefs
+    assert "/app/financeiras" in hrefs
+    # Sem config técnica
+    assert not any("trafego" in i.href or "campanhas" in i.href for i in items)
+    assert not any("configuracoes" in i.href for i in items)
+    assert not any("operacao" in i.href for i in items)
+
+
+def test_nav_oculta_estoque_sem_entitlement():
+    sections = build_nav(_store(), _ents(estoque=False), shell_enabled=True)
+    titles = [s.title for s in sections]
+    assert "Estoque" not in titles
+    assert "Vendas" in titles
+
+
+def test_nav_vendedor_sem_acessos_bancarios():
+    sections = build_nav(_store(roles=("vendedor",)), _ents(), shell_enabled=True)
+    items = flatten_nav(sections)
+    assert not any(i.href == "/app/financeiras" for i in items)
+
+
+def test_nav_shell_desligado_vazio():
+    assert build_nav(_store(), _ents(), shell_enabled=False) == ()
+
+
+def test_nav_item_active_prefix_estoque():
+    visao = NavItem(
+        label="Visão geral",
+        href="/app/loja/estoque",
+        section="Estoque",
+        active_prefix="/app/loja/estoque",
+    )
+    veiculos = NavItem(
+        label="Veículos",
+        href="/app/loja/estoque/veiculos",
+        section="Estoque",
+        active_prefix="/app/loja/estoque/veiculos",
+    )
+    assert nav_item_is_active(visao, "/app/loja/estoque") is True
+    assert nav_item_is_active(visao, "/app/loja/estoque/veiculos") is False
+    assert nav_item_is_active(veiculos, "/app/loja/estoque/veiculos") is True
+
+
+def test_shell_off_mantem_nav_legado(client, monkeypatch):
+    monkeypatch.setenv("REVY_LOJA_SHELL_ENABLED", "0")
+    login(client)
+    r = client.get("/app/estoque")
+    assert r.status_code == 200
+    assert 'href="/app/simulacoes"' in r.text
+    assert 'href="/app/equipe"' in r.text
+    assert "Revy Loja" not in r.text or "Revy" in r.text
+    assert 'href="/app/loja/vendas"' not in r.text
+
+
+def test_shell_on_exibe_brand_e_nav_modulos(client, monkeypatch):
+    monkeypatch.setenv("REVY_LOJA_SHELL_ENABLED", "1")
+    monkeypatch.setenv("REVY_LOJA_ENTITLEMENTS_ENABLED", "0")
+    login(client)
+    r = client.get("/app")
+    assert r.status_code == 200
+    assert "Revy Loja" in r.text
+    assert 'href="/app/loja/vendas"' in r.text
+    assert 'href="/app/loja/atendimento"' in r.text
+    assert 'href="/app/loja/estoque"' in r.text
+    assert 'href="/app/loja/estoque/veiculos"' in r.text
+    # Menu técnico some do shell
+    assert 'href="/app/simulacoes"' not in r.text
+    assert 'href="/app/configuracoes"' not in r.text
+    assert 'href="/app/equipe"' not in r.text
+
+
+def test_shell_stubs_redirecionam(client, monkeypatch):
+    monkeypatch.setenv("REVY_LOJA_SHELL_ENABLED", "1")
+    monkeypatch.setenv("REVY_LOJA_ENTITLEMENTS_ENABLED", "0")
+    login(client)
+    r = client.get("/app/loja/atendimento", follow_redirects=False)
+    assert r.status_code == 303
+    assert r.headers["location"] == "/app/leads"
+    r2 = client.get("/app/loja/estoque/veiculos", follow_redirects=False)
+    assert r2.status_code == 303
+    assert r2.headers["location"] == "/app/estoque"
+
+
+def test_shell_off_stubs_ainda_redirecionam_legado(client, monkeypatch):
+    monkeypatch.setenv("REVY_LOJA_SHELL_ENABLED", "0")
+    login(client)
+    r = client.get("/app/loja/vendas", follow_redirects=False)
+    assert r.status_code == 303
+    assert r.headers["location"] == "/app"

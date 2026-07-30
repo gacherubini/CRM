@@ -91,7 +91,14 @@ from app.resultados_dono import (
     resumo_from_api,
     resumo_periodo,
 )
-from app.config import settings
+from app.config import (
+    revy_loja_entitlements_enabled,
+    revy_loja_shell_enabled,
+    settings,
+)
+from app.web.loja_shell import check_module_access, router as loja_shell_router
+from app.web import loja_shell as loja_shell_mod
+from app.loja.types import Module
 from app.roi_calc import calcular_roi_loja, gerar_insights_roi, totais_roi, venda_casa_campanha
 from app.clients.chatbot import (
     ChatbotClient,
@@ -289,6 +296,7 @@ app.add_middleware(
     max_age=60 * 60 * 10,
 )
 app.mount("/static", StaticFiles(directory=str(BASE_DIR / "static")), name="static")
+app.include_router(loja_shell_router)
 
 @app.middleware("http")
 async def headers_seguranca(request: Request, call_next):
@@ -369,14 +377,33 @@ def redirecionar_login() -> RedirectResponse:
     return RedirectResponse("/login", status_code=303)
 
 
-def contexto(request: Request, usuario=None, **extra):
-    return {
+def contexto(request: Request, usuario=None, db: Session | None = None, **extra):
+    ctx = {
         "request": request,
         "usuario": usuario,
         "csrf": csrf_token(request),
         "versao": settings.version,
         **extra,
     }
+    # Shell Revy Loja (flag off → sem loja_nav; base.html mantém nav legado).
+    if (
+        revy_loja_shell_enabled()
+        and usuario is not None
+        and "loja_nav" not in extra
+    ):
+        session = db
+        owned = False
+        if session is None and revy_loja_entitlements_enabled():
+            session = SessionLocal()
+            owned = True
+        try:
+            if usuario is not None:
+                loja_shell_mod.ensure_session_loja(request, usuario)
+            ctx.update(loja_shell_mod.template_extras(request, usuario, session))
+        finally:
+            if owned and session is not None:
+                session.close()
+    return ctx
 
 
 @app.get("/health/live")
@@ -605,6 +632,9 @@ def estoque_lista(
     usuario = usuario_atual(request, db)
     if not usuario:
         return redirecionar_login()
+    blocked = check_module_access(request, usuario, db, Module.ESTOQUE)
+    if blocked is not None:
+        return blocked
     veiculos, erro = [], None
     publicado_bool = None if publicado in (None, "") else publicado == "true"
     try:
@@ -618,6 +648,7 @@ def estoque_lista(
         contexto(
             request,
             usuario,
+            db=db,
             veiculos=veiculos,
             filtros={"tipo": tipo or "", "status": status or "", "publicado": publicado or "", "busca": busca or ""},
             integracao_erro=erro,
@@ -632,11 +663,21 @@ def estoque_novo(request: Request, db: Session = Depends(get_db)):
     usuario = usuario_atual(request, db)
     if not usuario:
         return redirecionar_login()
+    blocked = check_module_access(request, usuario, db, Module.ESTOQUE)
+    if blocked is not None:
+        return blocked
     if not pode_gerir_estoque(usuario):
         return RedirectResponse("/app/estoque", status_code=303)
     return templates.TemplateResponse(
         "estoque/form.html",
-        contexto(request, usuario, veiculo=None, titulo="Cadastrar veículo", pode_custo=True),
+        contexto(
+            request,
+            usuario,
+            db=db,
+            veiculo=None,
+            titulo="Cadastrar veículo",
+            pode_custo=True,
+        ),
     )
 
 
@@ -770,6 +811,9 @@ async def estoque_criar(
     usuario = usuario_atual(request, db)
     if not usuario:
         return redirecionar_login()
+    blocked = check_module_access(request, usuario, db, Module.ESTOQUE)
+    if blocked is not None:
+        return blocked
     form = await request.form()
     if not pode_gerir_estoque(usuario) or not csrf_valido(request, form.get("csrf")):
         return RedirectResponse("/app/estoque", status_code=303)
@@ -778,7 +822,7 @@ async def estoque_criar(
     except (EstoqueIndisponivel, ValueError) as exc:
         return templates.TemplateResponse(
             "estoque/form.html",
-            contexto(request, usuario, veiculo=dict(form), titulo="Cadastrar veículo", erro=str(exc), pode_custo=pode_ver_custo(usuario)),
+            contexto(request, usuario, db=db, veiculo=dict(form), titulo="Cadastrar veículo", erro=str(exc), pode_custo=pode_ver_custo(usuario)),
             status_code=422,
         )
     return RedirectResponse("/app/estoque?ok=criado", status_code=303)
@@ -794,21 +838,24 @@ def estoque_editar_pagina(
     usuario = usuario_atual(request, db)
     if not usuario:
         return redirecionar_login()
+    blocked = check_module_access(request, usuario, db, Module.ESTOQUE)
+    if blocked is not None:
+        return blocked
     if not pode_gerir_estoque(usuario):
         return RedirectResponse("/app/estoque", status_code=303)
     try:
         veiculo = estoque.obter(veiculo_id)
     except VeiculoNaoEncontrado as exc:
         return templates.TemplateResponse(
-            "erro.html", contexto(request, usuario, erro=str(exc)), status_code=404
+            "erro.html", contexto(request, usuario, db=db, erro=str(exc)), status_code=404
         )
     except EstoqueIndisponivel as exc:
         return templates.TemplateResponse(
-            "erro.html", contexto(request, usuario, erro=str(exc)), status_code=503
+            "erro.html", contexto(request, usuario, db=db, erro=str(exc)), status_code=503
         )
     return templates.TemplateResponse(
         "estoque/form.html",
-        contexto(request, usuario, veiculo=veiculo, titulo="Editar veículo", pode_custo=pode_ver_custo(usuario)),
+        contexto(request, usuario, db=db, veiculo=veiculo, titulo="Editar veículo", pode_custo=pode_ver_custo(usuario)),
     )
 
 
@@ -822,6 +869,9 @@ async def estoque_editar(
     usuario = usuario_atual(request, db)
     if not usuario:
         return redirecionar_login()
+    blocked = check_module_access(request, usuario, db, Module.ESTOQUE)
+    if blocked is not None:
+        return blocked
     form = await request.form()
     if not pode_gerir_estoque(usuario) or not csrf_valido(request, form.get("csrf")):
         return RedirectResponse("/app/estoque", status_code=303)
@@ -830,7 +880,7 @@ async def estoque_editar(
     except (EstoqueIndisponivel, ValueError) as exc:
         return templates.TemplateResponse(
             "estoque/form.html",
-            contexto(request, usuario, veiculo={**dict(form), "id": veiculo_id}, titulo="Editar veículo", erro=str(exc), pode_custo=pode_ver_custo(usuario)),
+            contexto(request, usuario, db=db, veiculo={**dict(form), "id": veiculo_id}, titulo="Editar veículo", erro=str(exc), pode_custo=pode_ver_custo(usuario)),
             status_code=422,
         )
     return RedirectResponse("/app/estoque?ok=atualizado", status_code=303)
@@ -847,6 +897,9 @@ async def estoque_acao(
     usuario = usuario_atual(request, db)
     if not usuario:
         return redirecionar_login()
+    blocked = check_module_access(request, usuario, db, Module.ESTOQUE)
+    if blocked is not None:
+        return blocked
     form = await request.form()
     if not pode_gerir_estoque(usuario) or not csrf_valido(request, form.get("csrf")):
         return RedirectResponse("/app/estoque", status_code=303)
@@ -2007,6 +2060,10 @@ async def vendas_criar(
         return RedirectResponse(
             "/app/vendas?erro=loja-nao-operacional", status_code=303
         )
+    # Com entitlements on, módulo Vendas suspenso também bloqueia novo registro.
+    blocked = check_module_access(request, usuario, db, Module.VENDAS)
+    if blocked is not None:
+        return blocked
     valores = {
         campo: (form.get(campo) or "")
         for campo in ("descricao", "preco_venda", "lead_ref", "veiculo_ref", "custo_veiculo", "custo_categoria", "custo_valor")
