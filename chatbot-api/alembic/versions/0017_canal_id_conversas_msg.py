@@ -1,7 +1,7 @@
 """canal_id em conversas/mensagens + estado no canal (multi-WA expand).
 
-Revision ID: 0017_canal_id_conversas_mensagens
-Revises: 0015_whatsapp_canais
+Revision ID: 0017_canal_id_conversas_msg
+Revises: 0016_lead_google_click_ids
 
 Expand:
 - whatsapp_canais.estado (pendente|conectado|desconectado|inativo)
@@ -15,7 +15,7 @@ from alembic import op
 import sqlalchemy as sa
 
 
-revision = "0017_canal_id_conversas_mensagens"
+revision = "0017_canal_id_conversas_msg"
 down_revision = "0016_lead_google_click_ids"
 branch_labels = None
 depends_on = None
