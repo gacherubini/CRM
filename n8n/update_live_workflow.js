@@ -121,15 +121,13 @@ async function main() {
   );
   const existingInventory = nodeByName(existingNodes, "consultar_estoque1");
 
-  const extractedInstance = tryExtractFromTemplate(
-    canonicalEvolution.parameters.url,
-    existingEvolution.parameters.url,
-    "__INSTANCE__",
-  );
-  const instance =
-    extractedInstance && !extractedInstance.includes("__")
-      ? extractedInstance
-      : instanceArg;
+  // multi-WA: instance is dynamic from Evolution webhook body.instance.
+  // --instance= is accepted for CLI compatibility but never baked into URLs.
+  if (instanceArg) {
+    console.error(
+      "aviso: --instance ignorado (workflow multi-WA usa body.instance por evento)",
+    );
+  }
   const chatbotBase = normalizeBaseUrl(
     "chatbot-base-url",
     chatbotBaseArg,
@@ -147,12 +145,16 @@ async function main() {
   const chatbotToken = chatbotMatch ? chatbotMatch[1] : "";
 
   const replacements = {
-    __INSTANCE__: instance,
     __EVOLUTION_KEY__: evolutionKey,
     __CHATBOT_WEBHOOK_TOKEN__: webhookToken,
     __CHATBOT_TOKEN__: chatbotToken,
   };
   for (const [name, value] of Object.entries(replacements)) assertSecret(name, value);
+  if (JSON.stringify(canonicalNodes).includes("__INSTANCE__")) {
+    throw new Error(
+      "canonical workflow still has __INSTANCE__; expect dynamic body.instance only",
+    );
+  }
 
   let serialized = JSON.stringify({
     nodes: canonical.nodes,

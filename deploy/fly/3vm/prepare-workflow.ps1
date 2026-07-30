@@ -40,12 +40,15 @@ Get-Content $secretsFile | ForEach-Object {
 # flycast needs private IPv6 + nginx listen [::] (see nginx-edge.conf).
 $chatbotBase = if ($env:CHATBOT_BASE_URL) { $env:CHATBOT_BASE_URL } else { "https://app2037.fly.dev" }
 $evolutionBase = if ($env:EVOLUTION_BASE_URL) { $env:EVOLUTION_BASE_URL } else { "https://evolution2037.fly.dev" }
-$instance = if ($env:EVOLUTION_INSTANCE) { $env:EVOLUTION_INSTANCE } else { "loja1" }
+# multi-WA: instance NÃO é substituída — vem de body.instance em cada evento Evolution.
+# Um único workflow atende N números; o Chatbot resolve loja/canal por instância.
 
 $json = Get-Content $canonical -Raw -Encoding UTF8
 $json = $json.Replace("http://chatbot-api:8000", $chatbotBase)
 $json = $json.Replace("http://evolution:8080", $evolutionBase)
-$json = $json.Replace("__INSTANCE__", $instance)
+if ($json.Contains("__INSTANCE__")) {
+  Write-Warning "canonical still has __INSTANCE__; multi-WA expects dynamic body.instance only"
+}
 $json = $json.Replace("__CHATBOT_TOKEN__", $secrets["CHATBOT_API_TOKEN"])
 $json = $json.Replace("__CHATBOT_WEBHOOK_TOKEN__", $secrets["CHATBOT_WEBHOOK_TOKEN"])
 
@@ -71,5 +74,5 @@ if ($evoKey) {
 $json = $json.Replace('"active": false', '"active": true')
 
 [System.IO.File]::WriteAllText($outFile, $json, [System.Text.UTF8Encoding]::new($false))
-Write-Host "wrote $outFile (len=$($json.Length)) mode=$Mode chatbot=$chatbotBase evolution=$evolutionBase instance=$instance"
+Write-Host "wrote $outFile (len=$($json.Length)) mode=$Mode chatbot=$chatbotBase evolution=$evolutionBase instance=dynamic(body.instance)"
 Write-Host "tokens: chatbot_api=$($secrets['CHATBOT_API_TOKEN'].Length) webhook=$($secrets['CHATBOT_WEBHOOK_TOKEN'].Length)"

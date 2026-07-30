@@ -80,13 +80,16 @@ def main() -> None:
     assert "$('Extrair1').first()" in registrar_saida
 
     serialized = json.dumps(test, ensure_ascii=False)
+    # multi-WA: instance vem do body do webhook; só secrets usam placeholders.
+    assert "__INSTANCE__" not in serialized, "workflow de teste não deve fixar __INSTANCE__"
     for placeholder in (
-        "__INSTANCE__",
         "__EVOLUTION_KEY__",
         "__CHATBOT_TOKEN__",
         "__CHATBOT_WEBHOOK_TOKEN__",
     ):
         assert placeholder in serialized, f"placeholder ausente: {placeholder}"
+    extract = by_name(test, "Extrair1")["parameters"]["jsCode"]
+    assert "b.instance" in extract and "if (!instance) return []" in extract
 
     assert all(share["workflowId"] == TEST_ID for share in test.get("shared", []))
     test_prompt = by_name(test, 'AI Agent1')['parameters']['options']['systemMessage']

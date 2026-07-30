@@ -198,6 +198,20 @@ class RoteamentoInput(BaseModel):
 
 class EstadoInput(BaseModel):
     bot_ativo: bool
+    # multi-WA: escopa handoff/pausa ao canal da instância Evolution do webhook
+    instance: Optional[str] = None
+
+    @field_validator("instance")
+    @classmethod
+    def validar_instance_estado(cls, value: Optional[str]) -> Optional[str]:
+        if value is None:
+            return None
+        texto = str(value).strip()
+        if not texto:
+            return None
+        return validar_identificador(
+            texto, nome="instance", limite=config.WEBHOOK_MAX_INSTANCE_CHARS
+        )
 
 
 class ConsentimentoInput(BaseModel):
@@ -467,9 +481,14 @@ def listar_mensagens(
 
 @app.get("/v1/conversas/{telefone}/estado")
 def obter_estado(
-    telefone: str, ctx: Contexto = Depends(get_contexto), db: Session = Depends(get_db)
+    telefone: str,
+    instance: Optional[str] = None,
+    ctx: Contexto = Depends(get_contexto),
+    db: Session = Depends(get_db),
 ):
-    return servico.obter_estado(db, ctx.loja_id, telefone)
+    return servico.obter_estado(
+        db, ctx.loja_id, telefone, instance=instance
+    )
 
 
 @app.patch("/v1/conversas/{telefone}/estado")
@@ -482,7 +501,13 @@ def definir_estado(
     # Reativar bot é efeito de saída/atendimento — bloqueado se loja inoperante.
     if dados.bot_ativo:
         _exigir_loja_operacional(db, ctx.loja_id)
-    return servico.definir_bot_ativo(db, ctx.loja_id, telefone, dados.bot_ativo)
+    return servico.definir_bot_ativo(
+        db,
+        ctx.loja_id,
+        telefone,
+        dados.bot_ativo,
+        instance=dados.instance,
+    )
 
 
 @app.post("/v1/consentimentos", status_code=201)

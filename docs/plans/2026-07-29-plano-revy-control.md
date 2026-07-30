@@ -1,6 +1,6 @@
 # Plano — Evolução do Revy Tráfego para Revy Control
 
-**Status:** ATIVO / CÓDIGO F0–6 LEAN COMPLETE (Meta, readiness+aceite, Google 4A–D ports/fakes, click IDs 4C, multi-WA canal_id+connect, dashboard rico; F7 lab/rollout e adapters GCP reais ainda abertos)
+**Status:** ATIVO / CÓDIGO F0–6 LEAN COMPLETE (Meta, readiness+aceite, Google 4A–D ports/fakes, click IDs 4C, multi-WA canal_id+connect+n8n instance dinâmica, RBAC sem slug manual; F7 lab/rollout e adapters GCP reais ainda abertos)
 **Data:** 2026-07-29
 **Spec:** [`docs/superpowers/specs/2026-07-29-revy-control-design.md`](../superpowers/specs/2026-07-29-revy-control-design.md)
 **Vocabulário:** [`CONTEXT.md`](../../CONTEXT.md)
@@ -475,11 +475,18 @@ adapter em memória para testes. O navegador nunca chama Evolution diretamente.
 
 ### n8n
 
-- [ ] Remover dependência de `__INSTANCE__` fixa no workflow de produção.
-- [ ] Resolver dinamicamente `body.instance` no Chatbot.
-- [ ] Manter um workflow, não uma cópia por número.
-- [ ] Registrar `fromMe` e pausar apenas a conversa correspondente.
-- [ ] Testar texto, áudio, foto, CTWA, contato salvo, grupo e instância desconhecida.
+- [x] Remover dependência de `__INSTANCE__` fixa no workflow de produção
+      (`n8n/workflow-ai-nao-salvos.json` + `validate_workflow.py`;
+      `prepare-workflow.ps1` não grava instance).
+- [x] Resolver dinamicamente `body.instance` no Chatbot
+      (`resolver_loja_e_canal_por_instancia` / `resolve_canal_for_instance`;
+      PATCH `/estado` aceita `instance` para handoff por canal).
+- [x] Manter um workflow, não uma cópia por número (doc em
+      `deploy/fly/3vm/README.md` + `n8n/GUIA-WORKFLOW.md`).
+- [x] Registrar `fromMe` e pausar apenas a conversa correspondente
+      (testes multi-WA: fromMe + PATCH estado com instance).
+- [ ] Testar texto, áudio, foto, CTWA, contato salvo, grupo e instância desconhecida
+      no lab (código/unitário coberto; E2E Evolution pendente).
 
 ### Critério de pronto
 
@@ -545,7 +552,9 @@ suas lojas; dono, gerente e vendedor continuam fora do Control.
 - [ ] Validar suspensão/reativação e reconexão de número.
 - [ ] Validar restauração de backup com tabelas novas.
 - [ ] Ativar flags gradualmente e manter rollback somente por flag/código compatível.
-- [ ] Remover seletor manual e fallback de env após todos os slugs estarem cadastrados.
+- [x] Remover seletor manual na UI/API quando `REVY_CONTROL_RBAC_ENABLED=1`
+      (`home.html` sem `loja_slug_manual`; POST só `loja_id` + `select_store`;
+      legado por slug permanece com flag off). Residual lab: ativar flag após backfill.
 - [ ] Remover campos legados de uma instância por loja apenas em release posterior.
 - [x] Atualizar README operacional e runbooks de deploy
       (checklist de flags/smoke Control no

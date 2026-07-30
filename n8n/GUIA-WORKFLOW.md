@@ -9,6 +9,15 @@ O fluxo de teste é gerado a partir dele e atende somente o número configurado 
 Edite o arquivo principal. Não edite os arquivos `workflow-fly*.ready.json`: eles
 são gerados com endereços e credenciais locais apenas na hora da publicação.
 
+## Multi-WhatsApp (um workflow)
+
+- A Evolution envia `body.instance` em todo webhook.
+- `Extrair1` propaga `instance`; eventos sem instance são descartados.
+- Chamadas Evolution usam a instance do evento (não há `__INSTANCE__` fixo).
+- O Chatbot resolve loja/canal por instance; conversa e handoff são por canal.
+- Placeholders de deploy: só `__EVOLUTION_KEY__`, `__CHATBOT_TOKEN__`,
+  `__CHATBOT_WEBHOOK_TOKEN__` (e URLs). **Um workflow serve N números.**
+
 O fluxo atual tem 25 nós e trabalha com:
 
 - mensagens de texto de clientes;

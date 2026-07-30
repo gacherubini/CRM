@@ -123,6 +123,50 @@ def test_from_me_pausa_apenas_conversa_do_canal(db, loja_a, monkeypatch):
     assert conv_extra.status == "aberta"
 
 
+def test_patch_estado_com_instance_pausa_so_canal(db, loja_a, monkeypatch):
+    """Handoff via PATCH /estado com instance escopa ao canal (tool n8n)."""
+    legado, extra = _register_two_channels(db, loja_a, monkeypatch)
+    tel = "5511988000004"
+    servico.registrar_mensagem(
+        db, legado["evolution_instance"], tel, "oi", "IN-H1"
+    )
+    servico.registrar_mensagem(
+        db, extra["evolution_instance"], tel, "oi", "IN-H2"
+    )
+
+    r = servico.definir_bot_ativo(
+        db,
+        loja_a["loja_id"],
+        tel,
+        False,
+        instance=legado["evolution_instance"],
+    )
+    assert r["bot_ativo"] is False
+    assert r["status"] == "handoff"
+
+    est_legado = servico.obter_estado(
+        db, loja_a["loja_id"], tel, instance=legado["evolution_instance"]
+    )
+    est_extra = servico.obter_estado(
+        db, loja_a["loja_id"], tel, instance=extra["evolution_instance"]
+    )
+    assert est_legado["bot_ativo"] is False
+    assert est_extra["bot_ativo"] is True
+
+    conv_legado = (
+        db.query(models_db.Conversa)
+        .filter(models_db.Conversa.canal_id == legado["id"])
+        .one()
+    )
+    conv_extra = (
+        db.query(models_db.Conversa)
+        .filter(models_db.Conversa.canal_id == extra["id"])
+        .one()
+    )
+    assert conv_legado.bot_ativo is False
+    assert conv_extra.bot_ativo is True
+
+
 def test_connect_qr_no_store(client, loja_a, monkeypatch):
     monkeypatch.setattr(config, "MULTI_WHATSAPP_ENABLED", True)
     r = client.get("/v1/whatsapp/canais", headers=loja_a["headers"])

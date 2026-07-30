@@ -62,8 +62,12 @@ def main() -> None:
     assert "/v1/operacao/numeros-autorizados" in simulation_code, (
         "tool não consulta os vendedores autorizados"
     )
-    assert "/message/sendText/__INSTANCE__" in simulation_code, (
-        "tool não avisa o vendedor pela Evolution"
+    assert (
+        "/message/sendText/' + encodeURIComponent(instance)" in simulation_code
+        or "/message/sendText/\" + encodeURIComponent(instance)" in simulation_code
+    ), "tool não avisa o vendedor pela Evolution com instance do webhook"
+    assert "origem.instance" in simulation_code or "const instance = String(origem.instance" in simulation_code, (
+        "tool de simulação não lê instance do Extrair1"
     )
     assert "cpf e data de nascimento recebidos" in simulation_code, (
         "aviso interno não informa que os dados foram recebidos"
@@ -249,8 +253,12 @@ def main() -> None:
     assert "/v1/operacao/numeros-autorizados" in handoff_code, (
         "handoff não consulta o vendedor ativo"
     )
-    assert "/message/sendText/__INSTANCE__" in handoff_code, (
-        "handoff não avisa o vendedor pela Evolution"
+    assert (
+        "/message/sendText/' + encodeURIComponent(instance)" in handoff_code
+        or "/message/sendText/\" + encodeURIComponent(instance)" in handoff_code
+    ), "handoff não avisa o vendedor pela Evolution com instance do webhook"
+    assert "instance: instance" in handoff_code or "instance: instance || null" in handoff_code, (
+        "handoff deve enviar instance no PATCH /estado (multi-WA)"
     )
     assert "https://app2037.fly.dev/app/conversas/" in handoff_code, (
         "handoff não inclui o link seguro do CRM"
@@ -330,9 +338,10 @@ def main() -> None:
     assert "slice(0, 4)" in photo_code and "for (const midia of midias)" in photo_code, (
         "tool não envia até quatro fotos do catálogo"
     )
-    assert "/message/sendMedia/__INSTANCE__" in photo_code, (
-        "tool não envia mídia pela Evolution"
-    )
+    assert (
+        "/message/sendMedia/' + encodeURIComponent(instance)" in photo_code
+        or "/message/sendMedia/\" + encodeURIComponent(instance)" in photo_code
+    ), "tool não envia mídia pela Evolution com instance do webhook"
     assert "mediatype: 'image'" in photo_code and "media: mediaUrl.toString()" in photo_code, (
         "payload de imagem da Evolution incompleto"
     )
@@ -367,6 +376,12 @@ def main() -> None:
     assert removidos.isdisjoint(nodes_by_name), "workflow ainda contém nós removidos"
 
     extract_code = nodes_by_name["Extrair1"].get("parameters", {}).get("jsCode", "")
+    assert "b.instance" in extract_code and "__INSTANCE__" not in extract_code, (
+        "Extrair1 deve usar body.instance do webhook, sem placeholder fixo"
+    )
+    assert "if (!instance) return []" in extract_code, (
+        "Extrair1 deve rejeitar evento sem instance (multi-WA)"
+    )
     assert "audioMessage" in extract_code and "if (audio) return []" in extract_code, (
         "áudio deve ser ignorado imediatamente na entrada"
     )
@@ -491,9 +506,28 @@ def main() -> None:
     assert not saida_ramos[0], "resposta do grupo não deve ser registrada como conversa de cliente"
     assert saida_ramos[1][0].get("node") == "Registrar saida do bot1"
 
+    # multi-WA: um workflow, instance sempre dinâmica nas URLs Evolution
+    for name in (
+        "Responder WhatsApp1",
+        "Responder cadastro de foto1",
+        "Consultar contato na Evolution1",
+    ):
+        url = nodes_by_name[name]["parameters"].get("url", "")
+        assert "encodeURIComponent" in url and "Extrair1" in url, (
+            f"{name}: URL Evolution deve ser expressão com instance do Extrair1"
+        )
+        assert "__INSTANCE__" not in url, f"{name}: ainda usa __INSTANCE__ fixo"
+    rota_body = nodes_by_name["Rotear operacao1"]["parameters"].get("jsonBody", "")
+    assert "instance: o.instance" in rota_body and "__INSTANCE__" not in rota_body, (
+        "roteamento deve enviar instance do webhook, não placeholder fixo"
+    )
+    assert "__INSTANCE__" not in json.dumps(data, ensure_ascii=False), (
+        "workflow de produção não pode depender de __INSTANCE__ fixo"
+    )
+
     print(
-        "workflow n8n válido: 25 nós, áudio ignorado, webhook seguro, "
-        "foto automática, menu de operação e resultado privado"
+        "workflow n8n válido: 25 nós, multi-WA instance dinâmica, áudio ignorado, "
+        "webhook seguro, foto automática, menu de operação e resultado privado"
     )
 
 

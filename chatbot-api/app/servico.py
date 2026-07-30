@@ -924,12 +924,35 @@ def _bot_ativo_efetivo(db: Session, loja_id: str, bot_ativo: bool) -> bool:
     return bool(bot_ativo) and provisioning.allows_outbound_whatsapp(db, loja_id)
 
 
-def obter_estado(db: Session, loja_id: str, telefone: str) -> dict:
-    conversa = (
-        db.query(Conversa)
-        .filter(Conversa.loja_id == loja_id, Conversa.telefone == telefone)
-        .first()
+def _canal_id_opcional_por_instance(
+    db: Session, loja_id: str, instance: str | None
+) -> str | None:
+    """Resolve canal_id da loja para escopo multi-WA; None = legado (1ª conversa)."""
+    texto = (instance or "").strip()
+    if not texto:
+        return None
+    from app import channels
+
+    canal = channels.resolve_canal_for_instance(db, texto)
+    if canal.loja_id != loja_id:
+        raise HTTPException(status_code=404, detail="instância não reconhecida")
+    return canal.id
+
+
+def obter_estado(
+    db: Session,
+    loja_id: str,
+    telefone: str,
+    *,
+    instance: str | None = None,
+) -> dict:
+    canal_id = _canal_id_opcional_por_instance(db, loja_id, instance)
+    q = db.query(Conversa).filter(
+        Conversa.loja_id == loja_id, Conversa.telefone == telefone
     )
+    if canal_id:
+        q = q.filter(Conversa.canal_id == canal_id)
+    conversa = q.order_by(Conversa.criada_em.asc()).first()
     if conversa is None:
         return {
             "bot_ativo": _bot_ativo_efetivo(db, loja_id, True),
@@ -941,7 +964,14 @@ def obter_estado(db: Session, loja_id: str, telefone: str) -> dict:
     }
 
 
-def definir_bot_ativo(db: Session, loja_id: str, telefone: str, ativo: bool) -> dict:
+def definir_bot_ativo(
+    db: Session,
+    loja_id: str,
+    telefone: str,
+    ativo: bool,
+    *,
+    instance: str | None = None,
+) -> dict:
     from app import provisioning
 
     if ativo and not provisioning.allows_outbound_whatsapp(db, loja_id):
@@ -955,7 +985,8 @@ def definir_bot_ativo(db: Session, loja_id: str, telefone: str, ativo: bool) -> 
                 "loja_operacional": False,
             },
         )
-    conversa = _get_or_create_conversa(db, loja_id, telefone)
+    canal_id = _canal_id_opcional_por_instance(db, loja_id, instance)
+    conversa = _get_or_create_conversa(db, loja_id, telefone, canal_id=canal_id)
     conversa.bot_ativo = ativo
     conversa.status = "aberta" if ativo else "handoff"
     conversa.atualizada_em = datetime.now(timezone.utc)

@@ -10,6 +10,78 @@ from app.models import GestorRevy, Loja, VinculoTrafego
 from tests.conftest import csrf_da_resposta
 
 
+def test_rbac_ignora_loja_slug_manual_e_so_aceita_loja_id_autorizada(
+    client,
+    monkeypatch,
+):
+    """Com REVY_CONTROL_RBAC_ENABLED, slug livre não autoriza loja alheia."""
+    with SessionLocal() as db:
+        gestor = GestorRevy(
+            email="gestor.slug.manual@revy.local",
+            nome="Gestor Slug",
+            senha_hash=hash_senha("segredo-gestor"),
+            papel="gestor",
+            ativo=True,
+        )
+        loja_permitida = Loja(nome="Permitida Slug", slug="permitida-slug")
+        loja_alheia = Loja(nome="Alheia Slug", slug="alheia-slug")
+        db.add_all([gestor, loja_permitida, loja_alheia])
+        db.flush()
+        db.add(
+            VinculoTrafego(
+                loja_id=loja_permitida.id,
+                gestor_id=gestor.id,
+                tipo="colaborador",
+            )
+        )
+        db.commit()
+        loja_permitida_id = loja_permitida.id
+
+    monkeypatch.setattr(
+        main_mod,
+        "settings",
+        replace(settings, revy_control_rbac_enabled=True),
+    )
+    client.post(
+        "/login",
+        data={
+            "email": "gestor.slug.manual@revy.local",
+            "senha": "segredo-gestor",
+        },
+        follow_redirects=False,
+    )
+    home = client.get("/app")
+    assert home.status_code == 200
+    assert "loja_slug_manual" not in home.text
+    assert "Outra loja" not in home.text
+
+    # POST legado com slug livre: caminho RBAC exige loja_id → não autoriza
+    via_slug = client.post(
+        "/app/loja",
+        data={
+            "loja_slug": "alheia-slug",
+            "loja_slug_manual": "alheia-slug",
+            "csrf": csrf_da_resposta(home),
+        },
+        follow_redirects=False,
+    )
+    assert via_slug.status_code == 303
+    assert "erro=loja" in (via_slug.headers.get("location") or "")
+    trafego = client.get("/app/trafego", follow_redirects=False)
+    assert trafego.status_code in (303, 404)
+
+    ok = client.post(
+        "/app/loja",
+        data={
+            "loja_id": loja_permitida_id,
+            "csrf": csrf_da_resposta(home),
+        },
+        follow_redirects=False,
+    )
+    assert ok.status_code == 303
+    assert client.get("/app/trafego").status_code == 200
+
+
 def test_gestor_seleciona_somente_loja_com_vinculo_ativo(
     client,
     monkeypatch,

@@ -72,9 +72,11 @@ O template versionado é `n8n/workflow-ai-nao-salvos.json`. Ele aplica, nesta or
 - Match de autorizado: variantes de telefone (com/sem `55`, com/sem 9º dígito).
 - Fallback se `/roteamento` falhar: mesmo gate antigo (`isSaved === false` → cliente).
 
-1. Importe o workflow e substitua `__INSTANCE__`, `__EVOLUTION_KEY__`,
-   `__CHATBOT_TOKEN__` e `__CHATBOT_WEBHOOK_TOKEN__`. O último deve ter exatamente o mesmo
-   valor de `CHATBOT_WEBHOOK_TOKEN` no `.env`; ele autentica tanto a entrada quanto o registro
+1. Importe o workflow e substitua `__EVOLUTION_KEY__`, `__CHATBOT_TOKEN__` e
+   `__CHATBOT_WEBHOOK_TOKEN__`. A instance WhatsApp **não** é fixa no JSON: cada
+   evento da Evolution traz `body.instance` e o workflow usa esse valor (multi-WA
+   com um único workflow). O webhook token deve ter exatamente o mesmo valor de
+   `CHATBOT_WEBHOOK_TOKEN` no `.env`; ele autentica tanto a entrada quanto o registro
    da saída do bot na Chatbot API.
 2. Selecione a credencial no nó **Google Gemini Chat Model**. As ferramentas
    HTTP do AI Agent apontam para a `chatbot-api` (`http://chatbot-api:8000`) com header

@@ -107,11 +107,31 @@ fly image show -a motor2037
 **Depois** do cutover: deploy completo com `fly.worker.toml` torna `motor2037`
 worker-only (sem HTTP `min_machines`).
 
+## Multi-WhatsApp: um workflow n8n, N instâncias Evolution
+
+**Regra:** um único workflow atende todos os números da loja (e do lab). Não
+copie o JSON por número.
+
+| Peça | Comportamento |
+|------|----------------|
+| Evolution webhook | cada evento traz `body.instance` (nome da instância) |
+| n8n `Extrair1` | exige `body.instance`; rejeita evento sem instance |
+| URLs Evolution (`sendText`, `findChats`, `sendMedia`) | expressão n8n com `instance` do `Extrair1` — **sem** `__INSTANCE__` fixo |
+| Chatbot `registrar_mensagem` / tools | resolvem loja + canal via `resolver_loja_por_instancia` / `resolve_canal_for_instance` |
+| Memória do Agent | chave `instance:telefone` (conversas isoladas por canal) |
+| `fromMe` / handoff | pausa só a conversa do canal (webhook com instance; PATCH `/estado` com `instance` opcional) |
+| `prepare-workflow.ps1` | substitui só bases URL + secrets (`__EVOLUTION_KEY__`, tokens); **não** grava instance |
+
+Placeholders ainda necessários no JSON canônico: `__EVOLUTION_KEY__`,
+`__CHATBOT_TOKEN__`, `__CHATBOT_WEBHOOK_TOKEN__`. Instance **não** é placeholder.
+
+Validação: `python n8n/validate_workflow.py` (rejeita qualquer `__INSTANCE__` residual).
+
 ## Roteamento WhatsApp (grupo do estoque)
 
 Endpoint: `POST /v1/operacao/roteamento` (chatbot em `app2037`).
 O n8n consulta `isSaved` na Evolution e manda
-`{ telefone, texto, is_saved, grupo_jid }`.
+`{ instance, telefone, texto, is_saved, grupo_jid }`.
 
 | Caso | Condição | `acao` |
 |------|----------|--------|
