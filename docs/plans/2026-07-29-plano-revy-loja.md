@@ -1,6 +1,6 @@
 # Plano — Evolução do Portal para Revy Loja
 
-**Status:** ATIVO / CÓDIGO F0–F4 LEAN (shell, identity, estoque overview, vendas overview, atendimento; flags default OFF; residual F5 equipe/bancos, F6 multi-canal, F7 Seller AI, F8 rollout)
+**Status:** ATIVO / CÓDIGO F0–F5 LEAN (shell, identity, estoque/vendas overview, atendimento, equipe read-only + acessos bancários; flags default OFF; residual F6 multi-canal, F7 Seller AI, F8 rollout)
 **Data:** 2026-07-29
 **Spec:** [`docs/superpowers/specs/2026-07-29-revy-loja-design.md`](../superpowers/specs/2026-07-29-revy-loja-design.md)
 **Depende por gates de:** [`Plano Revy Control`](2026-07-29-plano-revy-control.md) —
@@ -291,27 +291,40 @@ separadas de lead, conversa, simulação e venda.
 
 ### Equipe
 
-- [ ] Remover da Loja criação de conta, senha estrutural e troca de cargo.
-- [ ] Exibir equipe provisionada pelo Control somente onde a operação exige.
-- [ ] Manter distribuição, reatribuição, fila e produtividade no Revy Loja.
+- [x] Remover da Loja criação de conta, senha estrutural e troca de cargo.
+      *(com `REVY_LOJA_SHELL_ENABLED=1`: POST/GET estruturais em `/app/equipe*` → 403
+      “Contas e cargos são geridos no Revy Control”; legado offline intacto com flag off)*
+- [x] Exibir equipe provisionada pelo Control somente onde a operação exige.
+      *(`/app/equipe` e `/app/loja/equipe` read-only para dono/gerente; nav Ajustes → Equipe)*
+- [x] Manter distribuição, reatribuição, fila e produtividade no Revy Loja.
+      *(`registrar_handoff_local` / AtendimentoAtribuicao / assumir-devolver — documentado em código)*
 - [ ] Auditar mudança de responsável por atendimento.
-- [ ] Não mostrar números WhatsApp, tokens ou integrações como cadastro de equipe.
+      *(atribuicao já grava histórico ativo/encerrado; trilha de auditoria formal fica residual)*
+- [x] Não mostrar números WhatsApp, tokens ou integrações como cadastro de equipe.
+      *(lista só nome/papel/ativo; sem e-mail em modo leitura shell)*
 
 ### Acessos bancários
 
-- [ ] Manter credenciais de portais bancários no domínio atual do
-      Portal/Motor.
-- [ ] Colocar a entrada em ação contextual “Configurações financeiras” dentro de
+- [x] Manter credenciais de portais bancários no domínio atual do
+      Portal/Motor. *(`/app/financeiras` inalterado — crypto/test/replace)*
+- [x] Colocar a entrada em ação contextual “Configurações financeiras” dentro de
       Vendas, não no menu principal.
-- [ ] Autorizar somente dono e gerente.
-- [ ] Nunca reapresentar segredo em claro; permitir substituir e testar.
-- [ ] Auditar criação, troca, teste e revogação sem registrar o segredo.
+      *(nav Ajustes → Acessos bancários; alias `/app/loja/vendas/configuracoes-financeiras` → `/app/financeiras`)*
+- [x] Autorizar somente dono e gerente. *(`pode_gerir_financeiras`; vendedor 403)*
+- [x] Nunca reapresentar segredo em claro; permitir substituir e testar.
+      *(templates + testes; redirect pós-save sem senha no HTML)*
+- [~] Auditar criação, troca, teste e revogação sem registrar o segredo.
+      *(Motor já recebe `ator` no upsert/teste; auditoria formal de revogação no Control residual)*
 - [ ] Confirmar que Admin Revy e gestor de tráfego não recebem esse payload pelo Control.
-- [ ] Tratar banco ainda não configurado como pendência operacional de Vendas, sem
+      *(gate Control; fora do escopo de código Portal F5 lean)*
+- [x] Tratar banco ainda não configurado como pendência operacional de Vendas, sem
       impedir que o Control ative a Loja ou que as demais funções de Vendas operem.
+      *(`pendencias_bancos_nao_configurados` no SalesOverview para dono/gerente)*
 
 **Critério de pronto:** Control define quem compõe a loja; Loja distribui o trabalho;
 somente dono/gerente administram acesso aos bancos.
+*(Lean F5: limite Control/Loja aplicado no Portal com flag; projeção Control completa e
+auditoria formal residual F6–F8 / plano Control.)*
 
 Esse é o corte mínimo recomendado para o primeiro MVP comercial do Revy Loja.
 

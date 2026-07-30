@@ -26,7 +26,9 @@ Com as flags desligadas, a UI e as rotas legadas permanecem. Rollback = desligar
 | `/app/estoque/*` CRUD | **Estoque → Veículos** | 2 | |
 | Visão indicadores estoque | **Estoque → Visão geral** (`/app/loja/estoque`) | 2 | Stub F1 redireciona à lista |
 | `/app/financeiras` | Config financeira contextual (dono/gerente) | 1 / 5 | No shell: Ajustes → Acessos bancários |
-| `/app/equipe` | Equipe view-only (estrutura no Control) | 5 | Fora do nav principal F1 |
+| `/app/loja/vendas/configuracoes-financeiras` | Alias → `/app/financeiras` | 5 | Shell on only |
+| `/app/equipe` | Equipe view-only com shell on (estrutura no Control) | 5 | Mutações 403 com shell; legado com flag off |
+| `/app/loja/equipe` | Lista read-only (nome, papel, ativo) | 5 | Shell on; Ajustes → Equipe |
 | `/app/operacao/numeros` | **Control** (técnico WhatsApp/grupo) | Control | Não aparece no shell Loja |
 | `/app/configuracoes` | Misto → Control / operacional | — | Ver classificação |
 | `/app/trafego/*`, `/app/campanhas/*` | **Revy Tráfego / Control** | — | Fora do shell Loja |

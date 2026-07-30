@@ -458,6 +458,32 @@ def _carregar_aquisicao(
     )
 
 
+def pendencias_bancos_nao_configurados(
+    nomes_faltando: list[str] | tuple[str, ...] | None,
+) -> list[PendenciaAcao]:
+    """Pendência operacional: bancos sem credencial (F5). Não bloqueia Vendas."""
+    if not nomes_faltando:
+        return []
+    nomes = [str(n).strip() for n in nomes_faltando if str(n).strip()]
+    if not nomes:
+        return []
+    n = len(nomes)
+    if n == 1:
+        texto = f"Banco {nomes[0]} ainda não configurado"
+    elif n <= 3:
+        texto = f"Bancos sem acesso: {', '.join(nomes)}"
+    else:
+        texto = f"{n} bancos ainda sem acesso configurado"
+    return [
+        PendenciaAcao(
+            codigo="bancos_nao_configurados",
+            texto=texto,
+            href="/app/financeiras",
+            quantidade=n,
+        )
+    ]
+
+
 def _pendencias(
     db: Session,
     *,
@@ -467,6 +493,7 @@ def _pendencias(
     vendedor_email: str | None,
     chatbot: Any | None,
     escopo: str,
+    bancos_nao_configurados: list[str] | None = None,
 ) -> list[PendenciaAcao]:
     itens: list[PendenciaAcao] = []
 
@@ -493,6 +520,9 @@ def _pendencias(
                 quantidade=n,
             )
         )
+
+    if escopo == "loja" and bancos_nao_configurados:
+        itens.extend(pendencias_bancos_nao_configurados(bancos_nao_configurados))
 
     if chatbot is None:
         return itens[:8]
@@ -545,6 +575,7 @@ def build_sales_overview(
     fetch_resultados_api: Callable[..., dict | None] | None = None,
     revy_trafego_resultados_enabled: bool | None = None,
     pode_ver_margem: bool | None = None,
+    bancos_nao_configurados: list[str] | None = None,
 ) -> SalesOverview:
     """Monta o read model da Visão geral de Vendas.
 
@@ -753,6 +784,9 @@ def build_sales_overview(
         vendedor_email=email_filtro if escopo == "vendedor" else None,
         chatbot=chatbot,
         escopo=escopo,
+        bancos_nao_configurados=(
+            bancos_nao_configurados if escopo == "loja" else None
+        ),
     )
 
     # --- Status global ---

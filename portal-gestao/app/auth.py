@@ -114,8 +114,22 @@ def pode_ver_resultados_midia(usuario: Usuario) -> bool:
 
 
 def pode_gerir_equipe(usuario: Usuario) -> bool:
-    """Cadastro e manutenção de acessos da loja — somente dono ou plataforma."""
+    """Cadastro e manutenção de acessos da loja — somente dono ou plataforma.
+
+    Com ``REVY_LOJA_SHELL_ENABLED``, criação/cargo/senha estrutural ficam no
+    Revy Control; as rotas de mutação do Portal bloqueiam com 403. A listagem
+    operacional usa ``pode_ver_equipe``.
+    """
     return usuario.papel in {"dono", "admin_plataforma"}
+
+
+def pode_ver_equipe(usuario: Usuario) -> bool:
+    """Lista da equipe (projeção Usuario) para contexto operacional.
+
+    Dono e gerente precisam ver quem está na loja para distribuição de
+    atendimento. Não concede mutação estrutural (conta/cargo/senha).
+    """
+    return usuario.papel in {"dono", "gerente", "admin_plataforma"}
 
 
 def pode_ver_relatorios(usuario: Usuario) -> bool:

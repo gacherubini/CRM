@@ -31,6 +31,7 @@ from app.auth import (
     pode_confirmar_venda,
     pode_gerir_equipe,
     pode_gerir_financeiras,
+    pode_ver_equipe,
     pode_gerir_metas,
     pode_gerir_estoque,
     pode_gerir_trafego,
@@ -1116,6 +1117,12 @@ def conversas_detalhe(
 
 
 def registrar_handoff_local(db: Session, usuario: Usuario, telefone: str, assumir: bool) -> None:
+    """Distribuição/reatribuição de atendimento permanece no Revy Loja (F5).
+
+    Contas e cargos estruturais migram para o Revy Control; assumir/devolver
+    e ``AtendimentoAtribuicao`` continuam operacionais aqui (não são cadastro
+    de equipe nem números WhatsApp/tokens).
+    """
     telefone_hmac = identidade_telefone(telefone)
     if not telefone_hmac:
         raise ValueError("telefone inválido")
@@ -3076,6 +3083,23 @@ def _valores_membro_form(form) -> dict[str, str]:
     }
 
 
+MSG_EQUIPE_CONTROL = "Contas e cargos são geridos no Revy Control"
+
+
+def _equipe_estrutural_no_control() -> bool:
+    """Com shell Revy Loja, mutações estruturais de equipe saem do Portal."""
+    return revy_loja_shell_enabled()
+
+
+def _resposta_equipe_control_only(request: Request, usuario: Usuario | None):
+    """403 quando tentam criar/editar cargo/senha com shell ligado."""
+    return templates.TemplateResponse(
+        "erro.html",
+        contexto(request, usuario, erro=MSG_EQUIPE_CONTROL),
+        status_code=403,
+    )
+
+
 def _render_equipe_lista(
     request: Request,
     usuario: Usuario,
@@ -3083,7 +3107,10 @@ def _render_equipe_lista(
     *,
     erro: str | None = None,
     status_code: int = 200,
+    somente_leitura: bool | None = None,
 ):
+    if somente_leitura is None:
+        somente_leitura = _equipe_estrutural_no_control()
     return templates.TemplateResponse(
         "equipe/lista.html",
         contexto(
@@ -3092,6 +3119,8 @@ def _render_equipe_lista(
             membros=_membros_da_loja(db, usuario.loja_slug),
             papeis_rotulo=PAPEIS_EQUIPE_ROTULO,
             erro=erro,
+            equipe_somente_leitura=somente_leitura,
+            msg_equipe_control=MSG_EQUIPE_CONTROL if somente_leitura else None,
         ),
         status_code=status_code,
     )
@@ -3132,9 +3161,15 @@ def equipe_lista(request: Request, db: Session = Depends(get_db)):
     usuario = usuario_atual(request, db)
     if not usuario:
         return redirecionar_login()
+    # Shell on: lista read-only para dono/gerente (contexto de distribuição).
+    # Shell off: mantém gestão legada só para dono/admin_plataforma.
+    if _equipe_estrutural_no_control():
+        if not pode_ver_equipe(usuario):
+            return RedirectResponse("/app", status_code=303)
+        return _render_equipe_lista(request, usuario, db, somente_leitura=True)
     if not pode_gerir_equipe(usuario):
         return RedirectResponse("/app", status_code=303)
-    return _render_equipe_lista(request, usuario, db)
+    return _render_equipe_lista(request, usuario, db, somente_leitura=False)
 
 
 @app.get("/app/equipe/novo", response_class=HTMLResponse)
@@ -3142,6 +3177,8 @@ def equipe_novo(request: Request, db: Session = Depends(get_db)):
     usuario = usuario_atual(request, db)
     if not usuario:
         return redirecionar_login()
+    if _equipe_estrutural_no_control():
+        return _resposta_equipe_control_only(request, usuario)
     if not pode_gerir_equipe(usuario):
         return RedirectResponse("/app", status_code=303)
     return _render_membro_form(
@@ -3157,6 +3194,8 @@ async def equipe_criar(request: Request, db: Session = Depends(get_db)):
     usuario = usuario_atual(request, db)
     if not usuario:
         return redirecionar_login()
+    if _equipe_estrutural_no_control():
+        return _resposta_equipe_control_only(request, usuario)
     if not pode_gerir_equipe(usuario):
         return RedirectResponse("/app", status_code=303)
     form = await request.form()
@@ -3224,6 +3263,8 @@ def equipe_editar_pagina(request: Request, membro_id: str, db: Session = Depends
     usuario = usuario_atual(request, db)
     if not usuario:
         return redirecionar_login()
+    if _equipe_estrutural_no_control():
+        return _resposta_equipe_control_only(request, usuario)
     if not pode_gerir_equipe(usuario):
         return RedirectResponse("/app", status_code=303)
     membro = _membro_da_loja(db, usuario, membro_id)
@@ -3246,6 +3287,8 @@ async def equipe_editar(request: Request, membro_id: str, db: Session = Depends(
     usuario = usuario_atual(request, db)
     if not usuario:
         return redirecionar_login()
+    if _equipe_estrutural_no_control():
+        return _resposta_equipe_control_only(request, usuario)
     if not pode_gerir_equipe(usuario):
         return RedirectResponse("/app", status_code=303)
     form = await request.form()
@@ -3296,6 +3339,8 @@ def equipe_senha_pagina(request: Request, membro_id: str, db: Session = Depends(
     usuario = usuario_atual(request, db)
     if not usuario:
         return redirecionar_login()
+    if _equipe_estrutural_no_control():
+        return _resposta_equipe_control_only(request, usuario)
     if not pode_gerir_equipe(usuario):
         return RedirectResponse("/app", status_code=303)
     membro = _membro_da_loja(db, usuario, membro_id)
@@ -3320,6 +3365,8 @@ async def equipe_redefinir_senha(request: Request, membro_id: str, db: Session =
     usuario = usuario_atual(request, db)
     if not usuario:
         return redirecionar_login()
+    if _equipe_estrutural_no_control():
+        return _resposta_equipe_control_only(request, usuario)
     if not pode_gerir_equipe(usuario):
         return RedirectResponse("/app", status_code=303)
     form = await request.form()
@@ -3367,6 +3414,8 @@ async def equipe_alterar_acesso(
     usuario = usuario_atual(request, db)
     if not usuario:
         return redirecionar_login()
+    if _equipe_estrutural_no_control():
+        return _resposta_equipe_control_only(request, usuario)
     if not pode_gerir_equipe(usuario):
         return RedirectResponse("/app", status_code=303)
     form = await request.form()

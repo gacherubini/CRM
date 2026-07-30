@@ -31,6 +31,7 @@ def test_nav_somente_vendas_e_estoque_com_acessos_bancarios():
         "Visão geral",
         "Veículos",
         "Acessos bancários",
+        "Equipe",
     ]
     hrefs = {i.href for i in items}
     assert "/app/loja/vendas" in hrefs
@@ -38,10 +39,11 @@ def test_nav_somente_vendas_e_estoque_com_acessos_bancarios():
     assert "/app/loja/estoque" in hrefs
     assert "/app/loja/estoque/veiculos" in hrefs
     assert "/app/financeiras" in hrefs
+    assert "/app/loja/equipe" in hrefs
     # Sem config técnica
     assert not any("trafego" in i.href or "campanhas" in i.href for i in items)
-    assert not any("configuracoes" in i.href for i in items)
     assert not any("operacao" in i.href for i in items)
+    assert not any(i.href.startswith("/app/configuracoes") for i in items)
 
 
 def test_nav_oculta_estoque_sem_entitlement():

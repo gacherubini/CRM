@@ -78,22 +78,30 @@ def build_nav(
             )
         )
 
-    # Contextual: acessos bancários (dono/gerente) — não é módulo principal.
-    if roles & ROLES_GESTAO and entitlements.vendas_enabled and entitlements.loja_ativa:
-        sections.append(
-            NavSection(
-                title="Ajustes",
-                items=(
-                    NavItem(
-                        label="Acessos bancários",
-                        href="/app/financeiras",
-                        section="Ajustes",
-                        module=None,
-                        active_prefix="/app/financeiras",
-                    ),
-                ),
+    # Contextual (dono/gerente): não é módulo principal.
+    # Acessos bancários e lista operacional da equipe (estrutura no Control).
+    if roles & ROLES_GESTAO and entitlements.loja_ativa:
+        ajustes: list[NavItem] = []
+        if entitlements.vendas_enabled:
+            ajustes.append(
+                NavItem(
+                    label="Acessos bancários",
+                    href="/app/financeiras",
+                    section="Ajustes",
+                    module=None,
+                    active_prefix="/app/financeiras",
+                )
+            )
+        ajustes.append(
+            NavItem(
+                label="Equipe",
+                href="/app/loja/equipe",
+                section="Ajustes",
+                module=None,
+                active_prefix="/app/loja/equipe",
             )
         )
+        sections.append(NavSection(title="Ajustes", items=tuple(ajustes)))
 
     return tuple(sections)
 

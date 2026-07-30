@@ -2,10 +2,21 @@
 {% block title %}Equipe — Revy{% endblock %}
 {% block content %}
 <div class="page-heading">
-  <div><span class="eyebrow">Acessos da loja</span><h1>Equipe</h1><p>Gerencie quem pode entrar no Portal sem apagar o histórico comercial.</p></div>
+  <div>
+    <span class="eyebrow">Acessos da loja</span>
+    <h1>Equipe</h1>
+    {% if equipe_somente_leitura %}
+    <p>Membros provisionados para esta loja — contas e cargos são geridos no Revy Control. Distribuição de atendimento permanece na Loja.</p>
+    {% else %}
+    <p>Gerencie quem pode entrar no Portal sem apagar o histórico comercial.</p>
+    {% endif %}
+  </div>
+  {% if not equipe_somente_leitura %}
   <a class="button primary" href="/app/equipe/novo">Adicionar membro</a>
+  {% endif %}
 </div>
 
+{% if msg_equipe_control %}<div class="alert info">{{ msg_equipe_control }}. Use esta lista só para contexto operacional (distribuição de leads e produtividade).</div>{% endif %}
 {% if erro %}<div class="alert error">{{ erro }}</div>{% endif %}
 {% if request.query_params.get('ok') == 'criado' %}<div class="alert success">Membro adicionado com sucesso.</div>{% endif %}
 {% if request.query_params.get('ok') == 'editado' %}<div class="alert success">Dados do membro atualizados.</div>{% endif %}
@@ -20,13 +31,19 @@
 <section class="panel flush">
   {% if membros %}
   <div class="table-wrap"><table>
-    <thead><tr><th>Membro</th><th>Papel</th><th>Acesso</th><th><span class="sr-only">Ações</span></th></tr></thead>
+    <thead><tr>
+      <th>Membro</th>
+      <th>Papel</th>
+      <th>Acesso</th>
+      {% if not equipe_somente_leitura %}<th><span class="sr-only">Ações</span></th>{% endif %}
+    </tr></thead>
     <tbody>
       {% for membro in membros %}
       <tr>
-        <td><div class="cell-stack"><strong>{{ membro.nome }}{% if membro.id == usuario.id %} <span class="muted">(você)</span>{% endif %}</strong><small>{{ membro.email }}</small></div></td>
+        <td><div class="cell-stack"><strong>{{ membro.nome }}{% if membro.id == usuario.id %} <span class="muted">(você)</span>{% endif %}</strong>{% if not equipe_somente_leitura %}<small>{{ membro.email }}</small>{% endif %}</div></td>
         <td><span class="status">{{ papeis_rotulo.get(membro.papel, membro.papel) }}</span></td>
         <td><span class="status {{ 'disponivel' if membro.ativo else 'indisponivel' }}">{{ 'Ativo' if membro.ativo else 'Inativo' }}</span></td>
+        {% if not equipe_somente_leitura %}
         <td><div class="action-grid">
           {% if membro.id == usuario.id or membro.papel in ['gerente', 'vendedor'] %}
           <a class="button secondary" href="/app/equipe/{{ membro.id }}/editar">Editar</a>
@@ -42,12 +59,20 @@
           </form>
           {% endif %}
         </div></td>
+        {% endif %}
       </tr>
       {% endfor %}
     </tbody>
   </table></div>
   {% else %}
-  <div class="empty"><strong>Nenhum membro cadastrado.</strong><p>Adicione um gerente ou vendedor para começar.</p></div>
+  <div class="empty">
+    <strong>Nenhum membro cadastrado.</strong>
+    {% if equipe_somente_leitura %}
+    <p>Provisione pessoas e cargos no Revy Control. Números WhatsApp e tokens não aparecem como equipe.</p>
+    {% else %}
+    <p>Adicione um gerente ou vendedor para começar.</p>
+    {% endif %}
+  </div>
   {% endif %}
 </section>
 {% endblock %}
