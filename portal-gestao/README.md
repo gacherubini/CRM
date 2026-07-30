@@ -30,11 +30,14 @@ desligadas a UI legada permanece idêntica. Mapa de rotas:
 |---|---|---|
 | `REVY_LOJA_SHELL_ENABLED` | `0` | `1` = brand/nav Vendas·Estoque; `0` = menu legado |
 | `REVY_LOJA_ENTITLEMENTS_ENABLED` | `0` | `1` = 403 se módulo não contratado/ativo; `0` = fail-open |
-| `REVY_LOJA_ATENDIMENTO_ENABLED` | `0` | Workspace unificado (F4+); ainda não altera rotas |
+| `REVY_LOJA_ATENDIMENTO_ENABLED` | `0` | Workspace unificado `/app/loja/atendimento` |
+| `REVY_LOJA_REDIRECT_LEGACY` | `0` | `1` = 303 de paths legados → shell (exige shell on); ver cutover |
 | `SELLER_AI_ENABLED` | `0` | Seller AI (F7+); ainda não altera rotas |
 
-Backend: `app/loja/*` (domínio) + `app/web/loja_shell.py` (router/hooks).  
-Projeção: reutiliza `app.provisioning.allows_processing` / `LojaOperacionalProjecao`.
+Backend: `app/loja/*` (domínio) + `app/web/loja_shell.py` (router/hooks) +
+`app/loja/redirects.py` (cutover F8).  
+Projeção: reutiliza `app.provisioning.allows_processing` / `LojaOperacionalProjecao`.  
+Cutover / rollback: [`docs/revy-loja-cutover.md`](docs/revy-loja-cutover.md).
 
 ### Tráfego / Meta (E10 + Revy Tráfego)
 

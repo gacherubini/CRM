@@ -223,16 +223,18 @@ def shell_on(monkeypatch):
     monkeypatch.setattr("app.web.loja_estoque._shell_ativo", lambda: True)
 
 
-def test_rota_visao_flag_off_redireciona_legado(client):
+def test_rota_visao_flag_off_redireciona_legado(client, monkeypatch):
     login(client)
-    # default flag off
+    # Isola do patch de settings feito por outros testes (sales overview etc.).
+    monkeypatch.setattr("app.web.loja_estoque._shell_ativo", lambda: False)
     resp = client.get("/app/loja/estoque", follow_redirects=False)
     assert resp.status_code == 303
     assert resp.headers["location"] == "/app/estoque"
 
 
-def test_rota_veiculos_flag_off_redireciona_legado(client):
+def test_rota_veiculos_flag_off_redireciona_legado(client, monkeypatch):
     login(client)
+    monkeypatch.setattr("app.web.loja_estoque._shell_ativo", lambda: False)
     resp = client.get("/app/loja/estoque/veiculos", follow_redirects=False)
     assert resp.status_code == 303
     assert resp.headers["location"] == "/app/estoque"

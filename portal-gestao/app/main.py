@@ -97,6 +97,7 @@ from app.config import (
     revy_loja_shell_enabled,
     settings,
 )
+from app.loja.redirects import resolve_legacy_redirect, should_consider_request
 from app.web.loja_shell import check_module_access, router as loja_shell_router
 from app.web import loja_shell as loja_shell_mod
 from app.loja.types import Module
@@ -298,6 +299,17 @@ app.add_middleware(
 )
 app.mount("/static", StaticFiles(directory=str(BASE_DIR / "static")), name="static")
 app.include_router(loja_shell_router)
+
+
+@app.middleware("http")
+async def revy_loja_legacy_redirects(request: Request, call_next):
+    """F8: redirects graduais legado → shell (flags default OFF)."""
+    if should_consider_request(request.method, request.headers.get("accept")):
+        destino = resolve_legacy_redirect(request.url.path)
+        if destino is not None:
+            return RedirectResponse(destino, status_code=303)
+    return await call_next(request)
+
 
 @app.middleware("http")
 async def headers_seguranca(request: Request, call_next):

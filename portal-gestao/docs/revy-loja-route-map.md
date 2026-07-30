@@ -3,7 +3,7 @@
 **Data:** 2026-07-29  
 **Escopo:** `portal-gestao`  
 **Flags (default OFF):** `REVY_LOJA_SHELL_ENABLED`, `REVY_LOJA_ENTITLEMENTS_ENABLED`,
-`REVY_LOJA_ATENDIMENTO_ENABLED`, `SELLER_AI_ENABLED`
+`REVY_LOJA_ATENDIMENTO_ENABLED`, `REVY_LOJA_REDIRECT_LEGACY`, `SELLER_AI_ENABLED`
 
 Com as flags desligadas, a UI e as rotas legadas permanecem. Rollback = desligar flags
 (e reverter deploy se necessário). Nenhuma rota legada é removida nesta fase.
@@ -64,8 +64,11 @@ Com as flags desligadas, a UI e as rotas legadas permanecem. Rollback = desligar
 
 1. `REVY_LOJA_SHELL_ENABLED=0` — restaura nav legada em `base.html`.
 2. `REVY_LOJA_ENTITLEMENTS_ENABLED=0` — fail-open; sem 403 de módulo.
-3. Rotas `/app/*` legadas nunca removidas em F0–F1.
-4. Projeção `loja_operacional_projecao` permanece (provisioning já existente).
+3. `REVY_LOJA_REDIRECT_LEGACY=0` — desliga 303 de paths legados (F8; default).
+4. Rotas `/app/*` legadas nunca removidas em F0–F1 / F8 (só redirect opcional).
+5. Projeção `loja_operacional_projecao` permanece (provisioning já existente).
+
+Cutover completo (ordem de enablement): [`revy-loja-cutover.md`](revy-loja-cutover.md).
 
 ## Baseline de testes (comandos)
 

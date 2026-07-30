@@ -1,6 +1,6 @@
 # Plano — Evolução do Portal para Revy Loja
 
-**Status:** ATIVO / CÓDIGO F0–F5 LEAN (shell, identity, estoque/vendas overview, atendimento, equipe read-only + acessos bancários; flags default OFF; residual F6 multi-canal, F7 Seller AI, F8 rollout)
+**Status:** ATIVO / CÓDIGO F0–F6 + F8 LEAN (shell, overviews, atendimento multi-canal, equipe read-only, bancos, Evolution send, redirects; flags default OFF; residual F7 Seller AI + pilot/ops lab)
 **Data:** 2026-07-29
 **Spec:** [`docs/superpowers/specs/2026-07-29-revy-loja-design.md`](../superpowers/specs/2026-07-29-revy-loja-design.md)
 **Depende por gates de:** [`Plano Revy Control`](2026-07-29-plano-revy-control.md) —
@@ -99,9 +99,10 @@ produção respeita esses gates.
 - [x] Classificar cada configuração como estrutural, técnica, operacional ou financeira.
 - [x] Criar flags default off:
       `REVY_LOJA_SHELL_ENABLED`, `REVY_LOJA_ENTITLEMENTS_ENABLED`,
-      `REVY_LOJA_ATENDIMENTO_ENABLED` e `SELLER_AI_ENABLED`.
+      `REVY_LOJA_ATENDIMENTO_ENABLED`, `REVY_LOJA_REDIRECT_LEGACY` e `SELLER_AI_ENABLED`.
 - [ ] Confirmar backup e restauração do banco do Portal.
 - [x] Definir redirects e rollback antes da primeira remoção visual.
+      → implementação F8 em `app/loja/redirects.py` + runbook cutover.
 
 **Critério de pronto:** nenhuma função atual fica sem destino, e o shell antigo pode
 ser restaurado apenas desligando flags.
@@ -393,10 +394,14 @@ comercial continua explícito, autorizado e auditável.
 - [ ] Validar permissões de dono, gerente e vendedor por rota e API.
 - [ ] Validar indisponibilidade isolada de Control, Chatbot, Motor, Estoque e IA.
 - [ ] Observar filas/outboxes, dedupe e atraso das projeções.
-- [ ] Ativar redirects de rotas antigas gradualmente.
+- [x] Ativar redirects de rotas antigas gradualmente.
+      → flag `REVY_LOJA_REDIRECT_LEGACY` (default off) + `app/loja/redirects.py` +
+      middleware GET HTML; testes em `tests/test_loja_redirects.py`;
+      runbook [`portal-gestao/docs/revy-loja-cutover.md`](../../portal-gestao/docs/revy-loja-cutover.md).
 - [ ] Remover menus antigos depois de telemetria provar ausência de uso necessário.
 - [ ] Remover escrita estrutural de `Usuario` somente após projeção do Control estável.
-- [ ] Atualizar runbooks, ajuda e onboarding da loja.
+- [x] Atualizar runbooks, ajuda e onboarding da loja (parte código: cutover.md + matriz de flags).
+      (onboarding operacional / piloto permanece aberto)
 
 ## Matriz mínima de testes
 

@@ -24,6 +24,15 @@ def revy_loja_atendimento_enabled() -> bool:
     return _env_bool("REVY_LOJA_ATENDIMENTO_ENABLED", "0")
 
 
+def revy_loja_redirect_legacy_enabled() -> bool:
+    """Redirects 303 de rotas legadas → shell Loja (F8 cutover). Default off.
+
+    Só age com ``REVY_LOJA_SHELL_ENABLED=1``. Ver
+    ``portal-gestao/docs/revy-loja-cutover.md``.
+    """
+    return _env_bool("REVY_LOJA_REDIRECT_LEGACY", "0")
+
+
 def seller_ai_enabled() -> bool:
     """Seller AI (F7+). Default off."""
     return _env_bool("SELLER_AI_ENABLED", "0")
@@ -104,6 +113,9 @@ class Settings:
     )
     revy_loja_atendimento_enabled: bool = _env_bool(
         "REVY_LOJA_ATENDIMENTO_ENABLED", "0"
+    )
+    revy_loja_redirect_legacy_enabled: bool = _env_bool(
+        "REVY_LOJA_REDIRECT_LEGACY", "0"
     )
     seller_ai_enabled: bool = _env_bool("SELLER_AI_ENABLED", "0")
 
