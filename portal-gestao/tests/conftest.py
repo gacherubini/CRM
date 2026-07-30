@@ -225,17 +225,26 @@ class ChatbotFake:
             raise ChatbotIndisponivel("Não foi possível acessar o chatbot agora")
         return list(self.canais)
 
-    def listar_mensagens(self, telefone, limit=200, offset=0):
+    def listar_mensagens(
+        self, telefone, limit=200, offset=0, *, canal_id=None, instance=None
+    ):
         if self.indisponivel:
             raise ChatbotIndisponivel("Não foi possível acessar o chatbot agora")
-        if telefone not in self.mensagens:
+        # Multi-WA: chave opcional (telefone, canal_id) se o fake tiver dict aninhado.
+        msgs = self.mensagens.get(telefone)
+        if isinstance(msgs, dict) and not isinstance(msgs, list):
+            chave = canal_id or instance or next(iter(msgs), None)
+            if chave is None or chave not in msgs:
+                raise ConversaNaoEncontrada("conversa não encontrada")
+            return msgs[chave]
+        if msgs is None:
             raise ConversaNaoEncontrada("conversa não encontrada")
-        return self.mensagens[telefone]
+        return msgs
 
-    def obter_estado(self, telefone):
+    def obter_estado(self, telefone, *, canal_id=None, instance=None):
         return self.estados.get(telefone, {"bot_ativo": True, "status": "aberta"})
 
-    def definir_bot_ativo(self, telefone, bot_ativo):
+    def definir_bot_ativo(self, telefone, bot_ativo, *, instance=None):
         if self.indisponivel:
             raise ChatbotIndisponivel("Não foi possível acessar o chatbot agora")
         self.handoffs.append((telefone, bot_ativo))

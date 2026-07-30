@@ -137,6 +137,29 @@ def test_client_mensagens_404_mapeia_conversa_nao_encontrada(monkeypatch):
         pass
 
 
+def test_client_listar_mensagens_envia_canal_id_e_instance(monkeypatch):
+    def handler(request):
+        assert request.url.path == "/v1/conversas/5511999/mensagens"
+        assert request.url.params["canal_id"] == "canal-x"
+        assert request.url.params["instance"] == "inst-y"
+        return httpx.Response(
+            200,
+            json={
+                "telefone": "5511999",
+                "canal_id": "canal-x",
+                "mensagens": [{"direcao": "entrada", "texto": "oi"}],
+                "limit": 200,
+                "offset": 0,
+            },
+        )
+
+    chatbot = _cliente_com_transporte(monkeypatch, handler)
+    msgs = chatbot.listar_mensagens(
+        "5511999", canal_id="canal-x", instance="inst-y"
+    )
+    assert msgs == [{"direcao": "entrada", "texto": "oi"}]
+
+
 def test_client_definir_bot_ativo_faz_patch(monkeypatch):
     def handler(request):
         assert request.method == "PATCH"

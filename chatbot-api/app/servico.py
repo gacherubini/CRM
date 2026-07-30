@@ -940,20 +940,89 @@ def _canal_id_opcional_por_instance(
     return canal.id
 
 
-def obter_estado(
+def _resolver_canal_id_escopo(
+    db: Session,
+    loja_id: str,
+    *,
+    canal_id: str | None = None,
+    instance: str | None = None,
+) -> str | None:
+    """Resolve canal a partir de ``canal_id`` e/ou ``instance`` (multi-WA).
+
+    ``None`` = sem escopo de canal (legado / single-channel).
+    Canal inexistente na loja → 404. Conflito canal_id×instance → 409.
+    """
+    from app import channels
+
+    por_instance = _canal_id_opcional_por_instance(db, loja_id, instance)
+    texto = (canal_id or "").strip() or None
+    if not texto:
+        return por_instance
+    canal = channels.get_channel_for_loja(db, loja_id, texto)
+    if por_instance is not None and por_instance != canal.id:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "canal_instance_mismatch",
+                "message": "canal_id e instance não correspondem ao mesmo canal",
+            },
+        )
+    return canal.id
+
+
+def _listar_conversas_telefone(
     db: Session,
     loja_id: str,
     telefone: str,
     *,
-    instance: str | None = None,
-) -> dict:
-    canal_id = _canal_id_opcional_por_instance(db, loja_id, instance)
+    canal_id: str | None = None,
+) -> list[Conversa]:
     q = db.query(Conversa).filter(
         Conversa.loja_id == loja_id, Conversa.telefone == telefone
     )
     if canal_id:
         q = q.filter(Conversa.canal_id == canal_id)
-    conversa = q.order_by(Conversa.criada_em.asc()).first()
+    return q.order_by(Conversa.criada_em.asc()).all()
+
+
+def _exigir_conversa_unica(
+    conversas: list[Conversa],
+    *,
+    canal_id: str | None,
+) -> Conversa | None:
+    """0 → None; 1 → conversa; >1 sem canal → 409 ambíguo multi-WA."""
+    if not conversas:
+        return None
+    if canal_id is None and len(conversas) > 1:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "conversa_ambigua",
+                "message": (
+                    "múltiplas conversas para o telefone; "
+                    "informe canal_id ou instance"
+                ),
+                "canais": [c.canal_id for c in conversas if c.canal_id],
+            },
+        )
+    return conversas[0]
+
+
+def obter_estado(
+    db: Session,
+    loja_id: str,
+    telefone: str,
+    *,
+    canal_id: str | None = None,
+    instance: str | None = None,
+) -> dict:
+    resolved = _resolver_canal_id_escopo(
+        db, loja_id, canal_id=canal_id, instance=instance
+    )
+    conversas = _listar_conversas_telefone(
+        db, loja_id, telefone, canal_id=resolved
+    )
+    conversa = _exigir_conversa_unica(conversas, canal_id=resolved)
     if conversa is None:
         return {
             "bot_ativo": _bot_ativo_efetivo(db, loja_id, True),
@@ -971,13 +1040,12 @@ def definir_bot_ativo(
     telefone: str,
     ativo: bool,
     *,
+    canal_id: str | None = None,
     instance: str | None = None,
 ) -> dict:
     from app import provisioning
 
     if ativo and not provisioning.allows_outbound_whatsapp(db, loja_id):
-        from fastapi import HTTPException
-
         raise HTTPException(
             status_code=423,
             detail={
@@ -986,8 +1054,16 @@ def definir_bot_ativo(
                 "loja_operacional": False,
             },
         )
-    canal_id = _canal_id_opcional_por_instance(db, loja_id, instance)
-    conversa = _get_or_create_conversa(db, loja_id, telefone, canal_id=canal_id)
+    resolved = _resolver_canal_id_escopo(
+        db, loja_id, canal_id=canal_id, instance=instance
+    )
+    if resolved is None:
+        # Sem canal: se já há várias conversas, não adivinhar qual pausar.
+        existentes = _listar_conversas_telefone(db, loja_id, telefone)
+        _exigir_conversa_unica(existentes, canal_id=None)
+        if len(existentes) == 1:
+            resolved = existentes[0].canal_id
+    conversa = _get_or_create_conversa(db, loja_id, telefone, canal_id=resolved)
     conversa.bot_ativo = ativo
     conversa.status = "aberta" if ativo else "handoff"
     conversa.atualizada_em = datetime.now(timezone.utc)
@@ -1053,13 +1129,27 @@ def listar_conversas(
 
 
 def listar_mensagens(
-    db: Session, loja_id: str, telefone: str, limit: int, offset: int
+    db: Session,
+    loja_id: str,
+    telefone: str,
+    limit: int,
+    offset: int,
+    *,
+    canal_id: str | None = None,
+    instance: str | None = None,
 ) -> dict:
-    conversa = (
-        db.query(Conversa)
-        .filter(Conversa.loja_id == loja_id, Conversa.telefone == telefone)
-        .first()
+    """Histórico de mensagens da conversa (loja, telefone[, canal]).
+
+    Multi-WA: sem ``canal_id``/``instance`` e com 2+ conversas no telefone → 409.
+    Single-channel (1 conversa) continua sem precisar de canal.
+    """
+    resolved = _resolver_canal_id_escopo(
+        db, loja_id, canal_id=canal_id, instance=instance
     )
+    conversas = _listar_conversas_telefone(
+        db, loja_id, telefone, canal_id=resolved
+    )
+    conversa = _exigir_conversa_unica(conversas, canal_id=resolved)
     if conversa is None:
         raise HTTPException(status_code=404, detail="conversa não encontrada")
     mensagens = (
@@ -1072,6 +1162,7 @@ def listar_mensagens(
     )
     return {
         "telefone": telefone,
+        "canal_id": conversa.canal_id,
         "mensagens": [para_saida_mensagem(m) for m in mensagens],
     }
 
@@ -1190,17 +1281,14 @@ def enviar_mensagem_humana(
         raise HTTPException(status_code=422, detail="texto inválido")
 
     provider_message_id = _provider_id_humano(idempotency_key)
-    canal_id = _canal_id_opcional_por_instance(db, loja_id, instance)
+    canal_id = _resolver_canal_id_escopo(db, loja_id, instance=instance)
 
-    # Se já existe conversa, reutiliza o canal dela quando instance não veio.
-    conversa_existente = (
-        db.query(Conversa)
-        .filter(Conversa.loja_id == loja_id, Conversa.telefone == telefone_norm)
-        .order_by(Conversa.criada_em.asc())
-        .first()
-    )
-    if canal_id is None and conversa_existente is not None:
-        canal_id = conversa_existente.canal_id
+    # Sem instance: reutiliza canal só se houver conversa única (evita .first() multi-WA).
+    if canal_id is None:
+        existentes = _listar_conversas_telefone(db, loja_id, telefone_norm)
+        unica = _exigir_conversa_unica(existentes, canal_id=None)
+        if unica is not None:
+            canal_id = unica.canal_id
 
     existente = _mensagem_existente(
         db, loja_id, provider_message_id, canal_id=canal_id

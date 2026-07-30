@@ -145,19 +145,59 @@ class ChatbotClient:
         conversas = self._request("GET", "/v1/conversas", params=params)["conversas"]
         return [self._mapear_conversa(c) for c in conversas]
 
-    def listar_mensagens(self, telefone: str, limit: int = 200, offset: int = 0) -> list[dict]:
-        params = {"limit": limit, "offset": offset}
+    def listar_mensagens(
+        self,
+        telefone: str,
+        limit: int = 200,
+        offset: int = 0,
+        *,
+        canal_id: str | None = None,
+        instance: str | None = None,
+    ) -> list[dict]:
+        """Histórico da conversa. Multi-WA: informe ``canal_id`` ou ``instance``."""
+        params: dict[str, Any] = {"limit": limit, "offset": offset}
+        if canal_id:
+            params["canal_id"] = canal_id
+        if instance:
+            params["instance"] = instance
         dados = self._request(
-            "GET", f"/v1/conversas/{telefone}/mensagens", erro_404=ConversaNaoEncontrada, params=params
+            "GET",
+            f"/v1/conversas/{telefone}/mensagens",
+            erro_404=ConversaNaoEncontrada,
+            params=params,
         )
         return dados["mensagens"]
 
-    def obter_estado(self, telefone: str) -> dict:
-        return self._request("GET", f"/v1/conversas/{telefone}/estado")
-
-    def definir_bot_ativo(self, telefone: str, bot_ativo: bool) -> dict:
+    def obter_estado(
+        self,
+        telefone: str,
+        *,
+        canal_id: str | None = None,
+        instance: str | None = None,
+    ) -> dict:
+        params: dict[str, Any] = {}
+        if canal_id:
+            params["canal_id"] = canal_id
+        if instance:
+            params["instance"] = instance
         return self._request(
-            "PATCH", f"/v1/conversas/{telefone}/estado", json={"bot_ativo": bot_ativo}
+            "GET",
+            f"/v1/conversas/{telefone}/estado",
+            params=params or None,
+        )
+
+    def definir_bot_ativo(
+        self,
+        telefone: str,
+        bot_ativo: bool,
+        *,
+        instance: str | None = None,
+    ) -> dict:
+        payload: dict[str, Any] = {"bot_ativo": bot_ativo}
+        if instance:
+            payload["instance"] = instance
+        return self._request(
+            "PATCH", f"/v1/conversas/{telefone}/estado", json=payload
         )
 
     def listar_canais_whatsapp(self) -> list[dict]:

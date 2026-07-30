@@ -234,3 +234,74 @@ def test_http_unknown_instance_webhook(client):
         },
     )
     assert r.status_code == 404
+
+
+def test_listar_mensagens_isolado_por_canal(client, db, loja_a, monkeypatch):
+    """Dois canais, mesmo telefone: histórico isolado por canal_id/instance."""
+    legado, extra = _register_two_channels(db, loja_a, monkeypatch)
+    tel = "5511988000020"
+    servico.registrar_mensagem(
+        db, legado["evolution_instance"], tel, "msg legado", "HIST-L1"
+    )
+    servico.registrar_mensagem(
+        db, extra["evolution_instance"], tel, "msg extra", "HIST-E1"
+    )
+
+    h = loja_a["headers"]
+
+    # Sem canal: ambíguo → 409
+    r_amb = client.get(f"/v1/conversas/{tel}/mensagens", headers=h)
+    assert r_amb.status_code == 409
+    assert r_amb.json()["detail"]["code"] == "conversa_ambigua"
+
+    # Por canal_id
+    r_legado = client.get(
+        f"/v1/conversas/{tel}/mensagens?canal_id={legado['id']}", headers=h
+    )
+    assert r_legado.status_code == 200
+    textos_l = [m["texto"] for m in r_legado.json()["mensagens"]]
+    assert textos_l == ["msg legado"]
+    assert r_legado.json().get("canal_id") == legado["id"]
+
+    r_extra = client.get(
+        f"/v1/conversas/{tel}/mensagens?canal_id={extra['id']}", headers=h
+    )
+    assert r_extra.status_code == 200
+    textos_e = [m["texto"] for m in r_extra.json()["mensagens"]]
+    assert textos_e == ["msg extra"]
+
+    # Por instance (mesmo isolamento)
+    r_inst = client.get(
+        f"/v1/conversas/{tel}/mensagens?instance={extra['evolution_instance']}",
+        headers=h,
+    )
+    assert r_inst.status_code == 200
+    assert [m["texto"] for m in r_inst.json()["mensagens"]] == ["msg extra"]
+
+    # obter_estado também exige desambiguação
+    assert client.get(f"/v1/conversas/{tel}/estado", headers=h).status_code == 409
+    est = client.get(
+        f"/v1/conversas/{tel}/estado?canal_id={legado['id']}", headers=h
+    )
+    assert est.status_code == 200
+    assert "bot_ativo" in est.json()
+
+
+def test_listar_mensagens_single_channel_sem_canal_ok(client, loja_a):
+    """Single-channel: histórico por telefone continua sem canal_id/instance."""
+    tel = "5511988000021"
+    r = client.post(
+        "/webhook/mensagem",
+        json={
+            "instance": loja_a["instance"],
+            "telefone": tel,
+            "texto": "unica",
+            "provider_message_id": "HIST-S1",
+        },
+    )
+    assert r.status_code == 200
+    h = loja_a["headers"]
+    body = client.get(f"/v1/conversas/{tel}/mensagens", headers=h).json()
+    assert [m["texto"] for m in body["mensagens"]] == ["unica"]
+    estado = client.get(f"/v1/conversas/{tel}/estado", headers=h)
+    assert estado.status_code == 200

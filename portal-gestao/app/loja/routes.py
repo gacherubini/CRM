@@ -113,13 +113,20 @@ def _conversa_por_telefone(
             # Com canal_id, primeira match já é a desejada; sem, preferir mais recente
             # (listar_conversas já vem ordenada por atualizada_em desc).
             break
+        instance = None
+        if resumo:
+            instance = resumo.get("evolution_instance") or resumo.get("instance")
         try:
-            mensagens = chatbot.listar_mensagens(tel)
+            mensagens = chatbot.listar_mensagens(
+                tel,
+                canal_id=canal_id or (resumo.get("canal_id") if resumo else None),
+                instance=instance,
+            )
         except ConversaNaoEncontrada:
             mensagens = []
         if resumo is None:
             try:
-                estado = chatbot.obter_estado(tel)
+                estado = chatbot.obter_estado(tel, canal_id=canal_id)
                 resumo = {
                     "telefone": tel,
                     "bot_ativo": estado.get("bot_ativo"),

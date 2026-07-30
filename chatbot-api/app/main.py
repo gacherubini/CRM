@@ -473,12 +473,23 @@ def listar_mensagens(
     telefone: str,
     limit: int = 100,
     offset: int = 0,
+    canal_id: Optional[str] = None,
+    instance: Optional[str] = None,
     ctx: Contexto = Depends(get_contexto),
     db: Session = Depends(get_db),
 ):
+    """Histórico da conversa. Multi-WA: passe ``canal_id`` ou ``instance``."""
     limit = max(1, min(limit, 500))
     offset = max(0, offset)
-    resultado = servico.listar_mensagens(db, ctx.loja_id, telefone, limit, offset)
+    resultado = servico.listar_mensagens(
+        db,
+        ctx.loja_id,
+        telefone,
+        limit,
+        offset,
+        canal_id=canal_id,
+        instance=instance,
+    )
     return {**resultado, "limit": limit, "offset": offset}
 
 
@@ -486,11 +497,16 @@ def listar_mensagens(
 def obter_estado(
     telefone: str,
     instance: Optional[str] = None,
+    canal_id: Optional[str] = None,
     ctx: Contexto = Depends(get_contexto),
     db: Session = Depends(get_db),
 ):
     return servico.obter_estado(
-        db, ctx.loja_id, telefone, instance=instance
+        db,
+        ctx.loja_id,
+        telefone,
+        canal_id=canal_id,
+        instance=instance,
     )
 
 
