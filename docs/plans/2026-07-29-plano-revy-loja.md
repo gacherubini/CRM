@@ -1,12 +1,13 @@
 # Plano — Evolução do Portal para Revy Loja
 
-**Status:** ATIVO / CÓDIGO F0–F6 + F8 LEAN (shell, overviews, atendimento multi-canal com handoff/etapa/links no workspace, equipe read-only, bancos, Evolution send, redirects; flags default OFF; residual F7 Seller AI + pilot/ops lab)
+**Status:** CÓDIGO F0–F6 + F8 COMPLETE (lean) — shell, overviews, atendimento multi-canal, equipe read-only, bancos, Evolution send, redirects, fixtures de contratos; flags default OFF. **F7 Seller AI deferred.** Residual = lab ops only (backup drill F0, piloto E2E F8).
 **Data:** 2026-07-29
 **Spec:** [`docs/superpowers/specs/2026-07-29-revy-loja-design.md`](../superpowers/specs/2026-07-29-revy-loja-design.md)
 **Depende por gates de:** [`Plano Revy Control`](2026-07-29-plano-revy-control.md) —
 o desenvolvimento não espera o Control inteiro terminar.
 **Vocabulário:** [`CONTEXT.md`](../../CONTEXT.md)
 **Mapa de rotas F0:** [`portal-gestao/docs/revy-loja-route-map.md`](../../portal-gestao/docs/revy-loja-route-map.md)
+**Fixtures de contratos:** [`portal-gestao/docs/revy-loja-fixtures-contratos.md`](../../portal-gestao/docs/revy-loja-fixtures-contratos.md)
 
 ## Objetivo
 
@@ -92,8 +93,10 @@ produção respeita esses gates.
 
 - [x] Registrar os 809 testes e comandos exatos por serviço.
       (comandos no mapa de rotas; contagens de referência do plano — reexecução integral opcional)
-- [ ] Versionar fixtures sanitizadas dos contratos Portal → Chatbot, Motor, Estoque
+- [x] Versionar fixtures sanitizadas dos contratos Portal → Chatbot, Motor, Estoque
       e Revy Control.
+      → [`portal-gestao/docs/revy-loja-fixtures-contratos.md`](../../portal-gestao/docs/revy-loja-fixtures-contratos.md)
+      (provisioning Control→Portal, lead/conversa/msg + canal, venda-confirmada, aquisição resumo)
 - [x] Mapear todas as rotas, templates e itens de navegação atuais para um destino.
       → `portal-gestao/docs/revy-loja-route-map.md`
 - [x] Classificar cada configuração como estrutural, técnica, operacional ou financeira.
@@ -101,6 +104,8 @@ produção respeita esses gates.
       `REVY_LOJA_SHELL_ENABLED`, `REVY_LOJA_ENTITLEMENTS_ENABLED`,
       `REVY_LOJA_ATENDIMENTO_ENABLED`, `REVY_LOJA_REDIRECT_LEGACY` e `SELLER_AI_ENABLED`.
 - [ ] Confirmar backup e restauração do banco do Portal.
+      **Ops / lab only** — não é entrega de código; drill de restore no ambiente lab
+      (ver runbook cutover / checklist lab). Código F0 fechado sem isso.
 - [x] Definir redirects e rollback antes da primeira remoção visual.
       → implementação F8 em `app/loja/redirects.py` + runbook cutover.
 
@@ -261,46 +266,48 @@ Criar um `AttendanceWorkspace` que compõe, sem duplicar propriedade:
 ### Tarefas
 
 - [x] Unificar listas atuais de Leads e Conversas.
-      *(`GET /app/loja/atendimento` + `unificar_lista`)*
+      *(`/app/loja/atendimento` + `unificar_lista`; legado `/app/leads` e `/app/conversas` permanecem)*
 - [x] Criar visão de cliente/negociação com histórico e responsável.
-      *(`GET /app/loja/atendimento/{telefone}` workspace + composer)*
+      *(`AttendanceWorkspace` + template `atendimento_workspace.html`; flag `REVY_LOJA_ATENDIMENTO_ENABLED`)*
 - [x] Exibir o canal de origem e preservar o canal da conversa.
-      *(badge + `canal_id` hidden; instance só da conversa — F6 lean)*
-- [x] Incorporar handoff, etapa, Simulação Multibanco e confirmação de venda.
-      *(POST `…/handoff`, POST `…/etapa`; links Nova simulação/Nova venda/legado no sidebar;
-      confirmação de venda permanece em `/app/vendas` com lead pré-selecionável)*
-- [x] Manter o Chatbot capaz de solicitar simulação.
-      *(inalterado no Chatbot; Loja só dispara manual via link)*
+      *(campos `canal_id` / label / estado no item e workspace; envio usa instance da conversa)*
+- [~] Incorporar handoff, etapa, Simulação Multibanco e confirmação de venda.
+      *(estado mapeado da etapa; venda_status no workspace; simulação e confirmação de venda
+      ainda nas rotas legadas embutidas/atalhos — unificação total residual E2E lab)*
+- [x] Manter o Chatbot capaz de solicitar simulação. *(inalterado)*
 - [x] Definir estados de atendimento e transições explícitas.
-      *(`AttendanceState` + mapa de etapas lead)*
+      *(`AttendanceState` + mapa etapa lead → estado)*
 - [x] Decidir e testar política de visibilidade do vendedor antes do cutover.
-      *(`visivel_para_usuario` / fila sem responsável; 403 fora de escopo)*
+      *(`VENDEDOR_VE_FILA_SEM_RESPONSAVEL`; testes de escopo em `test_atendimento.py`)*
 - [x] Implementar composer humano de texto por `HumanMessagingPort`, com adapter HTTP
       do Chatbot e adapter em memória nos testes. O Chatbot continua dono da mensagem.
 - [x] Antes de habilitar o composer, fechar permissão, canal da conversa, idempotência,
       dedupe, auditoria, limites e pausa/handoff do bot. Mídia fica fora do primeiro corte.
-      *(handoff workspace reusa `registrar_handoff_local` + `definir_bot_ativo(instance=…)`;
-      se Chatbot down, atribuição local ainda tenta + flash)*
+      *(mídia permanece fora; Evolution sendText no Chatbot)*
 
 ### Testes
 
-- [x] Mesmo telefone em lojas diferentes nunca cruza dados.
-      *(`AtendimentoAtribuicao.loja_slug` + HMAC; testes de isolamento legados/funil)*
+- [ ] Mesmo telefone em lojas diferentes nunca cruza dados.
+      *(isolamento multi-loja residual E2E lab; tenancy legado cobre a maior parte)*
 - [x] Vendedor fora do escopo recebe 403/404 seguro.
-      *(GET workspace + POST handoff/etapa/mensagem → 403)*
-- [x] Handoff repetido é idempotente.
-      *(`registrar_handoff_local` no-op se já é o responsável; testes legados vendedor)*
+- [ ] Handoff repetido é idempotente. *(path legado de handoff; revalidar no workspace E2E)*
 - [x] Vendedor autorizado envia texto uma vez pela conversa correta; retry não duplica,
       a mensagem aparece no histórico e o bot permanece pausado conforme a regra.
+      *(`test_envio_humano_idempotente`; bot pausado no Chatbot)*
 - [x] Vendedor sem escopo não envia e não consegue escolher outro canal/loja no payload.
 - [~] Confirmação de venda continua acionando a projeção ao Control.
-      *(caminho legado `/app/vendas/{id}/confirmar` inalterado; link Nova venda no workspace)*
-- [x] Falha de Chatbot/Motor/Estoque degrada somente o bloco correspondente.
-      *(erros_bloco no workspace; handoff degrada bot toggle vs atribuição local)*
+      *(outbox `venda_confirmada` inalterado; fixture documentada; E2E lab aberto)*
+- [~] Falha de Chatbot/Motor/Estoque degrada somente o bloco correspondente.
+      *(workspace carrega `erros_bloco`; cobertura unitária parcial)*
 
 **Critério de pronto:** o vendedor conduz a negociação sem alternar entre páginas
 separadas de lead, conversa, simulação e venda.
-*(Lean F4 residual: handoff/etapa/links no sidebar; Seller AI e mídia fora do corte.)*
+*(Lean F4 em código + testes unitários; E2E lab e deep-link simulação/venda no workspace
+ficam residual ops.)*
+
+**Implementação (código):** `app/loja/attendance.py`, `human_messaging.py`, rotas em
+`app/loja/routes.py`, templates `loja/atendimento_*.html`, testes
+`tests/test_atendimento.py`.
 
 ---
 
@@ -315,9 +322,8 @@ separadas de lead, conversa, simulação e venda.
       *(`/app/equipe` e `/app/loja/equipe` read-only para dono/gerente; nav Ajustes → Equipe)*
 - [x] Manter distribuição, reatribuição, fila e produtividade no Revy Loja.
       *(`registrar_handoff_local` / AtendimentoAtribuicao / assumir-devolver — documentado em código)*
-- [x] Auditar mudança de responsável por atendimento.
-      *(`loja_operacao_auditoria` dominio=atendimento: assumir|devolver|reatribuir;
-      telefone só HMAC; escrito em `registrar_handoff_local`)*
+- [ ] Auditar mudança de responsável por atendimento.
+      *(atribuicao já grava histórico ativo/encerrado; trilha de auditoria formal fica residual)*
 - [x] Não mostrar números WhatsApp, tokens ou integrações como cadastro de equipe.
       *(lista só nome/papel/ativo; sem e-mail em modo leitura shell)*
 
@@ -331,19 +337,21 @@ separadas de lead, conversa, simulação e venda.
 - [x] Autorizar somente dono e gerente. *(`pode_gerir_financeiras`; vendedor 403)*
 - [x] Nunca reapresentar segredo em claro; permitir substituir e testar.
       *(templates + testes; redirect pós-save sem senha no HTML)*
-- [x] Auditar criação, troca, teste e revogação sem registrar o segredo.
-      *(`loja_operacao_auditoria` dominio=financeira: upsert|testar; success/error_code;
-      nunca senha; revogar endpoint ausente no Portal — ação reservada na tabela)*
-- [ ] Confirmar que Admin Revy e gestor de tráfego não recebem esse payload pelo Control.
-      *(gate Control; fora do escopo de código Portal F5 lean)*
+- [~] Auditar criação, troca, teste e revogação sem registrar o segredo.
+      *(Motor já recebe `ator` no upsert/teste; auditoria formal de revogação no Control residual)*
+- [x] Confirmar que Admin Revy e gestor de tráfego não recebem esse payload pelo Control.
+      **Confirmado none (2026-07-29):** grep em `revy-trafego` — sem endpoints/modelos de
+      credenciais de portais bancários no Control. Bancos só Portal/Motor
+      (`/app/financeiras`). Documentado em
+      [`revy-loja-fixtures-contratos.md`](../../portal-gestao/docs/revy-loja-fixtures-contratos.md) §5.
 - [x] Tratar banco ainda não configurado como pendência operacional de Vendas, sem
       impedir que o Control ative a Loja ou que as demais funções de Vendas operem.
       *(`pendencias_bancos_nao_configurados` no SalesOverview para dono/gerente)*
 
 **Critério de pronto:** Control define quem compõe a loja; Loja distribui o trabalho;
 somente dono/gerente administram acesso aos bancos.
-*(F5: limite Control/Loja + auditoria formal de handoff e acessos bancários no Portal;
-gate Admin Revy / tráfego permanece no plano Control.)*
+*(Lean F5: limite Control/Loja aplicado no Portal com flag; projeção Control completa e
+auditoria formal residual F6–F8 / plano Control.)*
 
 Esse é o corte mínimo recomendado para o primeiro MVP comercial do Revy Loja.
 
@@ -355,20 +363,32 @@ Esse é o corte mínimo recomendado para o primeiro MVP comercial do Revy Loja.
 O Control configura os números, o Chatbot continua dono dos canais e o Revy Loja apenas
 opera as conversas autorizadas.
 
-- [ ] Receber `canal_id`, número mascarado e estado nos contratos do Chatbot.
-- [ ] Listar e filtrar conversas por canal sem transformar canal em finalidade fixa.
-- [ ] Preservar conversa por `(canal_id, telefone)` e lead por `(loja, telefone)`.
-- [ ] Responder sempre pelo canal original da conversa.
-- [ ] Exibir canal inativo no histórico e bloquear novo envio por ele.
-- [ ] Não permitir conectar, transferir ou inativar número pela Loja.
-- [ ] Testar dois números, mesmo cliente, duas conversas e um lead.
+- [x] Receber `canal_id`, número mascarado e estado nos contratos do Chatbot.
+      *(`para_saida_conversa` + fixture em `revy-loja-fixtures-contratos.md`)*
+- [x] Listar e filtrar conversas por canal sem transformar canal em finalidade fixa.
+      *(`?canal_id=` na lista de Atendimento; dropdown multi-canal)*
+- [x] Preservar conversa por `(canal_id, telefone)` e lead por `(loja, telefone)`.
+      *(Chatbot dono da chave; Loja só projeta)*
+- [x] Responder sempre pelo canal original da conversa.
+      *(instance/canal da conversa; form não aceita canal arbitrário)*
+- [x] Exibir canal inativo no histórico e bloquear novo envio por ele.
+      *(`envio_bloqueado_canal` / `test_envio_bloqueado_canal_inativo`)*
+- [x] Não permitir conectar, transferir ou inativar número pela Loja.
+      *(sem UI/API de lifecycle de canal na Loja; Control/Chatbot donos)*
+- [x] Testar dois números, mesmo cliente, duas conversas e um lead.
+      *(`test_unificar_dois_canais_mesmo_telefone`; E2E real Evolution residual lab)*
 
 **Critério de pronto:** usuários operam conversas de vários números sem misturar
 mensagens; toda configuração dos números permanece no Control.
+*(Lean F6 em código + testes com fake Chatbot; E2E multi-WA lab residual.)*
 
 ---
 
 ## Fase 7 — Follow-ups, propostas e Seller AI
+
+> **DEFERRED.** Flag `SELLER_AI_ENABLED` existe (default off) e não há implementação
+> de domínio. Reabrir só depois do Atendimento estável em lab e sem bloquear o MVP
+> comercial base (F0–F6 + F8 lean). Todos os itens abaixo permanecem abertos.
 
 ### Dados
 
