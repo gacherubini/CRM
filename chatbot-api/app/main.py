@@ -557,8 +557,10 @@ def enviar_mensagem_humana(
     ctx: Contexto = Depends(get_contexto),
     db: Session = Depends(get_db),
 ):
-    """Persiste mensagem humana na conversa da loja autenticada (idempotente).
+    """Persiste mensagem humana, pausa o bot e envia via Evolution sendText.
 
+    Idempotente por ``idempotency_key``. Em falha da Evolution responde 502
+    com a mensagem já no histórico e bot em handoff (não reativa o bot).
     Não aceita loja/telefone de outro tenant: loja vem do token de serviço.
     """
     _exigir_loja_operacional(db, ctx.loja_id)

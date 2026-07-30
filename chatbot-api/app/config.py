@@ -59,6 +59,16 @@ IMAGE_DOWNLOAD_TIMEOUT = float(os.getenv("CHATBOT_IMAGE_DOWNLOAD_TIMEOUT", "10")
 IMAGE_SESSION_TTL_SECONDS = max(
     0, int(os.getenv("CHATBOT_IMAGE_SESSION_TTL_SECONDS", "600"))
 )
+
+# Evolution genérica (envio de texto humano / atendimento). Preferir estas;
+# se vazias, reutiliza IMAGE_* (mesmo host/apikey já usados em lab/prod).
+EVOLUTION_URL = (
+    os.getenv("CHATBOT_EVOLUTION_URL", "").strip() or IMAGE_EVOLUTION_URL
+)
+EVOLUTION_API_KEY = (
+    os.getenv("CHATBOT_EVOLUTION_API_KEY", "").strip() or IMAGE_EVOLUTION_API_KEY
+)
+EVOLUTION_SEND_TIMEOUT = float(os.getenv("CHATBOT_EVOLUTION_SEND_TIMEOUT", "10"))
 CADASTRO_SESSION_TTL_SECONDS = max(
     0, int(os.getenv("CHATBOT_CADASTRO_SESSION_TTL_SECONDS", "1800"))
 )

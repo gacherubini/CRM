@@ -1066,6 +1066,65 @@ def _provider_id_humano(idempotency_key: str) -> str:
     return f"human:{chave}"[:255]
 
 
+def _resolver_instance_envio(
+    db: Session, loja_id: str, conversa: Conversa
+) -> str:
+    """Resolve evolution_instance do canal da conversa ou legado da loja."""
+    from app.models_db import WhatsAppCanal
+
+    if conversa.canal_id:
+        canal = db.get(WhatsAppCanal, conversa.canal_id)
+        if canal is not None and (canal.evolution_instance or "").strip():
+            return canal.evolution_instance.strip()
+    loja = db.get(Loja, loja_id)
+    if loja is not None and (loja.evolution_instance or "").strip():
+        return loja.evolution_instance.strip()
+    raise HTTPException(
+        status_code=422,
+        detail={
+            "code": "evolution_instance_missing",
+            "message": "conversa sem instância Evolution para envio",
+        },
+    )
+
+
+def _enviar_texto_evolution(
+    *,
+    instance: str,
+    number: str,
+    text: str,
+    mensagem_id: str,
+    canal_id: str | None,
+) -> None:
+    """Push sendText. Em falha: mensagem já persistida e bot permanece pausado.
+
+    Política: se o humano já assumiu (bot_ativo=False / handoff), NÃO reativamos
+    o bot quando a Evolution falha — o atendimento humano continua no histórico
+    e o Portal deve reenviar com nova idempotency_key se necessário.
+    """
+    from app.whatsapp_outbound import WhatsAppOutboundError, get_whatsapp_outbound
+
+    try:
+        get_whatsapp_outbound().send_text(
+            instance=instance, number=number, text=text
+        )
+    except WhatsAppOutboundError as exc:
+        raise HTTPException(
+            status_code=502,
+            detail={
+                "code": getattr(exc, "code", None) or "evolution_send_failed",
+                "message": str(exc) or "falha ao enviar via Evolution",
+                "mensagem_id": mensagem_id,
+                "bot_ativo": False,
+                "status": "handoff",
+                "enviado": False,
+                "canal_id": canal_id,
+                # Mensagem permanece no histórico; bot não é reativado.
+                "preservado_no_historico": True,
+            },
+        ) from exc
+
+
 def enviar_mensagem_humana(
     db: Session,
     loja_id: str,
@@ -1076,12 +1135,14 @@ def enviar_mensagem_humana(
     instance: str | None = None,
     ator: str | None = None,
 ) -> dict:
-    """Persiste saída humana na conversa da loja e pausa o bot.
+    """Persiste saída humana na conversa da loja, pausa o bot e envia via Evolution.
 
     Escopo: somente a loja autenticada (token de serviço) + telefone.
     Idempotente por ``idempotency_key`` (provider_message_id = human:…).
-    Envio real ao WhatsApp fica best-effort/fora deste corte se Evolution
-    não estiver configurada — a mensagem já aparece no histórico.
+    Segunda chamada com a mesma chave não reenvia à Evolution (dedupe).
+
+    Se a Evolution falhar após o commit: a mensagem permanece no histórico,
+    o bot continua pausado (handoff) e a API responde 502 com detalhe.
     """
     from app import provisioning
     from app.hardening import normalizar_telefone_webhook
@@ -1126,6 +1187,7 @@ def enviar_mensagem_humana(
         db, loja_id, provider_message_id, canal_id=canal_id
     )
     if existente is not None:
+        # Já enviada (ou persistida em tentativa anterior): não reenvia Evolution.
         conversa = db.get(Conversa, existente.conversa_id)
         return {
             "duplicada": True,
@@ -1151,6 +1213,7 @@ def enviar_mensagem_humana(
 
     mensagem_id = str(uuid.uuid4())
     texto_persistido = mascarar_cpf(texto_limpo) or texto_limpo
+    instance_envio = _resolver_instance_envio(db, loja_id, conversa)
 
     db.add(
         Mensagem(
@@ -1185,6 +1248,15 @@ def enviar_mensagem_humana(
             "ator": ator,
         }
 
+    # Após persistir + pausar: push real. Falha → 502; não desfaz handoff.
+    _enviar_texto_evolution(
+        instance=instance_envio,
+        number=telefone_norm,
+        text=texto_limpo,
+        mensagem_id=mensagem_id,
+        canal_id=conversa.canal_id,
+    )
+
     return {
         "duplicada": False,
         "mensagem_id": mensagem_id,
@@ -1192,9 +1264,10 @@ def enviar_mensagem_humana(
         "texto": texto_persistido,
         "bot_ativo": False,
         "status": "handoff",
-        "enviado": True,  # persistido; push Evolution é opcional/n8n
+        "enviado": True,
         "canal_id": conversa.canal_id,
         "ator": ator,
+        "evolution_instance": instance_envio,
     }
 
 

@@ -15,6 +15,10 @@ from app import models_db  # noqa: E402,F401
 from app.auth import hash_token  # noqa: E402
 from app.db import Base, get_db  # noqa: E402
 from app.main import app  # noqa: E402
+from app.whatsapp_outbound import (  # noqa: E402
+    FakeWhatsAppOutbound,
+    set_whatsapp_outbound,
+)
 
 _engine = create_engine(
     "sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool
@@ -32,6 +36,15 @@ def _override_get_db():
 
 
 app.dependency_overrides[get_db] = _override_get_db
+
+
+@pytest.fixture(autouse=True)
+def _fake_whatsapp_outbound():
+    """Evita HTTP real à Evolution nos testes; individual tests can override."""
+    fake = FakeWhatsAppOutbound()
+    set_whatsapp_outbound(fake)
+    yield fake
+    set_whatsapp_outbound(None)
 
 
 def _criar_loja(nome, slug, instancia, token, *, operacional_ativa: bool = True):
