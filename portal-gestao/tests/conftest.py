@@ -167,6 +167,7 @@ class ChatbotFake:
             "5511911112222": {"bot_ativo": False, "status": "handoff"},
         }
         self.handoffs = []
+        self.last_handoff_instance = None
         self.simulacao_indisponivel = False
         self.simulacoes = []
         self.etapas_atualizadas = []
@@ -248,7 +249,15 @@ class ChatbotFake:
         if self.indisponivel:
             raise ChatbotIndisponivel("Não foi possível acessar o chatbot agora")
         self.handoffs.append((telefone, bot_ativo))
+        self.last_handoff_instance = instance
         self.estados[telefone] = {"bot_ativo": bot_ativo, "status": "aberta" if bot_ativo else "handoff"}
+        # Mantém resumo da conversa alinhado com o estado (workspace UI).
+        for conv in self.conversas:
+            if conv.get("telefone") == telefone:
+                if instance and conv.get("evolution_instance") not in (None, instance):
+                    continue
+                conv["bot_ativo"] = bot_ativo
+                conv["status"] = "aberta" if bot_ativo else "handoff"
         return self.estados[telefone]
 
     def listar_numeros_cadastro(self):

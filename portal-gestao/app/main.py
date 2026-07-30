@@ -1439,6 +1439,7 @@ def dados_simulacao_motor(
 @app.get("/app/simulacoes", response_class=HTMLResponse)
 def simulacoes_pagina(
     request: Request,
+    celular: str | None = None,
     db: Session = Depends(get_db),
     motor: MotorClient = Depends(get_motor_client),
 ):
@@ -1448,12 +1449,17 @@ def simulacoes_pagina(
     if not pode_simular(usuario):
         return RedirectResponse("/app", status_code=303)
     bancos_prontos = _credenciais_prontas_motor(motor, usuario.email)
+    # Prefill opcional a partir do workspace de Atendimento (?celular=).
+    celular_limpo = "".join(c for c in (celular or "") if c.isdigit())
+    valores: dict = {"modo": "todos"}
+    if celular_limpo:
+        valores["celular"] = celular_limpo
     return templates.TemplateResponse(
         "simulacoes/form.html",
         contexto(
             request,
             usuario,
-            valores={"modo": "todos"},
+            valores=valores,
             ufs=UFS_BR,
             bancos_prontos=bancos_prontos,
         ),
@@ -2080,6 +2086,7 @@ def vendas_lista(
 @app.get("/app/vendas/nova", response_class=HTMLResponse)
 def vendas_nova(
     request: Request,
+    lead_ref: str | None = None,
     db: Session = Depends(get_db),
     chatbot: ChatbotClient = Depends(get_chatbot_client),
     estoque: EstoqueClient = Depends(get_estoque_client),
@@ -2089,7 +2096,8 @@ def vendas_nova(
         return redirecionar_login()
     if not pode_registrar_venda(usuario):
         return RedirectResponse("/app/vendas", status_code=303)
-    return _render_venda_form(request, usuario, chatbot, estoque)
+    valores = {"lead_ref": lead_ref.strip()} if lead_ref and lead_ref.strip() else None
+    return _render_venda_form(request, usuario, chatbot, estoque, valores=valores)
 
 
 @app.post("/app/vendas/nova")

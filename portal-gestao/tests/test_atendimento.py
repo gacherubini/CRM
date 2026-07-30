@@ -242,10 +242,11 @@ def test_badge_canal_no_workspace(client, chatbot_fake, atendimento_on):
     assert r.status_code == 200
     assert "***0001" in r.text
     assert 'name="canal_id" value="canal-principal"' in r.text
-    # Sem seletor arbitrário de canal/instance no composer
+    # Sem seletor arbitrário de canal/instance no composer (etapa tem select próprio)
     assert 'name="instance"' not in r.text
     assert 'name="canal_id"' in r.text
-    assert r.text.count("<select") == 0
+    assert 'name="etapa"' in r.text
+    assert 'name="instance"' not in r.text
 
 
 def test_envio_usa_instance_da_conversa_nao_do_form(
@@ -372,3 +373,226 @@ def test_filtrar_itens_por_canal():
     ]
     assert len(filtrar_itens(itens, canal_id="a")) == 1
     assert filtrar_itens(itens, canal_id="a")[0].canal_id == "a"
+
+
+# ---------------------------------------------------------------------------
+# Handoff / etapa no workspace (F4 residual)
+# ---------------------------------------------------------------------------
+
+
+def test_workspace_mostra_acoes_sidebar(client, chatbot_fake, atendimento_on):
+    login(client)
+    r = client.get("/app/loja/atendimento/5511987654321")
+    assert r.status_code == 200
+    assert 'action="/app/loja/atendimento/5511987654321/handoff"' in r.text
+    assert "Assumir atendimento" in r.text
+    assert 'action="/app/loja/atendimento/5511987654321/etapa"' in r.text
+    assert 'name="etapa"' in r.text
+    assert 'href="/app/simulacoes?celular=5511987654321"' in r.text
+    assert 'href="/app/vendas/nova?lead_ref=l1"' in r.text
+    assert 'href="/app/leads/l1"' in r.text
+    assert 'href="/app/conversas/5511987654321"' in r.text
+
+
+def test_handoff_workspace_assumir(
+    client, chatbot_fake, atendimento_on, db
+):
+    login(client, papel="vendedor", email="vendedor@loja.test")
+    pagina = client.get("/app/loja/atendimento/5511987654321")
+    csrf = csrf_da_resposta(pagina)
+    r = client.post(
+        "/app/loja/atendimento/5511987654321/handoff",
+        data={
+            "csrf": csrf,
+            "acao": "assumir",
+            "canal_id": "canal-principal",
+            # Tentativa de forjar instance — servidor ignora e usa a da conversa.
+            "instance": "instancia-arbitraria-hack",
+        },
+        follow_redirects=False,
+    )
+    assert r.status_code == 303
+    assert "ok=assumir" in r.headers["location"]
+    assert chatbot_fake.handoffs == [("5511987654321", False)]
+    assert chatbot_fake.last_handoff_instance == "loja-teste-wa"
+    atr = (
+        db.query(AtendimentoAtribuicao)
+        .filter(
+            AtendimentoAtribuicao.loja_slug == "loja-teste",
+            AtendimentoAtribuicao.telefone_hmac
+            == identidade_telefone("5511987654321"),
+            AtendimentoAtribuicao.ativa.is_(True),
+        )
+        .one()
+    )
+    assert atr.vendedor_email == "vendedor@loja.test"
+
+
+def test_handoff_workspace_devolver(client, chatbot_fake, atendimento_on, db):
+    db.add(
+        AtendimentoAtribuicao(
+            loja_slug="loja-teste",
+            telefone_hmac=identidade_telefone("5511987654321"),
+            vendedor_email="vendedor@loja.test",
+            origem="handoff_portal",
+            iniciada_em=agora(),
+            ativa=True,
+        )
+    )
+    db.commit()
+    chatbot_fake.estados["5511987654321"] = {
+        "bot_ativo": False,
+        "status": "handoff",
+    }
+    chatbot_fake.conversas[0]["bot_ativo"] = False
+
+    login(client, papel="vendedor", email="vendedor@loja.test")
+    pagina = client.get("/app/loja/atendimento/5511987654321")
+    assert "Devolver ao bot" in pagina.text
+    r = client.post(
+        "/app/loja/atendimento/5511987654321/handoff",
+        data={
+            "csrf": csrf_da_resposta(pagina),
+            "acao": "devolver",
+            "canal_id": "canal-principal",
+        },
+        follow_redirects=False,
+    )
+    assert r.status_code == 303
+    assert "ok=devolver" in r.headers["location"]
+    assert chatbot_fake.handoffs == [("5511987654321", True)]
+    ativas = (
+        db.query(AtendimentoAtribuicao)
+        .filter(
+            AtendimentoAtribuicao.loja_slug == "loja-teste",
+            AtendimentoAtribuicao.telefone_hmac
+            == identidade_telefone("5511987654321"),
+            AtendimentoAtribuicao.ativa.is_(True),
+        )
+        .all()
+    )
+    assert ativas == []
+
+
+def test_handoff_workspace_fora_de_escopo_403(
+    client, chatbot_fake, atendimento_on, db
+):
+    db.add(
+        AtendimentoAtribuicao(
+            loja_slug="loja-teste",
+            telefone_hmac=identidade_telefone("5511987654321"),
+            vendedor_email="outro@loja.test",
+            origem="handoff_portal",
+            iniciada_em=agora(),
+            ativa=True,
+        )
+    )
+    db.commit()
+
+    login(client, papel="vendedor", email="vendedor@loja.test")
+    pagina = client.get("/app/leads")
+    r = client.post(
+        "/app/loja/atendimento/5511987654321/handoff",
+        data={"csrf": csrf_da_resposta(pagina), "acao": "assumir"},
+        follow_redirects=False,
+    )
+    assert r.status_code == 403
+    assert chatbot_fake.handoffs == []
+
+
+def test_handoff_workspace_chatbot_down_ainda_atribui_local(
+    client, chatbot_fake, atendimento_on, db
+):
+    """Degradação: bot toggle falha, atribuição local ainda tenta."""
+    login(client, papel="vendedor", email="vendedor@loja.test")
+    pagina = client.get("/app/loja/atendimento/5511987654321")
+    csrf = csrf_da_resposta(pagina)
+    chatbot_fake.indisponivel = True
+    r = client.post(
+        "/app/loja/atendimento/5511987654321/handoff",
+        data={"csrf": csrf, "acao": "assumir", "canal_id": "canal-principal"},
+        follow_redirects=False,
+    )
+    assert r.status_code == 303
+    assert "ok=assumir" in r.headers["location"]
+    assert "aviso=bot-indisponivel" in r.headers["location"]
+    assert chatbot_fake.handoffs == []
+    atr = (
+        db.query(AtendimentoAtribuicao)
+        .filter(
+            AtendimentoAtribuicao.loja_slug == "loja-teste",
+            AtendimentoAtribuicao.telefone_hmac
+            == identidade_telefone("5511987654321"),
+            AtendimentoAtribuicao.ativa.is_(True),
+        )
+        .one()
+    )
+    assert atr.vendedor_email == "vendedor@loja.test"
+
+
+def test_etapa_workspace_atualiza_lead(client, chatbot_fake, atendimento_on):
+    login(client, papel="vendedor", email="vendedor@loja.test")
+    pagina = client.get("/app/loja/atendimento/5511987654321")
+    r = client.post(
+        "/app/loja/atendimento/5511987654321/etapa",
+        data={
+            "csrf": csrf_da_resposta(pagina),
+            "lead_id": "l1",
+            "etapa": "em_atendimento",
+            "canal_id": "canal-principal",
+        },
+        follow_redirects=False,
+    )
+    assert r.status_code == 303
+    assert "ok=etapa-atualizada" in r.headers["location"]
+    assert chatbot_fake.etapas_atualizadas == [("l1", "em_atendimento")]
+    assert chatbot_fake.leads[0]["etapa"] == "em_atendimento"
+
+
+def test_etapa_workspace_fora_de_escopo_403(
+    client, chatbot_fake, atendimento_on, db
+):
+    db.add(
+        AtendimentoAtribuicao(
+            loja_slug="loja-teste",
+            telefone_hmac=identidade_telefone("5511987654321"),
+            vendedor_email="outro@loja.test",
+            origem="handoff_portal",
+            iniciada_em=agora(),
+            ativa=True,
+        )
+    )
+    db.commit()
+
+    login(client, papel="vendedor", email="vendedor@loja.test")
+    pagina = client.get("/app/leads")
+    r = client.post(
+        "/app/loja/atendimento/5511987654321/etapa",
+        data={
+            "csrf": csrf_da_resposta(pagina),
+            "lead_id": "l1",
+            "etapa": "qualificado",
+        },
+        follow_redirects=False,
+    )
+    assert r.status_code == 403
+    assert chatbot_fake.etapas_atualizadas == []
+
+
+def test_etapa_workspace_rejeita_valor_invalido(
+    client, chatbot_fake, atendimento_on
+):
+    login(client)
+    pagina = client.get("/app/loja/atendimento/5511987654321")
+    r = client.post(
+        "/app/loja/atendimento/5511987654321/etapa",
+        data={
+            "csrf": csrf_da_resposta(pagina),
+            "lead_id": "l1",
+            "etapa": "inexistente",
+        },
+        follow_redirects=False,
+    )
+    assert r.status_code == 303
+    assert "erro=etapa" in r.headers["location"]
+    assert chatbot_fake.etapas_atualizadas == []

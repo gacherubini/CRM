@@ -18,6 +18,11 @@
   .meta-list dd{margin:0 0 .5rem;opacity:.9}
   .canal-badge{display:inline-flex;align-items:center;gap:.35rem;padding:.15rem .55rem;border-radius:999px;font-size:.8rem;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12)}
   .canal-badge.inativo,.canal-badge.desconectado{opacity:.75;border-color:rgba(255,180,80,.4)}
+  .action-stack{display:flex;flex-direction:column;gap:.75rem}
+  .action-stack form{margin:0}
+  .action-links{display:flex;flex-direction:column;gap:.4rem;margin:0;padding:0;list-style:none}
+  .action-links a{font-size:.92rem}
+  .handoff-bar{display:flex;flex-wrap:wrap;gap:.75rem;align-items:center}
 </style>
 
 <div class="page-heading">
@@ -41,11 +46,21 @@
 
 {% if request.query_params.get('ok') == 'enviada' %}<div class="alert success" role="status">Mensagem enviada.</div>{% endif %}
 {% if request.query_params.get('ok') == 'duplicada' %}<div class="alert success" role="status">Mensagem já havia sido enviada (idempotente).</div>{% endif %}
+{% if request.query_params.get('ok') == 'assumir' %}<div class="alert success" role="status">Atendimento assumido. O bot foi pausado neste contato.</div>{% endif %}
+{% if request.query_params.get('ok') == 'devolver' %}<div class="alert success" role="status">Atendimento devolvido ao bot.</div>{% endif %}
+{% if request.query_params.get('ok') == 'etapa-atualizada' %}<div class="alert success" role="status">Etapa do lead atualizada.</div>{% endif %}
+{% if request.query_params.get('aviso') == 'bot-indisponivel' %}<div class="alert warning" role="alert">Atribuição local registrada, mas o Chatbot não confirmou a pausa/reativação do bot. Tente de novo em instantes.</div>{% endif %}
+{% if request.query_params.get('registro') == 'indisponivel' %}<div class="alert warning" role="alert">O bot foi alterado no Chatbot, mas a atribuição local do vendedor não pôde ser registrada.</div>{% endif %}
 {% if request.query_params.get('erro') == 'envio' %}<div class="alert warning" role="alert">Não foi possível enviar a mensagem agora.</div>{% endif %}
 {% if request.query_params.get('erro') == 'texto' %}<div class="alert warning" role="alert">Informe um texto válido.</div>{% endif %}
 {% if request.query_params.get('erro') == 'sessao' %}<div class="alert warning" role="alert">Sessão expirada. Atualize a página e tente de novo.</div>{% endif %}
 {% if request.query_params.get('erro') == 'conversa' %}<div class="alert warning" role="alert">Conversa não encontrada no Chatbot.</div>{% endif %}
 {% if request.query_params.get('erro') == 'canal' %}<div class="alert warning" role="alert">Este canal WhatsApp está inativo. O histórico permanece visível; novos envios ficam bloqueados.</div>{% endif %}
+{% if request.query_params.get('erro') == 'handoff' %}<div class="alert warning" role="alert">Não foi possível concluir o handoff (Chatbot e atribuição local). Tente de novo.</div>{% endif %}
+{% if request.query_params.get('erro') == 'acao' %}<div class="alert warning" role="alert">Ação de handoff inválida.</div>{% endif %}
+{% if request.query_params.get('erro') == 'etapa' %}<div class="alert warning" role="alert">Selecione uma etapa válida.</div>{% endif %}
+{% if request.query_params.get('erro') == 'lead' %}<div class="alert warning" role="alert">Lead não encontrado para este contato.</div>{% endif %}
+{% if request.query_params.get('erro') == 'integracao' %}<div class="alert warning" role="alert">Não foi possível atualizar a etapa agora. A etapa anterior foi preservada.</div>{% endif %}
 
 {% if workspace.erros_bloco %}
 <div class="alert warning" role="alert">
@@ -95,7 +110,7 @@
     {% endif %}
   </div>
 
-  <div>
+  <div class="action-stack">
     <section class="panel">
       <h2 style="margin-top:0;font-size:1rem">Resumo</h2>
       <dl class="meta-list">
@@ -122,13 +137,78 @@
             {% if workspace.conversa_resumo.bot_ativo %}<span class="status novo">Ativo</span>{% else %}<span class="status em_atendimento">Pausado (humano)</span>{% endif %}
           {% else %}<span class="muted">—</span>{% endif %}
         </dd>
-        {% if workspace.lead and workspace.lead.id %}
-        <dt>Lead</dt>
-        <dd><a href="/app/leads/{{ workspace.lead.id }}">Abrir lead legado</a></dd>
-        {% endif %}
-        <dt>Conversa legada</dt>
-        <dd><a href="/app/conversas/{{ workspace.telefone }}">Abrir conversa</a></dd>
       </dl>
+    </section>
+
+    {% if pode_handoff %}
+    <section class="panel">
+      <h2 style="margin-top:0;font-size:1rem">Handoff</h2>
+      <div class="handoff-bar">
+        {% set bot_ativo = workspace.conversa_resumo.bot_ativo if workspace.conversa_resumo and workspace.conversa_resumo.bot_ativo is not none else true %}
+        {% if bot_ativo %}
+        <span class="status novo">Bot ativo</span>
+        <form method="post" action="/app/loja/atendimento/{{ workspace.id }}/handoff">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          <input type="hidden" name="acao" value="assumir">
+          {% if workspace.canal_id %}<input type="hidden" name="canal_id" value="{{ workspace.canal_id }}">{% endif %}
+          <button class="button" type="submit">Assumir atendimento</button>
+        </form>
+        <p class="muted" style="margin:0;flex-basis:100%">Ao assumir, o bot para de responder este contato e você vira o responsável.</p>
+        {% else %}
+        <span class="status em_atendimento">Atendimento humano</span>
+        <form method="post" action="/app/loja/atendimento/{{ workspace.id }}/handoff">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          <input type="hidden" name="acao" value="devolver">
+          {% if workspace.canal_id %}<input type="hidden" name="canal_id" value="{{ workspace.canal_id }}">{% endif %}
+          <button class="button secondary" type="submit">Devolver ao bot</button>
+        </form>
+        <p class="muted" style="margin:0;flex-basis:100%">O bot volta a responder este contato e a atribuição local é encerrada.</p>
+        {% endif %}
+      </div>
+    </section>
+    {% endif %}
+
+    {% if pode_atualizar_etapa and workspace.lead and workspace.lead.id %}
+    <section class="panel">
+      <h2 style="margin-top:0;font-size:1rem">Etapa do lead</h2>
+      <form method="post" action="/app/loja/atendimento/{{ workspace.id }}/etapa" class="form-grid">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <input type="hidden" name="lead_id" value="{{ workspace.lead.id }}">
+        {% if workspace.canal_id %}<input type="hidden" name="canal_id" value="{{ workspace.canal_id }}">{% endif %}
+        <label>Etapa
+          <select name="etapa" required>
+            {% for valor, rotulo in etapas.items() %}
+            <option value="{{ valor }}" {{ 'selected' if workspace.lead.etapa == valor }}>{{ rotulo }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <div class="form-actions" style="margin-top:.5rem">
+          <button class="button primary" type="submit">Salvar etapa</button>
+        </div>
+      </form>
+    </section>
+    {% endif %}
+
+    <section class="panel">
+      <h2 style="margin-top:0;font-size:1rem">Ações</h2>
+      <ul class="action-links">
+        <li>
+          <a href="/app/simulacoes?celular={{ workspace.telefone }}">Nova simulação</a>
+          <span class="muted"> · celular pré-preenchido</span>
+        </li>
+        <li>
+          {% if workspace.lead and workspace.lead.id %}
+          <a href="/app/vendas/nova?lead_ref={{ workspace.lead.id }}">Nova venda</a>
+          <span class="muted"> · lead vinculado</span>
+          {% else %}
+          <a href="/app/vendas/nova">Nova venda</a>
+          {% endif %}
+        </li>
+        {% if workspace.lead and workspace.lead.id %}
+        <li><a href="/app/leads/{{ workspace.lead.id }}">Lead legado</a></li>
+        {% endif %}
+        <li><a href="/app/conversas/{{ workspace.telefone }}">Conversa legada</a></li>
+      </ul>
     </section>
   </div>
 </div>

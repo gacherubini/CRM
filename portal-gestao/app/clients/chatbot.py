@@ -168,7 +168,7 @@ class ChatbotClient:
         )
         return dados["mensagens"]
 
-    def obter_estado(
+def obter_estado(
         self,
         telefone: str,
         *,
@@ -193,6 +193,7 @@ class ChatbotClient:
         *,
         instance: str | None = None,
     ) -> dict:
+        """Pausa/reativa o bot. ``instance`` vem do resumo da conversa (multi-WA)."""
         payload: dict[str, Any] = {"bot_ativo": bot_ativo}
         if instance:
             payload["instance"] = instance

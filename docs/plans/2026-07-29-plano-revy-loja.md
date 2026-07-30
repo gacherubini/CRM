@@ -1,6 +1,6 @@
 # Plano — Evolução do Portal para Revy Loja
 
-**Status:** ATIVO / CÓDIGO F0–F6 + F8 LEAN (shell, overviews, atendimento multi-canal, equipe read-only, bancos, Evolution send, redirects; flags default OFF; residual F7 Seller AI + pilot/ops lab)
+**Status:** ATIVO / CÓDIGO F0–F6 + F8 LEAN (shell, overviews, atendimento multi-canal com handoff/etapa/links no workspace, equipe read-only, bancos, Evolution send, redirects; flags default OFF; residual F7 Seller AI + pilot/ops lab)
 **Data:** 2026-07-29
 **Spec:** [`docs/superpowers/specs/2026-07-29-revy-loja-design.md`](../superpowers/specs/2026-07-29-revy-loja-design.md)
 **Depende por gates de:** [`Plano Revy Control`](2026-07-29-plano-revy-control.md) —
@@ -260,31 +260,47 @@ Criar um `AttendanceWorkspace` que compõe, sem duplicar propriedade:
 
 ### Tarefas
 
-- [ ] Unificar listas atuais de Leads e Conversas.
-- [ ] Criar visão de cliente/negociação com histórico e responsável.
-- [ ] Exibir o canal de origem e preservar o canal da conversa.
-- [ ] Incorporar handoff, etapa, Simulação Multibanco e confirmação de venda.
-- [ ] Manter o Chatbot capaz de solicitar simulação.
-- [ ] Definir estados de atendimento e transições explícitas.
-- [ ] Decidir e testar política de visibilidade do vendedor antes do cutover.
-- [ ] Implementar composer humano de texto por `HumanMessagingPort`, com adapter HTTP
+- [x] Unificar listas atuais de Leads e Conversas.
+      *(`GET /app/loja/atendimento` + `unificar_lista`)*
+- [x] Criar visão de cliente/negociação com histórico e responsável.
+      *(`GET /app/loja/atendimento/{telefone}` workspace + composer)*
+- [x] Exibir o canal de origem e preservar o canal da conversa.
+      *(badge + `canal_id` hidden; instance só da conversa — F6 lean)*
+- [x] Incorporar handoff, etapa, Simulação Multibanco e confirmação de venda.
+      *(POST `…/handoff`, POST `…/etapa`; links Nova simulação/Nova venda/legado no sidebar;
+      confirmação de venda permanece em `/app/vendas` com lead pré-selecionável)*
+- [x] Manter o Chatbot capaz de solicitar simulação.
+      *(inalterado no Chatbot; Loja só dispara manual via link)*
+- [x] Definir estados de atendimento e transições explícitas.
+      *(`AttendanceState` + mapa de etapas lead)*
+- [x] Decidir e testar política de visibilidade do vendedor antes do cutover.
+      *(`visivel_para_usuario` / fila sem responsável; 403 fora de escopo)*
+- [x] Implementar composer humano de texto por `HumanMessagingPort`, com adapter HTTP
       do Chatbot e adapter em memória nos testes. O Chatbot continua dono da mensagem.
-- [ ] Antes de habilitar o composer, fechar permissão, canal da conversa, idempotência,
+- [x] Antes de habilitar o composer, fechar permissão, canal da conversa, idempotência,
       dedupe, auditoria, limites e pausa/handoff do bot. Mídia fica fora do primeiro corte.
+      *(handoff workspace reusa `registrar_handoff_local` + `definir_bot_ativo(instance=…)`;
+      se Chatbot down, atribuição local ainda tenta + flash)*
 
 ### Testes
 
-- [ ] Mesmo telefone em lojas diferentes nunca cruza dados.
-- [ ] Vendedor fora do escopo recebe 403/404 seguro.
-- [ ] Handoff repetido é idempotente.
-- [ ] Vendedor autorizado envia texto uma vez pela conversa correta; retry não duplica,
+- [x] Mesmo telefone em lojas diferentes nunca cruza dados.
+      *(`AtendimentoAtribuicao.loja_slug` + HMAC; testes de isolamento legados/funil)*
+- [x] Vendedor fora do escopo recebe 403/404 seguro.
+      *(GET workspace + POST handoff/etapa/mensagem → 403)*
+- [x] Handoff repetido é idempotente.
+      *(`registrar_handoff_local` no-op se já é o responsável; testes legados vendedor)*
+- [x] Vendedor autorizado envia texto uma vez pela conversa correta; retry não duplica,
       a mensagem aparece no histórico e o bot permanece pausado conforme a regra.
-- [ ] Vendedor sem escopo não envia e não consegue escolher outro canal/loja no payload.
-- [ ] Confirmação de venda continua acionando a projeção ao Control.
-- [ ] Falha de Chatbot/Motor/Estoque degrada somente o bloco correspondente.
+- [x] Vendedor sem escopo não envia e não consegue escolher outro canal/loja no payload.
+- [~] Confirmação de venda continua acionando a projeção ao Control.
+      *(caminho legado `/app/vendas/{id}/confirmar` inalterado; link Nova venda no workspace)*
+- [x] Falha de Chatbot/Motor/Estoque degrada somente o bloco correspondente.
+      *(erros_bloco no workspace; handoff degrada bot toggle vs atribuição local)*
 
 **Critério de pronto:** o vendedor conduz a negociação sem alternar entre páginas
 separadas de lead, conversa, simulação e venda.
+*(Lean F4 residual: handoff/etapa/links no sidebar; Seller AI e mídia fora do corte.)*
 
 ---
 
