@@ -80,8 +80,11 @@
           <th>Slug</th>
           <th>Status</th>
           <th>Pronta</th>
+          <th>Gestor responsável</th>
+          <th>Módulos</th>
           <th>Pixel</th>
           <th>Google</th>
+          <th>Falhas</th>
         </tr>
       </thead>
       <tbody>
@@ -99,10 +102,34 @@
           <td>{{ item.status.value }}</td>
           <td>{% if item.ready %}sim{% else %}não{% endif %}</td>
           <td>
+            {% if item.gestor_responsavel %}
+            <span title="{{ item.gestor_responsavel.email }}">{{ item.gestor_responsavel.name }}</span>
+            <br><small class="muted">{{ item.gestor_responsavel.email }}</small>
+            {% else %}
+            —
+            {% endif %}
+          </td>
+          <td>
+            {% if item.modulos %}
+              {% for m in item.modulos %}
+              <code>{{ m.code }}:{{ m.status }}</code>{% if not loop.last %} {% endif %}
+              {% endfor %}
+            {% else %}
+            —
+            {% endif %}
+          </td>
+          <td>
             {% if health and health.pixel_connected %}conectado{% else %}—{% endif %}
           </td>
           <td>
             {% if health and health.google_status %}{{ health.google_status }}{% else %}—{% endif %}
+          </td>
+          <td>
+            {% if item.integration_failures %}
+            <code>{{ item.integration_failures | join(', ') }}</code>
+            {% else %}
+            —
+            {% endif %}
           </td>
         </tr>
         {% endfor %}
@@ -113,4 +140,37 @@
   <p class="muted" id="dashboard-vazio">Nenhuma loja no seu escopo.</p>
   {% endif %}
 </section>
+
+{% if overview and overview.recent_audit %}
+<section class="panel" id="dashboard-auditoria">
+  <div class="panel-heading">
+    <h2>Alterações recentes</h2>
+  </div>
+  <div style="overflow-x:auto">
+    <table id="tabela-dashboard-auditoria">
+      <thead>
+        <tr>
+          <th>Quando</th>
+          <th>Ação</th>
+          <th>Ator</th>
+          <th>Recurso</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for event in overview.recent_audit %}
+        <tr data-audit-id="{{ event.id }}"{% if event.store_id %} data-store-id="{{ event.store_id }}"{% endif %}>
+          <td><small>{{ event.created_at }}</small></td>
+          <td><code>{{ event.action }}</code></td>
+          <td>{{ event.actor_email or '—' }}</td>
+          <td>
+            {{ event.resource_type }}
+            {% if event.resource_id %}<code>{{ event.resource_id }}</code>{% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endif %}
 {% endblock %}

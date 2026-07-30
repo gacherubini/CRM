@@ -55,6 +55,36 @@ class AuditTrail:
             )
             return AuditPage(items=tuple(_event_view(event) for event in rows))
 
+    def list_recent(self, actor: Actor, *, limit: int = 20) -> AuditPage:
+        """Últimos eventos no escopo do ator (mais recentes primeiro)."""
+        limit = max(1, min(limit, 100))
+        with self._session_factory() as db:
+            events = db.query(AuditoriaEvento)
+            if actor.is_admin:
+                pass
+            else:
+                store_ids = [
+                    store_id
+                    for (store_id,) in db.query(VinculoTrafego.loja_id)
+                    .filter(
+                        VinculoTrafego.gestor_id == actor.id,
+                        VinculoTrafego.encerrado_em.is_(None),
+                    )
+                    .all()
+                ]
+                if not store_ids:
+                    return AuditPage(items=())
+                events = events.filter(AuditoriaEvento.loja_id.in_(store_ids))
+            rows = (
+                events.order_by(
+                    AuditoriaEvento.criado_em.desc(),
+                    AuditoriaEvento.id.desc(),
+                )
+                .limit(limit)
+                .all()
+            )
+            return AuditPage(items=tuple(_event_view(event) for event in rows))
+
 
 def _append_event(
     db: Any,

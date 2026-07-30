@@ -226,3 +226,50 @@ def _store_view(store: Loja) -> StoreView:
         created_at=store.criada_em,
         updated_at=store.atualizada_em,
     )
+
+
+# Estados em que jobs de tráfego (spend Meta, CAPI outbox) não devem processar.
+# Histórico e filas permanecem intactos (PARK / BLOCK do ADR 0001).
+_JOB_BLOCKED_STATUSES = frozenset(
+    {
+        StoreStatus.SUSPENDED.value,
+        StoreStatus.CLOSED.value,
+    }
+)
+
+
+def lookup_store_status(
+    db: Any,
+    *,
+    loja_id: str | None = None,
+    loja_slug: str | None = None,
+) -> str | None:
+    """Retorna o status canônico da Loja ou None se não houver cadastro Control."""
+    if loja_id:
+        row = db.query(Loja.status).filter(Loja.id == loja_id).first()
+        if row is not None:
+            return row[0]
+    if loja_slug:
+        slug = loja_slug.strip().lower()
+        if slug:
+            row = db.query(Loja.status).filter(Loja.slug == slug).first()
+            if row is not None:
+                return row[0]
+    return None
+
+
+def store_blocks_traffic_jobs(
+    db: Any,
+    *,
+    loja_id: str | None = None,
+    loja_slug: str | None = None,
+) -> bool:
+    """True quando a loja está suspensa/encerrada e jobs não devem avançar.
+
+    Sem Loja no Control (legado só por slug), retorna False para preservar
+    o comportamento atual durante o cutover.
+    """
+    status = lookup_store_status(db, loja_id=loja_id, loja_slug=loja_slug)
+    if status is None:
+        return False
+    return status in _JOB_BLOCKED_STATUSES

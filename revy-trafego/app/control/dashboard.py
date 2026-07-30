@@ -2,18 +2,54 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Any, Protocol
 
+from app.control.audit import AuditTrail
 from app.control.integrations import pixel_configured
+from app.control.portfolio import ModuleCode, ModuleStatus
 from app.control.readiness import StoreReadiness
 from app.control.stores import StoreControl
-from app.control.types import AccessDenied, Actor, StoreRef, StoreStatus, StoreView
+from app.control.types import (
+    AccessDenied,
+    Actor,
+    AuditEventView,
+    StoreRef,
+    StoreStatus,
+    StoreView,
+    TrafficRole,
+)
 from app.meta_ads_spend import normalizar_ad_account_id
-from app.models import GoogleAdsConnection, MetaAdsConfig, MetaPixelConfig
+from app.models import (
+    GestorRevy,
+    GoogleAdsConnection,
+    LojaModulo,
+    MetaAdsConfig,
+    MetaPixelConfig,
+    ModuloRevy,
+    VinculoTrafego,
+)
+
+_RECENT_AUDIT_LIMIT = 15
+_GOOGLE_FAILURE_STATUSES = frozenset({"erro", "expirado", "revogado", "atencao"})
 
 
 class _WhatsAppChannelsPort(Protocol):
     def list_for_store(self, store_ref: StoreRef) -> list[Any]: ...
+
+
+@dataclass(frozen=True)
+class ResponsibleManagerSummary:
+    id: str
+    name: str
+    email: str
+
+
+@dataclass(frozen=True)
+class StoreModuleSummary:
+    code: str
+    name: str
+    status: str
 
 
 @dataclass(frozen=True)
@@ -23,6 +59,9 @@ class StoreReadinessSummary:
     name: str
     status: StoreStatus
     ready: bool
+    gestor_responsavel: ResponsibleManagerSummary | None = None
+    modulos: tuple[StoreModuleSummary, ...] = ()
+    integration_failures: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -50,6 +89,7 @@ class StoreIntegrationHealth:
     meta_ads_connected: bool
     google_status: str | None
     whatsapp_channels: int | None
+    failures: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -58,6 +98,7 @@ class DashboardOverview:
     items: tuple[StoreReadinessSummary, ...]
     pending_readiness: tuple[PendingReadinessItem, ...]
     integrations: tuple[StoreIntegrationHealth, ...]
+    recent_audit: tuple[AuditEventView, ...] = ()
 
 
 class _StoreStub:
@@ -80,6 +121,7 @@ class DashboardControl:
         self._session_factory = session_factory
         self._stores = StoreControl(session_factory)
         self._readiness = StoreReadiness(session_factory)
+        self._audit = AuditTrail(session_factory)
         self._whatsapp_port = whatsapp_port
 
     def summary(self, actor: Actor) -> tuple[StoreReadinessSummary, ...]:
@@ -88,6 +130,10 @@ class DashboardControl:
     def overview(self, actor: Actor) -> DashboardOverview:
         """Visão admin (todas) ou gestor (somente lojas com vínculo)."""
         stores = self._stores.list(actor)
+        store_ids = [store.id for store in stores]
+        responsaveis = self._load_responsaveis(store_ids)
+        modulos_por_loja = self._load_modulos(store_ids)
+
         items: list[StoreReadinessSummary] = []
         pending: list[PendingReadinessItem] = []
         integrations: list[StoreIntegrationHealth] = []
@@ -98,6 +144,7 @@ class DashboardControl:
 
         for store in stores:
             report = self._readiness.evaluate(actor, StoreRef(id=store.id))
+            health = self._integration_health(store)
             items.append(
                 StoreReadinessSummary(
                     store_id=store.id,
@@ -105,6 +152,9 @@ class DashboardControl:
                     name=store.name,
                     status=store.status,
                     ready=report.ready,
+                    gestor_responsavel=responsaveis.get(store.id),
+                    modulos=modulos_por_loja.get(store.id, ()),
+                    integration_failures=health.failures,
                 )
             )
             if store.status is StoreStatus.ACTIVE:
@@ -132,7 +182,9 @@ class DashboardControl:
                     )
                 )
 
-            integrations.append(self._integration_health(store))
+            integrations.append(health)
+
+        recent = self._audit.list_recent(actor, limit=_RECENT_AUDIT_LIMIT)
 
         return DashboardOverview(
             counts=DashboardCounts(
@@ -144,6 +196,7 @@ class DashboardControl:
             items=tuple(items),
             pending_readiness=tuple(pending),
             integrations=tuple(integrations),
+            recent_audit=recent.items,
         )
 
     def admin_overview(self, actor: Actor) -> DashboardOverview:
@@ -155,7 +208,67 @@ class DashboardControl:
         """Alias semântico: overview já filtra pelo vínculo do gestor."""
         return self.overview(actor)
 
+    def _load_responsaveis(
+        self, store_ids: list[str]
+    ) -> dict[str, ResponsibleManagerSummary]:
+        if not store_ids:
+            return {}
+        with self._session_factory() as db:
+            rows = (
+                db.query(VinculoTrafego, GestorRevy)
+                .join(GestorRevy, GestorRevy.id == VinculoTrafego.gestor_id)
+                .filter(
+                    VinculoTrafego.loja_id.in_(store_ids),
+                    VinculoTrafego.tipo == TrafficRole.RESPONSIBLE.value,
+                    VinculoTrafego.encerrado_em.is_(None),
+                )
+                .all()
+            )
+            return {
+                link.loja_id: ResponsibleManagerSummary(
+                    id=manager.id,
+                    name=manager.nome,
+                    email=manager.email,
+                )
+                for link, manager in rows
+            }
+
+    def _load_modulos(
+        self, store_ids: list[str]
+    ) -> dict[str, tuple[StoreModuleSummary, ...]]:
+        if not store_ids:
+            return {}
+        with self._session_factory() as db:
+            rows = (
+                db.query(LojaModulo, ModuloRevy)
+                .join(ModuloRevy, ModuloRevy.id == LojaModulo.modulo_id)
+                .filter(LojaModulo.loja_id.in_(store_ids))
+                .order_by(ModuloRevy.codigo)
+                .all()
+            )
+            by_store: dict[str, list[StoreModuleSummary]] = {
+                store_id: [] for store_id in store_ids
+            }
+            for assignment, module in rows:
+                # Aceita somente códigos do catálogo conhecido.
+                try:
+                    code = ModuleCode(module.codigo).value
+                    status = ModuleStatus(assignment.estado).value
+                except ValueError:
+                    continue
+                by_store.setdefault(assignment.loja_id, []).append(
+                    StoreModuleSummary(
+                        code=code,
+                        name=module.nome,
+                        status=status,
+                    )
+                )
+            return {
+                store_id: tuple(items) for store_id, items in by_store.items()
+            }
+
     def _integration_health(self, store: StoreView) -> StoreIntegrationHealth:
+        failures: list[str] = []
         with self._session_factory() as db:
             stub = _StoreStub(store.id, store.slug)
             pixel_ok = pixel_configured(db, stub)
@@ -177,6 +290,25 @@ class DashboardControl:
             meta_ads_ok = bool(
                 ads_row and account and ads_row.token_ciphertext
             )
+            if ads_row is not None and ads_row.ultima_sync_status == "erro":
+                detail = (ads_row.ultima_sync_erro or "").strip()
+                failures.append(
+                    f"meta_ads_sync:{detail}" if detail else "meta_ads_sync"
+                )
+
+            pixel_row = (
+                db.query(MetaPixelConfig)
+                .filter(MetaPixelConfig.loja_id == store.id)
+                .first()
+            )
+            if pixel_row is None:
+                pixel_row = (
+                    db.query(MetaPixelConfig)
+                    .filter(MetaPixelConfig.loja_slug == store.slug)
+                    .first()
+                )
+            if pixel_row is not None and not pixel_ok:
+                failures.append("pixel_incomplete")
 
             google_status: str | None = None
             google_row = (
@@ -186,6 +318,8 @@ class DashboardControl:
             )
             if google_row is not None:
                 google_status = google_row.status
+                if google_status in _GOOGLE_FAILURE_STATUSES:
+                    failures.append(f"google:{google_status}")
 
         whatsapp_count: int | None = None
         if self._whatsapp_port is not None:
@@ -196,6 +330,7 @@ class DashboardControl:
                 whatsapp_count = len(channels)
             except Exception:
                 whatsapp_count = None
+                failures.append("whatsapp_unavailable")
 
         return StoreIntegrationHealth(
             store_id=store.id,
@@ -204,4 +339,5 @@ class DashboardControl:
             meta_ads_connected=meta_ads_ok,
             google_status=google_status,
             whatsapp_channels=whatsapp_count,
+            failures=tuple(failures),
         )

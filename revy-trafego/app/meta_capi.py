@@ -243,6 +243,13 @@ def tentar_enviar_outbox(
 ) -> bool:
     """Tenta enviar um item da outbox. Retorna True se entregue. Não propaga erro."""
     try:
+        from app.control.stores import store_blocks_traffic_jobs
+
+        if store_blocks_traffic_jobs(
+            db, loja_id=outbox.loja_id, loja_slug=outbox.loja_slug
+        ):
+            # PARK: não envia e não apaga/cancela a fila (ADR 0001).
+            return False
         if outbox.venda_id:
             from app.models import VendaProjetada
 
@@ -385,6 +392,19 @@ def processar_outbox_pendentes(
     lease_seconds: int = OUTBOX_LEASE_SECONDS,
 ) -> dict[str, int]:
     """Retenta somente itens da loja, mantendo erros isolados por evento."""
+    from app.control.stores import store_blocks_traffic_jobs
+
+    if store_blocks_traffic_jobs(db, loja_slug=loja_slug):
+        # Loja suspensa: estaciona a fila sem apagar/alterar status.
+        return {
+            "processados": 0,
+            "entregues": 0,
+            "falharam": 0,
+            "aguardando_lease": 0,
+            "concorrentes": 0,
+            "suspensas": 1,
+        }
+
     config = _config_loja(db, loja_slug)
     itens = (
         db.query(MetaCapiOutbox)
@@ -426,6 +446,7 @@ def processar_outbox_pendentes(
         "falharam": falharam,
         "aguardando_lease": aguardando_lease,
         "concorrentes": concorrentes,
+        "suspensas": 0,
     }
 
 
@@ -484,6 +505,8 @@ def processar_outbox_automatico(
             .limit(max(1, min(limite, 500)))
             .all()
         )
+        from app.control.stores import store_blocks_traffic_jobs
+
         resultado = {
             "encontrados": len(itens),
             "processados": 0,
@@ -493,8 +516,15 @@ def processar_outbox_automatico(
             "aguardando_lease": 0,
             "concorrentes": 0,
             "esgotados": 0,
+            "suspensas": 0,
         }
         for item in itens:
+            if store_blocks_traffic_jobs(
+                db, loja_id=item.loja_id, loja_slug=item.loja_slug
+            ):
+                # PARK: não reivindica, não altera status, não apaga.
+                resultado["suspensas"] += 1
+                continue
             if item.status == "processing" and item.atualizada_em is not None:
                 expira_em = _em_utc(item.atualizada_em) + timedelta(
                     seconds=max(1, lease_seconds)

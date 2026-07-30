@@ -180,6 +180,14 @@ def sincronizar_gastos_meta(
 ) -> SyncResult:
     """Importa spend e grava CampanhaGasto com origem meta_api."""
     result = SyncResult()
+    from app.control.stores import store_blocks_traffic_jobs
+
+    if store_blocks_traffic_jobs(db, loja_slug=loja_slug):
+        # Suspensa/encerrada: não chama a Meta e não apaga histórico local.
+        result.status = "skipped"
+        result.errors.append("Loja suspensa ou encerrada; sincronização de gastos pausada.")
+        return result
+
     config = _config_loja(db, loja_slug)
     if config is None or not config.token_ciphertext or not config.ad_account_id:
         result.status = "erro"
@@ -414,8 +422,10 @@ class SyncAllResult:
 
 
 def listar_lojas_para_sync(db: Session) -> list[str]:
+    from app.control.stores import store_blocks_traffic_jobs
+
     rows = (
-        db.query(MetaAdsConfig.loja_slug)
+        db.query(MetaAdsConfig.loja_slug, MetaAdsConfig.loja_id)
         .filter(
             MetaAdsConfig.sync_enabled.is_(True),
             MetaAdsConfig.token_ciphertext.isnot(None),
@@ -423,7 +433,11 @@ def listar_lojas_para_sync(db: Session) -> list[str]:
         )
         .all()
     )
-    return [r[0] for r in rows]
+    return [
+        slug
+        for slug, loja_id in rows
+        if not store_blocks_traffic_jobs(db, loja_id=loja_id, loja_slug=slug)
+    ]
 
 
 def sincronizar_todas_lojas(
@@ -454,6 +468,9 @@ def sincronizar_todas_lojas(
                 aggregate.ok += 1
             elif result.status == "partial":
                 aggregate.partial += 1
+            elif result.status == "skipped":
+                # Contabiliza na lista, mas não como erro operacional.
+                pass
             else:
                 aggregate.erro += 1
             aggregate.imported += result.imported

@@ -178,11 +178,25 @@ def test_dashboard_api_admin_e_gestor_respeitam_escopo(client, monkeypatch):
     sample = next(
         item for item in body["items"] if item["store_id"] == allowed_id
     )
-    assert set(sample) == {"store_id", "slug", "name", "status", "ready"}
+    assert set(sample) >= {
+        "store_id",
+        "slug",
+        "name",
+        "status",
+        "ready",
+        "gestor_responsavel",
+        "modulos",
+        "integration_failures",
+    }
     assert sample["slug"] == "loja-dashboard-permitida"
     assert sample["name"] == "Loja Dashboard Permitida"
     assert sample["status"] == "rascunho"
     assert sample["ready"] is False
+    assert sample["gestor_responsavel"] is not None
+    assert sample["gestor_responsavel"]["email"] == "gestor.dashboard@revy.local"
+    assert sample["modulos"] == []
+    assert "recent_audit" in body
+    assert isinstance(body["recent_audit"], list)
     pending_ids = {item["store_id"] for item in body["pending_readiness"]}
     assert allowed_id in pending_ids
     assert other_id in pending_ids
@@ -196,6 +210,7 @@ def test_dashboard_api_admin_e_gestor_respeitam_escopo(client, monkeypatch):
         "meta_ads_connected",
         "google_status",
         "whatsapp_channels",
+        "failures",
     }
     assert integ["pixel_connected"] is False
 
@@ -214,6 +229,9 @@ def test_dashboard_api_admin_e_gestor_respeitam_escopo(client, monkeypatch):
     assert other_id not in {
         item["store_id"] for item in gestor_body["integrations"]
     }
+    for event in gestor_body["recent_audit"]:
+        assert event["store_id"] in {None, allowed_id}
+        assert event["store_id"] != other_id
 
 
 def test_dashboard_overview_counts_e_isolamento_gestor():
@@ -304,8 +322,11 @@ def test_dashboard_html_lista_prontidao_no_escopo(client, monkeypatch):
     assert "Configurando" in admin_page.text
     assert "Suspensas" in admin_page.text
     assert "Com erro" in admin_page.text
+    assert "Gestor responsável" in admin_page.text
+    assert "Módulos" in admin_page.text
     assert "Loja Dashboard Permitida" in admin_page.text
     assert "Loja Dashboard Alheia" in admin_page.text
+    assert "Gestor Dashboard" in admin_page.text
     assert f'data-store-id="{allowed_id}"' in admin_page.text
     assert f'data-store-id="{other_id}"' in admin_page.text
     assert 'id="nav-control-dashboard"' in admin_page.text
@@ -318,3 +339,111 @@ def test_dashboard_html_lista_prontidao_no_escopo(client, monkeypatch):
     assert gestor_page.status_code == 200
     assert "Loja Dashboard Permitida" in gestor_page.text
     assert "Loja Dashboard Alheia" not in gestor_page.text
+
+
+def test_dashboard_overview_modulos_gestor_e_auditoria_escopada():
+    from app.control.portfolio import PortfolioControl
+    from app.control.types import StoreRef
+    from app.models import AuditoriaEvento, ModuloRevy
+
+    admin = _admin_actor()
+    stores = StoreControl(SessionLocal)
+    allowed = stores.create(
+        admin,
+        CreateStore(name="Dash Rico Permitida", slug="dash-rico-ok"),
+    )
+    other = stores.create(
+        admin,
+        CreateStore(name="Dash Rico Alheia", slug="dash-rico-alheia"),
+    )
+
+    with SessionLocal() as db:
+        if db.query(ModuloRevy).count() == 0:
+            db.add_all(
+                [
+                    ModuloRevy(id="vendas", codigo="vendas", nome="Vendas"),
+                    ModuloRevy(id="estoque", codigo="estoque", nome="Estoque"),
+                ]
+            )
+            db.commit()
+
+    PortfolioControl(SessionLocal).configure(
+        admin,
+        StoreRef(id=allowed.id),
+        {"vendas", "estoque"},
+    )
+    PortfolioControl(SessionLocal).configure(
+        admin,
+        StoreRef(id=other.id),
+        {"vendas"},
+    )
+    PortfolioControl(SessionLocal).suspend(
+        admin,
+        StoreRef(id=allowed.id),
+        "estoque",
+        reason="manutenção programada",
+    )
+
+    with SessionLocal() as db:
+        manager = GestorRevy(
+            email="gestor.rico@revy.local",
+            nome="Gestor Rico",
+            senha_hash=hash_senha("senha-rico"),
+            papel="gestor",
+            ativo=True,
+        )
+        db.add(manager)
+        db.flush()
+        db.add(
+            VinculoTrafego(
+                loja_id=allowed.id,
+                gestor_id=manager.id,
+                tipo="responsavel",
+            )
+        )
+        # Evento na loja alheia não deve vazar para o gestor.
+        db.add(
+            AuditoriaEvento(
+                loja_id=other.id,
+                ator_gestor_id=admin.id,
+                ator_email=admin.email,
+                acao="store.secret",
+                recurso_tipo="loja",
+                recurso_id=other.id,
+                resultado="sucesso",
+            )
+        )
+        db.commit()
+        manager_actor = Actor(
+            id=manager.id,
+            email=manager.email,
+            name=manager.nome,
+            role=manager.papel,
+        )
+
+    dashboard = DashboardControl(SessionLocal)
+    admin_overview = dashboard.overview(admin)
+    admin_item = next(
+        item for item in admin_overview.items if item.store_id == allowed.id
+    )
+    assert admin_item.gestor_responsavel is not None
+    assert admin_item.gestor_responsavel.email == "gestor.rico@revy.local"
+    assert admin_item.gestor_responsavel.name == "Gestor Rico"
+    codes = {m.code: m.status for m in admin_item.modulos}
+    assert codes["vendas"] == "ativo"
+    assert codes["estoque"] == "suspenso"
+    admin_audit_store_ids = {
+        e.store_id for e in admin_overview.recent_audit if e.store_id
+    }
+    assert other.id in admin_audit_store_ids or allowed.id in admin_audit_store_ids
+
+    gestor_overview = dashboard.gestor_overview(manager_actor)
+    assert [item.store_id for item in gestor_overview.items] == [allowed.id]
+    gestor_item = gestor_overview.items[0]
+    assert gestor_item.gestor_responsavel is not None
+    assert gestor_item.gestor_responsavel.email == "gestor.rico@revy.local"
+    assert {m.code for m in gestor_item.modulos} == {"vendas", "estoque"}
+    for event in gestor_overview.recent_audit:
+        assert event.store_id != other.id
+        assert event.action != "store.secret"
+    assert any(e.action == "store_module.suspended" for e in gestor_overview.recent_audit)

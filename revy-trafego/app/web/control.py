@@ -1527,12 +1527,31 @@ def _integration_json(view: IntegrationView) -> dict[str, object]:
 
 
 def _dashboard_item_json(item: StoreReadinessSummary) -> dict[str, object]:
+    gestor = item.gestor_responsavel
     return {
         "store_id": item.store_id,
         "slug": item.slug,
         "name": item.name,
         "status": item.status.value,
         "ready": item.ready,
+        "gestor_responsavel": (
+            {
+                "id": gestor.id,
+                "name": gestor.name,
+                "email": gestor.email,
+            }
+            if gestor is not None
+            else None
+        ),
+        "modulos": [
+            {
+                "code": module.code,
+                "name": module.name,
+                "status": module.status,
+            }
+            for module in item.modulos
+        ],
+        "integration_failures": list(item.integration_failures),
     }
 
 
@@ -1563,8 +1582,26 @@ def _dashboard_overview_json(overview: DashboardOverview) -> dict[str, object]:
                 "meta_ads_connected": item.meta_ads_connected,
                 "google_status": item.google_status,
                 "whatsapp_channels": item.whatsapp_channels,
+                "failures": list(item.failures),
             }
             for item in overview.integrations
+        ],
+        "recent_audit": [
+            {
+                "id": event.id,
+                "store_id": event.store_id,
+                "actor_email": event.actor_email,
+                "action": event.action,
+                "resource_type": event.resource_type,
+                "resource_id": event.resource_id,
+                "result": event.result.value,
+                "created_at": (
+                    event.created_at.isoformat()
+                    if event.created_at is not None
+                    else None
+                ),
+            }
+            for event in overview.recent_audit
         ],
     }
 
