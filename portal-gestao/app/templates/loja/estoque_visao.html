@@ -7,7 +7,7 @@
     <h1>Visão geral</h1>
     <p>Indicadores do estoque da loja. Números vêm da API de estoque — nenhum valor é estimado.</p>
   </div>
-  <div style="display:flex;gap:8px;flex-wrap:wrap">
+  <div class="heading-actions">
     <a class="button secondary" href="{{ caminho_veiculos }}">Ver veículos</a>
     {% if pode_gerir %}<a class="button primary" href="{{ caminho_novo }}">Cadastrar veículo</a>{% endif %}
   </div>
@@ -77,7 +77,7 @@
 <section class="panel" aria-labelledby="idade-titulo">
   <div class="panel-heading">
     <div>
-      <span class="mono-label">IDADE DO ESTOQUE</span>
+      <span class="mono-label">Idade do estoque</span>
       <h2 id="idade-titulo">Dias desde a entrada</h2>
     </div>
   </div>
@@ -94,7 +94,7 @@
 <section class="panel" aria-labelledby="lacunas-titulo">
   <div class="panel-heading">
     <div>
-      <span class="mono-label">CADASTRO</span>
+      <span class="mono-label">Cadastro</span>
       <h2 id="lacunas-titulo">Pendências</h2>
     </div>
     {% if overview.total_lacunas %}
@@ -156,7 +156,7 @@
 <section class="panel" aria-labelledby="recentes-titulo">
   <div class="panel-heading">
     <div>
-      <span class="mono-label">MOVIMENTAÇÃO</span>
+      <span class="mono-label">Movimentação</span>
       <h2 id="recentes-titulo">Reservas e vendas recentes</h2>
     </div>
   </div>
@@ -193,7 +193,7 @@
 </section>
 {% endif %}
 
-<p class="muted" style="margin-top:1.5rem">
+<p class="muted page-shortcuts">
   Catálogo público: publicação e despublicação permanecem nas ações de cada veículo em
   <a href="{{ caminho_veiculos }}">Veículos</a>.
 </p>

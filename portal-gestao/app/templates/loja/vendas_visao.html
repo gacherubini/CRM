@@ -24,12 +24,12 @@
   </label>
   <button class="button secondary" type="submit">Aplicar período</button>
 </form>
-<p class="mono-label">PERÍODO: {{ periodo.inicio }} A {{ periodo.fim }} · {{ overview.timezone }} · estado {{ overview.status }}</p>
+<p class="mono-label">Período de {{ formatar_data(periodo.inicio) }} a {{ formatar_data(periodo.fim) }}</p>
 
 {# --- Vendas / resultado --- #}
 <section class="panel" aria-labelledby="bloco-resultado">
   <div class="panel-heading">
-    <div><span class="mono-label">RESULTADO</span><h2 id="bloco-resultado">Receita e vendas</h2></div>
+    <div><span class="mono-label">Resultado</span><h2 id="bloco-resultado">Receita e vendas</h2></div>
   </div>
   {% if overview.vendas_status == 'vazio' %}
   <div class="empty">
@@ -70,7 +70,7 @@
 {# --- Metas --- #}
 <section class="panel" aria-labelledby="bloco-metas">
   <div class="panel-heading">
-    <div><span class="mono-label">METAS</span><h2 id="bloco-metas">Atingimento</h2></div>
+    <div><span class="mono-label">Metas</span><h2 id="bloco-metas">Atingimento</h2></div>
   </div>
   {% if overview.metas_status == 'vazio' or not overview.metas %}
   <div class="empty">
@@ -88,9 +88,8 @@
       {% else %}
       <strong>{% if m.quantidade %}{{ m.realizado | int }}{% else %}{{ formatar_brl(m.realizado) }}{% endif %}</strong>
       <small>meta: {% if m.quantidade %}{{ m.alvo | int }}{% else %}{{ formatar_brl(m.alvo) }}{% endif %} · {{ m.pct }}%</small>
-      <div class="meta-bar" role="progressbar" aria-valuenow="{{ m.pct }}" aria-valuemin="0" aria-valuemax="100"
-           style="height:6px;margin-top:8px;background:rgba(128,128,128,0.15);border-radius:4px;overflow:hidden">
-        <span style="display:block;height:100%;width:{{ m.pct_barra }}%;background:currentColor"></span>
+      <div class="meta-bar" role="progressbar" aria-valuenow="{{ m.pct }}" aria-valuemin="0" aria-valuemax="100">
+        <span style="width:{{ m.pct_barra }}%"></span>
       </div>
       {% endif %}
     </div>
@@ -102,7 +101,7 @@
 {# --- Funil / leads --- #}
 <section class="panel" aria-labelledby="bloco-funil">
   <div class="panel-heading">
-    <div><span class="mono-label">FUNIL</span><h2 id="bloco-funil">Leads e conversão</h2></div>
+    <div><span class="mono-label">Funil</span><h2 id="bloco-funil">Leads e conversão</h2></div>
   </div>
   {% if overview.funil_status == 'erro' %}
   <div class="empty"><strong>Funil indisponível.</strong><p>Não foi possível agregar os eventos do período.</p></div>
@@ -151,7 +150,7 @@
 {% if pode_ver_aquisicao %}
 <section class="panel" aria-labelledby="bloco-aquisicao">
   <div class="panel-heading">
-    <div><span class="mono-label">AQUISIÇÃO</span><h2 id="bloco-aquisicao">Investimento e retorno</h2></div>
+    <div><span class="mono-label">Aquisição</span><h2 id="bloco-aquisicao">Investimento e retorno</h2></div>
   </div>
   {% set aq = overview.aquisicao %}
   {% if not aq or overview.aquisicao_status == 'indisponivel' %}
@@ -198,10 +197,10 @@
     </div>
   </div>
   {% if aq.mensagem %}
-  <p class="muted" style="margin:12px 16px 16px">{{ aq.mensagem }}</p>
+  <p class="muted">{{ aq.mensagem }}</p>
   {% endif %}
   {% if overview.aquisicao_status == 'parcial' %}
-  <p class="muted" style="margin:0 16px 16px">Estado parcial: as vendas acima seguem válidas; a aquisição pode estar incompleta.</p>
+  <p class="muted">Estado parcial: as vendas acima seguem válidas; a aquisição pode estar incompleta.</p>
   {% endif %}
   {% endif %}
 </section>
@@ -210,7 +209,7 @@
 {# --- Pendências --- #}
 <section class="panel" aria-labelledby="bloco-pendencias">
   <div class="panel-heading">
-    <div><span class="mono-label">PENDÊNCIAS</span><h2 id="bloco-pendencias">Ações do período</h2></div>
+    <div><span class="mono-label">Pendências</span><h2 id="bloco-pendencias">Ações do período</h2></div>
   </div>
   {% if not overview.pendencias %}
   <div class="empty">
@@ -218,9 +217,9 @@
     <p>Próximas ações persistentes entram em uma fase posterior.</p>
   </div>
   {% else %}
-  <ul class="list-plain" style="margin:0;padding:12px 16px;list-style:none">
+  <ul class="list-rows">
     {% for p in overview.pendencias %}
-    <li style="padding:10px 0;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;gap:12px;align-items:center">
+    <li>
       <span>{{ p.texto }}</span>
       <a class="button ghost" href="{{ p.href }}">Abrir</a>
     </li>
@@ -229,7 +228,7 @@
   {% endif %}
 </section>
 
-<p class="muted" style="margin-top:8px">
+<p class="muted page-shortcuts">
   Atalhos: <a href="/app/vendas">Vendas</a> ·
   <a href="/app/leads">Leads</a> ·
   {% if overview.escopo == 'vendedor' %}<a href="/app/vendedor">Meu painel</a>{% else %}<a href="/app/financeiro">Financeiro</a> · <a href="/app/funil">Funil</a>{% endif %}

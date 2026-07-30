@@ -2,6 +2,16 @@
 {% block title %}Visão geral — Revy Control{% endblock %}
 {% block page_title %}Visão geral{% endblock %}
 {% block content %}
+{# Rotulos curtos dos checks de prontidao: a tabela mostrava o codigo interno
+   (active_owner, module_selected...). Mensagens longas ficam em readiness.py. #}
+{% set rotulo_check = {
+  'active_owner': 'Dono ativo',
+  'activatable_owner': 'Acesso do dono',
+  'module_selected': 'Módulo contratado',
+  'contract_present': 'Contrato',
+  'meta_pixel': 'Pixel e CAPI',
+  'whatsapp_channel': 'Canal WhatsApp',
+} %}
 <div class="page-heading">
   <div>
     <span class="eyebrow">Revy Control</span>
@@ -38,13 +48,13 @@
   <div class="panel-heading">
     <h2>Lojas com pendência de prontidão</h2>
   </div>
-  <div style="overflow-x:auto">
+  <div class="table-wrap">
     <table id="tabela-dashboard-pendencias">
       <thead>
         <tr>
           <th>Nome</th>
           <th>Status</th>
-          <th>Checks falhando</th>
+          <th class="wrap">O que falta</th>
         </tr>
       </thead>
       <tbody>
@@ -52,13 +62,19 @@
         <tr data-store-id="{{ item.store_id }}" class="dashboard-pendencia">
           <td>
             {% if control_enabled %}
-            <a href="{{ public_path('/app/control/lojas/' + item.store_id) }}">{{ item.name }}</a>
+            <a class="table-action" href="{{ public_path('/app/control/lojas/' + item.store_id) }}">{{ item.name }}</a>
             {% else %}
             {{ item.name }}
             {% endif %}
           </td>
-          <td>{{ item.status.value }}</td>
-          <td><code>{{ item.failing_codes | join(', ') }}</code></td>
+          <td><span class="status {{ item.status.value }}">{{ item.status.value | replace('_', ' ') }}</span></td>
+          <td class="wrap">
+            <span class="chip-list">
+              {% for code in item.failing_codes %}
+              <span class="status warn">{{ rotulo_check.get(code, code | replace('_', ' ')) }}</span>
+              {% endfor %}
+            </span>
+          </td>
         </tr>
         {% endfor %}
       </tbody>
@@ -72,7 +88,7 @@
     <h2>Lojas</h2>
   </div>
   {% if items %}
-  <div style="overflow-x:auto">
+  <div class="table-wrap">
     <table id="tabela-dashboard-prontidao">
       <thead>
         <tr>
@@ -93,27 +109,31 @@
         <tr data-store-id="{{ item.store_id }}">
           <td>
             {% if control_enabled %}
-            <a href="{{ public_path('/app/control/lojas/' + item.store_id) }}">{{ item.name }}</a>
+            <a class="table-action" href="{{ public_path('/app/control/lojas/' + item.store_id) }}">{{ item.name }}</a>
             {% else %}
             {{ item.name }}
             {% endif %}
           </td>
           <td><code>{{ item.slug }}</code></td>
-          <td>{{ item.status.value }}</td>
-          <td>{% if item.ready %}sim{% else %}não{% endif %}</td>
+          <td><span class="status {{ item.status.value }}">{{ item.status.value | replace('_', ' ') }}</span></td>
+          <td>{% if item.ready %}<span class="status novo">sim</span>{% else %}<span class="status">não</span>{% endif %}</td>
           <td>
             {% if item.gestor_responsavel %}
-            <span title="{{ item.gestor_responsavel.email }}">{{ item.gestor_responsavel.name }}</span>
-            <br><small class="muted">{{ item.gestor_responsavel.email }}</small>
+            <div class="cell-stack">
+              <span>{{ item.gestor_responsavel.name }}</span>
+              <small>{{ item.gestor_responsavel.email }}</small>
+            </div>
             {% else %}
             —
             {% endif %}
           </td>
           <td>
             {% if item.modulos %}
+            <span class="chip-list">
               {% for m in item.modulos %}
-              <code>{{ m.code }}:{{ m.status }}</code>{% if not loop.last %} {% endif %}
+              <span class="status {{ m.status }}">{{ m.code | capitalize }}</span>
               {% endfor %}
+            </span>
             {% else %}
             —
             {% endif %}
@@ -148,7 +168,7 @@
     <p class="muted">Investimento e conversões da conta Google Ads conectada. ROAS usa valor de conversão Google, não vendas Revy.</p>
   </div>
   {% if google_by_store %}
-  <div style="overflow-x:auto">
+  <div class="table-wrap">
     <table id="tabela-dashboard-google">
       <thead>
         <tr>
@@ -168,7 +188,7 @@
         <tr data-store-id="{{ row.loja_id }}" class="dashboard-google-row">
           <td>
             {% if control_enabled %}
-            <a href="{{ public_path('/app/control/lojas/' + row.loja_id) }}">{{ row.name }}</a>
+            <a class="table-action" href="{{ public_path('/app/control/lojas/' + row.loja_id) }}">{{ row.name }}</a>
             {% else %}
             {{ row.name }}
             {% endif %}
@@ -201,7 +221,7 @@
   <div class="panel-heading">
     <h2>Alterações recentes</h2>
   </div>
-  <div style="overflow-x:auto">
+  <div class="table-wrap">
     <table id="tabela-dashboard-auditoria">
       <thead>
         <tr>
@@ -214,7 +234,7 @@
       <tbody>
         {% for event in overview.recent_audit %}
         <tr data-audit-id="{{ event.id }}"{% if event.store_id %} data-store-id="{{ event.store_id }}"{% endif %}>
-          <td><small>{{ event.created_at }}</small></td>
+          <td><small>{{ event.created_at.strftime('%d/%m/%Y %H:%M') if event.created_at.strftime is defined else event.created_at }}</small></td>
           <td><code>{{ event.action }}</code></td>
           <td>{{ event.actor_email or '—' }}</td>
           <td>

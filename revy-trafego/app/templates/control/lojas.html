@@ -36,7 +36,7 @@
 <section class="panel">
   <h2>Lojas disponíveis</h2>
   {% if stores %}
-  <div style="overflow-x:auto">
+  <div class="table-wrap">
     <table>
       <thead>
         <tr>
@@ -49,7 +49,7 @@
       <tbody>
         {% for item in stores %}
         <tr>
-          <td><a href="{{ public_path('/app/control/lojas/' ~ item.store.id) }}"><strong>{{ item.store.name }}</strong></a></td>
+          <td><a class="table-action" href="{{ public_path('/app/control/lojas/' ~ item.store.id) }}"><strong>{{ item.store.name }}</strong></a></td>
           <td><code>{{ item.store.slug }}</code></td>
           <td>{{ item.store.status.value | replace('_', ' ') }}</td>
           <td>{{ item.role.value if item.role else 'Admin Revy' }}</td>

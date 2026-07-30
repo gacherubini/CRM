@@ -36,7 +36,7 @@
 <section class="panel" id="modulos-contratados">
   <h2>Módulos contratados</h2>
   {% if modules %}
-  <div style="overflow-x:auto">
+  <div class="table-wrap">
     <table>
       <thead>
         <tr>
@@ -64,18 +64,20 @@
     <input type="hidden" name="csrf" value="{{ csrf }}">
     <fieldset>
       <legend>Módulos da Loja</legend>
-      {% for module_option in module_options %}
-      <label>
-        <input
-          id="selecao-modulo-{{ module_option.value }}"
-          type="checkbox"
-          name="modulos"
-          value="{{ module_option.value }}"
-          {% if module_option.value in active_module_codes %}checked{% endif %}
-        >
-        {{ module_option.value | capitalize }}
-      </label>
-      {% endfor %}
+      <div class="option-group">
+        {% for module_option in module_options %}
+        <label>
+          <input
+            id="selecao-modulo-{{ module_option.value }}"
+            type="checkbox"
+            name="modulos"
+            value="{{ module_option.value }}"
+            {% if module_option.value in active_module_codes %}checked{% endif %}
+          >
+          {{ module_option.value | capitalize }}
+        </label>
+        {% endfor %}
+      </div>
     </fieldset>
     <button class="button primary" type="submit">Salvar módulos</button>
   </form>
@@ -85,7 +87,7 @@
 <section class="panel" id="{{ 'contrato-ativo' if contract else 'contrato-ausente' }}">
   <h2>Contrato</h2>
   {% if contract %}
-  <div style="overflow-x:auto">
+  <div class="table-wrap">
     <table>
       <tbody>
         <tr>
@@ -143,7 +145,7 @@
   <h2>Pessoas e cargos</h2>
   <p class="muted">Cadastre a Pessoa Revy uma vez e atribua somente o cargo estrutural desta Loja.</p>
   {% if store_people %}
-  <div style="overflow-x:auto">
+  <div class="table-wrap">
     <table id="tabela-cargos-loja">
       <thead>
         <tr>
@@ -249,7 +251,7 @@
 <section class="panel">
   <h2>Auditoria</h2>
   {% if audit_events %}
-  <div style="overflow-x:auto">
+  <div class="table-wrap">
     <table>
       <thead>
         <tr>
@@ -263,7 +265,7 @@
       <tbody>
         {% for event in audit_events %}
         <tr>
-          <td>{{ event.created_at }}</td>
+          <td>{{ event.created_at.strftime('%d/%m/%Y %H:%M') if event.created_at.strftime is defined else event.created_at }}</td>
           <td><code>{{ event.action }}</code></td>
           <td>{{ event.actor_email or 'sistema' }}</td>
           <td>{{ event.result.value }}</td>

@@ -219,6 +219,16 @@ def formatar_horario(iso: str | None) -> str:
     return momento.strftime("%d/%m %H:%M")
 
 
+def formatar_data(iso: str | None) -> str:
+    """ISO (2026-07-01) -> 01/07/2026. Devolve a entrada se nao for data."""
+    if not iso:
+        return ""
+    try:
+        return date.fromisoformat(str(iso)[:10]).strftime("%d/%m/%Y")
+    except ValueError:
+        return str(iso)
+
+
 def mascarar_cpf(cpf: str | None) -> str:
     digitos = "".join(c for c in (cpf or "") if c.isdigit())
     if len(digitos) < 3:
@@ -261,6 +271,7 @@ def formatar_duracao(segundos) -> str:
 
 templates.env.globals["mascarar_telefone"] = mascarar_telefone
 templates.env.globals["formatar_horario"] = formatar_horario
+templates.env.globals["formatar_data"] = formatar_data
 templates.env.globals["mascarar_cpf"] = mascarar_cpf
 templates.env.globals["formatar_brl"] = formatar_brl
 templates.env.globals["formatar_percentual"] = formatar_percentual

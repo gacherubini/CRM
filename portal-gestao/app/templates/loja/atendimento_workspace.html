@@ -1,30 +1,7 @@
 {% extends "base.html" %}
 {% block title %}Atendimento — Revy Loja{% endblock %}
 {% block content %}
-<style>
-  .thread{display:flex;flex-direction:column;gap:.5rem;padding:1rem;max-width:100%}
-  .thread .bolha{max-width:min(80%,42rem);padding:.55rem .8rem;border-radius:.9rem;line-height:1.35;word-break:break-word}
-  .thread .bolha small{display:block;opacity:.6;font-size:.72rem;margin-top:.25rem}
-  .thread .entrada{align-self:flex-start;background:rgba(255,255,255,.06);border-bottom-left-radius:.2rem}
-  .thread .saida{align-self:flex-end;background:rgba(70,130,255,.18);border-bottom-right-radius:.2rem}
-  .workspace-grid{display:grid;gap:1rem}
-  @media (min-width: 960px){
-    .workspace-grid{grid-template-columns:1.4fr .9fr}
-  }
-  .composer{display:flex;flex-direction:column;gap:.5rem;padding:1rem}
-  .composer textarea{width:100%;min-height:4.5rem;resize:vertical}
-  .meta-list{display:grid;gap:.4rem;font-size:.92rem}
-  .meta-list dt{font-weight:600;margin:0}
-  .meta-list dd{margin:0 0 .5rem;opacity:.9}
-  .canal-badge{display:inline-flex;align-items:center;gap:.35rem;padding:.15rem .55rem;border-radius:999px;font-size:.8rem;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12)}
-  .canal-badge.inativo,.canal-badge.desconectado{opacity:.75;border-color:rgba(255,180,80,.4)}
-  .action-stack{display:flex;flex-direction:column;gap:.75rem}
-  .action-stack form{margin:0}
-  .action-links{display:flex;flex-direction:column;gap:.4rem;margin:0;padding:0;list-style:none}
-  .action-links a{font-size:.92rem}
-  .handoff-bar{display:flex;flex-wrap:wrap;gap:.75rem;align-items:center}
-</style>
-
+{# Estilos do workspace vivem em app.css (.thread/.composer/.meta-list/...). #}
 <div class="page-heading">
   <div>
     <span class="eyebrow">Atendimento</span>
@@ -85,9 +62,9 @@
 
     {% if workspace.envio_bloqueado_canal %}
     <section class="panel">
-      <div class="alert warning" role="status" style="margin:0">
+      <div class="alert warning" role="status">
         <strong>Envio bloqueado</strong>
-        <p style="margin:.35rem 0 0">O canal desta conversa está inativo ou desconectado. Ajuste no Revy Control; a Loja não conecta nem desconecta números.</p>
+        <p>O canal desta conversa está inativo ou desconectado. Ajuste no Revy Control; a Loja não conecta nem desconecta números.</p>
       </div>
     </section>
     {% elif pode_enviar %}
@@ -98,9 +75,9 @@
         {% if workspace.canal_id %}<input type="hidden" name="canal_id" value="{{ workspace.canal_id }}">{% endif %}
         <label for="texto-msg"><strong>Responder ao cliente</strong></label>
         <textarea id="texto-msg" name="texto" maxlength="4000" placeholder="Escreva a mensagem de texto…" required></textarea>
-        <div class="handoff-bar" style="display:flex;gap:.75rem;align-items:center;flex-wrap:wrap">
-          <button class="button" type="submit">Enviar</button>
-          <p class="muted" style="margin:0">
+        <div class="handoff-bar">
+          <button class="button primary" type="submit">Enviar</button>
+          <p class="muted">
             Resposta sai pelo canal desta conversa{% if workspace.canal_label %} ({{ workspace.canal_label }}){% endif %}.
             O envio pausa o bot neste contato. Mídia ainda não está disponível.
           </p>
@@ -112,7 +89,7 @@
 
   <div class="action-stack">
     <section class="panel">
-      <h2 style="margin-top:0;font-size:1rem">Resumo</h2>
+      <h2>Resumo</h2>
       <dl class="meta-list">
         <dt>Telefone</dt>
         <dd>{{ mascarar_telefone(workspace.telefone) }}</dd>
@@ -142,7 +119,7 @@
 
     {% if pode_handoff %}
     <section class="panel">
-      <h2 style="margin-top:0;font-size:1rem">Handoff</h2>
+      <h2>Handoff</h2>
       <div class="handoff-bar">
         {% set bot_ativo = workspace.conversa_resumo.bot_ativo if workspace.conversa_resumo and workspace.conversa_resumo.bot_ativo is not none else true %}
         {% if bot_ativo %}
@@ -153,7 +130,7 @@
           {% if workspace.canal_id %}<input type="hidden" name="canal_id" value="{{ workspace.canal_id }}">{% endif %}
           <button class="button" type="submit">Assumir atendimento</button>
         </form>
-        <p class="muted" style="margin:0;flex-basis:100%">Ao assumir, o bot para de responder este contato e você vira o responsável.</p>
+        <p class="muted">Ao assumir, o bot para de responder este contato e você vira o responsável.</p>
         {% else %}
         <span class="status em_atendimento">Atendimento humano</span>
         <form method="post" action="/app/loja/atendimento/{{ workspace.id }}/handoff">
@@ -162,7 +139,7 @@
           {% if workspace.canal_id %}<input type="hidden" name="canal_id" value="{{ workspace.canal_id }}">{% endif %}
           <button class="button secondary" type="submit">Devolver ao bot</button>
         </form>
-        <p class="muted" style="margin:0;flex-basis:100%">O bot volta a responder este contato e a atribuição local é encerrada.</p>
+        <p class="muted">O bot volta a responder este contato e a atribuição local é encerrada.</p>
         {% endif %}
       </div>
     </section>
@@ -170,8 +147,9 @@
 
     {% if pode_atualizar_etapa and workspace.lead and workspace.lead.id %}
     <section class="panel">
-      <h2 style="margin-top:0;font-size:1rem">Etapa do lead</h2>
-      <form method="post" action="/app/loja/atendimento/{{ workspace.id }}/etapa" class="form-grid">
+      <h2>Etapa do lead</h2>
+      {# form-layout (1 coluna): em cartao estreito o form-grid esticava o botao. #}
+      <form method="post" action="/app/loja/atendimento/{{ workspace.id }}/etapa" class="form-layout">
         <input type="hidden" name="csrf" value="{{ csrf }}">
         <input type="hidden" name="lead_id" value="{{ workspace.lead.id }}">
         {% if workspace.canal_id %}<input type="hidden" name="canal_id" value="{{ workspace.canal_id }}">{% endif %}
@@ -182,15 +160,13 @@
             {% endfor %}
           </select>
         </label>
-        <div class="form-actions" style="margin-top:.5rem">
-          <button class="button primary" type="submit">Salvar etapa</button>
-        </div>
+        <button class="button primary" type="submit">Salvar etapa</button>
       </form>
     </section>
     {% endif %}
 
     <section class="panel">
-      <h2 style="margin-top:0;font-size:1rem">Ações</h2>
+      <h2>Ações</h2>
       <ul class="action-links">
         <li>
           <a href="/app/simulacoes?celular={{ workspace.telefone }}">Nova simulação</a>
