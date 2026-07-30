@@ -226,6 +226,43 @@ class ChatbotFake:
             raise ChatbotIndisponivel("Não foi possível acessar o chatbot agora")
         return list(self.canais)
 
+    def registrar_canal_whatsapp(self, label):
+        if self.indisponivel:
+            raise ChatbotIndisponivel("Não foi possível acessar o chatbot agora")
+        canal = {
+            "id": f"c{len(self.canais) + 1}",
+            "e164_or_label": label,
+            "evolution_instance": f"loja-teste-{len(self.canais) + 1}",
+            "ativo": True,
+            "estado": "pendente",
+        }
+        self.canais.append(canal)
+        return dict(canal)
+
+    def conectar_canal_whatsapp(self, canal_id):
+        if self.indisponivel:
+            raise ChatbotIndisponivel("Não foi possível acessar o chatbot agora")
+        canal = self._canal(canal_id)
+        canal["estado"] = "pendente"
+        return {**canal, "qr_payload": "QR-FAKE", "expires_in_seconds": 60}
+
+    def desconectar_canal_whatsapp(self, canal_id):
+        canal = self._canal(canal_id)
+        canal["estado"] = "desconectado"
+        return dict(canal)
+
+    def inativar_canal_whatsapp(self, canal_id):
+        canal = self._canal(canal_id)
+        canal["ativo"] = False
+        canal["estado"] = "inativo"
+        return dict(canal)
+
+    def obter_status_canal_whatsapp(self, canal_id):
+        return dict(self._canal(canal_id))
+
+    def _canal(self, canal_id):
+        return next(c for c in self.canais if c["id"] == canal_id)
+
     def listar_mensagens(
         self, telefone, limit=200, offset=0, *, canal_id=None, instance=None
     ):

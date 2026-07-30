@@ -202,9 +202,38 @@ class ChatbotClient:
         )
 
     def listar_canais_whatsapp(self) -> list[dict]:
-        """Lista canais da loja (read-only; Loja não conecta/desconecta)."""
+        """Lista canais da loja. A Loja também opera canais (ver métodos abaixo)."""
         dados = self._request("GET", "/v1/whatsapp/canais")
         return list(dados.get("canais") or [])
+
+    def registrar_canal_whatsapp(self, label: str) -> dict:
+        """Cadastra canal. Não envia ``evolution_instance``: o Chatbot gera o nome."""
+        return self._request(
+            "POST",
+            "/v1/whatsapp/canais",
+            json={"e164_or_label": label},
+        )
+
+    def conectar_canal_whatsapp(self, canal_id: str) -> dict:
+        """Inicia pareamento. A resposta traz ``qr_payload`` efêmero — nunca logar."""
+        return self._request(
+            "POST", f"/v1/whatsapp/canais/{canal_id}/connect"
+        )
+
+    def desconectar_canal_whatsapp(self, canal_id: str) -> dict:
+        return self._request(
+            "POST", f"/v1/whatsapp/canais/{canal_id}/disconnect"
+        )
+
+    def inativar_canal_whatsapp(self, canal_id: str) -> dict:
+        return self._request(
+            "POST", f"/v1/whatsapp/canais/{canal_id}/inativar"
+        )
+
+    def obter_status_canal_whatsapp(self, canal_id: str) -> dict:
+        return self._request(
+            "GET", f"/v1/whatsapp/canais/{canal_id}/status"
+        )
 
     def enviar_mensagem_humana(
         self,
