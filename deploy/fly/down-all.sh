@@ -4,7 +4,7 @@
 # Preferido (arquitetura 3-VM — deploy/fly/3vm/):
 #   bash deploy/fly/down-all.sh --3vm
 #   bash deploy/fly/down-all.sh --3vm --yes
-#     para: suite-pg, evolution2037, app2037
+#     para: suite-pg, evolution2037, app2037, n8n2037
 #     + motor2037 se estiver up (workers on-demand; idle deve estar stopped)
 #   NÃO toca apps legados (removidos a pedido do owner).
 #
@@ -60,6 +60,7 @@ if [ "$MODE_3VM" -eq 1 ]; then
   # motor2037: só para garantir stop se algum job deixou worker started.
   APPS=(
     app2037
+    n8n2037
     evolution2037
     suite-pg
     motor2037

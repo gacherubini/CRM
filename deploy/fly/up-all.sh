@@ -3,11 +3,11 @@
 #
 # Preferido (arquitetura 3-VM — deploy/fly/3vm/):
 #   bash deploy/fly/up-all.sh --3vm
-#     sobe: suite-pg, evolution2037, app2037
+#     sobe: suite-pg, evolution2037, app2037, n8n2037
 #     NÃO sobe: motor2037 (workers Playwright ficam stopped; sobem on-demand)
 #
 # Inventário operacional (apps monólito legados removidos a pedido do owner):
-#   always-on: suite-pg, evolution2037, app2037
+#   always-on: suite-pg, evolution2037, app2037, n8n2037
 #   on-demand: motor2037 (workers Playwright; idle stopped)
 #
 # Uso:
@@ -59,16 +59,19 @@ for arg in "$@"; do
   esac
 done
 
-# IDs conhecidos do lab (fallback se list falhar). Atualize se recrear machines.
+# IDs conhecidos do lab (fallback se list falhar). Atualize se recriar machines.
+# Revisados em 2026-07-31 apos a migracao gru->iad: os IDs anteriores apontavam
+# para machines destruidas, entao o fallback acordaria nada.
 # Apenas apps que permanecem no inventário 3-VM (+ worker on-demand).
 # Legados (portal/catalogo/estoque/chatbot/n8n/site monólito) foram removidos —
 # não listar IDs mortos aqui (evita start em machines inexistentes).
 # app2037: sem fallback estático — use `fly machine list -a app2037`.
 # Chaves com aspas: com set -u, [suite-pg] é parseado como aritmética (suite - pg).
 declare -A FALLBACK_ID=(
-  ["suite-pg"]=d8946d2f320de8
-  ["evolution2037"]=7847926f5d1758
-  ["motor2037"]=0807560c916d68
+  ["suite-pg"]=48ee5d4ad12768
+  ["evolution2037"]=867637ae203298
+  ["app2037"]=48e1e6ea557558
+  ["n8n2037"]=890d66b6604998
 )
 
 machine_ids() {
@@ -194,40 +197,47 @@ print(" | ".join(parts))
 
 if [ "$MODE_3VM" -eq 1 ]; then
   # ---------------------------------------------------------------------------
-  # Arquitetura 3-VM (deploy/fly/3vm/): suite-pg + evolution2037 + app2037
+  # Arquitetura 3-VM (deploy/fly/3vm/): suite-pg + evolution2037 + app2037 + n8n2037
   # motor2037 (Playwright) fica stopped — sobe on-demand por job.
   # ---------------------------------------------------------------------------
-  echo ">> up-all --3vm (always-on: suite-pg, evolution2037, app2037)"
+  echo ">> up-all --3vm (always-on: suite-pg, evolution2037, app2037, n8n2037)"
   echo "   motor2037 workers: NÃO iniciados (on-demand / idle stopped)"
   echo "   keepalive_min=$MINUTES"
   echo ""
 
-  echo "=== 1/3 Postgres ==="
+  echo "=== 1/4 Postgres ==="
   start_app suite-pg || true
   wait_started suite-pg 15 || true
   sleep 3
 
   echo ""
-  echo "=== 2/3 Evolution (canal WhatsApp) ==="
+  echo "=== 2/4 Evolution (canal WhatsApp) ==="
   start_app evolution2037 || true
   wait_started evolution2037 20 || true
   ensure_backend_always_on evolution2037
 
   echo ""
-  echo "=== 3/3 app2037 (n8n + chatbot + estoque + portal + catálogo + site + motor-api) ==="
+  echo "=== 3/4 app2037 (chatbot + estoque + portal + catálogo + site + motor-api) ==="
   start_app app2037 || true
   wait_started app2037 30 || true
   ensure_backend_always_on app2037
+
+  echo ""
+  echo "=== 4/4 n8n2037 (orquestração WhatsApp) ==="
+  start_app n8n2037 || true
+  wait_started n8n2037 25 || true
+  ensure_backend_always_on n8n2037
 
   echo ""
   echo "  (motor2037: workers deixados stopped — Playwright sobe só sob demanda)"
 
   echo ""
   echo ">> resumo"
-  print_machine_summary suite-pg evolution2037 app2037 motor2037
+  print_machine_summary suite-pg evolution2037 app2037 n8n2037 motor2037
 
   echo ""
-  echo "URLs: App https://app2037.fly.dev  |  Evolution https://evolution2037.fly.dev/manager"
+  echo "URLs: App https://app2037.fly.dev  |  n8n https://n8n2037.fly.dev"
+  echo "      Evolution https://evolution2037.fly.dev/manager"
   echo "      Site https://site2037.fly.dev/health (se host apontar para app2037)"
   echo "Down quando acabar:  bash deploy/fly/down-all.sh --3vm --yes"
 
