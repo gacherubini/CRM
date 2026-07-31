@@ -1,6 +1,6 @@
 # VM 2 — Evolution only (reusa app evolution2037)
 app = "evolution2037"
-primary_region = "gru"
+primary_region = "iad"
 
 [build]
   image = "evoapicloud/evolution-api:v2.3.7"

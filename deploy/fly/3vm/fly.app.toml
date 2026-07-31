@@ -1,5 +1,5 @@
 app = "app2037"
-primary_region = "gru"
+primary_region = "iad"
 
 [build]
   # Deploy da raiz do repo (context = .):

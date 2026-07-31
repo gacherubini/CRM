@@ -4,15 +4,34 @@ Plano canônico: `docs/plans/2026-07-21-plano-arquitetura-3-vms.md`.
 
 ## Status (2026-07-21+)
 
-Stack **implementada e em uso** no org Fly (`crm-419` / `gru`):
+Stack **implementada e em uso** no org Fly (`crm-419`). Desde **2026-07-31** a topologia é
+**dividida por região** — ver "Por que a stack está dividida" abaixo:
 
-| Host público | App / papel |
-|--------------|-------------|
-| `https://app2037.fly.dev` | Bundle: portal, **revy-trafego (`/trafego`)**, chatbot, estoque, catálogo, site, motor-api, nginx edge |
-| `https://n8n2037.fly.dev` | n8n (orquestra WhatsApp → tools HTTP no chatbot) |
-| `https://evolution2037.fly.dev` | Evolution (WhatsApp) |
-| (interno) `suite-pg` | Postgres por serviço |
-| (on-demand) `motor2037` | Playwright por banco |
+| Host público | App / papel | Região |
+|--------------|-------------|--------|
+| `https://app2037.fly.dev` | Bundle: portal, **revy-trafego (`/trafego`)**, chatbot, estoque, catálogo, site, motor-api, nginx edge | `iad` |
+| `https://n8n2037.fly.dev` | n8n (orquestra WhatsApp → tools HTTP no chatbot) | `iad` |
+| `https://evolution2037.fly.dev` | Evolution (WhatsApp) — 512MB | `iad` |
+| (interno) `suite-pg` | Postgres por serviço | `iad` |
+| (on-demand) `motor2037` | Playwright por banco | **`gru`** |
+
+### Por que a stack está dividida
+
+`gru` é a região **mais cara da Fly**: markup de **1,615** sobre a tabela base, contra **1,0**
+de `iad` (valor publicado em `regionMarkups` na página de preços da Fly). Migrar os quatro
+always-on derrubou o custo com tudo ligado de **~US$ 36,80 para ~US$ 20,28/mês**.
+
+O `motor2037` **fica em `gru` de propósito**: os drivers Playwright logam em portal de lojista
+brasileiro e já falham com `captcha_login` por reputação de IP de datacenter
+(`docs/plans/2026-07-16-fly-rpa-captcha-opcoes.md`). IP dos EUA piora o scoring e arrisca
+geo-block; e como as machines ficam `stopped`, mover não economizaria nada.
+
+**Consequência aceita:** `motor2037` (`gru`) consulta `suite-pg` (`iad`) via `flycast`, então
+cada query do RPA custa ~120ms de RTT. Decisão do owner em 2026-07-30. Se o RPA degradar de
+forma perceptível, a saída é dar ao motor um Postgres próprio em `gru`.
+
+**Pendência após a migração:** o volume da Evolution nasceu vazio — os números de WhatsApp
+precisam ser pareados de novo por QR, em Ajustes na Revy Loja.
 
 **Feito neste cutover:** monólitos legados removidos; bundle `app2037` + Evolution isolada;
 workflow n8n importado/publicado; webhook Evolution → `n8n2037` `/webhook/whatsapp-ai`;

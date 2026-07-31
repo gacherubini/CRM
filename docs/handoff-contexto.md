@@ -37,18 +37,26 @@ instante. Antes de qualquer ação:
 3. confira migrations/readiness e logs sem imprimir segredos;
 4. use deploy com contexto na raiz do repositório.
 
-Arquitetura esperada do lab:
+Arquitetura esperada do lab (**topologia dividida desde 2026-07-31**):
 
-- `suite-pg`: banco;
-- `evolution2037`: canal WhatsApp;
-- `app2037`: bundle de APIs/UI/site;
-- `n8n2037`: orquestração;
-- `motor2037`: workers Playwright sob demanda.
+- `suite-pg`: banco — **`iad`**;
+- `evolution2037`: canal WhatsApp, 512MB — **`iad`**;
+- `app2037`: bundle de APIs/UI/site — **`iad`**;
+- `n8n2037`: orquestração — **`iad`**;
+- `motor2037`: workers Playwright sob demanda — **`gru`** (IP brasileiro para o RPA bancário;
+  não mover — `deploy/fly/3vm/README.md`, "Por que a stack está dividida").
 
 Não recriar apps monolíticos legados e não destruir volumes/snapshots sem pedido explícito.
 
 ## Pendências reais
 
+- **Re-parear os números de WhatsApp por QR** (Ajustes na Revy Loja): o volume da Evolution
+  nasceu vazio na migração para `iad` em 2026-07-31.
+- **`n8n/workflow-ai-nao-salvos.json` está defasado**: o workflow live tem 31 nós, o arquivo
+  do repo tem 25. Faltam no repo transcrição de áudio (`Transcrever audio1`, `E audio1`,
+  `Aplicar transcricao1`), `consultar_por_placa1`, `registrar_consentimento1` e
+  `registrar_lead1`. O `CLAUDE.md` chama o arquivo de canônico — não é. Sincronizar exige
+  re-placeholderizar os segredos antes de commitar.
 - Rollout das flags Control/Loja em uma loja piloto com projeção e gates observados.
 - E2E Multi-WhatsApp com dois canais Evolution e resposta pelo canal correto.
 - Configuração humana do Google Ads/GCP e smoke OAuth/métricas/conversões.

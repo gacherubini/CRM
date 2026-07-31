@@ -1,6 +1,6 @@
 # n8n always-on (imagem oficial — sem npm install no build)
 app = "n8n2037"
-primary_region = "gru"
+primary_region = "iad"
 
 [build]
   image = "n8nio/n8n:2.26.8"

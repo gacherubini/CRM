@@ -16,6 +16,10 @@
 # CMD da imagem = /srv/scripts/on-demand-worker-entrypoint.sh
 
 app = "motor2037"
+# NAO mover para iad: os drivers Playwright logam em portal de lojista brasileiro
+# (Santander/Bradesco/Pan/Fontecred) e ja falham com captcha_login por reputacao de
+# IP de datacenter — ver docs/plans/2026-07-16-fly-rpa-captcha-opcoes.md. IP dos EUA
+# piora o scoring e arrisca geo-block. O resto da stack esta em iad desde 2026-07-31.
 primary_region = "gru"
 
 kill_timeout = 30
