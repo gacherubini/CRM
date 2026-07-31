@@ -13,6 +13,7 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 
 from app.auth import csrf_token, csrf_valido, gestor_atual, sessao_gestor
+from app.clients.portal import PortalClient, PortalIndisponivel
 from app.config import settings
 from app.control.access import AccessControl
 from app.control.accounts import ControlAccounts
@@ -176,6 +177,7 @@ _DETAIL_TABS = ("visao", "pessoas", "modulos", "integracoes", "estado", "auditor
 
 # Cada alerta de sucesso (?ok=…) reabre a aba onde a ação aconteceu.
 _OK_TO_TAB = {
+    "dono": "pessoas",
     "cargo": "pessoas",
     "cargo_revogado": "pessoas",
     "gestor": "pessoas",
@@ -184,6 +186,14 @@ _OK_TO_TAB = {
     "contrato": "modulos",
     "estado": "estado",
 }
+
+
+def _portal_client() -> PortalClient:
+    return PortalClient(
+        settings.portal_url,
+        settings.portal_service_token,
+        settings.request_timeout,
+    )
 
 
 # Rótulos amigáveis para o que falta a loja cumprir antes de ativar.
@@ -670,20 +680,19 @@ async def assign_store_role_page(
 
     email = (form.get("email") or "").strip()
     name = (form.get("nome") or "").strip()
-    role_value = (form.get("cargo") or "").strip()
+    role_value = (form.get("cargo") or StoreRole.OWNER.value).strip()
     form_values = {"email": email, "nome": name, "cargo": role_value}
-    try:
-        role = StoreRole(role_value)
-    except ValueError:
+    if role_value != StoreRole.OWNER.value:
         return _render_store_detail(
             request,
             db,
             manager,
             loja_id,
-            error="Selecione um cargo válido para a Loja.",
+            error="O Control permite convidar somente o dono da Loja.",
             person_form_values=form_values,
             status_code=422,
         )
+    role = StoreRole.OWNER
     if len(name) > 160:
         return _render_store_detail(
             request,
@@ -697,7 +706,7 @@ async def assign_store_role_page(
 
     actor = actor_from_user(manager)
     try:
-        StoreControl(SessionLocal).get(actor, StoreRef(id=loja_id))
+        store = StoreControl(SessionLocal).get(actor, StoreRef(id=loja_id))
     except StoreNotFound:
         return HTMLResponse("Loja não encontrada.", status_code=404)
     people = PeopleDirectory(SessionLocal)
@@ -762,17 +771,26 @@ async def assign_store_role_page(
             status_code=404,
         )
     except StoreRoleConflict:
+        # Reenviar o convite para um dono já vinculado é uma operação válida.
+        pass
+
+    try:
+        _portal_client().convidar_dono(person.email, person.name, store.slug)
+    except PortalIndisponivel:
         return _render_store_detail(
             request,
             db,
             manager,
             loja_id,
-            error="Essa pessoa já possui esse cargo ativo na Loja.",
+            error=(
+                "Dono vinculado, mas não foi possível enviar o convite. "
+                "Tente novamente."
+            ),
             person_form_values=form_values,
-            status_code=409,
+            status_code=502,
         )
     return RedirectResponse(
-        _detail_path(loja_id, "cargo"),
+        _detail_path(loja_id, "dono"),
         status_code=303,
     )
 
@@ -1898,7 +1916,7 @@ def _render_store_detail(
             ),
             "audit_events": audit.items,
             "store_statuses": tuple(StoreStatus),
-            "store_roles": tuple(StoreRole),
+            "store_roles": (StoreRole.OWNER,),
             "store_people": store_people,
             "traffic_links": traffic_links,
             "is_admin": manager.papel == "admin",
@@ -1907,7 +1925,7 @@ def _render_store_detail(
             "active_tab": active_tab or _detail_active_tab(request),
             "erro": error,
             "person_form_values": person_form_values
-            or {"email": "", "nome": "", "cargo": StoreRole.SELLER.value},
+            or {"email": "", "nome": "", "cargo": StoreRole.OWNER.value},
         },
         status_code=status_code,
     )

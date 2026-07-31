@@ -122,7 +122,7 @@ def test_rascunho_sem_dono_e_modulos_nao_esta_pronta():
     assert by_code["active_owner"].ok is False
     assert by_code["active_owner"].severity == "required"
     assert by_code["activatable_owner"].ok is False
-    assert by_code["activatable_owner"].severity == "required"
+    assert by_code["activatable_owner"].severity == "alert"
     assert by_code["module_selected"].ok is False
     assert by_code["module_selected"].severity == "required"
     assert by_code["contract_present"].ok is False

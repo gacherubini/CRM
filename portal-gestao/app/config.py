@@ -114,6 +114,39 @@ class Settings:
         or os.getenv("PORTAL_PROVISIONING_TOKEN")
         or ""
     ).strip()
+    # Convites do Portal. Durante o rollout, reutiliza o SMTP já configurado
+    # no bundle do Revy Control quando os equivalentes PORTAL_* não existirem.
+    email_backend: str = os.getenv(
+        "PORTAL_EMAIL_BACKEND",
+        os.getenv("REVY_TRAFEGO_EMAIL_BACKEND", "console"),
+    ).strip().lower()
+    email_from: str = os.getenv(
+        "PORTAL_EMAIL_FROM",
+        os.getenv("REVY_TRAFEGO_EMAIL_FROM", "no-reply@revy.local"),
+    ).strip()
+    email_from_name: str = os.getenv(
+        "PORTAL_EMAIL_FROM_NAME",
+        os.getenv("REVY_TRAFEGO_EMAIL_FROM_NAME", "Revy"),
+    ).strip()
+    smtp_host: str = os.getenv(
+        "PORTAL_SMTP_HOST", os.getenv("REVY_TRAFEGO_SMTP_HOST", "")
+    ).strip()
+    smtp_port: int = int(
+        os.getenv("PORTAL_SMTP_PORT", os.getenv("REVY_TRAFEGO_SMTP_PORT", "587"))
+    )
+    smtp_username: str = os.getenv(
+        "PORTAL_SMTP_USERNAME", os.getenv("REVY_TRAFEGO_SMTP_USERNAME", "")
+    ).strip()
+    smtp_password: str = os.getenv(
+        "PORTAL_SMTP_PASSWORD", os.getenv("REVY_TRAFEGO_SMTP_PASSWORD", "")
+    )
+    smtp_use_tls: bool = os.getenv(
+        "PORTAL_SMTP_USE_TLS", os.getenv("REVY_TRAFEGO_SMTP_USE_TLS", "1")
+    ).strip().lower() in {"1", "true", "yes", "on"}
+    public_base_url: str = os.getenv(
+        "PORTAL_PUBLIC_BASE_URL",
+        os.getenv("REVY_TRAFEGO_PUBLIC_BASE_URL", ""),
+    ).strip().rstrip("/")
     # Revy Loja — snapshot no boot (preferir helpers revy_loja_*_enabled() em runtime).
     revy_loja_shell_enabled: bool = _env_bool("REVY_LOJA_SHELL_ENABLED", "0")
     revy_loja_entitlements_enabled: bool = _env_bool(
@@ -127,6 +160,10 @@ class Settings:
         "REVY_LOJA_REDIRECT_LEGACY", "0"
     )
     seller_ai_enabled: bool = _env_bool("SELLER_AI_ENABLED", "0")
+
+    def absolute_url(self, path: str) -> str:
+        normalized = path if path.startswith("/") else f"/{path}"
+        return f"{self.public_base_url}{normalized}" if self.public_base_url else normalized
 
 
 settings = Settings()

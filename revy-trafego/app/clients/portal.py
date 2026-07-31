@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import time
 from collections.abc import Callable
 from typing import Any
@@ -41,6 +42,55 @@ class PortalClient:
     @property
     def configurado(self) -> bool:
         return bool(self.base_url and self.service_token)
+
+    def convidar_dono(self, email: str, nome: str, loja_slug: str) -> dict:
+        """Solicita ao Portal um convite idempotente para o dono da Loja."""
+        if not self.configurado:
+            raise PortalIndisponivel(
+                "Integra\u00e7\u00e3o do portal ainda n\u00e3o configurada"
+            )
+
+        email_normalizado = (email or "").strip().lower()
+        nome_normalizado = " ".join((nome or "").split())
+        loja_normalizada = (loja_slug or "").strip().lower()
+        material_chave = "|".join((loja_normalizada, email_normalizado))
+        idempotency_key = "revy-owner-invite-" + hashlib.sha256(
+            material_chave.encode("utf-8")
+        ).hexdigest()
+        headers = {
+            "X-Service-Token": self.service_token,
+            "Idempotency-Key": idempotency_key,
+        }
+        payload = {
+            "email": email_normalizado,
+            "nome": nome_normalizado,
+            "loja_slug": loja_normalizada,
+        }
+        try:
+            with httpx.Client(
+                base_url=self.base_url,
+                headers={"X-Service-Token": self.service_token},
+                timeout=self.timeout,
+            ) as client:
+                resposta = requisicao_com_retry(
+                    client,
+                    "POST",
+                    "/internal/v1/lojistas/convite",
+                    retries=0,
+                    backoff=self.retry_backoff,
+                    sleeper=self.sleeper,
+                    headers=headers,
+                    json=payload,
+                )
+                resposta.raise_for_status()
+                corpo = resposta.json()
+                if not isinstance(corpo, dict):
+                    raise ValueError("resposta invalida")
+                return corpo
+        except (httpx.HTTPError, ValueError) as exc:
+            raise PortalIndisponivel(
+                "N\u00e3o foi poss\u00edvel solicitar o convite no portal agora"
+            ) from exc
 
     def aplicar_estado_operacional(self, payload: dict) -> dict:
         if not self.configurado:

@@ -44,7 +44,6 @@ _CHECK_ORDER = (
 _REQUIRED_CODES = frozenset(
     {
         "active_owner",
-        "activatable_owner",
         "module_selected",
     }
 )

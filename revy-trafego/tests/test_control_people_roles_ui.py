@@ -1,6 +1,8 @@
 from dataclasses import replace
 import re
 
+import pytest
+
 from app.auth import hash_senha
 from app.config import settings
 from app.control.access import AccessControl
@@ -18,12 +20,26 @@ from app.web import control_ui as control_ui_mod
 from tests.conftest import csrf_da_resposta
 
 
-def _enable_control_ui(monkeypatch) -> None:
+class _FakePortal:
+    def __init__(self):
+        self.invites: list[dict[str, str]] = []
+
+    def convidar_dono(self, email: str, nome: str, loja_slug: str) -> dict:
+        self.invites.append(
+            {"email": email, "nome": nome, "loja_slug": loja_slug}
+        )
+        return {"status": "sent"}
+
+
+def _enable_control_ui(monkeypatch) -> _FakePortal:
     monkeypatch.setattr(
         control_ui_mod,
         "settings",
         replace(settings, revy_control_enabled=True),
     )
+    portal = _FakePortal()
+    monkeypatch.setattr(control_ui_mod, "_portal_client", lambda: portal)
+    return portal
 
 
 def _login(client, email: str, password: str) -> None:
@@ -46,7 +62,7 @@ def _admin_actor() -> Actor:
         )
 
 
-def test_admin_cadastra_pessoa_e_atribui_cargos_pelo_detalhe_da_loja(
+def test_admin_cadastra_pessoa_e_atribui_dono_pelo_detalhe_da_loja(
     client,
     monkeypatch,
 ):
@@ -54,13 +70,23 @@ def test_admin_cadastra_pessoa_e_atribui_cargos_pelo_detalhe_da_loja(
         _admin_actor(),
         CreateStore(name="Loja Pessoas UI", slug="loja-pessoas-ui"),
     )
-    _enable_control_ui(monkeypatch)
+    portal = _enable_control_ui(monkeypatch)
     _login(client, "trafego@revy.local", "secret-teste")
     detail_url = f"/app/control/lojas/{store.id}"
     detail = client.get(detail_url)
 
     assert detail.status_code == 200
     assert 'id="form-atribuir-cargo"' in detail.text
+    owner_form = re.search(
+        r'<form[^>]+id="form-atribuir-cargo".*?</form>',
+        detail.text,
+        flags=re.DOTALL,
+    )
+    assert owner_form is not None
+    assert re.search(r'name="cargo"\s+value="dono"', owner_form.group())
+    assert "gerente" not in owner_form.group()
+    assert "vendedor" not in owner_form.group()
+    assert "Convidar dono" in owner_form.group()
 
     owner = client.post(
         f"{detail_url}/cargos",
@@ -74,30 +100,55 @@ def test_admin_cadastra_pessoa_e_atribui_cargos_pelo_detalhe_da_loja(
     )
 
     assert owner.status_code == 303
-    assert "ok=cargo" in owner.headers["location"]
+    assert "ok=dono" in owner.headers["location"]
     owner_page = client.get(owner.headers["location"])
-    assert "Cargo atribuído à Pessoa Revy." in owner_page.text
+    assert "Convite enviado ao dono da Loja." in owner_page.text
     assert "Ana Pessoa" in owner_page.text
     assert "ana.pessoa@example.com" in owner_page.text
     assert "dono" in owner_page.text
     assert 'name="senha"' not in owner_page.text
     assert ">Origem<" not in owner_page.text
+    assert portal.invites == [
+        {
+            "email": "ana.pessoa@example.com",
+            "nome": "Ana Pessoa",
+            "loja_slug": "loja-pessoas-ui",
+        }
+    ]
 
-    manager = client.post(
+
+@pytest.mark.parametrize("forged_role", ["gerente", "vendedor"])
+def test_formulario_de_dono_rejeita_cargo_forjado(
+    client,
+    monkeypatch,
+    forged_role,
+):
+    store = StoreControl(SessionLocal).create(
+        _admin_actor(),
+        CreateStore(
+            name=f"Loja Cargo Forjado {forged_role}",
+            slug=f"loja-cargo-forjado-{forged_role}",
+        ),
+    )
+    _enable_control_ui(monkeypatch)
+    _login(client, "trafego@revy.local", "secret-teste")
+    detail_url = f"/app/control/lojas/{store.id}"
+    detail = client.get(detail_url)
+    email = f"cargo.forjado.{forged_role}@example.com"
+
+    response = client.post(
         f"{detail_url}/cargos",
         data={
-            "csrf": csrf_da_resposta(owner_page),
-            "email": "ANA.PESSOA@EXAMPLE.COM",
-            "nome": "",
-            "cargo": "gerente",
+            "csrf": csrf_da_resposta(detail),
+            "email": email,
+            "nome": "Cargo Forjado",
+            "cargo": forged_role,
         },
-        follow_redirects=False,
     )
 
-    assert manager.status_code == 303
-    final_page = client.get(manager.headers["location"])
-    assert "dono" in final_page.text
-    assert "gerente" in final_page.text
+    assert response.status_code == 422
+    with SessionLocal() as db:
+        assert db.query(Pessoa).filter(Pessoa.email == email).first() is None
 
 
 def test_admin_revoga_cargo_pela_linha_e_segunda_revogacao_falha_explicita(
@@ -244,7 +295,7 @@ def test_formularios_de_cargo_validam_csrf_email_pessoa_e_duplicidade(
         _admin_actor(),
         CreateStore(name="Loja Validações", slug="loja-validacoes-cargo"),
     )
-    _enable_control_ui(monkeypatch)
+    portal = _enable_control_ui(monkeypatch)
     _login(client, "trafego@revy.local", "secret-teste")
     detail_url = f"/app/control/lojas/{store.id}"
     detail = client.get(detail_url)
@@ -282,7 +333,7 @@ def test_formularios_de_cargo_validam_csrf_email_pessoa_e_duplicidade(
             "csrf": csrf,
             "email": "duplicada@example.com",
             "nome": "Pessoa Duplicada",
-            "cargo": "gerente",
+            "cargo": "dono",
         },
         follow_redirects=False,
     )
@@ -294,8 +345,9 @@ def test_formularios_de_cargo_validam_csrf_email_pessoa_e_duplicidade(
             "csrf": csrf_da_resposta(assigned_page),
             "email": "DUPLICADA@EXAMPLE.COM",
             "nome": "",
-            "cargo": "gerente",
+            "cargo": "dono",
         },
+        follow_redirects=False,
     )
     missing_role = client.post(
         f"{detail_url}/cargos/cargo-ausente/revogar",
@@ -308,10 +360,58 @@ def test_formularios_de_cargo_validam_csrf_email_pessoa_e_duplicidade(
     assert "Informe um e-mail válido para a Pessoa Revy." in invalid_email.text
     assert absent_person.status_code == 422
     assert "Informe o nome para cadastrar uma nova Pessoa Revy." in absent_person.text
-    assert duplicate.status_code == 409
-    assert "Essa pessoa já possui esse cargo ativo na Loja." in duplicate.text
+    assert duplicate.status_code == 303
+    assert "ok=dono" in duplicate.headers["location"]
+    assert len(portal.invites) == 2
     assert missing_role.status_code == 404
     assert "Cargo ativo não encontrado na Loja." in missing_role.text
+
+
+def test_falha_do_portal_mantem_dono_vinculado_e_permite_reenvio(
+    client,
+    monkeypatch,
+):
+    store = StoreControl(SessionLocal).create(
+        _admin_actor(),
+        CreateStore(
+            name="Loja Portal Indisponível",
+            slug="loja-portal-indisponivel",
+        ),
+    )
+    _enable_control_ui(monkeypatch)
+
+    class _PortalIndisponivel:
+        def convidar_dono(self, email: str, nome: str, loja_slug: str) -> dict:
+            raise control_ui_mod.PortalIndisponivel("falha simulada")
+
+    monkeypatch.setattr(
+        control_ui_mod,
+        "_portal_client",
+        lambda: _PortalIndisponivel(),
+    )
+    _login(client, "trafego@revy.local", "secret-teste")
+    detail_url = f"/app/control/lojas/{store.id}"
+    detail = client.get(detail_url)
+
+    response = client.post(
+        f"{detail_url}/cargos",
+        data={
+            "csrf": csrf_da_resposta(detail),
+            "email": "dono.reenvio@example.com",
+            "nome": "Dono Reenvio",
+            "cargo": "dono",
+        },
+    )
+
+    assert response.status_code == 502
+    assert "Dono vinculado, mas não foi possível enviar o convite." in response.text
+    with SessionLocal() as db:
+        person = (
+            db.query(Pessoa)
+            .filter(Pessoa.email == "dono.reenvio@example.com")
+            .one()
+        )
+        assert person is not None
 
 
 def test_gestor_vinculado_nao_ve_pii_formularios_nem_pode_postar_cargos(

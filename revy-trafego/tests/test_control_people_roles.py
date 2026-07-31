@@ -243,7 +243,7 @@ def test_dono_revogado_nao_satisfaz_prontidao_da_loja():
     assert stores.get(admin, StoreRef(id=store.id)).status is StoreStatus.CONFIGURING
 
 
-def test_dono_ativo_sem_acesso_ativavel_nao_permite_loja_ficar_pronta():
+def test_dono_ativo_sem_acesso_ativavel_permite_loja_ficar_pronta():
     admin = _admin_actor()
     stores, _, store, _, _ = _store_with_owners(
         admin,
@@ -251,17 +251,21 @@ def test_dono_ativo_sem_acesso_ativavel_nao_permite_loja_ficar_pronta():
         status=StoreStatus.CONFIGURING,
     )
 
-    with pytest.raises(StoreReadinessBlocked) as error:
-        stores.transition(
-            admin,
-            TransitionStore(
-                store=StoreRef(id=store.id),
-                target=StoreStatus.READY,
-            ),
-        )
+    PortfolioControl(SessionLocal).configure(
+        admin,
+        StoreRef(id=store.id),
+        {"vendas"},
+    )
 
-    assert error.value.requirement == "activatable_owner"
-    assert stores.get(admin, StoreRef(id=store.id)).status is StoreStatus.CONFIGURING
+    ready = stores.transition(
+        admin,
+        TransitionStore(
+            store=StoreRef(id=store.id),
+            target=StoreStatus.READY,
+        ),
+    )
+
+    assert ready.status is StoreStatus.READY
 
 
 def test_dono_com_acesso_ativavel_permite_loja_ficar_pronta():

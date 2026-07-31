@@ -33,6 +33,8 @@
 <div class="alert success" role="status">Gestor vinculado à Loja.</div>
 {% elif ok == 'revogado' %}
 <div class="alert success" role="status">Vínculo do gestor revogado.</div>
+{% elif ok == 'dono' %}
+<div class="alert success" role="status">Convite enviado ao dono da Loja.</div>
 {% elif ok == 'cargo' %}
 <div class="alert success" role="status">Cargo atribuído à Pessoa Revy.</div>
 {% elif ok == 'cargo_revogado' %}
@@ -115,7 +117,7 @@
 <section class="control-tabpanel" role="tabpanel" id="panel-pessoas" data-tab="pessoas" aria-labelledby="tab-pessoas" tabindex="0">
   <section class="panel form-section" id="pessoas-cargos">
     <h2>Pessoas e cargos</h2>
-    <p class="muted">Cadastre a Pessoa Revy uma vez e atribua somente o cargo estrutural desta Loja.</p>
+    <p class="muted">Consulte os cargos existentes e convide o dono desta Loja.</p>
     {% if store_people %}
     <div class="table-wrap">
       <table id="tabela-cargos-loja">
@@ -150,21 +152,17 @@
 
     <form method="post" action="{{ public_path('/app/control/lojas/' ~ store.id ~ '/cargos') }}" class="form-layout" id="form-atribuir-cargo">
       <input type="hidden" name="csrf" value="{{ csrf }}">
-      <label>E-mail da Pessoa Revy
+      <input type="hidden" name="cargo" value="dono">
+      <h3>Convidar dono</h3>
+      <label>E-mail do dono
         <input type="email" name="email" maxlength="320" value="{{ person_form_values.email }}" required>
       </label>
-      <label>Nome
+      <label>Nome do dono
         <input type="text" name="nome" maxlength="160" value="{{ person_form_values.nome }}">
-        <small>Obrigatório somente para uma pessoa ainda não cadastrada.</small>
+        <small>Obrigatório somente se o dono ainda não estiver cadastrado.</small>
       </label>
-      <label>Cargo na Loja
-        <select name="cargo" required>
-          {% for role in store_roles %}
-          <option value="{{ role.value }}" {% if person_form_values.cargo == role.value %}selected{% endif %}>{{ role.value }}</option>
-          {% endfor %}
-        </select>
-      </label>
-      <button class="button primary" type="submit">Atribuir cargo</button>
+      <p class="muted">Cargo na Loja: <strong>dono</strong></p>
+      <button class="button primary" type="submit">Convidar dono</button>
     </form>
   </section>
 
