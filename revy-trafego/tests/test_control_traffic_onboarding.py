@@ -161,6 +161,35 @@ def test_nao_admin_recebe_access_denied():
         pass
 
 
+def test_reenvio_de_convite_pendente_reemite_token_sem_duplicar_vinculo():
+    with SessionLocal() as db:
+        actor = _admin(db)
+    store_id = _make_store(actor)
+    onboarding = TrafficManagerOnboarding(SessionLocal)
+    command = InviteTrafficManager(
+        store=StoreRef(id=store_id),
+        email="reenvio@example.com",
+        name="Gestor Reenvio",
+        role=TrafficRole.COLLABORATOR,
+    )
+    first = onboarding.invite_or_bind(actor, command)
+    second = onboarding.invite_or_bind(actor, command)
+    assert second.token is not None
+    assert second.token != first.token
+    with SessionLocal() as db:
+        assert db.query(VinculoTrafego).filter(
+            VinculoTrafego.loja_id == store_id,
+            VinculoTrafego.gestor_id == first.manager_id,
+            VinculoTrafego.encerrado_em.is_(None),
+        ).count() == 1
+        invitations = db.query(ConviteAcessoControl).filter(
+            ConviteAcessoControl.acesso_id == first.manager_id
+        ).order_by(ConviteAcessoControl.criado_em).all()
+        assert len(invitations) == 2
+        assert invitations[0].revogado_em is not None
+        assert invitations[1].token_hash == _token_hash(second.token)
+
+
 def test_list_links_traz_email_e_nome_do_gestor():
     with SessionLocal() as db:
         actor = _admin(db)

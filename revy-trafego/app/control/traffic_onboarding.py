@@ -153,7 +153,11 @@ class TrafficManagerOnboarding:
             .first()
         )
         if existing is not None:
-            raise TrafficLinkConflict("o gestor já possui vínculo ativo com a Loja")
+            if existing.tipo == role.value:
+                return
+            raise TrafficLinkConflict(
+                "o gestor já possui vínculo ativo com outro papel na Loja"
+            )
         if role is TrafficRole.RESPONSIBLE:
             responsible = (
                 db.query(VinculoTrafego)
