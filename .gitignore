@@ -24,6 +24,7 @@ data/storage_state/
 
 # Ambiente
 .env
+.env.local
 deploy/fly/.env.production.local
 deploy/fly/3vm/.secrets.local
 deploy/fly/3vm/.evolution_key.local

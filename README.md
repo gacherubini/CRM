@@ -220,6 +220,16 @@ bot-whatsapp-financiamento/
 3. Chave Gemini no n8n (se testar conversa IA).
 4. Credenciais de portal lojista no Motor (cifradas; via Portal 9A ou env de dev).
 
+Para subir **todos os produtos localmente com um comando**:
+
+```bash
+./local.sh up
+```
+
+O script cria segredos apenas nesta máquina, sobe a stack Docker completa e prepara
+loja/usuário/credenciais internas. Operação e explicação de cada componente:
+[`deploy/local/README.md`](deploy/local/README.md).
+
 **Lab Fly (3-VM — path atual):**
 5. `flyctl` + org com apps `suite-pg`, `evolution2037`, `app2037` (+ `motor2037` on-demand).
 6. Subir: `bash deploy/fly/up-all.sh --3vm` · desligar: `bash deploy/fly/down-all.sh --3vm --yes`.

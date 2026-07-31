@@ -33,6 +33,20 @@ forma perceptível, a saída é dar ao motor um Postgres próprio em `gru`.
 **Pendência após a migração:** o volume da Evolution nasceu vazio — os números de WhatsApp
 precisam ser pareados de novo por QR, em Ajustes na Revy Loja.
 
+### Rotas públicas do `app2037`
+
+| Path | Destino |
+|---|---|
+| `/` · `/app` | Portal / Revy Loja (`:9000`) |
+| `/trafego/` | Revy Control (`:9010`) |
+| `/catalogo/` | Catálogo público (`:8003`) — `/loja/` é legado e redireciona 301 |
+| `/public/` | **Mídia do estoque** (`:8002`) — não confundir com o catálogo |
+| `/site/` | Site marketing (`:8081`) |
+| `/webhook/` `/v1/` `/health/` | Chatbot API (`:8001`) |
+
+O catálogo saiu de `/loja/` para `/catalogo/` em 2026-07-31: `/loja/` colidia com o
+vocabulário do shell Revy Loja, que vive em `/app/loja/…` no Portal.
+
 **Feito neste cutover:** monólitos legados removidos; bundle `app2037` + Evolution isolada;
 workflow n8n importado/publicado; webhook Evolution → `n8n2037` `/webhook/whatsapp-ai`;
 roteamento de mensagens no chatbot (3 casos); portal dono; `MOTOR_ENCRYPTION_KEY` no Motor

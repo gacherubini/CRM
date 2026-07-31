@@ -16,16 +16,23 @@ Leia primeiro:
 - Seller AI permanece adiado e desligado.
 - O Portal foi modularizado: simulações, metas, equipe e tráfego/campanhas ficam em
   `portal-gestao/app/web/`; `main.py` mantém bootstrap e rotas legadas restantes.
-- O workflow canônico continua `n8n/workflow-ai-nao-salvos.json`.
 - O workflow `n8n/workflow-teste-numero-autorizado.json` é usado para testes e não deve
   ser removido.
+- `n8n/workflow-ai-nao-salvos.json` **não é mais fiel ao que roda**: o live tem 31 nós e o
+  arquivo tem 25 (ver Pendências). Tratar como referência, não como fonte de verdade.
+- Stack local completa com um comando: `./local.sh up` (compose + bootstrap de loja,
+  usuário e credenciais). Guia em `deploy/local/README.md`; segredos ficam em `.env.local`,
+  que é ignorado pelo Git.
 
 ## Validação conhecida
 
-- Refatoração do Portal: **439 testes passando**.
+- Suítes em 2026-07-31: portal-gestao **471**, revy-trafego **361** (+1 falha pré-existente),
+  chatbot-api **246**, catalogo-publico **53**.
+- A falha é `revy-trafego/tests/test_control_provisioning_outbox.py::test_process_pending_falha_marca_failed_e_incrementa_attempts`:
+  teste estagnado desde `573348e`, que incluiu `"motor"` em `DEFAULT_PROVISIONING_TARGETS`.
+  O hook passou a enfileirar uma linha `motor` e o `.one()` do teste estoura
+  `MultipleResultsFound`. Não é regressão de produto; o fix é filtrar pelo `id` enfileirado.
 - `git diff --check` e compilação dos módulos extraídos passaram no corte da refatoração.
-- Contagens antigas de outros produtos foram removidas deste handoff; rode a suíte atual
-  do produto modificado antes de publicar.
 
 ## Estado operacional
 
@@ -52,6 +59,16 @@ Não recriar apps monolíticos legados e não destruir volumes/snapshots sem ped
 
 - **Re-parear os números de WhatsApp por QR** (Ajustes na Revy Loja): o volume da Evolution
   nasceu vazio na migração para `iad` em 2026-07-31.
+- **Portal, Tráfego e Catálogo começaram com banco vazio** na mesma migração (decisão do
+  owner: só o n8n precisava sobreviver). Foi recriada uma conta `dono` no Portal para a loja
+  `moto-center`; o gestor do Control é recriado sozinho por `bootstrap_gestor_se_vazio` a
+  partir dos secrets `REVY_TRAFEGO_BOOTSTRAP_*`. Fotos do estoque se perderam.
+- **Escala horizontal está bloqueada por dois motivos independentes** — plano em
+  `docs/superpowers/plans/2026-07-31-escala-horizontal-app2037.md`: (1) Portal, Tráfego e
+  Catálogo rodam em SQLite dentro do volume `app_data`, que é single-attach, então
+  `fly scale count 2` produziria bancos divergentes em silêncio; (2) os workers de outbox e
+  jobs sobem no `lifespan` do processo web, então N machines rodariam N cópias de cada loop.
+  Sessão é cookie assinado e **não** é bloqueador.
 - **`n8n/workflow-ai-nao-salvos.json` está defasado**: o workflow live tem 31 nós, o arquivo
   do repo tem 25. Faltam no repo transcrição de áudio (`Transcrever audio1`, `E audio1`,
   `Aplicar transcricao1`), `consultar_por_placa1`, `registrar_consentimento1` e

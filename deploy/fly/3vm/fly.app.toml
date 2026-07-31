@@ -16,8 +16,8 @@ primary_region = "iad"
   PORTAL_DATABASE_URL = "sqlite:////data/portal/portal.db"
   CATALOGO_DATABASE_PATH = "/data/catalogo/catalogo.db"
   CATALOGO_SECURE_COOKIE = "1"
-  CATALOGO_PUBLIC_BASE_URL = "https://app2037.fly.dev/loja"
-  CATALOGO_URL_PREFIX = "/loja"
+  CATALOGO_PUBLIC_BASE_URL = "https://app2037.fly.dev/catalogo"
+  CATALOGO_URL_PREFIX = "/catalogo"
   CATALOGO_DEFAULT_STORE_SLUG = "moto-center"
   CATALOGO_EVENTS_URL = "http://127.0.0.1:8001/v1/integracoes/catalogo/interesses"
   # Slug único da loja: moto-center (o mesmo em Estoque, Chatbot e Catálogo).
@@ -97,7 +97,7 @@ primary_region = "iad"
 
 [[vm]]
   size = "shared-cpu-1x"
-  memory = "1536"
+  memory = "1024"
 
 [[mounts]]
   source = "app_data"

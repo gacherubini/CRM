@@ -1,0 +1,425 @@
+name: revy-local
+
+# Stack completa de desenvolvimento local.
+# Todos os serviços compartilham esta rede Docker e se chamam pelo nome abaixo.
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: revy
+      POSTGRES_PASSWORD: ${LOCAL_POSTGRES_PASSWORD:?execute ./local.sh up}
+      POSTGRES_DB: postgres
+    volumes:
+      - local_postgres_data:/var/lib/postgresql/data
+      - ./deploy/local/init-db.sql:/docker-entrypoint-initdb.d/01-init-db.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U revy -d postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - local_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+  evolution:
+    image: evoapicloud/evolution-api:latest
+    environment:
+      AUTHENTICATION_API_KEY: ${EVOLUTION_API_KEY:?execute ./local.sh up}
+      CONFIG_SESSION_PHONE_VERSION: ${CONFIG_SESSION_PHONE_VERSION:-2.3000.1033773198}
+      DATABASE_ENABLED: "true"
+      DATABASE_PROVIDER: postgresql
+      DATABASE_CONNECTION_URI: postgresql://revy:${LOCAL_POSTGRES_PASSWORD}@postgres:5432/evolution
+      DATABASE_CONNECTION_CLIENT_NAME: evolution-local
+      CACHE_REDIS_ENABLED: "true"
+      CACHE_REDIS_URI: redis://redis:6379
+      CACHE_REDIS_PREFIX_KEY: evolution-local
+      CACHE_LOCAL_ENABLED: "false"
+    ports:
+      - "8080:8080"
+    volumes:
+      - local_evolution_instances:/evolution/instances
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  estoque-api:
+    build:
+      context: ./estoque-api
+    environment:
+      DATABASE_URL: postgresql+psycopg://revy:${LOCAL_POSTGRES_PASSWORD}@postgres:5432/estoque
+      ESTOQUE_SKIP_INIT: "1"
+      ESTOQUE_SESSION_SECRET: ${ESTOQUE_SESSION_SECRET}
+      ESTOQUE_SESSION_SECURE_COOKIE: "0"
+      ESTOQUE_OUTBOX_KEY: ${ESTOQUE_OUTBOX_KEY}
+      ESTOQUE_MEDIA_PUBLIC_BASE_URL: http://localhost:8100/public/v1/media
+      ESTOQUE_MEDIA_STORAGE_DIR: /data/media
+      ESTOQUE_MEDIA_ALLOWED_HOSTS: localhost,127.0.0.1,estoque-api
+      LOCAL_STORE_NAME: ${LOCAL_STORE_NAME}
+      LOCAL_STORE_SLUG: ${LOCAL_STORE_SLUG}
+      LOCAL_STORE_WHATSAPP: ${LOCAL_STORE_WHATSAPP}
+      LOCAL_ADMIN_EMAIL: ${LOCAL_ADMIN_EMAIL}
+      LOCAL_ADMIN_NAME: ${LOCAL_ADMIN_NAME}
+      LOCAL_ADMIN_PASSWORD: ${LOCAL_ADMIN_PASSWORD}
+      ESTOQUE_API_TOKEN: ${ESTOQUE_API_TOKEN}
+    ports:
+      - "8100:8000"
+    volumes:
+      - local_estoque_media:/data/media
+      - ./deploy/local/bootstrap.py:/opt/revy-local/bootstrap.py:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/ready', timeout=3)",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 20s
+    restart: unless-stopped
+
+  estoque-outbox:
+    build:
+      context: ./estoque-api
+    command: ["python", "-m", "app.worker"]
+    environment:
+      DATABASE_URL: postgresql+psycopg://revy:${LOCAL_POSTGRES_PASSWORD}@postgres:5432/estoque
+      ESTOQUE_SKIP_INIT: "1"
+      ESTOQUE_OUTBOX_KEY: ${ESTOQUE_OUTBOX_KEY}
+      ESTOQUE_OUTBOX_INTERVALO: "5"
+      ESTOQUE_MEDIA_PUBLIC_BASE_URL: http://localhost:8100/public/v1/media
+      ESTOQUE_MEDIA_STORAGE_DIR: /data/media
+      ESTOQUE_MEDIA_ALLOWED_HOSTS: localhost,127.0.0.1,estoque-api
+    volumes:
+      - local_estoque_media:/data/media
+    depends_on:
+      postgres:
+        condition: service_healthy
+      estoque-api:
+        condition: service_healthy
+    restart: unless-stopped
+
+  motor-api:
+    build:
+      context: ./motor-simulacao
+    environment:
+      DATABASE_URL: postgresql+psycopg://revy:${LOCAL_POSTGRES_PASSWORD}@postgres:5432/motor
+      MOTOR_SKIP_INIT: "1"
+      MOTOR_ENV: development
+      MOTOR_ENCRYPTION_KEY: ${MOTOR_ENCRYPTION_KEY}
+      MOTOR_METRICS_TOKEN: ${MOTOR_METRICS_TOKEN}
+      MOTOR_SCREENSHOT_DIR: /srv/data/screenshots
+      MOTOR_STORAGE_STATE_DIR: /srv/data/storage_state
+      LOCAL_STORE_NAME: ${LOCAL_STORE_NAME}
+      MOTOR_TOKEN: ${MOTOR_TOKEN}
+    ports:
+      - "8000:8000"
+    volumes:
+      - local_motor_data:/srv/data
+      - ./deploy/local/bootstrap.py:/opt/revy-local/bootstrap.py:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/ready', timeout=3)",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
+    restart: unless-stopped
+
+  motor-worker:
+    build:
+      context: ./motor-simulacao
+    command: ["/srv/scripts/worker-entrypoint.sh"]
+    environment:
+      DATABASE_URL: postgresql+psycopg://revy:${LOCAL_POSTGRES_PASSWORD}@postgres:5432/motor
+      MOTOR_SKIP_INIT: "1"
+      MOTOR_ENV: development
+      MOTOR_ENCRYPTION_KEY: ${MOTOR_ENCRYPTION_KEY}
+      MOTOR_WORKER_INTERVALO: "2"
+      MOTOR_JOB_LEASE_SECONDS: "180"
+      MOTOR_BROWSER_HEADLESS: "0"
+      MOTOR_SCREENSHOT_DIR: /srv/data/screenshots
+      MOTOR_STORAGE_STATE_DIR: /srv/data/storage_state
+      PLAYWRIGHT_CHROMIUM_USE_HEADLESS_SHELL: "0"
+      DISPLAY: :99
+    volumes:
+      - local_motor_data:/srv/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+      motor-api:
+        condition: service_healthy
+    shm_size: 1gb
+    restart: unless-stopped
+
+  chatbot-api:
+    build:
+      context: ./chatbot-api
+    environment:
+      DATABASE_URL: postgresql+psycopg://revy:${LOCAL_POSTGRES_PASSWORD}@postgres:5432/chatbot
+      CHATBOT_SKIP_INIT: "1"
+      CHATBOT_WEBHOOK_TOKEN: ${CHATBOT_WEBHOOK_TOKEN}
+      CHATBOT_AUDIO_EVOLUTION_URL: http://evolution:8080
+      CHATBOT_AUDIO_EVOLUTION_API_KEY: ${EVOLUTION_API_KEY}
+      CHATBOT_AUDIO_TRANSCRIPTION_PROVIDER: none
+      CHATBOT_IMAGE_EVOLUTION_URL: http://evolution:8080
+      CHATBOT_IMAGE_EVOLUTION_API_KEY: ${EVOLUTION_API_KEY}
+      CHATBOT_EVOLUTION_URL: http://evolution:8080
+      CHATBOT_EVOLUTION_API_KEY: ${EVOLUTION_API_KEY}
+      CHATBOT_WHATSAPP_PROVIDER: evolution
+      CHATBOT_EVOLUTION_WEBHOOK_URL: http://n8n:5678/webhook/whatsapp-ai
+      MULTI_WHATSAPP_ENABLED: "1"
+      ESTOQUE_PUBLIC_URL: http://estoque-api:8000
+      ESTOQUE_API_URL: http://estoque-api:8000
+      ESTOQUE_API_TOKEN: ${ESTOQUE_API_TOKEN}
+      ESTOQUE_MEDIA_ALLOWED_HOSTS: localhost,127.0.0.1,estoque-api
+      SIMULATION_PROVIDER: http
+      MOTOR_URL: http://motor-api:8000
+      MOTOR_TOKEN: ${MOTOR_TOKEN}
+      LOCAL_STORE_NAME: ${LOCAL_STORE_NAME}
+      LOCAL_STORE_SLUG: ${LOCAL_STORE_SLUG}
+      LOCAL_STORE_WHATSAPP: ${LOCAL_STORE_WHATSAPP}
+      LOCAL_EVOLUTION_INSTANCE: ${LOCAL_EVOLUTION_INSTANCE}
+      CHATBOT_API_TOKEN: ${CHATBOT_API_TOKEN}
+    ports:
+      - "8001:8000"
+    volumes:
+      - ./deploy/local/bootstrap.py:/opt/revy-local/bootstrap.py:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+      estoque-api:
+        condition: service_healthy
+      motor-api:
+        condition: service_healthy
+      evolution:
+        condition: service_started
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/ready', timeout=3)",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 20s
+    restart: unless-stopped
+
+  n8n:
+    image: docker.n8n.io/n8nio/n8n
+    environment:
+      N8N_ENCRYPTION_KEY: ${N8N_ENCRYPTION_KEY}
+      N8N_SECURE_COOKIE: "false"
+      N8N_HOST: localhost
+      N8N_PORT: "5678"
+      N8N_PROTOCOL: http
+      N8N_EDITOR_BASE_URL: http://localhost:5678
+      WEBHOOK_URL: http://localhost:5678/
+      GENERIC_TIMEZONE: America/Sao_Paulo
+      TZ: America/Sao_Paulo
+      N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS: "true"
+    ports:
+      - "5678:5678"
+    volumes:
+      - local_n8n_data:/home/node/.n8n
+    depends_on:
+      chatbot-api:
+        condition: service_healthy
+    restart: unless-stopped
+
+  revy-trafego:
+    build:
+      context: ./revy-trafego
+    environment:
+      REVY_TRAFEGO_DATABASE_URL: sqlite:////data/revy_trafego.db
+      REVY_TRAFEGO_SESSION_SECRET: ${REVY_TRAFEGO_SESSION_SECRET}
+      REVY_TRAFEGO_ENCRYPTION_KEY: ${PORTAL_ENCRYPTION_KEY}
+      REVY_TRAFEGO_SECURE_COOKIE: "0"
+      REVY_TRAFEGO_URL_PREFIX: ""
+      REVY_TRAFEGO_URL: http://revy-trafego:9010
+      REVY_TRAFEGO_PUBLIC_URL: http://revy-trafego:9010
+      REVY_TRAFEGO_SERVICE_TOKEN: ${REVY_TRAFEGO_SERVICE_TOKEN}
+      REVY_TRAFEGO_BOOTSTRAP_EMAIL: ${LOCAL_ADMIN_EMAIL}
+      REVY_TRAFEGO_BOOTSTRAP_SENHA: ${LOCAL_ADMIN_PASSWORD}
+      REVY_TRAFEGO_BOOTSTRAP_NOME: ${LOCAL_ADMIN_NAME}
+      REVY_TRAFEGO_LOJAS: ${LOCAL_STORE_SLUG}
+      REVY_TRAFEGO_CHATBOT_TOKENS_JSON: '{"${LOCAL_STORE_SLUG}":"${CHATBOT_API_TOKEN}"}'
+      REVY_TRAFEGO_ESTOQUE_TOKENS_JSON: '{"${LOCAL_STORE_SLUG}":"${ESTOQUE_API_TOKEN}"}'
+      REVY_TRAFEGO_MOTOR_TOKENS_JSON: '{"${LOCAL_STORE_SLUG}":"${MOTOR_TOKEN}"}'
+      CHATBOT_API_URL: http://chatbot-api:8000
+      ESTOQUE_API_URL: http://estoque-api:8000
+      MOTOR_URL: http://motor-api:8000
+      REVY_CONTROL_ENABLED: "1"
+      REVY_CONTROL_RBAC_ENABLED: "0"
+      REVY_CONTROL_DASHBOARD_ENABLED: "1"
+      REVY_CONTROL_PROVISIONING_DELIVERY_ENABLED: "0"
+      REVY_TRAFEGO_CAPI_WORKER: "0"
+      REVY_TRAFEGO_META_SPEND_SYNC_ENABLED: "0"
+      GOOGLE_ADS_SYNC_ENABLED: "0"
+      GOOGLE_CONVERSIONS_ENABLED: "0"
+      MULTI_WHATSAPP_ENABLED: "1"
+    ports:
+      - "9010:9010"
+    volumes:
+      - local_revy_trafego_data:/data
+    depends_on:
+      chatbot-api:
+        condition: service_healthy
+      estoque-api:
+        condition: service_healthy
+      motor-api:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:9010/health/ready', timeout=3)",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 20s
+    restart: unless-stopped
+
+  portal:
+    build:
+      context: ./portal-gestao
+    environment:
+      PORTAL_DATABASE_URL: sqlite:////data/portal.db
+      PORTAL_SESSION_SECRET: ${PORTAL_SESSION_SECRET}
+      PORTAL_IDENTITY_HMAC_SECRET: ${PORTAL_IDENTITY_HMAC_SECRET}
+      PORTAL_ENCRYPTION_KEY: ${PORTAL_ENCRYPTION_KEY}
+      PORTAL_SECURE_COOKIE: "0"
+      PORTAL_META_SPEND_SYNC_ENABLED: "0"
+      PORTAL_CAPI_RETRY_ENABLED: "0"
+      ESTOQUE_API_URL: http://estoque-api:8000
+      ESTOQUE_API_TOKEN: ${ESTOQUE_API_TOKEN}
+      CHATBOT_API_URL: http://chatbot-api:8000
+      CHATBOT_API_TOKEN: ${CHATBOT_API_TOKEN}
+      MOTOR_URL: http://motor-api:8000
+      MOTOR_TOKEN: ${MOTOR_TOKEN}
+      REVY_TRAFEGO_URL: http://revy-trafego:9010
+      REVY_TRAFEGO_SERVICE_TOKEN: ${REVY_TRAFEGO_SERVICE_TOKEN}
+      PORTAL_REVY_TRAFEGO_RESULTADOS: "1"
+      PORTAL_REVY_TRAFEGO_VENDA_EVENTS: "1"
+      REVY_LOJA_SHELL_ENABLED: "1"
+      REVY_LOJA_ENTITLEMENTS_ENABLED: "0"
+      REVY_LOJA_ATENDIMENTO_ENABLED: "1"
+      REVY_LOJA_WHATSAPP_ENABLED: "1"
+      REVY_LOJA_REDIRECT_LEGACY: "0"
+      LOCAL_STORE_SLUG: ${LOCAL_STORE_SLUG}
+      LOCAL_ADMIN_EMAIL: ${LOCAL_ADMIN_EMAIL}
+      LOCAL_ADMIN_NAME: ${LOCAL_ADMIN_NAME}
+      LOCAL_ADMIN_PASSWORD: ${LOCAL_ADMIN_PASSWORD}
+    ports:
+      - "9000:9000"
+    volumes:
+      - local_portal_data:/data
+      - ./deploy/local/bootstrap.py:/opt/revy-local/bootstrap.py:ro
+    depends_on:
+      revy-trafego:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:9000/health/ready', timeout=3)",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 20s
+    restart: unless-stopped
+
+  catalogo:
+    build:
+      context: ./catalogo-publico
+    environment:
+      ESTOQUE_PUBLIC_API_URL: http://estoque-api:8000
+      CATALOGO_DATABASE_PATH: /data/catalogo.db
+      CATALOGO_PUBLIC_BASE_URL: http://localhost:8200
+      CATALOGO_DEFAULT_STORE_SLUG: ${LOCAL_STORE_SLUG}
+      CATALOGO_SECURE_COOKIE: "0"
+      CATALOGO_EVENTS_URL: http://chatbot-api:8000/v1/integracoes/catalogo/interesses
+      CATALOGO_EVENTS_TOKEN: ${CHATBOT_API_TOKEN}
+      REVY_TRAFEGO_PUBLIC_URL: http://revy-trafego:9010
+    ports:
+      - "8200:8000"
+    volumes:
+      - local_catalogo_data:/data
+    depends_on:
+      estoque-api:
+        condition: service_healthy
+      chatbot-api:
+        condition: service_healthy
+      revy-trafego:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/ready', timeout=3)",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 20s
+    restart: unless-stopped
+
+  site:
+    build:
+      context: ./site
+    ports:
+      - "8088:8080"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+volumes:
+  local_postgres_data:
+  local_redis_data:
+  local_evolution_instances:
+  local_estoque_media:
+  local_motor_data:
+  local_n8n_data:
+  local_revy_trafego_data:
+  local_portal_data:
+  local_catalogo_data:
