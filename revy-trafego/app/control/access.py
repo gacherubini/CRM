@@ -18,11 +18,12 @@ from app.control.types import (
     StoreNotFound,
     StoreRef,
     TrafficLinkConflict,
+    TrafficLinkDetail,
     TrafficLinkNotFound,
     TrafficLinkView,
     TrafficRole,
 )
-from app.models import GestorRevy, Loja, VinculoTrafego, agora
+from app.models import AcessoControl, GestorRevy, Loja, Pessoa, VinculoTrafego, agora
 
 
 class AccessControl:
@@ -124,6 +125,48 @@ class AccessControl:
                     role=TrafficRole(link.tipo),
                 )
                 for store, link in rows
+            )
+
+    def list_links(
+        self, actor: Actor, store_ref: StoreRef
+    ) -> tuple[TrafficLinkDetail, ...]:
+        with self._session_factory() as db:
+            store = _find_store(db, store_ref)
+            if store is None:
+                raise StoreNotFound("Loja não encontrada")
+            if not actor.is_admin:
+                mine = (
+                    db.query(VinculoTrafego.id)
+                    .filter(
+                        VinculoTrafego.loja_id == store.id,
+                        VinculoTrafego.gestor_id == actor.id,
+                        VinculoTrafego.encerrado_em.is_(None),
+                    )
+                    .first()
+                )
+                if mine is None:
+                    raise StoreNotFound("Loja não encontrada")
+            rows = (
+                db.query(VinculoTrafego, Pessoa)
+                .join(
+                    AcessoControl,
+                    AcessoControl.gestor_legado_id == VinculoTrafego.gestor_id,
+                )
+                .join(Pessoa, Pessoa.id == AcessoControl.pessoa_id)
+                .filter(
+                    VinculoTrafego.loja_id == store.id,
+                    VinculoTrafego.encerrado_em.is_(None),
+                )
+                .order_by(Pessoa.nome, Pessoa.email)
+                .all()
+            )
+            return tuple(
+                TrafficLinkDetail(
+                    link=_traffic_link_view(link),
+                    manager_email=person.email,
+                    manager_name=person.nome,
+                )
+                for link, person in rows
             )
 
     def authorize(self, actor: Actor, store_ref: StoreRef) -> AccessibleStore:

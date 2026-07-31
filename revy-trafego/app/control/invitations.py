@@ -27,6 +27,7 @@ from app.control.types import (
 from app.models import (
     AcessoControl,
     ConviteAcessoControl,
+    GestorRevy,
     Pessoa,
     agora,
 )
@@ -164,7 +165,6 @@ class ControlInvitations:
             if (
                 access is None
                 or access.estado != ControlAccountStatus.PENDING.value
-                or access.gestor_legado_id is not None
                 or access.senha_hash is not None
             ):
                 raise ControlInvitationInvalid("convite inválido ou expirado")
@@ -175,8 +175,13 @@ class ControlInvitations:
             password_hash = hash_senha(password)
             access.senha_hash = password_hash
             access.estado = ControlAccountStatus.ACTIVE.value
-            access.gestor_legado_id = None
             access.atualizada_em = now
+            if access.gestor_legado_id is not None:
+                manager = db.get(GestorRevy, access.gestor_legado_id)
+                if manager is None:
+                    raise ControlInvitationInvalid("convite inválido ou expirado")
+                manager.senha_hash = password_hash
+                manager.ativo = True
             invitation.usado_em = now
             _append_event(
                 db,

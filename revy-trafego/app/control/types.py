@@ -355,6 +355,24 @@ class GrantTrafficAccess:
 
 
 @dataclass(frozen=True)
+class InviteTrafficManager:
+    store: StoreRef
+    email: str
+    name: str
+    role: TrafficRole
+
+
+@dataclass(frozen=True)
+class TrafficInviteResult:
+    store_id: str
+    manager_id: str
+    email: str
+    role: TrafficRole
+    token: str | None
+    already_active: bool
+
+
+@dataclass(frozen=True)
 class RevokeTrafficAccess:
     store: StoreRef
     manager_id: str
@@ -373,6 +391,13 @@ class TrafficLinkView:
     @property
     def active(self) -> bool:
         return self.ended_at is None
+
+
+@dataclass(frozen=True)
+class TrafficLinkDetail:
+    link: TrafficLinkView
+    manager_email: str
+    manager_name: str
 
 
 @dataclass(frozen=True)
