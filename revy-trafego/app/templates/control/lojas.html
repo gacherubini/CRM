@@ -59,23 +59,26 @@
     </div>
   </div>
   {% if stores %}
+  <p class="muted list-hint">Clique numa loja para abrir e gerenciar (pessoas, módulos, integrações e estado).</p>
   <div class="table-wrap">
-    <table>
+    <table class="rowlink">
       <thead>
         <tr>
           <th>Loja</th>
           <th>Endereço</th>
           <th>Estado</th>
           <th>Vínculo</th>
+          <th><span class="sr-only">Abrir</span></th>
         </tr>
       </thead>
       <tbody>
         {% for item in stores %}
-        <tr>
+        <tr data-href="{{ public_path('/app/control/lojas/' ~ item.store.id) }}">
           <td><a class="table-action" href="{{ public_path('/app/control/lojas/' ~ item.store.id) }}"><strong>{{ item.store.name }}</strong></a></td>
           <td><code>{{ item.store.slug }}</code></td>
           <td><span class="status-pill status-{{ item.store.status.value }}">{{ item.store.status.value | replace('_', ' ') }}</span></td>
           <td>{{ item.role.value if item.role else 'Admin Revy' }}</td>
+          <td class="row-open"><span class="row-open-label">Abrir</span><span class="row-open-chevron" aria-hidden="true">›</span></td>
         </tr>
         {% endfor %}
       </tbody>
@@ -129,6 +132,16 @@
       if (!slug.value) slug.value = slugify(nome.value);
       setPreview(slugify(slug.value));
       slug.focus();
+    });
+  })();
+
+  // Linha inteira da lista vira clicável (o link do nome continua valendo).
+  (() => {
+    document.querySelectorAll('tr[data-href]').forEach((row) => {
+      row.addEventListener('click', (event) => {
+        if (event.target.closest('a')) return;
+        window.location.href = row.dataset.href;
+      });
     });
   })();
 </script>

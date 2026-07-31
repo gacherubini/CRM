@@ -2114,3 +2114,27 @@ tr:hover td { background: var(--surface-soft); }
   color: var(--ink-soft);
   font-size: var(--text-sm);
 }
+
+/* Lista de lojas: linha inteira clicavel, com hover e affordance "Abrir" */
+.list-hint { margin: var(--space-3) 0 var(--space-2); }
+.rowlink tbody tr { cursor: pointer; }
+.rowlink tbody tr:hover { background: var(--surface-soft); }
+.rowlink .row-open {
+  width: 1%;
+  white-space: nowrap;
+  text-align: right;
+  color: var(--ink-muted);
+}
+.rowlink .row-open-label {
+  font-size: var(--text-xs);
+  font-weight: 600;
+  opacity: 0;
+  transition: opacity .15s ease;
+}
+.rowlink .row-open-chevron {
+  margin-left: var(--space-2);
+  font-size: 18px;
+  line-height: 1;
+}
+.rowlink tbody tr:hover .row-open { color: var(--ink); }
+.rowlink tbody tr:hover .row-open-label { opacity: 1; }
