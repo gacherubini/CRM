@@ -100,6 +100,64 @@ def _public_path(path: str) -> str:
 
 templates.env.globals["public_path"] = _public_path
 
+@router.get("/app/control/convite/aceitar", response_class=HTMLResponse)
+def accept_invite_page(
+    request: Request,
+    token: str = Query(default="", max_length=256),
+):
+    """Exibe a página pública para um convidado definir a própria senha."""
+    if not settings.revy_control_enabled:
+        return HTMLResponse("Página não encontrada.", status_code=404)
+    return templates.TemplateResponse(
+        request=request,
+        name="control/convite_aceitar.html",
+        context={"csrf": csrf_token(request), "token": token, "erro": None},
+    )
+
+
+@router.post("/app/control/convite/aceitar", response_class=HTMLResponse)
+async def accept_invite_submit(request: Request):
+    """Consome um convite de uso único e ativa o acesso Control do convidado."""
+    if not settings.revy_control_enabled:
+        return HTMLResponse("Página não encontrada.", status_code=404)
+
+    from app.control.invitations import ControlInvitations
+    from app.control.types import (
+        ActivateControlAccess,
+        ControlInvitationInvalid,
+        WeakControlPassword,
+    )
+
+    form = await request.form()
+    if not csrf_valido(request, form.get("csrf")):
+        return _csrf_denied()
+    token = (form.get("token") or "").strip()
+    password = form.get("senha") or ""
+
+    def render_error(message: str, status_code: int) -> HTMLResponse:
+        return templates.TemplateResponse(
+            request=request,
+            name="control/convite_aceitar.html",
+            context={
+                "csrf": csrf_token(request),
+                "token": token,
+                "erro": message,
+            },
+            status_code=status_code,
+        )
+
+    try:
+        ControlInvitations(SessionLocal).activate(
+            ActivateControlAccess(token=token, password=password)
+        )
+    except WeakControlPassword:
+        return render_error("A senha deve ter entre 12 e 256 caracteres.", 422)
+    except ControlInvitationInvalid:
+        return render_error(
+            "Convite inválido ou expirado. Peça um novo convite.", 409
+        )
+    return RedirectResponse(_public_path("/login?ativado=1"), status_code=303)
+
 
 def _slugify(value: str) -> str:
     """Deriva um slug canônico a partir de um texto livre (ex.: nome da loja).
@@ -900,6 +958,71 @@ async def grant_traffic_access_page(
 
 
 @router.post(
+    "/app/control/lojas/{loja_id}/gestores/convidar",
+    response_class=HTMLResponse,
+)
+async def invite_traffic_manager_page(
+    loja_id: str, request: Request, db: Session = Depends(get_db)
+):
+    manager, denied = _admin_for_mutation(request, db)
+    if denied is not None:
+        return denied
+    form = await request.form()
+    if not csrf_valido(request, form.get("csrf")):
+        return _csrf_denied()
+    from app.control.traffic_onboarding import TrafficManagerOnboarding
+    from app.control.types import InviteTrafficManager
+    from app.email import sender as email_sender
+
+    email = (form.get("email") or "").strip()
+    name = (form.get("nome") or "").strip()
+    try:
+        role = TrafficRole((form.get("tipo") or "").strip())
+    except ValueError:
+        return _render_store_detail(request, db, manager, loja_id,
+            error="Selecione o tipo de vínculo (responsável ou colaborador).",
+            active_tab="pessoas", status_code=422)
+    try:
+        result = TrafficManagerOnboarding(SessionLocal).invite_or_bind(
+            actor_from_user(manager),
+            InviteTrafficManager(store=StoreRef(id=loja_id), email=email,
+                                 name=name, role=role),
+        )
+    except StoreNotFound:
+        return HTMLResponse("Loja não encontrada.", status_code=404)
+    except InvalidPersonEmail:
+        return _render_store_detail(request, db, manager, loja_id,
+            error="Informe um e-mail válido e, para um gestor novo, o nome.",
+            active_tab="pessoas", status_code=422)
+    except (ActiveResponsibleConflict, TrafficLinkConflict) as exc:
+        return _render_store_detail(request, db, manager, loja_id, error=str(exc),
+            active_tab="pessoas", status_code=409)
+    if result.token is not None:
+        link = settings.absolute_url(
+            f"/app/control/convite/aceitar?token={result.token}"
+        )
+        try:
+            email_sender.get_email_backend().send(email_sender.EmailMessage(
+                to=result.email,
+                subject="Seu acesso ao Revy Control",
+                text_body=(
+                    "Você foi convidado(a) como gestor(a) de tráfego no Revy Control.\n"
+                    f"Crie sua senha e acesse: {link}\n\nO link expira em 24 horas."
+                ),
+                html_body=(
+                    "<p>Você foi convidado(a) como gestor(a) de tráfego no Revy Control.</p>"
+                    f"<p><a href=\"{link}\">Criar minha senha e acessar</a></p>"
+                    "<p>O link expira em 24 horas.</p>"
+                ),
+            ))
+        except Exception:
+            return _render_store_detail(request, db, manager, loja_id,
+                error="Vínculo criado, mas o e-mail falhou. Reenvie o convite.",
+                active_tab="pessoas")
+    return RedirectResponse(_detail_path(loja_id, "gestor"), status_code=303)
+
+
+@router.post(
     "/app/control/lojas/{loja_id}/gestores/revogar",
     response_class=HTMLResponse,
 )
@@ -1608,6 +1731,7 @@ def _render_store_detail(
         )
 
     store_people = ()
+    traffic_links = ()
     if manager.papel == "admin":
         roles = StoreRoles(SessionLocal).list_for_store(
             actor,
@@ -1621,6 +1745,7 @@ def _render_store_detail(
             }
             for role in roles
         )
+        traffic_links = AccessControl(SessionLocal).list_links(actor, store_ref)
 
     google_connection = None
     google_accounts = ()
@@ -1775,6 +1900,7 @@ def _render_store_detail(
             "store_statuses": tuple(StoreStatus),
             "store_roles": tuple(StoreRole),
             "store_people": store_people,
+            "traffic_links": traffic_links,
             "is_admin": manager.papel == "admin",
             "ok": request.query_params.get("ok"),
             "created": request.query_params.get("created") == "1",

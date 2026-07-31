@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#ffffff">
+  <title>Ativar acesso — Revy Control</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ public_path('/static/css/app.css') }}">
+  <script>
+    (() => {
+      const saved = localStorage.getItem('revy-theme');
+      const theme = saved === 'dark' || saved === 'light'
+        ? saved
+        : (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+      document.documentElement.setAttribute('data-theme', theme);
+    })();
+  </script>
+</head>
+<body class="login-page">
+  <main class="login-layout">
+    <section class="login-story">
+      <span class="eyebrow">Revy Control</span>
+      <h1>Seu acesso está quase pronto.</h1>
+      <p>Defina sua senha para acessar as lojas vinculadas a você.</p>
+    </section>
+    <section class="login-panel">
+      <div class="login-card">
+        <span class="brand-mark" style="display:inline-grid;margin-bottom:16px" aria-hidden="true">C</span>
+        <div>
+          <h2>Definir sua senha</h2>
+          <p>Crie uma senha para acessar o Revy Control.</p>
+        </div>
+        {% if erro %}<div class="alert error" role="alert">{{ erro }}</div>{% endif %}
+        <form method="post" action="{{ public_path('/app/control/convite/aceitar') }}" class="stack-form">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          <input type="hidden" name="token" value="{{ token }}">
+          <label>Nova senha (mínimo 12 caracteres)
+            <input type="password" name="senha" minlength="12" maxlength="256" autocomplete="new-password" required autofocus>
+          </label>
+          <button class="button primary" type="submit">Ativar acesso</button>
+        </form>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

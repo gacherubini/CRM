@@ -167,6 +167,48 @@
       <button class="button primary" type="submit">Atribuir cargo</button>
     </form>
   </section>
+
+  <section class="panel form-section" id="pessoas-gestores">
+    <h2>Gestor de tráfego</h2>
+    <p class="muted">Convide por e-mail; o gestor recebe um link para criar a senha.</p>
+    {% if traffic_links %}
+    <div class="table-wrap">
+      <table id="tabela-gestores-loja">
+        <thead><tr><th>Nome</th><th>E-mail</th><th>Vínculo</th><th>Ação</th></tr></thead>
+        <tbody>
+          {% for item in traffic_links %}
+          <tr>
+            <td>{{ item.manager_name }}</td>
+            <td>{{ item.manager_email }}</td>
+            <td>{{ item.link.role.value }}</td>
+            <td>
+              <form method="post" action="{{ public_path('/app/control/lojas/' ~ store.id ~ '/gestores/' ~ item.link.manager_id ~ '/revogar') }}">
+                <input type="hidden" name="csrf" value="{{ csrf }}">
+                <button class="button secondary" type="submit">Revogar</button>
+              </form>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="empty"><strong>Nenhum gestor de tráfego vinculado.</strong></div>
+    {% endif %}
+    <form method="post" action="{{ public_path('/app/control/lojas/' ~ store.id ~ '/gestores/convidar') }}" class="form-layout" id="form-convidar-gestor">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <label>E-mail do gestor <input type="email" name="email" maxlength="320" required></label>
+      <label>Nome <input type="text" name="nome" maxlength="160">
+        <small>Obrigatório para um gestor ainda não cadastrado.</small></label>
+      <label>Vínculo
+        <select name="tipo" required>
+          <option value="responsavel">responsável</option>
+          <option value="colaborador">colaborador</option>
+        </select>
+      </label>
+      <button class="button primary" type="submit">Convidar gestor</button>
+    </form>
+  </section>
 </section>
 {% endif %}
 
