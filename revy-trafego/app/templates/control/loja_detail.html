@@ -7,12 +7,23 @@
     <a class="back-link" href="{{ public_path('/app/control/lojas') }}">← Lojas</a>
     <span class="eyebrow">Revy Control</span>
     <h1>{{ store.name }}</h1>
-    <p>
-      <code>{{ store.slug }}</code> · Estado: <strong>{{ store.status.value }}</strong>
+    <p class="store-meta">
+      <code>{{ store.slug }}</code>
+      · <span class="status-pill status-{{ store.status.value }}">{{ store.status.value | replace('_', ' ') }}</span>
       · <span id="loja-versao">Versão {{ store.version }}</span>
     </p>
   </div>
 </div>
+
+{% if created %}
+<div class="next-steps" role="status">
+  <div class="next-steps-body">
+    <strong>Loja criada com sucesso 🎉</strong>
+    <p>Comece adicionando as pessoas da equipe. Depois configure módulos, contrato e integrações.</p>
+  </div>
+  <button type="button" class="button primary" data-tab-target="pessoas">Adicionar equipe</button>
+</div>
+{% endif %}
 
 {% if ok == 'estado' %}
 <div class="alert success" role="status">Estado da Loja atualizado.</div>
@@ -45,461 +56,584 @@
 <div class="alert error" role="alert">{{ erro }}</div>
 {% endif %}
 
-{% if google_ads_enabled %}
-<section class="panel" id="google-ads-operacao">
-  <div class="panel-heading">
-    <div>
-      <span class="eyebrow">Aquisição</span>
-      <h2>Google Ads</h2>
+<nav class="control-tabs" role="tablist" aria-label="Seções da loja" data-tabs>
+  <button class="control-tab" role="tab" id="tab-visao" data-tab="visao" aria-controls="panel-visao">Visão geral</button>
+  {% if is_admin %}
+  <button class="control-tab" role="tab" id="tab-pessoas" data-tab="pessoas" aria-controls="panel-pessoas">Pessoas</button>
+  {% endif %}
+  <button class="control-tab" role="tab" id="tab-modulos" data-tab="modulos" aria-controls="panel-modulos">Módulos &amp; contrato</button>
+  {% if google_ads_enabled %}
+  <button class="control-tab" role="tab" id="tab-integracoes" data-tab="integracoes" aria-controls="panel-integracoes">Integrações</button>
+  {% endif %}
+  {% if is_admin %}
+  <button class="control-tab" role="tab" id="tab-estado" data-tab="estado" aria-controls="panel-estado">Estado</button>
+  {% endif %}
+  <button class="control-tab" role="tab" id="tab-auditoria" data-tab="auditoria" aria-controls="panel-auditoria">Auditoria</button>
+</nav>
+
+<!-- Visão geral ------------------------------------------------------------- -->
+<section class="control-tabpanel" role="tabpanel" id="panel-visao" data-tab="visao" aria-labelledby="tab-visao" tabindex="0">
+  <div class="overview-grid">
+    <div class="panel overview-card">
+      <h2>Resumo</h2>
+      <dl class="overview-list">
+        <div><dt>Nome</dt><dd>{{ store.name }}</dd></div>
+        <div><dt>Endereço</dt><dd><code>{{ store.slug }}</code></dd></div>
+        <div><dt>Estado</dt><dd><span class="status-pill status-{{ store.status.value }}">{{ store.status.value | replace('_', ' ') }}</span></dd></div>
+      </dl>
     </div>
-  </div>
-  {% if not google_oauth_configured %}
-  <div class="empty">
-    <strong>Google não configurado neste ambiente.</strong>
-    <p>Configure as credenciais OAuth do Control para habilitar a conexão.</p>
-  </div>
-  {% else %}
-  <section class="google-step" id="google-conexao">
-    <h3>1. Conexão</h3>
-    {% if google_next_step == 'connection' %}
-    <div class="alert warning" id="google-proximo-passo-conexao">
-      Próximo passo: conecte uma conta Google autorizada.
+    {% if is_admin %}
+    <div class="panel overview-card">
+      <h2>Próximos passos</h2>
+      <ul class="checklist">
+        <li class="{{ 'is-done' if store_people else 'is-todo' }}">
+          <span class="checklist-mark" aria-hidden="true"></span>
+          <button type="button" class="checklist-link" data-tab-target="pessoas">Adicionar a equipe</button>
+        </li>
+        <li class="{{ 'is-done' if active_module_codes else 'is-todo' }}">
+          <span class="checklist-mark" aria-hidden="true"></span>
+          <button type="button" class="checklist-link" data-tab-target="modulos">Escolher os módulos</button>
+        </li>
+        <li class="{{ 'is-done' if contract else 'is-todo' }}">
+          <span class="checklist-mark" aria-hidden="true"></span>
+          <button type="button" class="checklist-link" data-tab-target="modulos">Registrar o contrato</button>
+        </li>
+        <li class="{{ 'is-done' if store.status.value == 'ativa' else 'is-todo' }}">
+          <span class="checklist-mark" aria-hidden="true"></span>
+          <button type="button" class="checklist-link" data-tab-target="estado">Ativar a loja</button>
+        </li>
+      </ul>
     </div>
     {% endif %}
-    {% if google_connection %}
-    <p>
-      Status: <strong>{{ google_connection.status }}</strong>
-      · Conta selecionada:
-      <strong>{{ google_connection.customer_id or 'nenhuma' }}</strong>
-      · Credencial disponível:
-      <strong>{{ 'sim' if google_connection.has_refresh_token else 'não' }}</strong>
-    </p>
+  </div>
+</section>
+
+{% if is_admin %}
+<!-- Pessoas ----------------------------------------------------------------- -->
+<section class="control-tabpanel" role="tabpanel" id="panel-pessoas" data-tab="pessoas" aria-labelledby="tab-pessoas" tabindex="0">
+  <section class="panel form-section" id="pessoas-cargos">
+    <h2>Pessoas e cargos</h2>
+    <p class="muted">Cadastre a Pessoa Revy uma vez e atribua somente o cargo estrutural desta Loja.</p>
+    {% if store_people %}
+    <div class="table-wrap">
+      <table id="tabela-cargos-loja">
+        <thead>
+          <tr>
+            <th>Nome</th>
+            <th>E-mail</th>
+            <th>Cargo</th>
+            <th>Ação</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in store_people %}
+          <tr>
+            <td>{{ item.person.name }}</td>
+            <td>{{ item.person.email }}</td>
+            <td>{{ item.role.role.value }}</td>
+            <td>
+              <form method="post" action="{{ public_path('/app/control/lojas/' ~ store.id ~ '/cargos/' ~ item.role.id ~ '/revogar') }}" id="form-revogar-cargo-{{ item.role.id }}">
+                <input type="hidden" name="csrf" value="{{ csrf }}">
+                <button class="button secondary" type="submit">Revogar cargo</button>
+              </form>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
     {% else %}
-    <p class="muted">Esta Loja ainda não possui uma conexão Google Ads.</p>
+    <div class="empty"><strong>Nenhum cargo ativo nesta Loja.</strong></div>
     {% endif %}
-    {% if not google_connection or not google_connection.has_refresh_token %}
-    <form method="post" action="{{ public_path('/app/control/lojas/' ~ store.id ~ '/google-ads/oauth/start') }}" id="form-google-oauth-start">
+
+    <form method="post" action="{{ public_path('/app/control/lojas/' ~ store.id ~ '/cargos') }}" class="form-layout" id="form-atribuir-cargo">
       <input type="hidden" name="csrf" value="{{ csrf }}">
-      <button class="button primary" type="submit">Conectar Google Ads</button>
+      <label>E-mail da Pessoa Revy
+        <input type="email" name="email" maxlength="320" value="{{ person_form_values.email }}" required>
+      </label>
+      <label>Nome
+        <input type="text" name="nome" maxlength="160" value="{{ person_form_values.nome }}">
+        <small>Obrigatório somente para uma pessoa ainda não cadastrada.</small>
+      </label>
+      <label>Cargo na Loja
+        <select name="cargo" required>
+          {% for role in store_roles %}
+          <option value="{{ role.value }}" {% if person_form_values.cargo == role.value %}selected{% endif %}>{{ role.value }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <button class="button primary" type="submit">Atribuir cargo</button>
     </form>
-    {% else %}
-    <form method="post" action="{{ public_path('/app/control/lojas/' ~ store.id ~ '/google-ads/desconectar') }}" id="form-google-desconectar">
+  </section>
+
+  <section class="panel form-section">
+    <h2>Conceder vínculo de tráfego</h2>
+    <p class="muted">Pessoas entra na Fase 2. Neste corte, informe o ID interno de um gestor ativo.</p>
+    <form method="post" action="{{ public_path('/app/control/lojas/' ~ store.id ~ '/gestores') }}" class="form-layout" id="form-conceder-gestor">
       <input type="hidden" name="csrf" value="{{ csrf }}">
-      <button class="button secondary" type="submit">Desconectar</button>
+      <label>ID do gestor
+        <input type="text" name="gestor_id" maxlength="36" required>
+      </label>
+      <label>Tipo do vínculo
+        <select name="tipo" required>
+          <option value="responsavel">Gestor Responsável</option>
+          <option value="colaborador">Gestor Colaborador</option>
+        </select>
+      </label>
+      <button class="button primary" type="submit">Conceder vínculo</button>
+    </form>
+  </section>
+
+  <section class="panel form-section">
+    <h2>Revogar vínculo de tráfego</h2>
+    <p class="muted">Informe explicitamente o mesmo ID interno usado no vínculo.</p>
+    <form method="post" action="{{ public_path('/app/control/lojas/' ~ store.id ~ '/gestores/revogar') }}" class="form-layout" id="form-revogar-gestor">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <label>ID do gestor
+        <input type="text" name="gestor_id" maxlength="36" required>
+      </label>
+      <label>Motivo
+        <input type="text" name="motivo" maxlength="1000">
+      </label>
+      <button class="button secondary" type="submit">Revogar vínculo</button>
+    </form>
+  </section>
+</section>
+{% endif %}
+
+<!-- Módulos & contrato ------------------------------------------------------ -->
+<section class="control-tabpanel" role="tabpanel" id="panel-modulos" data-tab="modulos" aria-labelledby="tab-modulos" tabindex="0">
+  <section class="panel" id="modulos-contratados">
+    <h2>Módulos contratados</h2>
+    {% if modules %}
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Módulo</th>
+            <th>Estado</th>
+            <th>Versão</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for module in modules %}
+          <tr id="modulo-{{ module.code.value }}">
+            <td>{{ module.name }}</td>
+            <td>{{ module.status.value }}</td>
+            <td>{{ module.version }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="empty"><strong>Nenhum módulo contratado.</strong></div>
+    {% endif %}
+    {% if is_admin %}
+    <form method="post" action="{{ public_path('/app/control/lojas/' ~ store.id ~ '/modulos') }}" class="form-layout" id="form-configurar-modulos">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <fieldset>
+        <legend>Módulos da Loja</legend>
+        <div class="option-group">
+          {% for module_option in module_options %}
+          <label>
+            <input
+              id="selecao-modulo-{{ module_option.value }}"
+              type="checkbox"
+              name="modulos"
+              value="{{ module_option.value }}"
+              {% if module_option.value in active_module_codes %}checked{% endif %}
+            >
+            {{ module_option.value | capitalize }}
+          </label>
+          {% endfor %}
+        </div>
+      </fieldset>
+      <button class="button primary" type="submit">Salvar módulos</button>
     </form>
     {% endif %}
   </section>
 
-  {% if google_connection and google_connection.has_refresh_token %}
-  <section class="google-step" id="google-conta">
-    <h3>2. Conta</h3>
-    {% if google_next_step == 'account' %}
-    <div class="alert warning" id="google-proximo-passo-conta">
-      Próximo passo: sincronize e selecione uma conta anunciante.
+  <section class="panel form-section" id="{{ 'contrato-ativo' if contract else 'contrato-ausente' }}">
+    <h2>Contrato</h2>
+    {% if contract %}
+    <div class="table-wrap">
+      <table>
+        <tbody>
+          <tr>
+            <th>Valor mensal</th>
+            <td>{{ contract_amount_brl }}</td>
+          </tr>
+          <tr>
+            <th>Vigência</th>
+            <td>{{ contract.starts_on.strftime('%d/%m/%Y') }} a {{ contract.ends_on.strftime('%d/%m/%Y') if contract.ends_on else 'sem término' }}</td>
+          </tr>
+          <tr>
+            <th>Vencimento</th>
+            <td>Dia {{ contract.due_day }}</td>
+          </tr>
+          <tr>
+            <th>Cobrança</th>
+            <td>{{ contract.billing_status.value }}</td>
+          </tr>
+        </tbody>
+      </table>
     </div>
+    {% else %}
+    <div class="empty"><strong>Nenhum contrato ativo.</strong></div>
     {% endif %}
-    <form method="post" action="{{ public_path('/app/control/lojas/' ~ store.id ~ '/google-ads/accounts/sync') }}" id="form-google-contas-sync">
+    {% if is_admin %}
+    <form method="post" action="{{ public_path('/app/control/lojas/' ~ store.id ~ '/contrato') }}" class="form-layout" id="form-configurar-contrato">
       <input type="hidden" name="csrf" value="{{ csrf }}">
-      <button class="button secondary" type="submit">Sincronizar contas</button>
+      <label>Valor mensal
+        <input id="contrato-valor-mensal" type="number" name="valor_mensal" value="{{ contract_form_values.valor_mensal }}" min="0" max="9999999999.99" step="0.01" required>
+      </label>
+      <label>Início da vigência
+        <input id="contrato-vigencia-inicio" type="date" name="vigencia_inicio" value="{{ contract_form_values.vigencia_inicio }}" required>
+      </label>
+      <label>Fim da vigência
+        <input id="contrato-vigencia-fim" type="date" name="vigencia_fim" value="{{ contract_form_values.vigencia_fim }}">
+        <small>Opcional; deve ser igual ou posterior ao início.</small>
+      </label>
+      <label>Dia do vencimento
+        <input id="contrato-vencimento-dia" type="number" name="vencimento_dia" value="{{ contract_form_values.vencimento_dia }}" min="1" max="31" required>
+      </label>
+      <label>Situação da cobrança
+        <select id="contrato-situacao-cobranca" name="situacao_cobranca" required>
+          {% for contract_status in contract_statuses %}
+          <option value="{{ contract_status.value }}" {% if contract_form_values.situacao_cobranca == contract_status.value %}selected{% endif %}>{{ contract_status.value }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <button class="button primary" type="submit">Salvar contrato</button>
     </form>
-    {% if google_accounts %}
-    <form method="post" action="{{ public_path('/app/control/lojas/' ~ store.id ~ '/google-ads/accounts/select') }}" id="form-google-conta-select">
-      <input type="hidden" name="csrf" value="{{ csrf }}">
+    {% endif %}
+  </section>
+</section>
+
+{% if google_ads_enabled %}
+<!-- Integrações ------------------------------------------------------------- -->
+<section class="control-tabpanel" role="tabpanel" id="panel-integracoes" data-tab="integracoes" aria-labelledby="tab-integracoes" tabindex="0">
+  <section class="panel" id="google-ads-operacao">
+    <div class="panel-heading">
+      <div>
+        <span class="eyebrow">Aquisição</span>
+        <h2>Google Ads</h2>
+      </div>
+    </div>
+    {% if not google_oauth_configured %}
+    <div class="empty">
+      <strong>Google não configurado neste ambiente.</strong>
+      <p>Configure as credenciais OAuth do Control para habilitar a conexão.</p>
+    </div>
+    {% else %}
+    <section class="google-step" id="google-conexao">
+      <h3>1. Conexão</h3>
+      {% if google_next_step == 'connection' %}
+      <div class="alert warning" id="google-proximo-passo-conexao">
+        Próximo passo: conecte uma conta Google autorizada.
+      </div>
+      {% endif %}
+      {% if google_connection %}
+      <p>
+        Status: <strong>{{ google_connection.status }}</strong>
+        · Conta selecionada:
+        <strong>{{ google_connection.customer_id or 'nenhuma' }}</strong>
+        · Credencial disponível:
+        <strong>{{ 'sim' if google_connection.has_refresh_token else 'não' }}</strong>
+      </p>
+      {% else %}
+      <p class="muted">Esta Loja ainda não possui uma conexão Google Ads.</p>
+      {% endif %}
+      {% if not google_connection or not google_connection.has_refresh_token %}
+      <form method="post" action="{{ public_path('/app/control/lojas/' ~ store.id ~ '/google-ads/oauth/start') }}" id="form-google-oauth-start">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <button class="button primary" type="submit">Conectar Google Ads</button>
+      </form>
+      {% else %}
+      <form method="post" action="{{ public_path('/app/control/lojas/' ~ store.id ~ '/google-ads/desconectar') }}" id="form-google-desconectar">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <button class="button secondary" type="submit">Desconectar</button>
+      </form>
+      {% endif %}
+    </section>
+
+    {% if google_connection and google_connection.has_refresh_token %}
+    <section class="google-step" id="google-conta">
+      <h3>2. Conta</h3>
+      {% if google_next_step == 'account' %}
+      <div class="alert warning" id="google-proximo-passo-conta">
+        Próximo passo: sincronize e selecione uma conta anunciante.
+      </div>
+      {% endif %}
+      <form method="post" action="{{ public_path('/app/control/lojas/' ~ store.id ~ '/google-ads/accounts/sync') }}" id="form-google-contas-sync">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <button class="button secondary" type="submit">Sincronizar contas</button>
+      </form>
+      {% if google_accounts %}
+      <form method="post" action="{{ public_path('/app/control/lojas/' ~ store.id ~ '/google-ads/accounts/select') }}" id="form-google-conta-select">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Selecionar</th>
+                <th>Conta</th>
+                <th>Customer ID</th>
+                <th>Moeda</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for account in google_accounts %}
+              <tr>
+                <td>
+                  <input
+                    id="google-conta-{{ account.customer_id }}"
+                    {% if account.is_manager %}disabled{% endif %}
+                    type="radio"
+                    name="customer_id"
+                    value="{{ account.customer_id }}"
+                    {% if account.selected %}checked{% endif %}
+                  >
+                </td>
+                <td>
+                  {{ account.descriptive_name or 'Conta sem nome' }}
+                  {% if account.is_manager %}
+                  <small>Conta gerenciadora (MCC) não pode ser selecionada.</small>
+                  {% endif %}
+                </td>
+                <td><code>{{ account.customer_id }}</code></td>
+                <td>{{ account.currency_code or '—' }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        <button class="button primary" type="submit">Selecionar</button>
+      </form>
+      {% else %}
+      <div class="empty"><strong>Nenhuma conta sincronizada.</strong></div>
+      {% endif %}
+    </section>
+    {% endif %}
+
+    {% if google_conversions_enabled and google_selected_account %}
+    <section class="google-step" id="google-conversoes">
+      <h3>3. Conversões</h3>
+      {% if google_conversion_bindings %}
       <div class="table-wrap">
         <table>
           <thead>
             <tr>
-              <th>Selecionar</th>
-              <th>Conta</th>
-              <th>Customer ID</th>
-              <th>Moeda</th>
+              <th>Evento Revy</th>
+              <th>Ação Google</th>
+              <th>Estado</th>
             </tr>
           </thead>
           <tbody>
-            {% for account in google_accounts %}
+            {% for binding in google_conversion_bindings %}
             <tr>
-              <td>
-                <input
-                  id="google-conta-{{ account.customer_id }}"
-                  {% if account.is_manager %}disabled{% endif %}
-                  type="radio"
-                  name="customer_id"
-                  value="{{ account.customer_id }}"
-                  {% if account.selected %}checked{% endif %}
-                >
-              </td>
-              <td>
-                {{ account.descriptive_name or 'Conta sem nome' }}
-                {% if account.is_manager %}
-                <small>Conta gerenciadora (MCC) não pode ser selecionada.</small>
-                {% endif %}
-              </td>
-              <td><code>{{ account.customer_id }}</code></td>
-              <td>{{ account.currency_code or '—' }}</td>
+              <td><code>{{ binding.revy_event_type }}</code></td>
+              <td><code>{{ binding.conversion_action_resource_name }}</code></td>
+              <td>{{ 'ativo' if binding.active else 'inativo' }}</td>
             </tr>
             {% endfor %}
           </tbody>
         </table>
       </div>
-      <button class="button primary" type="submit">Selecionar</button>
-    </form>
-    {% else %}
-    <div class="empty"><strong>Nenhuma conta sincronizada.</strong></div>
+      {% endif %}
+      {% if google_conversion_actions %}
+      <form method="post" action="{{ public_path('/app/control/lojas/' ~ store.id ~ '/google-ads/conversion-bindings') }}" class="form-layout" id="form-google-conversao">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <input type="hidden" name="customer_id" value="{{ google_selected_account.customer_id }}">
+        <label>Evento Revy
+          <select name="revy_event_type" required>
+            {% for event_type in google_revy_event_types %}
+            <option value="{{ event_type }}">{{ event_type | replace('_', ' ') }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <label>Ação de conversão existente
+          <select name="conversion_action_resource_name" required>
+            {% for action in google_conversion_actions %}
+            <option value="{{ action.resource_name }}">
+              {{ action.name }} · {{ action.category }} · {{ action.status }}
+            </option>
+            {% endfor %}
+          </select>
+        </label>
+        <button class="button primary" type="submit">Salvar vínculo</button>
+      </form>
+      {% else %}
+      <div class="empty">
+        <strong>Nenhuma ação de conversão disponível.</strong>
+        <p>Crie a ação no Google Ads e recarregue esta página.</p>
+      </div>
+      {% endif %}
+    </section>
+    {% endif %}
+
+    {% if google_selected_account %}
+    <section class="google-step" id="google-metricas">
+      <h3>4. Métricas</h3>
+      <form method="post" action="{{ public_path('/app/control/lojas/' ~ store.id ~ '/google-ads/metrics/sync') }}" class="form-layout" id="form-google-metricas">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <label>Data inicial
+          <input type="date" name="date_from" value="{{ google_metrics_date_from }}" required>
+        </label>
+        <label>Data final
+          <input type="date" name="date_to" value="{{ google_metrics_date_to }}" required>
+        </label>
+        <button class="button secondary" type="submit">Sincronizar agora</button>
+      </form>
+      {% if google_metrics_summary and (
+        google_metrics_summary.impressions
+        or google_metrics_summary.clicks
+        or google_metrics_summary.cost_micros
+        or google_metrics_summary.conversions
+      ) %}
+      <div class="table-wrap">
+        <table>
+          <tbody>
+            <tr>
+              <th>Alcance e tráfego</th>
+              <td>{{ google_metrics_impressions }} impressões · {{ google_metrics_summary.clicks }} cliques</td>
+            </tr>
+            <tr>
+              <th>Investimento</th>
+              <td>{{ google_metrics_cost_brl }} {{ google_metrics_summary.currency_code or '' }}</td>
+            </tr>
+            <tr>
+              <th>Resultado Google</th>
+              <td>
+                {{ google_metrics_conversions }} conversões
+                {% if google_metrics_summary.roas is not none %}
+                · ROAS {{ '%.2f' | format(google_metrics_summary.roas) }}
+                {% endif %}
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div class="empty"><strong>Sem métricas no período selecionado.</strong></div>
+      {% endif %}
+    </section>
+    {% endif %}
     {% endif %}
   </section>
-  {% endif %}
+</section>
+{% endif %}
 
-  {% if google_conversions_enabled and google_selected_account %}
-  <section class="google-step" id="google-conversoes">
-    <h3>3. Conversões</h3>
-    {% if google_conversion_bindings %}
+{% if is_admin %}
+<!-- Estado ------------------------------------------------------------------ -->
+<section class="control-tabpanel" role="tabpanel" id="panel-estado" data-tab="estado" aria-labelledby="tab-estado" tabindex="0">
+  <section class="panel form-section">
+    <h2>Estado da loja</h2>
+    <form method="post" action="{{ public_path('/app/control/lojas/' ~ store.id ~ '/estado') }}" class="form-layout" id="form-alterar-estado">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <label>Novo estado
+        <select name="estado" required>
+          {% for status in store_statuses %}
+          <option value="{{ status.value }}" {% if status == store.status %}selected{% endif %}>{{ status.value | replace('_', ' ') }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label>Motivo
+        <input type="text" name="motivo" maxlength="1000">
+      </label>
+      <button class="button primary" type="submit">Atualizar estado</button>
+    </form>
+  </section>
+</section>
+{% endif %}
+
+<!-- Auditoria --------------------------------------------------------------- -->
+<section class="control-tabpanel" role="tabpanel" id="panel-auditoria" data-tab="auditoria" aria-labelledby="tab-auditoria" tabindex="0">
+  <section class="panel">
+    <h2>Auditoria</h2>
+    {% if audit_events %}
     <div class="table-wrap">
       <table>
         <thead>
           <tr>
-            <th>Evento Revy</th>
-            <th>Ação Google</th>
-            <th>Estado</th>
+            <th>Data</th>
+            <th>Ação</th>
+            <th>Ator</th>
+            <th>Resultado</th>
+            <th>Motivo</th>
           </tr>
         </thead>
         <tbody>
-          {% for binding in google_conversion_bindings %}
+          {% for event in audit_events %}
           <tr>
-            <td><code>{{ binding.revy_event_type }}</code></td>
-            <td><code>{{ binding.conversion_action_resource_name }}</code></td>
-            <td>{{ 'ativo' if binding.active else 'inativo' }}</td>
+            <td>{{ event.created_at.strftime('%d/%m/%Y %H:%M') if event.created_at.strftime is defined else event.created_at }}</td>
+            <td><code>{{ event.action }}</code></td>
+            <td>{{ event.actor_email or 'sistema' }}</td>
+            <td>{{ event.result.value }}</td>
+            <td>{{ event.reason or '—' }}</td>
           </tr>
           {% endfor %}
         </tbody>
       </table>
     </div>
-    {% endif %}
-    {% if google_conversion_actions %}
-    <form method="post" action="{{ public_path('/app/control/lojas/' ~ store.id ~ '/google-ads/conversion-bindings') }}" class="form-layout" id="form-google-conversao">
-      <input type="hidden" name="csrf" value="{{ csrf }}">
-      <input type="hidden" name="customer_id" value="{{ google_selected_account.customer_id }}">
-      <label>Evento Revy
-        <select name="revy_event_type" required>
-          {% for event_type in google_revy_event_types %}
-          <option value="{{ event_type }}">{{ event_type | replace('_', ' ') }}</option>
-          {% endfor %}
-        </select>
-      </label>
-      <label>Ação de conversão existente
-        <select name="conversion_action_resource_name" required>
-          {% for action in google_conversion_actions %}
-          <option value="{{ action.resource_name }}">
-            {{ action.name }} · {{ action.category }} · {{ action.status }}
-          </option>
-          {% endfor %}
-        </select>
-      </label>
-      <button class="button primary" type="submit">Salvar vínculo</button>
-    </form>
     {% else %}
-    <div class="empty">
-      <strong>Nenhuma ação de conversão disponível.</strong>
-      <p>Crie a ação no Google Ads e recarregue esta página.</p>
-    </div>
+    <div class="empty"><strong>Sem eventos de auditoria.</strong></div>
     {% endif %}
   </section>
-  {% endif %}
-
-  {% if google_selected_account %}
-  <section class="google-step" id="google-metricas">
-    <h3>4. Métricas</h3>
-    <form method="post" action="{{ public_path('/app/control/lojas/' ~ store.id ~ '/google-ads/metrics/sync') }}" class="form-layout" id="form-google-metricas">
-      <input type="hidden" name="csrf" value="{{ csrf }}">
-      <label>Data inicial
-        <input type="date" name="date_from" value="{{ google_metrics_date_from }}" required>
-      </label>
-      <label>Data final
-        <input type="date" name="date_to" value="{{ google_metrics_date_to }}" required>
-      </label>
-      <button class="button secondary" type="submit">Sincronizar agora</button>
-    </form>
-    {% if google_metrics_summary and (
-      google_metrics_summary.impressions
-      or google_metrics_summary.clicks
-      or google_metrics_summary.cost_micros
-      or google_metrics_summary.conversions
-    ) %}
-    <div class="table-wrap">
-      <table>
-        <tbody>
-          <tr>
-            <th>Alcance e tráfego</th>
-            <td>{{ google_metrics_impressions }} impressões · {{ google_metrics_summary.clicks }} cliques</td>
-          </tr>
-          <tr>
-            <th>Investimento</th>
-            <td>{{ google_metrics_cost_brl }} {{ google_metrics_summary.currency_code or '' }}</td>
-          </tr>
-          <tr>
-            <th>Resultado Google</th>
-            <td>
-              {{ google_metrics_conversions }} conversões
-              {% if google_metrics_summary.roas is not none %}
-              · ROAS {{ '%.2f' | format(google_metrics_summary.roas) }}
-              {% endif %}
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-    {% else %}
-    <div class="empty"><strong>Sem métricas no período selecionado.</strong></div>
-    {% endif %}
-  </section>
-  {% endif %}
-  {% endif %}
-</section>
-{% endif %}
-
-<section class="panel" id="modulos-contratados">
-  <h2>Módulos contratados</h2>
-  {% if modules %}
-  <div class="table-wrap">
-    <table>
-      <thead>
-        <tr>
-          <th>Módulo</th>
-          <th>Estado</th>
-          <th>Versão</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for module in modules %}
-        <tr id="modulo-{{ module.code.value }}">
-          <td>{{ module.name }}</td>
-          <td>{{ module.status.value }}</td>
-          <td>{{ module.version }}</td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
-  {% else %}
-  <div class="empty"><strong>Nenhum módulo contratado.</strong></div>
-  {% endif %}
-  {% if is_admin %}
-  <form method="post" action="{{ public_path('/app/control/lojas/' ~ store.id ~ '/modulos') }}" class="form-layout" id="form-configurar-modulos">
-    <input type="hidden" name="csrf" value="{{ csrf }}">
-    <fieldset>
-      <legend>Módulos da Loja</legend>
-      <div class="option-group">
-        {% for module_option in module_options %}
-        <label>
-          <input
-            id="selecao-modulo-{{ module_option.value }}"
-            type="checkbox"
-            name="modulos"
-            value="{{ module_option.value }}"
-            {% if module_option.value in active_module_codes %}checked{% endif %}
-          >
-          {{ module_option.value | capitalize }}
-        </label>
-        {% endfor %}
-      </div>
-    </fieldset>
-    <button class="button primary" type="submit">Salvar módulos</button>
-  </form>
-  {% endif %}
 </section>
 
-<section class="panel" id="{{ 'contrato-ativo' if contract else 'contrato-ausente' }}">
-  <h2>Contrato</h2>
-  {% if contract %}
-  <div class="table-wrap">
-    <table>
-      <tbody>
-        <tr>
-          <th>Valor mensal</th>
-          <td>{{ contract_amount_brl }}</td>
-        </tr>
-        <tr>
-          <th>Vigência</th>
-          <td>{{ contract.starts_on.strftime('%d/%m/%Y') }} a {{ contract.ends_on.strftime('%d/%m/%Y') if contract.ends_on else 'sem término' }}</td>
-        </tr>
-        <tr>
-          <th>Vencimento</th>
-          <td>Dia {{ contract.due_day }}</td>
-        </tr>
-        <tr>
-          <th>Cobrança</th>
-          <td>{{ contract.billing_status.value }}</td>
-        </tr>
-      </tbody>
-    </table>
-  </div>
-  {% else %}
-  <div class="empty"><strong>Nenhum contrato ativo.</strong></div>
-  {% endif %}
-  {% if is_admin %}
-  <form method="post" action="{{ public_path('/app/control/lojas/' ~ store.id ~ '/contrato') }}" class="form-layout" id="form-configurar-contrato">
-    <input type="hidden" name="csrf" value="{{ csrf }}">
-    <label>Valor mensal
-      <input id="contrato-valor-mensal" type="number" name="valor_mensal" value="{{ contract_form_values.valor_mensal }}" min="0" max="9999999999.99" step="0.01" required>
-    </label>
-    <label>Início da vigência
-      <input id="contrato-vigencia-inicio" type="date" name="vigencia_inicio" value="{{ contract_form_values.vigencia_inicio }}" required>
-    </label>
-    <label>Fim da vigência
-      <input id="contrato-vigencia-fim" type="date" name="vigencia_fim" value="{{ contract_form_values.vigencia_fim }}">
-      <small>Opcional; deve ser igual ou posterior ao início.</small>
-    </label>
-    <label>Dia do vencimento
-      <input id="contrato-vencimento-dia" type="number" name="vencimento_dia" value="{{ contract_form_values.vencimento_dia }}" min="1" max="31" required>
-    </label>
-    <label>Situação da cobrança
-      <select id="contrato-situacao-cobranca" name="situacao_cobranca" required>
-        {% for contract_status in contract_statuses %}
-        <option value="{{ contract_status.value }}" {% if contract_form_values.situacao_cobranca == contract_status.value %}selected{% endif %}>{{ contract_status.value }}</option>
-        {% endfor %}
-      </select>
-    </label>
-    <button class="button primary" type="submit">Salvar contrato</button>
-  </form>
-  {% endif %}
-</section>
+<script>
+  (() => {
+    const tablist = document.querySelector('[data-tabs]');
+    if (!tablist) return;
+    const tabs = Array.from(tablist.querySelectorAll('.control-tab'));
+    const panels = Array.from(document.querySelectorAll('.control-tabpanel'));
+    const names = tabs.map((t) => t.dataset.tab);
 
-{% if is_admin %}
-<section class="panel form-section" id="pessoas-cargos">
-  <h2>Pessoas e cargos</h2>
-  <p class="muted">Cadastre a Pessoa Revy uma vez e atribua somente o cargo estrutural desta Loja.</p>
-  {% if store_people %}
-  <div class="table-wrap">
-    <table id="tabela-cargos-loja">
-      <thead>
-        <tr>
-          <th>Nome</th>
-          <th>E-mail</th>
-          <th>Cargo</th>
-          <th>Ação</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for item in store_people %}
-        <tr>
-          <td>{{ item.person.name }}</td>
-          <td>{{ item.person.email }}</td>
-          <td>{{ item.role.role.value }}</td>
-          <td>
-            <form method="post" action="{{ public_path('/app/control/lojas/' ~ store.id ~ '/cargos/' ~ item.role.id ~ '/revogar') }}" id="form-revogar-cargo-{{ item.role.id }}">
-              <input type="hidden" name="csrf" value="{{ csrf }}">
-              <button class="button secondary" type="submit">Revogar cargo</button>
-            </form>
-          </td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
-  {% else %}
-  <div class="empty"><strong>Nenhum cargo ativo nesta Loja.</strong></div>
-  {% endif %}
+    const activate = (name, { focus = false, push = false } = {}) => {
+      if (!names.includes(name)) name = names[0];
+      tabs.forEach((tab) => {
+        const on = tab.dataset.tab === name;
+        tab.classList.toggle('is-active', on);
+        tab.setAttribute('aria-selected', on ? 'true' : 'false');
+        tab.tabIndex = on ? 0 : -1;
+        if (on && focus) tab.focus();
+      });
+      panels.forEach((panel) => {
+        panel.classList.toggle('is-active', panel.dataset.tab === name);
+      });
+      if (push && window.history) {
+        window.history.replaceState(null, '', '#' + name);
+      }
+    };
 
-  <form method="post" action="{{ public_path('/app/control/lojas/' ~ store.id ~ '/cargos') }}" class="form-layout" id="form-atribuir-cargo">
-    <input type="hidden" name="csrf" value="{{ csrf }}">
-    <label>E-mail da Pessoa Revy
-      <input type="email" name="email" maxlength="320" value="{{ person_form_values.email }}" required>
-    </label>
-    <label>Nome
-      <input type="text" name="nome" maxlength="160" value="{{ person_form_values.nome }}">
-      <small>Obrigatório somente para uma pessoa ainda não cadastrada.</small>
-    </label>
-    <label>Cargo na Loja
-      <select name="cargo" required>
-        {% for role in store_roles %}
-        <option value="{{ role.value }}" {% if person_form_values.cargo == role.value %}selected{% endif %}>{{ role.value }}</option>
-        {% endfor %}
-      </select>
-    </label>
-    <button class="button primary" type="submit">Atribuir cargo</button>
-  </form>
-</section>
+    tabs.forEach((tab) => {
+      tab.addEventListener('click', () => activate(tab.dataset.tab, { push: true }));
+    });
 
-<section class="panel form-section">
-  <h2>Estado da loja</h2>
-  <form method="post" action="{{ public_path('/app/control/lojas/' ~ store.id ~ '/estado') }}" class="form-layout" id="form-alterar-estado">
-    <input type="hidden" name="csrf" value="{{ csrf }}">
-    <label>Novo estado
-      <select name="estado" required>
-        {% for status in store_statuses %}
-        <option value="{{ status.value }}" {% if status == store.status %}selected{% endif %}>{{ status.value | replace('_', ' ') }}</option>
-        {% endfor %}
-      </select>
-    </label>
-    <label>Motivo
-      <input type="text" name="motivo" maxlength="1000">
-    </label>
-    <button class="button primary" type="submit">Atualizar estado</button>
-  </form>
-</section>
+    // Setas navegam entre abas (padrão ARIA tablist).
+    tablist.addEventListener('keydown', (event) => {
+      const current = names.indexOf(document.activeElement.dataset && document.activeElement.dataset.tab);
+      if (current < 0) return;
+      let next = null;
+      if (event.key === 'ArrowRight') next = (current + 1) % tabs.length;
+      else if (event.key === 'ArrowLeft') next = (current - 1 + tabs.length) % tabs.length;
+      else if (event.key === 'Home') next = 0;
+      else if (event.key === 'End') next = tabs.length - 1;
+      if (next === null) return;
+      event.preventDefault();
+      activate(names[next], { focus: true, push: true });
+    });
 
-<section class="panel form-section">
-  <h2>Conceder vínculo de tráfego</h2>
-  <p class="muted">Pessoas entra na Fase 2. Neste corte, informe o ID interno de um gestor ativo.</p>
-  <form method="post" action="{{ public_path('/app/control/lojas/' ~ store.id ~ '/gestores') }}" class="form-layout" id="form-conceder-gestor">
-    <input type="hidden" name="csrf" value="{{ csrf }}">
-    <label>ID do gestor
-      <input type="text" name="gestor_id" maxlength="36" required>
-    </label>
-    <label>Tipo do vínculo
-      <select name="tipo" required>
-        <option value="responsavel">Gestor Responsável</option>
-        <option value="colaborador">Gestor Colaborador</option>
-      </select>
-    </label>
-    <button class="button primary" type="submit">Conceder vínculo</button>
-  </form>
-</section>
+    // Atalhos "próximos passos" e banner trocam de aba.
+    document.querySelectorAll('[data-tab-target]').forEach((el) => {
+      el.addEventListener('click', () => activate(el.dataset.tabTarget, { focus: true, push: true }));
+    });
 
-<section class="panel form-section">
-  <h2>Revogar vínculo de tráfego</h2>
-  <p class="muted">Informe explicitamente o mesmo ID interno usado no vínculo.</p>
-  <form method="post" action="{{ public_path('/app/control/lojas/' ~ store.id ~ '/gestores/revogar') }}" class="form-layout" id="form-revogar-gestor">
-    <input type="hidden" name="csrf" value="{{ csrf }}">
-    <label>ID do gestor
-      <input type="text" name="gestor_id" maxlength="36" required>
-    </label>
-    <label>Motivo
-      <input type="text" name="motivo" maxlength="1000">
-    </label>
-    <button class="button secondary" type="submit">Revogar vínculo</button>
-  </form>
-</section>
-{% endif %}
-
-<section class="panel">
-  <h2>Auditoria</h2>
-  {% if audit_events %}
-  <div class="table-wrap">
-    <table>
-      <thead>
-        <tr>
-          <th>Data</th>
-          <th>Ação</th>
-          <th>Ator</th>
-          <th>Resultado</th>
-          <th>Motivo</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for event in audit_events %}
-        <tr>
-          <td>{{ event.created_at.strftime('%d/%m/%Y %H:%M') if event.created_at.strftime is defined else event.created_at }}</td>
-          <td><code>{{ event.action }}</code></td>
-          <td>{{ event.actor_email or 'sistema' }}</td>
-          <td>{{ event.result.value }}</td>
-          <td>{{ event.reason or '—' }}</td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
-  {% else %}
-  <div class="empty"><strong>Sem eventos de auditoria.</strong></div>
-  {% endif %}
-</section>
+    const fromHash = window.location.hash.replace('#', '');
+    const initial = names.includes(fromHash) ? fromHash : '{{ active_tab }}';
+    activate(initial);
+  })();
+</script>
 {% endblock %}

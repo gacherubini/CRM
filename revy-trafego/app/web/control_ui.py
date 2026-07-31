@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+import unicodedata
 from datetime import date, timedelta
 from decimal import Decimal, InvalidOperation
 from html import escape
@@ -97,6 +98,46 @@ def _public_path(path: str) -> str:
 
 
 templates.env.globals["public_path"] = _public_path
+
+
+def _slugify(value: str) -> str:
+    """Deriva um slug canônico a partir de um texto livre (ex.: nome da loja).
+
+    'Auto Center BH' -> 'auto-center-bh'. Remove acentos, baixa a caixa e troca
+    tudo que não for [a-z0-9] por hífen, colapsando repetições. Devolve '' quando
+    o texto não produz nenhum caractere aproveitável (ex.: só símbolos)."""
+    normalized = unicodedata.normalize("NFKD", value)
+    ascii_only = normalized.encode("ascii", "ignore").decode("ascii").lower()
+    hyphenated = re.sub(r"[^a-z0-9]+", "-", ascii_only)
+    return hyphenated.strip("-")
+
+
+# Painéis do detalhe agrupados em abas. A ordem aqui é a ordem visual das abas.
+_DETAIL_TABS = ("visao", "pessoas", "modulos", "integracoes", "estado", "auditoria")
+
+# Cada alerta de sucesso (?ok=…) reabre a aba onde a ação aconteceu.
+_OK_TO_TAB = {
+    "cargo": "pessoas",
+    "cargo_revogado": "pessoas",
+    "gestor": "pessoas",
+    "revogado": "pessoas",
+    "modulos": "modulos",
+    "contrato": "modulos",
+    "estado": "estado",
+}
+
+
+def _detail_active_tab(request: Request) -> str:
+    """Aba inicial do detalhe: ?tab= explícito, senão derivada de ?ok=, senão visão."""
+    tab = request.query_params.get("tab")
+    if tab in _DETAIL_TABS:
+        return tab
+    ok = request.query_params.get("ok") or ""
+    if ok.startswith("google"):
+        return "integracoes"
+    if ok in _OK_TO_TAB:
+        return _OK_TO_TAB[ok]
+    return "visao"
 
 
 def _format_brl(value: Decimal) -> str:
@@ -268,25 +309,37 @@ async def create_store_page(
         )
 
     name = (form.get("nome") or "").strip()
+    # Endereço da loja (slug) é opcional: se vier vazio, deriva do nome. Assim o
+    # admin não precisa conhecer o formato — a UI mostra o preview e só quem quer
+    # ajustar abre o campo manual.
     slug = (form.get("slug") or "").strip().lower()
+    if not slug:
+        slug = _slugify(name)
     form_values = {"nome": name, "slug": slug}
-    if (
-        not name
-        or len(name) > 160
-        or len(slug) > 120
-        or not re.fullmatch(r"[a-z0-9]+(?:-[a-z0-9]+)*", slug)
-    ):
+    if not name or len(name) > 160:
         return _render_stores_page(
             request,
             db,
             manager,
-            error="Informe um nome e um slug canônico para a Loja.",
+            error="Dê um nome para a loja.",
+            form_values=form_values,
+            status_code=422,
+        )
+    if len(slug) > 120 or not re.fullmatch(r"[a-z0-9]+(?:-[a-z0-9]+)*", slug):
+        return _render_stores_page(
+            request,
+            db,
+            manager,
+            error=(
+                "Não consegui gerar um endereço a partir desse nome. "
+                "Abra “editar” e informe o endereço da loja."
+            ),
             form_values=form_values,
             status_code=422,
         )
 
     try:
-        StoreControl(SessionLocal).create(
+        store = StoreControl(SessionLocal).create(
             actor_from_user(manager),
             CreateStore(name=name, slug=slug),
         )
@@ -295,7 +348,7 @@ async def create_store_page(
             request,
             db,
             manager,
-            error="Já existe uma Loja com esse slug.",
+            error="Já existe uma loja com esse endereço. Abra “editar” e escolha outro.",
             form_values=form_values,
             status_code=409,
         )
@@ -304,8 +357,9 @@ async def create_store_page(
             "<h1>Não foi possível criar a Loja</h1><p>Revise os dados e tente novamente.</p>",
             status_code=409,
         )
+    # Leva o admin direto pra configurar a loja: detalhe em abas, aberto em Pessoas.
     return RedirectResponse(
-        _public_path("/app/control/lojas?created=1"),
+        _public_path(f"/app/control/lojas/{store.id}?created=1&tab=pessoas"),
         status_code=303,
     )
 
@@ -1626,6 +1680,8 @@ def _render_store_detail(
             "store_people": store_people,
             "is_admin": manager.papel == "admin",
             "ok": request.query_params.get("ok"),
+            "created": request.query_params.get("created") == "1",
+            "active_tab": _detail_active_tab(request),
             "erro": error,
             "person_form_values": person_form_values
             or {"email": "", "nome": "", "cargo": StoreRole.SELLER.value},
