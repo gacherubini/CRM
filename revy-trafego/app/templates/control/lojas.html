@@ -13,6 +13,9 @@
 {% if created %}
 <div class="alert success" role="status">Loja criada com sucesso.</div>
 {% endif %}
+{% if excluida %}
+<div class="alert success" role="status">Loja apagada.</div>
+{% endif %}
 {% if erro %}
 <div class="alert error" role="alert">{{ erro }}</div>
 {% endif %}

@@ -378,6 +378,56 @@ def store_detail_page(
     return _render_store_detail(request, db, manager, loja_id)
 
 
+@router.post("/app/control/lojas/{loja_id}/excluir", response_class=HTMLResponse)
+async def delete_store_page(
+    loja_id: str,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    manager, denied = _admin_for_mutation(request, db)
+    if denied is not None:
+        return denied
+    form = await request.form()
+    if not csrf_valido(request, form.get("csrf")):
+        return _csrf_denied()
+
+    actor = actor_from_user(manager)
+    try:
+        store = StoreControl(SessionLocal).get(actor, StoreRef(id=loja_id))
+    except StoreNotFound:
+        return HTMLResponse("Loja não encontrada.", status_code=404)
+
+    # Confirmação: exigir o nome exato evita clique acidental numa ação destrutiva.
+    confirmacao = (form.get("confirmacao") or "").strip()
+    if confirmacao != store.name.strip():
+        return _render_store_detail(
+            request,
+            db,
+            manager,
+            loja_id,
+            error="Digite o nome exato da loja para confirmar a exclusão.",
+            active_tab="estado",
+            status_code=422,
+        )
+
+    try:
+        outcome = StoreControl(SessionLocal).delete(actor, StoreRef(id=loja_id))
+    except AccessDenied:
+        return _access_denied()
+    except StoreNotFound:
+        return HTMLResponse("Loja não encontrada.", status_code=404)
+
+    if outcome == "archived":
+        return RedirectResponse(
+            _detail_path(loja_id, "arquivada"),
+            status_code=303,
+        )
+    return RedirectResponse(
+        _public_path("/app/control/lojas?excluida=1"),
+        status_code=303,
+    )
+
+
 @router.post(
     "/app/control/lojas/{loja_id}/modulos",
     response_class=HTMLResponse,
@@ -1340,6 +1390,7 @@ def _render_stores_page(
             "stores": stores,
             "is_admin": manager.papel == "admin",
             "created": request.query_params.get("created") == "1",
+            "excluida": request.query_params.get("excluida") == "1",
             "erro": error,
             "form_values": form_values or {"nome": "", "slug": ""},
         },
@@ -1470,6 +1521,7 @@ def _render_store_detail(
     error: str | None = None,
     person_form_values: dict[str, str] | None = None,
     contract_form_values: dict[str, str] | None = None,
+    active_tab: str | None = None,
     status_code: int = 200,
 ):
     actor = actor_from_user(manager)
@@ -1681,7 +1733,7 @@ def _render_store_detail(
             "is_admin": manager.papel == "admin",
             "ok": request.query_params.get("ok"),
             "created": request.query_params.get("created") == "1",
-            "active_tab": _detail_active_tab(request),
+            "active_tab": active_tab or _detail_active_tab(request),
             "erro": error,
             "person_form_values": person_form_values
             or {"email": "", "nome": "", "cargo": StoreRole.SELLER.value},

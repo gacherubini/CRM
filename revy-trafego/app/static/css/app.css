@@ -2090,3 +2090,27 @@ tr:hover td { background: var(--surface-soft); }
   }
   .control-tabs::-webkit-scrollbar { display: none; }
 }
+
+/* Zona de risco (excluir loja) — escondida atras de <details> */
+.danger-zone { border-color: color-mix(in srgb, var(--red) 24%, var(--line)); }
+.danger-zone > summary {
+  padding: var(--space-4) var(--space-5);
+  color: var(--red);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  cursor: pointer;
+  list-style: none;
+}
+.danger-zone > summary::-webkit-details-marker { display: none; }
+.danger-zone > summary::before { content: "\26A0  "; }
+.danger-zone[open] > summary { border-bottom: 1px solid var(--line); }
+.danger-zone-body {
+  padding: var(--space-5);
+  display: grid;
+  gap: var(--space-4);
+}
+.danger-zone-body p {
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: var(--text-sm);
+}

@@ -25,6 +25,7 @@ from app.control.types import (
     TransitionStore,
     UpdateStore,
 )
+from app.db import Base
 from app.models import Loja, VinculoTrafego, agora
 
 _ALLOWED_TRANSITIONS = {
@@ -150,6 +151,58 @@ class StoreControl:
             )
             return tuple(_store_view(row) for row in rows)
 
+    def delete(self, actor: Actor, store: StoreRef) -> str:
+        """Remove ou arquiva uma Loja.
+
+        Loja em rascunho é apagada de vez (junto com o que estiver vinculado);
+        loja com qualquer histórico é arquivada (estado `encerrada`), preservando
+        auditoria e dados fiscais. Retorna 'deleted' ou 'archived'."""
+        if not actor.is_admin:
+            raise AccessDenied("somente Admin Revy pode excluir Loja")
+
+        with self._session_factory() as db:
+            row = _find_store(db, store, for_update=True)
+            if row is None:
+                raise StoreNotFound("Loja não encontrada")
+            loja_id = row.id
+            status = StoreStatus(row.status)
+
+            if status is not StoreStatus.DRAFT:
+                if status is StoreStatus.CLOSED:
+                    return "archived"
+                before = {"status": row.status}
+                row.status = StoreStatus.CLOSED.value
+                row.versao += 1
+                row.atualizada_em = agora()
+                _append_event(
+                    db,
+                    actor=actor,
+                    store_id=loja_id,
+                    action="store.archived",
+                    resource_type="loja",
+                    resource_id=loja_id,
+                    before=before,
+                    after={"status": row.status},
+                )
+                db.commit()
+                return "archived"
+
+            # Rascunho: hard delete. Deixa um rastro sem loja_id (a linha da loja
+            # e seus eventos somem) e remove os filhos antes da própria loja.
+            _append_event(
+                db,
+                actor=actor,
+                store_id=None,
+                action="store.deleted",
+                resource_type="loja",
+                resource_id=loja_id,
+                before={"name": row.nome, "slug": row.slug, "status": row.status},
+            )
+            _delete_store_children(db, loja_id)
+            db.delete(row)
+            db.commit()
+            return "deleted"
+
     def transition(self, actor: Actor, command: TransitionStore) -> StoreView:
         if not actor.is_admin:
             raise AccessDenied("somente Admin Revy pode alterar o estado da Loja")
@@ -214,6 +267,23 @@ def _find_store(
     if store.id:
         return query.filter(Loja.id == store.id).first()
     return query.filter(Loja.slug == store.slug.strip().lower()).first()
+
+
+def _delete_store_children(db: Any, loja_id: str) -> None:
+    """Apaga toda linha que referencia esta Loja, folha-primeiro.
+
+    Percorre o metadata do SQLAlchemy em ordem topológica reversa (filhos antes
+    de pais) e, para cada tabela com FK para `lojas`, deleta onde a coluna aponta
+    para `loja_id`. É genérico de propósito: uma tabela nova que referencie a
+    Loja passa a ser limpa aqui sem precisar editar este método."""
+    lojas_table = Loja.__table__
+    for table in reversed(Base.metadata.sorted_tables):
+        if table is lojas_table:
+            continue
+        for fk in table.foreign_keys:
+            if fk.column.table is lojas_table:
+                db.execute(table.delete().where(fk.parent == loja_id))
+                break
 
 
 def _store_view(store: Loja) -> StoreView:

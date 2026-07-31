@@ -27,6 +27,8 @@
 
 {% if ok == 'estado' %}
 <div class="alert success" role="status">Estado da Loja atualizado.</div>
+{% elif ok == 'arquivada' %}
+<div class="alert success" role="status">Loja arquivada (encerrada). Ela sai das listas ativas, mas o histórico é mantido.</div>
 {% elif ok == 'gestor' %}
 <div class="alert success" role="status">Gestor vinculado à Loja.</div>
 {% elif ok == 'revogado' %}
@@ -545,6 +547,26 @@
       <button class="button primary" type="submit">Atualizar estado</button>
     </form>
   </section>
+
+  <details class="panel danger-zone" id="zona-de-risco">
+    <summary>Zona de risco</summary>
+    <div class="danger-zone-body">
+      {% if store.status.value == 'rascunho' %}
+      <p>Esta loja está em <strong>rascunho</strong>. Apagar remove tudo permanentemente e não dá para desfazer.</p>
+      {% else %}
+      <p>Esta loja já tem histórico, então "excluir" vai <strong>arquivá-la</strong> (estado encerrada): ela sai das listas ativas, mas a auditoria e os dados ficam guardados.</p>
+      {% endif %}
+      <form method="post" action="{{ public_path('/app/control/lojas/' ~ store.id ~ '/excluir') }}" class="form-layout" id="form-excluir-loja" data-confirm-name="{{ store.name }}">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <label>Digite <strong>{{ store.name }}</strong> para confirmar
+          <input type="text" name="confirmacao" autocomplete="off" data-confirm-input>
+        </label>
+        <button class="button danger" type="submit" data-confirm-submit>
+          {% if store.status.value == 'rascunho' %}Apagar loja{% else %}Arquivar loja{% endif %}
+        </button>
+      </form>
+    </div>
+  </details>
 </section>
 {% endif %}
 
@@ -634,6 +656,18 @@
     const fromHash = window.location.hash.replace('#', '');
     const initial = names.includes(fromHash) ? fromHash : '{{ active_tab }}';
     activate(initial);
+  })();
+
+  // Zona de risco: só libera o botão quando o nome digitado bate com o da loja.
+  (() => {
+    const form = document.getElementById('form-excluir-loja');
+    if (!form) return;
+    const input = form.querySelector('[data-confirm-input]');
+    const submit = form.querySelector('[data-confirm-submit]');
+    const expected = (form.dataset.confirmName || '').trim();
+    const sync = () => { submit.disabled = input.value.trim() !== expected; };
+    input.addEventListener('input', sync);
+    sync();
   })();
 </script>
 {% endblock %}
