@@ -150,6 +150,22 @@ class Settings:
     service_token: str = os.getenv("REVY_TRAFEGO_SERVICE_TOKEN", "").strip()
     # Prefixo público no edge (ex.: /trafego no app2037). Vazio em local puro.
     url_prefix_raw: str = os.getenv("REVY_TRAFEGO_URL_PREFIX", "").strip()
+    email_backend: str = os.getenv("REVY_TRAFEGO_EMAIL_BACKEND", "console").strip().lower()
+    email_from: str = os.getenv("REVY_TRAFEGO_EMAIL_FROM", "no-reply@revy.local").strip()
+    email_from_name: str = os.getenv(
+        "REVY_TRAFEGO_EMAIL_FROM_NAME", "Revy Control"
+    ).strip()
+    smtp_host: str = os.getenv("REVY_TRAFEGO_SMTP_HOST", "").strip()
+    smtp_port: int = int(os.getenv("REVY_TRAFEGO_SMTP_PORT", "587"))
+    smtp_username: str = os.getenv("REVY_TRAFEGO_SMTP_USERNAME", "").strip()
+    smtp_password: str = os.getenv("REVY_TRAFEGO_SMTP_PASSWORD", "")
+    smtp_use_tls: bool = os.getenv("REVY_TRAFEGO_SMTP_USE_TLS", "1").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
+    public_base_url_raw: str = os.getenv("REVY_TRAFEGO_PUBLIC_BASE_URL", "").strip()
 
     @property
     def url_prefix(self) -> str:
@@ -159,6 +175,17 @@ class Settings:
         if not raw.startswith("/"):
             raw = "/" + raw
         return raw.rstrip("/")
+
+    @property
+    def public_base_url(self) -> str:
+        return (self.public_base_url_raw or "").rstrip("/")
+
+    def absolute_url(self, path: str) -> str:
+        """URL absoluta para links de e-mail (origem externa + prefixo do edge)."""
+        normalized = path if path.startswith("/") else f"/{path}"
+        prefixed = f"{self.url_prefix}{normalized}"
+        base = self.public_base_url
+        return f"{base}{prefixed}" if base else prefixed
 
     def chatbot_token_para(self, loja_slug: str) -> str:
         """Resolve credencial por loja; falha fechado se o escopo for ambiguo."""
