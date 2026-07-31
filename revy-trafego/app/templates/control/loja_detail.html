@@ -167,39 +167,6 @@
       <button class="button primary" type="submit">Atribuir cargo</button>
     </form>
   </section>
-
-  <section class="panel form-section">
-    <h2>Conceder vínculo de tráfego</h2>
-    <p class="muted">Pessoas entra na Fase 2. Neste corte, informe o ID interno de um gestor ativo.</p>
-    <form method="post" action="{{ public_path('/app/control/lojas/' ~ store.id ~ '/gestores') }}" class="form-layout" id="form-conceder-gestor">
-      <input type="hidden" name="csrf" value="{{ csrf }}">
-      <label>ID do gestor
-        <input type="text" name="gestor_id" maxlength="36" required>
-      </label>
-      <label>Tipo do vínculo
-        <select name="tipo" required>
-          <option value="responsavel">Gestor Responsável</option>
-          <option value="colaborador">Gestor Colaborador</option>
-        </select>
-      </label>
-      <button class="button primary" type="submit">Conceder vínculo</button>
-    </form>
-  </section>
-
-  <section class="panel form-section">
-    <h2>Revogar vínculo de tráfego</h2>
-    <p class="muted">Informe explicitamente o mesmo ID interno usado no vínculo.</p>
-    <form method="post" action="{{ public_path('/app/control/lojas/' ~ store.id ~ '/gestores/revogar') }}" class="form-layout" id="form-revogar-gestor">
-      <input type="hidden" name="csrf" value="{{ csrf }}">
-      <label>ID do gestor
-        <input type="text" name="gestor_id" maxlength="36" required>
-      </label>
-      <label>Motivo
-        <input type="text" name="motivo" maxlength="1000">
-      </label>
-      <button class="button secondary" type="submit">Revogar vínculo</button>
-    </form>
-  </section>
 </section>
 {% endif %}
 

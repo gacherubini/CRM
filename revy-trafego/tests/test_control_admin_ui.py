@@ -247,8 +247,6 @@ def test_detalhe_mostra_estado_e_auditoria_somente_no_escopo(
     assert "store.created" in admin_page.text
     assert "traffic_access.granted" in admin_page.text
     assert 'id="form-alterar-estado"' in admin_page.text
-    assert 'id="form-conceder-gestor"' in admin_page.text
-    assert 'id="form-revogar-gestor"' in admin_page.text
 
     client.cookies.clear()
     _login(client, "gestor.detalhe@revy.local", "senha-detalhe")
@@ -259,8 +257,6 @@ def test_detalhe_mostra_estado_e_auditoria_somente_no_escopo(
     assert "Loja Detalhada" in manager_page.text
     assert "traffic_access.granted" in manager_page.text
     assert 'id="form-alterar-estado"' not in manager_page.text
-    assert 'id="form-conceder-gestor"' not in manager_page.text
-    assert 'id="form-revogar-gestor"' not in manager_page.text
     assert hidden.status_code == 404
 
 
