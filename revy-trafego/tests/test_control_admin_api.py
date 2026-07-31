@@ -246,9 +246,11 @@ def test_admin_transiciona_loja_e_salto_invalido_retorna_conflito(
         f"/control/v1/lojas/{created['id']}/estado",
         json={"estado": "em_configuracao", "motivo": "onboarding iniciado"},
     )
+    # em_configuracao -> encerrada continua sendo um salto inválido (ativa agora
+    # é permitida direto, então deixou de servir como exemplo de transição proibida).
     invalid = client.post(
         f"/control/v1/lojas/{created['id']}/estado",
-        json={"estado": "ativa"},
+        json={"estado": "encerrada"},
     )
 
     assert transitioned.status_code == 200

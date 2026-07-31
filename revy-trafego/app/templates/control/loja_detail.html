@@ -530,6 +530,24 @@
 {% if is_admin %}
 <!-- Estado ------------------------------------------------------------------ -->
 <section class="control-tabpanel" role="tabpanel" id="panel-estado" data-tab="estado" aria-labelledby="tab-estado" tabindex="0">
+  {% if store.status.value == 'ativa' %}
+  <section class="panel form-section" id="ativar-loja">
+    <h2>Ativar loja</h2>
+    <p class="muted">Esta loja já está ativa. 🎉</p>
+  </section>
+  {% elif store.status.value != 'encerrada' %}
+  <section class="panel form-section" id="ativar-loja">
+    <h2>Ativar loja</h2>
+    <p class="muted">Publica a loja num passo (rascunho → ativada). Precisa de um dono com acesso e ao menos um módulo ativo — se faltar, eu aviso o que é.</p>
+    <form method="post" action="{{ public_path('/app/control/lojas/' ~ store.id ~ '/estado') }}" class="form-layout" id="form-ativar-loja">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <input type="hidden" name="estado" value="ativa">
+      <input type="hidden" name="motivo" value="Ativação direta pelo Control">
+      <button class="button primary" type="submit">Ativar loja</button>
+    </form>
+  </section>
+  {% endif %}
+
   <section class="panel form-section">
     <h2>Estado da loja</h2>
     <form method="post" action="{{ public_path('/app/control/lojas/' ~ store.id ~ '/estado') }}" class="form-layout" id="form-alterar-estado">

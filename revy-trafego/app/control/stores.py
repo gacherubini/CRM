@@ -28,9 +28,12 @@ from app.control.types import (
 from app.db import Base
 from app.models import Loja, VinculoTrafego, agora
 
+# Rascunho e Em configuração podem ir direto para Ativa (ativação em 1 clique).
+# O salto continua passando pelo gate de prontidão (dono + módulo) em `transition`,
+# então "direto" não significa "sem requisitos": significa "sem subir degrau a degrau".
 _ALLOWED_TRANSITIONS = {
-    StoreStatus.DRAFT: frozenset({StoreStatus.CONFIGURING}),
-    StoreStatus.CONFIGURING: frozenset({StoreStatus.READY}),
+    StoreStatus.DRAFT: frozenset({StoreStatus.CONFIGURING, StoreStatus.ACTIVE}),
+    StoreStatus.CONFIGURING: frozenset({StoreStatus.READY, StoreStatus.ACTIVE}),
     StoreStatus.READY: frozenset({StoreStatus.ACTIVE}),
     StoreStatus.ACTIVE: frozenset({StoreStatus.SUSPENDED}),
     StoreStatus.SUSPENDED: frozenset({StoreStatus.ACTIVE, StoreStatus.CLOSED}),

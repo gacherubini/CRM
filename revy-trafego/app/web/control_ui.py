@@ -78,8 +78,9 @@ from app.control.types import (
     TrafficRole,
     TransitionStore,
 )
+from app.control.readiness import build_readiness_report
 from app.db import SessionLocal, get_db
-from app.models import GoogleAdsOAuthState
+from app.models import GoogleAdsOAuthState, Loja
 
 # redirect_uri registrado no Google Cloud Console (GOOGLE_ADS_OAUTH_REDIRECT_URI)
 # deve apontar para esta rota HTML; o endpoint JSON equivalente
@@ -125,6 +126,38 @@ _OK_TO_TAB = {
     "contrato": "modulos",
     "estado": "estado",
 }
+
+
+# Rótulos amigáveis para o que falta a loja cumprir antes de ativar.
+_REQUIREMENT_LABELS = {
+    "active_owner": "um dono com acesso ativo",
+    "activatable_owner": "um dono com acesso ativo",
+    "module_selected": "pelo menos um módulo ativo (Vendas ou Estoque)",
+}
+
+
+def _readiness_missing_message(loja_id: str) -> str:
+    """Monta 'A loja ainda não está pronta. Falta: X e Y' com o que ficou pendente."""
+    with SessionLocal() as db:
+        store = db.query(Loja).filter(Loja.id == loja_id).first()
+        if store is None:
+            return "Não foi possível concluir: loja não encontrada."
+        report = build_readiness_report(db, store)
+    faltas: list[str] = []
+    for check in report.checks:
+        if check.severity == "required" and not check.ok:
+            label = _REQUIREMENT_LABELS.get(check.code)
+            if label and label not in faltas:
+                faltas.append(label)
+    if not faltas:
+        return "A loja ainda não está pronta. Revise a configuração e tente de novo."
+    if len(faltas) == 1:
+        return f"A loja ainda não está pronta. Falta {faltas[0]}."
+    return (
+        "A loja ainda não está pronta. Falta "
+        + ", ".join(faltas[:-1])
+        + f" e {faltas[-1]}."
+    )
 
 
 def _detail_active_tab(request: Request) -> str:
@@ -762,6 +795,7 @@ async def transition_store_page(
             manager,
             loja_id,
             error="Selecione um estado válido para a Loja.",
+            active_tab="estado",
             status_code=422,
         )
     try:
@@ -775,13 +809,24 @@ async def transition_store_page(
         )
     except StoreNotFound:
         return HTMLResponse("Loja não encontrada.", status_code=404)
-    except (InvalidStoreTransition, StoreReadinessBlocked) as exc:
+    except StoreReadinessBlocked:
+        return _render_store_detail(
+            request,
+            db,
+            manager,
+            loja_id,
+            error=_readiness_missing_message(loja_id),
+            active_tab="estado",
+            status_code=409,
+        )
+    except InvalidStoreTransition as exc:
         return _render_store_detail(
             request,
             db,
             manager,
             loja_id,
             error=str(exc),
+            active_tab="estado",
             status_code=409,
         )
     return RedirectResponse(

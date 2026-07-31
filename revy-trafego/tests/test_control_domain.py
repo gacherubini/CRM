@@ -22,6 +22,7 @@ from app.control.types import (
     StoreEditConflict,
     StoreRef,
     StoreNotFound,
+    StoreReadinessBlocked,
     StoreRole,
     StoreStatus,
     TrafficRole,
@@ -187,7 +188,9 @@ def test_criar_loja_normaliza_espacos_externos_e_caixa_do_slug():
     assert created.slug == "loja-centro"
 
 
-def test_loja_rascunho_nao_pode_saltar_direto_para_ativa():
+def test_loja_rascunho_ativa_direto_mas_exige_prontidao():
+    # Ativação em 1 clique: rascunho -> ativa é permitido como transição, mas
+    # sem dono/módulo o gate de prontidão bloqueia e a loja segue em rascunho.
     stores = StoreControl(SessionLocal)
     admin = _admin_actor()
     store = stores.create(
@@ -195,7 +198,7 @@ def test_loja_rascunho_nao_pode_saltar_direto_para_ativa():
         CreateStore(name="Loja Norte", slug="loja-norte"),
     )
 
-    with pytest.raises(InvalidStoreTransition) as error:
+    with pytest.raises(StoreReadinessBlocked):
         stores.transition(
             admin,
             TransitionStore(
@@ -204,8 +207,6 @@ def test_loja_rascunho_nao_pode_saltar_direto_para_ativa():
             ),
         )
 
-    assert error.value.current is StoreStatus.DRAFT
-    assert error.value.target is StoreStatus.ACTIVE
     assert stores.get(admin, StoreRef(id=store.id)).status is StoreStatus.DRAFT
 
 

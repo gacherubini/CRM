@@ -231,7 +231,8 @@ def test_prontidao_sem_dono_ativo_retorna_erro_no_detalhe(
     )
 
     assert blocked.status_code == 409
-    assert "Loja precisa manter ao menos um Dono ativo neste estado" in blocked.text
+    assert "A loja ainda não está pronta" in blocked.text
+    assert "um dono com acesso ativo" in blocked.text
     assert "em_configuracao" in blocked.text
 
 
