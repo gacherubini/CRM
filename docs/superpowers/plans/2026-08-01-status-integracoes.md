@@ -8,6 +8,13 @@
 
 **Tech Stack:** FastAPI, SQLAlchemy, httpx, pytest — tudo em `revy-trafego` na Fase 1.
 
+## Decisões do owner (2026-08-01) — vinculantes
+
+1. **WhatsApp (multi-número):** o badge fica 🟢 **só se TODOS os números conectados**; se qualquer um caiu → 🔴 (detalhe de qual ao expandir). **Sem nenhum número cadastrado → ⚪ missing** (não vermelho).
+2. **Atualização na tela:** carrega no open (do cache) + botão **"Testar agora"** (fura o cache). **Sem auto-poll** em background.
+3. **Autonomia de execução:** implementar as 4 fases, testes verdes, review por task, e **mergear na `main`** conforme cada fase fica pronta. **NÃO deployar** nem subir o Fly (fica pro owner).
+4. **UX/acesso:** badge é **só status (não clicável)**; visível **apenas a dono/gerente** (não vendedor). Sem link pra tela de config nesta versão.
+
 ## Global Constraints
 
 - Rodar testes de `revy-trafego/` com `.venv/bin/python -m pytest -q`.
