@@ -19,6 +19,7 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Callable, Protocol
 
+from app.clients.chatbot import ChatbotClient
 from app.config import settings
 from app.control.graph_probe import GraphProbe
 from app.control.health_cache import TTLCache
@@ -167,6 +168,78 @@ def check_google(
 
     item = ItemHealth(kind="google_ads", status=HealthStatus.CONNECTED, message=None)
     return GroupHealth(status=HealthStatus.CONNECTED, itens=(item,))
+
+
+class WhatsappPort(Protocol):
+    """Porta fina e injetável para listar canais WhatsApp de uma loja.
+
+    Retorna `None` quando o chatbot não está configurado para a loja (→
+    MISSING) e deixa a exceção propagar quando a chamada falha de fato (→
+    ERROR, tratado por `check_whatsapp`).
+    """
+
+    def listar_canais(self, loja_slug: str) -> list[dict] | None: ...
+
+
+@dataclass(frozen=True)
+class ChatbotWhatsappPort:
+    """Implementação real de `WhatsappPort`, sobre `ChatbotClient`."""
+
+    def listar_canais(self, loja_slug: str) -> list[dict] | None:
+        client = ChatbotClient(
+            settings.chatbot_url,
+            settings.chatbot_token_para(loja_slug),
+            settings.request_timeout,
+        )
+        if not client.configurado:
+            return None
+        return client.listar_canais_whatsapp()
+
+
+def check_whatsapp(store: StoreView | Loja, port: WhatsappPort) -> GroupHealth:
+    """Consulta os canais WhatsApp da Loja no Chatbot e resume a saúde do grupo.
+
+    Nunca loga/retorna segredo do chatbot: o `label` exibido é o
+    telefone/rótulo do canal (dado da própria loja), não uma credencial.
+    """
+    try:
+        canais = port.listar_canais(store.slug)
+    except Exception:
+        item = ItemHealth(
+            kind="whatsapp", status=HealthStatus.ERROR, message="falha ao consultar WhatsApp"
+        )
+        return GroupHealth(status=HealthStatus.ERROR, itens=(item,))
+
+    if canais is None:
+        item = ItemHealth(kind="whatsapp", status=HealthStatus.MISSING, message=None)
+        return GroupHealth(status=HealthStatus.MISSING, itens=(item,))
+
+    operaveis = [
+        canal
+        for canal in canais
+        if canal.get("ativo") and canal.get("estado") != "inativo"
+    ]
+    if not operaveis:
+        item = ItemHealth(kind="whatsapp", status=HealthStatus.MISSING, message=None)
+        return GroupHealth(status=HealthStatus.MISSING, itens=(item,))
+
+    itens: list[ItemHealth] = []
+    for canal in operaveis:
+        estado = canal.get("estado")
+        label = canal.get("e164_or_label")
+        if estado == "conectado":
+            itens.append(ItemHealth(kind="whatsapp", status=HealthStatus.CONNECTED, message=None))
+        else:
+            itens.append(
+                ItemHealth(
+                    kind="whatsapp",
+                    status=HealthStatus.ERROR,
+                    message=f"{label}: {estado}",
+                )
+            )
+
+    itens_tuple = tuple(itens)
+    return GroupHealth(status=_group_status(itens_tuple), itens=itens_tuple)
 
 
 def _serializar_grupo(grupo: GroupHealth) -> dict[str, Any]:

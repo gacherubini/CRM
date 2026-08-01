@@ -185,6 +185,12 @@ class ChatbotClient:
     def listar_numeros_cadastro(self) -> list[dict]:
         return self._request("GET", "/v1/operacao/numeros-autorizados")["numeros"]
 
+    # --- WhatsApp: canais --------------------------------------------------
+
+    def listar_canais_whatsapp(self) -> list[dict]:
+        dados = self._request("GET", "/v1/whatsapp/canais")
+        return list(dados.get("canais") or [])
+
     def adicionar_numero_cadastro(self, telefone: str, nome: str | None = None) -> dict:
         return self._request(
             "POST",
