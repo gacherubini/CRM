@@ -156,6 +156,10 @@ class IntegrationsControl:
                 db.rollback()
                 raise
             db.refresh(config)
+
+            from app.control.integrations_health import invalidar
+
+            invalidar(store.id)
             return _pixel_view(store, config)
 
     def disconnect_pixel(
@@ -196,6 +200,10 @@ class IntegrationsControl:
                 db.rollback()
                 raise
             db.refresh(config)
+
+            from app.control.integrations_health import invalidar
+
+            invalidar(store.id)
             return _pixel_view(store, config)
 
     def upsert_meta_ads(
@@ -249,6 +257,10 @@ class IntegrationsControl:
                 db.rollback()
                 raise
             db.refresh(config)
+
+            from app.control.integrations_health import invalidar
+
+            invalidar(store.id)
             return _ads_view(store, config)
 
     def disconnect_meta_ads(
@@ -290,6 +302,10 @@ class IntegrationsControl:
                 db.rollback()
                 raise
             db.refresh(config)
+
+            from app.control.integrations_health import invalidar
+
+            invalidar(store.id)
             return _ads_view(store, config)
 
 

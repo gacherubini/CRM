@@ -578,6 +578,10 @@ class GoogleAdsConnectionControl:
             )
             db.commit()
             db.refresh(connection)
+
+            from app.control.integrations_health import invalidar
+
+            invalidar(loja_id)
             return _connection_view(connection)
 
     def get(
@@ -642,6 +646,10 @@ class GoogleAdsConnectionControl:
             )
             db.commit()
             db.refresh(connection)
+
+            from app.control.integrations_health import invalidar
+
+            invalidar(loja.id)
             return _connection_view(connection)
 
     def decrypt_refresh_token(self, connection_id: str) -> str | None:
