@@ -100,6 +100,7 @@ from app.config import (
 from app.loja.redirects import resolve_legacy_redirect, should_consider_request
 from app.web.loja_shell import check_module_access, router as loja_shell_router
 from app.web.owner_invitations import router as owner_invitations_router
+from app.web.password_reset import router as password_reset_router
 from app.web import loja_shell as loja_shell_mod
 from app.loja.types import Module
 from app.roi_calc import calcular_roi_loja, gerar_insights_roi, totais_roi, venda_casa_campanha
@@ -312,6 +313,7 @@ app.add_middleware(
 app.mount("/static", StaticFiles(directory=str(BASE_DIR / "static")), name="static")
 app.include_router(loja_shell_router)
 app.include_router(owner_invitations_router)
+app.include_router(password_reset_router)
 
 
 @app.middleware("http")

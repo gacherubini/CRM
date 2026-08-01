@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <title>Nova senha — Revy</title>
+  <link rel="stylesheet" href="/static/css/app.css">
+</head>
+<body class="login-page">
+  <main class="login-layout">
+    <section class="login-story">
+      <span class="eyebrow">Revy</span>
+      <h1>Definir nova senha.</h1>
+      <p>Escolha uma senha com pelo menos 12 caracteres.</p>
+    </section>
+    <section class="login-panel">
+      <div class="login-card">
+        <span class="brand-mark" style="display:inline-grid;margin-bottom:16px">R</span>
+        <div><h2>Criar nova senha</h2></div>
+        {% if erro %}<div class="alert error" role="alert">{{ erro }}</div>{% endif %}
+        <form method="post" action="/senha/redefinir" class="stack-form">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          <input type="hidden" name="token" value="{{ token }}">
+          <label>Nova senha<input type="password" name="senha" minlength="12" maxlength="256" autocomplete="new-password" required></label>
+          <label>Confirmar senha<input type="password" name="senha_confirmacao" minlength="12" maxlength="256" autocomplete="new-password" required></label>
+          <button class="button primary" type="submit">Salvar nova senha</button>
+        </form>
+        <p><a href="/login">Voltar ao login</a></p>
+      </div>
+    </section>
+  </main>
+</body>
+</html>
