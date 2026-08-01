@@ -261,15 +261,17 @@ def health_da_loja(
     *,
     probe: GraphProbe,
     exchanger: GoogleAccessTokenPort,
+    whatsapp_port: WhatsappPort,
     forcar: bool = False,
     cache: TTLCache | None = None,
     clock: Callable[[], Any] | None = None,
 ) -> dict[str, Any]:
-    """Agrega `check_meta` + `check_google` no contrato JSON do Revy Control.
+    """Agrega `check_meta` + `check_google` + `check_whatsapp` no contrato JSON
+    do Revy Control.
 
     Usa `cache` (Task 1, `TTLCache`) para evitar rechecagem de tokens a cada
-    request; `forcar=True` ignora o cache e recheca de fato. WhatsApp entra
-    numa fase futura — não incluído aqui.
+    request; `forcar=True` ignora o cache e recheca de fato. Num cache HIT,
+    `whatsapp_port` não é chamado (assim como `probe`/`exchanger`).
     """
     active_cache = cache if cache is not None else _CACHE
     key = (store.id,)
@@ -281,6 +283,7 @@ def health_da_loja(
 
     meta = check_meta(db, store, probe)
     google = check_google(db, store, exchanger)
+    whatsapp = check_whatsapp(store, whatsapp_port)
 
     checked_at = clock() if clock is not None else agora()
     checked_at_iso = checked_at.isoformat() if hasattr(checked_at, "isoformat") else str(checked_at)
@@ -288,6 +291,7 @@ def health_da_loja(
     resultado = {
         "meta": _serializar_grupo(meta),
         "google": _serializar_grupo(google),
+        "whatsapp": _serializar_grupo(whatsapp),
         "checked_at": checked_at_iso,
         "cache_ttl_seg": settings.integracoes_health_ttl_seg,
     }

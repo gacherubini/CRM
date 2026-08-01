@@ -36,6 +36,7 @@ from app.control.google_ads_conversions import GoogleAdsInvalidConversionBinding
 from app.control.google_ads_http import build_google_ads_ports
 from app.control.graph_probe import GraphProbe, HttpGraphProbe
 from app.control.integrations_health import (
+    ChatbotWhatsappPort,
     GoogleAccessTokenPort,
     HttpGoogleAccessTokenPort,
     health_da_loja,
@@ -508,6 +509,12 @@ def _build_exchanger() -> GoogleAccessTokenPort:
     return HttpGoogleAccessTokenPort(exchanger=ports.read_port)
 
 
+def _build_whatsapp_port() -> ChatbotWhatsappPort:
+    """Port real do WhatsApp (via Chatbot). Isolada para permitir monkeypatch
+    em teste (mesmo motivo de `_build_probe`/`_build_exchanger`)."""
+    return ChatbotWhatsappPort()
+
+
 @router.get("/control/v1/lojas/{loja_id}/integracoes/health")
 def get_store_integrations_health(
     loja_id: str,
@@ -541,6 +548,7 @@ def get_store_integrations_health(
             store,
             probe=_build_probe(),
             exchanger=_build_exchanger(),
+            whatsapp_port=_build_whatsapp_port(),
             forcar=bool(forcar),
         )
     except Exception:

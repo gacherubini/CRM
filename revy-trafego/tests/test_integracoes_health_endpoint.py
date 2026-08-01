@@ -49,9 +49,17 @@ class FakeExchanger:
         return "access-fake"
 
 
+class FakeWhatsappPort:
+    def listar_canais(self, loja_slug: str):
+        return None
+
+
 def _patch_fakes(monkeypatch):
     monkeypatch.setattr(control_ui_mod, "_build_probe", lambda: FakeGraphProbe())
     monkeypatch.setattr(control_ui_mod, "_build_exchanger", lambda: FakeExchanger())
+    monkeypatch.setattr(
+        control_ui_mod, "_build_whatsapp_port", lambda: FakeWhatsappPort()
+    )
 
 
 def test_health_endpoint_retorna_200_com_meta_e_google(client_logado, monkeypatch):
@@ -65,8 +73,10 @@ def test_health_endpoint_retorna_200_com_meta_e_google(client_logado, monkeypatc
     body = response.json()
     assert "meta" in body
     assert "google" in body
+    assert "whatsapp" in body
     assert "status" in body["meta"]
     assert "status" in body["google"]
+    assert "status" in body["whatsapp"]
 
 
 def test_health_endpoint_aceita_forcar_1(client_logado, monkeypatch):

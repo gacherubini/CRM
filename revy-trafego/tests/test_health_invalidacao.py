@@ -27,6 +27,7 @@ from app.control.integrations_health import HealthStatus, health_da_loja
 from app.control.types import Actor, StoreRef
 from app.db import SessionLocal
 from app.models import GestorRevy, Loja
+from tests.test_integrations_health_whatsapp import FakeWppPort
 
 
 def _admin_actor() -> Actor:
@@ -71,6 +72,12 @@ def _load_store(store_id: str, db) -> Loja:
     return db.query(Loja).filter(Loja.id == store_id).one()
 
 
+def _wpp() -> FakeWppPort:
+    # WhatsApp não é o alvo deste teste (invalidação de Meta/Google): fica
+    # sempre MISSING, sem afetar as asserções em `out["meta"]`/`out["google"]`.
+    return FakeWppPort(indisponivel=True)
+
+
 def test_upsert_pixel_invalida_cache_de_health():
     store_id = _create_store("loja-health-inv-upsert-pixel")
     actor = _admin_actor()
@@ -84,11 +91,11 @@ def test_upsert_pixel_invalida_cache_de_health():
     probe = FakeGraphProbe()
     with SessionLocal() as db:
         loja = _load_store(store_id, db)
-        health_da_loja(db, loja, probe=probe, exchanger=FakeExchanger())
+        health_da_loja(db, loja, probe=probe, exchanger=FakeExchanger(), whatsapp_port=_wpp())
         n1 = probe.chamadas
         assert n1 > 0
 
-        health_da_loja(db, loja, probe=probe, exchanger=FakeExchanger())
+        health_da_loja(db, loja, probe=probe, exchanger=FakeExchanger(), whatsapp_port=_wpp())
         assert probe.chamadas == n1  # cache hit, ainda não invalidado
 
     # Reconecta com token novo: deve invalidar o cache da loja.
@@ -99,7 +106,7 @@ def test_upsert_pixel_invalida_cache_de_health():
 
     with SessionLocal() as db:
         loja = _load_store(store_id, db)
-        health_da_loja(db, loja, probe=probe, exchanger=FakeExchanger())
+        health_da_loja(db, loja, probe=probe, exchanger=FakeExchanger(), whatsapp_port=_wpp())
         assert probe.chamadas > n1  # invalidado pelo upsert, rechecou de fato
 
 
@@ -116,17 +123,17 @@ def test_disconnect_pixel_invalida_cache_de_health():
     probe = FakeGraphProbe(ok=True)
     with SessionLocal() as db:
         loja = _load_store(store_id, db)
-        out1 = health_da_loja(db, loja, probe=probe, exchanger=FakeExchanger())
+        out1 = health_da_loja(db, loja, probe=probe, exchanger=FakeExchanger(), whatsapp_port=_wpp())
         assert out1["meta"]["status"] == HealthStatus.CONNECTED.value
 
-        out2 = health_da_loja(db, loja, probe=probe, exchanger=FakeExchanger())
+        out2 = health_da_loja(db, loja, probe=probe, exchanger=FakeExchanger(), whatsapp_port=_wpp())
         assert out2["meta"]["status"] == HealthStatus.CONNECTED.value  # cache hit
 
     control.disconnect_pixel(actor, StoreRef(id=store_id))
 
     with SessionLocal() as db:
         loja = _load_store(store_id, db)
-        out3 = health_da_loja(db, loja, probe=probe, exchanger=FakeExchanger())
+        out3 = health_da_loja(db, loja, probe=probe, exchanger=FakeExchanger(), whatsapp_port=_wpp())
         # Sem a invalidação, o resultado CONNECTED antigo ficaria em cache até o
         # TTL expirar; com a invalidação, a rechecagem reflete o estado real
         # (pixel desconectado) imediatamente.
@@ -153,10 +160,10 @@ def test_google_ads_connect_e_disconnect_invalidam_cache_de_health():
 
     with SessionLocal() as db:
         loja = _load_store(store_id, db)
-        out1 = health_da_loja(db, loja, probe=FakeGraphProbe(), exchanger=FakeExchanger())
+        out1 = health_da_loja(db, loja, probe=FakeGraphProbe(), exchanger=FakeExchanger(), whatsapp_port=_wpp())
         assert out1["google"]["status"] == HealthStatus.MISSING.value
 
-        out2 = health_da_loja(db, loja, probe=FakeGraphProbe(), exchanger=FakeExchanger())
+        out2 = health_da_loja(db, loja, probe=FakeGraphProbe(), exchanger=FakeExchanger(), whatsapp_port=_wpp())
         assert out2["google"]["status"] == HealthStatus.MISSING.value  # cache hit
 
     # Conecta: deve invalidar o cache imediatamente.
@@ -165,10 +172,10 @@ def test_google_ads_connect_e_disconnect_invalidam_cache_de_health():
 
     with SessionLocal() as db:
         loja = _load_store(store_id, db)
-        out3 = health_da_loja(db, loja, probe=FakeGraphProbe(), exchanger=FakeExchanger())
+        out3 = health_da_loja(db, loja, probe=FakeGraphProbe(), exchanger=FakeExchanger(), whatsapp_port=_wpp())
         assert out3["google"]["status"] == HealthStatus.CONNECTED.value
 
-        out4 = health_da_loja(db, loja, probe=FakeGraphProbe(), exchanger=FakeExchanger())
+        out4 = health_da_loja(db, loja, probe=FakeGraphProbe(), exchanger=FakeExchanger(), whatsapp_port=_wpp())
         assert out4["google"]["status"] == HealthStatus.CONNECTED.value  # cache hit
 
     # Desconecta: deve invalidar o cache imediatamente.
@@ -176,5 +183,5 @@ def test_google_ads_connect_e_disconnect_invalidam_cache_de_health():
 
     with SessionLocal() as db:
         loja = _load_store(store_id, db)
-        out5 = health_da_loja(db, loja, probe=FakeGraphProbe(), exchanger=FakeExchanger())
+        out5 = health_da_loja(db, loja, probe=FakeGraphProbe(), exchanger=FakeExchanger(), whatsapp_port=_wpp())
         assert out5["google"]["status"] == HealthStatus.MISSING.value

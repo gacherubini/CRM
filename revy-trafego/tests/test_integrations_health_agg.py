@@ -22,6 +22,7 @@ from app.control.integrations_health import (
 from app.control.types import Actor, StoreRef
 from app.db import SessionLocal
 from app.models import GestorRevy, Loja
+from tests.test_integrations_health_whatsapp import FakeWppPort
 
 
 def _admin_actor() -> Actor:
@@ -83,20 +84,36 @@ def test_agrega_meta_e_google():
             _load_store(store_id, db),
             probe=FakeGraphProbe(),
             exchanger=FakeExchanger(),
+            whatsapp_port=FakeWppPort(indisponivel=True),
         )
 
-    assert set(out.keys()) >= {"meta", "google", "checked_at", "cache_ttl_seg"}
+    assert set(out.keys()) >= {"meta", "google", "whatsapp", "checked_at", "cache_ttl_seg"}
     assert out["meta"]["status"] in {s.value for s in HealthStatus}
     assert out["google"]["status"] in {s.value for s in HealthStatus}
+    assert out["whatsapp"]["status"] in {s.value for s in HealthStatus}
     assert isinstance(out["meta"]["itens"], list)
     assert isinstance(out["google"]["itens"], list)
-    for item in out["meta"]["itens"] + out["google"]["itens"]:
+    assert isinstance(out["whatsapp"]["itens"], list)
+    for item in out["meta"]["itens"] + out["google"]["itens"] + out["whatsapp"]["itens"]:
         assert set(item.keys()) == {"kind", "status", "message"}
         assert item["status"] in {s.value for s in HealthStatus}
     assert isinstance(out["checked_at"], str)
     assert isinstance(out["cache_ttl_seg"], int)
-    # WhatsApp fica para fase futura, não deve aparecer ainda
-    assert "whatsapp" not in out
+
+
+def test_agrega_whatsapp_conectado():
+    store_id = _create_store("loja-health-agg-whatsapp-ok")
+    canais = [{"e164_or_label": "a", "estado": "conectado", "ativo": True}]
+    with SessionLocal() as db:
+        out = health_da_loja(
+            db,
+            _load_store(store_id, db),
+            probe=FakeGraphProbe(),
+            exchanger=FakeExchanger(),
+            whatsapp_port=FakeWppPort(canais),
+        )
+
+    assert out["whatsapp"]["status"] == HealthStatus.CONNECTED.value
 
 
 def test_cache_evita_rechecagem_e_forcar_recheca():
@@ -105,16 +122,29 @@ def test_cache_evita_rechecagem_e_forcar_recheca():
     t = {"v": 0.0}
     cache = TTLCache(ttl_seg=600, clock=lambda: t["v"])
     probe = FakeGraphProbe()
+    wpp = FakeWppPort(indisponivel=True)
 
     with SessionLocal() as db:
         loja = _load_store(store_id, db)
         health_da_loja(
-            db, loja, probe=probe, exchanger=FakeExchanger(), cache=cache, clock=lambda: t["v"]
+            db,
+            loja,
+            probe=probe,
+            exchanger=FakeExchanger(),
+            whatsapp_port=wpp,
+            cache=cache,
+            clock=lambda: t["v"],
         )
         n1 = probe.chamadas
 
         health_da_loja(
-            db, loja, probe=probe, exchanger=FakeExchanger(), cache=cache, clock=lambda: t["v"]
+            db,
+            loja,
+            probe=probe,
+            exchanger=FakeExchanger(),
+            whatsapp_port=wpp,
+            cache=cache,
+            clock=lambda: t["v"],
         )
         assert probe.chamadas == n1  # 2ª veio do cache, não chamou o probe de novo
 
@@ -123,11 +153,53 @@ def test_cache_evita_rechecagem_e_forcar_recheca():
             loja,
             probe=probe,
             exchanger=FakeExchanger(),
+            whatsapp_port=wpp,
             cache=cache,
             clock=lambda: t["v"],
             forcar=True,
         )
         assert probe.chamadas > n1  # forçou recheck
+
+
+def test_cache_hit_nao_chama_whatsapp_port():
+    store_id = _create_store("loja-health-agg-cache-wpp")
+    t = {"v": 0.0}
+    cache = TTLCache(ttl_seg=600, clock=lambda: t["v"])
+
+    class _CountingWppPort:
+        def __init__(self) -> None:
+            self.chamadas = 0
+
+        def listar_canais(self, loja_slug: str):
+            self.chamadas += 1
+            return None
+
+    wpp = _CountingWppPort()
+
+    with SessionLocal() as db:
+        loja = _load_store(store_id, db)
+        health_da_loja(
+            db,
+            loja,
+            probe=FakeGraphProbe(),
+            exchanger=FakeExchanger(),
+            whatsapp_port=wpp,
+            cache=cache,
+            clock=lambda: t["v"],
+        )
+        n1 = wpp.chamadas
+        assert n1 > 0
+
+        health_da_loja(
+            db,
+            loja,
+            probe=FakeGraphProbe(),
+            exchanger=FakeExchanger(),
+            whatsapp_port=wpp,
+            cache=cache,
+            clock=lambda: t["v"],
+        )
+        assert wpp.chamadas == n1  # cache hit, não chamou o whatsapp_port de novo
 
 
 def test_invalidar_forca_recheck_na_proxima_chamada():
@@ -136,16 +208,17 @@ def test_invalidar_forca_recheck_na_proxima_chamada():
     store_id = _create_store("loja-health-agg-invalidar")
     _com_pixel_configurado(store_id)
     probe = FakeGraphProbe()
+    wpp = FakeWppPort(indisponivel=True)
 
     with SessionLocal() as db:
         loja = _load_store(store_id, db)
-        health_da_loja(db, loja, probe=probe, exchanger=FakeExchanger())
+        health_da_loja(db, loja, probe=probe, exchanger=FakeExchanger(), whatsapp_port=wpp)
         n1 = probe.chamadas
 
-        health_da_loja(db, loja, probe=probe, exchanger=FakeExchanger())
+        health_da_loja(db, loja, probe=probe, exchanger=FakeExchanger(), whatsapp_port=wpp)
         assert probe.chamadas == n1  # veio do cache default, não rechecou
 
         invalidar(store_id)
 
-        health_da_loja(db, loja, probe=probe, exchanger=FakeExchanger())
+        health_da_loja(db, loja, probe=probe, exchanger=FakeExchanger(), whatsapp_port=wpp)
         assert probe.chamadas > n1  # invalidado, rechecou
