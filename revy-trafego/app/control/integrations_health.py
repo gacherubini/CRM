@@ -23,6 +23,7 @@ from app.config import settings
 from app.control.graph_probe import GraphProbe
 from app.control.health_cache import TTLCache
 from app.control.integrations import _ads_config, _pixel_config
+from app.control.types import StoreView
 from app.cripto import decifrar
 from app.meta_pixel import normalizar_pixel_id
 from app.models import GoogleAdsConnection, Loja, agora
@@ -56,7 +57,7 @@ def _group_status(itens: tuple[ItemHealth, ...]) -> HealthStatus:
     return HealthStatus.MISSING
 
 
-def check_meta(db: Any, store: Loja, probe: GraphProbe) -> GroupHealth:
+def check_meta(db: Any, store: StoreView | Loja, probe: GraphProbe) -> GroupHealth:
     """Consulta Pixel/CAPI/Meta Ads da Loja e valida os tokens no probe."""
     pixel_config = _pixel_config(db, store)
     ads_config = _ads_config(db, store)
@@ -128,7 +129,7 @@ class HttpGoogleAccessTokenPort:
 
 
 def check_google(
-    db: Any, store: Loja, exchanger: GoogleAccessTokenPort
+    db: Any, store: StoreView | Loja, exchanger: GoogleAccessTokenPort
 ) -> GroupHealth:
     """Consulta a conexão Google Ads da Loja e valida o refresh token de fato.
 
@@ -183,7 +184,7 @@ _CACHE = TTLCache(ttl_seg=settings.integracoes_health_ttl_seg)
 
 def health_da_loja(
     db: Any,
-    store: Loja,
+    store: StoreView | Loja,
     *,
     probe: GraphProbe,
     exchanger: GoogleAccessTokenPort,

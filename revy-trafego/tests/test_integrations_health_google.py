@@ -104,4 +104,4 @@ def test_check_google_error_quando_refresh_invalido():
     assert grupo.itens[0].status is HealthStatus.ERROR
     # o token cru nunca deve vazar na mensagem de erro
     assert "rt-ruim" not in (grupo.itens[0].message or "")
-    assert "invalid_grant" in (grupo.itens[0].message or "") or grupo.itens[0].message
+    assert grupo.itens[0].message == "falha ao renovar access token do Google Ads"

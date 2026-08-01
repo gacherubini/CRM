@@ -502,7 +502,9 @@ def _build_exchanger() -> GoogleAccessTokenPort:
     Função isolada (mesmo motivo de `_build_probe`) para permitir monkeypatch
     em teste sem bater na rede.
     """
-    ports = build_google_ads_ports(settings)
+    ports = build_google_ads_ports(
+        settings, timeout=settings.integracoes_health_timeout_seg
+    )
     return HttpGoogleAccessTokenPort(exchanger=ports.read_port)
 
 

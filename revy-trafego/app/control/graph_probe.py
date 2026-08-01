@@ -38,10 +38,19 @@ class HttpGraphProbe:
     motivo de erro devolvido.
     """
 
-    def __init__(self, timeout: float | None = None) -> None:
+    def __init__(
+        self,
+        timeout: float | None = None,
+        *,
+        transport: httpx.BaseTransport | None = None,
+    ) -> None:
         self._timeout = (
             timeout if timeout is not None else settings.integracoes_health_timeout_seg
         )
+        # Injetável apenas para testes (httpx.MockTransport) — nunca bate na
+        # rede real quando informado. Default None preserva o comportamento
+        # atual (transporte HTTP real do httpx).
+        self._transport = transport
 
     def validar_token(self, token: str, pixel_id: str) -> tuple[bool, str | None]:
         token = (token or "").strip()
@@ -51,7 +60,7 @@ class HttpGraphProbe:
         alvo = (pixel_id or "").strip() or "me"
         url = f"{GRAPH_BASE}/{alvo}"
         try:
-            with httpx.Client(timeout=self._timeout) as client:
+            with httpx.Client(timeout=self._timeout, transport=self._transport) as client:
                 response = client.get(url, params={"access_token": token, "fields": "id"})
         except httpx.RequestError:
             logger.warning("graph_probe.request_error alvo=%s", alvo)
