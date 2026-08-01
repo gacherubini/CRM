@@ -46,6 +46,18 @@ def resolve_store_and_entitlements(
     control_memberships=None,
     control_entitlements: EntitlementState | None = None,
 ) -> tuple[StoreContext, EntitlementState, ActorLoja]:
+    from app.loja.control_projection import HttpControlProjectionPort
+
+    if (
+        control_memberships is None
+        and db is not None
+        and revy_loja_entitlements_enabled()
+    ):
+        port = HttpControlProjectionPort(db_session=db)
+        pessoa_id = str(getattr(usuario, "id", "") or "")
+        if pessoa_id:
+            control_memberships = port.get_memberships(pessoa_id) or None
+
     actor = _actor_for(usuario, control_memberships)
     store = identity.resolve_store_context(
         actor, identity.session_loja_slug(request.session)

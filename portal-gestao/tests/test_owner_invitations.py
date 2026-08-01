@@ -103,7 +103,7 @@ def test_reenvio_reutiliza_usuario_revoga_token_anterior(client, monkeypatch):
         set_email_backend(None)
 
 
-def test_endpoint_exige_token_e_nao_reconfigura_usuario_ativo(client, monkeypatch):
+def test_endpoint_exige_token_e_permite_reenvio_usuario_ativo(client, monkeypatch):
     monkeypatch.setenv("PORTAL_SERVICE_TOKEN", "token-interno")
     with SessionLocal() as db:
         db.add(
@@ -129,7 +129,7 @@ def test_endpoint_exige_token_e_nao_reconfigura_usuario_ativo(client, monkeypatc
     active = _issue(client, email="dono@loja.test", name="Tentativa")
     assert missing.status_code == 401
     assert wrong.status_code == 401
-    assert active.status_code == 409
+    assert active.status_code == 200
     with SessionLocal() as db:
         user = db.query(Usuario).filter(Usuario.email == "dono@loja.test").one()
         assert user.nome == "Ana Loja"

@@ -13,7 +13,7 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 
 from app.auth import csrf_token, csrf_valido, gestor_atual, sessao_gestor
-from app.clients.portal import PortalClient, PortalIndisponivel
+from app.clients.portal import ConviteDonoRecusado, PortalClient, PortalIndisponivel
 from app.config import settings
 from app.control.access import AccessControl
 from app.control.accounts import ControlAccounts
@@ -774,8 +774,21 @@ async def assign_store_role_page(
         # Reenviar o convite para um dono já vinculado é uma operação válida.
         pass
 
+    aviso = None
     try:
-        _portal_client().convidar_dono(person.email, person.name, store.slug)
+        resultado = _portal_client().convidar_dono(person.email, person.name, store.slug)
+        if resultado.get("email_pendente"):
+            aviso = "email_pendente"
+    except ConviteDonoRecusado as exc:
+        return _render_store_detail(
+            request,
+            db,
+            manager,
+            loja_id,
+            error=str(exc),
+            person_form_values=form_values,
+            status_code=409,
+        )
     except PortalIndisponivel:
         return _render_store_detail(
             request,
@@ -789,8 +802,12 @@ async def assign_store_role_page(
             person_form_values=form_values,
             status_code=502,
         )
+
+    redirect_url = _detail_path(loja_id, "dono")
+    if aviso:
+        redirect_url += f"?aviso={aviso}"
     return RedirectResponse(
-        _detail_path(loja_id, "dono"),
+        redirect_url,
         status_code=303,
     )
 

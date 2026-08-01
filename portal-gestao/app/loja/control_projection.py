@@ -202,18 +202,51 @@ class InMemoryControlProjectionPort:
 
 @dataclass
 class HttpControlProjectionPort:
-    """Stub HTTP — ainda não chama o Control em produção (Fase 1).
+    """Adapter HTTP para projeção local do Control via DB.
 
-    Mantém a forma do contrato para plug futuro. Métodos devolvem vazio / None
-    sem levantar, para degradar com segurança.
+    Substitui o stub original em Fase 2: lê memberships persistidas
+    na tabela ``vinculo_loja_pessoa`` (preenchida por apply_payload do provisioning).
     """
 
     base_url: str = ""
     service_token: str = ""
     timeout: float = 3.0
+    db_session: Any = None
 
     def get_memberships(self, pessoa_id: str) -> list[StoreMembership]:
-        return []
+        from app.models import VinculoLojaPessoa
+        from sqlalchemy.orm import Session
+
+        if not self.db_session:
+            return []
+        if not isinstance(self.db_session, Session):
+            return []
+
+        try:
+            rows = self.db_session.query(VinculoLojaPessoa).filter(
+                VinculoLojaPessoa.pessoa_id == pessoa_id,
+                VinculoLojaPessoa.state == "ativo",
+            ).all()
+
+            out: dict[str, StoreMembership] = {}
+            for row in rows:
+                key = row.loja_slug
+                if key in out:
+                    existing = out[key]
+                    out[key] = StoreMembership(
+                        loja_slug=existing.loja_slug,
+                        roles=frozenset(existing.roles | {row.cargo}),
+                        ativo=True,
+                    )
+                else:
+                    out[key] = StoreMembership(
+                        loja_slug=row.loja_slug,
+                        roles=frozenset({row.cargo}),
+                        ativo=True,
+                    )
+            return list(out.values())
+        except Exception:
+            return []
 
     def get_entitlements(self, loja_slug: str) -> EntitlementState | None:
         return None

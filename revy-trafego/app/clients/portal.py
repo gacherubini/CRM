@@ -15,6 +15,12 @@ class PortalIndisponivel(RuntimeError):
     pass
 
 
+class ConviteDonoRecusado(RuntimeError):
+    """Portal recusou o convite por conflito (ex.: e-mail de outro tipo de acesso)."""
+
+    pass
+
+
 class PortalClient:
     """Cliente mínimo Control → Portal (provisionamento com X-Service-Token)."""
 
@@ -76,12 +82,27 @@ class PortalClient:
                     client,
                     "POST",
                     "/internal/v1/lojistas/convite",
+                    # O endpoint do Portal NÃO é idempotente (não honra
+                    # Idempotency-Key): retry poderia duplicar convite/e-mail.
                     retries=0,
                     backoff=self.retry_backoff,
                     sleeper=self.sleeper,
                     headers=headers,
                     json=payload,
                 )
+                if resposta.status_code == 409:
+                    # 409 = conflito real do Portal (e-mail pertence a outro tipo de
+                    # acesso). NÃO é sucesso idempotente — surge como erro claro.
+                    detalhe = ""
+                    try:
+                        corpo = resposta.json()
+                        if isinstance(corpo, dict):
+                            detalhe = str(corpo.get("detail") or "")
+                    except ValueError:
+                        detalhe = ""
+                    raise ConviteDonoRecusado(
+                        detalhe or "e-mail já pertence a outro tipo de acesso"
+                    )
                 resposta.raise_for_status()
                 corpo = resposta.json()
                 if not isinstance(corpo, dict):

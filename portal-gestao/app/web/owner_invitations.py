@@ -53,6 +53,8 @@ def invite_owner_internal(
         return JSONResponse({"detail": "serviço de convites não configurado"}, status_code=503)
     if not secrets.compare_digest(x_service_token or "", expected):
         return JSONResponse({"detail": "não autorizado"}, status_code=401)
+
+    email_pendente = False
     try:
         invitation = issue_owner_invitation(
             db,
@@ -60,8 +62,13 @@ def invite_owner_internal(
             name=body.nome,
             store_slug=body.loja_slug,
         )
-    except OwnerInvitationConflict as exc:
-        return JSONResponse({"detail": str(exc)}, status_code=409)
+    except OwnerInvitationConflict:
+        # Conflito real: o e-mail já pertence a outro tipo de acesso (vendedor/gerente).
+        # NÃO é um reenvio idempotente — o caso "dono já vinculado" retorna 200 acima.
+        return JSONResponse(
+            {"detail": "e-mail já pertence a outro tipo de acesso"},
+            status_code=409,
+        )
     except OwnerInvitationError as exc:
         return JSONResponse({"detail": str(exc)}, status_code=422)
 
@@ -84,16 +91,17 @@ def invite_owner_internal(
             )
         )
     except Exception:
-        return JSONResponse(
-            {"detail": "convite criado, mas o e-mail não pôde ser enviado"},
-            status_code=502,
-        )
-    return {
+        email_pendente = True
+
+    result = {
         "usuario_id": invitation.user_id,
         "email": invitation.email,
         "loja_slug": invitation.store_slug,
         "expira_em": invitation.expires_at.isoformat(),
     }
+    if email_pendente:
+        result["email_pendente"] = True
+    return result
 
 
 @router.get("/convite/aceitar", response_class=HTMLResponse)

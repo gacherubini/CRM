@@ -47,7 +47,13 @@ def actor_from_usuario(
         m = membership_from_usuario(usuario)
         mems: tuple[StoreMembership, ...] = (m,) if m.loja_slug else ()
     else:
+        # Memberships do Control aumentam, não substituem: a loja legada
+        # (usuario.loja_slug) nunca some da sessão do dono.
+        legacy = membership_from_usuario(usuario)
+        slugs = {mm.loja_slug for mm in memberships}
         mems = tuple(memberships)
+        if legacy.loja_slug and legacy.loja_slug not in slugs:
+            mems = mems + (legacy,)
     return ActorLoja(
         pessoa_id=str(getattr(usuario, "id", "") or ""),
         email=str(getattr(usuario, "email", "") or ""),

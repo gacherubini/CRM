@@ -393,3 +393,44 @@ class CampanhaGasto(Base):
     criada_por: Mapped[str] = mapped_column(String(320))
 
     campanha: Mapped["Campanha"] = relationship(back_populates="gastos")
+
+
+class PessoaRevyProjetada(Base):
+    """Projeção de identidade do Control — pessoas com acesso ao Portal."""
+
+    __tablename__ = "pessoa_revy_projetada"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    email: Mapped[str] = mapped_column(String(320), unique=True, index=True)
+    nome: Mapped[Optional[str]] = mapped_column(String(160), nullable=True)
+
+    vinculos: Mapped[list["VinculoLojaPessoa"]] = relationship(
+        back_populates="pessoa", cascade="all, delete-orphan"
+    )
+
+
+class VinculoLojaPessoa(Base):
+    """Vínculo de uma pessoa com uma loja e seu cargo nela (multi-loja)."""
+
+    __tablename__ = "vinculo_loja_pessoa"
+    __table_args__ = (
+        UniqueConstraint(
+            "pessoa_id", "loja_slug", "cargo", name="uq_vinculo_loja_pessoa"
+        ),
+        Index("ix_vinculo_loja_pessoa_pessoa_id", "pessoa_id"),
+        Index("ix_vinculo_loja_pessoa_loja_slug", "loja_slug"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=novo_id)
+    pessoa_id: Mapped[str] = mapped_column(
+        ForeignKey("pessoa_revy_projetada.id"), nullable=False
+    )
+    loja_slug: Mapped[str] = mapped_column(String(120), nullable=False)
+    cargo: Mapped[str] = mapped_column(String(32), nullable=False)
+    state: Mapped[str] = mapped_column(String(32), nullable=False)
+    versao: Mapped[int] = mapped_column(Integer, nullable=False)
+    atualizado_em: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+
+    pessoa: Mapped["PessoaRevyProjetada"] = relationship(back_populates="vinculos")

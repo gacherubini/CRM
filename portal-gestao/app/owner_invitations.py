@@ -9,7 +9,7 @@ from datetime import datetime, timedelta, timezone
 from sqlalchemy.orm import Session
 
 from app.auth import hash_senha
-from app.models import ConviteAcessoLoja, Usuario, agora
+from app.models import ConviteAcessoLoja, Usuario, VinculoLojaPessoa, PessoaRevyProjetada, agora
 
 _EMAIL = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 _SLUG = re.compile(r"^[a-z0-9][a-z0-9-]{0,119}$")
@@ -53,6 +53,7 @@ def issue_owner_invitation(
 
     now = agora()
     user = db.query(Usuario).filter(Usuario.email == normalized_email).first()
+
     if user is None:
         user = Usuario(
             email=normalized_email,
@@ -64,17 +65,65 @@ def issue_owner_invitation(
         )
         db.add(user)
         db.flush()
+
+        pessoa = PessoaRevyProjetada(
+            id=user.id,
+            email=normalized_email,
+            nome=normalized_name,
+        )
+        db.add(pessoa)
+        db.flush()
+
+        vinculo = VinculoLojaPessoa(
+            pessoa_id=user.id,
+            loja_slug=normalized_slug,
+            cargo="dono",
+            state="pendente",
+            versao=0,
+            atualizado_em=now,
+        )
+        db.add(vinculo)
     else:
-        if user.ativo or user.papel != "dono" or user.loja_slug != normalized_slug:
+        if user.papel != "dono":
             raise OwnerInvitationConflict("e-mail já possui acesso configurado")
-        previous = (
-            db.query(ConviteAcessoLoja.id)
-            .filter(ConviteAcessoLoja.usuario_id == user.id)
+
+        pessoa = db.query(PessoaRevyProjetada).filter(
+            PessoaRevyProjetada.id == user.id
+        ).first()
+        if pessoa is None:
+            pessoa = PessoaRevyProjetada(
+                id=user.id,
+                email=normalized_email,
+                nome=normalized_name,
+            )
+            db.add(pessoa)
+            db.flush()
+
+        existing_vinculo = (
+            db.query(VinculoLojaPessoa).filter(
+                VinculoLojaPessoa.pessoa_id == user.id,
+                VinculoLojaPessoa.loja_slug == normalized_slug,
+                VinculoLojaPessoa.cargo == "dono",
+            )
             .first()
         )
-        if previous is None:
-            raise OwnerInvitationConflict("e-mail já possui acesso configurado")
-        user.nome = normalized_name
+
+        if existing_vinculo is None:
+            vinculo = VinculoLojaPessoa(
+                pessoa_id=user.id,
+                loja_slug=normalized_slug,
+                cargo="dono",
+                state="pendente" if not user.ativo else "ativo",
+                versao=0,
+                atualizado_em=now,
+            )
+            db.add(vinculo)
+        else:
+            existing_vinculo.state = "pendente" if not user.ativo else "ativo"
+            existing_vinculo.atualizado_em = now
+
+        if not user.ativo:
+            user.nome = normalized_name
 
     db.query(ConviteAcessoLoja).filter(
         ConviteAcessoLoja.usuario_id == user.id,
@@ -97,7 +146,7 @@ def issue_owner_invitation(
         user_id=user.id,
         email=user.email,
         name=user.nome,
-        store_slug=user.loja_slug,
+        store_slug=normalized_slug,
         token=token,
         expires_at=expires_at,
     )
@@ -127,6 +176,14 @@ def activate_owner_invitation(db: Session, *, token: str, password: str) -> Usua
     user.senha_hash = hash_senha(password)
     user.ativo = True
     invitation.usado_em = now
+    db.query(VinculoLojaPessoa).filter(
+        VinculoLojaPessoa.pessoa_id == user.id,
+        VinculoLojaPessoa.cargo == "dono",
+        VinculoLojaPessoa.state == "pendente",
+    ).update(
+        {VinculoLojaPessoa.state: "ativo", VinculoLojaPessoa.atualizado_em: now},
+        synchronize_session=False,
+    )
     db.commit()
     db.refresh(user)
     return user
