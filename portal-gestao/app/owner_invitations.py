@@ -1,15 +1,15 @@
 from __future__ import annotations
 
-import hashlib
 import re
 import secrets
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 
 from sqlalchemy.orm import Session
 
 from app.auth import hash_senha
 from app.models import ConviteAcessoLoja, Usuario, VinculoLojaPessoa, PessoaRevyProjetada, agora
+from app.tokens import as_utc as _as_utc, token_hash as _token_hash
 
 _EMAIL = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 _SLUG = re.compile(r"^[a-z0-9][a-z0-9-]{0,119}$")
@@ -213,13 +213,3 @@ def activate_owner_invitation(db: Session, *, token: str, password: str) -> Usua
     db.commit()
     db.refresh(user)
     return user
-
-
-def _token_hash(token: str) -> str:
-    return hashlib.sha256(token.encode("utf-8")).hexdigest()
-
-
-def _as_utc(value: datetime) -> datetime:
-    if value.tzinfo is None:
-        return value.replace(tzinfo=timezone.utc)
-    return value.astimezone(timezone.utc)
