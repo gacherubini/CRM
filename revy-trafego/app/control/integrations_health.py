@@ -17,13 +17,15 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Protocol
+from typing import Any, Callable, Protocol
 
+from app.config import settings
 from app.control.graph_probe import GraphProbe
+from app.control.health_cache import TTLCache
 from app.control.integrations import _ads_config, _pixel_config
 from app.cripto import decifrar
 from app.meta_pixel import normalizar_pixel_id
-from app.models import GoogleAdsConnection, Loja
+from app.models import GoogleAdsConnection, Loja, agora
 
 
 class HealthStatus(str, Enum):
@@ -164,3 +166,62 @@ def check_google(
 
     item = ItemHealth(kind="google_ads", status=HealthStatus.CONNECTED, message=None)
     return GroupHealth(status=HealthStatus.CONNECTED, itens=(item,))
+
+
+def _serializar_grupo(grupo: GroupHealth) -> dict[str, Any]:
+    return {
+        "status": grupo.status.value,
+        "itens": [
+            {"kind": item.kind, "status": item.status.value, "message": item.message}
+            for item in grupo.itens
+        ],
+    }
+
+
+_CACHE = TTLCache(ttl_seg=settings.integracoes_health_ttl_seg)
+
+
+def health_da_loja(
+    db: Any,
+    store: Loja,
+    *,
+    probe: GraphProbe,
+    exchanger: GoogleAccessTokenPort,
+    forcar: bool = False,
+    cache: TTLCache | None = None,
+    clock: Callable[[], Any] | None = None,
+) -> dict[str, Any]:
+    """Agrega `check_meta` + `check_google` no contrato JSON do Revy Control.
+
+    Usa `cache` (Task 1, `TTLCache`) para evitar rechecagem de tokens a cada
+    request; `forcar=True` ignora o cache e recheca de fato. WhatsApp entra
+    numa fase futura — não incluído aqui.
+    """
+    active_cache = cache if cache is not None else _CACHE
+    key = (store.id,)
+
+    if not forcar:
+        cached = active_cache.get(key)
+        if cached is not None:
+            return cached
+
+    meta = check_meta(db, store, probe)
+    google = check_google(db, store, exchanger)
+
+    checked_at = clock() if clock is not None else agora()
+    checked_at_iso = checked_at.isoformat() if hasattr(checked_at, "isoformat") else str(checked_at)
+
+    resultado = {
+        "meta": _serializar_grupo(meta),
+        "google": _serializar_grupo(google),
+        "checked_at": checked_at_iso,
+        "cache_ttl_seg": settings.integracoes_health_ttl_seg,
+    }
+
+    active_cache.set(key, resultado)
+    return resultado
+
+
+def invalidar(store_id: str) -> None:
+    """Invalida o cache de health para a loja, forçando recheck na próxima chamada."""
+    _CACHE.invalidate((store_id,))
