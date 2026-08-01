@@ -88,6 +88,24 @@
   </div>
 
   <div class="action-stack">
+    <section class="panel" id="acoes-rapidas">
+      <h2>Ações rápidas</h2>
+      <div class="heading-actions" style="padding:0 var(--space-5) var(--space-4)">
+        <a class="button primary" href="/app/simulacoes?celular={{ workspace.telefone }}">Nova simulação</a>
+        {% if workspace.lead and workspace.lead.id %}
+        <a class="button secondary" href="/app/vendas/nova?lead_ref={{ workspace.lead.id }}">Nova venda</a>
+        {% else %}
+        <a class="button secondary" href="/app/vendas/nova">Nova venda</a>
+        {% endif %}
+      </div>
+      <ul class="action-links">
+        <li><span class="muted">A simulação já abre com o celular preenchido.</span></li>
+        {% if workspace.lead and workspace.lead.id %}
+        <li><a href="/app/leads/{{ workspace.lead.id }}">Abrir ficha do lead</a></li>
+        {% endif %}
+        <li><a href="/app/conversas/{{ workspace.telefone }}">Ver histórico da conversa</a></li>
+      </ul>
+    </section>
     <section class="panel">
       <h2>Resumo</h2>
       <dl class="meta-list">
@@ -165,27 +183,6 @@
     </section>
     {% endif %}
 
-    <section class="panel">
-      <h2>Ações</h2>
-      <ul class="action-links">
-        <li>
-          <a href="/app/simulacoes?celular={{ workspace.telefone }}">Nova simulação</a>
-          <span class="muted"> · celular pré-preenchido</span>
-        </li>
-        <li>
-          {% if workspace.lead and workspace.lead.id %}
-          <a href="/app/vendas/nova?lead_ref={{ workspace.lead.id }}">Nova venda</a>
-          <span class="muted"> · lead vinculado</span>
-          {% else %}
-          <a href="/app/vendas/nova">Nova venda</a>
-          {% endif %}
-        </li>
-        {% if workspace.lead and workspace.lead.id %}
-        <li><a href="/app/leads/{{ workspace.lead.id }}">Lead legado</a></li>
-        {% endif %}
-        <li><a href="/app/conversas/{{ workspace.telefone }}">Conversa legada</a></li>
-      </ul>
-    </section>
   </div>
 </div>
 {% endblock %}

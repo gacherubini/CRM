@@ -93,13 +93,11 @@
       <thead>
         <tr>
           <th>Nome</th>
-          <th>Slug</th>
           <th>Status</th>
           <th>Pronta</th>
           <th>Gestor responsável</th>
           <th>Módulos</th>
-          <th>Pixel</th>
-          <th>Google</th>
+          <th>Integrações</th>
           <th>Falhas</th>
         </tr>
       </thead>
@@ -114,7 +112,6 @@
             {{ item.name }}
             {% endif %}
           </td>
-          <td><code>{{ item.slug }}</code></td>
           <td><span class="status {{ item.status.value }}">{{ item.status.value | replace('_', ' ') }}</span></td>
           <td>{% if item.ready %}<span class="status novo">sim</span>{% else %}<span class="status">não</span>{% endif %}</td>
           <td>
@@ -139,10 +136,11 @@
             {% endif %}
           </td>
           <td>
-            {% if health and health.pixel_connected %}conectado{% else %}—{% endif %}
-          </td>
-          <td>
-            {% if health and health.google_status %}{{ health.google_status }}{% else %}—{% endif %}
+            <span class="chip-list">
+              {% if health and health.pixel_connected %}<span class="status ativa">Pixel</span>{% endif %}
+              {% if health and health.google_status %}<span class="status">Google: {{ health.google_status }}</span>{% endif %}
+              {% if not (health and (health.pixel_connected or health.google_status)) %}<span class="muted">—</span>{% endif %}
+            </span>
           </td>
           <td>
             {% if item.integration_failures %}

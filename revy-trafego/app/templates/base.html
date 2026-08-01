@@ -37,11 +37,11 @@
         {% if control_enabled %}
         <span class="nav-section">Control</span>
         {% if control_dashboard_enabled %}
-        <a id="nav-control-dashboard" class="nav-link {{ 'active' if path == '/app/control/dashboard' else '' }}" href="{{ public_path('/app/control/dashboard') }}">Visão geral</a>
+        <a id="nav-control-dashboard" class="nav-link {{ 'active' if path == '/app/control/dashboard' else '' }}" href="{{ public_path('/app/control/dashboard') }}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg>Visão geral</a>
         {% endif %}
-        <a id="nav-control-lojas" class="nav-link {{ 'active' if path.startswith('/app/control/lojas') else '' }}" href="{{ public_path('/app/control/lojas') }}">Lojas</a>
+        <a id="nav-control-lojas" class="nav-link {{ 'active' if path.startswith('/app/control/lojas') else '' }}" href="{{ public_path('/app/control/lojas') }}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 9h18l-1.6-5H4.6L3 9Z"/><path d="M4 9v10h16V9M9 19v-5h6v5"/></svg>Lojas</a>
         {% if usuario.papel == 'admin' %}
-        <a id="nav-control-acessos" class="nav-link {{ 'active' if path == '/app/control/acessos' else '' }}" href="{{ public_path('/app/control/acessos') }}">Acessos</a>
+        <a id="nav-control-acessos" class="nav-link {{ 'active' if path == '/app/control/acessos' else '' }}" href="{{ public_path('/app/control/acessos') }}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="15" r="4"/><path d="m10.8 12.2 8.2-8.2M17 6l2 2M15 8l2 2"/></svg>Acessos</a>
         {% endif %}
         {% endif %}
         <span class="nav-section">Loja</span>
@@ -62,20 +62,24 @@
             {% endif %}
           </select>
         </form>
-        <a class="nav-link {{ 'active' if path == '/app' else '' }}" href="{{ public_path('/app') }}">Todas as lojas</a>
+        <a class="nav-link {{ 'active' if path == '/app' else '' }}" href="{{ public_path('/app') }}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2 2 7l10 5 10-5-10-5Z"/><path d="m2 17 10 5 10-5M2 12l10 5 10-5"/></svg>Todas as lojas</a>
         {% if usuario.loja_slug %}
         <span class="nav-section">Mídia</span>
-        <a class="nav-link {{ 'active' if path == '/app/trafego' else '' }}" href="{{ public_path('/app/trafego') }}">Config / Pixel</a>
-        <a class="nav-link {{ 'active' if path.startswith('/app/campanhas') else '' }}" href="{{ public_path('/app/campanhas') }}">Campanhas</a>
-        <a class="nav-link {{ 'active' if path.startswith('/app/trafego/roi') else '' }}" href="{{ public_path('/app/trafego/roi') }}">ROI</a>
-        <a class="nav-link {{ 'active' if path.startswith('/app/trafego/ctwa') else '' }}" href="{{ public_path('/app/trafego/ctwa-auditoria') }}">CTWA</a>
-        <a class="nav-link {{ 'active' if path.startswith('/app/trafego/pixel') else '' }}" href="{{ public_path('/app/trafego/pixel-auditoria') }}">Pixel audit</a>
+        <a class="nav-link {{ 'active' if path == '/app/trafego' else '' }}" href="{{ public_path('/app/trafego') }}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="4" y1="8" x2="20" y2="8"/><circle cx="9" cy="8" r="2"/><line x1="4" y1="16" x2="20" y2="16"/><circle cx="15" cy="16" r="2"/></svg>Medição</a>
+        <a class="nav-link {{ 'active' if path.startswith('/app/campanhas') else '' }}" href="{{ public_path('/app/campanhas') }}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10v4a1 1 0 0 0 1 1h3l4 4V5L7 9H4a1 1 0 0 0-1 1Z"/><path d="M15 8a4 4 0 0 1 0 8"/></svg>Campanhas</a>
+        <a class="nav-link {{ 'active' if path.startswith('/app/trafego/roi') else '' }}" href="{{ public_path('/app/trafego/roi') }}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 17 9 11l4 4 8-8"/><path d="M15 7h6v6"/></svg>ROI</a>
+        <a class="nav-link {{ 'active' if path.startswith('/app/trafego/ctwa') else '' }}" href="{{ public_path('/app/trafego/ctwa-auditoria') }}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 3v5M5.6 5.6l3 3M3 9h5"/><path d="m11 11 9 3.4-3.7 1.5-1.5 3.7L11 11Z"/></svg>Cliques do WhatsApp</a>
+        <a class="nav-link {{ 'active' if path.startswith('/app/trafego/pixel') else '' }}" href="{{ public_path('/app/trafego/pixel-auditoria') }}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/><path d="m9 12 2 2 4-4"/></svg>Conferir Pixel</a>
         <span class="nav-section">Diagnóstico</span>
-        <a class="nav-link {{ 'active' if path.startswith('/app/diagnostico') else '' }}" href="{{ public_path('/app/diagnostico/leads') }}">Leads</a>
+        <a class="nav-link {{ 'active' if path.startswith('/app/diagnostico') else '' }}" href="{{ public_path('/app/diagnostico/leads') }}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0M16 3.5a3 3 0 0 1 0 5.5M22 20a6 6 0 0 0-5.5-5"/></svg>Leads</a>
         {% endif %}
       </nav>
 
       <div class="sidebar-footer">
+        <button class="theme-toggle theme-toggle-sidebar" type="button" id="theme-toggle" aria-label="Alternar tema claro ou escuro" title="Modo claro / escuro">
+          <span class="theme-toggle-icon" aria-hidden="true">☾</span>
+          <span class="theme-toggle-label">Escuro</span>
+        </button>
         <form action="{{ public_path('/logout') }}" method="post">
           <input type="hidden" name="csrf" value="{{ csrf }}">
           <button class="link-button" type="submit">Sair</button>
@@ -114,6 +118,31 @@
       openBtn && openBtn.addEventListener('click', () => setOpen(true));
       closeBtn && closeBtn.addEventListener('click', () => setOpen(false));
       backdrop && backdrop.addEventListener('click', () => setOpen(false));
+    })();
+
+    // Alternar tema claro/escuro (mesma logica da Revy Loja)
+    (() => {
+      const root = document.documentElement;
+      const toggle = document.getElementById('theme-toggle');
+      if (!toggle) return;
+      const applyTheme = () => {
+        const dark = root.getAttribute('data-theme') === 'dark';
+        const meta = document.querySelector('meta[name="theme-color"]');
+        if (meta) meta.setAttribute('content', dark ? '#0a0a0a' : '#ffffff');
+        const label = toggle.querySelector('.theme-toggle-label');
+        const icon = toggle.querySelector('.theme-toggle-icon');
+        if (label) label.textContent = dark ? 'Claro' : 'Escuro';
+        if (icon) icon.textContent = dark ? '☀' : '☾';
+        toggle.setAttribute('aria-pressed', dark ? 'true' : 'false');
+        toggle.title = dark ? 'Mudar para modo claro' : 'Mudar para modo escuro';
+      };
+      applyTheme();
+      toggle.addEventListener('click', () => {
+        const next = root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+        root.setAttribute('data-theme', next);
+        localStorage.setItem('revy-theme', next);
+        applyTheme();
+      });
     })();
   </script>
 </body>

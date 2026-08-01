@@ -38,6 +38,15 @@
         <button class="drawer-close" type="button" aria-label="Fechar menu">×</button>
       </div>
 
+      {% set loja_icons = {
+        '/app/loja/vendas': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 2h12v20l-3-2-3 2-3-2-3 2V2Z"/><path d="M9 7h6M9 11h6"/></svg>',
+        '/app/loja/atendimento': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H8l-4 4V5a2 2 0 0 1 2-2h13a2 2 0 0 1 2 2Z"/></svg>',
+        '/app/loja/estoque': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2 3 7v10l9 5 9-5V7l-9-5Z"/><path d="M3 7l9 5 9-5M12 12v10"/></svg>',
+        '/app/loja/estoque/veiculos': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 13l2-5.2A2 2 0 0 1 6.9 6.5h10.2A2 2 0 0 1 19 7.8L21 13"/><path d="M3 13h18v4a1 1 0 0 1-1 1h-1.5a1.5 1.5 0 0 1-3 0h-5a1.5 1.5 0 0 1-3 0H4a1 1 0 0 1-1-1Z"/></svg>',
+        '/app/financeiras': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10 12 4l9 6"/><path d="M5 10v8M19 10v8M9 10v8M15 10v8M3 20h18"/></svg>',
+        '/app/loja/whatsapp': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 11.5a8.5 8.5 0 0 1-12.3 7.6L3 21l1.9-5.7A8.5 8.5 0 1 1 21 11.5Z"/></svg>',
+        '/app/loja/equipe': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0M16 3.5a3 3 0 0 1 0 5.5M22 20a6 6 0 0 0-5.5-5"/></svg>'
+      } %}
       <nav class="nav" aria-label="Menu principal">
         {% if loja_shell and loja_nav %}
         {# Shell Revy Loja: somente Vendas / Estoque (+ acessos bancários contextuais). #}
@@ -45,7 +54,7 @@
         <span class="nav-section">{{ section.title }}</span>
         {% for item in section.items %}
         {% set item_active = (path == item.href) or (item.active_prefix and path.startswith(item.active_prefix) and not (item.href == '/app/loja/estoque' and path.startswith('/app/loja/estoque/veiculos'))) %}
-        <a class="nav-link {{ 'active' if item_active else '' }}" href="{{ item.href }}" {% if item_active %}aria-current="page"{% endif %}>{{ item.label }}</a>
+        <a class="nav-link {{ 'active' if item_active else '' }}" href="{{ item.href }}" {% if item_active %}aria-current="page"{% endif %}>{{ loja_icons.get(item.href, '') | safe }}{{ item.label }}</a>
         {% endfor %}
         {% endfor %}
         {% if lojas_disponiveis and lojas_disponiveis|length > 1 %}
@@ -61,44 +70,44 @@
         {% endif %}
         {% else %}
         <span class="nav-section">Dia a dia</span>
-        <a class="nav-link {{ 'active' if path == '/app' else '' }}" href="/app" {% if path == '/app' %}aria-current="page"{% endif %}>Visão geral</a>
+        <a class="nav-link {{ 'active' if path == '/app' else '' }}" href="/app" {% if path == '/app' %}aria-current="page"{% endif %}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg>Visão geral</a>
         {% if revy_loja_atendimento_enabled and usuario.papel in ['dono', 'gerente', 'vendedor', 'admin_plataforma'] %}
-        <a class="nav-link {{ 'active' if path.startswith('/app/loja/atendimento') else '' }}" href="/app/loja/atendimento" {% if path.startswith('/app/loja/atendimento') %}aria-current="page"{% endif %}>Atendimento</a>
+        <a class="nav-link {{ 'active' if path.startswith('/app/loja/atendimento') else '' }}" href="/app/loja/atendimento" {% if path.startswith('/app/loja/atendimento') %}aria-current="page"{% endif %}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H8l-4 4V5a2 2 0 0 1 2-2h13a2 2 0 0 1 2 2Z"/></svg>Atendimento</a>
         {% endif %}
-        <a class="nav-link {{ 'active' if path.startswith('/app/leads') else '' }}" href="/app/leads" {% if path.startswith('/app/leads') %}aria-current="page"{% endif %}>Leads</a>
-        <a class="nav-link {{ 'active' if path.startswith('/app/conversas') else '' }}" href="/app/conversas" {% if path.startswith('/app/conversas') %}aria-current="page"{% endif %}>Conversas</a>
-        <a class="nav-link {{ 'active' if path.startswith('/app/estoque') else '' }}" href="/app/estoque" {% if path.startswith('/app/estoque') %}aria-current="page"{% endif %}>Estoque</a>
+        <a class="nav-link {{ 'active' if path.startswith('/app/leads') else '' }}" href="/app/leads" {% if path.startswith('/app/leads') %}aria-current="page"{% endif %}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0M16 3.5a3 3 0 0 1 0 5.5M22 20a6 6 0 0 0-5.5-5"/></svg>Leads</a>
+        <a class="nav-link {{ 'active' if path.startswith('/app/conversas') else '' }}" href="/app/conversas" {% if path.startswith('/app/conversas') %}aria-current="page"{% endif %}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4h16v12H8l-4 4V4Z"/></svg>Conversas</a>
+        <a class="nav-link {{ 'active' if path.startswith('/app/estoque') else '' }}" href="/app/estoque" {% if path.startswith('/app/estoque') %}aria-current="page"{% endif %}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2 3 7v10l9 5 9-5V7l-9-5Z"/><path d="M3 7l9 5 9-5M12 12v10"/></svg>Estoque</a>
         {% if usuario.papel in ['dono', 'gerente', 'vendedor'] %}
-        <a class="nav-link {{ 'active' if path.startswith('/app/vendas') else '' }}" href="/app/vendas" {% if path.startswith('/app/vendas') %}aria-current="page"{% endif %}>Vendas</a>
+        <a class="nav-link {{ 'active' if path.startswith('/app/vendas') else '' }}" href="/app/vendas" {% if path.startswith('/app/vendas') %}aria-current="page"{% endif %}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 2h12v20l-3-2-3 2-3-2-3 2V2Z"/><path d="M9 7h6M9 11h6"/></svg>Vendas</a>
         {% endif %}
         {% if usuario.papel in ['dono', 'gerente', 'vendedor', 'admin_plataforma'] %}
-        <a class="nav-link {{ 'active' if path.startswith('/app/simulacoes') else '' }}" href="/app/simulacoes" {% if path.startswith('/app/simulacoes') %}aria-current="page"{% endif %}>Simulações</a>
+        <a class="nav-link {{ 'active' if path.startswith('/app/simulacoes') else '' }}" href="/app/simulacoes" {% if path.startswith('/app/simulacoes') %}aria-current="page"{% endif %}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="2" width="14" height="20" rx="2"/><line x1="8" y1="6" x2="16" y2="6"/><path d="M8 11h.01M12 11h.01M16 11h.01M8 15h.01M12 15h.01M16 15h.01"/></svg>Simulações</a>
         {% endif %}
 
         {% if usuario.papel in ['dono', 'gerente', 'vendedor'] %}
         <span class="nav-section">Gestão</span>
         {% endif %}
         {% if usuario.papel in ['dono', 'gerente'] %}
-        <a class="nav-link {{ 'active' if path == '/app/funil' else '' }}" href="/app/funil" {% if path == '/app/funil' %}aria-current="page"{% endif %}>Funil</a>
-        <a class="nav-link {{ 'active' if path.startswith('/app/financeiro') else '' }}" href="/app/financeiro" {% if path.startswith('/app/financeiro') %}aria-current="page"{% endif %}>Financeiro</a>
-        <a class="nav-link {{ 'active' if path.startswith('/app/relatorios') else '' }}" href="/app/relatorios" {% if path.startswith('/app/relatorios') %}aria-current="page"{% endif %}>Relatórios</a>
+        <a class="nav-link {{ 'active' if path == '/app/funil' else '' }}" href="/app/funil" {% if path == '/app/funil' %}aria-current="page"{% endif %}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 4h18l-7 8v7l-4 2v-9L3 4Z"/></svg>Funil</a>
+        <a class="nav-link {{ 'active' if path.startswith('/app/financeiro') else '' }}" href="/app/financeiro" {% if path.startswith('/app/financeiro') %}aria-current="page"{% endif %}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M15 9a3 3 0 0 0-3-2c-1.7 0-3 1-3 2.3 0 3 6 1.5 6 4.4C15 17 13.7 18 12 18a3 3 0 0 1-3-2"/><path d="M12 5v2M12 17v2"/></svg>Financeiro</a>
+        <a class="nav-link {{ 'active' if path.startswith('/app/relatorios') else '' }}" href="/app/relatorios" {% if path.startswith('/app/relatorios') %}aria-current="page"{% endif %}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 2h9l5 5v15H6V2Z"/><path d="M15 2v5h5M9 13h6M9 17h6"/></svg>Relatórios</a>
         {% endif %}
         {% if usuario.papel == 'vendedor' %}
-        <a class="nav-link {{ 'active' if path.startswith('/app/vendedor') else '' }}" href="/app/vendedor" {% if path.startswith('/app/vendedor') %}aria-current="page"{% endif %}>Meu painel</a>
+        <a class="nav-link {{ 'active' if path.startswith('/app/vendedor') else '' }}" href="/app/vendedor" {% if path.startswith('/app/vendedor') %}aria-current="page"{% endif %}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>Meu painel</a>
         {% endif %}
         {% if usuario.papel in ['dono', 'gerente', 'vendedor'] %}
-        <a class="nav-link {{ 'active' if path.startswith('/app/metas') else '' }}" href="/app/metas" {% if path.startswith('/app/metas') %}aria-current="page"{% endif %}>Metas</a>
+        <a class="nav-link {{ 'active' if path.startswith('/app/metas') else '' }}" href="/app/metas" {% if path.startswith('/app/metas') %}aria-current="page"{% endif %}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.2"/></svg>Metas</a>
         {% endif %}
 
         {% if usuario.papel in ['dono', 'gerente', 'admin_plataforma'] %}
         <span class="nav-section">Configurações</span>
         {% if usuario.papel in ['dono', 'gerente'] %}
-        <a class="nav-link {{ 'active' if path.startswith('/app/financeiras') else '' }}" href="/app/financeiras" {% if path.startswith('/app/financeiras') %}aria-current="page"{% endif %}>Acessos dos bancos</a>
-        <a class="nav-link {{ 'active' if path.startswith('/app/operacao/numeros') else '' }}" href="/app/operacao/numeros" {% if path.startswith('/app/operacao/numeros') %}aria-current="page"{% endif %}>Grupo do estoque</a>
+        <a class="nav-link {{ 'active' if path.startswith('/app/financeiras') else '' }}" href="/app/financeiras" {% if path.startswith('/app/financeiras') %}aria-current="page"{% endif %}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10 12 4l9 6"/><path d="M5 10v8M19 10v8M9 10v8M15 10v8M3 20h18"/></svg>Acessos dos bancos</a>
+        <a class="nav-link {{ 'active' if path.startswith('/app/operacao/numeros') else '' }}" href="/app/operacao/numeros" {% if path.startswith('/app/operacao/numeros') %}aria-current="page"{% endif %}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 11.5a8.5 8.5 0 0 1-12.3 7.6L3 21l1.9-5.7A8.5 8.5 0 1 1 21 11.5Z"/></svg>Grupo do estoque</a>
         {% endif %}
         {% if usuario.papel in ['dono', 'admin_plataforma'] %}
-        <a class="nav-link {{ 'active' if path.startswith('/app/equipe') else '' }}" href="/app/equipe" {% if path.startswith('/app/equipe') %}aria-current="page"{% endif %}>Equipe</a>
-        <a class="nav-link {{ 'active' if path.startswith('/app/configuracoes') else '' }}" href="/app/configuracoes" {% if path.startswith('/app/configuracoes') %}aria-current="page"{% endif %}>Ajustes</a>
+        <a class="nav-link {{ 'active' if path.startswith('/app/equipe') else '' }}" href="/app/equipe" {% if path.startswith('/app/equipe') %}aria-current="page"{% endif %}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0M16 3.5a3 3 0 0 1 0 5.5M22 20a6 6 0 0 0-5.5-5"/></svg>Equipe</a>
+        <a class="nav-link {{ 'active' if path.startswith('/app/configuracoes') else '' }}" href="/app/configuracoes" {% if path.startswith('/app/configuracoes') %}aria-current="page"{% endif %}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M5 19l2-2M17 7l2-2"/></svg>Ajustes</a>
         {% endif %}
         {% endif %}
         {% endif %}
