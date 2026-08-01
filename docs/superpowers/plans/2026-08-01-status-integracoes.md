@@ -309,9 +309,94 @@ def test_cache_evita_rechecagem(db, loja):
 
 ---
 
-## Fases seguintes (esboço — detalhar em plano próprio, com review do owner)
+---
 
-- **Fase 2 — WhatsApp no contrato.** Endpoint per-loja de status WhatsApp (chatbot/Portal via `obter_status_canal_whatsapp`/`listar_canais_whatsapp`); o Control chama o Portal (`clients/portal.py`) e adiciona `whatsapp` ao agregador. Testar contrato nos dois lados com mocks.
+## Fase 2 — WhatsApp no agregador (revy-trafego-only)
+
+**Achado:** o Control já tem `ChatbotClient` (`revy-trafego/app/clients/chatbot.py`) e resolução de token por loja (`settings.chatbot_token_para(loja_slug)`). O chatbot expõe `GET /v1/whatsapp/canais` (retorna canais com `estado` ∈ {conectado, pendente, desconectado, inativo} e `e164_or_label`/`ativo`). Então o Control fala **direto** com o chatbot por loja — sem tocar Portal nem chatbot. Regra de rollup (decisão do owner): 🟢 só se **todos** os canais operáveis estão `conectado`; 🔴 se algum não; ⚪ se nenhum canal operável (ou chatbot não configurado).
+
+### Task 7: listar_canais_whatsapp no ChatbotClient + check_whatsapp
+
+**Files:**
+- Modify: `revy-trafego/app/clients/chatbot.py` (add `listar_canais_whatsapp`)
+- Modify: `revy-trafego/app/control/integrations_health.py` (add `check_whatsapp` + `WhatsappPort`/`ChatbotWhatsappPort`)
+- Test: `revy-trafego/tests/test_integrations_health_whatsapp.py`
+
+**Interfaces:**
+- `ChatbotClient.listar_canais_whatsapp() -> list[dict]` → `self._request("GET", "/v1/whatsapp/canais")` e retorna `list(dados.get("canais") or [])` (espelha o client do Portal).
+- `class WhatsappPort(Protocol): def listar_canais(self, loja_slug: str) -> list[dict] | None: ...` — retorna `None` quando o chatbot **não está configurado** para a loja (→ MISSING), lança exceção quando a chamada **falha** (→ ERROR), senão a lista de canais.
+- `class ChatbotWhatsappPort:` real — monta `ChatbotClient(settings.chatbot_url, settings.chatbot_token_para(loja_slug), settings.request_timeout)`; se `not client.configurado` → `None`; senão `client.listar_canais_whatsapp()`.
+- `check_whatsapp(store, port: WhatsappPort) -> GroupHealth`.
+
+**Regras de `check_whatsapp`:**
+- `port.listar_canais(store.slug)` lança → `GroupHealth(ERROR, (ItemHealth("whatsapp", ERROR, "falha ao consultar WhatsApp"),))`.
+- retorno `None` → `GroupHealth(MISSING, (ItemHealth("whatsapp", MISSING, None),))`.
+- operáveis = canais com `ativo` truthy **e** `estado != "inativo"`. Sem operáveis → MISSING.
+- por canal operável: `conectado` → `ItemHealth("whatsapp", CONNECTED, None)`; senão → `ItemHealth("whatsapp", ERROR, f"{label}: {estado}")` (label = `e164_or_label`).
+- status do grupo via o `_group_status` já existente (any ERROR → ERROR; senão ≥1 non-missing → CONNECTED). Nunca logar/retornar segredo (labels são telefones — ok exibir label, é o número da loja; não é segredo de API).
+
+- [ ] **Step 1: Failing test**
+```python
+# revy-trafego/tests/test_integrations_health_whatsapp.py
+from app.control.integrations_health import HealthStatus, check_whatsapp
+
+
+class FakeWppPort:
+    def __init__(self, canais=None, indisponivel=False, erro=False):
+        self.canais, self.indisponivel, self.erro = canais, indisponivel, erro
+    def listar_canais(self, loja_slug):
+        if self.erro:
+            raise RuntimeError("timeout")
+        return None if self.indisponivel else (self.canais or [])
+
+
+class _Store:
+    id = "loja-1"; slug = "loja-1"
+
+
+def test_whatsapp_missing_sem_config():
+    assert check_whatsapp(_Store(), FakeWppPort(indisponivel=True)).status is HealthStatus.MISSING
+
+def test_whatsapp_missing_sem_canais_operaveis():
+    canais = [{"e164_or_label": "x", "estado": "inativo", "ativo": False}]
+    assert check_whatsapp(_Store(), FakeWppPort(canais)).status is HealthStatus.MISSING
+
+def test_whatsapp_connected_todos_conectados():
+    canais = [{"e164_or_label": "a", "estado": "conectado", "ativo": True},
+              {"e164_or_label": "b", "estado": "conectado", "ativo": True}]
+    assert check_whatsapp(_Store(), FakeWppPort(canais)).status is HealthStatus.CONNECTED
+
+def test_whatsapp_error_se_algum_caido():
+    canais = [{"e164_or_label": "a", "estado": "conectado", "ativo": True},
+              {"e164_or_label": "b", "estado": "desconectado", "ativo": True}]
+    g = check_whatsapp(_Store(), FakeWppPort(canais))
+    assert g.status is HealthStatus.ERROR
+    assert any(i.status is HealthStatus.ERROR for i in g.itens)
+
+def test_whatsapp_error_quando_chamada_falha():
+    assert check_whatsapp(_Store(), FakeWppPort(erro=True)).status is HealthStatus.ERROR
+```
+
+- [ ] **Step 2–5:** run→fail; implementar `listar_canais_whatsapp` + `WhatsappPort`/`ChatbotWhatsappPort` + `check_whatsapp`; run→pass; commit `feat(control): check_whatsapp ao vivo (canais do chatbot por loja)`.
+
+### Task 8: WhatsApp no agregador + endpoint
+
+**Files:**
+- Modify: `revy-trafego/app/control/integrations_health.py` (`health_da_loja` inclui `whatsapp`)
+- Modify: `revy-trafego/app/web/control_ui.py` (`_build_whatsapp_port` + passar ao `health_da_loja`)
+- Test: `revy-trafego/tests/test_integrations_health_agg.py` (estender) e o endpoint (`tests/test_integracoes_health_endpoint.py`, estender)
+
+**Interfaces:**
+- `health_da_loja(db, store, *, probe, exchanger, whatsapp_port, forcar=False, cache=None, clock=None) -> dict` — adiciona `"whatsapp": <grupo serializado>` ao dict (junto de `meta`/`google`). Cache continua cobrindo o dict inteiro.
+- `control_ui._build_whatsapp_port() -> ChatbotWhatsappPort` (monkeypatchável nos testes); o endpoint passa `whatsapp_port=_build_whatsapp_port()`.
+
+- [ ] **Step 1: Failing test** — estender `test_integrations_health_agg.py`: `health_da_loja(..., whatsapp_port=FakeWppPort([...conectado...]))` retorna dict com chave `"whatsapp"` cujo `status=="connected"`. No endpoint, monkeypatch `_build_whatsapp_port` p/ um fake e assertar que o JSON tem `whatsapp`.
+- [ ] **Step 2–5:** run→fail; implementar; run→pass; **suite completa** (verde exceto o outbox pré-existente); commit `feat(control): WhatsApp no agregador de health + endpoint`.
+
+> Nota: o cache do WhatsApp segue o mesmo TTL (10min). O Control **não** invalida em connect/disconnect de WhatsApp (essa ação é no Portal/chatbot) — staleness de até 10min é aceita (decisão do owner) + "Testar agora".
+
+## Fases seguintes (esboço — detalhar com review do owner)
+
 - **Fase 3 — Badge UI no Control** (detalhe da loja): componente de 3 badges com expandir, cores por estado, "Testar agora" (fetch `?forcar=1`), poll leve opcional. Seguir os templates/estilos do Control. **Review visual do owner.**
 - **Fase 4 — Badge UI no Portal/Loja shell:** consome o agregador do Control por HTTP (`clients/revy_trafego.py`) + WhatsApp local; badge no topo/lado do shell. **Review visual do owner.**
 
