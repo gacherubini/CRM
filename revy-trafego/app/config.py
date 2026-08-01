@@ -166,6 +166,13 @@ class Settings:
         "on",
     }
     public_base_url_raw: str = os.getenv("REVY_TRAFEGO_PUBLIC_BASE_URL", "").strip()
+    # Cache de status de integracoes (Revy Control): TTL e timeout de checagem.
+    integracoes_health_ttl_seg: int = int(
+        os.getenv("INTEGRACOES_HEALTH_TTL_SEGUNDOS", "600")
+    )
+    integracoes_health_timeout_seg: float = float(
+        os.getenv("INTEGRACOES_HEALTH_TIMEOUT_SEG", "5")
+    )
 
     @property
     def url_prefix(self) -> str:
