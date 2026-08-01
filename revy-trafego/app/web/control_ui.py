@@ -9,7 +9,7 @@ from html import escape
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, Query, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 
@@ -33,6 +33,13 @@ from app.control.google_ads import (
     GoogleAdsTokenExchangeError,
 )
 from app.control.google_ads_conversions import GoogleAdsInvalidConversionBinding
+from app.control.google_ads_http import build_google_ads_ports
+from app.control.graph_probe import GraphProbe, HttpGraphProbe
+from app.control.integrations_health import (
+    GoogleAccessTokenPort,
+    HttpGoogleAccessTokenPort,
+    health_da_loja,
+)
 from app.control.google_ads_metrics import (
     GoogleAdsAccountNotFound,
     GoogleAdsManagerAccountNotSelectable,
@@ -482,6 +489,68 @@ def store_detail_page(
     if manager is None:
         return RedirectResponse(_public_path("/login"), status_code=303)
     return _render_store_detail(request, db, manager, loja_id)
+
+
+def _build_probe() -> GraphProbe:
+    """Probe real da Graph API. Função isolada para permitir monkeypatch em teste."""
+    return HttpGraphProbe()
+
+
+def _build_exchanger() -> GoogleAccessTokenPort:
+    """Exchanger real de access token do Google Ads (via ports HTTP/Fake).
+
+    Função isolada (mesmo motivo de `_build_probe`) para permitir monkeypatch
+    em teste sem bater na rede.
+    """
+    ports = build_google_ads_ports(settings)
+    return HttpGoogleAccessTokenPort(exchanger=ports.read_port)
+
+
+@router.get("/control/v1/lojas/{loja_id}/integracoes/health")
+def get_store_integrations_health(
+    loja_id: str,
+    request: Request,
+    forcar: int = Query(default=0),
+    db: Session = Depends(get_db),
+):
+    """Health ao vivo das integrações Meta/Google da Loja (Task 5).
+
+    Nunca deixa uma exceção do probe/exchanger virar 500: `health_da_loja` e
+    os checks já devolvem estados de erro; aqui só protegemos contra falhas
+    inesperadas na própria montagem dos ports reais.
+    """
+    if not settings.revy_control_enabled:
+        return JSONResponse({"detail": "não encontrado"}, status_code=404)
+    manager = gestor_atual(request, db)
+    if manager is None:
+        return JSONResponse({"detail": "não autorizado"}, status_code=401)
+
+    actor = actor_from_user(manager)
+    try:
+        store = StoreControl(SessionLocal).get(actor, StoreRef(id=loja_id))
+    except StoreNotFound:
+        return JSONResponse({"detail": "loja não encontrada"}, status_code=404)
+    except AccessDenied:
+        return JSONResponse({"detail": "acesso negado"}, status_code=403)
+
+    try:
+        resultado = health_da_loja(
+            db,
+            store,
+            probe=_build_probe(),
+            exchanger=_build_exchanger(),
+            forcar=bool(forcar),
+        )
+    except Exception:
+        logger.exception(
+            "integracoes_health.falha_inesperada loja_id=%s", loja_id
+        )
+        return JSONResponse(
+            {"detail": "falha ao verificar saúde das integrações"},
+            status_code=502,
+        )
+
+    return JSONResponse(resultado)
 
 
 @router.post("/app/control/lojas/{loja_id}/excluir", response_class=HTMLResponse)
