@@ -152,13 +152,9 @@ def issue_owner_invitation(
     )
 
 
-def activate_owner_invitation(db: Session, *, token: str, password: str) -> Usuario:
-    if not 12 <= len(password) <= 256:
-        raise OwnerInvitationInvalid("a senha deve ter entre 12 e 256 caracteres")
-    normalized_token = token.strip()
-    if not normalized_token or len(normalized_token) > 256:
-        raise OwnerInvitationInvalid("convite inválido ou expirado")
-    now = agora()
+def _find_active_invitation(
+    db: Session, normalized_token: str, now: datetime
+) -> ConviteAcessoLoja | None:
     invitation = (
         db.query(ConviteAcessoLoja)
         .filter(
@@ -169,12 +165,42 @@ def activate_owner_invitation(db: Session, *, token: str, password: str) -> Usua
         .first()
     )
     if invitation is None or _as_utc(invitation.expira_em) <= now:
+        return None
+    return invitation
+
+
+def owner_invitation_needs_password(db: Session, *, token: str) -> bool:
+    """False quando o convite é para um dono já ativo (multiloja): ele já tem
+    senha e a aceitação apenas confirma o novo vínculo. True nos demais casos
+    (dono inativo, ou convite que o fluxo normal vai reportar como inválido)."""
+    normalized_token = token.strip()
+    if not normalized_token or len(normalized_token) > 256:
+        return True
+    invitation = _find_active_invitation(db, normalized_token, agora())
+    if invitation is None:
+        return True
+    user = db.get(Usuario, invitation.usuario_id)
+    return not (user is not None and user.ativo and user.papel == "dono")
+
+
+def activate_owner_invitation(db: Session, *, token: str, password: str) -> Usuario:
+    normalized_token = token.strip()
+    if not normalized_token or len(normalized_token) > 256:
+        raise OwnerInvitationInvalid("convite inválido ou expirado")
+    now = agora()
+    invitation = _find_active_invitation(db, normalized_token, now)
+    if invitation is None:
         raise OwnerInvitationInvalid("convite inválido ou expirado")
     user = db.get(Usuario, invitation.usuario_id)
-    if user is None or user.ativo or user.papel != "dono":
+    if user is None or user.papel != "dono":
         raise OwnerInvitationInvalid("convite inválido ou expirado")
-    user.senha_hash = hash_senha(password)
-    user.ativo = True
+    if not user.ativo:
+        # Primeiro acesso do dono: precisa definir a senha.
+        if not 12 <= len(password) <= 256:
+            raise OwnerInvitationInvalid("a senha deve ter entre 12 e 256 caracteres")
+        user.senha_hash = hash_senha(password)
+        user.ativo = True
+    # Dono já ativo (multiloja): não altera a senha, apenas confirma o vínculo.
     invitation.usado_em = now
     db.query(VinculoLojaPessoa).filter(
         VinculoLojaPessoa.pessoa_id == user.id,

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import re
 import unicodedata
 from datetime import date, timedelta
@@ -175,9 +176,13 @@ def _slugify(value: str) -> str:
 # Painéis do detalhe agrupados em abas. A ordem aqui é a ordem visual das abas.
 _DETAIL_TABS = ("visao", "pessoas", "modulos", "integracoes", "estado", "auditoria")
 
+logger = logging.getLogger(__name__)
+
+
 # Cada alerta de sucesso (?ok=…) reabre a aba onde a ação aconteceu.
 _OK_TO_TAB = {
     "dono": "pessoas",
+    "dono_email_pendente": "pessoas",
     "cargo": "pessoas",
     "cargo_revogado": "pessoas",
     "gestor": "pessoas",
@@ -803,11 +808,9 @@ async def assign_store_role_page(
             status_code=502,
         )
 
-    redirect_url = _detail_path(loja_id, "dono")
-    if aviso:
-        redirect_url += f"?aviso={aviso}"
+    status = "dono_email_pendente" if aviso == "email_pendente" else "dono"
     return RedirectResponse(
-        redirect_url,
+        _detail_path(loja_id, status),
         status_code=303,
     )
 
@@ -1051,6 +1054,11 @@ async def invite_traffic_manager_page(
                 ),
             ))
         except Exception:
+            logger.exception(
+                "falha ao enviar e-mail de convite de gestor para %s (loja %s)",
+                result.email,
+                loja_id,
+            )
             return _render_store_detail(request, db, manager, loja_id,
                 error="Vínculo criado, mas o e-mail falhou. Reenvie o convite.",
                 active_tab="pessoas")

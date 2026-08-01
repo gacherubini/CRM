@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import os
 import secrets
 from pathlib import Path
@@ -20,7 +21,10 @@ from app.owner_invitations import (
     OwnerInvitationInvalid,
     activate_owner_invitation,
     issue_owner_invitation,
+    owner_invitation_needs_password,
 )
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 templates = Jinja2Templates(
@@ -91,6 +95,12 @@ def invite_owner_internal(
             )
         )
     except Exception:
+        # Não logamos o corpo (contém o token do convite); só o destino e a falha.
+        logger.exception(
+            "falha ao enviar e-mail de convite ao dono para %s (loja %s)",
+            invitation.email,
+            invitation.store_slug,
+        )
         email_pendente = True
 
     result = {
@@ -107,8 +117,13 @@ def invite_owner_internal(
 @router.get("/convite/aceitar", response_class=HTMLResponse)
 def accept_owner_invitation_page(
     request: Request,
+    db: Session = Depends(get_db),
     token: str = Query(default="", max_length=256),
 ):
+    # Dono já ativo (multiloja): ele já tem senha e o novo vínculo já nasce ativo.
+    # Não faz sentido pedir "crie sua senha" — manda direto para o login.
+    if token and not owner_invitation_needs_password(db, token=token):
+        return RedirectResponse("/login?ativado=1", status_code=303)
     return templates.TemplateResponse(
         request=request,
         name="convite_aceitar.html",

@@ -22,6 +22,27 @@ def db():
     session.close()
 
 
+def test_accept_page_active_dono_redirects_to_login(client, db):
+    from app.owner_invitations import (
+        activate_owner_invitation,
+        issue_owner_invitation,
+    )
+
+    inv_a = issue_owner_invitation(
+        db, email="dono2@example.com", name="Dono", store_slug="loja-a"
+    )
+    activate_owner_invitation(db, token=inv_a.token, password="senha-super-segura")
+    inv_b = issue_owner_invitation(
+        db, email="dono2@example.com", name="Dono", store_slug="loja-b"
+    )
+
+    resp = client.get(
+        f"/convite/aceitar?token={inv_b.token}", follow_redirects=False
+    )
+    assert resp.status_code == 303
+    assert resp.headers["location"] == "/login?ativado=1"
+
+
 def test_invite_owner_internal_new_user_returns_200(client):
     response = client.post(
         "/internal/v1/lojistas/convite",

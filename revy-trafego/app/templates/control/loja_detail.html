@@ -35,6 +35,8 @@
 <div class="alert success" role="status">Vínculo do gestor revogado.</div>
 {% elif ok == 'dono' %}
 <div class="alert success" role="status">Convite enviado ao dono da Loja.</div>
+{% elif ok == 'dono_email_pendente' %}
+<div class="alert warning" role="alert">Dono vinculado à Loja, mas o <strong>e-mail de convite não foi enviado</strong>. Verifique a configuração de e-mail e reenvie o convite.</div>
 {% elif ok == 'cargo' %}
 <div class="alert success" role="status">Cargo atribuído à Pessoa Revy.</div>
 {% elif ok == 'cargo_revogado' %}

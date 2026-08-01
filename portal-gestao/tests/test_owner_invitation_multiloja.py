@@ -6,7 +6,9 @@ from app.models import PessoaRevyProjetada, Usuario, VinculoLojaPessoa
 from app.owner_invitations import (
     OwnerInvitationConflict,
     OwnerInvitationError,
+    activate_owner_invitation,
     issue_owner_invitation,
+    owner_invitation_needs_password,
 )
 
 
@@ -78,6 +80,49 @@ def test_issue_owner_invitation_same_user_new_store_creates_second_vinculo(db: S
 
     slugs = {v.loja_slug for v in vinculos}
     assert slugs == {"loja-a", "loja-b"}
+
+
+def test_activate_owner_invitation_active_dono_new_store_skips_password(db: Session):
+    # Dono ativa a primeira loja (define a senha).
+    inv_a = issue_owner_invitation(
+        db, email="dono@x.com", name="Dono", store_slug="loja-a"
+    )
+    activate_owner_invitation(db, token=inv_a.token, password="senha-super-segura")
+
+    user = db.query(Usuario).filter(Usuario.email == "dono@x.com").one()
+    assert user.ativo is True
+    senha_hash_antes = user.senha_hash
+
+    # Convite para uma SEGUNDA loja, com o dono já ativo (caso multiloja).
+    inv_b = issue_owner_invitation(
+        db, email="dono@x.com", name="Dono", store_slug="loja-b"
+    )
+
+    # Dono já ativo não precisa criar senha — e aceitar não pode dar "inválido".
+    assert owner_invitation_needs_password(db, token=inv_b.token) is False
+    activated = activate_owner_invitation(db, token=inv_b.token, password="")
+
+    assert activated.ativo is True
+    db.refresh(user)
+    assert user.senha_hash == senha_hash_antes  # senha inalterada
+
+    vinculo_b = (
+        db.query(VinculoLojaPessoa)
+        .filter(
+            VinculoLojaPessoa.pessoa_id == user.id,
+            VinculoLojaPessoa.loja_slug == "loja-b",
+            VinculoLojaPessoa.cargo == "dono",
+        )
+        .one()
+    )
+    assert vinculo_b.state == "ativo"
+
+
+def test_owner_invitation_needs_password_true_for_new_dono(db: Session):
+    inv = issue_owner_invitation(
+        db, email="novo@x.com", name="Novo", store_slug="loja-a"
+    )
+    assert owner_invitation_needs_password(db, token=inv.token) is True
 
 
 def test_issue_owner_invitation_reissue_same_loja_idempotent(db: Session):
