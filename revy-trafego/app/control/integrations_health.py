@@ -1,9 +1,14 @@
-"""Health ao vivo das integrações Meta (Pixel/CAPI/Meta Ads) — Task 2.
+"""Health ao vivo das integrações Meta e Google Ads — Tasks 2 e 3.
 
 `check_meta` reaproveita os getters de config já existentes em
 `app.control.integrations` (não duplica storage) e usa um `GraphProbe`
 injetável para validar o token na Graph API de verdade — sem nunca
 retornar ou logar o token cru.
+
+`check_google` reaproveita a troca refresh->access token já existente em
+`app.control.google_ads_http.HttpGoogleAdsTokenExchanger` através da porta fina
+`GoogleAccessTokenPort` (protocolo `obter_access_token(refresh_token) -> str`),
+também sem nunca retornar ou logar o token cru.
 
 O agregador multi-grupo (Meta + Google + WhatsApp) vem na Task 4.
 """
@@ -12,13 +17,13 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any
+from typing import Any, Protocol
 
 from app.control.graph_probe import GraphProbe
 from app.control.integrations import _ads_config, _pixel_config
 from app.cripto import decifrar
 from app.meta_pixel import normalizar_pixel_id
-from app.models import Loja
+from app.models import GoogleAdsConnection, Loja
 
 
 class HealthStatus(str, Enum):
@@ -97,3 +102,65 @@ def check_meta(db: Any, store: Loja, probe: GraphProbe) -> GroupHealth:
 
     itens_tuple = tuple(itens)
     return GroupHealth(status=_group_status(itens_tuple), itens=itens_tuple)
+
+
+class GoogleAccessTokenPort(Protocol):
+    """Porta fina e injetável para trocar refresh token por access token.
+
+    Permite mockar `check_google` em teste sem bater na rede. A implementação
+    real é um wrapper sobre
+    `app.control.google_ads_http.HttpGoogleAdsTokenExchanger._access_token`.
+    """
+
+    def obter_access_token(self, refresh_token: str) -> str: ...
+
+
+@dataclass(frozen=True)
+class HttpGoogleAccessTokenPort:
+    """Wrapper fino sobre `HttpGoogleAdsTokenExchanger` para uso real."""
+
+    exchanger: Any  # HttpGoogleAdsTokenExchanger, evita import circular
+
+    def obter_access_token(self, refresh_token: str) -> str:
+        return self.exchanger._access_token(refresh_token)
+
+
+def check_google(
+    db: Any, store: Loja, exchanger: GoogleAccessTokenPort
+) -> GroupHealth:
+    """Consulta a conexão Google Ads da Loja e valida o refresh token de fato.
+
+    Troca o refresh token cifrado por um access token através de `exchanger`
+    (nunca retorna nem loga o token cru, cifrado ou não).
+    """
+    connection = (
+        db.query(GoogleAdsConnection)
+        .filter(GoogleAdsConnection.loja_id == store.id)
+        .one_or_none()
+    )
+
+    if connection is None or not connection.refresh_token_ciphertext:
+        itens = (ItemHealth(kind="google_ads", status=HealthStatus.MISSING, message=None),)
+        return GroupHealth(status=HealthStatus.MISSING, itens=itens)
+
+    refresh_token = decifrar(connection.refresh_token_ciphertext)
+    try:
+        access_token = exchanger.obter_access_token(refresh_token)
+    except Exception:
+        item = ItemHealth(
+            kind="google_ads",
+            status=HealthStatus.ERROR,
+            message="falha ao renovar access token do Google Ads",
+        )
+        return GroupHealth(status=HealthStatus.ERROR, itens=(item,))
+
+    if not access_token:
+        item = ItemHealth(
+            kind="google_ads",
+            status=HealthStatus.ERROR,
+            message="access token vazio ao renovar Google Ads",
+        )
+        return GroupHealth(status=HealthStatus.ERROR, itens=(item,))
+
+    item = ItemHealth(kind="google_ads", status=HealthStatus.CONNECTED, message=None)
+    return GroupHealth(status=HealthStatus.CONNECTED, itens=(item,))
