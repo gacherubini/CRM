@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import logging
 import secrets
 from dataclasses import dataclass
 from datetime import datetime, timedelta
@@ -11,8 +10,6 @@ from app.auth import hash_senha
 from app.models import RedefinicaoSenha, Usuario, agora
 from app.password_rules import validar_nova_senha
 from app.tokens import as_utc, token_hash
-
-logger = logging.getLogger(__name__)
 
 _LIFETIME = timedelta(hours=24)
 _REEMISSAO_MINIMA = timedelta(minutes=2)

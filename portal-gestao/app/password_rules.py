@@ -13,7 +13,7 @@ def validar_nova_senha(senha: str | None, confirmacao: str | None) -> str:
     if len(senha) < SENHA_MINIMA:
         raise SenhaInvalida(f"A senha deve ter pelo menos {SENHA_MINIMA} caracteres.")
     if len(senha) > SENHA_MAXIMA:
-        raise SenhaInvalida("A senha deve ter no máximo 256 caracteres.")
+        raise SenhaInvalida(f"A senha deve ter no máximo {SENHA_MAXIMA} caracteres.")
     if senha != (confirmacao or ""):
         raise SenhaInvalida("A confirmação da senha não confere.")
     return senha
