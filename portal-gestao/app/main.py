@@ -40,6 +40,7 @@ from app.auth import (
     pode_ver_financeiro,
     pode_ver_resultados_midia,
     usuario_atual,
+    verifica_senha,
 )
 from app.cripto import cifrar
 from app.conversions import ConversionKind, PurchaseConversion, publish_conversion
@@ -119,6 +120,7 @@ from app.clients.estoque import (
 )
 from app.clients.motor import CredencialNaoEncontrada, MotorClient, MotorIndisponivel
 from app.db import SessionLocal, get_db
+from app.password_rules import SenhaInvalida, validar_nova_senha
 from app.financeiro_calc import (
     FUSO_PORTAL,
     calcular_metricas_vendas,
@@ -523,6 +525,50 @@ def logout(request: Request, csrf: Annotated[str, Form()]):
     if csrf_valido(request, csrf):
         encerrar_sessao(request)
     return RedirectResponse("/login", status_code=303)
+
+
+@app.get("/conta/senha", response_class=HTMLResponse)
+def conta_senha_pagina(request: Request, db: Session = Depends(get_db)):
+    usuario = usuario_atual(request, db)
+    if usuario is None:
+        return RedirectResponse("/login", status_code=303)
+    return templates.TemplateResponse(
+        "conta_senha.html",
+        contexto(request, usuario=usuario, db=db, erro=None, mensagem=None),
+    )
+
+
+@app.post("/conta/senha", response_class=HTMLResponse)
+def conta_senha_salvar(
+    request: Request,
+    senha_atual: Annotated[str, Form()],
+    senha: Annotated[str, Form()],
+    senha_confirmacao: Annotated[str, Form()],
+    csrf: Annotated[str, Form()],
+    db: Session = Depends(get_db),
+):
+    usuario = usuario_atual(request, db)
+    if usuario is None:
+        return RedirectResponse("/login", status_code=303)
+
+    def render(erro=None, mensagem=None, code=200):
+        return templates.TemplateResponse(
+            "conta_senha.html",
+            contexto(request, usuario=usuario, db=db, erro=erro, mensagem=mensagem),
+            status_code=code,
+        )
+
+    if not csrf_valido(request, csrf):
+        return render(erro="Sessão expirada. Recarregue a página.", code=400)
+    if not verifica_senha(usuario.senha_hash, senha_atual):
+        return render(erro="Senha atual incorreta.", code=400)
+    try:
+        senha_validada = validar_nova_senha(senha, senha_confirmacao)
+    except SenhaInvalida as exc:
+        return render(erro=str(exc), code=400)
+    usuario.senha_hash = hash_senha(senha_validada)
+    db.commit()
+    return render(mensagem="Senha alterada com sucesso.")
 
 
 @app.get("/app", response_class=HTMLResponse)

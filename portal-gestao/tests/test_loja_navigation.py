@@ -32,6 +32,7 @@ def test_nav_somente_vendas_e_estoque_com_acessos_bancarios():
         "Veículos",
         "Acessos bancários",
         "Equipe",
+        "Senha",
     ]
     hrefs = {i.href for i in items}
     assert "/app/loja/vendas" in hrefs

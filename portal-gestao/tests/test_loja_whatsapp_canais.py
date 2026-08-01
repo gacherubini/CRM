@@ -338,6 +338,7 @@ def test_nav_com_flag_on_mostra_item_em_ajustes():
         "Acessos bancários",
         "Números de WhatsApp",
         "Equipe",
+        "Senha",
     ]
 
 

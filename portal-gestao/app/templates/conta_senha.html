@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="card">
+  <h1>Trocar senha</h1>
+  {% if erro %}<div class="alert error" role="alert">{{ erro }}</div>{% endif %}
+  {% if mensagem %}<div class="alert success" role="status">{{ mensagem }}</div>{% endif %}
+  <form method="post" action="/conta/senha" class="stack-form">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <label>Senha atual<input type="password" name="senha_atual" autocomplete="current-password" required></label>
+    <label>Nova senha<input type="password" name="senha" minlength="12" maxlength="256" autocomplete="new-password" required></label>
+    <label>Confirmar nova senha<input type="password" name="senha_confirmacao" minlength="12" maxlength="256" autocomplete="new-password" required></label>
+    <button class="button primary" type="submit">Salvar</button>
+  </form>
+</section>
+{% endblock %}

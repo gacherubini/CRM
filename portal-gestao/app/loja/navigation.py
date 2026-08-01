@@ -120,6 +120,15 @@ def build_nav(
                 active_prefix="/app/loja/equipe",
             )
         )
+        ajustes.append(
+            NavItem(
+                label="Senha",
+                href="/conta/senha",
+                section="Ajustes",
+                module=None,
+                active_prefix="/conta/senha",
+            )
+        )
         sections.append(NavSection(title="Ajustes", items=tuple(ajustes)))
 
     return tuple(sections)
