@@ -70,6 +70,23 @@ class ConviteAcessoLoja(Base):
     criado_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=agora)
 
 
+class RedefinicaoSenha(Base):
+    __tablename__ = "redefinicoes_senha"
+    __table_args__ = (
+        Index("ix_redefinicoes_senha_usuario_id", "usuario_id"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=novo_id)
+    usuario_id: Mapped[str] = mapped_column(
+        ForeignKey("usuarios.id", ondelete="CASCADE"), nullable=False
+    )
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
+    expira_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    usado_em: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    revogado_em: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    criado_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=agora)
+
+
 class LojaOperacionalProjecao(Base):
     """Projeção monotônica do estado operacional vindo do Control (Loja / módulos).
 
