@@ -1,16 +1,9 @@
-"""Health ao vivo das integrações Meta e Google Ads — Tasks 2 e 3.
+"""Health ao vivo das integrações Meta, Google Ads e WhatsApp.
 
-`check_meta` reaproveita os getters de config já existentes em
-`app.control.integrations` (não duplica storage) e usa um `GraphProbe`
-injetável para validar o token na Graph API de verdade — sem nunca
-retornar ou logar o token cru.
-
-`check_google` reaproveita a troca refresh->access token já existente em
-`app.control.google_ads_http.HttpGoogleAdsTokenExchanger` através da porta fina
-`GoogleAccessTokenPort` (protocolo `obter_access_token(refresh_token) -> str`),
-também sem nunca retornar ou logar o token cru.
-
-O agregador multi-grupo (Meta + Google + WhatsApp) vem na Task 4.
+Executa três checks independentes com cache TTL: `check_meta` valida tokens
+Pixel/CAPI/Ads na Graph API (via `GraphProbe`), `check_google` valida
+refresh tokens do Google Ads (via `GoogleAccessTokenPort`), e `check_whatsapp`
+lista canais ativos do Chatbot. Agregado em `health_da_loja` por loja.
 """
 
 from __future__ import annotations
@@ -189,7 +182,7 @@ class ChatbotWhatsappPort:
         client = ChatbotClient(
             settings.chatbot_url,
             settings.chatbot_token_para(loja_slug),
-            settings.request_timeout,
+            settings.integracoes_health_timeout_seg,  # timeout curto de health (mesmo dos checks Meta/Google)
         )
         if not client.configurado:
             return None

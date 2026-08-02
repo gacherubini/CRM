@@ -522,7 +522,7 @@ def get_store_integrations_health(
     forcar: int = Query(default=0),
     db: Session = Depends(get_db),
 ):
-    """Health ao vivo das integrações Meta/Google da Loja (Task 5).
+    """Health ao vivo das integrações Meta/Google/WhatsApp da Loja.
 
     Nunca deixa uma exceção do probe/exchanger virar 500: `health_da_loja` e
     os checks já devolvem estados de erro; aqui só protegemos contra falhas
