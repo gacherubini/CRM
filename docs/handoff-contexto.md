@@ -63,6 +63,12 @@ Não recriar apps monolíticos legados e não destruir volumes/snapshots sem ped
   owner: só o n8n precisava sobreviver). Foi recriada uma conta `dono` no Portal para a loja
   `moto-center`; o gestor do Control é recriado sozinho por `bootstrap_gestor_se_vazio` a
   partir dos secrets `REVY_TRAFEGO_BOOTSTRAP_*`. Fotos do estoque se perderam.
+  **Atualização 2026-08-02:** a `moto-center` estava só no Portal (login), não no Control —
+  com `REVY_LOJA_ENTITLEMENTS_ENABLED=1` isso dava "módulo indisponível" + menu do shell
+  vazio. O owner (re)criou a loja no Control (ativa + Vendas + Estoque) e ela foi projetada
+  ao Portal; enforcement volta a funcionar. Mecanismo, estado das flags em prod e runbook de
+  inspeção dos bancos em [`2026-08-02-provisionamento-loja-entitlements.md`](2026-08-02-provisionamento-loja-entitlements.md).
+  Residual: ligar `REVY_LOJA_WHATSAPP_ENABLED=1` para a opção "Números de WhatsApp" aparecer.
 - **Escala horizontal está bloqueada por dois motivos independentes** — plano em
   `docs/superpowers/plans/2026-07-31-escala-horizontal-app2037.md`: (1) Portal, Tráfego e
   Catálogo rodam em SQLite dentro do volume `app_data`, que é single-attach, então

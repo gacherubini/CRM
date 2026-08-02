@@ -30,6 +30,7 @@ os termos do domínio em [`../CONTEXT.md`](../CONTEXT.md) e os planos válidos e
 | Arquitetura implementada Control/Loja | `docs/design/2026-07-30-revy-control-loja-asbuilt-e-melhorias.md` |
 | Próxima implementação / status de planos | `docs/plans/README.md` e o bloco Status do plano |
 | Operação recente | `docs/handoff-contexto.md` |
+| Provisionamento loja / entitlements / inspeção de prod | `docs/2026-08-02-provisionamento-loja-entitlements.md` |
 | Deploy Fly | `deploy/fly/3vm/README.md` |
 | Go-live WhatsApp | `docs/go-live-chatbot.md` |
 | RPA bancário | `docs/plans/*playwright*` e mapa de bancos |
