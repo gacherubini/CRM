@@ -113,3 +113,40 @@ def test_health_endpoint_loja_inexistente_retorna_404(client_logado, monkeypatch
     )
 
     assert response.status_code == 404
+
+
+def test_health_endpoint_contrato_consumido_pelo_js(client_logado, monkeypatch):
+    """Task 10: `integracoes_health.js` consome `meta`/`google`/`whatsapp`,
+    cada um com `status` e `itens[].kind/status/message`, além de
+    `checked_at` e `cache_ttl_seg` no nível raiz. Este teste trava o formato
+    exato que o front-end depende, sem precisar de um browser."""
+    _enable_control_ui(monkeypatch)
+    _patch_fakes(monkeypatch)
+    store_id = _create_store("loja-health-endpoint-contrato-js")
+
+    response = client_logado.get(
+        f"/control/v1/lojas/{store_id}/integracoes/health"
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+
+    assert set(body.keys()) >= {
+        "meta",
+        "google",
+        "whatsapp",
+        "checked_at",
+        "cache_ttl_seg",
+    }
+    assert isinstance(body["checked_at"], str) and body["checked_at"]
+    assert isinstance(body["cache_ttl_seg"], int)
+
+    for grupo in ("meta", "google", "whatsapp"):
+        grupo_body = body[grupo]
+        assert grupo_body["status"] in {"connected", "error", "missing"}
+        assert isinstance(grupo_body["itens"], list) and grupo_body["itens"]
+        for item in grupo_body["itens"]:
+            assert set(item.keys()) >= {"kind", "status", "message"}
+            assert isinstance(item["kind"], str) and item["kind"]
+            assert item["status"] in {"connected", "error", "missing"}
+            assert item["message"] is None or isinstance(item["message"], str)

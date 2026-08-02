@@ -1,7 +1,8 @@
 """Painel de status das integracoes (Meta/Google/WhatsApp) no detalhe da Loja.
 
-Task 9 (Fase 3): apenas o container HTML + CSS. Sem dados ao vivo aqui — o JS
-que consome `GET /control/v1/lojas/{id}/integracoes/health` vem na Task 10.
+Task 9 (Fase 3): apenas o container HTML + CSS. Task 10 (Fase 3): o JS que
+consome `GET /control/v1/lojas/{id}/integracoes/health` e preenche o painel
+(`integracoes_health.js`), incluído aqui pela referência ao `<script>`.
 
 O card vive na aba "Visão geral" (`#panel-visao`), que é a aba default e NÃO é
 gated por `google_ads_enabled` — diferente de `#panel-integracoes`, que só
@@ -83,3 +84,20 @@ def test_painel_de_saude_das_integracoes_aparece_na_visao_geral(
     assert health_index > visao_start
     if not google_ads_sync_enabled:
         assert 'id="panel-integracoes"' not in detail.text
+
+
+def test_painel_de_saude_inclui_script_que_consome_o_endpoint(client, monkeypatch):
+    """Task 10: o JS que busca `/integracoes/health` e renderiza os badges
+    precisa estar incluído na página — sem ele o card fica preso em
+    "Carregando…" para sempre."""
+    _enable_control_ui(monkeypatch, google_ads_sync_enabled=False)
+    store = StoreControl(SessionLocal).create(
+        _admin_actor(),
+        CreateStore(name="Loja Integrações Script", slug="loja-integracoes-script"),
+    )
+    _login(client)
+
+    detail = client.get(f"/app/control/lojas/{store.id}")
+
+    assert detail.status_code == 200
+    assert "integracoes_health.js" in detail.text
