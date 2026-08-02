@@ -395,6 +395,46 @@ def test_whatsapp_error_quando_chamada_falha():
 
 > Nota: o cache do WhatsApp segue o mesmo TTL (10min). O Control **não** invalida em connect/disconnect de WhatsApp (essa ação é no Portal/chatbot) — staleness de até 10min é aceita (decisão do owner) + "Testar agora".
 
+---
+
+## Fase 3 — Badge UI no Control (aba Integrações do detalhe da loja)
+
+**Onde:** `revy-trafego/app/templates/control/loja_detail.html`, no topo do painel `#panel-integracoes` (a aba "Integrações" já existe). **Visual:** aprovado no mockup (3 badges Meta·Google·WhatsApp, 🟢/🔴/⚪, expandir sub-itens, "Testar agora"), cara de marca via tokens do `app.css`. **Dados:** JS busca `GET /control/v1/lojas/{id}/integracoes/health` no load e no "Testar agora" (`?forcar=1`); a página não bloqueia. Só status (não clicável pra corrigir), dono/gerente (a aba já é do gestor).
+
+### Task 9: Container + CSS do painel de saúde
+
+**Files:**
+- Modify: `revy-trafego/app/templates/control/loja_detail.html` (container `#integracoes-health` no topo de `#panel-integracoes`, com `data-loja-id`)
+- Modify: `revy-trafego/app/static/css/app.css` (estilos `.integ-*` usando os tokens existentes — `--green/--red/--ink-muted`, `--surface`, `--line`, `--radius`; estados ok/err/off; pill+dot; sub-itens; chevron; spinner do botão)
+- Test: `revy-trafego/tests/test_control_integracoes_health_ui.py`
+
+**Interfaces:** o container tem `id="integracoes-health"` e `data-loja-id="{{ store.id }}"`; um `<button data-integ-testar>` e um alvo `<div data-integ-corpo>` com um estado inicial "Carregando…". Nenhum dado sensível no HTML (o JS busca via endpoint autenticado).
+
+- [ ] **Step 1: Failing test** — TestClient logado como gestor abre `/app/control/lojas/{id}` (ou a aba) e assert: o HTML contém `id="integracoes-health"` e `data-loja-id="<id>"` e o botão "Testar agora". Usar o helper de login de gestor dos testes existentes.
+- [ ] **Step 2–5:** run→fail; adicionar o container no template + os estilos `.integ-*` no `app.css` (seguir o mockup: `.integ-card`, `.integ-row`, `.integ-pill.ok/.err/.off`, `.integ-dot`, `.integ-sub`, chevron, spinner); run→pass; commit `feat(control): container + estilos do painel de status das integracoes`.
+
+### Task 10: JS que consome o endpoint e renderiza os badges
+
+**Files:**
+- Create: `revy-trafego/app/static/js/integracoes_health.js`
+- Modify: `revy-trafego/app/templates/control/loja_detail.html` (incluir o `<script src>` e chamar init com o `data-loja-id`)
+- Test: `revy-trafego/tests/test_control_integracoes_health_ui.py` (estender: assert que o `<script ... integracoes_health.js>` está incluído; e um teste de render do endpoint→shape que o JS espera, garantindo o contrato)
+
+**Comportamento do JS (vanilla, sem dependência):**
+- No load: `fetch("/control/v1/lojas/"+lojaId+"/integracoes/health")` → renderiza os 3 grupos (rótulos PT: Meta/Google/WhatsApp; sub-itens por `kind`). Mapear `status`→classe (`connected`→ok, `error`→err, `missing`→off) e rótulo ("Conectado"/"Com erro"/"Não configurado"). Mensagem do item quando houver. Expandir/colapsar por grupo.
+- "Testar agora": refaz o fetch com `?forcar=1`, mostra "Verificando…" no botão, atualiza "Verificado agora".
+- Erro de fetch (rede/500): mostra um estado neutro "Não foi possível verificar agora — tente de novo", sem quebrar a página. Nunca renderiza token (o endpoint não manda).
+- Rótulos e cores só via classes CSS da Task 9. `Cache-Control` do fetch: default (o cache é no servidor).
+
+- [ ] **Step 1: Failing test** — assert o `<script>` incluído; (o render em si é client-side, difícil de unit-testar sem browser — cobrir o **contrato** do endpoint com um teste que valida as chaves/kinds que o JS consome: `meta/google/whatsapp`, cada `itens[].kind/status/message`).
+- [ ] **Step 2–5:** run→fail; implementar o JS + inclusão no template; rodar suite; commit `feat(control): painel de status das integracoes (render via endpoint + testar agora)`.
+
+> Nota: render client-side (JS-required) é aceitável numa tela de admin. O visual final deve ser conferido pelo owner (review visual) — o mockup aprovado é a referência.
+
+## Fase 4 — Badge UI no shell da Revy Loja (Portal) — esboço
+
+Item **"Integrações"** em Ajustes (`app/loja/navigation.py`, dono/gerente) → página no shell (`portal-gestao/app/templates/loja/integracoes.html`, estende `base.html`) reusando o mesmo componente. O Portal consome o endpoint do Control por HTTP (`clients/revy_trafego.py`) OU embute o mesmo JS apontando para o Control. Detalhar após a Fase 3, com review visual do owner.
+
 ## Fases seguintes (esboço — detalhar com review do owner)
 
 - **Fase 3 — Badge UI no Control** (detalhe da loja): componente de 3 badges com expandir, cores por estado, "Testar agora" (fetch `?forcar=1`), poll leve opcional. Seguir os templates/estilos do Control. **Review visual do owner.**
