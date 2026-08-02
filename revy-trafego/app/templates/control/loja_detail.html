@@ -79,7 +79,7 @@
 
 <!-- Visão geral ------------------------------------------------------------- -->
 <section class="control-tabpanel" role="tabpanel" id="panel-visao" data-tab="visao" aria-labelledby="tab-visao" tabindex="0">
-  <section class="integ-card" id="integracoes-health" data-loja-id="{{ store.id }}">
+  <section class="integ-card" id="integracoes-health" data-loja-id="{{ store.id }}" data-integ-endpoint="{{ public_path('/control/v1/lojas/' ~ store.id ~ '/integracoes/health') }}">
     <div class="integ-card-head">
       <div class="integ-card-title">Status das integrações</div>
       <div class="integ-meta">

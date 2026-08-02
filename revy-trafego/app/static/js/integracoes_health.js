@@ -157,6 +157,12 @@
     var checkedEl = section.querySelector("[data-integ-checked]");
     var testarBtn = section.querySelector("[data-integ-testar]");
 
+    // Endpoint vem do template via public_path (inclui o prefixo /trafego em
+    // producao). Fallback relativo so para dev/local sem prefixo.
+    var endpoint =
+      section.getAttribute("data-integ-endpoint") ||
+      "/control/v1/lojas/" + encodeURIComponent(lojaId) + "/integracoes/health";
+
     if (!lojaId || !corpo) return;
 
     function render(data) {
@@ -182,10 +188,7 @@
 
     function carregar(forcar) {
       var url =
-        "/control/v1/lojas/" +
-        encodeURIComponent(lojaId) +
-        "/integracoes/health" +
-        (forcar ? "?forcar=1" : "");
+        endpoint + (forcar ? (endpoint.indexOf("?") >= 0 ? "&" : "?") + "forcar=1" : "");
       return fetch(url, {
         headers: { Accept: "application/json" },
         credentials: "same-origin",

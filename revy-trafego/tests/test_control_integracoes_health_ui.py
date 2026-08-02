@@ -76,6 +76,10 @@ def test_painel_de_saude_das_integracoes_aparece_na_visao_geral(
     assert 'id="integracoes-health"' in detail.text
     assert f'data-loja-id="{store.id}"' in detail.text
     assert "Testar agora" in detail.text
+    # O endpoint vem via public_path (com prefixo /trafego em producao); o JS le
+    # este atributo em vez de hardcodar /control/... (que quebraria atras do edge).
+    assert 'data-integ-endpoint=' in detail.text
+    assert f'/control/v1/lojas/{store.id}/integracoes/health' in detail.text
 
     # O card fica dentro de #panel-visao, que nunca é gated pela flag do
     # Google Ads — diferente de #panel-integracoes.
