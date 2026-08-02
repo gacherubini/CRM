@@ -66,6 +66,45 @@ class RevyTrafegoClient:
             )
             return None
 
+    def fetch_integracoes_health(
+        self,
+        *,
+        loja_slug: str,
+        forcar: bool = False,
+    ) -> dict[str, Any] | None:
+        """GET /v1/lojas/{slug}/integracoes/health. None se offline/erro/não configurado.
+
+        Consumido server-side pelo endpoint local do shell da Loja (badge de
+        status Meta/Google/WhatsApp): o token de serviço nunca sai daqui; o
+        navegador do dono/gerente fala só com o Portal. None (offline/não
+        configurado) é distinto de um 200 com `status=missing` (configuração
+        ausente, mas Control no ar) — o chamador decide como sinalizar cada caso.
+        """
+        if not self.configurado:
+            return None
+        try:
+            with httpx.Client(base_url=self.base_url, timeout=self.timeout) as client:
+                r = client.get(
+                    f"/v1/lojas/{loja_slug}/integracoes/health",
+                    params={"forcar": 1} if forcar else None,
+                    headers=self._headers(),
+                )
+                if r.status_code != 200:
+                    logger.warning(
+                        "revy_trafego integracoes_health status=%s loja=%s",
+                        r.status_code,
+                        loja_slug,
+                    )
+                    return None
+                return r.json()
+        except (httpx.HTTPError, ValueError) as exc:
+            logger.warning(
+                "revy_trafego integracoes_health falhou loja=%s err=%s",
+                loja_slug,
+                type(exc).__name__,
+            )
+            return None
+
     def notificar_venda_confirmada(
         self,
         *,

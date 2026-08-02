@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}Integrações — Revy Loja{% endblock %}
+{% block page_title %}Integrações{% endblock %}
+{% block content %}
+<section class="page-head">
+  <h1>Integrações</h1>
+  <p class="muted">
+    Status ao vivo das conexões de marketing e atendimento desta loja. Só
+    leitura — a configuração fica com a Revy.
+  </p>
+</section>
+
+{# O JS lê data-integ-endpoint e busca o status no endpoint local do Portal
+   (que proxya o Revy Control server-side). Nenhum token no HTML. #}
+<section class="integ-card" id="integracoes-health"
+         data-loja-id="{{ usuario.loja_slug }}"
+         data-integ-endpoint="/app/loja/integracoes/health">
+  <div class="integ-card-head">
+    <div class="integ-card-title">Status das integrações</div>
+    <div class="integ-meta">
+      <span class="integ-checked" data-integ-checked></span>
+      <button type="button" class="integ-btn" data-integ-testar>Testar agora</button>
+    </div>
+  </div>
+  <div class="integ-corpo" data-integ-corpo>
+    <p class="integ-loading">Carregando…</p>
+  </div>
+</section>
+
+<script src="/static/js/integracoes_health.js" defer></script>
+{% endblock %}

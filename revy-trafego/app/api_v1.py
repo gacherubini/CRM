@@ -1,6 +1,7 @@
 """API v1 serviço: resultados de mídia e eventos de venda."""
 from __future__ import annotations
 
+import logging
 from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 from typing import Any
@@ -18,6 +19,12 @@ from app.control.google_ads_conversions import (
     GoogleAdsConversionsControl,
 )
 from app.control.google_ads_http import build_google_ads_ports
+from app.control.graph_probe import HttpGraphProbe
+from app.control.integrations_health import (
+    ChatbotWhatsappPort,
+    HttpGoogleAccessTokenPort,
+    health_da_loja,
+)
 from app.db import SessionLocal, get_db
 from app.financeiro_calc import calcular_metricas_vendas, hoje_portal, periodo_padrao
 from app.meta_capi import enfileirar_purchase
@@ -28,6 +35,7 @@ from app.roi_calc import calcular_roi_loja, totais_roi
 from app.service_auth import exigir_service_token
 from app.vendas_projection import VendaSnapshot, projetar_venda
 router = APIRouter(prefix="/v1", tags=["v1"])
+logger = logging.getLogger(__name__)
 
 
 def _dec_str(v: Decimal | None) -> str | None:
@@ -405,3 +413,66 @@ def _maybe_enqueue_google_conversion(
         return view.id if view is not None else None
     except Exception:
         return None
+
+
+# --- Health das integrações por loja (Fase 4: consumo pelo Portal/Revy Loja) ---
+#
+# Superfície service-token (X-Service-Token) espelhando o agregador da UI de
+# gestor do Control (Fase 1-2): mesmo `health_da_loja` e mesmo cache module-level.
+# A diferença é a chave (slug, não loja_id) e a auth (token de serviço em vez de
+# sessão de gestor), porque o dono/gerente da Loja não tem sessão de Control.
+# Os builders ficam em funções isoladas para permitir monkeypatch nos testes
+# (mesmo motivo de `control_ui._build_probe`), sem bater na rede.
+
+
+def _build_integ_probe() -> HttpGraphProbe:
+    return HttpGraphProbe()
+
+
+def _build_integ_exchanger() -> HttpGoogleAccessTokenPort:
+    ports = build_google_ads_ports(
+        settings, timeout=settings.integracoes_health_timeout_seg
+    )
+    return HttpGoogleAccessTokenPort(exchanger=ports.read_port)
+
+
+def _build_integ_whatsapp_port() -> ChatbotWhatsappPort:
+    return ChatbotWhatsappPort()
+
+
+@router.get("/lojas/{loja_slug}/integracoes/health")
+def api_integracoes_health(
+    loja_slug: str,
+    forcar: int = 0,
+    db: Session = Depends(get_db),
+    _: None = Depends(exigir_service_token),
+):
+    """Health ao vivo (Meta/Google/WhatsApp) de uma loja, por slug.
+
+    Nunca vaza token: só `status` + `message` amigável. O gate de rollout de UI
+    vive em cada produto (Control: `revy_control_enabled`; Loja:
+    `revy_loja_shell_enabled`); aqui o guard é o service token, para desacoplar o
+    badge da Loja do rollout da UI do Control.
+    """
+    slug = (loja_slug or "").strip()
+    if not slug or len(slug) > 120:
+        return JSONResponse({"detail": "loja_slug inválido"}, status_code=400)
+    loja = db.query(Loja).filter(Loja.slug == slug).first()
+    if loja is None:
+        return JSONResponse({"detail": "loja não encontrada"}, status_code=404)
+    try:
+        resultado = health_da_loja(
+            db,
+            loja,
+            probe=_build_integ_probe(),
+            exchanger=_build_integ_exchanger(),
+            whatsapp_port=_build_integ_whatsapp_port(),
+            forcar=bool(forcar),
+        )
+    except Exception:
+        logger.exception("api_integracoes_health.falha_inesperada loja=%s", slug)
+        return JSONResponse(
+            {"detail": "falha ao verificar saúde das integrações"},
+            status_code=502,
+        )
+    return JSONResponse(resultado)

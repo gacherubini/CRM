@@ -111,6 +111,17 @@ def build_nav(
                     active_prefix="/app/loja/whatsapp",
                 )
             )
+        # Só status (Meta/Google/WhatsApp), não configuração: o Portal consome o
+        # agregador do Revy Control por HTTP. Visível a dono/gerente.
+        ajustes.append(
+            NavItem(
+                label="Integrações",
+                href="/app/loja/integracoes",
+                section="Ajustes",
+                module=None,
+                active_prefix="/app/loja/integracoes",
+            )
+        )
         ajustes.append(
             NavItem(
                 label="Equipe",
