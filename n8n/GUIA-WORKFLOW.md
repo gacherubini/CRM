@@ -18,7 +18,7 @@ são gerados com endereços e credenciais locais apenas na hora da publicação.
 - Placeholders de deploy: só `__EVOLUTION_KEY__`, `__CHATBOT_TOKEN__`,
   `__CHATBOT_WEBHOOK_TOKEN__` (e URLs). **Um workflow serve N números.**
 
-O fluxo atual tem 25 nós e trabalha com:
+O fluxo atual tem 26 nós e trabalha com:
 
 - mensagens de texto de clientes;
 - contexto de anúncios;
@@ -66,10 +66,19 @@ flowchart LR
    duplicada, se é a primeira mensagem e se o bot está ativo.
 6. `Gate handoff e duplicidade1` encerra duplicatas e mensagens que não devem
    continuar.
-7. `Consultar contato na Evolution1` verifica se o contato está salvo.
-8. `Rotear operacao1` pergunta ao backend se o número pertence à equipe ou se é
-   cliente.
-9. `Gate somente nao salvos1` aplica a decisão de roteamento.
+7. `Consultar contato na Evolution1` (findChats) normaliza dois sinais: `isSaved`
+   (salvo na agenda do celular) e `chatFound` (já existe conversa no WhatsApp =
+   histórico pré-bot).
+8. `Rotear operacao1` chama o backend `/v1/operacao/roteamento` mandando
+   `is_saved` **e** `chat_found`. **Quem decide `cliente`/`ignorar` é o backend
+   (`decidir_roteamento`)**, porque só ele tem o estado da conversa. A regra do
+   dono vive aí: número **não salvo COM histórico** não é atendido; mas conversa
+   que o bot já iniciou (já existe `Mensagem.direcao='saida'`) **segue** sendo
+   atendida; virgem/Evolution cega → atende (fail-open). O nó do n8n só transporta
+   os sinais.
+9. `Gate somente nao salvos1` **aplica** o `acao` que o backend devolveu e trava o
+   handoff (`bot_ativo` do `Registrar mensagem e ler handoff1`). Ele **não** decide
+   cliente virgem — o ramo `if (!acao)` é só fallback caso o backend não responda.
 10. `Se resposta controle1` manda menus da equipe direto ao WhatsApp; clientes
     seguem para a IA.
 11. `AI Agent1` decide a resposta e pode usar as ferramentas.

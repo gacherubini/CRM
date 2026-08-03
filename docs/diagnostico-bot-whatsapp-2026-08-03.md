@@ -90,8 +90,12 @@ Efeito: bot falando por cima do humano em threads como `***7567`, `***9874`, `**
 
 ## 5. Correções recomendadas (ordem sugerida)
 
-1. **Exceção CTWA/anúncio no gate** — **feita** em `docs/superpowers/plans/2026-08-03-gate-bot-somente-leads-virgens.md`.  
-   O gate passou a atender quando `chat.chatFound === true` (histórico existe e não é salvo) ou quando não há histórico algum na Evolution (fail-open para lead virgem/CTWA), silenciando apenas contato salvo (`isSaved === true`) ou handoff ativo. Ver `n8n/validate_workflow.py` (assert do nó `Gate somente nao salvos1`) e `n8n/test_gate_somente_nao_salvos.js`.
+1. **Não atender não-salvo com histórico** — **feita no BACKEND** `decidir_roteamento` (`chatbot-api/app/operacao.py`).  
+   ⚠️ **Atenção a quem for reler:** a 1ª tentativa mexeu no nó `Gate somente nao salvos1` do n8n, mas isso estava no lugar errado — aquele ramo (`if (!acao)`) só roda no fallback. O **gate real do cliente é o backend**: `Rotear operacao1` chama `/v1/operacao/roteamento`, que decide `cliente`/`ignorar`; o nó do n8n só **aplica** o `acao` (e o handoff). A regra vive no backend porque só ele tem o estado da conversa:
+   - não salvo + conversa em andamento (já existe `Mensagem.direcao='saida'`) → `cliente` (não silencia no meio);
+   - não salvo + primeiro contato + `chat_found` (histórico pré-bot no WhatsApp) → `ignorar`;
+   - não salvo + virgem / Evolution cega → `cliente` (fail-open).
+   `Rotear operacao1` passou a enviar `chat_found`. Testes reais em `chatbot-api/tests/test_roteamento_historico.py`. Commits `bf1d4e0` (gate n8n, virou fallback) e `134aec3` (fix real no backend).
 
 2. **Respeitar handoff** — **feita** em `docs/superpowers/plans/2026-08-03-gate-bot-somente-leads-virgens.md`.  
    Gate agora lê `estadoMensagem.bot_ativo !== false` do `Registrar mensagem e ler handoff1`, travado por assert no validador.
@@ -107,18 +111,19 @@ Efeito: bot falando por cima do humano em threads como `***7567`, `***9874`, `**
 5. **Estabilizar `findChats`**  
    Investigar por que a Evolution devolve lista vazia (body, instância multi-WA, JID `@lid` vs telefone). Enquanto cego, o gate continua frágil.
 
-6. **Não reativar em produção/lab** até (1) e (2) estarem no workflow live + smoke em:  
-   - lead CTWA sintético (sem spam real)  
-   - conversa com `bot_ativo: false` (bot silencioso)  
-   - contato salvo (bot silencioso)
+6. **Reativação** — (1) e (2) já estão **no ar** (backend `app2037` redeployado em 2026-08-03; workflow `n8n2037` republicado com `chat_found`). Workflow segue **inativo de propósito**; ligar (`active`) só após smoke em:  
+   - lead CTWA/virgem sintético (atende, sem spam real)  
+   - não-salvo com conversa no celular (silêncio)  
+   - contato salvo (silêncio)  
+   - conversa com `bot_ativo: false` (silêncio)
 
 ## 6. Relacionado no repo
 
 - Workflow canônico: `n8n/workflow-ai-nao-salvos.json`
 - Update live: `n8n/update_live_workflow.js`
 - Fail-closed salvos (lista vazia ≠ não salvo): commit `883fb9c`
-- Gate somente leads virgens (corrige (1) e (2) acima): `docs/superpowers/plans/2026-08-03-gate-bot-somente-leads-virgens.md`
-- Teste do novo gate: `n8n/test_gate_somente_nao_salvos.js`
+- **Regra de histórico (fix real, #1): backend `chatbot-api/app/operacao.py` `decidir_roteamento` + `conversa_tem_resposta` em `servico.py`; testes `chatbot-api/tests/test_roteamento_historico.py`. Commit `134aec3`.**
+- Handoff + gate n8n (fallback) (#2): `docs/superpowers/plans/2026-08-03-gate-bot-somente-leads-virgens.md`; teste `n8n/test_gate_somente_nao_salvos.js`
 - CTWA/atribuição: `docs/fluxo-utm-pixel-ctwa-meta.md`, plano `docs/plans/2026-07-22-plano-ctwa-atribuicao-capi-messaging.md`
 - Checkpoint ops: `docs/handoff-contexto.md`
 
@@ -128,7 +133,9 @@ Efeito: bot falando por cima do humano em threads como `***7567`, `***9874`, `**
 |---|---|
 | Workflow n8n produção | **Inativo** (desligado de propósito) |
 | Webhook `POST /webhook/whatsapp-ai` | 404 enquanto inativo |
-| Correções (1)–(2) | **Aplicadas** em `docs/superpowers/plans/2026-08-03-gate-bot-somente-leads-virgens.md`; (3)–(5) pendentes |
+| Correção (1) histórico | **No ar** no backend `app2037` (`decidir_roteamento`, commit `134aec3`) |
+| Correção (2) handoff | **No ar** (gate n8n lê `bot_ativo` do registrar) |
+| Correções (3)–(5) | Pendentes (memória à prova de restart, 1ª msg inteligente, `findChats`) |
 | Este documento | Registro do diagnóstico; não é plano de implementação formal |
 
 ---
