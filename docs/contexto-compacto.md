@@ -1,6 +1,6 @@
 # Contexto compacto para continuidade
 
-Atualizado em **2026-07-30**. Este é o ponto de entrada para estado e prioridades.
+Atualizado em **2026-08-03**. Este é o ponto de entrada para estado e prioridades.
 O desenho implementado está em
 [`design/2026-07-30-revy-control-loja-asbuilt-e-melhorias.md`](design/2026-07-30-revy-control-loja-asbuilt-e-melhorias.md),
 os termos do domínio em [`../CONTEXT.md`](../CONTEXT.md) e os planos válidos em
@@ -10,11 +10,15 @@ os termos do domínio em [`../CONTEXT.md`](../CONTEXT.md) e os planos válidos e
 
 - **Revy Control:** código lean F0–F6 implementado em `revy-trafego`. Inclui lojas,
   pessoas/cargos, acessos, contrato/módulos, prontidão, auditoria, provisioning,
-  Google Ads e canais WhatsApp. Flags continuam desligadas por padrão.
+  Google Ads e canais WhatsApp. **Defaults de código** das flags continuam OFF (dev/lab).
 - **Revy Loja:** código lean F0–F6 e F8 implementado em `portal-gestao`. Inclui shell,
   entitlements, visões de Vendas/Estoque, Atendimento multi-canal, equipe e bancos.
-  Seller AI (F7) permanece explicitamente adiado.
-- **Portal legado:** continua disponível durante o cutover. `app/main.py` foi reduzido e
+  Seller AI (F7) permanece explicitamente adiado (off em prod).
+- **Prod `app2037` (piloto, secrets 2026-08-03):** cutover **parcial** — shell +
+  entitlements + atendimento + WhatsApp Loja **ON**; `REVY_LOJA_REDIRECT_LEGACY` **OFF**
+  (dual-path: `/app/leads`, `/app/conversas` etc. ainda respondem sem 303). Detalhe e
+  runbook em [`2026-08-02-provisionamento-loja-entitlements.md`](2026-08-02-provisionamento-loja-entitlements.md).
+- **Portal legado:** continua disponível (redirect legado off). `app/main.py` foi reduzido e
   os domínios grandes estão em `app/web/{simulacoes,metas,equipe,trafego}.py`.
 - **WhatsApp:** Chatbot é dono de canais, leads, conversas e mensagens; Control apenas
   administra os canais por contrato HTTP. n8n continua a orquestração do webhook.
@@ -45,11 +49,11 @@ Escolha um eixo por mudança; não misture rollout, RPA e produto na mesma entre
 
 | Eixo | Próximo resultado verificável |
 |---|---|
-| Rollout Control/Loja | Projetar uma loja piloto, ligar flags em ordem e validar gates/redirects |
+| Rollout Control/Loja | Piloto parcial já ON em prod (shell/entitlements/atendimento/whatsapp). Residual: redirect legado opcional + validar dual-path/UX; não “ligar shell de novo” |
 | Multi-WhatsApp | E2E Evolution + n8n com dois canais e resposta pelo `canal_id` correto |
 | Google Ads | Configurar projeto GCP/secrets e fechar OAuth, métricas e conversões no lab |
 | Motor | Smoke real por banco, sessão quente e teto de dois browsers |
-| Loja | Fechar deep-links de simulação/venda dentro do Atendimento e telemetria do cutover |
+| Loja | Fechar deep-links de simulação/venda no Atendimento; telemetria; redirect legado se desejado |
 | Operação | Restore drill de banco/volume e revisão dos runbooks |
 
 ## Fronteiras permanentes
@@ -62,7 +66,8 @@ Escolha um eixo por mudança; não misture rollout, RPA e produto na mesma entre
 - Control é dono de lojas, acessos globais, pessoas/cargos, módulos e integrações técnicas.
 - Credenciais, tokens, cookies e workflows preparados nunca entram no Git ou em logs.
 - Suspensão operacional é gate de backend, não simples visibilidade de menu.
-- Flags de rollout ficam OFF por padrão; entitlements só ligam após projeção confiável.
+- Flags de rollout ficam OFF por padrão no **código** (dev/lab); em prod o piloto liga
+  secrets por ops. Entitlements só ligam após projeção confiável (fail-closed).
 
 ## Mapa rápido
 

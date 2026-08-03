@@ -475,10 +475,16 @@ def listar_mensagens(
     offset: int = 0,
     canal_id: Optional[str] = None,
     instance: Optional[str] = None,
+    after_id: Optional[str] = None,
+    after_criada_em: Optional[str] = None,
     ctx: Contexto = Depends(get_contexto),
     db: Session = Depends(get_db),
 ):
-    """Histórico da conversa. Multi-WA: passe ``canal_id`` ou ``instance``."""
+    """Histórico da conversa. Multi-WA: passe ``canal_id`` ou ``instance``.
+
+    Polling: ``after_id`` (preferido) ou ``after_criada_em`` retornam só
+    mensagens posteriores ao cursor. Sem cursor: ``limit``/``offset``.
+    """
     limit = max(1, min(limit, 500))
     offset = max(0, offset)
     resultado = servico.listar_mensagens(
@@ -489,6 +495,8 @@ def listar_mensagens(
         offset,
         canal_id=canal_id,
         instance=instance,
+        after_id=after_id,
+        after_criada_em=after_criada_em,
     )
     return {**resultado, "limit": limit, "offset": offset}
 

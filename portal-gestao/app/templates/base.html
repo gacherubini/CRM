@@ -46,7 +46,8 @@
         '/app/financeiras': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10 12 4l9 6"/><path d="M5 10v8M19 10v8M9 10v8M15 10v8M3 20h18"/></svg>',
         '/app/loja/whatsapp': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 11.5a8.5 8.5 0 0 1-12.3 7.6L3 21l1.9-5.7A8.5 8.5 0 1 1 21 11.5Z"/></svg>',
         '/app/loja/equipe': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0M16 3.5a3 3 0 0 1 0 5.5M22 20a6 6 0 0 0-5.5-5"/></svg>',
-        '/app/loja/integracoes': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4"/></svg>'
+        '/app/loja/integracoes': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4"/></svg>',
+        '/app/loja/perfil': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>'
       } %}
       <nav class="nav" aria-label="Menu principal">
         {% if loja_shell and loja_nav %}
@@ -151,8 +152,12 @@
           {% endif %}
           {% endif %}
         </div>
-        <div class="topbar-user" title="{{ usuario.email }}">
-          <span class="avatar">{{ usuario.nome[:1] | upper }}</span>
+        <div class="topbar-user">
+          <a class="avatar{% if path.startswith('/app/loja/perfil') %} is-active{% endif %}"
+             href="/app/loja/perfil"
+             title="{{ usuario.email }} · Abrir perfil"
+             aria-label="Abrir perfil"
+             {% if path.startswith('/app/loja/perfil') %}aria-current="page"{% endif %}>{{ usuario.nome[:1] | upper }}</a>
         </div>
       </header>
       <main class="content" id="conteudo">

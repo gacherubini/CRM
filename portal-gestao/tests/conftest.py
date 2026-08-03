@@ -158,8 +158,18 @@ class ChatbotFake:
         ]
         self.mensagens = {
             "5511987654321": [
-                {"direcao": "entrada", "texto": "Tem Civic disponível?", "criada_em": "2026-07-12T14:00:00+00:00"},
-                {"direcao": "saida", "texto": "Temos sim!", "criada_em": "2026-07-12T14:01:00+00:00"},
+                {
+                    "id": "msg-m1",
+                    "direcao": "entrada",
+                    "texto": "Tem Civic disponível?",
+                    "criada_em": "2026-07-12T14:00:00+00:00",
+                },
+                {
+                    "id": "msg-m2",
+                    "direcao": "saida",
+                    "texto": "Temos sim!",
+                    "criada_em": "2026-07-12T14:01:00+00:00",
+                },
             ],
         }
         self.estados = {
@@ -263,21 +273,83 @@ class ChatbotFake:
     def _canal(self, canal_id):
         return next(c for c in self.canais if c["id"] == canal_id)
 
-    def listar_mensagens(
-        self, telefone, limit=200, offset=0, *, canal_id=None, instance=None
-    ):
-        if self.indisponivel:
-            raise ChatbotIndisponivel("Não foi possível acessar o chatbot agora")
+    def _mensagens_da_conversa(self, telefone, *, canal_id=None, instance=None):
         # Multi-WA: chave opcional (telefone, canal_id) se o fake tiver dict aninhado.
         msgs = self.mensagens.get(telefone)
         if isinstance(msgs, dict) and not isinstance(msgs, list):
             chave = canal_id or instance or next(iter(msgs), None)
             if chave is None or chave not in msgs:
                 raise ConversaNaoEncontrada("conversa não encontrada")
-            return msgs[chave]
+            return list(msgs[chave])
         if msgs is None:
             raise ConversaNaoEncontrada("conversa não encontrada")
-        return msgs
+        return list(msgs)
+
+    def listar_mensagens(
+        self,
+        telefone,
+        limit=200,
+        offset=0,
+        *,
+        canal_id=None,
+        instance=None,
+        after_id=None,
+        after_criada_em=None,
+    ):
+        if self.indisponivel:
+            raise ChatbotIndisponivel("Não foi possível acessar o chatbot agora")
+        msgs = self._mensagens_da_conversa(
+            telefone, canal_id=canal_id, instance=instance
+        )
+        if after_id:
+            idx = next(
+                (i for i, m in enumerate(msgs) if m.get("id") == after_id), None
+            )
+            if idx is None:
+                raise ConversaNaoEncontrada("cursor after_id não encontrado")
+            msgs = msgs[idx + 1 :]
+        elif after_criada_em:
+            msgs = [
+                m
+                for m in msgs
+                if (m.get("criada_em") or "") > after_criada_em
+            ]
+        else:
+            msgs = msgs[offset : offset + limit]
+            return msgs
+        return msgs[:limit]
+
+    def listar_mensagens_envelope(
+        self,
+        telefone,
+        limit=200,
+        offset=0,
+        *,
+        canal_id=None,
+        instance=None,
+        after_id=None,
+        after_criada_em=None,
+    ):
+        msgs = self.listar_mensagens(
+            telefone,
+            limit=limit,
+            offset=offset,
+            canal_id=canal_id,
+            instance=instance,
+            after_id=after_id,
+            after_criada_em=after_criada_em,
+        )
+        last_id = msgs[-1].get("id") if msgs else after_id
+        return {
+            "telefone": telefone,
+            "canal_id": canal_id,
+            "mensagens": msgs,
+            "after_id": after_id,
+            "after_criada_em": after_criada_em if not after_id else None,
+            "last_id": last_id,
+            "limit": limit,
+            "offset": offset,
+        }
 
     def obter_estado(self, telefone, *, canal_id=None, instance=None):
         return self.estados.get(telefone, {"bot_ativo": True, "status": "aberta"})

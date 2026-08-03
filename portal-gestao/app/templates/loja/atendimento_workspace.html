@@ -1,13 +1,14 @@
 {% extends "base.html" %}
 {% block title %}Atendimento — Revy Loja{% endblock %}
 {% block content %}
-{# Estilos do workspace vivem em app.css (.thread/.composer/.meta-list/...). #}
+{# Estilos: .chat-column / .thread / .composer em app.css #}
 <div class="page-heading">
   <div>
     <span class="eyebrow">Atendimento</span>
     <h1>{% if workspace.lead and workspace.lead.nome %}{{ workspace.lead.nome }}{% else %}{{ mascarar_telefone(workspace.telefone) }}{% endif %}</h1>
-    <p>
+    <p class="chat-header-meta">
       <span class="status {{ workspace.estado }}">{{ workspace.estado_label }}</span>
+      <span class="muted">· {{ mascarar_telefone(workspace.telefone) }}</span>
       {% if workspace.canal_label %}
       · <span class="canal-badge {{ workspace.canal_estado or '' }}{% if workspace.canal_ativo is sameas false %} inativo{% endif %}">
         {{ workspace.canal_label }}
@@ -15,6 +16,14 @@
         · canal indisponível
         {% endif %}
       </span>
+      {% endif %}
+      {% if workspace.conversa_resumo and workspace.conversa_resumo.bot_ativo is not none %}
+      ·
+      {% if workspace.conversa_resumo.bot_ativo %}
+      <span class="status novo" data-bot-status>Bot ativo</span>
+      {% else %}
+      <span class="status em_atendimento" data-bot-status>Pausado (humano)</span>
+      {% endif %}
       {% endif %}
     </p>
   </div>
@@ -46,45 +55,72 @@
 </div>
 {% endif %}
 
-<div class="workspace-grid">
-  <div>
-    <section class="panel flush">
-      {% if workspace.mensagens %}
-      <div class="thread">
-        {% for m in workspace.mensagens %}
-        <div class="bolha {{ m.direcao }}">{{ m.texto or '—' }}<small>{{ formatar_horario(m.criada_em) }}</small></div>
-        {% endfor %}
-      </div>
-      {% else %}
-      <div class="empty"><strong>Sem mensagens nesta conversa.</strong></div>
-      {% endif %}
-    </section>
+<div class="workspace-grid"
+     id="atendimento-workspace"
+     data-poll-url="/app/loja/atendimento/{{ workspace.id }}/mensagens.json"
+     data-canal-id="{{ workspace.canal_id or '' }}"
+     data-poll-ms="4000">
+  <div class="chat-column">
+    <section class="panel flush chat-panel">
+      <header class="chat-panel-header">
+        <div>
+          <strong>{% if workspace.lead and workspace.lead.nome %}{{ workspace.lead.nome }}{% else %}Contato{% endif %}</strong>
+          <span class="muted">{{ mascarar_telefone(workspace.telefone) }}</span>
+        </div>
+        {% if workspace.canal_label %}
+        <span class="canal-badge {{ workspace.canal_estado or '' }}{% if workspace.canal_ativo is sameas false %} inativo{% endif %}">{{ workspace.canal_label }}</span>
+        {% endif %}
+      </header>
 
-    {% if workspace.envio_bloqueado_canal %}
-    <section class="panel">
-      <div class="alert warning" role="status">
-        <strong>Envio bloqueado</strong>
-        <p>O canal desta conversa está inativo ou desconectado. Ajuste no Revy Control; a Loja não conecta nem desconecta números.</p>
+      <div class="thread" data-thread role="log" aria-live="polite" aria-relevant="additions">
+        {% if workspace.mensagens %}
+        {% for m in workspace.mensagens %}
+        <div class="bolha {{ m.direcao }}"{% if m.id %} data-msg-id="{{ m.id }}"{% endif %}>{{ m.texto or '—' }}<small>{{ formatar_horario(m.criada_em) }}</small></div>
+        {% endfor %}
+        {% else %}
+        <div class="thread-empty" data-thread-empty>
+          <strong>Sem mensagens nesta conversa.</strong>
+          <p class="muted">Quando o cliente escrever, as mensagens aparecem aqui.</p>
+        </div>
+        {% endif %}
       </div>
-    </section>
-    {% elif pode_enviar %}
-    <section class="panel">
-      <form class="composer" method="post" action="/app/loja/atendimento/{{ workspace.id }}/mensagem">
+
+      {% if workspace.envio_bloqueado_canal %}
+      <div class="composer composer-blocked">
+        <div class="alert warning" role="status">
+          <strong>Envio bloqueado</strong>
+          <p>O canal desta conversa está inativo ou desconectado. Ajuste no Revy Control; a Loja não conecta nem desconecta números.</p>
+        </div>
+      </div>
+      {% elif pode_enviar %}
+      <form class="composer"
+            data-composer-form
+            method="post"
+            action="/app/loja/atendimento/{{ workspace.id }}/mensagem"
+            autocomplete="off">
         <input type="hidden" name="csrf" value="{{ csrf }}">
         {# canal_id somente da conversa aberta — sem seletor de canal #}
         {% if workspace.canal_id %}<input type="hidden" name="canal_id" value="{{ workspace.canal_id }}">{% endif %}
-        <label for="texto-msg"><strong>Responder ao cliente</strong></label>
-        <textarea id="texto-msg" name="texto" maxlength="4000" placeholder="Escreva a mensagem de texto…" required></textarea>
-        <div class="handoff-bar">
-          <button class="button primary" type="submit">Enviar</button>
-          <p class="muted">
-            Resposta sai pelo canal desta conversa{% if workspace.canal_label %} ({{ workspace.canal_label }}){% endif %}.
-            O envio pausa o bot neste contato. Mídia ainda não está disponível.
+        <input type="hidden" name="idempotency_key" value="">
+        <label for="texto-msg" class="sr-only">Responder ao cliente</label>
+        <textarea id="texto-msg"
+                  name="texto"
+                  data-composer-text
+                  maxlength="4000"
+                  rows="2"
+                  placeholder="Escreva a mensagem… (Enter envia, Shift+Enter quebra linha)"
+                  required></textarea>
+        <div class="composer-bar">
+          <p class="muted composer-hint">
+            Sai pelo canal desta conversa{% if workspace.canal_label %} ({{ workspace.canal_label }}){% endif %}.
+            O envio pausa o bot. Só texto por enquanto.
           </p>
+          <button class="button primary" type="submit" data-composer-submit>Enviar</button>
         </div>
+        <p class="composer-flash" data-composer-flash hidden role="status"></p>
       </form>
+      {% endif %}
     </section>
-    {% endif %}
   </div>
 
   <div class="action-stack">
@@ -129,7 +165,7 @@
         <dt>Bot</dt>
         <dd>
           {% if workspace.conversa_resumo and workspace.conversa_resumo.bot_ativo is not none %}
-            {% if workspace.conversa_resumo.bot_ativo %}<span class="status novo">Ativo</span>{% else %}<span class="status em_atendimento">Pausado (humano)</span>{% endif %}
+            {% if workspace.conversa_resumo.bot_ativo %}<span class="status novo" data-bot-status>Ativo</span>{% else %}<span class="status em_atendimento" data-bot-status>Pausado (humano)</span>{% endif %}
           {% else %}<span class="muted">—</span>{% endif %}
         </dd>
       </dl>
@@ -185,4 +221,5 @@
 
   </div>
 </div>
+<script src="/static/js/atendimento_workspace.js" defer></script>
 {% endblock %}

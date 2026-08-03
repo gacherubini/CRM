@@ -147,7 +147,7 @@ def test_client_listar_mensagens_envia_canal_id_e_instance(monkeypatch):
             json={
                 "telefone": "5511999",
                 "canal_id": "canal-x",
-                "mensagens": [{"direcao": "entrada", "texto": "oi"}],
+                "mensagens": [{"id": "m1", "direcao": "entrada", "texto": "oi"}],
                 "limit": 200,
                 "offset": 0,
             },
@@ -157,7 +157,45 @@ def test_client_listar_mensagens_envia_canal_id_e_instance(monkeypatch):
     msgs = chatbot.listar_mensagens(
         "5511999", canal_id="canal-x", instance="inst-y"
     )
-    assert msgs == [{"direcao": "entrada", "texto": "oi"}]
+    assert msgs == [{"id": "m1", "direcao": "entrada", "texto": "oi"}]
+
+
+def test_client_listar_mensagens_envia_after_id(monkeypatch):
+    def handler(request):
+        assert request.url.path == "/v1/conversas/5511999/mensagens"
+        assert request.url.params["after_id"] == "msg-10"
+        assert request.url.params["canal_id"] == "canal-x"
+        return httpx.Response(
+            200,
+            json={
+                "telefone": "5511999",
+                "canal_id": "canal-x",
+                "mensagens": [
+                    {
+                        "id": "msg-11",
+                        "direcao": "entrada",
+                        "texto": "nova",
+                        "criada_em": "2026-07-12T15:00:00+00:00",
+                    }
+                ],
+                "after_id": "msg-10",
+                "last_id": "msg-11",
+                "limit": 200,
+                "offset": 0,
+            },
+        )
+
+    chatbot = _cliente_com_transporte(monkeypatch, handler)
+    msgs = chatbot.listar_mensagens(
+        "5511999", canal_id="canal-x", after_id="msg-10"
+    )
+    assert msgs[0]["id"] == "msg-11"
+
+    envelope = chatbot.listar_mensagens_envelope(
+        "5511999", canal_id="canal-x", after_id="msg-10"
+    )
+    assert envelope["last_id"] == "msg-11"
+    assert envelope["after_id"] == "msg-10"
 
 
 def test_client_definir_bot_ativo_faz_patch(monkeypatch):

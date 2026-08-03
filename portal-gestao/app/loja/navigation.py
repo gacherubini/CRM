@@ -131,16 +131,23 @@ def build_nav(
                 active_prefix="/app/loja/equipe",
             )
         )
-        ajustes.append(
-            NavItem(
-                label="Senha",
-                href="/conta/senha",
-                section="Ajustes",
-                module=None,
-                active_prefix="/conta/senha",
-            )
-        )
         sections.append(NavSection(title="Ajustes", items=tuple(ajustes)))
+
+    # Conta: perfil e troca de senha da própria conta — todos os papéis operacionais.
+    sections.append(
+        NavSection(
+            title="Conta",
+            items=(
+                NavItem(
+                    label="Perfil",
+                    href="/app/loja/perfil",
+                    section="Conta",
+                    module=None,
+                    active_prefix="/app/loja/perfil",
+                ),
+            ),
+        )
+    )
 
     return tuple(sections)
 

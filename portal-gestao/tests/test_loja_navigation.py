@@ -22,7 +22,7 @@ def _ents(vendas=True, estoque=True, ativa=True, slug="loja-teste"):
 def test_nav_somente_vendas_e_estoque_com_acessos_bancarios():
     sections = build_nav(_store(), _ents(), shell_enabled=True)
     titles = [s.title for s in sections]
-    assert titles == ["Vendas", "Estoque", "Ajustes"]
+    assert titles == ["Vendas", "Estoque", "Ajustes", "Conta"]
     items = flatten_nav(sections)
     labels = [i.label for i in items]
     assert labels == [
@@ -33,7 +33,7 @@ def test_nav_somente_vendas_e_estoque_com_acessos_bancarios():
         "Acessos bancários",
         "Integrações",
         "Equipe",
-        "Senha",
+        "Perfil",
     ]
     hrefs = {i.href for i in items}
     assert "/app/loja/vendas" in hrefs
@@ -43,6 +43,9 @@ def test_nav_somente_vendas_e_estoque_com_acessos_bancarios():
     assert "/app/financeiras" in hrefs
     assert "/app/loja/integracoes" in hrefs
     assert "/app/loja/equipe" in hrefs
+    assert "/app/loja/perfil" in hrefs
+    # Senha saiu de Ajustes (agora em Conta → Perfil)
+    assert "/conta/senha" not in hrefs
     # Sem config técnica
     assert not any("trafego" in i.href or "campanhas" in i.href for i in items)
     assert not any("operacao" in i.href for i in items)
@@ -60,6 +63,10 @@ def test_nav_vendedor_sem_acessos_bancarios():
     sections = build_nav(_store(roles=("vendedor",)), _ents(), shell_enabled=True)
     items = flatten_nav(sections)
     assert not any(i.href == "/app/financeiras" for i in items)
+    # Vendedor também vê Perfil (Conta), mas não Ajustes
+    assert any(i.href == "/app/loja/perfil" for i in items)
+    assert "Ajustes" not in [s.title for s in sections]
+    assert "Conta" in [s.title for s in sections]
 
 
 def test_nav_shell_desligado_vazio():

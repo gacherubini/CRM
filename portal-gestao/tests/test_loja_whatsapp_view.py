@@ -16,11 +16,12 @@ def test_view_traduz_estados_para_linguagem_de_loja():
         ]
     )
     rotulos = [c.rotulo for c in view.canais]
+    # O inativo (linha 4) é "apagado": fica fora da lista. Os demais estados
+    # viram linguagem de loja.
     assert rotulos == [
         "Conectado",
         "Aguardando leitura do QR",
         "Caiu — reconectar",
-        "Desativado",
     ]
 
 
@@ -31,13 +32,13 @@ def test_view_com_erro_nao_inventa_canais():
     assert view.pode_adicionar is False
 
 
-def test_canal_inativo_nao_pode_conectar():
+def test_canal_inativo_fica_fora_da_lista():
+    """Apagar é inativação lógica: o canal some da lista (não é hard-delete)."""
     view = montar_canais_view(
         [{"id": "c4", "e164_or_label": "x", "evolution_instance": "i4",
           "ativo": False, "estado": "inativo"}]
     )
-    assert view.canais[0].pode_conectar is False
-    assert view.canais[0].pode_desconectar is False
+    assert view.canais == ()
 
 
 def test_multi_desabilitado_impede_adicionar():

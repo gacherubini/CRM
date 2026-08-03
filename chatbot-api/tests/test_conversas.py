@@ -137,3 +137,101 @@ def test_saida_nao_expoe_provider_message_id(client, loja_a):
     assert "SECRET-123" not in mensagens
     assert "provider_message_id" not in conversas
     assert "provider_message_id" not in mensagens
+
+
+def test_mensagens_incluem_id(client, loja_a):
+    inst, h = loja_a["instance"], loja_a["headers"]
+    tel = "5511966667777"
+    _enviar(client, inst, tel, "com id", "MID-ID-1")
+
+    body = client.get(f"/v1/conversas/{tel}/mensagens", headers=h).json()
+    assert len(body["mensagens"]) == 1
+    msg = body["mensagens"][0]
+    assert msg["id"]
+    assert msg["direcao"] == "entrada"
+    assert msg["texto"] == "com id"
+    assert msg["criada_em"]
+
+
+def test_mensagens_cursor_after_id(client, loja_a):
+    inst, h = loja_a["instance"], loja_a["headers"]
+    tel = "5511970000001"
+    for i in range(4):
+        _enviar(client, inst, tel, f"c{i}", f"CUR{i}")
+
+    todas = client.get(f"/v1/conversas/{tel}/mensagens", headers=h).json()
+    ids = [m["id"] for m in todas["mensagens"]]
+    assert len(ids) == 4
+
+    r = client.get(
+        f"/v1/conversas/{tel}/mensagens?after_id={ids[1]}", headers=h
+    )
+    assert r.status_code == 200
+    body = r.json()
+    assert [m["texto"] for m in body["mensagens"]] == ["c2", "c3"]
+    assert body["after_id"] == ids[1]
+    assert body["last_id"] == ids[3]
+    assert all(m["id"] for m in body["mensagens"])
+
+    # Cursor na última mensagem → lista vazia (sem novas)
+    vazio = client.get(
+        f"/v1/conversas/{tel}/mensagens?after_id={ids[3]}", headers=h
+    ).json()
+    assert vazio["mensagens"] == []
+    assert vazio["last_id"] == ids[3]
+
+
+def test_mensagens_after_id_outra_conversa_404(client, loja_a):
+    inst, h = loja_a["instance"], loja_a["headers"]
+    tel_a, tel_b = "5511970000010", "5511970000011"
+    _enviar(client, inst, tel_a, "na A", "CA1")
+    _enviar(client, inst, tel_b, "na B", "CB1")
+
+    id_b = client.get(f"/v1/conversas/{tel_b}/mensagens", headers=h).json()[
+        "mensagens"
+    ][0]["id"]
+    r = client.get(
+        f"/v1/conversas/{tel_a}/mensagens?after_id={id_b}", headers=h
+    )
+    assert r.status_code == 404
+
+
+def test_mensagens_after_id_inexistente_404(client, loja_a):
+    inst, h = loja_a["instance"], loja_a["headers"]
+    tel = "5511970000020"
+    _enviar(client, inst, tel, "existe", "CX1")
+    r = client.get(
+        f"/v1/conversas/{tel}/mensagens?after_id=00000000-0000-0000-0000-000000000000",
+        headers=h,
+    )
+    assert r.status_code == 404
+
+
+def test_mensagens_cursor_after_criada_em(client, loja_a):
+    inst, h = loja_a["instance"], loja_a["headers"]
+    tel = "5511970000030"
+    for i in range(3):
+        _enviar(client, inst, tel, f"t{i}", f"TS{i}")
+
+    todas = client.get(f"/v1/conversas/{tel}/mensagens", headers=h).json()[
+        "mensagens"
+    ]
+    ts0 = todas[0]["criada_em"]
+    r = client.get(
+        f"/v1/conversas/{tel}/mensagens?after_criada_em={ts0}", headers=h
+    )
+    assert r.status_code == 200
+    body = r.json()
+    assert body["after_criada_em"] == ts0
+    # Só mensagens com criada_em estritamente maior que o cursor.
+    for m in body["mensagens"]:
+        assert m["criada_em"] > ts0
+    # after_id tem precedência sobre after_criada_em
+    mid = todas[1]["id"]
+    pref = client.get(
+        f"/v1/conversas/{tel}/mensagens?after_id={mid}&after_criada_em={ts0}",
+        headers=h,
+    ).json()
+    assert [m["texto"] for m in pref["mensagens"]] == ["t2"]
+    assert pref["after_id"] == mid
+    assert pref["after_criada_em"] is None

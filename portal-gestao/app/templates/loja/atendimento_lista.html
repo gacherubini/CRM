@@ -50,10 +50,13 @@
     </thead>
     <tbody>
       {% for i in itens %}
-      <tr>
+      {% set href_ws = "/app/loja/atendimento/" ~ i.id ~ (("?canal_id=" ~ i.canal_id) if i.canal_id else "") %}
+      <tr class="atend-row">
         <td>
           <div class="cell-stack">
-            <strong>{% if i.nome %}{{ i.nome }}{% else %}<span class="muted">Sem nome</span>{% endif %}</strong>
+            <a class="atend-contato-link" href="{{ href_ws }}">
+              <strong>{% if i.nome %}{{ i.nome }}{% else %}<span class="muted">Sem nome</span>{% endif %}</strong>
+            </a>
             <small>{{ mascarar_telefone(i.telefone) }}</small>
           </div>
         </td>
@@ -73,8 +76,8 @@
           {% endif %}
         </td>
         <td>{% if i.ultima_mensagem %}<span class="muted">{{ i.ultima_mensagem[:80] }}</span>{% else %}<span class="muted">—</span>{% endif %}</td>
-        <td>
-          <a class="table-action" href="/app/loja/atendimento/{{ i.id }}{% if i.canal_id %}?canal_id={{ i.canal_id }}{% endif %}">Abrir</a>
+        <td class="atend-acoes">
+          <a class="button secondary table-action-btn" href="{{ href_ws }}">Abrir conversa</a>
         </td>
       </tr>
       {% endfor %}

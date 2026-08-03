@@ -5,10 +5,11 @@ Rotas legadas ``/app/leads`` e ``/app/conversas`` permanecem intactas.
 """
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
@@ -348,6 +349,23 @@ def _append_query(destino: str, **params: str) -> str:
     return f"{destino}{sep}{'&'.join(partes)}"
 
 
+def _quer_json(request: Request) -> bool:
+    """True se o cliente pediu JSON (Accept ou header X-Requested-With)."""
+    accept = (request.headers.get("accept") or "").lower()
+    if "application/json" in accept and "text/html" not in accept:
+        return True
+    if (request.headers.get("x-requested-with") or "").lower() == "xmlhttprequest":
+        return True
+    return False
+
+
+def _json_erro(status: int, code: str, message: str) -> JSONResponse:
+    return JSONResponse(
+        {"ok": False, "error": code, "message": message},
+        status_code=status,
+    )
+
+
 def _guard_workspace_mutacao(
     request: Request,
     usuario: Usuario | None,
@@ -391,6 +409,115 @@ def _guard_workspace_mutacao(
     return None, atr
 
 
+@router.get("/app/loja/atendimento/{workspace_id}/mensagens.json")
+def atendimento_mensagens_json(
+    request: Request,
+    workspace_id: str,
+    canal_id: str | None = None,
+    after_id: str | None = None,
+    after_criada_em: str | None = None,
+    limit: int = 100,
+    db: Session = Depends(get_db),
+    chatbot: ChatbotClient = Depends(get_chatbot_client),
+):
+    """Poll de mensagens (JSON). Proxy autenticado ao Chatbot; sem tokens ao browser.
+
+    Query: ``canal_id`` (multi-WA), ``after_id`` (preferido) ou ``after_criada_em``.
+    """
+    usuario = usuario_atual(request, db)
+    if not usuario:
+        return _json_erro(401, "auth", "Não autenticado")
+    if not atendimento_habilitado():
+        return _json_erro(404, "flag", "Atendimento não habilitado")
+    if not pode_usar_atendimento(usuario):
+        return _json_erro(403, "perm", "Sem permissão")
+
+    telefone = normalizar_telefone(workspace_id)
+    if not telefone:
+        return _json_erro(404, "not_found", "Atendimento não encontrado")
+
+    atribuicoes = carregar_atribuicoes_ativas(db, usuario.loja_slug)
+    atr = atribuicao_para_telefone(atribuicoes, telefone)
+    if not visivel_para_usuario(usuario, atribuicao=atr):
+        return _json_erro(403, "scope", "Atendimento fora do seu escopo")
+
+    limit = max(1, min(int(limit or 100), 200))
+    canal = (canal_id or "").strip() or None
+    cursor_id = (after_id or "").strip() or None
+    cursor_ts = (after_criada_em or "").strip() or None
+
+    # Resolve instance da conversa aberta (multi-WA) no servidor.
+    instance = None
+    try:
+        conversas = chatbot.listar_conversas(busca=telefone, canal_id=canal)
+        for c in conversas:
+            if normalizar_telefone(c.get("telefone")) != telefone:
+                continue
+            if canal and c.get("canal_id") and c.get("canal_id") != canal:
+                continue
+            instance = c.get("evolution_instance") or c.get("instance")
+            if not canal:
+                canal = c.get("canal_id") or canal
+            break
+    except ChatbotIndisponivel as exc:
+        return _json_erro(503, "integracao", str(exc) or "Chatbot indisponível")
+
+    try:
+        if hasattr(chatbot, "listar_mensagens_envelope"):
+            envelope = chatbot.listar_mensagens_envelope(
+                telefone,
+                limit=limit,
+                canal_id=canal,
+                instance=instance,
+                after_id=cursor_id,
+                after_criada_em=cursor_ts,
+            )
+            mensagens = envelope.get("mensagens") or []
+            last_id = envelope.get("last_id")
+            canal_out = envelope.get("canal_id") or canal
+        else:
+            mensagens = chatbot.listar_mensagens(
+                telefone,
+                limit=limit,
+                canal_id=canal,
+                instance=instance,
+                after_id=cursor_id,
+                after_criada_em=cursor_ts,
+            )
+            last_id = (
+                mensagens[-1].get("id")
+                if mensagens and isinstance(mensagens[-1], dict)
+                else cursor_id
+            )
+            canal_out = canal
+    except ConversaNaoEncontrada:
+        if cursor_id:
+            return _json_erro(404, "cursor", "Cursor não encontrado nesta conversa")
+        return JSONResponse(
+            {
+                "ok": True,
+                "telefone": telefone,
+                "canal_id": canal,
+                "mensagens": [],
+                "after_id": cursor_id,
+                "last_id": cursor_id,
+            }
+        )
+    except ChatbotIndisponivel as exc:
+        return _json_erro(503, "integracao", str(exc) or "Chatbot indisponível")
+
+    return JSONResponse(
+        {
+            "ok": True,
+            "telefone": telefone,
+            "canal_id": canal_out,
+            "mensagens": mensagens,
+            "after_id": cursor_id,
+            "last_id": last_id or cursor_id,
+        }
+    )
+
+
 @router.post("/app/loja/atendimento/{workspace_id}/mensagem")
 async def atendimento_enviar_mensagem(
     request: Request,
@@ -399,12 +526,19 @@ async def atendimento_enviar_mensagem(
     chatbot: ChatbotClient = Depends(get_chatbot_client),
     messaging: HumanMessagingPort = Depends(get_human_messaging_port),
 ):
+    quer_json = _quer_json(request)
     usuario = usuario_atual(request, db)
     if not usuario:
+        if quer_json:
+            return _json_erro(401, "auth", "Não autenticado")
         return redirecionar_login()
     if not atendimento_habilitado():
+        if quer_json:
+            return _json_erro(404, "flag", "Atendimento não habilitado")
         return _flag_off_response(request, usuario)
     if not pode_usar_atendimento(usuario):
+        if quer_json:
+            return _json_erro(403, "perm", "Sem permissão")
         return templates.TemplateResponse(
             "erro.html",
             contexto(request, usuario, erro="Sem permissão para o Atendimento."),
@@ -421,12 +555,25 @@ async def atendimento_enviar_mensagem(
     if canal_id_form:
         destino = f"{destino}?canal_id={canal_id_form}"
 
+    def _redir_erro(code: str):
+        if quer_json:
+            return _json_erro(400, code, code)
+        sep = "&" if "?" in destino else "?"
+        return RedirectResponse(f"{destino}{sep}erro={code}", status_code=303)
+
     if not csrf_valido(request, form.get("csrf")):
-        return RedirectResponse(f"{destino}&erro=sessao" if "?" in destino else f"{destino}?erro=sessao", status_code=303)
+        if quer_json:
+            return _json_erro(403, "sessao", "Sessão expirada")
+        return RedirectResponse(
+            f"{destino}&erro=sessao" if "?" in destino else f"{destino}?erro=sessao",
+            status_code=303,
+        )
 
     atribuicoes = carregar_atribuicoes_ativas(db, usuario.loja_slug)
     atr = atribuicao_para_telefone(atribuicoes, telefone)
     if not visivel_para_usuario(usuario, atribuicao=atr):
+        if quer_json:
+            return _json_erro(403, "scope", "Atendimento fora do seu escopo")
         return templates.TemplateResponse(
             "erro.html",
             contexto(request, usuario, erro="Atendimento fora do seu escopo."),
@@ -435,11 +582,9 @@ async def atendimento_enviar_mensagem(
 
     texto = (form.get("texto") or "").strip()
     if not texto:
-        sep = "&" if "?" in destino else "?"
-        return RedirectResponse(f"{destino}{sep}erro=texto", status_code=303)
+        return _redir_erro("texto")
     if len(texto) > 4000:
-        sep = "&" if "?" in destino else "?"
-        return RedirectResponse(f"{destino}{sep}erro=texto", status_code=303)
+        return _redir_erro("texto")
 
     # Resolve canal da conversa no servidor — sem aceitar instance do form.
     conversa_resumo, _, _ = _conversa_por_telefone(
@@ -449,8 +594,9 @@ async def atendimento_enviar_mensagem(
         canal_ativo=conversa_resumo.get("canal_ativo"),
         canal_estado=conversa_resumo.get("canal_estado"),
     ):
-        sep = "&" if "?" in destino else "?"
-        return RedirectResponse(f"{destino}{sep}erro=canal", status_code=303)
+        if quer_json:
+            return _json_erro(423, "canal", "Canal inativo ou desconectado")
+        return _redir_erro("canal")
 
     instance_conversa = None
     if conversa_resumo:
@@ -474,33 +620,58 @@ async def atendimento_enviar_mensagem(
             ator=usuario.email,
         )
     except MensagemHumanaNaoEncontrada:
-        sep = "&" if "?" in destino else "?"
-        return RedirectResponse(f"{destino}{sep}erro=conversa", status_code=303)
+        if quer_json:
+            return _json_erro(404, "conversa", "Conversa não encontrada")
+        return _redir_erro("conversa")
     except MensagemHumanaNaoAutorizada:
+        if quer_json:
+            return _json_erro(403, "perm", "Envio não autorizado")
         return templates.TemplateResponse(
             "erro.html",
             contexto(request, usuario, erro="Envio não autorizado."),
             status_code=403,
         )
     except (MensagemHumanaErro, ChatbotIndisponivel):
-        sep = "&" if "?" in destino else "?"
-        return RedirectResponse(f"{destino}{sep}erro=envio", status_code=303)
+        if quer_json:
+            return _json_erro(503, "envio", "Não foi possível enviar a mensagem agora")
+        return _redir_erro("envio")
 
     # Espelha no fake de mensagens do chatbot client se expuser o histórico
     # (testes com ChatbotFake + InMemory port).
+    criada_em = datetime.now(timezone.utc).isoformat()
+    msg_id = resultado.mensagem_id
     if hasattr(chatbot, "mensagens") and isinstance(getattr(chatbot, "mensagens"), dict):
         hist = chatbot.mensagens.setdefault(telefone, [])
         if not resultado.duplicada:
             hist.append(
                 {
+                    "id": msg_id,
                     "direcao": "saida",
                     "texto": texto,
-                    "criada_em": None,
+                    "criada_em": criada_em,
                     "humana": True,
                 }
             )
         if hasattr(chatbot, "estados"):
             chatbot.estados[telefone] = {"bot_ativo": False, "status": "handoff"}
+
+    if quer_json:
+        return JSONResponse(
+            {
+                "ok": True,
+                "duplicada": bool(resultado.duplicada),
+                "bot_ativo": bool(resultado.bot_ativo),
+                "mensagem": {
+                    "id": msg_id,
+                    "direcao": "saida",
+                    "texto": texto,
+                    "criada_em": criada_em,
+                },
+                "canal_id": resultado.canal_id
+                or (conversa_resumo or {}).get("canal_id")
+                or canal_id_form,
+            }
+        )
 
     sufixo = "duplicada" if resultado.duplicada else "enviada"
     sep = "&" if "?" in destino else "?"

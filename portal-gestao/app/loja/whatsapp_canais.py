@@ -48,7 +48,11 @@ def montar_canais_view(
     for bruto in canais:
         estado = str(bruto.get("estado") or "pendente")
         ativo = bool(bruto.get("ativo", True))
-        operavel = ativo and estado != "inativo"
+        # "Apagar" é inativação lógica: o Chatbot é dono de whatsapp_canais e não
+        # deleta (histórico de conversas fica preservado). Os inativos ficam de
+        # fora da lista para que apagar signifique "sumiu" para o dono.
+        if not ativo or estado == "inativo":
+            continue
         itens.append(
             CanalView(
                 id=str(bruto.get("id") or ""),
@@ -57,8 +61,8 @@ def montar_canais_view(
                 estado=estado,
                 rotulo=ROTULOS.get(estado, estado),
                 ativo=ativo,
-                pode_conectar=operavel and estado != "conectado",
-                pode_desconectar=operavel and estado == "conectado",
+                pode_conectar=estado != "conectado",
+                pode_desconectar=estado == "conectado",
             )
         )
     return CanaisView(

@@ -7,6 +7,7 @@ from conftest import csrf_da_resposta, login
 from app.clients.chatbot import ChatbotIndisponivel
 from app.loja.navigation import build_nav, flatten_nav
 from app.loja.types import EntitlementState, StoreContext
+from app.loja.whatsapp_canais import montar_canais_view
 from app.loja_operacao_auditoria import DOMINIO_CANAL
 from app.models import LojaOperacaoAuditoria
 
@@ -234,6 +235,43 @@ def test_desconectar_e_inativar_auditam(client, chatbot_fake, db, monkeypatch):
     ]
 
 
+def test_montar_canais_view_esconde_inativos():
+    """Apagar é inativação lógica: o canal some da lista (histórico fica no Chatbot)."""
+    view = montar_canais_view(
+        [
+            {"id": "a", "e164_or_label": "Linha 1", "estado": "conectado", "ativo": True},
+            {"id": "b", "e164_or_label": "Antiga", "estado": "inativo", "ativo": False},
+        ]
+    )
+    assert [c.label for c in view.canais] == ["Linha 1"]
+
+
+def test_lista_usa_coluna_nome_e_botao_apagar(client, chatbot_fake, monkeypatch):
+    _ligar(monkeypatch)
+    login(client)
+    r = client.get(TELA)
+    assert r.status_code == 200
+    # Coluna é "Nome" (o valor é o rótulo digitado), não "Número".
+    assert ">Nome<" in r.text
+    # Ação de remover é "Apagar".
+    assert "Apagar" in r.text
+
+
+def test_canal_apagado_some_da_lista(client, chatbot_fake, monkeypatch):
+    _ligar(monkeypatch)
+    login(client)
+    apagado = chatbot_fake.canais[0]
+    mantido = chatbot_fake.canais[1]["e164_or_label"]
+    client.post(
+        f"/app/loja/whatsapp/canais/{apagado['id']}/inativar",
+        data={"csrf": _csrf(client)},
+        follow_redirects=False,
+    )
+    r = client.get(TELA)
+    assert apagado["e164_or_label"] not in r.text
+    assert mantido in r.text
+
+
 def test_chatbot_indisponivel_mostra_banner(client, chatbot_fake, monkeypatch):
     _ligar(monkeypatch)
     login(client)
@@ -339,7 +377,6 @@ def test_nav_com_flag_on_mostra_item_em_ajustes():
         "Números de WhatsApp",
         "Integrações",
         "Equipe",
-        "Senha",
     ]
 
 

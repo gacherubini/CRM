@@ -1,6 +1,6 @@
 # Handoff técnico
 
-Atualizado em **2026-07-30**. Este arquivo registra somente o checkpoint atual.
+Atualizado em **2026-08-03**. Este arquivo registra somente o checkpoint atual.
 Histórico detalhado permanece no Git; não acumular “checkpoints anteriores” aqui.
 
 Leia primeiro:
@@ -68,7 +68,10 @@ Não recriar apps monolíticos legados e não destruir volumes/snapshots sem ped
   vazio. O owner (re)criou a loja no Control (ativa + Vendas + Estoque) e ela foi projetada
   ao Portal; enforcement volta a funcionar. Mecanismo, estado das flags em prod e runbook de
   inspeção dos bancos em [`2026-08-02-provisionamento-loja-entitlements.md`](2026-08-02-provisionamento-loja-entitlements.md).
-  Residual: ligar `REVY_LOJA_WHATSAPP_ENABLED=1` para a opção "Números de WhatsApp" aparecer.
+  **Atualização 2026-08-03:** cutover **parcial** no `app2037` (secrets revalidados): shell +
+  entitlements + atendimento + `REVY_LOJA_WHATSAPP_ENABLED` **ON**; `REVY_LOJA_REDIRECT_LEGACY`
+  **ainda OFF** (dual-path: URLs legadas `/app/leads`, `/app/conversas` etc. não redirecionam
+  sozinhas). Seller AI permanece off. Defaults de código no repo continuam OFF.
 - **Escala horizontal está bloqueada por dois motivos independentes** — plano em
   `docs/superpowers/plans/2026-07-31-escala-horizontal-app2037.md`: (1) Portal, Tráfego e
   Catálogo rodam em SQLite dentro do volume `app_data`, que é single-attach, então
@@ -80,7 +83,8 @@ Não recriar apps monolíticos legados e não destruir volumes/snapshots sem ped
   `Aplicar transcricao1`), `consultar_por_placa1`, `registrar_consentimento1` e
   `registrar_lead1`. O `CLAUDE.md` chama o arquivo de canônico — não é. Sincronizar exige
   re-placeholderizar os segredos antes de commitar.
-- Rollout das flags Control/Loja em uma loja piloto com projeção e gates observados.
+- Residual cutover Loja (opcional): ligar `REVY_LOJA_REDIRECT_LEGACY=1` quando bookmarks/menus
+  antigos devem cair no shell; até lá dual-path permanece. UX/deep-links de Atendimento.
 - E2E Multi-WhatsApp com dois canais Evolution e resposta pelo canal correto.
 - Configuração humana do Google Ads/GCP e smoke OAuth/métricas/conversões.
 - Smoke real dos quatro bancos, incluindo sessão quente e limite de concorrência.

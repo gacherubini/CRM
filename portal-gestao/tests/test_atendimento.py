@@ -167,6 +167,108 @@ def test_envio_humano_idempotente(
     assert len(messaging_fake.enviadas) == 1
 
 
+def test_poll_mensagens_json_autenticado(client, chatbot_fake, atendimento_on):
+    login(client)
+    r = client.get("/app/loja/atendimento/5511987654321/mensagens.json")
+    assert r.status_code == 200
+    body = r.json()
+    assert body["ok"] is True
+    assert body["telefone"] == "5511987654321"
+    assert len(body["mensagens"]) == 2
+    assert body["mensagens"][0]["id"] == "msg-m1"
+    assert body["mensagens"][0]["texto"] == "Tem Civic disponível?"
+    # Não vaza token do Chatbot
+    assert "Bearer" not in r.text
+    assert "CHATBOT_API_TOKEN" not in r.text
+
+
+def test_poll_mensagens_json_after_id(client, chatbot_fake, atendimento_on):
+    login(client)
+    r = client.get(
+        "/app/loja/atendimento/5511987654321/mensagens.json"
+        "?after_id=msg-m1&canal_id=canal-principal"
+    )
+    assert r.status_code == 200
+    body = r.json()
+    assert body["ok"] is True
+    assert [m["id"] for m in body["mensagens"]] == ["msg-m2"]
+    assert body["after_id"] == "msg-m1"
+    assert body["last_id"] == "msg-m2"
+
+
+def test_poll_mensagens_json_cursor_inexistente(
+    client, chatbot_fake, atendimento_on
+):
+    login(client)
+    r = client.get(
+        "/app/loja/atendimento/5511987654321/mensagens.json?after_id=nao-existe"
+    )
+    assert r.status_code == 404
+    assert r.json()["error"] == "cursor"
+
+
+def test_poll_mensagens_json_vendedor_fora_escopo(
+    client, chatbot_fake, atendimento_on, db
+):
+    db.add(
+        AtendimentoAtribuicao(
+            loja_slug="loja-teste",
+            telefone_hmac=identidade_telefone("5511987654321"),
+            vendedor_email="outro@loja.test",
+            origem="handoff_portal",
+            iniciada_em=agora(),
+            ativa=True,
+        )
+    )
+    db.commit()
+    login(client, papel="vendedor", email="vendedor@loja.test")
+    r = client.get("/app/loja/atendimento/5511987654321/mensagens.json")
+    assert r.status_code == 403
+    assert r.json()["error"] == "scope"
+
+
+def test_poll_mensagens_json_sem_login(client, chatbot_fake, atendimento_on):
+    r = client.get("/app/loja/atendimento/5511987654321/mensagens.json")
+    assert r.status_code == 401
+
+
+def test_envio_json_sem_reload(
+    client, chatbot_fake, messaging_fake, atendimento_on
+):
+    login(client, papel="vendedor", email="vendedor@loja.test")
+    pagina = client.get("/app/loja/atendimento/5511987654321")
+    csrf = csrf_da_resposta(pagina)
+    r = client.post(
+        "/app/loja/atendimento/5511987654321/mensagem",
+        data={
+            "csrf": csrf,
+            "texto": "Resposta async",
+            "idempotency_key": "idem-json-1",
+            "canal_id": "canal-principal",
+        },
+        headers={
+            "Accept": "application/json",
+            "X-Requested-With": "XMLHttpRequest",
+        },
+    )
+    assert r.status_code == 200
+    body = r.json()
+    assert body["ok"] is True
+    assert body["duplicada"] is False
+    assert body["bot_ativo"] is False
+    assert body["mensagem"]["direcao"] == "saida"
+    assert body["mensagem"]["texto"] == "Resposta async"
+    assert body["mensagem"]["id"]
+    assert len(messaging_fake.enviadas) == 1
+    # Workspace HTML inclui hooks de poll/composer
+    assert (
+        'data-poll-url="/app/loja/atendimento/5511987654321/mensagens.json"'
+        in pagina.text
+    )
+    assert "atendimento_workspace.js" in pagina.text
+    assert "data-msg-id=" in pagina.text
+
+
 def test_auditor_sem_permissao_403(client, chatbot_fake, atendimento_on):
     login(client, papel="auditor", email="auditor@loja.test")
     r = client.get("/app/loja/atendimento")

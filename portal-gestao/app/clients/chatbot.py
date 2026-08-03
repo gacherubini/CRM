@@ -153,13 +153,23 @@ class ChatbotClient:
         *,
         canal_id: str | None = None,
         instance: str | None = None,
+        after_id: str | None = None,
+        after_criada_em: str | None = None,
     ) -> list[dict]:
-        """Histórico da conversa. Multi-WA: informe ``canal_id`` ou ``instance``."""
+        """Histórico da conversa. Multi-WA: informe ``canal_id`` ou ``instance``.
+
+        Polling: ``after_id`` (preferido) ou ``after_criada_em`` pede só
+        mensagens posteriores ao cursor no Chatbot.
+        """
         params: dict[str, Any] = {"limit": limit, "offset": offset}
         if canal_id:
             params["canal_id"] = canal_id
         if instance:
             params["instance"] = instance
+        if after_id:
+            params["after_id"] = after_id
+        if after_criada_em:
+            params["after_criada_em"] = after_criada_em
         dados = self._request(
             "GET",
             f"/v1/conversas/{telefone}/mensagens",
@@ -167,6 +177,34 @@ class ChatbotClient:
             params=params,
         )
         return dados["mensagens"]
+
+    def listar_mensagens_envelope(
+        self,
+        telefone: str,
+        limit: int = 200,
+        offset: int = 0,
+        *,
+        canal_id: str | None = None,
+        instance: str | None = None,
+        after_id: str | None = None,
+        after_criada_em: str | None = None,
+    ) -> dict:
+        """Como ``listar_mensagens``, mas devolve o envelope completo do Chatbot."""
+        params: dict[str, Any] = {"limit": limit, "offset": offset}
+        if canal_id:
+            params["canal_id"] = canal_id
+        if instance:
+            params["instance"] = instance
+        if after_id:
+            params["after_id"] = after_id
+        if after_criada_em:
+            params["after_criada_em"] = after_criada_em
+        return self._request(
+            "GET",
+            f"/v1/conversas/{telefone}/mensagens",
+            erro_404=ConversaNaoEncontrada,
+            params=params,
+        )
 
     def obter_estado(
         self,

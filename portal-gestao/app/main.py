@@ -26,7 +26,7 @@ from app.auth import (
     csrf_token,
     csrf_valido,
     encerrar_sessao,
-    hash_senha,
+    hash_senha,  # reexportado para app.web.equipe e imports tardios
     iniciar_sessao,
     pode_confirmar_venda,
     pode_gerir_equipe,
@@ -40,7 +40,7 @@ from app.auth import (
     pode_ver_financeiro,
     pode_ver_resultados_midia,
     usuario_atual,
-    verifica_senha,
+    verifica_senha,  # reexportado / uso legado em módulos que importam de main
 )
 from app.cripto import cifrar
 from app.conversions import ConversionKind, PurchaseConversion, publish_conversion
@@ -120,7 +120,7 @@ from app.clients.estoque import (
 )
 from app.clients.motor import CredencialNaoEncontrada, MotorClient, MotorIndisponivel
 from app.db import SessionLocal, get_db
-from app.password_rules import SenhaInvalida, validar_nova_senha
+from app.password_rules import SenhaInvalida, validar_nova_senha  # reexport / equipe
 from app.financeiro_calc import (
     FUSO_PORTAL,
     calcular_metricas_vendas,
@@ -529,13 +529,11 @@ def logout(request: Request, csrf: Annotated[str, Form()]):
 
 @app.get("/conta/senha", response_class=HTMLResponse)
 def conta_senha_pagina(request: Request, db: Session = Depends(get_db)):
+    """Compatibilidade: bookmark /conta/senha → área Perfil do shell."""
     usuario = usuario_atual(request, db)
     if usuario is None:
         return RedirectResponse("/login", status_code=303)
-    return templates.TemplateResponse(
-        "conta_senha.html",
-        contexto(request, usuario=usuario, db=db, erro=None, mensagem=None),
-    )
+    return RedirectResponse("/app/loja/perfil#trocar-senha", status_code=303)
 
 
 @app.post("/conta/senha", response_class=HTMLResponse)
@@ -547,28 +545,32 @@ def conta_senha_salvar(
     csrf: Annotated[str, Form()],
     db: Session = Depends(get_db),
 ):
+    """Compatibilidade do form legado; lógica canônica em /app/loja/perfil/senha."""
+    from app.web.loja_perfil import aplicar_troca_senha, _render_perfil
+
     usuario = usuario_atual(request, db)
     if usuario is None:
         return RedirectResponse("/login", status_code=303)
-
-    def render(erro=None, mensagem=None, code=200):
-        return templates.TemplateResponse(
-            "conta_senha.html",
-            contexto(request, usuario=usuario, db=db, erro=erro, mensagem=mensagem),
-            status_code=code,
-        )
-
     if not csrf_valido(request, csrf):
-        return render(erro="Sessão expirada. Recarregue a página.", code=400)
-    if not verifica_senha(usuario.senha_hash, senha_atual):
-        return render(erro="Senha atual incorreta.", code=400)
-    try:
-        senha_validada = validar_nova_senha(senha, senha_confirmacao)
-    except SenhaInvalida as exc:
-        return render(erro=str(exc), code=400)
-    usuario.senha_hash = hash_senha(senha_validada)
+        return _render_perfil(
+            request,
+            usuario,
+            db,
+            erro="Sessão expirada. Recarregue a página.",
+            status_code=400,
+        )
+    erro = aplicar_troca_senha(
+        usuario,
+        senha_atual=senha_atual,
+        senha=senha,
+        senha_confirmacao=senha_confirmacao,
+    )
+    if erro:
+        return _render_perfil(request, usuario, db, erro=erro, status_code=400)
     db.commit()
-    return render(mensagem="Senha alterada com sucesso.")
+    return _render_perfil(
+        request, usuario, db, mensagem="Senha alterada com sucesso."
+    )
 
 
 @app.get("/app", response_class=HTMLResponse)
@@ -2269,6 +2271,7 @@ from app.web import loja_estoque  # noqa: E402
 from app.web import loja_vendas  # noqa: E402
 from app.web import loja_whatsapp  # noqa: E402
 from app.web import loja_integracoes  # noqa: E402
+from app.web import loja_perfil  # noqa: E402
 from app.loja import routes as loja_routes  # noqa: E402
 
 app.include_router(relatorios.router)
@@ -2281,4 +2284,5 @@ app.include_router(loja_estoque.router)
 app.include_router(loja_vendas.router)
 app.include_router(loja_whatsapp.router)
 app.include_router(loja_integracoes.router)
+app.include_router(loja_perfil.router)
 app.include_router(loja_routes.router)

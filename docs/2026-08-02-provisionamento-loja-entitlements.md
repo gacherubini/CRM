@@ -59,19 +59,43 @@ Revy Control (revy-trafego)                    Portal / Revy Loja
   outbox entregou aos 5 destinos (`delivered`) e o Portal passou a ter
   `moto-center`: loja=ativa, vendas=ativo, estoque=ativo. Resolvido.
 
-## Estado das flags em prod (`app2037`, 2026-08-02)
+## Estado das flags em prod (`app2037`)
 
-Ligadas: `REVY_CONTROL_ENABLED`, `REVY_CONTROL_PROVISIONING_DELIVERY_ENABLED`,
+Verificado em **2026-08-02** e **revalidado em 2026-08-03** via `fly secrets list -a app2037`
+(secrets Deployed; digest igual ao de outras flags `=1` do Control).
+
+**Ligadas (secret presente, valor 1):**
+`REVY_CONTROL_ENABLED`, `REVY_CONTROL_PROVISIONING_DELIVERY_ENABLED`,
 `REVY_CONTROL_RBAC_ENABLED`, `REVY_CONTROL_DASHBOARD_ENABLED`, `MULTI_WHATSAPP_ENABLED`,
-`REVY_LOJA_SHELL_ENABLED`, `REVY_LOJA_ENTITLEMENTS_ENABLED`, `REVY_LOJA_ATENDIMENTO_ENABLED`.
+`REVY_LOJA_SHELL_ENABLED`, `REVY_LOJA_ENTITLEMENTS_ENABLED`, `REVY_LOJA_ATENDIMENTO_ENABLED`,
+`REVY_LOJA_WHATSAPP_ENABLED` (canais WhatsApp na Loja — Ajustes / "Números de WhatsApp").
 
-Desligadas (default 0): `REVY_LOJA_WHATSAPP_ENABLED` (⇒ opção "Números de WhatsApp" não
-aparece), `REVY_LOJA_REDIRECT_LEGACY`, `SELLER_AI_ENABLED`.
+**Ausente / default código = 0 (off):**
+`REVY_LOJA_REDIRECT_LEGACY` — cutover de redirect legado **ainda não ligado**.
+
+**Presente com digest diferente (provável off):**
+`SELLER_AI_ENABLED` (esperado off; F7 adiado).
+
+### Interpretação de cutover (piloto operacional)
+
+Cutover **parcial / piloto operacional OK**, não 100%:
+
+| Flag / área | Prod | Efeito |
+|---|---|---|
+| Shell Revy Loja | ON | brand + nav + rotas `/app/loja/*` |
+| Entitlements | ON | fail-closed; loja precisa projeção Control |
+| Atendimento unificado | ON | workspace `/app/loja/atendimento` |
+| WhatsApp canais (Loja) | ON | opção "Números de WhatsApp" disponível |
+| Redirect legado | **OFF** | URLs `/app/leads`, `/app/conversas`, `/app/funil` etc. **não** redirecionam sozinhas; **dual-path ainda existe** |
+| Seller AI | OFF | esperado |
+
+Defaults de código no repo continuam **OFF** (correto para dev/lab). Não confundir default
+de `config.py` com o estado operacional do `app2037`.
 
 > O redirect legado (Fase 8) mapeia `/app/funil`, `/app/financeiro`, `/app/relatorios` →
 > `/app/loja/vendas` e `/app/leads`, `/app/conversas` → `/app/loja/atendimento` **só** com
 > `REVY_LOJA_SHELL_ENABLED=1` + `REVY_LOJA_REDIRECT_LEGACY=1` (`app/loja/redirects.py`,
-> middleware `revy_loja_legacy_redirects` em `main.py`). Em prod está **off**.
+> middleware `revy_loja_legacy_redirects` em `main.py`). Em prod o redirect permanece **off**.
 
 ## Runbook — inspecionar os bancos em prod
 

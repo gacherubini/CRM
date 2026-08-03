@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% block title %}Perfil — Revy Loja{% endblock %}
+{% block page_title %}Perfil{% endblock %}
+{% block content %}
+<div class="page-heading">
+  <div>
+    <span class="eyebrow">Conta</span>
+    <h1>Perfil</h1>
+    <p>Dados do seu acesso e troca de senha desta conta.</p>
+  </div>
+</div>
+
+{% if erro %}<div class="alert error" role="alert">{{ erro }}</div>{% endif %}
+{% if mensagem %}<div class="alert success" role="status">{{ mensagem }}</div>{% endif %}
+
+<div class="perfil-grid">
+  <section class="panel" aria-labelledby="dados-conta" id="conta">
+    <div class="panel-heading">
+      <div>
+        <span class="mono-label">Conta</span>
+        <h2 id="dados-conta">Sua conta</h2>
+      </div>
+    </div>
+    <div class="panel-body">
+      <dl class="meta-list">
+        <dt>Nome</dt>
+        <dd>{{ usuario.nome }}</dd>
+        <dt>E-mail</dt>
+        <dd>{{ usuario.email }}</dd>
+        <dt>Papel</dt>
+        <dd>{{ papel_rotulo }}</dd>
+        <dt>Loja</dt>
+        <dd>{{ usuario.loja_slug }}</dd>
+      </dl>
+    </div>
+  </section>
+
+  <section class="panel" aria-labelledby="trocar-senha-titulo" id="trocar-senha">
+    <div class="panel-heading">
+      <div>
+        <span class="mono-label">Segurança</span>
+        <h2 id="trocar-senha-titulo">Trocar senha</h2>
+      </div>
+    </div>
+    <div class="panel-body">
+      <p class="muted perfil-hint">
+        Use uma senha forte com no mínimo 12 caracteres. Só altera a senha desta conta.
+      </p>
+      <form method="post" action="/app/loja/perfil/senha" class="stack-form perfil-senha-form">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <label>Senha atual
+          <input type="password" name="senha_atual" autocomplete="current-password" required>
+        </label>
+        <label>Nova senha
+          <input type="password" name="senha" minlength="12" maxlength="256" autocomplete="new-password" required>
+        </label>
+        <label>Confirmar nova senha
+          <input type="password" name="senha_confirmacao" minlength="12" maxlength="256" autocomplete="new-password" required>
+        </label>
+        <button class="button primary" type="submit">Salvar senha</button>
+      </form>
+    </div>
+  </section>
+</div>
+{% endblock %}

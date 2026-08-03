@@ -11,6 +11,7 @@ import uuid
 from datetime import datetime, timezone
 
 from fastapi import HTTPException
+from sqlalchemy import and_, or_
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -1137,11 +1138,21 @@ def listar_mensagens(
     *,
     canal_id: str | None = None,
     instance: str | None = None,
+    after_id: str | None = None,
+    after_criada_em: str | None = None,
 ) -> dict:
     """Histórico de mensagens da conversa (loja, telefone[, canal]).
 
     Multi-WA: sem ``canal_id``/``instance`` e com 2+ conversas no telefone → 409.
     Single-channel (1 conversa) continua sem precisar de canal.
+
+    Cursor (polling):
+    - ``after_id``: mensagens estritamente posteriores ao id na conversa
+      (ordem ``criada_em`` asc, desempate por ``id``). Se o id não existir
+      nesta conversa → 404.
+    - ``after_criada_em``: ISO timestamp; usado só se ``after_id`` ausente.
+      Retorna mensagens com ``criada_em`` estritamente maior.
+    - Sem cursor: paginação clássica ``limit``/``offset``.
     """
     resolved = _resolver_canal_id_escopo(
         db, loja_id, canal_id=canal_id, instance=instance
@@ -1152,18 +1163,73 @@ def listar_mensagens(
     conversa = _exigir_conversa_unica(conversas, canal_id=resolved)
     if conversa is None:
         raise HTTPException(status_code=404, detail="conversa não encontrada")
-    mensagens = (
-        db.query(Mensagem)
-        .filter(Mensagem.loja_id == loja_id, Mensagem.conversa_id == conversa.id)
-        .order_by(Mensagem.criada_em.asc())
-        .limit(limit)
-        .offset(offset)
-        .all()
+
+    base = db.query(Mensagem).filter(
+        Mensagem.loja_id == loja_id, Mensagem.conversa_id == conversa.id
     )
+    cursor_after_id = (after_id or "").strip() or None
+    cursor_after_ts = (after_criada_em or "").strip() or None
+
+    if cursor_after_id:
+        cursor_msg = (
+            db.query(Mensagem)
+            .filter(
+                Mensagem.id == cursor_after_id,
+                Mensagem.loja_id == loja_id,
+                Mensagem.conversa_id == conversa.id,
+            )
+            .first()
+        )
+        if cursor_msg is None:
+            raise HTTPException(
+                status_code=404,
+                detail="cursor after_id não encontrado nesta conversa",
+            )
+        # Estritamente posterior: (criada_em, id) > (cursor.criada_em, cursor.id)
+        base = base.filter(
+            or_(
+                Mensagem.criada_em > cursor_msg.criada_em,
+                and_(
+                    Mensagem.criada_em == cursor_msg.criada_em,
+                    Mensagem.id > cursor_msg.id,
+                ),
+            )
+        )
+        mensagens = (
+            base.order_by(Mensagem.criada_em.asc(), Mensagem.id.asc())
+            .limit(limit)
+            .all()
+        )
+    elif cursor_after_ts:
+        try:
+            ts = datetime.fromisoformat(cursor_after_ts.replace("Z", "+00:00"))
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=422, detail="after_criada_em inválido"
+            ) from exc
+        mensagens = (
+            base.filter(Mensagem.criada_em > ts)
+            .order_by(Mensagem.criada_em.asc(), Mensagem.id.asc())
+            .limit(limit)
+            .all()
+        )
+    else:
+        mensagens = (
+            base.order_by(Mensagem.criada_em.asc(), Mensagem.id.asc())
+            .limit(limit)
+            .offset(offset)
+            .all()
+        )
+
+    saida_msgs = [para_saida_mensagem(m) for m in mensagens]
+    last_id = saida_msgs[-1]["id"] if saida_msgs else cursor_after_id
     return {
         "telefone": telefone,
         "canal_id": conversa.canal_id,
-        "mensagens": [para_saida_mensagem(m) for m in mensagens],
+        "mensagens": saida_msgs,
+        "after_id": cursor_after_id,
+        "after_criada_em": cursor_after_ts if not cursor_after_id else None,
+        "last_id": last_id,
     }
 
 
@@ -1380,6 +1446,7 @@ def enviar_mensagem_humana(
 
 def para_saida_mensagem(msg: Mensagem) -> dict:
     return {
+        "id": msg.id,
         "direcao": msg.direcao,
         "texto": mascarar_cpf(msg.texto),
         "criada_em": msg.criada_em.isoformat() if msg.criada_em else None,
