@@ -1,94 +1,165 @@
 {% extends "base.html" %}
-{% block title %}Grupo do estoque — Revy{% endblock %}
+{% block title %}Grupo do estoque — Revy Loja{% endblock %}
 {% block page_title %}Grupo do estoque{% endblock %}
 {% block content %}
 {% set selecionado = grupo_config.selecionado %}
-<section class="page-head">
-  <h1>WhatsApp do estoque</h1>
-  <p class="muted">
-    Escolha o único grupo em que o bot aceitará o menu e as fotos do catálogo.
-    Imagens enviadas no privado ou em qualquer outro grupo serão ignoradas.
-  </p>
-</section>
+<div class="page-heading">
+  <div>
+    <span class="eyebrow">Ajustes</span>
+    <h1>Grupo do estoque</h1>
+    <p>
+      Um único grupo do WhatsApp para o menu e as fotos do catálogo.
+      Imagens no privado ou em outro grupo são ignoradas.
+    </p>
+  </div>
+</div>
 
 {% if integracao_erro %}
-<div class="alert warning">{{ integracao_erro }}</div>
+<div class="alert warning" role="alert">{{ integracao_erro }}</div>
 {% endif %}
 {% if grupo_config.aviso %}
-<div class="alert warning">{{ grupo_config.aviso }}</div>
+<div class="alert warning" role="alert">{{ grupo_config.aviso }}</div>
 {% endif %}
 
-<form class="card" method="post" action="/app/operacao/grupo">
-  <input type="hidden" name="csrf" value="{{ csrf }}">
-  <label>Grupo autorizado
-    <select name="grupo_jid">
-      <option value="">Nenhum grupo (menu do estoque desativado)</option>
-      {% for grupo in grupo_config.grupos %}
-      <option value="{{ grupo.jid }}" {{ 'selected' if selecionado and selecionado.jid == grupo.jid else '' }}>
-        {{ grupo.nome }}
-      </option>
-      {% endfor %}
-    </select>
-  </label>
-  <p class="muted">
-    Depois de salvar, envie <strong>menu</strong> nesse grupo. O cadastro de veículos,
-    a consulta do estoque e o envio de fotos passam a funcionar somente ali.
-  </p>
-  <button class="button primary" type="submit">Salvar grupo</button>
-</form>
+<div class="perfil-grid">
+  <section class="panel" aria-labelledby="grupo-titulo">
+    <div class="panel-heading">
+      <div>
+        <span class="mono-label">WhatsApp</span>
+        <h2 id="grupo-titulo">Grupo autorizado</h2>
+      </div>
+    </div>
+    <div class="panel-body">
+      <form method="post" action="/app/operacao/grupo" class="form-layout">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <label class="wide">Grupo
+          <select name="grupo_jid" aria-describedby="grupo-ajuda">
+            <option value="">Nenhum grupo (menu do estoque desativado)</option>
+            {% for grupo in grupo_config.grupos %}
+            <option value="{{ grupo.jid }}" {{ 'selected' if selecionado and selecionado.jid == grupo.jid else '' }}>
+              {{ grupo.nome }}
+            </option>
+            {% endfor %}
+          </select>
+        </label>
+        <p class="muted perfil-hint" id="grupo-ajuda">
+          Depois de salvar, envie <strong>menu</strong> nesse grupo. Cadastro, consulta e fotos
+          passam a funcionar somente ali.
+        </p>
+        <button class="button primary" type="submit">Salvar grupo</button>
+      </form>
+    </div>
+  </section>
 
-<div class="card">
-  <strong>Status:</strong>
-  {% if selecionado %}
-    {{ selecionado.nome }} <span class="muted">({{ selecionado.jid }})</span>
-  {% else %}
-    <span class="muted">nenhum grupo selecionado</span>
-  {% endif %}
+  <section class="panel" aria-labelledby="status-grupo-titulo">
+    <div class="panel-heading">
+      <div>
+        <span class="mono-label">Status</span>
+        <h2 id="status-grupo-titulo">Situação atual</h2>
+      </div>
+    </div>
+    <div class="panel-body">
+      <dl class="meta-list">
+        <dt>Grupo</dt>
+        <dd>
+          {% if selecionado %}
+          <strong>{{ selecionado.nome }}</strong>
+          {% else %}
+          <span class="muted">Nenhum selecionado</span>
+          {% endif %}
+        </dd>
+        <dt>Menu / fotos</dt>
+        <dd>
+          {% if selecionado %}
+          <span class="status conectado">Ativo no grupo</span>
+          {% else %}
+          <span class="status pendente">Desativado</span>
+          {% endif %}
+        </dd>
+        {% if selecionado and selecionado.jid %}
+        <dt>Identificador</dt>
+        <dd><span class="mono-inline">{{ selecionado.jid }}</span></dd>
+        {% endif %}
+      </dl>
+      {% if not grupo_config.grupos %}
+      <div class="empty" style="margin-top:var(--space-4)">
+        <strong>Nenhum grupo listado</strong>
+        <p>Confira se o WhatsApp da loja está conectado e se este número participa de grupos.</p>
+      </div>
+      {% endif %}
+    </div>
+  </section>
 </div>
 
-<section class="page-head">
-  <h2>Números da equipe</h2>
-  <p class="muted">
-    Lista mantida para identificação da equipe e compatibilidade. Quando um grupo
-    estiver selecionado, estes números não abrem o menu em conversa privada.
-  </p>
+<section class="panel" aria-labelledby="equipe-titulo" style="margin-top:var(--space-4)">
+  <div class="panel-heading">
+    <div>
+      <span class="mono-label">Equipe</span>
+      <h2 id="equipe-titulo">Números autorizados</h2>
+    </div>
+  </div>
+  <div class="panel-body">
+    <p class="muted perfil-hint">
+      Usados para identificar a equipe e enviar avisos (ex.: simulação humana).
+      Com grupo selecionado, estes números <strong>não</strong> abrem o menu de estoque no privado.
+    </p>
+
+    <form method="post" action="/app/operacao/numeros" class="filter-bar" style="margin:var(--space-4) 0">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <label class="search">
+        <span class="sr-only">Telefone</span>
+        <input name="telefone" inputmode="numeric" placeholder="5511999998888" required autocomplete="tel">
+      </label>
+      <label class="search">
+        <span class="sr-only">Nome</span>
+        <input name="nome" maxlength="120" placeholder="Nome (opcional)">
+      </label>
+      <button class="button primary" type="submit">Adicionar</button>
+    </form>
+
+    {% if numeros %}
+    <div class="table-wrap">
+      <table>
+        <caption class="sr-only">Números da equipe autorizados</caption>
+        <thead>
+          <tr>
+            <th scope="col">Telefone</th>
+            <th scope="col">Nome</th>
+            <th scope="col">Situação</th>
+            <th scope="col"><span class="sr-only">Ações</span></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for n in numeros %}
+          <tr>
+            <td><strong>{{ mascarar_telefone(n.telefone) }}</strong></td>
+            <td>{% if n.nome %}{{ n.nome }}{% else %}<span class="muted">—</span>{% endif %}</td>
+            <td>
+              {% if n.ativo %}
+              <span class="status conectado">Ativo</span>
+              {% else %}
+              <span class="status inativo">Inativo</span>
+              {% endif %}
+            </td>
+            <td class="atend-acoes">
+              <form method="post" action="/app/operacao/numeros/remover"
+                    onsubmit="return confirm('Remover este número da lista?')">
+                <input type="hidden" name="csrf" value="{{ csrf }}">
+                <input type="hidden" name="telefone" value="{{ n.telefone }}">
+                <button class="button danger table-action-btn" type="submit">Remover</button>
+              </form>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="empty">
+      <strong>Nenhum número cadastrado</strong>
+      <p>Adicione o WhatsApp dos atendentes para avisos de simulação e handoff.</p>
+    </div>
+    {% endif %}
+  </div>
 </section>
-
-<form class="card form-inline" method="post" action="/app/operacao/numeros">
-  <input type="hidden" name="csrf" value="{{ csrf }}">
-  <label>Telefone
-    <input name="telefone" inputmode="numeric" placeholder="5511999998888" required>
-  </label>
-  <label>Nome (opcional)
-    <input name="nome" maxlength="120" placeholder="João Vendedor">
-  </label>
-  <button class="button primary" type="submit">Adicionar</button>
-</form>
-
-<div class="card">
-  <table class="table">
-    <thead>
-      <tr><th>Telefone</th><th>Nome</th><th>Ativo</th><th></th></tr>
-    </thead>
-    <tbody>
-      {% for n in numeros %}
-      <tr>
-        <td>{{ mascarar_telefone(n.telefone) }}</td>
-        <td>{{ n.nome or "—" }}</td>
-        <td>{{ "sim" if n.ativo else "não" }}</td>
-        <td>
-          <form method="post" action="/app/operacao/numeros/remover"
-                onsubmit="return confirm('Remover este número da lista de cadastro?')">
-            <input type="hidden" name="csrf" value="{{ csrf }}">
-            <input type="hidden" name="telefone" value="{{ n.telefone }}">
-            <button class="button danger" type="submit">Remover</button>
-          </form>
-        </td>
-      </tr>
-      {% else %}
-      <tr><td colspan="4" class="muted">Nenhum número cadastrado.</td></tr>
-      {% endfor %}
-    </tbody>
-  </table>
-</div>
 {% endblock %}
