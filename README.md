@@ -4,23 +4,26 @@ Bot de WhatsApp para revenda de motos que conversa com o cliente, coleta os dado
 necessários, solicita a simulação internamente e transfere o atendimento para um vendedor.
 Parcelas, taxas e bancos não são enviados automaticamente ao cliente.
 
-> **Status:** 🟢 MVP demonstrável; lab Fly **3-VM no ar** (`app2037` + `evolution2037` + `suite-pg`; workers Playwright on-demand).  
+> **Status:** 🟢 MVP demonstrável; Fly **3-VM** (`app2037` + `evolution2037` + `suite-pg` + `n8n2037`; workers Playwright on-demand).  
 > **Ambiente:** local (dev) **ou** Fly consolidado — ver [`deploy/fly/3vm/README.md`](deploy/fly/3vm/README.md).  
 > **Estado canônico:** [`docs/contexto-compacto.md`](docs/contexto-compacto.md) · planos
 > [`docs/plans/README.md`](docs/plans/README.md) · go-live WA [`docs/go-live-chatbot.md`](docs/go-live-chatbot.md).  
-> **As-built Control/Loja:** [`docs/design/2026-07-30-revy-control-loja-asbuilt-e-melhorias.md`](docs/design/2026-07-30-revy-control-loja-asbuilt-e-melhorias.md).
+> **As-built Control/Loja:** [`docs/design/2026-07-30-revy-control-loja-asbuilt-e-melhorias.md`](docs/design/2026-07-30-revy-control-loja-asbuilt-e-melhorias.md).  
+> **Prod piloto (`app2037`, 2026-08):** shell Loja + entitlements + Atendimento + WhatsApp Loja **ON**; redirect legado **OFF** (dual-path). Defaults de **código** das flags continuam OFF.
 
-### Estado atual do Revy Control
+### Estado atual do Revy Control / Revy Loja
 
 > **Agentes e manutencao:** comece por [`CLAUDE.md`](CLAUDE.md) para o mapa dos sete produtos,
 > acoplamentos HTTP, arquivos certos e comandos de teste/deploy com baixo uso de contexto.
 
 O corte lean está implementado no código: **Control F0–F6** e **Loja F0–F6 + F8**,
-com shells, RBAC, projeções, Vendas/Estoque, Atendimento, Multibanco e contratos.
-As flags continuam desligadas por padrão para permitir cutover gradual. Restam tarefas
-operacionais de lab — rollout, credenciais Google, E2E Evolution/multi-WhatsApp e
-smokes bancários. Seller AI (F7) segue explicitamente adiado. Consulte o
-[as-built atual](docs/design/2026-07-30-revy-control-loja-asbuilt-e-melhorias.md)
+com shells, RBAC, projeções, Vendas/Estoque, **Atendimento com chat humano** (envio +
+polling), Perfil (troca de senha), Multibanco e contratos. Em **prod** o piloto liga
+secrets por ops; no **repo** as flags default OFF permitem lab seguro. Residuais:
+redirect legado opcional, E2E multi-WA/Google GCP, smokes bancários, workflow n8n
+live vs JSON no Git. Seller AI (F7) segue adiado. Consulte o
+[as-built](docs/design/2026-07-30-revy-control-loja-asbuilt-e-melhorias.md) e o
+[runbook de provisionamento](docs/2026-08-02-provisionamento-loja-entitlements.md)
 antes de reabrir trabalho já entregue.
 
 ---
@@ -47,14 +50,16 @@ Cliente (WhatsApp)          Catálogo público (UTM/Pixel)
       │                   (Santander, Fontecred, Bradesco, Pan portal)
       ▼
  Revy Loja (`portal-gestao`) ←→ Estoque API → Catálogo
- (CRM, vendas, metas; resultados de mídia)
-      │ outbox transacional de vendas (HTTP)
-      ▼
- Revy Control `/trafego` (banco próprio; Pixel, CAPI, Ads, ROI, canais, leads)
+ (CRM, vendas, metas, Atendimento/chat humano, resultados de mídia)
+      │ HTTP (mensagens humanas, handoff)     │ outbox vendas (HTTP)
+      ▼                                       ▼
+ Chatbot API                            Revy Control `/trafego`
+ (persistência + Evolution)             (Pixel, CAPI, Ads, ROI, lojas)
 ```
 
 **Princípio central:** produtos **independentes** ligados só por HTTP. Motor mock ou real
-não muda o contrato `/v1/simulacoes`. Estoque é a fonte de verdade de veículos.
+não muda o contrato `/v1/simulacoes`. Estoque é a fonte de verdade de veículos; Chatbot é
+a fonte de conversas/mensagens (a Loja só autoriza e exibe).
 
 ---
 
@@ -178,9 +183,13 @@ Mapa de campos e decisões: [`docs/plans/2026-07-13-plano1a-task12-bancos-reconh
   criptografado Portal → Revy; CAPI assíncrona e isolada por loja.
 - [x] **Revy Control/Loja lean** — shells, RBAC, prontidão, operação Google Ads e
   números multi-WhatsApp com QR efêmero.
+- [x] **Atendimento humano na Loja** — lista unificada, workspace de chat, envio de texto
+  (Evolution via Chatbot), handoff, polling com cursor `after_id`; Perfil/troca de senha.
 - [x] **Mídia WhatsApp backend** — áudio efêmero; foto automática WhatsApp → Estoque → Catálogo; lote por sessão; envio da capa ao cliente.
-- [ ] **Residual CRM/ops** — rollout/secrets/E2E Google e multi-WhatsApp; outbound
-  E11/E12; transcritor real; polish revenda.
+- [x] **Piloto flags Loja em prod** — shell + entitlements + atendimento + WhatsApp Loja
+  (redirect legado ainda off). Ver `docs/contexto-compacto.md`.
+- [ ] **Residual CRM/ops** — redirect legado se desejado; E2E Google GCP e multi-WhatsApp;
+  outbound E11/E12; transcritor real; polish revenda; sync n8n live ↔ Git.
 
 Estado canônico: [`docs/contexto-compacto.md`](docs/contexto-compacto.md) · planos: [`docs/plans/README.md`](docs/plans/README.md) · handoff: [`docs/handoff-contexto.md`](docs/handoff-contexto.md).
 
@@ -196,9 +205,9 @@ bot-whatsapp-financiamento/
 ├── chatbot-api/               # Chatbot Standalone (FastAPI)
 ├── motor-simulacao/           # Motor mock + Playwright
 ├── estoque-api/               # Estoque + admin HTMX
-├── portal-gestao/             # CRM, vendas, metas, campanhas/ROI
-├── revy-trafego/              # operação de mídia, CAPI e ROI em banco próprio
-├── catalogo-publico/          # vitrine + Pixel
+├── portal-gestao/             # Revy Loja: CRM, Atendimento/chat, Perfil, vendas, metas
+├── revy-trafego/              # Revy Control: mídia, CAPI, ROI, lojas (UI /trafego)
+├── catalogo-publico/          # vitrine + Pixel (path público /catalogo no Fly)
 ├── site/                      # landing marketing
 └── deploy/
     ├── chatbot-standalone/    # docker-compose local
@@ -248,19 +257,24 @@ versionados. Cada produto funciona sem os demais:
 |---|---|---|
 | **Chatbot Standalone** | Evolution + n8n + Chatbot API + Estoque Lite; responde veículos disponíveis | funciona sem Portal/Catálogo Público |
 | **Motor de Simulação** | Jobs mock ou bancários; pode ser acoplado ao chatbot ou vendido sozinho | `/v1/simulacoes` |
-| **Revy Loja** (`portal-gestao`) | Dono, gerente, vendedor, estoque incluído, vendas e metas | Estoque API incluída; Bot/Motor opcionais |
+| **Revy Loja** (`portal-gestao`) | Dono, gerente, vendedor: Vendas/Estoque, Atendimento (chat WA), Perfil, vendas e metas | Chatbot/Motor/Estoque por HTTP; flags shell/atendimento |
 | **Revy Control** (`revy-trafego`) | Operação multi-loja de Pixel, CAPI, Google Ads, campanhas, ROI e prontidão | recebe projeções de venda da Loja por HTTP/outbox |
 | **Estoque API** | Fonte oficial dos veículos; incluída em modo Lite no Chatbot e completa no Dashboard | API privada e pública |
 | **Catálogo Público** | Vitrine opcional, alimentada somente pelos veículos publicados no Estoque | API pública read-only |
 
 O Estoque API é a fonte única de veículos; bot, portal e vitrine integram-se somente por contratos HTTP/eventos.
 
-### Acesso no Portal por papel
+### Acesso na Revy Loja por papel
 
-- **Dono/gerente:** estoque completo, vendas, custos, lucro, metas, funil, resultados de mídia
-  e simulações. Configuração técnica de Pixel/CAPI/campanhas fica no Revy Control.
-- **Vendedor:** painel e vendas próprios, leads/conversas autorizados, estoque sem custos e
-  **simulação manual**. Nunca expõe custo do veículo, lucro, tokens ou credenciais do Motor.
+- **Dono/gerente:** shell Vendas/Estoque, Atendimento (abrir conversa, enviar texto, handoff),
+  estoque completo, vendas, custos, lucro, metas, resultados de mídia, simulações, Ajustes
+  (bancos, números WA, integrações status, equipe). Config técnica Pixel/CAPI/campanhas no
+  **Revy Control** (`/trafego`). **Perfil** (avatar / Conta): troca de senha da própria conta.
+- **Vendedor:** Atendimento no escopo (fila + atribuídos), vendas próprias, estoque sem custos
+  e **simulação manual**. **Perfil** também. Nunca expõe custo do veículo, lucro, tokens ou
+  credenciais do Motor.
+- **Grupo do estoque (WhatsApp):** cadastro por fotos no grupo oficial — UI legada
+  `/app/operacao/numeros` (com shell on o item some do menu; a rota ainda existe).
 
 A liberação da simulação para vendedor é uma decisão de produto registrada no Plano #3A.1 e deve
 ser aplicada por RBAC no backend, não apenas ocultando ou exibindo itens de menu.
@@ -269,7 +283,9 @@ ser aplicada por RBAC no backend, não apenas ocultando ou exibindo itens de men
 
 - **[docs/contexto-compacto.md](docs/contexto-compacto.md)** — ponto de entrada para agentes (estado + regras).
 - **[docs/handoff-contexto.md](docs/handoff-contexto.md)** — checkpoint operacional.
+- **[docs/2026-08-02-provisionamento-loja-entitlements.md](docs/2026-08-02-provisionamento-loja-entitlements.md)** — flags em prod e projeção Control→Portal.
 - **[deploy/fly/3vm/README.md](deploy/fly/3vm/README.md)** — inventário Fly, deploy, secrets, up/down.
+- **[portal-gestao/README.md](portal-gestao/README.md)** — Revy Loja (flags, Atendimento, Perfil).
 - **[docs/tutorial-dono.md](docs/tutorial-dono.md)** / **[docs/tutorial-vendedor.md](docs/tutorial-vendedor.md)** — manuais de operação.
 - **[Índice dos planos válidos](docs/plans/README.md)** — ordem, status e pacotes comerciais.
 - **Planos de implementação** (`docs/plans/` — só `*A`/`*B` e #0/#6; legados em `_archive/`):

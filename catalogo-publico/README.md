@@ -16,6 +16,9 @@ $env:ESTOQUE_PUBLIC_API_URL="http://localhost:8100"
 Abra `http://localhost:8200/l/<slug-da-loja>`. O veículo precisa estar disponível e publicado
 na Estoque API.
 
+No lab Fly 3-VM o catálogo fica em **`https://app2037.fly.dev/catalogo/`** (prefixo
+`CATALOGO_URL_PREFIX=/catalogo`). O path `/loja/` no edge redireciona 301 para `/catalogo/`.
+
 Configurações:
 
 - `ESTOQUE_PUBLIC_API_URL`: URL-base da Estoque API;

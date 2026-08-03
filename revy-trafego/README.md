@@ -19,7 +19,8 @@ técnica, prontidão e operação multi-loja ficam aqui.
 ## Status atual — Control F0–F6 concluído no código
 
 - Banco próprio; o Alembic head do código é
-  `0013_revy_control_readiness_alert_acceptances`.
+  `0013_revy_control_readiness_alert_acceptances` (confira `alembic/versions/` se o head
+  tiver avançado).
 - Vendas chegam pelo outbox criptografado da Loja e são materializadas em
   `vendas_projetadas`; ROI/CAPI não leem tabelas do Portal.
 - CAPI assíncrona, `blocked_config`, cancelamento seguro, lease e dedupe por loja.
@@ -27,13 +28,13 @@ técnica, prontidão e operação multi-loja ficam aqui.
   portfólio, provisionamento e prontidão estão implementados.
 - O detalhe da Loja oferece a operação Google Ads em quatro passos: conexão OAuth,
   conta, conversões e métricas.
-- As superfícies de canais WhatsApp e Google continuam protegidas por flags default
-  off. O rollout no lab, os secrets Google e o E2E real com Evolution são passos de
-  operação, não trabalho de código pendente.
-- Validação da entrega de Google: **19 testes** da UI e **62 testes** focados de
-  Control/Google passando. Na suíte Revy completa, 361 testes passam e permanece um
-  teste legado já falhando antes desta entrega, por assumir um único item no outbox
-  de provisionamento.
+- **Defaults de código** das flags Control/Google/multi-WA continuam OFF. Em **prod
+  `app2037`** o piloto liga Control + delivery + RBAC + dashboard + multi-WA por
+  secrets (ops). Google Ads sync/conversões e secrets GCP ainda são residual operacional.
+- Referência as-built:
+  [`docs/design/2026-07-30-revy-control-loja-asbuilt-e-melhorias.md`](../docs/design/2026-07-30-revy-control-loja-asbuilt-e-melhorias.md).
+  Provisão de loja → Portal:
+  [`docs/2026-08-02-provisionamento-loja-entitlements.md`](../docs/2026-08-02-provisionamento-loja-entitlements.md).
 
 ## Status anterior (2026-07-28 — Fase 1/2 no lab)
 
@@ -54,8 +55,8 @@ técnica, prontidão e operação multi-loja ficam aqui.
 |---|---|
 | Login / app | https://app2037.fly.dev/trafego |
 | Login direto | https://app2037.fly.dev/trafego/health/live (health) · `/trafego/login` |
-| Portal loja | https://app2037.fly.dev |
-| Catálogo | https://app2037.fly.dev/loja/ |
+| Portal / Revy Loja | https://app2037.fly.dev |
+| Catálogo | https://app2037.fly.dev/catalogo/ (`/loja/` é legado e redireciona 301) |
 
 Bootstrap do 1º gestor: secrets Fly `REVY_TRAFEGO_BOOTSTRAP_EMAIL` / `_SENHA` (só cria se `gestores_revy` vazia).
 
