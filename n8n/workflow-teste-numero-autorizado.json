@@ -601,6 +601,22 @@
         2160,
         400
       ]
+    },
+    {
+      "parameters": {
+        "resume": "timeInterval",
+        "amount": 40,
+        "unit": "seconds"
+      },
+      "id": "9cf02d42-8b5c-410b-bbff-ac29999e5ec8",
+      "name": "Aguardar 40s cliente1",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        3120,
+        400
+      ],
+      "webhookId": "47e99d9757424984b0048280c34079a8"
     }
   ],
   "connections": {
@@ -703,7 +719,7 @@
       "main": [
         [
           {
-            "node": "Responder WhatsApp1",
+            "node": "Aguardar 40s cliente1",
             "type": "main",
             "index": 0
           }
@@ -884,6 +900,17 @@
         [
           {
             "node": "Rotear operacao1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aguardar 40s cliente1": {
+      "main": [
+        [
+          {
+            "node": "Responder WhatsApp1",
             "type": "main",
             "index": 0
           }

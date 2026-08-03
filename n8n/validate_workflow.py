@@ -412,7 +412,7 @@ def main() -> None:
     ), "tool de foto não está conectada ao AI Agent"
 
     nodes_by_name = {node.get("name"): node for node in data.get("nodes", [])}
-    assert len(nodes_by_name) == 26, "workflow deve ter 26 nós (inclui Normalizar isSaved)"
+    assert len(nodes_by_name) == 27, "workflow deve ter 27 nós (inclui Wait 40s cliente)"
     removidos = {
         "E audio1", "Transcrever audio1", "Aplicar transcricao1",
         "registrar_consentimento1", "registrar_lead1", "consultar_por_placa1",
@@ -450,6 +450,25 @@ def main() -> None:
     )), "extração não reconhece o contexto da mensagem de anúncio"
 
     connections = data.get("connections", {})
+
+    # Delay humano só no caminho do cliente (IA → Wait → WhatsApp); menu da equipe não espera.
+    wait_node = nodes_by_name.get("Aguardar 40s cliente1")
+    assert wait_node is not None, "falta nó Aguardar 40s cliente1 no caminho do cliente"
+    assert wait_node.get("type") == "n8n-nodes-base.wait"
+    wait_params = wait_node.get("parameters") or {}
+    assert wait_params.get("resume") == "timeInterval"
+    assert int(wait_params.get("amount") or 0) == 40
+    assert str(wait_params.get("unit") or "") in {"seconds", "second"}
+    assert connections.get("AI Agent1", {}).get("main", [[]])[0][0]["node"] == (
+        "Aguardar 40s cliente1"
+    ), "AI Agent deve ir para o Wait de 40s"
+    assert connections.get("Aguardar 40s cliente1", {}).get("main", [[]])[0][0][
+        "node"
+    ] == "Responder WhatsApp1", "Wait deve ir para Responder WhatsApp1"
+    se_ctrl = connections.get("Se resposta controle1", {}).get("main", [])
+    assert se_ctrl[0][0]["node"] == "Responder WhatsApp1"
+    assert se_ctrl[1][0]["node"] == "AI Agent1"
+
     assert connections.get("Extrair1", {}).get("main", [[]])[0][0].get("node") == "E imagem de estoque1"
     imagem_ramos = connections.get("E imagem de estoque1", {}).get("main", [])
     assert imagem_ramos[0][0].get("node") == "Salvar foto no estoque1"
@@ -603,7 +622,7 @@ def main() -> None:
     )
 
     print(
-        "workflow n8n válido: 26 nós, multi-WA instance dinâmica, isSaved normalizado, "
+        "workflow n8n válido: 27 nós, multi-WA instance dinâmica, isSaved normalizado, "
         "áudio ignorado, webhook seguro, foto automática, menu de operação e resultado privado"
     )
 

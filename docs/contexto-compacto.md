@@ -19,8 +19,8 @@ os termos do domínio em [`../CONTEXT.md`](../CONTEXT.md) e os planos válidos e
   gate n8n `atendeLeadVirgem`; registrar com `tem_saida` + `historico_recente`; prompt
   prioriza `mensagem_atual` e histórico CRM. Diagnóstico:
   [`diagnostico-bot-whatsapp-2026-08-03.md`](diagnostico-bot-whatsapp-2026-08-03.md).
-- **n8n:** workflow oficial `wAiNaoSalvos0001` (26 nós no Git). **Manter Active OFF** até
-  deploy do chatbot + reimport + smoke. Teste permanece separado/OFF.
+- **n8n:** workflow oficial `wAiNaoSalvos0001` (27 nós no Git; Wait 40s no
+  caminho cliente). Teste permanece separado/OFF.
 - **WhatsApp:** Chatbot dono de canais/conversas; Loja UI de canais + grupo estoque; n8n orquestra.
 - **Motor:** Playwright sob demanda; simulação ao cliente ainda **humana** (bot não devolve parcela).
 

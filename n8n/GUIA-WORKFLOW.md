@@ -18,7 +18,7 @@ são gerados com endereços e credenciais locais apenas na hora da publicação.
 - Placeholders de deploy: só `__EVOLUTION_KEY__`, `__CHATBOT_TOKEN__`,
   `__CHATBOT_WEBHOOK_TOKEN__` (e URLs). **Um workflow serve N números.**
 
-O fluxo atual tem 26 nós e trabalha com:
+O fluxo atual tem 27 nós e trabalha com:
 
 - mensagens de texto de clientes;
 - contexto de anúncios;
@@ -50,7 +50,8 @@ flowchart LR
     M --> N{Se resposta controle1}
     N -- menu da equipe --> O[Responder WhatsApp1]
     N -- cliente --> P[AI Agent1]
-    P --> O
+    P --> W[Aguardar 40s cliente1]
+    W --> O
     O --> Q{E resposta de grupo1}
     Q -- cliente --> R[Registrar saida do bot1]
 ```
@@ -83,8 +84,11 @@ flowchart LR
     seguem para a IA.
 11. `AI Agent1` usa system message com **prioridade da `mensagem_atual`** e user
     prompt com **`historico_recente`** (CRM) + flags de anúncio/primeira msg.
-12. `Responder WhatsApp1` envia a resposta.
-13. `Registrar saida do bot1` grava no CRM a mensagem enviada ao cliente.
+12. `Aguardar 40s cliente1` — espera **40 segundos** antes de mandar a resposta
+    (tom mais humano). Só no caminho da IA; menus da equipe e fotos de estoque
+    não passam por este Wait.
+13. `Responder WhatsApp1` envia a resposta.
+14. `Registrar saida do bot1` grava no CRM a mensagem enviada ao cliente.
 
 ## O caminho da equipe e das fotos
 

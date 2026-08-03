@@ -30,7 +30,7 @@ def main() -> None:
     assert test["activeVersionId"] is None
     assert test["connections"]["Se resposta controle1"]["main"][1][0]["node"] == "AI Agent1"
     assert test["connections"] == canonical["connections"]
-    assert len(test["nodes"]) == len(canonical["nodes"]) == 26
+    assert len(test["nodes"]) == len(canonical["nodes"]) == 27
     assert [(node["name"], node["type"]) for node in test["nodes"]] == [
         (node["name"], node["type"]) for node in canonical["nodes"]
     ]

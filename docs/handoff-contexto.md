@@ -28,8 +28,8 @@ Leia primeiro:
 - O Portal foi modularizado: simulações, metas, equipe e tráfego/campanhas ficam em
   `portal-gestao/app/web/`; `main.py` mantém bootstrap e rotas legadas restantes.
 - O workflow `n8n/workflow-teste-numero-autorizado.json` é gerado do canônico (lab; 1 telefone).
-- `n8n/workflow-ai-nao-salvos.json` é o **oficial no Git** (26 nós). Importado no
-  `n8n2037` como `wAiNaoSalvos0001` — **não religar Active** até smoke pós-deploy A+B.
+- `n8n/workflow-ai-nao-salvos.json` é o **oficial no Git** (27 nós, Wait 40s no
+  caminho IA→WhatsApp). Importado no `n8n2037` como `wAiNaoSalvos0001`.
 - Stack local: `./local.sh up` — `deploy/local/README.md`; segredos em `.env.local`.
 
 ## Validação conhecida
