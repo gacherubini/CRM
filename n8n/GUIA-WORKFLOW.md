@@ -62,26 +62,25 @@ flowchart LR
    eventos técnicos, reações, saídas do próprio bot e áudios.
 3. `E imagem de estoque1` separa fotos do grupo de estoque.
 4. `E grupo de estoque1` separa operação da equipe de conversa de cliente.
-5. `Registrar mensagem e ler handoff1` grava a entrada no CRM e informa se ela é
-   duplicada, se é a primeira mensagem e se o bot está ativo.
-6. `Gate handoff e duplicidade1` encerra duplicatas e mensagens que não devem
+5. `Registrar mensagem e ler handoff1` grava a entrada no CRM e devolve
+   `bot_ativo`, `primeira_mensagem`, **`tem_saida`** (já houve resposta na conversa)
+   e **`historico_recente`** (últimas msgs compactas para o prompt).
+6. `Gate handoff e duplicidade1` encerra duplicatas e `fromMe` que não devem
    continuar.
-7. `Consultar contato na Evolution1` (findChats) normaliza dois sinais: `isSaved`
-   (salvo na agenda do celular) e `chatFound` (já existe conversa no WhatsApp =
-   histórico pré-bot).
-8. `Rotear operacao1` chama o backend `/v1/operacao/roteamento` mandando
-   `is_saved` **e** `chat_found`. **Quem decide `cliente`/`ignorar` é o backend
-   (`decidir_roteamento`)**, porque só ele tem o estado da conversa. A regra do
-   dono vive aí: número **não salvo COM histórico** não é atendido; mas conversa
-   que o bot já iniciou (já existe `Mensagem.direcao='saida'`) **segue** sendo
-   atendida; virgem/Evolution cega → atende (fail-open). O nó do n8n só transporta
-   os sinais.
-9. `Gate somente nao salvos1` **aplica** o `acao` que o backend devolveu e trava o
-   handoff (`bot_ativo` do `Registrar mensagem e ler handoff1`). Ele **não** decide
-   cliente virgem — o ramo `if (!acao)` é só fallback caso o backend não responda.
+7. `Consultar contato na Evolution1` + `Normalizar isSaved Evolution1` → `isSaved`
+   (agenda) e `chatFound` (chat no WA). Lista vazia ⇒ `isSaved: null` (desconhecido).
+8. `Rotear operacao1` → `/v1/operacao/roteamento` com `is_saved` e `chat_found`.
+   Backend (defesa em profundidade): só `is_saved === true` bloqueia por agenda;
+   `null` é **fail-open** (atende lead novo/CTWA se não houver prova de histórico);
+   conversa com saída segue `cliente`; `chat_found` no primeiro contato → `ignorar`.
+9. `Gate somente nao salvos1` — função **`atendeLeadVirgem()`** (juiz fino n8n):
+   cala em handoff, agenda (`isSaved true`) ou `chatFound` sem `tem_saida`; atende
+   virgem/Evolution cega e multi-msg rápida; se `tem_saida` e bot ativo, continua.
+   Aplica a tranca também quando o backend manda `acao=cliente` (não só no fallback).
 10. `Se resposta controle1` manda menus da equipe direto ao WhatsApp; clientes
     seguem para a IA.
-11. `AI Agent1` decide a resposta e pode usar as ferramentas.
+11. `AI Agent1` usa system message com **prioridade da `mensagem_atual`** e user
+    prompt com **`historico_recente`** (CRM) + flags de anúncio/primeira msg.
 12. `Responder WhatsApp1` envia a resposta.
 13. `Registrar saida do bot1` grava no CRM a mensagem enviada ao cliente.
 
@@ -131,13 +130,16 @@ O modelo usado fica em `Google Gemini Chat Model1`. A memória fica em
 | Mudança desejada | Local |
 |---|---|
 | Tom de voz, frases e regras | `AI Agent1` → `System Message` |
-| Primeira mensagem | seção `primeiro contato` do `System Message` |
+| Primeira mensagem / prioridade do pedido | seções `prioridade absoluta` e `primeiro contato` |
+| Histórico no prompt | registrar (`historico_recente`) + template `text` do Agent |
+| Tranca virgem / handoff / fail-open | `Gate somente nao salvos1` (`atendeLeadVirgem`) + backend `decidir_roteamento` |
 | Comportamento de anúncio | seção `mensagem de anúncio` |
 | Busca e seleção da moto | `consultar_estoque1` |
 | Criação do lead e aviso ao vendedor | `simular1` |
 | Resposta final no WhatsApp | `Responder WhatsApp1` |
 | Filtro do número de teste | constantes no início de `build_test_workflow.js` |
 | Reativar áudio no futuro | criar um ramo depois de `Extrair1`; não misturar com o caminho de texto |
+| Teste da tranca sem rede | `node n8n/test_gate_somente_nao_salvos.js` |
 
 ## Arquivos do workflow
 

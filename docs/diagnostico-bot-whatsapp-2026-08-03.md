@@ -90,53 +90,60 @@ Efeito: bot falando por cima do humano em threads como `***7567`, `***9874`, `**
 
 ## 5. Correções recomendadas (ordem sugerida)
 
-1. **Não atender não-salvo com histórico** — **feita no BACKEND** `decidir_roteamento` (`chatbot-api/app/operacao.py`).  
-   ⚠️ **Atenção a quem for reler:** a 1ª tentativa mexeu no nó `Gate somente nao salvos1` do n8n, mas isso estava no lugar errado — aquele ramo (`if (!acao)`) só roda no fallback. O **gate real do cliente é o backend**: `Rotear operacao1` chama `/v1/operacao/roteamento`, que decide `cliente`/`ignorar`; o nó do n8n só **aplica** o `acao` (e o handoff). A regra vive no backend porque só ele tem o estado da conversa:
-   - não salvo + conversa em andamento (já existe `Mensagem.direcao='saida'`) → `cliente` (não silencia no meio);
-   - não salvo + primeiro contato + `chat_found` (histórico pré-bot no WhatsApp) → `ignorar`;
-   - não salvo + virgem / Evolution cega → `cliente` (fail-open).
-   `Rotear operacao1` passou a enviar `chat_found`. Testes reais em `chatbot-api/tests/test_roteamento_historico.py`. Commits `bf1d4e0` (gate n8n, virou fallback) e `134aec3` (fix real no backend).
+1. **Não atender não-salvo com histórico + fail-open Evolution cega** — **feita** (backend +
+   gate n8n). Backend `decidir_roteamento` / `_decidir_cliente_ou_ignorar`:
+   - `is_saved is True` → ignorar (só prova de agenda);
+   - conversa com saída → cliente (em andamento);
+   - `chat_found is True` no primeiro contato → ignorar;
+   - `is_saved` False/**None** sem prova de histórico → **cliente** (fail-open).
+   Gate n8n `atendeLeadVirgem()` (em `Gate somente nao salvos1`) reaplica a tranca em
+   `acao=cliente` e no fallback: handoff, agenda, `tem_saida`, `chatFound`.
+   Commits: `134aec3`, **`8effb99`**. Testes: `test_roteamento_historico.py`,
+   `n8n/test_gate_somente_nao_salvos.js` (11 cenários).
 
-2. **Respeitar handoff** — **feita** em `docs/superpowers/plans/2026-08-03-gate-bot-somente-leads-virgens.md`.  
-   Gate agora lê `estadoMensagem.bot_ativo !== false` do `Registrar mensagem e ler handoff1`, travado por assert no validador.
+2. **Respeitar handoff** — **feita**. Gate lê `estadoMensagem.bot_ativo !== false` do
+   registrar; assert no `validate_workflow.py`.
 
-   **Trade-off consciente (fail-open):** voltar a atender quando `findChats` vem vazio (fail-open) reabre uma janela residual em que um contato salvo mas sem chat na Evolution (nunca conversou) pode receber uma saudação na primeira mensagem, antes de `primeira_mensagem` virar `false` e o bot calar a partir da segunda.
+   **Trade-off consciente (fail-open):** contato salvo que a Evolution não achar
+   (`isSaved null`) pode levar **uma** saudação; com handoff/agenda/`chatFound` a tranca cala.
 
-3. **Memória / histórico**  
-   Session key estável por `instance + telefone`; injetar últimas N mensagens do chatbot na prompt do agent (além do buffer n8n).
+3. **Memória / histórico** — **feita no código (`8effb99`)**. Registrar devolve
+   `historico_recente` (últimas msgs CRM); user prompt do Agent injeta o bloco.
+   Buffer n8n (`Memoria da conversa1`) permanece; histórico CRM sobrevive restart.
 
-4. **Primeira mensagem inteligente**  
-   Se o texto já trouxer pedido (financiar, preço, modelo) **ou** houver `anuncioDescricao` (ex.: MT-03), não usar só o template “quer ver as motos?”.
+4. **Primeira mensagem inteligente** — **feita no código (`8effb99`)**. System message
+   com “prioridade absoluta”: responde `mensagem_atual`; template “quer ver as motos?”
+   só em cumprimento puro sem pedido/anúncio/histórico.
 
-5. **Estabilizar `findChats`**  
-   Investigar por que a Evolution devolve lista vazia (body, instância multi-WA, JID `@lid` vs telefone). Enquanto cego, o gate continua frágil.
+5. **Estabilizar `findChats`** — **pendente**. Agenda via Evolution ainda é melhor esforço
+   (`@lid`, lista vazia). Fail-open mitiga silêncio em lead; não substitui `findContacts`.
 
-6. **Reativação** — (1) e (2) já estão **no ar** (backend `app2037` redeployado em 2026-08-03; workflow `n8n2037` republicado com `chat_found`). Workflow segue **inativo de propósito**; ligar (`active`) só após smoke em:  
-   - lead CTWA/virgem sintético (atende, sem spam real)  
-   - não-salvo com conversa no celular (silêncio)  
-   - contato salvo (silêncio)  
-   - conversa com `bot_ativo: false` (silêncio)
+6. **Reativação** — código no Git; **deploy + reimport + Active** sob critério do owner.
+   Smoke antes de Active ON:
+   - lead CTWA/virgem (atende; pedido específico sem template genérico)
+   - não-salvo com conversa no celular / `chatFound` (silêncio)
+   - contato salvo (silêncio)
+   - `bot_ativo: false` (silêncio)
 
 ## 6. Relacionado no repo
 
 - Workflow canônico: `n8n/workflow-ai-nao-salvos.json`
-- Update live: `n8n/update_live_workflow.js`
-- Fail-closed salvos (lista vazia ≠ não salvo): commit `883fb9c`
-- **Regra de histórico (fix real, #1): backend `chatbot-api/app/operacao.py` `decidir_roteamento` + `conversa_tem_resposta` em `servico.py`; testes `chatbot-api/tests/test_roteamento_historico.py`. Commit `134aec3`.**
-- Handoff + gate n8n (fallback) (#2): `docs/superpowers/plans/2026-08-03-gate-bot-somente-leads-virgens.md`; teste `n8n/test_gate_somente_nao_salvos.js`
-- CTWA/atribuição: `docs/fluxo-utm-pixel-ctwa-meta.md`, plano `docs/plans/2026-07-22-plano-ctwa-atribuicao-capi-messaging.md`
+- Guia: `n8n/GUIA-WORKFLOW.md`
+- Fail-open + prompt + histórico: commit **`8effb99`**
+- Histórico pré-bot no backend: commit `134aec3`
+- Handoff / plano virgem: `docs/superpowers/plans/2026-08-03-gate-bot-somente-leads-virgens.md`
+- Teste gate: `n8n/test_gate_somente_nao_salvos.js`
 - Checkpoint ops: `docs/handoff-contexto.md`
 
-## 7. Status no momento do doc
+## 7. Status no momento do doc (atualizado pós-`8effb99`)
 
 | Item | Estado |
 |---|---|
-| Workflow n8n produção | **Inativo** (desligado de propósito) |
-| Webhook `POST /webhook/whatsapp-ai` | 404 enquanto inativo |
-| Correção (1) histórico | **No ar** no backend `app2037` (`decidir_roteamento`, commit `134aec3`) |
-| Correção (2) handoff | **No ar** (gate n8n lê `bot_ativo` do registrar) |
-| Correções (3)–(5) | Pendentes (memória à prova de restart, 1ª msg inteligente, `findChats`) |
-| Este documento | Registro do diagnóstico; não é plano de implementação formal |
+| Código A+B no Git | **Sim** (`8effb99`) |
+| Deploy `app2037` com A+B | A confirmar / fazer se ainda não subiu |
+| Workflow n8n produção | **Manter inativo** até reimport + smoke |
+| Correções (1)–(4) | **No código**; (5) pendente |
+| Este documento | Diagnóstico + status das correções |
 
 ---
 

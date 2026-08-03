@@ -1,6 +1,6 @@
 # Contexto compacto para continuidade
 
-Atualizado em **2026-08-03 (noite)**. Este é o ponto de entrada para estado e prioridades.
+Atualizado em **2026-08-03 (tarde/noite)**. Este é o ponto de entrada para estado e prioridades.
 O desenho implementado está em
 [`design/2026-07-30-revy-control-loja-asbuilt-e-melhorias.md`](design/2026-07-30-revy-control-loja-asbuilt-e-melhorias.md),
 os termos do domínio em [`../CONTEXT.md`](../CONTEXT.md) e os planos válidos em
@@ -15,12 +15,12 @@ os termos do domínio em [`../CONTEXT.md`](../CONTEXT.md) e os planos válidos e
 - **Prod `app2037` (piloto):** secrets shell + entitlements + atendimento + WhatsApp Loja
   **ON**; redirect legado **OFF**. Detalhe:
   [`2026-08-02-provisionamento-loja-entitlements.md`](2026-08-02-provisionamento-loja-entitlements.md).
-- **n8n:** workflow oficial `WhatsApp IA - Somente Nao Salvos` (`wAiNaoSalvos0001`) importado
-  (catálogo + `simular` com aviso humano e pausa do bot). **Active = owner na manhã.**
-  Teste permanece separado/OFF.
-- **Fly lab (noite 03/08):** machines **stopped** (app2037, n8n2037, evolution2037, suite-pg)
-  para economizar; volumes intactos. Ligar: `bash deploy/fly/up-all.sh --3vm` e checklist
-  em [`handoff-contexto.md`](handoff-contexto.md) § “Ligar amanhã”.
+- **Bot WhatsApp (código main `8effb99`):** fail-open se Evolution cega (`is_saved` null);
+  gate n8n `atendeLeadVirgem`; registrar com `tem_saida` + `historico_recente`; prompt
+  prioriza `mensagem_atual` e histórico CRM. Diagnóstico:
+  [`diagnostico-bot-whatsapp-2026-08-03.md`](diagnostico-bot-whatsapp-2026-08-03.md).
+- **n8n:** workflow oficial `wAiNaoSalvos0001` (26 nós no Git). **Manter Active OFF** até
+  deploy do chatbot + reimport + smoke. Teste permanece separado/OFF.
 - **WhatsApp:** Chatbot dono de canais/conversas; Loja UI de canais + grupo estoque; n8n orquestra.
 - **Motor:** Playwright sob demanda; simulação ao cliente ainda **humana** (bot não devolve parcela).
 
@@ -46,7 +46,7 @@ Escolha um eixo por mudança; não misture rollout, RPA e produto na mesma entre
 
 | Eixo | Próximo resultado verificável |
 |---|---|
-| Operação (manhã) | `up-all --3vm` → Active no workflow oficial → QR/canal Conectado → smoke bot + simulação humana |
+| Bot WhatsApp | Deploy `app2037` + reimport workflow (Active OFF) → smoke virgem/CTWA/handoff/salvo → Active ON |
 | Rollout Control/Loja | Redirect legado opcional; dual-path ainda on |
 | Multi-WhatsApp | E2E dois canais + `canal_id` correto |
 | Google Ads | Secrets GCP + OAuth/métricas/conversões |

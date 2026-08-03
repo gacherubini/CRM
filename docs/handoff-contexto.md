@@ -1,6 +1,6 @@
 # Handoff técnico
 
-Atualizado em **2026-08-03 (noite)**. Este arquivo registra somente o checkpoint atual.
+Atualizado em **2026-08-03 (tarde/noite)**. Este arquivo registra somente o checkpoint atual.
 Histórico detalhado permanece no Git; não acumular “checkpoints anteriores” aqui.
 
 Leia primeiro:
@@ -17,37 +17,37 @@ Leia primeiro:
   (senha fora de Ajustes); status WA persiste `conectado` no DB; Grupo do estoque de volta
   no menu Ajustes + redesign da tela; workflow oficial com jornada de catálogo e
   `simular1` (lead qualificado + aviso equipe no WA + pausa bot; cliente só confirmação).
+- **Bot WhatsApp (main `8effb99`):** fail-open no gate + prompt com histórico CRM.
+  - Backend: `is_saved is True` cala por agenda; `None` (Evolution cega) **atende**.
+  - Registrar expõe `tem_saida` + `historico_recente`.
+  - Gate n8n `atendeLeadVirgem()` (handoff, agenda, `chatFound`, conversa em andamento).
+  - IA: system prompt com prioridade da `mensagem_atual` + histórico no user prompt.
+  - Detalhe: [`diagnostico-bot-whatsapp-2026-08-03.md`](diagnostico-bot-whatsapp-2026-08-03.md);
+    guia: [`../n8n/GUIA-WORKFLOW.md`](../n8n/GUIA-WORKFLOW.md).
 - Seller AI permanece adiado e desligado.
 - O Portal foi modularizado: simulações, metas, equipe e tráfego/campanhas ficam em
   `portal-gestao/app/web/`; `main.py` mantém bootstrap e rotas legadas restantes.
 - O workflow `n8n/workflow-teste-numero-autorizado.json` é gerado do canônico (lab; 1 telefone).
-- `n8n/workflow-ai-nao-salvos.json` é o **oficial no Git** (25 nós, jornada catálogo +
-  simulação humana). Importado no `n8n2037` como `wAiNaoSalvos0001` — **Active fica a
-  critério do owner**; **não religar** sem ler o diagnóstico e aplicar correções mínimas.
-- **Diagnóstico bot (2026-08-03):** [`diagnostico-bot-whatsapp-2026-08-03.md`](diagnostico-bot-whatsapp-2026-08-03.md)
-  — CTWA silenciado por `isSaved` fail-closed, handoff `bot_ativo` ignorado, saudação
-  sem contexto; workflow desligado de propósito até fix.
+- `n8n/workflow-ai-nao-salvos.json` é o **oficial no Git** (26 nós). Importado no
+  `n8n2037` como `wAiNaoSalvos0001` — **não religar Active** até smoke pós-deploy A+B.
 - Stack local: `./local.sh up` — `deploy/local/README.md`; segredos em `.env.local`.
 
 ## Validação conhecida
 
-- Suítes em 2026-07-31: portal-gestao **471**, revy-trafego **361** (+1 falha pré-existente),
-  chatbot-api **246**, catalogo-publico **53**.
+- chatbot-api (corte A+B 2026-08-03): **265** passed; gate n8n **11** cenários;
+  `python n8n/validate_workflow.py` ok.
+- Suítes anteriores (2026-07-31): portal-gestao **471**, revy-trafego **361**
+  (+1 falha pré-existente outbox motor), catalogo-publico **53**.
 - A falha é `revy-trafego/tests/test_control_provisioning_outbox.py::test_process_pending_falha_marca_failed_e_incrementa_attempts`:
-  teste estagnado desde `573348e`, que incluiu `"motor"` em `DEFAULT_PROVISIONING_TARGETS`.
-  O hook passou a enfileirar uma linha `motor` e o `.one()` do teste estoura
-  `MultipleResultsFound`. Não é regressão de produto; o fix é filtrar pelo `id` enfileirado.
-- `git diff --check` e compilação dos módulos extraídos passaram no corte da refatoração.
+  teste estagnado desde `573348e` (`"motor"` em `DEFAULT_PROVISIONING_TARGETS`).
 
 ## Estado operacional
 
-**Noite 2026-08-03:** lab Fly **desligado** para economizar; **volumes e apps preservados**.
-- `app2037`, `evolution2037`, `suite-pg`: `machine stop`.
-- `n8n2037`: machine recriada no volume `n8n_data` (`801655f6637358`), depois
-  `autostart=false` + stop (senão o `min_machines_running=1` religava sozinho).
-  **Amanhã:** `fly machine start 801655f6637358 -a n8n2037` e, se quiser always-on de novo,
-  `fly machine update … --autostart=true` ou redeploy `fly.n8n.toml`.
-- Workflow oficial **importado** no volume n8n (`wAiNaoSalvos0001`); **Active na manhã**.
+**2026-08-03 (sessão bot):** lab **ligado** (app/n8n/evolution/suite-pg started em momentos
+da sessão). Código A+B no Git (`8effb99`); **deploy app2037 + reimport n8n ainda a fazer**
+se não rodados nesta sessão. Workflow deve permanecer **inativo** até smoke.
+- Não rodar `n8n list:workflow` / CLI n8n via SSH no volume de prod (trava SQLite).
+- Import: `prepare-workflow.ps1` + `upload-and-import-workflow.ps1`; **Active OFF** na UI.
 
 Antes de qualquer ação:
 
@@ -98,14 +98,17 @@ powershell -File deploy\fly\3vm\upload-and-import-workflow.ps1 -Mode production
 
 ## Pendências reais
 
-- **Ativar workflow oficial** na manhã (lab estava off; Active não garantido após restart).
+- **Deploy `app2037`** com commit A+B se ainda não subiu; **reimport workflow** no n8n
+  (**Active OFF**); smoke e só então Active ON.
+- Smoke bot: virgem/CTWA atende; salvo/`chatFound` cala; handoff cala; pedido específico
+  não usa só o template “quer ver as motos?”.
 - **Re-parear / confirmar QR** do canal da loja se Evolution ou status ainda “Aguardando QR”.
 - **Números da equipe** em Grupo do estoque se lista vazia (senão não há aviso de simulação no WA).
 - **Motor/RPA** ainda não é o caminho de resultado ao cliente — simulação humana no Portal.
 - Cutover Loja: `REVY_LOJA_REDIRECT_LEGACY` ainda OFF (dual-path).
-- Áudio no workflow Git = ignorado (ramo de 31 nós do live antigo pode ter sido
-  sobrescrito pelo import de 25 nós — se precisar áudio, reexportar/fundir).
-- E2E multi-WA; Google Ads GCP; smokes bancários; restore drill; Graphify se usar como índice.
+- Áudio no workflow Git = ignorado; estabilizar `findChats`/`@lid` (sinal de agenda ainda frágil).
+- Enxugar nós n8n (fundir gates) adiado de propósito.
+- E2E multi-WA; Google Ads GCP; smokes bancários; restore drill.
 
 ## Segurança
 
