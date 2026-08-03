@@ -23,7 +23,10 @@ Leia primeiro:
 - O workflow `n8n/workflow-teste-numero-autorizado.json` é gerado do canônico (lab; 1 telefone).
 - `n8n/workflow-ai-nao-salvos.json` é o **oficial no Git** (25 nós, jornada catálogo +
   simulação humana). Importado no `n8n2037` como `wAiNaoSalvos0001` — **Active fica a
-  critério do owner na manhã** (lab desligado à noite; ver “Ligar amanhã”).
+  critério do owner**; **não religar** sem ler o diagnóstico e aplicar correções mínimas.
+- **Diagnóstico bot (2026-08-03):** [`diagnostico-bot-whatsapp-2026-08-03.md`](diagnostico-bot-whatsapp-2026-08-03.md)
+  — CTWA silenciado por `isSaved` fail-closed, handoff `bot_ativo` ignorado, saudação
+  sem contexto; workflow desligado de propósito até fix.
 - Stack local: `./local.sh up` — `deploy/local/README.md`; segredos em `.env.local`.
 
 ## Validação conhecida
