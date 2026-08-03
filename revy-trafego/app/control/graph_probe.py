@@ -31,11 +31,16 @@ class GraphProbe(Protocol):
 class HttpGraphProbe:
     """Probe real via Graph API.
 
-    Se ``pixel_id`` for informado, valida o token consultando o próprio
-    objeto do Pixel (``GET /{pixel_id}``); caso contrário (uso genérico, ex.
-    Meta Ads), valida via ``GET /me``. Em ambos os casos o único uso do
-    token é como parâmetro da chamada HTTP — nunca é logado ou incluído no
-    motivo de erro devolvido.
+    Validação:
+
+    * Sem ``pixel_id`` (ex. Meta Ads): ``GET /me``.
+    * Com ``pixel_id``: tenta ``GET /{pixel_id}`` (token Marketing com leitura
+      do Pixel). Se a Graph devolver erro de **permissão** (``#100`` Missing
+      Permission), faz fallback em ``GET /me``: tokens do Events Manager
+      (Conversions API) autenticam e enviam eventos, mas **não** leem o
+      objeto Pixel — o health antigo marcava falso negativo.
+
+    O token só viaja como query param; nunca é logado nem incluído no motivo.
     """
 
     def __init__(
@@ -57,7 +62,23 @@ class HttpGraphProbe:
         if not token:
             return False, "token ausente"
 
-        alvo = (pixel_id or "").strip() or "me"
+        pixel = (pixel_id or "").strip()
+        if not pixel:
+            return self._get_ok(token, "me")
+
+        ok, motivo = self._get_ok(token, pixel)
+        if ok:
+            return True, None
+        if not _eh_erro_permissao(motivo):
+            return False, motivo
+
+        # Token CAPI típico: vivo, mas sem ads_read no objeto Pixel.
+        ok_me, motivo_me = self._get_ok(token, "me")
+        if ok_me:
+            return True, None
+        return False, motivo_me or motivo
+
+    def _get_ok(self, token: str, alvo: str) -> tuple[bool, str | None]:
         url = f"{GRAPH_BASE}/{alvo}"
         try:
             with httpx.Client(timeout=self._timeout, transport=self._transport) as client:
@@ -69,6 +90,18 @@ class HttpGraphProbe:
         if 200 <= response.status_code < 300:
             return True, None
         return False, _motivo_erro(response)
+
+
+def _eh_erro_permissao(motivo: str | None) -> bool:
+    """Detecta (#100) Missing Permission e variações da Graph."""
+    if not motivo:
+        return False
+    texto = motivo.casefold()
+    if "missing permission" in texto:
+        return True
+    if "(#100)" in texto and "permission" in texto:
+        return True
+    return False
 
 
 def _motivo_erro(response: httpx.Response) -> str:

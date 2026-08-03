@@ -303,6 +303,27 @@ def get_channel_by_instance(db: Session, instance: str) -> WhatsAppCanal | None:
     )
 
 
+def resolve_evolution_instance_for_loja(db: Session, loja: Loja) -> str:
+    """Instância Evolution para operações de loja (ex.: listar grupos do estoque).
+
+    Preferência: canal multi-WA ativo e ``conectado``; senão qualquer canal ativo;
+    senão o campo legado ``Loja.evolution_instance``.
+    """
+    canais = (
+        db.query(WhatsAppCanal)
+        .filter(WhatsAppCanal.loja_id == loja.id, WhatsAppCanal.ativo.is_(True))
+        .order_by(WhatsAppCanal.criado_em.desc())
+        .all()
+    )
+    for canal in canais:
+        if canal.estado == ESTADO_CONECTADO and (canal.evolution_instance or "").strip():
+            return canal.evolution_instance.strip()
+    for canal in canais:
+        if (canal.evolution_instance or "").strip():
+            return canal.evolution_instance.strip()
+    return (loja.evolution_instance or "").strip()
+
+
 def resolve_canal_for_instance(db: Session, instancia: str) -> WhatsAppCanal:
     """Resolve canal pela instância; backfill legado se só existir em Loja.
 

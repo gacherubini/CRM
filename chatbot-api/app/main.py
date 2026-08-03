@@ -1114,11 +1114,12 @@ def obter_grupo_estoque(
 ):
     """Lista os grupos da instancia e informa qual opera o estoque."""
     loja = db.get(models_db.Loja, ctx.loja_id)
+    instancia = channels.resolve_evolution_instance_for_loja(db, loja)
     selecionado = operacao.grupo_estoque_selecionado(db, ctx.loja_id)
     grupos: list[dict[str, str]] = []
     aviso = None
     try:
-        grupos = listar_grupos_whatsapp(loja.evolution_instance)
+        grupos = listar_grupos_whatsapp(instancia)
     except GruposWhatsappIndisponiveis as exc:
         aviso = str(exc)
     if selecionado and not any(item["jid"] == selecionado["jid"] for item in grupos):
@@ -1135,11 +1136,12 @@ def definir_grupo_estoque(
     nome = dados.grupo_nome
     if not nome:
         loja = db.get(models_db.Loja, ctx.loja_id)
+        instancia = channels.resolve_evolution_instance_for_loja(db, loja)
         try:
             encontrado = next(
                 (
                     grupo
-                    for grupo in listar_grupos_whatsapp(loja.evolution_instance)
+                    for grupo in listar_grupos_whatsapp(instancia)
                     if grupo["jid"] == dados.grupo_jid.strip().lower()
                 ),
                 None,
