@@ -70,13 +70,15 @@ flowchart LR
 7. `Consultar contato na Evolution1` + `Normalizar isSaved Evolution1` → `isSaved`
    (agenda) e `chatFound` (chat no WA). Lista vazia ⇒ `isSaved: null` (desconhecido).
 8. `Rotear operacao1` → `/v1/operacao/roteamento` com `is_saved` e `chat_found`.
-   Backend (defesa em profundidade): só `is_saved === true` bloqueia por agenda;
-   `null` é **fail-open** (atende lead novo/CTWA se não houver prova de histórico);
-   conversa com saída segue `cliente`; `chat_found` no primeiro contato → `ignorar`.
+   Backend (defesa em profundidade), **ordem**: (1) conversa com saída → `cliente`;
+   (2) `is_saved === true` no 1º contato → agenda, `ignorar`; (3) `chat_found` no
+   1º contato → `ignorar`; (4) `is_saved` null/false sem prova → **fail-open**
+   (atende lead novo/CTWA). `tem_saida` vem **antes** de agenda: após a 1ª resposta
+   a Evolution costuma marcar `isSaved=true` e isso não pode calar a 2ª msg.
 9. `Gate somente nao salvos1` — função **`atendeLeadVirgem()`** (juiz fino n8n):
-   cala em handoff, agenda (`isSaved true`) ou `chatFound` sem `tem_saida`; atende
-   virgem/Evolution cega e multi-msg rápida; se `tem_saida` e bot ativo, continua.
-   Aplica a tranca também quando o backend manda `acao=cliente` (não só no fallback).
+   mesma ordem (`tem_saida` → agenda → `chatFound`); cala handoff; atende
+   virgem/Evolution cega e multi-msg rápida. Aplica a tranca também quando o
+   backend manda `acao=cliente` (não só no fallback).
 10. `Se resposta controle1` manda menus da equipe direto ao WhatsApp; clientes
     seguem para a IA.
 11. `AI Agent1` usa system message com **prioridade da `mensagem_atual`** e user

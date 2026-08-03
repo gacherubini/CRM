@@ -125,7 +125,7 @@ const casos = [
     esperado: true,
   },
   {
-    nome: "S11 acao=cliente + salvo na agenda -> silêncio (gate confirma)",
+    nome: "S11 acao=cliente + salvo na agenda (sem saida) -> silêncio (gate confirma)",
     entrada: {
       chat: { isSaved: true, chatFound: true },
       estado: { primeira_mensagem: true, bot_ativo: true, tem_saida: false },
@@ -133,6 +133,27 @@ const casos = [
       rot: { acao: "cliente" },
     },
     esperado: false,
+  },
+  {
+    // Regressão ***6615: bot respondeu 1x → Evolution isSaved=true → 2ª msg do lead.
+    nome: "S12 conversa em andamento + isSaved true (pós-resposta Evolution) -> atende",
+    entrada: {
+      chat: { isSaved: true, chatFound: true },
+      estado: { primeira_mensagem: false, bot_ativo: true, tem_saida: true },
+      origem: { ehGrupo: false },
+      rot: { acao: "cliente" },
+    },
+    esperado: true,
+  },
+  {
+    // Fallback (sem acao do backend): mesma tranca com tem_saida + isSaved.
+    nome: "S13 tem_saida + isSaved true sem acao backend -> atende",
+    entrada: {
+      chat: { isSaved: true, chatFound: true },
+      estado: { primeira_mensagem: false, bot_ativo: true, tem_saida: true },
+      origem: { ehGrupo: false },
+    },
+    esperado: true,
   },
 ];
 

@@ -118,6 +118,13 @@ Efeito: bot falando por cima do humano em threads como `***7567`, `***9874`, `**
 5. **Estabilizar `findChats`** — **pendente**. Agenda via Evolution ainda é melhor esforço
    (`@lid`, lista vazia). Fail-open mitiga silêncio em lead; não substitui `findContacts`.
 
+5b. **2ª msg silenciada após 1ª resposta (`isSaved` antes de `tem_saida`)** — **feita no
+   código**. Caso `***6615` (exec n8n `10617`, “Gostei da gs310”): após a saída do bot,
+   Evolution passou a devolver `isSaved: true`/`chatFound: true`; backend e gate n8n
+   checavam agenda **antes** de `tem_saida` e retornavam `ignorar`. Ordem corrigida:
+   `tem_saida` → agenda → `chatFound`. Testes: `test_salvo_conversa_em_andamento_atende`,
+   gate S12/S13.
+
 6. **Reativação** — código no Git; **deploy + reimport + Active** sob critério do owner.
    Smoke antes de Active ON:
    - lead CTWA/virgem (atende; pedido específico sem template genérico)

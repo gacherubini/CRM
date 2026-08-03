@@ -743,19 +743,25 @@ def _decidir_cliente_ou_ignorar(
 ) -> dict:
     """Gate de cliente (defesa em profundidade; juiz fino fica no n8n).
 
-    - ``is_saved is True``: prova de contato na agenda → ignorar.
-    - conversa já com saída: segue cliente (bot no meio da conversa).
+    Ordem importa (bug 2026-08-03 ***6615): após a 1ª resposta do bot a Evolution
+    passa a achar o chat e muitas vezes devolve ``is_saved=true``. Se agenda
+    rodar *antes* de ``tem_saida``, a 2ª mensagem do lead morre em silêncio.
+
+    - conversa já com saída: segue cliente (bot/atendente no meio da conversa),
+      mesmo com ``is_saved``/``chat_found`` true (artefato pós-resposta).
+    - ``is_saved is True`` no 1º contato: prova de contato na agenda → ignorar.
     - ``chat_found is True`` no primeiro contato: histórico pré-bot no WA → ignorar.
     - ``is_saved`` False/None (Evolution cega) sem prova de histórico → cliente
       (fail-open: não matar lead CTWA/novo por findChats vazio).
     """
     from app import servico
 
-    if is_saved is True:
-        return {"acao": "ignorar", "resposta": None}
     if servico.conversa_tem_resposta(db, loja_id, telefone, instance=instance):
         # conversa em andamento (bot/atendente já respondeu): segue atendendo.
+        # DEVE vir antes de is_saved/chat_found — ver docstring.
         return {"acao": "cliente", "resposta": None}
+    if is_saved is True:
+        return {"acao": "ignorar", "resposta": None}
     if chat_found is True:
         # primeiro contato COM histórico pré-bot no WhatsApp: não atende.
         return {"acao": "ignorar", "resposta": None}
@@ -781,7 +787,9 @@ def decidir_roteamento(
     Quando existe um grupo de estoque configurado, somente esse JID pode abrir
     o menu. O telefone do participante nao concede acesso fora do grupo.
 
-    ``is_saved``: só ``True`` explícito bloqueia por agenda; ``None`` é fail-open.
+    ``is_saved``: só ``True`` explícito bloqueia por agenda no 1º contato;
+    com saída prévia na conversa, agenda não cala (ver ``_decidir_cliente_ou_ignorar``).
+    ``None`` é fail-open.
 
     Gate operacional (ADR 0001):
     - Loja não operacional → ``ignorar`` com captura passiva (sem atendimento).
