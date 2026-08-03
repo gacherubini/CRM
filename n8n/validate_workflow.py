@@ -41,6 +41,22 @@ def main() -> None:
             f"{node.get('name')}: {WEBHOOK_HEADER} ausente ou inseguro"
         )
 
+    gate = next(
+        (n for n in data.get("nodes", []) if n.get("name") == "Gate somente nao salvos1"),
+        None,
+    )
+    assert gate is not None, "nó 'Gate somente nao salvos1' sumiu"
+    gate_code = gate.get("parameters", {}).get("jsCode", "")
+    assert "chat.isSaved === false" not in gate_code, (
+        "gate voltou a atender por isSaved===false (regra antiga)"
+    )
+    assert "chat.chatFound === true" in gate_code, (
+        "gate não checa histórico (chatFound)"
+    )
+    assert "estadoMensagem.bot_ativo !== false" in gate_code, (
+        "gate não lê bot_ativo do registrar (handoff furado)"
+    )
+
     simulation_node = next(
         (node for node in data.get("nodes", []) if node.get("name") == "simular1"),
         None,

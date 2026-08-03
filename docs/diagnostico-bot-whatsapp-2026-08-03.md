@@ -90,11 +90,13 @@ Efeito: bot falando por cima do humano em threads como `***7567`, `***9874`, `**
 
 ## 5. Correções recomendadas (ordem sugerida)
 
-1. **Exceção CTWA/anúncio no gate**  
-   Se `veioDeAnuncio` / `ctwa_clid` (e `bot_ativo`), **atender mesmo com `isSaved === null`**. Lead pago não pode morrer no fail-closed. Continuar fail-closed para o resto sem sinal de anúncio quando o chat não for encontrado.
+1. **Exceção CTWA/anúncio no gate** — **feita** em `docs/superpowers/plans/2026-08-03-gate-bot-somente-leads-virgens.md`.  
+   O gate passou a atender quando `chat.chatFound === true` (histórico existe e não é salvo) ou quando não há histórico algum na Evolution (fail-open para lead virgem/CTWA), silenciando apenas contato salvo (`isSaved === true`) ou handoff ativo. Ver `n8n/validate_workflow.py` (assert do nó `Gate somente nao salvos1`) e `n8n/test_gate_somente_nao_salvos.js`.
 
-2. **Respeitar handoff**  
-   Gate deve ler `bot_ativo` (e status) do `Registrar mensagem e ler handoff1`, não só do `Extrair1`.
+2. **Respeitar handoff** — **feita** em `docs/superpowers/plans/2026-08-03-gate-bot-somente-leads-virgens.md`.  
+   Gate agora lê `estadoMensagem.bot_ativo !== false` do `Registrar mensagem e ler handoff1`, travado por assert no validador.
+
+   **Trade-off consciente (fail-open):** voltar a atender quando `findChats` vem vazio (fail-open) reabre uma janela residual em que um contato salvo mas sem chat na Evolution (nunca conversou) pode receber uma saudação na primeira mensagem, antes de `primeira_mensagem` virar `false` e o bot calar a partir da segunda.
 
 3. **Memória / histórico**  
    Session key estável por `instance + telefone`; injetar últimas N mensagens do chatbot na prompt do agent (além do buffer n8n).
@@ -115,6 +117,8 @@ Efeito: bot falando por cima do humano em threads como `***7567`, `***9874`, `**
 - Workflow canônico: `n8n/workflow-ai-nao-salvos.json`
 - Update live: `n8n/update_live_workflow.js`
 - Fail-closed salvos (lista vazia ≠ não salvo): commit `883fb9c`
+- Gate somente leads virgens (corrige (1) e (2) acima): `docs/superpowers/plans/2026-08-03-gate-bot-somente-leads-virgens.md`
+- Teste do novo gate: `n8n/test_gate_somente_nao_salvos.js`
 - CTWA/atribuição: `docs/fluxo-utm-pixel-ctwa-meta.md`, plano `docs/plans/2026-07-22-plano-ctwa-atribuicao-capi-messaging.md`
 - Checkpoint ops: `docs/handoff-contexto.md`
 
@@ -124,7 +128,7 @@ Efeito: bot falando por cima do humano em threads como `***7567`, `***9874`, `**
 |---|---|
 | Workflow n8n produção | **Inativo** (desligado de propósito) |
 | Webhook `POST /webhook/whatsapp-ai` | 404 enquanto inativo |
-| Correções (1)–(5) | **Pendentes** |
+| Correções (1)–(2) | **Aplicadas** em `docs/superpowers/plans/2026-08-03-gate-bot-somente-leads-virgens.md`; (3)–(5) pendentes |
 | Este documento | Registro do diagnóstico; não é plano de implementação formal |
 
 ---
