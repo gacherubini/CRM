@@ -390,7 +390,7 @@ def main() -> None:
     ), "tool de foto não está conectada ao AI Agent"
 
     nodes_by_name = {node.get("name"): node for node in data.get("nodes", [])}
-    assert len(nodes_by_name) == 25, "workflow simplificado deve ter 25 nós"
+    assert len(nodes_by_name) == 26, "workflow deve ter 26 nós (inclui Normalizar isSaved)"
     removidos = {
         "E audio1", "Transcrever audio1", "Aplicar transcricao1",
         "registrar_consentimento1", "registrar_lead1", "consultar_por_placa1",
@@ -493,9 +493,40 @@ def main() -> None:
         connections.get("Rotear operacao1", {}).get("main", [[]])[0][0].get("node")
         == "Gate somente nao salvos1"
     ), "roteamento não alimenta o gate"
+    # findChats vazio não pode matar o fluxo: alwaysOutputData + normalizador
+    consultar = nodes_by_name["Consultar contato na Evolution1"]
+    assert consultar.get("alwaysOutputData") is True, (
+        "Consultar contato deve alwaysOutputData (lista vazia não encerra o fluxo)"
+    )
+    assert (
+        connections.get("Consultar contato na Evolution1", {})
+        .get("main", [[]])[0][0]
+        .get("node")
+        == "Normalizar isSaved Evolution1"
+    ), "Consultar contato deve alimentar o normalizador de isSaved"
+    assert (
+        connections.get("Normalizar isSaved Evolution1", {})
+        .get("main", [[]])[0][0]
+        .get("node")
+        == "Rotear operacao1"
+    ), "normalizador deve alimentar o roteamento privado"
+    normalize_code = nodes_by_name["Normalizar isSaved Evolution1"].get(
+        "parameters", {}
+    ).get("jsCode", "")
+    assert "isSaved = false" in normalize_code or "isSaved=false" in normalize_code.replace(
+        " ", ""
+    ), "normalizador deve defaultar isSaved=false quando findChats vem vazio"
+    assert "chatFound" in normalize_code, "normalizador deve expor chatFound"
+    rota_body_priv = nodes_by_name["Rotear operacao1"]["parameters"].get("jsonBody", "")
+    assert "Normalizar isSaved Evolution1" in rota_body_priv, (
+        "roteamento privado deve ler is_saved do normalizador"
+    )
     gate_salvos_code = nodes_by_name["Gate somente nao salvos1"].get(
         "parameters", {}
     ).get("jsCode", "")
+    assert "Normalizar isSaved Evolution1" in gate_salvos_code, (
+        "gate deve usar isSaved normalizado (não o raw do findChats)"
+    )
     assert "$input.first()" in gate_salvos_code, "gate não consome a decisão de roteamento"
     assert "cadastro_controle" in gate_salvos_code, (
         "gate não trata a resposta de controle do cadastro"
@@ -549,8 +580,8 @@ def main() -> None:
     )
 
     print(
-        "workflow n8n válido: 25 nós, multi-WA instance dinâmica, áudio ignorado, "
-        "webhook seguro, foto automática, menu de operação e resultado privado"
+        "workflow n8n válido: 26 nós, multi-WA instance dinâmica, isSaved normalizado, "
+        "áudio ignorado, webhook seguro, foto automática, menu de operação e resultado privado"
     )
 
 
