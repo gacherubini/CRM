@@ -38,10 +38,13 @@ Leia primeiro:
 
 ## Estado operacional
 
-**Noite 2026-08-03:** lab Fly **desligado** (`machine stop` em `app2037`, `n8n2037`,
-`evolution2037`, `suite-pg`) para economizar; **volumes e apps preservados**. Código e
-imagem `app2037` já no último deploy da sessão. Workflow oficial **importado** no n8n
-(`wAiNaoSalvos0001`); **não** contar com Active até o owner ligar amanhã.
+**Noite 2026-08-03:** lab Fly **desligado** para economizar; **volumes e apps preservados**.
+- `app2037`, `evolution2037`, `suite-pg`: `machine stop`.
+- `n8n2037`: machine recriada no volume `n8n_data` (`801655f6637358`), depois
+  `autostart=false` + stop (senão o `min_machines_running=1` religava sozinho).
+  **Amanhã:** `fly machine start 801655f6637358 -a n8n2037` e, se quiser always-on de novo,
+  `fly machine update … --autostart=true` ou redeploy `fly.n8n.toml`.
+- Workflow oficial **importado** no volume n8n (`wAiNaoSalvos0001`); **Active na manhã**.
 
 Antes de qualquer ação:
 
@@ -64,19 +67,22 @@ Não recriar apps monolíticos legados e não destruir volumes/snapshots sem ped
 ## Ligar amanhã (checklist curto)
 
 ```text
-1) bash deploy/fly/up-all.sh --3vm
-   (Windows: se não houver bash, fly machine start em suite-pg, evolution2037, app2037, n8n2037)
-2) fly status -a app2037 / n8n2037 / evolution2037 → started + health
+1) Subir stack:
+   fly machine start 48ee5d4ad12768 -a suite-pg
+   fly machine start 867637ae203298 -a evolution2037
+   fly machine start 48e1e6ea557558 -a app2037
+   fly machine start 801655f6637358 -a n8n2037
+   (opcional n8n always-on de novo: fly machine update 801655f6637358 -a n8n2037 --yes --autostart=true)
+2) fly status → started + checks passing; healthz app e n8n
 3) n8n UI https://n8n2037.fly.dev
-   - workflow "WhatsApp IA - Somente Nao Salvos" (wAiNaoSalvos0001) → Active ON
+   - "WhatsApp IA - Somente Nao Salvos" (wAiNaoSalvos0001) → Active ON
    - TESTE permanece OFF
-   - se webhook não registrar: fly apps restart n8n2037
-4) Evolution: instância conectada; webhook → https://n8n2037.fly.dev/webhook/whatsapp-ai
+4) Evolution: canal conectado; webhook → https://n8n2037.fly.dev/webhook/whatsapp-ai
 5) Loja https://app2037.fly.dev
-   - Ajustes → Números de WhatsApp: canal Conectado (fix de status já no código)
-   - Ajustes → Grupo do estoque: escolher grupo + números da equipe (avisos simulação)
-6) Smoke: contato não-salvo → bot; simular com dados completos → frase curta ao cliente,
-   aviso WA equipe, Portal "Aguardando simulação", bot pausado
+   - Ajustes → Números de WhatsApp: Conectado
+   - Ajustes → Grupo do estoque: grupo + números da equipe
+6) Smoke: não-salvo → bot; simular completo → frase curta; aviso WA equipe;
+   Portal "Aguardando simulação"; bot pausado
 ```
 
 Prepare de novo se precisar reimportar JSON com secrets:
