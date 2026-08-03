@@ -1009,6 +1009,32 @@ def _exigir_conversa_unica(
     return conversas[0]
 
 
+def conversa_tem_resposta(
+    db: Session,
+    loja_id: str,
+    telefone: str,
+    *,
+    canal_id: str | None = None,
+    instance: str | None = None,
+) -> bool:
+    """True se a conversa deste telefone já teve alguma saída (bot ou atendente
+    já respondeu). O roteamento usa isto para não reavaliar como primeiro
+    contato uma conversa que o bot já está tocando."""
+    resolved = _resolver_canal_id_escopo(
+        db, loja_id, canal_id=canal_id, instance=instance
+    )
+    conversas = _listar_conversas_telefone(db, loja_id, telefone, canal_id=resolved)
+    if not conversas:
+        return False
+    ids = [c.id for c in conversas]
+    return (
+        db.query(Mensagem.id)
+        .filter(Mensagem.conversa_id.in_(ids), Mensagem.direcao == "saida")
+        .first()
+        is not None
+    )
+
+
 def obter_estado(
     db: Session,
     loja_id: str,

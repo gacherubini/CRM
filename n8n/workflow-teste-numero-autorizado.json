@@ -422,7 +422,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ (() => { const o = $('Extrair1').first().json; const norm = $('Normalizar isSaved Evolution1').first().json || {}; const s = norm.isSaved; return { instance: o.instance, telefone: o.telefone, texto: o.texto, is_saved: s === true ? true : (s === false ? false : null) }; })() }}",
+        "jsonBody": "={{ (() => { const o = $('Extrair1').first().json; const norm = $('Normalizar isSaved Evolution1').first().json || {}; const s = norm.isSaved; return { instance: o.instance, telefone: o.telefone, texto: o.texto, is_saved: s === true ? true : (s === false ? false : null), chat_found: norm.chatFound === true }; })() }}",
         "options": {
           "timeout": 8000
         }

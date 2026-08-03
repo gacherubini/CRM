@@ -733,6 +733,31 @@ def _handle_modo_acao(
     return _controle(_TEXTO_MENU)
 
 
+def _decidir_cliente_ou_ignorar(
+    db: Session,
+    loja_id: str,
+    telefone: str,
+    is_saved: bool | None,
+    chat_found: bool | None,
+    instance: str | None,
+) -> dict:
+    """Gate de cliente: atende só lead virgem (não salvo E sem conversa pré-bot),
+    mas segue atendendo conversa que o bot já iniciou (já existe uma saída)."""
+    from app import servico
+
+    if is_saved is not False:
+        # salvo (True) ou desconhecido (None): não atende, como antes.
+        return {"acao": "ignorar", "resposta": None}
+    if servico.conversa_tem_resposta(db, loja_id, telefone, instance=instance):
+        # conversa em andamento (bot/atendente já respondeu): segue atendendo.
+        return {"acao": "cliente", "resposta": None}
+    if chat_found is True:
+        # primeiro contato COM histórico pré-bot no WhatsApp: não atende.
+        return {"acao": "ignorar", "resposta": None}
+    # virgem, ou Evolution cega (chat_found desconhecido): fail-open, atende.
+    return {"acao": "cliente", "resposta": None}
+
+
 def decidir_roteamento(
     db: Session,
     loja_id: str,
@@ -740,6 +765,9 @@ def decidir_roteamento(
     texto: str | None,
     is_saved: bool | None,
     grupo_jid: str | None = None,
+    *,
+    chat_found: bool | None = None,
+    instance: str | None = None,
 ) -> dict:
     """Decide como o n8n trata a mensagem.
 
@@ -787,18 +815,18 @@ def decidir_roteamento(
         # que continuam cadastrados na lista legada da equipe.
         if _numero_autorizado_ativo(db, loja_id, telefone) is not None:
             return {"acao": "ignorar", "resposta": None}
-        if is_saved is False:
-            return {"acao": "cliente", "resposta": None}
-        return {"acao": "ignorar", "resposta": None}
+        return _decidir_cliente_ou_ignorar(
+            db, loja_id, telefone, is_saved, chat_found, instance
+        )
     else:
         # Compatibilidade de implantacao: ate o grupo ser escolhido, o menu
         # textual antigo ainda funciona para numeros autorizados.
         numero = _numero_autorizado_ativo(db, loja_id, telefone)
 
     if numero is None:
-        if is_saved is False:
-            return {"acao": "cliente", "resposta": None}
-        return {"acao": "ignorar", "resposta": None}
+        return _decidir_cliente_ou_ignorar(
+            db, loja_id, telefone, is_saved, chat_found, instance
+        )
 
     # A partir daqui: menu/cadastro/operação de estoque.
     if not provisioning.is_module_operational(db, loja_id, "estoque"):

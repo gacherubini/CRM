@@ -181,6 +181,7 @@ class RoteamentoInput(BaseModel):
     telefone: str
     texto: Optional[str] = Field(default=None, max_length=config.WEBHOOK_MAX_TEXT_CHARS)
     is_saved: Optional[bool] = None
+    chat_found: Optional[bool] = None
     grupo_jid: Optional[str] = Field(default=None, max_length=120)
 
     @field_validator("instance")
@@ -415,6 +416,8 @@ def operacao_roteamento(
         dados.texto,
         dados.is_saved,
         grupo_jid=dados.grupo_jid,
+        chat_found=dados.chat_found,
+        instance=dados.instance,
     )
 
 
