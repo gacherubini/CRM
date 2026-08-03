@@ -9,6 +9,7 @@ o provider devolve lista vazia / None e o chamador oferece fallback/handoff (nun
 O Chatbot NÃO é fonte de verdade de veículos.
 """
 import ipaddress
+import re
 from typing import Protocol
 from urllib.parse import urlparse
 
@@ -96,6 +97,61 @@ def _projetar_midia(midia: object) -> dict | None:
     }
 
 
+def _normalizar_texto_busca(texto: object) -> str:
+    """Lowercase + separadores viram espaço (mt-03 → mt 03)."""
+    bruto = str(texto or "").lower()
+    return re.sub(r"[^a-z0-9]+", " ", bruto).strip()
+
+
+def _tokens_busca(texto: object) -> list[str]:
+    return [t for t in _normalizar_texto_busca(texto).split() if t]
+
+
+def veiculo_casa_termo(veiculo: dict, termo: str | None) -> bool:
+    """Match tolerante: tokens do termo contra marca/modelo/versão/ano.
+
+    Exemplos que precisam bater:
+    - ``mt-03`` em modelo MT-03
+    - ``mt-03 2023`` (ano em ``ano_modelo``, não só marca+modelo)
+    - ``yamaha mt-03`` mesmo com marca digitada ``yahamaha``
+    - ``mt 03`` / ``mt03``
+    """
+    if not termo or not str(termo).strip():
+        return True
+    tokens = _tokens_busca(termo)
+    if not tokens:
+        return True
+    hay = _normalizar_texto_busca(
+        " ".join(
+            str(veiculo.get(campo) or "")
+            for campo in ("marca", "modelo", "versao", "ano_modelo", "ano", "cor")
+        )
+    )
+    hay_compact = hay.replace(" ", "")
+    palavras = hay.split()
+
+    def _subsequencia(menor: str, maior: str) -> bool:
+        """True se os chars de menor aparecem em ordem em maior (yamaha ⊂ yahamaha)."""
+        it = iter(maior)
+        return all(c in it for c in menor)
+
+    def _token_ok(tok: str) -> bool:
+        if tok in hay or tok in hay_compact:
+            return True
+        # yamaha ⊂ yahamaha; mt03 ⊂ …mt03…
+        if len(tok) >= 3:
+            for p in palavras:
+                if len(p) < 3:
+                    continue
+                if tok in p or p in tok:
+                    return True
+                if _subsequencia(tok, p) or _subsequencia(p, tok):
+                    return True
+        return False
+
+    return all(_token_ok(tok) for tok in tokens)
+
+
 def projetar_veiculo_chatbot(veiculo: object) -> dict | None:
     """Allowlist para o modelo: remove custo, códigos e quaisquer paths internos."""
     if not isinstance(veiculo, dict):
@@ -157,12 +213,7 @@ class HttpInventoryProvider:
         except Exception:
             return []
         if termo:
-            t = termo.lower()
-            veiculos = [
-                v
-                for v in veiculos
-                if t in f"{v.get('marca', '')} {v.get('modelo', '')}".lower()
-            ]
+            veiculos = [v for v in veiculos if veiculo_casa_termo(v, termo)]
         return [
             projetado
             for veiculo in veiculos

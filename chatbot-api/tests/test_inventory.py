@@ -40,7 +40,8 @@ def test_busca_estoque_vazio_gera_fallback(client, loja_a):
         body = r.json()
         assert body["fonte"] == "fallback"
         assert body["veiculos"] == []
-        assert "atendente" in body["mensagem"]
+        assert "atendente" not in body["mensagem"].lower()
+        assert "vendedor" not in body["mensagem"].lower()
     finally:
         app.dependency_overrides.pop(get_inventory_provider, None)
 
@@ -63,6 +64,52 @@ def test_http_provider_filtra_por_termo(monkeypatch):
     monkeypatch.setattr(inventory.httpx, "get", lambda *a, **k: _FakeResp())
     prov = HttpInventoryProvider(base_url="http://estoque")
     assert [v["modelo"] for v in prov.buscar("slug", "onix")] == ["Onix"]
+
+
+def test_veiculo_casa_termo_mt03_com_ano_e_marca_aproximada():
+    """Bug real: bot buscou 'mt-03 2023' e o filtro antigo (marca+modelo substring) zerou."""
+    from app.inventory import veiculo_casa_termo
+
+    v = {
+        "marca": "yahamaha",  # typo no cadastro
+        "modelo": "MT-03",
+        "versao": "MT-03 321/ABS",
+        "ano_modelo": 2023,
+    }
+    assert veiculo_casa_termo(v, "mt-03")
+    assert veiculo_casa_termo(v, "MT-03 2023")
+    assert veiculo_casa_termo(v, "mt 03")
+    assert veiculo_casa_termo(v, "yamaha mt-03")
+    assert veiculo_casa_termo(v, "mt03")
+    assert not veiculo_casa_termo(v, "biz 125")
+
+
+def test_http_provider_filtra_mt03_2023(monkeypatch):
+    from app import inventory
+
+    class _FakeResp:
+        def raise_for_status(self):
+            pass
+
+        def json(self):
+            return {
+                "veiculos": [
+                    {
+                        "marca": "yahamaha",
+                        "modelo": "MT-03",
+                        "versao": "MT-03 321/ABS",
+                        "ano_modelo": 2023,
+                        "preco": 31900,
+                    },
+                    {"marca": "Honda", "modelo": "CG 160", "ano_modelo": 2018},
+                ]
+            }
+
+    monkeypatch.setattr(inventory.httpx, "get", lambda *a, **k: _FakeResp())
+    prov = HttpInventoryProvider(base_url="http://estoque")
+    achados = prov.buscar("slug", "mt-03 2023")
+    assert len(achados) == 1
+    assert achados[0]["modelo"] == "MT-03"
 
 
 def test_http_provider_sem_base_url_retorna_vazio():
@@ -98,7 +145,7 @@ def test_por_placa_endpoint_fallback(client, loja_a):
         body = r.json()
         assert body["fonte"] == "fallback"
         assert body["veiculo"] is None
-        assert "atendente" in body["mensagem"]
+        assert "atendente" not in body["mensagem"].lower()
     finally:
         app.dependency_overrides.pop(get_inventory_provider, None)
 

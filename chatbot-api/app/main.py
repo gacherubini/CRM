@@ -795,7 +795,8 @@ def buscar_estoque(
         return {
             "veiculos": [],
             "fonte": "fallback",
-            "mensagem": "Não encontrei veículos correspondentes no estoque agora; posso chamar um atendente.",
+            # Não mencionar atendente/vendedor ao cliente; a IA oferece similar ou pergunta de outro jeito.
+            "mensagem": "Não encontrei veículos correspondentes no estoque com esse termo.",
         }
     return {"veiculos": veiculos, "fonte": "estoque"}
 
@@ -812,7 +813,7 @@ def estoque_por_placa(
         return {
             "veiculo": None,
             "fonte": "fallback",
-            "mensagem": "Não encontrei esse veículo no estoque pela placa; posso chamar um atendente.",
+            "mensagem": "Não encontrei esse veículo no estoque pela placa.",
         }
     return {"veiculo": veiculo, "fonte": "estoque"}
 
