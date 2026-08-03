@@ -1,6 +1,6 @@
 # Handoff técnico
 
-Atualizado em **2026-08-03**. Este arquivo registra somente o checkpoint atual.
+Atualizado em **2026-08-03 (noite)**. Este arquivo registra somente o checkpoint atual.
 Histórico detalhado permanece no Git; não acumular “checkpoints anteriores” aqui.
 
 Leia primeiro:
@@ -13,16 +13,18 @@ Leia primeiro:
 
 - Revy Control lean F0–F6 está implementado em `revy-trafego`.
 - Revy Loja lean F0–F6/F8 está implementado em `portal-gestao`.
+- **Entregas 2026-08-03 (main):** Atendimento com chat humano + poll `after_id`; Perfil
+  (senha fora de Ajustes); status WA persiste `conectado` no DB; Grupo do estoque de volta
+  no menu Ajustes + redesign da tela; workflow oficial com jornada de catálogo e
+  `simular1` (lead qualificado + aviso equipe no WA + pausa bot; cliente só confirmação).
 - Seller AI permanece adiado e desligado.
 - O Portal foi modularizado: simulações, metas, equipe e tráfego/campanhas ficam em
   `portal-gestao/app/web/`; `main.py` mantém bootstrap e rotas legadas restantes.
-- O workflow `n8n/workflow-teste-numero-autorizado.json` é usado para testes e não deve
-  ser removido.
-- `n8n/workflow-ai-nao-salvos.json` **não é mais fiel ao que roda**: o live tem 31 nós e o
-  arquivo tem 25 (ver Pendências). Tratar como referência, não como fonte de verdade.
-- Stack local completa com um comando: `./local.sh up` (compose + bootstrap de loja,
-  usuário e credenciais). Guia em `deploy/local/README.md`; segredos ficam em `.env.local`,
-  que é ignorado pelo Git.
+- O workflow `n8n/workflow-teste-numero-autorizado.json` é gerado do canônico (lab; 1 telefone).
+- `n8n/workflow-ai-nao-salvos.json` é o **oficial no Git** (25 nós, jornada catálogo +
+  simulação humana). Importado no `n8n2037` como `wAiNaoSalvos0001` — **Active fica a
+  critério do owner na manhã** (lab desligado à noite; ver “Ligar amanhã”).
+- Stack local: `./local.sh up` — `deploy/local/README.md`; segredos em `.env.local`.
 
 ## Validação conhecida
 
@@ -36,8 +38,12 @@ Leia primeiro:
 
 ## Estado operacional
 
-O repositório não é fonte confiável para afirmar que uma Machine Fly está ligada neste
-instante. Antes de qualquer ação:
+**Noite 2026-08-03:** lab Fly **desligado** (`machine stop` em `app2037`, `n8n2037`,
+`evolution2037`, `suite-pg`) para economizar; **volumes e apps preservados**. Código e
+imagem `app2037` já no último deploy da sessão. Workflow oficial **importado** no n8n
+(`wAiNaoSalvos0001`); **não** contar com Active até o owner ligar amanhã.
+
+Antes de qualquer ação:
 
 1. consulte `deploy/fly/3vm/README.md`;
 2. verifique `fly status` dos apps envolvidos;
@@ -55,42 +61,42 @@ Arquitetura esperada do lab (**topologia dividida desde 2026-07-31**):
 
 Não recriar apps monolíticos legados e não destruir volumes/snapshots sem pedido explícito.
 
+## Ligar amanhã (checklist curto)
+
+```text
+1) bash deploy/fly/up-all.sh --3vm
+   (Windows: se não houver bash, fly machine start em suite-pg, evolution2037, app2037, n8n2037)
+2) fly status -a app2037 / n8n2037 / evolution2037 → started + health
+3) n8n UI https://n8n2037.fly.dev
+   - workflow "WhatsApp IA - Somente Nao Salvos" (wAiNaoSalvos0001) → Active ON
+   - TESTE permanece OFF
+   - se webhook não registrar: fly apps restart n8n2037
+4) Evolution: instância conectada; webhook → https://n8n2037.fly.dev/webhook/whatsapp-ai
+5) Loja https://app2037.fly.dev
+   - Ajustes → Números de WhatsApp: canal Conectado (fix de status já no código)
+   - Ajustes → Grupo do estoque: escolher grupo + números da equipe (avisos simulação)
+6) Smoke: contato não-salvo → bot; simular com dados completos → frase curta ao cliente,
+   aviso WA equipe, Portal "Aguardando simulação", bot pausado
+```
+
+Prepare de novo se precisar reimportar JSON com secrets:
+
+```powershell
+powershell -File deploy\fly\3vm\prepare-workflow.ps1 -Mode production
+powershell -File deploy\fly\3vm\upload-and-import-workflow.ps1 -Mode production
+# depois Active ON na UI (owner)
+```
+
 ## Pendências reais
 
-- **Re-parear os números de WhatsApp por QR** (Ajustes na Revy Loja): o volume da Evolution
-  nasceu vazio na migração para `iad` em 2026-07-31.
-- **Portal, Tráfego e Catálogo começaram com banco vazio** na mesma migração (decisão do
-  owner: só o n8n precisava sobreviver). Foi recriada uma conta `dono` no Portal para a loja
-  `moto-center`; o gestor do Control é recriado sozinho por `bootstrap_gestor_se_vazio` a
-  partir dos secrets `REVY_TRAFEGO_BOOTSTRAP_*`. Fotos do estoque se perderam.
-  **Atualização 2026-08-02:** a `moto-center` estava só no Portal (login), não no Control —
-  com `REVY_LOJA_ENTITLEMENTS_ENABLED=1` isso dava "módulo indisponível" + menu do shell
-  vazio. O owner (re)criou a loja no Control (ativa + Vendas + Estoque) e ela foi projetada
-  ao Portal; enforcement volta a funcionar. Mecanismo, estado das flags em prod e runbook de
-  inspeção dos bancos em [`2026-08-02-provisionamento-loja-entitlements.md`](2026-08-02-provisionamento-loja-entitlements.md).
-  **Atualização 2026-08-03:** cutover **parcial** no `app2037` (secrets revalidados): shell +
-  entitlements + atendimento + `REVY_LOJA_WHATSAPP_ENABLED` **ON**; `REVY_LOJA_REDIRECT_LEGACY`
-  **ainda OFF** (dual-path: URLs legadas `/app/leads`, `/app/conversas` etc. não redirecionam
-  sozinhas). Seller AI permanece off. Defaults de código no repo continuam OFF.
-- **Escala horizontal está bloqueada por dois motivos independentes** — plano em
-  `docs/superpowers/plans/2026-07-31-escala-horizontal-app2037.md`: (1) Portal, Tráfego e
-  Catálogo rodam em SQLite dentro do volume `app_data`, que é single-attach, então
-  `fly scale count 2` produziria bancos divergentes em silêncio; (2) os workers de outbox e
-  jobs sobem no `lifespan` do processo web, então N machines rodariam N cópias de cada loop.
-  Sessão é cookie assinado e **não** é bloqueador.
-- **`n8n/workflow-ai-nao-salvos.json` está defasado**: o workflow live tem 31 nós, o arquivo
-  do repo tem 25. Faltam no repo transcrição de áudio (`Transcrever audio1`, `E audio1`,
-  `Aplicar transcricao1`), `consultar_por_placa1`, `registrar_consentimento1` e
-  `registrar_lead1`. O `CLAUDE.md` chama o arquivo de canônico — não é. Sincronizar exige
-  re-placeholderizar os segredos antes de commitar.
-- Residual cutover Loja (opcional): ligar `REVY_LOJA_REDIRECT_LEGACY=1` quando bookmarks/menus
-  antigos devem cair no shell; até lá dual-path permanece. UX/deep-links de Atendimento.
-- E2E Multi-WhatsApp com dois canais Evolution e resposta pelo canal correto.
-- Configuração humana do Google Ads/GCP e smoke OAuth/métricas/conversões.
-- Smoke real dos quatro bancos, incluindo sessão quente e limite de concorrência.
-- Restore drill dos bancos/volumes.
-- Fechar deep-links de simulação e venda dentro do workspace de Atendimento.
-- Atualizar o Graphify após mudanças estruturais antes de usá-lo como índice.
+- **Ativar workflow oficial** na manhã (lab estava off; Active não garantido após restart).
+- **Re-parear / confirmar QR** do canal da loja se Evolution ou status ainda “Aguardando QR”.
+- **Números da equipe** em Grupo do estoque se lista vazia (senão não há aviso de simulação no WA).
+- **Motor/RPA** ainda não é o caminho de resultado ao cliente — simulação humana no Portal.
+- Cutover Loja: `REVY_LOJA_REDIRECT_LEGACY` ainda OFF (dual-path).
+- Áudio no workflow Git = ignorado (ramo de 31 nós do live antigo pode ter sido
+  sobrescrito pelo import de 25 nós — se precisar áudio, reexportar/fundir).
+- E2E multi-WA; Google Ads GCP; smokes bancários; restore drill; Graphify se usar como índice.
 
 ## Segurança
 

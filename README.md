@@ -4,27 +4,25 @@ Bot de WhatsApp para revenda de motos que conversa com o cliente, coleta os dado
 necessários, solicita a simulação internamente e transfere o atendimento para um vendedor.
 Parcelas, taxas e bancos não são enviados automaticamente ao cliente.
 
-> **Status:** 🟢 MVP demonstrável; Fly **3-VM** (`app2037` + `evolution2037` + `suite-pg` + `n8n2037`; workers Playwright on-demand).  
-> **Ambiente:** local (dev) **ou** Fly consolidado — ver [`deploy/fly/3vm/README.md`](deploy/fly/3vm/README.md).  
-> **Estado canônico:** [`docs/contexto-compacto.md`](docs/contexto-compacto.md) · planos
-> [`docs/plans/README.md`](docs/plans/README.md) · go-live WA [`docs/go-live-chatbot.md`](docs/go-live-chatbot.md).  
+> **Status:** 🟢 MVP no código e imagem; lab Fly **pode estar stopped** à noite (dados em volume).  
+> **Ambiente:** local (dev) **ou** Fly 3-VM — [`deploy/fly/3vm/README.md`](deploy/fly/3vm/README.md).  
+> **Estado canônico:** [`docs/contexto-compacto.md`](docs/contexto-compacto.md) · handoff
+> [`docs/handoff-contexto.md`](docs/handoff-contexto.md) (inclui **checklist “Ligar amanhã”**).  
 > **As-built Control/Loja:** [`docs/design/2026-07-30-revy-control-loja-asbuilt-e-melhorias.md`](docs/design/2026-07-30-revy-control-loja-asbuilt-e-melhorias.md).  
-> **Prod piloto (`app2037`, 2026-08):** shell Loja + entitlements + Atendimento + WhatsApp Loja **ON**; redirect legado **OFF** (dual-path). Defaults de **código** das flags continuam OFF.
+> **Piloto flags Loja:** shell + entitlements + Atendimento + WhatsApp **ON** (secrets); redirect legado **OFF**.  
+> **n8n oficial:** `WhatsApp IA - Somente Nao Salvos` importado; **Active na manhã** (owner).
 
 ### Estado atual do Revy Control / Revy Loja
 
 > **Agentes e manutencao:** comece por [`CLAUDE.md`](CLAUDE.md) para o mapa dos sete produtos,
 > acoplamentos HTTP, arquivos certos e comandos de teste/deploy com baixo uso de contexto.
 
-O corte lean está implementado no código: **Control F0–F6** e **Loja F0–F6 + F8**,
-com shells, RBAC, projeções, Vendas/Estoque, **Atendimento com chat humano** (envio +
-polling), Perfil (troca de senha), Multibanco e contratos. Em **prod** o piloto liga
-secrets por ops; no **repo** as flags default OFF permitem lab seguro. Residuais:
-redirect legado opcional, E2E multi-WA/Google GCP, smokes bancários, workflow n8n
-live vs JSON no Git. Seller AI (F7) segue adiado. Consulte o
-[as-built](docs/design/2026-07-30-revy-control-loja-asbuilt-e-melhorias.md) e o
-[runbook de provisionamento](docs/2026-08-02-provisionamento-loja-entitlements.md)
-antes de reabrir trabalho já entregue.
+Código: **Control F0–F6** e **Loja F0–F6/F8** + chat no Atendimento, Perfil, Grupo do
+estoque no menu, status WA persistido, workflow com jornada de catálogo e simulação
+**humana** (aviso equipe + pausa bot; sem parcelas ao cliente). Flags default **OFF** no
+repo; piloto em prod via secrets. Lab: `up-all.sh --3vm` / `down-all.sh --3vm --yes`.
+Seller AI adiado. Ver [as-built](docs/design/2026-07-30-revy-control-loja-asbuilt-e-melhorias.md)
+e [handoff](docs/handoff-contexto.md).
 
 ---
 

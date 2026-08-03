@@ -1,6 +1,6 @@
 # Contexto compacto para continuidade
 
-Atualizado em **2026-08-03**. Este é o ponto de entrada para estado e prioridades.
+Atualizado em **2026-08-03 (noite)**. Este é o ponto de entrada para estado e prioridades.
 O desenho implementado está em
 [`design/2026-07-30-revy-control-loja-asbuilt-e-melhorias.md`](design/2026-07-30-revy-control-loja-asbuilt-e-melhorias.md),
 os termos do domínio em [`../CONTEXT.md`](../CONTEXT.md) e os planos válidos em
@@ -8,24 +8,21 @@ os termos do domínio em [`../CONTEXT.md`](../CONTEXT.md) e os planos válidos e
 
 ## Estado atual
 
-- **Revy Control:** código lean F0–F6 implementado em `revy-trafego`. Inclui lojas,
-  pessoas/cargos, acessos, contrato/módulos, prontidão, auditoria, provisioning,
-  Google Ads e canais WhatsApp. **Defaults de código** das flags continuam OFF (dev/lab).
-- **Revy Loja:** código lean F0–F6 e F8 implementado em `portal-gestao`. Inclui shell,
-  entitlements, visões de Vendas/Estoque, Atendimento multi-canal, equipe e bancos.
-  Seller AI (F7) permanece explicitamente adiado (off em prod).
-- **Prod `app2037` (piloto, secrets 2026-08-03):** cutover **parcial** — shell +
-  entitlements + atendimento + WhatsApp Loja **ON**; `REVY_LOJA_REDIRECT_LEGACY` **OFF**
-  (dual-path: `/app/leads`, `/app/conversas` etc. ainda respondem sem 303). Detalhe e
-  runbook em [`2026-08-02-provisionamento-loja-entitlements.md`](2026-08-02-provisionamento-loja-entitlements.md).
-- **Portal legado:** continua disponível (redirect legado off). `app/main.py` foi reduzido e
-  os domínios grandes estão em `app/web/{simulacoes,metas,equipe,trafego}.py`.
-- **WhatsApp:** Chatbot é dono de canais, leads, conversas e mensagens; Control apenas
-  administra os canais por contrato HTTP. n8n continua a orquestração do webhook.
-- **Motor:** Santander, Fontecred, Bradesco e Pan portal usam workers Playwright sob
-  demanda. Warm sessions e concorrência máxima devem ser validadas no ambiente real.
-- **Fly:** a arquitetura canônica é 3-VM. Nunca assuma que o lab está ligado ou saudável;
-  confira `deploy/fly/3vm/README.md` e o estado atual antes de operar.
+- **Revy Control:** código lean F0–F6 em `revy-trafego`. Defaults de flags no **código** OFF.
+- **Revy Loja:** F0–F6/F8 + entregas 2026-08-03: chat no Atendimento (envio + poll),
+  Perfil, status WA persistido, Grupo do estoque no menu, redesign da tela de números.
+  Seller AI adiado.
+- **Prod `app2037` (piloto):** secrets shell + entitlements + atendimento + WhatsApp Loja
+  **ON**; redirect legado **OFF**. Detalhe:
+  [`2026-08-02-provisionamento-loja-entitlements.md`](2026-08-02-provisionamento-loja-entitlements.md).
+- **n8n:** workflow oficial `WhatsApp IA - Somente Nao Salvos` (`wAiNaoSalvos0001`) importado
+  (catálogo + `simular` com aviso humano e pausa do bot). **Active = owner na manhã.**
+  Teste permanece separado/OFF.
+- **Fly lab (noite 03/08):** machines **stopped** (app2037, n8n2037, evolution2037, suite-pg)
+  para economizar; volumes intactos. Ligar: `bash deploy/fly/up-all.sh --3vm` e checklist
+  em [`handoff-contexto.md`](handoff-contexto.md) § “Ligar amanhã”.
+- **WhatsApp:** Chatbot dono de canais/conversas; Loja UI de canais + grupo estoque; n8n orquestra.
+- **Motor:** Playwright sob demanda; simulação ao cliente ainda **humana** (bot não devolve parcela).
 
 ## Fontes da verdade
 
@@ -49,12 +46,12 @@ Escolha um eixo por mudança; não misture rollout, RPA e produto na mesma entre
 
 | Eixo | Próximo resultado verificável |
 |---|---|
-| Rollout Control/Loja | Piloto parcial já ON em prod (shell/entitlements/atendimento/whatsapp). Residual: redirect legado opcional + validar dual-path/UX; não “ligar shell de novo” |
-| Multi-WhatsApp | E2E Evolution + n8n com dois canais e resposta pelo `canal_id` correto |
-| Google Ads | Configurar projeto GCP/secrets e fechar OAuth, métricas e conversões no lab |
-| Motor | Smoke real por banco, sessão quente e teto de dois browsers |
-| Loja | Fechar deep-links de simulação/venda no Atendimento; telemetria; redirect legado se desejado |
-| Operação | Restore drill de banco/volume e revisão dos runbooks |
+| Operação (manhã) | `up-all --3vm` → Active no workflow oficial → QR/canal Conectado → smoke bot + simulação humana |
+| Rollout Control/Loja | Redirect legado opcional; dual-path ainda on |
+| Multi-WhatsApp | E2E dois canais + `canal_id` correto |
+| Google Ads | Secrets GCP + OAuth/métricas/conversões |
+| Motor | Smoke real por banco (resultado ao cliente ainda não via bot) |
+| Loja | Deep-links simulação/venda no workspace; telemetria |
 
 ## Fronteiras permanentes
 
