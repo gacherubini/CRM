@@ -90,6 +90,10 @@ def test_nav_item_active_prefix_estoque():
     assert nav_item_is_active(visao, "/app/loja/estoque") is True
     assert nav_item_is_active(visao, "/app/loja/estoque/veiculos") is False
     assert nav_item_is_active(veiculos, "/app/loja/estoque/veiculos") is True
+    # Lista/CRUD legado após redirect de /app/loja/estoque/veiculos
+    assert nav_item_is_active(veiculos, "/app/estoque") is True
+    assert nav_item_is_active(veiculos, "/app/estoque/novo") is True
+    assert nav_item_is_active(visao, "/app/estoque") is False
 
 
 def test_shell_off_mantem_nav_legado(client, monkeypatch):

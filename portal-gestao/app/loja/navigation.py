@@ -172,13 +172,24 @@ def flatten_nav(sections: tuple[NavSection, ...] | list[NavSection]) -> list[Nav
 
 
 def nav_item_is_active(item: NavItem, path: str) -> bool:
-    prefix = item.active_prefix or item.href
     if path == item.href:
         return True
+
+    # Veículos: entrada shell + lista/CRUD legado em /app/estoque*
+    if item.href == "/app/loja/estoque/veiculos":
+        if path.startswith("/app/loja/estoque/veiculos"):
+            return True
+        if path == "/app/estoque" or path.startswith("/app/estoque/"):
+            return True
+        return False
+
+    prefix = item.active_prefix or item.href
     if prefix and path.startswith(prefix):
-        # Evita que /app/loja/estoque marque /app/loja/estoque/veiculos como "Visão geral"
-        if item.href == "/app/loja/estoque" and path.startswith(
-            "/app/loja/estoque/veiculos"
+        # Evita que Visão geral do estoque marque a lista de veículos
+        if item.href == "/app/loja/estoque" and (
+            path.startswith("/app/loja/estoque/veiculos")
+            or path == "/app/estoque"
+            or path.startswith("/app/estoque/")
         ):
             return False
         return True

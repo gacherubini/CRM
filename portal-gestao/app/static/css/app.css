@@ -188,6 +188,7 @@ button, .button, a { -webkit-tap-highlight-color: transparent; }
   min-height: 34px;
   display: flex;
   align-items: center;
+  gap: 10px;
   padding: 0 12px;
   margin: 0 4px;
   border-radius: 8px;
@@ -211,7 +212,17 @@ button, .button, a { -webkit-tap-highlight-color: transparent; }
   box-shadow: var(--shadow);
 }
 
+/* Hover também no item ativo (mesmo padrão visual dos demais) */
+.nav-link.active:hover {
+  background: var(--surface-soft);
+  color: var(--ink);
+}
+
 .nav-link.disabled { opacity: .36; cursor: default; }
+.nav-link.disabled:hover {
+  background: transparent;
+  color: var(--ink-soft);
+}
 
 .sidebar-footer {
   margin-top: auto;
@@ -2080,11 +2091,18 @@ tr:hover td { background: var(--surface-soft); }
   background: var(--brand);
 }
 
-/* Icones na navegacao lateral */
-.nav-link { gap: 10px; }
-.nav-link svg { width: 17px; height: 17px; flex: 0 0 auto; opacity: .8; }
-.nav-link:hover svg { opacity: 1; }
+/* Icones na navegacao lateral — todos os itens (incl. Veículos) herdam currentColor */
+.nav-link svg {
+  width: 17px;
+  height: 17px;
+  flex: 0 0 auto;
+  opacity: .8;
+  color: inherit;
+  transition: opacity .15s ease, color .15s ease;
+}
+.nav-link:hover svg { opacity: 1; color: inherit; }
 .nav-link.active svg { color: var(--brand); opacity: 1; }
+.nav-link.active:hover svg { color: var(--brand); opacity: 1; }
 
 /* Pilulas de status: forma de pilula + ponto de estado */
 .status, .status-pill { border-radius: 999px; font-weight: 600; gap: 6px; }
