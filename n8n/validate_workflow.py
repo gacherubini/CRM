@@ -513,9 +513,13 @@ def main() -> None:
     normalize_code = nodes_by_name["Normalizar isSaved Evolution1"].get(
         "parameters", {}
     ).get("jsCode", "")
-    assert "isSaved = false" in normalize_code or "isSaved=false" in normalize_code.replace(
+    # Vazio/desconhecido = null (fail-closed). Só isSaved===false na Evolution libera o bot.
+    assert "isSaved = null" in normalize_code or "isSaved=null" in normalize_code.replace(
         " ", ""
-    ), "normalizador deve defaultar isSaved=false quando findChats vem vazio"
+    ), "normalizador deve defaultar isSaved=null (fail-closed) quando findChats vem vazio"
+    assert "fail-closed" in normalize_code or "NÃO atende" in normalize_code, (
+        "normalizador deve documentar fail-closed para lista vazia"
+    )
     assert "chatFound" in normalize_code, "normalizador deve expor chatFound"
     rota_body_priv = nodes_by_name["Rotear operacao1"]["parameters"].get("jsonBody", "")
     assert "Normalizar isSaved Evolution1" in rota_body_priv, (

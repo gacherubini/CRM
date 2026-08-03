@@ -190,9 +190,43 @@ async function main() {
     return;
   }
 
+  // Backup leve: só o JSON do workflow (VACUUM INTO no volume de 1GB enche o disco).
   const stamp = new Date().toISOString().replace(/[-:.TZ]/g, "");
-  const backupPath = path.join(path.dirname(databasePath), `database.before-workflow-${stamp}.sqlite`);
-  await run("VACUUM INTO ?", [backupPath]);
+  const backupPath = path.join(
+    path.dirname(databasePath),
+    `workflow.before-${stamp}.json`,
+  );
+  fs.writeFileSync(
+    backupPath,
+    JSON.stringify(
+      {
+        id: workflow.id,
+        name: workflow.name,
+        nodes: existingNodes,
+        connections: JSON.parse(workflow.connections || "{}"),
+      },
+      null,
+      2,
+    ),
+  );
+  // Remove backups de workflow antigos (mantém os 3 mais recentes).
+  try {
+    const dir = path.dirname(databasePath);
+    const old = fs
+      .readdirSync(dir)
+      .filter(
+        (f) =>
+          f.startsWith("workflow.before-") ||
+          f.startsWith("database.before-workflow-"),
+      )
+      .map((f) => ({ f, t: fs.statSync(path.join(dir, f)).mtimeMs }))
+      .sort((a, b) => b.t - a.t);
+    for (const item of old.slice(3)) {
+      fs.unlinkSync(path.join(dir, item.f));
+    }
+  } catch {
+    /* best-effort */
+  }
 
   const nodesJson = JSON.stringify(merged.nodes);
   const connectionsJson = JSON.stringify(merged.connections);
