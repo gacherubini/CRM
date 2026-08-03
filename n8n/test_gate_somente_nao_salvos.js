@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 /*
  * Testa o nó "Gate somente nao salvos1" do workflow canônico rodando o jsCode
- * real extraído do JSON. Regra: atende só lead virgem (não salvo na agenda E
- * sem histórico), respeita handoff, fail-open na dúvida.
+ * real extraído do JSON. Regra: atende só lead virgem (não salvo E sem histórico),
+ * respeita handoff, fail-open na dúvida, e continua se tem_saida (conversa em andamento).
  * Sem segredos, sem rede: só lógica pura do gate.
  */
 const fs = require("fs");
@@ -34,25 +34,25 @@ const casos = [
     nome: "S1 salvo na agenda -> silêncio",
     entrada: {
       chat: { isSaved: true, chatFound: true },
-      estado: { primeira_mensagem: false, bot_ativo: true },
+      estado: { primeira_mensagem: true, bot_ativo: true, tem_saida: false },
       origem: { ehGrupo: false },
     },
     esperado: false,
   },
   {
-    nome: "S2 não salvo COM histórico -> silêncio (incômodo principal)",
+    nome: "S2 não salvo COM histórico WA (chatFound) -> silêncio",
     entrada: {
       chat: { isSaved: false, chatFound: true },
-      estado: { primeira_mensagem: false, bot_ativo: true },
+      estado: { primeira_mensagem: true, bot_ativo: true, tem_saida: false },
       origem: { ehGrupo: false },
     },
     esperado: false,
   },
   {
-    nome: "S3 virgem (findChats vazio) -> atende",
+    nome: "S3 virgem (findChats vazio / isSaved null) -> atende",
     entrada: {
       chat: { isSaved: null, chatFound: false },
-      estado: { primeira_mensagem: true, bot_ativo: true },
+      estado: { primeira_mensagem: true, bot_ativo: true, tem_saida: false },
       origem: { ehGrupo: false, veioDeAnuncio: false },
     },
     esperado: true,
@@ -61,16 +61,16 @@ const casos = [
     nome: "S4 virgem de anúncio -> atende (fail-open)",
     entrada: {
       chat: { isSaved: null, chatFound: false },
-      estado: { primeira_mensagem: true, bot_ativo: true },
+      estado: { primeira_mensagem: true, bot_ativo: true, tem_saida: false },
       origem: { ehGrupo: false, veioDeAnuncio: true },
     },
     esperado: true,
   },
   {
-    nome: "S5 handoff sobre não-salvo -> silêncio (bug de handoff)",
+    nome: "S5 handoff sobre não-salvo -> silêncio",
     entrada: {
-      chat: { isSaved: false, chatFound: true },
-      estado: { primeira_mensagem: false, bot_ativo: false },
+      chat: { isSaved: false, chatFound: false },
+      estado: { primeira_mensagem: true, bot_ativo: false, tem_saida: false },
       origem: { ehGrupo: false },
     },
     esperado: false,
@@ -79,27 +79,58 @@ const casos = [
     nome: "S6 handoff no 2º passe (acao=cliente) -> silêncio",
     entrada: {
       chat: {},
-      estado: { bot_ativo: false },
+      estado: { bot_ativo: false, tem_saida: true },
       origem: { ehGrupo: false },
       rot: { acao: "cliente" },
     },
     esperado: false,
   },
   {
-    nome: "S7 bot já falou (Evolution cega, primeira_mensagem false) -> silêncio",
+    nome: "S7 2a msg do lead antes do bot responder (primeira false, sem saida) -> atende",
     entrada: {
       chat: { isSaved: null, chatFound: false },
-      estado: { primeira_mensagem: false, bot_ativo: true },
+      estado: { primeira_mensagem: false, bot_ativo: true, tem_saida: false },
       origem: { ehGrupo: false },
     },
-    esperado: false,
+    // Nao pode calar multi-msg rapida; handoff/agenda/chatFound cobrem o resto.
+    esperado: true,
   },
   {
     nome: "S8 grupo -> silêncio",
     entrada: {
       chat: { isSaved: null, chatFound: false },
-      estado: { primeira_mensagem: true, bot_ativo: true },
+      estado: { primeira_mensagem: true, bot_ativo: true, tem_saida: false },
       origem: { ehGrupo: true },
+    },
+    esperado: false,
+  },
+  {
+    nome: "S9 conversa em andamento (tem_saida) mesmo com chatFound -> atende",
+    entrada: {
+      chat: { isSaved: false, chatFound: true },
+      estado: { primeira_mensagem: false, bot_ativo: true, tem_saida: true },
+      origem: { ehGrupo: false },
+      rot: { acao: "cliente" },
+    },
+    esperado: true,
+  },
+  {
+    nome: "S10 acao=cliente + isSaved null + primeira msg -> atende (fail-open no 2º juiz)",
+    entrada: {
+      chat: { isSaved: null, chatFound: false },
+      estado: { primeira_mensagem: true, bot_ativo: true, tem_saida: false },
+      origem: { ehGrupo: false },
+      rot: { acao: "cliente" },
+    },
+    esperado: true,
+  },
+  {
+    nome: "S11 acao=cliente + salvo na agenda -> silêncio (gate confirma)",
+    entrada: {
+      chat: { isSaved: true, chatFound: true },
+      estado: { primeira_mensagem: true, bot_ativo: true, tem_saida: false },
+      origem: { ehGrupo: false },
+      rot: { acao: "cliente" },
     },
     esperado: false,
   },

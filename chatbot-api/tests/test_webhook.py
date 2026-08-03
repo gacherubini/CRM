@@ -43,6 +43,40 @@ def test_webhook_marca_apenas_a_primeira_entrada_do_cliente(client, loja_a):
     assert segunda.json()["primeira_mensagem"] is False
 
 
+def test_webhook_expoe_tem_saida_e_historico_recente(client, loja_a):
+    """Gate n8n e prompt da IA usam tem_saida + historico_recente do registrar."""
+    inst = loja_a["instance"]
+    r1 = client.post(
+        "/webhook/mensagem",
+        json=_msg(inst, provider_message_id="HIST-1", texto="tem biz?"),
+    )
+    body1 = r1.json()
+    assert body1["tem_saida"] is False
+    assert body1["historico_recente"] == ""
+
+    # Saída do bot
+    client.post(
+        "/webhook/mensagem",
+        json=_msg(
+            inst,
+            provider_message_id="HIST-OUT",
+            texto="tenho uma biz 2022",
+            from_me=True,
+            origem_bot=True,
+        ),
+    )
+    r2 = client.post(
+        "/webhook/mensagem",
+        json=_msg(inst, provider_message_id="HIST-2", texto="qual o preco"),
+    )
+    body2 = r2.json()
+    assert body2["tem_saida"] is True
+    assert "[entrada] tem biz?" in body2["historico_recente"]
+    assert "[saida] tenho uma biz 2022" in body2["historico_recente"]
+    # histórico é anterior à msg atual
+    assert "qual o preco" not in body2["historico_recente"]
+
+
 def test_webhook_idempotente_por_provider_message_id(client, loja_a):
     inst = loja_a["instance"]
     r1 = client.post("/webhook/mensagem", json=_msg(inst))

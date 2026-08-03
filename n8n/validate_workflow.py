@@ -56,6 +56,12 @@ def main() -> None:
     assert "estadoMensagem.bot_ativo !== false" in gate_code, (
         "gate não lê bot_ativo do registrar (handoff furado)"
     )
+    assert "tem_saida" in gate_code, (
+        "gate não usa tem_saida do registrar (conversa em andamento)"
+    )
+    assert "atendeLeadVirgem" in gate_code, (
+        "gate deve concentrar a tranca em atendeLeadVirgem"
+    )
 
     simulation_node = next(
         (node for node in data.get("nodes", []) if node.get("name") == "simular1"),
@@ -529,13 +535,10 @@ def main() -> None:
     normalize_code = nodes_by_name["Normalizar isSaved Evolution1"].get(
         "parameters", {}
     ).get("jsCode", "")
-    # Vazio/desconhecido = null (fail-closed). Só isSaved===false na Evolution libera o bot.
+    # Vazio/desconhecido = null; o gate decide fail-open (não matar lead por lista vazia).
     assert "isSaved = null" in normalize_code or "isSaved=null" in normalize_code.replace(
         " ", ""
-    ), "normalizador deve defaultar isSaved=null (fail-closed) quando findChats vem vazio"
-    assert "fail-closed" in normalize_code or "NÃO atende" in normalize_code, (
-        "normalizador deve documentar fail-closed para lista vazia"
-    )
+    ), "normalizador deve defaultar isSaved=null quando findChats vem vazio"
     assert "chatFound" in normalize_code, "normalizador deve expor chatFound"
     rota_body_priv = nodes_by_name["Rotear operacao1"]["parameters"].get("jsonBody", "")
     assert "Normalizar isSaved Evolution1" in rota_body_priv, (

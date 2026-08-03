@@ -1,12 +1,11 @@
-"""Gate de histórico no roteamento: atende só lead virgem (não salvo E sem
-conversa pré-bot), mas segue atendendo conversa que o bot já iniciou.
+"""Gate de histórico no roteamento: atende lead virgem / Evolution cega,
+mas silencia agenda e histórico pré-bot; segue conversa já iniciada.
 
-Regra (para número NÃO salvo):
-  - já existe uma saída na conversa (alguém já respondeu) -> cliente (em andamento)
-  - primeiro contato:
-      chat_found True (histórico pré-bot no WhatsApp) -> ignorar
-      senão (virgem, ou chat_found desconhecido) -> cliente (fail-open)
-Salvo (is_saved True) ou desconhecido (None) -> ignorar, como hoje.
+Regra:
+  - is_saved True -> ignorar (prova de agenda)
+  - já existe saída -> cliente (em andamento)
+  - primeiro contato + chat_found True -> ignorar
+  - is_saved False/None sem prova de histórico -> cliente (fail-open)
 """
 import uuid
 
@@ -72,6 +71,21 @@ def test_nao_salvo_chat_found_desconhecido_fail_open(client, loja_a, db):
         db, loja_a["loja_id"], "5511970000104", "oi", False, chat_found=None
     )
     assert d["acao"] == "cliente"
+
+
+def test_is_saved_null_fail_open_atende(client, loja_a, db):
+    # findChats vazio / mismatch (@lid): is_saved None não pode matar lead novo
+    d = operacao.decidir_roteamento(
+        db, loja_a["loja_id"], "5511970000108", "tem biz?", None, chat_found=False
+    )
+    assert d["acao"] == "cliente"
+
+
+def test_is_saved_null_com_historico_prebot_ignora(client, loja_a, db):
+    d = operacao.decidir_roteamento(
+        db, loja_a["loja_id"], "5511970000109", "oi", None, chat_found=True
+    )
+    assert d["acao"] == "ignorar"
 
 
 def test_salvo_continua_ignorando(client, loja_a, db):

@@ -519,11 +519,44 @@ def _mensagem_existente(
     )
 
 
+def _formatar_historico_recente(
+    db: Session, conversa_id: str, *, limit: int = 10
+) -> str:
+    """Últimas N mensagens da conversa em texto compacto para o prompt do n8n."""
+    msgs = (
+        db.query(Mensagem)
+        .filter(Mensagem.conversa_id == conversa_id)
+        .order_by(Mensagem.criada_em.desc(), Mensagem.id.desc())
+        .limit(limit)
+        .all()
+    )
+    linhas: list[str] = []
+    for m in reversed(msgs):
+        txt = (m.texto or "").replace("\n", " ").strip()
+        if not txt:
+            continue
+        if len(txt) > 180:
+            txt = txt[:180] + "…"
+        tag = "entrada" if m.direcao == "entrada" else "saida"
+        linhas.append(f"- [{tag}] {txt}")
+    return "\n".join(linhas)
+
+
+def _conversa_tem_saida(db: Session, conversa_id: str) -> bool:
+    return (
+        db.query(Mensagem.id)
+        .filter(Mensagem.conversa_id == conversa_id, Mensagem.direcao == "saida")
+        .first()
+        is not None
+    )
+
+
 def _resposta_duplicada(
     conversa: Conversa,
     *,
     captura_passiva: bool = False,
     evolution_instance: str | None = None,
+    db: Session | None = None,
 ) -> dict:
     base: dict = {
         "duplicada": True,
@@ -532,6 +565,9 @@ def _resposta_duplicada(
     if evolution_instance:
         base["evolution_instance"] = evolution_instance
         base["canal_id"] = conversa.canal_id
+    if db is not None:
+        base["tem_saida"] = _conversa_tem_saida(db, conversa.id)
+        base["historico_recente"] = _formatar_historico_recente(db, conversa.id)
     if captura_passiva:
         base.update(
             {
@@ -692,6 +728,7 @@ def registrar_mensagem(
             conversa,
             captura_passiva=captura_passiva,
             evolution_instance=evolution_instance,
+            db=db,
         )
 
     # O workflow usa este sinal para humanizar somente a primeira resposta.
@@ -706,6 +743,9 @@ def registrar_mensagem(
         .first()
         is None
     )
+    # Sinais para o gate n8n e o prompt da IA (antes de gravar a msg atual).
+    tem_saida = _conversa_tem_saida(db, conversa.id)
+    historico_recente = _formatar_historico_recente(db, conversa.id)
 
     # Eventos sem conteúdo (ack/recibo/status/reação ou texto vazio): não pausam e
     # não gravam mensagem fantasma. O n8n idealmente nem encaminha esses eventos.
@@ -883,6 +923,7 @@ def registrar_mensagem(
             conversa,
             captura_passiva=captura_passiva,
             evolution_instance=evolution_instance,
+            db=db,
         )
     # Outbound (n8n) deve usar a instância do canal da conversa.
     if captura_passiva:
@@ -891,6 +932,8 @@ def registrar_mensagem(
             "conversa_id": conversa.id,
             "bot_ativo": False,
             "primeira_mensagem": primeira_mensagem,
+            "tem_saida": tem_saida,
+            "historico_recente": historico_recente,
             "captura_passiva": True,
             "loja_operacional": False,
             "catalog_interest_ref": None,
@@ -905,6 +948,8 @@ def registrar_mensagem(
         "conversa_id": conversa.id,
         "bot_ativo": conversa.bot_ativo,
         "primeira_mensagem": primeira_mensagem,
+        "tem_saida": tem_saida,
+        "historico_recente": historico_recente,
         "catalog_interest_ref": atribuicao.catalog_interest_ref if atribuicao else None,
         "ctwa_atribuido": bool(ctwa_ok) if not from_me else False,
         "ctwa_pendente": bool(ctwa_pendente) if not from_me else False,

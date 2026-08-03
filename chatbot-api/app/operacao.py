@@ -741,12 +741,17 @@ def _decidir_cliente_ou_ignorar(
     chat_found: bool | None,
     instance: str | None,
 ) -> dict:
-    """Gate de cliente: atende só lead virgem (não salvo E sem conversa pré-bot),
-    mas segue atendendo conversa que o bot já iniciou (já existe uma saída)."""
+    """Gate de cliente (defesa em profundidade; juiz fino fica no n8n).
+
+    - ``is_saved is True``: prova de contato na agenda → ignorar.
+    - conversa já com saída: segue cliente (bot no meio da conversa).
+    - ``chat_found is True`` no primeiro contato: histórico pré-bot no WA → ignorar.
+    - ``is_saved`` False/None (Evolution cega) sem prova de histórico → cliente
+      (fail-open: não matar lead CTWA/novo por findChats vazio).
+    """
     from app import servico
 
-    if is_saved is not False:
-        # salvo (True) ou desconhecido (None): não atende, como antes.
+    if is_saved is True:
         return {"acao": "ignorar", "resposta": None}
     if servico.conversa_tem_resposta(db, loja_id, telefone, instance=instance):
         # conversa em andamento (bot/atendente já respondeu): segue atendendo.
@@ -754,7 +759,7 @@ def _decidir_cliente_ou_ignorar(
     if chat_found is True:
         # primeiro contato COM histórico pré-bot no WhatsApp: não atende.
         return {"acao": "ignorar", "resposta": None}
-    # virgem, ou Evolution cega (chat_found desconhecido): fail-open, atende.
+    # virgem, is_saved False, ou Evolution cega (None): fail-open, atende.
     return {"acao": "cliente", "resposta": None}
 
 
@@ -776,7 +781,7 @@ def decidir_roteamento(
     Quando existe um grupo de estoque configurado, somente esse JID pode abrir
     o menu. O telefone do participante nao concede acesso fora do grupo.
 
-    ``is_saved``: só ``False`` explícito conta como contato novo.
+    ``is_saved``: só ``True`` explícito bloqueia por agenda; ``None`` é fail-open.
 
     Gate operacional (ADR 0001):
     - Loja não operacional → ``ignorar`` com captura passiva (sem atendimento).

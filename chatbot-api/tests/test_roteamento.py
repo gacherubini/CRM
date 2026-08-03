@@ -133,9 +133,10 @@ def test_sessao_expirada_volta_a_ignorar(client, loja_a, db):
     assert d["acao"] == "ignorar"
 
 
-def test_is_saved_desconhecido_nao_autorizado_ignora(client, loja_a, db):
+def test_is_saved_desconhecido_fail_open_atende(client, loja_a, db):
+    # Evolution cega (is_saved None) não pode silenciar lead novo.
     d = operacao.decidir_roteamento(db, loja_a["loja_id"], "5511970000007", "oi", None)
-    assert d["acao"] == "ignorar"
+    assert d["acao"] == "cliente"
 
 
 def test_autorizado_bate_com_ou_sem_ddi55(client, loja_a, db):
