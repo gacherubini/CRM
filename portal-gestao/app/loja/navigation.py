@@ -111,6 +111,18 @@ def build_nav(
                     active_prefix="/app/loja/whatsapp",
                 )
             )
+        # Grupo WA de fotos/cadastro + números autorizados (aviso simulação/handoff).
+        # Rota legada /app/operacao/numeros — precisa aparecer no shell (antes sumia do menu).
+        if entitlements.estoque_enabled or entitlements.vendas_enabled:
+            ajustes.append(
+                NavItem(
+                    label="Grupo do estoque",
+                    href="/app/operacao/numeros",
+                    section="Ajustes",
+                    module=None,
+                    active_prefix="/app/operacao/numeros",
+                )
+            )
         # Só status (Meta/Google/WhatsApp), não configuração: o Portal consome o
         # agregador do Revy Control por HTTP. Visível a dono/gerente.
         ajustes.append(

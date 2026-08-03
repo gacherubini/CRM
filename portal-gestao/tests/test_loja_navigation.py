@@ -31,6 +31,7 @@ def test_nav_somente_vendas_e_estoque_com_acessos_bancarios():
         "Visão geral",
         "Veículos",
         "Acessos bancários",
+        "Grupo do estoque",
         "Integrações",
         "Equipe",
         "Perfil",
@@ -41,14 +42,14 @@ def test_nav_somente_vendas_e_estoque_com_acessos_bancarios():
     assert "/app/loja/estoque" in hrefs
     assert "/app/loja/estoque/veiculos" in hrefs
     assert "/app/financeiras" in hrefs
+    assert "/app/operacao/numeros" in hrefs
     assert "/app/loja/integracoes" in hrefs
     assert "/app/loja/equipe" in hrefs
     assert "/app/loja/perfil" in hrefs
     # Senha saiu de Ajustes (agora em Conta → Perfil)
     assert "/conta/senha" not in hrefs
-    # Sem config técnica
+    # Sem config técnica de tráfego/campanhas
     assert not any("trafego" in i.href or "campanhas" in i.href for i in items)
-    assert not any("operacao" in i.href for i in items)
     assert not any(i.href.startswith("/app/configuracoes") for i in items)
 
 

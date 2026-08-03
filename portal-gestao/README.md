@@ -21,9 +21,9 @@ das APIs ficam somente no servidor e o navegador recebe uma sessão assinada.
 - **Resultados de tráfego** (dono/gerente): gasto/leads/ROAS na visão geral — config técnica (Pixel/CAPI/campanhas) migrou para o app **`revy-trafego`** (equipe Revy);
 - confirmação/cancelamento de venda publicados no Revy por outbox transacional criptografado;
   o Portal não chama a Meta nem o Revy dentro da requisição;
-- **Números de cadastro / grupo estoque** (legado): `/app/operacao/numeros` — BFF
-  `/v1/operacao/numeros-autorizados`. Com shell on o item some do menu lateral; a rota
-  continua (bookmark/URL). Fluxo WA: `cadastro` / fotos / `fim` no grupo oficial;
+- **Grupo do estoque** (Ajustes no shell): `/app/operacao/numeros` — escolher grupo WA
+  de fotos/cadastro + números autorizados (aviso de simulação/handoff). BFF
+  `/v1/operacao/numeros-autorizados`. Fluxo WA: `cadastro` / fotos / `fim` no grupo;
 - **Números de WhatsApp da loja** (flag): Ajustes → `/app/loja/whatsapp` — QR efêmero,
   reconectar/desconectar sem expor a API key da Evolution;
 - **Integrações** (status read-only Meta/Google/WA): `/app/loja/integracoes`;
