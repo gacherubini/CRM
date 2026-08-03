@@ -216,3 +216,114 @@ def test_connect_chama_ensure_e_502_quando_evolution_fora(db, loja_a, monkeypatc
     atual = channels.list_channels(db, loja_a["loja_id"])
     alvo = [c for c in atual if c["id"] == canal["id"]][0]
     assert alvo["estado"] == "pendente"
+
+
+class _ProviderStatusFixo:
+    """Devolve estado live sem mutar o ORM (simula Evolution open pós-QR)."""
+
+    def __init__(self, estado: str, *, fail: bool = False):
+        self.estado = estado
+        self.fail = fail
+        self.status_chamado = 0
+
+    def connect(self, canal):
+        raise NotImplementedError
+
+    def status(self, canal):
+        self.status_chamado += 1
+        if self.fail:
+            raise WhatsAppProvisionError(
+                "evolution fora", code="evolution_unreachable"
+            )
+        from app.whatsapp_provider import StatusResult
+
+        return StatusResult(
+            estado=self.estado,
+            ativo=bool(canal.ativo),
+            evolution_instance=canal.evolution_instance,
+        )
+
+    def disconnect(self, canal):
+        raise NotImplementedError
+
+
+def test_channel_status_persiste_conectado_quando_live_mudou(db, loja_a, monkeypatch):
+    """DB pendente + provider conectado → após status, DB = conectado."""
+    monkeypatch.setattr(config, "MULTI_WHATSAPP_ENABLED", True)
+    canal = channels.register_channel(db, loja_a["loja_id"], None, "linha status")
+    assert canal["estado"] == "pendente"
+
+    prov = _ProviderStatusFixo("conectado")
+    out = channels.channel_status(
+        db, loja_a["loja_id"], canal["id"], provider=prov
+    )
+    assert out["estado"] == "conectado"
+    assert prov.status_chamado == 1
+
+    na_lista = [
+        c
+        for c in channels.list_channels(db, loja_a["loja_id"])
+        if c["id"] == canal["id"]
+    ][0]
+    assert na_lista["estado"] == "conectado"
+
+    row = db.get(models_db.WhatsAppCanal, canal["id"])
+    assert row is not None
+    assert row.estado == "conectado"
+
+
+def test_channel_status_idempotente_quando_ja_conectado(db, loja_a, monkeypatch):
+    monkeypatch.setattr(config, "MULTI_WHATSAPP_ENABLED", True)
+    canal = channels.register_channel(db, loja_a["loja_id"], None, "linha ok")
+    row = db.get(models_db.WhatsAppCanal, canal["id"])
+    row.estado = "conectado"
+    db.commit()
+
+    prov = _ProviderStatusFixo("conectado")
+    out = channels.channel_status(
+        db, loja_a["loja_id"], canal["id"], provider=prov
+    )
+    assert out["estado"] == "conectado"
+    row2 = db.get(models_db.WhatsAppCanal, canal["id"])
+    assert row2.estado == "conectado"
+    assert row2.ativo is True
+
+
+def test_channel_status_nao_reativa_inativo(db, loja_a, monkeypatch):
+    """Canal inativo não vira conectado por GET status."""
+    monkeypatch.setattr(config, "MULTI_WHATSAPP_ENABLED", True)
+    canal = channels.register_channel(db, loja_a["loja_id"], None, "linha morta")
+    channels.inactivate_channel(db, loja_a["loja_id"], canal["id"])
+
+    prov = _ProviderStatusFixo("conectado")
+    out = channels.channel_status(
+        db, loja_a["loja_id"], canal["id"], provider=prov
+    )
+    # Resposta pode refletir live, mas DB permanece inativo.
+    assert out["estado"] == "conectado"
+
+    row = db.get(models_db.WhatsAppCanal, canal["id"])
+    assert row.estado == "inativo"
+    assert row.ativo is False
+    na_lista = [
+        c
+        for c in channels.list_channels(db, loja_a["loja_id"])
+        if c["id"] == canal["id"]
+    ][0]
+    assert na_lista["estado"] == "inativo"
+    assert na_lista["ativo"] is False
+
+
+def test_channel_status_502_quando_provider_falha(db, loja_a, monkeypatch):
+    monkeypatch.setattr(config, "MULTI_WHATSAPP_ENABLED", True)
+    canal = channels.register_channel(db, loja_a["loja_id"], None, "linha fail")
+    prov = _ProviderStatusFixo("conectado", fail=True)
+
+    with pytest.raises(HTTPException) as exc:
+        channels.channel_status(
+            db, loja_a["loja_id"], canal["id"], provider=prov
+        )
+    assert exc.value.status_code == 502
+
+    row = db.get(models_db.WhatsAppCanal, canal["id"])
+    assert row.estado == "pendente"

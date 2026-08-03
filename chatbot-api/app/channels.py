@@ -202,12 +202,32 @@ def channel_status(
     canal_id: str,
     provider: WhatsAppProvider | None = None,
 ) -> dict[str, Any]:
-    """Consulta estado do canal."""
+    """Consulta estado live do canal e persiste no DB se mudou.
+
+    O poll da UI (GET status) devolve ``estado`` da Evolution; sem gravar,
+    a lista de canais (só DB) ficava em ``pendente`` após leitura do QR.
+    Canal inativo não é reativado nem tem ``estado`` sobrescrito por status.
+    """
     if not config.MULTI_WHATSAPP_ENABLED:
         raise HTTPException(status_code=404, detail="multi-whatsapp desabilitado")
     canal = get_channel_for_loja(db, loja_id, canal_id)
     prov = provider or get_whatsapp_provider()
-    st = prov.status(canal)
+    try:
+        st = prov.status(canal)
+    except WhatsAppProvisionError as exc:
+        # Coerente com connect: falha do provider não inventa estado.
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+    # Sincroniza DB com o live apenas para canais ativos.
+    if (
+        canal.ativo
+        and canal.estado != ESTADO_INATIVO
+        and st.estado != canal.estado
+    ):
+        canal.estado = st.estado
+        db.commit()
+        db.refresh(canal)
+
     out = _canal_dict(canal)
     out["estado"] = st.estado
     out["ativo"] = st.ativo
