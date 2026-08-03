@@ -30,16 +30,27 @@
   var pollTimer = null;
   var sending = false;
 
+  // Horário de Brasília (mesmo fuso do formatar_horario do portal).
   function formatHorario(iso) {
     if (!iso) return "";
     try {
       var d = new Date(iso);
       if (isNaN(d.getTime())) return String(iso);
-      var dd = String(d.getDate()).padStart(2, "0");
-      var mm = String(d.getMonth() + 1).padStart(2, "0");
-      var hh = String(d.getHours()).padStart(2, "0");
-      var mi = String(d.getMinutes()).padStart(2, "0");
-      return dd + "/" + mm + " " + hh + ":" + mi;
+      var parts = new Intl.DateTimeFormat("pt-BR", {
+        timeZone: "America/Sao_Paulo",
+        day: "2-digit",
+        month: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: false,
+      }).formatToParts(d);
+      var get = function (type) {
+        for (var i = 0; i < parts.length; i++) {
+          if (parts[i].type === type) return parts[i].value;
+        }
+        return "";
+      };
+      return get("day") + "/" + get("month") + " " + get("hour") + ":" + get("minute");
     } catch (e) {
       return String(iso);
     }

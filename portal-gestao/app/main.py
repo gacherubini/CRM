@@ -6,10 +6,11 @@ import re
 import secrets
 import uuid
 from contextlib import asynccontextmanager
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from pathlib import Path
 from typing import Annotated
+from zoneinfo import ZoneInfo
 
 from fastapi import Depends, FastAPI, Form, Header, Request, Response
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
@@ -213,14 +214,26 @@ def mascarar_telefone(telefone: str | None) -> str:
     return f"•••• {digitos[-4:]}"
 
 
+# Fuso de exibição da UI (Brasil). APIs continuam em UTC; só a formatação muda.
+_TZ_EXIBICAO = ZoneInfo(os.getenv("PORTAL_TIMEZONE", "America/Sao_Paulo"))
+
+
 def formatar_horario(iso: str | None) -> str:
+    """ISO (UTC ou com offset) → ``dd/mm HH:MM`` em horário de Brasília.
+
+    Sem isso, timestamps com ``+00:00`` apareciam 3h adiantados na UI.
+    """
     if not iso:
         return ""
     try:
-        momento = datetime.fromisoformat(iso)
+        bruto = str(iso).strip().replace("Z", "+00:00")
+        momento = datetime.fromisoformat(bruto)
     except ValueError:
-        return iso
-    return momento.strftime("%d/%m %H:%M")
+        return str(iso)
+    if momento.tzinfo is None:
+        # naive: trata como UTC (contrato das APIs internas).
+        momento = momento.replace(tzinfo=timezone.utc)
+    return momento.astimezone(_TZ_EXIBICAO).strftime("%d/%m %H:%M")
 
 
 def formatar_data(iso: str | None) -> str:
