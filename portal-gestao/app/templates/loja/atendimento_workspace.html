@@ -30,6 +30,14 @@
   <a class="back-link" href="/app/loja/atendimento">← Voltar à lista</a>
 </div>
 
+{% if workspace.estado == 'aguardando_simulacao' %}
+<div class="alert warning" role="status">
+  <strong>Aguardando simulação humana.</strong>
+  O cliente pediu simular com dados completos. O bot foi pausado — faça a simulação e responda por aqui.
+  A equipe também recebe aviso no WhatsApp (números em Grupo do estoque / números autorizados).
+</div>
+{% endif %}
+
 {% if request.query_params.get('ok') == 'enviada' %}<div class="alert success" role="status">Mensagem enviada.</div>{% endif %}
 {% if request.query_params.get('ok') == 'duplicada' %}<div class="alert success" role="status">Mensagem já havia sido enviada (idempotente).</div>{% endif %}
 {% if request.query_params.get('ok') == 'assumir' %}<div class="alert success" role="status">Atendimento assumido. O bot foi pausado neste contato.</div>{% endif %}

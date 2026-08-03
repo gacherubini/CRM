@@ -50,8 +50,15 @@ def main() -> None:
     assert "/v1/simulacoes/solicitar" in simulation_code, (
         "tool não usa a solicitação assíncrona e privada"
     )
-    assert "/estado" not in simulation_code and "bot_ativo: false" not in simulation_code, (
-        "tool de simulação não deve desligar o bot"
+    # Simulação humana: com dados completos a tool pausa o bot e avisa a equipe.
+    assert "/estado" in simulation_code and "bot_ativo: false" in simulation_code, (
+        "tool de simulação deve pausar o bot após qualificar (simulação humana)"
+    )
+    assert "precisa de simulação humana" in simulation_code, (
+        "aviso à equipe deve pedir simulação humana"
+    )
+    assert "app/loja/atendimento" in simulation_code, (
+        "aviso à equipe deve linkar o Atendimento da Loja"
     )
     assert "/v1/leads" in simulation_code and "etapa: 'qualificado'" in simulation_code, (
         "tool de simulação não cria o lead qualificado"
@@ -107,8 +114,8 @@ def main() -> None:
     assert "o lead só nasce dentro da tool simular" in system_message_lower, (
         "prompt não restringe a criação ao ponto da simulação"
     )
-    assert "mantém o bot ativo" in system_message_lower, (
-        "prompt ainda pode desligar o bot após a simulação"
+    assert "pausa o bot" in system_message_lower and "simulação humana" in system_message_lower, (
+        "prompt deve explicar que simular pausa o bot para o atendente"
     )
     assert "nunca peça placa ao cliente" in system_message_lower, (
         "prompt ainda permite pedir a placa ao cliente"

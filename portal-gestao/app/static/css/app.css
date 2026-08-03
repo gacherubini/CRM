@@ -840,6 +840,9 @@ p { color: var(--ink-soft); }
 }
 .status.reservado,
 .status.em_atendimento,
+.status.negociacao,
+.status.aguardando_simulacao,
+.status.aguardando_cliente,
 .status.warn,
 .status.em_configuracao,
 .status.rascunho,

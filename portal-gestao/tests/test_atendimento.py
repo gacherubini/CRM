@@ -277,7 +277,7 @@ def test_auditor_sem_permissao_403(client, chatbot_fake, atendimento_on):
 
 def test_mapear_estados_lead():
     assert mapear_estado_de_lead("novo") == AttendanceState.NOVO
-    assert mapear_estado_de_lead("qualificado") == AttendanceState.NEGOCIACAO
+    assert mapear_estado_de_lead("qualificado") == AttendanceState.AGUARDANDO_SIMULACAO
     assert mapear_estado_de_lead("convertido") == AttendanceState.VENDIDO
     assert mapear_estado_de_lead("perdido") == AttendanceState.PERDIDO
 

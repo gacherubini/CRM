@@ -34,6 +34,7 @@ class AttendanceState(str, Enum):
     NOVO = "novo"
     EM_ATENDIMENTO = "em_atendimento"
     AGUARDANDO_CLIENTE = "aguardando_cliente"
+    AGUARDANDO_SIMULACAO = "aguardando_simulacao"
     NEGOCIACAO = "negociacao"
     VENDIDO = "vendido"
     PERDIDO = "perdido"
@@ -43,6 +44,7 @@ ATTENDANCE_STATE_LABELS: dict[str, str] = {
     AttendanceState.NOVO.value: "Novo",
     AttendanceState.EM_ATENDIMENTO.value: "Em atendimento",
     AttendanceState.AGUARDANDO_CLIENTE.value: "Aguardando cliente",
+    AttendanceState.AGUARDANDO_SIMULACAO.value: "Aguardando simulação",
     AttendanceState.NEGOCIACAO.value: "Negociação",
     AttendanceState.VENDIDO.value: "Vendido",
     AttendanceState.PERDIDO.value: "Perdido",
@@ -52,7 +54,7 @@ ATTENDANCE_STATE_LABELS: dict[str, str] = {
 _LEAD_ETAPA_PARA_ESTADO: dict[str, AttendanceState] = {
     "novo": AttendanceState.NOVO,
     "em_atendimento": AttendanceState.EM_ATENDIMENTO,
-    "qualificado": AttendanceState.NEGOCIACAO,
+    "qualificado": AttendanceState.AGUARDANDO_SIMULACAO,
     "convertido": AttendanceState.VENDIDO,
     "perdido": AttendanceState.PERDIDO,
 }
@@ -266,7 +268,8 @@ def resolver_estado(
     if lead_etapa == "convertido":
         return AttendanceState.VENDIDO
     if lead_etapa == "qualificado":
-        return AttendanceState.NEGOCIACAO
+        # Pediu simular com dados completos: fila humana (Motor pode estar off).
+        return AttendanceState.AGUARDANDO_SIMULACAO
     if bot_ativo is False:
         return AttendanceState.EM_ATENDIMENTO
     if lead_etapa == "em_atendimento":
