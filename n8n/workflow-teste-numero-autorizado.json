@@ -181,8 +181,10 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ { where: { remoteJid: $json.remoteJid } } }}",
-        "options": {}
+        "jsonBody": "={{ (() => { const o = $('Extrair1').first().json || {}; const a = String(o.remoteJidAlt || '').trim(); const j = String(o.remoteJid || '').trim(); const jid = (a.endsWith('@s.whatsapp.net') ? a : (j.endsWith('@s.whatsapp.net') ? j : (a || j))); return { where: { remoteJid: jid } }; })() }}",
+        "options": {
+          "timeout": 10000
+        }
       },
       "id": "b907bf44-f147-4bed-9af4-fa9b63e27707",
       "name": "Consultar contato na Evolution1",
@@ -191,11 +193,13 @@
       "position": [
         2040,
         400
-      ]
+      ],
+      "alwaysOutputData": true,
+      "continueOnFail": true
     },
     {
       "parameters": {
-        "jsCode": "let chat = {};\ntry { chat = $('Consultar contato na Evolution1').first().json || {}; } catch (e) {}\nlet origem = $('Extrair1').first().json;\nconst rot = $input.first().json || {};\nconst acao = rot.acao;\nlet estadoMensagem = {};\ntry { estadoMensagem = $('Registrar mensagem e ler handoff1').first().json || {}; } catch (e) {}\norigem = { ...origem, primeiraMensagem: estadoMensagem.primeira_mensagem === true };\nconst botAtivo = origem.bot_ativo !== false;\nconst ehTelefoneTeste = [\"5551980336365\",\"555180336365\"].includes(String(origem.telefone || '').replace(/\\D/g, ''));\n// No fluxo de teste, o numero permitido sempre entra como cliente da IA.\nif (ehTelefoneTeste && !origem.ehGrupo && botAtivo) {\n  // Permite testar uma vez o primeiro contato mesmo com conversa antiga no CRM.\n  let primeiraMensagemTeste = origem.primeiraMensagem === true;\n  try {\n    const estadoTeste = $getWorkflowStaticData('global');\n    const chavePrimeiroContato = 'vitorMotosFirstContact20260727v2';\n    if (!estadoTeste[chavePrimeiroContato]) {\n      primeiraMensagemTeste = true;\n      estadoTeste[chavePrimeiroContato] = true;\n    }\n  } catch (e) {}\n  return [{ json: { ...origem, acao: 'cliente', primeiraMensagem: primeiraMensagemTeste } }];\n}\nif (!acao) {\n  if (origem.ehGrupo) return [];\n  return (chat.isSaved === false && botAtivo) ? [{ json: { ...origem, acao: 'cliente' } }] : [];\n}\nif (acao === 'cliente') {\n  if (origem.ehGrupo || !botAtivo) return [];\n  return [{ json: { ...origem, acao } }];\n}\nif (acao === 'cadastro') {\n  return [{ json: { ...origem, acao } }];\n}\nif (acao === 'cadastro_controle' || acao === 'operacao_controle') {\n  const resposta = String(rot.resposta || '').trim();\n  if (!resposta) return [];\n  return [{ json: { ...origem, acao, output: resposta } }];\n}\nreturn [];\n"
+        "jsCode": "let chat = {};\ntry { chat = $('Normalizar isSaved Evolution1').first().json || {}; } catch (e) {}\nlet origem = $('Extrair1').first().json;\nconst rot = $input.first().json || {};\nconst acao = rot.acao;\nlet estadoMensagem = {};\ntry { estadoMensagem = $('Registrar mensagem e ler handoff1').first().json || {}; } catch (e) {}\norigem = { ...origem, primeiraMensagem: estadoMensagem.primeira_mensagem === true };\n// Handoff manda no bot: bot_ativo vem do registrar (ler handoff), NAO do Extrair1.\nconst botAtivo = estadoMensagem.bot_ativo !== false;\nconst ehTelefoneTeste = [\"5551980336365\",\"555180336365\"].includes(String(origem.telefone || '').replace(/\\D/g, ''));\n// No fluxo de teste, o numero permitido sempre entra como cliente da IA.\nif (ehTelefoneTeste && !origem.ehGrupo && botAtivo) {\n  // Permite testar uma vez o primeiro contato mesmo com conversa antiga no CRM.\n  let primeiraMensagemTeste = origem.primeiraMensagem === true;\n  try {\n    const estadoTeste = $getWorkflowStaticData('global');\n    const chavePrimeiroContato = 'vitorMotosFirstContact20260727v2';\n    if (!estadoTeste[chavePrimeiroContato]) {\n      primeiraMensagemTeste = true;\n      estadoTeste[chavePrimeiroContato] = true;\n    }\n  } catch (e) {}\n  return [{ json: { ...origem, acao: 'cliente', primeiraMensagem: primeiraMensagemTeste } }];\n}\nif (!acao) {\n  if (origem.ehGrupo) return [];\n  // Atende so lead virgem: nao salvo na agenda E sem historico conhecido.\n  // Silencio exige prova positiva; ausencia de prova (findChats vazio/mismatch) -> atende (fail-open).\n  const salvo = chat.isSaved === true;                       // agenda do celular\n  const temHistorico = chat.chatFound === true               // conversa no cel (desde o connect da Evolution)\n    || estadoMensagem.primeira_mensagem === false;           // bot ja falou com esse numero (pega mismatch da Evolution)\n  const atende = botAtivo && !salvo && !temHistorico;\n  return atende ? [{ json: { ...origem, acao: 'cliente' } }] : [];\n}\nif (acao === 'cliente') {\n  if (origem.ehGrupo || !botAtivo) return [];\n  return [{ json: { ...origem, acao } }];\n}\nif (acao === 'cadastro') {\n  return [{ json: { ...origem, acao } }];\n}\nif (acao === 'cadastro_controle' || acao === 'operacao_controle') {\n  const resposta = String(rot.resposta || '').trim();\n  if (!resposta) return [];\n  return [{ json: { ...origem, acao, output: resposta } }];\n}\nreturn [];\n"
       },
       "id": "c4b1465b-5543-4cea-9c15-148d229eb518",
       "name": "Gate somente nao salvos1",
@@ -418,7 +422,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ (() => { const o = $('Extrair1').first().json; const chat = $('Consultar contato na Evolution1').first().json || {}; return { instance: o.instance, telefone: o.telefone, texto: o.texto, is_saved: chat.isSaved }; })() }}",
+        "jsonBody": "={{ (() => { const o = $('Extrair1').first().json; const norm = $('Normalizar isSaved Evolution1').first().json || {}; const s = norm.isSaved; return { instance: o.instance, telefone: o.telefone, texto: o.texto, is_saved: s === true ? true : (s === false ? false : null) }; })() }}",
         "options": {
           "timeout": 8000
         }
@@ -584,6 +588,19 @@
         3480,
         400
       ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Normaliza findChats da Evolution em isSaved explícito.\n// - isSaved true  → contato na agenda → bot NÃO atende\n// - isSaved false → contato novo      → bot atende\n// - não encontrado / lista vazia → null (fail-closed: NÃO atende)\n//   Vazio costuma ser mismatch de JID (@lid vs telefone), NÃO prova de \"novo\".\n// alwaysOutputData no HTTP evita matar o fluxo; o roteamento recebe is_saved nulo.\nconst origem = $('Extrair1').first().json || {};\nconst jids = [origem.remoteJid, origem.remoteJidAlt]\n  .map((j) => String(j || '').trim().toLowerCase())\n  .filter(Boolean);\n// também aceita comparação só pelos dígitos do telefone\nconst telDigits = String(origem.telefone || '').replace(/\\D/g, '');\n\nfunction isEvolutionChat(j) {\n  if (!j || typeof j !== 'object' || Array.isArray(j)) return false;\n  if (typeof j.isSaved === 'boolean') return true;\n  if (!j.remoteJid) return false;\n  return (\n    j.lastMessage !== undefined ||\n    j.unreadCount !== undefined ||\n    j.windowStart !== undefined ||\n    j.profilePicUrl !== undefined\n  );\n}\n\nfunction asChatList(all) {\n  const out = [];\n  for (const item of all) {\n    const j = item && Object.prototype.hasOwnProperty.call(item, 'json') ? item.json : item;\n    if (j == null) continue;\n    if (Array.isArray(j)) {\n      for (const el of j) {\n        if (isEvolutionChat(el)) out.push(el);\n      }\n      continue;\n    }\n    if (isEvolutionChat(j)) out.push(j);\n  }\n  return out;\n}\n\nfunction jidMatch(chatJid) {\n  const cj = String(chatJid || '').trim().toLowerCase();\n  if (!cj) return false;\n  if (jids.includes(cj)) return true;\n  if (telDigits && cj.startsWith(telDigits) && cj.endsWith('@s.whatsapp.net')) return true;\n  // match últimos dígitos (BR com/sem 55)\n  if (telDigits && telDigits.length >= 8) {\n    const chatDigits = cj.split('@')[0].replace(/\\D/g, '');\n    if (chatDigits && (chatDigits.endsWith(telDigits.slice(-10)) || telDigits.endsWith(chatDigits.slice(-10)))) {\n      return true;\n    }\n  }\n  return false;\n}\n\nconst chats = asChatList($input.all());\nlet matched = null;\nfor (const chat of chats) {\n  if (jidMatch(chat.remoteJid)) {\n    matched = chat;\n    break;\n  }\n}\n// where da Evolution já restringe a 0/1\nif (!matched && chats.length === 1) matched = chats[0];\n\nlet isSaved = null; // desconhecido → fail-closed\nlet chatFound = false;\nif (matched) {\n  chatFound = true;\n  if (matched.isSaved === true) isSaved = true;\n  else if (matched.isSaved === false) isSaved = false;\n  else isSaved = null;\n}\n\nreturn [{\n  json: {\n    isSaved,\n    chatFound,\n    chatsReturned: chats.length,\n    remoteJidMatched: matched ? String(matched.remoteJid || '') : null,\n  },\n}];\n"
+      },
+      "id": "c0ffee00-15a7-4ed0-9f00-n0rmal1ze001",
+      "name": "Normalizar isSaved Evolution1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2160,
+        400
+      ]
     }
   ],
   "connections": {
@@ -664,7 +681,7 @@
       "main": [
         [
           {
-            "node": "Rotear operacao1",
+            "node": "Normalizar isSaved Evolution1",
             "type": "main",
             "index": 0
           }
@@ -856,6 +873,17 @@
         [
           {
             "node": "Registrar saida do bot1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalizar isSaved Evolution1": {
+      "main": [
+        [
+          {
+            "node": "Rotear operacao1",
             "type": "main",
             "index": 0
           }

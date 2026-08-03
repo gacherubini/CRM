@@ -105,7 +105,7 @@ extractor.parameters.jsCode = extractCode.replace(anchor, guard);
 
 const gate = workflow.nodes.find((node) => node.name === "Gate somente nao salvos1");
 if (!gate) throw new Error("node Gate somente nao salvos1 nao encontrado");
-const gateAnchor = "const botAtivo = origem.bot_ativo !== false;\n";
+const gateAnchor = "const botAtivo = estadoMensagem.bot_ativo !== false;\n";
 const testRouteOverride = [
   gateAnchor.trimEnd(),
   "const ehTelefoneTeste = " + JSON.stringify(TEST_PHONE_ALIASES) +
