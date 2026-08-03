@@ -132,10 +132,13 @@ O modelo usado fica em `Google Gemini Chat Model1`. A memória fica em
 
 ## Arquivos do workflow
 
-- `workflow-ai-nao-salvos.json`: fonte principal.
-- `build_test_workflow.js`: gera a cópia restrita.
-- `workflow-teste-numero-autorizado.json`: cópia de teste gerada.
-- `validate_workflow.py`: protege as regras do fluxo principal.
+- `workflow-ai-nao-salvos.json`: **oficial de produção** — nome `WhatsApp IA - Somente Nao Salvos`,
+  webhook `whatsapp-ai`, contatos não salvos + grupo de estoque, **jornada de catálogo**
+  (fotos antes de simular). Placeholders de secret no prepare-workflow.
+- `build_test_workflow.js`: gera a cópia restrita a partir do oficial (só freios de lab:
+  1 telefone, sem grupos, webhook `whatsapp-ai-teste`).
+- `workflow-teste-numero-autorizado.json`: cópia de teste gerada (não usar no número da loja).
+- `validate_workflow.py`: protege as regras do fluxo oficial.
 - `validate_test_workflow.py`: garante que o teste continue restrito.
 
 ## Validar e publicar

@@ -116,13 +116,23 @@ def main() -> None:
     assert "consulte o estoque novamente" in system_message_lower, (
         "prompt não recupera a placa internamente quando necessário"
     )
-    assert "só fale em enviar cpf" in system_message_lower, (
-        "prompt ainda pode pedir dados antes da escolha da moto"
+    # Jornada oficial: catálogo/fotos antes da simulação (promovido do workflow de teste).
+    assert "jornada de catálogo antes da simulação" in system_message_lower, (
+        "prompt oficial deve usar a jornada de catálogo antes da simulação"
     )
-    assert "qual moto você quer simular?" in system_message_lower, (
-        "prompt não pede a escolha da moto antes dos dados"
+    assert "gostou dessa? se quiser, posso fazer uma simulação pra você." in system_message_lower, (
+        "prompt não oferece simulação só após as fotos do catálogo"
     )
-    assert "nunca repita a solicitação desses dados" in system_message_lower, (
+    assert "quer que eu mande as fotos do catálogo?" in system_message_lower, (
+        "prompt não oferece fotos do catálogo na moto única"
+    )
+    assert "qual moto você quer simular?" not in system_message_lower, (
+        "prompt antigo de simulação imediata não deve permanecer no oficial"
+    )
+    assert (
+        "nunca repita a solicitação desses dados" in system_message_lower
+        or "nunca repita a solicitação de dados já recebidos" in system_message_lower
+    ), (
         "prompt ainda permite repetir CPF, nascimento e entrada"
     )
     assert "11 dígitos de cpf, uma data e um valor de entrada" in system_message_lower, (
@@ -204,7 +214,10 @@ def main() -> None:
     assert "precisa_escolher_moto: true" in simulation_code, (
         "tool não bloqueia simulação sem escolha de moto"
     )
-    assert "não repita dados que ele já enviou" in simulation_code, (
+    assert "a moto ainda não foi escolhida" in simulation_code, (
+        "fallback da tool não pede escolha de moto no catálogo"
+    )
+    assert "conhecer melhor" in simulation_code or "não repita dados" in simulation_code, (
         "fallback da tool ainda permite repetir CPF, nascimento e entrada"
     )
     assert "dataBr" in simulation_code and "cpf: cpfDigitos" in simulation_code, (
@@ -213,7 +226,10 @@ def main() -> None:
     assert "temValorEstoque" in simulation_code and "categoriaValida" in simulation_code, (
         "tool não implementa fallback interno para estoque sem placa"
     )
-    assert "não peça cpf, nascimento, entrada ou placa agora" in simulation_code, (
+    assert (
+        "não peça cpf, nascimento, entrada ou placa agora" in simulation_code
+        or "não fale em simulação e não peça cpf" in simulation_code
+    ), (
         "tool não bloqueia coleta de dados antes da escolha do veículo"
     )
     assert "certinho. vou preparar a simulação pra você." in simulation_code, (

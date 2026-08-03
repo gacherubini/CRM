@@ -92,15 +92,15 @@ def main() -> None:
     assert "b.instance" in extract and "if (!instance) return []" in extract
 
     assert all(share["workflowId"] == TEST_ID for share in test.get("shared", []))
+    # Jornada de catálogo é oficial (canônico e teste herdam o mesmo prompt/tools).
     test_prompt = by_name(test, 'AI Agent1')['parameters']['options']['systemMessage']
     canonical_prompt = by_name(canonical, 'AI Agent1')['parameters']['options']['systemMessage']
-    assert 'jornada de catálogo antes da simulação' in test_prompt
-    assert 'qual delas você quer conhecer melhor?' in test_prompt
-    assert 'quer que eu mande as fotos do catálogo?' in test_prompt
-    assert 'gostou dessa? se quiser, posso fazer uma simulação pra você.' in test_prompt
-    assert 'qual moto você quer simular?' not in test_prompt
-    assert 'jornada de catálogo antes da simulação' not in canonical_prompt
-    assert 'qual moto você quer simular?' in canonical_prompt
+    for prompt in (test_prompt, canonical_prompt):
+        assert 'jornada de catálogo antes da simulação' in prompt
+        assert 'qual delas você quer conhecer melhor?' in prompt
+        assert 'quer que eu mande as fotos do catálogo?' in prompt
+        assert 'gostou dessa? se quiser, posso fazer uma simulação pra você.' in prompt
+        assert 'qual moto você quer simular?' not in prompt
 
     inventory = by_name(test, 'consultar_estoque1')
     canonical_inventory = by_name(canonical, 'consultar_estoque1')
@@ -112,7 +112,8 @@ def main() -> None:
     assert 'replace(/\\D/g' in inventory_code
     assert 'replace(/D/g' not in inventory_code
     assert inventory_code.index('delete estadoTeste[') < inventory_code.index('return JSON.stringify(resp)')
-    assert 'delete estadoTeste' not in canonical_inventory['parameters']['jsCode']
+    # Canônico oficial também preserva moto-escolhida (veio do teste promovido).
+    assert 'delete estadoTeste' in canonical_inventory['parameters']['jsCode']
 
     photo_tool = by_name(test, 'enviar_foto_veiculo1')
     canonical_photo_tool = by_name(canonical, 'enviar_foto_veiculo1')
@@ -121,15 +122,15 @@ def main() -> None:
     assert 'telefone]?.id' in photo_tool['parameters']['jsCode']
     assert 'sem_veiculo_escolhido: true' in photo_tool['parameters']['jsCode']
     assert 'required' not in json.loads(photo_tool['parameters']['inputSchema'])
-    assert 'sem_veiculo_escolhido' not in canonical_photo_tool['parameters']['jsCode']
-    assert 'required' in json.loads(canonical_photo_tool['parameters']['inputSchema'])
+    assert 'sem_veiculo_escolhido' in canonical_photo_tool['parameters']['jsCode']
+    assert 'required' not in json.loads(canonical_photo_tool['parameters']['inputSchema'])
 
     simulation_tool = by_name(test, 'simular1')
     canonical_simulation_tool = by_name(canonical, 'simular1')
     assert 'Use somente no fim da jornada' in simulation_tool['parameters']['description']
     assert 'qual moto o cliente quer conhecer melhor' in simulation_tool['parameters']['jsCode']
     assert 'qual moto o cliente quer simular' not in simulation_tool['parameters']['jsCode']
-    assert 'Use somente no fim da jornada' not in canonical_simulation_tool['parameters']['description']
+    assert 'Use somente no fim da jornada' in canonical_simulation_tool['parameters']['description']
 
     print(
         "workflow de teste valido: "
