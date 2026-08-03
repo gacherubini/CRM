@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 router = APIRouter()
 
 from app.auth import (  # noqa: E402
+    pode_gerir_equipe,
     pode_gerir_financeiras,
     pode_ver_custo,
     pode_ver_equipe,
@@ -33,7 +34,7 @@ from app.main import (  # noqa: E402
     templates,
     PAPEIS_EQUIPE_ROTULO,
 )
-from app.web.equipe import MSG_EQUIPE_CONTROL, _membros_da_loja  # noqa: E402
+from app.web.equipe import _membros_da_loja  # noqa: E402
 from app.clients.motor import MotorClient, MotorIndisponivel  # noqa: E402
 from app.models import Usuario  # noqa: E402
 
@@ -215,6 +216,8 @@ def loja_equipe_lista(
     if not pode_ver_equipe(usuario):
         return JSONResponse({"detail": "Forbidden"}, status_code=403)
 
+    # Dono gerencia; gerente só consulta (distribuição de atendimento).
+    somente_leitura = not pode_gerir_equipe(usuario)
     return templates.TemplateResponse(
         "equipe/lista.html",
         contexto(
@@ -222,7 +225,7 @@ def loja_equipe_lista(
             usuario,
             membros=_membros_da_loja(db, usuario.loja_slug),
             papeis_rotulo=PAPEIS_EQUIPE_ROTULO,
-            equipe_somente_leitura=True,
-            msg_equipe_control=MSG_EQUIPE_CONTROL,
+            equipe_somente_leitura=somente_leitura,
+            msg_equipe_control=None,
         ),
     )

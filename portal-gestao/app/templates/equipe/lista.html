@@ -6,9 +6,9 @@
     <span class="eyebrow">Acessos da loja</span>
     <h1>Equipe</h1>
     {% if equipe_somente_leitura %}
-    <p>Membros provisionados para esta loja — contas e cargos são geridos no Revy Control. Distribuição de atendimento permanece na Loja.</p>
+    <p>Equipe da loja — você pode consultar quem atende. Cadastro de contas fica com o dono.</p>
     {% else %}
-    <p>Gerencie quem pode entrar no Portal sem apagar o histórico comercial.</p>
+    <p>Gerencie quem pode entrar na loja sem apagar o histórico comercial.</p>
     {% endif %}
   </div>
   {% if not equipe_somente_leitura %}
@@ -16,7 +16,7 @@
   {% endif %}
 </div>
 
-{% if msg_equipe_control %}<div class="alert info">{{ msg_equipe_control }}. Use esta lista só para contexto operacional (distribuição de leads e produtividade).</div>{% endif %}
+{% if msg_equipe_control %}<div class="alert info">{{ msg_equipe_control }}</div>{% endif %}
 {% if erro %}<div class="alert error">{{ erro }}</div>{% endif %}
 {% if request.query_params.get('ok') == 'criado' %}<div class="alert success">Membro adicionado com sucesso.</div>{% endif %}
 {% if request.query_params.get('ok') == 'editado' %}<div class="alert success">Dados do membro atualizados.</div>{% endif %}
@@ -68,7 +68,7 @@
   <div class="empty">
     <strong>Nenhum membro cadastrado.</strong>
     {% if equipe_somente_leitura %}
-    <p>Provisione pessoas e cargos no Revy Control. Números WhatsApp e tokens não aparecem como equipe.</p>
+    <p>Peça ao dono da loja para cadastrar a equipe.</p>
     {% else %}
     <p>Adicione um gerente ou vendedor para começar.</p>
     {% endif %}

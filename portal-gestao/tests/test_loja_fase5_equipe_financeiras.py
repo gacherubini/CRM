@@ -48,14 +48,15 @@ def _criar_membro(
 
 
 # ---------------------------------------------------------------------------
-# Equipe com shell ON
+# Equipe com shell ON — dono gerencia; gerente só consulta
 # ---------------------------------------------------------------------------
 
 
-def test_shell_on_post_criar_usuario_retorna_403(client, monkeypatch):
+def test_shell_on_dono_pode_criar_usuario(client, monkeypatch):
     _enable_shell(monkeypatch)
     login(client)
-    pagina = client.get("/app")
+    pagina = client.get("/app/equipe/novo")
+    assert pagina.status_code == 200
     csrf = csrf_da_resposta(pagina)
 
     resposta = client.post(
@@ -71,18 +72,19 @@ def test_shell_on_post_criar_usuario_retorna_403(client, monkeypatch):
         follow_redirects=False,
     )
 
-    assert resposta.status_code == 403
-    assert "Contas e cargos são geridos no Revy Control" in resposta.text
+    assert resposta.status_code == 303
+    assert "ok=criado" in resposta.headers["location"]
     db = SessionLocal()
-    assert db.query(Usuario).filter(Usuario.email == "bruno@loja.test").count() == 0
+    assert db.query(Usuario).filter(Usuario.email == "bruno@loja.test").count() == 1
     db.close()
 
 
-def test_shell_on_post_alterar_cargo_retorna_403(client, monkeypatch):
+def test_shell_on_dono_pode_alterar_cargo(client, monkeypatch):
     _enable_shell(monkeypatch)
     membro_id = _criar_membro()
     login(client)
-    pagina = client.get("/app/equipe")
+    pagina = client.get(f"/app/equipe/{membro_id}/editar")
+    assert pagina.status_code == 200
     csrf = csrf_da_resposta(pagina)
 
     resposta = client.post(
@@ -95,20 +97,19 @@ def test_shell_on_post_alterar_cargo_retorna_403(client, monkeypatch):
         follow_redirects=False,
     )
 
-    assert resposta.status_code == 403
-    assert "Contas e cargos são geridos no Revy Control" in resposta.text
+    assert resposta.status_code == 303
     db = SessionLocal()
     membro = db.get(Usuario, membro_id)
-    assert membro.papel == "vendedor"
-    assert membro.nome == "Vera Vendas"
+    assert membro.papel == "gerente"
+    assert membro.nome == "Vera Gerente"
     db.close()
 
 
-def test_shell_on_post_senha_e_desativar_retornam_403(client, monkeypatch):
+def test_shell_on_dono_pode_redefinir_senha_e_desativar(client, monkeypatch):
     _enable_shell(monkeypatch)
     membro_id = _criar_membro()
     login(client)
-    csrf = csrf_da_resposta(client.get("/app/equipe"))
+    csrf = csrf_da_resposta(client.get(f"/app/equipe/{membro_id}/senha"))
 
     senha = client.post(
         f"/app/equipe/{membro_id}/senha",
@@ -119,21 +120,21 @@ def test_shell_on_post_senha_e_desativar_retornam_403(client, monkeypatch):
         },
         follow_redirects=False,
     )
+    csrf2 = csrf_da_resposta(client.get("/app/equipe"))
     desativar = client.post(
         f"/app/equipe/{membro_id}/desativar",
-        data={"csrf": csrf},
+        data={"csrf": csrf2},
         follow_redirects=False,
     )
 
-    assert senha.status_code == 403
-    assert desativar.status_code == 403
-    assert "Revy Control" in senha.text
+    assert senha.status_code == 303
+    assert desativar.status_code == 303
     db = SessionLocal()
-    assert db.get(Usuario, membro_id).ativo is True
+    assert db.get(Usuario, membro_id).ativo is False
     db.close()
 
 
-def test_shell_on_get_forms_estruturais_retornam_403(client, monkeypatch):
+def test_shell_on_forms_estruturais_abrem_para_dono(client, monkeypatch):
     _enable_shell(monkeypatch)
     membro_id = _criar_membro()
     login(client)
@@ -144,8 +145,7 @@ def test_shell_on_get_forms_estruturais_retornam_403(client, monkeypatch):
         f"/app/equipe/{membro_id}/senha",
     ):
         r = client.get(path, follow_redirects=False)
-        assert r.status_code == 403, path
-        assert "Contas e cargos são geridos no Revy Control" in r.text
+        assert r.status_code == 200, path
 
 
 def test_shell_on_lista_equipe_funciona_para_dono(client, monkeypatch):
@@ -158,11 +158,9 @@ def test_shell_on_lista_equipe_funciona_para_dono(client, monkeypatch):
     assert "Vera Vendas" in resposta.text
     assert "Vendedor" in resposta.text or "vendedor" in resposta.text
     assert "Ativo" in resposta.text
-    # Sem formulários estruturais
-    assert "Adicionar membro" not in resposta.text
-    assert "Redefinir senha" not in resposta.text
-    assert "/app/equipe/novo" not in resposta.text
-    assert "Contas e cargos são geridos no Revy Control" in resposta.text
+    assert "Adicionar membro" in resposta.text
+    assert "/app/equipe/novo" in resposta.text
+    assert "Contas e cargos são geridos no Revy Control" not in resposta.text
 
 
 def test_shell_on_lista_equipe_funciona_para_gerente(client, monkeypatch):
@@ -173,10 +171,11 @@ def test_shell_on_lista_equipe_funciona_para_gerente(client, monkeypatch):
     resposta = client.get("/app/equipe")
     assert resposta.status_code == 200
     assert "Vera Vendas" in resposta.text
+    # Gerente consulta; não cria contas
     assert "Adicionar membro" not in resposta.text
 
 
-def test_shell_on_rota_loja_equipe_somente_leitura(client, monkeypatch):
+def test_shell_on_rota_loja_equipe_dono_pode_adicionar(client, monkeypatch):
     _enable_shell(monkeypatch)
     _criar_membro(nome="Carla Contato", email="carla@loja.test")
     login(client)
@@ -184,9 +183,7 @@ def test_shell_on_rota_loja_equipe_somente_leitura(client, monkeypatch):
     resposta = client.get("/app/loja/equipe")
     assert resposta.status_code == 200
     assert "Carla Contato" in resposta.text
-    assert "Adicionar membro" not in resposta.text
-    # Nunca trata números WA/tokens como equipe
-    assert "whatsapp" not in resposta.text.lower() or "não aparecem" in resposta.text.lower()
+    assert "Adicionar membro" in resposta.text
     assert "token" not in resposta.text.lower()
 
 

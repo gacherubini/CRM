@@ -24,7 +24,6 @@ from app.main import (  # import tardio; main registra este router no fim
     pode_gerir_equipe,
     pode_ver_equipe,
     redirecionar_login,
-    revy_loja_shell_enabled,
     templates,
     usuario_atual,
 )
@@ -101,12 +100,17 @@ MSG_EQUIPE_CONTROL = "Contas e cargos são geridos no Revy Control"
 
 
 def _equipe_estrutural_no_control() -> bool:
-    """Com shell Revy Loja, mutações estruturais de equipe saem do Portal."""
-    return revy_loja_shell_enabled()
+    """Mutações de equipe no Portal (dono).
+
+    O desenho original migrava cadastro para o Control, mas o Control só
+    convida **dono** (Admin Revy) e não expõe gerente/vendedor ao dono da
+    loja. Enquanto isso, o dono gerencia a equipe operacional aqui.
+    """
+    return False
 
 
 def _resposta_equipe_control_only(request: Request, usuario: Usuario | None):
-    """403 quando tentam criar/editar cargo/senha com shell ligado."""
+    """403 legado (caminho Control-only). Mantido para testes/compat."""
     return templates.TemplateResponse(
         "erro.html",
         contexto(request, usuario, erro=MSG_EQUIPE_CONTROL),
@@ -175,15 +179,15 @@ def equipe_lista(request: Request, db: Session = Depends(get_db)):
     usuario = usuario_atual(request, db)
     if not usuario:
         return redirecionar_login()
-    # Shell on: lista read-only para dono/gerente (contexto de distribuição).
-    # Shell off: mantém gestão legada só para dono/admin_plataforma.
-    if _equipe_estrutural_no_control():
-        if not pode_ver_equipe(usuario):
-            return RedirectResponse("/app", status_code=303)
-        return _render_equipe_lista(request, usuario, db, somente_leitura=True)
-    if not pode_gerir_equipe(usuario):
+    # Dono gerencia; gerente só consulta a lista.
+    if not pode_ver_equipe(usuario):
         return RedirectResponse("/app", status_code=303)
-    return _render_equipe_lista(request, usuario, db, somente_leitura=False)
+    somente_leitura = (
+        _equipe_estrutural_no_control() or not pode_gerir_equipe(usuario)
+    )
+    return _render_equipe_lista(
+        request, usuario, db, somente_leitura=somente_leitura
+    )
 
 
 @router.get("/app/equipe/novo", response_class=HTMLResponse)
