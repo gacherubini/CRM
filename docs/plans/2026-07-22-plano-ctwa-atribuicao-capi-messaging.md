@@ -1,5 +1,14 @@
 # Plano — CTWA (Click-to-WhatsApp): atribuição, persona→CTWA e CAPI messaging
 
+> **REVISÃO 2026-08-04:** o *match de campanha* descrito aqui estava **quebrado na
+> prática** (diagnóstico do dia 1: 0 leads criados no dia; `meta_campaign_id` nunca
+> preenchido — a referral CTWA do WhatsApp entrega só `ad_id`, não o id da campanha).
+> Corrigido/estendido pelo plano
+> [CTWA por ad_id + Graph](../superpowers/plans/2026-08-04-atribuicao-ctwa-campanha.md)
+> — **Fase 1 deployada** (`app2037`, 2026-08-04): lead na 2ª mensagem + match por `ad_id`;
+> Fase 2 (resolução `ad_id→campaign_id` via Graph) pendente do token `ads_read`.
+> O **CAPI messaging Purchase** descrito neste plano continua válido.
+
 > **FRONTEIRA FUTURA:** o fluxo CTWA implementado continua válido, mas configuração,
 > Registros de Campanha e CAPI técnica migram ao [Revy Control](2026-07-29-plano-revy-control.md).
 > Multi-WhatsApp por vendedor e o “Google residual” citados abaixo foram substituídos
