@@ -11,3 +11,4 @@ python-multipart==0.0.*
 itsdangerous==2.*
 argon2-cffi==23.*
 cryptography>=42,<46
+Pillow==11.*

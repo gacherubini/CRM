@@ -28,7 +28,7 @@
   <article class="vehicle-card">
     <a href="{{ url_prefix }}/l/{{ loja.slug }}/veiculos/{{ v.id }}" aria-label="Ver {{ v.marca }} {{ v.modelo }}">
       <div class="card-media">
-        {% if v.imagens %}<img src="{{ v.imagens[0] }}" alt="{{ v.marca }} {{ v.modelo }}" loading="lazy" width="640" height="420">
+        {% if v.imagens %}<img src="{{ v.imagens[0] }}{% if '/public/v1/media/' in v.imagens[0] %}?w=640{% endif %}" alt="{{ v.marca }} {{ v.modelo }}" loading="lazy" width="640" height="420">
         {% else %}<div class="image-fallback">Sem foto</div>{% endif %}
       </div>
       <div class="card-body">
