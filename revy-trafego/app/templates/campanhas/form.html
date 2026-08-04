@@ -60,6 +60,10 @@
         <input type="text" name="codigo_ctwa" value="{{ valores.codigo_ctwa or '' }}" maxlength="40" placeholder="Ex.: RV-JUL" autocomplete="off">
         <small class="muted">Coloque na mensagem pré-preenchida do anúncio: <code>Cód: RV-JUL</code>. Fallback se o WhatsApp não mandar o click id.</small>
       </label>
+      <label style="grid-column:1/-1">IDs de anúncio (um por linha)
+        <textarea name="ad_ids" rows="4" placeholder="120252470707220341" inputmode="numeric" autocomplete="off">{{ valores.ad_ids or '' }}</textarea>
+        <small class="muted">Cole o ID de cada anúncio desta campanha (Gerenciador de Anúncios → Anúncios). Casa o lead pelo <code>meta_ad_id</code> do clique (Click-to-WhatsApp).</small>
+      </label>
     </div>
   </section>
   <section class="panel form-section">

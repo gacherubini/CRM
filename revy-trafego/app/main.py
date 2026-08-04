@@ -781,6 +781,7 @@ async def campanhas_nova_post(request: Request, db: Session = Depends(get_db)):
     if not csrf_valido(request, form.get("csrf")):
         return redirect("/app", status_code=303)
     dados = campanha_payload_form(form)
+    dados["ad_ids"] = form.get("ad_ids") or ""
     erros = validar_campanha_payload(dados)
     if erros:
         return templates.TemplateResponse(
@@ -812,6 +813,9 @@ async def campanhas_nova_post(request: Request, db: Session = Depends(get_db)):
     )
     preencher_campanha(c, dados, email=usuario.email)
     db.add(c)
+    db.flush()
+    from app.campanha_anuncios import sincronizar_anuncios
+    sincronizar_anuncios(db, c, form.get("ad_ids"))
     db.commit()
     return redirect("/app/campanhas?ok=criada", status_code=303)
 
@@ -1075,6 +1079,7 @@ def campanhas_editar_get(request: Request, campanha_id: str, db: Session = Depen
         "periodo_inicio": campanha.periodo_inicio.isoformat() if campanha.periodo_inicio else "",
         "periodo_fim": campanha.periodo_fim.isoformat() if campanha.periodo_fim else "",
         "notas": campanha.notas or "",
+        "ad_ids": "\n".join(a.ad_id for a in campanha.anuncios),
     }
     return templates.TemplateResponse(
         "campanhas/form.html",
@@ -1098,6 +1103,7 @@ async def campanhas_editar_post(request: Request, campanha_id: str, db: Session 
     if not campanha:
         return redirect("/app/campanhas?erro=1", status_code=303)
     dados = campanha_payload_form(form)
+    dados["ad_ids"] = form.get("ad_ids") or ""
     erros = validar_campanha_payload(dados)
     if erros:
         return templates.TemplateResponse(
@@ -1122,6 +1128,8 @@ async def campanhas_editar_post(request: Request, campanha_id: str, db: Session 
             status_code=422,
         )
     preencher_campanha(campanha, dados)
+    from app.campanha_anuncios import sincronizar_anuncios
+    sincronizar_anuncios(db, campanha, form.get("ad_ids"))
     db.commit()
     return redirect(f"/app/campanhas/{campanha.id}?ok=salvo")
 
