@@ -101,9 +101,17 @@ fly ssh console -a chatbot2037 -C "cd /srv && alembic upgrade head"
 - Estado verificado em 24/07/2026: health OK; workflow `wAiNaoSalvos0001` publicado com
   31 nós. O backup consistente foi criado no volume antes da atualização. Para futuras atualizações,
   usar primeiro o preview de
-  `n8n/update_live_workflow.js`; no Fly, informar `--chatbot-base-url=http://chatbot2037.flycast:8000`
-  e `--evolution-base-url=http://evolution2037.flycast:8080`. `--apply` é uma ação operacional
+  `n8n/update_live_workflow.js`; no Fly, usar
+  `--chatbot-base-url=https://app2037.fly.dev` e
+  `--evolution-base-url=https://evolution2037.fly.dev`. `--apply` é uma ação operacional
   explícita. Sem esses parâmetros, o script mantém os nomes do compose local.
+- **Não usar** `app2037.flycast:8080` nem `evolution2037.flycast:8080` nos nós n8n.
+  Em 04/08/2026 essas URLs causaram, respectivamente, `ECONNRESET` e `ENOTFOUND`,
+  interrompendo o workflow antes da gravação da mensagem. O gerador
+  `prepare-workflow.ps1` já usa os hosts HTTPS corretos por padrão.
+- Antes de importar, confirmar no nó `Extrair1` que o bloqueio de replay continua
+  presente: mensagens sem timestamp válido, com mais de 300 segundos ou mais de
+  120 segundos no futuro devem retornar `[]` antes de qualquer gravação/resposta.
 - Workflow de produção esperado: **WhatsApp IA - Somente Nao Salvos** (ou id local
   `wAiNaoSalvos0001` / nome equivalente no volume).
 - Webhook de produção: `/webhook/whatsapp-ai` (confirmar path no workflow ativo).

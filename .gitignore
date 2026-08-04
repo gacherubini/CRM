@@ -49,3 +49,6 @@ motor-simulacao/scripts/diag_bradesco_recaptcha.py
 
 # grafo do graphify (graph.json ~11MB, regenerável com `graphify extract . --code-only`)
 graphify-out/
+
+# macOS
+.DS_Store
