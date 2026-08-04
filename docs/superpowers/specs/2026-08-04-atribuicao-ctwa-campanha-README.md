@@ -13,6 +13,45 @@ A Fase 1 já faz a atribuição funcionar (com cadastro manual de `ad_id`). A Fa
 
 ---
 
+## Status atual (2026-08-04)
+
+**Fase 1 — IMPLEMENTADA, testada e commitada.** Fase 2 — não iniciada (aguarda token Meta).
+
+Branch: `feat/atribuicao-ctwa-campanha`. Commits da Fase 1 (após o commit dos docs `960ff56`):
+
+| Commit | O que entrou |
+|---|---|
+| `62dbbf7` | Revy: tabela `campanha_anuncios` + migration `0014` (Task 1) |
+| `c71da62` | Revy: match do lead por `ad_id` no casador (Task 2) |
+| `cda9f68` | Revy: UI + sync pra cadastrar ad_ids na campanha (Task 3) |
+| `4267008` | Chatbot: cria o lead na **2ª mensagem** de conversa CTWA (Task 4) |
+
+Verificação (rodada manualmente, não só pelos agentes):
+- Chatbot: `272 passed`.
+- Revy: 6 testes novos verdes; suite completa `440 passed, 1 failed`.
+- Alembic: head único `0014_campanha_anuncios`, `upgrade head` limpo.
+
+⚠️ **A 1 falha é pré-existente, não é desta mudança.** É
+`tests/test_control_provisioning_outbox.py::test_process_pending_falha_marca_failed_e_incrementa_attempts`
+(`MultipleResultsFound`). Comprovado: o mesmo teste falha no `main` sem nenhuma alteração nossa
+(provável incompatibilidade com o Python 3.14 do ambiente). Domínio sem relação com atribuição —
+fila separada.
+
+**Importante — ainda NÃO está valendo em produção.** O código está na branch, mas não foi
+pushado nem deployado. `fly deploy` usa a árvore local commitada (ver memória do projeto), então
+enquanto não houver deploy, o `app2037` continua rodando o código antigo. Para ir ao ar:
+
+1. `git push -u origin feat/atribuicao-ctwa-campanha` (e merge quando quiser).
+2. Deploy do `app2037` (bundle com Chatbot + Revy) — rodar migration `0014` (`alembic upgrade head`) no deploy.
+3. **Cadastrar os `ad_id`** de cada anúncio nas campanhas Cauã/Pedro (Tutorial A + B abaixo).
+4. **Lançar o gasto** do período (Tutorial D) para CPL/CPA/ROAS.
+
+Depois disso: lead nasce na 2ª mensagem já com `meta_ad_id`, casa com a campanha pelo ad_id, e o
+ROI para de jogar tudo em "Sem campanha". A **Fase 2** (resolução automática via Graph) entra
+quando o token `ads_read` existir (Tutorial C + Tasks 5–8 do plano).
+
+---
+
 ## Para o agente de código
 
 ### Contexto mínimo antes de tocar código
