@@ -82,8 +82,9 @@ flowchart LR
    backend manda `acao=cliente` (não só no fallback).
 10. `Se resposta controle1` manda menus da equipe direto ao WhatsApp; clientes
     seguem para a IA.
-11. `AI Agent1` usa system message com **prioridade da `mensagem_atual`** e user
-    prompt com **`historico_recente`** (CRM) + flags de anúncio/primeira msg.
+11. `AI Agent1` usa system message com **prioridade da `mensagem_atual`**, jornada
+    **fotos ou simulação** no mesmo convite (moto clara), **sem insistir** em
+    recusa, e user prompt com **`historico_recente`** (CRM) + flags de anúncio.
 12. `Aguardar 40s cliente1` — espera **40 segundos** antes de mandar a resposta
     (tom mais humano). Só no caminho da IA; menus da equipe e fotos de estoque
     não passam por este Wait.

@@ -145,23 +145,23 @@ def main() -> None:
     assert "consulte o estoque novamente" in system_message_lower, (
         "prompt não recupera a placa internamente quando necessário"
     )
-    # Jornada oficial: catálogo/fotos antes da simulação (promovido do workflow de teste).
-    assert "jornada de catálogo antes da simulação" in system_message_lower, (
-        "prompt oficial deve usar a jornada de catálogo antes da simulação"
+    # Jornada: moto clara → convite dual (fotos ou simulação); recusa sem insistir.
+    assert "jornada de catálogo e simulação" in system_message_lower, (
+        "prompt oficial deve usar a jornada de catálogo e simulação"
     )
-    assert "gostou dessa? se quiser, posso fazer uma simulação pra você." in system_message_lower, (
-        "prompt não oferece simulação só após as fotos do catálogo"
+    assert "mande as fotos do catálogo ou prefere" in system_message_lower or (
+        "fotos do catálogo ou prefere que eu faça uma simulação" in system_message_lower
+    ), (
+        "prompt deve oferecer fotos e simulação no mesmo convite (moto única)"
     )
-    assert "quer que eu mande as fotos do catálogo?" in system_message_lower, (
-        "prompt não oferece fotos do catálogo na moto única"
+    assert "não exija foto antes" in system_message_lower, (
+        "prompt deve permitir simulação sem foto prévia quando o cliente escolher simular"
     )
     assert "recusa e não insistir" in system_message_lower, (
         "prompt deve ter bloco explícito de recusa (não insistir após 'não precisa')"
     )
-    assert "nÃO ofereça simulação nem outro cta" in system_message_lower or (
-        "não ofereça simulação nem outro cta" in system_message_lower
-    ), (
-        "prompt deve proibir CTA de simulação quando o cliente recusa as fotos"
+    assert "não ofereça de novo foto nem simulação" in system_message_lower, (
+        "prompt deve proibir re-CTA quando o cliente recusa o convite"
     )
     assert "qual moto você quer simular?" not in system_message_lower, (
         "prompt antigo de simulação imediata não deve permanecer no oficial"

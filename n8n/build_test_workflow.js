@@ -67,9 +67,9 @@ workflow.sourceWorkflowId = null;
 
 const agent = nodeByName('AI Agent1');
 const canonicalPrompt = String(agent.parameters.options.systemMessage || '');
-if (!canonicalPrompt.includes('jornada de catálogo antes da simulação')) {
+if (!canonicalPrompt.includes('jornada de catálogo e simulação')) {
   throw new Error(
-    'AI Agent1 no canônico deve ter a jornada de catálogo; rode a promoção teste→oficial antes',
+    'AI Agent1 no canônico deve ter a jornada de catálogo e simulação; rode a promoção teste→oficial antes',
   );
 }
 

@@ -96,10 +96,10 @@ def main() -> None:
     test_prompt = by_name(test, 'AI Agent1')['parameters']['options']['systemMessage']
     canonical_prompt = by_name(canonical, 'AI Agent1')['parameters']['options']['systemMessage']
     for prompt in (test_prompt, canonical_prompt):
-        assert 'jornada de catálogo antes da simulação' in prompt
+        assert 'jornada de catálogo e simulação' in prompt
         assert 'qual delas você quer conhecer melhor?' in prompt
-        assert 'quer que eu mande as fotos do catálogo?' in prompt
-        assert 'gostou dessa? se quiser, posso fazer uma simulação pra você.' in prompt
+        assert 'mande as fotos do catálogo ou prefere' in prompt
+        assert 'NÃO exija foto antes' in prompt or 'não exija foto antes' in prompt.lower()
         assert 'qual moto você quer simular?' not in prompt
 
     inventory = by_name(test, 'consultar_estoque1')
