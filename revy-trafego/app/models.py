@@ -675,6 +675,26 @@ class Campanha(Base):
     gastos: Mapped[list["CampanhaGasto"]] = relationship(
         back_populates="campanha", cascade="all, delete-orphan"
     )
+    anuncios: Mapped[list["CampanhaAnuncio"]] = relationship(
+        back_populates="campanha", cascade="all, delete-orphan"
+    )
+
+
+class CampanhaAnuncio(Base):
+    __tablename__ = "campanha_anuncios"
+    __table_args__ = (
+        UniqueConstraint("campanha_id", "ad_id", name="uq_campanha_ad_id"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=novo_id)
+    loja_slug: Mapped[str] = mapped_column(String(120), index=True)
+    campanha_id: Mapped[str] = mapped_column(
+        ForeignKey("campanhas.id", ondelete="CASCADE"), index=True
+    )
+    ad_id: Mapped[str] = mapped_column(String(64), index=True)
+    criada_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=agora)
+
+    campanha: Mapped["Campanha"] = relationship(back_populates="anuncios")
 
 
 class CampanhaGasto(Base):

@@ -775,6 +775,7 @@ def registrar_mensagem(
     ctwa_pendente = False
     lead_ctwa = None
     lead_ctwa_id = None
+    lead_criado_auto = False
     if not from_me and loja_operacional:
         # Correlação e touch de lead só quando a loja processa (não só captura).
         atribuicao = _correlacionar_catalogo(db, loja.id, telefone, texto)
@@ -824,6 +825,37 @@ def registrar_mensagem(
                     ctwa_codigo=ctwa_codigo,
                     texto=texto,
                 )
+        # Fase 1: o lead nasce na 2ª mensagem de uma conversa originada de anúncio.
+        # `primeira_mensagem` foi calculado ANTES de gravar a msg atual: quando é
+        # False, o cliente já respondeu de verdade. `lead_ctwa is None` aqui só
+        # quando ainda não há lead com sinal CTWA nesta entrada. Escopo restrito a
+        # conversas com tracking CTWA pendente (não enche o CRM com não-anúncio);
+        # para estender a toda conversa, trocar `tem_ctwa_pend` por `True`.
+        if lead_ctwa is None and not primeira_mensagem:
+            pend = _carregar_tracking_pendente(conversa)
+            tem_ctwa_pend = any(
+                pend.get(k)
+                for k in ("ctwa_clid", "meta_ad_id", "meta_campaign_id", "ctwa_codigo")
+            )
+            if tem_ctwa_pend:
+                lead_existente = (
+                    db.query(Lead)
+                    .filter(Lead.loja_id == loja.id, Lead.telefone == telefone)
+                    .first()
+                )
+                if lead_existente is None:
+                    lead_novo = _get_or_create_lead(db, loja.id, telefone)
+                    _vincular_tracking_pendente_ao_lead(
+                        db, loja.id, telefone, lead_novo
+                    )
+                    if not lead_novo.origem:
+                        lead_novo.origem = "meta_ctwa"
+                    lead_novo.atualizada_em = datetime.now(timezone.utc)
+                    lead_ctwa_id = lead_novo.id
+                    lead_criado_auto = True
+                else:
+                    # Idempotente: lead já existe (ex.: POST /v1/leads anterior).
+                    lead_ctwa_id = lead_existente.id
         registrar_auditoria_ctwa(
             db,
             loja_id=loja.id,
@@ -939,6 +971,7 @@ def registrar_mensagem(
             "catalog_interest_ref": None,
             "ctwa_atribuido": False,
             "ctwa_pendente": False,
+            "lead_criado_auto": False,
             "lead_id": None,
             "evolution_instance": evolution_instance,
             "canal_id": canal_id,
@@ -953,6 +986,7 @@ def registrar_mensagem(
         "catalog_interest_ref": atribuicao.catalog_interest_ref if atribuicao else None,
         "ctwa_atribuido": bool(ctwa_ok) if not from_me else False,
         "ctwa_pendente": bool(ctwa_pendente) if not from_me else False,
+        "lead_criado_auto": bool(lead_criado_auto) if not from_me else False,
         "lead_id": (
             lead_ctwa_id
             or (atribuicao.lead_id if atribuicao is not None else None)
