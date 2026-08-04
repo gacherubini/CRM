@@ -155,6 +155,14 @@ def main() -> None:
     assert "quer que eu mande as fotos do catálogo?" in system_message_lower, (
         "prompt não oferece fotos do catálogo na moto única"
     )
+    assert "recusa e não insistir" in system_message_lower, (
+        "prompt deve ter bloco explícito de recusa (não insistir após 'não precisa')"
+    )
+    assert "nÃO ofereça simulação nem outro cta" in system_message_lower or (
+        "não ofereça simulação nem outro cta" in system_message_lower
+    ), (
+        "prompt deve proibir CTA de simulação quando o cliente recusa as fotos"
+    )
     assert "qual moto você quer simular?" not in system_message_lower, (
         "prompt antigo de simulação imediata não deve permanecer no oficial"
     )
