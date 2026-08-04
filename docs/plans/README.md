@@ -1,5 +1,10 @@
 # Índice dos planos (canônico para agentes)
 
+> **Última revisão: 2026-08-04.** Situação atual: Revy Control (F0–F6) e Revy Loja
+> (F0–F6/F8) implementados; bot WhatsApp com atendimento humano + gate n8n; **atribuição
+> CTWA por `ad_id` Fase 1 deployada** (`app2037`). A fila real está em **Próximos passos**
+> abaixo; os planos marcados **DONE documentam o código atual** (referência, não fila).
+
 ## Como usar (agentes)
 
 1. `docs/contexto-compacto.md` — estado atual, **eixos de prioridade** e regras (**sempre primeiro**).
@@ -17,6 +22,21 @@
 
 Cada plano `*A`/`*B` tem bloco **Status** no topo: leia antes de reimplementar.
 
+## Próximos passos ativos (2026-08+)
+
+Eixos com trabalho real pendente (um por mudança; não misturar). Fonte viva:
+`docs/contexto-compacto.md` → "Prioridades independentes".
+
+- **Atribuição CTWA — Fase 2:** resolver `ad_id→campaign_id` via Graph API (Tasks 5–8 do
+  [plano 2026-08-04](../superpowers/plans/2026-08-04-atribuicao-ctwa-campanha.md)); **pende
+  token `ads_read`**. Fase 1 já deployada. Antes de medir de fato: cadastrar `ad_id` nas
+  campanhas + lançar gasto (README do plano).
+- **Bot WhatsApp:** smoke virgem/CTWA/handoff/salvo no lab → workflow Active ON.
+- **Multi-WhatsApp (Control Fase 5):** E2E dois canais + `canal_id` correto.
+- **Google Ads (Control Fase 4):** secrets GCP + OAuth/métricas/conversões.
+- **Motor/RPA:** smoke real por banco (resultado ao cliente ainda humano no Portal).
+- **Revy Loja:** deep-links simulação/venda no workspace + telemetria; Seller AI (F7) adiado.
+
 ## Ordem válida de implementação
 
 | Ordem | Plano | Produto | Status resumido |
@@ -31,15 +51,16 @@ Cada plano `*A`/`*B` tem bloco **Status** no topo: leia antes de reimplementar.
 | 6 | [Plano #3B](2026-07-11-plano3b-dashboard-dono-vendas-metas.md) | Vendas/metas/dono | Vendas+metas+CSV+**Task 5 campanhas**; **Task 4 funil DONE** |
 | 6.1 | [Tráfego pago CRM](2026-07-20-plano-trafego-pago-crm-campanhas-roi.md) | Campanhas + atribuição + ROI | **DONE MVP** (`8e7ec5f`) — E8 + #3B T5; CAPI/CSV fechados no plano 6.2 |
 | 6.2 | [Conversões / funil / insights](2026-07-21-plano-conversao-atribuicao-insights.md) | CAPI, gastos, resultados dono, funil e bus | **DONE NO ESCOPO** — Google movido ao Revy Control |
-| 6.2b | [CTWA atribuição + CAPI messaging](2026-07-22-plano-ctwa-atribuicao-capi-messaging.md) | Click-to-WhatsApp no CRM, match campanha, Purchase messaging | **MVP CÓDIGO** — lead CTWA + match + CAPI messaging; residual E2E lab Evolution |
+| 6.2b | [CTWA atribuição + CAPI messaging](2026-07-22-plano-ctwa-atribuicao-capi-messaging.md) | Click-to-WhatsApp no CRM, match campanha, Purchase messaging | **PARCIAL/REVISTO** — CAPI messaging válido; o **match por campanha estava quebrado na prática** (diag. dia 1: 0 leads criados, `meta_campaign_id` sempre nulo). Corrigido/estendido pelo **6.2d**. |
 | 6.2c | [Meta spend API (gasto automático)](2026-07-22-plano-meta-spend-api.md) | Puxar `spend` do Ads via Marketing API → `CampanhaGasto` | **MVP + job 24h** — botão + thread + `/internal/jobs/meta-spend-sync`; residual OAuth / App Review |
-| 6.3 | [Multi-WhatsApp por vendedor](2026-07-22-plano-multi-whatsapp-vendedores-campanhas.md) | Proposta histórica de canais por vendedor | **SUPERSEDED** pelo Revy Control; não implementar |
+| 6.2d | [CTWA por ad_id + Graph](../superpowers/plans/2026-08-04-atribuicao-ctwa-campanha.md) | Lead na 2ª mensagem + match por `ad_id`; resolução `ad_id→campaign_id` via Graph | **FASE 1 DEPLOYADA** (`app2037`, 2026-08-04): tabela `campanha_anuncios`, matcher ad_id, UI, lead na 2ª msg. **Fase 2 (Graph) pende token `ads_read`.** Spec/README em `docs/superpowers/specs/2026-08-04-*`. |
 | 6.4 | [Revy Tráfego × Portal loja](2026-07-28-plano-revy-trafego-separacao.md) | App gestor multi-loja + slim resultados no portal | **FASE 3 pronta**: banco próprio, projeção de vendas e outbox; arquitetura no as-built e operação em `deploy/fly/3vm/` |
 | 6.5 | [Revy Control](2026-07-29-plano-revy-control.md) | Lojas, RBAC, módulos, Google Ads, integrações, auditoria e Multi-WhatsApp | **CÓDIGO PRODUTO COMPLETE** — workers outbox/métricas Google, reconcile status, HTTP adapters, UI/API aquisição, multi-WA n8n; residual = GCP humano + lab F7/E2E |
+| 6.5b | [PR-4 identidade loja / memberships](2026-07-31-pr4-identidade-loja-fase-b-memberships.md) | Dono multi-loja por convite (identidade da loja, fase B) | **IMPLEMENTADO** (`cd9e4f0`) — memberships + convite de dono |
 | 6.6 | [Revy Loja](2026-07-29-plano-revy-loja.md) | Portal → Vendas + Estoque; Atendimento, Chatbot, Multibanco e Seller AI | **CÓDIGO F0–F6+F8 COMPLETE (lean)** — shell, overviews, atendimento multi-canal, equipe, bancos, fixtures contratos; **F7 Seller AI deferred**; residual = lab ops only |
 | 6+ | [Plano #6](2026-07-11-plano6-evolucoes-roadmap.md) | Roadmap histórico de ideias | Entregas antigas continuam válidas; itens ainda “ativos” exigem revalidação em Control/Loja |
-| ops | [Plano #7 deploy Fly](2026-07-13-plano7-deploy-fly-io-design.md) | Lab Fly.io | **DONE** (monólitos); superado na prática pela arquitetura 3-VM |
 | ops | [Arquitetura 3 VMs](2026-07-21-plano-arquitetura-3-vms.md) | Consolidação Fly (custo) | **IMPLEMENTADO / OPERANDO** — `suite-pg` + `evolution2037` + `app2037` always-on; `motor2037` Playwright on-demand; n8n webhook + roteamento 3 casos; ops = `deploy/fly/3vm/` + `up-all.sh --3vm` |
+| ops | [Runbook rollout lab / provisionamento](2026-07-29-runbook-rollout-lab-provisionamento.md) | Subida do lab + provisionamento | Procedimento operacional; usar junto de `deploy/fly/3vm/README.md` |
 | ops | [Menu estoque WA + fixes foto](2026-07-22-plano-menu-estoque-wa-e-fotos-fix.md) | Cadastro/menu/fotos prod | **CÓDIGO DONE** — próximo: E2E menu/cadastro, depois cliente novo |
 
 Planos #1A e #4A podem avançar em paralelo após #0. #2A depende da fatia Lite do #4A.
@@ -104,5 +125,7 @@ Tudo em [`_archive/`](_archive/) é **histórico** — não define arquitetura n
 | Planos monolíticos #1–#5 (2026-07-11) | Substituídos pelos `*A` / `*B` |
 | `…-santander-implementacao.md` | Checklist DONE; usar **lições** + **design** Santander |
 | `…-bradesco-implementacao.md` / `…-pan-playwright-implementacao.md` | Checklists DONE; usar mapa de bancos + código + lições |
-| `…-plano7-deploy-fly-io-implementacao.md` | 1ª subida Fly já feita; ops = `deploy/fly/*.sh` + design #7 |
+| `…-plano7-deploy-fly-io-implementacao.md` | 1ª subida Fly já feita; ops = `deploy/fly/3vm/` + arquitetura 3-VM |
 | `…-fontecred-deploy-handoff.md` | SUPERSEDED; usar **lições Fontecred** |
+| `…-multi-whatsapp-vendedores-campanhas.md` (2026-08-04) | SUPERSEDED pelo Revy Control (Fase 5 multi-WhatsApp) |
+| `…-plano7-deploy-fly-io-design.md` (2026-08-04) | DONE; superado pela arquitetura 3-VM + `deploy/fly/3vm/` |
