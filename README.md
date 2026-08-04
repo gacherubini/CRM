@@ -10,7 +10,7 @@ Parcelas, taxas e bancos não são enviados automaticamente ao cliente.
 > [`docs/handoff-contexto.md`](docs/handoff-contexto.md) (inclui **checklist “Ligar amanhã”**).  
 > **As-built Control/Loja:** [`docs/design/2026-07-30-revy-control-loja-asbuilt-e-melhorias.md`](docs/design/2026-07-30-revy-control-loja-asbuilt-e-melhorias.md).  
 > **Piloto flags Loja:** shell + entitlements + Atendimento + WhatsApp **ON** (secrets); redirect legado **OFF**.  
-> **n8n oficial:** `WhatsApp IA - Somente Nao Salvos` importado; **Active na manhã** (owner).
+> **n8n oficial:** `WhatsApp IA - Somente Nao Salvos` importado; mantido **inativo** após o incidente de replay até o smoke manual.
 
 ### Estado atual do Revy Control / Revy Loja
 
@@ -90,6 +90,28 @@ Sinal de “contato novo” = `isSaved === false` na Evolution (agenda do WhatsA
 Qualquer participante do grupo escolhido pode operar o estoque. A lista de números da equipe é
 apenas compatibilidade/identificação e não abre o menu no privado quando existe um grupo configurado.
 Sem sinal claro de contato novo → fail-closed (**ignora**).
+
+---
+
+## 🛡️ Proteções de resposta do WhatsApp
+
+- Eventos sem horário válido, com mais de **5 minutos** ou mais de **2 minutos no futuro** são descartados antes de qualquer chamada à IA.
+- O caminho do cliente espera **40 segundos**, agrupando mensagens consecutivas. Antes de responder, o n8n pergunta ao Chatbot se aquela ainda é a entrada mais recente.
+- Só a última mensagem recebida pode gerar resposta. Se o cliente escreveu novamente ou a última mensagem já é uma saída da loja, a execução antiga termina sem responder.
+
+## 🧩 Fallback temporário — estoque digital incompleto
+
+Enquanto nem todas as motos estiverem cadastradas, uma busca específica sem resultado não encerra a conversa. O nó isolado `TEMP continuar sem estoque1`:
+
+1. preserva o modelo/ano procurado;
+2. **não oferece nem envia fotos** e não inventa preço ou disponibilidade;
+3. oferece apenas verificar uma simulação;
+4. após o aceite, coleta somente CPF, nascimento e entrada que ainda faltarem;
+5. cria o lead qualificado, avisa a equipe para fazer a simulação humana e pausa o bot.
+
+Esse caminho não chama o motor automático, porque não existe veículo/preço confiável no estoque. Buscas com veículos reais continuam no fluxo normal. A implementação removível está concentrada no nó acima e nos blocos marcados `[TEMP_ESTOQUE_INCOMPLETO_INICIO]` / `[TEMP_ESTOQUE_INCOMPLETO_FIM]` do prompt e da descrição de `consultar_estoque1`.
+
+Para retirar o fallback quando o estoque estiver completo: exclua o nó e sua conexão `ai_tool`, remova os dois blocos marcados, regenere o workflow de teste com `node n8n/build_test_workflow.js` e ajuste os validadores para 29 nós. O fluxo permanente `simular1` não precisa ser alterado.
 
 ---
 

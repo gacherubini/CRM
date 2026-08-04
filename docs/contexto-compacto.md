@@ -1,6 +1,6 @@
 # Contexto compacto para continuidade
 
-Atualizado em **2026-08-03 (tarde/noite)**. Este é o ponto de entrada para estado e prioridades.
+Atualizado em **2026-08-04**. Este é o ponto de entrada para estado e prioridades.
 O desenho implementado está em
 [`design/2026-07-30-revy-control-loja-asbuilt-e-melhorias.md`](design/2026-07-30-revy-control-loja-asbuilt-e-melhorias.md),
 os termos do domínio em [`../CONTEXT.md`](../CONTEXT.md) e os planos válidos em
@@ -15,12 +15,13 @@ os termos do domínio em [`../CONTEXT.md`](../CONTEXT.md) e os planos válidos e
 - **Prod `app2037` (piloto):** secrets shell + entitlements + atendimento + WhatsApp Loja
   **ON**; redirect legado **OFF**. Detalhe:
   [`2026-08-02-provisionamento-loja-entitlements.md`](2026-08-02-provisionamento-loja-entitlements.md).
-- **Bot WhatsApp (código main `8effb99`):** fail-open se Evolution cega (`is_saved` null);
-  gate n8n `atendeLeadVirgem`; registrar com `tem_saida` + `historico_recente`; prompt
-  prioriza `mensagem_atual` e histórico CRM. Diagnóstico:
+- **Bot WhatsApp:** bloqueia replay com mais de 5 minutos, agrupa rajadas por 40 segundos
+  e confirma no Chatbot que só a última entrada ainda pode responder. O prompt prioriza
+  `mensagem_atual` e histórico CRM. Diagnóstico original:
   [`diagnostico-bot-whatsapp-2026-08-03.md`](diagnostico-bot-whatsapp-2026-08-03.md).
-- **n8n:** workflow oficial `wAiNaoSalvos0001` (27 nós no Git; Wait 40s no
-  caminho cliente). Teste permanece separado/OFF.
+- **n8n:** workflow oficial `wAiNaoSalvos0001` (30 nós no Git; bloqueio de replay,
+  debounce/última mensagem e fallback temporário de estoque). Atualizado no `n8n2037`
+  em 2026-08-04 e confirmado **inativo/draft**; teste permanece separado/OFF.
 - **WhatsApp:** Chatbot dono de canais/conversas; Loja UI de canais + grupo estoque; n8n orquestra.
 - **Motor:** Playwright sob demanda; simulação ao cliente ainda **humana** (bot não devolve parcela).
 
@@ -46,7 +47,7 @@ Escolha um eixo por mudança; não misture rollout, RPA e produto na mesma entre
 
 | Eixo | Próximo resultado verificável |
 |---|---|
-| Bot WhatsApp | Deploy `app2037` + reimport workflow (Active OFF) → smoke virgem/CTWA/handoff/salvo → Active ON |
+| Bot WhatsApp | Backend e workflow publicados com Active OFF → smoke virgem/CTWA/handoff/salvo → Active ON somente pelo owner |
 | Rollout Control/Loja | Redirect legado opcional; dual-path ainda on |
 | Multi-WhatsApp | E2E dois canais + `canal_id` correto |
 | Google Ads | Secrets GCP + OAuth/métricas/conversões |

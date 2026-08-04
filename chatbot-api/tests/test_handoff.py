@@ -41,6 +41,101 @@ def test_estado_exige_credencial(client):
     assert client.get("/v1/conversas/5511/estado").status_code == 401
 
 
+def test_pode_responder_somente_a_ultima_entrada(client, loja_a):
+    inst, tel, h = loja_a["instance"], "5511977700001", loja_a["headers"]
+    client.post(
+        "/webhook/mensagem",
+        json={
+            "instance": inst,
+            "telefone": tel,
+            "texto": "primeira parte",
+            "provider_message_id": "DEBOUNCE-1",
+        },
+    )
+    client.post(
+        "/webhook/mensagem",
+        json={
+            "instance": inst,
+            "telefone": tel,
+            "texto": "segunda parte",
+            "provider_message_id": "DEBOUNCE-2",
+        },
+    )
+
+    antiga = client.post(
+        f"/v1/conversas/{tel}/pode-responder",
+        json={"instance": inst, "provider_message_id": "DEBOUNCE-1"},
+        headers=h,
+    )
+    atual = client.post(
+        f"/v1/conversas/{tel}/pode-responder",
+        json={"instance": inst, "provider_message_id": "DEBOUNCE-2"},
+        headers=h,
+    )
+
+    assert antiga.status_code == 200
+    assert antiga.json() == {
+        "pode_responder": False,
+        "motivo": "mensagem_superada",
+    }
+    assert atual.json() == {"pode_responder": True, "motivo": "ultima_entrada"}
+
+
+def test_pode_responder_bloqueia_saida_consecutiva_e_handoff(client, loja_a):
+    inst, tel, h = loja_a["instance"], "5511977700002", loja_a["headers"]
+    client.post(
+        "/webhook/mensagem",
+        json={
+            "instance": inst,
+            "telefone": tel,
+            "texto": "quero saber da moto",
+            "provider_message_id": "CLIENTE-1",
+        },
+    )
+    client.post(
+        "/webhook/mensagem",
+        json={
+            "instance": inst,
+            "telefone": tel,
+            "texto": "resposta já enviada",
+            "provider_message_id": "BOT-RESPOSTA-1",
+            "from_me": True,
+            "origem_bot": True,
+        },
+    )
+
+    ja_respondida = client.post(
+        f"/v1/conversas/{tel}/pode-responder",
+        json={"instance": inst, "provider_message_id": "CLIENTE-1"},
+        headers=h,
+    )
+    assert ja_respondida.json() == {
+        "pode_responder": False,
+        "motivo": "ultima_mensagem_saida",
+    }
+
+    client.post(
+        "/webhook/mensagem",
+        json={
+            "instance": inst,
+            "telefone": tel,
+            "texto": "nova pergunta",
+            "provider_message_id": "CLIENTE-2",
+        },
+    )
+    client.patch(
+        f"/v1/conversas/{tel}/estado",
+        json={"bot_ativo": False, "instance": inst},
+        headers=h,
+    )
+    handoff = client.post(
+        f"/v1/conversas/{tel}/pode-responder",
+        json={"instance": inst, "provider_message_id": "CLIENTE-2"},
+        headers=h,
+    )
+    assert handoff.json() == {"pode_responder": False, "motivo": "bot_inativo"}
+
+
 def test_resposta_manual_pausa_o_bot(client, loja_a):
     tel = "5511977700011"
     r = client.post(

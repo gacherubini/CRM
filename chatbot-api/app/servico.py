@@ -1140,6 +1140,47 @@ def obter_estado(
     }
 
 
+def pode_responder_mensagem(
+    db: Session,
+    loja_id: str,
+    telefone: str,
+    provider_message_id: str,
+    *,
+    instance: str,
+) -> dict:
+    """Autoriza somente a última entrada ainda sem uma saída posterior.
+
+    O n8n chama este juiz depois do debounce. Execuções de mensagens anteriores
+    param aqui, assim como uma execução que perdeu a corrida para outra resposta.
+    """
+    resolved = _resolver_canal_id_escopo(db, loja_id, instance=instance)
+    conversas = _listar_conversas_telefone(
+        db, loja_id, telefone, canal_id=resolved
+    )
+    conversa = _exigir_conversa_unica(conversas, canal_id=resolved)
+    if conversa is None:
+        return {"pode_responder": False, "motivo": "conversa_nao_encontrada"}
+    if not _bot_ativo_efetivo(db, loja_id, conversa.bot_ativo):
+        return {"pode_responder": False, "motivo": "bot_inativo"}
+
+    ultima = (
+        db.query(Mensagem)
+        .filter(
+            Mensagem.loja_id == loja_id,
+            Mensagem.conversa_id == conversa.id,
+        )
+        .order_by(Mensagem.criada_em.desc(), Mensagem.id.desc())
+        .first()
+    )
+    if ultima is None:
+        return {"pode_responder": False, "motivo": "conversa_sem_mensagem"}
+    if ultima.direcao != "entrada":
+        return {"pode_responder": False, "motivo": "ultima_mensagem_saida"}
+    if ultima.provider_message_id != provider_message_id:
+        return {"pode_responder": False, "motivo": "mensagem_superada"}
+    return {"pode_responder": True, "motivo": "ultima_entrada"}
+
+
 def definir_bot_ativo(
     db: Session,
     loja_id: str,

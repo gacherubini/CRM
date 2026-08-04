@@ -28,9 +28,11 @@ def main() -> None:
     assert test["name"] == f"WhatsApp IA - TESTE {TEST_PHONE}"
     assert test["active"] is False
     assert test["activeVersionId"] is None
-    assert test["connections"]["Se resposta controle1"]["main"][1][0]["node"] == "AI Agent1"
+    assert test["connections"]["Se resposta controle1"]["main"][1][0]["node"] == (
+        "Aguardar 40s cliente1"
+    )
     assert test["connections"] == canonical["connections"]
-    assert len(test["nodes"]) == len(canonical["nodes"]) == 27
+    assert len(test["nodes"]) == len(canonical["nodes"]) == 30
     assert [(node["name"], node["type"]) for node in test["nodes"]] == [
         (node["name"], node["type"]) for node in canonical["nodes"]
     ]
@@ -42,6 +44,14 @@ def main() -> None:
     }
     assert removidos.isdisjoint(nomes)
     assert "if (audio) return []" in by_name(test, "Extrair1")["parameters"]["jsCode"]
+    assert "MAX_MESSAGE_AGE_SECONDS = 300" in by_name(test, "Extrair1")["parameters"]["jsCode"]
+    assert by_name(test, "Verificar mensagem mais recente1")
+    assert by_name(test, "Gate resposta mais recente1")
+    temp_fallback = by_name(test, "TEMP continuar sem estoque1")
+    assert temp_fallback["type"] == "@n8n/n8n-nodes-langchain.toolCode"
+    assert "não oferece fotos" in temp_fallback["parameters"]["description"].lower()
+    assert "/v1/simulacoes/solicitar" not in temp_fallback["parameters"]["jsCode"]
+    assert test["connections"]["TEMP continuar sem estoque1"]["ai_tool"][0][0]["node"] == "AI Agent1"
 
     webhook = by_name(test, "Webhook1")
     assert webhook["parameters"]["path"] == TEST_WEBHOOK
@@ -101,6 +111,8 @@ def main() -> None:
         assert 'mande as fotos do catálogo ou prefere' in prompt
         assert 'NÃO exija foto antes' in prompt or 'não exija foto antes' in prompt.lower()
         assert 'qual moto você quer simular?' not in prompt
+        assert '[TEMP_ESTOQUE_INCOMPLETO_INICIO]' in prompt
+        assert '[TEMP_ESTOQUE_INCOMPLETO_FIM]' in prompt
 
     inventory = by_name(test, 'consultar_estoque1')
     canonical_inventory = by_name(canonical, 'consultar_estoque1')
