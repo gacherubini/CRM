@@ -37,6 +37,7 @@ from app.main import (  # import tardio; main registra este router no fim
     gerar_insights_roi,
     get_chatbot_client,
     get_db,
+    lead_casa_campanha,
     meta_ads_spend_job,
     normalizar_ad_account_id,
     normalizar_pixel_id,
@@ -128,6 +129,23 @@ def campanhas_lista(request: Request, db: Session = Depends(get_db)):
     gastos_totais: dict[str, Decimal] = {}
     for g in db.query(CampanhaGasto).filter(CampanhaGasto.loja_slug == usuario.loja_slug).all():
         gastos_totais[g.campanha_id] = gastos_totais.get(g.campanha_id, Decimal("0")) + g.valor
+    # Mensagens = conversas vindas do anúncio (leads CTWA) atribuídas à campanha;
+    # custo/msg = gasto total / mensagens. Mesma atribuição (último toque) do ROI.
+    mensagens_totais: dict[str, int] = {}
+    custo_por_msg: dict[str, Decimal] = {}
+    chatbot_erro = None
+    try:
+        leads = get_chatbot_client().listar_leads()
+    except ChatbotIndisponivel:
+        leads = []
+        chatbot_erro = "indisponivel"
+    for c in campanhas:
+        n = sum(1 for l in leads if lead_casa_campanha(l, c, modo="last"))
+        mensagens_totais[c.id] = n
+        if n > 0:
+            custo_por_msg[c.id] = (gastos_totais.get(c.id, Decimal("0")) / n).quantize(
+                Decimal("0.01")
+            )
     return templates.TemplateResponse(
         "campanhas/lista.html",
         contexto(
@@ -135,6 +153,9 @@ def campanhas_lista(request: Request, db: Session = Depends(get_db)):
             usuario,
             campanhas=campanhas,
             gastos_totais=gastos_totais,
+            mensagens_totais=mensagens_totais,
+            custo_por_msg=custo_por_msg,
+            chatbot_erro=chatbot_erro,
             canais=CANAIS_ROTULO,
             status_rotulo=STATUS_ROTULO,
         ),

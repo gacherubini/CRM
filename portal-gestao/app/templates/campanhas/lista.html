@@ -17,6 +17,7 @@
 {% if request.query_params.get('ok') == 'apagada' %}<div class="alert success">Campanha apagada com sucesso.</div>
 {% elif request.query_params.get('ok') %}<div class="alert success">Ação concluída com sucesso.</div>{% endif %}
 {% if request.query_params.get('erro') %}<div class="alert error">Não foi possível localizar essa campanha.</div>{% endif %}
+{% if chatbot_erro %}<div class="n" role="alert"><strong>Chatbot indisponível.</strong> Mensagens e Custo/msg podem estar desatualizados.</div>{% endif %}
 
 <section class="panel flush">
   {% if campanhas %}
@@ -28,6 +29,8 @@
         <th>utm_campaign</th>
         <th>Status</th>
         <th>Gasto total</th>
+        <th>Mensagens</th>
+        <th>Custo/msg</th>
         <th><span class="sr-only">Ações</span></th>
       </tr>
     </thead>
@@ -39,6 +42,8 @@
         <td><code>{{ c.utm_campaign }}</code></td>
         <td><span class="status {{ 'confirmada' if c.status == 'ativa' else ('cancelada' if c.status == 'encerrada' else '') }}">{{ status_rotulo.get(c.status, c.status) }}</span></td>
         <td>{{ formatar_brl(gastos_totais.get(c.id, 0)) }}</td>
+        <td>{{ mensagens_totais.get(c.id, 0) }}</td>
+        <td>{% if custo_por_msg.get(c.id) is not none %}{{ formatar_brl(custo_por_msg.get(c.id)) }}{% else %}—{% endif %}</td>
         <td>
           <div class="action-grid">
             <a class="button secondary" href="/app/campanhas/{{ c.id }}">Detalhe</a>
