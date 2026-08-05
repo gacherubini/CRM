@@ -7,8 +7,9 @@
     <span class="eyebrow">Estoque</span>
     <h1>Ordem na vitrine</h1>
     <p>
-      Arraste as fotos para montar a ordem do catálogo público.
-      As mudanças só vão pro ar quando você clicar em <strong>Salvar ordem</strong>.
+      Arraste as fotos para montar a ordem do catálogo público (mesma grade e
+      paginação da vitrine). As mudanças só vão pro ar quando você clicar em
+      <strong>Salvar ordem</strong>.
     </p>
   </div>
   <div class="heading-actions">
@@ -26,8 +27,8 @@
       <span class="mono-label">Catálogo público</span>
       <h2 id="vitrine-titulo">Publicados e disponíveis</h2>
     </div>
-    {% if veiculos %}
-    <span class="muted">{{ veiculos|length }} veículo{{ 's' if veiculos|length != 1 else '' }} · 3 por linha</span>
+    {% if total_items %}
+    <span class="muted">{{ total_items }} veículo{{ 's' if total_items != 1 else '' }} · 3 por linha</span>
     {% endif %}
   </div>
   <div class="panel-body panel-body-vitrine">
@@ -39,7 +40,7 @@
     </div>
     {% elif veiculos %}
     <p class="muted vitrine-hint">
-      Arraste qualquer card para trocar a posição. Nada é gravado até o botão Salvar.
+      Arraste qualquer card nesta página. A ordem de todas as páginas é salva junta.
     </p>
     <form
       id="vitrine-ordem-form"
@@ -47,20 +48,25 @@
       action="/app/loja/estoque/vitrine"
       class="vitrine-form"
       data-vitrine-grid
+      data-offset="{{ offset }}"
+      data-limit="{{ limit }}"
     >
       <input type="hidden" name="csrf" value="{{ csrf }}">
+      <input type="hidden" name="limit" value="{{ limit }}">
+      <input type="hidden" name="offset" value="{{ offset }}">
+      {# Ordem GLOBAL (todas as páginas). A grade só mostra o recorte atual. #}
       <input
         type="hidden"
         name="ordem_ids"
         id="vitrine-ordem-ids"
-        value="{% for v in veiculos %}{{ v.id }}{% if not loop.last %},{% endif %}{% endfor %}"
-        data-initial="{% for v in veiculos %}{{ v.id }}{% if not loop.last %},{% endif %}{% endfor %}"
+        value="{% for id in all_ids %}{{ id }}{% if not loop.last %},{% endif %}{% endfor %}"
+        data-initial="{% for id in all_ids %}{{ id }}{% if not loop.last %},{% endif %}{% endfor %}"
       >
       <ul class="vitrine-grid" id="vitrine-lista" role="list">
         {% for v in veiculos %}
         {% set foto = v.foto_url or (v.midia_principal.url if v.midia_principal and v.midia_principal.url else none) %}
         {% if foto and '/public/v1/media/' in foto and '?' not in foto %}
-          {% set foto_src = foto ~ '?w=640' %}
+          {% set foto_src = foto ~ '?w=400' %}
         {% else %}
           {% set foto_src = foto %}
         {% endif %}
@@ -72,22 +78,22 @@
               alt="{{ v.marca }} {{ v.modelo }}"
               loading="lazy"
               decoding="async"
+              width="400"
+              height="250"
               draggable="false"
             >
             {% else %}
-            <span class="vitrine-card-empty">
-              <span class="vitrine-card-empty-letter">{{ (v.marca or '?')[:1]|upper }}</span>
-              sem foto
-            </span>
+            <span class="vitrine-card-empty">Sem foto</span>
             {% endif %}
-            <span class="vitrine-card-badge" data-pos aria-hidden="true">{{ loop.index }}</span>
+            <span class="vitrine-card-badge" data-pos aria-hidden="true">{{ offset + loop.index }}</span>
           </div>
           <div class="vitrine-card-meta">
+            <span class="vitrine-card-eyebrow">{{ v.tipo or 'moto' }}{% if v.ano_modelo %} · {{ v.ano_modelo }}{% endif %}</span>
             <strong>{{ v.marca }} {{ v.modelo }}</strong>
-            <span class="muted">
-              {% if v.ano_modelo %}{{ v.ano_modelo }}{% endif %}
-              {% if v.preco is not none %} · R$ {{ '%.0f'|format(v.preco|float) }}{% endif %}
-            </span>
+            <div class="vitrine-card-facts">
+              <span class="muted">{% if v.km is not none %}{{ "{:,.0f}".format(v.km|float).replace(',', '.') }} km{% else %}—{% endif %}</span>
+              <span class="vitrine-card-price">{% if v.preco is not none %}R$ {{ '%.0f'|format(v.preco|float) }}{% else %}—{% endif %}</span>
+            </div>
           </div>
           <div class="vitrine-card-tools">
             <button type="button" class="button secondary vitrine-btn-up" aria-label="Mover {{ v.marca }} {{ v.modelo }} para a esquerda">←</button>
@@ -96,6 +102,46 @@
         </li>
         {% endfor %}
       </ul>
+
+      {% if previous_url or next_url or page_links|length > 1 %}
+      <nav class="vitrine-pagination" aria-label="Paginação">
+        <p class="vitrine-pagination-meta muted">
+          {% if total_items %}
+          Mostrando <strong>{{ showing_from }}–{{ showing_to }}</strong> de <strong>{{ total_items }}</strong>
+          {% endif %}
+        </p>
+        <ul class="vitrine-pagination-bar">
+          <li>
+            {% if previous_url %}
+            <a class="vitrine-page-btn" href="{{ previous_url }}" rel="prev" data-vitrine-page>‹ Anterior</a>
+            {% else %}
+            <span class="vitrine-page-btn is-disabled" aria-disabled="true">‹ Anterior</span>
+            {% endif %}
+          </li>
+          {% for link in page_links %}
+            {% if link.kind == 'ellipsis' %}
+            <li class="vitrine-page-ellipsis" aria-hidden="true"><span>…</span></li>
+            {% else %}
+            <li>
+              {% if link.current %}
+              <span class="vitrine-page-btn is-current" aria-current="page">{{ link.number }}</span>
+              {% else %}
+              <a class="vitrine-page-btn" href="{{ link.url }}" data-vitrine-page>{{ link.number }}</a>
+              {% endif %}
+            </li>
+            {% endif %}
+          {% endfor %}
+          <li>
+            {% if next_url %}
+            <a class="vitrine-page-btn" href="{{ next_url }}" rel="next" data-vitrine-page>Próxima ›</a>
+            {% else %}
+            <span class="vitrine-page-btn is-disabled" aria-disabled="true">Próxima ›</span>
+            {% endif %}
+          </li>
+        </ul>
+      </nav>
+      {% endif %}
+
       <div class="vitrine-footer">
         <button class="button primary" type="submit" id="vitrine-salvar" disabled>Salvar ordem</button>
         <button class="button secondary" type="button" id="vitrine-descartar" disabled>Descartar</button>
@@ -106,6 +152,6 @@
   </div>
 </section>
 {% if veiculos %}
-<script src="/static/js/vitrine_ordem.js" defer></script>
+<script src="/static/js/vitrine_ordem.js?v=3" defer></script>
 {% endif %}
 {% endblock %}

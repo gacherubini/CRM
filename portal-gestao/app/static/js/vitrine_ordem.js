@@ -1,4 +1,4 @@
-/* Grade da vitrine: reordenação local sem save automático. */
+/* Grade da vitrine: reordenação local na página; ordem global no hidden field. */
 (function () {
   const form = document.querySelector("[data-vitrine-grid]");
   if (!form) return;
@@ -10,6 +10,7 @@
   const btnDescartar = document.getElementById("vitrine-descartar");
   if (!lista || !campo) return;
 
+  const offset = Math.max(0, parseInt(form.dataset.offset || "0", 10) || 0);
   const initialOrder = (campo.dataset.initial || campo.value || "").trim();
   let dragging = null;
   let lastOverId = null;
@@ -20,22 +21,40 @@
     return Array.from(lista.querySelectorAll(".vitrine-card"));
   }
 
-  function currentOrder() {
+  function fullIds() {
+    return (campo.value || "")
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
+  }
+
+  function pageIds() {
     return cards()
       .map((card) => card.getAttribute("data-id") || "")
-      .filter(Boolean)
-      .join(",");
+      .filter(Boolean);
+  }
+
+  /** Reaplica a ordem dos cards da página no array global. */
+  function mergePageIntoGlobal() {
+    const full = fullIds();
+    const page = pageIds();
+    if (!page.length) return full;
+    const next = full.slice();
+    // Garante que o recorte da página tem o tamanho certo
+    const len = page.length;
+    next.splice(offset, len, ...page);
+    return next;
+  }
+
+  function syncField() {
+    campo.value = mergePageIntoGlobal().join(",");
   }
 
   function refreshBadges() {
     cards().forEach((card, index) => {
       const badge = card.querySelector("[data-pos]");
-      if (badge) badge.textContent = String(index + 1);
+      if (badge) badge.textContent = String(offset + index + 1);
     });
-  }
-
-  function syncField() {
-    campo.value = currentOrder();
   }
 
   function setDirty(dirty) {
@@ -91,10 +110,6 @@
     try {
       event.dataTransfer.effectAllowed = "move";
       event.dataTransfer.setData("text/plain", card.getAttribute("data-id") || "");
-      // Ghost mais limpo em alguns browsers
-      if (event.dataTransfer.setDragImage) {
-        event.dataTransfer.setDragImage(card, card.clientWidth / 2, 40);
-      }
     } catch (_) {}
   });
 
@@ -151,15 +166,23 @@
 
   if (btnDescartar) {
     btnDescartar.addEventListener("click", () => {
-      const ids = initialOrder.split(",").filter(Boolean);
-      const map = new Map(cards().map((c) => [c.getAttribute("data-id"), c]));
-      ids.forEach((id) => {
-        const card = map.get(id);
-        if (card) lista.appendChild(card);
-      });
-      markIfChanged();
+      // Recarrega a página limpa (ordem inicial do servidor).
+      window.location.reload();
     });
   }
+
+  // Avisa se sair da página com alterações não salvas (paginação / link).
+  form.querySelectorAll("[data-vitrine-page]").forEach((link) => {
+    link.addEventListener("click", (event) => {
+      syncField();
+      if (campo.value !== initialOrder) {
+        const ok = window.confirm(
+          "Você tem alterações não salvas nesta página. Sair e perder a ordem?"
+        );
+        if (!ok) event.preventDefault();
+      }
+    });
+  });
 
   form.addEventListener("submit", (event) => {
     syncField();

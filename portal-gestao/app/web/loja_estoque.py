@@ -14,8 +14,9 @@ adicionados, reutilizar ``pode_ver_custo`` (vendedor não vê).
 from __future__ import annotations
 
 from typing import Annotated
+from urllib.parse import urlencode
 
-from fastapi import APIRouter, Depends, Form, Request
+from fastapi import APIRouter, Depends, Form, Query, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy.orm import Session
 
@@ -35,6 +36,9 @@ from app.main import (  # noqa: E402
     templates,
 )
 
+# Mesmo default do catálogo público (CATALOGO_PAGE_SIZE=12 → 3 colunas × 4 linhas).
+_VITRINE_PAGE_SIZE = 12
+
 
 def _shell_ativo() -> bool:
     return revy_loja_shell_enabled()
@@ -49,6 +53,35 @@ def _ordenar_vitrine(veiculos: list[dict]) -> list[dict]:
             str(v.get("id") or ""),
         ),
     )
+
+
+def _pagination_window(
+    current_page: int, total_pages: int, *, radius: int = 2
+) -> list[int | None]:
+    """Mesma janela do catálogo público; ``None`` = reticências."""
+    if total_pages <= 0:
+        return []
+    current_page = max(1, min(current_page, total_pages))
+    if total_pages <= 1 + 2 * radius + 2:
+        return list(range(1, total_pages + 1))
+    pages: set[int] = {1, total_pages}
+    for n in range(current_page - radius, current_page + radius + 1):
+        if 1 <= n <= total_pages:
+            pages.add(n)
+    ordered = sorted(pages)
+    result: list[int | None] = []
+    prev = 0
+    for n in ordered:
+        if prev and n - prev > 1:
+            result.append(None)
+        result.append(n)
+        prev = n
+    return result
+
+
+def _vitrine_page_url(offset: int, limit: int) -> str:
+    qs = urlencode({"limit": limit, "offset": max(0, offset)})
+    return f"/app/loja/estoque/vitrine?{qs}"
 
 
 @router.get("/app/loja/estoque", response_class=HTMLResponse)
@@ -122,8 +155,14 @@ def loja_estoque_vitrine(
     request: Request,
     db: Session = Depends(get_db),
     estoque: EstoqueClient = Depends(get_estoque_client),
+    limit: int = Query(default=_VITRINE_PAGE_SIZE, ge=1, le=48),
+    offset: int = Query(default=0, ge=0),
 ):
-    """Edição da ordem dos veículos publicados no catálogo público."""
+    """Edição da ordem dos veículos publicados no catálogo público.
+
+    Paginação alinhada ao catálogo (default 12 = 3 colunas × 4 linhas).
+    A ordem salva é sempre a lista global; a página só mostra um recorte.
+    """
     usuario = usuario_atual(request, db)
     if not usuario:
         return redirecionar_login()
@@ -132,14 +171,46 @@ def loja_estoque_vitrine(
     if not pode_gerir_estoque(usuario):
         return RedirectResponse("/app/loja/estoque", status_code=303)
 
-    veiculos: list[dict] = []
+    todos: list[dict] = []
     erro: str | None = request.session.pop("vitrine_erro", None)
     mensagem: str | None = request.session.pop("vitrine_mensagem", None)
     try:
         brutos = estoque.listar(publicado=True, status="disponivel")
-        veiculos = _ordenar_vitrine(brutos)
+        todos = _ordenar_vitrine(brutos)
     except EstoqueIndisponivel as exc:
         erro = str(exc)
+
+    total = len(todos)
+    if total and offset >= total:
+        offset = max(0, ((total - 1) // limit) * limit)
+
+    veiculos = todos[offset : offset + limit]
+    total_pages = max(1, (total + limit - 1) // limit) if total else 1
+    current_page = (offset // limit) + 1 if limit else 1
+    if total and current_page > total_pages:
+        current_page = total_pages
+
+    previous_url = _vitrine_page_url(offset - limit, limit) if offset else None
+    has_next = (offset + len(veiculos)) < total
+    next_url = _vitrine_page_url(offset + limit, limit) if has_next else None
+
+    page_links: list[dict] = []
+    for item in _pagination_window(current_page, total_pages if total else 1):
+        if item is None:
+            page_links.append({"kind": "ellipsis"})
+        else:
+            page_links.append(
+                {
+                    "kind": "page",
+                    "number": item,
+                    "url": _vitrine_page_url((item - 1) * limit, limit),
+                    "current": item == current_page,
+                }
+            )
+
+    showing_from = offset + 1 if veiculos else 0
+    showing_to = offset + len(veiculos)
+    all_ids = [str(v.get("id") or "") for v in todos if v.get("id")]
 
     return templates.TemplateResponse(
         "loja/vitrine_ordem.html",
@@ -147,6 +218,15 @@ def loja_estoque_vitrine(
             request,
             usuario,
             veiculos=veiculos,
+            all_ids=all_ids,
+            total_items=total,
+            limit=limit,
+            offset=offset,
+            previous_url=previous_url,
+            next_url=next_url,
+            page_links=page_links,
+            showing_from=showing_from,
+            showing_to=showing_to,
             erro=erro,
             mensagem=mensagem,
             pode_gerir=True,
@@ -161,6 +241,8 @@ def loja_estoque_vitrine_salvar(
     estoque: EstoqueClient = Depends(get_estoque_client),
     csrf: Annotated[str, Form()] = "",
     ordem_ids: Annotated[str, Form()] = "",
+    limit: Annotated[int, Form()] = _VITRINE_PAGE_SIZE,
+    offset: Annotated[int, Form()] = 0,
 ):
     usuario = usuario_atual(request, db)
     if not usuario:
@@ -172,11 +254,22 @@ def loja_estoque_vitrine_salvar(
     ):
         return RedirectResponse("/app/loja/estoque", status_code=303)
 
+    try:
+        limit_i = max(1, min(48, int(limit)))
+    except (TypeError, ValueError):
+        limit_i = _VITRINE_PAGE_SIZE
+    try:
+        offset_i = max(0, int(offset))
+    except (TypeError, ValueError):
+        offset_i = 0
+
+    destino = _vitrine_page_url(offset_i, limit_i)
     ids = [parte.strip() for parte in (ordem_ids or "").split(",") if parte.strip()]
     if not ids:
         request.session["vitrine_erro"] = "Nenhuma ordem enviada."
-        return RedirectResponse("/app/loja/estoque/vitrine", status_code=303)
+        return RedirectResponse(destino, status_code=303)
 
+    # Ordem global: posições 0..N-1 na lista completa.
     itens = [{"id": vid, "ordem_vitrine": indice} for indice, vid in enumerate(ids)]
     try:
         estoque.reordenar_vitrine(itens)
@@ -186,4 +279,4 @@ def loja_estoque_vitrine_salvar(
     except EstoqueIndisponivel as exc:
         request.session["vitrine_erro"] = str(exc)
 
-    return RedirectResponse("/app/loja/estoque/vitrine", status_code=303)
+    return RedirectResponse(destino, status_code=303)
