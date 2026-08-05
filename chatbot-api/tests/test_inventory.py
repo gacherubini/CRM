@@ -429,7 +429,11 @@ def test_config_catalogo_bot_configurado(client, loja_a, monkeypatch):
         assert body["ok"] is True
         assert body["configurado"] is True
         assert body["catalogo_url"].startswith("https://")
-        assert "https://exemplo.com/catalogo/l/loja" in body["mensagem"]
+        assert body["mensagem"] == (
+            "olha o catálogo completo aqui: https://exemplo.com/catalogo/l/loja"
+        )
+        # Nunca instrução interna ("manda este link pro cliente…").
+        assert "pro cliente" not in body["mensagem"].lower()
     finally:
         app.dependency_overrides.pop(get_inventory_write_client, None)
 

@@ -927,10 +927,8 @@ def config_catalogo_bot(
         "ok": True,
         "configurado": True,
         "catalogo_url": url,
-        "mensagem": (
-            "manda este link pro cliente ver as motos no catálogo: "
-            f"{url}"
-        ),
+        # Texto cliente-facing: o Agent ecoa `mensagem` no WhatsApp.
+        "mensagem": f"olha o catálogo completo aqui: {url}",
     }
 
 
