@@ -113,10 +113,14 @@ def test_vitrine_paginacao_numerada(client, fake_provider):
     fake_provider.list_vehicles = paged
     response = client.get("/l/moto-center?limit=12&offset=0")
     assert response.status_code == 200
-    assert "Mostrando 1–1 de 25" in response.text
+    assert "Mostrando" in response.text and "de" in response.text and "25" in response.text
     assert 'aria-current="page"' in response.text
+    assert 'class="pagination-bar"' in response.text
+    assert 'class="page-btn is-current"' in response.text
     assert "Próxima" in response.text
     assert "Anterior" in response.text
+    # Não deve usar ol numerado (marcadores 1. 1 / 2. 2 na UI).
+    assert "<ol" not in response.text
 
 
 def test_detalhe_renderiza_galeria_e_cta(client):

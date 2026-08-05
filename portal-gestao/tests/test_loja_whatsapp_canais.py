@@ -375,9 +375,11 @@ def test_nav_com_flag_on_mostra_item_em_ajustes():
     assert [i.label for i in ajustes.items] == [
         "Acessos bancários",
         "Números de WhatsApp",
+        "Grupo do estoque",
         "Integrações",
         "Equipe",
     ]
+    assert not any(i.label == "Catálogo" or i.href == "/app/loja/catalogo" for i in ajustes.items)
 
 
 def test_nav_com_flag_off_nao_mostra_item():

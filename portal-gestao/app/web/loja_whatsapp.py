@@ -4,10 +4,15 @@ QR nunca vai a log nem a auditoria: vive só no request/response do conectar. A
 sessão carrega apenas um token curto; o payload fica no store de `qr_efemero`,
 porque um QR em base64 estouraria o limite de ~4 KB do cookie.
 Gated por REVY_LOJA_SHELL_ENABLED + REVY_LOJA_WHATSAPP_ENABLED (default off).
+
+Também hospeda o WhatsApp do catálogo (CTA da vitrine), gravado no Estoque —
+independente dos canais Evolution.
 """
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Request
+from typing import Annotated
+
+from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from sqlalchemy.orm import Session
 
@@ -15,6 +20,7 @@ router = APIRouter()
 
 from app.auth import csrf_valido, usuario_atual  # noqa: E402
 from app.clients.chatbot import ChatbotIndisponivel  # noqa: E402
+from app.clients.estoque import EstoqueClient, EstoqueIndisponivel  # noqa: E402
 from app.config import (  # noqa: E402
     revy_loja_shell_enabled,
     revy_loja_whatsapp_enabled,
@@ -27,6 +33,7 @@ from app.loja_operacao_auditoria import registrar_auditoria_canal  # noqa: E402
 from app.main import (  # noqa: E402
     contexto,
     get_chatbot_client,
+    get_estoque_client,
     redirecionar_login,
     templates,
 )
@@ -53,11 +60,27 @@ def _para_tela() -> RedirectResponse:
     return RedirectResponse(_TELA, status_code=303)
 
 
+def _carregar_whatsapp_catalogo(estoque: EstoqueClient) -> tuple[str, str | None]:
+    """Lê o CTA da vitrine no Estoque; falha best-effort (não quebra a tela)."""
+    obter = getattr(estoque, "obter_loja", None)
+    if not callable(obter):
+        # Fakes legados de testes / cliente sem o método ainda.
+        return "", None
+    try:
+        dados = obter()
+        return str(dados.get("whatsapp") or ""), None
+    except EstoqueIndisponivel as exc:
+        return "", str(exc) or "Não foi possível carregar o WhatsApp do catálogo."
+    except Exception:
+        return "", None
+
+
 @router.get(_TELA, response_class=HTMLResponse)
 def loja_whatsapp_canais(
     request: Request,
     db: Session = Depends(get_db),
     chatbot=Depends(get_chatbot_client),
+    estoque: EstoqueClient = Depends(get_estoque_client),
 ):
     usuario = usuario_atual(request, db)
     if not usuario:
@@ -72,6 +95,7 @@ def loja_whatsapp_canais(
         erro = str(exc)
 
     view = montar_canais_view(canais, erro=erro)
+    catalogo_wa, catalogo_erro = _carregar_whatsapp_catalogo(estoque)
     return templates.TemplateResponse(
         "loja/whatsapp_canais.html",
         contexto(
@@ -83,9 +107,40 @@ def loja_whatsapp_canais(
             # store, para não sobreviver ao reload.
             qr=qr_efemero.consumir(request.session.pop("canal_qr_token", None)),
             acao_erro=request.session.pop("canal_erro", None),
+            catalogo_whatsapp=catalogo_wa,
+            catalogo_erro=catalogo_erro or request.session.pop("catalogo_erro", None),
+            catalogo_mensagem=request.session.pop("catalogo_mensagem", None),
         ),
         headers={"Cache-Control": "no-store"},
     )
+
+
+@router.post("/app/loja/whatsapp/catalogo", response_class=HTMLResponse)
+def loja_whatsapp_catalogo_salvar(
+    request: Request,
+    whatsapp: Annotated[str, Form()] = "",
+    csrf: Annotated[str, Form()] = "",
+    db: Session = Depends(get_db),
+    estoque: EstoqueClient = Depends(get_estoque_client),
+):
+    """Salva o número do botão Tenho interesse da vitrine pública."""
+    usuario = usuario_atual(request, db)
+    if not usuario:
+        return redirecionar_login()
+    if not _habilitado() or not _autorizado(usuario) or not csrf_valido(request, csrf):
+        return _para_app()
+
+    valor = (whatsapp or "").strip()
+    try:
+        salva = estoque.atualizar_loja(whatsapp=valor or None)
+        request.session["catalogo_mensagem"] = "WhatsApp do catálogo atualizado."
+        # Mantém o valor normalizado na próxima renderização se a leitura falhar.
+        request.session["catalogo_whatsapp_salvo"] = str(salva.get("whatsapp") or "")
+    except EstoqueIndisponivel as exc:
+        request.session["catalogo_erro"] = (
+            str(exc) or "Não foi possível salvar o WhatsApp do catálogo."
+        )
+    return RedirectResponse(_TELA + "#catalogo-wa", status_code=303)
 
 
 async def _guarda(request: Request, db: Session):

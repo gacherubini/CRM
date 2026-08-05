@@ -25,13 +25,13 @@ def test_nav_somente_vendas_e_estoque_com_acessos_bancarios():
     assert titles == ["Vendas", "Estoque", "Ajustes", "Conta"]
     items = flatten_nav(sections)
     labels = [i.label for i in items]
+    # WhatsApp no menu depende da flag (default off nos unit tests sem flag).
     assert labels == [
         "Visão geral",
         "Atendimento",
         "Visão geral",
         "Veículos",
         "Acessos bancários",
-        "Catálogo",
         "Grupo do estoque",
         "Integrações",
         "Equipe",
@@ -43,7 +43,7 @@ def test_nav_somente_vendas_e_estoque_com_acessos_bancarios():
     assert "/app/loja/estoque" in hrefs
     assert "/app/loja/estoque/veiculos" in hrefs
     assert "/app/financeiras" in hrefs
-    assert "/app/loja/catalogo" in hrefs
+    assert "/app/loja/catalogo" not in hrefs
     assert "/app/operacao/numeros" in hrefs
     assert "/app/loja/integracoes" in hrefs
     assert "/app/loja/equipe" in hrefs
