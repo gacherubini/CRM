@@ -697,6 +697,29 @@ class CampanhaAnuncio(Base):
     campanha: Mapped["Campanha"] = relationship(back_populates="anuncios")
 
 
+class MetaAdCampanha(Base):
+    """Cache ad_id → meta_campaign_id resolvido via Graph API (Fase 2 CTWA)."""
+
+    __tablename__ = "meta_ad_campanha"
+    __table_args__ = (
+        UniqueConstraint("loja_slug", "ad_id", name="uq_meta_ad_campanha"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=novo_id)
+    loja_slug: Mapped[str] = mapped_column(String(120), index=True)
+    ad_id: Mapped[str] = mapped_column(String(64), index=True)
+    meta_campaign_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    meta_campaign_nome: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
+    resolvido_em: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    ultima_tentativa_em: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    erro: Mapped[Optional[str]] = mapped_column(String(300), nullable=True)
+    tentativas: Mapped[int] = mapped_column(Integer, default=0)
+
+
 class CampanhaGasto(Base):
     __tablename__ = "campanha_gastos"
     __table_args__ = (

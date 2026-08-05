@@ -96,9 +96,11 @@ def calcular_roi_loja(
     d_inicio: date,
     d_fim: date,
     modo_atribuicao: str = "last",
+    mapa_ad_campaign: dict[str, str] | None = None,
 ) -> list[LinhaRoiCampanha]:
     modo = modo_atribuicao if modo_atribuicao in ("first", "last") else "last"
     leads_periodo = [l for l in leads if _lead_no_periodo(l, d_inicio, d_fim)]
+    mapa = mapa_ad_campaign or None
 
     linhas: list[LinhaRoiCampanha] = []
     leads_matched_ids: set[str] = set()
@@ -109,7 +111,7 @@ def calcular_roi_loja(
         leads_c = [
             l
             for l in leads_periodo
-            if lead_casa_campanha(l, campanha, modo=modo)
+            if lead_casa_campanha(l, campanha, modo=modo, mapa_ad_campaign=mapa)
         ]
         for l in leads_c:
             if l.get("id"):
@@ -160,7 +162,11 @@ def calcular_roi_loja(
     leads_sem += [
         l
         for l in leads_periodo
-        if not l.get("id") and all(not lead_casa_campanha(l, c, modo=modo) for c in campanhas)
+        if not l.get("id")
+        and all(
+            not lead_casa_campanha(l, c, modo=modo, mapa_ad_campaign=mapa)
+            for c in campanhas
+        )
     ]
     # dedupe by id/object
     seen = set()

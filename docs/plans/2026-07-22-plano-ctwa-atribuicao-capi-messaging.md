@@ -5,8 +5,8 @@
 > preenchido — a referral CTWA do WhatsApp entrega só `ad_id`, não o id da campanha).
 > Corrigido/estendido pelo plano
 > [CTWA por ad_id + Graph](../superpowers/plans/2026-08-04-atribuicao-ctwa-campanha.md)
-> — **Fase 1 deployada** (`app2037`, 2026-08-04): lead na 2ª mensagem + match por `ad_id`;
-> Fase 2 (resolução `ad_id→campaign_id` via Graph) pendente do token `ads_read`.
+> — **Fase 1 deployada** + **Fase 2 código** (cache Graph + worker gated): lead na 2ª
+> mensagem, match por `ad_id` e resolução `ad_id→campaign_id` via Graph (`ads_read`).
 > O **CAPI messaging Purchase** descrito neste plano continua válido.
 
 > **FRONTEIRA FUTURA:** o fluxo CTWA implementado continua válido, mas configuração,

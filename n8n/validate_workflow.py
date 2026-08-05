@@ -11,6 +11,7 @@ WORKFLOW = Path(__file__).with_name("workflow-ai-nao-salvos.json")
 WEBHOOK_URL = "http://chatbot-api:8000/webhook/mensagem"
 WEBHOOK_HEADER = "X-Webhook-Token"
 WEBHOOK_TOKEN_PLACEHOLDER = "__CHATBOT_WEBHOOK_TOKEN__"
+CHATBOT_TOKEN_PLACEHOLDER = "__CHATBOT_TOKEN__"
 IMAGE_INGEST_URL = "http://chatbot-api:8000/webhook/operacao/veiculos/foto"
 ROTEAMENTO_URL = "http://chatbot-api:8000/v1/operacao/roteamento"
 
@@ -142,6 +143,12 @@ def main() -> None:
     assert "nunca peça placa ao cliente" in system_message_lower, (
         "prompt ainda permite pedir a placa ao cliente"
     )
+    assert "texto genérico do botão do anúncio" in system_message_lower, (
+        "prompt não contextualiza a resposta ao CTA genérico da Meta"
+    )
+    assert "nunca diga que há outras unidades/opções" in system_message_lower, (
+        "prompt ainda permite inventar alternativas do mesmo modelo"
+    )
     assert "consulte o estoque novamente" in system_message_lower, (
         "prompt não recupera a placa internamente quando necessário"
     )
@@ -210,6 +217,39 @@ def main() -> None:
     assert "veiculos.length === 1" in stock_code and "moto-escolhida:" in stock_code, (
         "consulta específica não preserva a moto escolhida"
     )
+    temp_name = "TEMP continuar sem estoque1"
+    temp_node = next(
+        (node for node in data.get("nodes", []) if node.get("name") == temp_name),
+        None,
+    )
+    assert temp_node is not None, "fallback temporário de estoque ausente"
+    assert temp_node.get("type") == "@n8n/n8n-nodes-langchain.toolCode"
+    temp_description = temp_node.get("parameters", {}).get("description", "").lower()
+    temp_code = temp_node.get("parameters", {}).get("jsCode", "")
+    assert "temporário" in temp_description and "não oferece fotos" in temp_description, (
+        "fallback temporário deve estar identificado e proibir fotos"
+    )
+    assert "/v1/leads" in temp_code and "/estado" in temp_code, (
+        "fallback temporário deve criar lead e transferir para atendimento humano"
+    )
+    assert "/v1/simulacoes/solicitar" not in temp_code, (
+        "fallback sem veículo real nunca deve chamar o motor de simulação"
+    )
+    assert "pode_oferecer_fotos: false" in temp_code, (
+        "fallback temporário deve bloquear a oferta de fotos"
+    )
+    assert temp_name in stock_node.get("parameters", {}).get("description", ""), (
+        "consulta de estoque não encaminha resultado vazio ao fallback temporário"
+    )
+    assert "[temp_estoque_incompleto_inicio]" in system_message_lower
+    assert "[temp_estoque_incompleto_fim]" in system_message_lower
+    assert temp_name.lower() in system_message_lower
+    temp_connections = data.get("connections", {}).get(temp_name, {})
+    assert any(
+        item.get("node") == "AI Agent1" and item.get("type") == "ai_tool"
+        for group in temp_connections.get("ai_tool", [])
+        for item in group
+    ), "fallback temporário não está conectado ao AI Agent"
     memory_node = next(
         (node for node in data.get("nodes", []) if node.get("name") == "Memoria da conversa1"),
         None,
@@ -420,7 +460,9 @@ def main() -> None:
     ), "tool de foto não está conectada ao AI Agent"
 
     nodes_by_name = {node.get("name"): node for node in data.get("nodes", [])}
-    assert len(nodes_by_name) == 27, "workflow deve ter 27 nós (inclui Wait 40s cliente)"
+    assert len(nodes_by_name) == 30, (
+        "workflow deve ter 30 nós (inclui debounce, juiz e fallback temporário)"
+    )
     removidos = {
         "E audio1", "Transcrever audio1", "Aplicar transcricao1",
         "registrar_consentimento1", "registrar_lead1", "consultar_por_placa1",
@@ -456,10 +498,20 @@ def main() -> None:
     assert all(field in extract_code for field in (
         "veioDeAnuncio", "anuncioTitulo", "anuncioDescricao", "externalAdReply",
     )), "extração não reconhece o contexto da mensagem de anúncio"
+    assert "data.messageTimestamp" in extract_code, (
+        "Extrair1 não lê o horário original da mensagem Evolution"
+    )
+    assert "MAX_MESSAGE_AGE_SECONDS = 300" in extract_code, (
+        "Extrair1 deve bloquear replay com mais de 5 minutos"
+    )
+    assert "messageAgeSeconds == null" in extract_code, (
+        "evento sem timestamp deve falhar fechado"
+    )
 
     connections = data.get("connections", {})
 
-    # Delay humano só no caminho do cliente (IA → Wait → WhatsApp); menu da equipe não espera.
+    # Debounce só no caminho do cliente: Wait → confirma última entrada → IA → WhatsApp.
+    # O menu da equipe continua sem espera.
     wait_node = nodes_by_name.get("Aguardar 40s cliente1")
     assert wait_node is not None, "falta nó Aguardar 40s cliente1 no caminho do cliente"
     assert wait_node.get("type") == "n8n-nodes-base.wait"
@@ -467,15 +519,41 @@ def main() -> None:
     assert wait_params.get("resume") == "timeInterval"
     assert int(wait_params.get("amount") or 0) == 40
     assert str(wait_params.get("unit") or "") in {"seconds", "second"}
-    assert connections.get("AI Agent1", {}).get("main", [[]])[0][0]["node"] == (
-        "Aguardar 40s cliente1"
-    ), "AI Agent deve ir para o Wait de 40s"
+    verify_name = "Verificar mensagem mais recente1"
+    debounce_gate_name = "Gate resposta mais recente1"
+    verify_node = nodes_by_name.get(verify_name)
+    assert verify_node is not None, "falta juiz HTTP da última mensagem"
+    verify_params = verify_node.get("parameters") or {}
+    assert "/pode-responder" in verify_params.get("url", "")
+    assert "provider_message_id" in verify_params.get("jsonBody", "")
+    assert "Extrair1" in verify_params.get("jsonBody", "")
+    verify_headers = {
+        header.get("name"): header.get("value")
+        for header in verify_params.get("headerParameters", {}).get("parameters", [])
+    }
+    assert verify_headers.get("Authorization") == f"Bearer {CHATBOT_TOKEN_PLACEHOLDER}"
+
+    debounce_gate = nodes_by_name.get(debounce_gate_name)
+    assert debounce_gate is not None, "falta gate que elimina mensagem superada"
+    debounce_code = debounce_gate.get("parameters", {}).get("jsCode", "")
+    assert "pode_responder !== true" in debounce_code
+    assert "Gate somente nao salvos1" in debounce_code
+
     assert connections.get("Aguardar 40s cliente1", {}).get("main", [[]])[0][0][
         "node"
-    ] == "Responder WhatsApp1", "Wait deve ir para Responder WhatsApp1"
+    ] == verify_name, "Wait deve consultar se a mensagem ainda é a mais recente"
+    assert connections.get(verify_name, {}).get("main", [[]])[0][0]["node"] == (
+        debounce_gate_name
+    )
+    assert connections.get(debounce_gate_name, {}).get("main", [[]])[0][0][
+        "node"
+    ] == "AI Agent1"
+    assert connections.get("AI Agent1", {}).get("main", [[]])[0][0]["node"] == (
+        "Responder WhatsApp1"
+    ), "AI Agent deve responder somente depois do debounce"
     se_ctrl = connections.get("Se resposta controle1", {}).get("main", [])
     assert se_ctrl[0][0]["node"] == "Responder WhatsApp1"
-    assert se_ctrl[1][0]["node"] == "AI Agent1"
+    assert se_ctrl[1][0]["node"] == "Aguardar 40s cliente1"
 
     assert connections.get("Extrair1", {}).get("main", [[]])[0][0].get("node") == "E imagem de estoque1"
     imagem_ramos = connections.get("E imagem de estoque1", {}).get("main", [])
@@ -593,8 +671,8 @@ def main() -> None:
     assert if_true and if_true[0][0].get("node") == "Responder WhatsApp1", (
         "controle deve ir direto ao WhatsApp"
     )
-    assert len(if_true) > 1 and if_true[1][0].get("node") == "AI Agent1", (
-        "mensagem de cliente deve ir direto ao Agent, sem atraso"
+    assert len(if_true) > 1 and if_true[1][0].get("node") == "Aguardar 40s cliente1", (
+        "mensagem de cliente deve passar pelo debounce antes do Agent"
     )
     assert "estadoMensagem.primeira_mensagem === true" in gate_salvos_code, (
         "sinal de primeira mensagem não chega ao Agent"
@@ -630,8 +708,9 @@ def main() -> None:
     )
 
     print(
-        "workflow n8n válido: 27 nós, multi-WA instance dinâmica, isSaved normalizado, "
-        "áudio ignorado, webhook seguro, foto automática, menu de operação e resultado privado"
+        "workflow n8n válido: 30 nós, replay >5min bloqueado, debounce pela última entrada, "
+        "fallback temporário sem fotos, multi-WA instance dinâmica, áudio ignorado, "
+        "webhook seguro e resultado privado"
     )
 
 

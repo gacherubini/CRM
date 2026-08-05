@@ -1,0 +1,345 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Revy — Atribuição CTWA, Fase 1, Fase 2 e gastos Meta</title>
+  <style>
+    @page { size: A4; margin: 16mm 15mm 17mm; }
+    :root {
+      --ink: #17202a;
+      --muted: #607080;
+      --line: #dce3e8;
+      --soft: #f4f7f8;
+      --accent: #0b766e;
+      --accent-soft: #e7f5f2;
+      --warn: #8a5a00;
+      --warn-soft: #fff4d8;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      color: var(--ink);
+      font-family: Arial, Helvetica, sans-serif;
+      font-size: 10pt;
+      line-height: 1.46;
+      background: #fff;
+    }
+    .cover {
+      min-height: 252mm;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      page-break-after: always;
+    }
+    .eyebrow {
+      color: var(--accent);
+      font-size: 10pt;
+      font-weight: 700;
+      letter-spacing: .13em;
+      text-transform: uppercase;
+      margin-bottom: 13mm;
+    }
+    h1 {
+      font-size: 30pt;
+      line-height: 1.07;
+      letter-spacing: -.03em;
+      margin: 0 0 8mm;
+      max-width: 160mm;
+    }
+    .subtitle {
+      max-width: 155mm;
+      color: var(--muted);
+      font-size: 14pt;
+      line-height: 1.42;
+      margin: 0 0 18mm;
+    }
+    .cover-meta {
+      border-top: 1px solid var(--line);
+      padding-top: 6mm;
+      color: var(--muted);
+      font-size: 9pt;
+    }
+    h2 {
+      color: var(--accent);
+      font-size: 18pt;
+      line-height: 1.2;
+      margin: 0 0 5mm;
+      padding-top: 2mm;
+      page-break-after: avoid;
+    }
+    h3 {
+      font-size: 12pt;
+      margin: 6mm 0 2.5mm;
+      page-break-after: avoid;
+    }
+    p { margin: 0 0 3.2mm; }
+    ul, ol { margin: 2mm 0 4mm 6mm; padding-left: 5mm; }
+    li { margin-bottom: 1.4mm; }
+    code {
+      font-family: Menlo, Consolas, monospace;
+      font-size: 8.7pt;
+      background: var(--soft);
+      border-radius: 3px;
+      padding: 1px 3px;
+    }
+    .section { page-break-before: always; }
+    .section:first-of-type { page-break-before: auto; }
+    .callout {
+      border-left: 4px solid var(--accent);
+      background: var(--accent-soft);
+      padding: 4mm 5mm;
+      margin: 4mm 0 6mm;
+      page-break-inside: avoid;
+    }
+    .callout.warn {
+      border-left-color: #d29a20;
+      background: var(--warn-soft);
+      color: #573900;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 4mm 0 7mm;
+      font-size: 9pt;
+      page-break-inside: avoid;
+    }
+    th, td {
+      border: 1px solid var(--line);
+      padding: 3mm;
+      text-align: left;
+      vertical-align: top;
+    }
+    th { background: var(--soft); font-weight: 700; }
+    .status-ok { color: #116b46; font-weight: 700; }
+    .status-warn { color: var(--warn); font-weight: 700; }
+    .flow {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 2mm;
+      margin: 4mm 0 6mm;
+      page-break-inside: avoid;
+    }
+    .flow div {
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: var(--soft);
+      padding: 3mm;
+      text-align: center;
+      font-size: 8.5pt;
+      position: relative;
+    }
+    .flow div:not(:last-child)::after {
+      content: "→";
+      position: absolute;
+      right: -3.8mm;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--accent);
+      font-weight: 700;
+      z-index: 2;
+    }
+    .checklist li::marker { color: var(--accent); font-weight: 700; }
+    .small { color: var(--muted); font-size: 8.5pt; }
+    .footer-note {
+      border-top: 1px solid var(--line);
+      color: var(--muted);
+      font-size: 8pt;
+      padding-top: 3mm;
+      margin-top: 8mm;
+    }
+    a { color: var(--accent); text-decoration: none; }
+  </style>
+</head>
+<body>
+  <main>
+    <section class="cover">
+      <div class="eyebrow">Revy · Tráfego Meta</div>
+      <h1>Atribuição CTWA, Fase 1, Fase 2 e gastos de campanha</h1>
+      <p class="subtitle">Como o sistema está funcionando, o que ainda falta e o que deve ser configurado na Meta e no Revy.</p>
+      <div class="cover-meta">
+        Documento operacional · 04 de agosto de 2026<br>
+        Loja: Vitor Motos · Uso interno
+      </div>
+    </section>
+
+    <section>
+      <h2>1. Resumo do estado atual</h2>
+      <table>
+        <thead>
+          <tr><th>Parte</th><th>Estado do código</th><th>O que falta</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Fase 1 — atribuição manual por <code>ad_id</code></td><td class="status-ok">Implementada e publicada</td><td>Cadastrar os IDs dos anúncios nas campanhas.</td></tr>
+          <tr><td>Fase 2 — atribuição automática</td><td class="status-warn">Ainda não implementada</td><td>App/token Meta e desenvolvimento no Revy.</td></tr>
+          <tr><td>Gastos automáticos</td><td class="status-ok">Código implementado</td><td>Configurar token, conta de anúncios e IDs das campanhas.</td></tr>
+        </tbody>
+      </table>
+      <div class="callout warn">
+        <strong>Situação observada em produção:</strong> existem duas campanhas, mas havia zero IDs de anúncio cadastrados e nenhuma configuração <code>MetaAdsConfig</code>. Assim, a Fase 1 está publicada, mas incompleta operacionalmente; a sincronização automática de gastos ainda não consegue rodar.
+      </div>
+      <p>São três partes relacionadas, mas diferentes: a Fase 1 atribui pelo ID do anúncio cadastrado manualmente; a Fase 2 automatizará a descoberta da campanha; e o módulo de gastos consulta o valor investido diretamente na Meta.</p>
+    </section>
+
+    <section class="section">
+      <h2>2. Fase 1 — como funciona</h2>
+      <div class="flow">
+        <div>Clique no anúncio CTWA</div>
+        <div>WhatsApp entrega o <code>meta_ad_id</code></div>
+        <div>Lead nasce na 2ª mensagem</div>
+        <div>Revy casa com o ID manual</div>
+      </div>
+      <ol>
+        <li>A pessoa clica em um anúncio Click-to-WhatsApp.</li>
+        <li>O WhatsApp envia a primeira mensagem junto com o <code>meta_ad_id</code>, que identifica o anúncio individual.</li>
+        <li>O Chatbot guarda esse tracking temporariamente na conversa.</li>
+        <li>A primeira mensagem não cria o lead.</li>
+        <li>Quando o cliente envia a segunda mensagem, o Chatbot cria o lead automaticamente.</li>
+        <li>O tracking guardado, incluindo o <code>meta_ad_id</code>, é transferido para o lead.</li>
+        <li>O Revy compara o ID com os IDs cadastrados na campanha.</li>
+        <li>Se encontrar, atribui lead, venda e resultado à campanha correspondente.</li>
+        <li>A terceira mensagem e as seguintes não criam outro lead.</li>
+      </ol>
+      <h3>O que falta para a Fase 1 funcionar completamente</h3>
+      <ul class="checklist">
+        <li>Abrir cada campanha no Revy.</li>
+        <li>Preencher “IDs de anúncio — um por linha”.</li>
+        <li>Adicionar todos os anúncios pertencentes àquela campanha.</li>
+        <li>Atualizar o cadastro sempre que um novo anúncio for criado.</li>
+      </ul>
+      <div class="callout">
+        <strong>Não confundir:</strong> <code>ad_id</code> é o ID do anúncio individual e é usado pela Fase 1. <code>campaign_id</code> é o ID da campanha e é usado nos gastos e na futura Fase 2.
+      </div>
+    </section>
+
+    <section class="section">
+      <h2>3. Fase 2 — funcionamento planejado</h2>
+      <p>A Fase 2 ainda não está rodando. Ela está projetada para eliminar o cadastro manual de novos <code>ad_id</code>.</p>
+      <div class="flow">
+        <div>Lead chega com <code>ad_id</code></div>
+        <div>Revy consulta a Graph API</div>
+        <div>Descobre o <code>campaign_id</code></div>
+        <div>Salva no cache e atribui</div>
+      </div>
+      <ol>
+        <li>O lead chega com um <code>meta_ad_id</code>.</li>
+        <li>O Revy identifica que o anúncio ainda não foi resolvido.</li>
+        <li>Consulta a Graph/Marketing API: <code>ad_id → campaign_id + nome</code>.</li>
+        <li>Guarda o resultado em um cache local.</li>
+        <li>Compara o <code>campaign_id</code> retornado com o ID Meta cadastrado na campanha do Revy.</li>
+        <li>Atribui automaticamente o lead à campanha.</li>
+        <li>Próximos leads do mesmo anúncio usam o cache, sem uma nova consulta.</li>
+        <li>Se a Meta falhar, a Fase 1 manual permanece como fallback.</li>
+      </ol>
+
+      <h3>O que precisa ser feito na Meta</h3>
+      <ol>
+        <li>Abrir Configurações do negócio → Contas → Aplicativos.</li>
+        <li>Adicionar ao portfólio um Meta App existente, preferencialmente o já usado pela integração/CAPI.</li>
+        <li>Habilitar nesse App o produto ou caso de uso da Marketing API.</li>
+        <li>Voltar em Usuários → Usuários do sistema → <code>revy</code>.</li>
+        <li>Confirmar o acesso à conta de anúncios <code>CT01</code>. A captura indica que esse acesso já existe.</li>
+        <li>Gerar um token selecionando o App e a permissão <code>ads_read</code>.</li>
+        <li>Copiar o Ad Account ID, no formato <code>act_123...</code>.</li>
+        <li>Validar o token com uma consulta somente de leitura.</li>
+      </ol>
+      <p class="small">Para ativos do próprio negócio, acesso padrão com <code>ads_read</code> normalmente atende a leitura. Contas de outros negócios podem exigir Advanced Access. O token deve ser guardado diretamente no Revy e nunca enviado em mensagens.</p>
+
+      <h3>O que precisa ser implementado no Revy</h3>
+      <ul class="checklist">
+        <li>Tabela de cache <code>meta_ad_campanha</code>.</li>
+        <li>Cliente Graph API para consultar o anúncio.</li>
+        <li>Resolução automática <code>ad_id → campaign_id</code>.</li>
+        <li>Worker periódico com tentativas, espera após erros e rate limit.</li>
+        <li>Uso do cache no cálculo do ROI.</li>
+        <li>Flag <code>REVY_TRAFEGO_AD_RESOLVER_ENABLED</code>, inicialmente desligada.</li>
+        <li>Testes simulados e teste real com um anúncio conhecido.</li>
+        <li>Monitoramento de token inválido, permissão negada e anúncio não encontrado.</li>
+      </ul>
+      <p>O token e o Ad Account ID já possuem local de configuração no Revy e são armazenados de forma cifrada. Em cada campanha também será necessário preencher o <code>meta_campaign_id</code> correto e manter os IDs manuais durante a implantação.</p>
+    </section>
+
+    <section class="section">
+      <h2>4. Gastos de campanha — como funcionam</h2>
+      <p>A sincronização de gastos é separada da Fase 2 e seu código já está implementado.</p>
+      <div class="flow">
+        <div>Revy consulta Insights</div>
+        <div>Recebe gasto diário por campanha</div>
+        <div>Casa pelo <code>campaign_id</code></div>
+        <div>Calcula CPL, CPA e ROAS</div>
+      </div>
+      <p>A consulta solicita <code>campaign_id</code>, nome da campanha, <code>spend</code> e datas. O Revy grava um gasto por campanha e por dia.</p>
+      <table>
+        <thead><tr><th>Indicador</th><th>Cálculo</th><th>O que mostra</th></tr></thead>
+        <tbody>
+          <tr><td>CPL</td><td>Gasto ÷ leads</td><td>Custo por interessado atribuído.</td></tr>
+          <tr><td>CPA</td><td>Gasto ÷ vendas</td><td>Custo por venda atribuída.</td></tr>
+          <tr><td>ROAS</td><td>Faturamento ÷ gasto</td><td>Retorno em receita para cada real investido.</td></tr>
+        </tbody>
+      </table>
+      <ul>
+        <li>Uma nova sincronização atualiza valores corrigidos pela Meta.</li>
+        <li>O mesmo gasto não é duplicado.</li>
+        <li>Um lançamento manual existente no mesmo dia é preservado.</li>
+        <li>Campanhas recebidas da Meta sem vínculo no Revy aparecem como órfãs.</li>
+        <li>O botão sincroniza os últimos sete dias.</li>
+        <li>O worker automático roda a cada 24 horas e revisa os últimos três dias.</li>
+      </ul>
+
+      <h3>O que precisa ser feito na Meta para os gastos</h3>
+      <ul class="checklist">
+        <li>Adicionar o App ao portfólio e habilitar Marketing API.</li>
+        <li>Dar ao usuário de sistema <code>revy</code> acesso à conta <code>CT01</code>.</li>
+        <li>Gerar o token com <code>ads_read</code>.</li>
+        <li>Copiar o Ad Account ID.</li>
+        <li>Confirmar moeda BRL e fuso horário correto na conta.</li>
+        <li>Validar que o token consegue consultar Insights.</li>
+      </ul>
+      <div class="callout">
+        O mesmo token <code>ads_read</code> pode alimentar o gasto automático e a futura resolução da Fase 2. Esse token fica no campo Marketing API; não é o token de CAPI usado para enviar conversões.
+      </div>
+
+      <h3>O que precisa ser feito no Revy para os gastos</h3>
+      <ol>
+        <li>Abrir Tráfego → “Gasto automático — Marketing API”.</li>
+        <li>Informar o Ad Account ID da <code>CT01</code>.</li>
+        <li>Colar o token <code>ads_read</code>.</li>
+        <li>Marcar “Sincronização habilitada” e salvar.</li>
+        <li>Abrir cada campanha e preencher o “ID da campanha no Meta Ads”.</li>
+        <li>Clicar em “Sincronizar gastos agora — 7 dias”.</li>
+        <li>Comparar os valores por campanha e por dia com o Gerenciador de Anúncios.</li>
+        <li>Corrigir eventuais campanhas órfãs e depois deixar o job diário rodando.</li>
+      </ol>
+    </section>
+
+    <section class="section">
+      <h2>5. Ordem recomendada de execução</h2>
+      <ol class="checklist">
+        <li>Adicionar o App ao portfólio empresarial da Meta.</li>
+        <li>Gerar o token <code>ads_read</code>.</li>
+        <li>Cadastrar no Revy o Ad Account ID e o token.</li>
+        <li>Cadastrar o <code>meta_campaign_id</code> das duas campanhas.</li>
+        <li>Sincronizar e validar os gastos contra o Ads Manager.</li>
+        <li>Cadastrar os <code>ad_id</code> manualmente para completar a Fase 1 imediatamente.</li>
+        <li>Implementar a Fase 2 com a flag desligada.</li>
+        <li>Testar a resolução com um anúncio conhecido.</li>
+        <li>Ativar a Fase 2, mantendo a Fase 1 como fallback.</li>
+      </ol>
+      <div class="callout">
+        <strong>Resultado esperado:</strong> os gastos podem funcionar antes da Fase 2. Enquanto a automação é desenvolvida, a atribuição dos leads já funciona pela Fase 1 assim que os IDs dos anúncios forem cadastrados.
+      </div>
+
+      <h3>Critérios de validação</h3>
+      <ul>
+        <li>Um lead CTWA nasce na segunda mensagem e não duplica nas seguintes.</li>
+        <li>O <code>meta_ad_id</code> aparece no lead.</li>
+        <li>O lead deixa de cair em “Sem campanha”.</li>
+        <li>O gasto de sete dias confere com o Gerenciador de Anúncios.</li>
+        <li>CPL, CPA e ROAS aparecem quando houver leads, vendas e gasto no mesmo período.</li>
+        <li>Falhas da Meta não interrompem o atendimento nem removem a atribuição manual.</li>
+      </ul>
+      <p class="footer-note">Fontes técnicas: implementação e documentação do projeto Revy; documentação oficial da Meta Marketing API e Insights API. Documento preparado para orientar configuração, implantação e validação.</p>
+    </section>
+  </main>
+</body>
+</html>

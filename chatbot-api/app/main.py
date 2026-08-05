@@ -215,6 +215,31 @@ class EstadoInput(BaseModel):
         )
 
 
+class PodeResponderInput(BaseModel):
+    """Identifica a entrada que uma execução atrasada do n8n quer responder."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    instance: str
+    provider_message_id: str
+
+    @field_validator("instance")
+    @classmethod
+    def validar_instance(cls, value: str) -> str:
+        return validar_identificador(
+            value, nome="instance", limite=config.WEBHOOK_MAX_INSTANCE_CHARS
+        )
+
+    @field_validator("provider_message_id")
+    @classmethod
+    def validar_provider_message_id(cls, value: str) -> str:
+        return validar_identificador(
+            value,
+            nome="provider_message_id",
+            limite=config.WEBHOOK_MAX_PROVIDER_MESSAGE_ID_CHARS,
+        )
+
+
 class ConsentimentoInput(BaseModel):
     telefone: str
     versao_texto: str
@@ -518,6 +543,23 @@ def obter_estado(
         telefone,
         canal_id=canal_id,
         instance=instance,
+    )
+
+
+@app.post("/v1/conversas/{telefone}/pode-responder")
+def pode_responder(
+    telefone: str,
+    dados: PodeResponderInput,
+    ctx: Contexto = Depends(get_contexto),
+    db: Session = Depends(get_db),
+):
+    """Debounce do n8n: só a última entrada pendente pode chegar à IA."""
+    return servico.pode_responder_mensagem(
+        db,
+        ctx.loja_id,
+        telefone,
+        dados.provider_message_id,
+        instance=dados.instance,
     )
 
 

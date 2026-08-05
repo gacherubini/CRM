@@ -39,7 +39,7 @@
   <div class="table-wrap"><table>
     <thead><tr><th>Veículo</th><th>Placa</th><th>Status</th><th>Publicação</th><th>Preço</th>{% if pode_custo %}<th>Custo</th>{% endif %}<th><span class="sr-only">Ações</span></th></tr></thead>
     <tbody>{% for v in veiculos %}<tr>
-      <td><div class="vehicle-cell"><div class="vehicle-photo small">{% if v.foto_url %}<img src="{{ v.foto_url }}" alt="">{% else %}<span>{{ v.marca[:1] }}</span>{% endif %}</div><div class="cell-stack"><strong>{{ v.marca }} {{ v.modelo }}</strong><small>{{ v.ano_modelo }}{% if v.versao %} · {{ v.versao }}{% endif %} · {{ "{:,.0f}".format(v.km).replace(',', '.') }} km</small></div></div></td>
+      <td><div class="vehicle-cell"><div class="vehicle-photo small">{% if v.foto_url %}<img src="{{ v.foto_url }}{% if '/public/v1/media/' in v.foto_url %}?w=160{% endif %}" alt="" loading="lazy" decoding="async">{% else %}<span>{{ v.marca[:1] }}</span>{% endif %}</div><div class="cell-stack"><strong>{{ v.marca }} {{ v.modelo }}</strong><small>{{ v.ano_modelo }}{% if v.versao %} · {{ v.versao }}{% endif %} · {{ "{:,.0f}".format(v.km).replace(',', '.') }} km</small></div></div></td>
       <td class="muted mono-inline">{% if v.placa %}{{ v.placa }}{% else %}—{% endif %}</td>
       <td><span class="status {{ v.status }}">{{ {'disponivel':'Disponível','reservado':'Reservado','vendido':'Vendido','indisponivel':'Indisponível'}.get(v.status, v.status) }}</span></td>
       <td>{% if v.publicado %}<span class="published">Publicado</span>{% else %}<span class="muted">Interno</span>{% endif %}</td>

@@ -214,6 +214,20 @@ O grupo é selecionado no Portal em **Operação → Grupo do estoque**. A lista
 números autorizados permanece somente para compatibilidade com instalações que
 ainda não escolheram um grupo.
 
+### Fallback temporário quando o estoque não encontra a moto
+
+O workflow oficial contém o tool-node isolado `TEMP continuar sem estoque1`. Ele só deve ser chamado depois que `consultar_estoque1` voltar sem veículos para uma moto específica. Nesse caminho o bot não afirma indisponibilidade, não oferece fotos e não inventa preço: oferece uma simulação, coleta CPF, nascimento e entrada após aceite explícito, cria o lead, avisa a equipe para simulação humana e pausa o bot. O endpoint do motor não é chamado sem veículo/preço real.
+
+O comportamento está delimitado pelas tags `[TEMP_ESTOQUE_INCOMPLETO_INICIO]` e `[TEMP_ESTOQUE_INCOMPLETO_FIM]`. Para rollback definitivo, remova o nó e a conexão `ai_tool`, apague os blocos marcados no prompt do `AI Agent1` e na descrição de `consultar_estoque1`, rode `node n8n/build_test_workflow.js` e volte os validadores para 29 nós. `simular1` e o fluxo normal de estoque não são modificados.
+
+Antes de publicar/reativar, rode:
+
+```bash
+node n8n/test_fallback_estoque_temporario.js
+python3 n8n/validate_workflow.py
+python3 n8n/validate_test_workflow.py
+```
+
 ## Critérios de aceite
 
 1. Evolution `loja1` (ou instância ativa) state `open`.

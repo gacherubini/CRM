@@ -210,8 +210,14 @@ def validar_campanha_payload(dados: dict) -> list[str]:
     return erros
 
 
-def lead_casa_campanha(lead: dict, campanha: Campanha, *, modo: str) -> bool:
-    """modo: 'first' | 'last'. UTM, meta_campaign_id (CTWA) ou codigo_ctwa."""
+def lead_casa_campanha(
+    lead: dict,
+    campanha: Campanha,
+    *,
+    modo: str,
+    mapa_ad_campaign: dict[str, str] | None = None,
+) -> bool:
+    """modo: 'first' | 'last'. UTM, meta_campaign_id (CTWA), codigo_ctwa, ad_id ou cache Graph."""
     assert modo in ("first", "last")
     if modo == "first":
         camp_key = normalizar_utm(
@@ -264,18 +270,15 @@ def lead_casa_campanha(lead: dict, campanha: Campanha, *, modo: str) -> bool:
     if camp_cod and codigo and camp_cod == codigo:
         return True
 
-    # 4) ad_id manual (Fase 1): muitos anúncios → 1 campanha
-    ad_ids_camp = {
-        normalizar_meta_campaign_id(getattr(a, "ad_id", None))
-        for a in getattr(campanha, "anuncios", [])
-    }
-    ad_ids_camp.discard(None)
+    # 4) ad_id do lead resolvido via cache Graph (meta_ad_campanha)
     lead_ad = normalizar_meta_campaign_id(
         (lead.get("meta_ad_id_first") if modo == "first" else lead.get("meta_ad_id"))
         or lead.get("meta_ad_id")
     )
-    if ad_ids_camp and lead_ad and lead_ad in ad_ids_camp:
-        return True
+    if mapa_ad_campaign and lead_ad and camp_meta:
+        cid = normalizar_meta_campaign_id(mapa_ad_campaign.get(lead_ad))
+        if cid and cid == camp_meta:
+            return True
 
     return False
 
@@ -299,17 +302,28 @@ def campanha_por_utm(
 def resolver_campanhas_do_lead(
     db: Session, loja_slug: str, lead: dict
 ) -> tuple[Campanha | None, Campanha | None]:
+    from app.meta_ad_resolver_job import mapa_ad_campaign_loja
+
     campanhas = (
         db.query(Campanha)
         .filter(Campanha.loja_slug == loja_slug)
         .all()
     )
+    mapa = mapa_ad_campaign_loja(db, loja_slug)
     first_c = next(
-        (c for c in campanhas if lead_casa_campanha(lead, c, modo="first")),
+        (
+            c
+            for c in campanhas
+            if lead_casa_campanha(lead, c, modo="first", mapa_ad_campaign=mapa)
+        ),
         None,
     )
     last_c = next(
-        (c for c in campanhas if lead_casa_campanha(lead, c, modo="last")),
+        (
+            c
+            for c in campanhas
+            if lead_casa_campanha(lead, c, modo="last", mapa_ad_campaign=mapa)
+        ),
         None,
     )
     return first_c, last_c

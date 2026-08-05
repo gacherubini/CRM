@@ -225,3 +225,63 @@ def resolver_publica(loja_id: str, veiculo_id: str, arquivo: str) -> tuple[Path,
         raise HTTPException(status_code=404, detail="mídia não encontrada")
     extensao = arquivo.rsplit(".", 1)[-1]
     return caminho, _MIME_POR_EXTENSAO[extensao]
+
+
+# Larguras permitidas para thumbnail. Conjunto pequeno e fixo para limitar o
+# tamanho do cache em disco e evitar geração arbitrária (DoS via ?w=...).
+THUMB_WIDTHS = (160, 320, 640)
+
+
+def _caminho_thumb(loja_id: str, veiculo_id: str, arquivo: str, largura: int) -> Path:
+    # Segmentos já validados por caminho_seguro na origem; revalida por garantia.
+    loja = _segmento(loja_id, "loja_id")
+    veiculo = _segmento(veiculo_id, "veiculo_id")
+    if not _ARQUIVO_RE.fullmatch(arquivo):
+        raise HTTPException(status_code=404, detail="mídia não encontrada")
+    raiz = config.MEDIA_STORAGE_DIR.resolve()
+    # ".thumbs" tem ponto/underscore fora de _SEGMENTO_RE e 4 níveis de
+    # profundidade, então nunca é visto como storage_key pela limpeza de órfãos.
+    return raiz / ".thumbs" / loja / veiculo / f"{arquivo}.w{largura}.jpg"
+
+
+def resolver_thumbnail(
+    loja_id: str, veiculo_id: str, arquivo: str, largura: int
+) -> tuple[Path, str]:
+    """Entrega uma versão reduzida (JPEG) da mídia, gerada sob demanda e cacheada.
+
+    Degrada com segurança para a imagem original se a largura não for permitida,
+    se o Pillow não estiver disponível ou se a geração falhar por qualquer motivo.
+    """
+    origem, mime = resolver_publica(loja_id, veiculo_id, arquivo)
+    if largura not in THUMB_WIDTHS:
+        return origem, mime
+    try:
+        from PIL import Image, ImageOps
+    except ImportError:
+        return origem, mime
+
+    destino = _caminho_thumb(loja_id, veiculo_id, arquivo, largura)
+    temporario: str | None = None
+    try:
+        if destino.is_file() and destino.stat().st_mtime >= origem.stat().st_mtime:
+            return destino, "image/jpeg"
+        destino.parent.mkdir(parents=True, exist_ok=True)
+        with Image.open(origem) as img:
+            img = ImageOps.exif_transpose(img)  # respeita orientação de fotos de celular
+            img = img.convert("RGB")
+            img.thumbnail((largura, largura * 8), Image.LANCZOS)  # limita só a largura
+            with tempfile.NamedTemporaryFile(
+                dir=destino.parent, prefix=".thumb-", suffix=".jpg", delete=False
+            ) as tmp:
+                temporario = tmp.name
+                img.save(tmp, format="JPEG", quality=82, optimize=True, progressive=True)
+        os.replace(temporario, destino)
+    except Exception:
+        # Qualquer falha na geração cai para a original; nunca derruba a request.
+        if temporario and os.path.exists(temporario):
+            try:
+                os.unlink(temporario)
+            except OSError:
+                pass
+        return origem, mime
+    return destino, "image/jpeg"

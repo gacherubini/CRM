@@ -14,7 +14,7 @@ from urllib.parse import quote, urlparse
 from fastapi import HTTPException
 from sqlalchemy import and_, case, exists, or_, update
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from app import config, media
 from app.auth import hash_token
@@ -418,7 +418,9 @@ def listar_veiculos(
     busca: str | None = None,
     placa: str | None = None,
 ) -> list[Veiculo]:
-    q = db.query(Veiculo).filter(Veiculo.loja_id == loja_id)
+    # Eager-load das fotos: evita N+1 (1 query/veículo em _midias_saida) na listagem,
+    # que sobre Postgres remoto (suite-pg) vira segundos de round-trips sequenciais.
+    q = db.query(Veiculo).options(selectinload(Veiculo.fotos)).filter(Veiculo.loja_id == loja_id)
     if tipo:
         q = q.filter(Veiculo.tipo == tipo)
     if status:
@@ -929,7 +931,8 @@ def listar_veiculos_publicos(
     offset: int = 0,
 ) -> tuple[Loja, list[Veiculo], int]:
     loja = obter_loja_por_slug(db, slug)
-    q = db.query(Veiculo).filter(
+    # Eager-load das fotos: mesma correção de N+1 aplicada à vitrine pública.
+    q = db.query(Veiculo).options(selectinload(Veiculo.fotos)).filter(
         Veiculo.loja_id == loja.id,
         Veiculo.status == "disponivel",
         Veiculo.publicado.is_(True),

@@ -80,6 +80,7 @@ from app.campanhas import (
     STATUS_ROTULO,
     aplicar_snapshot_venda,
     campanha_por_utm,
+    lead_casa_campanha,
     normalizar_utm,
     parse_brl_valor,
     parse_gastos_csv,

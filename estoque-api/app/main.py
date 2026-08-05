@@ -565,8 +565,16 @@ def exportar_csv(
 
 
 @app.get("/public/v1/media/{loja_id}/{veiculo_id}/{arquivo}")
-def media_publica(loja_id: str, veiculo_id: str, arquivo: str):
-    caminho, content_type = media.resolver_publica(loja_id, veiculo_id, arquivo)
+def media_publica(
+    loja_id: str,
+    veiculo_id: str,
+    arquivo: str,
+    w: Optional[int] = Query(default=None, description="largura do thumbnail (160|320|640)"),
+):
+    if w is not None:
+        caminho, content_type = media.resolver_thumbnail(loja_id, veiculo_id, arquivo, w)
+    else:
+        caminho, content_type = media.resolver_publica(loja_id, veiculo_id, arquivo)
     return FileResponse(
         caminho,
         media_type=content_type,
