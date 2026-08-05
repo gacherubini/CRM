@@ -203,11 +203,29 @@ def main() -> None:
     assert "oi, [primeiro nome]. aqui é da vitor motos." in system_message_lower, (
         "abertura minimalista da vitor motos ausente"
     )
-    assert "veio_de_anuncio" in system_message and "enviar_foto_veiculo automaticamente" in system_message_lower, (
-        "prompt não trata automaticamente a mensagem de anúncio"
+    assert "veio_de_anuncio" in system_message, (
+        "prompt não trata a flag veio_de_anuncio"
+    )
+    assert "vi que você veio pelo anúncio" in system_message_lower, (
+        "prompt de abertura de anúncio ausente"
+    )
+    assert (
+        "não chame consultar_estoque só por causa do anúncio" in system_message_lower
+        and "não chame enviar_foto_veiculo automaticamente no clique do anúncio" in system_message_lower
+    ), (
+        "prompt ainda força estoque/foto automática no clique do anúncio"
+    )
+    assert "à vista" in system_message_lower and "financiamento" in system_message_lower, (
+        "abertura de anúncio deve perguntar à vista ou financiamento"
+    )
+    assert "fan" in system_message_lower and "start" in system_message_lower and "titan" in system_message_lower, (
+        "prompt não orienta modelos próximos quando o estoque não achar o pedido"
     )
     assert "até 4 fotos do catálogo" in system_message_lower, (
         "prompt não orienta o envio das fotos do catálogo"
+    )
+    assert "nunca envie foto automaticamente só porque veio de anúncio" in system_message_lower, (
+        "regra 9 deve proibir foto automática só por anúncio"
     )
     stock_node = next(
         (node for node in data.get("nodes", []) if node.get("name") == "consultar_estoque1"),
