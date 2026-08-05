@@ -822,6 +822,12 @@ def decidir_roteamento(
             return _ignorar_estoque_inoperante()
         if not _grupo_estoque_corresponde(grupo, grupo_jid):
             return {"acao": "ignorar", "resposta": None}
+        # Multi-WA: só o canal principal de estoque responde no grupo
+        # (evita dois números da loja no mesmo @g.us gerarem menu em dobro).
+        from app import channels as channels_mod
+
+        if not channels_mod.instance_opera_estoque(db, loja_id, instance):
+            return {"acao": "ignorar", "resposta": None}
         numero = grupo
     elif grupo is not None:
         # Com grupo selecionado, o menu nunca opera no privado, nem para numeros

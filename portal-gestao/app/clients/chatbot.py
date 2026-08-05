@@ -268,6 +268,12 @@ class ChatbotClient:
             "POST", f"/v1/whatsapp/canais/{canal_id}/inativar"
         )
 
+    def definir_principal_estoque_whatsapp(self, canal_id: str) -> dict:
+        """Marca o canal como único operador do grupo de estoque."""
+        return self._request(
+            "POST", f"/v1/whatsapp/canais/{canal_id}/principal-estoque"
+        )
+
     def obter_status_canal_whatsapp(self, canal_id: str) -> dict:
         return self._request(
             "GET", f"/v1/whatsapp/canais/{canal_id}/status"

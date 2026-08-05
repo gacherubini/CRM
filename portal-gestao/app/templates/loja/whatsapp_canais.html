@@ -18,6 +18,9 @@
 {% if acao_erro %}
 <div class="alert warning">{{ acao_erro }}</div>
 {% endif %}
+{% if acao_mensagem %}
+<div class="alert success" role="status">{{ acao_mensagem }}</div>
+{% endif %}
 {% if catalogo_erro %}
 <div class="alert warning" role="alert">{{ catalogo_erro }}</div>
 {% endif %}
@@ -118,6 +121,11 @@
       <h2 id="canais-titulo">Seus números</h2>
     </div>
   </div>
+  <p class="muted" style="padding: 0 var(--space-5) var(--space-3)">
+    O <strong>principal do estoque</strong> é o único que responde no grupo do estoque
+    e envia o aviso quando um cliente pede simulação. Os outros números só atendem
+    conversas de cliente.
+  </p>
   {% if view.canais %}
   <div class="table-wrap">
     <table>
@@ -126,6 +134,7 @@
         <tr>
           <th scope="col">Nome</th>
           <th scope="col">Situação</th>
+          <th scope="col">Estoque</th>
           <th scope="col"><span class="sr-only">Ações</span></th>
         </tr>
       </thead>
@@ -136,6 +145,13 @@
             <div class="cell-stack"><strong>{{ canal.label }}</strong></div>
           </td>
           <td><span class="status {{ canal.estado }}">{{ canal.rotulo }}</span></td>
+          <td>
+            {% if canal.principal_estoque %}
+            <span class="status conectado">Principal do estoque</span>
+            {% else %}
+            <span class="muted">—</span>
+            {% endif %}
+          </td>
           <td>
             <div class="row-actions">
               {% if canal.pode_conectar %}
@@ -148,6 +164,12 @@
               <form method="post" action="/app/loja/whatsapp/canais/{{ canal.id }}/desconectar">
                 <input type="hidden" name="csrf" value="{{ csrf }}">
                 <button class="button secondary" type="submit">Desconectar</button>
+              </form>
+              {% endif %}
+              {% if canal.pode_marcar_principal_estoque %}
+              <form method="post" action="/app/loja/whatsapp/canais/{{ canal.id }}/principal-estoque">
+                <input type="hidden" name="csrf" value="{{ csrf }}">
+                <button class="button secondary" type="submit">Usar no estoque</button>
               </form>
               {% endif %}
               <form method="post" action="/app/loja/whatsapp/canais/{{ canal.id }}/inativar"

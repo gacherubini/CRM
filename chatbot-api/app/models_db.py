@@ -61,6 +61,8 @@ class WhatsAppCanal(Base):
     ativo: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     # pendente | conectado | desconectado | inativo
     estado: Mapped[str] = mapped_column(String(20), default="pendente", nullable=False)
+    # Só este canal responde no grupo de estoque e envia alertas de simulação.
+    principal_estoque: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     criado_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_agora)
 
 

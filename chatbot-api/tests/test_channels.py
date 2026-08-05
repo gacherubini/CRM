@@ -22,6 +22,7 @@ def test_backfill_legacy_from_loja(db, loja_a):
     assert canal["e164_or_label"] == "5511999990001"
     assert canal["ativo"] is True
     assert canal["loja_id"] == loja_a["loja_id"]
+    assert canal["principal_estoque"] is True
 
     # Idempotente
     again = channels.backfill_legacy_from_loja(db, loja_a["loja_id"])

@@ -107,6 +107,7 @@ def loja_whatsapp_canais(
             # store, para não sobreviver ao reload.
             qr=qr_efemero.consumir(request.session.pop("canal_qr_token", None)),
             acao_erro=request.session.pop("canal_erro", None),
+            acao_mensagem=request.session.pop("canal_mensagem", None),
             catalogo_whatsapp=catalogo_wa,
             catalogo_erro=catalogo_erro or request.session.pop("catalogo_erro", None),
             catalogo_mensagem=request.session.pop("catalogo_mensagem", None),
@@ -254,6 +255,31 @@ async def loja_whatsapp_inativar(
     except ChatbotIndisponivel as exc:
         request.session["canal_erro"] = str(exc)
         _auditar(db, usuario, "inativar", success=False, error_code=_ERRO_CHATBOT)
+    return _para_tela()
+
+
+@router.post("/app/loja/whatsapp/canais/{canal_id}/principal-estoque")
+async def loja_whatsapp_principal_estoque(
+    canal_id: str,
+    request: Request,
+    db: Session = Depends(get_db),
+    chatbot=Depends(get_chatbot_client),
+):
+    """Define qual número opera o grupo de estoque e envia alertas de simulação."""
+    usuario, _form, erro = await _guarda(request, db)
+    if erro is not None:
+        return erro
+    try:
+        chatbot.definir_principal_estoque_whatsapp(canal_id)
+        request.session["canal_mensagem"] = (
+            "Número principal do estoque atualizado. Só ele responde no grupo."
+        )
+        _auditar(db, usuario, "principal_estoque", success=True)
+    except ChatbotIndisponivel as exc:
+        request.session["canal_erro"] = str(exc)
+        _auditar(
+            db, usuario, "principal_estoque", success=False, error_code=_ERRO_CHATBOT
+        )
     return _para_tela()
 
 

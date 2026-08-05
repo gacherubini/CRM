@@ -32,8 +32,92 @@ def _canal_dict(canal: WhatsAppCanal) -> dict[str, Any]:
         "evolution_instance": canal.evolution_instance,
         "ativo": canal.ativo,
         "estado": canal.estado,
+        "principal_estoque": bool(canal.principal_estoque),
         "criado_em": canal.criado_em.isoformat() if canal.criado_em else None,
     }
+
+
+def _loja_tem_principal_estoque(db: Session, loja_id: str) -> bool:
+    return (
+        db.query(WhatsAppCanal)
+        .filter(
+            WhatsAppCanal.loja_id == loja_id,
+            WhatsAppCanal.ativo.is_(True),
+            WhatsAppCanal.principal_estoque.is_(True),
+        )
+        .first()
+        is not None
+    )
+
+
+def obter_canal_principal_estoque(
+    db: Session, loja_id: str
+) -> WhatsAppCanal | None:
+    """Canal que opera o grupo de estoque (menu + alertas de simulação).
+
+    Preferência: flag ``principal_estoque``. Fallback: canal ativo mais antigo
+    (compat multi-WA sem escolha explícita — evita dois bots respondendo).
+    """
+    explicit = (
+        db.query(WhatsAppCanal)
+        .filter(
+            WhatsAppCanal.loja_id == loja_id,
+            WhatsAppCanal.ativo.is_(True),
+            WhatsAppCanal.principal_estoque.is_(True),
+        )
+        .order_by(WhatsAppCanal.criado_em.asc())
+        .first()
+    )
+    if explicit is not None:
+        return explicit
+    return (
+        db.query(WhatsAppCanal)
+        .filter(WhatsAppCanal.loja_id == loja_id, WhatsAppCanal.ativo.is_(True))
+        .order_by(WhatsAppCanal.criado_em.asc())
+        .first()
+    )
+
+
+def instance_opera_estoque(
+    db: Session, loja_id: str, instance: str | None
+) -> bool:
+    """True se esta instância Evolution pode responder/operar o grupo de estoque."""
+    principal = obter_canal_principal_estoque(db, loja_id)
+    if principal is None:
+        # Sem canais cadastrados (legado/testes): qualquer instance da loja opera.
+        return True
+    inst = (instance or "").strip()
+    if not inst:
+        return False
+    return (principal.evolution_instance or "").strip() == inst
+
+
+def definir_principal_estoque(
+    db: Session, loja_id: str, canal_id: str
+) -> dict[str, Any]:
+    """Marca um canal como único principal de estoque da loja."""
+    canal = get_channel_for_loja(db, loja_id, canal_id)
+    if not canal.ativo or canal.estado == ESTADO_INATIVO:
+        raise HTTPException(status_code=409, detail="canal inativo")
+    outros = (
+        db.query(WhatsAppCanal)
+        .filter(WhatsAppCanal.loja_id == loja_id)
+        .all()
+    )
+    for item in outros:
+        item.principal_estoque = item.id == canal.id
+    db.commit()
+    db.refresh(canal)
+    return _canal_dict(canal)
+
+
+def resolve_instance_principal_estoque(db: Session, loja_id: str) -> str | None:
+    """Instance Evolution do canal principal (envio de alerta no grupo)."""
+    canal = obter_canal_principal_estoque(db, loja_id)
+    if canal is None:
+        return None
+    inst = (canal.evolution_instance or "").strip()
+    return inst or None
 
 
 def list_channels(db: Session, loja_id: str) -> list[dict[str, Any]]:
@@ -121,6 +205,8 @@ def register_channel(
                 detail="multi-whatsapp desabilitado: apenas 1 canal por loja",
             )
 
+    # Primeiro canal ativo da loja vira principal de estoque por padrão.
+    tornar_principal = not _loja_tem_principal_estoque(db, loja_id)
     canal = WhatsAppCanal(
         id=str(uuid.uuid4()),
         loja_id=loja_id,
@@ -128,6 +214,7 @@ def register_channel(
         evolution_instance=instance,
         ativo=True,
         estado=ESTADO_PENDENTE,
+        principal_estoque=tornar_principal,
     )
     db.add(canal)
     db.commit()
@@ -142,8 +229,21 @@ def inactivate_channel(db: Session, loja_id: str, canal_id: str) -> dict[str, An
         raise HTTPException(status_code=404, detail="canal não encontrado")
     if not canal.ativo and canal.estado == ESTADO_INATIVO:
         return _canal_dict(canal)
+    era_principal = bool(canal.principal_estoque)
     canal.ativo = False
     canal.estado = ESTADO_INATIVO
+    canal.principal_estoque = False
+    db.flush()
+    if era_principal:
+        # Passa o bastão ao canal ativo mais antigo.
+        sucessor = (
+            db.query(WhatsAppCanal)
+            .filter(WhatsAppCanal.loja_id == loja_id, WhatsAppCanal.ativo.is_(True))
+            .order_by(WhatsAppCanal.criado_em.asc())
+            .first()
+        )
+        if sucessor is not None:
+            sucessor.principal_estoque = True
     db.commit()
     db.refresh(canal)
     return _canal_dict(canal)
@@ -278,6 +378,7 @@ def backfill_legacy_from_loja(db: Session, loja_id: str) -> dict[str, Any] | Non
         return _canal_dict(existente)
 
     label = (loja.whatsapp or "").strip() or "legado"
+    tornar_principal = not _loja_tem_principal_estoque(db, loja.id)
     canal = WhatsAppCanal(
         id=str(uuid.uuid4()),
         loja_id=loja.id,
@@ -285,6 +386,7 @@ def backfill_legacy_from_loja(db: Session, loja_id: str) -> dict[str, Any] | Non
         evolution_instance=instance,
         ativo=True,
         estado=ESTADO_CONECTADO,  # legado já em operação
+        principal_estoque=tornar_principal,
     )
     db.add(canal)
     db.commit()
@@ -306,9 +408,12 @@ def get_channel_by_instance(db: Session, instance: str) -> WhatsAppCanal | None:
 def resolve_evolution_instance_for_loja(db: Session, loja: Loja) -> str:
     """Instância Evolution para operações de loja (ex.: listar grupos do estoque).
 
-    Preferência: canal multi-WA ativo e ``conectado``; senão qualquer canal ativo;
-    senão o campo legado ``Loja.evolution_instance``.
+    Preferência: canal **principal de estoque**; senão conectado ativo; senão
+    qualquer ativo; senão ``Loja.evolution_instance`` legado.
     """
+    principal = obter_canal_principal_estoque(db, loja.id)
+    if principal is not None and (principal.evolution_instance or "").strip():
+        return principal.evolution_instance.strip()
     canais = (
         db.query(WhatsAppCanal)
         .filter(WhatsAppCanal.loja_id == loja.id, WhatsAppCanal.ativo.is_(True))

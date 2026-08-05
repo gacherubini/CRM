@@ -504,6 +504,11 @@ def webhook_foto_veiculo(
             "captura_passiva": True,
             "loja_operacional": loja_ok,
         }
+    # Fotos do grupo: só o canal principal de estoque processa (anti-duplicata multi-WA).
+    if dados.grupo_jid and not channels.instance_opera_estoque(
+        db, loja.id, dados.instance
+    ):
+        return {"ok": False, "ignorar": True, "mensagem": None}
     return operacao.anexar_foto_whatsapp(
         db,
         loja.id,
@@ -1140,6 +1145,16 @@ def registrar_canal_whatsapp(
         dados.evolution_instance,
         dados.e164_or_label,
     )
+
+
+@app.post("/v1/whatsapp/canais/{canal_id}/principal-estoque")
+def definir_canal_principal_estoque(
+    canal_id: str,
+    ctx: Contexto = Depends(get_contexto),
+    db: Session = Depends(get_db),
+):
+    """Define o único número que opera o grupo de estoque e envia alertas."""
+    return channels.definir_principal_estoque(db, ctx.loja_id, canal_id)
 
 
 @app.post("/v1/whatsapp/canais/{canal_id}/inativar")

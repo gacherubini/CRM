@@ -130,6 +130,7 @@ def test_texto_livre_no_menu_do_grupo_nao_reenvia_menu(client, loja_a, db):
         "menu",
         None,
         grupo_jid=GRUPO,
+        instance=loja_a["instance"],
     )
     assert menu["acao"] == "cadastro_controle"
 
@@ -140,6 +141,7 @@ def test_texto_livre_no_menu_do_grupo_nao_reenvia_menu(client, loja_a, db):
         "alguém viu a CG 160?",
         None,
         grupo_jid=GRUPO,
+        instance=loja_a["instance"],
     )
     assert livre == {"acao": "ignorar", "resposta": None}
 
@@ -151,6 +153,56 @@ def test_texto_livre_no_menu_do_grupo_nao_reenvia_menu(client, loja_a, db):
         "2",
         None,
         grupo_jid=GRUPO,
+        instance=loja_a["instance"],
     )
     assert opcao["acao"] == "cadastro_controle"
     assert opcao["resposta"]
+
+
+def test_so_canal_principal_estoque_responde_no_grupo(client, loja_a, db, monkeypatch):
+    from app import channels, config
+
+    monkeypatch.setattr(config, "MULTI_WHATSAPP_ENABLED", True)
+    _selecionar(client, loja_a)
+
+    principal = channels.backfill_legacy_from_loja(db, loja_a["loja_id"])
+    outro = channels.register_channel(
+        db, loja_a["loja_id"], "inst-secundaria", "Linha 2"
+    )
+    assert principal["principal_estoque"] is True
+    assert outro["principal_estoque"] is False
+
+    ok = operacao.decidir_roteamento(
+        db,
+        loja_a["loja_id"],
+        "5511999990001",
+        "menu",
+        None,
+        grupo_jid=GRUPO,
+        instance=principal["evolution_instance"],
+    )
+    assert ok["acao"] == "cadastro_controle"
+
+    silenciado = operacao.decidir_roteamento(
+        db,
+        loja_a["loja_id"],
+        "5511999990001",
+        "menu",
+        None,
+        grupo_jid=GRUPO,
+        instance=outro["evolution_instance"],
+    )
+    assert silenciado == {"acao": "ignorar", "resposta": None}
+
+    # Troca o principal: agora a linha 2 opera o grupo.
+    channels.definir_principal_estoque(db, loja_a["loja_id"], outro["id"])
+    agora = operacao.decidir_roteamento(
+        db,
+        loja_a["loja_id"],
+        "5511999990001",
+        "menu",
+        None,
+        grupo_jid=GRUPO,
+        instance=outro["evolution_instance"],
+    )
+    assert agora["acao"] == "cadastro_controle"

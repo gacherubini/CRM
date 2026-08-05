@@ -23,8 +23,10 @@ class CanalView:
     estado: str
     rotulo: str
     ativo: bool
+    principal_estoque: bool
     pode_conectar: bool
     pode_desconectar: bool
+    pode_marcar_principal_estoque: bool
 
 
 @dataclass(frozen=True)
@@ -53,6 +55,7 @@ def montar_canais_view(
         # fora da lista para que apagar signifique "sumiu" para o dono.
         if not ativo or estado == "inativo":
             continue
+        principal = bool(bruto.get("principal_estoque"))
         itens.append(
             CanalView(
                 id=str(bruto.get("id") or ""),
@@ -61,10 +64,42 @@ def montar_canais_view(
                 estado=estado,
                 rotulo=ROTULOS.get(estado, estado),
                 ativo=ativo,
+                principal_estoque=principal,
                 pode_conectar=estado != "conectado",
                 pode_desconectar=estado == "conectado",
+                pode_marcar_principal_estoque=not principal,
             )
         )
+    # Se a API ainda não marcou ninguém, o primeiro da lista é o implícito
+    # (mesmo fallback do Chatbot: ativo mais antigo).
+    if itens and not any(c.principal_estoque for c in itens):
+        primeiro = itens[0]
+        itens[0] = CanalView(
+            id=primeiro.id,
+            label=primeiro.label,
+            instancia=primeiro.instancia,
+            estado=primeiro.estado,
+            rotulo=primeiro.rotulo,
+            ativo=primeiro.ativo,
+            principal_estoque=True,
+            pode_conectar=primeiro.pode_conectar,
+            pode_desconectar=primeiro.pode_desconectar,
+            pode_marcar_principal_estoque=False,
+        )
+        for i in range(1, len(itens)):
+            c = itens[i]
+            itens[i] = CanalView(
+                id=c.id,
+                label=c.label,
+                instancia=c.instancia,
+                estado=c.estado,
+                rotulo=c.rotulo,
+                ativo=c.ativo,
+                principal_estoque=False,
+                pode_conectar=c.pode_conectar,
+                pode_desconectar=c.pode_desconectar,
+                pode_marcar_principal_estoque=True,
+            )
     return CanaisView(
         canais=tuple(itens),
         erro=erro,

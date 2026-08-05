@@ -247,12 +247,14 @@ def solicitar_simulacao_humana(
             alerta_enviado=False,
         )
 
-    instancia = (instance or "").strip()
-    if not instancia:
-        # Fallback: instância da loja legada.
-        from app import channels
-        from app.models_db import Loja
+    # Sempre prefere o canal principal de estoque (um número manda no grupo).
+    from app import channels
+    from app.models_db import Loja
 
+    instancia = channels.resolve_instance_principal_estoque(db, loja_id) or ""
+    if not instancia:
+        instancia = (instance or "").strip()
+    if not instancia:
         loja = db.get(Loja, loja_id)
         if loja is not None:
             instancia = channels.resolve_evolution_instance_for_loja(db, loja)
