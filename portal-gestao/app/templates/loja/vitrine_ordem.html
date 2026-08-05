@@ -7,8 +7,8 @@
     <span class="eyebrow">Estoque</span>
     <h1>Ordem na vitrine</h1>
     <p>
-      Arraste as motos publicadas para definir a ordem no catálogo público.
-      O primeiro da lista aparece no topo da vitrine.
+      Arraste as fotos para montar a ordem do catálogo público.
+      As mudanças só vão pro ar quando você clicar em <strong>Salvar ordem</strong>.
     </p>
   </div>
   <div class="heading-actions">
@@ -20,17 +20,17 @@
 {% if erro %}<div class="alert warning" role="alert">{{ erro }}</div>{% endif %}
 {% if mensagem %}<div class="alert success" role="status">{{ mensagem }}</div>{% endif %}
 
-<section class="panel" aria-labelledby="vitrine-titulo">
+<section class="panel panel-vitrine" aria-labelledby="vitrine-titulo">
   <div class="panel-heading">
     <div>
       <span class="mono-label">Catálogo público</span>
       <h2 id="vitrine-titulo">Publicados e disponíveis</h2>
     </div>
     {% if veiculos %}
-    <span class="muted">{{ veiculos|length }} veículo{{ 's' if veiculos|length != 1 else '' }}</span>
+    <span class="muted">{{ veiculos|length }} veículo{{ 's' if veiculos|length != 1 else '' }} · 3 por linha</span>
     {% endif %}
   </div>
-  <div class="panel-body">
+  <div class="panel-body panel-body-vitrine">
     {% if not veiculos and not erro %}
     <div class="empty">
       <strong>Nenhum veículo publicado</strong>
@@ -39,47 +39,67 @@
     </div>
     {% elif veiculos %}
     <p class="muted vitrine-hint">
-      Arraste pelo handle · ou use ↑/↓ · a ordem é salva automaticamente ao soltar.
+      Arraste qualquer card para trocar a posição. Nada é gravado até o botão Salvar.
     </p>
     <form
       id="vitrine-ordem-form"
       method="post"
       action="/app/loja/estoque/vitrine"
       class="vitrine-form"
-      data-vitrine-sortable
+      data-vitrine-grid
     >
       <input type="hidden" name="csrf" value="{{ csrf }}">
-      <input type="hidden" name="ordem_ids" id="vitrine-ordem-ids" value="{% for v in veiculos %}{{ v.id }}{% if not loop.last %},{% endif %}{% endfor %}">
-      <ul class="vitrine-sortable" id="vitrine-lista" role="list">
+      <input
+        type="hidden"
+        name="ordem_ids"
+        id="vitrine-ordem-ids"
+        value="{% for v in veiculos %}{{ v.id }}{% if not loop.last %},{% endif %}{% endfor %}"
+        data-initial="{% for v in veiculos %}{{ v.id }}{% if not loop.last %},{% endif %}{% endfor %}"
+      >
+      <ul class="vitrine-grid" id="vitrine-lista" role="list">
         {% for v in veiculos %}
-        <li class="vitrine-row" draggable="true" data-id="{{ v.id }}" tabindex="0">
-          <button type="button" class="vitrine-handle" aria-label="Arrastar {{ v.marca }} {{ v.modelo }}" title="Arrastar">
-            <span aria-hidden="true">⋮⋮</span>
-          </button>
-          <div class="vitrine-thumb" aria-hidden="true">
-            {% if v.foto_url or (v.midia_principal and v.midia_principal.url) %}
-            <img src="{{ v.foto_url or v.midia_principal.url }}" alt="" loading="lazy" width="56" height="42">
+        {% set foto = v.foto_url or (v.midia_principal.url if v.midia_principal and v.midia_principal.url else none) %}
+        {% if foto and '/public/v1/media/' in foto and '?' not in foto %}
+          {% set foto_src = foto ~ '?w=640' %}
+        {% else %}
+          {% set foto_src = foto %}
+        {% endif %}
+        <li class="vitrine-card" draggable="true" data-id="{{ v.id }}" tabindex="0">
+          <div class="vitrine-card-photo">
+            {% if foto_src %}
+            <img
+              src="{{ foto_src }}"
+              alt="{{ v.marca }} {{ v.modelo }}"
+              loading="lazy"
+              decoding="async"
+              draggable="false"
+            >
             {% else %}
-            <span class="vitrine-thumb-empty">sem foto</span>
+            <span class="vitrine-card-empty">
+              <span class="vitrine-card-empty-letter">{{ (v.marca or '?')[:1]|upper }}</span>
+              sem foto
+            </span>
             {% endif %}
+            <span class="vitrine-card-badge" data-pos aria-hidden="true">{{ loop.index }}</span>
           </div>
-          <div class="vitrine-meta">
-            <strong>{{ v.marca }} {{ v.modelo }}{% if v.ano_modelo %} · {{ v.ano_modelo }}{% endif %}</strong>
+          <div class="vitrine-card-meta">
+            <strong>{{ v.marca }} {{ v.modelo }}</strong>
             <span class="muted">
-              {% if v.preco is not none %}R$ {{ '%.0f'|format(v.preco|float) }}{% else %}—{% endif %}
-              {% if v.placa %} · {{ v.placa }}{% endif %}
+              {% if v.ano_modelo %}{{ v.ano_modelo }}{% endif %}
+              {% if v.preco is not none %} · R$ {{ '%.0f'|format(v.preco|float) }}{% endif %}
             </span>
           </div>
-          <div class="vitrine-actions">
-            <button type="button" class="button secondary vitrine-btn-up" aria-label="Subir">↑</button>
-            <button type="button" class="button secondary vitrine-btn-down" aria-label="Descer">↓</button>
+          <div class="vitrine-card-tools">
+            <button type="button" class="button secondary vitrine-btn-up" aria-label="Mover {{ v.marca }} {{ v.modelo }} para a esquerda">←</button>
+            <button type="button" class="button secondary vitrine-btn-down" aria-label="Mover {{ v.marca }} {{ v.modelo }} para a direita">→</button>
           </div>
         </li>
         {% endfor %}
       </ul>
       <div class="vitrine-footer">
-        <button class="button primary" type="submit" id="vitrine-salvar">Salvar ordem</button>
-        <span class="muted" id="vitrine-status" aria-live="polite"></span>
+        <button class="button primary" type="submit" id="vitrine-salvar" disabled>Salvar ordem</button>
+        <button class="button secondary" type="button" id="vitrine-descartar" disabled>Descartar</button>
+        <span class="muted" id="vitrine-status" aria-live="polite">Sem alterações</span>
       </div>
     </form>
     {% endif %}

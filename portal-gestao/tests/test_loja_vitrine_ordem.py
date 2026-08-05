@@ -58,8 +58,12 @@ def test_vitrine_renderiza_e_salva_ordem(client, monkeypatch):
         assert "Ordem na vitrine" in get.text
         assert "CG 160" in get.text
         assert "Fazer" in get.text
-        assert 'data-vitrine-sortable' in get.text
+        assert "data-vitrine-grid" in get.text
+        assert "vitrine-grid" in get.text
         assert "vitrine_ordem.js" in get.text
+        assert "Salvar ordem" in get.text
+        # Save só no submit — botão começa desabilitado até sujar a ordem.
+        assert 'id="vitrine-salvar"' in get.text
 
         csrf = csrf_da_resposta(get)
         post = client.post(
