@@ -9,6 +9,7 @@ import re
 import secrets
 import uuid
 from datetime import datetime, timezone
+from typing import Any
 
 from fastapi import HTTPException
 from sqlalchemy import and_, or_
@@ -194,8 +195,9 @@ def _aplicar_tracking_pendente_no_lead(conversa: Conversa, lead: Lead) -> bool:
     dados = _carregar_tracking_pendente(conversa)
     if not dados:
         return False
-    # CPF da simulação não é tracking de anúncio: preserva ao limpar o restante.
+    # CPF/moto da simulação não são tracking de anúncio: preserva ao limpar o restante.
     cpf_cliente = dados.get("cpf_cliente")
+    moto_escolhida = dados.get("moto_escolhida")
     aplicar_touch_ctwa(
         lead,
         ctwa_clid=dados.get("ctwa_clid_first"),
@@ -212,12 +214,14 @@ def _aplicar_tracking_pendente_no_lead(conversa: Conversa, lead: Lead) -> bool:
         ctwa_source_type=dados.get("ctwa_source_type"),
         ctwa_codigo=dados.get("ctwa_codigo"),
     )
+    preservado: dict[str, Any] = {}
     if cpf_cliente and _cpf_valido(str(cpf_cliente)):
-        conversa.tracking_pendente_json = json.dumps(
-            {"cpf_cliente": str(cpf_cliente)}, ensure_ascii=False, sort_keys=True
-        )
-    else:
-        conversa.tracking_pendente_json = None
+        preservado["cpf_cliente"] = str(cpf_cliente)
+    if isinstance(moto_escolhida, dict) and moto_escolhida:
+        preservado["moto_escolhida"] = moto_escolhida
+    conversa.tracking_pendente_json = (
+        json.dumps(preservado, ensure_ascii=False, sort_keys=True) if preservado else None
+    )
     return aplicado
 
 
@@ -443,6 +447,96 @@ def limpar_cpf_cliente_conversa(db: Session, loja_id: str, telefone: str) -> Non
     db.commit()
 
 
+def _normalizar_moto_escolhida(payload: dict[str, Any] | None) -> dict[str, Any] | None:
+    """Sanitiza dados internos da moto escolhida (sem PII do cliente)."""
+    if not isinstance(payload, dict):
+        return None
+    placa = str(payload.get("placa") or "").strip().upper()
+    try:
+        valor = float(payload.get("valor"))
+    except (TypeError, ValueError):
+        valor = None
+    if valor is not None and (valor != valor or valor <= 0):  # NaN / <=0
+        valor = None
+    categoria = str(payload.get("categoria") or payload.get("tipo") or "").strip().lower()
+    if categoria not in {"moto", "carro"}:
+        categoria = "moto" if placa or valor else ""
+    interesse = str(payload.get("interesse") or "").strip()[:160]
+    vid = str(payload.get("id") or "").strip()[:80]
+    if not placa and not (valor and categoria in {"moto", "carro"}):
+        return None
+    out: dict[str, Any] = {}
+    if vid:
+        out["id"] = vid
+    if placa:
+        out["placa"] = placa[:12]
+    if valor is not None:
+        out["valor"] = valor
+    if categoria in {"moto", "carro"}:
+        out["categoria"] = categoria
+    if interesse:
+        out["interesse"] = interesse
+    return out or None
+
+
+def _salvar_moto_escolhida(conversa: Conversa, payload: dict[str, Any] | None) -> None:
+    """Guarda moto única consultada na conversa (simular1 sobrevive a restart n8n)."""
+    normalizado = _normalizar_moto_escolhida(payload)
+    dados = _carregar_tracking_pendente(conversa)
+    if normalizado is None:
+        dados.pop("moto_escolhida", None)
+    else:
+        dados["moto_escolhida"] = normalizado
+    conversa.tracking_pendente_json = (
+        json.dumps(dados, ensure_ascii=False, sort_keys=True) if dados else None
+    )
+
+
+def _obter_moto_escolhida(conversa: Conversa) -> dict[str, Any] | None:
+    return _normalizar_moto_escolhida(
+        _carregar_tracking_pendente(conversa).get("moto_escolhida")
+    )
+
+
+def salvar_moto_escolhida_conversa(
+    db: Session,
+    loja_id: str,
+    telefone: str,
+    payload: dict[str, Any],
+    *,
+    instance: str | None = None,
+) -> dict[str, Any] | None:
+    """Persiste moto escolhida para o telefone (escopo multi-WA por instance)."""
+    from app.hardening import normalizar_telefone_webhook
+
+    telefone_norm = normalizar_telefone_webhook(telefone)
+    canal_id = _canal_id_opcional_por_instance(db, loja_id, instance)
+    conversa = _get_or_create_conversa(db, loja_id, telefone_norm, canal_id=canal_id)
+    _salvar_moto_escolhida(conversa, payload)
+    db.commit()
+    db.refresh(conversa)
+    return _obter_moto_escolhida(conversa)
+
+
+def limpar_moto_escolhida_conversa(db: Session, loja_id: str, telefone: str) -> None:
+    """Remove moto escolhida após simulação (ou busca ambígua no n8n)."""
+    from app.hardening import normalizar_telefone_webhook
+
+    try:
+        telefone_norm = normalizar_telefone_webhook(telefone)
+    except Exception:
+        return
+    for conversa in _listar_conversas_telefone(db, loja_id, telefone_norm):
+        dados = _carregar_tracking_pendente(conversa)
+        if "moto_escolhida" not in dados:
+            continue
+        dados.pop("moto_escolhida", None)
+        conversa.tracking_pendente_json = (
+            json.dumps(dados, ensure_ascii=False, sort_keys=True) if dados else None
+        )
+    db.commit()
+
+
 def criar_loja(
     db: Session, nome: str, slug: str, evolution_instance: str, whatsapp: str | None = None
 ) -> tuple[Loja, str]:
@@ -630,6 +724,7 @@ def _resposta_duplicada(
         base["tem_saida"] = _conversa_tem_saida(db, conversa.id)
         base["historico_recente"] = _formatar_historico_recente(db, conversa.id)
         base["cpf_cliente"] = _obter_cpf_cliente(conversa)
+        base["moto_escolhida"] = _obter_moto_escolhida(conversa)
     if captura_passiva:
         base.update(
             {
@@ -1037,6 +1132,7 @@ def registrar_mensagem(
             "tem_saida": tem_saida,
             "historico_recente": historico_recente,
             "cpf_cliente": cpf_cliente,
+            "moto_escolhida": _obter_moto_escolhida(conversa),
             "captura_passiva": True,
             "loja_operacional": False,
             "catalog_interest_ref": None,
@@ -1055,6 +1151,7 @@ def registrar_mensagem(
         "tem_saida": tem_saida,
         "historico_recente": historico_recente,
         "cpf_cliente": cpf_cliente,
+        "moto_escolhida": _obter_moto_escolhida(conversa),
         "catalog_interest_ref": atribuicao.catalog_interest_ref if atribuicao else None,
         "ctwa_atribuido": bool(ctwa_ok) if not from_me else False,
         "ctwa_pendente": bool(ctwa_pendente) if not from_me else False,

@@ -115,6 +115,79 @@ def test_webhook_preserva_cpf_cliente_mascarado_no_historico(client, loja_a):
     assert "11144477735" not in body2["historico_recente"]
 
 
+def test_moto_escolhida_persiste_e_aparece_no_webhook(client, loja_a):
+    """Moto única do estoque sobrevive em tracking e volta no registrar (simular1).
+
+    Regressão 2026-08-05 ***9992: n8n static data sumiu entre consulta e simulação;
+    simular1 falhou com precisa_escolher_moto e o agent confirmou à toa.
+    """
+    inst = loja_a["instance"]
+    tel = "5511983189992"
+    headers = loja_a["headers"]
+
+    # conversa precisa existir
+    r0 = client.post(
+        "/webhook/mensagem",
+        json=_msg(inst, telefone=tel, provider_message_id="MOTO-0", texto="oi"),
+    )
+    assert r0.status_code == 200
+    assert r0.json().get("moto_escolhida") in (None, {})
+
+    r_save = client.post(
+        "/v1/operacao/moto-escolhida",
+        headers=headers,
+        json={
+            "telefone": tel,
+            "instance": inst,
+            "id": "veh-twister-1",
+            "placa": "ABC1D23",
+            "valor": 21900,
+            "categoria": "moto",
+            "interesse": "honda cb 250 twister 2021",
+        },
+    )
+    assert r_save.status_code == 200, r_save.text
+    body_save = r_save.json()
+    assert body_save["ok"] is True
+    assert body_save["moto_escolhida"]["placa"] == "ABC1D23"
+    assert body_save["moto_escolhida"]["valor"] == 21900
+
+    r1 = client.post(
+        "/webhook/mensagem",
+        json=_msg(
+            inst,
+            telefone=tel,
+            provider_message_id="MOTO-1",
+            texto="quero simular",
+        ),
+    )
+    assert r1.status_code == 200
+    moto = r1.json().get("moto_escolhida")
+    assert moto is not None
+    assert moto["placa"] == "ABC1D23"
+    assert moto["interesse"] == "honda cb 250 twister 2021"
+
+    # limpar (busca ambígua / payload vazio)
+    r_clear = client.post(
+        "/v1/operacao/moto-escolhida",
+        headers=headers,
+        json={"telefone": tel, "instance": inst},
+    )
+    assert r_clear.status_code == 200
+    assert r_clear.json()["moto_escolhida"] is None
+
+    r2 = client.post(
+        "/webhook/mensagem",
+        json=_msg(
+            inst,
+            telefone=tel,
+            provider_message_id="MOTO-2",
+            texto="ainda quero",
+        ),
+    )
+    assert r2.json().get("moto_escolhida") in (None, {})
+
+
 def test_webhook_idempotente_por_provider_message_id(client, loja_a):
     inst = loja_a["instance"]
     r1 = client.post("/webhook/mensagem", json=_msg(inst))

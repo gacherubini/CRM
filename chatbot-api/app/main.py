@@ -388,6 +388,32 @@ class SolicitacaoSimulacaoHumanaInput(BaseModel):
         )
 
 
+class MotoEscolhidaInput(BaseModel):
+    """Moto única consultada no estoque — persiste para simular1 após restart n8n."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    telefone: str
+    instance: Optional[str] = Field(default=None, max_length=120)
+    id: Optional[str] = Field(default=None, max_length=80)
+    placa: Optional[str] = Field(default=None, max_length=12)
+    valor: Optional[float] = Field(default=None, gt=0)
+    categoria: Optional[str] = Field(default=None, max_length=20)
+    interesse: Optional[str] = Field(default=None, max_length=160)
+
+    @field_validator("instance")
+    @classmethod
+    def validar_instance(cls, value: Optional[str]) -> Optional[str]:
+        if value is None:
+            return None
+        texto = str(value).strip()
+        if not texto:
+            return None
+        return validar_identificador(
+            texto, nome="instance", limite=config.WEBHOOK_MAX_INSTANCE_CHARS
+        )
+
+
 class GrupoEstoqueInput(BaseModel):
     grupo_jid: str = Field(min_length=1, max_length=120)
     grupo_nome: Optional[str] = Field(default=None, max_length=160)
@@ -1303,6 +1329,33 @@ def solicitar_simulacao_humana(
         entrada=dados.entrada,
         idempotency_key=str(idempotency_key).strip(),
     )
+
+
+@app.post("/v1/operacao/moto-escolhida")
+def salvar_moto_escolhida(
+    dados: MotoEscolhidaInput,
+    ctx: Contexto = Depends(get_contexto),
+    db: Session = Depends(get_db),
+):
+    """Persiste a moto única do estoque escolhida na conversa (para simular1).
+
+    n8n grava após consultar_estoque com 1 resultado. Reinício do n8n não perde a moto.
+    """
+    _exigir_loja_operacional(db, ctx.loja_id)
+    moto = servico.salvar_moto_escolhida_conversa(
+        db,
+        ctx.loja_id,
+        dados.telefone,
+        {
+            "id": dados.id,
+            "placa": dados.placa,
+            "valor": dados.valor,
+            "categoria": dados.categoria,
+            "interesse": dados.interesse,
+        },
+        instance=dados.instance,
+    )
+    return {"ok": True, "moto_escolhida": moto}
 
 
 @app.get("/v1/operacao/grupo-estoque")

@@ -463,11 +463,15 @@ def solicitar_simulacao_humana(
         )
     db.refresh(notificacao)
 
-    # Minimiza retenção: CPF capturado na conversa só existia para a tool.
+    # Minimiza retenção: CPF e moto só existiam para a tool / simulação.
     try:
         servico.limpar_cpf_cliente_conversa(db, loja_id, telefone_norm)
     except Exception:
         logger.exception("falha ao limpar cpf_cliente pos-simulacao")
+    try:
+        servico.limpar_moto_escolhida_conversa(db, loja_id, telefone_norm)
+    except Exception:
+        logger.exception("falha ao limpar moto_escolhida pos-simulacao")
 
     if destino_jid is None:
         notificacao.status = "failed"
