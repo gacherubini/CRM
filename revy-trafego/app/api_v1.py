@@ -113,6 +113,9 @@ def api_resultados(
     except ChatbotIndisponivel:
         chatbot_offline = True
 
+    from app.meta_ad_resolver_job import mapa_ad_campaign_loja
+
+    mapa_ad = mapa_ad_campaign_loja(db, slug)
     linhas = calcular_roi_loja(
         campanhas=campanhas,
         gastos=gastos,
@@ -121,6 +124,7 @@ def api_resultados(
         d_inicio=d_inicio,
         d_fim=d_fim,
         modo_atribuicao=touch,
+        mapa_ad_campaign=mapa_ad,
     )
     resumo = resumo_periodo(linhas)
     totais = totais_roi(linhas)

@@ -92,6 +92,15 @@ async def _lifespan(_app: FastAPI):
             os.environ["PORTAL_CAPI_RETRY_ENABLED"] = "1"
             meta_capi_job.start_worker(SessionLocal)
             logger.info("revy-trafego: capi retry worker ON")
+        # Atribuição CTWA: resolve ad_id→campaign via Graph (sempre ligado no runtime).
+        # Em testes, REVY_TRAFEGO_SKIP_INIT=1 impede o lifespan de subir workers.
+        from app import meta_ad_resolver_job
+
+        meta_ad_resolver_job.start_worker(
+            SessionLocal,
+            chatbot_factory=get_chatbot_client,
+        )
+        logger.info("revy-trafego: meta ad_resolver worker ON")
         if settings.revy_control_provisioning_delivery_enabled:
             from app.control import provisioning_job
 
@@ -127,10 +136,12 @@ async def _lifespan(_app: FastAPI):
     finally:
         meta_ads_spend_job.stop_worker()
         meta_capi_job.stop_worker()
+        from app import meta_ad_resolver_job
         from app.control import provisioning_job
         from app.control import google_ads_conversions_job
         from app.control import google_ads_metrics_job
 
+        meta_ad_resolver_job.stop_worker()
         provisioning_job.stop_worker()
         google_ads_conversions_job.stop_worker()
         google_ads_metrics_job.stop_worker()
@@ -688,6 +699,9 @@ def trafego_roi(
         leads = get_chatbot_client(usuario.loja_slug).listar_leads()
     except ChatbotIndisponivel:
         chatbot_erro = "indisponivel"
+    from app.meta_ad_resolver_job import mapa_ad_campaign_loja
+
+    mapa_ad = mapa_ad_campaign_loja(db, usuario.loja_slug)
     linhas = calcular_roi_loja(
         campanhas=campanhas,
         gastos=gastos,
@@ -696,6 +710,7 @@ def trafego_roi(
         d_inicio=d_inicio,
         d_fim=d_fim,
         modo_atribuicao=modo,
+        mapa_ad_campaign=mapa_ad,
     )
     totais = totais_roi(linhas)
     return templates.TemplateResponse(
@@ -781,7 +796,6 @@ async def campanhas_nova_post(request: Request, db: Session = Depends(get_db)):
     if not csrf_valido(request, form.get("csrf")):
         return redirect("/app", status_code=303)
     dados = campanha_payload_form(form)
-    dados["ad_ids"] = form.get("ad_ids") or ""
     erros = validar_campanha_payload(dados)
     if erros:
         return templates.TemplateResponse(
@@ -813,9 +827,6 @@ async def campanhas_nova_post(request: Request, db: Session = Depends(get_db)):
     )
     preencher_campanha(c, dados, email=usuario.email)
     db.add(c)
-    db.flush()
-    from app.campanha_anuncios import sincronizar_anuncios
-    sincronizar_anuncios(db, c, form.get("ad_ids"))
     db.commit()
     return redirect("/app/campanhas?ok=criada", status_code=303)
 
@@ -1011,6 +1022,9 @@ def campanhas_detalhe(
         leads = chatbot.listar_leads()
     except ChatbotIndisponivel:
         chatbot_erro = True
+    from app.meta_ad_resolver_job import mapa_ad_campaign_loja
+
+    mapa_ad = mapa_ad_campaign_loja(db, usuario.loja_slug)
     linha_roi = next(
         linha
         for linha in calcular_roi_loja(
@@ -1021,6 +1035,7 @@ def campanhas_detalhe(
             d_inicio=d_inicio,
             d_fim=d_fim,
             modo_atribuicao="last",
+            mapa_ad_campaign=mapa_ad,
         )
         if linha.campanha_id == campanha.id
     )
@@ -1079,7 +1094,6 @@ def campanhas_editar_get(request: Request, campanha_id: str, db: Session = Depen
         "periodo_inicio": campanha.periodo_inicio.isoformat() if campanha.periodo_inicio else "",
         "periodo_fim": campanha.periodo_fim.isoformat() if campanha.periodo_fim else "",
         "notas": campanha.notas or "",
-        "ad_ids": "\n".join(a.ad_id for a in campanha.anuncios),
     }
     return templates.TemplateResponse(
         "campanhas/form.html",
@@ -1103,7 +1117,6 @@ async def campanhas_editar_post(request: Request, campanha_id: str, db: Session 
     if not campanha:
         return redirect("/app/campanhas?erro=1", status_code=303)
     dados = campanha_payload_form(form)
-    dados["ad_ids"] = form.get("ad_ids") or ""
     erros = validar_campanha_payload(dados)
     if erros:
         return templates.TemplateResponse(
@@ -1128,8 +1141,6 @@ async def campanhas_editar_post(request: Request, campanha_id: str, db: Session 
             status_code=422,
         )
     preencher_campanha(campanha, dados)
-    from app.campanha_anuncios import sincronizar_anuncios
-    sincronizar_anuncios(db, campanha, form.get("ad_ids"))
     db.commit()
     return redirect(f"/app/campanhas/{campanha.id}?ok=salvo")
 

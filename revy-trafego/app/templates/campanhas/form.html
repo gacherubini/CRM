@@ -54,15 +54,11 @@
       </label>
       <label style="grid-column:1/-1">ID da campanha no Meta Ads (gasto + CTWA)
         <input type="text" name="meta_campaign_id" value="{{ valores.meta_campaign_id or '' }}" maxlength="64" placeholder="Ex.: 120330000000000000" inputmode="numeric" autocomplete="off">
-        <small class="muted">Gerenciador de Anúncios → campanha → copiar ID. Serve para gasto automático e match CTWA.</small>
+        <small class="muted">Gerenciador de Anúncios → campanha → copiar ID. Obrigatório para gasto automático e para atribuir leads CTWA (o Revy resolve o anúncio → esta campanha via Graph).</small>
       </label>
       <label style="grid-column:1/-1">Código CTWA na mensagem do anúncio
         <input type="text" name="codigo_ctwa" value="{{ valores.codigo_ctwa or '' }}" maxlength="40" placeholder="Ex.: RV-JUL" autocomplete="off">
         <small class="muted">Coloque na mensagem pré-preenchida do anúncio: <code>Cód: RV-JUL</code>. Fallback se o WhatsApp não mandar o click id.</small>
-      </label>
-      <label style="grid-column:1/-1">IDs de anúncio (um por linha)
-        <textarea name="ad_ids" rows="4" placeholder="120252470707220341" inputmode="numeric" autocomplete="off">{{ valores.ad_ids or '' }}</textarea>
-        <small class="muted">Cole o ID de cada anúncio desta campanha (Gerenciador de Anúncios → Anúncios). Casa o lead pelo <code>meta_ad_id</code> do clique (Click-to-WhatsApp).</small>
       </label>
     </div>
   </section>
