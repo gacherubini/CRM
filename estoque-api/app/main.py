@@ -602,6 +602,36 @@ def loja_publica(request: Request, slug: str, db: Session = Depends(get_db)):
     return _resposta_publica_cache(request, _loja_publica(loja), loja.criada_em)
 
 
+class LojaWhatsappUpdate(BaseModel):
+    """Atualiza o WhatsApp usado no CTA do catálogo público."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    whatsapp: Optional[str] = Field(default=None, max_length=32)
+
+
+@app.get("/v1/loja")
+def obter_loja_atual(
+    ctx: Contexto = Depends(get_contexto), db: Session = Depends(get_db)
+):
+    loja = db.get(models_db.Loja, ctx.loja_id)
+    if loja is None:
+        raise HTTPException(status_code=404, detail="loja não encontrada")
+    return {"slug": loja.slug, "nome": loja.nome, "whatsapp": loja.whatsapp}
+
+
+@app.patch("/v1/loja")
+def atualizar_loja_atual(
+    dados: LojaWhatsappUpdate,
+    ctx: Contexto = Depends(get_contexto),
+    db: Session = Depends(get_db),
+):
+    _exigir_gestao(ctx)
+    _exigir_loja_operacional(db, ctx.loja_id)
+    loja = servico.atualizar_whatsapp_loja(db, ctx.loja_id, dados.whatsapp)
+    return {"slug": loja.slug, "nome": loja.nome, "whatsapp": loja.whatsapp}
+
+
 @app.get("/public/v1/lojas/{slug}/veiculos")
 def veiculos_publicos(
     request: Request,
@@ -614,13 +644,18 @@ def veiculos_publicos(
     offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
 ):
-    loja, veiculos = servico.listar_veiculos_publicos(
+    loja, veiculos, total = servico.listar_veiculos_publicos(
         db, slug, tipo, marca, preco_min, preco_max, limit, offset
     )
     payload = {
         "loja": _loja_publica(loja),
         "veiculos": [servico.para_saida_publica(v) for v in veiculos],
-        "paginacao": {"limit": limit, "offset": offset, "quantidade": len(veiculos)},
+        "paginacao": {
+            "limit": limit,
+            "offset": offset,
+            "quantidade": len(veiculos),
+            "total": total,
+        },
     }
     atualizado = max((v.atualizado_em for v in veiculos if v.atualizado_em), default=loja.criada_em)
     return _resposta_publica_cache(request, payload, atualizado)

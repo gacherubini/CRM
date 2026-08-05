@@ -71,7 +71,12 @@ def test_filtro_marca_paginacao_e_cache_condicional(client, loja_a):
     resposta = client.get(f"/public/v1/lojas/{slug}/veiculos?marca=Honda&limit=1")
     assert resposta.status_code == 200
     assert [v["marca"] for v in resposta.json()["veiculos"]] == ["Honda"]
-    assert resposta.json()["paginacao"] == {"limit": 1, "offset": 0, "quantidade": 1}
+    assert resposta.json()["paginacao"] == {
+        "limit": 1,
+        "offset": 0,
+        "quantidade": 1,
+        "total": 1,
+    }
     assert resposta.headers["etag"]
     assert resposta.headers["x-ratelimit-limit"]
 
@@ -86,3 +91,43 @@ def test_paginacao_publica_rejeita_limites_invalidos(client, loja_a):
     slug = loja_a["slug"]
     assert client.get(f"/public/v1/lojas/{slug}/veiculos?limit=0").status_code == 422
     assert client.get(f"/public/v1/lojas/{slug}/veiculos?limit=101").status_code == 422
+
+
+def test_vitrine_prioriza_com_foto_e_expõe_total(client, loja_a):
+    h, slug = loja_a["headers"], loja_a["slug"]
+    sem_foto = client.post(
+        "/v1/veiculos", json=_novo() | {"modelo": "SemFoto"}, headers=h
+    ).json()["id"]
+    com_foto = client.post(
+        "/v1/veiculos", json=_novo() | {"modelo": "ComFoto"}, headers=h
+    ).json()["id"]
+    client.put(
+        f"/v1/veiculos/{com_foto}/fotos",
+        json={"urls": ["https://img.test/capa.jpg"]},
+        headers=h,
+    )
+    client.post(f"/v1/veiculos/{sem_foto}/publicar", headers=h)
+    client.post(f"/v1/veiculos/{com_foto}/publicar", headers=h)
+
+    pagina = client.get(f"/public/v1/lojas/{slug}/veiculos?limit=10").json()
+    assert pagina["paginacao"]["total"] == 2
+    assert pagina["paginacao"]["quantidade"] == 2
+    assert [v["modelo"] for v in pagina["veiculos"]] == ["ComFoto", "SemFoto"]
+
+
+def test_patch_whatsapp_loja_normaliza_e_reflete_no_publico(client, loja_a):
+    h, slug = loja_a["headers"], loja_a["slug"]
+    atual = client.get("/v1/loja", headers=h).json()
+    assert atual["slug"] == slug
+    assert atual["whatsapp"] == "5511999999999"
+
+    patch = client.patch("/v1/loja", json={"whatsapp": "(21) 98888-7777"}, headers=h)
+    assert patch.status_code == 200
+    assert patch.json()["whatsapp"] == "5521988887777"
+
+    pub = client.get(f"/public/v1/lojas/{slug}").json()
+    assert pub["whatsapp"] == "5521988887777"
+
+    limpa = client.patch("/v1/loja", json={"whatsapp": ""}, headers=h)
+    assert limpa.status_code == 200
+    assert limpa.json()["whatsapp"] is None

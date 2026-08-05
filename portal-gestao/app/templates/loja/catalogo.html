@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}Catálogo — Revy Loja{% endblock %}
+{% block page_title %}Catálogo{% endblock %}
+{% block content %}
+<div class="page-heading">
+  <div>
+    <span class="eyebrow">Ajustes</span>
+    <h1>Catálogo público</h1>
+    <p>
+      Número de WhatsApp do botão <strong>Tenho interesse</strong> na vitrine.
+      Independente dos números de atendimento/bot.
+    </p>
+  </div>
+</div>
+
+{% if erro %}<div class="alert warning" role="alert">{{ erro }}</div>{% endif %}
+{% if mensagem %}<div class="alert success" role="status">{{ mensagem }}</div>{% endif %}
+
+<section class="panel" aria-labelledby="catalogo-wa-titulo">
+  <div class="panel-heading">
+    <div>
+      <span class="mono-label">CTA da vitrine</span>
+      <h2 id="catalogo-wa-titulo">WhatsApp do catálogo</h2>
+    </div>
+  </div>
+  <div class="panel-body">
+    <p class="muted">
+      Aceita DDD + número (ex.: 11 99999-9999) ou com DDI 55.
+      Deixe em branco para remover o botão de contato na vitrine.
+    </p>
+    <form method="post" action="/app/loja/catalogo" class="stack-form">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <label>Telefone
+        <input
+          name="whatsapp"
+          type="tel"
+          inputmode="tel"
+          autocomplete="tel"
+          maxlength="32"
+          placeholder="Ex.: (11) 98888-7777"
+          value="{{ whatsapp }}"
+        >
+      </label>
+      <button class="button primary" type="submit">Salvar</button>
+    </form>
+  </div>
+</section>
+{% endblock %}

@@ -23,6 +23,7 @@
   "paginacao": {
     "limit": 12,
     "offset": 0,
-    "quantidade": 1
+    "quantidade": 1,
+    "total": 1
   }
 }

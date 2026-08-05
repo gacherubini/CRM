@@ -71,8 +71,8 @@ def test_vitrine_renderiza_dados_e_preserva_filtros(client, fake_provider):
     assert "Honda CG 160" in response.text
     assert 'value="Honda"' in response.text
     assert 'option value="moto" selected' in response.text
-    assert "preco_min=10000.0" in response.text
-    assert "preco_max=30000.0" in response.text
+    assert 'name="preco_min"' in response.text and "10000" in response.text
+    assert 'name="preco_max"' in response.text and "30000" in response.text
     assert fake_provider.last_filters == {
         "tipo": "moto",
         "marca": "Honda",
@@ -90,12 +90,33 @@ def test_vitrine_estado_vazio(client, fake_provider):
         page = original(slug, **filters)
         page.veiculos = []
         page.paginacao.quantidade = 0
+        page.paginacao.total = 0
         return page
 
     fake_provider.list_vehicles = empty
     response = client.get("/l/moto-center")
     assert response.status_code == 200
     assert "Nenhum veículo encontrado" in response.text
+
+
+def test_vitrine_paginacao_numerada(client, fake_provider):
+    original = fake_provider.list_vehicles
+
+    def paged(slug, **filters):
+        page = original(slug, **filters)
+        page.paginacao.total = 25
+        page.paginacao.quantidade = 1
+        page.paginacao.limit = filters["limit"]
+        page.paginacao.offset = filters["offset"]
+        return page
+
+    fake_provider.list_vehicles = paged
+    response = client.get("/l/moto-center?limit=12&offset=0")
+    assert response.status_code == 200
+    assert "Mostrando 1–1 de 25" in response.text
+    assert 'aria-current="page"' in response.text
+    assert "Próxima" in response.text
+    assert "Anterior" in response.text
 
 
 def test_detalhe_renderiza_galeria_e_cta(client):

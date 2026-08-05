@@ -12,7 +12,7 @@ from decimal import Decimal
 from urllib.parse import quote, urlparse
 
 from fastapi import HTTPException
-from sqlalchemy import update
+from sqlalchemy import and_, case, exists, or_, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -911,6 +911,13 @@ def obter_loja_por_slug(db: Session, slug: str) -> Loja:
     return loja
 
 
+def _expressao_tem_foto():
+    """1 se há capa legada ou galeria; 0 caso contrário (ordenação da vitrine)."""
+    tem_capa = and_(Veiculo.foto_url.isnot(None), Veiculo.foto_url != "")
+    tem_galeria = exists().where(VeiculoFoto.veiculo_id == Veiculo.id)
+    return case((or_(tem_capa, tem_galeria), 1), else_=0)
+
+
 def listar_veiculos_publicos(
     db: Session,
     slug: str,
@@ -920,7 +927,7 @@ def listar_veiculos_publicos(
     preco_max: float | None = None,
     limit: int = 50,
     offset: int = 0,
-) -> tuple[Loja, list[Veiculo]]:
+) -> tuple[Loja, list[Veiculo], int]:
     loja = obter_loja_por_slug(db, slug)
     q = db.query(Veiculo).filter(
         Veiculo.loja_id == loja.id,
@@ -935,8 +942,43 @@ def listar_veiculos_publicos(
         q = q.filter(Veiculo.preco >= preco_min)
     if preco_max is not None:
         q = q.filter(Veiculo.preco <= preco_max)
-    veiculos = q.order_by(Veiculo.criado_em.desc()).offset(offset).limit(min(limit, 100)).all()
-    return loja, veiculos
+    total = q.count()
+    # Com foto primeiro (vitrine); dentro do grupo, mais recentes.
+    veiculos = (
+        q.order_by(_expressao_tem_foto().desc(), Veiculo.criado_em.desc())
+        .offset(offset)
+        .limit(min(limit, 100))
+        .all()
+    )
+    return loja, veiculos, total
+
+
+def normalizar_whatsapp_loja(valor: str | None) -> str | None:
+    """Normaliza telefone do CTA do catálogo (E.164 digits, BR com DDI 55).
+
+    String vazia / None limpa o campo. Inválido → 422.
+    """
+    if valor is None:
+        return None
+    bruto = str(valor).strip()
+    if not bruto:
+        return None
+    digitos = re.sub(r"\D", "", bruto)
+    if len(digitos) in {10, 11}:
+        digitos = f"55{digitos}"
+    if not 10 <= len(digitos) <= 15:
+        raise HTTPException(status_code=422, detail="WhatsApp inválido")
+    return digitos
+
+
+def atualizar_whatsapp_loja(db: Session, loja_id: str, whatsapp: str | None) -> Loja:
+    loja = db.get(Loja, loja_id)
+    if loja is None:
+        raise HTTPException(status_code=404, detail="loja não encontrada")
+    loja.whatsapp = normalizar_whatsapp_loja(whatsapp)
+    db.commit()
+    db.refresh(loja)
+    return loja
 
 
 def obter_veiculo_publico(db: Session, slug: str, veiculo_id: str) -> Veiculo:

@@ -42,7 +42,10 @@ class FakeProvider:
             loja=self.store,
             veiculos=[self.vehicle],
             paginacao=Pagination(
-                limit=filters["limit"], offset=filters["offset"], quantidade=1
+                limit=filters["limit"],
+                offset=filters["offset"],
+                quantidade=1,
+                total=1,
             ),
         )
 

@@ -106,3 +106,11 @@ class EstoqueClient:
             erro_404=VeiculoNaoEncontrado,
             erro_409=ConflitoEstoque,
         )
+
+    def obter_loja(self) -> dict:
+        """Metadados públicos da loja autenticada (slug, nome, whatsapp do CTA)."""
+        return self._request("GET", "/v1/loja")
+
+    def atualizar_loja(self, *, whatsapp: str | None) -> dict:
+        """Atualiza WhatsApp do catálogo (campo livre normalizado no Estoque)."""
+        return self._request("PATCH", "/v1/loja", json={"whatsapp": whatsapp})

@@ -40,6 +40,8 @@ class Pagination(BaseModel):
     limit: int = Field(ge=1, le=100)
     offset: int = Field(ge=0)
     quantidade: int = Field(ge=0)
+    # Total filtrado (contrato público estoque ≥ 2026-08). Default 0 em mocks legados.
+    total: int = Field(default=0, ge=0)
 
 
 class VehiclePage(BaseModel):
