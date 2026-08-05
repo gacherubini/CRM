@@ -2321,3 +2321,106 @@ tr:hover td { background: var(--surface-soft); }
     transition: none !important;
   }
 }
+
+/* ---------------------------------------------------------------------------
+   Ordem na vitrine (drag-and-drop)
+   --------------------------------------------------------------------------- */
+.vitrine-hint { margin: 0 0 var(--space-4); }
+.vitrine-form { display: flex; flex-direction: column; gap: var(--space-4); }
+.vitrine-sortable {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.vitrine-row {
+  display: grid;
+  grid-template-columns: auto 56px 1fr auto;
+  gap: var(--space-3);
+  align-items: center;
+  padding: var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  transition: box-shadow .15s ease, transform .15s ease, border-color .15s ease, background .15s ease;
+  cursor: grab;
+}
+.vitrine-row:active { cursor: grabbing; }
+.vitrine-row.is-dragging {
+  opacity: .85;
+  box-shadow: var(--shadow);
+  border-color: var(--line-strong);
+  background: var(--surface-raised);
+  transform: scale(1.01);
+  z-index: 2;
+}
+.vitrine-row.drop-target {
+  border-color: var(--accent);
+  background: var(--surface-soft);
+}
+.vitrine-handle {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--ink-muted);
+  font-size: 16px;
+  line-height: 1;
+  padding: var(--space-2);
+  cursor: grab;
+  border-radius: 8px;
+}
+.vitrine-handle:hover { color: var(--ink); background: var(--surface-soft); }
+.vitrine-thumb {
+  width: 56px;
+  height: 42px;
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--surface-soft);
+  border: 1px solid var(--line);
+  display: grid;
+  place-items: center;
+}
+.vitrine-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.vitrine-thumb-empty {
+  font-size: var(--text-xs);
+  color: var(--ink-muted);
+  text-align: center;
+  padding: 2px;
+}
+.vitrine-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.vitrine-meta strong {
+  font-size: var(--text-base);
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.vitrine-actions {
+  display: flex;
+  gap: var(--space-2);
+}
+.vitrine-actions .button {
+  min-width: 36px;
+  padding-inline: 10px;
+}
+.vitrine-footer {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+@media (prefers-reduced-motion: reduce) {
+  .vitrine-row { transition: none !important; }
+}

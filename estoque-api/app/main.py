@@ -99,6 +99,17 @@ class VeiculoUpdate(BaseModel):
     foto_url: Optional[str] = None
 
 
+class OrdemVitrineItem(BaseModel):
+    id: str = Field(min_length=1, max_length=36)
+    ordem_vitrine: int = Field(ge=0, le=1_000_000)
+
+
+class OrdemVitrineInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    itens: list[OrdemVitrineItem] = Field(min_length=1, max_length=500)
+
+
 class FotoInput(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -223,6 +234,30 @@ def listar_veiculos(
     veiculos = servico.listar_veiculos(db, ctx.loja_id, tipo, status, publicado, busca, placa)
     return {
         "veiculos": [servico.para_saida_privada(v, _pode_ver_custo(ctx)) for v in veiculos]
+    }
+
+
+@app.put("/v1/veiculos/ordem-vitrine")
+def reordenar_vitrine(
+    dados: OrdemVitrineInput,
+    ctx: Contexto = Depends(get_contexto),
+    db: Session = Depends(get_db),
+):
+    """Reordena veículos na vitrine pública (ordem_vitrine ASC)."""
+    _exigir_operacao(ctx)
+    _exigir_loja_operacional(db, ctx.loja_id)
+    atualizados = servico.reordenar_vitrine(
+        db,
+        ctx.loja_id,
+        [item.model_dump() for item in dados.itens],
+        ctx.papel,
+    )
+    return {
+        "ok": True,
+        "atualizados": len(atualizados),
+        "veiculos": [
+            servico.para_saida_privada(v, _pode_ver_custo(ctx)) for v in atualizados
+        ],
     }
 
 

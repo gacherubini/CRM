@@ -16,7 +16,7 @@ Status: aprovado para implementação
 |---|---|
 | Número do CTA | Continua em `estoque.lojas.whatsapp`; Loja edita via API privada do Estoque |
 | UI Loja | Ajustes → **Catálogo** (`/app/loja/catalogo`), dono/gerente, shell ligado |
-| Ordenação | `tem_foto DESC`, depois `criado_em DESC` |
+| Ordenação | `ordem_vitrine ASC`, depois `tem_foto DESC`, depois `criado_em DESC` (manual na Loja: `/app/loja/estoque/vitrine`) |
 | Total | `paginacao.total` no contrato público (além de limit/offset/quantidade) |
 | Dark mode | Fora de escopo |
 

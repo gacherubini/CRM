@@ -288,3 +288,37 @@ class GrupoEstoque(Base):
     operacao_modo: Mapped[str | None] = mapped_column(String(40), nullable=True)
     operacao_ctx: Mapped[str | None] = mapped_column(Text, nullable=True)
     atualizado_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_agora, onupdate=_agora)
+
+
+class NotificacaoOperacional(Base):
+    """Outbox de alertas operacionais (ex.: simulação humana → grupo estoque).
+
+    Nunca persiste CPF, nascimento, token ou texto bruto do cliente.
+    """
+
+    __tablename__ = "notificacoes_operacionais"
+    __table_args__ = (
+        UniqueConstraint(
+            "loja_id", "idempotency_key", name="uq_notif_op_loja_idempotency"
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    loja_id: Mapped[str] = mapped_column(ForeignKey("lojas.id"), nullable=False, index=True)
+    canal_id: Mapped[str | None] = mapped_column(
+        ForeignKey("whatsapp_canais.id"), nullable=True, index=True
+    )
+    tipo: Mapped[str] = mapped_column(String(40), nullable=False, default="simulacao_humana")
+    idempotency_key: Mapped[str] = mapped_column(String(255), nullable=False)
+    destino_jid: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="pending")
+    attempts: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    next_attempt_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    provider_message_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    last_error_code: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    # Resumo seguro: interesse truncado, flags, telefone mascarado (JSON textual).
+    payload_resumo: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_agora)
+    sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

@@ -86,6 +86,8 @@ class Veiculo(Base):
     placa: Mapped[str | None] = mapped_column(String(7), nullable=True)  # normalizada, sem hífen
     codigo_interno: Mapped[str | None] = mapped_column(String, nullable=True)
     foto_url: Mapped[str | None] = mapped_column(String, nullable=True)
+    # Ordem manual na vitrine pública (menor = mais acima). Desempate: tem_foto, criado_em.
+    ordem_vitrine: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     criado_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_agora)
     atualizado_em: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=_agora, onupdate=_agora
@@ -105,6 +107,7 @@ class Veiculo(Base):
             sqlite_where=text("placa IS NOT NULL"),
             postgresql_where=text("placa IS NOT NULL"),
         ),
+        Index("ix_veiculos_loja_ordem_vitrine", "loja_id", "ordem_vitrine"),
     )
 
 

@@ -893,11 +893,10 @@ def decidir_roteamento(
         if opcao == "vender":
             _set_modo(db, numero, "vender", {"step": "placa"})
             return _ctrl(_pedir_placa("Marcar como vendido ✅"))
-        # texto livre no menu: reexibe opções
-        _abrir_ou_renovar_cadastro(db, numero)
-        return _ctrl(
-            "Não entendi essa opção.\n\n" + _TEXTO_MENU
-        )
+        # Texto livre no menu: silêncio. Evita flood no grupo quando a sessão
+        # está aberta e a equipe conversa (ou Evolution reenvia histórico ≤5 min).
+        # Não renova TTL — só gatilhos e opções 1–5 mantêm a sessão viva.
+        return {"acao": "ignorar", "resposta": None}
 
     if modo == "cadastrar":
         if normal in _GATILHO_MENU or normal == "menu":

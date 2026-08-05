@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+{% block title %}Ordem na vitrine — Revy Loja{% endblock %}
+{% block page_title %}Ordem na vitrine{% endblock %}
+{% block content %}
+<div class="page-heading">
+  <div>
+    <span class="eyebrow">Estoque</span>
+    <h1>Ordem na vitrine</h1>
+    <p>
+      Arraste as motos publicadas para definir a ordem no catálogo público.
+      O primeiro da lista aparece no topo da vitrine.
+    </p>
+  </div>
+  <div class="heading-actions">
+    <a class="button secondary" href="/app/loja/estoque">Visão geral</a>
+    <a class="button secondary" href="/app/loja/estoque/veiculos">Veículos</a>
+  </div>
+</div>
+
+{% if erro %}<div class="alert warning" role="alert">{{ erro }}</div>{% endif %}
+{% if mensagem %}<div class="alert success" role="status">{{ mensagem }}</div>{% endif %}
+
+<section class="panel" aria-labelledby="vitrine-titulo">
+  <div class="panel-heading">
+    <div>
+      <span class="mono-label">Catálogo público</span>
+      <h2 id="vitrine-titulo">Publicados e disponíveis</h2>
+    </div>
+    {% if veiculos %}
+    <span class="muted">{{ veiculos|length }} veículo{{ 's' if veiculos|length != 1 else '' }}</span>
+    {% endif %}
+  </div>
+  <div class="panel-body">
+    {% if not veiculos and not erro %}
+    <div class="empty">
+      <strong>Nenhum veículo publicado</strong>
+      <p>Publique veículos na lista de estoque para reordená-los aqui.</p>
+      <a class="button secondary" href="/app/loja/estoque/veiculos">Abrir veículos</a>
+    </div>
+    {% elif veiculos %}
+    <p class="muted vitrine-hint">
+      Arraste pelo handle · ou use ↑/↓ · a ordem é salva automaticamente ao soltar.
+    </p>
+    <form
+      id="vitrine-ordem-form"
+      method="post"
+      action="/app/loja/estoque/vitrine"
+      class="vitrine-form"
+      data-vitrine-sortable
+    >
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <input type="hidden" name="ordem_ids" id="vitrine-ordem-ids" value="{% for v in veiculos %}{{ v.id }}{% if not loop.last %},{% endif %}{% endfor %}">
+      <ul class="vitrine-sortable" id="vitrine-lista" role="list">
+        {% for v in veiculos %}
+        <li class="vitrine-row" draggable="true" data-id="{{ v.id }}" tabindex="0">
+          <button type="button" class="vitrine-handle" aria-label="Arrastar {{ v.marca }} {{ v.modelo }}" title="Arrastar">
+            <span aria-hidden="true">⋮⋮</span>
+          </button>
+          <div class="vitrine-thumb" aria-hidden="true">
+            {% if v.foto_url or (v.midia_principal and v.midia_principal.url) %}
+            <img src="{{ v.foto_url or v.midia_principal.url }}" alt="" loading="lazy" width="56" height="42">
+            {% else %}
+            <span class="vitrine-thumb-empty">sem foto</span>
+            {% endif %}
+          </div>
+          <div class="vitrine-meta">
+            <strong>{{ v.marca }} {{ v.modelo }}{% if v.ano_modelo %} · {{ v.ano_modelo }}{% endif %}</strong>
+            <span class="muted">
+              {% if v.preco is not none %}R$ {{ '%.0f'|format(v.preco|float) }}{% else %}—{% endif %}
+              {% if v.placa %} · {{ v.placa }}{% endif %}
+            </span>
+          </div>
+          <div class="vitrine-actions">
+            <button type="button" class="button secondary vitrine-btn-up" aria-label="Subir">↑</button>
+            <button type="button" class="button secondary vitrine-btn-down" aria-label="Descer">↓</button>
+          </div>
+        </li>
+        {% endfor %}
+      </ul>
+      <div class="vitrine-footer">
+        <button class="button primary" type="submit" id="vitrine-salvar">Salvar ordem</button>
+        <span class="muted" id="vitrine-status" aria-live="polite"></span>
+      </div>
+    </form>
+    {% endif %}
+  </div>
+</section>
+{% if veiculos %}
+<script src="/static/js/vitrine_ordem.js" defer></script>
+{% endif %}
+{% endblock %}

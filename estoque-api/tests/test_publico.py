@@ -109,10 +109,80 @@ def test_vitrine_prioriza_com_foto_e_expõe_total(client, loja_a):
     client.post(f"/v1/veiculos/{sem_foto}/publicar", headers=h)
     client.post(f"/v1/veiculos/{com_foto}/publicar", headers=h)
 
+    # Empate em ordem_vitrine: desempate tem_foto DESC.
+    assert (
+        client.put(
+            "/v1/veiculos/ordem-vitrine",
+            json={
+                "itens": [
+                    {"id": sem_foto, "ordem_vitrine": 0},
+                    {"id": com_foto, "ordem_vitrine": 0},
+                ]
+            },
+            headers=h,
+        ).status_code
+        == 200
+    )
+
     pagina = client.get(f"/public/v1/lojas/{slug}/veiculos?limit=10").json()
     assert pagina["paginacao"]["total"] == 2
     assert pagina["paginacao"]["quantidade"] == 2
     assert [v["modelo"] for v in pagina["veiculos"]] == ["ComFoto", "SemFoto"]
+
+
+def test_vitrine_respeita_ordem_manual(client, loja_a):
+    h, slug = loja_a["headers"], loja_a["slug"]
+    a = client.post(
+        "/v1/veiculos", json=_novo() | {"modelo": "Primeira"}, headers=h
+    ).json()["id"]
+    b = client.post(
+        "/v1/veiculos", json=_novo() | {"modelo": "Segunda"}, headers=h
+    ).json()["id"]
+    c = client.post(
+        "/v1/veiculos", json=_novo() | {"modelo": "Terceira"}, headers=h
+    ).json()["id"]
+    for vid in (a, b, c):
+        client.post(f"/v1/veiculos/{vid}/publicar", headers=h)
+
+    r = client.put(
+        "/v1/veiculos/ordem-vitrine",
+        json={
+            "itens": [
+                {"id": c, "ordem_vitrine": 0},
+                {"id": a, "ordem_vitrine": 1},
+                {"id": b, "ordem_vitrine": 2},
+            ]
+        },
+        headers=h,
+    )
+    assert r.status_code == 200, r.text
+    assert r.json()["atualizados"] == 3
+
+    pagina = client.get(f"/public/v1/lojas/{slug}/veiculos?limit=10").json()
+    assert [v["modelo"] for v in pagina["veiculos"]] == [
+        "Terceira",
+        "Primeira",
+        "Segunda",
+    ]
+
+    # Idempotência de leitura: segunda reordenação troca topo.
+    client.put(
+        "/v1/veiculos/ordem-vitrine",
+        json={
+            "itens": [
+                {"id": b, "ordem_vitrine": 0},
+                {"id": c, "ordem_vitrine": 1},
+                {"id": a, "ordem_vitrine": 2},
+            ]
+        },
+        headers=h,
+    )
+    pagina2 = client.get(f"/public/v1/lojas/{slug}/veiculos?limit=10").json()
+    assert [v["modelo"] for v in pagina2["veiculos"]] == [
+        "Segunda",
+        "Terceira",
+        "Primeira",
+    ]
 
 
 def test_patch_whatsapp_loja_normaliza_e_reflete_no_publico(client, loja_a):

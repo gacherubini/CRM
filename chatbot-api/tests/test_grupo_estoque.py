@@ -117,3 +117,40 @@ def test_menu_ignora_privado_e_grupo_diferente_quando_configurado(
 
     assert privado == {"acao": "ignorar", "resposta": None}
     assert outro == {"acao": "ignorar", "resposta": None}
+
+
+def test_texto_livre_no_menu_do_grupo_nao_reenvia_menu(client, loja_a, db):
+    """Anti-flood: conversa da equipe com sessão aberta não gera menu em loop."""
+    _selecionar(client, loja_a)
+
+    menu = operacao.decidir_roteamento(
+        db,
+        loja_a["loja_id"],
+        "5511999990001",
+        "menu",
+        None,
+        grupo_jid=GRUPO,
+    )
+    assert menu["acao"] == "cadastro_controle"
+
+    livre = operacao.decidir_roteamento(
+        db,
+        loja_a["loja_id"],
+        "5511999990002",
+        "alguém viu a CG 160?",
+        None,
+        grupo_jid=GRUPO,
+    )
+    assert livre == {"acao": "ignorar", "resposta": None}
+
+    # Opções válidas continuam respondendo com a sessão compartilhada.
+    opcao = operacao.decidir_roteamento(
+        db,
+        loja_a["loja_id"],
+        "5511999990002",
+        "2",
+        None,
+        grupo_jid=GRUPO,
+    )
+    assert opcao["acao"] == "cadastro_controle"
+    assert opcao["resposta"]

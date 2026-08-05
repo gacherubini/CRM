@@ -1,6 +1,7 @@
 # Plano — alerta confiável de simulação no grupo do estoque
 
-**Status:** diagnóstico concluído; implementação pendente.
+**Status:** Fases 0–2 implementadas no código (schema TEMP, endpoint canônico + envio ao
+grupo, cutover das tools n8n). Fase 3 (outbox/retry worker) e smoke/Active ON ainda pendentes.
 
 **Objetivo:** toda solicitação de simulação aceita pelo bot deve ser persistida, pausar o bot e
 gerar exatamente um aviso no grupo de estoque configurado para a loja. O cliente só recebe a

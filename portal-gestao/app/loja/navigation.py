@@ -83,6 +83,13 @@ def build_nav(
                         module=Module.ESTOQUE.value,
                         active_prefix="/app/loja/estoque/veiculos",
                     ),
+                    NavItem(
+                        label="Ordem na vitrine",
+                        href="/app/loja/estoque/vitrine",
+                        section="Estoque",
+                        module=Module.ESTOQUE.value,
+                        active_prefix="/app/loja/estoque/vitrine",
+                    ),
                 ),
             )
         )
@@ -185,12 +192,8 @@ def nav_item_is_active(item: NavItem, path: str) -> bool:
 
     prefix = item.active_prefix or item.href
     if prefix and path.startswith(prefix):
-        # Evita que Visão geral do estoque marque a lista de veículos
-        if item.href == "/app/loja/estoque" and (
-            path.startswith("/app/loja/estoque/veiculos")
-            or path == "/app/estoque"
-            or path.startswith("/app/estoque/")
-        ):
+        # Evita que Visão geral do estoque marque subpáginas (veículos, vitrine)
+        if item.href == "/app/loja/estoque" and path != "/app/loja/estoque":
             return False
         return True
     return False

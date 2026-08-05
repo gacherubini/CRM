@@ -114,3 +114,12 @@ class EstoqueClient:
     def atualizar_loja(self, *, whatsapp: str | None) -> dict:
         """Atualiza WhatsApp do catálogo (campo livre normalizado no Estoque)."""
         return self._request("PATCH", "/v1/loja", json={"whatsapp": whatsapp})
+
+    def reordenar_vitrine(self, itens: list[dict]) -> dict:
+        """Atualiza ordem manual dos veículos na vitrine pública."""
+        return self._request(
+            "PUT",
+            "/v1/veiculos/ordem-vitrine",
+            json={"itens": itens},
+            erro_404=VeiculoNaoEncontrado,
+        )

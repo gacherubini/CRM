@@ -32,9 +32,8 @@ Eixos com trabalho real pendente (um por mudança; não misturar). Fonte viva:
   teto 20 calls/ciclo, backoff 429/5xx (migrations `0015`/`0016`). Cadastro manual
   de `ad_id` (Fase 1) **removido** — campanha Revy precisa de `meta_campaign_id` +
   token `ads_read`.
-- **Bot WhatsApp:** corrigir e implementar o
-  [alerta confiável de simulação no grupo do estoque](2026-08-05-plano-alerta-grupo-estoque-simulacao.md);
-  depois smoke virgem/CTWA/handoff/salvo no lab → workflow Active ON.
+- **Bot WhatsApp:** alerta de simulação no grupo (F0–F2 no código); smoke virgem/CTWA/handoff/salvo
+  no lab → workflow Active ON; residual outbox/retry (Fase 3 do plano de alerta).
 - **Multi-WhatsApp (Control Fase 5):** E2E dois canais + `canal_id` correto.
 - **Google Ads (Control Fase 4):** secrets GCP + OAuth/métricas/conversões.
 - **Motor/RPA:** smoke real por banco (resultado ao cliente ainda humano no Portal).
@@ -65,7 +64,7 @@ Eixos com trabalho real pendente (um por mudança; não misturar). Fonte viva:
 | ops | [Arquitetura 3 VMs](2026-07-21-plano-arquitetura-3-vms.md) | Consolidação Fly (custo) | **IMPLEMENTADO / OPERANDO** — `suite-pg` + `evolution2037` + `app2037` always-on; `motor2037` Playwright on-demand; n8n webhook + roteamento 3 casos; ops = `deploy/fly/3vm/` + `up-all.sh --3vm` |
 | ops | [Runbook rollout lab / provisionamento](2026-07-29-runbook-rollout-lab-provisionamento.md) | Subida do lab + provisionamento | Procedimento operacional; usar junto de `deploy/fly/3vm/README.md` |
 | ops | [Menu estoque WA + fixes foto](2026-07-22-plano-menu-estoque-wa-e-fotos-fix.md) | Cadastro/menu/fotos prod | **CÓDIGO DONE** — próximo: E2E menu/cadastro, depois cliente novo |
-| ops | [Alerta de simulação no grupo do estoque](2026-08-05-plano-alerta-grupo-estoque-simulacao.md) | Chatbot + n8n + Evolution | **DIAGNÓSTICO FECHADO / IMPLEMENTAÇÃO PENDENTE** — fallback temporário falha no schema; tools atuais enviam no privado e engolem erros |
+| ops | [Alerta de simulação no grupo do estoque](2026-08-05-plano-alerta-grupo-estoque-simulacao.md) | Chatbot + n8n + Evolution | **F0–F2 NO CÓDIGO** — schema TEMP ok; `POST /solicitacoes-simulacao-humana` + envio `@g.us`; residual = outbox/retry (F3) + smoke/Active ON |
 
 Planos #1A e #4A podem avançar em paralelo após #0. #2A depende da fatia Lite do #4A.
 Numeração é histórica; não obriga Portal antes de Estoque/Catálogo.

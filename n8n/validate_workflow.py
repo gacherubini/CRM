@@ -73,37 +73,24 @@ def main() -> None:
     assert "/v1/simulacoes/solicitar" in simulation_code, (
         "tool não usa a solicitação assíncrona e privada"
     )
-    # Simulação humana: com dados completos a tool pausa o bot e avisa a equipe.
-    assert "/estado" in simulation_code and "bot_ativo: false" in simulation_code, (
-        "tool de simulação deve pausar o bot após qualificar (simulação humana)"
+    # Simulação humana canônica: endpoint único (lead + pausa + alerta grupo).
+    assert "/v1/operacao/solicitacoes-simulacao-humana" in simulation_code, (
+        "tool de simulação deve usar o endpoint canônico de simulação humana"
     )
-    assert "precisa de simulação humana" in simulation_code, (
-        "aviso à equipe deve pedir simulação humana"
-    )
-    assert "app/loja/atendimento" in simulation_code, (
-        "aviso à equipe deve linkar o Atendimento da Loja"
-    )
-    assert "/v1/leads" in simulation_code and "etapa: 'qualificado'" in simulation_code, (
-        "tool de simulação não cria o lead qualificado"
+    assert "simulacao_humana_solicitada" in simulation_code, (
+        "tool deve só confirmar ao cliente quando o backend aceitar a simulação"
     )
     assert "cpfDigitos.length !== 11" in simulation_code, (
         "tool cria lead sem confirmar a presença de CPF"
     )
-    assert "/v1/operacao/numeros-autorizados" in simulation_code, (
-        "tool não consulta os vendedores autorizados"
+    assert "numeros-autorizados" not in simulation_code, (
+        "alerta de simulação não deve mais listar vendedores no privado"
     )
-    assert (
-        "/message/sendText/' + encodeURIComponent(instance)" in simulation_code
-        or "/message/sendText/\" + encodeURIComponent(instance)" in simulation_code
-    ), "tool não avisa o vendedor pela Evolution com instance do webhook"
+    assert "/message/sendText/" not in simulation_code, (
+        "envio WhatsApp do alerta deve ficar no Chatbot (grupo), não na tool n8n"
+    )
     assert "origem.instance" in simulation_code or "const instance = String(origem.instance" in simulation_code, (
         "tool de simulação não lê instance do Extrair1"
-    )
-    assert "cpf e data de nascimento recebidos" in simulation_code, (
-        "aviso interno não informa que os dados foram recebidos"
-    )
-    assert "body: { number: numero, text: textoVendedor }" in simulation_code, (
-        "aviso ao vendedor deve conter somente o texto interno seguro"
     )
     assert "Idempotency-Key" in simulation_code and "providerMessageId" in simulation_code, (
         "tool de simulação não deduplica pela mensagem do WhatsApp"
@@ -229,14 +216,26 @@ def main() -> None:
     assert "temporário" in temp_description and "não oferece fotos" in temp_description, (
         "fallback temporário deve estar identificado e proibir fotos"
     )
-    assert "/v1/leads" in temp_code and "/estado" in temp_code, (
-        "fallback temporário deve criar lead e transferir para atendimento humano"
+    assert "/v1/operacao/solicitacoes-simulacao-humana" in temp_code, (
+        "fallback temporário deve usar o endpoint canônico de simulação humana"
     )
     assert "/v1/simulacoes/solicitar" not in temp_code, (
         "fallback sem veículo real nunca deve chamar o motor de simulação"
     )
     assert "pode_oferecer_fotos: false" in temp_code, (
         "fallback temporário deve bloquear a oferta de fotos"
+    )
+    assert "numeros-autorizados" not in temp_code and "/message/sendText/" not in temp_code, (
+        "fallback não deve enviar alerta privado direto pela Evolution"
+    )
+    temp_schema = temp_node.get("parameters", {}).get("inputSchema", "")
+    assert '"additionalProperties": true' in temp_schema.replace(
+        " ", ""
+    ) or '"additionalProperties":true' in temp_schema.replace(" ", ""), (
+        "schema TEMP deve permitir campos de contexto do n8n (additionalProperties true)"
+    )
+    assert "simulacao_humana_solicitada" in system_message_lower or "ok:true" in system_message_lower, (
+        "prompt deve proibir confirmação de simulação sem sucesso da tool"
     )
     assert temp_name in stock_node.get("parameters", {}).get("description", ""), (
         "consulta de estoque não encaminha resultado vazio ao fallback temporário"
@@ -488,6 +487,9 @@ def main() -> None:
     )
     assert "Boolean(imagem) && !fromMe" in extract_code, (
         "eco de imagem enviada pela própria loja entraria como upload"
+    )
+    assert "(ehGrupo && fromMe)" in extract_code, (
+        "eco fromMe no grupo deve ser descartado na entrada — evita loop de menu"
     )
     assert "ehGrupo" in extract_code and "@g.us" in extract_code, (
         "extração não reconhece mensagens do grupo de estoque"

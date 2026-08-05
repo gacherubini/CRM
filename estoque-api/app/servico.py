@@ -378,6 +378,16 @@ def criar_veiculo(
         Veiculo.loja_id == loja_id, Veiculo.codigo_interno == codigo
     ).first():
         raise HTTPException(status_code=409, detail="código interno já existe nesta loja")
+    # Append ao fim da vitrine (manual manda; foto/data só desempate).
+    if "ordem_vitrine" not in dados or dados.get("ordem_vitrine") is None:
+        max_ordem = (
+            db.query(Veiculo.ordem_vitrine)
+            .filter(Veiculo.loja_id == loja_id)
+            .order_by(Veiculo.ordem_vitrine.desc())
+            .limit(1)
+            .scalar()
+        )
+        dados["ordem_vitrine"] = int(max_ordem) + 1 if max_ordem is not None else 0
     v = Veiculo(id=str(uuid.uuid4()), loja_id=loja_id, **dados)
     db.add(v)
     try:
@@ -433,7 +443,10 @@ def listar_veiculos(
     if busca:
         termo = f"%{busca}%"
         q = q.filter((Veiculo.modelo.ilike(termo)) | (Veiculo.marca.ilike(termo)))
-    return q.order_by(Veiculo.criado_em.desc()).all()
+    return q.order_by(
+        Veiculo.ordem_vitrine.asc(),
+        Veiculo.criado_em.desc(),
+    ).all()
 
 
 def obter_veiculo(db: Session, loja_id: str, veiculo_id: str) -> Veiculo:
@@ -946,14 +959,78 @@ def listar_veiculos_publicos(
     if preco_max is not None:
         q = q.filter(Veiculo.preco <= preco_max)
     total = q.count()
-    # Com foto primeiro (vitrine); dentro do grupo, mais recentes.
+    # Ordem manual da loja; desempate: com foto, depois mais recentes.
     veiculos = (
-        q.order_by(_expressao_tem_foto().desc(), Veiculo.criado_em.desc())
+        q.order_by(
+            Veiculo.ordem_vitrine.asc(),
+            _expressao_tem_foto().desc(),
+            Veiculo.criado_em.desc(),
+        )
         .offset(offset)
         .limit(min(limit, 100))
         .all()
     )
     return loja, veiculos, total
+
+
+def reordenar_vitrine(
+    db: Session,
+    loja_id: str,
+    itens: list[dict],
+    ator_papel: str = "sistema",
+) -> list[Veiculo]:
+    """Atualiza ``ordem_vitrine`` de veículos da loja (parcial, atômico).
+
+    ``itens``: ``[{id, ordem_vitrine}, ...]``. IDs de outra loja → 404.
+    Ordens duplicadas no payload → 422.
+    """
+    if not itens:
+        raise HTTPException(status_code=422, detail="lista de ordem vazia")
+    if len(itens) > 500:
+        raise HTTPException(status_code=422, detail="no máximo 500 veículos por reordenação")
+
+    ids: list[str] = []
+    mapa: dict[str, int] = {}
+    for item in itens:
+        vid = str(item.get("id") or "").strip()
+        if not vid:
+            raise HTTPException(status_code=422, detail="id de veículo obrigatório")
+        try:
+            ordem = int(item.get("ordem_vitrine"))
+        except (TypeError, ValueError) as exc:
+            raise HTTPException(status_code=422, detail="ordem_vitrine inválida") from exc
+        if ordem < 0:
+            raise HTTPException(status_code=422, detail="ordem_vitrine deve ser >= 0")
+        if vid in mapa:
+            raise HTTPException(status_code=422, detail="id de veículo duplicado no payload")
+        # Ordens iguais são permitidas: desempate por foto / criado_em na vitrine.
+        mapa[vid] = ordem
+        ids.append(vid)
+
+    veiculos = (
+        db.query(Veiculo)
+        .filter(Veiculo.loja_id == loja_id, Veiculo.id.in_(ids))
+        .all()
+    )
+    if len(veiculos) != len(ids):
+        raise HTTPException(status_code=404, detail="veículo não encontrado")
+
+    agora = datetime.now(timezone.utc)
+    for v in veiculos:
+        v.ordem_vitrine = mapa[v.id]
+        v.atualizado_em = agora
+        _registrar_operacao(
+            db,
+            v,
+            "ordem_vitrine",
+            ator_papel,
+            {"ordem_vitrine": v.ordem_vitrine},
+            evento="vehicle.updated",
+        )
+    db.commit()
+    for v in veiculos:
+        db.refresh(v)
+    return sorted(veiculos, key=lambda item: (item.ordem_vitrine, item.id))
 
 
 def normalizar_whatsapp_loja(valor: str | None) -> str | None:
@@ -1040,6 +1117,7 @@ def para_saida_privada(v: Veiculo, incluir_custo: bool = True) -> dict:
         "publicado": v.publicado,
         "placa": v.placa,
         "codigo_interno": v.codigo_interno,
+        "ordem_vitrine": int(v.ordem_vitrine or 0),
         "foto_url": _url_capa(v, midias),
         "fotos": [foto["url"] for foto in midias],
         "midias": midias,

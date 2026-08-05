@@ -16,7 +16,15 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from app import channels, config, models_db, operacao, provisioning, servico  # noqa: F401 (registra os modelos)
+from app import (  # noqa: F401 (registra os modelos)
+    channels,
+    config,
+    models_db,
+    operacao,
+    provisioning,
+    servico,
+    solicitacoes_simulacao,
+)
 from app.audio import AudioProcessor, get_audio_processor
 from app.auth import Contexto, get_contexto, verificar_webhook_token
 from app.db import get_db
@@ -324,6 +332,36 @@ class NumeroAutorizadoInput(BaseModel):
     papel: str = "vendedor"
     ativo: bool = True
     nome: Optional[str] = Field(default=None, max_length=120)
+
+
+class SolicitacaoSimulacaoHumanaInput(BaseModel):
+    """Pedido de simulação humana (alerta no grupo de estoque + handoff).
+
+    CPF/nascimento completos não entram no alerta; use apenas flags de recebimento.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    telefone: str
+    interesse: Optional[str] = Field(default=None, max_length=160)
+    tem_cnh: Optional[str] = Field(default=None, max_length=40)
+    instance: Optional[str] = Field(default=None, max_length=120)
+    nome: Optional[str] = Field(default=None, max_length=120)
+    cpf_recebido: bool = False
+    nascimento_recebido: bool = False
+    fallback_temporario: bool = False
+
+    @field_validator("instance")
+    @classmethod
+    def validar_instance(cls, value: Optional[str]) -> Optional[str]:
+        if value is None:
+            return None
+        texto = str(value).strip()
+        if not texto:
+            return None
+        return validar_identificador(
+            texto, nome="instance", limite=config.WEBHOOK_MAX_INSTANCE_CHARS
+        )
 
 
 class GrupoEstoqueInput(BaseModel):
@@ -1152,6 +1190,35 @@ def desconectar_canal_whatsapp(
 
 
 # --- Operação WhatsApp (E5): números autorizados + cadastro de veículo --------
+
+
+@app.post("/v1/operacao/solicitacoes-simulacao-humana", status_code=202)
+def solicitar_simulacao_humana(
+    dados: SolicitacaoSimulacaoHumanaInput,
+    ctx: Contexto = Depends(get_contexto),
+    db: Session = Depends(get_db),
+    idempotency_key: Optional[str] = Header(default=None, alias="Idempotency-Key"),
+):
+    """Aceita simulação humana: lead qualificado, pausa bot e alerta o grupo de estoque.
+
+    Idempotente por ``Idempotency-Key`` (providerMessageId do WhatsApp).
+    """
+    _exigir_loja_operacional(db, ctx.loja_id)
+    if not idempotency_key or not str(idempotency_key).strip():
+        raise HTTPException(status_code=422, detail="Idempotency-Key obrigatória")
+    return solicitacoes_simulacao.solicitar_simulacao_humana(
+        db,
+        ctx.loja_id,
+        telefone=dados.telefone,
+        interesse=dados.interesse,
+        tem_cnh=dados.tem_cnh,
+        instance=dados.instance,
+        cpf_recebido=dados.cpf_recebido,
+        nascimento_recebido=dados.nascimento_recebido,
+        fallback_temporario=dados.fallback_temporario,
+        nome=dados.nome,
+        idempotency_key=str(idempotency_key).strip(),
+    )
 
 
 @app.get("/v1/operacao/grupo-estoque")

@@ -27,6 +27,41 @@ const prompt = workflow.nodes.find((candidate) => candidate.name === "AI Agent1"
 assert.ok(prompt.includes("[TEMP_ESTOQUE_INCOMPLETO_INICIO]"));
 assert.ok(prompt.includes("[TEMP_ESTOQUE_INCOMPLETO_FIM]"));
 assert.ok(prompt.includes(name));
+assert.ok(
+  /simulacao_humana_solicitada/i.test(prompt) || /ok:true/i.test(prompt),
+  "prompt deve proibir confirmação de simulação sem sucesso da tool"
+);
+
+// n8n ToolCode injeta o item pai no argumento. additionalProperties:false quebra em runtime.
+const schemaRaw = String(node.parameters.inputSchema || "");
+const schema = JSON.parse(schemaRaw);
+assert.strictEqual(
+  schema.additionalProperties,
+  true,
+  "schema TEMP deve tolerar contexto do webhook (instance, telefone, providerMessageId…)"
+);
+const enrichedLikeProd = {
+  interesse: "Honda CG Fan 160 2024",
+  confirmar_simulacao: true,
+  cpf: "11144477735",
+  nascimento: "10/02/1995",
+  entrada: 5000,
+  // Campos que o n8n anexa e que quebravam com additionalProperties:false (exec 12413).
+  instance: "loja-teste",
+  remoteJid: "5511999999999@s.whatsapp.net",
+  telefone: "5511999999999",
+  providerMessageId: "TEMP-MSG-ENRICHED",
+  toolCallId: "call_synthetic_1",
+  pushName: "Cliente",
+};
+for (const key of Object.keys(enrichedLikeProd)) {
+  if (schema.properties && schema.properties[key]) continue;
+  assert.notStrictEqual(
+    schema.additionalProperties,
+    false,
+    `campo extra '${key}' seria rejeitado com additionalProperties false`
+  );
+}
 
 const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor;
 const runTool = new AsyncFunction(
@@ -42,6 +77,16 @@ const helpers = {
   httpRequest: async (request) => {
     requests.push(request);
     if (request.method === "GET") return { numeros: [] };
+    if (
+      request.method === "POST" &&
+      String(request.url || "").includes("/solicitacoes-simulacao-humana")
+    ) {
+      return {
+        ok: true,
+        simulacao_humana_solicitada: true,
+        mensagem: "certinho. vou preparar a simulação pra você.",
+      };
+    }
     return { ok: true };
   },
 };
@@ -97,14 +142,48 @@ const staticData = () => state;
       staticData
     )
   );
+  assert.strictEqual(completed.ok, true);
   assert.strictEqual(completed.simulacao_humana_solicitada, true);
   assert.strictEqual(completed.mensagem, "certinho. vou preparar a simulação pra você.");
-  assert.ok(requests.some((request) => request.method === "POST" && request.url.endsWith("/v1/leads")));
-  assert.ok(requests.some((request) => request.method === "PATCH" && request.url.includes("/estado")));
   assert.ok(
-    requests.every((request) => !request.url.includes("/v1/simulacoes/solicitar")),
+    requests.some(
+      (request) =>
+        request.method === "POST" &&
+        String(request.url).includes("/solicitacoes-simulacao-humana")
+    ),
+    "deve chamar o endpoint canônico de simulação humana"
+  );
+  assert.ok(
+    requests.every((request) => !String(request.url).includes("/v1/simulacoes/solicitar")),
     "sem preço/placa do estoque não pode disparar o motor"
   );
+  assert.ok(
+    requests.every((request) => !String(request.url).includes("/message/sendText/")),
+    "envio ao grupo fica no Chatbot, não na tool"
+  );
+
+  // Objeto enriquecido como na execução real (schema + jsCode).
+  requests.length = 0;
+  const enriched = JSON.parse(
+    await runTool(
+      {
+        confirmar_simulacao: true,
+        cpf: "11144477735",
+        nascimento: "10/02/1995",
+        entrada: 5000,
+        instance: "loja-teste",
+        remoteJid: "5511999999999@s.whatsapp.net",
+        telefone: "5511999999999",
+        providerMessageId: "TEMP-MSG-ENRICHED",
+        toolCallId: "call_synthetic_1",
+      },
+      helpers,
+      $,
+      staticData
+    )
+  );
+  assert.strictEqual(enriched.ok, true);
+  assert.strictEqual(enriched.simulacao_humana_solicitada, true);
 
   console.log("ok - fallback temporário oferece simulação sem foto e conclui em handoff");
 })().catch((error) => {

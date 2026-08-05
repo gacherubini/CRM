@@ -73,6 +73,11 @@ CADASTRO_SESSION_TTL_SECONDS = max(
     0, int(os.getenv("CHATBOT_CADASTRO_SESSION_TTL_SECONDS", "1800"))
 )
 
+# Base do Portal/Loja para links operacionais (alerta de simulação no grupo).
+PORTAL_BASE_URL = os.getenv(
+    "CHATBOT_PORTAL_BASE_URL", "https://app2037.fly.dev"
+).rstrip("/")
+
 # Provider de simulação: none (Atendimento) | mock (demo) | http (Motor real)
 SIMULATION_PROVIDER = os.getenv("SIMULATION_PROVIDER", "none")
 MOTOR_URL = os.getenv("MOTOR_URL", "")
