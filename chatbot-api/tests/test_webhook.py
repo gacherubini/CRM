@@ -77,6 +77,44 @@ def test_webhook_expoe_tem_saida_e_historico_recente(client, loja_a):
     assert "qual o preco" not in body2["historico_recente"]
 
 
+def test_webhook_preserva_cpf_cliente_mascarado_no_historico(client, loja_a):
+    """CPF real fica em cpf_cliente (tool); texto/histórico ficam mascarados (UI).
+
+    Regressão 2026-08-05 ***2308: Agent lia só o histórico mascarado e o simular1
+    rejeitava com faltando=cpf sem criar alerta no grupo.
+    """
+    inst = loja_a["instance"]
+    tel = "5511912152308"
+    r1 = client.post(
+        "/webhook/mensagem",
+        json=_msg(
+            inst,
+            telefone=tel,
+            provider_message_id="CPF-TURN-1",
+            texto="11144477735",
+        ),
+    )
+    body1 = r1.json()
+    assert body1["cpf_cliente"] == "11144477735"
+    # histórico desta resposta é anterior à msg atual (ainda vazio de CPF)
+    assert "11144477735" not in body1.get("historico_recente", "")
+
+    r2 = client.post(
+        "/webhook/mensagem",
+        json=_msg(
+            inst,
+            telefone=tel,
+            provider_message_id="CPF-TURN-2",
+            texto="17/05/2005",
+        ),
+    )
+    body2 = r2.json()
+    # turn seguinte ainda expõe o CPF capturado, mesmo com texto mascarado no histórico
+    assert body2["cpf_cliente"] == "11144477735"
+    assert "*********35" in body2["historico_recente"]
+    assert "11144477735" not in body2["historico_recente"]
+
+
 def test_webhook_idempotente_por_provider_message_id(client, loja_a):
     inst = loja_a["instance"]
     r1 = client.post("/webhook/mensagem", json=_msg(inst))

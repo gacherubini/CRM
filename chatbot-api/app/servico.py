@@ -194,6 +194,8 @@ def _aplicar_tracking_pendente_no_lead(conversa: Conversa, lead: Lead) -> bool:
     dados = _carregar_tracking_pendente(conversa)
     if not dados:
         return False
+    # CPF da simulação não é tracking de anúncio: preserva ao limpar o restante.
+    cpf_cliente = dados.get("cpf_cliente")
     aplicar_touch_ctwa(
         lead,
         ctwa_clid=dados.get("ctwa_clid_first"),
@@ -210,7 +212,12 @@ def _aplicar_tracking_pendente_no_lead(conversa: Conversa, lead: Lead) -> bool:
         ctwa_source_type=dados.get("ctwa_source_type"),
         ctwa_codigo=dados.get("ctwa_codigo"),
     )
-    conversa.tracking_pendente_json = None
+    if cpf_cliente and _cpf_valido(str(cpf_cliente)):
+        conversa.tracking_pendente_json = json.dumps(
+            {"cpf_cliente": str(cpf_cliente)}, ensure_ascii=False, sort_keys=True
+        )
+    else:
+        conversa.tracking_pendente_json = None
     return aplicado
 
 
@@ -380,6 +387,60 @@ def mascarar_cpf(texto: str | None) -> str | None:
         return "*" * 9 + d[-2:] if _cpf_valido(d) else d
 
     return _RE_CPF_BARE.sub(_bare, texto)
+
+
+def extrair_cpf(texto: str | None) -> str | None:
+    """Primeiro CPF válido (11 dígitos) no texto livre, ou None.
+
+    Usado para preservar o valor para a tool de simulação sem expor no histórico
+    mascarado (UI/Portal). Não aceita máscara (****) nem sequências inválidas.
+    """
+    if not texto:
+        return None
+    for m in _RE_CPF_FMT.finditer(texto):
+        digitos = f"{m.group(1)}{m.group(2)}{m.group(3)}{m.group(4)}"
+        if _cpf_valido(digitos):
+            return digitos
+    for m in _RE_CPF_BARE.finditer(texto):
+        digitos = m.group(1)
+        if _cpf_valido(digitos):
+            return digitos
+    return None
+
+
+def _salvar_cpf_cliente(conversa: Conversa, cpf_digitos: str) -> None:
+    """Guarda CPF na conversa (tracking_pendente_json) para o n8n/simular1."""
+    if not cpf_digitos or not _cpf_valido(cpf_digitos):
+        return
+    dados = _carregar_tracking_pendente(conversa)
+    dados["cpf_cliente"] = cpf_digitos
+    conversa.tracking_pendente_json = json.dumps(
+        dados, ensure_ascii=False, sort_keys=True
+    )
+
+
+def _obter_cpf_cliente(conversa: Conversa) -> str | None:
+    digitos = str(_carregar_tracking_pendente(conversa).get("cpf_cliente") or "")
+    return digitos if _cpf_valido(digitos) else None
+
+
+def limpar_cpf_cliente_conversa(db: Session, loja_id: str, telefone: str) -> None:
+    """Remove CPF guardado após simulação registrada (minimiza retenção)."""
+    from app.hardening import normalizar_telefone_webhook
+
+    try:
+        telefone_norm = normalizar_telefone_webhook(telefone)
+    except Exception:
+        return
+    for conversa in _listar_conversas_telefone(db, loja_id, telefone_norm):
+        dados = _carregar_tracking_pendente(conversa)
+        if "cpf_cliente" not in dados:
+            continue
+        dados.pop("cpf_cliente", None)
+        conversa.tracking_pendente_json = (
+            json.dumps(dados, ensure_ascii=False, sort_keys=True) if dados else None
+        )
+    db.commit()
 
 
 def criar_loja(
@@ -568,6 +629,7 @@ def _resposta_duplicada(
     if db is not None:
         base["tem_saida"] = _conversa_tem_saida(db, conversa.id)
         base["historico_recente"] = _formatar_historico_recente(db, conversa.id)
+        base["cpf_cliente"] = _obter_cpf_cliente(conversa)
     if captura_passiva:
         base.update(
             {
@@ -929,6 +991,14 @@ def registrar_mensagem(
                 if conversa.status == "handoff":
                     conversa.status = "aberta"
 
+    # CPF: captura no texto cru antes de mascarar; UI/histórico ficam mascarados.
+    cpf_cliente = _obter_cpf_cliente(conversa)
+    if not from_me:
+        capturado = extrair_cpf(texto)
+        if capturado:
+            _salvar_cpf_cliente(conversa, capturado)
+            cpf_cliente = capturado
+
     db.add(
         Mensagem(
             id=str(uuid.uuid4()),
@@ -966,6 +1036,7 @@ def registrar_mensagem(
             "primeira_mensagem": primeira_mensagem,
             "tem_saida": tem_saida,
             "historico_recente": historico_recente,
+            "cpf_cliente": cpf_cliente,
             "captura_passiva": True,
             "loja_operacional": False,
             "catalog_interest_ref": None,
@@ -983,6 +1054,7 @@ def registrar_mensagem(
         "primeira_mensagem": primeira_mensagem,
         "tem_saida": tem_saida,
         "historico_recente": historico_recente,
+        "cpf_cliente": cpf_cliente,
         "catalog_interest_ref": atribuicao.catalog_interest_ref if atribuicao else None,
         "ctwa_atribuido": bool(ctwa_ok) if not from_me else False,
         "ctwa_pendente": bool(ctwa_pendente) if not from_me else False,

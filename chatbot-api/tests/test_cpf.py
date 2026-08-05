@@ -1,4 +1,4 @@
-from app.servico import mascarar_cpf
+from app.servico import extrair_cpf, mascarar_cpf
 
 # CPF válido usado nos testes (dígitos verificadores conferem): 111.444.777-35
 CPF_FMT = "111.444.777-35"
@@ -40,3 +40,17 @@ def test_nao_mangla_sequencia_mais_longa():
 def test_texto_vazio_ou_none():
     assert mascarar_cpf("") == ""
     assert mascarar_cpf(None) is None
+
+
+def test_extrair_cpf_formatado_e_avulso():
+    assert extrair_cpf(CPF_FMT) == CPF_BARE
+    assert extrair_cpf(f"meu cpf {CPF_BARE} ok") == CPF_BARE
+    assert extrair_cpf(f"CPF: {CPF_FMT}") == CPF_BARE
+
+
+def test_extrair_cpf_ignora_mascarado_e_invalido():
+    assert extrair_cpf("*********35") is None
+    assert extrair_cpf("***.***.***-35") is None
+    assert extrair_cpf("11987654321") is None
+    assert extrair_cpf("") is None
+    assert extrair_cpf(None) is None

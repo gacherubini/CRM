@@ -125,7 +125,7 @@ const staticData = () => state;
       staticData
     )
   );
-  assert.deepStrictEqual(missing.faltando, ["cpf", "data de nascimento", "valor de entrada"]);
+  assert.deepStrictEqual(missing.faltando, ["cpf", "data de nascimento"]);
   assert.strictEqual(missing.pode_oferecer_fotos, false);
   assert.deepStrictEqual(requests, [], "dados incompletos não devem produzir efeitos");
 

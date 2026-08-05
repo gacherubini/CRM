@@ -80,7 +80,10 @@ def main() -> None:
     assert "simulacao_humana_solicitada" in simulation_code, (
         "tool deve só confirmar ao cliente quando o backend aceitar a simulação"
     )
-    assert "cpfDigitos.length !== 11" in simulation_code, (
+    assert (
+        "cpfDigitosEfetivo.length !== 11" in simulation_code
+        or "cpfDigitos.length !== 11" in simulation_code
+    ), (
         "tool cria lead sem confirmar a presença de CPF"
     )
     assert "numeros-autorizados" not in simulation_code, (
@@ -168,6 +171,9 @@ def main() -> None:
     )
     assert "11 dígitos de cpf e uma data de nascimento" in system_message_lower, (
         "prompt não reconhece cpf e nascimento na mesma mensagem (entrada é opcional)"
+    )
+    assert "cpf_cliente" in system_message_lower or "cpf mascarado" in system_message_lower, (
+        "prompt deve orientar uso do cpf_cliente (não o histórico mascarado)"
     )
     assert "quer dar uma olhada nas motos disponíveis?" in system_message_lower, (
         "primeiro contato ainda oferece simulação antes da escolha"
@@ -320,8 +326,13 @@ def main() -> None:
     assert "conhecer melhor" in simulation_code or "não repita dados" in simulation_code, (
         "fallback da tool ainda permite repetir CPF, nascimento e entrada"
     )
-    assert "dataBr" in simulation_code and "cpf: cpfDigitos" in simulation_code, (
+    assert "dataBr" in simulation_code and (
+        "cpf: cpfDigitosEfetivo" in simulation_code or "cpf: cpfDigitos" in simulation_code
+    ), (
         "tool não normaliza os dados enviados na mesma mensagem"
+    )
+    assert "cpf-cliente:" in simulation_code, (
+        "tool deve recuperar CPF capturado quando o histórico está mascarado"
     )
     assert "temValorEstoque" in simulation_code and "categoriaValida" in simulation_code, (
         "tool não implementa fallback interno para estoque sem placa"

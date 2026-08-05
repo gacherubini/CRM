@@ -463,6 +463,12 @@ def solicitar_simulacao_humana(
         )
     db.refresh(notificacao)
 
+    # Minimiza retenção: CPF capturado na conversa só existia para a tool.
+    try:
+        servico.limpar_cpf_cliente_conversa(db, loja_id, telefone_norm)
+    except Exception:
+        logger.exception("falha ao limpar cpf_cliente pos-simulacao")
+
     if destino_jid is None:
         notificacao.status = "failed"
         notificacao.last_error_code = "grupo_estoque_nao_configurado"
