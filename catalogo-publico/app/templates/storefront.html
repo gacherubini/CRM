@@ -49,10 +49,44 @@
 </section>
 {% endif %}
 
-{% if previous_url or next_url %}
+{% if veiculos and (previous_url or next_url or page_links|length > 1) %}
 <nav class="pagination" aria-label="Paginação">
-  {% if previous_url %}<a class="button secondary" href="{{ previous_url }}">Anterior</a>{% else %}<span></span>{% endif %}
-  {% if next_url %}<a class="button secondary" href="{{ next_url }}">Próxima</a>{% endif %}
+  <div class="pagination-meta">
+    {% if total_items %}
+    <span class="muted">Mostrando {{ showing_from }}–{{ showing_to }} de {{ total_items }}</span>
+    {% elif showing_to %}
+    <span class="muted">Mostrando {{ showing_from }}–{{ showing_to }}</span>
+    {% endif %}
+  </div>
+  <div class="pagination-controls">
+    {% if previous_url %}
+    <a class="button secondary" href="{{ previous_url }}" rel="prev">Anterior</a>
+    {% else %}
+    <span class="button secondary is-disabled" aria-disabled="true">Anterior</span>
+    {% endif %}
+
+    <ol class="page-list">
+      {% for link in page_links %}
+        {% if link.kind == 'ellipsis' %}
+        <li class="page-ellipsis" aria-hidden="true">…</li>
+        {% else %}
+        <li>
+          {% if link.current %}
+          <span class="page-num is-current" aria-current="page">{{ link.number }}</span>
+          {% else %}
+          <a class="page-num" href="{{ link.url }}">{{ link.number }}</a>
+          {% endif %}
+        </li>
+        {% endif %}
+      {% endfor %}
+    </ol>
+
+    {% if next_url %}
+    <a class="button secondary" href="{{ next_url }}" rel="next">Próxima</a>
+    {% else %}
+    <span class="button secondary is-disabled" aria-disabled="true">Próxima</span>
+    {% endif %}
+  </div>
 </nav>
 {% endif %}
 {% endblock %}

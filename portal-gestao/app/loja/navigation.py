@@ -111,6 +111,17 @@ def build_nav(
                     active_prefix="/app/loja/whatsapp",
                 )
             )
+        # CTA da vitrine pública (número livre no Estoque; independente dos canais Evolution).
+        if entitlements.estoque_enabled:
+            ajustes.append(
+                NavItem(
+                    label="Catálogo",
+                    href="/app/loja/catalogo",
+                    section="Ajustes",
+                    module=Module.ESTOQUE,
+                    active_prefix="/app/loja/catalogo",
+                )
+            )
         # Grupo WA de fotos/cadastro + números autorizados (aviso simulação/handoff).
         # Rota legada /app/operacao/numeros — precisa aparecer no shell (antes sumia do menu).
         if entitlements.estoque_enabled or entitlements.vendas_enabled:

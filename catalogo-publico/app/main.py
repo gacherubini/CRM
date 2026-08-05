@@ -246,6 +246,34 @@ def page_url(slug: str, filters: dict, offset: int, limit: int) -> str:
     return public_path(f"/l/{slug}?{urlencode(params)}")
 
 
+def pagination_window(
+    current_page: int, total_pages: int, *, radius: int = 2
+) -> list[int | None]:
+    """Lista de páginas para a UI; ``None`` representa reticências.
+
+    Ex.: página 5 de 12 com radius 1 → [1, None, 4, 5, 6, None, 12]
+    """
+    if total_pages <= 0:
+        return []
+    current_page = max(1, min(current_page, total_pages))
+    if total_pages <= 1 + 2 * radius + 2:
+        return list(range(1, total_pages + 1))
+
+    pages: set[int] = {1, total_pages}
+    for n in range(current_page - radius, current_page + radius + 1):
+        if 1 <= n <= total_pages:
+            pages.add(n)
+    ordered = sorted(pages)
+    result: list[int | None] = []
+    prev = 0
+    for n in ordered:
+        if prev and n - prev > 1:
+            result.append(None)
+        result.append(n)
+        prev = n
+    return result
+
+
 @app.get("/", include_in_schema=False)
 def root_catalog():
     return RedirectResponse(
@@ -365,12 +393,47 @@ def storefront(
             loja_slug=slug,
         )
 
+    total = int(page.paginacao.total or 0)
+    # Fallback se o estoque ainda não enviar total: estima pelo offset + página.
+    if total <= 0 and page.veiculos:
+        total = offset + page.paginacao.quantidade
+        if page.paginacao.quantidade >= limit:
+            # Há possivelmente mais itens; não inventa total fechado.
+            total = max(total, offset + limit + 1)
+    elif total <= 0:
+        total = 0
+
+    total_pages = max(1, (total + limit - 1) // limit) if total else 1
+    current_page = (offset // limit) + 1 if limit else 1
+    if total and current_page > total_pages:
+        current_page = total_pages
+
     previous_url = page_url(slug, filters, offset - limit, limit) if offset else None
-    next_url = (
-        page_url(slug, filters, offset + limit, limit)
-        if page.paginacao.quantidade >= limit
-        else None
+    has_next = (
+        (offset + page.paginacao.quantidade) < total
+        if total
+        else page.paginacao.quantidade >= limit
     )
+    next_url = (
+        page_url(slug, filters, offset + limit, limit) if has_next else None
+    )
+    page_links = []
+    for item in pagination_window(current_page, total_pages if total else current_page):
+        if item is None:
+            page_links.append({"kind": "ellipsis"})
+        else:
+            page_links.append(
+                {
+                    "kind": "page",
+                    "number": item,
+                    "url": page_url(slug, filters, (item - 1) * limit, limit),
+                    "current": item == current_page,
+                }
+            )
+
+    showing_from = offset + 1 if page.veiculos else 0
+    showing_to = offset + len(page.veiculos)
+
     return templates.TemplateResponse(
         request,
         "storefront.html",
@@ -383,6 +446,12 @@ def storefront(
             "offset": offset,
             "previous_url": previous_url,
             "next_url": next_url,
+            "page_links": page_links,
+            "current_page": current_page,
+            "total_pages": total_pages if total else (current_page if has_next else 1),
+            "total_items": total,
+            "showing_from": showing_from,
+            "showing_to": showing_to,
             **pixel_context(slug, request),
         },
     )

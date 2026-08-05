@@ -2284,6 +2284,7 @@ from app.web import trafego as trafego_routes  # noqa: E402
 from app.web import loja_estoque  # noqa: E402
 from app.web import loja_vendas  # noqa: E402
 from app.web import loja_whatsapp  # noqa: E402
+from app.web import loja_catalogo  # noqa: E402
 from app.web import loja_integracoes  # noqa: E402
 from app.web import loja_perfil  # noqa: E402
 from app.loja import routes as loja_routes  # noqa: E402
@@ -2297,6 +2298,7 @@ app.include_router(trafego_routes.router)
 app.include_router(loja_estoque.router)
 app.include_router(loja_vendas.router)
 app.include_router(loja_whatsapp.router)
+app.include_router(loja_catalogo.router)
 app.include_router(loja_integracoes.router)
 app.include_router(loja_perfil.router)
 app.include_router(loja_routes.router)
