@@ -35,6 +35,7 @@ from app.campanhas import (
     CANAIS_ROTULO,
     STATUS_ROTULO,
     campanha_por_utm,
+    lead_casa_campanha,
     normalizar_utm,
     parse_brl_valor,
     parse_gastos_csv,
@@ -749,6 +750,23 @@ def campanhas_lista(request: Request, db: Session = Depends(get_db)):
     gastos_totais: dict[str, Decimal] = {}
     for g in db.query(CampanhaGasto).filter(CampanhaGasto.loja_slug == usuario.loja_slug).all():
         gastos_totais[g.campanha_id] = gastos_totais.get(g.campanha_id, Decimal("0")) + g.valor
+    # Mensagens = leads CTWA atribuídos (last-touch, mesmo critério do ROI).
+    # Custo/msg = gasto total / mensagens.
+    mensagens_totais: dict[str, int] = {}
+    custo_por_msg: dict[str, Decimal] = {}
+    chatbot_erro = None
+    try:
+        leads = get_chatbot_client(usuario.loja_slug).listar_leads()
+    except ChatbotIndisponivel:
+        leads = []
+        chatbot_erro = "indisponivel"
+    for c in campanhas:
+        n = sum(1 for l in leads if lead_casa_campanha(l, c, modo="last"))
+        mensagens_totais[c.id] = n
+        if n > 0:
+            custo_por_msg[c.id] = (gastos_totais.get(c.id, Decimal("0")) / n).quantize(
+                Decimal("0.01")
+            )
     return templates.TemplateResponse(
         "campanhas/lista.html",
         contexto(
@@ -756,6 +774,9 @@ def campanhas_lista(request: Request, db: Session = Depends(get_db)):
             usuario,
             campanhas=campanhas,
             gastos_totais=gastos_totais,
+            mensagens_totais=mensagens_totais,
+            custo_por_msg=custo_por_msg,
+            chatbot_erro=chatbot_erro,
             canais=CANAIS_ROTULO,
             status_rotulo=STATUS_ROTULO,
         ),

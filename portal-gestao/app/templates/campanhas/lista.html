@@ -40,7 +40,7 @@
         <td><strong>{{ c.nome }}</strong></td>
         <td>{{ canais.get(c.canal, c.canal) }}</td>
         <td><code>{{ c.utm_campaign }}</code></td>
-        <td><span class="status {{ 'confirmada' if c.status == 'ativa' else ('cancelada' if c.status == 'encerrada' else '') }}">{{ status_rotulo.get(c.status, c.status) }}</span></td>
+        <td><span class="status {{ c.status }}">{{ status_rotulo.get(c.status, c.status) }}</span></td>
         <td>{{ formatar_brl(gastos_totais.get(c.id, 0)) }}</td>
         <td>{{ mensagens_totais.get(c.id, 0) }}</td>
         <td>{% if custo_por_msg.get(c.id) is not none %}{{ formatar_brl(custo_por_msg.get(c.id)) }}{% else %}—{% endif %}</td>
