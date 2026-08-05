@@ -620,7 +620,17 @@ def media_publica(
     )
 
 
+def _loja_dict(loja) -> dict:
+    return {
+        "slug": loja.slug,
+        "nome": loja.nome,
+        "whatsapp": loja.whatsapp,
+        "catalogo_url": loja.catalogo_url,
+    }
+
+
 def _loja_publica(loja) -> dict:
+    # Público da vitrine: só CTA WhatsApp (URL do bot não precisa no HTML público).
     return {"slug": loja.slug, "nome": loja.nome, "whatsapp": loja.whatsapp}
 
 
@@ -645,12 +655,16 @@ def loja_publica(request: Request, slug: str, db: Session = Depends(get_db)):
     return _resposta_publica_cache(request, _loja_publica(loja), loja.criada_em)
 
 
-class LojaWhatsappUpdate(BaseModel):
-    """Atualiza o WhatsApp usado no CTA do catálogo público."""
+class LojaUpdate(BaseModel):
+    """Metadados da loja: CTA WhatsApp da vitrine e link do catálogo do bot.
+
+    Campos omitidos não são alterados. String vazia limpa o campo.
+    """
 
     model_config = ConfigDict(extra="forbid")
 
     whatsapp: Optional[str] = Field(default=None, max_length=32)
+    catalogo_url: Optional[str] = Field(default=None, max_length=500)
 
 
 @app.get("/v1/loja")
@@ -660,19 +674,30 @@ def obter_loja_atual(
     loja = db.get(models_db.Loja, ctx.loja_id)
     if loja is None:
         raise HTTPException(status_code=404, detail="loja não encontrada")
-    return {"slug": loja.slug, "nome": loja.nome, "whatsapp": loja.whatsapp}
+    return _loja_dict(loja)
 
 
 @app.patch("/v1/loja")
 def atualizar_loja_atual(
-    dados: LojaWhatsappUpdate,
+    dados: LojaUpdate,
     ctx: Contexto = Depends(get_contexto),
     db: Session = Depends(get_db),
 ):
     _exigir_gestao(ctx)
     _exigir_loja_operacional(db, ctx.loja_id)
-    loja = servico.atualizar_whatsapp_loja(db, ctx.loja_id, dados.whatsapp)
-    return {"slug": loja.slug, "nome": loja.nome, "whatsapp": loja.whatsapp}
+    fields_set = dados.model_fields_set
+    kwargs: dict = {}
+    if "whatsapp" in fields_set:
+        kwargs["whatsapp"] = dados.whatsapp
+    if "catalogo_url" in fields_set:
+        kwargs["catalogo_url"] = dados.catalogo_url
+    if not kwargs:
+        loja = db.get(models_db.Loja, ctx.loja_id)
+        if loja is None:
+            raise HTTPException(status_code=404, detail="loja não encontrada")
+        return _loja_dict(loja)
+    loja = servico.atualizar_loja_meta(db, ctx.loja_id, **kwargs)
+    return _loja_dict(loja)
 
 
 @app.get("/public/v1/lojas/{slug}/veiculos")

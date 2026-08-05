@@ -60,19 +60,29 @@ def _para_tela() -> RedirectResponse:
     return RedirectResponse(_TELA, status_code=303)
 
 
-def _carregar_whatsapp_catalogo(estoque: EstoqueClient) -> tuple[str, str | None]:
-    """Lê o CTA da vitrine no Estoque; falha best-effort (não quebra a tela)."""
+def _carregar_meta_catalogo(
+    estoque: EstoqueClient,
+) -> tuple[str, str, str | None]:
+    """Lê WhatsApp CTA + URL do catálogo no Estoque; falha best-effort."""
     obter = getattr(estoque, "obter_loja", None)
     if not callable(obter):
         # Fakes legados de testes / cliente sem o método ainda.
-        return "", None
+        return "", "", None
     try:
         dados = obter()
-        return str(dados.get("whatsapp") or ""), None
+        return (
+            str(dados.get("whatsapp") or ""),
+            str(dados.get("catalogo_url") or ""),
+            None,
+        )
     except EstoqueIndisponivel as exc:
-        return "", str(exc) or "Não foi possível carregar o WhatsApp do catálogo."
+        return (
+            "",
+            "",
+            str(exc) or "Não foi possível carregar as configurações do catálogo.",
+        )
     except Exception:
-        return "", None
+        return "", "", None
 
 
 @router.get(_TELA, response_class=HTMLResponse)
@@ -95,7 +105,7 @@ def loja_whatsapp_canais(
         erro = str(exc)
 
     view = montar_canais_view(canais, erro=erro)
-    catalogo_wa, catalogo_erro = _carregar_whatsapp_catalogo(estoque)
+    catalogo_wa, catalogo_url, catalogo_erro = _carregar_meta_catalogo(estoque)
     return templates.TemplateResponse(
         "loja/whatsapp_canais.html",
         contexto(
@@ -109,6 +119,7 @@ def loja_whatsapp_canais(
             acao_erro=request.session.pop("canal_erro", None),
             acao_mensagem=request.session.pop("canal_mensagem", None),
             catalogo_whatsapp=catalogo_wa,
+            catalogo_url=catalogo_url,
             catalogo_erro=catalogo_erro or request.session.pop("catalogo_erro", None),
             catalogo_mensagem=request.session.pop("catalogo_mensagem", None),
         ),
@@ -120,26 +131,29 @@ def loja_whatsapp_canais(
 def loja_whatsapp_catalogo_salvar(
     request: Request,
     whatsapp: Annotated[str, Form()] = "",
+    catalogo_url: Annotated[str, Form()] = "",
     csrf: Annotated[str, Form()] = "",
     db: Session = Depends(get_db),
     estoque: EstoqueClient = Depends(get_estoque_client),
 ):
-    """Salva o número do botão Tenho interesse da vitrine pública."""
+    """Salva CTA WhatsApp da vitrine e o link do catálogo que o bot envia."""
     usuario = usuario_atual(request, db)
     if not usuario:
         return redirecionar_login()
     if not _habilitado() or not _autorizado(usuario) or not csrf_valido(request, csrf):
         return _para_app()
 
-    valor = (whatsapp or "").strip()
+    valor_wa = (whatsapp or "").strip()
+    valor_url = (catalogo_url or "").strip()
     try:
-        salva = estoque.atualizar_loja(whatsapp=valor or None)
-        request.session["catalogo_mensagem"] = "WhatsApp do catálogo atualizado."
-        # Mantém o valor normalizado na próxima renderização se a leitura falhar.
-        request.session["catalogo_whatsapp_salvo"] = str(salva.get("whatsapp") or "")
+        estoque.atualizar_loja(
+            whatsapp=valor_wa or None,
+            catalogo_url=valor_url or None,
+        )
+        request.session["catalogo_mensagem"] = "Configurações do catálogo atualizadas."
     except EstoqueIndisponivel as exc:
         request.session["catalogo_erro"] = (
-            str(exc) or "Não foi possível salvar o WhatsApp do catálogo."
+            str(exc) or "Não foi possível salvar as configurações do catálogo."
         )
     return RedirectResponse(_TELA + "#catalogo-wa", status_code=303)
 

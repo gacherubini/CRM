@@ -190,6 +190,7 @@ def test_patch_whatsapp_loja_normaliza_e_reflete_no_publico(client, loja_a):
     atual = client.get("/v1/loja", headers=h).json()
     assert atual["slug"] == slug
     assert atual["whatsapp"] == "5511999999999"
+    assert "catalogo_url" in atual
 
     patch = client.patch("/v1/loja", json={"whatsapp": "(21) 98888-7777"}, headers=h)
     assert patch.status_code == 200
@@ -197,7 +198,26 @@ def test_patch_whatsapp_loja_normaliza_e_reflete_no_publico(client, loja_a):
 
     pub = client.get(f"/public/v1/lojas/{slug}").json()
     assert pub["whatsapp"] == "5521988887777"
+    assert "catalogo_url" not in pub
 
     limpa = client.patch("/v1/loja", json={"whatsapp": ""}, headers=h)
     assert limpa.status_code == 200
     assert limpa.json()["whatsapp"] is None
+
+
+def test_patch_catalogo_url_loja(client, loja_a):
+    h = loja_a["headers"]
+    url = "https://app2037.fly.dev/catalogo/l/vitor-motos"
+    patch = client.patch("/v1/loja", json={"catalogo_url": url}, headers=h)
+    assert patch.status_code == 200, patch.text
+    body = patch.json()
+    assert body["catalogo_url"] == url
+    assert body["whatsapp"] == "5511999999999"
+    assert client.get("/v1/loja", headers=h).json()["catalogo_url"] == url
+
+    ruim = client.patch("/v1/loja", json={"catalogo_url": "ftp://x"}, headers=h)
+    assert ruim.status_code == 422
+
+    limpa = client.patch("/v1/loja", json={"catalogo_url": ""}, headers=h)
+    assert limpa.status_code == 200
+    assert limpa.json()["catalogo_url"] is None

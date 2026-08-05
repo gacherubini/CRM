@@ -3,17 +3,29 @@ from conftest import csrf_da_resposta, login
 
 
 class _EstoqueFake:
-    def __init__(self, whatsapp="5511999999999"):
+    def __init__(self, whatsapp="5511999999999", catalogo_url=""):
         self.whatsapp = whatsapp
-        self.patches: list[str | None] = []
+        self.catalogo_url = catalogo_url
+        self.patches: list[dict] = []
 
     def obter_loja(self):
-        return {"slug": "loja-teste", "nome": "Loja", "whatsapp": self.whatsapp}
+        return {
+            "slug": "loja-teste",
+            "nome": "Loja",
+            "whatsapp": self.whatsapp,
+            "catalogo_url": self.catalogo_url or None,
+        }
 
-    def atualizar_loja(self, *, whatsapp):
-        self.patches.append(whatsapp)
-        self.whatsapp = whatsapp
-        return {"slug": "loja-teste", "nome": "Loja", "whatsapp": whatsapp}
+    def atualizar_loja(self, *, whatsapp=..., catalogo_url=...):
+        body = {}
+        if whatsapp is not ...:
+            body["whatsapp"] = whatsapp
+            self.whatsapp = whatsapp
+        if catalogo_url is not ...:
+            body["catalogo_url"] = catalogo_url
+            self.catalogo_url = catalogo_url or ""
+        self.patches.append(body)
+        return self.obter_loja()
 
 
 def test_catalogo_redirect_para_whatsapp(client, monkeypatch):
@@ -44,24 +56,32 @@ def test_whatsapp_exibe_e_salva_catalogo(client, monkeypatch):
         login(client)
         get = client.get("/app/loja/whatsapp")
         assert get.status_code == 200
-        assert "WhatsApp do catálogo" in get.text
+        assert "Catálogo e vitrine" in get.text or "Link do catálogo" in get.text
         assert 'value="5511999999999"' in get.text
+        assert 'name="catalogo_url"' in get.text
         assert 'href="/app/loja/catalogo"' not in get.text or "catalogo-wa" in get.text
-        # Menu lateral não deve listar item Catálogo como destino principal
-        # (o redirect de /app/loja/catalogo ainda existe).
 
         csrf = csrf_da_resposta(get)
         post = client.post(
             "/app/loja/whatsapp/catalogo",
-            data={"csrf": csrf, "whatsapp": "(21) 98888-7777"},
+            data={
+                "csrf": csrf,
+                "whatsapp": "(21) 98888-7777",
+                "catalogo_url": "https://app2037.fly.dev/catalogo/l/loja-teste",
+            },
             follow_redirects=False,
         )
         assert post.status_code == 303
         assert "/app/loja/whatsapp" in post.headers["location"]
-        assert fake.patches == ["(21) 98888-7777"]
+        assert fake.patches == [
+            {
+                "whatsapp": "(21) 98888-7777",
+                "catalogo_url": "https://app2037.fly.dev/catalogo/l/loja-teste",
+            }
+        ]
 
         after = client.get("/app/loja/whatsapp")
-        assert "atualizado" in after.text.lower()
+        assert "atualizad" in after.text.lower()
     finally:
         app.dependency_overrides.pop(loja_whatsapp.get_estoque_client, None)
         app.dependency_overrides.pop(loja_whatsapp.get_chatbot_client, None)

@@ -21,6 +21,8 @@ class Loja(Base):
     nome: Mapped[str] = mapped_column(String)
     slug: Mapped[str] = mapped_column(String, unique=True, index=True)
     whatsapp: Mapped[str | None] = mapped_column(String, nullable=True)
+    # Link público do catálogo (bot envia quando o cliente pede para ver as motos).
+    catalogo_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
     criada_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_agora)
 
 

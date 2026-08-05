@@ -337,7 +337,8 @@ class NumeroAutorizadoInput(BaseModel):
 class SolicitacaoSimulacaoHumanaInput(BaseModel):
     """Pedido de simulação humana (alerta no grupo de estoque + handoff).
 
-    CPF/nascimento completos não entram no alerta; use apenas flags de recebimento.
+    Telefone, CPF e nascimento completos vão no texto do grupo para a equipe.
+    Canal de origem (vendedor) é resolvido pela instance de entrada.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -347,6 +348,9 @@ class SolicitacaoSimulacaoHumanaInput(BaseModel):
     tem_cnh: Optional[str] = Field(default=None, max_length=40)
     instance: Optional[str] = Field(default=None, max_length=120)
     nome: Optional[str] = Field(default=None, max_length=120)
+    cpf: Optional[str] = Field(default=None, max_length=20)
+    nascimento: Optional[str] = Field(default=None, max_length=20)
+    entrada: Optional[float] = Field(default=None, ge=0)
     cpf_recebido: bool = False
     nascimento_recebido: bool = False
     fallback_temporario: bool = False
@@ -866,6 +870,50 @@ def atualizar_etapa_lead(
     return servico.para_saida_lead(lead)
 
 
+@app.get("/v1/config/catalogo-bot")
+def config_catalogo_bot(
+    ctx: Contexto = Depends(get_contexto),
+    write_client: InventoryWriteClient = Depends(get_inventory_write_client),
+):
+    """Link do catálogo configurado na Loja (bot manda quando o cliente pede as motos).
+
+    Fonte: Estoque ``lojas.catalogo_url``, editável em Revy Loja → Números/Catálogo.
+    """
+    if not write_client.disponivel():
+        return {
+            "ok": False,
+            "configurado": False,
+            "catalogo_url": None,
+            "mensagem": "catálogo ainda não configurado. peça o modelo que o cliente procura e use consultar_estoque.",
+        }
+    try:
+        meta = write_client.obter_loja()
+    except HTTPException:
+        return {
+            "ok": False,
+            "configurado": False,
+            "catalogo_url": None,
+            "mensagem": "não consegui carregar o catálogo agora. peça o modelo que o cliente procura e use consultar_estoque.",
+        }
+    url = str((meta or {}).get("catalogo_url") or "").strip()
+    if not url:
+        return {
+            "ok": False,
+            "configurado": False,
+            "catalogo_url": None,
+            "mensagem": "catálogo ainda não configurado. peça o modelo que o cliente procura e use consultar_estoque.",
+        }
+    return {
+        "ok": True,
+        "configurado": True,
+        "catalogo_url": url,
+        "mensagem": (
+            "manda este link pro cliente ver as motos no catálogo: "
+            f"{url}"
+        ),
+    }
+
+
 @app.get("/v1/estoque/buscar")
 def buscar_estoque(
     termo: Optional[str] = None,
@@ -1228,10 +1276,13 @@ def solicitar_simulacao_humana(
         interesse=dados.interesse,
         tem_cnh=dados.tem_cnh,
         instance=dados.instance,
+        cpf=dados.cpf,
+        nascimento=dados.nascimento,
         cpf_recebido=dados.cpf_recebido,
         nascimento_recebido=dados.nascimento_recebido,
         fallback_temporario=dados.fallback_temporario,
         nome=dados.nome,
+        entrada=dados.entrada,
         idempotency_key=str(idempotency_key).strip(),
     )
 

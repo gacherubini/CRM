@@ -108,12 +108,25 @@ class EstoqueClient:
         )
 
     def obter_loja(self) -> dict:
-        """Metadados públicos da loja autenticada (slug, nome, whatsapp do CTA)."""
+        """Metadados da loja autenticada (slug, nome, whatsapp, catalogo_url)."""
         return self._request("GET", "/v1/loja")
 
-    def atualizar_loja(self, *, whatsapp: str | None) -> dict:
-        """Atualiza WhatsApp do catálogo (campo livre normalizado no Estoque)."""
-        return self._request("PATCH", "/v1/loja", json={"whatsapp": whatsapp})
+    def atualizar_loja(
+        self,
+        *,
+        whatsapp: str | None | object = ...,
+        catalogo_url: str | None | object = ...,
+    ) -> dict:
+        """Atualiza WhatsApp do CTA e/ou link do catálogo do bot.
+
+        Campos omitidos (ellipsis) não entram no PATCH.
+        """
+        body: dict = {}
+        if whatsapp is not ...:
+            body["whatsapp"] = whatsapp
+        if catalogo_url is not ...:
+            body["catalogo_url"] = catalogo_url
+        return self._request("PATCH", "/v1/loja", json=body)
 
     def reordenar_vitrine(self, itens: list[dict]) -> dict:
         """Atualiza ordem manual dos veículos na vitrine pública."""

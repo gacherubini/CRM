@@ -196,6 +196,30 @@ def main() -> None:
     assert "até 4 fotos do catálogo" in system_message_lower, (
         "prompt não orienta o envio das fotos do catálogo"
     )
+    catalog_tool = next(
+        (
+            node
+            for node in data.get("nodes", [])
+            if node.get("name") == "enviar_link_catalogo1"
+        ),
+        None,
+    )
+    assert catalog_tool is not None, "tool enviar_link_catalogo1 ausente"
+    assert catalog_tool.get("type") == "@n8n/n8n-nodes-langchain.toolCode"
+    catalog_code = catalog_tool.get("parameters", {}).get("jsCode", "")
+    assert "/v1/config/catalogo-bot" in catalog_code, (
+        "tool de catálogo deve ler o link configurado no Chatbot/Estoque"
+    )
+    assert "enviar_link_catalogo" in system_message_lower, (
+        "prompt deve mandar o link do catálogo quando o cliente pede para ver as motos"
+    )
+    assert any(
+        item.get("node") == "AI Agent1" and item.get("type") == "ai_tool"
+        for group in data.get("connections", {})
+        .get("enviar_link_catalogo1", {})
+        .get("ai_tool", [])
+        for item in group
+    ), "enviar_link_catalogo1 precisa estar ligada ao AI Agent"
     stock_node = next(
         (node for node in data.get("nodes", []) if node.get("name") == "consultar_estoque1"),
         None,
@@ -459,8 +483,8 @@ def main() -> None:
     ), "tool de foto não está conectada ao AI Agent"
 
     nodes_by_name = {node.get("name"): node for node in data.get("nodes", [])}
-    assert len(nodes_by_name) == 30, (
-        "workflow deve ter 30 nós (inclui debounce, juiz e fallback temporário)"
+    assert len(nodes_by_name) == 31, (
+        "workflow deve ter 31 nós (inclui debounce, juiz, fallback e link catálogo)"
     )
     removidos = {
         "E audio1", "Transcrever audio1", "Aplicar transcricao1",
@@ -710,7 +734,7 @@ def main() -> None:
     )
 
     print(
-        "workflow n8n válido: 30 nós, replay >5min bloqueado, debounce pela última entrada, "
+        "workflow n8n válido: 31 nós, replay >5min bloqueado, debounce pela última entrada, "
         "fallback temporário sem fotos, multi-WA instance dinâmica, áudio ignorado, "
         "webhook seguro e resultado privado"
     )

@@ -21,6 +21,7 @@ def test_solicita_simula_alerta_grupo_e_pausa_bot(
 ):
     _selecionar_grupo(client, loja_a)
     tel = "5511999001122"
+    cpf = "52998224725"
     r = client.post(
         "/v1/operacao/solicitacoes-simulacao-humana",
         headers={
@@ -29,9 +30,12 @@ def test_solicita_simula_alerta_grupo_e_pausa_bot(
         },
         json={
             "telefone": tel,
-            "interesse": "Honda CG 160 2024",
+            "interesse": "Honda CG 160 2024 preta",
             "tem_cnh": "sim",
             "instance": loja_a["instance"],
+            "cpf": cpf,
+            "nascimento": "1990-05-15",
+            "entrada": 3500,
             "cpf_recebido": True,
             "nascimento_recebido": True,
         },
@@ -50,10 +54,19 @@ def test_solicita_simula_alerta_grupo_e_pausa_bot(
     assert call["instance"] == loja_a["instance"]
     assert call["number"] == GRUPO
     assert call["number"].endswith("@g.us")
-    assert "cpf" not in call["text"].lower() or "recebidos" in call["text"].lower()
-    assert "111" not in call["text"]  # não vaza dígitos de CPF
-    assert "Honda CG 160" in call["text"]
-    assert "atendimento" in call["text"]
+    texto = call["text"]
+    assert "PRECISA DE SIMULAÇÃO HUMANA" in texto
+    assert f"Cliente final: {tel}" in texto
+    assert "CPF: 529.982.247-25" in texto
+    assert "Data de nascimento: 15/05/1990" in texto
+    assert "CNH: SIM" in texto
+    assert "Vendedor de origem:" in texto
+    assert "Honda CG 160 2024 preta" in texto
+    assert "Faça a simulação no portal e responda ao cliente:" in texto
+    assert "atendimento" in texto
+    assert tel in texto
+    assert "****" not in texto
+    assert "***" not in texto
 
     estado = client.get(
         f"/v1/conversas/{tel}/estado", headers=loja_a["headers"]

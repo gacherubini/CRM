@@ -1051,11 +1051,57 @@ def normalizar_whatsapp_loja(valor: str | None) -> str | None:
     return digitos
 
 
+def normalizar_catalogo_url(valor: str | None) -> str | None:
+    """Normaliza URL do catálogo enviada pelo bot.
+
+    Vazio limpa o campo. Só http/https; sem espaços; máx. 500 chars.
+    """
+    if valor is None:
+        return None
+    bruto = str(valor).strip()
+    if not bruto:
+        return None
+    if len(bruto) > 500:
+        raise HTTPException(status_code=422, detail="URL do catálogo muito longa")
+    if any(ch.isspace() for ch in bruto):
+        raise HTTPException(status_code=422, detail="URL do catálogo inválida")
+    lower = bruto.lower()
+    if not (lower.startswith("https://") or lower.startswith("http://")):
+        raise HTTPException(
+            status_code=422,
+            detail="URL do catálogo deve começar com https:// ou http://",
+        )
+    return bruto
+
+
 def atualizar_whatsapp_loja(db: Session, loja_id: str, whatsapp: str | None) -> Loja:
     loja = db.get(Loja, loja_id)
     if loja is None:
         raise HTTPException(status_code=404, detail="loja não encontrada")
     loja.whatsapp = normalizar_whatsapp_loja(whatsapp)
+    db.commit()
+    db.refresh(loja)
+    return loja
+
+
+def atualizar_loja_meta(
+    db: Session,
+    loja_id: str,
+    *,
+    whatsapp: str | None | object = ...,
+    catalogo_url: str | None | object = ...,
+) -> Loja:
+    """Atualiza metadados da loja (WhatsApp CTA e/ou URL do catálogo do bot).
+
+    Campos omitidos (ellipsis) não são alterados.
+    """
+    loja = db.get(Loja, loja_id)
+    if loja is None:
+        raise HTTPException(status_code=404, detail="loja não encontrada")
+    if whatsapp is not ...:
+        loja.whatsapp = normalizar_whatsapp_loja(whatsapp)  # type: ignore[arg-type]
+    if catalogo_url is not ...:
+        loja.catalogo_url = normalizar_catalogo_url(catalogo_url)  # type: ignore[arg-type]
     db.commit()
     db.refresh(loja)
     return loja

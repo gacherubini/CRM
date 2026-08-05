@@ -405,3 +405,53 @@ def test_http_provider_resolve_midia_em_detalhe_publico_tenant_scoped(monkeypatc
     assert capturado["url"].endswith("/public/v1/lojas/loja-a/veiculos/veh-1")
     assert midia["url"] == "https://cdn.example/veh-1.webp"
     assert midia["content_type"] == "image/webp"
+
+
+def test_config_catalogo_bot_configurado(client, loja_a, monkeypatch):
+    class _Write:
+        def disponivel(self):
+            return True
+
+        def obter_loja(self):
+            return {
+                "slug": "x",
+                "catalogo_url": "https://exemplo.com/catalogo/l/loja",
+            }
+
+    from app.main import app
+    from app.inventory import get_inventory_write_client
+
+    app.dependency_overrides[get_inventory_write_client] = lambda: _Write()
+    try:
+        r = client.get("/v1/config/catalogo-bot", headers=loja_a["headers"])
+        assert r.status_code == 200, r.text
+        body = r.json()
+        assert body["ok"] is True
+        assert body["configurado"] is True
+        assert body["catalogo_url"].startswith("https://")
+        assert "https://exemplo.com/catalogo/l/loja" in body["mensagem"]
+    finally:
+        app.dependency_overrides.pop(get_inventory_write_client, None)
+
+
+def test_config_catalogo_bot_sem_url(client, loja_a, monkeypatch):
+    class _Write:
+        def disponivel(self):
+            return True
+
+        def obter_loja(self):
+            return {"slug": "x", "catalogo_url": None}
+
+    from app.main import app
+    from app.inventory import get_inventory_write_client
+
+    app.dependency_overrides[get_inventory_write_client] = lambda: _Write()
+    try:
+        r = client.get("/v1/config/catalogo-bot", headers=loja_a["headers"])
+        assert r.status_code == 200
+        body = r.json()
+        assert body["ok"] is False
+        assert body["configurado"] is False
+        assert body["catalogo_url"] is None
+    finally:
+        app.dependency_overrides.pop(get_inventory_write_client, None)

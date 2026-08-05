@@ -1,12 +1,16 @@
 """Solicitação de simulação humana: lead + pausa bot + alerta no grupo de estoque.
 
 Endpoint canônico usado pelas tools n8n (simular1 e fallback TEMP). Idempotente por
-``Idempotency-Key`` (providerMessageId). Não persiste CPF/nascimento.
+``Idempotency-Key`` (providerMessageId).
+
+O alerta do grupo inclui telefone, CPF e nascimento completos (operação da equipe);
+não inventa dados ausentes.
 """
 from __future__ import annotations
 
 import json
 import logging
+import re
 import uuid
 from datetime import datetime, timezone
 from typing import Any
@@ -25,26 +29,75 @@ logger = logging.getLogger("chatbot.solicitacoes_simulacao")
 
 TIPO_SIMULACAO_HUMANA = "simulacao_humana"
 _MENSAGEM_CLIENTE = "certinho. vou preparar a simulação pra você."
+_VENDEDOR_NAO_IDENTIFICADO = "não identificado"
 
 
 def _agora() -> datetime:
     return datetime.now(timezone.utc)
 
 
-def _mascarar_telefone(telefone: str) -> str:
-    digitos = "".join(ch for ch in telefone if ch.isdigit())
-    if len(digitos) < 4:
-        return "****"
-    return f"***{digitos[-4:]}"
-
-
 def _normalizar_cnh(valor: str | None) -> str:
+    """Retorna SIM, NÃO ou NÃO INFORMADO (maiúsculas, como no modelo do grupo)."""
     raw = (valor or "").strip().lower()
     if raw.startswith(("s", "sim", "tenho", "possuo", "true", "1")):
-        return "sim"
+        return "SIM"
     if raw.startswith(("n", "nao", "não", "false", "0")):
-        return "não"
+        return "NÃO"
+    return "NÃO INFORMADO"
+
+
+def _normalizar_cpf(valor: str | None) -> str | None:
+    """Só dígitos; 11 posições. None se ausente/inválido (não inventa)."""
+    if valor is None:
+        return None
+    digitos = re.sub(r"\D", "", str(valor))
+    if len(digitos) != 11:
+        return None
+    return digitos
+
+
+def _formatar_cpf(cpf_digitos: str | None) -> str:
+    if not cpf_digitos or len(cpf_digitos) != 11:
+        return "não informado"
+    return f"{cpf_digitos[:3]}.{cpf_digitos[3:6]}.{cpf_digitos[6:9]}-{cpf_digitos[9:]}"
+
+
+def _formatar_nascimento(valor: str | None) -> str:
+    """Aceita YYYY-MM-DD ou DD/MM/YYYY; devolve DD/MM/YYYY ou 'não informado'."""
+    if valor is None:
+        return "não informado"
+    bruto = str(valor).strip()
+    if not bruto:
+        return "não informado"
+    m = re.fullmatch(r"(\d{4})-(\d{2})-(\d{2})", bruto)
+    if m:
+        return f"{m.group(3)}/{m.group(2)}/{m.group(1)}"
+    m = re.fullmatch(r"(\d{2})[/-](\d{2})[/-](\d{4})", bruto)
+    if m:
+        return f"{m.group(1)}/{m.group(2)}/{m.group(3)}"
+    # Não inventa: se o formato for desconhecido, devolve o texto recebido se curto.
+    if len(bruto) <= 32 and re.search(r"\d", bruto):
+        return bruto
     return "não informado"
+
+
+def _rotulo_vendedor(db: Session, loja_id: str, instance: str | None) -> str:
+    """Canal/WhatsApp de origem do lead (de qual vendedor veio a conversa)."""
+    from app import channels
+
+    inst = (instance or "").strip()
+    if not inst:
+        return _VENDEDOR_NAO_IDENTIFICADO
+    canal = channels.get_channel_by_instance(db, inst)
+    if canal is not None and canal.loja_id == loja_id:
+        label = (canal.e164_or_label or "").strip()
+        if label:
+            return label
+        ev = (canal.evolution_instance or "").strip()
+        if ev:
+            return ev
+    # Instance conhecida mas sem label amigável: ainda identifica a origem.
+    return inst
 
 
 def _montar_texto_grupo(
@@ -52,29 +105,37 @@ def _montar_texto_grupo(
     telefone: str,
     interesse: str,
     tem_cnh: str | None,
-    cpf_recebido: bool,
-    nascimento_recebido: bool,
-    fallback_temporario: bool,
+    cpf: str | None,
+    nascimento: str | None,
+    vendedor: str,
+    fallback_temporario: bool = False,
 ) -> str:
-    final = _mascarar_telefone(telefone)
+    digitos = "".join(ch for ch in telefone if ch.isdigit()) or telefone
     cnh = _normalizar_cnh(tem_cnh)
+    cpf_fmt = _formatar_cpf(_normalizar_cpf(cpf))
+    nasc_fmt = _formatar_nascimento(nascimento)
+    vend = (vendedor or "").strip() or _VENDEDOR_NAO_IDENTIFICADO
+    portal = (
+        f"{config.PORTAL_BASE_URL}/app/loja/atendimento/{quote(telefone, safe='')}"
+    )
     linhas = [
-        "precisa de simulação humana",
+        "🚨 PRECISA DE SIMULAÇÃO HUMANA",
+        "",
     ]
     if fallback_temporario:
-        linhas.append("fallback temporário: moto fora do estoque digital")
+        linhas.append("Fallback temporário: moto fora do estoque digital")
+        linhas.append("")
     linhas.extend(
         [
-            f"cliente final {final}",
-            (
-                "cpf e data de nascimento recebidos"
-                if cpf_recebido and nascimento_recebido
-                else "dados de simulação recebidos"
-            ),
-            f"cnh: {cnh}",
-            f"interesse: {(interesse or '—')[:80]}",
-            "faça a simulação no portal e responda o cliente",
-            f"portal: {config.PORTAL_BASE_URL}/app/loja/atendimento/{quote(telefone, safe='')}",
+            f"Cliente final: {digitos}",
+            f"CPF: {cpf_fmt}",
+            f"Data de nascimento: {nasc_fmt}",
+            f"CNH: {cnh}",
+            f"Vendedor de origem: {vend[:80]}",
+            f"Interesse: {(interesse or '—')[:120]}",
+            "",
+            "Faça a simulação no portal e responda ao cliente:",
+            portal,
         ]
     )
     return "\n".join(linhas)
@@ -109,10 +170,13 @@ def solicitar_simulacao_humana(
     interesse: str | None = None,
     tem_cnh: str | None = None,
     instance: str | None = None,
+    cpf: str | None = None,
+    nascimento: str | None = None,
     cpf_recebido: bool = False,
     nascimento_recebido: bool = False,
     fallback_temporario: bool = False,
     nome: str | None = None,
+    entrada: float | int | None = None,
     idempotency_key: str,
 ) -> dict[str, Any]:
     """Aceita pedido humano: qualifica lead, pausa bot e alerta o grupo de estoque.
@@ -139,6 +203,26 @@ def solicitar_simulacao_humana(
         raise HTTPException(status_code=422, detail="telefone inválido") from exc
 
     interesse_limpo = (interesse or "").strip()[:160] or "simulação de financiamento"
+    vendedor = _rotulo_vendedor(db, loja_id, instance)
+    cpf_norm = _normalizar_cpf(cpf)
+    if cpf_norm is None and cpf_recebido and cpf:
+        # Valor veio mas inválido: não inventa; mensagem dirá "não informado".
+        cpf_norm = None
+    # cpf_recebido sem valor: também "não informado" no texto.
+    if cpf_norm is not None:
+        cpf_recebido = True
+    nasc_limpo = (nascimento or "").strip() or None
+    if nasc_limpo:
+        nascimento_recebido = True
+
+    entrada_val: float | None = None
+    if entrada is not None:
+        try:
+            entrada_val = float(entrada)
+            if entrada_val < 0 or entrada_val != entrada_val:
+                entrada_val = None
+        except (TypeError, ValueError):
+            entrada_val = None
 
     existente = (
         db.query(NotificacaoOperacional)
@@ -182,12 +266,16 @@ def solicitar_simulacao_humana(
     grupo = operacao.obter_grupo_estoque(db, loja_id)
     destino_jid = grupo.grupo_jid if grupo is not None else None
 
+    # Resumo operacional: não grava CPF completo no JSON de auditoria.
     resumo = {
-        "telefone_mascarado": _mascarar_telefone(telefone_norm),
+        "telefone": telefone_norm,
+        "vendedor": vendedor[:80],
+        "entrada": entrada_val,
         "interesse": interesse_limpo[:80],
         "tem_cnh": _normalizar_cnh(tem_cnh),
-        "cpf_recebido": bool(cpf_recebido),
-        "nascimento_recebido": bool(nascimento_recebido),
+        "cpf_recebido": bool(cpf_recebido) or cpf_norm is not None,
+        "nascimento_recebido": bool(nascimento_recebido) or bool(nasc_limpo),
+        "nascimento": _formatar_nascimento(nasc_limpo) if nasc_limpo else None,
         "fallback_temporario": bool(fallback_temporario),
     }
 
@@ -263,8 +351,9 @@ def solicitar_simulacao_humana(
         telefone=telefone_norm,
         interesse=interesse_limpo,
         tem_cnh=tem_cnh,
-        cpf_recebido=cpf_recebido,
-        nascimento_recebido=nascimento_recebido,
+        cpf=cpf_norm,
+        nascimento=nasc_limpo,
+        vendedor=vendedor,
         fallback_temporario=fallback_temporario,
     )
 

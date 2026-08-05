@@ -458,6 +458,24 @@ class HttpInventoryWriteClient:
         lim = max(1, min(int(limit or 10), 30))
         return veiculos[:lim]
 
+    def obter_loja(self) -> dict:
+        """Metadados da loja no Estoque (whatsapp CTA, catalogo_url do bot)."""
+        self._exigir_disponivel()
+        try:
+            r = httpx.get(
+                f"{self.base_url}/v1/loja",
+                headers={"Authorization": f"Bearer {self.token}"},
+                timeout=self.timeout,
+            )
+        except httpx.HTTPError as exc:
+            raise HTTPException(
+                status_code=502, detail="estoque indisponível no momento"
+            ) from exc
+        if r.status_code != 200:
+            raise self._mapear_erro_http(r)
+        body = r.json() if r.content else {}
+        return body if isinstance(body, dict) else {}
+
     def atualizar_veiculo(self, veiculo_id: str, campos: dict) -> dict:
         self._exigir_disponivel()
         try:
