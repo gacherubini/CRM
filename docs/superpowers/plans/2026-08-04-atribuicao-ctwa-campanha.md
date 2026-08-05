@@ -868,3 +868,125 @@ git commit -m "feat(revy): casar por ad_id resolvido via cache Graph (Fase 2)"
 - Confirmar `alembic heads` para os `down_revision` reais (0013/0014).
 - Confirmar a versão estável do Graph (`GRAPH_VERSION`).
 - Fase 2 permanece OFF (`REVY_TRAFEGO_AD_RESOLVER_ENABLED` ausente) até o token existir.
+
+---
+
+## Diagnóstico de produção — 2026-08-05
+
+> Este bloco registra o código já implantado, a fotografia operacional e como reproduzi-la.
+> Ele substitui o achado que chegou a ficar temporariamente no README raiz.
+
+### Resultado
+
+Nos eventos mais recentes, a captura do identificador do anúncio funciona. A falha ocorre depois,
+ao transformar esse identificador em `campaign_id` pela Graph API:
+
+| Evidência (janela móvel de 36h) | Snapshot inicial | Recheck `2026-08-05 04:07 UTC` |
+|---|---:|---:|
+| Eventos CTWA auditados | 60 | 80 |
+| Eventos com `meta_ad_id` | 53 | 67 |
+| Eventos com `meta_campaign_id` direto | 0 | 0 |
+| Leads `meta_ctwa` | 35 | 35 |
+| Leads `meta_ctwa` com `meta_ad_id` | **35/35** | **35/35** |
+| Leads `meta_ctwa` com `meta_campaign_id` | **0/35** | **0/35** |
+| `meta_ad_id` distintos no cache/resolvedor | 10 | 10 |
+| Resolvidos para campanha | **0/10** | **0/10** |
+| Falhas do resolvedor | **10/10 `http_4xx`** | **10/10 `http_4xx`** |
+
+Como a janela é móvel, totais de eventos mudam com novas mensagens; a conclusão e os contadores de
+leads/cache não mudaram entre os dois snapshots. Os dois eventos mais novos verificados, finais
+mascarados `3156` e `8261`, também chegaram com `meta_ad_id`. Logo, nessa amostra, o gargalo não é
+a captura/persistência do ad ID.
+
+Uma chamada read-only real, sem imprimir o token, reproduziu:
+
+```text
+GET /v21.0/{sourceId}?fields=campaign{id,name}
+HTTP 400
+GraphMethodException
+code=100, error_subcode=33
+```
+
+Fluxo comprovado:
+
+```text
+Evolution externalAdReply.sourceId
+  → Chatbot grava meta_ad_id                         OK
+  → Revy chama Graph /{id}?fields=campaign{id,name} OK
+  → Meta não reconhece/libera o objeto              FALHA 100/33
+  → meta_campaign_id permanece vazio
+  → lead não casa com a campanha no ROI
+```
+
+O sync geral de campanhas Meta continuava funcionando para as campanhas MT-03 configuradas.
+Portanto, token completamente inválido é menos provável do que incompatibilidade do ID ou acesso
+ao ativo específico.
+
+### Hipóteses em ordem de prioridade
+
+1. `externalAdReply.sourceId` normalizado pela Evolution não é o `Ad.id` consultável na
+   Marketing API. A referência oficial Cloud API chama `referral.source_id` de Ad ID, mas também
+   diferencia `source_type`; o fluxo atual prioriza o objeto Baileys/Evolution.
+2. O anúncio pertence a outra conta de anúncios ou Business Portfolio. O token pode listar as
+   campanhas da conta configurada e não acessar o objeto recebido pelo WhatsApp.
+3. O usuário/system user do token tem scope, mas não recebeu o ativo/conta específica em Business
+   Settings.
+4. O anúncio foi removido, recriado ou a referência é antiga/inacessível.
+5. App emissor, validade, permissões granulares ou conta do token não correspondem ao ativo.
+6. A leitura direta `/{id}` é inadequada para o identificador recebido. O cruzamento autoritativo
+   deve usar `/act_{account_id}/ads?fields=id,name,campaign_id` com paginação.
+
+### Runbook reproduzível
+
+O utilitário abaixo consulta os dois bancos em modo read-only, mascara a saída e não imprime
+token. A opção `--probe-graph` faz um único GET read-only para um ad pendente e devolve somente
+status/type/code/subcode.
+
+```powershell
+fly status -a app2037
+
+fly ssh sftp put revy-trafego\scripts\diagnose_ctwa_resolution.py `
+  /tmp/diagnose_ctwa_resolution.py -a app2037
+
+# Fotografia de banco/cache, sem chamada à Meta:
+fly ssh console -a app2037 -C `
+  'python /tmp/diagnose_ctwa_resolution.py --hours 36'
+
+# Reproduz a chamada Graph sanitizada:
+fly ssh console -a app2037 -C `
+  'python /tmp/diagnose_ctwa_resolution.py --hours 36 --probe-graph'
+```
+
+Conferência do código chamado pelo worker:
+
+```powershell
+rg -n 'externalAdReply|sourceId|meta_ad_id' n8n chatbot-api
+rg -n 'campaign\{id,name\}|GRAPH_VERSION|http_4xx' `
+  revy-trafego/app/clients/meta_graph.py `
+  revy-trafego/app/meta_ad_resolver_job.py
+
+cd revy-trafego
+.\.venv\Scripts\python.exe -m pytest `
+  tests/test_meta_graph_client.py `
+  tests/test_meta_ad_resolver_job.py `
+  tests/test_match_via_cache.py -q
+```
+
+Para decidir entre ID incompatível e falta de acesso, o próximo diagnóstico deve:
+
+1. gravar `source_type`, `source_url` e qual campo originou o ID (`referral.source_id`,
+   `advertisementId`, `adId` ou `externalAdReply.sourceId`), com payload sanitizado;
+2. listar, com paginação, `act_{account_id}/ads?fields=id,name,campaign_id` e cruzar os dez IDs;
+3. testar `GET /{id}?fields=id` antes de pedir `campaign_id`;
+4. validar o token no Access Token Debugger e o acesso do usuário/system user à conta;
+5. persistir HTTP status e `error.code`/`error_subcode`; hoje o cache reduz tudo a `http_4xx`.
+
+Retry isolado não resolve um `400 code=100/subcode=33` permanente. O worker já aplica cooldown de
+24h e máximo de cinco tentativas; é necessário corrigir a identidade do objeto ou o acesso.
+
+Fontes primárias:
+
+- [Meta WhatsApp Business Platform — Click to WhatsApp Ads](https://www.postman.com/meta/whatsapp-business-platform/request/g7sv9jo/received-message-triggered-by-click-to-whatsapp-ads)
+- [Meta Marketing API — anúncios da conta e `campaign_id`](https://www.postman.com/meta/facebook-marketing-api/request/uisas2z/getadsfromaccountidwithfields)
+- [Meta Business SDK oficial — tokens e permissões](https://github.com/facebook/facebook-python-business-sdk)
+- [Meta Help Center — acesso à conta de anúncios](https://www.facebook.com/help/messenger-app/195296697183682/)
