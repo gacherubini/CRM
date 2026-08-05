@@ -10,13 +10,15 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import re
 import uuid
-from datetime import datetime, timezone
-from typing import Any
+from datetime import datetime, timedelta, timezone
+from typing import Any, Callable
 from urllib.parse import quote
 
 from fastapi import HTTPException
+from sqlalchemy import or_
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -32,8 +34,121 @@ _MENSAGEM_CLIENTE = "certinho. vou preparar a simulação pra você."
 _VENDEDOR_NAO_IDENTIFICADO = "não identificado"
 
 
+def _int_env(nome: str, default: int) -> int:
+    try:
+        return int(os.getenv(nome, str(default)) or default)
+    except (TypeError, ValueError):
+        return default
+
+
+def _float_env(nome: str, default: float) -> float:
+    try:
+        return float(os.getenv(nome, str(default)) or default)
+    except (TypeError, ValueError):
+        return default
+
+
+# Reenvio do alerta: cada envio conta uma tentativa; o drenador reprocessa
+# pending/failed com backoff exponencial até MAX_TENTATIVAS_ALERTA.
+MAX_TENTATIVAS_ALERTA = _int_env("CHATBOT_NOTIF_MAX_ATTEMPTS", 6)
+_BACKOFF_BASE_SECONDS = _float_env("CHATBOT_NOTIF_BACKOFF_BASE_SECONDS", 30)
+_BACKOFF_MAX_SECONDS = _float_env("CHATBOT_NOTIF_BACKOFF_MAX_SECONDS", 1800)
+
+
 def _agora() -> datetime:
     return datetime.now(timezone.utc)
+
+
+def _proximo_attempt_at(attempts: int) -> datetime:
+    """Backoff exponencial a partir da tentativa já contabilizada."""
+    atraso = min(
+        _BACKOFF_BASE_SECONDS * (2 ** max(attempts - 1, 0)), _BACKOFF_MAX_SECONDS
+    )
+    return _agora() + timedelta(seconds=atraso)
+
+
+def _resolver_instancia_alerta(
+    db: Session, loja_id: str, instance: str | None
+) -> str:
+    """Número que fala no grupo: canal principal de estoque, senão o da conversa."""
+    from app import channels
+    from app.models_db import Loja
+
+    instancia = channels.resolve_instance_principal_estoque(db, loja_id) or ""
+    if not instancia:
+        instancia = (instance or "").strip()
+    if not instancia:
+        loja = db.get(Loja, loja_id)
+        if loja is not None:
+            instancia = channels.resolve_evolution_instance_for_loja(db, loja)
+    return instancia
+
+
+def _despachar_alerta(
+    db: Session, notificacao: NotificacaoOperacional, *, instancia: str, texto: str
+) -> bool:
+    """Envia (ou reenvia) o alerta ao grupo e persiste o resultado. True se enviou.
+
+    Em falha, agenda ``next_attempt_at`` para o drenador reprocessar, até esgotar
+    ``MAX_TENTATIVAS_ALERTA`` (quando para de reagendar e fica ``failed`` visível).
+    """
+    notificacao.attempts = (notificacao.attempts or 0) + 1
+    try:
+        get_whatsapp_outbound().send_text(
+            instance=instancia,
+            number=notificacao.destino_jid,
+            text=texto,
+        )
+    except WhatsAppOutboundError as exc:
+        code = getattr(exc, "code", None) or "evolution_send_failed"
+        notificacao.status = "failed"
+        notificacao.last_error_code = code
+        notificacao.next_attempt_at = (
+            None
+            if notificacao.attempts >= MAX_TENTATIVAS_ALERTA
+            else _proximo_attempt_at(notificacao.attempts)
+        )
+        db.commit()
+        logger.warning(
+            "alerta simulação falhou notif=%s code=%s tentativa=%s",
+            notificacao.id,
+            code,
+            notificacao.attempts,
+        )
+        return False
+    notificacao.status = "sent"
+    notificacao.sent_at = _agora()
+    notificacao.last_error_code = None
+    notificacao.next_attempt_at = None
+    db.commit()
+    logger.info(
+        "alerta simulação enviado notif=%s loja_sufixo=%s tentativa=%s",
+        notificacao.id,
+        notificacao.loja_id[-8:],
+        notificacao.attempts,
+    )
+    return True
+
+
+def _texto_do_resumo(notif: NotificacaoOperacional) -> str:
+    """Reconstrói o texto do alerta a partir do resumo persistido.
+
+    O CPF completo não é persistido (privacidade), então o reenvio pelo drenador
+    o omite ("não informado"); a equipe age pelo link do portal. O caminho normal
+    e o reenvio por rechamada (mesma Idempotency-Key) mantêm o CPF, pois recebem
+    os dados frescos da requisição.
+    """
+    dados = json.loads(notif.payload_resumo or "{}")
+    cnh_render = {"SIM": "sim", "NÃO": "nao"}.get(dados.get("tem_cnh"))
+    return _montar_texto_grupo(
+        telefone=dados.get("telefone") or "",
+        interesse=dados.get("interesse") or "",
+        tem_cnh=cnh_render,
+        cpf=None,
+        nascimento=dados.get("nascimento"),
+        vendedor=dados.get("vendedor") or "",
+        fallback_temporario=bool(dados.get("fallback_temporario")),
+    )
 
 
 def _normalizar_cnh(valor: str | None) -> str:
@@ -233,11 +348,43 @@ def solicitar_simulacao_humana(
         .first()
     )
     if existente is not None:
+        if existente.status == "sent":
+            return _saida(
+                notificacao=existente,
+                telefone=telefone_norm,
+                duplicada=True,
+                alerta_enviado=True,
+            )
+        # Tentativa anterior não concluiu (pending/failed): reprocessa com os
+        # dados desta chamada, que ainda trazem o CPF completo (não persistido).
+        grupo = operacao.obter_grupo_estoque(db, loja_id)
+        destino_jid = grupo.grupo_jid if grupo is not None else None
+        if destino_jid is None:
+            return _saida(
+                notificacao=existente,
+                telefone=telefone_norm,
+                duplicada=True,
+                alerta_enviado=False,
+            )
+        existente.destino_jid = destino_jid
+        instancia = _resolver_instancia_alerta(db, loja_id, instance)
+        texto = _montar_texto_grupo(
+            telefone=telefone_norm,
+            interesse=interesse_limpo,
+            tem_cnh=tem_cnh,
+            cpf=cpf_norm,
+            nascimento=nasc_limpo,
+            vendedor=vendedor,
+            fallback_temporario=fallback_temporario,
+        )
+        enviado = _despachar_alerta(
+            db, existente, instancia=instancia, texto=texto
+        )
         return _saida(
             notificacao=existente,
             telefone=telefone_norm,
             duplicada=True,
-            alerta_enviado=existente.status == "sent",
+            alerta_enviado=enviado,
         )
 
     # Lead + pausa + notificação pending (efeitos duráveis antes do envio).
@@ -320,6 +467,8 @@ def solicitar_simulacao_humana(
         notificacao.status = "failed"
         notificacao.last_error_code = "grupo_estoque_nao_configurado"
         notificacao.attempts = 1
+        # Reagenda: o drenador reconsulta o grupo e reenvia quando for configurado.
+        notificacao.next_attempt_at = _proximo_attempt_at(1)
         db.commit()
         logger.info(
             "alerta simulação sem grupo loja_sufixo=%s notif=%s",
@@ -335,18 +484,7 @@ def solicitar_simulacao_humana(
             alerta_enviado=False,
         )
 
-    # Sempre prefere o canal principal de estoque (um número manda no grupo).
-    from app import channels
-    from app.models_db import Loja
-
-    instancia = channels.resolve_instance_principal_estoque(db, loja_id) or ""
-    if not instancia:
-        instancia = (instance or "").strip()
-    if not instancia:
-        loja = db.get(Loja, loja_id)
-        if loja is not None:
-            instancia = channels.resolve_evolution_instance_for_loja(db, loja)
-
+    instancia = _resolver_instancia_alerta(db, loja_id, instance)
     texto = _montar_texto_grupo(
         telefone=telefone_norm,
         interesse=interesse_limpo,
@@ -357,42 +495,67 @@ def solicitar_simulacao_humana(
         fallback_temporario=fallback_temporario,
     )
 
-    notificacao.attempts = 1
+    enviado = _despachar_alerta(db, notificacao, instancia=instancia, texto=texto)
+    # Lead e handoff já aceitos; falha vira 202 com alerta_enviado=false e retry.
+    return _saida(
+        notificacao=notificacao,
+        telefone=telefone_norm,
+        duplicada=False,
+        alerta_enviado=enviado,
+    )
+
+
+def processar_pendentes(
+    db_factory: Callable[[], Session], *, limite: int = 50
+) -> dict[str, int]:
+    """Drena alertas pending/failed cujo ``next_attempt_at`` já venceu e reenvia.
+
+    Rede de segurança para falhas transitórias da Evolution: sem isto, um único
+    envio malsucedido perde o alerta para sempre. Roda no worker de background.
+    """
+    db = db_factory()
+    resultado = {"encontrados": 0, "enviados": 0, "falharam": 0}
     try:
-        get_whatsapp_outbound().send_text(
-            instance=instancia,
-            number=destino_jid,
-            text=texto,
+        agora = _agora()
+        pendentes = (
+            db.query(NotificacaoOperacional)
+            .filter(
+                NotificacaoOperacional.tipo == TIPO_SIMULACAO_HUMANA,
+                NotificacaoOperacional.status.in_(("pending", "failed")),
+                NotificacaoOperacional.attempts < MAX_TENTATIVAS_ALERTA,
+                or_(
+                    NotificacaoOperacional.next_attempt_at.is_(None),
+                    NotificacaoOperacional.next_attempt_at <= agora,
+                ),
+            )
+            .order_by(NotificacaoOperacional.created_at.asc())
+            .limit(limite)
+            .all()
         )
-        notificacao.status = "sent"
-        notificacao.sent_at = _agora()
-        notificacao.last_error_code = None
-        db.commit()
-        logger.info(
-            "alerta simulação enviado notif=%s loja_sufixo=%s",
-            notificacao.id,
-            loja_id[-8:],
-        )
-        return _saida(
-            notificacao=notificacao,
-            telefone=telefone_norm,
-            duplicada=False,
-            alerta_enviado=True,
-        )
-    except WhatsAppOutboundError as exc:
-        code = getattr(exc, "code", None) or "evolution_send_failed"
-        notificacao.status = "failed"
-        notificacao.last_error_code = code
-        db.commit()
-        logger.warning(
-            "alerta simulação falhou notif=%s code=%s",
-            notificacao.id,
-            code,
-        )
-        # Lead e handoff já aceitos; 202 com ok e alerta_enviado=false.
-        return _saida(
-            notificacao=notificacao,
-            telefone=telefone_norm,
-            duplicada=False,
-            alerta_enviado=False,
-        )
+        resultado["encontrados"] = len(pendentes)
+        for notif in pendentes:
+            destino_jid = notif.destino_jid
+            if not destino_jid:
+                grupo = operacao.obter_grupo_estoque(db, notif.loja_id)
+                destino_jid = grupo.grupo_jid if grupo is not None else None
+                if not destino_jid:
+                    notif.attempts = (notif.attempts or 0) + 1
+                    notif.last_error_code = "grupo_estoque_nao_configurado"
+                    notif.next_attempt_at = (
+                        None
+                        if notif.attempts >= MAX_TENTATIVAS_ALERTA
+                        else _proximo_attempt_at(notif.attempts)
+                    )
+                    db.commit()
+                    resultado["falharam"] += 1
+                    continue
+                notif.destino_jid = destino_jid
+            texto = _texto_do_resumo(notif)
+            instancia = _resolver_instancia_alerta(db, notif.loja_id, None)
+            enviado = _despachar_alerta(
+                db, notif, instancia=instancia, texto=texto
+            )
+            resultado["enviados" if enviado else "falharam"] += 1
+        return resultado
+    finally:
+        db.close()

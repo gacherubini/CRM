@@ -3,6 +3,7 @@ import csv
 import io
 import os
 import uuid
+from contextlib import asynccontextmanager
 from datetime import datetime
 from typing import Optional
 from typing import Literal
@@ -45,7 +46,26 @@ from app.simulation import SimulationProvider, get_simulation_provider
 from app.vehicle_photo import VehiclePhotoProcessor, get_vehicle_photo_processor
 from app.whatsapp_groups import GruposWhatsappIndisponiveis, listar_grupos_whatsapp
 
-app = FastAPI(title="Chatbot API")
+@asynccontextmanager
+async def _lifespan(_app: FastAPI):
+    """Sobe/desce o worker de retry do outbox de alertas operacionais."""
+    from app.db import SessionLocal
+    from app import notificacoes_outbox_job
+
+    enabled = (os.getenv("CHATBOT_NOTIF_RETRY_ENABLED", "1") or "1").strip() not in {
+        "0",
+        "false",
+        "False",
+        "",
+    }
+    notificacoes_outbox_job.start_worker(SessionLocal, enabled=enabled)
+    try:
+        yield
+    finally:
+        notificacoes_outbox_job.stop_worker()
+
+
+app = FastAPI(title="Chatbot API", lifespan=_lifespan)
 app.add_middleware(WebhookPayloadLimitMiddleware)
 
 EtapaLead = Literal["novo", "em_atendimento", "qualificado", "convertido", "perdido"]

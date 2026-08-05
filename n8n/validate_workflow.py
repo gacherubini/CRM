@@ -166,8 +166,8 @@ def main() -> None:
     ), (
         "prompt ainda permite repetir CPF, nascimento e entrada"
     )
-    assert "11 dígitos de cpf, uma data e um valor de entrada" in system_message_lower, (
-        "prompt não reconhece os três dados na mesma mensagem"
+    assert "11 dígitos de cpf e uma data de nascimento" in system_message_lower, (
+        "prompt não reconhece cpf e nascimento na mesma mensagem (entrada é opcional)"
     )
     assert "quer dar uma olhada nas motos disponíveis?" in system_message_lower, (
         "primeiro contato ainda oferece simulação antes da escolha"
@@ -190,8 +190,8 @@ def main() -> None:
     assert "oi, [primeiro nome]. aqui é da vitor motos." in system_message_lower, (
         "abertura minimalista da vitor motos ausente"
     )
-    assert "veio_de_anuncio" in system_message and "enviar_foto_veiculo automaticamente" in system_message_lower, (
-        "prompt não trata automaticamente a mensagem de anúncio"
+    assert "veio_de_anuncio" in system_message and "à vista ou no financiamento" in system_message_lower, (
+        "prompt não abre a mensagem de anúncio perguntando à vista ou financiamento"
     )
     assert "até 4 fotos do catálogo" in system_message_lower, (
         "prompt não orienta o envio das fotos do catálogo"

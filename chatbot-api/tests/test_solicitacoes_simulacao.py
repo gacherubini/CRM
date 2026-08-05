@@ -140,6 +140,96 @@ def test_sem_grupo_aceita_mas_marca_failed(client, loja_a, _fake_whatsapp_outbou
     assert estado["bot_ativo"] is False
 
 
+def test_reenvia_quando_tentativa_anterior_falhou(
+    client, loja_a, _fake_whatsapp_outbound
+):
+    """Rechamada com a mesma Idempotency-Key reenvia se o 1º envio falhou."""
+    _selecionar_grupo(client, loja_a)
+    _fake_whatsapp_outbound.fail = True
+    headers = {**loja_a["headers"], "Idempotency-Key": "WA-RETRY-1"}
+    payload = {
+        "telefone": "5511988887777",
+        "interesse": "Honda Biz 2023",
+        "instance": loja_a["instance"],
+        "cpf": "52998224725",
+        "nascimento": "1990-05-15",
+        "tem_cnh": "sim",
+    }
+    r1 = client.post(
+        "/v1/operacao/solicitacoes-simulacao-humana", headers=headers, json=payload
+    )
+    assert r1.status_code == 202, r1.text
+    assert r1.json()["alerta_enviado"] is False
+    assert r1.json()["status_alerta"] == "failed"
+    assert len(_fake_whatsapp_outbound.calls) == 1
+
+    _fake_whatsapp_outbound.fail = False
+    r2 = client.post(
+        "/v1/operacao/solicitacoes-simulacao-humana", headers=headers, json=payload
+    )
+    assert r2.status_code == 202, r2.text
+    body = r2.json()
+    assert body["duplicada"] is True
+    assert body["alerta_enviado"] is True
+    assert body["status_alerta"] == "sent"
+    assert len(_fake_whatsapp_outbound.calls) == 2
+    # Reenvio por rechamada mantém o CPF completo (dados frescos da requisição).
+    assert "CPF: 529.982.247-25" in _fake_whatsapp_outbound.calls[1]["text"]
+
+
+def test_drenador_reenvia_alerta_pendente(
+    client, loja_a, _fake_whatsapp_outbound, db
+):
+    """O worker reprocessa alertas failed cujo next_attempt_at venceu."""
+    from datetime import datetime, timedelta, timezone
+
+    from sqlalchemy.orm import sessionmaker
+
+    from app.solicitacoes_simulacao import processar_pendentes
+
+    _selecionar_grupo(client, loja_a)
+    _fake_whatsapp_outbound.fail = True
+    headers = {**loja_a["headers"], "Idempotency-Key": "WA-DRAIN-1"}
+    tel = "5511977776666"
+    r = client.post(
+        "/v1/operacao/solicitacoes-simulacao-humana",
+        headers=headers,
+        json={
+            "telefone": tel,
+            "interesse": "Yamaha Fazer 250",
+            "instance": loja_a["instance"],
+            "cpf": "52998224725",
+            "nascimento": "1988-03-10",
+            "tem_cnh": "nao",
+        },
+    )
+    assert r.status_code == 202, r.text
+    assert r.json()["status_alerta"] == "failed"
+    assert len(_fake_whatsapp_outbound.calls) == 1
+
+    notif = (
+        db.query(NotificacaoOperacional)
+        .filter(NotificacaoOperacional.idempotency_key == "WA-DRAIN-1")
+        .one()
+    )
+    notif.next_attempt_at = datetime.now(timezone.utc) - timedelta(seconds=1)
+    db.commit()
+
+    _fake_whatsapp_outbound.fail = False
+    resultado = processar_pendentes(sessionmaker(bind=db.get_bind()))
+    assert resultado["encontrados"] == 1
+    assert resultado["enviados"] == 1
+    assert len(_fake_whatsapp_outbound.calls) == 2
+
+    db.refresh(notif)
+    assert notif.status == "sent"
+    texto = _fake_whatsapp_outbound.calls[1]["text"]
+    assert f"Cliente final: {tel}" in texto
+    assert "Faça a simulação no portal" in texto
+    # CPF completo não é persistido; o reenvio pelo drenador o omite.
+    assert "CPF: não informado" in texto
+
+
 def test_exige_idempotency_key(client, loja_a):
     r = client.post(
         "/v1/operacao/solicitacoes-simulacao-humana",
