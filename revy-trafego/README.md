@@ -345,6 +345,56 @@ consulta `vendas_projetadas`; schema incompleto não deve ser anunciado como sau
 
 ---
 
+## Integração Meta Graph API — versão e diagnóstico de erro
+
+Fonte única da versão: `app/meta_graph_config.py` (`DEFAULT_GRAPH_VERSION = "v26.0"`,
+override por `META_GRAPH_API_VERSION`, validado por regex). Spend, CAPI, `graph_probe` e
+resolução de anúncios importam `GRAPH_BASE`/`GRAPH_VERSION` dali — **não** hardcodar versão
+em módulo novo. Antes de `d5b78cc` a versão estava espalhada (`v21.0`/`v19.0`) e o erro da
+Meta era mascarado como `HTTP {status}` genérico.
+
+**Erro desmascarado.** `erro_api_sanitizado` (`app/meta_ads_spend.py`) faz parse do
+`error` da Meta e traduz o `code`:
+
+| Código Meta | Significado | Ação |
+|---|---|---|
+| `190` | Token inválido/expirado | Gerar novo token `ads_read` (System User de preferência) |
+| `10` / `200` | Sem acesso/permissão à conta de anúncios | Atribuir a conta ao System User + escopo `ads_read` no Business Manager |
+| outro | Erro real da Meta | Ler a mensagem/`message` retornada |
+
+O token é sanitizado da mensagem (`[oculto]`). `fbtrace_id` ainda **não** é exposto.
+
+**Como ler o erro real de um sync que falhou:**
+
+```bash
+# 1) rodar o sync sob demanda (precisa do secret do job no app)
+JOBTOK=$(openssl rand -hex 16); fly secrets set REVY_TRAFEGO_JOB_SECRET=$JOBTOK -a app2037 \
+  && curl -s -X POST https://app2037.fly.dev/trafego/internal/jobs/meta-spend-sync \
+       -H "X-Job-Token: $JOBTOK" | python3 -m json.tool
+# (o payload traz só o agregado: "N loja(s) · X ok · Y erro")
+
+# 2) mensagem detalhada fica em meta_ads_config.ultima_sync_erro
+fly ssh console -a app2037 -C "python3 -c \"import sqlite3; c=sqlite3.connect('/data/revy-trafego/revy_trafego.db'); [print(r) for r in c.execute('SELECT loja_id,ultima_sync_status,ultima_sync_em,ultima_sync_erro FROM meta_ads_config')]\""
+```
+
+O worker automático (`REVY_TRAFEGO_META_SPEND_SYNC_ENABLED=1`, 24h, delay inicial 0) já
+roda o sync no boot e grava `ultima_sync_erro`/`ultima_sync_resumo` — o resumo também
+aparece na tela de Tráfego (`templates/trafego/form.html`, campo `n`).
+
+**Incidente 2026-08-06 (moto-center).** Após subir `d5b78cc` (deploy v101), o sync
+retornou `1 loja · 1 erro` e `ultima_sync_erro` revelou:
+`Meta negou acesso à conta de anúncios (código 200)`. Ou seja, **não era token expirado
+(190)** — o token autentica, mas o System User não tinha acesso `ads_read`/atribuição à
+conta. Correção é no **Business Manager** (Usuários do sistema → Adicionar ativos → Conta
+de anúncios → Ver desempenho) + token com `ads_read`, não em código.
+
+**Pendência conhecida.** O Portal (`portal-gestao/app/meta_ads_spend.py`,
+`app/meta_capi.py`) continua em `v21.0` e ainda mascara o erro como `HTTP {status}`. Em
+prod isso está **desligado** (`PORTAL_META_SPEND_SYNC_ENABLED=0`), então não afeta o
+sync ativo; portar o mesmo tratamento é melhoria pendente.
+
+---
+
 ## Cutover workers (B5 — **DONE no lab**)
 
 Estado atual no `fly.app.toml` + scripts:
