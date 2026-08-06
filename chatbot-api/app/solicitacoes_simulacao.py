@@ -30,7 +30,10 @@ from app.whatsapp_outbound import WhatsAppOutboundError, get_whatsapp_outbound
 logger = logging.getLogger("chatbot.solicitacoes_simulacao")
 
 TIPO_SIMULACAO_HUMANA = "simulacao_humana"
-_MENSAGEM_CLIENTE = "certinho. vou preparar a simulação pra você."
+_MENSAGEM_CLIENTE = (
+    "certo, já tenho seus dados. vou encaminhar pro setor de simulação e te retorno "
+    "por aqui. atendemos das 8h30 às 18h; fora desse horário, respondo no próximo dia útil."
+)
 _VENDEDOR_NAO_IDENTIFICADO = "não identificado"
 
 

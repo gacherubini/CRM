@@ -343,7 +343,7 @@ def main() -> None:
     ), (
         "tool não bloqueia coleta de dados antes da escolha do veículo"
     )
-    assert "certinho. vou preparar a simulação pra você." in simulation_code, (
+    assert "certo, já tenho seus dados. vou encaminhar pro setor de simulação" in simulation_code, (
         "confirmação minimalista da simulação está ausente"
     )
     assert "chamar um vendedor" not in simulation_code and "pra trazer" not in simulation_code, (

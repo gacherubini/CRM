@@ -47,7 +47,7 @@ def test_solicita_simula_alerta_grupo_e_pausa_bot(
     assert body["duplicada"] is False
     assert body["alerta_enviado"] is True
     assert body["status_alerta"] == "sent"
-    assert "certinho" in body["mensagem"]
+    assert "encaminhar pro setor de simulação" in body["mensagem"]
 
     assert len(_fake_whatsapp_outbound.calls) == 1
     call = _fake_whatsapp_outbound.calls[0]
