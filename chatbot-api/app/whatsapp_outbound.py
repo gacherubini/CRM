@@ -5,6 +5,7 @@ Adapter HTTP Evolution (sendText) e Fake para testes. A apikey nunca é logada.
 from __future__ import annotations
 
 import logging
+import re
 from dataclasses import dataclass, field
 from typing import Any, Protocol
 from urllib.parse import quote
@@ -14,6 +15,39 @@ import httpx
 from app import config
 
 logger = logging.getLogger("chatbot.whatsapp_outbound")
+
+# Redige sequências longas de dígitos (CPF, telefone, nascimento, JID numérico)
+# antes de logar o corpo de erro do Evolution: o texto do alerta contém PII e o
+# provedor pode ecoá-lo no corpo da resposta.
+_DIGITOS_SENSIVEIS = re.compile(r"\d{5,}")
+
+
+def _sanitizar_corpo_erro(texto: str, api_key: str) -> str:
+    """Trunca e remove PII/segredos do corpo de erro antes de ir para o log."""
+    limpo = (texto or "")[:500]
+    if api_key and api_key in limpo:
+        limpo = limpo.replace(api_key, "[apikey]")
+    return _DIGITOS_SENSIVEIS.sub("[num]", limpo)
+
+
+def _classificar_falha_evolution(status: int, corpo: str) -> tuple[str, str]:
+    """Mapeia o corpo de erro do Evolution para (code durável, motivo curto).
+
+    O ``code`` cabe em ``last_error_code`` (<=80 chars) e é persistido; o corpo
+    bruto NUNCA é persistido (só logado, já sanitizado).
+    """
+    baixo = corpo.lower()
+    if any(
+        termo in baixo
+        for termo in ("not-authorized", "forbidden", "not a participant", "participant")
+    ):
+        return "evolution_group_forbidden", "instância não participa do grupo de destino"
+    if any(
+        termo in baixo
+        for termo in ("item-not-found", "not found", "does not exist", '"exists":false')
+    ):
+        return "evolution_target_not_found", "grupo/número de destino não encontrado"
+    return "evolution_send_failed", f"HTTP {status}"
 
 
 class WhatsAppOutboundError(RuntimeError):
@@ -104,14 +138,20 @@ class EvolutionWhatsAppOutbound:
                     json={"number": numero, "text": corpo},
                 )
                 if resposta.status_code >= 400:
+                    corpo_erro = _sanitizar_corpo_erro(resposta.text, self.api_key)
+                    code, motivo = _classificar_falha_evolution(
+                        resposta.status_code, corpo_erro
+                    )
                     logger.warning(
-                        "Evolution sendText falhou status=%s instancia=%s",
+                        "Evolution sendText falhou status=%s instancia=%s code=%s corpo=%s",
                         resposta.status_code,
                         instancia,
+                        code,
+                        corpo_erro,
                     )
                     raise WhatsAppOutboundError(
-                        f"Evolution recusou o envio (HTTP {resposta.status_code})",
-                        code="evolution_send_failed",
+                        f"Evolution recusou o envio (HTTP {resposta.status_code}): {motivo}",
+                        code=code,
                     )
                 if not resposta.content:
                     return {}
