@@ -31,6 +31,7 @@ def test_nav_somente_vendas_e_estoque_com_acessos_bancarios():
         "Atendimento",
         "Visão geral",
         "Veículos",
+        "Ordem na vitrine",
         "Acessos bancários",
         "Grupo do estoque",
         "Integrações",

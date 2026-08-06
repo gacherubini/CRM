@@ -154,21 +154,29 @@ def test_criacao_rejeita_email_ja_usado_sem_duplicar_usuario(client):
     db.close()
 
 
-@pytest.mark.parametrize("papel", ["gerente", "vendedor"])
-def test_rbac_impede_gerente_e_vendedor_de_gerir_equipe(client, papel):
+# Gerente enxerga a lista da equipe em modo leitura (200); vendedor nem acessa
+# (303 -> /app). Nenhum dos dois pode CADASTRAR (gerir), que é o que este teste
+# garante. Ver pode_ver_equipe vs pode_gerir_equipe em app/auth.py.
+@pytest.mark.parametrize(
+    "papel,pagina_status",
+    [("gerente", 200), ("vendedor", 303)],
+)
+def test_rbac_impede_gerente_e_vendedor_de_gerir_equipe(client, papel, pagina_status):
     login(client, papel=papel, email=f"{papel}@loja.test")
     dashboard = client.get("/app")
     csrf = csrf_da_resposta(dashboard)
 
     pagina = client.get("/app/equipe", follow_redirects=False)
+    assert pagina.status_code == pagina_status
+    if pagina_status == 303:
+        assert pagina.headers["location"] == "/app"
+
+    # Cadastrar membro é gerir: bloqueado para ambos, sem criar usuário.
     criacao = client.post(
         "/app/equipe/novo",
         data={"csrf": csrf, **dados_novo()},
         follow_redirects=False,
     )
-
-    assert pagina.status_code == 303
-    assert pagina.headers["location"] == "/app"
     assert criacao.status_code == 303
     assert criacao.headers["location"] == "/app"
     db = SessionLocal()

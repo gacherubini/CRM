@@ -6,6 +6,12 @@ from app.db import SessionLocal
 from app.main import identidade_telefone
 from app.models import AtendimentoAtribuicao, FunilEvento, Venda
 
+# Os leads do fixture são de julho/2026, mas a venda e a atribuição são criadas
+# em runtime ("agora"). Sem período explícito, /app/financeiro usa o mês corrente
+# e os leads envelhecem para fora da janela. Uma janela com início antes dos leads
+# e fim aberto garante que os três caiam no período — independente de quando roda.
+PERIODO_AMPLO = {"inicio": "2026-07-01", "fim": "2100-01-01"}
+
 
 def criar_venda_vinculada(lead_ref, vendedor_email="dono@loja.test", loja_slug="loja-teste"):
     db = SessionLocal()
@@ -42,7 +48,7 @@ def test_funil_reconcilia_leads_handoffs_e_venda_vinculada(client, chatbot_fake)
     criar_atribuicao("5511987654321")
     criar_venda_vinculada("l1")
     login(client)
-    resposta = client.get("/app/financeiro")
+    resposta = client.get("/app/financeiro", params=PERIODO_AMPLO)
     assert resposta.status_code == 200
     assert "Leads elegíveis" in resposta.text
     assert "<strong>2</strong><small>leads criados" in resposta.text
@@ -54,7 +60,9 @@ def test_funil_reconcilia_leads_handoffs_e_venda_vinculada(client, chatbot_fake)
 def test_funil_filtra_origem_declarada_sem_inferir_ausentes(client, chatbot_fake):
     criar_venda_vinculada("l1")
     login(client)
-    resposta = client.get("/app/financeiro", params={"origem": "catalogo"})
+    resposta = client.get(
+        "/app/financeiro", params={**PERIODO_AMPLO, "origem": "catalogo"}
+    )
     assert resposta.status_code == 200
     assert "<strong>1</strong><small>leads criados" in resposta.text
     assert "origem declarada" in resposta.text
@@ -65,7 +73,9 @@ def test_funil_filtra_vendedor_por_handoff_confiavel(client, chatbot_fake):
     criar_atribuicao("5511987654321", vendedor_email="vendedor@loja.test")
     criar_venda_vinculada("l1", vendedor_email="vendedor@loja.test")
     login(client)
-    resposta = client.get("/app/financeiro", params={"vendedor": "vendedor@loja.test"})
+    resposta = client.get(
+        "/app/financeiro", params={**PERIODO_AMPLO, "vendedor": "vendedor@loja.test"}
+    )
     assert resposta.status_code == 200
     assert "<strong>1</strong><small>leads criados" in resposta.text
     assert "<strong>1</strong><small>leads elegíveis com handoff" in resposta.text
