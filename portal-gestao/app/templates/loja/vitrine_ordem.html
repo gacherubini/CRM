@@ -40,7 +40,9 @@
     </div>
     {% elif veiculos %}
     <p class="muted vitrine-hint">
-      Arraste qualquer card nesta página. A ordem de todas as páginas é salva junta.
+      Arraste (ou use ← →) para reordenar dentro desta página. Para trazer um veículo
+      de outra página para a frente da vitrine, use <strong>Topo</strong> — a ordem de
+      todas as páginas é salva junta.
     </p>
     <form
       id="vitrine-ordem-form"
@@ -96,6 +98,7 @@
             </div>
           </div>
           <div class="vitrine-card-tools">
+            <button type="button" class="button secondary vitrine-btn-top" aria-label="Mover {{ v.marca }} {{ v.modelo }} para o topo da vitrine" title="Mover para o topo da vitrine">Topo</button>
             <button type="button" class="button secondary vitrine-btn-up" aria-label="Mover {{ v.marca }} {{ v.modelo }} para a esquerda">←</button>
             <button type="button" class="button secondary vitrine-btn-down" aria-label="Mover {{ v.marca }} {{ v.modelo }} para a direita">→</button>
           </div>
@@ -152,6 +155,6 @@
   </div>
 </section>
 {% if veiculos %}
-<script src="/static/js/vitrine_ordem.js?v=3" defer></script>
+<script src="/static/js/vitrine_ordem.js?v=4" defer></script>
 {% endif %}
 {% endblock %}

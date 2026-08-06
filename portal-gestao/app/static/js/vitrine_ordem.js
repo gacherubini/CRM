@@ -8,6 +8,7 @@
   const status = document.getElementById("vitrine-status");
   const btnSalvar = document.getElementById("vitrine-salvar");
   const btnDescartar = document.getElementById("vitrine-descartar");
+  const offsetInput = form.querySelector('input[name="offset"]');
   if (!lista || !campo) return;
 
   const offset = Math.max(0, parseInt(form.dataset.offset || "0", 10) || 0);
@@ -72,6 +73,30 @@
     syncField();
     refreshBadges();
     setDirty(campo.value !== initialOrder);
+  }
+
+  /**
+   * Salva a ordem GLOBAL crua e navega para `targetOffset`.
+   * Usa form.submit() de propósito: ele NÃO dispara o listener de submit,
+   * então o merge por-página (mergePageIntoGlobal) não roda e não desfaz a
+   * ordem global que acabamos de montar. O POST redireciona para a página alvo.
+   */
+  function saveGlobalOrder(order, targetOffset) {
+    campo.value = order.join(",");
+    if (offsetInput) offsetInput.value = String(Math.max(0, targetOffset || 0));
+    if (status) status.textContent = "Salvando…";
+    if (btnSalvar) btnSalvar.disabled = true;
+    form.submit();
+  }
+
+  /** Traz o veículo para a frente da vitrine (posição 1), de qualquer página. */
+  function moveToTop(card) {
+    const id = card.getAttribute("data-id");
+    if (!id) return;
+    syncField(); // preserva rearranjos desta página antes de promover
+    const full = fullIds().filter((x) => x !== id);
+    full.unshift(id);
+    saveGlobalOrder(full, 0); // salva e cai na página 1, com o item na frente
   }
 
   function moveCard(card, delta) {
@@ -155,12 +180,17 @@
   });
 
   lista.addEventListener("click", (event) => {
+    const top = event.target.closest(".vitrine-btn-top");
     const left = event.target.closest(".vitrine-btn-up");
     const right = event.target.closest(".vitrine-btn-down");
-    if (!left && !right) return;
+    if (!top && !left && !right) return;
     const card = event.target.closest(".vitrine-card");
     if (!card) return;
     event.preventDefault();
+    if (top) {
+      moveToTop(card);
+      return;
+    }
     moveCard(card, left ? -1 : 1);
   });
 
@@ -171,16 +201,20 @@
     });
   }
 
-  // Avisa se sair da página com alterações não salvas (paginação / link).
+  // Paginação: com alterações não salvas, salva a ordem global e navega para a
+  // página escolhida (sem confirm bloqueante e sem perder a ordem). Sem
+  // alterações, deixa a navegação normal do link acontecer.
   form.querySelectorAll("[data-vitrine-page]").forEach((link) => {
     link.addEventListener("click", (event) => {
       syncField();
-      if (campo.value !== initialOrder) {
-        const ok = window.confirm(
-          "Você tem alterações não salvas nesta página. Sair e perder a ordem?"
-        );
-        if (!ok) event.preventDefault();
-      }
+      if (campo.value === initialOrder) return; // nada a salvar
+      event.preventDefault();
+      let targetOffset = 0;
+      try {
+        const url = new URL(link.href, window.location.origin);
+        targetOffset = parseInt(url.searchParams.get("offset") || "0", 10) || 0;
+      } catch (_) {}
+      saveGlobalOrder(fullIds(), targetOffset);
     });
   });
 

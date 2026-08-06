@@ -2479,6 +2479,8 @@ tr:hover td { background: var(--surface-soft); }
 
 /* Paginação — espelha o catálogo público */
 .vitrine-pagination {
+  position: relative;
+  z-index: 4; /* acima do rodapé sticky (z-index:3) — senão ele intercepta o clique */
   display: flex;
   flex-direction: column;
   align-items: center;
