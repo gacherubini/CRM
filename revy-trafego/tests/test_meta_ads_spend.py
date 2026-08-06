@@ -19,6 +19,7 @@ from sqlalchemy.exc import IntegrityError
 from app.cripto import cifrar
 from app.db import SessionLocal
 from app.meta_ads_spend import (
+    GRAPH_VERSION,
     SyncAllResult,
     SyncResult,
     external_key_meta,
@@ -113,11 +114,11 @@ def test_normalizar_meta_campaign_id_e_external_key():
 
 def test_fetch_campaign_insights_pagina_e_agrega():
     paginas = {
-        "/v21.0/act_1234/insights": {
+        f"/{GRAPH_VERSION}/act_1234/insights": {
             "data": [{"campaign_id": "1", "spend": "10.00", "date_start": "2026-07-20"}],
-            "paging": {"next": "https://graph.facebook.com/v21.0/next-page?after=abc"},
+            "paging": {"next": f"https://graph.facebook.com/{GRAPH_VERSION}/next-page?after=abc"},
         },
-        "/v21.0/next-page": {
+        f"/{GRAPH_VERSION}/next-page": {
             "data": [{"campaign_id": "2", "spend": "20.00", "date_start": "2026-07-20"}],
             "paging": {},
         },
@@ -162,7 +163,7 @@ def test_fetch_campaign_insights_valida_argumentos():
 
 
 def test_fetch_campaign_insights_interrompe_paginacao_ciclica():
-    proxima = "https://graph.facebook.com/v21.0/repetida?after=abc"
+    proxima = f"https://graph.facebook.com/{GRAPH_VERSION}/repetida?after=abc"
 
     def handler(request: httpx.Request) -> httpx.Response:
         return httpx.Response(200, json={"data": [], "paging": {"next": proxima}})
@@ -559,7 +560,9 @@ def test_falha_da_api_e_sanitizada_e_persistida():
     db.close()
 
     def fetch_explode(**kwargs):
-        request = httpx.Request("GET", "https://graph.facebook.com/v21.0/act_1/insights")
+        request = httpx.Request(
+            "GET", f"https://graph.facebook.com/{GRAPH_VERSION}/act_1/insights"
+        )
         raise httpx.HTTPStatusError(
             "boom",
             request=request,
@@ -578,6 +581,70 @@ def test_falha_da_api_e_sanitizada_e_persistida():
     assert cfg.ultima_sync_erro == "Meta Insights respondeu HTTP 400."
     assert cfg.ultima_sync_em is not None
     db.close()
+
+
+@pytest.mark.parametrize(
+    ("payload", "esperado"),
+    [
+        (
+            {"error": {"message": "Invalid OAuth access token.", "code": 190}},
+            "Token Meta inválido ou expirado (código 190)",
+        ),
+        (
+            {"error": {"message": "Permissions error", "code": 200}},
+            "Meta negou acesso à conta de anúncios (código 200)",
+        ),
+        (
+            {
+                "error": {
+                    "message": "Unsupported get request.",
+                    "code": 100,
+                    "error_subcode": 33,
+                }
+            },
+            "Unsupported get request. (código 100, subcódigo 33)",
+        ),
+    ],
+)
+def test_falha_da_meta_exibe_diagnostico_acionavel(payload, esperado):
+    token = "token-super-secreto"
+    request = httpx.Request(
+        "GET",
+        f"https://graph.facebook.com/{GRAPH_VERSION}/act_1/insights",
+        params={"access_token": token},
+    )
+    exc = httpx.HTTPStatusError(
+        "erro",
+        request=request,
+        response=httpx.Response(400, request=request, json=payload),
+    )
+
+    from app.meta_ads_spend import erro_api_sanitizado
+
+    mensagem = erro_api_sanitizado(exc)
+    assert esperado in mensagem
+    assert token not in mensagem
+
+
+def test_falha_da_meta_nunca_vaza_token_ecoado_na_mensagem():
+    token = "token-super-secreto"
+    request = httpx.Request(
+        "GET",
+        f"https://graph.facebook.com/{GRAPH_VERSION}/act_1/insights",
+        params={"access_token": token},
+    )
+    response = httpx.Response(
+        400,
+        request=request,
+        json={"error": {"message": f"access_token={token}", "code": 999}},
+    )
+    exc = httpx.HTTPStatusError("erro", request=request, response=response)
+
+    from app.meta_ads_spend import erro_api_sanitizado
+
+    mensagem = erro_api_sanitizado(exc)
+    assert "[oculto]" in mensagem
+    assert token not in mensagem
 
 
 def test_falha_de_rede_nao_vaza_url_nem_token():

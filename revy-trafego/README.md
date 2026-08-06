@@ -199,6 +199,7 @@ pytest -q
 | `MULTI_WHATSAPP_ENABLED` | `0` | `1` = libera os endpoints proxy de canais WhatsApp e faz a prontidão contar canais ativos |
 | `REVY_CONTROL_DASHBOARD_ENABLED` | `0` | Com `REVY_CONTROL_ENABLED=1`, habilita dashboard/resumo e os painéis operacionais no Control |
 | `REVY_TRAFEGO_JOB_SECRET` | vazio | `POST /internal/jobs/*` (`meta-spend-sync`, `google-conversions-outbox`, `google-ads-metrics-sync`) |
+| `META_GRAPH_API_VERSION` | `v26.0` | Versão compartilhada da Graph/Marketing API (spend, CAPI, diagnóstico e resolução de anúncios) |
 | `REVY_TRAFEGO_SERVICE_TOKEN` | vazio | Header `X-Service-Token` nas APIs `/v1/*` |
 
 ### Portal (flags cutover)

@@ -15,12 +15,9 @@ from typing import Protocol
 import httpx
 
 from app.config import settings
+from app.meta_graph_config import GRAPH_BASE
 
 logger = logging.getLogger(__name__)
-
-GRAPH_VERSION = "v19.0"
-GRAPH_BASE = f"https://graph.facebook.com/{GRAPH_VERSION}"
-
 
 class GraphProbe(Protocol):
     def validar_token(self, token: str, pixel_id: str) -> tuple[bool, str | None]:

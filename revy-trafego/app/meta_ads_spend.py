@@ -16,12 +16,11 @@ import httpx
 from sqlalchemy.orm import Session
 
 from app.cripto import decifrar
+from app.meta_graph_config import GRAPH_BASE, GRAPH_VERSION
 from app.models import Campanha, CampanhaGasto, MetaAdsConfig, agora, novo_id
 
 logger = logging.getLogger(__name__)
 
-GRAPH_VERSION = "v21.0"
-GRAPH_BASE = f"https://graph.facebook.com/{GRAPH_VERSION}"
 CENTAVOS = Decimal("0.01")
 ORIGEM_META = "meta_api"
 ORIGEM_MANUAL = "manual"
@@ -89,7 +88,54 @@ def parse_spend(valor: Any) -> Decimal | None:
 
 def erro_api_sanitizado(exc: Exception) -> str:
     if isinstance(exc, httpx.HTTPStatusError) and exc.response is not None:
-        return f"Meta Insights respondeu HTTP {exc.response.status_code}."
+        response = exc.response
+        status = response.status_code
+        error: dict[str, Any] | None = None
+        try:
+            body = response.json()
+            if isinstance(body, dict) and isinstance(body.get("error"), dict):
+                error = body["error"]
+        except ValueError:
+            pass
+
+        if error:
+            code = error.get("code")
+            subcode = error.get("error_subcode")
+            message = str(error.get("message") or "").strip()
+
+            # A resposta da Meta normalmente não ecoa o token, mas o removemos
+            # defensivamente caso ele apareça em uma mensagem inesperada.
+            try:
+                token = response.request.url.params.get("access_token")
+            except (RuntimeError, AttributeError):
+                token = None
+            if token:
+                message = message.replace(token, "[oculto]")
+            message = re.sub(
+                r"(?i)(access[_ -]?token\s*[=:]\s*)[^\s&,;]+",
+                r"\1[oculto]",
+                message,
+            )
+            message = " ".join(message.split())[:240]
+
+            if code == 190:
+                return "Token Meta inválido ou expirado (código 190). Gere outro token ads_read e salve no Revy."
+            if code in {10, 200}:
+                return (
+                    f"Meta negou acesso à conta de anúncios (código {code}). "
+                    "Confira ads_read e a atribuição da conta ao usuário do sistema."
+                )
+
+            identificadores = []
+            if code is not None:
+                identificadores.append(f"código {code}")
+            if subcode is not None:
+                identificadores.append(f"subcódigo {subcode}")
+            sufixo = f" ({', '.join(identificadores)})" if identificadores else ""
+            if message:
+                return f"Meta Insights HTTP {status}: {message}{sufixo}."[:500]
+
+        return f"Meta Insights respondeu HTTP {status}."
     if isinstance(exc, httpx.RequestError):
         return "Falha de rede ao contatar a Meta Insights."
     return "Falha interna ao sincronizar gastos da Meta."

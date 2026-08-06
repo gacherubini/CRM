@@ -12,11 +12,9 @@ from typing import Callable
 
 import httpx
 
-logger = logging.getLogger(__name__)
+from app.meta_graph_config import GRAPH_BASE
 
-# Alinhado a meta_ads_spend.GRAPH_VERSION
-GRAPH_VERSION = "v21.0"
-GRAPH_BASE = f"https://graph.facebook.com/{GRAPH_VERSION}"
+logger = logging.getLogger(__name__)
 
 # Teto de espera em um único backoff (segundos)
 _MAX_BACKOFF_SLEEP = 30.0

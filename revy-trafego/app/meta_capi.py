@@ -19,12 +19,13 @@ from sqlalchemy.orm import Session
 from app.cripto import decifrar
 from app.meta_pixel import normalizar_pixel_id
 from app.financeiro_calc import VendaRoi
+from app.meta_graph_config import GRAPH_BASE
 from app.models import MetaCapiOutbox, MetaPixelConfig, agora, novo_id
 
 logger = logging.getLogger(__name__)
 OUTBOX_LEASE_SECONDS = 300
 
-GRAPH_EVENTS_URL = "https://graph.facebook.com/v21.0/{pixel_id}/events"
+GRAPH_EVENTS_URL = f"{GRAPH_BASE}/{{pixel_id}}/events"
 DEFAULT_TIMEOUT = 5.0
 
 
