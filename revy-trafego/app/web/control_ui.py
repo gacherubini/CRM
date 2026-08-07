@@ -292,10 +292,16 @@ class _ChatbotLeadsPort:
 
     def count_for_store(self, slug: str) -> int | None:
         try:
+            # Best-effort: o dashboard chama isto uma vez por loja ativa, em
+            # sequência. Timeout curto e sem retry para não empilhar
+            # ~(1+retries)×timeout por loja e travar a página inteira quando
+            # o Chatbot está fora do ar.
             client = ChatbotClient(
                 settings.chatbot_url,
                 settings.chatbot_token_para(slug),
-                settings.request_timeout,
+                timeout=3,
+                retries=0,
+                retry_backoff=0,
             )
             if not client.configurado:
                 return None
@@ -342,12 +348,13 @@ def dashboard_page(
     assert user is not None
     stores = AccessControl(SessionLocal).scope(actor)
     nav_stores = _selector_stores(stores)
-    overview = DashboardControl(SessionLocal).overview(actor)
+    dashboard = DashboardControl(SessionLocal)
+    overview = dashboard.overview(actor)
     items = overview.items
     integration_by_store = {
         item.store_id: item for item in overview.integrations
     }
-    network = DashboardControl(SessionLocal).network_overview(
+    network = dashboard.network_overview(
         actor, leads_port=_ChatbotLeadsPort()
     )
     network_ticket_brl = (

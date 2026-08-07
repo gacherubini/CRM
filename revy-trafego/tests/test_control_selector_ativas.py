@@ -1,11 +1,10 @@
 from dataclasses import replace
 from types import SimpleNamespace
 
-from app.auth import hash_senha
 from app.config import settings as app_settings
 from app.control.types import StoreStatus
 from app.db import SessionLocal
-from app.models import Loja, GestorRevy
+from app.models import Loja
 from app.web import control as control_mod
 from app.web import control_ui as control_ui_mod
 
