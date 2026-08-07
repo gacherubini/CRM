@@ -287,36 +287,8 @@
 </section>
 {% endif %}
 
-{% if overview and overview.recent_audit %}
-<section class="panel" id="dashboard-auditoria">
-  <div class="panel-heading">
-    <h2>Alterações recentes</h2>
-  </div>
-  <div class="table-wrap">
-    <table id="tabela-dashboard-auditoria">
-      <thead>
-        <tr>
-          <th>Quando</th>
-          <th>Ação</th>
-          <th>Ator</th>
-          <th>Recurso</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for event in overview.recent_audit %}
-        <tr data-audit-id="{{ event.id }}"{% if event.store_id %} data-store-id="{{ event.store_id }}"{% endif %}>
-          <td><small>{{ event.created_at.strftime('%d/%m/%Y %H:%M') if event.created_at.strftime is defined else event.created_at }}</small></td>
-          <td><code>{{ event.action }}</code></td>
-          <td>{{ event.actor_email or '—' }}</td>
-          <td>
-            {{ event.resource_type }}
-            {% if event.resource_id %}<code>{{ event.resource_id }}</code>{% endif %}
-          </td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
-</section>
-{% endif %}
+{# "Alterações recentes" saiu da visão geral: era log de auditoria cru (action e
+   resource_id internos) numa tela de negócio. O overview continua expondo
+   recent_audit na API/domínio (escopo por loja é testado); só não ocupa mais
+   espaço aqui. #}
 {% endblock %}
