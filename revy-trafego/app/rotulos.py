@@ -38,6 +38,18 @@ ROTULO_ACESSO: dict[str, str] = {
 }
 
 
+# Checks de prontidão: a tabela mostrava o código interno (active_owner,
+# module_selected...). As mensagens longas continuam em readiness.py.
+ROTULO_CHECK: dict[str, str] = {
+    "active_owner": "Dono ativo",
+    "activatable_owner": "Acesso do dono",
+    "module_selected": "Módulo contratado",
+    "contract_present": "Contrato",
+    "meta_pixel": "Pixel e CAPI",
+    "whatsapp_channel": "Canal WhatsApp",
+}
+
+
 def rotular(mapa: dict[str, str], valor) -> str:
     """Rótulo humano de um enum; desconhecido cai no valor sem underline."""
     if valor is None:
@@ -51,4 +63,5 @@ def registrar_globals(env) -> None:
     env.globals["rotulo_status"] = ROTULO_STATUS_LOJA
     env.globals["rotulo_papel"] = ROTULO_PAPEL
     env.globals["rotulo_acesso"] = ROTULO_ACESSO
+    env.globals["rotulo_check"] = ROTULO_CHECK
     env.globals["rotular"] = rotular

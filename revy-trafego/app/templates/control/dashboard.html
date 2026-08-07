@@ -2,16 +2,7 @@
 {% block title %}Visão geral — Revy Control{% endblock %}
 {% block page_title %}Visão geral{% endblock %}
 {% block content %}
-{# Rotulos curtos dos checks de prontidao: a tabela mostrava o codigo interno
-   (active_owner, module_selected...). Mensagens longas ficam em readiness.py. #}
-{% set rotulo_check = {
-  'active_owner': 'Dono ativo',
-  'activatable_owner': 'Acesso do dono',
-  'module_selected': 'Módulo contratado',
-  'contract_present': 'Contrato',
-  'meta_pixel': 'Pixel e CAPI',
-  'whatsapp_channel': 'Canal WhatsApp',
-} %}
+{# rotulo_check / rotulo_status vêm de app/rotulos.py (mapa único do Control). #}
 <div class="page-heading">
   <div>
     <span class="eyebrow">Revy Control</span>
@@ -130,7 +121,7 @@
             {{ item.name }}
             {% endif %}
           </td>
-          <td><span class="status {{ item.status.value }}">{{ rotulo_status.get(item.status.value, item.status.value | replace('_', ' ')) }}</span></td>
+          <td><span class="status-pill status-{{ item.status.value }}">{{ rotular(rotulo_status, item.status) }}</span></td>
           <td class="wrap">
             <span class="chip-list">
               {% for code in item.failing_codes %}

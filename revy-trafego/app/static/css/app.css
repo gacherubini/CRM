@@ -1953,7 +1953,9 @@ tr:hover td { background: var(--surface-soft); }
   color: var(--ink-soft);
   font-size: var(--text-xs);
   font-weight: 600;
-  text-transform: capitalize;
+  /* Rotulo ja vem pronto de app/rotulos.py; capitalize virava
+     "Em Configuracao". */
+  text-transform: none;
   white-space: nowrap;
 }
 .status-pill.status-ativa,
@@ -2533,3 +2535,40 @@ tr:hover td { background: var(--surface-soft); }
   background: color-mix(in srgb, var(--red) 10%, var(--paper));
   color: var(--red);
 }
+
+/* ===========================================================================
+   Prontidao na ficha da loja — /app/control/lojas/{id} (aba Visao geral)
+   O dashboard manda o usuario para ca com "o que falta"; antes a ficha nao
+   respondia nada disso.
+   =========================================================================== */
+.readiness-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+  padding: var(--space-4) var(--space-5);
+  list-style: none;
+}
+.readiness-item {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: start;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+.readiness-item strong { display: block; font-size: var(--text-sm); }
+.readiness-item p { margin: 2px 0 0; font-size: var(--text-xs); }
+.readiness-mark {
+  width: 8px;
+  height: 8px;
+  margin-top: 6px;
+  border-radius: 50%;
+  background: var(--line-strong);
+}
+.readiness-item.is-ok .readiness-mark { background: var(--green); }
+.readiness-item.is-block .readiness-mark { background: var(--red); }
+.readiness-item.is-warn .readiness-mark { background: var(--amber); }
+.readiness-item.is-block { border-color: color-mix(in srgb, var(--red) 28%, var(--line)); }

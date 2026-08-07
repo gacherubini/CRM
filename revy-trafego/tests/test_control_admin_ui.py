@@ -244,9 +244,13 @@ def test_detalhe_mostra_estado_e_auditoria_somente_no_escopo(
     assert admin_page.status_code == 200
     assert "Loja Detalhada" in admin_page.text
     assert "rascunho" in admin_page.text
-    assert "store.created" in admin_page.text
-    assert "traffic_access.granted" in admin_page.text
     assert 'id="form-alterar-estado"' in admin_page.text
+    # A aba "Auditoria" saiu da ficha (mostrava action/result crus). O escopo
+    # dos eventos continua coberto em test_control_dashboard.py.
+    assert 'id="tab-auditoria"' not in admin_page.text
+    assert "store.created" not in admin_page.text
+    # Prontidão passou a responder aqui o "o que falta" que o dashboard linka.
+    assert 'id="loja-prontidao"' in admin_page.text
 
     client.cookies.clear()
     _login(client, "gestor.detalhe@revy.local", "senha-detalhe")
@@ -255,7 +259,6 @@ def test_detalhe_mostra_estado_e_auditoria_somente_no_escopo(
 
     assert manager_page.status_code == 200
     assert "Loja Detalhada" in manager_page.text
-    assert "traffic_access.granted" in manager_page.text
     assert 'id="form-alterar-estado"' not in manager_page.text
     assert hidden.status_code == 404
 
@@ -472,7 +475,6 @@ def test_admin_configura_contrato_e_gestor_permanece_read_only(
     assert "01/09/2026 a 31/08/2027" in created_page.text
     assert "Dia 18" in created_page.text
     assert "atrasada" in created_page.text
-    assert "store_contract.upserted" in created_page.text
     assert (
         'id="contrato-valor-mensal" type="number" '
         'name="valor_mensal" value="2199.90"'
@@ -612,9 +614,18 @@ def test_admin_transiciona_concede_revoga_e_gestor_nao_muta(
 
     final_page = client.get(f"/app/control/lojas/{store.id}")
     assert "em_configuracao" in final_page.text
-    assert "store.status_changed" in final_page.text
-    assert "traffic_access.granted" in final_page.text
-    assert "traffic_access.revoked" in final_page.text
+    # A aba Auditoria saiu da ficha; a revogacao passa a ser verificada na
+    # trilha, que e onde ela de fato mora.
+    from app.models import AuditoriaEvento
+
+    with SessionLocal() as db:
+        acoes = {
+            evento.acao
+            for evento in db.query(AuditoriaEvento)
+            .filter(AuditoriaEvento.loja_id == store.id)
+            .all()
+        }
+    assert "traffic_access.revoked" in acoes
 
     client.cookies.clear()
     _login(client, "gestor.ciclo-dois@revy.local", "senha-ciclo-dois")

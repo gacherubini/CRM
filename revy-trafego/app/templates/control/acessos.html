@@ -27,8 +27,8 @@
         <tr>
           <td>{{ account.person_name }}</td>
           <td>{{ account.person_email }}</td>
-          <td>{{ account.role.value }}</td>
-          <td>{{ account.status.value }}</td>
+          <td>{{ rotular(rotulo_papel, account.role) }}</td>
+          <td><span class="status {{ account.status.value }}">{{ rotular(rotulo_acesso, account.status) }}</span></td>
         </tr>
         {% endfor %}
       </tbody>

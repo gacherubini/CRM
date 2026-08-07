@@ -9,7 +9,7 @@
     <h1>{{ store.name }}</h1>
     <p class="store-meta">
       <code>{{ store.slug }}</code>
-      · <span class="status-pill status-{{ store.status.value }}">{{ store.status.value | replace('_', ' ') }}</span>
+      · <span class="status-pill status-{{ store.status.value }}">{{ rotular(rotulo_status, store.status) }}</span>
       · <span id="loja-versao">Versão {{ store.version }}</span>
     </p>
   </div>
@@ -74,7 +74,6 @@
   {% if is_admin %}
   <button class="control-tab" role="tab" id="tab-estado" data-tab="estado" aria-controls="panel-estado">Estado</button>
   {% endif %}
-  <button class="control-tab" role="tab" id="tab-auditoria" data-tab="auditoria" aria-controls="panel-auditoria">Auditoria</button>
 </nav>
 
 <!-- Visão geral ------------------------------------------------------------- -->
@@ -92,13 +91,45 @@
     </div>
   </section>
 
+  {# Prontidão: o dashboard manda o usuário para cá com "o que falta", então a
+     resposta precisa estar aqui. Bloqueio impede ativar; alerta não impede. #}
+  {% if readiness %}
+  <section class="panel" id="loja-prontidao">
+    <div class="panel-heading">
+      <h2>Prontidão</h2>
+      <p class="muted">
+        {% if readiness.ready %}
+        Tudo pronto para ativar a loja.
+        {% else %}
+        Resolva os bloqueios para poder ativar a loja.
+        {% endif %}
+      </p>
+    </div>
+    <ul class="readiness-list">
+      {% for check in readiness.checks %}
+      {% set bloqueia = check.code in readiness_required_codes %}
+      <li class="readiness-item {{ 'is-ok' if check.ok else ('is-block' if bloqueia else 'is-warn') }}">
+        <span class="readiness-mark" aria-hidden="true"></span>
+        <div>
+          <strong>{{ rotulo_check.get(check.code, check.code | replace('_', ' ')) }}</strong>
+          <p class="muted">{{ check.message }}</p>
+        </div>
+        <span class="status {{ 'ativa' if check.ok else ('erro' if bloqueia else 'warn') }}">
+          {% if check.ok %}OK{% elif bloqueia %}Bloqueio{% else %}Alerta{% endif %}
+        </span>
+      </li>
+      {% endfor %}
+    </ul>
+  </section>
+  {% endif %}
+
   <div class="overview-grid">
     <div class="panel overview-card">
       <h2>Resumo</h2>
       <dl class="overview-list">
         <div><dt>Nome</dt><dd>{{ store.name }}</dd></div>
         <div><dt>Endereço</dt><dd><code>{{ store.slug }}</code></dd></div>
-        <div><dt>Estado</dt><dd><span class="status-pill status-{{ store.status.value }}">{{ store.status.value | replace('_', ' ') }}</span></dd></div>
+        <div><dt>Estado</dt><dd><span class="status-pill status-{{ store.status.value }}">{{ rotular(rotulo_status, store.status) }}</span></dd></div>
       </dl>
     </div>
     {% if is_admin %}
@@ -560,7 +591,7 @@
   {% elif store.status.value != 'encerrada' %}
   <section class="panel form-section" id="ativar-loja">
     <h2>Ativar loja</h2>
-    <p class="muted">Publica a loja num passo (rascunho → ativada). Precisa de um dono com acesso e ao menos um módulo ativo — se faltar, eu aviso o que é.</p>
+    <p class="muted">Publica a loja num passo (rascunho → ativada). Precisa de um dono com acesso e ao menos um módulo ativo. O que falta aparece em Visão geral › Prontidão.</p>
     <form method="post" action="{{ public_path('/app/control/lojas/' ~ store.id ~ '/estado') }}" class="form-layout" id="form-ativar-loja">
       <input type="hidden" name="csrf" value="{{ csrf }}">
       <input type="hidden" name="estado" value="ativa">
@@ -610,40 +641,8 @@
 </section>
 {% endif %}
 
-<!-- Auditoria --------------------------------------------------------------- -->
-<section class="control-tabpanel" role="tabpanel" id="panel-auditoria" data-tab="auditoria" aria-labelledby="tab-auditoria" tabindex="0">
-  <section class="panel">
-    <h2>Auditoria</h2>
-    {% if audit_events %}
-    <div class="table-wrap">
-      <table>
-        <thead>
-          <tr>
-            <th>Data</th>
-            <th>Ação</th>
-            <th>Ator</th>
-            <th>Resultado</th>
-            <th>Motivo</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for event in audit_events %}
-          <tr>
-            <td>{{ event.created_at.strftime('%d/%m/%Y %H:%M') if event.created_at.strftime is defined else event.created_at }}</td>
-            <td><code>{{ event.action }}</code></td>
-            <td>{{ event.actor_email or 'sistema' }}</td>
-            <td>{{ event.result.value }}</td>
-            <td>{{ event.reason or '—' }}</td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-    {% else %}
-    <div class="empty"><strong>Sem eventos de auditoria.</strong></div>
-    {% endif %}
-  </section>
-</section>
+{# Aba "Auditoria" removida: mostrava event.action e result.value crus, que
+   nenhum usuário de negócio lê. O histórico continua no domínio e na API. #}
 
 <script>
   (() => {

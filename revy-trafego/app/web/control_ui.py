@@ -186,7 +186,8 @@ def _slugify(value: str) -> str:
 
 
 # Painéis do detalhe agrupados em abas. A ordem aqui é a ordem visual das abas.
-_DETAIL_TABS = ("visao", "pessoas", "modulos", "integracoes", "estado", "auditoria")
+# "auditoria" saiu: mostrava action/result crus e nenhum usuário de negócio lia.
+_DETAIL_TABS = ("visao", "pessoas", "modulos", "integracoes", "estado")
 
 logger = logging.getLogger(__name__)
 
@@ -2045,6 +2046,17 @@ def _render_store_detail(
     assert user is not None
     stores = AccessControl(SessionLocal).scope(actor)
     nav_stores = _selector_stores(stores)
+    # Prontidão na ficha: o dashboard linka "o que falta" para cá, mas a ficha
+    # não mostrava nada disso — o relatório só existia como mensagem de erro na
+    # hora de ativar. O usuário clicava na pendência e chegava numa página que
+    # não respondia.
+    readiness = None
+    with SessionLocal() as readiness_db:
+        readiness_store = (
+            readiness_db.query(Loja).filter(Loja.id == store.id).first()
+        )
+        if readiness_store is not None:
+            readiness = build_readiness_report(readiness_db, readiness_store)
     return templates.TemplateResponse(
         request=request,
         name="control/loja_detail.html",
@@ -2052,6 +2064,8 @@ def _render_store_detail(
             "usuario": user,
             "csrf": csrf_token(request),
             "lojas": nav_stores,
+            "readiness": readiness,
+            "readiness_required_codes": sorted(READINESS_REQUIRED_CODES),
             "control_enabled": settings.revy_control_enabled,
             "control_rbac_enabled": settings.revy_control_rbac_enabled,
             "control_dashboard_enabled": _dashboard_surface_enabled(),
