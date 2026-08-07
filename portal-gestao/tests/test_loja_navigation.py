@@ -29,6 +29,7 @@ def test_nav_somente_vendas_e_estoque_com_acessos_bancarios():
     assert labels == [
         "Visão geral",
         "Atendimento",
+        "Agente",
         "Simulações",
         "Visão geral",
         "Veículos",
@@ -42,6 +43,7 @@ def test_nav_somente_vendas_e_estoque_com_acessos_bancarios():
     hrefs = {i.href for i in items}
     assert "/app/loja/vendas" in hrefs
     assert "/app/loja/atendimento" in hrefs
+    assert "/app/loja/agente" in hrefs
     assert "/app/simulacoes" in hrefs
     assert "/app/loja/estoque" in hrefs
     assert "/app/loja/estoque/veiculos" in hrefs
