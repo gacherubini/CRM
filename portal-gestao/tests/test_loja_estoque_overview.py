@@ -248,9 +248,13 @@ def test_rota_visao_ok_com_dados(client, shell_on, estoque_fake):
     estoque_fake.veiculos[1]["criado_em"] = "2026-06-01T00:00:00+00:00"
     resp = client.get("/app/loja/estoque")
     assert resp.status_code == 200
-    assert "Visão geral" in resp.text
+    # "Visão geral" virou "Situação do estoque": havia dois itens de menu com
+    # o mesmo nome (Vendas e Estoque).
+    assert "Situação do estoque" in resp.text
     assert "Disponíveis" in resp.text
-    assert "Honda Civic" in resp.text or "Pendências" in resp.text
+    # O painel "Cadastro › Pendências" e "Reservas e vendas recentes" saíram.
+    assert "Pendências" not in resp.text
+    assert "Reservas e vendas recentes" not in resp.text
     # fake: v1 sem foto → lacuna
     assert "foto" in resp.text.lower() or "Pendências" in resp.text
     # sem linguagem de IA

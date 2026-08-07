@@ -344,7 +344,10 @@ def test_rota_html_dono_quando_shell_on(client, monkeypatch, chatbot_fake):
     login(client)
     r = client.get("/app/loja/vendas")
     assert r.status_code == 200
-    assert "Visão geral" in r.text
+    # "Visão geral" virou "Resultado" (havia dois itens de menu homônimos).
+    assert "Resultado" in r.text
+    # O rodapé "Atalhos" apontava para as telas legadas que o shell substitui.
+    assert "Painel clássico" not in r.text
     assert "Receita" in r.text
     assert "50.000,00" in r.text or "50000" in r.text
     # Linguagem comercial — sem UI técnica

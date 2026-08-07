@@ -1,11 +1,12 @@
 {% extends "base.html" %}
-{% block title %}Estoque — Visão geral — Revy{% endblock %}
+{% block title %}Situação do estoque — Revy Loja{% endblock %}
+{% block page_title %}Situação do estoque{% endblock %}
 {% block content %}
 <div class="page-heading">
   <div>
     <span class="eyebrow">Estoque</span>
-    <h1>Visão geral</h1>
-    <p>Indicadores do estoque da loja. Números vêm da API de estoque — nenhum valor é estimado.</p>
+    <h1>Situação do estoque</h1>
+    <p>Como está o estoque da loja hoje. Todos os números vêm do cadastro dos veículos — nada é estimado.</p>
   </div>
   <div class="heading-actions">
     <a class="button secondary" href="{{ caminho_veiculos }}">Ver veículos</a>
@@ -27,7 +28,7 @@
 <section class="panel flush" aria-labelledby="estoque-vazio-titulo">
   <div class="empty">
     <strong id="estoque-vazio-titulo">Nenhum veículo cadastrado</strong>
-    <p>Quando houver veículos na loja, os totais por disponibilidade e as pendências de cadastro aparecem aqui.</p>
+    <p>Quando houver veículos na loja, os totais por disponibilidade aparecem aqui.</p>
     {% if pode_gerir %}
     <a class="button primary" href="{{ caminho_novo }}">Cadastrar veículo</a>
     {% else %}
@@ -45,9 +46,9 @@
       <h2>Disponibilidade</h2>
       <p>
         {% if overview.status == 'parcial' %}
-        Totais calculados a partir da lista atual. Faixas de idade omitidas: nenhum veículo ativo tem data de entrada.
+        Totais contados na lista atual. As faixas de idade não aparecem: nenhum veículo ativo tem data de entrada.
         {% else %}
-        Totais por status, calculados a partir da lista atual da API de estoque.
+        Totais por disponibilidade, contados na lista atual de veículos.
         {% endif %}
       </p>
     </div>
@@ -67,7 +68,7 @@
       </div>
       <span class="status-chip"><i></i>Operacional</span>
     </div>
-    <p>Cadastro, edição, reserva, venda e publicação no catálogo continuam na lista de veículos até a migração completa do shell.</p>
+    <p>Cadastrar, editar, reservar, vender e publicar no catálogo: tudo acontece na lista de veículos.</p>
     <a class="button secondary integration-action" href="{{ caminho_veiculos }}">Abrir lista de veículos</a>
   </aside>
 </section>
@@ -91,106 +92,9 @@
 </section>
 {% endif %}
 
-<section class="panel" aria-labelledby="lacunas-titulo">
-  <div class="panel-heading">
-    <div>
-      <span class="mono-label">Cadastro</span>
-      <h2 id="lacunas-titulo">Pendências</h2>
-    </div>
-    {% if overview.total_lacunas %}
-    <span class="muted">{{ overview.total_lacunas }} veículo{% if overview.total_lacunas != 1 %}s{% endif %}</span>
-    {% endif %}
-  </div>
-  {% if overview.lacunas %}
-  <div class="table-wrap">
-    <table>
-      <caption class="sr-only">Veículos com preço, foto ou campos obrigatórios ausentes</caption>
-      <thead>
-        <tr>
-          <th scope="col">Veículo</th>
-          <th scope="col">Placa</th>
-          <th scope="col">Status</th>
-          <th scope="col">Falta</th>
-          <th scope="col"><span class="sr-only">Ações</span></th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for item in overview.lacunas %}
-        <tr>
-          <td>
-            <div class="cell-stack">
-              <strong>{{ item.marca }} {{ item.modelo }}</strong>
-              <small class="muted mono-inline">{{ item.id }}</small>
-            </div>
-          </td>
-          <td class="muted mono-inline">{% if item.placa %}{{ item.placa }}{% else %}—{% endif %}</td>
-          <td><span class="status {{ item.status }}">{{ {'disponivel':'Disponível','reservado':'Reservado','indisponivel':'Indisponível'}.get(item.status, item.status) }}</span></td>
-          <td>
-            {% for f in item.faltas %}
-            <span class="muted">{{ {'preco':'preço','foto':'foto','tipo':'tipo','marca':'marca','modelo':'modelo','ano_modelo':'ano'}.get(f, f) }}{% if not loop.last %}, {% endif %}</span>
-            {% endfor %}
-          </td>
-          <td>
-            {% if pode_gerir and item.id %}
-            <a class="table-action" href="/app/estoque/{{ item.id }}">Corrigir</a>
-            {% else %}
-            <span class="muted">—</span>
-            {% endif %}
-          </td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
-  {% if overview.total_lacunas > overview.lacunas|length %}
-  <p class="muted">Mostrando {{ overview.lacunas|length }} de {{ overview.total_lacunas }}. Abra a lista de veículos para ver o restante.</p>
-  {% endif %}
-  {% else %}
-  <div class="empty">
-    <strong>Nenhuma pendência de cadastro</strong>
-    <p>Todos os veículos ativos têm preço, foto e campos obrigatórios preenchidos.</p>
-  </div>
-  {% endif %}
-</section>
-
-<section class="panel" aria-labelledby="recentes-titulo">
-  <div class="panel-heading">
-    <div>
-      <span class="mono-label">Movimentação</span>
-      <h2 id="recentes-titulo">Reservas e vendas recentes</h2>
-    </div>
-  </div>
-  {% if overview.recentes %}
-  <div class="table-wrap">
-    <table>
-      <caption class="sr-only">Veículos reservados ou vendidos, ordenados pela última atualização</caption>
-      <thead>
-        <tr>
-          <th scope="col">Tipo</th>
-          <th scope="col">Veículo</th>
-          <th scope="col">Placa</th>
-          <th scope="col">Atualizado</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for ev in overview.recentes %}
-        <tr>
-          <td>{% if ev.tipo == 'reserva' %}Reserva{% else %}Venda{% endif %}</td>
-          <td><strong>{{ ev.marca }} {{ ev.modelo }}</strong></td>
-          <td class="muted mono-inline">{% if ev.placa %}{{ ev.placa }}{% else %}—{% endif %}</td>
-          <td class="muted">{% if ev.atualizado_em %}{{ ev.atualizado_em[:16] | replace('T', ' ') }}{% else %}—{% endif %}</td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
-  {% else %}
-  <div class="empty">
-    <strong>Nenhuma reserva ou venda listada</strong>
-    <p>Quando houver veículos reservados ou vendidos, eles aparecem aqui com a data de atualização informada pela API.</p>
-  </div>
-  {% endif %}
-</section>
+{# Fora daqui: "Cadastro › Pendências" e "Reservas e vendas recentes".
+   O primeiro saiu a pedido do dono do produto; o segundo era log — quatro
+   colunas sem link para o veículo, que não respondiam nenhuma pergunta. #}
 {% endif %}
 
 <p class="muted page-shortcuts">

@@ -47,7 +47,7 @@ def build_nav(
                 title="Vendas",
                 items=(
                     NavItem(
-                        label="Visão geral",
+                        label="Resultado",
                         href="/app/loja/vendas",
                         section="Vendas",
                         module=Module.VENDAS.value,
@@ -84,7 +84,7 @@ def build_nav(
                 title="Estoque",
                 items=(
                     NavItem(
-                        label="Visão geral",
+                        label="Situação do estoque",
                         href="/app/loja/estoque",
                         section="Estoque",
                         module=Module.ESTOQUE.value,

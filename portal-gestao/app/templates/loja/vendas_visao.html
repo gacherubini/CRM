@@ -1,10 +1,11 @@
 {% extends "base.html" %}
-{% block title %}Vendas — Visão geral — Revy Loja{% endblock %}
+{% block title %}Resultado — Revy Loja{% endblock %}
+{% block page_title %}Resultado{% endblock %}
 {% block content %}
 <div class="page-heading">
   <div>
     <span class="eyebrow">Vendas</span>
-    <h1>Visão geral</h1>
+    <h1>Resultado</h1>
     <p>
       {% if overview.escopo == 'vendedor' %}
       Seus resultados no período. Números reais — nada estimado.
@@ -41,7 +42,7 @@
     <div class="metric">
       <span>Vendas confirmadas</span>
       <strong>{{ overview.qtd_vendas }}</strong>
-      <small>status confirmada no período</small>
+      <small>vendas fechadas no período</small>
     </div>
     <div class="metric">
       <span>Receita</span>
@@ -206,17 +207,12 @@
 </section>
 {% endif %}
 
-{# --- Pendências --- #}
+{# --- Pendências: só aparece quando há algo a fazer --- #}
+{% if overview.pendencias %}
 <section class="panel" aria-labelledby="bloco-pendencias">
   <div class="panel-heading">
     <div><span class="mono-label">Pendências</span><h2 id="bloco-pendencias">Ações do período</h2></div>
   </div>
-  {% if not overview.pendencias %}
-  <div class="empty">
-    <strong>Nada pendente nos dados atuais.</strong>
-    <p>Próximas ações persistentes entram em uma fase posterior.</p>
-  </div>
-  {% else %}
   <ul class="list-rows">
     {% for p in overview.pendencias %}
     <li>
@@ -225,13 +221,9 @@
     </li>
     {% endfor %}
   </ul>
-  {% endif %}
 </section>
-
-<p class="muted page-shortcuts">
-  Atalhos: <a href="/app/vendas">Vendas</a> ·
-  <a href="/app/leads">Leads</a> ·
-  {% if overview.escopo == 'vendedor' %}<a href="/app/vendedor">Meu painel</a>{% else %}<a href="/app/financeiro">Financeiro</a> · <a href="/app/funil">Funil</a>{% endif %}
-  · <a href="/app">Painel clássico</a>
-</p>
+{% endif %}
+{# Rodapé "Atalhos" removido: apontava para /app/vendas, /app/leads, /app/funil,
+   /app/financeiro e "Painel clássico" — exatamente as telas legadas que este
+   shell existe para substituir. #}
 {% endblock %}

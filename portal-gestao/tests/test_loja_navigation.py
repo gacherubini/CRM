@@ -27,11 +27,11 @@ def test_nav_somente_vendas_e_estoque_com_acessos_bancarios():
     labels = [i.label for i in items]
     # WhatsApp no menu depende da flag (default off nos unit tests sem flag).
     assert labels == [
-        "Visão geral",
+        "Resultado",
         "Atendimento",
         "Agente",
         "Simulações",
-        "Visão geral",
+        "Situação do estoque",
         "Veículos",
         "Ordem na vitrine",
         "Acessos bancários",
