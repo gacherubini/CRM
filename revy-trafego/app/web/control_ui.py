@@ -401,6 +401,44 @@ def dashboard_page(
     )
 
 
+@router.get("/app/control/integracoes", response_class=HTMLResponse)
+def integrations_page(
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """Ajustes › Integrações — espelho da mesma página na Revy Loja.
+
+    O status já existia dentro da ficha de cada loja, mas quem opera o dia a dia
+    não passa pela ficha. Aqui vale a loja selecionada no seletor lateral.
+    """
+    if not settings.revy_control_enabled:
+        return HTMLResponse("Página não encontrada.", status_code=404)
+    manager = gestor_atual(request, db)
+    if manager is None:
+        return RedirectResponse(_public_path("/login"), status_code=303)
+
+    actor = actor_from_user(manager)
+    user = sessao_gestor(request, db)
+    assert user is not None
+    stores = AccessControl(SessionLocal).scope(actor)
+    selecionada = next(
+        (item.store for item in stores if item.store.slug == user.loja_slug), None
+    )
+    return templates.TemplateResponse(
+        request=request,
+        name="control/integracoes.html",
+        context={
+            "usuario": user,
+            "csrf": csrf_token(request),
+            "lojas": _selector_stores(stores),
+            "control_enabled": settings.revy_control_enabled,
+            "control_rbac_enabled": settings.revy_control_rbac_enabled,
+            "control_dashboard_enabled": settings.revy_control_dashboard_enabled,
+            "loja_selecionada": selecionada,
+        },
+    )
+
+
 @router.get("/app/control/lojas", response_class=HTMLResponse)
 def list_stores_page(
     request: Request,

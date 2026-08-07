@@ -1,15 +1,16 @@
 ﻿{% extends "base.html" %}
-{% block title %}Tráfego — Revy{% endblock %}
+{% block title %}Medição — Revy Control{% endblock %}
+{% block page_title %}Medição{% endblock %}
 {% block content %}
 <div class="page-heading">
   <div>
     <span class="eyebrow">Meta Ads</span>
-    <h1>Tráfego</h1>
+    <h1>Medição</h1>
     <p>Pixel da Meta e Conversions API (CAPI) por loja. O token CAPI fica cifrado no servidor e nunca vai ao catálogo.</p>
   </div>
   <div class="heading-actions">
-    <a class="button secondary" href="{{ public_path('/app/trafego/pixel-auditoria') }}">Auditoria Pixel</a>
-    <a class="button secondary" href="{{ public_path('/app/trafego/ctwa-auditoria') }}">Auditoria CTWA</a>
+    <a class="button secondary" href="{{ public_path('/app/trafego/pixel-auditoria') }}">Conferir Pixel</a>
+    <a class="button secondary" href="{{ public_path('/app/trafego/ctwa-auditoria') }}">Cliques do WhatsApp</a>
     <a class="button secondary" href="{{ public_path('/app/campanhas') }}">Campanhas</a>
     <a class="button primary" href="{{ public_path('/app/trafego/roi') }}">ROI</a>
   </div>

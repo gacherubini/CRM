@@ -44,7 +44,10 @@
         <a id="nav-control-acessos" class="nav-link {{ 'active' if path == '/app/control/acessos' else '' }}" href="{{ public_path('/app/control/acessos') }}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="15" r="4"/><path d="m10.8 12.2 8.2-8.2M17 6l2 2M15 8l2 2"/></svg>Acessos</a>
         {% endif %}
         {% endif %}
-        <span class="nav-section">Loja</span>
+        {# "Loja" nomeava duas coisas: o seletor e um link "Todas as lojas" que
+           levava para uma tela que só repetia o seletor, enquanto a gestão de
+           lojas mora em Control › Lojas. Ficou só o seletor, com nome claro. #}
+        <span class="nav-section">Loja selecionada</span>
         <form method="post" action="{{ public_path('/app/loja') }}" class="loja-switch" style="margin:0 0 10px;padding:0 4px">
           <input type="hidden" name="csrf" value="{{ csrf }}">
           <input type="hidden" name="next" value="{{ path if path.startswith('/app') else '/app/trafego' }}">
@@ -62,7 +65,6 @@
             {% endif %}
           </select>
         </form>
-        <a class="nav-link {{ 'active' if path == '/app' else '' }}" href="{{ public_path('/app') }}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2 2 7l10 5 10-5-10-5Z"/><path d="m2 17 10 5 10-5M2 12l10 5 10-5"/></svg>Todas as lojas</a>
         {% if usuario.loja_slug %}
         <span class="nav-section">Mídia</span>
         <a class="nav-link {{ 'active' if path == '/app/trafego' else '' }}" href="{{ public_path('/app/trafego') }}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="4" y1="8" x2="20" y2="8"/><circle cx="9" cy="8" r="2"/><line x1="4" y1="16" x2="20" y2="16"/><circle cx="15" cy="16" r="2"/></svg>Medição</a>
@@ -72,6 +74,12 @@
         <a class="nav-link {{ 'active' if path.startswith('/app/trafego/pixel') else '' }}" href="{{ public_path('/app/trafego/pixel-auditoria') }}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/><path d="m9 12 2 2 4-4"/></svg>Conferir Pixel</a>
         <span class="nav-section">Diagnóstico</span>
         <a class="nav-link {{ 'active' if path.startswith('/app/diagnostico') else '' }}" href="{{ public_path('/app/diagnostico/leads') }}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0M16 3.5a3 3 0 0 1 0 5.5M22 20a6 6 0 0 0-5.5-5"/></svg>Leads</a>
+        {% endif %}
+        {% if control_enabled %}
+        {# Mesma entrada que existe em Ajustes na Revy Loja: lojista e dono da
+           operação são pessoas diferentes olhando o mesmo status. #}
+        <span class="nav-section">Ajustes</span>
+        <a id="nav-control-integracoes" class="nav-link {{ 'active' if path.startswith('/app/control/integracoes') else '' }}" href="{{ public_path('/app/control/integracoes') }}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4"/></svg>Integrações</a>
         {% endif %}
       </nav>
 

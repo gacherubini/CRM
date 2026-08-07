@@ -1,75 +1,29 @@
 {% extends "base.html" %}
-{% block title %}Lojas — Revy Control{% endblock %}
-{% block page_title %}Selecionar loja{% endblock %}
+{% block title %}Selecione uma loja — Revy Control{% endblock %}
+{% block page_title %}Selecione uma loja{% endblock %}
 {% block content %}
+{# Estado vazio, não formulário: o seletor de loja vive fixo na sidebar e esta
+   página existia só para repeti-lo. Chega-se aqui quando nenhuma loja está
+   escolhida e não há tela da rede para onde mandar. #}
 <div class="page-heading">
   <div>
     <span class="eyebrow">Revy Control</span>
-    <h1>Escolha a loja</h1>
-    <p>Selecione a loja no dropdown para operar Pixel, campanhas, ROI e diagnóstico.</p>
+    <h1>Selecione uma loja</h1>
+    <p>As telas de mídia e diagnóstico trabalham sempre sobre uma loja.</p>
   </div>
 </div>
 
-{% if erro == 'loja' %}<div class="alert error">Selecione uma loja válida.</div>{% endif %}
+{% if erro == 'loja' %}<div class="alert error">Selecione uma loja válida para continuar.</div>{% endif %}
 
-<section class="panel form-section">
-  <form method="post" action="{{ public_path('/app/loja') }}" class="form-layout" id="form-loja">
-    <input type="hidden" name="csrf" value="{{ csrf }}">
-    <label>Loja
-      <select name="{{ 'loja_id' if control_rbac_enabled else 'loja_slug' }}" id="loja-select" required>
-        <option value="">— selecione a loja —</option>
-        {% if control_rbac_enabled %}
-        {% for item in lojas %}
-        <option value="{{ item.store.id }}" {% if loja_selecionada == item.store.slug %}selected{% endif %}>{{ item.store.name }}</option>
-        {% endfor %}
-        {% else %}
-        {% for slug in lojas %}
-        <option value="{{ slug }}" {% if loja_selecionada == slug %}selected{% endif %}>{{ slug }}</option>
-        {% endfor %}
-        <option value="__manual__">Outra loja (digitar slug)…</option>
-        {% endif %}
-      </select>
-    </label>
-    {% if not control_rbac_enabled %}
-    <label id="loja-manual-wrap" style="display:none">Slug da loja
-      <input type="text" name="loja_slug_manual" id="loja-manual" placeholder="ex.: loja-centro" maxlength="120" autocomplete="off">
-    </label>
+<section class="panel">
+  <div class="empty">
+    {% if lojas %}
+    <strong>Escolha a loja no menu lateral.</strong>
+    <p class="muted">O seletor fica no topo da seção “Loja”, na barra à esquerda. Depois de escolher, Medição, Campanhas, ROI e Leads passam a responder por ela.</p>
+    {% else %}
+    <strong>Nenhuma loja disponível para você.</strong>
+    <p class="muted">Peça a um Admin Revy para vincular você a uma loja.</p>
     {% endif %}
-    <button class="button primary" type="submit">Abrir loja</button>
-  </form>
+  </div>
 </section>
-
-{% if loja_selecionada %}
-<p class="muted">Loja ativa: <strong>{{ loja_selecionada }}</strong> —
-  <a href="{{ public_path('/app/trafego') }}">Config</a> ·
-  <a href="{{ public_path('/app/campanhas') }}">Campanhas</a> ·
-  <a href="{{ public_path('/app/trafego/roi') }}">ROI</a> ·
-  <a href="{{ public_path('/app/diagnostico/leads') }}">Leads</a>
-</p>
-{% endif %}
-
-{% if not control_rbac_enabled %}<script>
-(() => {
-  const sel = document.getElementById('loja-select');
-  const wrap = document.getElementById('loja-manual-wrap');
-  const manual = document.getElementById('loja-manual');
-  const form = document.getElementById('form-loja');
-  const sync = () => {
-    const isManual = sel && sel.value === '__manual__';
-    if (wrap) wrap.style.display = isManual ? '' : 'none';
-    if (manual) manual.required = !!isManual;
-    if (sel) sel.required = !isManual;
-  };
-  sel && sel.addEventListener('change', sync);
-  sync();
-  form && form.addEventListener('submit', () => {
-    if (sel && sel.value === '__manual__' && manual) {
-      sel.name = '';
-      manual.name = 'loja_slug';
-    } else if (manual) {
-      manual.name = '';
-    }
-  });
-})();
-</script>{% endif %}
 {% endblock %}

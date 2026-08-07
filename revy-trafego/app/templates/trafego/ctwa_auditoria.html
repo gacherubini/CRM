@@ -1,16 +1,17 @@
 {% extends "base.html" %}
-{% block title %}Auditoria CTWA — Revy{% endblock %}
+{% block title %}Cliques do WhatsApp — Revy Control{% endblock %}
+{% block page_title %}Cliques do WhatsApp{% endblock %}
 {% block content %}
 <div class="page-heading">
   <div>
-    <a class="back-link" href="{{ public_path('/app/trafego') }}">← Tráfego</a>
+    <a class="back-link" href="{{ public_path('/app/trafego') }}">← Medição</a>
     <span class="eyebrow">Click-to-WhatsApp</span>
-    <h1>Auditoria CTWA</h1>
+    <h1>Cliques do WhatsApp</h1>
     <p>Sinais de campanha/ad que chegaram no webhook. Telefone e click id completos não são exibidos (LGPD).</p>
   </div>
   <div class="heading-actions">
     <a class="button secondary" href="{{ public_path('/app/campanhas') }}">Campanhas</a>
-    <a class="button primary" href="{{ public_path('/app/trafego') }}">Config tráfego</a>
+    <a class="button primary" href="{{ public_path('/app/trafego') }}">Medição</a>
   </div>
 </div>
 

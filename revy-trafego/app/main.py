@@ -400,30 +400,42 @@ async def logout(request: Request):
 
 @app.get("/app", response_class=HTMLResponse)
 def app_home(request: Request, db: Session = Depends(get_db)):
+    """Encaminha para a tela que importa.
+
+    Era a página "Escolha a loja": um formulário que duplicava o seletor fixo
+    na sidebar, mais atalhos que duplicavam o menu. Com o Control ligado, /app
+    só redireciona. O template ``home.html`` sobrou para o único caso em que
+    não há para onde mandar: Control desligado e nenhuma loja escolhida —
+    ``exigir_loja`` devolve todo mundo para cá, então esta rota não pode
+    redirecionar para uma página que exige loja (laço infinito).
+    """
     gestor = gestor_atual(request, db)
     if not gestor:
         return redirecionar_login()
     usuario = sessao_gestor(request, db)
     assert usuario is not None
+
+    if settings.revy_control_enabled:
+        destino = (
+            "/app/control/dashboard"
+            if settings.revy_control_dashboard_enabled
+            else "/app/control/lojas"
+        )
+        return redirect(destino, status_code=303)
+    if usuario.loja_slug:
+        return redirect("/app/trafego", status_code=303)
+
     lojas = (
         visible_stores(SessionLocal, gestor)
         if settings.revy_control_rbac_enabled
         else listar_loja_slugs(db)
     )
-    # Se só há uma loja e nenhuma selecionada, pré-seleciona no dropdown.
-    if settings.revy_control_rbac_enabled:
-        loja_sel = usuario.loja_slug or (
-            lojas[0].store.slug if len(lojas) == 1 else None
-        )
-    else:
-        loja_sel = usuario.loja_slug or (lojas[0] if len(lojas) == 1 else None)
     return templates.TemplateResponse(
         "home.html",
         contexto(
             request,
             usuario,
             lojas=lojas,
-            loja_selecionada=loja_sel,
             erro=request.query_params.get("erro"),
         ),
     )

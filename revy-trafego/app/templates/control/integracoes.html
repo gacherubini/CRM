@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}Integrações — Revy Control{% endblock %}
+{% block page_title %}Integrações{% endblock %}
+{% block content %}
+{# Espelha Ajustes › Integrações da Revy Loja: mesmo card, mesmo "Testar agora",
+   mesmo endpoint por trás. Lojista e dono da operação olham o mesmo status. #}
+<div class="page-heading">
+  <div>
+    <span class="eyebrow">Ajustes</span>
+    <h1>Integrações</h1>
+    <p>Status ao vivo das conexões de marketing e atendimento da loja selecionada.</p>
+  </div>
+</div>
+
+{% if loja_selecionada %}
+<section class="integ-card" id="integracoes-health"
+         data-loja-id="{{ loja_selecionada.id }}"
+         data-integ-endpoint="{{ public_path('/control/v1/lojas/' ~ loja_selecionada.id ~ '/integracoes/health') }}">
+  <div class="integ-card-head">
+    <div class="integ-card-title">{{ loja_selecionada.name }}</div>
+    <div class="integ-meta">
+      <span class="integ-checked" data-integ-checked></span>
+      <button type="button" class="integ-btn" data-integ-testar>Testar agora</button>
+    </div>
+  </div>
+  <div class="integ-corpo" data-integ-corpo>
+    <p class="integ-loading">Carregando…</p>
+  </div>
+</section>
+
+<p class="muted">
+  Para configurar Pixel e CAPI, abra
+  <a href="{{ public_path('/app/trafego') }}">Medição</a>.
+</p>
+{% else %}
+<section class="panel">
+  <div class="empty">
+    <strong>Escolha uma loja para ver as integrações.</strong>
+    <p class="muted">O seletor fica no topo da seção “Loja selecionada”, na barra à esquerda.</p>
+  </div>
+</section>
+{% endif %}
+
+<script src="{{ public_path('/static/js/integracoes_health.js') }}" defer></script>
+{% endblock %}

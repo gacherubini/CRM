@@ -98,7 +98,8 @@ def test_enfileirar_purchase_gera_auditoria(monkeypatch):
 def test_ui_pixel_auditoria_e_config_salva(client_com_loja):
     p = client_com_loja.get("/app/trafego")
     assert p.status_code == 200
-    assert "Auditoria Pixel" in p.text
+    # Rotulos casam com o menu: "Auditoria Pixel" virou "Conferir Pixel".
+    assert "Conferir Pixel" in p.text
     csrf = csrf_da_resposta(p)
     r = client_com_loja.post(
         "/app/trafego",
@@ -116,7 +117,7 @@ def test_ui_pixel_auditoria_e_config_salva(client_com_loja):
 
     page = client_com_loja.get("/app/trafego/pixel-auditoria")
     assert page.status_code == 200
-    assert "Auditoria Pixel" in page.text
+    assert "Conferir Pixel" in page.text
     assert "config_salva" in page.text
 
     db = SessionLocal()
