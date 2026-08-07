@@ -76,3 +76,48 @@ def test_network_overview_degrada_leads_quando_none():
     assert overview.leads_rede is None
     assert overview.por_loja[0].leads is None
     assert overview.por_loja[0].conversao is None
+
+
+def test_network_overview_exclui_vendas_canceladas():
+    """Vendas com status='cancelada' não devem contar, mesmo com confirmada_em no mês."""
+    agora = datetime.now(timezone.utc)
+    with SessionLocal() as db:
+        loja = Loja(nome="Loja", slug="loja", status="ativa")
+        db.add(loja)
+        db.flush()
+        # Venda confirmada (deve contar)
+        db.add(
+            VendaProjetada(
+                id="v-confirm",
+                loja_slug="loja",
+                loja_id=loja.id,
+                preco_venda=Decimal("10000.00"),
+                status="confirmada",
+                criada_em=agora,
+                confirmada_em=agora,
+                atualizada_em=agora,
+            )
+        )
+        # Venda cancelada (não deve contar, mesmo com confirmada_em no mês)
+        db.add(
+            VendaProjetada(
+                id="v-cancelada",
+                loja_slug="loja",
+                loja_id=loja.id,
+                preco_venda=Decimal("20000.00"),
+                status="cancelada",
+                criada_em=agora,
+                confirmada_em=agora,
+                atualizada_em=agora,
+            )
+        )
+        db.commit()
+
+    overview = DashboardControl(SessionLocal).network_overview(
+        _admin_actor(), leads_port=_FakeLeads({})
+    )
+
+    # Apenas a venda confirmada deve contar
+    assert overview.vendas_mes == 1
+    assert overview.ticket_medio == Decimal("10000.00")
+    assert overview.por_loja[0].vendas == 1

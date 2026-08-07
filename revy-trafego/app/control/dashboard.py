@@ -273,6 +273,7 @@ class DashboardControl:
                     db.query(VendaProjetada.loja_id, func.count(VendaProjetada.id))
                     .filter(
                         VendaProjetada.loja_id.in_(ativa_ids),
+                        VendaProjetada.status == "confirmada",
                         VendaProjetada.confirmada_em >= inicio_mes,
                         VendaProjetada.confirmada_em < fim_mes,
                     )
@@ -287,6 +288,7 @@ class DashboardControl:
                     )
                     .filter(
                         VendaProjetada.loja_id.in_(ativa_ids),
+                        VendaProjetada.status == "confirmada",
                         VendaProjetada.confirmada_em >= inicio_mes,
                         VendaProjetada.confirmada_em < fim_mes,
                     )
@@ -302,6 +304,7 @@ class DashboardControl:
                     db.query(func.count(VendaProjetada.id))
                     .filter(
                         VendaProjetada.loja_id.in_(ativa_ids),
+                        VendaProjetada.status == "confirmada",
                         VendaProjetada.confirmada_em >= inicio_mes_ant,
                         VendaProjetada.confirmada_em < inicio_mes,
                     )
