@@ -2511,3 +2511,25 @@ tr:hover td { background: var(--surface-soft); }
 }
 .thread-empty strong { display: block; margin-bottom: var(--space-2); color: var(--ink); }
 .thread-empty p { margin: 0 auto; max-width: 42ch; }
+
+/* ===========================================================================
+   Visao geral do Control — /app/control/dashboard
+   =========================================================================== */
+/* Cinco KPIs (o "Melhor loja" subiu do painel Destaques). auto-fit em vez de
+   repeat(5) porque um dos cards carrega nome de loja, que varia de largura. */
+#dashboard-kpis {
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+}
+#dashboard-kpis .funil-summary-card > strong {
+  font-size: var(--text-metric, 26px);
+  overflow-wrap: anywhere;
+}
+
+#dashboard-periodo { margin: var(--space-2) 0 0; }
+
+/* Prontidao: bloqueio (impede ativar) le diferente de alerta. Antes tudo saia
+   com o mesmo chip ambar e nao dava para saber o que travava a ativacao. */
+.status.erro {
+  background: color-mix(in srgb, var(--red) 10%, var(--paper));
+  color: var(--red);
+}

@@ -89,6 +89,8 @@ from app.control.types import (
     TrafficRole,
     TransitionStore,
 )
+from app import rotulos
+from app.control.readiness import REQUIRED_CODES as READINESS_REQUIRED_CODES
 from app.control.readiness import build_readiness_report
 from app.db import SessionLocal, get_db
 from app.models import GoogleAdsOAuthState, Loja
@@ -110,6 +112,7 @@ def _public_path(path: str) -> str:
 
 
 templates.env.globals["public_path"] = _public_path
+rotulos.registrar_globals(templates.env)
 
 @router.get("/app/control/convite/aceitar", response_class=HTMLResponse)
 def accept_invite_page(
@@ -332,9 +335,21 @@ def _google_conversions_surface_enabled() -> bool:
     )
 
 
+def _data_query(valor: str | None) -> date | None:
+    """Data ISO vinda do filtro de período; entrada inválida vira None (janela padrão)."""
+    if not valor:
+        return None
+    try:
+        return date.fromisoformat(valor.strip())
+    except ValueError:
+        return None
+
+
 @router.get("/app/control/dashboard", response_class=HTMLResponse)
 def dashboard_page(
     request: Request,
+    inicio: str | None = None,
+    fim: str | None = None,
     db: Session = Depends(get_db),
 ):
     if not _dashboard_surface_enabled():
@@ -355,33 +370,31 @@ def dashboard_page(
         item.store_id: item for item in overview.integrations
     }
     network = dashboard.network_overview(
-        actor, leads_port=_ChatbotLeadsPort()
+        actor,
+        leads_port=_ChatbotLeadsPort(),
+        desde=_data_query(inicio),
+        ate=_data_query(fim),
     )
     network_ticket_brl = (
         _format_brl(network.ticket_medio)
         if network.ticket_medio is not None
         else None
     )
-    google_by_store = None
-    if settings.google_ads_sync_enabled:
-        from app.web.control import _dashboard_google_by_store
-
-        google_by_store = _dashboard_google_by_store(overview)
     return templates.TemplateResponse(
         request=request,
         name="control/dashboard.html",
         context={
+            # Prontidão: separa o que impede ativar do que é só alerta.
+            "readiness_required_codes": sorted(READINESS_REQUIRED_CODES),
             "usuario": user,
             "csrf": csrf_token(request),
             "lojas": nav_stores,
             "control_enabled": settings.revy_control_enabled,
             "control_rbac_enabled": settings.revy_control_rbac_enabled,
             "control_dashboard_enabled": True,
-            "google_ads_sync_enabled": settings.google_ads_sync_enabled,
             "items": items,
             "overview": overview,
             "integration_by_store": integration_by_store,
-            "google_by_store": google_by_store,
             "network": network,
             "network_ticket_brl": network_ticket_brl,
         },

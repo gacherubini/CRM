@@ -316,21 +316,25 @@ def test_dashboard_html_lista_prontidao_no_escopo(client, monkeypatch):
 
     assert admin_page.status_code == 200
     assert "Revy Control" in admin_page.text
-    assert 'id="tabela-dashboard-prontidao"' in admin_page.text
-    assert 'id="dashboard-counts"' in admin_page.text
-    assert "Ativas" in admin_page.text
-    assert "Configurando" in admin_page.text
-    assert "Suspensas" in admin_page.text
-    assert "Com erro" in admin_page.text
-    assert "Gestor responsável" in admin_page.text
-    assert "Módulos" in admin_page.text
+    # A tabela de cadastro e a faixa de contagens saíram: duplicavam a tela
+    # Lojas, que é item de menu próprio. O escopo por gestor passou a ser
+    # verificado pela tabela de pendências de prontidão, que ficou.
+    assert 'id="tabela-dashboard-prontidao"' not in admin_page.text
+    assert 'id="dashboard-counts"' not in admin_page.text
+    assert 'id="dashboard-destaques"' not in admin_page.text
+    assert "Alterações recentes" not in admin_page.text
+    assert 'id="dashboard-pendencias"' in admin_page.text
+    assert 'id="tabela-dashboard-pendencias"' in admin_page.text
     assert "Loja Dashboard Permitida" in admin_page.text
     assert "Loja Dashboard Alheia" in admin_page.text
-    assert "Gestor Dashboard" in admin_page.text
     assert f'data-store-id="{allowed_id}"' in admin_page.text
     assert f'data-store-id="{other_id}"' in admin_page.text
     assert 'id="nav-control-dashboard"' in admin_page.text
-    assert 'id="dashboard-pendencias"' in admin_page.text
+    # Prontidão distingue bloqueio de alerta em vez de um chip só.
+    assert "Bloqueio ·" in admin_page.text
+    # Período declarado na tela (a venda é contada por confirmada_em).
+    assert 'id="dashboard-periodo"' in admin_page.text
+    assert "vendas contadas pela data de confirmação" in admin_page.text
 
     client.cookies.clear()
     _login(client, "gestor.dashboard@revy.local", "senha-gestor-dashboard")
@@ -339,6 +343,31 @@ def test_dashboard_html_lista_prontidao_no_escopo(client, monkeypatch):
     assert gestor_page.status_code == 200
     assert "Loja Dashboard Permitida" in gestor_page.text
     assert "Loja Dashboard Alheia" not in gestor_page.text
+
+
+def test_dashboard_html_aceita_filtro_de_periodo(client, monkeypatch):
+    _seed_scoped_stores()
+    _enable_control(monkeypatch, dashboard=True)
+    _login(client, "trafego@revy.local", "secret-teste")
+
+    pagina = client.get("/app/control/dashboard?inicio=2026-01-01&fim=2026-01-31")
+
+    assert pagina.status_code == 200
+    assert "Período de 01/01/2026 a 31/01/2026" in pagina.text
+    assert 'name="inicio" value="2026-01-01"' in pagina.text
+    assert 'name="fim" value="2026-01-31"' in pagina.text
+
+
+def test_dashboard_html_ignora_periodo_invalido(client, monkeypatch):
+    """Data quebrada na query não pode derrubar a página — cai na janela padrão."""
+    _seed_scoped_stores()
+    _enable_control(monkeypatch, dashboard=True)
+    _login(client, "trafego@revy.local", "secret-teste")
+
+    pagina = client.get("/app/control/dashboard?inicio=31-01-2026&fim=abacaxi")
+
+    assert pagina.status_code == 200
+    assert 'id="dashboard-periodo"' in pagina.text
 
 
 def test_dashboard_overview_modulos_gestor_e_auditoria_escopada():

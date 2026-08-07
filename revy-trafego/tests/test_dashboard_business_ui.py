@@ -56,10 +56,15 @@ def test_dashboard_mostra_kpis_de_negocio(client, monkeypatch):
     r = client.get("/app/control/dashboard")
 
     assert r.status_code == 200
-    assert "Vendas no mês" in r.text
+    # "Vendas no mês" virou "Vendas confirmadas": a janela agora é um período
+    # escolhido pelo usuário, não necessariamente o mês.
+    assert "Vendas confirmadas" in r.text
     assert "Leads na rede" in r.text
+    assert "Melhor loja" in r.text  # veio do painel Destaques, que saiu
     assert "Desempenho por loja" in r.text
     assert "Loja Viva" in r.text
+    # A linha da loja precisa abrir a ficha — era a única tabela sem saída.
+    assert 'href="/app/control/lojas/' in r.text
 
 
 def test_dashboard_leads_indisponivel_nao_inventa_zero(client, monkeypatch):

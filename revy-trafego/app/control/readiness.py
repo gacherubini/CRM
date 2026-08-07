@@ -48,6 +48,10 @@ _REQUIRED_CODES = frozenset(
     }
 )
 
+# Alias público: a UI precisa distinguir bloqueio de alerta nos chips de
+# prontidão — antes tudo saía com o mesmo "status warn".
+REQUIRED_CODES = _REQUIRED_CODES
+
 
 @dataclass(frozen=True)
 class ReadinessCheck:

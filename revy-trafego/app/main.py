@@ -17,7 +17,7 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 from starlette.middleware.sessions import SessionMiddleware
 
-from app import meta_ads_spend_job, meta_capi_job
+from app import meta_ads_spend_job, meta_capi_job, rotulos
 from app.audit import registrar_audit
 from app.auth import (
     autenticar,
@@ -254,6 +254,7 @@ templates.env.globals["mascarar_telefone"] = mascarar_telefone
 templates.env.globals["formatar_horario"] = formatar_horario
 templates.env.globals["dia_conversa"] = dia_conversa
 templates.env.globals["hora_conversa"] = hora_conversa
+rotulos.registrar_globals(templates.env)
 templates.env.globals["formatar_brl"] = formatar_brl
 templates.env.globals["url_prefix"] = settings.url_prefix
 templates.env.globals["public_path"] = public_path

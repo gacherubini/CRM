@@ -15,36 +15,58 @@
 <div class="page-heading">
   <div>
     <span class="eyebrow">Revy Control</span>
-    <h1>Prontidão das lojas</h1>
-    <p>Resumo de status, alertas e saúde de integrações no seu escopo.</p>
+    <h1>Visão geral</h1>
+    <p>Como a rede foi no período e quais lojas ainda não estão prontas para operar.</p>
   </div>
 </div>
 
+{# Mesmo filtro da visão geral da Revy Loja (mesmos campos, mesmo botão): o
+   dono da operação não deveria ter menos poder sobre o período que o lojista. #}
+<form class="filter-bar" method="get">
+  <label class="search"><span class="sr-only">Início do período</span>
+    <input type="date" name="inicio" value="{{ network.periodo_inicio.isoformat() if network and network.periodo_inicio else '' }}">
+  </label>
+  <label class="search"><span class="sr-only">Fim do período</span>
+    <input type="date" name="fim" value="{{ network.periodo_fim.isoformat() if network and network.periodo_fim else '' }}">
+  </label>
+  <button class="button secondary" type="submit">Aplicar período</button>
+</form>
+
 {% if network %}
-<section class="funil-summary" aria-label="Indicadores da rede">
+<p class="mono-label" id="dashboard-periodo">
+  Período de {{ network.periodo_inicio.strftime('%d/%m/%Y') }} a {{ network.periodo_fim.strftime('%d/%m/%Y') }} ·
+  vendas contadas pela data de confirmação
+</p>
+
+<section class="funil-summary" id="dashboard-kpis" aria-label="Indicadores da rede">
   <div class="funil-summary-card highlight">
     <span>Lojas ativas</span>
     <strong>{{ network.lojas_ativas }}</strong>
     <small>de {{ network.lojas_total }}</small>
   </div>
   <div class="funil-summary-card">
-    <span>Vendas no mês</span>
+    <span>Vendas confirmadas</span>
     <strong>{{ network.vendas_mes }}</strong>
     <small>
       {% if network.vendas_delta_pct is not none %}
-        {{ '▲' if network.vendas_delta_pct >= 0 else '▼' }} {{ network.vendas_delta_pct }}%
-      {% else %}—{% endif %}
+        {{ '▲' if network.vendas_delta_pct >= 0 else '▼' }} {{ network.vendas_delta_pct }}% vs. período anterior
+      {% else %}sem período anterior para comparar{% endif %}
     </small>
   </div>
   <div class="funil-summary-card">
     <span>Ticket médio</span>
     <strong>{{ network_ticket_brl or '—' }}</strong>
-    <small>no mês</small>
+    <small>no período</small>
   </div>
   <div class="funil-summary-card">
     <span>Leads na rede</span>
     <strong>{% if network.leads_rede is not none %}{{ network.leads_rede }}{% else %}<span class="muted">indisponível</span>{% endif %}</strong>
     <small>lojas ativas</small>
+  </div>
+  <div class="funil-summary-card">
+    <span>Melhor loja</span>
+    <strong>{{ network.destaques.melhor_loja_nome or '—' }}</strong>
+    <small>{{ network.destaques.melhor_loja_vendas }} venda{{ '' if network.destaques.melhor_loja_vendas == 1 else 's' }}</small>
   </div>
 </section>
 
@@ -55,14 +77,20 @@
   </div>
   {% if network.por_loja %}
   <div class="table-wrap">
-    <table>
+    <table id="tabela-dashboard-desempenho">
       <thead>
         <tr><th>Loja</th><th>Vendas</th><th>Leads</th><th>Conversão</th></tr>
       </thead>
       <tbody>
         {% for p in network.por_loja %}
-        <tr>
-          <td>{{ p.name }}</td>
+        <tr data-store-id="{{ p.store_id }}">
+          <td>
+            {% if control_enabled %}
+            <a class="table-action" href="{{ public_path('/app/control/lojas/' + p.store_id) }}">{{ p.name }}</a>
+            {% else %}
+            {{ p.name }}
+            {% endif %}
+          </td>
           <td>{{ p.vendas }}</td>
           <td>{% if p.leads is not none %}{{ p.leads }}{% else %}<span class="muted">indisponível</span>{% endif %}</td>
           <td>{% if p.conversao is not none %}{{ (p.conversao * 100) | round(1) }}%{% else %}—{% endif %}</td>
@@ -75,51 +103,13 @@
   <p class="muted">Nenhuma loja ativa no seu escopo.</p>
   {% endif %}
 </section>
-
-<section class="panel" id="dashboard-destaques">
-  <div class="panel-heading"><h2>Destaques</h2></div>
-  <div class="funil-summary">
-    <div class="funil-summary-card">
-      <span>Melhor loja</span>
-      <strong>{{ network.destaques.melhor_loja_nome or '—' }}</strong>
-      <small>{{ network.destaques.melhor_loja_vendas }} vendas</small>
-    </div>
-    <div class="funil-summary-card">
-      <span>Ticket médio da rede</span>
-      <strong>{{ network_ticket_brl or '—' }}</strong>
-      <small>no mês</small>
-    </div>
-  </div>
-</section>
 {% endif %}
-
-<section class="funil-summary" id="dashboard-counts" aria-label="Contagens por status">
-  <div class="funil-summary-card{% if overview and overview.counts.ativas %} highlight{% endif %}">
-    <span>Ativas</span>
-    <strong>{{ overview.counts.ativas if overview else 0 }}</strong>
-    <small>em operação</small>
-  </div>
-  <div class="funil-summary-card">
-    <span>Configurando</span>
-    <strong>{{ overview.counts.em_configuracao if overview else 0 }}</strong>
-    <small>em configuração</small>
-  </div>
-  <div class="funil-summary-card">
-    <span>Suspensas</span>
-    <strong>{{ overview.counts.suspensas if overview else 0 }}</strong>
-    <small>pausadas</small>
-  </div>
-  <div class="funil-summary-card">
-    <span>Com erro</span>
-    <strong>{{ overview.counts.erro if overview else 0 }}</strong>
-    <small>ativas sem prontidão</small>
-  </div>
-</section>
 
 {% if overview and overview.pending_readiness %}
 <section class="panel" id="dashboard-pendencias">
   <div class="panel-heading">
     <h2>Lojas com pendência de prontidão</h2>
+    <p class="muted">Bloqueio impede ativar a loja; alerta não impede, mas fica registrado.</p>
   </div>
   <div class="table-wrap">
     <table id="tabela-dashboard-pendencias">
@@ -140,11 +130,15 @@
             {{ item.name }}
             {% endif %}
           </td>
-          <td><span class="status {{ item.status.value }}">{{ item.status.value | replace('_', ' ') }}</span></td>
+          <td><span class="status {{ item.status.value }}">{{ rotulo_status.get(item.status.value, item.status.value | replace('_', ' ')) }}</span></td>
           <td class="wrap">
             <span class="chip-list">
               {% for code in item.failing_codes %}
-              <span class="status warn">{{ rotulo_check.get(code, code | replace('_', ' ')) }}</span>
+              {% set bloqueia = code in readiness_required_codes %}
+              <span class="status {{ 'erro' if bloqueia else 'warn' }}"
+                    title="{{ 'Impede ativar a loja' if bloqueia else 'Alerta — não impede ativar' }}">
+                {{ 'Bloqueio' if bloqueia else 'Alerta' }} · {{ rotulo_check.get(code, code | replace('_', ' ')) }}
+              </span>
               {% endfor %}
             </span>
           </td>
@@ -156,139 +150,14 @@
 </section>
 {% endif %}
 
-<section class="panel">
-  <div class="panel-heading">
-    <h2>Lojas</h2>
-  </div>
-  {% if items %}
-  <div class="table-wrap">
-    <table id="tabela-dashboard-prontidao">
-      <thead>
-        <tr>
-          <th>Nome</th>
-          <th>Status</th>
-          <th>Pronta</th>
-          <th>Gestor responsável</th>
-          <th>Módulos</th>
-          <th>Integrações</th>
-          <th>Falhas</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for item in items %}
-        {% set health = integration_by_store.get(item.store_id) if integration_by_store else none %}
-        <tr data-store-id="{{ item.store_id }}">
-          <td>
-            {% if control_enabled %}
-            <a class="table-action" href="{{ public_path('/app/control/lojas/' + item.store_id) }}">{{ item.name }}</a>
-            {% else %}
-            {{ item.name }}
-            {% endif %}
-          </td>
-          <td><span class="status {{ item.status.value }}">{{ item.status.value | replace('_', ' ') }}</span></td>
-          <td>{% if item.ready %}<span class="status novo">sim</span>{% else %}<span class="status">não</span>{% endif %}</td>
-          <td>
-            {% if item.gestor_responsavel %}
-            <div class="cell-stack">
-              <span>{{ item.gestor_responsavel.name }}</span>
-              <small>{{ item.gestor_responsavel.email }}</small>
-            </div>
-            {% else %}
-            —
-            {% endif %}
-          </td>
-          <td>
-            {% if item.modulos %}
-            <span class="chip-list">
-              {% for m in item.modulos %}
-              <span class="status {{ m.status }}">{{ m.code | capitalize }}</span>
-              {% endfor %}
-            </span>
-            {% else %}
-            —
-            {% endif %}
-          </td>
-          <td>
-            <span class="chip-list">
-              {% if health and health.pixel_connected %}<span class="status ativa">Pixel</span>{% endif %}
-              {% if health and health.google_status %}<span class="status">Google: {{ health.google_status }}</span>{% endif %}
-              {% if not (health and (health.pixel_connected or health.google_status)) %}<span class="muted">—</span>{% endif %}
-            </span>
-          </td>
-          <td>
-            {% if item.integration_failures %}
-            <code>{{ item.integration_failures | join(', ') }}</code>
-            {% else %}
-            —
-            {% endif %}
-          </td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
-  {% else %}
-  <p class="muted" id="dashboard-vazio">Nenhuma loja no seu escopo.</p>
-  {% endif %}
-</section>
-
-{% if google_ads_sync_enabled %}
-<section class="panel" id="dashboard-aquisicao-google" aria-label="Aquisição Google Ads">
-  <div class="panel-heading">
-    <h2>Aquisição Google (7 dias)</h2>
-    <p class="muted">Investimento e conversões da conta Google Ads conectada. ROAS usa valor de conversão Google, não vendas Revy.</p>
-  </div>
-  {% if google_by_store %}
-  <div class="table-wrap">
-    <table id="tabela-dashboard-google">
-      <thead>
-        <tr>
-          <th>Loja</th>
-          <th>Status</th>
-          <th>Custo</th>
-          <th>Cliques</th>
-          <th>CTR</th>
-          <th>CPC</th>
-          <th>Conversões</th>
-          <th>ROAS</th>
-          <th>CPL</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for row in google_by_store %}
-        <tr data-store-id="{{ row.loja_id }}" class="dashboard-google-row">
-          <td>
-            {% if control_enabled %}
-            <a class="table-action" href="{{ public_path('/app/control/lojas/' + row.loja_id) }}">{{ row.name }}</a>
-            {% else %}
-            {{ row.name }}
-            {% endif %}
-          </td>
-          {% if row.google_disponivel and row.google %}
-          <td>conectado</td>
-          <td>{{ row.google.cost }}{% if row.google.currency_code %} {{ row.google.currency_code }}{% endif %}</td>
-          <td>{{ row.google.clicks }}</td>
-          <td>{% if row.google.ctr is not none %}{{ row.google.ctr }}{% else %}—{% endif %}</td>
-          <td>{% if row.google.cpc is not none %}{{ row.google.cpc }}{% else %}—{% endif %}</td>
-          <td>{{ row.google.conversions }}</td>
-          <td>{% if row.google.roas is not none %}{{ row.google.roas }}x{% else %}—{% endif %}</td>
-          <td>{% if row.google.cpl is not none %}{{ row.google.cpl }}{% else %}—{% endif %}</td>
-          {% else %}
-          <td colspan="8" class="muted">Google indisponível</td>
-          {% endif %}
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
-  {% else %}
-  <p class="muted" id="dashboard-google-vazio">Google indisponível — nenhuma loja no escopo ou sync desligado.</p>
-  {% endif %}
-</section>
-{% endif %}
-
-{# "Alterações recentes" saiu da visão geral: era log de auditoria cru (action e
-   resource_id internos) numa tela de negócio. O overview continua expondo
-   recent_audit na API/domínio (escopo por loja é testado); só não ocupa mais
-   espaço aqui. #}
+{# Fora daqui de propósito:
+   - "Lojas" (tabela de cadastro com 7 colunas) e a coluna "Falhas" com código
+     interno: já existem em Control › Lojas, que é item de menu próprio.
+   - "Contagens por status": "Ativas" já está no card do topo e o resto sai da
+     coluna Status da tela Lojas.
+   - "Destaques": o ticket médio repetia o card do topo; "Melhor loja" subiu
+     para a faixa de KPIs.
+   - "Aquisição Google (7 dias)": 9 colunas de mídia numa tela de negócio da
+     rede; o lugar dela é a ficha da loja.
+   - "Alterações recentes": log de auditoria cru. #}
 {% endblock %}

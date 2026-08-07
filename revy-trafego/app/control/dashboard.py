@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import datetime, timezone, timedelta
+from datetime import date, datetime, timezone, timedelta
 from decimal import Decimal
 from typing import Any, Protocol
 
@@ -73,6 +73,12 @@ class NetworkOverview:
     leads_rede: int | None
     por_loja: tuple[StorePerformance, ...]
     destaques: NetworkHighlights
+    # Janela efetiva (datas inclusivas). A tela precisa declarar de quando ate
+    # quando os numeros valem: o Control conta por confirmada_em e o financeiro
+    # do Portal conta por criada_em — sem isso o dono compara numeros que
+    # discordam sem saber por que.
+    periodo_inicio: date | None = None
+    periodo_fim: date | None = None
 
 
 @dataclass(frozen=True)
@@ -246,22 +252,41 @@ class DashboardControl:
         return self.overview(actor)
 
     def network_overview(
-        self, actor: Actor, *, leads_port: _LeadsCountPort | None = None
+        self,
+        actor: Actor,
+        *,
+        leads_port: _LeadsCountPort | None = None,
+        desde: date | None = None,
+        ate: date | None = None,
     ) -> NetworkOverview:
         """KPIs de negócio no escopo do ator. Vendas/ticket de vendas_projetadas;
-        leads do Chatbot (port injetado). Só lojas ativas entram em por_loja."""
+        leads do Chatbot (port injetado). Só lojas ativas entram em por_loja.
+
+        ``desde``/``ate`` são datas inclusivas; sem elas a janela é do dia 1 do
+        mês até hoje. O comparativo é sempre a janela imediatamente anterior de
+        mesmo tamanho — mês corrente inteiro contra mês anterior inteiro fazia
+        o delta do dia 1 parecer despencar todo mês.
+        """
         stores = self._stores.list(actor)
         ativas = [s for s in stores if s.status is StoreStatus.ACTIVE]
         ativa_ids = [s.id for s in ativas]
 
-        agora = datetime.now(timezone.utc)
-        inicio_mes = datetime(agora.year, agora.month, 1, tzinfo=timezone.utc)
-        fim_mes = (
-            datetime(agora.year + 1, 1, 1, tzinfo=timezone.utc)
-            if agora.month == 12
-            else datetime(agora.year, agora.month + 1, 1, tzinfo=timezone.utc)
-        )
-        inicio_mes_ant = (inicio_mes - timedelta(days=1)).replace(day=1)
+        hoje = datetime.now(timezone.utc).date()
+        if desde is None and ate is None:
+            desde, ate = hoje.replace(day=1), hoje
+        elif desde is None:
+            desde = ate.replace(day=1)
+        elif ate is None:
+            ate = hoje
+        if ate < desde:
+            desde, ate = ate, desde
+
+        inicio_mes = datetime(desde.year, desde.month, desde.day, tzinfo=timezone.utc)
+        fim_mes = datetime(
+            ate.year, ate.month, ate.day, tzinfo=timezone.utc
+        ) + timedelta(days=1)
+        dias_janela = (ate - desde).days + 1
+        inicio_mes_ant = inicio_mes - timedelta(days=dias_janela)
 
         vendas_por_loja: dict[str, int] = {}
         vendas_mes = 0
@@ -355,6 +380,8 @@ class DashboardControl:
             leads_rede=leads_rede,
             por_loja=tuple(por_loja),
             destaques=destaques,
+            periodo_inicio=desde,
+            periodo_fim=ate,
         )
 
     def _load_responsaveis(

@@ -63,6 +63,67 @@ def test_network_overview_conta_vendas_ticket_e_leads():
     assert round(perf.conversao, 3) == 0.25  # 2/8
 
 
+def test_network_overview_respeita_janela_explicita():
+    """Janela declarada filtra as vendas e volta nos campos de período."""
+    from datetime import date
+
+    with SessionLocal() as db:
+        loja = Loja(nome="Viva", slug="viva", status="ativa")
+        db.add(loja)
+        db.flush()
+        db.add(
+            _venda(
+                loja.id, "viva", "10000.00",
+                datetime(2026, 1, 15, 12, 0, tzinfo=timezone.utc),
+            )
+        )
+        db.add(
+            _venda(
+                loja.id, "viva", "20000.00",
+                datetime(2026, 3, 15, 12, 0, tzinfo=timezone.utc),
+            )
+        )
+        db.commit()
+
+    overview = DashboardControl(SessionLocal).network_overview(
+        _admin_actor(),
+        leads_port=_FakeLeads({}),
+        desde=date(2026, 1, 1),
+        ate=date(2026, 1, 31),
+    )
+
+    assert overview.vendas_mes == 1  # só a venda de janeiro
+    assert overview.ticket_medio == Decimal("10000.00")
+    assert overview.periodo_inicio == date(2026, 1, 1)
+    assert overview.periodo_fim == date(2026, 1, 31)
+
+
+def test_network_overview_inclui_venda_do_ultimo_dia_da_janela():
+    """Janela é inclusiva no fim: venda de hoje não pode cair fora."""
+    from datetime import date
+
+    with SessionLocal() as db:
+        loja = Loja(nome="Viva", slug="viva", status="ativa")
+        db.add(loja)
+        db.flush()
+        db.add(
+            _venda(
+                loja.id, "viva", "10000.00",
+                datetime(2026, 2, 10, 23, 30, tzinfo=timezone.utc),
+            )
+        )
+        db.commit()
+
+    overview = DashboardControl(SessionLocal).network_overview(
+        _admin_actor(),
+        leads_port=_FakeLeads({}),
+        desde=date(2026, 2, 1),
+        ate=date(2026, 2, 10),
+    )
+
+    assert overview.vendas_mes == 1
+
+
 def test_network_overview_degrada_leads_quando_none():
     with SessionLocal() as db:
         viva = Loja(nome="Viva", slug="viva", status="ativa")
