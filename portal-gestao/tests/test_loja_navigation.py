@@ -134,6 +134,22 @@ def test_shell_on_exibe_brand_e_nav_modulos(client, monkeypatch):
     assert 'href="/app/equipe"' not in r.text
 
 
+def test_shell_nav_todos_os_itens_tem_icone(client, monkeypatch):
+    """Item novo em navigation.py sem entrada em loja_icons vira link sem ícone."""
+    import re
+
+    monkeypatch.setenv("REVY_LOJA_SHELL_ENABLED", "1")
+    monkeypatch.setenv("REVY_LOJA_ENTITLEMENTS_ENABLED", "0")
+    login(client)
+    r = client.get("/app")
+    assert r.status_code == 200
+    links = re.findall(r'<a class="nav-link[^"]*" href="([^"]+)"[^>]*>(.{0,10})', r.text)
+    assert links, "shell não renderizou nenhum item de navegação"
+    assert "/app/loja/agente" in {href for href, _ in links}
+    sem_icone = [href for href, inicio in links if not inicio.startswith("<svg")]
+    assert sem_icone == []
+
+
 def test_shell_on_estoque_veiculos_redireciona_legado(client, monkeypatch):
     monkeypatch.setenv("REVY_LOJA_SHELL_ENABLED", "1")
     monkeypatch.setenv("REVY_LOJA_ENTITLEMENTS_ENABLED", "0")

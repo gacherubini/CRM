@@ -1,56 +1,105 @@
 {% extends "base.html" %}
 {% block title %}Agente de atendimento — Revy Loja{% endblock %}
+{# Sem este bloco a topbar cai no else do base.html e escreve "Ajustes". #}
+{% block page_title %}Agente{% endblock %}
 {% block content %}
+{# Estilos: .agente-* / .split-bar / .day-chart em app.css #}
 <div class="page-heading">
   <div>
-    <span class="eyebrow">Atendimento</span>
+    <span class="eyebrow">Vendas</span>
     <h1>Agente de atendimento</h1>
-    <p>Desempenho do bot automático no mês corrente.</p>
+    <p>Quanto o agente atendeu sozinho e quanto passou para uma pessoa, no mês corrente.</p>
   </div>
 </div>
 
-{% if erro_resumo == 'indisponivel' or resumo is none %}
+{% if erro_resumo == 'indisponivel' or visao is none %}
 <section class="panel">
-  <p class="muted">Agente indisponível no momento. Tente novamente em instantes.</p>
+  <div class="panel-empty">
+    <strong>O agente está indisponível agora.</strong>
+    <p class="muted">Os números voltam assim que a conexão com o atendimento se restabelecer. Tente de novo em instantes.</p>
+  </div>
+</section>
+{% elif visao.atendimentos == 0 %}
+<section class="panel">
+  <div class="panel-empty">
+    <strong>Nenhum atendimento neste mês.</strong>
+    <p class="muted">Quando alguém chamar no WhatsApp, o agente responde e o desempenho aparece aqui.</p>
+  </div>
 </section>
 {% else %}
-<section class="funil-summary" aria-label="Indicadores do agente">
-  <div class="funil-summary-card highlight">
-    <span>Atendimentos</span>
-    <strong>{{ resumo.atendimentos }}</strong>
-    <small>no mês</small>
+<section class="panel agente-hero" aria-labelledby="agente-hero-titulo">
+  <div class="agente-hero-top">
+    <div class="agente-hero-figure">
+      <span id="agente-hero-titulo">Atendimentos no mês</span>
+      <strong>{{ visao.atendimentos }}</strong>
+    </div>
+    <p class="agente-hero-lede">
+      {% if visao.transferidos_pct is not none %}
+      O agente passou <strong>{{ (visao.transferidos_pct * 100) | round(0) | int }}%</strong> das conversas para uma pessoa.
+      {% else %}
+      Ainda sem base para calcular a taxa de transferência.
+      {% endif %}
+    </p>
   </div>
-  <div class="funil-summary-card">
-    <span>Transferidos</span>
-    <strong>{{ resumo.transferidos }}</strong>
-    <small>
-      {% if resumo.transferidos_pct is not none %}{{ (resumo.transferidos_pct * 100) | round(0) | int }}% dos atendimentos{% else %}—{% endif %}
-    </small>
+
+  <div class="split-bar" role="img"
+       aria-label="{{ visao.so_agente }} atendimentos só com o agente e {{ visao.transferidos }} transferidos, de {{ visao.atendimentos }} no total.">
+    {% if visao.so_agente %}
+    <span class="split-bar-seg agente" style="flex-grow:{{ visao.so_agente }}"></span>
+    {% endif %}
+    {% if visao.transferidos %}
+    <span class="split-bar-seg handoff" style="flex-grow:{{ visao.transferidos }}"></span>
+    {% endif %}
   </div>
-  <div class="funil-summary-card">
-    <span>Simulações</span>
-    <strong class="muted">em construção</strong>
-    <small>em breve</small>
+
+  <ul class="split-legend">
+    <li>
+      <span class="legend-dot agente" aria-hidden="true"></span>
+      <span class="legend-label">Só com o agente</span>
+      <strong>{{ visao.so_agente }}</strong>
+      <small>{% if visao.so_agente_pct is not none %}{{ (visao.so_agente_pct * 100) | round(0) | int }}% das conversas{% else %}—{% endif %}</small>
+    </li>
+    <li>
+      <span class="legend-dot handoff" aria-hidden="true"></span>
+      <span class="legend-label">Transferidos</span>
+      <strong>{{ visao.transferidos }}</strong>
+      <small>{% if visao.transferidos_pct is not none %}{{ (visao.transferidos_pct * 100) | round(0) | int }}% das conversas{% else %}—{% endif %}</small>
+    </li>
+  </ul>
+</section>
+
+<section class="panel" id="agente-por-dia" aria-labelledby="agente-por-dia-titulo">
+  <div class="panel-heading">
+    <h2 id="agente-por-dia-titulo">Atendimentos por dia</h2>
+    <p class="muted">Do dia 1 até hoje. Dias sem conversa aparecem como zero.</p>
+  </div>
+
+  <div class="day-chart">
+    <div class="day-chart-track" role="img"
+         aria-label="Atendimentos por dia do mês. Pico de {{ visao.maximo }} no dia {{ visao.pico.dia if visao.pico else '—' }}.">
+      {% for d in visao.serie %}
+      <div class="day-col{% if d.pico %} is-peak{% endif %}"
+           title="Dia {{ d.dia }}: {{ d.atendimentos }} atendimento{{ '' if d.atendimentos == 1 else 's' }}">
+        <span class="day-bar-slot">
+          <span class="day-bar{% if not d.atendimentos %} is-zero{% endif %}" style="height:{{ d.altura }}%"></span>
+        </span>
+        <small class="day-label">{{ d.dia }}</small>
+      </div>
+      {% endfor %}
+    </div>
+    <p class="day-chart-foot">
+      {% if visao.pico %}
+      Pico de <strong>{{ visao.pico.atendimentos }}</strong> no dia {{ visao.pico.dia }}.
+      {% endif %}
+    </p>
   </div>
 </section>
 
-<section class="panel" id="agente-por-dia">
-  <div class="panel-heading"><h2>Atendimentos por dia</h2></div>
-  {% if resumo.por_dia %}
-  {% set maximo = resumo.por_dia | map(attribute='atendimentos') | max %}
-  <div style="display:flex;align-items:flex-end;gap:6px;height:160px;padding:8px 4px;overflow-x:auto">
-    {% for d in resumo.por_dia %}
-    <div style="display:flex;flex-direction:column;align-items:center;gap:4px;min-width:28px">
-      <div title="{{ d.atendimentos }}"
-           style="width:20px;border-radius:4px 4px 0 0;background:var(--brand,#1f6feb);
-                  height:{{ ((d.atendimentos / maximo) * 130) | round(0) | int if maximo else 0 }}px"></div>
-      <small class="muted" style="font-size:10px">{{ d.data[8:10] }}</small>
-    </div>
-    {% endfor %}
+<section class="panel next-metric" aria-label="Próxima métrica">
+  <div>
+    <strong>Simulações pelo agente</strong>
+    <p class="muted">em construção — em breve você vê quantas simulações o agente enviou sem ajuda.</p>
   </div>
-  {% else %}
-  <p class="muted">Sem atendimentos no período.</p>
-  {% endif %}
 </section>
 {% endif %}
 {% endblock %}

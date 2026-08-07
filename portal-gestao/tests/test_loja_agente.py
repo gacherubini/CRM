@@ -73,3 +73,76 @@ def test_agente_degrada_quando_chatbot_offline(client, atendimento_on):
     r = client.get("/app/loja/agente")
     assert r.status_code == 200
     assert "indisponível" in r.text.lower()
+
+
+def test_agente_mostra_divisao_entre_agente_e_handoff(client, atendimento_on):
+    _override(
+        _FakeChatbot(
+            resumo={
+                "atendimentos": 10,
+                "transferidos": 4,
+                "transferidos_pct": 0.4,
+                "por_dia": [],
+                "simulacoes": None,
+            }
+        )
+    )
+    login(client)
+    r = client.get("/app/loja/agente")
+    assert r.status_code == 200
+    assert "Só com o agente" in r.text
+    assert "<strong>6</strong>" in r.text  # 10 atendimentos - 4 transferidos
+    assert "40% das conversas" in r.text
+
+
+def test_agente_sem_atendimentos_mostra_estado_vazio(client, atendimento_on):
+    _override(
+        _FakeChatbot(
+            resumo={
+                "atendimentos": 0,
+                "transferidos": 0,
+                "transferidos_pct": None,
+                "por_dia": [],
+                "simulacoes": None,
+            }
+        )
+    )
+    login(client)
+    r = client.get("/app/loja/agente")
+    assert r.status_code == 200
+    assert "Nenhum atendimento neste mês." in r.text
+    assert "split-bar" not in r.text
+
+
+def test_visao_agente_preenche_dias_sem_atendimento():
+    """por_dia do Chatbot só traz dias com conversa; a série tem de ter todos."""
+    from datetime import date
+
+    from app.loja.routes import montar_visao_agente
+
+    visao = montar_visao_agente(
+        {
+            "atendimentos": 10,
+            "transferidos": 4,
+            "transferidos_pct": 0.4,
+            "por_dia": [
+                {"data": "2026-08-01", "atendimentos": 6},
+                {"data": "2026-08-03", "atendimentos": 4},
+            ],
+        },
+        date(2026, 8, 3),
+    )
+    assert [d["dia"] for d in visao["serie"]] == ["01", "02", "03"]
+    assert [d["atendimentos"] for d in visao["serie"]] == [6, 0, 4]
+    assert [d["altura"] for d in visao["serie"]] == [100, 0, 67]
+    assert visao["so_agente"] == 6
+    assert visao["maximo"] == 6
+    assert visao["pico"]["dia"] == "01"
+
+
+def test_visao_agente_sem_resumo():
+    from datetime import date
+
+    from app.loja.routes import montar_visao_agente
+
+    assert montar_visao_agente(None, date(2026, 8, 3)) is None

@@ -5,7 +5,7 @@ Rotas legadas ``/app/leads`` e ``/app/conversas`` permanecem intactas.
 """
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, Request
@@ -226,6 +226,50 @@ def atendimento_lista(
     )
 
 
+def montar_visao_agente(resumo: dict | None, hoje: date) -> dict | None:
+    """View-model do desempenho do agente a partir do resumo do Chatbot.
+
+    O Chatbot devolve ``por_dia`` só com os dias que tiveram conversa, o que faz
+    o gráfico mentir sobre a tendência (dias vazios somem em vez de virar zero).
+    Aqui a série é preenchida do dia 1 até ``hoje`` — a janela do resumo é o mês
+    corrente (``/v1/atendimento/resumo`` usa ``_janela_mes``).
+    """
+    if not resumo:
+        return None
+
+    atendimentos = int(resumo.get("atendimentos") or 0)
+    transferidos = int(resumo.get("transferidos") or 0)
+    so_agente = max(atendimentos - transferidos, 0)
+    por_dia = {
+        str(item.get("data")): int(item.get("atendimentos") or 0)
+        for item in (resumo.get("por_dia") or [])
+    }
+
+    serie: list[dict] = []
+    for numero in range(1, hoje.day + 1):
+        data = hoje.replace(day=numero).isoformat()
+        serie.append(
+            {"data": data, "dia": f"{numero:02d}", "atendimentos": por_dia.get(data, 0)}
+        )
+
+    maximo = max((d["atendimentos"] for d in serie), default=0)
+    for dia in serie:
+        dia["altura"] = round(dia["atendimentos"] / maximo * 100) if maximo else 0
+        dia["pico"] = maximo > 0 and dia["atendimentos"] == maximo
+
+    pico = next((d for d in serie if d["pico"]), None)
+    return {
+        "atendimentos": atendimentos,
+        "transferidos": transferidos,
+        "transferidos_pct": resumo.get("transferidos_pct"),
+        "so_agente": so_agente,
+        "so_agente_pct": (so_agente / atendimentos) if atendimentos else None,
+        "serie": serie,
+        "pico": pico,
+        "maximo": maximo,
+    }
+
+
 @router.get("/app/loja/agente", response_class=HTMLResponse)
 def agente_desempenho(
     request: Request,
@@ -251,7 +295,13 @@ def agente_desempenho(
         erro_resumo = "indisponivel"
     return templates.TemplateResponse(
         "loja/agente.html",
-        contexto(request, usuario, resumo=resumo, erro_resumo=erro_resumo),
+        contexto(
+            request,
+            usuario,
+            resumo=resumo,
+            visao=montar_visao_agente(resumo, datetime.now(timezone.utc).date()),
+            erro_resumo=erro_resumo,
+        ),
     )
 
 
