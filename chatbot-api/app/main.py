@@ -4,7 +4,7 @@ import io
 import os
 import uuid
 from contextlib import asynccontextmanager
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 from typing import Literal
 from uuid import UUID
@@ -849,6 +849,46 @@ def listar_auditoria_ctwa(
         "offset": max(0, offset),
         "total_pagina": len(itens),
     }
+
+
+def _janela_mes(desde: Optional[str], ate: Optional[str]) -> tuple[datetime, datetime]:
+    """Converte ?desde/?ate (YYYY-MM-DD) em [inicio, fim). Sem parâmetros → mês corrente."""
+    agora = datetime.now(timezone.utc)
+    padrao_inicio = datetime(agora.year, agora.month, 1, tzinfo=timezone.utc)
+    padrao_fim = (
+        datetime(agora.year + 1, 1, 1, tzinfo=timezone.utc)
+        if agora.month == 12
+        else datetime(agora.year, agora.month + 1, 1, tzinfo=timezone.utc)
+    )
+    try:
+        inicio = (
+            datetime.fromisoformat(desde).replace(tzinfo=timezone.utc)
+            if desde
+            else padrao_inicio
+        )
+    except ValueError:
+        inicio = padrao_inicio
+    try:
+        fim = (
+            datetime.fromisoformat(ate).replace(tzinfo=timezone.utc)
+            if ate
+            else padrao_fim
+        )
+    except ValueError:
+        fim = padrao_fim
+    return inicio, fim
+
+
+@app.get("/v1/atendimento/resumo")
+def resumo_atendimento(
+    desde: Optional[str] = None,
+    ate: Optional[str] = None,
+    ctx: Contexto = Depends(get_contexto),
+    db: Session = Depends(get_db),
+):
+    """Resumo agregado do agente (bot) para a loja: atendimentos, handoff e série diária."""
+    inicio, fim = _janela_mes(desde, ate)
+    return servico.resumo_atendimento(db, ctx.loja_id, inicio, fim)
 
 
 @app.get("/v1/leads.csv")

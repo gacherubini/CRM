@@ -12,7 +12,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 from fastapi import HTTPException
-from sqlalchemy import and_, or_
+from sqlalchemy import and_, or_, func
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -1442,6 +1442,41 @@ def listar_conversas(
         )
         for c in conversas
     ]
+
+
+def resumo_atendimento(db, loja_id, desde, ate):
+    """Agrega conversas da loja no intervalo [desde, ate). Sem inventar zeros:
+    contagens reais; simulações reservado (None) enquanto o produto ajusta."""
+    filtro = (
+        Conversa.loja_id == loja_id,
+        Conversa.criada_em >= desde,
+        Conversa.criada_em < ate,
+    )
+    atendimentos = db.query(func.count(Conversa.id)).filter(*filtro).scalar() or 0
+    transferidos = (
+        db.query(func.count(Conversa.id))
+        .filter(*filtro, Conversa.status == "handoff")
+        .scalar()
+        or 0
+    )
+    por_dia_rows = (
+        db.query(func.date(Conversa.criada_em), func.count(Conversa.id))
+        .filter(*filtro)
+        .group_by(func.date(Conversa.criada_em))
+        .order_by(func.date(Conversa.criada_em))
+        .all()
+    )
+    por_dia = [
+        {"data": str(dia), "atendimentos": int(qtd)} for dia, qtd in por_dia_rows
+    ]
+    pct = (transferidos / atendimentos) if atendimentos else None
+    return {
+        "atendimentos": int(atendimentos),
+        "transferidos": int(transferidos),
+        "transferidos_pct": pct,
+        "por_dia": por_dia,
+        "simulacoes": None,
+    }
 
 
 def listar_mensagens(
