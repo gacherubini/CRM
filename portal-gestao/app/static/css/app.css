@@ -2622,15 +2622,13 @@ a.vitrine-page-btn:hover {
 
 /* ===========================================================================
    Agente de atendimento (Revy Loja) — /app/loja/agente
-   A pagina tinha 3 cards soltos e um grafico com estilo inline. O numero que
-   importa e um so (atendimentos) e a leitura que importa e a divisao entre o
-   que o agente resolveu sozinho e o que virou handoff — por isso uma barra
-   dividida em vez de dois cards que nao se falam. Handoff usa hachura em vez
-   de cor propria: o produto e monocromatico + azul de marca, e "passou para
-   uma pessoa" nao e erro para virar vermelho.
+   Um painel hero (total + barra dividida + legenda) e um painel de serie
+   diaria. Handoff usa hachura em vez de cor propria: o produto e monocromatico
+   + azul de marca, e "passou para uma pessoa" nao e erro para virar vermelho.
+   Conteudo sempre dentro de .panel-body para herdar o recuo padrao do shell.
    =========================================================================== */
 .panel-empty {
-  padding: var(--space-7) var(--space-4);
+  padding: var(--space-7) var(--space-5);
   text-align: center;
   color: var(--ink-muted);
 }
@@ -2642,72 +2640,100 @@ a.vitrine-page-btn:hover {
 }
 .panel-empty p { margin: 0 auto; max-width: 44ch; }
 
+.agente-hero > .panel-body {
+  display: grid;
+  gap: var(--space-5);
+}
+
 .agente-hero-top {
   display: flex;
   flex-wrap: wrap;
-  align-items: baseline;
+  align-items: flex-end;
   justify-content: space-between;
-  gap: var(--space-4);
-  margin-bottom: var(--space-5);
+  gap: var(--space-4) var(--space-6);
 }
 .agente-hero-figure > span {
   display: block;
   color: var(--ink-muted);
   font-size: var(--text-xs);
   font-weight: 600;
-  letter-spacing: .04em;
-  text-transform: uppercase;
+  letter-spacing: .02em;
 }
 .agente-hero-figure > strong {
   display: block;
   margin-top: var(--space-2);
-  font-size: clamp(38px, 6vw, 52px);
+  font-size: clamp(40px, 6vw, 56px);
   line-height: 1;
   letter-spacing: -.04em;
   font-variant-numeric: tabular-nums;
+  font-weight: 600;
 }
 .agente-hero-lede {
   margin: 0;
-  max-width: 34ch;
+  max-width: 32ch;
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--brand-line);
+  border-radius: calc(var(--radius) - 2px);
+  background: var(--brand-tint);
   color: var(--ink-soft);
-  font-size: var(--text-base);
+  font-size: var(--text-sm);
+  line-height: 1.45;
 }
-.agente-hero-lede strong { color: var(--ink); font-variant-numeric: tabular-nums; }
+.agente-hero-lede strong {
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
 
 .split-bar {
   display: flex;
   gap: 3px;
-  height: 14px;
+  height: 12px;
   border-radius: 999px;
   overflow: hidden;
   background: var(--surface-soft);
+  box-shadow: inset 0 0 0 1px var(--line);
 }
-.split-bar-seg { display: block; min-width: 4px; }
+.split-bar-seg { display: block; min-width: 6px; }
 .split-bar-seg.agente { background: var(--brand); }
 .split-bar-seg.handoff {
   background:
     repeating-linear-gradient(135deg,
-      color-mix(in srgb, var(--ink) 30%, transparent) 0 3px,
+      color-mix(in srgb, var(--ink) 28%, transparent) 0 3px,
       transparent 3px 7px),
     var(--surface-raised);
 }
 
+/* Legenda no mesmo ritmo do .metric-grid (borda superior + 2 colunas). */
 .split-legend {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--space-4);
-  margin: var(--space-4) 0 0;
-  padding: 0;
+  gap: 0;
+  margin: 0;
+  padding: var(--space-5) 0 0;
+  border-top: 1px solid var(--line);
   list-style: none;
 }
-.split-legend li { min-width: 0; }
+.split-legend li {
+  min-width: 0;
+  padding: 0 var(--space-5);
+  border-right: 1px solid var(--line);
+}
+.split-legend li:first-child { padding-left: 0; }
+.split-legend li:last-child {
+  padding-right: 0;
+  border-right: 0;
+}
+.split-legend .legend-swatch {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
 .split-legend .legend-dot {
-  display: inline-block;
-  width: 9px;
-  height: 9px;
-  margin-right: var(--space-2);
+  flex: 0 0 auto;
+  width: 10px;
+  height: 10px;
   border-radius: 3px;
-  vertical-align: baseline;
 }
 .split-legend .legend-dot.agente { background: var(--brand); }
 .split-legend .legend-dot.handoff {
@@ -2719,84 +2745,148 @@ a.vitrine-page-btn:hover {
   box-shadow: inset 0 0 0 1px var(--line-strong);
 }
 .split-legend .legend-label {
-  color: var(--ink-soft);
-  font-size: var(--text-sm);
+  color: var(--ink-muted);
+  font-size: var(--text-xs);
   font-weight: 600;
+  letter-spacing: .01em;
+  line-height: 1.35;
 }
 .split-legend strong {
   display: block;
-  margin-top: var(--space-1);
+  margin-top: var(--space-2);
   font-size: var(--text-metric);
-  letter-spacing: -.02em;
+  font-weight: 600;
+  letter-spacing: -.03em;
+  line-height: 1.15;
   font-variant-numeric: tabular-nums;
 }
 .split-legend small {
   display: block;
-  color: var(--ink-muted);
+  margin-top: var(--space-1);
+  color: var(--ink-soft);
   font-size: var(--text-xs);
+  line-height: 1.4;
 }
 
-/* Grafico diario: colunas com baseline e o pico marcado. Sem eixo Y — o pico
-   vira legenda embaixo, que e o unico valor de referencia que o lojista usa. */
+/* Grafico diario: valor no topo da barra, pico em brand cheio, zero como
+   traco discreto. Sem eixo Y — o pico e a legenda embaixo bastam. */
+.day-chart-hint {
+  margin: 0;
+  max-width: 36ch;
+  text-align: right;
+  font-size: var(--text-xs);
+}
+.day-chart.panel-body {
+  display: grid;
+  gap: var(--space-3);
+}
 .day-chart-track {
   display: flex;
   align-items: stretch;
-  gap: 4px;
-  height: 176px;
-  padding-top: var(--space-2);
+  gap: 6px;
+  height: 200px;
+  /* Espaço no topo para o valor acima da barra (position absolute). */
+  padding: 18px 0 0;
   border-bottom: 1px solid var(--line);
   overflow-x: auto;
+  scrollbar-width: thin;
 }
 .day-col {
   display: grid;
   grid-template-rows: 1fr auto;
   justify-items: center;
   flex: 1 1 0;
-  min-width: 16px;
+  min-width: 28px;
+  max-width: 56px;
 }
 .day-bar-slot {
   display: flex;
   align-items: flex-end;
-  width: 100%;
   justify-content: center;
+  width: 100%;
+  min-height: 0;
+  height: 100%;
 }
 .day-bar {
+  position: relative;
   display: block;
-  width: 68%;
-  max-width: 20px;
-  min-height: 2px;
-  border-radius: 3px 3px 0 0;
-  background: color-mix(in srgb, var(--brand) 45%, transparent);
+  width: 70%;
+  max-width: 28px;
+  min-height: 3px;
+  border-radius: 4px 4px 0 0;
+  background: color-mix(in srgb, var(--brand) 48%, transparent);
 }
-.day-bar.is-zero { background: var(--line-strong); }
-.day-col.is-peak .day-bar { background: var(--brand); }
-.day-label {
-  padding-top: 6px;
+.day-value {
+  position: absolute;
+  bottom: calc(100% + 4px);
+  left: 50%;
+  transform: translateX(-50%);
   color: var(--ink-muted);
   font-size: 10px;
+  font-weight: 600;
   font-variant-numeric: tabular-nums;
+  line-height: 1;
+  white-space: nowrap;
+}
+.day-col.is-peak .day-value { color: var(--ink); }
+.day-bar.is-zero {
+  height: 3px !important;
+  background: var(--line-strong);
+  border-radius: 2px;
+}
+.day-col.is-peak .day-bar {
+  background: var(--brand);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--brand) 35%, transparent);
+}
+.day-label {
+  padding-top: var(--space-2);
+  color: var(--ink-muted);
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
 }
 .day-col.is-peak .day-label { color: var(--ink); font-weight: 600; }
+.day-col.is-empty .day-label { color: var(--ink-muted); font-weight: 400; }
 .day-chart-foot {
-  margin: var(--space-3) 0 0;
+  margin: 0;
   color: var(--ink-muted);
   font-size: var(--text-xs);
 }
 .day-chart-foot strong { color: var(--ink); font-variant-numeric: tabular-nums; }
 
-/* Metrica que ainda nao existe: fica no rodape, discreta e tracejada, para nao
-   competir com numero real. Antes era um card de KPI dizendo "em construcao". */
-.next-metric {
-  border-style: dashed;
-  background: transparent;
-  box-shadow: none;
+/* Metrica futura: uma linha no rodape da pagina, sem card tracejado competindo
+   com numero real (triagem L6 — nao remover de vez). */
+.agente-next-metric {
+  margin: var(--space-2) 0 0;
+  padding: 0 var(--space-1);
+  color: var(--ink-muted);
+  font-size: var(--text-xs);
+  line-height: 1.45;
 }
-.next-metric strong { font-size: var(--text-sm); }
-.next-metric p { margin: 2px 0 0; font-size: var(--text-xs); }
+.agente-next-metric strong {
+  color: var(--ink-soft);
+  font-weight: 600;
+}
 
 @media (max-width: 640px) {
-  .split-legend { grid-template-columns: 1fr; gap: var(--space-3); }
-  .day-chart-track { height: 140px; }
+  .split-legend { grid-template-columns: 1fr; gap: var(--space-4); }
+  .split-legend li {
+    padding: 0;
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+    padding-bottom: var(--space-4);
+  }
+  .split-legend li:last-child {
+    border-bottom: 0;
+    padding-bottom: 0;
+  }
+  .day-chart-hint {
+    max-width: none;
+    text-align: left;
+  }
+  .day-chart-track { height: 160px; }
+  .day-col { min-width: 24px; }
+  .day-value { display: none; } /* no mobile o title/tooltip basta */
 }
 
 /* ===========================================================================

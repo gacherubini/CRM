@@ -64,7 +64,10 @@ def test_agente_mostra_cards(client, atendimento_on):
     assert "Agente de atendimento" in r.text
     assert "65" in r.text
     assert "Transferidos" in r.text
-    assert "em construção" in r.text  # card de simulações placeholder
+    assert "em construção" in r.text  # placeholder de simulações (rodapé)
+    assert "Ver fila" in r.text
+    assert "panel-body" in r.text
+    assert "split-bar" in r.text
 
 
 def test_agente_degrada_quando_chatbot_offline(client, atendimento_on):
