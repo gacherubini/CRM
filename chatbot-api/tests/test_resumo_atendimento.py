@@ -1,8 +1,6 @@
 import uuid
 from datetime import datetime, timezone
 
-import pytest
-
 from app import models_db
 
 
@@ -52,3 +50,43 @@ def test_resumo_escopo_por_loja(client, db, loja_a, loja_b):
     )
 
     assert r.json()["atendimentos"] == 1  # só a loja A
+
+
+def test_resumo_zero_atendimentos(client, loja_a):
+    """When loja_a has zero conversas, verify zero count, None percentage, empty series."""
+    r = client.get(
+        "/v1/atendimento/resumo?desde=2026-08-01&ate=2026-09-01",
+        headers=loja_a["headers"],
+    )
+
+    assert r.status_code == 200
+    corpo = r.json()
+    assert corpo["atendimentos"] == 0
+    assert corpo["transferidos"] == 0
+    assert corpo["transferidos_pct"] is None
+    assert corpo["por_dia"] == []
+    assert corpo["simulacoes"] is None
+
+
+def test_resumo_janela_default_e_datas_invalidas(client, db, loja_a):
+    """Test default window (current month) and invalid date fallback."""
+    # Seed one conversa created "now"
+    agora = datetime.now(timezone.utc)
+    db.add(_conversa(loja_a["loja_id"], "aberta", agora))
+    db.commit()
+
+    # (a) No params: defaults to current calendar month
+    r_default = client.get(
+        "/v1/atendimento/resumo",
+        headers=loja_a["headers"],
+    )
+    assert r_default.status_code == 200
+    assert r_default.json()["atendimentos"] >= 1  # current month includes it
+
+    # (b) Invalid dates: fallback to default window (should NOT error 500)
+    r_invalid = client.get(
+        "/v1/atendimento/resumo?desde=garbage&ate=also-garbage",
+        headers=loja_a["headers"],
+    )
+    assert r_invalid.status_code == 200  # NOT 500; fallback to defaults
+    assert r_invalid.json()["atendimentos"] >= 1  # same result as default
