@@ -1364,6 +1364,17 @@ def _carregar_opcoes_venda(
     return leads, veiculos, avisos
 
 
+def _destino_vendas(request: Request) -> str:
+    """Para onde voltar depois de registrar/agir sobre uma venda.
+
+    Com ``?origem=loja`` a pessoa veio do shell Revy Loja e tem que voltar para
+    ele — cair na lista legada era jogá-la para fora do menu (ver L1 na triagem).
+    """
+    if (request.query_params.get("origem") or "").strip() == "loja":
+        return "/app/loja/vendas/lista"
+    return "/app/vendas"
+
+
 def _render_venda_form(
     request: Request,
     usuario: Usuario,
@@ -1387,6 +1398,8 @@ def _render_venda_form(
             veiculos=veiculos,
             integracoes_avisos=avisos,
             erro=erro,
+            destino_vendas=_destino_vendas(request),
+            pode_confirmar=pode_confirmar_venda(usuario),
         ),
         status_code=status_code,
     )
@@ -1563,62 +1576,53 @@ async def vendas_criar(
         payload={"venda_id": venda.id, "status": "registrada"},
     )
     sufixo = "&aviso=referencias-pendentes" if referencias_pendentes else ""
-    return RedirectResponse(f"/app/vendas?ok=registrada{sufixo}", status_code=303)
+    return RedirectResponse(
+        f"{_destino_vendas(request)}?ok=registrada{sufixo}", status_code=303
+    )
 
 
-@app.post("/app/vendas/{venda_id}/confirmar")
-async def vendas_confirmar(
-    request: Request,
+def executar_confirmacao_venda(
+    db: Session,
+    usuario: Usuario,
     venda_id: str,
-    db: Session = Depends(get_db),
-    chatbot: ChatbotClient = Depends(get_chatbot_client),
-    estoque: EstoqueClient = Depends(get_estoque_client),
-):
-    usuario = usuario_atual(request, db)
-    if not usuario:
-        return redirecionar_login()
-    form = await request.form()
-    if not pode_confirmar_venda(usuario) or not csrf_valido(request, form.get("csrf")):
-        return RedirectResponse("/app/vendas", status_code=303)
+    chatbot: ChatbotClient,
+    estoque: EstoqueClient,
+) -> str:
+    """Confirma a venda e dispara a cascata; devolve o código do resultado.
+
+    Compartilhada pela rota legada e pelo shell Revy Loja — a confirmação é o
+    gatilho de estoque, funil, Revy Tráfego e Meta, e não pode divergir entre as
+    duas entradas. Chamador cuida de permissão, CSRF e do redirect.
+    """
     if not provisioning.allows_processing(db, usuario.loja_slug):
-        return RedirectResponse(
-            "/app/vendas?erro=loja-nao-operacional", status_code=303
-        )
+        return "erro=loja-nao-operacional"
     venda = db.query(Venda).filter(Venda.id == venda_id, Venda.loja_slug == usuario.loja_slug).first()
     if not venda or venda.status == "cancelada":
-        return RedirectResponse("/app/vendas?erro=acao", status_code=303)
+        return "erro=acao"
     if venda.status == "confirmada":
-        return RedirectResponse("/app/vendas?ok=ja-confirmada", status_code=303)
+        return "ok=ja-confirmada"
     lead = None
     if venda.lead_ref:
         try:
             lead = chatbot.obter_lead(venda.lead_ref)
         except LeadNaoEncontrado:
-            return RedirectResponse("/app/vendas?erro=lead", status_code=303)
+            return "erro=lead"
         except ChatbotIndisponivel:
-            return RedirectResponse(
-                "/app/vendas?erro=chatbot-indisponivel", status_code=303
-            )
+            return "erro=chatbot-indisponivel"
     estoque_baixado = False
     if venda.veiculo_ref:
         try:
             veiculo = estoque.obter(venda.veiculo_ref)
             if veiculo.get("status") not in {"disponivel", "reservado"}:
-                return RedirectResponse(
-                    "/app/vendas?erro=conflito-estoque", status_code=303
-                )
+                return "erro=conflito-estoque"
             estoque.acao(venda.veiculo_ref, "vender")
             estoque_baixado = True
         except VeiculoNaoEncontrado:
-            return RedirectResponse("/app/vendas?erro=veiculo", status_code=303)
+            return "erro=veiculo"
         except ConflitoEstoque:
-            return RedirectResponse(
-                "/app/vendas?erro=conflito-estoque", status_code=303
-            )
+            return "erro=conflito-estoque"
         except EstoqueIndisponivel:
-            return RedirectResponse(
-                "/app/vendas?erro=estoque-indisponivel", status_code=303
-            )
+            return "erro=estoque-indisponivel"
     venda.status = "confirmada"
     venda.confirmada_por = usuario.email
     venda.confirmada_em = agora()
@@ -1632,8 +1636,7 @@ async def vendas_confirmar(
         db.commit()
     except SQLAlchemyError:
         db.rollback()
-        erro = "reconciliacao" if estoque_baixado else "acao"
-        return RedirectResponse(f"/app/vendas?erro={erro}", status_code=303)
+        return "erro=reconciliacao" if estoque_baixado else "erro=acao"
     registrar_evento_funil_best_effort(
         db,
         loja_slug=usuario.loja_slug,
@@ -1652,7 +1655,53 @@ async def vendas_confirmar(
             purchase,
             db,
         )
-    return RedirectResponse("/app/vendas?ok=confirmada", status_code=303)
+    return "ok=confirmada"
+
+
+def executar_cancelamento_venda(
+    db: Session,
+    usuario: Usuario,
+    venda_id: str,
+    motivo: str,
+) -> str:
+    """Cancela o registro comercial; devolve o código do resultado.
+
+    Compartilhada pela rota legada e pelo shell Revy Loja.
+    """
+    venda = db.query(Venda).filter(Venda.id == venda_id, Venda.loja_slug == usuario.loja_slug).first()
+    motivo = (motivo or "").strip()
+    if not venda:
+        return "erro=acao"
+    if not motivo:
+        return "erro=motivo"
+    venda.status = "cancelada"
+    venda.motivo_cancelamento = motivo
+    venda.atualizada_em = agora()
+    if settings.revy_trafego_venda_events_enabled:
+        enfileirar_venda_atualizada(db, venda)
+    db.commit()
+    # Regra segura: cancelar o registro comercial nunca reabre estoque vendido.
+    if venda.confirmada_em and venda.veiculo_ref:
+        return "ok=cancelada-estoque-mantido"
+    return "ok=cancelada"
+
+
+@app.post("/app/vendas/{venda_id}/confirmar")
+async def vendas_confirmar(
+    request: Request,
+    venda_id: str,
+    db: Session = Depends(get_db),
+    chatbot: ChatbotClient = Depends(get_chatbot_client),
+    estoque: EstoqueClient = Depends(get_estoque_client),
+):
+    usuario = usuario_atual(request, db)
+    if not usuario:
+        return redirecionar_login()
+    form = await request.form()
+    if not pode_confirmar_venda(usuario) or not csrf_valido(request, form.get("csrf")):
+        return RedirectResponse("/app/vendas", status_code=303)
+    resultado = executar_confirmacao_venda(db, usuario, venda_id, chatbot, estoque)
+    return RedirectResponse(f"/app/vendas?{resultado}", status_code=303)
 
 
 @app.post("/app/vendas/{venda_id}/cancelar")
@@ -1663,24 +1712,8 @@ async def vendas_cancelar(request: Request, venda_id: str, db: Session = Depends
     form = await request.form()
     if not pode_confirmar_venda(usuario) or not csrf_valido(request, form.get("csrf")):
         return RedirectResponse("/app/vendas", status_code=303)
-    venda = db.query(Venda).filter(Venda.id == venda_id, Venda.loja_slug == usuario.loja_slug).first()
-    motivo = (form.get("motivo") or "").strip()
-    if not venda:
-        return RedirectResponse("/app/vendas?erro=acao", status_code=303)
-    if not motivo:
-        return RedirectResponse("/app/vendas?erro=motivo", status_code=303)
-    venda.status = "cancelada"
-    venda.motivo_cancelamento = motivo
-    venda.atualizada_em = agora()
-    if settings.revy_trafego_venda_events_enabled:
-        enfileirar_venda_atualizada(db, venda)
-    db.commit()
-    # Regra segura: cancelar o registro comercial nunca reabre estoque vendido.
-    if venda.confirmada_em and venda.veiculo_ref:
-        return RedirectResponse(
-            "/app/vendas?ok=cancelada-estoque-mantido", status_code=303
-        )
-    return RedirectResponse("/app/vendas?ok=cancelada", status_code=303)
+    resultado = executar_cancelamento_venda(db, usuario, venda_id, form.get("motivo"))
+    return RedirectResponse(f"/app/vendas?{resultado}", status_code=303)
 
 
 @app.get("/app/vendedor", response_class=HTMLResponse)

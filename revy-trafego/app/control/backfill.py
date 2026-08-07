@@ -28,6 +28,37 @@ def slug_canonico(valor: str) -> str:
     return slug
 
 
+def religar_vendas_orfas(connection: Connection) -> int:
+    """Preenche ``vendas_projetadas.loja_id`` onde ficou nulo; devolve quantas.
+
+    A projecao so gravava ``loja_slug``, entao vendas recebidas do Portal depois
+    da 0002 sumiam da Visao Geral do Control, que filtra por ``loja_id``.
+    Vinculos ja existentes nunca sao sobrescritos.
+    """
+    inspector = sa.inspect(connection)
+    tabelas = set(inspector.get_table_names())
+    if "vendas_projetadas" not in tabelas or "lojas" not in tabelas:
+        return 0
+
+    metadata = sa.MetaData()
+    vendas = sa.Table("vendas_projetadas", metadata, autoload_with=connection)
+    lojas = sa.Table("lojas", metadata, autoload_with=connection)
+    if "loja_id" not in vendas.c:
+        return 0
+
+    loja_id = (
+        sa.select(lojas.c.id)
+        .where(lojas.c.slug == sa.func.lower(sa.func.trim(vendas.c.loja_slug)))
+        .scalar_subquery()
+    )
+    resultado = connection.execute(
+        sa.update(vendas)
+        .where(vendas.c.loja_id.is_(None), loja_id.is_not(None))
+        .values(loja_id=loja_id)
+    )
+    return int(resultado.rowcount or 0)
+
+
 def backfill_lojas_confirmadas(
     connection: Connection,
     slugs_confirmados: Iterable[str] = (),

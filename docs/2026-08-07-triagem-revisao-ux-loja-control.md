@@ -97,9 +97,8 @@ São decisões de produto, não pendências técnicas. Ao mexer nessas telas, de
 
 ## Aberto
 
-- **Os KPIs de venda da Visão Geral contam 0 em produção** por causa de
-  `venda_projetada.loja_id` — ver "Pendências reais" em
-  [`handoff-contexto.md`](handoff-contexto.md). Nada do que foi feito em `C21`/`C22`/`C20`
-  é visível até isso ser corrigido.
+- ~~**Os KPIs de venda da Visão Geral contam 0 em produção**~~ — corrigido em 07/08
+  (`projetar_venda` resolve o `loja_id` + migration `0017` religa as órfãs). `C21`/`C22`/`C20`
+  só ficam visíveis em produção depois do deploy com `alembic upgrade head`.
 - **Espaçamento ("gaps")**: o dono viu problemas de espaçamento nas prévias e ainda não
   localizou onde. Fila separada.

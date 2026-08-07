@@ -149,18 +149,13 @@ powershell -File deploy\fly\3vm\upload-and-import-workflow.ps1 -Mode production
 
 ## Pendências reais
 
-- **BUG — `venda_projetada.loja_id` nunca é preenchido (bloqueia os KPIs do Control):**
-  `revy-trafego/app/vendas_projection.py` (`projetar_venda`) grava `loja_slug` e deixa
-  `loja_id` NULL; o único lugar que preenche é `app/control/backfill.py`, chamado **só**
-  dentro da migration `0002`. Toda venda que chega pelo contrato HTTP depois da migration
-  fica órfã. O dashboard filtra por `loja_id`
-  (`revy-trafego/app/control/dashboard.py`), então "Vendas confirmadas", ticket médio, Δ%
-  e a tabela por loja mostram **zero** em produção, mesmo com vendas chegando. O ROI da
-  Loja não sofre porque `financeiro_calc` filtra por `loja_slug`.
-  **Correção:** resolver `Loja.slug → id` dentro de `projetar_venda` (padrão já existe em
-  `api_v1.py:389-396`) + backfill único das órfãs. Ao testar, exercitar o caminho
-  `projetar_venda` — `tests/test_dashboard_network_overview.py` passa `loja_id=` na mão e
-  por isso valida a query, não o contrato.
+- **~~BUG — `venda_projetada.loja_id` nunca é preenchido~~ — CORRIGIDO (07/08, ainda não
+  deployado):** `projetar_venda` passou a resolver `Loja.slug → id` (só quando está nulo,
+  o que também cura venda órfã na próxima atualização) e a migration
+  `0017_vendas_projetadas_backfill_loja_id` religa o passivo via
+  `app/control/backfill.py::religar_vendas_orfas`. Cobertura pelo caminho real em
+  `tests/test_vendas_projection.py`. **Ao deployar, rodar `alembic upgrade head` no
+  revy-trafego** — sem a migration os KPIs continuam zerados para as vendas antigas.
 - **Visão Geral do Control — as 2 decisões de produto de 07/08 foram resolvidas:**
   1. *Conversão mistura janelas* — o dono **recusou** mexer (item `C17` da triagem). A
      coluna segue como está.

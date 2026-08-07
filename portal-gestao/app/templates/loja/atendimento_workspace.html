@@ -164,6 +164,16 @@
             <span class="muted">WhatsApp</span>
           {% endif %}
         </dd>
+        {% if origem_lead %}
+        <dt>Veio de</dt>
+        <dd>
+          {{ origem_lead.nome }}
+          {% if origem_lead.canal %}<span class="muted"> · {{ origem_lead.canal }}</span>{% endif %}
+          {% if origem_lead.primeiro_clique %}
+          <br><small class="muted">Primeiro contato: {{ origem_lead.primeiro_clique }}</small>
+          {% endif %}
+        </dd>
+        {% endif %}
         <dt>Responsável</dt>
         <dd>{% if workspace.assignment and workspace.assignment.vendedor_email %}{{ workspace.assignment.vendedor_email }}{% else %}<span class="muted">Fila (sem responsável)</span>{% endif %}</dd>
         <dt>Interesse</dt>

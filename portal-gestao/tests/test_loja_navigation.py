@@ -29,6 +29,7 @@ def test_nav_somente_vendas_e_estoque_com_acessos_bancarios():
     assert labels == [
         "Resultado",
         "Atendimento",
+        "Vendas da loja",
         "Agente",
         "Simulações",
         "Situação do estoque",
@@ -103,6 +104,39 @@ def test_nav_item_active_prefix_estoque():
     assert nav_item_is_active(veiculos, "/app/estoque") is True
     assert nav_item_is_active(veiculos, "/app/estoque/novo") is True
     assert nav_item_is_active(visao, "/app/estoque") is False
+
+
+def test_nav_rotula_a_lista_de_vendas_por_papel():
+    """"Vendas da loja" mente para o vendedor, que só enxerga as próprias."""
+    gestao = flatten_nav(build_nav(_store(roles=("dono",)), _ents(), shell_enabled=True))
+    vendedor = flatten_nav(
+        build_nav(_store(roles=("vendedor",)), _ents(), shell_enabled=True)
+    )
+
+    def _label(items):
+        return next(i.label for i in items if i.href == "/app/loja/vendas/lista")
+
+    assert _label(gestao) == "Vendas da loja"
+    assert _label(vendedor) == "Minhas vendas"
+
+
+def test_nav_item_active_prefix_vendas():
+    """Resultado nao pode acender junto com a lista de vendas."""
+    resultado = NavItem(
+        label="Resultado",
+        href="/app/loja/vendas",
+        section="Vendas",
+        active_prefix="/app/loja/vendas",
+    )
+    lista = NavItem(
+        label="Minhas vendas",
+        href="/app/loja/vendas/lista",
+        section="Vendas",
+        active_prefix="/app/loja/vendas/lista",
+    )
+    assert nav_item_is_active(resultado, "/app/loja/vendas") is True
+    assert nav_item_is_active(resultado, "/app/loja/vendas/lista") is False
+    assert nav_item_is_active(lista, "/app/loja/vendas/lista") is True
 
 
 def test_shell_off_mantem_nav_legado(client, monkeypatch):

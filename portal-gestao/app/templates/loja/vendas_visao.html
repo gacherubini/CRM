@@ -205,6 +205,52 @@
   {% endif %}
   {% endif %}
 </section>
+
+{# --- De onde veio: campanha e canal (só com a fonte de mídia respondendo) --- #}
+{% if overview.aquisicao_campanhas %}
+<section class="panel" aria-labelledby="bloco-campanhas">
+  <div class="panel-heading">
+    <div><span class="mono-label">Aquisição</span><h2 id="bloco-campanhas">De onde veio o resultado</h2></div>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th scope="col">Campanha</th>
+          <th scope="col">Investimento</th>
+          <th scope="col">Leads</th>
+          <th scope="col">Vendas</th>
+          <th scope="col">Receita</th>
+          <th scope="col">ROAS</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for c in overview.aquisicao_campanhas %}
+        <tr>
+          <td>
+            <strong>{{ c.nome or '—' }}</strong>
+            {% if c.canal %}<small class="muted"> · {{ c.canal }}</small>{% endif %}
+          </td>
+          <td>{{ formatar_brl(c.gasto) if c.gasto is not none else '—' }}</td>
+          <td>{{ c.leads if c.leads is not none else '—' }}</td>
+          <td>{{ c.vendas if c.vendas is not none else '—' }}</td>
+          <td>{{ formatar_brl(c.faturamento) if c.faturamento is not none else '—' }}</td>
+          <td>{% if c.roas is not none %}{{ c.roas }}x{% else %}<span class="muted">—</span>{% endif %}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% if overview.aquisicao_canais %}
+  <p class="muted">
+    Por canal:
+    {% for canal in overview.aquisicao_canais %}
+    {{ canal.canal }} {{ formatar_brl(canal.gasto) }}{% if canal.roas is not none %} ({{ canal.roas }}x){% endif %}{% if not loop.last %} · {% endif %}
+    {% endfor %}
+  </p>
+  {% endif %}
+</section>
+{% endif %}
 {% endif %}
 
 {# --- Pendências: só aparece quando há algo a fazer --- #}

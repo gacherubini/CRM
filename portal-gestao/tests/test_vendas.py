@@ -200,13 +200,44 @@ def test_vendedor_registra_sem_custo(client):
     db.close()
 
 
-def test_vendedor_nao_confirma(client):
-    venda_id = criar_venda()
-    login(client, papel="vendedor")
+def test_vendedor_confirma_venda(client):
+    """Decisão do dono: quem fecha a venda a confirma, sem esperar gestão.
+
+    É a confirmação que dispara estoque, funil, Control e Meta — deixá-la só com
+    dono/gerente atrasava o sinal de conversão do anúncio.
+    """
+    venda_id = criar_venda(vendedor_email="vendedor@loja.test")
+    login(client, papel="vendedor", email="vendedor@loja.test")
     csrf = csrf_das_vendas(client)
-    resposta = client.post(f"/app/vendas/{venda_id}/confirmar", data={"csrf": csrf}, follow_redirects=False)
+
+    resposta = client.post(
+        f"/app/vendas/{venda_id}/confirmar",
+        data={"csrf": csrf},
+        follow_redirects=False,
+    )
+
     assert resposta.status_code == 303
-    assert resposta.headers["location"] == "/app/vendas"
+    assert resposta.headers["location"] == "/app/vendas?ok=confirmada"
+    db = SessionLocal()
+    venda = db.get(Venda, venda_id)
+    assert venda.status == "confirmada"
+    assert venda.confirmada_por == "vendedor@loja.test"
+    db.close()
+
+
+def test_vendedor_nao_confirma_venda_de_outra_loja(client):
+    """Confirmar deixou de ser privilégio de cargo, mas segue preso à loja."""
+    venda_id = criar_venda(loja_slug="outra-loja")
+    login(client, papel="vendedor", email="vendedor@loja.test")
+    csrf = csrf_das_vendas(client)
+
+    resposta = client.post(
+        f"/app/vendas/{venda_id}/confirmar",
+        data={"csrf": csrf},
+        follow_redirects=False,
+    )
+
+    assert resposta.headers["location"] == "/app/vendas?erro=acao"
     db = SessionLocal()
     assert db.get(Venda, venda_id).status == "registrada"
     db.close()

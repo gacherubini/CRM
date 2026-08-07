@@ -409,8 +409,36 @@ def atendimento_workspace(
             pode_handoff=pode_papel,
             pode_atualizar_etapa=pode_atualizar_etapa,
             canal_id_filtro=canal_id or workspace.canal_id,
+            origem_lead=_origem_do_lead(db, usuario.loja_slug, lead),
         ),
     )
+
+
+def _origem_do_lead(db: Session, loja_slug: str, lead: dict | None) -> dict | None:
+    """De qual campanha veio o contato — mesma regra que atribui a venda.
+
+    Devolve None quando não há match: sem campanha casada é melhor não dizer
+    nada do que sugerir uma origem que a atribuição da venda não vai confirmar.
+    """
+    if not lead:
+        return None
+    try:
+        from app.campanhas import resolver_campanhas_do_lead
+
+        primeira, ultima = resolver_campanhas_do_lead(db, loja_slug, lead)
+    except Exception:
+        return None
+    campanha = ultima or primeira
+    if campanha is None:
+        return None
+    return {
+        "nome": campanha.nome,
+        "canal": campanha.canal,
+        "utm_campaign": campanha.utm_campaign,
+        "primeiro_clique": (
+            primeira.nome if primeira is not None and primeira is not campanha else None
+        ),
+    }
 
 
 def _destino_workspace(telefone: str, canal_id: str | None = None) -> str:

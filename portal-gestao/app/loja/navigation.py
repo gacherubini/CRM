@@ -60,6 +60,19 @@ def build_nav(
                         module=Module.VENDAS.value,
                         active_prefix="/app/loja/atendimento",
                     ),
+                    # Registrar/confirmar venda vive no shell: antes só existia
+                    # no atendimento, caindo na tela legada fora do menu.
+                    NavItem(
+                        label=(
+                            "Vendas da loja"
+                            if roles & ROLES_GESTAO
+                            else "Minhas vendas"
+                        ),
+                        href="/app/loja/vendas/lista",
+                        section="Vendas",
+                        module=Module.VENDAS.value,
+                        active_prefix="/app/loja/vendas/lista",
+                    ),
                     NavItem(
                         label="Agente",
                         href="/app/loja/agente",
@@ -208,6 +221,9 @@ def nav_item_is_active(item: NavItem, path: str) -> bool:
     if prefix and path.startswith(prefix):
         # Evita que Visão geral do estoque marque subpáginas (veículos, vitrine)
         if item.href == "/app/loja/estoque" and path != "/app/loja/estoque":
+            return False
+        # Mesmo caso em Vendas: Resultado não acende na lista de vendas.
+        if item.href == "/app/loja/vendas" and path != "/app/loja/vendas":
             return False
         return True
     return False

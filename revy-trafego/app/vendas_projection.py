@@ -9,15 +9,29 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from decimal import Decimal
 
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from app.models import VendaProjetada
+from app.models import Loja, VendaProjetada
 
 
 def _utc(valor: datetime) -> datetime:
     if valor.tzinfo is None:
         return valor.replace(tzinfo=timezone.utc)
     return valor.astimezone(timezone.utc)
+
+
+def _loja_id_do_slug(db: Session, loja_slug: str) -> str | None:
+    """Vinculo com a loja do Control. None quando o slug ainda nao foi provisionado.
+
+    O Control filtra vendas por ``loja_id``; sem este vinculo a venda existe na
+    projecao mas some da Visao Geral.
+    """
+    slug = (loja_slug or "").strip().lower()
+    if not slug:
+        return None
+    loja = db.query(Loja.id).filter(func.lower(Loja.slug) == slug).first()
+    return loja.id if loja is not None else None
 
 
 @dataclass(frozen=True)
@@ -64,6 +78,10 @@ def projetar_venda(db: Session, snapshot: VendaSnapshot) -> ProjecaoResultado:
         db.add(venda)
 
     venda.loja_slug = snapshot.loja_slug
+    # Só resolve quando falta: evita uma query por evento e cura vendas órfãs
+    # projetadas antes de a loja existir no Control.
+    if venda.loja_id is None:
+        venda.loja_id = _loja_id_do_slug(db, snapshot.loja_slug)
     venda.lead_ref = snapshot.lead_ref
     venda.preco_venda = snapshot.valor
     venda.custo_veiculo = snapshot.custo_veiculo

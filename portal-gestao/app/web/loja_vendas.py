@@ -12,10 +12,13 @@ from sqlalchemy.orm import Session
 router = APIRouter()
 
 from app.auth import (  # noqa: E402
+    pode_confirmar_venda,
     pode_gerir_equipe,
     pode_gerir_financeiras,
+    pode_registrar_venda,
     pode_ver_custo,
     pode_ver_equipe,
+    pode_ver_financeiro,
     pode_ver_resultados_midia,
     usuario_atual,
 )
@@ -27,8 +30,12 @@ from app.loja.sales_overview import (  # noqa: E402
 )
 from app.main import (  # noqa: E402
     contexto,
+    csrf_valido,
     enriquecer_credenciais,
+    executar_cancelamento_venda,
+    executar_confirmacao_venda,
     get_chatbot_client,
+    get_estoque_client,
     get_motor_client,
     redirecionar_login,
     templates,
@@ -36,7 +43,9 @@ from app.main import (  # noqa: E402
 )
 from app.web.equipe import _membros_da_loja  # noqa: E402
 from app.clients.motor import MotorClient, MotorIndisponivel  # noqa: E402
-from app.models import Usuario  # noqa: E402
+from app.models import Usuario, Venda  # noqa: E402
+
+_LISTA = "/app/loja/vendas/lista"
 
 
 def _shell_desligado() -> JSONResponse:
@@ -60,9 +69,20 @@ def _fetch_resultados_api():
 
     client = RevyTrafegoClient()
 
-    def _fetch(*, loja_slug: str, periodo: str = "mes", modo: str = "last"):
+    def _fetch(
+        *,
+        loja_slug: str,
+        periodo: str = "mes",
+        modo: str = "last",
+        inicio: str | None = None,
+        fim: str | None = None,
+    ):
         return client.fetch_resultados(
-            loja_slug=loja_slug, periodo=periodo, modo=modo
+            loja_slug=loja_slug,
+            periodo=periodo,
+            modo=modo,
+            inicio=inicio,
+            fim=fim,
         )
 
     return _fetch
@@ -179,6 +199,88 @@ def loja_vendas_dados(
 
     overview = _montar_overview(usuario, db, chatbot, inicio, fim, motor=motor)
     return overview.to_dict()
+
+
+@router.get("/app/loja/vendas/lista", response_class=HTMLResponse)
+def loja_vendas_lista(
+    request: Request,
+    ok: str | None = None,
+    erro: str | None = None,
+    db: Session = Depends(get_db),
+):
+    """Registro de vendas dentro do shell: registrar, confirmar e cancelar.
+
+    Vendedor vê as próprias; dono/gerente veem as da loja.
+    """
+    if not _shell_ativo():
+        return _shell_desligado()
+
+    usuario = usuario_atual(request, db)
+    if not usuario:
+        return redirecionar_login()
+    if not _papel_autorizado(usuario):
+        return JSONResponse({"detail": "Forbidden"}, status_code=403)
+
+    consulta = db.query(Venda).filter(Venda.loja_slug == usuario.loja_slug)
+    if not pode_ver_financeiro(usuario):
+        consulta = consulta.filter(Venda.vendedor_email == usuario.email)
+    vendas = consulta.order_by(Venda.criada_em.desc()).all()
+
+    return templates.TemplateResponse(
+        "loja/vendas_lista.html",
+        contexto(
+            request,
+            usuario,
+            vendas=vendas,
+            escopo_proprio=not pode_ver_financeiro(usuario),
+            pode_agir=pode_confirmar_venda(usuario),
+            pode_registrar=pode_registrar_venda(usuario),
+            aviso_ok=ok,
+            aviso_erro=erro,
+            shell_loja=True,
+        ),
+    )
+
+
+@router.post("/app/loja/vendas/{venda_id}/confirmar")
+async def loja_venda_confirmar(
+    request: Request,
+    venda_id: str,
+    db: Session = Depends(get_db),
+    chatbot=Depends(get_chatbot_client),
+    estoque=Depends(get_estoque_client),
+):
+    """Mesma cascata da rota legada, sem tirar a pessoa do shell."""
+    if not _shell_ativo():
+        return _shell_desligado()
+
+    usuario = usuario_atual(request, db)
+    if not usuario:
+        return redirecionar_login()
+    form = await request.form()
+    if not pode_confirmar_venda(usuario) or not csrf_valido(request, form.get("csrf")):
+        return RedirectResponse(_LISTA, status_code=303)
+    resultado = executar_confirmacao_venda(db, usuario, venda_id, chatbot, estoque)
+    return RedirectResponse(f"{_LISTA}?{resultado}", status_code=303)
+
+
+@router.post("/app/loja/vendas/{venda_id}/cancelar")
+async def loja_venda_cancelar(
+    request: Request,
+    venda_id: str,
+    db: Session = Depends(get_db),
+):
+    if not _shell_ativo():
+        return _shell_desligado()
+
+    usuario = usuario_atual(request, db)
+    if not usuario:
+        return redirecionar_login()
+    form = await request.form()
+    if not pode_confirmar_venda(usuario) or not csrf_valido(request, form.get("csrf")):
+        return RedirectResponse(_LISTA, status_code=303)
+    resultado = executar_cancelamento_venda(db, usuario, venda_id, form.get("motivo"))
+    return RedirectResponse(f"{_LISTA}?{resultado}", status_code=303)
 
 
 @router.get("/app/loja/vendas/configuracoes-financeiras")

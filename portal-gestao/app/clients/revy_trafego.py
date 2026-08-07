@@ -39,15 +39,26 @@ class RevyTrafegoClient:
         loja_slug: str,
         periodo: str = "7d",
         modo: str = "last",
+        inicio: str | None = None,
+        fim: str | None = None,
     ) -> dict[str, Any] | None:
-        """GET /v1/lojas/{slug}/resultados. None se offline/erro/não configurado."""
+        """GET /v1/lojas/{slug}/resultados. None se offline/erro/não configurado.
+
+        Com ``inicio``/``fim`` a API usa a janela exata; sem eles, o seletor
+        ``periodo``.
+        """
         if not self.configurado:
             return None
+        params: dict[str, Any] = {"periodo": periodo, "modo": modo}
+        if inicio:
+            params["inicio"] = inicio
+        if fim:
+            params["fim"] = fim
         try:
             with httpx.Client(base_url=self.base_url, timeout=self.timeout) as client:
                 r = client.get(
                     f"/v1/lojas/{loja_slug}/resultados",
-                    params={"periodo": periodo, "modo": modo},
+                    params=params,
                     headers=self._headers(),
                 )
                 if r.status_code != 200:

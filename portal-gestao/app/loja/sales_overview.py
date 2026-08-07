@@ -119,6 +119,10 @@ class SalesOverview:
     # Aquisição (Control / Revy Tráfego / cálculo local)
     aquisicao: AquisicaoResumo | None = None
     aquisicao_status: str = "indisponivel"
+    # Detalhe por campanha/canal — só quando vem da API, que é quem sabe o gasto.
+    # O fallback local não tem número confiável por campanha; fica vazio.
+    aquisicao_campanhas: list[dict[str, Any]] = field(default_factory=list)
+    aquisicao_canais: list[dict[str, Any]] = field(default_factory=list)
 
     # Pendências acionáveis derivadas dos dados atuais
     pendencias: list[PendenciaAcao] = field(default_factory=list)
@@ -149,6 +153,8 @@ class SalesOverview:
             "funil_status": self.funil_status,
             "aquisicao": self.aquisicao.to_dict() if self.aquisicao else None,
             "aquisicao_status": self.aquisicao_status,
+            "aquisicao_campanhas": _serializar_linhas_midia(self.aquisicao_campanhas),
+            "aquisicao_canais": _serializar_linhas_midia(self.aquisicao_canais),
             "pendencias": [asdict(p) for p in self.pendencias],
             "mensagem": self.mensagem,
         }
@@ -158,6 +164,54 @@ def _dec_str(valor: Decimal | None) -> str | None:
     if valor is None:
         return None
     return str(valor.quantize(CENTAVOS, rounding=ROUND_HALF_UP))
+
+
+def _serializar_linhas_midia(linhas: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    saida = []
+    for linha in linhas:
+        item = {
+            chave: (_dec_str(valor) if isinstance(valor, Decimal) else valor)
+            for chave, valor in linha.items()
+        }
+        saida.append(item)
+    return saida
+
+
+def _dec_ou_none(valor: Any) -> Decimal | None:
+    if valor is None or valor == "":
+        return None
+    try:
+        return Decimal(str(valor))
+    except (ArithmeticError, TypeError, ValueError):
+        return None
+
+
+def _linhas_midia_da_api(payload: Mapping[str, Any] | None) -> tuple[list, list]:
+    """Campanhas e canais do payload da API, com Decimal já convertido.
+
+    Ordena campanha por gasto (maior primeiro): quem gasta mais é o que o dono
+    precisa olhar antes.
+    """
+    if not payload:
+        return [], []
+
+    def _linha(bruto: Mapping[str, Any], campos_decimais: tuple[str, ...]) -> dict:
+        item = dict(bruto)
+        for campo in campos_decimais:
+            if campo in item:
+                item[campo] = _dec_ou_none(item[campo])
+        return item
+
+    campanhas = [
+        _linha(c, ("gasto", "faturamento", "cpl", "cpa", "roas"))
+        for c in (payload.get("campanhas") or [])
+    ]
+    campanhas.sort(key=lambda c: c.get("gasto") or Decimal("0"), reverse=True)
+    canais = [
+        _linha(c, ("gasto", "faturamento", "roas"))
+        for c in (payload.get("canais") or [])
+    ]
+    return campanhas, canais
 
 
 def _serializar_metas(metas: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -382,16 +436,22 @@ def _carregar_aquisicao(
     chatbot: Any | None,
     fetch_resultados_api: Callable[..., dict | None] | None,
     revy_trafego_resultados_enabled: bool,
-) -> AquisicaoResumo:
-    """Tenta API (Control/Revy Tráfego); fallback local; nunca zera gasto ausente."""
+) -> tuple[AquisicaoResumo, list[dict], list[dict]]:
+    """Tenta API (Control/Revy Tráfego); fallback local; nunca zera gasto ausente.
+
+    Devolve também o detalhe por campanha e por canal quando a API responde — é
+    ela que conhece o gasto real por campanha.
+    """
     chatbot_offline = False
     api_payload = None
     if revy_trafego_resultados_enabled and fetch_resultados_api is not None:
         try:
-            # Período genérico: seletor "mes" se cobrir o mês corrente, senão janela custom via local
+            # Janela explícita: gasto e receita têm que sair do MESMO período, senão
+            # o ROAS divide receita filtrada por gasto de outra janela.
             api_payload = fetch_resultados_api(
                 loja_slug=loja_slug,
-                periodo="mes",
+                inicio=d_inicio.isoformat(),
+                fim=d_fim.isoformat(),
                 modo="last",
             )
         except Exception:
@@ -401,10 +461,17 @@ def _carregar_aquisicao(
         resumo = resumo_from_api(api_payload)
         periodo_api = api_payload.get("periodo") or {}
         chatbot_offline = bool(periodo_api.get("chatbot_offline"))
-        return _aquisicao_de_totais(
-            resumo.get("totais") or {},
-            fonte="api",
-            chatbot_offline=chatbot_offline,
+        # Do payload cru: resumo_from_api monta só os totais e os canais, e
+        # descarta a lista de campanhas — que é justamente o detalhe procurado.
+        campanhas, canais = _linhas_midia_da_api(api_payload)
+        return (
+            _aquisicao_de_totais(
+                resumo.get("totais") or {},
+                fonte="api",
+                chatbot_offline=chatbot_offline,
+            ),
+            campanhas,
+            canais,
         )
 
     if revy_trafego_resultados_enabled and fetch_resultados_api is not None:
@@ -434,27 +501,41 @@ def _carregar_aquisicao(
     )
     if not any(l.campanha_id is not None for l in linhas):
         if api_falhou:
-            return AquisicaoResumo(
-                status="parcial",
+            return (
+                AquisicaoResumo(
+                    status="parcial",
+                    google_status="indisponivel",
+                    fonte=None,
+                    mensagem="Aquisição parcial: fonte de mídia indisponível e sem campanhas locais.",
+                ),
+                [],
+                [],
+            )
+        return (
+            AquisicaoResumo(
+                status="indisponivel",
                 google_status="indisponivel",
                 fonte=None,
-                mensagem="Aquisição parcial: fonte de mídia indisponível e sem campanhas locais.",
-            )
-        return AquisicaoResumo(
-            status="indisponivel",
-            google_status="indisponivel",
-            fonte=None,
-            mensagem="Sem dados de aquisição no período.",
+                mensagem="Sem dados de aquisição no período.",
+            ),
+            [],
+            [],
         )
 
     totais = totais_roi(linhas)
     # resumo_periodo é usado só para garantir paridade com dashboard; totais_roi é a fonte.
     _ = resumo_periodo(linhas)
-    return _aquisicao_de_totais(
-        totais,
-        fonte="local",
-        chatbot_offline=chatbot_offline,
-        api_falhou=api_falhou,
+    # Fallback local não publica detalhe por campanha: sem o gasto que a API
+    # conhece, a linha por campanha enganaria mais do que informaria.
+    return (
+        _aquisicao_de_totais(
+            totais,
+            fonte="local",
+            chatbot_offline=chatbot_offline,
+            api_falhou=api_falhou,
+        ),
+        [],
+        [],
     )
 
 
@@ -754,9 +835,11 @@ def build_sales_overview(
     # --- Aquisição (somente visão completa) ---
     aquisicao: AquisicaoResumo | None = None
     aquisicao_status = "indisponivel"
+    aquisicao_campanhas: list[dict[str, Any]] = []
+    aquisicao_canais: list[dict[str, Any]] = []
     if escopo == "loja":
         try:
-            aquisicao = _carregar_aquisicao(
+            aquisicao, aquisicao_campanhas, aquisicao_canais = _carregar_aquisicao(
                 db,
                 loja_slug=loja_slug,
                 d_inicio=d_inicio,
@@ -774,6 +857,8 @@ def build_sales_overview(
                 mensagem="Não foi possível carregar aquisição.",
             )
             aquisicao_status = "parcial"
+            aquisicao_campanhas = []
+            aquisicao_canais = []
 
     # --- Pendências ---
     pendencias = _pendencias(
@@ -829,6 +914,8 @@ def build_sales_overview(
         funil_status=funil_status,
         aquisicao=aquisicao,
         aquisicao_status=aquisicao_status,
+        aquisicao_campanhas=aquisicao_campanhas,
+        aquisicao_canais=aquisicao_canais,
         pendencias=pendencias,
     )
 

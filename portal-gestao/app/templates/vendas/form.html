@@ -2,7 +2,15 @@
 {% block title %}Registrar venda — Gestão{% endblock %}
 {% block content %}
 <div class="page-heading">
-  <div><a class="back-link" href="/app/vendas">← Voltar às vendas</a><h1>Registrar venda</h1><p>O registro entra como <strong>registrada</strong> e depende de confirmação do gerente ou dono.</p></div>
+  <div><a class="back-link" href="{{ destino_vendas | default('/app/vendas') }}">← Voltar às vendas</a><h1>Registrar venda</h1>
+    <p>
+      {% if pode_confirmar %}
+      O registro entra como <strong>registrada</strong>. Confirme em seguida para fechar o negócio no sistema.
+      {% else %}
+      O registro entra como <strong>registrada</strong> e depende de confirmação do gerente ou dono.
+      {% endif %}
+    </p>
+  </div>
 </div>
 {% if erro %}<div class="alert error">{{ erro }}</div>{% endif %}
 {% for aviso in integracoes_avisos %}<div class="alert warning" role="alert">{{ aviso }}</div>{% endfor %}
@@ -52,6 +60,6 @@
     </div>
   </section>
   {% endif %}
-  <div class="form-actions"><a class="button ghost" href="/app/vendas">Cancelar</a><button class="button primary" type="submit">Registrar venda</button></div>
+  <div class="form-actions"><a class="button ghost" href="{{ destino_vendas | default('/app/vendas') }}">Cancelar</a><button class="button primary" type="submit">Registrar venda</button></div>
 </form>
 {% endblock %}

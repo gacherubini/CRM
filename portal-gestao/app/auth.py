@@ -74,7 +74,12 @@ def pode_registrar_venda(usuario: Usuario) -> bool:
 
 
 def pode_confirmar_venda(usuario: Usuario) -> bool:
-    return usuario.papel in {"dono", "gerente"}
+    """Quem fecha a venda a confirma — a confirmação é o gatilho do funil.
+
+    Decisão do dono: prender a confirmação em dono/gerente atrasava estoque,
+    Control e o Purchase da Meta. O escopo de loja segue valendo na rota.
+    """
+    return usuario.papel in {"dono", "gerente", "vendedor"}
 
 
 def pode_ver_financeiro(usuario: Usuario) -> bool:

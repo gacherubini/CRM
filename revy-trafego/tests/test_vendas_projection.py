@@ -2,7 +2,7 @@ from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
 from app.db import SessionLocal
-from app.models import VendaProjetada
+from app.models import Loja, VendaProjetada
 from app.vendas_projection import VendaSnapshot, projetar_venda
 
 
@@ -57,6 +57,104 @@ def test_projecao_rejeita_confirmacao_antiga_apos_cancelamento():
         assert atrasada.aplicada is False
         assert atrasada.motivo == "evento_antigo"
         assert atrasada.venda.status == "cancelada"
+    finally:
+        db.close()
+
+
+def test_projecao_vincula_loja_id_pelo_slug():
+    """Sem loja_id a venda some da Visao Geral do Control, que filtra por ele."""
+    db = SessionLocal()
+    try:
+        loja = Loja(nome="Loja A", slug="loja-a", status="ativa")
+        db.add(loja)
+        db.flush()
+
+        projetar_venda(db, _snapshot(loja_slug="loja-a"))
+        db.commit()
+
+        assert db.get(VendaProjetada, ("venda-igual", "loja-a")).loja_id == loja.id
+    finally:
+        db.close()
+
+
+def test_projecao_sem_loja_cadastrada_nao_quebra():
+    """Slug ainda nao provisionado no Control: projeta com loja_id nulo."""
+    db = SessionLocal()
+    try:
+        resultado = projetar_venda(db, _snapshot(loja_slug="loja-sem-cadastro"))
+        db.commit()
+
+        assert resultado.aplicada is True
+        assert resultado.venda.loja_id is None
+    finally:
+        db.close()
+
+
+def test_projecao_vincula_loja_id_em_venda_ja_existente():
+    """Venda orfa recebe o vinculo assim que a loja passa a existir."""
+    db = SessionLocal()
+    try:
+        projetar_venda(db, _snapshot(loja_slug="loja-a"))
+        db.commit()
+        assert db.get(VendaProjetada, ("venda-igual", "loja-a")).loja_id is None
+
+        loja = Loja(nome="Loja A", slug="loja-a", status="ativa")
+        db.add(loja)
+        db.flush()
+        projetar_venda(
+            db,
+            _snapshot(
+                loja_slug="loja-a",
+                atualizada_em=datetime(2026, 7, 29, 12, 0, tzinfo=timezone.utc),
+            ),
+        )
+        db.commit()
+
+        assert db.get(VendaProjetada, ("venda-igual", "loja-a")).loja_id == loja.id
+    finally:
+        db.close()
+
+
+def test_backfill_religa_vendas_orfas_sem_tocar_vinculos_existentes():
+    """Passivo anterior a correcao: vendas com loja_id NULL voltam para o Control."""
+    from app.control.backfill import religar_vendas_orfas
+
+    db = SessionLocal()
+    try:
+        certa = Loja(nome="Loja A", slug="loja-a", status="ativa")
+        outra = Loja(nome="Loja B", slug="loja-b", status="ativa")
+        db.add_all([certa, outra])
+        db.flush()
+
+        orfa = VendaProjetada(
+            id="venda-orfa",
+            loja_slug="loja-a",
+            preco_venda=Decimal("100"),
+            status="confirmada",
+            criada_em=datetime(2026, 7, 28, 12, 0, tzinfo=timezone.utc),
+            confirmada_em=datetime(2026, 7, 28, 12, 0, tzinfo=timezone.utc),
+            atualizada_em=datetime(2026, 7, 28, 12, 0, tzinfo=timezone.utc),
+        )
+        # Vínculo já correto não pode ser reescrito pelo slug.
+        vinculada = VendaProjetada(
+            id="venda-vinculada",
+            loja_slug="loja-a",
+            loja_id=outra.id,
+            preco_venda=Decimal("200"),
+            status="confirmada",
+            criada_em=datetime(2026, 7, 28, 12, 0, tzinfo=timezone.utc),
+            confirmada_em=datetime(2026, 7, 28, 12, 0, tzinfo=timezone.utc),
+            atualizada_em=datetime(2026, 7, 28, 12, 0, tzinfo=timezone.utc),
+        )
+        db.add_all([orfa, vinculada])
+        db.flush()
+
+        religadas = religar_vendas_orfas(db.connection())
+        db.commit()
+
+        assert religadas == 1
+        assert db.get(VendaProjetada, ("venda-orfa", "loja-a")).loja_id == certa.id
+        assert db.get(VendaProjetada, ("venda-vinculada", "loja-a")).loja_id == outra.id
     finally:
         db.close()
 

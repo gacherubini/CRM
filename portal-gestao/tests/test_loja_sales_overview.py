@@ -227,6 +227,39 @@ def test_falha_control_sem_campanhas_locais_parcial():
         db.close()
 
 
+def test_aquisicao_consulta_api_com_a_janela_escolhida():
+    """ROAS tem que dividir receita e gasto da MESMA janela.
+
+    Antes a chamada ia com periodo="mes" fixo: filtrar 7 dias devolvia vendas de
+    7 dias sobre gasto do mes inteiro.
+    """
+    _criar_venda(preco="10000", custo="8000")
+    d_inicio = date(2026, 7, 10)
+    d_fim = date(2026, 7, 16)
+    capturado: dict = {}
+
+    def fetch_espiao(**kwargs):
+        capturado.update(kwargs)
+        return None
+
+    db = SessionLocal()
+    try:
+        build_sales_overview(
+            db,
+            loja_slug="loja-teste",
+            papel="dono",
+            inicio=d_inicio,
+            fim=d_fim,
+            chatbot=ChatbotStub(),
+            fetch_resultados_api=fetch_espiao,
+            revy_trafego_resultados_enabled=True,
+        )
+        assert capturado.get("inicio") == d_inicio.isoformat()
+        assert capturado.get("fim") == d_fim.isoformat()
+    finally:
+        db.close()
+
+
 def test_vendedor_so_proprias_metricas():
     _criar_venda(preco="50000", custo="40000", vendedor="vendedor@loja.test")
     _criar_venda(preco="30000", custo="20000", vendedor="outro@loja.test")

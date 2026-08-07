@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% block title %}{% if escopo_proprio %}Minhas vendas{% else %}Vendas da loja{% endif %} — Revy Loja{% endblock %}
+{% block page_title %}{% if escopo_proprio %}Minhas vendas{% else %}Vendas da loja{% endif %}{% endblock %}
+{% block content %}
+<div class="page-heading">
+  <div>
+    <span class="eyebrow">Vendas</span>
+    <h1>{% if escopo_proprio %}Minhas vendas{% else %}Vendas da loja{% endif %}</h1>
+    <p>
+      {% if escopo_proprio %}
+      As vendas que você registrou. Confirmar é o que fecha o negócio no sistema.
+      {% else %}
+      Todas as vendas da loja. Confirmar é o que fecha o negócio no sistema.
+      {% endif %}
+    </p>
+  </div>
+  {% if pode_registrar %}
+  <div class="heading-actions">
+    <a class="button primary" href="/app/vendas/nova?origem=loja">Registrar venda</a>
+  </div>
+  {% endif %}
+</div>
+
+{% if aviso_ok == 'confirmada' %}<div class="alert success" role="status">Venda confirmada.</div>{% endif %}
+{% if aviso_ok == 'ja-confirmada' %}<div class="alert success" role="status">Esta venda já estava confirmada.</div>{% endif %}
+{% if aviso_ok == 'registrada' %}<div class="alert success" role="status">Venda registrada. Confirme para fechar o negócio.</div>{% endif %}
+{% if aviso_ok == 'cancelada' %}<div class="alert success" role="status">Venda cancelada.</div>{% endif %}
+{% if aviso_ok == 'cancelada-estoque-mantido' %}<div class="alert warning" role="status">Venda cancelada. O veículo continua baixado no estoque.</div>{% endif %}
+{% if aviso_erro == 'motivo' %}<div class="alert error" role="alert">Informe o motivo para cancelar.</div>{% endif %}
+{% if aviso_erro == 'acao' %}<div class="alert error" role="alert">Não foi possível agir sobre esta venda.</div>{% endif %}
+{% if aviso_erro == 'lead' %}<div class="alert error" role="alert">O lead vinculado não existe mais nesta loja.</div>{% endif %}
+{% if aviso_erro == 'chatbot-indisponivel' %}<div class="alert error" role="alert">Atendimento indisponível agora. Tente confirmar em instantes.</div>{% endif %}
+{% if aviso_erro == 'veiculo' %}<div class="alert error" role="alert">O veículo vinculado não existe mais nesta loja.</div>{% endif %}
+{% if aviso_erro == 'conflito-estoque' %}<div class="alert error" role="alert">O veículo já não está disponível para venda.</div>{% endif %}
+{% if aviso_erro == 'estoque-indisponivel' %}<div class="alert error" role="alert">Estoque indisponível agora. Tente confirmar em instantes.</div>{% endif %}
+{% if aviso_erro == 'reconciliacao' %}<div class="alert error" role="alert">O veículo foi baixado mas a venda não gravou. Confira antes de repetir.</div>{% endif %}
+{% if aviso_erro == 'loja-nao-operacional' %}<div class="alert error" role="alert">A loja não está operacional no momento.</div>{% endif %}
+
+<section class="panel">
+  {% if not vendas %}
+  <div class="empty">
+    <strong>Nenhuma venda registrada ainda.</strong>
+    <p>Fechou negócio? Registre a venda — é o que leva o resultado para o painel e para a campanha.</p>
+  </div>
+  {% else %}
+  <ul class="list-rows">
+    {% for venda in vendas %}
+    <li>
+      <div>
+        <strong>{{ venda.descricao }}</strong>
+        <small class="muted">
+          {{ formatar_brl(venda.preco_venda) }}
+          · {{ formatar_data(venda.criada_em) }}
+          {% if not escopo_proprio %} · {{ venda.vendedor_email }}{% endif %}
+          {% if venda.status == 'cancelada' and venda.motivo_cancelamento %}
+          · motivo: {{ venda.motivo_cancelamento }}
+          {% endif %}
+        </small>
+      </div>
+      <div class="heading-actions">
+        <span class="status {{ venda.status }}">{{ venda.status | capitalize }}</span>
+        {% if pode_agir and venda.status == 'registrada' %}
+        <form method="post" action="/app/loja/vendas/{{ venda.id }}/confirmar">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          <button class="button primary" type="submit">Confirmar</button>
+        </form>
+        <form method="post" action="/app/loja/vendas/{{ venda.id }}/cancelar">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          <input type="text" name="motivo" placeholder="Motivo do cancelamento" required aria-label="Motivo do cancelamento">
+          <button class="button ghost" type="submit">Cancelar</button>
+        </form>
+        {% endif %}
+      </div>
+    </li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+</section>
+{% endblock %}
