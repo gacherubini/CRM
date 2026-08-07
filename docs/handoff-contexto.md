@@ -1,6 +1,6 @@
 # Handoff técnico
 
-Atualizado em **2026-08-04**. Este arquivo registra somente o checkpoint atual.
+Atualizado em **2026-08-07**. Este arquivo registra somente o checkpoint atual.
 Histórico detalhado permanece no Git; não acumular “checkpoints anteriores” aqui.
 
 Leia primeiro:
@@ -11,6 +11,22 @@ Leia primeiro:
 
 ## Checkpoint de código
 
+- **Entregas 2026-08-07 (main `a2a11f5`, LIVE app2037 v114):** 3 features no bundle —
+  1. **Revy Control — Visão Geral de negócio** (`/trafego/app/control/dashboard`): cards
+     Lojas ativas / Vendas no mês (Δ%) / Ticket médio / Leads na rede + tabela "Desempenho
+     por loja" (só ativas) + "Destaques". Read model `network_overview`
+     (`revy-trafego/app/control/dashboard.py`): vendas/ticket de `vendas_projetadas`
+     (filtro `status=="confirmada"`); leads via `_ChatbotLeadsPort` HTTP (retries=0/timeout=3s,
+     em `control_ui.py`). **Sem coluna/painel de Meta nesta fase** (Portal→Control não projeta
+     metas ainda).
+  2. **Filtro lojas ativas**: seletor lateral do Control mostra só `StoreStatus.ACTIVE`
+     (`_selector_stores`); a gestão "Lojas" continua listando todas.
+  3. **Revy Loja — Desempenho do agente** (`/app/loja/agente`): métricas do BOT (atendimentos,
+     transferidos+%, gráfico CSS por dia) + card Simulações **placeholder "em construção"**.
+     Consome endpoint NOVO do Chatbot `GET /v1/atendimento/resumo` (SQL sobre `conversas`).
+  - Sem migration nova (lê tabelas existentes). Flags já ON no app2037 (são **secrets**, e o
+    secret vence o `[env]="0"` do toml). Spec/plano em
+    `docs/superpowers/{specs,plans}/2026-08-07-control-overview-loja-agente*`.
 - Revy Control lean F0–F6 está implementado em `revy-trafego`.
 - Revy Loja lean F0–F6/F8 está implementado em `portal-gestao`.
 - **Entregas 2026-08-03 (main):** Atendimento com chat humano + poll `after_id`; Perfil
@@ -35,12 +51,14 @@ Leia primeiro:
 
 ## Validação conhecida
 
-- chatbot-api (2026-08-04): **274** passed; gate n8n **13** cenários; testes de
-  replay/debounce e fallback temporário passaram; ambos os workflows validados com 30 nós.
-- Suítes anteriores (2026-07-31): portal-gestao **471**, revy-trafego **361**
-  (+1 falha pré-existente outbox motor), catalogo-publico **53**.
+- Suítes (2026-08-07, no resultado do merge `a2a11f5`): revy-trafego **461**
+  (+1 falha pré-existente outbox motor), chatbot-api **297**, portal-gestao **551**.
+  Rodadas com `python` global (não havia `.venv` no checkout).
 - A falha é `revy-trafego/tests/test_control_provisioning_outbox.py::test_process_pending_falha_marca_failed_e_incrementa_attempts`:
-  teste estagnado desde `573348e` (`"motor"` em `DEFAULT_PROVISIONING_TARGETS`).
+  teste estagnado desde `573348e` (`"motor"` em `DEFAULT_PROVISIONING_TARGETS`);
+  **confirmado que falha no `main` também** (não é regressão da entrega de 07/08).
+- chatbot-api: rodar ignorando dirs temporários travados de runs paralelos
+  (`--ignore=test-tmp-run4 --ignore=test-tmp-run5`) — são scratch gitignored, não código.
 
 ## Estado operacional
 
@@ -101,6 +119,17 @@ powershell -File deploy\fly\3vm\upload-and-import-workflow.ps1 -Mode production
 
 ## Pendências reais
 
+- **Visão Geral do Control (entrega 07/08) — 2 decisões de produto (não são bugs):**
+  1. **Conversão mistura janelas:** vendas *do mês* ÷ leads *acumulados* (o Chatbot
+     `listar_leads` não filtra por data). Opções: alinhar período (novo endpoint no Chatbot,
+     já previsto no spec como fase futura) ou rotular a coluna como "leads (acumulado)".
+  2. **Âncora do mês diverge:** `network_overview` conta por `confirmada_em`; o
+     `financeiro_calc` do Portal conta por `criada_em` — os dois "vendas do mês" podem
+     discordar. Decidir a âncora canônica e uniformizar.
+- **Fase 2 do Control (diferida):** projeção de **metas** Portal→Control (habilita coluna
+  Meta + painel "Meta da rede" + atingimento); endpoint bulk de leads por rede (hoje é loop
+  por loja no escopo). Card **Simulações** no agente da Loja segue placeholder até a simulação
+  estabilizar.
 - Smoke bot e só então Active ON definitivo: virgem/CTWA atende; salvo/`chatFound` cala;
   handoff cala; rajada gera uma resposta; replay antigo não responde; estoque vazio oferece
   simulação sem fotos.
