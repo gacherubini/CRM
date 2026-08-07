@@ -35,21 +35,19 @@
 
 :root,
 [data-theme="light"] {
-  /* Paleta clara "suave" alinhada a landing: off-white quente no lugar de branco
-     puro, tinta suave no lugar de preto puro. "Canvas medio": o fundo da pagina
-     e um greige quente e os cards (--surface) sao brancos e flutuam por cima.
-     Isso tira a sensacao de "branco estourado" sem escurecer o tema. */
+  /* Paleta clara "suave" alinhada a landing (site/index.html): off-white #f9f9f9
+     no lugar de branco puro, tinta suave #1b1b1b, cinzas quentes. Canvas "suave"
+     = mesmo nivel do site (fundo levemente off-white, cards brancos por cima). */
   --ink: #1b1b1b;
-  --ink-soft: #544e4c;
-  /* Muted precisa passar AA tambem sobre --surface-raised (#e9e4db), nao so
-     sobre branco: #635a57 da ~5:1 ali; tons mais claros reprovavam. */
-  --ink-muted: #635a57;
-  --paper: #f1ede6;
+  --ink-soft: #57514f;
+  /* #6b625f passa AA (~5:1) sobre o fundo #f9f9f9 e sobre --surface-raised. */
+  --ink-muted: #6b625f;
+  --paper: #f9f9f9;
   --surface: #ffffff;
-  --surface-raised: #e9e4db;
-  --surface-soft: #e3ddd2;
-  --line: #ddd5c9;
-  --line-strong: #cfc6b8;
+  --surface-raised: #f4f2f1;
+  --surface-soft: #efeceb;
+  --line: #ded8d9;
+  --line-strong: #cdc6c4;
   --accent: #1b1b1b;
   --accent-soft: #3a3534;
   --green: #0d7a4f;
@@ -59,7 +57,7 @@
   --amber: #8a6d1d;
   --red: #b42318;
   --radius: 12px;
-  --shadow: 0 1px 2px rgba(50, 40, 28, .06);
+  --shadow: 0 1px 2px rgba(27, 20, 20, .05);
 }
 
 [data-theme="dark"] {
@@ -2077,6 +2075,9 @@ tr:hover td { background: var(--surface-soft); }
 
 /* Marca: o quadradinho R/C passa a usar a cor da marca */
 .brand-mark { background: var(--brand); color: var(--brand-ink); }
+/* ...mas no modo claro a logo e PRETA (tinta neutra, como a wordmark do site);
+   o acento de marca segue azul. Escuro intocado (logo segue a marca). */
+[data-theme="light"] .brand-mark { background: var(--ink); color: var(--paper); }
 
 /* Foco visivel na cor da marca */
 :focus-visible { outline-color: var(--brand); }
