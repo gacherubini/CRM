@@ -29,6 +29,7 @@ def test_nav_somente_vendas_e_estoque_com_acessos_bancarios():
     assert labels == [
         "Visão geral",
         "Atendimento",
+        "Simulações",
         "Visão geral",
         "Veículos",
         "Ordem na vitrine",
@@ -41,6 +42,7 @@ def test_nav_somente_vendas_e_estoque_com_acessos_bancarios():
     hrefs = {i.href for i in items}
     assert "/app/loja/vendas" in hrefs
     assert "/app/loja/atendimento" in hrefs
+    assert "/app/simulacoes" in hrefs
     assert "/app/loja/estoque" in hrefs
     assert "/app/loja/estoque/veiculos" in hrefs
     assert "/app/financeiras" in hrefs
@@ -67,6 +69,8 @@ def test_nav_vendedor_sem_acessos_bancarios():
     sections = build_nav(_store(roles=("vendedor",)), _ents(), shell_enabled=True)
     items = flatten_nav(sections)
     assert not any(i.href == "/app/financeiras" for i in items)
+    # Vendedor simula (pode_simular inclui vendedor) → link no menu Vendas
+    assert any(i.href == "/app/simulacoes" for i in items)
     # Vendedor também vê Perfil (Conta), mas não Ajustes
     assert any(i.href == "/app/loja/perfil" for i in items)
     assert "Ajustes" not in [s.title for s in sections]
@@ -121,8 +125,9 @@ def test_shell_on_exibe_brand_e_nav_modulos(client, monkeypatch):
     assert 'href="/app/loja/atendimento"' in r.text
     assert 'href="/app/loja/estoque"' in r.text
     assert 'href="/app/loja/estoque/veiculos"' in r.text
-    # Menu técnico some do shell
-    assert 'href="/app/simulacoes"' not in r.text
+    # Simulações é ferramenta de Vendas: presente no shell (sob a seção Vendas)
+    assert 'href="/app/simulacoes"' in r.text
+    # Config técnica continua fora do shell
     assert 'href="/app/configuracoes"' not in r.text
     assert 'href="/app/equipe"' not in r.text
 
