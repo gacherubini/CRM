@@ -33,7 +33,7 @@ def test_nav_somente_vendas_e_estoque_com_acessos_bancarios():
         "Simulações",
         "Situação do estoque",
         "Veículos",
-        "Ordem na vitrine",
+        "Vitrine",
         "Acessos bancários",
         "Grupo do estoque",
         "Integrações",

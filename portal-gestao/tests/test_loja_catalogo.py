@@ -1,4 +1,4 @@
-"""WhatsApp do catálogo embutido em Números de WhatsApp (sem item de menu)."""
+"""Configuração do catálogo/vitrine — vive em Estoque › Vitrine."""
 from conftest import csrf_da_resposta, login
 
 
@@ -15,6 +15,9 @@ class _EstoqueFake:
             "whatsapp": self.whatsapp,
             "catalogo_url": self.catalogo_url or None,
         }
+
+    def listar(self, **filtros):
+        return []
 
     def atualizar_loja(self, *, whatsapp=..., catalogo_url=...):
         body = {}
@@ -44,22 +47,25 @@ def test_whatsapp_exibe_e_salva_catalogo(client, monkeypatch):
     fake = _EstoqueFake()
 
     from app.main import app
-    from app.web import loja_whatsapp
+    from app.web import loja_estoque, loja_whatsapp
 
     class _ChatbotFake:
         def listar_canais_whatsapp(self):
             return []
 
     app.dependency_overrides[loja_whatsapp.get_estoque_client] = lambda: fake
+    app.dependency_overrides[loja_estoque.get_estoque_client] = lambda: fake
     app.dependency_overrides[loja_whatsapp.get_chatbot_client] = lambda: _ChatbotFake()
     try:
         login(client)
-        get = client.get("/app/loja/whatsapp")
+        get = client.get("/app/loja/estoque/vitrine")
         assert get.status_code == 200
         assert "Catálogo e vitrine" in get.text or "Link do catálogo" in get.text
         assert 'value="5511999999999"' in get.text
         assert 'name="catalogo_url"' in get.text
-        assert 'href="/app/loja/catalogo"' not in get.text or "catalogo-wa" in get.text
+        # Números de WhatsApp deixou de carregar a configuração da vitrine.
+        numeros = client.get("/app/loja/whatsapp")
+        assert "Catálogo e vitrine" not in numeros.text
 
         csrf = csrf_da_resposta(get)
         post = client.post(
@@ -72,7 +78,7 @@ def test_whatsapp_exibe_e_salva_catalogo(client, monkeypatch):
             follow_redirects=False,
         )
         assert post.status_code == 303
-        assert "/app/loja/whatsapp" in post.headers["location"]
+        assert "/app/loja/estoque/vitrine" in post.headers["location"]
         assert fake.patches == [
             {
                 "whatsapp": "(21) 98888-7777",
@@ -80,8 +86,9 @@ def test_whatsapp_exibe_e_salva_catalogo(client, monkeypatch):
             }
         ]
 
-        after = client.get("/app/loja/whatsapp")
+        after = client.get("/app/loja/estoque/vitrine")
         assert "atualizad" in after.text.lower()
     finally:
         app.dependency_overrides.pop(loja_whatsapp.get_estoque_client, None)
+        app.dependency_overrides.pop(loja_estoque.get_estoque_client, None)
         app.dependency_overrides.pop(loja_whatsapp.get_chatbot_client, None)

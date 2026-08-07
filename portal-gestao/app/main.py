@@ -237,6 +237,39 @@ def formatar_horario(iso: str | None) -> str:
     return momento.astimezone(_TZ_EXIBICAO).strftime("%d/%m %H:%M")
 
 
+def tempo_relativo(iso: str | None, *, agora: datetime | None = None) -> str:
+    """Há quanto tempo foi ``iso``: "agora", "12 min", "3 h", "2 d", "5 sem".
+
+    A fila de atendimento não mostrava tempo nenhum: dava para ler a última
+    mensagem mas não para saber se o cliente esperou 5 minutos ou 5 dias, que é
+    a decisão primária daquela tela.
+    """
+    if not iso:
+        return "—"
+    try:
+        momento = datetime.fromisoformat(str(iso).strip().replace("Z", "+00:00"))
+    except ValueError:
+        return "—"
+    if momento.tzinfo is None:
+        momento = momento.replace(tzinfo=timezone.utc)
+    referencia = agora or datetime.now(timezone.utc)
+    segundos = (referencia - momento).total_seconds()
+    if segundos < 0:
+        return "agora"
+    if segundos < 90:
+        return "agora"
+    minutos = segundos / 60
+    if minutos < 60:
+        return f"{int(minutos)} min"
+    horas = minutos / 60
+    if horas < 24:
+        return f"{int(horas)} h"
+    dias = horas / 24
+    if dias < 7:
+        return f"{int(dias)} d"
+    return f"{int(dias // 7)} sem"
+
+
 def formatar_data(iso: str | None) -> str:
     """ISO (2026-07-01) -> 01/07/2026. Devolve a entrada se nao for data."""
     if not iso:
@@ -290,6 +323,7 @@ def formatar_duracao(segundos) -> str:
 templates.env.globals["mascarar_telefone"] = mascarar_telefone
 templates.env.globals["formatar_horario"] = formatar_horario
 templates.env.globals["formatar_data"] = formatar_data
+templates.env.globals["tempo_relativo"] = tempo_relativo
 templates.env.globals["mascarar_cpf"] = mascarar_cpf
 templates.env.globals["formatar_brl"] = formatar_brl
 templates.env.globals["formatar_percentual"] = formatar_percentual

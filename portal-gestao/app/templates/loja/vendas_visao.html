@@ -112,11 +112,11 @@
   <div class="empty"><strong>Nenhum lead no período.</strong><p>Novos contatos aparecem aqui assim que entrarem no funil.</p></div>
   {% else %}
   <div class="metric-grid">
-    <div class="metric">
+    <a class="metric metric-link" href="/app/loja/atendimento">
       <span>{% if overview.escopo == 'vendedor' %}Leads atribuídos{% else %}Leads no período{% endif %}</span>
       <strong>{% if overview.leads_count is not none %}{{ overview.leads_count }}{% else %}—{% endif %}</strong>
-      <small>{% if overview.funil_status == 'parcial' %}dados parciais{% else %}coorte do período{% endif %}</small>
-    </div>
+      <small>{% if overview.funil_status == 'parcial' %}dados parciais{% else %}coorte do período{% endif %} · abrir fila</small>
+    </a>
     {% if overview.funil and overview.funil.taxa_resposta_pct is defined and overview.funil.taxa_resposta_pct is not none %}
     <div class="metric">
       <span>Taxa de resposta</span>
@@ -132,16 +132,16 @@
     </div>
     {% endif %}
     {% if overview.funil and overview.funil.auditavel and overview.funil.auditavel.disponivel %}
-    <div class="metric">
+    <a class="metric metric-link" href="/app/loja/atendimento?estado=em_atendimento">
       <span>Atendidos</span>
       <strong>{{ overview.funil.auditavel.atendidos }}</strong>
-      <small>handoff no período</small>
-    </div>
-    <div class="metric">
+      <small>passaram para uma pessoa · abrir fila</small>
+    </a>
+    <a class="metric metric-link" href="/app/loja/atendimento?estado=vendido">
       <span>Vendas vinculadas</span>
       <strong>{{ overview.funil.auditavel.vendas_vinculadas }}</strong>
-      <small>lead elegível + venda confirmada</small>
-    </div>
+      <small>lead + venda confirmada · abrir fila</small>
+    </a>
     {% endif %}
   </div>
   {% endif %}

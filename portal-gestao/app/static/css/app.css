@@ -2798,3 +2798,52 @@ a.vitrine-page-btn:hover {
   .split-legend { grid-template-columns: 1fr; gap: var(--space-3); }
   .day-chart-track { height: 140px; }
 }
+
+/* ===========================================================================
+   Fila de atendimento (Revy Loja) — /app/loja/atendimento
+   O badge de canal vinha de um <style> inline escrito para o tema escuro
+   (rgba(255,255,255,...)): com a paleta clara como default ficava branco sobre
+   branco. Agora usa tokens e le nos dois temas.
+   =========================================================================== */
+.canal-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: .35rem;
+  padding: .15rem .5rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface-soft);
+  color: var(--ink-soft);
+  font-size: var(--text-xs);
+  white-space: nowrap;
+}
+.canal-badge.inativo,
+.canal-badge.desconectado {
+  border-color: color-mix(in srgb, var(--amber) 40%, var(--line));
+  color: var(--ink-muted);
+}
+
+/* Quanto o cliente esperou: e a decisao primaria da tela, entao alinha em
+   coluna e usa numeros tabulares. */
+.fila-espera {
+  color: var(--ink-soft);
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* Metrica clicavel: o funil da visao de Vendas parava no numero — cada um
+   agora abre a fila de atendimento no recorte correspondente. */
+a.metric-link {
+  display: block;
+  color: inherit;
+  text-decoration: none;
+  transition: border-color .12s ease, background .12s ease;
+}
+a.metric-link:hover,
+a.metric-link:focus-visible {
+  border-color: var(--brand);
+  background: var(--brand-tint);
+}
+a.metric-link:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) { a.metric-link { transition: none; } }

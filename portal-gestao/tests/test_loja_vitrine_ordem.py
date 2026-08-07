@@ -1,4 +1,4 @@
-"""Tela Ordem na vitrine — grade, paginação e save da ordem global."""
+"""Tela Vitrine — grade, paginação, save da ordem e config do catálogo."""
 from conftest import csrf_da_resposta, login
 
 
@@ -48,7 +48,9 @@ def test_vitrine_renderiza_e_salva_ordem(client, monkeypatch):
         login(client)
         get = client.get("/app/loja/estoque/vitrine")
         assert get.status_code == 200
-        assert "Ordem na vitrine" in get.text
+        # "Ordem na vitrine" virou "Vitrine": a tela passou a reunir toda a
+        # configuração da vitrine, não só a ordenação.
+        assert "Vitrine" in get.text
         assert "Moto 0" in get.text
         assert "data-vitrine-grid" in get.text
         assert "vitrine-grid" in get.text

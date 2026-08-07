@@ -105,7 +105,6 @@ def loja_whatsapp_canais(
         erro = str(exc)
 
     view = montar_canais_view(canais, erro=erro)
-    catalogo_wa, catalogo_url, catalogo_erro = _carregar_meta_catalogo(estoque)
     return templates.TemplateResponse(
         "loja/whatsapp_canais.html",
         contexto(
@@ -118,10 +117,6 @@ def loja_whatsapp_canais(
             qr=qr_efemero.consumir(request.session.pop("canal_qr_token", None)),
             acao_erro=request.session.pop("canal_erro", None),
             acao_mensagem=request.session.pop("canal_mensagem", None),
-            catalogo_whatsapp=catalogo_wa,
-            catalogo_url=catalogo_url,
-            catalogo_erro=catalogo_erro or request.session.pop("catalogo_erro", None),
-            catalogo_mensagem=request.session.pop("catalogo_mensagem", None),
         ),
         headers={"Cache-Control": "no-store"},
     )
@@ -155,7 +150,9 @@ def loja_whatsapp_catalogo_salvar(
         request.session["catalogo_erro"] = (
             str(exc) or "Não foi possível salvar as configurações do catálogo."
         )
-    return RedirectResponse(_TELA + "#catalogo-wa", status_code=303)
+    # O painel mora na Vitrine (Estoque): toda a configuração do catálogo
+    # público num lugar só.
+    return RedirectResponse("/app/loja/estoque/vitrine#catalogo-wa", status_code=303)
 
 
 async def _guarda(request: Request, db: Session):

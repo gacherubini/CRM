@@ -208,6 +208,12 @@ def loja_estoque_vitrine(
                 }
             )
 
+    # Configuração da vitrine (CTA + link do catálogo) morava em Ajustes >
+    # Números de WhatsApp, longe da ordenação. Agora vive aqui, junto.
+    from app.web.loja_whatsapp import _carregar_meta_catalogo
+
+    catalogo_wa, catalogo_url, catalogo_erro = _carregar_meta_catalogo(estoque)
+
     showing_from = offset + 1 if veiculos else 0
     showing_to = offset + len(veiculos)
     all_ids = [str(v.get("id") or "") for v in todos if v.get("id")]
@@ -229,6 +235,10 @@ def loja_estoque_vitrine(
             showing_to=showing_to,
             erro=erro,
             mensagem=mensagem,
+            catalogo_whatsapp=catalogo_wa,
+            catalogo_url=catalogo_url,
+            catalogo_erro=catalogo_erro or request.session.pop("catalogo_erro", None),
+            catalogo_mensagem=request.session.pop("catalogo_mensagem", None),
             pode_gerir=True,
         ),
     )

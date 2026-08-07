@@ -1,11 +1,11 @@
 {% extends "base.html" %}
-{% block title %}Ordem na vitrine — Revy Loja{% endblock %}
-{% block page_title %}Ordem na vitrine{% endblock %}
+{% block title %}Vitrine — Revy Loja{% endblock %}
+{% block page_title %}Vitrine{% endblock %}
 {% block content %}
 <div class="page-heading">
   <div>
     <span class="eyebrow">Estoque</span>
-    <h1>Ordem na vitrine</h1>
+    <h1>Vitrine</h1>
     <p>
       Arraste as fotos para montar a ordem do catálogo público (mesma grade e
       paginação da vitrine). As mudanças só vão pro ar quando você clicar em
@@ -13,10 +13,62 @@
     </p>
   </div>
   <div class="heading-actions">
-    <a class="button secondary" href="/app/loja/estoque">Visão geral</a>
+    <a class="button secondary" href="/app/loja/estoque">Situação do estoque</a>
     <a class="button secondary" href="/app/loja/estoque/veiculos">Veículos</a>
   </div>
 </div>
+
+{% if catalogo_erro %}<div class="alert warning" role="alert">{{ catalogo_erro }}</div>{% endif %}
+{% if catalogo_mensagem %}<div class="alert success" role="status">{{ catalogo_mensagem }}</div>{% endif %}
+
+<section class="panel" id="catalogo-wa" aria-labelledby="catalogo-wa-titulo">
+  <div class="panel-heading">
+    <div>
+      <span class="mono-label">Catálogo</span>
+      <h2 id="catalogo-wa-titulo">Catálogo e vitrine</h2>
+    </div>
+  </div>
+  <div class="panel-body">
+    <p class="muted">
+      Configure o WhatsApp do botão <strong>Tenho interesse</strong> na vitrine
+      e o link do catálogo que o bot envia quando o cliente pede para ver as motos.
+    </p>
+    <form method="post" action="/app/loja/whatsapp/catalogo" class="stack-form">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <label>WhatsApp da vitrine (CTA)
+        <input
+          name="whatsapp"
+          type="tel"
+          inputmode="tel"
+          autocomplete="tel"
+          maxlength="32"
+          placeholder="Ex.: (11) 98888-7777"
+          value="{{ catalogo_whatsapp or '' }}"
+        >
+      </label>
+      <p class="muted" style="margin-top:-0.5rem">
+        Aceita DDD + número ou DDI 55. Em branco remove o botão de contato na vitrine.
+      </p>
+      <label>Link do catálogo (bot)
+        <input
+          name="catalogo_url"
+          type="url"
+          inputmode="url"
+          autocomplete="url"
+          maxlength="500"
+          placeholder="Ex.: https://app2037.fly.dev/catalogo/l/sua-loja"
+          value="{{ catalogo_url or '' }}"
+        >
+      </label>
+      <p class="muted" style="margin-top:-0.5rem">
+        URL completa (https://…). Quando o cliente pedir para ver as motos ou o estoque,
+        o bot manda este link. Em branco o bot não envia catálogo.
+      </p>
+      <button class="button primary" type="submit">Salvar</button>
+    </form>
+  </div>
+</section>
+
 
 {% if erro %}<div class="alert warning" role="alert">{{ erro }}</div>{% endif %}
 {% if mensagem %}<div class="alert success" role="status">{{ mensagem }}</div>{% endif %}

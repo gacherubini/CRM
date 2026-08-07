@@ -98,7 +98,7 @@ def build_nav(
                         active_prefix="/app/loja/estoque/veiculos",
                     ),
                     NavItem(
-                        label="Ordem na vitrine",
+                        label="Vitrine",
                         href="/app/loja/estoque/vitrine",
                         section="Estoque",
                         module=Module.ESTOQUE.value,
