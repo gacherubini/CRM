@@ -119,7 +119,12 @@ TASK_LEASE_SECONDS = int(
 
 # Fly Machines API (orquestrador na API — nunca no worker on-demand).
 FLY_API_BASE = (os.getenv("FLY_API_BASE") or "https://api.machines.dev").rstrip("/")
-FLY_APP_NAME = (os.getenv("FLY_APP_NAME") or os.getenv("FLY_APP") or "motor2037").strip()
+# NÃO ler FLY_APP_NAME aqui: o Fly injeta essa var reservada = app da própria
+# machine (app2037 no bundle). O alvo do wake é SEMPRE o app dos workers
+# Playwright (motor2037), então usamos uma var dedicada com default correto.
+FLY_APP_NAME = (
+    os.getenv("MOTOR_FLY_APP_NAME") or os.getenv("FLY_APP") or "motor2037"
+).strip()
 # Token app-scoped; vazio desliga wake real (fake em testes / lab sem token).
 FLY_API_TOKEN = (os.getenv("FLY_API_TOKEN") or os.getenv("MOTOR_FLY_API_TOKEN") or "").strip()
 FLY_START_TIMEOUT_SECONDS = float(os.getenv("MOTOR_FLY_START_TIMEOUT_SECONDS", "8"))
