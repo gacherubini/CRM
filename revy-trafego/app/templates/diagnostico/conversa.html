@@ -1,23 +1,48 @@
 {% extends "base.html" %}
-{% block title %}Conversa — Revy Tráfego{% endblock %}
+{% block title %}Conversa — Revy Control{% endblock %}
 {% block page_title %}Conversa{% endblock %}
 {% block content %}
+{# Estilos: .chat-panel / .thread / .bolha / .thread-day em app.css #}
 <div class="page-heading">
   <div>
-    <span class="eyebrow">Diagnóstico</span>
+    <span class="eyebrow">Leads</span>
     <h1>Conversa {{ mascarar_telefone(telefone) }}</h1>
+    <p>Histórico do WhatsApp. Somente leitura — para responder, use o Atendimento na Revy Loja.</p>
   </div>
-  <a class="button secondary" href="{{ public_path('/app/diagnostico/leads') }}">Voltar</a>
+  <a class="button secondary" href="{{ public_path('/app/diagnostico/leads') }}">Voltar para leads</a>
 </div>
+
 {% if erro %}<div class="alert error">{{ erro }}</div>{% endif %}
-<section class="panel">
-  {% for m in mensagens %}
-  <div style="margin-bottom:10px;padding:8px;border-left:3px solid var(--border)">
-    <small class="muted">{{ m.direcao }} · {{ formatar_horario(m.criada_em) }}</small>
-    <div>{{ m.texto }}</div>
+
+<section class="panel chat-panel">
+  <div class="chat-panel-header">
+    <div>
+      <strong>{{ mascarar_telefone(telefone) }}</strong>
+      <small class="muted">
+        {% if mensagens %}{{ mensagens | length }} mensagem{{ '' if mensagens | length == 1 else 's' }}{% else %}sem mensagens{% endif %}
+      </small>
+    </div>
+    <p class="thread-legend">
+      <span><span class="legend-swatch entrada" aria-hidden="true"></span>Cliente</span>
+      <span><span class="legend-swatch saida" aria-hidden="true"></span>Loja</span>
+    </p>
   </div>
-  {% else %}
-  <p class="muted">Sem mensagens.</p>
-  {% endfor %}
+
+  <div class="thread" role="log" aria-label="Mensagens da conversa">
+    {% set ns = namespace(dia='') %}
+    {% for m in mensagens %}
+    {% set dia = dia_conversa(m.criada_em) %}
+    {% if dia != ns.dia %}
+    <div class="thread-day"><span>{{ dia }}</span></div>
+    {% set ns.dia = dia %}
+    {% endif %}
+    <div class="bolha {{ 'saida' if m.direcao == 'saida' else 'entrada' }}">{{ m.texto or '—' }}<small>{{ hora_conversa(m.criada_em) }}</small></div>
+    {% else %}
+    <div class="thread-empty">
+      <strong>Nenhuma mensagem nesta conversa.</strong>
+      <p class="muted">O lead existe, mas ainda não há histórico de WhatsApp para este número.</p>
+    </div>
+    {% endfor %}
+  </div>
 </section>
 {% endblock %}

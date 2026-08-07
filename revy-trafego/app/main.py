@@ -209,6 +209,38 @@ def formatar_horario(iso: str | None) -> str:
         return str(iso)[:16]
 
 
+def dia_conversa(iso: str | None) -> str:
+    """Rótulo do separador de dia na conversa: Hoje, Ontem ou dd/mm/aaaa."""
+    if not iso:
+        return "Sem data"
+    try:
+        from datetime import datetime
+
+        momento = datetime.fromisoformat(str(iso).replace("Z", "+00:00"))
+    except (TypeError, ValueError):
+        return str(iso)[:10]
+    dia = momento.date()
+    hoje = datetime.now(momento.tzinfo).date()
+    delta = (hoje - dia).days
+    if delta == 0:
+        return "Hoje"
+    if delta == 1:
+        return "Ontem"
+    return dia.strftime("%d/%m/%Y")
+
+
+def hora_conversa(iso: str | None) -> str:
+    """Só a hora — o dia já vem do separador da thread."""
+    if not iso:
+        return "—"
+    try:
+        from datetime import datetime
+
+        return datetime.fromisoformat(str(iso).replace("Z", "+00:00")).strftime("%H:%M")
+    except (TypeError, ValueError):
+        return str(iso)[11:16] or "—"
+
+
 def formatar_brl(valor) -> str:
     try:
         numero = float(valor)
@@ -220,6 +252,8 @@ def formatar_brl(valor) -> str:
 
 templates.env.globals["mascarar_telefone"] = mascarar_telefone
 templates.env.globals["formatar_horario"] = formatar_horario
+templates.env.globals["dia_conversa"] = dia_conversa
+templates.env.globals["hora_conversa"] = hora_conversa
 templates.env.globals["formatar_brl"] = formatar_brl
 templates.env.globals["url_prefix"] = settings.url_prefix
 templates.env.globals["public_path"] = public_path
