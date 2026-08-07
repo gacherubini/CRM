@@ -1,6 +1,6 @@
 # Contexto compacto para continuidade
 
-Atualizado em **2026-08-04**. Este é o ponto de entrada para estado e prioridades.
+Atualizado em **2026-08-07**. Este é o ponto de entrada para estado e prioridades.
 O desenho implementado está em
 [`design/2026-07-30-revy-control-loja-asbuilt-e-melhorias.md`](design/2026-07-30-revy-control-loja-asbuilt-e-melhorias.md),
 os termos do domínio em [`../CONTEXT.md`](../CONTEXT.md) e os planos válidos em
@@ -9,9 +9,16 @@ os termos do domínio em [`../CONTEXT.md`](../CONTEXT.md) e os planos válidos e
 ## Estado atual
 
 - **Revy Control:** código lean F0–F6 em `revy-trafego`. Defaults de flags no **código** OFF.
+  Visão geral enxugada com filtro de período; Prontidão virou painel na ficha da loja;
+  Ajustes → Integrações espelha a página da Loja; rótulos de enum saem de
+  `revy-trafego/app/rotulos.py`.
 - **Revy Loja:** F0–F6/F8 + entregas 2026-08-03: chat no Atendimento (envio + poll),
   Perfil, status WA persistido, Grupo do estoque no menu, redesign da tela de números.
-  Seller AI adiado.
+  Desde 2026-08-07: fila com tempo de espera, config da vitrine unificada em
+  Estoque → Vitrine, funil clicável, página do Agente redesenhada. Seller AI adiado.
+- **Triagem de UX 2026-08-07:** 32 itens entregues e **13 recusados pelo dono** — a lista
+  de recusados evita re-propor decisão já tomada:
+  [`2026-08-07-triagem-revisao-ux-loja-control.md`](2026-08-07-triagem-revisao-ux-loja-control.md).
 - **Prod `app2037` (piloto):** secrets shell + entitlements + atendimento + WhatsApp Loja
   **ON**; redirect legado **OFF**. Detalhe:
   [`2026-08-02-provisionamento-loja-entitlements.md`](2026-08-02-provisionamento-loja-entitlements.md).
@@ -32,6 +39,7 @@ os termos do domínio em [`../CONTEXT.md`](../CONTEXT.md) e os planos válidos e
 | Arquitetura implementada Control/Loja | `docs/design/2026-07-30-revy-control-loja-asbuilt-e-melhorias.md` |
 | Próxima implementação / status de planos | `docs/plans/README.md` e o bloco Status do plano |
 | Operação recente | `docs/handoff-contexto.md` |
+| Decisões de UX aceitas **e recusadas** (07/08) | `docs/2026-08-07-triagem-revisao-ux-loja-control.md` |
 | Provisionamento loja / entitlements / inspeção de prod | `docs/2026-08-02-provisionamento-loja-entitlements.md` |
 | Deploy Fly | `deploy/fly/3vm/README.md` |
 | Go-live WhatsApp | `docs/go-live-chatbot.md` |

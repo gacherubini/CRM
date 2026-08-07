@@ -29,6 +29,22 @@ das APIs ficam somente no servidor e o navegador recebe uma sessão assinada.
 - **Integrações** (status read-only Meta/Google/WA): `/app/loja/integracoes`;
 - **Acessos bancos** (credenciais do Motor cifradas; exige `MOTOR_ENCRYPTION_KEY` no Motor).
 
+### Triagem de UX 2026-08-07 (o que mudou na interface)
+
+Decisões e itens **recusados** em
+[`../docs/2026-08-07-triagem-revisao-ux-loja-control.md`](../docs/2026-08-07-triagem-revisao-ux-loja-control.md).
+Consulte antes de propor mudanças nessas telas — parte do que "parece faltando" foi
+recusado de propósito.
+
+| Tela | Mudança |
+|---|---|
+| Vendas › **Resultado** (era "Visão geral") | Rodapé "Atalhos" para telas legadas removido; bloco "Pendências" só aparece quando há pendência; números do funil abrem `/app/loja/atendimento` filtrado. |
+| Vendas › **Atendimento** | Coluna **"Aguardando há"** (helper `tempo_relativo()` em `app/main.py`, sobre `atualizada_em`); badge de canal migrou do `<style>` inline para `app.css` com tokens — no tema claro ele era branco sobre branco. |
+| Vendas › **Agente** | Redesenhada: barra dividida "só com o agente" × "transferidos", série diária preenchida do dia 1 até hoje (`montar_visao_agente` em `app/loja/routes.py` — o Chatbot só devolve dias com conversa). Ícone próprio no menu. |
+| Estoque › **Situação do estoque** (era "Visão geral") | Painéis "Cadastro › Pendências" e "Reservas e vendas recentes" removidos; texto sem jargão de API/shell. |
+| Estoque › **Vitrine** (era "Ordem na vitrine") | Passou a reunir a ordenação **e** a configuração do catálogo (WhatsApp do CTA + link), que morava em Ajustes › Números de WhatsApp. O POST `/app/loja/whatsapp/catalogo` redireciona para `/app/loja/estoque/vitrine#catalogo-wa`. |
+| Topbar | Páginas do shell declaram `page_title`; sem isso o `if/elif` de `base.html` não cobre `/app/loja/*` e a topbar escreve "Ajustes". **Item novo no menu precisa de `page_title` no template e de ícone no dicionário `loja_icons` de `base.html`** — `tests/test_loja_navigation.py::test_shell_nav_todos_os_itens_tem_icone` falha se o ícone faltar. |
+
 ### Revy Loja (shell / entitlements — defaults de código OFF)
 
 Evolução do portal para o shell operacional **Revy Loja** (Vendas + Estoque). Com flags

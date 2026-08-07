@@ -5,6 +5,10 @@ Use este arquivo como mapa antes de abrir codigo grande. O estado atual do produ
 planos validos, em `docs/plans/README.md`. Ignore `docs/plans/_archive/`; para Control e
 Loja, consulte tambem `docs/design/2026-07-30-revy-control-loja-asbuilt-e-melhorias.md`.
 
+Antes de sugerir mudanca de interface no Control ou na Loja, leia
+`docs/2026-08-07-triagem-revisao-ux-loja-control.md`: 13 itens foram **recusados pelo dono**
+e nao devem voltar como proposta nova.
+
 ## Como explorar com poucos tokens
 
 1. Identifique primeiro o produto afetado na tabela abaixo.

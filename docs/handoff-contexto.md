@@ -11,6 +11,35 @@ Leia primeiro:
 
 ## Checkpoint de código
 
+- **Entregas 2026-08-07 — triagem de UX (main `e06d9e5`, LIVE app2037 v115):** 32 itens de
+  uma revisão de produto, triados um a um pelo dono. **Sem migration.** Detalhe completo,
+  com o que foi aceito e o que foi **recusado**, em
+  [`2026-08-07-triagem-revisao-ux-loja-control.md`](2026-08-07-triagem-revisao-ux-loja-control.md).
+  Resumo do que mudou de contrato ou de estrutura:
+  - **Control › Visão geral** encolheu: saíram "Destaques", "Contagens por status", a tabela
+    "Lojas", a coluna "Falhas", o painel Google e "Alterações recentes". `network_overview`
+    ganhou `desde`/`ate` (datas inclusivas) e devolve `periodo_inicio`/`periodo_fim`; a
+    janela padrão virou `[1º do mês, hoje]` e o Δ% compara a janela anterior de mesmo
+    tamanho. A rota aceita `?inicio=&fim=`.
+  - **`revy-trafego/app/rotulos.py`** (novo): mapa único de rótulos dos enums, registrado
+    nos **dois** ambientes Jinja (`app.main` e `app.web.control_ui` têm instâncias
+    separadas — global posto em um não aparece no outro).
+  - **`/app` do Control deixou de ser tela**: encaminha para Visão geral (ou Lojas sem a
+    flag de dashboard). `home.html` sobrou como estado vazio para Control desligado e sem
+    loja — `exigir_loja` devolve todo mundo para `/app`, então redirecionar dali fecharia
+    um laço.
+  - **Ajustes › Integrações no Control** (`/app/control/integracoes`), espelhando a página
+    que a Loja já tinha.
+  - **Painel de Prontidão na ficha da loja**: `build_readiness_report` sai da mensagem de
+    erro de ativação e vira UI (OK / Bloqueio / Alerta). Aba "Auditoria" da ficha removida.
+  - **Loja**: fila de atendimento com coluna "Aguardando há" (`tempo_relativo()` em
+    `portal-gestao/app/main.py`); badge de canal saiu do `<style>` inline escrito para o
+    tema escuro; config da vitrine mudou de Ajustes › Números de WhatsApp para
+    **Estoque › Vitrine** (o POST `/app/loja/whatsapp/catalogo` agora redireciona para
+    `/app/loja/estoque/vitrine`); menu renomeado ("Resultado", "Situação do estoque",
+    "Vitrine"); funil clicável; rodapé "Atalhos" para telas legadas removido.
+  - **Página do Agente redesenhada** + ícone no menu; **conversa do lead no Control** com
+    bolhas e separador de dia.
 - **Entregas 2026-08-07 (main `a2a11f5`, LIVE app2037 v114):** 3 features no bundle —
   1. **Revy Control — Visão Geral de negócio** (`/trafego/app/control/dashboard`): cards
      Lojas ativas / Vendas no mês (Δ%) / Ticket médio / Leads na rede + tabela "Desempenho
@@ -51,9 +80,10 @@ Leia primeiro:
 
 ## Validação conhecida
 
-- Suítes (2026-08-07, no resultado do merge `a2a11f5`): revy-trafego **461**
-  (+1 falha pré-existente outbox motor), chatbot-api **297**, portal-gestao **551**.
-  Rodadas com `python` global (não havia `.venv` no checkout).
+- Suítes (2026-08-07, em `e06d9e5`): revy-trafego **472** (+1 falha pré-existente outbox
+  motor), portal-gestao **558** (`.venv` local). chatbot-api não foi tocado nesta entrega;
+  última contagem conhecida **297** em `a2a11f5`.
+- Suítes anteriores (merge `a2a11f5`): revy-trafego 461, chatbot-api 297, portal-gestao 551.
 - A falha é `revy-trafego/tests/test_control_provisioning_outbox.py::test_process_pending_falha_marca_failed_e_incrementa_attempts`:
   teste estagnado desde `573348e` (`"motor"` em `DEFAULT_PROVISIONING_TARGETS`);
   **confirmado que falha no `main` também** (não é regressão da entrega de 07/08).
@@ -119,13 +149,26 @@ powershell -File deploy\fly\3vm\upload-and-import-workflow.ps1 -Mode production
 
 ## Pendências reais
 
-- **Visão Geral do Control (entrega 07/08) — 2 decisões de produto (não são bugs):**
-  1. **Conversão mistura janelas:** vendas *do mês* ÷ leads *acumulados* (o Chatbot
-     `listar_leads` não filtra por data). Opções: alinhar período (novo endpoint no Chatbot,
-     já previsto no spec como fase futura) ou rotular a coluna como "leads (acumulado)".
-  2. **Âncora do mês diverge:** `network_overview` conta por `confirmada_em`; o
-     `financeiro_calc` do Portal conta por `criada_em` — os dois "vendas do mês" podem
-     discordar. Decidir a âncora canônica e uniformizar.
+- **BUG — `venda_projetada.loja_id` nunca é preenchido (bloqueia os KPIs do Control):**
+  `revy-trafego/app/vendas_projection.py` (`projetar_venda`) grava `loja_slug` e deixa
+  `loja_id` NULL; o único lugar que preenche é `app/control/backfill.py`, chamado **só**
+  dentro da migration `0002`. Toda venda que chega pelo contrato HTTP depois da migration
+  fica órfã. O dashboard filtra por `loja_id`
+  (`revy-trafego/app/control/dashboard.py`), então "Vendas confirmadas", ticket médio, Δ%
+  e a tabela por loja mostram **zero** em produção, mesmo com vendas chegando. O ROI da
+  Loja não sofre porque `financeiro_calc` filtra por `loja_slug`.
+  **Correção:** resolver `Loja.slug → id` dentro de `projetar_venda` (padrão já existe em
+  `api_v1.py:389-396`) + backfill único das órfãs. Ao testar, exercitar o caminho
+  `projetar_venda` — `tests/test_dashboard_network_overview.py` passa `loja_id=` na mão e
+  por isso valida a query, não o contrato.
+- **Visão Geral do Control — as 2 decisões de produto de 07/08 foram resolvidas:**
+  1. *Conversão mistura janelas* — o dono **recusou** mexer (item `C17` da triagem). A
+     coluna segue como está.
+  2. *Âncora do mês* — resolvida por declaração na tela ("vendas contadas pela data de
+     confirmação"), sem uniformizar o backend. `network_overview` continua em
+     `confirmada_em` e `financeiro_calc` em `criada_em`.
+- **Espaçamento ("gaps") nas telas novas:** o dono viu problemas de espaçamento nas prévias
+  e ainda não localizou onde. Fila separada.
 - **Fase 2 do Control (diferida):** projeção de **metas** Portal→Control (habilita coluna
   Meta + painel "Meta da rede" + atingimento); endpoint bulk de leads por rede (hoje é loop
   por loja no escopo). Card **Simulações** no agente da Loja segue placeholder até a simulação

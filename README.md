@@ -24,6 +24,11 @@ repo; piloto em prod via secrets. Lab: `up-all.sh --3vm` / `down-all.sh --3vm --
 Seller AI adiado. Ver [as-built](docs/design/2026-07-30-revy-control-loja-asbuilt-e-melhorias.md)
 e [handoff](docs/handoff-contexto.md).
 
+**Interface (2026-08-07, `app2037` v115):** uma revisão de UX rendeu 45 achados; o dono
+aceitou 32 e **recusou 13**. Antes de propor mudança nas telas do Control ou da Loja, leia
+a [triagem](docs/2026-08-07-triagem-revisao-ux-loja-control.md) — parte do que "parece
+faltando" foi recusado de propósito.
+
 ---
 
 ## ✨ Visão geral
@@ -306,6 +311,8 @@ ser aplicada por RBAC no backend, não apenas ocultando ou exibindo itens de men
 - **[docs/2026-08-02-provisionamento-loja-entitlements.md](docs/2026-08-02-provisionamento-loja-entitlements.md)** — flags em prod e projeção Control→Portal.
 - **[deploy/fly/3vm/README.md](deploy/fly/3vm/README.md)** — inventário Fly, deploy, secrets, up/down.
 - **[portal-gestao/README.md](portal-gestao/README.md)** — Revy Loja (flags, Atendimento, Perfil).
+- **[revy-trafego/README.md](revy-trafego/README.md)** — Revy Control (lojas, acessos, prontidão, mídia).
+- **[docs/2026-08-07-triagem-revisao-ux-loja-control.md](docs/2026-08-07-triagem-revisao-ux-loja-control.md)** — decisões de UX aceitas **e recusadas** nas telas Control/Loja.
 - **[docs/tutorial-dono.md](docs/tutorial-dono.md)** / **[docs/tutorial-vendedor.md](docs/tutorial-vendedor.md)** — manuais de operação.
 - **[Índice dos planos válidos](docs/plans/README.md)** — ordem, status e pacotes comerciais.
 - **Planos de implementação** (`docs/plans/` — só `*A`/`*B` e #0/#6; legados em `_archive/`):

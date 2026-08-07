@@ -36,6 +36,36 @@ técnica, prontidão e operação multi-loja ficam aqui.
   Provisão de loja → Portal:
   [`docs/2026-08-02-provisionamento-loja-entitlements.md`](../docs/2026-08-02-provisionamento-loja-entitlements.md).
 
+### Triagem de UX 2026-08-07 (o que mudou na interface)
+
+Decisões e itens **recusados** em
+[`docs/2026-08-07-triagem-revisao-ux-loja-control.md`](../docs/2026-08-07-triagem-revisao-ux-loja-control.md).
+Consulte antes de propor mudanças nessas telas.
+
+| Tela | Mudança |
+|---|---|
+| **Visão geral** (`/app/control/dashboard`) | Encolheu: saíram "Destaques", "Contagens por status", a tabela "Lojas", a coluna "Falhas", o painel Google e "Alterações recentes". Ganhou **filtro de período** (`?inicio=&fim=`), a declaração de que a venda conta por `confirmada_em`, linhas clicáveis para a ficha e chips **Bloqueio** × **Alerta** na prontidão. |
+| **Ficha da loja** | Novo painel **Prontidão** (OK / Bloqueio / Alerta) na aba Visão geral — o dashboard linka "o que falta" para cá e a ficha não respondia nada. Aba "Auditoria" removida (mostrava `action`/`result` crus); a trilha continua no domínio e na API. |
+| **Ajustes › Integrações** (`/app/control/integracoes`) | Página nova, espelhando a que a Revy Loja já tem, sobre a loja selecionada. |
+| **Menu** | Seção "Loja" virou "Loja selecionada" e perdeu "Todas as lojas". `page_title` e `h1` casam com o rótulo do menu: Medição, ROI, Cliques do WhatsApp, Conferir Pixel. |
+| **`/app`** | Deixou de ser a tela "Escolha a loja": encaminha para Visão geral (ou Lojas sem a flag de dashboard). `home.html` sobrou como estado vazio — `exigir_loja` devolve todo mundo para `/app`, então redirecionar dali para uma página que exige loja fecharia um laço. |
+
+Contratos que mudaram:
+
+- `DashboardControl.network_overview(actor, *, leads_port=None, desde=None, ate=None)` —
+  datas **inclusivas**; devolve `periodo_inicio`/`periodo_fim`. Janela padrão
+  `[1º do mês, hoje]`; o Δ% compara a janela anterior de **mesmo tamanho**.
+- `app/rotulos.py` — mapa único de rótulos dos enums (`rotulo_status`, `rotulo_papel`,
+  `rotulo_acesso`, `rotulo_check`, `rotular()`). **`app.main` e `app.web.control_ui` têm
+  instâncias Jinja separadas**: registre em ambos via `rotulos.registrar_globals(env)`,
+  senão o template de um lado não enxerga o global do outro.
+- `readiness.REQUIRED_CODES` — alias público de `_REQUIRED_CODES`, usado pela UI para
+  separar bloqueio de alerta.
+
+> **KPIs de venda mostram zero em produção** enquanto `venda_projetada.loja_id` não for
+> preenchido por `projetar_venda` — ver "Pendências reais" em
+> [`docs/handoff-contexto.md`](../docs/handoff-contexto.md).
+
 ## Status anterior (2026-07-28 — Fase 1/2 no lab)
 
 | Item | Estado |
