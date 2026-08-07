@@ -273,6 +273,18 @@ def _dashboard_surface_enabled() -> bool:
     )
 
 
+def _selector_stores(scoped):
+    """Lojas do seletor lateral: só ativas (Task 2 — esconde inativas do dia a dia).
+
+    Com RBAC ligado, o template usa item.store.id/slug/name → devolvemos os itens.
+    Sem RBAC, o seletor usa slugs → devolvemos slugs. A tela de gestão "Lojas"
+    NÃO usa este helper (continua listando todas as lojas)."""
+    ativas = [item for item in scoped if item.store.status is StoreStatus.ACTIVE]
+    if settings.revy_control_rbac_enabled:
+        return ativas
+    return [item.store.slug for item in ativas]
+
+
 def _google_ads_surface_enabled() -> bool:
     """Superfície Google Ads do Control: flag do produto + flag do módulo."""
     return settings.revy_control_enabled and settings.google_ads_sync_enabled
@@ -310,11 +322,7 @@ def dashboard_page(
     user = sessao_gestor(request, db)
     assert user is not None
     stores = AccessControl(SessionLocal).scope(actor)
-    nav_stores = (
-        stores
-        if settings.revy_control_rbac_enabled
-        else [item.store.slug for item in stores]
-    )
+    nav_stores = _selector_stores(stores)
     overview = DashboardControl(SessionLocal).overview(actor)
     items = overview.items
     integration_by_store = {
@@ -378,11 +386,7 @@ def list_control_accounts_page(
     user = sessao_gestor(request, db)
     assert user is not None
     stores = AccessControl(SessionLocal).scope(actor)
-    nav_stores = (
-        stores
-        if settings.revy_control_rbac_enabled
-        else [item.store.slug for item in stores]
-    )
+    nav_stores = _selector_stores(stores)
     accounts = ControlAccounts(SessionLocal).list(actor)
     return templates.TemplateResponse(
         request=request,
@@ -1662,11 +1666,7 @@ def _render_stores_page(
     user = sessao_gestor(request, db)
     assert user is not None
     stores = AccessControl(SessionLocal).scope(actor_from_user(manager))
-    nav_stores = (
-        stores
-        if settings.revy_control_rbac_enabled
-        else [item.store.slug for item in stores]
-    )
+    nav_stores = _selector_stores(stores)
     return templates.TemplateResponse(
         request=request,
         name="control/lojas.html",
@@ -1957,11 +1957,7 @@ def _render_store_detail(
     user = sessao_gestor(request, db)
     assert user is not None
     stores = AccessControl(SessionLocal).scope(actor)
-    nav_stores = (
-        stores
-        if settings.revy_control_rbac_enabled
-        else [item.store.slug for item in stores]
-    )
+    nav_stores = _selector_stores(stores)
     return templates.TemplateResponse(
         request=request,
         name="control/loja_detail.html",
