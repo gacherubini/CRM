@@ -226,6 +226,35 @@ def atendimento_lista(
     )
 
 
+@router.get("/app/loja/agente", response_class=HTMLResponse)
+def agente_desempenho(
+    request: Request,
+    db: Session = Depends(get_db),
+    chatbot: ChatbotClient = Depends(get_chatbot_client),
+):
+    usuario = usuario_atual(request, db)
+    if not usuario:
+        return redirecionar_login()
+    if not atendimento_habilitado():
+        return _flag_off_response(request, usuario)
+    if not pode_usar_atendimento(usuario):
+        return templates.TemplateResponse(
+            "erro.html",
+            contexto(request, usuario, erro="Sem permissão para o Atendimento."),
+            status_code=403,
+        )
+    resumo = None
+    erro_resumo = None
+    try:
+        resumo = chatbot.resumo_atendimento()
+    except ChatbotIndisponivel:
+        erro_resumo = "indisponivel"
+    return templates.TemplateResponse(
+        "loja/agente.html",
+        contexto(request, usuario, resumo=resumo, erro_resumo=erro_resumo),
+    )
+
+
 @router.get("/app/loja/atendimento/{workspace_id}", response_class=HTMLResponse)
 def atendimento_workspace(
     request: Request,

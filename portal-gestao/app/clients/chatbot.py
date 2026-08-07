@@ -321,6 +321,14 @@ class ChatbotClient:
             out["instance"] = out["evolution_instance"]
         return out
 
+    def resumo_atendimento(self, desde: str | None = None, ate: str | None = None) -> dict:
+        params: dict[str, Any] = {}
+        if desde:
+            params["desde"] = desde
+        if ate:
+            params["ate"] = ate
+        return self._request("GET", "/v1/atendimento/resumo", params=params)
+
     # --- Simulação -------------------------------------------------------------
 
     def simular(self, payload: dict) -> dict:

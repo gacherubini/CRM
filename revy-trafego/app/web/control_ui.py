@@ -14,6 +14,7 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 
 from app.auth import csrf_token, csrf_valido, gestor_atual, sessao_gestor
+from app.clients.chatbot import ChatbotClient, ChatbotIndisponivel
 from app.clients.portal import ConviteDonoRecusado, PortalClient, PortalIndisponivel
 from app.config import settings
 from app.control.access import AccessControl
@@ -273,6 +274,42 @@ def _dashboard_surface_enabled() -> bool:
     )
 
 
+def _selector_stores(scoped):
+    """Lojas do seletor lateral: só ativas (Task 2 — esconde inativas do dia a dia).
+
+    Com RBAC ligado, o template usa item.store.id/slug/name → devolvemos os itens.
+    Sem RBAC, o seletor usa slugs → devolvemos slugs. A tela de gestão "Lojas"
+    NÃO usa este helper (continua listando todas as lojas)."""
+    ativas = [item for item in scoped if item.store.status is StoreStatus.ACTIVE]
+    if settings.revy_control_rbac_enabled:
+        return ativas
+    return [item.store.slug for item in ativas]
+
+
+class _ChatbotLeadsPort:
+    """Conta leads por loja via Chatbot (client por slug). None quando indisponível
+    — nunca zero inventado."""
+
+    def count_for_store(self, slug: str) -> int | None:
+        try:
+            # Best-effort: o dashboard chama isto uma vez por loja ativa, em
+            # sequência. Timeout curto e sem retry para não empilhar
+            # ~(1+retries)×timeout por loja e travar a página inteira quando
+            # o Chatbot está fora do ar.
+            client = ChatbotClient(
+                settings.chatbot_url,
+                settings.chatbot_token_para(slug),
+                timeout=3,
+                retries=0,
+                retry_backoff=0,
+            )
+            if not client.configurado:
+                return None
+            return len(client.listar_leads())
+        except ChatbotIndisponivel:
+            return None
+
+
 def _google_ads_surface_enabled() -> bool:
     """Superfície Google Ads do Control: flag do produto + flag do módulo."""
     return settings.revy_control_enabled and settings.google_ads_sync_enabled
@@ -310,16 +347,21 @@ def dashboard_page(
     user = sessao_gestor(request, db)
     assert user is not None
     stores = AccessControl(SessionLocal).scope(actor)
-    nav_stores = (
-        stores
-        if settings.revy_control_rbac_enabled
-        else [item.store.slug for item in stores]
-    )
-    overview = DashboardControl(SessionLocal).overview(actor)
+    nav_stores = _selector_stores(stores)
+    dashboard = DashboardControl(SessionLocal)
+    overview = dashboard.overview(actor)
     items = overview.items
     integration_by_store = {
         item.store_id: item for item in overview.integrations
     }
+    network = dashboard.network_overview(
+        actor, leads_port=_ChatbotLeadsPort()
+    )
+    network_ticket_brl = (
+        _format_brl(network.ticket_medio)
+        if network.ticket_medio is not None
+        else None
+    )
     google_by_store = None
     if settings.google_ads_sync_enabled:
         from app.web.control import _dashboard_google_by_store
@@ -340,6 +382,8 @@ def dashboard_page(
             "overview": overview,
             "integration_by_store": integration_by_store,
             "google_by_store": google_by_store,
+            "network": network,
+            "network_ticket_brl": network_ticket_brl,
         },
     )
 
@@ -378,11 +422,7 @@ def list_control_accounts_page(
     user = sessao_gestor(request, db)
     assert user is not None
     stores = AccessControl(SessionLocal).scope(actor)
-    nav_stores = (
-        stores
-        if settings.revy_control_rbac_enabled
-        else [item.store.slug for item in stores]
-    )
+    nav_stores = _selector_stores(stores)
     accounts = ControlAccounts(SessionLocal).list(actor)
     return templates.TemplateResponse(
         request=request,
@@ -1662,11 +1702,7 @@ def _render_stores_page(
     user = sessao_gestor(request, db)
     assert user is not None
     stores = AccessControl(SessionLocal).scope(actor_from_user(manager))
-    nav_stores = (
-        stores
-        if settings.revy_control_rbac_enabled
-        else [item.store.slug for item in stores]
-    )
+    nav_stores = _selector_stores(stores)
     return templates.TemplateResponse(
         request=request,
         name="control/lojas.html",
@@ -1957,11 +1993,7 @@ def _render_store_detail(
     user = sessao_gestor(request, db)
     assert user is not None
     stores = AccessControl(SessionLocal).scope(actor)
-    nav_stores = (
-        stores
-        if settings.revy_control_rbac_enabled
-        else [item.store.slug for item in stores]
-    )
+    nav_stores = _selector_stores(stores)
     return templates.TemplateResponse(
         request=request,
         name="control/loja_detail.html",

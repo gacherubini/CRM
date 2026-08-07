@@ -20,6 +20,79 @@
   </div>
 </div>
 
+{% if network %}
+<section class="funil-summary" aria-label="Indicadores da rede">
+  <div class="funil-summary-card highlight">
+    <span>Lojas ativas</span>
+    <strong>{{ network.lojas_ativas }}</strong>
+    <small>de {{ network.lojas_total }}</small>
+  </div>
+  <div class="funil-summary-card">
+    <span>Vendas no mês</span>
+    <strong>{{ network.vendas_mes }}</strong>
+    <small>
+      {% if network.vendas_delta_pct is not none %}
+        {{ '▲' if network.vendas_delta_pct >= 0 else '▼' }} {{ network.vendas_delta_pct }}%
+      {% else %}—{% endif %}
+    </small>
+  </div>
+  <div class="funil-summary-card">
+    <span>Ticket médio</span>
+    <strong>{{ network_ticket_brl or '—' }}</strong>
+    <small>no mês</small>
+  </div>
+  <div class="funil-summary-card">
+    <span>Leads na rede</span>
+    <strong>{% if network.leads_rede is not none %}{{ network.leads_rede }}{% else %}<span class="muted">indisponível</span>{% endif %}</strong>
+    <small>lojas ativas</small>
+  </div>
+</section>
+
+<section class="panel" id="dashboard-desempenho-loja">
+  <div class="panel-heading">
+    <h2>Desempenho por loja</h2>
+    <p class="muted">Apenas lojas ativas. Metas chegam na próxima fase.</p>
+  </div>
+  {% if network.por_loja %}
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>Loja</th><th>Vendas</th><th>Leads</th><th>Conversão</th></tr>
+      </thead>
+      <tbody>
+        {% for p in network.por_loja %}
+        <tr>
+          <td>{{ p.name }}</td>
+          <td>{{ p.vendas }}</td>
+          <td>{% if p.leads is not none %}{{ p.leads }}{% else %}<span class="muted">indisponível</span>{% endif %}</td>
+          <td>{% if p.conversao is not none %}{{ (p.conversao * 100) | round(1) }}%{% else %}—{% endif %}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p class="muted">Nenhuma loja ativa no seu escopo.</p>
+  {% endif %}
+</section>
+
+<section class="panel" id="dashboard-destaques">
+  <div class="panel-heading"><h2>Destaques</h2></div>
+  <div class="funil-summary">
+    <div class="funil-summary-card">
+      <span>Melhor loja</span>
+      <strong>{{ network.destaques.melhor_loja_nome or '—' }}</strong>
+      <small>{{ network.destaques.melhor_loja_vendas }} vendas</small>
+    </div>
+    <div class="funil-summary-card">
+      <span>Ticket médio da rede</span>
+      <strong>{{ network_ticket_brl or '—' }}</strong>
+      <small>no mês</small>
+    </div>
+  </div>
+</section>
+{% endif %}
+
 <section class="funil-summary" id="dashboard-counts" aria-label="Contagens por status">
   <div class="funil-summary-card{% if overview and overview.counts.ativas %} highlight{% endif %}">
     <span>Ativas</span>

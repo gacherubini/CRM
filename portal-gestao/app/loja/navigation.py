@@ -61,6 +61,13 @@ def build_nav(
                         active_prefix="/app/loja/atendimento",
                     ),
                     NavItem(
+                        label="Agente",
+                        href="/app/loja/agente",
+                        section="Vendas",
+                        module=Module.VENDAS.value,
+                        active_prefix="/app/loja/agente",
+                    ),
+                    NavItem(
                         label="Simulações",
                         href="/app/simulacoes",
                         section="Vendas",

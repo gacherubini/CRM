@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block title %}Agente de atendimento — Revy Loja{% endblock %}
+{% block content %}
+<div class="page-heading">
+  <div>
+    <span class="eyebrow">Atendimento</span>
+    <h1>Agente de atendimento</h1>
+    <p>Desempenho do bot automático no mês corrente.</p>
+  </div>
+</div>
+
+{% if erro_resumo == 'indisponivel' or resumo is none %}
+<section class="panel">
+  <p class="muted">Agente indisponível no momento. Tente novamente em instantes.</p>
+</section>
+{% else %}
+<section class="funil-summary" aria-label="Indicadores do agente">
+  <div class="funil-summary-card highlight">
+    <span>Atendimentos</span>
+    <strong>{{ resumo.atendimentos }}</strong>
+    <small>no mês</small>
+  </div>
+  <div class="funil-summary-card">
+    <span>Transferidos</span>
+    <strong>{{ resumo.transferidos }}</strong>
+    <small>
+      {% if resumo.transferidos_pct is not none %}{{ (resumo.transferidos_pct * 100) | round(0) | int }}% dos atendimentos{% else %}—{% endif %}
+    </small>
+  </div>
+  <div class="funil-summary-card">
+    <span>Simulações</span>
+    <strong class="muted">em construção</strong>
+    <small>em breve</small>
+  </div>
+</section>
+
+<section class="panel" id="agente-por-dia">
+  <div class="panel-heading"><h2>Atendimentos por dia</h2></div>
+  {% if resumo.por_dia %}
+  {% set maximo = resumo.por_dia | map(attribute='atendimentos') | max %}
+  <div style="display:flex;align-items:flex-end;gap:6px;height:160px;padding:8px 4px;overflow-x:auto">
+    {% for d in resumo.por_dia %}
+    <div style="display:flex;flex-direction:column;align-items:center;gap:4px;min-width:28px">
+      <div title="{{ d.atendimentos }}"
+           style="width:20px;border-radius:4px 4px 0 0;background:var(--brand,#1f6feb);
+                  height:{{ ((d.atendimentos / maximo) * 130) | round(0) | int if maximo else 0 }}px"></div>
+      <small class="muted" style="font-size:10px">{{ d.data[8:10] }}</small>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <p class="muted">Sem atendimentos no período.</p>
+  {% endif %}
+</section>
+{% endif %}
+{% endblock %}
