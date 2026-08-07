@@ -2,8 +2,11 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
+from decimal import Decimal
 from typing import Any, Protocol
+
+from sqlalchemy import func
 
 from app.control.audit import AuditTrail
 from app.control.integrations import pixel_configured
@@ -27,6 +30,7 @@ from app.models import (
     MetaAdsConfig,
     MetaPixelConfig,
     ModuloRevy,
+    VendaProjetada,
     VinculoTrafego,
 )
 
@@ -36,6 +40,39 @@ _GOOGLE_FAILURE_STATUSES = frozenset({"erro", "expirado", "revogado", "atencao"}
 
 class _WhatsAppChannelsPort(Protocol):
     def list_for_store(self, store_ref: StoreRef) -> list[Any]: ...
+
+
+class _LeadsCountPort(Protocol):
+    def count_for_store(self, slug: str) -> int | None: ...
+
+
+@dataclass(frozen=True)
+class StorePerformance:
+    store_id: str
+    slug: str
+    name: str
+    vendas: int
+    leads: int | None
+    conversao: float | None
+
+
+@dataclass(frozen=True)
+class NetworkHighlights:
+    melhor_loja_nome: str | None
+    melhor_loja_vendas: int
+    ticket_medio: Decimal | None
+
+
+@dataclass(frozen=True)
+class NetworkOverview:
+    lojas_ativas: int
+    lojas_total: int
+    vendas_mes: int
+    vendas_delta_pct: float | None
+    ticket_medio: Decimal | None
+    leads_rede: int | None
+    por_loja: tuple[StorePerformance, ...]
+    destaques: NetworkHighlights
 
 
 @dataclass(frozen=True)
@@ -207,6 +244,115 @@ class DashboardControl:
     def gestor_overview(self, actor: Actor) -> DashboardOverview:
         """Alias semântico: overview já filtra pelo vínculo do gestor."""
         return self.overview(actor)
+
+    def network_overview(
+        self, actor: Actor, *, leads_port: _LeadsCountPort | None = None
+    ) -> NetworkOverview:
+        """KPIs de negócio no escopo do ator. Vendas/ticket de vendas_projetadas;
+        leads do Chatbot (port injetado). Só lojas ativas entram em por_loja."""
+        stores = self._stores.list(actor)
+        ativas = [s for s in stores if s.status is StoreStatus.ACTIVE]
+        ativa_ids = [s.id for s in ativas]
+
+        agora = datetime.now(timezone.utc)
+        inicio_mes = datetime(agora.year, agora.month, 1, tzinfo=timezone.utc)
+        fim_mes = (
+            datetime(agora.year + 1, 1, 1, tzinfo=timezone.utc)
+            if agora.month == 12
+            else datetime(agora.year, agora.month + 1, 1, tzinfo=timezone.utc)
+        )
+        inicio_mes_ant = (inicio_mes - timedelta(days=1)).replace(day=1)
+
+        vendas_por_loja: dict[str, int] = {}
+        vendas_mes = 0
+        ticket_medio: Decimal | None = None
+        vendas_mes_ant = 0
+        if ativa_ids:
+            with self._session_factory() as db:
+                for loja_id, count in (
+                    db.query(VendaProjetada.loja_id, func.count(VendaProjetada.id))
+                    .filter(
+                        VendaProjetada.loja_id.in_(ativa_ids),
+                        VendaProjetada.confirmada_em >= inicio_mes,
+                        VendaProjetada.confirmada_em < fim_mes,
+                    )
+                    .group_by(VendaProjetada.loja_id)
+                    .all()
+                ):
+                    vendas_por_loja[loja_id] = count
+                total_count, total_avg = (
+                    db.query(
+                        func.count(VendaProjetada.id),
+                        func.avg(VendaProjetada.preco_venda),
+                    )
+                    .filter(
+                        VendaProjetada.loja_id.in_(ativa_ids),
+                        VendaProjetada.confirmada_em >= inicio_mes,
+                        VendaProjetada.confirmada_em < fim_mes,
+                    )
+                    .one()
+                )
+                vendas_mes = int(total_count or 0)
+                ticket_medio = (
+                    Decimal(total_avg).quantize(Decimal("0.01"))
+                    if total_avg is not None
+                    else None
+                )
+                vendas_mes_ant = int(
+                    db.query(func.count(VendaProjetada.id))
+                    .filter(
+                        VendaProjetada.loja_id.in_(ativa_ids),
+                        VendaProjetada.confirmada_em >= inicio_mes_ant,
+                        VendaProjetada.confirmada_em < inicio_mes,
+                    )
+                    .scalar()
+                    or 0
+                )
+
+        delta_pct: float | None = None
+        if vendas_mes_ant > 0:
+            delta_pct = round((vendas_mes - vendas_mes_ant) / vendas_mes_ant * 100, 1)
+
+        por_loja: list[StorePerformance] = []
+        leads_total = 0
+        algum_lead = False
+        for store in ativas:
+            vendas = vendas_por_loja.get(store.id, 0)
+            leads = leads_port.count_for_store(store.slug) if leads_port else None
+            if leads is not None:
+                algum_lead = True
+                leads_total += leads
+            conversao = (
+                (vendas / leads) if (leads is not None and leads > 0) else None
+            )
+            por_loja.append(
+                StorePerformance(
+                    store_id=store.id,
+                    slug=store.slug,
+                    name=store.name,
+                    vendas=vendas,
+                    leads=leads,
+                    conversao=conversao,
+                )
+            )
+
+        leads_rede = leads_total if algum_lead else None
+        melhor = max(por_loja, key=lambda p: p.vendas, default=None)
+        destaques = NetworkHighlights(
+            melhor_loja_nome=melhor.name if melhor and melhor.vendas > 0 else None,
+            melhor_loja_vendas=melhor.vendas if melhor else 0,
+            ticket_medio=ticket_medio,
+        )
+        return NetworkOverview(
+            lojas_ativas=len(ativas),
+            lojas_total=len(stores),
+            vendas_mes=vendas_mes,
+            vendas_delta_pct=delta_pct,
+            ticket_medio=ticket_medio,
+            leads_rede=leads_rede,
+            por_loja=tuple(por_loja),
+            destaques=destaques,
+        )
 
     def _load_responsaveis(
         self, store_ids: list[str]
