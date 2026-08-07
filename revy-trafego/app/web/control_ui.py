@@ -14,6 +14,7 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 
 from app.auth import csrf_token, csrf_valido, gestor_atual, sessao_gestor
+from app.clients.chatbot import ChatbotClient, ChatbotIndisponivel
 from app.clients.portal import ConviteDonoRecusado, PortalClient, PortalIndisponivel
 from app.config import settings
 from app.control.access import AccessControl
@@ -285,6 +286,24 @@ def _selector_stores(scoped):
     return [item.store.slug for item in ativas]
 
 
+class _ChatbotLeadsPort:
+    """Conta leads por loja via Chatbot (client por slug). None quando indisponível
+    — nunca zero inventado."""
+
+    def count_for_store(self, slug: str) -> int | None:
+        try:
+            client = ChatbotClient(
+                settings.chatbot_url,
+                settings.chatbot_token_para(slug),
+                settings.request_timeout,
+            )
+            if not client.configurado:
+                return None
+            return len(client.listar_leads())
+        except ChatbotIndisponivel:
+            return None
+
+
 def _google_ads_surface_enabled() -> bool:
     """Superfície Google Ads do Control: flag do produto + flag do módulo."""
     return settings.revy_control_enabled and settings.google_ads_sync_enabled
@@ -328,6 +347,14 @@ def dashboard_page(
     integration_by_store = {
         item.store_id: item for item in overview.integrations
     }
+    network = DashboardControl(SessionLocal).network_overview(
+        actor, leads_port=_ChatbotLeadsPort()
+    )
+    network_ticket_brl = (
+        _format_brl(network.ticket_medio)
+        if network.ticket_medio is not None
+        else None
+    )
     google_by_store = None
     if settings.google_ads_sync_enabled:
         from app.web.control import _dashboard_google_by_store
@@ -348,6 +375,8 @@ def dashboard_page(
             "overview": overview,
             "integration_by_store": integration_by_store,
             "google_by_store": google_by_store,
+            "network": network,
+            "network_ticket_brl": network_ticket_brl,
         },
     )
 
