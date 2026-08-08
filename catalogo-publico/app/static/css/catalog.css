@@ -1,7 +1,9 @@
-/* Revy Vitrine — tokens alinhados ao Revy Loja (app.css), layout de storefront */
+/* Revy Vitrine — cor, forma e tipo vem de revy-tokens.css; aqui fica o layout. */
 
 :root {
   color-scheme: light;
+  /* Decisao de 08/08: a vitrine e SEMPRE clara. Foto de veiculo sobre fundo
+     escuro nunca foi testada, e a vitrine nao vai ser onde isso se descobre. */
 
   --space-1: 4px;
   --space-2: 8px;
@@ -22,30 +24,9 @@
   --page-max: 1120px;
   --gutter: var(--space-6);
 
-  --ink: #0a0a0a;
-  --ink-soft: #5c5c5c;
-  --ink-muted: #6b6b6b;
-  --paper: #ffffff;
-  --surface: #ffffff;
-  --surface-raised: #fafafa;
-  --surface-soft: #f5f5f5;
-  --line: #e8e8e8;
-  --line-strong: #d4d4d4;
-  --accent: #0a0a0a;
-  --green: #0d7a4f;
-  --amber: #8a6d1d;
-  --radius: 12px;
-  --shadow: 0 1px 2px rgba(0, 0, 0, .04);
-  --font: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font: var(--font-ui);
 
-  /* aliases usados no markup legado da vitrine */
-  --bg: var(--paper);
-  --fg: var(--ink);
-  --muted: var(--ink-muted);
-  --soft: var(--surface-soft);
-  --soft-2: var(--surface-raised);
-  --ok: var(--green);
-  --warn: var(--amber);
+  /* Fundo do aviso: tinta de aviso so do catalogo, sem par no canonico. */
   --warn-bg: #f7f1dc;
 }
 
@@ -215,12 +196,21 @@ button.secondary {
 }
 
 .vehicle-card {
-  overflow: hidden;
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
   background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-srf);
+  overflow: hidden;
   box-shadow: var(--shadow);
+  display: flex;
+  flex-direction: column;
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.vehicle-card .card-media img {
+  aspect-ratio: 16 / 10;
+  object-fit: cover;
+  width: 100%;
+  display: block;
 }
 
 .vehicle-card:hover {
@@ -253,19 +243,47 @@ button.secondary {
   font-weight: 500;
 }
 
-.card-body { padding: var(--space-4); }
-
-.facts {
+.vehicle-card .card-body {
+  padding: 13px 15px 16px;
   display: flex;
-  justify-content: space-between;
-  align-items: end;
-  gap: var(--space-4);
-  margin-top: 0.75rem;
-  color: var(--ink-muted);
-  font-size: 0.9rem;
+  flex-direction: column;
+  gap: 2px;
 }
 
-.facts strong,
+.vehicle-card .card-body h2 {
+  margin: 0;
+  font-size: var(--text-base);
+  font-weight: 600;
+  letter-spacing: -.01em;
+}
+
+.vehicle-card .card-body p {
+  /* O gap de 2px so vale com o margin do <p> zerado; e a versao vem abaixo
+     do titulo, entao nao pode ser maior que ele. */
+  margin: 0;
+  font-size: var(--text-sm);
+}
+
+.card-price {
+  font-size: 21px;
+  font-weight: 700;
+  letter-spacing: -.04em;
+  /* Preco e Hanken com tabular: serifa aqui atrapalha leitura rapida. */
+  font-variant-numeric: tabular-nums;
+  color: var(--brand-strong);
+  margin-top: 5px;
+}
+
+.card-chips { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 9px; }
+
+.card-chips span {
+  font-size: 10.5px;
+  padding: 2px 8px;
+  border-radius: var(--radius-ctl);
+  background: var(--surface-soft);
+  color: var(--ink-muted);
+}
+
 .price {
   color: var(--ink);
   font-size: 1.15rem;

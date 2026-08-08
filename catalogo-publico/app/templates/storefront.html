@@ -32,10 +32,14 @@
         {% else %}<div class="image-fallback">Sem foto</div>{% endif %}
       </div>
       <div class="card-body">
-        <p class="eyebrow">{{ v.tipo }} · {{ v.ano_modelo }}</p>
         <h2>{{ v.marca }} {{ v.modelo }}</h2>
         {% if v.versao %}<p class="muted">{{ v.versao }}</p>{% endif %}
-        <div class="facts"><span>{{ "{:,.0f}".format(v.km).replace(',', '.') }} km</span><strong>{{ v.preco | moeda }}</strong></div>
+        <strong class="card-price">{{ v.preco | moeda }}</strong>
+        <div class="card-chips">
+          <span>{{ v.ano_modelo }}</span>
+          <span>{{ "{:,.0f}".format(v.km).replace(',', '.') }} km</span>
+          {% if v.tipo %}<span>{{ v.tipo }}</span>{% endif %}
+        </div>
       </div>
     </a>
   </article>

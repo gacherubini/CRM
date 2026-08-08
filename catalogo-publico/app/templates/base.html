@@ -4,11 +4,12 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="{% if loja %}Veículos de {{ loja.nome }}{% else %}Catálogo de veículos{% endif %}">
-  <meta name="theme-color" content="#ffffff">
+  <meta name="theme-color" content="#f9f9f9">
   <title>{% block title %}Catálogo de veículos{% endblock %}</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_prefix }}/static/css/revy-tokens.css">
   <link rel="stylesheet" href="{{ url_prefix }}/static/css/catalog.css">
   {% if meta_pixel_enabled and meta_pixel_id %}
   <!-- Meta Pixel (E10). Pixel ID é público; token CAPI nunca no catálogo. -->
