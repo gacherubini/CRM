@@ -1045,6 +1045,12 @@ def registrar_mensagem(
                     lead_criado_auto = True
                 else:
                     # Idempotente: lead já existe (ex.: POST /v1/leads anterior).
+                    # Ainda assim o pendente tem que ser colhido — antes daqui
+                    # o código só lia o id e deixava o anúncio na conversa.
+                    _vincular_tracking_pendente_ao_lead(
+                        db, loja.id, telefone, lead_existente
+                    )
+                    lead_existente.atualizada_em = datetime.now(timezone.utc)
                     lead_ctwa_id = lead_existente.id
         registrar_auditoria_ctwa(
             db,
@@ -1951,12 +1957,22 @@ def _vincular_tracking_pendente_ao_lead(
     for atribuicao in atribuicoes:
         _vincular_catalogo_ao_lead(lead, atribuicao)
 
-    conversa = (
+    # Todas as conversas do telefone, não `.first()`: `Conversa` é única por
+    # (canal_id, telefone) com canal_id nullable, então o mesmo cliente tem uma
+    # linha por canal e o `.first()` podia pegar justamente a que não tem
+    # pendente. ASC é obrigatório: `aplicar_touch_ctwa` só grava os campos
+    # `_first` enquanto estão nulos, então o toque mais antigo tem que vir antes.
+    conversas = (
         db.query(Conversa)
-        .filter(Conversa.loja_id == loja_id, Conversa.telefone == telefone)
-        .first()
+        .filter(
+            Conversa.loja_id == loja_id,
+            Conversa.telefone == telefone,
+            Conversa.tracking_pendente_json.isnot(None),
+        )
+        .order_by(Conversa.criada_em.asc())
+        .all()
     )
-    if conversa is not None:
+    for conversa in conversas:
         _aplicar_tracking_pendente_no_lead(conversa, lead)
 
 
