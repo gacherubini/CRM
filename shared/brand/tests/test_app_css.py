@@ -71,6 +71,15 @@ def test_dado_tecnico_usa_a_fonte_mono(rel):
     )
 
 
+@pytest.mark.parametrize("rel", PAINEIS)
+@pytest.mark.parametrize("token", ["--ok", "--warn", "--danger", "--whatsapp"])
+def test_resultado_de_operacao_usa_token_semantico(rel, token):
+    """--ok/--warn/--danger dizem o que aconteceu; --green/--amber/--red so
+    diziam a cor. Sem o nome semantico, ninguem sabe se o verde e 'conectou'
+    ou 'e da marca'."""
+    assert usos_de_var(caminho(rel), token) > 0, f"{rel} nao usa var({token})"
+
+
 # Uma secao por peca de interface, na ordem do arquivo. Cada tarefa de peca
 # escreve dentro da sua: e isso que impede a regra de uma peca de nascer a
 # 1.500 linhas da outra regra da mesma peca.
@@ -79,8 +88,8 @@ def test_dado_tecnico_usa_a_fonte_mono(rel):
 # O sistema tem tres raios (3/8/12); qualquer quarto valor e um sistema
 # paralelo nascendo.
 TETO_RAIOS = {
-    "portal-gestao/app/static/css/app.css": 33,
-    "revy-trafego/app/static/css/app.css": 28,
+    "portal-gestao/app/static/css/app.css": 29,
+    "revy-trafego/app/static/css/app.css": 24,
 }
 
 
@@ -122,8 +131,8 @@ def test_item_de_menu_usa_o_raio_de_navegacao(rel):
 APELIDOS = ("--green", "--amber", "--red", "--online")
 
 TETO_APELIDOS = {
-    "portal-gestao/app/static/css/app.css": 40,
-    "revy-trafego/app/static/css/app.css": 45,
+    "portal-gestao/app/static/css/app.css": 18,
+    "revy-trafego/app/static/css/app.css": 26,
 }
 
 
