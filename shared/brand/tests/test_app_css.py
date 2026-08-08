@@ -25,3 +25,38 @@ def test_app_css_nao_redeclara_token_canonico(rel):
         f"{rel} redeclara {len(invasores)} token(s) canonico(s), entao "
         f"shared/brand/revy-tokens.css nao pinta: {' '.join(invasores)}"
     )
+
+
+# Unico vocabulario que o app.css pode declarar por conta propria: escala de
+# layout. Ritmo e densidade de painel nao sao marca, entao nao vao para o
+# canonico; mas os dois paineis compartilham o mesmo shell e nao podem divergir.
+LAYOUT_PERMITIDO = {
+    "--space-1", "--space-2", "--space-3", "--space-4", "--space-5",
+    "--space-6", "--space-7", "--space-8", "--space-9",
+    "--text-xs", "--text-sm", "--text-base", "--text-lg", "--text-xl",
+    "--text-display-sm", "--text-display", "--text-metric",
+    "--gutter", "--page-inline",
+}
+
+
+@pytest.mark.parametrize("rel", PAINEIS)
+def test_root_so_declara_escala_de_layout(rel):
+    sobrando = sorted(variaveis_do_root(caminho(rel)) - LAYOUT_PERMITIDO)
+    assert not sobrando, f"{rel} declara fora do vocabulario de layout: {sobrando}"
+
+
+def test_escala_de_layout_identica_entre_os_dois_paineis():
+    """Loja e Control tem o mesmo shell. Se o ritmo divergir, as duas telas
+    equivalentes deixam de parecer o mesmo produto."""
+    a = load_tokens(caminho(PAINEIS[0]))["light"]
+    b = load_tokens(caminho(PAINEIS[1]))["light"]
+    diferentes = sorted(k for k in set(a) & set(b) if a[k].strip() != b[k].strip())
+    assert set(a) == set(b), f"conjuntos diferentes: {set(a) ^ set(b)}"
+    assert not diferentes, f"mesmo nome, valor diferente: {diferentes}"
+
+
+@pytest.mark.parametrize("rel", PAINEIS)
+@pytest.mark.parametrize("morto", ["--accent", "--accent-soft"])
+def test_acento_preto_do_sistema_antigo_nao_volta(rel, morto):
+    """O preto deixou de ser acento quando o verde entrou, em 08/08."""
+    assert usos_de_var(caminho(rel), morto) == 0, f"{rel} ainda usa var({morto})"

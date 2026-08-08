@@ -36,20 +36,10 @@
      shell e nao podem divergir. */
   --gutter: var(--space-8);
   --page-inline: var(--gutter);
-}
 
-/* A paleta vem de shared/brand/revy-tokens.css, carregado antes deste arquivo.
-   Nao redeclare token canonico aqui: como este arquivo vem depois no cascade,
-   a redeclaracao vence e a fonte unica deixa de valer. */
-:root,
-[data-theme="light"] {
-  --accent: #1b1b1b;
-  --accent-soft: #3a3534;
-}
-
-[data-theme="dark"] {
-  --accent: #f5f5f5;
-  --accent-soft: #e5e5e5;
+  /* A paleta vem de shared/brand/revy-tokens.css, carregado antes deste
+     arquivo. Nao redeclare token canonico aqui: como este arquivo vem depois
+     no cascade, a redeclaracao vence e a fonte unica deixa de valer. */
 }
 
 * { box-sizing: border-box; }
