@@ -426,15 +426,6 @@ p { color: var(--ink-soft); }
   margin-bottom: 12px;
 }
 
-.operations-card,
-.integration-card,
-.panel {
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  background: var(--surface);
-  box-shadow: var(--shadow);
-}
-
 .operations-card {
   position: relative;
   overflow: hidden;
@@ -664,7 +655,7 @@ p { color: var(--ink-soft); }
   color: var(--ink-soft);
   font-size: 12px;
 }
-.panel.flush { border-radius: var(--radius); }
+.panel.flush { border-radius: var(--radius-srf); }
 .panel.flush .empty { border-top: 0; }
 
 .vehicle-row small,
@@ -814,14 +805,9 @@ code {
   min-width: 0;
   padding: 18px;
   border: 1px solid var(--line);
-  border-radius: var(--radius);
+  border-radius: var(--radius-srf);
   background: var(--surface);
   box-shadow: var(--shadow);
-}
-.funil-summary-card.highlight {
-  background: var(--ink);
-  border-color: var(--ink);
-  color: var(--paper);
 }
 .funil-summary-card > span,
 .funil-time-grid span {
@@ -843,10 +829,6 @@ code {
   margin-top: 5px;
   color: var(--ink-soft);
   font-size: var(--text-xs);
-}
-.funil-summary-card.highlight > span,
-.funil-summary-card.highlight small {
-  color: color-mix(in srgb, var(--paper) 70%, transparent);
 }
 .funil-panel { margin-top: 12px; }
 .funil-stages {
@@ -2220,6 +2202,18 @@ textarea:focus-visible {
    === Painel e card ===
    =========================================================================== */
 
+/* Superficie sempre contrasta com o papel: e o que da profundidade,
+   principalmente no escuro. Achatar tudo no mesmo tom mata a peca. */
+.operations-card,
+.integration-card,
+.panel,
+.metric-grid > .panel {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-srf);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
 /* Cartao-resumo em destaque: cor da marca (antes invertia para preto) */
 .funil-summary-card.highlight {
   background: var(--brand);
@@ -2240,7 +2234,7 @@ textarea:focus-visible {
 .integ-card {
   background: var(--surface);
   border: 1px solid var(--line);
-  border-radius: var(--radius);
+  border-radius: var(--radius-srf);
   box-shadow: var(--shadow);
   overflow: hidden;
   margin-bottom: var(--space-6);
@@ -2617,4 +2611,3 @@ textarea:focus-visible {
 
 /* --- Botao reto (3px) --- */
 .nav-link { border-radius: var(--radius-nav); }
-.panel, .metric-grid > .panel { border-radius: var(--radius-srf); }
