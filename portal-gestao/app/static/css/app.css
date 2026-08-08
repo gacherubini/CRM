@@ -2426,7 +2426,7 @@ tr.roi-sem-campanha td { color: var(--ink-soft); }
    =========================================================================== */
 
 /* ---------------------------------------------------------------------------
-   Login (2026-08-08) — o unico momento de marca dentro do produto.
+   Login — o unico momento de marca dentro do produto.
    O painel da frase e SEMPRE preto: derivar de var(--ink) o deixava branco no
    modo escuro, porque la --ink e quase branco.
    --------------------------------------------------------------------------- */
