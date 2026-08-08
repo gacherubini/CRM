@@ -79,8 +79,8 @@ def test_dado_tecnico_usa_a_fonte_mono(rel):
 # O sistema tem tres raios (3/8/12); qualquer quarto valor e um sistema
 # paralelo nascendo.
 TETO_RAIOS = {
-    "portal-gestao/app/static/css/app.css": 34,
-    "revy-trafego/app/static/css/app.css": 29,
+    "portal-gestao/app/static/css/app.css": 33,
+    "revy-trafego/app/static/css/app.css": 28,
 }
 
 
@@ -104,6 +104,14 @@ def test_teto_de_raios_literais(rel):
     assert len(achados) <= TETO_RAIOS[rel], (
         f"{rel}: {len(achados)} raios literais, teto {TETO_RAIOS[rel]}. "
         f"Primeiros: {achados[:8]}"
+    )
+
+
+@pytest.mark.parametrize("rel", PAINEIS)
+def test_item_de_menu_usa_o_raio_de_navegacao(rel):
+    css = caminho(rel).read_text(encoding="utf-8")
+    assert "border-radius: var(--radius-nav)" in css, (
+        f"{rel} nao usa --radius-nav em item de menu"
     )
 
 
