@@ -2,11 +2,11 @@ from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
 from app.db import SessionLocal
-from app.models import Loja, VendaProjetada
+from app.models import Campanha, Loja, VendaProjetada, novo_id
 from app.vendas_projection import VendaSnapshot, projetar_venda
 
 
-def _snapshot(*, loja_slug, status="confirmada", atualizada_em=None, valor="100"):
+def _snapshot(*, loja_slug, status="confirmada", atualizada_em=None, valor="100", **extras):
     instante = atualizada_em or datetime(2026, 7, 28, 12, 0, tzinfo=timezone.utc)
     return VendaSnapshot(
         venda_id="venda-igual",
@@ -18,7 +18,24 @@ def _snapshot(*, loja_slug, status="confirmada", atualizada_em=None, valor="100"
         atualizada_em=instante,
         custo_veiculo=Decimal("70"),
         custos_diretos_total=Decimal("5"),
+        **extras,
     )
+
+
+def _campanha(db, *, loja_slug, nome="MT03 Agosto", utm="MT03AGOSTO"):
+    campanha = Campanha(
+        id=novo_id(),
+        loja_slug=loja_slug,
+        nome=nome,
+        canal="meta",
+        status="ativa",
+        utm_campaign=utm,
+        utm_campaign_norm=utm.casefold(),
+        criada_por_email="dono@loja.test",
+    )
+    db.add(campanha)
+    db.flush()
+    return campanha
 
 
 def test_projecao_isola_mesmo_id_por_loja():
@@ -155,6 +172,67 @@ def test_backfill_religa_vendas_orfas_sem_tocar_vinculos_existentes():
         assert religadas == 1
         assert db.get(VendaProjetada, ("venda-orfa", "loja-a")).loja_id == certa.id
         assert db.get(VendaProjetada, ("venda-vinculada", "loja-a")).loja_id == outra.id
+    finally:
+        db.close()
+
+
+def test_projecao_descarta_campanha_id_desconhecido():
+    """O Portal envia UUID do cadastro dele; Campanha.id no Revy e gerado local.
+
+    Aceitar o id de fora grava lixo na venda e desliga tanto o casamento por UTM
+    quanto a heranca do lead (roi_calc: ambos exigem campanha_id vazio).
+    """
+    db = SessionLocal()
+    try:
+        snap = _snapshot(
+            loja_slug="moto-center",
+            campanha_id_last="uuid-do-portal",
+            campanha_id_first="uuid-do-portal",
+            utm_campaign_last="MT03AGOSTO",
+            utm_campaign_first="MT03AGOSTO",
+        )
+        r = projetar_venda(db, snap)
+        db.commit()
+
+        assert r.venda.campanha_id_last is None
+        assert r.venda.campanha_id_first is None
+        assert r.venda.utm_campaign_last == "MT03AGOSTO"
+        assert r.venda.utm_campaign_first == "MT03AGOSTO"
+    finally:
+        db.close()
+
+
+def test_projecao_mantem_campanha_id_conhecido():
+    db = SessionLocal()
+    try:
+        campanha = _campanha(db, loja_slug="moto-center")
+        r = projetar_venda(
+            db,
+            _snapshot(
+                loja_slug="moto-center",
+                campanha_id_last=campanha.id,
+                campanha_id_first=campanha.id,
+            ),
+        )
+        db.commit()
+
+        assert r.venda.campanha_id_last == campanha.id
+        assert r.venda.campanha_id_first == campanha.id
+    finally:
+        db.close()
+
+
+def test_projecao_descarta_campanha_id_de_outra_loja():
+    """Id valido no Revy, mas de outra loja: nao pode atravessar a fronteira."""
+    db = SessionLocal()
+    try:
+        alheia = _campanha(db, loja_slug="outra-loja")
+        r = projetar_venda(
+            db, _snapshot(loja_slug="moto-center", campanha_id_last=alheia.id)
+        )
+        db.commit()
+
+        assert r.venda.campanha_id_last is None
     finally:
         db.close()
 
