@@ -32,6 +32,13 @@ Eixos com trabalho real pendente (um por mudança; não misturar). Fonte viva:
   teto 20 calls/ciclo, backoff 429/5xx (migrations `0015`/`0016`). Cadastro manual
   de `ad_id` (Fase 1) **removido** — campanha Revy precisa de `meta_campaign_id` +
   token `ads_read`.
+- **CTWA/ROI herança venda→lead:** plano
+  [`../superpowers/plans/2026-08-08-ctwa-lead-ad-id-e-roi-venda.md`](../superpowers/plans/2026-08-08-ctwa-lead-ad-id-e-roi-venda.md)
+  — a venda herda a campanha do lead no cálculo do ROI (retroativo); código no
+  anúncio como rota independente da Meta; painel "por onde as pessoas chegam" na
+  Loja e fim do carimbo `meta_ctwa` em quem chegou por link direto.
+  **Código implementado 2026-08-08** (Tasks 1, 2, 3, 5, 6, 8 e 9); pendente só a
+  **Task 4**, que é configuração dos anúncios e não código.
 - **Bot WhatsApp:** alerta de simulação no grupo (F0–F2 no código); smoke virgem/CTWA/handoff/salvo
   no lab → workflow Active ON; residual outbox/retry (Fase 3 do plano de alerta).
 - **Multi-WhatsApp (Control Fase 5):** E2E dois canais + `canal_id` correto.
@@ -56,6 +63,7 @@ Eixos com trabalho real pendente (um por mudança; não misturar). Fonte viva:
 | 6.2b | [CTWA atribuição + CAPI messaging](2026-07-22-plano-ctwa-atribuicao-capi-messaging.md) | Click-to-WhatsApp no CRM, match campanha, Purchase messaging | **PARCIAL/REVISTO** — CAPI messaging válido; o **match por campanha estava quebrado na prática** (diag. dia 1: 0 leads criados, `meta_campaign_id` sempre nulo). Corrigido/estendido pelo **6.2d**. |
 | 6.2c | [Meta spend API (gasto automático)](2026-07-22-plano-meta-spend-api.md) | Puxar `spend` do Ads via Marketing API → `CampanhaGasto` | **MVP + job 24h** — botão + thread + `/internal/jobs/meta-spend-sync`; residual OAuth / App Review |
 | 6.2d | [CTWA por ad_id + Graph](../superpowers/plans/2026-08-04-atribuicao-ctwa-campanha.md) | Lead na 2ª mensagem + resolução `ad_id→campaign_id` via Graph | **CÓDIGO ATUAL:** lead 2ª msg (Chatbot); worker Graph **sempre ON** no Revy; match só via cache + `meta_campaign_id` na campanha. Cadastro manual de `ad_ids` **removido**. |
+| 6.2e | [CTWA/ROI herança venda→lead](../superpowers/plans/2026-08-08-ctwa-lead-ad-id-e-roi-venda.md) | Venda herda a campanha do lead no ROI; origem honesta; painel de entrada na Loja | **IMPLEMENTADO** (2026-08-08) — Tasks 1/2/3/5/6/8/9 no código; **Task 4 (código no anúncio) é configuração e segue pendente**. Nunca casar lead↔auditoria por telefone mascarado: a colisão de 4 dígitos já pôs receita na campanha errada. |
 | 6.4 | [Revy Tráfego × Portal loja](2026-07-28-plano-revy-trafego-separacao.md) | App gestor multi-loja + slim resultados no portal | **FASE 3 pronta**: banco próprio, projeção de vendas e outbox; arquitetura no as-built e operação em `deploy/fly/3vm/` |
 | 6.5 | [Revy Control](2026-07-29-plano-revy-control.md) | Lojas, RBAC, módulos, Google Ads, integrações, auditoria e Multi-WhatsApp | **CÓDIGO PRODUTO COMPLETE** — workers outbox/métricas Google, reconcile status, HTTP adapters, UI/API aquisição, multi-WA n8n; residual = GCP humano + lab F7/E2E |
 | 6.5b | [PR-4 identidade loja / memberships](2026-07-31-pr4-identidade-loja-fase-b-memberships.md) | Dono multi-loja por convite (identidade da loja, fase B) | **IMPLEMENTADO** (`cd9e4f0`) — memberships + convite de dono |

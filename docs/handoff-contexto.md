@@ -1,6 +1,6 @@
 # Handoff técnico
 
-Atualizado em **2026-08-07**. Este arquivo registra somente o checkpoint atual.
+Atualizado em **2026-08-08**. Este arquivo registra somente o checkpoint atual.
 Histórico detalhado permanece no Git; não acumular “checkpoints anteriores” aqui.
 
 Leia primeiro:
@@ -11,6 +11,40 @@ Leia primeiro:
 
 ## Checkpoint de código
 
+- **Entregas 2026-08-08 — CTWA/ROI: a venda herda a campanha do lead (branch
+  `feat/ctwa-heranca-roi`, ainda NÃO deployado). Sem migration.** Plano em
+  [`superpowers/plans/2026-08-08-ctwa-lead-ad-id-e-roi-venda.md`](superpowers/plans/2026-08-08-ctwa-lead-ad-id-e-roi-venda.md).
+  - **`revy-trafego/app/roi_calc.py` — `herdar_campanhas_de_leads`**: `venda_casa_campanha`
+    só olhava `campanha_id`/`utm` gravados na própria venda, enquanto a contagem de leads
+    já casava por `ad_id`. O conserto é **na leitura**, então vale retroativamente para
+    toda venda já projetada — sem backfill, sem `UPDATE`, sem reenviar evento. Atribuição
+    explícita vence herança, e a ordem do laço (nome em `casefold`) garante que uma venda
+    nunca conte em duas campanhas. O detalhe da campanha (`main.py`) usa a mesma herança.
+  - **`vendas_projection.py`**: `campanha_id_first/last` vindo do outbox do Portal só é
+    gravado se existir em `campanhas` da mesma loja. O Portal manda UUID do cadastro dele;
+    aceitar isso desligaria o casamento por UTM **e** a herança, e a venda sumiria do ROI.
+  - **`chatbot-api/app/servico.py`**: `origem = meta_ctwa` passou a exigir identificador de
+    anúncio **ou** `ctwa_source_type` de família de anúncio (`fb_ads`/`ctwa_ad`/`ad`, em
+    `casefold` — o valor real é `FB_Ads`). Link direto e busca dentro do WhatsApp não são
+    mais contados como anúncio. **Sem backfill**: os 10 leads antigos ficam errados de
+    propósito. O sinal cru continua sempre gravado, e `canal=whatsapp` saiu do guard.
+  - **`_vincular_tracking_pendente_ao_lead`**: varre **todas** as conversas do telefone com
+    pendente em `ORDER BY criada_em ASC` (ASC é obrigatório: `_first` só é gravado enquanto
+    nulo). O ramo idempotente do webhook passou a consumir o pendente.
+  - **`portal-gestao/app/loja/sales_overview.py` + `templates/loja/vendas_visao.html`**:
+    bloco "Por onde as pessoas chegam" na seção de aquisição, agrupando por
+    `ctwa_source_type` (não por `origem`, que está errada e não será corrigida). **Guard
+    próprio**: a fonte é o lead do Chatbot, não o gasto da Meta.
+  - **`meta_ad_resolver_job.py` + `control/integrations.py`**: salvar a config de Ads
+    destrava os ads que estouraram `max_tentativas` (WHERE por `loja_slug`, **não** por
+    `store.id`), e a auditoria CTWA mostra quantos anúncios seguem sem campanha.
+  - ⚠️ **Pendente e não é código — Task 4:** pôr `Cód: <CÓDIGO>` na mensagem pré-preenchida
+    de cada anúncio e corrigir `codigo_ctwa` das campanhas (2 das 3 têm a frase-convite
+    inteira colada no campo). É a **única** rota que alcança os 3,6% de leads que a Meta
+    entrega sem identificador.
+  - ⚠️ **Nunca casar lead↔`ctwa_auditoria` por telefone mascarado.** Testado contra o dado
+    real: casou o lead de uma venda com o anúncio de outro cliente (só os 4 dígitos finais
+    batiam). Está documentado em "O que foi descartado" no plano.
 - **Entregas 2026-08-07 — triagem de UX (main `e06d9e5`, LIVE app2037 v115):** 32 itens de
   uma revisão de produto, triados um a um pelo dono. **Sem migration.** Detalhe completo,
   com o que foi aceito e o que foi **recusado**, em
