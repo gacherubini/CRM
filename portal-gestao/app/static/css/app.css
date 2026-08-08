@@ -2014,62 +2014,23 @@ tr:hover td { background: var(--surface-soft); }
 }
 
 /* ===========================================================================
-   Camada Revy 2026 — cor de marca, icones e hierarquia
-   Adiciona identidade sobre o design system monocromatico existente. As regras
-   ficam por ultimo de proposito para vencerem no cascade; nada acima foi
-   removido. Para trocar a cor da marca, edite APENAS os tokens --brand-* abaixo.
+   === Botao ===
    =========================================================================== */
-
-/* A marca e preta nos dois temas — nunca verde. O simbolo agora vem do SVG
-   em docs/brand/assets; .brand-mark so posiciona. */
-.brand-mark {
-  background: transparent;
-  color: inherit;
-  padding: 0;
-}
-.brand-mark svg { width: 32px; height: 32px; display: block; }
-
-/* No escuro o quadrado preto sobre a sidebar #161616 sumiria sem o fio. */
-[data-theme="dark"] .brand-mark rect:first-of-type { fill: #000000; }
-[data-theme="dark"] .brand-mark .brand-mark-edge { stroke: rgba(255,255,255,.16); }
-[data-theme="dark"] .brand-mark path { stroke: #f5f5f5; }
-
-/* Foco visivel na cor da marca */
-:focus-visible { outline-color: var(--brand); }
 
 /* Botao primario = cor da marca (antes era preto) */
 .button.primary { background: var(--brand); color: var(--brand-ink); }
 .button.primary:hover { background: var(--brand-strong); opacity: 1; }
 
-/* Item de navegacao ativo: fundo tint + faixa lateral na cor da marca */
-.nav-link.active {
-  background: var(--brand-tint);
-  color: var(--brand-strong);
-  border-color: var(--brand-line);
-  box-shadow: none;
-  position: relative;
-}
-[data-theme="dark"] .nav-link.active { color: var(--brand); }
-.nav-link.active::before {
-  content: "";
-  position: absolute;
-  left: 0; top: 7px; bottom: 7px;
-  width: 3px; border-radius: 3px;
-  background: var(--brand);
-}
+/* ===========================================================================
+   === Campo e formulario ===
+   =========================================================================== */
 
-/* Icones na navegacao lateral — todos os itens (incl. Veículos) herdam currentColor */
-.nav-link svg {
-  width: 17px;
-  height: 17px;
-  flex: 0 0 auto;
-  opacity: .8;
-  color: inherit;
-  transition: opacity .15s ease, color .15s ease;
-}
-.nav-link:hover svg { opacity: 1; color: inherit; }
-.nav-link.active svg { color: var(--brand); opacity: 1; }
-.nav-link.active:hover svg { color: var(--brand); opacity: 1; }
+/* Foco visivel na cor da marca */
+:focus-visible { outline-color: var(--brand); }
+
+/* ===========================================================================
+   === Estado ===
+   =========================================================================== */
 
 /* Pilulas de status: forma de pilula + ponto de estado */
 .status, .status-pill { border-radius: 999px; font-weight: 600; gap: 6px; }
@@ -2080,37 +2041,9 @@ tr:hover td { background: var(--surface-soft); }
   flex: 0 0 auto;
 }
 
-/* Aba do Control ativa: sublinhado na cor da marca */
-.control-tab.is-active { color: var(--brand); box-shadow: inset 0 -2px 0 var(--brand); }
-
-/* Alertas com icone (mask herda a cor do texto do alerta, entao acompanha o tema).
-   Icone posicionado em absoluto para nao virar irmao flex de conteudo multi-bloco. */
-.alert { position: relative; padding-left: 42px; }
-.alert::before {
-  content: "";
-  position: absolute; left: 14px; top: 13px;
-  width: 18px; height: 18px;
-  background: currentColor;
-  -webkit-mask: var(--ico) center / contain no-repeat;
-  mask: var(--ico) center / contain no-repeat;
-}
-.alert.warning,
-.alert.error {
-  --ico: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z'/%3E%3Cline x1='12' y1='9' x2='12' y2='13'/%3E%3Cline x1='12' y1='17' x2='12.01' y2='17'/%3E%3C/svg%3E"); }
-.alert.success {
-  --ico: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M22 11.1V12a10 10 0 1 1-5.9-9.1'/%3E%3Cpath d='M22 4 12 14.01l-3-3'/%3E%3C/svg%3E"); }
-/* o icone nao deve empurrar textos multi-linha/listas do alerta */
-.alert > *:first-child { margin-top: 0; }
-
-/* Estado vazio com icone de marca */
-.empty::before {
-  content: "";
-  width: 40px; height: 40px;
-  background: var(--brand);
-  opacity: .9;
-  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M22 12h-6l-2 3h-4l-2-3H2'/%3E%3Cpath d='M5.5 5.5 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.5-6.5A2 2 0 0 0 16.8 4H7.2a2 2 0 0 0-1.7 1.5Z'/%3E%3C/svg%3E") center / contain no-repeat;
-  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M22 12h-6l-2 3h-4l-2-3H2'/%3E%3Cpath d='M5.5 5.5 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.5-6.5A2 2 0 0 0 16.8 4H7.2a2 2 0 0 0-1.7 1.5Z'/%3E%3C/svg%3E") center / contain no-repeat;
-}
+/* ===========================================================================
+   === Painel e card ===
+   =========================================================================== */
 
 /* Cartao-resumo em destaque: cor da marca (antes invertia para preto) */
 .funil-summary-card.highlight {
@@ -2122,16 +2055,6 @@ tr:hover td { background: var(--surface-soft); }
 .funil-summary-card.highlight small {
   color: color-mix(in srgb, var(--brand-ink) 76%, transparent);
 }
-
-/* Sparkline / mini-grafico (uso opcional em dashboards) */
-.spark { display: block; width: 100%; height: 28px; margin-top: 10px; }
-.spark polyline { fill: none; stroke: var(--brand); stroke-width: 2; }
-.spark .spark-dot { fill: var(--brand); }
-.spark-delta {
-  display: inline-flex; align-items: center; gap: 4px; margin-top: 6px;
-  font-size: var(--text-xs); font-weight: 700; color: var(--green);
-}
-.spark-delta.down { color: var(--red); }
 
 /* Painel de status das integrações (Meta/Google/WhatsApp) — Ajustes da Loja.
    Componente compartilhado com o Revy Control; usa os tokens do projeto. */
@@ -2288,6 +2211,112 @@ tr:hover td { background: var(--surface-soft); }
     transition: none !important;
   }
 }
+
+/* ===========================================================================
+   === Tabela e lista ===
+   =========================================================================== */
+
+/* ===========================================================================
+   === Numero e grafico ===
+   =========================================================================== */
+
+/* Sparkline / mini-grafico (uso opcional em dashboards) */
+.spark { display: block; width: 100%; height: 28px; margin-top: 10px; }
+.spark polyline { fill: none; stroke: var(--brand); stroke-width: 2; }
+.spark .spark-dot { fill: var(--brand); }
+.spark-delta {
+  display: inline-flex; align-items: center; gap: 4px; margin-top: 6px;
+  font-size: var(--text-xs); font-weight: 700; color: var(--green);
+}
+.spark-delta.down { color: var(--red); }
+
+/* ===========================================================================
+   === Navegacao e shell ===
+   =========================================================================== */
+
+/* A marca e preta nos dois temas — nunca verde. O simbolo agora vem do SVG
+   em docs/brand/assets; .brand-mark so posiciona. */
+.brand-mark {
+  background: transparent;
+  color: inherit;
+  padding: 0;
+}
+.brand-mark svg { width: 32px; height: 32px; display: block; }
+
+/* No escuro o quadrado preto sobre a sidebar #161616 sumiria sem o fio. */
+[data-theme="dark"] .brand-mark rect:first-of-type { fill: #000000; }
+[data-theme="dark"] .brand-mark .brand-mark-edge { stroke: rgba(255,255,255,.16); }
+[data-theme="dark"] .brand-mark path { stroke: #f5f5f5; }
+
+/* Item de navegacao ativo: fundo tint + faixa lateral na cor da marca */
+.nav-link.active {
+  background: var(--brand-tint);
+  color: var(--brand-strong);
+  border-color: var(--brand-line);
+  box-shadow: none;
+  position: relative;
+}
+[data-theme="dark"] .nav-link.active { color: var(--brand); }
+.nav-link.active::before {
+  content: "";
+  position: absolute;
+  left: 0; top: 7px; bottom: 7px;
+  width: 3px; border-radius: 3px;
+  background: var(--brand);
+}
+
+/* Icones na navegacao lateral — todos os itens (incl. Veículos) herdam currentColor */
+.nav-link svg {
+  width: 17px;
+  height: 17px;
+  flex: 0 0 auto;
+  opacity: .8;
+  color: inherit;
+  transition: opacity .15s ease, color .15s ease;
+}
+.nav-link:hover svg { opacity: 1; color: inherit; }
+.nav-link.active svg { color: var(--brand); opacity: 1; }
+.nav-link.active:hover svg { color: var(--brand); opacity: 1; }
+
+/* Aba do Control ativa: sublinhado na cor da marca */
+.control-tab.is-active { color: var(--brand); box-shadow: inset 0 -2px 0 var(--brand); }
+
+/* ===========================================================================
+   === Alerta, faixa e vazio ===
+   =========================================================================== */
+
+/* Alertas com icone (mask herda a cor do texto do alerta, entao acompanha o tema).
+   Icone posicionado em absoluto para nao virar irmao flex de conteudo multi-bloco. */
+.alert { position: relative; padding-left: 42px; }
+.alert::before {
+  content: "";
+  position: absolute; left: 14px; top: 13px;
+  width: 18px; height: 18px;
+  background: currentColor;
+  -webkit-mask: var(--ico) center / contain no-repeat;
+  mask: var(--ico) center / contain no-repeat;
+}
+.alert.warning,
+.alert.error {
+  --ico: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z'/%3E%3Cline x1='12' y1='9' x2='12' y2='13'/%3E%3Cline x1='12' y1='17' x2='12.01' y2='17'/%3E%3C/svg%3E"); }
+.alert.success {
+  --ico: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M22 11.1V12a10 10 0 1 1-5.9-9.1'/%3E%3Cpath d='M22 4 12 14.01l-3-3'/%3E%3C/svg%3E"); }
+/* o icone nao deve empurrar textos multi-linha/listas do alerta */
+.alert > *:first-child { margin-top: 0; }
+
+/* Estado vazio com icone de marca */
+.empty::before {
+  content: "";
+  width: 40px; height: 40px;
+  background: var(--brand);
+  opacity: .9;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M22 12h-6l-2 3h-4l-2-3H2'/%3E%3Cpath d='M5.5 5.5 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.5-6.5A2 2 0 0 0 16.8 4H7.2a2 2 0 0 0-1.7 1.5Z'/%3E%3C/svg%3E") center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M22 12h-6l-2 3h-4l-2-3H2'/%3E%3Cpath d='M5.5 5.5 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.5-6.5A2 2 0 0 0 16.8 4H7.2a2 2 0 0 0-1.7 1.5Z'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+
+/* ===========================================================================
+   === Autenticacao ===
+   =========================================================================== */
 
 /* ---------------------------------------------------------------------------
    Ordem na vitrine — grade 3 colunas (igual catálogo) + paginação
@@ -2564,7 +2593,7 @@ a.vitrine-page-btn:hover {
    Enviar dispara uma mensagem de WhatsApp, entao ganha o verde da marca do canal
    em vez do azul de marca do portal. Escopo [data-theme="light"] de proposito:
    o modo escuro segue intocado (Enviar continua azul la). Fica por ultimo para
-   vencer no cascade a regra .button.primary da camada Revy 2026. */
+   vencer no cascade a regra .button.primary da secao Botao. */
 [data-theme="light"] .composer .button.primary[data-composer-submit] {
   background: var(--online);
   border-color: var(--online);

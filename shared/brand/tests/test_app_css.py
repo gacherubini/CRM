@@ -60,3 +60,45 @@ def test_escala_de_layout_identica_entre_os_dois_paineis():
 def test_acento_preto_do_sistema_antigo_nao_volta(rel, morto):
     """O preto deixou de ser acento quando o verde entrou, em 08/08."""
     assert usos_de_var(caminho(rel), morto) == 0, f"{rel} ainda usa var({morto})"
+
+
+# Uma secao por peca de interface, na ordem do arquivo. Cada tarefa de peca
+# escreve dentro da sua: e isso que impede a regra de uma peca de nascer a
+# 1.500 linhas da outra regra da mesma peca.
+SECOES = [
+    "Botao",
+    "Campo e formulario",
+    "Estado",
+    "Painel e card",
+    "Tabela e lista",
+    "Numero e grafico",
+    "Navegacao e shell",
+    "Alerta, faixa e vazio",
+    "Autenticacao",
+]
+
+
+@pytest.mark.parametrize("rel", PAINEIS)
+def test_camada_do_fim_foi_dissolvida(rel):
+    """Enquanto ela existir, cada peca tem duas regras disputando o seletor."""
+    assert not contem(caminho(rel), "Camada Revy 2026"), (
+        f"{rel} ainda tem a camada de sobrescritas no fim do arquivo"
+    )
+
+
+@pytest.mark.parametrize("rel", PAINEIS)
+def test_arquivo_tem_uma_secao_por_peca(rel):
+    """As tarefas seguintes escrevem dentro destas secoes; sem elas, cada
+    correcao volta a virar apendice no fim do arquivo."""
+    css = caminho(rel).read_text(encoding="utf-8")
+    faltando = [s for s in SECOES if f"=== {s} ===" not in css]
+    assert not faltando, f"{rel} sem secao para: {faltando}"
+
+
+@pytest.mark.parametrize("rel", PAINEIS)
+def test_secoes_estao_na_ordem_declarada(rel):
+    """Os dois paineis compartilham o shell: se a ordem divergir, a mesma peca
+    fica em lugar diferente nos dois arquivos e a busca deixa de valer."""
+    css = caminho(rel).read_text(encoding="utf-8")
+    posicoes = [css.index(f"=== {s} ===") for s in SECOES]
+    assert posicoes == sorted(posicoes), f"{rel} tem secoes fora de ordem"
