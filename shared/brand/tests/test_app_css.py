@@ -72,12 +72,24 @@ def test_dado_tecnico_usa_a_fonte_mono(rel):
 
 
 @pytest.mark.parametrize("rel", PAINEIS)
-@pytest.mark.parametrize("token", ["--ok", "--warn", "--danger", "--whatsapp"])
+@pytest.mark.parametrize("token", ["--ok", "--warn", "--danger"])
 def test_resultado_de_operacao_usa_token_semantico(rel, token):
     """--ok/--warn/--danger dizem o que aconteceu; --green/--amber/--red so
     diziam a cor. Sem o nome semantico, ninguem sabe se o verde e 'conectou'
     ou 'e da marca'."""
     assert usos_de_var(caminho(rel), token) > 0, f"{rel} nao usa var({token})"
+
+
+def test_whatsapp_usa_token_semantico_na_loja():
+    """--whatsapp e o verde do canal (selo Conectado, botao Enviar do
+    atendimento) e so existe na Loja. O Control nunca teve elemento com essa
+    cor — exigir o token la seria inventar UI so pra fazer o teste passar,
+    nao corrigir uma lacuna real. Fica de fora de
+    test_resultado_de_operacao_usa_token_semantico de proposito: aquele e
+    parametrizado nos dois paineis, este e Loja-only."""
+    assert usos_de_var(caminho(PAINEIS[0]), "--whatsapp") > 0, (
+        f"{PAINEIS[0]} nao usa var(--whatsapp)"
+    )
 
 
 # Uma secao por peca de interface, na ordem do arquivo. Cada tarefa de peca
