@@ -15,6 +15,19 @@ import pytest
 from css_audit import PAINEIS, caminho, contem, raios_literais, usos_de_var, variaveis_do_root
 from tokens import CANONICAL, RAIZ, load_tokens
 
+# Apelidos genericos herdados do sistema anterior. Existiam so para o app.css
+# antigo continuar funcionando. A Tarefa 14 os aposenta do canonico.
+APELIDOS_APOSENTADOS = ("--green", "--amber", "--red", "--online", "--radius")
+
+
+def test_canonico_nao_carrega_mais_apelido_generico():
+    """Eles existiam so para o app.css antigo continuar funcionando. Enquanto
+    estiverem la, uma regra nova pode nascer usando --green sem que ninguem
+    saiba se aquilo e sucesso, estado de registro ou verde de marca."""
+    declarados = set(load_tokens(CANONICAL)["light"])
+    sobrando = sorted(set(APELIDOS_APOSENTADOS) & declarados)
+    assert not sobrando, f"o canonico ainda declara: {sobrando}"
+
 
 @pytest.mark.parametrize("rel", PAINEIS)
 def test_app_css_nao_redeclara_token_canonico(rel):
@@ -96,15 +109,6 @@ def test_whatsapp_usa_token_semantico_na_loja():
 # Uma secao por peca de interface, na ordem do arquivo. Cada tarefa de peca
 # escreve dentro da sua: e isso que impede a regra de uma peca de nascer a
 # 1.500 linhas da outra regra da mesma peca.
-# Teto de border-radius literais por arquivo. So desce: cada tarefa de peca
-# tokeniza os raios da peca dela e baixa o numero aqui. A Tarefa 13 zerou.
-# O sistema tem tres raios (3/8/12); qualquer quarto valor e um sistema
-# paralelo nascendo.
-TETO_RAIOS = {
-    "portal-gestao/app/static/css/app.css": 0,
-    "revy-trafego/app/static/css/app.css": 0,
-}
-
 
 # Barra fina: a ponta arredondada e geometria da barra, nao raio de caixa.
 # Duas excecoes nominais e documentadas — nao e categoria aberta.
@@ -121,12 +125,11 @@ def _raios_relevantes(rel):
 
 
 @pytest.mark.parametrize("rel", PAINEIS)
-def test_teto_de_raios_literais(rel):
+def test_nenhum_raio_fora_do_sistema(rel):
+    """O sistema tem tres raios: 3px controle, 8px menu, 12px superficie.
+    Um quarto valor e um sistema paralelo nascendo."""
     achados = _raios_relevantes(rel)
-    assert len(achados) <= TETO_RAIOS[rel], (
-        f"{rel}: {len(achados)} raios literais, teto {TETO_RAIOS[rel]}. "
-        f"Primeiros: {achados[:8]}"
-    )
+    assert not achados, f"{rel} tem raio fora do sistema: {achados}"
 
 
 @pytest.mark.parametrize("rel", PAINEIS)
@@ -147,25 +150,10 @@ def test_item_de_menu_usa_o_raio_de_navegacao(rel):
     )
 
 
-# Apelidos genericos herdados do sistema anterior. Cada tarefa migra os seus
-# para o nome semantico e baixa o teto; a Tarefa 13 zerou o teto. Remove-los
-# do canonico fica para uma tarefa futura. Enquanto .status pintar por
-# --green, "Proposta" e "Ganho" saem da mesma variavel e a regra "o acento
-# nunca e status" nao tem como valer.
-APELIDOS = ("--green", "--amber", "--red", "--online")
-
-TETO_APELIDOS = {
-    "portal-gestao/app/static/css/app.css": 0,
-    "revy-trafego/app/static/css/app.css": 0,
-}
-
-
 @pytest.mark.parametrize("rel", PAINEIS)
-def test_teto_de_apelidos_genericos(rel):
-    total = sum(usos_de_var(caminho(rel), a) for a in APELIDOS)
-    assert total <= TETO_APELIDOS[rel], (
-        f"{rel}: {total} usos de apelido generico, teto {TETO_APELIDOS[rel]}"
-    )
+@pytest.mark.parametrize("apelido", APELIDOS_APOSENTADOS)
+def test_apelido_generico_nao_volta(rel, apelido):
+    assert usos_de_var(caminho(rel), apelido) == 0, f"{rel} voltou a usar {apelido}"
 
 
 # Numero que muda a cada refresh nao pode dancar de largura: sem tabular-nums,

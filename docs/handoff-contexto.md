@@ -43,6 +43,39 @@ Leia primeiro:
     `loja/vendas_visao.html` seguem como estão — o plano trocou marca, cor, forma e tipo,
     não redesenhou telas.
 
+- **Entregas 2026-08-08 — Varredura de marca em todas as telas (branch
+  `marca/varredura-telas`, ainda NÃO deployado/mesclado). Sem migration.** Plano em
+  [`superpowers/plans/2026-08-08-varredura-marca-todas-as-telas.md`](superpowers/plans/2026-08-08-varredura-marca-todas-as-telas.md),
+  spec em [`superpowers/specs/2026-08-08-varredura-marca-todas-as-telas-design.md`](superpowers/specs/2026-08-08-varredura-marca-todas-as-telas-design.md).
+  Continuação da entrega de identidade visual acima: leva a marca decidida às 76 telas do
+  Revy Loja e do Revy Control. **As 14 tarefas do plano foram executadas.**
+  - `app.css` de cada painel **não redeclara mais nenhum token canônico**, e a antiga
+    "Camada Revy 2026" (sobrescritas soltas no fim do arquivo) foi dissolvida numa seção
+    por peça (Botão, Campo e formulário, Estado, Painel e card, Tabela e lista, Número e
+    gráfico, Navegação e shell, Alerta/faixa/vazio, Autenticação) — idêntica nos dois
+    painéis.
+  - **Os cinco apelidos genéricos saíram do canônico (Tarefa 14):** `--green`, `--amber`,
+    `--red`, `--online` e `--radius` existiam só para o `app.css` antigo continuar
+    funcionando; hoje todo consumo usa o nome semântico (`--ok`/`--warn`/`--danger`/
+    `--whatsapp`, `--radius-ctl`/`--radius-nav`/`--radius-srf`). `catalogo-publico` e
+    `site` também consumiam apelidos fora do alcance das guardas dos dois painéis
+    (`.whatsapp`/`.notice`/`.filters` etc. em `catalog.css`, `--green: var(--online)` no
+    `site/index.html`) e foram migrados na mesma tarefa.
+  - **Os antigos tetos decrescentes viraram asserções absolutas** em
+    `shared/brand/tests/test_app_css.py`: `test_nenhum_raio_fora_do_sistema` (zero raio
+    literal fora de `--radius-ctl`/`-nav`/`-srf`, 50%, `inherit`, `0`) e
+    `test_apelido_generico_nao_volta` (zero uso de qualquer apelido aposentado), nos dois
+    painéis. Substituem `TETO_RAIOS`/`TETO_APELIDOS`, que só podiam descer.
+  - **Hotfix crítico (`add7828`), pré-requisito da Tarefa 14:** o comentário de cabeçalho
+    de `shared/brand/revy-tokens.css` tinha um `*/` literal no texto, fechando o comentário
+    cedo e derrubando o `:root` do tema claro no parser real do navegador — as guardas em
+    Python (regex) não pegavam isso. Corrigido, com guarda de regressão
+    `test_root_do_tema_claro_sobrevive_ao_parser_do_navegador`.
+  - **Pendente:** merge/deploy da branch. **Conferência visual consolidada dos dois temas**
+    (telas-testemunha dos dois painéis + vitrine + site) foi deferida de propósito para
+    depois da Tarefa 14 e é o próximo passo antes do merge. Espaçamento/"gaps" nas telas
+    novas segue em fila separada, por decisão do dono (ver "Pendências reais").
+
 - **Entregas 2026-08-08 — CTWA/ROI: a venda herda a campanha do lead (branch
   `feat/ctwa-heranca-roi`, ainda NÃO deployado). Sem migration.** Plano em
   [`superpowers/plans/2026-08-08-ctwa-lead-ad-id-e-roi-venda.md`](superpowers/plans/2026-08-08-ctwa-lead-ad-id-e-roi-venda.md).
@@ -146,6 +179,10 @@ Leia primeiro:
 
 ## Validação conhecida
 
+- Suítes (2026-08-08, branch `marca/varredura-telas`, fim da Tarefa 14): `shared/brand`
+  **181** guardas de marca (raio, apelido aposentado, contraste AA, cópia sincronizada,
+  `:root` sobrevive ao parser); portal-gestao **597**; revy-trafego **497** (+1 falha
+  pré-existente `test_control_provisioning_outbox`, mesma de sempre — ver abaixo).
 - Suítes (2026-08-07, em `e06d9e5`): revy-trafego **472** (+1 falha pré-existente outbox
   motor), portal-gestao **558** (`.venv` local). chatbot-api não foi tocado nesta entrega;
   última contagem conhecida **297** em `a2a11f5`.

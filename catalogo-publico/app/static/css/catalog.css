@@ -127,7 +127,7 @@ h2 {
   padding: var(--space-4);
   margin-bottom: 1.75rem;
   border: 1px solid var(--line);
-  border-radius: var(--radius);
+  border-radius: var(--radius-srf);
   background: var(--surface-raised);
 }
 
@@ -295,7 +295,7 @@ button.secondary {
   text-align: center;
   padding: 3.5rem 1.25rem;
   border: 1px solid var(--line);
-  border-radius: var(--radius);
+  border-radius: var(--radius-srf);
   background: var(--surface-raised);
 }
 
@@ -431,13 +431,13 @@ a.page-btn:focus-visible {
 
 .detail-fallback {
   aspect-ratio: 3 / 2;
-  border-radius: var(--radius);
+  border-radius: var(--radius-srf);
   border: 1px solid var(--line);
 }
 
 .detail-info {
   border: 1px solid var(--line);
-  border-radius: var(--radius);
+  border-radius: var(--radius-srf);
   background: var(--surface);
   padding: 1.35rem;
   position: sticky;
@@ -487,8 +487,8 @@ a.page-btn:focus-visible {
 .whatsapp {
   width: 100%;
   margin-bottom: 0.85rem;
-  border-color: var(--green);
-  background: var(--green);
+  border-color: var(--whatsapp);
+  background: var(--whatsapp);
   color: #fff;
 }
 
@@ -496,10 +496,10 @@ a.page-btn:focus-visible {
 
 .notice {
   padding: 0.9rem 1rem;
-  border: 1px solid color-mix(in srgb, var(--amber) 30%, var(--line));
+  border: 1px solid color-mix(in srgb, var(--warn) 30%, var(--line));
   border-radius: 8px;
   background: var(--warn-bg);
-  color: var(--amber);
+  color: var(--warn);
   font-size: 0.9rem;
 }
 

@@ -24,6 +24,9 @@ Tokens das APIs ficam **somente no servidor**; o navegador recebe uma sessão as
 - Antes de mudar as telas da Loja, leia
   [`../docs/2026-08-07-triagem-revisao-ux-loja-control.md`](../docs/2026-08-07-triagem-revisao-ux-loja-control.md):
   parte do que "parece faltando" foi **recusado pelo dono**.
+- O `app.css` **não** pode reabrir `:root` para declarar token de marca: ele carrega depois
+  do `revy-tokens.css` e a redeclaração anula a fonte única.
+  `shared/brand/tests/test_app_css.py` falha se acontecer.
 
 ## Onde editar
 

@@ -40,19 +40,14 @@
   --st-lost: #6b625f;
 
   --ok: #0d7a4f;
-  --amber: #8a6d1d;
   --warn: #8a6d1d;
   --danger: #b42318;
-  --red: #b42318;
-  --green: #0d7a4f;
   --whatsapp: #25d366;
-  --online: #25d366;
 
   /* --- forma --- */
   --radius-ctl: 3px;
   --radius-nav: 8px;
   --radius-srf: 12px;
-  --radius: 12px;
 
   /* --- tipografia --- */
   --font-ui: "Hanken Grotesk", "Segoe UI", ui-sans-serif, system-ui, -apple-system, sans-serif;
@@ -88,9 +83,6 @@
   --st-lost: #949494;
 
   --ok: #3ecf8e;
-  --amber: #d9b04a;
   --warn: #d9b04a;
   --danger: #f97066;
-  --red: #f97066;
-  --green: #3ecf8e;
 }

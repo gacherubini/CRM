@@ -29,6 +29,9 @@ para o lojista; configuração técnica e operação multi-loja ficam aqui.
 - Antes de mudar as telas do Control, leia
   [`docs/2026-08-07-triagem-revisao-ux-loja-control.md`](../docs/2026-08-07-triagem-revisao-ux-loja-control.md):
   parte do que "parece faltando" foi **recusado pelo dono**.
+- O `app.css` **não** pode reabrir `:root` para declarar token de marca: ele carrega depois
+  do `revy-tokens.css` e a redeclaração anula a fonte única.
+  `shared/brand/tests/test_app_css.py` falha se acontecer.
 
 ## Onde editar
 

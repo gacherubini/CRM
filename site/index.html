@@ -21,7 +21,7 @@
       --soft: var(--surface-soft);
       --black: var(--ink);
       --muted: var(--ink-muted);
-      --green: var(--online);   /* ponto "ao vivo" do hero: verde WhatsApp */
+      --hero-live: var(--whatsapp);   /* ponto "ao vivo" do hero: verde WhatsApp */
     }
     * { box-sizing: border-box; }
     html { scroll-behavior: smooth; }
@@ -79,7 +79,7 @@
     .hero::before { position: absolute; inset: 0; z-index: -1; content: ''; background: radial-gradient(circle at 18% 30%, rgba(0,0,0,.08), transparent 30%), radial-gradient(circle at 86% 65%, rgba(0,0,0,.05), transparent 35%); filter: blur(34px); }
     .hero-grid { display: grid; grid-template-columns: minmax(0,1fr) minmax(420px,.9fr); gap: clamp(54px,7vw,96px); align-items: center; }
     .hero-badge { display: inline-flex; align-items: center; gap: 9px; margin-bottom: 22px; padding: 8px 12px; border: 1px solid var(--line); border-radius: 999px; background: #fff; color: var(--muted); font-size: 11px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; }
-    .hero-badge i { width: 8px; height: 8px; border-radius: 50%; background: var(--green); box-shadow: 0 0 10px rgba(37,211,102,.6); }
+    .hero-badge i { width: 8px; height: 8px; border-radius: 50%; background: var(--hero-live); box-shadow: 0 0 10px rgba(37,211,102,.6); }
     .hero h1 { max-width: 760px; margin: 0 0 26px; font-family: var(--font-brand); font-weight: 300; font-size: clamp(46px, 6vw, 72px); line-height: 1.06; letter-spacing: -.02em; }
     .hero-copy { max-width: 640px; margin: 0 0 38px; color: var(--muted); font-size: 18px; line-height: 1.62; }
     .hero-actions { display: flex; flex-wrap: wrap; gap: 14px; }
