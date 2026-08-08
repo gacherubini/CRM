@@ -184,7 +184,10 @@ def test_shell_on_rota_loja_equipe_dono_pode_adicionar(client, monkeypatch):
     assert resposta.status_code == 200
     assert "Carla Contato" in resposta.text
     assert "Adicionar membro" in resposta.text
-    assert "token" not in resposta.text.lower()
+    # O que nao pode vazar e o token de convite, no corpo da pagina. O <head>
+    # carrega revy-tokens.css, cujo NOME contem "token" e nao e segredo.
+    corpo = resposta.text.split("<body", 1)[-1].lower()
+    assert "token" not in corpo
 
 
 def test_shell_off_rota_loja_equipe_404(client, monkeypatch):

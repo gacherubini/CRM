@@ -2154,25 +2154,34 @@ tr:hover td { background: var(--surface-soft); }
    =========================================================================== */
 :root,
 [data-theme="light"] {
-  --brand: #1f6feb;
-  --brand-strong: #1a5fd0;
+  --brand: #1f4d3a;
+  --brand-strong: #1a4231;
   --brand-ink: #ffffff;
-  --brand-tint: rgba(31, 111, 235, .09);
-  --brand-line: rgba(31, 111, 235, .32);
+  --brand-tint: rgba(31, 77, 58, .09);
+  --brand-line: rgba(31, 77, 58, .32);
 }
 [data-theme="dark"] {
-  --brand: #5a95ff;
-  --brand-strong: #82afff;
-  --brand-ink: #0a0f18;
-  --brand-tint: rgba(90, 149, 255, .14);
-  --brand-line: rgba(90, 149, 255, .34);
+  /* Passo 300 da escala. O 700 (#1f4d3a) da 1,6:1 sobre #0a0a0a. */
+  --brand: #7fbfa3;
+  --brand-strong: #9ed0ba;
+  --brand-ink: #0a0a0a;
+  --brand-tint: rgba(127, 191, 163, .14);
+  --brand-line: rgba(127, 191, 163, .34);
 }
 
-/* Marca: o quadradinho R/C passa a usar a cor da marca */
-.brand-mark { background: var(--brand); color: var(--brand-ink); }
-/* ...mas no modo claro a logo e PRETA (tinta neutra, como a wordmark do site);
-   o acento de marca segue azul. Escuro intocado (logo segue a marca). */
-[data-theme="light"] .brand-mark { background: var(--ink); color: var(--paper); }
+/* A marca e preta nos dois temas — nunca verde. O simbolo agora vem do SVG
+   em docs/brand/assets; .brand-mark so posiciona. */
+.brand-mark {
+  background: transparent;
+  color: inherit;
+  padding: 0;
+}
+.brand-mark svg { width: 32px; height: 32px; display: block; }
+
+/* No escuro o quadrado preto sobre a sidebar #161616 sumiria sem o fio. */
+[data-theme="dark"] .brand-mark rect:first-of-type { fill: #000000; }
+[data-theme="dark"] .brand-mark .brand-mark-edge { stroke: rgba(255,255,255,.16); }
+[data-theme="dark"] .brand-mark path { stroke: #f5f5f5; }
 
 /* Foco visivel na cor da marca */
 :focus-visible { outline-color: var(--brand); }
@@ -2572,3 +2581,133 @@ tr:hover td { background: var(--surface-soft); }
 .readiness-item.is-block .readiness-mark { background: var(--red); }
 .readiness-item.is-warn .readiness-mark { background: var(--amber); }
 .readiness-item.is-block { border-color: color-mix(in srgb, var(--red) 28%, var(--line)); }
+
+/* ===========================================================================
+   Estado em ponto (2026-08-08)
+   A pilula cheia virava mosaico numa fila longa. Agora a cor vive no ponto e
+   o texto fica neutro: cor + forma + palavra, nunca cor sozinha.
+   O grupo de cor de cada estado continua em app.css:848-880; aqui so trocamos
+   a FORMA e movemos a cor de `color` para `--sc`.
+   =========================================================================== */
+.status,
+.status-pill {
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  color: var(--ink-soft);
+  font-weight: 500;
+  gap: 6px;
+}
+.status::before,
+.status-pill::before {
+  width: 7px;
+  height: 7px;
+  background: var(--sc, var(--ink-muted));
+}
+
+/* Os tres grupos herdados passam a definir --sc em vez de background+color. */
+.status.disponivel, .status.novo, .status.qualificado, .status.convertido,
+.status.ativa, .status.ativo, .status.conectado, .status.pronta {
+  background: transparent;
+  color: var(--ink-soft);
+  --sc: var(--st-won);
+}
+.status.reservado, .status.aguardando_simulacao, .status.aguardando_cliente,
+.status.warn, .status.em_configuracao, .status.rascunho, .status.pendente,
+.status.desconectado {
+  background: transparent;
+  color: var(--ink-soft);
+  --sc: var(--st-wait);
+}
+/* Em atendimento sai do ambar: quem exige acao e quem espera, nao quem ja
+   esta sendo atendido. Negociacao (Proposta) ganha o acento. */
+.status.em_atendimento {
+  background: transparent;
+  color: var(--ink-soft);
+  --sc: var(--st-live);
+}
+.status.negociacao {
+  background: transparent;
+  color: var(--ink-soft);
+  --sc: var(--st-prop);
+}
+/* Terminais nao recebem ponto: nao disputam atencao com quem esta esperando. */
+.status.vendido, .status.perdido, .status.indisponivel,
+.status.suspensa, .status.encerrada, .status.inativo {
+  background: transparent;
+  color: var(--ink-muted);
+  font-weight: 500;
+}
+.status.vendido::before, .status.perdido::before, .status.indisponivel::before,
+.status.suspensa::before, .status.encerrada::before, .status.inativo::before {
+  display: none;
+}
+
+/* --- Estados que so existem no Control ---
+   O Control tem vocabulario proprio: confirmacao de sinal (Pixel/CTWA/Meta),
+   convite de acesso (app/rotulos.py:ROTULO_ACESSO) e campanha
+   (app/campanhas.py:STATUS_ROTULO). Sem grupo eles cairiam no --sc padrao e
+   sumiriam junto com os terminais. `sem_gasto` nao existe no produto. */
+.status.confirmada, .status.aceito {
+  background: transparent;
+  color: var(--ink-soft);
+  --sc: var(--st-won);
+}
+/* Pausada nao e terminal: a campanha volta com um clique, entao continua
+   pedindo decisao — mesmo grupo de desconectado. */
+.status.convidado, .status.pausada {
+  background: transparent;
+  color: var(--ink-soft);
+  --sc: var(--st-wait);
+}
+/* Bloqueio de prontidao (impede ativar a loja) le diferente de alerta — o
+   unico estado do produto que ganha ponto vermelho. Regra de cor original em
+   `.status.erro`, acima. */
+.status.erro {
+  background: transparent;
+  color: var(--ink-soft);
+  --sc: var(--red);
+}
+.status.revogado, .status.recusado, .status.expirado {
+  background: transparent;
+  color: var(--ink-muted);
+  font-weight: 500;
+}
+.status.revogado::before, .status.recusado::before, .status.expirado::before {
+  display: none;
+}
+
+/* O estado da loja vem em classe hifenizada (`status-pill status-ativa`, do
+   enum em app/rotulos.py). Especificidade 0,2,0 vence o `.status-pill` acima,
+   entao a troca precisa ser repetida aqui. */
+.status-pill.status-ativa, .status-pill.status-pronta {
+  background: transparent;
+  border: 0;
+  color: var(--ink-soft);
+  font-weight: 500;
+  --sc: var(--st-won);
+}
+.status-pill.status-em_configuracao, .status-pill.status-rascunho {
+  background: transparent;
+  border: 0;
+  color: var(--ink-soft);
+  font-weight: 500;
+  --sc: var(--st-wait);
+}
+.status-pill.status-suspensa, .status-pill.status-encerrada {
+  background: transparent;
+  border: 0;
+  color: var(--ink-muted);
+  font-weight: 500;
+}
+.status-pill.status-suspensa::before, .status-pill.status-encerrada::before {
+  display: none;
+}
+
+/* --- Botao reto (3px) --- */
+.button, .link-button, input, select, textarea, .search, .filter-bar select {
+  border-radius: var(--radius-ctl);
+}
+.nav-link { border-radius: var(--radius-nav); }
+.panel, .metric-grid > .panel { border-radius: var(--radius-srf); }

@@ -2059,25 +2059,34 @@ tr:hover td { background: var(--surface-soft); }
    =========================================================================== */
 :root,
 [data-theme="light"] {
-  --brand: #1f6feb;
-  --brand-strong: #1a5fd0;
+  --brand: #1f4d3a;
+  --brand-strong: #1a4231;
   --brand-ink: #ffffff;
-  --brand-tint: rgba(31, 111, 235, .09);
-  --brand-line: rgba(31, 111, 235, .32);
+  --brand-tint: rgba(31, 77, 58, .09);
+  --brand-line: rgba(31, 77, 58, .32);
 }
 [data-theme="dark"] {
-  --brand: #5a95ff;
-  --brand-strong: #82afff;
-  --brand-ink: #0a0f18;
-  --brand-tint: rgba(90, 149, 255, .14);
-  --brand-line: rgba(90, 149, 255, .34);
+  /* Passo 300 da escala. O 700 (#1f4d3a) da 1,6:1 sobre #0a0a0a. */
+  --brand: #7fbfa3;
+  --brand-strong: #9ed0ba;
+  --brand-ink: #0a0a0a;
+  --brand-tint: rgba(127, 191, 163, .14);
+  --brand-line: rgba(127, 191, 163, .34);
 }
 
-/* Marca: o quadradinho R/C passa a usar a cor da marca */
-.brand-mark { background: var(--brand); color: var(--brand-ink); }
-/* ...mas no modo claro a logo e PRETA (tinta neutra, como a wordmark do site);
-   o acento de marca segue azul. Escuro intocado (logo segue a marca). */
-[data-theme="light"] .brand-mark { background: var(--ink); color: var(--paper); }
+/* A marca e preta nos dois temas — nunca verde. O simbolo agora vem do SVG
+   em docs/brand/assets; .brand-mark so posiciona. */
+.brand-mark {
+  background: transparent;
+  color: inherit;
+  padding: 0;
+}
+.brand-mark svg { width: 32px; height: 32px; display: block; }
+
+/* No escuro o quadrado preto sobre a sidebar #161616 sumiria sem o fio. */
+[data-theme="dark"] .brand-mark rect:first-of-type { fill: #000000; }
+[data-theme="dark"] .brand-mark .brand-mark-edge { stroke: rgba(255,255,255,.16); }
+[data-theme="dark"] .brand-mark path { stroke: #f5f5f5; }
 
 /* Foco visivel na cor da marca */
 :focus-visible { outline-color: var(--brand); }
@@ -2937,3 +2946,118 @@ a.metric-link:focus-visible {
 }
 a.metric-link:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
 @media (prefers-reduced-motion: reduce) { a.metric-link { transition: none; } }
+
+/* ===========================================================================
+   Estado em ponto (2026-08-08)
+   A pilula cheia virava mosaico numa fila longa. Agora a cor vive no ponto e
+   o texto fica neutro: cor + forma + palavra, nunca cor sozinha.
+   O grupo de cor de cada estado continua em app.css:848-880; aqui so trocamos
+   a FORMA e movemos a cor de `color` para `--sc`.
+   =========================================================================== */
+.status,
+.status-pill {
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  color: var(--ink-soft);
+  font-weight: 500;
+  gap: 6px;
+}
+.status::before,
+.status-pill::before {
+  width: 7px;
+  height: 7px;
+  background: var(--sc, var(--ink-muted));
+}
+
+/* Os tres grupos herdados passam a definir --sc em vez de background+color.
+   Os estados marcados /conferencia/ nao tinham grupo antes (caiam no cinza):
+   vieram do enum real (venda, simulacao, campanha, meta) na Step 2. */
+.status.disponivel, .status.novo, .status.qualificado, .status.convertido,
+.status.ativa, .status.ativo, .status.conectado, .status.pronta,
+.status.confirmada, .status.concluida /* conferencia */ {
+  background: transparent;
+  color: var(--ink-soft);
+  --sc: var(--st-won);
+}
+.status.reservado, .status.aguardando_simulacao, .status.aguardando_cliente,
+.status.warn, .status.em_configuracao, .status.rascunho, .status.pendente,
+.status.desconectado,
+.status.registrada, .status.recebida, .status.parcial,
+.status.aguardando_intervencao, .status.pausada /* conferencia */ {
+  background: transparent;
+  color: var(--ink-soft);
+  --sc: var(--st-wait);
+}
+/* Em atendimento sai do ambar: quem exige acao e quem espera, nao quem ja
+   esta sendo atendido. Negociacao (Proposta) ganha o acento. */
+.status.em_atendimento,
+.status.processando /* conferencia: rodando, nao esperando alguem */ {
+  background: transparent;
+  color: var(--ink-soft);
+  --sc: var(--st-live);
+}
+.status.negociacao {
+  background: transparent;
+  color: var(--ink-soft);
+  --sc: var(--st-prop);
+}
+/* Terminais nao recebem ponto: nao disputam atencao com quem esta esperando. */
+.status.vendido, .status.perdido, .status.indisponivel,
+.status.suspensa, .status.encerrada, .status.inativo,
+.status.cancelada, .status.falhou /* conferencia */ {
+  background: transparent;
+  color: var(--ink-muted);
+  font-weight: 500;
+}
+.status.vendido::before, .status.perdido::before, .status.indisponivel::before,
+.status.suspensa::before, .status.encerrada::before, .status.inativo::before,
+.status.cancelada::before, .status.falhou::before {
+  display: none;
+}
+
+/* --- Botao reto (3px) --- */
+.button, .link-button, input, select, textarea, .search, .filter-bar select {
+  border-radius: var(--radius-ctl);
+}
+.nav-link { border-radius: var(--radius-nav); }
+.panel, .metric-grid > .panel { border-radius: var(--radius-srf); }
+
+/* ===========================================================================
+   Login (2026-08-08) — o unico momento de marca dentro do produto.
+   O painel da frase e SEMPRE preto: derivar de var(--ink) o deixava branco no
+   modo escuro, porque la --ink e quase branco.
+   =========================================================================== */
+.login-story {
+  background: #1b1b1b;
+  color: #f7f7f7;
+  padding: 56px 48px;
+}
+[data-theme="dark"] .login-story { background: #000000; }
+
+/* Esta camada vem depois da media query de 900px e, com a mesma especificidade,
+   venceria o padding de celular. Repetido aqui para o login nao ficar com 48px
+   de margem lateral em tela de 375px. */
+@media (max-width: 900px) {
+  .login-story { padding: 32px 20px; }
+}
+
+.login-story h1 {
+  font-family: var(--font-brand);
+  font-weight: 300;
+  font-size: clamp(32px, 4vw, 45px);
+  letter-spacing: -.018em;
+  line-height: 1.08;
+  max-width: 13ch;
+  color: inherit;
+  text-transform: none;
+}
+.login-story p { color: #9a9a9a; max-width: 36ch; }
+
+.login-sig { display: flex; flex-direction: column; gap: 5px; margin-bottom: 6px; }
+.login-sig b { font-size: 26px; font-weight: 700; letter-spacing: -.05em; line-height: 1; }
+.login-sig > span {
+  font-size: 9px; font-weight: 700; letter-spacing: .3em;
+  text-transform: uppercase; color: #7fbfa3;
+}

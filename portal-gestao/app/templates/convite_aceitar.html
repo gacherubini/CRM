@@ -6,7 +6,8 @@
   <meta name="referrer" content="no-referrer">
   <meta name="theme-color" content="#ffffff">
   <title>Criar acesso — Revy</title>
-  <link rel="stylesheet" href="/static/css/app.css">
+  <link rel="stylesheet" href="/static/css/revy-tokens.css?v=marca2">
+  <link rel="stylesheet" href="/static/css/app.css?v=marca2">
 </head>
 <body class="login-page">
   <main class="login-layout">
@@ -17,7 +18,14 @@
     </section>
     <section class="login-panel">
       <div class="login-card">
-        <span class="brand-mark" style="display:inline-grid;margin-bottom:16px">R</span>
+        <span class="brand-mark" style="display:inline-grid;margin-bottom:16px" aria-hidden="true">
+          <svg viewBox="0 0 40 40" role="img" aria-label="Revy">
+            <rect width="40" height="40" rx="9" fill="#1b1b1b"/>
+            <rect class="brand-mark-edge" x="1" y="1" width="38" height="38" rx="8" fill="none" stroke="transparent" stroke-width="2"/>
+            <path d="M15.5 30V13h6.8a4.3 4.3 0 0 1 0 8.6h-6.8" fill="none" stroke="#ffffff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M21 21.6 27 30" fill="none" stroke="#ffffff" stroke-width="3" stroke-linecap="round"/>
+          </svg>
+        </span>
         <div><h2>Criar minha senha</h2><p>Use pelo menos 12 caracteres.</p></div>
         {% if erro %}<div class="alert error" role="alert">{{ erro }}</div>{% endif %}
         <form method="post" action="/convite/aceitar" class="stack-form">
