@@ -22,6 +22,7 @@ from app.financeiro_calc import (
     FUSO_PORTAL,
     _data,
     calcular_metricas_vendas,
+    data_api,
     funil_periodo,
     lucro_bruto_venda,
     metas_view_periodo,
@@ -123,6 +124,9 @@ class SalesOverview:
     # O fallback local não tem número confiável por campanha; fica vazio.
     aquisicao_campanhas: list[dict[str, Any]] = field(default_factory=list)
     aquisicao_canais: list[dict[str, Any]] = field(default_factory=list)
+    # Por onde as pessoas chegam — guard próprio: a fonte é o lead do Chatbot,
+    # não o gasto da Meta. Se a fonte de mídia cair, isto continua respondível.
+    aquisicao_origens: list[dict[str, Any]] = field(default_factory=list)
 
     # Pendências acionáveis derivadas dos dados atuais
     pendencias: list[PendenciaAcao] = field(default_factory=list)
@@ -155,6 +159,7 @@ class SalesOverview:
             "aquisicao_status": self.aquisicao_status,
             "aquisicao_campanhas": _serializar_linhas_midia(self.aquisicao_campanhas),
             "aquisicao_canais": _serializar_linhas_midia(self.aquisicao_canais),
+            "aquisicao_origens": _serializar_origens(self.aquisicao_origens),
             "pendencias": [asdict(p) for p in self.pendencias],
             "mensagem": self.mensagem,
         }
@@ -166,6 +171,162 @@ def _dec_str(valor: Decimal | None) -> str | None:
     return str(valor.quantize(CENTAVOS, rounding=ROUND_HALF_UP))
 
 
+# --- Por onde as pessoas chegam -------------------------------------------
+#
+# Agrupa por `ctwa_source_type` (dado cru da Meta) e não por `origem`: origem
+# está errada em 10 leads antigos e não será corrigida retroativamente.
+#
+# A lista de famílias anda junto com `FAMILIA_ANUNCIO` em
+# `chatbot-api/app/servico.py` — produto diferente, sem import entre produtos,
+# então é duplicação consciente: mudou lá, muda aqui.
+FAMILIA_ANUNCIO = frozenset({"fb_ads", "ctwa_ad", "ad"})
+FAMILIA_LINK_DIRETO = frozenset({"click_to_chat_link", "message_short_link"})
+FAMILIA_BUSCA = frozenset({"global_search_new_chat"})
+
+# Rótulos, não enum cru: `FB_Ads` e `global_search_new_chat` não chegam na tela.
+ROTULOS_ORIGEM = {
+    "anuncio": "Anúncio",
+    "link_direto": "Link direto",
+    "busca_whatsapp": "Procurou no WhatsApp",
+    "outro": "Outro (WhatsApp)",
+    "catalogo": "Catálogo",
+    "site": "Site",
+    "whatsapp": "WhatsApp",
+    "manual": "Cadastro manual",
+    "indicacao": "Indicação",
+    "nao_identificado": "Não identificado",
+}
+# Empate no volume resolve por esta ordem, para a tela não dançar entre requests.
+ORDEM_ORIGEM = (
+    "anuncio",
+    "link_direto",
+    "busca_whatsapp",
+    "catalogo",
+    "site",
+    "whatsapp",
+    "indicacao",
+    "manual",
+    "outro",
+    "nao_identificado",
+)
+IDENTIFICADORES_CAMPANHA = (
+    "meta_ad_id",
+    "meta_campaign_id",
+    "ctwa_clid",
+    "ctwa_codigo",
+)
+
+
+def _rotulo_origem(chave: str, bruto: str | None = None) -> str:
+    return ROTULOS_ORIGEM.get(chave) or (bruto or chave).replace("_", " ").capitalize()
+
+
+def classificar_origem_lead(lead: Mapping[str, Any]) -> tuple[str, str]:
+    """Por onde a pessoa chegou — nunca qual campanha pagou.
+
+    `casefold` obrigatório: o valor real em produção é `FB_Ads`, e comparação
+    sensível a caixa classifica 205 leads errado.
+    """
+    source = str(lead.get("ctwa_source_type") or "").strip().casefold()
+    if source:
+        if source in FAMILIA_ANUNCIO:
+            return "anuncio", ROTULOS_ORIGEM["anuncio"]
+        if source in FAMILIA_LINK_DIRETO:
+            return "link_direto", ROTULOS_ORIGEM["link_direto"]
+        if source in FAMILIA_BUSCA:
+            return "busca_whatsapp", ROTULOS_ORIGEM["busca_whatsapp"]
+        return "outro", ROTULOS_ORIGEM["outro"]
+
+    origem = str(lead.get("origem") or "").strip()
+    if origem:
+        # `meta_ctwa` sem source_type só é carimbado com identificador de
+        # anúncio na mão: é anúncio de verdade.
+        chave = "anuncio" if origem.casefold() == "meta_ctwa" else origem.casefold()
+        return chave, _rotulo_origem(chave, origem)
+
+    return "nao_identificado", ROTULOS_ORIGEM["nao_identificado"]
+
+
+def _sem_identificacao_de_campanha(lead: Mapping[str, Any]) -> bool:
+    return not any(str(lead.get(c) or "").strip() for c in IDENTIFICADORES_CAMPANHA)
+
+
+def _shares(contagens: Mapping[str, int], total: int) -> dict[str, Decimal]:
+    """Percentuais que somam exatamente 100.0 (maior resto).
+
+    Arredondar cada linha por conta própria deixa a coluna somando 99.9, e o
+    painel promete "% do total do período".
+    """
+    if total <= 0:
+        return {}
+    cem = Decimal("100")
+    exatos = {c: (Decimal(n) * cem / Decimal(total)) for c, n in contagens.items()}
+    base = {c: v.quantize(Decimal("0.1"), rounding="ROUND_DOWN") for c, v in exatos.items()}
+    faltam = int(((cem - sum(base.values())) / Decimal("0.1")).to_integral_value())
+    restos = sorted(
+        base, key=lambda c: (-(exatos[c] - base[c]), ORDEM_ORIGEM.index(c) if c in ORDEM_ORIGEM else 99)
+    )
+    for chave in restos[: max(faltam, 0)]:
+        base[chave] += Decimal("0.1")
+    return base
+
+
+def resumir_origens(
+    leads: list[Mapping[str, Any]], d_inicio: date, d_fim: date
+) -> list[dict[str, Any]]:
+    """Distribuição dos leads do período por onde a pessoa entrou.
+
+    Cobre TODOS os leads do período, não só os com sinal da Meta: um painel
+    chamado "por onde as pessoas chegam" que só conta anúncio mente por omissão.
+
+    Lead sem `criada_em` fica de fora — virar "Não identificado" incharia o
+    balde com lead antigo e faria o total mentir.
+    """
+    contagens: dict[str, int] = {}
+    rotulos: dict[str, str] = {}
+    cegos: dict[str, int] = {}
+    total = 0
+    for lead in leads:
+        dia = data_api(lead.get("criada_em"))
+        if dia is None or not (d_inicio <= dia <= d_fim):
+            continue
+        chave, rotulo = classificar_origem_lead(lead)
+        contagens[chave] = contagens.get(chave, 0) + 1
+        rotulos.setdefault(chave, rotulo)
+        if _sem_identificacao_de_campanha(lead):
+            cegos[chave] = cegos.get(chave, 0) + 1
+        total += 1
+
+    if not total:
+        return []
+
+    shares = _shares(contagens, total)
+    linhas = [
+        {
+            "chave": chave,
+            "rotulo": rotulos[chave],
+            "leads": n,
+            "share": shares.get(chave, Decimal("0.0")),
+            # Só em "Anúncio": é o número que explica, na própria tela, por que a
+            # soma das campanhas não bate com o total de anúncio.
+            "nota": (
+                f"{cegos[chave]} sem identificação de campanha"
+                if chave == "anuncio" and cegos.get(chave)
+                else None
+            ),
+        }
+        for chave, n in contagens.items()
+    ]
+    linhas.sort(
+        key=lambda l: (
+            -l["leads"],
+            ORDEM_ORIGEM.index(l["chave"]) if l["chave"] in ORDEM_ORIGEM else 99,
+            l["rotulo"],
+        )
+    )
+    return linhas
+
+
 def _serializar_linhas_midia(linhas: list[dict[str, Any]]) -> list[dict[str, Any]]:
     saida = []
     for linha in linhas:
@@ -175,6 +336,14 @@ def _serializar_linhas_midia(linhas: list[dict[str, Any]]) -> list[dict[str, Any
         }
         saida.append(item)
     return saida
+
+
+def _serializar_origens(linhas: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """`share` é percentual com uma casa, não dinheiro: não passa por _dec_str."""
+    return [
+        {c: (str(v) if isinstance(v, Decimal) else v) for c, v in linha.items()}
+        for linha in linhas
+    ]
 
 
 def _dec_ou_none(valor: Any) -> Decimal | None:
@@ -837,6 +1006,14 @@ def build_sales_overview(
     aquisicao_status = "indisponivel"
     aquisicao_campanhas: list[dict[str, Any]] = []
     aquisicao_canais: list[dict[str, Any]] = []
+    aquisicao_origens: list[dict[str, Any]] = []
+    if escopo == "loja" and chatbot is not None:
+        # Guard próprio, independente da fonte de mídia: quando a Meta ou o Revy
+        # caem é justamente quando o lojista mais quer saber por onde entrou gente.
+        try:
+            aquisicao_origens = resumir_origens(chatbot.listar_leads(), d_inicio, d_fim)
+        except Exception:
+            aquisicao_origens = []
     if escopo == "loja":
         try:
             aquisicao, aquisicao_campanhas, aquisicao_canais = _carregar_aquisicao(
@@ -916,6 +1093,7 @@ def build_sales_overview(
         aquisicao_status=aquisicao_status,
         aquisicao_campanhas=aquisicao_campanhas,
         aquisicao_canais=aquisicao_canais,
+        aquisicao_origens=aquisicao_origens,
         pendencias=pendencias,
     )
 
