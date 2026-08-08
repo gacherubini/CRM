@@ -1,8 +1,15 @@
 # Revy — Brand Kit
 
-**Versão:** 1.0 · **Grafia oficial:** Revy (não Revvy)  
-**Atualizado:** 2026-07-14  
+**Versão:** 2.0 · **Grafia oficial:** Revy (não Revvy)  
+**Atualizado:** 2026-08-08  
 **Uso:** identidade visual, tom de voz, nomenclatura de produto e copy padrão da suíte.
+
+> **O que mudou na v2.0** — a seção 4 (identidade visual) foi refeita. A v1.0 mandava usar
+> **Inter**, listava uma paleta que não estava em produção e citava uma cor "Signal" que a
+> própria tabela não definia. O produto usa **Hanken Grotesk** desde julho. Também entrou o
+> acento verde `#1f4d3a` e a marca passou a ter geometria vetorial de verdade.
+> Nome, tagline, personalidade, tom de voz, templates de WhatsApp, nomenclatura e compliance
+> **não mudaram**. Decisões e escopo técnico: `docs/superpowers/specs/2026-08-08-identidade-visual-revy-design.md`.
 
 ---
 
@@ -125,98 +132,158 @@ aprovado com certeza · melhor do Brasil · IA revolucionária · pipeline (no c
 
 ## 4. Identidade visual
 
-### 4.1 Paleta (v1.1 — monocromática, sem laranja “IA”)
+### 4.1 Paleta
 
-Direção: preto / branco / cinza. Status só em verde/âmbar/vermelho neutros.
+Base **preto e branco**. O verde é acento de marca — nunca cor de status. Status tem família
+própria. Regra que vale em toda a suíte: **cor nunca vem sozinha**, sempre acompanha forma
+(ponto, ícone) e palavra escrita.
 
-| Token | Hex | Uso |
+#### Preto e neutros
+
+| Token | Claro | Escuro | Uso |
+|---|---|---|---|
+| `--paper` | `#f9f9f9` | `#0a0a0a` | Fundo da página |
+| `--surface` | `#ffffff` | `#111111` | Painel, card, cabeçalho da vitrine |
+| `--surface-raised` | `#f4f2f1` | `#161616` | Sidebar |
+| `--surface-soft` | `#efeceb` | `#1a1a1a` | Hover |
+| `--ink` | `#1b1b1b` | `#f5f5f5` | Texto principal — **o preto da marca** |
+| `--ink-soft` | `#57514f` | `#a3a3a3` | Texto secundário |
+| `--ink-muted` | `#6b625f` | `#949494` | Texto apagado |
+| `--line` | `#ded8d9` | `#2a2a2a` | Borda, separador |
+| `--line-strong` | `#cdc6c4` | `#3a3a3a` | Borda de controle |
+
+> **O modo escuro é dos painéis.** Revy Loja e Revy Control têm os dois temas. **O site e a
+> vitrine pública são sempre claros** — foto de veículo sobre fundo escuro não é terreno para
+> descobrir na cara do cliente. Para criativo: peça padrão em fundo claro. Fundo escuro é
+> escolha de arte de uma peça específica, com o verde 300 e a marca reversa — não um tema do produto.
+
+#### Verde de marca — escala completa
+
+Criativo precisa de mais que um tom: fundo, texto sobre fundo e realce.
+
+| Passo | Hex | Uso |
 |---|---|---|
-| Ink / ação | `#0A0A0A` | Texto, botões primários, wordmark no claro |
-| Paper | `#FFFFFF` | Fundo modo claro (padrão do portal) |
-| Soft | `#FAFAFA` / `#F5F5F5` | Sidebar, KPI, hover |
-| Line | `#E8E8E8` | Bordas finas |
-| Muted | `#6B6B6B` | Texto secundário |
-| Ok | `#0D7A4F` | Sucesso |
-| Warn | `#8A6D1D` | Atenção |
-| Danger | `#B42318` | Erro |
+| 900 | `#0f2b20` | Fundo de anúncio |
+| **700** | **`#1f4d3a`** | **Acento no modo claro** |
+| 500 | `#2f7355` | Hover, série de gráfico |
+| **300** | **`#7fbfa3`** | **Acento no modo escuro** |
+| 100 | `#dfeee7` | Tint, faixa |
 
-**Modo escuro:** fundo `#0A0A0A`, superfície `#111`, texto `#F5F5F5`, bordas `#2A2A2A`.
+O acento **muda de passo entre os temas, e isso não é opcional**: `#1f4d3a` sobre fundo
+`#0a0a0a` dá contraste de 1,6:1 — ilegível.
 
-**Proibido:** laranja neon, gradiente “IA”, glow colorido em cards.
+#### Status
 
-#### CSS tokens
+| Estado | Claro | Escuro |
+|---|---|---|
+| Aguardando | `#8a6d1d` | `#d9b04a` |
+| Em atendimento | `#57514f` | `#a3a3a3` |
+| Proposta | `#1f4d3a` | `#7fbfa3` |
+| Ganho / sucesso | `#0d7a4f` | `#3ecf8e` |
+| Perdido | `#6b625f` | `#949494` |
+| Falha | `#b42318` | `#f97066` |
+| WhatsApp (canal, não marca) | `#25d366` | `#25d366` |
 
-```css
-:root, [data-theme="light"] {
-  --ink: #0a0a0a;
-  --paper: #ffffff;
-  --soft: #f5f5f5;
-  --line: #e8e8e8;
-  --muted: #6b6b6b;
-  --ok: #0d7a4f;
-  --warn: #8a6d1d;
-  --danger: #b42318;
-}
-```
+**Proibido:** laranja neon, gradiente "IA", glow colorido em card, azul de fintech genérica,
+e usar o verde de marca como se fosse sinal de sucesso.
+
+#### Onde ficam os tokens
+
+Fonte única: `shared/brand/revy-tokens.css`, copiado para os quatro front-ends.
+Não edite as cópias.
 
 ### 4.2 Tipografia
 
-| Papel | Família | Uso |
+| Papel | Família | Onde |
 |---|---|---|
-| **UI + marketing** | [Inter](https://fonts.google.com/specimen/Inter) 400–700 | Tudo (wordmark, portal, landing) |
-| **Mono (opcional)** | ui-monospace / IBM Plex Mono | Placa, IDs |
+| **Interface** | [Hanken Grotesk](https://fonts.google.com/specimen/Hanken+Grotesk) 400–700 | Painel, catálogo, corpo do site — tudo que é para trabalhar |
+| **Frase de marca** | [Newsreader](https://fonts.google.com/specimen/Newsreader) 300 | Frase do login, manchete do site, criativo |
+| **Dados** | ui-monospace / Consolas | Placa, telefone, ID |
 
-Logo = **wordmark “Revy”** em Inter 600. Mark “R” só quando precisar de favicon/avatar.
+A serifa entra **só onde a marca fala**. Dentro do painel ela atrapalha quem está trabalhando,
+e no preço do catálogo ela prejudica leitura rápida — preço é Hanken com
+`font-variant-numeric: tabular-nums`.
 
 ### 4.3 Logo
 
+#### O símbolo
+
+Monograma **R** vazado em quadrado de canto arredondado. Desenhado em **geometria vetorial**
+(`<path>`), sem depender de nenhuma fonte instalada.
+
+> **A v1.0 deste kit descrevia um símbolo que nunca foi desenhado** ("corte em diagonal / risca
+> de velocidade") e os arquivos entregues eram `<text font-family="Inter…">` — letra viva, que
+> muda de forma conforme a máquina e não tem contorno para levar a impresso ou a Canva.
+> A v2.0 substitui todos eles.
+
+```svg
+<rect width="40" height="40" rx="9" fill="#1b1b1b"/>
+<path d="M15.5 30V13h6.8a4.3 4.3 0 0 1 0 8.6h-6.8" fill="none" stroke="#fff"
+      stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M21 21.6 27 30" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round"/>
+```
+
+#### A marca é preta. Sempre.
+
+Nada de verde no símbolo. Em fundo claro, quadrado `#1b1b1b` com R branco. Em fundo escuro,
+quadrado `#000000` com R claro **e um fio de 1px `rgba(255,255,255,.16)`**, para não desaparecer
+sobre a sidebar `#161616`.
+
+#### Assinatura
+
+**Nome + descritor**: "Revy" com "GESTÃO DE REVENDA" embaixo, em caixa-alta espaçada.
+
+Dois usos que não competem:
+- **Símbolo sozinho** — favicon, avatar de WhatsApp, sidebar do painel. Onde só cabe um quadrado.
+- **Assinatura completa** — login, cabeçalho do catálogo, rodapé de criativo. Onde há largura
+  para dizer o que a empresa faz a quem nunca ouviu falar.
+
 #### Arquivos
+
 | Arquivo | Uso |
 |---|---|
-| `assets/revy-logo-full-dark.svg` | Wordmark + marca em fundo claro |
-| `assets/revy-logo-full-light.svg` | Wordmark + marca em fundo escuro |
-| `assets/revy-mark.svg` | Símbolo só (favicon, avatar, app icon base) |
-| `assets/revy-wordmark.svg` | Só texto “Revy” |
-| `preview.html` | Painel visual do kit no browser |
-
-#### Conceito da marca (símbolo)
-Monograma **R** estilizado com um **corte em diagonal / risca de velocidade** — sugere movimento da revenda sem desenhar moto/carro (escopo pode ser multi-veículo).
+| `assets/revy-mark.svg` | Símbolo, fundo claro |
+| `assets/revy-mark-reverse.svg` | Símbolo, fundo escuro |
+| `assets/revy-wordmark.svg` | "Revy" em contorno |
+| `assets/revy-signature.svg` | Wordmark + descritor |
+| `assets/revy-signature-reverse.svg` | Idem, fundo escuro |
+| `assets/favicon.svg` · `favicon-32.png` · `apple-touch-icon-180.png` | Derivados do símbolo |
 
 #### Clear space
-Mínimo = altura do “R” do wordmark em todos os lados.
+Mínimo = altura do "R" do wordmark em todos os lados.
 
 #### Tamanhos mínimos
 | Contexto | Mínimo |
 |---|---|
-| Wordmark digital | 88 px de largura |
-| Mark isolado | 24 × 24 px |
-| Favicon | 32 × 32 (mark simplificado) |
-| Avatar WhatsApp | 192 × 192 (mark centralizado em Ink ou Signal) |
+| Assinatura digital | 96 px de largura |
+| Símbolo isolado | 24 × 24 px |
+| Favicon | 32 × 32 |
+| Avatar WhatsApp | 192 × 192 (símbolo centralizado, ~60% do quadro) |
 
 #### Usos proibidos
-- Distorcer, rotacionar “por estilo”, adicionar sombra 3D barata
-- Contornar o logo com stroke aleatório
-- Colocar Signal sobre Signal ou Paper sobre Paper sem contraste
-- Trocar Signal por verde-banco ou azul “fintech genérico”
-- Animar o logo com bounce exagerado
-
-#### Versões de cor do logo
-1. **Primary:** mark Signal + wordmark Ink (fundo Paper)
-2. **Inverse:** mark Signal + wordmark Paper (fundo Ink)
-3. **Mono ink:** tudo Ink (documentos B&W)
-4. **Mono paper:** tudo Paper (sobre foto escura)
-5. **Signal only mark:** favicon / badge
+- Pintar o símbolo de verde, ou de qualquer cor que não seja o preto e sua reversa
+- Distorcer, rotacionar "por estilo", aplicar sombra 3D
+- Contornar com stroke aleatório
+- Preto sobre preto ou branco sobre branco sem o fio de contraste
+- Recompor o wordmark digitando "Revy" numa fonte qualquer — use o arquivo
+- Animar com bounce
 
 ### 4.4 Iconografia e UI
-- Ícones: linha 1.5–2 px, cantos levemente arredondados (estilo Lucide / Phosphor)
-- Radius padrão: **12px** cards, **8px** inputs/buttons
-- Sombra: quase nenhuma; preferir borda Mist ou elevação sutil `0 8px 24px rgba(11,15,20,0.08)`
+- Ícones: linha 2px, cantos arredondados (estilo Lucide / Phosphor), 17px na navegação
+- Raio: **3px** em controle (botão, campo, chip), **8px** em item de menu, **12px** em painel e card
+- Botão primário: preto sólido, texto na cor do papel, caixa-baixa. Sem caixa-alta espaçada.
+- Sombra: quase nenhuma no claro (`0 1px 2px rgba(27,20,20,.05)`), nenhuma no escuro —
+  lá a separação vem da superfície, não da sombra
+- Estado em lista: ponto de 7px na cor do estado + palavra. Estados terminais (Ganho, Perdido)
+  não recebem ponto — o destaque é de quem exige ação
+- KPI: um rótulo curto e o número. Sem linha de explicação embaixo
 - Densidade do painel: confortável (revenda, não terminal de trading)
 
 ### 4.5 Fotografia e arte
 - Preferir: oficina limpa, vitrine, celular na mão do vendedor, detalhe de painel — **pessoas reais de loja BR**
 - Evitar: stock de aperto de mão em escritório de vidro, robô 3D, “IA roxa com cérebro neon”
-- Overlay de marketing: gradiente Ink→transparente + CTA Signal
+- Overlay de marketing: gradiente `--ink`→transparente; CTA em preto sólido, ou no verde 700
+  quando o fundo for foto clara
 
 ---
 
@@ -262,17 +329,21 @@ Mínimo = altura do “R” do wordmark em todos os lados.
 | Elemento | Spec |
 |---|---|
 | Nome do perfil | `{Loja}` ou `{Loja} · Revy` |
-| Foto | Mark em fundo Ink (quadrado, mark central ~60%) |
+| Foto | Símbolo em fundo preto (quadrado, símbolo central ~60%) |
 | Mensagens | Tom da seção 3; máx. ~4 linhas por bolha quando possível |
 | Listas / botões | Preferir opções claras a texto longo |
 
 ### Revy Painel
-- Sidebar Ink ou Paper com item ativo em Signal (barra ou texto)
-- KPI cards: número em Display/Space Grotesk, label Muted
-- Tabela: mono para placa e valores
+- Sidebar em `--surface-raised`, distinta do papel. Item ativo com fundo `--brand-tint`,
+  borda `--brand-line`, barra de 3px à esquerda e ícone no acento
+- KPI: rótulo curto em `--ink-muted`, número grande em Hanken com `tabular-nums`
+- Tabela: mono para placa, telefone e ID. Linha de ~34px
+- Estado: ponto colorido + palavra
 
 ### Revy Vitrine
-- Hero limpo, preço legível, CTA Signal “Falar no WhatsApp”
+- Hero limpo, **preço legível em Hanken com `tabular-nums`** — nunca serifa
+- Card de veículo: superfície própria, foto 16:10, preço em destaque, dados em pastilhas
+- CTA “Falar no WhatsApp” em preto sólido; o verde `#25d366` só aparece como cor de canal
 - Mobile-first; foto do veículo em primeiro plano
 
 ### Pitch deck / one-pager (estrutura)
@@ -313,13 +384,18 @@ Abs,
 - [x] Nome e grafia fixados: **Revy**
 - [x] Tagline oficial
 - [x] Personalidade e tom de voz + templates WA
-- [x] Paleta + tokens CSS
-- [x] Tipografia
-- [x] Logos SVG + preview HTML
 - [x] Nomenclatura de módulos e pacotes
-- [ ] Favicon PNG 32/180 (exportar do mark quando for pro ar)
+- [x] Paleta, escala do verde e família de status (v2.0)
+- [x] Tipografia decidida: Hanken na interface, Newsreader na marca (v2.0)
+- [x] Símbolo desenhado em geometria vetorial (v2.0)
+- [ ] **Símbolo exportado** para `assets/` — os SVGs atuais ainda são `<text>` em Inter
+- [ ] **Wordmark convertido em contorno** — precisa de FontForge/Inkscape/Figma; é o único item
+      que não fecha só com código
+- [ ] Favicon SVG + PNG 32/180
+- [ ] `shared/brand/revy-tokens.css` criado e sincronizado nos quatro front-ends
+- [ ] Tokens aplicados em `site`, `catalogo-publico`, `portal-gestao` e `revy-trafego`
+- [ ] `docs/brand/preview.html` e `index.html` regerados (hoje mostram a paleta da v1.0)
 - [ ] Domínio e @ registrados
-- [ ] Aplicar tokens no `portal-gestao` / `catalogo-publico` (quando priorizar UI)
 
 ---
 
@@ -327,21 +403,20 @@ Abs,
 
 ```
 docs/brand/
-  index.html                 ← landing (estrutura inspirada em Attio + personalidade Revy)
-  revy-brand-kit.md          ← este documento
-  preview.html               ← painel visual de tokens/UI
-  assets/
-    revy-mark.svg
-    revy-wordmark.svg
-    revy-logo-full-dark.svg  ← para fundo claro
-    revy-logo-full-light.svg ← para fundo escuro
+  revy-brand-kit.md          ← este documento (a fonte)
+  assets/                    ← marca em contorno vetorial
+  index.html                 ← LEGADO v1.0: paleta e fonte antigas
+  preview.html               ← LEGADO v1.0: tokens antigos
+  portal-mock.html           ← LEGADO v1.0
+  instagram-logo.html        ← LEGADO v1.0
+  hero-animacao-prompts.md
+shared/brand/
+  revy-tokens.css            ← tokens canônicos, copiados para os quatro front-ends
+  sync-tokens.py
 ```
 
-Abrir no browser:
-```text
-docs/brand/index.html     → marketing / personalidade
-docs/brand/preview.html   → tokens e UI kit
-```
+**Os quatro HTML marcados como legado mostram a paleta e a fonte da v1.0.** Não use como
+referência até serem regerados; este documento é a fonte.
 
 ### Referência de estrutura (Attio → Revy)
 
