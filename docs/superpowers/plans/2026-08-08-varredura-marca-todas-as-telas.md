@@ -1185,10 +1185,12 @@ Run: o pytest do arquivo. Expected: FAIL nos oito parâmetros (os quatro tokens 
 - [ ] **Step 3: Reescrever a peça nos dois arquivos**
 
 ```css
+/* O padding fica exatamente como estava (12px 14px, mais os 42px de recuo do
+   icone): espacamento esta fora desta rodada. So raio e cor mudam. */
 .alert {
   position: relative;
-  margin-bottom: var(--space-4);
-  padding: var(--space-3) var(--space-4) var(--space-3) 42px;
+  margin-bottom: 16px;
+  padding: 12px 14px 12px 42px;
   border: 1px solid;
   border-radius: var(--radius-srf);
   font-size: 13px;
