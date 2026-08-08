@@ -72,6 +72,30 @@ def extrair_codigo_ctwa_do_texto(texto: str | None) -> str | None:
     return None
 
 
+# `ctwa_source_type` diz POR ONDE a pessoa entrou, nunca QUAL campanha pagou.
+# Só esta família é anúncio; o resto do balde CTWA é link direto (`wa.me` do
+# site, catálogo, bio) ou busca dentro do WhatsApp.
+# Anda junto com o mapa de rótulos da Loja em
+# `portal-gestao/app/loja/sales_overview.py` — mudou aqui, muda lá.
+FAMILIA_ANUNCIO = frozenset({"fb_ads", "ctwa_ad", "ad"})
+_SOURCE_TYPES_DESCONHECIDOS: set[str] = set()
+
+
+def _e_anuncio(source: str | None) -> bool:
+    """casefold obrigatório: o valor real em produção é `FB_Ads`."""
+    chave = (source or "").strip().casefold()
+    if not chave:
+        return False
+    if chave in FAMILIA_ANUNCIO:
+        return True
+    if chave not in _SOURCE_TYPES_DESCONHECIDOS:
+        # Enum da Meta, não é PII. Logado uma vez para a lista crescer com
+        # evidência em vez de palpite.
+        _SOURCE_TYPES_DESCONHECIDOS.add(chave)
+        logger.info("ctwa_source_type desconhecido: %s", chave)
+    return False
+
+
 def _set_first_last(lead: Lead, campo: str, valor: str | None) -> None:
     if not valor:
         return
@@ -93,7 +117,12 @@ def aplicar_touch_ctwa(
     ctwa_codigo: str | None = None,
     texto: str | None = None,
 ) -> bool:
-    """Aplica sinais CTWA no lead (first/last). Retorna True se algo mudou de origem CTWA."""
+    """Aplica sinais CTWA no lead (first/last). Retorna True se gravou algum sinal.
+
+    Gravar o sinal e carimbar a origem são coisas diferentes: todo sinal cru é
+    salvo, mas `origem = meta_ctwa` só sai quando há identificador de anúncio ou
+    `ctwa_source_type` de família de anúncio.
+    """
     clid = _limpar_tracking(ctwa_clid, limite=255)
     ad_id = _limpar_tracking(meta_ad_id, limite=64)
     camp_id = _limpar_tracking(meta_campaign_id, limite=64)
@@ -129,16 +158,20 @@ def aplicar_touch_ctwa(
         if not lead.utm_campaign:
             _set_first_last(lead, "utm_campaign", codigo)
 
-    # Origem tipada quando há sinal de anúncio WA
-    if tem_sinal:
+    # Qualquer sinal do balde CTWA chegou pelo WhatsApp — inclusive link direto.
+    if lead.canal_first is None:
+        lead.canal_first = "whatsapp"
+    lead.canal_last = "whatsapp"
+    lead.canal = "whatsapp"
+
+    # Origem tipada só quando há prova de anúncio. O guard decide se ESCREVE:
+    # lead que veio de anúncio e depois volta por link direto segue meta_ctwa.
+    tem_anuncio = bool(clid or ad_id or camp_id or adset or codigo or _e_anuncio(source))
+    if tem_anuncio:
         if lead.origem_first is None:
             lead.origem_first = "meta_ctwa"
         lead.origem_last = "meta_ctwa"
         lead.origem = "meta_ctwa"
-        if lead.canal_first is None:
-            lead.canal_first = "whatsapp"
-        lead.canal_last = "whatsapp"
-        lead.canal = "whatsapp"
         if lead.ctwa_atribuido_em is None:
             lead.ctwa_atribuido_em = datetime.now(timezone.utc)
     return True
