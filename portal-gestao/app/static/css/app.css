@@ -1592,16 +1592,6 @@ tr:hover td { background: var(--surface-soft); }
   .page-heading .button { width: 100%; }
   .operations-card { padding: var(--space-5); }
   .metric-grid { grid-template-columns: 1fr; gap: var(--space-2); }
-  .vehicle-row {
-    grid-template-columns: 48px 1fr auto;
-    padding: var(--space-3) var(--space-4);
-  }
-  .vehicle-row .status { display: none; }
-  .vehicle-row .price {
-    grid-column: 2 / -1;
-    text-align: left;
-    font-size: var(--text-xs);
-  }
   .panel-heading {
     padding: var(--space-4);
     align-items: flex-start;
@@ -2285,6 +2275,19 @@ textarea:focus-visible {
 }
 .vehicle-row:hover { background: var(--surface-soft); }
 .vehicle-row:last-child { border-bottom: 0; }
+
+@media (max-width: 620px) {
+  .vehicle-row {
+    grid-template-columns: 48px 1fr auto;
+    padding: var(--space-3) var(--space-4);
+  }
+  .vehicle-row .status { display: none; }
+  .vehicle-row .price {
+    grid-column: 2 / -1;
+    text-align: left;
+    font-size: var(--text-xs);
+  }
+}
 
 /* Placa, telefone e ID: mono e tabular, para conferir caractere a caractere. */
 .dado-tecnico,
