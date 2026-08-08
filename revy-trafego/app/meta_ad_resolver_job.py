@@ -77,6 +77,53 @@ def mapa_ad_campaign_loja(db: Session, loja_slug: str) -> dict[str, str]:
     return out
 
 
+def contar_ads_nao_resolvidos(db: Session, loja_slug: str) -> int:
+    """Quantos ads da loja seguem sem campanha resolvida.
+
+    Existe para a falha não ser invisível: em 07/08, 10 ads pararam no teto de
+    tentativas no mesmo lote e nada na tela dizia isso.
+    """
+    if not loja_slug:
+        return 0
+    return (
+        db.query(MetaAdCampanha)
+        .filter(
+            MetaAdCampanha.loja_slug == loja_slug,
+            MetaAdCampanha.meta_campaign_id.is_(None),
+        )
+        .count()
+    )
+
+
+def destravar_ads_nao_resolvidos(db: Session, loja_slug: str) -> int:
+    """Zera tentativas/erro dos ads sem campanha da loja. Devolve quantos.
+
+    ``_deve_pular`` descarta ``tentativas >= max_tentativas`` sem prazo e sem
+    caminho de reset: corrigida a configuração da Meta, o ad continuaria morto.
+
+    ⚠️ A chave aqui é ``loja_slug``. O ``invalidar`` que roda ao lado usa
+    ``store.id``; reusar o id neste WHERE não zera nada e não levanta erro.
+    """
+    if not loja_slug:
+        return 0
+    linhas = (
+        db.query(MetaAdCampanha)
+        .filter(
+            MetaAdCampanha.loja_slug == loja_slug,
+            MetaAdCampanha.meta_campaign_id.is_(None),
+        )
+        .all()
+    )
+    destravados = 0
+    for linha in linhas:
+        if not (linha.tentativas or 0) and linha.erro is None:
+            continue
+        linha.tentativas = 0
+        linha.erro = None
+        destravados += 1
+    return destravados
+
+
 @dataclass
 class ResolveBatchResult:
     resolvidos: int = 0

@@ -719,6 +719,9 @@ def trafego_ctwa_auditoria(
         itens = dados.get("itens") or []
     except ChatbotIndisponivel:
         erro_chatbot = "Chatbot indisponível — não foi possível carregar a auditoria CTWA."
+    from app.meta_ad_resolver_job import contar_ads_nao_resolvidos
+
+    ads_nao_resolvidos = contar_ads_nao_resolvidos(db, usuario.loja_slug)
     return templates.TemplateResponse(
         "trafego/ctwa_auditoria.html",
         contexto(
@@ -727,6 +730,7 @@ def trafego_ctwa_auditoria(
             itens=itens,
             so_com_clid=filtro_clid,
             erro_chatbot=erro_chatbot,
+            ads_nao_resolvidos=ads_nao_resolvidos,
         ),
     )
 

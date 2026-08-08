@@ -241,6 +241,12 @@ class IntegrationsControl:
             config.atualizada_em = agora()
             if token_novo:
                 config.token_ciphertext = cifrar(token_novo)
+            # Config nova é a única evidência de que "não tenho acesso" pode ter
+            # virado "tenho": os ads que estouraram o teto de tentativas voltam
+            # à fila. Chave é loja_slug, não store.id (ver destravar_*).
+            from app.meta_ad_resolver_job import destravar_ads_nao_resolvidos
+
+            destravar_ads_nao_resolvidos(db, store.slug)
             _append_event(
                 db,
                 actor=actor,

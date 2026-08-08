@@ -17,6 +17,15 @@
 
 {% if erro_chatbot %}<div class="alert error">{{ erro_chatbot }}</div>{% endif %}
 
+{% if ads_nao_resolvidos %}
+<div class="alert warning">
+  {{ ads_nao_resolvidos }} anúncio{{ 's' if ads_nao_resolvidos != 1 else '' }} sem campanha
+  resolvida pela Graph. Enquanto ficarem assim, os leads deles não entram na linha de
+  nenhuma campanha. Se o token de Ads mudou, salve a integração de novo em
+  <a href="{{ public_path('/app/trafego') }}">Medição</a> — isso recoloca esses anúncios na fila.
+</div>
+{% endif %}
+
 <form class="filter-bar" method="get">
   <label class="check-row">
     <input type="checkbox" name="so_com_clid" value="1" {% if so_com_clid %}checked{% endif %} onchange="this.form.submit()">
