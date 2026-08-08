@@ -26,7 +26,33 @@
   - Suíte da Loja: `cd portal-gestao; .\.venv\Scripts\python.exe -m pytest -q`
   - Suíte do Control: `cd revy-trafego; ..\portal-gestao\.venv\Scripts\python.exe -m pytest -q`
   - `revy-trafego` **não tem `.venv`** — use o do `portal-gestao`.
-- **Cache de CSS:** `base.html` dos dois produtos referencia o `app.css` com `?v=marca3`. A partir da Tarefa 3, cada tarefa de peça incrementa para `?v=v1`, `?v=v2`, … nos **dois** produtos. Sem isso a conferência visual mostra a folha antiga.
+- **Cache de CSS:** a partir da Tarefa 3, cada tarefa de peça incrementa `?v=v1`, `?v=v2`, … São **oito** arquivos, não dois: os dois `base.html` mais seis telas standalone com `<head>` próprio (`portal-gestao/app/templates/login.html`, `convite_aceitar.html`, `senha_esqueci.html`, `senha_redefinir.html`; `revy-trafego/app/templates/login.html`, `control/convite_aceitar.html`). Confirme com `rg -n "v=v" portal-gestao revy-trafego` que as oito subiram. Sem isso a conferência visual do dono mostra a folha antiga.
+
+### Descoberta da Tarefa 3: existem quatro camadas, não duas
+
+A revisão da Tarefa 3 revelou que o diagnóstico do spec estava incompleto. Além da regra base e
+da camada `Camada Revy 2026` (agora dissolvida em seções), existe **um terceiro grupo de blocos
+ad-hoc no fim de cada arquivo**, todos datados de 2026-08-08, que já implementam parte das
+decisões de marca por sobrescrita:
+
+| Bloco | Onde | O que já faz |
+|---|---|---|
+| `Estado em ponto (2026-08-08)` | Loja ~2926, Control ~2564 | Forma Ponto **já aplicada**; família `--st-*` **já mapeada**, com estados do enum real que o spec não listava; terminais já sem ponto |
+| `Botao reto (3px)` | Loja ~2995, Control ~2686 | `--radius-ctl` **já aplicado** a botão, campo, select, textarea, busca; `--radius-nav` ao menu; `--radius-srf` a painel |
+| `Login (2026-08-08)` | Loja ~3002 | Newsreader na frase **já aplicado**; painel da história já sempre preto |
+
+Corrigem-se, portanto, duas afirmações do spec: **o botão já está reto** e **o estado já é
+ponto** — não "nunca chegaram ao produto". O que continua verdade, e é o que justifica a
+varredura, é que essas decisões vivem como sobrescrita no fim do arquivo enquanto a regra base
+segue com o valor antigo (`.button` com 8px, `.status` com pílula de 6px). São duas verdades
+disputando o mesmo seletor, que é exatamente o que este trabalho existe para acabar.
+
+**Regra que passa a valer para as Tarefas 4 a 13:** cada tarefa de peça funde **três** fontes na
+sua seção — a regra base, o que a Tarefa 3 moveu da camada, e a fatia correspondente desses
+blocos do fim — e apaga as três origens. A tarefa só está pronta quando `rg` mostra a peça num
+lugar só. As seções nasceram no meio do arquivo, então enquanto o bloco do fim não for absorvido
+ele **vence** a seção no cascade: escrever na seção sem apagar o bloco do fim não muda nada na
+tela.
 - **Conferência visual** ao fim de cada peça, no app rodando (`cd portal-gestao; docker compose up --build -d`), **nos dois temas**. Telas-testemunha: Loja — login, Atendimento (fila e conversa), Vendas → Visão, Estoque → lista, Ajustes → Integrações. Control — Visão geral, Lojas → lista, Loja → detalhe, Aquisição/ROI.
 - Encerrar cada tarefa com `git diff --check` e `git status --short` limpos, e um commit por tarefa.
 
@@ -472,7 +498,22 @@ git commit -m "refactor(marca): dissolve a camada do fim em uma secao por peca"
 
 ## Task 4: Peça 1 — Botão
 
-O botão reto de 3px foi decidido em 08/08 e nunca chegou ao produto: `.button` continua em `border-radius: 8px`, e a camada trocou só a cor do primário. Esta tarefa entrega a peça inteira e instala o **teto de raios literais**, o mecanismo que as peças seguintes vão apertar.
+O botão reto de 3px **já está na tela**, mas por sobrescrita: o bloco `Botao reto (3px)` no fim do arquivo força `border-radius: var(--radius-ctl)` num seletor agrupado, enquanto a regra base do `.button` segue declarando `border-radius: 8px`. Duas verdades, 2.400 linhas de distância. Esta tarefa funde as três fontes (base, o que veio da camada, e a linha do bloco do fim) numa peça só, e instala o **teto de raios literais**, o mecanismo que as peças seguintes vão apertar.
+
+O bloco do fim cobre num único seletor peças de quatro tarefas diferentes:
+
+```css
+.button, .link-button, input, select, textarea, .search, .filter-bar select {
+  border-radius: var(--radius-ctl);
+}
+.nav-link { border-radius: var(--radius-nav); }
+.panel, .metric-grid > .panel { border-radius: var(--radius-srf); }
+```
+
+**Retire desse bloco apenas `.button` e `.link-button`**, que são seus. `input`, `select`,
+`textarea`, `.search` e `.filter-bar select` ficam para a Tarefa 5; `.nav-link` para a Tarefa 10;
+`.panel` para a Tarefa 7. O bloco só desaparece quando a última dessas tarefas levar a sua parte —
+quem levar a última linha apaga o comentário `/* --- Botao reto (3px) --- */` junto.
 
 **Files:**
 - Modify: `shared/brand/tests/test_app_css.py`
@@ -715,22 +756,45 @@ A maior e mais arriscada: 71 regras de `.status` na Loja, 64 no Control. Hoje o 
 
 ### Mapa de estado → token
 
-Decidido aqui para que a edição não vire escolha caso a caso. O corte segue a regra do spec: `--st-*` é estado de **registro**; `--ok`/`--warn`/`--danger` é resultado de **operação**.
+**O mapa já existe no produto.** O bloco `Estado em ponto (2026-08-08)` no fim do arquivo já
+aplica a forma Ponto e já distribui os estados pela família `--st-*` — inclusive estados vindos
+do enum real (`confirmada`, `concluida`, `registrada`, `recebida`, `parcial`,
+`aguardando_intervencao`, `pausada`, `processando`, `cancelada`, `falhou`) que o spec não listava.
 
-| Classe hoje | Token | Ponto? |
+Esse mapa é a **linha de base**, não um rascunho a substituir: ele foi conferido contra o enum e
+está no ar. Esta tarefa faz três coisas com ele — traz para a seção `Estado`, aplica **uma** troca
+de significado, e renomeia dois grupos para o vocabulário semântico.
+
+**A tabela final:**
+
+| Classes | Token | Ponto? |
 |---|---|---|
-| `novo`, `pendente`, `aguardando_simulacao`, `aguardando_cliente`, `rascunho`, `em_configuracao` | `--st-wait` | sim |
-| `qualificado`, `em_atendimento`, `negociacao`, `reservado` | `--st-live` | sim |
-| `convertido`, `vendido` | `--st-won` | **não** — terminal |
-| `perdido`, `indisponivel`, `encerrada`, `inativo`, `suspensa` | `--st-lost` | **não** — terminal |
-| `disponivel` | `--ink-soft` neutro | **não** |
+| `novo`, `qualificado`, `convertido`, `confirmada`, `concluida` | `--st-won` | sim |
 | `ativa`, `ativo`, `pronta`, `conectado` | `--ok` | sim |
+| `reservado`, `aguardando_simulacao`, `aguardando_cliente`, `em_configuracao`, `rascunho`, `pendente`, `registrada`, `recebida`, `parcial`, `aguardando_intervencao`, `pausada` | `--st-wait` | sim |
 | `desconectado`, `warn` | `--warn` | sim |
+| `em_atendimento`, `processando` | `--st-live` | sim |
+| `negociacao` | `--st-prop` | sim |
+| `disponivel` | `--ink-muted` (neutro) | **não** |
+| `vendido`, `perdido`, `indisponivel`, `suspensa`, `encerrada`, `inativo`, `cancelada`, `falhou` | `--ink-muted`, `--st-lost` no `--sc` | **não** — terminal |
 
-Duas decisões embutidas, que o revisor precisa aprovar junto com o código:
+**A única troca de significado** — aprovada pelo dono em 08/08: `disponivel` sai de `--st-won` e
+vira neutro sem ponto. Hoje ele sai da mesma variável que `convertido`, ou seja, `Disponível` e
+`Convertido` são a mesma cor na tela. É o estado de repouso da maioria dos veículos e não exige
+ação; o destaque vai para quem espera.
 
-1. **`disponivel` deixa de ser verde e vira neutro.** Hoje sai da mesma variável que `convertido`. É o estado de repouso da maioria dos veículos e não exige ação; o destaque tem de ir para quem espera. Sem isso, `Disponível` e `Vendido` continuariam da mesma cor.
-2. **`desconectado` continua âmbar** (`--warn`), não vermelho. Mudar a severidade seria decisão de produto, e isto é varredura.
+**As duas renomeações são de graça e não mudam pixel:** `ativa`/`ativo`/`pronta`/`conectado`
+saem de `--st-won` para `--ok`, e `desconectado`/`warn` saem de `--st-wait` para `--warn`. Os
+valores são idênticos nos dois temas (`--st-won` e `--ok` são ambos `#0d7a4f`/`#3ecf8e`;
+`--st-wait` e `--warn` são ambos `#8a6d1d`/`#d9b04a`). O ganho é de leitura: passa a ser possível
+saber, olhando o CSS, se aquele verde significa "registro ganho" ou "operação deu certo" — que é
+a regra §3.3 do spec. Confirme os valores em `shared/brand/revy-tokens.css` antes de trocar; se
+divergirem, **pare e reporte** em vez de mudar a cor de um estado.
+
+**Nada mais no mapa muda.** Em particular `qualificado` continua `--st-won` e `reservado`
+continua `--st-wait`, mesmo que pareçam candidatos a `--st-live`: mexer neles seria redesenho, e
+o mapa vigente veio do enum real. `--st-lost` também passa a ter uso, no `--sc` dos terminais,
+saindo de zero usos.
 
 - [ ] **Step 1: Escrever as guardas que falham**
 
@@ -1287,20 +1351,28 @@ Expected: FAIL em dois arquivos — `simulacoes/registros.html` (`#111`) e `traf
 
 `portal-gestao/app/templates/simulacoes/registros.html` e `portal-gestao/app/templates/trafego/roi.html` têm CSS embutido. Mova as regras para a seção apropriada do `app.css` (Painel e card, ou Número e gráfico) e apague o `<style>`. Se alguma regra for específica de uma tela só, mantenha-a no `app.css` sob um seletor de página — não deixe CSS em template.
 
-- [ ] **Step 4: Newsreader na frase de marca**
+- [ ] **Step 4: Trazer o bloco `Login (2026-08-08)` para a seção**
 
-Na seção `Autenticacao` do `app.css` da Loja:
+A Newsreader **já está aplicada** — no `.login-story h1`, pelo bloco `Login (2026-08-08)` no fim
+do arquivo da Loja. O painel da história **já é** sempre preto. Esta tarefa não introduz nada
+disso: ela move o bloco inteiro para a seção `Autenticacao`, funde com o que já houver lá e com
+as regras `.login-*` mais acima no arquivo, e apaga as origens. Confirme com `rg -n "login-"` que
+a peça fica num lugar só — no Portal ela existe hoje em **três** regiões distintas.
 
-```css
-/* Unico momento de marca dentro do produto: a frase do login. Newsreader 300
-   nao entra em nenhuma outra superficie do painel. */
-.login-story p {
-  font-family: var(--font-brand);
-  font-weight: 300;
-}
-```
+Preserve intactos, junto das regras que explicam, os dois comentários de armadilha desse bloco: o
+que registra por que o preto é literal (derivar de `var(--ink)` deixaria o painel branco no modo
+escuro) e o que registra por que a media query de 900px é repetida (senão o login fica com 48px
+de margem lateral em tela de 375px).
 
-O painel da história é **sempre preto**, nos dois temas — confirme que já é, e que a fonte Newsreader está no `<link>` do Google Fonts do `login.html` (e só dele; o `base.html` do painel não carrega Newsreader).
+Esse bloco tem cinco cores cruas. Só uma muda:
+
+| Cor | Destino |
+|---|---|
+| `#1b1b1b`, `#000000`, `#f7f7f7`, `#9a9a9a` | **ficam literais.** O painel é uma superfície de escuro fixo, não uma superfície temática: token de tema aqui inverteria a cor no modo escuro, que é justamente a armadilha registrada no comentário |
+| `#7fbfa3` (descritor "GESTÃO DE REVENDA") | vira `var(--green-300)` — é exatamente esse passo da escala, e a escala existe para isto |
+
+Confirme que a Newsreader está no `<link>` do Google Fonts do `login.html` (e só dele; o
+`base.html` do painel não carrega Newsreader).
 
 - [ ] **Step 5: Subir o cache-buster para `?v=v10`.**
 - [ ] **Step 6: Rodar as guardas e as suítes.** Expected: PASS.
@@ -1464,7 +1536,9 @@ Depois da Tarefa 14, tudo abaixo tem de valer:
 - [ ] `rg -n "Camada Revy 2026"` — nada
 - [ ] `rg -n "var\(--accent"` em `portal-gestao` e `revy-trafego` — nada
 - [ ] `rg -n "1f6feb|5a95ff"` no repositório, fora de `docs/historico` — nada
-- [ ] `rg -n "1f4d3a|7fbfa3" portal-gestao revy-trafego` — nada: o acento só pode chegar por token, ou um dos dois passos acaba sob o fundo errado
+- [ ] `rg -n "1f4d3a|7fbfa3" portal-gestao revy-trafego` — nada: o acento só pode chegar por token, ou um dos dois passos acaba sob o fundo errado. As cores literais do painel de login (`#1b1b1b`, `#000000`, `#f7f7f7`, `#9a9a9a`) são a exceção documentada — superfície de escuro fixo, não temática
+- [ ] `rg -n "/\* --- Botao reto" portal-gestao revy-trafego` — nada: o bloco ad-hoc do fim foi absorvido pelas Tarefas 4, 5, 7 e 10
+- [ ] `rg -n "Estado em ponto|Login \(2026-08-08\)" portal-gestao revy-trafego` — nada: absorvidos pelas Tarefas 6 e 12
 - [ ] Nenhum template com cor própria fora dos cinco de anti-flash
 - [ ] Nenhum `border-radius` fora de `var(--radius-*)`, `50%`, `inherit`, `0` e as duas barras finas nominais
 - [ ] `--st-lost`, `--ok`, `--warn`, `--danger`, `--whatsapp` e `--font-data` todos com uso > 0 nos dois painéis
