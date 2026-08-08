@@ -53,6 +53,25 @@ blocos do fim — e apaga as três origens. A tarefa só está pronta quando `rg
 lugar só. As seções nasceram no meio do arquivo, então enquanto o bloco do fim não for absorvido
 ele **vence** a seção no cascade: escrever na seção sem apagar o bloco do fim não muda nada na
 tela.
+
+### Armadilha do `@media`: mover a regra base pode matar um override responsivo
+
+Descoberta na revisão da Tarefa 8, e vale para **todas** as tarefas de peça. Quando você move a
+regra base de uma classe para a seção nova (que fica lá pelo meio-fim do arquivo), qualquer
+`@media (max-width: …) { .aquela-classe { … } }` que estava **acima** da posição nova passa a
+vir **antes** da base no arquivo. Com a mesma especificidade, a base agora vence o `@media`, e o
+layout responsivo daquela peça morre — silenciosamente, porque nenhuma guarda testa ordem de
+cascade e a conferência visual desktop não pega o que só aparece em tela estreita.
+
+O caso que revelou isso: `.vehicle-row` tem um `@media (max-width: 620px)` que troca
+`grid-template-columns` e `padding` para tela de toque. A Tarefa 8 moveu a base do `.vehicle-row`
+para depois desse `@media`, e o override de celular parou de valer.
+
+**Antes de dar a peça por pronta:** para cada classe que você moveu, procure um `@media` que
+mexa nela (`rg -n "max-width|min-width" no arquivo, e veja se algum bloco cita sua classe). Se
+existir e ele ficou **acima** da regra base movida, mova esse bloco `@media` **junto**, para
+depois da base, dentro ou logo após a sua seção. A ordem relativa base → `@media` tem de ser
+preservada, do mesmo jeito que a Tarefa 3 preservou a ordem entre regras concorrentes.
 - **Conferência visual** ao fim de cada peça, no app rodando (`cd portal-gestao; docker compose up --build -d`), **nos dois temas**. Telas-testemunha: Loja — login, Atendimento (fila e conversa), Vendas → Visão, Estoque → lista, Ajustes → Integrações. Control — Visão geral, Lojas → lista, Loja → detalhe, Aquisição/ROI.
 - Encerrar cada tarefa com `git diff --check` e `git status --short` limpos, e um commit por tarefa.
 
