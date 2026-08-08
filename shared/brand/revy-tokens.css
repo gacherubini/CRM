@@ -1,0 +1,94 @@
+/* ===========================================================================
+   Revy — tokens de marca. FONTE UNICA.
+   Edite este arquivo; nunca as copias em */static/css/revy-tokens.css.
+   Depois de editar: python shared/brand/sync_tokens.py
+   Spec: docs/superpowers/specs/2026-08-08-identidade-visual-revy-design.md
+   =========================================================================== */
+:root {
+  /* --- neutros --- */
+  --paper: #f9f9f9;
+  --surface: #ffffff;
+  --surface-raised: #f4f2f1;
+  --surface-soft: #efeceb;
+  --ink: #1b1b1b;
+  --ink-soft: #57514f;
+  --ink-muted: #6b625f;
+  --line: #ded8d9;
+  --line-strong: #cdc6c4;
+  --shadow: 0 1px 2px rgba(27, 20, 20, .05);
+
+  /* --- acento: escala do verde racing --- */
+  --green-900: #0f2b20;
+  --green-700: #1f4d3a;
+  --green-500: #2f7355;
+  --green-300: #7fbfa3;
+  --green-100: #dfeee7;
+
+  --brand: var(--green-700);
+  --brand-strong: #1a4231;
+  --brand-ink: #ffffff;
+  --brand-tint: rgba(31, 77, 58, .09);
+  --brand-line: rgba(31, 77, 58, .32);
+
+  /* --- estado --- */
+  --st-wait: #8a6d1d;
+  --st-live: #57514f;
+  --st-prop: #1f4d3a;
+  --st-won: #0d7a4f;
+  --st-lost: #6b625f;
+
+  --ok: #0d7a4f;
+  --amber: #8a6d1d;
+  --warn: #8a6d1d;
+  --danger: #b42318;
+  --red: #b42318;
+  --green: #0d7a4f;
+  --whatsapp: #25d366;
+  --online: #25d366;
+
+  /* --- forma --- */
+  --radius-ctl: 3px;
+  --radius-nav: 8px;
+  --radius-srf: 12px;
+  --radius: 12px;
+
+  /* --- tipografia --- */
+  --font-ui: "Hanken Grotesk", "Segoe UI", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-brand: "Newsreader", Georgia, "Times New Roman", serif;
+  --font-data: ui-monospace, "Consolas", "SF Mono", monospace;
+}
+
+/* O modo escuro e dos paineis. site/ e catalogo-publico/ nunca recebem
+   data-theme e declaram color-scheme: light. */
+[data-theme="dark"] {
+  --paper: #0a0a0a;
+  --surface: #111111;
+  --surface-raised: #161616;
+  --surface-soft: #1a1a1a;
+  --ink: #f5f5f5;
+  --ink-soft: #a3a3a3;
+  --ink-muted: #949494;
+  --line: #2a2a2a;
+  --line-strong: #3a3a3a;
+  --shadow: none;
+
+  /* O acento sobe para o 300: o 700 da 1,6:1 sobre #0a0a0a. */
+  --brand: var(--green-300);
+  --brand-strong: #9ed0ba;
+  --brand-ink: #0a0a0a;
+  --brand-tint: rgba(127, 191, 163, .14);
+  --brand-line: rgba(127, 191, 163, .34);
+
+  --st-wait: #d9b04a;
+  --st-live: #a3a3a3;
+  --st-prop: #7fbfa3;
+  --st-won: #3ecf8e;
+  --st-lost: #949494;
+
+  --ok: #3ecf8e;
+  --amber: #d9b04a;
+  --warn: #d9b04a;
+  --danger: #f97066;
+  --red: #f97066;
+  --green: #3ecf8e;
+}

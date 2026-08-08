@@ -10,6 +10,9 @@ test-tmp*/
 # Scratch / hotpatch / probes de sessão (nunca versionar)
 tmp/
 
+# Fontes baixadas pelo gerador da marca (shared/brand/build_marca.py rebaixa sozinho)
+shared/brand/.cache/
+
 # Docker / dados locais
 pg_data/
 n8n_data/
