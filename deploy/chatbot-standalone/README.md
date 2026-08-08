@@ -1,231 +1,157 @@
 # Chatbot Standalone — subir e ir ao ar
 
-Pacote completo do Chatbot: `chatbot-api` + **Estoque Lite** + Postgres + Redis + **n8n** +
-**Evolution API**. Sobe tudo com um comando; a conversa é montada no n8n usando **Gemini** (grátis).
+Pacote revendível: `chatbot-api` + **Estoque Lite** + Postgres + Redis + **n8n** +
+**Evolution API**. Funciona sem Portal e sem Catálogo Público.
 
-## Pré-requisitos
+**Pré-requisitos:** Docker Desktop, um número de WhatsApp dedicado, uma chave do Gemini
+(grátis em https://aistudio.google.com → *Get API key*).
 
-- Docker Desktop ligado.
-- Um **número de WhatsApp dedicado** (um chip só pro bot).
-- Uma **chave do Gemini** (grátis em https://aistudio.google.com → *Get API key*).
-
-## 1. Subir a infra
+## 1. Subir
 
 ```bash
 cd deploy/chatbot-standalone
 cp .env.example .env
-# edite .env: defina EVOLUTION_API_KEY e N8N_ENCRYPTION_KEY (invente strings)
+# defina EVOLUTION_API_KEY e N8N_ENCRYPTION_KEY (strings inventadas)
 docker compose up -d --build
 ```
 
 Portas: chatbot-api `:8001`, estoque `:8100`, Evolution `:8080`, n8n `:5678`.
 
-## 2. Criar a loja (nos dois serviços, com o MESMO slug)
+## 2. Criar a loja nos dois serviços (mesmo slug)
 
 ```bash
-# no Estoque (retorna TOKEN do estoque)
 docker compose exec estoque-api python -m app.cli criar-loja \
   --nome "Moto Center" --slug moto-center --whatsapp 5511999999999
 
-# no Chatbot (retorna TOKEN do chatbot; instance = nome da instância Evolution)
 docker compose exec chatbot-api python -m app.cli criar-loja \
   --nome "Moto Center" --slug moto-center --instance loja1 --whatsapp 5511999999999
 ```
 
-Cadastre alguns veículos no Estoque (use o TOKEN do estoque) e publique — ver
-`deploy/estoque-standalone/README.md`.
+Cada comando imprime um TOKEN. Cadastre veículos no Estoque e publique — ver
+[`../estoque-standalone/README.md`](../estoque-standalone/README.md).
 
-## 3. Conectar o WhatsApp (Evolution)
+## 3. Conectar o WhatsApp
 
 ```bash
-# criar a instância (mesmo nome usado em --instance acima: loja1)
 curl -s -X POST http://localhost:8080/instance/create \
   -H "apikey: SUA_EVOLUTION_API_KEY" -H "Content-Type: application/json" \
   -d '{"instanceName":"loja1","integration":"WHATSAPP-BAILEYS","qrcode":true}'
 ```
 
-Abra o **Evolution Manager** em `http://localhost:8080/manager` (login com a API key),
-escaneie o **QR** com o WhatsApp do número dedicado. Status deve virar `open`.
+Abra o Evolution Manager em `http://localhost:8080/manager` (login com a API key) e
+escaneie o QR com o número dedicado. Status deve virar `open`.
 
-## 4. Importar/configurar o fluxo no n8n (`http://localhost:5678`)
+## 4. Importar o fluxo no n8n (`http://localhost:5678`)
 
-O template versionado é `n8n/workflow-ai-nao-salvos.json`. Ele aplica, nesta ordem:
+Template versionado: `n8n/workflow-ai-nao-salvos.json`. Substitua `__EVOLUTION_KEY__`,
+`__CHATBOT_TOKEN__` e `__CHATBOT_WEBHOOK_TOKEN__` — este último tem de ter **exatamente** o
+mesmo valor de `CHATBOT_WEBHOOK_TOKEN` no `.env` (autentica entrada e registro da saída).
 
-1. ignora grupos/status e mensagens sem texto;
-2. registra/deduplica a mensagem na Chatbot API;
-3. respeita `bot_ativo=false` (handoff);
-4. consulta `POST /chat/findChats/{instance}` na Evolution (`isSaved`);
-5. chama `POST /v1/operacao/roteamento` no Chatbot com `{ telefone, texto, is_saved }`;
-6. ramifica pela `acao` retornada (ver tabela abaixo);
-7. registra a saída do bot para diferenciar respostas automáticas das manuais.
+A instance **não** é fixa no JSON: cada evento traz `body.instance` e o workflow usa esse
+valor (multi-WhatsApp com um único workflow).
 
-### Três casos de produto (roteamento)
+Selecione a credencial no nó **Google Gemini Chat Model**. As tools do AI Agent apontam
+para `http://chatbot-api:8000` com `Authorization: Bearer TOKEN_DO_CHATBOT`:
 
-| Caso | Condição | `acao` | Efeito |
-|---|---|---|---|
-| Contato que já fala | `isSaved=true`, **não** autorizado | `ignorar` | Sem bot de vendas |
-| Contato **novo** | `isSaved=false`, **não** autorizado | `cliente` | IA (Gemini) + tools |
-| Equipe cadastrada | telefone em **números autorizados** | `cadastro` / `cadastro_controle` | Gatilho `cadastro`, fotos, `fim` |
+| Tool | Endpoint |
+|---|---|
+| `consultar_estoque` | `GET /v1/estoque/buscar?termo={termo}` |
+| `enviar_foto_veiculo` | resolve a capa pelo ID e envia mídia pela Evolution |
+| `registrar_consentimento` | `POST /v1/consentimentos` |
+| `registrar_lead` | `POST /v1/leads` |
+| `simular` | `POST /v1/simulacoes/solicitar` — descarta a resposta técnica e pausa o bot |
+| `solicitar_handoff` | `PATCH /v1/conversas/{telefone}/estado` |
+| `adicionar_veiculo` | `POST /v1/operacao/veiculos` (só números autorizados) |
 
-- Só **contato novo** recebe mensagem de bot de vendas.
-- `is_saved` desconhecido → fail-closed (`ignorar`).
-- Match de autorizado: variantes de telefone (com/sem `55`, com/sem 9º dígito).
-- Fallback se `/roteamento` falhar: mesmo gate antigo (`isSaved === false` → cliente).
-
-1. Importe o workflow e substitua `__EVOLUTION_KEY__`, `__CHATBOT_TOKEN__` e
-   `__CHATBOT_WEBHOOK_TOKEN__`. A instance WhatsApp **não** é fixa no JSON: cada
-   evento da Evolution traz `body.instance` e o workflow usa esse valor (multi-WA
-   com um único workflow). O webhook token deve ter exatamente o mesmo valor de
-   `CHATBOT_WEBHOOK_TOKEN` no `.env`; ele autentica tanto a entrada quanto o registro
-   da saída do bot na Chatbot API.
-2. Selecione a credencial no nó **Google Gemini Chat Model**. As ferramentas
-   HTTP do AI Agent apontam para a `chatbot-api` (`http://chatbot-api:8000`) com header
-   `Authorization: Bearer TOKEN_DO_CHATBOT`:
-   - `consultar_estoque` → `GET /v1/estoque/buscar?termo={termo}`
-   - `enviar_foto_veiculo` → resolve a capa pelo ID e envia mídia pela Evolution,
-     sem mandar o cliente abrir o catálogo/site
-   - `registrar_consentimento` → `POST /v1/consentimentos`
-   - `registrar_lead` → `POST /v1/leads`
-   - `simular` → enfileira internamente em `POST /v1/simulacoes/solicitar`, descarta a resposta
-     técnica e pausa o bot para um vendedor responder (só na edição Financiamento)
-   - `solicitar_handoff` → `PATCH /v1/conversas/{telefone}/estado`
-   - `adicionar_veiculo` → `POST /v1/operacao/veiculos` (só números autorizados; ver E5 abaixo)
-3. Publique o workflow e registre o novo webhook na Evolution:
-   ```bash
-   curl -s -X POST http://localhost:8080/webhook/set/loja1 \
-     -H "apikey: SUA_EVOLUTION_API_KEY" -H "Content-Type: application/json" \
-     -d '{"webhook":{"enabled":true,"url":"http://n8n:5678/webhook/whatsapp-ai","events":["MESSAGES_UPSERT"]}}'
-   ```
-
-Não use o sufixo `@lid` para decidir se o contato é salvo: a Evolution pode ter chats salvos com
-`@lid`. O campo canônico de “contato novo” é `isSaved` retornado por `findChats`, consumido pelo
-endpoint `/v1/operacao/roteamento` (não um gate solto só no n8n).
-
-O system prompt não deve inventar veículo ou parcela. No fluxo de financiamento, o cliente nunca
-recebe parcelas, taxas ou bancos do bot: depois de solicitar a simulação, a conversa é pausada e o
-resultado é entregue por um vendedor. O workflow pronto é versionado em `n8n/`.
-
-O webhook também limita o corpo a 32 KiB, valida telefone/texto/identificadores, não ecoa payloads
-inválidos e aplica rate limit por origem. Os limites podem ser ajustados pelas variáveis
-`CHATBOT_WEBHOOK_MAX_*` e `CHATBOT_WEBHOOK_RATE_LIMIT_*`; não desligue o rate limit em produção.
-
-### Áudio recebido
-
-O ramo `E audio1` envia apenas instância, ID da mensagem, MIME e duração para a Chatbot API.
-A API baixa o conteúdo pela Evolution com `apikey` server-side, aceita somente MIME de áudio,
-limita a 8 MiB/180 s e apaga o diretório temporário ao fim de cada tentativa. O n8n e o banco não
-guardam o binário. Sem provider (`CHATBOT_AUDIO_TRANSCRIPTION_PROVIDER=none`) ou em qualquer falha,
-o cliente recebe um pedido curto para enviar a mensagem por texto.
-
-Para integrar um transcritor real, use `CHATBOT_AUDIO_TRANSCRIPTION_PROVIDER=http`, URL e token.
-O contrato é `multipart/form-data`, campo `file` + `language=pt-BR`, e resposta JSON com `text` ou
-`texto`. A credencial fica somente no Chatbot; não a coloque no workflow. O endpoint real deve ser
-homologado antes de ativar, pois o template versionado não inclui nenhum segredo.
-
-## E5 — Cadastro de veículo via WhatsApp (Chatbot-only)
-
-Caminho canônico de estoque **sem Portal**: o dono/vendedor manda os dados no WhatsApp;
-o n8n extrai os campos e chama a Chatbot API, que grava no **Estoque** (HTTP privado)
-e já publica o veículo para aparecer no Catálogo.
-
-### Env vars (chatbot-api)
-
-| Variável | Uso |
-|----------|-----|
-| `ESTOQUE_PUBLIC_URL` | Leitura da vitrine (`GET /public/v1/...`) |
-| `ESTOQUE_API_URL` | Base da API privada do Estoque (ex.: `http://estoque-api:8000`) |
-| `ESTOQUE_API_TOKEN` | Token de serviço **da loja no estoque-api** (escrita) |
-| `ESTOQUE_REQUEST_TIMEOUT` | Timeout HTTP (default 8s) |
-| `CHATBOT_IMAGE_SESSION_TTL_SECONDS` | Janela para fotos em lote (default 600s) |
-
-### 1. Autorizar telefones da equipe
+Publique o workflow e registre o webhook na Evolution:
 
 ```bash
-# CLI
-docker compose exec chatbot-api python -m app.cli autorizar-numero \
-  --slug moto-center --telefone 5511999999999 --papel dono
-
-# ou API (token do chatbot)
-curl -s -X POST http://localhost:8001/v1/operacao/numeros-autorizados \
-  -H "Authorization: Bearer TOKEN_DO_CHATBOT" -H "Content-Type: application/json" \
-  -d '{"telefone":"5511999999999","papel":"dono"}'
+curl -s -X POST http://localhost:8080/webhook/set/loja1 \
+  -H "apikey: SUA_EVOLUTION_API_KEY" -H "Content-Type: application/json" \
+  -d '{"webhook":{"enabled":true,"url":"http://n8n:5678/webhook/whatsapp-ai","events":["MESSAGES_UPSERT"]}}'
 ```
 
-### 2. Ferramenta n8n `adicionar_veiculo`
+## Armadilhas
 
-O schema exposto ao modelo contém somente os dados comerciais abaixo e rejeita
-campos extras. O Code Tool monta `telefone_solicitante` e `Idempotency-Key` com
-os valores da mensagem real extraídos do webhook; esses dois campos não são
-controlados pelo modelo nem pelo cliente atendido.
+- **Não use o sufixo `@lid` para decidir se o contato é salvo.** A Evolution pode ter chats
+  salvos com `@lid`. O campo canônico é `isSaved` de `findChats`, consumido por
+  `POST /v1/operacao/roteamento` — não um gate solto no n8n.
+- **O cliente nunca recebe parcela, taxa ou banco do bot.** Depois de solicitar a
+  simulação, a conversa é pausada e o resultado é entregue por um vendedor.
+- **O system prompt não pode inventar veículo nem parcela.**
+- **Não desligue o rate limit do webhook em produção** (`CHATBOT_WEBHOOK_RATE_LIMIT_*`);
+  o corpo é limitado a 32 KiB e payload inválido não é ecoado.
+- **O LLM não escolhe identidade autorizada.** `telefone_solicitante` e `Idempotency-Key`
+  são montados pelo Code Tool a partir do webhook real.
+- **A credencial do transcritor fica só no Chatbot**, nunca no workflow.
+
+Roteamento (3 casos) e fail-closed: ver [`../../README.md`](../../README.md).
+
+## Cadastro de veículo por WhatsApp (E5)
+
+Caminho de estoque **sem Portal**: a equipe manda os dados no WhatsApp, o n8n extrai os
+campos e chama a Chatbot API, que grava no Estoque e já publica.
+
+Env da `chatbot-api`: `ESTOQUE_PUBLIC_URL` (leitura), `ESTOQUE_API_URL` +
+`ESTOQUE_API_TOKEN` (escrita), `ESTOQUE_REQUEST_TIMEOUT` (8s),
+`CHATBOT_IMAGE_SESSION_TTL_SECONDS` (600s, janela de fotos em lote).
+
+Autorizar telefones da equipe:
+
+```bash
+docker compose exec chatbot-api python -m app.cli autorizar-numero \
+  --slug moto-center --telefone 5511999999999 --papel dono
+```
+
+Requisição da tool:
 
 ```http
 POST http://chatbot-api:8000/v1/operacao/veiculos
 Authorization: Bearer TOKEN_DO_CHATBOT
 Idempotency-Key: {{ providerMessageId_do_webhook }}
-Content-Type: application/json
 
-{
-  "tipo": "moto",
-  "marca": "Honda",
-  "modelo": "CG 160",
-  "ano_modelo": 2023,
-  "preco": 16000,
-  "km": 12000,
-  "placa": "ABC1D23"
-}
+{"tipo":"moto","marca":"Honda","modelo":"CG 160","ano_modelo":2023,
+ "preco":16000,"km":12000,"placa":"ABC1D23"}
 ```
 
-**Sucesso (201):**
-```json
-{
-  "ok": true,
-  "mensagem": "Veículo cadastrado e publicado no catálogo: Honda CG 160 2023 — R$ 16.000,00 — placa ABC1D23",
-  "veiculo": {
-    "id": "...", "tipo": "moto", "marca": "Honda", "modelo": "CG 160",
-    "ano_modelo": 2023, "preco": 16000.0, "km": 12000, "placa": "ABC1D23",
-    "status": "disponivel", "publicado": true, "foto_url": null
-  },
-  "solicitante": "5511999999999"
-}
-```
+Erros legíveis para o bot falar: `403` não autorizado · `422` faltou valor / placa
+inválida / faltou marca · `503` escrita no Estoque não configurada.
 
-**Erros legíveis (para o bot falar no WhatsApp):**
-- `403` `{"detail":"não autorizado"}` — cliente comum tentou cadastrar
-- `422` `{"detail":"faltou valor"}` / `"placa inválida ..."` / `"faltou marca"`
-- `503` escrita no Estoque não configurada (`ESTOQUE_API_URL`/`TOKEN`)
-
-### 3. Enviar fotos pelo WhatsApp
-
-Depois do cadastro em texto, abre-se uma sessão de 10 minutos para o vendedor
-enviar várias fotos sem repetir a placa. Para um veículo já existente, a primeira
-foto usa a placa na legenda (`ABC1D23`) e as seguintes reutilizam a sessão. O
-workflow valida o telefone, baixa a imagem server-side da Evolution, faz upload
-binário no Estoque e confirma quando Estoque+Catálogo estiverem atualizados.
-O volume `estoque_media` preserva os arquivos; configure:
+**Fotos:** após o cadastro em texto abre uma sessão de 10 min para enviar várias fotos sem
+repetir a placa. Para veículo já existente, a primeira foto usa a placa na legenda. O
+workflow valida o telefone, baixa a imagem server-side, faz upload binário no Estoque e
+confirma quando Estoque+Catálogo estiverem atualizados. Aceita JPEG/PNG/WebP até 10 MiB;
+reentrega da mesma mensagem não duplica. Configure:
 
 ```env
 ESTOQUE_MEDIA_PUBLIC_BASE_URL=https://estoque.seudominio.com/public/v1/media
 ESTOQUE_MEDIA_ALLOWED_HOSTS=estoque.seudominio.com
 ```
 
-Essa URL precisa ser HTTPS e acessível pelo navegador e pela Evolution. O n8n/LLM
-nunca recebe base64 nem escolhe path/URL. A API aceita somente JPEG/PNG/WebP, até
-10 MiB, e reentrega da mesma mensagem não duplica a foto.
+Essa URL precisa ser HTTPS e acessível pelo navegador **e** pela Evolution. O n8n/LLM nunca
+recebe base64 nem escolhe path/URL.
 
-O cadastro do veículo também é idempotente no Estoque. Telefone e chave de
-reentrega vêm do webhook real; o LLM não pode escolher uma identidade autorizada.
+## Áudio recebido
 
-Quando o cliente pedir uma imagem, o fluxo inverso resolve a capa pelo ID confiável
-e chama `message/sendMedia` na Evolution, sem obrigar o cliente a abrir o site.
+O ramo `E audio1` manda só instância, ID da mensagem, MIME e duração. A API baixa o
+conteúdo pela Evolution com `apikey` server-side, aceita só MIME de áudio, limita a
+8 MiB/180 s e apaga o diretório temporário a cada tentativa. n8n e banco não guardam o
+binário. Sem provider (`CHATBOT_AUDIO_TRANSCRIPTION_PROVIDER=none`) ou em qualquer falha, o
+cliente recebe um pedido curto para mandar por texto.
 
-## Edições
+Transcritor real: `CHATBOT_AUDIO_TRANSCRIPTION_PROVIDER=http` + URL e token. Contrato
+`multipart/form-data`, campo `file` + `language=pt-BR`, resposta JSON com `text` ou `texto`.
 
-- **Atendimento:** `SIMULATION_PROVIDER=none` (bot qualifica e encaminha, sem simular).
-- **Financiamento (demo):** `SIMULATION_PROVIDER=mock` (padrão) — simula com taxas fictícias.
-- **Financiamento (real):** `SIMULATION_PROVIDER=http` + `MOTOR_URL` do Motor de Simulação.
+## Edições e operação
 
-## Operação
+| Edição | Config |
+|---|---|
+| Atendimento (sem simular) | `SIMULATION_PROVIDER=none` |
+| Financiamento demo | `SIMULATION_PROVIDER=mock` (padrão) |
+| Financiamento real | `SIMULATION_PROVIDER=http` + `MOTOR_URL` |
 
-- **Logs:** `docker compose logs -f chatbot-api`
-- **Leads (CSV):** `curl -H "Authorization: Bearer TOKEN" http://localhost:8001/v1/leads.csv`
-- **Parar:** `docker compose down` (dados nos volumes).
+```bash
+docker compose logs -f chatbot-api
+curl -H "Authorization: Bearer TOKEN" http://localhost:8001/v1/leads.csv
+docker compose down     # dados ficam nos volumes
+```

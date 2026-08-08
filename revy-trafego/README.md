@@ -1,503 +1,159 @@
 # Revy Control (diretório `revy-trafego`)
 
-> O nome técnico do diretório, do processo e do prefixo público (`/trafego`) continua
-> `revy-trafego` durante a migração. A UI e o produto operacional já se chamam
-> **Revy Control**, mantendo Tráfego como um módulo interno. Ver
-> [design](../docs/superpowers/specs/2026-07-29-revy-control-design.md) e
-> [plano por fases](../docs/plans/2026-07-29-plano-revy-control.md).
+Cockpit multi-loja da equipe Revy: Pixel, CAPI, gasto de Ads, campanhas, ROI, prontidão,
+auditoria e diagnóstico de leads. Banco e Alembic próprios.
 
-Cockpit multi-loja da **equipe Revy** para operação de mídia paga (Pixel, CAPI, Ads spend, campanhas, ROI, auditorias e diagnóstico de leads).
+O diretório, o processo e o prefixo público (`/trafego`) mantêm o nome `revy-trafego`; a UI
+e o produto se chamam **Revy Control**. A **Revy Loja** (`portal-gestao`) mostra resultados
+para o lojista; configuração técnica e operação multi-loja ficam aqui.
 
-A **Revy Loja** (`portal-gestao`) mostra resultados e rotinas da loja; configuração
-técnica, prontidão e operação multi-loja ficam aqui.
+## Armadilhas — leia antes de mexer
 
-**Plano canônico:**  
-[`docs/plans/2026-07-28-plano-revy-trafego-separacao.md`](../docs/plans/2026-07-28-plano-revy-trafego-separacao.md)
+- **Nunca casar lead ↔ `ctwa_auditoria` por telefone mascarado.** A máscara são os 4
+  dígitos finais e a colisão é real: em 08/08 casou o lead de uma venda com o anúncio de
+  outro cliente. Atribuição saída daí é receita inventada.
+- **Nunca ligar o worker CAPI nos dois processos** sobre a mesma outbox. O Revy é o dono
+  único da outbox CAPI e do sync de spend; o Portal roda com `PORTAL_*_ENABLED=0`.
+- **`vendas_projetadas.campanha_id` fica `NULL` de propósito.** O vínculo venda↔campanha
+  existe só no cálculo (`herdar_campanhas_de_leads`), e é isso que faz a atribuição valer
+  retroativamente. Não "conserte" com backfill.
+- **A linha de venda da campanha é o relatório da Revy, não a atribuição da Meta.** A
+  compra só chega ao Gerenciador de Anúncios pelo Purchase CAPI, que exige `ctwa_clid` no
+  lead. Divergência entre os dois números é esperada.
+- **Não aceite `campanha_id` vindo do Portal.** `Campanha.id` aqui é local; gravar o UUID
+  de fora desliga o casamento por UTM e a herança, e a venda some do ROI sem erro visível.
+- **Não hardcode versão da Graph API.** Fonte única: `app/meta_graph_config.py`
+  (`GRAPH_BASE`/`GRAPH_VERSION`, override por `META_GRAPH_API_VERSION`).
+- **`app.main` e `app.web.control_ui` têm instâncias Jinja separadas.** Global novo precisa
+  ser registrado nas duas (`rotulos.registrar_globals(env)`), senão um lado não enxerga.
+- Antes de mudar as telas do Control, leia
+  [`docs/2026-08-07-triagem-revisao-ux-loja-control.md`](../docs/2026-08-07-triagem-revisao-ux-loja-control.md):
+  parte do que "parece faltando" foi **recusado pelo dono**.
 
----
+## Onde editar
 
-## Status atual — Control F0–F6 concluído no código
-
-- Banco próprio; o Alembic head do código é
-  `0013_revy_control_readiness_alert_acceptances` (confira `alembic/versions/` se o head
-  tiver avançado).
-- Vendas chegam pelo outbox criptografado da Loja e são materializadas em
-  `vendas_projetadas`; ROI/CAPI não leem tabelas do Portal.
-- CAPI assíncrona, `blocked_config`, cancelamento seguro, lease e dedupe por loja.
-- Shell Control, Pessoas/Cargos, `AcessoControl`, RBAC, convites, recuperação,
-  portfólio, provisionamento e prontidão estão implementados.
-- O detalhe da Loja oferece a operação Google Ads em quatro passos: conexão OAuth,
-  conta, conversões e métricas.
-- **Defaults de código** das flags Control/Google/multi-WA continuam OFF. Em **prod
-  `app2037`** o piloto liga Control + delivery + RBAC + dashboard + multi-WA por
-  secrets (ops). Google Ads sync/conversões e secrets GCP ainda são residual operacional.
-- Referência as-built:
-  [`docs/design/2026-07-30-revy-control-loja-asbuilt-e-melhorias.md`](../docs/design/2026-07-30-revy-control-loja-asbuilt-e-melhorias.md).
-  Provisão de loja → Portal:
-  [`docs/2026-08-02-provisionamento-loja-entitlements.md`](../docs/2026-08-02-provisionamento-loja-entitlements.md).
-
-### Atribuição de venda no ROI 2026-08-08 (a venda herda a campanha do lead)
-
-`venda_casa_campanha` só comparava `campanha_id_*` e `utm_campaign_*` gravados **na
-própria venda**, e nunca consultava o lead. Na mesma função, a contagem de leads já
-casava por `ad_id` via cache do Graph — por isso a linha da campanha mostrava leads e
-não mostrava vendas. Eram dois caminhos de código, e só um enxergava o anúncio.
-
-`herdar_campanhas_de_leads` (`app/roi_calc.py`) fecha o buraco **na leitura**:
-
-- vale **retroativamente** para toda venda já projetada — sem backfill, sem `UPDATE`
-  em `vendas_projetadas` e sem reenviar evento;
-- **atribuição explícita vence herança**: se a venda já tem `campanha_id` ou
-  `utm_campaign` no snapshot, é isso que manda;
-- a ordem do laço (nome em `casefold`) torna a escolha determinística, então uma venda
-  **nunca conta em duas campanhas**;
-- o índice de leads sai da lista **completa**, não dos leads do período: a venda é de
-  agosto e o lead pode ser de julho;
-- Chatbot offline → `leads=[]` → herança vazia → comportamento idêntico ao anterior.
-
-O detalhe da campanha (`app/main.py`) usa a mesma herança; sem isso a linha do ROI diria
-"1 venda" e a lista da página ficaria vazia.
-
-> **`vendas_projetadas.campanha_id` continua `NULL` — é de propósito.** O vínculo existe
-> só no cálculo. É exatamente essa escolha que faz o conserto valer para o passado.
-
-**Isto é o SEU relatório, não a atribuição da Meta.** São duas coisas diferentes e vão
-divergir:
->
-> | | Onde decide | O que mudou em 08/08 |
-> |---|---|---|
-> | Linha da campanha no ROI / Loja | `roi_calc.herdar_campanhas_de_leads` | **passou a contar a venda** |
-> | Compra atribuída no Gerenciador de Anúncios | `POST /eventos/venda-confirmada` → Purchase CAPI, que só liga a compra ao anúncio quando o lead tem `ctwa_clid` | **nada** |
-
-Um lead pode ter `meta_ad_id` e **não** ter `ctwa_clid`. Nesse caso a venda passa a contar
-na campanha aqui e continua não contando na Meta. A divergência é o comportamento correto,
-não é bug — e ela **aumentou** com esta mudança, porque este lado melhorou e o outro não
-foi tocado. Fechar o lado da Meta é outro trabalho: depende de `ctwa_clid` no lead.
-
-Ainda em `app/vendas_projection.py`: `campanha_id_first/last` vindo do outbox do Portal só
-é gravado se existir em `campanhas` da **mesma loja**. O Portal manda o UUID do cadastro
-dele e `Campanha.id` aqui é gerado local; aceitar o id de fora desligaria o casamento por
-UTM **e** a herança, e a venda sumiria do ROI sem erro visível.
-
-E `app/meta_ad_resolver_job.py`: salvar a config de Ads (`upsert_meta_ads`) agora destrava
-os ads que estouraram `max_tentativas` — o `WHERE` é por **`loja_slug`**, não por
-`store.id` como o `invalidar` que roda ao lado. A tela de Cliques do WhatsApp mostra
-quantos anúncios seguem sem campanha resolvida; sem esse número a falha fica invisível,
-que foi o que aconteceu com 10 ads em 07/08.
-
-⚠️ **Nunca casar lead ↔ `ctwa_auditoria` por telefone mascarado.** A máscara são os 4
-dígitos finais, e a colisão é real: em 08/08 ela casou o lead de uma venda com o anúncio de
-outro cliente. Qualquer atribuição saída daí é receita inventada.
-
-### Triagem de UX 2026-08-07 (o que mudou na interface)
-
-Decisões e itens **recusados** em
-[`docs/2026-08-07-triagem-revisao-ux-loja-control.md`](../docs/2026-08-07-triagem-revisao-ux-loja-control.md).
-Consulte antes de propor mudanças nessas telas.
-
-| Tela | Mudança |
+| Arquivo | Responsabilidade |
 |---|---|
-| **Visão geral** (`/app/control/dashboard`) | Encolheu: saíram "Destaques", "Contagens por status", a tabela "Lojas", a coluna "Falhas", o painel Google e "Alterações recentes". Ganhou **filtro de período** (`?inicio=&fim=`), a declaração de que a venda conta por `confirmada_em`, linhas clicáveis para a ficha e chips **Bloqueio** × **Alerta** na prontidão. |
-| **Ficha da loja** | Novo painel **Prontidão** (OK / Bloqueio / Alerta) na aba Visão geral — o dashboard linka "o que falta" para cá e a ficha não respondia nada. Aba "Auditoria" removida (mostrava `action`/`result` crus); a trilha continua no domínio e na API. |
-| **Ajustes › Integrações** (`/app/control/integracoes`) | Página nova, espelhando a que a Revy Loja já tem, sobre a loja selecionada. |
-| **Menu** | Seção "Loja" virou "Loja selecionada" e perdeu "Todas as lojas". `page_title` e `h1` casam com o rótulo do menu: Medição, ROI, Cliques do WhatsApp, Conferir Pixel. |
-| **`/app`** | Deixou de ser a tela "Escolha a loja": encaminha para Visão geral (ou Lojas sem a flag de dashboard). `home.html` sobrou como estado vazio — `exigir_loja` devolve todo mundo para `/app`, então redirecionar dali para uma página que exige loja fecharia um laço. |
+| `app/main.py` | Bootstrap, API `/v1`, `/public/v1`, detalhe de campanha |
+| `app/web/control_ui.py` | Telas `/app/control` |
+| `app/roi_calc.py` | ROI, `venda_casa_campanha`, `herdar_campanhas_de_leads` |
+| `app/vendas_projection.py` | Materializa o outbox do Portal em `vendas_projetadas` |
+| `app/meta_ads_spend.py` | Sync de gasto + `erro_api_sanitizado` (traduz o code da Meta) |
+| `app/meta_ad_resolver_job.py` | Worker que resolve `ad_id → campaign_id` pelo Graph |
+| `app/control/permissions.py` | Isolamento `control:*` × `store:*` |
+| `app/rotulos.py` | Mapa único de rótulos dos enums |
+| `app/readiness.py` | Prontidão da loja (`REQUIRED_CODES` separa bloqueio de alerta) |
 
-Contratos que mudaram:
-
-- `DashboardControl.network_overview(actor, *, leads_port=None, desde=None, ate=None)` —
-  datas **inclusivas**; devolve `periodo_inicio`/`periodo_fim`. Janela padrão
-  `[1º do mês, hoje]`; o Δ% compara a janela anterior de **mesmo tamanho**.
-- `app/rotulos.py` — mapa único de rótulos dos enums (`rotulo_status`, `rotulo_papel`,
-  `rotulo_acesso`, `rotulo_check`, `rotular()`). **`app.main` e `app.web.control_ui` têm
-  instâncias Jinja separadas**: registre em ambos via `rotulos.registrar_globals(env)`,
-  senão o template de um lado não enxerga o global do outro.
-- `readiness.REQUIRED_CODES` — alias público de `_REQUIRED_CODES`, usado pela UI para
-  separar bloqueio de alerta.
-
-> **KPIs de venda mostram zero em produção** enquanto `venda_projetada.loja_id` não for
-> preenchido por `projetar_venda` — ver "Pendências reais" em
-> [`docs/handoff-contexto.md`](../docs/handoff-contexto.md).
-
-## Status anterior (2026-07-28 — Fase 1/2 no lab)
-
-| Item | Estado |
-|---|---|
-| Código Fase 1 + 2 + UI + cutover B5 | **DONE** na `main` |
-| Deploy lab Fly 3-VM (`app2037`) | **DONE** (imagem com `/trafego` + workers) |
-| Lab machines | Desligar com `down-all.sh --3vm` quando não em uso (pedido ops) |
-| UI pública (lab up) | `https://app2037.fly.dev/trafego` |
-| API interna (bundle) | `http://127.0.0.1:9010` |
-| Flags portal resultados + venda | **ON** |
-| Workers CAPI/spend | **Só Revy Tráfego** (`:9010`); portal `PORTAL_*_ENABLED=0` |
-| Smoke final | **17/17 PASS** (health, login, loja, telas, conversa, API, pixel, portal, catálogo) |
-
-### URLs lab
-
-| O quê | URL |
-|---|---|
-| Login / app | https://app2037.fly.dev/trafego |
-| Login direto | https://app2037.fly.dev/trafego/health/live (health) · `/trafego/login` |
-| Portal / Revy Loja | https://app2037.fly.dev |
-| Catálogo | https://app2037.fly.dev/catalogo/ (`/loja/` é legado e redireciona 301) |
-
-Bootstrap do 1º gestor: secrets Fly `REVY_TRAFEGO_BOOTSTRAP_EMAIL` / `_SENHA` (só cria se `gestores_revy` vazia).
-
----
-
-## O que entrou nesta entrega (ops + UI)
-
-### Bundle Fly 3-VM
-
-- App copiado em `Dockerfile.app` → `/srv/revy-trafego`
-- Supervisor: `program:revy-trafego` → `run-revy-trafego.sh` (uvicorn `:9010`)
-- Nginx edge: path **`/trafego/`** (strip prefix) + `absolute_redirect off` (evita `http://host:8080`)
-- Envs no `fly.app.toml` + secrets (`SESSION_SECRET`, `SERVICE_TOKEN`, bootstrap)
-- Prefixo de URL: `REVY_TRAFEGO_URL_PREFIX=/trafego` (links/redirects corretos no edge)
-
-### Flags / cutover no lab (completo B1–B5)
-
-| Env | Valor lab | Nota |
-|---|---|---|
-| `REVY_TRAFEGO_URL` | `http://127.0.0.1:9010` | Portal → API |
-| `REVY_TRAFEGO_PUBLIC_URL` | `http://127.0.0.1:9010` | Catálogo Pixel (prioridade) |
-| `PORTAL_REVY_TRAFEGO_RESULTADOS` | `1` | Cards ROI via API |
-| `PORTAL_REVY_TRAFEGO_VENDA_EVENTS` | `1` | Notifica venda-confirmada |
-| `PORTAL_TRAFEGO_UI_LEGACY` | `0` | Dono sem menus técnicos |
-| `PORTAL_CAPI_RETRY_ENABLED` | `0` | Portal **não** processa outbox |
-| `PORTAL_META_SPEND_SYNC_ENABLED` | `0` | Portal **não** sync spend |
-| `REVY_TRAFEGO_CAPI_WORKER` | `1` | CAPI retry **só** no tráfego |
-| `REVY_TRAFEGO_META_SPEND_SYNC_ENABLED` | `1` | Spend job **só** no tráfego |
-| `REVY_TRAFEGO_LOJAS` | `loja1,moto-center` | Dropdown mesmo sem campanha no DB |
-
-No bundle, o shell `run-revy-trafego.sh` força `PORTAL_CAPI_RETRY_ENABLED=1` / spend `=1`
-**apenas** no processo `:9010` (o Portal força `0`). O Revy usa banco próprio e é o único dono
-da outbox CAPI e do sync de spend.
-
-**Nunca** ligar CAPI worker nos dois processos no mesmo outbox.
-
-### UI
-
-- Login no mesmo padrão do portal (layout 2 colunas, tema claro/escuro, Inter)
-- **Dropdown de loja** na home e na sidebar (troca com `POST /app/loja` + `next`)
-- Lista de lojas: união de tabelas de mídia/vendas + `REVY_TRAFEGO_LOJAS` / fallback catálogo
-
-### Bugs corrigidos no lab
-
-- Redirect `/trafego` → `http://host:8080/...` (browser “off”) — nginx `absolute_redirect off`
-- Links Jinja `public_path('/.../{{ id }}')` literal (conversas/campanhas/ROI/CTWA) — concatenação `~`
-- Schema portal stuck em Alembic `0008` com tabelas parciais — alinhado a `0011` + coluna `codigo_ctwa`
-- Conversas de leads inacessíveis (links quebrados + telefone na path)
-
-### Smoke validado no lab
-
-- Login bootstrap → `/trafego/app`
-- Dropdown `loja1` / `moto-center`
-- Config, Campanhas, ROI → 200
-- Diagnóstico leads (proxy chatbot) + abrir conversa (mensagens)
-- `GET /v1/lojas/{slug}/resultados` com `X-Service-Token`
-- `GET /public/v1/lojas/{slug}/pixel`
-
-### Ainda residual (dados de mídia, não de plataforma)
-
-- Pixel / CAPI / Ads token: configurar por loja na UI (lab ainda sem Pixel salvo)
-- Campanhas/gastos/vendas: vazios até operação de mídia
-- Plataforma/cutover de código e workers: **concluído**
-
----
-
-## Fase 1 / 2 (histórico do desenho compartilhado — não usar no deploy atual)
-
-- Essas fases usavam o banco do Portal (`/data/portal/portal.db`); a Fase 3 substituiu esse desenho.
-- Mesma chave Fernet: `PORTAL_ENCRYPTION_KEY` (ou `REVY_TRAFEGO_ENCRYPTION_KEY`).
-- Workers CAPI/spend **desligados por padrão** (continuam no portal até cutover B5).
-- API `/v1` com `REVY_TRAFEGO_SERVICE_TOKEN`; portal consome com flags ligadas.
-
----
-
-## Local
+## Rodar e testar
 
 ```bash
 cd revy-trafego
-python3.12 -m venv .venv   # precisa 3.12+
-source .venv/bin/activate  # Windows: .venv\Scripts\activate
+python3.12 -m venv .venv && source .venv/bin/activate   # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 export REVY_TRAFEGO_DATABASE_URL="sqlite:///./revy_trafego.db"
 export REVY_TRAFEGO_ENCRYPTION_KEY='gere-uma-chave-fernet'
 export REVY_TRAFEGO_BOOTSTRAP_EMAIL=trafego@revy.local
 export REVY_TRAFEGO_BOOTSTRAP_SENHA='troque-isto'
-export REVY_TRAFEGO_URL_PREFIX=   # vazio em local puro (sem nginx /trafego)
+export REVY_TRAFEGO_URL_PREFIX=      # vazio em local puro (sem nginx /trafego)
 export CHATBOT_API_URL=http://127.0.0.1:8001
-export REVY_TRAFEGO_CHATBOT_TOKENS_JSON='{"moto-center":"..."}'
-alembic upgrade head
-uvicorn app.main:app --reload --port 9010
+alembic upgrade head && uvicorn app.main:app --reload --port 9010
+
+pytest -q     # não há .venv própria no repo: use a do portal-gestao se preciso
 ```
 
-Login: se `gestores_revy` estiver vazia, o bootstrap cria o primeiro admin legado e
-projeta sua `Pessoa` e seu `AcessoControl`. A autenticação prefere
-`AcessoControl` + `Pessoa`; `GestorRevy` permanece apenas como fallback de
-compatibilidade quando ainda não existe projeção.
+Head do Alembic: confira com `alembic heads` / `ls alembic/versions/` — não confie em
+número anotado em doc.
 
-Testes:
+Login: com `gestores_revy` vazia o bootstrap cria o primeiro admin e projeta sua `Pessoa` +
+`AcessoControl`. A autenticação prefere `AcessoControl` + `Pessoa`; `GestorRevy` é só
+fallback de compatibilidade.
 
-```bash
-pytest -q
-```
+## API
 
----
+| Rota | Nota |
+|---|---|
+| `GET /health/live` · `/health/ready` | Ready consulta `vendas_projetadas` |
+| `GET /v1/lojas/{slug}/resultados?periodo=7d\|mes` | ROI — header `X-Service-Token` |
+| `POST /v1/lojas/{slug}/eventos/venda-confirmada` | CAPI, idempotente |
+| `POST /v1/lojas/{slug}/eventos/venda-atualizada` | Projeção/cancelamento idempotente |
+| `GET /public/v1/lojas/{slug}/pixel` | Público, sem auth |
+| `/control/v1/*` · `/app/control/*` | Só com `REVY_CONTROL_ENABLED=1` (senão 404) |
+| `POST /internal/jobs/*` | `meta-spend-sync`, `google-conversions-outbox`, `google-ads-metrics-sync` — header `X-Job-Token` |
 
-## Envs principais
+Pelo edge do Fly, prefixe `/trafego`. No bundle, portal/catálogo chamam
+`http://127.0.0.1:9010` **sem** prefixo.
 
-| Env | Default | Notas |
-|---|---|---|
-| `REVY_TRAFEGO_DATABASE_URL` | `sqlite:///./revy_trafego.db` | Banco exclusivo do Revy |
-| `REVY_TRAFEGO_SESSION_SECRET` | dev | Cookie `revy_trafego_session` |
-| `REVY_TRAFEGO_ENCRYPTION_KEY` | = `PORTAL_ENCRYPTION_KEY` | Tokens CAPI/Ads |
-| `REVY_TRAFEGO_URL_PREFIX` | vazio | No Fly: `/trafego` |
-| `REVY_TRAFEGO_SECURE_COOKIE` | `0` | Lab Fly: `1` |
-| `REVY_TRAFEGO_LOJAS` | vazio | Lista `loja1,moto-center` para o dropdown |
-| `REVY_TRAFEGO_BOOTSTRAP_EMAIL` / `_SENHA` / `_NOME` | bootstrap | 1º gestor se tabela vazia |
-| `CHATBOT_API_URL` | — | Diagnóstico leads/conversas |
-| `REVY_TRAFEGO_CHATBOT_TOKENS_JSON` | — | JSON `loja_slug → token`; recomendado para multi-loja |
-| `REVY_TRAFEGO_CHATBOT_TOKEN_LOJA` + `CHATBOT_API_TOKEN` | — | Compatibilidade para uma única loja |
-| `REVY_TRAFEGO_META_SPEND_SYNC_ENABLED` | `0` | Job 24h |
-| `REVY_TRAFEGO_CAPI_WORKER` | `0` | Retry outbox |
-| `REVY_CONTROL_ENABLED` | `0` | Habilita as superfícies `/control/v1` e `/app/control`; desligada, elas respondem 404 |
-| `REVY_CONTROL_RBAC_ENABLED` | `0` | Aplica escopo de lojas por vínculo no backend e no seletor; ligar somente após migration/backfill e gate de isolamento da Fase 1 |
-| `GOOGLE_ADS_SYNC_ENABLED` | `0` | Liga rotas Control de OAuth/contas/métricas e os quatro passos Google Ads no detalhe da loja em `/app/control`; no lifespan também sobe o worker de métricas |
-| `GOOGLE_CONVERSIONS_ENABLED` | `0` | Liga bindings/outbox, hook venda→conversão e worker de outbox Google; também gate do painel de conversões da UI (Parte B) |
-| `GOOGLE_CONVERSIONS_WORKER_ENABLED` | = conversions | Override do worker; default segue `GOOGLE_CONVERSIONS_ENABLED` |
-| `GOOGLE_CONVERSIONS_WORKER_INTERVAL_SECONDS` | `60` | Intervalo do outbox Google |
-| `GOOGLE_CONVERSIONS_WORKER_INITIAL_DELAY_SECONDS` | `30` | Delay inicial do outbox Google |
-| `GOOGLE_CONVERSIONS_WORKER_MAX_ATTEMPTS` | `8` | Máx. tentativas por item da outbox |
-| `GOOGLE_ADS_METRICS_WORKER_ENABLED` | `0` | Worker diário de métricas (forçado `1` se `GOOGLE_ADS_SYNC_ENABLED`) |
-| `GOOGLE_ADS_METRICS_WORKER_INTERVAL_SECONDS` | `86400` | Intervalo (default diário) |
-| `GOOGLE_ADS_METRICS_WORKER_INITIAL_DELAY_SECONDS` | `120` | Delay inicial |
-| `GOOGLE_ADS_METRICS_WORKER_TIME_WINDOW_DAYS` | `7` | Janela de datas no sync |
-| `GOOGLE_ADS_OAUTH_CLIENT_ID` | vazio | OAuth Web client (GCP) |
-| `GOOGLE_ADS_OAUTH_CLIENT_SECRET` | vazio | Secret do client OAuth (secret manager) |
-| `GOOGLE_ADS_OAUTH_REDIRECT_URI` | vazio | Callback HTTPS do Control; ver "Operação Google Ads no Control" — precisa ser repontado à mão para a rota HTML nova (passo de ops pendente) |
-| `GOOGLE_ADS_DEVELOPER_TOKEN` | vazio | Developer token (API Center do manager Revy); sem ele a UI bloqueia a conexão real. Os adapters fake continuam disponíveis para testes |
-| `GOOGLE_ADS_API_VERSION` | `v19` | Versão REST da Google Ads API |
-| `MULTI_WHATSAPP_ENABLED` | `0` | `1` = libera os endpoints proxy de canais WhatsApp e faz a prontidão contar canais ativos |
-| `REVY_CONTROL_DASHBOARD_ENABLED` | `0` | Com `REVY_CONTROL_ENABLED=1`, habilita dashboard/resumo e os painéis operacionais no Control |
-| `REVY_TRAFEGO_JOB_SECRET` | vazio | `POST /internal/jobs/*` (`meta-spend-sync`, `google-conversions-outbox`, `google-ads-metrics-sync`) |
-| `META_GRAPH_API_VERSION` | `v26.0` | Versão compartilhada da Graph/Marketing API (spend, CAPI, diagnóstico e resolução de anúncios) |
-| `REVY_TRAFEGO_SERVICE_TOKEN` | vazio | Header `X-Service-Token` nas APIs `/v1/*` |
+## Flags e env
 
-### Portal (flags cutover)
+Defaults de código são **OFF**; em prod `app2037` o piloto liga por secrets.
 
 | Env | Default | Efeito |
 |---|---|---|
-| `PORTAL_TRAFEGO_UI_LEGACY` | off | `1` = menus técnicos de volta ao dono |
-| `REVY_TRAFEGO_URL` | — | Base deste app |
-| `REVY_TRAFEGO_SERVICE_TOKEN` | — | Mesmo token |
-| `PORTAL_REVY_TRAFEGO_RESULTADOS` | `0` | `1` = cards ROI via API |
-| `PORTAL_REVY_TRAFEGO_VENDA_EVENTS` | `0` | `1` = POST venda-confirmada |
-| `PORTAL_REVY_TRAFEGO_TIMEOUT` | `4` | segundos |
+| `REVY_TRAFEGO_DATABASE_URL` | `sqlite:///./revy_trafego.db` | Banco exclusivo |
+| `REVY_TRAFEGO_ENCRYPTION_KEY` | = `PORTAL_ENCRYPTION_KEY` | Fernet dos tokens CAPI/Ads |
+| `REVY_TRAFEGO_SESSION_SECRET` / `_SECURE_COOKIE` | dev / `0` | Cookie de sessão (`1` no Fly) |
+| `REVY_TRAFEGO_URL_PREFIX` | vazio | `/trafego` no Fly |
+| `REVY_TRAFEGO_SERVICE_TOKEN` | vazio | `X-Service-Token` nas APIs `/v1/*` |
+| `REVY_TRAFEGO_JOB_SECRET` | vazio | `X-Job-Token` em `/internal/jobs/*` |
+| `REVY_TRAFEGO_LOJAS` | vazio | Lista `loja1,moto-center` para o dropdown |
+| `REVY_TRAFEGO_BOOTSTRAP_EMAIL` / `_SENHA` / `_NOME` | — | 1º gestor se a tabela estiver vazia |
+| `CHATBOT_API_URL` + `REVY_TRAFEGO_CHATBOT_TOKENS_JSON` | — | Diagnóstico de leads; JSON `loja_slug → token` (recomendado em multi-loja) |
+| `REVY_TRAFEGO_CAPI_WORKER` | `0` | Retry da outbox CAPI |
+| `REVY_TRAFEGO_META_SPEND_SYNC_ENABLED` | `0` | Job de spend 24h |
+| `META_GRAPH_API_VERSION` | `v26.0` | Versão compartilhada da Graph/Marketing API |
+| `REVY_CONTROL_ENABLED` | `0` | Liga `/control/v1` e `/app/control` |
+| `REVY_CONTROL_RBAC_ENABLED` | `0` | Escopo de lojas por vínculo; só após migration/backfill |
+| `REVY_CONTROL_DASHBOARD_ENABLED` | `0` | Dashboard e painéis operacionais |
+| `REVY_CONTROL_PROVISIONING_DELIVERY_ENABLED` | `0` | Worker da outbox de provisionamento |
+| `MULTI_WHATSAPP_ENABLED` | `0` | Proxy de canais WA + prontidão conta canais |
+| `GOOGLE_ADS_SYNC_ENABLED` | `0` | OAuth/contas/métricas + worker de métricas |
+| `GOOGLE_CONVERSIONS_ENABLED` | `0` | Bindings/outbox, hook venda→conversão, worker |
+| `GOOGLE_ADS_OAUTH_*` · `GOOGLE_ADS_DEVELOPER_TOKEN` | vazio | Sem eles a UI não oferece conexão |
 
-### Catálogo
+Workers Google têm override próprio (`*_WORKER_ENABLED`, `*_INTERVAL_SECONDS`,
+`*_INITIAL_DELAY_SECONDS`, `*_MAX_ATTEMPTS`) — ver `app/config.py`.
 
-| Env | Notas |
-|---|---|
-| `REVY_TRAFEGO_PUBLIC_URL` | Prioridade sobre `PORTAL_PUBLIC_URL` para Pixel |
-| `PORTAL_PUBLIC_URL` | Fallback |
+Do lado do Portal: `REVY_TRAFEGO_URL`, `REVY_TRAFEGO_SERVICE_TOKEN`,
+`PORTAL_REVY_TRAFEGO_RESULTADOS`, `PORTAL_REVY_TRAFEGO_VENDA_EVENTS`,
+`PORTAL_REVY_TRAFEGO_TIMEOUT` (4s), `PORTAL_TRAFEGO_UI_LEGACY` (rollback da UI do dono).
+No Catálogo, `REVY_TRAFEGO_PUBLIC_URL` tem prioridade sobre `PORTAL_PUBLIC_URL`.
 
----
+## Pessoas, cargos e provisionamento
 
-## API v1
-
-- `GET /health/live`
-- `GET /health/ready`
-- `GET /v1/lojas/{slug}/resultados?periodo=7d|mes` — ROI (header `X-Service-Token`)
-- `POST /v1/lojas/{slug}/eventos/venda-confirmada` — CAPI (idempotente)
-- `POST /v1/lojas/{slug}/eventos/venda-atualizada` — projeção/cancelamento idempotente
-- `GET /public/v1/lojas/{slug}/pixel` — Pixel público (sem auth)
-
-### Revy Control — Fases 1 e 2 locais
-
-Com `REVY_CONTROL_ENABLED=1`, `/control/v1` expõe cadastro, consulta e transição de
-Lojas, vínculos de gestores, auditoria e o corte de Pessoas/Cargos:
-
-- `POST /control/v1/pessoas` — cadastra uma Pessoa Revy sem senha;
-- `GET /control/v1/pessoas?email=...` — busca exata por e-mail normalizado;
-- `GET /control/v1/pessoas/{pessoa_id}` — consulta uma pessoa por ID;
-- `POST /control/v1/lojas/{loja_id}/cargos` — atribui dono, gerente ou vendedor;
-- `GET /control/v1/lojas/{loja_id}/cargos` — lista os cargos ativos da Loja;
-- `POST /control/v1/lojas/{loja_id}/cargos/{cargo_id}/revogar` — encerra a atribuição
-  identificada, preservando seu histórico.
-
-`/app/control/lojas` oferece o painel administrativo para listar, criar e administrar
-Lojas. No detalhe da Loja, o Admin busca ou cadastra a pessoa por e-mail, atribui vários
-cargos e revoga cada atribuição pelo seu `cargo_id`. A Loja só vira `pronta` com ao
-menos um Dono ativo **e** com acesso ativável (`AcessoControl` em `pendente` ou
+`/app/control/lojas` lista, cria e administra Lojas. No detalhe, o Admin busca ou cadastra a
+pessoa por e-mail, atribui vários cargos e revoga cada um pelo `cargo_id`. A Loja só vira
+`pronta` com ao menos um Dono ativo **e** acesso ativável (`AcessoControl` em `pendente` ou
 `ativo`); o último Dono ativo fica protegido nos estados operacionais.
 
-O schema local `acessos_control` e seu backfill são aditivos e idempotentes. Para cada
-gestor legado, a reconciliação reutiliza ou cria a `Pessoa`, preserva o ID de
-`GestorRevy` em `AcessoControl.id` e `gestor_legado_id` e copia o hash de senha sem
-alterá-lo ou expor senha em texto puro. O bootstrap também mantém essa projeção.
+O snapshot de provisionamento enfileira para chatbot, estoque, portal, motor e catálogo
+(`control_provisioning_outbox`). Tokens por destino: Chatbot/Estoque/Motor por Bearer;
+Portal/Catálogo por `X-Service-Token`.
 
-Login, sessão e `Actor` preferem `AcessoControl` + `Pessoa`. Um acesso ativo sem
-`gestor_legado_id` autentica e opera o Control; convite de ativação não cria mais
-`GestorRevy`. Gestores legados sem projeção continuam autenticáveis; quando a projeção
-existe, o estado/versão de `AcessoControl` mandam. Recuperação e reativação sincronizam
-o legado somente se houver vínculo.
+## Google Ads — passo manual de ops obrigatório
 
-O snapshot de provisionamento enfileira para **chatbot, estoque, portal, motor e
-catalogo** (`control_provisioning_outbox` / migration `0009`). Worker opt-in
-(`REVY_CONTROL_PROVISIONING_DELIVERY_ENABLED`) entrega e reprocessa `failed` (máx. 5).
+A rota HTML é `GET /app/control/google-ads/oauth/callback`. Antes do rollout:
 
-Tokens por destino: Chatbot/Estoque/Motor Bearer (por slug ou JSON);
-Portal/Catálogo `X-Service-Token` (`PORTAL_SERVICE_TOKEN`, `CATALOGO_SERVICE_TOKEN`).
-Import push: `POST /control/v1/imports/portal-usuarios`. Isolamento de permissões:
-`control:*` vs `store:*` em `app/control/permissions.py`.
+1. registre essa URL como redirect autorizado no Google Cloud Console (no lab, com o
+   prefixo do edge: `https://app2037.fly.dev/trafego/app/control/google-ads/oauth/callback`);
+2. aponte o secret `GOOGLE_ADS_OAUTH_REDIRECT_URI` para a **mesma** URL.
 
-Com `REVY_CONTROL_ENABLED=0`, as superfícies Control respondem 404.
+Divergência entre os dois dá `redirect_uri_mismatch` no Google **sem pista no log**. O
+endpoint JSON legado `/control/v1/google-ads/oauth/callback` existe só por compatibilidade;
+quem apontar para ele volta do Google em JSON cru.
 
-`REVY_CONTROL_RBAC_ENABLED=1` aplica o escopo de vínculos ao seletor e às requisições
-existentes. As duas flags permanecem default off; não ativar no lab antes de concluir
-inventário, restore drill, migrations/backfills e o gate de isolamento. O Alembic head
-local é `0013_revy_control_readiness_alert_acceptances`; confirme o estado do lab antes
-do rollout do Control.
-
-### Operação Google Ads no Control (Parte B — implementada)
-
-Desenho em `docs/superpowers/specs/2026-07-29-telas-canais-wa-google-design.md` (Parte B).
-O detalhe da Loja (`/app/control/lojas/{id}`) oferece o fluxo conexão → conta →
-conversões → métricas, sem endpoint novo de API e gated por
-`GOOGLE_ADS_SYNC_ENABLED`; o painel de conversões também exige
-`GOOGLE_CONVERSIONS_ENABLED`. Contas MCC aparecem desabilitadas, conversion actions
-vêm da lista do Google e métricas usam por padrão os últimos sete dias. Autorização
-segue no domínio: admin Revy **ou** gestor responsável pela Loja; colaborador recebe
-403. Sem client id, client secret, redirect URI ou developer token, a tela informa que
-o Google não está configurado e não oferece o botão de conexão.
-
-**Passo manual de ops — obrigatório antes do rollout.** A rota HTML implementada é
-`GET /app/control/google-ads/oauth/callback`, que completa o OAuth e redireciona para
-`/app/control/lojas/{id}?ok=google_conectado`. Para a UI funcionar:
-
-1. registrar a rota HTML nova como URI de redirecionamento autorizado no **Google Cloud
-   Console** (no lab, com o prefixo do edge:
-   `https://app2037.fly.dev/trafego/app/control/google-ads/oauth/callback`);
-2. repontar o secret `GOOGLE_ADS_OAUTH_REDIRECT_URI` para a mesma URL
-   (`fly secrets set GOOGLE_ADS_OAUTH_REDIRECT_URI=... -a app2037`).
-
-Os dois têm de casar exatamente — divergência dá `redirect_uri_mismatch` no Google, sem
-pista no log do Control. O endpoint JSON legado
-`GET /control/v1/google-ads/oauth/callback` continua existindo para compatibilidade;
-se algum ambiente ainda apontar para ele, o admin voltará do Google para JSON cru.
-Sem client id/secret e developer token, o painel permanece indisponível para conexão.
-
-Público via edge: prefixar `/trafego` (ex.: `/trafego/health/live`, `/trafego/v1/...`).  
-No bundle, portal/catálogo usam `http://127.0.0.1:9010` **sem** prefixo.
-
----
-
-## Deploy Fly (3-VM)
-
-Da raiz do repo:
+## Deploy
 
 ```bash
-# Secrets (uma vez; não commitar valores)
-fly secrets set --stage \
-  REVY_TRAFEGO_SESSION_SECRET=... \
-  REVY_TRAFEGO_SERVICE_TOKEN=... \
-  REVY_TRAFEGO_BOOTSTRAP_EMAIL=trafego@revy.local \
-  REVY_TRAFEGO_BOOTSTRAP_SENHA=... \
-  -a app2037
-
 fly deploy . -a app2037 -c deploy/fly/3vm/fly.app.toml --ha=false
-# Se a machine ficar stopped após deploy:
-fly machine start <id> -a app2037
 ```
 
-Artefatos: `deploy/fly/3vm/Dockerfile.app`, `supervisord.conf`, `run-revy-trafego.sh`, `nginx-edge.conf`, `fly.app.toml`, `env.example`.
+Artefatos em `deploy/fly/3vm/`: `Dockerfile.app`, `supervisord.conf`,
+`run-revy-trafego.sh`, `nginx-edge.conf`, `fly.app.toml`, `env.example`.
 
-Subir/desligar lab: `bash deploy/fly/up-all.sh --3vm` / `down-all.sh --3vm`.
-
-### Schemas no volume
-
-- Revy Loja: `/data/portal/portal.db`; head esperado pelo código:
-  `0015_auditoria_dominio_canal`.
-- Revy Control: `/data/revy-trafego/revy_trafego.db`; head esperado pelo código:
-  `0013_revy_control_readiness_alert_acceptances`.
-
-O entrypoint executa ambos os Alembics em modo fail-fast antes do supervisord. Readiness do Revy
-consulta `vendas_projetadas`; schema incompleto não deve ser anunciado como saudável.
+O entrypoint roda os Alembics de Portal e Revy em modo fail-fast antes do supervisord.
+Bancos no volume: `/data/portal/portal.db` e `/data/revy-trafego/revy_trafego.db`.
 
 ---
 
-## Integração Meta Graph API — versão e diagnóstico de erro
-
-Fonte única da versão: `app/meta_graph_config.py` (`DEFAULT_GRAPH_VERSION = "v26.0"`,
-override por `META_GRAPH_API_VERSION`, validado por regex). Spend, CAPI, `graph_probe` e
-resolução de anúncios importam `GRAPH_BASE`/`GRAPH_VERSION` dali — **não** hardcodar versão
-em módulo novo. Antes de `d5b78cc` a versão estava espalhada (`v21.0`/`v19.0`) e o erro da
-Meta era mascarado como `HTTP {status}` genérico.
-
-**Erro desmascarado.** `erro_api_sanitizado` (`app/meta_ads_spend.py`) faz parse do
-`error` da Meta e traduz o `code`:
-
-| Código Meta | Significado | Ação |
-|---|---|---|
-| `190` | Token inválido/expirado | Gerar novo token `ads_read` (System User de preferência) |
-| `10` / `200` | Sem acesso/permissão à conta de anúncios | Atribuir a conta ao System User + escopo `ads_read` no Business Manager |
-| outro | Erro real da Meta | Ler a mensagem/`message` retornada |
-
-O token é sanitizado da mensagem (`[oculto]`). `fbtrace_id` ainda **não** é exposto.
-
-**Como ler o erro real de um sync que falhou:**
-
-```bash
-# 1) rodar o sync sob demanda (precisa do secret do job no app)
-JOBTOK=$(openssl rand -hex 16); fly secrets set REVY_TRAFEGO_JOB_SECRET=$JOBTOK -a app2037 \
-  && curl -s -X POST https://app2037.fly.dev/trafego/internal/jobs/meta-spend-sync \
-       -H "X-Job-Token: $JOBTOK" | python3 -m json.tool
-# (o payload traz só o agregado: "N loja(s) · X ok · Y erro")
-
-# 2) mensagem detalhada fica em meta_ads_config.ultima_sync_erro
-fly ssh console -a app2037 -C "python3 -c \"import sqlite3; c=sqlite3.connect('/data/revy-trafego/revy_trafego.db'); [print(r) for r in c.execute('SELECT loja_id,ultima_sync_status,ultima_sync_em,ultima_sync_erro FROM meta_ads_config')]\""
-```
-
-O worker automático (`REVY_TRAFEGO_META_SPEND_SYNC_ENABLED=1`, 24h, delay inicial 0) já
-roda o sync no boot e grava `ultima_sync_erro`/`ultima_sync_resumo` — o resumo também
-aparece na tela de Tráfego (`templates/trafego/form.html`, campo `n`).
-
-**Incidente 2026-08-06 (moto-center).** Após subir `d5b78cc` (deploy v101), o sync
-retornou `1 loja · 1 erro` e `ultima_sync_erro` revelou:
-`Meta negou acesso à conta de anúncios (código 200)`. Ou seja, **não era token expirado
-(190)** — o token autentica, mas o System User não tinha acesso `ads_read`/atribuição à
-conta. Correção é no **Business Manager** (Usuários do sistema → Adicionar ativos → Conta
-de anúncios → Ver desempenho) + token com `ads_read`, não em código.
-
-**Pendência conhecida.** O Portal (`portal-gestao/app/meta_ads_spend.py`,
-`app/meta_capi.py`) continua em `v21.0` e ainda mascara o erro como `HTTP {status}`. Em
-prod isso está **desligado** (`PORTAL_META_SPEND_SYNC_ENABLED=0`), então não afeta o
-sync ativo; portar o mesmo tratamento é melhoria pendente.
-
----
-
-## Cutover workers (B5 — **DONE no lab**)
-
-Estado atual no `fly.app.toml` + scripts:
-
-1. `REVY_TRAFEGO_CAPI_WORKER=1` + `REVY_TRAFEGO_META_SPEND_SYNC_ENABLED=1`
-2. Portal: `PORTAL_CAPI_RETRY_ENABLED=0`, `PORTAL_META_SPEND_SYNC_ENABLED=0`
-3. `run-revy-trafego.sh` força `PORTAL_*=1` só no processo tráfego
-
-Rollback flags portal: zerar `PORTAL_REVY_TRAFEGO_*`.  
-Rollback UI dono: `PORTAL_TRAFEGO_UI_LEGACY=1`.  
-Rollback workers: inverter os `PORTAL_*_ENABLED` / `REVY_TRAFEGO_*_WORKER`.
-
----
-
-## Relação com o portal
-
-| Superfície | Onde |
-|---|---|
-| Pixel, CAPI token, Ads, campanhas, ROI técnico, CTWA audit, leads | **Revy Control** |
-| Resultados de mídia (leitura) no dashboard do dono | Revy Loja (API ou local conforme flags) |
-| Confirmar venda / CRM / estoque | Revy Loja |
-
-Detalhe de flags e runbook: plano 6.4 em `docs/plans/`.
+Histórico (atribuição no ROI, incidente Meta 08/06, cutover de workers, smokes):
+[`docs/historico/revy-control.md`](../docs/historico/revy-control.md).

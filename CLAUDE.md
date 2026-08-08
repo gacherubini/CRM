@@ -12,12 +12,16 @@ e nao devem voltar como proposta nova.
 ## Como explorar com poucos tokens
 
 1. Identifique primeiro o produto afetado na tabela abaixo.
-2. Use `rg -n` para localizar rota, classe, mensagem de erro ou variavel de ambiente.
-3. Leia somente o modulo do dominio. No Portal, nao abra `app/main.py` inteiro: ele faz o
+2. Leia o `README.md` daquele produto: ele traz "Armadilhas" (invariantes que nao podem
+   quebrar), "Onde editar" e como rodar/testar. Narrativa de incidente e status de fases
+   concluidas ficam em `docs/historico/` — so abra se precisar do *porque* de uma
+   armadilha. Ao editar um README, mantenha esse corte: invariante fica, historia sai.
+3. Use `rg -n` para localizar rota, classe, mensagem de erro ou variavel de ambiente.
+4. Leia somente o modulo do dominio. No Portal, nao abra `app/main.py` inteiro: ele faz o
    bootstrap e ainda contem rotas legadas, enquanto os dominios maiores ficam em `app/web/`.
-4. Para falhas entre produtos, siga o contrato HTTP e as configs de deploy; o grafo Python nao
+5. Para falhas entre produtos, siga o contrato HTTP e as configs de deploy; o grafo Python nao
    representa n8n, Fly, migrations nem chamadas HTTP entre servicos.
-5. Para RPA bancario, comece pelos logs e pelos documentos `docs/plans/*playwright*` do banco.
+6. Para RPA bancario, comece pelos logs e pelos documentos `docs/plans/*playwright*` do banco.
 
 ## Mapa dos produtos
 
