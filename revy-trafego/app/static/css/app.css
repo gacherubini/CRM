@@ -2100,7 +2100,14 @@ tr:hover td { background: var(--surface-soft); }
   background: transparent;
   color: var(--ink-soft);
 }
-.button.danger { background: var(--danger); color: #ffffff; border-color: var(--danger); }
+/* Vermelho tintado, nunca preenchimento solido: --danger no escuro e #f97066,
+   e texto branco sobre ele da 2,76:1. O tintado tambem e o padrao dos outros
+   cinco lugares que sinalizam erro (.alert.error, .sim-step.fail, .integ-pill.err). */
+.button.danger {
+  border-color: color-mix(in srgb, var(--danger) 30%, var(--line));
+  background: color-mix(in srgb, var(--danger) 8%, var(--paper));
+  color: var(--danger);
+}
 
 .link-button {
   border: 0;
