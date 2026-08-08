@@ -2515,7 +2515,7 @@ tr.roi-sem-campanha td { color: var(--ink-soft); }
 .login-theme-bar .theme-toggle {
   padding: 6px 8px;
   border: 1px solid var(--line);
-  border-radius: var(--radius-ctl);
+  border-radius: var(--radius-nav);
   background: var(--paper);
   color: var(--ink-soft);
   font-size: 12px;

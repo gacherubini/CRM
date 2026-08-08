@@ -97,7 +97,7 @@ def test_whatsapp_usa_token_semantico_na_loja():
 # escreve dentro da sua: e isso que impede a regra de uma peca de nascer a
 # 1.500 linhas da outra regra da mesma peca.
 # Teto de border-radius literais por arquivo. So desce: cada tarefa de peca
-# tokeniza os raios da peca dela e baixa o numero aqui. A Tarefa 14 zera.
+# tokeniza os raios da peca dela e baixa o numero aqui. A Tarefa 13 zerou.
 # O sistema tem tres raios (3/8/12); qualquer quarto valor e um sistema
 # paralelo nascendo.
 TETO_RAIOS = {
@@ -131,16 +131,27 @@ def test_teto_de_raios_literais(rel):
 
 @pytest.mark.parametrize("rel", PAINEIS)
 def test_item_de_menu_usa_o_raio_de_navegacao(rel):
+    """Nao basta --radius-nav aparecer em algum lugar do arquivo: isso deixa
+    passar muda uma contingencia como a da Tarefa 13 (barra de tema do login
+    virou --radius-ctl, encolhendo o canto de 8px para 3px). A barra de tema
+    do login e item de navegacao — o seletor especifico tem que usar o raio
+    certo."""
     css = caminho(rel).read_text(encoding="utf-8")
     assert "border-radius: var(--radius-nav)" in css, (
         f"{rel} nao usa --radius-nav em item de menu"
     )
+    bloco = re.search(r"\.login-theme-bar \.theme-toggle\s*\{[^}]*\}", css)
+    assert bloco, f"{rel}: bloco .login-theme-bar .theme-toggle nao encontrado"
+    assert "border-radius: var(--radius-nav)" in bloco.group(0), (
+        f"{rel}: .login-theme-bar .theme-toggle nao usa --radius-nav"
+    )
 
 
 # Apelidos genericos herdados do sistema anterior. Cada tarefa migra os seus
-# para o nome semantico e baixa o teto; a Tarefa 14 zera e os remove do
-# canonico. Enquanto .status pintar por --green, "Proposta" e "Ganho" saem da
-# mesma variavel e a regra "o acento nunca e status" nao tem como valer.
+# para o nome semantico e baixa o teto; a Tarefa 13 zerou o teto. Remove-los
+# do canonico fica para uma tarefa futura. Enquanto .status pintar por
+# --green, "Proposta" e "Ganho" saem da mesma variavel e a regra "o acento
+# nunca e status" nao tem como valer.
 APELIDOS = ("--green", "--amber", "--red", "--online")
 
 TETO_APELIDOS = {
