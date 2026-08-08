@@ -26,11 +26,16 @@
   --text-display: clamp(26px, 3vw, 32px);
   --text-metric: 26px;
 
-  /* Largura util da pagina. topbar e .content usam a MESMA formula de recuo
-     para que titulo da topbar e <h1> do conteudo compartilhem a borda esquerda. */
-  --page-max: 1200px;
-  --gutter: var(--space-6);
-  --page-inline: max(var(--gutter), calc((100% - var(--page-max)) / 2));
+  /* Largura util da pagina. topbar e .content usam o MESMO recuo para que o
+     titulo da topbar e o <h1> do conteudo compartilhem a borda esquerda.
+
+     Nao ha teto de largura: o conteudo acompanha a coluna, com --gutter de cada
+     lado. Havia um --page-max de 1200px que centralizava; num monitor de 1920 a
+     sobra virava 244px de folga morta de cada lado. Decisao do dono em 08/08.
+     Mantido identico no revy-trafego (Control) — os dois paineis tem o mesmo
+     shell e nao podem divergir. */
+  --gutter: var(--space-8);
+  --page-inline: var(--gutter);
 }
 
 :root,
