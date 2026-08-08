@@ -1179,9 +1179,17 @@ Para cada KPI, o padrão é rótulo (`<span>`) + valor (`<strong>`) + explicaç�
 .funil-stage-value,
 .revy-results__value {
   font-variant-numeric: tabular-nums;
-  letter-spacing: -.02em;
 }
 ```
+
+**Só `tabular-nums`, nada de `letter-spacing`.** A mudança autorizada é o número tabular; o
+tracking não. Algumas bases já declaram `letter-spacing: -.03em` (`.funil-summary-card > strong`,
+`.revy-results__kpi strong`) — se a regra nova declarar `-.02em`, ela sobrescreve esse valor e
+muda a aparência do KPI sem autorização. Ajuste os seletores desta regra aos que realmente são
+**valor de KPI** no seu arquivo (não o rótulo), conferindo no markup; e não inclua um seletor
+sob alegação de "necessário para o piso de `tabular-nums`" — o teste conta a substring
+`tabular-nums` no arquivo, não seletores cobertos, então um seletor a mais numa lista agrupada
+não muda a contagem.
 
 Série de gráfico e barra passam a usar `var(--green-500)` — o passo da escala reservado a
 gráfico — e o pico continua em `var(--brand)`. As duas barras finas isentadas no Step 3
