@@ -83,7 +83,7 @@ app.state.pixel_resolver = _build_pixel_resolver()
 
 
 def _content_security_policy() -> str:
-    # Google Fonts (Inter) + Meta Pixel opcional (Portal por loja ou env).
+    # Google Fonts (Hanken Grotesk) + Meta Pixel opcional (Portal por loja ou env).
     style = "style-src 'self' https://fonts.googleapis.com; "
     font = "font-src 'self' https://fonts.gstatic.com data:; "
     if settings.meta_pixel_csp_needed:

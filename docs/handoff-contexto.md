@@ -11,6 +11,38 @@ Leia primeiro:
 
 ## Checkpoint de código
 
+- **Entregas 2026-08-08 — Identidade visual unificada nos quatro front-ends (branch
+  `design/identidade-visual-revy`, ainda NÃO deployado). Sem migration.** Spec em
+  [`superpowers/specs/2026-08-08-identidade-visual-revy-design.md`](superpowers/specs/2026-08-08-identidade-visual-revy-design.md),
+  plano em [`superpowers/plans/2026-08-08-identidade-visual-revy.md`](superpowers/plans/2026-08-08-identidade-visual-revy.md),
+  kit para pessoas de fora em [`brand/revy-brand-kit.md`](brand/revy-brand-kit.md) v2.0.
+  **As 10 tarefas do plano foram executadas.**
+  - **`shared/brand/revy-tokens.css` é a fonte única** de cor, forma e tipografia.
+    `sync_tokens.py` copia para os quatro produtos; `shared/brand/tests` falha se uma
+    cópia divergir do canônico ou se um par de contraste cair abaixo de 4,5:1. Copiar em
+    vez de importar por HTTP é decisão: cada produto é um deploy independente, e uma
+    folha buscada de outro serviço faria o Control fora do ar despintar o catálogo.
+  - **Acento passa a ser o verde racing.** `#1f4d3a` no claro, `#7fbfa3` no escuro — o 700
+    sobre `#0a0a0a` dá 1,6:1. Um teste falha se o azul antigo (`#1f6feb`, `#5a95ff`,
+    `#1a5fd0`, `#82afff`) voltar ao CSS da Loja ou do Control.
+  - **Marca virou vetor.** O logo anterior era `<text font-family="Inter">`: sem contorno,
+    dependia da fonte instalada e não servia para impresso nem criativo. `build_marca.py`
+    gera símbolo por geometria e wordmark por `fontTools`. **A logo é preta sempre**; a
+    versão reversa leva fio `rgba(255,255,255,.16)` para não sumir sobre `#161616`.
+  - **Estado virou ponto + palavra**, nunca cor sozinha. Terminais (`cancelada`, `falhou`,
+    `suspensa`, `encerrada`) não levam ponto. No Control existem **duas** formas de estado:
+    `.status` e a hifenizada `.status-pill.status-ativa` (`app/rotulos.py`), de
+    especificidade maior — as duas foram migradas.
+  - **Catálogo e site são sempre claros.** Declaram `color-scheme: light`, e
+    `shared/brand/tests/test_publicas.py` varre HTML e CSS escritos à mão para impedir que
+    alguém ligue `data-theme` numa vitrine.
+  - **Pendente:** deploy; PNG de favicon 32/180 (precisa de rasterizador, nenhum venv tem);
+    `docs/brand/preview.html` e `index.html` ainda mostram a paleta v1.0; medição de LCP do
+    catálogo; conferência visual humana dos dois temas. **Fora de escopo por decisão:** as
+    ~57 páginas com o cabeçalho triplo (eyebrow + h1 + parágrafo) e a copy de marketing em
+    `loja/vendas_visao.html` seguem como estão — o plano trocou marca, cor, forma e tipo,
+    não redesenhou telas.
+
 - **Entregas 2026-08-08 — CTWA/ROI: a venda herda a campanha do lead (branch
   `feat/ctwa-heranca-roi`, ainda NÃO deployado). Sem migration.** Plano em
   [`superpowers/plans/2026-08-08-ctwa-lead-ad-id-e-roi-venda.md`](superpowers/plans/2026-08-08-ctwa-lead-ad-id-e-roi-venda.md).

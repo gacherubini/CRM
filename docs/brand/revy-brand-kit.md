@@ -388,11 +388,15 @@ Abs,
 - [x] Paleta, escala do verde e família de status (v2.0)
 - [x] Tipografia decidida: Hanken na interface, Newsreader na marca (v2.0)
 - [x] Símbolo desenhado em geometria vetorial (v2.0)
-- [ ] **Símbolo exportado** para `assets/` — os SVGs atuais ainda são `<text>` em Inter
-- [ ] **Wordmark convertido em contorno** — gerado por `fontTools` a partir da Hanken 700
-- [ ] Favicon SVG + PNG 32/180
-- [ ] `shared/brand/revy-tokens.css` criado e sincronizado nos quatro front-ends
-- [ ] Tokens aplicados em `site`, `catalogo-publico`, `portal-gestao` e `revy-trafego`
+- [x] **Símbolo exportado** para `assets/` — `revy-mark.svg` e `revy-mark-reverse.svg`
+- [x] **Wordmark convertido em contorno** — `revy-wordmark.svg`, `revy-signature.svg` e
+  `revy-signature-reverse.svg`, gerados por `fontTools` a partir da Hanken 700
+- [x] Favicon SVG (`assets/favicon.svg`)
+- [ ] Favicon PNG 32/180 — precisa de rasterizador (`cairosvg` ou Pillow+cairo), que
+  nenhum venv do repositório tem. O SVG cobre todo navegador atual; os PNG só importam
+  para iOS antigo e para o atalho na tela inicial
+- [x] `shared/brand/revy-tokens.css` criado e sincronizado nos quatro front-ends
+- [x] Tokens aplicados em `site`, `catalogo-publico`, `portal-gestao` e `revy-trafego`
 - [ ] `docs/brand/preview.html` e `index.html` regerados (hoje mostram a paleta da v1.0)
 - [ ] Domínio e @ registrados
 
@@ -403,7 +407,16 @@ Abs,
 ```
 docs/brand/
   revy-brand-kit.md          ← este documento (a fonte)
-  assets/                    ← marca em contorno vetorial
+  assets/
+    revy-mark.svg            ← símbolo, preto sobre claro
+    revy-mark-reverse.svg    ← símbolo sobre fundo escuro (fio de contraste)
+    revy-wordmark.svg        ← "Revy" em contorno
+    revy-signature.svg       ← wordmark + descritor
+    revy-signature-reverse.svg
+    favicon.svg
+    revy-logo-full-*.svg     ← LEGADO v1.0: `<text>` em Inter, não é contorno.
+    revy-wordmark-light.svg     Só continuam aqui porque preview.html e
+    revy-instagram-*            portal-mock.html ainda os carregam. NÃO use.
   index.html                 ← LEGADO v1.0: paleta e fonte antigas
   preview.html               ← LEGADO v1.0: tokens antigos
   portal-mock.html           ← LEGADO v1.0
@@ -411,8 +424,15 @@ docs/brand/
   hero-animacao-prompts.md
 shared/brand/
   revy-tokens.css            ← tokens canônicos, copiados para os quatro front-ends
-  sync-tokens.py
+  tokens.py                  ← leitura dos tokens + contraste WCAG
+  sync_tokens.py             ← `python shared/brand/sync_tokens.py` distribui as cópias
+  build_marca.py             ← regera os SVG acima
+  tests/                     ← contraste AA, sincronia das cópias, logo sem `<text>`
 ```
+
+**Para mudar uma cor:** edite `shared/brand/revy-tokens.css` e rode
+`python shared/brand/sync_tokens.py`. Editar uma cópia em `*/static/css/revy-tokens.css`
+quebra a suíte de propósito. **Para regerar a marca:** `python shared/brand/build_marca.py`.
 
 **Os quatro HTML marcados como legado mostram a paleta e a fonte da v1.0.** Não use como
 referência até serem regerados; este documento é a fonte.
