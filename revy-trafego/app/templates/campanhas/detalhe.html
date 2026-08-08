@@ -32,7 +32,7 @@
 <section class="panel" style="margin-bottom: 18px;">
   <div class="metric-grid">
     <div class="metric"><span>Gasto no período</span><strong>{{ formatar_brl(linha_roi.gasto) }}</strong><small>total histórico {{ formatar_brl(gasto_total) }}</small></div>
-    <div class="metric"><span>Leads</span><strong>{% if chatbot_erro %}—{% else %}{{ linha_roi.leads }}{% endif %}</strong><small>com match de UTM</small></div>
+    <div class="metric"><span>Leads</span><strong>{% if chatbot_erro %}—{% else %}{{ linha_roi.leads }}{% endif %}</strong></div>
     <div class="metric"><span>Vendas</span><strong>{{ linha_roi.vendas }}</strong><small>faturamento {{ formatar_brl(linha_roi.faturamento) }}</small></div>
     <div class="metric accent"><span>ROAS / custo por moto</span><strong>{% if linha_roi.roas is not none %}{{ linha_roi.roas }}x{% else %}—{% endif %}</strong><small>CPA {% if linha_roi.cpa is not none %}{{ formatar_brl(linha_roi.cpa) }}{% else %}—{% endif %}</small></div>
   </div>
@@ -41,9 +41,9 @@
 <section class="panel form-section" style="margin-bottom:18px">
   <div class="section-title"><span>01</span><div><h2>Funil atribuído</h2><p>Last touch no período selecionado.</p></div></div>
   <div class="metric-grid metric-grid-3">
-    <div class="metric"><span>Leads</span><strong>{% if chatbot_erro %}—{% else %}{{ linha_roi.leads }}{% endif %}</strong><small>interessados</small></div>
-    <div class="metric"><span>Vendas</span><strong>{{ linha_roi.vendas }}</strong><small>confirmadas</small></div>
-    <div class="metric accent"><span>Conversão</span><strong>{% if linha_roi.leads %}{{ '%.1f'|format(linha_roi.vendas / linha_roi.leads * 100) }}%{% else %}—{% endif %}</strong><small>vendas ÷ leads</small></div>
+    <div class="metric"><span>Leads</span><strong>{% if chatbot_erro %}—{% else %}{{ linha_roi.leads }}{% endif %}</strong></div>
+    <div class="metric"><span>Vendas</span><strong>{{ linha_roi.vendas }}</strong></div>
+    <div class="metric accent"><span>Conversão</span><strong>{% if linha_roi.leads %}{{ '%.1f'|format(linha_roi.vendas / linha_roi.leads * 100) }}%{% else %}—{% endif %}</strong></div>
   </div>
 </section>
 

@@ -79,14 +79,28 @@ def test_dado_tecnico_usa_a_fonte_mono(rel):
 # O sistema tem tres raios (3/8/12); qualquer quarto valor e um sistema
 # paralelo nascendo.
 TETO_RAIOS = {
-    "portal-gestao/app/static/css/app.css": 39,
-    "revy-trafego/app/static/css/app.css": 33,
+    "portal-gestao/app/static/css/app.css": 34,
+    "revy-trafego/app/static/css/app.css": 29,
 }
+
+
+# Barra fina: a ponta arredondada e geometria da barra, nao raio de caixa.
+# Duas excecoes nominais e documentadas — nao e categoria aberta.
+EXCECOES_DE_RAIO = ("roas-bar", "revy-onboarding__progress")
+
+
+def _raios_relevantes(rel):
+    """Raios literais, menos os das barras finas isentas."""
+    linhas = caminho(rel).read_text(encoding="utf-8").split("\n")
+    return [
+        (n, v) for n, v in raios_literais(caminho(rel))
+        if not any(e in "\n".join(linhas[max(0, n - 4):n]) for e in EXCECOES_DE_RAIO)
+    ]
 
 
 @pytest.mark.parametrize("rel", PAINEIS)
 def test_teto_de_raios_literais(rel):
-    achados = raios_literais(caminho(rel))
+    achados = _raios_relevantes(rel)
     assert len(achados) <= TETO_RAIOS[rel], (
         f"{rel}: {len(achados)} raios literais, teto {TETO_RAIOS[rel]}. "
         f"Primeiros: {achados[:8]}"
@@ -100,8 +114,8 @@ def test_teto_de_raios_literais(rel):
 APELIDOS = ("--green", "--amber", "--red", "--online")
 
 TETO_APELIDOS = {
-    "portal-gestao/app/static/css/app.css": 41,
-    "revy-trafego/app/static/css/app.css": 46,
+    "portal-gestao/app/static/css/app.css": 40,
+    "revy-trafego/app/static/css/app.css": 45,
 }
 
 
@@ -110,6 +124,22 @@ def test_teto_de_apelidos_genericos(rel):
     total = sum(usos_de_var(caminho(rel), a) for a in APELIDOS)
     assert total <= TETO_APELIDOS[rel], (
         f"{rel}: {total} usos de apelido generico, teto {TETO_APELIDOS[rel]}"
+    )
+
+
+# Numero que muda a cada refresh nao pode dancar de largura: sem tabular-nums,
+# a coluna de valores treme quando o digito 1 entra ou sai.
+MINIMO_TABULAR = {
+    "portal-gestao/app/static/css/app.css": 12,
+    "revy-trafego/app/static/css/app.css": 5,
+}
+
+
+@pytest.mark.parametrize("rel", PAINEIS)
+def test_numero_e_tabular(rel):
+    css = caminho(rel).read_text(encoding="utf-8")
+    assert css.count("tabular-nums") >= MINIMO_TABULAR[rel], (
+        f"{rel}: {css.count('tabular-nums')} usos, minimo {MINIMO_TABULAR[rel]}"
     )
 
 

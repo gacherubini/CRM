@@ -169,7 +169,6 @@
       <span>CAC</span>
       {% if aq.cac_disponivel %}
       <strong>{{ formatar_brl(aq.cac) }}</strong>
-      <small>custo por venda atribuída</small>
       {% else %}
       <strong>Indisponível</strong>
       <small>precisa de investimento e vendas</small>
@@ -179,7 +178,6 @@
       <span>ROAS</span>
       {% if aq.roas_disponivel and aq.roas is not none %}
       <strong>{{ aq.roas }}x</strong>
-      <small>receita atribuída / investimento</small>
       {% else %}
       <strong>Indisponível</strong>
       <small>sem investimento não calculamos ROAS</small>

@@ -893,7 +893,7 @@ code {
   place-items: center;
   flex: 0 0 auto;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: var(--radius-nav);
   background: var(--surface-raised);
   color: var(--ink-muted);
   font-size: var(--text-xs);
@@ -938,6 +938,7 @@ code {
   margin-top: 7px;
   font-size: 20px;
   letter-spacing: -.02em;
+  font-variant-numeric: tabular-nums;
 }
 .funil-note {
   margin: 0;
@@ -1685,7 +1686,7 @@ tr:hover td { background: var(--surface-soft); }
   margin-bottom: 18px;
   padding: 22px;
   border: 1px solid var(--line);
-  border-radius: var(--radius);
+  border-radius: var(--radius-srf);
   background: var(--surface);
   box-shadow: var(--shadow);
 }
@@ -1749,8 +1750,10 @@ tr:hover td { background: var(--surface-soft); }
 .revy-results__subheading { margin: 20px 0 10px; font-size: 13px; }
 .revy-results__channels { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
 .revy-results__channel strong { display: block; font-size: 14px; }
+/* Ponta arredondada e geometria da barra, nao raio de caixa: isenta do teto
+   (shared/brand/tests/test_app_css.py EXCECOES_DE_RAIO). */
 .roas-bar { height: 7px; margin-top: 10px; overflow: hidden; border-radius: 99px; background: var(--line); }
-.roas-bar > i { display: block; height: 100%; border-radius: inherit; background: var(--green); }
+.roas-bar > i { display: block; height: 100%; border-radius: inherit; background: var(--green-500); }
 .revy-results__best {
   display: grid;
   grid-template-columns: minmax(100px, .7fr) minmax(160px, 1fr) minmax(130px, 1fr) auto;
@@ -1774,6 +1777,8 @@ tr:hover td { background: var(--surface-soft); }
 }
 .revy-onboarding > header > strong { font-size: 18px; }
 .revy-onboarding__progress { display: grid; grid-template-columns: repeat(5, 1fr); gap: 5px; margin: 12px 0; }
+/* Ponta arredondada e geometria da barra, nao raio de caixa: isenta do teto
+   (shared/brand/tests/test_app_css.py EXCECOES_DE_RAIO). */
 .revy-onboarding__progress i { height: 4px; border-radius: 99px; background: var(--line-strong); }
 .revy-onboarding__progress i.done { background: var(--green); }
 .revy-onboarding ul { display: flex; flex-wrap: wrap; gap: 8px 16px; margin: 0; padding: 0; list-style: none; }
@@ -2295,13 +2300,23 @@ textarea:focus-visible {
 
 /* Sparkline / mini-grafico (uso opcional em dashboards) */
 .spark { display: block; width: 100%; height: 28px; margin-top: 10px; }
-.spark polyline { fill: none; stroke: var(--brand); stroke-width: 2; }
-.spark .spark-dot { fill: var(--brand); }
+.spark polyline { fill: none; stroke: var(--green-500); stroke-width: 2; }
+.spark .spark-dot { fill: var(--green-500); }
 .spark-delta {
   display: inline-flex; align-items: center; gap: 4px; margin-top: 6px;
   font-size: var(--text-xs); font-weight: 700; color: var(--green);
 }
 .spark-delta.down { color: var(--red); }
+
+/* Um rotulo por numero: rotulo curto + valor. A linha de explicacao saiu —
+   era ela que fazia tres camadas de texto entregarem um numero so. */
+.metric strong,
+.funil-summary-card > strong,
+.funil-stage-value strong,
+.revy-results__kpi strong {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -.02em;
+}
 
 /* ===========================================================================
    === Navegacao e shell ===
@@ -2790,7 +2805,7 @@ a.vitrine-page-btn:hover {
   flex: 0 0 auto;
   width: 10px;
   height: 10px;
-  border-radius: 3px;
+  border-radius: var(--radius-ctl);
 }
 .split-legend .legend-dot.agente { background: var(--brand); }
 .split-legend .legend-dot.handoff {
@@ -2871,7 +2886,8 @@ a.vitrine-page-btn:hover {
   max-width: 28px;
   min-height: 3px;
   border-radius: 4px 4px 0 0;
-  background: color-mix(in srgb, var(--brand) 48%, transparent);
+  /* Serie no passo da escala reservado a grafico; o pico (abaixo) continua em --brand. */
+  background: color-mix(in srgb, var(--green-500) 48%, transparent);
 }
 .day-value {
   position: absolute;
