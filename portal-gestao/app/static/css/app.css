@@ -2318,7 +2318,6 @@ textarea:focus-visible {
 .funil-stage-value strong,
 .revy-results__kpi strong {
   font-variant-numeric: tabular-nums;
-  letter-spacing: -.02em;
 }
 
 /* ===========================================================================
