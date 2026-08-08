@@ -214,7 +214,7 @@ button, .button, a { -webkit-tap-highlight-color: transparent; }
   display: inline-block;
   flex: 0 0 auto;
   border-radius: 50%;
-  background: var(--green);
+  background: var(--ok);
 }
 
 /* Toggle claro / escuro — mesmo peso visual do "Sair" */
@@ -526,25 +526,6 @@ p { color: var(--ink-soft); }
   display: none;
 }
 
-.status-chip {
-  margin-left: auto;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px 9px;
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--green) 12%, var(--paper));
-  color: var(--green);
-  font-size: var(--text-xs);
-  font-weight: 600;
-}
-
-.offline .status-chip {
-  background: color-mix(in srgb, var(--amber) 14%, var(--paper));
-  color: var(--amber);
-}
-.offline .status-chip i { background: var(--amber); }
-
 .integration-card > p {
   margin: 16px 0;
   font-size: 13px;
@@ -715,45 +696,6 @@ p { color: var(--ink-soft); }
 }
 
 .price { text-align: right; }
-
-.status {
-  display: inline-flex;
-  align-items: center;
-  width: max-content;
-  padding: 3px 8px;
-  border-radius: 6px;
-  background: var(--surface-soft);
-  color: var(--ink-soft);
-  font-size: 12px;
-  font-weight: 500;
-  text-transform: none;
-}
-.status.disponivel,
-.status.novo,
-.status.qualificado,
-.status.convertido,
-.status.ativa,
-.status.ativo,
-.status.pronta {
-  background: color-mix(in srgb, var(--green) 12%, var(--paper));
-  color: var(--green);
-}
-.status.reservado,
-.status.em_atendimento,
-.status.warn,
-.status.em_configuracao,
-.status.rascunho {
-  background: color-mix(in srgb, var(--amber) 14%, var(--paper));
-  color: var(--amber);
-}
-.status.vendido,
-.status.perdido,
-.status.indisponivel,
-.status.suspensa,
-.status.encerrada {
-  background: var(--surface-soft);
-  color: var(--ink-muted);
-}
 
 /* Varios estados na mesma celula: embrulha em vez de esticar a coluna. */
 .chip-list {
@@ -1385,24 +1327,6 @@ tr:hover td { background: var(--surface-soft); }
 .composer > label { font-size: var(--text-sm); }
 .composer .handoff-bar { padding: 0; }
 
-.canal-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-1);
-  padding: 2px var(--space-2);
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  background: var(--surface-soft);
-  color: var(--ink-soft);
-  font-size: var(--text-xs);
-}
-.canal-badge.inativo,
-.canal-badge.desconectado {
-  border-color: color-mix(in srgb, var(--amber) 40%, var(--line));
-  background: color-mix(in srgb, var(--amber) 12%, var(--paper));
-  color: var(--amber);
-}
-
 .action-stack { display: grid; gap: var(--space-4); align-content: start; }
 .action-stack form { margin: 0; }
 
@@ -1825,39 +1749,6 @@ tr:hover td { background: var(--surface-soft); }
 .slug-field.is-open .slug-preview-chip { border-style: solid; }
 .slug-field.is-open .slug-edit { display: none; }
 
-/* Status pill (lista de lojas + detalhe) */
-.status-pill {
-  display: inline-flex;
-  align-items: center;
-  padding: 2px 10px;
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  background: var(--surface-soft);
-  color: var(--ink-soft);
-  font-size: var(--text-xs);
-  font-weight: 600;
-  /* Rotulo ja vem pronto de app/rotulos.py; capitalize virava
-     "Em Configuracao". */
-  text-transform: none;
-  white-space: nowrap;
-}
-.status-pill.status-ativa,
-.status-pill.status-pronta {
-  color: var(--green);
-  border-color: color-mix(in srgb, var(--green) 30%, var(--line));
-  background: color-mix(in srgb, var(--green) 10%, var(--paper));
-}
-.status-pill.status-suspensa {
-  color: var(--amber);
-  border-color: color-mix(in srgb, var(--amber) 30%, var(--line));
-  background: color-mix(in srgb, var(--amber) 10%, var(--paper));
-}
-.status-pill.status-encerrada {
-  color: var(--red);
-  border-color: color-mix(in srgb, var(--red) 30%, var(--line));
-  background: color-mix(in srgb, var(--red) 8%, var(--paper));
-}
-
 .store-meta {
   display: flex;
   flex-wrap: wrap;
@@ -2142,14 +2033,188 @@ textarea:focus-visible {
    === Estado ===
    =========================================================================== */
 
-/* Pilulas de status: forma de pilula + ponto de estado */
-.status, .status-pill { border-radius: 999px; font-weight: 600; gap: 6px; }
-.status::before, .status-pill::before {
-  content: "";
-  width: 6px; height: 6px; border-radius: 50%;
-  background: currentColor;
-  flex: 0 0 auto;
+/* Estado = ponto na cor do estado + a palavra escrita. Cor nunca comunica
+   sozinha. A pilula cheia foi testada e rejeitada em 08/08: numa lista longa
+   ela vira mosaico, entao a cor saiu do fundo e foi para o ponto e o texto
+   ficou neutro. `--sc` e a cor deste estado: cada variante abaixo so troca
+   `--sc`, nunca o fundo. */
+.status,
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  width: max-content;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ink-soft);
+  font-size: var(--text-xs);
+  font-weight: 500;
+  /* O rotulo ja vem pronto de app/rotulos.py; capitalize virava
+     "Em Configuracao". */
+  text-transform: none;
+  --sc: var(--ink-muted);
 }
+.status::before,
+.status-pill::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: var(--sc);
+}
+/* "Em configuracao" nao pode quebrar no meio dentro da celula da lista. */
+.status-pill { white-space: nowrap; }
+
+/* Registro ganho: lead que andou, sinal confirmado (Pixel/CTWA/Meta), convite
+   aceito. */
+.status.novo,
+.status.qualificado,
+.status.convertido,
+.status.confirmada,
+.status.aceito { --sc: var(--st-won); }
+
+/* Operacao no ar. Mesmo verde do ganho, nome diferente de proposito: aqui ele
+   significa "ligado e funcionando", nao "registro fechado". */
+.status.ativa,
+.status.ativo,
+.status.pronta,
+.status.conectado { --sc: var(--ok); }
+
+/* Espera alguem. E para ca que vai o orcamento de destaque da tela. Pausada
+   nao e terminal: a campanha volta com um clique, entao continua pedindo
+   decisao. */
+.status.reservado,
+.status.aguardando_simulacao,
+.status.aguardando_cliente,
+.status.em_configuracao,
+.status.rascunho,
+.status.pendente,
+.status.convidado,
+.status.pausada { --sc: var(--st-wait); }
+
+/* Alerta de operacao: caiu, alguem precisa reconectar. */
+.status.desconectado,
+.status.warn { --sc: var(--warn); }
+
+/* Bloqueio de prontidao (impede ativar a loja) le diferente de alerta — o
+   unico estado do produto que ganha ponto vermelho. Antes tudo saia com o
+   mesmo chip ambar e nao dava para saber o que travava a ativacao. */
+.status.erro { --sc: var(--danger); }
+
+/* Em atendimento saiu do ambar: quem exige acao e quem espera, nao quem ja
+   esta sendo atendido. */
+.status.em_atendimento { --sc: var(--st-live); }
+
+/* Proposta na mesa: o unico estado que usa o verde da marca. */
+.status.negociacao { --sc: var(--st-prop); }
+
+/* Repouso: nao exige acao nenhuma. Ate 08/08 saia do mesmo verde de
+   "Convertido" e os dois eram a mesma cor na tela. Sem ponto e sem cor. */
+.status.disponivel { color: var(--ink-muted); }
+
+/* Terminal nao disputa atencao: uma loja encerrada importa menos que uma loja
+   que trava na ativacao. Sem ponto. */
+.status.vendido,
+.status.perdido,
+.status.indisponivel,
+.status.suspensa,
+.status.encerrada,
+.status.inativo,
+.status.revogado,
+.status.recusado,
+.status.expirado {
+  color: var(--ink-muted);
+  --sc: var(--st-lost);
+}
+.status.is-terminal::before,
+.status.disponivel::before,
+.status.vendido::before,
+.status.perdido::before,
+.status.indisponivel::before,
+.status.suspensa::before,
+.status.encerrada::before,
+.status.inativo::before,
+.status.revogado::before,
+.status.recusado::before,
+.status.expirado::before { display: none; }
+
+/* O estado da loja vem em classe hifenizada (`status-pill status-ativa`, do
+   enum StoreStatus em app/control/types.py, rotulado em app/rotulos.py).
+   Especificidade 0,2,0: os grupos precisam ser repetidos aqui. */
+.status-pill.status-ativa,
+.status-pill.status-pronta { --sc: var(--ok); }
+.status-pill.status-em_configuracao,
+.status-pill.status-rascunho { --sc: var(--st-wait); }
+.status-pill.status-suspensa,
+.status-pill.status-encerrada {
+  color: var(--ink-muted);
+  --sc: var(--st-lost);
+}
+.status-pill.status-suspensa::before,
+.status-pill.status-encerrada::before { display: none; }
+
+/* Saude da integracao no cabecalho do card. E rotulo E estado: fica pastilha
+   reta e neutra (o nome do servico nao e status) com o ponto colorido ao lado.
+   O `i` vazio no template e o ponto. */
+.status-chip {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 9px;
+  border-radius: var(--radius-ctl);
+  background: var(--surface-soft);
+  color: var(--ink-soft);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  --sc: var(--ok);
+}
+.status-chip i { background: var(--sc); }
+.offline .status-chip { --sc: var(--warn); }
+
+/* Nome do canal: rotulo, nao estado — por isso pastilha neutra. Quando o canal
+   caiu, a borda avisa e o template escreve "· off" junto, porque cor sozinha
+   nao comunica.
+   Armadilha: este badge vinha de um <style> inline escrito para o tema escuro
+   (rgba(255,255,255,...)); com a paleta clara como default ficava branco sobre
+   branco. Precisa continuar saindo de token para ler nos dois temas. */
+.canal-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 2px var(--space-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-ctl);
+  background: var(--surface-soft);
+  color: var(--ink-soft);
+  font-size: var(--text-xs);
+}
+.canal-badge.inativo,
+.canal-badge.desconectado {
+  border-color: color-mix(in srgb, var(--warn) 40%, var(--line));
+  color: var(--ink-muted);
+}
+
+/* Saude por integracao (montada em js/integracoes_health.js). Mesmo Ponto do
+   `.status`: a cor vive no `.integ-dot`, o texto fica neutro. */
+.integ-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0;
+  background: transparent;
+  color: var(--ink-soft);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  white-space: nowrap;
+  --sc: var(--ink-muted);
+}
+.integ-dot { width: 8px; height: 8px; border-radius: 50%; flex: none; background: var(--sc); }
+.integ-pill.ok { --sc: var(--ok); }
+.integ-pill.err { --sc: var(--danger); }
+.integ-pill.off { color: var(--ink-muted); --sc: var(--ink-muted); }
 
 /* ===========================================================================
    === Painel e card ===
@@ -2265,21 +2330,6 @@ textarea:focus-visible {
   color: var(--ink-muted);
   margin-top: 1px;
 }
-
-.integ-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  font-size: var(--text-xs);
-  font-weight: 600;
-  padding: 5px 10px;
-  border-radius: 999px;
-  white-space: nowrap;
-}
-.integ-dot { width: 8px; height: 8px; border-radius: 50%; flex: none; background: currentColor; }
-.integ-pill.ok { color: var(--green); background: color-mix(in srgb, var(--green) 12%, transparent); }
-.integ-pill.err { color: var(--red); background: color-mix(in srgb, var(--red) 12%, transparent); }
-.integ-pill.off { color: var(--ink-muted); background: color-mix(in srgb, var(--ink-muted) 12%, transparent); }
 
 .integ-chev { flex: none; color: var(--ink-muted); transition: transform .18s ease; }
 .integ-row.open .integ-chev { transform: rotate(90deg); }
@@ -2528,13 +2578,6 @@ textarea:focus-visible {
 
 #dashboard-periodo { margin: var(--space-2) 0 0; }
 
-/* Prontidao: bloqueio (impede ativar) le diferente de alerta. Antes tudo saia
-   com o mesmo chip ambar e nao dava para saber o que travava a ativacao. */
-.status.erro {
-  background: color-mix(in srgb, var(--red) 10%, var(--paper));
-  color: var(--red);
-}
-
 /* ===========================================================================
    Prontidao na ficha da loja — /app/control/lojas/{id} (aba Visao geral)
    O dashboard manda o usuario para ca com "o que falta"; antes a ficha nao
@@ -2571,129 +2614,6 @@ textarea:focus-visible {
 .readiness-item.is-block .readiness-mark { background: var(--red); }
 .readiness-item.is-warn .readiness-mark { background: var(--amber); }
 .readiness-item.is-block { border-color: color-mix(in srgb, var(--red) 28%, var(--line)); }
-
-/* ===========================================================================
-   Estado em ponto (2026-08-08)
-   A pilula cheia virava mosaico numa fila longa. Agora a cor vive no ponto e
-   o texto fica neutro: cor + forma + palavra, nunca cor sozinha.
-   O grupo de cor de cada estado continua em app.css:848-880; aqui so trocamos
-   a FORMA e movemos a cor de `color` para `--sc`.
-   =========================================================================== */
-.status,
-.status-pill {
-  padding: 0;
-  background: transparent;
-  border: 0;
-  border-radius: 0;
-  color: var(--ink-soft);
-  font-weight: 500;
-  gap: 6px;
-}
-.status::before,
-.status-pill::before {
-  width: 7px;
-  height: 7px;
-  background: var(--sc, var(--ink-muted));
-}
-
-/* Os tres grupos herdados passam a definir --sc em vez de background+color. */
-.status.disponivel, .status.novo, .status.qualificado, .status.convertido,
-.status.ativa, .status.ativo, .status.conectado, .status.pronta {
-  background: transparent;
-  color: var(--ink-soft);
-  --sc: var(--st-won);
-}
-.status.reservado, .status.aguardando_simulacao, .status.aguardando_cliente,
-.status.warn, .status.em_configuracao, .status.rascunho, .status.pendente,
-.status.desconectado {
-  background: transparent;
-  color: var(--ink-soft);
-  --sc: var(--st-wait);
-}
-/* Em atendimento sai do ambar: quem exige acao e quem espera, nao quem ja
-   esta sendo atendido. Negociacao (Proposta) ganha o acento. */
-.status.em_atendimento {
-  background: transparent;
-  color: var(--ink-soft);
-  --sc: var(--st-live);
-}
-.status.negociacao {
-  background: transparent;
-  color: var(--ink-soft);
-  --sc: var(--st-prop);
-}
-/* Terminais nao recebem ponto: nao disputam atencao com quem esta esperando. */
-.status.vendido, .status.perdido, .status.indisponivel,
-.status.suspensa, .status.encerrada, .status.inativo {
-  background: transparent;
-  color: var(--ink-muted);
-  font-weight: 500;
-}
-.status.vendido::before, .status.perdido::before, .status.indisponivel::before,
-.status.suspensa::before, .status.encerrada::before, .status.inativo::before {
-  display: none;
-}
-
-/* --- Estados que so existem no Control ---
-   O Control tem vocabulario proprio: confirmacao de sinal (Pixel/CTWA/Meta),
-   convite de acesso (app/rotulos.py:ROTULO_ACESSO) e campanha
-   (app/campanhas.py:STATUS_ROTULO). Sem grupo eles cairiam no --sc padrao e
-   sumiriam junto com os terminais. `sem_gasto` nao existe no produto. */
-.status.confirmada, .status.aceito {
-  background: transparent;
-  color: var(--ink-soft);
-  --sc: var(--st-won);
-}
-/* Pausada nao e terminal: a campanha volta com um clique, entao continua
-   pedindo decisao — mesmo grupo de desconectado. */
-.status.convidado, .status.pausada {
-  background: transparent;
-  color: var(--ink-soft);
-  --sc: var(--st-wait);
-}
-/* Bloqueio de prontidao (impede ativar a loja) le diferente de alerta — o
-   unico estado do produto que ganha ponto vermelho. Regra de cor original em
-   `.status.erro`, acima. */
-.status.erro {
-  background: transparent;
-  color: var(--ink-soft);
-  --sc: var(--red);
-}
-.status.revogado, .status.recusado, .status.expirado {
-  background: transparent;
-  color: var(--ink-muted);
-  font-weight: 500;
-}
-.status.revogado::before, .status.recusado::before, .status.expirado::before {
-  display: none;
-}
-
-/* O estado da loja vem em classe hifenizada (`status-pill status-ativa`, do
-   enum em app/rotulos.py). Especificidade 0,2,0 vence o `.status-pill` acima,
-   entao a troca precisa ser repetida aqui. */
-.status-pill.status-ativa, .status-pill.status-pronta {
-  background: transparent;
-  border: 0;
-  color: var(--ink-soft);
-  font-weight: 500;
-  --sc: var(--st-won);
-}
-.status-pill.status-em_configuracao, .status-pill.status-rascunho {
-  background: transparent;
-  border: 0;
-  color: var(--ink-soft);
-  font-weight: 500;
-  --sc: var(--st-wait);
-}
-.status-pill.status-suspensa, .status-pill.status-encerrada {
-  background: transparent;
-  border: 0;
-  color: var(--ink-muted);
-  font-weight: 500;
-}
-.status-pill.status-suspensa::before, .status-pill.status-encerrada::before {
-  display: none;
-}
 
 /* --- Botao reto (3px) --- */
 .nav-link { border-radius: var(--radius-nav); }

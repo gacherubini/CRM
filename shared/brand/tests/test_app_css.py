@@ -70,8 +70,8 @@ def test_acento_preto_do_sistema_antigo_nao_volta(rel, morto):
 # O sistema tem tres raios (3/8/12); qualquer quarto valor e um sistema
 # paralelo nascendo.
 TETO_RAIOS = {
-    "portal-gestao/app/static/css/app.css": 49,
-    "revy-trafego/app/static/css/app.css": 44,
+    "portal-gestao/app/static/css/app.css": 44,
+    "revy-trafego/app/static/css/app.css": 38,
 }
 
 
@@ -81,6 +81,73 @@ def test_teto_de_raios_literais(rel):
     assert len(achados) <= TETO_RAIOS[rel], (
         f"{rel}: {len(achados)} raios literais, teto {TETO_RAIOS[rel]}. "
         f"Primeiros: {achados[:8]}"
+    )
+
+
+# Apelidos genericos herdados do sistema anterior. Cada tarefa migra os seus
+# para o nome semantico e baixa o teto; a Tarefa 14 zera e os remove do
+# canonico. Enquanto .status pintar por --green, "Proposta" e "Ganho" saem da
+# mesma variavel e a regra "o acento nunca e status" nao tem como valer.
+APELIDOS = ("--green", "--amber", "--red", "--online")
+
+TETO_APELIDOS = {
+    "portal-gestao/app/static/css/app.css": 44,
+    "revy-trafego/app/static/css/app.css": 46,
+}
+
+
+@pytest.mark.parametrize("rel", PAINEIS)
+def test_teto_de_apelidos_genericos(rel):
+    total = sum(usos_de_var(caminho(rel), a) for a in APELIDOS)
+    assert total <= TETO_APELIDOS[rel], (
+        f"{rel}: {total} usos de apelido generico, teto {TETO_APELIDOS[rel]}"
+    )
+
+
+# Terminais presentes nos DOIS paineis. `convertido` ficou de fora de proposito:
+# o mapa vigente lhe da ponto verde (lead convertido ainda gera trabalho), e o
+# mapa veio do enum real. Quem so existe num painel vai em TERMINAIS_PROPRIOS —
+# a guarda protege o que existe, nao inventa classe.
+TERMINAIS = ("vendido", "perdido", "indisponivel", "suspensa", "encerrada", "inativo")
+
+TERMINAIS_PROPRIOS = {
+    # Loja: enum de simulacao (app/web/simulacoes.py:_SIM_STATUS_LABELS).
+    "portal-gestao/app/static/css/app.css": ("cancelada", "falhou"),
+    # Control: convite de acesso (app/rotulos.py:ROTULO_ACESSO).
+    "revy-trafego/app/static/css/app.css": ("revogado", "recusado", "expirado"),
+}
+
+
+@pytest.mark.parametrize("rel", PAINEIS)
+@pytest.mark.parametrize("terminal", TERMINAIS)
+def test_estado_terminal_nao_recebe_ponto(rel, terminal):
+    """Ganho e marca de conferido; Perdido e texto apagado. O orcamento de
+    destaque vai para quem exige acao — um cliente esperando ha tres horas
+    importa mais que uma venda fechada semana passada."""
+    css = caminho(rel).read_text(encoding="utf-8")
+    assert f".status.{terminal}::before" in css, (
+        f"{rel}: o estado terminal '{terminal}' nao suprime o ponto"
+    )
+
+
+@pytest.mark.parametrize("rel", PAINEIS)
+def test_terminal_proprio_do_painel_tambem_perde_o_ponto(rel):
+    css = caminho(rel).read_text(encoding="utf-8")
+    faltando = [t for t in TERMINAIS_PROPRIOS[rel] if f".status.{t}::before" not in css]
+    assert not faltando, f"{rel}: terminais sem supressao de ponto: {faltando}"
+
+
+@pytest.mark.parametrize("rel", PAINEIS)
+def test_disponivel_e_repouso_nao_ganho(rel):
+    """Ate 08/08 `Disponivel` e `Convertido` saiam da mesma variavel: os dois
+    eram o mesmo verde na tela. Disponivel e o estado de repouso da maioria dos
+    veiculos e nao exige acao — fica neutro e sem ponto."""
+    css = caminho(rel).read_text(encoding="utf-8")
+    assert ".status.disponivel::before" in css, (
+        f"{rel}: 'disponivel' ainda recebe ponto"
+    )
+    assert ".status.disponivel { color: var(--ink-muted); }" in css, (
+        f"{rel}: 'disponivel' nao esta no neutro"
     )
 
 

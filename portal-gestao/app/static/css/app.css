@@ -225,7 +225,7 @@ button, .button, a { -webkit-tap-highlight-color: transparent; }
   display: inline-block;
   flex: 0 0 auto;
   border-radius: 50%;
-  background: var(--green);
+  background: var(--ok);
 }
 
 /* Toggle claro / escuro — mesmo peso visual do "Sair" */
@@ -569,25 +569,6 @@ p { color: var(--ink-soft); }
   display: none;
 }
 
-.status-chip {
-  margin-left: auto;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px 9px;
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--green) 12%, var(--paper));
-  color: var(--green);
-  font-size: var(--text-xs);
-  font-weight: 600;
-}
-
-.offline .status-chip {
-  background: color-mix(in srgb, var(--amber) 14%, var(--paper));
-  color: var(--amber);
-}
-.offline .status-chip i { background: var(--amber); }
-
 .integration-card > p {
   margin: 16px 0;
   font-size: 13px;
@@ -737,52 +718,6 @@ p { color: var(--ink-soft); }
 }
 
 .price { text-align: right; }
-
-.status {
-  display: inline-flex;
-  align-items: center;
-  width: max-content;
-  padding: 3px 8px;
-  border-radius: 6px;
-  background: var(--surface-soft);
-  color: var(--ink-soft);
-  font-size: 12px;
-  font-weight: 500;
-  text-transform: none;
-}
-.status.disponivel,
-.status.novo,
-.status.qualificado,
-.status.convertido,
-.status.ativa,
-.status.ativo,
-.status.conectado,
-.status.pronta {
-  background: color-mix(in srgb, var(--green) 12%, var(--paper));
-  color: var(--green);
-}
-.status.reservado,
-.status.em_atendimento,
-.status.negociacao,
-.status.aguardando_simulacao,
-.status.aguardando_cliente,
-.status.warn,
-.status.em_configuracao,
-.status.rascunho,
-.status.pendente,
-.status.desconectado {
-  background: color-mix(in srgb, var(--amber) 14%, var(--paper));
-  color: var(--amber);
-}
-.status.vendido,
-.status.perdido,
-.status.indisponivel,
-.status.suspensa,
-.status.encerrada,
-.status.inativo {
-  background: var(--surface-soft);
-  color: var(--ink-muted);
-}
 
 /* Varios estados na mesma celula: embrulha em vez de esticar a coluna. */
 .chip-list {
@@ -2044,14 +1979,168 @@ textarea:focus-visible {
    === Estado ===
    =========================================================================== */
 
-/* Pilulas de status: forma de pilula + ponto de estado */
-.status, .status-pill { border-radius: 999px; font-weight: 600; gap: 6px; }
-.status::before, .status-pill::before {
-  content: "";
-  width: 6px; height: 6px; border-radius: 50%;
-  background: currentColor;
-  flex: 0 0 auto;
+/* Estado = ponto na cor do estado + a palavra escrita. Cor nunca comunica
+   sozinha. A pilula cheia foi testada e rejeitada em 08/08: numa fila de 40
+   linhas ela vira mosaico, entao a cor saiu do fundo e foi para o ponto e o
+   texto ficou neutro. `--sc` e a cor deste estado: cada variante abaixo so
+   troca `--sc`, nunca o fundo. */
+.status,
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  width: max-content;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ink-soft);
+  font-size: var(--text-xs);
+  font-weight: 500;
+  /* O rotulo ja vem pronto do Python; capitalize virava "Em Configuracao". */
+  text-transform: none;
+  --sc: var(--ink-muted);
 }
+.status::before,
+.status-pill::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: var(--sc);
+}
+
+/* Registro ganho: lead que andou, venda confirmada, simulacao concluida. Os
+   estados marcados /conferencia/ vieram do enum real (venda, simulacao,
+   campanha, meta) e antes nao tinham grupo — caiam no cinza. */
+.status.novo,
+.status.qualificado,
+.status.convertido,
+.status.confirmada,
+.status.concluida /* conferencia */ { --sc: var(--st-won); }
+
+/* Operacao no ar. Mesmo verde do ganho, nome diferente de proposito: aqui ele
+   significa "ligado e funcionando", nao "registro fechado". */
+.status.ativa,
+.status.ativo,
+.status.pronta,
+.status.conectado { --sc: var(--ok); }
+
+/* Espera alguem. E para ca que vai o orcamento de destaque da tela. */
+.status.reservado,
+.status.aguardando_simulacao,
+.status.aguardando_cliente,
+.status.em_configuracao,
+.status.rascunho,
+.status.pendente,
+.status.registrada,
+.status.recebida,
+.status.parcial,
+.status.aguardando_intervencao,
+.status.pausada /* conferencia */ { --sc: var(--st-wait); }
+
+/* Alerta de operacao: caiu, alguem precisa reconectar. */
+.status.desconectado,
+.status.warn { --sc: var(--warn); }
+
+/* Em atendimento saiu do ambar: quem exige acao e quem espera, nao quem ja
+   esta sendo atendido. */
+.status.em_atendimento,
+.status.processando /* conferencia: rodando, nao esperando alguem */ { --sc: var(--st-live); }
+
+/* Proposta na mesa: o unico estado que usa o verde da marca. */
+.status.negociacao { --sc: var(--st-prop); }
+
+/* Repouso: a maioria dos veiculos fica disponivel o tempo todo e isso nao
+   exige acao nenhuma. Ate 08/08 saia do mesmo verde de "Convertido" e os dois
+   eram a mesma cor na tela. Sem ponto e sem cor. */
+.status.disponivel { color: var(--ink-muted); }
+
+/* Terminal nao disputa atencao: uma venda fechada semana passada importa menos
+   que um cliente esperando ha tres horas. Sem ponto. */
+.status.vendido,
+.status.perdido,
+.status.indisponivel,
+.status.suspensa,
+.status.encerrada,
+.status.inativo,
+.status.cancelada,
+.status.falhou /* conferencia */ {
+  color: var(--ink-muted);
+  --sc: var(--st-lost);
+}
+.status.is-terminal::before,
+.status.disponivel::before,
+.status.vendido::before,
+.status.perdido::before,
+.status.indisponivel::before,
+.status.suspensa::before,
+.status.encerrada::before,
+.status.inativo::before,
+.status.cancelada::before,
+.status.falhou::before { display: none; }
+
+/* Saude da integracao no cabecalho do card. E rotulo E estado: fica pastilha
+   reta e neutra (o nome do servico nao e status) com o ponto colorido ao lado.
+   O `i` vazio no template e o ponto. */
+.status-chip {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 9px;
+  border-radius: var(--radius-ctl);
+  background: var(--surface-soft);
+  color: var(--ink-soft);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  --sc: var(--ok);
+}
+.status-chip i { background: var(--sc); }
+.offline .status-chip { --sc: var(--warn); }
+
+/* Nome do canal na fila de atendimento: rotulo, nao estado — por isso pastilha
+   neutra. Quando o canal caiu, a borda avisa e o template escreve "· off"
+   junto, porque cor sozinha nao comunica.
+   Armadilha: este badge vinha de um <style> inline escrito para o tema escuro
+   (rgba(255,255,255,...)); com a paleta clara como default ficava branco sobre
+   branco. Precisa continuar saindo de token para ler nos dois temas. */
+.canal-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: .35rem;
+  padding: .15rem .5rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-ctl);
+  background: var(--surface-soft);
+  color: var(--ink-soft);
+  font-size: var(--text-xs);
+  white-space: nowrap;
+}
+.canal-badge.inativo,
+.canal-badge.desconectado {
+  border-color: color-mix(in srgb, var(--warn) 40%, var(--line));
+  color: var(--ink-muted);
+}
+
+/* Saude por integracao (montada em js/integracoes_health.js). Mesmo Ponto do
+   `.status`: a cor vive no `.integ-dot`, o texto fica neutro. */
+.integ-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0;
+  background: transparent;
+  color: var(--ink-soft);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  white-space: nowrap;
+  --sc: var(--ink-muted);
+}
+.integ-dot { width: 8px; height: 8px; border-radius: 50%; flex: none; background: var(--sc); }
+.integ-pill.ok { --sc: var(--ok); }
+.integ-pill.err { --sc: var(--danger); }
+.integ-pill.off { color: var(--ink-muted); --sc: var(--ink-muted); }
 
 /* ===========================================================================
    === Painel e card ===
@@ -2163,21 +2252,6 @@ textarea:focus-visible {
   color: var(--ink-muted);
   margin-top: 1px;
 }
-
-.integ-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  font-size: var(--text-xs);
-  font-weight: 600;
-  padding: 5px 10px;
-  border-radius: 999px;
-  white-space: nowrap;
-}
-.integ-dot { width: 8px; height: 8px; border-radius: 50%; flex: none; background: currentColor; }
-.integ-pill.ok { color: var(--green); background: color-mix(in srgb, var(--green) 12%, transparent); }
-.integ-pill.err { color: var(--red); background: color-mix(in srgb, var(--red) 12%, transparent); }
-.integ-pill.off { color: var(--ink-muted); background: color-mix(in srgb, var(--ink-muted) 12%, transparent); }
 
 .integ-chev { flex: none; color: var(--ink-muted); transition: transform .18s ease; }
 .integ-row.open .integ-chev { transform: rotate(90deg); }
@@ -2887,27 +2961,7 @@ a.vitrine-page-btn:hover {
 
 /* ===========================================================================
    Fila de atendimento (Revy Loja) — /app/loja/atendimento
-   O badge de canal vinha de um <style> inline escrito para o tema escuro
-   (rgba(255,255,255,...)): com a paleta clara como default ficava branco sobre
-   branco. Agora usa tokens e le nos dois temas.
    =========================================================================== */
-.canal-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: .35rem;
-  padding: .15rem .5rem;
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  background: var(--surface-soft);
-  color: var(--ink-soft);
-  font-size: var(--text-xs);
-  white-space: nowrap;
-}
-.canal-badge.inativo,
-.canal-badge.desconectado {
-  border-color: color-mix(in srgb, var(--amber) 40%, var(--line));
-  color: var(--ink-muted);
-}
 
 /* Quanto o cliente esperou: e a decisao primaria da tela, entao alinha em
    coluna e usa numeros tabulares. */
@@ -2933,76 +2987,6 @@ a.metric-link:focus-visible {
 }
 a.metric-link:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
 @media (prefers-reduced-motion: reduce) { a.metric-link { transition: none; } }
-
-/* ===========================================================================
-   Estado em ponto (2026-08-08)
-   A pilula cheia virava mosaico numa fila longa. Agora a cor vive no ponto e
-   o texto fica neutro: cor + forma + palavra, nunca cor sozinha.
-   O grupo de cor de cada estado continua em app.css:848-880; aqui so trocamos
-   a FORMA e movemos a cor de `color` para `--sc`.
-   =========================================================================== */
-.status,
-.status-pill {
-  padding: 0;
-  background: transparent;
-  border: 0;
-  border-radius: 0;
-  color: var(--ink-soft);
-  font-weight: 500;
-  gap: 6px;
-}
-.status::before,
-.status-pill::before {
-  width: 7px;
-  height: 7px;
-  background: var(--sc, var(--ink-muted));
-}
-
-/* Os tres grupos herdados passam a definir --sc em vez de background+color.
-   Os estados marcados /conferencia/ nao tinham grupo antes (caiam no cinza):
-   vieram do enum real (venda, simulacao, campanha, meta) na Step 2. */
-.status.disponivel, .status.novo, .status.qualificado, .status.convertido,
-.status.ativa, .status.ativo, .status.conectado, .status.pronta,
-.status.confirmada, .status.concluida /* conferencia */ {
-  background: transparent;
-  color: var(--ink-soft);
-  --sc: var(--st-won);
-}
-.status.reservado, .status.aguardando_simulacao, .status.aguardando_cliente,
-.status.warn, .status.em_configuracao, .status.rascunho, .status.pendente,
-.status.desconectado,
-.status.registrada, .status.recebida, .status.parcial,
-.status.aguardando_intervencao, .status.pausada /* conferencia */ {
-  background: transparent;
-  color: var(--ink-soft);
-  --sc: var(--st-wait);
-}
-/* Em atendimento sai do ambar: quem exige acao e quem espera, nao quem ja
-   esta sendo atendido. Negociacao (Proposta) ganha o acento. */
-.status.em_atendimento,
-.status.processando /* conferencia: rodando, nao esperando alguem */ {
-  background: transparent;
-  color: var(--ink-soft);
-  --sc: var(--st-live);
-}
-.status.negociacao {
-  background: transparent;
-  color: var(--ink-soft);
-  --sc: var(--st-prop);
-}
-/* Terminais nao recebem ponto: nao disputam atencao com quem esta esperando. */
-.status.vendido, .status.perdido, .status.indisponivel,
-.status.suspensa, .status.encerrada, .status.inativo,
-.status.cancelada, .status.falhou /* conferencia */ {
-  background: transparent;
-  color: var(--ink-muted);
-  font-weight: 500;
-}
-.status.vendido::before, .status.perdido::before, .status.indisponivel::before,
-.status.suspensa::before, .status.encerrada::before, .status.inativo::before,
-.status.cancelada::before, .status.falhou::before {
-  display: none;
-}
 
 /* --- Botao reto (3px) --- */
 .nav-link { border-radius: var(--radius-nav); }
