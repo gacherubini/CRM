@@ -70,7 +70,7 @@ def test_acento_preto_do_sistema_antigo_nao_volta(rel, morto):
 # O sistema tem tres raios (3/8/12); qualquer quarto valor e um sistema
 # paralelo nascendo.
 TETO_RAIOS = {
-    "portal-gestao/app/static/css/app.css": 44,
+    "portal-gestao/app/static/css/app.css": 43,
     "revy-trafego/app/static/css/app.css": 38,
 }
 
@@ -91,7 +91,7 @@ def test_teto_de_raios_literais(rel):
 APELIDOS = ("--green", "--amber", "--red", "--online")
 
 TETO_APELIDOS = {
-    "portal-gestao/app/static/css/app.css": 44,
+    "portal-gestao/app/static/css/app.css": 41,
     "revy-trafego/app/static/css/app.css": 46,
 }
 
