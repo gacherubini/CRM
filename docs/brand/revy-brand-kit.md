@@ -389,8 +389,7 @@ Abs,
 - [x] Tipografia decidida: Hanken na interface, Newsreader na marca (v2.0)
 - [x] Símbolo desenhado em geometria vetorial (v2.0)
 - [ ] **Símbolo exportado** para `assets/` — os SVGs atuais ainda são `<text>` em Inter
-- [ ] **Wordmark convertido em contorno** — precisa de FontForge/Inkscape/Figma; é o único item
-      que não fecha só com código
+- [ ] **Wordmark convertido em contorno** — gerado por `fontTools` a partir da Hanken 700
 - [ ] Favicon SVG + PNG 32/180
 - [ ] `shared/brand/revy-tokens.css` criado e sincronizado nos quatro front-ends
 - [ ] Tokens aplicados em `site`, `catalogo-publico`, `portal-gestao` e `revy-trafego`

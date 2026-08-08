@@ -232,10 +232,14 @@ não tem contorno para converter.
 <path d="M21 21.6 27 30" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round"/>
 ```
 
-**O wordmark precisa de uma etapa fora do repositório:** converter "Revy" em Hanken Grotesk 700
-para contorno exige uma ferramenta de tipografia (FontForge, Inkscape ou Figma). Enquanto isso
-não acontece, o wordmark continua sendo texto vivo — e é o único item deste spec que não fecha
-só com código.
+**O wordmark é gerado em código.** `fontTools` (4.63, já no venv do `portal-gestao`) converte
+"Revy" em Hanken Grotesk 700 para contorno com `SVGPathPen`: baixa o TTF estático do Google
+Fonts, extrai os glifos, aplica `Transform(1, 0, 0, -1, x, 0)` para inverter o eixo Y e emite
+os `<path>`. Verificado em 08/08: saem 4 subcaminhos, ~1,1 KB de dados de path.
+
+Duas ressalvas: o TTF precisa vir com user-agent antigo (`Mozilla/4.0`), porque o woff2 exige
+a extensão Brotli, que não está instalada; e o arquivo de peso 700 é o **segundo** da lista
+retornada pelo CSS, não o primeiro.
 
 ---
 
