@@ -128,6 +128,42 @@ No `fly.app.toml` o processo motor roda com `MOTOR_ORCHESTRATOR_ONLY=1` e
 app), `MOTOR_METRICS_TOKEN` opcional, e os `MOTOR_WORKER_*` no `[env]` do toml. Workers
 **não** precisam de `FLY_API_TOKEN` — só o orquestrador acorda machines.
 
+### `n8n2037` (retenção de execução — senão o volume enche e o bot fica mudo)
+
+O n8n usa SQLite no volume `n8n_data` (**3 GB**, montado em `/home/node/.n8n`). Sem poda, o
+`database.sqlite` cresce ~1 GB/semana (guarda o payload inteiro de cada execução) e ao
+chegar a 100% **toda** execução do workflow estoura `SQLITE_FULL` → `POST
+/webhook/whatsapp-ai` responde **500** → Evolution não entrega → **bot mudo**, com todos os
+serviços de pé e `/healthz` = ok. Diagnóstico: `fly logs -a n8n2037` (`SQLITE_FULL`) e
+`fly ssh console -a n8n2037 -C "df -h /home/node/.n8n"`. Destravar sem apagar dados:
+`fly volumes extend <vol-id> -s <GB> -a n8n2037` (redimensiona online, sem restart).
+
+Secrets obrigatórios (janela deslizante de 7 dias; o banco estabiliza em ~1 semana ≈ ~1 GB
+e para de crescer). Apagar execução do n8n **não** perde conversa — o Revy Loja lê do
+chatbot-api (`/v1/conversas`) e o workflow grava toda mensagem em `POST /webhook/mensagem`:
+
+| Secret | Valor | Papel |
+|---|---|---|
+| `EXECUTIONS_DATA_PRUNE` | `true` | liga a poda |
+| `EXECUTIONS_DATA_MAX_AGE` | `168` | retém 7 dias (limitador principal) |
+| `EXECUTIONS_DATA_PRUNE_MAX_COUNT` | `20000` | teto de segurança p/ surto de tráfego |
+| `EXECUTIONS_DATA_SAVE_ON_SUCCESS` | `all` | mantém sucesso p/ debug (bug "respondeu errado" conta como execução de **sucesso**, não de erro) |
+| `EXECUTIONS_DATA_SAVE_ON_ERROR` | `all` | mantém erros |
+| `EXECUTIONS_DATA_SAVE_ON_PROGRESS` | `false` | — |
+| `EXECUTIONS_DATA_SAVE_MANUAL_EXECUTIONS` | `false` | — |
+| `DB_SQLITE_VACUUM_ON_STARTUP` | `true` | compacta o arquivo no boot |
+
+> **Armadilha — reiniciar o `n8n2037` derruba o bot por ~6 min.** Qualquer restart
+> (`fly secrets set`, `fly machine restart`, `fly deploy`) faz o n8n levar **~6 min** para
+> reativar o workflow e re-registrar o webhook (recuperação "This could be due to a
+> crash…"). Nesse intervalo `POST /webhook/whatsapp-ai` responde **404** e a **Evolution
+> cancela o retry no 404** (perde as mensagens do intervalo; no 500 ela re-tenta). **Não
+> reinicie de novo** — zera o relógio; espere. Verificação não-invasiva: `curl -X POST -d
+> '{}' https://n8n2037.fly.dev/webhook/whatsapp-ai` → **404** = ainda ativando, **200** =
+> registrado (o `Extrair1` rejeita `{}` sem `instance`, sem efeito colateral). Confira o
+> estado no DB com `HOME=/home/node n8n list:workflow --active=true` (via `fly ssh`).
+> Agrupe mudanças de secret e evite restart em horário de pico.
+
 ## Multi-WhatsApp: um workflow n8n, N instâncias
 
 **Um único workflow atende todos os números.** Não copie o JSON por número — a instance

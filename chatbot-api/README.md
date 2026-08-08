@@ -27,6 +27,10 @@ Domínio em `app/servico.py`; bootstrap e rotas em `app/main.py`.
 - **O bot só responde pela instância por onde a conversa entrou.** Canal
   `desconectado`/`inativo` deixa a conversa órfã; **nenhum PATCH de estado resolve** — é
   preciso reconectar o canal por QR (Ajustes na Revy Loja) ou migrar a conversa.
+- **Bot mudo em produção mas o chatbot e `/healthz` de pé? A causa costuma estar no n8n, não
+  aqui.** Volume do `n8n2037` cheio → o webhook responde **500** (Evolution entra em backoff);
+  ou n8n reiniciado há < ~6 min → webhook **404** (Evolution **cancela** o retry no 404).
+  Diagnóstico e correção na seção `n8n2037` de `deploy/fly/3vm/README.md`.
 - **Nunca ecoar payload inválido nem desligar o rate limit do webhook** em produção
   (`CHATBOT_WEBHOOK_MAX_*`, `CHATBOT_WEBHOOK_RATE_LIMIT_*`; corpo limitado a 32 KiB).
 - **O LLM não escolhe identidade autorizada.** `telefone_solicitante` e `Idempotency-Key`
