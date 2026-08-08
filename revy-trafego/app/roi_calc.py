@@ -87,6 +87,46 @@ def venda_casa_campanha(
     )
 
 
+def herdar_campanhas_de_leads(
+    *,
+    campanhas: list[Campanha],
+    vendas: list[VendaRoi],
+    leads: list[dict],
+    modo: str = "last",
+    mapa_ad_campaign: dict[str, str] | None = None,
+) -> dict[str, str]:
+    """venda.id -> campanha.id herdada do lead que originou a venda.
+
+    Só entra venda SEM atribuição própria (sem campanha_id e sem utm no modo):
+    o que o Portal gravou no snapshot manda. Determinístico: primeira campanha
+    da ordem do laço de ROI (nome em casefold) que casa com o lead, para a venda
+    nunca contar em duas campanhas.
+    """
+    if not campanhas or not vendas or not leads:
+        return {}
+    por_ref = {str(l["id"]): l for l in leads if l.get("id")}
+    if not por_ref:
+        return {}
+    ordenadas = sorted(campanhas, key=lambda c: c.nome.casefold())
+
+    heranca: dict[str, str] = {}
+    for venda in vendas:
+        if modo == "first":
+            proprio = venda.campanha_id_first or normalizar_utm(venda.utm_campaign_first)
+        else:
+            proprio = venda.campanha_id_last or normalizar_utm(venda.utm_campaign_last)
+        if proprio:
+            continue
+        lead = por_ref.get(str(venda.lead_ref or ""))
+        if not lead:
+            continue
+        for c in ordenadas:
+            if lead_casa_campanha(lead, c, modo=modo, mapa_ad_campaign=mapa_ad_campaign):
+                heranca[venda.id] = c.id
+                break
+    return heranca
+
+
 def calcular_roi_loja(
     *,
     campanhas: list[Campanha],
@@ -101,6 +141,15 @@ def calcular_roi_loja(
     modo = modo_atribuicao if modo_atribuicao in ("first", "last") else "last"
     leads_periodo = [l for l in leads if _lead_no_periodo(l, d_inicio, d_fim)]
     mapa = mapa_ad_campaign or None
+    # Índice sobre a lista COMPLETA de leads: a venda é de agosto e o lead pode
+    # ser de julho — filtrar por período aqui zeraria a herança.
+    heranca = herdar_campanhas_de_leads(
+        campanhas=campanhas,
+        vendas=vendas_confirmadas,
+        leads=leads,
+        modo=modo,
+        mapa_ad_campaign=mapa,
+    )
 
     linhas: list[LinhaRoiCampanha] = []
     leads_matched_ids: set[str] = set()
@@ -119,7 +168,7 @@ def calcular_roi_loja(
 
         vendas_c: list[VendaRoi] = []
         for v in vendas_confirmadas:
-            if venda_casa_campanha(v, campanha, modo=modo):
+            if venda_casa_campanha(v, campanha, modo=modo) or heranca.get(v.id) == campanha.id:
                 vendas_c.append(v)
         for v in vendas_c:
             vendas_matched_ids.add(v.id)

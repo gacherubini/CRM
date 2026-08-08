@@ -12,7 +12,7 @@ from decimal import Decimal
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from app.models import Loja, VendaProjetada
+from app.models import Campanha, Loja, VendaProjetada
 
 
 def _utc(valor: datetime) -> datetime:
@@ -32,6 +32,25 @@ def _loja_id_do_slug(db: Session, loja_slug: str) -> str | None:
         return None
     loja = db.query(Loja.id).filter(func.lower(Loja.slug) == slug).first()
     return loja.id if loja is not None else None
+
+
+def _campanhas_conhecidas(db: Session, loja_slug: str, ids) -> set[str]:
+    """Filtra ids de campanha que existem mesmo no Revy, na loja da venda.
+
+    O outbox do Portal envia o UUID do cadastro dele, e ``Campanha.id`` aqui e
+    gerado local (nunca importado). Gravar o id de fora e pior que gravar nada:
+    ``roi_calc`` so casa por UTM e so herda a campanha do lead quando
+    ``campanha_id`` esta vazio, entao a venda sumiria do ROI sem erro visivel.
+    """
+    candidatos = {i for i in ids if i}
+    if not candidatos:
+        return set()
+    linhas = (
+        db.query(Campanha.id)
+        .filter(Campanha.loja_slug == loja_slug, Campanha.id.in_(candidatos))
+        .all()
+    )
+    return {linha.id for linha in linhas}
 
 
 @dataclass(frozen=True)
@@ -94,8 +113,15 @@ def projetar_venda(db: Session, snapshot: VendaSnapshot) -> ProjecaoResultado:
         _utc(snapshot.confirmada_em) if snapshot.confirmada_em else None
     )
     venda.atualizada_em = versao
-    venda.campanha_id_first = snapshot.campanha_id_first
-    venda.campanha_id_last = snapshot.campanha_id_last
+    conhecidas = _campanhas_conhecidas(
+        db, snapshot.loja_slug, (snapshot.campanha_id_first, snapshot.campanha_id_last)
+    )
+    venda.campanha_id_first = (
+        snapshot.campanha_id_first if snapshot.campanha_id_first in conhecidas else None
+    )
+    venda.campanha_id_last = (
+        snapshot.campanha_id_last if snapshot.campanha_id_last in conhecidas else None
+    )
     venda.utm_campaign_first = snapshot.utm_campaign_first
     venda.utm_campaign_last = snapshot.utm_campaign_last
     db.flush()

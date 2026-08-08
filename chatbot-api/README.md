@@ -76,6 +76,60 @@ Multi-WhatsApp/canais existe desde ~2026-07-29 (routing por `canal_id`).
 
 ---
 
+## CTWA: `origem = meta_ctwa` só para quem veio de anúncio (2026-08-08)
+
+`aplicar_touch_ctwa` separa duas coisas que antes eram uma só:
+
+| | Regra |
+|---|---|
+| **Gravar o sinal** | **sempre**, sem guard. `ctwa_source_type`, `ctwa_clid`, `meta_ad_id`, `ctwa_codigo` seguem salvos como antes. Nada se perde. |
+| **Carimbar `origem`** | só com identificador de anúncio **ou** `ctwa_source_type` em `FAMILIA_ANUNCIO` (`fb_ads`, `ctwa_ad`, `ad`). |
+
+Antes, `ctwa_source_type` **sozinho** já bastava — então `global_search_new_chat` (alguém
+digitando o número dentro do WhatsApp) e `click_to_chat_link` (link `wa.me` do site, do
+catálogo ou da bio) entravam como lead de anúncio da Meta. Em produção eram 10 leads.
+
+Três detalhes que decidem se a mudança está certa:
+
+- **`casefold` obrigatório.** O valor real em produção é `FB_Ads`, com maiúsculas;
+  comparação sensível a caixa classifica 205 leads errado.
+- **`canal = whatsapp` ficou fora do guard.** Quem chegou por link direto também chegou
+  pelo WhatsApp. Só `origem*` e `ctwa_atribuido_em` dependem de ser anúncio.
+- **O guard decide se escreve, nunca apaga.** Lead que veio de anúncio e depois manda
+  mensagem por link direto continua `meta_ctwa`.
+- **`source_type` desconhecido não carimba**, e é logado uma vez (é enum, não é PII) para
+  a lista crescer com evidência. Anúncio de verdade quase sempre traz `clid` ou `ad_id`,
+  que já passam pelo guard: falso negativo aqui é barato, falso positivo é o defeito.
+
+**Sem backfill.** Os 10 leads já carimbados ficam como estão — o carimbo antigo
+sobrescreveu a origem anterior e não dá para saber qual era. Não faz falta: o painel da
+Loja agrupa por `ctwa_source_type`, que está correto nos 10.
+
+`FAMILIA_ANUNCIO` é **duplicação consciente** com o mapa de rótulos em
+`portal-gestao/app/loja/sales_overview.py` (produtos diferentes, sem import entre eles).
+Mudou aqui, muda lá.
+
+### Tracking pendente com várias conversas no mesmo telefone
+
+`Conversa` é única por `(canal_id, telefone)` com `canal_id` nullable, então o mesmo
+cliente tem uma linha **por canal** — a loja tem 7 canais e 492 conversas para 243
+identidades. `_vincular_tracking_pendente_ao_lead` pegava a conversa com `.first()`, sem
+filtrar canal e sem ordenar, e podia pegar justamente a que não tem
+`tracking_pendente_json`.
+
+Agora varre **todas** as conversas do telefone que têm pendente, em `ORDER BY criada_em
+ASC`. **Ascendente é obrigatório:** `aplicar_touch_ctwa` só grava os campos `_first`
+enquanto estão nulos, então o toque mais antigo precisa chegar primeiro. E o ramo
+idempotente do webhook (lead já existe) passou a consumir o pendente em vez de só ler o id
+e deixar o anúncio parado na conversa.
+
+⚠️ **Nunca casar lead ↔ `ctwa_auditoria` por telefone mascarado.** `telefone_mascarado`
+são `***` + 4 dígitos. Testada contra o dado real em 08/08, a heurística casou o lead de
+uma venda com o anúncio de **outro cliente** — DDI/DDD diferentes, 6 últimos diferentes, só
+os 4 finais iguais. O aviso está repetido em `scripts/diagnose_ctwa_sinais.py`.
+
+---
+
 ## Testes relevantes
 
 - `tests/test_whatsapp_outbound.py` — `EvolutionWhatsAppOutbound.send_text`: sucesso,

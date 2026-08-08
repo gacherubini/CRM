@@ -72,6 +72,30 @@ def extrair_codigo_ctwa_do_texto(texto: str | None) -> str | None:
     return None
 
 
+# `ctwa_source_type` diz POR ONDE a pessoa entrou, nunca QUAL campanha pagou.
+# Só esta família é anúncio; o resto do balde CTWA é link direto (`wa.me` do
+# site, catálogo, bio) ou busca dentro do WhatsApp.
+# Anda junto com o mapa de rótulos da Loja em
+# `portal-gestao/app/loja/sales_overview.py` — mudou aqui, muda lá.
+FAMILIA_ANUNCIO = frozenset({"fb_ads", "ctwa_ad", "ad"})
+_SOURCE_TYPES_DESCONHECIDOS: set[str] = set()
+
+
+def _e_anuncio(source: str | None) -> bool:
+    """casefold obrigatório: o valor real em produção é `FB_Ads`."""
+    chave = (source or "").strip().casefold()
+    if not chave:
+        return False
+    if chave in FAMILIA_ANUNCIO:
+        return True
+    if chave not in _SOURCE_TYPES_DESCONHECIDOS:
+        # Enum da Meta, não é PII. Logado uma vez para a lista crescer com
+        # evidência em vez de palpite.
+        _SOURCE_TYPES_DESCONHECIDOS.add(chave)
+        logger.info("ctwa_source_type desconhecido: %s", chave)
+    return False
+
+
 def _set_first_last(lead: Lead, campo: str, valor: str | None) -> None:
     if not valor:
         return
@@ -93,7 +117,12 @@ def aplicar_touch_ctwa(
     ctwa_codigo: str | None = None,
     texto: str | None = None,
 ) -> bool:
-    """Aplica sinais CTWA no lead (first/last). Retorna True se algo mudou de origem CTWA."""
+    """Aplica sinais CTWA no lead (first/last). Retorna True se gravou algum sinal.
+
+    Gravar o sinal e carimbar a origem são coisas diferentes: todo sinal cru é
+    salvo, mas `origem = meta_ctwa` só sai quando há identificador de anúncio ou
+    `ctwa_source_type` de família de anúncio.
+    """
     clid = _limpar_tracking(ctwa_clid, limite=255)
     ad_id = _limpar_tracking(meta_ad_id, limite=64)
     camp_id = _limpar_tracking(meta_campaign_id, limite=64)
@@ -129,16 +158,20 @@ def aplicar_touch_ctwa(
         if not lead.utm_campaign:
             _set_first_last(lead, "utm_campaign", codigo)
 
-    # Origem tipada quando há sinal de anúncio WA
-    if tem_sinal:
+    # Qualquer sinal do balde CTWA chegou pelo WhatsApp — inclusive link direto.
+    if lead.canal_first is None:
+        lead.canal_first = "whatsapp"
+    lead.canal_last = "whatsapp"
+    lead.canal = "whatsapp"
+
+    # Origem tipada só quando há prova de anúncio. O guard decide se ESCREVE:
+    # lead que veio de anúncio e depois volta por link direto segue meta_ctwa.
+    tem_anuncio = bool(clid or ad_id or camp_id or adset or codigo or _e_anuncio(source))
+    if tem_anuncio:
         if lead.origem_first is None:
             lead.origem_first = "meta_ctwa"
         lead.origem_last = "meta_ctwa"
         lead.origem = "meta_ctwa"
-        if lead.canal_first is None:
-            lead.canal_first = "whatsapp"
-        lead.canal_last = "whatsapp"
-        lead.canal = "whatsapp"
         if lead.ctwa_atribuido_em is None:
             lead.ctwa_atribuido_em = datetime.now(timezone.utc)
     return True
@@ -1012,6 +1045,12 @@ def registrar_mensagem(
                     lead_criado_auto = True
                 else:
                     # Idempotente: lead já existe (ex.: POST /v1/leads anterior).
+                    # Ainda assim o pendente tem que ser colhido — antes daqui
+                    # o código só lia o id e deixava o anúncio na conversa.
+                    _vincular_tracking_pendente_ao_lead(
+                        db, loja.id, telefone, lead_existente
+                    )
+                    lead_existente.atualizada_em = datetime.now(timezone.utc)
                     lead_ctwa_id = lead_existente.id
         registrar_auditoria_ctwa(
             db,
@@ -1918,12 +1957,22 @@ def _vincular_tracking_pendente_ao_lead(
     for atribuicao in atribuicoes:
         _vincular_catalogo_ao_lead(lead, atribuicao)
 
-    conversa = (
+    # Todas as conversas do telefone, não `.first()`: `Conversa` é única por
+    # (canal_id, telefone) com canal_id nullable, então o mesmo cliente tem uma
+    # linha por canal e o `.first()` podia pegar justamente a que não tem
+    # pendente. ASC é obrigatório: `aplicar_touch_ctwa` só grava os campos
+    # `_first` enquanto estão nulos, então o toque mais antigo tem que vir antes.
+    conversas = (
         db.query(Conversa)
-        .filter(Conversa.loja_id == loja_id, Conversa.telefone == telefone)
-        .first()
+        .filter(
+            Conversa.loja_id == loja_id,
+            Conversa.telefone == telefone,
+            Conversa.tracking_pendente_json.isnot(None),
+        )
+        .order_by(Conversa.criada_em.asc())
+        .all()
     )
-    if conversa is not None:
+    for conversa in conversas:
         _aplicar_tracking_pendente_no_lead(conversa, lead)
 
 

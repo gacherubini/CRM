@@ -36,6 +36,59 @@ técnica, prontidão e operação multi-loja ficam aqui.
   Provisão de loja → Portal:
   [`docs/2026-08-02-provisionamento-loja-entitlements.md`](../docs/2026-08-02-provisionamento-loja-entitlements.md).
 
+### Atribuição de venda no ROI 2026-08-08 (a venda herda a campanha do lead)
+
+`venda_casa_campanha` só comparava `campanha_id_*` e `utm_campaign_*` gravados **na
+própria venda**, e nunca consultava o lead. Na mesma função, a contagem de leads já
+casava por `ad_id` via cache do Graph — por isso a linha da campanha mostrava leads e
+não mostrava vendas. Eram dois caminhos de código, e só um enxergava o anúncio.
+
+`herdar_campanhas_de_leads` (`app/roi_calc.py`) fecha o buraco **na leitura**:
+
+- vale **retroativamente** para toda venda já projetada — sem backfill, sem `UPDATE`
+  em `vendas_projetadas` e sem reenviar evento;
+- **atribuição explícita vence herança**: se a venda já tem `campanha_id` ou
+  `utm_campaign` no snapshot, é isso que manda;
+- a ordem do laço (nome em `casefold`) torna a escolha determinística, então uma venda
+  **nunca conta em duas campanhas**;
+- o índice de leads sai da lista **completa**, não dos leads do período: a venda é de
+  agosto e o lead pode ser de julho;
+- Chatbot offline → `leads=[]` → herança vazia → comportamento idêntico ao anterior.
+
+O detalhe da campanha (`app/main.py`) usa a mesma herança; sem isso a linha do ROI diria
+"1 venda" e a lista da página ficaria vazia.
+
+> **`vendas_projetadas.campanha_id` continua `NULL` — é de propósito.** O vínculo existe
+> só no cálculo. É exatamente essa escolha que faz o conserto valer para o passado.
+
+**Isto é o SEU relatório, não a atribuição da Meta.** São duas coisas diferentes e vão
+divergir:
+>
+> | | Onde decide | O que mudou em 08/08 |
+> |---|---|---|
+> | Linha da campanha no ROI / Loja | `roi_calc.herdar_campanhas_de_leads` | **passou a contar a venda** |
+> | Compra atribuída no Gerenciador de Anúncios | `POST /eventos/venda-confirmada` → Purchase CAPI, que só liga a compra ao anúncio quando o lead tem `ctwa_clid` | **nada** |
+
+Um lead pode ter `meta_ad_id` e **não** ter `ctwa_clid`. Nesse caso a venda passa a contar
+na campanha aqui e continua não contando na Meta. A divergência é o comportamento correto,
+não é bug — e ela **aumentou** com esta mudança, porque este lado melhorou e o outro não
+foi tocado. Fechar o lado da Meta é outro trabalho: depende de `ctwa_clid` no lead.
+
+Ainda em `app/vendas_projection.py`: `campanha_id_first/last` vindo do outbox do Portal só
+é gravado se existir em `campanhas` da **mesma loja**. O Portal manda o UUID do cadastro
+dele e `Campanha.id` aqui é gerado local; aceitar o id de fora desligaria o casamento por
+UTM **e** a herança, e a venda sumiria do ROI sem erro visível.
+
+E `app/meta_ad_resolver_job.py`: salvar a config de Ads (`upsert_meta_ads`) agora destrava
+os ads que estouraram `max_tentativas` — o `WHERE` é por **`loja_slug`**, não por
+`store.id` como o `invalidar` que roda ao lado. A tela de Cliques do WhatsApp mostra
+quantos anúncios seguem sem campanha resolvida; sem esse número a falha fica invisível,
+que foi o que aconteceu com 10 ads em 07/08.
+
+⚠️ **Nunca casar lead ↔ `ctwa_auditoria` por telefone mascarado.** A máscara são os 4
+dígitos finais, e a colisão é real: em 08/08 ela casou o lead de uma venda com o anúncio de
+outro cliente. Qualquer atribuição saída daí é receita inventada.
+
 ### Triagem de UX 2026-08-07 (o que mudou na interface)
 
 Decisões e itens **recusados** em

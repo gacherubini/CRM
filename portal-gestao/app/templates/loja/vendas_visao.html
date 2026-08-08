@@ -206,12 +206,15 @@
   {% endif %}
 </section>
 
-{# --- De onde veio: campanha e canal (só com a fonte de mídia respondendo) --- #}
-{% if overview.aquisicao_campanhas %}
+{# --- De onde veio o resultado: campanha (fonte de mídia) + por onde as pessoas
+     chegam (lead do Chatbot). Guards separados: se a mídia cair, o segundo
+     bloco continua respondendo. --- #}
+{% if overview.aquisicao_campanhas or overview.aquisicao_origens %}
 <section class="panel" aria-labelledby="bloco-campanhas">
   <div class="panel-heading">
     <div><span class="mono-label">Aquisição</span><h2 id="bloco-campanhas">De onde veio o resultado</h2></div>
   </div>
+  {% if overview.aquisicao_campanhas %}
   <div class="table-wrap">
     <table>
       <thead>
@@ -248,6 +251,35 @@
     {{ canal.canal }} {{ formatar_brl(canal.gasto) }}{% if canal.roas is not none %} ({{ canal.roas }}x){% endif %}{% if not loop.last %} · {% endif %}
     {% endfor %}
   </p>
+  {% endif %}
+  {% endif %}
+
+  {% if overview.aquisicao_origens %}
+  <h3>Por onde as pessoas chegam</h3>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th scope="col">Entrada</th>
+          <th scope="col">Leads</th>
+          <th scope="col">% do período</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for o in overview.aquisicao_origens %}
+        <tr>
+          <td>
+            <strong>{{ o.rotulo }}</strong>
+            {% if o.nota %}<small class="muted"> · {{ o.nota }}</small>{% endif %}
+          </td>
+          <td>{{ o.leads }}</td>
+          <td>{{ o.share }}%</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <p class="muted">Leads criados no período, agrupados por como a conversa começou.</p>
   {% endif %}
 </section>
 {% endif %}

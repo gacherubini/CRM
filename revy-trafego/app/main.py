@@ -70,7 +70,13 @@ from app.models import (
     agora,
     novo_id,
 )
-from app.roi_calc import calcular_roi_loja, gerar_insights_roi, totais_roi, venda_casa_campanha
+from app.roi_calc import (
+    calcular_roi_loja,
+    gerar_insights_roi,
+    herdar_campanhas_de_leads,
+    totais_roi,
+    venda_casa_campanha,
+)
 from app.api_v1 import router as api_v1_router
 from app.web.control import router as control_router
 from app.web.control_ui import router as control_ui_router
@@ -713,6 +719,9 @@ def trafego_ctwa_auditoria(
         itens = dados.get("itens") or []
     except ChatbotIndisponivel:
         erro_chatbot = "Chatbot indisponível — não foi possível carregar a auditoria CTWA."
+    from app.meta_ad_resolver_job import contar_ads_nao_resolvidos
+
+    ads_nao_resolvidos = contar_ads_nao_resolvidos(db, usuario.loja_slug)
     return templates.TemplateResponse(
         "trafego/ctwa_auditoria.html",
         contexto(
@@ -721,6 +730,7 @@ def trafego_ctwa_auditoria(
             itens=itens,
             so_com_clid=filtro_clid,
             erro_chatbot=erro_chatbot,
+            ads_nao_resolvidos=ads_nao_resolvidos,
         ),
     )
 
@@ -1107,10 +1117,20 @@ def campanhas_detalhe(
         )
         if linha.campanha_id == campanha.id
     )
+    # Mesma herança do cálculo do ROI: sem isto a linha diz "1 venda" e a lista
+    # da página fica vazia.
+    heranca_vendas = herdar_campanhas_de_leads(
+        campanhas=[campanha],
+        vendas=metricas_vendas["confirmadas"],
+        leads=leads,
+        modo="last",
+        mapa_ad_campaign=mapa_ad,
+    )
     vendas_atribuidas = [
         venda
         for venda in metricas_vendas["confirmadas"]
         if venda_casa_campanha(venda, campanha, modo="last")
+        or heranca_vendas.get(venda.id) == campanha.id
     ]
     return templates.TemplateResponse(
         "campanhas/detalhe.html",
