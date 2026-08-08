@@ -626,13 +626,24 @@ Passa a ser, na seção Botao:
 
 .button.primary { background: var(--brand); color: var(--brand-ink); border-color: var(--brand); }
 .button.primary:hover { background: var(--brand-strong); border-color: var(--brand-strong); opacity: 1; }
-.button.danger { background: var(--danger); color: #ffffff; border-color: var(--danger); }
+
+/* Vermelho tintado, nunca preenchimento solido: --danger no escuro e #f97066,
+   e texto branco sobre ele da 2,76:1. O tintado tambem e o padrao dos outros
+   cinco lugares que sinalizam erro (.alert.error, .sim-step.fail, .integ-pill.err). */
+.button.danger {
+  border-color: color-mix(in srgb, var(--danger) 30%, var(--line));
+  background: color-mix(in srgb, var(--danger) 8%, var(--paper));
+  color: var(--danger);
+}
 ```
 
 Duas mudanças além do raio, ambas dentro da decisão de marca:
 
 - a borda do botão neutro sobe de `--line` para `--line-strong` — com raio 3px e sem sombra, `--line` some no papel;
-- `.button.danger` passa a usar `--danger`, o token semântico, no lugar de `--red`.
+- `.button.danger` passa a usar `--danger` no lugar de `--red`. **É só troca de nome**: os dois
+  tokens têm valor idêntico nos dois temas (`#b42318` / `#f97066`), então a fórmula `color-mix`
+  fica exatamente como está. Trocar o tintado por preenchimento sólido seria redesenho de peça e
+  reprova no contraste — decisão do dono em 08/08.
 
 Mantenha `.secondary` e `.ghost` como estão, só migrando raio e eventuais `--red`/`--green`.
 Aplique o mesmo a `.link-button`, e tokenize os raios de `.action-links` e `.action-stack` se houver.
