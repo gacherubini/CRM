@@ -101,8 +101,8 @@ def test_whatsapp_usa_token_semantico_na_loja():
 # O sistema tem tres raios (3/8/12); qualquer quarto valor e um sistema
 # paralelo nascendo.
 TETO_RAIOS = {
-    "portal-gestao/app/static/css/app.css": 29,
-    "revy-trafego/app/static/css/app.css": 24,
+    "portal-gestao/app/static/css/app.css": 0,
+    "revy-trafego/app/static/css/app.css": 0,
 }
 
 
@@ -144,8 +144,8 @@ def test_item_de_menu_usa_o_raio_de_navegacao(rel):
 APELIDOS = ("--green", "--amber", "--red", "--online")
 
 TETO_APELIDOS = {
-    "portal-gestao/app/static/css/app.css": 18,
-    "revy-trafego/app/static/css/app.css": 26,
+    "portal-gestao/app/static/css/app.css": 0,
+    "revy-trafego/app/static/css/app.css": 0,
 }
 
 
