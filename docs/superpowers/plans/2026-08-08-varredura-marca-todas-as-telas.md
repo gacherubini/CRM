@@ -906,29 +906,17 @@ Toda a peça vai para a seção `Estado`. A base passa a ser Ponto — sem fundo
 .status.inativo,
 .status.suspensa { color: var(--st-lost); }
 
-.status.novo,
-.status.pendente,
-.status.aguardando_simulacao,
-.status.aguardando_cliente,
-.status.rascunho,
-.status.em_configuracao { --sc: var(--st-wait); }
-
-.status.qualificado,
-.status.em_atendimento,
-.status.negociacao,
-.status.reservado { --sc: var(--st-live); }
-
-.status.ativa,
-.status.ativo,
-.status.pronta,
-.status.conectado { --sc: var(--ok); }
-
-.status.desconectado,
-.status.warn { --sc: var(--warn); }
+/* Os grupos de estado saem da tabela acima, nao deste exemplo. A forma e
+   sempre esta: */
+.status.<classe>, .status.<classe> { --sc: var(<token da tabela>); }
 
 /* Repouso: a maioria dos veiculos esta disponivel. Sem destaque. */
 .status.disponivel { --sc: var(--ink-muted); }
 ```
+
+**A tabela acima é a autoridade dos grupos, não este bloco de exemplo.** Ele mostra só a
+*forma* da regra. Se as duas divergirem, a tabela vence — e reporte a divergência, porque
+significa que este documento voltou a ter duas verdades.
 
 As classes terminais precisam de `is-terminal` no template. Em vez de editar cada `<span>`, acrescente as terminais também como seletor do `::before`:
 
