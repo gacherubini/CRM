@@ -70,8 +70,8 @@ def test_acento_preto_do_sistema_antigo_nao_volta(rel, morto):
 # O sistema tem tres raios (3/8/12); qualquer quarto valor e um sistema
 # paralelo nascendo.
 TETO_RAIOS = {
-    "portal-gestao/app/static/css/app.css": 52,
-    "revy-trafego/app/static/css/app.css": 48,
+    "portal-gestao/app/static/css/app.css": 49,
+    "revy-trafego/app/static/css/app.css": 44,
 }
 
 

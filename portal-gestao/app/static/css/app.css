@@ -1045,39 +1045,13 @@ code {
   font-size: 12px;
 }
 
-/* width:100% nao pode valer para checkbox/radio — era o que esticava a caixinha
-   de "Modulos da Loja" e a jogava para longe do proprio rotulo. */
-input:not([type="checkbox"]):not([type="radio"]),
-select,
-textarea {
-  width: 100%;
-  min-height: 40px;
-  padding: var(--space-2) var(--space-3);
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  /* Campos ficam brancos (--surface) sobre o canvas greige; a borda os delineia
-     tambem quando estao dentro de um card branco. */
-  background: var(--surface);
-  color: var(--ink);
-}
-input:not([type="checkbox"]):not([type="radio"]),
-select { padding-block: 0; }
-textarea {
-  min-height: 96px;
-  line-height: 1.5;
-  resize: vertical;
-}
-input::placeholder,
-textarea::placeholder { color: var(--ink-muted); }
-select option { background: var(--surface); }
-
 /* Grupo de opcoes: rotulo ao lado da caixa, alvo de clique inteiro. */
 fieldset {
   min-width: 0;
   margin: 0;
   padding: var(--space-4);
   border: 1px solid var(--line);
-  border-radius: 10px;
+  border-radius: var(--radius-srf);
   background: var(--surface-raised);
 }
 fieldset > legend {
@@ -1097,7 +1071,7 @@ fieldset > legend {
   gap: var(--space-3);
   min-height: 36px;
   padding: 0 var(--space-2);
-  border-radius: 8px;
+  border-radius: var(--radius-ctl);
   color: var(--ink);
   font-size: var(--text-sm);
   font-weight: 500;
@@ -2026,8 +2000,45 @@ tr:hover td { background: var(--surface-soft); }
    === Campo e formulario ===
    =========================================================================== */
 
+/* Campo reto, mesma familia do botao. A borda e --line-strong porque com raio
+   de 3px e sem sombra a borda e o unico limite visivel do campo. */
+/* width:100% nao pode valer para checkbox/radio — era o que esticava a caixinha
+   de "Modulos da Loja" e a jogava para longe do proprio rotulo. */
+input:not([type="checkbox"]):not([type="radio"]),
+select,
+textarea {
+  width: 100%;
+  min-height: 40px;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-ctl);
+  /* Campos ficam brancos (--surface) sobre o canvas greige; a borda os delineia
+     tambem quando estao dentro de um card branco. */
+  background: var(--surface);
+  color: var(--ink);
+}
+input:not([type="checkbox"]):not([type="radio"]),
+select { padding-block: 0; }
+textarea {
+  min-height: 96px;
+  line-height: 1.5;
+  resize: vertical;
+}
+input::placeholder,
+textarea::placeholder { color: var(--ink-muted); }
+select option { background: var(--surface); }
+.search,
+.filter-bar select { border-radius: var(--radius-ctl); }
+
 /* Foco visivel na cor da marca */
 :focus-visible { outline-color: var(--brand); }
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 1px;
+  border-color: var(--brand);
+}
 
 /* ===========================================================================
    === Estado ===
@@ -2994,9 +3005,6 @@ a.metric-link:focus-visible { outline: 2px solid var(--brand); outline-offset: 2
 }
 
 /* --- Botao reto (3px) --- */
-input, select, textarea, .search, .filter-bar select {
-  border-radius: var(--radius-ctl);
-}
 .nav-link { border-radius: var(--radius-nav); }
 .panel, .metric-grid > .panel { border-radius: var(--radius-srf); }
 
