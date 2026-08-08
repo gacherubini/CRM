@@ -37,17 +37,16 @@
         <span class="sim-step-num" aria-hidden="true">{{ loop.index }}</span>
         <div>
           <strong>{{ evento.etapa | replace('_', ' ') | title }}</strong>
-          <p class="muted" style="margin:4px 0">{{ formatar_horario(evento.criada_em) }} · {{ evento.mensagem }}</p>
+          <p class="muted sim-evt-time">{{ formatar_horario(evento.criada_em) }} · {{ evento.mensagem }}</p>
           {% if evento.tem_print %}
             {% if pode_ver_print %}
-            <div style="margin-top:8px">
+            <div class="sim-print">
               <a class="table-action" href="/app/simulacoes/{{ sim_id }}/registros/{{ evento.id }}/print" target="_blank" rel="noopener">Abrir print</a>
-              <div style="margin-top:8px;max-width:420px;border:1px solid var(--border);border-radius:10px;overflow:hidden;background:var(--surface-2, #111)">
+              <div class="sim-print-frame">
                 <img
                   src="/app/simulacoes/{{ sim_id }}/registros/{{ evento.id }}/print"
                   alt="Print da etapa {{ evento.etapa }}"
                   loading="lazy"
-                  style="display:block;width:100%;height:auto"
                 >
               </div>
             </div>
@@ -71,7 +70,7 @@
         <span class="sim-step-num" aria-hidden="true">{{ loop.index }}</span>
         <div>
           <strong>{% if evento.provedor %}{{ evento.provedor }} · {% endif %}{{ evento.etapa | replace('_', ' ') | title }}</strong>
-          <p class="muted" style="margin:4px 0">{{ formatar_horario(evento.criada_em) }} · {{ evento.mensagem }}</p>
+          <p class="muted sim-evt-time">{{ formatar_horario(evento.criada_em) }} · {{ evento.mensagem }}</p>
           {% if evento.tem_print and pode_ver_print %}
           <a class="table-action" href="/app/simulacoes/{{ sim_id }}/registros/{{ evento.id }}/print" target="_blank" rel="noopener">Ver print</a>
           {% endif %}

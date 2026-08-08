@@ -205,26 +205,6 @@ button, .button, a { -webkit-tap-highlight-color: transparent; }
 }
 .theme-toggle-label { letter-spacing: 0; }
 
-/* Login: inferior esquerdo, discreto */
-.login-theme-bar {
-  position: fixed;
-  bottom: 16px;
-  left: 16px;
-  z-index: 20;
-}
-.login-theme-bar .theme-toggle {
-  padding: 6px 8px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: var(--paper);
-  color: var(--ink-soft);
-  font-size: 12px;
-}
-.login-theme-bar .theme-toggle:hover {
-  color: var(--ink);
-  background: var(--surface-soft);
-}
-
 .main { min-width: 0; }
 
 .topbar {
@@ -980,32 +960,6 @@ tr:hover td { background: var(--surface-soft); }
   gap: 8px;
 }
 
-.login-page { min-height: 100vh; background: var(--paper); }
-.login-layout {
-  min-height: 100vh;
-  display: grid;
-  grid-template-columns: minmax(420px, 1.15fr) minmax(390px, .85fr);
-}
-.login-story {
-  padding: clamp(40px, 7vw, 80px);
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  color: var(--ink);
-  background: var(--surface-raised);
-  border-right: 1px solid var(--line);
-}
-.login-story h1 {
-  max-width: 720px;
-  margin: 40px 0 16px;
-  font-size: clamp(40px, 5.5vw, 64px);
-  letter-spacing: -.04em;
-}
-.login-story p {
-  max-width: 520px;
-  color: var(--ink-soft);
-  font-size: 16px;
-}
 .story-number {
   color: var(--ink-muted);
   font-size: 13px;
@@ -1014,21 +968,6 @@ tr:hover td { background: var(--surface-soft); }
   display: block;
 }
 .story-number strong { display: none; }
-.login-panel {
-  padding: 40px;
-  display: grid;
-  place-items: center;
-  background: var(--paper);
-}
-.login-card {
-  width: min(400px, 100%);
-  padding: 28px;
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  background: var(--surface);
-  box-shadow: var(--shadow);
-}
-.login-card h2 { font-size: 26px; }
 .stack-form {
   display: grid;
   gap: 14px;
@@ -1303,7 +1242,6 @@ tr:hover td { background: var(--surface-soft); }
     border-radius: 10px;
     background: var(--surface-raised);
   }
-  .login-layout { grid-template-columns: 1fr 1fr; }
   .funil-summary { grid-template-columns: 1fr 1fr; }
   .funil-summary-card.highlight { grid-column: 1 / -1; }
   .funil-stages li { grid-template-columns: minmax(0, 1fr) auto; }
@@ -1342,7 +1280,6 @@ tr:hover td { background: var(--surface-soft); }
     flex-direction: column;
   }
   .action-grid { justify-content: flex-start; }
-  .login-layout { display: block; }
   .funil-filter { grid-template-columns: 1fr; }
   .funil-summary { grid-template-columns: 1fr; }
   .funil-summary-card.highlight { grid-column: auto; }
@@ -1355,19 +1292,6 @@ tr:hover td { background: var(--surface-soft); }
     border-bottom: 1px solid var(--line);
   }
   .funil-time-grid article:last-child { border-bottom: 0; }
-  .login-story {
-    min-height: 280px;
-    padding: 32px 20px;
-    border-right: 0;
-    border-bottom: 1px solid var(--line);
-  }
-  .login-story h1 { font-size: 36px; }
-  .login-story p { font-size: 14px; }
-  .login-panel {
-    min-height: 480px;
-    padding: 20px;
-  }
-  .login-card { padding: 22px 18px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -2170,6 +2094,85 @@ textarea:focus-visible {
   }
 }
 
+/* ---------------------------------------------------------------------------
+   ROI de trafego — mesma tela da Loja (/app/relatorios/roi), aqui no Control.
+   Migrado do <style> inline de trafego/roi.html: pagina identica nos dois
+   produtos, mesmo bloco nos dois app.css. --ok no lugar do --green generico:
+   ROAS >= 1x e "deu certo", que e exatamente o que o token semantico descreve.
+   --------------------------------------------------------------------------- */
+.roi-hero {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-bottom: 18px;
+}
+.roi-card {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-srf);
+  background: var(--surface);
+  padding: 18px 16px;
+  box-shadow: var(--shadow);
+  min-width: 0;
+}
+.roi-card span {
+  display: block;
+  color: var(--ink-muted);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+.roi-card strong {
+  display: block;
+  font-size: 26px;
+  letter-spacing: -.03em;
+  line-height: 1.1;
+}
+.roi-card small {
+  display: block;
+  margin-top: 8px;
+  color: var(--ink-soft);
+  font-size: 12px;
+}
+.roi-card.highlight {
+  background: var(--ink);
+  color: var(--paper);
+  border-color: var(--ink);
+}
+.roi-card.highlight span,
+.roi-card.highlight small { color: color-mix(in srgb, var(--paper) 70%, transparent); }
+.roi-card.good strong { color: var(--ok); }
+/* O card highlight e sempre escuro (fundo var(--ink) nos dois temas); o verde
+   do modo claro (var(--ok) la) nao teria contraste ali. Literal fixo no
+   mesmo valor que --ok/--green ja usam no escuro, so nesta combinacao. */
+.roi-card.highlight.good strong { color: #3ecf8e; }
+tr.roi-sem-campanha td { color: var(--ink-soft); }
+.touch-toggle {
+  display: inline-flex;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  overflow: hidden;
+  background: var(--surface);
+}
+.touch-toggle a {
+  padding: 8px 14px;
+  font-size: 12px;
+  font-weight: 700;
+  text-decoration: none;
+  color: var(--ink-soft);
+}
+.touch-toggle a.active {
+  background: var(--ink);
+  color: var(--paper);
+}
+@media (max-width: 960px) {
+  .roi-hero { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 560px) {
+  .roi-hero { grid-template-columns: 1fr; }
+}
+
 /* ===========================================================================
    === Tabela e lista ===
    =========================================================================== */
@@ -2493,6 +2496,89 @@ textarea:focus-visible {
 /* ===========================================================================
    === Autenticacao ===
    =========================================================================== */
+
+/* ---------------------------------------------------------------------------
+   Login — tela de entrada do Revy Control.
+   --------------------------------------------------------------------------- */
+.login-page { min-height: 100vh; background: var(--paper); }
+.login-layout {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: minmax(420px, 1.15fr) minmax(390px, .85fr);
+}
+.login-theme-bar {
+  position: fixed;
+  bottom: 16px;
+  left: 16px;
+  z-index: 20;
+}
+.login-theme-bar .theme-toggle {
+  padding: 6px 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--paper);
+  color: var(--ink-soft);
+  font-size: 12px;
+}
+.login-theme-bar .theme-toggle:hover {
+  color: var(--ink);
+  background: var(--surface-soft);
+}
+.login-story {
+  padding: clamp(40px, 7vw, 80px);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  color: var(--ink);
+  background: var(--surface-raised);
+  border-right: 1px solid var(--line);
+}
+.login-story h1 {
+  max-width: 720px;
+  margin: 40px 0 16px;
+  font-size: clamp(40px, 5.5vw, 64px);
+  letter-spacing: -.04em;
+}
+.login-story p {
+  max-width: 520px;
+  color: var(--ink-soft);
+  font-size: 16px;
+}
+.login-panel {
+  padding: 40px;
+  display: grid;
+  place-items: center;
+  background: var(--paper);
+}
+.login-card {
+  width: min(400px, 100%);
+  padding: 28px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-srf);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+.login-card h2 { font-size: 26px; }
+
+@media (max-width: 860px) {
+  .login-layout { grid-template-columns: 1fr 1fr; }
+}
+@media (max-width: 620px) {
+  .login-layout { display: block; }
+  .login-story {
+    min-height: 280px;
+    padding: 32px 20px;
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+  }
+  .login-story h1 { font-size: 36px; }
+  .login-story p { font-size: 14px; }
+  .login-panel {
+    min-height: 480px;
+    padding: 20px;
+  }
+  .login-card { padding: 22px 18px; }
+}
 
 /* ===========================================================================
    Conversa do lead (Revy Control) — /app/diagnostico/conversas/{telefone}

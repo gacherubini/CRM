@@ -5,6 +5,7 @@ O app.css de cada painel e carregado DEPOIS do revy-tokens.css. Se ele reabrir
 unica vira decoracao. Foi assim que o ambar do modo escuro divergiu sem que
 ninguem visse. Estes testes existem para que isso quebre aqui.
 """
+import re
 import sys
 from pathlib import Path
 
@@ -256,3 +257,39 @@ def test_secoes_estao_na_ordem_declarada(rel):
     css = caminho(rel).read_text(encoding="utf-8")
     posicoes = [css.index(f"=== {s} ===") for s in SECOES]
     assert posicoes == sorted(posicoes), f"{rel} tem secoes fora de ordem"
+
+
+# Cor em template so se justifica no anti-flash: o <script> que aplica o tema
+# antes de o CSS carregar, para a tela nao piscar branco. Sao cinco arquivos, e
+# os valores tem de bater com o canonico — se divergirem, a tela pisca de uma
+# cor para a outra.
+TEMPLATES_COM_ANTI_FLASH = {
+    "base.html",
+    "login.html",
+    "convite_aceitar.html",
+    "senha_esqueci.html",
+    "senha_redefinir.html",
+}
+
+HEX_DO_ANTI_FLASH = {"#f9f9f9", "#0a0a0a", "#ffffff", "#1b1b1b", "#f5f5f5", "#111111"}
+
+TEMPLATES = ["portal-gestao/app/templates", "revy-trafego/app/templates"]
+
+
+def _templates():
+    for raiz in TEMPLATES:
+        for p in sorted((RAIZ / raiz).rglob("*.html")):
+            yield p.relative_to(RAIZ).as_posix(), p
+
+
+@pytest.mark.parametrize("rel,path", list(_templates()), ids=lambda x: x if isinstance(x, str) else "")
+def test_template_nao_carrega_cor_propria(rel, path):
+    achados = {h.lower() for h in re.findall(r"#[0-9a-fA-F]{3,8}\b", path.read_text(encoding="utf-8"))}
+    if not achados:
+        return
+    permitido = HEX_DO_ANTI_FLASH if path.name in TEMPLATES_COM_ANTI_FLASH else set()
+    fora = sorted(achados - permitido)
+    assert not fora, (
+        f"{rel} tem cor propria: {fora}. Cor vem de token no app.css; "
+        f"so os cinco templates de anti-flash podem citar hex, e so os canonicos."
+    )
