@@ -55,7 +55,7 @@
             <a class="atend-contato-link" href="{{ href_ws }}">
               <strong>{% if i.nome %}{{ i.nome }}{% else %}<span class="muted">Sem nome</span>{% endif %}</strong>
             </a>
-            <small>{{ mascarar_telefone(i.telefone) }}</small>
+            <small class="dado-tecnico">{{ mascarar_telefone(i.telefone) }}</small>
           </div>
         </td>
         <td>{% if i.interesse %}{{ i.interesse }}{% else %}<span class="muted">—</span>{% endif %}</td>

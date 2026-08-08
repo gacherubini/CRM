@@ -629,21 +629,6 @@ p { color: var(--ink-soft); }
 
 .vehicle-list { display: grid; }
 
-.vehicle-row {
-  min-width: 0;
-  display: grid;
-  grid-template-columns: 54px minmax(180px, 1fr) auto 150px;
-  align-items: center;
-  gap: 15px;
-  padding: 14px 16px;
-  border-bottom: 1px solid var(--line);
-  color: inherit;
-  text-decoration: none;
-  transition: background .15s ease;
-}
-.vehicle-row:last-child { border-bottom: 0; }
-.vehicle-row:hover { background: var(--surface-soft); }
-
 .vehicle-row > div:nth-child(2),
 .vehicle-cell > div:last-child,
 .cell-stack {
@@ -1243,7 +1228,8 @@ tr:hover td { background: var(--surface-soft); }
 }
 
 .mono-inline {
-  font: var(--text-xs) ui-monospace, "SFMono-Regular", Consolas, monospace;
+  font: var(--text-xs) var(--font-data);
+  font-variant-numeric: tabular-nums;
   color: var(--ink-soft);
   word-break: break-all;
 }
@@ -2374,6 +2360,31 @@ textarea:focus-visible {
    === Tabela e lista ===
    =========================================================================== */
 
+/* Densidade media: linha de ~34px. Decisao de marca de 08/08, o unico ajuste
+   de espacamento autorizado nesta varredura. */
+.vehicle-row {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 54px minmax(180px, 1fr) auto 150px;
+  align-items: center;
+  gap: 15px;
+  padding: var(--space-2) var(--space-4);
+  border-bottom: 1px solid var(--line);
+  color: inherit;
+  text-decoration: none;
+  transition: background .15s ease;
+}
+.vehicle-row:hover { background: var(--surface-soft); }
+.vehicle-row:last-child { border-bottom: 0; }
+
+/* Placa, telefone e ID: mono e tabular, para conferir caractere a caractere. */
+.dado-tecnico,
+.vehicle-cell .placa {
+  font-family: var(--font-data);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: .01em;
+}
+
 /* ===========================================================================
    === Numero e grafico ===
    =========================================================================== */
@@ -2592,7 +2603,7 @@ textarea:focus-visible {
   gap: var(--space-3);
   padding: var(--space-3);
   border: 1px solid var(--line);
-  border-radius: var(--radius);
+  border-radius: var(--radius-srf);
   background: var(--surface);
 }
 .readiness-item strong { display: block; font-size: var(--text-sm); }

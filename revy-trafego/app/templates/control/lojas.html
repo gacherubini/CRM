@@ -75,7 +75,7 @@
         {% for item in stores %}
         <tr data-href="{{ public_path('/app/control/lojas/' ~ item.store.id) }}">
           <td><a class="table-action" href="{{ public_path('/app/control/lojas/' ~ item.store.id) }}"><strong>{{ item.store.name }}</strong></a></td>
-          <td><code>{{ item.store.slug }}</code></td>
+          <td><code class="dado-tecnico">{{ item.store.slug }}</code></td>
           <td><span class="status-pill status-{{ item.store.status.value }}">{{ rotular(rotulo_status, item.store.status) }}</span></td>
           <td>{{ rotular(rotulo_papel, item.role) if item.role else 'Admin Revy' }}</td>
           <td class="row-open"><span class="row-open-label">Abrir</span><span class="row-open-chevron" aria-hidden="true">›</span></td>

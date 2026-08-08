@@ -62,6 +62,15 @@ def test_acento_preto_do_sistema_antigo_nao_volta(rel, morto):
     assert usos_de_var(caminho(rel), morto) == 0, f"{rel} ainda usa var({morto})"
 
 
+@pytest.mark.parametrize("rel", PAINEIS)
+def test_dado_tecnico_usa_a_fonte_mono(rel):
+    """Placa, telefone e ID sao para conferir caractere a caractere; em fonte
+    proporcional o 0/O e o 1/l se confundem."""
+    assert usos_de_var(caminho(rel), "--font-data") > 0, (
+        f"{rel} nao usa --font-data em lugar nenhum"
+    )
+
+
 # Uma secao por peca de interface, na ordem do arquivo. Cada tarefa de peca
 # escreve dentro da sua: e isso que impede a regra de uma peca de nascer a
 # 1.500 linhas da outra regra da mesma peca.
@@ -71,7 +80,7 @@ def test_acento_preto_do_sistema_antigo_nao_volta(rel, morto):
 # paralelo nascendo.
 TETO_RAIOS = {
     "portal-gestao/app/static/css/app.css": 39,
-    "revy-trafego/app/static/css/app.css": 34,
+    "revy-trafego/app/static/css/app.css": 33,
 }
 
 
