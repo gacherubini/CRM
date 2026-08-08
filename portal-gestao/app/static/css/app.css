@@ -228,17 +228,6 @@ button, .button, a { -webkit-tap-highlight-color: transparent; }
   background: var(--green);
 }
 
-.link-button {
-  border: 0;
-  background: transparent;
-  color: var(--ink-soft);
-  cursor: pointer;
-  font-size: 12px;
-  font-weight: 500;
-}
-
-.link-button:hover { color: var(--ink); }
-
 /* Toggle claro / escuro — mesmo peso visual do "Sair" */
 .theme-toggle {
   display: inline-flex;
@@ -472,52 +461,6 @@ p { color: var(--ink-soft); }
   text-decoration: none;
 }
 .back-link:hover { color: var(--ink); }
-
-.button {
-  min-height: 36px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0 14px;
-  border: 1px solid transparent;
-  border-radius: 8px;
-  cursor: pointer;
-  font-size: 13px;
-  font-weight: 600;
-  text-decoration: none;
-  transition: background .15s ease, border-color .15s ease, opacity .15s ease;
-}
-.button:hover { opacity: .92; }
-/* Sem variante o botao caia no estilo nativo do navegador (cinza, fora da
-   paleta). O padrao passa a ser o neutro. */
-.button:not(.primary):not(.secondary):not(.ghost):not(.danger) {
-  border-color: var(--line);
-  background: var(--surface);
-  color: var(--ink);
-}
-.button:not(.primary):not(.secondary):not(.ghost):not(.danger):hover {
-  background: var(--surface-soft);
-}
-.button.primary {
-  background: var(--ink);
-  color: var(--paper);
-}
-.button.secondary {
-  /* Branco (--surface) para nao sumir no canvas greige; delineado pela borda. */
-  border-color: var(--line);
-  background: var(--surface);
-  color: var(--ink);
-}
-.button.secondary:hover { background: var(--surface-soft); }
-.button.ghost {
-  background: transparent;
-  color: var(--ink-soft);
-}
-.button.danger {
-  border-color: color-mix(in srgb, var(--red) 30%, var(--line));
-  background: color-mix(in srgb, var(--red) 8%, var(--paper));
-  color: var(--red);
-}
 
 .dashboard-grid {
   display: grid;
@@ -2017,9 +1960,60 @@ tr:hover td { background: var(--surface-soft); }
    === Botao ===
    =========================================================================== */
 
+/* Botao reto: raio 3px, borda de 1px, caixa-baixa. Decisao de 08/08 — o botao
+   e a mesma peca no site, na vitrine e no painel. */
+.button {
+  min-height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 14px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-ctl);
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: background .15s ease, border-color .15s ease, opacity .15s ease;
+}
+.button:hover { opacity: .92; }
+
+/* Sem variante o botao caia no estilo nativo do navegador. O padrao e o neutro. */
+.button:not(.primary):not(.secondary):not(.ghost):not(.danger) {
+  border-color: var(--line-strong);
+  background: var(--surface);
+  color: var(--ink);
+}
+.button:not(.primary):not(.secondary):not(.ghost):not(.danger):hover {
+  background: var(--surface-soft);
+}
+
 /* Botao primario = cor da marca (antes era preto) */
-.button.primary { background: var(--brand); color: var(--brand-ink); }
-.button.primary:hover { background: var(--brand-strong); opacity: 1; }
+.button.primary { background: var(--brand); color: var(--brand-ink); border-color: var(--brand); }
+.button.primary:hover { background: var(--brand-strong); border-color: var(--brand-strong); opacity: 1; }
+.button.secondary {
+  /* Branco (--surface) para nao sumir no canvas greige; delineado pela borda. */
+  border-color: var(--line);
+  background: var(--surface);
+  color: var(--ink);
+}
+.button.secondary:hover { background: var(--surface-soft); }
+.button.ghost {
+  background: transparent;
+  color: var(--ink-soft);
+}
+.button.danger { background: var(--danger); color: #ffffff; border-color: var(--danger); }
+
+.link-button {
+  border: 0;
+  border-radius: var(--radius-ctl);
+  background: transparent;
+  color: var(--ink-soft);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 500;
+}
+.link-button:hover { color: var(--ink); }
 
 /* ===========================================================================
    === Campo e formulario ===
@@ -2993,7 +2987,7 @@ a.metric-link:focus-visible { outline: 2px solid var(--brand); outline-offset: 2
 }
 
 /* --- Botao reto (3px) --- */
-.button, .link-button, input, select, textarea, .search, .filter-bar select {
+input, select, textarea, .search, .filter-bar select {
   border-radius: var(--radius-ctl);
 }
 .nav-link { border-radius: var(--radius-nav); }

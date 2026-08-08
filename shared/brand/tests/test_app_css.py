@@ -65,6 +65,25 @@ def test_acento_preto_do_sistema_antigo_nao_volta(rel, morto):
 # Uma secao por peca de interface, na ordem do arquivo. Cada tarefa de peca
 # escreve dentro da sua: e isso que impede a regra de uma peca de nascer a
 # 1.500 linhas da outra regra da mesma peca.
+# Teto de border-radius literais por arquivo. So desce: cada tarefa de peca
+# tokeniza os raios da peca dela e baixa o numero aqui. A Tarefa 14 zera.
+# O sistema tem tres raios (3/8/12); qualquer quarto valor e um sistema
+# paralelo nascendo.
+TETO_RAIOS = {
+    "portal-gestao/app/static/css/app.css": 52,
+    "revy-trafego/app/static/css/app.css": 48,
+}
+
+
+@pytest.mark.parametrize("rel", PAINEIS)
+def test_teto_de_raios_literais(rel):
+    achados = raios_literais(caminho(rel))
+    assert len(achados) <= TETO_RAIOS[rel], (
+        f"{rel}: {len(achados)} raios literais, teto {TETO_RAIOS[rel]}. "
+        f"Primeiros: {achados[:8]}"
+    )
+
+
 SECOES = [
     "Botao",
     "Campo e formulario",
