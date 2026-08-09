@@ -60,6 +60,7 @@ independentes".
 | ops | [Runbook rollout lab](2026-07-29-runbook-rollout-lab-provisionamento.md) | Subida do lab + provisionamento | Usar junto de `deploy/fly/3vm/README.md` |
 | ops | [Menu estoque WA + fotos](2026-07-22-plano-menu-estoque-wa-e-fotos-fix.md) | Cadastro/menu/fotos | Código DONE; falta E2E |
 | ops | [Alerta simulação no grupo](2026-08-05-plano-alerta-grupo-estoque-simulacao.md) | Chatbot + n8n + Evolution | F0–F2 no código; residual outbox/retry + smoke |
+| site | [Rebuild landing estática](2026-08-09-plano-site-rebuild-html-estatico.md) | Site marketing | **BACKLOG deferido** — export do design tool segue em uso + `apply-seo` a cada export; rebuild só quando o site virar prioridade |
 
 #1A e #4A avançam em paralelo depois do #0; #2A depende da fatia Lite do #4A. A numeração é
 histórica e **não** obriga Portal antes de Estoque/Catálogo.
