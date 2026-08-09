@@ -52,6 +52,7 @@ img{max-width:100%}
 .hvid{transform-origin:50% 50%;transition:transform .9s cubic-bezier(.22,.61,.36,1),box-shadow .9s ease,border-color .9s ease}
 .hvid:hover{transform:scale(.93)!important;box-shadow:0 14px 40px rgba(27,20,20,.09),0 2px 5px rgba(27,20,20,.04);border-color:#cdc6c4}
 @keyframes revy-dash{to{stroke-dashoffset:-100}}
+@media (max-width:1115px){[data-veja-list]{position:static!important;top:auto!important;background:transparent!important;max-width:none!important}}
 </style>
 </head>
 <body>
@@ -172,45 +173,82 @@ img{max-width:100%}
         <p style="margin: 0; max-width: 620px; font-size: 19px; line-height: 1.6; color: #57514f;">Escolha um momento da operação e veja o que acontece dentro do Revy Loja.</p>
       </div>
 
-      <div style="display: flex; flex-wrap: wrap; gap: clamp(28px, 3.5vw, 48px); align-items: flex-start;">
-        <div style="flex: 1 1 220px; max-width: 260px; display: flex; flex-direction: column; gap: 4px;">
-          <button type="button" data-tab="0" class="tab is-on" style="display:flex;width:100%;text-align:left;align-items:center;padding:14px 0 14px 18px;cursor:pointer;font-family:inherit;background:transparent;border:none;border-left:2px solid #1b1b1b;color:#1b1b1b;transform-origin:left center;transform:translateX(4px);transition:color .3s ease,border-color .3s ease,transform .35s cubic-bezier(.22,.61,.36,1)">
-            <span style="font-size: 18px; font-weight: 600; letter-spacing: -.01em;">Atendimento no WhatsApp</span>
+      <div id="veja-row" style="display: flex; flex-wrap: wrap; gap: clamp(28px, 3.5vw, 48px); align-items: flex-start;">
+        <div data-veja-list id="veja-list" style="flex: 1 1 220px; max-width: 260px; position: sticky; top: 132px; z-index: 2; background: #f9f9f9; display: flex; flex-direction: column; gap: 4px;">
+          <button type="button" data-tab="0" style="display:flex;width:100%;text-align:left;align-items:center;padding:11px 0;cursor:pointer;font-family:inherit;background:transparent;border:none;transition:color .45s ease;color:#1b1b1b;">
+            <span style="font-size: 21px; font-weight: 600; letter-spacing: -.015em;">Atendimento no WhatsApp</span>
           </button>
-          <button type="button" data-tab="1" class="tab" style="display:flex;width:100%;text-align:left;align-items:center;padding:14px 0 14px 18px;cursor:pointer;font-family:inherit;background:transparent;border:none;border-left:2px solid #ded8d9;color:#8a8280;transform-origin:left center;transform:translateX(0px);transition:color .3s ease,border-color .3s ease,transform .35s cubic-bezier(.22,.61,.36,1)">
-            <span style="font-size: 18px; font-weight: 600; letter-spacing: -.01em;">Simulação nos bancos</span>
+          <button type="button" data-tab="1" style="display:flex;width:100%;text-align:left;align-items:center;padding:11px 0;cursor:pointer;font-family:inherit;background:transparent;border:none;transition:color .45s ease;color:#d3cecc;">
+            <span style="font-size: 21px; font-weight: 600; letter-spacing: -.015em;">Simulação nos bancos</span>
           </button>
-          <button type="button" data-tab="2" class="tab" style="display:flex;width:100%;text-align:left;align-items:center;padding:14px 0 14px 18px;cursor:pointer;font-family:inherit;background:transparent;border:none;border-left:2px solid #ded8d9;color:#8a8280;transform-origin:left center;transform:translateX(0px);transition:color .3s ease,border-color .3s ease,transform .35s cubic-bezier(.22,.61,.36,1)">
-            <span style="font-size: 18px; font-weight: 600; letter-spacing: -.01em;">Venda confirmada</span>
+          <button type="button" data-tab="2" style="display:flex;width:100%;text-align:left;align-items:center;padding:11px 0;cursor:pointer;font-family:inherit;background:transparent;border:none;transition:color .45s ease;color:#d3cecc;">
+            <span style="font-size: 21px; font-weight: 600; letter-spacing: -.015em;">Venda confirmada</span>
           </button>
-          <button type="button" data-tab="3" class="tab" style="display:flex;width:100%;text-align:left;align-items:center;padding:14px 0 14px 18px;cursor:pointer;font-family:inherit;background:transparent;border:none;border-left:2px solid #ded8d9;color:#8a8280;transform-origin:left center;transform:translateX(0px);transition:color .3s ease,border-color .3s ease,transform .35s cubic-bezier(.22,.61,.36,1)">
-            <span style="font-size: 18px; font-weight: 600; letter-spacing: -.01em;">Caixa do mês</span>
+          <button type="button" data-tab="3" style="display:flex;width:100%;text-align:left;align-items:center;padding:11px 0;cursor:pointer;font-family:inherit;background:transparent;border:none;transition:color .45s ease;color:#d3cecc;">
+            <span style="font-size: 21px; font-weight: 600; letter-spacing: -.015em;">Caixa do mês</span>
           </button>
-          <button type="button" data-tab="4" class="tab" style="display:flex;width:100%;text-align:left;align-items:center;padding:14px 0 14px 18px;cursor:pointer;font-family:inherit;background:transparent;border:none;border-left:2px solid #ded8d9;color:#8a8280;transform-origin:left center;transform:translateX(0px);transition:color .3s ease,border-color .3s ease,transform .35s cubic-bezier(.22,.61,.36,1)">
-            <span style="font-size: 18px; font-weight: 600; letter-spacing: -.01em;">Números do agente</span>
+          <button type="button" data-tab="4" style="display:flex;width:100%;text-align:left;align-items:center;padding:11px 0;cursor:pointer;font-family:inherit;background:transparent;border:none;transition:color .45s ease;color:#d3cecc;">
+            <span style="font-size: 21px; font-weight: 600; letter-spacing: -.015em;">Números do agente</span>
           </button>
         </div>
 
-        <div style="flex: 4 1 680px; min-width: 0;">
-          <div style="border: 1px solid #ded8d9; border-radius: 16px; overflow: hidden; background: #ffffff; box-shadow: 0 30px 80px rgba(27,20,20,.10), 0 2px 6px rgba(27,20,20,.05); transition: transform .45s cubic-bezier(.22,.61,.36,1), box-shadow .45s ease, border-color .45s ease;" class="h4">
-            <div style="position: relative; aspect-ratio: 16 / 9; overflow: hidden; background: #ffffff;">
-              <figure class="slide is-on" data-slide="0" style="margin:0;position:absolute;inset:0;" data-demo="demos/02-agente-atendimento.html">
-                <img src="assets/poster-2.jpg" width="960" height="540" alt="Atendimento no WhatsApp dentro do Revy Loja" loading="eager" decoding="async" style="display:block;width:100%;height:100%;object-fit:cover;" />
-              </figure>
-              <figure class="slide" data-slide="1" style="margin:0;position:absolute;inset:0;display:none;" data-demo="demos/03-simulacao-bancos.html">
-                <img src="assets/poster-3.jpg" width="960" height="540" alt="Simulação de financiamento nos bancos da loja" loading="lazy" decoding="async" style="display:block;width:100%;height:100%;object-fit:cover;" />
-              </figure>
-              <figure class="slide" data-slide="2" style="margin:0;position:absolute;inset:0;display:none;" data-demo="demos/04-venda-confirmada.html">
-                <img src="assets/poster-4.jpg" width="960" height="540" alt="Venda confirmada no Revy Loja" loading="lazy" decoding="async" style="display:block;width:100%;height:100%;object-fit:cover;" />
-              </figure>
-              <figure class="slide" data-slide="3" style="margin:0;position:absolute;inset:0;display:none;" data-demo="demos/05-caixa-do-mes.html">
-                <img src="assets/poster-5.jpg" width="960" height="540" alt="Caixa do mês com as vendas confirmadas" loading="lazy" decoding="async" style="display:block;width:100%;height:100%;object-fit:cover;" />
-              </figure>
-              <figure class="slide" data-slide="4" style="margin:0;position:absolute;inset:0;display:none;" data-demo="demos/06-numeros-do-agente.html">
-                <img src="assets/poster-6.jpg" width="960" height="540" alt="Números do agente: conversas atendidas e repassadas" loading="lazy" decoding="async" style="display:block;width:100%;height:100%;object-fit:cover;" />
-              </figure>
+        <div style="flex: 4 1 680px; min-width: 0; display: flex; flex-direction: column;">
+
+          <div data-panel="0" style="scroll-margin-top: 132px; padding-block: clamp(40px, 5vw, 68px); border-top: 1px solid #ded8d9;">
+            <p style="margin: 0 0 34px; max-width: 34ch; font-size: clamp(24px, 2.3vw, 32px); line-height: 1.28; letter-spacing: -.015em; color: #8a8280; text-wrap: pretty;"><strong style="font-weight: 600; color: #1b1b1b;">Para quem atende o dia inteiro.</strong> O cliente pergunta a qualquer hora e é respondido na mesma hora, pelo nome da sua loja.</p>
+            <div class="hvid" style="border: 1px solid #ded8d9; border-radius: 16px; overflow: hidden; background: #ffffff; box-shadow: 0 30px 80px rgba(27,20,20,.10), 0 2px 6px rgba(27,20,20,.05);">
+              <div style="position: relative; aspect-ratio: 16 / 9; overflow: hidden; background: #ffffff;">
+                <figure style="margin:0;position:absolute;inset:0;" data-demo="demos/02-agente-atendimento.html">
+                  <img src="assets/poster-2.jpg" width="960" height="540" alt="Atendimento no WhatsApp dentro do Revy Loja" loading="lazy" decoding="async" style="display:block;width:100%;height:100%;object-fit:cover;" />
+                </figure>
+              </div>
             </div>
           </div>
+
+          <div data-panel="1" style="scroll-margin-top: 132px; padding-block: clamp(40px, 5vw, 68px); border-top: 1px solid #ded8d9;">
+            <p style="margin: 0 0 34px; max-width: 34ch; font-size: clamp(24px, 2.3vw, 32px); line-height: 1.28; letter-spacing: -.015em; color: #8a8280; text-wrap: pretty;"><strong style="font-weight: 600; color: #1b1b1b;">Para quem vive nos portais.</strong> Os bancos da sua loja são consultados de uma vez, com as credenciais da própria loja.</p>
+            <div class="hvid" style="border: 1px solid #ded8d9; border-radius: 16px; overflow: hidden; background: #ffffff; box-shadow: 0 30px 80px rgba(27,20,20,.10), 0 2px 6px rgba(27,20,20,.05);">
+              <div style="position: relative; aspect-ratio: 16 / 9; overflow: hidden; background: #ffffff;">
+                <figure style="margin:0;position:absolute;inset:0;" data-demo="demos/03-simulacao-bancos.html">
+                  <img src="assets/poster-3.jpg" width="960" height="540" alt="Simulação de financiamento nos bancos da loja" loading="lazy" decoding="async" style="display:block;width:100%;height:100%;object-fit:cover;" />
+                </figure>
+              </div>
+            </div>
+          </div>
+
+          <div data-panel="2" style="scroll-margin-top: 132px; padding-block: clamp(40px, 5vw, 68px); border-top: 1px solid #ded8d9;">
+            <p style="margin: 0 0 34px; max-width: 34ch; font-size: clamp(24px, 2.3vw, 32px); line-height: 1.28; letter-spacing: -.015em; color: #8a8280; text-wrap: pretty;"><strong style="font-weight: 600; color: #1b1b1b;">Para quem fecha o negócio.</strong> A moto sai do estoque, o vendedor fica registrado e a campanha que trouxe o cliente vem junto.</p>
+            <div class="hvid" style="border: 1px solid #ded8d9; border-radius: 16px; overflow: hidden; background: #ffffff; box-shadow: 0 30px 80px rgba(27,20,20,.10), 0 2px 6px rgba(27,20,20,.05);">
+              <div style="position: relative; aspect-ratio: 16 / 9; overflow: hidden; background: #ffffff;">
+                <figure style="margin:0;position:absolute;inset:0;" data-demo="demos/04-venda-confirmada.html">
+                  <img src="assets/poster-4.jpg" width="960" height="540" alt="Venda confirmada no Revy Loja" loading="lazy" decoding="async" style="display:block;width:100%;height:100%;object-fit:cover;" />
+                </figure>
+              </div>
+            </div>
+          </div>
+
+          <div data-panel="3" style="scroll-margin-top: 132px; padding-block: clamp(40px, 5vw, 68px); border-top: 1px solid #ded8d9;">
+            <p style="margin: 0 0 34px; max-width: 34ch; font-size: clamp(24px, 2.3vw, 32px); line-height: 1.28; letter-spacing: -.015em; color: #8a8280; text-wrap: pretty;"><strong style="font-weight: 600; color: #1b1b1b;">Para quem responde pelo número.</strong> Quem vendeu, quanto entrou e o que ainda está em aberto — em uma tela só.</p>
+            <div class="hvid" style="border: 1px solid #ded8d9; border-radius: 16px; overflow: hidden; background: #ffffff; box-shadow: 0 30px 80px rgba(27,20,20,.10), 0 2px 6px rgba(27,20,20,.05);">
+              <div style="position: relative; aspect-ratio: 16 / 9; overflow: hidden; background: #ffffff;">
+                <figure style="margin:0;position:absolute;inset:0;" data-demo="demos/05-caixa-do-mes.html">
+                  <img src="assets/poster-5.jpg" width="960" height="540" alt="Caixa do mês com as vendas confirmadas" loading="lazy" decoding="async" style="display:block;width:100%;height:100%;object-fit:cover;" />
+                </figure>
+              </div>
+            </div>
+          </div>
+
+          <div data-panel="4" style="scroll-margin-top: 132px; padding-block: clamp(40px, 5vw, 68px); border-top: 1px solid #ded8d9;">
+            <p style="margin: 0 0 34px; max-width: 34ch; font-size: clamp(24px, 2.3vw, 32px); line-height: 1.28; letter-spacing: -.015em; color: #8a8280; text-wrap: pretty;"><strong style="font-weight: 600; color: #1b1b1b;">Para quem quer saber se funciona.</strong> Quantas conversas o assistente segurou sozinho e quantas chegaram prontas para o vendedor.</p>
+            <div class="hvid" style="border: 1px solid #ded8d9; border-radius: 16px; overflow: hidden; background: #ffffff; box-shadow: 0 30px 80px rgba(27,20,20,.10), 0 2px 6px rgba(27,20,20,.05);">
+              <div style="position: relative; aspect-ratio: 16 / 9; overflow: hidden; background: #ffffff;">
+                <figure style="margin:0;position:absolute;inset:0;" data-demo="demos/06-numeros-do-agente.html">
+                  <img src="assets/poster-6.jpg" width="960" height="540" alt="Números do agente: conversas atendidas e repassadas" loading="lazy" decoding="async" style="display:block;width:100%;height:100%;object-fit:cover;" />
+                </figure>
+              </div>
+            </div>
+          </div>
+
         </div>
       </div>
     </div>
@@ -353,8 +391,6 @@ img{max-width:100%}
   });
   intro.forEach(function(el,i){ setTimeout(function(){ el.classList.add('in'); }, 90+i*150); });
 
-  var tabs=[].slice.call(document.querySelectorAll('.tab'));
-  var slides=[].slice.call(document.querySelectorAll('.slide'));
   var figs=[].slice.call(document.querySelectorAll('figure[data-demo]'));
 
   // com JS ativo a imagem é só ponte: some na hora, para nunca aparecer ampliada
@@ -375,25 +411,18 @@ img{max-width:100%}
     fig.appendChild(f);
   }
 
-  // hero e primeira tela da lista carregam já; o resto assim que se aproxima
+  // hero carrega já; o resto (telas empilhadas e tráfego) assim que se aproxima
   var eager={};
   if(figs[0]){ mount(figs[0]); eager[0]=1; }
-  var first=document.querySelector('.slide.is-on');
-  if(first){ mount(first); }
 
   var io=new IntersectionObserver(function(es){
     es.forEach(function(e){ if(e.isIntersecting){ mount(e.target); io.unobserve(e.target); } });
   },{threshold:0,rootMargin:'900px 0px'});
   figs.forEach(function(fig){
     if(fig.dataset.mounted)return;
-    if(!fig.classList.contains('slide')) io.observe(fig);
+    io.observe(fig);
   });
 
-  function paint(on,el){
-    el.style.borderLeftColor=on?'#1b1b1b':'#ded8d9';
-    el.style.color=on?'#1b1b1b':'#8a8280';
-    el.style.transform='translateX('+(on?4:0)+'px)';
-  }
   // entrada em cascata: o que está abaixo da dobra sobe conforme aparece
   (function(){
     var sel='section h2, section h3, section p, .tab, figure, section [style*="aspect-ratio"], section [style*="box-shadow: 0 0 0 1px #ded8d9"]';
@@ -416,18 +445,59 @@ img{max-width:100%}
     cand.forEach(function(el){ rio.observe(el); });
   })();
 
-  tabs.forEach(function(t,i){
-    t.addEventListener('click',function(){
-      tabs.forEach(function(o,j){o.classList.toggle('is-on',i===j);paint(i===j,o);});
-      slides.forEach(function(sl,j){
-        if(i===j){
-          sl.style.display=''; sl.style.opacity=0;
-          requestAnimationFrame(function(){ sl.style.opacity=1; });
-          mount(sl);
-        } else { sl.style.display='none'; }
+  // lista fixa + telas empilhadas: destaque por leitura e clique com scroll rápido
+  (function(){
+    var row=document.getElementById('veja-row');
+    if(!row)return;
+    var btns=[].slice.call(row.querySelectorAll('[data-tab]'));
+    var panels=[].slice.call(row.querySelectorAll('[data-panel]'));
+    if(!btns.length||btns.length!==panels.length)return;
+    var active=-1, lock=false, raf=null;
+
+    function paint(i){
+      if(i===active)return;
+      active=i;
+      btns.forEach(function(b,j){ b.style.color = j===i ? '#1b1b1b' : '#d3cecc'; });
+    }
+    // o hover respeita o item ativo: o ativo continua preto
+    btns.forEach(function(b,i){
+      b.addEventListener('mouseenter',function(){ b.style.color = i===active ? '#1b1b1b' : '#8a8280'; });
+      b.addEventListener('mouseleave',function(){ b.style.color = i===active ? '#1b1b1b' : '#d3cecc'; });
+    });
+
+    function sync(){
+      if(lock)return;
+      var line=window.innerHeight*0.38, idx=0;
+      panels.forEach(function(p,i){ if(p.getBoundingClientRect().top<=line) idx=i; });
+      paint(idx);
+    }
+    window.addEventListener('scroll',function(){
+      if(raf)return;
+      raf=requestAnimationFrame(function(){ raf=null; sync(); });
+    },{passive:true});
+    window.addEventListener('resize',sync);
+    sync();
+
+    btns.forEach(function(b,i){
+      b.addEventListener('click',function(){
+        var el=panels[i]; if(!el)return;
+        lock=true; paint(i);
+        // durante a rolagem o mouse não deve acender o que passa por baixo
+        row.style.pointerEvents='none';
+        var start=window.pageYOffset;
+        var dist=el.getBoundingClientRect().top+start-150-start;
+        if(Math.abs(dist)<2){ lock=false; row.style.pointerEvents=''; return; }
+        var dur=Math.min(600,Math.max(280,Math.abs(dist)*0.32)), t0=performance.now();
+        (function step(now){
+          var p=Math.min(1,(now-t0)/dur);
+          var e=p<0.5?4*p*p*p:1-Math.pow(-2*p+2,3)/2;
+          window.scrollTo(0,start+dist*e);
+          if(p<1)requestAnimationFrame(step);
+          else{ lock=false; row.style.pointerEvents=''; }
+        })(performance.now());
       });
     });
-  });
+  })();
 
   // linha verde percorrendo a borda do badge — 12 segmentos com opacidade crescente
   (function(){
