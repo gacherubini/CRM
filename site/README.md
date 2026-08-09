@@ -20,6 +20,24 @@ site/
   README.md
 ```
 
+## SEO e preview social (rodar a CADA novo export)
+
+O `index.html` é um bundle que **só renderiza via JavaScript** — sem tratamento, Google e os
+scrapers de link (WhatsApp, Instagram, Facebook) recebem uma página vazia. O script
+`apply-seo.mjs` injeta no `<head>` do export: `lang`, `meta description`, `canonical`,
+Open Graph + Twitter Card (imagem de preview = `assets/hero-poster.jpg`) e troca o
+`<noscript>` "requires JavaScript" por um fallback com o conteúdo real (hero + como funciona +
+o que a Revy não faz). É **idempotente** e mexe só no `<head>`.
+
+**Sempre que você trouxer um export novo do design tool, rode isto ANTES de commitar/deployar:**
+
+```powershell
+# depois de copiar o novo revy-site.html para site\index.html
+node site\apply-seo.mjs site\index.html
+```
+
+Se pular esse passo, o próximo export volta a ficar invisível pro Google/preview.
+
 ## Deploy Fly.io
 
 No path **3-VM**, o site vai **dentro do bundle** `app2037` (nginx edge), não como app
