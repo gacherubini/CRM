@@ -2,14 +2,16 @@
 
 ## Status
 
-**BACKLOG — deferido pelo dono (2026-08-09).** Não é fila ativa. O site atual (export do
-design tool) **segue válido e em uso**; dá pra continuar buildando/exportando normalmente. A
-única regra operacional enquanto isso: **rodar `node site/apply-seo.mjs site/index.html` a cada
-export, antes do deploy** (senão volta a ficar invisível no Google/preview). Ver
-[[site-seo-apply-export]] e `site/README.md`.
+**EM GRANDE PARTE RESOLVIDO PELA FERRAMENTA (2026-08-09).** A ferramenta passou a exportar em
+**formato estático de produção** (`dist/static/`: `index.html` **pré-renderizado** com conteúdo
+visível sem JS + SEO/OG nativo, `assets/`, e `demos/` em `<iframe>` lazy). Essa versão está
+**LIVE** no `app2037` e o `apply-seo.mjs` foi **aposentado** (o export já traz SEO). Fluxo de
+atualização em `site/README.md`.
 
-Fazer só **quando o site virar prioridade de aquisição** (tráfego/SEO sério). Para um piloto com
-uma loja, o site atual é suficiente.
+Sobra do rebuild manual, agora um BACKLOG menor: (a) as **animações** ainda são bundles pesados
+(~1,27 MB cada, React/Babel transpilando no navegador) embutidos em iframe — o único ponto de
+peso/jank que resta; (b) **a11y**: `<main>`, `<form>` de verdade no contato, `prefers-reduced-motion`.
+Fazer só quando o site virar prioridade; para um piloto, a versão atual já resolve o essencial.
 
 ## Problema (por que arrumar um dia)
 

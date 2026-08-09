@@ -48,6 +48,7 @@ COPY motor-simulacao/alembic.ini /srv/motor/alembic.ini
 
 COPY site/index.html /srv/site/html/index.html
 COPY site/assets /srv/site/html/assets
+COPY site/demos /srv/site/html/demos
 COPY deploy/fly/3vm/site-nginx.conf /etc/nginx/sites-available/site.conf
 COPY deploy/fly/3vm/nginx-edge.conf /etc/nginx/edge.conf
 COPY deploy/fly/3vm/nginx.conf /etc/nginx/nginx.conf
