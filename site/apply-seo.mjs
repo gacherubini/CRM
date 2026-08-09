@@ -14,8 +14,8 @@ import { readFileSync, writeFileSync } from 'node:fs';
 const file = process.argv[2] || 'site/index.html';
 
 const SITE_URL = 'https://app2037.fly.dev/site/';
-const OG_IMAGE = 'https://app2037.fly.dev/site/assets/hero-poster.jpg';
-const OG_W = 1376, OG_H = 768;
+const OG_IMAGE = 'https://app2037.fly.dev/site/assets/og-card.jpg';
+const OG_W = 1200, OG_H = 630;
 const TITLE = 'Revy — A revenda no ritmo certo';
 const DESC =
   'A Revy atende o cliente no WhatsApp, simula financiamento nos bancos da propria ' +
