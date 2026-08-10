@@ -62,7 +62,8 @@ Testes que cobrem os pontos sensíveis:
    HTTP 200 com `bloqueado=true`, `motivo_bloqueio=menor_de_idade` e a mensagem fixa ao
    cliente — sem lead/pausa/alerta.
 2. **CNH objetiva** (`sim` ou `não`). Resposta vaga → `motivo_bloqueio=cnh_nao_confirmada`
-   e `faltando: ["cnh"]` (sem envio).
+   e `faltando: ["cnh"]` (sem envio). **Não ter CNH não bloqueia**: `não`/`não tenho`
+   é confirmação válida e a solicitação segue para o grupo com `CNH: NÃO`.
 3. **Dedupe**: mesma `Idempotency-Key`, ou solicitação recente do mesmo telefone/CPF
    (janela `CHATBOT_SIMULACAO_DEDUPE_HORAS`, default 48h) → reutiliza o atendimento e
    **não** reenvia o alerta.

@@ -174,8 +174,18 @@ def main() -> None:
     )
     assert "cnh (sim ou não) são obrigatórios" in system_message_lower or (
         "cnh (sim ou não) é obrigatória" in system_message_lower
+        or "resposta sobre cnh (sim ou não) são obrigatórios" in system_message_lower
+        or "resposta se tem cnh (sim ou não) são obrigatórios" in system_message_lower
     ), (
         "prompt deve exigir CNH objetiva (sim/não) antes de encaminhar simulação"
+    )
+    assert (
+        "nunca recuse simulação porque o cliente não tem cnh" in system_message_lower
+        or "não ter cnh não impede" in system_message_lower
+        or "não ter cnh não bloqueia" in system_message_lower
+        or "ter cnh não é requisito" in system_message_lower
+    ), (
+        "prompt deve deixar claro que não ter CNH não bloqueia a simulação"
     )
     assert "motivo_bloqueio=menor_de_idade" in system_message_lower, (
         "prompt deve tratar bloqueio de menor de 18 anos com a mensagem da tool"

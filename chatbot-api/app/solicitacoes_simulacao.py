@@ -50,8 +50,9 @@ _MENSAGEM_MENOR_IDADE = (
 )
 _MENSAGEM_CNH = (
     "confirme claramente se o cliente tem CNH. peça resposta objetiva: sim ou não. "
-    "insista com educação até obter essa resposta. NÃO diga certinho nem que vai "
-    "encaminhar pro setor enquanto a CNH não estiver confirmada."
+    "“não” também vale e a simulação segue. insista com educação só se a resposta for "
+    "vaga. NÃO diga certinho nem que vai encaminhar pro setor enquanto a CNH não "
+    "estiver confirmada. NUNCA diga que sem CNH não dá para simular."
 )
 _VENDEDOR_NAO_IDENTIFICADO = "não identificado"
 
