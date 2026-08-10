@@ -1,21 +1,31 @@
 """Solicitação de simulação humana: lead + pausa bot + alerta no grupo de estoque.
 
 Endpoint canônico usado pelas tools n8n (simular1 e fallback TEMP). Idempotente por
-``Idempotency-Key`` (providerMessageId).
+``Idempotency-Key`` (providerMessageId) e, em seguida, por solicitação recente do
+mesmo cliente (telefone/CPF) para evitar alertas duplicados no grupo.
+
+Ordem obrigatória antes de enviar ao grupo:
+1. validar data de nascimento e maioridade (>= 18);
+2. confirmar CNH com sim ou não objetivo;
+3. verificar se já existe solicitação recente para o mesmo cliente;
+4. somente então qualificar lead, pausar bot e alertar o grupo.
 
 O alerta do grupo inclui telefone, CPF e nascimento completos (operação da equipe);
-não inventa dados ausentes.
+não inventa dados ausentes. Bloqueios sempre registram ``motivo_bloqueio`` no log
+e na resposta.
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 import os
 import re
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from typing import Any, Callable
 from urllib.parse import quote
+from zoneinfo import ZoneInfo
 
 from fastapi import HTTPException
 from sqlalchemy import or_
@@ -33,6 +43,15 @@ TIPO_SIMULACAO_HUMANA = "simulacao_humana"
 _MENSAGEM_CLIENTE = (
     "certo, já tenho seus dados. vou encaminhar pro setor de simulação e te retorno "
     "por aqui. atendemos das 8h30 às 18h; fora desse horário, respondo no próximo dia útil."
+)
+_MENSAGEM_MENOR_IDADE = (
+    "No momento, não é possível liberar financiamento para menores de 18 anos. "
+    "Quando você atingir a maioridade, poderemos realizar uma nova simulação para você."
+)
+_MENSAGEM_CNH = (
+    "confirme claramente se o cliente tem CNH. peça resposta objetiva: sim ou não. "
+    "insista com educação até obter essa resposta. NÃO diga certinho nem que vai "
+    "encaminhar pro setor enquanto a CNH não estiver confirmada."
 )
 _VENDEDOR_NAO_IDENTIFICADO = "não identificado"
 
@@ -56,6 +75,9 @@ def _float_env(nome: str, default: float) -> float:
 MAX_TENTATIVAS_ALERTA = _int_env("CHATBOT_NOTIF_MAX_ATTEMPTS", 6)
 _BACKOFF_BASE_SECONDS = _float_env("CHATBOT_NOTIF_BACKOFF_BASE_SECONDS", 30)
 _BACKOFF_MAX_SECONDS = _float_env("CHATBOT_NOTIF_BACKOFF_MAX_SECONDS", 1800)
+# Janela em que um segundo pedido do mesmo cliente (telefone/CPF) reutiliza o
+# atendimento em vez de reenviar alerta ao grupo.
+DEDUPE_HORAS = max(1, _int_env("CHATBOT_SIMULACAO_DEDUPE_HORAS", 48))
 
 
 def _agora() -> datetime:
@@ -157,11 +179,53 @@ def _texto_do_resumo(notif: NotificacaoOperacional) -> str:
 def _normalizar_cnh(valor: str | None) -> str:
     """Retorna SIM, NÃO ou NÃO INFORMADO (maiúsculas, como no modelo do grupo)."""
     raw = (valor or "").strip().lower()
-    if raw.startswith(("s", "sim", "tenho", "possuo", "true", "1")):
+    # Normaliza acentos simples e pontuação residual.
+    raw = (
+        raw.replace("ã", "a")
+        .replace("á", "a")
+        .replace("à", "a")
+        .replace("â", "a")
+        .replace("é", "e")
+        .replace("ê", "e")
+        .replace("ó", "o")
+        .replace("ô", "o")
+        .replace(".", "")
+        .replace("!", "")
+        .replace("?", "")
+        .strip()
+    )
+    if raw in {"s", "sim", "ss", "si", "tenho", "possuo", "true", "1", "yes", "y"}:
         return "SIM"
-    if raw.startswith(("n", "nao", "não", "false", "0")):
+    if raw in {
+        "n",
+        "nao",
+        "nn",
+        "no",
+        "nop",
+        "false",
+        "0",
+        "nao tenho",
+        "nao possuo",
+        "sem cnh",
+        "sem",
+    }:
+        return "NÃO"
+    # Frases curtas objetivas: "tenho cnh", "possuo sim", "nao tenho cnh".
+    if re.fullmatch(r"(sim|tenho|possuo)(\s+\w+){0,3}", raw):
+        if re.search(r"\bnao\b", raw):
+            return "NÃO"
+        return "SIM"
+    if re.fullmatch(r"(nao|no)(\s+\w+){0,3}", raw) or raw.startswith("nao "):
         return "NÃO"
     return "NÃO INFORMADO"
+
+
+def _cnh_confirmada(valor: str | None) -> str | None:
+    """SIM/NÃO se objetivo; None se ambíguo (bloqueia envio ao grupo)."""
+    normalizado = _normalizar_cnh(valor)
+    if normalizado in {"SIM", "NÃO"}:
+        return normalizado
+    return None
 
 
 def _normalizar_cpf(valor: str | None) -> str | None:
@@ -174,29 +238,141 @@ def _normalizar_cpf(valor: str | None) -> str | None:
     return digitos
 
 
+def _cpf_fingerprint(cpf_digitos: str | None) -> str | None:
+    """Huella curta do CPF para dedupe sem persistir o documento completo."""
+    if not cpf_digitos or len(cpf_digitos) != 11:
+        return None
+    return hashlib.sha256(cpf_digitos.encode("utf-8")).hexdigest()[:16]
+
+
 def _formatar_cpf(cpf_digitos: str | None) -> str:
     if not cpf_digitos or len(cpf_digitos) != 11:
         return "não informado"
     return f"{cpf_digitos[:3]}.{cpf_digitos[3:6]}.{cpf_digitos[6:9]}-{cpf_digitos[9:]}"
 
 
+def _parse_nascimento(valor: str | None) -> date | None:
+    """Converte YYYY-MM-DD ou DD/MM/YYYY em ``date``; None se inválido."""
+    if valor is None:
+        return None
+    bruto = str(valor).strip()
+    if not bruto:
+        return None
+    m = re.fullmatch(r"(\d{4})-(\d{2})-(\d{2})", bruto)
+    if m:
+        ano, mes, dia = int(m.group(1)), int(m.group(2)), int(m.group(3))
+    else:
+        m = re.fullmatch(r"(\d{2})[/-](\d{2})[/-](\d{4})", bruto)
+        if not m:
+            return None
+        dia, mes, ano = int(m.group(1)), int(m.group(2)), int(m.group(3))
+    try:
+        return date(ano, mes, dia)
+    except ValueError:
+        return None
+
+
+def _hoje_brasil() -> date:
+    return datetime.now(ZoneInfo("America/Sao_Paulo")).date()
+
+
+def _calcular_idade(nasc: date, ref: date | None = None) -> int:
+    """Idade civil completa (dia/mês/ano) em ``ref`` (default: hoje em America/Sao_Paulo)."""
+    hoje = ref or _hoje_brasil()
+    anos = hoje.year - nasc.year
+    if (hoje.month, hoje.day) < (nasc.month, nasc.day):
+        anos -= 1
+    return anos
+
+
 def _formatar_nascimento(valor: str | None) -> str:
     """Aceita YYYY-MM-DD ou DD/MM/YYYY; devolve DD/MM/YYYY ou 'não informado'."""
+    parsed = _parse_nascimento(valor)
+    if parsed is not None:
+        return parsed.strftime("%d/%m/%Y")
     if valor is None:
         return "não informado"
     bruto = str(valor).strip()
     if not bruto:
         return "não informado"
-    m = re.fullmatch(r"(\d{4})-(\d{2})-(\d{2})", bruto)
-    if m:
-        return f"{m.group(3)}/{m.group(2)}/{m.group(1)}"
-    m = re.fullmatch(r"(\d{2})[/-](\d{2})[/-](\d{4})", bruto)
-    if m:
-        return f"{m.group(1)}/{m.group(2)}/{m.group(3)}"
     # Não inventa: se o formato for desconhecido, devolve o texto recebido se curto.
     if len(bruto) <= 32 and re.search(r"\d", bruto):
         return bruto
     return "não informado"
+
+
+def _log_bloqueio(motivo: str, *, loja_id: str, telefone: str) -> None:
+    logger.info(
+        "simulação bloqueada motivo=%s loja_sufixo=%s tel_sufixo=%s",
+        motivo,
+        (loja_id or "")[-8:],
+        (telefone or "")[-4:],
+    )
+
+
+def _saida_bloqueada(
+    *,
+    motivo: str,
+    mensagem: str,
+    loja_id: str,
+    telefone: str,
+    faltando: list[str] | None = None,
+    extra: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    _log_bloqueio(motivo, loja_id=loja_id, telefone=telefone)
+    body: dict[str, Any] = {
+        "ok": False,
+        "simulacao_humana_solicitada": False,
+        "bloqueado": True,
+        "motivo_bloqueio": motivo,
+        "mensagem": mensagem,
+        "telefone": telefone,
+    }
+    if faltando:
+        body["faltando"] = list(faltando)
+    if extra:
+        body.update(extra)
+    return body
+
+
+def _buscar_solicitacao_recente(
+    db: Session,
+    loja_id: str,
+    *,
+    telefone: str,
+    cpf_fp: str | None,
+    excluir_idempotency_key: str | None = None,
+) -> NotificacaoOperacional | None:
+    """Localiza pedido recente do mesmo cliente (telefone ou fingerprint de CPF)."""
+    desde = _agora() - timedelta(hours=DEDUPE_HORAS)
+    candidatos = (
+        db.query(NotificacaoOperacional)
+        .filter(
+            NotificacaoOperacional.loja_id == loja_id,
+            NotificacaoOperacional.tipo == TIPO_SIMULACAO_HUMANA,
+            NotificacaoOperacional.created_at >= desde,
+        )
+        .order_by(NotificacaoOperacional.created_at.desc())
+        .limit(100)
+        .all()
+    )
+    for notif in candidatos:
+        if (
+            excluir_idempotency_key
+            and notif.idempotency_key == excluir_idempotency_key
+        ):
+            continue
+        try:
+            dados = json.loads(notif.payload_resumo or "{}")
+        except (TypeError, json.JSONDecodeError):
+            dados = {}
+        tel = str(dados.get("telefone") or "").strip()
+        if tel and tel == telefone:
+            return notif
+        fp = str(dados.get("cpf_fp") or "").strip()
+        if cpf_fp and fp and fp == cpf_fp:
+            return notif
+    return None
 
 
 def _rotulo_vendedor(db: Session, loja_id: str, instance: str | None) -> str:
@@ -299,7 +475,9 @@ def solicitar_simulacao_humana(
 ) -> dict[str, Any]:
     """Aceita pedido humano: qualifica lead, pausa bot e alerta o grupo de estoque.
 
-    Idempotente por ``(loja_id, idempotency_key)``. Segunda chamada não reenvia.
+    Idempotente por ``(loja_id, idempotency_key)`` e por solicitação recente do
+    mesmo cliente (telefone/CPF). Não envia ao grupo sem maioridade e CNH
+    confirmada (sim/não).
     """
     if not provisioning.is_store_operational(db, loja_id):
         raise HTTPException(
@@ -332,6 +510,41 @@ def solicitar_simulacao_humana(
     nasc_limpo = (nascimento or "").strip() or None
     if nasc_limpo:
         nascimento_recebido = True
+    cpf_fp = _cpf_fingerprint(cpf_norm)
+
+    # --- Gate 1: data de nascimento + maioridade ----------------------------
+    nasc_date = _parse_nascimento(nasc_limpo)
+    if nasc_date is None:
+        return _saida_bloqueada(
+            motivo="nascimento_invalido",
+            mensagem=(
+                "peça a data de nascimento completa (dia, mês e ano) em DD/MM/AAAA. "
+                "NÃO diga certinho nem que vai encaminhar pro setor sem data válida."
+            ),
+            loja_id=loja_id,
+            telefone=telefone_norm,
+            faltando=["data de nascimento"],
+        )
+    idade = _calcular_idade(nasc_date)
+    if idade < 18:
+        return _saida_bloqueada(
+            motivo="menor_de_idade",
+            mensagem=_MENSAGEM_MENOR_IDADE,
+            loja_id=loja_id,
+            telefone=telefone_norm,
+            extra={"idade": idade},
+        )
+
+    # --- Gate 2: CNH objetiva (sim ou não) ----------------------------------
+    cnh_ok = _cnh_confirmada(tem_cnh)
+    if cnh_ok is None:
+        return _saida_bloqueada(
+            motivo="cnh_nao_confirmada",
+            mensagem=_MENSAGEM_CNH,
+            loja_id=loja_id,
+            telefone=telefone_norm,
+            faltando=["cnh"],
+        )
 
     entrada_val: float | None = None
     if entrada is not None:
@@ -342,6 +555,7 @@ def solicitar_simulacao_humana(
         except (TypeError, ValueError):
             entrada_val = None
 
+    # --- Gate 3a: idempotência por chave de mensagem ------------------------
     existente = (
         db.query(NotificacaoOperacional)
         .filter(
@@ -352,6 +566,11 @@ def solicitar_simulacao_humana(
     )
     if existente is not None:
         if existente.status == "sent":
+            logger.info(
+                "simulação reutilizada motivo=idempotency_key loja_sufixo=%s tel_sufixo=%s",
+                loja_id[-8:],
+                telefone_norm[-4:],
+            )
             return _saida(
                 notificacao=existente,
                 telefone=telefone_norm,
@@ -374,7 +593,7 @@ def solicitar_simulacao_humana(
         texto = _montar_texto_grupo(
             telefone=telefone_norm,
             interesse=interesse_limpo,
-            tem_cnh=tem_cnh,
+            tem_cnh=cnh_ok,
             cpf=cpf_norm,
             nascimento=nasc_limpo,
             vendedor=vendedor,
@@ -385,6 +604,65 @@ def solicitar_simulacao_humana(
         )
         return _saida(
             notificacao=existente,
+            telefone=telefone_norm,
+            duplicada=True,
+            alerta_enviado=enviado,
+        )
+
+    # --- Gate 3b: dedupe por cliente (telefone ou CPF recente) --------------
+    recente = _buscar_solicitacao_recente(
+        db,
+        loja_id,
+        telefone=telefone_norm,
+        cpf_fp=cpf_fp,
+        excluir_idempotency_key=chave,
+    )
+    if recente is not None:
+        logger.info(
+            "simulação reutilizada motivo=solicitacao_recente notif=%s "
+            "loja_sufixo=%s tel_sufixo=%s",
+            recente.id,
+            loja_id[-8:],
+            telefone_norm[-4:],
+        )
+        # Garante handoff no atendimento existente; não reenvia ao grupo se já sent.
+        try:
+            servico.definir_bot_ativo(
+                db, loja_id, telefone_norm, False, instance=instance
+            )
+        except Exception:
+            logger.exception("falha ao reafirmar bot_ativo=false em dedupe")
+        if recente.status == "sent":
+            return _saida(
+                notificacao=recente,
+                telefone=telefone_norm,
+                duplicada=True,
+                alerta_enviado=True,
+            )
+        # pending/failed: tenta reenviar o alerta já existente (sem criar outro).
+        grupo = operacao.obter_grupo_estoque(db, loja_id)
+        destino_jid = grupo.grupo_jid if grupo is not None else None
+        if destino_jid is None:
+            return _saida(
+                notificacao=recente,
+                telefone=telefone_norm,
+                duplicada=True,
+                alerta_enviado=False,
+            )
+        recente.destino_jid = destino_jid
+        instancia = _resolver_instancia_alerta(db, loja_id, instance)
+        texto = _montar_texto_grupo(
+            telefone=telefone_norm,
+            interesse=interesse_limpo,
+            tem_cnh=cnh_ok,
+            cpf=cpf_norm,
+            nascimento=nasc_limpo,
+            vendedor=vendedor,
+            fallback_temporario=fallback_temporario,
+        )
+        enviado = _despachar_alerta(db, recente, instancia=instancia, texto=texto)
+        return _saida(
+            notificacao=recente,
             telefone=telefone_norm,
             duplicada=True,
             alerta_enviado=enviado,
@@ -422,8 +700,9 @@ def solicitar_simulacao_humana(
         "vendedor": vendedor[:80],
         "entrada": entrada_val,
         "interesse": interesse_limpo[:80],
-        "tem_cnh": _normalizar_cnh(tem_cnh),
+        "tem_cnh": cnh_ok,
         "cpf_recebido": bool(cpf_recebido) or cpf_norm is not None,
+        "cpf_fp": cpf_fp,
         "nascimento_recebido": bool(nascimento_recebido) or bool(nasc_limpo),
         "nascimento": _formatar_nascimento(nasc_limpo) if nasc_limpo else None,
         "fallback_temporario": bool(fallback_temporario),
@@ -501,7 +780,7 @@ def solicitar_simulacao_humana(
     texto = _montar_texto_grupo(
         telefone=telefone_norm,
         interesse=interesse_limpo,
-        tem_cnh=tem_cnh,
+        tem_cnh=cnh_ok,
         cpf=cpf_norm,
         nascimento=nasc_limpo,
         vendedor=vendedor,

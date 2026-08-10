@@ -125,9 +125,47 @@ const staticData = () => state;
       staticData
     )
   );
-  assert.deepStrictEqual(missing.faltando, ["cpf", "data de nascimento"]);
+  assert.deepStrictEqual(missing.faltando, ["cpf", "data de nascimento", "cnh"]);
   assert.strictEqual(missing.pode_oferecer_fotos, false);
   assert.deepStrictEqual(requests, [], "dados incompletos não devem produzir efeitos");
+
+  const missingCnh = JSON.parse(
+    await runTool(
+      {
+        confirmar_simulacao: true,
+        cpf: "11144477735",
+        nascimento: "10/02/1995",
+        entrada: 5000,
+      },
+      helpers,
+      $,
+      staticData
+    )
+  );
+  assert.deepStrictEqual(missingCnh.faltando, ["cnh"]);
+  assert.ok(
+    /cnh/i.test(missingCnh.mensagem) && /sim ou n/i.test(missingCnh.mensagem),
+    "deve insistir em CNH sim/não"
+  );
+  assert.deepStrictEqual(requests, [], "sem CNH não deve chamar o backend");
+
+  const menor = JSON.parse(
+    await runTool(
+      {
+        confirmar_simulacao: true,
+        cpf: "11144477735",
+        nascimento: "10/08/2010",
+        tem_cnh: "sim",
+      },
+      helpers,
+      $,
+      staticData
+    )
+  );
+  assert.strictEqual(menor.bloqueado, true);
+  assert.strictEqual(menor.motivo_bloqueio, "menor_de_idade");
+  assert.ok(menor.mensagem.includes("menores de 18 anos"));
+  assert.deepStrictEqual(requests, [], "menor de idade não deve chamar o backend");
 
   const completed = JSON.parse(
     await runTool(
@@ -136,6 +174,7 @@ const staticData = () => state;
         cpf: "11144477735",
         nascimento: "10/02/1995",
         entrada: 5000,
+        tem_cnh: "sim",
       },
       helpers,
       $,
@@ -171,6 +210,7 @@ const staticData = () => state;
         cpf: "11144477735",
         nascimento: "10/02/1995",
         entrada: 5000,
+        tem_cnh: "não",
         instance: "loja-teste",
         remoteJid: "5511999999999@s.whatsapp.net",
         telefone: "5511999999999",

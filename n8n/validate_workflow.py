@@ -172,6 +172,17 @@ def main() -> None:
     assert "11 dígitos de cpf e uma data de nascimento" in system_message_lower, (
         "prompt não reconhece cpf e nascimento na mesma mensagem (entrada é opcional)"
     )
+    assert "cnh (sim ou não) são obrigatórios" in system_message_lower or (
+        "cnh (sim ou não) é obrigatória" in system_message_lower
+    ), (
+        "prompt deve exigir CNH objetiva (sim/não) antes de encaminhar simulação"
+    )
+    assert "motivo_bloqueio=menor_de_idade" in system_message_lower, (
+        "prompt deve tratar bloqueio de menor de 18 anos com a mensagem da tool"
+    )
+    assert "insista com educação" in system_message_lower or "sim ou não" in system_message_lower, (
+        "prompt deve insistir em resposta objetiva de CNH"
+    )
     assert "cpf_cliente" in system_message_lower or "cpf mascarado" in system_message_lower, (
         "prompt deve orientar uso do cpf_cliente (não o histórico mascarado)"
     )
@@ -345,6 +356,15 @@ def main() -> None:
     )
     assert "certo, já tenho seus dados. vou encaminhar pro setor de simulação" in simulation_code, (
         "confirmação minimalista da simulação está ausente"
+    )
+    assert "faltando.push('cnh')" in simulation_code or 'faltando.push("cnh")' in simulation_code, (
+        "tool de simulação deve exigir CNH objetiva antes do envio"
+    )
+    assert "menor_de_idade" in simulation_code and "menores de 18 anos" in simulation_code, (
+        "tool de simulação deve bloquear menor de 18 anos com mensagem fixa"
+    )
+    assert "resp.bloqueado" in simulation_code, (
+        "tool deve repassar bloqueios do backend (idade/CNH) ao Agent"
     )
     assert "chamar um vendedor" not in simulation_code and "pra trazer" not in simulation_code, (
         "resposta ao cliente ainda promete chamar vendedor"

@@ -1348,12 +1348,16 @@ def solicitar_simulacao_humana(
 ):
     """Aceita simulação humana: lead qualificado, pausa bot e alerta o grupo de estoque.
 
-    Idempotente por ``Idempotency-Key`` (providerMessageId do WhatsApp).
+    Idempotente por ``Idempotency-Key`` (providerMessageId do WhatsApp) e por
+    solicitação recente do mesmo cliente. Bloqueios de idade/CNH retornam 200
+    com ``bloqueado=true`` e ``motivo_bloqueio`` (sem efeito no grupo).
     """
+    from fastapi.responses import JSONResponse
+
     _exigir_loja_operacional(db, ctx.loja_id)
     if not idempotency_key or not str(idempotency_key).strip():
         raise HTTPException(status_code=422, detail="Idempotency-Key obrigatória")
-    return solicitacoes_simulacao.solicitar_simulacao_humana(
+    resultado = solicitacoes_simulacao.solicitar_simulacao_humana(
         db,
         ctx.loja_id,
         telefone=dados.telefone,
@@ -1369,6 +1373,9 @@ def solicitar_simulacao_humana(
         entrada=dados.entrada,
         idempotency_key=str(idempotency_key).strip(),
     )
+    if resultado.get("bloqueado"):
+        return JSONResponse(status_code=200, content=resultado)
+    return JSONResponse(status_code=202, content=resultado)
 
 
 @app.post("/v1/operacao/moto-escolhida")

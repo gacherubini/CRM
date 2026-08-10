@@ -48,14 +48,30 @@ Testes que cobrem os pontos sensíveis:
 
 - `tests/test_whatsapp_outbound.py` — `send_text`: sucesso, classificação dos codes e
   **sanitização do log** (CPF/nascimento redigidos, apikey nunca vaza).
-- `tests/test_solicitacoes_simulacao.py` — pedido de simulação humana: qualifica lead,
-  pausa bot, enfileira/reenvia alerta, reprocessa dead-letters.
+- `tests/test_solicitacoes_simulacao.py` — pedido de simulação humana: maioridade,
+  CNH objetiva (sim/não), dedupe por telefone/CPF, qualifica lead, pausa bot,
+  enfileira/reenvia alerta, reprocessa dead-letters.
 - `tests/test_whatsapp_provider_evolution.py` — provisionamento/estado das instâncias
   (connect/QR, status, logout) sem vazar URL/apikey.
 
+## Gates antes do alerta de simulação
+
+`POST /v1/operacao/solicitacoes-simulacao-humana` só envia ao grupo depois de, nesta ordem:
+
+1. **Nascimento válido + maioridade** (`>= 18` em `America/Sao_Paulo`). Menor retorna
+   HTTP 200 com `bloqueado=true`, `motivo_bloqueio=menor_de_idade` e a mensagem fixa ao
+   cliente — sem lead/pausa/alerta.
+2. **CNH objetiva** (`sim` ou `não`). Resposta vaga → `motivo_bloqueio=cnh_nao_confirmada`
+   e `faltando: ["cnh"]` (sem envio).
+3. **Dedupe**: mesma `Idempotency-Key`, ou solicitação recente do mesmo telefone/CPF
+   (janela `CHATBOT_SIMULACAO_DEDUPE_HORAS`, default 48h) → reutiliza o atendimento e
+   **não** reenvia o alerta.
+
+Todo bloqueio grava `motivo_bloqueio` no log (`simulação bloqueada motivo=...`) e no body.
+
 ## Alerta de simulação ao grupo de estoque falhando
 
-Quando um cliente pede financiamento, o bot pausa a conversa e envia
+Quando um cliente pede financiamento (após os gates), o bot pausa a conversa e envia
 **"🚨 precisa de simulação humana"** ao grupo de estoque (`solicitacoes_simulacao.py`). Se
 esse envio falha, o cliente fica preso em `handoff` **e ninguém fica sabendo** — o sintoma
 é "o bot parou de responder" para aquele cliente.
