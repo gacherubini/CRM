@@ -334,8 +334,10 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ (() => { const fluxo = $('Gate somente nao salvos1').first().json || {}; const texto = String($json.output || ''); const limpo = texto.toLocaleLowerCase('pt-BR').replace(/[\\p{Extended_Pictographic}\\uFE0F\\u200D]/gu, '').replace(/!+/g, '.').replace(/\\bme conta[:,]?\\s*/g, '').replace(/\\s{2,}/g, ' ').replace(/\\s+([.,?])/g, '$1').trim(); return { number: $('Extrair1').first().json.destino, text: fluxo.acao === 'cliente' ? limpo : texto }; })() }}",
-        "options": {}
+        "jsonBody": "={{ (() => { const fluxo = $('Gate somente nao salvos1').first().json || {}; const texto = String($json.output || ''); const limpo = texto.toLocaleLowerCase('pt-BR').replace(/[\\p{Extended_Pictographic}\\uFE0F\\u200D]/gu, '').replace(/!+/g, '.').replace(/\\bme conta[:,]?\\s*/g, '').replace(/\\s{2,}/g, ' ').replace(/\\s+([.,?])/g, '$1').trim(); const delay = Number($json.__delayAntiBan || 0); return { number: $('Extrair1').first().json.destino, text: fluxo.acao === 'cliente' ? limpo : texto, delay }; })() }}",
+        "options": {
+          "timeout": 30000
+        }
       },
       "id": "c7573fcf-2ffb-443a-a324-bf33cf005668",
       "name": "Responder WhatsApp1",
@@ -691,6 +693,19 @@
         3960,
         1000
       ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Anti-ban itens 1+2: calcula o \"delay\" (ms) que a Evolution usa para\n// (1) mostrar \"digitando...\" proporcional ao tamanho do texto e\n// (2) espacar os envios da MESMA instancia (throttle global), evitando rajada.\n// A Evolution segura a mensagem por 'delay' ms antes de enviar. Falha-fecha:\n// qualquer erro cai so no typing e NUNCA bloqueia a resposta.\nconst rand = (a, b) => a + Math.floor(Math.random() * (b - a + 1));\nlet inst = '';\ntry { inst = String($('Extrair1').first().json.instance || ''); } catch (_) {}\nlet st = null;\ntry { st = $getWorkflowStaticData('global'); } catch (_) {}\nconst chave = 'throttle-next:' + inst;\nconst TETO_FILA = 12000;   // nunca segura a fila alem disto (degrada agrupando)\nconst TETO_TOTAL = 16000;  // teto final p/ nao estourar timeout do HTTP node\nconst out = [];\nfor (const item of $input.all()) {\n  const j = item.json || {};\n  const texto = String(j.output || '');\n  // typing: ~45ms/char (teto 4s) + jitter humano 0.8-2.5s.\n  const typing = Math.min(texto.length * 45, 4000) + rand(800, 2500);\n  let delay = typing;\n  if (st) {\n    try {\n      const now = Date.now();\n      const prox = Number(st[chave] || 0);\n      const inicio = Math.max(now, prox);\n      let espera = inicio - now;\n      if (espera > TETO_FILA) espera = TETO_FILA;\n      delay = espera + typing;\n      st[chave] = inicio + rand(3000, 6000); // reserva o proximo slot (3-6s)\n    } catch (_) {}\n  }\n  if (delay > TETO_TOTAL) delay = TETO_TOTAL;\n  out.push({ json: { ...j, __delayAntiBan: Math.round(delay) } });\n}\nreturn out;\n"
+      },
+      "id": "4d5c55fc-c593-4c29-a249-387eb5b4c02b",
+      "name": "Atraso anti-ban1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3840,
+        620
+      ]
     }
   ],
   "connections": {
@@ -793,7 +808,7 @@
       "main": [
         [
           {
-            "node": "Responder WhatsApp1",
+            "node": "Atraso anti-ban1",
             "type": "main",
             "index": 0
           }
@@ -903,7 +918,7 @@
       "main": [
         [
           {
-            "node": "Responder WhatsApp1",
+            "node": "Atraso anti-ban1",
             "type": "main",
             "index": 0
           }
@@ -1030,6 +1045,17 @@
           {
             "node": "AI Agent1",
             "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Atraso anti-ban1": {
+      "main": [
+        [
+          {
+            "node": "Responder WhatsApp1",
+            "type": "main",
             "index": 0
           }
         ]

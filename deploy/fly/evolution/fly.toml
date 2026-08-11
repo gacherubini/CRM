@@ -8,7 +8,13 @@ primary_region = "gru"
   SERVER_TYPE = "http"
   SERVER_PORT = "8080"
   SERVER_URL = "https://evolution2037.fly.dev"
-  CONFIG_SESSION_PHONE_VERSION = "2.3000.1033773198"
+  # CONFIG_SESSION_PHONE_VERSION: intencionalmente NAO fixada. Uma versao fixa
+  # envelhece e o servidor do WhatsApp passa a recusar o handshake (428) e/ou
+  # derruba os dispositivos vinculados. Sem a env, o Baileys usa a versao
+  # embutida na lib (atualizada junto da imagem) -- que e a abordagem que o
+  # proprio .env.example da Evolution (branch main) adotou. So fixar como
+  # contorno emergencial (usar o valor de src/Defaults/index.ts do Baileys na
+  # data; NUNCA 2.3000.1015901307, comprovadamente quebrado).
   DATABASE_ENABLED = "true"
   DATABASE_PROVIDER = "postgresql"
   DATABASE_CONNECTION_CLIENT_NAME = "evolution2037"

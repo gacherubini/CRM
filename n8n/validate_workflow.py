@@ -524,8 +524,32 @@ def main() -> None:
     ), "tool de foto não está conectada ao AI Agent"
 
     nodes_by_name = {node.get("name"): node for node in data.get("nodes", [])}
-    assert len(nodes_by_name) == 31, (
-        "workflow deve ter 31 nós (inclui debounce, juiz, fallback e link catálogo)"
+    assert len(nodes_by_name) == 32, (
+        "workflow deve ter 32 nós (inclui debounce, juiz, fallback, link catálogo "
+        "e atraso anti-ban)"
+    )
+    # Anti-ban: "Atraso anti-ban1" fica ENTRE o gerador da resposta e o envio,
+    # calculando o delay (typing + throttle por instância) que a Evolution honra
+    # antes de mandar. Sem ele o bot responde em tempo de máquina (fingerprint) e
+    # dispara em rajada — os dois gatilhos de bloqueio da conta.
+    assert "Atraso anti-ban1" in nodes_by_name, (
+        "nó de atraso anti-ban (typing + throttle) foi removido"
+    )
+    atraso_code = nodes_by_name["Atraso anti-ban1"].get("parameters", {}).get("jsCode", "")
+    assert "__delayAntiBan" in atraso_code and "throttle-next:" in atraso_code, (
+        "atraso anti-ban deve calcular typing + throttle por instância"
+    )
+    atraso_out = data.get("connections", {}).get("Atraso anti-ban1", {})
+    assert any(
+        item.get("node") == "Responder WhatsApp1"
+        for group in atraso_out.get("main", [])
+        for item in group
+    ), "atraso anti-ban deve alimentar o envio (Responder WhatsApp1)"
+    responder_body = nodes_by_name["Responder WhatsApp1"].get("parameters", {}).get(
+        "jsonBody", ""
+    )
+    assert "__delayAntiBan" in responder_body and "delay" in responder_body, (
+        "Responder WhatsApp1 deve enviar o campo delay calculado (typing/throttle)"
     )
     removidos = {
         "E audio1", "Transcrever audio1", "Aplicar transcricao1",
@@ -616,10 +640,10 @@ def main() -> None:
         "node"
     ] == "AI Agent1"
     assert connections.get("AI Agent1", {}).get("main", [[]])[0][0]["node"] == (
-        "Responder WhatsApp1"
-    ), "AI Agent deve responder somente depois do debounce"
+        "Atraso anti-ban1"
+    ), "AI Agent deve passar pelo atraso anti-ban antes do envio"
     se_ctrl = connections.get("Se resposta controle1", {}).get("main", [])
-    assert se_ctrl[0][0]["node"] == "Responder WhatsApp1"
+    assert se_ctrl[0][0]["node"] == "Atraso anti-ban1"
     assert se_ctrl[1][0]["node"] == "Aguardar 40s cliente1"
 
     assert connections.get("Extrair1", {}).get("main", [[]])[0][0].get("node") == "E imagem de estoque1"
@@ -735,8 +759,8 @@ def main() -> None:
         == "Se resposta controle1"
     ), "gate deve alimentar o IF de resposta controle"
     if_true = connections.get("Se resposta controle1", {}).get("main", [[], []])
-    assert if_true and if_true[0][0].get("node") == "Responder WhatsApp1", (
-        "controle deve ir direto ao WhatsApp"
+    assert if_true and if_true[0][0].get("node") == "Atraso anti-ban1", (
+        "controle deve ir ao WhatsApp passando pelo atraso anti-ban"
     )
     assert len(if_true) > 1 and if_true[1][0].get("node") == "Aguardar 40s cliente1", (
         "mensagem de cliente deve passar pelo debounce antes do Agent"
@@ -775,7 +799,7 @@ def main() -> None:
     )
 
     print(
-        "workflow n8n válido: 31 nós, replay >5min bloqueado, debounce pela última entrada, "
+        "workflow n8n válido: 32 nós, replay >5min bloqueado, debounce pela última entrada, "
         "fallback temporário sem fotos, multi-WA instance dinâmica, áudio ignorado, "
         "webhook seguro e resultado privado"
     )

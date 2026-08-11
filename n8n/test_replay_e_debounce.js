@@ -94,7 +94,9 @@ assert.strictEqual(next("Se resposta controle1", 1), waitName);
 assert.strictEqual(next(waitName), checkName);
 assert.strictEqual(next(checkName), gateName);
 assert.strictEqual(next(gateName), "AI Agent1");
-assert.strictEqual(next("AI Agent1"), "Responder WhatsApp1");
+// AI Agent passa pelo atraso anti-ban (typing + throttle) antes do envio.
+assert.strictEqual(next("AI Agent1"), "Atraso anti-ban1");
+assert.strictEqual(next("Atraso anti-ban1"), "Responder WhatsApp1");
 
 const checkJson = JSON.stringify(byName[checkName]);
 assert.ok(checkJson.includes("/pode-responder"));
