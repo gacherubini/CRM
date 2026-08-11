@@ -451,3 +451,71 @@ class VinculoLojaPessoa(Base):
     )
 
     pessoa: Mapped["PessoaRevyProjetada"] = relationship(back_populates="vinculos")
+
+
+# --- Copiloto de Vendas -----------------------------------------------------
+
+SINAL_ESTADOS = ("novo", "visto", "resolvido", "dispensado")
+SINAL_SEVERIDADES = ("info", "atencao", "critico")
+SINAL_REGRAS = (
+    "estoque_parado",
+    "lead_sem_resposta",
+    "meta_em_risco",
+    "margem_incompleta",
+    "cadastro_incompleto",
+    "atribuicao_baixa",
+)
+
+
+class CopilotoSinal(Base):
+    """Alerta proativo do Copiloto.
+
+    Gerado por REGRA DETERMINÍSTICA — o LLM não participa. É o que mantém a
+    seção útil quando o provedor de IA está fora do ar.
+
+    Nunca guarda telefone em claro (mesma disciplina de
+    ``loja_operacao_auditoria``): sinais de lead são agregados.
+    """
+
+    __tablename__ = "copiloto_sinal"
+    __table_args__ = (
+        CheckConstraint(
+            "estado IN ('novo', 'visto', 'resolvido', 'dispensado')",
+            name="ck_copiloto_sinal_estado",
+        ),
+        CheckConstraint(
+            "severidade IN ('info', 'atencao', 'critico')",
+            name="ck_copiloto_sinal_severidade",
+        ),
+        Index(
+            "ix_copiloto_sinal_loja_regra_entidade",
+            "loja_slug",
+            "regra",
+            "entidade_ref",
+        ),
+        Index("ix_copiloto_sinal_loja_estado", "loja_slug", "estado", "criado_em"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=novo_id)
+    loja_slug: Mapped[str] = mapped_column(String(120), nullable=False, index=True)
+    regra: Mapped[str] = mapped_column(String(40), nullable=False, index=True)
+    # Id do veículo / meta / o que a regra observa. None = sinal agregado da loja.
+    entidade_ref: Mapped[Optional[str]] = mapped_column(String(120), nullable=True)
+    severidade: Mapped[str] = mapped_column(String(20), nullable=False)
+    titulo: Mapped[str] = mapped_column(String(240), nullable=False)
+    detalhe: Mapped[str] = mapped_column(String(600), nullable=False)
+    dados_json: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    acao_sugerida_json: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    estado: Mapped[str] = mapped_column(String(20), nullable=False, default="novo")
+    criado_em: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=agora, nullable=False
+    )
+    atualizado_em: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=agora, onupdate=agora, nullable=False
+    )
+    resolvido_em: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    dispensado_em: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
