@@ -603,6 +603,11 @@ rótulo — rota, template e conteúdo ficam onde estão.
 
 ## 10. Fases
 
+> **"Fase" aqui é roadmap de produto, não plano de implementação.** As fases desta seção (v1, v2,
+> v3) dizem *o que o produto faz*. Os três planos em `docs/superpowers/plans/2026-08-11-copiloto-fase*`
+> são **F1, F2 e F3: fatias de implementação da v1 apenas** — juntas entregam a v1 abaixo e nada
+> além. "Fase 2" do design ≠ plano F2.
+
 - **v1 (este design):** seção "Copiloto"; chat com histórico, estado "pensando" e texto
   progressivo; 6 funções de leitura (incluindo `venda_origem`) + FIPE + 2 ações; **motor proativo
   de alertas**; "Resumo de hoje" determinístico; camada de tools MCP-nativa; prompt rígido +

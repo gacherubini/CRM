@@ -15,6 +15,12 @@
 2. `2026-08-11-copiloto-fase2-chat-llm.md` — chat, turno assíncrono, DeepSeek;
 3. `2026-08-11-copiloto-fase3-fipe-e-acoes.md` — FIPE + caminho de escrita.
 
+> **Cuidado com a palavra "fase" — ela significa duas coisas diferentes.** Os três planos (F1, F2,
+> F3) são **fatias de implementação da v1**: juntas, elas entregam a v1 inteira do §10 do design e
+> nada além. Já as "Fase 2" e "Fase 3" **do design** (§4.6, §10) são o roadmap de produto — v2 e
+> v3: WhatsApp, memória do dono, busca cautelar, contrato, leitura de PDF. Neste documento, "F1/F2/F3"
+> sempre quer dizer plano; "v2/v3" sempre quer dizer roadmap.
+
 ## Global Constraints
 
 - **Sem import entre produtos.** Estoque e Chatbot só por HTTP, usando `app/clients/*` já existentes. Nunca `from estoque_api...`.
@@ -60,11 +66,18 @@ Arquivos existentes tocados: `app/config.py`, `app/loja/types.py`, `app/loja/ent
 - Modify: `portal-gestao/app/config.py`
 - Modify: `portal-gestao/app/loja/types.py`
 - Modify: `portal-gestao/app/loja/entitlements.py`
+- Modify: `portal-gestao/app/loja/permissions.py`
 - Test: `portal-gestao/tests/test_copiloto_flag_entitlement.py`
 
 **Interfaces:**
 - Consumes: nada.
 - Produces: `revy_loja_copiloto_enabled() -> bool`; `Module.COPILOTO` (valor `"copiloto"`); `EntitlementState.copiloto_enabled: bool`.
+
+**Armadilha:** `module_enabled` (`app/loja/permissions.py:38-47`) é uma cadeia de `if` explícita
+que devolve `False` para módulo desconhecido. Acrescentar `Module.COPILOTO` ao enum **sem** tocar
+nela cria um valor que existe mas nunca autoriza: o primeiro `require_module(ents, Module.COPILOTO)`
+— o padrão da casa — levanta `ModuloNaoContratado` mesmo com o entitlement concedido, e o bug
+parece de contrato, não de código. Este task fecha as duas pontas.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -102,6 +115,35 @@ def test_projecao_gate_copiloto_por_modulo():
     assert estado.copiloto_enabled is False
     assert estado.vendas_enabled is True
     assert Module.COPILOTO.value in consultados
+
+
+def test_module_enabled_reconhece_copiloto():
+    """Enum novo sem entrada em module_enabled = módulo que nunca autoriza."""
+    from app.loja.permissions import module_enabled
+    from app.loja.types import EntitlementState
+
+    ligado = fail_open("loja-teste", {"dono"})
+    assert module_enabled(ligado, Module.COPILOTO) is True
+
+    desligado = EntitlementState(
+        loja_slug="loja-teste",
+        loja_ativa=True,
+        vendas_enabled=True,
+        estoque_enabled=True,
+        source="projecao",
+        copiloto_enabled=False,
+    )
+    assert module_enabled(desligado, Module.COPILOTO) is False
+
+    inativa = EntitlementState(
+        loja_slug="loja-teste",
+        loja_ativa=False,
+        vendas_enabled=False,
+        estoque_enabled=False,
+        source="projecao",
+        copiloto_enabled=True,
+    )
+    assert module_enabled(inativa, Module.COPILOTO) is False
 ```
 
 - [ ] **Step 2: Run test to verify it fails**
@@ -162,6 +204,17 @@ E em `from_allows_processing`, no retorno da loja ativa:
         copiloto_enabled=bool(allows(loja_slug, Module.COPILOTO.value)),
 ```
 
+> Os outros dois construtores de `EntitlementState` (loja inativa, `entitlements.py:47-49`, e o
+> fallback de `resolve_entitlements`, `:104-106`) **não** mudam: `copiloto_enabled` tem default
+> `False`, que é a resposta certa nos dois casos.
+
+Em `app/loja/permissions.py`, dentro de `module_enabled`, **antes** do `return False` final:
+
+```python
+    if mod == Module.COPILOTO.value:
+        return entitlements.copiloto_enabled
+```
+
 - [ ] **Step 4: Run tests to verify they pass**
 
 Run: `.\.venv\Scripts\python.exe -m pytest tests/test_copiloto_flag_entitlement.py tests/test_loja_navigation.py -q`
@@ -170,7 +223,7 @@ Expected: PASS (a suíte de navegação não pode quebrar — `copiloto_enabled`
 - [ ] **Step 5: Commit**
 
 ```bash
-git add portal-gestao/app/config.py portal-gestao/app/loja/types.py portal-gestao/app/loja/entitlements.py portal-gestao/tests/test_copiloto_flag_entitlement.py
+git add portal-gestao/app/config.py portal-gestao/app/loja/types.py portal-gestao/app/loja/entitlements.py portal-gestao/app/loja/permissions.py portal-gestao/tests/test_copiloto_flag_entitlement.py
 git commit -m "feat(copiloto): flag REVY_LOJA_COPILOTO_ENABLED e entitlement por loja"
 ```
 
@@ -184,8 +237,11 @@ git commit -m "feat(copiloto): flag REVY_LOJA_COPILOTO_ENABLED e entitlement por
 - Test: `portal-gestao/tests/test_copiloto_tipos.py`
 
 **Interfaces:**
-- Consumes: `app.loja.types.StatusReadModel`.
+- Consumes: nada. (**Atenção:** o `StatusReadModel` de `app/loja/types.py:9` é
+  `Literal["ok","vazio","erro","parcial"]` e **não** tem `"indisponivel"` — por isso este task
+  define um `StatusCopiloto` próprio em vez de reusar aquele. Não trocar um pelo outro.)
 - Produces:
+  - `StatusCopiloto = Literal["ok","vazio","parcial","erro","indisponivel"]`;
   - `Cobertura(com_dado: int, total: int)` com `.parcial -> bool`, `.completa -> bool`, `.to_dict() -> dict`;
   - `CopilotoContexto(loja_slug: str, papel: str, ator_email: str, hoje: date, pode_ver_margem: bool)`;
   - `STATUS_INDISPONIVEL = "indisponivel"`.
@@ -3820,12 +3876,16 @@ class CopilotoSinaisWorker:
             if initial_delay_seconds is not None
             else env_float("PORTAL_COPILOTO_SINAIS_INITIAL_DELAY_SECONDS", 60.0)
         )
+        # Duas chaves diferentes, de propósito:
+        #  - `enabled` é o interruptor do PROCESSO (roda worker aqui?), snapshot no boot;
+        #  - a flag de produto `REVY_LOJA_COPILOTO_ENABLED` é lida A CADA CICLO, igual às
+        #    rotas. Snapshotá-la aqui criaria o descasamento "rota abre, worker dorme".
+        # `enabled=` explícito é decisão já tomada pelo chamador (testes): vale sozinho.
+        self._gate_flag = enabled is None
         if enabled is not None:
             self.enabled = enabled
         else:
-            self.enabled = revy_loja_copiloto_enabled() and env_flag(
-                "PORTAL_COPILOTO_SINAIS_ENABLED", True
-            )
+            self.enabled = env_flag("PORTAL_COPILOTO_SINAIS_ENABLED", True)
         self._estoque_factory = estoque_factory
         self._chatbot_factory = chatbot_factory
         self._agora = agora or (lambda: datetime.now(timezone.utc))
@@ -3859,8 +3919,13 @@ class CopilotoSinaisWorker:
             self._thread.join(timeout=timeout)
         self._thread = None
 
-    def run_once(self) -> dict:
+    def _ligado(self) -> bool:
         if not self.enabled:
+            return False
+        return revy_loja_copiloto_enabled() if self._gate_flag else True
+
+    def run_once(self) -> dict:
+        if not self._ligado():
             payload = {"ok": False, "motivo": "desligado", "lojas": 0, "erros": 0}
             self.last_result = payload
             return payload
@@ -4911,7 +4976,9 @@ git commit -m "feat(copiloto): secao Copiloto no shell da Loja e rename Agente d
 | §7 "Resumo de hoje" + chips vivos | 14 |
 | §7 seção, rename, 404 coerente | 15 |
 
-**Fora deste plano, de propósito** (estão nos planos irmãos): `roi_canais` e `consultar_fipe` (Fase 3), chat/LLM/turno assíncrono (Fase 2), ações de escrita e auditoria (Fase 3), tabelas `copiloto_conversa`/`copiloto_turno` (Fase 2).
+**Fora deste plano, de propósito** (estão nos planos irmãos): chat/LLM/turno assíncrono e tabelas
+`copiloto_conversa`/`copiloto_turno` (F2); `roi_canais` (F2 — não precisa de consulta nova, lê o
+overview já cacheado por este plano); `consultar_fipe`, ações de escrita e auditoria (F3).
 
 **Consistência de tipos verificada:** `Cobertura` (Task 2) é usada com a mesma assinatura em 4, 6, 7 e 11; `CopilotoContexto` idem em 4–8, 13, 14, 15; `SinalCandidato` (11) é o input de `sincronizar_sinais` (12) e o output de `avaliar_loja` (13); `Janela` (3) atravessa 4, 5, 6, 11, 14. `estoque_parado` recebe `agora=` em 7, 13 e 14 — mesmo nome de parâmetro.
 

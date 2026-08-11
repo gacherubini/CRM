@@ -10,6 +10,10 @@
 
 **Pré-requisito:** `2026-08-11-copiloto-fase1-fundacao-deterministica.md` **implementado e verde**. Este plano consome as consultas, o contexto e a página criados lá.
 
+> **Cuidado com a palavra "fase".** Este é o **plano F2**, fatia de implementação da **v1**. A
+> "Fase 2" do design (§4.6) é outra coisa: o roadmap de produto (v2) — WhatsApp, memória do dono,
+> cautelar, contrato. Nada disso está aqui.
+
 **Spec:** design revisão 2, §3.1, §3.3, §3.4, §3.5, §3.6, §4, §6, §7, §9, §11.
 
 ## Global Constraints
@@ -2361,12 +2365,24 @@ git commit -m "feat(copiloto): runner do turno com deadline, teto de tokens e gu
 - Consumes: `executar_turno` (Task 6), `conversas.*` (Task 5), `RecursosTools` (Task 3), `DeepSeekClient` (Task 2).
 - Produces:
   - `processar_turno(db, turno, *, llm, estoque, chatbot, agora=None) -> None`;
-  - `CopilotoTurnosWorker` (`start`/`stop`/`run_once`/`last_result`), `start_worker`, `stop_worker`, `get_worker`;
+  - `CopilotoTurnosWorker` (`start`/`stop`/`run_once`/`expirar_orfaos`/`last_result`), `start_worker`, `stop_worker`, `get_worker`;
   - rotas `POST /app/loja/copiloto/perguntar` (→ JSON `{turno_id, conversa_id}`), `GET /app/loja/copiloto/turno/{turno_id}.json`, `POST /app/loja/copiloto/turno/{turno_id}/cancelar`.
+
+**Turno órfão — a falha que o deadline NÃO cobre.** O deadline de 45s do runner é in-process: se o
+processo morre no meio do turno (e `fly deploy` faz exatamente isso, de rotina), o turno fica
+`executando` para sempre. Duas consequências, a segunda pior que a primeira: a tela faz polling
+eterno, e a guarda de runaway — que conta `pendente|executando` por usuário — tranca aquele dono
+num 429 permanente depois de dois deploys infelizes. Duas defesas independentes, porque nenhuma
+das duas pode depender da outra estar viva:
+1. `expirar_orfaos()` roda a cada ciclo do worker e fecha `executando` mais velho que
+   `PORTAL_COPILOTO_TURNO_TTL_SECONDS` com `erro_code="interrompido"`;
+2. a contagem da rota filtra por `criado_em` dentro da mesma janela.
 
 **Por que job e não requisição (§3.5):** `build_sales_overview()` faz 3–4 round-trips sequenciais e o loop soma 2–4 chamadas ao provedor. **Não existe streaming no repo** — zero `StreamingResponse`, SSE ou WebSocket; as rotas são síncronas e os clients usam `httpx.Client`. Prender um worker por 30s significa que meia dúzia de perguntas simultâneas derruba a Revy Loja inteira, que é o app que serve todo o resto.
 
-**Env novas:** `PORTAL_COPILOTO_TURNOS_ENABLED` (default `1`, gated pela flag do Copiloto), `PORTAL_COPILOTO_TURNOS_INTERVAL_SECONDS` (default `1.0`), `PORTAL_COPILOTO_TURNO_DEADLINE_SECONDS` (default `45`).
+**Env novas:** `PORTAL_COPILOTO_TURNOS_ENABLED` (default `1` — interruptor do **processo**, snapshot no boot), `PORTAL_COPILOTO_TURNOS_INTERVAL_SECONDS` (default `1.0`), `PORTAL_COPILOTO_TURNO_DEADLINE_SECONDS` (default `45`), `PORTAL_COPILOTO_TURNO_TTL_SECONDS` (default `180` — janela de órfão; tem de ser **maior** que o deadline).
+
+**A flag de produto é lida a cada ciclo, não no boot.** As rotas leem `REVY_LOJA_COPILOTO_ENABLED` em runtime (constraint global). Se o worker a congelasse no `__init__`, ligar a flag sem reiniciar abriria a rota com o worker dormindo e **toda** pergunta ficaria `pendente` para sempre. Por isso `run_once()` rechecha a flag, e `enabled` guarda só o interruptor do processo.
 
 **Rate-limit da v1:** máximo de turnos em aberto por usuário (`PORTAL_COPILOTO_MAX_TURNOS_ABERTOS`, default 2). É guarda de *runaway*, não medidor comercial (§9).
 
@@ -2578,6 +2594,81 @@ def test_worker_desligado_nao_processa(db):
     )
     assert worker.run_once()["processados"] == 0
     assert db.query(CopilotoTurno).one().estado == "pendente"
+
+
+def test_worker_le_a_flag_de_produto_a_cada_ciclo(db, monkeypatch):
+    """Rota lê a flag em runtime; o worker também, senão um abre e o outro dorme."""
+    monkeypatch.setenv("PORTAL_COPILOTO_TURNOS_ENABLED", "1")
+    monkeypatch.delenv("REVY_LOJA_COPILOTO_ENABLED", raising=False)
+    criar_turno(db, loja_slug="loja-teste", usuario_id="u1", pergunta="a?")
+
+    worker = CopilotoTurnosWorker(  # sem `enabled=`: o gate da flag fica ativo
+        db_factory=SessionLocal, llm_factory=_llm_ok,
+        estoque_factory=lambda: EstoqueStub(), chatbot_factory=lambda: ChatbotStub(),
+    )
+    assert worker.run_once()["processados"] == 0
+
+    monkeypatch.setenv("REVY_LOJA_COPILOTO_ENABLED", "1")
+    assert worker.run_once()["processados"] == 1  # sem reiniciar o worker
+
+
+def test_worker_expira_turno_orfao_de_processo_morto(db):
+    """`fly deploy` no meio da pergunta deixa `executando` sem ninguém tocando."""
+    from datetime import datetime, timedelta, timezone
+
+    turno = criar_turno(
+        db, loja_slug="loja-teste", usuario_id="u1", pergunta="quanto vendi?"
+    )
+    turno.estado = "executando"
+    turno.iniciado_em = datetime.now(timezone.utc) - timedelta(minutes=30)
+    db.commit()
+
+    worker = CopilotoTurnosWorker(
+        db_factory=SessionLocal, enabled=True, llm_factory=_llm_ok,
+        estoque_factory=lambda: EstoqueStub(), chatbot_factory=lambda: ChatbotStub(),
+    )
+    worker.run_once()
+    db.refresh(turno)
+    assert turno.estado == "erro"
+    assert turno.erro_code == "interrompido"
+
+
+def test_worker_nao_expira_turno_em_andamento(db):
+    """Turno vivo dentro do TTL não pode ser morto pelo reaper."""
+    from datetime import datetime, timezone
+
+    turno = criar_turno(db, loja_slug="loja-teste", usuario_id="u1", pergunta="a?")
+    turno.estado = "executando"
+    turno.iniciado_em = datetime.now(timezone.utc)
+    db.commit()
+
+    worker = CopilotoTurnosWorker(
+        db_factory=SessionLocal, enabled=True, llm_factory=_llm_ok,
+        estoque_factory=lambda: EstoqueStub(), chatbot_factory=lambda: ChatbotStub(),
+    )
+    worker.run_once()
+    db.refresh(turno)
+    assert turno.estado == "executando"
+
+
+def test_turno_orfao_nao_tranca_o_usuario_no_429(client, db):
+    """A guarda de runaway conta só turno recente — senão o 429 vira permanente."""
+    from datetime import datetime, timedelta, timezone
+
+    for _ in range(3):
+        t = criar_turno(
+            db, loja_slug="loja-teste", usuario_id="u1", pergunta="antiga?"
+        )
+        t.estado = "executando"
+        t.criado_em = datetime.now(timezone.utc) - timedelta(hours=2)
+        db.commit()
+
+    csrf = csrf_da_resposta(login(client))
+    r = client.post(
+        "/app/loja/copiloto/perguntar",
+        data={"csrf": csrf, "pergunta": "quanto vendi?"},
+    )
+    assert r.status_code == 200, r.text
 ```
 
 - [ ] **Step 2: Run test to verify it fails**
@@ -2600,7 +2691,7 @@ from __future__ import annotations
 
 import logging
 import threading
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Callable
 
 from sqlalchemy.orm import Session
@@ -2737,12 +2828,20 @@ class CopilotoTurnosWorker:
         self.lote = int(
             lote if lote is not None else env_int("PORTAL_COPILOTO_TURNOS_LOTE", 3)
         )
+        self.ttl_executando = float(
+            env_float("PORTAL_COPILOTO_TURNO_TTL_SECONDS", 180.0)
+        )
+        # Duas chaves diferentes, de propósito:
+        #  - `enabled` é o interruptor do PROCESSO (roda worker aqui?), snapshot no boot;
+        #  - a flag de produto `REVY_LOJA_COPILOTO_ENABLED` é lida A CADA CICLO, igual às
+        #    rotas. Snapshotá-la aqui criaria o descasamento "rota abre, worker dorme" —
+        #    toda pergunta ficaria `pendente` para sempre.
+        # `enabled=` explícito é decisão já tomada pelo chamador (testes): vale sozinho.
+        self._gate_flag = enabled is None
         if enabled is not None:
             self.enabled = enabled
         else:
-            self.enabled = revy_loja_copiloto_enabled() and env_flag(
-                "PORTAL_COPILOTO_TURNOS_ENABLED", True
-            )
+            self.enabled = env_flag("PORTAL_COPILOTO_TURNOS_ENABLED", True)
         self._llm_factory = llm_factory or _llm_padrao
         self._estoque_factory = estoque_factory
         self._chatbot_factory = chatbot_factory
@@ -2773,14 +2872,46 @@ class CopilotoTurnosWorker:
             self._thread.join(timeout=timeout)
         self._thread = None
 
-    def run_once(self) -> dict:
+    def expirar_orfaos(self, db: Session) -> int:
+        """Fecha turno preso em `executando` — o processo morreu no meio dele.
+
+        Sem isto, todo ``fly deploy`` no meio de uma pergunta deixa um turno
+        `executando` para sempre: a tela faz polling eterno e, pior, a guarda de
+        runaway da rota (que conta `pendente|executando` por usuário) trava o dono
+        num 429 permanente depois de dois deploys infelizes. O deadline do runner
+        é in-process — não sobrevive à morte do processo. Este é o único lugar que
+        varre isso.
+        """
+        limite = datetime.now(timezone.utc) - timedelta(seconds=self.ttl_executando)
+        orfaos = (
+            db.query(CopilotoTurno)
+            .filter(
+                CopilotoTurno.estado == "executando",
+                CopilotoTurno.iniciado_em.isnot(None),
+                CopilotoTurno.iniciado_em < limite,
+            )
+            .all()
+        )
+        for turno in orfaos:
+            falhar_turno(db, turno, erro_code="interrompido")
+        if orfaos:
+            logger.warning("copiloto_turnos_job: %s turno(s) órfão(s)", len(orfaos))
+        return len(orfaos)
+
+    def _ligado(self) -> bool:
         if not self.enabled:
+            return False
+        return revy_loja_copiloto_enabled() if self._gate_flag else True
+
+    def run_once(self) -> dict:
+        if not self._ligado():
             payload = {"ok": False, "processados": 0}
             self.last_result = payload
             return payload
         db = self.db_factory()
         processados = 0
         try:
+            self.expirar_orfaos(db)
             pendentes = (
                 db.query(CopilotoTurno)
                 .filter(CopilotoTurno.estado == "pendente")
@@ -2839,13 +2970,14 @@ Acrescentar em `app/web/loja_copiloto.py` (reusando `_secao_ativa`, `_pode`, `_c
 
 ```python
 import json  # noqa: E402
+from datetime import datetime, timedelta, timezone  # noqa: E402
 
 from app.loja.copiloto.conversas import (  # noqa: E402
     cancelar_turno,
     criar_turno,
     obter_turno,
 )
-from app.meta_ads_spend_job import env_int  # noqa: E402
+from app.meta_ads_spend_job import env_float, env_int  # noqa: E402
 from app.models import CopilotoTurno  # noqa: E402
 
 
@@ -2882,11 +3014,19 @@ async def copiloto_perguntar(request: Request, db: Session = Depends(get_db)):
         return _json_erro(400, "pergunta", "Escreva uma pergunta.")
 
     # Guarda de runaway (§9): não é medidor comercial.
+    # A janela de tempo é obrigatória, não cosmética: sem ela, turno órfão de um
+    # processo morto (deploy no meio da pergunta) conta para sempre e o dono fica
+    # num 429 permanente. O worker também expira órfão, mas a rota não pode
+    # depender de o worker estar vivo para deixar de trancar o usuário.
+    desde = datetime.now(timezone.utc) - timedelta(
+        seconds=env_float("PORTAL_COPILOTO_TURNO_TTL_SECONDS", 180.0)
+    )
     abertos = (
         db.query(CopilotoTurno)
         .filter(
             CopilotoTurno.usuario_id == usuario.id,
             CopilotoTurno.estado.in_(("pendente", "executando")),
+            CopilotoTurno.criado_em >= desde,
         )
         .count()
     )
@@ -3778,7 +3918,12 @@ git commit -m "feat(copiloto): suite de validacao do modelo com 30 perguntas de 
 
 **Fora deste plano, de propósito:** FIPE e ações de escrita (Fase 3); franquia/excedente (não existe na v1 — §9); entrega de alertas fora do painel, memória do dono, superfície WhatsApp (Fase 2 do produto, não deste plano).
 
-**Consistência de tipos verificada:** `MensagemLLM`/`RespostaLLM`/`ToolCall` (Task 1) atravessam 2, 6 e 9; `RecursosTools` (Task 3) é o mesmo objeto em 6, 7 e 9; `Passo.to_dict()` (6) é o que `atualizar_progresso` grava (5) e o que o template lê (8); `erro_code` usa o mesmo vocabulário em 6, 7 e 8 (`deadline`, `provedor`, `teto_tokens`, `max_iteracoes`, `resposta_invalida`, `interno`).
+**Consistência de tipos verificada:** `MensagemLLM`/`RespostaLLM`/`ToolCall` (Task 1) atravessam 2, 6 e 9; `RecursosTools` (Task 3) é o mesmo objeto em 6, 7 e 9; `Passo.to_dict()` (6) é o que `atualizar_progresso` grava (5) e o que o template lê (8); `erro_code` usa o mesmo vocabulário em 6, 7 e 8 (`deadline`, `provedor`, `teto_tokens`, `max_iteracoes`, `resposta_invalida`, `interno`, `sem_resposta`, `interrompido`). Nenhum deles precisa de texto próprio na tela: `falhar_turno` não escreve `resposta`, e o template cai no genérico *"Não consegui responder desta vez."*
 
-**Riscos que o plano aceita:** polling de 700ms é mais chamada HTTP do que SSE (mas o repo não tem SSE em lugar nenhum); o histórico vai como pares pergunta/resposta, sem as tool messages antigas — mais barato e evita reciclar dado velho como se fosse fresco; `LLMFake` mora em código de produção porque runner, worker e a suíte de validação o injetam.
+**Riscos que o plano aceita:**
+- **Um turno por vez.** `run_once()` busca `lote=3` pendentes e os processa **em sequência, na mesma thread**. Com turno de 10–30s, o terceiro dono da fila espera os dois primeiros terminarem. Para loja piloto é irrelevante e o custo de errar para o outro lado é alto (prender worker derruba a Revy Loja inteira — §3.5). Se virar dor, o lever é um pool pequeno de threads, **não** subir o `lote`: aumentar o lote só alonga o bloco sequencial.
+- **A busca de pendentes não usa `FOR UPDATE SKIP LOCKED`.** Hoje o Portal roda um uvicorn sem `--workers` e `--ha=false`, então existe um worker só e não há disputa. No dia da escala horizontal (`docs/plans/2026-07-31-escala-horizontal-app2037.md`), dois processos pegam o mesmo turno e o dono paga o LLM duas vezes. Fechar **junto com** aquele plano, não antes.
+- Polling de 700ms é mais chamada HTTP do que SSE (mas o repo não tem SSE em lugar nenhum).
+- O histórico vai como pares pergunta/resposta, sem as tool messages antigas — mais barato e evita reciclar dado velho como se fosse fresco.
+- `LLMFake` mora em código de produção porque runner, worker e a suíte de validação o injetam.
 

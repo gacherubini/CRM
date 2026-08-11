@@ -104,5 +104,7 @@ só por processo administrativo autorizado — o cliente não tem autosserviço.
 | [`docs/design/2026-07-30-revy-control-loja-asbuilt-e-melhorias.md`](docs/design/2026-07-30-revy-control-loja-asbuilt-e-melhorias.md) | As-built Control/Loja |
 | [`docs/2026-08-07-triagem-revisao-ux-loja-control.md`](docs/2026-08-07-triagem-revisao-ux-loja-control.md) | UX aceita **e recusada** |
 | [`docs/README-COMERCIAL.md`](docs/README-COMERCIAL.md) | Visão comercial e vocabulário |
+| [`docs/mercado/README.md`](docs/mercado/README.md) | Análise de mercado e fit: dores × produto, ICP, concorrência |
+| [`docs/vendas/script-venda-outbound.md`](docs/vendas/script-venda-outbound.md) | Script de venda outbound e a pergunta que abre a conversa |
 | [`docs/tutorial-dono.md`](docs/tutorial-dono.md) · [`docs/tutorial-vendedor.md`](docs/tutorial-vendedor.md) | Manuais de operação |
 | [`docs/historico/`](docs/historico/) | Incidentes, decisões antigas, roadmap concluído |

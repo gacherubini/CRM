@@ -8,7 +8,11 @@
 
 **Tech Stack:** Python 3.11+, FastAPI, SQLAlchemy 2.0, Alembic, `httpx`, pytest, Jinja2.
 
-**Pré-requisitos:** Fases 1 e 2 implementadas e verdes.
+**Pré-requisitos:** planos F1 e F2 implementados e verdes.
+
+> **Cuidado com a palavra "fase".** Este é o **plano F3**, a última fatia de implementação da
+> **v1** — com ele a v1 do §10 do design está completa. A "Fase 3" do design (§4.6) é outra coisa:
+> o roadmap de produto (v3) — leitura de PDF, aprovação de crédito, visão de rede.
 
 **Spec:** design revisão 2, §4.3, §4.5, §6.3, §8, §11, §12.
 
