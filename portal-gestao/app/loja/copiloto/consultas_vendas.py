@@ -7,12 +7,13 @@ que Copiloto e Visão Geral nunca discordem: se um disser 12 vendas e o outro
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal, ROUND_HALF_UP
 from typing import Any
 
 from sqlalchemy.orm import Session
 
-from app.financeiro_calc import calcular_metricas_vendas
+from app.financeiro_calc import _data, calcular_metricas_vendas
 from app.loja.copiloto.periodo import Janela, janela_anterior, janela_do_periodo
 from app.loja.copiloto.tipos import (
     STATUS_OK,
@@ -21,6 +22,7 @@ from app.loja.copiloto.tipos import (
     Cobertura,
     CopilotoContexto,
 )
+from app.models import Venda
 
 CENTAVOS = Decimal("0.01")
 DECIMO = Decimal("0.1")
@@ -141,4 +143,146 @@ def vendas_resumo(
         delta_qtd=qtd - passado["quantidade"],
         delta_receita_pct=_pct(receita, receita_ant),
         delta_ticket_pct=_pct(ticket, ticket_ant),
+    )
+
+
+@dataclass(frozen=True)
+class LinhaRanking:
+    vendedor_email: str
+    qtd: int
+    receita: Decimal
+    ticket_medio: Decimal | None
+    posicao: int
+    posicao_anterior: int | None
+    variacao: str  # subiu | caiu | manteve | novo
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "vendedor_email": self.vendedor_email,
+            "qtd": self.qtd,
+            "receita": _dec(self.receita),
+            "ticket_medio": _dec(self.ticket_medio),
+            "posicao": self.posicao,
+            "posicao_anterior": self.posicao_anterior,
+            "variacao": self.variacao,
+        }
+
+
+@dataclass(frozen=True)
+class RankingVendedores:
+    status: str
+    janela: Janela
+    janela_comparacao: Janela
+    linhas: tuple[LinhaRanking, ...]
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "status": self.status,
+            "periodo": self.janela.to_dict(),
+            "periodo_comparacao": self.janela_comparacao.to_dict(),
+            "linhas": [linha.to_dict() for linha in self.linhas],
+        }
+
+
+def _totais_por_vendedor(
+    db: Session, loja_slug: str, janela: Janela
+) -> dict[str, tuple[int, Decimal]]:
+    """{email: (qtd, receita)} das vendas confirmadas da janela.
+
+    O ``WHERE`` alarga a janela em 1 dia de cada lado porque o corte oficial do
+    Portal é feito no fuso da loja (``financeiro_calc._data``), não em UTC.
+    Alargar é barato; divergir do painel não é.
+    """
+    inicio_dt = datetime.combine(
+        janela.inicio, datetime.min.time(), tzinfo=timezone.utc
+    ) - timedelta(days=1)
+    fim_dt = datetime.combine(
+        janela.fim, datetime.max.time(), tzinfo=timezone.utc
+    ) + timedelta(days=1)
+
+    linhas = (
+        db.query(Venda.vendedor_email, Venda.preco_venda, Venda.criada_em)
+        .filter(
+            Venda.loja_slug == loja_slug,
+            Venda.status == "confirmada",
+            Venda.criada_em >= inicio_dt,
+            Venda.criada_em <= fim_dt,
+        )
+        .all()
+    )
+
+    totais: dict[str, tuple[int, Decimal]] = {}
+    for email, preco, criada_em in linhas:
+        if not (janela.inicio <= _data(criada_em) <= janela.fim):
+            continue
+        chave = (email or "").strip().casefold()
+        qtd, receita = totais.get(chave, (0, Decimal("0")))
+        totais[chave] = (qtd + 1, receita + preco)
+    return totais
+
+
+def _posicoes(totais: dict[str, tuple[int, Decimal]]) -> dict[str, int]:
+    ordenado = sorted(
+        totais.items(), key=lambda item: (-item[1][1], -item[1][0], item[0])
+    )
+    return {email: i + 1 for i, (email, _) in enumerate(ordenado)}
+
+
+def ranking_vendedores(
+    db: Session,
+    ctx: CopilotoContexto,
+    *,
+    inicio: str | None = None,
+    fim: str | None = None,
+    limite: int = 10,
+) -> RankingVendedores:
+    """Vendedores ordenados por receita, com quem subiu e quem caiu."""
+    janela = janela_do_periodo(inicio, fim)
+    anterior = janela_anterior(janela)
+
+    atual = _totais_por_vendedor(db, ctx.loja_slug, janela)
+    passado = _totais_por_vendedor(db, ctx.loja_slug, anterior)
+
+    if not atual:
+        return RankingVendedores(
+            status=STATUS_VAZIO,
+            janela=janela,
+            janela_comparacao=anterior,
+            linhas=(),
+        )
+
+    pos_atual = _posicoes(atual)
+    pos_anterior = _posicoes(passado)
+
+    linhas: list[LinhaRanking] = []
+    for email, posicao in sorted(pos_atual.items(), key=lambda item: item[1]):
+        if posicao > max(1, limite):
+            break
+        qtd, receita = atual[email]
+        antiga = pos_anterior.get(email)
+        if antiga is None:
+            variacao = "novo"
+        elif posicao < antiga:
+            variacao = "subiu"
+        elif posicao > antiga:
+            variacao = "caiu"
+        else:
+            variacao = "manteve"
+        linhas.append(
+            LinhaRanking(
+                vendedor_email=email,
+                qtd=qtd,
+                receita=_c(receita),
+                ticket_medio=_ticket(_c(receita), qtd),
+                posicao=posicao,
+                posicao_anterior=antiga,
+                variacao=variacao,
+            )
+        )
+
+    return RankingVendedores(
+        status=STATUS_OK,
+        janela=janela,
+        janela_comparacao=anterior,
+        linhas=tuple(linhas),
     )
