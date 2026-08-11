@@ -61,6 +61,9 @@ independentes".
 | ops | [Menu estoque WA + fotos](2026-07-22-plano-menu-estoque-wa-e-fotos-fix.md) | Cadastro/menu/fotos | Código DONE; falta E2E |
 | ops | [Alerta simulação no grupo](2026-08-05-plano-alerta-grupo-estoque-simulacao.md) | Chatbot + n8n + Evolution | F0–F2 no código; residual outbox/retry + smoke |
 | site | [Rebuild landing estática](2026-08-09-plano-site-rebuild-html-estatico.md) | Site marketing | **BACKLOG deferido** — export do design tool segue em uso + `apply-seo` a cada export; rebuild só quando o site virar prioridade |
+| 7.1 | [Copiloto F1 — fundação determinística](../superpowers/plans/2026-08-11-copiloto-fase1-fundacao-deterministica.md) | Portal / Revy Loja | **NÃO INICIADO** — seção Copiloto, read models novos e motor de alertas, sem IA |
+| 7.2 | [Copiloto F2 — chat com LLM](../superpowers/plans/2026-08-11-copiloto-fase2-chat-llm.md) | Portal / Revy Loja | **NÃO INICIADO** — depende da F1. DeepSeek, turno assíncrono, tools MCP |
+| 7.3 | [Copiloto F3 — FIPE e ações](../superpowers/plans/2026-08-11-copiloto-fase3-fipe-e-acoes.md) | Portal / Revy Loja | **NÃO INICIADO** — depende da F2. Escrita com confirmação, auditoria e desfazer |
 
 #1A e #4A avançam em paralelo depois do #0; #2A depende da fatia Lite do #4A. A numeração é
 histórica e **não** obriga Portal antes de Estoque/Catálogo.
