@@ -32,6 +32,15 @@ def revy_loja_whatsapp_enabled() -> bool:
     return _env_bool("REVY_LOJA_WHATSAPP_ENABLED", "0")
 
 
+def revy_loja_copiloto_enabled() -> bool:
+    """Seção Copiloto de Vendas da Loja. Default off.
+
+    É kill-switch global do deploy: quem libera loja a loja é o entitlement
+    (``Module.COPILOTO``). Só age com ``REVY_LOJA_SHELL_ENABLED=1``.
+    """
+    return _env_bool("REVY_LOJA_COPILOTO_ENABLED", "0")
+
+
 def revy_loja_redirect_legacy_enabled() -> bool:
     """Redirects 303 de rotas legadas → shell Loja (F8 cutover). Default off.
 
@@ -156,6 +165,7 @@ class Settings:
         "REVY_LOJA_ATENDIMENTO_ENABLED", "0"
     )
     revy_loja_whatsapp_enabled: bool = _env_bool("REVY_LOJA_WHATSAPP_ENABLED", "0")
+    revy_loja_copiloto_enabled: bool = _env_bool("REVY_LOJA_COPILOTO_ENABLED", "0")
     revy_loja_redirect_legacy_enabled: bool = _env_bool(
         "REVY_LOJA_REDIRECT_LEGACY", "0"
     )

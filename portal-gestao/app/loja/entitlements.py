@@ -26,6 +26,7 @@ def fail_open(loja_slug: str, roles: frozenset[str] | set[str]) -> EntitlementSt
         vendas_enabled=has_role,
         estoque_enabled=has_role,
         source="fail_open",
+        copiloto_enabled=has_role,
     )
 
 
@@ -54,6 +55,7 @@ def from_allows_processing(
         vendas_enabled=bool(allows(loja_slug, Module.VENDAS.value)),
         estoque_enabled=bool(allows(loja_slug, Module.ESTOQUE.value)),
         source=source,
+        copiloto_enabled=bool(allows(loja_slug, Module.COPILOTO.value)),
     )
 
 
