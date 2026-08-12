@@ -3,10 +3,19 @@
 A ação NUNCA é executada pelo turno do LLM. O modelo propõe; isto aqui roda
 depois do clique humano, com sete guardas server-side.
 
-A guarda 5 (releitura antes do PATCH) existe porque o PATCH da estoque-api
-não tem idempotência nem If-Match/ETag (Idempotency-Key só existe no POST de
-criação, ``estoque-api/app/main.py:204``). Sem ela, o Copiloto sobrescreve em
-silêncio a alteração que outra pessoa fez dois segundos antes.
+A guarda 5 (releitura antes de escrever) existe porque o PATCH da
+estoque-api não tem idempotência nem If-Match/ETag (Idempotency-Key só
+existe no POST de criação, ``estoque-api/app/main.py:204``). Sem ela, o
+Copiloto sobrescreve em silêncio a alteração que outra pessoa fez dois
+segundos antes. A mesma guarda vale para o desfazer (revisão de 2026-08-12,
+achado I-2 da revisão): ele também é uma escrita real num estoque real, e
+também relê antes de escrever.
+
+``agora`` é ponto de injeção **de teste** (relógio determinístico para
+rate-limit, carimbo e prazo de desfazer). Quem chama estas funções a partir
+de uma rota HTTP (Task 6) NUNCA pode derivar ``agora`` de um dado vindo do
+cliente — um relógio controlável pelo chamador fura o rate-limit e envenena
+a auditoria e o prazo de desfazer ao mesmo tempo (achado I-4 da revisão).
 """
 from __future__ import annotations
 
@@ -38,12 +47,14 @@ ACOES_PERMITIDAS = frozenset({"ajustar_preco", "repostar_veiculo", "publicar_vei
 
 # Cada ação diz ao Estoque EXATAMENTE o verbo dela. Um "else" que assume
 # "publicar" faz despublicar_veiculo publicar o veículo — o oposto do que o
-# dono confirmou no cartão.
+# dono confirmou no cartão. O desfazer reaproveita este mesmo vocabulário: não
+# inventa um terceiro jeito de nomear "publicado"/"despublicado".
 VERBO_ESTOQUE = {
     "repostar_veiculo": "publicar",
     "publicar_veiculo": "publicar",
     "despublicar_veiculo": "despublicar",
 }
+VERBOS_VALIDOS = frozenset(VERBO_ESTOQUE.values())
 
 
 class AcaoRecusada(RuntimeError):
@@ -56,7 +67,17 @@ def _dec(valor) -> Decimal | None:
     if valor in (None, ""):
         return None
     try:
-        return Decimal(str(valor)).quantize(CENTAVOS, rounding=ROUND_HALF_UP)
+        bruto = Decimal(str(valor))
+    except (ArithmeticError, ValueError):
+        return None
+    # NaN passa pelo Decimal(...) sem levantar (json.loads aceita o literal
+    # NaN) e só explodiria mais adiante, em decimal.InvalidOperation, na
+    # primeira comparação. Infinity já cairia no quantize abaixo, mas checar
+    # aqui deixa as duas recusas de não-finito no mesmo lugar (achado I-6).
+    if not bruto.is_finite():
+        return None
+    try:
+        return bruto.quantize(CENTAVOS, rounding=ROUND_HALF_UP)
     except (ArithmeticError, ValueError):
         return None
 
@@ -66,6 +87,11 @@ def _max_acoes_hora() -> int:
         return int(os.getenv("PORTAL_COPILOTO_MAX_ACOES_HORA", "20"))
     except ValueError:
         return 20
+
+
+def _estado_publicacao_atual(veiculo: dict) -> str:
+    """Verbo do Estoque que RESTAURA o estado de publicação atual do veículo."""
+    return "publicar" if veiculo.get("publicado") else "despublicar"
 
 
 def validar_ajuste_preco(preco_atual: Decimal, preco_novo: Decimal) -> Decimal:
@@ -91,17 +117,23 @@ def validar_ajuste_preco(preco_atual: Decimal, preco_novo: Decimal) -> Decimal:
 
 
 def _checar_rate_limit(db: Session, loja_slug: str, agora: datetime) -> None:
+    """Conta TODAS as tentativas da janela, inclusive as que falharam.
+
+    Revisão de 2026-08-12 (achado I-3): o rate-limit existe para limitar
+    dano e custo de um laço; um laço que martela o botão com a estoque-api
+    fora do ar é exatamente o caso que precisa ser freado — não só as ações
+    que tiveram sucesso.
+    """
     desde = agora - timedelta(hours=1)
-    executadas = (
+    tentativas = (
         db.query(CopilotoAcao)
         .filter(
             CopilotoAcao.loja_slug == loja_slug,
             CopilotoAcao.executada_em >= desde,
-            CopilotoAcao.estado != "falhou",
         )
         .count()
     )
-    if executadas >= _max_acoes_hora():
+    if tentativas >= _max_acoes_hora():
         raise AcaoRecusada("rate_limit", "limite de ações por hora atingido")
 
 
@@ -125,6 +157,21 @@ def executar_acao(
     if not veiculo_id:
         raise AcaoRecusada("parametro", "veículo não informado")
 
+    # Revisão de 2026-08-12 (achado C-1, Critical): preco_esperado é
+    # OBRIGATÓRIO para ajustar_preco. Sem ele a guarda 5 (releitura x
+    # cartão, abaixo) não tem nada para comparar e vira decorativa — o PATCH
+    # segue com o preço fresco, seja ele qual for. Quem monta o cartão
+    # sempre sabe o preço que mostrou; não existe caso legítimo de
+    # ajustar_preco sem preco_esperado.
+    esperado: Decimal | None = None
+    if acao == "ajustar_preco":
+        esperado = _dec((parametros or {}).get("preco_esperado"))
+        if esperado is None:
+            raise AcaoRecusada(
+                "preco_esperado_ausente",
+                "preco_esperado é obrigatório para ajustar_preco",
+            )
+
     # 6) rate-limit
     _checar_rate_limit(db, ctx.loja_slug, ref)
 
@@ -145,20 +192,29 @@ def executar_acao(
         raise AcaoRecusada("indisponivel", "estoque indisponível agora") from exc
 
     preco_atual = _dec(veiculo.get("preco"))
-    esperado = _dec((parametros or {}).get("preco_esperado"))
-    if esperado is not None and preco_atual != esperado:
+    if acao == "ajustar_preco" and preco_atual != esperado:
         raise AcaoRecusada(
             "divergencia",
             f"o preço mudou para {preco_atual} desde que o cartão foi montado",
         )
 
     valor_novo: Decimal | None = None
+    estado_anterior: str | None = None
     if acao == "ajustar_preco":
         # 4) banda + piso
         valor_novo = validar_ajuste_preco(
             preco_atual or Decimal("0"), (parametros or {}).get("novo_preco")
         )
+    else:
+        # Achado I-1 da revisão: guarda o verbo que RESTAURA o estado de
+        # publicação de ANTES da ação — lido agora, na mesma releitura da
+        # guarda 5, não inferido do nome da ação.
+        estado_anterior = _estado_publicacao_atual(veiculo)
 
+    # Achado I-5 (Important) da revisão: grava a INTENÇÃO e comita ANTES de
+    # tocar a rede. Se o processo morrer entre a escrita real no estoque e a
+    # promoção para "executada", esta linha "pendente" é o único jeito de
+    # alguém descobrir depois que o preço/estado de uma loja real mudou.
     registro = CopilotoAcao(
         loja_slug=ctx.loja_slug,
         turno_id=turno_id,
@@ -167,18 +223,20 @@ def executar_acao(
         entidade_ref=veiculo_id,
         valor_anterior=preco_atual,
         valor_novo=valor_novo,
-        estado="executada",
+        estado_anterior=estado_anterior,
+        estado="pendente",
         executada_em=ref,
         desfazer_ate=ref + timedelta(minutes=settings.copiloto_desfazer_minutos),
     )
     db.add(registro)
+    db.commit()
 
     try:
         if acao == "ajustar_preco":
             estoque.atualizar(veiculo_id, {"preco": float(valor_novo)})
         else:
             estoque.acao(veiculo_id, VERBO_ESTOQUE[acao])
-    except (VeiculoNaoEncontrado, ConflitoEstoque, EstoqueIndisponivel, Exception) as exc:
+    except Exception as exc:
         registro.estado = "falhou"
         registro.erro_code = type(exc).__name__[:40]
         # 7) auditoria também no fracasso
@@ -190,16 +248,17 @@ def executar_acao(
         logger.warning("copiloto_acao falha acao=%s tipo=%s", acao, type(exc).__name__)
         raise AcaoRecusada("execucao", "não consegui executar a ação agora") from exc
 
+    registro.estado = "executada"
     # 7) auditoria com anterior → novo
     registrar_auditoria_copiloto(
         db, loja_slug=ctx.loja_slug, acao=acao, ator_email=ctx.ator_email, success=True
     )
     db.commit()
     db.refresh(registro)
-    # SQLite (testes) não preserva tzinfo em DateTime(timezone=True) — o
-    # refresh acima devolve naive. Normaliza de volta, mesmo padrão já usado
-    # em desfazer_acao/sinais_store, para o cartão e o desfazer receberem
-    # sempre aware.
+    # SQLite (usado nos testes e em qualquer deploy sem Postgres — o default
+    # de PORTAL_DATABASE_URL é sqlite) não preserva tzinfo em
+    # DateTime(timezone=True). Normaliza de volta pro mesmo padrão já usado
+    # em outros pontos do repo (app/tokens.py, loja/estoque_overview.py...).
     if registro.executada_em is not None and registro.executada_em.tzinfo is None:
         registro.executada_em = registro.executada_em.replace(tzinfo=timezone.utc)
     if registro.desfazer_ate is not None and registro.desfazer_ate.tzinfo is None:
@@ -219,7 +278,14 @@ def desfazer_acao(
     estoque,
     agora: datetime | None = None,
 ) -> bool:
-    """Desfazer em um clique dentro do prazo. Fora dele, não."""
+    """Desfazer em um clique dentro do prazo. Fora dele, não.
+
+    Escreve de verdade no estoque de uma loja real — por isso relê
+    imediatamente antes de escrever, a mesma guarda 5 de ``executar_acao``
+    (achado I-2 da revisão de 2026-08-12): se o valor/estado atual não bater
+    com o que a ação original gravou, alguém mexeu depois e a restauração
+    aborta em vez de sobrescrever.
+    """
     ref = agora or datetime.now(timezone.utc)
     registro = (
         db.query(CopilotoAcao)
@@ -237,15 +303,47 @@ def desfazer_acao(
         prazo = prazo.replace(tzinfo=timezone.utc)
     if prazo is None or ref > prazo:
         return False
-    if registro.acao != "ajustar_preco" or registro.valor_anterior is None:
-        return False
 
     try:
         garantir_escopo_loja(estoque, ctx.loja_slug)
-        estoque.atualizar(
-            registro.entidade_ref, {"preco": float(registro.valor_anterior)}
-        )
+        veiculo = estoque.obter(registro.entidade_ref)
     except Exception:
+        return False
+
+    if registro.acao == "ajustar_preco":
+        if registro.valor_anterior is None or registro.valor_novo is None:
+            return False
+        atual = _dec(veiculo.get("preco"))
+        if atual != registro.valor_novo:
+            logger.warning(
+                "copiloto_desfazer divergiu_apos_acao acao_id=%s de=%s para=%s",
+                acao_id, registro.valor_novo, atual,
+            )
+            return False
+        try:
+            estoque.atualizar(
+                registro.entidade_ref, {"preco": float(registro.valor_anterior)}
+            )
+        except Exception:
+            return False
+    elif registro.acao in VERBO_ESTOQUE:
+        # Achado I-1: linhas de antes da migration 0022 não têm
+        # estado_anterior — falha fechado em vez de adivinhar o verbo.
+        if registro.estado_anterior not in VERBOS_VALIDOS:
+            return False
+        esperado_apos_acao = VERBO_ESTOQUE[registro.acao]
+        atual_verbo = _estado_publicacao_atual(veiculo)
+        if atual_verbo != esperado_apos_acao:
+            logger.warning(
+                "copiloto_desfazer divergiu_apos_acao acao_id=%s esperado=%s atual=%s",
+                acao_id, esperado_apos_acao, atual_verbo,
+            )
+            return False
+        try:
+            estoque.acao(registro.entidade_ref, registro.estado_anterior)
+        except Exception:
+            return False
+    else:
         return False
 
     registro.estado = "desfeita"
