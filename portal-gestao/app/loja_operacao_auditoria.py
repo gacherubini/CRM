@@ -19,10 +19,20 @@ logger = logging.getLogger("portal.loja_operacao_auditoria")
 DOMINIO_ATENDIMENTO = "atendimento"
 DOMINIO_FINANCEIRA = "financeira"
 DOMINIO_CANAL = "canal"
+DOMINIO_COPILOTO = "copiloto"
 
 ACOES_ATENDIMENTO = frozenset({"assumir", "devolver", "reatribuir"})
 ACOES_FINANCEIRA = frozenset({"upsert", "testar", "revogar"})
 ACOES_CANAL = frozenset({"criar", "conectar", "desconectar", "inativar"})
+ACOES_COPILOTO = frozenset(
+    {
+        "ajustar_preco",
+        "repostar_veiculo",
+        "publicar_veiculo",
+        "despublicar_veiculo",
+        "desfazer",
+    }
+)
 
 
 def registrar_auditoria_operacao(
@@ -42,7 +52,12 @@ def registrar_auditoria_operacao(
     commit: bool = False,
 ) -> LojaOperacaoAuditoria:
     """Persiste uma linha de auditoria. Não aceita telefone em claro."""
-    if dominio not in {DOMINIO_ATENDIMENTO, DOMINIO_FINANCEIRA, DOMINIO_CANAL}:
+    if dominio not in {
+        DOMINIO_ATENDIMENTO,
+        DOMINIO_FINANCEIRA,
+        DOMINIO_CANAL,
+        DOMINIO_COPILOTO,
+    }:
         raise ValueError(f"dominio inválido: {dominio}")
     if dominio == DOMINIO_ATENDIMENTO and acao not in ACOES_ATENDIMENTO:
         raise ValueError(f"acao de atendimento inválida: {acao}")
@@ -50,6 +65,8 @@ def registrar_auditoria_operacao(
         raise ValueError(f"acao financeira inválida: {acao}")
     if dominio == DOMINIO_CANAL and acao not in ACOES_CANAL:
         raise ValueError(f"acao de canal inválida: {acao}")
+    if dominio == DOMINIO_COPILOTO and acao not in ACOES_COPILOTO:
+        raise ValueError(f"acao de copiloto inválida: {acao}")
 
     # Defesa: se alguém passar dígitos longos no lugar do hmac, recusa.
     if telefone_hmac and telefone_hmac.isdigit() and len(telefone_hmac) >= 10:
@@ -159,6 +176,31 @@ def registrar_auditoria_canal(
         acao=acao,
         ator_email=ator_email,
         provedor=provedor,
+        success=success,
+        error_code=error_code,
+        commit=commit,
+    )
+
+
+def registrar_auditoria_copiloto(
+    db: Session,
+    *,
+    loja_slug: str,
+    acao: str,
+    ator_email: str,
+    success: bool,
+    error_code: Optional[str] = None,
+    origem: str = "copiloto",
+    commit: bool = False,
+) -> LojaOperacaoAuditoria:
+    """Ação disparada pelo cartão de confirmação do Copiloto."""
+    return registrar_auditoria_operacao(
+        db,
+        loja_slug=loja_slug,
+        dominio=DOMINIO_COPILOTO,
+        acao=acao,
+        ator_email=ator_email,
+        origem=origem,
         success=success,
         error_code=error_code,
         commit=commit,
