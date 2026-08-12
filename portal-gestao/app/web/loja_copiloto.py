@@ -29,6 +29,7 @@ router = APIRouter()
 from app.auth import usuario_atual  # noqa: E402
 from app.config import revy_loja_copiloto_enabled, revy_loja_shell_enabled  # noqa: E402
 from app.db import get_db  # noqa: E402
+from app.loja.copiloto.acoes import AcaoRecusada, desfazer_acao, executar_acao  # noqa: E402
 from app.loja.copiloto.conversas import (  # noqa: E402
     cancelar_turno,
     criar_turno,
@@ -91,6 +92,35 @@ def _ctx(usuario: Usuario) -> CopilotoContexto:
     )
 
 
+def _cartao_do_turno(passos: list[dict]) -> dict | None:
+    """O cartão do último `propor_acao` do turno, se houver.
+
+    ``passo.get("extra")``, nunca ``passo["extra"]``: turnos persistidos
+    antes desta task têm ``passos_json`` sem a chave ``extra`` no JSON —
+    indexação direta quebraria em qualquer turno anterior a este deploy.
+    """
+    for passo in reversed(passos or []):
+        if passo.get("ferramenta") == "propor_acao" and passo.get("extra"):
+            return passo["extra"]
+    return None
+
+
+_STATUS_POR_CODE = {
+    "acao_invalida": 400,
+    "parametro": 400,
+    "preco_invalido": 400,
+    "banda": 400,
+    "piso": 400,
+    "preco_esperado_ausente": 400,
+    "divergencia": 409,
+    "nao_encontrado": 404,
+    "escopo": 403,
+    "rate_limit": 429,
+    "indisponivel": 503,
+    "execucao": 502,
+}
+
+
 @router.get(_PAGINA, response_class=HTMLResponse)
 def copiloto_home(
     request: Request,
@@ -118,6 +148,20 @@ def copiloto_home(
     # string é entrada do cliente) nunca aparece aqui — vira "nenhuma escolhida".
     escolhida = next((c for c in conversas if c.id == conversa_id), None)
     turnos = listar_turnos(db, ctx.loja_slug, escolhida.id) if escolhida else []
+    turnos_view = []
+    for t in turnos:
+        passos = json.loads(t.passos_json) if t.passos_json else []
+        turnos_view.append(
+            {
+                "id": t.id,
+                "pergunta": t.pergunta,
+                "resposta": t.resposta or t.texto_parcial,
+                "estado": t.estado,
+                "erro_code": t.erro_code,
+                "passos": passos,
+                "cartao": _cartao_do_turno(passos),
+            }
+        )
     return templates.TemplateResponse(
         "loja/copiloto.html",
         contexto(
@@ -129,17 +173,7 @@ def copiloto_home(
             sinais_novos=contar_sinais_novos(db, ctx.loja_slug),
             conversas=conversas,
             conversa_atual=escolhida,
-            turnos=[
-                {
-                    "id": t.id,
-                    "pergunta": t.pergunta,
-                    "resposta": t.resposta or t.texto_parcial,
-                    "estado": t.estado,
-                    "erro_code": t.erro_code,
-                    "passos": json.loads(t.passos_json) if t.passos_json else [],
-                }
-                for t in turnos
-            ],
+            turnos=turnos_view,
         ),
     )
 
@@ -280,6 +314,7 @@ def copiloto_turno_json(
     turno = obter_turno(db, usuario.loja_slug, turno_id)
     if turno is None:
         return _json_erro(404, "not_found", "Turno não encontrado")
+    passos = json.loads(turno.passos_json) if turno.passos_json else []
     return JSONResponse(
         {
             "ok": True,
@@ -288,7 +323,8 @@ def copiloto_turno_json(
             "estado": turno.estado,
             "texto": turno.resposta or turno.texto_parcial,
             "erro_code": turno.erro_code,
-            "passos": json.loads(turno.passos_json) if turno.passos_json else [],
+            "passos": passos,
+            "cartao": _cartao_do_turno(passos),
         }
     )
 
@@ -307,3 +343,74 @@ async def copiloto_turno_cancelar(
     return JSONResponse(
         {"ok": True, "cancelado": cancelar_turno(db, usuario.loja_slug, turno_id)}
     )
+
+
+@router.post(_PAGINA + "/acao")
+async def copiloto_executar_acao(
+    request: Request,
+    db: Session = Depends(get_db),
+    # Depends, não uma chamada direta a get_estoque_client(): só assim o
+    # dependency_override que os testes usam (EstoqueAcaoFake) tem efeito. Uma
+    # chamada direta ignoraria app.dependency_overrides e bateria na rede real.
+    estoque=Depends(get_estoque_client),
+):
+    """Execução da ação. NUNCA sai do turno do LLM — sai do clique humano.
+
+    ``agora`` nunca vem daqui: ``executar_acao`` recebe ``agora=None`` e
+    deriva o relógio real internamente. Nenhum campo da requisição (query,
+    form ou header) é repassado como ``agora`` — ver ``acoes.py`` para o
+    porquê (fura rate-limit e envenena carimbo/prazo de desfazer).
+    """
+    usuario, erro = _guard_json(request, db)
+    if erro is not None:
+        return erro
+
+    form = await request.form()
+    if not csrf_valido(request, form.get("csrf")):
+        return _json_erro(403, "sessao", "Sessão expirada")
+
+    parametros = {
+        "veiculo_id": (form.get("veiculo_id") or "").strip(),
+        "novo_preco": (form.get("novo_preco") or "").strip() or None,
+        "preco_esperado": (form.get("preco_esperado") or "").strip() or None,
+    }
+    try:
+        registro = executar_acao(
+            db,
+            _ctx(usuario),
+            acao=(form.get("acao") or "").strip(),
+            parametros=parametros,
+            estoque=estoque,
+            turno_id=(form.get("turno_id") or "").strip() or None,
+        )
+    except AcaoRecusada as exc:
+        return _json_erro(_STATUS_POR_CODE.get(exc.code, 400), exc.code, str(exc))
+
+    return JSONResponse(
+        {
+            "ok": True,
+            "acao_id": registro.id,
+            "acao": registro.acao,
+            "desfazer_ate": (
+                registro.desfazer_ate.isoformat() if registro.desfazer_ate else None
+            ),
+        }
+    )
+
+
+@router.post(_PAGINA + "/acao/{acao_id}/desfazer")
+async def copiloto_desfazer_acao(
+    request: Request,
+    acao_id: str,
+    db: Session = Depends(get_db),
+    estoque=Depends(get_estoque_client),
+):
+    """``agora`` também nunca vem da requisição aqui — mesma razão da rota acima."""
+    usuario, erro = _guard_json(request, db)
+    if erro is not None:
+        return erro
+    form = await request.form()
+    if not csrf_valido(request, form.get("csrf")):
+        return _json_erro(403, "sessao", "Sessão expirada")
+    desfeito = desfazer_acao(db, _ctx(usuario), acao_id, estoque=estoque)
+    return JSONResponse({"ok": True, "desfeito": desfeito})

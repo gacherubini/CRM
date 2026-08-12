@@ -3227,3 +3227,19 @@ a.metric-link:focus-visible { outline: 2px solid var(--brand); outline-offset: 2
 
 .copiloto-sinal { display: flex; justify-content: space-between; gap: var(--space-4); align-items: start; }
 .copiloto-sinal-acoes { display: flex; gap: var(--space-2); }
+
+.copiloto-cartao {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-nav);
+  background: var(--surface-soft);
+}
+.copiloto-cartao ul {
+  margin: 0;
+  padding-left: var(--space-4);
+  color: var(--ink-soft);
+  font-size: var(--text-sm);
+}
+.copiloto-cartao-form { display: flex; gap: var(--space-2); }
