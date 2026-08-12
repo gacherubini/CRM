@@ -105,6 +105,9 @@ resultado zero.
   implementado.
 - [Estabilidade Bradesco](2026-07-24-plano-estabilidade-bradesco-playwright.md) —
   **BACKLOG priorizado**, não implementado.
+- [Worker Playwright em PC local](../superpowers/specs/2026-08-12-worker-playwright-pc-local-design.md)
+  — opção **I** da decisão de captcha/IP: worker em IP residencial, fallback para o Fly,
+  retry com taxonomia. **DESIGN APROVADO, sem código.** Fase 0 (probe no PC) é gate.
 
 ## Arquivo (não executar)
 
