@@ -213,6 +213,30 @@ def test_cancelar_turno_em_andamento(client, monkeypatch):
     assert r.json()["cancelado"] is True
 
 
+def test_cancelar_sem_csrf_e_recusado(client, monkeypatch):
+    """Fix round 1 / Finding 1: mesma checagem de CSRF de /perguntar, agora
+    provada em /cancelar — o brief exigia o par para as duas rotas POST."""
+    _ligar(monkeypatch)
+    login(client)
+    pagina = client.get("/app/loja/copiloto")
+    turno_id = client.post(
+        "/app/loja/copiloto/perguntar",
+        data={"csrf": csrf_da_resposta(pagina), "pergunta": "a?"},
+    ).json()["turno_id"]
+
+    r = client.post(
+        f"/app/loja/copiloto/turno/{turno_id}/cancelar", data={"csrf": "x"}
+    )
+    assert r.status_code == 403
+
+    db = SessionLocal()
+    try:
+        # Estado inalterado — não só o HTTP status, o efeito colateral também.
+        assert obter_turno(db, "loja-teste", turno_id).estado == "pendente"
+    finally:
+        db.close()
+
+
 def test_limite_de_turnos_abertos_por_usuario(client, monkeypatch):
     _ligar(monkeypatch)
     monkeypatch.setenv("PORTAL_COPILOTO_MAX_TURNOS_ABERTOS", "1")
@@ -245,6 +269,7 @@ def test_provedor_fora_grava_erro_e_nao_texto(db):
 
 
 def test_worker_pega_turno_pendente(db):
+    seed_loja_operacional(db)
     criar_turno(db, loja_slug="loja-teste", usuario_id="u1", pergunta="quanto vendi?")
     worker = CopilotoTurnosWorker(
         db_factory=SessionLocal,
@@ -268,10 +293,80 @@ def test_worker_desligado_nao_processa(db):
     assert db.query(CopilotoTurno).one().estado == "pendente"
 
 
+def test_worker_nao_processa_turno_de_loja_sem_entitlement(db, monkeypatch):
+    """Fix round 1 / Finding 2: um turno pode esperar na fila (lote, intervalo
+    do worker) tempo suficiente para a loja perder o entitlement do Copiloto
+    (ou ser desativada) entre a pergunta e o processamento. Sem recheck aqui,
+    o worker chamaria o provedor — e cobraria custo real — por uma loja que
+    já não tem mais acesso. O turno também não pode ficar `pendente` para
+    sempre: isso recriaria o mesmo problema de órfão/429 permanente que
+    `expirar_orfaos()` existe para evitar.
+    """
+    monkeypatch.setenv("REVY_LOJA_ENTITLEMENTS_ENABLED", "1")
+    seed_loja_operacional(db, loja_slug="loja-teste", state="ativa")
+    # loja ativa, mas SEM aggregate "copiloto" contratado — entitlement ausente.
+    turno = criar_turno(
+        db, loja_slug="loja-teste", usuario_id="u1", pergunta="quanto vendi?"
+    )
+
+    chamadas = []
+
+    class LLMEspiao:
+        def completar(self, *a, **k):
+            chamadas.append((a, k))
+            raise AssertionError("o provedor não deveria ser chamado")
+
+    worker = CopilotoTurnosWorker(
+        db_factory=SessionLocal,
+        enabled=True,
+        llm_factory=lambda: LLMEspiao(),
+        estoque_factory=lambda: EstoqueStub(),
+        chatbot_factory=lambda: ChatbotStub(),
+    )
+    resultado = worker.run_once()
+    assert resultado["processados"] == 0
+    assert chamadas == []  # LLM nunca chamado
+
+    db.refresh(turno)
+    assert turno.estado == "erro"  # terminal — não fica pendente para sempre
+    assert turno.erro_code == "sem_acesso"
+
+
+def test_worker_processa_turno_quando_entitlement_presente(db, monkeypatch):
+    """Contraprova da Finding 2: com o módulo contratado e ativo, o worker
+    processa normalmente — a checagem não é fail-closed a ponto de travar
+    quem tem acesso de verdade."""
+    monkeypatch.setenv("REVY_LOJA_ENTITLEMENTS_ENABLED", "1")
+    seed_loja_operacional(db, loja_slug="loja-teste", state="ativa")
+    db.add(
+        LojaOperacionalProjecao(
+            loja_slug="loja-teste",
+            aggregate="copiloto",
+            version=1,
+            state="ativo",
+            event_id="seed-copiloto",
+        )
+    )
+    db.commit()
+    criar_turno(db, loja_slug="loja-teste", usuario_id="u1", pergunta="quanto vendi?")
+
+    worker = CopilotoTurnosWorker(
+        db_factory=SessionLocal,
+        enabled=True,
+        llm_factory=_llm_ok,
+        estoque_factory=lambda: EstoqueStub(),
+        chatbot_factory=lambda: ChatbotStub(),
+    )
+    resultado = worker.run_once()
+    assert resultado["processados"] == 1
+    assert db.query(CopilotoTurno).one().estado == "pronto"
+
+
 def test_worker_le_a_flag_de_produto_a_cada_ciclo(db, monkeypatch):
     """Rota lê a flag em runtime; o worker também, senão um abre e o outro dorme."""
     monkeypatch.setenv("PORTAL_COPILOTO_TURNOS_ENABLED", "1")
     monkeypatch.delenv("REVY_LOJA_COPILOTO_ENABLED", raising=False)
+    seed_loja_operacional(db)
     criar_turno(db, loja_slug="loja-teste", usuario_id="u1", pergunta="a?")
 
     worker = CopilotoTurnosWorker(  # sem `enabled=`: o gate da flag fica ativo

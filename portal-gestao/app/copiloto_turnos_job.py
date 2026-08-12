@@ -13,7 +13,12 @@ from typing import Callable
 
 from sqlalchemy.orm import Session
 
-from app.config import revy_loja_copiloto_enabled, settings
+from app import provisioning
+from app.config import (
+    revy_loja_copiloto_enabled,
+    revy_loja_entitlements_enabled,
+    settings,
+)
 from app.loja.copiloto.conversas import (
     atualizar_progresso,
     concluir_turno,
@@ -23,12 +28,28 @@ from app.loja.copiloto.conversas import (
 from app.loja.copiloto.runner import executar_turno
 from app.loja.copiloto.tipos import CopilotoContexto
 from app.loja.copiloto.tools import RecursosTools
+from app.loja.types import Module
 from app.meta_ads_spend_job import env_flag, env_float, env_int
 from app.models import CopilotoTurno, Usuario
 
 logger = logging.getLogger("portal.copiloto.turnos")
 
 LIMITE_HISTORICO = 6
+
+
+def _copiloto_permitido(db: Session, loja_slug: str) -> bool:
+    """Mesmo gate por loja do motor de sinais (`copiloto_sinais_job._copiloto_permitido`).
+
+    Um turno pode ficar `pendente` na fila por um tempo (lote, intervalo do
+    worker); nesse intervalo a loja pode ser desativada ou perder o
+    entitlement do módulo Copiloto. Sem recheckar aqui, o worker processaria
+    — e cobraria custo real de LLM por — uma loja que já não tem mais
+    acesso. Isto NÃO é vazamento entre lojas (o turno já pertence à própria
+    loja, e a rota de leitura tem seu próprio gate), é integridade de
+    autorização/custo: só quem ainda tem acesso pode gerar a despesa.
+    """
+    modulo = Module.COPILOTO.value if revy_loja_entitlements_enabled() else None
+    return provisioning.allows_processing(db, loja_slug, modulo)
 
 
 def _historico(db: Session, turno: CopilotoTurno) -> list[tuple[str, str]]:
@@ -246,10 +267,28 @@ class CopilotoTurnosWorker:
                 .limit(max(1, self.lote))
                 .all()
             )
-            if pendentes:
+            permitidos = []
+            for turno in pendentes:
+                if _copiloto_permitido(db, turno.loja_slug):
+                    permitidos.append(turno)
+                else:
+                    # Falha terminal SEM chamar o provedor: turno enfileirado
+                    # antes de a loja perder o entitlement (ou ser
+                    # desativada) não pode gerar custo de LLM, e não pode
+                    # ficar `pendente` para sempre — isso recriaria o mesmo
+                    # problema de órfão/429 permanente que expirar_orfaos()
+                    # existe para evitar.
+                    logger.warning(
+                        "copiloto_turnos_job: turno=%s loja=%s sem acesso ao "
+                        "Copiloto — falhando sem chamar o provedor",
+                        turno.id,
+                        turno.loja_slug,
+                    )
+                    falhar_turno(db, turno, erro_code="sem_acesso")
+            if permitidos:
                 estoque, chatbot = self._clients()
                 llm = self._llm_factory()
-                for turno in pendentes:
+                for turno in permitidos:
                     processar_turno(
                         db, turno, llm=llm, estoque=estoque, chatbot=chatbot
                     )
