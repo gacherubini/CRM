@@ -22,8 +22,9 @@ mas o valor não aparece se você procurar só em `Settings`:
   documentação faltando** — se for unificar em `app/config.py`, confirme que os
   testes que fazem `monkeypatch.setenv("PORTAL_COPILOTO_MAX_ACOES_HORA", ...)`
   continuam pegando o valor novo a cada chamada.
-- **As variáveis dos workers em background** (`app/copiloto_sinais_job.py` e
-  `app/copiloto_turnos_job.py`) e as duas lidas em `app/web/loja_copiloto.py` — são
+- **As variáveis dos workers em background** (`app/copiloto_sinais_job.py`,
+  `app/copiloto_turnos_job.py` e `app/copiloto_purge_job.py`) e as duas lidas em
+  `app/web/loja_copiloto.py` — são
   lidas via os helpers `env_flag`/`env_float`/`env_int` de
   `app/meta_ads_spend_job.py`, também fora de `app/config.py`. Esse padrão é
   compartilhado com outros workers do Portal (não é peculiaridade do Copiloto), mas
@@ -65,11 +66,15 @@ mas o valor não aparece se você procurar só em `Settings`:
 | `PORTAL_COPILOTO_DESFAZER_MINUTOS` | `30` | Janela, em minutos, em que uma ação executada pode ser desfeita pelo botão "Desfazer" no cartão. O prazo é gravado na linha (`CopilotoAcao.desfazer_ate`) no momento da execução, não recalculado na tela. | Ajustar quanto tempo de tolerância o dono tem para reverter um clique. |
 | `PORTAL_COPILOTO_MAX_ACOES_HORA` | `20` | Rate-limit de quantas ações **a loja inteira** pode executar por hora — soma de todos os atores dela, não um contador por pessoa (`_checar_rate_limit`, `app/loja/copiloto/acoes.py:119-137`, filtra só por `loja_slug`). Conta TODA tentativa da última hora, inclusive as que falharam. **Lida direto em `app/loja/copiloto/acoes.py`, fora de `app/config.py`** — ver seção "Onde cada uma é lida" acima. | Suspeita de uso automatizado/abuso, ou piloto pedindo limite mais folgado. |
 
-## Retenção e workers (turnos e sinais)
+## Retenção e workers (turnos, sinais e purge)
 
 | Variável | Default | O que muda na prática | Quando mexer |
 |---|---|---|---|
-| `PORTAL_COPILOTO_RETENCAO_DIAS` | `90` | Contrato de retenção de conversas do Copiloto. **O job de purge ainda não existe** — hoje este valor não apaga nada sozinho; é a promessa para quando o job de limpeza for implementado. | Não mexer sem também implementar o purge — hoje é só documentação viva do contrato futuro. |
+| `PORTAL_COPILOTO_RETENCAO_DIAS` | `30` | Prazo de retenção de conversas do Copiloto, aplicado por `app/copiloto_purge_job.py`. O job apaga `copiloto_turno` (exceto `pendente`/`executando`, nunca por idade) mais velho que este prazo e, junto, `copiloto_conversa` que fica sem nenhum turno restante. **Não apaga** `copiloto_acao` nem `loja_operacao_auditoria` — são registro de alteração comercial (quem mudou o preço de qual veículo, de quanto para quanto, e quando), não conversa; saem por outra política, ou por nenhuma. `CopilotoAcao.turno_id` não tem FK: quando o turno de origem é purgado, a linha de ação fica com uma referência solta, de propósito. | Mudar o prazo é decisão do dono, não lever técnico — ver histórico da mudança de `90` para `30` dias em 2026-08-12. |
+| `PORTAL_COPILOTO_PURGE_ENABLED` | `1` (on) — helper `env_flag` | Liga/desliga só o **worker de purge de retenção** (`app/copiloto_purge_job.py`). Snapshot no boot do processo + relê `REVY_LOJA_COPILOTO_ENABLED` a cada ciclo (mesmo padrão dos outros dois workers do Copiloto): produto desligado, purge não roda. | Desligar o worker isoladamente (debug, incidente) sem tirar o Copiloto do ar para quem já está no chat. |
+| `PORTAL_COPILOTO_PURGE_INTERVAL_SECONDS` | `21600.0` (6h) | Intervalo do laço do worker de purge. | Ajuste fino de quão rápido o backlog de dados antigos é drenado. |
+| `PORTAL_COPILOTO_PURGE_INITIAL_DELAY_SECONDS` | `300.0` (5 min) | Atraso antes da primeira rodada do worker de purge após o boot do processo. | Coordenar com o tempo de boot do restante do Portal em ambientes mais lentos. |
+| `PORTAL_COPILOTO_PURGE_LOTE` | `500` | Teto de turnos apagados **por execução**, somado entre todas as lojas — transação curta, sem travar tabela. Se uma loja tem mais turnos elegíveis que o teto, o resto fica para o próximo ciclo. | Ajuste fino de throughput de limpeza vs. carga no banco. |
 | `PORTAL_COPILOTO_TURNO_DEADLINE_SECONDS` | `45.0` | Deadline de um turno inteiro (pergunta → resposta), passado como `deadline_segundos` para `executar_turno` em `app/copiloto_turnos_job.py`. Estourar vira turno com erro, nunca fica pendurado. | Provedor de LLM consistentemente mais lento/rápido que 45s nos logs reais. |
 | `PORTAL_COPILOTO_TURNO_TTL_SECONDS` | `180.0` | Janela de tempo considerada "turno em aberto" — usada em dois lugares: o worker de turnos (`app/copiloto_turnos_job.py`, TTL para reciclar turno `executando` órfão de processo morto) e a rota que abre turno novo (`app/web/loja_copiloto.py`, guarda de runaway contra `429`). As duas leituras são independentes (mesma env, dois `os.getenv` diferentes) — mudar o valor afeta as duas ao mesmo tempo. | Deploy no meio de perguntas deixando turno "preso" por tempo maior/menor que o esperado. |
 | `PORTAL_COPILOTO_MAX_TURNOS_ABERTOS` | `2` | Quantos turnos `pendente`/`executando` (dentro da janela TTL acima) um usuário pode ter ao mesmo tempo antes da rota responder `429 Espere a resposta anterior terminar`. Guarda de *runaway*, não medidor comercial. | Ajustar tolerância a duplo clique / múltiplas abas do mesmo usuário. |

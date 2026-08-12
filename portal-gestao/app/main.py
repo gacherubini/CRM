@@ -71,6 +71,7 @@ from app.meta_ads_spend import (
     sincronizar_gastos_meta,
 )
 from app import (
+    copiloto_purge_job,
     copiloto_sinais_job,
     copiloto_turnos_job,
     meta_ads_spend_job,
@@ -347,6 +348,7 @@ async def _lifespan(_app: FastAPI):
         )
         copiloto_sinais_job.start_worker(SessionLocal)
         copiloto_turnos_job.start_worker(SessionLocal)
+        copiloto_purge_job.start_worker(SessionLocal)
     try:
         yield
     finally:
@@ -355,6 +357,7 @@ async def _lifespan(_app: FastAPI):
         revy_trafego_outbox_job.stop_worker()
         copiloto_sinais_job.stop_worker()
         copiloto_turnos_job.stop_worker()
+        copiloto_purge_job.stop_worker()
 
 
 app = FastAPI(

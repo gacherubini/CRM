@@ -196,10 +196,12 @@ class Settings:
     copiloto_historico_tokens: int = int(
         os.getenv("REVY_LOJA_COPILOTO_HISTORICO_TOKENS", "2000")
     )
-    # Retenção de conversas do Copiloto (dias). Purge ainda não está implementado;
-    # este valor é o contrato para quando o job de limpeza existir.
+    # Retenção de conversas do Copiloto (dias). Aplicada por
+    # app/copiloto_purge_job.py: apaga turno/conversa mais velhos que este
+    # prazo. NÃO apaga copiloto_acao nem loja_operacao_auditoria — ver
+    # docstring do job.
     copiloto_retencao_dias: int = int(
-        os.getenv("PORTAL_COPILOTO_RETENCAO_DIAS", "90")
+        os.getenv("PORTAL_COPILOTO_RETENCAO_DIAS", "30")
     )
     # Copiloto de Vendas — tabela FIPE (fonte externa, read-only). API
     # comunitária gratuita, sem SLA: ver app/loja/copiloto/fipe.py.
