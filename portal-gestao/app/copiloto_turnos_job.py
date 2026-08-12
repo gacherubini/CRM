@@ -25,6 +25,7 @@ from app.loja.copiloto.conversas import (
     falhar_turno,
     listar_turnos,
 )
+from app.loja.copiloto.historico import selecionar_historico
 from app.loja.copiloto.runner import executar_turno
 from app.loja.copiloto.tipos import CopilotoContexto
 from app.loja.copiloto.tools import RecursosTools
@@ -33,8 +34,6 @@ from app.meta_ads_spend_job import env_flag, env_float, env_int
 from app.models import CopilotoTurno, Usuario
 
 logger = logging.getLogger("portal.copiloto.turnos")
-
-LIMITE_HISTORICO = 6
 
 
 def _copiloto_permitido(db: Session, loja_slug: str) -> bool:
@@ -52,14 +51,21 @@ def _copiloto_permitido(db: Session, loja_slug: str) -> bool:
     return provisioning.allows_processing(db, loja_slug, modulo)
 
 
-def _historico(db: Session, turno: CopilotoTurno) -> list[tuple[str, str]]:
+def _historico(
+    db: Session, turno: CopilotoTurno, orcamento_tokens: int | None = None
+) -> list[tuple[str, str]]:
+    orcamento = (
+        settings.copiloto_historico_tokens
+        if orcamento_tokens is None
+        else orcamento_tokens
+    )
     pares: list[tuple[str, str]] = []
     for anterior in listar_turnos(db, turno.loja_slug, turno.conversa_id):
         if anterior.id == turno.id:
             break
         if anterior.estado == "pronto" and anterior.resposta:
             pares.append((anterior.pergunta, anterior.resposta))
-    return pares[-LIMITE_HISTORICO:]
+    return selecionar_historico(pares, orcamento)
 
 
 def _papel_do_ator(db: Session, turno: CopilotoTurno) -> str:

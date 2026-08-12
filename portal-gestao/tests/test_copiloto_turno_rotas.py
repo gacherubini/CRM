@@ -1,8 +1,14 @@
 from conftest import csrf_da_resposta, login, seed_loja_operacional
 
-from app.copiloto_turnos_job import CopilotoTurnosWorker, processar_turno
+from app.config import settings
+from app.copiloto_turnos_job import CopilotoTurnosWorker, _historico, processar_turno
 from app.db import SessionLocal
-from app.loja.copiloto.conversas import cancelar_turno, criar_turno, obter_turno
+from app.loja.copiloto.conversas import (
+    cancelar_turno,
+    concluir_turno,
+    criar_turno,
+    obter_turno,
+)
 from app.loja.copiloto.port import LLMFake, RespostaLLM, ToolCall
 from app.models import CopilotoTurno, LojaOperacionalProjecao
 
@@ -495,3 +501,70 @@ def test_turno_orfao_nao_tranca_o_usuario_no_429(client, db, monkeypatch):
         data={"csrf": csrf, "pergunta": "quanto vendi?"},
     )
     assert r.status_code == 200, r.text
+
+
+def _seedar_conversa_com_turnos_prontos(db, quantidade: int) -> tuple[list[CopilotoTurno], CopilotoTurno]:
+    """Cria `quantidade` turnos `pronto` na mesma conversa e devolve
+    (turnos_prontos, turno_atual_pendente). Pergunta/resposta são longas de
+    propósito (bem acima do custo de sobrecarga por mensagem), para que o
+    corte por orçamento de tokens tenha efeito real nos testes."""
+    conversa_id = None
+    prontos: list[CopilotoTurno] = []
+    for i in range(quantidade):
+        t = criar_turno(
+            db,
+            loja_slug="loja-teste",
+            usuario_id="u1",
+            pergunta=f"pergunta {i} " + "x" * 50,
+            conversa_id=conversa_id,
+        )
+        conversa_id = t.conversa_id
+        concluir_turno(
+            db,
+            t,
+            resposta=f"resposta {i} " + "y" * 50,
+            passos=[],
+            tokens_entrada=10,
+            tokens_saida=10,
+            custo_estimado=None,
+        )
+        prontos.append(t)
+    atual = criar_turno(
+        db,
+        loja_slug="loja-teste",
+        usuario_id="u1",
+        pergunta="pergunta atual",
+        conversa_id=conversa_id,
+    )
+    return prontos, atual
+
+
+def test_historico_corta_por_orcamento_de_tokens_preservando_o_mais_recente(db):
+    """Substitui a antiga cobertura de corte por contagem fixa (6 pares):
+    agora o corte é por orçamento de tokens (§ app/loja/copiloto/historico.py),
+    não por número de turnos. Cada par pronto=(pergunta, resposta) custa ~40
+    tokens estimados nesta fixture — orçamento pequeno só cabe o mais recente."""
+    prontos, atual = _seedar_conversa_com_turnos_prontos(db, quantidade=3)
+
+    curto = _historico(db, atual, orcamento_tokens=40)
+    assert curto == [(prontos[-1].pergunta, prontos[-1].resposta)]
+
+    completo = _historico(db, atual, orcamento_tokens=10_000)
+    assert completo == [(t.pergunta, t.resposta) for t in prontos]  # ordem cronológica
+
+
+def test_historico_sem_orcamento_explicito_usa_o_da_config(db):
+    """`orcamento_tokens=None` (chamada real do worker) cai em
+    `settings.copiloto_historico_tokens` — o teste controla isso sem mexer em
+    variável de ambiente. `Settings` é dataclass frozen (mesmo padrão de
+    `object.__setattr__` usado nos demais testes deste repo para ligar/
+    desligar flags durante o teste)."""
+    original = settings.copiloto_historico_tokens
+    object.__setattr__(settings, "copiloto_historico_tokens", 40)
+    try:
+        prontos, atual = _seedar_conversa_com_turnos_prontos(db, quantidade=3)
+        resultado = _historico(db, atual)
+    finally:
+        object.__setattr__(settings, "copiloto_historico_tokens", original)
+
+    assert resultado == [(prontos[-1].pergunta, prontos[-1].resposta)]

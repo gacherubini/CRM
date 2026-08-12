@@ -190,6 +190,12 @@ class Settings:
         os.getenv("REVY_LOJA_COPILOTO_LLM_TIMEOUT", "40")
     )
     copiloto_llm_retries: int = int(os.getenv("REVY_LOJA_COPILOTO_LLM_RETRIES", "1"))
+    # Teto de tokens do BLOCO DE HISTÓRICO enviado ao modelo a cada turno
+    # (system prompt e retorno das ferramentas são separados e não entram
+    # nesta conta). 2000 é ponto de partida, a calibrar com uso real.
+    copiloto_historico_tokens: int = int(
+        os.getenv("REVY_LOJA_COPILOTO_HISTORICO_TOKENS", "2000")
+    )
     # Retenção de conversas do Copiloto (dias). Purge ainda não está implementado;
     # este valor é o contrato para quando o job de limpeza existir.
     copiloto_retencao_dias: int = int(
