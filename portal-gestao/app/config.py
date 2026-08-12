@@ -201,6 +201,18 @@ class Settings:
     copiloto_retencao_dias: int = int(
         os.getenv("PORTAL_COPILOTO_RETENCAO_DIAS", "90")
     )
+    # Copiloto de Vendas — tabela FIPE (fonte externa, read-only). API
+    # comunitária gratuita, sem SLA: ver app/loja/copiloto/fipe.py.
+    copiloto_fipe_url: str = os.getenv(
+        "REVY_LOJA_COPILOTO_FIPE_URL", "https://parallelum.com.br/fipe/api/v1"
+    ).strip().rstrip("/")
+    copiloto_fipe_timeout: float = float(
+        os.getenv("REVY_LOJA_COPILOTO_FIPE_TIMEOUT", "8")
+    )
+    # Tabela FIPE vira uma vez por mês: marca/modelo aguentam horas de cache.
+    copiloto_fipe_cache_segundos: float = float(
+        os.getenv("REVY_LOJA_COPILOTO_FIPE_CACHE_SEGUNDOS", "21600")
+    )
 
     def absolute_url(self, path: str) -> str:
         normalized = path if path.startswith("/") else f"/{path}"
