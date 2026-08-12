@@ -44,6 +44,7 @@ Tokens das APIs ficam **somente no servidor**; o navegador recebe uma sessão as
 
 Mapa completo de rotas: [`docs/revy-loja-route-map.md`](docs/revy-loja-route-map.md).
 Cutover/rollback do shell: [`docs/revy-loja-cutover.md`](docs/revy-loja-cutover.md).
+Variáveis de ambiente do Copiloto de Vendas: [`docs/copiloto-env.md`](docs/copiloto-env.md).
 
 ## O que já funciona
 
