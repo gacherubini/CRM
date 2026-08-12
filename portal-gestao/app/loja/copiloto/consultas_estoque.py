@@ -15,6 +15,11 @@ from decimal import Decimal, ROUND_HALF_UP
 from typing import Any
 
 from app.clients.estoque import EstoqueIndisponivel
+from app.loja.copiloto.prompt import rotular_conteudo_externo
+from app.loja.copiloto.texto_externo import (
+    sanitizar_texto_externo,
+    truncar_com_reticencias,
+)
 from app.loja.copiloto.tipos import (
     STATUS_ERRO,
     STATUS_INDISPONIVEL,
@@ -30,6 +35,12 @@ CENTAVOS = Decimal("0.01")
 
 # Status que ainda prendem capital. Vendido/indisponível não são "parados".
 STATUS_ATIVOS = frozenset({"disponivel", "reservado"})
+
+# Descrição vai para o CONTEXTO DO MODELO (via to_dict() -> tool result),
+# não direto para tela — por isso o limite é mais generoso que o rótulo do
+# cartão (LIMITE_ROTULO=40 em cartao.py, que É tela). 200 ainda corta
+# qualquer payload de injeção bem antes de caber uma frase de instrução.
+LIMITE_DESCRICAO = 200
 
 RESSALVA_IDADE = (
     "Dias contados a partir da data de cadastro no sistema, não da entrada "
@@ -64,12 +75,24 @@ def _preco(veiculo: dict) -> Decimal | None:
 
 
 def _descricao(veiculo: dict) -> str:
+    """Descrição de marca/modelo/versão/ano — texto de terceiro.
+
+    Sanitizada (controle/bidi fora, espaço colapsado) e cortada em
+    ``LIMITE_DESCRICAO`` como QUALQUER texto de terceiro nesta base. O
+    rótulo "conteúdo não confiável" (``rotular_conteudo_externo``) é
+    aplicado só na fronteira de serialização para o modelo
+    (``VeiculoParado.to_dict``), não aqui: este valor também alimenta
+    ``sinais.py`` (título mostrado direto ao dono), que não pode carregar
+    tags `<CONTEUDO_NAO_CONFIAVEL>` literais na tela.
+    """
     partes = [
-        str(veiculo.get(campo)).strip()
+        sanitizar_texto_externo(str(veiculo.get(campo)))
         for campo in ("marca", "modelo", "versao", "ano_modelo")
         if veiculo.get(campo) not in (None, "")
     ]
-    return " ".join(partes) or str(veiculo.get("id") or "veículo")
+    partes = [p for p in partes if p]
+    texto = " ".join(partes) or str(veiculo.get("id") or "veículo")
+    return truncar_com_reticencias(texto, LIMITE_DESCRICAO)
 
 
 @dataclass(frozen=True)
@@ -84,7 +107,10 @@ class VeiculoParado:
     def to_dict(self) -> dict[str, Any]:
         return {
             "id": self.id,
-            "descricao": self.descricao,
+            # Aqui, e só aqui, o texto de terceiro entra no contexto do
+            # modelo (§6.3, defesa 1): rotulado e delimitado como conteúdo
+            # não confiável antes de virar JSON de retorno de ferramenta.
+            "descricao": rotular_conteudo_externo(self.descricao),
             "placa": self.placa,
             "preco": None if self.preco is None else str(self.preco),
             "dias_parado": self.dias_parado,

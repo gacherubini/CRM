@@ -61,7 +61,10 @@ def test_cartao_descreve_a_acao_com_dado_do_estoque(db):
         parametros={"veiculo_id": "v1", "novo_preco": "25000"},
     )
     assert cartao.acao == "ajustar_preco"
-    assert "Honda CB 500F" in cartao.titulo
+    # Título é só a ação (achado C-1 da revisão de 2026-08-12): o rótulo do
+    # veículo vive em campo próprio, nunca dentro da frase do servidor.
+    assert cartao.titulo == "Alterar o preço"
+    assert "Honda CB 500F" in cartao.veiculo_rotulo
     texto = " ".join(cartao.linhas)
     assert "28.000" in texto and "25.000" in texto
 
@@ -116,7 +119,7 @@ def test_cartao_de_publicar_veiculo_tem_titulo_proprio(db):
         EstoqueStub(), _ctx(), acao="publicar_veiculo",
         parametros={"veiculo_id": "v1"},
     )
-    assert "Publicar" in cartao.titulo
+    assert cartao.titulo == "Publicar na vitrine"
     assert "Republicar" not in cartao.titulo
 
 
@@ -128,9 +131,26 @@ def test_cartao_de_despublicar_veiculo_tem_titulo_proprio(db):
         EstoqueStub(), _ctx(), acao="despublicar_veiculo",
         parametros={"veiculo_id": "v1"},
     )
-    assert "Tirar" in cartao.titulo
+    assert cartao.titulo == "Tirar da vitrine"
     assert "Republicar" not in cartao.titulo
     assert "Publicar" not in cartao.titulo
+
+
+def test_cartao_expoe_rotulo_id_e_placa_em_campos_proprios(db):
+    """C-1: rótulo do veículo, id e placa são campos próprios do cartão —
+    nunca colados dentro do título. `to_dict()` expõe os três para a rota
+    que serializa em JSON para a tela."""
+    cartao = montar_cartao(
+        EstoqueStub(preco=28000.0), _ctx(), acao="repostar_veiculo",
+        parametros={"veiculo_id": "v1"},
+    )
+    assert cartao.veiculo_rotulo == "Honda CB 500F 2020"
+    assert cartao.veiculo_id == "v1"
+    assert cartao.veiculo_placa == "ABC1D23"
+    d = cartao.to_dict()
+    assert d["veiculo_rotulo"] == "Honda CB 500F 2020"
+    assert d["veiculo_id"] == "v1"
+    assert d["veiculo_placa"] == "ABC1D23"
 
 
 def test_registro_ganhou_consultar_fipe_e_propor_acao():

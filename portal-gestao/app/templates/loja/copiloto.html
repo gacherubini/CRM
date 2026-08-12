@@ -61,6 +61,12 @@
         {% if turno.cartao %}
         <div class="copiloto-cartao" data-acao="{{ turno.cartao.acao }}">
           <strong>{{ turno.cartao.titulo }}</strong>
+          <p class="copiloto-cartao-veiculo">
+            {{ turno.cartao.veiculo_rotulo }}
+            <span class="copiloto-cartao-ancora">
+              · {{ turno.cartao.veiculo_id }}{% if turno.cartao.veiculo_placa %} · {{ turno.cartao.veiculo_placa }}{% endif %}
+            </span>
+          </p>
           <ul>{% for linha in turno.cartao.linhas %}<li>{{ linha }}</li>{% endfor %}</ul>
           {% if turno.cartao.aviso %}<p class="muted">{{ turno.cartao.aviso }}</p>{% endif %}
           <form class="copiloto-cartao-form">
@@ -160,6 +166,13 @@
     // innerHTML reabriria a superfície de XSS que o textContent fechou. O
     // CSRF é o MESMO token que o composer já tem no DOM (form.csrf.value):
     // nunca um token novo mandado no JSON do polling.
+    //
+    // titulo e veiculo_rotulo vão em NÓS SEPARADOS de propósito: o título é
+    // só a ação, de autoria do servidor (TITULOS_ACAO em cartao.py); o
+    // rótulo do veículo é dado de terceiro (marca/modelo), sanitizado e
+    // curto. Concatenar os dois num único nó de texto reabriria o mesmo
+    // ataque que motivou separá-los — nunca junte titulo + veiculo_rotulo
+    // numa só string.
     var div = document.createElement('div');
     div.className = 'copiloto-cartao';
     div.dataset.acao = cartao.acao;
@@ -167,6 +180,18 @@
     var titulo = document.createElement('strong');
     titulo.textContent = cartao.titulo;
     div.appendChild(titulo);
+
+    var veiculo = document.createElement('p');
+    veiculo.className = 'copiloto-cartao-veiculo';
+    veiculo.appendChild(document.createTextNode(cartao.veiculo_rotulo || ''));
+
+    var ancora = document.createElement('span');
+    ancora.className = 'copiloto-cartao-ancora';
+    var textoAncora = ' · ' + cartao.veiculo_id;
+    if (cartao.veiculo_placa) { textoAncora += ' · ' + cartao.veiculo_placa; }
+    ancora.textContent = textoAncora;
+    veiculo.appendChild(ancora);
+    div.appendChild(veiculo);
 
     var lista = document.createElement('ul');
     (cartao.linhas || []).forEach(function (linha) {
