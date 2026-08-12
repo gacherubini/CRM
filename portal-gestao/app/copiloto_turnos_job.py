@@ -1,0 +1,297 @@
+"""Worker que executa os turnos do chat.
+
+O turno NÃO roda na requisição HTTP: o Portal não tem streaming em lugar
+nenhum e prender worker por 30s derruba a Revy Loja inteira. A rota grava e
+volta; este worker executa; a tela faz polling.
+"""
+from __future__ import annotations
+
+import logging
+import threading
+from datetime import datetime, timedelta, timezone
+from typing import Callable
+
+from sqlalchemy.orm import Session
+
+from app.config import revy_loja_copiloto_enabled, settings
+from app.loja.copiloto.conversas import (
+    atualizar_progresso,
+    concluir_turno,
+    falhar_turno,
+    listar_turnos,
+)
+from app.loja.copiloto.runner import executar_turno
+from app.loja.copiloto.tipos import CopilotoContexto
+from app.loja.copiloto.tools import RecursosTools
+from app.meta_ads_spend_job import env_flag, env_float, env_int
+from app.models import CopilotoTurno, Usuario
+
+logger = logging.getLogger("portal.copiloto.turnos")
+
+LIMITE_HISTORICO = 6
+
+
+def _historico(db: Session, turno: CopilotoTurno) -> list[tuple[str, str]]:
+    pares: list[tuple[str, str]] = []
+    for anterior in listar_turnos(db, turno.loja_slug, turno.conversa_id):
+        if anterior.id == turno.id:
+            break
+        if anterior.estado == "pronto" and anterior.resposta:
+            pares.append((anterior.pergunta, anterior.resposta))
+    return pares[-LIMITE_HISTORICO:]
+
+
+def _papel_do_ator(db: Session, turno: CopilotoTurno) -> str:
+    usuario = db.get(Usuario, turno.usuario_id)
+    return (usuario.papel if usuario else "dono") or "dono"
+
+
+def processar_turno(
+    db: Session,
+    turno: CopilotoTurno,
+    *,
+    llm,
+    estoque,
+    chatbot,
+    agora: datetime | None = None,
+) -> None:
+    """Executa um turno e grava o resultado. Nunca levanta para o chamador."""
+    ref = agora or datetime.now(timezone.utc)
+    atualizar_progresso(db, turno, estado="executando", passos=[])
+
+    ctx = CopilotoContexto(
+        loja_slug=turno.loja_slug,
+        papel=_papel_do_ator(db, turno),
+        ator_email="",
+        hoje=ref.date(),
+    )
+    recursos = RecursosTools(
+        db=db, estoque=estoque, chatbot=chatbot, ctx=ctx, agora=ref
+    )
+
+    def _on_passo(passos: list[dict]) -> None:
+        atualizar_progresso(db, turno, passos=passos)
+
+    try:
+        resultado = executar_turno(
+            pergunta=turno.pergunta,
+            historico=_historico(db, turno),
+            llm=llm,
+            recursos=recursos,
+            deadline_segundos=env_float(
+                "PORTAL_COPILOTO_TURNO_DEADLINE_SECONDS", 45.0
+            ),
+            on_passo=_on_passo,
+            agora=ref,
+        )
+    except Exception as exc:  # rede de segurança: turno nunca fica pendurado
+        logger.warning("copiloto_turno erro inesperado tipo=%s", type(exc).__name__)
+        falhar_turno(db, turno, erro_code="interno")
+        return
+
+    if resultado.estado == "pronto" and resultado.texto:
+        concluir_turno(
+            db,
+            turno,
+            resposta=resultado.texto,
+            passos=resultado.passos_dict(),
+            tokens_entrada=resultado.tokens_entrada,
+            tokens_saida=resultado.tokens_saida,
+            custo_estimado=str(resultado.custo),
+        )
+        return
+
+    atualizar_progresso(db, turno, passos=resultado.passos_dict())
+    turno.texto_parcial = resultado.texto
+    falhar_turno(
+        db,
+        turno,
+        erro_code=resultado.erro_code or "sem_resposta",
+        tokens_entrada=resultado.tokens_entrada,
+        tokens_saida=resultado.tokens_saida,
+    )
+
+
+def _llm_padrao():
+    from app.clients.deepseek import DeepSeekClient
+
+    return DeepSeekClient(
+        settings.copiloto_llm_url,
+        settings.copiloto_llm_key,
+        settings.copiloto_llm_model,
+        timeout=settings.copiloto_llm_timeout,
+        retries=settings.copiloto_llm_retries,
+    )
+
+
+class CopilotoTurnosWorker:
+    def __init__(
+        self,
+        *,
+        db_factory: Callable[[], Session],
+        interval_seconds: float | None = None,
+        enabled: bool | None = None,
+        lote: int | None = None,
+        llm_factory: Callable[[], object] | None = None,
+        estoque_factory: Callable[[], object] | None = None,
+        chatbot_factory: Callable[[], object] | None = None,
+    ):
+        self.db_factory = db_factory
+        self.interval = float(
+            interval_seconds
+            if interval_seconds is not None
+            else env_float("PORTAL_COPILOTO_TURNOS_INTERVAL_SECONDS", 1.0)
+        )
+        self.lote = int(
+            lote if lote is not None else env_int("PORTAL_COPILOTO_TURNOS_LOTE", 3)
+        )
+        self.ttl_executando = float(
+            env_float("PORTAL_COPILOTO_TURNO_TTL_SECONDS", 180.0)
+        )
+        # Duas chaves diferentes, de propósito:
+        #  - `enabled` é o interruptor do PROCESSO (roda worker aqui?), snapshot no boot;
+        #  - a flag de produto `REVY_LOJA_COPILOTO_ENABLED` é lida A CADA CICLO, igual às
+        #    rotas. Snapshotá-la aqui criaria o descasamento "rota abre, worker dorme" —
+        #    toda pergunta ficaria `pendente` para sempre.
+        # `enabled=` explícito é decisão já tomada pelo chamador (testes): vale sozinho.
+        self._gate_flag = enabled is None
+        if enabled is not None:
+            self.enabled = enabled
+        else:
+            self.enabled = env_flag("PORTAL_COPILOTO_TURNOS_ENABLED", True)
+        self._llm_factory = llm_factory or _llm_padrao
+        self._estoque_factory = estoque_factory
+        self._chatbot_factory = chatbot_factory
+        self._stop = threading.Event()
+        self._thread: threading.Thread | None = None
+        self.last_result: dict | None = None
+
+    def _clients(self):
+        if self._estoque_factory and self._chatbot_factory:
+            return self._estoque_factory(), self._chatbot_factory()
+        # Construção direta (mesmos um-liners de app.main.get_estoque_client /
+        # get_chatbot_client), sem importar app.main: o worker não pode depender
+        # do módulo que o inicia, senão o boot vira um ciclo.
+        from app.clients.chatbot import ChatbotClient
+        from app.clients.estoque import EstoqueClient
+
+        estoque = EstoqueClient(
+            settings.estoque_url, settings.estoque_token, settings.request_timeout
+        )
+        chatbot = ChatbotClient(
+            settings.chatbot_url, settings.chatbot_token, settings.request_timeout
+        )
+        return estoque, chatbot
+
+    def start(self) -> None:
+        if not self.enabled or (self._thread and self._thread.is_alive()):
+            return
+        self._stop.clear()
+        self._thread = threading.Thread(
+            target=self._run, name="copiloto-turnos", daemon=True
+        )
+        self._thread.start()
+        logger.info("copiloto_turnos_job: iniciado interval=%ss", self.interval)
+
+    def stop(self, timeout: float = 5.0) -> None:
+        self._stop.set()
+        if self._thread and self._thread.is_alive():
+            self._thread.join(timeout=timeout)
+        self._thread = None
+
+    def expirar_orfaos(self, db: Session) -> int:
+        """Fecha turno preso em `executando` — o processo morreu no meio dele.
+
+        Sem isto, todo ``fly deploy`` no meio de uma pergunta deixa um turno
+        `executando` para sempre: a tela faz polling eterno e, pior, a guarda de
+        runaway da rota (que conta `pendente|executando` por usuário) trava o dono
+        num 429 permanente depois de dois deploys infelizes. O deadline do runner
+        é in-process — não sobrevive à morte do processo. Este é o único lugar que
+        varre isso.
+        """
+        limite = datetime.now(timezone.utc) - timedelta(seconds=self.ttl_executando)
+        orfaos = (
+            db.query(CopilotoTurno)
+            .filter(
+                CopilotoTurno.estado == "executando",
+                CopilotoTurno.iniciado_em.isnot(None),
+                CopilotoTurno.iniciado_em < limite,
+            )
+            .all()
+        )
+        for turno in orfaos:
+            falhar_turno(db, turno, erro_code="interrompido")
+        if orfaos:
+            logger.warning("copiloto_turnos_job: %s turno(s) órfão(s)", len(orfaos))
+        return len(orfaos)
+
+    def _ligado(self) -> bool:
+        if not self.enabled:
+            return False
+        return revy_loja_copiloto_enabled() if self._gate_flag else True
+
+    def run_once(self) -> dict:
+        if not self._ligado():
+            payload = {"ok": False, "processados": 0}
+            self.last_result = payload
+            return payload
+        db = self.db_factory()
+        processados = 0
+        try:
+            self.expirar_orfaos(db)
+            pendentes = (
+                db.query(CopilotoTurno)
+                .filter(CopilotoTurno.estado == "pendente")
+                .order_by(CopilotoTurno.criado_em.asc())
+                .limit(max(1, self.lote))
+                .all()
+            )
+            if pendentes:
+                estoque, chatbot = self._clients()
+                llm = self._llm_factory()
+                for turno in pendentes:
+                    processar_turno(
+                        db, turno, llm=llm, estoque=estoque, chatbot=chatbot
+                    )
+                    processados += 1
+            payload = {"ok": True, "processados": processados}
+        except Exception as exc:
+            db.rollback()
+            payload = {
+                "ok": False,
+                "erro": type(exc).__name__,
+                "processados": processados,
+            }
+        finally:
+            db.close()
+        self.last_result = payload
+        return payload
+
+    def _run(self) -> None:
+        while not self._stop.is_set():
+            self.run_once()
+            if self._stop.wait(self.interval):
+                break
+
+
+_worker: CopilotoTurnosWorker | None = None
+
+
+def get_worker() -> CopilotoTurnosWorker | None:
+    return _worker
+
+
+def start_worker(db_factory: Callable[[], Session]) -> CopilotoTurnosWorker | None:
+    global _worker
+    if _worker is not None:
+        return _worker
+    _worker = CopilotoTurnosWorker(db_factory=db_factory)
+    _worker.start()
+    return _worker
+
+
+def stop_worker() -> None:
+    global _worker
+    if _worker is not None:
+        _worker.stop()
+        _worker = None

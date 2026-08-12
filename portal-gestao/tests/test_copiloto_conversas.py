@@ -32,7 +32,14 @@ def test_segundo_turno_reusa_a_conversa(db):
     )
     assert segundo.conversa_id == primeiro.conversa_id
     assert db.query(CopilotoConversa).count() == 1
-    assert len(listar_turnos(db, primeiro.conversa_id)) == 2
+    assert len(listar_turnos(db, "loja-teste", primeiro.conversa_id)) == 2
+
+
+def test_listar_turnos_de_outra_loja_nao_vaza(db):
+    """conversa_id sozinho não pode autorizar leitura entre lojas."""
+    turno = criar_turno(db, loja_slug="loja-a", usuario_id="u1", pergunta="segredo?")
+    assert listar_turnos(db, "loja-b", turno.conversa_id) == []
+    assert len(listar_turnos(db, "loja-a", turno.conversa_id)) == 1
 
 
 def test_progresso_grava_passos_e_texto_parcial(db):

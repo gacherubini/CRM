@@ -14,6 +14,9 @@ os.environ["PORTAL_META_SPEND_SYNC_ENABLED"] = "0"
 os.environ["PORTAL_CAPI_RETRY_ENABLED"] = "0"
 # Motor proativo do Copiloto não deve rodar em background nos testes.
 os.environ["PORTAL_COPILOTO_SINAIS_ENABLED"] = "0"
+# Worker de turnos do chat também não deve rodar sozinho em background: os
+# testes chamam processar_turno/run_once diretamente, de forma determinística.
+os.environ["PORTAL_COPILOTO_TURNOS_ENABLED"] = "0"
 # Mantém UI técnica de tráfego nos testes de regressão (CAPI/campanhas ainda no código).
 # Testes do slim do portal (cliente sem menus técnicos) desligam com monkeypatch.
 os.environ["PORTAL_TRAFEGO_UI_LEGACY"] = "1"

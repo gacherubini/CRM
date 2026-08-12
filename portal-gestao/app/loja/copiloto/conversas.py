@@ -156,10 +156,21 @@ def listar_conversas(
     )
 
 
-def listar_turnos(db: Session, conversa_id: str) -> list[CopilotoTurno]:
+def listar_turnos(
+    db: Session, loja_slug: str, conversa_id: str
+) -> list[CopilotoTurno]:
+    """Turnos de uma conversa — escopados por loja, como ``obter_turno``.
+
+    Um ``conversa_id`` sozinho nunca autoriza a leitura: sem o filtro de
+    ``loja_slug`` aqui, um chamador que só validasse o dono da conversa (ou
+    nem isso) vazaria turnos de outra loja pelo mesmo endpoint.
+    """
     return (
         db.query(CopilotoTurno)
-        .filter(CopilotoTurno.conversa_id == conversa_id)
+        .filter(
+            CopilotoTurno.loja_slug == loja_slug,
+            CopilotoTurno.conversa_id == conversa_id,
+        )
         .order_by(CopilotoTurno.criado_em.asc())
         .all()
     )
