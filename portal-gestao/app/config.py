@@ -182,6 +182,11 @@ class Settings:
         os.getenv("REVY_LOJA_COPILOTO_LLM_TIMEOUT", "40")
     )
     copiloto_llm_retries: int = int(os.getenv("REVY_LOJA_COPILOTO_LLM_RETRIES", "1"))
+    # Retenção de conversas do Copiloto (dias). Purge ainda não está implementado;
+    # este valor é o contrato para quando o job de limpeza existir.
+    copiloto_retencao_dias: int = int(
+        os.getenv("PORTAL_COPILOTO_RETENCAO_DIAS", "90")
+    )
 
     def absolute_url(self, path: str) -> str:
         normalized = path if path.startswith("/") else f"/{path}"

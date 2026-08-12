@@ -519,3 +519,82 @@ class CopilotoSinal(Base):
     dispensado_em: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
+
+
+TURNO_ESTADOS = ("pendente", "executando", "pronto", "erro", "cancelado")
+PERGUNTA_MAX = 4000
+
+
+class CopilotoConversa(Base):
+    """Thread de chat do Copiloto. Uma por assunto, como no Claude."""
+
+    __tablename__ = "copiloto_conversa"
+    __table_args__ = (
+        Index(
+            "ix_copiloto_conversa_loja_usuario",
+            "loja_slug",
+            "usuario_id",
+            "atualizada_em",
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=novo_id)
+    loja_slug: Mapped[str] = mapped_column(String(120), nullable=False, index=True)
+    usuario_id: Mapped[str] = mapped_column(String(36), nullable=False, index=True)
+    titulo: Mapped[str] = mapped_column(String(160), nullable=False)
+    criada_em: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=agora, nullable=False
+    )
+    atualizada_em: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=agora, onupdate=agora, nullable=False
+    )
+    arquivada_em: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+
+
+class CopilotoTurno(Base):
+    """Uma pergunta e sua execução.
+
+    ``passos_json`` alimenta a UI de "pensando" e a citação de fonte; os
+    contadores de token alimentam o log de perguntas — que é o instrumento de
+    roadmap mais barato disponível.
+
+    NUNCA guarda PII de cliente: as ferramentas devolvem agregados.
+    """
+
+    __tablename__ = "copiloto_turno"
+    __table_args__ = (
+        CheckConstraint(
+            "estado IN ('pendente', 'executando', 'pronto', 'erro', 'cancelado')",
+            name="ck_copiloto_turno_estado",
+        ),
+        Index("ix_copiloto_turno_estado_criado", "estado", "criado_em"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=novo_id)
+    conversa_id: Mapped[str] = mapped_column(
+        ForeignKey("copiloto_conversa.id", ondelete="CASCADE"), index=True
+    )
+    loja_slug: Mapped[str] = mapped_column(String(120), nullable=False, index=True)
+    usuario_id: Mapped[str] = mapped_column(String(36), nullable=False)
+    pergunta: Mapped[str] = mapped_column(String(PERGUNTA_MAX), nullable=False)
+    estado: Mapped[str] = mapped_column(String(20), nullable=False, default="pendente")
+    passos_json: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    texto_parcial: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    resposta: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    erro_code: Mapped[Optional[str]] = mapped_column(String(40), nullable=True)
+    tokens_entrada: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    tokens_saida: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    custo_estimado: Mapped[Optional[Decimal]] = mapped_column(
+        Numeric(12, 6), nullable=True
+    )
+    criado_em: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=agora, nullable=False
+    )
+    iniciado_em: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    concluido_em: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
