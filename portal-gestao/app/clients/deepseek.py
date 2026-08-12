@@ -36,7 +36,12 @@ logger = logging.getLogger("portal.copiloto.llm")
 TEMPERATURE_AGENTICA = 1.0
 TOP_P_AGENTICO = 0.95
 
-STATUS_QUE_REPETEM = frozenset({408, 409, 425, 429, 500, 502, 503, 504})
+# 529 nao e padrao HTTP, mas varios provedores (NVIDIA NIM entre eles) usam
+# para "sobrecarregado, tente de novo" -- descoberto num smoke real em
+# 2026-08-12, quando um turno morreu sem repetir. E o erro mais transitorio
+# que existe: nao repetir nele entrega "assistente indisponivel" ao dono por
+# causa de fila do provedor.
+STATUS_QUE_REPETEM = frozenset({408, 409, 425, 429, 500, 502, 503, 504, 529})
 
 TAMANHO_MAX_LOG_CORPO = 300
 

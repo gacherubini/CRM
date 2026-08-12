@@ -319,3 +319,20 @@ def test_corpo_invalido_sempre_levanta_resposta_llm_invalida():
 
     with pytest.raises(RespostaLLMInvalida):
         _client(handler).completar(_mensagens(), FERRAMENTAS)
+
+
+def test_erro_529_sobrecarregado_repete():
+    """529 nao e padrao HTTP, mas provedores usam para "tente de novo".
+
+    Achado num smoke real contra a NVIDIA NIM em 2026-08-12: sem isto, fila do
+    provedor vira "assistente indisponivel" para o dono na primeira tentativa.
+    """
+    tentativas = []
+
+    def handler(request):
+        tentativas.append(1)
+        return httpx.Response(529, json={"error": "overloaded"})
+
+    with pytest.raises(LLMIndisponivel):
+        _client(handler, retries=2).completar(_mensagens(), FERRAMENTAS)
+    assert len(tentativas) == 3
