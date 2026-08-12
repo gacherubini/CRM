@@ -1013,7 +1013,7 @@ async def estoque_editar(
         return RedirectResponse("/app/estoque", status_code=303)
     try:
         estoque.atualizar(veiculo_id, dados_veiculo(form, pode_ver_custo(usuario)))
-    except (EstoqueIndisponivel, ValueError) as exc:
+    except (ConflitoEstoque, EstoqueIndisponivel, VeiculoNaoEncontrado, ValueError) as exc:
         return templates.TemplateResponse(
             "estoque/form.html",
             contexto(request, usuario, db=db, veiculo={**dict(form), "id": veiculo_id}, titulo="Editar veículo", erro=str(exc), pode_custo=pode_ver_custo(usuario)),
