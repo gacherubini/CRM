@@ -71,6 +71,14 @@ class Settings:
     estoque_token: str = os.getenv("ESTOQUE_API_TOKEN", "")
     chatbot_url: str = os.getenv("CHATBOT_API_URL", "http://chatbot-api:8000")
     chatbot_token: str = os.getenv("CHATBOT_API_TOKEN", "")
+    # I5: o chatbot-api não tem endpoint de identidade equivalente a
+    # ``EstoqueClient.obter_loja()`` (ver app/loja/copiloto/consultas_leads.py),
+    # então não há como o Portal confirmar, numa chamada, de qual loja
+    # ``chatbot_token`` é a credencial. Declaração manual e opt-in: vazio (hoje,
+    # deploy de uma loja só) preserva o comportamento atual. Só quando um
+    # segundo deploy do Portal compartilhar o mesmo chatbot precisa ser
+    # configurado — aí protege contra devolver o "sem resposta" de outra loja.
+    chatbot_loja_slug: str = os.getenv("CHATBOT_API_LOJA_SLUG", "")
     motor_url: str = (
         os.getenv("MOTOR_URL")
         or os.getenv("MOTOR_API_URL", "http://motor-simulacao:8000")

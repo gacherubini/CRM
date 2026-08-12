@@ -1,7 +1,7 @@
 from datetime import date, datetime, timedelta, timezone
 
 from app.clients.chatbot import ChatbotIndisponivel
-from app.loja.copiloto.consultas_leads import leads_status
+from app.loja.copiloto.consultas_leads import escopo_chatbot_confiavel, leads_status
 from app.loja.copiloto.tipos import CopilotoContexto
 from app.loja.sales_overview import SalesOverview
 
@@ -180,6 +180,83 @@ def test_funil_parcial_com_chatbot_saudavel_vira_status_parcial():
     assert r.status == "parcial"
     # Os dados continuam repassados — "parcial" é status, não apagão de dado.
     assert r.total_leads == 40
+
+
+# --- I5: leads_status é a única consulta sem escopo de loja. ChatbotClient
+# não tem hook de escopo (nem parâmetro de loja em listar_conversas, nem
+# endpoint de identidade como EstoqueClient.obter_loja()) — ver docstring de
+# consultas_leads.py. O guard compara a sessão contra uma declaração opt-in
+# de config (settings.chatbot_loja_slug / CHATBOT_API_LOJA_SLUG).
+
+
+def test_escopo_confiavel_por_padrao_sem_declaracao():
+    """Hoje (deploy de uma loja só): ninguém configura CHATBOT_API_LOJA_SLUG,
+    então o guard confia — comportamento idêntico ao pré-fix."""
+    assert escopo_chatbot_confiavel(_ctx(), loja_declarada="") is True
+    assert escopo_chatbot_confiavel(_ctx(), loja_declarada=None) is True
+
+
+def test_escopo_confiavel_quando_declaracao_bate_com_sessao():
+    assert escopo_chatbot_confiavel(_ctx(), loja_declarada="loja-teste") is True
+    assert escopo_chatbot_confiavel(_ctx(), loja_declarada="LOJA-TESTE") is True
+
+
+def test_escopo_nao_confiavel_quando_declaracao_diverge():
+    """O dia em que duas lojas compartilharem um deploy do chatbot: a
+    declaração aponta para outra loja que não a da sessão."""
+    assert escopo_chatbot_confiavel(_ctx(), loja_declarada="loja-outra") is False
+
+
+class ChatbotEspiao:
+    """Devolveria a contagem de uma loja ESTRANHA — prova que o guard barra
+    ANTES de chamar o chatbot, não descarta o resultado depois de já ter
+    vazado o dado para o processo."""
+
+    def __init__(self):
+        self.chamado = False
+
+    def listar_conversas(self, busca=None, limit=50, offset=0, *, canal_id=None):
+        self.chamado = True
+        return [_conversa(bot_ativo=False, direcao="entrada", horas=99)]
+
+
+def test_leads_status_degrada_sem_chamar_chatbot_quando_declaracao_diverge():
+    espiao = ChatbotEspiao()
+
+    r = leads_status(
+        _overview(), espiao, ctx=_ctx(), agora=AGORA, chatbot_loja_slug="loja-outra"
+    )
+
+    assert espiao.chamado is False
+    assert r.sem_resposta is None
+    assert r.sem_resposta_status == "indisponivel"
+
+
+def test_leads_status_deploy_de_uma_loja_so_continua_igual():
+    """Constraint dura do fix: CHATBOT_API_LOJA_SLUG não configurado (o
+    default, hoje) não pode virar "indisponivel" permanente — o dado real
+    tem que continuar fluindo exatamente como antes do fix."""
+    conversas = [_conversa(bot_ativo=False, direcao="entrada", horas=6)]
+
+    r = leads_status(
+        _overview(), ChatbotStub(conversas), ctx=_ctx(), agora=AGORA,
+        chatbot_loja_slug="",
+    )
+
+    assert r.sem_resposta == 1
+    assert r.sem_resposta_status == "ok"
+
+
+def test_leads_status_usa_settings_quando_chatbot_loja_slug_nao_e_passado():
+    """Sem injetar o parâmetro (o caminho real de produção), o guard lê de
+    settings.chatbot_loja_slug — que é "" por padrão (dev/test), então o
+    comportamento é o mesmo de hoje."""
+    conversas = [_conversa(bot_ativo=False, direcao="entrada", horas=6)]
+
+    r = leads_status(_overview(), ChatbotStub(conversas), ctx=_ctx(), agora=AGORA)
+
+    assert r.sem_resposta == 1
+    assert r.sem_resposta_status == "ok"
 
 
 def test_funil_e_sem_resposta_indisponiveis_vira_status_indisponivel():
