@@ -21,6 +21,7 @@ from app.models import LojaModulo, ModuloRevy, VinculoTrafego, agora
 class ModuleCode(str, Enum):
     INVENTORY = "estoque"
     SALES = "vendas"
+    COPILOTO = "copiloto"
 
 
 class ModuleStatus(str, Enum):

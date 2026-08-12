@@ -30,6 +30,7 @@ def _seed_catalog() -> None:
             [
                 ModuloRevy(id="vendas", codigo="vendas", nome="Vendas"),
                 ModuloRevy(id="estoque", codigo="estoque", nome="Estoque"),
+                ModuloRevy(id="copiloto", codigo="copiloto", nome="Copiloto de Vendas"),
             ]
         )
         db.commit()
@@ -103,6 +104,31 @@ def test_admin_configura_vendas_e_estoque_e_lista_portfolio():
         "code": "estoque",
         "status": "ativo",
         "version": 1,
+    }
+
+
+def test_admin_contrata_copiloto_junto_com_vendas_e_estoque():
+    _seed_catalog()
+    admin = _admin_actor()
+    store = StoreControl(SessionLocal).create(
+        admin,
+        CreateStore(name="Loja Copiloto", slug="loja-copiloto-domain"),
+    )
+    portfolio = PortfolioControl(SessionLocal)
+
+    configured = portfolio.configure(
+        admin,
+        StoreRef(id=store.id),
+        {"vendas", "estoque", "copiloto"},
+    )
+
+    by_code = {item.code: item for item in configured}
+    assert by_code[ModuleCode.COPILOTO].status is ModuleStatus.ACTIVE
+    assert by_code[ModuleCode.COPILOTO].name == "Copiloto de Vendas"
+    assert set(by_code) == {
+        ModuleCode.INVENTORY,
+        ModuleCode.SALES,
+        ModuleCode.COPILOTO,
     }
 
 

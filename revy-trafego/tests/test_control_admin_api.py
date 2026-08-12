@@ -291,6 +291,7 @@ def test_admin_reativa_loja_suspensa_sem_expor_versao(
                 [
                     ModuloRevy(id="vendas", codigo="vendas", nome="Vendas"),
                     ModuloRevy(id="estoque", codigo="estoque", nome="Estoque"),
+                    ModuloRevy(id="copiloto", codigo="copiloto", nome="Copiloto de Vendas"),
                 ]
             )
             db.commit()

@@ -64,6 +64,7 @@ def _seed_module_catalog() -> None:
             [
                 ModuloRevy(id="vendas", codigo="vendas", nome="Vendas"),
                 ModuloRevy(id="estoque", codigo="estoque", nome="Estoque"),
+                ModuloRevy(id="copiloto", codigo="copiloto", nome="Copiloto de Vendas"),
             ]
         )
         db.commit()

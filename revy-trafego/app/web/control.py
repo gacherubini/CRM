@@ -325,7 +325,7 @@ class ConsumeControlPasswordRecoveryBody(BaseModel):
 class ModuleConfigurationBody(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    modulos: list[ModuleCode] = Field(min_length=1, max_length=2)
+    modulos: list[ModuleCode] = Field(min_length=1, max_length=3)
 
 
 class ModuleTransitionBody(BaseModel):
