@@ -170,6 +170,18 @@ class Settings:
         "REVY_LOJA_REDIRECT_LEGACY", "0"
     )
     seller_ai_enabled: bool = _env_bool("SELLER_AI_ENABLED", "0")
+    # Copiloto de Vendas — provedor de LLM (DeepSeek, API compatível com OpenAI).
+    copiloto_llm_url: str = os.getenv(
+        "REVY_LOJA_COPILOTO_LLM_URL", "https://api.deepseek.com"
+    ).strip().rstrip("/")
+    copiloto_llm_key: str = os.getenv("REVY_LOJA_COPILOTO_LLM_KEY", "").strip()
+    copiloto_llm_model: str = os.getenv(
+        "REVY_LOJA_COPILOTO_LLM_MODEL", "DeepSeek-V4-Flash-0731"
+    ).strip()
+    copiloto_llm_timeout: float = float(
+        os.getenv("REVY_LOJA_COPILOTO_LLM_TIMEOUT", "40")
+    )
+    copiloto_llm_retries: int = int(os.getenv("REVY_LOJA_COPILOTO_LLM_RETRIES", "1"))
 
     def absolute_url(self, path: str) -> str:
         normalized = path if path.startswith("/") else f"/{path}"
