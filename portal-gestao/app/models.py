@@ -519,7 +519,14 @@ SINAL_REGRAS = (
     "margem_incompleta",
     "cadastro_incompleto",
     "atribuicao_baixa",
+    "preco_fora_da_faixa",
 )
+# Lista escrita à mão de propósito (evita acoplar `models.py`, importado no
+# boot da aplicação, a uma leitura de arquivo via AST em outro módulo) — mas
+# não é a única fonte: `tests/test_copiloto_sinal_model.py` parseia o AST de
+# `app/loja/copiloto/sinais.py` (mesma técnica de
+# `tests/test_copiloto_notificacoes_shell.py`, F4/Task 5) e falha se esta
+# tupla ficar fora de sincronia com as regras que `sinais.py` de fato emite.
 
 
 class CopilotoSinal(Base):
