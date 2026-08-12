@@ -16,6 +16,19 @@ rate-limit, carimbo e prazo de desfazer). Quem chama estas funções a partir
 de uma rota HTTP (Task 6) NUNCA pode derivar ``agora`` de um dado vindo do
 cliente — um relógio controlável pelo chamador fura o rate-limit e envenena
 a auditoria e o prazo de desfazer ao mesmo tempo (achado I-4 da revisão).
+
+Por que ``pendente`` pode ser o estado FINAL de uma ação, não só um passo de
+transição (achado I-1 da revisão de 2026-08-12): ``EstoqueClient._request``
+colapsa timeout, erro de conexão e 5xx no mesmo ``EstoqueIndisponivel`` — se
+isso acontece DEPOIS do PATCH ter saído, o Portal não sabe se a escrita
+pegou. Gravar ``falhou`` nesse caso afirmaria com confiança o que não se
+sabe, e isso é pior que admitir a dúvida: o dono leria "não aconteceu nada"
+justo na hora em que o botão Desfazer sumiria — o mecanismo desenhado
+exatamente para resolver essa dúvida. Por isso ``executar_acao`` deixa a
+linha ``pendente`` (em vez de promovê-la para ``falhou``) quando o erro é
+``EstoqueIndisponivel``, e ``desfazer_acao`` aceita linhas ``pendente``: a
+releitura da guarda 5 decide sozinha — valor bate com ``valor_novo``? o PATCH
+pegou, reverte. Não bate? não havia o que reverter, devolve ``False``.
 """
 from __future__ import annotations
 
@@ -236,7 +249,40 @@ def executar_acao(
             estoque.atualizar(veiculo_id, {"preco": float(valor_novo)})
         else:
             estoque.acao(veiculo_id, VERBO_ESTOQUE[acao])
+    except EstoqueIndisponivel as exc:
+        # Revisão de 2026-08-12 (achado I-1, Important): `EstoqueClient._request`
+        # colapsa timeout, erro de conexão e 5xx num único `EstoqueIndisponivel`
+        # — deste lado do Portal o resultado é genuinamente INDETERMINADO, não
+        # uma certeza de que nada mudou. O PATCH pode ter chegado ao Estoque e
+        # só a RESPOSTA se perdeu. Gravar "falhou" aqui seria afirmar com
+        # confiança o que não se sabe: o dono leria "não aconteceu nada" bem na
+        # hora em que o botão Desfazer sumiria — justo o caso em que ele é mais
+        # necessário. Por isso a linha continua "pendente" (o estado que a
+        # escrita em duas fases já criou para representar "não sei", achado
+        # I-5) — só o erro_code muda. `desfazer_acao` relê o estoque antes de
+        # escrever (guarda 5): se o valor bater com valor_novo, o PATCH pegou
+        # e ele reverte; se não bater, não havia o que reverter e ele devolve
+        # False sem tocar a rede. A releitura que já existia por outro motivo
+        # é a resposta certa para esta indeterminação — "falhou" fecharia essa
+        # porta bem no caso em que ela precisa ficar aberta.
+        registro.erro_code = type(exc).__name__[:40]
+        registrar_auditoria_copiloto(
+            db, loja_slug=ctx.loja_slug, acao=acao, ator_email=ctx.ator_email,
+            success=False, error_code=type(exc).__name__,
+        )
+        db.commit()
+        logger.warning(
+            "copiloto_acao indeterminado acao=%s tipo=%s", acao, type(exc).__name__
+        )
+        raise AcaoRecusada(
+            "indisponivel",
+            "não sei se a ação chegou a ser aplicada — confira o veículo antes de tentar de novo",
+        ) from exc
     except Exception as exc:
+        # Aqui SÓ chegam erros que PROVAM que a escrita não aconteceu:
+        # VeiculoNaoEncontrado (404), ConflitoEstoque (409) — a estoque-api
+        # respondeu, e respondeu recusando. Não há indeterminação para
+        # resolver: "falhou" é a verdade.
         registro.estado = "falhou"
         registro.erro_code = type(exc).__name__[:40]
         # 7) auditoria também no fracasso
@@ -285,6 +331,16 @@ def desfazer_acao(
     (achado I-2 da revisão de 2026-08-12): se o valor/estado atual não bater
     com o que a ação original gravou, alguém mexeu depois e a restauração
     aborta em vez de sobrescrever.
+
+    Aceita linhas ``pendente`` além de ``executada`` (achado I-1 da revisão de
+    2026-08-12): uma linha ``pendente`` significa "não sei se o PATCH foi
+    aplicado", não "não aconteceu nada". A MESMA releitura acima já resolve a
+    dúvida sem lógica nova: se o valor atual do Estoque bater com
+    ``valor_novo``, o PATCH pegou — reverte. Se não bater, o PATCH não pegou —
+    não há o que reverter, e devolve ``False`` sem escrever. Recusar o
+    desfazer de uma linha ``pendente`` fecharia a única saída justo no caso em
+    que ela é mais necessária: preço mudou de verdade, e o sistema afirma que
+    não mudou.
     """
     ref = agora or datetime.now(timezone.utc)
     registro = (
@@ -292,7 +348,7 @@ def desfazer_acao(
         .filter(
             CopilotoAcao.id == acao_id,
             CopilotoAcao.loja_slug == ctx.loja_slug,
-            CopilotoAcao.estado == "executada",
+            CopilotoAcao.estado.in_(("executada", "pendente")),
         )
         .first()
     )

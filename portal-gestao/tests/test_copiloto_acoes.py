@@ -3,7 +3,11 @@ from decimal import Decimal
 
 import pytest
 
-from app.clients.estoque import VeiculoNaoEncontrado
+from app.clients.estoque import (
+    ConflitoEstoque,
+    EstoqueIndisponivel,
+    VeiculoNaoEncontrado,
+)
 from app.loja.copiloto.acoes import (
     AcaoRecusada,
     desfazer_acao,
@@ -377,6 +381,146 @@ def test_queda_apos_patch_deixa_linha_pendente(db, monkeypatch):
         assert linha.estado == "pendente"
     finally:
         outra_sessao.close()
+
+
+# --- falhou x pendente: o que se sabe x o que é indeterminado (I-1) -------
+
+
+def test_timeout_apos_patch_deixa_linha_pendente_com_erro_code(db):
+    """I-1 (Important, revisão final de 2026-08-12): EstoqueIndisponivel
+    depois do PATCH é INDETERMINADO — o Portal não sabe se a escrita pegou.
+    'falhou' mentiria com confiança sobre um preço que já mudou de verdade.
+    A linha continua 'pendente' (o estado que a escrita em duas fases criou
+    para representar 'não sei'), com o erro_code registrando o que houve."""
+
+    class EstoqueTimeoutAposPatch(EstoqueStub):
+        def atualizar(self, veiculo_id, dados):
+            # o PATCH de fato chega ao Estoque real...
+            self.patches.append((veiculo_id, dados))
+            self.veiculo.update(dados)
+            # ...mas a RESPOSTA se perde (timeout) — é exatamente o que
+            # EstoqueClient._request colapsa em EstoqueIndisponivel.
+            raise EstoqueIndisponivel("timeout lendo a resposta")
+
+    estoque = EstoqueTimeoutAposPatch(preco=28000.0)
+    with pytest.raises(AcaoRecusada) as exc:
+        executar_acao(
+            db, _ctx(), acao="ajustar_preco",
+            parametros={
+                "veiculo_id": "v1", "novo_preco": "25000", "preco_esperado": "28000",
+            },
+            estoque=estoque, agora=AGORA,
+        )
+    assert exc.value.code == "indisponivel"
+    # o preço mudou de verdade no estoque real
+    assert estoque.veiculo["preco"] == 25000.0
+
+    linha = db.query(CopilotoAcao).one()
+    assert linha.estado == "pendente"
+    assert linha.erro_code == "EstoqueIndisponivel"
+
+
+def test_desfazer_de_linha_pendente_reverte_quando_valor_bate(db):
+    """A releitura (guarda 5) já existente é a resposta para a
+    indeterminação: se o valor atual do Estoque bate com valor_novo, o PATCH
+    pegou de verdade — o desfazer reverte mesmo a linha nunca tendo virado
+    'executada'."""
+
+    class EstoqueTimeoutNaPrimeiraChamada(EstoqueStub):
+        """A ação original perde a resposta (timeout); o PATCH do desfazer,
+        chamado depois, é uma requisição nova e tem resposta normal — como
+        aconteceria de verdade se o dono tentar de novo depois do timeout."""
+
+        def __init__(self, *a, **k):
+            super().__init__(*a, **k)
+            self._chamadas = 0
+
+        def atualizar(self, veiculo_id, dados):
+            self._chamadas += 1
+            self.patches.append((veiculo_id, dados))
+            self.veiculo.update(dados)
+            if self._chamadas == 1:
+                raise EstoqueIndisponivel("timeout lendo a resposta")
+            return dict(self.veiculo)
+
+    estoque = EstoqueTimeoutNaPrimeiraChamada(preco=28000.0)
+    with pytest.raises(AcaoRecusada):
+        executar_acao(
+            db, _ctx(), acao="ajustar_preco",
+            parametros={
+                "veiculo_id": "v1", "novo_preco": "25000", "preco_esperado": "28000",
+            },
+            estoque=estoque, agora=AGORA,
+        )
+    linha = db.query(CopilotoAcao).one()
+    assert linha.estado == "pendente"
+
+    assert desfazer_acao(db, _ctx(), linha.id, estoque=estoque, agora=AGORA) is True
+    assert estoque.veiculo["preco"] == 28000.0
+    db.refresh(linha)
+    assert linha.estado == "desfeita"
+
+
+def test_veiculo_nao_encontrado_no_patch_continua_falhou(db):
+    """404 no PATCH PROVA que a escrita não aconteceu — a estoque-api
+    respondeu, e respondeu recusando. Não há indeterminação: 'falhou' é a
+    verdade, ao contrário do EstoqueIndisponivel do teste acima."""
+
+    class EstoqueQuebrado(EstoqueStub):
+        def atualizar(self, veiculo_id, dados):
+            raise VeiculoNaoEncontrado("veículo sumiu")
+
+    estoque = EstoqueQuebrado(preco=28000.0)
+    with pytest.raises(AcaoRecusada) as exc:
+        executar_acao(
+            db, _ctx(), acao="ajustar_preco",
+            parametros={
+                "veiculo_id": "v1", "novo_preco": "25000", "preco_esperado": "28000",
+            },
+            estoque=estoque, agora=AGORA,
+        )
+    assert exc.value.code == "execucao"
+    linha = db.query(CopilotoAcao).one()
+    assert linha.estado == "falhou"
+    assert linha.erro_code == "VeiculoNaoEncontrado"
+
+
+def test_conflito_no_patch_continua_falhou(db):
+    """409 no PATCH também PROVA a não-aplicação: mesmo tratamento do 404."""
+
+    class EstoqueQuebrado(EstoqueStub):
+        def atualizar(self, veiculo_id, dados):
+            raise ConflitoEstoque("veículo em estado incompatível")
+
+    estoque = EstoqueQuebrado(preco=28000.0)
+    with pytest.raises(AcaoRecusada):
+        executar_acao(
+            db, _ctx(), acao="ajustar_preco",
+            parametros={
+                "veiculo_id": "v1", "novo_preco": "25000", "preco_esperado": "28000",
+            },
+            estoque=estoque, agora=AGORA,
+        )
+    linha = db.query(CopilotoAcao).one()
+    assert linha.estado == "falhou"
+    assert linha.erro_code == "ConflitoEstoque"
+
+
+def test_desfazer_de_linha_pendente_cujo_valor_nao_bate_devolve_false(db):
+    """Se o valor atual não bate com valor_novo, o PATCH original não pegou
+    (ou algo mexeu depois) — não há o que reverter, e o desfazer não escreve."""
+    estoque = EstoqueStub(preco=28000.0)  # nunca virou 25000 de verdade
+    registro = CopilotoAcao(
+        loja_slug="loja-teste", ator_email="dono@loja.test", acao="ajustar_preco",
+        entidade_ref="v1", valor_anterior=Decimal("28000.00"),
+        valor_novo=Decimal("25000.00"), estado="pendente",
+        executada_em=AGORA, desfazer_ate=AGORA + timedelta(minutes=30),
+    )
+    db.add(registro)
+    db.commit()
+    db.refresh(registro)
+    assert desfazer_acao(db, _ctx(), registro.id, estoque=estoque, agora=AGORA) is False
+    assert estoque.patches == []
 
 
 # --- desfazer: prazo, releitura antes de escrever (I-2), isolamento -------
