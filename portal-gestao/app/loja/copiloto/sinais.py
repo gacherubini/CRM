@@ -186,6 +186,108 @@ def regra_cadastro_incompleto(overview_estoque: Any) -> list[SinalCandidato]:
     ]
 
 
+def regra_preco_fora_da_faixa(
+    veiculos_com_fipe: Any,
+    *,
+    folga_alta: float,
+    folga_base: float,
+    dias_parado_min: int,
+) -> list[SinalCandidato]:
+    """Preço muito acima da FIPE, ou acima e encalhado — capital preso.
+
+    Recebe pares ``(veiculo, valor_fipe)`` JÁ RESOLVIDOS — esta regra não
+    consulta a FIPE. Quem busca, aplica o teto por ciclo e decide quais
+    veículos entram na lista é o worker (``app/copiloto_sinais_job.py``); ele
+    só inclui aqui veículos com match exato e confirmado (status ``ok``).
+    Ambíguo, não encontrado ou indisponível nunca chegam com ``valor_fipe``
+    preenchido — e sem valor, esta função não tem o que decidir e pula o
+    veículo (defesa também útil para o caso raro de o chamador passar
+    ``None`` por engano).
+
+    Estar acima da FIPE, sozinho, é normal — decisão do dono (2026-08-12:
+    "na FIPE é normal estar acima"). Alertar em qualquer centavo acima seria
+    ruído em cima do estoque inteiro. Por isso dois gatilhos, nunca "qualquer
+    centavo acima":
+
+    1. **Muito acima, sozinho**: preço >= FIPE * (1 + ``folga_alta``). Destoa
+       o bastante para valer aviso mesmo em veículo recém-cadastrado.
+    2. **Acima + encalhado**: preço >= FIPE * (1 + ``folga_base``) E parado
+       há >= ``dias_parado_min`` dias. Nenhuma das duas condições sozinha
+       merece alerta; juntas são a definição de capital preso.
+
+    Preço abaixo da FIPE nunca dispara nesta fase — pode ser giro deliberado
+    do dono, e opinar sobre isso é opinar sobre a operação dele.
+
+    Severidade: "critico" no caso 2 (preço alto em veículo parado há meses é
+    dinheiro dormindo), "atencao" no caso 1 (preço alto sozinho é decisão
+    comercial recente, ainda não é capital preso).
+    """
+    saida: list[SinalCandidato] = []
+    for par in veiculos_com_fipe or ():
+        veiculo, valor_fipe = par
+        if valor_fipe is None:
+            continue
+        preco = getattr(veiculo, "preco", None)
+        if preco is None:
+            continue
+        valor_fipe = Decimal(str(valor_fipe))
+        preco = Decimal(str(preco))
+        if valor_fipe <= 0 or preco < valor_fipe:
+            continue
+
+        dias_parado = int(getattr(veiculo, "dias_parado", 0) or 0)
+        limite_alto = valor_fipe * (Decimal("1") + Decimal(str(folga_alta)))
+        limite_base = valor_fipe * (Decimal("1") + Decimal(str(folga_base)))
+        muito_acima = preco >= limite_alto
+        acima_e_encalhado = preco >= limite_base and dias_parado >= dias_parado_min
+        if not muito_acima and not acima_e_encalhado:
+            continue
+
+        severidade = "critico" if acima_e_encalhado else "atencao"
+        veiculo_id = getattr(veiculo, "id", None)
+        descricao = getattr(veiculo, "descricao", None) or "Veículo"
+        pct_acima = (preco / valor_fipe - 1) * 100
+        pct_txt = f"{pct_acima:.0f}%"
+
+        if acima_e_encalhado:
+            titulo = (
+                f"{descricao} está {pct_txt} acima da FIPE e parado há "
+                f"{dias_parado} dias"
+            )
+            detalhe = (
+                f"{_brl(preco)} contra {_brl(valor_fipe)} da FIPE, e o veículo "
+                "já está parado tempo suficiente para isso pesar. Vale revisar "
+                "o preço."
+            )
+        else:
+            titulo = f"{descricao} está {pct_txt} acima da FIPE"
+            detalhe = (
+                f"{_brl(preco)} contra {_brl(valor_fipe)} da FIPE. Acima da "
+                "FIPE pode ser decisão comercial — vale só confirmar que é "
+                "intencional."
+            )
+
+        saida.append(
+            SinalCandidato(
+                regra="preco_fora_da_faixa",
+                severidade=severidade,
+                entidade_ref=veiculo_id,
+                titulo=titulo,
+                detalhe=detalhe,
+                dados={
+                    "veiculo_id": veiculo_id,
+                    "preco": str(preco),
+                    "valor_fipe": str(valor_fipe),
+                    "pct_acima": float(pct_acima.quantize(Decimal("0.1"))),
+                    "dias_parado": dias_parado,
+                    "encalhado": acima_e_encalhado,
+                },
+                acao_sugerida={"acao": "ajustar_preco", "veiculo_id": veiculo_id},
+            )
+        )
+    return saida
+
+
 def regra_atribuicao_baixa(
     origem: Any,
     *,
