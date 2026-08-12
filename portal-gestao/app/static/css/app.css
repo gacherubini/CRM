@@ -3252,3 +3252,126 @@ a.metric-link:focus-visible { outline: 2px solid var(--brand); outline-offset: 2
   font-size: var(--text-xs);
 }
 .copiloto-cartao-form { display: flex; gap: var(--space-2); }
+
+/* ===========================================================================
+   === Copiloto: sino de notificacoes (F4/Task 2) ===
+   Ancorado em .topbar-actions (base.html); so existe no DOM quando o
+   contexto traz copiloto_nao_vistos != None (ver base.html/loja_shell.py).
+   Severidade usa --danger/--warn/--ok — nunca hex. Badge tintado, nunca
+   preenchimento solido: mesmo principio de .alert/.button.danger acima.
+   =========================================================================== */
+.copiloto-notif { position: relative; display: flex; }
+
+.copiloto-notif-sino {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-nav);
+  background: var(--surface);
+  color: var(--ink-soft);
+  cursor: pointer;
+}
+.copiloto-notif-sino:hover { background: var(--surface-soft); color: var(--ink); }
+.copiloto-notif-icone { width: 18px; height: 18px; }
+
+.copiloto-notif-badge {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--danger) 45%, var(--line));
+  background: color-mix(in srgb, var(--danger) 22%, var(--surface));
+  color: var(--danger);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.copiloto-notif-painel {
+  position: absolute;
+  top: calc(100% + var(--space-2));
+  right: 0;
+  z-index: 30;
+  width: min(360px, calc(100vw - var(--space-6)));
+  max-height: min(480px, calc(100vh - 96px));
+  overflow-y: auto;
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-srf);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+/* [hidden] com especificidade maior que a regra base acima: sem isto, o
+   `display: grid` do seletor de classe ganharia do UA stylesheet e o painel
+   ficaria visivel mesmo com o atributo `hidden`. */
+.copiloto-notif-painel[hidden] { display: none; }
+
+.copiloto-notif-cabecalho strong { font-size: var(--text-base); }
+
+.copiloto-notif-escopo {
+  margin: 0;
+  color: var(--ink-muted);
+  font-size: var(--text-xs);
+}
+
+/* <ul> de verdade (Important da revisão): leitor de tela só anuncia "lista
+   de N itens" com <li> dentro de <list>. Reset do estilo nativo de lista —
+   sem token porque não é cor, é o mesmo list-style:none do resto do app. */
+.copiloto-notif-lista {
+  display: grid;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+/* Mesma armadilha de especificidade do painel: [hidden] precisa ganhar do
+   `display: grid` da classe. */
+.copiloto-notif-lista[hidden] { display: none; }
+.copiloto-notif-status {
+  margin: 0;
+  padding: var(--space-4) 0;
+  text-align: center;
+  color: var(--ink-muted);
+  font-size: var(--text-sm);
+}
+
+.copiloto-notif-item {
+  display: grid;
+  gap: var(--space-1);
+  padding: var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-nav);
+  background: var(--surface-soft);
+}
+.copiloto-notif-item strong { font-size: var(--text-sm); }
+.copiloto-notif-item p { margin: 0; color: var(--ink-soft); font-size: var(--text-xs); }
+.copiloto-notif-item time { color: var(--ink-muted); font-size: var(--text-xs); }
+
+.copiloto-notif-sev {
+  justify-self: start;
+  padding: 2px var(--space-2);
+  border-radius: var(--radius-ctl);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  border: 1px solid color-mix(in srgb, var(--sc) 30%, var(--line));
+  background: color-mix(in srgb, var(--sc) 10%, var(--paper));
+  color: var(--sc);
+}
+.copiloto-notif-item.severidade-critico { --sc: var(--danger); }
+.copiloto-notif-item.severidade-atencao { --sc: var(--warn); }
+.copiloto-notif-item.severidade-info { --sc: var(--ok); }
+
+.copiloto-notif-acoes { display: flex; gap: var(--space-2); flex-wrap: wrap; }
+/* === fim: sino de notificacoes (F4/Task 2) === */

@@ -3,8 +3,15 @@
 Isolamento de ``cache_nao_vistos`` (TTL de relógio real, por processo):
 fixture autouse em ``tests/conftest.py``, vale para todo teste do repositório —
 não só os desta rota.
+
+F4/Task 2 acrescenta a UI: o sino e o painel em ``.topbar-actions``
+(``base.html``). Esses testes batem em ``/app/loja/perfil`` — tela do shell
+sem gate de módulo (qualquer papel autenticado acessa) — porque o sino
+precisa aparecer em QUALQUER tela do shell, não só na do Copiloto.
 """
 import itertools
+import re
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -591,3 +598,174 @@ def test_paridade_sino_x_secao(
         f"secao(status={resposta.status_code})={secao_permite} "
         f"sino({extras.get('copiloto_nao_vistos')!r})={sino_aparece}"
     )
+
+
+# =============================================================================
+# F4/Task 2 — o sino e o painel em .topbar-actions (renderização)
+# =============================================================================
+
+_TELA_SEM_GATE_DE_MODULO = "/app/loja/perfil"
+
+
+def _badge_texto(html: str) -> str | None:
+    m = re.search(r'<span class="copiloto-notif-badge"[^>]*>([^<]*)</span>', html)
+    return m.group(1) if m else None
+
+
+def test_sino_presente_para_gestor_com_entitlement_e_mostra_contagem(
+    client, db, monkeypatch
+):
+    _ligar_shell_e_entitlements(monkeypatch)
+    _seedar_modulo_copiloto(db)
+    sincronizar_sinais(db, "loja-teste", [_cand("v1"), _cand("v2")])
+    login(client, papel="dono", email="dono-sino@loja.test")
+
+    resposta = client.get(_TELA_SEM_GATE_DE_MODULO)
+
+    assert resposta.status_code == 200
+    assert 'id="copiloto-notif-sino"' in resposta.text
+    assert _badge_texto(resposta.text) == "2"
+    assert "2 notificações não vistas" in resposta.text
+
+
+def test_sino_ausente_para_vendedor(client, db, monkeypatch):
+    _ligar_shell_e_entitlements(monkeypatch)
+    _seedar_modulo_copiloto(db)
+    sincronizar_sinais(db, "loja-teste", [_cand("v1")])
+    login(client, papel="vendedor", email="vendedor-sino@loja.test")
+
+    resposta = client.get(_TELA_SEM_GATE_DE_MODULO)
+
+    assert resposta.status_code == 200
+    assert 'id="copiloto-notif-sino"' not in resposta.text
+
+
+def test_sino_ausente_para_loja_sem_modulo(client, db, monkeypatch):
+    _ligar_shell_e_entitlements(monkeypatch)
+    _seedar_modulo_copiloto(db, ligado=False)  # loja ativa, módulo Copiloto off
+    login(client, papel="dono", email="dono-semmodulo@loja.test")
+
+    resposta = client.get(_TELA_SEM_GATE_DE_MODULO)
+
+    assert resposta.status_code == 200
+    assert 'id="copiloto-notif-sino"' not in resposta.text
+
+
+def test_badge_numerico_ausente_quando_contagem_e_zero_mas_sino_permanece(
+    client, db, monkeypatch
+):
+    """``None`` e ``0`` são coisas diferentes: sem sinal algum para este
+    usuário, o sino continua aparecendo (sino!=None) — só o número some."""
+    _ligar_shell_e_entitlements(monkeypatch)
+    _seedar_modulo_copiloto(db)
+    login(client, papel="dono", email="dono-zero@loja.test")
+
+    resposta = client.get(_TELA_SEM_GATE_DE_MODULO)
+
+    assert resposta.status_code == 200
+    assert 'id="copiloto-notif-sino"' in resposta.text
+    assert _badge_texto(resposta.text) is None
+    assert "0 notificações não vistas" in resposta.text
+
+
+def test_frase_sobre_alcance_dos_alertas_esta_no_painel(client, db, monkeypatch):
+    """A frase precisa descrever o comportamento REAL (Task 0 desta fase):
+    visto é por pessoa; dispensar é da loja inteira."""
+    _ligar_shell_e_entitlements(monkeypatch)
+    _seedar_modulo_copiloto(db)
+    login(client, papel="dono", email="dono-frase@loja.test")
+
+    resposta = client.get(_TELA_SEM_GATE_DE_MODULO)
+
+    assert "class=\"copiloto-notif-escopo\"" in resposta.text
+    assert "Estes alertas são da loja" in resposta.text
+    assert "Marcar como visto vale só para você" in resposta.text
+    assert "dispensar tira o alerta para todo mundo" in resposta.text
+
+
+def test_estado_vazio_honesto_disponivel_para_o_painel_usar(client, db, monkeypatch):
+    """O painel é populado por fetch (rota de listagem é a Task 3, ainda não
+    existe) — por isso o texto honesto de "nada a tratar" vive num
+    ``<template>`` que o JS usa quando a listagem real vier vazia, em vez de
+    ser fabricado ad-hoc pelo JS ou assumido estaticamente pela contagem
+    pessoal (que é um número DIFERENTE do conteúdo do painel: contagem 0 não
+    prova painel vazio — só que ESTE usuário não tem sinal novo)."""
+    _ligar_shell_e_entitlements(monkeypatch)
+    _seedar_modulo_copiloto(db)
+    login(client, papel="dono", email="dono-vazio@loja.test")
+
+    resposta = client.get(_TELA_SEM_GATE_DE_MODULO)
+
+    assert (
+        '<template data-copiloto-texto-vazio>Não há nada para tratar agora.'
+        in resposta.text
+    )
+
+
+def test_painel_acessivel_fechado_por_padrao_com_aria_live(client, db, monkeypatch):
+    _ligar_shell_e_entitlements(monkeypatch)
+    _seedar_modulo_copiloto(db)
+    login(client, papel="dono", email="dono-acess@loja.test")
+
+    resposta = client.get(_TELA_SEM_GATE_DE_MODULO)
+
+    painel = re.search(r'<div class="copiloto-notif-painel"[\s\S]*?>', resposta.text)
+    assert painel is not None
+    assert 'aria-live="polite"' in painel.group(0)
+    assert re.search(r"\bhidden\b", painel.group(0))
+    assert 'aria-expanded="false"' in resposta.text
+
+
+def test_lista_de_notificacoes_e_ul_para_leitor_de_tela(client, db, monkeypatch):
+    """Important da revisão: ``montarItem()`` cria um ``<li>`` e o anexa em
+    ``data-copiloto-lista``. Sem um ``<ul>``/``<ol>`` ancestral, esse ``<li>``
+    é um ``listitem`` órfão — leitor de tela não anuncia "lista de N itens".
+    Trava a estrutura no HTML servido, não só no JS (a rota que popula a
+    lista é a Task 3; até lá isto é a única prova possível)."""
+    _ligar_shell_e_entitlements(monkeypatch)
+    _seedar_modulo_copiloto(db)
+    login(client, papel="dono", email="dono-estrutura@loja.test")
+
+    resposta = client.get(_TELA_SEM_GATE_DE_MODULO)
+
+    # O container que o JS usa para anexar <li> (data-copiloto-lista) tem que
+    # ser um elemento de lista de verdade — nunca <div>/<span>.
+    assert re.search(
+        r'<ul class="copiloto-notif-lista" data-copiloto-lista\b', resposta.text
+    )
+    assert '<div class="copiloto-notif-lista"' not in resposta.text
+    # E o status (carregando/vazio/erro) não pode ser filho do <ul>: um <p>
+    # dentro de <ul> também é inválido/mal-anunciado. Tem que ser irmão.
+    ul_aberto = resposta.text.index('<ul class="copiloto-notif-lista"')
+    ul_fechado = resposta.text.index("</ul>", ul_aberto)
+    assert "copiloto-notif-status" not in resposta.text[ul_aberto:ul_fechado]
+
+
+def test_sem_innerhtml_no_script_do_sino(client, db, monkeypatch):
+    """Regra dura do projeto (defeito de XSS já ocorreu numa fase anterior):
+    qualquer JS que monte conteúdo a partir de dado do alerta usa
+    createElement/textContent, nunca innerHTML/insertAdjacentHTML. Checa o uso
+    real (``.innerHTML`` / ``insertAdjacentHTML(``), não o comentário do
+    próprio script que documenta a regra em prosa."""
+    _ligar_shell_e_entitlements(monkeypatch)
+    _seedar_modulo_copiloto(db)
+    login(client, papel="dono", email="dono-xss@loja.test")
+
+    resposta = client.get(_TELA_SEM_GATE_DE_MODULO)
+
+    assert ".innerHTML" not in resposta.text
+    assert "insertAdjacentHTML(" not in resposta.text
+
+
+def test_css_do_sino_nao_usa_cor_literal():
+    """Only tokens: --danger/--warn/--ok e var(...) — nunca hex/rgba direto no
+    bloco novo. Complementa (não substitui) o grep manual pedido no brief."""
+    caminho = (
+        Path(__file__).resolve().parents[1] / "app" / "static" / "css" / "app.css"
+    )
+    texto = caminho.read_text(encoding="utf-8")
+    inicio = texto.index("=== Copiloto: sino de notificacoes (F4/Task 2) ===")
+    fim = texto.index("=== fim: sino de notificacoes (F4/Task 2) ===", inicio)
+    bloco = texto[inicio:fim]
+    achados = re.findall(r"#[0-9a-fA-F]{3,6}|rgba?\(", bloco)
+    assert achados == []
