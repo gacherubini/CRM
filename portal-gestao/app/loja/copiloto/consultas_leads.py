@@ -10,6 +10,7 @@ passou do limiar de horas. Bot ligado = bot respondendo, não é abandono.
 """
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any
@@ -20,8 +21,11 @@ from app.loja.copiloto.tipos import (
     STATUS_INDISPONIVEL,
     STATUS_OK,
     STATUS_PARCIAL,
+    STATUS_VAZIO,
     CopilotoContexto,
 )
+
+logger = logging.getLogger(__name__)
 
 LIMITE_CONVERSAS = 200
 
@@ -112,11 +116,26 @@ def leads_status(
     except ChatbotIndisponivel:
         pass
     except Exception:
-        # Client sem o método (fake antigo) degrada igual: nunca zero inventado.
-        pass
+        # Degrada igual ao caso esperado (nunca zero inventado), mas isto NÃO
+        # é o sinal conhecido de "chatbot fora do ar": é bug real (payload
+        # malformado, client sem o método) e precisa aparecer no log.
+        logger.warning(
+            "copiloto leads_status: falha inesperada em chatbot.listar_conversas "
+            "loja=%s",
+            ctx.loja_slug,
+            exc_info=True,
+        )
 
-    if funil_status == STATUS_ERRO and sem_resposta_status != STATUS_OK:
+    if funil_status == STATUS_INDISPONIVEL and sem_resposta_status == STATUS_INDISPONIVEL:
+        # As duas fontes fora do ar ao mesmo tempo: não há nada parcialmente
+        # confiável para mostrar.
+        status = STATUS_INDISPONIVEL
+    elif funil_status == STATUS_ERRO and sem_resposta_status != STATUS_OK:
         status = STATUS_ERRO
+    elif funil_status == STATUS_VAZIO and sem_resposta_status == STATUS_OK:
+        # Funil genuinamente vazio (zero leads) com as duas fontes ok: vazio
+        # não é degradação, é o mesmo vocabulário de estoque_parado/vendas_resumo.
+        status = STATUS_VAZIO
     elif funil_status in {STATUS_ERRO, STATUS_INDISPONIVEL} or sem_resposta is None:
         status = STATUS_PARCIAL
     else:

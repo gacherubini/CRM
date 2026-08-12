@@ -107,6 +107,26 @@ def test_chatbot_fora_do_ar_marca_indisponivel_nao_zero():
     assert r.sem_resposta_status == "indisponivel"
 
 
+class ChatbotQuebrado:
+    """Payload malformado: nem ChatbotIndisponivel, nem sucesso — bug real."""
+
+    def listar_conversas(self, busca=None, limit=50, offset=0, *, canal_id=None):
+        raise KeyError("ultima_mensagem")
+
+
+def test_excecao_inesperada_no_chatbot_degrada_e_loga_warning(caplog):
+    with caplog.at_level("WARNING", logger="app.loja.copiloto.consultas_leads"):
+        r = leads_status(_overview(), ChatbotQuebrado(), ctx=_ctx(), agora=AGORA)
+
+    # Degrada exatamente como o caso "esperado" (nunca zero inventado)...
+    assert r.sem_resposta is None
+    assert r.sem_resposta_status == "indisponivel"
+    # ...mas, ao contrário do offline conhecido, o defeito real não fica mudo.
+    avisos = [rec for rec in caplog.records if rec.levelname == "WARNING"]
+    assert len(avisos) == 1
+    assert "loja-teste" in avisos[0].getMessage()
+
+
 def test_funil_com_erro_nao_vira_zero_leads():
     r = leads_status(
         _overview(funil=None, funil_status="erro"),
@@ -116,3 +136,38 @@ def test_funil_com_erro_nao_vira_zero_leads():
     )
     assert r.total_leads is None
     assert r.status in {"parcial", "erro"}
+
+
+def test_funil_vazio_com_fontes_ok_vira_status_vazio():
+    """Zero leads de verdade (funil_status='vazio') não é a mesma coisa que
+    "está tudo bem" — mas também não é degradação. Mesmo vocabulário das
+    outras consultas (estoque_parado, vendas_resumo): vazio é vazio."""
+    r = leads_status(
+        _overview(
+            funil={
+                "total_leads": 0,
+                "taxa_resposta_pct": None,
+                "tempo_mediano_primeira_resposta_segundos": None,
+            },
+            funil_status="vazio",
+        ),
+        ChatbotStub([]),
+        ctx=_ctx(),
+        agora=AGORA,
+    )
+    assert r.total_leads == 0
+    assert r.status == "vazio"
+
+
+def test_funil_e_sem_resposta_indisponiveis_vira_status_indisponivel():
+    """As duas fontes fora do ar ao mesmo tempo: nada de "parcial" — não há
+    nenhum dado confiável para mostrar, então o status tem que dizer isso."""
+    r = leads_status(
+        _overview(funil=None, funil_status="indisponivel"),
+        ChatbotStub([], indisponivel=True),
+        ctx=_ctx(),
+        agora=AGORA,
+    )
+    assert r.sem_resposta is None
+    assert r.sem_resposta_status == "indisponivel"
+    assert r.status == "indisponivel"

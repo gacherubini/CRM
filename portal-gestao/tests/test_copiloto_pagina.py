@@ -1,20 +1,12 @@
-import pytest
 from conftest import csrf_da_resposta, login, seed_loja_operacional
 
 from app.db import SessionLocal
-from app.loja.copiloto.cache import cache_overview
 from app.loja.copiloto.sinais import SinalCandidato
 from app.loja.copiloto.sinais_store import sincronizar_sinais
 from app.models import CopilotoSinal, LojaOperacionalProjecao
 
-
-@pytest.fixture(autouse=True)
-def _cache_overview_isolado():
-    """cache_overview é TTL global por processo: isola os testes desta rota
-    de sobra de outro teste que rodou antes com o mesmo loja_slug/papel."""
-    cache_overview.invalidar()
-    yield
-    cache_overview.invalidar()
+# Isolamento de cache_overview (TTL global por processo): fixture autouse
+# em tests/conftest.py, vale para todo teste do repositório — não só desta rota.
 
 
 def _ligar(monkeypatch):

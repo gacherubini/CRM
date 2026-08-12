@@ -32,6 +32,7 @@ from app.clients.estoque import (  # noqa: E402
 )
 from app.clients.motor import CredencialNaoEncontrada, MotorIndisponivel  # noqa: E402
 from app.db import Base, SessionLocal, engine  # noqa: E402
+from app.loja.copiloto.cache import cache_overview  # noqa: E402
 from app.main import app, get_chatbot_client, get_estoque_client, get_motor_client  # noqa: E402
 from app.models import LojaOperacionalProjecao, Usuario  # noqa: E402
 
@@ -765,6 +766,19 @@ def banco_limpo():
     Base.metadata.drop_all(bind=engine)
     Base.metadata.create_all(bind=engine)
     yield
+
+
+@pytest.fixture(autouse=True)
+def _cache_overview_isolado():
+    """cache_overview é TTL global por processo (90s de relógio real): sem
+    isolar, um teste que rodou antes com o mesmo loja_slug/papel deixa um
+    SalesOverview de sobra — inclusive construído em cima de uma sessão de
+    banco já fechada. Autouse em TODO teste, não só nos da rota do Copiloto:
+    qualquer arquivo que chame montar_resumo_hoje/build_sales_overview
+    repetidamente dentro do TTL pode reusar esse resíduo."""
+    cache_overview.invalidar()
+    yield
+    cache_overview.invalidar()
 
 
 @pytest.fixture

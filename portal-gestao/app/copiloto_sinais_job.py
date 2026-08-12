@@ -14,6 +14,8 @@ from typing import Callable
 from sqlalchemy.orm import Session
 
 from app import provisioning
+from app.clients.chatbot import ChatbotIndisponivel
+from app.clients.estoque import EstoqueIndisponivel
 from app.config import revy_loja_copiloto_enabled, revy_loja_entitlements_enabled
 from app.loja.copiloto.consultas_estoque import estoque_parado
 from app.loja.copiloto.consultas_leads import leads_status
@@ -95,7 +97,17 @@ def avaliar_loja(
 
     try:
         veiculos = estoque.listar()
+    except EstoqueIndisponivel:
+        veiculos = None
     except Exception:
+        # Degrada igual ao offline conhecido (regra pulada, nunca inventa
+        # dado), mas isto não é o sinal esperado — é bug real e tem que
+        # aparecer no log.
+        logger.warning(
+            "copiloto_sinais_job: falha inesperada em estoque.listar loja=%s",
+            loja_slug,
+            exc_info=True,
+        )
         veiculos = None
     if veiculos is not None:
         candidatos.extend(
@@ -131,7 +143,17 @@ def avaliar_loja(
         overview = build_sales_overview(
             db, loja_slug=loja_slug, papel="dono", chatbot=chatbot
         )
+    except (EstoqueIndisponivel, ChatbotIndisponivel):
+        overview = None
     except Exception:
+        # Mesma lógica: degrada a regra (pulada), mas loga — build_sales_overview
+        # já absorve as falhas esperadas internamente, então qualquer exceção
+        # que escape daqui é inesperada por definição.
+        logger.warning(
+            "copiloto_sinais_job: falha inesperada em build_sales_overview loja=%s",
+            loja_slug,
+            exc_info=True,
+        )
         overview = None
     if overview is not None:
         candidatos.extend(

@@ -46,6 +46,43 @@ def _veiculo_parado(dias=90):
     }
 
 
+class EstoqueListarQuebraNaSegundaChamada(EstoqueStub):
+    """Bug real, não o offline conhecido: a 1ª leitura (usada por
+    ``estoque_parado``) funciona; a 2ª leitura direta do ``avaliar_loja``
+    (usada por ``regra_cadastro_incompleto``) explode com payload malformado
+    — não é ``EstoqueIndisponivel``."""
+
+    def __init__(self, veiculos=None, slug="loja-teste"):
+        super().__init__(veiculos, slug)
+        self.chamadas = 0
+
+    def listar(self, **filtros):
+        self.chamadas += 1
+        if self.chamadas == 1:
+            return super().listar(**filtros)
+        raise TypeError("payload malformado do estoque")
+
+
+def test_falha_inesperada_em_estoque_listar_degrada_e_loga(db, caplog):
+    seed_loja_operacional(db)
+    db.commit()
+    with caplog.at_level("WARNING", logger="app.copiloto_sinais_job"):
+        candidatos = avaliar_loja(
+            db,
+            "loja-teste",
+            estoque=EstoqueListarQuebraNaSegundaChamada(),
+            chatbot=ChatbotStub(),
+            agora=AGORA,
+        )
+    regras = {c.regra for c in candidatos}
+    assert "cadastro_incompleto" not in regras
+    avisos = [rec for rec in caplog.records if rec.levelname == "WARNING"]
+    assert any(
+        "estoque.listar" in rec.getMessage() and "loja-teste" in rec.getMessage()
+        for rec in avisos
+    )
+
+
 def test_avaliar_loja_gera_candidato_de_estoque_parado(db):
     seed_loja_operacional(db)
     db.commit()
