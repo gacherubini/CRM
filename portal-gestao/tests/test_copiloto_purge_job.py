@@ -169,6 +169,41 @@ def test_purge_de_uma_loja_nao_toca_outra(db):
     assert db.query(CopilotoTurno).filter_by(id=velho_b_id).first() is not None
 
 
+def test_purge_de_uma_loja_nao_apaga_conversa_orfa_de_outra_loja(db):
+    """Achado da revisão final da fase (I2): o DELETE de conversas em
+    `purgar_loja` também precisa do filtro `CopilotoConversa.loja_slug ==
+    loja_slug` — sem ele, a subquery `~turnos_restantes` sozinha já apaga
+    QUALQUER conversa órfã e velha, de qualquer loja, mesmo quando só
+    `loja_slug` está sendo purgada. `test_purge_de_uma_loja_nao_toca_outra`
+    (acima) só prova o escopo do DELETE de turnos — os dois DELETEs de
+    `purgar_loja` são independentes, então aquele teste passa mesmo se o
+    escopo das conversas quebrar.
+
+    Loja B nunca teve turno nenhum: sua conversa nasce órfã (sem
+    `criar_turno`, direto no modelo) e velha. Purgar só loja A não pode
+    tocar nela.
+    """
+    velho_a = _turno(db, loja_slug="loja-a", idade=timedelta(days=RETENCAO_DIAS + 1))
+    conversa_a_id = velho_a.conversa_id
+
+    conversa_b = CopilotoConversa(
+        loja_slug="loja-b",
+        usuario_id="u1",
+        titulo="conversa órfã de loja-b",
+        atualizada_em=AGORA - timedelta(days=RETENCAO_DIAS + 1),
+    )
+    db.add(conversa_b)
+    db.commit()
+    conversa_b_id = conversa_b.id
+
+    resultado = purgar_loja(
+        db, "loja-a", corte=AGORA - timedelta(days=RETENCAO_DIAS), lote=1000
+    )
+    assert resultado["conversas"] == 1
+    assert db.query(CopilotoConversa).filter_by(id=conversa_a_id).first() is None
+    assert db.query(CopilotoConversa).filter_by(id=conversa_b_id).first() is not None
+
+
 def test_teto_por_execucao_e_respeitado(db):
     for i in range(5):
         _turno(
