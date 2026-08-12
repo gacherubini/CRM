@@ -81,6 +81,15 @@ def downgrade() -> None:
     # backfill, de propósito, porque também não existia associada a
     # nenhuma pessoa). Fingir simetria aqui seria pior que admitir que o
     # downgrade é parcial: a constraint volta, os dados não.
+    #
+    # Mesmo problema, de novo, no `drop_table` no fim desta função: ele
+    # apaga a tabela `copiloto_sinal_visto` inteira — todo "visto" por
+    # pessoa gravado depois do upgrade some, sem recuperação possível. Não
+    # é um caso simétrico de "criar tabela / apagar tabela": ao reverter
+    # para o modelo antigo (estado por loja), não existe onde guardar
+    # "fulano viu, beltrano não" — exatamente o motivo pelo qual o modelo
+    # antigo nunca registrou quem viu, para começo de conversa. Rodar este
+    # downgrade em produção descarta os vistos de todo mundo.
     with op.batch_alter_table(_TABELA_SINAL) as batch:
         batch.drop_constraint(_NOME_CONSTRAINT, type_="check")
         batch.create_check_constraint(
