@@ -1,6 +1,7 @@
 """Shell Revy Loja — injeção de nav, sessão multi-loja e gates de módulo."""
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 from fastapi import APIRouter, Depends, Request
@@ -15,6 +16,8 @@ from app.config import (
 from app.db import get_db
 from app.loja import entitlements as ents_mod
 from app.loja import identity, navigation
+from app.loja.copiloto import notificacoes as copiloto_notificacoes
+from app.loja.copiloto.tipos import PAPEIS_GESTAO_COPILOTO
 from app.loja.permissions import (
     LojaPermissionError,
     ModuloNaoContratado,
@@ -28,6 +31,8 @@ from app.loja.types import (
     NavSection,
     StoreContext,
 )
+
+logger = logging.getLogger(__name__)
 
 BRAND_NAME = "Revy Loja"
 
@@ -88,6 +93,47 @@ def build_loja_nav(
     return navigation.build_nav(store, entitlements, shell_enabled=True)
 
 
+def _copiloto_nao_vistos(
+    store: StoreContext,
+    ents: EntitlementState,
+    usuario: Any,
+    db: Session | None,
+) -> int | None:
+    """``None`` = sem sino; ``int`` (inclusive 0) = sino com essa contagem.
+
+    ``None`` cobre: papel fora de ``PAPEIS_GESTAO_COPILOTO`` (mesmo gate de
+    ``_pode()`` em ``loja_copiloto.py``), módulo Copiloto fora do
+    entitlement da loja (ou loja inativa/suspensa) e ausência de sessão de
+    banco para consultar. O template usa a diferença entre "sem sino" e
+    "sino zerado" — não trocar por 0 nesses casos.
+
+    O sino é acessório: uma falha na contagem NUNCA pode derrubar a tela
+    (a exceção não propaga), mas também não é engolida em silêncio — vai
+    para ``warning`` (achado I2 da revisão da F1).
+    """
+    papel = (getattr(usuario, "papel", "") or "").strip().casefold()
+    if papel not in PAPEIS_GESTAO_COPILOTO:
+        return None
+    try:
+        require_module(ents, Module.COPILOTO)
+    except LojaPermissionError:
+        return None
+    if db is None:
+        return None
+    usuario_id = getattr(usuario, "id", None)
+    if not usuario_id:
+        return None
+    try:
+        return copiloto_notificacoes.contar_nao_vistos(db, store.loja_slug, usuario_id)
+    except Exception:
+        logger.warning(
+            "copiloto: falha ao contar sinais não vistos (loja=%s)",
+            store.loja_slug,
+            exc_info=True,
+        )
+        return None
+
+
 def template_extras(
     request: Request,
     usuario: Any,
@@ -107,6 +153,7 @@ def template_extras(
             "lojas_disponiveis": (),
             "store_context": None,
             "entitlements": None,
+            "copiloto_nao_vistos": None,
         }
     nav = build_loja_nav(store, ents)
     return {
@@ -116,6 +163,7 @@ def template_extras(
         "lojas_disponiveis": identity.available_store_slugs(actor),
         "store_context": store,
         "entitlements": ents,
+        "copiloto_nao_vistos": _copiloto_nao_vistos(store, ents, usuario, db),
     }
 
 
