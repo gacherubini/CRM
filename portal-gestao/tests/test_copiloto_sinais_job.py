@@ -1,16 +1,29 @@
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
+import httpx
+import pytest
 from conftest import seed_loja_operacional
 
 from app.clients.chatbot import ChatbotClient
-from app.clients.estoque import EstoqueClient
+from app.clients.estoque import EstoqueClient, VeiculoNaoEncontrado
+from app.clients.fipe import FipeClient
 from app.copiloto_sinais_job import CopilotoSinaisWorker, avaliar_loja
 from app.db import SessionLocal
+from app.loja.copiloto.fipe import cache_fipe
 from app.loja.types import Module
 from app.models import CopilotoSinal, LojaOperacionalProjecao, Venda
 
 AGORA = datetime(2026, 8, 11, 12, 0, tzinfo=timezone.utc)
+
+
+@pytest.fixture(autouse=True)
+def _cache_fipe_limpo():
+    """Cache de marca/modelo da FIPE é global (Fase 3): isolar entre testes
+    deste arquivo, mesmo padrão de tests/test_copiloto_fipe.py."""
+    cache_fipe.invalidar()
+    yield
+    cache_fipe.invalidar()
 
 
 class EstoqueStub:
@@ -23,6 +36,12 @@ class EstoqueStub:
 
     def listar(self, **filtros):
         return list(self.veiculos)
+
+    def obter(self, veiculo_id):
+        for v in self.veiculos:
+            if str(v.get("id")) == str(veiculo_id):
+                return dict(v)
+        raise VeiculoNaoEncontrado("não existe")
 
 
 class ChatbotStub:
@@ -44,6 +63,55 @@ def _veiculo_parado(dias=90):
         "criado_em": (AGORA - timedelta(days=dias)).isoformat(),
         "tem_foto": True,
     }
+
+
+def _veiculo_fipe(id_, dias, preco, modelo="CB 500F ABS"):
+    """Igual a ``_veiculo_parado``, mas com ``tipo`` — necessário para o
+    matching FIPE (``_tipo_fipe`` falha fechado sem ele)."""
+    return {
+        "id": id_,
+        "tipo": "moto",
+        "marca": "Honda",
+        "modelo": modelo,
+        "ano_modelo": 2020,
+        "preco": preco,
+        "status": "disponivel",
+        "criado_em": (AGORA - timedelta(days=dias)).isoformat(),
+        "tem_foto": True,
+    }
+
+
+# --- fixtures FIPE (mesmo padrão de tests/test_copiloto_fipe.py) -----------
+
+_FIPE_MARCAS = [{"codigo": "80", "nome": "Honda"}]
+_FIPE_MODELOS = {
+    "modelos": [
+        {"codigo": "5140", "nome": "CB 500F ABS"},
+        {"codigo": "5141", "nome": "CB 500X ABS"},
+    ]
+}
+_FIPE_ANOS = [{"codigo": "2020-1", "nome": "2020 Gasolina"}]
+_FIPE_VALOR = {"Valor": "R$ 25.000,00", "MesReferencia": "agosto de 2026"}
+
+
+def _fipe_client(indisponivel=False, chamadas=None):
+    def handler(request):
+        if chamadas is not None:
+            chamadas.append(request.url.path)
+        if indisponivel:
+            return httpx.Response(503, json={})
+        rotas = {
+            "/motos/marcas": _FIPE_MARCAS,
+            "/80/modelos": _FIPE_MODELOS,
+            "/5140/anos": _FIPE_ANOS,
+            "/5140/anos/2020-1": _FIPE_VALOR,
+        }
+        for sufixo, corpo in rotas.items():
+            if request.url.path.endswith(sufixo):
+                return httpx.Response(200, json=corpo)
+        return httpx.Response(404, json={})
+
+    return FipeClient("https://fipe.test", transport=httpx.MockTransport(handler))
 
 
 class EstoqueListarQuebraNaSegundaChamada(EstoqueStub):
@@ -239,9 +307,109 @@ def test_clients_padrao_nao_importa_app_main(db):
     """O caminho de produção (sem factories injetadas) constrói os clients
     direto de app.clients/app.config — não pode depender de app.main (import
     de volta para o módulo que inicia o worker), e não pode ficar sem
-    cobertura só porque os 6 testes acima sempre injetam stub.
+    cobertura só porque os testes acima sempre injetam stub.
     """
     worker = CopilotoSinaisWorker(db_factory=SessionLocal, enabled=True, agora=lambda: AGORA)
-    estoque, chatbot = worker._clients()
+    estoque, chatbot, fipe = worker._clients()
     assert isinstance(estoque, EstoqueClient)
     assert isinstance(chatbot, ChatbotClient)
+    assert isinstance(fipe, FipeClient)
+
+
+# --- regra 7: preço fora da faixa da FIPE, ligada ao worker ----------------
+
+
+def test_avaliar_loja_preco_muito_acima_da_fipe_gera_sinal(db):
+    seed_loja_operacional(db)
+    db.commit()
+    candidatos = avaliar_loja(
+        db,
+        "loja-teste",
+        estoque=EstoqueStub([_veiculo_fipe("v1", dias=5, preco=40000)]),
+        chatbot=ChatbotStub(),
+        fipe=_fipe_client(),
+        agora=AGORA,
+    )
+    sinais_preco = [c for c in candidatos if c.regra == "preco_fora_da_faixa"]
+    assert len(sinais_preco) == 1
+    assert sinais_preco[0].entidade_ref == "v1"
+    assert sinais_preco[0].severidade == "atencao"
+
+
+def test_avaliar_loja_fipe_indisponivel_nao_gera_sinal_de_preco(db):
+    """FIPE fora do ar para o veículo -> nenhum sinal. Não existe
+    "provavelmente caro"."""
+    seed_loja_operacional(db)
+    db.commit()
+    candidatos = avaliar_loja(
+        db,
+        "loja-teste",
+        estoque=EstoqueStub([_veiculo_fipe("v1", dias=5, preco=99999)]),
+        chatbot=ChatbotStub(),
+        fipe=_fipe_client(indisponivel=True),
+        agora=AGORA,
+    )
+    assert "preco_fora_da_faixa" not in {c.regra for c in candidatos}
+
+
+def test_avaliar_loja_fipe_ambiguo_nao_gera_sinal_de_preco(db):
+    """Matching sem candidato exato e único -> nenhum sinal, mesmo com preço
+    absurdo: a Fase 3 nunca adivinha, e um alerta proativo é pior lugar para
+    adivinhar do que uma resposta de chat, porque ninguém perguntou nada."""
+    seed_loja_operacional(db)
+    db.commit()
+    candidatos = avaliar_loja(
+        db,
+        "loja-teste",
+        estoque=EstoqueStub(
+            [_veiculo_fipe("v1", dias=5, preco=99999, modelo="CB 500")]
+        ),
+        chatbot=ChatbotStub(),
+        fipe=_fipe_client(),
+        agora=AGORA,
+    )
+    assert "preco_fora_da_faixa" not in {c.regra for c in candidatos}
+
+
+def test_avaliar_loja_sem_fipe_client_pula_a_regra(db):
+    """fipe=None (default) degrada como qualquer outra dependência externa
+    deste arquivo — não derruba o ciclo, só pula a regra 7."""
+    seed_loja_operacional(db)
+    db.commit()
+    candidatos = avaliar_loja(
+        db,
+        "loja-teste",
+        estoque=EstoqueStub([_veiculo_fipe("v1", dias=5, preco=99999)]),
+        chatbot=ChatbotStub(),
+        agora=AGORA,
+    )
+    assert "preco_fora_da_faixa" not in {c.regra for c in candidatos}
+
+
+def test_avaliar_loja_respeita_teto_e_prioriza_mais_parado(db, monkeypatch):
+    """Teto por ciclo (default 10, aqui forçado a 1) é convivência com API
+    comunitária sem SLA — e quem é consultado primeiro é quem está parado há
+    mais tempo, nunca ordem de cadastro."""
+    monkeypatch.setenv("PORTAL_COPILOTO_FIPE_POR_CICLO", "1")
+    seed_loja_operacional(db)
+    db.commit()
+    chamadas: list[str] = []
+    candidatos = avaliar_loja(
+        db,
+        "loja-teste",
+        estoque=EstoqueStub(
+            [
+                _veiculo_fipe("v1", dias=200, preco=40000),
+                _veiculo_fipe("v2", dias=50, preco=40000),
+            ]
+        ),
+        chatbot=ChatbotStub(),
+        fipe=_fipe_client(chamadas=chamadas),
+        agora=AGORA,
+    )
+    sinais_preco = [c for c in candidatos if c.regra == "preco_fora_da_faixa"]
+    assert len(sinais_preco) == 1
+    assert sinais_preco[0].entidade_ref == "v1"  # 200 dias > 50 dias
+    # /anos nunca é cacheado (só marca/modelo): contar essa rota isola
+    # quantos veículos de fato foram consultados nesta rodada.
+    assert sum(1 for c in chamadas if c.endswith("/5140/anos")) == 1

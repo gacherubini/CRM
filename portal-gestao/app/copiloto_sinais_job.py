@@ -7,8 +7,10 @@ mantém o alerta funcionando com o provedor de IA fora do ar.
 from __future__ import annotations
 
 import logging
+import re
 import threading
 from datetime import datetime, timezone
+from decimal import Decimal
 from typing import Callable
 
 from sqlalchemy.orm import Session
@@ -21,6 +23,7 @@ from app.loja.copiloto.consultas_estoque import estoque_parado
 from app.loja.copiloto.consultas_leads import leads_status
 from app.loja.copiloto.consultas_origem import venda_origem_periodo
 from app.loja.copiloto.consultas_vendas import vendas_resumo
+from app.loja.copiloto.fipe import STATUS_OK, consultar_fipe_do_veiculo
 from app.loja.copiloto.periodo import janela_do_periodo
 from app.loja.copiloto.sinais import (
     SinalCandidato,
@@ -30,18 +33,30 @@ from app.loja.copiloto.sinais import (
     regra_lead_sem_resposta,
     regra_margem_incompleta,
     regra_meta_em_risco,
+    regra_preco_fora_da_faixa,
 )
 from app.loja.copiloto.sinais_store import sincronizar_sinais
 from app.loja.copiloto.tipos import CopilotoContexto
 from app.loja.estoque_overview import montar_estoque_overview
 from app.loja.types import Module
-from app.meta_ads_spend_job import env_flag, env_float
+from app.meta_ads_spend_job import env_flag, env_float, env_int
 from app.models import LojaOperacionalProjecao
 
 logger = logging.getLogger(__name__)
 
 DIAS_ESTOQUE_PARADO = 60
 HORAS_LEAD_SEM_RESPOSTA = 4
+
+# Regra 7 (preço fora da faixa da FIPE): os três limiares abaixo são
+# CALIBRAGEM DE MERCADO, não de engenharia — o dono quer ajustar com o
+# estoque real na mão. Estes defaults são só o ponto de partida (nunca
+# tratar como recomendação); como vêm de env, calibrar não exige deploy.
+FIPE_FOLGA_ALTA_DEFAULT = 0.30  # 30% acima da FIPE já destoa sozinho
+FIPE_FOLGA_BASE_DEFAULT = 0.15  # 15% acima só soma sinal se também parado
+FIPE_DIAS_PARADO_DEFAULT = 60  # mesmo piso de "encalhado" da regra 1
+# Teto de consultas à FIPE por ciclo — API comunitária sem SLA; consultar o
+# estoque inteiro por rodada é abuso e queima rate limit para todo mundo.
+FIPE_POR_CICLO_DEFAULT = 10
 
 
 def _copiloto_permitido(db: Session, loja_slug: str) -> bool:
@@ -70,15 +85,82 @@ def lojas_ativas(db: Session) -> list[str]:
     return [slug for slug in slugs if _copiloto_permitido(db, slug)]
 
 
+def _parse_valor_fipe(bruto: str | None) -> Decimal | None:
+    """``"R$ 27.500,00"`` -> ``Decimal("27500.00")``. Falha vira ``None``,
+    nunca um valor aproximado."""
+    if not bruto:
+        return None
+    limpo = re.sub(r"[^\d,]", "", str(bruto)).replace(",", ".")
+    try:
+        valor = Decimal(limpo)
+    except (ArithmeticError, ValueError):
+        return None
+    return valor if valor > 0 else None
+
+
+def _veiculos_com_fipe(
+    estoque,
+    fipe,
+    ctx: CopilotoContexto,
+    ref: datetime,
+    *,
+    teto: int,
+) -> list[tuple]:
+    """Até ``teto`` pares ``(veiculo, valor_fipe)`` para a regra 7.
+
+    Prioriza quem está parado há mais tempo (``estoque_parado`` já devolve
+    ordenado por ``-dias_parado``) e se apoia no cache de 6h de marca/modelo
+    da Fase 3 — a FIPE é API comunitária sem SLA, consultar o estoque inteiro
+    por ciclo é abuso. ``dias_min=0`` para não deixar de fora um veículo
+    recém-cadastrado com preço muito acima (caso 1 não exige estar parado).
+
+    Só entram pares com match CONFIRMADO (``status == ok``): ambíguo, não
+    encontrado ou indisponível ficam de fora silenciosamente — a Fase 3 é
+    categórica que a FIPE nunca adivinha, e um sinal proativo é lugar pior
+    para adivinhar do que uma resposta de chat, porque ninguém perguntou
+    nada.
+    """
+    candidatos = estoque_parado(estoque, ctx, dias_min=0, limite=max(1, teto), agora=ref)
+    pares: list[tuple] = []
+    for item in candidatos.itens:
+        try:
+            resultado = consultar_fipe_do_veiculo(fipe, estoque, ctx, veiculo_id=item.id)
+        except Exception:
+            # Mesma lógica das outras degradações deste arquivo: pula o
+            # veículo (não inventa dado), mas loga porque isto não é uma das
+            # falhas esperadas do cliente FIPE (essas já viram ResultadoFipe
+            # com status "indisponivel" dentro de consultar_fipe_do_veiculo).
+            logger.warning(
+                "copiloto_sinais_job: falha inesperada em consultar_fipe_do_veiculo veiculo=%s",
+                item.id,
+                exc_info=True,
+            )
+            continue
+        if resultado.status != STATUS_OK:
+            continue
+        valor = _parse_valor_fipe(resultado.valor)
+        if valor is None:
+            continue
+        pares.append((item, valor))
+    return pares
+
+
 def avaliar_loja(
     db: Session,
     loja_slug: str,
     *,
     estoque,
     chatbot,
+    fipe=None,
     agora: datetime | None = None,
 ) -> list[SinalCandidato]:
-    """Roda as 6 regras da loja e devolve os candidatos desta passada."""
+    """Roda as 7 regras da loja e devolve os candidatos desta passada.
+
+    ``fipe`` é opcional: sem client (ex.: testes das outras 6 regras), a
+    regra 7 é simplesmente pulada — mesma lógica de degradação das demais
+    dependências externas deste arquivo (estoque/chatbot indisponíveis
+    tampouco derrubam o ciclo).
+    """
     ref = agora or datetime.now(timezone.utc)
     ctx = CopilotoContexto(
         loja_slug=loja_slug,
@@ -94,6 +176,39 @@ def avaliar_loja(
         estoque, ctx, dias_min=DIAS_ESTOQUE_PARADO, agora=ref, limite=50
     )
     candidatos.extend(regra_estoque_parado(parado))
+
+    if fipe is not None:
+        try:
+            pares_fipe = _veiculos_com_fipe(
+                estoque,
+                fipe,
+                ctx,
+                ref,
+                teto=env_int("PORTAL_COPILOTO_FIPE_POR_CICLO", FIPE_POR_CICLO_DEFAULT),
+            )
+        except EstoqueIndisponivel:
+            pares_fipe = []
+        except Exception:
+            logger.warning(
+                "copiloto_sinais_job: falha inesperada montando pares FIPE loja=%s",
+                loja_slug,
+                exc_info=True,
+            )
+            pares_fipe = []
+        candidatos.extend(
+            regra_preco_fora_da_faixa(
+                pares_fipe,
+                folga_alta=env_float(
+                    "PORTAL_COPILOTO_FIPE_FOLGA_ALTA", FIPE_FOLGA_ALTA_DEFAULT
+                ),
+                folga_base=env_float(
+                    "PORTAL_COPILOTO_FIPE_FOLGA_BASE", FIPE_FOLGA_BASE_DEFAULT
+                ),
+                dias_parado_min=env_int(
+                    "PORTAL_COPILOTO_FIPE_DIAS_PARADO", FIPE_DIAS_PARADO_DEFAULT
+                ),
+            )
+        )
 
     try:
         veiculos = estoque.listar()
@@ -183,6 +298,7 @@ class CopilotoSinaisWorker:
         enabled: bool | None = None,
         estoque_factory: Callable[[], object] | None = None,
         chatbot_factory: Callable[[], object] | None = None,
+        fipe_factory: Callable[[], object] | None = None,
         agora: Callable[[], datetime] | None = None,
     ):
         self.db_factory = db_factory
@@ -208,6 +324,7 @@ class CopilotoSinaisWorker:
             self.enabled = env_flag("PORTAL_COPILOTO_SINAIS_ENABLED", True)
         self._estoque_factory = estoque_factory
         self._chatbot_factory = chatbot_factory
+        self._fipe_factory = fipe_factory
         self._agora = agora or (lambda: datetime.now(timezone.utc))
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
@@ -215,12 +332,14 @@ class CopilotoSinaisWorker:
 
     def _clients(self):
         if self._estoque_factory and self._chatbot_factory:
-            return self._estoque_factory(), self._chatbot_factory()
+            fipe = self._fipe_factory() if self._fipe_factory else None
+            return self._estoque_factory(), self._chatbot_factory(), fipe
         # Construção direta (mesmos um-liners de app.main.get_estoque_client /
         # get_chatbot_client), sem importar app.main: o worker não pode depender
         # do módulo que o inicia, senão o boot vira um ciclo.
         from app.clients.chatbot import ChatbotClient
         from app.clients.estoque import EstoqueClient
+        from app.clients.fipe import FipeClient
         from app.config import settings
 
         estoque = EstoqueClient(
@@ -229,7 +348,10 @@ class CopilotoSinaisWorker:
         chatbot = ChatbotClient(
             settings.chatbot_url, settings.chatbot_token, settings.request_timeout
         )
-        return estoque, chatbot
+        fipe = FipeClient(
+            settings.copiloto_fipe_url, timeout=settings.copiloto_fipe_timeout
+        )
+        return estoque, chatbot, fipe
 
     def start(self) -> None:
         if not self.enabled:
@@ -266,11 +388,16 @@ class CopilotoSinaisWorker:
         lojas = 0
         erros = 0
         try:
-            estoque, chatbot = self._clients()
+            estoque, chatbot, fipe = self._clients()
             for loja_slug in lojas_ativas(db):
                 try:
                     candidatos = avaliar_loja(
-                        db, loja_slug, estoque=estoque, chatbot=chatbot, agora=ref
+                        db,
+                        loja_slug,
+                        estoque=estoque,
+                        chatbot=chatbot,
+                        fipe=fipe,
+                        agora=ref,
                     )
                     resultado = sincronizar_sinais(
                         db, loja_slug, candidatos, agora=ref

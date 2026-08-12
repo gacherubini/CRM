@@ -17,6 +17,7 @@ from app.loja.copiloto.sinais import (
     regra_lead_sem_resposta,
     regra_margem_incompleta,
     regra_meta_em_risco,
+    regra_preco_fora_da_faixa,
 )
 from app.loja.copiloto.tipos import Cobertura
 from app.loja.estoque_overview import EstoqueOverview, LacunaCadastro
@@ -230,3 +231,71 @@ def test_atribuicao_boa_nao_dispara():
 def test_atribuicao_com_poucas_vendas_nao_dispara():
     """1 venda sem origem em 2 é 50%, mas não é sinal — é ruído."""
     assert regra_atribuicao_baixa(_origem(identificadas=1, total=2)) == []
+
+
+# --- preço fora da faixa da FIPE --------------------------------------------
+
+FOLGAS = dict(folga_alta=0.30, folga_base=0.15, dias_parado_min=60)
+
+
+def test_preco_muito_acima_da_fipe_dispara_mesmo_recem_cadastrado():
+    """Caso 1: destoa sozinho o bastante — não precisa estar parado."""
+    veiculo = _veiculo("v1", dias=5, preco=40000)
+    sinais = regra_preco_fora_da_faixa([(veiculo, Decimal("25000"))], **FOLGAS)
+    assert len(sinais) == 1
+    assert sinais[0].regra == "preco_fora_da_faixa"
+    assert sinais[0].severidade == "atencao"
+    assert sinais[0].entidade_ref == "v1"
+
+
+def test_preco_dentro_da_tolerancia_nao_dispara():
+    veiculo = _veiculo("v1", dias=5, preco=27000)
+    assert regra_preco_fora_da_faixa([(veiculo, Decimal("25000"))], **FOLGAS) == []
+
+
+def test_preco_abaixo_da_fipe_nao_dispara():
+    """Pode ser estratégia de giro — não é problema, mesmo parado há tempo."""
+    veiculo = _veiculo("v1", dias=200, preco=20000)
+    assert regra_preco_fora_da_faixa([(veiculo, Decimal("25000"))], **FOLGAS) == []
+
+
+def test_preco_abaixo_da_fipe_nao_dispara_mesmo_com_folga_base_negativa():
+    """O guard é explícito e incondicional, não um efeito colateral dos
+    limiares positivos de hoje: mesmo se ``folga_base`` fosse configurada
+    negativa (limite abaixo da própria FIPE), preço abaixo da FIPE nunca
+    vira sinal — a regra nesta fase não tem opinião sobre giro."""
+    veiculo = _veiculo("v1", dias=200, preco=24000)  # abaixo da FIPE (25000)
+    sinais = regra_preco_fora_da_faixa(
+        [(veiculo, Decimal("25000"))],
+        folga_alta=0.30,
+        folga_base=-0.10,  # limite_base = 22500 < preco, se não fosse o guard
+        dias_parado_min=60,
+    )
+    assert sinais == []
+
+
+def test_sem_valor_fipe_confirmado_nao_dispara():
+    """Sem valor resolvido (FIPE indisponível ou matching ambíguo no
+    worker), esta função pura não tem o que decidir e pula o veículo."""
+    veiculo = _veiculo("v1", dias=5, preco=99999)
+    assert regra_preco_fora_da_faixa([(veiculo, None)], **FOLGAS) == []
+
+
+def test_severidade_sobe_quando_tambem_esta_parado():
+    """Caso 2: mesma folga de preço, mas só dispara — e só vira crítico —
+    quando o veículo também está encalhado."""
+    parado = _veiculo("v1", dias=90, preco=29000)
+    recente = _veiculo("v2", dias=5, preco=29000)
+    sinais_parado = regra_preco_fora_da_faixa([(parado, Decimal("25000"))], **FOLGAS)
+    sinais_recente = regra_preco_fora_da_faixa([(recente, Decimal("25000"))], **FOLGAS)
+    assert len(sinais_parado) == 1
+    assert sinais_parado[0].severidade == "critico"
+    assert sinais_recente == []
+
+
+def test_entidade_ref_e_o_id_do_veiculo():
+    veiculo = _veiculo("v42", dias=90, preco=40000)
+    sinais = regra_preco_fora_da_faixa([(veiculo, Decimal("25000"))], **FOLGAS)
+    assert sinais[0].entidade_ref == "v42"
+    assert sinais[0].dados["veiculo_id"] == "v42"
+    assert sinais[0].acao_sugerida == {"acao": "ajustar_preco", "veiculo_id": "v42"}

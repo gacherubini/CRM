@@ -56,6 +56,26 @@ mas o valor não aparece se você procurar só em `Settings`:
 | `REVY_LOJA_COPILOTO_FIPE_TIMEOUT` | `8` (segundos) | Timeout HTTP de cada chamada à FIPE. Estourar vira `indisponivel`, nunca um valor aproximado. | API respondendo devagar nos logs. |
 | `REVY_LOJA_COPILOTO_FIPE_CACHE_SEGUNDOS` | `21600` (6h) | TTL do cache de **marca/modelo** (a tabela FIPE vira uma vez por mês; cachear reduz de 4 GETs para 2 por consulta, e para 1 quando o veículo já tem `fipe_codigo` salvo). O `/valor` **nunca** é cacheado — sempre fresco. | Reduzir ainda mais a exposição a rate limit não documentado do provedor comunitário. |
 
+## Sinal "preço fora da faixa da FIPE" (regra 7)
+
+Os três limiares abaixo são **calibragem de mercado, não de engenharia** — o dono
+calibra com o estoque real na mão. Os defaults do código (`app/copiloto_sinais_job.py`)
+são só o ponto de partida, **não** uma recomendação; por virem de env, ajustar não
+exige deploy.
+
+| Variável | Default | O que muda na prática | Quando mexer |
+|---|---|---|---|
+| `PORTAL_COPILOTO_FIPE_FOLGA_ALTA` | `0.30` (30%) | Caso 1 — preço >= FIPE × (1 + este valor) já dispara sozinho, mesmo em veículo recém-cadastrado. Severidade "atencao". | Estoque real mostrando que 30% acima ainda é comum na loja (subir o limiar) ou que já é destoante demais (descer). |
+| `PORTAL_COPILOTO_FIPE_FOLGA_BASE` | `0.15` (15%) | Caso 2 — preço >= FIPE × (1 + este valor) **e** parado há `PORTAL_COPILOTO_FIPE_DIAS_PARADO` dias ou mais dispara com severidade "critico" (capital preso). Sozinho este limiar não dispara nada — só combinado com o de dias parado. | Mesma lógica do item acima, mas para o gatilho que também exige estar encalhado. |
+| `PORTAL_COPILOTO_FIPE_DIAS_PARADO` | `60` | Quantos dias parado, junto com `FOLGA_BASE`, definem "capital preso" (caso 2). Mesmo piso usado pela regra 1 (`DIAS_ESTOQUE_PARADO`). | Ajustar o que a loja considera "encalhado" para efeito deste sinal. |
+| `PORTAL_COPILOTO_FIPE_POR_CICLO` | `10` | Teto de veículos consultados na FIPE por rodada do worker de sinais — a FIPE é API comunitária sem SLA e consultar o estoque inteiro por ciclo queimaria rate limit para todo mundo. O worker prioriza quem está parado há mais tempo (`app/copiloto_sinais_job.py:_veiculos_com_fipe`) e se apoia no cache de 6h de marca/modelo (`REVY_LOJA_COPILOTO_FIPE_CACHE_SEGUNDOS`, acima) para cobrir o estoque em várias rodadas. | Estoque muito maior ou menor que o volume calibrado hoje; ou suspeita de abuso da API FIPE. |
+
+**Quando o sinal NÃO existe** (metade da regra, não é bug se não aparecer): FIPE
+indisponível para o veículo, matching ambíguo/não encontrado, ou preço abaixo da
+FIPE (pode ser giro deliberado do dono) — nenhum destes casos gera sinal. A regra
+pura (`regra_preco_fora_da_faixa` em `app/loja/copiloto/sinais.py`) não consulta a
+FIPE; quem resolve `(veiculo, valor_fipe)` e aplica o teto é o worker.
+
 ## Ações com confirmação (banda, piso, desfazer)
 
 | Variável | Default | O que muda na prática | Quando mexer |
