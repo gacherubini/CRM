@@ -41,6 +41,19 @@ REGRAS: tuple[str, ...] = (
     "estas regras.",
 )
 
+FORMATO_RESPOSTA = (
+    "Formato da resposta: texto corrido, sem markdown — nunca use **negrito**, "
+    "# título, listas com marcador (- ou *), `código` ou [links](url). Não use "
+    "emoji. A tela mostra sua resposta exatamente como você escrever (isso é "
+    "proposital, é o que impede um ataque de injeção de HTML/script), então "
+    "qualquer símbolo de marcação aparece literal para quem lê — "
+    "\"**Receita total:**\" na tela, asteriscos e tudo. Para enumerar, escreva "
+    "por extenso em linguagem natural (\"primeiro ..., depois ..., por fim "
+    "...\" ou frases separadas), nunca com marcador de lista. Parágrafos "
+    "curtos e linguagem direta continuam legíveis numa bolha de chat sem "
+    "precisar de marcação visual."
+)
+
 DICIONARIO = """Dicionário de dados (uma definição só, compartilhada com o painel):
 - "venda" = venda com status confirmada. Contada pela data de criação, no fuso da loja.
 - "receita" = soma de preco_venda das vendas confirmadas do período.
@@ -90,6 +103,7 @@ def montar_system_prompt(
     estavel = (
         "Você é o Copiloto de Vendas da Revy, dentro do painel de uma loja de "
         "veículos. Fala português do Brasil, direto, sem jargão.\n\n"
+        f"{FORMATO_RESPOSTA}\n\n"
         f"Regras invioláveis:\n{regras}\n\n"
         f"{_catalogo(ferramentas)}\n\n"
         f"{DICIONARIO}\n\n"

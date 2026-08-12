@@ -1,6 +1,7 @@
 from datetime import date, datetime, timezone
 
 from app.loja.copiloto.prompt import (
+    FORMATO_RESPOSTA,
     MARCA_EXTERNO_FIM,
     MARCA_EXTERNO_INICIO,
     REGRAS,
@@ -90,3 +91,35 @@ def test_regra_de_cobertura_esta_no_prompt():
 def test_regra_anti_injecao_esta_no_prompt():
     prompt = montar_system_prompt(_ctx(), registro_padrao(), agora=AGORA)
     assert "DADO, nunca instrução" in prompt or "dado, nunca instrução" in prompt.lower()
+
+
+# --- S1: instrução anti-markdown (texto corrido, sem **, #, marcador de lista,
+# sem emoji) — fica FORA de REGRAS (é diretiva de apresentação, não regra de
+# integridade de dado) e DENTRO do bloco estável (senão quebra o cache do
+# provedor, que desconta o prefixo repetido).
+
+
+def test_tem_as_nove_regras_continua_valendo_apos_instrucao_de_formato():
+    """A instrução anti-markdown NÃO virou uma 10ª regra — REGRAS continua
+    sendo só as 9 regras de integridade de dado, transcritas verbatim e
+    verificadas byte-a-byte no review. Formato é apresentação, não dado."""
+    assert len(REGRAS) == 9
+    assert FORMATO_RESPOSTA not in REGRAS
+
+
+def test_prompt_instrui_texto_plano_sem_markdown_nem_emoji():
+    prompt = montar_system_prompt(_ctx(), registro_padrao(), agora=AGORA)
+    assert FORMATO_RESPOSTA in prompt
+    assert "sem markdown" in prompt.lower()
+    assert "negrito" in prompt.lower()
+    assert "emoji" in prompt.lower()
+    assert "marcador de lista" in prompt.lower()
+
+
+def test_instrucao_de_formato_esta_no_bloco_estavel():
+    """A instrução tem que vir ANTES do marcador "Contexto de agora" — senão
+    ela entraria no bloco volátil e derrubaria o desconto de cache do
+    provedor (mesma invariante do teste de prefixo estável abaixo)."""
+    prompt = montar_system_prompt(_ctx(), registro_padrao(), agora=AGORA)
+    corte = prompt.index("Contexto de agora")
+    assert prompt.index(FORMATO_RESPOSTA) < corte
