@@ -6,6 +6,7 @@ prompt mudar no começo a cada turno, o desconto de cache some.
 """
 from __future__ import annotations
 
+import re
 from datetime import datetime, timezone
 from typing import Sequence
 from zoneinfo import ZoneInfo
@@ -57,12 +58,16 @@ DICIONARIO = """Dicionário de dados (uma definição só, compartilhada com o p
 MARCA_EXTERNO_INICIO = "<CONTEUDO_NAO_CONFIAVEL>"
 MARCA_EXTERNO_FIM = "</CONTEUDO_NAO_CONFIAVEL>"
 
+# Casa a marca em qualquer combinação de maiúsculas/minúsculas e com espaços
+# internos (ex.: "< conteudo_nao_confiavel >"), para que um look-alike dentro
+# do conteúdo de terceiro não sobreviva ao rótulo. Os marcadores EMITIDOS
+# continuam exatamente MARCA_EXTERNO_INICIO/FIM — só a limpeza é tolerante.
+_MARCA_QUALQUER = re.compile(r"</?\s*CONTEUDO_NAO_CONFIAVEL\s*>", re.IGNORECASE)
+
 
 def rotular_conteudo_externo(texto: str) -> str:
     """Texto escrito por terceiro entra rotulado e delimitado (§6.3)."""
-    limpo = (texto or "").replace(MARCA_EXTERNO_INICIO, "").replace(
-        MARCA_EXTERNO_FIM, ""
-    )
+    limpo = _MARCA_QUALQUER.sub("", texto or "")
     return f"{MARCA_EXTERNO_INICIO}{limpo}{MARCA_EXTERNO_FIM}"
 
 
