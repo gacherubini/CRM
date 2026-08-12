@@ -30,7 +30,7 @@ def test_nav_somente_vendas_e_estoque_com_acessos_bancarios():
         "Resultado",
         "Atendimento",
         "Vendas da loja",
-        "Agente",
+        "Agente do WhatsApp",
         "Simulações",
         "Situação do estoque",
         "Veículos",
@@ -208,3 +208,39 @@ def test_shell_off_vendas_retorna_404(client, monkeypatch):
     login(client)
     r = client.get("/app/loja/vendas", follow_redirects=False)
     assert r.status_code == 404
+
+
+def test_nav_sem_copiloto_quando_entitlement_falta():
+    """Copiloto é módulo contratável: sem entitlement, não aparece."""
+    sections = build_nav(_store(), _ents(), shell_enabled=True, copiloto_enabled=True)
+    assert "Copiloto" not in [s.title for s in sections]
+
+
+def test_nav_copiloto_e_a_primeira_secao_quando_liberado():
+    ents = EntitlementState(
+        loja_slug="loja-teste",
+        loja_ativa=True,
+        vendas_enabled=True,
+        estoque_enabled=True,
+        source="test",
+        copiloto_enabled=True,
+    )
+    sections = build_nav(_store(), ents, shell_enabled=True, copiloto_enabled=True)
+    assert [s.title for s in sections][0] == "Copiloto"
+    labels = [i.label for i in flatten_nav(sections)]
+    assert labels[0] == "Copiloto de Vendas"
+
+
+def test_nav_copiloto_nao_aparece_para_vendedor():
+    ents = EntitlementState(
+        loja_slug="loja-teste",
+        loja_ativa=True,
+        vendas_enabled=True,
+        estoque_enabled=True,
+        source="test",
+        copiloto_enabled=True,
+    )
+    sections = build_nav(
+        _store(roles=("vendedor",)), ents, shell_enabled=True, copiloto_enabled=True
+    )
+    assert "Copiloto" not in [s.title for s in sections]

@@ -1,7 +1,11 @@
-"""Navegação permitida do shell Revy Loja (somente Vendas e Estoque)."""
+"""Navegação permitida do shell Revy Loja (Copiloto, Vendas e Estoque).
+
+Copiloto entrou em 2026-08-11 por decisão do dono e é a primeira seção: a
+tela de "o que fazer hoje" vem antes das telas de "quanto deu".
+"""
 from __future__ import annotations
 
-from app.config import revy_loja_whatsapp_enabled
+from app.config import revy_loja_copiloto_enabled, revy_loja_whatsapp_enabled
 from app.loja.types import (
     ROLES_GESTAO,
     ROLES_OPERACIONAIS,
@@ -19,6 +23,7 @@ def build_nav(
     *,
     shell_enabled: bool = True,
     whatsapp_enabled: bool | None = None,
+    copiloto_enabled: bool | None = None,
 ) -> tuple[NavSection, ...]:
     """Produz seções de navegação conforme contrato e cargos.
 
@@ -35,11 +40,36 @@ def build_nav(
     if whatsapp_enabled is None:
         whatsapp_enabled = revy_loja_whatsapp_enabled()
 
+    if copiloto_enabled is None:
+        copiloto_enabled = revy_loja_copiloto_enabled()
+
     roles = store.roles & ROLES_OPERACIONAIS
     if not roles:
         return ()
 
     sections: list[NavSection] = []
+
+    # Copiloto: só dono/gerente, só com flag + entitlement do módulo.
+    if (
+        copiloto_enabled
+        and entitlements.copiloto_enabled
+        and entitlements.loja_ativa
+        and roles & ROLES_GESTAO
+    ):
+        sections.append(
+            NavSection(
+                title="Copiloto",
+                items=(
+                    NavItem(
+                        label="Copiloto de Vendas",
+                        href="/app/loja/copiloto",
+                        section="Copiloto",
+                        module=Module.COPILOTO.value,
+                        active_prefix="/app/loja/copiloto",
+                    ),
+                ),
+            )
+        )
 
     if entitlements.vendas_enabled and entitlements.loja_ativa:
         sections.append(
@@ -74,7 +104,7 @@ def build_nav(
                         active_prefix="/app/loja/vendas/lista",
                     ),
                     NavItem(
-                        label="Agente",
+                        label="Agente do WhatsApp",
                         href="/app/loja/agente",
                         section="Vendas",
                         module=Module.VENDAS.value,

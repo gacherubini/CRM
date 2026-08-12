@@ -56,6 +56,12 @@ class EstoqueFake:
         self.acoes = []
         self.indisponivel = False
         self.conflito_ao_vender = False
+        self.loja_slug = "loja-teste"
+
+    def obter_loja(self):
+        if self.indisponivel:
+            raise EstoqueIndisponivel("Não foi possível acessar o estoque agora")
+        return {"slug": self.loja_slug, "nome": "Loja Teste"}
 
     def listar(self, **filtros):
         if self.indisponivel:
