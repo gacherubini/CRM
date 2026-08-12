@@ -158,6 +158,55 @@
           <small>{{ usuario.nome }} · {{ usuario.papel | replace('_', ' ') }}</small>
         </div>
         <div class="topbar-actions">
+          {% if copiloto_nao_vistos is defined and copiloto_nao_vistos is not none %}
+          {# Sino do Copiloto: primeira vez que o Copiloto aparece fora da sua
+             própria seção — visível em toda tela do shell (F4/Task 2).
+             ``copiloto_nao_vistos`` vem de app/web/loja_shell.py::template_extras.
+             None (sem sino) e 0 (sino zerado) são estados diferentes: o `if`
+             acima só cobre None; o `if copiloto_nao_vistos > 0` abaixo decide
+             o numeral do badge, não a presença do sino. #}
+          <div class="copiloto-notif" data-copiloto-notif>
+            <button type="button"
+                    class="copiloto-notif-sino"
+                    id="copiloto-notif-sino"
+                    aria-haspopup="true"
+                    aria-expanded="false"
+                    aria-controls="copiloto-notif-painel"
+                    aria-label="{{ copiloto_nao_vistos }} {{ 'notificação não vista' if copiloto_nao_vistos == 1 else 'notificações não vistas' }}">
+              <svg class="copiloto-notif-icone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/>
+                <path d="M13.7 21a2 2 0 0 1-3.4 0"/>
+              </svg>
+              {% if copiloto_nao_vistos > 0 %}
+              <span class="copiloto-notif-badge" aria-hidden="true">{{ copiloto_nao_vistos }}</span>
+              {% endif %}
+            </button>
+            <div class="copiloto-notif-painel"
+                 id="copiloto-notif-painel"
+                 role="region"
+                 aria-label="Notificações do Copiloto"
+                 aria-live="polite"
+                 hidden
+                 data-copiloto-painel
+                 data-listar-url="/app/loja/copiloto/notificacoes.json"
+                 data-csrf="{{ csrf }}">
+              <div class="copiloto-notif-cabecalho">
+                <strong>Notificações</strong>
+              </div>
+              {# Alcance real (conferido no código, não copiado do brief): visto
+                 é por pessoa (F4/Task 0); dispensar é da loja inteira. #}
+              <p class="copiloto-notif-escopo">Estes alertas são da loja: toda a equipe de gestão os vê. Marcar como visto vale só para você — dispensar tira o alerta para todo mundo.</p>
+              <div class="copiloto-notif-lista" data-copiloto-lista>
+                <p class="copiloto-notif-status" data-copiloto-status>Carregando notificações…</p>
+              </div>
+            </div>
+            {# Textos canônicos para o JS usar quando souber o estado real da
+               listagem (rota de listar é a Task 3) — não são fabricados no
+               script, para o vazio honesto ficar revisável/testável aqui. #}
+            <template data-copiloto-texto-vazio>Não há nada para tratar agora.</template>
+            <template data-copiloto-texto-erro>Não foi possível carregar as notificações agora.</template>
+          </div>
+          {% endif %}
           {% if loja_shell %}
           {% if entitlements is defined and entitlements and entitlements.vendas_enabled %}
           <a class="button secondary topbar-btn" href="/app/loja/atendimento">Atendimento</a>
@@ -226,6 +275,177 @@
         localStorage.setItem('revy-theme', next);
         applyTheme();
       });
+    })();
+  </script>
+  <script>
+    // Sino de notificações do Copiloto (F4/Task 2). A rota de listagem
+    // (/app/loja/copiloto/notificacoes.json) e as de ação (visto/dispensar)
+    // são a Task 3 — ainda não existem; até lá, abrir o painel mostra o erro
+    // de carregamento, não conteúdo inventado. Regra dura do projeto: só
+    // createElement/textContent para montar HTML a partir de dado do alerta
+    // (texto vindo do estoque) — nunca innerHTML/insertAdjacentHTML.
+    (() => {
+      const wrap = document.querySelector('[data-copiloto-notif]');
+      if (!wrap) return;
+      const sino = document.getElementById('copiloto-notif-sino');
+      const painel = document.getElementById('copiloto-notif-painel');
+      if (!sino || !painel) return;
+      const lista = painel.querySelector('[data-copiloto-lista]');
+      const textoVazioEl = wrap.querySelector('[data-copiloto-texto-vazio]');
+      const textoErroEl = wrap.querySelector('[data-copiloto-texto-erro]');
+      const textoVazio = textoVazioEl ? textoVazioEl.textContent : '';
+      const textoErro = textoErroEl ? textoErroEl.textContent : '';
+      const listarUrl = painel.dataset.listarUrl;
+      const csrf = painel.dataset.csrf || '';
+      let carregado = false;
+
+      const fecharPainel = () => {
+        painel.hidden = true;
+        sino.setAttribute('aria-expanded', 'false');
+      };
+      const abrirPainel = () => {
+        painel.hidden = false;
+        sino.setAttribute('aria-expanded', 'true');
+        if (!carregado) carregar();
+      };
+      sino.addEventListener('click', () => {
+        if (painel.hidden) abrirPainel(); else fecharPainel();
+      });
+      document.addEventListener('keydown', (evento) => {
+        if (evento.key === 'Escape' && !painel.hidden) { fecharPainel(); sino.focus(); }
+      });
+      document.addEventListener('click', (evento) => {
+        if (painel.hidden) return;
+        if (wrap.contains(evento.target)) return;
+        fecharPainel();
+      });
+
+      const limparLista = () => { while (lista.firstChild) lista.removeChild(lista.firstChild); };
+
+      const mostrarStatus = (texto) => {
+        limparLista();
+        const p = document.createElement('p');
+        p.className = 'copiloto-notif-status';
+        p.textContent = texto;
+        lista.appendChild(p);
+      };
+
+      const rotuloSeveridade = { critico: 'Crítico', atencao: 'Atenção', info: 'Info' };
+
+      const montarItem = (item) => {
+        const li = document.createElement('li');
+        const severidade = item && item.severidade;
+        li.className = 'copiloto-notif-item' + (severidade ? ' severidade-' + severidade : '');
+
+        const sev = document.createElement('span');
+        sev.className = 'copiloto-notif-sev';
+        sev.textContent = rotuloSeveridade[severidade] || severidade || '';
+        li.appendChild(sev);
+
+        const titulo = document.createElement('strong');
+        titulo.textContent = (item && item.titulo) || '';
+        li.appendChild(titulo);
+
+        if (item && item.detalhe) {
+          const detalhe = document.createElement('p');
+          detalhe.textContent = item.detalhe;
+          li.appendChild(detalhe);
+        }
+
+        if (item && item.quando) {
+          const quando = document.createElement('time');
+          quando.textContent = item.quando;
+          li.appendChild(quando);
+        }
+
+        if (item && item.acao_sugerida && item.acao_sugerida.href) {
+          const link = document.createElement('a');
+          link.href = item.acao_sugerida.href;
+          link.className = 'link-button';
+          link.textContent = 'Abrir';
+          li.appendChild(link);
+        }
+
+        const acoes = document.createElement('div');
+        acoes.className = 'copiloto-notif-acoes';
+
+        const btnVisto = document.createElement('button');
+        btnVisto.type = 'button';
+        btnVisto.className = 'button secondary';
+        btnVisto.textContent = 'Marcar como visto';
+        btnVisto.addEventListener('click', () => acionar(item.id, 'visto', li));
+        acoes.appendChild(btnVisto);
+
+        const btnDispensar = document.createElement('button');
+        btnDispensar.type = 'button';
+        btnDispensar.className = 'button ghost';
+        btnDispensar.textContent = 'Dispensar';
+        btnDispensar.addEventListener('click', () => acionar(item.id, 'dispensar', li));
+        acoes.appendChild(btnDispensar);
+
+        li.appendChild(acoes);
+        return li;
+      };
+
+      const atualizarBadge = (n) => {
+        if (typeof n !== 'number') return;
+        let badge = sino.querySelector('.copiloto-notif-badge');
+        const rotulo = n === 1 ? 'notificação não vista' : 'notificações não vistas';
+        sino.setAttribute('aria-label', n + ' ' + rotulo);
+        if (n > 0) {
+          if (!badge) {
+            badge = document.createElement('span');
+            badge.className = 'copiloto-notif-badge';
+            badge.setAttribute('aria-hidden', 'true');
+            sino.appendChild(badge);
+          }
+          badge.textContent = String(n);
+        } else if (badge) {
+          badge.remove();
+        }
+      };
+
+      // Alvo combinável com a Task 3 (rotas ainda não existem): mesmos
+      // caminhos documentados no plano da fase, não inventados aqui.
+      const acionar = (sinalId, tipo, li) => {
+        if (!sinalId) return;
+        const corpo = new FormData();
+        corpo.append('csrf', csrf);
+        fetch('/app/loja/copiloto/notificacoes/' + encodeURIComponent(sinalId) + '/' + tipo, {
+          method: 'POST',
+          body: corpo,
+        })
+          .then((resposta) => {
+            if (!resposta.ok) return;
+            li.remove();
+            if (!lista.querySelector('.copiloto-notif-item')) mostrarStatus(textoVazio);
+            carregar();
+          })
+          .catch(() => {});
+      };
+
+      const carregar = () => {
+        if (!listarUrl) return;
+        fetch(listarUrl, { headers: { Accept: 'application/json' } })
+          .then((resposta) => {
+            if (!resposta.ok) throw new Error('falha ao carregar notificações');
+            return resposta.json();
+          })
+          .then((dados) => {
+            carregado = true;
+            const itens = (dados && dados.itens) || [];
+            limparLista();
+            if (itens.length === 0) {
+              mostrarStatus(textoVazio);
+            } else {
+              itens.forEach((item) => lista.appendChild(montarItem(item)));
+            }
+            if (dados && typeof dados.nao_vistos === 'number') atualizarBadge(dados.nao_vistos);
+          })
+          .catch(() => {
+            mostrarStatus(textoErro);
+          });
+      };
     })();
   </script>
 </body>
