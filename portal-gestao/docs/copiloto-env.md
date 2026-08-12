@@ -63,7 +63,7 @@ mas o valor não aparece se você procurar só em `Settings`:
 | `PORTAL_COPILOTO_BANDA_PRECO_PCT` | `25` (%) | Banda máxima de variação de preço que `ajustar_preco` aceita propor, para mais ou para menos, em relação ao preço atual do veículo. Fora da banda → `AcaoRecusada`. | Dono decide apertar/afrouxar o quanto o Copiloto pode sugerir de mudança de preço num clique. |
 | `PORTAL_COPILOTO_PRECO_MINIMO` | `1000` | Piso absoluto de preço — nenhuma ação de preço confirma abaixo disso, mesmo dentro da banda. | Ajustar para o piso real de venda da loja (evita R$ 1 "dentro da banda" de um veículo já muito barato). |
 | `PORTAL_COPILOTO_DESFAZER_MINUTOS` | `30` | Janela, em minutos, em que uma ação executada pode ser desfeita pelo botão "Desfazer" no cartão. O prazo é gravado na linha (`CopilotoAcao.desfazer_ate`) no momento da execução, não recalculado na tela. | Ajustar quanto tempo de tolerância o dono tem para reverter um clique. |
-| `PORTAL_COPILOTO_MAX_ACOES_HORA` | `20` | Rate-limit de quantas ações um ator pode executar por hora. **Lida direto em `app/loja/copiloto/acoes.py`, fora de `app/config.py`** — ver seção "Onde cada uma é lida" acima. | Suspeita de uso automatizado/abuso, ou piloto pedindo limite mais folgado. |
+| `PORTAL_COPILOTO_MAX_ACOES_HORA` | `20` | Rate-limit de quantas ações **a loja inteira** pode executar por hora — soma de todos os atores dela, não um contador por pessoa (`_checar_rate_limit`, `app/loja/copiloto/acoes.py:119-137`, filtra só por `loja_slug`). Conta TODA tentativa da última hora, inclusive as que falharam. **Lida direto em `app/loja/copiloto/acoes.py`, fora de `app/config.py`** — ver seção "Onde cada uma é lida" acima. | Suspeita de uso automatizado/abuso, ou piloto pedindo limite mais folgado. |
 
 ## Retenção e workers (turnos e sinais)
 
@@ -80,7 +80,12 @@ mas o valor não aparece se você procurar só em `Settings`:
 
 ## Não é env var, mas anda junto
 
-- **Papel** (`ROLES_GESTAO`, `app/loja/types.py`) e o **entitlement**
-  `Module.COPILOTO` por loja não são variáveis de ambiente — são dados no banco.
-  `REVY_LOJA_COPILOTO_ENABLED` é o interruptor do *deploy*; quem libera loja a loja
-  é o entitlement.
+- **Papel** e o **entitlement** `Module.COPILOTO` por loja não são variáveis de
+  ambiente — são dados no banco. `REVY_LOJA_COPILOTO_ENABLED` é o interruptor do
+  *deploy*; quem libera loja a loja é o entitlement. O gate de papel do Copiloto
+  é `PAPEIS_GESTAO_COPILOTO` (`app/loja/copiloto/tipos.py:18`) — **não**
+  `ROLES_GESTAO` (`app/loja/types.py:32`), que é o conjunto genérico de
+  dono+gerente usado por outras seções da Revy Loja. `PAPEIS_GESTAO_COPILOTO`
+  inclui os dois **e também `admin_plataforma`** — checar `_pode()`
+  (`app/web/loja_copiloto.py:81-82`) contra `ROLES_GESTAO` faria um
+  `admin_plataforma` autenticado receber 403 mesmo tendo acesso de verdade.
