@@ -109,7 +109,16 @@ def _pode(usuario: Usuario) -> bool:
 
 
 def _ctx(usuario: Usuario) -> CopilotoContexto:
-    """loja_slug e papel SEMPRE da sessão — nunca de parâmetro de rota."""
+    """loja_slug e papel vêm de ``usuario`` (sessão), nunca de parâmetro de
+    rota — mas ``usuario.loja_slug`` NÃO é a única fonte de loja_slug do
+    Copiloto: o sino do cabeçalho (``app/web/loja_shell.py``,
+    ``_copiloto_nao_vistos``) usa ``store.loja_slug``, resolvido por
+    ``resolve_store_and_entitlements``. As duas rotas de sessão coincidem
+    hoje porque cada usuário pertence a uma única loja; nada aqui garante
+    isso automaticamente. Unificar as duas fontes é pré-requisito do
+    multi-loja (usuário com acesso a mais de uma loja) — não faça isso de
+    passagem numa correção pontual.
+    """
     return CopilotoContexto(
         loja_slug=usuario.loja_slug,
         papel=usuario.papel,
