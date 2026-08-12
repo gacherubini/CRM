@@ -167,6 +167,12 @@ Em vez de um n8n com `if` de payload, **dois workflows**:
 Os dois normalizam e caem no **mesmo** `chatbot-api` (`/webhook/mensagem`). Decisão de encanamento
 do inbound Cloud (Evolution→n8n **ou** Meta→n8n direto) sai do **spike** (§10).
 
+> **Achado da pesquisa (2026-08-12):** o CHANGELOG do Evolution **não menciona** coexistência /
+> `smb_message_echoes` / `history`; existe um repo **dedicado** à coexistência Cloud à parte
+> (`iragazzisrl/whatsapp-api-cloud-coexistence`); e a issue #807 mostra atrito no webhook Cloud do
+> Evolution. → **Lean: Meta→n8n direto** para o inbound Cloud (Evolution fica no Baileys + envio
+> Cloud opcional). O spike vira **confirmação** disso, não decisão do zero.
+
 ## 8. Onboarding & Tech Provider
 
 - **Fase 1 (piloto):** onboarding do número do vendedor via **BSP que suporta coexistência** (ex.:

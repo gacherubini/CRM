@@ -132,6 +132,11 @@ WhatsApp Business de teste + um celular, e um segundo número ("cliente de teste
 **Files:** decisão registrada em
 `docs/superpowers/specs/2026-08-12-whatsapp-hibrido-coexistencia-design.md` (§7 e §10).
 
+> **Pesquisa (2026-08-12) já inclina a decisão:** CHANGELOG do Evolution sem menção a coexistência /
+> `smb_message_echoes` / `history`; repo dedicado à parte; issue #807 com atrito no webhook Cloud.
+> → **lean Meta→n8n direto.** Esta task passa a ser **confirmação empírica** com um número real, não
+> decisão do zero.
+
 - [ ] **Step 1:** Com base nas Tasks 5–7, responder: **o Evolution repassa** `messages` +
   `smb_message_echoes` + `history` de forma utilizável?
 - [ ] **Step 2:** Se **sim** → encanamento **Meta → Evolution → n8n** (mantém o Evolution como
