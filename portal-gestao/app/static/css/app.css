@@ -3196,7 +3196,16 @@ a.metric-link:focus-visible { outline: 2px solid var(--brand); outline-offset: 2
   padding: var(--space-1) var(--space-3);
   font: inherit;
   font-size: var(--text-sm);
+}
+/* Cursor de clique so na fileira da thread (buttons com data-pergunta): os
+   chips do painel "Perguntas frequentes" da Fase 1 sao <span> informativos,
+   sem acao nenhuma — nao devem convidar o clique. */
+.copiloto-thread .copiloto-chips .chip {
   cursor: pointer;
+}
+.copiloto-thread .copiloto-chips .chip:disabled {
+  cursor: not-allowed;
+  opacity: .6;
 }
 .copiloto-chips button.chip:hover {
   background: var(--surface-soft);

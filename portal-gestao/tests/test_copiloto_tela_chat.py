@@ -102,3 +102,14 @@ def test_tela_traz_o_endpoint_de_polling(client, monkeypatch):
     r = client.get("/app/loja/copiloto")
     assert "/app/loja/copiloto/turno/" in r.text
     assert "/app/loja/copiloto/perguntar" in r.text
+
+
+def test_botao_perguntar_tem_id_para_desabilitar_durante_o_turno(client, monkeypatch):
+    """Hook que o JS usa para travar o composer enquanto um turno está em
+    voo (fix round 1): sem este id o botão não pode ser desabilitado, e uma
+    segunda pergunta poderia órfão o polling da primeira (ver template)."""
+    _ligar(monkeypatch)
+    login(client)
+    r = client.get("/app/loja/copiloto")
+    assert 'id="copiloto-enviar"' in r.text
+    assert "definirPendente" in r.text

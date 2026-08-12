@@ -66,7 +66,7 @@
       <label class="sr-only" for="copiloto-pergunta">Sua pergunta</label>
       <textarea id="copiloto-pergunta" name="pergunta" rows="2"
                 placeholder="Pergunte sobre vendas, estoque, leads ou de onde veio a última venda…"></textarea>
-      <button class="button" type="submit">Perguntar</button>
+      <button class="button" type="submit" id="copiloto-enviar">Perguntar</button>
       <button class="button ghost" type="button" id="copiloto-cancelar" hidden>Cancelar</button>
     </form>
 
@@ -87,9 +87,31 @@
   var mensagens = document.getElementById('copiloto-mensagens');
   var pensando = document.getElementById('copiloto-pensando');
   var cancelar = document.getElementById('copiloto-cancelar');
+  var campo = document.getElementById('copiloto-pergunta');
+  var enviar = document.getElementById('copiloto-enviar');
+  // Escopado a .copiloto-thread: a mesma classe .copiloto-chips também
+  // estiliza o painel estático "Perguntas frequentes" da Fase 1 (chips sem
+  // data-pergunta) — sem o escopo, clicar neles submeteria "undefined".
+  var chipsInterativos = document.querySelectorAll('.copiloto-thread .copiloto-chips .chip');
   var rotulos = {{ rotulos_passo | tojson }};
   var turnoAtual = null;
   var timer = null;
+
+  // Só um turno em voo por vez: enquanto pendente=true o composer inteiro
+  // (campo, botão Perguntar, chips) fica desabilitado. Isso impede que uma
+  // segunda pergunta (digitada ou por chip) dispare outro acompanhar() e
+  // sobrescreva `timer`/`turnoAtual` enquanto o primeiro polling ainda está
+  // vivo — o que órfã-ria o intervalo antigo (ele nunca mais seria limpo) e
+  // misturaria a resposta de um turno na bolha do outro. Precisa ser
+  // reabilitado em TODO caminho terminal, inclusive falha de rede, senão o
+  // composer trava desabilitado para sempre — pior que o bug original.
+  function definirPendente(pendente) {
+    campo.disabled = pendente;
+    enviar.disabled = pendente;
+    Array.prototype.forEach.call(chipsInterativos, function (chip) {
+      chip.disabled = pendente;
+    });
+  }
 
   function bloco(pergunta) {
     var artigo = document.createElement('article');
@@ -111,6 +133,16 @@
     return (rotulos[ultimo.ferramenta] || 'consultando dados') + '…';
   }
 
+  function terminar(alvo, dados) {
+    clearInterval(timer);
+    pensando.hidden = true;
+    cancelar.hidden = true;
+    definirPendente(false);
+    if (dados && dados.estado !== 'pronto' && !dados.texto) {
+      alvo.textContent = 'Não consegui responder desta vez.';
+    }
+  }
+
   function acompanhar(alvo) {
     timer = setInterval(function () {
       fetch('/app/loja/copiloto/turno/' + turnoAtual + '.json')
@@ -119,25 +151,20 @@
           pensando.textContent = descrever(dados.passos);
           if (dados.texto) { alvo.textContent = dados.texto; }
           if (dados.estado === 'pronto' || dados.estado === 'erro' || dados.estado === 'cancelado') {
-            clearInterval(timer);
-            pensando.hidden = true;
-            cancelar.hidden = true;
-            if (dados.estado !== 'pronto' && !dados.texto) {
-              alvo.textContent = 'Não consegui responder desta vez.';
-            }
+            terminar(alvo, dados);
           }
         })
-        .catch(function () { clearInterval(timer); pensando.hidden = true; });
+        .catch(function () { terminar(alvo, null); });
     }, 700);
   }
 
   form.addEventListener('submit', function (evento) {
     evento.preventDefault();
-    var campo = document.getElementById('copiloto-pergunta');
     var pergunta = (campo.value || '').trim();
     if (!pergunta) { return; }
     var alvo = bloco(pergunta);
     campo.value = '';
+    definirPendente(true);
     pensando.hidden = false;
     pensando.textContent = 'Pensando…';
 
@@ -146,6 +173,7 @@
       .then(function (resposta) {
         if (resposta.status !== 200) {
           pensando.hidden = true;
+          definirPendente(false);
           alvo.textContent = resposta.dados.message || 'Não consegui enviar sua pergunta.';
           return;
         }
@@ -153,6 +181,11 @@
         form.conversa_id.value = resposta.dados.conversa_id;
         cancelar.hidden = false;
         acompanhar(alvo);
+      })
+      .catch(function () {
+        pensando.hidden = true;
+        definirPendente(false);
+        alvo.textContent = 'Não consegui enviar sua pergunta.';
       });
   });
 
@@ -163,12 +196,9 @@
     fetch('/app/loja/copiloto/turno/' + turnoAtual + '/cancelar', { method: 'POST', body: corpo });
   });
 
-  // Escopado a .copiloto-thread: a mesma classe .copiloto-chips também
-  // estiliza o painel estático "Perguntas frequentes" da Fase 1 (chips sem
-  // data-pergunta) — sem o escopo, clicar neles submeteria "undefined".
-  Array.prototype.forEach.call(document.querySelectorAll('.copiloto-thread .copiloto-chips .chip'), function (chip) {
+  Array.prototype.forEach.call(chipsInterativos, function (chip) {
     chip.addEventListener('click', function () {
-      document.getElementById('copiloto-pergunta').value = chip.dataset.pergunta;
+      campo.value = chip.dataset.pergunta;
       form.dispatchEvent(new Event('submit'));
     });
   });
