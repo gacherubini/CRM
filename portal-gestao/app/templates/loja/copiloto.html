@@ -72,6 +72,7 @@
           <form class="copiloto-cartao-form">
             <input type="hidden" name="csrf" value="{{ csrf }}">
             <input type="hidden" name="acao" value="{{ turno.cartao.acao }}">
+            <input type="hidden" name="turno_id" value="{{ turno.id }}">
             {% for chave, valor in turno.cartao.parametros.items() %}
             <input type="hidden" name="{{ chave }}" value="{{ valor }}">
             {% endfor %}
@@ -159,7 +160,7 @@
     return (rotulos[ultimo.ferramenta] || 'consultando dados') + '…';
   }
 
-  function criarCartao(cartao) {
+  function criarCartao(cartao, turnoId) {
     // document.createElement + textContent, NUNCA innerHTML: o cartão é
     // renderizado pelo servidor porque o conteúdo (linhas, título) veio da
     // entidade REAL relida do Estoque — nunca da prosa do modelo — e
@@ -220,6 +221,10 @@
     }
     campoOculto('csrf', form.csrf.value);
     campoOculto('acao', cartao.acao);
+    // Sem isto a coluna que liga "o Copiloto sugeriu" a "o preço mudou"
+    // fica sempre NULL: a auditoria existe mas não dá para juntar com a
+    // causa (revisão de 2026-08-12, achado I-2).
+    campoOculto('turno_id', turnoId || '');
     Object.keys(cartao.parametros || {}).forEach(function (chave) {
       campoOculto(chave, cartao.parametros[chave]);
     });
@@ -248,7 +253,7 @@
       alvo.textContent = 'Não consegui responder desta vez.';
     }
     if (dados && dados.cartao) {
-      alvo.parentNode.appendChild(criarCartao(dados.cartao));
+      alvo.parentNode.appendChild(criarCartao(dados.cartao, dados.turno_id));
     }
   }
 

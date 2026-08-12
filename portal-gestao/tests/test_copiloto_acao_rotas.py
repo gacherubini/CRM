@@ -1,4 +1,6 @@
+import re
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 
 from conftest import csrf_da_resposta, login
 
@@ -298,3 +300,139 @@ def test_polling_devolve_cartao_apos_propor_acao(client, monkeypatch):
     assert corpo["cartao"] is not None
     assert corpo["cartao"]["acao"] == "ajustar_preco"
     assert "Alterar o preço" in corpo["cartao"]["titulo"]
+
+
+def _propor_ajuste_de_preco(client, monkeypatch):
+    """Cria um turno real, chama propor_acao através do LLM fake e devolve
+    (turno_id, conversa_id, fake_estoque) — o mesmo setup de
+    test_polling_devolve_cartao_apos_propor_acao, reaproveitado para os
+    testes de turno_id abaixo."""
+    from app.copiloto_turnos_job import processar_turno
+    from app.loja.copiloto.conversas import obter_turno
+    from app.loja.copiloto.port import LLMFake, RespostaLLM, ToolCall
+
+    class ChatbotStub:
+        def listar_conversas(self, **k):
+            return []
+
+        def listar_leads(self, etapa=None):
+            return []
+
+    _ligar(monkeypatch)
+    fake = _com_estoque(EstoqueAcaoFake(preco=28000.0))
+    login(client)
+    pagina = client.get("/app/loja/copiloto")
+    resposta_perguntar = client.post(
+        "/app/loja/copiloto/perguntar",
+        data={
+            "csrf": csrf_da_resposta(pagina),
+            "pergunta": "baixa o preço da CB500 que está parada",
+        },
+    ).json()
+    turno_id = resposta_perguntar["turno_id"]
+    conversa_id = resposta_perguntar["conversa_id"]
+
+    llm = LLMFake(
+        [
+            RespostaLLM(
+                texto=None,
+                tool_calls=(
+                    ToolCall(
+                        id="c1", nome="propor_acao",
+                        argumentos={
+                            "acao": "ajustar_preco", "veiculo_id": "v1",
+                            "novo_preco": "25000", "justificativa": "dias_parado",
+                        },
+                    ),
+                ),
+                tokens_entrada=900, tokens_saida=20, finish_reason="tool_calls",
+            ),
+            RespostaLLM(
+                texto="Aqui está a proposta.", tool_calls=(),
+                tokens_entrada=1200, tokens_saida=30, finish_reason="stop",
+            ),
+        ]
+    )
+    db = SessionLocal()
+    try:
+        turno = obter_turno(db, "loja-teste", turno_id)
+        processar_turno(db, turno, llm=llm, estoque=fake, chatbot=ChatbotStub())
+    finally:
+        db.close()
+
+    return turno_id, conversa_id, fake
+
+
+def test_turno_id_e_gravado_pelo_caminho_jinja_da_carga_inicial(client, monkeypatch):
+    """I-2 (Important, revisão final de 2026-08-12): sem isto,
+    CopilotoAcao.turno_id fica sempre NULL — a auditoria existe, mas não dá
+    para ligar 'o Copiloto sugeriu' a 'o preço mudou'. Este teste NÃO
+    hardcoda o turno_id no POST: ele extrai da própria página que o Jinja
+    renderiza (o mesmo HTML que o navegador recebe na carga inicial), para
+    provar que é o template — e não o teste — que está emitindo o campo."""
+    turno_id, conversa_id, fake = _propor_ajuste_de_preco(client, monkeypatch)
+
+    pagina = client.get(f"/app/loja/copiloto?conversa_id={conversa_id}")
+    assert pagina.status_code == 200
+    casamento = re.search(
+        r'name="turno_id" value="([^"]*)"', pagina.text
+    )
+    assert casamento is not None, "form do cartão não emite turno_id"
+    assert casamento.group(1) == turno_id
+
+    csrf = re.search(r'name="csrf" value="([^"]*)"', pagina.text).group(1)
+    r = client.post(
+        "/app/loja/copiloto/acao",
+        data={
+            "csrf": csrf, "acao": "ajustar_preco", "veiculo_id": "v1",
+            "novo_preco": "25000", "preco_esperado": "28000.00",
+            "turno_id": casamento.group(1),
+        },
+    )
+    assert r.status_code == 200
+    db = SessionLocal()
+    try:
+        linha = db.query(CopilotoAcao).one()
+        assert linha.turno_id == turno_id
+    finally:
+        db.close()
+
+
+def test_turno_id_e_gravado_pelo_caminho_do_polling_json(client, monkeypatch):
+    """Mesma garantia pelo OUTRO caminho de renderização: o que
+    criarCartao() monta a partir da resposta JSON de /turno/{id}.json — é o
+    que aparece quando o cartão chega via polling, não no primeiro
+    carregamento. O JSON já expõe `turno_id` no nível raiz (o valor que
+    criarCartao(cartao, dados.turno_id) usa para preencher o campo oculto);
+    este teste simula exatamente o POST que o formulário montado por JS
+    manda."""
+    turno_id, _conversa_id, fake = _propor_ajuste_de_preco(client, monkeypatch)
+
+    corpo = client.get(f"/app/loja/copiloto/turno/{turno_id}.json").json()
+    assert corpo["turno_id"] == turno_id
+    cartao = corpo["cartao"]
+    assert cartao is not None
+
+    pagina = client.get("/app/loja/copiloto")
+    csrf = csrf_da_resposta(pagina)
+    dados_form = {"csrf": csrf, "acao": cartao["acao"], "turno_id": corpo["turno_id"]}
+    dados_form.update(cartao["parametros"])
+    r = client.post("/app/loja/copiloto/acao", data=dados_form)
+    assert r.status_code == 200
+    db = SessionLocal()
+    try:
+        linha = db.query(CopilotoAcao).one()
+        assert linha.turno_id == turno_id
+    finally:
+        db.close()
+
+
+def test_template_emite_turno_id_nos_dois_renderizadores_do_cartao():
+    """Checagem estática de regressão: os dois pontos do template que
+    montam o formulário do cartão (o Jinja da carga inicial e o
+    criarCartao() do polling, em JS) precisam emitir o campo `turno_id` —
+    sem isso a auditoria não liga a ação à conversa que a propôs."""
+    origem = Path(__file__).resolve().parents[1] / "app" / "templates" / "loja" / "copiloto.html"
+    texto = origem.read_text(encoding="utf-8")
+    assert 'name="turno_id" value="{{ turno.id }}"' in texto
+    assert "campoOculto('turno_id'" in texto
