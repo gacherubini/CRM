@@ -25,6 +25,12 @@
 - **Papel:** `ajustar_preco`/`repostar_veiculo` só para dono/gerente (`ROLES_GESTAO`, `app/loja/types.py:31`). Vendedor recebe 403.
 - **Toda proteção de papel é portal-side.** A `estoque-api` valida papel contra a credencial de serviço global do Portal (`estoque-api/app/main.py:143-145`), não contra o humano — nada pode depender dela para barrar um ator.
 - **MCP externo só de leitura** (§3.4). Nada que escreva em plataforma externa (§13).
+- **Interface segue o design system da casa** — vale integralmente a constraint escrita no plano F2
+  (`2026-08-11-copiloto-fase2-chat-llm.md`, "Global Constraints"): folha real em
+  `app/static/css/app.css`, paleta em `app/static/css/revy-tokens.css`, **toda** cor/raio/fonte nova
+  em `var(--token)` (nunca cor na mão, senão o tema escuro quebra — ver item `L10` da triagem de UX),
+  classe nova escopada `.copiloto-*`, e reusar `.button`/`.sr-only`/`.chip-list` antes de inventar.
+  O cartão de confirmação desta fase é UI nova: nasce dentro dessa regra.
 - **Comandos** (de `portal-gestao/`): `.\.venv\Scripts\python.exe -m pytest -q` · `.\.venv\Scripts\python.exe -m alembic upgrade head`
 - Commit por task; `git diff --check` + `git status --short` no fim.
 
@@ -2611,7 +2617,7 @@ Expected: PASS — suíte inteira.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add portal-gestao/app/web/loja_copiloto.py portal-gestao/app/loja/copiloto/runner.py portal-gestao/app/templates/loja/copiloto.html portal-gestao/app/static/app.css portal-gestao/tests/test_copiloto_acao_rotas.py
+git add portal-gestao/app/web/loja_copiloto.py portal-gestao/app/loja/copiloto/runner.py portal-gestao/app/templates/loja/copiloto.html portal-gestao/app/static/css/app.css portal-gestao/tests/test_copiloto_acao_rotas.py
 git commit -m "feat(copiloto): rotas de acao e desfazer com cartao de confirmacao na tela"
 ```
 

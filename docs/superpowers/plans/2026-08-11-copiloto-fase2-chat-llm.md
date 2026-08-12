@@ -26,6 +26,23 @@
 - **Turno é job.** A rota POST grava e volta na hora; worker daemon executa; a tela faz polling. **Proibido** chamar `build_sales_overview()` de dentro da rota do chat.
 - **Degradação obrigatória:** provedor fora → alertas e "Resumo de hoje" (Fase 1) continuam; só o chat informa indisponibilidade.
 - **Sem PII no prompt.** Ferramentas devolvem agregados e campos tipados; texto de terceiro, quando inevitável, vai rotulado como conteúdo não confiável.
+- **Interface segue o design system da casa, sem exceção.** A folha real é
+  `portal-gestao/app/static/css/app.css` (**não** `app/static/css/app.css`, que não existe), e a paleta
+  vem de `portal-gestao/app/static/css/revy-tokens.css`: `--paper`, `--surface`, `--surface-raised`,
+  `--surface-soft`, `--ink`, `--ink-soft`, `--ink-muted`, `--line`, `--line-strong`, `--shadow`,
+  `--brand`, `--brand-strong`, `--brand-ink`, `--brand-tint`, `--brand-line`, `--ok`, `--warn`,
+  `--danger`, `--radius-ctl`, `--radius-nav`, `--radius-srf`, `--font-ui`, `--font-brand`,
+  `--font-data`. **Toda** cor, raio e fonte nova é `var(--token)` — cor escrita na mão é defeito.
+  `revy-tokens.css` tem bloco `[data-theme="dark"]`: usando só token, o tema escuro sai de graça.
+  Precedente real: o item `L10` de `docs/2026-08-07-triagem-revisao-ux-loja-control.md` registra um
+  badge escrito com `rgba(255,255,255,…)` pensando no escuro que ficou **branco sobre branco** na
+  paleta clara, que é a default. Nada de `<style>` com cor fixa no template.
+- **Reusar componente antes de inventar classe.** `.button` (`.primary`/`.secondary`/`.ghost`/
+  `.danger`), `.sr-only` e `.chip-list` já existem no `app.css`; classe nova é escopada `.copiloto-*`.
+  Atenção: `.chip` **já é usada** pelo painel estático "Perguntas frequentes" da Fase 1 — seletor de
+  JS que a pegue sem escopo liga clique em `<span>` sem `data-pergunta`. JS inline no template é o
+  padrão da casa (`base.html`, `atendimento_workspace.html`), em vanilla ES5-ish com `var`, sem build.
+  Referência de layout mais próxima: `app/templates/loja/atendimento_workspace.html`.
 - **Comandos** (de `portal-gestao/`): `.\.venv\Scripts\python.exe -m pytest -q` · `.\.venv\Scripts\python.exe -m alembic upgrade head`
 - Commit por task; `git diff --check` + `git status --short` no fim.
 
@@ -3129,7 +3146,7 @@ git commit -m "feat(copiloto): turno assincrono com worker, polling e guarda de 
 **Files:**
 - Modify: `portal-gestao/app/templates/loja/copiloto.html`
 - Modify: `portal-gestao/app/web/loja_copiloto.py` (a rota da página passa a carregar conversa/turnos)
-- Modify: `portal-gestao/app/static/app.css` (bloco `.copiloto-*`)
+- Modify: `portal-gestao/app/static/css/app.css` (bloco `.copiloto-*`)
 - Test: `portal-gestao/tests/test_copiloto_tela_chat.py`
 
 **Interfaces:**
@@ -3477,7 +3494,7 @@ Em `app/templates/loja/copiloto.html`, **antes** do bloco de alertas da Fase 1, 
 </script>
 ```
 
-Em `app/static/app.css`, ao fim do arquivo (antes da camada de marca, se houver):
+Em `app/static/css/app.css`, ao fim do arquivo (antes da camada de marca, se houver):
 
 ```css
 /* --- Copiloto de Vendas --- */
@@ -3506,7 +3523,7 @@ Expected: PASS.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add portal-gestao/app/templates/loja/copiloto.html portal-gestao/app/web/loja_copiloto.py portal-gestao/app/static/app.css portal-gestao/tests/test_copiloto_tela_chat.py
+git add portal-gestao/app/templates/loja/copiloto.html portal-gestao/app/web/loja_copiloto.py portal-gestao/app/static/css/app.css portal-gestao/tests/test_copiloto_tela_chat.py
 git commit -m "feat(copiloto): tela de chat com historico, passo real e bloco de fontes"
 ```
 
