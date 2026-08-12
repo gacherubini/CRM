@@ -1429,6 +1429,57 @@ histórico — a implementação real diverge dele nos pontos a seguir. Ver
 6. **Rate-limit** de ações por loja/hora, contando toda tentativa (inclusive as que falharam).
 7. **Auditoria** com valor/estado anterior → novo, e prazo de desfazer gravado na linha; linha `pendente` comitada antes da escrita real.
 
+> **Nota de correção (2026-08-12, revisão final) — o "gate de FIPE" NÃO é uma
+> guarda, e a lista acima já estava certa em não incluí-lo.** A exigência de
+> FIPE confirmada (§4.5.2, adiante — "Nenhuma proposta de preço sem FIPE
+> confirmada") é uma **regra de produto do Copiloto**: ele não *propõe*
+> ajustar preço sem FIPE confirmada (ou uma justificativa que não seja FIPE,
+> ex. dias parados). Não é uma proteção server-side contra escrita indevida —
+> as sete acima são, essa não é.
+>
+> **Prova (probe da revisão final):** `POST /acao` com `ajustar_preco`
+> executa o PATCH sem que `propor_acao` ou `consultar_fipe` tenham rodado
+> naquele turno. O gate mora só dentro de `_f_propor_acao`
+> (`app/loja/copiloto/tools.py`) — a rota nunca o reconsulta, então ele só
+> se aplica a quem passa pelo chat. Chamar isso de "guarda" no design é o
+> problema: faz alguém confiar numa proteção que não existe no caminho que
+> importa (a rota). **Não é um buraco de segurança** — quem chega a
+> `POST /acao` já é dono/gerente autenticado, com CSRF válido, e já pode
+> mudar o preço direto pela tela de Estoque; as sete guardas de verdade
+> (papel, CSRF, escopo de loja, banda, piso, releitura, rate-limit,
+> auditoria) protegem esse caminho inteiro e nenhuma delas depende da FIPE.
+>
+> **O que falta para virar guarda de verdade (trabalho futuro, não cobrado
+> nesta fase):** o runner precisaria registrar, no turno, quais ferramentas
+> rodaram (por exemplo, um conjunto de nomes de ferramenta anexado ao
+> `Passo`/estado do turno), e `POST /acao` precisaria reconsultar esse
+> registro antes de executar `ajustar_preco` — recusando quando
+> `consultar_fipe`/`propor_acao` não rodaram com `fipe_status="ok"` para o
+> mesmo veículo naquele turno. Hoje esse registro não existe. Vale registrar
+> também que isso sozinho não bastaria: o gate confia no `fipe_status` que o
+> próprio modelo declara nos argumentos da tool-call — endurecer só o lado
+> da rota sem também validar essa alegação do modelo deixaria a mesma
+> lacuna um passo adiante.
+>
+> **Propriedade que a banda de valor (guarda 4) tem e que este documento não
+> registrava: ela compõe por PASSO, não é um teto absoluto.** Partindo de
+> R$ 28.000, com cada passo dentro da banda de ±25% e passando pelas sete
+> guardas, **12 ações seguidas** levam o veículo ao piso de R$ 1.000
+> (`PORTAL_COPILOTO_PRECO_MINIMO`) — cabem folgadas dentro do rate-limit
+> default de 20/hora (guarda 6). Para cima não há teto nenhum: 20 passos de
+> +25% numa hora dão ~86× o preço original. Isto **não é um furo** — cada
+> passo é um cartão novo, montado pelo servidor sobre o preço relido (guarda
+> 5), confirmado por um clique humano informado — mas ler "banda de ±25%"
+> como limite absoluto de uma sessão de uso seria um engano. Os únicos
+> limites que de fato compõem são o piso (para baixo) e o rate-limit (quantos
+> passos cabem numa hora); para cima não existe piso equivalente. A revisão
+> também testou as composições óbvias que poderiam furar a banda em dois
+> tempos — ação seguida de desfazer seguida de nova ação, e desfazer
+> encadeado — e **nenhuma delas fura**: o desfazer só restaura
+> `valor_anterior` (nunca calcula um valor novo), e a guarda 5 (releitura:
+> `atual != valor_novo` → aborta) impede desfazer um passo intermediário
+> depois que outro passo já mexeu no preço.
+
 - [ ] **Step 1: Write the failing test**
 
 Criar `portal-gestao/tests/test_copiloto_acoes.py`:
@@ -2006,7 +2057,7 @@ Por isso: **o cartão é montado pelo servidor a partir da entidade real relida 
 
 **`propor_acao` não executa nada.** Ela devolve o cartão para a UI renderizar. A execução só acontece na rota da Task 6, disparada pelo clique.
 
-**Nenhuma proposta de preço sem FIPE confirmada** (§4.5.2): `propor_acao` com `ajustar_preco` exige `fipe_status="ok"` nos parâmetros ou uma justificativa que não seja FIPE (ex.: dias parados). Ambígua ou não encontrada → recusa.
+**Nenhuma proposta de preço sem FIPE confirmada** (§4.5.2): `propor_acao` com `ajustar_preco` exige `fipe_status="ok"` nos parâmetros ou uma justificativa que não seja FIPE (ex.: dias parados). Ambígua ou não encontrada → recusa. **É regra de produto, não guarda de segurança** — ver a nota de correção de 2026-08-12 (revisão final) logo após a lista das sete guardas, na Task 4: a rota `/acao` nunca reconsulta este check.
 
 > **Nota de correção (2026-08-12):** a revisão de código achou um Critical (C-1) no
 > desenho original abaixo: `TITULOS_ACAO["ajustar_preco"]` interpolava `{rotulo}` —
