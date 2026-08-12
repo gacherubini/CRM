@@ -65,13 +65,23 @@ def _secao_ativa() -> bool:
     # Lê env em runtime (evita snapshot de Settings poluído entre testes).
     #
     # Estas quatro checagens (aqui, em check_module_access() logo abaixo nas
-    # rotas, e em _pode()) e app.web.loja_shell.copiloto_secao_liberada()
+    # rotas — inclusive o bypass de módulo quando revy_loja_entitlements_enabled()
+    # está desligada — e em _pode()) e app.web.loja_shell.copiloto_secao_liberada()
     # (que decide se o SINO aparece no shell) têm que andar juntas: mesma
-    # flag, mesmo Module.COPILOTO, mesma PAPEIS_GESTAO_COPILOTO. Não foram
+    # flag de shell, mesma flag do copiloto, mesmo bypass de entitlements,
+    # mesmo Module.COPILOTO, mesma PAPEIS_GESTAO_COPILOTO. Não foram
     # fundidas numa função só porque aqui cada condição vira uma resposta
     # HTTP diferente (404 de flag desligada vs 403 de módulo vs 403 de
     # papel, com mensagens distintas) — um único bool perderia essa
     # distinção. Mudar uma exige olhar a outra.
+    #
+    # admin_plataforma é caso à parte dos dois lados: não tem cargo
+    # operacional de loja (identity.py), então _pode()/check_module_access()
+    # aqui nunca dependem de membership pra esse papel (com entitlements OFF,
+    # bypass total antes mesmo de tentar resolver loja); do lado do sino,
+    # resolve_store_and_entitlements SEMPRE levanta SemAcessoLoja pra esse
+    # papel, então quem fecha a paridade lá é
+    # _copiloto_nao_vistos_sem_membership(), não copiloto_secao_liberada().
     return revy_loja_shell_enabled() and revy_loja_copiloto_enabled()
 
 
