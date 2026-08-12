@@ -45,8 +45,7 @@ Não-objetivos desta fase: migrar todo mundo pro Cloud; recurso proativo de mens
 | Mídia do cliente | Cliente **só manda texto** → **sem** reescrita de download de mídia no lado Cloud. |
 | Proativo pro cliente | **Fase futura.** Quando existir, usa **template Utility** aprovado (§9). Não entra agora. |
 | n8n | **Dois pipelines** (um Cloud, um Baileys), no futuro quando for buildar (§7). Mais limpo que um n8n com `if` no meio. |
-| Onboarding Fase 1 | Via **BSP** que suporta coexistência (ex.: 360dialog) — **sem** o Revy virar Tech Provider (§8). |
-| Onboarding Fase 2 | **Toggle self-serve no Portal** → Revy vira **Tech Provider** (embedded signup) ou segue via BSP (§8, §11). |
+| Onboarding | **Direto na Meta, SEM BSP** (decisão do dono). App próprio do Revy com **embedded signup** (o Revy é o provider/Tech Provider). Fase 1 e Fase 2 usam o **mesmo** build; piloto roda em **dev mode** com número de teste, sem verificação completa (§8). |
 
 ## 3. Arquitetura
 
@@ -175,13 +174,22 @@ do inbound Cloud (Evolution→n8n **ou** Meta→n8n direto) sai do **spike** (§
 
 ## 8. Onboarding & Tech Provider
 
-- **Fase 1 (piloto):** onboarding do número do vendedor via **BSP que suporta coexistência** (ex.:
-  360dialog, que dá acesso direto às credenciais Cloud pra plugar no Evolution/n8n). **Não** exige
-  o Revy virar Tech Provider. Mais rápido, menor compromisso.
+- **Fase 1 (piloto) — direto na Meta, sem BSP (decisão do dono):** montar o **app próprio do Revy**
+  na Meta com **embedded signup** (o Revy é o provider). O piloto roda em **dev mode** com um número
+  de teste — sem verificação de negócio completa — pra provar o fluxo. As credenciais Cloud
+  (phone_number_id + token) são nossas, plugadas no `n8n-cloud`.
 - **Fase 2 (self-serve):** pra o lojista/vendedor clicar "usar API oficial" **dentro do Revy** e
   conectar sozinho, o Revy precisa ser **Tech Provider** (criar app Meta, app review, aceitar
   Partner Solution, integrar o SDK de embedded signup) — ou seguir amarrado a um BSP. No modelo
   Tech Provider, **cada vendedor paga a Meta direto**; o Revy cobra só o software.
+
+> **BSP NÃO é obrigatório — dá pra ir direto na Meta (o dono prefere).** Coexistência exige o fluxo
+> de *embedded signup* (um "provider"), mas o provider pode ser o **próprio app do Revy na Meta**
+> (você vira Tech Provider): sem fees de BSP, **dono das credenciais**, e isso **já é a base da Fase
+> 2**. O BSP é só um **atalho** (pula o setup, cobra fee/markup). O único caminho "sem provider
+> nenhum" é o **Cloud API padrão** — mas esse é a **migração cheia** (o número sai do app),
+> descartada. **Pro piloto:** rodar o app próprio em **dev mode** com um número de teste, sem
+> verificação completa, prova o fluxo sem BSP.
 
 **Dificuldade de virar Tech Provider** (para dimensionar a Fase 2): não é difícil tecnicamente — é
 mais **burocracia + espera**. Envolve criar o app Meta, passar por **verificação de negócio**
@@ -276,7 +284,7 @@ aparecem corretamente atribuídas (bot vs humano) no destino.
 
 1. **Canal do aviso ao vendedor** (Portal / SMS / WhatsApp central) — adiado; começar pelo Portal,
    modelar como abstração plugável.
-2. **Qual BSP** para o piloto (360dialog é o candidato por dar credenciais Cloud diretas).
+2. ~~Qual BSP~~ **Resolvido:** sem BSP — onboarding direto na Meta (app próprio + embedded signup).
 3. **Aviso direcionado vs broadcast** — no modelo por-vendedor, cada bot avisa o próprio vendedor;
    confirmar se há caso de encaminhar a outro vendedor.
 4. **Alcance exato do history sync** (contatos vs mensagens, quanto tempo) — confirmar no spike.
