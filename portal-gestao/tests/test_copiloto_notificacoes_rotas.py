@@ -11,7 +11,7 @@ Mesmo gate quádruplo das outras rotas do Copiloto (shell + flag + entitlement
 + papel de gestão), CSRF nos dois POST e invalidação do cache de contagem
 depois de qualquer mutação — ver `app/web/loja_copiloto.py`.
 """
-from conftest import csrf_da_resposta, login, seed_loja_operacional
+from conftest import criar_usuario, csrf_da_resposta, login, seed_loja_operacional
 
 from app.db import SessionLocal
 from app.loja.copiloto import notificacoes
@@ -343,7 +343,97 @@ def test_dispensar_com_entitlement_presente_libera(client, monkeypatch):
         db.close()
 
 
-def _usuario_id(db):
+# --- Alcance da invalidação com DUAS pessoas na mesma loja --------------------
+#
+# Achado da revisão (Important pós-aprovação): todo teste de cache acima
+# aquece e confere o cache de um único usuário logado — "invalidar só o meu"
+# e "invalidar o de todos" são indistinguíveis com uma pessoa só. Os dois
+# testes abaixo precisam de um segundo gestor (mesma loja) para separar as
+# duas garantias de verdade: visto é por pessoa (só o cache de quem marcou
+# cai); dispensar é da loja inteira (o cache de todo mundo tem que cair,
+# porque o estado que mudou é compartilhado).
+
+
+def _usuario_por_email(db, email):
     from app.models import Usuario
 
-    return db.query(Usuario).filter(Usuario.email == "dono@loja.test").one().id
+    return db.query(Usuario).filter(Usuario.email == email).one()
+
+
+def _espiar_contar_sinais_novos(monkeypatch):
+    """Mesma técnica de ``test_copiloto_notificacoes_shell.py``: espiona a
+    função NÃO cacheada para contar consultas reais ao banco. Necessário
+    porque, para ``visto``, o valor recalculado do outro usuário seria igual
+    de qualquer jeito (visto de A não muda o que B viu) — só o NÚMERO de
+    chamadas distingue "cache de B intacto" de "cache de B invalidado e
+    recalculado por acaso com o mesmo resultado"."""
+    chamadas = []
+    original = notificacoes.contar_sinais_novos
+
+    def _espiao(db, loja_slug, usuario_id):
+        chamadas.append((loja_slug, usuario_id))
+        return original(db, loja_slug, usuario_id)
+
+    monkeypatch.setattr(notificacoes, "contar_sinais_novos", _espiao)
+    return chamadas
+
+
+def test_visto_invalida_apenas_o_cache_de_quem_marcou(client, monkeypatch, db):
+    _ligar(monkeypatch)
+    login(client, papel="dono", email="gestor-a@loja.test")
+    criar_usuario(papel="gerente", email="gestor-b@loja.test", loja_slug="loja-teste")
+    usuario_a = _usuario_por_email(db, "gestor-a@loja.test")
+    usuario_b = _usuario_por_email(db, "gestor-b@loja.test")
+    sinal_id = _semear_sinal()
+
+    # Aquece o cache dos dois ANTES de ligar o espião — o aquecimento não
+    # conta como chamada "durante" a ação que estamos medindo.
+    assert notificacoes.contar_nao_vistos(db, "loja-teste", usuario_a.id) == 1
+    assert notificacoes.contar_nao_vistos(db, "loja-teste", usuario_b.id) == 1
+
+    chamadas = _espiar_contar_sinais_novos(monkeypatch)
+
+    pagina = client.get("/app/loja/copiloto")
+    client.post(
+        f"/app/loja/copiloto/notificacoes/{sinal_id}/visto",
+        data={"csrf": csrf_da_resposta(pagina)},
+    )
+
+    # Cache de A caiu: a leitura seguinte tem que ir ao banco de novo.
+    notificacoes.contar_nao_vistos(db, "loja-teste", usuario_a.id)
+    assert len(chamadas) == 1
+
+    # Cache de B continua quente: a leitura seguinte NÃO pode bater no banco.
+    notificacoes.contar_nao_vistos(db, "loja-teste", usuario_b.id)
+    assert len(chamadas) == 1
+
+
+def test_dispensar_invalida_o_cache_de_toda_a_loja_nao_so_de_quem_clicou(
+    client, monkeypatch, db
+):
+    _ligar(monkeypatch)
+    login(client, papel="dono", email="gestor-a2@loja.test")
+    criar_usuario(papel="gerente", email="gestor-b2@loja.test", loja_slug="loja-teste")
+    usuario_a = _usuario_por_email(db, "gestor-a2@loja.test")
+    usuario_b = _usuario_por_email(db, "gestor-b2@loja.test")
+    sinal_id = _semear_sinal()
+
+    # Aquece o cache dos dois.
+    assert notificacoes.contar_nao_vistos(db, "loja-teste", usuario_a.id) == 1
+    assert notificacoes.contar_nao_vistos(db, "loja-teste", usuario_b.id) == 1
+
+    pagina = client.get("/app/loja/copiloto")
+    r = client.post(
+        f"/app/loja/copiloto/notificacoes/{sinal_id}/dispensar",
+        data={"csrf": csrf_da_resposta(pagina)},
+    )
+    assert r.status_code == 200
+
+    # O sinal sumiu de verdade para os dois (estado é da loja) — o cache de
+    # B (que não clicou em nada) tem que refletir isso, não a foto velha.
+    assert notificacoes.contar_nao_vistos(db, "loja-teste", usuario_a.id) == 0
+    assert notificacoes.contar_nao_vistos(db, "loja-teste", usuario_b.id) == 0
+
+
+def _usuario_id(db):
+    return _usuario_por_email(db, "dono@loja.test").id
