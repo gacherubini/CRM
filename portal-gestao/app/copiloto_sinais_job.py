@@ -13,7 +13,8 @@ from typing import Callable
 
 from sqlalchemy.orm import Session
 
-from app.config import revy_loja_copiloto_enabled
+from app import provisioning
+from app.config import revy_loja_copiloto_enabled, revy_loja_entitlements_enabled
 from app.loja.copiloto.consultas_estoque import estoque_parado
 from app.loja.copiloto.consultas_leads import leads_status
 from app.loja.copiloto.consultas_origem import venda_origem_periodo
@@ -31,6 +32,7 @@ from app.loja.copiloto.sinais import (
 from app.loja.copiloto.sinais_store import sincronizar_sinais
 from app.loja.copiloto.tipos import CopilotoContexto
 from app.loja.estoque_overview import montar_estoque_overview
+from app.loja.types import Module
 from app.meta_ads_spend_job import env_flag, env_float
 from app.models import LojaOperacionalProjecao
 
@@ -38,6 +40,19 @@ logger = logging.getLogger(__name__)
 
 DIAS_ESTOQUE_PARADO = 60
 HORAS_LEAD_SEM_RESPOSTA = 4
+
+
+def _copiloto_permitido(db: Session, loja_slug: str) -> bool:
+    """Gate duplo por loja: mesmo mecanismo usado pelas rotas (``allows_processing``).
+
+    Com ``REVY_LOJA_ENTITLEMENTS_ENABLED`` desligado (default hoje, single-tenant),
+    ``allows_processing`` recebe ``module=None`` e só confere a loja ativa — é o
+    fail-open que preserva o comportamento atual. Ligado, exige o módulo Copiloto
+    contratado e ativo (``LojaOperacionalProjecao`` do aggregate ``copiloto``), do
+    jeito que ``check_module_access``/``resolve_entitlements`` já fazem nas rotas.
+    """
+    modulo = Module.COPILOTO.value if revy_loja_entitlements_enabled() else None
+    return provisioning.allows_processing(db, loja_slug, modulo)
 
 
 def lojas_ativas(db: Session) -> list[str]:
@@ -49,7 +64,8 @@ def lojas_ativas(db: Session) -> list[str]:
         )
         .all()
     )
-    return sorted({linha[0] for linha in linhas})
+    slugs = sorted({linha[0] for linha in linhas})
+    return [slug for slug in slugs if _copiloto_permitido(db, slug)]
 
 
 def avaliar_loja(
@@ -178,9 +194,20 @@ class CopilotoSinaisWorker:
     def _clients(self):
         if self._estoque_factory and self._chatbot_factory:
             return self._estoque_factory(), self._chatbot_factory()
-        from app.main import get_chatbot_client, get_estoque_client
+        # Construção direta (mesmos um-liners de app.main.get_estoque_client /
+        # get_chatbot_client), sem importar app.main: o worker não pode depender
+        # do módulo que o inicia, senão o boot vira um ciclo.
+        from app.clients.chatbot import ChatbotClient
+        from app.clients.estoque import EstoqueClient
+        from app.config import settings
 
-        return get_estoque_client(), get_chatbot_client()
+        estoque = EstoqueClient(
+            settings.estoque_url, settings.estoque_token, settings.request_timeout
+        )
+        chatbot = ChatbotClient(
+            settings.chatbot_url, settings.chatbot_token, settings.request_timeout
+        )
+        return estoque, chatbot
 
     def start(self) -> None:
         if not self.enabled:

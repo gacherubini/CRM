@@ -3,9 +3,12 @@ from decimal import Decimal
 
 from conftest import seed_loja_operacional
 
+from app.clients.chatbot import ChatbotClient
+from app.clients.estoque import EstoqueClient
 from app.copiloto_sinais_job import CopilotoSinaisWorker, avaliar_loja
 from app.db import SessionLocal
-from app.models import CopilotoSinal, Venda
+from app.loja.types import Module
+from app.models import CopilotoSinal, LojaOperacionalProjecao, Venda
 
 AGORA = datetime(2026, 8, 11, 12, 0, tzinfo=timezone.utc)
 
@@ -143,3 +146,65 @@ def test_falha_em_uma_loja_nao_derruba_o_ciclo(db):
     resultado = worker.run_once()
     assert resultado["ok"] is True
     assert resultado["erros"] >= 1
+
+
+def test_loja_sem_entitlement_copiloto_e_pulada(db, monkeypatch):
+    """Gate duplo: com REVY_LOJA_ENTITLEMENTS_ENABLED=1, loja ativa mas sem o
+    módulo Copiloto contratado não é avaliada — nenhum dado é buscado, nenhum
+    sinal é gravado. A loja entitled ao lado continua funcionando normalmente.
+    """
+    monkeypatch.setenv("REVY_LOJA_ENTITLEMENTS_ENABLED", "1")
+    seed_loja_operacional(db, loja_slug="loja-teste")  # sem módulo copiloto
+    seed_loja_operacional(db, loja_slug="loja-2")
+    db.add(
+        LojaOperacionalProjecao(
+            loja_slug="loja-2",
+            aggregate=Module.COPILOTO.value,
+            version=1,
+            state="ativo",
+            event_id="seed-copiloto",
+        )
+    )
+    for i in range(4):
+        db.add(
+            Venda(
+                loja_slug="loja-2",
+                vendedor_email="ana@loja.test",
+                descricao="Moto",
+                preco_venda=Decimal("20000"),
+                custo_veiculo=Decimal("16000") if i == 0 else None,
+                status="confirmada",
+                criada_em=AGORA - timedelta(days=2),
+            )
+        )
+    db.commit()
+
+    worker = CopilotoSinaisWorker(
+        db_factory=SessionLocal,
+        enabled=True,
+        estoque_factory=lambda: EstoqueStub(slug="loja-2"),
+        chatbot_factory=lambda: ChatbotStub(),
+        agora=lambda: AGORA,
+    )
+    resultado = worker.run_once()
+    assert resultado["ok"] is True
+    assert resultado["lojas"] == 1  # só a loja-2, entitled
+    assert db.query(CopilotoSinal).filter(CopilotoSinal.loja_slug == "loja-teste").count() == 0
+    assert (
+        db.query(CopilotoSinal)
+        .filter(CopilotoSinal.loja_slug == "loja-2", CopilotoSinal.regra == "margem_incompleta")
+        .count()
+        == 1
+    )
+
+
+def test_clients_padrao_nao_importa_app_main(db):
+    """O caminho de produção (sem factories injetadas) constrói os clients
+    direto de app.clients/app.config — não pode depender de app.main (import
+    de volta para o módulo que inicia o worker), e não pode ficar sem
+    cobertura só porque os 6 testes acima sempre injetam stub.
+    """
+    worker = CopilotoSinaisWorker(db_factory=SessionLocal, enabled=True, agora=lambda: AGORA)
+    estoque, chatbot = worker._clients()
+    assert isinstance(estoque, EstoqueClient)
+    assert isinstance(chatbot, ChatbotClient)
