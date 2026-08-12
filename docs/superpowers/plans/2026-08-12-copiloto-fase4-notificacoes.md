@@ -114,7 +114,7 @@ Cobrir: (a) gestor de loja com entitlement vê a contagem real; (b) vendedor rec
 
 **O que o painel mostra por sinal:** severidade, título, detalhe, quando surgiu, e — quando houver — o link da ação sugerida (`acao_sugerida_json`). Mais dois botões: **Marcar como visto** e **Dispensar**.
 
-**A frase que precisa estar na tela:** o painel diz, em texto pequeno, que os alertas são **da loja** e que marcar como visto vale para toda a equipe de gestão. Sem isso, dois sócios discutem sobre alerta que "sumiu sozinho".
+**A frase que precisa estar na tela:** o painel diz, em texto pequeno, que os alertas são **da loja**, que marcar como visto vale **só para quem marcou** (Task 0 — tabela `copiloto_sinal_visto`) e que dispensar tira o alerta **para todo mundo**. Sem isso, dois sócios discutem sobre alerta que "sumiu sozinho" quando na verdade só um dos dois marcou como visto.
 
 **Estado vazio honesto:** sem alerta, o painel diz que não há nada a tratar agora — não inventa conteúdo nem some do cabeçalho.
 
@@ -141,7 +141,7 @@ Cobrir: (a) gestor de loja com entitlement vê a contagem real; (b) vendedor rec
 - `POST /app/loja/copiloto/notificacoes/{sinal_id}/visto`
 - `POST /app/loja/copiloto/notificacoes/{sinal_id}/dispensar`
 
-**Reusar, não reescrever:** `listar_sinais_abertos`, `marcar_visto(db, loja_slug, sinal_id)` e `dispensar(db, loja_slug, sinal_id)` já existem em `sinais_store.py` e já recebem `loja_slug` obrigatório. Nenhuma função nova de domínio nesta task.
+**Reusar, não reescrever:** `listar_sinais_abertos`, `marcar_visto(db, loja_slug, sinal_id, usuario_id)` (assinatura já com `usuario_id` — mudou na Task 0) e `dispensar(db, loja_slug, sinal_id)` já existem em `sinais_store.py` e já recebem `loja_slug` obrigatório. Nenhuma função nova de domínio nesta task.
 
 **Segurança — o ponto onde este projeto já sangrou duas vezes:** as três rotas carregam o gate completo, incluindo `check_module_access(request, usuario, db, Module.COPILOTO)` **server-side**. `loja_slug` vem da sessão, nunca do corpo ou da query. `sinal_id` é entrada do cliente e nunca autoriza nada sozinho — o escopo por loja é feito no `WHERE`, que as funções da Fase 1 já fazem. Os dois POST exigem CSRF, com teste negativo para **cada um** (na Fase 2 faltou o teste de um dos POST e passou batido até a revisão final).
 
@@ -225,5 +225,5 @@ Severidade maior no caso 2 — preço alto em veículo que acabou de entrar é d
 ## O que esta fase deliberadamente não faz
 
 - **Não notifica fora do painel.** Sem WhatsApp, sem e-mail. Decisão do dono em 2026-08-12; quando entrar, precisa de regra de frequência, janela de horário e opt-out — nada disso está desenhado aqui.
-- **Não torna o sinal por usuário.** `copiloto_sinal` continua da loja. Marcar visto por pessoa exigiria tabela nova e é mudança de modelo, não de superfície.
+- **`copiloto_sinal.estado` continua da loja — só o "visto" virou por pessoa.** A Task 0 desta fase criou `copiloto_sinal_visto` (tabela nova, `sinal_id` + `usuario_id`) exatamente para tornar o **visto** individual, por decisão do dono (2026-08-12): cada gestor marca como visto por si, e o cache/badge do sino reflete só a leitura de quem está logado. **Dispensar** continua sendo da loja inteira — muda `estado` em `copiloto_sinal`, o mesmo campo que todo mundo lê, então um gestor dispensar vale para os demais. `copiloto_sinal` em si não ganhou `usuario_id`; a relação pessoa-sinal mora inteira na tabela nova.
 - **Não alerta preço abaixo da FIPE.** Ver Task 4.
