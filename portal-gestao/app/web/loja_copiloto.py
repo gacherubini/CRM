@@ -37,6 +37,10 @@ from app.loja.copiloto.conversas import (  # noqa: E402
     listar_turnos,
     obter_turno,
 )
+from app.loja.copiloto.notificacoes import (  # noqa: E402
+    contar_nao_vistos,
+    invalidar_contagem,
+)
 from app.loja.copiloto.resumo import montar_resumo_hoje  # noqa: E402
 from app.loja.copiloto.sinais_store import (  # noqa: E402
     contar_sinais_novos,
@@ -55,7 +59,7 @@ from app.main import (  # noqa: E402
     templates,
 )
 from app.meta_ads_spend_job import env_float, env_int  # noqa: E402
-from app.models import CopilotoTurno, Usuario  # noqa: E402
+from app.models import CopilotoSinal, CopilotoTurno, Usuario  # noqa: E402
 from app.web.loja_shell import check_module_access  # noqa: E402
 
 _PAGINA = "/app/loja/copiloto"
@@ -276,6 +280,93 @@ def _guard_json(request: Request, db: Session):
     if not _pode(usuario):
         return None, _json_erro(403, "perm", "O Copiloto é do dono e do gerente.")
     return usuario, None
+
+
+def _serializar_sinal_para_painel(sinal: CopilotoSinal) -> dict:
+    """Só os campos que o JS do painel (``base.html``, F4/Task 2) lê.
+
+    ``acao_sugerida`` vem de volta como dict (não string) — o JS só usa
+    ``.href`` quando presente; ações sem link (ex.: ajustar_preco) chegam
+    sem ``href`` e o botão "Abrir" simplesmente não aparece.
+    """
+    acao_sugerida = (
+        json.loads(sinal.acao_sugerida_json) if sinal.acao_sugerida_json else None
+    )
+    return {
+        "id": sinal.id,
+        "severidade": sinal.severidade,
+        "titulo": sinal.titulo,
+        "detalhe": sinal.detalhe,
+        "quando": sinal.criado_em.isoformat() if sinal.criado_em else None,
+        "acao_sugerida": acao_sugerida,
+    }
+
+
+@router.get(_PAGINA + "/notificacoes.json")
+def copiloto_notificacoes_json(request: Request, db: Session = Depends(get_db)):
+    """Alimenta o painel do sino (F4/Task 2). Mesmo gate quádruplo das demais
+    rotas JSON — ``_guard_json`` já resolve ``loja_slug`` da sessão.
+
+    ``itens`` é a lista da LOJA inteira (``listar_sinais_abertos`` — mesma
+    função da tela principal do Copiloto): a equipe de gestão toda vê os
+    mesmos alertas. ``nao_vistos`` é pessoal (usa o mesmo cache do sino, não
+    uma segunda query) para o número do painel nunca discordar do badge que
+    já está na tela.
+    """
+    usuario, erro = _guard_json(request, db)
+    if erro is not None:
+        return erro
+    itens = [
+        _serializar_sinal_para_painel(s)
+        for s in listar_sinais_abertos(db, usuario.loja_slug)
+    ]
+    nao_vistos = contar_nao_vistos(db, usuario.loja_slug, usuario.id)
+    return JSONResponse({"itens": itens, "nao_vistos": nao_vistos})
+
+
+@router.post(_PAGINA + "/notificacoes/{sinal_id}/visto")
+async def copiloto_notificacao_visto(
+    request: Request, sinal_id: str, db: Session = Depends(get_db)
+):
+    """``sinal_id`` é entrada do cliente e não autoriza nada sozinho:
+    ``marcar_visto`` filtra por ``loja_slug`` no WHERE — sinal de outra loja
+    devolve ``False`` aqui, nunca confirma que existe em outro lugar."""
+    usuario, erro = _guard_json(request, db)
+    if erro is not None:
+        return erro
+    form = await request.form()
+    if not csrf_valido(request, form.get("csrf")):
+        return _json_erro(403, "sessao", "Sessão expirada")
+
+    ok = marcar_visto(db, usuario.loja_slug, sinal_id, usuario.id)
+    if not ok:
+        return _json_erro(404, "not_found", "Notificação não encontrada")
+    # "Visto" é por pessoa (Task 0): só o cache DESTE usuário fica velho —
+    # invalidar a loja inteira aqui apagaria de graça o cache de quem nem
+    # tocou no sinal.
+    invalidar_contagem(usuario.loja_slug, usuario.id)
+    return JSONResponse({"ok": True})
+
+
+@router.post(_PAGINA + "/notificacoes/{sinal_id}/dispensar")
+async def copiloto_notificacao_dispensar(
+    request: Request, sinal_id: str, db: Session = Depends(get_db)
+):
+    """``dispensar`` é da loja inteira (não por pessoa) — por isso invalida o
+    cache de TODA a loja, não só do usuário que clicou (ver docstring de
+    ``invalidar_contagem``)."""
+    usuario, erro = _guard_json(request, db)
+    if erro is not None:
+        return erro
+    form = await request.form()
+    if not csrf_valido(request, form.get("csrf")):
+        return _json_erro(403, "sessao", "Sessão expirada")
+
+    ok = dispensar(db, usuario.loja_slug, sinal_id)
+    if not ok:
+        return _json_erro(404, "not_found", "Notificação não encontrada")
+    invalidar_contagem(usuario.loja_slug)
+    return JSONResponse({"ok": True})
 
 
 @router.post(_PAGINA + "/perguntar")
