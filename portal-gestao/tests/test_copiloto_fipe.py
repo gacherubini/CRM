@@ -120,6 +120,19 @@ def test_termo_que_casa_com_varios_e_ambiguo_e_nao_escolhe():
     }
 
 
+def test_substring_unico_nao_vira_ok_fica_ambiguo():
+    """Regra 3: só exato normalizado vira ok — mesmo 1 candidato por
+    substring ainda é aproximação, não escolha automática."""
+    r = consultar_fipe(
+        _client(_rotas_completas()), tipo="motos", marca="Honda",
+        modelo="500F ABS", ano=2020,
+    )
+    assert r.status == "ambiguo"
+    assert r.valor is None
+    assert len(r.candidatos) == 1
+    assert r.candidatos[0].modelo_nome == "CB 500F ABS"
+
+
 def test_modelo_inexistente_nao_aproxima():
     r = consultar_fipe(
         _client(_rotas_completas()), tipo="motos", marca="Honda",
@@ -153,6 +166,19 @@ def test_codigo_persistido_pula_a_desambiguacao():
     )
     assert r.status == "ok"
     assert r.valor == "R$ 27.500,00"
+
+
+def test_ano_none_nao_pega_primeiro_item_da_lista_de_anos():
+    """Na API real o primeiro item de /anos pode ser a entrada convencional
+    '32000' (zero-km/sem ano) — ano=None não pode virar esse chute."""
+    chamadas = []
+    r = consultar_fipe(
+        _client(_rotas_completas(), chamadas=chamadas), tipo="motos",
+        marca="Honda", modelo="CB 500F ABS", ano=None,
+    )
+    assert r.status == "nao_encontrado"
+    assert r.valor is None
+    assert not any("/anos" in c for c in chamadas)
 
 
 def test_client_levanta_indisponivel_em_erro():
@@ -296,3 +322,37 @@ def test_estoque_indisponivel_nao_vira_fipe_nao_encontrada():
         _client(_rotas_completas()), EstoqueFora(), _ctx(), veiculo_id="v1"
     )
     assert r.status == "indisponivel"
+
+
+def test_veiculo_sem_ano_nao_chuta_no_zero_km():
+    """Veículo sem ano_modelo válido não pode virar 'ok' com o primeiro item
+    de /anos — que na API real pode ser a convenção de zero-km."""
+    chamadas = []
+    estoque = EstoqueStub(
+        {"id": "v1", "tipo": "moto", "marca": "Honda", "modelo": "CB 500F ABS"}
+    )
+    r = consultar_fipe_do_veiculo(
+        _client(_rotas_completas(), chamadas=chamadas), estoque, _ctx(),
+        veiculo_id="v1",
+    )
+    assert r.status == "nao_encontrado"
+    assert r.valor is None
+    assert not any("/anos" in c for c in chamadas)
+
+
+def test_veiculo_tipo_desconhecido_nao_chuta_motos():
+    """Tipo fora do vocabulário conhecido falha fechado — não vira "motos"
+    por padrão nem consulta a FIPE."""
+    chamadas = []
+    estoque = EstoqueStub(
+        {
+            "id": "v1", "tipo": "utilitario", "marca": "Honda",
+            "modelo": "CB 500F ABS", "ano_modelo": 2020,
+        }
+    )
+    r = consultar_fipe_do_veiculo(
+        _client(_rotas_completas(), chamadas=chamadas), estoque, _ctx(),
+        veiculo_id="v1",
+    )
+    assert r.status == "nao_encontrado"
+    assert chamadas == []

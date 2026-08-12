@@ -173,7 +173,9 @@ git commit -m "fix(estoque): PATCH de veiculo mapeia 404 e 409 como os demais ve
   - `ResultadoFipe(status, valor, referencia, candidatos, mensagem)` com `status ∈ {ok, ambiguo, nao_encontrado, indisponivel}`;
   - `consultar_fipe(client, *, tipo, marca, modelo, ano=None, fipe_codigo=None) -> ResultadoFipe` (nível baixo, por texto);
   - **`consultar_fipe_do_veiculo(client, estoque, ctx, *, veiculo_id, fipe_codigo=None) -> ResultadoFipe`** — a que o Copiloto usa;
-  - `cache_fipe` (`CacheTTL` de horas) e `_tipo_fipe(tipo_estoque) -> str`;
+  - `cache_fipe` (`CacheTTL` de horas) e `_tipo_fipe(tipo_estoque) -> str | None`
+    (``None`` = tipo fora do vocabulário conhecido; fail-closed, ver nota de
+    correção 2026-08-12 abaixo);
   - `normalizar(texto) -> str` (minúsculas, sem acento, sem pontuação).
 
 **Duas decisões de desenho que valem mais que o matching:**
@@ -187,6 +189,34 @@ git commit -m "fix(estoque): PATCH de veiculo mapeia 404 e 409 como os demais ve
 1. Zero candidatos → `nao_encontrado`. Nunca aproximar.
 2. Mais de um candidato → `ambiguo` + a lista. Quem escolhe é o humano, via pergunta do copiloto.
 3. Um candidato **exato** (após normalização) → `ok`. Similaridade parcial nunca vira `ok` sozinha.
+
+> **Nota de correção (2026-08-12):** a revisão de código do commit original achou dois
+> Critical e um Important, os três a mesma falha em lugares diferentes — um caminho onde
+> "não sei o suficiente" virava um palpite disfarçado de certeza, em vez de "não sei" ou
+> "escolha você". Os blocos de código abaixo (Step 1 e Step 3) já foram atualizados para
+> refletir a correção; resumo:
+> 1. **Regra 3 tinha um furo:** quando o casamento por nome exato não achava nada, o
+>    código caía para "contém o termo" (substring) e, se sobrasse **exatamente 1** item
+>    desse filtro, `consultar_fipe` tratava como se fosse exato e devolvia `ok` — a
+>    aproximação virava certeza só porque a lista tinha tamanho 1. Corrigido: o casamento
+>    por modelo agora carrega consigo se veio do ramo exato ou do ramo aproximado
+>    (`_CandidatosModelo.exato`); só exato E único vira `ok`. Aproximado, mesmo com um
+>    único candidato, vira `ambiguo` — o humano confirma.
+> 2. **`ano=None` escolhia `anos[0]`** como se fosse "o ano mais razoável". Contra a API
+>    real, o primeiro item de `/anos` pode ser a entrada convencional de zero-km/sem ano
+>    (`{"codigo": "32000-1", "nome": "32000"}`), não um ano de verdade. Corrigido: sem o
+>    ano do veículo, `consultar_fipe` devolve `nao_encontrado` direto (nem chega a chamar
+>    `/anos`) — nunca infere um ano.
+> 3. **`_tipo_fipe` caía em `"motos"`** para qualquer tipo não reconhecido (vazio, `None`,
+>    valor estranho) — um chute silencioso que podia consultar a tabela errada. Corrigido:
+>    tipo fora do mapa devolve `None`, e `consultar_fipe_do_veiculo` responde
+>    `nao_encontrado` sem chamar a FIPE. O mapa `TIPOS_FIPE` continua com as variantes
+>    plausíveis do vocabulário do Estoque, mas hoje a `estoque-api` só persiste
+>    `tipo ∈ {"moto", "carro"}` (`TIPOS` em `estoque-api/app/config.py:8`, validado em
+>    `estoque-api/app/servico.py:292-293` — sem CHECK constraint no banco).
+>
+> Quatro testes novos cobrem os três achados (ver Step 1); a suíte de
+> `test_copiloto_fipe.py` passou de 20 para 24 testes.
 
 **Env novas:** `REVY_LOJA_COPILOTO_FIPE_URL` (default `https://parallelum.com.br/fipe/api/v1`), `REVY_LOJA_COPILOTO_FIPE_TIMEOUT` (default `8`), `REVY_LOJA_COPILOTO_FIPE_CACHE_SEGUNDOS` (default `21600` = 6h).
 
@@ -319,6 +349,19 @@ def test_termo_que_casa_com_varios_e_ambiguo_e_nao_escolhe():
     }
 
 
+def test_substring_unico_nao_vira_ok_fica_ambiguo():
+    """Regra 3: só exato normalizado vira ok — mesmo 1 candidato por
+    substring ainda é aproximação, não escolha automática."""
+    r = consultar_fipe(
+        _client(_rotas_completas()), tipo="motos", marca="Honda",
+        modelo="500F ABS", ano=2020,
+    )
+    assert r.status == "ambiguo"
+    assert r.valor is None
+    assert len(r.candidatos) == 1
+    assert r.candidatos[0].modelo_nome == "CB 500F ABS"
+
+
 def test_modelo_inexistente_nao_aproxima():
     r = consultar_fipe(
         _client(_rotas_completas()), tipo="motos", marca="Honda",
@@ -352,6 +395,19 @@ def test_codigo_persistido_pula_a_desambiguacao():
     )
     assert r.status == "ok"
     assert r.valor == "R$ 27.500,00"
+
+
+def test_ano_none_nao_pega_primeiro_item_da_lista_de_anos():
+    """Na API real o primeiro item de /anos pode ser a entrada convencional
+    '32000' (zero-km/sem ano) — ano=None não pode virar esse chute."""
+    chamadas = []
+    r = consultar_fipe(
+        _client(_rotas_completas(), chamadas=chamadas), tipo="motos",
+        marca="Honda", modelo="CB 500F ABS", ano=None,
+    )
+    assert r.status == "nao_encontrado"
+    assert r.valor is None
+    assert not any("/anos" in c for c in chamadas)
 
 
 def test_client_levanta_indisponivel_em_erro():
@@ -495,6 +551,40 @@ def test_estoque_indisponivel_nao_vira_fipe_nao_encontrada():
         _client(_rotas_completas()), EstoqueFora(), _ctx(), veiculo_id="v1"
     )
     assert r.status == "indisponivel"
+
+
+def test_veiculo_sem_ano_nao_chuta_no_zero_km():
+    """Veículo sem ano_modelo válido não pode virar 'ok' com o primeiro item
+    de /anos — que na API real pode ser a convenção de zero-km."""
+    chamadas = []
+    estoque = EstoqueStub(
+        {"id": "v1", "tipo": "moto", "marca": "Honda", "modelo": "CB 500F ABS"}
+    )
+    r = consultar_fipe_do_veiculo(
+        _client(_rotas_completas(), chamadas=chamadas), estoque, _ctx(),
+        veiculo_id="v1",
+    )
+    assert r.status == "nao_encontrado"
+    assert r.valor is None
+    assert not any("/anos" in c for c in chamadas)
+
+
+def test_veiculo_tipo_desconhecido_nao_chuta_motos():
+    """Tipo fora do vocabulário conhecido falha fechado — não vira "motos"
+    por padrão nem consulta a FIPE."""
+    chamadas = []
+    estoque = EstoqueStub(
+        {
+            "id": "v1", "tipo": "utilitario", "marca": "Honda",
+            "modelo": "CB 500F ABS", "ano_modelo": 2020,
+        }
+    )
+    r = consultar_fipe_do_veiculo(
+        _client(_rotas_completas(), chamadas=chamadas), estoque, _ctx(),
+        veiculo_id="v1",
+    )
+    assert r.status == "nao_encontrado"
+    assert chamadas == []
 ```
 
 - [ ] **Step 2: Run test to verify it fails**
@@ -623,6 +713,12 @@ LIMITE_CANDIDATOS = 8
 cache_fipe = CacheTTL(ttl_segundos=settings.copiloto_fipe_cache_segundos)
 
 # O estoque diz "moto"/"carro"; a FIPE espera "motos"/"carros"/"caminhoes".
+# A escrita da estoque-api só persiste tipo em {"moto", "carro"} (TIPOS em
+# estoque-api/app/config.py:8, validado em estoque-api/app/servico.py:292-293)
+# — sem CHECK constraint no banco. O mapa abaixo aceita essas duas mais as
+# variantes plausíveis (plural, "caminhao") para não depender só dessa
+# garantia de outro serviço; o que ficar de fora falha fechado (ver
+# ``_tipo_fipe`` abaixo), nunca cai em "motos" por padrão.
 TIPOS_FIPE = {
     "moto": "motos",
     "motos": "motos",
@@ -633,9 +729,14 @@ TIPOS_FIPE = {
 }
 
 
-def _tipo_fipe(tipo_estoque: str | None) -> str:
-    """Traduz o vocabulário do Estoque. Desconhecido cai em motos (moto-first)."""
-    return TIPOS_FIPE.get(normalizar(tipo_estoque or ""), "motos")
+def _tipo_fipe(tipo_estoque: str | None) -> str | None:
+    """Traduz o vocabulário do Estoque para o da FIPE.
+
+    Tipo fora do mapa (vazio, ``None``, valor não reconhecido) devolve
+    ``None`` — NUNCA chuta "motos". Quem chama decide o que fazer com isso
+    (hoje: ``consultar_fipe_do_veiculo`` devolve ``nao_encontrado``).
+    """
+    return TIPOS_FIPE.get(normalizar(tipo_estoque or ""))
 
 
 def _marcas_cacheadas(client: Any, tipo: str) -> list[dict]:
@@ -707,20 +808,37 @@ def _achar_marca(marcas: list[dict], termo: str) -> dict | None:
     return None
 
 
-def _candidatos_de_modelo(modelos: list[dict], termo: str) -> list[dict]:
+@dataclass(frozen=True)
+class _CandidatosModelo:
+    """Resultado do casamento de modelo, marcado com a PROVENIÊNCIA do match.
+
+    ``exato`` distingue "achei o nome certo" de "achei um nome que contém o
+    termo" — a única forma de ``consultar_fipe`` saber que, mesmo com um só
+    item, aquilo ainda é um palpite (regra 3: só exato normalizado vira
+    ``ok``; nunca por tamanho de lista sozinho).
+    """
+
+    itens: list[dict]
+    exato: bool
+
+
+def _candidatos_de_modelo(modelos: list[dict], termo: str) -> _CandidatosModelo:
     alvo = normalizar(termo)
     exatos = [m for m in modelos if normalizar(m.get("nome")) == alvo]
     if exatos:
-        return exatos
-    # Sem exato: devolve os que CONTÊM o termo — como candidatos, não escolha.
-    return [m for m in modelos if alvo and alvo in normalizar(m.get("nome"))]
+        return _CandidatosModelo(itens=exatos, exato=True)
+    # Sem exato: os que CONTÊM o termo são candidatos, nunca uma escolha —
+    # mesmo quando sobra só 1, é uma aproximação e precisa de confirmação.
+    aproximados = [m for m in modelos if alvo and alvo in normalizar(m.get("nome"))]
+    return _CandidatosModelo(itens=aproximados, exato=False)
 
 
 def _ano_compativel(anos: list[dict], ano: int | None) -> dict | None:
-    if not anos:
+    # ano=None nunca escolhe anos[0]: na API real essa posição pode ser a
+    # entrada convencional "32000" (zero-km/sem ano-modelo definido), não um
+    # ano de verdade. Sem ano do veículo, não há candidato compatível.
+    if not anos or ano is None:
         return None
-    if ano is None:
-        return anos[0]
     for item in anos:
         if str(ano) in str(item.get("nome") or "") or str(ano) in str(
             item.get("codigo") or ""
@@ -762,13 +880,17 @@ def consultar_fipe(
             )
 
         modelos = _modelos_cacheados(client, tipo, achada["codigo"])
-        candidatos_modelo = _candidatos_de_modelo(modelos, modelo)
+        resultado_modelo = _candidatos_de_modelo(modelos, modelo)
+        candidatos_modelo = resultado_modelo.itens
         if not candidatos_modelo:
             return ResultadoFipe(
                 status=STATUS_NAO_ENCONTRADO,
                 mensagem=f"não encontrei {marca} {modelo} na FIPE",
             )
-        if len(candidatos_modelo) > 1:
+        # Regra 3: só exato E único vira ok. Mais de um candidato, OU um só
+        # candidato que veio por aproximação (substring) — ambos são
+        # "ambiguo": quem decide é o humano, nunca o tamanho da lista.
+        if len(candidatos_modelo) > 1 or not resultado_modelo.exato:
             return ResultadoFipe(
                 status=STATUS_AMBIGUO,
                 candidatos=tuple(
@@ -780,10 +902,21 @@ def consultar_fipe(
                     )
                     for m in candidatos_modelo[:LIMITE_CANDIDATOS]
                 ),
-                mensagem="mais de um modelo bate com essa descrição",
+                mensagem=(
+                    "mais de um modelo bate com essa descrição"
+                    if len(candidatos_modelo) > 1
+                    else "achei um modelo parecido, mas o nome não bate exatamente"
+                ),
             )
 
         escolhido = candidatos_modelo[0]
+        # ano=None não é "primeiro ano disponível": sem o ano do veículo não
+        # há candidato compatível, e não vale nem gastar o GET de /anos.
+        if ano is None:
+            return ResultadoFipe(
+                status=STATUS_NAO_ENCONTRADO,
+                mensagem="não é possível consultar a FIPE sem o ano do veículo",
+            )
         anos = client.anos(tipo, achada["codigo"], escolhido["codigo"])
         ano_item = _ano_compativel(anos, ano)
         if ano_item is None:
@@ -874,9 +1007,18 @@ def consultar_fipe_do_veiculo(
             mensagem="o cadastro deste veículo está sem marca ou modelo",
         )
 
+    tipo_fipe = _tipo_fipe(veiculo.get("tipo"))
+    if tipo_fipe is None:
+        # Fail-closed: tipo fora do vocabulário conhecido não consulta nada
+        # "por padrão" — sem saber o tipo, não há tabela certa para buscar.
+        return ResultadoFipe(
+            status=STATUS_NAO_ENCONTRADO,
+            mensagem="não é possível consultar a FIPE sem saber o tipo do veículo",
+        )
+
     return consultar_fipe(
         client,
-        tipo=_tipo_fipe(veiculo.get("tipo")),
+        tipo=tipo_fipe,
         marca=marca,
         modelo=modelo,
         ano=_ano_do_veiculo(veiculo),
@@ -887,7 +1029,8 @@ def consultar_fipe_do_veiculo(
 - [ ] **Step 4: Run test to verify it passes**
 
 Run: `.\.venv\Scripts\python.exe -m pytest tests/test_copiloto_fipe.py -q`
-Expected: PASS (20 testes).
+Expected: PASS (24 testes — 20 originais + 4 acrescentados pela correção de
+2026-08-12, ver nota acima).
 
 - [ ] **Step 5: Validar contra o endpoint real (uma vez, na mão)**
 
