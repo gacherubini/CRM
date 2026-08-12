@@ -45,6 +45,18 @@ def test_fixture_cobre_as_seis_ferramentas():
     }
 
 
+def test_fixture_casos_de_cobertura_sao_alcancaveis_pela_ferramenta():
+    """Fix round 1 (finding 3): _f_roi_canais (app/loja/copiloto/tools.py)
+    nunca devolve com_dado/total — só ``status`` (ok|parcial|indisponivel) e
+    ``detalhe_disponivel`` (bool). Exigir citação "N de M" dela forçaria um
+    modelo bem-comportado a inventar um número, violando a Regra 1. Por
+    isso nenhum caso ``exige_cobertura`` pode mirar roi_canais."""
+    casos = json.loads(FIXTURE.read_text(encoding="utf-8"))
+    exigem = [c for c in casos if c["exige_cobertura"]]
+    assert len(exigem) == 6
+    assert all(c["ferramenta_esperada"] != "roi_canais" for c in exigem)
+
+
 def test_acerto_de_tool_call():
     caso = {"id": "v01", "pergunta": "x", "ferramenta_esperada": "vendas_resumo", "exige_cobertura": False}
     ok = avaliar_caso(caso, ResultadoFalso("Você vendeu 2.", ["vendas_resumo"]))
@@ -70,6 +82,37 @@ def test_cobertura_citada_e_reconhecida():
     assert calou.citou_cobertura is False
 
 
+def test_padrao_cobertura_aceita_concordancia_masculina_e_feminina():
+    """Fix round 1 (finding 2): "dos" (masculino, ex. "veículos") tinha que
+    ser reconhecido tanto quanto "das" (feminino, ex. "vendas") — a regex
+    original só cobria feminino."""
+    caso = {"id": "e03", "pergunta": "x", "ferramenta_esperada": "estoque_parado", "exige_cobertura": True}
+    masculino = avaliar_caso(
+        caso,
+        ResultadoFalso(
+            "Consegui a data de cadastro de 8 dos 12 veículos parados.",
+            ["estoque_parado"],
+        ),
+    )
+    assert masculino.citou_cobertura is True
+    feminino = avaliar_caso(
+        caso,
+        ResultadoFalso("Calculei sobre 6 das 14 vendas.", ["estoque_parado"]),
+    )
+    assert feminino.citou_cobertura is True
+
+
+def test_turno_com_erro_nao_conta_como_acerto_sem_ferramenta():
+    """Fix round 1 (finding 6): zero tool-calls por ter falhado no meio
+    (deadline, provedor fora...) não pode ler como "decidiu corretamente
+    que não precisava de ferramenta"."""
+    caso = {"id": "x01", "pergunta": "x", "ferramenta_esperada": None, "exige_cobertura": False}
+    resultado_com_erro = ResultadoFalso("Não consegui responder desta vez.", [])
+    resultado_com_erro.estado = "erro"
+    avaliacao = avaliar_caso(caso, resultado_com_erro)
+    assert avaliacao.acertou_tool is False
+
+
 def test_relatorio_calcula_percentuais_e_p95():
     relatorio = Relatorio(
         [
@@ -83,6 +126,31 @@ def test_relatorio_calcula_percentuais_e_p95():
     assert relatorio.pct_cobertura == 75.0
     assert relatorio.latencia_p95 >= 2000
     assert "acerto de tool-call" in relatorio.to_markdown().lower()
+
+
+def test_pct_cobertura_conta_so_casos_que_exigem_cobertura():
+    """Fix round 1 (finding 1), worked example do reviewer: dividir por
+    TODOS os 30 casos deixava o gate impossível de reprovar — 1 erro em 9
+    casos relevantes vazava para 29/30=96.7% (passaria a meta de 95%) em
+    vez do real 8/9=88.9% (não passa)."""
+    relevantes = [Avaliacao(f"c{i}", True, i != 0, 1000, exige_cobertura=True) for i in range(9)]
+    irrelevantes = [
+        Avaliacao(f"n{i}", True, True, 1000, exige_cobertura=False) for i in range(21)
+    ]
+    relatorio = Relatorio(relevantes + irrelevantes)
+
+    assert len(relatorio.avaliacoes) == 30
+    assert relatorio.pct_cobertura == round(8 / 9 * 100, 1)
+    assert relatorio.pct_cobertura < 95.0
+    markdown = relatorio.to_markdown()
+    assert "8/9" in markdown
+
+
+def test_pct_cobertura_sem_casos_aplicaveis_nao_finge_100():
+    relatorio = Relatorio([Avaliacao("a", True, True, 1000, exige_cobertura=False)])
+    assert relatorio.pct_cobertura is None
+    assert "sem casos" in relatorio.to_markdown().lower()
+    assert "100%" not in relatorio.to_markdown()
 
 
 def test_carregar_casos_le_a_fixture():
@@ -138,23 +206,26 @@ def _texto(txt):
 
 def test_rodar_validacao_fim_a_fim_contra_llmfake(db):
     casos = [
-        {"id": "v01", "pergunta": "quanto eu vendi esse mês?",
-         "ferramenta_esperada": "vendas_resumo", "exige_cobertura": False},
+        {"id": "v03", "pergunta": "minha margem esse mês",
+         "ferramenta_esperada": "vendas_resumo", "exige_cobertura": True},
         {"id": "x01", "pergunta": "quantos funcionários eu posso contratar?",
          "ferramenta_esperada": None, "exige_cobertura": False},
     ]
     llm = LLMFake([
-        _tool("vendas_resumo"), _texto("Você vendeu 4 este mês."),
+        _tool("vendas_resumo"),
+        _texto("Margem de 18%, calculada sobre 6 das 14 vendas."),
         _texto("Não tenho esse dado — isso é uma decisão sua."),
     ])
     relatorio = rodar_validacao(llm, _recursos(db), casos)
 
     assert relatorio.pct_tool == 100.0
+    # Só v03 exige cobertura (x01 não conta no denominador — fix round 1,
+    # finding 1); v03 citou "6 das 14", então 1/1 = 100%.
     assert relatorio.pct_cobertura == 100.0
     assert len(relatorio.avaliacoes) == 2
-    # v01 chamou uma ferramenta: o runner sobe o esforço para a rodada
+    # v03 chamou uma ferramenta: o runner sobe o esforço para a rodada
     # seguinte (a de resposta final) mesmo sem uma 2ª ferramenta — ver
-    # runner.py:269 e a nota de desvio em scripts/copiloto_validacao.py.
+    # runner.py:269 e a nota no topo de scripts/copiloto_validacao.py.
     assert relatorio.avaliacoes[0].esforco == "high"
     # x01 nunca chamou ferramenta: resolveu na única chamada, que fica "low".
     assert relatorio.avaliacoes[1].esforco == "low"

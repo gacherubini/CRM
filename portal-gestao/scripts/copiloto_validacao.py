@@ -12,25 +12,25 @@ Decisão do dono: nunca trocar de modelo. Se uma meta cair abaixo do
 aceitável, os levers são, NESTA ORDEM: subir o esforço do turno → endurecer
 o prompt → limitar ferramentas por turno. Ver docs/copiloto-validacao.md.
 
-Desvio em relação ao design original (documentado, não silencioso):
-``executar_turno`` (app/loja/copiloto/runner.py) não aceita um esforço
-inicial vindo de quem chama — o runner decide sozinho, começando em "low" e
-subindo para "high" incondicionalmente depois da PRIMEIRA rodada que chamou
-alguma ferramenta, antes da chamada seguinte ao provedor (runner.py:154 e
-:269). Isso vale mesmo quando essa chamada seguinte só devolve o texto
-final, sem nenhuma 2ª ferramenta — não é preciso haver cadeia de duas
-ferramentas para chegar em "high". Na prática: turno que nunca chama
-ferramenta fica em "low" (uma única chamada); QUALQUER turno que chama ao
-menos uma ferramenta termina em "high" (a chamada que produz a resposta
-final já vem escalada). Por isso a flag ``--esforco`` não força o
-comportamento do provedor: ela só rotula a rodada no relatório. O que a
-métrica 3 (§11) realmente mede é o esforço QUE CADA TURNO ATINGIU de fato —
-via ``_RegistradorEsforco`` abaixo, que envolve o LLM (fake ou real) e
-observa o parâmetro ``esforco`` da ÚLTIMA chamada do turno — e reporta a
-latência separada entre "sem ferramenta" (low) e "com ferramenta" (high).
-Isso é mais honesto que uma flag que não teria efeito nenhum, e é também o
-dado que calibra a política real: hoje não existe uma pergunta que use
-ferramenta e ainda assim custe "low".
+``--esforco`` agora É o lever real (fix round 1): repassa para
+``executar_turno(..., esforco_inicial=...)`` (app/loja/copiloto/runner.py),
+que controla o PONTO DE PARTIDA de cada turno. A escalada automática do
+runner continua intocada: assim que um turno chama qualquer ferramenta, o
+esforço da chamada seguinte sobe para "high" incondicionalmente (runner.py,
+guarda da 2ª rodada em diante) — isso vale mesmo que essa chamada seguinte
+só devolva o texto final, sem uma 2ª ferramenta. Consequência: rodar
+``--esforco low`` e ``--esforco high`` muda de fato o custo/latência de
+perguntas SEM ferramenta (única chamada, no esforço pedido) e a PRIMEIRA
+chamada de perguntas COM ferramenta (o que pode até mudar acerto de
+tool-call, não só latência); a chamada final de um turno com ferramenta
+sempre acaba em "high" nos dois casos, por escalada automática. A métrica 3
+(§11) reporta o esforço que cada turno DE FATO atingiu (via
+``_RegistradorEsforco`` abaixo — observa a última chamada ao provedor), que
+pode ser igual ou maior que o pedido em ``--esforco``.
+
+Nota: ``Ferramenta.esforco_sugerido`` (app/loja/copiloto/tools.py) existe
+como metadado mas NÃO é lido em lugar nenhum do runner — não é um lever.
+Não o recomende como remédio; ver docs/copiloto-validacao.md.
 """
 from __future__ import annotations
 
@@ -47,8 +47,9 @@ from typing import Any
 
 FIXTURE_PADRAO = Path(__file__).resolve().parents[1] / "tests" / "fixtures" / "copiloto_perguntas.json"
 
-# "6 das 14", "6 de 14", "sobre 6 das 14 vendas".
-PADRAO_COBERTURA = re.compile(r"\b\d+\s+d[ea]s?\s+\d+\b", re.IGNORECASE)
+# "6 das 14", "6 de 14", "8 dos 12", "8 do total de 12" (concordância
+# masculina E feminina — "veículos" pede "dos", "vendas" pede "das").
+PADRAO_COBERTURA = re.compile(r"\b\d+\s+d[eoa]s?\s+\d+\b", re.IGNORECASE)
 
 
 @dataclass(frozen=True)
@@ -57,9 +58,15 @@ class Avaliacao:
     acertou_tool: bool
     citou_cobertura: bool
     latencia_ms: int
-    # Esforço que o turno de fato atingiu ("low" ou "high") — não o que a
-    # flag de CLI pediu. Ver nota de desvio no topo do módulo. Default "low"
-    # mantém compatível a chamada posicional de 4 argumentos usada nos testes.
+    # Este caso EXIGIA citação de cobertura? Default True porque é o que os
+    # testes existentes (que constroem Avaliacao com 4 args posicionais,
+    # antes deste campo existir) sempre representaram na prática: um lote de
+    # casos todos relevantes para a métrica de cobertura. avaliar_caso()
+    # abaixo sempre passa o valor real do caso, então isto só importa para
+    # Avaliacao construída à mão (testes).
+    exige_cobertura: bool = True
+    # Esforço que o turno de fato atingiu ("low" ou "high") — o pedido em
+    # --esforco mais a escalada automática do runner, não só o pedido.
     esforco: str = "low"
 
 
@@ -70,14 +77,22 @@ def carregar_casos(caminho: Path = FIXTURE_PADRAO) -> list[dict]:
 def avaliar_caso(caso: dict, resultado) -> Avaliacao:
     chamadas = [p.ferramenta for p in getattr(resultado, "passos", ()) or ()]
     esperada = caso.get("ferramenta_esperada")
-    if esperada is None:
+    # Fix round 1 (finding 6): um turno que terminou em erro (deadline,
+    # provedor fora, teto de tokens...) não pode contar como acerto — nem
+    # no caso "sem ferramenta esperada", onde zero tool-calls por ter
+    # falhado no meio do caminho não é a mesma coisa que zero tool-calls
+    # por ter decidido corretamente que não precisava de nenhuma.
+    if getattr(resultado, "estado", "pronto") == "erro":
+        acertou = False
+    elif esperada is None:
         acertou = not chamadas
     else:
         acertou = esperada in chamadas
 
     texto = getattr(resultado, "texto", "") or ""
+    exige = bool(caso.get("exige_cobertura"))
     citou = True
-    if caso.get("exige_cobertura"):
+    if exige:
         citou = bool(PADRAO_COBERTURA.search(texto))
 
     return Avaliacao(
@@ -85,6 +100,7 @@ def avaliar_caso(caso: dict, resultado) -> Avaliacao:
         acertou_tool=acertou,
         citou_cobertura=citou,
         latencia_ms=int(getattr(resultado, "latencia_ms", 0) or 0),
+        exige_cobertura=exige,
     )
 
 
@@ -102,11 +118,24 @@ class Relatorio:
         )
 
     @property
-    def pct_cobertura(self) -> float:
-        if not self.avaliacoes:
-            return 0.0
+    def _casos_com_cobertura_exigida(self) -> list[Avaliacao]:
+        return [a for a in self.avaliacoes if a.exige_cobertura]
+
+    @property
+    def pct_cobertura(self) -> float | None:
+        """% de acerto SÓ entre os casos que exigiam citar cobertura.
+
+        Fix round 1 (finding 1): dividir por TODOS os casos deixava o gate
+        impossível de reprovar — 1 erro em 9 casos relevantes virava
+        29/30=96.7% (passa a meta de 95%) em vez do real 8/9=88.9% (não
+        passa). ``None`` quando não há nenhum caso relevante no lote —
+        nunca finge 100% por ausência de dado.
+        """
+        relevantes = self._casos_com_cobertura_exigida
+        if not relevantes:
+            return None
         return round(
-            sum(1 for a in self.avaliacoes if a.citou_cobertura) / len(self.avaliacoes) * 100,
+            sum(1 for a in relevantes if a.citou_cobertura) / len(relevantes) * 100,
             1,
         )
 
@@ -137,12 +166,29 @@ class Relatorio:
         return saida
 
     def to_markdown(self) -> str:
-        falhas = [a for a in self.avaliacoes if not a.acertou_tool or not a.citou_cobertura]
+        falhas = [
+            a
+            for a in self.avaliacoes
+            if not a.acertou_tool or (a.exige_cobertura and not a.citou_cobertura)
+        ]
+        relevantes = self._casos_com_cobertura_exigida
+        if self.pct_cobertura is None:
+            linha_cobertura = (
+                "- Aderência à cobertura: sem casos que exigiam cobertura neste "
+                "lote (meta ≥ 95%)"
+            )
+        else:
+            acertos = sum(1 for a in relevantes if a.citou_cobertura)
+            linha_cobertura = (
+                f"- Aderência à cobertura: **{self.pct_cobertura}%** "
+                f"({acertos}/{len(relevantes)} casos que exigiam cobertura) "
+                "(meta ≥ 95%)"
+            )
         linhas = [
             "# Validação do Copiloto",
             "",
             f"- Acerto de tool-call: **{self.pct_tool}%** (meta ≥ 90%)",
-            f"- Aderência à cobertura: **{self.pct_cobertura}%** (meta ≥ 95%)",
+            linha_cobertura,
             f"- Latência p50/p95 (geral): **{self.latencia_p50}ms / {self.latencia_p95}ms**",
             f"- Casos: {len(self.avaliacoes)}",
             "",
@@ -170,10 +216,11 @@ class _RegistradorEsforco:
     """Envolve qualquer LLMPort (fake ou real) só para observar o esforço de
     cada chamada de um turno, sem alterar LLMFake nem DeepSeekClient.
 
-    ``executar_turno`` não recebe esforço inicial de quem chama (ver nota de
-    desvio no topo do módulo): o runner decide sozinho e só sobe para "high"
-    a partir da 2ª rodada de tool-calls. Esta classe é a única forma
-    confiável de saber, de fora, que esforço um turno específico atingiu.
+    Desde o fix round 1, ``executar_turno`` aceita ``esforco_inicial`` — mas
+    a escalada automática para "high" após a 1ª ferramenta continua
+    acontecendo por cima do que foi pedido. Esta classe é a forma confiável
+    de saber, de fora, que esforço a ÚLTIMA chamada de um turno atingiu de
+    fato (pedido + escalada), não só o que foi solicitado no início.
     """
 
     def __init__(self, llm: Any):
@@ -191,11 +238,14 @@ def rodar_validacao(llm, recursos, casos: list[dict], *, esforco: str = "low") -
     """Roda os 30 casos contra ``llm`` (LLMFake nos testes; DeepSeekClient no
     go-live real) e devolve o Relatorio com as 3 métricas do §11.
 
-    ``esforco`` rotula a rodada (útil para nomear o relatório quando se roda
-    ``--esforco low`` e depois ``--esforco high`` em sequência), mas NÃO
-    força o comportamento do runner — ver nota de desvio no topo do módulo.
-    A métrica de latência por esforço usa o esforço realmente atingido por
-    cada turno, não este parâmetro.
+    ``esforco`` é repassado como ``esforco_inicial`` de cada turno (fix round
+    1 — ver runner.py e a nota no topo do módulo): controla de fato o ponto
+    de partida. A escalada automática para "high" após a 1ª ferramenta
+    continua acontecendo por cima disso. A métrica de latência por esforço
+    (``Relatorio.latencia_p95_por_esforco``) usa o esforço que cada turno
+    REALMENTE atingiu na última chamada (pedido + escalada), não este
+    parâmetro isoladamente — os dois podem divergir para turnos com
+    ferramenta.
     """
     from app.loja.copiloto.runner import executar_turno
 
@@ -204,7 +254,8 @@ def rodar_validacao(llm, recursos, casos: list[dict], *, esforco: str = "low") -
         registrador = _RegistradorEsforco(llm)
         inicio = time.monotonic()
         resultado = executar_turno(
-            pergunta=caso["pergunta"], historico=[], llm=registrador, recursos=recursos
+            pergunta=caso["pergunta"], historico=[], llm=registrador, recursos=recursos,
+            esforco_inicial=esforco,
         )
         latencia_ms = int((time.monotonic() - inicio) * 1000)
         resultado_avaliavel = SimpleNamespace(

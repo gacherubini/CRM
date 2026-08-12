@@ -22,10 +22,10 @@
   {"id": "l03", "pergunta": "qual o tempo medio pra responder um lead", "ferramenta_esperada": "leads_status", "exige_cobertura": false},
   {"id": "l04", "pergunta": "quantos leads a gente ta perdendo por demora", "ferramenta_esperada": "leads_status", "exige_cobertura": false},
   {"id": "m01", "pergunta": "quanto eu gastei de anuncio esse mes", "ferramenta_esperada": "roi_canais", "exige_cobertura": false},
-  {"id": "m02", "pergunta": "qual canal ta trazendo mais retorno", "ferramenta_esperada": "roi_canais", "exige_cobertura": true},
+  {"id": "m02", "pergunta": "qual canal ta trazendo mais retorno", "ferramenta_esperada": "roi_canais", "exige_cobertura": false},
   {"id": "m03", "pergunta": "meu CAC ta bom ou ruim esse mes?", "ferramenta_esperada": "roi_canais", "exige_cobertura": false},
-  {"id": "m04", "pergunta": "instagram ta valendo a pena ou é so gasto?", "ferramenta_esperada": "roi_canais", "exige_cobertura": true},
-  {"id": "m05", "pergunta": "roi das campanhas do mes passado", "ferramenta_esperada": "roi_canais", "exige_cobertura": true},
+  {"id": "m04", "pergunta": "instagram ta valendo a pena ou é so gasto?", "ferramenta_esperada": "roi_canais", "exige_cobertura": false},
+  {"id": "m05", "pergunta": "roi das campanhas do mes passado", "ferramenta_esperada": "roi_canais", "exige_cobertura": false},
   {"id": "x01", "pergunta": "quantos funcionários eu posso contratar?", "ferramenta_esperada": null, "exige_cobertura": false},
   {"id": "x02", "pergunta": "bom dia, tudo bem?", "ferramenta_esperada": null, "exige_cobertura": false},
   {"id": "x03", "pergunta": "qual a tabela fipe desse carro", "ferramenta_esperada": null, "exige_cobertura": false}

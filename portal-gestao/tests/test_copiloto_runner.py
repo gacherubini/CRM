@@ -116,6 +116,31 @@ def test_cadeia_de_duas_ferramentas_sobe_o_esforco(db):
     assert llm.chamadas[1]["esforco"] == "high"
 
 
+def test_esforco_inicial_e_configuravel_mas_escalada_automatica_continua(db):
+    """Fix round 1 da suíte de validação (finding 5): o dono pede o ponto de
+    partida do turno (§11, lever 1 — "subir o esforço"); a escalada
+    automática para "high" após a 1ª ferramenta continua acontecendo por
+    cima disso, sem exceção."""
+    llm = LLMFake(
+        [_tool("estoque_parado", {"dias_min": 60}), _tool("vendas_resumo", id_="c2"),
+         _texto("Pronto.")]
+    )
+    r = executar_turno(
+        pergunta="e aí?", historico=[], llm=llm, recursos=_recursos(db),
+        esforco_inicial="high",
+    )
+    assert [p.ferramenta for p in r.passos] == ["estoque_parado", "vendas_resumo"]
+    assert llm.chamadas[0]["esforco"] == "high"  # pedido, não mais hardcoded "low"
+    assert llm.chamadas[1]["esforco"] == "high"  # escalada automática, sem mudança
+
+    # Sem esforco_inicial, o default continua "low" — 100% retrocompatível
+    # com os ~18 call sites existentes (test_copiloto_runner.py e
+    # app/copiloto_turnos_job.py), nenhum dos quais passa este parâmetro.
+    llm_padrao = LLMFake([_tool("estoque_parado"), _texto("Pronto.")])
+    executar_turno(pergunta="e aí?", historico=[], llm=llm_padrao, recursos=_recursos(db))
+    assert llm_padrao.chamadas[0]["esforco"] == "low"
+
+
 def test_ferramenta_desconhecida_nao_executa_e_o_modelo_corrige(db):
     llm = LLMFake([_tool("apagar_tudo"), _texto("Desculpa, vou usar a função certa.")])
     r = executar_turno(

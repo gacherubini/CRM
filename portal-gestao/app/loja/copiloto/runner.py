@@ -142,6 +142,7 @@ def executar_turno(
     on_passo: Callable[[list[dict]], None] | None = None,
     relogio: Callable[[], float] = time.monotonic,
     agora: datetime | None = None,
+    esforco_inicial: EsforcoLLM = "low",
 ) -> ResultadoTurno:
     registro = ferramentas or registro_padrao()
     catalogo = schemas(registro)
@@ -151,7 +152,11 @@ def executar_turno(
     tokens_entrada = 0
     tokens_saida = 0
     inicio = relogio()
-    esforco: EsforcoLLM = "low"
+    # Ponto de partida configurável (§11 da suíte de validação: comparar o
+    # custo de "low" contra "high"). A escalada automática continua igual —
+    # sobe para "high" na 1ª rodada que chamar ferramenta (guarda abaixo),
+    # não é afetada por este parâmetro.
+    esforco: EsforcoLLM = esforco_inicial
     correcao_json_usada = False
 
     def _erro(code: str, texto: str | None) -> ResultadoTurno:
