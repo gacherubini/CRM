@@ -1,5 +1,6 @@
 import json
 from datetime import date, datetime, timezone
+from decimal import Decimal
 from pathlib import Path
 
 from app.loja.copiloto.port import LLMFake, LLMIndisponivel, RespostaLLM, ToolCall
@@ -10,6 +11,9 @@ from scripts.copiloto_validacao import (
     Relatorio,
     avaliar_caso,
     carregar_casos,
+    extrair_numeros_da_resposta,
+    folhas_numericas,
+    normalizar_numero,
     rodar_validacao,
 )
 
@@ -299,3 +303,186 @@ def test_rodar_validacao_turno_com_erro_de_verdade_nao_conta_como_acerto(db):
     # None seria "acerto" pela regra ingênua — mas o turno FALHOU, não
     # decidiu corretamente que não precisava de ferramenta.
     assert avaliacao.acertou_tool is False
+
+
+# --- Métrica 4 (I6): todo número na resposta rastreia a algum payload de
+# ferramenta desta conversa — medida SEPARADA de pct_tool/pct_cobertura.
+
+
+def test_normalizar_numero_br_e_payload_cru_batem():
+    """R$ 412.000,00 (formatação BR da resposta) e "412000.00" (Decimal
+    serializado cru pelo to_dict() da ferramenta) têm que normalizar para o
+    MESMO Decimal — senão a métrica reprova resposta certa só por causa de
+    formatação, o caso que o dono pediu para blindar explicitamente."""
+    assert normalizar_numero("R$ 412.000,00") == Decimal("412000.00")
+    assert normalizar_numero("412000.00") == Decimal("412000.00")
+    assert normalizar_numero("R$ 412.000,00") == normalizar_numero("412000.00")
+    assert normalizar_numero("29.428,57") == normalizar_numero("29428.57") == Decimal("29428.57")
+    assert normalizar_numero("40%") == Decimal("40")
+    assert normalizar_numero("82,5") == Decimal("82.5")
+    assert normalizar_numero("não é número") is None
+
+
+def test_extrair_numeros_da_resposta_ignora_data_ano_e_ordinal():
+    """Data, ano solto e ordinal são restatement de período, não claim
+    numérico de negócio — a métrica tem que ignorá-los (viés a favor de
+    falso negativo, como pedido: nunca acusar violação por causa disso)."""
+    texto = (
+        "Em 12/08/2026, seu 1º colocado vendeu 6 das 14 unidades em 2026, "
+        "faturando R$ 412.000,00."
+    )
+    numeros = extrair_numeros_da_resposta(texto)
+    assert Decimal("6") in numeros
+    assert Decimal("14") in numeros
+    assert Decimal("412000.00") in numeros
+    assert Decimal("12") not in numeros  # dia da data
+    assert Decimal("8") not in numeros  # mês da data
+    assert Decimal("2026") not in numeros  # ano solto
+    assert Decimal("1") not in numeros  # ordinal "1º"
+
+
+def test_folhas_numericas_pega_numero_aninhado_em_dict_e_lista():
+    payload = {
+        "status": "ok",
+        "cobertura_data": {"com_dado": 6, "total": 14},
+        "itens": [{"preco": "29428.57"}, {"preco": None, "placa": "ABC1D23"}],
+        "capital_preso": "412000.00",
+    }
+    folhas = folhas_numericas(payload)
+    assert Decimal("6") in folhas
+    assert Decimal("14") in folhas
+    assert Decimal("29428.57") in folhas
+    assert Decimal("412000.00") in folhas
+
+
+def test_avaliar_caso_resposta_limpa_com_formatacao_br_score_limpo():
+    """O exemplo exato do dono: resposta formatada em R$ contra payload cru
+    em string decimal — NÃO pode ser flagrado."""
+    caso = {"id": "v10", "pergunta": "x", "ferramenta_esperada": "vendas_resumo", "exige_cobertura": False}
+    payload_numeros = frozenset({Decimal("412000.00"), Decimal("29428.57")})
+    resultado = ResultadoFalso(
+        "Sua receita foi R$ 412.000,00, com ticket médio de R$ 29.428,57.",
+        ["vendas_resumo"],
+    )
+    av = avaliar_caso(caso, resultado, payload_numeros)
+    assert av.numeros_relevante is True
+    assert av.numeros_ok is True
+
+
+def test_avaliar_caso_numero_inventado_e_flagrado():
+    caso = {"id": "v11", "pergunta": "x", "ferramenta_esperada": "vendas_resumo", "exige_cobertura": False}
+    payload_numeros = frozenset({Decimal("412000.00")})
+    resultado = ResultadoFalso(
+        "Sua receita foi R$ 412.000,00 e sua margem é de 37%.", ["vendas_resumo"]
+    )
+    av = avaliar_caso(caso, resultado, payload_numeros)
+    assert av.numeros_relevante is True
+    assert av.numeros_ok is False  # 37% não veio de nenhum payload desta conversa
+
+
+def test_avaliar_caso_sem_payload_nao_participa_da_metrica_4():
+    """Compatibilidade: chamador que não passa payload_numeros (testes
+    antigos, ResultadoFalso sem 3º argumento) fica FORA do denominador — não
+    finge medição que não foi feita."""
+    caso = {"id": "x02", "pergunta": "x", "ferramenta_esperada": None, "exige_cobertura": False}
+    av = avaliar_caso(caso, ResultadoFalso("Você vendeu 2.", []))
+    assert av.numeros_relevante is False
+
+
+def test_relatorio_pct_numeros_rastreaveis_denominador_explicito():
+    limpos = [
+        Avaliacao(f"c{i}", True, True, 1000, numeros_relevante=True, numeros_ok=True)
+        for i in range(3)
+    ]
+    com_invencao = [
+        Avaliacao("c9", True, True, 1000, numeros_relevante=True, numeros_ok=False)
+    ]
+    sem_numero = [
+        Avaliacao("n0", True, True, 1000, numeros_relevante=False, numeros_ok=True)
+    ]
+    relatorio = Relatorio(limpos + com_invencao + sem_numero)
+
+    assert relatorio.pct_numeros_rastreaveis == round(3 / 4 * 100, 1)
+    assert "3/4" in relatorio.to_markdown()
+
+
+def test_relatorio_pct_numeros_rastreaveis_none_sem_caso_aplicavel():
+    """Nenhuma resposta do lote tinha número extraível: None, nunca 100%
+    fingido por ausência de caso (mesmo desenho de pct_cobertura)."""
+    relatorio = Relatorio(
+        [Avaliacao("a", True, True, 1000, numeros_relevante=False, numeros_ok=True)]
+    )
+    assert relatorio.pct_numeros_rastreaveis is None
+    assert "sem resposta com número" in relatorio.to_markdown().lower()
+
+
+class _EstoqueComVeiculoParado:
+    """Um veículo parado há 40 dias, preço fixo — payload com número real
+    de uma ferramenta de verdade (não um double manual), para provar o
+    caminho fim a fim de _payload_numeros_do_turno via rodar_validacao."""
+
+    def obter_loja(self):
+        return {"slug": "loja-teste"}
+
+    def listar(self, **_kw):
+        return [
+            {
+                "id": "v1",
+                "status": "disponivel",
+                "marca": "Fiat", "modelo": "Argo", "ano_modelo": 2022,
+                "preco": "15000.00",
+                "criado_em": "2026-07-02T12:00:00+00:00",  # 40 dias antes de AGORA
+            }
+        ]
+
+
+def test_rodar_validacao_fim_a_fim_resposta_limpa_nao_e_flagrada(db):
+    """A resposta cita exatamente o capital preso (R$ 15.000,00) e os dias
+    parados (40) que a ferramenta estoque_parado devolveu de verdade."""
+    caso = {
+        "id": "e10", "pergunta": "tenho veículo parado?",
+        "ferramenta_esperada": "estoque_parado", "exige_cobertura": False,
+    }
+    ctx = CopilotoContexto(
+        loja_slug="loja-teste", papel="dono", ator_email="d@l.test",
+        hoje=date(2026, 8, 11),
+    )
+    recursos = RecursosTools(
+        db=db, estoque=_EstoqueComVeiculoParado(), chatbot=_ChatbotStub(), ctx=ctx,
+        agora=datetime(2026, 8, 11, 15, 0, tzinfo=timezone.utc),
+    )
+    llm = LLMFake([
+        _tool("estoque_parado"),
+        _texto("Você tem 1 veículo parado há 40 dias, com R$ 15.000,00 de capital preso."),
+    ])
+    relatorio = rodar_validacao(llm, recursos, [caso])
+
+    assert relatorio.avaliacoes[0].numeros_relevante is True
+    assert relatorio.avaliacoes[0].numeros_ok is True
+    assert relatorio.pct_numeros_rastreaveis == 100.0
+
+
+def test_rodar_validacao_fim_a_fim_numero_inventado_e_flagrado(db):
+    """Mesma ferramenta, mesmo payload real — mas a resposta inventa um
+    capital preso que a ferramenta nunca devolveu."""
+    caso = {
+        "id": "e11", "pergunta": "tenho veículo parado?",
+        "ferramenta_esperada": "estoque_parado", "exige_cobertura": False,
+    }
+    ctx = CopilotoContexto(
+        loja_slug="loja-teste", papel="dono", ator_email="d@l.test",
+        hoje=date(2026, 8, 11),
+    )
+    recursos = RecursosTools(
+        db=db, estoque=_EstoqueComVeiculoParado(), chatbot=_ChatbotStub(), ctx=ctx,
+        agora=datetime(2026, 8, 11, 15, 0, tzinfo=timezone.utc),
+    )
+    llm = LLMFake([
+        _tool("estoque_parado"),
+        _texto("Você tem capital preso de R$ 99.000,00 em veículos parados."),
+    ])
+    relatorio = rodar_validacao(llm, recursos, [caso])
+
+    assert relatorio.avaliacoes[0].numeros_relevante is True
+    assert relatorio.avaliacoes[0].numeros_ok is False
+    assert relatorio.pct_numeros_rastreaveis == 0.0

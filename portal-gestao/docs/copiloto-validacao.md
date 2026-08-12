@@ -21,7 +21,7 @@ export REVY_LOJA_COPILOTO_LLM_KEY="..."   # nunca commitar, só no ambiente
 — falha cedo com uma mensagem, em vez de bater 42 vezes num provedor sem
 chave.
 
-## As três métricas (medidas separadas, §11)
+## As quatro métricas (medidas separadas, §11 + I6)
 
 1. **Acerto de tool-call** — chamou a função certa? A cadeia encadeou certo?
 2. **Aderência à cobertura** — nos casos em que a ferramenta chamada devolve
@@ -33,6 +33,31 @@ chave.
 3. **Latência por esforço** — quanto custa em segundos um turno partindo de
    `"low"` contra um partindo de `"high"` (`--esforco`, repassado como
    `esforco_inicial` para `executar_turno`).
+4. **Números rastreáveis ao payload (I6)** — de todo número que a resposta
+   apresenta como fato, quantos aparecem em algum payload que uma ferramenta
+   devolveu NESTA conversa? As três métricas acima medem QUAL ferramenta foi
+   chamada e se um texto no formato "N de M" apareceu — nenhuma delas olha
+   se os números em si batem com o que a ferramenta realmente devolveu. Esta
+   é a única que mede a promessa central do produto: o modelo nunca produz
+   número de cabeça.
+
+   **O que ela FAZ:** extrai todo literal numérico da resposta (moeda,
+   percentual, decimal com vírgula, inteiro), normaliza formatação BR
+   (`R$ 412.000,00` → `412000.00`, igual ao `Decimal` que os `to_dict()` do
+   domínio serializam como string) e confere se cada um aparece em alguma
+   folha numérica (recursiva — dict e lista aninhados) de algum payload de
+   ferramenta chamada naquele turno. Exclui data (`12/08`), ano solto
+   (`2026`) e ordinal (`1º`) — restatement de período, não claim de negócio.
+
+   **O que ela NÃO FAZ (limite deliberado, não bug):** não prova que o
+   número está CERTO — só que ele aparece em ALGUM lugar do payload. Se o
+   modelo trocar receita por ticket médio mas os dois vierem da mesma
+   ferramenta, esta métrica não pega — os dois números "existem" no payload.
+   Também não distingue número de negócio de ID/telefone numérico dentro do
+   payload (inclui-los só alarga o conjunto aceito, nunca aperta — viés
+   deliberado a favor de falso negativo, nunca falso positivo, para que o
+   gate nunca "grite lobo" numa resposta correta). É um PISO de sanidade —
+   detecta número inventado do zero — não uma prova de resposta correta.
 
 ## Metas de aceite
 
@@ -41,6 +66,7 @@ chave.
 | Acerto de tool-call | ≥ 90% | Errar a função = responder outra pergunta. |
 | Aderência à cobertura | ≥ 95%, **medida só sobre os casos que exigem cobertura** (18 de 42 na fixture atual) | É a regra que sustenta a confiança no número; diluir no total dos 42 casos deixaria o gate incapaz de reprovar. |
 | Latência p95 (`low`) | ≤ 25s | Acima disso a espera da tela fica insustentável. |
+| Números rastreáveis ao payload | Sem meta definida ainda — reportada, não é gate de go-live até o dono decidir um piso | É métrica nova (I6); precisa de uma rodada real contra o provedor antes de virar critério de reprovação. |
 
 O dono confirma estas metas antes do go-live — não são definitivas até lá.
 `Relatorio.to_markdown()` sempre mostra o denominador da cobertura por
