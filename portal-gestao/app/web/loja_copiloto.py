@@ -170,7 +170,7 @@ def copiloto_home(
             db=db,
             resumo=resumo,
             sinais=listar_sinais_abertos(db, ctx.loja_slug),
-            sinais_novos=contar_sinais_novos(db, ctx.loja_slug),
+            sinais_novos=contar_sinais_novos(db, ctx.loja_slug, usuario.id),
             conversas=conversas,
             conversa_atual=escolhida,
             turnos=turnos_view,
@@ -184,6 +184,13 @@ async def _acao_sinal(
     db: Session,
     operacao,
 ):
+    """``operacao`` sempre recebe ``(db, loja_slug, sinal_id, usuario_id)``.
+
+    ``dispensar`` não usa pessoa (é da loja, por desenho — ver
+    ``sinais_store.py``), então o chamador abaixo o embrulha para ignorar o
+    ``usuario_id``. Isso mantém este helper único em vez de duas cópias, sem
+    inventar um ``usuario_id`` opcional dentro do próprio ``dispensar``.
+    """
     usuario = usuario_atual(request, db)
     if not usuario:
         return redirecionar_login()
@@ -200,7 +207,7 @@ async def _acao_sinal(
         return RedirectResponse(f"{_PAGINA}?erro=sessao", status_code=303)
 
     # loja_slug da sessão: id de sinal sozinho nunca autoriza nada.
-    ok = operacao(db, usuario.loja_slug, sinal_id)
+    ok = operacao(db, usuario.loja_slug, sinal_id, usuario.id)
     destino = f"{_PAGINA}?ok=1" if ok else f"{_PAGINA}?erro=sinal"
     return RedirectResponse(destino, status_code=303)
 
@@ -216,7 +223,12 @@ async def copiloto_sinal_visto(
 async def copiloto_sinal_dispensar(
     request: Request, sinal_id: str, db: Session = Depends(get_db)
 ):
-    return await _acao_sinal(request, sinal_id, db, dispensar)
+    return await _acao_sinal(
+        request,
+        sinal_id,
+        db,
+        lambda db, loja_slug, sid, _usuario_id: dispensar(db, loja_slug, sid),
+    )
 
 
 def _json_erro(status: int, code: str, mensagem: str) -> JSONResponse:

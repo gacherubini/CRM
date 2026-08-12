@@ -9,7 +9,7 @@ from app.loja.copiloto.sinais_store import (
     marcar_visto,
     sincronizar_sinais,
 )
-from app.models import CopilotoSinal
+from app.models import CopilotoSinal, CopilotoSinalVisto
 
 AGORA = datetime(2026, 8, 11, 12, 0, tzinfo=timezone.utc)
 
@@ -116,13 +116,52 @@ def test_listar_abertos_ignora_resolvido_e_dispensado(db):
     assert [s.entidade_ref for s in abertos] == ["v1"]
 
 
-def test_contador_de_novos_cai_quando_marca_visto(db):
+def test_contador_de_novos_cai_so_para_quem_marcou_visto(db):
+    """Visto é por pessoa: A marca, a contagem de A cai e a de B não."""
     sincronizar_sinais(db, "loja-teste", [_cand("v1"), _cand("v2")], agora=AGORA)
-    assert contar_sinais_novos(db, "loja-teste") == 2
+    assert contar_sinais_novos(db, "loja-teste", "user-a") == 2
+    assert contar_sinais_novos(db, "loja-teste", "user-b") == 2
     sinal = (
         db.query(CopilotoSinal).filter(CopilotoSinal.entidade_ref == "v1").one()
     )
-    assert marcar_visto(db, "loja-teste", sinal.id) is True
-    assert contar_sinais_novos(db, "loja-teste") == 1
+    assert marcar_visto(db, "loja-teste", sinal.id, "user-a") is True
+    assert contar_sinais_novos(db, "loja-teste", "user-a") == 1
+    assert contar_sinais_novos(db, "loja-teste", "user-b") == 2
     # Visto continua aberto na lista — só sai do contador.
     assert len(listar_sinais_abertos(db, "loja-teste")) == 2
+
+
+def test_dispensar_some_para_todos_apos_visto_de_um(db):
+    """Dispensar segue sendo da loja: some do contador dos dois, não só de A."""
+    sincronizar_sinais(db, "loja-teste", [_cand("v1")], agora=AGORA)
+    sinal = db.query(CopilotoSinal).one()
+    assert marcar_visto(db, "loja-teste", sinal.id, "user-a") is True
+    assert dispensar(db, "loja-teste", sinal.id) is True
+    assert contar_sinais_novos(db, "loja-teste", "user-a") == 0
+    assert contar_sinais_novos(db, "loja-teste", "user-b") == 0
+
+
+def test_marcar_visto_duas_vezes_nao_duplica_linha(db):
+    sincronizar_sinais(db, "loja-teste", [_cand("v1")], agora=AGORA)
+    sinal = db.query(CopilotoSinal).one()
+    assert marcar_visto(db, "loja-teste", sinal.id, "user-a") is True
+    assert marcar_visto(db, "loja-teste", sinal.id, "user-a") is True
+    assert (
+        db.query(CopilotoSinalVisto)
+        .filter(
+            CopilotoSinalVisto.sinal_id == sinal.id,
+            CopilotoSinalVisto.usuario_id == "user-a",
+        )
+        .count()
+        == 1
+    )
+
+
+def test_marcar_visto_de_sinal_de_outra_loja_nao_e_aceito(db):
+    sincronizar_sinais(db, "loja-a", [_cand("v1")], agora=AGORA)
+    sinal = db.query(CopilotoSinal).one()
+    assert marcar_visto(db, "loja-b", sinal.id, "user-a") is False
+    assert db.query(CopilotoSinalVisto).count() == 0
+    # loja-a continua sem o registro de visto — a chamada com loja errada
+    # não deixa rastro nenhum, nem para a loja certa.
+    assert contar_sinais_novos(db, "loja-a", "user-a") == 1

@@ -576,6 +576,34 @@ class CopilotoSinal(Base):
     )
 
 
+class CopilotoSinalVisto(Base):
+    """"Visto" por pessoa (Fase 4, Task 0): sino do cabeçalho é individual.
+
+    Relação N-para-N entre sinal e pessoa — por isso é tabela, não coluna em
+    ``copiloto_sinal`` (que só guardaria um leitor). Um gestor marcar visto
+    NUNCA muda o que os outros veem: ``estado`` do sinal continua o mesmo,
+    só esta linha existe a mais. Dispensar é diferente — continua mudando
+    ``estado`` em ``copiloto_sinal``, porque dispensar é da loja inteira.
+    """
+
+    __tablename__ = "copiloto_sinal_visto"
+    __table_args__ = (
+        UniqueConstraint(
+            "sinal_id", "usuario_id", name="uq_copiloto_sinal_visto_sinal_usuario"
+        ),
+        Index("ix_copiloto_sinal_visto_usuario", "usuario_id"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=novo_id)
+    sinal_id: Mapped[str] = mapped_column(
+        ForeignKey("copiloto_sinal.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    usuario_id: Mapped[str] = mapped_column(String(36), nullable=False)
+    visto_em: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=agora, nullable=False
+    )
+
+
 TURNO_ESTADOS = ("pendente", "executando", "pronto", "erro", "cancelado")
 PERGUNTA_MAX = 4000
 
