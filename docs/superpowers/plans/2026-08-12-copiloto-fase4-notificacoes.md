@@ -10,6 +10,10 @@
 
 **Pré-requisito:** Fase 1 implementada e verde (motor de sinais). As Tasks 1–3 e 5 **não** dependem da Fase 3. A Task 4 depende do `FipeClient` da Fase 3 e só pode ser executada depois dela.
 
+**Ordem em relação à Fase 3 (duas colisões conhecidas, resolvidas por ordem — não por conteúdo):**
+1. **Migration.** A Fase 3 cria `0021_copiloto_acoes`; esta fase cria a sua própria (`CopilotoSinalVisto`, Task 0). Se as duas assumirem `0020_copiloto_conversa_turno` como pai — o que acontece se rodarem em paralelo —, nasce head dupla do Alembic. A Task 0 já manda conferir `alembic heads` em vez de assumir número (ver Migration, abaixo); o reforço aqui é que essa conferência só faz sentido **depois** de a Fase 3 estar mergeada, não antes. Uma migration vira pai da outra; elas não podem nascer irmãs.
+2. **`app/web/loja_copiloto.py`** é modificado pela Fase 3 (rotas de ação e desfazer), por esta fase (rotas de notificação, Task 3) e possivelmente pela Fase 5. Não há incompatibilidade de conteúdo entre as três — só exige que as fases entrem em ordem: **3 → 4 → 5 → 6**.
+
 **Decisões do dono (2026-08-12):**
 - Notificação **só dentro do painel**. Nada de WhatsApp nem e-mail nesta fase — sem custo de envio, sem regra de horário, sem opt-out para desenhar.
 - Superfície é **sino no cabeçalho, visível de qualquer tela**, não uma página escondida no menu.
@@ -18,7 +22,7 @@
 
 - **O motor não muda.** Regra nova é função pura em `sinais.py` que devolve `SinalCandidato`; o worker, o dedupe e o cooldown da Fase 1 cuidam do resto. Se uma task quiser mexer em `sinais_store.py`, algo está errado no desenho.
 - **`template_extras()` roda em toda renderização do shell.** Uma query de contagem sem cache ali é imposto em cada page view do produto inteiro. A contagem tem de ser cacheada (reusar `CacheTTL` de `app/loja/copiloto/cache.py`) e tem de degradar para "sem badge" se a query falhar — o sino nunca pode derrubar uma página que não é dele.
-- **Gate-duplo vale para o sino.** Ele só existe quando `REVY_LOJA_SHELL_ENABLED` + `REVY_LOJA_COPILOTO_ENABLED` + entitlement `Module.COPILOTO` da loja + papel em `ROLES_GESTAO`. Esconder no template não é autorização: a rota do painel carrega o gate inteiro, igual às rotas da Fase 2.
+- **Gate-duplo vale para o sino, com a MESMA constante que governa a seção.** Ele só existe quando `REVY_LOJA_SHELL_ENABLED` + `REVY_LOJA_COPILOTO_ENABLED` + entitlement `Module.COPILOTO` da loja + papel em `PAPEIS_GESTAO_COPILOTO` (`app/loja/copiloto/tipos.py:18` — dono, gerente e admin_plataforma; **não** `ROLES_GESTAO` de `app/loja/types.py:32`, que não inclui admin_plataforma). Esconder no template não é autorização: a rota do painel carrega o gate inteiro, igual às rotas da Fase 2. **Quem vê o sino é exatamente quem `_pode()` (`app/web/loja_copiloto.py:81`) deixa entrar na seção — uma constante só.** Duas definições de "quem tem acesso ao Copiloto" é como o sino e a página passam a discordar: um `admin_plataforma` abriria a página inteira e não veria aviso nenhum — sintoma que aparece como "notificação fantasma" ou "não recebo aviso", caro de diagnosticar porque a causa fica numa constante errada, não numa lógica quebrada. Isso não muda quem tem acesso na prática além disso: vendedor continua fora.
 - **Copiloto continua só de gestão** (decisão do dono, 2026-08-12: "só pra gestão por enquanto"). O "por enquanto" é literal e a Task 5 prepara o terreno: o catálogo guarda a audiência de cada regra, hoje toda `gestao`. No dia em que o vendedor entrar, muda-se o catálogo — não o gate, não as rotas, não o worker. **Regra sem audiência declarada é tratada como `gestao` (fail-closed), nunca como pública**, e um teste trava isso. O motivo de fail-closed importa: `estoque_parado` mostra capital preso, `margem_incompleta` é sobre custo e `meta_em_risco` mostra meta — o ledger da Fase 1 já tinha parqueado esse vazamento como adormecido justamente porque a seção era só de gestão. Um default público reabriria isso em silêncio.
 - **Visto é por pessoa; dispensar é da loja.** `copiloto_sinal` não tem `usuario_id`, e por isso hoje "visto" é coletivo — o dono quer o contrário (decisão de 2026-08-12). Isso exige tabela nova (Task 0). A assimetria é proposital: **visto** significa "eu li", então é de quem leu; **dispensar** significa "esse alerta não procede", que é um juízo sobre o alerta em si — se fosse pessoal, cada gestor teria de dispensar separadamente o mesmo alerta falso. A tela precisa dizer isso em texto, senão o comportamento parece inconsistente.
 - **Nunca inventar número.** O alerta de FIPE só existe quando a FIPE respondeu. FIPE fora → nenhum sinal, e o alerta de tempo parado (que não depende dela) continua. Nada de "provavelmente acima do mercado".
@@ -77,7 +81,7 @@
 - Test: `portal-gestao/tests/test_copiloto_notificacoes_shell.py`
 
 **Interfaces:**
-- Consome: `contar_sinais_novos` (Task 0, já com `usuario_id`), `CacheTTL` (`cache.py`), `Module`, `ROLES_GESTAO`.
+- Consome: `contar_sinais_novos` (Task 0, já com `usuario_id`), `CacheTTL` (`cache.py`), `Module`, `PAPEIS_GESTAO_COPILOTO` (`app/loja/copiloto/tipos.py:18` — a mesma constante que `_pode()` usa para a seção inteira).
 - Produz: `contar_nao_vistos(db, loja_slug, usuario_id) -> int` (cacheado, TTL curto); `invalidar_contagem(loja_slug, usuario_id=None)`; `template_extras` passa a devolver `copiloto_nao_vistos: int | None`.
 
 **A chave do cache inclui o usuário**, porque a contagem agora é pessoal (Task 0). Cachear só por loja devolveria a contagem do sócio — e `invalidar_contagem(loja_slug)` sem usuário precisa limpar todas as entradas daquela loja, senão o worker criar um sinal novo não reflete para ninguém até o TTL virar.
@@ -86,7 +90,7 @@
 
 **Degradação:** se a contagem levantar, `template_extras` devolve `copiloto_nao_vistos = None` e a página renderiza **sem badge**. O sino é acessório; ele nunca pode ser o motivo de um 500 na tela de Vendas. Logar a exceção em `warning` — não engolir em silêncio (foi achado I2 da revisão final da F1).
 
-**Gate:** devolver `None` — não `0` — quando o shell está desligado, quando o módulo não está no entitlement da loja, ou quando o papel não está em `ROLES_GESTAO`. `None` significa "não tem sino"; `0` significa "tem sino, zerado". A distinção importa para o template.
+**Gate:** devolver `None` — não `0` — quando o shell está desligado, quando o módulo não está no entitlement da loja, ou quando o papel não está em `PAPEIS_GESTAO_COPILOTO`. `None` significa "não tem sino"; `0` significa "tem sino, zerado". A distinção importa para o template.
 
 - [ ] **Step 1: Escrever o teste que falha**
 
