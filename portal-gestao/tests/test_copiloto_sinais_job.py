@@ -8,7 +8,11 @@ from conftest import seed_loja_operacional
 from app.clients.chatbot import ChatbotClient
 from app.clients.estoque import EstoqueClient, VeiculoNaoEncontrado
 from app.clients.fipe import FipeClient
-from app.copiloto_sinais_job import CopilotoSinaisWorker, avaliar_loja
+from app.copiloto_sinais_job import (
+    CopilotoSinaisWorker,
+    _parse_valor_fipe,
+    avaliar_loja,
+)
 from app.db import SessionLocal
 from app.loja.copiloto.fipe import cache_fipe
 from app.loja.types import Module
@@ -413,3 +417,102 @@ def test_avaliar_loja_respeita_teto_e_prioriza_mais_parado(db, monkeypatch):
     # /anos nunca é cacheado (só marca/modelo): contar essa rota isola
     # quantos veículos de fato foram consultados nesta rodada.
     assert sum(1 for c in chamadas if c.endswith("/5140/anos")) == 1
+
+
+# --- _parse_valor_fipe: dado externo malformado nunca vira valor aproximado
+
+
+def test_parse_valor_fipe_formato_br_padrao():
+    assert _parse_valor_fipe("R$ 27.500,00") == Decimal("27500.00")
+
+
+def test_parse_valor_fipe_sem_separador_de_milhar():
+    assert _parse_valor_fipe("R$ 500,00") == Decimal("500.00")
+
+
+def test_parse_valor_fipe_varios_separadores_de_milhar():
+    assert _parse_valor_fipe("R$ 1.234.567,89") == Decimal("1234567.89")
+
+
+def test_parse_valor_fipe_sem_espaco_apos_cifrao():
+    assert _parse_valor_fipe("R$27.500,00") == Decimal("27500.00")
+
+
+def test_parse_valor_fipe_negativo_e_rejeitado_nao_vira_positivo():
+    """O defeito real encontrado na revisão: o regex antigo removia o '-' em
+    vez de rejeitar o valor inteiro, e '-27.500,00' virava Decimal positivo.
+    Um 'Valor' negativo não é preço malformado que dá para consertar — é
+    sinal de que a resposta não deve ser usada."""
+    assert _parse_valor_fipe("-27.500,00") is None
+    assert _parse_valor_fipe("R$ -27.500,00") is None
+
+
+def test_parse_valor_fipe_zero_e_rejeitado():
+    assert _parse_valor_fipe("R$ 0,00") is None
+
+
+def test_parse_valor_fipe_vazio_e_none_sao_rejeitados():
+    assert _parse_valor_fipe("") is None
+    assert _parse_valor_fipe(None) is None
+
+
+def test_parse_valor_fipe_formato_americano_e_rejeitado():
+    """'27500.00' não é BR — se fosse aceito por engano, viraria 100x o
+    valor real (2750000) ao tratar o ponto como separador de milhar."""
+    assert _parse_valor_fipe("27500.00") is None
+
+
+def test_parse_valor_fipe_sem_cifrao_e_rejeitado():
+    assert _parse_valor_fipe("27.500,00") is None
+
+
+def test_parse_valor_fipe_texto_arbitrario_e_rejeitado():
+    assert _parse_valor_fipe("consulte o revendedor") is None
+
+
+# --- dedupe/cooldown pelo caminho do worker (brief item 7) ------------------
+
+
+def test_avaliar_loja_preco_fora_da_faixa_atualiza_em_vez_de_duplicar_no_worker(db):
+    """O brief pede prova pelo caminho do worker, não só da regra: rodar
+    avaliar_loja + sincronizar_sinais duas vezes para o MESMO veículo caro
+    tem que reconciliar (1 criado, depois 1 atualizado), nunca duplicar uma
+    segunda linha 'preco_fora_da_faixa' para o mesmo entidade_ref."""
+    from app.loja.copiloto.sinais_store import sincronizar_sinais
+
+    seed_loja_operacional(db)
+    db.commit()
+
+    estoque = EstoqueStub([_veiculo_fipe("v1", dias=90, preco=40000)])
+    chatbot = ChatbotStub()
+    fipe = _fipe_client()
+
+    candidatos_1 = avaliar_loja(
+        db, "loja-teste", estoque=estoque, chatbot=chatbot, fipe=fipe, agora=AGORA
+    )
+    resultado_1 = sincronizar_sinais(db, "loja-teste", candidatos_1, agora=AGORA)
+    db.commit()
+    # dias=90 também passa do limiar de "estoque parado" (60 dias): a regra 1
+    # dispara junto com a regra 7 para o mesmo veículo — 2 sinais no ciclo 1,
+    # não é sinal de duplicação da regra 7.
+    assert resultado_1.criados == 2
+
+    agora_2 = AGORA + timedelta(minutes=30)
+    candidatos_2 = avaliar_loja(
+        db, "loja-teste", estoque=estoque, chatbot=chatbot, fipe=fipe, agora=agora_2
+    )
+    resultado_2 = sincronizar_sinais(db, "loja-teste", candidatos_2, agora=agora_2)
+    db.commit()
+    assert resultado_2.criados == 0
+    assert resultado_2.atualizados == 2
+
+    linhas = (
+        db.query(CopilotoSinal)
+        .filter(
+            CopilotoSinal.loja_slug == "loja-teste",
+            CopilotoSinal.regra == "preco_fora_da_faixa",
+        )
+        .all()
+    )
+    assert len(linhas) == 1
+    assert linhas[0].entidade_ref == "v1"

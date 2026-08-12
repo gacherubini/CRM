@@ -85,12 +85,29 @@ def lojas_ativas(db: Session) -> list[str]:
     return [slug for slug in slugs if _copiloto_permitido(db, slug)]
 
 
+# Formato documentado da resposta real da FIPE (client.valor()["Valor"]):
+# "R$ 27.500,00" — moeda BR, "." separador de milhar, "," separador decimal.
+# Qualquer coisa fora deste formato é rejeitada, não "consertada": um regex
+# de limpeza que só remove caracteres indesejados (em vez de VALIDAR o
+# formato inteiro) é exatamente o tipo de parser que transforma dado externo
+# estranho em número plausível — a classe de defeito que esta fase inteira
+# existe para evitar.
+_RE_VALOR_FIPE = re.compile(r"R\$\s*\d{1,3}(?:\.\d{3})*,\d{2}$")
+
+
 def _parse_valor_fipe(bruto: str | None) -> Decimal | None:
-    """``"R$ 27.500,00"`` -> ``Decimal("27500.00")``. Falha vira ``None``,
-    nunca um valor aproximado."""
+    """``"R$ 27.500,00"`` -> ``Decimal("27500.00")``. Qualquer coisa que não
+    seja esse formato positivo bem-formado vira ``None`` — nunca um valor
+    aproximado. Em particular, sinal negativo é REJEITADO, não descartado:
+    ``"-27.500,00"`` não vira ``27500.00`` — vira ``None``, porque um "Valor"
+    negativo não é um preço malformado que dá para consertar, é sinal de que
+    aquela resposta da FIPE não deve ser usada."""
     if not bruto:
         return None
-    limpo = re.sub(r"[^\d,]", "", str(bruto)).replace(",", ".")
+    texto = str(bruto).strip()
+    if not _RE_VALOR_FIPE.fullmatch(texto):
+        return None
+    limpo = texto.split("R$", 1)[1].strip().replace(".", "").replace(",", ".")
     try:
         valor = Decimal(limpo)
     except (ArithmeticError, ValueError):
@@ -119,7 +136,17 @@ def _veiculos_com_fipe(
     categórica que a FIPE nunca adivinha, e um sinal proativo é lugar pior
     para adivinhar do que uma resposta de chat, porque ninguém perguntou
     nada.
+
+    ``fipe is None`` sai cedo, sem tocar no estoque: o chamador
+    (``avaliar_loja``) já filtra isso antes de chamar esta função, mas o
+    guard fica também aqui — defesa que não depende de quem chama, e que
+    evita gastar um ``estoque_parado()`` (mais um ``estoque.obter()`` por
+    item) só para falhar no primeiro ``fipe.marcas()``. O ``except``
+    por-veículo abaixo continua como rede para falhas genuinamente
+    inesperadas, não como o mecanismo principal para este caso previsível.
     """
+    if fipe is None:
+        return []
     candidatos = estoque_parado(estoque, ctx, dias_min=0, limite=max(1, teto), agora=ref)
     pares: list[tuple] = []
     for item in candidatos.itens:
