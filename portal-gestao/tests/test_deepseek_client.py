@@ -2,7 +2,7 @@ import httpx
 import pytest
 
 from app.clients.deepseek import DeepSeekClient, montar_payload
-from app.loja.copiloto.port import LLMIndisponivel, MensagemLLM
+from app.loja.copiloto.port import LLMIndisponivel, MensagemLLM, RespostaLLMInvalida
 
 FERRAMENTAS = [
     {
@@ -179,3 +179,23 @@ def test_chave_nunca_aparece_em_log(caplog):
         client.completar(_mensagens(), FERRAMENTAS)
     assert "chave-secreta" not in caplog.text
     assert "Quantas vendas" not in caplog.text
+
+
+def test_200_com_corpo_invalido_nao_repete():
+    tentativas = []
+
+    def handler(request):
+        tentativas.append(1)
+        return httpx.Response(200, text="<html>gateway error</html>")
+
+    with pytest.raises(RespostaLLMInvalida):
+        _client(handler, retries=2).completar(_mensagens(), FERRAMENTAS)
+    assert len(tentativas) == 1
+
+
+def test_corpo_invalido_sempre_levanta_resposta_llm_invalida():
+    def handler(request):
+        return httpx.Response(200, text="not json at all")
+
+    with pytest.raises(RespostaLLMInvalida):
+        _client(handler).completar(_mensagens(), FERRAMENTAS)

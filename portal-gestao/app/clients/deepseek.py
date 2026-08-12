@@ -131,7 +131,11 @@ class DeepSeekClient:
                     resposta = client.post("/chat/completions", json=payload)
                 ultimo_status = resposta.status_code
                 if resposta.status_code == 200:
-                    saida = self._interpretar(resposta.json())
+                    try:
+                        corpo = resposta.json()
+                    except ValueError as exc:
+                        raise RespostaLLMInvalida("resposta com corpo inválido") from exc
+                    saida = self._interpretar(corpo)
                     logger.info(
                         "copiloto_llm modelo=%s esforco=%s in=%s out=%s ms=%s",
                         self.modelo,
