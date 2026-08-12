@@ -139,6 +139,20 @@ def test_cartao_de_despublicar_veiculo_tem_titulo_proprio(db):
     assert "Publicar" not in cartao.titulo
 
 
+def test_cartao_nao_inventa_preco_quando_estoque_nao_tem(db):
+    """I-3 (Important, revisão final de 2026-08-12): veículo sem preço não
+    pode virar 'R$ 0,00' no cartão — é a última tela que o dono lê antes de
+    confirmar, e um preço inventado ali é exatamente a classe de defeito que
+    esta fase inteira combateu. Ausência tem que aparecer como ausência."""
+    cartao = montar_cartao(
+        EstoqueStub(preco=None), _ctx(), acao="despublicar_veiculo",
+        parametros={"veiculo_id": "v1"},
+    )
+    texto = " ".join(cartao.linhas)
+    assert "R$ 0,00" not in texto
+    assert "Preço: —" in cartao.linhas
+
+
 def test_cartao_expoe_rotulo_id_e_placa_em_campos_proprios(db):
     """C-1: rótulo do veículo, id e placa são campos próprios do cartão —
     nunca colados dentro do título. `to_dict()` expõe os três para a rota

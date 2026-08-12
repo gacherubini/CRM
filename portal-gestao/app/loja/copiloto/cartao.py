@@ -94,6 +94,25 @@ def _rotulo_veiculo(veiculo: dict) -> str:
     return truncar_com_reticencias(rotulo, LIMITE_ROTULO)
 
 
+def _preco_atual(veiculo: dict) -> Decimal | None:
+    """Preço real do veículo, ou ``None`` quando o Estoque não tem um.
+
+    Revisão de 2026-08-12 (achado I-3, Important): a versão anterior fazia
+    ``Decimal(str(veiculo.get("preco") or 0))`` — um veículo sem preço
+    virava ``R$ 0,00`` no cartão, o único lugar da fase em que ausência de
+    dado virava um valor inventado, e justo na última tela que o dono lê
+    antes de confirmar. ``_brl(None)`` já sabe mostrar "—"; esta função só
+    precisa deixar a ausência passar como ausência, sem "or 0".
+    """
+    bruto = veiculo.get("preco")
+    if bruto in (None, ""):
+        return None
+    try:
+        return Decimal(str(bruto)).quantize(CENTAVOS, rounding=ROUND_HALF_UP)
+    except (ArithmeticError, ValueError):
+        return None
+
+
 def _placa_veiculo(veiculo: dict) -> str | None:
     # Placa é DADO de terceiro tanto quanto marca/modelo (ver _rotulo_veiculo
     # acima): mesmo tratamento — sanitiza controle/bidi e corta — nunca
@@ -154,7 +173,7 @@ def montar_cartao(
 
     rotulo = _rotulo_veiculo(veiculo)
     placa = _placa_veiculo(veiculo)
-    preco_atual = Decimal(str(veiculo.get("preco") or 0)).quantize(CENTAVOS)
+    preco_atual = _preco_atual(veiculo)
 
     if acao == "ajustar_preco":
         novo = validar_ajuste_preco(preco_atual, (parametros or {}).get("novo_preco"))
