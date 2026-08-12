@@ -70,7 +70,7 @@ from app.meta_ads_spend import (
     normalizar_ad_account_id,
     sincronizar_gastos_meta,
 )
-from app import meta_ads_spend_job, meta_capi_job, revy_trafego_outbox_job
+from app import copiloto_sinais_job, meta_ads_spend_job, meta_capi_job, revy_trafego_outbox_job
 from app.revy_trafego_outbox import (
     enfileirar_venda_atualizada,
     enfileirar_venda_confirmada,
@@ -339,12 +339,14 @@ async def _lifespan(_app: FastAPI):
             SessionLocal,
             enabled=settings.revy_trafego_venda_events_enabled,
         )
+        copiloto_sinais_job.start_worker(SessionLocal)
     try:
         yield
     finally:
         meta_ads_spend_job.stop_worker()
         meta_capi_job.stop_worker()
         revy_trafego_outbox_job.stop_worker()
+        copiloto_sinais_job.stop_worker()
 
 
 app = FastAPI(
