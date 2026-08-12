@@ -94,7 +94,15 @@ class EstoqueClient:
         return self._request("POST", "/v1/veiculos", json=dados)
 
     def atualizar(self, veiculo_id: str, dados: dict) -> dict:
-        return self._request("PATCH", f"/v1/veiculos/{veiculo_id}", json=dados)
+        # 404/409 mapeados: o Copiloto precisa distinguir "veículo não existe"
+        # de "estoque fora do ar" — são mensagens diferentes para o dono.
+        return self._request(
+            "PATCH",
+            f"/v1/veiculos/{veiculo_id}",
+            json=dados,
+            erro_404=VeiculoNaoEncontrado,
+            erro_409=ConflitoEstoque,
+        )
 
     def acao(self, veiculo_id: str, acao: str) -> dict:
         permitidas = {"publicar", "despublicar", "reservar", "vender"}
