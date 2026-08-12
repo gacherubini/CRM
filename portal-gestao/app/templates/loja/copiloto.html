@@ -41,8 +41,12 @@
         <p class="copiloto-pergunta">{{ turno.pergunta }}</p>
         {% if turno.estado == 'erro' %}
         <p class="copiloto-resposta erro">{{ turno.resposta or 'Não consegui responder desta vez.' }}</p>
-        {% else %}
+        {% elif turno.estado == 'cancelado' %}
+        <p class="copiloto-resposta muted">{{ turno.resposta or 'Pergunta cancelada.' }}</p>
+        {% elif turno.resposta %}
         <p class="copiloto-resposta">{{ turno.resposta }}</p>
+        {% else %}
+        <p class="copiloto-resposta muted">Ainda processando esta pergunta…</p>
         {% endif %}
         {% if turno.passos %}
         <details class="copiloto-fontes">

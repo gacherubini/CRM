@@ -2,7 +2,7 @@ from conftest import csrf_da_resposta, login, seed_loja_operacional
 
 from app.copiloto_turnos_job import CopilotoTurnosWorker, processar_turno
 from app.db import SessionLocal
-from app.loja.copiloto.conversas import criar_turno, obter_turno
+from app.loja.copiloto.conversas import cancelar_turno, criar_turno, obter_turno
 from app.loja.copiloto.port import LLMFake, RespostaLLM, ToolCall
 from app.models import CopilotoTurno, LojaOperacionalProjecao
 
@@ -266,6 +266,60 @@ def test_provedor_fora_grava_erro_e_nao_texto(db):
     db.refresh(turno)
     assert turno.estado == "erro"
     assert turno.erro_code == "provedor"
+
+
+def test_turno_cancelado_durante_execucao_nao_vira_pronto(db):
+    """I3: Cancelar roda numa sessão HTTP separada da do worker. Sem reler o
+    estado do banco antes de gravar o resultado, o worker ressuscitaria um
+    turno cancelado como `pronto` — a tela já parou de fazer polling em
+    `cancelado`, então o dono só veria a resposta se recarregasse a página."""
+    turno = criar_turno(
+        db, loja_slug="loja-teste", usuario_id="u1", pergunta="quanto vendi?"
+    )
+    turno_id = turno.id
+
+    class LLMCancelaDuranteAChamada:
+        def completar(self, *a, **k):
+            outra_sessao = SessionLocal()
+            try:
+                assert cancelar_turno(outra_sessao, "loja-teste", turno_id) is True
+            finally:
+                outra_sessao.close()
+            return RespostaLLM(
+                texto="Você vendeu 2 motos.",
+                tool_calls=(),
+                tokens_entrada=100,
+                tokens_saida=10,
+                finish_reason="stop",
+            )
+
+    processar_turno(
+        db, turno, llm=LLMCancelaDuranteAChamada(), estoque=EstoqueStub(),
+        chatbot=ChatbotStub(),
+    )
+    db.refresh(turno)
+    assert turno.estado == "cancelado"
+    assert turno.resposta is None
+
+
+def test_turno_ja_cancelado_no_pickup_nao_chama_o_provedor(db):
+    """I3: turno cancelado ANTES do worker pegá-lo não pode gerar custo de
+    LLM — nem `atualizar_progresso(estado='executando')` pode rodar por cima
+    do cancelamento."""
+    turno = criar_turno(
+        db, loja_slug="loja-teste", usuario_id="u1", pergunta="quanto vendi?"
+    )
+    assert cancelar_turno(db, "loja-teste", turno.id) is True
+
+    class LLMEspiao:
+        def completar(self, *a, **k):
+            raise AssertionError("o provedor não deveria ser chamado")
+
+    processar_turno(
+        db, turno, llm=LLMEspiao(), estoque=EstoqueStub(), chatbot=ChatbotStub()
+    )
+    db.refresh(turno)
+    assert turno.estado == "cancelado"
 
 
 def test_worker_pega_turno_pendente(db):

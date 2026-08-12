@@ -6,7 +6,9 @@ Duas coisas que este client NÃO faz, de propósito:
 - não usa ``app/clients/_retry.py``: aquele helper só repete GET/HEAD/OPTIONS
   ou POST com ``Idempotency-Key`` (``_retry.py:44-46``), e este POST não é
   idempotente pelo padrão da casa;
-- não loga payload nem chave. Só metadados.
+- não loga payload nem chave, nunca. Em falha 4xx loga só o CORPO DA
+  RESPOSTA do provedor (truncado) — nunca o corpo do request — porque um
+  400 mudo (`status=400`) não diz qual campo o provedor rejeitou.
 """
 from __future__ import annotations
 
@@ -35,6 +37,21 @@ TEMPERATURE_AGENTICA = 1.0
 TOP_P_AGENTICO = 0.95
 
 STATUS_QUE_REPETEM = frozenset({408, 409, 425, 429, 500, 502, 503, 504})
+
+TAMANHO_MAX_LOG_CORPO = 300
+
+
+def _resumo_corpo_resposta(resposta: httpx.Response) -> str:
+    """Corpo da RESPOSTA do provedor, truncado — nunca o request, nunca a
+    chave. Best-effort: se nem o texto vier legível, loga string vazia em
+    vez de derrubar o client por causa de um log."""
+    try:
+        texto = (resposta.text or "").strip()
+    except Exception:
+        return ""
+    if len(texto) > TAMANHO_MAX_LOG_CORPO:
+        return texto[:TAMANHO_MAX_LOG_CORPO] + "…"
+    return texto
 
 
 def montar_payload(
@@ -138,6 +155,7 @@ class DeepSeekClient:
         inicio = time.monotonic()
 
         ultimo_status: int | None = None
+        ultimo_corpo_erro: str | None = None
         for tentativa in range(self.retries + 1):
             try:
                 with httpx.Client(
@@ -164,13 +182,29 @@ class DeepSeekClient:
                     )
                     return saida
                 if resposta.status_code not in STATUS_QUE_REPETEM:
+                    if 400 <= resposta.status_code < 500:
+                        # Só o corpo da RESPOSTA (nunca o payload que mandamos
+                        # nem a chave): é a mensagem de erro do provedor —
+                        # p.ex. "reasoning_effort não suportado" — que
+                        # transforma um 400 mudo num log diagnosticável.
+                        ultimo_corpo_erro = _resumo_corpo_resposta(resposta)
                     break  # 4xx de validação: repetir só queima token
             except httpx.HTTPError:
                 ultimo_status = None
             if tentativa < self.retries:
                 self._sleeper(self.backoff * (2**tentativa))
 
-        logger.warning("copiloto_llm falha modelo=%s status=%s", self.modelo, ultimo_status)
+        if ultimo_corpo_erro:
+            logger.warning(
+                "copiloto_llm falha modelo=%s status=%s corpo=%s",
+                self.modelo,
+                ultimo_status,
+                ultimo_corpo_erro,
+            )
+        else:
+            logger.warning(
+                "copiloto_llm falha modelo=%s status=%s", self.modelo, ultimo_status
+            )
         raise LLMIndisponivel(f"provedor de LLM indisponível (status={ultimo_status})")
 
     def _interpretar(self, bruto: dict) -> RespostaLLM:

@@ -104,6 +104,30 @@ def test_tela_traz_o_endpoint_de_polling(client, monkeypatch):
     assert "/app/loja/copiloto/perguntar" in r.text
 
 
+def test_turno_sem_resposta_nao_vaza_a_string_none(client, monkeypatch):
+    """I2: pendente/executando/cancelado não têm `resposta` nem
+    `texto_parcial` — a rota manda None para o template, e o Jinja2Templates
+    do FastAPI não tem finalize configurado, então `{{ turno.resposta }}`
+    sem guarda renderiza o literal `None`."""
+    _ligar(monkeypatch)
+    login(client)
+    usuario_id = _usuario_id()
+    for estado in ("pendente", "executando", "cancelado"):
+        db = SessionLocal()
+        try:
+            turno = criar_turno(
+                db, loja_slug="loja-teste", usuario_id=usuario_id,
+                pergunta=f"pergunta em estado {estado}?",
+            )
+            turno.estado = estado
+            db.commit()
+            conversa_id = turno.conversa_id
+        finally:
+            db.close()
+        r = client.get(f"/app/loja/copiloto?conversa_id={conversa_id}")
+        assert "None" not in r.text, f"estado={estado} vazou 'None' no HTML"
+
+
 def test_botao_perguntar_tem_id_para_desabilitar_durante_o_turno(client, monkeypatch):
     """Hook que o JS usa para travar o composer enquanto um turno está em
     voo (fix round 1): sem este id o botão não pode ser desabilitado, e uma

@@ -56,6 +56,10 @@ MENSAGEM_RESPOSTA_INVALIDA = (
     "O assistente não conseguiu montar uma chamada de função válida mesmo "
     "depois de tentar de novo. Tente reformular a pergunta."
 )
+MENSAGEM_RESPOSTA_TRUNCADA = (
+    "A resposta ficou grande demais e o provedor cortou o texto antes de "
+    "terminar. Tente perguntar de um jeito mais específico ou em partes."
+)
 
 # Nudge textual quando o provedor devolve uma tool-call com JSON quebrado
 # (RespostaLLMInvalida, levantada dentro de completar() — antes de existir
@@ -205,6 +209,13 @@ def executar_turno(
         tokens_saida += resposta.tokens_saida
 
         if not resposta.tool_calls:
+            if resposta.finish_reason == "length":
+                # O provedor cortou a resposta em max_tokens_resposta antes de
+                # terminar a frase — servir esse texto como "pronto" seria
+                # entregar um número/frase truncados como se fossem a
+                # resposta final. Sem tool_calls pendentes não há como pedir
+                # continuação, então isto é erro, não sucesso parcial.
+                return _erro("resposta_truncada", MENSAGEM_RESPOSTA_TRUNCADA)
             return ResultadoTurno(
                 estado="pronto",
                 texto=(resposta.texto or "").strip() or None,

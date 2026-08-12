@@ -76,8 +76,27 @@ def processar_turno(
     chatbot,
     agora: datetime | None = None,
 ) -> None:
-    """Executa um turno e grava o resultado. Nunca levanta para o chamador."""
+    """Executa um turno e grava o resultado. Nunca levanta para o chamador.
+
+    Cancelar roda numa sessão HTTP separada desta (a rota flipa `estado` na
+    sessão do request; este worker tem a sua própria). `db.refresh` força a
+    releitura do valor comitado por aquela outra sessão — sem isso, os
+    `atualizar_progresso`/`concluir_turno`/`falhar_turno` abaixo escreveriam
+    por cima de um cancelamento (blind write): na pior hipótese,
+    ressuscitando o turno como `pronto` depois que a tela já parou de fazer
+    polling em `cancelado`.
+    """
     ref = agora or datetime.now(timezone.utc)
+
+    db.refresh(turno)
+    if turno.estado == "cancelado":
+        logger.info(
+            "copiloto_turno turno=%s já cancelado antes de iniciar — não chama "
+            "o provedor",
+            turno.id,
+        )
+        return
+
     atualizar_progresso(db, turno, estado="executando", passos=[])
 
     ctx = CopilotoContexto(
@@ -107,7 +126,26 @@ def processar_turno(
         )
     except Exception as exc:  # rede de segurança: turno nunca fica pendurado
         logger.warning("copiloto_turno erro inesperado tipo=%s", type(exc).__name__)
+        db.refresh(turno)
+        if turno.estado == "cancelado":
+            logger.info(
+                "copiloto_turno turno=%s cancelado durante a execução — mantém "
+                "estado apesar do erro interno",
+                turno.id,
+            )
+            return
         falhar_turno(db, turno, erro_code="interno")
+        return
+
+    db.refresh(turno)
+    if turno.estado == "cancelado":
+        logger.info(
+            "copiloto_turno turno=%s cancelado durante a execução — descarta o "
+            "resultado do provedor (in=%s out=%s) e mantém o estado",
+            turno.id,
+            resultado.tokens_entrada,
+            resultado.tokens_saida,
+        )
         return
 
     if resultado.estado == "pronto" and resultado.texto:

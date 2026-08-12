@@ -243,6 +243,64 @@ def test_chave_nunca_aparece_em_log(caplog):
     assert "Quantas vendas" not in caplog.text
 
 
+def test_erro_400_loga_o_corpo_da_resposta_para_diagnostico(caplog):
+    """I4: um 400 mudo (`status=400`) não diz qual campo o provedor
+    rejeitou. O corpo da RESPOSTA (nunca o request) precisa entrar no log
+    para o smoke contra o provedor de verdade ser diagnosticável."""
+
+    def handler(request):
+        return httpx.Response(
+            400,
+            json={
+                "error": {
+                    "message": "reasoning_effort is not supported for this model"
+                }
+            },
+        )
+
+    with caplog.at_level("WARNING"):
+        with pytest.raises(LLMIndisponivel):
+            _client(handler).completar(_mensagens(), FERRAMENTAS)
+
+    assert "reasoning_effort is not supported for this model" in caplog.text
+
+
+def test_erro_5xx_nao_loga_corpo_da_resposta(caplog):
+    """Só 4xx é diagnóstico de payload — 5xx é o provedor caindo, não a
+    gente errando um campo, então o corpo não precisa (nem deveria) aparecer."""
+
+    def handler(request):
+        return httpx.Response(503, text="upstream connect error")
+
+    with caplog.at_level("WARNING"):
+        with pytest.raises(LLMIndisponivel):
+            _client(handler, retries=0).completar(_mensagens(), FERRAMENTAS)
+
+    assert "upstream connect error" not in caplog.text
+
+
+def test_chave_nunca_aparece_em_log_mesmo_em_erro_400(caplog):
+    def handler(request):
+        assert request.headers["authorization"] == "Bearer chave-secreta"
+        return httpx.Response(
+            400, json={"error": {"message": "invalid parameter: top_p"}}
+        )
+
+    client = DeepSeekClient(
+        base_url="https://api.deepseek.test",
+        api_key="chave-secreta",
+        modelo="m",
+        transport=httpx.MockTransport(handler),
+    )
+    with caplog.at_level("DEBUG"):
+        with pytest.raises(LLMIndisponivel):
+            client.completar(_mensagens(), FERRAMENTAS)
+    assert "chave-secreta" not in caplog.text
+    assert "Quantas vendas" not in caplog.text
+    # Log continua diagnosticável: o corpo do erro aparece, só a chave não.
+    assert "invalid parameter: top_p" in caplog.text
+
+
 def test_200_com_corpo_invalido_nao_repete():
     tentativas = []
 

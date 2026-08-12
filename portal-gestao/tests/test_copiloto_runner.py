@@ -317,6 +317,38 @@ def test_correcao_de_json_nao_ignora_o_teto_de_tokens(db):
     assert len(llm.chamadas) == 0
 
 
+# --- finish_reason == "length": resposta cortada não pode virar "pronto" ---
+
+
+def test_resposta_cortada_pelo_provedor_nao_vira_pronto_nem_vaza_o_texto(db):
+    """C1: o provedor sinaliza finish_reason="length" quando corta a resposta
+    em max_tokens_resposta. Sem tool_calls pendentes, o runner não tem como
+    pedir continuação — teria que servir o texto truncado como se fosse a
+    resposta final. Isso vira erro, com mensagem canônica sem dígito."""
+    llm = LLMFake(
+        [
+            RespostaLLM(
+                texto="Ana fechou 4 vendas, Bruno 3, Carlos fechou R$ 1",
+                tool_calls=(),
+                tokens_entrada=1200,
+                tokens_saida=800,
+                finish_reason="length",
+            )
+        ]
+    )
+    r = executar_turno(
+        pergunta="me lista os vendedores e quanto cada um fez esse mês",
+        historico=[],
+        llm=llm,
+        recursos=_recursos(db),
+    )
+    assert r.estado != "pronto"
+    assert r.erro_code == "resposta_truncada"
+    assert r.texto is not None
+    assert "Carlos" not in r.texto
+    assert not any(ch.isdigit() for ch in r.texto)
+
+
 # --- Formato de wire (Finding 2): histórico do assistant leva ToolCall real ---
 
 

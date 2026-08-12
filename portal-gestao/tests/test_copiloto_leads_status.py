@@ -159,6 +159,29 @@ def test_funil_vazio_com_fontes_ok_vira_status_vazio():
     assert r.status == "vazio"
 
 
+def test_funil_parcial_com_chatbot_saudavel_vira_status_parcial():
+    """I1: funil_status="parcial" é INPUT para um modelo instruído (REGRAS[7])
+    a avisar quando um dado vier parcial. Devolver STATUS_OK aqui faria um
+    modelo bem-comportado não qualificar um número que devia vir com
+    ressalva — mesmo com o chatbot saudável."""
+    r = leads_status(
+        _overview(
+            funil={
+                "total_leads": 40,
+                "taxa_resposta_pct": "62.0",
+                "tempo_mediano_primeira_resposta_segundos": 300,
+            },
+            funil_status="parcial",
+        ),
+        ChatbotStub([]),
+        ctx=_ctx(),
+        agora=AGORA,
+    )
+    assert r.status == "parcial"
+    # Os dados continuam repassados — "parcial" é status, não apagão de dado.
+    assert r.total_leads == 40
+
+
 def test_funil_e_sem_resposta_indisponiveis_vira_status_indisponivel():
     """As duas fontes fora do ar ao mesmo tempo: nada de "parcial" — não há
     nenhum dado confiável para mostrar, então o status tem que dizer isso."""

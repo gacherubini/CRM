@@ -136,7 +136,15 @@ def leads_status(
         # Funil genuinamente vazio (zero leads) com as duas fontes ok: vazio
         # não é degradação, é o mesmo vocabulário de estoque_parado/vendas_resumo.
         status = STATUS_VAZIO
-    elif funil_status in {STATUS_ERRO, STATUS_INDISPONIVEL} or sem_resposta is None:
+    elif (
+        funil_status in {STATUS_ERRO, STATUS_INDISPONIVEL, STATUS_PARCIAL}
+        or sem_resposta is None
+    ):
+        # funil_status == "parcial" cai aqui: o período coberto pelo funil não
+        # é o todo, e REGRAS[7] do system prompt instrui o modelo a avisar
+        # quando um dado vier parcial — entregar STATUS_OK aqui faria um
+        # modelo bem-comportado NÃO qualificar um número que devia vir com
+        # ressalva.
         status = STATUS_PARCIAL
     else:
         status = STATUS_OK
