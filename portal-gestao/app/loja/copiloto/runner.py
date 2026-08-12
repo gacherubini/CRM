@@ -85,6 +85,11 @@ class Passo:
     argumentos: dict[str, Any]
     status: str  # ok | erro
     resumo: str
+    # Registro genérico de um passo de ferramenta: quando a saída (dict) trouxer
+    # algo estruturado além do resumo textual (hoje, o "cartao" de propor_acao),
+    # ele vive aqui. O nome NÃO é "cartao" — a próxima ferramenta que precisar
+    # devolver algo estruturado reusa este mesmo campo em vez de inventar outro.
+    extra: dict[str, Any] | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -92,6 +97,7 @@ class Passo:
             "argumentos": self.argumentos,
             "status": self.status,
             "resumo": self.resumo,
+            "extra": self.extra,
         }
 
 
@@ -235,6 +241,7 @@ def executar_turno(
         for chamada in resposta.tool_calls:
             if relogio() - inicio > deadline_segundos:
                 return _erro("deadline", MENSAGEM_DEADLINE)
+            extra: dict[str, Any] | None = None
             try:
                 saida = despachar(
                     chamada.nome, chamada.argumentos, recursos, ferramentas=registro
@@ -242,6 +249,8 @@ def executar_turno(
                 status = "ok"
                 resumo = str(saida.get("status", "ok"))
                 conteudo = json.dumps(saida, ensure_ascii=False)
+                if isinstance(saida.get("cartao"), dict):
+                    extra = saida["cartao"]
             except FerramentaDesconhecida:
                 status = "erro"
                 resumo = "ferramenta desconhecida"
@@ -267,6 +276,7 @@ def executar_turno(
                     argumentos=chamada.argumentos,
                     status=status,
                     resumo=resumo,
+                    extra=extra,
                 )
             )
             mensagens.append(
