@@ -1,7 +1,12 @@
 {% extends "base.html" %}
 {% block title %}Copiloto de Vendas — Revy Loja{% endblock %}
 {% block page_title %}Copiloto{% endblock %}
+{% block body_class %}copiloto-body{% endblock %}
+{% block head %}
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&display=swap" rel="stylesheet">
+{% endblock %}
 {% block content %}
+<div class="copiloto-page">
 <div class="page-heading">
   <div>
     <span class="eyebrow">Copiloto</span>
@@ -472,4 +477,5 @@
   </div>
 </section>
 {% endif %}
+</div>
 {% endblock %}
