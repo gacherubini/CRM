@@ -10,6 +10,171 @@
   </div>
 </div>
 
+{% set rotulos_passo = {
+  'vendas_resumo': 'consultando vendas',
+  'ranking_vendedores': 'consultando o ranking de vendedores',
+  'venda_origem': 'consultando a origem das vendas',
+  'estoque_parado': 'consultando o estoque parado',
+  'leads_status': 'consultando leads e atendimento',
+  'roi_canais': 'consultando investimento e ROI'
+} %}
+
+<div class="copiloto-layout">
+  <aside class="copiloto-historico" aria-label="Conversas anteriores">
+    <a class="button secondary" href="/app/loja/copiloto">Nova conversa</a>
+    <ul>
+      {% for conversa in conversas %}
+      <li>
+        <a href="/app/loja/copiloto?conversa_id={{ conversa.id }}"
+           class="{{ 'ativa' if conversa_atual and conversa_atual.id == conversa.id else '' }}">
+          {{ conversa.titulo }}
+        </a>
+      </li>
+      {% endfor %}
+    </ul>
+  </aside>
+
+  <section class="copiloto-thread" aria-live="polite">
+    <div id="copiloto-mensagens">
+      {% for turno in turnos %}
+      <article class="copiloto-turno">
+        <p class="copiloto-pergunta">{{ turno.pergunta }}</p>
+        {% if turno.estado == 'erro' %}
+        <p class="copiloto-resposta erro">{{ turno.resposta or 'Não consegui responder desta vez.' }}</p>
+        {% else %}
+        <p class="copiloto-resposta">{{ turno.resposta }}</p>
+        {% endif %}
+        {% if turno.passos %}
+        <details class="copiloto-fontes">
+          <summary>Fontes</summary>
+          <ul>
+            {% for passo in turno.passos %}
+            <li>{{ rotulos_passo.get(passo.ferramenta, 'consultando dados') }} — {{ passo.status }}</li>
+            {% endfor %}
+          </ul>
+        </details>
+        {% endif %}
+      </article>
+      {% endfor %}
+    </div>
+
+    <p id="copiloto-pensando" class="copiloto-pensando" hidden>Pensando…</p>
+
+    <form id="copiloto-form" class="copiloto-composer" autocomplete="off">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <input type="hidden" name="conversa_id" value="{{ conversa_atual.id if conversa_atual else '' }}">
+      <label class="sr-only" for="copiloto-pergunta">Sua pergunta</label>
+      <textarea id="copiloto-pergunta" name="pergunta" rows="2"
+                placeholder="Pergunte sobre vendas, estoque, leads ou de onde veio a última venda…"></textarea>
+      <button class="button" type="submit">Perguntar</button>
+      <button class="button ghost" type="button" id="copiloto-cancelar" hidden>Cancelar</button>
+    </form>
+
+    {% if resumo.chips %}
+    <div class="copiloto-chips">
+      {% for chip in resumo.chips %}
+      <button type="button" class="chip" data-pergunta="{{ chip.pergunta }}">{{ chip.texto }}</button>
+      {% endfor %}
+    </div>
+    {% endif %}
+  </section>
+</div>
+
+<script>
+(function () {
+  var form = document.getElementById('copiloto-form');
+  if (!form) { return; }
+  var mensagens = document.getElementById('copiloto-mensagens');
+  var pensando = document.getElementById('copiloto-pensando');
+  var cancelar = document.getElementById('copiloto-cancelar');
+  var rotulos = {{ rotulos_passo | tojson }};
+  var turnoAtual = null;
+  var timer = null;
+
+  function bloco(pergunta) {
+    var artigo = document.createElement('article');
+    artigo.className = 'copiloto-turno';
+    var p = document.createElement('p');
+    p.className = 'copiloto-pergunta';
+    p.textContent = pergunta;
+    var r = document.createElement('p');
+    r.className = 'copiloto-resposta';
+    artigo.appendChild(p);
+    artigo.appendChild(r);
+    mensagens.appendChild(artigo);
+    return r;
+  }
+
+  function descrever(passos) {
+    if (!passos || !passos.length) { return 'Pensando…'; }
+    var ultimo = passos[passos.length - 1];
+    return (rotulos[ultimo.ferramenta] || 'consultando dados') + '…';
+  }
+
+  function acompanhar(alvo) {
+    timer = setInterval(function () {
+      fetch('/app/loja/copiloto/turno/' + turnoAtual + '.json')
+        .then(function (r) { return r.json(); })
+        .then(function (dados) {
+          pensando.textContent = descrever(dados.passos);
+          if (dados.texto) { alvo.textContent = dados.texto; }
+          if (dados.estado === 'pronto' || dados.estado === 'erro' || dados.estado === 'cancelado') {
+            clearInterval(timer);
+            pensando.hidden = true;
+            cancelar.hidden = true;
+            if (dados.estado !== 'pronto' && !dados.texto) {
+              alvo.textContent = 'Não consegui responder desta vez.';
+            }
+          }
+        })
+        .catch(function () { clearInterval(timer); pensando.hidden = true; });
+    }, 700);
+  }
+
+  form.addEventListener('submit', function (evento) {
+    evento.preventDefault();
+    var campo = document.getElementById('copiloto-pergunta');
+    var pergunta = (campo.value || '').trim();
+    if (!pergunta) { return; }
+    var alvo = bloco(pergunta);
+    campo.value = '';
+    pensando.hidden = false;
+    pensando.textContent = 'Pensando…';
+
+    fetch('/app/loja/copiloto/perguntar', { method: 'POST', body: new FormData(form) })
+      .then(function (r) { return r.json().then(function (d) { return { status: r.status, dados: d }; }); })
+      .then(function (resposta) {
+        if (resposta.status !== 200) {
+          pensando.hidden = true;
+          alvo.textContent = resposta.dados.message || 'Não consegui enviar sua pergunta.';
+          return;
+        }
+        turnoAtual = resposta.dados.turno_id;
+        form.conversa_id.value = resposta.dados.conversa_id;
+        cancelar.hidden = false;
+        acompanhar(alvo);
+      });
+  });
+
+  cancelar.addEventListener('click', function () {
+    if (!turnoAtual) { return; }
+    var corpo = new FormData();
+    corpo.append('csrf', form.csrf.value);
+    fetch('/app/loja/copiloto/turno/' + turnoAtual + '/cancelar', { method: 'POST', body: corpo });
+  });
+
+  // Escopado a .copiloto-thread: a mesma classe .copiloto-chips também
+  // estiliza o painel estático "Perguntas frequentes" da Fase 1 (chips sem
+  // data-pergunta) — sem o escopo, clicar neles submeteria "undefined".
+  Array.prototype.forEach.call(document.querySelectorAll('.copiloto-thread .copiloto-chips .chip'), function (chip) {
+    chip.addEventListener('click', function () {
+      document.getElementById('copiloto-pergunta').value = chip.dataset.pergunta;
+      form.dispatchEvent(new Event('submit'));
+    });
+  });
+})();
+</script>
+
 {% if sinais %}
 <section class="panel" aria-labelledby="copiloto-alertas">
   <div class="panel-header">

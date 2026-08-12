@@ -32,6 +32,8 @@ from app.db import get_db  # noqa: E402
 from app.loja.copiloto.conversas import (  # noqa: E402
     cancelar_turno,
     criar_turno,
+    listar_conversas,
+    listar_turnos,
     obter_turno,
 )
 from app.loja.copiloto.resumo import montar_resumo_hoje  # noqa: E402
@@ -92,6 +94,7 @@ def _ctx(usuario: Usuario) -> CopilotoContexto:
 @router.get(_PAGINA, response_class=HTMLResponse)
 def copiloto_home(
     request: Request,
+    conversa_id: str | None = None,
     db: Session = Depends(get_db),
     estoque=Depends(get_estoque_client),
     chatbot=Depends(get_chatbot_client),
@@ -109,6 +112,12 @@ def copiloto_home(
 
     ctx = _ctx(usuario)
     resumo = montar_resumo_hoje(db, ctx, estoque=estoque, chatbot=chatbot)
+    conversas = listar_conversas(db, ctx.loja_slug, usuario.id)
+    # Só abre conversa que está NESTA lista: listar_conversas já filtra por
+    # loja_slug+usuario_id, então um conversa_id de outra loja/usuário (query
+    # string é entrada do cliente) nunca aparece aqui — vira "nenhuma escolhida".
+    escolhida = next((c for c in conversas if c.id == conversa_id), None)
+    turnos = listar_turnos(db, ctx.loja_slug, escolhida.id) if escolhida else []
     return templates.TemplateResponse(
         "loja/copiloto.html",
         contexto(
@@ -118,6 +127,19 @@ def copiloto_home(
             resumo=resumo,
             sinais=listar_sinais_abertos(db, ctx.loja_slug),
             sinais_novos=contar_sinais_novos(db, ctx.loja_slug),
+            conversas=conversas,
+            conversa_atual=escolhida,
+            turnos=[
+                {
+                    "id": t.id,
+                    "pergunta": t.pergunta,
+                    "resposta": t.resposta or t.texto_parcial,
+                    "estado": t.estado,
+                    "erro_code": t.erro_code,
+                    "passos": json.loads(t.passos_json) if t.passos_json else [],
+                }
+                for t in turnos
+            ],
         ),
     )
 

@@ -3111,3 +3111,110 @@ a.metric-link:focus-visible {
 }
 a.metric-link:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
 @media (prefers-reduced-motion: reduce) { a.metric-link { transition: none; } }
+
+/* ===========================================================================
+   Copiloto de Vendas (Revy Loja) — /app/loja/copiloto
+   Historico a esquerda, thread ao centro. O estado "pensando" mostra o passo
+   real (rotulos_passo no template) — nunca um spinner mudo — porque a
+   pergunta pode levar 10-30s para responder.
+   =========================================================================== */
+.copiloto-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 14rem) minmax(0, 1fr);
+  gap: var(--space-6);
+  margin-bottom: var(--space-6);
+}
+@media (max-width: 768px) {
+  .copiloto-layout { grid-template-columns: 1fr; }
+}
+
+.copiloto-historico ul {
+  list-style: none;
+  margin: var(--space-4) 0 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-1);
+}
+.copiloto-historico a {
+  display: block;
+  padding: var(--space-2);
+  border-radius: var(--radius-ctl);
+  color: var(--ink-soft);
+  text-decoration: none;
+  font-size: var(--text-sm);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.copiloto-historico a:hover { background: var(--surface-soft); color: var(--ink); }
+.copiloto-historico a.ativa { background: var(--brand-tint); color: var(--ink); font-weight: 600; }
+
+.copiloto-thread {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+.copiloto-turno {
+  display: grid;
+  gap: var(--space-2);
+  padding-bottom: var(--space-4);
+  border-bottom: 1px solid var(--line);
+}
+.copiloto-turno:last-child { border-bottom: 0; padding-bottom: 0; }
+.copiloto-pergunta { margin: 0; font-weight: 600; color: var(--ink); }
+.copiloto-resposta { margin: 0; color: var(--ink); line-height: 1.5; white-space: pre-wrap; }
+.copiloto-resposta.erro { color: var(--danger); }
+.copiloto-pensando {
+  margin: 0;
+  color: var(--ink-muted);
+  font-size: var(--text-sm);
+  font-style: italic;
+}
+
+.copiloto-composer {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: var(--space-2);
+  align-items: end;
+}
+.copiloto-composer textarea {
+  resize: vertical;
+  min-height: 2.75rem;
+  border-radius: var(--radius-ctl);
+  line-height: 1.4;
+}
+
+/* Vale para as duas listas de perguntas prontas: a fileira clicavel da thread
+   e o painel estatico "Perguntas frequentes" da Fase 1 — mesma classe,
+   mesmo cartao. So o clique (JS) e escopado a .copiloto-thread. */
+.copiloto-chips { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.copiloto-chips .chip {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-nav);
+  background: var(--surface);
+  color: var(--ink-soft);
+  padding: var(--space-1) var(--space-3);
+  font: inherit;
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+.copiloto-chips button.chip:hover {
+  background: var(--surface-soft);
+  color: var(--ink);
+  border-color: var(--line-strong);
+}
+
+.copiloto-fontes summary {
+  cursor: pointer;
+  color: var(--ink-muted);
+  font-size: var(--text-xs);
+}
+.copiloto-fontes ul {
+  margin: var(--space-2) 0 0;
+  padding-left: var(--space-4);
+  color: var(--ink-soft);
+  font-size: var(--text-xs);
+}
+
+.copiloto-sinal { display: flex; justify-content: space-between; gap: var(--space-4); align-items: start; }
+.copiloto-sinal-acoes { display: flex; gap: var(--space-2); }
