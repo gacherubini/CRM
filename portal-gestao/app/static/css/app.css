@@ -3346,6 +3346,18 @@ a.metric-link:focus-visible { outline: 2px solid var(--brand); outline-offset: 2
   color: var(--ink-muted);
   font-size: var(--text-sm);
 }
+/* Erro de ação (visto/dispensar) — I6 da revisão final da F4. Cor de aviso
+   (mesmo token de severidade "crítico" já usado no bloco), nunca hex. */
+.copiloto-notif-acao-erro {
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-ctl);
+  border: 1px solid color-mix(in srgb, var(--danger) 30%, var(--line));
+  background: color-mix(in srgb, var(--danger) 10%, var(--paper));
+  color: var(--danger);
+  font-size: var(--text-xs);
+}
+.copiloto-notif-acao-erro[hidden] { display: none; }
 
 .copiloto-notif-item {
   display: grid;

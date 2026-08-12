@@ -202,6 +202,13 @@
                  (carregando/vazio/erro) é parágrafo irmão, nunca filho do
                  <ul>. #}
               <p class="copiloto-notif-status" data-copiloto-status>Carregando notificações…</p>
+              {# Erro de AÇÃO (visto/dispensar), separado do status de
+                 CARREGAMENTO acima: falhar em marcar/dispensar não pode
+                 esconder a lista inteira (o lojista ainda quer ver os outros
+                 alertas) — por isso é um parágrafo próprio, não reaproveita
+                 mostrarStatus(). role="alert" para leitor de tela anunciar
+                 sem o usuário precisar navegar até aqui. #}
+              <p class="copiloto-notif-acao-erro" data-copiloto-acao-erro role="alert" hidden></p>
               <ul class="copiloto-notif-lista" data-copiloto-lista hidden></ul>
             </div>
             {# Textos canônicos para o JS usar quando souber o estado real da
@@ -209,6 +216,11 @@
                script, para o vazio honesto ficar revisável/testável aqui. #}
             <template data-copiloto-texto-vazio>Não há nada para tratar agora.</template>
             <template data-copiloto-texto-erro>Não foi possível carregar as notificações agora.</template>
+            {# Mesmo idioma de "sessão expirada" já usado em outras telas do
+               shell (ver financeiras/lista.html e loja/atendimento_workspace.html) —
+               não inventado aqui. #}
+            <template data-copiloto-texto-sessao-expirada>Sessão expirada. Atualize a página e tente de novo.</template>
+            <template data-copiloto-texto-erro-acao>Não foi possível concluir a ação. Tente novamente.</template>
           </div>
           {% endif %}
           {% if loja_shell %}
@@ -296,10 +308,15 @@
       if (!sino || !painel) return;
       const lista = painel.querySelector('[data-copiloto-lista]');
       const status = painel.querySelector('[data-copiloto-status]');
+      const acaoErro = painel.querySelector('[data-copiloto-acao-erro]');
       const textoVazioEl = wrap.querySelector('[data-copiloto-texto-vazio]');
       const textoErroEl = wrap.querySelector('[data-copiloto-texto-erro]');
+      const textoSessaoEl = wrap.querySelector('[data-copiloto-texto-sessao-expirada]');
+      const textoErroAcaoEl = wrap.querySelector('[data-copiloto-texto-erro-acao]');
       const textoVazio = textoVazioEl ? textoVazioEl.textContent : '';
       const textoErro = textoErroEl ? textoErroEl.textContent : '';
+      const textoSessaoExpirada = textoSessaoEl ? textoSessaoEl.textContent : '';
+      const textoErroAcao = textoErroAcaoEl ? textoErroAcaoEl.textContent : '';
       const listarUrl = painel.dataset.listarUrl;
       const csrf = painel.dataset.csrf || '';
       let carregado = false;
@@ -418,10 +435,36 @@
         }
       };
 
+      // Erro de ação (visto/dispensar) fica em `acaoErro`, separado do
+      // status de carregamento (`mostrarStatus`/`status`) — ver comentário
+      // no template sobre por que não pode esconder a lista inteira.
+      const mostrarErroAcao = (texto) => {
+        if (!acaoErro) return;
+        acaoErro.hidden = false;
+        acaoErro.textContent = texto;
+      };
+      const esconderErroAcao = () => {
+        if (!acaoErro) return;
+        acaoErro.hidden = true;
+        acaoErro.textContent = '';
+      };
+
       // Alvo combinável com a Task 3 (rotas ainda não existem): mesmos
       // caminhos documentados no plano da fase, não inventados aqui.
+      //
+      // Achado da revisão final da fase (I6): a versão anterior devolvia
+      // sem fazer nada quando a resposta não era 2xx, e o catch do fetch
+      // também não fazia nada — engoliam qualquer falha. Com a sessão
+      // expirada (403 "sessao"), o lojista clicava em "dispensar", nada
+      // acontecia na tela, e ele clicava de novo achando que tinha travado.
+      // Agora toda
+      // falha (HTTP não-2xx OU rede/fetch rejeitado) aparece no painel, sem
+      // inventar detalhe que a resposta não deu: 401/403 usa o mesmo texto
+      // de sessão expirada já usado noutras telas do shell; qualquer outro
+      // caso (404 sinal sumiu, 429, 5xx, rede fora) usa o texto genérico.
       const acionar = (sinalId, tipo, li) => {
         if (!sinalId) return;
+        esconderErroAcao();
         const corpo = new FormData();
         corpo.append('csrf', csrf);
         fetch('/app/loja/copiloto/notificacoes/' + encodeURIComponent(sinalId) + '/' + tipo, {
@@ -429,12 +472,16 @@
           body: corpo,
         })
           .then((resposta) => {
-            if (!resposta.ok) return;
+            if (!resposta.ok) {
+              const sessaoExpirada = resposta.status === 401 || resposta.status === 403;
+              mostrarErroAcao(sessaoExpirada ? textoSessaoExpirada : textoErroAcao);
+              return;
+            }
             li.remove();
             if (!lista.querySelector('.copiloto-notif-item')) mostrarStatus(textoVazio);
             carregar();
           })
-          .catch(() => {});
+          .catch(() => mostrarErroAcao(textoErroAcao));
       };
 
       const carregar = () => {

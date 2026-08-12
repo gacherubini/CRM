@@ -759,6 +759,47 @@ def test_sem_innerhtml_no_script_do_sino(client, db, monkeypatch):
     assert "insertAdjacentHTML(" not in resposta.text
 
 
+def test_falha_em_acao_do_painel_aparece_no_proprio_painel(client, db, monkeypatch):
+    """Achado da revisão final da fase (I6): `acionar()` (visto/dispensar)
+    tinha `if (!resposta.ok) return;` e `.catch(() => {})` — com a sessão
+    expirada (403 "sessao"), o lojista clicava em "dispensar", nada
+    acontecia na tela, e ele clicava de novo achando que tinha travado.
+
+    Sem harness de JS neste repositório: a prova é estática, no mesmo estilo
+    de `test_sem_innerhtml_no_script_do_sino` — confere o texto do script
+    embutido, não a execução real. Ainda assim prende a regressão: as duas
+    branches de falha (`!resposta.ok` e `.catch`) têm que chamar a função que
+    escreve no painel, e o padrão antigo (retorno mudo / catch vazio) não
+    pode reaparecer.
+    """
+    _ligar_shell_e_entitlements(monkeypatch)
+    _seedar_modulo_copiloto(db)
+    login(client, papel="dono", email="dono-erro-acao@loja.test")
+
+    resposta = client.get(_TELA_SEM_GATE_DE_MODULO)
+    texto = resposta.text
+
+    # O elemento que recebe o erro existe e é anunciado a leitor de tela.
+    assert 'data-copiloto-acao-erro' in texto
+    assert 'role="alert"' in texto
+
+    # Padrões antigos (falha muda) não podem reaparecer.
+    assert "if (!resposta.ok) return;" not in texto
+    assert ".catch(() => {})" not in texto
+
+    # As duas branches de falha da ação chamam a função que escreve no
+    # painel — não engolem o erro.
+    inicio = texto.index("const acionar = ")
+    fim = texto.index("};", texto.index("fetch(", inicio))
+    trecho_acionar = texto[inicio:fim]
+    assert "mostrarErroAcao(" in trecho_acionar
+    assert ".catch(() => mostrarErroAcao(" in trecho_acionar
+
+    # Idioma de sessão expirada é o mesmo já usado noutras telas do shell —
+    # não fabricado no script.
+    assert "Sessão expirada. Atualize a página e tente de novo." in texto
+
+
 def test_css_do_sino_nao_usa_cor_literal():
     """Only tokens: --danger/--warn/--ok e var(...) — nunca hex/rgba direto no
     bloco novo. Complementa (não substitui) o grep manual pedido no brief."""
