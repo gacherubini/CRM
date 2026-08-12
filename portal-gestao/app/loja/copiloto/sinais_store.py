@@ -19,7 +19,10 @@ from sqlalchemy.orm import Session
 from app.loja.copiloto.sinais import SinalCandidato
 from app.models import CopilotoSinal, CopilotoSinalVisto
 
-ESTADOS_ABERTOS = ("novo", "visto")
+# "visto" saiu daqui na Fase 4/Task 0: virou copiloto_sinal_visto (por
+# pessoa), não mais um estado do sinal. Nenhum código escreve mais
+# estado="visto" — a migration 0023 faz backfill das linhas antigas.
+ESTADOS_ABERTOS = ("novo",)
 COOLDOWN_PADRAO_HORAS = 24
 
 

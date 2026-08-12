@@ -510,7 +510,7 @@ class VinculoLojaPessoa(Base):
 
 # --- Copiloto de Vendas -----------------------------------------------------
 
-SINAL_ESTADOS = ("novo", "visto", "resolvido", "dispensado")
+SINAL_ESTADOS = ("novo", "resolvido", "dispensado")
 SINAL_SEVERIDADES = ("info", "atencao", "critico")
 SINAL_REGRAS = (
     "estoque_parado",
@@ -535,7 +535,11 @@ class CopilotoSinal(Base):
     __tablename__ = "copiloto_sinal"
     __table_args__ = (
         CheckConstraint(
-            "estado IN ('novo', 'visto', 'resolvido', 'dispensado')",
+            # "visto" foi removido da Fase 4/Task 0 em diante: virou a tabela
+            # copiloto_sinal_visto (por pessoa). A migration 0023 faz o
+            # backfill de linhas antigas com estado="visto" para "novo" antes
+            # de apertar esta constraint — ver o comentário lá.
+            "estado IN ('novo', 'resolvido', 'dispensado')",
             name="ck_copiloto_sinal_estado",
         ),
         CheckConstraint(
