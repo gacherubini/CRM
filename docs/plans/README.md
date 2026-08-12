@@ -66,6 +66,7 @@ independentes".
 | 7.3 | [Copiloto F3 — FIPE e ações](../superpowers/plans/2026-08-11-copiloto-fase3-fipe-e-acoes.md) | Portal / Revy Loja | **NÃO INICIADO** — depende da F2. Escrita com confirmação, auditoria e desfazer |
 | 7.4 | [Copiloto F4 — notificações](../superpowers/plans/2026-08-12-copiloto-fase4-notificacoes.md) | Portal / Revy Loja | **NÃO INICIADO** — sino no shell + 7ª regra (preço fora da FIPE). Tasks 1–3 e 5 não dependem da F3; a Task 4 sim |
 | 7.5 | [Copiloto F5 — log de perguntas e isolamento](../superpowers/plans/2026-08-12-copiloto-fase5-log-de-perguntas-e-isolamento.md) | Portal / Control | **NÃO INICIADO** — Parte A: lacunas do Copiloto no Control por contrato HTTP. Parte B: RLS no Postgres. Independentes entre si |
+| 7.6 | [Copiloto F6 — cadastro e funil](../superpowers/plans/2026-08-12-copiloto-fase6-cadastro-e-funil.md) | Portal / Revy Loja | **NÃO INICIADO** — 2 ferramentas de consulta (cadastro incompleto, funil). Simulação de financiamento avaliada e RETIRADA (PII no prompt) |
 
 #1A e #4A avançam em paralelo depois do #0; #2A depende da fatia Lite do #4A. A numeração é
 histórica e **não** obriga Portal antes de Estoque/Catálogo.

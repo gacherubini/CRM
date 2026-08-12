@@ -22,7 +22,7 @@
 - **O cartão de confirmação é renderizado pelo servidor**, a partir da entidade real relida do Estoque e dos parâmetros já validados — **nunca** do texto que o modelo escreveu (§6.3).
 - **`consultar_fipe` nunca adivinha.** Mais de um candidato → devolve a lista e o copiloto **pergunta qual**. Zero resultados → "não encontrei na FIPE". Sem aproximação.
 - **Nenhuma ação de preço** pode ser proposta a partir de uma FIPE não confirmada.
-- **Papel:** `ajustar_preco`/`repostar_veiculo` só para dono/gerente (`ROLES_GESTAO`, `app/loja/types.py:31`). Vendedor recebe 403.
+- **Papel:** todas as ações só para dono/gerente (`ROLES_GESTAO`, `app/loja/types.py:31`). Vendedor recebe 403.
 - **Toda proteção de papel é portal-side.** A `estoque-api` valida papel contra a credencial de serviço global do Portal (`estoque-api/app/main.py:143-145`), não contra o humano — nada pode depender dela para barrar um ator.
 - **MCP externo só de leitura** (§3.4). Nada que escreva em plataforma externa (§13).
 - **Interface segue o design system da casa** — vale integralmente a constraint escrita no plano F2
@@ -926,7 +926,7 @@ git commit -m "feat(copiloto): FIPE por veiculo, com cache de marca/modelo e sem
 
 **Interfaces:**
 - Produces:
-  - `DOMINIO_COPILOTO = "copiloto"`, `ACOES_COPILOTO = frozenset({"ajustar_preco", "repostar_veiculo", "desfazer"})`, `registrar_auditoria_copiloto(db, *, loja_slug, acao, ator_email, success, error_code=None, origem="copiloto", commit=False)`;
+  - `DOMINIO_COPILOTO = "copiloto"`, `ACOES_COPILOTO = frozenset({"ajustar_preco", "repostar_veiculo", "publicar_veiculo", "despublicar_veiculo", "desfazer"})`, `registrar_auditoria_copiloto(db, *, loja_slug, acao, ator_email, success, error_code=None, origem="copiloto", commit=False)`;
   - `CopilotoAcao` (`id`, `loja_slug`, `turno_id`, `ator_email`, `acao`, `entidade_ref`, `valor_anterior`, `valor_novo`, `estado`, `erro_code`, `executada_em`, `desfeita_em`, `desfazer_ate`).
 
 **Duas lacunas do §8 que isto fecha:**
@@ -1090,7 +1090,7 @@ Em `app/loja_operacao_auditoria.py`:
 
 ```python
 DOMINIO_COPILOTO = "copiloto"
-ACOES_COPILOTO = frozenset({"ajustar_preco", "repostar_veiculo", "desfazer"})
+ACOES_COPILOTO = frozenset({"ajustar_preco", "repostar_veiculo", "publicar_veiculo", "despublicar_veiculo", "desfazer"})
 ```
 
 Na validação de `registrar_auditoria_operacao`:
@@ -1232,13 +1232,18 @@ git commit -m "feat(copiloto): dominio de auditoria copiloto e tabela de acoes c
 **Interfaces:**
 - Consumes: `EstoqueClient` (duck-typed: `.obter`, `.atualizar`, `.acao`), `garantir_escopo_loja` (Fase 1), `registrar_auditoria_copiloto` + `CopilotoAcao` (Task 3), `CopilotoContexto`.
 - Produces:
-  - `ACOES_PERMITIDAS = frozenset({"ajustar_preco", "repostar_veiculo"})`;
+  - `ACOES_PERMITIDAS = frozenset({"ajustar_preco", "repostar_veiculo", "publicar_veiculo", "despublicar_veiculo"})`;
   - `AcaoRecusada(RuntimeError)` com `.code`;
   - `validar_ajuste_preco(preco_atual, preco_novo) -> Decimal`;
   - `executar_acao(db, ctx, *, acao, parametros, estoque, turno_id=None, agora=None) -> CopilotoAcao`;
   - `desfazer_acao(db, ctx, acao_id, *, estoque, agora=None) -> bool`.
 
 **Env novas:** `PORTAL_COPILOTO_BANDA_PRECO_PCT` (default `25`), `PORTAL_COPILOTO_PRECO_MINIMO` (default `1000`), `PORTAL_COPILOTO_DESFAZER_MINUTOS` (default `30`), `PORTAL_COPILOTO_MAX_ACOES_HORA` (default `20`).
+
+**`publicar_veiculo` / `despublicar_veiculo` (acrescentadas em 2026-08-12, decisão do dono):** saem quase de graça porque `EstoqueClient.acao()` já as aceita (`app/clients/estoque.py:99`) — é o mesmo caminho de `repostar_veiculo`, então herdam as sete guardas sem código novo de execução. Duas observações:
+
+- A guarda 4 (banda de valor) **não se aplica** a elas: não há valor a validar. As outras seis valem integralmente, e a auditoria grava o estado anterior de publicação para o desfazer funcionar.
+- `EstoqueClient.acao()` também aceita `reservar` e `vender`. **Nenhuma das duas entra no Copiloto.** Elas mudam estado comercial do veículo — marcar como vendido por engano é dano de outra ordem que despublicar, e nada nesta fase pediu isso. Manter a whitelist estreita é a guarda 1 funcionando como projetada.
 
 **As sete guardas (§8), todas server-side e todas testadas:**
 1. **Whitelist** de ação — qualquer outro nome é recusado antes de tocar em rede.
@@ -1536,7 +1541,7 @@ from app.models import CopilotoAcao
 logger = logging.getLogger("portal.copiloto.acoes")
 
 CENTAVOS = Decimal("0.01")
-ACOES_PERMITIDAS = frozenset({"ajustar_preco", "repostar_veiculo"})
+ACOES_PERMITIDAS = frozenset({"ajustar_preco", "repostar_veiculo", "publicar_veiculo", "despublicar_veiculo"})
 
 
 class AcaoRecusada(RuntimeError):
