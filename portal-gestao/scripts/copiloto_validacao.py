@@ -1,4 +1,4 @@
-"""Gate de go-live do Copiloto: 30 perguntas reais de dono, 3 métricas.
+"""Gate de go-live do Copiloto: 42 perguntas reais de dono, 3 métricas.
 
 Mede SEPARADO: acerto de tool-call, aderência à regra de cobertura e
 latência por esforço. A cobertura é medida sozinha porque é a regra que
@@ -235,7 +235,7 @@ class _RegistradorEsforco:
 
 
 def rodar_validacao(llm, recursos, casos: list[dict], *, esforco: str = "low") -> Relatorio:
-    """Roda os 30 casos contra ``llm`` (LLMFake nos testes; DeepSeekClient no
+    """Roda os casos da fixture contra ``llm`` (LLMFake nos testes; DeepSeekClient no
     go-live real) e devolve o Relatorio com as 3 métricas do §11.
 
     ``esforco`` é repassado como ``esforco_inicial`` de cada turno (fix round
@@ -258,9 +258,17 @@ def rodar_validacao(llm, recursos, casos: list[dict], *, esforco: str = "low") -
             esforco_inicial=esforco,
         )
         latencia_ms = int((time.monotonic() - inicio) * 1000)
-        resultado_avaliavel = SimpleNamespace(
-            texto=resultado.texto, passos=resultado.passos, latencia_ms=latencia_ms
-        )
+        # Fix round 2 (finding 6): ResultadoTurno é frozen e não tem
+        # latencia_ms (medida fora do runner), então precisa de um wrapper —
+        # mas um wrapper que rechama campos NOMEADOS é uma fonte de bug
+        # recorrente: a versão anterior listava só texto/passos/latencia_ms
+        # e descartava .estado por engano, fazendo o guard de turno-com-erro
+        # (avaliar_caso) nunca disparar no caminho real (só em testes que
+        # construíam o objeto à mão). ``vars(resultado)`` copia TODOS os
+        # campos do dataclass automaticamente (estado, texto, passos,
+        # tokens_entrada, tokens_saida, erro_code) — nenhum campo futuro do
+        # ResultadoTurno pode ser esquecido aqui de novo por omissão.
+        resultado_avaliavel = SimpleNamespace(**vars(resultado), latencia_ms=latencia_ms)
         avaliacao = avaliar_caso(caso, resultado_avaliavel)
         avaliacoes.append(replace(avaliacao, esforco=registrador.ultimo_esforco))
     return Relatorio(avaliacoes)
@@ -268,7 +276,7 @@ def rodar_validacao(llm, recursos, casos: list[dict], *, esforco: str = "low") -
 
 def main() -> None:  # pragma: no cover - entrada de CLI, roda contra o provedor real
     parser = argparse.ArgumentParser(
-        description="Gate de go-live do Copiloto: roda as 30 perguntas contra o "
+        description="Gate de go-live do Copiloto: roda as perguntas da fixture contra o "
         "provedor real (DeepSeek) e mede tool-call, cobertura e latência."
     )
     parser.add_argument("--esforco", default="low", choices=["low", "high", "max"])

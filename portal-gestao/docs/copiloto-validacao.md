@@ -18,7 +18,7 @@ export REVY_LOJA_COPILOTO_LLM_KEY="..."   # nunca commitar, só no ambiente
 
 `REVY_LOJA_COPILOTO_LLM_KEY` é um **secret** do `app2037` (nunca `[env]` no
 `fly.toml`, nunca no repo). O script recusa rodar sem a variável configurada
-— falha cedo com uma mensagem, em vez de bater 30 vezes num provedor sem
+— falha cedo com uma mensagem, em vez de bater 42 vezes num provedor sem
 chave.
 
 ## As três métricas (medidas separadas, §11)
@@ -28,8 +28,8 @@ chave.
    `com_dado < total` (a estrutura `Cobertura` — ver `vendas_resumo`,
    `venda_origem` e `estoque_parado`), a resposta citou isso? É a regra que
    nenhum modelo obedece de graça, e a que sustenta a confiança do dono no
-   número. Só as 6 perguntas da fixture cuja ferramenta esperada realmente
-   produz `Cobertura` entram nesta métrica — ver "Casos elegíveis" abaixo.
+   número. Das 42 perguntas da fixture, 18 têm `exige_cobertura: true` e
+   entram nesta métrica — ver "Casos elegíveis" abaixo.
 3. **Latência por esforço** — quanto custa em segundos um turno partindo de
    `"low"` contra um partindo de `"high"` (`--esforco`, repassado como
    `esforco_inicial` para `executar_turno`).
@@ -39,13 +39,27 @@ chave.
 | Métrica | Meta | Por quê |
 |---|---|---|
 | Acerto de tool-call | ≥ 90% | Errar a função = responder outra pergunta. |
-| Aderência à cobertura | ≥ 95%, **medida só sobre os casos que exigem cobertura** (6 de 30 na fixture atual) | É a regra que sustenta a confiança no número; diluir no total dos 30 casos deixaria o gate incapaz de reprovar. |
+| Aderência à cobertura | ≥ 95%, **medida só sobre os casos que exigem cobertura** (18 de 42 na fixture atual) | É a regra que sustenta a confiança no número; diluir no total dos 42 casos deixaria o gate incapaz de reprovar. |
 | Latência p95 (`low`) | ≤ 25s | Acima disso a espera da tela fica insustentável. |
 
 O dono confirma estas metas antes do go-live — não são definitivas até lá.
 `Relatorio.to_markdown()` sempre mostra o denominador da cobertura por
-extenso (ex. "8/9 casos que exigiam cobertura") — nunca só a porcentagem —
+extenso (ex. "17/18 casos que exigiam cobertura") — nunca só a porcentagem —
 para que a base do número nunca seja ambígua na leitura.
+
+**O que a meta de 95% custa na prática, com honestidade sobre o denominador
+(fix round 2):** com n=18, cada caso vale 1/18 ≈ 5,6 pontos percentuais. Um
+único erro cai para 17/18 = 94,4% — **ainda abaixo** dos 95% pedidos. Ou
+seja, mesmo com a amostra maior, a meta de 95% continua, na prática, exigindo
+zero erros nos casos de cobertura; ela não abre uma folga de "1 erro
+tolerado" a menos que o dono aceite baixar a meta para algo como ~94% ou
+crescer a amostra ainda mais. O ganho real do fix round 2 não foi abrir
+folga — foi sair de n=6 (só 7 valores possíveis: 0%, 16,7%, 33,3%, 50%,
+66,7%, 83,3%, 100% — **nenhum valor entre 83,3% e 100%**, tornando a meta de
+95% um gate de zero-tolerância disfarçado de tolerante) para n=18, onde o
+relatório agora consegue diferenciar "1 erro isolado" (94,4%) de "sistema
+ignora a Regra 4 com frequência" (ex. 5 erros → 72,2%) — a instrumentação
+antes não distinguia essas duas situações de jeito nenhum.
 
 ## Casos elegíveis para a métrica de cobertura (fix round 1, finding 3)
 
@@ -59,11 +73,22 @@ indisponível/parcial, diga isso"), não a Regra 4 (cobertura
 `com_dado < total`) — são regras diferentes, com vocabulário diferente, e
 esta suíte mede só a Regra 4. Por isso os 3 casos de `roi_canais` na
 fixture (`m02`, `m04`, `m05`) têm `exige_cobertura: false`: pedem uma coisa
-que a ferramenta que eles disparam não tem como fornecer. Restam 6 casos
-elegíveis (`v03`, `v04`, `o02`, `o03`, `o04`, `e03`), todos direcionados a
-ferramentas que realmente produzem `Cobertura` — um modelo bem-comportado
-consegue tirar 100% nesta métrica com a fixture atual. Testar a Regra 8
+que a ferramenta que eles disparam não tem como fornecer. Testar a Regra 8
 para `roi_canais` é válido, mas é outra métrica; não foi adicionada aqui.
+
+**Amostra (fix round 2):** restavam só 6 casos elegíveis (`v03`, `v04`,
+`o02`, `o03`, `o04`, `e03`) — pequeno demais para o gate ter graduação real
+(ver a nota de custo do erro acima). Foram adicionados mais 12 casos
+coverage-bearing, todos direcionados às 3 ferramentas verificadas para
+realmente produzirem `Cobertura`:
+- `vendas_resumo` (margem/lucro): `v06`–`v09`.
+- `venda_origem`, escopo periodo (só ele tem `Cobertura`; escopo "ultima"
+  não tem): `o05`–`o08`.
+- `estoque_parado` (`cobertura_data`): `e06`–`e09`.
+
+Total agora: 18 casos elegíveis. Um modelo bem-comportado consegue tirar
+100% nesta métrica com a fixture atual — nenhum caso pede uma citação que a
+ferramenta correspondente não consegue fornecer.
 
 ## Se cair abaixo
 
@@ -96,6 +121,20 @@ O que muda de fato ao rodar `--esforco high` versus `--esforco low`:
 A métrica 3 reporta o esforço que cada turno **de fato atingiu** na última
 chamada (pedido + escalada, via `_RegistradorEsforco`), não só o valor de
 `--esforco` — os dois podem divergir para turnos com ferramenta.
+
+## Turno com erro nunca conta como acerto (fix round 1 + round 2, finding 6)
+
+Um turno que falha (deadline, provedor fora, teto de tokens...) nunca deve
+contar como "respondeu certo" — nem no caso sem ferramenta esperada, onde
+zero tool-calls por falha no meio do caminho não é a mesma coisa que zero
+tool-calls por decisão correta. O primeiro fix (round 1) corrigiu
+`avaliar_caso`, mas o caminho real de `rodar_validacao` reembrulhava o
+`ResultadoTurno` num `SimpleNamespace` que listava só `texto`/`passos`, e
+descartava `.estado` sem querer — o guard nunca disparava de fato no CLI ou
+no gate real, só nos testes que construíam o objeto à mão. Corrigido no
+round 2: o wrapper agora copia **todos** os campos do `ResultadoTurno` via
+`vars(resultado)` em vez de listar campos nomeados, para que um campo novo
+do dataclass nunca mais seja esquecido em silêncio.
 
 ## Regressão
 

@@ -2,7 +2,7 @@ import json
 from datetime import date, datetime, timezone
 from pathlib import Path
 
-from app.loja.copiloto.port import LLMFake, RespostaLLM, ToolCall
+from app.loja.copiloto.port import LLMFake, LLMIndisponivel, RespostaLLM, ToolCall
 from app.loja.copiloto.tipos import CopilotoContexto
 from app.loja.copiloto.tools import RecursosTools
 from scripts.copiloto_validacao import (
@@ -26,10 +26,17 @@ class ResultadoFalso:
         self.estado = "pronto"
 
 
-def test_fixture_tem_trinta_casos():
+def test_fixture_tem_pelo_menos_trinta_casos():
+    """Fix round 2 (sample size): a fixture cresceu de 30 para 42 casos —
+    os 12 novos são todos coverage-bearing (ver
+    test_fixture_casos_de_cobertura_sao_alcancaveis_pela_ferramenta), para
+    tirar a métrica de cobertura de n=6 (só 7 valores possíveis, sem
+    graduação real entre 83.3% e 100%) para n=18."""
     casos = json.loads(FIXTURE.read_text(encoding="utf-8"))
-    assert len(casos) == 30
+    assert len(casos) == 42
     assert all("pergunta" in c and "id" in c for c in casos)
+    ids = [c["id"] for c in casos]
+    assert len(ids) == len(set(ids)), "ids da fixture precisam ser únicos"
 
 
 def test_fixture_cobre_as_seis_ferramentas():
@@ -50,11 +57,21 @@ def test_fixture_casos_de_cobertura_sao_alcancaveis_pela_ferramenta():
     nunca devolve com_dado/total — só ``status`` (ok|parcial|indisponivel) e
     ``detalhe_disponivel`` (bool). Exigir citação "N de M" dela forçaria um
     modelo bem-comportado a inventar um número, violando a Regra 1. Por
-    isso nenhum caso ``exige_cobertura`` pode mirar roi_canais."""
+    isso nenhum caso ``exige_cobertura`` pode mirar roi_canais.
+
+    Fix round 2 (sample size): o lote relevante cresceu de 6 para 18 casos
+    — vendas_resumo (margem/lucro), venda_origem (escopo periodo) e
+    estoque_parado (cobertura_data), as 3 ferramentas verificadas para
+    realmente produzirem ``Cobertura(com_dado, total)``."""
     casos = json.loads(FIXTURE.read_text(encoding="utf-8"))
     exigem = [c for c in casos if c["exige_cobertura"]]
-    assert len(exigem) == 6
+    assert len(exigem) == 18
     assert all(c["ferramenta_esperada"] != "roi_canais" for c in exigem)
+    assert {c["ferramenta_esperada"] for c in exigem} == {
+        "vendas_resumo",
+        "venda_origem",
+        "estoque_parado",
+    }
 
 
 def test_acerto_de_tool_call():
@@ -154,7 +171,7 @@ def test_pct_cobertura_sem_casos_aplicaveis_nao_finge_100():
 
 
 def test_carregar_casos_le_a_fixture():
-    assert len(carregar_casos(FIXTURE)) == 30
+    assert len(carregar_casos(FIXTURE)) == 42
 
 
 # --- rodar_validacao fim a fim, sempre contra LLMFake: determinístico, sem
@@ -247,3 +264,38 @@ def test_rodar_validacao_registra_esforco_alto_quando_turno_encadeia(db):
     assert relatorio.latencia_p95_por_esforco() == {
         "high": relatorio.avaliacoes[0].latencia_ms
     }
+
+
+class _LLMDerruba:
+    """Provedor que sempre cai — para forçar ``executar_turno`` a devolver
+    ``estado="erro"`` DE VERDADE (não um ``ResultadoFalso`` construído à
+    mão), pelo mesmo caminho que o guard #2 do runner usa em produção
+    (``except LLMIndisponivel`` em app/loja/copiloto/runner.py)."""
+
+    def completar(self, mensagens, ferramentas, *, esforco="low", max_tokens=800):
+        raise LLMIndisponivel("provedor fora do ar (teste)")
+
+
+def test_rodar_validacao_turno_com_erro_de_verdade_nao_conta_como_acerto(db):
+    """Fix round 2 (finding 6, o caminho que importa): a versão anterior do
+    fix em ``avaliar_caso`` só funcionava porque
+    ``test_turno_com_erro_nao_conta_como_acerto_sem_ferramenta`` construía o
+    resultado à mão com ``.estado`` setado direto. Em ``rodar_validacao`` —
+    o caminho que o CLI e o gate real usam — o resultado é reembrulhado num
+    ``SimpleNamespace``, e a versão anterior desse wrapper listava só
+    texto/passos/latencia_ms, descartando ``.estado`` por engano: o guard
+    nunca disparava de verdade. Este teste passa pelo ``executar_turno``
+    real (via ``LLMIndisponivel``, sem rede) para provar que o erro
+    sobrevive até ``Avaliacao.acertou_tool``."""
+    caso = {
+        "id": "x99", "pergunta": "oi, tudo bem?",
+        "ferramenta_esperada": None, "exige_cobertura": False,
+    }
+    relatorio = rodar_validacao(_LLMDerruba(), _recursos(db), [caso])
+
+    assert len(relatorio.avaliacoes) == 1
+    avaliacao = relatorio.avaliacoes[0]
+    # Zero tool-calls (o provedor nunca respondeu) + ferramenta_esperada
+    # None seria "acerto" pela regra ingênua — mas o turno FALHOU, não
+    # decidiu corretamente que não precisava de ferramenta.
+    assert avaliacao.acertou_tool is False
