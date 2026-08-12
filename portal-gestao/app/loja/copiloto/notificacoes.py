@@ -12,8 +12,17 @@ cache, cada page view nessas telas vira uma query extra.
 Escopo consciente: cache por processo, no mesmo espírito de
 ``cache_overview`` (``cache.py``) — não distribuído, TTL curto. Um alerta
 que aparece até um minuto depois não muda a vida de ninguém.
+
+Este módulo também guarda o catálogo ``regra -> (rótulo, ícone, severidade
+padrão)`` (F4/Task 5). Hoje ``sinais.py`` tem sete regras e o rótulo de cada
+uma vivia espalhado — quando a 8ª regra chegasse, seria preciso caçar
+template, painel e tela do Copiloto pra escrever o nome dela em algum lugar.
+``catalogo_regra`` é o ponto único: painel do sino e tela do Copiloto devem
+ler daqui, nunca reescrever o mapa.
 """
 from __future__ import annotations
+
+from dataclasses import dataclass
 
 from sqlalchemy.orm import Session
 
@@ -55,3 +64,75 @@ def invalidar_contagem(loja_slug: str, usuario_id: str | None = None) -> None:
     """
     prefixo = f"{loja_slug}:" if usuario_id is None else _chave(loja_slug, usuario_id)
     cache_nao_vistos.invalidar(prefixo=prefixo)
+
+
+# =============================================================================
+# Catálogo de regras (F4/Task 5) — regra -> (rótulo, ícone, severidade padrão)
+# =============================================================================
+
+
+@dataclass(frozen=True)
+class EntradaCatalogo:
+    """Como uma regra de ``sinais.py`` aparece pra quem usa a loja.
+
+    ``severidade_padrao`` é um fallback: cada candidato já traz sua própria
+    severidade (calculada em cima do dado real, ex.: "crítico" só quando o
+    veículo parado passa de 120 dias). Este campo existe pro catálogo cumprir
+    o contrato "rótulo, ícone e severidade padrão" e servir de base caso
+    algum consumidor futuro precise de severidade sem ter um candidato em
+    mãos — não substitui a severidade calculada pela regra.
+    """
+
+    rotulo: str
+    icone: str
+    severidade_padrao: str  # info | atencao | critico
+
+
+_ROTULO_GENERICO = "Alerta"
+_ICONE_GENERICO = "generico"
+
+#: Regra desconhecida (ainda não catalogada, ou dado inesperado) cai aqui —
+#: nunca no nome cru da função/regra. Mesma disciplina que ``rotulos_passo``
+#: aplica aos passos do chat em ``copiloto.html`` (Fase 2): nome de função
+#: vazando pra tela do lojista é vazamento de implementação.
+ENTRADA_GENERICA = EntradaCatalogo(
+    rotulo=_ROTULO_GENERICO, icone=_ICONE_GENERICO, severidade_padrao="info"
+)
+
+#: Uma entrada por regra registrada em ``sinais.py``. Toda regra nova
+#: precisa ganhar uma linha aqui — é o que ``test_copiloto_notificacoes_shell``
+#: trava, iterando as regras de verdade (lidas do AST de ``sinais.py``, não
+#: copiadas à mão) em vez de confiar que alguém lembra de atualizar uma lista.
+CATALOGO_REGRAS: dict[str, EntradaCatalogo] = {
+    "estoque_parado": EntradaCatalogo(
+        rotulo="Estoque parado", icone="estoque", severidade_padrao="atencao"
+    ),
+    "lead_sem_resposta": EntradaCatalogo(
+        rotulo="Lead sem resposta", icone="leads", severidade_padrao="critico"
+    ),
+    "meta_em_risco": EntradaCatalogo(
+        rotulo="Meta em risco", icone="meta", severidade_padrao="atencao"
+    ),
+    "margem_incompleta": EntradaCatalogo(
+        rotulo="Margem incompleta", icone="margem", severidade_padrao="atencao"
+    ),
+    "cadastro_incompleto": EntradaCatalogo(
+        rotulo="Cadastro incompleto", icone="cadastro", severidade_padrao="info"
+    ),
+    "preco_fora_da_faixa": EntradaCatalogo(
+        rotulo="Preço fora da faixa da FIPE", icone="preco", severidade_padrao="atencao"
+    ),
+    "atribuicao_baixa": EntradaCatalogo(
+        rotulo="Atribuição de origem baixa", icone="atribuicao", severidade_padrao="atencao"
+    ),
+}
+
+
+def catalogo_regra(regra: str) -> EntradaCatalogo:
+    """Devolve a entrada do catálogo para ``regra``.
+
+    Regra desconhecida cai em ``ENTRADA_GENERICA`` — nunca no nome cru da
+    regra/função. Painel do sino e tela do Copiloto devem chamar esta função
+    em vez de manter seu próprio mapa de rótulos.
+    """
+    return CATALOGO_REGRAS.get(regra, ENTRADA_GENERICA)
