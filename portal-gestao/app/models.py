@@ -181,7 +181,7 @@ class LojaOperacaoAuditoria(Base):
     __tablename__ = "loja_operacao_auditoria"
     __table_args__ = (
         CheckConstraint(
-            "dominio IN ('atendimento', 'financeira', 'canal')",
+            "dominio IN ('atendimento', 'financeira', 'canal', 'copiloto')",
             name="ck_loja_operacao_auditoria_dominio",
         ),
         Index(
@@ -209,6 +209,49 @@ class LojaOperacaoAuditoria(Base):
     error_code: Mapped[Optional[str]] = mapped_column(String(80), nullable=True)
     criado_em: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=agora, nullable=False, index=True
+    )
+
+
+ACAO_ESTADOS = ("executada", "desfeita", "falhou")
+
+
+class CopilotoAcao(Base):
+    """Ação executada a partir de uma proposta do Copiloto.
+
+    O valor ANTERIOR é capturado aqui pelo Portal antes do PATCH: a
+    ``estoque-api`` grava só o valor novo (``servico.py:504``) e o client não
+    tem leitura de auditoria. Sem esta linha não existe desfazer.
+    """
+
+    __tablename__ = "copiloto_acao"
+    __table_args__ = (
+        CheckConstraint(
+            "estado IN ('executada', 'desfeita', 'falhou')",
+            name="ck_copiloto_acao_estado",
+        ),
+        Index("ix_copiloto_acao_loja_criada", "loja_slug", "executada_em"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=novo_id)
+    loja_slug: Mapped[str] = mapped_column(String(120), nullable=False, index=True)
+    turno_id: Mapped[Optional[str]] = mapped_column(String(36), nullable=True)
+    ator_email: Mapped[str] = mapped_column(String(320), nullable=False)
+    acao: Mapped[str] = mapped_column(String(40), nullable=False)
+    entidade_ref: Mapped[str] = mapped_column(String(120), nullable=False)
+    valor_anterior: Mapped[Optional[Decimal]] = mapped_column(
+        Numeric(12, 2), nullable=True
+    )
+    valor_novo: Mapped[Optional[Decimal]] = mapped_column(Numeric(12, 2), nullable=True)
+    estado: Mapped[str] = mapped_column(String(20), nullable=False, default="executada")
+    erro_code: Mapped[Optional[str]] = mapped_column(String(40), nullable=True)
+    executada_em: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=agora, nullable=False
+    )
+    desfeita_em: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    desfazer_ate: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
     )
 
 

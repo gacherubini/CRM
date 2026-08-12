@@ -60,6 +60,8 @@ class EstoqueFake:
         self.acoes = []
         self.indisponivel = False
         self.conflito_ao_vender = False
+        self.atualizar_nao_encontrado = False
+        self.atualizar_conflito = False
         self.loja_slug = "loja-teste"
 
     def obter_loja(self):
@@ -94,6 +96,12 @@ class EstoqueFake:
         return {"id": "novo", **dados}
 
     def atualizar(self, veiculo_id, dados):
+        if self.indisponivel:
+            raise EstoqueIndisponivel("Não foi possível acessar o estoque agora")
+        if self.atualizar_nao_encontrado:
+            raise VeiculoNaoEncontrado("veículo não encontrado")
+        if self.atualizar_conflito:
+            raise ConflitoEstoque("veículo em estado incompatível")
         return {"id": veiculo_id, **dados}
 
     def acao(self, veiculo_id, acao):
