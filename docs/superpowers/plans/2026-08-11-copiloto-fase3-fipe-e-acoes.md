@@ -1240,7 +1240,7 @@ git commit -m "feat(copiloto): dominio de auditoria copiloto e tabela de acoes c
 
 **Env novas:** `PORTAL_COPILOTO_BANDA_PRECO_PCT` (default `25`), `PORTAL_COPILOTO_PRECO_MINIMO` (default `1000`), `PORTAL_COPILOTO_DESFAZER_MINUTOS` (default `30`), `PORTAL_COPILOTO_MAX_ACOES_HORA` (default `20`).
 
-**`publicar_veiculo` / `despublicar_veiculo` (acrescentadas em 2026-08-12, decisão do dono):** saem quase de graça porque `EstoqueClient.acao()` já as aceita (`app/clients/estoque.py:99`) — é o mesmo caminho de `repostar_veiculo`, então herdam as sete guardas sem código novo de execução. Duas observações:
+**`publicar_veiculo` / `despublicar_veiculo` (acrescentadas em 2026-08-12, decisão do dono):** saem quase de graça porque `EstoqueClient.acao()` já as aceita (`app/clients/estoque.py:99`) — é o mesmo caminho de `repostar_veiculo`, então herdam as sete guardas sem lógica de guarda nova. A única coisa nova é o mapa `VERBO_ESTOQUE` que diz qual verbo cada ação manda ao Estoque (abaixo) — sem ele as três ações não-preço colapsariam no mesmo verbo. Duas observações:
 
 - A guarda 4 (banda de valor) **não se aplica** a elas: não há valor a validar. As outras seis valem integralmente, e a auditoria grava o estado anterior de publicação para o desfazer funcionar.
 - `EstoqueClient.acao()` também aceita `reservar` e `vender`. **Nenhuma das duas entra no Copiloto.** Elas mudam estado comercial do veículo — marcar como vendido por engano é dano de outra ordem que despublicar, e nada nesta fase pediu isso. Manter a whitelist estreita é a guarda 1 funcionando como projetada.
@@ -1317,8 +1317,12 @@ def test_banda_aceita_ajuste_dentro_do_limite():
 
 
 def test_banda_recusa_corte_absurdo():
+    # R$ 5.000 está ACIMA do piso de R$ 1.000 (default) — só a banda pode
+    # recusar este valor, e é exatamente isso que este teste existe para
+    # provar. Com um valor abaixo do piso, o piso recusaria primeiro e o
+    # teste passaria sem exercitar a banda.
     with pytest.raises(AcaoRecusada) as exc:
-        validar_ajuste_preco(Decimal("28000"), Decimal("1"))
+        validar_ajuste_preco(Decimal("28000"), Decimal("5000"))
     assert exc.value.code == "banda"
 
 
@@ -1412,6 +1416,35 @@ def test_repostar_veiculo_publica(db):
     )
     assert estoque.acoes == [("v1", "publicar")]
     assert registro.estado == "executada"
+
+
+def test_despublicar_veiculo_manda_o_verbo_despublicar(db):
+    """Sem isto, despublicar_veiculo publicaria o veículo — o oposto do
+    que o dono confirmou no cartão."""
+    estoque = EstoqueStub()
+    executar_acao(
+        db, _ctx(), acao="despublicar_veiculo", parametros={"veiculo_id": "v1"},
+        estoque=estoque, agora=AGORA,
+    )
+    assert estoque.acoes == [("v1", "despublicar")]
+
+
+def test_publicar_veiculo_manda_o_verbo_publicar(db):
+    estoque = EstoqueStub()
+    executar_acao(
+        db, _ctx(), acao="publicar_veiculo", parametros={"veiculo_id": "v1"},
+        estoque=estoque, agora=AGORA,
+    )
+    assert estoque.acoes == [("v1", "publicar")]
+
+
+def test_verbo_estoque_cobre_toda_acao_nao_preco():
+    """Se alguém acrescentar uma ação à whitelist e esquecer o verbo
+    correspondente, o KeyError só apareceria em produção, no clique do
+    dono — este teste move essa falha para o CI."""
+    from app.loja.copiloto.acoes import ACOES_PERMITIDAS, VERBO_ESTOQUE
+
+    assert set(VERBO_ESTOQUE) == ACOES_PERMITIDAS - {"ajustar_preco"}
 
 
 def test_rate_limit_por_hora(db, monkeypatch):
@@ -1542,6 +1575,15 @@ logger = logging.getLogger("portal.copiloto.acoes")
 
 CENTAVOS = Decimal("0.01")
 ACOES_PERMITIDAS = frozenset({"ajustar_preco", "repostar_veiculo", "publicar_veiculo", "despublicar_veiculo"})
+
+# Cada ação diz ao Estoque EXATAMENTE o verbo dela. Um "else" que assume
+# "publicar" faz despublicar_veiculo publicar o veículo — o oposto do que o
+# dono confirmou no cartão.
+VERBO_ESTOQUE = {
+    "repostar_veiculo": "publicar",
+    "publicar_veiculo": "publicar",
+    "despublicar_veiculo": "despublicar",
+}
 
 
 class AcaoRecusada(RuntimeError):
@@ -1675,7 +1717,7 @@ def executar_acao(
         if acao == "ajustar_preco":
             estoque.atualizar(veiculo_id, {"preco": float(valor_novo)})
         else:
-            estoque.acao(veiculo_id, "publicar")
+            estoque.acao(veiculo_id, VERBO_ESTOQUE[acao])
     except (VeiculoNaoEncontrado, ConflitoEstoque, EstoqueIndisponivel, Exception) as exc:
         registro.estado = "falhou"
         registro.erro_code = type(exc).__name__[:40]
@@ -1751,7 +1793,7 @@ def desfazer_acao(
 - [ ] **Step 4: Run test to verify it passes**
 
 Run: `.\.venv\Scripts\python.exe -m pytest tests/test_copiloto_acoes.py -q`
-Expected: PASS (16 testes).
+Expected: PASS (19 testes).
 
 - [ ] **Step 5: Commit**
 
@@ -1902,10 +1944,42 @@ def test_cartao_de_repostar_nao_pede_preco(db):
     assert "novo_preco" not in cartao.parametros
 
 
+def test_cartao_de_publicar_veiculo_tem_titulo_proprio(db):
+    cartao = montar_cartao(
+        EstoqueStub(), _ctx(), acao="publicar_veiculo",
+        parametros={"veiculo_id": "v1"},
+    )
+    assert "Publicar" in cartao.titulo
+    assert "Republicar" not in cartao.titulo
+
+
+def test_cartao_de_despublicar_veiculo_tem_titulo_proprio(db):
+    """Um cartão de despublicar não pode dizer 'Republicar' nem 'Publicar' —
+    o dono clicaria Confirmar pensando estar repondo o veículo na vitrine
+    quando na verdade está tirando-o de lá."""
+    cartao = montar_cartao(
+        EstoqueStub(), _ctx(), acao="despublicar_veiculo",
+        parametros={"veiculo_id": "v1"},
+    )
+    assert "Tirar" in cartao.titulo
+    assert "Republicar" not in cartao.titulo
+    assert "Publicar" not in cartao.titulo
+
+
 def test_registro_ganhou_consultar_fipe_e_propor_acao():
     nomes = {f.nome for f in registro_padrao()}
     assert "consultar_fipe" in nomes
     assert "propor_acao" in nomes
+
+
+def test_enum_de_propor_acao_e_derivado_da_whitelist():
+    """O enum não pode ser escrito à mão: duas listas mantidas separadas
+    divergem cedo ou tarde. Sem isto, uma ação nova na whitelist fica
+    inalcançável pelo LLM até alguém lembrar de atualizar o schema."""
+    from app.loja.copiloto.acoes import ACOES_PERMITIDAS
+
+    ferramenta = next(f for f in registro_padrao() if f.nome == "propor_acao")
+    assert ferramenta.parametros["properties"]["acao"]["enum"] == sorted(ACOES_PERMITIDAS)
 
 
 def test_propor_acao_devolve_cartao_e_nao_executa(db):
@@ -1992,6 +2066,17 @@ from app.loja.copiloto.consultas_estoque import (
 from app.loja.copiloto.tipos import CopilotoContexto
 
 CENTAVOS = Decimal("0.01")
+
+# O título é a ÚNICA coisa que o dono lê antes de clicar em Confirmar. Um
+# título genérico para ações opostas transforma o cartão — que existe para
+# proteger — na própria armadilha: um cartão de despublicar_veiculo dizendo
+# "Republicar" faria o dono clicar Confirmar pensando estar repondo o
+# veículo na vitrine quando na verdade está tirando.
+TITULOS_ACAO = {
+    "repostar_veiculo": "Republicar {rotulo} na vitrine",
+    "publicar_veiculo": "Publicar {rotulo} na vitrine",
+    "despublicar_veiculo": "Tirar {rotulo} da vitrine",
+}
 
 
 def _brl(valor: Decimal | None) -> str:
@@ -2080,7 +2165,7 @@ def montar_cartao(
 
     return CartaoAcao(
         acao=acao,
-        titulo=f"Republicar {rotulo} na vitrine",
+        titulo=TITULOS_ACAO[acao].format(rotulo=rotulo),
         linhas=(
             f"Situação atual: {veiculo.get('status') or '—'}",
             f"Preço: {_brl(preco_atual)}",
@@ -2090,7 +2175,13 @@ def montar_cartao(
     )
 ```
 
-Em `app/loja/copiloto/tools.py`, acrescentar as duas ferramentas:
+Em `app/loja/copiloto/tools.py`, acrescentar no topo do módulo:
+
+```python
+from app.loja.copiloto.acoes import ACOES_PERMITIDAS
+```
+
+e as duas ferramentas:
 
 ```python
 def _f_consultar_fipe(argumentos: dict, r: RecursosTools) -> dict:
@@ -2185,7 +2276,11 @@ E no `registro_padrao()`, acrescentar ao final da tupla:
                 "properties": {
                     "acao": {
                         "type": "string",
-                        "enum": ["ajustar_preco", "repostar_veiculo"],
+                        # Derivado da whitelist, nunca escrito à mão: duas
+                        # listas mantidas separadas divergem cedo ou tarde —
+                        # ACOES_PERMITIDAS é a fonte da verdade, e o enum
+                        # aqui é só a projeção dela para o modelo.
+                        "enum": sorted(ACOES_PERMITIDAS),
                     },
                     "veiculo_id": {"type": "string"},
                     "novo_preco": {"type": "string"},
@@ -2231,6 +2326,7 @@ git commit -m "feat(copiloto): cartao renderizado pelo servidor, consultar_fipe 
 **Files:**
 - Modify: `portal-gestao/app/web/loja_copiloto.py`
 - Modify: `portal-gestao/app/templates/loja/copiloto.html`
+- Modify: `portal-gestao/app/loja/copiloto/runner.py` — `Passo` ganha o campo `extra`.
 - Test: `portal-gestao/tests/test_copiloto_acao_rotas.py`
 
 **Interfaces:**
@@ -2439,6 +2535,70 @@ def test_acao_com_flag_off_e_404(client, monkeypatch):
         data={"csrf": "x", "acao": "ajustar_preco", "veiculo_id": "v1"},
     )
     assert r.status_code == 404
+
+
+def test_polling_devolve_cartao_apos_propor_acao(client, monkeypatch):
+    """O caminho real de uso: pergunta -> turno roda -> o modelo chama
+    propor_acao -> o polling em /turno/{id}.json devolve `cartao` preenchido.
+    Todos os outros testes deste arquivo exercitam POST /acao com um
+    formulário montado à mão, nunca este caminho pergunta->proposta->cartão
+    — e foi exatamente por isso que o cartão podia nunca chegar à tela sem
+    que nenhum teste da suíte percebesse."""
+    from app.copiloto_turnos_job import processar_turno
+    from app.loja.copiloto.conversas import obter_turno
+    from app.loja.copiloto.port import LLMFake, RespostaLLM, ToolCall
+
+    class ChatbotStub:
+        def listar_conversas(self, **k):
+            return []
+
+        def listar_leads(self, etapa=None):
+            return []
+
+    _ligar(monkeypatch)
+    fake = _com_estoque(EstoqueAcaoFake(preco=28000.0))
+    login(client)
+    pagina = client.get("/app/loja/copiloto")
+    turno_id = client.post(
+        "/app/loja/copiloto/perguntar",
+        data={
+            "csrf": csrf_da_resposta(pagina),
+            "pergunta": "baixa o preço da CB500 que está parada",
+        },
+    ).json()["turno_id"]
+
+    llm = LLMFake(
+        [
+            RespostaLLM(
+                texto=None,
+                tool_calls=(
+                    ToolCall(
+                        id="c1", nome="propor_acao",
+                        argumentos={
+                            "acao": "ajustar_preco", "veiculo_id": "v1",
+                            "novo_preco": "25000", "justificativa": "dias_parado",
+                        },
+                    ),
+                ),
+                tokens_entrada=900, tokens_saida=20, finish_reason="tool_calls",
+            ),
+            RespostaLLM(
+                texto="Aqui está a proposta.", tool_calls=(),
+                tokens_entrada=1200, tokens_saida=30, finish_reason="stop",
+            ),
+        ]
+    )
+    db = SessionLocal()
+    try:
+        turno = obter_turno(db, "loja-teste", turno_id)
+        processar_turno(db, turno, llm=llm, estoque=fake, chatbot=ChatbotStub())
+    finally:
+        db.close()
+
+    corpo = client.get(f"/app/loja/copiloto/turno/{turno_id}.json").json()
+    assert corpo["cartao"] is not None
+    assert corpo["cartao"]["acao"] == "ajustar_preco"
+    assert "Alterar o preço" in corpo["cartao"]["titulo"]
 ```
 
 - [ ] **Step 2: Run test to verify it fails**
@@ -2591,6 +2751,87 @@ E no `<script>` do template, ao fim do IIFE:
   });
 ```
 
+**Isso não basta.** Os dois blocos acima só desenham o cartão quando a página é recarregada com um `turno.cartao` vindo do servidor (Jinja). Mas o fluxo real de uso é assíncrono: `form` (composer) faz `POST /perguntar` e o resultado chega pelo **polling** de `acompanhar()`/`terminar()` (Fase 2, `GET /turno/{id}.json`), que hoje só faz `alvo.textContent = dados.texto`. Sem tocar nisso, o cartão nunca aparece na primeira vez que o dono pergunta algo — só depois de um F5, o que não é como ninguém usa o chat. `terminar()` precisa aprender a desenhar o mesmo cartão quando `dados.cartao` vier no JSON do polling.
+
+**Regra dura desta parte da task:** o cartão é construído com `document.createElement` e `textContent`, **nunca** com `innerHTML`. A constraint "o cartão é renderizado pelo servidor" (Global Constraints, §6.3) é sobre **de onde vem o conteúdo** — a entidade real relida do Estoque, nunca o texto que o modelo escreveu — e não sobre qual processo concatena a string. Montar nós com `textContent` preserva as duas coisas: o conteúdo continua vindo do servidor e a superfície de XSS continua fechada. `innerHTML` reabriria exatamente o buraco que o `textContent` da Fase 2 fechou, e reabriria com conteúdo que passou perto de um LLM.
+
+Acrescentar ao mesmo IIFE, e trocar o corpo de `terminar()`:
+
+```javascript
+  function criarCartao(cartao) {
+    // document.createElement + textContent, NUNCA innerHTML — ver a regra
+    // dura logo acima. O CSRF é o MESMO token que o composer já tem no DOM
+    // (form.csrf.value): nunca um token novo mandado no JSON do polling.
+    var div = document.createElement('div');
+    div.className = 'copiloto-cartao';
+    div.dataset.acao = cartao.acao;
+
+    var titulo = document.createElement('strong');
+    titulo.textContent = cartao.titulo;
+    div.appendChild(titulo);
+
+    var lista = document.createElement('ul');
+    (cartao.linhas || []).forEach(function (linha) {
+      var li = document.createElement('li');
+      li.textContent = linha;
+      lista.appendChild(li);
+    });
+    div.appendChild(lista);
+
+    if (cartao.aviso) {
+      var aviso = document.createElement('p');
+      aviso.className = 'muted';
+      aviso.textContent = cartao.aviso;
+      div.appendChild(aviso);
+    }
+
+    var formCartao = document.createElement('form');
+    formCartao.className = 'copiloto-cartao-form';
+
+    function campoOculto(nome, valor) {
+      var input = document.createElement('input');
+      input.type = 'hidden';
+      input.name = nome;
+      input.value = valor;
+      formCartao.appendChild(input);
+    }
+    campoOculto('csrf', form.csrf.value);
+    campoOculto('acao', cartao.acao);
+    Object.keys(cartao.parametros || {}).forEach(function (chave) {
+      campoOculto(chave, cartao.parametros[chave]);
+    });
+
+    var confirmar = document.createElement('button');
+    confirmar.className = 'button';
+    confirmar.type = 'submit';
+    confirmar.textContent = 'Confirmar';
+    var cancelarBotao = document.createElement('button');
+    cancelarBotao.className = 'button ghost';
+    cancelarBotao.type = 'button';
+    cancelarBotao.dataset.cancelar = '';
+    cancelarBotao.textContent = 'Cancelar';
+    formCartao.appendChild(confirmar);
+    formCartao.appendChild(cancelarBotao);
+    div.appendChild(formCartao);
+    return div;
+  }
+
+  function terminar(alvo, dados) {
+    clearInterval(timer);
+    pensando.hidden = true;
+    cancelar.hidden = true;
+    definirPendente(false);
+    if (dados && dados.estado !== 'pronto' && !dados.texto) {
+      alvo.textContent = 'Não consegui responder desta vez.';
+    }
+    if (dados && dados.cartao) {
+      alvo.parentNode.appendChild(criarCartao(dados.cartao));
+    }
+  }
+```
+
+Os handlers de `submit`/`click` do bloco anterior são delegados em `document` e checam a classe do alvo (`.copiloto-cartao-form`, `[data-cancelar]`, `[data-desfazer]`) — funcionam sem nenhuma mudança para um cartão criado por `criarCartao()`, exatamente como funcionam para o que o Jinja já desenha no primeiro carregamento da página.
+
 Acrescentar ao `app.css`:
 
 ```css
@@ -2599,22 +2840,89 @@ Acrescentar ao `app.css`:
 .copiloto-cartao-form { display: flex; gap: .5rem; }
 ```
 
-E, na rota da página (`copiloto_home`), extrair o cartão do último passo `propor_acao` de cada turno:
+**O cartão precisa nascer no `Passo` do runner antes de conseguir chegar a qualquer rota.** Hoje (Fase 2, `app/loja/copiloto/runner.py`) `Passo` só tem `ferramenta`, `argumentos`, `status` e `resumo`, e `to_dict()` devolve exatamente esses quatro campos — nenhum lugar guarda o dicionário que `_f_propor_acao` devolve em `saida["cartao"]` (Task 5). Acrescentar um campo genérico:
+
+```python
+@dataclass(frozen=True)
+class Passo:
+    ferramenta: str
+    argumentos: dict[str, Any]
+    status: str  # ok | erro
+    resumo: str
+    extra: dict[str, Any] | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "ferramenta": self.ferramenta,
+            "argumentos": self.argumentos,
+            "status": self.status,
+            "resumo": self.resumo,
+            "extra": self.extra,
+        }
+```
+
+O nome é `extra`, não `cartao`: `Passo` é um registro genérico de um passo de ferramenta, e amarrar o nome do campo a um recurso específico (o cartão de ação) é pior — a próxima ferramenta que precisar devolver algo estruturado além do resumo textual reusa o mesmo campo. Em `executar_turno`, ao montar o `Passo` de uma ferramenta cujo retorno (dict) contém a chave `"cartao"`, copiar esse dicionário para `extra`.
+
+**Aviso que precisa ir no código, não só aqui:** turnos já persistidos antes desta task têm `passos_json` sem a chave `"extra"` — `Passo.to_dict()` novo grava `"extra": null`, mas o JSON *antigo* no banco simplesmente não tem a chave. Todo leitor de `passo` (dict solto, vindo de `json.loads(t.passos_json)`) precisa usar `.get("extra")`, nunca `passo["extra"]` — indexação direta quebra em qualquer turno anterior a este deploy.
+
+Com isso, extrair o cartão do último passo `propor_acao` de cada turno:
 
 ```python
 def _cartao_do_turno(passos: list[dict]) -> dict | None:
+    """O cartão do último `propor_acao` do turno, se houver."""
     for passo in reversed(passos or []):
-        if passo.get("ferramenta") == "propor_acao" and passo.get("cartao"):
-            return passo["cartao"]
+        if passo.get("ferramenta") == "propor_acao" and passo.get("extra"):
+            return passo["extra"]
     return None
 ```
 
-(e o `runner` da Fase 2 passa a guardar o retorno de `propor_acao` no passo: em `executar_turno`, ao montar o `Passo` de uma ferramenta cujo retorno tem `"cartao"`, incluir esse dicionário em `Passo.resumo`→ novo campo `extra`. Ajustar `Passo` para `extra: dict | None = None` e `to_dict()` para incluí-lo.)
+**O campo tem que ser servido nos DOIS lugares que hoje montam a resposta do turno** — sem os dois, o cartão continua não chegando à tela por nenhum caminho real:
+
+1. `copiloto_home` (a mesma rota, dict-comprehension de `turnos=[...]`, hoje com `id, pergunta, resposta, estado, erro_code, passos`). Trocar por:
+
+   ```python
+   turnos_view = []
+   for t in turnos:
+       passos = json.loads(t.passos_json) if t.passos_json else []
+       turnos_view.append(
+           {
+               "id": t.id,
+               "pergunta": t.pergunta,
+               "resposta": t.resposta or t.texto_parcial,
+               "estado": t.estado,
+               "erro_code": t.erro_code,
+               "passos": passos,
+               "cartao": _cartao_do_turno(passos),
+           }
+       )
+   ```
+
+   e passar `turnos=turnos_view` para `contexto(...)` no lugar do dict-comprehension antigo. É este dict que alimenta `{% if turno.cartao %}` no template.
+
+2. **`copiloto_turno_json`** (`GET /app/loja/copiloto/turno/{turno_id}.json`) — este é o que importa **mais**: é o endpoint que o JS de polling (`acompanhar()`/`terminar()`, ver acima) já usa para acompanhar a resposta de uma pergunta feita normalmente, então é o **único** caminho por onde o cartão pode chegar à tela numa pergunta feita do jeito que a UI realmente é usada (sem recarregar a página). Hoje devolve `ok, turno_id, conversa_id, estado, texto, erro_code, passos`, sem `cartao`. Trocar por:
+
+   ```python
+   passos = json.loads(turno.passos_json) if turno.passos_json else []
+   return JSONResponse(
+       {
+           "ok": True,
+           "turno_id": turno.id,
+           "conversa_id": turno.conversa_id,
+           "estado": turno.estado,
+           "texto": turno.resposta or turno.texto_parcial,
+           "erro_code": turno.erro_code,
+           "passos": passos,
+           "cartao": _cartao_do_turno(passos),
+       }
+   )
+   ```
+
+`_cartao_do_turno` fica definida no módulo, antes das duas rotas que a usam.
 
 - [ ] **Step 4: Run tests to verify they pass**
 
 Run: `.\.venv\Scripts\python.exe -m pytest tests/test_copiloto_acao_rotas.py -q`
-Expected: PASS (9 testes).
+Expected: PASS (10 testes).
 
 Run: `.\.venv\Scripts\python.exe -m pytest -q`
 Expected: PASS — suíte inteira.
