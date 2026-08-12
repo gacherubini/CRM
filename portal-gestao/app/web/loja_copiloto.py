@@ -209,6 +209,7 @@ async def _acao_sinal(
     sinal_id: str,
     db: Session,
     operacao,
+    invalidar,
 ):
     """``operacao`` sempre recebe ``(db, loja_slug, sinal_id, usuario_id)``.
 
@@ -216,6 +217,12 @@ async def _acao_sinal(
     ``sinais_store.py``), então o chamador abaixo o embrulha para ignorar o
     ``usuario_id``. Isso mantém este helper único em vez de duas cópias, sem
     inventar um ``usuario_id`` opcional dentro do próprio ``dispensar``.
+
+    ``invalidar`` recebe ``(loja_slug, usuario_id)`` e decide o alcance do
+    cache: mesma regra das rotas JSON gêmeas (``copiloto_notificacao_visto``/
+    ``copiloto_notificacao_dispensar``) — visto é por pessoa, dispensar é da
+    loja inteira. Sem isso o corpo da página (lê o banco) e o sino do
+    cabeçalho (lê o cache de ``invalidar_contagem``) discordam por até 45s.
     """
     usuario = usuario_atual(request, db)
     if not usuario:
@@ -234,6 +241,8 @@ async def _acao_sinal(
 
     # loja_slug da sessão: id de sinal sozinho nunca autoriza nada.
     ok = operacao(db, usuario.loja_slug, sinal_id, usuario.id)
+    if ok:
+        invalidar(usuario.loja_slug, usuario.id)
     destino = f"{_PAGINA}?ok=1" if ok else f"{_PAGINA}?erro=sinal"
     return RedirectResponse(destino, status_code=303)
 
@@ -242,7 +251,13 @@ async def _acao_sinal(
 async def copiloto_sinal_visto(
     request: Request, sinal_id: str, db: Session = Depends(get_db)
 ):
-    return await _acao_sinal(request, sinal_id, db, marcar_visto)
+    return await _acao_sinal(
+        request,
+        sinal_id,
+        db,
+        marcar_visto,
+        lambda loja_slug, usuario_id: invalidar_contagem(loja_slug, usuario_id),
+    )
 
 
 @router.post(_PAGINA + "/sinais/{sinal_id}/dispensar")
@@ -254,6 +269,7 @@ async def copiloto_sinal_dispensar(
         sinal_id,
         db,
         lambda db, loja_slug, sid, _usuario_id: dispensar(db, loja_slug, sid),
+        lambda loja_slug, _usuario_id: invalidar_contagem(loja_slug),
     )
 
 

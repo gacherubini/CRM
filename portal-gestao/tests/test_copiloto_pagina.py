@@ -1,6 +1,7 @@
-from conftest import csrf_da_resposta, login, seed_loja_operacional
+from conftest import criar_usuario, csrf_da_resposta, login, seed_loja_operacional
 
 from app.db import SessionLocal
+from app.loja.copiloto import notificacoes
 from app.loja.copiloto.sinais import SinalCandidato
 from app.loja.copiloto.sinais_store import sincronizar_sinais
 from app.models import CopilotoSinal, CopilotoSinalVisto, LojaOperacionalProjecao
@@ -240,3 +241,84 @@ def test_entitlement_presente_libera_dispensar(client, monkeypatch):
         assert db.query(CopilotoSinal).one().estado == "dispensado"
     finally:
         db.close()
+
+
+# --- Alcance da invalidação de cache das rotas ANTIGAS da página --------------
+#
+# Achado da revisão final da fase (I1): `_acao_sinal` (as rotas de página
+# `/sinais/{id}/visto` e `/sinais/{id}/dispensar`, distintas das rotas JSON do
+# painel do sino) não chamava `invalidar_contagem` — o corpo da página lê o
+# banco direto, mas o sino do cabeçalho lê o cache de 45s, então os dois
+# discordavam logo após o clique. Mesma técnica de dois gestores usada em
+# `test_copiloto_notificacoes_rotas.py` (commit 7d21c1a): com um usuário só,
+# "invalidar apenas quem clicou" e "invalidar a loja inteira" são
+# indistinguíveis.
+
+
+def _usuario_por_email(db, email):
+    from app.models import Usuario
+
+    return db.query(Usuario).filter(Usuario.email == email).one()
+
+
+def test_pagina_visto_invalida_apenas_o_cache_de_quem_marcou(client, monkeypatch, db):
+    _ligar(monkeypatch)
+    login(client, papel="dono", email="gestor-a3@loja.test")
+    criar_usuario(papel="gerente", email="gestor-b3@loja.test", loja_slug="loja-teste")
+    usuario_a = _usuario_por_email(db, "gestor-a3@loja.test")
+    usuario_b = _usuario_por_email(db, "gestor-b3@loja.test")
+    sinal_id = _semear_sinal()
+
+    # Aquece o cache dos dois ANTES da ação.
+    assert notificacoes.contar_nao_vistos(db, "loja-teste", usuario_a.id) == 1
+    assert notificacoes.contar_nao_vistos(db, "loja-teste", usuario_b.id) == 1
+
+    chamadas = []
+    original = notificacoes.contar_sinais_novos
+
+    def _espiao(db, loja_slug, usuario_id):
+        chamadas.append((loja_slug, usuario_id))
+        return original(db, loja_slug, usuario_id)
+
+    monkeypatch.setattr(notificacoes, "contar_sinais_novos", _espiao)
+
+    pagina = client.get("/app/loja/copiloto")
+    client.post(
+        f"/app/loja/copiloto/sinais/{sinal_id}/visto",
+        data={"csrf": csrf_da_resposta(pagina)},
+        follow_redirects=False,
+    )
+
+    # Cache de A caiu: a leitura seguinte tem que ir ao banco de novo.
+    notificacoes.contar_nao_vistos(db, "loja-teste", usuario_a.id)
+    assert len(chamadas) == 1
+
+    # Cache de B continua quente: a leitura seguinte NÃO pode bater no banco.
+    notificacoes.contar_nao_vistos(db, "loja-teste", usuario_b.id)
+    assert len(chamadas) == 1
+
+
+def test_pagina_dispensar_invalida_o_cache_de_toda_a_loja(client, monkeypatch, db):
+    _ligar(monkeypatch)
+    login(client, papel="dono", email="gestor-a4@loja.test")
+    criar_usuario(papel="gerente", email="gestor-b4@loja.test", loja_slug="loja-teste")
+    usuario_a = _usuario_por_email(db, "gestor-a4@loja.test")
+    usuario_b = _usuario_por_email(db, "gestor-b4@loja.test")
+    sinal_id = _semear_sinal()
+
+    # Aquece o cache dos dois.
+    assert notificacoes.contar_nao_vistos(db, "loja-teste", usuario_a.id) == 1
+    assert notificacoes.contar_nao_vistos(db, "loja-teste", usuario_b.id) == 1
+
+    pagina = client.get("/app/loja/copiloto")
+    r = client.post(
+        f"/app/loja/copiloto/sinais/{sinal_id}/dispensar",
+        data={"csrf": csrf_da_resposta(pagina)},
+        follow_redirects=False,
+    )
+    assert r.status_code == 303
+
+    # O sinal sumiu de verdade para os dois (estado é da loja) — o cache de
+    # B (que não clicou em nada) tem que refletir isso, não a foto velha.
+    assert notificacoes.contar_nao_vistos(db, "loja-teste", usuario_a.id) == 0
+    assert notificacoes.contar_nao_vistos(db, "loja-teste", usuario_b.id) == 0
