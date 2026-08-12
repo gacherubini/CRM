@@ -44,6 +44,33 @@ def _seed_module_catalog() -> None:
         db.commit()
 
 
+def test_snapshot_inclui_copiloto_quando_contratado():
+    _seed_module_catalog()
+    admin = _admin_actor()
+    store = StoreControl(SessionLocal).create(
+        admin,
+        CreateStore(name="Loja Copiloto Snap", slug="loja-copiloto-snap"),
+    )
+    PortfolioControl(SessionLocal).configure(
+        admin,
+        StoreRef(id=store.id),
+        {"vendas", "estoque", "copiloto"},
+    )
+
+    snapshot = ProvisioningControl(SessionLocal).snapshot(StoreRef(id=store.id))
+
+    aggregates = tuple(item.aggregate for item in snapshot.operational)
+    assert aggregates == ("loja", "vendas", "estoque", "copiloto")
+    copiloto_env = next(
+        item for item in snapshot.operational if item.aggregate == "copiloto"
+    )
+    assert copiloto_env.state == "ativo"
+    assert copiloto_env.version == 1
+    # event_id do snapshot precisa mudar ao ganhar copiloto (senão o outbox
+    # deduplica contra a entrega anterior de vendas+estoque e nunca propaga).
+    assert len({item.event_id for item in snapshot.operational}) == 4
+
+
 def test_snapshot_operacional_e_versionado_estavel_e_ordenado():
     _seed_module_catalog()
     admin = _admin_actor()
