@@ -14,6 +14,7 @@ from scripts.copiloto_validacao import (
     extrair_numeros_da_resposta,
     folhas_numericas,
     normalizar_numero,
+    rastreia_ao_payload,
     rodar_validacao,
 )
 
@@ -486,3 +487,21 @@ def test_rodar_validacao_fim_a_fim_numero_inventado_e_flagrado(db):
     assert relatorio.avaliacoes[0].numeros_relevante is True
     assert relatorio.avaliacoes[0].numeros_ok is False
     assert relatorio.pct_numeros_rastreaveis == 0.0
+
+
+def test_derivacao_exata_do_payload_rastreia():
+    """14 - 6 = 8: o modelo dizer "as outras 8" e derivacao, nao invencao.
+
+    Caso real do gate de 2026-08-12: sem isto, as 9 respostas com dado real
+    reprovaram todas por causa deste unico numero.
+    """
+    payload = {Decimal("14"), Decimal("6"), Decimal("412000.00")}
+    assert rastreia_ao_payload(Decimal("8"), payload) is True
+    assert rastreia_ao_payload(Decimal("20"), payload) is True  # 14 + 6
+
+
+def test_numero_inventado_nao_rastreia():
+    """A derivacao e estreita de proposito: so soma e subtracao de dois."""
+    payload = {Decimal("14"), Decimal("6"), Decimal("412000.00")}
+    assert rastreia_ao_payload(Decimal("999"), payload) is False
+    assert rastreia_ao_payload(Decimal("84"), payload) is False  # 14 * 6

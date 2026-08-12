@@ -127,6 +127,32 @@ def extrair_numeros_da_resposta(texto: str) -> list[Decimal]:
     return numeros
 
 
+def rastreia_ao_payload(numero: Decimal, payload: set[Decimal]) -> bool:
+    """O número aparece no payload, ou é diferença/soma exata de dois valores
+    dele.
+
+    A derivação existe por um caso real, medido no gate de 2026-08-12: com
+    ``cobertura_margem {com_dado: 6, total: 14}``, o modelo escreveu "6 das 14
+    vendas, porque as outras **8** ainda não têm custo". O 8 é ``14 - 6`` --
+    exato, correto, e deixa a resposta melhor. Sem esta função a métrica
+    reprovava justamente o comportamento que queremos, e as 9 respostas com
+    dado real do primeiro gate falharam todas por isso.
+
+    O escopo é deliberadamente estreito: SÓ soma e subtração de DOIS valores
+    do payload. Aceitar qualquer aritmética tornaria a métrica incapaz de
+    reprovar um número inventado, que é a única coisa que ela existe para
+    pegar. Regra 1 proíbe estimar e supor -- não proíbe subtrair.
+    """
+    if numero in payload:
+        return True
+    valores = list(payload)
+    for i, a in enumerate(valores):
+        for b in valores[i:]:
+            if numero == a - b or numero == b - a or numero == a + b:
+                return True
+    return False
+
+
 def folhas_numericas(valor: Any) -> list[Decimal]:
     """Todo número folha de um payload JSON aninhado (dict/list) — inclusive
     strings numéricas, porque os ``to_dict()`` do domínio serializam Decimal
@@ -212,7 +238,9 @@ def avaliar_caso(
         numeros_resposta = extrair_numeros_da_resposta(texto)
         if numeros_resposta:
             numeros_relevante = True
-            numeros_ok = all(n in payload_numeros for n in numeros_resposta)
+            numeros_ok = all(
+                rastreia_ao_payload(n, payload_numeros) for n in numeros_resposta
+            )
 
     return Avaliacao(
         caso_id=caso["id"],
