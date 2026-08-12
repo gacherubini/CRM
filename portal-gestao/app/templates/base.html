@@ -196,9 +196,13 @@
               {# Alcance real (conferido no código, não copiado do brief): visto
                  é por pessoa (F4/Task 0); dispensar é da loja inteira. #}
               <p class="copiloto-notif-escopo">Estes alertas são da loja: toda a equipe de gestão os vê. Marcar como visto vale só para você — dispensar tira o alerta para todo mundo.</p>
-              <div class="copiloto-notif-lista" data-copiloto-lista>
-                <p class="copiloto-notif-status" data-copiloto-status>Carregando notificações…</p>
-              </div>
+              {# Lista e status ficam separados de propósito: <ul> só recebe
+                 <li> (Important da revisão — um <li> sem <ul> ancestral não
+                 é anunciado como lista por leitor de tela); o status
+                 (carregando/vazio/erro) é parágrafo irmão, nunca filho do
+                 <ul>. #}
+              <p class="copiloto-notif-status" data-copiloto-status>Carregando notificações…</p>
+              <ul class="copiloto-notif-lista" data-copiloto-lista hidden></ul>
             </div>
             {# Textos canônicos para o JS usar quando souber o estado real da
                listagem (rota de listar é a Task 3) — não são fabricados no
@@ -291,6 +295,7 @@
       const painel = document.getElementById('copiloto-notif-painel');
       if (!sino || !painel) return;
       const lista = painel.querySelector('[data-copiloto-lista]');
+      const status = painel.querySelector('[data-copiloto-status]');
       const textoVazioEl = wrap.querySelector('[data-copiloto-texto-vazio]');
       const textoErroEl = wrap.querySelector('[data-copiloto-texto-erro]');
       const textoVazio = textoVazioEl ? textoVazioEl.textContent : '';
@@ -322,12 +327,20 @@
 
       const limparLista = () => { while (lista.firstChild) lista.removeChild(lista.firstChild); };
 
+      // <ul> só recebe <li> (senão o leitor de tela não anuncia lista); o
+      // status (carregando/vazio/erro) é sempre o parágrafo irmão.
       const mostrarStatus = (texto) => {
         limparLista();
-        const p = document.createElement('p');
-        p.className = 'copiloto-notif-status';
-        p.textContent = texto;
-        lista.appendChild(p);
+        lista.hidden = true;
+        status.hidden = false;
+        status.textContent = texto;
+      };
+
+      const mostrarItens = (itens) => {
+        limparLista();
+        status.hidden = true;
+        lista.hidden = false;
+        itens.forEach((item) => lista.appendChild(montarItem(item)));
       };
 
       const rotuloSeveridade = { critico: 'Crítico', atencao: 'Atenção', info: 'Info' };
@@ -434,11 +447,10 @@
           .then((dados) => {
             carregado = true;
             const itens = (dados && dados.itens) || [];
-            limparLista();
             if (itens.length === 0) {
               mostrarStatus(textoVazio);
             } else {
-              itens.forEach((item) => lista.appendChild(montarItem(item)));
+              mostrarItens(itens);
             }
             if (dados && typeof dados.nao_vistos === 'number') atualizarBadge(dados.nao_vistos);
           })

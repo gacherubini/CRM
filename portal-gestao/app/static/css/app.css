@@ -3326,7 +3326,19 @@ a.metric-link:focus-visible { outline: 2px solid var(--brand); outline-offset: 2
   font-size: var(--text-xs);
 }
 
-.copiloto-notif-lista { display: grid; gap: var(--space-3); }
+/* <ul> de verdade (Important da revisão): leitor de tela só anuncia "lista
+   de N itens" com <li> dentro de <list>. Reset do estilo nativo de lista —
+   sem token porque não é cor, é o mesmo list-style:none do resto do app. */
+.copiloto-notif-lista {
+  display: grid;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+/* Mesma armadilha de especificidade do painel: [hidden] precisa ganhar do
+   `display: grid` da classe. */
+.copiloto-notif-lista[hidden] { display: none; }
 .copiloto-notif-status {
   margin: 0;
   padding: var(--space-4) 0;

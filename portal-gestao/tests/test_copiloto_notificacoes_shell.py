@@ -716,6 +716,31 @@ def test_painel_acessivel_fechado_por_padrao_com_aria_live(client, db, monkeypat
     assert 'aria-expanded="false"' in resposta.text
 
 
+def test_lista_de_notificacoes_e_ul_para_leitor_de_tela(client, db, monkeypatch):
+    """Important da revisão: ``montarItem()`` cria um ``<li>`` e o anexa em
+    ``data-copiloto-lista``. Sem um ``<ul>``/``<ol>`` ancestral, esse ``<li>``
+    é um ``listitem`` órfão — leitor de tela não anuncia "lista de N itens".
+    Trava a estrutura no HTML servido, não só no JS (a rota que popula a
+    lista é a Task 3; até lá isto é a única prova possível)."""
+    _ligar_shell_e_entitlements(monkeypatch)
+    _seedar_modulo_copiloto(db)
+    login(client, papel="dono", email="dono-estrutura@loja.test")
+
+    resposta = client.get(_TELA_SEM_GATE_DE_MODULO)
+
+    # O container que o JS usa para anexar <li> (data-copiloto-lista) tem que
+    # ser um elemento de lista de verdade — nunca <div>/<span>.
+    assert re.search(
+        r'<ul class="copiloto-notif-lista" data-copiloto-lista\b', resposta.text
+    )
+    assert '<div class="copiloto-notif-lista"' not in resposta.text
+    # E o status (carregando/vazio/erro) não pode ser filho do <ul>: um <p>
+    # dentro de <ul> também é inválido/mal-anunciado. Tem que ser irmão.
+    ul_aberto = resposta.text.index('<ul class="copiloto-notif-lista"')
+    ul_fechado = resposta.text.index("</ul>", ul_aberto)
+    assert "copiloto-notif-status" not in resposta.text[ul_aberto:ul_fechado]
+
+
 def test_sem_innerhtml_no_script_do_sino(client, db, monkeypatch):
     """Regra dura do projeto (defeito de XSS já ocorreu numa fase anterior):
     qualquer JS que monte conteúdo a partir de dado do alerta usa
