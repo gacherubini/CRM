@@ -356,6 +356,53 @@ def test_avaliar_loja_fipe_indisponivel_nao_gera_sinal_de_preco(db):
     assert "preco_fora_da_faixa" not in {c.regra for c in candidatos}
 
 
+def test_avaliar_loja_com_fipe_fora_nao_derruba_as_outras_regras(db):
+    """Verificação de fechamento da F4: "com a FIPE fora, nenhum sinal de
+    preço, e os alertas das outras regras continuam aparecendo". A regra 7
+    fica atrás de um `if fipe is not None` isolado (`avaliar_loja` acima) —
+    este teste prova isso na integração, não só por leitura de código: um
+    estoque e vendas que disparam QUATRO das outras seis regras ao mesmo
+    tempo em que a FIPE está fora continuam gerando os quatro sinais, e
+    nenhum sinal de preço aparece.
+
+    ``_veiculo_parado()`` não tem o campo ``tipo`` (só ``_veiculo_fipe`` tem,
+    de propósito, para o matching FIPE) — por isso também é lacuna de
+    cadastro, além de estoque parado; junto com as 4 vendas sem custo do
+    padrão de ``test_avaliar_loja_gera_margem_incompleta``, cobre
+    estoque_parado, cadastro_incompleto, margem_incompleta e
+    atribuicao_baixa nesta mesma chamada."""
+    seed_loja_operacional(db)
+    for i in range(4):
+        db.add(
+            Venda(
+                loja_slug="loja-teste",
+                vendedor_email="ana@loja.test",
+                descricao="Moto",
+                preco_venda=Decimal("20000"),
+                custo_veiculo=Decimal("16000") if i == 0 else None,
+                status="confirmada",
+                criada_em=AGORA - timedelta(days=2),
+            )
+        )
+    db.commit()
+    candidatos = avaliar_loja(
+        db,
+        "loja-teste",
+        estoque=EstoqueStub([_veiculo_parado()]),
+        chatbot=ChatbotStub(),
+        fipe=_fipe_client(indisponivel=True),
+        agora=AGORA,
+    )
+    regras = {c.regra for c in candidatos}
+    assert "preco_fora_da_faixa" not in regras
+    assert {
+        "estoque_parado",
+        "cadastro_incompleto",
+        "margem_incompleta",
+        "atribuicao_baixa",
+    } <= regras
+
+
 def test_avaliar_loja_fipe_ambiguo_nao_gera_sinal_de_preco(db):
     """Matching sem candidato exato e único -> nenhum sinal, mesmo com preço
     absurdo: a Fase 3 nunca adivinha, e um alerta proativo é pior lugar para
