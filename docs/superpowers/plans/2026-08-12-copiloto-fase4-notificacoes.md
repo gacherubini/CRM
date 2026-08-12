@@ -18,11 +18,8 @@
 
 - **O motor não muda.** Regra nova é função pura em `sinais.py` que devolve `SinalCandidato`; o worker, o dedupe e o cooldown da Fase 1 cuidam do resto. Se uma task quiser mexer em `sinais_store.py`, algo está errado no desenho.
 - **`template_extras()` roda em toda renderização do shell.** Uma query de contagem sem cache ali é imposto em cada page view do produto inteiro. A contagem tem de ser cacheada (reusar `CacheTTL` de `app/loja/copiloto/cache.py`) e tem de degradar para "sem badge" se a query falhar — o sino nunca pode derrubar uma página que não é dele.
-- **Gate-duplo vale para o sino**, com uma diferença em relação à Fase 1: o sino existe quando `REVY_LOJA_SHELL_ENABLED` + `REVY_LOJA_COPILOTO_ENABLED` + entitlement `Module.COPILOTO` da loja + o usuário tem acesso à Revy Loja. **O papel deixa de ser porteiro da seção e passa a ser filtro por regra** (constraint seguinte). Esconder no template não é autorização: a rota do painel carrega o gate inteiro, igual às rotas da Fase 2.
-- **Audiência é propriedade da regra, não da tela** (decisão do dono, 2026-08-12: "todos que têm acesso à Revy Loja devem receber"). Abrir a seção inteira para vendedor seria vazamento: `regra_estoque_parado` mostra **capital preso**, `regra_margem_incompleta` é sobre **custo** e `regra_meta_em_risco` mostra **meta** — e o ledger da Fase 1 já tinha parqueado exatamente esse risco como adormecido ("o formatador não pode expor presença de dado de custo ao vendedor; inócuo na F1 porque a seção é só de gestão"). Esta fase acorda o risco, então cada regra declara sua audiência no catálogo da Task 5:
-  - **operacionais, todos veem:** `lead_sem_resposta`, `cadastro_incompleto` — são as que ajudam o vendedor a trabalhar;
-  - **gestão apenas:** `estoque_parado`, `margem_incompleta`, `meta_em_risco`, `atribuicao_baixa`, `preco_fora_da_faixa`.
-  Um teste trava a regra: **toda** regra tem audiência declarada; regra sem entrada no catálogo é tratada como gestão (fail-closed), nunca como pública.
+- **Gate-duplo vale para o sino.** Ele só existe quando `REVY_LOJA_SHELL_ENABLED` + `REVY_LOJA_COPILOTO_ENABLED` + entitlement `Module.COPILOTO` da loja + papel em `ROLES_GESTAO`. Esconder no template não é autorização: a rota do painel carrega o gate inteiro, igual às rotas da Fase 2.
+- **Copiloto continua só de gestão** (decisão do dono, 2026-08-12: "só pra gestão por enquanto"). O "por enquanto" é literal e a Task 5 prepara o terreno: o catálogo guarda a audiência de cada regra, hoje toda `gestao`. No dia em que o vendedor entrar, muda-se o catálogo — não o gate, não as rotas, não o worker. **Regra sem audiência declarada é tratada como `gestao` (fail-closed), nunca como pública**, e um teste trava isso. O motivo de fail-closed importa: `estoque_parado` mostra capital preso, `margem_incompleta` é sobre custo e `meta_em_risco` mostra meta — o ledger da Fase 1 já tinha parqueado esse vazamento como adormecido justamente porque a seção era só de gestão. Um default público reabriria isso em silêncio.
 - **Visto é por pessoa; dispensar é da loja.** `copiloto_sinal` não tem `usuario_id`, e por isso hoje "visto" é coletivo — o dono quer o contrário (decisão de 2026-08-12). Isso exige tabela nova (Task 0). A assimetria é proposital: **visto** significa "eu li", então é de quem leu; **dispensar** significa "esse alerta não procede", que é um juízo sobre o alerta em si — se fosse pessoal, cada gestor teria de dispensar separadamente o mesmo alerta falso. A tela precisa dizer isso em texto, senão o comportamento parece inconsistente.
 - **Nunca inventar número.** O alerta de FIPE só existe quando a FIPE respondeu. FIPE fora → nenhum sinal, e o alerta de tempo parado (que não depende dela) continua. Nada de "provavelmente acima do mercado".
 - **Design system.** Vale a constraint escrita no plano F2: folha real em `app/static/css/app.css`, paleta em `app/static/css/revy-tokens.css`, toda cor/raio/fonte em `var(--token)`, classe nova escopada, reusar `.button`/`.sr-only`/`.chip-list` antes de inventar. O sino aparece em **todas** as telas do shell — um erro de contraste aqui aparece no produto inteiro.
@@ -80,20 +77,20 @@
 - Test: `portal-gestao/tests/test_copiloto_notificacoes_shell.py`
 
 **Interfaces:**
-- Consome: `contar_sinais_novos` (Task 0, já com `usuario_id`), `CacheTTL` (`cache.py`), `Module`, o catálogo de audiência da Task 5.
-- Produz: `contar_nao_vistos(db, loja_slug, usuario_id, papel) -> int` (cacheado, TTL curto); `invalidar_contagem(loja_slug, usuario_id=None)`; `template_extras` passa a devolver `copiloto_nao_vistos: int | None`.
+- Consome: `contar_sinais_novos` (Task 0, já com `usuario_id`), `CacheTTL` (`cache.py`), `Module`, `ROLES_GESTAO`.
+- Produz: `contar_nao_vistos(db, loja_slug, usuario_id) -> int` (cacheado, TTL curto); `invalidar_contagem(loja_slug, usuario_id=None)`; `template_extras` passa a devolver `copiloto_nao_vistos: int | None`.
 
-**A chave do cache inclui o usuário e o papel**, porque a contagem agora é pessoal (Task 0) e filtrada por audiência (Task 5). Cachear só por loja devolveria a contagem de outra pessoa — e `invalidar_contagem(loja_slug)` sem usuário precisa limpar todas as entradas daquela loja, senão o worker criar um sinal novo não reflete para ninguém até o TTL virar.
+**A chave do cache inclui o usuário**, porque a contagem agora é pessoal (Task 0). Cachear só por loja devolveria a contagem do sócio — e `invalidar_contagem(loja_slug)` sem usuário precisa limpar todas as entradas daquela loja, senão o worker criar um sinal novo não reflete para ninguém até o TTL virar.
 
 **Por que cache aqui é obrigatório e não otimização:** `template_extras` (`loja_shell.py:91`) roda em **toda** renderização do shell. Uma contagem sem cache adiciona uma query por page view em Vendas, Estoque, Atendimento — telas que não têm nada a ver com o Copiloto. TTL curto (30–60s) é suficiente: um alerta que aparece um minuto depois não muda a vida de ninguém; uma query a mais em cada tela, sim.
 
 **Degradação:** se a contagem levantar, `template_extras` devolve `copiloto_nao_vistos = None` e a página renderiza **sem badge**. O sino é acessório; ele nunca pode ser o motivo de um 500 na tela de Vendas. Logar a exceção em `warning` — não engolir em silêncio (foi achado I2 da revisão final da F1).
 
-**Gate:** devolver `None` — não `0` — quando o shell está desligado, quando o módulo não está no entitlement da loja, ou quando o usuário não tem acesso à Revy Loja. `None` significa "não tem sino"; `0` significa "tem sino, zerado". A distinção importa para o template. **Vendedor com acesso recebe `0` ou mais** (ele vê as regras operacionais), nunca `None` só por ser vendedor.
+**Gate:** devolver `None` — não `0` — quando o shell está desligado, quando o módulo não está no entitlement da loja, ou quando o papel não está em `ROLES_GESTAO`. `None` significa "não tem sino"; `0` significa "tem sino, zerado". A distinção importa para o template.
 
 - [ ] **Step 1: Escrever o teste que falha**
 
-Cobrir: (a) gestor de loja com entitlement vê a contagem real; (b) vendedor vê contagem só das regras operacionais — **não** `None`, e **não** inclui `estoque_parado`/`margem_incompleta`; (c) loja sem o módulo recebe `None` mesmo com papel certo; (d) uma exceção na contagem devolve `None` e **não** propaga; (e) a segunda chamada dentro do TTL não vai ao banco (contar queries ou espionar a função); (f) `invalidar_contagem` força releitura.
+Cobrir: (a) gestor de loja com entitlement vê a contagem real; (b) vendedor recebe `None`; (c) loja sem o módulo recebe `None` mesmo com papel certo; (d) uma exceção na contagem devolve `None` e **não** propaga; (e) a segunda chamada dentro do TTL não vai ao banco (contar queries ou espionar a função); (f) `invalidar_contagem` força releitura.
 
 - [ ] **Step 2: Rodar e ver falhar**
 - [ ] **Step 3: Implementar**
