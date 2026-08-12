@@ -2008,6 +2008,22 @@ Por isso: **o cartão é montado pelo servidor a partir da entidade real relida 
 
 **Nenhuma proposta de preço sem FIPE confirmada** (§4.5.2): `propor_acao` com `ajustar_preco` exige `fipe_status="ok"` nos parâmetros ou uma justificativa que não seja FIPE (ex.: dias parados). Ambígua ou não encontrada → recusa.
 
+> **Nota de correção (2026-08-12):** a revisão de código achou um Critical (C-1) no
+> desenho original abaixo: `TITULOS_ACAO["ajustar_preco"]` interpolava `{rotulo}` —
+> marca/modelo, texto de terceiro — dentro de uma frase escrita pelo servidor
+> ("Alterar o preço de {rotulo}"). Um `modelo` malicioso podia fechar
+> gramaticalmente a frase do servidor com uma negação própria (ex.: terminar em
+> "... o anúncio NÃO sai") e o dono leria uma instrução do servidor que na
+> verdade era metade texto de atacante. Corrigido no commit `4cbf6de`: os
+> valores de `TITULOS_ACAO` viraram frase fixa, **sem** slot de interpolação;
+> `CartaoAcao` ganhou os campos próprios `veiculo_rotulo` e `veiculo_placa`
+> (nunca colados dentro do título); e `_rotulo_veiculo` passou a sanitizar cada
+> parte com `sanitizar_texto_externo` e truncar com `truncar_com_reticencias`
+> (`app/loja/copiloto/texto_externo.py`) antes de virar rótulo. Os blocos de
+> código abaixo (Step 1 e Step 3) **ainda mostram o desenho original, sem essa
+> correção** — para o código real, ver `portal-gestao/app/loja/copiloto/cartao.py`
+> e `portal-gestao/tests/test_copiloto_cartao.py::test_cartao_expoe_rotulo_id_e_placa_em_campos_proprios`.
+
 - [ ] **Step 1: Write the failing test**
 
 Criar `portal-gestao/tests/test_copiloto_cartao.py`:
@@ -2871,6 +2887,12 @@ async def copiloto_desfazer_acao(
 
 No template `loja/copiloto.html`, dentro do bloco de resposta do turno, renderizar o cartão vindo do passo `propor_acao` e ligar o JS:
 
+> **Nota de correção (2026-08-12):** o Jinja abaixo é do desenho ORIGINAL, de
+> antes do achado C-1 (ver nota na Task 5). O template real também renderiza
+> `turno.cartao.veiculo_rotulo` num `<p>` próprio (com `veiculo_id`/`veiculo_placa`
+> como âncora ao lado) — nunca dentro do `<strong>{{ turno.cartao.titulo }}</strong>`,
+> que hoje é só a ação, sem interpolação. Ver `app/templates/loja/copiloto.html`.
+
 ```jinja
         {% if turno.cartao %}
         <div class="copiloto-cartao" data-acao="{{ turno.cartao.acao }}">
@@ -2893,23 +2915,38 @@ No template `loja/copiloto.html`, dentro do bloco de resposta do turno, renderiz
 E no `<script>` do template, ao fim do IIFE:
 
 ```javascript
+  // document.createElement + textContent, NUNCA innerHTML/insertAdjacentHTML
+  // — mesma regra dura de baixo. O erro do servidor e o "Feito." também são
+  // dado (mensagem da API, id da ação), nunca concatenados como string HTML.
   document.addEventListener('submit', function (evento) {
-    var form = evento.target;
-    if (!form.classList || !form.classList.contains('copiloto-cartao-form')) { return; }
+    var formAcao = evento.target;
+    if (!formAcao.classList || !formAcao.classList.contains('copiloto-cartao-form')) { return; }
     evento.preventDefault();
-    var botao = form.querySelector('button[type="submit"]');
+    var botao = formAcao.querySelector('button[type="submit"]');
     botao.disabled = true; // duplo clique reaplicaria o PATCH
-    fetch('/app/loja/copiloto/acao', { method: 'POST', body: new FormData(form) })
+    fetch('/app/loja/copiloto/acao', { method: 'POST', body: new FormData(formAcao) })
       .then(function (r) { return r.json().then(function (d) { return { status: r.status, dados: d }; }); })
       .then(function (resposta) {
-        var cartao = form.closest('.copiloto-cartao');
+        var cartaoEl = formAcao.closest('.copiloto-cartao');
         if (resposta.status !== 200) {
           botao.disabled = false;
-          cartao.insertAdjacentHTML('beforeend', '<p class="muted">' + (resposta.dados.message || 'Não consegui executar.') + '</p>');
+          var erro = document.createElement('p');
+          erro.className = 'muted';
+          erro.textContent = resposta.dados.message || 'Não consegui executar.';
+          cartaoEl.appendChild(erro);
           return;
         }
-        cartao.innerHTML = '<strong>Feito.</strong> <button class="button ghost" type="button" data-desfazer="'
-          + resposta.dados.acao_id + '">Desfazer</button>';
+        while (cartaoEl.firstChild) { cartaoEl.removeChild(cartaoEl.firstChild); }
+        var feito = document.createElement('strong');
+        feito.textContent = 'Feito.';
+        var desfazerBotao = document.createElement('button');
+        desfazerBotao.className = 'button ghost';
+        desfazerBotao.type = 'button';
+        desfazerBotao.dataset.desfazer = resposta.dados.acao_id;
+        desfazerBotao.textContent = 'Desfazer';
+        cartaoEl.appendChild(feito);
+        cartaoEl.appendChild(document.createTextNode(' '));
+        cartaoEl.appendChild(desfazerBotao);
       });
   });
 
