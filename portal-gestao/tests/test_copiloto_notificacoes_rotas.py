@@ -48,7 +48,7 @@ def _seedar_modulo_copiloto(loja_slug="loja-teste", state="ativo"):
         db.close()
 
 
-def _semear_sinal(loja="loja-teste", entidade="v1", **extra):
+def _semear_sinal(loja="loja-teste", entidade="v1", regra="estoque_parado", **extra):
     db = SessionLocal()
     try:
         sincronizar_sinais(
@@ -56,7 +56,7 @@ def _semear_sinal(loja="loja-teste", entidade="v1", **extra):
             loja,
             [
                 SinalCandidato(
-                    regra="estoque_parado",
+                    regra=regra,
                     severidade="atencao",
                     titulo="Honda CB 500F parada há 70 dias",
                     detalhe="R$ 25.000,00 de capital preso.",
@@ -90,6 +90,49 @@ def test_listar_devolve_itens_e_contagem(client, monkeypatch):
     assert item["severidade"] == "atencao"
     assert item["acao_sugerida"] == {"acao": "abrir", "href": "/app/loja/estoque"}
     assert item["quando"]
+
+
+def test_listar_traz_rotulo_icone_e_severidade_padrao_do_catalogo(client, monkeypatch):
+    """A rota nasceu (F4/Task 3) sem conhecer o catálogo (F4/Task 5) — as
+    duas tasks rodaram em paralelo, em branches diferentes. Este teste prende
+    a ligação: o item de um sinal com regra CONHECIDA carrega o rótulo, o
+    ícone e a severidade padrão de ``catalogo_regra``, não só os campos que
+    já existiam antes desta correção."""
+    _ligar(monkeypatch)
+    login(client)
+    _semear_sinal()  # regra="estoque_parado" — ver _semear_sinal acima
+    r = client.get("/app/loja/copiloto/notificacoes.json")
+    assert r.status_code == 200
+    item = r.json()["itens"][0]
+
+    esperado = notificacoes.catalogo_regra("estoque_parado")
+    assert item["rotulo"] == esperado.rotulo == "Estoque parado"
+    assert item["icone"] == esperado.icone == "estoque"
+    assert item["severidade_padrao"] == esperado.severidade_padrao == "atencao"
+    # Nome cru da regra nunca vaza para o payload — só o rótulo do catálogo.
+    assert "regra" not in item
+    assert "estoque_parado" not in item.values()
+
+
+def test_listar_com_regra_desconhecida_traz_rotulo_generico_nunca_o_nome_cru(
+    client, monkeypatch
+):
+    """Regra sem entrada no catálogo (dado inesperado, ou regra nova ainda
+    não catalogada) cai em ``ENTRADA_GENERICA`` — nunca no nome cru da
+    função/regra. Vazar ``regra_preco_fora_da_faixa`` (ou qualquer nome de
+    função) no painel do sino é vazamento de implementação para o lojista."""
+    _ligar(monkeypatch)
+    login(client)
+    _semear_sinal(regra="regra_fantasma_desconhecida")
+    r = client.get("/app/loja/copiloto/notificacoes.json")
+    assert r.status_code == 200
+    item = r.json()["itens"][0]
+
+    assert item["rotulo"] == notificacoes.ENTRADA_GENERICA.rotulo
+    assert item["icone"] == notificacoes.ENTRADA_GENERICA.icone
+    assert item["severidade_padrao"] == notificacoes.ENTRADA_GENERICA.severidade_padrao
+    assert item["rotulo"] != "regra_fantasma_desconhecida"
+    assert "regra_fantasma_desconhecida" not in item.values()
 
 
 def test_listar_nao_mostra_sinal_de_outra_loja(client, monkeypatch):

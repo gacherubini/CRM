@@ -38,6 +38,7 @@ from app.loja.copiloto.conversas import (  # noqa: E402
     obter_turno,
 )
 from app.loja.copiloto.notificacoes import (  # noqa: E402
+    catalogo_regra,
     contar_nao_vistos,
     invalidar_contagem,
 )
@@ -288,10 +289,21 @@ def _serializar_sinal_para_painel(sinal: CopilotoSinal) -> dict:
     ``acao_sugerida`` vem de volta como dict (não string) — o JS só usa
     ``.href`` quando presente; ações sem link (ex.: ajustar_preco) chegam
     sem ``href`` e o botão "Abrir" simplesmente não aparece.
+
+    ``rotulo``/``icone``/``severidade_padrao`` vêm do catálogo único
+    (``catalogo_regra``, F4/Task 5) — nunca de ``sinal.regra`` copiado direto
+    no payload. ``EntradaCatalogo`` é ``@dataclass(frozen=True)`` e não é
+    serializável por ``JSONResponse``/``json.dumps`` puro; em vez de
+    ``dataclasses.asdict`` (que devolveria as 3 chaves com os nomes do
+    dataclass automaticamente, inclusive se o dataclass ganhar um campo novo
+    amanhã), os campos são extraídos um a um aqui, no mesmo estilo manual do
+    resto deste dict — explícito sobre o que o payload promete, e o nome
+    cru da regra (``sinal.regra``) nunca entra na resposta.
     """
     acao_sugerida = (
         json.loads(sinal.acao_sugerida_json) if sinal.acao_sugerida_json else None
     )
+    entrada_catalogo = catalogo_regra(sinal.regra)
     return {
         "id": sinal.id,
         "severidade": sinal.severidade,
@@ -299,6 +311,9 @@ def _serializar_sinal_para_painel(sinal: CopilotoSinal) -> dict:
         "detalhe": sinal.detalhe,
         "quando": sinal.criado_em.isoformat() if sinal.criado_em else None,
         "acao_sugerida": acao_sugerida,
+        "rotulo": entrada_catalogo.rotulo,
+        "icone": entrada_catalogo.icone,
+        "severidade_padrao": entrada_catalogo.severidade_padrao,
     }
 
 
