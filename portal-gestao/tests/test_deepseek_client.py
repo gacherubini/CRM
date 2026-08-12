@@ -2,7 +2,12 @@ import httpx
 import pytest
 
 from app.clients.deepseek import DeepSeekClient, montar_payload
-from app.loja.copiloto.port import LLMIndisponivel, MensagemLLM, RespostaLLMInvalida
+from app.loja.copiloto.port import (
+    LLMIndisponivel,
+    MensagemLLM,
+    RespostaLLMInvalida,
+    ToolCall,
+)
 
 FERRAMENTAS = [
     {
@@ -54,6 +59,63 @@ def test_payload_serializa_mensagem_de_tool():
     ultima = payload["messages"][-1]
     assert ultima["role"] == "tool"
     assert ultima["tool_call_id"] == "call-1"
+
+
+def test_payload_serializa_tool_calls_da_mensagem_assistant():
+    """Formato OpenAI: assistant que pediu ferramenta leva ``tool_calls``
+    estruturado (id/type/function.name/function.arguments-como-string), não
+    um resumo de texto — é isso que a mensagem role=tool seguinte referencia
+    por ``tool_call_id``."""
+    mensagens = _mensagens() + [
+        MensagemLLM(
+            papel="assistant",
+            conteudo="",
+            tool_calls=(
+                ToolCall(id="call-1", nome="vendas_resumo", argumentos={"periodo": "mes"}),
+            ),
+        ),
+        MensagemLLM(
+            papel="tool", conteudo='{"qtd": 2}', tool_call_id="call-1",
+            nome="vendas_resumo",
+        ),
+    ]
+    payload = montar_payload(
+        mensagens, FERRAMENTAS, modelo="m", esforco="low", max_tokens=800
+    )
+    assistant_msg = payload["messages"][-2]
+    tool_msg = payload["messages"][-1]
+
+    assert assistant_msg["role"] == "assistant"
+    assert assistant_msg["content"] is None
+    assert assistant_msg["tool_calls"] == [
+        {
+            "id": "call-1",
+            "type": "function",
+            "function": {
+                "name": "vendas_resumo",
+                "arguments": '{"periodo": "mes"}',
+            },
+        }
+    ]
+    # Propriedade que importa de verdade: o id declarado no tool_calls do
+    # assistant é o mesmo tool_call_id que a mensagem role=tool referencia.
+    assert assistant_msg["tool_calls"][0]["id"] == tool_msg["tool_call_id"]
+
+
+def test_payload_assistant_com_texto_e_tool_calls_preserva_o_texto():
+    mensagens = _mensagens() + [
+        MensagemLLM(
+            papel="assistant",
+            conteudo="Vou checar.",
+            tool_calls=(ToolCall(id="call-9", nome="vendas_resumo", argumentos={}),),
+        ),
+    ]
+    payload = montar_payload(
+        mensagens, FERRAMENTAS, modelo="m", esforco="low", max_tokens=800
+    )
+    assistant_msg = payload["messages"][-1]
+    assert assistant_msg["content"] == "Vou checar."
+    assert assistant_msg["tool_calls"][0]["function"]["arguments"] == "{}"
 
 
 def _client(handler, **kwargs):

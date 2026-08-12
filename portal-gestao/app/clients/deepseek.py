@@ -10,6 +10,7 @@ Duas coisas que este client NÃO faz, de propósito:
 """
 from __future__ import annotations
 
+import json
 import logging
 import time
 from typing import Any, Callable, Sequence
@@ -55,6 +56,23 @@ def montar_payload(
     }
     for m in mensagens:
         item: dict[str, Any] = {"role": m.papel, "content": m.conteudo}
+        if m.tool_calls:
+            # Formato OpenAI: a mensagem assistant que pediu ferramenta leva
+            # ``tool_calls`` estruturado, e ``content`` vai None quando não há
+            # texto — é essa entrada que a mensagem role=tool seguinte referencia
+            # por ``tool_call_id``.
+            item["content"] = m.conteudo or None
+            item["tool_calls"] = [
+                {
+                    "id": tc.id,
+                    "type": "function",
+                    "function": {
+                        "name": tc.nome,
+                        "arguments": json.dumps(tc.argumentos, ensure_ascii=False),
+                    },
+                }
+                for tc in m.tool_calls
+            ]
         if m.tool_call_id:
             item["tool_call_id"] = m.tool_call_id
         if m.nome:

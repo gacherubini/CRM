@@ -44,6 +44,27 @@ MENSAGEM_PROVEDOR = (
     "O assistente está indisponível agora. Os alertas e o resumo de hoje "
     "continuam funcionando normalmente."
 )
+MENSAGEM_TETO_TOKENS = (
+    "Essa pergunta ficou grande demais para responder num único turno. Tente "
+    "quebrar em perguntas mais específicas."
+)
+MENSAGEM_MAX_ITERACOES = (
+    "Essa pergunta precisou de passos demais para eu responder com segurança. "
+    "Tente perguntar de um jeito mais direto ou em partes."
+)
+MENSAGEM_RESPOSTA_INVALIDA = (
+    "O assistente não conseguiu montar uma chamada de função válida mesmo "
+    "depois de tentar de novo. Tente reformular a pergunta."
+)
+
+# Nudge textual quando o provedor devolve uma tool-call com JSON quebrado
+# (RespostaLLMInvalida, levantada dentro de completar() — antes de existir
+# qualquer ToolCall/tool_call_id para responder como mensagem role=tool).
+NUDGE_JSON_QUEBRADO = (
+    "A chamada de função anterior veio com argumentos em JSON inválido e foi "
+    "descartada sem executar nada. Chame a função de novo com um objeto JSON "
+    "válido nos argumentos."
+)
 
 
 def custo_estimado(tokens_entrada: int, tokens_saida: int) -> Decimal:
@@ -131,6 +152,7 @@ def executar_turno(
     tokens_saida = 0
     inicio = relogio()
     esforco: EsforcoLLM = "low"
+    correcao_json_usada = False
 
     def _erro(code: str, texto: str | None) -> ResultadoTurno:
         return ResultadoTurno(
@@ -147,9 +169,12 @@ def executar_turno(
             return _erro("deadline", MENSAGEM_DEADLINE)
         # Projeta o pior caso da próxima chamada (resposta cheia) para poder
         # recusar SEM chamar o provedor de novo — só o já gasto não seria
-        # suficiente para barrar a próxima rodada a tempo.
+        # suficiente para barrar a próxima rodada a tempo. Esta checagem
+        # também protege a chamada de correção do guard #4 abaixo: ela roda
+        # de novo a cada volta do for, então uma retentativa nunca contorna
+        # o teto de tokens.
         if tokens_entrada + tokens_saida + max_tokens_resposta > teto_tokens:
-            return _erro("teto_tokens", MENSAGEM_DEADLINE)
+            return _erro("teto_tokens", MENSAGEM_TETO_TOKENS)
 
         try:
             resposta = llm.completar(
@@ -158,7 +183,18 @@ def executar_turno(
         except LLMIndisponivel:
             return _erro("provedor", MENSAGEM_PROVEDOR)
         except RespostaLLMInvalida:
-            return _erro("resposta_invalida", MENSAGEM_DEADLINE)
+            # Guard #4, sub-caso "JSON quebrado": a exceção nasce dentro do
+            # completar() do provedor, antes de existir qualquer ToolCall —
+            # não há tool_call_id para responder como mensagem role=tool, ao
+            # contrário do sub-caso "ferramenta desconhecida" (despachar()).
+            # Damos UMA chance de correção com um nudge textual; na segunda
+            # vez, desistimos. O teto de iterações do próprio for já limita
+            # quantas vezes isso pode se repetir por turno.
+            if correcao_json_usada:
+                return _erro("resposta_invalida", MENSAGEM_RESPOSTA_INVALIDA)
+            correcao_json_usada = True
+            mensagens.append(MensagemLLM(papel="user", conteudo=NUDGE_JSON_QUEBRADO))
+            continue
 
         tokens_entrada += resposta.tokens_entrada
         tokens_saida += resposta.tokens_saida
@@ -175,11 +211,8 @@ def executar_turno(
         mensagens.append(
             MensagemLLM(
                 papel="assistant",
-                conteudo=resposta.texto
-                or json.dumps(
-                    [{"tool": tc.nome} for tc in resposta.tool_calls],
-                    ensure_ascii=False,
-                ),
+                conteudo=resposta.texto or "",
+                tool_calls=resposta.tool_calls,
             )
         )
 
@@ -235,4 +268,4 @@ def executar_turno(
         # Segunda rodada = cadeia/desambiguação: sobe o esforço (§3.3).
         esforco = "high"
 
-    return _erro("max_iteracoes", MENSAGEM_DEADLINE)
+    return _erro("max_iteracoes", MENSAGEM_MAX_ITERACOES)

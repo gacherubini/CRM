@@ -26,6 +26,11 @@ class MensagemLLM:
     conteudo: str
     tool_call_id: str | None = None
     nome: str | None = None
+    # Só preenchido em mensagens role=assistant que pediram ferramenta: carrega
+    # o tool_calls estruturado que o wire da API (compatível OpenAI) exige que
+    # a mensagem assistant anterior declare, para o tool_call_id da mensagem
+    # role=tool seguinte fazer referência a algo real.
+    tool_calls: tuple["ToolCall", ...] = field(default_factory=tuple)
 
 
 @dataclass(frozen=True)

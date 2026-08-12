@@ -5,6 +5,7 @@ from app.loja.copiloto.port import (
     LLMFake,
     LLMIndisponivel,
     RespostaLLM,
+    RespostaLLMInvalida,
     ToolCall,
 )
 from app.loja.copiloto.runner import custo_estimado, executar_turno
@@ -56,6 +57,30 @@ def _texto(txt, entrada=1200, saida=40):
         texto=txt, tool_calls=(), tokens_entrada=entrada, tokens_saida=saida,
         finish_reason="stop",
     )
+
+
+class LLMSequencia:
+    """Como LLMFake, mas a fila pode conter exceções — para simular a
+    guarda #4 (JSON quebrado), que nasce dentro de ``completar()`` antes de
+    qualquer ``RespostaLLM`` existir, e não pode ser expressa com LLMFake."""
+
+    def __init__(self, itens):
+        self._fila = list(itens)
+        self.chamadas: list[dict] = []
+
+    def completar(self, mensagens, ferramentas, *, esforco="low", max_tokens=800):
+        self.chamadas.append(
+            {
+                "mensagens": list(mensagens),
+                "ferramentas": ferramentas,
+                "esforco": esforco,
+                "max_tokens": max_tokens,
+            }
+        )
+        item = self._fila.pop(0)
+        if isinstance(item, Exception):
+            raise item
+        return item
 
 
 def test_pergunta_com_uma_ferramenta(db):
@@ -187,3 +212,101 @@ def test_custo_estimado_usa_a_tabela_do_provedor():
     # $0.14/M entrada, $0.28/M saída.
     assert custo_estimado(1_000_000, 0) == Decimal("0.140000")
     assert custo_estimado(0, 1_000_000) == Decimal("0.280000")
+
+
+# --- Guard #4, sub-caso "JSON quebrado" (RespostaLLMInvalida) ---
+
+
+def test_json_quebrado_da_uma_chance_de_correcao_e_o_modelo_acerta(db):
+    llm = LLMSequencia(
+        [RespostaLLMInvalida("argumentos não são JSON válido"), _texto("Corrigido.")]
+    )
+    r = executar_turno(
+        pergunta="quanto vendi?", historico=[], llm=llm, recursos=_recursos(db)
+    )
+    assert r.estado == "pronto"
+    assert r.texto == "Corrigido."
+    assert len(llm.chamadas) == 2
+    # O nudge de correção entrou no histórico enviado na segunda chamada.
+    segunda_chamada = llm.chamadas[1]["mensagens"]
+    assert any("JSON" in m.conteudo for m in segunda_chamada if m.papel == "user")
+
+
+def test_dois_json_quebrados_seguidos_encerra_com_erro_sem_numero(db):
+    llm = LLMSequencia(
+        [
+            RespostaLLMInvalida("argumentos não são JSON válido"),
+            RespostaLLMInvalida("de novo"),
+        ]
+    )
+    r = executar_turno(
+        pergunta="quanto vendi?", historico=[], llm=llm, recursos=_recursos(db)
+    )
+    assert r.estado == "erro"
+    assert r.erro_code == "resposta_invalida"
+    assert len(llm.chamadas) == 2
+    assert r.texto is not None
+    assert not any(ch.isdigit() for ch in r.texto)
+
+
+def test_correcao_de_json_ainda_respeita_o_deadline(db):
+    marcas = iter([0.0, 1.0, 99.0, 99.0, 99.0])
+    llm = LLMSequencia(
+        [RespostaLLMInvalida("json quebrado"), _texto("Você vendeu 12 motos.")]
+    )
+    r = executar_turno(
+        pergunta="quanto vendi?", historico=[], llm=llm, recursos=_recursos(db),
+        deadline_segundos=45, relogio=lambda: next(marcas),
+    )
+    assert r.estado == "erro"
+    assert r.erro_code == "deadline"
+    assert "12 motos" not in (r.texto or "")
+    # A retentativa nunca chegou a acontecer: o deadline barrou antes.
+    assert len(llm.chamadas) == 1
+
+
+def test_correcao_de_json_respeita_o_teto_de_iteracoes(db):
+    llm = LLMSequencia([RespostaLLMInvalida("json quebrado")])
+    r = executar_turno(
+        pergunta="quanto vendi?", historico=[], llm=llm, recursos=_recursos(db),
+        max_iteracoes=1,
+    )
+    assert r.estado == "erro"
+    assert r.erro_code == "max_iteracoes"
+    # Só a tentativa original coube no teto de 1 iteração — a retentativa de
+    # correção não conseguiu rodar.
+    assert len(llm.chamadas) == 1
+
+
+def test_correcao_de_json_nao_ignora_o_teto_de_tokens(db):
+    # A guarda #3 é checada antes de QUALQUER chamada — inclusive a que
+    # teria sido a primeira tentativa (que aqui daria JSON quebrado). A
+    # guarda #4 nunca contorna a guarda #3.
+    llm = LLMSequencia([RespostaLLMInvalida("json quebrado")])
+    r = executar_turno(
+        pergunta="quanto vendi?", historico=[], llm=llm, recursos=_recursos(db),
+        teto_tokens=100,
+    )
+    assert r.estado == "erro"
+    assert r.erro_code == "teto_tokens"
+    assert len(llm.chamadas) == 0
+
+
+# --- Formato de wire (Finding 2): histórico do assistant leva ToolCall real ---
+
+
+def test_historico_do_assistant_carrega_tool_calls_estruturado(db):
+    llm = LLMFake([_tool("vendas_resumo", {"periodo": "mes"}, id_="call-42"), _texto("ok")])
+    executar_turno(
+        pergunta="quanto vendi?", historico=[], llm=llm, recursos=_recursos(db)
+    )
+    segunda_chamada_mensagens = llm.chamadas[1]["mensagens"]
+    assistant_msg = next(m for m in segunda_chamada_mensagens if m.papel == "assistant")
+    tool_msg = next(m for m in segunda_chamada_mensagens if m.papel == "tool")
+
+    assert len(assistant_msg.tool_calls) == 1
+    assert assistant_msg.tool_calls[0].id == "call-42"
+    assert assistant_msg.tool_calls[0].nome == "vendas_resumo"
+    # A propriedade que importa: o id do tool_calls do assistant é o mesmo
+    # tool_call_id referenciado pela mensagem role=tool seguinte.
+    assert assistant_msg.tool_calls[0].id == tool_msg.tool_call_id
