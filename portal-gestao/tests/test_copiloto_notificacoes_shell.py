@@ -9,6 +9,7 @@ F4/Task 2 acrescenta a UI: o sino e o painel em ``.topbar-actions``
 sem gate de módulo (qualquer papel autenticado acessa) — porque o sino
 precisa aparecer em QUALQUER tela do shell, não só na do Copiloto.
 """
+import ast
 import itertools
 import re
 from pathlib import Path
@@ -19,6 +20,7 @@ from conftest import criar_usuario, csrf_da_resposta, login, seed_loja_operacion
 
 import app.main as app_main
 from app.loja.copiloto import notificacoes
+from app.loja.copiloto import sinais as sinais_mod
 from app.loja.copiloto.sinais import SinalCandidato
 from app.loja.copiloto.sinais_store import contar_sinais_novos, sincronizar_sinais
 from app.loja.entitlements import fail_open
@@ -769,3 +771,68 @@ def test_css_do_sino_nao_usa_cor_literal():
     bloco = texto[inicio:fim]
     achados = re.findall(r"#[0-9a-fA-F]{3,6}|rgba?\(", bloco)
     assert achados == []
+
+
+# =============================================================================
+# F4/Task 5 — catálogo de regras: regra -> (rótulo, ícone, severidade padrão)
+# =============================================================================
+
+
+def _regras_registradas_em_sinais() -> list[str]:
+    """Lê o AST de ``sinais.py`` e extrai todo ``regra=...`` passado a
+    ``SinalCandidato(...)``.
+
+    De propósito NÃO é uma lista escrita à mão: se alguém adicionar a 8ª
+    regra em ``sinais.py`` e esquecer de registrar o rótulo dela no
+    catálogo, este parametrize cresce sozinho (a função nova aparece aqui
+    automaticamente) e o teste correspondente falha — é o "apitar" que o
+    brief pede, sem depender de ninguém lembrar de tocar neste arquivo.
+    """
+    caminho = Path(sinais_mod.__file__)
+    arvore = ast.parse(caminho.read_text(encoding="utf-8"))
+    regras: set[str] = set()
+    for node in ast.walk(arvore):
+        if not isinstance(node, ast.Call):
+            continue
+        nome_chamada = getattr(node.func, "id", None) or getattr(node.func, "attr", None)
+        if nome_chamada != "SinalCandidato":
+            continue
+        for kw in node.keywords:
+            if kw.arg == "regra" and isinstance(kw.value, ast.Constant):
+                regras.add(kw.value.value)
+    assert regras, "nenhuma regra encontrada em sinais.py — AST mudou de formato?"
+    return sorted(regras)
+
+
+_REGRAS_CONHECIDAS = _regras_registradas_em_sinais()
+
+
+def test_ha_pelo_menos_as_sete_regras_conhecidas():
+    """Trava de sanidade: se isto cair pra menos de 7, o parser do AST
+    parou de encontrar regras (falso-positivo perigoso — os testes abaixo
+    passariam vazios em vez de travar nada)."""
+    assert len(_REGRAS_CONHECIDAS) >= 7
+
+
+@pytest.mark.parametrize("regra", _REGRAS_CONHECIDAS)
+def test_toda_regra_registrada_em_sinais_tem_entrada_no_catalogo(regra):
+    assert regra in notificacoes.CATALOGO_REGRAS
+    entrada = notificacoes.catalogo_regra(regra)
+    assert entrada is not notificacoes.ENTRADA_GENERICA
+    assert entrada.rotulo and entrada.rotulo != regra
+    assert entrada.icone
+    assert entrada.severidade_padrao in {"info", "atencao", "critico"}
+
+
+def test_regra_desconhecida_cai_no_rotulo_generico_nunca_no_nome_da_funcao():
+    """Regra fictícia (nunca vai existir em ``CATALOGO_REGRAS``) tem que
+    devolver o rótulo genérico — nome de função vazando pra tela do lojista
+    é vazamento de implementação (mesma disciplina de ``rotulos_passo`` em
+    ``copiloto.html``, Fase 2)."""
+    regra_fantasma = "regra_inventada_que_nao_existe_em_sinais_py"
+    entrada = notificacoes.catalogo_regra(regra_fantasma)
+
+    assert entrada is notificacoes.ENTRADA_GENERICA
+    assert entrada.rotulo != regra_fantasma
+    assert "inventada" not in entrada.rotulo.lower()
+    assert "fantasma" not in entrada.rotulo.lower()
