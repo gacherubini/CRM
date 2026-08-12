@@ -17,6 +17,8 @@ os.environ["PORTAL_COPILOTO_SINAIS_ENABLED"] = "0"
 # Worker de turnos do chat também não deve rodar sozinho em background: os
 # testes chamam processar_turno/run_once diretamente, de forma determinística.
 os.environ["PORTAL_COPILOTO_TURNOS_ENABLED"] = "0"
+# Idem para o purge de retenção: os testes chamam run_once diretamente.
+os.environ["PORTAL_COPILOTO_PURGE_ENABLED"] = "0"
 # Mantém UI técnica de tráfego nos testes de regressão (CAPI/campanhas ainda no código).
 # Testes do slim do portal (cliente sem menus técnicos) desligam com monkeypatch.
 os.environ["PORTAL_TRAFEGO_UI_LEGACY"] = "1"
