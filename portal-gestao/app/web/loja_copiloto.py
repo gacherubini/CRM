@@ -63,6 +63,15 @@ _PAGINA = "/app/loja/copiloto"
 
 def _secao_ativa() -> bool:
     # Lê env em runtime (evita snapshot de Settings poluído entre testes).
+    #
+    # Estas quatro checagens (aqui, em check_module_access() logo abaixo nas
+    # rotas, e em _pode()) e app.web.loja_shell.copiloto_secao_liberada()
+    # (que decide se o SINO aparece no shell) têm que andar juntas: mesma
+    # flag, mesmo Module.COPILOTO, mesma PAPEIS_GESTAO_COPILOTO. Não foram
+    # fundidas numa função só porque aqui cada condição vira uma resposta
+    # HTTP diferente (404 de flag desligada vs 403 de módulo vs 403 de
+    # papel, com mensagens distintas) — um único bool perderia essa
+    # distinção. Mudar uma exige olhar a outra.
     return revy_loja_shell_enabled() and revy_loja_copiloto_enabled()
 
 
@@ -79,6 +88,8 @@ def _sem_permissao(request: Request, usuario: Usuario):
 
 
 def _pode(usuario: Usuario) -> bool:
+    # Mesma constante que o sino usa (app.web.loja_shell.copiloto_secao_liberada)
+    # — ver comentário em _secao_ativa() acima.
     return (usuario.papel or "").strip().casefold() in PAPEIS_GESTAO_COPILOTO
 
 

@@ -4,13 +4,16 @@ Isolamento de ``cache_nao_vistos`` (TTL de relógio real, por processo):
 fixture autouse em ``tests/conftest.py``, vale para todo teste do repositório —
 não só os desta rota.
 """
+from types import SimpleNamespace
+
 from conftest import criar_usuario, seed_loja_operacional
 
 from app.loja.copiloto import notificacoes
 from app.loja.copiloto.sinais import SinalCandidato
 from app.loja.copiloto.sinais_store import contar_sinais_novos, sincronizar_sinais
+from app.loja.entitlements import fail_open
 from app.models import LojaOperacionalProjecao, Usuario
-from app.web.loja_shell import template_extras
+from app.web.loja_shell import copiloto_secao_liberada, template_extras
 
 
 class _FakeRequest:
@@ -24,6 +27,11 @@ class _FakeRequest:
 def _ligar_shell_e_entitlements(monkeypatch):
     monkeypatch.setenv("REVY_LOJA_SHELL_ENABLED", "1")
     monkeypatch.setenv("REVY_LOJA_ENTITLEMENTS_ENABLED", "1")
+    # Gate quádruplo (F4/Task 1, correção pós-review): a flag global do
+    # Copiloto entra no gate do sino também — default é "1" aqui para não
+    # quebrar os testes que não são sobre ela; test_flag_global_do_copiloto_*
+    # sobrescreve para "0" depois de chamar este helper.
+    monkeypatch.setenv("REVY_LOJA_COPILOTO_ENABLED", "1")
 
 
 def _seedar_modulo_copiloto(db, loja_slug="loja-teste", ligado=True):
@@ -92,6 +100,79 @@ def test_loja_sem_modulo_recebe_none_mesmo_com_papel_certo(db, monkeypatch):
     extras = template_extras(_FakeRequest(), usuario, db)
 
     assert extras["copiloto_nao_vistos"] is None
+
+
+def test_flag_global_do_copiloto_desligada_recebe_none(db, monkeypatch):
+    """A seção Copiloto 404 com REVY_LOJA_COPILOTO_ENABLED=0 mesmo com shell
+    ligado, entitlement do módulo ok e papel de gestão — o sino tem que
+    concordar, senão mostra contagem para uma seção que não existe."""
+    _ligar_shell_e_entitlements(monkeypatch)
+    monkeypatch.setenv("REVY_LOJA_COPILOTO_ENABLED", "0")
+    criar_usuario(papel="dono", email="dono3@loja.test", loja_slug="loja-teste")
+    _seedar_modulo_copiloto(db)
+    usuario = _usuario(db, "dono3@loja.test")
+
+    extras = template_extras(_FakeRequest(), usuario, db)
+
+    assert extras["copiloto_nao_vistos"] is None
+
+
+# --- copiloto_secao_liberada: fonte única dos 4 gates (sino + seção) -------
+
+
+def test_copiloto_secao_liberada_true_quando_as_quatro_condicoes_batem():
+    ents = fail_open("loja-teste", {"dono"})  # copiloto_enabled=True p/ dono
+    usuario = SimpleNamespace(papel="dono")
+    assert (
+        copiloto_secao_liberada(
+            ents, usuario, shell_enabled=True, copiloto_enabled=True
+        )
+        is True
+    )
+
+
+def test_copiloto_secao_liberada_false_com_shell_desligado():
+    ents = fail_open("loja-teste", {"dono"})
+    usuario = SimpleNamespace(papel="dono")
+    assert (
+        copiloto_secao_liberada(
+            ents, usuario, shell_enabled=False, copiloto_enabled=True
+        )
+        is False
+    )
+
+
+def test_copiloto_secao_liberada_false_com_flag_global_desligada():
+    ents = fail_open("loja-teste", {"dono"})
+    usuario = SimpleNamespace(papel="dono")
+    assert (
+        copiloto_secao_liberada(
+            ents, usuario, shell_enabled=True, copiloto_enabled=False
+        )
+        is False
+    )
+
+
+def test_copiloto_secao_liberada_false_sem_modulo_no_entitlement():
+    ents = fail_open("loja-teste", set())  # sem cargo -> copiloto_enabled=False
+    usuario = SimpleNamespace(papel="dono")
+    assert (
+        copiloto_secao_liberada(
+            ents, usuario, shell_enabled=True, copiloto_enabled=True
+        )
+        is False
+    )
+
+
+def test_copiloto_secao_liberada_false_com_papel_fora_da_gestao():
+    ents = fail_open("loja-teste", {"vendedor"})
+    usuario = SimpleNamespace(papel="vendedor")
+    assert (
+        copiloto_secao_liberada(
+            ents, usuario, shell_enabled=True, copiloto_enabled=True
+        )
+        is False
+    )
 
 
 # --- (d): degradação sem propagar --------------------------------------------

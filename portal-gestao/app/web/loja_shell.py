@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from app.auth import csrf_valido, usuario_atual
 from app.config import (
+    revy_loja_copiloto_enabled,
     revy_loja_entitlements_enabled,
     revy_loja_shell_enabled,
 )
@@ -22,6 +23,7 @@ from app.loja.permissions import (
     LojaPermissionError,
     ModuloNaoContratado,
     SemAcessoLoja,
+    module_enabled,
     require_module,
 )
 from app.loja.types import (
@@ -93,6 +95,37 @@ def build_loja_nav(
     return navigation.build_nav(store, entitlements, shell_enabled=True)
 
 
+def copiloto_secao_liberada(
+    ents: EntitlementState,
+    usuario: Any,
+    *,
+    shell_enabled: bool,
+    copiloto_enabled: bool,
+) -> bool:
+    """A seção Copiloto existe para esta pessoa agora, nesta loja?
+
+    Fonte única para os QUATRO gates que hoje decidem se a seção Copiloto
+    existe (``_secao_ativa`` + ``check_module_access`` + ``_pode`` em
+    ``app/web/loja_copiloto.py``): shell ligado, flag global do Copiloto
+    ligada, módulo Copiloto no entitlement da loja (o que também cobre loja
+    inativa/suspensa) e papel em ``PAPEIS_GESTAO_COPILOTO``.
+
+    Quem chama esta função (o sino, aqui embaixo) e quem decide se a página
+    responde 404/403 (``loja_copiloto.py``) precisam concordar sempre — os
+    dois lugares usam os MESMOS primitivos (``revy_loja_copiloto_enabled``,
+    ``module_enabled``/``Module.COPILOTO``, ``PAPEIS_GESTAO_COPILOTO``), não
+    reimplementam a checagem. Ver comentário simétrico em
+    ``app/web/loja_copiloto.py``: os dois pontos têm que andar juntos, ou o
+    sino mostra contagem para uma seção que devolve 404/403.
+    """
+    if not (shell_enabled and copiloto_enabled):
+        return False
+    papel = (getattr(usuario, "papel", "") or "").strip().casefold()
+    if papel not in PAPEIS_GESTAO_COPILOTO:
+        return False
+    return module_enabled(ents, Module.COPILOTO)
+
+
 def _copiloto_nao_vistos(
     store: StoreContext,
     ents: EntitlementState,
@@ -101,22 +134,24 @@ def _copiloto_nao_vistos(
 ) -> int | None:
     """``None`` = sem sino; ``int`` (inclusive 0) = sino com essa contagem.
 
-    ``None`` cobre: papel fora de ``PAPEIS_GESTAO_COPILOTO`` (mesmo gate de
-    ``_pode()`` em ``loja_copiloto.py``), módulo Copiloto fora do
-    entitlement da loja (ou loja inativa/suspensa) e ausência de sessão de
-    banco para consultar. O template usa a diferença entre "sem sino" e
-    "sino zerado" — não trocar por 0 nesses casos.
+    ``None`` cobre: qualquer uma das quatro condições de
+    ``copiloto_secao_liberada`` faltando (shell desligado, flag global do
+    Copiloto desligada, módulo fora do entitlement/loja inativa, papel fora
+    de ``PAPEIS_GESTAO_COPILOTO``) e ausência de sessão de banco para
+    consultar. O template usa a diferença entre "sem sino" e "sino zerado"
+    — não trocar por 0 nesses casos.
 
     O sino é acessório: uma falha na contagem NUNCA pode derrubar a tela
     (a exceção não propaga), mas também não é engolida em silêncio — vai
     para ``warning`` (achado I2 da revisão da F1).
     """
-    papel = (getattr(usuario, "papel", "") or "").strip().casefold()
-    if papel not in PAPEIS_GESTAO_COPILOTO:
-        return None
-    try:
-        require_module(ents, Module.COPILOTO)
-    except LojaPermissionError:
+    liberado = copiloto_secao_liberada(
+        ents,
+        usuario,
+        shell_enabled=revy_loja_shell_enabled(),
+        copiloto_enabled=revy_loja_copiloto_enabled(),
+    )
+    if not liberado:
         return None
     if db is None:
         return None
