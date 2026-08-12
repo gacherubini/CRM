@@ -510,7 +510,7 @@ class VinculoLojaPessoa(Base):
 
 # --- Copiloto de Vendas -----------------------------------------------------
 
-SINAL_ESTADOS = ("novo", "visto", "resolvido", "dispensado")
+SINAL_ESTADOS = ("novo", "resolvido", "dispensado")
 SINAL_SEVERIDADES = ("info", "atencao", "critico")
 SINAL_REGRAS = (
     "estoque_parado",
@@ -535,7 +535,11 @@ class CopilotoSinal(Base):
     __tablename__ = "copiloto_sinal"
     __table_args__ = (
         CheckConstraint(
-            "estado IN ('novo', 'visto', 'resolvido', 'dispensado')",
+            # "visto" foi removido da Fase 4/Task 0 em diante: virou a tabela
+            # copiloto_sinal_visto (por pessoa). A migration 0023 faz o
+            # backfill de linhas antigas com estado="visto" para "novo" antes
+            # de apertar esta constraint — ver o comentário lá.
+            "estado IN ('novo', 'resolvido', 'dispensado')",
             name="ck_copiloto_sinal_estado",
         ),
         CheckConstraint(
@@ -573,6 +577,34 @@ class CopilotoSinal(Base):
     )
     dispensado_em: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True), nullable=True
+    )
+
+
+class CopilotoSinalVisto(Base):
+    """"Visto" por pessoa (Fase 4, Task 0): sino do cabeçalho é individual.
+
+    Relação N-para-N entre sinal e pessoa — por isso é tabela, não coluna em
+    ``copiloto_sinal`` (que só guardaria um leitor). Um gestor marcar visto
+    NUNCA muda o que os outros veem: ``estado`` do sinal continua o mesmo,
+    só esta linha existe a mais. Dispensar é diferente — continua mudando
+    ``estado`` em ``copiloto_sinal``, porque dispensar é da loja inteira.
+    """
+
+    __tablename__ = "copiloto_sinal_visto"
+    __table_args__ = (
+        UniqueConstraint(
+            "sinal_id", "usuario_id", name="uq_copiloto_sinal_visto_sinal_usuario"
+        ),
+        Index("ix_copiloto_sinal_visto_usuario", "usuario_id"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=novo_id)
+    sinal_id: Mapped[str] = mapped_column(
+        ForeignKey("copiloto_sinal.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    usuario_id: Mapped[str] = mapped_column(String(36), nullable=False)
+    visto_em: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=agora, nullable=False
     )
 
 

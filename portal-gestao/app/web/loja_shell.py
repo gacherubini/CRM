@@ -1,6 +1,7 @@
 """Shell Revy Loja — injeção de nav, sessão multi-loja e gates de módulo."""
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 from fastapi import APIRouter, Depends, Request
@@ -9,16 +10,20 @@ from sqlalchemy.orm import Session
 
 from app.auth import csrf_valido, usuario_atual
 from app.config import (
+    revy_loja_copiloto_enabled,
     revy_loja_entitlements_enabled,
     revy_loja_shell_enabled,
 )
-from app.db import get_db
+from app.db import SessionLocal, get_db
 from app.loja import entitlements as ents_mod
 from app.loja import identity, navigation
+from app.loja.copiloto import notificacoes as copiloto_notificacoes
+from app.loja.copiloto.tipos import PAPEIS_GESTAO_COPILOTO
 from app.loja.permissions import (
     LojaPermissionError,
     ModuloNaoContratado,
     SemAcessoLoja,
+    module_enabled,
     require_module,
 )
 from app.loja.types import (
@@ -28,6 +33,8 @@ from app.loja.types import (
     NavSection,
     StoreContext,
 )
+
+logger = logging.getLogger(__name__)
 
 BRAND_NAME = "Revy Loja"
 
@@ -88,6 +95,167 @@ def build_loja_nav(
     return navigation.build_nav(store, entitlements, shell_enabled=True)
 
 
+def copiloto_secao_liberada(
+    ents: EntitlementState,
+    usuario: Any,
+    *,
+    shell_enabled: bool,
+    copiloto_enabled: bool,
+    entitlements_enabled: bool,
+) -> bool:
+    """A seção Copiloto existe para esta pessoa agora, nesta loja?
+
+    Fonte única para os QUATRO gates que hoje decidem se a seção Copiloto
+    existe (``_secao_ativa`` + ``check_module_access`` + ``_pode`` em
+    ``app/web/loja_copiloto.py``): shell ligado, flag global do Copiloto
+    ligada, módulo Copiloto no entitlement da loja (o que também cobre loja
+    inativa/suspensa) e papel em ``PAPEIS_GESTAO_COPILOTO``.
+
+    ``entitlements_enabled`` replica o MESMO bypass de
+    ``check_module_access()``: com a flag de entitlements desligada, a rota
+    nunca olha ``module_enabled`` — devolve sempre liberado nesse quesito
+    (comportamento legado fail-open). Sem replicar esse bypass aqui, papéis
+    fora de ``ROLES_OPERACIONAIS`` mas dentro de ``PAPEIS_GESTAO_COPILOTO``
+    (``admin_plataforma`` — ver ``identity.py``) entram na seção (200) e o
+    sino, que aplicaria ``module_enabled`` mesmo assim, devolveria ``None``:
+    a mesma discordância sino/seção que motivou esta função existir.
+
+    Quem chama esta função (o sino, aqui embaixo) e quem decide se a página
+    responde 404/403 (``loja_copiloto.py``) precisam concordar sempre — os
+    dois lugares usam os MESMOS primitivos (``revy_loja_copiloto_enabled``,
+    ``revy_loja_entitlements_enabled``, ``module_enabled``/``Module.COPILOTO``,
+    ``PAPEIS_GESTAO_COPILOTO``), não reimplementam a checagem. Ver comentário
+    simétrico em ``app/web/loja_copiloto.py``: os dois pontos têm que andar
+    juntos, ou o sino discorda da seção.
+    """
+    if not (shell_enabled and copiloto_enabled):
+        return False
+    papel = (getattr(usuario, "papel", "") or "").strip().casefold()
+    if papel not in PAPEIS_GESTAO_COPILOTO:
+        return False
+    if not entitlements_enabled:
+        return True
+    return module_enabled(ents, Module.COPILOTO)
+
+
+def _contar_nao_vistos_com_sessao_propria(
+    loja_slug: str,
+    usuario_id: str,
+    db: Session | None,
+) -> int | None:
+    """Conta usando ``db`` se vier; senão abre e fecha uma sessão só nossa.
+
+    ``template_extras`` roda em TODA renderização do shell — inclusive nas
+    ~90% das telas cujo ``contexto(...)`` não passa ``db=`` explicitamente
+    (achado da revisão: sem sessão própria, o sino só funcionava na própria
+    tela do Copiloto, que é a única que já resolve ``db`` para outra coisa).
+    Por isso, quando ``db`` vem ``None``, abrimos uma sessão aqui —
+    independente de ``revy_loja_entitlements_enabled()`` — e a fechamos
+    sempre, inclusive se a contagem levantar. O custo continua limitado pelo
+    cache de ``contar_nao_vistos``: abrir uma ``Session`` não fala com o
+    banco por si só (SQLAlchemy só conecta na primeira query); num acerto de
+    cache, nenhuma query roda, então nenhuma conexão é sequer aberta.
+
+    O sino é acessório: uma falha aqui NUNCA pode derrubar a tela (a exceção
+    não propaga), mas também não é engolida em silêncio — vai para
+    ``warning`` (achado I2 da revisão da F1).
+    """
+    session = db
+    sessao_propria = False
+    if session is None:
+        try:
+            session = SessionLocal()
+            sessao_propria = True
+        except Exception:
+            logger.warning(
+                "copiloto: falha ao abrir sessão para contar sinais não vistos (loja=%s)",
+                loja_slug,
+                exc_info=True,
+            )
+            return None
+
+    try:
+        return copiloto_notificacoes.contar_nao_vistos(session, loja_slug, usuario_id)
+    except Exception:
+        logger.warning(
+            "copiloto: falha ao contar sinais não vistos (loja=%s)",
+            loja_slug,
+            exc_info=True,
+        )
+        return None
+    finally:
+        if sessao_propria:
+            session.close()
+
+
+def _copiloto_nao_vistos(
+    store: StoreContext,
+    ents: EntitlementState,
+    usuario: Any,
+    db: Session | None,
+) -> int | None:
+    """``None`` = sem sino; ``int`` (inclusive 0) = sino com essa contagem.
+
+    ``None`` cobre: qualquer uma das quatro condições de
+    ``copiloto_secao_liberada`` faltando (shell desligado, flag global do
+    Copiloto desligada, módulo fora do entitlement/loja inativa, papel fora
+    de ``PAPEIS_GESTAO_COPILOTO``) e falha ao obter uma sessão de banco para
+    consultar. O template usa a diferença entre "sem sino" e "sino zerado"
+    — não trocar por 0 nesses casos.
+    """
+    liberado = copiloto_secao_liberada(
+        ents,
+        usuario,
+        shell_enabled=revy_loja_shell_enabled(),
+        copiloto_enabled=revy_loja_copiloto_enabled(),
+        entitlements_enabled=revy_loja_entitlements_enabled(),
+    )
+    if not liberado:
+        return None
+    usuario_id = getattr(usuario, "id", None)
+    if not usuario_id:
+        return None
+    return _contar_nao_vistos_com_sessao_propria(store.loja_slug, usuario_id, db)
+
+
+def _copiloto_nao_vistos_sem_membership(usuario: Any, db: Session | None) -> int | None:
+    """Caminho de quem tem ``PAPEIS_GESTAO_COPILOTO`` mas nenhum cargo
+    operacional de loja — hoje só ``admin_plataforma`` (``identity.py``:
+    "admin_plataforma não é cargo operacional da Loja; não concede união
+    implícita"). Para essa pessoa, ``resolve_store_and_entitlements`` SEMPRE
+    levanta ``SemAcessoLoja`` (``active_memberships`` descarta membership com
+    ``roles`` vazio), então ``template_extras`` nunca chega a resolver
+    ``store``/``ents`` — e nunca chamaria ``_copiloto_nao_vistos`` acima.
+
+    A seção Copiloto não depende dessa resolução para este papel: com
+    ``revy_loja_entitlements_enabled()`` desligada, ``check_module_access()``
+    devolve ``None`` (liberado) ANTES de tentar resolver store, e
+    ``_pode()``/``_ctx()`` usam ``usuario.papel``/``usuario.loja_slug`` direto
+    — a rota nunca olha para membership. Espelhamos aqui, com o mesmo
+    ``usuario.loja_slug`` que a rota usa.
+
+    Só vale quando entitlements está desligada: com ela ligada,
+    ``check_module_access()`` também chama ``resolve_store_and_entitlements``
+    e também recebe ``SemAcessoLoja`` (subclasse de ``LojaPermissionError``,
+    que o `except` de lá já captura) — a rota responde 403 e o sino já
+    concorda devolvendo ``None`` sem precisar deste caminho.
+    """
+    if revy_loja_entitlements_enabled():
+        return None
+    if not (revy_loja_shell_enabled() and revy_loja_copiloto_enabled()):
+        return None
+    papel = (getattr(usuario, "papel", "") or "").strip().casefold()
+    if papel not in PAPEIS_GESTAO_COPILOTO:
+        return None
+    loja_slug = str(getattr(usuario, "loja_slug", "") or "").strip()
+    if not loja_slug:
+        return None
+    usuario_id = getattr(usuario, "id", None)
+    if not usuario_id:
+        return None
+    return _contar_nao_vistos_com_sessao_propria(loja_slug, usuario_id, db)
+
+
 def template_extras(
     request: Request,
     usuario: Any,
@@ -107,6 +275,7 @@ def template_extras(
             "lojas_disponiveis": (),
             "store_context": None,
             "entitlements": None,
+            "copiloto_nao_vistos": _copiloto_nao_vistos_sem_membership(usuario, db),
         }
     nav = build_loja_nav(store, ents)
     return {
@@ -116,6 +285,7 @@ def template_extras(
         "lojas_disponiveis": identity.available_store_slugs(actor),
         "store_context": store,
         "entitlements": ents,
+        "copiloto_nao_vistos": _copiloto_nao_vistos(store, ents, usuario, db),
     }
 
 

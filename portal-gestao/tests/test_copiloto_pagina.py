@@ -3,7 +3,7 @@ from conftest import csrf_da_resposta, login, seed_loja_operacional
 from app.db import SessionLocal
 from app.loja.copiloto.sinais import SinalCandidato
 from app.loja.copiloto.sinais_store import sincronizar_sinais
-from app.models import CopilotoSinal, LojaOperacionalProjecao
+from app.models import CopilotoSinal, CopilotoSinalVisto, LojaOperacionalProjecao
 
 # Isolamento de cache_overview (TTL global por processo): fixture autouse
 # em tests/conftest.py, vale para todo teste do repositório — não só desta rota.
@@ -203,7 +203,11 @@ def test_entitlement_ausente_bloqueia_marcar_visto(client, monkeypatch):
     assert r.status_code == 403
     db = SessionLocal()
     try:
+        # marcar_visto não mexe em CopilotoSinal.estado (fica sempre "novo",
+        # visto ou não) — a prova real do bloqueio é que nenhuma linha foi
+        # gravada em copiloto_sinal_visto.
         assert db.query(CopilotoSinal).one().estado == "novo"
+        assert db.query(CopilotoSinalVisto).count() == 0
     finally:
         db.close()
 

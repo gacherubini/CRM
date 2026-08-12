@@ -63,6 +63,25 @@ _PAGINA = "/app/loja/copiloto"
 
 def _secao_ativa() -> bool:
     # Lê env em runtime (evita snapshot de Settings poluído entre testes).
+    #
+    # Estas quatro checagens (aqui, em check_module_access() logo abaixo nas
+    # rotas — inclusive o bypass de módulo quando revy_loja_entitlements_enabled()
+    # está desligada — e em _pode()) e app.web.loja_shell.copiloto_secao_liberada()
+    # (que decide se o SINO aparece no shell) têm que andar juntas: mesma
+    # flag de shell, mesma flag do copiloto, mesmo bypass de entitlements,
+    # mesmo Module.COPILOTO, mesma PAPEIS_GESTAO_COPILOTO. Não foram
+    # fundidas numa função só porque aqui cada condição vira uma resposta
+    # HTTP diferente (404 de flag desligada vs 403 de módulo vs 403 de
+    # papel, com mensagens distintas) — um único bool perderia essa
+    # distinção. Mudar uma exige olhar a outra.
+    #
+    # admin_plataforma é caso à parte dos dois lados: não tem cargo
+    # operacional de loja (identity.py), então _pode()/check_module_access()
+    # aqui nunca dependem de membership pra esse papel (com entitlements OFF,
+    # bypass total antes mesmo de tentar resolver loja); do lado do sino,
+    # resolve_store_and_entitlements SEMPRE levanta SemAcessoLoja pra esse
+    # papel, então quem fecha a paridade lá é
+    # _copiloto_nao_vistos_sem_membership(), não copiloto_secao_liberada().
     return revy_loja_shell_enabled() and revy_loja_copiloto_enabled()
 
 
@@ -79,6 +98,8 @@ def _sem_permissao(request: Request, usuario: Usuario):
 
 
 def _pode(usuario: Usuario) -> bool:
+    # Mesma constante que o sino usa (app.web.loja_shell.copiloto_secao_liberada)
+    # — ver comentário em _secao_ativa() acima.
     return (usuario.papel or "").strip().casefold() in PAPEIS_GESTAO_COPILOTO
 
 
@@ -170,7 +191,7 @@ def copiloto_home(
             db=db,
             resumo=resumo,
             sinais=listar_sinais_abertos(db, ctx.loja_slug),
-            sinais_novos=contar_sinais_novos(db, ctx.loja_slug),
+            sinais_novos=contar_sinais_novos(db, ctx.loja_slug, usuario.id),
             conversas=conversas,
             conversa_atual=escolhida,
             turnos=turnos_view,
@@ -184,6 +205,13 @@ async def _acao_sinal(
     db: Session,
     operacao,
 ):
+    """``operacao`` sempre recebe ``(db, loja_slug, sinal_id, usuario_id)``.
+
+    ``dispensar`` não usa pessoa (é da loja, por desenho — ver
+    ``sinais_store.py``), então o chamador abaixo o embrulha para ignorar o
+    ``usuario_id``. Isso mantém este helper único em vez de duas cópias, sem
+    inventar um ``usuario_id`` opcional dentro do próprio ``dispensar``.
+    """
     usuario = usuario_atual(request, db)
     if not usuario:
         return redirecionar_login()
@@ -200,7 +228,7 @@ async def _acao_sinal(
         return RedirectResponse(f"{_PAGINA}?erro=sessao", status_code=303)
 
     # loja_slug da sessão: id de sinal sozinho nunca autoriza nada.
-    ok = operacao(db, usuario.loja_slug, sinal_id)
+    ok = operacao(db, usuario.loja_slug, sinal_id, usuario.id)
     destino = f"{_PAGINA}?ok=1" if ok else f"{_PAGINA}?erro=sinal"
     return RedirectResponse(destino, status_code=303)
 
@@ -216,7 +244,12 @@ async def copiloto_sinal_visto(
 async def copiloto_sinal_dispensar(
     request: Request, sinal_id: str, db: Session = Depends(get_db)
 ):
-    return await _acao_sinal(request, sinal_id, db, dispensar)
+    return await _acao_sinal(
+        request,
+        sinal_id,
+        db,
+        lambda db, loja_slug, sid, _usuario_id: dispensar(db, loja_slug, sid),
+    )
 
 
 def _json_erro(status: int, code: str, mensagem: str) -> JSONResponse:

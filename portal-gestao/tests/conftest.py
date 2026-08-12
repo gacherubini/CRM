@@ -35,6 +35,7 @@ from app.clients.estoque import (  # noqa: E402
 )
 from app.clients.motor import CredencialNaoEncontrada, MotorIndisponivel  # noqa: E402
 from app.db import Base, SessionLocal, engine  # noqa: E402
+from app.loja.copiloto import notificacoes as copiloto_notificacoes  # noqa: E402
 from app.loja.copiloto.cache import cache_overview  # noqa: E402
 from app.main import app, get_chatbot_client, get_estoque_client, get_motor_client  # noqa: E402
 from app.models import LojaOperacionalProjecao, Usuario  # noqa: E402
@@ -790,6 +791,18 @@ def _cache_overview_isolado():
     cache_overview.invalidar()
     yield
     cache_overview.invalidar()
+
+
+@pytest.fixture(autouse=True)
+def _cache_copiloto_nao_vistos_isolado():
+    """Mesmo risco do ``cache_overview`` acima, para o cache de
+    ``contar_nao_vistos`` (``app/loja/copiloto/notificacoes.py``): TTL de
+    relógio real, por processo. ``login()``/``client`` reusam
+    "dono@loja.test"/"loja-teste" em muitos arquivos de teste — sem isolar,
+    um teste anterior deixa a contagem cacheada para o próximo dentro do TTL."""
+    copiloto_notificacoes.cache_nao_vistos.invalidar()
+    yield
+    copiloto_notificacoes.cache_nao_vistos.invalidar()
 
 
 @pytest.fixture

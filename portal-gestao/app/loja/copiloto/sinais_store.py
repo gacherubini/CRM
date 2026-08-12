@@ -17,9 +17,12 @@ from typing import Iterable
 from sqlalchemy.orm import Session
 
 from app.loja.copiloto.sinais import SinalCandidato
-from app.models import CopilotoSinal
+from app.models import CopilotoSinal, CopilotoSinalVisto
 
-ESTADOS_ABERTOS = ("novo", "visto")
+# "visto" saiu daqui na Fase 4/Task 0: virou copiloto_sinal_visto (por
+# pessoa), não mais um estado do sinal. Nenhum código escreve mais
+# estado="visto" — a migration 0023 faz backfill das linhas antigas.
+ESTADOS_ABERTOS = ("novo",)
 COOLDOWN_PADRAO_HORAS = 24
 
 
@@ -162,12 +165,23 @@ def listar_sinais_abertos(
     return linhas[: max(1, limite)]
 
 
-def contar_sinais_novos(db: Session, loja_slug: str) -> int:
+def contar_sinais_novos(db: Session, loja_slug: str, usuario_id: str) -> int:
+    """Sinais novos que ESTA pessoa ainda não marcou como visto.
+
+    "Visto" é por pessoa (Fase 4, Task 0): o gestor A marcar visto não pode
+    fazer o contador do gestor B cair — por isso o filtro é contra
+    ``copiloto_sinal_visto`` de ``usuario_id``, não contra ``estado`` do
+    sinal (que é compartilhado pela loja inteira).
+    """
+    vistos_pelo_usuario = db.query(CopilotoSinalVisto.sinal_id).filter(
+        CopilotoSinalVisto.usuario_id == usuario_id
+    )
     return (
         db.query(CopilotoSinal)
         .filter(
             CopilotoSinal.loja_slug == loja_slug,
             CopilotoSinal.estado == "novo",
+            CopilotoSinal.id.notin_(vistos_pelo_usuario),
         )
         .count()
     )
@@ -195,8 +209,37 @@ def _transicionar(
     return True
 
 
-def marcar_visto(db: Session, loja_slug: str, sinal_id: str) -> bool:
-    return _transicionar(db, loja_slug, sinal_id, "visto")
+def marcar_visto(db: Session, loja_slug: str, sinal_id: str, usuario_id: str) -> bool:
+    """Registra que ESTA pessoa viu o sinal — não muda ``estado`` do sinal.
+
+    Sem `usuario_id` opcional: um default aqui silenciosamente contaria
+    "visto" para a pessoa errada e ninguém notaria (é exatamente o bug que
+    esta task existe para fechar). ``loja_slug`` é conferido no servidor —
+    sinal de outra loja nunca é aceito, mesmo que o chamador erre o escopo.
+    """
+    sinal = (
+        db.query(CopilotoSinal)
+        .filter(
+            CopilotoSinal.id == sinal_id,
+            CopilotoSinal.loja_slug == loja_slug,
+        )
+        .first()
+    )
+    if sinal is None:
+        return False
+
+    ja_visto = (
+        db.query(CopilotoSinalVisto)
+        .filter(
+            CopilotoSinalVisto.sinal_id == sinal_id,
+            CopilotoSinalVisto.usuario_id == usuario_id,
+        )
+        .first()
+    )
+    if ja_visto is None:
+        db.add(CopilotoSinalVisto(sinal_id=sinal_id, usuario_id=usuario_id))
+        db.commit()
+    return True
 
 
 def dispensar(db: Session, loja_slug: str, sinal_id: str) -> bool:
