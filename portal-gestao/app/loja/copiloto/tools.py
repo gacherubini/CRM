@@ -111,19 +111,24 @@ def _f_estoque_parado(argumentos: dict, r: RecursosTools) -> dict:
     ).to_dict()
 
 
-def _overview(r: RecursosTools):
+def _overview(r: RecursosTools, *, inicio: str | None = None, fim: str | None = None):
     from app.loja.sales_overview import build_sales_overview
 
     def _produzir():
         try:
             return build_sales_overview(
-                r.db, loja_slug=r.ctx.loja_slug, papel=r.ctx.papel, chatbot=r.chatbot
+                r.db,
+                loja_slug=r.ctx.loja_slug,
+                papel=r.ctx.papel,
+                chatbot=r.chatbot,
+                inicio=inicio,
+                fim=fim,
             )
         except Exception:
             return None
 
     return cache_overview.obter(
-        chave_overview(r.ctx.loja_slug, r.ctx.papel, None, None), _produzir
+        chave_overview(r.ctx.loja_slug, r.ctx.papel, inicio, fim), _produzir
     )
 
 
@@ -148,17 +153,21 @@ def _f_roi_canais(argumentos: dict, r: RecursosTools) -> dict:
     propósito (``:697-708``). Esta é a ferramenta frágil da v1 — e ela diz
     isso em vez de fingir zero.
     """
-    overview = _overview(r)
+    from app.loja.sales_overview import _serializar_linhas_midia
+
+    overview = _overview(
+        r, inicio=_texto(argumentos, "inicio"), fim=_texto(argumentos, "fim")
+    )
     if overview is None or overview.aquisicao is None:
         return {"status": "indisponivel", "campanhas": [], "canais": []}
+    campanhas = _serializar_linhas_midia(overview.aquisicao_campanhas)
+    canais = _serializar_linhas_midia(overview.aquisicao_canais)
     return {
         "status": overview.aquisicao_status,
         "totais": overview.aquisicao.to_dict(),
-        "campanhas": overview.aquisicao_campanhas,
-        "canais": overview.aquisicao_canais,
-        "detalhe_disponivel": bool(
-            overview.aquisicao_campanhas or overview.aquisicao_canais
-        ),
+        "campanhas": campanhas,
+        "canais": canais,
+        "detalhe_disponivel": bool(campanhas or canais),
     }
 
 

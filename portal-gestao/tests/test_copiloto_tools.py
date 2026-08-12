@@ -140,3 +140,113 @@ def test_toda_saida_e_serializavel_em_json(db):
 
     for ferramenta in registro_padrao():
         json.dumps(despachar(ferramenta.nome, {}, _recursos(db)))
+
+
+def _overview_com_aquisicao(**overrides):
+    from app.loja import sales_overview as so
+
+    padrao = dict(
+        status="ok",
+        periodo_inicio=date(2026, 8, 1),
+        periodo_fim=date(2026, 8, 11),
+        timezone="America/Sao_Paulo",
+        escopo="loja",
+        aquisicao=so.AquisicaoResumo(status="ok", fonte="local"),
+        aquisicao_status="ok",
+    )
+    padrao.update(overrides)
+    return so.SalesOverview(**padrao)
+
+
+def test_roi_canais_serializa_decimal_das_linhas_de_midia(db, monkeypatch):
+    """Quando a API do Revy Tráfego responde, as linhas trazem Decimal cru
+    (``_linhas_midia_da_api``); o tool precisa passar pelo mesmo serializador
+    que ``SalesOverview.to_dict()`` usa, senão ``json.dumps`` explode."""
+    import json
+
+    from app.loja import sales_overview as so
+    from app.loja.copiloto.cache import cache_overview
+
+    cache_overview.invalidar()
+
+    overview = _overview_com_aquisicao(
+        aquisicao=so.AquisicaoResumo(status="ok", fonte="api"),
+        aquisicao_status="ok",
+        aquisicao_campanhas=[
+            {"nome": "Campanha X", "gasto": Decimal("123.456"), "cpl": Decimal("1.5")}
+        ],
+        aquisicao_canais=[{"canal": "meta", "gasto": Decimal("999.999")}],
+    )
+    monkeypatch.setattr(so, "build_sales_overview", lambda *a, **k: overview)
+
+    saida = despachar("roi_canais", {}, _recursos(db))
+    json.dumps(saida)  # não pode levantar TypeError (Decimal não é serializável)
+
+    # Mesma conversão que _serializar_linhas_midia/_dec_str fazem: string,
+    # quantizada a centavos com ROUND_HALF_UP.
+    assert saida["campanhas"][0]["gasto"] == "123.46"
+    assert saida["campanhas"][0]["cpl"] == "1.50"
+    assert saida["canais"][0]["gasto"] == "1000.00"
+
+
+def test_roi_canais_encaminha_periodo_e_nao_colide_no_cache(db, monkeypatch):
+    """inicio/fim do schema precisam chegar em build_sales_overview e variar
+    a chave do cache — senão duas perguntas de períodos diferentes devolvem
+    o mesmo número (silenciosamente errado)."""
+    from app.loja import sales_overview as so
+    from app.loja.copiloto.cache import cache_overview
+
+    cache_overview.invalidar()
+    chamadas: list[dict] = []
+
+    def _fake_build(dbx, *, loja_slug, papel, chatbot=None, inicio=None, fim=None, **kw):
+        chamadas.append({"inicio": inicio, "fim": fim})
+        return _overview_com_aquisicao()
+
+    monkeypatch.setattr(so, "build_sales_overview", _fake_build)
+
+    despachar(
+        "roi_canais", {"inicio": "2026-07-01", "fim": "2026-07-31"}, _recursos(db)
+    )
+    despachar(
+        "roi_canais", {"inicio": "2026-08-01", "fim": "2026-08-11"}, _recursos(db)
+    )
+
+    # Duas chamadas de verdade: se a chave do cache tivesse colidido, a
+    # segunda teria vindo do cache e "chamadas" teria só 1 item.
+    assert chamadas == [
+        {"inicio": "2026-07-01", "fim": "2026-07-31"},
+        {"inicio": "2026-08-01", "fim": "2026-08-11"},
+    ]
+
+
+def test_roi_canais_indisponivel_quando_overview_falha(db, monkeypatch):
+    from app.loja import sales_overview as so
+    from app.loja.copiloto.cache import cache_overview
+
+    cache_overview.invalidar()
+
+    def _fake_build(*a, **k):
+        raise RuntimeError("revy trafego fora do ar")
+
+    monkeypatch.setattr(so, "build_sales_overview", _fake_build)
+
+    saida = despachar(
+        "roi_canais", {"inicio": "2026-06-01", "fim": "2026-06-30"}, _recursos(db)
+    )
+    assert saida == {"status": "indisponivel", "campanhas": [], "canais": []}
+
+
+def test_leads_status_indisponivel_quando_overview_falha(db, monkeypatch):
+    from app.loja import sales_overview as so
+    from app.loja.copiloto.cache import cache_overview
+
+    cache_overview.invalidar()
+
+    def _fake_build(*a, **k):
+        raise RuntimeError("revy trafego fora do ar")
+
+    monkeypatch.setattr(so, "build_sales_overview", _fake_build)
+
+    saida = despachar("leads_status", {}, _recursos(db))
+    assert saida == {"status": "indisponivel", "mensagem": "funil indisponível agora"}
