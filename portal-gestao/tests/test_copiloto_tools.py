@@ -66,6 +66,8 @@ def test_registro_tem_as_ferramentas_da_v1():
         "estoque_parado",
         "leads_status",
         "roi_canais",
+        "consultar_fipe",
+        "propor_acao",
     }
 
 

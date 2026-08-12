@@ -16,6 +16,7 @@ from typing import Any, Callable
 
 from sqlalchemy.orm import Session
 
+from app.loja.copiloto.acoes import ACOES_PERMITIDAS
 from app.loja.copiloto.cache import cache_overview, chave_overview
 from app.loja.copiloto.consultas_estoque import estoque_parado
 from app.loja.copiloto.consultas_leads import leads_status
@@ -171,6 +172,53 @@ def _f_roi_canais(argumentos: dict, r: RecursosTools) -> dict:
     }
 
 
+def _f_consultar_fipe(argumentos: dict, r: RecursosTools) -> dict:
+    """FIPE do veículo. O modelo escolhe QUAL veículo, não o texto da busca.
+
+    Marca, modelo, ano e tipo vêm do Estoque — o LLM não redigita nada.
+    """
+    from app.clients.fipe import FipeClient
+    from app.config import settings
+    from app.loja.copiloto.fipe import consultar_fipe_do_veiculo
+
+    client = FipeClient(
+        settings.copiloto_fipe_url, timeout=settings.copiloto_fipe_timeout
+    )
+    return consultar_fipe_do_veiculo(
+        client,
+        r.estoque,
+        r.ctx,
+        veiculo_id=_texto(argumentos, "veiculo_id") or "",
+        fipe_codigo=_texto(argumentos, "fipe_codigo"),
+    ).to_dict()
+
+
+def _f_propor_acao(argumentos: dict, r: RecursosTools) -> dict:
+    """Monta o CARTÃO. Não executa nada — quem executa é o clique humano."""
+    from app.loja.copiloto.acoes import AcaoRecusada
+    from app.loja.copiloto.cartao import montar_cartao
+
+    acao = str(argumentos.get("acao") or "").strip()
+    # Nenhuma proposta de preço a partir de FIPE não confirmada (§4.5).
+    if acao == "ajustar_preco":
+        fipe_status = str(argumentos.get("fipe_status") or "").strip()
+        justificativa = str(argumentos.get("justificativa") or "").strip()
+        if fipe_status != "ok" and justificativa not in {"dias_parado", "pedido_do_dono"}:
+            return {
+                "status": "recusado",
+                "motivo_code": "fipe_nao_confirmada",
+                "motivo": (
+                    "Não posso propor preço sem a FIPE confirmada. Pergunte qual "
+                    "modelo é o certo, ou justifique pelo tempo parado."
+                ),
+            }
+    try:
+        cartao = montar_cartao(r.estoque, r.ctx, acao=acao, parametros=argumentos)
+    except AcaoRecusada as exc:
+        return {"status": "recusado", "motivo_code": exc.code, "motivo": str(exc)}
+    return {"status": "cartao", "cartao": cartao.to_dict()}
+
+
 def registro_padrao() -> tuple[Ferramenta, ...]:
     return (
         Ferramenta(
@@ -256,6 +304,70 @@ def registro_padrao() -> tuple[Ferramenta, ...]:
             ),
             parametros={"type": "object", "properties": dict(_PERIODO)},
             executar=_f_roi_canais,
+            esforco_sugerido="high",
+        ),
+        Ferramenta(
+            nome="consultar_fipe",
+            descricao=(
+                "Valor de referência FIPE de um veículo DO ESTOQUE, pelo id. "
+                "Marca, modelo e ano são lidos do cadastro — não os informe. "
+                "Se voltar status 'ambiguo', PERGUNTE ao usuário qual dos "
+                "modelos é o certo e chame de novo com o fipe_codigo que ele "
+                "escolheu — nunca escolha por ele. Se voltar 'nao_encontrado', "
+                "diga que não achou na FIPE."
+            ),
+            parametros={
+                "type": "object",
+                "properties": {
+                    "veiculo_id": {
+                        "type": "string",
+                        "description": "Id do veículo no estoque (veio de estoque_parado).",
+                    },
+                    "fipe_codigo": {
+                        "type": "string",
+                        "description": (
+                            "Só quando o usuário já escolheu entre candidatos "
+                            "de uma consulta 'ambiguo' anterior."
+                        ),
+                    },
+                },
+                "required": ["veiculo_id"],
+            },
+            executar=_f_consultar_fipe,
+            esforco_sugerido="high",
+        ),
+        Ferramenta(
+            nome="propor_acao",
+            descricao=(
+                "Monta o cartão de confirmação de uma ação. NÃO executa nada: "
+                "quem confirma é o usuário, com um clique. Use depois de ter o "
+                "dado que justifica a ação."
+            ),
+            parametros={
+                "type": "object",
+                "properties": {
+                    "acao": {
+                        "type": "string",
+                        # Derivado da whitelist, nunca escrito à mão: duas
+                        # listas mantidas separadas divergem cedo ou tarde —
+                        # ACOES_PERMITIDAS é a fonte da verdade, e o enum
+                        # aqui é só a projeção dela para o modelo.
+                        "enum": sorted(ACOES_PERMITIDAS),
+                    },
+                    "veiculo_id": {"type": "string"},
+                    "novo_preco": {"type": "string"},
+                    "fipe_status": {
+                        "type": "string",
+                        "description": "Status devolvido por consultar_fipe, se usou.",
+                    },
+                    "justificativa": {
+                        "type": "string",
+                        "enum": ["dias_parado", "pedido_do_dono"],
+                    },
+                },
+                "required": ["acao", "veiculo_id"],
+            },
+            executar=_f_propor_acao,
             esforco_sugerido="high",
         ),
     )
