@@ -1388,14 +1388,46 @@ git commit -m "feat(copiloto): dominio de auditoria copiloto e tabela de acoes c
 - A guarda 4 (banda de valor) **não se aplica** a elas: não há valor a validar. As outras seis valem integralmente, e a auditoria grava o estado anterior de publicação para o desfazer funcionar.
 - `EstoqueClient.acao()` também aceita `reservar` e `vender`. **Nenhuma das duas entra no Copiloto.** Elas mudam estado comercial do veículo — marcar como vendido por engano é dano de outra ordem que despublicar, e nada nesta fase pediu isso. Manter a whitelist estreita é a guarda 1 funcionando como projetada.
 
+**Revisão de 2026-08-12 (1 Critical + 7 Important, corrigidos no segundo commit da Task 4).**
+O código de referência abaixo (Steps 1 e 3) é o desenho ORIGINAL da task e ficou como
+histórico — a implementação real diverge dele nos pontos a seguir. Ver
+`app/loja/copiloto/acoes.py` para o código vigente.
+
+- **`preco_esperado` é obrigatório para `ajustar_preco`** (era opcional). Sem ele a guarda 5
+  não tem o que comparar e vira decorativa: o PATCH segue com o preço fresco, seja ele qual
+  for, e a banda (guarda 4) passa a validar contra um preço já adulterado por terceiro. Ausente
+  ou não numérico → `AcaoRecusada("preco_esperado_ausente", ...)` antes de qualquer rede.
+- **`CopilotoAcao.estado_anterior`** (coluna nova, `String(40)` nullable, migration
+  `0022_copiloto_acao_pendente_e_estado_anterior`): guarda o verbo (`"publicar"` ou
+  `"despublicar"`) que RESTAURA o estado de publicação de antes da ação, capturado na mesma
+  releitura da guarda 5. Sem isto o desfazer de `repostar_veiculo`/`publicar_veiculo`/
+  `despublicar_veiculo` gravava `desfazer_ate` mas não fazia nada de verdade — um botão que
+  promete e não cumpre.
+- **Estado `pendente`** (mesma migration, entra no `CheckConstraint` e em `ACAO_ESTADOS`):
+  `executar_acao` grava a linha como `pendente` e COMITA antes de tocar a rede; só promove para
+  `executada`/`falhou` depois da escrita real no estoque. Sem isso, uma queda do processo entre
+  o PATCH e o commit final deixava o preço da loja alterado sem nenhuma linha em
+  `copiloto_acao` — nem sequer `falhou`.
+- **A guarda 5 vale para o `desfazer_acao` também**: ele relê o estoque imediatamente antes de
+  escrever e aborta (retorna `False`, sem escrever) se o valor/estado atual não bater com o que
+  a ação original gravou. Antes, o desfazer escrevia direto, sem releitura — o mesmo bug do
+  cartão de confirmação, do outro lado.
+- **O rate-limit (guarda 6) conta TODAS as tentativas da janela, inclusive as que falharam**
+  (antes excluía `estado == "falhou"`). Um laço martelando o botão com a estoque-api fora do ar
+  é exatamente o caso que o rate-limit precisa frear.
+- `agora` segue como ponto de injeção **de teste** — documentado explicitamente no docstring do
+  módulo que uma rota HTTP nunca pode derivá-lo de dado do cliente (isso furaria rate-limit,
+  auditoria e prazo de desfazer ao mesmo tempo). Nenhuma trava nova foi criada aqui; a exigência
+  correspondente é da Task 6 (rota), onde pode ser testada de verdade.
+
 **As sete guardas (§8), todas server-side e todas testadas:**
 1. **Whitelist** de ação — qualquer outro nome é recusado antes de tocar em rede.
 2. **Papel** dono/gerente (validado na rota, Task 6) — a `estoque-api` valida contra a credencial de serviço do Portal, não contra o humano.
-3. **Escopo de loja** — `garantir_escopo_loja` antes de qualquer escrita.
-4. **Banda de valor** — preço novo dentro de ±X% do atual **e** acima de um piso. `preço > 0` deixa passar R$ 1; não basta.
-5. **Releitura imediatamente antes do PATCH** — se o preço atual divergir do que o cartão mostrou, **aborta** (§8.2: o PATCH não tem idempotência nem `If-Match`; sem isso o Copiloto sobrescreve a alteração que outra pessoa fez 2s antes).
-6. **Rate-limit** de ações por loja/hora.
-7. **Auditoria** com valor anterior → novo, e prazo de desfazer gravado na linha.
+3. **Escopo de loja** — `garantir_escopo_loja` antes de qualquer escrita, em `executar_acao` e em `desfazer_acao`.
+4. **Banda de valor** — preço novo dentro de ±X% do atual **e** acima de um piso. `preço > 0` deixa passar R$ 1; não basta. Não se aplica às ações de publicação.
+5. **Releitura imediatamente antes de escrever** — em `executar_acao` (com `preco_esperado` agora obrigatório) e em `desfazer_acao` (revisão de 2026-08-12): se o valor/estado atual divergir do que foi gravado, **aborta** (§8.2: nem o PATCH nem as ações de publicação da estoque-api têm idempotência ou `If-Match`; sem a releitura, o Copiloto — ou o próprio desfazer — sobrescreve em silêncio o que outra pessoa fez segundos antes).
+6. **Rate-limit** de ações por loja/hora, contando toda tentativa (inclusive as que falharam).
+7. **Auditoria** com valor/estado anterior → novo, e prazo de desfazer gravado na linha; linha `pendente` comitada antes da escrita real.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -1936,7 +1968,10 @@ def desfazer_acao(
 - [ ] **Step 4: Run test to verify it passes**
 
 Run: `.\.venv\Scripts\python.exe -m pytest tests/test_copiloto_acoes.py -q`
-Expected: PASS (19 testes).
+Expected (desenho original): PASS (19 testes). Após a revisão de 2026-08-12 (ver nota acima),
+o arquivo real tem 34 testes, incluindo os que matam as seis guardas que a mutation testing da
+revisão achou sem cobertura e os que cobrem `preco_esperado` obrigatório, `estado_anterior`,
+`pendente` e a releitura no desfazer.
 
 - [ ] **Step 5: Commit**
 
@@ -1944,6 +1979,10 @@ Expected: PASS (19 testes).
 git add portal-gestao/app/loja/copiloto/acoes.py portal-gestao/app/config.py portal-gestao/tests/test_copiloto_acoes.py
 git commit -m "feat(copiloto): execucao de acoes com sete guardas, auditoria e desfazer"
 ```
+
+Segundo commit (revisão de 2026-08-12): `portal-gestao/app/models.py`,
+`portal-gestao/alembic/versions/0022_copiloto_acao_pendente_e_estado_anterior.py`,
+`portal-gestao/app/loja/copiloto/acoes.py` e `portal-gestao/tests/test_copiloto_acoes.py`.
 
 ---
 

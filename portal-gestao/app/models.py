@@ -212,7 +212,7 @@ class LojaOperacaoAuditoria(Base):
     )
 
 
-ACAO_ESTADOS = ("executada", "desfeita", "falhou")
+ACAO_ESTADOS = ("pendente", "executada", "desfeita", "falhou")
 
 
 class CopilotoAcao(Base):
@@ -221,12 +221,23 @@ class CopilotoAcao(Base):
     O valor ANTERIOR é capturado aqui pelo Portal antes do PATCH: a
     ``estoque-api`` grava só o valor novo (``servico.py:504``) e o client não
     tem leitura de auditoria. Sem esta linha não existe desfazer.
+
+    ``pendente`` é gravado e COMITADO antes de tocar a rede (§8.2, revisão de
+    2026-08-12): se o processo morrer entre o PATCH e a promoção para
+    ``executada``, a linha ``pendente`` é o único rastro de que o estoque de
+    uma loja real pode ter mudado sem confirmação.
+
+    ``estado_anterior`` guarda o estado de publicação (``"publicar"`` ou
+    ``"despublicar"`` — o verbo que RESTAURA aquele estado) antes de
+    ``repostar_veiculo``/``publicar_veiculo``/``despublicar_veiculo``. Não usa
+    ``valor_anterior`` (é ``Numeric``, feito para preço) nem inventa um
+    terceiro vocabulário: reaproveita os mesmos literais de ``VERBO_ESTOQUE``.
     """
 
     __tablename__ = "copiloto_acao"
     __table_args__ = (
         CheckConstraint(
-            "estado IN ('executada', 'desfeita', 'falhou')",
+            "estado IN ('pendente', 'executada', 'desfeita', 'falhou')",
             name="ck_copiloto_acao_estado",
         ),
         Index("ix_copiloto_acao_loja_criada", "loja_slug", "executada_em"),
@@ -242,7 +253,8 @@ class CopilotoAcao(Base):
         Numeric(12, 2), nullable=True
     )
     valor_novo: Mapped[Optional[Decimal]] = mapped_column(Numeric(12, 2), nullable=True)
-    estado: Mapped[str] = mapped_column(String(20), nullable=False, default="executada")
+    estado_anterior: Mapped[Optional[str]] = mapped_column(String(40), nullable=True)
+    estado: Mapped[str] = mapped_column(String(20), nullable=False, default="pendente")
     erro_code: Mapped[Optional[str]] = mapped_column(String(40), nullable=True)
     executada_em: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=agora, nullable=False

@@ -213,6 +213,18 @@ class Settings:
     copiloto_fipe_cache_segundos: float = float(
         os.getenv("REVY_LOJA_COPILOTO_FIPE_CACHE_SEGUNDOS", "21600")
     )
+    # Execução de ações (Fase 3, Task 4): banda de valor, piso de preço e
+    # janela de desfazer. O rate-limit é lido em app/loja/copiloto/acoes.py
+    # via os.getenv diretamente (precisa refletir monkeypatch em teste).
+    copiloto_banda_preco_pct: float = float(
+        os.getenv("PORTAL_COPILOTO_BANDA_PRECO_PCT", "25")
+    )
+    copiloto_preco_minimo: float = float(
+        os.getenv("PORTAL_COPILOTO_PRECO_MINIMO", "1000")
+    )
+    copiloto_desfazer_minutos: int = int(
+        os.getenv("PORTAL_COPILOTO_DESFAZER_MINUTOS", "30")
+    )
 
     def absolute_url(self, path: str) -> str:
         normalized = path if path.startswith("/") else f"/{path}"
