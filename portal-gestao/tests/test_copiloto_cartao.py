@@ -19,14 +19,17 @@ def _ctx():
 
 
 class EstoqueStub:
-    def __init__(self, preco=28000.0, descricao_maliciosa=False, slug="loja-teste"):
+    def __init__(
+        self, preco=28000.0, descricao_maliciosa=False, slug="loja-teste",
+        placa="ABC1D23",
+    ):
         self.slug = slug
         self.veiculo = {
             "id": "v1",
             "marca": "Honda",
             "modelo": INJECAO if descricao_maliciosa else "CB 500F",
             "ano_modelo": 2020,
-            "placa": "ABC1D23",
+            "placa": placa,
             "preco": preco,
             "status": "disponivel",
         }
@@ -151,6 +154,38 @@ def test_cartao_expoe_rotulo_id_e_placa_em_campos_proprios(db):
     assert d["veiculo_rotulo"] == "Honda CB 500F 2020"
     assert d["veiculo_id"] == "v1"
     assert d["veiculo_placa"] == "ABC1D23"
+
+
+def test_placa_do_veiculo_e_sanitizada_como_o_rotulo(db):
+    """A placa é dado de terceiro tanto quanto marca/modelo: a estoque-api
+    valida o formato dela na escrita (regex em criar_veiculo/atualizar_veiculo/
+    importar_csv), mas essa garantia mora em OUTRO serviço — o cartão é a
+    última coisa que o dono lê antes de confirmar uma escrita no estoque, e
+    não pode confiar cegamente no que outro serviço prometeu validar.
+    Mesmo tratamento do rótulo: controle e override bidirecional saem."""
+    payload = "ABC\n\n\u202e1D23\u202c"
+    cartao = montar_cartao(
+        EstoqueStub(placa=payload), _ctx(), acao="repostar_veiculo",
+        parametros={"veiculo_id": "v1"},
+    )
+    assert "\n" not in cartao.veiculo_placa
+    assert "\u202e" not in cartao.veiculo_placa
+    assert "\u202c" not in cartao.veiculo_placa
+
+
+def test_placa_do_veiculo_e_truncada_como_o_rotulo(db):
+    """Placa absurdamente longa (defesa em profundidade — não deveria passar
+    pela validação da estoque-api, mas essa garantia mora em outro serviço)
+    não pode virar uma linha gigante no cartão de confirmação."""
+    from app.loja.copiloto.cartao import LIMITE_PLACA
+
+    payload = "A" * (LIMITE_PLACA * 3)
+    cartao = montar_cartao(
+        EstoqueStub(placa=payload), _ctx(), acao="repostar_veiculo",
+        parametros={"veiculo_id": "v1"},
+    )
+    assert len(cartao.veiculo_placa) <= LIMITE_PLACA
+    assert cartao.veiculo_placa.endswith("…")
 
 
 def test_registro_ganhou_consultar_fipe_e_propor_acao():

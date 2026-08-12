@@ -50,6 +50,13 @@ CENTAVOS = Decimal("0.01")
 # verdade, não o rótulo.
 LIMITE_ROTULO = 40
 
+# A placa é a outra metade da âncora (junto com veiculo_id) — cabe folgado
+# num formato real ("ABC1D23", 7 caracteres). A estoque-api valida o formato
+# na escrita (regex em criar_veiculo/atualizar_veiculo/importar_csv), mas
+# essa garantia mora em OUTRO serviço; o cartão é a última coisa que o dono
+# lê antes de confirmar, então não confia cegamente nela.
+LIMITE_PLACA = 20
+
 # O título é a ÚNICA coisa que o dono lê antes de clicar em Confirmar. Um
 # título genérico para ações opostas transforma o cartão — que existe para
 # proteger — na própria armadilha: um cartão de despublicar_veiculo dizendo
@@ -88,8 +95,13 @@ def _rotulo_veiculo(veiculo: dict) -> str:
 
 
 def _placa_veiculo(veiculo: dict) -> str | None:
-    placa = str(veiculo.get("placa") or "").strip()
-    return placa or None
+    # Placa é DADO de terceiro tanto quanto marca/modelo (ver _rotulo_veiculo
+    # acima): mesmo tratamento — sanitiza controle/bidi e corta — nunca
+    # confia cegamente na validação de formato de outro serviço.
+    placa = sanitizar_texto_externo(str(veiculo.get("placa") or ""))
+    if not placa:
+        return None
+    return truncar_com_reticencias(placa, LIMITE_PLACA)
 
 
 @dataclass(frozen=True)
