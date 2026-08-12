@@ -184,3 +184,97 @@ def test_desligado_nao_toca_o_banco(db):
     resultado = _worker(enabled=False).run_once()
     assert resultado["ok"] is False
     assert db.query(CopilotoTurno).filter_by(id=velho.id).first() is not None
+
+
+def test_loja_com_turno_elegivel_e_turno_em_voo_preserva_o_em_voo(db):
+    """Achado de revisão (Critical): o filtro `estado.notin_(ESTADOS_EM_VOO)`
+    existe em DOIS lugares — `lojas_com_turnos_elegiveis` (decide se a loja
+    entra no ciclo) e `purgar_loja` (decide o que apagar de fato). Os testes
+    de pendente/executando anteriores usavam uma loja que SÓ tinha o turno
+    preso, então ela nunca aparecia em `lojas_com_turnos_elegiveis` e
+    `purgar_loja` nunca chegava a ser chamado para ela — a proteção
+    "passava" pelo motivo errado, sem exercitar o filtro que de fato importa
+    (o de `purgar_loja`, o único lugar que executa o DELETE).
+
+    Este teste força os dois turnos na MESMA loja: o elegível faz a loja
+    entrar no ciclo, e só então o filtro de `purgar_loja` é testado de
+    verdade. É o estado normal de qualquer loja ativa há mais de o prazo de
+    retenção que já teve um worker travar uma vez (ver
+    `copiloto_turnos_job.expirar_orfaos`).
+    """
+    elegivel = _turno(
+        db, loja_slug="loja-mista", idade=timedelta(days=RETENCAO_DIAS + 1),
+        pergunta="pode sumir?",
+    )
+    pendente = _turno(
+        db, loja_slug="loja-mista", idade=timedelta(days=RETENCAO_DIAS + 5),
+        estado="pendente", pergunta="travado pendente?",
+    )
+    executando = _turno(
+        db, loja_slug="loja-mista", idade=timedelta(days=RETENCAO_DIAS + 5),
+        estado="executando", pergunta="travado executando?",
+    )
+    elegivel_id, pendente_id, executando_id = elegivel.id, pendente.id, executando.id
+
+    resultado = _worker().run_once()
+
+    assert resultado["turnos"] == 1
+    assert db.query(CopilotoTurno).filter_by(id=elegivel_id).first() is None
+    assert db.query(CopilotoTurno).filter_by(id=pendente_id).first() is not None
+    assert db.query(CopilotoTurno).filter_by(id=executando_id).first() is not None
+
+
+def test_loja_so_com_turno_em_voo_nao_entra_no_ciclo(db):
+    """Segunda metade da defesa em profundidade: `lojas_com_turnos_elegiveis`
+    decide QUAIS lojas o ciclo visita. Uma loja cujo único turno velho está
+    em voo não tem nenhum trabalho de purge — ela não deveria nem aparecer
+    na lista. Sem este filtro, a loja passaria a ser "visitada" (chamando
+    `purgar_loja` à toa) mesmo sem nada elegível — o segundo filtro, dentro
+    de `purgar_loja`, ainda impediria a exclusão do turno, mas o contador de
+    lojas processadas mudaria, provando que a mutação tem efeito
+    observável."""
+    preso = _turno(
+        db, loja_slug="loja-so-presa", idade=timedelta(days=RETENCAO_DIAS + 5),
+        estado="pendente",
+    )
+    resultado = _worker().run_once()
+    assert resultado["lojas"] == 0
+    assert db.query(CopilotoTurno).filter_by(id=preso.id).first() is not None
+
+
+def test_teto_por_execucao_e_repassado_entre_lojas(db):
+    """`PORTAL_COPILOTO_PURGE_LOTE` é um teto TOTAL por execução, somado
+    entre lojas — não um teto por loja. Loja A (3 turnos elegíveis) consome
+    a maior parte do orçamento de 4; o 1 que sobra vai para loja B (que tem
+    3 elegíveis); os 2 que sobraram de loja B ficam para a próxima
+    execução, não se perdem."""
+    for i in range(3):
+        _turno(
+            db, loja_slug="loja-a", idade=timedelta(days=RETENCAO_DIAS + 1),
+            pergunta=f"a{i}?",
+        )
+    for i in range(3):
+        _turno(
+            db, loja_slug="loja-b", idade=timedelta(days=RETENCAO_DIAS + 1),
+            pergunta=f"b{i}?",
+        )
+
+    primeira = _worker(lote=4).run_once()
+    assert primeira["turnos"] == 4
+    assert db.query(CopilotoTurno).filter_by(loja_slug="loja-a").count() == 0
+    assert db.query(CopilotoTurno).filter_by(loja_slug="loja-b").count() == 2
+
+    segunda = _worker(lote=4).run_once()
+    assert segunda["turnos"] == 2
+    assert db.query(CopilotoTurno).filter_by(loja_slug="loja-b").count() == 0
+
+
+def test_retencao_configurada_como_zero_nao_apaga_tudo(db):
+    """`_corte()` usa `max(1, dias)` como piso: `PORTAL_COPILOTO_RETENCAO_DIAS`
+    configurado como 0 (ou negativo, por typo/erro de config) não pode virar
+    "apaga tudo imediatamente" — sem o piso, corte = agora, e qualquer turno
+    concluído mais velho que o instante exato da chamada seria elegível."""
+    recente = _turno(db, idade=timedelta(hours=1))
+    resultado = _worker(retencao_dias=0).run_once()
+    assert resultado["turnos"] == 0
+    assert db.query(CopilotoTurno).filter_by(id=recente.id).first() is not None
