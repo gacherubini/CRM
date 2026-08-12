@@ -1,11 +1,11 @@
 import pytest
-from conftest import csrf_da_resposta, login
+from conftest import csrf_da_resposta, login, seed_loja_operacional
 
 from app.db import SessionLocal
 from app.loja.copiloto.cache import cache_overview
 from app.loja.copiloto.sinais import SinalCandidato
 from app.loja.copiloto.sinais_store import sincronizar_sinais
-from app.models import CopilotoSinal
+from app.models import CopilotoSinal, LojaOperacionalProjecao
 
 
 @pytest.fixture(autouse=True)
@@ -21,6 +21,29 @@ def _ligar(monkeypatch):
     monkeypatch.setenv("REVY_LOJA_SHELL_ENABLED", "1")
     monkeypatch.setenv("REVY_LOJA_ENTITLEMENTS_ENABLED", "0")
     monkeypatch.setenv("REVY_LOJA_COPILOTO_ENABLED", "1")
+
+
+def _seedar_modulo_copiloto(loja_slug="loja-teste", state="ativo"):
+    """Grava/atualiza a projeção do módulo Copiloto (aggregate='copiloto')."""
+    db = SessionLocal()
+    try:
+        seed_loja_operacional(db, loja_slug=loja_slug, state="ativa")
+        row = db.get(LojaOperacionalProjecao, (loja_slug, "copiloto"))
+        if row is None:
+            db.add(
+                LojaOperacionalProjecao(
+                    loja_slug=loja_slug,
+                    aggregate="copiloto",
+                    version=1,
+                    state=state,
+                    event_id="seed-copiloto",
+                )
+            )
+        else:
+            row.state = state
+        db.commit()
+    finally:
+        db.close()
 
 
 def _semear_sinal(loja="loja-teste"):
@@ -99,7 +122,7 @@ def test_dispensar_sinal_exige_csrf(client, monkeypatch):
         data={"csrf": "invalido"},
         follow_redirects=False,
     )
-    assert r.status_code in (303, 403)
+    assert r.status_code == 303
     db = SessionLocal()
     try:
         assert db.query(CopilotoSinal).one().estado == "novo"
@@ -139,5 +162,85 @@ def test_sinal_de_outra_loja_nao_e_dispensavel(client, monkeypatch):
     db = SessionLocal()
     try:
         assert db.query(CopilotoSinal).one().estado == "novo"
+    finally:
+        db.close()
+
+
+# --- Entitlement por loja: menu oculto não é autorização (permissions.py:1) ---
+# Com REVY_LOJA_ENTITLEMENTS_ENABLED=1 e o módulo Copiloto NÃO contratado
+# (sem aggregate "copiloto" na projeção), a rota tem que bloquear sozinha —
+# mesmo com shell/flag ligados e papel de gestão certo.
+
+
+def test_entitlement_ausente_bloqueia_a_pagina_mesmo_com_papel_certo(client, monkeypatch):
+    _ligar(monkeypatch)
+    monkeypatch.setenv("REVY_LOJA_ENTITLEMENTS_ENABLED", "1")
+    login(client)
+    r = client.get("/app/loja/copiloto", follow_redirects=False)
+    assert r.status_code == 403
+
+
+def test_entitlement_ausente_bloqueia_dispensar_e_nao_muta_sinal(client, monkeypatch):
+    _ligar(monkeypatch)
+    sinal_id = _semear_sinal()
+    monkeypatch.setenv("REVY_LOJA_ENTITLEMENTS_ENABLED", "1")
+    login(client)
+    r = client.post(
+        f"/app/loja/copiloto/sinais/{sinal_id}/dispensar",
+        data={"csrf": "qualquer"},
+        follow_redirects=False,
+    )
+    assert r.status_code == 403
+    db = SessionLocal()
+    try:
+        assert db.query(CopilotoSinal).one().estado == "novo"
+    finally:
+        db.close()
+
+
+def test_entitlement_ausente_bloqueia_marcar_visto(client, monkeypatch):
+    _ligar(monkeypatch)
+    sinal_id = _semear_sinal()
+    monkeypatch.setenv("REVY_LOJA_ENTITLEMENTS_ENABLED", "1")
+    login(client)
+    r = client.post(
+        f"/app/loja/copiloto/sinais/{sinal_id}/visto",
+        data={"csrf": "qualquer"},
+        follow_redirects=False,
+    )
+    assert r.status_code == 403
+    db = SessionLocal()
+    try:
+        assert db.query(CopilotoSinal).one().estado == "novo"
+    finally:
+        db.close()
+
+
+def test_entitlement_presente_libera_a_pagina(client, monkeypatch):
+    _ligar(monkeypatch)
+    monkeypatch.setenv("REVY_LOJA_ENTITLEMENTS_ENABLED", "1")
+    login(client)
+    _seedar_modulo_copiloto()
+    r = client.get("/app/loja/copiloto")
+    assert r.status_code == 200
+    assert "Copiloto de Vendas" in r.text
+
+
+def test_entitlement_presente_libera_dispensar(client, monkeypatch):
+    _ligar(monkeypatch)
+    sinal_id = _semear_sinal()
+    monkeypatch.setenv("REVY_LOJA_ENTITLEMENTS_ENABLED", "1")
+    login(client)
+    _seedar_modulo_copiloto()
+    pagina = client.get("/app/loja/copiloto")
+    r = client.post(
+        f"/app/loja/copiloto/sinais/{sinal_id}/dispensar",
+        data={"csrf": csrf_da_resposta(pagina)},
+        follow_redirects=False,
+    )
+    assert r.status_code == 303
+    db = SessionLocal()
+    try:
+        assert db.query(CopilotoSinal).one().estado == "dispensado"
     finally:
         db.close()

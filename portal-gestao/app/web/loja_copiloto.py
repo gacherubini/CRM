@@ -3,6 +3,11 @@
 Gate quádruplo: shell + flag do Copiloto + entitlement do módulo + papel de
 gestão. Com qualquer um faltando a seção NÃO EXISTE (404) — não redireciona.
 
+Menu oculto não substitui checagem (app/loja/permissions.py:1): o entitlement
+por loja (Module.COPILOTO) é resolvido e checado aqui, no servidor, com o
+mesmo mecanismo que Estoque/Vendas usam (check_module_access) — não basta
+esconder o item do nav quando a loja não contratou o módulo.
+
 Nesta fase não há LLM nenhum: resumo determinístico + alertas de regra.
 """
 from __future__ import annotations
@@ -26,6 +31,7 @@ from app.loja.copiloto.sinais_store import (  # noqa: E402
     marcar_visto,
 )
 from app.loja.copiloto.tipos import PAPEIS_GESTAO_COPILOTO, CopilotoContexto  # noqa: E402
+from app.loja.types import Module  # noqa: E402
 from app.main import (  # noqa: E402
     contexto,
     csrf_valido,
@@ -35,6 +41,7 @@ from app.main import (  # noqa: E402
     templates,
 )
 from app.models import Usuario  # noqa: E402
+from app.web.loja_shell import check_module_access  # noqa: E402
 
 _PAGINA = "/app/loja/copiloto"
 
@@ -82,6 +89,9 @@ def copiloto_home(
         return redirecionar_login()
     if not _secao_ativa():
         return _nao_existe()
+    blocked = check_module_access(request, usuario, db, Module.COPILOTO)
+    if blocked is not None:
+        return blocked
     if not _pode(usuario):
         return _sem_permissao(request, usuario)
 
@@ -111,6 +121,9 @@ async def _acao_sinal(
         return redirecionar_login()
     if not _secao_ativa():
         return _nao_existe()
+    blocked = check_module_access(request, usuario, db, Module.COPILOTO)
+    if blocked is not None:
+        return blocked
     if not _pode(usuario):
         return _sem_permissao(request, usuario)
 
