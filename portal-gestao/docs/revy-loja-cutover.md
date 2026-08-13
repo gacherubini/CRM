@@ -62,7 +62,7 @@ Não ligar redirect antes de shell + (para leads/conversas) atendimento.
 
 Piloto **parcial** (secrets): shell + entitlements + atendimento + WhatsApp Loja **ON**;
 `REVY_LOJA_REDIRECT_LEGACY` **ausente/off** (dual-path legado ainda responde 200).
-Fonte atualizada: [`../../docs/2026-08-02-provisionamento-loja-entitlements.md`](../../docs/2026-08-02-provisionamento-loja-entitlements.md).
+Fonte atualizada: [`../../docs/referencia-viva/2026-08-02-provisionamento-loja-entitlements.md`](../../docs/referencia-viva/2026-08-02-provisionamento-loja-entitlements.md).
 
 ## Rollback
 

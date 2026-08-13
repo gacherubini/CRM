@@ -1,6 +1,6 @@
 # Revy — site marketing
 
-Landing pública da marca, alinhada ao design em `docs/brand/`.
+Landing pública da marca, alinhada ao design em `docs/nao-plano/brand/`.
 
 ## Abrir local
 
@@ -47,7 +47,7 @@ sed -i 's#https://revy\.com\.br/#https://app2037.fly.dev/site/#g' site/index.htm
 > **Pendências conhecidas** (audit 2026-08-09): og:image/canonical vêm apontando pro domínio
 > **revy.com.br**, ainda não registrado — por isso o `sed` acima (quando o domínio existir e
 > servir o site, ele deixa de ser necessário). Faltam também `<main>`, `<form>` de verdade no
-> contato e `prefers-reduced-motion`. Detalhe do rebuild: `docs/plans/2026-08-09-plano-site-rebuild-html-estatico.md`.
+> contato e `prefers-reduced-motion`. Detalhe do rebuild: `docs/fila/2026-08-09-plano-site-rebuild-html-estatico.md`.
 
 ## Deploy Fly.io
 
@@ -70,7 +70,7 @@ usam caminhos relativos (`demos/...`), que resolvem certo atrás do proxy do edg
 | Pasta | Papel |
 |---|---|
 | `site/` | Marketing Revy (este site) |
-| `docs/brand/` | Brand kit, mocks, prompts de animação |
+| `docs/nao-plano/brand/` | Brand kit, mocks, prompts de animação |
 | `portal-gestao/` | App do painel (mesmo visual light Revy) |
 
 Os assets do site (og.jpg, poster-1..7.jpg, logos) vêm no próprio export, em `site/assets/`.

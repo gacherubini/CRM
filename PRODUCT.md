@@ -78,14 +78,14 @@ Não somos: CRM genérico, banco, robô engraçadinho, "aprovação mágica de c
 - **O resultado da simulação ainda chega ao cliente por humano** — o bot não devolve parcela.
 - **Nunca prometer aprovação de crédito**, em nenhuma superfície. Empty state não inventa número.
 - **13 propostas de UX foram recusadas pelo dono em 2026-08-07**
-  ([`docs/2026-08-07-triagem-revisao-ux-loja-control.md`](docs/2026-08-07-triagem-revisao-ux-loja-control.md))
+  ([`docs/referencia-viva/2026-08-07-triagem-revisao-ux-loja-control.md`](docs/referencia-viva/2026-08-07-triagem-revisao-ux-loja-control.md))
   e não devem voltar como ideia nova.
 - **Abertos, não inventar:** Seller AI está adiado; os pacotes comerciais do brand kit são
   sugestão, não preço confirmado; domínio e @ ainda não registrados.
 
 ## Brand Commitments
 
-Fonte vinculante: [`docs/brand/revy-brand-kit.md`](docs/brand/revy-brand-kit.md) v2.0.
+Fonte vinculante: [`docs/nao-plano/brand/revy-brand-kit.md`](docs/nao-plano/brand/revy-brand-kit.md) v2.0.
 
 - **Nome Revy** (nunca "Revvy"). Tagline oficial: *A revenda no ritmo certo.*
 - **Tipografia decidida:** Hanken Grotesk na interface (tudo que é para trabalhar); Newsreader 300
@@ -103,7 +103,7 @@ Fonte vinculante: [`docs/brand/revy-brand-kit.md`](docs/brand/revy-brand-kit.md)
 - **Voz:** co-piloto da loja — PT-BR curto, status explícito, pouco emoji, zero hype de IA.
 - **White-label:** o cliente final não precisa ver Revy; `Powered by Revy` na vitrine é toggle
   por loja.
-- **Legado a ignorar:** `docs/brand/index.html`, `preview.html`, `portal-mock.html` e
+- **Legado a ignorar:** `docs/nao-plano/brand/index.html`, `preview.html`, `portal-mock.html` e
   `instagram-logo.html` mostram a paleta e a fonte da v1.0 — não são referência.
 
 ## Evidence on Hand
@@ -115,9 +115,9 @@ Fonte vinculante: [`docs/brand/revy-brand-kit.md`](docs/brand/revy-brand-kit.md)
 - **Nunca fabricar:** depoimento, logotipo de cliente, número de lojas, benchmark, tempo médio,
   taxa de conversão, preço público, ou parceria endossada com banco (logo de banco não implica
   parceria).
-- **Assets e conteúdo reais disponíveis:** marca em `docs/brand/assets/` e `site/assets/`;
-  tutoriais em PDF (`docs/tutorial-*`, `docs/setup-grupo-whatsapp-estoque.pdf`); one-pager
-  comercial em `docs/README-COMERCIAL.md`; e o próprio produto, screenshotável nos quatro
+- **Assets e conteúdo reais disponíveis:** marca em `docs/nao-plano/brand/assets/` e `site/assets/`;
+  tutoriais em PDF (`docs/nao-plano/tutoriais/`); one-pager
+  comercial em `docs/referencia-viva/README-COMERCIAL.md`; e o próprio produto, screenshotável nos quatro
   front-ends.
 
 ## Product Principles

@@ -1,6 +1,6 @@
 """Warm session + batch 2 — paths de storage_state e classificação de driver browser.
 
-Plano: docs/plans/2026-07-17-plano1a-warm-session-batch2.md
+Plano: docs/referencia-viva/planos/2026-07-17-plano1a-warm-session-batch2.md
 """
 from __future__ import annotations
 

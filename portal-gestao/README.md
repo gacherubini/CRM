@@ -22,7 +22,7 @@ Tokens das APIs ficam **somente no servidor**; o navegador recebe uma sessão as
   eles. Mudou lá, muda aqui.
 - **Sem `create_all` no boot.** Falha de migração tem de impedir readiness/deploy.
 - Antes de mudar as telas da Loja, leia
-  [`../docs/2026-08-07-triagem-revisao-ux-loja-control.md`](../docs/2026-08-07-triagem-revisao-ux-loja-control.md):
+  [`../docs/referencia-viva/2026-08-07-triagem-revisao-ux-loja-control.md`](../docs/referencia-viva/2026-08-07-triagem-revisao-ux-loja-control.md):
   parte do que "parece faltando" foi **recusado pelo dono**.
 - O `app.css` **não** pode reabrir `:root` para declarar token de marca: ele carrega depois
   do `revy-tokens.css` e a redeclaração anula a fonte única.
@@ -111,4 +111,4 @@ no `.env`.
 ---
 
 Histórico (painel de aquisição 08/08, triagem de UX 08/07, piloto de flags):
-[`../docs/historico/revy-loja.md`](../docs/historico/revy-loja.md).
+[`../docs/nao-plano/historico/revy-loja.md`](../docs/nao-plano/historico/revy-loja.md).

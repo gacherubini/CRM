@@ -27,7 +27,7 @@ para o lojista; configuração técnica e operação multi-loja ficam aqui.
 - **`app.main` e `app.web.control_ui` têm instâncias Jinja separadas.** Global novo precisa
   ser registrado nas duas (`rotulos.registrar_globals(env)`), senão um lado não enxerga.
 - Antes de mudar as telas do Control, leia
-  [`docs/2026-08-07-triagem-revisao-ux-loja-control.md`](../docs/2026-08-07-triagem-revisao-ux-loja-control.md):
+  [`docs/referencia-viva/2026-08-07-triagem-revisao-ux-loja-control.md`](../docs/referencia-viva/2026-08-07-triagem-revisao-ux-loja-control.md):
   parte do que "parece faltando" foi **recusado pelo dono**.
 - O `app.css` **não** pode reabrir `:root` para declarar token de marca: ele carrega depois
   do `revy-tokens.css` e a redeclaração anula a fonte única.
@@ -159,4 +159,4 @@ Bancos no volume: `/data/portal/portal.db` e `/data/revy-trafego/revy_trafego.db
 ---
 
 Histórico (atribuição no ROI, incidente Meta 08/06, cutover de workers, smokes):
-[`docs/historico/revy-control.md`](../docs/historico/revy-control.md).
+[`docs/nao-plano/historico/revy-control.md`](../docs/nao-plano/historico/revy-control.md).

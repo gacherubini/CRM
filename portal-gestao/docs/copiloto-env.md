@@ -3,7 +3,7 @@
 Referência operacional das variáveis `REVY_LOJA_COPILOTO_*` e `PORTAL_COPILOTO_*`
 realmente lidas pelo código do Copiloto (produto Revy Loja, `portal-gestao`).
 Levantado direto do código (`rg -n "REVY_LOJA_COPILOTO|PORTAL_COPILOTO" app`), não
-dos planos de fase — os planos em `docs/superpowers/plans/` descrevem a
+dos planos de fase — os planos em `docs/referencia-viva/planos/` e `docs/fila/` descrevem a
 implementação no momento em que foram escritos e podem ter ficado para trás depois
 de correções. Nenhum valor de segredo aparece aqui — só nome e o que ele controla.
 

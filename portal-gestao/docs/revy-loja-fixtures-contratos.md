@@ -1,7 +1,7 @@
 # Revy Loja — fixtures sanitizadas de contratos
 
-**Data:** 2026-07-29  
-**Plano:** [`docs/plans/2026-07-29-plano-revy-loja.md`](../../docs/plans/2026-07-29-plano-revy-loja.md)  
+**Data:** 2026-07-29
+**Plano:** [`docs/referencia-viva/planos/2026-07-29-plano-revy-loja.md`](../../docs/referencia-viva/planos/2026-07-29-plano-revy-loja.md)
 **Propósito:** exemplos JSON versionados (schema_version 1 onde aplicável) para integração Control ↔ Portal, Chatbot e eventos comerciais. Valores fictícios; sem tokens, senhas ou PII real.
 
 > **F0 — Backup drill:** confirmar backup e restauração do banco do Portal é **operação de lab/ops**, não código. Ver runbook de cutover e checklist lab; este documento não substitui o drill.
@@ -10,10 +10,10 @@
 
 ## 1. Control → Portal — snapshot de provisionamento
 
-**Rota (Portal):** `POST /internal/v1/provisioning/state`  
-**Auth:** `X-Service-Token`  
-**Serialização Control:** `revy-trafego/app/control/provisioning_outbox.py` → `snapshot_to_payload`  
-**Consumo Portal:** `portal-gestao/app/provisioning.py` → `apply_payload` (envelopes `operational` monotônicos)  
+**Rota (Portal):** `POST /internal/v1/provisioning/state`
+**Auth:** `X-Service-Token`
+**Serialização Control:** `revy-trafego/app/control/provisioning_outbox.py` → `snapshot_to_payload`
+**Consumo Portal:** `portal-gestao/app/provisioning.py` → `apply_payload` (envelopes `operational` monotônicos)
 **Identidade (Loja lean):** `people` / `roles` também parseados por `app/loja/control_projection.py`
 
 ### Fixture completa (sanitizada)
@@ -129,7 +129,7 @@ O adapter em memória também aceita `people[].roles` / `pessoa_id` (compat):
 
 ## 2. Chatbot — lead / conversa / mensagem (com canal multi-WA)
 
-**Auth:** Bearer da loja (`Authorization`)  
+**Auth:** Bearer da loja (`Authorization`)
 **Fontes:** `chatbot-api/app/servico.py` → `para_saida_lead`, `para_saida_conversa`, `para_saida_mensagem`
 
 ### 2.1 Lead — `GET /v1/leads` → `{ "leads": [ ... ] }`
@@ -281,9 +281,9 @@ Canal inativo: UI da Loja bloqueia envio (`envio_bloqueado_canal`); Chatbot reje
 
 ## 3. Portal → Control — evento de venda confirmada
 
-**Outbox Portal:** `portal-gestao/app/revy_trafego_outbox.py` → `enfileirar_venda_confirmada`  
-**Entrega:** `POST /v1/lojas/{loja_slug}/eventos/venda-confirmada` (`X-Service-Token`)  
-**Body model Control:** `VendaConfirmadaBody` em `revy-trafego/app/api_v1.py`  
+**Outbox Portal:** `portal-gestao/app/revy_trafego_outbox.py` → `enfileirar_venda_confirmada`
+**Entrega:** `POST /v1/lojas/{loja_slug}/eventos/venda-confirmada` (`X-Service-Token`)
+**Body model Control:** `VendaConfirmadaBody` em `revy-trafego/app/api_v1.py`
 **Payload cifrado no outbox** (Fernet); exemplo abaixo é o JSON em claro após decifrar.
 
 ```json
@@ -340,8 +340,8 @@ Dois contratos relacionados:
 
 ### 4.1 Revy Tráfego resultados (Meta/ROI local) — usado pelo SalesOverview hoje
 
-**Rota:** `GET /v1/lojas/{loja_slug}/resultados?periodo=7d|mes&modo=last|first`  
-**Auth:** `X-Service-Token`  
+**Rota:** `GET /v1/lojas/{loja_slug}/resultados?periodo=7d|mes&modo=last|first`
+**Auth:** `X-Service-Token`
 **Cliente Portal:** `RevyTrafegoClient.fetch_resultados`
 
 ```json
@@ -391,8 +391,8 @@ Dois contratos relacionados:
 
 ### 4.2 Acquisition resumo Google (serviço Control)
 
-**Rota:** `GET /control/v1/internal/lojas/{loja_id}/aquisicao-resumo?date_from=YYYY-MM-DD&date_to=YYYY-MM-DD`  
-**Auth:** service token; flag Google habilitada  
+**Rota:** `GET /control/v1/internal/lojas/{loja_id}/aquisicao-resumo?date_from=YYYY-MM-DD&date_to=YYYY-MM-DD`
+**Auth:** service token; flag Google habilitada
 **Serialização:** `_aquisicao_resumo_json` em `revy-trafego/app/web/control.py`
 
 ```json

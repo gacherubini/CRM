@@ -112,7 +112,7 @@ Cuidado ao comparar em código: o valor real vem como `FB_Ads`, com maiúsculas.
 # mascarado. A máscara são só os 4 últimos dígitos e a colisão é real: em
 # 08/08/2026 ela casou o lead de uma venda com a auditoria de outro cliente.
 # Qualquer número saído desse join é ficção. Ver a retratação no plano
-# docs/superpowers/plans/2026-08-08-ctwa-lead-ad-id-e-roi-venda.md.
+# docs/referencia-viva/planos/2026-08-08-ctwa-lead-ad-id-e-roi-venda.md.
 
 
 def main() -> None:

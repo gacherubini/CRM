@@ -14,7 +14,7 @@ aqui** — cifradas — e em nenhum outro produto.
 - **O cliente nunca vê mensagem técnica nem página bancária.** Só `codigo_erro` estável por
   provedor.
 - **Teto de 2 browsers simultâneos** (`MOTOR_MAX_BROWSER_WORKERS`) — decisão B+D de
-  captcha/IP, ver `docs/plans/2026-07-16-fly-rpa-captcha-opcoes.md`. Subir esse teto piora
+  captcha/IP, ver `docs/referencia-viva/planos/2026-07-16-fly-rpa-captcha-opcoes.md`. Subir esse teto piora
   o scoring de IP e derruba os logins.
 - **Idempotência:** mesma `Idempotency-Key` + mesmo payload → `200` com o mesmo `id`;
   payload diferente → `409`.
@@ -25,8 +25,8 @@ aqui** — cifradas — e em nenhum outro produto.
   é o processo morrendo sem ninguém para reiniciar:** use `MOTOR_WORKER_IDLE_STOP_SECONDS=0`,
   que zera `idle_stop` e mantém o loop vivo sem alterar código.
 - Antes de escrever um driver Playwright novo, leia as lições dos anteriores em
-  `docs/plans/` (`*licoes-santander*`, `*licoes-fontecred*`, `*licoes-pan-portal*`) —
-  são leitura obrigatória registrada no índice de planos.
+  `docs/referencia-viva/planos/` (`*licoes-santander*`, `*licoes-fontecred*`, `*licoes-pan-portal*`) —
+  são leitura obrigatória. Uma lição por vez, não as três.
 
 ## Onde editar
 
@@ -43,7 +43,7 @@ aqui** — cifradas — e em nenhum outro produto.
 | `app/credenciais.py` · `app/cripto.py` | Credenciais cifradas por loja |
 
 Estado dos bancos e mapa de campos por provedor:
-`docs/plans/2026-07-13-plano1a-task12-bancos-reconhecimento.md`.
+`docs/referencia-viva/planos/2026-07-13-plano1a-task12-bancos-reconhecimento.md`.
 
 ## Ciclo de vida do job
 
@@ -79,7 +79,7 @@ A **API** roda no bundle `app2037` (`127.0.0.1:8004`) com `MOTOR_ORCHESTRATOR_ON
 IP do Fly: reCAPTCHA v3 e WAF pontuam mal faixas de nuvem. Santander, Bradesco e Fontecred
 **não têm API de parceiro** (Pan e BV têm) — para esses três o RPA é permanente, então
 corrigir o IP é infraestrutura, não remendo. Catálogo de opções e a decisão anterior (B+D)
-estão em `docs/plans/2026-07-16-fly-rpa-captcha-opcoes.md`; isto é a opção **I** daquele doc,
+estão em `docs/referencia-viva/planos/2026-07-16-fly-rpa-captcha-opcoes.md`; isto é a opção **I** daquele doc,
 cujo gatilho de revisão (`captcha_rate` alto) disparou.
 
 **Ganho secundário:** `storage_state` persistente num IP residencial fixo faz o score do

@@ -5,8 +5,7 @@ conversa com o cliente, coleta os dados, solicita a simulação internamente e t
 atendimento para um vendedor. **Parcelas, taxas e bancos nunca são enviados ao cliente
 pelo bot** — ficam na Revy Loja, com o vendedor.
 
-**Agentes: comece por [`CLAUDE.md`](CLAUDE.md)** (mapa dos produtos, onde editar, comandos)
-e [`docs/contexto-compacto.md`](docs/contexto-compacto.md) (estado atual e prioridades).
+**Agentes: comece por [`AGENTS.md`](AGENTS.md).** Quadro de docs: [`docs/README.md`](docs/README.md).
 
 ## Fluxo entre produtos
 
@@ -42,7 +41,7 @@ Catálogo público ──▶ Estoque API ◀────────────
   ou credenciais. O token CAPI nunca vai ao front nem ao git.
 - O contrato `/v1/simulacoes` não muda entre motor mock e motor real.
 - Antes de propor mudança de interface no Control ou na Loja, leia
-  [a triagem de UX](docs/2026-08-07-triagem-revisao-ux-loja-control.md): **13 itens foram
+  [a triagem de UX](docs/referencia-viva/2026-08-07-triagem-revisao-ux-loja-control.md): **13 itens foram
   recusados pelo dono** e não devem voltar como proposta nova.
 
 ## Rodar
@@ -97,14 +96,15 @@ só por processo administrativo autorizado — o cliente não tem autosserviço.
 
 | Onde | O quê |
 |---|---|
-| [`CLAUDE.md`](CLAUDE.md) | Mapa para agentes: produtos, onde editar, comandos |
-| [`docs/contexto-compacto.md`](docs/contexto-compacto.md) | **Estado atual** + prioridades (leia primeiro) |
-| [`docs/handoff-contexto.md`](docs/handoff-contexto.md) | Checkpoint operacional |
-| [`docs/plans/README.md`](docs/plans/README.md) | Índice dos planos válidos (ignore `_archive/`) |
-| [`docs/design/2026-07-30-revy-control-loja-asbuilt-e-melhorias.md`](docs/design/2026-07-30-revy-control-loja-asbuilt-e-melhorias.md) | As-built Control/Loja |
-| [`docs/2026-08-07-triagem-revisao-ux-loja-control.md`](docs/2026-08-07-triagem-revisao-ux-loja-control.md) | UX aceita **e recusada** |
-| [`docs/README-COMERCIAL.md`](docs/README-COMERCIAL.md) | Visão comercial e vocabulário |
-| [`docs/mercado/README.md`](docs/mercado/README.md) | Análise de mercado e fit: dores × produto, ICP, concorrência |
-| [`docs/vendas/script-venda-outbound.md`](docs/vendas/script-venda-outbound.md) | Script de venda outbound e a pergunta que abre a conversa |
-| [`docs/tutorial-dono.md`](docs/tutorial-dono.md) · [`docs/tutorial-vendedor.md`](docs/tutorial-vendedor.md) | Manuais de operação |
-| [`docs/historico/`](docs/historico/) | Incidentes, decisões antigas, roadmap concluído |
+| [`AGENTS.md`](AGENTS.md) | Regras do agente (Claude Code aponta via `CLAUDE.md`) |
+| [`docs/README.md`](docs/README.md) | Quadro: fila / referência viva / não-plano |
+| [`docs/fila/`](docs/fila/README.md) | Trabalho que ainda produz código |
+| [`docs/referencia-viva/contexto-compacto.md`](docs/referencia-viva/contexto-compacto.md) | Estado atual e prioridades |
+| [`docs/referencia-viva/handoff-contexto.md`](docs/referencia-viva/handoff-contexto.md) | Checkpoint operacional |
+| [`docs/referencia-viva/design/2026-07-30-revy-control-loja-asbuilt-e-melhorias.md`](docs/referencia-viva/design/2026-07-30-revy-control-loja-asbuilt-e-melhorias.md) | As-built Control/Loja |
+| [`docs/referencia-viva/2026-08-07-triagem-revisao-ux-loja-control.md`](docs/referencia-viva/2026-08-07-triagem-revisao-ux-loja-control.md) | UX aceita **e recusada** |
+| [`docs/referencia-viva/README-COMERCIAL.md`](docs/referencia-viva/README-COMERCIAL.md) | Visão comercial e vocabulário |
+| [`docs/nao-plano/mercado/README.md`](docs/nao-plano/mercado/README.md) | Análise de mercado e fit |
+| [`docs/nao-plano/vendas/script-venda-outbound.md`](docs/nao-plano/vendas/script-venda-outbound.md) | Script de venda outbound |
+| [`docs/nao-plano/tutoriais/`](docs/nao-plano/tutoriais/) | Manuais de operação |
+| [`docs/nao-plano/historico/`](docs/nao-plano/historico/) | Incidentes e decisões antigas |

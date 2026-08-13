@@ -1,7 +1,7 @@
 # Lab Fly — arquitetura 3 VMs (+ Playwright on-demand)
 
 Stack em uso no org Fly `crm-419`. Plano canônico:
-`docs/plans/2026-07-21-plano-arquitetura-3-vms.md`.
+`docs/referencia-viva/planos/2026-07-21-plano-arquitetura-3-vms.md`.
 
 ## O que não destruir
 
@@ -26,7 +26,7 @@ Stack em uso no org Fly `crm-419`. Plano canônico:
 
 `motor2037` fica em `gru` de propósito (reputação de IP para os portais bancários) e
 consulta `suite-pg` em `iad` via flycast, ~120ms de RTT por query — decisão aceita.
-Ver [histórico](../../../docs/historico/fly-3vm.md).
+Ver [histórico](../../../docs/nao-plano/historico/fly-3vm.md).
 
 ### Rotas públicas do `app2037`
 
@@ -215,4 +215,4 @@ Hosts preferidos no workflow preparado: `https://app2037.fly.dev` e
 ---
 
 Histórico (divisão de regiões e custo, cutover worker-only, rollback, critérios de aceite):
-[`../../../docs/historico/fly-3vm.md`](../../../docs/historico/fly-3vm.md).
+[`../../../docs/nao-plano/historico/fly-3vm.md`](../../../docs/nao-plano/historico/fly-3vm.md).

@@ -111,4 +111,4 @@ daquele cliente — prefira o registro mais recente.
 ---
 
 Histórico (origem CTWA honesta, tracking pendente multi-canal, desmascaramento do erro do
-Evolution): [`../docs/historico/chatbot.md`](../docs/historico/chatbot.md).
+Evolution): [`../docs/nao-plano/historico/chatbot.md`](../docs/nao-plano/historico/chatbot.md).
