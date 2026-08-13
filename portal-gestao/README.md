@@ -27,6 +27,13 @@ Tokens das APIs ficam **somente no servidor**; o navegador recebe uma sessão as
 - O `app.css` **não** pode reabrir `:root` para declarar token de marca: ele carrega depois
   do `revy-tokens.css` e a redeclaração anula a fonte única.
   `shared/brand/tests/test_app_css.py` falha se acontecer.
+- **Copiloto: sem PII no prompt e o LLM não inventa cifra.** Número vem da ferramenta
+  tipada; fonte fora → `indisponivel`, nunca zero. Identidade (`loja_slug`, papel) não
+  entra no schema das tools — vem de `CopilotoContexto`. Simulação de financiamento
+  no chat foi **retirada** (CPF no provedor).
+- **Copiloto some com qualquer um dos três gates off:** `REVY_LOJA_SHELL_ENABLED`,
+  `REVY_LOJA_COPILOTO_ENABLED` e entitlement `Module.COPILOTO`. Só dono/gerente.
+  A chave `REVY_LOJA_COPILOTO_LLM_KEY` nunca vai ao `[env]` do Fly nem ao git.
 
 ## Onde editar
 
@@ -34,6 +41,8 @@ Tokens das APIs ficam **somente no servidor**; o navegador recebe uma sessão as
 |---|---|
 | `app/main.py` | Bootstrap, middleware, auth, rotas legadas restantes, helpers de template |
 | `app/loja/` + `app/web/loja_*.py` | Shell Revy Loja (domínio + rotas) |
+| `app/loja/copiloto/` + `app/web/loja_copiloto.py` | Copiloto: tools, sinais, FIPE, ações, chat, sino |
+| `app/copiloto_sinais_job.py` · `app/copiloto_purge_job.py` | Worker de regras e retenção |
 | `app/loja/routes.py` | Atendimento (chat, envio, polling, visão do agente) |
 | `app/loja/sales_overview.py` | Visão geral de Vendas e painel de aquisição |
 | `app/web/simulacoes.py` | Simulação manual, jobs, histórico, prints |
@@ -42,9 +51,10 @@ Tokens das APIs ficam **somente no servidor**; o navegador recebe uma sessão as
 | `app/financeiro_calc.py` | Cálculos financeiros compartilhados |
 | `app/clients/` | Clientes HTTP (Chatbot, Motor, Estoque, Revy) |
 
-Mapa completo de rotas: [`docs/revy-loja-route-map.md`](docs/revy-loja-route-map.md).
+Mapa de rotas (F0, incompleto para o Copiloto): [`docs/revy-loja-route-map.md`](docs/revy-loja-route-map.md).
 Cutover/rollback do shell: [`docs/revy-loja-cutover.md`](docs/revy-loja-cutover.md).
-Variáveis de ambiente do Copiloto de Vendas: [`docs/copiloto-env.md`](docs/copiloto-env.md).
+Env do Copiloto: [`docs/copiloto-env.md`](docs/copiloto-env.md).
+Validação manual do LLM: [`docs/copiloto-validacao.md`](docs/copiloto-validacao.md).
 
 ## O que já funciona
 
@@ -55,7 +65,9 @@ filtrar, cadastrar, editar, publicar, despublicar, reservar, vender) · custo oc
 vendedor · vendas, metas e resultados de mídia · **Grupo do estoque** e **números de
 WhatsApp** (QR efêmero, sem expor a API key da Evolution) · **Integrações** (status
 read-only Meta/Google/WA) · **Acessos bancos** (credenciais do Motor cifradas; exige
-`MOTOR_ENCRYPTION_KEY` no Motor).
+`MOTOR_ENCRYPTION_KEY` no Motor) · **Copiloto de Vendas** (F1–F4: chat, 7 sinais, FIPE,
+ações com confirmação/desfazer, sino — flag + módulo OFF por default). Foto de veículo
+ainda é URL. Sino geral fora do Copiloto ainda não existe.
 
 ## Flags (defaults de código OFF)
 
@@ -69,6 +81,7 @@ entitlements, atendimento e WhatsApp por secrets; redirect legado segue off.
 | `REVY_LOJA_ATENDIMENTO_ENABLED` | Workspace `/app/loja/atendimento` (+ chat/envio/poll) |
 | `REVY_LOJA_WHATSAPP_ENABLED` | Tela de números de WhatsApp em Ajustes |
 | `REVY_LOJA_REDIRECT_LEGACY` | 303 de paths legados → shell (exige shell on) |
+| `REVY_LOJA_COPILOTO_ENABLED` | Seção e rotas `/app/loja/copiloto` (exige shell + módulo) |
 | `SELLER_AI_ENABLED` | Seller AI (F7+); ainda não altera rotas |
 
 Integração com o Revy Control: `REVY_TRAFEGO_URL`, `REVY_TRAFEGO_SERVICE_TOKEN`,

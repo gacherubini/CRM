@@ -1,5 +1,8 @@
 # Copiloto de Vendas — Fase 2: chat com LLM (DeepSeek), turno assíncrono
 
+> **Status 2026-08-13: IMPLEMENTADO e mergeado em `main`.** Chat, runner, registro de
+> tools, turno assíncrono. Não executar de novo.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Colocar o chat em cima da fundação determinística: o dono pergunta em português, o modelo escolhe qual função tipada chamar, e a resposta é escrita a partir do dado que a função devolveu — nunca da cabeça do modelo.

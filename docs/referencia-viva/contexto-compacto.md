@@ -1,115 +1,121 @@
 # Contexto compacto para continuidade
 
-Atualizado em **2026-08-13** (quadro de docs). Este é o ponto de entrada para estado e prioridades.
-O desenho implementado está em
-[`design/2026-07-30-revy-control-loja-asbuilt-e-melhorias.md`](design/2026-07-30-revy-control-loja-asbuilt-e-melhorias.md),
-os termos do domínio em [`../../CONTEXT.md`](../../CONTEXT.md), a fila em
-[`../fila/README.md`](../fila/README.md) e o quadro em [`../README.md`](../README.md).
+Atualizado em **2026-08-13**. Ponto de entrada de estado e prioridades.
+Quadro: [`../README.md`](../README.md). Fila: [`../fila/README.md`](../fila/README.md).
+Vocabulário: [`../../CONTEXT.md`](../../CONTEXT.md). As-built Control/Loja:
+[`design/2026-07-30-revy-control-loja-asbuilt-e-melhorias.md`](design/2026-07-30-revy-control-loja-asbuilt-e-melhorias.md).
 
 ## Estado atual
 
-- **Revy Control:** código lean F0–F6 em `revy-trafego`. Defaults de flags no **código** OFF.
-  Visão geral enxugada com filtro de período; Prontidão virou painel na ficha da loja;
-  Ajustes → Integrações espelha a página da Loja; rótulos de enum saem de
-  `revy-trafego/app/rotulos.py`.
-- **Revy Loja:** F0–F6/F8 + entregas 2026-08-03: chat no Atendimento (envio + poll),
-  Perfil, status WA persistido, Grupo do estoque no menu, redesign da tela de números.
-  Desde 2026-08-07: fila com tempo de espera, config da vitrine unificada em
-  Estoque → Vitrine, funil clicável, página do Agente redesenhada. Seller AI adiado.
-- **Triagem de UX 2026-08-07:** 32 itens entregues e **13 recusados pelo dono** — a lista
-  de recusados evita re-propor decisão já tomada:
+- **Copiloto de Vendas (Loja):** F1–F4 no `main`. Seção própria no shell (dono/gerente),
+  chat com LLM (DeepSeek, turno assíncrono), 7 regras de sinal (`estoque_parado`,
+  `lead_sem_resposta`, `meta_em_risco`, `margem_incompleta`, `cadastro_incompleto`,
+  `atribuicao_baixa`, `preco_fora_da_faixa`), FIPE, ações com confirmação e desfazer,
+  sino do Copiloto. Kill-switch `REVY_LOJA_COPILOTO_ENABLED` (default **OFF**) **e**
+  entitlement `Module.COPILOTO` (Control provisiona o módulo). F5 (log de lacunas no
+  Control + RLS) e F6 (ferramentas de cadastro/funil no chat) **não** estão no código.
+  Simulação de financiamento no Copiloto foi **retirada** (PII no prompt).
+- **Revy Control:** F0–F6 no código. Copiloto é módulo contratável
+  (`revy-trafego` migration `0018_copiloto_modulo`). Visão geral com filtro de período;
+  Prontidão na ficha da loja; Integrações espelham a Loja. Google Ads e Multi-WhatsApp
+  existem atrás de flag; falta secrets GCP e E2E de dois canais.
+- **Revy Loja:** F0–F6/F8 + Atendimento (chat + poll), Perfil, Grupo do estoque, números
+  WA, Vitrine unificada, funil clicável, página do Agente, bloco de aquisição por
+  `ctwa_source_type`. Seller AI adiado. Foto de veículo ainda é URL, não upload.
+  Sino geral (independente do Copiloto) **não** existe.
+- **Triagem UX 2026-08-07:** 32 itens feitos e **13 recusados** — não re-propor:
   [`2026-08-07-triagem-revisao-ux-loja-control.md`](2026-08-07-triagem-revisao-ux-loja-control.md).
-- **Prod `app2037` (piloto):** secrets shell + entitlements + atendimento + WhatsApp Loja
-  **ON**; redirect legado **OFF**. Detalhe:
-  [`2026-08-02-provisionamento-loja-entitlements.md`](2026-08-02-provisionamento-loja-entitlements.md).
-- **Bot WhatsApp:** bloqueia replay com mais de 5 minutos, agrupa rajadas por 40 segundos
-  e confirma no Chatbot que só a última entrada ainda pode responder. O prompt prioriza
-  `mensagem_atual` e histórico CRM. Diagnóstico original:
-  [`../nao-plano/tutoriais/diagnostico-bot-whatsapp-2026-08-03.md`](../nao-plano/tutoriais/diagnostico-bot-whatsapp-2026-08-03.md).
-- **n8n:** workflow oficial `wAiNaoSalvos0001` (30 nós no Git; bloqueio de replay,
-  debounce/última mensagem e fallback temporário de estoque). Atualizado no `n8n2037`
-  em 2026-08-04 e confirmado **inativo/draft**; teste permanece separado/OFF.
-- **WhatsApp:** Chatbot dono de canais/conversas; Loja UI de canais + grupo estoque; n8n orquestra.
-- **Motor:** Playwright sob demanda; simulação ao cliente ainda **humana** (bot não devolve parcela).
+- **Marca:** `shared/brand/revy-tokens.css` é a fonte única; acento verde racing;
+  `app.css` não reabre `:root`. Conferência visual e alguns deploys de marca ainda
+  pendentes no handoff da época — o código está no `main`.
+- **CTWA/ROI:** match por `ad_id` + Graph; venda herda campanha do lead na leitura
+  (`herdar_campanhas_de_leads`). Nunca casar por telefone mascarado. Task 4 é
+  configuração de anúncio (`Cód:`), não código.
+- **Bot WhatsApp:** replay >5 min bloqueado; debounce 40s (só a última mensagem);
+  `origem=meta_ctwa` só com identificador de anúncio ou `ctwa_source_type` da família.
+  Workflow Git `n8n/workflow-ai-nao-salvos.json` tem **32 nós**. Última inspeção do
+  live (`n8n2037`, 2026-08-04): importado como `wAiNaoSalvos0001`, **inativo/draft**.
+  Teste separado permanece OFF. Active ON só com smoke autorizado pelo dono.
+- **Alerta de simulação no grupo:** persistência + outbox + retry + dead-letter no
+  Chatbot. Residual = smoke, não código.
+- **WhatsApp dois modos** (Baileys+grupo **ou** Central Cloud API): spec fechada,
+  plano ainda não escrito. Coexistência por vendedor foi descartada.
+- **Motor:** 4 bancos LIVE; teto 2 browsers; Playwright sob demanda em `motor2037`
+  (`gru`). Resultado ao cliente continua **humano** no Portal. Worker em IP
+  residencial: design aprovado, sem código; gate é o probe no PC.
+- **Prod `app2037` (piloto):** secrets de shell, entitlements, atendimento e WhatsApp
+  Loja **ON**; redirect legado **OFF**; Copiloto **OFF** no código até ops ligar.
 
 ## Fontes da verdade
 
-| Tema | Fonte |
+| Tema | Abrir |
 |---|---|
-| Arquitetura implementada Control/Loja | `docs/referencia-viva/design/2026-07-30-revy-control-loja-asbuilt-e-melhorias.md` |
-| Próxima implementação / status de planos | `docs/fila/README.md` e o bloco Status do card |
-| Operação recente | `docs/referencia-viva/handoff-contexto.md` |
-| Decisões de UX aceitas **e recusadas** (07/08) | `docs/referencia-viva/2026-08-07-triagem-revisao-ux-loja-control.md` |
-| Provisionamento loja / entitlements / inspeção de prod | `docs/referencia-viva/2026-08-02-provisionamento-loja-entitlements.md` |
+| Fila de código | `docs/fila/README.md` |
+| As-built Control/Loja | `docs/referencia-viva/design/2026-07-30-revy-control-loja-asbuilt-e-melhorias.md` |
+| Ops recente | `docs/referencia-viva/handoff-contexto.md` |
+| UX aceita e recusada | `docs/referencia-viva/2026-08-07-triagem-revisao-ux-loja-control.md` |
+| Copiloto (env, validação) | `portal-gestao/docs/copiloto-env.md` |
 | Deploy Fly | `deploy/fly/3vm/README.md` |
-| Go-live WhatsApp | `docs/referencia-viva/go-live-chatbot.md` |
-| RPA bancário | lições Playwright em `docs/referencia-viva/planos/` e mapa de bancos |
-| Vocabulário e ownership | `CONTEXT.md` |
-
-`docs/nao-plano/arquivados/` é somente histórico. Specs válidas ficam em
-`docs/referencia-viva/specs/`.
+| RPA / lições | README do Motor + **uma** lição em `docs/referencia-viva/planos/` |
+| Vocabulário | `CONTEXT.md` |
 
 ## Prioridades independentes
 
-Escolha um eixo por mudança; não misture rollout, RPA e produto na mesma entrega.
+Um eixo por mudança. Não misture Copiloto, RPA, rollout e n8n na mesma entrega.
 
 | Eixo | Próximo resultado verificável |
 |---|---|
-| Bot WhatsApp | Backend e workflow publicados com Active OFF → smoke virgem/CTWA/handoff/salvo → Active ON somente pelo owner |
-| Rollout Control/Loja | Redirect legado opcional; dual-path ainda on |
-| Multi-WhatsApp | E2E dois canais + `canal_id` correto |
-| Google Ads | Secrets GCP + OAuth/métricas/conversões |
-| Motor | Smoke real por banco (resultado ao cliente ainda não via bot) |
-| Loja | Deep-links simulação/venda no workspace; telemetria |
+| Copiloto | F5 (lacunas no Control e/ou RLS) **ou** F6 (ferramentas cadastro/funil) |
+| Loja — foto | Upload por arquivo no form de estoque que já existe |
+| Loja — sino | Central geral + `simulacao_pronta`, sem depender da flag do Copiloto |
+| Motor | Probe Bradesco no PC (gate do worker residencial) **ou** estabilidade Bradesco |
+| Bot / n8n | Smoke virgem/CTWA/handoff/salvo no lab → Active ON pelo dono |
+| Control | Secrets GCP (Google Ads) **ou** E2E dois canais WA |
+| CTWA | Task 4: `Cód:` na mensagem do anúncio (config, não PR) |
+| Site | Adiado — não pegar sem o dono pedir |
 
 ## Fronteiras permanentes
 
-- Produtos se integram somente por HTTP/eventos versionados; não importe `app` de outro serviço.
-- Estoque API é a fonte de verdade de veículos.
-- Chatbot é a fonte de verdade de canais, leads, conversas e mensagens.
-- Portal/Revy Loja é dono de vendas e metas; projeta eventos ao Revy Control.
-- Motor é dono das credenciais e da execução bancária.
-- Control é dono de lojas, acessos globais, pessoas/cargos, módulos e integrações técnicas.
-- Credenciais, tokens, cookies e workflows preparados nunca entram no Git ou em logs.
-- Suspensão operacional é gate de backend, não simples visibilidade de menu.
-- Flags de rollout ficam OFF por padrão no **código** (dev/lab); em prod o piloto liga
-  secrets por ops. Entitlements só ligam após projeção confiável (fail-closed).
+- Produtos se integram só por HTTP/evento versionado. Sem import `app` cruzado.
+- Estoque = veículos. Chatbot = conversa. Loja = venda. Motor = banco. Control = estrutura.
+- Flags de rollout default OFF no código. Suspensão é gate de backend.
+- Copiloto: sem PII no prompt; cifra só vem de ferramenta tipada; `indisponivel`, nunca zero inventado.
+- Sem secret, token, cookie ou `workflow-fly.ready.json` no git ou no log.
+- 13 itens de UX recusados não voltam como proposta.
 
 ## Mapa rápido
 
-| Produto | Entrada / área principal |
+| Produto | Onde o domínio mora |
 |---|---|
-| Chatbot | `chatbot-api/app/main.py`, domínio em `app/servico.py` |
-| Motor | `motor-simulacao/app/main.py`, drivers em `app/motor/` |
-| Estoque | `estoque-api/app/main.py` |
-| Revy Loja | `portal-gestao/app/main.py`, `app/loja/`, `app/web/` |
-| Revy Control | `revy-trafego/app/main.py`, `app/control/`, `app/web/control*.py` |
-| Catálogo | `catalogo-publico/app/main.py` |
-| Orquestração | `n8n/workflow-ai-nao-salvos.json` |
+| Chatbot | `chatbot-api/app/servico.py` (não abrir `main.py` inteiro) |
+| Motor | `motor-simulacao/app/motor/` |
+| Estoque | `estoque-api/app/` |
+| Revy Loja | `portal-gestao/app/loja/` + `app/web/loja_*.py` + `app/loja/copiloto/` |
+| Revy Control | `revy-trafego/app/control/` + `app/web/control*.py` |
+| Catálogo | `catalogo-publico/app/` |
+| n8n | `n8n/workflow-ai-nao-salvos.json` (32 nós no Git) |
 
 ## Verificação mínima
 
-```powershell
-cd portal-gestao
-.\.venv\Scripts\python.exe -m pytest -q
+Sempre a partir da pasta do produto:
 
-cd ..\chatbot-api
-.\.venv\Scripts\python.exe -m pytest -q
-
-cd ..\motor-simulacao
-.\.venv\Scripts\python.exe -m pytest -q
-
-cd ..\estoque-api
-.\.venv\Scripts\python.exe -m pytest -q
+```bash
+cd portal-gestao && python -m pytest -q
+cd ../chatbot-api && python -m pytest -q
+cd ../motor-simulacao && python -m pytest -q
+cd ../estoque-api && python -m pytest -q
+cd ../revy-trafego && python -m pytest -q
 ```
 
-O workflow de teste `n8n/workflow-teste-numero-autorizado.json` é usado ativamente e
-deve ser preservado. Valide ambos os workflows com os scripts em `n8n/`.
+n8n: `python n8n/validate_workflow.py` na raiz. Preserve
+`n8n/workflow-teste-numero-autorizado.json`.
+
+Não anote contagem de testes neste arquivo — ela envelhece na hora.
 
 ## Regras de operação
 
-- Não recrie apps Fly monolíticos antigos.
-- Não destrua apps, volumes, snapshots ou bancos sem pedido explícito.
-- Não trate contagens antigas de testes ou releases registrados em documentos como estado atual.
-- Não use `git clean -fdX`: ele apagaria venvs, segredos, Graphify e sessões do Motor.
-- Antes de concluir: testes relevantes, `git diff --check` e `git status --short`.
+- Não recrie apps Fly monolíticos. Não destrua volume/snapshot sem pedido.
+- Não use `git clean -fdX`.
+- Ao fechar um card da fila, **mova** o arquivo para `docs/referencia-viva/planos/`
+  e atualize este arquivo + `docs/fila/README.md` no mesmo PR.
+- Antes de concluir: testes do produto, `git diff --check`, `git status --short`.

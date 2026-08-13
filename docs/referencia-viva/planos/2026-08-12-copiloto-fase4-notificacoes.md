@@ -1,5 +1,10 @@
 # Copiloto de Vendas — Fase 4: notificações no shell e alerta de preço fora da faixa
 
+> **Status 2026-08-13: IMPLEMENTADO em `main`.** Sino em
+> `loja_copiloto.py` (`/notificacoes.json`); 7ª regra `preco_fora_da_faixa` em
+> `SINAL_REGRAS`. Não confundir com o card da fila “Central de notificação + simulação
+> pronta”, que é outro produto (sino geral, sem flag do Copiloto). Não executar de novo.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Tirar o alerta proativo de dentro da tela do Copiloto e colocá-lo onde o lojista está — um sino no topo do shell, visível de Vendas, Estoque ou de onde ele estiver — e acrescentar a 7ª regra: veículo com preço fora da faixa da FIPE.

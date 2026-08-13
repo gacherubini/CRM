@@ -46,6 +46,7 @@ para o lojista; configuração técnica e operação multi-loja ficam aqui.
 | `app/control/permissions.py` | Isolamento `control:*` × `store:*` |
 | `app/rotulos.py` | Mapa único de rótulos dos enums |
 | `app/readiness.py` | Prontidão da loja (`REQUIRED_CODES` separa bloqueio de alerta) |
+| `app/control/portfolio.py` | Catálogo de módulos contratáveis (inclui `copiloto`) |
 
 ## Rodar e testar
 
@@ -131,6 +132,10 @@ pessoa por e-mail, atribui vários cargos e revoga cada um pelo `cargo_id`. A Lo
 O snapshot de provisionamento enfileira para chatbot, estoque, portal, motor e catálogo
 (`control_provisioning_outbox`). Tokens por destino: Chatbot/Estoque/Motor por Bearer;
 Portal/Catálogo por `X-Service-Token`.
+
+**Copiloto de Vendas** é módulo contratável (`codigo=copiloto`, migration `0018`).
+Ligar no Control **não** liga o chat: a Loja ainda exige `REVY_LOJA_COPILOTO_ENABLED`
+e o entitlement projetado. Log de perguntas-lacuna (F5) ainda não existe neste produto.
 
 ## Google Ads — passo manual de ops obrigatório
 

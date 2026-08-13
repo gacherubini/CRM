@@ -72,8 +72,10 @@ A **API** roda no bundle `app2037` (`127.0.0.1:8004`) com `MOTOR_ORCHESTRATOR_ON
 
 ## Worker em IP residencial — PLANEJADO, não implementado
 
-> **Status (2026-08-09): decidido, sem código escrito. Nada disto está em produção.**
+> **Status (2026-08-13): design aprovado, sem código de orquestração PC×Fly.**
+> Card: [`docs/fila/2026-08-12-worker-playwright-pc-local.md`](../docs/fila/2026-08-12-worker-playwright-pc-local.md).
 > Não presuma que existe worker fora do Fly ao ler logs ou depurar.
+> Gate: `scripts/probe_bradesco.py` no IP residencial **antes** de construir encanamento.
 
 **Por que sair do datacenter.** `captcha_login` e `portal_bloqueado` têm como causa raiz o
 IP do Fly: reCAPTCHA v3 e WAF pontuam mal faixas de nuvem. Santander, Bradesco e Fontecred

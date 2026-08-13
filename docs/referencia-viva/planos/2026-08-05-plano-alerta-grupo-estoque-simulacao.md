@@ -1,7 +1,8 @@
 # Plano — alerta confiável de simulação no grupo do estoque
 
-**Status:** Fases 0–2 implementadas no código (schema TEMP, endpoint canônico + envio ao
-grupo, cutover das tools n8n). Fase 3 (outbox/retry worker) e smoke/Active ON ainda pendentes.
+**Status 2026-08-13:** F0–F3 no código (`notificacoes_operacionais`,
+`notificacoes_outbox_job` no lifespan, dead-letter após `CHATBOT_NOTIF_MAX_ATTEMPTS`).
+Residual é **ops**: smoke e Active ON do workflow. Não é mais card de código.
 
 **Objetivo:** toda solicitação de simulação aceita pelo bot deve ser persistida, pausar o bot e
 gerar exatamente um aviso no grupo de estoque configurado para a loja. O cliente só recebe a

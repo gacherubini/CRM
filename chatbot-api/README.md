@@ -70,7 +70,11 @@ Testes que cobrem os pontos sensíveis:
 
 Todo bloqueio grava `motivo_bloqueio` no log (`simulação bloqueada motivo=...`) e no body.
 
-## Alerta de simulação ao grupo de estoque falhando
+## Alerta de simulação ao grupo de estoque
+
+Código F0–F3 pronto (2026-08-13): tabela `notificacoes_operacionais`, worker
+`notificacoes_outbox_job` no lifespan, dead-letter após `CHATBOT_NOTIF_MAX_ATTEMPTS`.
+Residual é smoke do workflow, não implementação.
 
 Quando um cliente pede financiamento (após os gates), o bot pausa a conversa e envia
 **"🚨 precisa de simulação humana"** ao grupo de estoque (`solicitacoes_simulacao.py`). Se

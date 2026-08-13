@@ -1,5 +1,9 @@
 # Copiloto de Vendas — Fase 3: FIPE e caminho de escrita (ações com confirmação)
 
+> **Status 2026-08-13: IMPLEMENTADO em `main`.** `consultar_fipe` e `propor_acao` estão
+> em `portal-gestao/app/loja/copiloto/`; rotas `/acao` e `/acao/{id}/desfazer` em
+> `loja_copiloto.py`. Este arquivo documenta o código. Não executar de novo.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Fechar a v1 com o fluxo operacional completo — *"a CB500 está parada há 60 dias e acima da FIPE → baixa o preço → reposta no catálogo"* — sempre atrás de um cartão de confirmação **renderizado pelo servidor**, com auditoria e desfazer.

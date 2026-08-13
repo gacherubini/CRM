@@ -1,5 +1,8 @@
 # Copiloto de Vendas — Fase 1: fundação determinística (sem IA)
 
+> **Status 2026-08-13: IMPLEMENTADO em `main`.** Seção Copiloto, read models e 6 regras
+> originais (a 7ª veio na F4). Não executar de novo.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Entregar a seção **Copiloto** na Revy Loja com dados reais da operação e alertas proativos, **sem chamar LLM nenhum** — a fatia que precisa continuar de pé quando o provedor de IA cair.
