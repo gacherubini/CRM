@@ -81,6 +81,8 @@ Não espalhe um eixo em vários filhos (código + Fly + n8n na mesma leva).
 - Estoque = veículos. Chatbot = conversa. Loja = venda. Motor = banco. Control = estrutura.
 - Testes a partir da pasta do produto (`python -m pytest -q`), senão importa o `app` errado.
 - Não destruir app/volume Fly. Não `git clean -fdX`.
+- Deploy Fly só por `deploy/fly/3vm/`. Os `fly.toml` na pasta do produto apontam para
+  apps monolíticos destruídos (`portal2037`, `chatbot2037`…) — não usar.
 - UI Loja/Control: 13 itens recusados não voltam como proposta.
 
 ## 6. Antes de dizer que acabou

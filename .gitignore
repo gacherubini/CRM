@@ -41,8 +41,9 @@ output/
 # scripts de patch one-off do n8n (nao versionar)
 n8n/_*.py
 
-# worktrees efêmeros de agentes (Claude Code)
+# worktrees e ledgers efêmeros de agentes
 .claude/
+.superpowers/
 
 # one-off fly/n8n patch scripts
 deploy/fly/_*.js

@@ -1,3 +1,5 @@
+# LEGADO. Nao fazer `fly deploy` daqui.
+# Apps monolíticos (chatbot2037 etc.) foram destruídos. Deploy atual: deploy/fly/3vm/
 app = "chatbot2037"
 primary_region = "gru"
 

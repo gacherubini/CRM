@@ -1,3 +1,5 @@
+# LEGADO. Nao fazer `fly deploy` daqui.
+# Apps monolíticos (catalogo2037 etc.) foram destruídos. Deploy atual: deploy/fly/3vm/
 app = "catalogo2037"
 primary_region = "gru"
 

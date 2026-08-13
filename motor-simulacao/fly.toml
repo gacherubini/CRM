@@ -1,3 +1,6 @@
+# LEGADO como orquestrador HTTP. O app motor2037 ainda existe, mas o deploy
+# vigente é deploy/fly/3vm/fly.worker.toml (slots Playwright, sem API always-on).
+# Nao fazer `fly deploy` daqui sem pedido explícito — recolocaria o monólito.
 app = "motor2037"
 primary_region = "gru"
 
