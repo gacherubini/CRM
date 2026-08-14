@@ -11,7 +11,7 @@ def test_vendedor_nasce_ativo(db, loja_a):
     estivesse errado.
     """
     v = FilaVendedor(
-        id="f1", loja_id=loja_a["loja_id"], nome="João",
+        id=f"{loja_a['loja_id'][:8]}-f1", loja_id=loja_a["loja_id"], nome="João",
         telefone="5511999998888", ordem=1,
     )
     db.add(v)
@@ -22,7 +22,7 @@ def test_vendedor_nasce_ativo(db, loja_a):
 def test_nome_e_obrigatorio(db, loja_a):
     """O nome vai no aviso ao cliente (§5.1) — sem ele o handoff fica anônimo."""
     db.add(FilaVendedor(
-        id="f2", loja_id=loja_a["loja_id"], nome=None,
+        id=f"{loja_a['loja_id'][:8]}-f2", loja_id=loja_a["loja_id"], nome=None,
         telefone="5511999998888", ordem=1,
     ))
     with pytest.raises(IntegrityError):
@@ -32,7 +32,8 @@ def test_nome_e_obrigatorio(db, loja_a):
 
 def test_telefone_e_obrigatorio(db, loja_a):
     db.add(FilaVendedor(
-        id="f3", loja_id=loja_a["loja_id"], nome="João", telefone=None, ordem=1,
+        id=f"{loja_a['loja_id'][:8]}-f3", loja_id=loja_a["loja_id"], nome="João",
+        telefone=None, ordem=1,
     ))
     with pytest.raises(IntegrityError):
         db.commit()

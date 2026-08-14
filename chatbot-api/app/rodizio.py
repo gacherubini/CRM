@@ -6,6 +6,13 @@ cada caso vira um teste de duas linhas.
 """
 from __future__ import annotations
 
+import uuid
+from datetime import datetime, timedelta, timezone
+
+from sqlalchemy.orm import Session
+
+from app.models_db import FilaVendedor, OfertaLead, RodizioPonteiro
+
 
 def escolher_proximo(
     ordem_ids: list[str],
@@ -41,3 +48,68 @@ def escolher_proximo(
     # receberam" é o que separa esperar de encerrar.
     livres = [v for v in ordem_ids if v not in ja_ofertados]
     return None, ponteiro, not livres
+
+
+def _fila_ordenada(db: Session, loja_id: str) -> list[FilaVendedor]:
+    return (
+        db.query(FilaVendedor)
+        .filter(FilaVendedor.loja_id == loja_id, FilaVendedor.ativo.is_(True))
+        .order_by(FilaVendedor.ordem, FilaVendedor.criado_em)
+        .all()
+    )
+
+
+def abrir_oferta(
+    db: Session,
+    loja_id: str,
+    telefone_cliente: str,
+    *,
+    prazo_minutos: int = 10,
+) -> OfertaLead | None:
+    """Oferece o lead ao vendedor da vez. ``None`` = ninguém para oferecer."""
+    fila = _fila_ordenada(db, loja_id)
+    ordem_ids = [v.id for v in fila]
+
+    ponteiro = db.get(RodizioPonteiro, loja_id)
+    if ponteiro is None:
+        ponteiro = RodizioPonteiro(loja_id=loja_id, posicao=0)
+        db.add(ponteiro)
+        db.flush()
+
+    abertas = (
+        db.query(OfertaLead)
+        .filter(OfertaLead.loja_id == loja_id, OfertaLead.estado == "aberta")
+        .all()
+    )
+    pendentes = {o.vendedor_id for o in abertas}
+
+    deste_lead = [o for o in abertas if o.telefone_cliente == telefone_cliente]
+    ja_ofertados = {o.vendedor_id for o in db.query(OfertaLead).filter(
+        OfertaLead.loja_id == loja_id,
+        OfertaLead.telefone_cliente == telefone_cliente,
+    ).all()}
+    posicao_inicial = deste_lead[0].posicao_inicial if deste_lead else None
+
+    vendedor_id, nova_posicao, _fechou = escolher_proximo(
+        ordem_ids,
+        ponteiro=ponteiro.posicao,
+        pendentes=pendentes - ja_ofertados,
+        ja_ofertados=ja_ofertados,
+        posicao_inicial=posicao_inicial,
+    )
+    if vendedor_id is None:
+        return None
+
+    oferta = OfertaLead(
+        id=str(uuid.uuid4()),
+        loja_id=loja_id,
+        telefone_cliente=telefone_cliente,
+        vendedor_id=vendedor_id,
+        estado="aberta",
+        posicao_inicial=posicao_inicial if posicao_inicial is not None else ponteiro.posicao,
+        prazo_em=datetime.now(timezone.utc) + timedelta(minutes=prazo_minutos),
+    )
+    ponteiro.posicao = nova_posicao
+    db.add(oferta)
+    db.commit()
+    return oferta
