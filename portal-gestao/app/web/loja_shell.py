@@ -33,6 +33,7 @@ from app.loja.types import (
     NavSection,
     StoreContext,
 )
+from app.models import SINAL_REGRAS
 
 logger = logging.getLogger(__name__)
 
@@ -136,6 +137,24 @@ def copiloto_secao_liberada(
     if not entitlements_enabled:
         return True
     return module_enabled(ents, Module.COPILOTO)
+
+
+def regras_elegiveis(
+    ents, usuario, *, shell_enabled: bool, copiloto_enabled: bool, entitlements_enabled: bool
+) -> frozenset[str]:
+    if copiloto_secao_liberada(
+        ents, usuario, shell_enabled=shell_enabled,
+        copiloto_enabled=copiloto_enabled, entitlements_enabled=entitlements_enabled,
+    ):
+        return frozenset(SINAL_REGRAS)
+    return frozenset()
+
+
+def central_disponivel(ents, usuario, *, shell_enabled, copiloto_enabled, entitlements_enabled) -> bool:
+    return bool(regras_elegiveis(
+        ents, usuario, shell_enabled=shell_enabled,
+        copiloto_enabled=copiloto_enabled, entitlements_enabled=entitlements_enabled,
+    ))
 
 
 def _contar_nao_vistos_com_sessao_propria(
