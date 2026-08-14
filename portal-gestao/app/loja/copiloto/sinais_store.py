@@ -146,17 +146,32 @@ def sincronizar_sinais(
 
 
 def listar_sinais_abertos(
-    db: Session, loja_slug: str, *, limite: int = 20
+    db: Session,
+    loja_slug: str,
+    *,
+    limite: int = 20,
+    usuario_id: str | None = None,
 ) -> list[CopilotoSinal]:
+    """Sinais abertos da loja.
+
+    ``usuario_id`` filtra o endereçamento 1:1 (spec §5.7): com ele, sinal de
+    outra pessoa não aparece. Sem ele, devolve tudo — é o comportamento
+    legado, mantido para não mudar chamador que ainda não conhece
+    destinatário.
+    """
     ordem = {"critico": 0, "atencao": 1, "info": 2}
-    linhas = (
-        db.query(CopilotoSinal)
-        .filter(
-            CopilotoSinal.loja_slug == loja_slug,
-            CopilotoSinal.estado.in_(ESTADOS_ABERTOS),
-        )
-        .all()
+    consulta = db.query(CopilotoSinal).filter(
+        CopilotoSinal.loja_slug == loja_slug,
+        CopilotoSinal.estado.in_(ESTADOS_ABERTOS),
     )
+    if usuario_id is not None:
+        consulta = consulta.filter(
+            or_(
+                CopilotoSinal.destinatario_usuario_id.is_(None),
+                CopilotoSinal.destinatario_usuario_id == usuario_id,
+            )
+        )
+    linhas = consulta.all()
     linhas.sort(
         key=lambda s: (
             ordem.get(s.severidade, 9),

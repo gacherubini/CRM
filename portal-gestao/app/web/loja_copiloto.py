@@ -358,7 +358,9 @@ def copiloto_notificacoes_json(request: Request, db: Session = Depends(get_db)):
         return erro
     itens = [
         _serializar_sinal_para_painel(s)
-        for s in listar_sinais_abertos(db, usuario.loja_slug)
+        for s in listar_sinais_abertos(
+            db, usuario.loja_slug, usuario_id=getattr(usuario, "id", None)
+        )
     ]
     nao_vistos = contar_nao_vistos(db, usuario.loja_slug, usuario.id)
     return JSONResponse({"itens": itens, "nao_vistos": nao_vistos})

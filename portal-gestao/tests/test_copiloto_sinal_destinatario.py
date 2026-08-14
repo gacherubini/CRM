@@ -1,4 +1,4 @@
-from app.loja.copiloto.sinais_store import contar_sinais_novos
+from app.loja.copiloto.sinais_store import contar_sinais_novos, listar_sinais_abertos
 from app.models import CopilotoSinal
 
 
@@ -58,3 +58,21 @@ def test_direcionado_e_da_loja_somam_para_o_destinatario(db):
     _sinal(db, "loja-a", regra="oferta_lead", destinatario="u-vendedor")
     assert contar_sinais_novos(db, "loja-a", "u-vendedor") == 2
     assert contar_sinais_novos(db, "loja-a", "u-dono") == 1
+
+
+def test_listagem_esconde_oferta_de_outro_vendedor(db):
+    _sinal(db, "loja-a")
+    _sinal(db, "loja-a", regra="oferta_lead", destinatario="u-vendedor")
+
+    do_vendedor = listar_sinais_abertos(db, "loja-a", usuario_id="u-vendedor")
+    do_dono = listar_sinais_abertos(db, "loja-a", usuario_id="u-dono")
+
+    assert {s.regra for s in do_vendedor} == {"estoque_parado", "oferta_lead"}
+    assert {s.regra for s in do_dono} == {"estoque_parado"}
+
+
+def test_listagem_sem_usuario_devolve_tudo(db):
+    """Compat: chamador que ainda não passa usuario_id não muda de resultado."""
+    _sinal(db, "loja-a")
+    _sinal(db, "loja-a", regra="oferta_lead", destinatario="u-vendedor")
+    assert len(listar_sinais_abertos(db, "loja-a")) == 2
