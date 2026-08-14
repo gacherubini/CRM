@@ -51,3 +51,37 @@ def test_loja_so_ve_as_proprias_ofertas(client, db, loja_a, loja_b):
 
 def test_sem_credencial_e_401(client):
     assert client.get("/v1/ofertas").status_code == 401
+
+
+def test_assumir_devolve_o_contato_para_quem_ganhou(client, db, loja_a):
+    _fila(db, loja_a["loja_id"])
+    oferta = abrir_oferta(db, loja_a["loja_id"], "5511988887777")
+
+    corpo = client.post(
+        f"/v1/ofertas/{oferta.id}/assumir", headers=loja_a["headers"]
+    ).json()
+
+    assert corpo["ganhou"] is True
+    assert corpo["telefone_cliente"] == "5511988887777"
+
+
+def test_assumir_duas_vezes_nao_devolve_contato_na_segunda(client, db, loja_a):
+    _fila(db, loja_a["loja_id"])
+    oferta = abrir_oferta(db, loja_a["loja_id"], "5511988887777")
+    client.post(f"/v1/ofertas/{oferta.id}/assumir", headers=loja_a["headers"])
+
+    corpo = client.post(
+        f"/v1/ofertas/{oferta.id}/assumir", headers=loja_a["headers"]
+    ).json()
+
+    assert corpo["ganhou"] is False
+    assert corpo["telefone_cliente"] == ""
+
+
+def test_assumir_oferta_de_outra_loja_e_404(client, db, loja_a, loja_b):
+    _fila(db, loja_a["loja_id"])
+    oferta = abrir_oferta(db, loja_a["loja_id"], "5511988887777")
+
+    assert client.post(
+        f"/v1/ofertas/{oferta.id}/assumir", headers=loja_b["headers"]
+    ).status_code == 404

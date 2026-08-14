@@ -1561,6 +1561,27 @@ def listar_ofertas(
     ]
 
 
+@app.post("/v1/ofertas/{oferta_id}/assumir")
+def assumir_oferta_http(
+    oferta_id: str,
+    ctx=Depends(get_contexto),
+    db: Session = Depends(get_db),
+):
+    """Peguei pelo sino da Loja — mesmo assumir do clique no WhatsApp (§5.7)."""
+    from app.rodizio import assumir_oferta as _assumir_oferta
+
+    oferta = db.get(OfertaLead, oferta_id)
+    if oferta is None or oferta.loja_id != ctx.loja_id:
+        raise HTTPException(status_code=404, detail="oferta não encontrada")
+
+    ganhou, travada = _assumir_oferta(db, oferta_id)
+    # Contato só para quem ganhou: quem perdeu o clique não fala com o cliente.
+    return {
+        "ganhou": ganhou,
+        "telefone_cliente": travada.telefone_cliente if ganhou else "",
+    }
+
+
 @app.post("/v1/fila-vendedores", status_code=201)
 def criar_fila_vendedor(
     entrada: FilaVendedorInput,
