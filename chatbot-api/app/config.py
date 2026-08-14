@@ -52,6 +52,10 @@ GRAPH_TOKEN = os.getenv("CHATBOT_GRAPH_TOKEN", "")
 GRAPH_PHONE_NUMBER_ID = os.getenv("CHATBOT_GRAPH_PHONE_NUMBER_ID", "")
 GRAPH_TEMPLATE_OFERTA = os.getenv("CHATBOT_GRAPH_TEMPLATE_OFERTA", "chama_vendedor")
 
+# Webhook da Meta (Modo 2). App Secret assina o corpo; verify token fecha o GET.
+META_APP_SECRET = os.getenv("CHATBOT_META_APP_SECRET", "")
+META_VERIFY_TOKEN = os.getenv("CHATBOT_META_VERIFY_TOKEN", "")
+
 # Imagem de veículo recebida de número autorizado. O binário só transita pela
 # API e é enviado ao Estoque; não é persistido no Chatbot/n8n.
 IMAGE_EVOLUTION_URL = os.getenv(
