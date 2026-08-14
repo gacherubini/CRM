@@ -22,7 +22,8 @@
 - **Sinais do Copiloto (as 7 regras) continuam gated no Copiloto** — o comportamento delas não muda.
 - **Não reimplementar checagem de gate.** Usar `revy_loja_shell_enabled`, `revy_loja_entitlements_enabled`, `module_enabled`/`Module`, papéis. Contrato em `loja_shell.py:106-129`.
 - **Contagem por pessoa** (`CopilotoSinalVisto`) e cache TTL 45s (`notificacoes.py:36`) permanecem.
-- Rodar testes a partir de `portal-gestao/`: `python -m pytest -q`.
+- Rodar testes **a partir de `portal-gestao/`** (senão importa o `app` errado). O dono usa **Mac e
+  Windows**: macOS/Linux `python -m pytest -q`; Windows `.\.venv\Scripts\python.exe -m pytest -q`.
 
 ---
 
@@ -181,6 +182,22 @@ Hoje isso coincide com a seção Copiloto. O plano dos dois modos amplia `regras
 
 ---
 
+## O que o B1 **não** entrega (é o buraco do plano dos dois modos)
+
+B1 amplia a elegibilidade por **tipo**. A oferta 1:1 do Modo 2 precisa de elegibilidade por
+**pessoa** — e isso o modelo atual não tem. Quem for escrever o plano dos dois modos precisa
+orçar isto **antes**, não descobrir no meio:
+
+| O que o spec exige | O que existe hoje | O que falta |
+|---|---|---|
+| Sino **só para o `oferecido_a`** (spec §5.7: dono/gerente não veem) | `CopilotoSinal` é **por loja** — o próprio docstring diz "dispensar é da loja inteira". Por pessoa só existe o *visto* (`CopilotoSinalVisto`, N-para-N) | **Migration**: destinatário no sinal (ex.: `destinatario_usuario_id` nullable + índice). `NULL` = comportamento de hoje (loja inteira), preenchido = 1:1. B1 **não** cria isso |
+| Botão **Peguei** no item do sino, chamando o backend (mesmo `assumir`) | O sino é leitura + dispensar | Rota de ação no item + o contrato de `assumir` já existente no Portal |
+| Oferta muda de dono quando o rodízio avança; perdedor vira "já foi pego" | `estado IN ('novo','resolvido','dispensado')` | Dá pra reusar `resolvido` na revogação; falta a troca de destinatário |
+| Oferta é **por lead**, com contato | Docstring do model: "nunca guarda telefone em claro; sinais de lead são **agregados**" | Essa disciplina precisa ser **revista explicitamente** no plano dos dois modos — não quebrar de lado |
+| Loja suspensa: sino **não toca** (spec §6.3) | Gate de suspensão não passa pelo sino | Entra no gate único do `chatbot-api`/Portal, não aqui |
+
+Nada disso muda o B1 — o gancho `regras_elegiveis` continua certo. É só o que **vem depois** dele.
+
 ## Superado — não executar (B2 / B9 antigos)
 
 O blast `simulacao_pronta` para dono+gerente+vendedor e a flag para desligar o grupo **chocam** o spec dos dois modos:
@@ -199,5 +216,7 @@ Esses tipos/avisos saem no **plano de implementação dos dois modos**, em cima 
 
 - Opção A (sino geral, não depende do Copiloto para *existir*): B1. **Coberto.**
 - Primeiro tipo não-Copiloto: **fora deste card** (spec §5.7–5.8).
+- Elegibilidade por **pessoa** (destinatário) e botão de ação: **fora deste card** — ver "O que o
+  B1 não entrega". B1 entrega só o filtro por tipo.
 - Grupo de estoque: **intocado.**
 - Risco: gating + property test de 48 combos — Task 5; rodar testes do Copiloto entre as tasks de B1.

@@ -18,7 +18,10 @@
 - **Design da marca, sem CSS novo.** Usar classes existentes: `.form-grid`, `.wide`, `.button.secondary`/`.primary`, `.alert.error`. `<input type="file">` **já herda** o estilo global de input (`portal-gestao/app/static/css/app.css:1637`, foco `--brand` em `:1665`). Não editar `revy-tokens.css` (é cópia gerada por `shared/brand/sync_tokens.py`).
 - **Contrato do estoque-api (já existe):** `POST /v1/veiculos/{veiculo_id}/fotos/upload?publicar=<bool>` — corpo = **bytes crus**, headers `Content-Type: <mime>` + `Idempotency-Key`; Bearer token de serviço; papel ≥ operador; 201 na criação. Mime jpeg/png/webp; ≤ 10 MB; mesma key + bytes diferentes → **409**; mesma key + mesmos bytes → no-op.
 - **Idempotência:** derivar a key dos bytes: `portal-foto:{veiculo_id}:{sha256(conteudo)[:32]}`.
-- Rodar testes a partir de `portal-gestao/`: `.\.venv\Scripts\python.exe -m pytest -q`.
+- Rodar testes **a partir de `portal-gestao/`** (senão importa o `app` errado). O dono usa **Mac e
+  Windows**, então cada Run traz as duas formas:
+  - macOS/Linux: `python -m pytest -q`
+  - Windows: `.\.venv\Scripts\python.exe -m pytest -q`
 
 ---
 
@@ -97,7 +100,7 @@ def test_adicionar_foto_409_vira_conflito():
 
 - [ ] **Step 2: Rodar e ver falhar**
 
-Run: `cd portal-gestao && .\.venv\Scripts\python.exe -m pytest tests/test_estoque_client_foto.py -q`
+Run: `cd portal-gestao && python -m pytest tests/test_estoque_client_foto.py -q` — Windows: `cd portal-gestao && .\.venv\Scripts\python.exe -m pytest tests/test_estoque_client_foto.py -q`
 Expected: FAIL — `AttributeError: 'EstoqueClient' object has no attribute 'adicionar_foto'`.
 
 - [ ] **Step 3: Implementar o método** (em `portal-gestao/app/clients/estoque.py`, logo após `atualizar`)
@@ -130,7 +133,7 @@ Expected: FAIL — `AttributeError: 'EstoqueClient' object has no attribute 'adi
 
 - [ ] **Step 4: Rodar e ver passar**
 
-Run: `cd portal-gestao && .\.venv\Scripts\python.exe -m pytest tests/test_estoque_client_foto.py -q`
+Run: `cd portal-gestao && python -m pytest tests/test_estoque_client_foto.py -q` — Windows: `cd portal-gestao && .\.venv\Scripts\python.exe -m pytest tests/test_estoque_client_foto.py -q`
 Expected: PASS (3 testes).
 
 - [ ] **Step 5: Commit**
@@ -228,7 +231,7 @@ E garantir que `criar` do fake devolva um `id` (ex.: `return {"id": "v-novo", ..
 
 - [ ] **Step 3: Rodar e ver falhar**
 
-Run: `cd portal-gestao && .\.venv\Scripts\python.exe -m pytest tests/test_estoque_foto_upload.py -q`
+Run: `cd portal-gestao && python -m pytest tests/test_estoque_foto_upload.py -q` — Windows: `cd portal-gestao && .\.venv\Scripts\python.exe -m pytest tests/test_estoque_foto_upload.py -q`
 Expected: FAIL — upload não é chamado (helper ainda não existe).
 
 - [ ] **Step 4: Implementar o helper e ligar nas rotas** (em `portal-gestao/app/main.py`)
@@ -288,7 +291,7 @@ Em `estoque_editar` (`:1017-1018`), dentro do `try`:
 
 - [ ] **Step 5: Rodar e ver passar**
 
-Run: `cd portal-gestao && .\.venv\Scripts\python.exe -m pytest tests/test_estoque_foto_upload.py -q`
+Run: `cd portal-gestao && python -m pytest tests/test_estoque_foto_upload.py -q` — Windows: `cd portal-gestao && .\.venv\Scripts\python.exe -m pytest tests/test_estoque_foto_upload.py -q`
 Expected: PASS (3 testes). Rodar a suíte de estoque para não regredir: `... -m pytest tests/ -q -k estoque`.
 
 - [ ] **Step 6: Commit**
@@ -341,7 +344,7 @@ def test_form_tem_input_de_arquivo(client):
     assert 'type="file"' in pagina.text and 'name="foto"' in pagina.text
 ```
 
-Run: `cd portal-gestao && .\.venv\Scripts\python.exe -m pytest tests/test_estoque_foto_upload.py::test_form_tem_input_de_arquivo -q`
+Run: `cd portal-gestao && python -m pytest tests/test_estoque_foto_upload.py::test_form_tem_input_de_arquivo -q` — Windows: `cd portal-gestao && .\.venv\Scripts\python.exe -m pytest tests/test_estoque_foto_upload.py::test_form_tem_input_de_arquivo -q`
 Expected: PASS.
 
 - [ ] **Step 4: Commit**
