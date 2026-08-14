@@ -245,9 +245,18 @@ procurando no HMAC.
 
 - **Fase 2** (Tech Provider, embedded signup **v4** — o v2 sai do ar em 15/10/2026, billing por
   loja): spec §11, não é piloto.
-- **Faixa "N sem vendedor", filtro Aguardando e card de 7 dias no Agente** (§5.8): dependem do
-  estado do lead exposto ao Portal, e não bloqueiam o smoke. Merecem card próprio.
-- **Botão Peguei no sino da Loja** (§5.7): o `assumir` pelo WhatsApp funciona; o do sino precisa da
-  rota de ação no Portal resolvendo `oferta_id → telefone` pelo chatbot.
+- **Toda a metade do dono da loja** (§5.8 e §2): faixa "N sem vendedor", filtro Aguardando, card
+  de 7 dias no Agente, e o **sino 1:1 com botão Peguei**. Nada disso existe, e o buraco é maior do
+  que "falta UI":
+  - o `chatbot-api` **não expõe rota nenhuma de oferta** — `oferta_lead` vive no banco dele e
+    nunca sai, então o Portal não tem como saber quem é `oferecido_a` nem o que está `aguardando`;
+  - `criar_sinal_direcionado` e `transferir_sinal` (plano `wa-modo2-1`) **não têm chamador**: a
+    capacidade de endereçar o sino existe e ninguém a usa. O sino não toca para o vendedor.
+  - **Consequência que não é cosmética:** o dono escolheu a faixa na Loja **no lugar** do resumo
+    por WhatsApp às 19h. Sem a faixa, o fallback que ele escolheu não existe em forma nenhuma —
+    lead que ninguém pega **some**, e ninguém é avisado.
+
+  O piloto roda assim (o caminho do WhatsApp é completo), mas rodar sem isso significa aceitar que
+  lead perdido é invisível. Card próprio, atravessando os dois produtos.
 - **Pacote pós-clique completo** e **VAD antes da transcrição**: declarados como pendentes dentro
   dos planos executados.
