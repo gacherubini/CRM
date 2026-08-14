@@ -61,6 +61,7 @@ class EstoqueFake:
         ]
         self.criados = []
         self.acoes = []
+        self.fotos = []
         self.indisponivel = False
         self.conflito_ao_vender = False
         self.atualizar_nao_encontrado = False
@@ -97,6 +98,14 @@ class EstoqueFake:
     def criar(self, dados):
         self.criados.append(dados)
         return {"id": "novo", **dados}
+
+    def adicionar_foto(self, veiculo_id, conteudo, content_type, *, idempotency_key, publicar=True):
+        self.fotos.append({
+            "veiculo_id": veiculo_id, "conteudo": conteudo,
+            "content_type": content_type, "idempotency_key": idempotency_key,
+            "publicar": publicar,
+        })
+        return {"id": veiculo_id, "publicado": publicar}
 
     def atualizar(self, veiculo_id, dados):
         if self.indisponivel:
