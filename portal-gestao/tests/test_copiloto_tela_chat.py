@@ -137,3 +137,32 @@ def test_botao_perguntar_tem_id_para_desabilitar_durante_o_turno(client, monkeyp
     r = client.get("/app/loja/copiloto")
     assert 'id="copiloto-enviar"' in r.text
     assert "definirPendente" in r.text
+
+
+def test_js_grava_pergunta_no_formdata_antes_de_limpar_o_campo(client, monkeypatch):
+    """Regressão: o JS limpava o textarea e desabilitava o campo, depois
+    montava FormData. Campo vazio/disabled some do POST — o servidor
+    devolve 400 'Escreva uma pergunta.' com a bolha já mostrando o texto."""
+    _ligar(monkeypatch)
+    login(client)
+    js = client.get("/app/loja/copiloto").text
+    assert "corpo.set('pergunta', pergunta)" in js
+    assert js.index("corpo.set('pergunta', pergunta)") < js.index("campo.value = ''")
+    assert js.index("corpo.set('pergunta', pergunta)") < js.index("definirPendente(true)")
+
+
+def test_tela_nao_carrega_fonte_externa_nem_capa_claude(client, monkeypatch):
+    _ligar(monkeypatch)
+    login(client)
+    html = client.get("/app/loja/copiloto").text
+    assert "Fraunces" not in html
+    assert "copiloto-body" not in html
+    assert "copiloto-page" not in html
+
+
+def test_sugestoes_sao_botoes_com_a_pergunta(client, monkeypatch):
+    _ligar(monkeypatch)
+    login(client)
+    html = client.get("/app/loja/copiloto").text
+    assert 'class="chip" data-pergunta=' in html
+    assert "Perguntas frequentes" not in html

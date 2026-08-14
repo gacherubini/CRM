@@ -1,0 +1,119 @@
+{% extends "base.html" %}
+{% block title %}Hoje — Revy Loja{% endblock %}
+{% block page_title %}Hoje{% endblock %}
+{% block content %}
+<div class="page-heading">
+  <div>
+    <span class="eyebrow">Copiloto</span>
+    <h1>Hoje</h1>
+    <p>O que precisa de atenção e os números por trás disso.</p>
+  </div>
+</div>
+
+{% if sinais %}
+<section class="panel" aria-labelledby="copiloto-alertas">
+  <div class="panel-heading">
+    <div>
+      <span class="mono-label">Sinais</span>
+      <h2 id="copiloto-alertas">Precisa de atenção</h2>
+    </div>
+    {% if sinais_novos %}<span class="muted">{{ sinais_novos }} novo(s)</span>{% endif %}
+  </div>
+  <div class="panel-body">
+    <ul class="copiloto-sinais">
+      {% for sinal in sinais %}
+      <li class="copiloto-sinal severidade-{{ sinal.severidade }}">
+        <div>
+          <strong>{{ sinal.titulo }}</strong>
+          <p class="muted">{{ sinal.detalhe }}</p>
+        </div>
+        <div class="copiloto-sinal-acoes">
+          <form action="/app/loja/copiloto/sinais/{{ sinal.id }}/visto" method="post">
+            <input type="hidden" name="csrf" value="{{ csrf }}">
+            <button class="button secondary" type="submit">Já vi</button>
+          </form>
+          <form action="/app/loja/copiloto/sinais/{{ sinal.id }}/dispensar" method="post">
+            <input type="hidden" name="csrf" value="{{ csrf }}">
+            <button class="button ghost" type="submit">Dispensar</button>
+          </form>
+        </div>
+      </li>
+      {% endfor %}
+    </ul>
+  </div>
+</section>
+{% endif %}
+
+<section class="panel" aria-labelledby="copiloto-resumo">
+  <div class="panel-heading">
+    <div>
+      <span class="mono-label">Hoje</span>
+      <h2 id="copiloto-resumo">Resumo de hoje</h2>
+    </div>
+    <span class="muted">{{ resumo.janela.rotulo }}</span>
+  </div>
+  <div class="metric-grid">
+    <div class="metric">
+      <span>Vendas</span>
+      <strong>{{ resumo.vendas.qtd_vendas }}</strong>
+      {% if resumo.vendas.delta_qtd %}<small>{{ resumo.vendas.delta_qtd }} vs. {{ resumo.vendas.janela_comparacao.rotulo }}</small>{% endif %}
+    </div>
+    <div class="metric">
+      <span>Receita</span>
+      <strong>{{ formatar_brl(resumo.vendas.receita) }}</strong>
+    </div>
+    <div class="metric">
+      <span>Ticket médio</span>
+      <strong>{% if resumo.vendas.ticket_medio %}{{ formatar_brl(resumo.vendas.ticket_medio) }}{% else %}—{% endif %}</strong>
+    </div>
+    {% if resumo.vendas.margem is not none %}
+    <div class="metric">
+      <span>Margem</span>
+      <strong>{{ formatar_brl(resumo.vendas.margem) }}</strong>
+      {% if resumo.vendas.cobertura_margem.parcial %}
+      <small>calculada sobre {{ resumo.vendas.cobertura_margem.com_dado }} de {{ resumo.vendas.cobertura_margem.total }} vendas</small>
+      {% endif %}
+    </div>
+    {% endif %}
+  </div>
+</section>
+
+<section class="panel" aria-labelledby="copiloto-origem">
+  <div class="panel-heading">
+    <div>
+      <span class="mono-label">Origem</span>
+      <h2 id="copiloto-origem">De onde veio a última venda</h2>
+    </div>
+  </div>
+  <div class="panel-body">
+    {% if resumo.origem_ultima.status == 'vazio' %}
+    <p class="muted">Nenhuma venda confirmada ainda.</p>
+    {% elif resumo.origem_ultima.origem.identificada %}
+    <p><strong>{{ resumo.origem_ultima.origem.descricao }}</strong> veio de
+      <strong>{{ resumo.origem_ultima.origem.campanha_nome or resumo.origem_ultima.origem.utm_campaign }}</strong>.</p>
+    {% else %}
+    <p class="muted">A última venda ({{ resumo.origem_ultima.origem.descricao }}) está sem campanha de origem.</p>
+    {% endif %}
+  </div>
+</section>
+
+<section class="panel" aria-labelledby="copiloto-parado">
+  <div class="panel-heading">
+    <div>
+      <span class="mono-label">Estoque</span>
+      <h2 id="copiloto-parado">Estoque parado</h2>
+    </div>
+  </div>
+  <div class="panel-body">
+    {% if resumo.parado.status == 'indisponivel' %}
+    <p class="muted">O estoque está indisponível agora — nenhum número aqui.</p>
+    {% elif not resumo.parado.itens %}
+    <p class="muted">Nada parado há mais de {{ resumo.parado.dias_min }} dias.</p>
+    {% else %}
+    <p><strong>{{ resumo.parado.total }}</strong> veículo(s) parado(s) há mais de
+      {{ resumo.parado.dias_min }} dias — {{ formatar_brl(resumo.parado.capital_preso) }} de capital preso.</p>
+    <p class="muted">{{ resumo.parado.ressalva }}</p>
+    {% endif %}
+  </div>
+</section>
+{% endblock %}

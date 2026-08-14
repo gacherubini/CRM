@@ -8,7 +8,8 @@ por loja (Module.COPILOTO) é resolvido e checado aqui, no servidor, com o
 mesmo mecanismo que Estoque/Vendas usam (check_module_access) — não basta
 esconder o item do nav quando a loja não contratou o módulo.
 
-Resumo/alertas (`copiloto_home`) são determinísticos. O chat com LLM
+Resumo/alertas (`copiloto_hoje`) são determinísticos e vivem em
+`/app/loja/copiloto/hoje`. O chat com LLM
 (`/perguntar`, `/turno/{id}.json`, `/turno/{id}/cancelar`) grava o turno e
 volta na hora — quem executa é `app.copiloto_turnos_job`, nunca a requisição:
 não há streaming neste repositório, e prender um worker HTTP por segundos
@@ -64,6 +65,7 @@ from app.models import CopilotoSinal, CopilotoTurno, Usuario  # noqa: E402
 from app.web.loja_shell import check_module_access  # noqa: E402
 
 _PAGINA = "/app/loja/copiloto"
+_HOJE = _PAGINA + "/hoje"
 
 
 def _secao_ativa() -> bool:
@@ -106,6 +108,24 @@ def _pode(usuario: Usuario) -> bool:
     # Mesma constante que o sino usa (app.web.loja_shell.copiloto_secao_liberada)
     # — ver comentário em _secao_ativa() acima.
     return (usuario.papel or "").strip().casefold() in PAPEIS_GESTAO_COPILOTO
+
+
+def _entrar(request: Request, db: Session):
+    """Gate das páginas HTML do Copiloto. Devolve (usuario, None) ou
+    (None, resposta). Mesmas quatro checagens de ``_secao_ativa`` /
+    ``check_module_access`` / ``_pode`` — ver comentário em ``_secao_ativa``.
+    """
+    usuario = usuario_atual(request, db)
+    if not usuario:
+        return None, redirecionar_login()
+    if not _secao_ativa():
+        return None, _nao_existe()
+    blocked = check_module_access(request, usuario, db, Module.COPILOTO)
+    if blocked is not None:
+        return None, blocked
+    if not _pode(usuario):
+        return None, _sem_permissao(request, usuario)
+    return usuario, None
 
 
 def _ctx(usuario: Usuario) -> CopilotoContexto:
@@ -164,16 +184,9 @@ def copiloto_home(
     estoque=Depends(get_estoque_client),
     chatbot=Depends(get_chatbot_client),
 ):
-    usuario = usuario_atual(request, db)
-    if not usuario:
-        return redirecionar_login()
-    if not _secao_ativa():
-        return _nao_existe()
-    blocked = check_module_access(request, usuario, db, Module.COPILOTO)
-    if blocked is not None:
-        return blocked
-    if not _pode(usuario):
-        return _sem_permissao(request, usuario)
+    usuario, erro = _entrar(request, db)
+    if erro is not None:
+        return erro
 
     ctx = _ctx(usuario)
     resumo = montar_resumo_hoje(db, ctx, estoque=estoque, chatbot=chatbot)
@@ -204,11 +217,35 @@ def copiloto_home(
             usuario,
             db=db,
             resumo=resumo,
-            sinais=listar_sinais_abertos(db, ctx.loja_slug),
-            sinais_novos=contar_sinais_novos(db, ctx.loja_slug, usuario.id),
             conversas=conversas,
             conversa_atual=escolhida,
             turnos=turnos_view,
+        ),
+    )
+
+
+@router.get(_HOJE, response_class=HTMLResponse)
+def copiloto_hoje(
+    request: Request,
+    db: Session = Depends(get_db),
+    estoque=Depends(get_estoque_client),
+    chatbot=Depends(get_chatbot_client),
+):
+    usuario, erro = _entrar(request, db)
+    if erro is not None:
+        return erro
+
+    ctx = _ctx(usuario)
+    resumo = montar_resumo_hoje(db, ctx, estoque=estoque, chatbot=chatbot)
+    return templates.TemplateResponse(
+        "loja/copiloto_hoje.html",
+        contexto(
+            request,
+            usuario,
+            db=db,
+            resumo=resumo,
+            sinais=listar_sinais_abertos(db, ctx.loja_slug),
+            sinais_novos=contar_sinais_novos(db, ctx.loja_slug, usuario.id),
         ),
     )
 
@@ -252,7 +289,7 @@ async def _acao_sinal(
     ok = operacao(db, usuario.loja_slug, sinal_id, usuario.id)
     if ok:
         invalidar(usuario.loja_slug, usuario.id)
-    destino = f"{_PAGINA}?ok=1" if ok else f"{_PAGINA}?erro=sinal"
+    destino = f"{_HOJE}?ok=1" if ok else f"{_HOJE}?erro=sinal"
     return RedirectResponse(destino, status_code=303)
 
 

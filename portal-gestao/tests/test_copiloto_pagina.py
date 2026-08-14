@@ -66,6 +66,7 @@ def test_flag_off_retorna_404(client, monkeypatch):
     monkeypatch.setenv("REVY_LOJA_COPILOTO_ENABLED", "0")
     login(client)
     assert client.get("/app/loja/copiloto", follow_redirects=False).status_code == 404
+    assert client.get("/app/loja/copiloto/hoje", follow_redirects=False).status_code == 404
 
 
 def test_shell_off_retorna_404(client, monkeypatch):
@@ -73,29 +74,36 @@ def test_shell_off_retorna_404(client, monkeypatch):
     monkeypatch.setenv("REVY_LOJA_COPILOTO_ENABLED", "1")
     login(client)
     assert client.get("/app/loja/copiloto", follow_redirects=False).status_code == 404
+    assert client.get("/app/loja/copiloto/hoje", follow_redirects=False).status_code == 404
 
 
 def test_vendedor_recebe_403(client, monkeypatch):
     _ligar(monkeypatch)
     login(client, papel="vendedor", email="v@loja.test")
     assert client.get("/app/loja/copiloto").status_code == 403
+    assert client.get("/app/loja/copiloto/hoje").status_code == 403
 
 
 def test_dono_abre_a_pagina_com_resumo(client, monkeypatch):
     _ligar(monkeypatch)
     login(client)
-    r = client.get("/app/loja/copiloto")
-    assert r.status_code == 200
-    assert "Copiloto de Vendas" in r.text
-    assert "Resumo de hoje" in r.text
+    chat = client.get("/app/loja/copiloto")
+    assert chat.status_code == 200
+    assert "Copiloto de Vendas" in chat.text
+    assert "Resumo de hoje" not in chat.text
+    hoje = client.get("/app/loja/copiloto/hoje")
+    assert hoje.status_code == 200
+    assert "Resumo de hoje" in hoje.text
 
 
 def test_pagina_lista_o_sinal_aberto(client, monkeypatch):
     _ligar(monkeypatch)
     login(client)
     _semear_sinal()
-    r = client.get("/app/loja/copiloto")
+    r = client.get("/app/loja/copiloto/hoje")
     assert "Honda CB 500F parada há 70 dias" in r.text
+    chat = client.get("/app/loja/copiloto")
+    assert "Honda CB 500F parada há 70 dias" not in chat.text
 
 
 def test_nav_mostra_a_secao_copiloto(client, monkeypatch):
@@ -103,6 +111,7 @@ def test_nav_mostra_a_secao_copiloto(client, monkeypatch):
     login(client)
     r = client.get("/app")
     assert 'href="/app/loja/copiloto"' in r.text
+    assert 'href="/app/loja/copiloto/hoje"' in r.text
     assert "Agente do WhatsApp" in r.text
 
 
@@ -134,6 +143,7 @@ def test_dispensar_sinal_com_csrf_valido(client, monkeypatch):
         follow_redirects=False,
     )
     assert r.status_code == 303
+    assert r.headers["location"].startswith("/app/loja/copiloto/hoje")
     db = SessionLocal()
     try:
         assert db.query(CopilotoSinal).one().estado == "dispensado"
@@ -171,6 +181,7 @@ def test_entitlement_ausente_bloqueia_a_pagina_mesmo_com_papel_certo(client, mon
     login(client)
     r = client.get("/app/loja/copiloto", follow_redirects=False)
     assert r.status_code == 403
+    assert client.get("/app/loja/copiloto/hoje", follow_redirects=False).status_code == 403
 
 
 def test_entitlement_ausente_bloqueia_dispensar_e_nao_muta_sinal(client, monkeypatch):
@@ -221,6 +232,9 @@ def test_entitlement_presente_libera_a_pagina(client, monkeypatch):
     r = client.get("/app/loja/copiloto")
     assert r.status_code == 200
     assert "Copiloto de Vendas" in r.text
+    hoje = client.get("/app/loja/copiloto/hoje")
+    assert hoje.status_code == 200
+    assert "Resumo de hoje" in hoje.text
 
 
 def test_entitlement_presente_libera_dispensar(client, monkeypatch):

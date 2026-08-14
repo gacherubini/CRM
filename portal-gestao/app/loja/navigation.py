@@ -67,6 +67,13 @@ def build_nav(
                         module=Module.COPILOTO.value,
                         active_prefix="/app/loja/copiloto",
                     ),
+                    NavItem(
+                        label="Hoje",
+                        href="/app/loja/copiloto/hoje",
+                        section="Copiloto",
+                        module=Module.COPILOTO.value,
+                        active_prefix="/app/loja/copiloto/hoje",
+                    ),
                 ),
             )
         )
@@ -254,6 +261,9 @@ def nav_item_is_active(item: NavItem, path: str) -> bool:
             return False
         # Mesmo caso em Vendas: Resultado não acende na lista de vendas.
         if item.href == "/app/loja/vendas" and path != "/app/loja/vendas":
+            return False
+        # Chat do Copiloto não acende em /hoje (mesmo prefixo /app/loja/copiloto).
+        if item.href == "/app/loja/copiloto" and path != "/app/loja/copiloto":
             return False
         return True
     return False

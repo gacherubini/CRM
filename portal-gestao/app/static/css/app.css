@@ -3114,15 +3114,16 @@ a.metric-link:focus-visible { outline: 2px solid var(--brand); outline-offset: 2
 
 /* ===========================================================================
    Copiloto de Vendas (Revy Loja) — /app/loja/copiloto
-   Historico a esquerda, thread ao centro. O estado "pensando" mostra o passo
-   real (rotulos_passo no template) — nunca um spinner mudo — porque a
-   pergunta pode levar 10-30s para responder.
+   Historico a esquerda, thread ao centro. Tokens de marca (--paper/--brand),
+   nunca paleta local. O estado "pensando" mostra o passo real (rotulos_passo
+   no template) — nunca um spinner mudo — porque a pergunta pode levar 10-30s.
    =========================================================================== */
 .copiloto-layout {
   display: grid;
   grid-template-columns: minmax(0, 14rem) minmax(0, 1fr);
   gap: var(--space-6);
   margin-bottom: var(--space-6);
+  align-items: start;
 }
 @media (max-width: 768px) {
   .copiloto-layout { grid-template-columns: 1fr; }
@@ -3152,7 +3153,16 @@ a.metric-link:focus-visible { outline: 2px solid var(--brand); outline-offset: 2
 .copiloto-thread {
   display: flex;
   flex-direction: column;
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-srf);
+  background: var(--surface);
+  overflow: hidden;
+}
+#copiloto-mensagens {
+  display: grid;
   gap: var(--space-4);
+  padding: var(--space-5);
 }
 .copiloto-turno {
   display: grid;
@@ -3166,44 +3176,52 @@ a.metric-link:focus-visible { outline: 2px solid var(--brand); outline-offset: 2
 .copiloto-resposta.erro { color: var(--danger); }
 .copiloto-pensando {
   margin: 0;
+  padding: 0 var(--space-5) var(--space-3);
   color: var(--ink-muted);
   font-size: var(--text-sm);
-  font-style: italic;
 }
 
 .copiloto-composer {
   display: grid;
-  grid-template-columns: 1fr auto auto;
   gap: var(--space-2);
-  align-items: end;
+  padding: var(--space-3) var(--space-5) var(--space-4);
+  border-top: 1px solid var(--line);
+  background: var(--paper);
 }
 .copiloto-composer textarea {
   resize: vertical;
   min-height: 2.75rem;
+  max-height: 9rem;
   border-radius: var(--radius-ctl);
   line-height: 1.4;
 }
+.copiloto-composer-bar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
+.copiloto-composer-bar .composer-hint {
+  margin-right: auto;
+}
 
-/* Vale para as duas listas de perguntas prontas: a fileira clicavel da thread
-   e o painel estatico "Perguntas frequentes" da Fase 1 — mesma classe,
-   mesmo cartao. So o clique (JS) e escopado a .copiloto-thread. */
-.copiloto-chips { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.copiloto-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  padding: 0 var(--space-5) var(--space-3);
+}
 .copiloto-chips .chip {
   border: 1px solid var(--line);
-  border-radius: var(--radius-nav);
+  border-radius: var(--radius-ctl);
   background: var(--surface);
   color: var(--ink-soft);
   padding: var(--space-1) var(--space-3);
   font: inherit;
   font-size: var(--text-sm);
-}
-/* Cursor de clique so na fileira da thread (buttons com data-pergunta): os
-   chips do painel "Perguntas frequentes" da Fase 1 sao <span> informativos,
-   sem acao nenhuma — nao devem convidar o clique. */
-.copiloto-thread .copiloto-chips .chip {
   cursor: pointer;
 }
-.copiloto-thread .copiloto-chips .chip:disabled {
+.copiloto-chips .chip:disabled {
   cursor: not-allowed;
   opacity: .6;
 }
@@ -3211,6 +3229,10 @@ a.metric-link:focus-visible { outline: 2px solid var(--brand); outline-offset: 2
   background: var(--surface-soft);
   color: var(--ink);
   border-color: var(--line-strong);
+}
+.copiloto-chips button.chip:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
 }
 
 .copiloto-fontes summary {
@@ -3225,8 +3247,15 @@ a.metric-link:focus-visible { outline: 2px solid var(--brand); outline-offset: 2
   font-size: var(--text-xs);
 }
 
+.copiloto-sinais {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-4);
+}
 .copiloto-sinal { display: flex; justify-content: space-between; gap: var(--space-4); align-items: start; }
-.copiloto-sinal-acoes { display: flex; gap: var(--space-2); }
+.copiloto-sinal-acoes { display: flex; gap: var(--space-2); flex-wrap: wrap; }
 
 .copiloto-cartao {
   display: grid;
@@ -3387,257 +3416,3 @@ a.metric-link:focus-visible { outline: 2px solid var(--brand); outline-offset: 2
 
 .copiloto-notif-acoes { display: flex; gap: var(--space-2); flex-wrap: wrap; }
 /* === fim: sino de notificacoes (F4/Task 2) === */
-
-/* ===========================================================================
-   === Copiloto de Vendas — restyle "Claude" (escopado a .copiloto-page) ===
-   So a pagina do Copiloto. Nada aqui vaza para o resto da Revy Loja: todo
-   seletor comeca em .copiloto-page (ou body.copiloto-body para o fundo).
-   Paleta local --cp-* (charcoal morno + creme + coral) em vez dos tokens de
-   marca --paper/--surface/--brand, para nao tocar a identidade Revy global.
-   =========================================================================== */
-.copiloto-page {
-  --cp-surface: #fbfaf6;
-  --cp-surface-inset: #f2eee4;
-  --cp-ink: #262624;
-  --cp-ink-soft: #55514a;
-  --cp-ink-muted: #857f72;
-  --cp-line: #e6e1d5;
-  --cp-line-strong: #d8d2c4;
-  --cp-accent: #c96442;
-  --cp-accent-ink: #ffffff;
-  --cp-accent-soft: rgba(201, 100, 66, .10);
-  --cp-accent-ring: rgba(201, 100, 66, .30);
-  --cp-shadow: 0 1px 2px rgba(38, 38, 36, .05);
-  --cp-serif: "Fraunces", "Newsreader", Georgia, "Times New Roman", serif;
-
-  max-width: 46rem;
-  margin: 0 auto;
-  color: var(--cp-ink);
-  font-feature-settings: "ss01";
-}
-[data-theme="dark"] .copiloto-page {
-  --cp-surface: #30302e;
-  --cp-surface-inset: #262624;
-  --cp-ink: #f5f4ee;
-  --cp-ink-soft: #c9c6bc;
-  --cp-ink-muted: #a6a298;
-  --cp-line: #413f3a;
-  --cp-line-strong: #514e48;
-  --cp-accent: #d97757;
-  --cp-accent-ink: #1f1e1d;
-  --cp-accent-soft: rgba(217, 119, 87, .14);
-  --cp-accent-ring: rgba(217, 119, 87, .40);
-  --cp-shadow: none;
-}
-
-/* Fundo quente do canvas — so nesta pagina (nao mexe na topbar/sidebar). */
-body.copiloto-body .content { background: #f4f1ea; }
-[data-theme="dark"] body.copiloto-body .content { background: #262624; }
-
-/* --- Hero: eyebrow coral, titulo em serif --- */
-.copiloto-page .page-heading { display: block; margin-bottom: var(--space-6); }
-.copiloto-page .page-heading .eyebrow {
-  display: inline-block;
-  color: var(--cp-accent);
-  font-size: var(--text-xs);
-  font-weight: 600;
-  letter-spacing: .14em;
-  text-transform: uppercase;
-  margin-bottom: var(--space-2);
-}
-.copiloto-page .page-heading .eyebrow::before { content: none; }
-.copiloto-page .page-heading h1 {
-  font-family: var(--cp-serif);
-  font-weight: 500;
-  font-size: clamp(1.9rem, 1.15rem + 2.6vw, 2.7rem);
-  line-height: 1.06;
-  letter-spacing: -.012em;
-  color: var(--cp-ink);
-  text-wrap: balance;
-  margin: 0 0 var(--space-2);
-}
-.copiloto-page .page-heading p {
-  color: var(--cp-ink-muted);
-  font-size: var(--text-base);
-  max-width: 46ch;
-  margin: 0;
-}
-
-/* --- Layout: coluna unica centrada (a caixa de chat e o centro) --- */
-.copiloto-page .copiloto-layout { display: block; margin-bottom: var(--space-6); }
-.copiloto-page .copiloto-historico {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: var(--space-2);
-  margin-bottom: var(--space-4);
-}
-.copiloto-page .copiloto-historico > .button {
-  border: 1px solid var(--cp-line-strong);
-  border-radius: 999px;
-  background: var(--cp-surface);
-  color: var(--cp-ink-soft);
-  padding: var(--space-2) var(--space-4);
-  font-size: var(--text-sm);
-  font-weight: 500;
-}
-.copiloto-page .copiloto-historico > .button:hover {
-  border-color: var(--cp-accent);
-  color: var(--cp-accent);
-  opacity: 1;
-}
-.copiloto-page .copiloto-historico ul {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-1);
-  margin: 0;
-}
-.copiloto-page .copiloto-historico a {
-  color: var(--cp-ink-muted);
-  border-radius: 999px;
-  padding: var(--space-1) var(--space-3);
-  max-width: 16rem;
-}
-.copiloto-page .copiloto-historico a:hover { background: var(--cp-surface-inset); color: var(--cp-ink); }
-.copiloto-page .copiloto-historico a.ativa { background: var(--cp-accent-soft); color: var(--cp-ink); }
-
-/* --- Assinatura: o compositor de chat --- */
-.copiloto-page .copiloto-composer {
-  display: grid;
-  grid-template-columns: auto auto 1fr;
-  gap: var(--space-3);
-  align-items: center;
-}
-.copiloto-page .copiloto-composer textarea {
-  grid-column: 1 / -1;
-  min-height: 3.75rem;
-  padding: var(--space-4);
-  border: 1px solid var(--cp-line-strong);
-  border-radius: 16px;
-  background: var(--cp-surface);
-  color: var(--cp-ink);
-  font-family: inherit;
-  font-size: var(--text-base);
-  line-height: 1.5;
-  box-shadow: var(--cp-shadow);
-  transition: border-color .15s ease, box-shadow .15s ease;
-}
-.copiloto-page .copiloto-composer textarea::placeholder { color: var(--cp-ink-muted); }
-.copiloto-page .copiloto-composer textarea:focus {
-  outline: none;
-  border-color: var(--cp-accent);
-  box-shadow: 0 0 0 4px var(--cp-accent-ring);
-}
-.copiloto-page #copiloto-enviar {
-  background: var(--cp-accent);
-  color: var(--cp-accent-ink);
-  border: 1px solid var(--cp-accent);
-  border-radius: 999px;
-  padding: var(--space-2) var(--space-5);
-  font-weight: 600;
-}
-.copiloto-page #copiloto-enviar:hover { opacity: .92; }
-.copiloto-page #copiloto-cancelar {
-  background: transparent;
-  color: var(--cp-ink-muted);
-  border: 1px solid transparent;
-  border-radius: 999px;
-  padding: var(--space-2) var(--space-4);
-}
-.copiloto-page #copiloto-cancelar:hover { color: var(--cp-ink); background: var(--cp-surface-inset); }
-
-/* --- Chips de pergunta rapida --- */
-.copiloto-page .copiloto-chips { gap: var(--space-2); margin-top: var(--space-3); }
-.copiloto-page .copiloto-chips .chip {
-  border: 1px solid var(--cp-line);
-  border-radius: 999px;
-  background: var(--cp-surface);
-  color: var(--cp-ink-soft);
-  padding: var(--space-1) var(--space-3);
-  font-size: var(--text-sm);
-}
-.copiloto-page .copiloto-chips button.chip:hover {
-  border-color: var(--cp-accent);
-  color: var(--cp-accent);
-  background: var(--cp-accent-soft);
-}
-
-/* --- Thread de mensagens --- */
-.copiloto-page .copiloto-turno { border-bottom: 1px solid var(--cp-line); gap: var(--space-2); }
-.copiloto-page .copiloto-pergunta { color: var(--cp-ink); font-weight: 600; }
-.copiloto-page .copiloto-resposta { color: var(--cp-ink); }
-.copiloto-page .copiloto-cartao {
-  border: 1px solid var(--cp-line);
-  border-radius: 14px;
-  background: var(--cp-surface-inset);
-}
-.copiloto-page .copiloto-pensando { color: var(--cp-ink-muted); }
-
-/* --- Cartoes (paineis) quietos e arredondados --- */
-.copiloto-page .panel {
-  background: var(--cp-surface);
-  border: 1px solid var(--cp-line);
-  border-radius: 18px;
-  box-shadow: var(--cp-shadow);
-  margin-bottom: var(--space-4);
-}
-.copiloto-page .panel-header {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: var(--space-3);
-  padding: var(--space-5) var(--space-5) 0;
-}
-.copiloto-page .panel-header h2 {
-  margin: 0;
-  color: var(--cp-ink);
-  font-size: var(--text-base);
-  font-weight: 600;
-}
-.copiloto-page .panel-body { color: var(--cp-ink); }
-.copiloto-page .panel-body strong { color: var(--cp-ink); }
-.copiloto-page .muted { color: var(--cp-ink-muted); }
-.copiloto-page .badge {
-  background: var(--cp-accent-soft);
-  color: var(--cp-accent);
-  border: 1px solid transparent;
-}
-
-/* --- Regua de KPIs (Resumo de hoje) --- */
-.copiloto-page .copiloto-resumo {
-  grid-template-columns: repeat(auto-fit, minmax(8.5rem, 1fr));
-  gap: var(--space-5);
-}
-.copiloto-page .kpi { display: grid; gap: 4px; }
-.copiloto-page .kpi > span {
-  color: var(--cp-ink-muted);
-  font-size: var(--text-xs);
-  text-transform: uppercase;
-  letter-spacing: .06em;
-}
-.copiloto-page .kpi > strong {
-  font-family: var(--cp-serif);
-  font-weight: 500;
-  font-size: 1.65rem;
-  line-height: 1.1;
-  color: var(--cp-ink);
-  font-variant-numeric: tabular-nums;
-}
-.copiloto-page .kpi > small { color: var(--cp-ink-muted); font-size: var(--text-xs); }
-
-/* --- Sinais "Precisa de atencao": barra de severidade --- */
-.copiloto-page .copiloto-sinal {
-  padding: var(--space-3) var(--space-4);
-  border: 1px solid var(--cp-line);
-  border-left: 3px solid var(--cp-line-strong);
-  border-radius: 10px;
-  background: var(--cp-surface-inset);
-}
-.copiloto-page .copiloto-sinal.severidade-critico { border-left-color: var(--danger); }
-.copiloto-page .copiloto-sinal.severidade-atencao { border-left-color: var(--warn); }
-.copiloto-page .copiloto-sinal strong { color: var(--cp-ink); }
-
-/* Movimento discreto no foco; respeita quem pediu menos animacao. */
-@media (prefers-reduced-motion: reduce) {
-  .copiloto-page .copiloto-composer textarea { transition: none; }
-}

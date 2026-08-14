@@ -139,6 +139,26 @@ def test_nav_item_active_prefix_vendas():
     assert nav_item_is_active(lista, "/app/loja/vendas/lista") is True
 
 
+def test_nav_item_active_prefix_copiloto():
+    """Chat do Copiloto não acende junto com Hoje."""
+    chat = NavItem(
+        label="Copiloto de Vendas",
+        href="/app/loja/copiloto",
+        section="Copiloto",
+        active_prefix="/app/loja/copiloto",
+    )
+    hoje = NavItem(
+        label="Hoje",
+        href="/app/loja/copiloto/hoje",
+        section="Copiloto",
+        active_prefix="/app/loja/copiloto/hoje",
+    )
+    assert nav_item_is_active(chat, "/app/loja/copiloto") is True
+    assert nav_item_is_active(chat, "/app/loja/copiloto/hoje") is False
+    assert nav_item_is_active(hoje, "/app/loja/copiloto/hoje") is True
+    assert nav_item_is_active(hoje, "/app/loja/copiloto") is False
+
+
 def test_shell_off_mantem_nav_legado(client, monkeypatch):
     monkeypatch.setenv("REVY_LOJA_SHELL_ENABLED", "0")
     login(client)
@@ -174,12 +194,16 @@ def test_shell_nav_todos_os_itens_tem_icone(client, monkeypatch):
 
     monkeypatch.setenv("REVY_LOJA_SHELL_ENABLED", "1")
     monkeypatch.setenv("REVY_LOJA_ENTITLEMENTS_ENABLED", "0")
+    monkeypatch.setenv("REVY_LOJA_COPILOTO_ENABLED", "1")
     login(client)
     r = client.get("/app")
     assert r.status_code == 200
     links = re.findall(r'<a class="nav-link[^"]*" href="([^"]+)"[^>]*>(.{0,10})', r.text)
     assert links, "shell não renderizou nenhum item de navegação"
-    assert "/app/loja/agente" in {href for href, _ in links}
+    hrefs = {href for href, _ in links}
+    assert "/app/loja/agente" in hrefs
+    assert "/app/loja/copiloto" in hrefs
+    assert "/app/loja/copiloto/hoje" in hrefs
     sem_icone = [href for href, inicio in links if not inicio.startswith("<svg")]
     assert sem_icone == []
 
@@ -229,6 +253,7 @@ def test_nav_copiloto_e_a_primeira_secao_quando_liberado():
     assert [s.title for s in sections][0] == "Copiloto"
     labels = [i.label for i in flatten_nav(sections)]
     assert labels[0] == "Copiloto de Vendas"
+    assert labels[1] == "Hoje"
 
 
 def test_nav_copiloto_nao_aparece_para_vendedor():
