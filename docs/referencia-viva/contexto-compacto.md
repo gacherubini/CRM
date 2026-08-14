@@ -1,6 +1,6 @@
 # Contexto compacto para continuidade
 
-Atualizado em **2026-08-13**. Ponto de entrada de estado e prioridades.
+Atualizado em **2026-08-14**. Ponto de entrada de estado e prioridades.
 Quadro: [`../README.md`](../README.md). Fila: [`../fila/README.md`](../fila/README.md).
 Vocabulário: [`../../CONTEXT.md`](../../CONTEXT.md). As-built Control/Loja:
 [`design/2026-07-30-revy-control-loja-asbuilt-e-melhorias.md`](design/2026-07-30-revy-control-loja-asbuilt-e-melhorias.md).
@@ -21,8 +21,30 @@ Vocabulário: [`../../CONTEXT.md`](../../CONTEXT.md). As-built Control/Loja:
   existem atrás de flag; falta secrets GCP e E2E de dois canais.
 - **Revy Loja:** F0–F6/F8 + Atendimento (chat + poll), Perfil, Grupo do estoque, números
   WA, Vitrine unificada, funil clicável, página do Agente, bloco de aquisição por
-  `ctwa_source_type`. Seller AI adiado. Foto de veículo ainda é URL, não upload.
-  Sino geral (independente do Copiloto) **não** existe.
+  `ctwa_source_type`. Seller AI adiado. **Foto de veículo agora tem upload por arquivo**
+  no form de estoque (o caminho pelo grupo continua). **Sino geral existe**
+  (`regras_elegiveis` por tipo, independente do Copiloto) e aceita **destinatário por
+  pessoa** (`copiloto_sinal.destinatario_usuario_id`, migration 0024).
+
+- **WhatsApp Modo 2 (central Cloud API):** **código da Fase 1 inteiro no código**, com todas
+  as flags **OFF**. Spec canônica:
+  [`specs/2026-08-12-whatsapp-dois-modos-design.md`](specs/2026-08-12-whatsapp-dois-modos-design.md).
+  Sete cards executados, planos em [`planos/`](planos/):
+  - `chatbot-api`: `fila_vendedor`, `oferta_lead`, `rodizio_ponteiro` (migrations 0020/0021),
+    `conversas.followup_toques` (0022). Ponteiro rotativo, trava idempotente do primeiro
+    clique, worker de 10 min, adapters Cloud (`GraphMediaDownloader`,
+    `CloudWhatsAppOutbound`), três gatilhos de handoff, re-notificação com throttle,
+    `FollowupWorker`, e o webhook `/webhook/cloud` com HMAC sobre corpo cru e dedup por
+    `wamid`. Flag `CHATBOT_WHATSAPP_MODO2_ENABLED`.
+  - `revy-trafego`: `lojas.whatsapp_modo` (1 XOR 2, migration 0019), emitido como aggregate
+    no snapshot de provisionamento, escolhido na ficha da loja. Flag
+    `REVY_CONTROL_WHATSAPP_MODO2_ENABLED`.
+  - `n8n`: `workflow-cloud.json` como transporte fino (GET verify + POST `rawBody`), com
+    `validate_workflow_cloud.py`. `workflow-ai-nao-salvos.json` (Baileys) **intacto**.
+  - **Gate único:** `rodizio.loja_opera_modo2` = flag + `allows_processing` +
+    projeção `whatsapp_modo == "2"`. Loja Modo 1 não entra no rodízio.
+  - **Falta para o piloto rodar:** conta do Revy na Meta, publicar/ativar o `n8n-cloud`,
+    e o provider de transcrição. Ver o card de fechamento em `../fila/`.
 - **Triagem UX 2026-08-07:** 32 itens feitos e **13 recusados** — não re-propor:
   [`2026-08-07-triagem-revisao-ux-loja-control.md`](2026-08-07-triagem-revisao-ux-loja-control.md).
 - **Marca:** `shared/brand/revy-tokens.css` é a fonte única; acento verde racing;
