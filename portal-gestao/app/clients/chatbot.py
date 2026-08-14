@@ -244,6 +244,14 @@ class ChatbotClient:
         dados = self._request("GET", "/v1/whatsapp/canais")
         return list(dados.get("canais") or [])
 
+    def listar_ofertas(self, estado: str | None = None) -> list[dict]:
+        params = {"estado": estado} if estado else {}
+        dados = self._request("GET", "/v1/ofertas", params=params)
+        return list(dados or [])
+
+    def assumir_oferta(self, oferta_id: str) -> dict:
+        return self._request("POST", f"/v1/ofertas/{oferta_id}/assumir")
+
     def registrar_canal_whatsapp(self, label: str) -> dict:
         """Cadastra canal. Não envia ``evolution_instance``: o Chatbot gera o nome."""
         return self._request(
