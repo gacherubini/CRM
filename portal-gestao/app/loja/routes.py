@@ -6,6 +6,7 @@ Rotas legadas ``/app/leads`` e ``/app/conversas`` permanecem intactas.
 from __future__ import annotations
 
 from datetime import date, datetime, timezone
+from types import SimpleNamespace
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, Request
@@ -32,6 +33,7 @@ from app.loja.attendance import (
     montar_workspace,
     normalizar_telefone,
     pode_usar_atendimento,
+    pode_ver_todo_atendimento,
     rotulos_canais_para_filtro,
     unificar_lista,
     visivel_para_usuario,
@@ -205,7 +207,46 @@ def atendimento_lista(
         atribuicoes=atribuicoes,
         usuario=usuario,
     )
-    itens = filtrar_itens(itens, busca=busca, estado=estado, canal_id=canal_id)
+    esgotadas: list[dict] = []
+    try:
+        esgotadas = list(chatbot.listar_ofertas(estado="esgotada") or [])
+    except ChatbotIndisponivel as exc:
+        erro_integracao = erro_integracao or str(exc)
+    except Exception:
+        esgotadas = []
+
+    sem_vendedor_total = 0
+    if pode_ver_todo_atendimento(usuario):
+        sem_vendedor_total = len(esgotadas)
+
+    if estado == "aguardando_vendedor":
+        itens = [
+            SimpleNamespace(
+                id=normalizar_telefone(o.get("telefone_cliente")),
+                telefone=normalizar_telefone(o.get("telefone_cliente")),
+                nome=None,
+                estado=SimpleNamespace(value="aguardando_vendedor"),
+                interesse=None,
+                lead_id=None,
+                bot_ativo=None,
+                status_conversa=None,
+                ultima_mensagem=None,
+                atualizada_em=o.get("criado_em"),
+                atribuido_a=None,
+                canal_id=None,
+                canal_label=None,
+                canal_ativo=None,
+                canal_estado=None,
+            )
+            for o in esgotadas
+            if normalizar_telefone(o.get("telefone_cliente"))
+        ]
+    else:
+        itens = filtrar_itens(itens, busca=busca, estado=estado, canal_id=canal_id)
+
+    estados_ui = dict(ATTENDANCE_STATE_LABELS)
+    if sem_vendedor_total or estado == "aguardando_vendedor":
+        estados_ui["aguardando_vendedor"] = "Aguardando vendedor"
 
     return templates.TemplateResponse(
         "loja/atendimento_lista.html",
@@ -213,7 +254,7 @@ def atendimento_lista(
             request,
             usuario,
             itens=itens,
-            estados=ATTENDANCE_STATE_LABELS,
+            estados=estados_ui,
             filtros={
                 "busca": busca or "",
                 "estado": estado or "",
@@ -222,6 +263,7 @@ def atendimento_lista(
             canais=opcoes_canal,
             integracao_erro=erro_integracao,
             atendimento_enabled=True,
+            sem_vendedor_total=sem_vendedor_total,
         ),
     )
 

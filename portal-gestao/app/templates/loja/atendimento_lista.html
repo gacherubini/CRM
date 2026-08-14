@@ -11,6 +11,13 @@
 </div>
 
 {% if integracao_erro %}<div class="alert warning" role="alert"><strong>Dados parciais.</strong> {{ integracao_erro }}</div>{% endif %}
+{% if sem_vendedor_total and sem_vendedor_total > 0 %}
+<div class="alert warning" id="faixa-sem-vendedor" role="status">
+  <strong>{{ sem_vendedor_total }} sem vendedor</strong>
+  — ninguém da fila pegou. 
+  <a href="/app/loja/atendimento?estado=aguardando_vendedor">Ver aguardando</a>
+</div>
+{% endif %}
 
 <form class="filter-bar" method="get">
   <label class="search"><span class="sr-only">Buscar</span><input name="busca" value="{{ filtros.busca }}" placeholder="Nome, telefone ou interesse"></label>
