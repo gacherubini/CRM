@@ -43,8 +43,12 @@ Vocabulário: [`../../CONTEXT.md`](../../CONTEXT.md). As-built Control/Loja:
     `validate_workflow_cloud.py`. `workflow-ai-nao-salvos.json` (Baileys) **intacto**.
   - **Gate único:** `rodizio.loja_opera_modo2` = flag + `allows_processing` +
     projeção `whatsapp_modo == "2"`. Loja Modo 1 não entra no rodízio.
-  - **Falta para o piloto rodar:** conta do Revy na Meta, publicar/ativar o `n8n-cloud`,
-    e o provider de transcrição. Ver o card de fechamento em `../fila/`.
+  - **Falta em código:** a metade do dono da loja — sino 1:1 com Peguei, faixa "N sem vendedor",
+    filtro Aguardando, card de 7 dias. O chatbot não expõe rota de oferta e
+    `criar_sinal_direcionado` não tem chamador, então **lead que ninguém pega some**. Card 5 em
+    `../fila/`.
+  - **Falta fora de código:** conta do Revy na Meta, publicar/ativar o `n8n-cloud`, provider de
+    transcrição. Card de fechamento em `../fila/`.
 - **Triagem UX 2026-08-07:** 32 itens feitos e **13 recusados** — não re-propor:
   [`2026-08-07-triagem-revisao-ux-loja-control.md`](2026-08-07-triagem-revisao-ux-loja-control.md).
 - **Marca:** `shared/brand/revy-tokens.css` é a fonte única; acento verde racing;

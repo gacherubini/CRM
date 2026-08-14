@@ -13,6 +13,7 @@ deploy. Ops sem código novo não ganha card.
 
 | Card | Produto | O que falta no `main` |
 |---|---|---|
+| [Modo 2 / Card 5 — a metade do dono](2026-08-14-wa-modo2-5-loja-visao-do-dono.md) | Chatbot / Loja | A ponte que ficou no vão entre os planos por produto: rotas de oferta no chatbot, sino 1:1 com botão Peguei, faixa "N sem vendedor" e card de 7 dias. Sem isto, **lead que ninguém pega some**. |
 | [Piloto Modo 2 — fechamento](2026-08-14-wa-modo2-fechamento-piloto.md) | Chatbot / n8n / Motor | Débitos técnicos (migration 0017 no SQLite, teste de outbox duplicado) + o roteiro operacional da Meta e do n8n que o código não faz sozinho. |
 | [Copiloto F5 — log e isolamento](2026-08-12-copiloto-fase5-log-de-perguntas-e-isolamento.md) | Loja / Control | Parte A: endpoint no Portal + tela no Control com as perguntas-lacuna. Parte B: RLS no Postgres. Independentes. |
 | [Copiloto F6 — cadastro e funil](2026-08-12-copiloto-fase6-cadastro-e-funil.md) | Loja | Ferramentas `cadastro_incompleto` e `funil_resumo` no registro MCP. A regra de sinal `cadastro_incompleto` **já existe** (F1) — isto é consulta no chat. Simulação de financiamento foi **retirada**. |

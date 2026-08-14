@@ -31,6 +31,15 @@ Sete planos executados, todos em [`referencia-viva/planos/`](referencia-viva/pla
 | `2026-08-13-wa-modo2-3-n8n-cloud-e-webhook` | Chatbot / n8n | HMAC sobre corpo cru, parse do inbound Cloud, `/webhook/cloud`, `workflow-cloud.json` e validador. |
 | `2026-08-13-wa-modo2-4-control-toggle` | Control / Chatbot | `lojas.whatsapp_modo` (0019), aggregate no snapshot, escolha na ficha, e a terceira cláusula do gate. |
 
-**Todas as flags estão OFF.** O que falta para o piloto rodar não é código — está em
+**Todas as flags estão OFF.**
+
+Falta em código a **metade do dono da loja** — sino 1:1 com botão Peguei, faixa "N sem vendedor",
+filtro Aguardando e card de 7 dias. Os sete planos acima foram recortados por produto e a interface
+entre eles ficou no vão: o `chatbot-api` não expõe rota de oferta, e `criar_sinal_direcionado` não
+tem chamador. Efeito prático: **lead que ninguém pega some** — vira `esgotou_fila` no chatbot e
+ninguém é avisado. Card em
+[`fila/2026-08-14-wa-modo2-5-loja-visao-do-dono.md`](fila/2026-08-14-wa-modo2-5-loja-visao-do-dono.md).
+
+O que falta fora de código (Meta, n8n, transcrição) está em
 [`fila/2026-08-14-wa-modo2-fechamento-piloto.md`](fila/2026-08-14-wa-modo2-fechamento-piloto.md).
 
