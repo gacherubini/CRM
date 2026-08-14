@@ -9,12 +9,14 @@ from sqlalchemy.exc import IntegrityError
 from app.control.audit import _append_event
 from app.control.provisioning_hooks import safe_enqueue_store_snapshot
 from app.control.readiness import build_readiness_report, first_failed_required
+from app import config
 from app.control.types import (
     AccessDenied,
     Actor,
     CreateStore,
     InvalidStoreSlug,
     InvalidStoreTransition,
+    SetWhatsappMode,
     StoreEditConflict,
     StoreNotFound,
     StoreRef,
@@ -250,6 +252,50 @@ class StoreControl:
             )
             return view
 
+    def set_whatsapp_mode(self, actor: Actor, command: SetWhatsappMode) -> StoreView:
+        """Escolhe o modo de WhatsApp da loja (spec §5.8).
+
+        O Control **escolhe**; quem opera é a Loja e o chatbot. Aqui não se toca em
+        QR, fila nem conversa: trocar o modo não migra conversa antiga.
+
+        O bump de ``versao`` é obrigatório — a projeção do chatbot é monotônica por
+        versão e descartaria um evento com a versão anterior, deixando a loja no
+        modo velho sem erro nenhum aparecer.
+        """
+        if not actor.is_admin:
+            raise AccessDenied("somente Admin Revy pode escolher o modo de WhatsApp")
+        if command.mode not in (1, 2):
+            raise ValueError("modo de WhatsApp inválido: use 1 ou 2")
+        if command.mode == 2 and not config.WHATSAPP_MODO2_ENABLED:
+            raise ValueError("Modo 2 ainda não liberado neste ambiente")
+
+        with self._session_factory() as db:
+            loja = _find_store(db, command.store)
+            if loja is None:
+                raise StoreNotFound("Loja não encontrada")
+
+            antes = loja.whatsapp_modo
+            loja.whatsapp_modo = command.mode
+            loja.versao = loja.versao + 1
+            loja.atualizada_em = agora()
+            _append_event(
+                db,
+                actor=actor,
+                store_id=loja.id,
+                action="store.whatsapp_mode_changed",
+                resource_type="whatsapp_modo",
+                resource_id=loja.id,
+                before={"whatsapp_modo": antes},
+                after={"whatsapp_modo": command.mode},
+            )
+            db.commit()
+            db.refresh(loja)
+            view = _store_view(loja)
+            safe_enqueue_store_snapshot(
+                self._session_factory, StoreRef(id=view.id)
+            )
+            return view
+
 
 def _normalize_name(name: str) -> str:
     normalized = name.strip()
@@ -296,6 +342,7 @@ def _store_view(store: Loja) -> StoreView:
         slug=store.slug,
         status=StoreStatus(store.status),
         version=store.versao,
+        whatsapp_mode=store.whatsapp_modo,
         created_at=store.criada_em,
         updated_at=store.atualizada_em,
     )

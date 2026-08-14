@@ -251,3 +251,8 @@ class Settings:
 
 
 settings = Settings()
+
+# Rollout do Modo 2 (central Cloud API). Default OFF: invariante do projeto.
+WHATSAPP_MODO2_ENABLED = os.getenv("REVY_CONTROL_WHATSAPP_MODO2_ENABLED", "").lower() in {
+    "1", "true", "yes",
+}
