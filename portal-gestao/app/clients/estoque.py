@@ -104,6 +104,30 @@ class EstoqueClient:
             erro_409=ConflitoEstoque,
         )
 
+    def adicionar_foto(
+        self,
+        veiculo_id: str,
+        conteudo: bytes,
+        content_type: str,
+        *,
+        idempotency_key: str,
+        publicar: bool = True,
+    ) -> dict:
+        """Sobe uma foto (bytes) para um veículo existente via estoque-api.
+
+        A Idempotency-Key torna o reenvio seguro: mesma key + mesmos bytes = no-op;
+        mesma key + bytes diferentes = 409 (ConflitoEstoque). O upload define a capa.
+        """
+        return self._request(
+            "POST",
+            f"/v1/veiculos/{veiculo_id}/fotos/upload",
+            params={"publicar": str(publicar).lower()},
+            content=conteudo,
+            headers={"Content-Type": content_type, "Idempotency-Key": idempotency_key},
+            erro_404=VeiculoNaoEncontrado,
+            erro_409=ConflitoEstoque,
+        )
+
     def acao(self, veiculo_id: str, acao: str) -> dict:
         permitidas = {"publicar", "despublicar", "reservar", "vender"}
         if acao not in permitidas:
