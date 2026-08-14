@@ -3,6 +3,7 @@ import csv
 import io
 import json
 import logging
+from collections import OrderedDict
 import os
 import secrets
 import uuid
@@ -55,7 +56,19 @@ from app.vehicle_photo import VehiclePhotoProcessor, get_vehicle_photo_processor
 from app.whatsapp_groups import GruposWhatsappIndisponiveis, listar_grupos_whatsapp
 
 logger = logging.getLogger("chatbot.webhook_cloud")
-_wamids_vistos: set[str] = set()
+# Reentrega da Meta chega em segundos, antes de a Mensagem do primeiro POST
+# estar commitada — por isso a camada em memória, à frente da consulta ao
+# banco. Limitada: o processo vive semanas e um set sem despejo cresceria
+# para sempre. FIFO simples porque a reentrega é sempre recente; wamid
+# antigo que caiu da janela ainda é pego pela consulta a `mensagens`.
+_WAMIDS_MEMORIA_MAX = 5000
+_wamids_vistos: OrderedDict[str, None] = OrderedDict()
+
+
+def _marcar_wamid_visto(wamid: str) -> None:
+    _wamids_vistos[wamid] = None
+    while len(_wamids_vistos) > _WAMIDS_MEMORIA_MAX:
+        _wamids_vistos.popitem(last=False)
 
 @asynccontextmanager
 async def _lifespan(_app: FastAPI):
@@ -502,7 +515,7 @@ async def webhook_cloud(request: Request, db: Session = Depends(get_db)):
         if evento.wamid and _wamid_ja_visto(db, evento.wamid):
             continue
         if evento.wamid:
-            _wamids_vistos.add(evento.wamid)
+            _marcar_wamid_visto(evento.wamid)
         try:
             processar_evento_cloud(db, evento)
         except Exception:  # noqa: BLE001

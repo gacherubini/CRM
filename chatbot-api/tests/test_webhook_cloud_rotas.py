@@ -66,3 +66,16 @@ def test_reentrega_do_mesmo_wamid_nao_processa_duas_vezes(client, monkeypatch):
     client.post("/webhook/cloud", content=corpo, headers=_assinar(corpo))
 
     assert len(processados) == 1
+
+
+def test_memoria_de_wamid_nao_cresce_sem_limite():
+    """O processo vive semanas; set sem despejo vazaria memória para sempre."""
+    from app.main import _WAMIDS_MEMORIA_MAX, _marcar_wamid_visto, _wamids_vistos
+
+    for i in range(_WAMIDS_MEMORIA_MAX + 500):
+        _marcar_wamid_visto(f"wamid.crescimento.{i}")
+
+    assert len(_wamids_vistos) == _WAMIDS_MEMORIA_MAX
+    # FIFO: o mais recente fica, o mais antigo saiu.
+    assert "wamid.crescimento.0" not in _wamids_vistos
+    assert f"wamid.crescimento.{_WAMIDS_MEMORIA_MAX + 499}" in _wamids_vistos
