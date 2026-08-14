@@ -43,6 +43,15 @@ class ResultadoSincronizacao:
         )
 
 
+def invalidar_contagem(loja_slug: str, usuario_id: str | None = None) -> None:
+    # notificacoes.py importa contar_sinais_novos daqui: import direto no
+    # topo (ou no fim) cicla. O nome precisa existir neste módulo para o
+    # monkeypatch dos testes; a implementação real é resolvida na chamada.
+    from app.loja.copiloto.notificacoes import invalidar_contagem as _fn
+
+    _fn(loja_slug, usuario_id)
+
+
 def _chave(regra: str, entidade_ref: str | None) -> tuple[str, str]:
     return (regra, entidade_ref or "")
 
@@ -305,6 +314,7 @@ def criar_sinal_direcionado(
     )
     db.add(sinal)
     db.commit()
+    invalidar_contagem(loja_slug, destinatario_usuario_id)
     return sinal
 
 
@@ -354,4 +364,7 @@ def transferir_sinal(
         )
     )
     db.commit()
+    # Os dois: quem perdeu a vez precisa parar de ver agora, não em 45s.
+    invalidar_contagem(loja_slug, de_usuario_id)
+    invalidar_contagem(loja_slug, para_usuario_id)
     return True

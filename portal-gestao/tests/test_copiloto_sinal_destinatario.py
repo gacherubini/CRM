@@ -122,3 +122,24 @@ def test_transferir_sem_sinal_aberto_devolve_false(db):
         db, "loja-a", entidade_ref="oferta-inexistente",
         de_usuario_id="u-v1", para_usuario_id="u-v2",
     ) is False
+
+
+def test_transferir_invalida_cache_dos_dois(db, monkeypatch):
+    invalidados = []
+    monkeypatch.setattr(
+        "app.loja.copiloto.sinais_store.invalidar_contagem",
+        lambda loja, usuario_id=None: invalidados.append((loja, usuario_id)),
+    )
+
+    criar_sinal_direcionado(
+        db, "loja-a", regra="oferta_lead",
+        destinatario_usuario_id="u-v1", entidade_ref="oferta-9",
+        titulo="t", detalhe="d",
+    )
+    transferir_sinal(
+        db, "loja-a", entidade_ref="oferta-9",
+        de_usuario_id="u-v1", para_usuario_id="u-v2",
+    )
+
+    assert ("loja-a", "u-v1") in invalidados
+    assert ("loja-a", "u-v2") in invalidados
