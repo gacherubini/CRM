@@ -1,8 +1,15 @@
 from datetime import datetime, timedelta, timezone
 
+import pytest
+
 from app.models_db import FilaVendedor, OfertaLead
 from app.rodizio import abrir_oferta
 from app.rodizio_job import RodizioWorker
+
+
+@pytest.fixture(autouse=True)
+def _modo2_on(monkeypatch):
+    monkeypatch.setattr("app.rodizio.config.MODO2_ENABLED", True)
 
 
 def _fila(db, loja_id, quantos):
