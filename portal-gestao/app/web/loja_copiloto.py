@@ -28,6 +28,7 @@ router = APIRouter()
 
 from app.auth import usuario_atual  # noqa: E402
 from app.config import revy_loja_copiloto_enabled, revy_loja_shell_enabled  # noqa: E402
+from app.clients.chatbot import ChatbotIndisponivel  # noqa: E402
 from app.db import get_db  # noqa: E402
 from app.loja.copiloto.acoes import AcaoRecusada, desfazer_acao, executar_acao  # noqa: E402
 from app.loja.copiloto.conversas import (  # noqa: E402
@@ -49,6 +50,7 @@ from app.loja.copiloto.sinais_store import (  # noqa: E402
     listar_sinais_abertos,
     marcar_visto,
 )
+from app.loja.copiloto.sinais_store import ESTADOS_ABERTOS  # noqa: E402
 from app.loja.copiloto.tipos import PAPEIS_GESTAO_COPILOTO, CopilotoContexto  # noqa: E402
 from app.loja.types import Module  # noqa: E402
 from app.main import (  # noqa: E402
@@ -57,6 +59,7 @@ from app.main import (  # noqa: E402
     get_chatbot_client,
     get_estoque_client,
     redirecionar_login,
+    registrar_handoff_local,
     templates,
 )
 from app.meta_ads_spend_job import env_float, env_int  # noqa: E402
@@ -409,6 +412,63 @@ async def copiloto_notificacao_dispensar(
         return _json_erro(404, "not_found", "Notificação não encontrada")
     invalidar_contagem(usuario.loja_slug)
     return JSONResponse({"ok": True})
+
+
+@router.post(_PAGINA + "/notificacoes/{sinal_id}/peguei")
+async def copiloto_notificacao_peguei(
+    request: Request,
+    sinal_id: str,
+    db: Session = Depends(get_db),
+    chatbot=Depends(get_chatbot_client),
+):
+    """Peguei no sino: mesmo assumir do WhatsApp. Só o destinatário pode clicar."""
+    usuario = usuario_atual(request, db)
+    if not usuario:
+        return _json_erro(401, "auth", "Não autenticado")
+    if not revy_loja_shell_enabled():
+        return _nao_existe()
+    form = await request.form()
+    if not csrf_valido(request, form.get("csrf")):
+        return _json_erro(403, "sessao", "Sessão expirada")
+
+    sinal = (
+        db.query(CopilotoSinal)
+        .filter(
+            CopilotoSinal.id == sinal_id,
+            CopilotoSinal.loja_slug == usuario.loja_slug,
+            CopilotoSinal.estado.in_(ESTADOS_ABERTOS),
+        )
+        .first()
+    )
+    if sinal is None:
+        return _json_erro(404, "not_found", "Notificação não encontrada")
+    if sinal.destinatario_usuario_id != usuario.id:
+        return _json_erro(403, "perm", "Essa oferta não é sua.")
+    if not sinal.entidade_ref:
+        return _json_erro(404, "not_found", "Oferta não encontrada")
+
+    try:
+        resultado = chatbot.assumir_oferta(sinal.entidade_ref)
+    except ChatbotIndisponivel:
+        return _json_erro(502, "indisponivel", "Não foi possível falar com o chatbot agora.")
+
+    ganhou = bool(resultado.get("ganhou"))
+    if ganhou:
+        telefone = (resultado.get("telefone_cliente") or "").strip()
+        if telefone:
+            registrar_handoff_local(db, usuario, telefone, assumir=True)
+        agora_utc = datetime.now(timezone.utc)
+        sinal.estado = "resolvido"
+        sinal.resolvido_em = agora_utc
+        sinal.atualizado_em = agora_utc
+        db.commit()
+        invalidar_contagem(usuario.loja_slug, usuario.id)
+        return JSONResponse({"ganhou": True, "mensagem": "Lead é seu. Abra o Atendimento."})
+
+    return JSONResponse({
+        "ganhou": False,
+        "mensagem": "Esse lead já foi pego por outro vendedor.",
+    })
 
 
 @router.post(_PAGINA + "/perguntar")
