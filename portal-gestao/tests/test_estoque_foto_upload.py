@@ -47,3 +47,10 @@ def test_cadastro_sem_arquivo_nao_chama_upload(client, estoque_fake):
     )
     assert resposta.status_code == 303
     assert not estoque_fake.fotos
+
+
+def test_form_tem_input_de_arquivo(client):
+    login(client)
+    pagina = client.get("/app/estoque/novo")
+    assert 'enctype="multipart/form-data"' in pagina.text
+    assert 'type="file"' in pagina.text and 'name="foto"' in pagina.text
