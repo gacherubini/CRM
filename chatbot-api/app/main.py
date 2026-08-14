@@ -29,6 +29,8 @@ from app import (  # noqa: F401 (registra os modelos)
 from app.audio import AudioProcessor, get_audio_processor
 from app.auth import Contexto, get_contexto, verificar_webhook_token
 from app.db import get_db
+from app.models_db import FilaVendedor
+from app.operacao import normalizar_telefone
 from app.inventory import (
     InventoryProvider,
     InventoryWriteClient,
@@ -1334,6 +1336,97 @@ def desconectar_canal_whatsapp(
 ):
     """Desconecta o canal (permanece na loja; reconectável)."""
     return channels.disconnect_channel(db, ctx.loja_id, canal_id)
+
+
+class FilaVendedorInput(BaseModel):
+    nome: str
+    telefone: str
+    ordem: int = 0
+
+
+class FilaVendedorPatch(BaseModel):
+    nome: str | None = None
+    telefone: str | None = None
+    ordem: int | None = None
+    ativo: bool | None = None
+
+
+def _fila_dict(v: FilaVendedor) -> dict:
+    return {
+        "id": v.id, "nome": v.nome, "telefone": v.telefone,
+        "ordem": v.ordem, "ativo": v.ativo,
+    }
+
+
+@app.get("/v1/fila-vendedores")
+def listar_fila_vendedores(ctx=Depends(get_contexto), db: Session = Depends(get_db)):
+    from app.rodizio import _fila_ordenada
+    return [_fila_dict(v) for v in _fila_ordenada(db, ctx.loja_id)]
+
+
+@app.post("/v1/fila-vendedores", status_code=201)
+def criar_fila_vendedor(
+    entrada: FilaVendedorInput,
+    ctx=Depends(get_contexto),
+    db: Session = Depends(get_db),
+):
+    telefone = normalizar_telefone(entrada.telefone)
+    if not telefone:
+        raise HTTPException(status_code=422, detail="telefone inválido")
+    vendedor = FilaVendedor(
+        id=str(uuid.uuid4()), loja_id=ctx.loja_id, nome=entrada.nome.strip(),
+        telefone=telefone, ordem=entrada.ordem, ativo=True,
+    )
+    db.add(vendedor)
+    db.commit()
+    return _fila_dict(vendedor)
+
+
+@app.patch("/v1/fila-vendedores/{vendedor_id}")
+def atualizar_fila_vendedor(
+    vendedor_id: str,
+    entrada: FilaVendedorPatch,
+    ctx=Depends(get_contexto),
+    db: Session = Depends(get_db),
+):
+    vendedor = (
+        db.query(FilaVendedor)
+        .filter(FilaVendedor.id == vendedor_id, FilaVendedor.loja_id == ctx.loja_id)
+        .first()
+    )
+    if vendedor is None:
+        raise HTTPException(status_code=404, detail="vendedor não encontrado")
+    if entrada.nome is not None:
+        vendedor.nome = entrada.nome.strip()
+    if entrada.telefone is not None:
+        telefone = normalizar_telefone(entrada.telefone)
+        if not telefone:
+            raise HTTPException(status_code=422, detail="telefone inválido")
+        vendedor.telefone = telefone
+    if entrada.ordem is not None:
+        vendedor.ordem = entrada.ordem
+    if entrada.ativo is not None:
+        vendedor.ativo = entrada.ativo
+    db.commit()
+    return _fila_dict(vendedor)
+
+
+@app.delete("/v1/fila-vendedores/{vendedor_id}", status_code=204)
+def remover_fila_vendedor(
+    vendedor_id: str,
+    ctx=Depends(get_contexto),
+    db: Session = Depends(get_db),
+):
+    """Inativação lógica: oferta antiga referencia o vendedor por FK."""
+    vendedor = (
+        db.query(FilaVendedor)
+        .filter(FilaVendedor.id == vendedor_id, FilaVendedor.loja_id == ctx.loja_id)
+        .first()
+    )
+    if vendedor is None:
+        raise HTTPException(status_code=404, detail="vendedor não encontrado")
+    vendedor.ativo = False
+    db.commit()
 
 
 # --- Operação WhatsApp (E5): números autorizados + cadastro de veículo --------
