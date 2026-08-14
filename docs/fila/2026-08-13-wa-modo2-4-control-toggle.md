@@ -41,6 +41,16 @@ uma loja.
   cobertura falsa. Cuidado especial com default de coluna (só é aplicado no `commit`, antes disso o
   atributo é `None`) e com asserção que só confere o que o próprio teste acabou de passar por
   kwarg — isso testa o SQLAlchemy, não o nosso código.
+- **O Control não usa fixture de banco nem de loja.** Verificado em 2026-08-14:
+  `revy-trafego/tests/conftest.py` só tem `client` (`:49`) e `client_logado` (`:55`), mais um
+  `_db_setup` **autouse** que faz `create_all`/`drop_all` por teste — então, ao contrário do
+  `chatbot-api`, aqui **não há vazamento entre casos** e id fixo é seguro. Os testes abrem
+  `with SessionLocal() as db:` na mão e montam a loja pelas classes de comando. Veja
+  `tests/test_control_provisioning.py:24-45` como modelo. **Não existem** as fixtures `db`,
+  `loja_ativa`, `ator_admin` nem `provisioning_service`.
+- **O Control é orientado a comando, não a argumento solto.** `StoreControl.update(actor, command)`,
+  `ProvisioningControl(SessionLocal).snapshot(StoreRef(id=...))`, `Actor` como dataclass. Método
+  novo segue essa forma — não invente assinatura no estilo `f(db, loja_id, valor)`.
 - Rodar testes **a partir da pasta do produto**. O dono usa **Mac e Windows**: macOS
   `.venv/bin/python -m pytest -q`; Windows `.\.venv\Scripts\python.exe -m pytest -q`.
 
@@ -64,36 +74,41 @@ uma loja.
 import pytest
 from sqlalchemy.exc import IntegrityError
 
+from app.db import SessionLocal
 from app.models import Loja
 
 
-def test_loja_nasce_no_modo_1(db):
-    loja = Loja(slug="loja-modo", nome="Loja Modo", status="ativa", versao=1)
-    db.add(loja)
-    db.commit()
-    assert loja.whatsapp_modo == 1
-
-
-def test_modo_2_e_aceito(db):
-    loja = Loja(
-        slug="loja-cloud", nome="Loja Cloud", status="ativa", versao=1, whatsapp_modo=2
-    )
-    db.add(loja)
-    db.commit()
-    assert loja.whatsapp_modo == 2
-
-
-def test_modo_invalido_e_rejeitado_pelo_banco(db):
-    """1 XOR 2 é restrição de banco, não só de UI (spec §2)."""
-    db.add(Loja(slug="loja-x", nome="X", status="ativa", versao=1, whatsapp_modo=3))
-    with pytest.raises(IntegrityError):
+def test_loja_nasce_no_modo_1():
+    with SessionLocal() as db:
+        loja = Loja(slug="loja-modo", nome="Loja Modo", status="ativa", versao=1)
+        db.add(loja)
         db.commit()
-    db.rollback()
+        assert loja.whatsapp_modo == 1
+
+
+def test_modo_2_e_aceito():
+    with SessionLocal() as db:
+        loja = Loja(
+            slug="loja-cloud", nome="Loja Cloud", status="ativa",
+            versao=1, whatsapp_modo=2,
+        )
+        db.add(loja)
+        db.commit()
+        assert loja.whatsapp_modo == 2
+
+
+def test_modo_invalido_e_rejeitado_pelo_banco():
+    """1 XOR 2 é restrição de banco, não só de UI (spec §2)."""
+    with SessionLocal() as db:
+        db.add(Loja(slug="loja-x", nome="X", status="ativa", versao=1, whatsapp_modo=3))
+        with pytest.raises(IntegrityError):
+            db.commit()
+        db.rollback()
 ```
 
-> Confirme o nome da fixture de sessão em `revy-trafego/tests/conftest.py` e os campos
-> obrigatórios de `Loja` (`slug`, `nome`, `status`, `versao`) — use o mesmo helper de criação de
-> loja que os testes de `stores` já usam, se existir, em vez de montar o objeto à mão.
+> `SessionLocal` direto, sem fixture: é o padrão do Control
+> (`tests/test_control_provisioning.py:24`). O `_db_setup` autouse recria o schema por teste, então
+> slug fixo é seguro aqui.
 
 - [ ] **Step 2: Rodar e ver falhar**
 
@@ -203,30 +218,46 @@ desligados). Como aggregate, o valor é único por construção — e a projeç�
 
 ```python
 # revy-trafego/tests/test_provisioning_whatsapp_modo.py
-def test_snapshot_traz_o_modo_como_aggregate(db, loja_ativa, provisioning_service):
-    snapshot = provisioning_service.snapshot(loja_ativa.ref)
+from app.control.provisioning import ProvisioningControl
+from app.control.types import StoreRef
+from app.db import SessionLocal
+from app.models import Loja
+
+
+def _loja(modo: int = 1) -> str:
+    """Loja ativa direto no banco. O que importa aqui é o snapshot, não o CRUD."""
+    with SessionLocal() as db:
+        loja = Loja(
+            slug=f"loja-modo-{modo}", nome="Loja Modo", status="ativa",
+            versao=1, whatsapp_modo=modo,
+        )
+        db.add(loja)
+        db.commit()
+        return loja.id
+
+
+def test_snapshot_traz_o_modo_como_aggregate():
+    snapshot = ProvisioningControl(SessionLocal).snapshot(StoreRef(id=_loja(1)))
     modos = [e for e in snapshot.operational if e.aggregate == "whatsapp_modo"]
     assert len(modos) == 1
     assert modos[0].state == "1"
 
 
-def test_modo_2_aparece_no_snapshot(db, loja_ativa, provisioning_service):
-    loja_ativa.whatsapp_modo = 2
-    db.commit()
-    snapshot = provisioning_service.snapshot(loja_ativa.ref)
+def test_modo_2_aparece_no_snapshot():
+    snapshot = ProvisioningControl(SessionLocal).snapshot(StoreRef(id=_loja(2)))
     modo = next(e for e in snapshot.operational if e.aggregate == "whatsapp_modo")
     assert modo.state == "2"
 
 
-def test_aggregate_loja_continua_existindo(db, loja_ativa, provisioning_service):
+def test_aggregate_loja_continua_existindo():
     """Regressão: o envelope novo não pode substituir o de status da loja."""
-    snapshot = provisioning_service.snapshot(loja_ativa.ref)
+    snapshot = ProvisioningControl(SessionLocal).snapshot(StoreRef(id=_loja(1)))
     assert any(e.aggregate == "loja" for e in snapshot.operational)
 ```
 
-> As fixtures `loja_ativa` e `provisioning_service` podem não existir com esses nomes. Antes de
-> escrever, abra `revy-trafego/tests/` e use as que os testes de provisionamento já usam para montar
-> loja e serviço — não crie fixture nova nem instancie o serviço à mão.
+> `ProvisioningControl(SessionLocal)` e `StoreRef(id=...)` são o padrão real
+> (`tests/test_control_provisioning.py:60`). `StoreRef` exige **exatamente um** identificador —
+> passar `id` e `slug` juntos levanta `ValueError`.
 
 - [ ] **Step 2: Rodar e ver falhar**
 
@@ -294,54 +325,88 @@ git commit -m "feat(control): whatsapp_modo no snapshot de provisionamento"
 # revy-trafego/tests/test_stores_whatsapp_modo.py
 import pytest
 
-from app.control.stores import definir_whatsapp_modo
+from app.control.stores import StoreControl
+from app.control.types import Actor, SetWhatsappMode, StoreRef
+from app.db import SessionLocal
+from app.models import GestorRevy, Loja
 
 
-def test_troca_para_modo_2_incrementa_a_versao(db, loja_ativa, ator_admin, monkeypatch):
+def _admin_actor() -> Actor:
+    with SessionLocal() as db:
+        admin = db.query(GestorRevy).filter(GestorRevy.papel == "admin").one()
+        return Actor(id=admin.id, email=admin.email, name=admin.nome, role=admin.papel)
+
+
+def _loja() -> tuple[str, int]:
+    with SessionLocal() as db:
+        loja = Loja(slug="loja-modo", nome="Loja Modo", status="ativa", versao=1)
+        db.add(loja)
+        db.commit()
+        return loja.id, loja.versao
+
+
+def test_troca_para_modo_2_incrementa_a_versao(monkeypatch):
     monkeypatch.setattr("app.control.stores.config.WHATSAPP_MODO2_ENABLED", True)
-    versao_antes = loja_ativa.versao
+    loja_id, versao_antes = _loja()
 
-    loja = definir_whatsapp_modo(db, loja_ativa.id, 2, ator=ator_admin)
+    view = StoreControl(SessionLocal).set_whatsapp_mode(
+        _admin_actor(), SetWhatsappMode(store=StoreRef(id=loja_id), mode=2)
+    )
 
-    assert loja.whatsapp_modo == 2
+    assert view.whatsapp_mode == 2
     # Sem bump, a projeção monotônica do chatbot descarta o evento.
-    assert loja.versao > versao_antes
+    assert view.version > versao_antes
 
 
-def test_flag_off_recusa_modo_2(db, loja_ativa, ator_admin, monkeypatch):
+def test_flag_off_recusa_modo_2(monkeypatch):
     monkeypatch.setattr("app.control.stores.config.WHATSAPP_MODO2_ENABLED", False)
+    loja_id, _ = _loja()
+
     with pytest.raises(ValueError):
-        definir_whatsapp_modo(db, loja_ativa.id, 2, ator=ator_admin)
-    assert loja_ativa.whatsapp_modo == 1
+        StoreControl(SessionLocal).set_whatsapp_mode(
+            _admin_actor(), SetWhatsappMode(store=StoreRef(id=loja_id), mode=2)
+        )
+
+    with SessionLocal() as db:
+        assert db.get(Loja, loja_id).whatsapp_modo == 1
 
 
-def test_modo_invalido_e_recusado(db, loja_ativa, ator_admin, monkeypatch):
+def test_modo_invalido_e_recusado(monkeypatch):
     monkeypatch.setattr("app.control.stores.config.WHATSAPP_MODO2_ENABLED", True)
+    loja_id, _ = _loja()
     with pytest.raises(ValueError):
-        definir_whatsapp_modo(db, loja_ativa.id, 3, ator=ator_admin)
+        StoreControl(SessionLocal).set_whatsapp_mode(
+            _admin_actor(), SetWhatsappMode(store=StoreRef(id=loja_id), mode=3)
+        )
 
 
-def test_voltar_para_modo_1_bumpa_a_versao_de_novo(db, loja_ativa, ator_admin, monkeypatch):
+def test_voltar_para_modo_1_bumpa_a_versao_de_novo(monkeypatch):
     """Ida e volta. Cada troca é um evento novo para a projeção do chatbot.
 
     Sem o segundo bump, o chatbot ficaria no modo 2 para sempre: a projeção é
     monotônica e descartaria a volta com a mesma versão.
     """
     monkeypatch.setattr("app.control.stores.config.WHATSAPP_MODO2_ENABLED", True)
-    versao_inicial = loja_ativa.versao
+    loja_id, versao_inicial = _loja()
+    controle = StoreControl(SessionLocal)
+    ator = _admin_actor()
 
-    definir_whatsapp_modo(db, loja_ativa.id, 2, ator=ator_admin)
-    versao_no_modo_2 = loja_ativa.versao
-    loja = definir_whatsapp_modo(db, loja_ativa.id, 1, ator=ator_admin)
+    no_modo_2 = controle.set_whatsapp_mode(
+        ator, SetWhatsappMode(store=StoreRef(id=loja_id), mode=2)
+    )
+    de_volta = controle.set_whatsapp_mode(
+        ator, SetWhatsappMode(store=StoreRef(id=loja_id), mode=1)
+    )
 
-    assert loja.whatsapp_modo == 1
-    assert versao_no_modo_2 > versao_inicial
-    assert loja.versao > versao_no_modo_2
+    assert de_volta.whatsapp_mode == 1
+    assert no_modo_2.version > versao_inicial
+    assert de_volta.version > no_modo_2.version
 ```
 
-> `ator_admin` e `loja_ativa` são as fixtures dos testes de `stores` — reuse as existentes. A
-> auditoria usa o mesmo helper que as outras ações de loja em `app/control/audit.py`; confira o nome
-> real antes de chamar.
+> Padrão do Control: comando + `Actor`, nunca argumento solto. `SetWhatsappMode` é um
+> `@dataclass(frozen=True)` novo em `app/control/types.py`, ao lado de `UpdateStore` (`:204`), e
+> `StoreView` ganha `whatsapp_mode`. `_admin_actor` é cópia de
+> `tests/test_control_provisioning.py:24` — o `_db_setup` autouse já semeia o admin.
 
 - [ ] **Step 2: Rodar e ver falhar**
 
@@ -363,7 +428,7 @@ WHATSAPP_MODO2_ENABLED = os.getenv("REVY_CONTROL_WHATSAPP_MODO2_ENABLED", "").lo
 Em `app/control/stores.py`:
 
 ```python
-def definir_whatsapp_modo(db: Session, loja_id: str, modo: int, *, ator) -> Loja:
+def set_whatsapp_mode(self, actor: Actor, command: SetWhatsappMode) -> StoreView:
     """Escolhe o modo de WhatsApp da loja (spec §5.8).
 
     O Control **escolhe**; quem opera é a Loja e o chatbot. Aqui não se toca em
@@ -373,25 +438,25 @@ def definir_whatsapp_modo(db: Session, loja_id: str, modo: int, *, ator) -> Loja
     versão e descartaria um evento com a versão anterior, deixando a loja no
     modo velho sem erro nenhum aparecer.
     """
-    if modo not in (1, 2):
+    if command.mode not in (1, 2):
         raise ValueError("modo de WhatsApp inválido: use 1 ou 2")
-    if modo == 2 and not config.WHATSAPP_MODO2_ENABLED:
+    if command.mode == 2 and not config.WHATSAPP_MODO2_ENABLED:
         raise ValueError("Modo 2 ainda não liberado neste ambiente")
 
-    loja = db.get(Loja, loja_id)
-    if loja is None:
-        raise StoreNotFound("Loja não encontrada")
+    with self._session_factory() as db:
+        loja = _find_store(db, command.store)
+        if loja is None:
+            raise StoreNotFound("Loja não encontrada")
 
-    loja.whatsapp_modo = modo
-    loja.versao = loja.versao + 1
-    db.commit()
-
-    registrar_auditoria(
-        db, ator=ator, acao="whatsapp_modo_definido",
-        recurso="loja", recurso_id=loja.id, detalhe={"modo": modo},
-    )
-    return loja
+        loja.whatsapp_modo = command.mode
+        loja.versao = loja.versao + 1
+        db.commit()
+        # Auditoria pelo mesmo caminho das outras ações de loja deste módulo —
+        # confira o helper real em `app/control/audit.py` antes de chamar.
+        return _to_view(loja)
 ```
+
+> `_find_store` e `_to_view` já existem em `stores.py` (é como `update` e `get` fazem). Reuse.
 
 Na ficha da loja (aba WhatsApp / prontidão), dois rádios — **Baileys + grupo** e **central Cloud
 API** —, com o segundo só renderizado se `config.WHATSAPP_MODO2_ENABLED`. Ao lado, uma linha de
