@@ -316,7 +316,7 @@ def test_payload_inclui_loja_slug_e_agregados_operacionais():
     assert payload["loja_id"] == store_id
     assert payload["loja_slug"] == store_slug
     aggregates = [item["aggregate"] for item in payload["operational"]]
-    assert aggregates == ["loja", "vendas", "estoque"]
+    assert aggregates == ["loja", "whatsapp_modo", "vendas", "estoque"]
     assert all("version" in item for item in payload["operational"])
     assert all(
         isinstance(item["effective_at"], str) and "T" in item["effective_at"]

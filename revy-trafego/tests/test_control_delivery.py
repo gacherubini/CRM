@@ -126,12 +126,12 @@ def test_apply_rejeita_versao_antiga_e_e_idempotente():
 
     active = control.snapshot(StoreRef(id=store_id))
     applied, reasons = apply_snapshot(None, active)
-    assert reasons == ["applied", "applied", "applied"]
+    assert reasons == ["applied", "applied", "applied", "applied"]
     assert allows_processing(applied) is True
     assert allows_processing(applied, module="vendas") is True
 
     same, same_reasons = apply_snapshot(applied, active)
-    assert same_reasons == ["idempotent", "idempotent", "idempotent"]
+    assert same_reasons == ["idempotent", "idempotent", "idempotent", "idempotent"]
     assert same == applied
 
     stores.transition(
@@ -149,7 +149,7 @@ def test_apply_rejeita_versao_antiga_e_e_idempotente():
     assert allows_processing(after_suspend, module="vendas") is False
 
     stale, stale_reasons = apply_snapshot(after_suspend, active)
-    assert stale_reasons == ["stale", "idempotent", "idempotent"]
+    assert stale_reasons == ["stale", "stale", "idempotent", "idempotent"]
     assert allows_processing(stale) is False
     loja = stale.aggregates["loja"]
     assert loja.state == "suspensa"

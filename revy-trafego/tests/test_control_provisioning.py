@@ -60,7 +60,7 @@ def test_snapshot_inclui_copiloto_quando_contratado():
     snapshot = ProvisioningControl(SessionLocal).snapshot(StoreRef(id=store.id))
 
     aggregates = tuple(item.aggregate for item in snapshot.operational)
-    assert aggregates == ("loja", "vendas", "estoque", "copiloto")
+    assert aggregates == ("loja", "whatsapp_modo", "vendas", "estoque", "copiloto")
     copiloto_env = next(
         item for item in snapshot.operational if item.aggregate == "copiloto"
     )
@@ -68,7 +68,7 @@ def test_snapshot_inclui_copiloto_quando_contratado():
     assert copiloto_env.version == 1
     # event_id do snapshot precisa mudar ao ganhar copiloto (senão o outbox
     # deduplica contra a entrega anterior de vendas+estoque e nunca propaga).
-    assert len({item.event_id for item in snapshot.operational}) == 4
+    assert len({item.event_id for item in snapshot.operational}) == 5
 
 
 def test_snapshot_operacional_e_versionado_estavel_e_ordenado():
@@ -95,26 +95,29 @@ def test_snapshot_operacional_e_versionado_estavel_e_ordenado():
     assert snapshot.schema_version == 1
     assert tuple(item.aggregate for item in snapshot.operational) == (
         "loja",
+        "whatsapp_modo",
         "vendas",
         "estoque",
     )
-    assert tuple(item.schema_version for item in snapshot.operational) == (1, 1, 1)
+    assert tuple(item.schema_version for item in snapshot.operational) == (1, 1, 1, 1)
     assert tuple(item.loja_id for item in snapshot.operational) == (
         store.id,
         store.id,
         store.id,
+        store.id,
     )
-    assert tuple(item.version for item in snapshot.operational) == (1, 1, 1)
+    assert tuple(item.version for item in snapshot.operational) == (1, 1, 1, 1)
     assert tuple(item.state for item in snapshot.operational) == (
         "rascunho",
+        "1",
         "ativo",
         "ativo",
     )
-    assert len({item.event_id for item in snapshot.operational}) == 3
+    assert len({item.event_id for item in snapshot.operational}) == 4
     assert all(item.event_id for item in snapshot.operational)
     assert all(isinstance(item.effective_at, datetime) for item in snapshot.operational)
     assert all(isinstance(item.occurred_at, datetime) for item in snapshot.operational)
-    assert tuple(item.reason for item in snapshot.operational) == (None, None, None)
+    assert tuple(item.reason for item in snapshot.operational) == (None, None, None, None)
     assert snapshot.people == ()
     assert snapshot.roles == ()
     with pytest.raises(FrozenInstanceError):
@@ -203,7 +206,7 @@ def test_snapshot_de_loja_legada_sem_auditoria_tem_evento_estavel():
     repeated = provisioning.snapshot(StoreRef(id="loja-legada"))
 
     assert repeated == snapshot
-    assert len(snapshot.operational) == 1
+    assert len(snapshot.operational) == 2
     envelope = snapshot.operational[0]
     assert (
         envelope.schema_version,
