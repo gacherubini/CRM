@@ -3,6 +3,7 @@
 leads e consentimentos entram no próximo incremento.
 """
 from datetime import datetime, timezone
+from typing import Optional
 
 from sqlalchemy import Boolean, DateTime, ForeignKey, Index, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
@@ -91,6 +92,48 @@ class FilaVendedor(Base):
     ordem: Mapped[int] = mapped_column(Integer, nullable=False)
     ativo: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     criado_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_agora)
+
+
+class OfertaLead(Base):
+    """Uma oferta de lead a um vendedor (spec §5.3).
+
+    ``posicao_inicial`` guarda onde o ponteiro estava quando o lead entrou:
+    e assim que se sabe que a volta fechou (voltou em quem comecou) sem
+    contar quantas ofertas ja sairam.
+
+    Oferta anterior continua ``aberta`` ate o lead travar — e o que faz
+    "primeiro clique vence mesmo atrasado" funcionar.
+    """
+
+    __tablename__ = "oferta_lead"
+    __table_args__ = (
+        Index("ix_oferta_lead_loja_estado", "loja_id", "estado"),
+        Index("ix_oferta_lead_prazo", "estado", "prazo_em"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    loja_id: Mapped[str] = mapped_column(ForeignKey("lojas.id"), nullable=False, index=True)
+    telefone_cliente: Mapped[str] = mapped_column(String(20), nullable=False, index=True)
+    vendedor_id: Mapped[str] = mapped_column(ForeignKey("fila_vendedor.id"), nullable=False)
+    # aberta | travada | expirada | esgotada
+    estado: Mapped[str] = mapped_column(String(20), default="aberta", nullable=False)
+    posicao_inicial: Mapped[int] = mapped_column(Integer, nullable=False)
+    prazo_em: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    criado_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_agora)
+    travada_em: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class RodizioPonteiro(Base):
+    """Onde a proxima oferta da loja comeca (spec §5.3).
+
+    Avanca a cada OFERTA emitida, nao a cada lead: dois leads simultaneos
+    caem em vendedores diferentes em vez de empilharem no primeiro da lista.
+    """
+
+    __tablename__ = "rodizio_ponteiro"
+
+    loja_id: Mapped[str] = mapped_column(ForeignKey("lojas.id"), primary_key=True)
+    posicao: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
 
 
 class CredencialServico(Base):
