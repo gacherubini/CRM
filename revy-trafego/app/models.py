@@ -47,6 +47,10 @@ class Loja(Base):
             "versao >= 1",
             name="ck_lojas_versao",
         ),
+        CheckConstraint(
+            "whatsapp_modo IN (1, 2)",
+            name="ck_lojas_whatsapp_modo",
+        ),
     )
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=novo_id)
@@ -58,6 +62,10 @@ class Loja(Base):
         default=1,
         server_default=text("1"),
     )
+    # 1 = Baileys + grupo (legado). 2 = central Cloud API. Nunca os dois:
+    # a spec dos dois modos é explícita em 1 XOR 2 por loja. Default 1 para
+    # que toda loja existente siga no comportamento de hoje sem backfill.
+    whatsapp_modo: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
     criada_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=agora)
     atualizada_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=agora)
 
