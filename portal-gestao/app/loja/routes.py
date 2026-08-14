@@ -5,7 +5,7 @@ Rotas legadas ``/app/leads`` e ``/app/conversas`` permanecem intactas.
 """
 from __future__ import annotations
 
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from types import SimpleNamespace
 from uuid import uuid4
 
@@ -312,6 +312,39 @@ def montar_visao_agente(resumo: dict | None, hoje: date) -> dict | None:
     }
 
 
+def _oferta_nos_ultimos_dias(oferta: dict, dias: int, agora: datetime) -> bool:
+    cru = oferta.get("criado_em") or oferta.get("travada_em")
+    if not cru:
+        return True
+    try:
+        quando = datetime.fromisoformat(str(cru).replace("Z", "+00:00"))
+    except ValueError:
+        return True
+    if quando.tzinfo is None:
+        quando = quando.replace(tzinfo=timezone.utc)
+    return quando >= agora - timedelta(days=dias)
+
+
+def montar_card_rodizio(chatbot: ChatbotClient, agora: datetime | None = None) -> dict | None:
+    """Quatro números da fila nos últimos 7 dias (spec §5.4). Só Modo 2."""
+    agora = agora or datetime.now(timezone.utc)
+    try:
+        abertas = list(chatbot.listar_ofertas(estado="aberta") or [])
+        esgotadas = list(chatbot.listar_ofertas(estado="esgotada") or [])
+        travadas = list(chatbot.listar_ofertas(estado="travada") or [])
+        expiradas = list(chatbot.listar_ofertas(estado="expirada") or [])
+    except (ChatbotIndisponivel, AttributeError):
+        return None
+    if not (abertas or esgotadas or travadas or expiradas):
+        return None
+    return {
+        "oferecidos": len(abertas),
+        "aguardando": len(esgotadas),
+        "atendidos": sum(1 for o in travadas if _oferta_nos_ultimos_dias(o, 7, agora)),
+        "perdidos": sum(1 for o in expiradas if _oferta_nos_ultimos_dias(o, 7, agora)),
+    }
+
+
 @router.get("/app/loja/agente", response_class=HTMLResponse)
 def agente_desempenho(
     request: Request,
@@ -343,6 +376,7 @@ def agente_desempenho(
             resumo=resumo,
             visao=montar_visao_agente(resumo, datetime.now(timezone.utc).date()),
             erro_resumo=erro_resumo,
+            card_rodizio=montar_card_rodizio(chatbot),
         ),
     )
 
