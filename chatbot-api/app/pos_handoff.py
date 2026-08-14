@@ -14,7 +14,11 @@ from app.models_db import FilaVendedor, OfertaLead
 from app.oferta_envio import janela_aberta
 
 INTERVALO_AVISO_CLIENTE = timedelta(hours=6)
-INTERVALO_CUTUCAO_VENDEDOR = timedelta(hours=1)
+
+# A spec (§5.4) permite cutucar o vendedor 1x/hora. Na prática o cutucão sai
+# junto do aviso ao cliente, então já é no máximo 1x/6h — dentro do teto e
+# mais conservador. Não existe constante de 1 h porque não existe throttle
+# separado: se um dia o aviso ao cliente e o cutucão se descolarem, aí sim.
 
 # Último aviso por lead, em memória do processo: perder isso num restart
 # custa um aviso repetido, não um erro. Persistir exigiria tabela nova para

@@ -164,6 +164,9 @@ class Conversa(Base):
     responsavel: Mapped[str | None] = mapped_column(String, nullable=True)
     # Sinais de anúncio ficam pendentes aqui até o cliente qualificar a simulação.
     tracking_pendente_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Quantos cutucões de silêncio já saíram nesta rodada (Modo 2, spec §5.9).
+    # Zera quando o cliente responde; para em 2 — não existe terceiro toque.
+    followup_toques: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     criada_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_agora)
     atualizada_em: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=_agora, onupdate=_agora
