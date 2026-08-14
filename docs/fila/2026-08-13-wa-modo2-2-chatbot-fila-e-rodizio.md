@@ -28,8 +28,14 @@ Também fora: `n8n-cloud` (card 3) e toggle no Control (card 4).
 
 ## Global Constraints
 
-- **Flag `CHATBOT_WHATSAPP_MODO2_ENABLED` default OFF.** Invariante do projeto. Com a flag off,
-  nenhuma rota nova responde e o worker não roda.
+- **Flag `CHATBOT_WHATSAPP_MODO2_ENABLED` default OFF.** Invariante do projeto. A flag gateia a
+  **operação, não a configuração**: com ela desligada, `abrir_oferta` devolve `None` e o worker não
+  oferece nada — mas o CRUD de `/v1/fila-vendedores` **continua respondendo**, porque o lojista
+  precisa cadastrar a fila **antes** do rollout. Gatear o cadastro tornaria o Modo 2 impossível de
+  configurar.
+
+  > Corrigido em 2026-08-14, depois da execução: a redação anterior dizia "nenhuma rota nova
+  > responde", o que contradizia a própria Task 8. O gate que importa está em `abrir_oferta`.
 - **Loja suspensa não opera** (§6.3): reusar `app/provisioning.py:28::allows_processing` — não
   reimplementar leitura de projeção. Vale para abrir oferta, expirar e travar. Um ponto só.
 - **Um lead pendente por vendedor** (§5.3): vendedor com oferta aberta é pulado.
