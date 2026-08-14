@@ -224,10 +224,17 @@ class NoopTranscriptionProvider:
 class HttpTranscriptionProvider:
     """Contrato genérico: multipart `file`; resposta JSON com `text` ou `texto`."""
 
-    def __init__(self, url: str, token: str = "", timeout: float = 15):
+    def __init__(
+        self,
+        url: str,
+        token: str = "",
+        timeout: float = 15,
+        transport: httpx.BaseTransport | None = None,
+    ):
         self.url = url
         self.token = token
         self.timeout = timeout
+        self._transport = transport
 
     def transcrever(self, arquivo: Path, mime_type: str) -> str:
         if not self.url:
@@ -235,13 +242,16 @@ class HttpTranscriptionProvider:
         headers = {"Authorization": f"Bearer {self.token}"} if self.token else {}
         try:
             with arquivo.open("rb") as stream:
-                resposta = httpx.post(
-                    self.url,
-                    headers=headers,
-                    files={"file": (arquivo.name, stream, mime_type)},
-                    data={"language": "pt-BR"},
-                    timeout=self.timeout,
-                )
+                with httpx.Client(
+                    timeout=self.timeout, transport=self._transport, headers=headers
+                ) as cliente:
+                    resposta = cliente.post(
+                        self.url,
+                        files={"file": (arquivo.name, stream, mime_type)},
+                        # ISO-639-1, duas letras. "pt-BR" não é código válido: alguns
+                        # providers ignoram em silêncio (perde acurácia), outros 400.
+                        data={"language": "pt"},
+                    )
             resposta.raise_for_status()
             payload = resposta.json()
         except (OSError, httpx.HTTPError, ValueError) as exc:
@@ -309,3 +319,26 @@ def get_audio_processor() -> AudioProcessor:
     else:
         provider = NoopTranscriptionProvider()
     return AudioProcessor(EvolutionMediaDownloader(), provider)
+
+
+def processador_de_audio(modo: int) -> "AudioProcessor | None":
+    """Processador do canal, ou ``None`` quando o canal não transcreve.
+
+    Transcrição é **só do Modo 2** (spec §5.10): a central precisa ouvir para
+    responder, porque não há humano do outro lado. No Modo 1 quem recebe o
+    áudio é o vendedor, no celular dele — transcrever ali só geraria custo.
+
+    Por isso a decisão é por canal, não por variável global do processo:
+    ligar `AUDIO_TRANSCRIPTION_PROVIDER` globalmente mudaria o Modo 1 junto.
+    """
+    if modo != 2:
+        return None
+    if not config.AUDIO_TRANSCRIPTION_URL:
+        return None
+    return AudioProcessor(
+        downloader=GraphMediaDownloader(),
+        provider=HttpTranscriptionProvider(
+            url=config.AUDIO_TRANSCRIPTION_URL,
+            token=config.AUDIO_TRANSCRIPTION_TOKEN,
+        ),
+    )
