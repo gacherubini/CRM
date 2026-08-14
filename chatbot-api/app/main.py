@@ -72,7 +72,7 @@ def _marcar_wamid_visto(wamid: str) -> None:
 
 @asynccontextmanager
 async def _lifespan(_app: FastAPI):
-    """Sobe/desce o worker de retry do outbox de alertas operacionais."""
+    """Sobe/desce os workers de fundo: outbox de alertas e Modo 2."""
     from app.db import SessionLocal
     from app import notificacoes_outbox_job
 
@@ -83,10 +83,23 @@ async def _lifespan(_app: FastAPI):
         "",
     }
     notificacoes_outbox_job.start_worker(SessionLocal, enabled=enabled)
+
+    # Modo 2: o prazo de 10 min do rodízio e o cutucão de silêncio têm timer
+    # próprio (spec §5.3). Sem subir aqui, `run_once` só roda em teste.
+    from app import modo2_workers
+
+    modo2_enabled = (os.getenv("CHATBOT_MODO2_WORKERS_ENABLED", "1") or "1").strip() not in {
+        "0",
+        "false",
+        "False",
+        "",
+    }
+    modo2_workers.start_workers(SessionLocal, enabled=modo2_enabled)
     try:
         yield
     finally:
         notificacoes_outbox_job.stop_worker()
+        modo2_workers.stop_workers()
 
 
 app = FastAPI(title="Chatbot API", lifespan=_lifespan)
@@ -586,6 +599,18 @@ def _processar_mensagem_cliente(db: Session, loja, evento: EventoCloud) -> None:
         False,
         evento.tipo,
         meta_ad_id=evento.referral_ad_id,
+    )
+
+    # Lead já travado: a central se cala, mas o cliente não pode falar sozinho
+    # (spec §5.4). Ele escreveu no número do anúncio, que é o único que conhece,
+    # e provavelmente o vendedor ainda não ligou. A própria regra tem throttle.
+    from app.pos_handoff import cliente_voltou_a_escrever
+
+    cliente_voltou_a_escrever(
+        db,
+        loja.id,
+        evento.remetente,
+        outbound=outbound_para_loja(db, loja.id),
     )
 
 

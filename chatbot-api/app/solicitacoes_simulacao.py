@@ -746,6 +746,31 @@ def solicitar_simulacao_humana(
         )
     db.refresh(notificacao)
 
+    # Modo 2: quem "chama vendedor" é o rodízio, não o grupo (spec §5.2). Tem
+    # que vir ANTES de qualquer resolução de grupo — no Modo 2 não existe
+    # grupo, e o "aceite sem grupo" logo abaixo retornaria antes daqui,
+    # deixando o gatilho sem acionar: o bot atenderia, a simulação ficaria
+    # pronta e nenhum vendedor seria chamado, nunca.
+    from app.handoff_gatilhos import disparar_handoff
+    from app.rodizio import loja_opera_modo2
+    from app.whatsapp_outbound import outbound_para_loja
+
+    if loja_opera_modo2(db, loja_id):
+        disparar_handoff(
+            db,
+            loja_id,
+            telefone_norm,
+            motivo="pediu_humano",
+            outbound=outbound_para_loja(db, loja_id),
+        )
+        return _saida(
+            notificacao=notificacao,
+            telefone=telefone_norm,
+            duplicada=False,
+            # Não há alerta de grupo no Modo 2: o grupo é do Modo 1.
+            alerta_enviado=False,
+        )
+
     # Minimiza retenção: CPF e moto só existiam para a tool / simulação.
     try:
         servico.limpar_cpf_cliente_conversa(db, loja_id, telefone_norm)
