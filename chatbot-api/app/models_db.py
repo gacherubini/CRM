@@ -4,7 +4,7 @@ leads e consentimentos entram no próximo incremento.
 """
 from datetime import datetime, timezone
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint
+from sqlalchemy import Boolean, DateTime, ForeignKey, Index, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db import Base
@@ -63,6 +63,33 @@ class WhatsAppCanal(Base):
     estado: Mapped[str] = mapped_column(String(20), default="pendente", nullable=False)
     # Só este canal responde no grupo de estoque e envia alertas de simulação.
     principal_estoque: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    criado_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_agora)
+
+
+class FilaVendedor(Base):
+    """Vendedor na fila de rodízio da loja (Modo 2).
+
+    O telefone mora aqui, não no Portal: o chatbot já é dono de conversa e
+    número (``Conversa.telefone``), e é ele que precisa casar o inbound do
+    vendedor com o cadastro (spec §5.5). O Portal desenha a tela lendo por
+    HTTP, mesmo padrão de ``whatsapp_canais``.
+
+    ``nome`` é obrigatório porque vai no aviso ao cliente ("o João vai te
+    chamar", spec §5.1) — sem ele o handoff fica anônimo.
+    """
+
+    __tablename__ = "fila_vendedor"
+    __table_args__ = (
+        Index("ix_fila_vendedor_loja_ordem", "loja_id", "ordem"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    loja_id: Mapped[str] = mapped_column(ForeignKey("lojas.id"), nullable=False, index=True)
+    nome: Mapped[str] = mapped_column(String(120), nullable=False)
+    # Só dígitos (DDI+DDD+número), normalizado por operacao.normalizar_telefone.
+    telefone: Mapped[str] = mapped_column(String(20), nullable=False)
+    ordem: Mapped[int] = mapped_column(Integer, nullable=False)
+    ativo: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     criado_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_agora)
 
 
