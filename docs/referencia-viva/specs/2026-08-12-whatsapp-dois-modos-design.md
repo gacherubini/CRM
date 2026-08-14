@@ -1,17 +1,18 @@
 # WhatsApp em dois modos: Baileys+grupo OU Central Cloud API (escolha por loja no Control)
 
-**Data:** 2026-08-12
-**Status:** Decisões estruturais **fechadas** com o dono (brainstorm 2026-08-12) — pronto para o plano
-de implementação. Aguardando revisão do dono sobre o texto do spec.
+**Data:** 2026-08-12 (revisão 2026-08-13)
+**Status:** Spec **fechada** com o dono (brainstorm 2026-08-12 + sessão 2026-08-13).
+Pronto para o plano de implementação. Este arquivo é o canônico.
 **Substitui:** a abordagem anterior de coexistência **por vendedor** (`smb_message_echoes` + history
 sync), **descartada** em favor do modelo de **central só-bot** (ver §14). Os planos daquela abordagem
 (design de coexistência, spike de coexistência e regra Cloud/n8n de coexistência) foram **removidos**
 — este é o documento canônico do "problema do WhatsApp".
 **Produtos afetados:**
-- `revy-control` / `portal-gestao`: toggle `whatsapp_modo` por loja + cadastro de vendedores e ordem
-  da fila (Modo 2, feito pelo lojista).
+- `revy-control`: escolhe `whatsapp_modo` por loja (1 XOR 2) e projeta saúde. Não opera QR nem fila.
+- `portal-gestao` (Loja): opera o modo escolhido — telas mudam (§5.8). Cadastro da fila (Modo 2)
+  é do lojista aqui.
 - `chatbot-api`: central bot do Modo 2 (intake, gatilho de handoff, rodízio, trava, detecção
-  vendedor×cliente, resumo diário). Modo 1 mantém o gate atual intacto.
+  vendedor×cliente). Modo 1 mantém o gate atual intacto.
 - `n8n`: novo workflow `n8n-cloud` (inbound/outbound Cloud). `n8n-baileys` = o atual, sem mudança.
 - `motor`: simulação (já existe; sem mudança de contrato).
 - `evolution`: **permanece só Baileys** (Modo 1). Não entra no Modo 2.
@@ -58,11 +59,14 @@ Portal); mensagem proativa da central pro cliente (templates de marketing); migr
 | Canal da central (Modo 2) | **Cloud API pura, só-bot.** Nenhum humano atende pela central → **não é coexistência**. Cai fora `smb_message_echoes`, history sync, QR, aprovação de histórico e a regra "humano já falou". |
 | Vendedores no Modo 2 | **Não são bots.** Usam o WhatsApp normal deles. Nenhum número de vendedor pareia com Evolution → passkey **não os afeta**. |
 | Como o vendedor fala com o cliente | **Handoff:** a central passa o contato do cliente ao vendedor, que chama o cliente **do próprio WhatsApp** (outro número; o cliente vê um número novo). **Não** é caixa compartilhada. |
-| Distribuição | **Rodízio em ordem fixa (um vendedor por vez).** Percorre a lista **na ordem cadastrada**; cada vendedor tem **X min** pra responder; sem resposta → próximo. **Passa por todos ≥1 vez; depois de uma passada completa sem ninguém pegar, PARA** (sem loop infinito). |
-| Confirmação do vendedor | O vendedor confirma que pegou **clicando num botão** na mensagem (não texto solto). O clique volta pro bot e **trava** o lead com ele. |
-| Cadastro de vendedores | Números + **ordem** da fila são cadastrados **no Portal, pelo lojista**. |
-| Fallback (ninguém pega) | **Sem aviso por-lead.** O lead fica "aguardando" no Portal. **No fim do dia**, a central manda **um resumo ao dono**: quantos leads ficaram sem atendimento. |
-| Canal do aviso ao vendedor | **WhatsApp individual** da central (Cloud API) via **template Utility** com botão (msg parte da central, fora da janela de 24h). |
+| Distribuição | **Só rodízio automático**, ordem fixa, um por vez. Sem apontar vendedor à mão. **10 min** pra clicar; sem resposta → próximo. Uma passada e **para**. Primeiro clique vence, mesmo atrasado (§5.3). |
+| Confirmação do vendedor | Dois jeitos, **o mesmo assumir**: botão no WhatsApp **ou** botão **Peguei** no sino da Loja. Primeiro que chegar vence. Ver §5.7. Pegou e não ligou: **fica travado**. |
+| Cadastro de vendedores | Números + **ordem** da fila: **na Loja, pelo lojista**. Control só escolhe o modo. |
+| Fallback (ninguém pega) | **Sem WhatsApp ao dono.** Lead fica `aguardando`. Na Loja: faixa + filtro no Atendimento, e card no Agente com os últimos 7 dias. |
+| Canal do aviso ao vendedor | **WhatsApp 1:1** + **sino na Loja só para o `oferecido_a`**, com botão Peguei no próprio sino. Nunca grupo, nunca sino da loja inteira. |
+| Timer do rodízio e do bot | **Worker no `chatbot-api`**. n8n só transporta. |
+| n8n | **Um workflow por modo.** `n8n-baileys` = o atual, intacto. `n8n-cloud` = novo, só Modo 2. Sem `if` de modo no meio de um workflow. |
+| Bot do Modo 2 | **Fork do atual** (mesmo debounce 40s, replay >5 min, intake, simulação, gates). Texto de follow-up + prompt se configuram juntos. Silêncio do cliente: 30 min → msg 1; +1 h sem resposta → msg 2; para. Só enquanto `bot_ativo`. |
 | Gatilho do handoff | **Dois gatilhos:** quando a **simulação fica pronta** OU quando o **cliente pede humano** explicitamente, o que vier primeiro. |
 | Encanamento Cloud | **Meta ↔ n8n-cloud direto.** Webhook da Meta aponta pro `n8n-cloud`; envio via **Graph API**. Central **independente do Evolution** (Evolution fica só no Baileys/Modo 1). |
 | Onboarding da central | **Direto na Meta, sem BSP.** Piloto roda em **dev mode** com número de teste. App próprio do Revy. |
@@ -82,9 +86,10 @@ Portal); mensagem proativa da central pro cliente (templates de marketing); migr
                                                          │
    Modo 2 handoff:  bot faz intake + simulação ──────────┘
      gatilho (sim pronta OU pede humano)
-       └─► rodízio EM ORDEM: template c/ botão ─► Vend.1 ─(X min)─► Vend.2 ─► ... ─► Vend.N
-              clicou o botão ─► trava o lead ─► handoff: vendedor chama o cliente do WhatsApp DELE
-              passou por todos sem pegar ─► lead "aguardando" (resumo ao dono no fim do dia)
+       └─► rodízio EM ORDEM, 1:1: msg c/ botão + sino só dele ─► Vend.1 ─(10 min)─► Vend.2 ─► ...
+              1º clique vence (mesmo atrasado) ─► inbound "peguei" ─► assumir (trava + Em atendimento)
+              central manda wa.me DEPOIS do clique ─► vendedor chama do WhatsApp DELE
+              passou por todos sem pegar ─► lead "aguardando" (faixa+filtro no Atendimento)
 ```
 
 - **Núcleo agnóstico:** o `chatbot-api` recebe o payload **normalizado** pelo n8n
@@ -132,27 +137,37 @@ Dois, o que vier primeiro (§2). "Cliente pede humano" precisa de detecção sim
 tem que funcionar com e sem esse campo.
 
 ### 5.3 Rodízio (distribuição em ordem)
-- **Fila por loja:** lista **ordenada** dos vendedores (número + ordem), cadastrada **no Portal pelo
-  lojista**. O Portal é a fonte da verdade.
-- **Ordem fixa, sem rotação:** cada lead percorre a lista **de cima pra baixo**. O 1º da lista sempre
-  recebe primeiro (não há ponteiro round-robin rotativo).
-- **X min por vendedor:** a central chama o vendedor `i` por WhatsApp (template Utility **com botão**).
-  Se ele não clicar o botão em **X min**, a central chama o `i+1`.
-- **Confirmação por botão:** o vendedor clica "peguei" no template → o clique chega à central → o lead
-  **trava** com ele e a central **para** de chamar os outros.
-- **Uma passada e para:** o rodízio **passa por todos ≥1 vez**. Se chegar ao fim da fila sem ninguém
-  clicar, **encerra** (não recomeça em loop). O lead fica `aguardando`.
+- **Só automático.** Não há "apontar o vendedor deste lead". Cada lead percorre a lista
+  cadastrada **de cima pra baixo**. O 1º da lista sempre recebe primeiro (sem ponteiro
+  rotativo). Critérios mais ricos (disponibilidade/performance) ficam pra Fase 2.
+- **Fila por loja:** números + ordem, cadastrados **no Portal pelo lojista**. O Portal é a
+  fonte da verdade.
+- **10 min por vendedor:** a central chama o vendedor `i` por WhatsApp 1:1 (envelope da §5.7)
+  **e** liga o sino da Loja **só para ele**. Se ele não clicar em **10 min**, a central chama
+  o `i+1` (sino muda de dono).
+- **Primeiro clique vence:** o botão de uma oferta anterior **continua válido** até o lead
+  travar. Se o vendedor 1 estoura, o 2 é oferecido, e o 1 clica o botão velho antes do 2,
+  o 1 leva. O 2 recebe um recado de "já foi pego" (sem `wa.me`). Trava é **idempotente**:
+  o primeiro `assumir` ganha; clique seguinte é ignorado.
+- **Uma passada e para:** percorre todos ≥1 vez. Sem ninguém clicar, **encerra** (não
+  recomeça). O lead fica `aguardando`.
+- **Pegou e não ligou:** o lead **fica travado** com ele. Não devolve à fila. Dono resolve
+  no Portal (reatribuir/devolver).
+- **Timer:** worker no `chatbot-api` (estado `oferecido_a` + prazo). n8n não espera.
 - **Estado do lead:** `aguardando` → `oferecido_a(vendedor_i)` → `travado(vendedor)` /
   `esgotou_fila`. Tudo visível no Portal.
 
-### 5.4 Handoff, silêncio e resumo do fim do dia
+### 5.4 Handoff, silêncio e o que sobrou na fila
 - Depois de travado, a central **não responde mais** aquele cliente. Se o cliente voltar a escrever,
   o padrão é **re-notificar o vendedor travado** (não reabrir o bot).
 - O chat real vendedor↔cliente acontece **no celular do vendedor** e a central **não o vê** —
   trade-off aceito do modelo handoff (§13).
-- **Fallback = resumo diário.** Não há aviso por-lead quando ninguém pega. **No fim do dia**, a central
-  manda **um** template ao **dono** com o total (e lista) de leads que ficaram `aguardando`, pra ele
-  resolver no Portal.
+- **Fallback = Loja, ao vivo.** Sem template às 19h, sem campo de WhatsApp do dono. Quem
+  ninguém pegou fica `aguardando` e aparece em dois lugares (§5.8):
+  1. **Atendimento** — faixa no topo ("N leads sem vendedor") + filtro de estado **Aguardando**,
+     só dono/gerente. Clique na faixa aplica o filtro. Dali o dono assume/reatribui.
+  2. **Agente** — card dos **últimos 7 dias**: atendidos (travados), perdidos, aguardando,
+     oferecidos. Não substitui a barra agente × handoff do mês; é o recorte da fila.
 
 ### 5.5 A central recebe cliente E vendedor (roteamento por remetente)
 O número central recebe inbound de **dois tipos** de remetente:
@@ -166,36 +181,150 @@ Com um número central, o **anúncio aponta pra central** e o `referral`/`ad_id`
 primeira mensagem — o `n8n-cloud` extrai e alimenta a atribuição existente. Um número por loja
 **simplifica** a atribuição (não piora).
 
+### 5.7 "Peguei" = clique que volta como inbound (é o assumir)
+
+O bot manda ao vendedor **uma mensagem com botão**. O vendedor **não digita**. O clique chega na
+central como inbound — webhook `button` (template) ou `interactive` (mensagem interativa). O
+`chatbot-api` trata esse inbound como **comando de controle** (§5.5), não como conversa de cliente,
+e executa o mesmo contrato do **assumir** que já existe no Portal
+(`portal-gestao` `atendimento_handoff` + `registrar_handoff_local`):
+
+- `bot_ativo=false` na conversa do cliente (central se cala);
+- `AtendimentoAtribuicao` para aquele vendedor;
+- o workspace de Atendimento mostra **Em atendimento** (`resolver_estado` já mapeia
+  `bot_ativo=false`).
+
+**Dois envelopes, um significado:**
+
+| Janela 24h com aquele vendedor | Envelope | Custo |
+|---|---|---|
+| Fechada (ele ainda não falou com a central) | Template Utility + botão de **resposta rápida** | cobrado (~R$0,03–0,04) |
+| Aberta (ele já clicou/respondeu nas últimas 24h) | Mensagem interativa (`type=interactive`) com o mesmo botão | grátis |
+
+Não há check-in matinal. O próprio primeiro "peguei" do dia abre a janela; os pokes seguintes
+àquele vendedor no mesmo dia usam mensagem interativa. Cobra-se o **primeiro toque por vendedor
+com janela fechada**, não um template por lead.
+
+**O contato do cliente (`wa.me`) só vai DEPOIS do clique** (WhatsApp ou sino). Se o número
+for na mensagem de oferta, o vendedor chama sem o backend saber.
+
+**Peguei no sino** = o mesmo `assumir` do clique WhatsApp. O item do sino do `oferecido_a`
+tem botão **Peguei** (não é só “abrir conversa”). Primeiro que chegar (sino ou WhatsApp)
+vence; o outro vira “já foi pego”.
+
+Proibido no WhatsApp: texto solto, botão URL, `wa.me` na oferta. O botão do app tem que
+voltar inbound. O do sino chama o backend direto — não é um link mágico na mensagem.
+
+**1:1, não grupo.** Só o `oferecido_a` recebe WhatsApp **e** o sino com Peguei. Dono/gerente
+não veem esse sino. Nenhuma regra disto vaza para o Modo 1.
+
+### 5.8 Control escolhe o modo; a Loja muda a tela
+
+O **tipo de atendimento** é o `whatsapp_modo` (1 XOR 2). Mora **só no Revy Control**, na
+ficha da loja (aba WhatsApp / prontidão). A Loja **não** oferece esse toggle — ela opera
+o modo que o Control gravou.
+
+| Superfície | Modo 1 (Baileys + grupo) | Modo 2 (central Cloud) |
+|---|---|---|
+| Control — ficha da loja | Escolhe modo 1. Saúde dos canais Evolution. | Escolhe modo 2. Saúde da central Cloud. Sem QR. |
+| Loja — Ajustes / canais WA | QR, vários números, reconectar. Como hoje. | Sem QR de vendedor. Número central (Cloud) + lista ordenada de vendedores. |
+| Loja — grupo de estoque | Ativo (foto + aviso de simulação). | Fora. Foto/aviso não passam por grupo. |
+| Loja — foto do veículo | Grupo **e** upload no form de estoque (card da fila). | **Só** upload no form de estoque. Sem isso o Modo 2 não publica foto. |
+| Loja — Atendimento | Lista de hoje. Sem faixa de fila esgotada. | Faixa "N sem vendedor" + filtro **Aguardando**. Sino 1:1 com **Peguei**. |
+| n8n | `n8n-baileys` (o de hoje). Sem mudança. | `n8n-cloud` novo. Meta ↔ Graph. Sem Evolution. |
+| Loja — Agente | Página atual: mês, só-agente × transferidos, série diária. | A mesma página **mais** o card dos últimos 7 dias (atendidos / perdidos / aguardando / oferecidos). |
+| Loja — cadastro da fila | Não existe. | Números + ordem, pelo lojista. |
+
+Trocar o modo no Control **não** migra conversa antiga. Loja Modo 2 esconde QR e grupo; Loja
+Modo 1 esconde fila, faixa Aguardando e o card de 7 dias.
+
+Foto de veículo **não entra neste plano**. O card
+[`docs/fila/2026-08-12-foto-veiculo-upload-portal.md`](../../fila/2026-08-12-foto-veiculo-upload-portal.md)
+é eixo à parte (Loja + Estoque) e vale nos dois modos: no 1 é atalho além do grupo; no 2 é
+o único jeito de publicar. Fazer esse card **antes** ou em paralelo do piloto Modo 2 — senão
+a loja Cloud não coloca foto no catálogo.
+
+Sino geral **também é eixo à parte**
+([`docs/fila/2026-08-12-notificacao-central-simulacao-pronta.md`](../../fila/2026-08-12-notificacao-central-simulacao-pronta.md)
+Fase B1): desacoplar o sino do Copiloto, com elegibilidade por tipo. Isso o Modo 2 usa
+para o aviso 1:1 do `oferecido_a`. **Não** aplicar a Fase B2/B9 daquele card (blast
+`simulacao_pronta` + desligar o grupo) — aqui o grupo fica no Modo 1 e o “ninguém pegou”
+é a faixa do Atendimento.
+
 ## 6. Encanamento Cloud — Meta direto ↔ n8n-cloud
 
 - **Inbound:** webhook da Meta (campos `messages` + `referral`) aponta **direto** para o
   `n8n-cloud`. Sem Evolution no caminho Cloud.
-- **Outbound:** envio via **Graph API** (REST simples) — texto livre dentro da janela de 24h e
-  **template Utility com botão** para o "chama vendedor" e para o resumo diário (fora da janela).
+- **Outbound:** envio via **Graph API** (REST simples).
+  - bot ↔ cliente: texto livre (janela aberta pelo inbound do cliente) — grátis.
+  - "chama vendedor": template Utility com botão se a janela com aquele vendedor está
+    **fechada**; mensagem interativa com o mesmo botão se está **aberta** (§5.7).
 - **Por quê direto e não via Evolution:** o suporte Cloud do Evolution mostrou-se frágil (CHANGELOG
   sem menção, repo dedicado à parte, issue #807). Como o Modo 2 é **Cloud API pura** (não
   coexistência), não há nada do Evolution a reaproveitar aqui — mais limpo apontar direto pra Meta.
 - **Dois workflows n8n** (§3): `n8n-baileys` (atual, intacto) e `n8n-cloud` (novo). Sem `if` de
-  payload no meio.
+  modo no meio. Cada loja aponta o webhook do canal para o workflow do **seu** modo.
+
+### 5.9 Bot do Modo 2 — fork do atual + cutucão no silêncio
+
+O núcleo (chatbot-api) é o de hoje. O `n8n-cloud` é **cópia do fluxo atual** (`workflow-ai-nao-salvos.json`)
+trocando Evolution por Graph API — não um bot novo. O que se herda sem discutir de novo:
+
+- debounce 40s (só a última mensagem);
+- replay >5 min bloqueado;
+- intake + simulação no Motor;
+- gate virgem / salvo / “humano já falou” **não se aplica** no Modo 2 da mesma forma (a central
+  é só-bot; quem assume é o peguei);
+- parcela **não** vai ao cliente pelo bot.
+
+**Follow-up se o cliente some** (só Modo 2, só enquanto `bot_ativo`, só na conversa com o
+**cliente** — nunca no vendedor):
+
+1. 30 min sem resposta do cliente → mensagem 1 da etapa.
+2. +1 h ainda sem resposta → mensagem 2 da etapa.
+3. Para. Sem terceiro toque. Cliente responder no meio **zera** o relógio.
+4. Handoff / `bot_ativo=false` **cancela** follow-ups pendentes.
+5. Recusa (“valeu”, “não precisa”) **não** cutuca.
+
+O bot **não** inventa o texto: classifica a etapa e escolhe o par abaixo. Sem certeza →
+linha “só deu oi”. **Sem** etapa “pediu foto e sumiu”.
+
+| Parou em | 30 min | +1 h |
+|---|---|---|
+| Só deu oi / sumiu | `e aí amigo, ainda tá aí? te ajudo a achar uma moto` | `amigo, se ainda quiser dar uma olhada nas motos é só responder. fico por aqui` |
+| Anúncio (à vista ou financiar) | `amigo, você queria essa moto à vista ou financiada? me fala que eu sigo` | `ainda consigo te ajudar nessa moto do anúncio. me diz se é à vista ou financiamento` |
+| Vendo opções / não escolheu | `amigo, viu alguma que te interessou? me fala qual que eu te mostro melhor` | `se alguma moto te pegou, me manda o modelo que eu continuo. senão a gente deixa quieto` |
+| Quis financiar, faltou dado | `amigo, pra eu simular falta só [o que falta]. me manda que eu já encaminho` | `sem esses dados eu não consigo simular. se ainda quiser, me passa que eu resolvo agora` |
+| Mandou o catálogo e sumiu | `amigo, deu uma olhada no catálogo? me fala qual moto que eu te atendo nela` | `se viu alguma, me manda o modelo. se não for a hora, tudo bem` |
+| À vista / “quanto é” e sumiu | `amigo, ficou alguma dúvida no valor? te explico direto` | `se ainda quiser fechar à vista me chama que eu sigo com você` |
+
+`[o que falta]` = cpf, nascimento e/ou cnh, só o que ainda não veio.
+
+Timer no worker do `chatbot-api`. O `n8n-baileys` não muda.
+
+Fluxo e tom além do follow-up: **iguais ao atual**, salvo o que o Modo 2 já muda
+(central só-bot, peguei, silêncio pós-handoff, sem grupo).
 
 ## 7. Peças novas a construir
 
 1. **Control:** campo `whatsapp_modo` por loja (1 XOR 2) + provisionamento (padrão de módulo
    provisionável do Control).
-2. **Cadastro de vendedores + ordem da fila** (por loja): números e **ordem**, cadastrados **no
-   Portal pelo lojista**; estado de trava por lead. Exposto ao chatbot/n8n-cloud por contrato (para o
-   roteamento por remetente e o rodízio).
-3. **Central bot (Modo 2)** no `chatbot-api`: intake, 2 gatilhos, detecção vendedor×cliente, trava do
-   lead por clique de botão, silêncio pós-handoff.
-4. **`n8n-cloud`:** inbound (parse Meta + `referral`) e outbound (Graph API: texto + template com
-   botão).
-5. **Motor de rodízio + timer:** percorrer a fila em ordem, esperar X min por vendedor, parar após
-   uma passada completa (candidato pro timer: nó Wait do `n8n-cloud`).
-6. **Template Utility com botão** aprovado na Meta para o "chama vendedor" (variáveis: nome do
-   cliente, veículo, resultado da simulação **quando houver**, link de assumir; botão "peguei").
-7. **Resumo diário ao dono:** job de fim de dia que conta os leads `aguardando` e manda um template
-   ao dono.
-8. **Handoff:** montar o `wa.me`/deep-link com o número do cliente para o vendedor abrir a conversa.
+2. **Cadastro de vendedores + ordem da fila** (por loja): números e **ordem**, cadastrados **na
+   Loja pelo lojista**; estado de trava por lead. Exposto ao chatbot por contrato.
+3. **Central bot (Modo 2)** no `chatbot-api`: intake, 2 gatilhos, detecção vendedor×cliente, trava
+   por clique (primeiro vence), silêncio pós-handoff, recado "já foi pego" no clique perdedor.
+4. **`n8n-cloud`:** inbound (parse Meta + `referral`) e outbound (Graph API: texto + template +
+   interativo). Sem timer.
+5. **Motor de rodízio + timer no `chatbot-api`:** 10 min por vendedor, uma passada, para. Worker
+   do próprio chatbot — não Wait do n8n.
+6. **Template Utility com botão de resposta rápida** aprovado na Meta para o "chama vendedor"
+   (variáveis: nome do cliente, veículo, resultado da simulação **quando houver**; **sem**
+   `wa.me` neste envelope). Mais a variante interativa grátis quando a janela está aberta.
+7. **Atendimento (Modo 2):** faixa "N sem vendedor" + filtro **Aguardando** (dono/gerente).
+8. **Handoff:** **depois** do peguei, mandar o `wa.me` ao vendedor que venceu (mensagem livre).
+9. **Sino 1:1 na Loja:** só o `oferecido_a` vê a oferta **com botão Peguei** (mesmo assumir).
+10. **Agente (Modo 2):** card dos últimos 7 dias (atendidos / perdidos / aguardando / oferecidos).
+11. **Follow-up de silêncio (Modo 2):** 30 min + 1 h, textos configuráveis, worker no chatbot.
 
 ## 8. Onboarding da central (direto na Meta, dev mode)
 
@@ -212,14 +341,17 @@ primeira mensagem — o `n8n-cloud` extrai e alimenta a atribuição existente. 
 
 | Mensagem | Quando | Custo |
 |---|---|---|
-| **Serviço** (dentro de 24h) | bot ↔ cliente | **Grátis** |
-| Template **Utility** (com botão) | "chama vendedor" (por tentativa) e resumo diário | ~R$0,04/msg |
-| Template **Marketing** | não é nosso fluxo | ~R$0,38 |
+| **Serviço** (dentro de 24h) | bot ↔ cliente; "chama vendedor" interativo se a janela com o vendedor está aberta | **Grátis** |
+| Template **Utility** (com botão) | primeiro toque em vendedor com janela **fechada** | ~R$0,03–0,04/entrega |
+| Template **Marketing** | não é nosso fluxo (e "está na loja?" de manhã cairia aqui se recategorizado) | ~R$0,32 |
 | Licença da API | — | Grátis |
 
-- Custo real do Modo 2 ≈ **1 template por vendedor chamado, numa única passada**. Fila de 3
-  vendedores no pior caso (ninguém pega) = ~R$0,12/lead. Se o 1º pega, ~R$0,04. + ~R$0,04/dia do
-  resumo ao dono. Barato.
+- Se o 1º da fila pega o primeiro lead do dia, o custo típico é **um** template (~R$0,04).
+  Os leads seguintes daquele vendedor no mesmo dia são grátis. Sem custo de resumo ao dono.
+- Pior caso numa passada: 1 template por vendedor **ainda frio**. Quem já clicou "peguei" nas
+  últimas 24h não gera cobrança.
+- Check-in matinal **não** entra: deslocaria o custo para todo vendedor, todo dia, mesmo sem lead,
+  e o template "está na loja?" arrisca recategorização Marketing.
 - Modo 1 continua ~R$0 (Baileys, reativo).
 
 ## 10. Validação (smoke leve — substitui o spike pesado)
@@ -242,7 +374,7 @@ ponta, num número de teste, sem vazar segredo. É trabalho de implementação, 
 - Control: toggle `whatsapp_modo` por loja.
 - Modo 1 exposto como opção (sem mudar comportamento).
 - Modo 2 numa loja piloto: central Cloud API em dev mode, `n8n-cloud`, cadastro+rodízio em ordem,
-  template com botão, handoff, resumo diário ao dono. Rodar o smoke (§10).
+  template com botão, handoff, faixa/filtro Aguardando, card de 7 dias no Agente. Rodar o smoke (§10).
 
 **Fase 2 — Produto (spec seguinte):**
 - Revy como **Tech Provider** + embedded signup no Control (self-serve de onboarding Cloud).
@@ -254,7 +386,9 @@ ponta, num número de teste, sem vazar segredo. É trabalho de implementação, 
 
 | Risco | Mitigação |
 |---|---|
-| Vendedores não respondem o rodízio | Uma passada completa pela fila (X min cada) e **para** — sem loop. Leads não pegos viram resumo diário ao dono; estado visível no Portal. |
+| Vendedores não respondem o rodízio | Uma passada (10 min cada) e **para**. Leads ficam `aguardando` na faixa/filtro do Atendimento. |
+| Clique atrasado vs oferta nova | Primeiro clique vence; o perdedor recebe "já foi pego". Trava idempotente. |
+| Pegou e não ligou | Fica travado. Sem auto-devolver. Dono reatribui no Portal. |
 | Template com botão precisa de aprovação Meta | Submeter cedo no piloto; conteúdo é transacional (Utility), aprovação costuma ser rápida. Confirmar suporte a botão de resposta rápida no template. |
 | Central não loga o chat vendedor↔cliente | Trade-off aceito do handoff; o registro do **lead** (não do chat) fica no Portal. Reavaliar na Fase 2. |
 | Dev mode limita destinatários | Piloto usa números de teste registrados; produção exige verificação (Fase 2). |
@@ -273,6 +407,18 @@ ponta, num número de teste, sem vazar segredo. É trabalho de implementação, 
 - **Logar o chat vendedor↔cliente** no Modo 2 — o chat acontece no celular do vendedor; fora de
   escopo desta fase.
 - **Baixar a versão do Baileys** para escapar do passkey — nenhuma versão resolve.
+- **Check-in matinal** ("está na loja?") — o primeiro peguei do dia já abre a janela; o bom-dia
+  só gera custo extra e risco de recategorização Marketing.
+- **"Peguei" por texto solto, URL ou link do Portal** — o backend não fica sabendo, ou fica
+  frágil. Só botão que volta inbound.
+- **`wa.me` na mensagem de oferta** — o vendedor chamaria sem travar o lead.
+- **Apontar vendedor à mão neste lead** — só rodízio automático. Fica pra Fase 2 se fizer falta.
+- **Sino da loja inteira na oferta** — só o `oferecido_a`. Dono vê o que sobrou na faixa do Atendimento.
+- **Resumo WhatsApp às 19h / campo do número do dono** — o recorte mora na Loja, ao vivo.
+- **Devolver à fila se pegou e não ligou** — não. Travou, ficou.
+- **Timer no Wait do n8n** — não. Worker no `chatbot-api`.
+- **Um n8n com `if` de modo** — não. Dois workflows.
+- **Follow-up no Modo 1** — não. O `n8n-baileys` não ganha cutucão.
 
 ## 14. Alternativa descartada: coexistência por-vendedor
 
@@ -287,18 +433,20 @@ O modelo de **central só-bot + handoff** entrega o mesmo resultado (bot atende,
 echo/history, e os números dos vendedores livres de qualquer pareamento. Por isso a coexistência foi
 descartada.
 
-## 15. Perguntas abertas / decisões adiadas
+## 15. Decisões fechadas nesta revisão (2026-08-13)
 
-1. **X min do rodízio** — default sugerido **5 min** por vendedor, configurável por loja. Confirmar no
-   piloto.
-2. ~~Ordem da fila~~ **Resolvido:** **ordem fixa** cadastrada no Portal (o 1º da lista sempre recebe
-   primeiro; sem rotação). Critérios mais ricos (disponibilidade/performance) ficam pra Fase 2.
-3. ~~Fallback quando ninguém pega~~ **Resolvido:** **uma passada e para**; sem aviso por-lead; **resumo
-   diário ao dono** dos leads `aguardando`. Definir a hora do resumo (ex.: 19h) no plano.
-4. **Onde mora o timer do rodízio** — nó Wait do `n8n-cloud` vs worker no `chatbot-api`. Decidir no
-   plano de implementação.
-5. ~~Cadastro dos números de vendedor~~ **Resolvido:** **no Portal, pelo lojista** (números + ordem).
-   Falta só o **contrato** de como o `n8n-cloud`/chatbot consulta a lista (roteamento por remetente +
-   rodízio) — detalhe do plano.
-6. ~~"Pego" palavra vs botão~~ **Resolvido:** **botão** de resposta rápida no template. Confirmar o
-   suporte exato ao botão no template Utility na implementação.
+Nada em aberto de produto. Contrato HTTP da fila (Portal → chatbot) é detalhe do plano.
+
+| # | Tema | Decisão |
+|---|---|---|
+| 1 | Quem escolhe o vendedor | **Só rodízio automático**, de cima pra baixo. Sem apontar à mão. |
+| 2 | Sino | WhatsApp 1:1 + sino só no `oferecido_a`, **com botão Peguei**. |
+| 3 | Tempo por oferta | **10 min**. |
+| 4 | Resumo ao dono | **Na Loja**, ao vivo: faixa+filtro no Atendimento + card 7 dias no Agente. Sem WhatsApp 19h. |
+| 5 | Timer | **Worker no `chatbot-api`**. |
+| 6 | Clique atrasado | **Primeiro clique vence.** Botão velho continua válido até travar. Perdedor ouve "já foi pego". |
+| 7 | Pegou e não ligou | **Fica travado.** Dono resolve no Portal. Sem auto-devolver. |
+| 8 | Número do dono | **Não existe.** Caiu com o template das 19h. |
+| 9 | Peguei no sino | **Sim.** Mesmo assumir do WhatsApp. |
+| 10 | n8n | **Um por modo.** `n8n-baileys` intacto; `n8n-cloud` novo. |
+| 11 | Silêncio do cliente | **30 min → msg 1; +1 h → msg 2; para.** Texto por etapa (§5.9). Sem cutucão de foto. |

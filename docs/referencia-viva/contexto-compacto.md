@@ -37,9 +37,11 @@ Vocabulário: [`../../CONTEXT.md`](../../CONTEXT.md). As-built Control/Loja:
   live (`n8n2037`, 2026-08-04): importado como `wAiNaoSalvos0001`, **inativo/draft**.
   Teste separado permanece OFF. Active ON só com smoke autorizado pelo dono.
 - **Alerta de simulação no grupo:** persistência + outbox + retry + dead-letter no
-  Chatbot. Residual = smoke, não código.
-- **WhatsApp dois modos** (Baileys+grupo **ou** Central Cloud API): spec fechada,
-  plano ainda não escrito. Coexistência por vendedor foi descartada.
+  Chatbot. Residual = smoke, não código. **Fica** no Modo 1.
+- **WhatsApp dois modos** (Baileys+grupo **ou** Central Cloud API): spec fechada
+  (revisão 2026-08-13). Plano ainda não escrito. Coexistência por vendedor foi
+  descartada. Escolha no Control; Loja muda a tela. Fallback do dono é Atendimento
+  (faixa + filtro), não WhatsApp 19h.
 - **Motor:** 4 bancos LIVE; teto 2 browsers; Playwright sob demanda em `motor2037`
   (`gru`). Resultado ao cliente continua **humano** no Portal. Worker em IP
   residencial: design aprovado, sem código; gate é o probe no PC.
@@ -66,8 +68,8 @@ Um eixo por mudança. Não misture Copiloto, RPA, rollout e n8n na mesma entrega
 | Eixo | Próximo resultado verificável |
 |---|---|
 | Copiloto | F5 (lacunas no Control e/ou RLS) **ou** F6 (ferramentas cadastro/funil) |
-| Loja — foto | Upload por arquivo no form de estoque que já existe |
-| Loja — sino | Central geral + `simulacao_pronta`, sem depender da flag do Copiloto |
+| Loja — foto | Upload por arquivo no form de estoque (os dois modos; no 2 é o único caminho) |
+| Loja — sino | B1: central geral por tipo. Sem blast `simulacao_pronta`. Oferta 1:1 = plano dos dois modos |
 | Motor | Probe Bradesco no PC (gate do worker residencial) **ou** estabilidade Bradesco |
 | Bot / n8n | Smoke virgem/CTWA/handoff/salvo no lab → Active ON pelo dono |
 | Control | Secrets GCP (Google Ads) **ou** E2E dois canais WA |

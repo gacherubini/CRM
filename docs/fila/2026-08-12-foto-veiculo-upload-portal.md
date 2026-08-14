@@ -1,8 +1,12 @@
 # Foto de veículo → upload no Portal — Implementation Plan
 
+> **Status 2026-08-13:** alinhado ao spec dos dois modos. Vale nos **dois**: Modo 1 = atalho
+> além do grupo; Modo 2 = **único** jeito de publicar. **Não** apagar o fluxo de foto pelo
+> grupo (Modo 1). Eixo à parte — não misturar com o plano WhatsApp.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) ou superpowers:executing-plans para executar tarefa-a-tarefa. Steps usam checkbox (`- [ ]`).
 
-**Goal:** Permitir que o vendedor suba a **foto do veículo por arquivo** (tirar/selecionar) na tela de estoque que **já existe** no Portal, reaproveitando o endpoint de upload que o `estoque-api` já expõe — substituindo o cadastro de foto por URL e removendo a dependência do grupo de WhatsApp para foto.
+**Goal:** Permitir que o vendedor suba a **foto do veículo por arquivo** (tirar/selecionar) na tela de estoque que **já existe** no Portal, reaproveitando o endpoint de upload que o `estoque-api` já expõe — substituindo o cadastro de foto por URL. Tira a *obrigatoriedade* do grupo para ter foto; o grupo do Modo 1 **permanece**.
 
 **Architecture:** três peças no `portal-gestao`, backend do `estoque-api` já pronto e sem migração: (1) método `adicionar_foto` no `EstoqueClient` chamando `POST /v1/veiculos/{id}/fotos/upload`; (2) tratamento de `UploadFile` nas rotas `estoque_criar`/`estoque_editar` via helper `_anexar_foto_se_enviada`; (3) `enctype="multipart/form-data"` + `<input type="file">` no `estoque/form.html`, herdando o estilo dos inputs.
 
