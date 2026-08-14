@@ -32,6 +32,10 @@ reimplementa.
 - **Parcela não vai ao cliente pelo bot** — invariante do projeto. Quem fala número é o vendedor.
 - **`wa.me` e pacote do lead só DEPOIS do clique** (§5.7). Nunca na mensagem de oferta.
 - **Nunca gastar template pago em re-notificação** (§5.4).
+- **O step "ver falhar" tem que falhar de verdade.** Teste que passa antes da implementação é
+  cobertura falsa. Cuidado especial com default de coluna (só é aplicado no `commit`, antes disso o
+  atributo é `None`) e com asserção que só confere o que o próprio teste acabou de passar por
+  kwarg — isso testa o SQLAlchemy, não o nosso código.
 - Rodar testes **a partir de `chatbot-api/`**. O dono usa **Mac e Windows**: macOS
   `.venv/bin/python -m pytest -q`; Windows `.\.venv\Scripts\python.exe -m pytest -q`.
 

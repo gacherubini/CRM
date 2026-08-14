@@ -317,12 +317,22 @@ def test_modo_invalido_e_recusado(db, loja_ativa, ator_admin, monkeypatch):
         definir_whatsapp_modo(db, loja_ativa.id, 3, ator=ator_admin)
 
 
-def test_voltar_para_modo_1_e_permitido_e_nao_toca_conversa(db, loja_ativa, ator_admin, monkeypatch):
-    """Spec §5.8: trocar o modo não migra conversa antiga — aqui só muda o campo."""
+def test_voltar_para_modo_1_bumpa_a_versao_de_novo(db, loja_ativa, ator_admin, monkeypatch):
+    """Ida e volta. Cada troca é um evento novo para a projeção do chatbot.
+
+    Sem o segundo bump, o chatbot ficaria no modo 2 para sempre: a projeção é
+    monotônica e descartaria a volta com a mesma versão.
+    """
     monkeypatch.setattr("app.control.stores.config.WHATSAPP_MODO2_ENABLED", True)
+    versao_inicial = loja_ativa.versao
+
     definir_whatsapp_modo(db, loja_ativa.id, 2, ator=ator_admin)
+    versao_no_modo_2 = loja_ativa.versao
     loja = definir_whatsapp_modo(db, loja_ativa.id, 1, ator=ator_admin)
+
     assert loja.whatsapp_modo == 1
+    assert versao_no_modo_2 > versao_inicial
+    assert loja.versao > versao_no_modo_2
 ```
 
 > `ator_admin` e `loja_ativa` são as fixtures dos testes de `stores` — reuse as existentes. A

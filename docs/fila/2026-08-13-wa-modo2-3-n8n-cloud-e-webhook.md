@@ -51,6 +51,10 @@ Trocar isso é decisão de deploy, não deste card.
 - **Responder 200 rápido.** A Meta reentrega se demorar. Processar depois de responder.
 - **Dedup por `wamid`.** O replay >5 min do Modo 1 não cobre reentrega em segundos.
 - **Ativar workflow é só pelo "Publish" na UI.** `active=1` no banco **não** registra o webhook.
+- **O step "ver falhar" tem que falhar de verdade.** Teste que passa antes da implementação é
+  cobertura falsa. Cuidado especial com default de coluna (só é aplicado no `commit`, antes disso o
+  atributo é `None`) e com asserção que só confere o que o próprio teste acabou de passar por
+  kwarg — isso testa o SQLAlchemy, não o nosso código.
 - Rodar testes **a partir de `chatbot-api/`**. O dono usa **Mac e Windows**: macOS
   `.venv/bin/python -m pytest -q`; Windows `.\.venv\Scripts\python.exe -m pytest -q`.
   O validador do n8n roda **da raiz**: `python n8n/validate_workflow_cloud.py`.
@@ -583,10 +587,39 @@ def _wamid_ja_visto(db: Session, wamid: str) -> bool:
     return existe
 ```
 
-> `processar_evento_cloud(db, evento)` é o despacho por `evento.tipo`: `texto` segue o fluxo do bot,
-> `audio`/`imagem` chamam o processador do card 2b Task 1–2, `clique` chama `processar_clique`
-> (card 2b Task 5), `status` só loga o `failed`, `ignorado` não faz nada. Escreva-o como função
-> nova em `main.py` chamando o que os cards 2 e 2b já entregaram — não reimplemente nada.
+E o despacho, que **precisa existir como função de módulo** — o teste de reentrega faz
+`monkeypatch` nele por nome, e um `if/elif` inline dentro da rota não seria substituível:
+
+```python
+def processar_evento_cloud(db: Session, evento: EventoCloud) -> None:
+    """Despacha o evento para o que os cards 2 e 2b já entregaram.
+
+    Função de módulo, não bloco inline na rota: é o ponto de substituição dos
+    testes e o lugar onde o tipo novo entra sem mexer no handler HTTP.
+    """
+    loja = _loja_por_phone_number_id(db, evento.phone_number_id)
+    if loja is None:
+        logger.warning("phone_number_id sem loja: %s", evento.phone_number_id)
+        return
+
+    if evento.tipo == "clique":
+        processar_clique(
+            db, loja.id, evento.remetente, evento.oferta_id,
+            outbound=outbound_para_loja(db, loja.id),
+        )
+    elif evento.tipo == "status":
+        if evento.status == "failed":
+            logger.warning("envio falhou wamid=%s para=%s", evento.wamid, evento.remetente)
+    elif evento.tipo in ("texto", "audio", "imagem"):
+        # Fluxo do bot: texto direto; áudio transcreve antes (card 2b Task 2);
+        # imagem entra na conversa sem OCR (spec §5.10).
+        _processar_mensagem_cliente(db, loja, evento)
+    # "ignorado" não faz nada de propósito: sticker, contato, localização.
+```
+
+> `_loja_por_phone_number_id` e `_processar_mensagem_cliente` são helpers desta task. O primeiro
+> consulta `whatsapp_canais` pelo id do número; o segundo chama o processador de áudio do card 2b
+> quando `tipo == "audio"` e segue o fluxo normal do bot com o texto resultante.
 
 - [ ] **Step 4: Rodar e ver passar**
 

@@ -60,6 +60,10 @@ bloqueia todo o resto.
   papéis. Contrato em `app/web/loja_shell.py`.
 - **Contagem por pessoa** (`CopilotoSinalVisto`) e cache TTL 45s (`app/loja/copiloto/notificacoes.py:36`) permanecem.
 - **Migration com `batch_alter_table`** — o projeto testa em SQLite, que não faz `ALTER COLUMN`.
+- **O step "ver falhar" tem que falhar de verdade.** Teste que passa antes da implementação é
+  cobertura falsa. Cuidado especial com default de coluna (só é aplicado no `commit`, antes disso o
+  atributo é `None`) e com asserção que só confere o que o próprio teste acabou de passar por
+  kwarg — isso testa o SQLAlchemy, não o nosso código.
 - Rodar testes **a partir de `portal-gestao/`** (senão importa o `app` errado). O dono usa **Mac e
   Windows**: macOS `.venv/bin/python -m pytest -q`; Windows `.\.venv\Scripts\python.exe -m pytest -q`.
 

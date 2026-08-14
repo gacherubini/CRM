@@ -38,6 +38,10 @@ Também fora: `n8n-cloud` (card 3) e toggle no Control (card 4).
 - **Telefone de vendedor mora aqui**, normalizado com `app/operacao.py::normalizar_telefone`. A
   comparação usa `variantes_telefone` (9º dígito) — nunca `==` de string crua.
 - **Sem import entre produtos.** O Portal chama por HTTP; nada de importar `app` do Portal.
+- **O step "ver falhar" tem que falhar de verdade.** Teste que passa antes da implementação é
+  cobertura falsa. Cuidado especial com default de coluna (só é aplicado no `commit`, antes disso o
+  atributo é `None`) e com asserção que só confere o que o próprio teste acabou de passar por
+  kwarg — isso testa o SQLAlchemy, não o nosso código.
 - Rodar testes **a partir de `chatbot-api/`** (senão importa o `app` errado). O dono usa **Mac e
   Windows**: macOS `.venv/bin/python -m pytest -q`; Windows `.\.venv\Scripts\python.exe -m pytest -q`.
 
@@ -59,20 +63,45 @@ Também fora: `n8n-cloud` (card 3) e toggle no Control (card 4).
 
 ```python
 # chatbot-api/tests/test_fila_vendedor.py
+import pytest
+from sqlalchemy.exc import IntegrityError
+
 from app.models_db import FilaVendedor
 
 
-def test_vendedor_nasce_ativo():
+def test_vendedor_nasce_ativo(db, loja_a):
+    """Precisa do commit: default de coluna só é aplicado no flush.
+
+    Sem ele, ``v.ativo`` é ``None`` e o teste passaria mesmo se o default
+    estivesse errado.
+    """
     v = FilaVendedor(
-        id="f1", loja_id="l1", nome="João", telefone="5511999998888", ordem=1
+        id="f1", loja_id=loja_a["loja_id"], nome="João",
+        telefone="5511999998888", ordem=1,
     )
-    assert v.ativo is True or v.ativo is None  # default aplicado no flush
+    db.add(v)
+    db.commit()
+    assert v.ativo is True
 
 
-def test_telefone_e_nome_sao_obrigatorios():
-    v = FilaVendedor(id="f1", loja_id="l1", nome="João", telefone="5511999998888", ordem=1)
-    assert v.nome == "João"
-    assert v.telefone == "5511999998888"
+def test_nome_e_obrigatorio(db, loja_a):
+    """O nome vai no aviso ao cliente (§5.1) — sem ele o handoff fica anônimo."""
+    db.add(FilaVendedor(
+        id="f2", loja_id=loja_a["loja_id"], nome=None,
+        telefone="5511999998888", ordem=1,
+    ))
+    with pytest.raises(IntegrityError):
+        db.commit()
+    db.rollback()
+
+
+def test_telefone_e_obrigatorio(db, loja_a):
+    db.add(FilaVendedor(
+        id="f3", loja_id=loja_a["loja_id"], nome="João", telefone=None, ordem=1,
+    ))
+    with pytest.raises(IntegrityError):
+        db.commit()
+    db.rollback()
 ```
 
 - [ ] **Step 2: Rodar e ver falhar**
@@ -195,20 +224,31 @@ git commit -m "feat(chatbot): tabela fila_vendedor do rodizio"
 
 ```python
 # chatbot-api/tests/test_oferta_lead.py
-from app.models_db import OfertaLead, RodizioPonteiro
+from app.models_db import FilaVendedor, OfertaLead, RodizioPonteiro
 
 
-def test_oferta_nasce_aberta():
+def test_oferta_nasce_aberta(db, loja_a):
+    """Commit obrigatório: antes do flush o estado é ``None``, não o default."""
+    db.add(FilaVendedor(
+        id="f1", loja_id=loja_a["loja_id"], nome="V", telefone="5511999990000", ordem=0,
+    ))
+    db.commit()
     o = OfertaLead(
-        id="o1", loja_id="l1", telefone_cliente="5511988887777",
+        id="o1", loja_id=loja_a["loja_id"], telefone_cliente="5511988887777",
         vendedor_id="f1", posicao_inicial=0,
     )
-    assert o.estado in (None, "aberta")
+    db.add(o)
+    db.commit()
+    assert o.estado == "aberta"
+    assert o.travada_em is None
 
 
-def test_ponteiro_guarda_posicao_por_loja():
-    p = RodizioPonteiro(loja_id="l1", posicao=2)
-    assert p.posicao == 2
+def test_ponteiro_comeca_em_zero(db, loja_a):
+    """Loja nova começa no topo da fila — o default é parte do contrato."""
+    p = RodizioPonteiro(loja_id=loja_a["loja_id"])
+    db.add(p)
+    db.commit()
+    assert p.posicao == 0
 ```
 
 - [ ] **Step 2: Rodar e ver falhar**
