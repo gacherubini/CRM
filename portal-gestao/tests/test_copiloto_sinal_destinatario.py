@@ -1,4 +1,9 @@
-from app.loja.copiloto.sinais_store import contar_sinais_novos, listar_sinais_abertos
+from app.loja.copiloto.sinais_store import (
+    contar_sinais_novos,
+    criar_sinal_direcionado,
+    listar_sinais_abertos,
+    transferir_sinal,
+)
 from app.models import CopilotoSinal
 
 
@@ -76,3 +81,44 @@ def test_listagem_sem_usuario_devolve_tudo(db):
     _sinal(db, "loja-a")
     _sinal(db, "loja-a", regra="oferta_lead", destinatario="u-vendedor")
     assert len(listar_sinais_abertos(db, "loja-a")) == 2
+
+
+def test_criar_direcionado_so_aparece_para_o_destinatario(db):
+    criar_sinal_direcionado(
+        db,
+        "loja-a",
+        regra="oferta_lead",
+        destinatario_usuario_id="u-v1",
+        entidade_ref="oferta-123",
+        titulo="Lead novo",
+        detalhe="Cliente quer uma Biz 125",
+    )
+    assert contar_sinais_novos(db, "loja-a", "u-v1") == 1
+    assert contar_sinais_novos(db, "loja-a", "u-v2") == 0
+
+
+def test_transferir_passa_a_oferta_para_o_proximo(db):
+    criar_sinal_direcionado(
+        db,
+        "loja-a",
+        regra="oferta_lead",
+        destinatario_usuario_id="u-v1",
+        entidade_ref="oferta-123",
+        titulo="Lead novo",
+        detalhe="Cliente quer uma Biz 125",
+    )
+
+    assert transferir_sinal(
+        db, "loja-a", entidade_ref="oferta-123",
+        de_usuario_id="u-v1", para_usuario_id="u-v2",
+    ) is True
+
+    assert contar_sinais_novos(db, "loja-a", "u-v1") == 0
+    assert contar_sinais_novos(db, "loja-a", "u-v2") == 1
+
+
+def test_transferir_sem_sinal_aberto_devolve_false(db):
+    assert transferir_sinal(
+        db, "loja-a", entidade_ref="oferta-inexistente",
+        de_usuario_id="u-v1", para_usuario_id="u-v2",
+    ) is False

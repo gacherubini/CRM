@@ -269,3 +269,89 @@ def marcar_visto(db: Session, loja_slug: str, sinal_id: str, usuario_id: str) ->
 
 def dispensar(db: Session, loja_slug: str, sinal_id: str) -> bool:
     return _transicionar(db, loja_slug, sinal_id, "dispensado")
+
+
+def criar_sinal_direcionado(
+    db: Session,
+    loja_slug: str,
+    *,
+    regra: str,
+    destinatario_usuario_id: str,
+    entidade_ref: str,
+    titulo: str,
+    detalhe: str,
+    severidade: str = "atencao",
+    dados_json: str | None = None,
+) -> CopilotoSinal:
+    """Cria sinal de UMA pessoa (oferta 1:1 do rodízio, spec §5.7).
+
+    Não passa por ``sincronizar_sinais``: aquilo é para regra determinística
+    que roda em lote sobre a loja. Aqui o produtor é um evento único, e o
+    destinatário é obrigatório — um sinal de oferta sem dono seria
+    exatamente o "sino da loja inteira" que o dono recusou.
+
+    ``entidade_ref`` guarda o id da oferta, nunca o telefone do cliente.
+    """
+    sinal = CopilotoSinal(
+        loja_slug=loja_slug,
+        regra=regra,
+        entidade_ref=entidade_ref,
+        severidade=severidade,
+        titulo=titulo,
+        detalhe=detalhe,
+        dados_json=dados_json,
+        estado="novo",
+        destinatario_usuario_id=destinatario_usuario_id,
+    )
+    db.add(sinal)
+    db.commit()
+    return sinal
+
+
+def transferir_sinal(
+    db: Session,
+    loja_slug: str,
+    *,
+    entidade_ref: str,
+    de_usuario_id: str,
+    para_usuario_id: str,
+) -> bool:
+    """Passa a oferta ao próximo do rodízio: resolve a do anterior, cria a nova.
+
+    Não é um UPDATE do destinatário: o sinal antigo precisa sair do contador
+    do vendedor que perdeu a vez, e ``CopilotoSinalVisto`` é por sinal — reusar
+    a linha carregaria o "visto" do anterior para o próximo.
+    """
+    anterior = (
+        db.query(CopilotoSinal)
+        .filter(
+            CopilotoSinal.loja_slug == loja_slug,
+            CopilotoSinal.entidade_ref == entidade_ref,
+            CopilotoSinal.destinatario_usuario_id == de_usuario_id,
+            CopilotoSinal.estado.in_(ESTADOS_ABERTOS),
+        )
+        .first()
+    )
+    if anterior is None:
+        return False
+
+    agora_utc = datetime.now(timezone.utc)
+    anterior.estado = "resolvido"
+    anterior.resolvido_em = agora_utc
+    anterior.atualizado_em = agora_utc
+
+    db.add(
+        CopilotoSinal(
+            loja_slug=loja_slug,
+            regra=anterior.regra,
+            entidade_ref=entidade_ref,
+            severidade=anterior.severidade,
+            titulo=anterior.titulo,
+            detalhe=anterior.detalhe,
+            dados_json=anterior.dados_json,
+            estado="novo",
+            destinatario_usuario_id=para_usuario_id,
+        )
+    )
+    db.commit()
+    return True
