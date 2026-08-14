@@ -14,6 +14,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Iterable
 
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from app.loja.copiloto.sinais import SinalCandidato
@@ -172,6 +173,9 @@ def contar_sinais_novos(db: Session, loja_slug: str, usuario_id: str) -> int:
     fazer o contador do gestor B cair — por isso o filtro é contra
     ``copiloto_sinal_visto`` de ``usuario_id``, não contra ``estado`` do
     sinal (que é compartilhado pela loja inteira).
+
+    Destinatário: ``NULL`` continua da loja inteira (as 7 regras do
+    Copiloto); preenchido só conta para essa pessoa.
     """
     vistos_pelo_usuario = db.query(CopilotoSinalVisto.sinal_id).filter(
         CopilotoSinalVisto.usuario_id == usuario_id
@@ -182,6 +186,12 @@ def contar_sinais_novos(db: Session, loja_slug: str, usuario_id: str) -> int:
             CopilotoSinal.loja_slug == loja_slug,
             CopilotoSinal.estado == "novo",
             CopilotoSinal.id.notin_(vistos_pelo_usuario),
+            # Sinal endereçado só conta para o destinatário. NULL continua
+            # sendo da loja inteira — é o caso das 7 regras do Copiloto.
+            or_(
+                CopilotoSinal.destinatario_usuario_id.is_(None),
+                CopilotoSinal.destinatario_usuario_id == usuario_id,
+            ),
         )
         .count()
     )
