@@ -118,3 +118,41 @@ def test_peguei_sinal_alheio_e_403(client, db, monkeypatch):
 
     assert r.status_code == 403
     assert db.query(AtendimentoAtribuicao).count() == 0
+
+
+def test_notificacoes_oferta_propria_pode_pegar(client, db, monkeypatch):
+    _ligar(monkeypatch)
+    login(client, email="dono-pega@loja.test")
+    usuario = _usuario(db, "dono-pega@loja.test")
+    _sinal(db, usuario.id, entidade="of-json")
+
+    r = client.get("/app/loja/copiloto/notificacoes.json")
+    assert r.status_code == 200
+    item = r.json()["itens"][0]
+    assert item["pode_pegar"] is True
+
+
+def test_notificacoes_sinal_copiloto_nao_pode_pegar(client, db, monkeypatch):
+    from app.loja.copiloto.sinais import SinalCandidato
+    from app.loja.copiloto.sinais_store import sincronizar_sinais
+
+    _ligar(monkeypatch)
+    login(client, email="dono-cop@loja.test")
+    sincronizar_sinais(
+        db,
+        "loja-teste",
+        [
+            SinalCandidato(
+                regra="estoque_parado",
+                severidade="atencao",
+                titulo="Moto parada",
+                detalhe="capital preso",
+                entidade_ref="v-json",
+            )
+        ],
+    )
+
+    r = client.get("/app/loja/copiloto/notificacoes.json")
+    assert r.status_code == 200
+    item = r.json()["itens"][0]
+    assert item["pode_pegar"] is False

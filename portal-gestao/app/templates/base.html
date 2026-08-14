@@ -399,6 +399,15 @@
         const acoes = document.createElement('div');
         acoes.className = 'copiloto-notif-acoes';
 
+        if (item && item.pode_pegar) {
+          const btnPeguei = document.createElement('button');
+          btnPeguei.type = 'button';
+          btnPeguei.className = 'button primary';
+          btnPeguei.textContent = 'Peguei';
+          btnPeguei.addEventListener('click', () => acionar(item.id, 'peguei', li));
+          acoes.appendChild(btnPeguei);
+        }
+
         const btnVisto = document.createElement('button');
         btnVisto.type = 'button';
         btnVisto.className = 'button secondary';

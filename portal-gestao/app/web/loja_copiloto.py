@@ -311,7 +311,9 @@ def _guard_json(request: Request, db: Session):
     return usuario, None
 
 
-def _serializar_sinal_para_painel(sinal: CopilotoSinal) -> dict:
+def _serializar_sinal_para_painel(
+    sinal: CopilotoSinal, *, usuario_id: str | None = None
+) -> dict:
     """Só os campos que o JS do painel (``base.html``, F4/Task 2) lê.
 
     ``acao_sugerida`` vem de volta como dict (não string) — o JS só usa
@@ -342,6 +344,11 @@ def _serializar_sinal_para_painel(sinal: CopilotoSinal) -> dict:
         "rotulo": entrada_catalogo.rotulo,
         "icone": entrada_catalogo.icone,
         "severidade_padrao": entrada_catalogo.severidade_padrao,
+        "pode_pegar": (
+            sinal.regra == "oferta_lead"
+            and usuario_id is not None
+            and sinal.destinatario_usuario_id == usuario_id
+        ),
     }
 
 
@@ -360,7 +367,7 @@ def copiloto_notificacoes_json(request: Request, db: Session = Depends(get_db)):
     if erro is not None:
         return erro
     itens = [
-        _serializar_sinal_para_painel(s)
+        _serializar_sinal_para_painel(s, usuario_id=usuario.id)
         for s in listar_sinais_abertos(
             db, usuario.loja_slug, usuario_id=getattr(usuario, "id", None)
         )
