@@ -1012,6 +1012,12 @@ def loja_opera_modo2(db: Session, loja_id: str) -> bool:
     return allows_processing(db, loja_id)
 ```
 
+> **Este gate ainda não está completo.** Falta a terceira condição — a loja estar de fato no
+> **modo 2** —, e ela só pode existir depois que o Control souber o que é modo. O
+> [card 4](2026-08-13-wa-modo2-4-control-toggle.md), Task 4, acrescenta essa cláusula. **Não ligue a
+> flag num ambiente com mais de uma loja antes do card 4**: com só estas duas condições, toda loja
+> ativa entra no rodízio, inclusive as de Modo 1.
+
 E no começo de `abrir_oferta`, antes de qualquer consulta:
 
 ```python
