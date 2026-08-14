@@ -36,21 +36,31 @@ TTL_SEGUNDOS = 45.0
 cache_nao_vistos = CacheTTL(ttl_segundos=TTL_SEGUNDOS)
 
 
-def _chave(loja_slug: str, usuario_id: str) -> str:
+def _chave(
+    loja_slug: str, usuario_id: str, regras: frozenset[str] | None = None
+) -> str:
     """Usuário entra na chave: a contagem é pessoal desde a Task 0.
 
     Cachear só por loja devolveria a contagem de uma pessoa (ex: o sócio)
     para outra que renderizasse o shell logo em seguida.
     """
-    return f"{loja_slug}:{usuario_id}"
+    return f"{loja_slug}:{usuario_id}:{hash(frozenset(regras)) if regras else 'all'}"
 
 
-def contar_nao_vistos(db: Session, loja_slug: str, usuario_id: str) -> int:
+def contar_nao_vistos(
+    db: Session,
+    loja_slug: str,
+    usuario_id: str,
+    regras: frozenset[str] | None = None,
+) -> int:
     """Contagem cacheada (TTL curto) de sinais novos do usuário nesta loja."""
-    return cache_nao_vistos.obter(
-        _chave(loja_slug, usuario_id),
-        lambda: contar_sinais_novos(db, loja_slug, usuario_id),
-    )
+
+    def _contar() -> int:
+        if regras is None:
+            return contar_sinais_novos(db, loja_slug, usuario_id)
+        return contar_sinais_novos(db, loja_slug, usuario_id, regras=regras)
+
+    return cache_nao_vistos.obter(_chave(loja_slug, usuario_id, regras), _contar)
 
 
 def invalidar_contagem(loja_slug: str, usuario_id: str | None = None) -> None:
@@ -62,7 +72,10 @@ def invalidar_contagem(loja_slug: str, usuario_id: str | None = None) -> None:
     refletiria o sinal novo quando o TTL de cada pessoa expirasse por conta
     própria.
     """
-    prefixo = f"{loja_slug}:" if usuario_id is None else _chave(loja_slug, usuario_id)
+    # Prefixo do usuário, não a chave completa: depois do B1 a chave leva
+    # o hash das regras (`:all` vs `:<hash>`), e quem invalida por pessoa
+    # (transferência 1:1) precisa limpar os dois.
+    prefixo = f"{loja_slug}:" if usuario_id is None else f"{loja_slug}:{usuario_id}:"
     cache_nao_vistos.invalidar(prefixo=prefixo)
 
 

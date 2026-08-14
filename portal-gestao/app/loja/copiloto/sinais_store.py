@@ -190,7 +190,13 @@ def listar_sinais_abertos(
     return linhas[: max(1, limite)]
 
 
-def contar_sinais_novos(db: Session, loja_slug: str, usuario_id: str) -> int:
+def contar_sinais_novos(
+    db: Session,
+    loja_slug: str,
+    usuario_id: str,
+    *,
+    regras: frozenset[str] | None = None,
+) -> int:
     """Sinais novos que ESTA pessoa ainda não marcou como visto.
 
     "Visto" é por pessoa (Fase 4, Task 0): o gestor A marcar visto não pode
@@ -200,25 +206,26 @@ def contar_sinais_novos(db: Session, loja_slug: str, usuario_id: str) -> int:
 
     Destinatário: ``NULL`` continua da loja inteira (as 7 regras do
     Copiloto); preenchido só conta para essa pessoa.
+
+    ``regras``: se vier, só conta esses tipos. ``None`` = tudo (compat).
     """
     vistos_pelo_usuario = db.query(CopilotoSinalVisto.sinal_id).filter(
         CopilotoSinalVisto.usuario_id == usuario_id
     )
-    return (
-        db.query(CopilotoSinal)
-        .filter(
-            CopilotoSinal.loja_slug == loja_slug,
-            CopilotoSinal.estado == "novo",
-            CopilotoSinal.id.notin_(vistos_pelo_usuario),
-            # Sinal endereçado só conta para o destinatário. NULL continua
-            # sendo da loja inteira — é o caso das 7 regras do Copiloto.
-            or_(
-                CopilotoSinal.destinatario_usuario_id.is_(None),
-                CopilotoSinal.destinatario_usuario_id == usuario_id,
-            ),
-        )
-        .count()
-    )
+    filtros = [
+        CopilotoSinal.loja_slug == loja_slug,
+        CopilotoSinal.estado == "novo",
+        CopilotoSinal.id.notin_(vistos_pelo_usuario),
+        # Sinal endereçado só conta para o destinatário. NULL continua
+        # sendo da loja inteira — é o caso das 7 regras do Copiloto.
+        or_(
+            CopilotoSinal.destinatario_usuario_id.is_(None),
+            CopilotoSinal.destinatario_usuario_id == usuario_id,
+        ),
+    ]
+    if regras is not None:
+        filtros.append(CopilotoSinal.regra.in_(regras))
+    return db.query(CopilotoSinal).filter(*filtros).count()
 
 
 def _transicionar(
