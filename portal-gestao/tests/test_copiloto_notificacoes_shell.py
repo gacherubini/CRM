@@ -129,6 +129,29 @@ def test_flag_global_do_copiloto_desligada_recebe_none(db, monkeypatch):
     assert extras["copiloto_nao_vistos"] is None
 
 
+def test_sino_repassa_regras_elegiveis_na_contagem(db, monkeypatch):
+    """Gate do sino passa a ser regras_elegiveis; a contagem recebe esse conjunto."""
+    _ligar_shell_e_entitlements(monkeypatch)
+    criar_usuario(papel="dono", email="dono-regras@loja.test", loja_slug="loja-teste")
+    _seedar_modulo_copiloto(db)
+    usuario = _usuario(db, "dono-regras@loja.test")
+
+    visto = {}
+
+    def _espiao(loja_slug, usuario_id, db, regras=None):
+        visto["regras"] = regras
+        return 0
+
+    monkeypatch.setattr(
+        "app.web.loja_shell._contar_nao_vistos_com_sessao_propria",
+        _espiao,
+    )
+    extras = template_extras(_FakeRequest(), usuario, db)
+    assert extras["copiloto_nao_vistos"] == 0
+    assert visto.get("regras")
+    assert "estoque_parado" in visto["regras"]
+
+
 # --- copiloto_secao_liberada: fonte única dos 4 gates (sino + seção) -------
 
 
