@@ -36,7 +36,7 @@ from app.oferta_inbound import processar_clique
 from app.whatsapp_outbound import outbound_para_loja
 from app.auth import Contexto, get_contexto, verificar_webhook_token
 from app.db import get_db
-from app.models_db import FilaVendedor
+from app.models_db import FilaVendedor, OfertaLead
 from app.operacao import normalizar_telefone
 from app.inventory import (
     InventoryProvider,
@@ -1522,6 +1522,43 @@ def _fila_dict(v: FilaVendedor) -> dict:
 def listar_fila_vendedores(ctx=Depends(get_contexto), db: Session = Depends(get_db)):
     from app.rodizio import _fila_ordenada
     return [_fila_dict(v) for v in _fila_ordenada(db, ctx.loja_id)]
+
+
+ESTADOS_NAO_ENCERRADOS = ("aberta", "esgotada")
+
+
+@app.get("/v1/ofertas")
+def listar_ofertas(
+    estado: str | None = None,
+    ctx=Depends(get_contexto),
+    db: Session = Depends(get_db),
+):
+    """Estado do rodízio para a Loja desenhar (spec §5.8).
+
+    Sem ``estado``, devolve o que ainda pede ação — aberta e esgotada. Travada
+    não entra por padrão: quem travou já está no workspace de Atendimento.
+    """
+    consulta = (
+        db.query(OfertaLead, FilaVendedor)
+        .join(FilaVendedor, FilaVendedor.id == OfertaLead.vendedor_id)
+        .filter(OfertaLead.loja_id == ctx.loja_id)
+    )
+    if estado:
+        consulta = consulta.filter(OfertaLead.estado == estado)
+    else:
+        consulta = consulta.filter(OfertaLead.estado.in_(ESTADOS_NAO_ENCERRADOS))
+    return [
+        {
+            "id": oferta.id,
+            "telefone_cliente": oferta.telefone_cliente,
+            "vendedor_id": oferta.vendedor_id,
+            "vendedor_nome": vendedor.nome,
+            "estado": oferta.estado,
+            "prazo_em": oferta.prazo_em.isoformat() if oferta.prazo_em else None,
+            "criado_em": oferta.criado_em.isoformat() if oferta.criado_em else None,
+        }
+        for oferta, vendedor in consulta.all()
+    ]
 
 
 @app.post("/v1/fila-vendedores", status_code=201)
