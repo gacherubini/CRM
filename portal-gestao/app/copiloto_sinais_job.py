@@ -39,12 +39,18 @@ from app.loja.copiloto.sinais import (
     regra_meta_em_risco,
     regra_preco_fora_da_faixa,
 )
-from app.loja.copiloto.sinais_store import sincronizar_sinais
+from app.loja.copiloto.sinais_store import (
+    ESTADOS_ABERTOS,
+    criar_sinal_direcionado,
+    invalidar_contagem,
+    sincronizar_sinais,
+    transferir_sinal,
+)
+from app.models import CopilotoSinal, LojaOperacionalProjecao
 from app.loja.copiloto.tipos import CopilotoContexto
 from app.loja.estoque_overview import montar_estoque_overview
 from app.loja.types import Module
 from app.meta_ads_spend_job import env_flag, env_float, env_int
-from app.models import LojaOperacionalProjecao
 
 logger = logging.getLogger(__name__)
 
@@ -74,6 +80,74 @@ def _loja_permite_copiloto(db: Session, loja_slug: str) -> bool:
     """
     modulo = Module.COPILOTO.value if revy_loja_entitlements_enabled() else None
     return provisioning.allows_processing(db, loja_slug, modulo)
+
+
+REGRA_OFERTA_LEAD = "oferta_lead"
+
+
+def sincronizar_ofertas(db: Session, loja_slug: str, chatbot) -> dict[str, int]:
+    """Reconcilia ofertas abertas do chatbot com sinais 1:1 do sino.
+
+    Idempotente por ``entidade_ref`` (id da oferta). O telefone do cliente
+    transita na lista do chatbot e **não** entra no sinal.
+    """
+    ofertas = list(chatbot.listar_ofertas() or [])
+    abertas = [o for o in ofertas if o.get("estado") == "aberta"]
+    refs_vivas = {str(o.get("id") or "") for o in abertas if o.get("id")}
+
+    contagem = {"criados": 0, "transferidos": 0, "resolvidos": 0}
+    abertos = (
+        db.query(CopilotoSinal)
+        .filter(
+            CopilotoSinal.loja_slug == loja_slug,
+            CopilotoSinal.regra == REGRA_OFERTA_LEAD,
+            CopilotoSinal.estado.in_(ESTADOS_ABERTOS),
+        )
+        .all()
+    )
+    por_ref = {s.entidade_ref: s for s in abertos if s.entidade_ref}
+
+    agora_utc = datetime.now(timezone.utc)
+    for sinal in abertos:
+        if sinal.entidade_ref in refs_vivas:
+            continue
+        sinal.estado = "resolvido"
+        sinal.resolvido_em = agora_utc
+        sinal.atualizado_em = agora_utc
+        db.commit()
+        invalidar_contagem(loja_slug, sinal.destinatario_usuario_id)
+        contagem["resolvidos"] += 1
+
+    for oferta in abertas:
+        ref = str(oferta.get("id") or "")
+        if not ref:
+            continue
+        dest = str(oferta.get("vendedor_id") or "")
+        if not dest:
+            continue
+        existente = por_ref.get(ref)
+        if existente is None:
+            criar_sinal_direcionado(
+                db,
+                loja_slug,
+                regra=REGRA_OFERTA_LEAD,
+                destinatario_usuario_id=dest,
+                entidade_ref=ref,
+                titulo=f"Lead novo para {oferta.get('vendedor_nome') or 'você'}",
+                detalhe="Toque em Peguei para assumir o atendimento.",
+            )
+            contagem["criados"] += 1
+            continue
+        if existente.destinatario_usuario_id != dest:
+            if transferir_sinal(
+                db,
+                loja_slug,
+                entidade_ref=ref,
+                de_usuario_id=existente.destinatario_usuario_id,
+                para_usuario_id=dest,
+            ):
+                contagem["transferidos"] += 1
+    return contagem
 
 
 def lojas_ativas(db: Session) -> list[str]:
@@ -430,6 +504,11 @@ class CopilotoSinaisWorker:
             estoque, chatbot, fipe = self._clients()
             for loja_slug in lojas_ativas(db):
                 try:
+                    try:
+                        sincronizar_ofertas(db, loja_slug, chatbot)
+                    except (ChatbotIndisponivel, AttributeError):
+                        # Chatbot stub/fora do ar: sino de oferta some, Copiloto segue.
+                        pass
                     if not self._deve_avaliar_copiloto(db, loja_slug):
                         continue
                     candidatos = avaliar_loja(
