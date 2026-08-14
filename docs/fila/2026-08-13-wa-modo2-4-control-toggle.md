@@ -37,8 +37,8 @@ uma loja.
 - **Migration aditiva.** O Control não faz downgrade: o padrão do repo é
   `raise RuntimeError(...)` no `downgrade`, com rollback por feature flag
   (`alembic/versions/0018_copiloto_modulo.py`).
-- Rodar testes **a partir da pasta do produto**. O dono usa **Mac e Windows**: macOS/Linux
-  `python -m pytest -q`; Windows `.\.venv\Scripts\python.exe -m pytest -q`.
+- Rodar testes **a partir da pasta do produto**. O dono usa **Mac e Windows**: macOS
+  `.venv/bin/python -m pytest -q`; Windows `.\.venv\Scripts\python.exe -m pytest -q`.
 
 ---
 
@@ -93,7 +93,7 @@ def test_modo_invalido_e_rejeitado_pelo_banco(db):
 
 - [ ] **Step 2: Rodar e ver falhar**
 
-Run: `cd revy-trafego && python -m pytest tests/test_loja_whatsapp_modo.py -q`
+Run: `cd revy-trafego && .venv/bin/python -m pytest tests/test_loja_whatsapp_modo.py -q`
 — Windows: `cd revy-trafego && .\.venv\Scripts\python.exe -m pytest tests/test_loja_whatsapp_modo.py -q`
 Esperado: `TypeError: 'whatsapp_modo' is an invalid keyword argument`.
 
@@ -166,7 +166,7 @@ def downgrade() -> None:
 
 - [ ] **Step 5: Rodar migration e testes**
 
-Run: `cd revy-trafego && alembic upgrade head && python -m pytest tests/test_loja_whatsapp_modo.py -q`
+Run: `cd revy-trafego && .venv/bin/alembic upgrade head && .venv/bin/python -m pytest tests/test_loja_whatsapp_modo.py -q`
 — Windows: `cd revy-trafego && alembic upgrade head && .\.venv\Scripts\python.exe -m pytest tests/test_loja_whatsapp_modo.py -q`
 Esperado: PASS nos 3 testes.
 
@@ -226,7 +226,7 @@ def test_aggregate_loja_continua_existindo(db, loja_ativa, provisioning_service)
 
 - [ ] **Step 2: Rodar e ver falhar**
 
-Run: `cd revy-trafego && python -m pytest tests/test_provisioning_whatsapp_modo.py -q`
+Run: `cd revy-trafego && .venv/bin/python -m pytest tests/test_provisioning_whatsapp_modo.py -q`
 — Windows: `cd revy-trafego && .\.venv\Scripts\python.exe -m pytest tests/test_provisioning_whatsapp_modo.py -q`
 Esperado: FAIL — nenhum envelope com `aggregate == "whatsapp_modo"`.
 
@@ -253,7 +253,7 @@ Em `provisioning.py`, dentro de `snapshot`, logo depois do envelope de `aggregat
 
 - [ ] **Step 4: Rodar e ver passar**
 
-Run: `cd revy-trafego && python -m pytest tests/test_provisioning_whatsapp_modo.py tests/ -k provisioning -q`
+Run: `cd revy-trafego && .venv/bin/python -m pytest tests/test_provisioning_whatsapp_modo.py tests/ -k provisioning -q`
 — Windows: `cd revy-trafego && .\.venv\Scripts\python.exe -m pytest tests/test_provisioning_whatsapp_modo.py tests/ -k provisioning -q`
 Esperado: PASS, e os testes de provisionamento existentes continuam verdes — inclusive os que
 conferem o hash composto das versões (`provisioning_outbox.py:76-81`), que agora inclui um
@@ -331,7 +331,7 @@ def test_voltar_para_modo_1_e_permitido_e_nao_toca_conversa(db, loja_ativa, ator
 
 - [ ] **Step 2: Rodar e ver falhar**
 
-Run: `cd revy-trafego && python -m pytest tests/test_stores_whatsapp_modo.py -q`
+Run: `cd revy-trafego && .venv/bin/python -m pytest tests/test_stores_whatsapp_modo.py -q`
 — Windows: `cd revy-trafego && .\.venv\Scripts\python.exe -m pytest tests/test_stores_whatsapp_modo.py -q`
 Esperado: `ImportError: cannot import name 'definir_whatsapp_modo'`.
 
@@ -385,7 +385,7 @@ texto: *"Trocar o modo não migra conversas antigas."* Nada de QR e nada de fila
 
 - [ ] **Step 4: Rodar e ver passar**
 
-Run: `cd revy-trafego && python -m pytest tests/test_stores_whatsapp_modo.py -q`
+Run: `cd revy-trafego && .venv/bin/python -m pytest tests/test_stores_whatsapp_modo.py -q`
 — Windows: `cd revy-trafego && .\.venv\Scripts\python.exe -m pytest tests/test_stores_whatsapp_modo.py -q`
 Esperado: PASS nos 4 testes.
 
@@ -450,7 +450,7 @@ def test_sem_projecao_de_modo_nao_opera(db, loja_a, monkeypatch):
 
 - [ ] **Step 2: Rodar e ver falhar**
 
-Run: `cd chatbot-api && python -m pytest tests/test_rodizio_gate.py -q`
+Run: `cd chatbot-api && .venv/bin/python -m pytest tests/test_rodizio_gate.py -q`
 — Windows: `cd chatbot-api && .\.venv\Scripts\python.exe -m pytest tests/test_rodizio_gate.py -q`
 Esperado: FAIL em `test_loja_no_modo_1_nao_opera_o_rodizio` e em
 `test_sem_projecao_de_modo_nao_opera` — hoje o gate devolve `True` para os dois.
@@ -483,13 +483,13 @@ Importar `LojaOperacionalProjecao` de `app.models_db`.
 
 - [ ] **Step 4: Rodar e ver passar**
 
-Run: `cd chatbot-api && python -m pytest -q`
+Run: `cd chatbot-api && .venv/bin/python -m pytest -q`
 — Windows: `cd chatbot-api && .\.venv\Scripts\python.exe -m pytest -q`
 Esperado: suíte inteira verde, com os testes dos cards 2 e 2b ajustados para projetar o modo.
 
 - [ ] **Step 5: Rodar a suíte do Control também**
 
-Run: `cd revy-trafego && python -m pytest -q && git diff --check && git status --short`
+Run: `cd revy-trafego && .venv/bin/python -m pytest -q && git diff --check && git status --short`
 — Windows: `cd revy-trafego && .\.venv\Scripts\python.exe -m pytest -q`
 Esperado: verde; nada de arquivo alheio no diff.
 

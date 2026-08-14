@@ -39,7 +39,7 @@ Também fora: `n8n-cloud` (card 3) e toggle no Control (card 4).
   comparação usa `variantes_telefone` (9º dígito) — nunca `==` de string crua.
 - **Sem import entre produtos.** O Portal chama por HTTP; nada de importar `app` do Portal.
 - Rodar testes **a partir de `chatbot-api/`** (senão importa o `app` errado). O dono usa **Mac e
-  Windows**: macOS/Linux `python -m pytest -q`; Windows `.\.venv\Scripts\python.exe -m pytest -q`.
+  Windows**: macOS `.venv/bin/python -m pytest -q`; Windows `.\.venv\Scripts\python.exe -m pytest -q`.
 
 ---
 
@@ -77,7 +77,7 @@ def test_telefone_e_nome_sao_obrigatorios():
 
 - [ ] **Step 2: Rodar e ver falhar**
 
-Run: `cd chatbot-api && python -m pytest tests/test_fila_vendedor.py -q`
+Run: `cd chatbot-api && .venv/bin/python -m pytest tests/test_fila_vendedor.py -q`
 — Windows: `cd chatbot-api && .\.venv\Scripts\python.exe -m pytest tests/test_fila_vendedor.py -q`
 Esperado: `ImportError: cannot import name 'FilaVendedor'`.
 
@@ -165,7 +165,7 @@ def downgrade() -> None:
 
 - [ ] **Step 5: Rodar migration e testes**
 
-Run: `cd chatbot-api && alembic upgrade head && python -m pytest tests/test_fila_vendedor.py -q`
+Run: `cd chatbot-api && .venv/bin/alembic upgrade head && .venv/bin/python -m pytest tests/test_fila_vendedor.py -q`
 — Windows: `cd chatbot-api && alembic upgrade head && .\.venv\Scripts\python.exe -m pytest tests/test_fila_vendedor.py -q`
 Esperado: PASS.
 
@@ -213,7 +213,7 @@ def test_ponteiro_guarda_posicao_por_loja():
 
 - [ ] **Step 2: Rodar e ver falhar**
 
-Run: `cd chatbot-api && python -m pytest tests/test_oferta_lead.py -q`
+Run: `cd chatbot-api && .venv/bin/python -m pytest tests/test_oferta_lead.py -q`
 — Windows: `cd chatbot-api && .\.venv\Scripts\python.exe -m pytest tests/test_oferta_lead.py -q`
 Esperado: `ImportError: cannot import name 'OfertaLead'`.
 
@@ -327,7 +327,7 @@ def downgrade() -> None:
 
 - [ ] **Step 5: Rodar e ver passar**
 
-Run: `cd chatbot-api && alembic upgrade head && python -m pytest tests/test_oferta_lead.py -q`
+Run: `cd chatbot-api && .venv/bin/alembic upgrade head && .venv/bin/python -m pytest tests/test_oferta_lead.py -q`
 — Windows: `cd chatbot-api && alembic upgrade head && .\.venv\Scripts\python.exe -m pytest tests/test_oferta_lead.py -q`
 Esperado: PASS.
 
@@ -414,7 +414,7 @@ def test_ponteiro_da_volta_circular():
 
 - [ ] **Step 2: Rodar e ver falhar**
 
-Run: `cd chatbot-api && python -m pytest tests/test_rodizio_escolha.py -q`
+Run: `cd chatbot-api && .venv/bin/python -m pytest tests/test_rodizio_escolha.py -q`
 — Windows: `cd chatbot-api && .\.venv\Scripts\python.exe -m pytest tests/test_rodizio_escolha.py -q`
 Esperado: `ModuleNotFoundError: No module named 'app.rodizio'`.
 
@@ -469,7 +469,7 @@ def escolher_proximo(
 
 - [ ] **Step 4: Rodar e ver passar**
 
-Run: `cd chatbot-api && python -m pytest tests/test_rodizio_escolha.py -q`
+Run: `cd chatbot-api && .venv/bin/python -m pytest tests/test_rodizio_escolha.py -q`
 — Windows: `cd chatbot-api && .\.venv\Scripts\python.exe -m pytest tests/test_rodizio_escolha.py -q`
 Esperado: PASS nos 6 testes.
 
@@ -544,7 +544,7 @@ def test_vendedor_inativo_e_pulado(db, loja_a):
 
 - [ ] **Step 2: Rodar e ver falhar**
 
-Run: `cd chatbot-api && python -m pytest tests/test_rodizio_store.py -q`
+Run: `cd chatbot-api && .venv/bin/python -m pytest tests/test_rodizio_store.py -q`
 — Windows: `cd chatbot-api && .\.venv\Scripts\python.exe -m pytest tests/test_rodizio_store.py -q`
 Esperado: `ImportError: cannot import name 'abrir_oferta'`.
 
@@ -628,7 +628,7 @@ def abrir_oferta(
 
 - [ ] **Step 4: Rodar e ver passar**
 
-Run: `cd chatbot-api && python -m pytest tests/test_rodizio_store.py -q`
+Run: `cd chatbot-api && .venv/bin/python -m pytest tests/test_rodizio_store.py -q`
 — Windows: `cd chatbot-api && .\.venv\Scripts\python.exe -m pytest tests/test_rodizio_store.py -q`
 Esperado: PASS.
 
@@ -707,7 +707,7 @@ def test_oferta_inexistente(db):
 
 - [ ] **Step 2: Rodar e ver falhar**
 
-Run: `cd chatbot-api && python -m pytest tests/test_rodizio_trava.py -q`
+Run: `cd chatbot-api && .venv/bin/python -m pytest tests/test_rodizio_trava.py -q`
 — Windows: `cd chatbot-api && .\.venv\Scripts\python.exe -m pytest tests/test_rodizio_trava.py -q`
 Esperado: `ImportError: cannot import name 'assumir_oferta'`.
 
@@ -758,7 +758,7 @@ def assumir_oferta(db: Session, oferta_id: str) -> tuple[bool, OfertaLead | None
 
 - [ ] **Step 4: Rodar e ver passar**
 
-Run: `cd chatbot-api && python -m pytest tests/test_rodizio_trava.py -q`
+Run: `cd chatbot-api && .venv/bin/python -m pytest tests/test_rodizio_trava.py -q`
 — Windows: `cd chatbot-api && .\.venv\Scripts\python.exe -m pytest tests/test_rodizio_trava.py -q`
 Esperado: PASS nos 4 testes.
 
@@ -846,7 +846,7 @@ def test_oferta_travada_nao_expira(db, loja_a):
 
 - [ ] **Step 2: Rodar e ver falhar**
 
-Run: `cd chatbot-api && python -m pytest tests/test_rodizio_job.py -q`
+Run: `cd chatbot-api && .venv/bin/python -m pytest tests/test_rodizio_job.py -q`
 — Windows: `cd chatbot-api && .\.venv\Scripts\python.exe -m pytest tests/test_rodizio_job.py -q`
 Esperado: `ModuleNotFoundError: No module named 'app.rodizio_job'`.
 
@@ -897,7 +897,7 @@ class RodizioWorker:
 
 - [ ] **Step 4: Rodar e ver passar**
 
-Run: `cd chatbot-api && python -m pytest tests/test_rodizio_job.py -q`
+Run: `cd chatbot-api && .venv/bin/python -m pytest tests/test_rodizio_job.py -q`
 — Windows: `cd chatbot-api && .\.venv\Scripts\python.exe -m pytest tests/test_rodizio_job.py -q`
 Esperado: PASS nos 3 testes.
 
@@ -975,7 +975,7 @@ def test_loja_ativa_com_flag_on_opera(db, loja_a, monkeypatch):
 
 - [ ] **Step 2: Rodar e ver falhar**
 
-Run: `cd chatbot-api && python -m pytest tests/test_rodizio_gate.py -q`
+Run: `cd chatbot-api && .venv/bin/python -m pytest tests/test_rodizio_gate.py -q`
 — Windows: `cd chatbot-api && .\.venv\Scripts\python.exe -m pytest tests/test_rodizio_gate.py -q`
 Esperado: `ImportError: cannot import name 'loja_opera_modo2'`.
 
@@ -1027,7 +1027,7 @@ E no começo de `abrir_oferta`, antes de qualquer consulta:
 
 - [ ] **Step 4: Rodar e ver passar**
 
-Run: `cd chatbot-api && python -m pytest tests/test_rodizio_gate.py -q`
+Run: `cd chatbot-api && .venv/bin/python -m pytest tests/test_rodizio_gate.py -q`
 — Windows: `cd chatbot-api && .\.venv\Scripts\python.exe -m pytest tests/test_rodizio_gate.py -q`
 Esperado: PASS.
 
@@ -1101,7 +1101,7 @@ def test_apagar_e_inativacao_logica(client, loja_a):
 
 - [ ] **Step 2: Rodar e ver falhar**
 
-Run: `cd chatbot-api && python -m pytest tests/test_fila_rotas.py -q`
+Run: `cd chatbot-api && .venv/bin/python -m pytest tests/test_fila_rotas.py -q`
 — Windows: `cd chatbot-api && .\.venv\Scripts\python.exe -m pytest tests/test_fila_rotas.py -q`
 Esperado: 404 nas rotas.
 
@@ -1206,13 +1206,13 @@ Importar no topo o que faltar: `FilaVendedor` de `app.models_db`, `normalizar_te
 
 - [ ] **Step 4: Rodar e ver passar**
 
-Run: `cd chatbot-api && python -m pytest tests/test_fila_rotas.py -q`
+Run: `cd chatbot-api && .venv/bin/python -m pytest tests/test_fila_rotas.py -q`
 — Windows: `cd chatbot-api && .\.venv\Scripts\python.exe -m pytest tests/test_fila_rotas.py -q`
 Esperado: PASS.
 
 - [ ] **Step 5: Suíte inteira**
 
-Run: `cd chatbot-api && python -m pytest -q && git diff --check && git status --short`
+Run: `cd chatbot-api && .venv/bin/python -m pytest -q && git diff --check && git status --short`
 — Windows: `cd chatbot-api && .\.venv\Scripts\python.exe -m pytest -q`
 Esperado: tudo verde; nada de arquivo alheio no diff.
 

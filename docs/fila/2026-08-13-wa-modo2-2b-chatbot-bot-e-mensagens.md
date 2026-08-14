@@ -32,8 +32,8 @@ reimplementa.
 - **Parcela não vai ao cliente pelo bot** — invariante do projeto. Quem fala número é o vendedor.
 - **`wa.me` e pacote do lead só DEPOIS do clique** (§5.7). Nunca na mensagem de oferta.
 - **Nunca gastar template pago em re-notificação** (§5.4).
-- Rodar testes **a partir de `chatbot-api/`**. O dono usa **Mac e Windows**: macOS/Linux
-  `python -m pytest -q`; Windows `.\.venv\Scripts\python.exe -m pytest -q`.
+- Rodar testes **a partir de `chatbot-api/`**. O dono usa **Mac e Windows**: macOS
+  `.venv/bin/python -m pytest -q`; Windows `.\.venv\Scripts\python.exe -m pytest -q`.
 
 ---
 
@@ -111,7 +111,7 @@ def test_media_id_desconhecido_vira_audio_indisponivel():
 
 - [ ] **Step 2: Rodar e ver falhar**
 
-Run: `cd chatbot-api && python -m pytest tests/test_graph_media_downloader.py -q`
+Run: `cd chatbot-api && .venv/bin/python -m pytest tests/test_graph_media_downloader.py -q`
 — Windows: `cd chatbot-api && .\.venv\Scripts\python.exe -m pytest tests/test_graph_media_downloader.py -q`
 Esperado: `ImportError: cannot import name 'GraphMediaDownloader'`.
 
@@ -189,7 +189,7 @@ class GraphMediaDownloader:
 
 - [ ] **Step 4: Rodar e ver passar**
 
-Run: `cd chatbot-api && python -m pytest tests/test_graph_media_downloader.py -q`
+Run: `cd chatbot-api && .venv/bin/python -m pytest tests/test_graph_media_downloader.py -q`
 — Windows: `cd chatbot-api && .\.venv\Scripts\python.exe -m pytest tests/test_graph_media_downloader.py -q`
 Esperado: PASS nos 3 testes.
 
@@ -262,7 +262,7 @@ def test_language_e_iso_639_1(tmp_path):
 
 - [ ] **Step 2: Rodar e ver falhar**
 
-Run: `cd chatbot-api && python -m pytest tests/test_transcricao_por_modo.py -q`
+Run: `cd chatbot-api && .venv/bin/python -m pytest tests/test_transcricao_por_modo.py -q`
 — Windows: `cd chatbot-api && .\.venv\Scripts\python.exe -m pytest tests/test_transcricao_por_modo.py -q`
 Esperado: `ImportError: cannot import name 'processador_de_audio'` e, depois, falha no `pt-BR`.
 
@@ -305,7 +305,7 @@ def processador_de_audio(modo: int) -> "AudioProcessor | None":
 
 - [ ] **Step 4: Rodar e ver passar**
 
-Run: `cd chatbot-api && python -m pytest tests/test_transcricao_por_modo.py tests/ -k audio -q`
+Run: `cd chatbot-api && .venv/bin/python -m pytest tests/test_transcricao_por_modo.py tests/ -k audio -q`
 — Windows: `cd chatbot-api && .\.venv\Scripts\python.exe -m pytest tests/test_transcricao_por_modo.py tests/ -k audio -q`
 Esperado: PASS, e os testes de áudio do Modo 1 continuam verdes.
 
@@ -398,7 +398,7 @@ def test_interativo_carrega_o_mesmo_id():
 
 - [ ] **Step 2: Rodar e ver falhar**
 
-Run: `cd chatbot-api && python -m pytest tests/test_cloud_outbound.py -q`
+Run: `cd chatbot-api && .venv/bin/python -m pytest tests/test_cloud_outbound.py -q`
 — Windows: `cd chatbot-api && .\.venv\Scripts\python.exe -m pytest tests/test_cloud_outbound.py -q`
 Esperado: `ImportError: cannot import name 'CloudWhatsAppOutbound'`.
 
@@ -520,7 +520,7 @@ def outbound_para_loja(db: Session, loja_id: str) -> WhatsAppOutboundPort:
 
 - [ ] **Step 4: Rodar e ver passar**
 
-Run: `cd chatbot-api && python -m pytest tests/test_cloud_outbound.py -q`
+Run: `cd chatbot-api && .venv/bin/python -m pytest tests/test_cloud_outbound.py -q`
 — Windows: `cd chatbot-api && .\.venv\Scripts\python.exe -m pytest tests/test_cloud_outbound.py -q`
 Esperado: PASS nos 3 testes.
 
@@ -646,7 +646,7 @@ def test_oferta_nao_leva_wa_me(db, loja_a, monkeypatch):
 
 - [ ] **Step 2: Rodar e ver falhar**
 
-Run: `cd chatbot-api && python -m pytest tests/test_oferta_envio.py -q`
+Run: `cd chatbot-api && .venv/bin/python -m pytest tests/test_oferta_envio.py -q`
 — Windows: `cd chatbot-api && .\.venv\Scripts\python.exe -m pytest tests/test_oferta_envio.py -q`
 Esperado: `ModuleNotFoundError: No module named 'app.oferta_envio'`.
 
@@ -730,7 +730,7 @@ GRAPH_TEMPLATE_OFERTA = os.getenv("CHATBOT_GRAPH_TEMPLATE_OFERTA", "chama_vended
 
 - [ ] **Step 4: Rodar e ver passar**
 
-Run: `cd chatbot-api && python -m pytest tests/test_oferta_envio.py -q`
+Run: `cd chatbot-api && .venv/bin/python -m pytest tests/test_oferta_envio.py -q`
 — Windows: `cd chatbot-api && .\.venv\Scripts\python.exe -m pytest tests/test_oferta_envio.py -q`
 Esperado: PASS nos 4 testes.
 
@@ -833,7 +833,7 @@ def test_clique_perdedor_recebe_ja_foi_pego_sem_contato(db, loja_a, monkeypatch)
 
 - [ ] **Step 2: Rodar e ver falhar**
 
-Run: `cd chatbot-api && python -m pytest tests/test_oferta_inbound.py -q`
+Run: `cd chatbot-api && .venv/bin/python -m pytest tests/test_oferta_inbound.py -q`
 — Windows: `cd chatbot-api && .\.venv\Scripts\python.exe -m pytest tests/test_oferta_inbound.py -q`
 Esperado: `ModuleNotFoundError: No module named 'app.oferta_inbound'`.
 
@@ -914,7 +914,7 @@ def processar_clique(
 
 - [ ] **Step 4: Rodar e ver passar**
 
-Run: `cd chatbot-api && python -m pytest tests/test_oferta_inbound.py -q`
+Run: `cd chatbot-api && .venv/bin/python -m pytest tests/test_oferta_inbound.py -q`
 — Windows: `cd chatbot-api && .\.venv\Scripts\python.exe -m pytest tests/test_oferta_inbound.py -q`
 Esperado: PASS nos 5 testes.
 
@@ -1020,7 +1020,7 @@ def test_segundo_gatilho_no_mesmo_lead_nao_duplica(db, loja_a, monkeypatch):
 
 - [ ] **Step 2: Rodar e ver falhar**
 
-Run: `cd chatbot-api && python -m pytest tests/test_handoff_gatilhos.py -q`
+Run: `cd chatbot-api && .venv/bin/python -m pytest tests/test_handoff_gatilhos.py -q`
 — Windows: `cd chatbot-api && .\.venv\Scripts\python.exe -m pytest tests/test_handoff_gatilhos.py -q`
 Esperado: `ModuleNotFoundError: No module named 'app.handoff_gatilhos'`.
 
@@ -1090,7 +1090,7 @@ def disparar_handoff(
 
 - [ ] **Step 4: Rodar e ver passar**
 
-Run: `cd chatbot-api && python -m pytest tests/test_handoff_gatilhos.py -q`
+Run: `cd chatbot-api && .venv/bin/python -m pytest tests/test_handoff_gatilhos.py -q`
 — Windows: `cd chatbot-api && .\.venv\Scripts\python.exe -m pytest tests/test_handoff_gatilhos.py -q`
 Esperado: PASS nos 5 casos (3 parametrizados + 2).
 
@@ -1192,7 +1192,7 @@ def test_nunca_gasta_template_na_renotificacao(db, loja_a, monkeypatch):
 
 - [ ] **Step 2: Rodar e ver falhar**
 
-Run: `cd chatbot-api && python -m pytest tests/test_pos_handoff.py -q`
+Run: `cd chatbot-api && .venv/bin/python -m pytest tests/test_pos_handoff.py -q`
 — Windows: `cd chatbot-api && .\.venv\Scripts\python.exe -m pytest tests/test_pos_handoff.py -q`
 Esperado: `ModuleNotFoundError: No module named 'app.pos_handoff'`.
 
@@ -1274,7 +1274,7 @@ def cliente_voltou_a_escrever(
 
 - [ ] **Step 4: Rodar e ver passar**
 
-Run: `cd chatbot-api && python -m pytest tests/test_pos_handoff.py -q`
+Run: `cd chatbot-api && .venv/bin/python -m pytest tests/test_pos_handoff.py -q`
 — Windows: `cd chatbot-api && .\.venv\Scripts\python.exe -m pytest tests/test_pos_handoff.py -q`
 Esperado: PASS nos 3 testes.
 
@@ -1336,7 +1336,7 @@ def test_texto_nao_menciona_parcela():
 
 - [ ] **Step 2: Rodar e ver falhar**
 
-Run: `cd chatbot-api && python -m pytest tests/test_followup_silencio.py -q`
+Run: `cd chatbot-api && .venv/bin/python -m pytest tests/test_followup_silencio.py -q`
 — Windows: `cd chatbot-api && .\.venv\Scripts\python.exe -m pytest tests/test_followup_silencio.py -q`
 Esperado: `ModuleNotFoundError: No module named 'app.followup_job'`.
 
@@ -1398,13 +1398,13 @@ def texto_followup(etapa: str, toque: int) -> str:
 
 - [ ] **Step 4: Rodar e ver passar**
 
-Run: `cd chatbot-api && python -m pytest tests/test_followup_silencio.py -q`
+Run: `cd chatbot-api && .venv/bin/python -m pytest tests/test_followup_silencio.py -q`
 — Windows: `cd chatbot-api && .\.venv\Scripts\python.exe -m pytest tests/test_followup_silencio.py -q`
 Esperado: PASS.
 
 - [ ] **Step 5: Suíte inteira**
 
-Run: `cd chatbot-api && python -m pytest -q && git diff --check && git status --short`
+Run: `cd chatbot-api && .venv/bin/python -m pytest -q && git diff --check && git status --short`
 — Windows: `cd chatbot-api && .\.venv\Scripts\python.exe -m pytest -q`
 Esperado: tudo verde. Especialmente os testes do Modo 1 — nada aqui pode tê-los mudado.
 

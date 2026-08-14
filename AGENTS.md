@@ -79,8 +79,9 @@ Não espalhe um eixo em vários filhos (código + Fly + n8n na mesma leva).
 - Flags de rollout default OFF no código.
 - Suspensão de loja é gate de backend, não item de menu.
 - Estoque = veículos. Chatbot = conversa. Loja = venda. Motor = banco. Control = estrutura.
-- Testes a partir da pasta do produto, senão importa o `app` errado. O dono usa **Mac e
-  Windows** — card novo traz as duas formas: `python -m pytest -q` (macOS/Linux) e
+- Testes a partir da pasta do produto, senão importa o `app` errado. Cada produto tem seu
+  **próprio `.venv`**, e `python` puro não existe no Mac do dono. O dono usa **Mac e Windows** —
+  card novo traz as duas formas: `.venv/bin/python -m pytest -q` (macOS) e
   `.\.venv\Scripts\python.exe -m pytest -q` (Windows).
 - Não destruir app/volume Fly. Não `git clean -fdX`.
 - Deploy Fly só por `deploy/fly/3vm/`. Os `fly.toml` na pasta do produto apontam para

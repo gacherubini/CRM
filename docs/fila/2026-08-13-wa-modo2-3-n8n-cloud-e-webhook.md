@@ -51,8 +51,8 @@ Trocar isso é decisão de deploy, não deste card.
 - **Responder 200 rápido.** A Meta reentrega se demorar. Processar depois de responder.
 - **Dedup por `wamid`.** O replay >5 min do Modo 1 não cobre reentrega em segundos.
 - **Ativar workflow é só pelo "Publish" na UI.** `active=1` no banco **não** registra o webhook.
-- Rodar testes **a partir de `chatbot-api/`**. O dono usa **Mac e Windows**: macOS/Linux
-  `python -m pytest -q`; Windows `.\.venv\Scripts\python.exe -m pytest -q`.
+- Rodar testes **a partir de `chatbot-api/`**. O dono usa **Mac e Windows**: macOS
+  `.venv/bin/python -m pytest -q`; Windows `.\.venv\Scripts\python.exe -m pytest -q`.
   O validador do n8n roda **da raiz**: `python n8n/validate_workflow_cloud.py`.
 
 ---
@@ -121,7 +121,7 @@ def test_sem_app_secret_configurado_reprova():
 
 - [ ] **Step 2: Rodar e ver falhar**
 
-Run: `cd chatbot-api && python -m pytest tests/test_meta_assinatura.py -q`
+Run: `cd chatbot-api && .venv/bin/python -m pytest tests/test_meta_assinatura.py -q`
 — Windows: `cd chatbot-api && .\.venv\Scripts\python.exe -m pytest tests/test_meta_assinatura.py -q`
 Esperado: `ModuleNotFoundError: No module named 'app.meta_webhook'`.
 
@@ -164,7 +164,7 @@ def assinatura_valida(corpo_cru: bytes, header: str, *, app_secret: str) -> bool
 
 - [ ] **Step 4: Rodar e ver passar**
 
-Run: `cd chatbot-api && python -m pytest tests/test_meta_assinatura.py -q`
+Run: `cd chatbot-api && .venv/bin/python -m pytest tests/test_meta_assinatura.py -q`
 — Windows: `cd chatbot-api && .\.venv\Scripts\python.exe -m pytest tests/test_meta_assinatura.py -q`
 Esperado: PASS nos 6 testes.
 
@@ -305,7 +305,7 @@ def test_tipo_desconhecido_vira_ignorado_sem_estourar():
 
 - [ ] **Step 2: Rodar e ver falhar**
 
-Run: `cd chatbot-api && python -m pytest tests/test_meta_parse.py -q`
+Run: `cd chatbot-api && .venv/bin/python -m pytest tests/test_meta_parse.py -q`
 — Windows: `cd chatbot-api && .\.venv\Scripts\python.exe -m pytest tests/test_meta_parse.py -q`
 Esperado: `ImportError: cannot import name 'parse_inbound'`.
 
@@ -403,7 +403,7 @@ def parse_inbound(payload: dict) -> list[EventoCloud]:
 
 - [ ] **Step 4: Rodar e ver passar**
 
-Run: `cd chatbot-api && python -m pytest tests/test_meta_parse.py -q`
+Run: `cd chatbot-api && .venv/bin/python -m pytest tests/test_meta_parse.py -q`
 — Windows: `cd chatbot-api && .\.venv\Scripts\python.exe -m pytest tests/test_meta_parse.py -q`
 Esperado: PASS nos 8 testes.
 
@@ -505,7 +505,7 @@ def test_reentrega_do_mesmo_wamid_nao_processa_duas_vezes(client, monkeypatch):
 
 - [ ] **Step 2: Rodar e ver falhar**
 
-Run: `cd chatbot-api && python -m pytest tests/test_webhook_cloud_rotas.py -q`
+Run: `cd chatbot-api && .venv/bin/python -m pytest tests/test_webhook_cloud_rotas.py -q`
 — Windows: `cd chatbot-api && .\.venv\Scripts\python.exe -m pytest tests/test_webhook_cloud_rotas.py -q`
 Esperado: 404 nas rotas.
 
@@ -590,7 +590,7 @@ def _wamid_ja_visto(db: Session, wamid: str) -> bool:
 
 - [ ] **Step 4: Rodar e ver passar**
 
-Run: `cd chatbot-api && python -m pytest tests/test_webhook_cloud_rotas.py -q`
+Run: `cd chatbot-api && .venv/bin/python -m pytest tests/test_webhook_cloud_rotas.py -q`
 — Windows: `cd chatbot-api && .\.venv\Scripts\python.exe -m pytest tests/test_webhook_cloud_rotas.py -q`
 Esperado: PASS nos 6 testes.
 

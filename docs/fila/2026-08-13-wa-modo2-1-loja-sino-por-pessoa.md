@@ -61,7 +61,7 @@ bloqueia todo o resto.
 - **Contagem por pessoa** (`CopilotoSinalVisto`) e cache TTL 45s (`app/loja/copiloto/notificacoes.py:36`) permanecem.
 - **Migration com `batch_alter_table`** — o projeto testa em SQLite, que não faz `ALTER COLUMN`.
 - Rodar testes **a partir de `portal-gestao/`** (senão importa o `app` errado). O dono usa **Mac e
-  Windows**: macOS/Linux `python -m pytest -q`; Windows `.\.venv\Scripts\python.exe -m pytest -q`.
+  Windows**: macOS `.venv/bin/python -m pytest -q`; Windows `.\.venv\Scripts\python.exe -m pytest -q`.
 
 ---
 
@@ -110,7 +110,7 @@ def test_sinal_aceita_destinatario():
 
 - [ ] **Step 2: Rodar e ver falhar**
 
-Run: `cd portal-gestao && python -m pytest tests/test_copiloto_sinal_destinatario.py -q`
+Run: `cd portal-gestao && .venv/bin/python -m pytest tests/test_copiloto_sinal_destinatario.py -q`
 — Windows: `cd portal-gestao && .\.venv\Scripts\python.exe -m pytest tests/test_copiloto_sinal_destinatario.py -q`
 Esperado: `TypeError: 'destinatario_usuario_id' is an invalid keyword argument`.
 
@@ -193,7 +193,7 @@ def downgrade() -> None:
 
 - [ ] **Step 5: Rodar a migration e os testes**
 
-Run: `cd portal-gestao && alembic upgrade head && python -m pytest tests/test_copiloto_sinal_destinatario.py -q`
+Run: `cd portal-gestao && .venv/bin/alembic upgrade head && .venv/bin/python -m pytest tests/test_copiloto_sinal_destinatario.py -q`
 — Windows: `cd portal-gestao && alembic upgrade head && .\.venv\Scripts\python.exe -m pytest tests/test_copiloto_sinal_destinatario.py -q`
 Esperado: PASS nos dois testes.
 
@@ -264,7 +264,7 @@ def test_direcionado_e_da_loja_somam_para_o_destinatario(db):
 
 - [ ] **Step 2: Rodar e ver falhar**
 
-Run: `cd portal-gestao && python -m pytest tests/test_copiloto_sinal_destinatario.py -q`
+Run: `cd portal-gestao && .venv/bin/python -m pytest tests/test_copiloto_sinal_destinatario.py -q`
 — Windows: `cd portal-gestao && .\.venv\Scripts\python.exe -m pytest tests/test_copiloto_sinal_destinatario.py -q`
 Esperado: FAIL em `test_sinal_direcionado_conta_so_para_o_dono_dele` — conta 1 para o dono, porque
 o filtro ainda não existe.
@@ -295,7 +295,7 @@ Importar `or_` no topo do arquivo: `from sqlalchemy import or_`.
 
 - [ ] **Step 4: Rodar e ver passar**
 
-Run: `cd portal-gestao && python -m pytest tests/test_copiloto_sinal_destinatario.py tests/test_copiloto_sinais_store.py -q`
+Run: `cd portal-gestao && .venv/bin/python -m pytest tests/test_copiloto_sinal_destinatario.py tests/test_copiloto_sinais_store.py -q`
 — Windows: `cd portal-gestao && .\.venv\Scripts\python.exe -m pytest tests/test_copiloto_sinal_destinatario.py tests/test_copiloto_sinais_store.py -q`
 Esperado: PASS, **e** os testes antigos do store continuam verdes (é a prova de que NULL não mudou).
 
@@ -347,7 +347,7 @@ def test_listagem_sem_usuario_devolve_tudo(db):
 
 - [ ] **Step 2: Rodar e ver falhar**
 
-Run: `cd portal-gestao && python -m pytest tests/test_copiloto_sinal_destinatario.py -q`
+Run: `cd portal-gestao && .venv/bin/python -m pytest tests/test_copiloto_sinal_destinatario.py -q`
 — Windows: `cd portal-gestao && .\.venv\Scripts\python.exe -m pytest tests/test_copiloto_sinal_destinatario.py -q`
 Esperado: `TypeError: listar_sinais_abertos() got an unexpected keyword argument 'usuario_id'`.
 
@@ -401,7 +401,7 @@ painel do sino é pessoal, então o filtro tem que valer ali:
 
 - [ ] **Step 5: Rodar e ver passar**
 
-Run: `cd portal-gestao && python -m pytest tests/test_copiloto_sinal_destinatario.py tests/test_copiloto_notificacoes_rotas.py -q`
+Run: `cd portal-gestao && .venv/bin/python -m pytest tests/test_copiloto_sinal_destinatario.py tests/test_copiloto_notificacoes_rotas.py -q`
 — Windows: `cd portal-gestao && .\.venv\Scripts\python.exe -m pytest tests/test_copiloto_sinal_destinatario.py tests/test_copiloto_notificacoes_rotas.py -q`
 Esperado: PASS.
 
@@ -478,7 +478,7 @@ def test_transferir_sem_sinal_aberto_devolve_false(db):
 
 - [ ] **Step 2: Rodar e ver falhar**
 
-Run: `cd portal-gestao && python -m pytest tests/test_copiloto_sinal_destinatario.py -q`
+Run: `cd portal-gestao && .venv/bin/python -m pytest tests/test_copiloto_sinal_destinatario.py -q`
 — Windows: `cd portal-gestao && .\.venv\Scripts\python.exe -m pytest tests/test_copiloto_sinal_destinatario.py -q`
 Esperado: `ImportError: cannot import name 'criar_sinal_direcionado'`.
 
@@ -575,7 +575,7 @@ def transferir_sinal(
 
 - [ ] **Step 4: Rodar e ver passar**
 
-Run: `cd portal-gestao && python -m pytest tests/test_copiloto_sinal_destinatario.py -q`
+Run: `cd portal-gestao && .venv/bin/python -m pytest tests/test_copiloto_sinal_destinatario.py -q`
 — Windows: `cd portal-gestao && .\.venv\Scripts\python.exe -m pytest tests/test_copiloto_sinal_destinatario.py -q`
 Esperado: PASS.
 
@@ -631,7 +631,7 @@ def test_transferir_invalida_cache_dos_dois(db, monkeypatch):
 
 - [ ] **Step 2: Rodar e ver falhar**
 
-Run: `cd portal-gestao && python -m pytest tests/test_copiloto_sinal_destinatario.py::test_transferir_invalida_cache_dos_dois -q`
+Run: `cd portal-gestao && .venv/bin/python -m pytest tests/test_copiloto_sinal_destinatario.py::test_transferir_invalida_cache_dos_dois -q`
 — Windows: `cd portal-gestao && .\.venv\Scripts\python.exe -m pytest tests/test_copiloto_sinal_destinatario.py::test_transferir_invalida_cache_dos_dois -q`
 Esperado: FAIL — `invalidados` vazio.
 
@@ -657,7 +657,7 @@ Em `transferir_sinal`, depois do `db.commit()`:
 
 - [ ] **Step 4: Rodar e ver passar**
 
-Run: `cd portal-gestao && python -m pytest tests/test_copiloto_sinal_destinatario.py -q`
+Run: `cd portal-gestao && .venv/bin/python -m pytest tests/test_copiloto_sinal_destinatario.py -q`
 — Windows: `cd portal-gestao && .\.venv\Scripts\python.exe -m pytest tests/test_copiloto_sinal_destinatario.py -q`
 Esperado: PASS.
 
@@ -680,7 +680,7 @@ que dono e gerente veem hoje.
 
 - [ ] **Step 1: Rodar a suíte inteira**
 
-Run: `cd portal-gestao && python -m pytest -q`
+Run: `cd portal-gestao && .venv/bin/python -m pytest -q`
 — Windows: `cd portal-gestao && .\.venv\Scripts\python.exe -m pytest -q`
 Esperado: **tudo verde**, incluindo a property test de 48 combinações em
 `tests/test_copiloto_notificacoes_shell.py`.
