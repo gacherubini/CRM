@@ -1,0 +1,86 @@
+{
+  "name": "whatsapp-cloud",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "GET",
+        "path": "whatsapp-cloud",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "id": "webhook-get",
+      "name": "Meta verificacao",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [0, 0],
+      "webhookId": "whatsapp-cloud"
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "http://chatbot-api:8000/webhook/cloud",
+        "sendQuery": true,
+        "specifyQuery": "keypair",
+        "queryParameters": {
+          "parameters": [
+            {"name": "hub.mode", "value": "={{ $json.query['hub.mode'] }}"},
+            {"name": "hub.verify_token", "value": "={{ $json.query['hub.verify_token'] }}"},
+            {"name": "hub.challenge", "value": "={{ $json.query['hub.challenge'] }}"}
+          ]
+        },
+        "options": {"response": {"response": {"neverError": true, "responseFormat": "text"}}}
+      },
+      "id": "http-get",
+      "name": "Repassar verificacao",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [220, 0]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "whatsapp-cloud",
+        "responseMode": "onReceived",
+        "responseCode": 200,
+        "options": {"rawBody": true}
+      },
+      "id": "webhook-post",
+      "name": "Meta inbound",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [0, 200],
+      "webhookId": "whatsapp-cloud"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://chatbot-api:8000/webhook/cloud",
+        "sendHeaders": true,
+        "specifyHeaders": "keypair",
+        "headerParameters": {
+          "parameters": [
+            {"name": "X-Hub-Signature-256", "value": "={{ $json.headers['x-hub-signature-256'] }}"},
+            {"name": "X-Webhook-Token", "value": "__CHATBOT_WEBHOOK_TOKEN__"},
+            {"name": "Content-Type", "value": "application/json"}
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ $json.body }}",
+        "options": {"response": {"response": {"neverError": true}}}
+      },
+      "id": "http-post",
+      "name": "Repassar inbound",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [220, 200]
+    }
+  ],
+  "connections": {
+    "Meta verificacao": {"main": [[{"node": "Repassar verificacao", "type": "main", "index": 0}]]},
+    "Meta inbound": {"main": [[{"node": "Repassar inbound", "type": "main", "index": 0}]]}
+  },
+  "settings": {},
+  "active": false
+}
