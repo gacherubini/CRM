@@ -541,9 +541,19 @@ O `n8n-cloud` é **um** workflow para **N lojas**, então precisa mapear número
 - **Piloto:** app próprio do Revy na Meta em **dev mode**, com um **número de teste** — sem
   verificação de negócio completa — para provar o fluxo. As credenciais Cloud (`phone_number_id` +
   token) são nossas, plugadas no `n8n-cloud`. **Sem BSP.**
+- **Token: System User, não o do painel.** O token que a Meta mostra na tela do app é
+  **temporário (24 h)** — plugado no `n8n-cloud`, o piloto funciona hoje e morre amanhã de manhã.
+  O certo desde o piloto: criar um **System User** no Business Suite, dar a permissão de WhatsApp e
+  gerar o token **permanente**. Vale para `n8n-cloud` e para o download de mídia no Graph (§5.10).
+- **Dev mode = 5 destinatários**, cadastrados à mão no painel. O rodízio consome isso rápido:
+  1 cliente de teste + 3 vendedores já são 4 de 5. Dá pra provar rodízio, "primeiro clique vence" e
+  handoff; **não** dá pra testar fila grande. Dimensionar o cenário do smoke (§10) por esse teto.
 - **Produto (fase seguinte):** virar **Tech Provider** (verificação de negócio + app review de
   `whatsapp_business_messaging` + embedded signup) para o lojista conectar sozinho pelo Control.
   Timeline realista 2–6 semanas de burocracia; sem taxa da Meta pelo programa.
+- **Verificação de negócio é por loja, e é da loja.** Sair do dev mode para atender cliente real
+  exige o Business Manager da loja verificado — ordem de dias úteis quando o CNPJ está redondo, mas
+  trava por documento errado, não por código. É burocracia do lojista, não do Revy.
 - **Assets Meta:** o número da central entra **sob o Meta Business da loja** (onde estão os ads) —
   favorece o CTWA. Login do onboarding é do **admin/dono do Business**.
 
@@ -601,6 +611,13 @@ ponta, num número de teste, sem vazar segredo. É trabalho de implementação, 
 
 **Fase 2 — Produto (spec seguinte):**
 - Revy como **Tech Provider** + embedded signup no Control (self-serve de onboarding Cloud).
+  **Nascer no embedded signup v4:** o v2 é descontinuado em **15/10/2026**. Não copiar tutorial
+  velho.
+- **Tech Provider não tem linha de crédito** — e isso define o billing: cada loja põe o meio de
+  pagamento dela na própria WABA e **paga a Meta direto**; o Revy fatura só o software. Os ~R$0,04
+  de template (§9) **não** passam pelo caixa do Revy. Faturar a mensagem junto da mensalidade
+  exigiria ser **Solution Partner** (que exige linha de crédito) — decisão de negócio, não de
+  código.
 - Configuração fina do rodízio (X min, ordem) na UI.
 - Proativo pro cliente + templates de marketing (se/quando fizer sentido).
 - Billing por loja Cloud.
@@ -614,7 +631,8 @@ ponta, num número de teste, sem vazar segredo. É trabalho de implementação, 
 | Pegou e não ligou | Fica travado. Sem auto-devolver. Dono reatribui no Portal. |
 | Template com botão precisa de aprovação Meta | Submeter cedo no piloto; conteúdo é transacional (Utility), aprovação costuma ser rápida. Confirmar suporte a botão de resposta rápida no template. |
 | Central não loga o chat vendedor↔cliente | Trade-off aceito do handoff; o registro do **lead** (não do chat) fica no Portal. Reavaliar na Fase 2. |
-| Dev mode limita destinatários | Piloto usa números de teste registrados; produção exige verificação (Fase 2). |
+| Dev mode limita destinatários | **5** no total (§8): 1 cliente de teste + 3 vendedores = 4. Cenário do smoke cabe nesse teto; fila grande não. Produção exige verificação de negócio da loja. |
+| Token temporário de 24 h derruba o piloto no dia seguinte | System User com token permanente desde o começo (§8). |
 | Cliente estranhar "número novo" do vendedor | Comum em venda de veículo; a central avisa "o vendedor Fulano vai te chamar agora". |
 | Passkey em números que ficam no Baileys (Modo 1) | Modo 1 é legado; parear limpo 1x, não churnar. Passkey **não** afeta o Modo 2. |
 | Webhook Cloud exposto na internet | `hub.verify_token` no GET + `X-Hub-Signature-256` no POST; número desconhecido descartado (§6.1). |
