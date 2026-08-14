@@ -12,7 +12,7 @@ from datetime import datetime, timedelta, timezone
 from sqlalchemy.orm import Session
 
 from app import config
-from app.models_db import FilaVendedor, OfertaLead, RodizioPonteiro
+from app.models_db import FilaVendedor, LojaOperacionalProjecao, OfertaLead, RodizioPonteiro
 from app.provisioning import allows_processing
 
 
@@ -53,20 +53,24 @@ def escolher_proximo(
 
 
 def loja_opera_modo2(db: Session, loja_id: str) -> bool:
-    """Gate único do Modo 2 (spec §6.3).
+    """Gate único do Modo 2 (spec §6.3 e §5.8).
 
-    Suspensão é gate de backend, não item de menu: com a loja suspensa, a
-    central não oferece, não expira e não trava — some tudo, não só o botão.
+    Três condições, todas fail-closed:
 
-    Reusa ``provisioning.allows_processing`` (``app/provisioning.py:28``) em vez
-    de reler a projeção: ele já é **fail-closed** (loja sem projeção também não
-    opera) e já é o gate que o resto do chatbot usa. Reimplementar aqui criaria
-    duas definições de "loja ativa" que divergem no primeiro estado novo que o
-    Control inventar.
+    1. flag de rollout ligada (invariante do projeto: default OFF);
+    2. loja operacional — ``allows_processing`` já cobre suspensa e sem projeção;
+    3. o Control projetou ``whatsapp_modo == "2"`` para esta loja.
+
+    A terceira é o que impede uma loja Modo 1 de cair no rodízio quando a flag
+    é ligada no ambiente: sem central Cloud, os vendedores dela nunca receberiam
+    a oferta e o lead ficaria preso em ``aguardando``.
     """
     if not config.MODO2_ENABLED:
         return False
-    return allows_processing(db, loja_id)
+    if not allows_processing(db, loja_id):
+        return False
+    modo = db.get(LojaOperacionalProjecao, (loja_id, "whatsapp_modo"))
+    return modo is not None and modo.state == "2"
 
 
 def _fila_ordenada(db: Session, loja_id: str) -> list[FilaVendedor]:

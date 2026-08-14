@@ -2,14 +2,19 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 
-from app.models_db import Conversa, FilaVendedor, Mensagem
+from app.models_db import Conversa, FilaVendedor, LojaOperacionalProjecao, Mensagem
 from app.oferta_envio import enviar_oferta, janela_aberta
 from app.rodizio import abrir_oferta
 
 
 @pytest.fixture(autouse=True)
-def _modo2_on(monkeypatch):
+def _modo2_on(monkeypatch, db, loja_a):
     monkeypatch.setattr("app.rodizio.config.MODO2_ENABLED", True)
+    db.add(LojaOperacionalProjecao(
+        loja_id=loja_a["loja_id"], aggregate="whatsapp_modo", version=1,
+        state="2", event_id=f"e-modo-{loja_a['loja_id'][:8]}",
+    ))
+    db.commit()
 
 
 def _inbound_do_vendedor(db, loja_id, telefone, *, horas_atras):

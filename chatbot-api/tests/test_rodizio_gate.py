@@ -36,6 +36,33 @@ def test_loja_sem_projecao_nao_opera(db, loja_sem_projecao, monkeypatch):
 
 def test_loja_ativa_com_flag_on_opera(db, loja_a, monkeypatch):
     monkeypatch.setattr("app.rodizio.config.MODO2_ENABLED", True)
+    _projetar_modo(db, loja_a["loja_id"], "2")
     _fila(db, loja_a["loja_id"])
     assert loja_opera_modo2(db, loja_a["loja_id"]) is True
     assert abrir_oferta(db, loja_a["loja_id"], "5511988887777") is not None
+
+
+def _projetar_modo(db, loja_id, modo: str):
+    db.add(LojaOperacionalProjecao(
+        loja_id=loja_id, aggregate="whatsapp_modo", version=1,
+        state=modo, event_id=f"e-modo-{modo}",
+    ))
+    db.commit()
+
+
+def test_loja_no_modo_1_nao_opera_o_rodizio(db, loja_a, monkeypatch):
+    monkeypatch.setattr("app.rodizio.config.MODO2_ENABLED", True)
+    _projetar_modo(db, loja_a["loja_id"], "1")
+    assert loja_opera_modo2(db, loja_a["loja_id"]) is False
+
+
+def test_loja_no_modo_2_opera(db, loja_a, monkeypatch):
+    monkeypatch.setattr("app.rodizio.config.MODO2_ENABLED", True)
+    _projetar_modo(db, loja_a["loja_id"], "2")
+    assert loja_opera_modo2(db, loja_a["loja_id"]) is True
+
+
+def test_sem_projecao_de_modo_nao_opera(db, loja_a, monkeypatch):
+    """Fail-closed: sem o Control ter dito o modo, não entra no rodízio."""
+    monkeypatch.setattr("app.rodizio.config.MODO2_ENABLED", True)
+    assert loja_opera_modo2(db, loja_a["loja_id"]) is False

@@ -116,12 +116,6 @@ def test_handoff_cancela_o_followup(db, loja_a, monkeypatch):
     assert fake.textos == []
 
 
-@pytest.mark.xfail(
-    reason="loja_opera_modo2 ainda não checa o modo projetado; a terceira "
-           "cláusula do gate é a Task 4 do card 4. Quando ela entrar, este "
-           "teste vira XPASS — é o sinal de que o gate fechou.",
-    strict=False,
-)
 def test_loja_fora_do_modo_2_nao_recebe_followup(db, loja_a, monkeypatch):
     """Follow-up é só do Modo 2 — o n8n-baileys não ganha cutucão (§13)."""
     monkeypatch.setattr("app.rodizio.config.MODO2_ENABLED", True)

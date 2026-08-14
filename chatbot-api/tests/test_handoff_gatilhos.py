@@ -1,12 +1,17 @@
 import pytest
 
 from app.handoff_gatilhos import disparar_handoff
-from app.models_db import FilaVendedor, OfertaLead
+from app.models_db import FilaVendedor, LojaOperacionalProjecao, OfertaLead
 
 
 @pytest.fixture(autouse=True)
-def _modo2_on(monkeypatch):
+def _modo2_on(monkeypatch, db, loja_a):
     monkeypatch.setattr("app.rodizio.config.MODO2_ENABLED", True)
+    db.add(LojaOperacionalProjecao(
+        loja_id=loja_a["loja_id"], aggregate="whatsapp_modo", version=1,
+        state="2", event_id=f"e-modo-{loja_a['loja_id'][:8]}",
+    ))
+    db.commit()
 
 
 class _OutboundFake:

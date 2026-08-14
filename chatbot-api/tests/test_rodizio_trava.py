@@ -1,12 +1,17 @@
 import pytest
 
-from app.models_db import FilaVendedor, OfertaLead
+from app.models_db import FilaVendedor, LojaOperacionalProjecao, OfertaLead
 from app.rodizio import abrir_oferta, assumir_oferta
 
 
 @pytest.fixture(autouse=True)
-def _modo2_on(monkeypatch):
+def _modo2_on(monkeypatch, db, loja_a):
     monkeypatch.setattr("app.rodizio.config.MODO2_ENABLED", True)
+    db.add(LojaOperacionalProjecao(
+        loja_id=loja_a["loja_id"], aggregate="whatsapp_modo", version=1,
+        state="2", event_id=f"e-modo-{loja_a['loja_id'][:8]}",
+    ))
+    db.commit()
 
 
 def _fila(db, loja_id, quantos):
