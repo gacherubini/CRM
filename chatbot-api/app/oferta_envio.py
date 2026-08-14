@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from app import config
 from app.models_db import Conversa, FilaVendedor, Mensagem, OfertaLead
+from app.operacao import variantes_telefone
 
 JANELA_HORAS = 24
 
@@ -21,6 +22,14 @@ def janela_aberta(
     abre a janela e os leads seguintes daquele vendedor saem de graça.
     """
     limite = (agora or datetime.now(timezone.utc)) - timedelta(hours=JANELA_HORAS)
+    # Match por variantes, não por igualdade de string: o `wa_id` da Meta vem
+    # do aparelho do vendedor e no Brasil costuma chegar SEM o 9º dígito, ou
+    # sem o DDI, enquanto `fila_vendedor.telefone` guarda o que o lojista
+    # digitou. Comparando cru, a janela parece sempre fechada e o Revy paga
+    # template em TODA oferta em vez de um por vendedor por dia (§5.7, §9).
+    variantes = variantes_telefone(telefone_vendedor)
+    if not variantes:
+        return False
     # Mensagem não guarda telefone: ele mora em Conversa (`models_db.py:91`).
     # O join é obrigatório — não existe `Mensagem.telefone`.
     return (
@@ -28,7 +37,7 @@ def janela_aberta(
         .join(Conversa, Mensagem.conversa_id == Conversa.id)
         .filter(
             Conversa.loja_id == loja_id,
-            Conversa.telefone == telefone_vendedor,
+            Conversa.telefone.in_(variantes),
             Mensagem.direcao == "entrada",
             Mensagem.criada_em >= limite,
         )

@@ -88,3 +88,24 @@ def test_oferta_nao_leva_wa_me(db, loja_a):
     enviado = str(fake.templates[0])
     assert "wa.me" not in enviado
     assert "5511988887777" not in enviado
+
+
+def test_janela_abre_mesmo_sem_o_9o_digito(db, loja_a):
+    """Bug de dinheiro: o `wa_id` da Meta costuma vir SEM o 9º dígito no Brasil.
+
+    Comparando string crua, a janela parece sempre fechada e o Revy paga
+    template em toda oferta em vez de um por vendedor por dia (spec §5.7/§9).
+    """
+    _inbound_do_vendedor(db, loja_a["loja_id"], "551199998888", horas_atras=2)
+    assert janela_aberta(db, loja_a["loja_id"], "5511999998888") is True
+
+
+def test_janela_abre_mesmo_sem_o_ddi(db, loja_a):
+    _inbound_do_vendedor(db, loja_a["loja_id"], "11988887777", horas_atras=1)
+    assert janela_aberta(db, loja_a["loja_id"], "5511988887777") is True
+
+
+def test_numero_de_outro_vendedor_nao_abre_a_janela(db, loja_a):
+    """A tolerância é de formato, não de identidade."""
+    _inbound_do_vendedor(db, loja_a["loja_id"], "5511977776666", horas_atras=1)
+    assert janela_aberta(db, loja_a["loja_id"], "5511999998888") is False
