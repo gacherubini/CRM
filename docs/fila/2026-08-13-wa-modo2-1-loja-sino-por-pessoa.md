@@ -16,12 +16,23 @@ o projeto roda SQLite em teste), pytest.
 
 **Spec:** [`../referencia-viva/specs/2026-08-12-whatsapp-dois-modos-design.md`](../referencia-viva/specs/2026-08-12-whatsapp-dois-modos-design.md) — §5.7 (sino 1:1 com Peguei) e §5.3 (rodízio troca o dono da oferta).
 
-## Pré-requisito
+## Relação com o card B1 do sino
 
-**O card B1 do sino precisa estar feito**
-([`2026-08-12-notificacao-central-simulacao-pronta.md`](2026-08-12-notificacao-central-simulacao-pronta.md)),
-porque a Task 4 daqui usa `regras_elegiveis`. Se o B1 ainda não rodou, execute-o primeiro — este
-card **não** o repete.
+**Verificado em 2026-08-13: o B1 ainda NÃO foi executado.** `regras_elegiveis` e
+`central_disponivel` não existem no `main`, `tests/test_central_elegibilidade.py` não existe,
+`app/web/loja_shell.py:98` ainda usa `copiloto_secao_liberada` direto e
+`app/copiloto_sinais_job.py:85` ainda filtra lojas por `_copiloto_permitido`.
+
+**Este card não depende do B1 para rodar.** Nenhuma das 6 tasks aqui chama `regras_elegiveis` —
+elas mexem em coluna, filtro de leitura e criação/transferência de sinal. Pode executar este card
+antes, depois ou em paralelo ao B1.
+
+**Mas a feature ponta-a-ponta depende.** Hoje o sino só existe quando a flag do Copiloto está
+ligada, e `oferta_lead` não é uma das 7 regras do Copiloto — então, sem o B1, o sinal endereçado é
+gravado corretamente e **não aparece para ninguém**. A ordem recomendada é B1 → este card, mas a
+inversa também funciona: o que não pode é ligar o Modo 2 em produção sem os dois.
+
+Card B1: [`2026-08-12-notificacao-central-simulacao-pronta.md`](2026-08-12-notificacao-central-simulacao-pronta.md).
 
 ## Escopo — o que este card NÃO faz
 
