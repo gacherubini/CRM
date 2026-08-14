@@ -90,12 +90,17 @@ def sincronizar_ofertas(db: Session, loja_slug: str, chatbot) -> dict[str, int]:
 
     Idempotente por ``entidade_ref`` (id da oferta). O telefone do cliente
     transita na lista do chatbot e **não** entra no sinal.
+
+    O destinatário é ``vendedor_usuario_id`` — a pessoa da Loja —, nunca o
+    ``vendedor_id`` da fila. Oferta de vendedor sem vínculo é contada em
+    ``ignorados_sem_vinculo`` e não gera sinal.
     """
     ofertas = list(chatbot.listar_ofertas() or [])
     abertas = [o for o in ofertas if o.get("estado") == "aberta"]
     refs_vivas = {str(o.get("id") or "") for o in abertas if o.get("id")}
 
-    contagem = {"criados": 0, "transferidos": 0, "resolvidos": 0}
+    contagem = {"criados": 0, "transferidos": 0, "resolvidos": 0,
+                "ignorados_sem_vinculo": 0}
     abertos = (
         db.query(CopilotoSinal)
         .filter(
@@ -122,8 +127,16 @@ def sincronizar_ofertas(db: Session, loja_slug: str, chatbot) -> dict[str, int]:
         ref = str(oferta.get("id") or "")
         if not ref:
             continue
-        dest = str(oferta.get("vendedor_id") or "")
+        # `vendedor_usuario_id` é a pessoa da Loja, não o `vendedor_id` da
+        # fila: aquele é UUID do chatbot e nunca bate com `Usuario.id`, então
+        # endereçaria o sinal a um id que ninguém tem — o sino ficaria vazio
+        # para todo mundo, inclusive para o vendedor da vez.
+        dest = str(oferta.get("vendedor_usuario_id") or "")
         if not dest:
+            # Vendedor cadastrado sem pessoa da Loja vinculada. Melhor não
+            # tocar o sino do que endereçar a ninguém; ele segue recebendo a
+            # oferta pelo WhatsApp, que não depende deste vínculo.
+            contagem["ignorados_sem_vinculo"] += 1
             continue
         existente = por_ref.get(ref)
         if existente is None:

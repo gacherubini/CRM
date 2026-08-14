@@ -1502,6 +1502,7 @@ class FilaVendedorInput(BaseModel):
     nome: str
     telefone: str
     ordem: int = 0
+    usuario_id: str | None = None
 
 
 class FilaVendedorPatch(BaseModel):
@@ -1509,12 +1510,13 @@ class FilaVendedorPatch(BaseModel):
     telefone: str | None = None
     ordem: int | None = None
     ativo: bool | None = None
+    usuario_id: str | None = None
 
 
 def _fila_dict(v: FilaVendedor) -> dict:
     return {
         "id": v.id, "nome": v.nome, "telefone": v.telefone,
-        "ordem": v.ordem, "ativo": v.ativo,
+        "ordem": v.ordem, "ativo": v.ativo, "usuario_id": v.usuario_id,
     }
 
 
@@ -1553,6 +1555,9 @@ def listar_ofertas(
             "telefone_cliente": oferta.telefone_cliente,
             "vendedor_id": oferta.vendedor_id,
             "vendedor_nome": vendedor.nome,
+            # É este id que o Portal usa como destinatário do sino 1:1.
+            # None = vendedor sem pessoa da Loja vinculada; o Portal pula.
+            "vendedor_usuario_id": vendedor.usuario_id,
             "estado": oferta.estado,
             "prazo_em": oferta.prazo_em.isoformat() if oferta.prazo_em else None,
             "criado_em": oferta.criado_em.isoformat() if oferta.criado_em else None,
@@ -1594,6 +1599,7 @@ def criar_fila_vendedor(
     vendedor = FilaVendedor(
         id=str(uuid.uuid4()), loja_id=ctx.loja_id, nome=entrada.nome.strip(),
         telefone=telefone, ordem=entrada.ordem, ativo=True,
+        usuario_id=entrada.usuario_id,
     )
     db.add(vendedor)
     db.commit()
@@ -1625,6 +1631,8 @@ def atualizar_fila_vendedor(
         vendedor.ordem = entrada.ordem
     if entrada.ativo is not None:
         vendedor.ativo = entrada.ativo
+    if entrada.usuario_id is not None:
+        vendedor.usuario_id = entrada.usuario_id
     db.commit()
     return _fila_dict(vendedor)
 

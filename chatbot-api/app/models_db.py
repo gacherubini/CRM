@@ -91,6 +91,12 @@ class FilaVendedor(Base):
     telefone: Mapped[str] = mapped_column(String(20), nullable=False)
     ordem: Mapped[int] = mapped_column(Integer, nullable=False)
     ativo: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    # Pessoa da Loja (``Usuario.id`` do portal-gestao) que este vendedor é.
+    # Sem ele o sino não toca: o sinal 1:1 é endereçado por id de usuário do
+    # Portal, e ``FilaVendedor.id`` é um UUID daqui que nenhum usuário tem.
+    # Nullable porque fila cadastrada por API antes da tela continua válida —
+    # o Portal simplesmente não endereça sinal para quem não tem vínculo.
+    usuario_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
     criado_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_agora)
 
 
