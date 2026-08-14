@@ -113,3 +113,45 @@ def abrir_oferta(
     db.add(oferta)
     db.commit()
     return oferta
+
+
+def assumir_oferta(db: Session, oferta_id: str) -> tuple[bool, OfertaLead | None]:
+    """Trava o lead no vendedor da oferta. Idempotente e exclusiva por lead.
+
+    "Primeiro clique vence, mesmo atrasado" (spec §5.3): a oferta anterior
+    continua ``aberta``, então o botão velho ainda resolve — o que decide é
+    se JÁ EXISTE trava para aquele telefone, não qual oferta é mais nova.
+    """
+    oferta = db.get(OfertaLead, oferta_id)
+    if oferta is None:
+        return False, None
+
+    ja_travada = (
+        db.query(OfertaLead)
+        .filter(
+            OfertaLead.loja_id == oferta.loja_id,
+            OfertaLead.telefone_cliente == oferta.telefone_cliente,
+            OfertaLead.estado == "travada",
+        )
+        .first()
+    )
+    if ja_travada is not None:
+        return False, ja_travada
+
+    agora = datetime.now(timezone.utc)
+    oferta.estado = "travada"
+    oferta.travada_em = agora
+
+    # As demais ofertas deste lead morrem: o perdedor recebe "já foi pego".
+    (
+        db.query(OfertaLead)
+        .filter(
+            OfertaLead.loja_id == oferta.loja_id,
+            OfertaLead.telefone_cliente == oferta.telefone_cliente,
+            OfertaLead.id != oferta.id,
+            OfertaLead.estado == "aberta",
+        )
+        .update({"estado": "expirada"}, synchronize_session=False)
+    )
+    db.commit()
+    return True, oferta
