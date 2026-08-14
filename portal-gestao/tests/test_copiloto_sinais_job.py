@@ -208,6 +208,24 @@ def test_run_once_persiste_sinais_da_loja_ativa(db):
     assert db.query(CopilotoSinal).filter(CopilotoSinal.regra == "estoque_parado").count() == 1
 
 
+def test_run_once_com_copiloto_off_nao_cria_sinal_nem_levanta(db, monkeypatch):
+    """Shell ligado, Copiloto off: o worker não some cedo e não grava as 7 regras."""
+    monkeypatch.setenv("PORTAL_COPILOTO_SINAIS_ENABLED", "1")
+    monkeypatch.setenv("REVY_LOJA_SHELL_ENABLED", "1")
+    monkeypatch.setenv("REVY_LOJA_COPILOTO_ENABLED", "0")
+    seed_loja_operacional(db)
+    db.commit()
+    worker = CopilotoSinaisWorker(
+        db_factory=SessionLocal,
+        estoque_factory=lambda: EstoqueStub([_veiculo_parado()]),
+        chatbot_factory=lambda: ChatbotStub(),
+        agora=lambda: AGORA,
+    )
+    resultado = worker.run_once()
+    assert resultado["ok"] is True
+    assert db.query(CopilotoSinal).count() == 0
+
+
 def test_run_once_desligado_nao_toca_o_banco(db):
     seed_loja_operacional(db)
     db.commit()

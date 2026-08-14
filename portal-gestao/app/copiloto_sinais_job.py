@@ -18,7 +18,11 @@ from sqlalchemy.orm import Session
 from app import provisioning
 from app.clients.chatbot import ChatbotIndisponivel
 from app.clients.estoque import EstoqueIndisponivel
-from app.config import revy_loja_copiloto_enabled, revy_loja_entitlements_enabled
+from app.config import (
+    revy_loja_copiloto_enabled,
+    revy_loja_entitlements_enabled,
+    revy_loja_shell_enabled,
+)
 from app.loja.copiloto.consultas_estoque import estoque_parado
 from app.loja.copiloto.consultas_leads import leads_status
 from app.loja.copiloto.consultas_origem import venda_origem_periodo
@@ -59,8 +63,8 @@ FIPE_DIAS_PARADO_DEFAULT = 60  # mesmo piso de "encalhado" da regra 1
 FIPE_POR_CICLO_DEFAULT = 10
 
 
-def _copiloto_permitido(db: Session, loja_slug: str) -> bool:
-    """Gate duplo por loja: mesmo mecanismo usado pelas rotas (``allows_processing``).
+def _loja_permite_copiloto(db: Session, loja_slug: str) -> bool:
+    """Gate das 7 regras do Copiloto: flag global + entitlement da loja.
 
     Com ``REVY_LOJA_ENTITLEMENTS_ENABLED`` desligado (default hoje, single-tenant),
     ``allows_processing`` recebe ``module=None`` e só confere a loja ativa — é o
@@ -73,6 +77,7 @@ def _copiloto_permitido(db: Session, loja_slug: str) -> bool:
 
 
 def lojas_ativas(db: Session) -> list[str]:
+    """Todas as lojas ativas. Elegibilidade por tipo fica em ``run_once``."""
     linhas = (
         db.query(LojaOperacionalProjecao.loja_slug)
         .filter(
@@ -81,8 +86,7 @@ def lojas_ativas(db: Session) -> list[str]:
         )
         .all()
     )
-    slugs = sorted({linha[0] for linha in linhas})
-    return [slug for slug in slugs if _copiloto_permitido(db, slug)]
+    return sorted({linha[0] for linha in linhas})
 
 
 # Formato documentado da resposta real da FIPE (client.valor()["Valor"]):
@@ -402,7 +406,15 @@ class CopilotoSinaisWorker:
     def _ligado(self) -> bool:
         if not self.enabled:
             return False
-        return revy_loja_copiloto_enabled() if self._gate_flag else True
+        return revy_loja_shell_enabled() if self._gate_flag else True
+
+    def _deve_avaliar_copiloto(self, db: Session, loja_slug: str) -> bool:
+        # Testes que passam enabled=True pulam a flag de produto (mesmo
+        # contrato de _ligado). Em produção a flag do Copiloto continua
+        # gated nas 7 regras — o worker só não some mais só por ela.
+        if self._gate_flag and not revy_loja_copiloto_enabled():
+            return False
+        return _loja_permite_copiloto(db, loja_slug)
 
     def run_once(self) -> dict:
         if not self._ligado():
@@ -418,6 +430,8 @@ class CopilotoSinaisWorker:
             estoque, chatbot, fipe = self._clients()
             for loja_slug in lojas_ativas(db):
                 try:
+                    if not self._deve_avaliar_copiloto(db, loja_slug):
+                        continue
                     candidatos = avaliar_loja(
                         db,
                         loja_slug,
