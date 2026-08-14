@@ -1,7 +1,10 @@
 """API do Chatbot (Plano #2A). n8n consome esta API; não escreve no banco direto."""
 import csv
 import io
+import json
+import logging
 import os
+import secrets
 import uuid
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
@@ -12,7 +15,7 @@ from uuid import UUID
 from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from fastapi.exception_handlers import request_validation_exception_handler
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse, Response
+from fastapi.responses import JSONResponse, PlainTextResponse, Response
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 from sqlalchemy import text
 from sqlalchemy.orm import Session
@@ -26,7 +29,10 @@ from app import (  # noqa: F401 (registra os modelos)
     servico,
     solicitacoes_simulacao,
 )
-from app.audio import AudioProcessor, get_audio_processor
+from app.audio import AudioProcessor, get_audio_processor, processador_de_audio
+from app.meta_webhook import EventoCloud, assinatura_valida, parse_inbound
+from app.oferta_inbound import processar_clique
+from app.whatsapp_outbound import outbound_para_loja
 from app.auth import Contexto, get_contexto, verificar_webhook_token
 from app.db import get_db
 from app.models_db import FilaVendedor
@@ -47,6 +53,9 @@ from app.hardening import (
 from app.simulation import SimulationProvider, get_simulation_provider
 from app.vehicle_photo import VehiclePhotoProcessor, get_vehicle_photo_processor
 from app.whatsapp_groups import GruposWhatsappIndisponiveis, listar_grupos_whatsapp
+
+logger = logging.getLogger("chatbot.webhook_cloud")
+_wamids_vistos: set[str] = set()
 
 @asynccontextmanager
 async def _lifespan(_app: FastAPI):
@@ -453,6 +462,144 @@ def ready(db: Session = Depends(get_db)):
 @app.get("/version")
 def version():
     return {"versao": config.VERSAO, "schema": config.SCHEMA_VERSAO}
+
+
+@app.get("/webhook/cloud", response_class=PlainTextResponse)
+def webhook_cloud_verificacao(request: Request):
+    """Handshake de domínio da Meta (spec §6.1).
+
+    Responde o challenge em **texto puro**: a Meta compara o corpo inteiro, e
+    as aspas que o JSON acrescentaria reprovam a verificação.
+    """
+    parametros = request.query_params
+    if parametros.get("hub.mode") != "subscribe":
+        raise HTTPException(status_code=403, detail="modo inválido")
+    if not config.META_VERIFY_TOKEN or not secrets.compare_digest(
+        parametros.get("hub.verify_token", ""), config.META_VERIFY_TOKEN
+    ):
+        raise HTTPException(status_code=403, detail="verify token inválido")
+    return parametros.get("hub.challenge", "")
+
+
+@app.post("/webhook/cloud")
+async def webhook_cloud(request: Request, db: Session = Depends(get_db)):
+    """Inbound da Cloud API. Responde 200 rápido; a Meta reentrega se demorar."""
+    corpo_cru = await request.body()
+    if not assinatura_valida(
+        corpo_cru,
+        request.headers.get("X-Hub-Signature-256", ""),
+        app_secret=config.META_APP_SECRET,
+    ):
+        raise HTTPException(status_code=401, detail="assinatura inválida")
+
+    try:
+        payload = json.loads(corpo_cru)
+    except ValueError:
+        # Assinatura bate mas o corpo não é JSON: não é reentrega útil.
+        return {"ok": True, "ignorado": "corpo inválido"}
+
+    for evento in parse_inbound(payload):
+        if evento.wamid and _wamid_ja_visto(db, evento.wamid):
+            continue
+        if evento.wamid:
+            _wamids_vistos.add(evento.wamid)
+        try:
+            processar_evento_cloud(db, evento)
+        except Exception:  # noqa: BLE001
+            # Erro nosso não pode virar reentrega infinita da Meta.
+            logger.exception("falha ao processar evento cloud wamid=%s", evento.wamid)
+    return {"ok": True}
+
+
+def _wamid_ja_visto(db: Session, wamid: str) -> bool:
+    """Dedup de reentrega (spec §6.1).
+
+    O replay >5 min do Modo 1 não cobre isto: a Meta reentrega em segundos
+    quando não recebe 200 rápido, e o mesmo ``wamid`` chegaria duas vezes
+    dentro da janela.
+    """
+    if wamid in _wamids_vistos:
+        return True
+    existe = (
+        db.query(models_db.Mensagem.id)
+        .filter(models_db.Mensagem.provider_message_id == wamid)
+        .first()
+        is not None
+    )
+    if existe:
+        _wamids_vistos.add(wamid)
+    return existe
+
+
+def _loja_por_phone_number_id(db: Session, phone_number_id: str):
+    """Loja dona deste phone_number_id, ou None se ninguém cadastrou."""
+    if not phone_number_id:
+        return None
+    canal = (
+        db.query(models_db.WhatsAppCanal)
+        .filter(models_db.WhatsAppCanal.evolution_instance == phone_number_id)
+        .first()
+    )
+    if canal is not None:
+        return db.get(models_db.Loja, canal.loja_id)
+    return (
+        db.query(models_db.Loja)
+        .filter(models_db.Loja.evolution_instance == phone_number_id)
+        .first()
+    )
+
+
+def _processar_mensagem_cliente(db: Session, loja, evento: EventoCloud) -> None:
+    texto = evento.texto
+    if evento.tipo == "audio":
+        processador = processador_de_audio(2)
+        if processador is not None:
+            resultado = processador.processar(
+                evento.phone_number_id,
+                evento.media_id or evento.wamid,
+                evento.mime,
+                None,
+            )
+            texto = resultado.get("texto") or resultado.get("fallback")
+        else:
+            texto = config.AUDIO_FALLBACK_TEXT
+    servico.registrar_mensagem(
+        db,
+        evento.phone_number_id,
+        evento.remetente,
+        texto,
+        evento.wamid,
+        False,
+        False,
+        evento.tipo,
+        meta_ad_id=evento.referral_ad_id,
+    )
+
+
+def processar_evento_cloud(db: Session, evento: EventoCloud) -> None:
+    """Despacha o evento para o que os cards 2 e 2b já entregaram.
+
+    Função de módulo, não bloco inline na rota: é o ponto de substituição dos
+    testes e o lugar onde o tipo novo entra sem mexer no handler HTTP.
+    """
+    loja = _loja_por_phone_number_id(db, evento.phone_number_id)
+    if loja is None:
+        logger.warning("phone_number_id sem loja: %s", evento.phone_number_id)
+        return
+
+    if evento.tipo == "clique":
+        processar_clique(
+            db, loja.id, evento.remetente, evento.oferta_id,
+            outbound=outbound_para_loja(db, loja.id),
+        )
+    elif evento.tipo == "status":
+        if evento.status == "failed":
+            logger.warning("envio falhou wamid=%s para=%s", evento.wamid, evento.remetente)
+    elif evento.tipo in ("texto", "audio", "imagem"):
+        # Fluxo do bot: texto direto; áudio transcreve antes (card 2b Task 2);
+        # imagem entra na conversa sem OCR (spec §5.10).
+        _processar_mensagem_cliente(db, loja, evento)
+    # "ignorado" não faz nada de propósito: sticker, contato, localização.
 
 
 @app.post("/webhook/mensagem")
