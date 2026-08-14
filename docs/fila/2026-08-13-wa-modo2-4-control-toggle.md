@@ -37,6 +37,10 @@ uma loja.
 - **Migration aditiva.** O Control não faz downgrade: o padrão do repo é
   `raise RuntimeError(...)` no `downgrade`, com rollback por feature flag
   (`alembic/versions/0018_copiloto_modulo.py`).
+- **O step "ver falhar" tem que falhar de verdade.** Teste que passa antes da implementação é
+  cobertura falsa. Cuidado especial com default de coluna (só é aplicado no `commit`, antes disso o
+  atributo é `None`) e com asserção que só confere o que o próprio teste acabou de passar por
+  kwarg — isso testa o SQLAlchemy, não o nosso código.
 - Rodar testes **a partir da pasta do produto**. O dono usa **Mac e Windows**: macOS
   `.venv/bin/python -m pytest -q`; Windows `.\.venv\Scripts\python.exe -m pytest -q`.
 
