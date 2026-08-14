@@ -46,6 +46,10 @@ AUDIO_FALLBACK_TEXT = os.getenv(
     "Não consegui entender o áudio. Pode me enviar por texto?",
 )[:160]
 
+# Cloud API (Modo 2). Token de System User — nunca o temporário de 24 h do painel.
+GRAPH_BASE_URL = os.getenv("CHATBOT_GRAPH_BASE_URL", "https://graph.facebook.com/v21.0")
+GRAPH_TOKEN = os.getenv("CHATBOT_GRAPH_TOKEN", "")
+
 # Imagem de veículo recebida de número autorizado. O binário só transita pela
 # API e é enviado ao Estoque; não é persistido no Chatbot/n8n.
 IMAGE_EVOLUTION_URL = os.getenv(
