@@ -1,0 +1,115 @@
+{% extends "base.html" %}
+{% block title %}Fila de atendimento — Revy Loja{% endblock %}
+{% block page_title %}Fila de atendimento{% endblock %}
+{% block content %}
+<div class="page-heading">
+  <div>
+    <span class="eyebrow">Ajustes</span>
+    <h1>Fila de atendimento</h1>
+    <p>
+      Quando um cliente pede para falar com alguém, o Revy chama um vendedor por
+      vez, na ordem daqui, e espera 10 minutos antes de passar para o próximo.
+      Quem clicar primeiro fica com o lead.
+    </p>
+  </div>
+</div>
+
+{% if erro_fila %}
+<div class="alert warning">{{ erro_fila }}</div>
+{% endif %}
+{% if acao_erro %}
+<div class="alert warning">{{ acao_erro }}</div>
+{% endif %}
+{% if acao_mensagem %}
+<div class="alert success" role="status">{{ acao_mensagem }}</div>
+{% endif %}
+
+<form class="filter-bar" method="post" action="/app/loja/whatsapp/fila">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  <label class="search">
+    <span class="sr-only">Vendedor</span>
+    <select name="usuario_id" required>
+      <option value="">Escolha o vendedor…</option>
+      {% for membro in equipe %}
+      <option value="{{ membro.id }}">{{ membro.nome or membro.email }}</option>
+      {% endfor %}
+    </select>
+  </label>
+  <label class="search">
+    <span class="sr-only">WhatsApp do vendedor</span>
+    <input name="telefone" maxlength="20" placeholder="WhatsApp: (11) 99999-0000" required>
+  </label>
+  <label class="search">
+    <span class="sr-only">Posição na fila</span>
+    <input name="ordem" type="number" min="0" step="1" value="0" placeholder="Ordem">
+  </label>
+  <button class="button primary" type="submit">Adicionar à fila</button>
+</form>
+
+<section class="panel" aria-labelledby="fila-titulo">
+  <div class="panel-heading">
+    <div>
+      <span class="mono-label">Ordem de chamada</span>
+      <h2 id="fila-titulo">Quem atende</h2>
+    </div>
+  </div>
+  <p class="muted" style="padding: 0 var(--space-5) var(--space-3)">
+    O vendedor recebe o aviso <strong>no WhatsApp dele</strong> e também no sino da
+    Loja. Ele fala com o cliente do próprio número — o Revy não entra nessa conversa.
+  </p>
+  {% if fila %}
+  <div class="table-wrap">
+    <table>
+      <caption class="sr-only">Vendedores na fila de rodízio, em ordem de chamada</caption>
+      <thead>
+        <tr>
+          <th scope="col">Ordem</th>
+          <th scope="col">Vendedor</th>
+          <th scope="col">WhatsApp</th>
+          <th scope="col">Sino da Loja</th>
+          <th scope="col"><span class="sr-only">Ações</span></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for vendedor in fila %}
+        <tr>
+          <td><strong>{{ loop.index }}º</strong></td>
+          <td>
+            <div class="cell-stack"><strong>{{ vendedor.nome }}</strong></div>
+          </td>
+          <td><span class="mono">{{ vendedor.telefone }}</span></td>
+          <td>
+            {% if vendedor.usuario_id %}
+            <span class="status conectado">Recebe</span>
+            {% else %}
+            {# Sem vínculo com pessoa da Loja, o sinal 1:1 não tem para quem ir. #}
+            <span class="status desconectado">Só WhatsApp — sem acesso à Loja</span>
+            {% endif %}
+          </td>
+          <td>
+            <div class="row-actions">
+              <form method="post"
+                    action="/app/loja/whatsapp/fila/{{ vendedor.id }}/remover"
+                    onsubmit="return confirm('Tirar {{ vendedor.nome }} da fila? Ele para de receber leads novos. Os leads que já são dele continuam.')">
+                <input type="hidden" name="csrf" value="{{ csrf }}">
+                <button class="button danger" type="submit">Tirar da fila</button>
+              </form>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty">
+    <strong>Ninguém na fila ainda</strong>
+    <p>
+      Sem vendedor na fila, o cliente que pede atendimento fica esperando e o lead
+      aparece como <strong>sem vendedor</strong> no Atendimento. Adicione pelo menos
+      um acima.
+    </p>
+  </div>
+  {% endif %}
+</section>
+{% endblock %}

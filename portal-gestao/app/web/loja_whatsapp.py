@@ -39,6 +39,7 @@ from app.main import (  # noqa: E402
 )
 
 _TELA = "/app/loja/whatsapp"
+_TELA_FILA = "/app/loja/whatsapp/fila"
 # Erro genérico: nenhuma mensagem de canal carrega QR nem detalhe de provedor.
 _ERRO_CHATBOT = "chatbot_indisponivel"
 
@@ -54,6 +55,26 @@ def _autorizado(usuario) -> bool:
 
 def _para_app() -> RedirectResponse:
     return RedirectResponse("/app", status_code=303)
+
+
+def _para_fila() -> RedirectResponse:
+    return RedirectResponse(_TELA_FILA, status_code=303)
+
+
+def _equipe_para_fila(db: Session, loja_slug: str):
+    """Quem pode entrar na fila: gente ativa da loja.
+
+    Vem da equipe e não de texto livre porque é daqui que sai o ``Usuario.id``
+    que vira destinatário do sino.
+    """
+    from app.models import Usuario
+
+    return (
+        db.query(Usuario)
+        .filter(Usuario.loja_slug == loja_slug, Usuario.ativo.is_(True))
+        .order_by(Usuario.nome, Usuario.email)
+        .all()
+    )
 
 
 def _para_tela() -> RedirectResponse:
@@ -314,3 +335,102 @@ def loja_whatsapp_status(
         {"estado": estado, "rotulo": ROTULOS.get(estado, estado)},
         headers={"Cache-Control": "no-store"},
     )
+
+
+@router.get(_TELA_FILA, response_class=HTMLResponse)
+def loja_whatsapp_fila(
+    request: Request,
+    db: Session = Depends(get_db),
+    chatbot=Depends(get_chatbot_client),
+):
+    """Cadastro da fila de rodízio do Modo 2 (spec §5.8).
+
+    A pessoa vem da **equipe da loja**, não de nome digitado: é assim que o
+    ``Usuario.id`` entra no cadastro e o sino 1:1 ganha destinatário real.
+    Sem vínculo o vendedor ainda recebe a oferta pelo WhatsApp, mas o sino
+    não toca para ele — a lista avisa isso na cara.
+    """
+    usuario = usuario_atual(request, db)
+    if not usuario:
+        return redirecionar_login()
+    if not _habilitado() or not _autorizado(usuario):
+        return _para_app()
+
+    fila, erro = [], None
+    try:
+        fila = chatbot.listar_fila_vendedores()
+    except ChatbotIndisponivel as exc:
+        # Chatbot fora do ar não derruba a tela: some a lista, o resto renderiza.
+        erro = str(exc)
+
+    return templates.TemplateResponse(
+        "loja/whatsapp_fila.html",
+        contexto(
+            request,
+            usuario,
+            db,
+            fila=fila,
+            erro_fila=erro,
+            equipe=_equipe_para_fila(db, usuario.loja_slug),
+            acao_erro=request.session.pop("fila_erro", None),
+            acao_mensagem=request.session.pop("fila_mensagem", None),
+        ),
+        headers={"Cache-Control": "no-store"},
+    )
+
+
+@router.post(_TELA_FILA)
+async def loja_whatsapp_fila_criar(
+    request: Request,
+    db: Session = Depends(get_db),
+    chatbot=Depends(get_chatbot_client),
+):
+    usuario, form, erro = await _guarda(request, db)
+    if erro is not None:
+        return erro
+
+    escolhido = (form.get("usuario_id") or "").strip()
+    telefone = (form.get("telefone") or "").strip()
+    # O id vem do form: sem conferir a equipe, daria para injetar pessoa de
+    # outra loja no rodízio desta.
+    membro = next(
+        (m for m in _equipe_para_fila(db, usuario.loja_slug) if m.id == escolhido), None
+    )
+    if membro is None:
+        request.session["fila_erro"] = "Escolha uma pessoa da equipe da loja."
+        return _para_fila()
+    if not telefone:
+        request.session["fila_erro"] = "Informe o WhatsApp do vendedor."
+        return _para_fila()
+
+    try:
+        ordem = int((form.get("ordem") or "0").strip() or 0)
+    except ValueError:
+        ordem = 0
+
+    try:
+        chatbot.criar_fila_vendedor(
+            nome=membro.nome, telefone=telefone, ordem=ordem, usuario_id=membro.id
+        )
+        request.session["fila_mensagem"] = f"{membro.nome} entrou na fila."
+    except ChatbotIndisponivel as exc:
+        request.session["fila_erro"] = str(exc)
+    return _para_fila()
+
+
+@router.post(_TELA_FILA + "/{vendedor_id}/remover")
+async def loja_whatsapp_fila_remover(
+    vendedor_id: str,
+    request: Request,
+    db: Session = Depends(get_db),
+    chatbot=Depends(get_chatbot_client),
+):
+    _usuario, _form, erro = await _guarda(request, db)
+    if erro is not None:
+        return erro
+    try:
+        chatbot.remover_fila_vendedor(vendedor_id)
+        request.session["fila_mensagem"] = "Vendedor saiu da fila."
+    except ChatbotIndisponivel as exc:
+        request.session["fila_erro"] = str(exc)
+    return _para_fila()
