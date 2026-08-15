@@ -137,3 +137,56 @@ def test_erro_tem_palavra_e_saida_nao_so_cor(client, monkeypatch):
     html = client.get(f"/app/loja/copiloto?conversa_id={conversa_id}").text
     assert "Não deu certo" in html
     assert "Tentar de novo" in html
+
+
+def test_aria_live_esta_na_lista_de_mensagens_nao_na_secao_inteira(client, monkeypatch):
+    """Com aria-live na <section>, o leitor de tela rele cabecalho, chips e
+    composer a cada sondagem — e a resposta inteira do comeco a cada 700ms."""
+    _ligar(monkeypatch)
+    login(client)
+    html = client.get("/app/loja/copiloto").text
+    assert '<section class="copiloto-thread" aria-live="polite">' not in html
+    assert 'id="copiloto-mensagens" aria-live="polite"' in html
+
+
+def test_resposta_tem_botao_de_copiar(client, monkeypatch):
+    _ligar(monkeypatch)
+    login(client)
+    db = SessionLocal()
+    try:
+        turno = criar_turno(
+            db, loja_slug="loja-teste", usuario_id=_usuario_id(), pergunta="quanto?",
+        )
+        concluir_turno(
+            db, turno, resposta="Você vendeu 2.", passos=[],
+            tokens_entrada=10, tokens_saida=5, custo_estimado="0.001",
+        )
+        conversa_id = turno.conversa_id
+    finally:
+        db.close()
+    html = client.get(f"/app/loja/copiloto?conversa_id={conversa_id}").text
+    assert "data-copiar" in html
+
+
+def test_fontes_nao_mostra_enum_cru(client, monkeypatch):
+    """runner.py devolve status ok|erro|indisponivel. 'consultando vendas — ok'
+    poe palavra de maquina na cara do dono."""
+    _ligar(monkeypatch)
+    login(client)
+    db = SessionLocal()
+    try:
+        turno = criar_turno(
+            db, loja_slug="loja-teste", usuario_id=_usuario_id(), pergunta="vendas?",
+        )
+        concluir_turno(
+            db, turno, resposta="Duas.",
+            passos=[{"ferramenta": "vendas_resumo", "argumentos": {},
+                     "status": "indisponivel", "resumo": ""}],
+            tokens_entrada=10, tokens_saida=5, custo_estimado="0.001",
+        )
+        conversa_id = turno.conversa_id
+    finally:
+        db.close()
+    html = client.get(f"/app/loja/copiloto?conversa_id={conversa_id}").text
+    assert "indisponivel" not in html
+    assert "indisponível" in html

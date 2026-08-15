@@ -10,6 +10,11 @@
   'leads_status': 'consultando leads e atendimento',
   'roi_canais': 'consultando investimento e ROI'
 } %}
+{% set rotulos_status = {
+  'ok': 'consultado',
+  'erro': 'falhou',
+  'indisponivel': 'indisponível'
+} %}
 
 <div class="copiloto-layout">
   <aside class="copiloto-historico" aria-label="Conversas anteriores">
@@ -29,7 +34,7 @@
     </ul>
   </aside>
 
-  <section class="copiloto-thread" aria-live="polite">
+  <section class="copiloto-thread">
     <header class="copiloto-thread-head">
       <span class="copiloto-avatar copiloto-avatar-lg" aria-hidden="true">✦</span>
       <div class="copiloto-thread-id">
@@ -38,12 +43,19 @@
       </div>
     </header>
 
-    <div id="copiloto-mensagens">
+    <div id="copiloto-mensagens" aria-live="polite">
       {% if not turnos %}
       <div class="copiloto-boas-vindas" data-copiloto-vazio>
         <span class="copiloto-avatar copiloto-avatar-xl" aria-hidden="true">✦</span>
         <p class="copiloto-boas-vindas-titulo">Como estão as vendas hoje?</p>
         <p class="copiloto-boas-vindas-sub">Pergunte sobre vendas, estoque, leads ou de onde veio a última venda.</p>
+        {% if resumo.chips %}
+        <div class="copiloto-chips">
+          {% for chip in resumo.chips %}
+          <button type="button" class="chip" data-pergunta="{{ chip.pergunta }}">{{ chip.texto }}</button>
+          {% endfor %}
+        </div>
+        {% endif %}
       </div>
       {% endif %}
       {% for turno in turnos %}
@@ -59,6 +71,7 @@
         <div class="copiloto-resposta muted">{{ turno.resposta or 'Pergunta cancelada.' }}</div>
         {% elif turno.resposta %}
         <div class="copiloto-resposta" data-md>{{ turno.resposta }}</div>
+        <button type="button" class="copiloto-copiar" data-copiar aria-label="Copiar resposta">Copiar</button>
         {% else %}
         <div class="copiloto-resposta muted">Ainda processando esta pergunta…</div>
         {% endif %}
@@ -67,7 +80,7 @@
           <summary>Fontes</summary>
           <ul>
             {% for passo in turno.passos %}
-            <li>{{ rotulos_passo.get(passo.ferramenta, 'consultando dados') }} — {{ passo.status }}</li>
+            <li>{{ rotulos_passo.get(passo.ferramenta, 'consultando dados') }} — {{ rotulos_status.get(passo.status, passo.status) }}</li>
             {% endfor %}
           </ul>
         </details>
@@ -98,14 +111,6 @@
       </article>
       {% endfor %}
     </div>
-
-    {% if resumo.chips %}
-    <div class="copiloto-chips">
-      {% for chip in resumo.chips %}
-      <button type="button" class="chip" data-pergunta="{{ chip.pergunta }}">{{ chip.texto }}</button>
-      {% endfor %}
-    </div>
-    {% endif %}
 
     <form id="copiloto-form" class="copiloto-composer" autocomplete="off">
       <input type="hidden" name="csrf" value="{{ csrf }}">
@@ -459,6 +464,15 @@
     } else if (dados && dados.estado !== 'pronto' && !dados.texto) {
       alvo.textContent = 'Não consegui responder desta vez.';
     }
+    if (dados && dados.estado === 'pronto' && (dados.texto || alvo.dataset.textoAlvo)) {
+      var copiar = document.createElement('button');
+      copiar.type = 'button';
+      copiar.className = 'copiloto-copiar';
+      copiar.dataset.copiar = '';
+      copiar.setAttribute('aria-label', 'Copiar resposta');
+      copiar.textContent = 'Copiar';
+      alvo.parentNode.appendChild(copiar);
+    }
     if (dados && dados.cartao) {
       alvo.parentNode.appendChild(criarCartao(dados.cartao, dados.turno_id));
       rolarParaFim();
@@ -640,6 +654,14 @@
     var alvo = evento.target;
     if (alvo.dataset && alvo.dataset.cancelar !== undefined) {
       alvo.closest('.copiloto-cartao').remove();
+      return;
+    }
+    if (alvo.dataset && alvo.dataset.copiar !== undefined) {
+      var corpoResposta = alvo.closest('.copiloto-turno').querySelector('.copiloto-resposta');
+      navigator.clipboard.writeText(corpoResposta.textContent.trim()).then(function () {
+        alvo.textContent = 'Copiado';
+        setTimeout(function () { alvo.textContent = 'Copiar'; }, 1600);
+      });
       return;
     }
     if (alvo.dataset && alvo.dataset.repergunta) {
