@@ -50,7 +50,11 @@
       <article class="copiloto-turno">
         <p class="copiloto-pergunta">{{ turno.pergunta }}</p>
         {% if turno.estado == 'erro' %}
-        <div class="copiloto-resposta erro">{{ turno.resposta or 'Não consegui responder desta vez.' }}</div>
+        <div class="copiloto-resposta erro">
+          <p class="copiloto-erro-rotulo"><span aria-hidden="true">!</span> Não deu certo</p>
+          <p>{{ turno.resposta or 'Não consegui responder desta vez.' }}</p>
+          <button type="button" class="button ghost" data-repergunta="{{ turno.pergunta }}">Tentar de novo</button>
+        </div>
         {% elif turno.estado == 'cancelado' %}
         <div class="copiloto-resposta muted">{{ turno.resposta or 'Pergunta cancelada.' }}</div>
         {% elif turno.resposta %}
@@ -410,13 +414,49 @@
     alvo.classList.remove('pensando');
   }
 
+  // Mesmo desenho do erro que o Jinja monta no primeiro carregamento: rotulo
+  // com palavra, mensagem e saida. Cor sozinha nao comunica (PRODUCT.md).
+  function marcarErro(alvo, mensagem, pergunta) {
+    alvo.classList.remove('pensando');
+    alvo.className = 'copiloto-resposta erro';
+    while (alvo.firstChild) { alvo.removeChild(alvo.firstChild); }
+
+    var rotulo = document.createElement('p');
+    rotulo.className = 'copiloto-erro-rotulo';
+    var marca = document.createElement('span');
+    marca.setAttribute('aria-hidden', 'true');
+    marca.textContent = '!';
+    rotulo.appendChild(marca);
+    rotulo.appendChild(document.createTextNode(' Não deu certo'));
+
+    var corpoErro = document.createElement('p');
+    corpoErro.textContent = mensagem;
+
+    var repetir = document.createElement('button');
+    repetir.type = 'button';
+    repetir.className = 'button ghost';
+    repetir.dataset.repergunta = pergunta;
+    repetir.textContent = 'Tentar de novo';
+
+    alvo.appendChild(rotulo);
+    alvo.appendChild(corpoErro);
+    alvo.appendChild(repetir);
+  }
+
   function terminar(alvo, dados) {
     clearInterval(timer);
     limparPasso(alvo);
     cancelar.hidden = true;
     definirPendente(false);
     revelarTudo(alvo);
-    if (dados && dados.estado !== 'pronto' && !dados.texto) {
+    if (dados && dados.estado === 'erro') {
+      var perguntaEl = alvo.parentNode && alvo.parentNode.querySelector('.copiloto-pergunta');
+      marcarErro(
+        alvo,
+        dados.texto || 'Não consegui responder desta vez.',
+        perguntaEl ? perguntaEl.textContent : ''
+      );
+    } else if (dados && dados.estado !== 'pronto' && !dados.texto) {
       alvo.textContent = 'Não consegui responder desta vez.';
     }
     if (dados && dados.cartao) {
@@ -496,8 +536,7 @@
         if (resposta.status !== 200) {
           limparPasso(alvo);
           definirPendente(false);
-          alvo.className = 'copiloto-resposta erro';
-          alvo.textContent = resposta.dados.message || 'Não consegui enviar sua pergunta.';
+          marcarErro(alvo, resposta.dados.message || 'Não consegui enviar sua pergunta.', pergunta);
           return;
         }
         turnoAtual = resposta.dados.turno_id;
@@ -508,8 +547,7 @@
       .catch(function () {
         limparPasso(alvo);
         definirPendente(false);
-        alvo.className = 'copiloto-resposta erro';
-        alvo.textContent = 'Não consegui enviar sua pergunta.';
+        marcarErro(alvo, 'Não consegui enviar sua pergunta.', pergunta);
       });
   });
 
@@ -602,6 +640,17 @@
     var alvo = evento.target;
     if (alvo.dataset && alvo.dataset.cancelar !== undefined) {
       alvo.closest('.copiloto-cartao').remove();
+      return;
+    }
+    if (alvo.dataset && alvo.dataset.repergunta) {
+      campo.value = alvo.dataset.repergunta;
+      ajustarAltura();
+      enviar.disabled = false;
+      if (typeof form.requestSubmit === 'function') {
+        form.requestSubmit();
+      } else {
+        form.dispatchEvent(new Event('submit', { cancelable: true }));
+      }
       return;
     }
     if (!alvo.dataset || !alvo.dataset.desfazer) { return; }

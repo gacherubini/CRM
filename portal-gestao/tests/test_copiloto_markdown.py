@@ -117,3 +117,23 @@ def test_polling_tolera_falha_transitoria(client, monkeypatch):
     html = client.get("/app/loja/copiloto").text
     assert "FALHAS_ATE_DESISTIR" in html
     assert "continua sendo processada" in html
+
+
+def test_erro_tem_palavra_e_saida_nao_so_cor(client, monkeypatch):
+    """PRODUCT.md, compromisso vinculante: cor nunca comunica sozinha."""
+    _ligar(monkeypatch)
+    login(client)
+    db = SessionLocal()
+    try:
+        turno = criar_turno(
+            db, loja_slug="loja-teste", usuario_id=_usuario_id(), pergunta="e ai?",
+        )
+        turno.estado = "erro"
+        turno.resposta = "O provedor não respondeu."
+        db.commit()
+        conversa_id = turno.conversa_id
+    finally:
+        db.close()
+    html = client.get(f"/app/loja/copiloto?conversa_id={conversa_id}").text
+    assert "Não deu certo" in html
+    assert "Tentar de novo" in html
