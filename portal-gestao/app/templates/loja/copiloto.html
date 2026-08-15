@@ -425,11 +425,38 @@
     }
   }
 
+  // Rede pisca. Antes, UMA sondagem falha matava a resposta e mostrava
+  // "nao consegui" — mentira: o worker segue rodando e a resposta cai no
+  // banco (um F5 mostraria). Tolera falhas seguidas e, ao desistir, diz a
+  // verdade em vez de inventar uma derrota.
+  var FALHAS_ATE_DESISTIR = 5;
+  var falhasSeguidas = 0;
+
+  function desistirDoPolling(alvo) {
+    clearInterval(timer);
+    limparPasso(alvo);
+    definirPendente(false);
+    revelarTudo(alvo);
+    var aviso = document.createElement('p');
+    aviso.className = 'copiloto-aviso';
+    aviso.textContent = 'Perdi a conexão. A resposta continua sendo processada — recarregue em alguns segundos.';
+    var recarregar = document.createElement('button');
+    recarregar.className = 'button ghost';
+    recarregar.type = 'button';
+    recarregar.textContent = 'Recarregar';
+    recarregar.addEventListener('click', function () { window.location.reload(); });
+    aviso.appendChild(document.createTextNode(' '));
+    aviso.appendChild(recarregar);
+    alvo.parentNode.appendChild(aviso);
+  }
+
   function acompanhar(alvo) {
+    falhasSeguidas = 0;
     timer = setInterval(function () {
       fetch('/app/loja/copiloto/turno/' + turnoAtual + '.json')
         .then(function (r) { return r.json(); })
         .then(function (dados) {
+          falhasSeguidas = 0;
           if (dados.texto) {
             limparPasso(alvo);
             revelar(alvo, dados.texto);
@@ -440,7 +467,10 @@
             terminar(alvo, dados);
           }
         })
-        .catch(function () { terminar(alvo, null); });
+        .catch(function () {
+          falhasSeguidas += 1;
+          if (falhasSeguidas >= FALHAS_ATE_DESISTIR) { desistirDoPolling(alvo); }
+        });
     }, 700);
   }
 

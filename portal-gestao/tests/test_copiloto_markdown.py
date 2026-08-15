@@ -107,3 +107,13 @@ def test_textarea_cresce_com_o_texto(client, monkeypatch):
     login(client)
     html = client.get("/app/loja/copiloto").text
     assert "function ajustarAltura" in html
+
+
+def test_polling_tolera_falha_transitoria(client, monkeypatch):
+    """Uma sondagem falha nao pode declarar derrota: o worker segue rodando e
+    a resposta vai cair no banco. Declarar erro ai e mentir para o dono."""
+    _ligar(monkeypatch)
+    login(client)
+    html = client.get("/app/loja/copiloto").text
+    assert "FALHAS_ATE_DESISTIR" in html
+    assert "continua sendo processada" in html
