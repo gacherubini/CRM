@@ -2,6 +2,7 @@
 {% block title %}Hoje — Revy Loja{% endblock %}
 {% block page_title %}Hoje{% endblock %}
 {% block content %}
+{% set rotulos_severidade = {'critico': 'Crítico', 'atencao': 'Atenção', 'info': 'Informativo'} %}
 <div class="page-heading">
   <div>
     <span class="eyebrow">Copiloto</span>
@@ -17,7 +18,7 @@
       <span class="mono-label">Sinais</span>
       <h2 id="copiloto-alertas">Precisa de atenção</h2>
     </div>
-    {% if sinais_novos %}<span class="muted">{{ sinais_novos }} novo(s)</span>{% endif %}
+    {% if sinais_novos %}<span class="muted">{{ sinais_novos }} {{ 'novo' if sinais_novos == 1 else 'novos' }}</span>{% endif %}
   </div>
   <div class="panel-body">
     <ul class="copiloto-sinais">
@@ -25,6 +26,7 @@
       <li class="copiloto-sinal severidade-{{ sinal.severidade }}">
         <div>
           <strong>{{ sinal.titulo }}</strong>
+          <span class="copiloto-sinal-grau">{{ rotulos_severidade.get(sinal.severidade, sinal.severidade) }}</span>
           <p class="muted">{{ sinal.detalhe }}</p>
         </div>
         <div class="copiloto-sinal-acoes">
@@ -110,7 +112,8 @@
     {% elif not resumo.parado.itens %}
     <p class="muted">Nada parado há mais de {{ resumo.parado.dias_min }} dias.</p>
     {% else %}
-    <p><strong>{{ resumo.parado.total }}</strong> veículo(s) parado(s) há mais de
+    <p><strong>{{ resumo.parado.total }}</strong>
+      {{ 'veículo parado' if resumo.parado.total == 1 else 'veículos parados' }} há mais de
       {{ resumo.parado.dias_min }} dias — {{ formatar_brl(resumo.parado.capital_preso) }} de capital preso.</p>
     <p class="muted">{{ resumo.parado.ressalva }}</p>
     {% endif %}
