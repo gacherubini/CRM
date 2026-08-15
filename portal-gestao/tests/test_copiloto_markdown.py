@@ -78,3 +78,13 @@ def test_pagina_revela_a_resposta_progressivamente(client, monkeypatch):
     html = client.get("/app/loja/copiloto").text
     assert "function revelar" in html
     assert "requestAnimationFrame" in html
+
+
+def test_indicador_de_pensando_vive_dentro_da_lista_de_mensagens(client, monkeypatch):
+    """Bolha vazia com avatar + legenda flutuante fora do scroll = dois
+    indicadores para um estado só."""
+    _ligar(monkeypatch)
+    login(client)
+    html = client.get("/app/loja/copiloto").text
+    assert 'id="copiloto-pensando"' not in html
+    assert "copiloto-resposta pensando" in html or "classList.add('pensando')" in html

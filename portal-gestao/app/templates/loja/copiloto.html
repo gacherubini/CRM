@@ -95,8 +95,6 @@
       {% endfor %}
     </div>
 
-    <p id="copiloto-pensando" class="copiloto-pensando" hidden>Pensando…</p>
-
     {% if resumo.chips %}
     <div class="copiloto-chips">
       {% for chip in resumo.chips %}
@@ -130,7 +128,6 @@
   var form = document.getElementById('copiloto-form');
   if (!form) { return; }
   var mensagens = document.getElementById('copiloto-mensagens');
-  var pensando = document.getElementById('copiloto-pensando');
 
   // Chat cola no fim como um app de mensagem: rola para a última resposta
   // quando o usuário já está por perto (nunca arranca ele do meio da leitura
@@ -401,9 +398,21 @@
     return div;
   }
 
+  // O passo real ("consultando vendas…") vive DENTRO do slot da resposta:
+  // um indicador so, no lugar onde o texto vai nascer. Sai no primeiro
+  // caractere que chega do provedor.
+  function mostrarPasso(alvo, rotulo) {
+    if (alvo.dataset.textoAlvo) { return; } // ja tem texto: nao regride
+    alvo.classList.add('pensando');
+    alvo.textContent = rotulo;
+  }
+  function limparPasso(alvo) {
+    alvo.classList.remove('pensando');
+  }
+
   function terminar(alvo, dados) {
     clearInterval(timer);
-    pensando.hidden = true;
+    limparPasso(alvo);
     cancelar.hidden = true;
     definirPendente(false);
     revelarTudo(alvo);
@@ -421,8 +430,12 @@
       fetch('/app/loja/copiloto/turno/' + turnoAtual + '.json')
         .then(function (r) { return r.json(); })
         .then(function (dados) {
-          pensando.textContent = descrever(dados.passos);
-          if (dados.texto) { revelar(alvo, dados.texto); }
+          if (dados.texto) {
+            limparPasso(alvo);
+            revelar(alvo, dados.texto);
+          } else {
+            mostrarPasso(alvo, descrever(dados.passos));
+          }
           if (dados.estado === 'pronto' || dados.estado === 'erro' || dados.estado === 'cancelado') {
             terminar(alvo, dados);
           }
@@ -443,14 +456,13 @@
     var alvo = bloco(pergunta);
     campo.value = '';
     definirPendente(true);
-    pensando.hidden = false;
-    pensando.textContent = 'Pensando…';
+    mostrarPasso(alvo, 'Pensando…');
 
     fetch('/app/loja/copiloto/perguntar', { method: 'POST', body: corpo })
       .then(function (r) { return r.json().then(function (d) { return { status: r.status, dados: d }; }); })
       .then(function (resposta) {
         if (resposta.status !== 200) {
-          pensando.hidden = true;
+          limparPasso(alvo);
           definirPendente(false);
           alvo.className = 'copiloto-resposta erro';
           alvo.textContent = resposta.dados.message || 'Não consegui enviar sua pergunta.';
@@ -462,7 +474,7 @@
         acompanhar(alvo);
       })
       .catch(function () {
-        pensando.hidden = true;
+        limparPasso(alvo);
         definirPendente(false);
         alvo.className = 'copiloto-resposta erro';
         alvo.textContent = 'Não consegui enviar sua pergunta.';

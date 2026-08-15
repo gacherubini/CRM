@@ -3330,36 +3330,16 @@ a.metric-link:focus-visible { outline: 2px solid var(--brand); outline-offset: 2
   max-width: min(88%, 46rem);
 }
 
-/* --- Indicador "digitando" (avatar pulsando + passo real) --- */
-.copiloto-pensando {
-  flex: none;
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  margin: 0;
-  padding: 0 var(--space-5) var(--space-3);
-  color: var(--ink-muted);
-  font-size: var(--text-sm);
-  font-style: italic;
-}
-.copiloto-pensando[hidden] { display: none; }
-.copiloto-pensando::before {
-  content: "✦";
-  flex: none;
-  width: 34px;
-  height: 34px;
-  display: grid;
-  place-items: center;
-  border-radius: var(--radius-nav);
-  background: var(--brand-tint);
-  color: var(--brand);
-  font-size: 16px;
-  line-height: 1;
+/* Estado "pensando" do proprio slot da resposta: o avatar ::before pulsa e o
+   texto e o passo real (rotulos_passo no template), nunca spinner mudo — a
+   pergunta pode levar 10-30s. */
+.copiloto-resposta.pensando { color: var(--ink-muted); font-style: italic; }
+.copiloto-resposta.pensando::before {
   animation: copiloto-pulse 1.1s ease-in-out infinite;
 }
 @keyframes copiloto-pulse { 0%, 100% { opacity: .4; } 50% { opacity: 1; } }
 @media (prefers-reduced-motion: reduce) {
-  .copiloto-pensando::before { animation: none; }
+  .copiloto-resposta.pensando::before { animation: none; }
 }
 
 /* --- Composer estilo chatbot: campo arredondado com botao de enviar dentro --- */
