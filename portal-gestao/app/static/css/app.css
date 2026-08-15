@@ -3130,11 +3130,17 @@ a.metric-link:focus-visible { outline: 2px solid var(--brand); outline-offset: 2
   /* Altura fixa (nao min-height): preenche a viewport abaixo da topbar (56px)
      descontando o padding do .content. Precisa ser altura definida para que
      #copiloto-mensagens role por dentro em vez de a thread crescer e empurrar
-     o composer para fora da tela. */
-  height: calc(100vh - 9rem);
+     o composer para fora da tela.
+     dvh, nao vh: no celular a barra de endereco do navegador faz 100vh
+     estourar a viewport e empurrar o composer para fora da tela. */
+  height: calc(100dvh - 9rem);
 }
 @media (max-width: 768px) {
+  /* O historico vinha ANTES do chat no fluxo: no celular o dono via a lista
+     de conversas primeiro e rolava para achar a conversa aberta. */
   .copiloto-layout { grid-template-columns: 1fr; height: auto; }
+  .copiloto-historico { order: 2; }
+  .copiloto-thread { order: 1; }
 }
 
 /* --- Coluna de historico (conversas anteriores) --- */
