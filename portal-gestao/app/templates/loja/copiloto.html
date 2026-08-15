@@ -260,6 +260,40 @@
     }
   }
 
+  // Revelacao progressiva. O servidor manda o texto acumulado ate agora
+  // (texto_parcial durante o streaming, resposta no fim); esta funcao so
+  // controla o quanto disso ja esta na tela. Cursor por elemento: dois
+  // turnos nunca compartilham estado.
+  var VELOCIDADE_REVELACAO = 3; // chars por frame ~ 180/s a 60fps
+  function revelar(alvo, textoAlvo) {
+    alvo.dataset.textoAlvo = textoAlvo;
+    if (alvo.dataset.revelando === '1') { return; }
+    alvo.dataset.revelando = '1';
+    function passo() {
+      var meta = alvo.dataset.textoAlvo || '';
+      var visivel = parseInt(alvo.dataset.cursor || '0', 10);
+      if (visivel >= meta.length) {
+        alvo.dataset.revelando = '0';
+        return;
+      }
+      var proximo = Math.min(meta.length, visivel + VELOCIDADE_REVELACAO);
+      alvo.dataset.cursor = String(proximo);
+      var colado = pertoDoFim();
+      renderizarMarkdown(meta.slice(0, proximo), alvo);
+      if (colado) { rolarParaFim(); }
+      requestAnimationFrame(passo);
+    }
+    requestAnimationFrame(passo);
+  }
+
+  // Fim do turno: nao deixa a revelacao pela metade.
+  function revelarTudo(alvo) {
+    var meta = alvo.dataset.textoAlvo || '';
+    if (!meta) { return; }
+    alvo.dataset.cursor = String(meta.length);
+    renderizarMarkdown(meta, alvo);
+  }
+
   function bloco(pergunta) {
     var vazio = mensagens.querySelector('[data-copiloto-vazio]');
     if (vazio) { vazio.remove(); }
@@ -372,6 +406,7 @@
     pensando.hidden = true;
     cancelar.hidden = true;
     definirPendente(false);
+    revelarTudo(alvo);
     if (dados && dados.estado !== 'pronto' && !dados.texto) {
       alvo.textContent = 'Não consegui responder desta vez.';
     }
@@ -387,11 +422,7 @@
         .then(function (r) { return r.json(); })
         .then(function (dados) {
           pensando.textContent = descrever(dados.passos);
-          if (dados.texto) {
-            var colado = pertoDoFim();
-            alvo.textContent = dados.texto;
-            if (colado) { rolarParaFim(); }
-          }
+          if (dados.texto) { revelar(alvo, dados.texto); }
           if (dados.estado === 'pronto' || dados.estado === 'erro' || dados.estado === 'cancelado') {
             terminar(alvo, dados);
           }

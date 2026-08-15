@@ -68,3 +68,13 @@ def test_resposta_e_um_bloco_e_nao_um_paragrafo(client, monkeypatch):
     html = client.get(f"/app/loja/copiloto?conversa_id={conversa_id}").text
     assert '<div class="copiloto-resposta"' in html
     assert '<p class="copiloto-resposta"' not in html
+
+
+def test_pagina_revela_a_resposta_progressivamente(client, monkeypatch):
+    """A resposta não pode aparecer de uma vez: 10-45s de 'Pensando…' e um
+    bloco de texto piscando é o que faz o Copiloto parecer formulário lento."""
+    _ligar(monkeypatch)
+    login(client)
+    html = client.get("/app/loja/copiloto").text
+    assert "function revelar" in html
+    assert "requestAnimationFrame" in html
