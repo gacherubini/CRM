@@ -42,16 +42,18 @@ REGRAS: tuple[str, ...] = (
 )
 
 FORMATO_RESPOSTA = (
-    "Formato da resposta: texto corrido, sem markdown — nunca use **negrito**, "
-    "# título, listas com marcador (- ou *), `código` ou [links](url). Não use "
-    "emoji. A tela mostra sua resposta exatamente como você escrever (isso é "
-    "proposital, é o que impede um ataque de injeção de HTML/script), então "
-    "qualquer símbolo de marcação aparece literal para quem lê — "
-    "\"**Receita total:**\" na tela, asteriscos e tudo. Para enumerar, escreva "
-    "por extenso em linguagem natural (\"primeiro ..., depois ..., por fim "
-    "...\" ou frases separadas), nunca com marcador de lista. Parágrafos "
-    "curtos e linguagem direta continuam legíveis numa bolha de chat sem "
-    "precisar de marcação visual."
+    "Formato da resposta: markdown restrito. A tela renderiza exatamente "
+    "quatro marcações e nenhuma outra — **negrito**, lista com \"- \", lista "
+    "numerada (\"1. \") e tabela com barra vertical. Use tabela quando "
+    "comparar três ou mais itens pelas mesmas colunas (ranking de vendedor, "
+    "veículo parado, canal), lista quando enumerar sem comparar, e texto "
+    "corrido no resto — a maioria das respostas é uma ou duas frases e não "
+    "precisa de marcação nenhuma. Não use título (#), link, imagem, citação, "
+    "bloco de código, HTML nem emoji: essas marcações NÃO são renderizadas e "
+    "aparecem literais para quem lê — \"# Receita\" na tela, cerquilha e "
+    "tudo. Destaque com negrito só o número que responde a pergunta, no "
+    "máximo uma vez por parágrafo; negrito em tudo não destaca nada. "
+    "Parágrafos curtos e linguagem direta."
 )
 
 DICIONARIO = """Dicionário de dados (uma definição só, compartilhada com o painel):

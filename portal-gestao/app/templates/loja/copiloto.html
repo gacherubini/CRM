@@ -50,13 +50,13 @@
       <article class="copiloto-turno">
         <p class="copiloto-pergunta">{{ turno.pergunta }}</p>
         {% if turno.estado == 'erro' %}
-        <p class="copiloto-resposta erro">{{ turno.resposta or 'Não consegui responder desta vez.' }}</p>
+        <div class="copiloto-resposta erro">{{ turno.resposta or 'Não consegui responder desta vez.' }}</div>
         {% elif turno.estado == 'cancelado' %}
-        <p class="copiloto-resposta muted">{{ turno.resposta or 'Pergunta cancelada.' }}</p>
+        <div class="copiloto-resposta muted">{{ turno.resposta or 'Pergunta cancelada.' }}</div>
         {% elif turno.resposta %}
-        <p class="copiloto-resposta">{{ turno.resposta }}</p>
+        <div class="copiloto-resposta" data-md>{{ turno.resposta }}</div>
         {% else %}
-        <p class="copiloto-resposta muted">Ainda processando esta pergunta…</p>
+        <div class="copiloto-resposta muted">Ainda processando esta pergunta…</div>
         {% endif %}
         {% if turno.passos %}
         <details class="copiloto-fontes">
@@ -163,6 +163,103 @@
     });
   }
 
+  // Markdown restrito: negrito, lista, lista numerada e tabela. Nada mais.
+  // O prompt (prompt.py, FORMATO_RESPOSTA) promete exatamente este conjunto
+  // ao modelo — ampliar um lado sem o outro faz a marcação nova vazar
+  // literal na bolha. Tudo por createElement/textContent: innerHTML aqui
+  // reabriria o XSS que o cartão de ação fechou.
+  function inline(texto, pai) {
+    // Só **negrito**. Um asterisco duplo sem par fecha voltando a ser texto.
+    var partes = String(texto).split('**');
+    partes.forEach(function (parte, i) {
+      if (!parte) { return; }
+      if (i % 2 === 1 && i < partes.length - 1) {
+        var forte = document.createElement('strong');
+        forte.textContent = parte;
+        pai.appendChild(forte);
+      } else {
+        pai.appendChild(document.createTextNode((i % 2 === 1 ? '**' : '') + parte));
+      }
+    });
+  }
+
+  function celulas(linha) {
+    return linha.replace(/^\||\|$/g, '').split('|').map(function (c) {
+      return c.trim();
+    });
+  }
+
+  function renderizarMarkdown(texto, alvo) {
+    while (alvo.firstChild) { alvo.removeChild(alvo.firstChild); }
+    var linhas = String(texto || '').split('\n');
+    var i = 0;
+    while (i < linhas.length) {
+      var linha = linhas[i];
+      if (!linha.trim()) { i++; continue; }
+
+      // Tabela: | a | b |  /  |---|---|  /  linhas
+      if (linha.trim().indexOf('|') === 0 && i + 1 < linhas.length &&
+          /^\s*\|[\s:|-]+\|\s*$/.test(linhas[i + 1])) {
+        var tabela = document.createElement('table');
+        var thead = document.createElement('thead');
+        var trh = document.createElement('tr');
+        celulas(linha.trim()).forEach(function (c) {
+          var th = document.createElement('th');
+          inline(c, th);
+          trh.appendChild(th);
+        });
+        thead.appendChild(trh);
+        tabela.appendChild(thead);
+        var tbody = document.createElement('tbody');
+        i += 2;
+        while (i < linhas.length && linhas[i].trim().indexOf('|') === 0) {
+          var tr = document.createElement('tr');
+          celulas(linhas[i].trim()).forEach(function (c) {
+            var td = document.createElement('td');
+            inline(c, td);
+            tr.appendChild(td);
+          });
+          tbody.appendChild(tr);
+          i++;
+        }
+        tabela.appendChild(tbody);
+        alvo.appendChild(tabela);
+        continue;
+      }
+
+      // Lista com marcador ou numerada
+      var ehItem = /^\s*[-*]\s+/.test(linha);
+      var ehNum = /^\s*\d+\.\s+/.test(linha);
+      if (ehItem || ehNum) {
+        var lista = document.createElement(ehNum ? 'ol' : 'ul');
+        while (i < linhas.length) {
+          var atual = linhas[i];
+          var casa = ehNum ? /^\s*\d+\.\s+/.exec(atual) : /^\s*[-*]\s+/.exec(atual);
+          if (!casa) { break; }
+          var li = document.createElement('li');
+          inline(atual.slice(casa[0].length), li);
+          lista.appendChild(li);
+          i++;
+        }
+        alvo.appendChild(lista);
+        continue;
+      }
+
+      // Parágrafo: linhas seguidas até a próxima linha em branco.
+      var p = document.createElement('p');
+      var primeira = true;
+      while (i < linhas.length && linhas[i].trim() &&
+             !/^\s*[-*]\s+/.test(linhas[i]) && !/^\s*\d+\.\s+/.test(linhas[i]) &&
+             linhas[i].trim().indexOf('|') !== 0) {
+        if (!primeira) { p.appendChild(document.createElement('br')); }
+        inline(linhas[i], p);
+        primeira = false;
+        i++;
+      }
+      alvo.appendChild(p);
+    }
+  }
+
   function bloco(pergunta) {
     var vazio = mensagens.querySelector('[data-copiloto-vazio]');
     if (vazio) { vazio.remove(); }
@@ -171,7 +268,7 @@
     var p = document.createElement('p');
     p.className = 'copiloto-pergunta';
     p.textContent = pergunta;
-    var r = document.createElement('p');
+    var r = document.createElement('div');
     r.className = 'copiloto-resposta';
     artigo.appendChild(p);
     artigo.appendChild(r);
@@ -425,6 +522,13 @@
 
   // Ao abrir uma conversa já existente, começa mostrando o último turno.
   rolarParaFim();
+
+  // As respostas de conversa antiga chegam como texto cru dentro do div
+  // (progressive enhancement: sem JS o dono ainda lê o texto, com asterisco).
+  Array.prototype.forEach.call(
+    mensagens.querySelectorAll('.copiloto-resposta[data-md]'),
+    function (el) { renderizarMarkdown(el.textContent, el); }
+  );
 })();
 </script>
 {% endblock %}

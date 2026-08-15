@@ -1,0 +1,70 @@
+"""A tela renderiza um subconjunto de markdown em nós de DOM.
+
+O contrato tem DUAS pontas e elas têm que casar: o prompt promete ao modelo
+que negrito/lista/tabela aparecem formatados (prompt.py, FORMATO_RESPOSTA), e
+o renderizador do template é quem cumpre. Se alguém ampliar um lado sem o
+outro, a marcação nova vaza literal na bolha do dono.
+"""
+from conftest import login
+
+from app.db import SessionLocal
+from app.loja.copiloto.conversas import concluir_turno, criar_turno
+
+
+def _ligar(monkeypatch):
+    monkeypatch.setenv("REVY_LOJA_SHELL_ENABLED", "1")
+    monkeypatch.setenv("REVY_LOJA_ENTITLEMENTS_ENABLED", "0")
+    monkeypatch.setenv("REVY_LOJA_COPILOTO_ENABLED", "1")
+
+
+def _usuario_id():
+    from app.models import Usuario
+
+    db = SessionLocal()
+    try:
+        return db.query(Usuario).filter(Usuario.email == "dono@loja.test").one().id
+    finally:
+        db.close()
+
+
+def test_pagina_traz_o_renderizador_de_markdown(client, monkeypatch):
+    _ligar(monkeypatch)
+    login(client)
+    html = client.get("/app/loja/copiloto").text
+    assert "function renderizarMarkdown" in html
+
+
+def test_renderizador_nunca_usa_innerhtml(client, monkeypatch):
+    """Invariante de segurança: o Copiloto monta DOM com createElement +
+    textContent. innerHTML reabriria o XSS que o cartão de ação fechou.
+
+    Checa o uso real (``.innerHTML``), não o comentário do template — o
+    comentário de 14 linhas cita a palavra de propósito, e o base.html também.
+    """
+    _ligar(monkeypatch)
+    login(client)
+    html = client.get("/app/loja/copiloto").text
+    assert ".innerHTML" not in html
+
+
+def test_resposta_e_um_bloco_e_nao_um_paragrafo(client, monkeypatch):
+    """Lista e tabela não podem viver dentro de <p> — o parser do navegador
+    fecha o parágrafo sozinho e o CSS do avatar (::before) perde a âncora."""
+    _ligar(monkeypatch)
+    login(client)
+    db = SessionLocal()
+    try:
+        turno = criar_turno(
+            db, loja_slug="loja-teste", usuario_id=_usuario_id(),
+            pergunta="ranking?",
+        )
+        concluir_turno(
+            db, turno, resposta="- Ana: 3\n- Bruno: 2", passos=[],
+            tokens_entrada=10, tokens_saida=5, custo_estimado="0.001",
+        )
+        conversa_id = turno.conversa_id
+    finally:
+        db.close()
+    html = client.get(f"/app/loja/copiloto?conversa_id={conversa_id}").text
+    assert '<div class="copiloto-resposta"' in html
+    assert '<p class="copiloto-resposta"' not in html

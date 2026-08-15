@@ -3277,7 +3277,6 @@ a.metric-link:focus-visible { outline: 2px solid var(--brand); outline-offset: 2
   min-height: 34px;
   color: var(--ink);
   line-height: 1.6;
-  white-space: pre-wrap;
 }
 .copiloto-resposta::before {
   content: "✦";
@@ -3295,6 +3294,33 @@ a.metric-link:focus-visible { outline: 2px solid var(--brand); outline-offset: 2
   line-height: 1;
 }
 .copiloto-resposta.erro { color: var(--danger); }
+
+/* Markdown restrito renderizado pelo template (negrito, lista, tabela).
+   pre-wrap sai do container e vai só no paragrafo: em <ul>/<table> ele
+   transformaria a indentacao do proprio markup em espaco visivel. */
+.copiloto-resposta p { margin: 0 0 var(--space-3); white-space: pre-wrap; }
+.copiloto-resposta > :last-child { margin-bottom: 0; }
+.copiloto-resposta ul,
+.copiloto-resposta ol { margin: 0 0 var(--space-3); padding-left: var(--space-5); }
+.copiloto-resposta li { margin: 0 0 var(--space-1); line-height: 1.6; }
+.copiloto-resposta strong { font-weight: 600; color: var(--ink); }
+.copiloto-resposta table {
+  width: 100%;
+  margin: 0 0 var(--space-3);
+  border-collapse: collapse;
+  font-size: var(--text-sm);
+}
+.copiloto-resposta th,
+.copiloto-resposta td {
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  vertical-align: top;
+}
+.copiloto-resposta th { color: var(--ink-soft); font-weight: 600; }
+/* Numero em tabela alinha e tabula: preco de coluna nunca serifa nem
+   proporcional (brand kit v2.0, "Tipografia decidida"). */
+.copiloto-resposta td:not(:first-child) { font-variant-numeric: tabular-nums; }
 
 /* Fontes e cartao de acao alinham sob o texto da resposta (mesmo recuo do avatar). */
 .copiloto-fontes,
