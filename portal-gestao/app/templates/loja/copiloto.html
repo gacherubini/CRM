@@ -270,7 +270,35 @@
   // (texto_parcial durante o streaming, resposta no fim); esta funcao so
   // controla o quanto disso ja esta na tela. Cursor por elemento: dois
   // turnos nunca compartilham estado.
-  var VELOCIDADE_REVELACAO = 3; // chars por frame ~ 180/s a 60fps
+  //
+  // A duracao e o alvo, nao a velocidade: com passo fixo, resposta longa
+  // demorava 7s para terminar de aparecer depois de ja estar em maos.
+  var VELOCIDADE_MINIMA = 3;
+  var DURACAO_REVELACAO_MS = 2200;
+
+  function velocidadeDe(meta) {
+    var frames = DURACAO_REVELACAO_MS / 16.7;
+    return Math.max(VELOCIDADE_MINIMA, Math.ceil(meta.length / frames));
+  }
+
+  // Trabalho que so pode acontecer depois que a resposta terminou de
+  // aparecer (botao Copiar, cartao de acao). Existe porque terminar() roda no
+  // MESMO tick em que revelar() agenda o primeiro frame: anexar ali, ou
+  // chamar revelarTudo() ali, matava a animacao antes de ela comecar.
+  // Guardado NO ELEMENTO, nao em variavel de modulo: o composer volta a
+  // aceitar pergunta assim que o turno fecha, entao dois turnos podem estar
+  // revelando ao mesmo tempo e um sobrescreveria a tarefa do outro.
+  function agendarPosRevelacao(alvo, tarefa) {
+    if (alvo.dataset.revelando === '1') { alvo.__posRevelacao = tarefa; return; }
+    tarefa();
+  }
+
+  function executarPosRevelacao(alvo) {
+    var tarefa = alvo.__posRevelacao;
+    alvo.__posRevelacao = null;
+    if (tarefa) { tarefa(); }
+  }
+
   function revelar(alvo, textoAlvo) {
     alvo.dataset.textoAlvo = textoAlvo;
     if (alvo.dataset.revelando === '1') { return; }
@@ -280,9 +308,10 @@
       var visivel = parseInt(alvo.dataset.cursor || '0', 10);
       if (visivel >= meta.length) {
         alvo.dataset.revelando = '0';
+        executarPosRevelacao(alvo);
         return;
       }
-      var proximo = Math.min(meta.length, visivel + VELOCIDADE_REVELACAO);
+      var proximo = Math.min(meta.length, visivel + velocidadeDe(meta));
       alvo.dataset.cursor = String(proximo);
       var colado = pertoDoFim();
       renderizarMarkdown(meta.slice(0, proximo), alvo);
@@ -292,12 +321,16 @@
     requestAnimationFrame(passo);
   }
 
-  // Fim do turno: nao deixa a revelacao pela metade.
+  // Corta a revelacao pela metade. So para caminho de ABORTO — cancelado,
+  // erro, desistiu do polling. Nunca para conclusao normal.
   function revelarTudo(alvo) {
     var meta = alvo.dataset.textoAlvo || '';
-    if (!meta) { return; }
-    alvo.dataset.cursor = String(meta.length);
-    renderizarMarkdown(meta, alvo);
+    alvo.dataset.revelando = '0';
+    if (meta) {
+      alvo.dataset.cursor = String(meta.length);
+      renderizarMarkdown(meta, alvo);
+    }
+    executarPosRevelacao(alvo);
   }
 
   function bloco(pergunta) {
@@ -453,7 +486,9 @@
     limparPasso(alvo);
     cancelar.hidden = true;
     definirPendente(false);
-    revelarTudo(alvo);
+    if (!dados || dados.estado === 'erro' || dados.estado === 'cancelado') {
+      revelarTudo(alvo);
+    }
     if (dados && dados.estado === 'erro') {
       var perguntaEl = alvo.parentNode && alvo.parentNode.querySelector('.copiloto-pergunta');
       marcarErro(
@@ -465,15 +500,20 @@
       alvo.textContent = 'Não consegui responder desta vez.';
     }
     if (dados && dados.estado === 'pronto' && (dados.texto || alvo.dataset.textoAlvo)) {
-      var copiar = document.createElement('button');
-      copiar.type = 'button';
-      copiar.className = 'copiloto-copiar';
-      copiar.dataset.copiar = '';
-      copiar.setAttribute('aria-label', 'Copiar resposta');
-      copiar.textContent = 'Copiar';
-      alvo.parentNode.appendChild(copiar);
-    }
-    if (dados && dados.cartao) {
+      agendarPosRevelacao(alvo, function () {
+        var copiar = document.createElement('button');
+        copiar.type = 'button';
+        copiar.className = 'copiloto-copiar';
+        copiar.dataset.copiar = '';
+        copiar.setAttribute('aria-label', 'Copiar resposta');
+        copiar.textContent = 'Copiar';
+        alvo.parentNode.appendChild(copiar);
+        if (dados.cartao) {
+          alvo.parentNode.appendChild(criarCartao(dados.cartao, dados.turno_id));
+        }
+        rolarParaFim();
+      });
+    } else if (dados && dados.cartao) {
       alvo.parentNode.appendChild(criarCartao(dados.cartao, dados.turno_id));
       rolarParaFim();
     }

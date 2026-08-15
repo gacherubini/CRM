@@ -190,3 +190,33 @@ def test_fontes_nao_mostra_enum_cru(client, monkeypatch):
     html = client.get(f"/app/loja/copiloto?conversa_id={conversa_id}").text
     assert "indisponivel" not in html
     assert "indisponível" in html
+
+
+def test_conclusao_normal_nao_corta_a_revelacao(client, monkeypatch):
+    """revelarTudo() corta a animação pela metade — é para aborto
+    (cancelado/erro/desistiu), nunca para conclusão normal. Chamada no
+    caminho 'pronto', ela matava a revelação antes do primeiro frame:
+    terminar() roda no MESMO tick em que revelar() agenda o rAF.
+
+    Este teste é estrutural de propósito. pytest não executa o JS, então
+    ele trava o CONTRATO (existe uma fila pós-revelação e ela é usada),
+    não o comportamento. A verificação de comportamento é no navegador.
+    """
+    _ligar(monkeypatch)
+    login(client)
+    html = client.get("/app/loja/copiloto").text
+    assert "function agendarPosRevelacao" in html
+    assert "function executarPosRevelacao" in html
+    # O botão Copiar do turno ao vivo passa pela fila, não é anexado direto.
+    assert "agendarPosRevelacao(alvo, function ()" in html
+
+
+def test_velocidade_da_revelacao_escala_com_o_tamanho(client, monkeypatch):
+    """Passo fixo de 3 chars/frame faz uma resposta de 1200 caracteres
+    levar 6,7s para aparecer — texto que já está em mãos não pode demorar
+    isso. A duração passa a ser alvo, e a velocidade é derivada dela."""
+    _ligar(monkeypatch)
+    login(client)
+    html = client.get("/app/loja/copiloto").text
+    assert "DURACAO_REVELACAO_MS" in html
+    assert "function velocidadeDe" in html
