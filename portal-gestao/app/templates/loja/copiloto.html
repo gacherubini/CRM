@@ -110,7 +110,7 @@
       <div class="copiloto-composer-field">
         <textarea id="copiloto-pergunta" name="pergunta" rows="1" maxlength="4000"
                   placeholder="Pergunte sobre vendas, estoque ou leads…"></textarea>
-        <button class="copiloto-enviar" type="submit" id="copiloto-enviar"
+        <button class="copiloto-enviar" type="submit" id="copiloto-enviar" disabled
                 aria-label="Perguntar" title="Perguntar — Enter envia, Shift+Enter quebra linha">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5"/><path d="M6 11l6-6 6 6"/></svg>
         </button>
@@ -144,17 +144,17 @@
   var turnoAtual = null;
   var timer = null;
 
-  // Só um turno em voo por vez: enquanto pendente=true o composer inteiro
-  // (campo, botão Perguntar, chips) fica desabilitado. Isso impede que uma
-  // segunda pergunta (digitada ou por chip) dispare outro acompanhar() e
-  // sobrescreva `timer`/`turnoAtual` enquanto o primeiro polling ainda está
-  // vivo — o que órfã-ria o intervalo antigo (ele nunca mais seria limpo) e
-  // misturaria a resposta de um turno na bolha do outro. Precisa ser
-  // reabilitado em TODO caminho terminal, inclusive falha de rede, senão o
-  // composer trava desabilitado para sempre — pior que o bug original.
+  // Um turno em voo por vez. Antes isto desabilitava o textarea inteiro — o
+  // foco caia no body e o dono nao podia nem rascunhar a proxima pergunta.
+  // Agora a guarda e no submit (emVoo) e o botao de enviar vira parar, como
+  // em qualquer chat serio. Precisa ser desligado em TODO caminho terminal,
+  // inclusive falha de rede, senao o composer trava em "parar" para sempre.
+  var emVoo = false;
   function definirPendente(pendente) {
-    campo.disabled = pendente;
-    enviar.disabled = pendente;
+    emVoo = pendente;
+    enviar.classList.toggle('parando', pendente);
+    enviar.setAttribute('aria-label', pendente ? 'Parar' : 'Perguntar');
+    enviar.disabled = pendente ? false : !campo.value.trim();
     Array.prototype.forEach.call(chipsInterativos, function (chip) {
       chip.disabled = pendente;
     });
@@ -446,6 +446,7 @@
 
   form.addEventListener('submit', function (evento) {
     evento.preventDefault();
+    if (emVoo) { return; }
     var pergunta = (campo.value || '').trim();
     if (!pergunta) { return; }
     // FormData ignora campo disabled e lê o valor *atual* do textarea.
@@ -455,6 +456,7 @@
     corpo.set('pergunta', pergunta);
     var alvo = bloco(pergunta);
     campo.value = '';
+    ajustarAltura();
     definirPendente(true);
     mostrarPasso(alvo, 'Pensando…');
 
@@ -481,6 +483,17 @@
       });
   });
 
+  // O CSS ja tem max-height: 9rem; sem isto aqui ele era codigo morto e a
+  // pergunta longa rolava dentro de uma linha.
+  function ajustarAltura() {
+    campo.style.height = 'auto';
+    campo.style.height = campo.scrollHeight + 'px';
+  }
+  campo.addEventListener('input', function () {
+    ajustarAltura();
+    if (!emVoo) { enviar.disabled = !campo.value.trim(); }
+  });
+
   campo.addEventListener('keydown', function (evento) {
     if (evento.key !== 'Enter' || evento.shiftKey) { return; }
     evento.preventDefault();
@@ -491,16 +504,27 @@
     }
   });
 
-  cancelar.addEventListener('click', function () {
+  function pararTurno() {
     if (!turnoAtual) { return; }
     var corpo = new FormData();
     corpo.append('csrf', form.csrf.value);
     fetch('/app/loja/copiloto/turno/' + turnoAtual + '/cancelar', { method: 'POST', body: corpo });
+  }
+
+  cancelar.addEventListener('click', function () {
+    pararTurno();
+  });
+
+  enviar.addEventListener('click', function (evento) {
+    if (!emVoo) { return; } // submit normal segue seu caminho
+    evento.preventDefault();
+    pararTurno();
   });
 
   Array.prototype.forEach.call(chipsInterativos, function (chip) {
     chip.addEventListener('click', function () {
       campo.value = chip.getAttribute('data-pergunta') || '';
+      ajustarAltura();
       if (typeof form.requestSubmit === 'function') {
         form.requestSubmit();
       } else {

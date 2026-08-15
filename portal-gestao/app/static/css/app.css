@@ -3398,6 +3398,15 @@ a.metric-link:focus-visible { outline: 2px solid var(--brand); outline-offset: 2
 .copiloto-enviar:hover { background: var(--brand-strong); }
 .copiloto-enviar:disabled { opacity: .5; cursor: not-allowed; }
 .copiloto-enviar:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+.copiloto-enviar.parando { background: var(--ink-soft); }
+.copiloto-enviar.parando svg { display: none; }
+.copiloto-enviar.parando::after {
+  content: "";
+  width: 10px;
+  height: 10px;
+  border-radius: var(--radius-ctl);
+  background: var(--surface);
+}
 .copiloto-composer-bar {
   display: flex;
   align-items: center;

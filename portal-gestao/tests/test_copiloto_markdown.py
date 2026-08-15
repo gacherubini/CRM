@@ -88,3 +88,22 @@ def test_indicador_de_pensando_vive_dentro_da_lista_de_mensagens(client, monkeyp
     html = client.get("/app/loja/copiloto").text
     assert 'id="copiloto-pensando"' not in html
     assert "copiloto-resposta pensando" in html or "classList.add('pensando')" in html
+
+
+def test_composer_continua_editavel_durante_o_turno(client, monkeypatch):
+    """Travar o campo derruba o foco no body e impede rascunhar a proxima
+    pergunta. A guarda de um-turno-por-vez passa a ser no submit."""
+    _ligar(monkeypatch)
+    login(client)
+    html = client.get("/app/loja/copiloto").text
+    assert "campo.disabled = pendente" not in html
+    assert "emVoo" in html
+
+
+def test_textarea_cresce_com_o_texto(client, monkeypatch):
+    """rows=1 + resize:none sem auto-grow faz a pergunta longa rolar dentro
+    de uma linha. O max-height: 9rem do CSS hoje e codigo morto."""
+    _ligar(monkeypatch)
+    login(client)
+    html = client.get("/app/loja/copiloto").text
+    assert "function ajustarAltura" in html
