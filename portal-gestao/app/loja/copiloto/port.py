@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass, field
-from typing import Any, Literal, Protocol, Sequence
+from typing import Any, Callable, Literal, Protocol, Sequence
 
 EsforcoLLM = Literal["low", "high", "max"]
 
@@ -71,6 +71,7 @@ class LLMPort(Protocol):
         *,
         esforco: EsforcoLLM = "low",
         max_tokens: int = 800,
+        ao_texto: Callable[[str], None] | None = None,
     ) -> RespostaLLM: ...
 
 
@@ -91,6 +92,7 @@ class LLMFake:
         *,
         esforco: EsforcoLLM = "low",
         max_tokens: int = 800,
+        ao_texto: Callable[[str], None] | None = None,
     ) -> RespostaLLM:
         self.chamadas.append(
             {
@@ -98,6 +100,7 @@ class LLMFake:
                 "ferramentas": [f.get("name") for f in ferramentas],
                 "esforco": esforco,
                 "max_tokens": max_tokens,
+                "streaming": ao_texto is not None,
             }
         )
         assert self._fila, "LLMFake sem resposta programada para esta chamada"

@@ -153,6 +153,7 @@ def executar_turno(
     relogio: Callable[[], float] = time.monotonic,
     agora: datetime | None = None,
     esforco_inicial: EsforcoLLM = "low",
+    ao_texto: Callable[[str], None] | None = None,
 ) -> ResultadoTurno:
     registro = ferramentas or registro_padrao()
     catalogo = schemas(registro)
@@ -192,9 +193,15 @@ def executar_turno(
             return _erro("teto_tokens", MENSAGEM_TETO_TOKENS)
 
         try:
-            resposta = llm.completar(
-                mensagens, catalogo, esforco=esforco, max_tokens=max_tokens_resposta
-            )
+            if ao_texto is None:
+                resposta = llm.completar(
+                    mensagens, catalogo, esforco=esforco, max_tokens=max_tokens_resposta
+                )
+            else:
+                resposta = llm.completar(
+                    mensagens, catalogo, esforco=esforco, max_tokens=max_tokens_resposta,
+                    ao_texto=ao_texto,
+                )
         except LLMIndisponivel:
             return _erro("provedor", MENSAGEM_PROVEDOR)
         except RespostaLLMInvalida:

@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import logging
 import threading
+import time
 from datetime import datetime, timedelta, timezone
 from typing import Callable
 
@@ -118,6 +119,18 @@ def processar_turno(
     def _on_passo(passos: list[dict]) -> None:
         atualizar_progresso(db, turno, passos=passos)
 
+    # A cada delta gravaria uma transacao por token. 0.4s e o passo que a
+    # sondagem de 700ms do front consegue consumir sem escrever a toa.
+    INTERVALO_PARCIAL = 0.4
+    ultimo_flush = [0.0]
+
+    def _on_texto(parcial: str) -> None:
+        marca = time.monotonic()
+        if marca - ultimo_flush[0] < INTERVALO_PARCIAL:
+            return
+        ultimo_flush[0] = marca
+        atualizar_progresso(db, turno, texto_parcial=parcial)
+
     try:
         resultado = executar_turno(
             pergunta=turno.pergunta,
@@ -129,6 +142,7 @@ def processar_turno(
             ),
             on_passo=_on_passo,
             agora=ref,
+            ao_texto=_on_texto,
         )
     except Exception as exc:  # rede de segurança: turno nunca fica pendurado
         logger.warning("copiloto_turno erro inesperado tipo=%s", type(exc).__name__)
