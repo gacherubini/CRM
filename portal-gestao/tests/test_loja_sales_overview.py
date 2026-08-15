@@ -357,6 +357,38 @@ def test_to_dict_serializa_decimals():
         db.close()
 
 
+def test_funil_usa_contagem_viva_quando_projecao_local_vazia():
+    """Bug (moto-center): a projeção local FunilEvento não foi materializada,
+    mas o Chatbot tem leads no período. O funil reportava total_leads=0 (a
+    projeção vazia) em vez da contagem viva — o Copiloto então dizia "0 leads"
+    com centenas de leads reais. Deve cair na contagem auditável (elegiveis),
+    a mesma fonte de "Por onde as pessoas chegam"."""
+    d_inicio, d_fim = date(2026, 8, 1), date(2026, 8, 31)
+    leads = [
+        {"id": "l1", "criada_em": "2026-08-05T12:00:00+00:00"},
+        {"id": "l2", "criada_em": "2026-08-06T12:00:00+00:00"},
+        {"id": "l3", "criada_em": "2026-08-07T12:00:00+00:00"},
+    ]
+    db = SessionLocal()
+    try:
+        overview = build_sales_overview(
+            db,
+            loja_slug="loja-teste",
+            papel="dono",
+            inicio=d_inicio,
+            fim=d_fim,
+            chatbot=ChatbotStub(leads=leads),
+            revy_trafego_resultados_enabled=False,
+        )
+        # FunilEvento não foi semeada → projeção local = 0; há 3 leads vivos.
+        assert overview.funil is not None
+        assert overview.funil["total_leads"] == 3
+        # Nunca "vazio" quando há leads vivos (o prompt trataria como zero real).
+        assert overview.funil_status in {"ok", "parcial"}
+    finally:
+        db.close()
+
+
 # ---------------------------------------------------------------------------
 # HTTP routes
 # ---------------------------------------------------------------------------

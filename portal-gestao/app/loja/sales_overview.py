@@ -964,8 +964,23 @@ def build_sales_overview(
                 if funil_view is None:
                     funil_view = {}
                 funil_view["auditavel"] = funil_audit
-                if funil_audit.get("disponivel") and leads_count is None:
-                    leads_count = funil_audit.get("elegiveis")
+                # Projeção local (FunilEvento) vazia mas o Chatbot tem leads no
+                # período: a materialização dos eventos lead_criado não populou
+                # a tabela (bug de pipeline à parte) e reportar 0 lead havendo
+                # centenas é o que fez o Copiloto dizer "0 leads" na moto-center.
+                # Cai na contagem viva `elegiveis` — a MESMA fonte de "Por onde
+                # as pessoas chegam" — para o número bater com o que o dono vê.
+                # `not leads_count` cobre None (resumo_funil estourou) e 0
+                # (projeção vazia). As taxas do funil seguem da projeção (None
+                # quando vazia): status vira "parcial" para o prompt qualificar,
+                # nunca tratar como zero real.
+                if funil_audit.get("disponivel") and not leads_count:
+                    elegiveis = funil_audit.get("elegiveis")
+                    if elegiveis:
+                        leads_count = elegiveis
+                        funil_view["total_leads"] = elegiveis
+                        if funil_status in {"vazio", "erro"}:
+                            funil_status = "parcial"
                 if funil_status == "erro" and funil_audit.get("disponivel"):
                     funil_status = "parcial"
             except Exception:
