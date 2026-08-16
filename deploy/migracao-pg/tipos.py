@@ -1,4 +1,4 @@
-"""Conversão de valor lido do SQLite para o tipo declarado no Postgres.
+"""Leitura crua da origem + conversão para o tipo declarado no Postgres.
 
 A conversão é dirigida pelo **tipo de destino**, refletido do banco que o
 alembic acabou de criar. Não há import de `app.models` em lugar nenhum desta
@@ -11,6 +11,41 @@ from datetime import datetime, timezone
 from decimal import Decimal
 
 from sqlalchemy import types as sqltypes
+
+
+def ler_cru(conn, tabela: str, colunas: list[str], schema: str | None = None):
+    """Lê SEM passar pela camada tipada do SQLAlchemy.
+
+    Existe porque o trabalho desta ferramenta é enxergar o que está **sujo** no
+    arquivo, e o result-processor do tipo mente sobre isso. Medido no venv do
+    Portal, com `10.00567` gravado numa coluna `NUMERIC(12,2)` e `2` numa
+    coluna `Boolean` do SQLite::
+
+        valor TIPADO      : 10.01      <- o que um select() devolve
+        valor CRU (driver): 10.00567   <- o que está no arquivo
+        SUM  TIPADO       : 10.01
+        SUM  CRU (driver) : 10.00567
+        booleano TIPADO   : True
+        booleano CRU      : 2
+
+    O `Numeric` do SQLite formata com `"%.{scale}f"` na leitura e o `Boolean`
+    coage qualquer inteiro truthy. Com leitura tipada a cadeia inteira mente
+    junto: `verificar` não vê as casas a mais, `copiar` grava arredondado e
+    `validar` compara arredondado com arredondado — e imprime "Sem divergencia.
+    Corte liberado." com centavos perdidos. Esse é o pior modo de falha do
+    conjunto, e é ele que este helper fecha.
+
+    **Não "simplifique" isto de volta para `select()` tipado.** Se alguém achar
+    daqui a seis meses que dá na mesma, é porque o teste de guarda em
+    `tests/test_tipos.py` está lá para provar que não dá.
+
+    Os identificadores vêm do schema refletido (não de entrada de usuário), mas
+    vão entre aspas duplas mesmo assim — nome de coluna como `order` ou `to`
+    quebraria o SQL sem elas.
+    """
+    lista = ", ".join(f'"{c}"' for c in colunas)
+    alvo = f'"{tabela}"' if schema is None else f'"{schema}"."{tabela}"'
+    return conn.exec_driver_sql(f"SELECT {lista} FROM {alvo}")
 
 
 class ValorInconvertivel(Exception):

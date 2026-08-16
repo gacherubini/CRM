@@ -43,6 +43,29 @@ Nunca `echo` de URL completa, nunca senha em `--destino` literal, nunca arquivo
 com senha dentro da árvore do repo. `fly secrets list` mostra o **nome**; é por
 ele que se confere.
 
+## Toda leitura da origem é CRUA
+
+A camada tipada do SQLAlchemy existe para o app; aqui o trabalho é enxergar o
+que está **sujo**, e o result-processor do tipo mente sobre isso. Medido com
+`10.00567` numa coluna `NUMERIC(12,2)` e `2` numa coluna `Boolean` do SQLite:
+
+```
+valor TIPADO      : 10.01      <- o que um select() devolve
+valor CRU (driver): 10.00567   <- o que está no arquivo
+SUM  TIPADO       : 10.01
+SUM  CRU (driver) : 10.00567
+booleano TIPADO   : True
+booleano CRU      : 2
+```
+
+Com leitura tipada a cadeia inteira mente junto: `verificar` não vê as casas a
+mais, `copiar` grava arredondado, `validar` compara arredondado com arredondado
+e o portão imprime **"Sem divergencia. Corte liberado."** com centavos perdidos.
+
+Por isso existe `tipos.ler_cru(conn, tabela, colunas, schema=None)`, e por isso
+os três módulos passam por ele. **Não troque de volta por `select()` tipado** —
+`tests/test_tipos.py` tem o teste de guarda que prova que não dá na mesma.
+
 ## Por que as ferramentas não importam `app`
 
 O Portal e o Control têm ambos um pacote chamado `app`, e nenhum processo pode

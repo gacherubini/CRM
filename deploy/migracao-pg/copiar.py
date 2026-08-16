@@ -6,7 +6,7 @@ import sys
 
 from sqlalchemy import MetaData, create_engine, func, insert, select
 
-from tipos import converter
+from tipos import converter, ler_cru
 
 IGNORADAS = {"alembic_version", "alembic_version_revy_trafego"}
 
@@ -50,7 +50,14 @@ def copiar(
                 continue
 
             colunas = [c for c in t_dst.columns if c.name in t_org.columns]
-            resultado = org.execute(select(*[t_org.c[c.name] for c in colunas]))
+            # Leitura CRUA (ver `tipos.ler_cru`), na mesma ordem de `colunas`.
+            # Com `select()` tipado, `converter()` receberia o que o SQLAlchemy
+            # já decidiu — `True` onde o arquivo tem `2`, um Decimal já
+            # arredondado onde o arquivo tem mais casas — e `ValorInconvertivel`
+            # nunca dispararia fora dos testes unitários: a carga coagiria em
+            # silêncio. Só lendo cru a conversão passa a ser de verdade dirigida
+            # pelo tipo de DESTINO.
+            resultado = ler_cru(org, t_org.name, [c.name for c in colunas])
             total = 0
             while True:
                 bloco = resultado.fetchmany(lote)

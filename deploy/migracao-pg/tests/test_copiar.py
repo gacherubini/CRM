@@ -9,6 +9,7 @@ from sqlalchemy import (
 )
 
 from copiar import CargaRecusada, copiar
+from tipos import ValorInconvertivel
 
 
 def _esquema():
@@ -79,6 +80,41 @@ def test_tabela_vazia_na_origem_nao_quebra(tmp_path):
     origem_url, _, _ = _banco(tmp_path, "origem.db")
     destino_url, _, _ = _banco(tmp_path, "destino.db")
     assert copiar(origem_url, destino_url, schema=None) == {"mae": 0, "filha": 0}
+
+
+def test_recusa_booleano_sujo_no_pipeline_de_verdade(tmp_path):
+    """A recusa de `tipos.py` tem que ser alcancavel FORA do teste unitario.
+
+    Com leitura tipada, `converter()` recebia `True` onde o arquivo tem `2` e
+    `ValorInconvertivel` nunca disparava aqui — a carga coagia em silencio.
+    """
+    origem_url, origem, md = _banco(tmp_path, "origem.db")
+    destino_url, _, _ = _banco(tmp_path, "destino.db")
+    with origem.begin() as conn:
+        conn.execute(insert(md.tables["mae"]), [{"id": "m1"}])
+        conn.exec_driver_sql(
+            "INSERT INTO filha (id, mae_id, valor, quando, ativo) "
+            "VALUES ('f1', 'm1', 10.0, '2026-08-16 10:00:00.000000', 2)"
+        )
+    with pytest.raises(ValorInconvertivel):
+        copiar(origem_url, destino_url, schema=None)
+
+
+def test_decimal_com_mais_casas_chega_inteiro_em_converter(tmp_path):
+    """O que o arquivo tem e o que a carga ve. Com leitura tipada o SQLite ja
+    entregava `10.01` e o dado extra sumia antes de qualquer decisao."""
+    origem_url, origem, md = _banco(tmp_path, "origem.db")
+    destino_url, destino, _ = _banco(tmp_path, "destino.db")
+    with origem.begin() as conn:
+        conn.execute(insert(md.tables["mae"]), [{"id": "m1"}])
+        conn.exec_driver_sql(
+            "INSERT INTO filha (id, mae_id, valor, quando, ativo) "
+            "VALUES ('f1', 'm1', 10.00567, '2026-08-16 10:00:00.000000', 1)"
+        )
+    copiar(origem_url, destino_url, schema=None)
+    with destino.connect() as conn:
+        (gravado,) = conn.exec_driver_sql("SELECT valor FROM filha").one()
+    assert Decimal(str(gravado)) == Decimal("10.00567")
 
 
 def test_lote_menor_que_o_total_copia_tudo(tmp_path):

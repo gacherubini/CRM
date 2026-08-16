@@ -31,10 +31,21 @@ def test_nenhum_script_cai_para_sqlite(arquivo):
         )
 
 
-def test_revy_trafego_nao_exporta_a_url_do_portal():
-    """`PORTAL_DATABASE_URL` não é lida por nenhum arquivo de revy-trafego/app.
-    O export era morto — e depois do corte vira arma carregada: bastaria alguém
-    passar a ler a variável para existir um segundo escritor no banco do Portal.
+def test_revy_trafego_nao_reintroduz_a_url_do_portal():
+    """O que este teste prova, exatamente: `run-revy-trafego.sh` não menciona
+    `PORTAL_DATABASE_URL`. Nada além disso.
+
+    O que ele **não** prova: que o processo do Control roda sem a variável. O
+    `entrypoint-app.sh` a exporta no processo pai do supervisord (ele precisa
+    dela para o `alembic upgrade head` do Portal), e o ambiente exportado é
+    herdado por todo filho — o shell do Control inclusive. Um `os.environ` do
+    Control ainda enxerga a URL do Portal hoje.
+
+    A garantia real, portanto, é de superfície: `revy-trafego/app` não lê a
+    variável, e este teste para quem tentar reintroduzi-la aqui por conta
+    própria. Se algum dia o Control precisar de verdade de isolamento de
+    ambiente, o lugar do conserto é o `entrypoint-app.sh` (rodar o alembic com
+    a variável no escopo do comando em vez de exportá-la), não este arquivo.
     """
     texto = (SCRIPTS / "run-revy-trafego.sh").read_text(encoding="utf-8")
     assert "PORTAL_DATABASE_URL" not in texto

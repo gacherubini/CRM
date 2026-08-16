@@ -6,12 +6,24 @@ from alembic import context
 from sqlalchemy import engine_from_config, pool
 
 from app.config import settings
-from app.db import Base
+from app.db import Base, normalizar_database_url
 from app import models  # noqa: F401
 
 
 config = context.config
-config.set_main_option("sqlalchemy.url", settings.database_url.replace("%", "%%"))
+# A URL crua NÃO serve aqui, e o alembic roda no boot (`entrypoint-app.sh`, com
+# `set -euo pipefail`) antes do app:
+#   1. normalizar: o Fly emite `postgres://`, que o SQLAlchemy resolve para
+#      psycopg2 — que não está instalado. O app normaliza e sobe; sem isto o
+#      alembic morria com ModuleNotFoundError e a máquina entrava em
+#      crash-loop levando os seis serviços do container junto.
+#   2. escapar `%`: `set_main_option` passa por ConfigParser, que interpola
+#      `%`. Uma senha URL-encoded (`%40`, `%2F` — o que `openssl rand -base64`
+#      costuma gerar) mataria o boot com InterpolationSyntaxError.
+# Nesta ordem: normalizar vê a URL de verdade, o escape é a última coisa antes
+# do ConfigParser.
+DATABASE_URL = normalizar_database_url(settings.database_url).replace("%", "%%")
+config.set_main_option("sqlalchemy.url", DATABASE_URL)
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 

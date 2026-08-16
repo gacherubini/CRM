@@ -12,6 +12,8 @@ from decimal import Decimal, InvalidOperation
 from sqlalchemy import MetaData, create_engine, func, select
 from sqlalchemy import types as sqltypes
 
+from tipos import ler_cru
+
 
 def _tabelas(md: MetaData) -> dict:
     return {t.name: t for t in md.tables.values()}
@@ -74,14 +76,15 @@ def verificar(origem_url: str, destino_url: str, schema: str | None) -> list[str
                         )
 
                 if isinstance(tipo, sqltypes.Boolean):
-                    # exec_driver_sql pula o result-processor do tipo Boolean, que
-                    # coagiria qualquer inteiro truthy (ex.: 2) para True antes do
-                    # `not in` rodar e esconderia o valor sujo de verdade.
-                    linhas = conn.exec_driver_sql(
-                        f'SELECT DISTINCT "{col_dst.name}" FROM "{nome}" '
-                        f'WHERE "{col_dst.name}" IS NOT NULL'
-                    )
-                    for (valor,) in linhas:
+                    # Leitura CRUA (ver `tipos.ler_cru`): o result-processor do
+                    # tipo Boolean coagiria qualquer inteiro truthy (ex.: 2)
+                    # para True antes do `not in` rodar e esconderia o valor
+                    # sujo de verdade.
+                    vistos = set()
+                    for (valor,) in ler_cru(conn, nome, [col_dst.name]):
+                        if valor is None or valor in vistos:
+                            continue
+                        vistos.add(valor)
                         if valor not in (0, 1, False, True):
                             problemas.append(
                                 f"`{nome}.{col_dst.name}` e booleano e tem o valor "
@@ -94,9 +97,15 @@ def verificar(origem_url: str, destino_url: str, schema: str | None) -> list[str
                     escala = tipo.scale
                     if escala is not None:
                         demais = 0
-                        for (valor,) in conn.execute(
-                            select(col_org).where(col_org.isnot(None))
-                        ):
+                        # Leitura CRUA pelo mesmo motivo do Boolean acima, e
+                        # aqui ela é a checagem inteira: com `select(col_org)`
+                        # tipado o SQLite já devolve o valor formatado com
+                        # `"%.{escala}f"`, o expoente nunca fica menor que
+                        # -escala e este contador era sempre 0 — a checagem
+                        # nunca reportou nada em toda a sua existência.
+                        for (valor,) in ler_cru(conn, nome, [col_dst.name]):
+                            if valor is None:
+                                continue
                             try:
                                 exp = Decimal(str(valor)).as_tuple().exponent
                             except InvalidOperation:
@@ -114,6 +123,18 @@ def verificar(origem_url: str, destino_url: str, schema: str | None) -> list[str
                                 f"arredondar e a soma da validacao vai divergir"
                             )
 
+            # Sentido simétrico: `copiar.py` monta a lista de colunas filtrando
+            # PELO DESTINO, então uma coluna que exista no `.db` e não na cadeia
+            # de migrations é descartada sem uma linha de log. Ela tem que
+            # aparecer aqui, no pré-voo, e não sumir na janela.
+            for so_na_origem in sorted(
+                set(t_org.columns.keys()) - set(t_dst.columns.keys())
+            ):
+                problemas.append(
+                    f"coluna `{nome}.{so_na_origem}` existe na origem e nao no "
+                    f"destino — a carga descartaria esses valores"
+                )
+
             for fk in t_dst.foreign_keys:
                 col_filha = t_org.columns.get(fk.parent.name)
                 mae_nome = fk.column.table.name
@@ -123,13 +144,19 @@ def verificar(origem_url: str, destino_url: str, schema: str | None) -> list[str
                 col_mae = t_mae.columns.get(fk.column.name)
                 if col_mae is None:
                     continue
+                # NOT EXISTS e não `notin_`: um único NULL dentro da subquery
+                # faz `IN`/`NOT IN` devolverem UNKNOWN e o contador virar 0 —
+                # zero órfãos, em silêncio. Hoje o alvo é sempre PK, então
+                # `notin_` era seguro; é uma falha silenciosa a um ALTER de
+                # distância. O anti-join também é mais barato.
+                mae_alias = t_mae.alias("_mae")  # alias: FK para a própria tabela
+                sem_mae = ~select(1).where(
+                    mae_alias.c[fk.column.name] == col_filha
+                ).exists()
                 orfas = conn.execute(
                     select(func.count())
                     .select_from(t_org)
-                    .where(
-                        col_filha.isnot(None),
-                        col_filha.notin_(select(col_mae)),
-                    )
+                    .where(col_filha.isnot(None), sem_mae)
                 ).scalar_one()
                 if orfas:
                     problemas.append(

@@ -12,11 +12,30 @@ from decimal import Decimal
 from sqlalchemy import MetaData, create_engine, func, select
 from sqlalchemy import types as sqltypes
 
+from tipos import ler_cru
+
 IGNORADAS = {"alembic_version", "alembic_version_revy_trafego"}
 
 
-def _decimal(valor) -> Decimal:
-    return Decimal("0") if valor is None else Decimal(str(valor))
+def _soma_crua(conn, tabela: str, coluna: str, schema: str | None = None) -> Decimal:
+    """Soma lendo CRU dos dois lados (ver `tipos.ler_cru`).
+
+    `select(func.sum(col))` infere o `Numeric(12,2)` e arredonda **na leitura
+    da validação** — exatamente o mesmo arredondamento que o Postgres aplicou
+    na carga. Os dois lados batem, o portão imprime "Corte liberado" e os
+    centavos já foram embora. Somando cru, `10.00567` na origem contra `10.01`
+    no destino vira divergência, que é o que ela é.
+
+    Sem tolerância, de propósito: depois de `verificar.py` barrar casas
+    decimais a mais no pré-voo, as duas somas têm que ser **exatamente** iguais.
+    Uma tolerância aqui seria um número escolhido para o teste passar, e é
+    justamente isso que este portão existe para não fazer.
+    """
+    total = Decimal("0")
+    for (valor,) in ler_cru(conn, tabela, [coluna], schema=schema):
+        if valor is not None:
+            total += Decimal(str(valor))
+    return total
 
 
 def _utc_naive(valor):
@@ -39,14 +58,45 @@ def validar(origem_url: str, destino_url: str, schema: str | None) -> list[str]:
     por_nome_org = {t.name: t for t in md_origem.tables.values()}
     divergencias: list[str] = []
 
+    alvos = [t for t in md_destino.sorted_tables if t.name not in IGNORADAS]
+    nomes_dst = {t.name for t in alvos}
+    nomes_org = set(por_nome_org) - IGNORADAS
+
+    # Não comparar nada não é o mesmo que não achar divergência. Com `--schema`
+    # errado (typo, ou o schema do outro produto), ou rodando antes do
+    # `alembic upgrade head`, o `reflect` devolve zero tabela SEM erro: a lista
+    # sairia vazia, o exit code seria 0 e o portão liberaria o corte tendo
+    # comparado exatamente nada.
+    if not alvos:
+        divergencias.append(
+            "o destino nao tem tabela nenhuma"
+            + (f" no schema `{schema}`" if schema else "")
+            + " — schema errado ou `alembic upgrade head` nao rodou; "
+            "nada foi comparado"
+        )
+
+    # Só-na-origem nunca era visitado: o laço itera o DESTINO. Uma tabela que
+    # exista no `.db` e não na cadeia de migrations sumiria em silêncio.
+    for so_na_origem in sorted(nomes_org - nomes_dst):
+        divergencias.append(
+            f"`{so_na_origem}` existe na origem e nao no destino — "
+            f"a carga nao levou essa tabela"
+        )
+
     with origem_engine.connect() as org, destino_engine.connect() as dst:
-        for t_dst in md_destino.sorted_tables:
-            if t_dst.name in IGNORADAS:
-                continue
+        for t_dst in alvos:
             t_org = por_nome_org.get(t_dst.name)
             if t_org is None:
                 divergencias.append(f"`{t_dst.name}` nao existe na origem")
                 continue
+
+            for col_so_na_origem in sorted(
+                set(t_org.columns.keys()) - set(t_dst.columns.keys())
+            ):
+                divergencias.append(
+                    f"`{t_dst.name}.{col_so_na_origem}` existe na origem e nao "
+                    f"no destino — a carga descartou esses valores"
+                )
 
             n_org = org.execute(select(func.count()).select_from(t_org)).scalar_one()
             n_dst = dst.execute(select(func.count()).select_from(t_dst)).scalar_one()
@@ -63,12 +113,8 @@ def validar(origem_url: str, destino_url: str, schema: str | None) -> list[str]:
                 if isinstance(col.type, sqltypes.Numeric) and not isinstance(
                     col.type, sqltypes.Float
                 ):
-                    s_org = _decimal(
-                        org.execute(select(func.sum(col_org))).scalar_one()
-                    )
-                    s_dst = _decimal(
-                        dst.execute(select(func.sum(col))).scalar_one()
-                    )
+                    s_org = _soma_crua(org, t_org.name, col_org.name)
+                    s_dst = _soma_crua(dst, t_dst.name, col.name, schema=schema)
                     if s_org != s_dst:
                         divergencias.append(
                             f"`{t_dst.name}.{col.name}`: soma {s_org} na origem, "

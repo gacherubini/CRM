@@ -1,10 +1,97 @@
 from datetime import date, datetime, timezone
 from decimal import Decimal
+from pathlib import Path
 
 import pytest
-from sqlalchemy import Boolean, Date, DateTime, Integer, Numeric, String
+from sqlalchemy import (
+    Boolean, Column, Date, DateTime, Integer, MetaData, Numeric, String, Table,
+    create_engine, insert, select,
+)
 
-from tipos import ValorInconvertivel, converter
+from tipos import ValorInconvertivel, converter, ler_cru
+
+
+def test_ler_cru_devolve_o_que_esta_no_arquivo_e_nao_o_que_o_tipo_diz(tmp_path: Path):
+    """Guarda do helper: se alguém trocar `ler_cru` por `select()` tipado, a
+    ferramenta inteira volta a mentir. `10.00567` numa `Numeric(12,2)` vira
+    `10.01` e `2` numa `Boolean` vira `True` — e é exatamente esse par de
+    valores sujos que `verificar`/`copiar`/`validar` existem para pegar.
+    """
+    url = f"sqlite:///{tmp_path / 'cru.db'}"
+    engine = create_engine(url)
+    md = MetaData()
+    linha = Table(
+        "linha",
+        md,
+        Column("id", String(36), primary_key=True),
+        Column("valor", Numeric(12, 2)),
+        Column("ativo", Boolean()),
+    )
+    md.create_all(engine)
+    with engine.begin() as conn:
+        conn.exec_driver_sql(
+            "INSERT INTO linha (id, valor, ativo) VALUES ('l1', 10.00567, 2)"
+        )
+
+    with engine.connect() as conn:
+        tipado = conn.execute(select(linha.c.valor, linha.c.ativo)).one()
+        cru = list(ler_cru(conn, "linha", ["valor", "ativo"]))
+
+    # O que a camada tipada mostra — arredondado e coagido:
+    assert tipado[0] == Decimal("10.01")
+    assert tipado[1] is True
+    # O que está no arquivo:
+    assert cru == [(10.00567, 2)]
+    assert Decimal(str(cru[0][0])) == Decimal("10.00567")
+    assert cru[0][1] == 2
+    assert cru[0][1] is not True
+
+
+def test_ler_cru_soma_sem_quantizar(tmp_path: Path):
+    """`func.sum` tipado quantiza na leitura da validacao, exatamente como o
+    Postgres quantizou na carga — por isso os dois lados batem e o portao
+    libera o corte com centavo perdido."""
+    from sqlalchemy import func
+
+    url = f"sqlite:///{tmp_path / 'soma.db'}"
+    engine = create_engine(url)
+    md = MetaData()
+    linha = Table(
+        "linha",
+        md,
+        Column("id", String(36), primary_key=True),
+        Column("valor", Numeric(12, 2)),
+    )
+    md.create_all(engine)
+    with engine.begin() as conn:
+        conn.exec_driver_sql("INSERT INTO linha (id, valor) VALUES ('l1', 10.00567)")
+
+    with engine.connect() as conn:
+        soma_tipada = conn.execute(select(func.sum(linha.c.valor))).scalar_one()
+        soma_crua = sum(
+            (Decimal(str(v)) for (v,) in ler_cru(conn, "linha", ["valor"])),
+            Decimal("0"),
+        )
+    assert soma_tipada == Decimal("10.01")
+    assert soma_crua == Decimal("10.00567")
+
+
+def test_ler_cru_cita_os_identificadores(tmp_path: Path):
+    """Nome de coluna que colide com palavra reservada nao pode quebrar o SQL."""
+    url = f"sqlite:///{tmp_path / 'reservado.db'}"
+    engine = create_engine(url)
+    md = MetaData()
+    Table(
+        "order",
+        md,
+        Column("id", String(36), primary_key=True),
+        Column("select", String(10)),
+    )
+    md.create_all(engine)
+    with engine.begin() as conn:
+        conn.execute(insert(md.tables["order"]), [{"id": "o1", "select": "x"}])
+    with engine.connect() as conn:
+        assert list(ler_cru(conn, "order", ["id", "select"])) == [("o1", "x")]
 
 
 def test_none_atravessa_qualquer_tipo():
