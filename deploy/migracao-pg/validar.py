@@ -12,7 +12,7 @@ from decimal import Decimal
 from sqlalchemy import MetaData, create_engine, func, select
 from sqlalchemy import types as sqltypes
 
-from tipos import ler_cru
+from tipos import converter, ler_cru
 
 IGNORADAS = {"alembic_version", "alembic_version_revy_trafego"}
 
@@ -44,6 +44,41 @@ def _utc_naive(valor):
     if valor is None:
         return None
     return valor.replace(tzinfo=None) if valor.tzinfo else valor
+
+
+def _maximo_convertido(conn, tabela: str, coluna: str, tipo_destino, schema=None):
+    """Maximo calculado em Python, com os DOIS lados passados por
+    `tipos.converter` — a mesma regra de ordem para origem e destino, em vez
+    de delegar `MAX()` a duas engines que ordenam de formas diferentes.
+
+    Medido no ensaio de 16/08/2026: a origem guarda `DateTime` em dois
+    formatos de texto (`'2026-07-31 22:00:13.482037'` e
+    `'2026-07-31T06:09:17.851485+00:00'`, este ultimo por causa de algum
+    escritor que usou `.isoformat()`). O SQLite ordena essas strings
+    **lexicograficamente** (`'T'` = 0x54 vence `' '` = 0x20, entao a linha com
+    `T` ganha o MAX do SQLite nao importa a hora real); o Postgres ordena o
+    `TIMESTAMP` de verdade, **cronologicamente**. Os dois `MAX()` saiam
+    diferentes com os tres valores corretos nos dois bancos — falso positivo
+    que abortaria um corte bom.
+
+    Mesma doenca em `String`: o SQLite compara `BINARY` e o Postgres compara
+    pela collation do banco (`en_US.UTF-8` e afins), em que maiuscula e
+    minuscula nao ordenam igual.
+
+    A cura para as duas e a mesma: ler CRU (`tipos.ler_cru`) dos dois lados e
+    converter com `tipos.converter(valor, tipo_destino)` antes de comparar —
+    a MESMA transformacao que `copiar.py` aplicou na carga, entao o portao
+    passa a medir exatamente o que foi gravado, com uma unica regra de ordem
+    (a ordem nativa do Python) aplicada aos dois lados.
+    """
+    maior = None
+    for (valor,) in ler_cru(conn, tabela, [coluna], schema=schema):
+        valor = converter(valor, tipo_destino)
+        if valor is None:
+            continue
+        if maior is None or valor > maior:
+            maior = valor
+    return maior
 
 
 def validar(origem_url: str, destino_url: str, schema: str | None) -> list[str]:
@@ -122,16 +157,36 @@ def validar(origem_url: str, destino_url: str, schema: str | None) -> list[str]:
                         )
 
                 if isinstance(col.type, sqltypes.DateTime):
+                    # Nao delegar a `func.max()`: ver `_maximo_convertido`. O
+                    # `_utc_naive` aqui e so para normalizar o resultado ja
+                    # convertido antes do `!=` — nao substitui a conversao.
                     m_org = _utc_naive(
-                        org.execute(select(func.max(col_org))).scalar_one()
+                        _maximo_convertido(org, t_org.name, col_org.name, col.type)
                     )
                     m_dst = _utc_naive(
-                        dst.execute(select(func.max(col))).scalar_one()
+                        _maximo_convertido(
+                            dst, t_dst.name, col.name, col.type, schema=schema
+                        )
                     )
                     if m_org != m_dst:
                         divergencias.append(
                             f"`{t_dst.name}.{col.name}`: max {m_org} na origem, "
                             f"{m_dst} no destino"
+                        )
+                elif isinstance(col.type, sqltypes.String):
+                    # Mesma doenca do DateTime, mesma cura — ver
+                    # `_maximo_convertido`. Se algum dia aparecer um tipo sem
+                    # ordem bem definida em Python (ex.: JSON), a checagem de
+                    # max deve ser pulada explicitamente aqui, com um
+                    # comentario dizendo por que — nunca em silencio.
+                    m_org = _maximo_convertido(org, t_org.name, col_org.name, col.type)
+                    m_dst = _maximo_convertido(
+                        dst, t_dst.name, col.name, col.type, schema=schema
+                    )
+                    if m_org != m_dst:
+                        divergencias.append(
+                            f"`{t_dst.name}.{col.name}`: max {m_org!r} na "
+                            f"origem, {m_dst!r} no destino"
                         )
 
     return divergencias
