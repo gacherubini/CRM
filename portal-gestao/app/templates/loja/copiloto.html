@@ -737,6 +737,20 @@
     mensagens.querySelectorAll('.copiloto-resposta[data-md]'),
     function (el) { renderizarMarkdown(el.textContent, el); }
   );
+
+  // Aba oculta CONGELA o requestAnimationFrame (comportamento do Chrome, não
+  // bug nosso). Sem isto a revelação para no meio e leva junto o que
+  // agendarPosRevelacao segura atrás dela — o botão Copiar e, o que importa,
+  // o CARTÃO DE AÇÃO. O dono vive no WhatsApp: ele pergunta, troca de aba
+  // durante os 10-45s e volta; até voltar, a resposta some e o cartão de
+  // ajustar preço não é oferecido. Ao sair da aba, entrega tudo de uma vez.
+  document.addEventListener('visibilitychange', function () {
+    if (!document.hidden) { return; }
+    Array.prototype.forEach.call(
+      mensagens.querySelectorAll('.copiloto-resposta[data-revelando="1"]'),
+      function (el) { revelarTudo(el); }
+    );
+  });
 })();
 </script>
 {% endblock %}

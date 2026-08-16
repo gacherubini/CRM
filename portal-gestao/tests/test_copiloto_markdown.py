@@ -220,3 +220,19 @@ def test_velocidade_da_revelacao_escala_com_o_tamanho(client, monkeypatch):
     html = client.get("/app/loja/copiloto").text
     assert "DURACAO_REVELACAO_MS" in html
     assert "function velocidadeDe" in html
+
+
+def test_aba_oculta_entrega_a_resposta_em_vez_de_congelar(client, monkeypatch):
+    """Chrome congela requestAnimationFrame em aba oculta. Como
+    agendarPosRevelacao segura o botão Copiar E o cartão de ação atrás do fim
+    da revelação, uma aba em segundo plano deixava a resposta invisível e o
+    cartão de ajustar preço sem ser oferecido — até o dono voltar.
+
+    O dono vive no WhatsApp (PRODUCT.md): trocar de aba durante os 10-45s de
+    espera é o uso normal, não o caso raro.
+    """
+    _ligar(monkeypatch)
+    login(client)
+    html = client.get("/app/loja/copiloto").text
+    assert "visibilitychange" in html
+    assert '[data-revelando="1"]' in html
