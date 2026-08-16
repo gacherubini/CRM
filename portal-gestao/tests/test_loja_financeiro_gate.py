@@ -178,3 +178,65 @@ def test_entitlement_presente_libera(client, monkeypatch):
     login(client, papel="dono", email="dono@loja.test")
     _seedar_modulo()
     assert client.get("/app/loja/financeiro").status_code == 200
+
+
+def _metricas_por_grade(html: str) -> list[int]:
+    """Quantas `.metric` cada `.metric-grid` da página tem."""
+    import re
+
+    grades = []
+    for bloco in re.split(r'<div class="metric-grid">', html)[1:]:
+        # Até o fechamento da grade: a primeira `</div>` seguida de `</section>`
+        # ou de outra grade. Contar `class="metric` já basta para o limite.
+        corpo = bloco.split("</section>")[0]
+        grades.append(len(re.findall(r'class="metric(?: accent)?"', corpo)))
+    return grades
+
+
+def test_nenhuma_grade_de_metricas_passa_de_quatro(client, monkeypatch):
+    """`.metric-grid` é grid fixo de 4 colunas SEM separação entre linhas.
+
+    Com 5+ métricas a quinta cai embaixo da primeira e, por causa do
+    `border-right` de `.metric`, lê como continuação do mesmo card — foi o que
+    aconteceu na primeira versão desta tela (verificado no navegador, não pelo
+    pytest). Passar de 4 exige grade nova, não mais um item.
+    """
+    from decimal import Decimal
+
+    from app.models import DespesaFixaLoja, Venda, agora
+
+    _ligar(monkeypatch)
+    # Sem venda a página cai no estado vazio e não renderiza grade nenhuma:
+    # o teste só vale sobre a tela cheia.
+    db = SessionLocal()
+    try:
+        db.add(
+            Venda(
+                loja_slug="loja-teste",
+                vendedor_email="dono@loja.test",
+                descricao="Honda CG 160",
+                preco_venda=Decimal("14900"),
+                custo_veiculo=Decimal("11200"),
+                status="confirmada",
+                confirmada_em=agora(),
+            )
+        )
+        db.add(
+            DespesaFixaLoja(
+                loja_slug="loja-teste",
+                categoria="aluguel",
+                descricao="Aluguel",
+                valor_mensal=Decimal("6000"),
+                inicio_competencia="2020-01",
+            )
+        )
+        db.commit()
+    finally:
+        db.close()
+
+    login(client, papel="dono", email="dono@loja.test")
+    r = client.get("/app/loja/financeiro")
+    assert r.status_code == 200
+    grades = _metricas_por_grade(r.text)
+    assert grades, "a página não renderizou nenhuma grade de métricas"
+    assert all(n <= 4 for n in grades), f"grade com mais de 4 métricas: {grades}"

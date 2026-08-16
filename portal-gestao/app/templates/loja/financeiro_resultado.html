@@ -54,6 +54,19 @@
       </small>
       {% endif %}
     </div>
+  </div>
+  {% endif %}
+</section>
+
+{# --- Estrutura: painel próprio de propósito. `.metric-grid` é um grid fixo de 4
+     colunas sem separação entre linhas, então 6 métricas numa grade só fazem a
+     quinta parecer continuação da primeira. Máximo 4 por grade. --- #}
+{% if r.qtd_vendas > 0 or r.tem_despesa_cadastrada %}
+<section class="panel" aria-labelledby="bloco-estrutura">
+  <div class="panel-heading">
+    <div><span class="mono-label">Estrutura</span><h2 id="bloco-estrutura">O que sobrou depois da casa</h2></div>
+  </div>
+  <div class="metric-grid">
     <div class="metric">
       <span>Despesas fixas</span>
       <strong>{{ formatar_brl(r.despesa_fixa) }}</strong>
@@ -71,8 +84,8 @@
       {% endif %}
     </div>
   </div>
-  {% endif %}
 </section>
+{% endif %}
 
 {# --- Ponto de equilíbrio: substitui o rateio, sem inventar número --- #}
 <section class="panel" aria-labelledby="bloco-equilibrio">
