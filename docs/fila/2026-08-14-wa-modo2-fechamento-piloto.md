@@ -14,6 +14,27 @@ os dois débitos técnicos que sobraram e o que só pode ser feito à mão.
 
 **Spec:** [`../referencia-viva/specs/2026-08-12-whatsapp-dois-modos-design.md`](../referencia-viva/specs/2026-08-12-whatsapp-dois-modos-design.md) — §8 (onboarding), §10 (smoke), §5.10 (transcrição).
 
+## Atualização 2026-08-16 — leia antes das Tasks
+
+Parte deste card **já foi feita**, e apareceu um buraco maior que os dois débitos previstos.
+Placar completo em
+[`../referencia-viva/design/2026-08-16-whatsapp-modo2-asbuilt.md`](../referencia-viva/design/2026-08-16-whatsapp-modo2-asbuilt.md).
+
+| Task | Situação |
+|---|---|
+| 1 — `alembic upgrade head` no SQLite do chatbot | **não é bloqueio**: o chatbot roda **Postgres** (`suite-pg`); a falha na `0017` é só em SQLite e é idêntica no `main` de antes. Prod está em `0024_cloud_evento_falho`, head único |
+| 2 — teste de outbox duplicado | **FEITO** (PR #5). Era bug do teste, não do outbox: os hooks fazem fan-out para os 5 destinos e o `.one()` por destino nunca fecharia. `revy-trafego`: 514 passed, 0 failed |
+| 3–4 — conta na Meta e template | pendentes, do dono |
+| 5 — publicar e ativar o `n8n-cloud` | **FEITO** (`wCloudMeta0001`, ativo, webhook 200). Armadilha registrada no README do 3vm: `import:workflow` desativa e `publish:workflow` não reativa |
+| 6 — provider de transcrição | pendente (Groq `whisper-large-v3`) |
+| 7 — ligar o piloto | pendente; a flag global já está ON, falta a projeção `whatsapp_modo=2` de uma loja |
+
+**O buraco que não estava previsto:** o `n8n-cloud` era um transporte de 4 nós. Havia rodízio,
+oferta e handoff — e **nenhum bot respondendo o cliente**. Corrigido em 16/08 (fork gerado de
+20 nós, `solicitar_handoff` abrindo o rodízio, retry da §6.1). Sobraram três dívidas novas, em
+ordem de risco: **VAD do áudio** (§5.10), **recusa não cutuca** (§5.9 r.5) e `classificar_etapa`
+presa em `so_oi`. As duas primeiras merecem card próprio antes do piloto com cliente real.
+
 ## Estado ao abrir este card
 
 Todo o código da Fase 1 está escrito e verde, com **todas as flags OFF**:

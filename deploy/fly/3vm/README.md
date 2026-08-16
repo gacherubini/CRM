@@ -195,6 +195,32 @@ log, ticket ou screenshot.
    `HOME=/home/node`; o workflow tem de estar **published** para o webhook responder 200).
 5. `python n8n/validate_workflow.py` — rejeita `__INSTANCE__` residual.
 
+### Workflow cloud (Modo 2) — outro caminho
+
+`prepare-workflow.ps1` e `upload-and-import-workflow.ps1` tratam **só** o
+`workflow-ai-nao-salvos.json`. Para o `n8n/workflow-cloud.json` as quatro substituições
+(`http://chatbot-api:8000` → `https://app2037.fly.dev`, `http://evolution:8080` →
+`https://evolution2037.fly.dev`, `__CHATBOT_*_TOKEN__` e `"active": false` → `true`) têm de
+ser repetidas à mão. Gere o arquivo com token real **fora do repo** — o `.gitignore` cobre
+apenas `workflow-fly.ready.json` e `workflow-fly-test.ready.json`.
+
+> **Armadilha — `import:workflow` DESATIVA o workflow e `publish:workflow` não reativa.**
+> O import imprime "Deactivating workflow …" e segue; o publish diz "Publishing …" e também
+> não liga. Só `n8n update:workflow --id=<id> --active=true` ativa — o n8n marca esse comando
+> como *deprecated* e manda usar `publish:workflow`, **ignore o aviso**, nesta versão o
+> publish sozinho não liga. Sem esse passo o webhook responde **404 para sempre**, mesmo
+> depois de restart (custou um restart inteiro em 16/08). Confira com
+> `n8n list:workflow --active=true` — o `list:workflow` puro mostra todos e não distingue.
+> Depois do `update`, reinicie: `fly apps restart n8n2037`.
+
+O `workflow-cloud.json` é **gerado** por `n8n/fork_cloud_workflow.py` a partir do workflow do
+Modo 1. Não edite à mão: `python n8n/validate_workflow_cloud.py` compara com o que o gerador
+produz e sai com código 1.
+
+> Em 16/08 dois restarts seguidos do `n8n2037` **não** derrubaram o `/webhook/whatsapp-ai`
+> (ficou 200 o tempo todo) e o webhook novo registrou em ~40 s. O risco dos ~6 min continua
+> real, mas não o trate como certeza.
+
 Hosts preferidos no workflow preparado: `https://app2037.fly.dev` e
 `https://evolution2037.fly.dev`.
 

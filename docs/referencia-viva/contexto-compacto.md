@@ -26,8 +26,18 @@ Vocabulário: [`../../CONTEXT.md`](../../CONTEXT.md). As-built Control/Loja:
   (`regras_elegiveis` por tipo, independente do Copiloto) e aceita **destinatário por
   pessoa** (`copiloto_sinal.destinatario_usuario_id`, migration 0024).
 
-- **WhatsApp Modo 2 (central Cloud API):** **código da Fase 1 inteiro no código**, com todas
-  as flags **OFF**. Spec canônica:
+- **WhatsApp Modo 2 (central Cloud API):** no `main` e **deployado**; flag
+  `CHATBOT_WHATSAPP_MODO2_ENABLED=1` no `app2037` desde 16/08, mas **nenhuma loja tem a
+  projeção `whatsapp_modo=2`** — o gate é fail-closed em três condições, então nada roda.
+  Placar do que existe e do que falta:
+  [`design/2026-08-16-whatsapp-modo2-asbuilt.md`](design/2026-08-16-whatsapp-modo2-asbuilt.md).
+  **Em 16/08 o `n8n-cloud` era um transporte de 4 nós — havia rodízio e handoff e nenhum bot
+  respondendo o cliente.** Corrigido: o workflow virou fork gerado do Modo 1 (20 nós, com
+  agente, ferramentas e debounce), `solicitar_handoff` passou a abrir o rodízio, e o retry
+  da §6.1 saiu do `logger.exception` para uma tabela com worker. Dívida conhecida, em ordem
+  de risco: **VAD do áudio** (§5.10 — o Whisper alucina em ruído e o bot age em cima),
+  **recusa não cutuca** (§5.9 r.5) e `classificar_etapa` presa em `so_oi`.
+  Spec canônica:
   [`specs/2026-08-12-whatsapp-dois-modos-design.md`](specs/2026-08-12-whatsapp-dois-modos-design.md).
   Sete cards executados, planos em [`planos/`](planos/):
   - `chatbot-api`: `fila_vendedor`, `oferta_lead`, `rodizio_ponteiro` (migrations 0020/0021),

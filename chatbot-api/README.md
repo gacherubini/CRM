@@ -35,6 +35,21 @@ Domínio em `app/servico.py`; bootstrap e rotas em `app/main.py`.
   (`CHATBOT_WEBHOOK_MAX_*`, `CHATBOT_WEBHOOK_RATE_LIMIT_*`; corpo limitado a 32 KiB).
 - **O LLM não escolhe identidade autorizada.** `telefone_solicitante` e `Idempotency-Key`
   vêm do webhook real, não do modelo.
+- **Não existe IA aqui dentro.** Nem Gemini, nem OpenAI, nem LangChain: o agente vive nos
+  workflows do n8n, nos **dois** modos. Este produto expõe as ferramentas que ele chama.
+  Foi confundir isso que deixou o Modo 2 sem bot por dois dias — havia rodízio, oferta e
+  handoff, e ninguém respondendo o cliente.
+- **Modo 2: `/webhook/cloud` devolve `mensagens[]`, e o n8n depende disso.** A assinatura da
+  Meta só fecha sobre o **corpo cru**, então validar, deduplicar por `wamid` e persistir
+  acontece aqui; o n8n recebe o evento já normalizado e segue no agente. Mudou o formato
+  desse retorno? O bot do Modo 2 para. Ver
+  [`docs/referencia-viva/design/2026-08-16-whatsapp-modo2-asbuilt.md`](../docs/referencia-viva/design/2026-08-16-whatsapp-modo2-asbuilt.md).
+- **Falha no inbound Cloud não pode virar só log.** Já respondemos `200` à Meta (§6.1), então
+  ela **não reentrega**: engolir a exceção perde o lead calado. O corpo cru vai para
+  `cloud_evento_falho` e o worker `cloud_retry` reprocessa (teto de 5 tentativas).
+- **O bot do Modo 2 pode responder a áudio inventado.** O Whisper alucina frase plausível em
+  trecho mudo ou com ruído, e o VAD que a spec §5.10 exige **ainda não existe**. Áudio curto
+  de rua pode virar texto que o cliente não disse — e o bot age em cima.
 
 ## Rodar e testar
 
@@ -53,6 +68,25 @@ Testes que cobrem os pontos sensíveis:
   enfileira/reenvia alerta, reprocessa dead-letters.
 - `tests/test_whatsapp_provider_evolution.py` — provisionamento/estado das instâncias
   (connect/QR, status, logout) sem vazar URL/apikey.
+- `tests/test_fluxo_modo2_ponta_a_ponta.py` — atravessa webhook → gatilho → oferta → clique
+  → trava. Existe porque os testes unitários passavam com o produto morto: cada função tinha
+  teste chamando ela direto e ninguém percorria "chega mensagem → o rodízio começa".
+- `tests/test_cloud_retry.py` — o "processar depois" da §6.1, incluindo o teto de tentativas.
+
+## Rotas do Modo 2 que o `n8n-cloud` chama
+
+O agente do Modo 2 vive no `n8n/workflow-cloud.json` (gerado — ver
+`n8n/fork_cloud_workflow.py`). Estas são as portas que ele usa aqui:
+
+| Rota | Papel |
+|---|---|
+| `POST /webhook/cloud` | inbound da Meta; confere assinatura no corpo cru, deduplica por `wamid`, persiste e **devolve `mensagens[]`** para o agente seguir |
+| `GET /webhook/cloud` | verificação do webhook da Meta (`hub.challenge`) |
+| `POST /v1/operacao/responder` | saída do bot. Existe porque o token do Graph **não pode entrar no workflow** (spec §6.2) |
+| `POST /v1/operacao/handoff-humano` | 3º gatilho da §5.2. Sem CPF/nascimento de propósito — "pediu humano" pode vir antes da simulação |
+
+Workers do Modo 2 (`app/modo2_workers.py`, todos atrás de `MODO2_ENABLED`): `rodizio`
+(expira oferta), `followup` (30 min + 1 h) e `cloud_retry` (reprocessa inbound que falhou).
 
 ## Gates antes do alerta de simulação
 

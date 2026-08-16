@@ -13,9 +13,11 @@ deploy. Ops sem código novo não ganha card.
 
 | Card | Produto | O que falta no `main` |
 |---|---|---|
+| [Postgres 2 — o corte](2026-08-16-postgres-2-corte.md) | Loja / Control / Deploy | Portal e Control ainda rodam **SQLite em arquivo** no volume do `app2037`. O card leva os dois para o banco `revy` no `suite-pg`, com schema e role por produto. Traz ferramenta com teste (pré-voo, carga, validação) e o runbook do corte com caminho de aborto. **Ler o spec junto.** |
+| [Postgres 1 — concorrência](2026-08-16-postgres-1-concorrencia.md) | Loja | Três "lê-depois-escreve" viram transições atômicas. Só o rate-limit de ações vaza hoje; o resto é **pré-requisito do segundo processo**, não do corte. Independente do card acima — qualquer ordem. |
 | [Modo 2 / Card 5 — a metade do dono](2026-08-14-wa-modo2-5-loja-visao-do-dono.md) | Chatbot / Loja | A ponte que ficou no vão entre os planos por produto: rotas de oferta no chatbot, sino 1:1 com botão Peguei, faixa "N sem vendedor" e card de 7 dias. Sem isto, **lead que ninguém pega some**. |
 | [Piloto Modo 2 — fechamento](2026-08-14-wa-modo2-fechamento-piloto.md) | Chatbot / n8n / Motor | Débitos técnicos (migration 0017 no SQLite, teste de outbox duplicado) + o roteiro operacional da Meta e do n8n que o código não faz sozinho. |
-| [Copiloto F5 — log e isolamento](2026-08-12-copiloto-fase5-log-de-perguntas-e-isolamento.md) | Loja / Control | Parte A: endpoint no Portal + tela no Control com as perguntas-lacuna. Parte B: RLS no Postgres. Independentes. |
+| [Copiloto F5 — log e isolamento](2026-08-12-copiloto-fase5-log-de-perguntas-e-isolamento.md) | Loja / Control | Parte A: endpoint no Portal + tela no Control com as perguntas-lacuna. Parte B: RLS no Postgres — **bloqueada**, o Portal roda SQLite e SQLite não tem RLS; destrava com o card do corte. Independentes. |
 | [Copiloto F6 — cadastro e funil](2026-08-12-copiloto-fase6-cadastro-e-funil.md) | Loja | Ferramentas `cadastro_incompleto` e `funil_resumo` no registro MCP. A regra de sinal `cadastro_incompleto` **já existe** (F1) — isto é consulta no chat. Simulação de financiamento foi **retirada**. |
 | [Worker Playwright no PC](2026-08-12-worker-playwright-pc-local.md) | Motor | Design aprovado, sem código de orquestração PC×Fly. Gate: `scripts/probe_bradesco.py` no IP residencial. |
 | [Estabilidade Bradesco](2026-07-24-plano-estabilidade-bradesco-playwright.md) | Motor | Backlog priorizado. Driver existe; falha recorrente é captcha/IP. |
