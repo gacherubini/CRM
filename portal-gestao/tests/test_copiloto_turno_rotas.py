@@ -1,5 +1,6 @@
 from conftest import csrf_da_resposta, login, seed_loja_operacional
 
+import app.copiloto_turnos_job as copiloto_turnos_job
 from app.config import settings
 from app.copiloto_turnos_job import CopilotoTurnosWorker, _historico, processar_turno
 from app.db import SessionLocal
@@ -8,6 +9,7 @@ from app.loja.copiloto.conversas import (
     concluir_turno,
     criar_turno,
     obter_turno,
+    reivindicar_turno,
 )
 from app.loja.copiloto.port import LLMFake, RespostaLLM, ToolCall
 from app.models import CopilotoTurno, LojaOperacionalProjecao
@@ -568,3 +570,57 @@ def test_historico_sem_orcamento_explicito_usa_o_da_config(db):
         object.__setattr__(settings, "copiloto_historico_tokens", original)
 
     assert resultado == [(prontos[-1].pergunta, prontos[-1].resposta)]
+
+
+def test_reivindicar_turno_so_o_primeiro_vence(db):
+    """Dois processos disputando o mesmo turno: o banco escolhe um."""
+    turno = criar_turno(
+        db, loja_slug="loja-teste", usuario_id="u1", pergunta="quanto vendi?"
+    )
+    assert reivindicar_turno(db, turno.id) is True
+    assert reivindicar_turno(db, turno.id) is False
+    db.refresh(turno)
+    assert turno.estado == "executando"
+    assert turno.iniciado_em is not None
+
+
+def test_reivindicar_turno_cancelado_devolve_false(db):
+    """Cancelar tira o turno de `pendente` — a reivindicação não pode ressuscitar."""
+    turno = criar_turno(
+        db, loja_slug="loja-teste", usuario_id="u1", pergunta="quanto vendi?"
+    )
+    assert cancelar_turno(db, "loja-teste", turno.id) is True
+    assert reivindicar_turno(db, turno.id) is False
+    db.refresh(turno)
+    assert turno.estado == "cancelado"
+
+
+def test_reivindicar_turno_inexistente_devolve_false(db):
+    assert reivindicar_turno(db, "nao-existe") is False
+
+
+def test_worker_solta_o_turno_quando_perde_a_reivindicacao(db, monkeypatch):
+    """Outro processo reivindicou entre o SELECT e o pickup: não pode chamar o
+    provedor, e não pode contar como processado."""
+    seed_loja_operacional(db)
+    turno = criar_turno(
+        db, loja_slug="loja-teste", usuario_id="u1", pergunta="quanto vendi?"
+    )
+
+    class LLMProibido:
+        def completar(self, *a, **k):
+            raise AssertionError("provedor não pode ser chamado")
+
+    monkeypatch.setattr(
+        copiloto_turnos_job, "reivindicar_turno", lambda db, turno_id: False
+    )
+    worker = CopilotoTurnosWorker(
+        db_factory=SessionLocal,
+        enabled=True,
+        llm_factory=lambda: LLMProibido(),
+        estoque_factory=lambda: EstoqueStub(),
+        chatbot_factory=lambda: ChatbotStub(),
+    )
+    assert worker.run_once()["processados"] == 0
+    db.refresh(turno)
+    assert turno.estado == "pendente"

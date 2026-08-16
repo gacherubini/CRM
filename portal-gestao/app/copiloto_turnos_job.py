@@ -25,6 +25,7 @@ from app.loja.copiloto.conversas import (
     concluir_turno,
     falhar_turno,
     listar_turnos,
+    reivindicar_turno,
 )
 from app.loja.copiloto.historico import selecionar_historico
 from app.loja.copiloto.runner import executar_turno
@@ -327,6 +328,12 @@ class CopilotoTurnosWorker:
             )
             permitidos = []
             for turno in pendentes:
+                if not reivindicar_turno(db, turno.id):
+                    # Outro processo pegou este turno (ou ele foi cancelado)
+                    # entre o SELECT acima e agora. Não é erro nem falha: é a
+                    # reivindicação fazendo o trabalho dela. Soltar em silêncio.
+                    continue
+                db.refresh(turno)
                 if _copiloto_permitido(db, turno.loja_slug):
                     permitidos.append(turno)
                 else:
