@@ -20,6 +20,8 @@ verificar  →  alembic upgrade head  →  copiar  →  validar
 2. **`alembic upgrade head`** de cada produto, contra o banco de destino. As
    tabelas vêm daí — **nunca** de `create_all`, nunca de DDL à mão, senão o
    schema de produção passa a divergir da cadeia de migrations em silêncio.
+   **Antes dele, pré-crie a tabela de versão** (ver a seção abaixo) — sem isso o
+   `upgrade head` morre no meio.
 3. **`copiar.py`** — carga em ordem topológica de FK, lotes de 500, conversão
    dirigida pelo tipo de destino. **Recusa carregar se o destino já tiver linha**:
    carregar duas vezes duplica tudo, e depois do fato é indistinguível de dado
@@ -27,6 +29,47 @@ verificar  →  alembic upgrade head  →  copiar  →  validar
 4. **`validar.py`** — o portão. Compara os dois lados linha a linha e soma a
    soma. **Saída zero libera o corte; qualquer divergência aborta.** Enquanto
    esta lista não estiver vazia, produção continua nos `.db` e nada foi perdido.
+
+## Pré-crie a tabela de versão, ou o `upgrade head` morre no meio
+
+Medido no ensaio de 16/08/2026, contra o Postgres de verdade:
+
+```
+DataError: value too long for type character varying(32)
+[SQL: UPDATE alembic_version SET version_num='0004_cria_atendimento_atribuicoes']
+```
+
+O alembic cria a tabela de versão com `version_num VARCHAR(32)`, largura
+**hardcoded** no código dele e sem opção de configuração. O SQLite não impõe
+largura de `VARCHAR`, então revisions longas passaram anos funcionando. O
+Postgres impõe. **9 revisions não cabem**: 2 no Portal e 7 no Control, a maior
+com 45 caracteres.
+
+O DDL da migration já foi aplicado quando o erro estoura, então o banco fica
+meio-migrado — na janela isso custa a janela.
+
+O alembic só **cria** a tabela se ela não existir. Então crie você, mais larga,
+logo depois dos schemas e **antes** do primeiro `upgrade head`:
+
+```sql
+CREATE TABLE portal.alembic_version (
+    version_num VARCHAR(255) NOT NULL,
+    CONSTRAINT alembic_version_pkc PRIMARY KEY (version_num)
+);
+ALTER TABLE portal.alembic_version OWNER TO portal_app;
+
+-- O Control renomeia a tabela (`revy-trafego/alembic/env.py`). Pré-criar
+-- `alembic_version` aqui não protegeria nada, e o erro só apareceria na janela.
+CREATE TABLE control.alembic_version_revy_trafego (
+    version_num VARCHAR(255) NOT NULL,
+    CONSTRAINT alembic_version_revy_trafego_pkc PRIMARY KEY (version_num)
+);
+ALTER TABLE control.alembic_version_revy_trafego OWNER TO control_app;
+```
+
+O guarda-corpo do outro lado é `tests/test_alembic_version_largura.py` nos dois
+produtos: uma revision mais longa que os 255 provisionados para o CI, não a
+janela. Se mudar a largura aqui, mude `LARGURA_PROVISIONADA` lá.
 
 ## Nenhuma senha entra em comando
 
