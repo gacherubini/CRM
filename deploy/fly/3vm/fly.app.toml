@@ -13,7 +13,10 @@ primary_region = "iad"
   PORTAL_ENV = "production"
   PORTAL_SECURE_COOKIE = "1"
   PORTAL_TIMEZONE = "America/Sao_Paulo"
-  PORTAL_DATABASE_URL = "sqlite:////data/portal/portal.db"
+  # PORTAL_DATABASE_URL saiu daqui no corte para Postgres (16/08/2026): agora ela
+  # vem SO do secret do Fly, porque a URL tem senha e este arquivo esta no git.
+  # E o que faz o ${VAR:?} do run-portal.sh valer de verdade — com um default
+  # aqui, um secret perdido criaria um SQLite vazio e o app subiria saudavel.
   CATALOGO_DATABASE_PATH = "/data/catalogo/catalogo.db"
   CATALOGO_SECURE_COOKIE = "1"
   CATALOGO_PUBLIC_BASE_URL = "https://app2037.fly.dev/catalogo"
@@ -27,8 +30,8 @@ primary_region = "iad"
   # NÃO confundir com a instância da Evolution, que continua se chamando loja1.
   # Catálogo puxa Pixel ID (dono/equipe configura no Revy Tráfego; sem secret Fly).
   PORTAL_PUBLIC_URL = "http://127.0.0.1:9000"
-  # Revy Tráfego no bundle (banco próprio, porta 9010, UI em /trafego)
-  REVY_TRAFEGO_DATABASE_URL = "sqlite:////data/revy-trafego/revy_trafego.db"
+  # Revy Tráfego no bundle (schema `control` no Postgres, porta 9010, UI em /trafego)
+  # REVY_TRAFEGO_DATABASE_URL saiu daqui no corte (16/08/2026) — só secret.
   REVY_TRAFEGO_URL = "http://127.0.0.1:9010"
   REVY_TRAFEGO_PUBLIC_URL = "http://127.0.0.1:9010"
   REVY_TRAFEGO_URL_PREFIX = "/trafego"

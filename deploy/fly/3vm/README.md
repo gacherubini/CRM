@@ -115,7 +115,7 @@ vence `[env]`. O toml pode dizer uma coisa e o efetivo ser outra.
 | `FLY_API_TOKEN` | token **app-scoped** com start/stop em `motor2037` (nunca token pessoal) |
 | `FLY_APP_NAME=motor2037` | app das machines worker |
 | `MOTOR_MAX_BROWSER_WORKERS=2` | teto de Playwrights simultâneos |
-| `REVY_TRAFEGO_DATABASE_URL` | `sqlite:////data/revy-trafego/revy_trafego.db` |
+| `REVY_TRAFEGO_DATABASE_URL` | **secret**, `postgresql+psycopg://control_app:…@suite-pg.flycast:5432/revy` (schema `control`). Idem `PORTAL_DATABASE_URL`, schema `portal`. Desde o corte de 16/08/2026 **não** têm default no `[env]` do toml: se o secret sumir, o boot morre com mensagem em vez de subir um SQLite vazio |
 | `REVY_TRAFEGO_SERVICE_TOKEN` | autentica Portal → Revy |
 | `REVY_TRAFEGO_CHATBOT_TOKENS_JSON` | JSON `loja_slug → token` (recomendado em multi-loja) |
 
