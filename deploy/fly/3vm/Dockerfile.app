@@ -46,6 +46,13 @@ COPY motor-simulacao/app /srv/motor/app
 COPY motor-simulacao/alembic /srv/motor/alembic
 COPY motor-simulacao/alembic.ini /srv/motor/alembic.ini
 
+# Ferramenta do corte para Postgres. Entra na imagem num deploy normal, dias
+# antes da janela, para a janela nao depender de `sftp put` de quatro arquivos
+# sob pressao. Ela roda de DENTRO deste container de proposito: o suite-pg so
+# responde em flycast, os .db estao no volume, e a imagem ja tem sqlalchemy,
+# psycopg e alembic. Nenhum dado sai do Fly, nenhum tunel e aberto.
+COPY deploy/migracao-pg /srv/migracao-pg
+
 COPY site/index.html /srv/site/html/index.html
 COPY site/assets /srv/site/html/assets
 COPY site/demos /srv/site/html/demos
