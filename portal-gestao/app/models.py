@@ -116,12 +116,18 @@ class Venda(Base):
     descricao: Mapped[str] = mapped_column(String(240))
     preco_venda: Mapped[Decimal] = mapped_column(Numeric(12, 2))
     custo_veiculo: Mapped[Optional[Decimal]] = mapped_column(Numeric(12, 2), nullable=True)
+    # registrada | confirmada | cancelada | excluida.
+    # "cancelada" é negócio desfeito e continua visível no histórico;
+    # "excluida" é registro que nunca deveria ter existido — some de toda
+    # lista e de todo total, mas a linha fica com autoria e data.
     status: Mapped[str] = mapped_column(String(20), default="registrada", index=True)
     motivo_cancelamento: Mapped[Optional[str]] = mapped_column(String(240), nullable=True)
     criada_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=agora)
     atualizada_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=agora)
     confirmada_por: Mapped[Optional[str]] = mapped_column(String(320), nullable=True)
     confirmada_em: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    excluida_por: Mapped[Optional[str]] = mapped_column(String(320), nullable=True)
+    excluida_em: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     # Snapshot de atribuição no confirmar (estável mesmo se UTM do lead mudar depois).
     campanha_id_first: Mapped[Optional[str]] = mapped_column(String(36), nullable=True, index=True)
     campanha_id_last: Mapped[Optional[str]] = mapped_column(String(36), nullable=True, index=True)

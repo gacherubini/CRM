@@ -25,6 +25,8 @@
 {% if aviso_ok == 'ja-confirmada' %}<div class="alert success" role="status">Esta venda já estava confirmada.</div>{% endif %}
 {% if aviso_ok == 'registrada' %}<div class="alert success" role="status">Venda registrada. Confirme para fechar o negócio.</div>{% endif %}
 {% if aviso_ok == 'cancelada' %}<div class="alert success" role="status">Venda cancelada.</div>{% endif %}
+{% if aviso_ok == 'editada' %}<div class="alert success" role="status">Venda atualizada.</div>{% endif %}
+{% if aviso_ok == 'excluida' %}<div class="alert success" role="status">Venda excluída. Ela saiu das listas e dos totais.</div>{% endif %}
 {% if aviso_ok == 'cancelada-estoque-mantido' %}<div class="alert warning" role="status">Venda cancelada. O veículo continua baixado no estoque.</div>{% endif %}
 {% if aviso_erro == 'motivo' %}<div class="alert error" role="alert">Informe o motivo para cancelar.</div>{% endif %}
 {% if aviso_erro == 'acao' %}<div class="alert error" role="alert">Não foi possível agir sobre esta venda.</div>{% endif %}
@@ -69,6 +71,9 @@
           <input type="text" name="motivo" placeholder="Motivo do cancelamento" required aria-label="Motivo do cancelamento">
           <button class="button ghost" type="submit">Cancelar</button>
         </form>
+        {% endif %}
+        {% if pode_editar and venda.status in ('registrada', 'confirmada') %}
+        <a class="button secondary" href="/app/loja/vendas/{{ venda.id }}/editar">Editar</a>
         {% endif %}
       </div>
     </li>

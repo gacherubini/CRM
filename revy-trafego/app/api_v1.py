@@ -248,12 +248,21 @@ def api_venda_atualizada(
     db: Session = Depends(get_db),
     _: None = Depends(exigir_service_token),
 ):
-    """Atualiza a projecao de ROI sem disparar efeitos externos."""
+    """Atualiza a projecao de ROI sem disparar efeitos externos.
+
+    "cancelada" e negocio desfeito; "excluida" e registro que nunca deveria ter
+    existido (Portal, 2026-08-16). A distincao importa la, nao aqui: para o
+    Control as duas tiram a venda do ROI — os leitores de VendaProjetada
+    filtram status == "confirmada" — e cancelam Purchase que ainda nao saiu.
+
+    A lista continua fechada de proposito: status desconhecido tem que dar 400
+    para aparecer como falha de contrato, em vez de virar projecao silenciosa.
+    """
     slug = (loja_slug or "").strip()
-    if not slug or body.status not in {"confirmada", "cancelada"}:
+    if not slug or body.status not in {"confirmada", "cancelada", "excluida"}:
         return JSONResponse({"detail": "evento de venda invalido"}, status_code=400)
     resultado = projetar_venda(db, _snapshot(slug, body))
-    if body.status == "cancelada":
+    if body.status in {"cancelada", "excluida"}:
         pendentes = (
             db.query(MetaCapiOutbox)
             .filter(
@@ -267,7 +276,7 @@ def api_venda_atualizada(
         )
         for item in pendentes:
             item.status = "cancelled"
-            item.last_error = "venda cancelada no Portal"
+            item.last_error = f"venda {body.status} no Portal"
             item.atualizada_em = agora()
     db.commit()
     return {

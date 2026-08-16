@@ -82,6 +82,16 @@ def pode_confirmar_venda(usuario: Usuario) -> bool:
     return usuario.papel in {"dono", "gerente", "vendedor"}
 
 
+def pode_editar_venda(usuario: Usuario) -> bool:
+    """Editar valores e apagar venda: só dono/gerente.
+
+    Vendedor registra, confirma (decisão do dono de 2026-08-07) e cancela com
+    motivo. Mexer em número que já saiu para o Control — ou fazer uma venda
+    desaparecer da lista — é outra categoria de poder.
+    """
+    return usuario.papel in {"dono", "gerente"}
+
+
 def pode_ver_financeiro(usuario: Usuario) -> bool:
     return usuario.papel in {"dono", "gerente", "admin_plataforma"}
 

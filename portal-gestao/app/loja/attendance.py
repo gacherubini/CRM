@@ -469,7 +469,11 @@ def buscar_venda_por_telefone(
     if lead_id:
         venda = (
             db.query(Venda)
-            .filter(Venda.loja_slug == loja_slug, Venda.lead_ref == lead_id)
+            .filter(
+                Venda.loja_slug == loja_slug,
+                Venda.lead_ref == lead_id,
+                Venda.status != "excluida",
+            )
             .order_by(Venda.criada_em.desc())
             .first()
         )

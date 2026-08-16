@@ -13,6 +13,7 @@ router = APIRouter()
 
 from app.auth import (  # noqa: E402
     pode_confirmar_venda,
+    pode_editar_venda,
     pode_gerir_equipe,
     pode_registrar_venda,
     pode_ver_custo,
@@ -28,10 +29,16 @@ from app.loja.sales_overview import (  # noqa: E402
     build_sales_overview,
 )
 from app.main import (  # noqa: E402
+    campos_editaveis,
     contexto,
     csrf_valido,
     executar_cancelamento_venda,
     executar_confirmacao_venda,
+    executar_custo_direto_novo,
+    executar_custo_direto_remocao,
+    executar_edicao_venda,
+    executar_exclusao_venda,
+    CATEGORIAS_CUSTO,
     get_chatbot_client,
     get_estoque_client,
     get_motor_client,
@@ -194,7 +201,12 @@ def loja_vendas_lista(
     if not _papel_autorizado(usuario):
         return JSONResponse({"detail": "Forbidden"}, status_code=403)
 
-    consulta = db.query(Venda).filter(Venda.loja_slug == usuario.loja_slug)
+    consulta = db.query(Venda).filter(
+        Venda.loja_slug == usuario.loja_slug,
+        # Venda excluída não aparece para ninguém — a linha só sobrevive no
+        # banco para auditoria (ver executar_exclusao_venda).
+        Venda.status != "excluida",
+    )
     if not pode_ver_financeiro(usuario):
         consulta = consulta.filter(Venda.vendedor_email == usuario.email)
     vendas = consulta.order_by(Venda.criada_em.desc()).all()
@@ -208,6 +220,7 @@ def loja_vendas_lista(
             escopo_proprio=not pode_ver_financeiro(usuario),
             pode_agir=pode_confirmar_venda(usuario),
             pode_registrar=pode_registrar_venda(usuario),
+            pode_editar=pode_editar_venda(usuario),
             aviso_ok=ok,
             aviso_erro=erro,
             shell_loja=True,
@@ -254,6 +267,128 @@ async def loja_venda_cancelar(
         return RedirectResponse(_LISTA, status_code=303)
     resultado = executar_cancelamento_venda(db, usuario, venda_id, form.get("motivo"))
     return RedirectResponse(f"{_LISTA}?{resultado}", status_code=303)
+
+
+async def _gate_edicao(request: Request, db: Session):
+    """Gate comum das rotas de edição/exclusão/custos.
+
+    Devolve ``(usuario, form, None)`` ou ``(None, None, resposta)``. RBAC no
+    backend: esconder o botão não é autorização.
+    """
+    if not _shell_ativo():
+        return None, None, _shell_desligado()
+    usuario = usuario_atual(request, db)
+    if not usuario:
+        return None, None, redirecionar_login()
+    form = await request.form()
+    if not pode_editar_venda(usuario) or not csrf_valido(request, form.get("csrf")):
+        return None, None, RedirectResponse(_LISTA, status_code=303)
+    return usuario, form, None
+
+
+@router.get("/app/loja/vendas/{venda_id}/editar", response_class=HTMLResponse)
+def loja_venda_editar_form(
+    request: Request,
+    venda_id: str,
+    erro: str | None = None,
+    db: Session = Depends(get_db),
+):
+    if not _shell_ativo():
+        return _shell_desligado()
+
+    usuario = usuario_atual(request, db)
+    if not usuario:
+        return redirecionar_login()
+    if not pode_editar_venda(usuario):
+        return JSONResponse({"detail": "Forbidden"}, status_code=403)
+
+    venda = (
+        db.query(Venda)
+        .filter(Venda.id == venda_id, Venda.loja_slug == usuario.loja_slug)
+        .first()
+    )
+    if venda is None or venda.status in {"cancelada", "excluida"}:
+        return RedirectResponse(f"{_LISTA}?erro=acao", status_code=303)
+
+    return templates.TemplateResponse(
+        "loja/venda_editar.html",
+        contexto(
+            request,
+            usuario,
+            venda=venda,
+            campos=campos_editaveis(venda),
+            categorias=CATEGORIAS_CUSTO,
+            aviso_erro=erro,
+            shell_loja=True,
+        ),
+    )
+
+
+@router.post("/app/loja/vendas/{venda_id}/editar")
+async def loja_venda_editar(
+    request: Request,
+    venda_id: str,
+    db: Session = Depends(get_db),
+):
+    usuario, form, bloqueio = await _gate_edicao(request, db)
+    if bloqueio is not None:
+        return bloqueio
+    resultado = executar_edicao_venda(db, usuario, venda_id, form)
+    if resultado.startswith("erro="):
+        destino = f"/app/loja/vendas/{venda_id}/editar?{resultado}"
+    else:
+        destino = f"{_LISTA}?{resultado}"
+    return RedirectResponse(destino, status_code=303)
+
+
+@router.post("/app/loja/vendas/{venda_id}/excluir")
+async def loja_venda_excluir(
+    request: Request,
+    venda_id: str,
+    db: Session = Depends(get_db),
+):
+    usuario, _form, bloqueio = await _gate_edicao(request, db)
+    if bloqueio is not None:
+        return bloqueio
+    resultado = executar_exclusao_venda(db, usuario, venda_id)
+    return RedirectResponse(f"{_LISTA}?{resultado}", status_code=303)
+
+
+@router.post("/app/loja/vendas/{venda_id}/custos")
+async def loja_venda_custo_novo(
+    request: Request,
+    venda_id: str,
+    db: Session = Depends(get_db),
+):
+    usuario, form, bloqueio = await _gate_edicao(request, db)
+    if bloqueio is not None:
+        return bloqueio
+    resultado = executar_custo_direto_novo(
+        db,
+        usuario,
+        venda_id,
+        (form.get("categoria") or "").strip(),
+        form.get("valor"),
+    )
+    return RedirectResponse(
+        f"/app/loja/vendas/{venda_id}/editar?{resultado}", status_code=303
+    )
+
+
+@router.post("/app/loja/vendas/{venda_id}/custos/{custo_id}/remover")
+async def loja_venda_custo_remover(
+    request: Request,
+    venda_id: str,
+    custo_id: str,
+    db: Session = Depends(get_db),
+):
+    usuario, _form, bloqueio = await _gate_edicao(request, db)
+    if bloqueio is not None:
+        return bloqueio
+    resultado = executar_custo_direto_remocao(db, usuario, venda_id, custo_id)
+    return RedirectResponse(
+        f"/app/loja/vendas/{venda_id}/editar?{resultado}", status_code=303
+    )
 
 
 @router.get("/app/loja/vendas/configuracoes-financeiras")
