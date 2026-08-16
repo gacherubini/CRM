@@ -198,6 +198,13 @@ class DeepSeekClient:
                                 return saida
                             if resposta.status_code not in STATUS_QUE_REPETEM:
                                 if 400 <= resposta.status_code < 500:
+                                    # Stream ainda NAO lido: sem o read() o
+                                    # .text levanta ResponseNotRead, o
+                                    # except Exception de _resumo_corpo_resposta
+                                    # engole e o log vira o "400 mudo" que
+                                    # aquela funcao existe para evitar. So no
+                                    # 4xx: em 200 quem le e o _consumir_stream.
+                                    resposta.read()
                                     ultimo_corpo_erro = _resumo_corpo_resposta(resposta)
                                 break
                     else:

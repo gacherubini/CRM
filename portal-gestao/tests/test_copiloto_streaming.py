@@ -7,7 +7,7 @@ optar por streaming.
 import httpx
 
 from app.clients.deepseek import DeepSeekClient
-from app.loja.copiloto.port import MensagemLLM
+from app.loja.copiloto.port import LLMIndisponivel, MensagemLLM
 
 SSE = (
     'data: {"choices":[{"delta":{"content":"Você "},"index":0}]}\n\n'
@@ -82,3 +82,34 @@ def test_streaming_monta_tool_call_por_indice():
     assert len(resposta.tool_calls) == 1
     assert resposta.tool_calls[0].nome == "vendas_resumo"
     assert resposta.tool_calls[0].argumentos == {"periodo": "mes"}
+
+
+def test_400_em_streaming_loga_o_corpo_do_provedor(caplog):
+    """Em streaming o corpo ainda nao foi lido: sem um read() explicito o
+    .text levanta ResponseNotRead, o except Exception de
+    _resumo_corpo_resposta engole, e o log vira o "400 mudo" que aquela
+    funcao existe justamente para evitar. E o unico sinal de qual campo o
+    provedor recusou — vale ouro na troca de provedor/modelo.
+
+    ATENCAO ao mexer neste teste: `httpx.Response(400, json=...)` NAO
+    reproduz o bug. Aquele construtor ja bufferiza o corpo, entao .text
+    funciona mesmo sem read() e o teste passa com e sem a correcao (foi o
+    que aconteceu na primeira versao dele). Precisa ser um corpo em stream
+    de verdade — `content=iter([...])` — que e o que a rede entrega.
+    """
+    import logging
+
+    import pytest
+
+    def handler(request):
+        return httpx.Response(
+            400, content=iter([b'{"error":{"message":"stream_options unsupported"}}'])
+        )
+
+    with caplog.at_level(logging.WARNING, logger="portal.copiloto.llm"):
+        with pytest.raises(LLMIndisponivel):
+            _client(handler).completar(
+                [MensagemLLM(papel="user", conteudo="oi")], [], ao_texto=lambda _: None
+            )
+
+    assert "stream_options unsupported" in caplog.text
