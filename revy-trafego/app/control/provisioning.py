@@ -83,7 +83,7 @@ class ProvisioningControl:
                 module.codigo: (assignment, module)
                 for assignment, module in assignments
             }
-            for code in ("vendas", "estoque", "copiloto"):
+            for code in ("vendas", "estoque", "copiloto", "financeiro"):
                 match = by_code.get(code)
                 if match is None:
                     continue

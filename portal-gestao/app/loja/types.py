@@ -23,6 +23,7 @@ class Module(str, Enum):
     VENDAS = "vendas"
     ESTOQUE = "estoque"
     COPILOTO = "copiloto"
+    FINANCEIRO = "financeiro"
 
 
 ROLES_OPERACIONAIS: frozenset[str] = frozenset(
@@ -70,6 +71,7 @@ class EntitlementState:
     estoque_enabled: bool
     source: str  # fail_open | projecao | control | cache
     copiloto_enabled: bool = False
+    financeiro_enabled: bool = False
 
 
 @dataclass(frozen=True)

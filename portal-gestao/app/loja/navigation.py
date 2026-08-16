@@ -5,7 +5,11 @@ tela de "o que fazer hoje" vem antes das telas de "quanto deu".
 """
 from __future__ import annotations
 
-from app.config import revy_loja_copiloto_enabled, revy_loja_whatsapp_enabled
+from app.config import (
+    revy_loja_copiloto_enabled,
+    revy_loja_financeiro_enabled,
+    revy_loja_whatsapp_enabled,
+)
 from app.loja.types import (
     ROLES_GESTAO,
     ROLES_OPERACIONAIS,
@@ -24,6 +28,7 @@ def build_nav(
     shell_enabled: bool = True,
     whatsapp_enabled: bool | None = None,
     copiloto_enabled: bool | None = None,
+    financeiro_enabled: bool | None = None,
 ) -> tuple[NavSection, ...]:
     """Produz seções de navegação conforme contrato e cargos.
 
@@ -42,6 +47,9 @@ def build_nav(
 
     if copiloto_enabled is None:
         copiloto_enabled = revy_loja_copiloto_enabled()
+
+    if financeiro_enabled is None:
+        financeiro_enabled = revy_loja_financeiro_enabled()
 
     roles = store.roles & ROLES_OPERACIONAIS
     if not roles:
@@ -116,6 +124,36 @@ def build_nav(
                         section="Vendas",
                         module=Module.VENDAS.value,
                         active_prefix="/app/simulacoes",
+                    ),
+                ),
+            )
+        )
+
+    # Financeiro: mesmo gate triplo do Copiloto — flag, entitlement e gestão.
+    # Custo e lucro nunca vão para vendedor (README, armadilha nº 1).
+    if (
+        financeiro_enabled
+        and entitlements.financeiro_enabled
+        and entitlements.loja_ativa
+        and roles & ROLES_GESTAO
+    ):
+        sections.append(
+            NavSection(
+                title="Financeiro",
+                items=(
+                    NavItem(
+                        label="Resultado financeiro",
+                        href="/app/loja/financeiro",
+                        section="Financeiro",
+                        module=Module.FINANCEIRO.value,
+                        active_prefix="/app/loja/financeiro",
+                    ),
+                    NavItem(
+                        label="Despesas fixas",
+                        href="/app/loja/financeiro/despesas",
+                        section="Financeiro",
+                        module=Module.FINANCEIRO.value,
+                        active_prefix="/app/loja/financeiro/despesas",
                     ),
                 ),
             )
@@ -254,6 +292,9 @@ def nav_item_is_active(item: NavItem, path: str) -> bool:
             return False
         # Mesmo caso em Vendas: Resultado não acende na lista de vendas.
         if item.href == "/app/loja/vendas" and path != "/app/loja/vendas":
+            return False
+        # Idem no Financeiro: o resultado não acende em /despesas.
+        if item.href == "/app/loja/financeiro" and path != "/app/loja/financeiro":
             return False
         return True
     return False

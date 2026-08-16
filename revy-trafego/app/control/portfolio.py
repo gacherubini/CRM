@@ -22,6 +22,7 @@ class ModuleCode(str, Enum):
     INVENTORY = "estoque"
     SALES = "vendas"
     COPILOTO = "copiloto"
+    FINANCEIRO = "financeiro"
 
 
 class ModuleStatus(str, Enum):

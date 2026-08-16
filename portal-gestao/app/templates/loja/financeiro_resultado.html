@@ -1,0 +1,174 @@
+{% extends "base.html" %}
+{% block title %}Resultado financeiro — Revy Loja{% endblock %}
+{% block page_title %}Resultado financeiro{% endblock %}
+{% block content %}
+{% set r = resultado %}
+<div class="page-heading">
+  <div>
+    <span class="eyebrow">Financeiro</span>
+    <h1>Resultado financeiro</h1>
+    <p>Quanto cada moto lucrou e se o mês pagou a estrutura. Números reais — nada rateado.</p>
+  </div>
+</div>
+
+<form class="filter-bar" method="get">
+  <label class="search"><span class="sr-only">Mês</span>
+    <input type="month" name="mes" value="{{ competencia }}" max="{{ competencia_hoje }}">
+  </label>
+  <button class="button secondary" type="submit">Ver mês</button>
+</form>
+
+{# --- Fechamento do mês --- #}
+<section class="panel" aria-labelledby="bloco-mes">
+  <div class="panel-heading">
+    <div><span class="mono-label">Mês</span><h2 id="bloco-mes">Como o mês fechou</h2></div>
+  </div>
+  {% if r.qtd_vendas == 0 %}
+  <div class="empty">
+    <strong>Nenhuma venda confirmada neste mês.</strong>
+    <p>Assim que houver venda confirmada, o resultado aparece aqui.</p>
+  </div>
+  {% else %}
+  <div class="metric-grid">
+    <div class="metric">
+      <span>Receita</span>
+      <strong>{{ formatar_brl(r.receita) }}</strong>
+      <small>{{ r.qtd_vendas }} {{ 'moto vendida' if r.qtd_vendas == 1 else 'motos vendidas' }}</small>
+    </div>
+    <div class="metric">
+      <span>Custo das motos</span>
+      <strong>{{ formatar_brl(r.custo_vendas) }}</strong>
+    </div>
+    <div class="metric">
+      <span>Custos diretos</span>
+      <strong>{{ formatar_brl(r.custos_diretos) }}</strong>
+      <small>documentação, frete, comissão</small>
+    </div>
+    <div class="metric accent">
+      <span>Lucro bruto</span>
+      <strong>{{ formatar_brl(r.lucro_bruto) }}</strong>
+      {% if not r.margem_completa %}
+      <small>
+        subtotal — {{ r.vendas_sem_custo }}
+        {{ 'venda sem custo informado' if r.vendas_sem_custo == 1 else 'vendas sem custo informado' }}
+      </small>
+      {% endif %}
+    </div>
+    <div class="metric">
+      <span>Despesas fixas</span>
+      <strong>{{ formatar_brl(r.despesa_fixa) }}</strong>
+      {% if not r.tem_despesa_cadastrada %}
+      <small><a href="/app/loja/financeiro/despesas?mes={{ competencia }}">Cadastre sua estrutura</a></small>
+      {% endif %}
+    </div>
+    <div class="metric accent">
+      <span>Lucro operacional</span>
+      {% if r.lucro_operacional is not none %}
+      <strong>{{ formatar_brl(r.lucro_operacional) }}</strong>
+      {% else %}
+      <strong>Incompleto</strong>
+      <small>informe o custo das motos que faltam para fechar o mês</small>
+      {% endif %}
+    </div>
+  </div>
+  {% endif %}
+</section>
+
+{# --- Ponto de equilíbrio: substitui o rateio, sem inventar número --- #}
+<section class="panel" aria-labelledby="bloco-equilibrio">
+  <div class="panel-heading">
+    <div><span class="mono-label">Ponto de equilíbrio</span><h2 id="bloco-equilibrio">Quantas motos pagam a estrutura</h2></div>
+  </div>
+  <div class="panel-body">
+    {% if r.ponto_equilibrio_disponivel %}
+    <p>
+      Sua estrutura custa <strong>{{ formatar_brl(r.despesa_fixa) }}</strong> neste mês e sua margem média
+      é <strong>{{ formatar_brl(r.margem_media) }}</strong> por moto — você precisa de
+      <strong>{{ r.ponto_equilibrio }}</strong>
+      {{ 'moto' if r.ponto_equilibrio == 1 else 'motos' }} para empatar.
+    </p>
+    {% if r.vendas_ate_equilibrio %}
+    <p>
+      Vendeu <strong>{{ r.qtd_vendas }}</strong> e passou desse ponto na
+      {{ r.vendas_ate_equilibrio }}ª venda, em {{ formatar_data(r.dia_do_equilibrio) }}.
+    </p>
+    {% else %}
+    <p class="muted">Vendeu {{ r.qtd_vendas }} — ainda não chegou lá neste mês.</p>
+    {% endif %}
+    {% elif r.ponto_equilibrio_motivo == 'margem_parcial' %}
+    <p class="muted">
+      Indisponível: {{ r.vendas_sem_custo }}
+      {{ 'venda ainda está' if r.vendas_sem_custo == 1 else 'vendas ainda estão' }} sem o custo do
+      veículo. Não calculamos ponto de equilíbrio sobre margem incompleta — seria estimativa,
+      não número.
+    </p>
+    {% elif r.ponto_equilibrio_motivo == 'sem_despesa' %}
+    <p class="muted">
+      Indisponível: nenhuma despesa fixa cadastrada.
+      <a href="/app/loja/financeiro/despesas?mes={{ competencia }}">Cadastre aluguel, salários e o resto</a>
+      para saber quantas motos pagam a casa.
+    </p>
+    {% elif r.ponto_equilibrio_motivo == 'margem_negativa' %}
+    <p class="muted">
+      Indisponível: a margem média do mês está negativa
+      ({{ formatar_brl(r.margem_media) }} por moto). Nenhuma quantidade de motos com margem
+      negativa paga a estrutura.
+    </p>
+    {% else %}
+    <p class="muted">Indisponível: ainda não há venda confirmada neste mês.</p>
+    {% endif %}
+  </div>
+</section>
+
+{# --- Por moto --- #}
+<section class="panel" aria-labelledby="bloco-motos">
+  <div class="panel-heading">
+    <div><span class="mono-label">Por moto</span><h2 id="bloco-motos">Lucro de cada venda</h2></div>
+  </div>
+  {% if not r.linhas %}
+  <div class="empty">
+    <strong>Nenhuma venda confirmada neste mês.</strong>
+    <p>Cada moto vendida aparece aqui com preço, custo e o lucro dela.</p>
+  </div>
+  {% else %}
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th scope="col">Moto</th>
+          <th scope="col">Data</th>
+          <th scope="col">Venda</th>
+          <th scope="col">Custo</th>
+          <th scope="col">Diretos</th>
+          <th scope="col">Lucro</th>
+          <th scope="col"><span class="sr-only">Ações</span></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for linha in r.linhas %}
+        <tr>
+          <td><strong>{{ linha.descricao }}</strong></td>
+          <td>{{ formatar_data(linha.data) }}</td>
+          <td>{{ formatar_brl(linha.preco) }}</td>
+          <td>{% if linha.custo is not none %}{{ formatar_brl(linha.custo) }}{% else %}<span class="muted">informe</span>{% endif %}</td>
+          <td>{{ formatar_brl(linha.custos_diretos) }}</td>
+          <td>
+            {% if linha.lucro is not none %}
+            <strong>{{ formatar_brl(linha.lucro) }}</strong>
+            {% else %}
+            <span class="muted">—</span>
+            {% endif %}
+          </td>
+          <td><a class="button ghost" href="/app/loja/vendas/{{ linha.venda_id }}/editar">Editar</a></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <p class="muted">
+    Lucro de cada moto = venda − custo do veículo − custos diretos dela. A despesa fixa da loja
+    não é dividida entre as motos: ela aparece só no fechamento do mês, acima.
+  </p>
+  {% endif %}
+</section>
+{% endblock %}
