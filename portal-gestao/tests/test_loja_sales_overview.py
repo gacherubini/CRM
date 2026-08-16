@@ -317,7 +317,12 @@ def test_estado_vazio_sem_vendas():
         db.close()
 
 
-def test_pendencias_vendas_registradas():
+def test_overview_nao_calcula_mais_metas_nem_pendencias():
+    """Os dois blocos saíram da tela Resultado em 2026-08-16 (decisão do dono).
+
+    O read model não pode continuar calculando o que ninguém exibe: metas
+    seguem em /app/metas e no painel financeiro legado.
+    """
     _criar_venda(preco="10000", custo=None, status="registrada")
     d_inicio, d_fim = periodo_padrao(None, None)
     db = SessionLocal()
@@ -331,9 +336,12 @@ def test_pendencias_vendas_registradas():
             chatbot=ChatbotStub(leads=[{"id": "x", "etapa": "novo", "telefone": "5511999"}]),
             revy_trafego_resultados_enabled=False,
         )
-        codigos = {p.codigo for p in overview.pendencias}
-        assert "vendas_registradas" in codigos
-        assert "leads_novos" in codigos
+        assert not hasattr(overview, "metas")
+        assert not hasattr(overview, "metas_status")
+        assert not hasattr(overview, "pendencias")
+        serializado = overview.to_dict()
+        assert "metas" not in serializado
+        assert "pendencias" not in serializado
     finally:
         db.close()
 

@@ -14,7 +14,6 @@ router = APIRouter()
 from app.auth import (  # noqa: E402
     pode_confirmar_venda,
     pode_gerir_equipe,
-    pode_gerir_financeiras,
     pode_registrar_venda,
     pode_ver_custo,
     pode_ver_equipe,
@@ -31,7 +30,6 @@ from app.loja.sales_overview import (  # noqa: E402
 from app.main import (  # noqa: E402
     contexto,
     csrf_valido,
-    enriquecer_credenciais,
     executar_cancelamento_venda,
     executar_confirmacao_venda,
     get_chatbot_client,
@@ -42,7 +40,7 @@ from app.main import (  # noqa: E402
     PAPEIS_EQUIPE_ROTULO,
 )
 from app.web.equipe import _membros_da_loja  # noqa: E402
-from app.clients.motor import MotorClient, MotorIndisponivel  # noqa: E402
+from app.clients.motor import MotorClient  # noqa: E402
 from app.models import Usuario, Venda  # noqa: E402
 
 _LISTA = "/app/loja/vendas/lista"
@@ -88,31 +86,6 @@ def _fetch_resultados_api():
     return _fetch
 
 
-def _bancos_nao_configurados(usuario: Usuario, motor: MotorClient) -> list[str] | None:
-    """Nomes de provedores sem credencial — pendência operacional (F5)."""
-    if not pode_gerir_financeiras(usuario):
-        return None
-    if not motor.configurado:
-        return None
-    try:
-        raw = motor.listar_credenciais(ator=usuario.email)
-        try:
-            provedores = motor.listar_provedores(ator=usuario.email)
-        except MotorIndisponivel:
-            provedores = []
-        credenciais = enriquecer_credenciais(raw, provedores)
-    except MotorIndisponivel:
-        return None
-    faltando: list[str] = []
-    for c in credenciais:
-        if c.get("senha_configurada"):
-            continue
-        nome = (c.get("rotulo") or c.get("provedor") or "").strip()
-        if nome:
-            faltando.append(nome)
-    return faltando or None
-
-
 def _montar_overview(
     usuario: Usuario,
     db: Session,
@@ -121,11 +94,12 @@ def _montar_overview(
     fim: str | None,
     motor: MotorClient | None = None,
 ):
+    """``motor`` fica na assinatura porque as rotas o injetam; a tela não o usa
+    mais desde que o bloco de Pendências saiu (2026-08-16) — era a única razão
+    de consultar credenciais bancárias a cada abertura do Resultado.
+    """
     papel = (usuario.papel or "").strip().casefold()
     fetch = _fetch_resultados_api() if pode_ver_resultados_midia(usuario) else None
-    bancos = None
-    if motor is not None and papel in {"dono", "gerente", "admin_plataforma"}:
-        bancos = _bancos_nao_configurados(usuario, motor)
     return build_sales_overview(
         db,
         loja_slug=usuario.loja_slug,
@@ -138,7 +112,6 @@ def _montar_overview(
         revy_trafego_resultados_enabled=settings.revy_trafego_resultados_enabled
         and pode_ver_resultados_midia(usuario),
         pode_ver_margem=pode_ver_custo(usuario),
-        bancos_nao_configurados=bancos,
     )
 
 

@@ -107,6 +107,7 @@ from app.config import (
     revy_loja_shell_enabled,
     settings,
 )
+from app.loja.navigation import nav_item_is_active
 from app.loja.redirects import resolve_legacy_redirect, should_consider_request
 from app.web.loja_shell import check_module_access, router as loja_shell_router
 from app.web.owner_invitations import router as owner_invitations_router
@@ -335,6 +336,9 @@ templates.env.globals["mascarar_cpf"] = mascarar_cpf
 templates.env.globals["formatar_brl"] = formatar_brl
 templates.env.globals["formatar_percentual"] = formatar_percentual
 templates.env.globals["formatar_duracao"] = formatar_duracao
+# O base.html tinha uma cópia desta regra em Jinja e a cópia esqueceu a exceção
+# de Vendas — "Resultado" acendia junto com a lista de vendas. Uma fonte só.
+templates.env.globals["nav_item_is_active"] = nav_item_is_active
 
 @asynccontextmanager
 async def _lifespan(_app: FastAPI):

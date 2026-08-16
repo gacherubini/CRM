@@ -151,6 +151,9 @@ def test_tela_de_resultado_renderiza_o_bloco_de_campanhas(client, monkeypatch):
     assert pagina.status_code == 200
     assert "De onde veio o resultado" in pagina.text
     assert "Civic — julho" in pagina.text
+    # Metas e Pendências saíram da tela em 2026-08-16 (decisão do dono).
+    assert "Atingimento" not in pagina.text
+    assert "Ações do período" not in pagina.text
 
 
 def test_vendedor_nao_recebe_detalhe_de_midia():
