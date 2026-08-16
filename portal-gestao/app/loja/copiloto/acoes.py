@@ -140,11 +140,17 @@ def _checar_rate_limit(db: Session, loja_slug: str, agora: datetime) -> None:
     """
     # Antes do COUNT, não depois: sem isto o limite é "contei e decidi", e dois
     # cliques simultâneos com o limite em N-1 passam os dois. Em Postgres a trava
-    # cobre o COUNT desta função e o commit da linha pendente em executar_acao —
-    # que vem depois — e é liberada nesse commit, antes do PATCH de rede. O que
-    # serializa a decisão é isso: a linha pendente é comitada ainda sob a trava,
-    # então um COUNT concorrente a vê. Isolamento por loja: uma loja lenta não
-    # segura as outras. Em SQLite é no-op e o comportamento é o de hoje.
+    # cobre o COUNT desta função, a checagem de escopo (garantir_escopo_loja,
+    # ~linha 203) e a releitura do veículo (estoque.obter, ~linha 211) em
+    # executar_acao — as duas são chamadas de rede à estoque-api, cada uma com
+    # timeout de 5s (EstoqueClient) — e o commit da linha pendente (~linha 255).
+    # É liberada nesse commit, antes do PATCH de rede que aplica a ação. Sob
+    # Postgres isso pode manter a trava por loja presa por até ~10s de rede; não
+    # há lock_timeout configurado (decisão adiada para quando Postgres estiver
+    # vivo, leva 2). O que serializa a decisão é isso: a linha pendente é
+    # comitada ainda sob a trava, então um COUNT concorrente a vê. Isolamento por
+    # loja: uma loja lenta não segura as outras. Em SQLite é no-op e o
+    # comportamento é o de hoje.
     travar_por_loja(db, loja_slug, "copiloto_acao")
 
     desde = agora - timedelta(hours=1)

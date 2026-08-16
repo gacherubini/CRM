@@ -29,6 +29,7 @@ def test_chave_nao_depende_do_hash_randomizado_do_processo():
     mesma loja e a trava vira decoração."""
     assert _chave("copiloto_acao:loja-teste") == _chave("copiloto_acao:loja-teste")
     assert isinstance(_chave("copiloto_acao:loja-teste"), int)
+    assert _chave("copiloto_acao:loja-teste") == -7423562336915025638
 
 
 def test_travar_por_loja_nao_emite_sql_em_sqlite():

@@ -388,6 +388,17 @@ def reivindicar_outbox(
     meio devolve o item para o próximo lote — só o relógio de backoff reinicia,
     que é o certo para "alguém acabou de tentar".
 
+    Isto ESTREITA a janela de dois workers enviando o mesmo evento, não a
+    fecha: o CAS impede que dois processos que leram o mesmo ``atualizada_em``
+    vençam os dois, mas não impede um processo cujo SELECT caia DEPOIS do
+    commit da reivindicação do outro — porque ``status`` continua `pending`
+    durante o POST inteiro (``tentar_enviar_outbox`` só escreve o status
+    quando a requisição retorna). A janela que sobra é a duração de um POST em
+    voo (timeout de 5s, ``DEFAULT_TIMEOUT``) contra o ciclo de 60s do worker de
+    retry — pequena, mas exatamente a hora em que a Meta lenta a abre. A
+    garantia final contra entrega dobrada não é este CAS: é o ``event_id``
+    único que a Meta usa para deduplicar do lado dela.
+
     Nota de custo: ``db.commit()`` expira os objetos da sessão, então os itens
     seguintes do lote recarregam ao serem lidos. São poucos SELECTs num lote de
     no máximo 500 — o preço da atomicidade, e é barato.
