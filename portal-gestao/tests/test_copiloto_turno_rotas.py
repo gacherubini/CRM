@@ -624,3 +624,126 @@ def test_worker_solta_o_turno_quando_perde_a_reivindicacao(db, monkeypatch):
     assert worker.run_once()["processados"] == 0
     db.refresh(turno)
     assert turno.estado == "pendente"
+
+
+def test_run_once_nao_reivindica_o_lote_inteiro_antes_de_processar(db):
+    """`expirar_orfaos` filtra por `iniciado_em < agora - ttl_executando`; se
+    `run_once` reivindicasse o lote inteiro ANTES de processar qualquer um, o
+    relógio de órfão do 2º/3º turno começaria a contar antes de o 1º sequer
+    rodar, e a morte do processo no meio do lote deixaria os turnos que
+    nunca chegaram a iniciar presos como `interrompido` em vez de voltarem
+    para a fila como `pendente`. A propriedade que protege isso: enquanto o
+    turno N-1 está sendo processado, o turno N ainda está `pendente` — a
+    reivindicação não corre na frente do processamento. Pina isso inspecionando
+    o banco, de dentro do LLM fake, no instante em que o 1º turno é processado."""
+    seed_loja_operacional(db)
+    primeiro = criar_turno(
+        db, loja_slug="loja-teste", usuario_id="u1", pergunta="primeira?"
+    )
+    segundo = criar_turno(
+        db, loja_slug="loja-teste", usuario_id="u1", pergunta="segunda?"
+    )
+
+    estados_do_segundo_visto_de_dentro_do_primeiro: list[str] = []
+
+    class LLMQueEspiaOProximoTurnoDoLote:
+        def __init__(self):
+            self.chamadas = 0
+
+        def completar(self, *a, **k):
+            self.chamadas += 1
+            if self.chamadas == 1:
+                # Sessão separada, mesmo padrão de LLMCancelaDuranteAChamada
+                # acima: quer ler o estado comitado por `run_once`, não o
+                # cache da sessão do próprio worker.
+                outra_sessao = SessionLocal()
+                try:
+                    turno_segundo = outra_sessao.get(CopilotoTurno, segundo.id)
+                    estados_do_segundo_visto_de_dentro_do_primeiro.append(
+                        turno_segundo.estado
+                    )
+                finally:
+                    outra_sessao.close()
+            return RespostaLLM(
+                texto="ok",
+                tool_calls=(),
+                tokens_entrada=10,
+                tokens_saida=10,
+                finish_reason="stop",
+            )
+
+    worker = CopilotoTurnosWorker(
+        db_factory=SessionLocal,
+        enabled=True,
+        lote=2,  # os dois turnos precisam caber no mesmo run_once
+        llm_factory=LLMQueEspiaOProximoTurnoDoLote,
+        estoque_factory=lambda: EstoqueStub(),
+        chatbot_factory=lambda: ChatbotStub(),
+    )
+    resultado = worker.run_once()
+
+    assert resultado["processados"] == 2
+    # Se o laço reivindicasse o lote inteiro antes de processar (o bug que
+    # este teste existe para travar), o segundo turno já estaria
+    # `executando` neste ponto — e não `pendente`.
+    assert estados_do_segundo_visto_de_dentro_do_primeiro == ["pendente"]
+
+    db.refresh(primeiro)
+    db.refresh(segundo)
+    assert primeiro.estado == "pronto"
+    assert segundo.estado == "pronto"
+
+
+def test_run_once_sem_turnos_pendentes_nao_constroi_provedores(db):
+    """Construir LLM/estoque/chatbot virou preguiçoso de propósito (§
+    `_provedores` em `run_once`): montar o client HTTP do estoque/chatbot ou
+    instanciar o cliente LLM tem custo real mesmo quando não há nenhum
+    turno para processar. Um ciclo do worker roda a cada
+    `PORTAL_COPILOTO_TURNOS_INTERVAL_SECONDS` — pagar esse custo à toa em
+    todo ciclo ocioso é desperdício constante, não só de um turno. As
+    factories aqui levantam se forem chamadas: a fila vazia não pode
+    tocá-las."""
+
+    def _nao_deveria_ser_chamada():
+        raise AssertionError("provedor não deveria ser construído sem trabalho")
+
+    worker = CopilotoTurnosWorker(
+        db_factory=SessionLocal,
+        enabled=True,
+        llm_factory=_nao_deveria_ser_chamada,
+        estoque_factory=_nao_deveria_ser_chamada,
+        chatbot_factory=_nao_deveria_ser_chamada,
+    )
+    resultado = worker.run_once()
+    assert resultado["processados"] == 0
+
+
+def test_run_once_com_todos_sem_entitlement_nao_constroi_provedores(db, monkeypatch):
+    """Mesma preguiça de `_provedores`, agora com trabalho na fila mas sem
+    acesso: a checagem de entitlement (`_copiloto_permitido`) roda ANTES de
+    `_provedores()` ser chamada, então uma loja sem contrato do módulo não
+    paga o custo de montar LLM/estoque/chatbot para, no fim, só gravar
+    `falhar_turno(erro_code="sem_acesso")`."""
+    monkeypatch.setenv("REVY_LOJA_ENTITLEMENTS_ENABLED", "1")
+    seed_loja_operacional(db, loja_slug="loja-teste", state="ativa")
+    # loja ativa, mas SEM aggregate "copiloto" contratado — entitlement ausente.
+    turno = criar_turno(
+        db, loja_slug="loja-teste", usuario_id="u1", pergunta="quanto vendi?"
+    )
+
+    def _nao_deveria_ser_chamada():
+        raise AssertionError("provedor não deveria ser construído sem entitlement")
+
+    worker = CopilotoTurnosWorker(
+        db_factory=SessionLocal,
+        enabled=True,
+        llm_factory=_nao_deveria_ser_chamada,
+        estoque_factory=_nao_deveria_ser_chamada,
+        chatbot_factory=_nao_deveria_ser_chamada,
+    )
+    resultado = worker.run_once()
+    assert resultado["processados"] == 0
+
+    db.refresh(turno)
+    assert turno.estado == "erro"
+    assert turno.erro_code == "sem_acesso"

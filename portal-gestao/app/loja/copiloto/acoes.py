@@ -140,10 +140,10 @@ def _checar_rate_limit(db: Session, loja_slug: str, agora: datetime) -> None:
     """
     # Antes do COUNT, não depois: sem isto o limite é "contei e decidi", e dois
     # cliques simultâneos com o limite em N-1 passam os dois. Em Postgres a trava
-    # cobre o COUNT desta função, a checagem de escopo (garantir_escopo_loja,
-    # ~linha 203) e a releitura do veículo (estoque.obter, ~linha 211) em
-    # executar_acao — as duas são chamadas de rede à estoque-api, cada uma com
-    # timeout de 5s (EstoqueClient) — e o commit da linha pendente (~linha 255).
+    # cobre o COUNT desta função, a checagem de escopo (garantir_escopo_loja) e a
+    # releitura do veículo (estoque.obter) em executar_acao — as duas são
+    # chamadas de rede à estoque-api, cada uma com timeout de 5s
+    # (EstoqueClient) — e o commit da linha pendente em executar_acao.
     # É liberada nesse commit, antes do PATCH de rede que aplica a ação. Sob
     # Postgres isso pode manter a trava por loja presa por até ~10s de rede; não
     # há lock_timeout configurado (decisão adiada para quando Postgres estiver
