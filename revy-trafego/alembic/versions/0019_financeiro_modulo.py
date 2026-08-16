@@ -27,13 +27,35 @@ branch_labels = None
 depends_on = None
 
 
-def upgrade() -> None:
+def _trocar_check_codigo(valores: str) -> None:
+    """Troca o CHECK de `modulos_revy.codigo` sem quebrar no Postgres.
+
+    Mesma armadilha da 0018, repetida aqui de propósito: migration não importa
+    helper compartilhado, senão uma migration antiga passa a depender de código
+    que alguém pode mudar depois.
+
+    `batch_alter_table(recreate="always")` copia a tabela inteira — o caminho do
+    SQLite, que não sabe fazer ALTER de constraint. No Postgres a cópia estoura,
+    porque a FK `fk_loja_modulos_modulo_id` de `loja_modulos` depende do índice
+    da PK de `modulos_revy` (`DependentObjectsStillExist`). Achado no ensaio de
+    16/08/2026.
+    """
+    if op.get_bind().dialect.name == "postgresql":
+        op.drop_constraint("ck_modulos_revy_codigo", "modulos_revy", type_="check")
+        op.create_check_constraint(
+            "ck_modulos_revy_codigo", "modulos_revy", f"codigo IN ({valores})"
+        )
+        return
+
     with op.batch_alter_table("modulos_revy", recreate="always") as batch_op:
         batch_op.drop_constraint("ck_modulos_revy_codigo", type_="check")
         batch_op.create_check_constraint(
-            "ck_modulos_revy_codigo",
-            "codigo IN ('vendas', 'estoque', 'copiloto', 'financeiro')",
+            "ck_modulos_revy_codigo", f"codigo IN ({valores})"
         )
+
+
+def upgrade() -> None:
+    _trocar_check_codigo("'vendas', 'estoque', 'copiloto', 'financeiro'")
 
     modulos_revy = sa.table(
         "modulos_revy",
