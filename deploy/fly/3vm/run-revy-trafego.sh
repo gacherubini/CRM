@@ -1,8 +1,7 @@
 #!/bin/sh
 set -eu
 # Banco próprio: vendas chegam por projeção HTTP/outbox; nunca ler o schema do Portal.
-export REVY_TRAFEGO_DATABASE_URL="${REVY_TRAFEGO_DATABASE_URL:-sqlite:////data/revy-trafego/revy_trafego.db}"
-export PORTAL_DATABASE_URL="${PORTAL_DATABASE_URL:-sqlite:////data/portal/portal.db}"
+export REVY_TRAFEGO_DATABASE_URL="${REVY_TRAFEGO_DATABASE_URL:?REVY_TRAFEGO_DATABASE_URL obrigatorio}"
 export REVY_TRAFEGO_SECURE_COOKIE="${REVY_TRAFEGO_SECURE_COOKIE:-1}"
 export REVY_TRAFEGO_URL_PREFIX="${REVY_TRAFEGO_URL_PREFIX:-/trafego}"
 # Este processo é o único dono dos workers de mídia.

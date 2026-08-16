@@ -1,6 +1,6 @@
 #!/bin/sh
 set -eu
-export PORTAL_DATABASE_URL="${PORTAL_DATABASE_URL:-sqlite:////data/portal/portal.db}"
+export PORTAL_DATABASE_URL="${PORTAL_DATABASE_URL:?PORTAL_DATABASE_URL obrigatorio}"
 export PORTAL_ENV="${PORTAL_ENV:-production}"
 export PORTAL_SECURE_COOKIE="${PORTAL_SECURE_COOKIE:-1}"
 # Cutover B5: workers de mídia só no revy-trafego (:9010).
