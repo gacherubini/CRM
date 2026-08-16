@@ -1,11 +1,11 @@
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from decimal import Decimal
 from pathlib import Path
 
 import pytest
 from sqlalchemy import (
-    Boolean, Column, DateTime, ForeignKey, MetaData, Numeric, String, Table,
-    create_engine, insert, select,
+    Boolean, Column, Date, DateTime, ForeignKey, MetaData, Numeric, String,
+    Table, create_engine, insert, select,
 )
 
 from copiar import CargaRecusada, copiar
@@ -23,6 +23,7 @@ def _esquema():
         Column("valor", Numeric(12, 2)),
         Column("quando", DateTime(timezone=True)),
         Column("ativo", Boolean()),
+        Column("nascimento", Date()),
     )
     return md
 
@@ -98,6 +99,32 @@ def test_recusa_booleano_sujo_no_pipeline_de_verdade(tmp_path):
         )
     with pytest.raises(ValorInconvertivel):
         copiar(origem_url, destino_url, schema=None)
+
+
+def test_data_crua_chega_como_data_e_nao_como_texto_no_pipeline_de_verdade(tmp_path):
+    """A leitura crua devolve `'2026-08-16'` (string) onde a leitura tipada
+    devolvia `datetime.date`. Sem o ramo `Date` em `converter()`, a string
+    atravessa intacta e o `insert()` tenta gravar texto numa coluna `Date` —
+    quebrando aqui no SQLite (que so aceita `date` python) e, no Postgres
+    real, so por acidente de driver as vezes."""
+    origem_url, origem, md = _banco(tmp_path, "origem.db")
+    destino_url, destino, _ = _banco(tmp_path, "destino.db")
+    with origem.begin() as conn:
+        conn.execute(insert(md.tables["mae"]), [{"id": "m1"}])
+        conn.exec_driver_sql(
+            "INSERT INTO filha (id, mae_id, valor, quando, ativo, nascimento) "
+            "VALUES ('f1', 'm1', 10.0, '2026-08-16 10:00:00.000000', 1, "
+            "'2026-08-16')"
+        )
+
+    copiar(origem_url, destino_url, schema=None)
+
+    with destino.connect() as conn:
+        (gravado,) = conn.execute(
+            select(md.tables["filha"].c.nascimento)
+        ).one()
+    assert gravado == date(2026, 8, 16)
+    assert not isinstance(gravado, str)
 
 
 def test_decimal_com_mais_casas_chega_inteiro_em_converter(tmp_path):

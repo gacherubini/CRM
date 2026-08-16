@@ -94,6 +94,25 @@ def test_ler_cru_cita_os_identificadores(tmp_path: Path):
         assert list(ler_cru(conn, "order", ["id", "select"])) == [("o1", "x")]
 
 
+def test_ler_cru_dobra_aspas_embutidas_no_identificador(tmp_path: Path):
+    """`f'"{c}"'` sem escapar quebraria o SQL se um nome de coluna tivesse
+    `"` embutido. Nao vem de entrada de usuario, mas o quoting deve fechar
+    mesmo assim."""
+    url = f"sqlite:///{tmp_path / 'aspas.db'}"
+    engine = create_engine(url)
+    nome_coluna = 'nome com "aspas"'
+    with engine.begin() as conn:
+        conn.exec_driver_sql(
+            f'CREATE TABLE t (id TEXT PRIMARY KEY, "{nome_coluna.replace(chr(34), chr(34) * 2)}" TEXT)'
+        )
+        conn.exec_driver_sql(
+            f'INSERT INTO t (id, "{nome_coluna.replace(chr(34), chr(34) * 2)}") '
+            "VALUES ('l1', 'v1')"
+        )
+    with engine.connect() as conn:
+        assert list(ler_cru(conn, "t", ["id", nome_coluna])) == [("l1", "v1")]
+
+
 def test_none_atravessa_qualquer_tipo():
     assert converter(None, Numeric(12, 2)) is None
     assert converter(None, DateTime(timezone=True)) is None
@@ -116,8 +135,28 @@ def test_datetime_em_texto_e_lido_como_iso():
     assert convertido == datetime(2026, 8, 16, 10, 0, tzinfo=timezone.utc)
 
 
-def test_date_atravessa():
+def test_datetime_em_texto_invalido_vira_valorinconvertivel():
+    """`fromisoformat` cru levanta `ValueError`, nao a excecao que a ferramenta
+    declara. Sem o relance, um valor sujo estoura fora do contrato."""
+    with pytest.raises(ValorInconvertivel):
+        converter("nao e uma data", DateTime(timezone=True))
+
+
+def test_date_em_texto_iso_vira_date():
+    """Caminho VIVO: `ler_cru` devolve a string ISO que o SQLite guarda numa
+    coluna `Date`, nao o `datetime.date` que a leitura tipada produzia. Se
+    `converter` nao tiver ramo para `Date`, a string atravessa intacta."""
+    assert converter("2026-08-16", Date()) == date(2026, 8, 16)
+
+
+def test_date_ja_pronta_atravessa():
+    """Se algum dia um chamador passar um `date` ja pronto, continua passando."""
     assert converter(date(2026, 8, 16), Date()) == date(2026, 8, 16)
+
+
+def test_date_em_texto_invalido_vira_valorinconvertivel():
+    with pytest.raises(ValorInconvertivel):
+        converter("nao e uma data", Date())
 
 
 def test_numeric_de_float_passa_por_str():

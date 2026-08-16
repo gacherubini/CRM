@@ -7,10 +7,20 @@ pode importar os dois.
 """
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from decimal import Decimal
 
 from sqlalchemy import types as sqltypes
+
+
+def _quotar(identificador: str) -> str:
+    """Aspas duplas em torno do identificador, com `"` embutido dobrado.
+
+    Os nomes vêm do schema refletido, não de entrada de usuário — isso não é
+    defesa contra injeção. É só para não gerar SQL inválido se algum dia um
+    nome de tabela/coluna legítimo tiver `"` dentro.
+    """
+    return '"' + identificador.replace('"', '""') + '"'
 
 
 def ler_cru(conn, tabela: str, colunas: list[str], schema: str | None = None):
@@ -43,8 +53,12 @@ def ler_cru(conn, tabela: str, colunas: list[str], schema: str | None = None):
     vão entre aspas duplas mesmo assim — nome de coluna como `order` ou `to`
     quebraria o SQL sem elas.
     """
-    lista = ", ".join(f'"{c}"' for c in colunas)
-    alvo = f'"{tabela}"' if schema is None else f'"{schema}"."{tabela}"'
+    lista = ", ".join(_quotar(c) for c in colunas)
+    alvo = (
+        _quotar(tabela)
+        if schema is None
+        else f"{_quotar(schema)}.{_quotar(tabela)}"
+    )
     return conn.exec_driver_sql(f"SELECT {lista} FROM {alvo}")
 
 
@@ -58,13 +72,32 @@ def converter(valor, tipo):
 
     if isinstance(tipo, sqltypes.DateTime):
         if isinstance(valor, str):
-            valor = datetime.fromisoformat(valor)
+            try:
+                valor = datetime.fromisoformat(valor)
+            except ValueError as exc:
+                raise ValorInconvertivel(
+                    f"datetime fora do formato ISO: {valor!r}"
+                ) from exc
         if valor.tzinfo is None:
             # O SQLite guarda DateTime(timezone=True) sem offset e devolve
             # naive. Todo escritor do Portal e do Control usa
             # agora() = datetime.now(timezone.utc), então o que está guardado
             # É UTC: anexar tzinfo restaura a informação, não a inventa.
             valor = valor.replace(tzinfo=timezone.utc)
+        return valor
+
+    if isinstance(tipo, sqltypes.Date):
+        # `Date` e `DateTime` são irmãos na hierarquia do SQLAlchemy — nenhum
+        # é subclasse do outro (ambos herdam de `_RenderISO8601NoT`) — então
+        # este ramo não pode capturar uma coluna DateTime por engano e a
+        # posição dele aqui é só estética (perto do outro tipo temporal).
+        if isinstance(valor, str):
+            try:
+                valor = date.fromisoformat(valor)
+            except ValueError as exc:
+                raise ValorInconvertivel(
+                    f"data fora do formato ISO: {valor!r}"
+                ) from exc
         return valor
 
     if isinstance(tipo, sqltypes.Boolean):
