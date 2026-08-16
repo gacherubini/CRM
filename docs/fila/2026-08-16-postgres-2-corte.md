@@ -82,6 +82,66 @@ operacional.
 
 ---
 
+## ENSAIO FEITO — 16/08/2026. Leia antes de executar as Tasks 8 a 10.
+
+Tasks 1 a 7 estão **DONE** e mergeadas em `main`. O ensaio (Task 8) rodou inteiro
+contra o Postgres de verdade, em banco descartável `revy_ensaio`, já derrubado.
+Os dois portões terminaram em **"Sem divergencia. Corte liberado."**
+
+### Números medidos (o que a janela precisava saber)
+
+| | Portal | Control |
+|---|---|---|
+| tabelas | 26 | 31 |
+| linhas | 172 | 243 |
+| carga | **1s** | **2s** |
+| pré-voo | 0 problemas | 0 problemas |
+
+**Zero órfão de FK** nos dois — o achado que este plano dava como "quase certo"
+não existe. Os bancos são muito menores do que o arquivo sugere (610 KB e 917 KB
+são quase todo página livre e índice).
+
+**O gargalo da janela não é a carga**: são segundos. É o `alembic upgrade head`
+do zero e a conferência na tela. Latência de base, com o app ainda em SQLite:
+`/healthz` ~0,25–0,42 s, `/trafego/health/ready` ~0,22–0,30 s. Repetir depois do
+corte e comparar.
+
+### Quatro correções que o ensaio forçou — o plano abaixo está desatualizado
+
+1. **Pré-crie a tabela de versão do alembic.** Ela é `VARCHAR(32)` por padrão, e
+   **9 revisions passam disso** (2 no Portal, 7 no Control, a maior com 45). O
+   `upgrade head` morria no meio, com o DDL já aplicado. DDL em
+   `deploy/migracao-pg/README.md`. Cuidado: o Control renomeia a tabela para
+   `alembic_version_revy_trafego`.
+2. **Migrations 0018/0019 do Control** derrubavam a PK de `modulos_revy` que uma
+   FK referencia (`batch_alter_table(recreate="always")`). Corrigidas com ramo por
+   dialeto — já em `main`.
+3. **Falta um `TRUNCATE` entre o alembic e a carga.** A Task 9 Step 6 diz que as
+   tabelas ficam "criadas e vazias": **é falso**. Migrations semeiam catálogo
+   (`op.bulk_insert` em `0007`/`0018`/`0019`), então `control.modulos_revy` nasce
+   com 4 linhas e o `copiar.py` recusa a carga. SQL no README.
+4. **O portão tinha um falso positivo** que abortaria um corte bom: comparava
+   máximo lexicográfico (SQLite sobre TEXT) contra cronológico (Postgres). A
+   origem guarda datetime em dois formatos. Corrigido — já em `main`.
+
+### Erros no texto deste plano, achados ao executá-lo
+
+- `fly pg connect -a suite-pg -c "\l"` (Task 10 Step 2) **não faz o que parece**:
+  o `-c` do `fly pg connect` é `--config`, não `--command`. Não existe flag de
+  comando. O caminho que funciona é `fly ssh console -a suite-pg` e chamar
+  `/usr/lib/postgresql/18/bin/psql -h localhost -p 5433 -U postgres` com
+  `PGPASSWORD=$OPERATOR_PASSWORD` (o `SU_PASSWORD` **não** autentica `postgres`).
+- `fly ssh sftp put` **não sobrescreve** arquivo existente; apague antes.
+- `time` não existe no container (`sh: 1: time: not found`); use `date +%s`.
+
+### O que continua valendo e ainda é do dono
+
+Task 9 (senhas, roles definitivas, `fly secrets import`) e Task 10 (a janela).
+A janela derruba o `app2037` inteiro — Loja, Control **e o bot do WhatsApp** —
+e o passo 1 continua sendo anunciar.
+
+---
+
 ## File Structure
 
 | Arquivo | Responsabilidade |
