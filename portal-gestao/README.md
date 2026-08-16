@@ -9,7 +9,16 @@ Tokens das APIs ficam **somente no servidor**; o navegador recebe uma sessão as
 ## Armadilhas — leia antes de mexer
 
 - **Custo do veículo, lucro, tokens e credenciais do Motor nunca aparecem para vendedor.**
-  Aplique RBAC no backend, não escondendo item de menu.
+  Aplique RBAC no backend, não escondendo item de menu. Vale para toda superfície
+  do módulo Financeiro (telas e JSON).
+- **Despesa fixa não é rateada por venda.** Decisão do dono (16/08): ratear faria o
+  lucro de uma moto depender de quantas outras foram vendidas no mês. Quem responde
+  "essa moto pagou a estrutura?" é o **ponto de equilíbrio** em `app/loja/financeiro.py`.
+  Margem parcial não vira estimativa: sem custo em alguma venda, lucro operacional e
+  ponto de equilíbrio ficam **indisponíveis**.
+- **Apagar venda ≠ cancelar.** `cancelada` é negócio desfeito e fica no histórico;
+  `excluida` é registro errado — some de listas e totais, mas a linha permanece com
+  autoria. Consulta nova sobre `Venda` precisa excluir `status == "excluida"`.
 - **Item novo no menu do shell precisa de duas coisas:** `page_title` no template e ícone
   no dicionário `loja_icons` de `base.html`. Sem `page_title` a topbar escreve "Ajustes";
   sem ícone, `tests/test_loja_navigation.py::test_shell_nav_todos_os_itens_tem_icone` falha.
@@ -49,6 +58,7 @@ Tokens das APIs ficam **somente no servidor**; o navegador recebe uma sessão as
 | `app/web/trafego.py` | Campanhas, ROI, Pixel/CAPI, Ads e jobs de tráfego |
 | `app/web/metas.py` · `app/web/equipe.py` | Metas · equipe e acesso |
 | `app/financeiro_calc.py` | Cálculos financeiros compartilhados |
+| `app/loja/financeiro.py` + `app/web/loja_financeiro.py` | Módulo Financeiro: DRE do mês, ponto de equilíbrio, despesas fixas |
 | `app/clients/` | Clientes HTTP (Chatbot, Motor, Estoque, Revy) |
 
 Mapa de rotas (F0, incompleto para o Copiloto): [`docs/revy-loja-route-map.md`](docs/revy-loja-route-map.md).
@@ -66,8 +76,12 @@ vendedor · vendas, metas e resultados de mídia · **Grupo do estoque** e **nú
 WhatsApp** (QR efêmero, sem expor a API key da Evolution) · **Integrações** (status
 read-only Meta/Google/WA) · **Acessos bancos** (credenciais do Motor cifradas; exige
 `MOTOR_ENCRYPTION_KEY` no Motor) · **Copiloto de Vendas** (F1–F4: chat, 7 sinais, FIPE,
-ações com confirmação/desfazer, sino — flag + módulo OFF por default). Foto de veículo
-ainda é URL. Sino geral fora do Copiloto ainda não existe.
+ações com confirmação/desfazer, sino — flag + módulo OFF por default) · **editar e
+apagar venda** com o efeito propagado ao Control · **Financeiro** (lucro por moto,
+lucro operacional do mês, ponto de equilíbrio e despesas fixas recorrentes — flag +
+módulo OFF por default). Foto de veículo ainda é URL. Sino geral fora do Copiloto
+ainda não existe. A página Hoje do Copiloto foi removida em 16/08: o sino cobre os
+sinais.
 
 ## Flags (defaults de código OFF)
 
@@ -82,6 +96,7 @@ entitlements, atendimento e WhatsApp por secrets; redirect legado segue off.
 | `REVY_LOJA_WHATSAPP_ENABLED` | Tela de números de WhatsApp em Ajustes |
 | `REVY_LOJA_REDIRECT_LEGACY` | 303 de paths legados → shell (exige shell on) |
 | `REVY_LOJA_COPILOTO_ENABLED` | Seção e rotas `/app/loja/copiloto` (exige shell + módulo) |
+| `REVY_LOJA_FINANCEIRO_ENABLED` | Seção e rotas `/app/loja/financeiro` (exige shell + módulo) |
 | `SELLER_AI_ENABLED` | Seller AI (F7+); ainda não altera rotas |
 
 Integração com o Revy Control: `REVY_TRAFEGO_URL`, `REVY_TRAFEGO_SERVICE_TOKEN`,

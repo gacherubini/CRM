@@ -76,7 +76,7 @@ class ModuloRevy(Base):
     __tablename__ = "modulos_revy"
     __table_args__ = (
         CheckConstraint(
-            "codigo IN ('vendas', 'estoque', 'copiloto')",
+            "codigo IN ('vendas', 'estoque', 'copiloto', 'financeiro')",
             name="ck_modulos_revy_codigo",
         ),
         UniqueConstraint(

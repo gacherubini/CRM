@@ -66,6 +66,7 @@ def montar_payload(
     modelo: str,
     esforco: EsforcoLLM,
     max_tokens: int,
+    stream: bool = False,
 ) -> dict[str, Any]:
     """Corpo do request. Função pura — testável sem rede."""
     corpo: dict[str, Any] = {
@@ -112,6 +113,11 @@ def montar_payload(
             }
             for f in ferramentas
         ]
+    if stream:
+        corpo["stream"] = True
+        # Sem isto o provedor nao manda usage no fim do stream e o turno
+        # perde a contabilidade de token (teto_tokens do runner ficaria cego).
+        corpo["stream_options"] = {"include_usage": True}
     return corpo
 
 
@@ -148,13 +154,14 @@ class DeepSeekClient:
         *,
         esforco: EsforcoLLM = "low",
         max_tokens: int = 800,
+        ao_texto: Callable[[str], None] | None = None,
     ) -> RespostaLLM:
         if not self.configurado:
             raise LLMIndisponivel("provedor de LLM não configurado")
 
         payload = montar_payload(
             mensagens, ferramentas, modelo=self.modelo, esforco=esforco,
-            max_tokens=max_tokens,
+            max_tokens=max_tokens, stream=ao_texto is not None,
         )
         headers = {"Authorization": f"Bearer {self.api_key}"}
         inicio = time.monotonic()
@@ -162,6 +169,7 @@ class DeepSeekClient:
         ultimo_status: int | None = None
         ultimo_corpo_erro: str | None = None
         for tentativa in range(self.retries + 1):
+            consumiu_corpo = False
             try:
                 with httpx.Client(
                     base_url=self.base_url,
@@ -169,32 +177,65 @@ class DeepSeekClient:
                     timeout=self.timeout,
                     transport=self._transport,
                 ) as client:
-                    resposta = client.post("/chat/completions", json=payload)
-                ultimo_status = resposta.status_code
-                if resposta.status_code == 200:
-                    try:
-                        corpo = resposta.json()
-                    except ValueError as exc:
-                        raise RespostaLLMInvalida("resposta com corpo inválido") from exc
-                    saida = self._interpretar(corpo)
-                    logger.info(
-                        "copiloto_llm modelo=%s esforco=%s in=%s out=%s ms=%s",
-                        self.modelo,
-                        esforco,
-                        saida.tokens_entrada,
-                        saida.tokens_saida,
-                        int((time.monotonic() - inicio) * 1000),
-                    )
-                    return saida
-                if resposta.status_code not in STATUS_QUE_REPETEM:
-                    if 400 <= resposta.status_code < 500:
-                        # Só o corpo da RESPOSTA (nunca o payload que mandamos
-                        # nem a chave): é a mensagem de erro do provedor —
-                        # p.ex. "reasoning_effort não suportado" — que
-                        # transforma um 400 mudo num log diagnosticável.
-                        ultimo_corpo_erro = _resumo_corpo_resposta(resposta)
-                    break  # 4xx de validação: repetir só queima token
+                    if ao_texto is not None:
+                        with client.stream(
+                            "POST", "/chat/completions", json=payload
+                        ) as resposta:
+                            ultimo_status = resposta.status_code
+                            if resposta.status_code == 200:
+                                # A partir daqui o corpo entra em jogo: retry
+                                # queimaria token e duplicaria ao_texto.
+                                consumiu_corpo = True
+                                saida = self._consumir_stream(resposta, ao_texto)
+                                logger.info(
+                                    "copiloto_llm modelo=%s esforco=%s in=%s out=%s ms=%s",
+                                    self.modelo,
+                                    esforco,
+                                    saida.tokens_entrada,
+                                    saida.tokens_saida,
+                                    int((time.monotonic() - inicio) * 1000),
+                                )
+                                return saida
+                            if resposta.status_code not in STATUS_QUE_REPETEM:
+                                if 400 <= resposta.status_code < 500:
+                                    # Stream ainda NAO lido: sem o read() o
+                                    # .text levanta ResponseNotRead, o
+                                    # except Exception de _resumo_corpo_resposta
+                                    # engole e o log vira o "400 mudo" que
+                                    # aquela funcao existe para evitar. So no
+                                    # 4xx: em 200 quem le e o _consumir_stream.
+                                    resposta.read()
+                                    ultimo_corpo_erro = _resumo_corpo_resposta(resposta)
+                                break
+                    else:
+                        resposta = client.post("/chat/completions", json=payload)
+                        ultimo_status = resposta.status_code
+                        if resposta.status_code == 200:
+                            try:
+                                corpo = resposta.json()
+                            except ValueError as exc:
+                                raise RespostaLLMInvalida("resposta com corpo inválido") from exc
+                            saida = self._interpretar(corpo)
+                            logger.info(
+                                "copiloto_llm modelo=%s esforco=%s in=%s out=%s ms=%s",
+                                self.modelo,
+                                esforco,
+                                saida.tokens_entrada,
+                                saida.tokens_saida,
+                                int((time.monotonic() - inicio) * 1000),
+                            )
+                            return saida
+                        if resposta.status_code not in STATUS_QUE_REPETEM:
+                            if 400 <= resposta.status_code < 500:
+                                # Só o corpo da RESPOSTA (nunca o payload que mandamos
+                                # nem a chave): é a mensagem de erro do provedor —
+                                # p.ex. "reasoning_effort não suportado" — que
+                                # transforma um 400 mudo num log diagnosticável.
+                                ultimo_corpo_erro = _resumo_corpo_resposta(resposta)
+                            break  # 4xx de validação: repetir só queima token
             except httpx.HTTPError:
+                if consumiu_corpo:
+                    break
                 ultimo_status = None
             if tentativa < self.retries:
                 self._sleeper(self.backoff * (2**tentativa))
@@ -211,6 +252,60 @@ class DeepSeekClient:
                 "copiloto_llm falha modelo=%s status=%s", self.modelo, ultimo_status
             )
         raise LLMIndisponivel(f"provedor de LLM indisponível (status={ultimo_status})")
+
+    def _consumir_stream(
+        self, resposta: httpx.Response, ao_texto: Callable[[str], None]
+    ) -> RespostaLLM:
+        """Monta RespostaLLM a partir do SSE. Deltas de tool_call chegam
+        fatiados e SEM repetir id/nome — a montagem é por ``index``, nunca
+        por ordem de chegada."""
+        texto = ""
+        finish = ""
+        entrada = saida = 0
+        parciais: dict[int, dict[str, str]] = {}
+        for linha in resposta.iter_lines():
+            if not linha.startswith("data:"):
+                continue
+            dado = linha[5:].strip()
+            if dado == "[DONE]":
+                break
+            try:
+                pedaco = json.loads(dado)
+            except ValueError as exc:
+                raise RespostaLLMInvalida("chunk SSE inválido") from exc
+            uso = pedaco.get("usage") or {}
+            if uso:
+                entrada = int(uso.get("prompt_tokens") or 0)
+                saida = int(uso.get("completion_tokens") or 0)
+            for escolha in pedaco.get("choices") or []:
+                if escolha.get("finish_reason"):
+                    finish = str(escolha["finish_reason"])
+                delta = escolha.get("delta") or {}
+                if delta.get("content"):
+                    texto += delta["content"]
+                    ao_texto(texto)
+                for tc in delta.get("tool_calls") or []:
+                    slot = parciais.setdefault(
+                        int(tc.get("index") or 0), {"id": "", "nome": "", "args": ""}
+                    )
+                    if tc.get("id"):
+                        slot["id"] = str(tc["id"])
+                    funcao = tc.get("function") or {}
+                    if funcao.get("name"):
+                        slot["nome"] = str(funcao["name"])
+                    if funcao.get("arguments"):
+                        slot["args"] += funcao["arguments"]
+        chamadas = tuple(
+            ToolCall(id=s["id"], nome=s["nome"], argumentos=parse_argumentos(s["args"]))
+            for _, s in sorted(parciais.items())
+        )
+        return RespostaLLM(
+            texto=texto or None,
+            tool_calls=chamadas,
+            tokens_entrada=entrada,
+            tokens_saida=saida,
+            finish_reason=finish,
+        )
 
     def _interpretar(self, bruto: dict) -> RespostaLLM:
         try:

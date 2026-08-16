@@ -5,10 +5,6 @@ from conftest import csrf_da_resposta, login
 
 from app.config import settings
 from app.db import SessionLocal
-from app.loja.sales_overview import (
-    build_sales_overview,
-    pendencias_bancos_nao_configurados,
-)
 from app.auth import hash_senha
 from app.models import Usuario
 
@@ -265,27 +261,3 @@ def test_upsert_nao_reexibe_senha_no_html(client, monkeypatch, motor_fake):
     assert resposta.status_code == 200
     assert senha not in resposta.text
     assert "SENHA-SECRETA" not in resposta.text
-
-
-def test_pendencia_bancos_nao_configurados_helper():
-    itens = pendencias_bancos_nao_configurados(["Santander", "FonteCred"])
-    assert len(itens) == 1
-    assert itens[0].codigo == "bancos_nao_configurados"
-    assert "Santander" in itens[0].texto
-    assert itens[0].href == "/app/financeiras"
-    assert pendencias_bancos_nao_configurados([]) == []
-    assert pendencias_bancos_nao_configurados(None) == []
-
-
-def test_sales_overview_inclui_pendencia_banco(client, monkeypatch):
-    _enable_shell(monkeypatch)
-    db = SessionLocal()
-    overview = build_sales_overview(
-        db,
-        loja_slug="loja-teste",
-        papel="dono",
-        bancos_nao_configurados=["Santander"],
-    )
-    db.close()
-    codigos = [p.codigo for p in overview.pendencias]
-    assert "bancos_nao_configurados" in codigos

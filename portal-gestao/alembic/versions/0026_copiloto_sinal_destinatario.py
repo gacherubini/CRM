@@ -1,7 +1,7 @@
 """copiloto_sinal: destinatario opcional (sino 1:1 do Modo 2)
 
-Revision ID: 0024_copiloto_sinal_destinatario
-Revises: 0023_copiloto_sinal_visto
+Revision ID: 0026_copiloto_sinal_destinatario
+Revises: 0025_despesas_fixas_loja
 
 O sino sempre foi da loja: quem tem acesso ve o sinal, e "visto" e por
 pessoa (0023). A oferta 1:1 do rodizio (spec dos dois modos, §5.7) precisa
@@ -16,8 +16,8 @@ import sqlalchemy as sa
 from alembic import op
 
 
-revision = "0024_copiloto_sinal_destinatario"
-down_revision = "0023_copiloto_sinal_visto"
+revision = "0026_copiloto_sinal_destinatario"
+down_revision = "0025_despesas_fixas_loja"
 branch_labels = None
 depends_on = None
 

@@ -1,0 +1,134 @@
+{% extends "base.html" %}
+{% block title %}Editar venda — Revy Loja{% endblock %}
+{% block page_title %}Editar venda{% endblock %}
+{% block content %}
+{% set confirmada = venda.status == 'confirmada' %}
+<div class="page-heading">
+  <div>
+    <a class="back-link" href="/app/loja/vendas/lista">← Voltar às vendas</a>
+    <span class="eyebrow">Vendas</span>
+    <h1>{{ venda.descricao }}</h1>
+    <p>
+      {% if confirmada %}
+      Venda confirmada. Dá para corrigir os valores — o resultado é reenviado ao Revy Control.
+      O vínculo com lead e veículo não muda: ele virou origem de campanha e baixa de estoque na confirmação.
+      {% else %}
+      Venda ainda não confirmada. Nada saiu da Loja, então tudo pode ser corrigido.
+      {% endif %}
+    </p>
+  </div>
+</div>
+
+{% if aviso_erro == 'valor' %}<div class="alert error" role="alert">Valor inválido. Use um número maior que zero.</div>{% endif %}
+{% if aviso_erro == 'descricao' %}<div class="alert error" role="alert">A descrição não pode ficar em branco.</div>{% endif %}
+{% if aviso_erro == 'categoria' %}<div class="alert error" role="alert">Escolha uma categoria de custo.</div>{% endif %}
+{% if aviso_erro == 'acao' %}<div class="alert error" role="alert">Não foi possível agir sobre esta venda.</div>{% endif %}
+{% if aviso_erro == 'custo-lancado' %}<div class="alert success" role="status">Custo lançado.</div>{% endif %}
+{% if aviso_erro == 'custo-removido' %}<div class="alert success" role="status">Custo removido.</div>{% endif %}
+
+<form method="post" action="/app/loja/vendas/{{ venda.id }}/editar" class="form-layout">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  <section class="panel form-section">
+    <div class="panel-heading">
+      <div><span class="mono-label">Venda</span><h2>Valores</h2></div>
+    </div>
+    <div class="form-grid">
+      {% if 'descricao' in campos %}
+      <label class="wide">Descrição<input name="descricao" value="{{ venda.descricao }}" required></label>
+      {% endif %}
+      <label>Preço de venda
+        <input type="number" step="0.01" min="0" name="preco_venda" value="{{ venda.preco_venda }}" required>
+      </label>
+      <label>Custo do veículo
+        <input type="number" step="0.01" min="0" name="custo_veiculo" value="{{ venda.custo_veiculo if venda.custo_veiculo is not none else '' }}">
+        <small class="muted">Em branco = custo ainda desconhecido. A margem fica marcada como incompleta.</small>
+      </label>
+      {% if 'lead_ref' in campos %}
+      <label>Referência do lead<input name="lead_ref" value="{{ venda.lead_ref or '' }}"></label>
+      {% endif %}
+      {% if 'veiculo_ref' in campos %}
+      <label>Referência do veículo<input name="veiculo_ref" value="{{ venda.veiculo_ref or '' }}"></label>
+      {% endif %}
+    </div>
+    {% if confirmada %}
+    <p class="muted">
+      Lead: <strong>{{ venda.lead_ref or '—' }}</strong> ·
+      Veículo: <strong>{{ venda.veiculo_ref or '—' }}</strong> — fixos desde a confirmação.
+    </p>
+    {% endif %}
+  </section>
+  <div class="heading-actions">
+    <button class="button primary" type="submit">Salvar alterações</button>
+    <a class="button ghost" href="/app/loja/vendas/lista">Cancelar</a>
+  </div>
+</form>
+
+<section class="panel" aria-labelledby="bloco-custos">
+  <div class="panel-heading">
+    <div>
+      <span class="mono-label">Custos diretos</span>
+      <h2 id="bloco-custos">O que mais saiu do bolso nesta venda</h2>
+    </div>
+  </div>
+  {% if venda.custos_diretos %}
+  <ul class="list-rows">
+    {% for custo in venda.custos_diretos %}
+    <li>
+      <div>
+        <strong>{{ custo.categoria | capitalize }}</strong>
+        <small class="muted">{{ formatar_brl(custo.valor) }}</small>
+      </div>
+      <form method="post" action="/app/loja/vendas/{{ venda.id }}/custos/{{ custo.id }}/remover">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <button class="button ghost" type="submit">Remover</button>
+      </form>
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <div class="empty">
+    <strong>Nenhum custo direto lançado.</strong>
+    <p>Frete, documentação e comissão entram aqui e saem da margem desta moto.</p>
+  </div>
+  {% endif %}
+  <form method="post" action="/app/loja/vendas/{{ venda.id }}/custos" class="filter-bar">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <label>Categoria
+      <select name="categoria" required>
+        {% for c in categorias %}<option value="{{ c }}">{{ c | capitalize }}</option>{% endfor %}
+      </select>
+    </label>
+    <label>Valor
+      <input type="number" step="0.01" min="0" name="valor" required placeholder="0,00">
+    </label>
+    <button class="button secondary" type="submit">Lançar custo</button>
+  </form>
+</section>
+
+<section class="panel" aria-labelledby="bloco-excluir">
+  <div class="panel-heading">
+    <div><span class="mono-label">Excluir</span><h2 id="bloco-excluir">Apagar esta venda</h2></div>
+  </div>
+  <div class="panel-body">
+    <p>
+      Use isto quando a venda foi <strong>registrada por engano</strong>. Ela some das listas,
+      dos totais e do financeiro. Quem apagou e quando fica gravado.
+    </p>
+    <p class="muted">
+      Se o cliente desistiu de um negócio que existiu de verdade, o certo é
+      <a href="/app/loja/vendas/lista">cancelar com motivo</a> — cancelamento fica no histórico.
+    </p>
+    {% if confirmada %}
+    <p class="muted">
+      Esta venda já foi confirmada: o Revy Control zera a projeção dela. O evento de
+      compra que já tiver sido enviado à Meta <strong>não volta atrás</strong> — se o envio
+      ainda não saiu, ele é cancelado.
+    </p>
+    {% endif %}
+    <form method="post" action="/app/loja/vendas/{{ venda.id }}/excluir">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <button class="button ghost" type="submit">Excluir venda</button>
+    </form>
+  </div>
+</section>
+{% endblock %}

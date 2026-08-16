@@ -10,7 +10,7 @@ from contextlib import asynccontextmanager
 from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Any, Mapping
 from zoneinfo import ZoneInfo
 
 from fastapi import Depends, FastAPI, Form, Header, Request, Response
@@ -108,6 +108,7 @@ from app.config import (
     revy_loja_shell_enabled,
     settings,
 )
+from app.loja.navigation import nav_item_is_active
 from app.loja.redirects import resolve_legacy_redirect, should_consider_request
 from app.web.loja_shell import check_module_access, router as loja_shell_router
 from app.web.owner_invitations import router as owner_invitations_router
@@ -336,6 +337,9 @@ templates.env.globals["mascarar_cpf"] = mascarar_cpf
 templates.env.globals["formatar_brl"] = formatar_brl
 templates.env.globals["formatar_percentual"] = formatar_percentual
 templates.env.globals["formatar_duracao"] = formatar_duracao
+# O base.html tinha uma cópia desta regra em Jinja e a cópia esqueceu a exceção
+# de Vendas — "Resultado" acendia junto com a lista de vendas. Uma fonte só.
+templates.env.globals["nav_item_is_active"] = nav_item_is_active
 
 @asynccontextmanager
 async def _lifespan(_app: FastAPI):
@@ -729,7 +733,12 @@ def dashboard(
                 config=config_meta,
                 campanhas=campanhas_ob,
                 gastos=gastos_ob,
-                vendas=db.query(Venda).filter(Venda.loja_slug == usuario.loja_slug).all(),
+                vendas=db.query(Venda)
+                .filter(
+                    Venda.loja_slug == usuario.loja_slug,
+                    Venda.status != "excluida",
+                )
+                .all(),
                 outboxes=outboxes,
             )
         periodo_resultados = {
@@ -1379,6 +1388,8 @@ async def conversas_handoff(
 
 
 CATEGORIAS_CUSTO = ["documentacao", "frete", "comissao", "outros"]
+# "excluida" fica fora: é estado terminal aplicado pelo dono, não opção de
+# filtro nem de formulário. Ver executar_exclusao_venda.
 STATUS_VENDA = ["registrada", "confirmada", "cancelada"]
 TIPOS_META = {
     "quantidade": "Quantidade de vendas",
@@ -1462,7 +1473,10 @@ def vendas_lista(
     if not usuario:
         return redirecionar_login()
     d_inicio, d_fim = periodo_padrao(inicio, fim)
-    consulta = db.query(Venda).filter(Venda.loja_slug == usuario.loja_slug)
+    consulta = db.query(Venda).filter(
+        Venda.loja_slug == usuario.loja_slug,
+        Venda.status != "excluida",
+    )
     if not pode_ver_financeiro(usuario):
         consulta = consulta.filter(Venda.vendedor_email == usuario.email)
     if status in STATUS_VENDA:
@@ -1642,7 +1656,7 @@ def executar_confirmacao_venda(
     if not provisioning.allows_processing(db, usuario.loja_slug):
         return "erro=loja-nao-operacional"
     venda = db.query(Venda).filter(Venda.id == venda_id, Venda.loja_slug == usuario.loja_slug).first()
-    if not venda or venda.status == "cancelada":
+    if not venda or venda.status in {"cancelada", "excluida"}:
         return "erro=acao"
     if venda.status == "confirmada":
         return "ok=ja-confirmada"
@@ -1715,7 +1729,7 @@ def executar_cancelamento_venda(
     """
     venda = db.query(Venda).filter(Venda.id == venda_id, Venda.loja_slug == usuario.loja_slug).first()
     motivo = (motivo or "").strip()
-    if not venda:
+    if not venda or venda.status == "excluida":
         return "erro=acao"
     if not motivo:
         return "erro=motivo"
@@ -1729,6 +1743,180 @@ def executar_cancelamento_venda(
     if venda.confirmada_em and venda.veiculo_ref:
         return "ok=cancelada-estoque-mantido"
     return "ok=cancelada"
+
+
+# Campos editáveis por status. Venda confirmada já tirou snapshot de
+# atribuição (campanha/UTM) e baixou o veículo do estoque: trocar lead ou
+# veículo reescreveria a origem de uma venda que o Control já contabilizou
+# numa campanha, e deixaria uma moto baixada e outra não. Valores, sim — é
+# para isso que o trilho `venda_atualizada` existe.
+CAMPOS_EDITAVEIS_VALORES = ("preco_venda", "custo_veiculo")
+CAMPOS_EDITAVEIS_REGISTRADA = CAMPOS_EDITAVEIS_VALORES + (
+    "descricao",
+    "lead_ref",
+    "veiculo_ref",
+)
+
+
+def _venda_da_loja(db: Session, usuario: Usuario, venda_id: str) -> Venda | None:
+    """loja_slug da sessão: id de venda sozinho nunca autoriza nada."""
+    return (
+        db.query(Venda)
+        .filter(Venda.id == venda_id, Venda.loja_slug == usuario.loja_slug)
+        .first()
+    )
+
+
+def campos_editaveis(venda: Venda) -> tuple[str, ...]:
+    if venda.status == "registrada":
+        return CAMPOS_EDITAVEIS_REGISTRADA
+    if venda.status == "confirmada":
+        return CAMPOS_EDITAVEIS_VALORES
+    return ()
+
+
+def executar_edicao_venda(
+    db: Session,
+    usuario: Usuario,
+    venda_id: str,
+    form: Mapping[str, Any],
+) -> str:
+    """Aplica só os campos que o status permite; ignora o resto em silêncio.
+
+    Ignorar em vez de recusar é deliberado: o formulário da venda confirmada
+    nem renderiza os campos de vínculo, então um `lead_ref` chegando aqui é
+    requisição forjada, não engano de quem preencheu.
+    """
+    venda = _venda_da_loja(db, usuario, venda_id)
+    if not venda or venda.status in {"cancelada", "excluida"}:
+        return "erro=acao"
+
+    permitidos = campos_editaveis(venda)
+    mudou = False
+    for campo in permitidos:
+        if campo not in form:
+            continue
+        bruto = form.get(campo)
+        if campo in {"preco_venda", "custo_veiculo"}:
+            texto = (str(bruto) if bruto is not None else "").strip()
+            if not texto:
+                # Custo em branco volta a ser "desconhecido"; preço não pode
+                # sumir — sem ele a venda perde a única cifra obrigatória.
+                if campo == "custo_veiculo" and venda.custo_veiculo is not None:
+                    venda.custo_veiculo = None
+                    mudou = True
+                continue
+            try:
+                valor = dinheiro(texto)
+            except (InvalidOperation, TypeError):
+                return "erro=valor"
+            if valor <= 0 and campo == "preco_venda":
+                return "erro=valor"
+            if getattr(venda, campo) != valor:
+                setattr(venda, campo, valor)
+                mudou = True
+            continue
+        texto = (str(bruto) if bruto is not None else "").strip()
+        if campo == "descricao" and not texto:
+            return "erro=descricao"
+        novo = texto or None
+        if getattr(venda, campo) != novo:
+            setattr(venda, campo, novo)
+            mudou = True
+
+    if not mudou:
+        return "ok=editada"
+
+    venda.atualizada_em = agora()
+    # Só venda confirmada existe como projeção no Control; registrada nunca
+    # foi enviada, e mandar evento dela criaria projeção do nada.
+    if settings.revy_trafego_venda_events_enabled and venda.status == "confirmada":
+        enfileirar_venda_atualizada(db, venda)
+    try:
+        db.commit()
+    except SQLAlchemyError:
+        db.rollback()
+        return "erro=acao"
+    return "ok=editada"
+
+
+def executar_exclusao_venda(db: Session, usuario: Usuario, venda_id: str) -> str:
+    """Exclusão lógica: some da tela, permanece no banco com autoria.
+
+    Diferente de cancelar — ver o docstring da migration 0024. Não reabre
+    estoque, pela mesma regra do cancelamento: o veículo baixado continua
+    baixado até alguém decidir o contrário no Estoque.
+    """
+    venda = _venda_da_loja(db, usuario, venda_id)
+    if not venda or venda.status == "excluida":
+        return "erro=acao"
+
+    venda.status = "excluida"
+    venda.excluida_por = usuario.email
+    venda.excluida_em = agora()
+    venda.atualizada_em = venda.excluida_em
+    if settings.revy_trafego_venda_events_enabled:
+        enfileirar_venda_atualizada(db, venda)
+    try:
+        db.commit()
+    except SQLAlchemyError:
+        db.rollback()
+        return "erro=acao"
+    return "ok=excluida"
+
+
+def executar_custo_direto_novo(
+    db: Session, usuario: Usuario, venda_id: str, categoria: str, valor_bruto: str
+) -> str:
+    """Lançar custo depois da venda — antes só cabia um, no ato do registro.
+
+    É o que faz a margem parar de aparecer como "Incompleto" quando o frete
+    ou a comissão só apareceram na semana seguinte.
+    """
+    venda = _venda_da_loja(db, usuario, venda_id)
+    if not venda or venda.status in {"cancelada", "excluida"}:
+        return "erro=acao"
+    if categoria not in CATEGORIAS_CUSTO:
+        return "erro=categoria"
+    try:
+        valor = dinheiro(valor_bruto)
+    except (InvalidOperation, TypeError):
+        return "erro=valor"
+    if valor <= 0:
+        return "erro=valor"
+
+    venda.custos_diretos.append(VendaCustoDireto(categoria=categoria, valor=valor))
+    venda.atualizada_em = agora()
+    if settings.revy_trafego_venda_events_enabled and venda.status == "confirmada":
+        enfileirar_venda_atualizada(db, venda)
+    try:
+        db.commit()
+    except SQLAlchemyError:
+        db.rollback()
+        return "erro=acao"
+    return "ok=custo-lancado"
+
+
+def executar_custo_direto_remocao(
+    db: Session, usuario: Usuario, venda_id: str, custo_id: str
+) -> str:
+    venda = _venda_da_loja(db, usuario, venda_id)
+    if not venda or venda.status in {"cancelada", "excluida"}:
+        return "erro=acao"
+    custo = next((c for c in venda.custos_diretos if c.id == custo_id), None)
+    if custo is None:
+        return "erro=acao"
+
+    venda.custos_diretos.remove(custo)
+    venda.atualizada_em = agora()
+    if settings.revy_trafego_venda_events_enabled and venda.status == "confirmada":
+        enfileirar_venda_atualizada(db, venda)
+    try:
+        db.commit()
+    except SQLAlchemyError:
+        db.rollback()
+        return "erro=acao"
+    return "ok=custo-removido"
 
 
 @app.post("/app/vendas/{venda_id}/confirmar")
@@ -1781,6 +1969,7 @@ def vendedor_dashboard(
         for venda in db.query(Venda).filter(
             Venda.loja_slug == usuario.loja_slug,
             Venda.vendedor_email == usuario.email,
+            Venda.status != "excluida",
         ).order_by(Venda.criada_em.desc()).all()
         if d_inicio <= _data(venda.criada_em) <= d_fim
     ]
@@ -2394,6 +2583,7 @@ from app.web import metas as metas_routes  # noqa: E402
 from app.web import simulacoes as simulacoes_routes  # noqa: E402
 from app.web import trafego as trafego_routes  # noqa: E402
 from app.web import loja_copiloto  # noqa: E402
+from app.web import loja_financeiro  # noqa: E402
 from app.web import loja_estoque  # noqa: E402
 from app.web import loja_vendas  # noqa: E402
 from app.web import loja_whatsapp  # noqa: E402
@@ -2409,6 +2599,7 @@ app.include_router(simulacoes_routes.router)
 app.include_router(trafego_routes.router)
 # Revy Loja modules (flags default off).
 app.include_router(loja_copiloto.router)
+app.include_router(loja_financeiro.router)
 app.include_router(loja_estoque.router)
 app.include_router(loja_vendas.router)
 app.include_router(loja_whatsapp.router)

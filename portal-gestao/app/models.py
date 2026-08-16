@@ -116,12 +116,18 @@ class Venda(Base):
     descricao: Mapped[str] = mapped_column(String(240))
     preco_venda: Mapped[Decimal] = mapped_column(Numeric(12, 2))
     custo_veiculo: Mapped[Optional[Decimal]] = mapped_column(Numeric(12, 2), nullable=True)
+    # registrada | confirmada | cancelada | excluida.
+    # "cancelada" é negócio desfeito e continua visível no histórico;
+    # "excluida" é registro que nunca deveria ter existido — some de toda
+    # lista e de todo total, mas a linha fica com autoria e data.
     status: Mapped[str] = mapped_column(String(20), default="registrada", index=True)
     motivo_cancelamento: Mapped[Optional[str]] = mapped_column(String(240), nullable=True)
     criada_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=agora)
     atualizada_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=agora)
     confirmada_por: Mapped[Optional[str]] = mapped_column(String(320), nullable=True)
     confirmada_em: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    excluida_por: Mapped[Optional[str]] = mapped_column(String(320), nullable=True)
+    excluida_em: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     # Snapshot de atribuição no confirmar (estável mesmo se UTM do lead mudar depois).
     campanha_id_first: Mapped[Optional[str]] = mapped_column(String(36), nullable=True, index=True)
     campanha_id_last: Mapped[Optional[str]] = mapped_column(String(36), nullable=True, index=True)
@@ -143,6 +149,61 @@ class VendaCustoDireto(Base):
     criada_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=agora)
 
     venda: Mapped["Venda"] = relationship(back_populates="custos_diretos")
+
+
+class DespesaFixaLoja(Base):
+    """Despesa recorrente da estrutura da loja (aluguel, salários, contador).
+
+    NÃO é rateada por venda — decisão do dono em 2026-08-16. Ratear faria o
+    lucro de uma moto depender de quantas outras foram vendidas no mês e mudar
+    retroativamente a cada venda nova. O resultado do mês desconta as despesas
+    de uma vez; o ponto de equilíbrio responde "quantas motos pagam a casa".
+
+    Não existe campo ``ativa``: um booleano de ativação e uma competência final
+    dizem a mesma coisa e uma hora discordam. Desativar grava
+    ``fim_competencia`` = mês corrente, e o mês fechado continua correto quando
+    alguém revisita o passado.
+    """
+
+    __tablename__ = "despesa_fixa_loja"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=novo_id)
+    loja_slug: Mapped[str] = mapped_column(String(120), index=True)
+    categoria: Mapped[str] = mapped_column(String(40))
+    descricao: Mapped[str] = mapped_column(String(240))
+    valor_mensal: Mapped[Decimal] = mapped_column(Numeric(12, 2))
+    # 'YYYY-MM': rótulo de mês, sem fuso e sem ambiguidade de primeiro/último dia.
+    inicio_competencia: Mapped[str] = mapped_column(String(7))
+    fim_competencia: Mapped[Optional[str]] = mapped_column(String(7), nullable=True)
+    criada_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=agora)
+    atualizada_em: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=agora, onupdate=agora
+    )
+
+    ajustes: Mapped[list["DespesaFixaAjuste"]] = relationship(
+        back_populates="despesa", cascade="all, delete-orphan"
+    )
+
+
+class DespesaFixaAjuste(Base):
+    """Valor diferente para UM mês, sem tocar no cadastro recorrente."""
+
+    __tablename__ = "despesa_fixa_ajuste"
+    __table_args__ = (
+        UniqueConstraint(
+            "despesa_id", "competencia", name="uq_despesa_fixa_ajuste_mes"
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=novo_id)
+    despesa_id: Mapped[str] = mapped_column(
+        ForeignKey("despesa_fixa_loja.id", ondelete="CASCADE"), index=True
+    )
+    competencia: Mapped[str] = mapped_column(String(7))
+    valor: Mapped[Decimal] = mapped_column(Numeric(12, 2))
+    criada_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=agora)
+
+    despesa: Mapped["DespesaFixaLoja"] = relationship(back_populates="ajustes")
 
 
 class Meta(Base):

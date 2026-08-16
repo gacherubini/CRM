@@ -11,7 +11,7 @@ Aquisição nunca inventa investimento zero nem ROAS infinito.
 """
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass, field
+from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta
 from decimal import Decimal, ROUND_HALF_UP
 from typing import Any, Callable, Mapping
@@ -25,11 +25,10 @@ from app.financeiro_calc import (
     data_api,
     funil_periodo,
     lucro_bruto_venda,
-    metas_view_periodo,
     periodo_padrao,
 )
 from app.funil_eventos import resumo_funil
-from app.models import Meta, Venda
+from app.models import Venda
 from app.resultados_dono import resumo_from_api, resumo_periodo
 from app.roi_calc import calcular_roi_loja, totais_roi
 
@@ -41,12 +40,6 @@ PAPEIS_VENDEDOR = frozenset({"vendedor"})
 PAPEIS_AUTORIZADOS = PAPEIS_VISAO_COMPLETA | PAPEIS_VENDEDOR
 
 
-@dataclass(frozen=True)
-class PendenciaAcao:
-    codigo: str
-    texto: str
-    href: str
-    quantidade: int = 1
 
 
 @dataclass(frozen=True)
@@ -108,10 +101,6 @@ class SalesOverview:
     qtd_vendas: int = 0
     vendas_status: str = "vazio"  # ok | vazio | parcial | erro
 
-    # Metas
-    metas: list[dict[str, Any]] = field(default_factory=list)
-    metas_status: str = "vazio"
-
     # Leads / funil
     leads_count: int | None = None
     funil: dict[str, Any] | None = None
@@ -127,9 +116,6 @@ class SalesOverview:
     # Por onde as pessoas chegam — guard próprio: a fonte é o lead do Chatbot,
     # não o gasto da Meta. Se a fonte de mídia cair, isto continua respondível.
     aquisicao_origens: list[dict[str, Any]] = field(default_factory=list)
-
-    # Pendências acionáveis derivadas dos dados atuais
-    pendencias: list[PendenciaAcao] = field(default_factory=list)
 
     # Mensagem global opcional
     mensagem: str | None = None
@@ -150,8 +136,6 @@ class SalesOverview:
             "vendas_lucro_incompleto": self.vendas_lucro_incompleto,
             "qtd_vendas": self.qtd_vendas,
             "vendas_status": self.vendas_status,
-            "metas": _serializar_metas(self.metas),
-            "metas_status": self.metas_status,
             "leads_count": self.leads_count,
             "funil": self.funil,
             "funil_status": self.funil_status,
@@ -160,7 +144,6 @@ class SalesOverview:
             "aquisicao_campanhas": _serializar_linhas_midia(self.aquisicao_campanhas),
             "aquisicao_canais": _serializar_linhas_midia(self.aquisicao_canais),
             "aquisicao_origens": _serializar_origens(self.aquisicao_origens),
-            "pendencias": [asdict(p) for p in self.pendencias],
             "mensagem": self.mensagem,
         }
 
@@ -383,15 +366,6 @@ def _linhas_midia_da_api(payload: Mapping[str, Any] | None) -> tuple[list, list]
     return campanhas, canais
 
 
-def _serializar_metas(metas: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    saida = []
-    for m in metas:
-        item = dict(m)
-        for chave in ("alvo", "realizado"):
-            if chave in item and isinstance(item[chave], Decimal):
-                item[chave] = _dec_str(item[chave])
-        saida.append(item)
-    return saida
 
 
 def _periodo_datetime(d_inicio: date, d_fim: date) -> tuple[datetime, datetime]:
@@ -440,54 +414,6 @@ def _metricas_vendedor(
     }
 
 
-def _metas_vendedor(
-    db: Session,
-    loja_slug: str,
-    vendedor_email: str,
-    d_inicio: date,
-    d_fim: date,
-    realizado_por_tipo: dict[str, Decimal],
-    lucro_completo: bool,
-    *,
-    pode_ver_margem: bool,
-) -> list[dict[str, Any]]:
-    metas_view: list[dict[str, Any]] = []
-    metas = (
-        db.query(Meta)
-        .filter(
-            Meta.loja_slug == loja_slug,
-            Meta.escopo == "vendedor",
-            Meta.vendedor_email == vendedor_email,
-            Meta.ativa.is_(True),
-        )
-        .all()
-    )
-    for meta in metas:
-        if meta.tipo == "lucro_bruto" and not pode_ver_margem:
-            continue
-        if meta.tipo not in realizado_por_tipo or not (
-            meta.periodo_inicio <= d_fim and meta.periodo_fim >= d_inicio
-        ):
-            continue
-        realizado = realizado_por_tipo[meta.tipo]
-        indisponivel = meta.tipo == "lucro_bruto" and not lucro_completo
-        pct = (
-            round(float(realizado / meta.valor_alvo * 100), 1)
-            if meta.valor_alvo and not indisponivel
-            else 0.0
-        )
-        metas_view.append(
-            {
-                "tipo": meta.tipo,
-                "alvo": meta.valor_alvo,
-                "realizado": realizado,
-                "pct": pct,
-                "pct_barra": min(pct, 100),
-                "quantidade": meta.tipo == "quantidade",
-                "indisponivel": indisponivel,
-            }
-        )
-    return metas_view
 
 
 def _aquisicao_de_totais(
@@ -708,109 +634,8 @@ def _carregar_aquisicao(
     )
 
 
-def pendencias_bancos_nao_configurados(
-    nomes_faltando: list[str] | tuple[str, ...] | None,
-) -> list[PendenciaAcao]:
-    """Pendência operacional: bancos sem credencial (F5). Não bloqueia Vendas."""
-    if not nomes_faltando:
-        return []
-    nomes = [str(n).strip() for n in nomes_faltando if str(n).strip()]
-    if not nomes:
-        return []
-    n = len(nomes)
-    if n == 1:
-        texto = f"Banco {nomes[0]} ainda não configurado"
-    elif n <= 3:
-        texto = f"Bancos sem acesso: {', '.join(nomes)}"
-    else:
-        texto = f"{n} bancos ainda sem acesso configurado"
-    return [
-        PendenciaAcao(
-            codigo="bancos_nao_configurados",
-            texto=texto,
-            href="/app/financeiras",
-            quantidade=n,
-        )
-    ]
 
 
-def _pendencias(
-    db: Session,
-    *,
-    loja_slug: str,
-    d_inicio: date,
-    d_fim: date,
-    vendedor_email: str | None,
-    chatbot: Any | None,
-    escopo: str,
-    bancos_nao_configurados: list[str] | None = None,
-) -> list[PendenciaAcao]:
-    itens: list[PendenciaAcao] = []
-
-    q_vendas = db.query(Venda).filter(
-        Venda.loja_slug == loja_slug,
-        Venda.status == "registrada",
-    )
-    if vendedor_email:
-        q_vendas = q_vendas.filter(Venda.vendedor_email == vendedor_email)
-    rascunhos = [
-        v for v in q_vendas.all() if d_inicio <= _data(v.criada_em) <= d_fim
-    ]
-    if rascunhos:
-        href = "/app/vendas" if escopo == "loja" else "/app/vendedor"
-        n = len(rascunhos)
-        itens.append(
-            PendenciaAcao(
-                codigo="vendas_registradas",
-                texto=(
-                    f"{n} venda{'s' if n != 1 else ''} registrada"
-                    f"{'s' if n != 1 else ''} aguardando confirmação"
-                ),
-                href=href,
-                quantidade=n,
-            )
-        )
-
-    if escopo == "loja" and bancos_nao_configurados:
-        itens.extend(pendencias_bancos_nao_configurados(bancos_nao_configurados))
-
-    if chatbot is None:
-        return itens[:8]
-
-    try:
-        leads = chatbot.listar_leads()
-    except Exception:
-        return itens[:8]
-
-    sem_etapa = [
-        lead
-        for lead in leads
-        if not str(lead.get("etapa") or "").strip()
-    ]
-    if escopo == "loja" and sem_etapa:
-        n = len(sem_etapa)
-        itens.append(
-            PendenciaAcao(
-                codigo="leads_sem_etapa",
-                texto=f"{n} lead{'s' if n != 1 else ''} sem etapa no funil",
-                href="/app/leads",
-                quantidade=n,
-            )
-        )
-
-    novos = [lead for lead in leads if str(lead.get("etapa") or "").casefold() == "novo"]
-    if novos and escopo == "loja":
-        n = len(novos)
-        itens.append(
-            PendenciaAcao(
-                codigo="leads_novos",
-                texto=f"{n} lead{'s' if n != 1 else ''} novo{'s' if n != 1 else ''} aguardando atendimento",
-                href="/app/leads",
-                quantidade=n,
-            )
-        )
-
-    return itens[:8]
 
 
 def build_sales_overview(
@@ -825,7 +650,6 @@ def build_sales_overview(
     fetch_resultados_api: Callable[..., dict | None] | None = None,
     revy_trafego_resultados_enabled: bool | None = None,
     pode_ver_margem: bool | None = None,
-    bancos_nao_configurados: list[str] | None = None,
 ) -> SalesOverview:
     """Monta o read model da Visão geral de Vendas.
 
@@ -890,30 +714,6 @@ def build_sales_overview(
     else:
         vendas_status = "ok"
 
-    realizado_por_tipo = {
-        "quantidade": Decimal(qtd),
-        "faturamento": receita,
-        "lucro_bruto": resultado["lucro_bruto"],
-    }
-
-    # --- Metas ---
-    if escopo == "vendedor":
-        metas = _metas_vendedor(
-            db,
-            loja_slug,
-            email_filtro,
-            d_inicio,
-            d_fim,
-            realizado_por_tipo,
-            margem_completa,
-            pode_ver_margem=ver_margem,
-        )
-    else:
-        metas = metas_view_periodo(
-            db, loja_slug, d_inicio, d_fim, realizado_por_tipo, margem_completa
-        )
-    metas_status = "ok" if metas else "vazio"
-
     # --- Funil / leads ---
     funil_view: dict[str, Any] | None = None
     funil_status = "indisponivel"
@@ -964,8 +764,23 @@ def build_sales_overview(
                 if funil_view is None:
                     funil_view = {}
                 funil_view["auditavel"] = funil_audit
-                if funil_audit.get("disponivel") and leads_count is None:
-                    leads_count = funil_audit.get("elegiveis")
+                # Projeção local (FunilEvento) vazia mas o Chatbot tem leads no
+                # período: a materialização dos eventos lead_criado não populou
+                # a tabela (bug de pipeline à parte) e reportar 0 lead havendo
+                # centenas é o que fez o Copiloto dizer "0 leads" na moto-center.
+                # Cai na contagem viva `elegiveis` — a MESMA fonte de "Por onde
+                # as pessoas chegam" — para o número bater com o que o dono vê.
+                # `not leads_count` cobre None (resumo_funil estourou) e 0
+                # (projeção vazia). As taxas do funil seguem da projeção (None
+                # quando vazia): status vira "parcial" para o prompt qualificar,
+                # nunca tratar como zero real.
+                if funil_audit.get("disponivel") and not leads_count:
+                    elegiveis = funil_audit.get("elegiveis")
+                    if elegiveis:
+                        leads_count = elegiveis
+                        funil_view["total_leads"] = elegiveis
+                        if funil_status in {"vazio", "erro"}:
+                            funil_status = "parcial"
                 if funil_status == "erro" and funil_audit.get("disponivel"):
                     funil_status = "parcial"
             except Exception:
@@ -1037,22 +852,8 @@ def build_sales_overview(
             aquisicao_campanhas = []
             aquisicao_canais = []
 
-    # --- Pendências ---
-    pendencias = _pendencias(
-        db,
-        loja_slug=loja_slug,
-        d_inicio=d_inicio,
-        d_fim=d_fim,
-        vendedor_email=email_filtro if escopo == "vendedor" else None,
-        chatbot=chatbot,
-        escopo=escopo,
-        bancos_nao_configurados=(
-            bancos_nao_configurados if escopo == "loja" else None
-        ),
-    )
-
     # --- Status global ---
-    blocos = [vendas_status, metas_status, funil_status]
+    blocos = [vendas_status, funil_status]
     if escopo == "loja":
         blocos.append(aquisicao_status)
 
@@ -1084,8 +885,6 @@ def build_sales_overview(
         vendas_lucro_incompleto=vendas_lucro_incompleto if ver_margem else 0,
         qtd_vendas=qtd,
         vendas_status=vendas_status,
-        metas=metas,
-        metas_status=metas_status,
         leads_count=leads_count,
         funil=funil_view,
         funil_status=funil_status,
@@ -1094,7 +893,6 @@ def build_sales_overview(
         aquisicao_campanhas=aquisicao_campanhas,
         aquisicao_canais=aquisicao_canais,
         aquisicao_origens=aquisicao_origens,
-        pendencias=pendencias,
     )
 
 

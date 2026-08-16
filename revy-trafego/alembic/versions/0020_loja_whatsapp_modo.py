@@ -1,7 +1,7 @@
 """Loja escolhe o modo de WhatsApp (1 Baileys+grupo, 2 central Cloud).
 
-Revision ID: 0019_loja_whatsapp_modo
-Revises: 0018_copiloto_modulo
+Revision ID: 0020_loja_whatsapp_modo
+Revises: 0019_financeiro_modulo
 
 Spec dos dois modos, §5.8: o tipo de atendimento e escolha do Control, por
 loja, e 1 XOR 2 — nunca os dois. Server default 1 para que toda loja
@@ -14,8 +14,8 @@ import sqlalchemy as sa
 from alembic import op
 
 
-revision = "0019_loja_whatsapp_modo"
-down_revision = "0018_copiloto_modulo"
+revision = "0020_loja_whatsapp_modo"
+down_revision = "0019_financeiro_modulo"
 branch_labels = None
 depends_on = None
 

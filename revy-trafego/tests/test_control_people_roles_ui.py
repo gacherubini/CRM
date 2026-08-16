@@ -511,6 +511,7 @@ def test_revogar_ultimo_dono_de_loja_pronta_retorna_erro_no_detalhe(
                     ModuloRevy(id="vendas", codigo="vendas", nome="Vendas"),
                     ModuloRevy(id="estoque", codigo="estoque", nome="Estoque"),
                     ModuloRevy(id="copiloto", codigo="copiloto", nome="Copiloto de Vendas"),
+                    ModuloRevy(id="financeiro", codigo="financeiro", nome="Financeiro"),
                 ]
             )
             db.commit()

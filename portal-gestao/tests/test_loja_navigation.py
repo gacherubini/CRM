@@ -19,6 +19,17 @@ def _ents(vendas=True, estoque=True, ativa=True, slug="loja-teste"):
     )
 
 
+def _ents_com_copiloto(slug="loja-teste"):
+    return EntitlementState(
+        loja_slug=slug,
+        loja_ativa=True,
+        vendas_enabled=True,
+        estoque_enabled=True,
+        source="test",
+        copiloto_enabled=True,
+    )
+
+
 def test_nav_somente_vendas_e_estoque_com_acessos_bancarios():
     sections = build_nav(_store(), _ents(), shell_enabled=True)
     titles = [s.title for s in sections]
@@ -139,6 +150,48 @@ def test_nav_item_active_prefix_vendas():
     assert nav_item_is_active(lista, "/app/loja/vendas/lista") is True
 
 
+def test_nav_copiloto_tem_um_item_so():
+    """A página Hoje foi removida em 2026-08-16; o sino cobre os sinais."""
+    sections = build_nav(
+        _store(),
+        _ents_com_copiloto(),
+        shell_enabled=True,
+        copiloto_enabled=True,
+    )
+    copiloto = next(s for s in sections if s.title == "Copiloto")
+    assert [i.href for i in copiloto.items] == ["/app/loja/copiloto"]
+
+    chat = copiloto.items[0]
+    assert nav_item_is_active(chat, "/app/loja/copiloto") is True
+    assert nav_item_is_active(chat, "/app/loja/vendas") is False
+
+
+def _itens_acesos(html: str) -> list[str]:
+    """hrefs do menu marcados como página atual no HTML renderizado."""
+    import re
+
+    return re.findall(r'<a class="nav-link[^"]*" href="([^"]+)"[^>]*aria-current="page"', html)
+
+
+def test_shell_render_acende_apenas_a_pagina_atual(client, monkeypatch):
+    """O template não pode reimplementar (e divergir de) nav_item_is_active.
+
+    A regra existia em navigation.py e o base.html tinha uma cópia sem a
+    exceção de Vendas: "Resultado" acendia junto com a lista de vendas.
+    """
+    monkeypatch.setenv("REVY_LOJA_SHELL_ENABLED", "1")
+    monkeypatch.setenv("REVY_LOJA_ENTITLEMENTS_ENABLED", "0")
+    login(client)
+
+    r = client.get("/app/loja/vendas/lista")
+    assert r.status_code == 200
+    assert _itens_acesos(r.text) == ["/app/loja/vendas/lista"]
+
+    r = client.get("/app/loja/vendas")
+    assert r.status_code == 200
+    assert _itens_acesos(r.text) == ["/app/loja/vendas"]
+
+
 def test_shell_off_mantem_nav_legado(client, monkeypatch):
     monkeypatch.setenv("REVY_LOJA_SHELL_ENABLED", "0")
     login(client)
@@ -174,12 +227,15 @@ def test_shell_nav_todos_os_itens_tem_icone(client, monkeypatch):
 
     monkeypatch.setenv("REVY_LOJA_SHELL_ENABLED", "1")
     monkeypatch.setenv("REVY_LOJA_ENTITLEMENTS_ENABLED", "0")
+    monkeypatch.setenv("REVY_LOJA_COPILOTO_ENABLED", "1")
     login(client)
     r = client.get("/app")
     assert r.status_code == 200
     links = re.findall(r'<a class="nav-link[^"]*" href="([^"]+)"[^>]*>(.{0,10})', r.text)
     assert links, "shell não renderizou nenhum item de navegação"
-    assert "/app/loja/agente" in {href for href, _ in links}
+    hrefs = {href for href, _ in links}
+    assert "/app/loja/agente" in hrefs
+    assert "/app/loja/copiloto" in hrefs
     sem_icone = [href for href, inicio in links if not inicio.startswith("<svg")]
     assert sem_icone == []
 
@@ -229,6 +285,7 @@ def test_nav_copiloto_e_a_primeira_secao_quando_liberado():
     assert [s.title for s in sections][0] == "Copiloto"
     labels = [i.label for i in flatten_nav(sections)]
     assert labels[0] == "Copiloto de Vendas"
+    assert labels[1] == "Resultado"
 
 
 def test_nav_copiloto_nao_aparece_para_vendedor():

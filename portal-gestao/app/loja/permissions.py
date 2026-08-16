@@ -45,6 +45,8 @@ def module_enabled(entitlements: EntitlementState, module: Module | str) -> bool
         return entitlements.estoque_enabled
     if mod == Module.COPILOTO.value:
         return entitlements.copiloto_enabled
+    if mod == Module.FINANCEIRO.value:
+        return entitlements.financeiro_enabled
     return False
 
 

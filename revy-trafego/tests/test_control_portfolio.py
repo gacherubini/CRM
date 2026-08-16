@@ -31,6 +31,7 @@ def _seed_catalog() -> None:
                 ModuloRevy(id="vendas", codigo="vendas", nome="Vendas"),
                 ModuloRevy(id="estoque", codigo="estoque", nome="Estoque"),
                 ModuloRevy(id="copiloto", codigo="copiloto", nome="Copiloto de Vendas"),
+                ModuloRevy(id="financeiro", codigo="financeiro", nome="Financeiro"),
             ]
         )
         db.commit()
@@ -284,10 +285,12 @@ def test_configuracao_rejeita_selecao_vazia_ou_fora_do_catalogo():
     with pytest.raises(InvalidModuleSelection):
         portfolio.configure(admin, StoreRef(id=store.id), set())
     with pytest.raises(InvalidModuleSelection):
+        # "financeiro" era o exemplo aqui ate 2026-08-16, quando virou modulo
+        # de verdade. O codigo abaixo precisa ser algo que nunca sera vendido.
         portfolio.configure(
             admin,
             StoreRef(id=store.id),
-            ("vendas", "financeiro"),
+            ("vendas", "modulo-inexistente"),
         )
 
     assert portfolio.list_modules(admin, StoreRef(id=store.id)) == ()
@@ -298,3 +301,34 @@ def test_configuracao_rejeita_selecao_vazia_ou_fora_do_catalogo():
         .items
     ]
     assert actions == ["store.created"]
+
+
+def test_admin_contrata_financeiro_como_modulo_da_loja():
+    """Financeiro entrou no catalogo em 2026-08-16: liga/desliga por loja."""
+    _seed_catalog()
+    admin = _admin_actor()
+    store = StoreControl(SessionLocal).create(
+        admin,
+        CreateStore(name="Loja Financeiro", slug="loja-financeiro-domain"),
+    )
+    portfolio = PortfolioControl(SessionLocal)
+
+    configured = portfolio.configure(
+        admin,
+        StoreRef(id=store.id),
+        {"vendas", "financeiro"},
+    )
+
+    by_code = {item.code: item for item in configured}
+    assert by_code[ModuleCode.FINANCEIRO].status is ModuleStatus.ACTIVE
+    assert by_code[ModuleCode.FINANCEIRO].name == "Financeiro"
+
+    # Loja que nao contratou fica sem o modulo — nao e default ligado.
+    outra = StoreControl(SessionLocal).create(
+        admin,
+        CreateStore(name="Loja Sem Financeiro", slug="loja-sem-financeiro-domain"),
+    )
+    somente_vendas = portfolio.configure(
+        admin, StoreRef(id=outra.id), {"vendas"}
+    )
+    assert ModuleCode.FINANCEIRO not in {item.code for item in somente_vendas}

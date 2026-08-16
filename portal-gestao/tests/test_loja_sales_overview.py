@@ -317,7 +317,12 @@ def test_estado_vazio_sem_vendas():
         db.close()
 
 
-def test_pendencias_vendas_registradas():
+def test_overview_nao_calcula_mais_metas_nem_pendencias():
+    """Os dois blocos saíram da tela Resultado em 2026-08-16 (decisão do dono).
+
+    O read model não pode continuar calculando o que ninguém exibe: metas
+    seguem em /app/metas e no painel financeiro legado.
+    """
     _criar_venda(preco="10000", custo=None, status="registrada")
     d_inicio, d_fim = periodo_padrao(None, None)
     db = SessionLocal()
@@ -331,9 +336,12 @@ def test_pendencias_vendas_registradas():
             chatbot=ChatbotStub(leads=[{"id": "x", "etapa": "novo", "telefone": "5511999"}]),
             revy_trafego_resultados_enabled=False,
         )
-        codigos = {p.codigo for p in overview.pendencias}
-        assert "vendas_registradas" in codigos
-        assert "leads_novos" in codigos
+        assert not hasattr(overview, "metas")
+        assert not hasattr(overview, "metas_status")
+        assert not hasattr(overview, "pendencias")
+        serializado = overview.to_dict()
+        assert "metas" not in serializado
+        assert "pendencias" not in serializado
     finally:
         db.close()
 
@@ -353,6 +361,38 @@ def test_to_dict_serializa_decimals():
         assert payload["qtd_vendas"] == 1
         assert isinstance(payload["receita"], str)
         assert payload["aquisicao_status"] in {"ok", "parcial", "indisponivel", "vazio"}
+    finally:
+        db.close()
+
+
+def test_funil_usa_contagem_viva_quando_projecao_local_vazia():
+    """Bug (moto-center): a projeção local FunilEvento não foi materializada,
+    mas o Chatbot tem leads no período. O funil reportava total_leads=0 (a
+    projeção vazia) em vez da contagem viva — o Copiloto então dizia "0 leads"
+    com centenas de leads reais. Deve cair na contagem auditável (elegiveis),
+    a mesma fonte de "Por onde as pessoas chegam"."""
+    d_inicio, d_fim = date(2026, 8, 1), date(2026, 8, 31)
+    leads = [
+        {"id": "l1", "criada_em": "2026-08-05T12:00:00+00:00"},
+        {"id": "l2", "criada_em": "2026-08-06T12:00:00+00:00"},
+        {"id": "l3", "criada_em": "2026-08-07T12:00:00+00:00"},
+    ]
+    db = SessionLocal()
+    try:
+        overview = build_sales_overview(
+            db,
+            loja_slug="loja-teste",
+            papel="dono",
+            inicio=d_inicio,
+            fim=d_fim,
+            chatbot=ChatbotStub(leads=leads),
+            revy_trafego_resultados_enabled=False,
+        )
+        # FunilEvento não foi semeada → projeção local = 0; há 3 leads vivos.
+        assert overview.funil is not None
+        assert overview.funil["total_leads"] == 3
+        # Nunca "vazio" quando há leads vivos (o prompt trataria como zero real).
+        assert overview.funil_status in {"ok", "parcial"}
     finally:
         db.close()
 

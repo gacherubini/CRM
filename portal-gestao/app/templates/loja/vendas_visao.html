@@ -65,36 +65,8 @@
   {% endif %}
 </section>
 
-{# --- Metas --- #}
-<section class="panel" aria-labelledby="bloco-metas">
-  <div class="panel-heading">
-    <div><span class="mono-label">Metas</span><h2 id="bloco-metas">Atingimento</h2></div>
-  </div>
-  {% if overview.metas_status == 'vazio' or not overview.metas %}
-  <div class="empty">
-    <strong>Nenhuma meta no período.</strong>
-    <p><a href="/app/metas">Cadastre metas</a> de quantidade, faturamento ou lucro bruto.</p>
-  </div>
-  {% else %}
-  <div class="metric-grid">
-    {% for m in overview.metas %}
-    <div class="metric">
-      <span>{{ m.tipo | replace('_', ' ') | capitalize }}</span>
-      {% if m.indisponivel %}
-      <strong>Incompleto</strong>
-      <small>Informe o custo do veículo nas vendas confirmadas.</small>
-      {% else %}
-      <strong>{% if m.quantidade %}{{ m.realizado | int }}{% else %}{{ formatar_brl(m.realizado) }}{% endif %}</strong>
-      <small>meta: {% if m.quantidade %}{{ m.alvo | int }}{% else %}{{ formatar_brl(m.alvo) }}{% endif %} · {{ m.pct }}%</small>
-      <div class="meta-bar" role="progressbar" aria-valuenow="{{ m.pct }}" aria-valuemin="0" aria-valuemax="100">
-        <span style="width:{{ m.pct_barra }}%"></span>
-      </div>
-      {% endif %}
-    </div>
-    {% endfor %}
-  </div>
-  {% endif %}
-</section>
+{# Metas/Atingimento saiu daqui em 2026-08-16 por decisão do dono. O cadastro
+   continua em /app/metas e o atingimento no painel financeiro legado. #}
 
 {# --- Funil / leads --- #}
 <section class="panel" aria-labelledby="bloco-funil">
@@ -277,22 +249,8 @@
 {% endif %}
 {% endif %}
 
-{# --- Pendências: só aparece quando há algo a fazer --- #}
-{% if overview.pendencias %}
-<section class="panel" aria-labelledby="bloco-pendencias">
-  <div class="panel-heading">
-    <div><span class="mono-label">Pendências</span><h2 id="bloco-pendencias">Ações do período</h2></div>
-  </div>
-  <ul class="list-rows">
-    {% for p in overview.pendencias %}
-    <li>
-      <span>{{ p.texto }}</span>
-      <a class="button ghost" href="{{ p.href }}">Abrir</a>
-    </li>
-    {% endfor %}
-  </ul>
-</section>
-{% endif %}
+{# Pendências/"Ações do período" saiu daqui em 2026-08-16 por decisão do dono:
+   o que precisa de atenção vive no sino do Copiloto, não numa segunda lista. #}
 {# Rodapé "Atalhos" removido: apontava para /app/vendas, /app/leads, /app/funil,
    /app/financeiro e "Painel clássico" — exatamente as telas legadas que este
    shell existe para substituir. #}
