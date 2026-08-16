@@ -165,3 +165,19 @@ def test_marcar_visto_de_sinal_de_outra_loja_nao_e_aceito(db):
     # loja-a continua sem o registro de visto — a chamada com loja errada
     # não deixa rastro nenhum, nem para a loja certa.
     assert contar_sinais_novos(db, "loja-a", "user-a") == 1
+
+
+def test_contar_sinais_novos_filtra_por_regras_elegiveis(db):
+    sincronizar_sinais(
+        db,
+        "loja-teste",
+        [_cand("v1", regra="estoque_parado"), _cand("v2", regra="lead_sem_resposta")],
+        agora=AGORA,
+    )
+    assert contar_sinais_novos(db, "loja-teste", "user-a") == 2
+    assert (
+        contar_sinais_novos(
+            db, "loja-teste", "user-a", regras=frozenset({"estoque_parado"})
+        )
+        == 1
+    )

@@ -210,7 +210,18 @@ def build_nav(
                     href="/app/loja/whatsapp",
                     section="Ajustes",
                     module=None,
+                    # Sem barra no fim marcaria "Fila" como ativo junto — o
+                    # prefixo do irmão começa com este.
                     active_prefix="/app/loja/whatsapp",
+                )
+            )
+            ajustes.append(
+                NavItem(
+                    label="Fila de atendimento",
+                    href="/app/loja/whatsapp/fila",
+                    section="Ajustes",
+                    module=None,
+                    active_prefix="/app/loja/whatsapp/fila",
                 )
             )
         # Grupo WA de fotos/cadastro + números autorizados (aviso simulação/handoff).

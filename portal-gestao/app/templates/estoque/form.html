@@ -6,7 +6,7 @@
 </div>
 {% if erro %}<div class="alert error">{{ erro }}</div>{% endif %}
 
-<form method="post" class="form-layout">
+<form method="post" class="form-layout" enctype="multipart/form-data">
   <input type="hidden" name="csrf" value="{{ csrf }}">
   <section class="panel form-section">
     <div class="section-title"><h2>Identificação</h2><p>Dados usados na busca e na vitrine.</p></div>
@@ -28,6 +28,10 @@
       <label>Quilometragem<input type="number" min="0" name="km" value="{{ veiculo.km if veiculo else 0 }}"></label>
       <label>Código interno<input name="codigo_interno" value="{{ veiculo.codigo_interno if veiculo and veiculo.codigo_interno else '' }}"></label>
       <label class="wide">URL da foto<input type="url" name="foto_url" value="{{ veiculo.foto_url if veiculo and veiculo.foto_url else '' }}" placeholder="https://..."></label>
+      <label class="wide">Foto do veículo
+        <input type="file" name="foto" accept="image/jpeg,image/png,image/webp">
+        <small>Tire ou selecione a foto (JPG, PNG ou WEBP, até 10 MB). Vira a capa. Ou informe a URL acima.</small>
+      </label>
     </div>
   </section>
   <div class="form-actions"><a class="button ghost" href="/app/estoque">Cancelar</a><button class="button primary" type="submit">Salvar veículo</button></div>

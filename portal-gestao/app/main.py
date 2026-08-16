@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import logging
 import os
 import re
@@ -848,6 +849,35 @@ def dados_veiculo(form, incluir_custo: bool) -> dict:
     return dados
 
 
+_FOTO_MIMES = {"image/jpeg", "image/png", "image/webp"}
+_FOTO_MAX_BYTES = 10 * 1024 * 1024
+
+
+async def _anexar_foto_se_enviada(estoque, veiculo_id: str | None, form) -> None:
+    """Se o form trouxe um arquivo de foto, sobe para o estoque-api.
+
+    Levanta ValueError (capturado pelas rotas → re-render com erro/422) para
+    arquivo inválido. Sem arquivo = no-op.
+    """
+    foto = form.get("foto")
+    if foto is None or not hasattr(foto, "read") or not getattr(foto, "filename", ""):
+        return
+    conteudo = await foto.read()
+    if not conteudo:
+        return
+    if len(conteudo) > _FOTO_MAX_BYTES:
+        raise ValueError("A foto excede o limite de 10 MB.")
+    content_type = (getattr(foto, "content_type", "") or "").lower()
+    if content_type not in _FOTO_MIMES:
+        raise ValueError("Formato de foto inválido (use JPG, PNG ou WEBP).")
+    if not veiculo_id:
+        raise ValueError("Não foi possível associar a foto ao veículo.")
+    chave = f"portal-foto:{veiculo_id}:{hashlib.sha256(conteudo).hexdigest()[:32]}"
+    estoque.adicionar_foto(
+        veiculo_id, conteudo, content_type, idempotency_key=chave, publicar=True
+    )
+
+
 @app.get("/app/operacao/numeros", response_class=HTMLResponse)
 def operacao_numeros(
     request: Request,
@@ -966,8 +996,9 @@ async def estoque_criar(
     if not pode_gerir_estoque(usuario) or not csrf_valido(request, form.get("csrf")):
         return RedirectResponse("/app/estoque", status_code=303)
     try:
-        estoque.criar(dados_veiculo(form, pode_ver_custo(usuario)))
-    except (EstoqueIndisponivel, ValueError) as exc:
+        criado = estoque.criar(dados_veiculo(form, pode_ver_custo(usuario)))
+        await _anexar_foto_se_enviada(estoque, (criado or {}).get("id"), form)
+    except (EstoqueIndisponivel, ConflitoEstoque, ValueError) as exc:
         return templates.TemplateResponse(
             "estoque/form.html",
             contexto(request, usuario, db=db, veiculo=dict(form), titulo="Cadastrar veículo", erro=str(exc), pode_custo=pode_ver_custo(usuario)),
@@ -1025,6 +1056,7 @@ async def estoque_editar(
         return RedirectResponse("/app/estoque", status_code=303)
     try:
         estoque.atualizar(veiculo_id, dados_veiculo(form, pode_ver_custo(usuario)))
+        await _anexar_foto_se_enviada(estoque, veiculo_id, form)
     except (ConflitoEstoque, EstoqueIndisponivel, VeiculoNaoEncontrado, ValueError) as exc:
         return templates.TemplateResponse(
             "estoque/form.html",

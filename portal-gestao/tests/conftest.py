@@ -61,6 +61,7 @@ class EstoqueFake:
         ]
         self.criados = []
         self.acoes = []
+        self.fotos = []
         self.indisponivel = False
         self.conflito_ao_vender = False
         self.atualizar_nao_encontrado = False
@@ -98,6 +99,14 @@ class EstoqueFake:
         self.criados.append(dados)
         return {"id": "novo", **dados}
 
+    def adicionar_foto(self, veiculo_id, conteudo, content_type, *, idempotency_key, publicar=True):
+        self.fotos.append({
+            "veiculo_id": veiculo_id, "conteudo": conteudo,
+            "content_type": content_type, "idempotency_key": idempotency_key,
+            "publicar": publicar,
+        })
+        return {"id": veiculo_id, "publicado": publicar}
+
     def atualizar(self, veiculo_id, dados):
         if self.indisponivel:
             raise EstoqueIndisponivel("Não foi possível acessar o estoque agora")
@@ -122,6 +131,12 @@ class EstoqueFake:
 
 class ChatbotFake:
     def __init__(self):
+        # Fila de rodízio (Modo 2). Instância, não classe: lista de classe
+        # seria compartilhada entre testes e vazaria estado.
+        self.fila_vendedores: list = []
+        self.fila_criados: list = []
+        self.fila_removidos: list = []
+        self.fila_indisponivel = False
         self.leads = [
             {
                 "id": "l1", "telefone": "5511987654321", "nome": "Maria Silva",
@@ -452,6 +467,31 @@ class ChatbotFake:
                 },
             ],
         }
+
+
+    def listar_fila_vendedores(self):
+        if self.fila_indisponivel:
+            raise ChatbotIndisponivel("chatbot indisponível")
+        return list(self.fila_vendedores)
+
+    def criar_fila_vendedor(self, *, nome, telefone, ordem, usuario_id=None):
+        if self.fila_indisponivel:
+            raise ChatbotIndisponivel("chatbot indisponível")
+        registro = {
+            "id": f"f{len(self.fila_vendedores)}", "nome": nome, "telefone": telefone,
+            "ordem": ordem, "ativo": True, "usuario_id": usuario_id,
+        }
+        self.fila_criados.append(registro)
+        self.fila_vendedores.append(registro)
+        return registro
+
+    def remover_fila_vendedor(self, vendedor_id):
+        if self.fila_indisponivel:
+            raise ChatbotIndisponivel("chatbot indisponível")
+        self.fila_removidos.append(vendedor_id)
+        self.fila_vendedores = [
+            v for v in self.fila_vendedores if v["id"] != vendedor_id
+        ]
 
 
 @pytest.fixture

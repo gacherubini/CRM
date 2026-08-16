@@ -16,7 +16,7 @@ from sqlalchemy.orm import Session
 from app.auth import csrf_token, csrf_valido, gestor_atual, sessao_gestor
 from app.clients.chatbot import ChatbotClient, ChatbotIndisponivel
 from app.clients.portal import ConviteDonoRecusado, PortalClient, PortalIndisponivel
-from app.config import settings
+from app.config import WHATSAPP_MODO2_ENABLED, settings
 from app.control.access import AccessControl
 from app.control.accounts import ControlAccounts
 from app.control.audit import AuditTrail
@@ -75,6 +75,7 @@ from app.control.types import (
     RegisterPerson,
     RevokeStoreRole,
     RevokeTrafficAccess,
+    SetWhatsappMode,
     StoreNotFound,
     StoreReadinessBlocked,
     StoreRef,
@@ -1103,6 +1104,56 @@ async def transition_store_page(
 
 
 @router.post(
+    "/app/control/lojas/{loja_id}/whatsapp-modo",
+    response_class=HTMLResponse,
+)
+async def set_whatsapp_mode_page(
+    loja_id: str,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    manager, denied = _admin_for_mutation(request, db)
+    if denied is not None:
+        return denied
+    form = await request.form()
+    if not csrf_valido(request, form.get("csrf")):
+        return _csrf_denied()
+    try:
+        modo = int((form.get("modo") or "").strip())
+    except ValueError:
+        return _render_store_detail(
+            request,
+            db,
+            manager,
+            loja_id,
+            error="Selecione um modo de WhatsApp válido.",
+            active_tab="visao",
+            status_code=422,
+        )
+    try:
+        StoreControl(SessionLocal).set_whatsapp_mode(
+            actor_from_user(manager),
+            SetWhatsappMode(store=StoreRef(id=loja_id), mode=modo),
+        )
+    except StoreNotFound:
+        return HTMLResponse("Loja não encontrada.", status_code=404)
+    except ValueError as exc:
+        return _render_store_detail(
+            request,
+            db,
+            manager,
+            loja_id,
+            error=str(exc),
+            active_tab="visao",
+            status_code=422,
+        )
+    return RedirectResponse(
+        _detail_path(loja_id, "whatsapp_modo"),
+        status_code=303,
+    )
+
+
+@router.post(
     "/app/control/lojas/{loja_id}/gestores",
     response_class=HTMLResponse,
 )
@@ -2121,6 +2172,7 @@ def _render_store_detail(
             "store_people": store_people,
             "traffic_links": traffic_links,
             "is_admin": manager.papel == "admin",
+            "whatsapp_modo2_enabled": WHATSAPP_MODO2_ENABLED,
             "ok": request.query_params.get("ok"),
             "created": request.query_params.get("created") == "1",
             "active_tab": active_tab or _detail_active_tab(request),

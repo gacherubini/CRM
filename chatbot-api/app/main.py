@@ -1,7 +1,11 @@
 """API do Chatbot (Plano #2A). n8n consome esta API; não escreve no banco direto."""
 import csv
 import io
+import json
+import logging
+from collections import OrderedDict
 import os
+import secrets
 import uuid
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
@@ -12,7 +16,7 @@ from uuid import UUID
 from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from fastapi.exception_handlers import request_validation_exception_handler
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse, Response
+from fastapi.responses import JSONResponse, PlainTextResponse, Response
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 from sqlalchemy import text
 from sqlalchemy.orm import Session
@@ -26,9 +30,14 @@ from app import (  # noqa: F401 (registra os modelos)
     servico,
     solicitacoes_simulacao,
 )
-from app.audio import AudioProcessor, get_audio_processor
+from app.audio import AudioProcessor, get_audio_processor, processador_de_audio
+from app.meta_webhook import EventoCloud, assinatura_valida, parse_inbound
+from app.oferta_inbound import processar_clique
+from app.whatsapp_outbound import outbound_para_loja
 from app.auth import Contexto, get_contexto, verificar_webhook_token
 from app.db import get_db
+from app.models_db import FilaVendedor, OfertaLead
+from app.operacao import normalizar_telefone
 from app.inventory import (
     InventoryProvider,
     InventoryWriteClient,
@@ -46,9 +55,24 @@ from app.simulation import SimulationProvider, get_simulation_provider
 from app.vehicle_photo import VehiclePhotoProcessor, get_vehicle_photo_processor
 from app.whatsapp_groups import GruposWhatsappIndisponiveis, listar_grupos_whatsapp
 
+logger = logging.getLogger("chatbot.webhook_cloud")
+# Reentrega da Meta chega em segundos, antes de a Mensagem do primeiro POST
+# estar commitada — por isso a camada em memória, à frente da consulta ao
+# banco. Limitada: o processo vive semanas e um set sem despejo cresceria
+# para sempre. FIFO simples porque a reentrega é sempre recente; wamid
+# antigo que caiu da janela ainda é pego pela consulta a `mensagens`.
+_WAMIDS_MEMORIA_MAX = 5000
+_wamids_vistos: OrderedDict[str, None] = OrderedDict()
+
+
+def _marcar_wamid_visto(wamid: str) -> None:
+    _wamids_vistos[wamid] = None
+    while len(_wamids_vistos) > _WAMIDS_MEMORIA_MAX:
+        _wamids_vistos.popitem(last=False)
+
 @asynccontextmanager
 async def _lifespan(_app: FastAPI):
-    """Sobe/desce o worker de retry do outbox de alertas operacionais."""
+    """Sobe/desce os workers de fundo: outbox de alertas e Modo 2."""
     from app.db import SessionLocal
     from app import notificacoes_outbox_job
 
@@ -59,10 +83,23 @@ async def _lifespan(_app: FastAPI):
         "",
     }
     notificacoes_outbox_job.start_worker(SessionLocal, enabled=enabled)
+
+    # Modo 2: o prazo de 10 min do rodízio e o cutucão de silêncio têm timer
+    # próprio (spec §5.3). Sem subir aqui, `run_once` só roda em teste.
+    from app import modo2_workers
+
+    modo2_enabled = (os.getenv("CHATBOT_MODO2_WORKERS_ENABLED", "1") or "1").strip() not in {
+        "0",
+        "false",
+        "False",
+        "",
+    }
+    modo2_workers.start_workers(SessionLocal, enabled=modo2_enabled)
     try:
         yield
     finally:
         notificacoes_outbox_job.stop_worker()
+        modo2_workers.stop_workers()
 
 
 app = FastAPI(title="Chatbot API", lifespan=_lifespan)
@@ -451,6 +488,156 @@ def ready(db: Session = Depends(get_db)):
 @app.get("/version")
 def version():
     return {"versao": config.VERSAO, "schema": config.SCHEMA_VERSAO}
+
+
+@app.get("/webhook/cloud", response_class=PlainTextResponse)
+def webhook_cloud_verificacao(request: Request):
+    """Handshake de domínio da Meta (spec §6.1).
+
+    Responde o challenge em **texto puro**: a Meta compara o corpo inteiro, e
+    as aspas que o JSON acrescentaria reprovam a verificação.
+    """
+    parametros = request.query_params
+    if parametros.get("hub.mode") != "subscribe":
+        raise HTTPException(status_code=403, detail="modo inválido")
+    if not config.META_VERIFY_TOKEN or not secrets.compare_digest(
+        parametros.get("hub.verify_token", ""), config.META_VERIFY_TOKEN
+    ):
+        raise HTTPException(status_code=403, detail="verify token inválido")
+    return parametros.get("hub.challenge", "")
+
+
+@app.post("/webhook/cloud")
+async def webhook_cloud(request: Request, db: Session = Depends(get_db)):
+    """Inbound da Cloud API. Responde 200 rápido; a Meta reentrega se demorar."""
+    corpo_cru = await request.body()
+    if not assinatura_valida(
+        corpo_cru,
+        request.headers.get("X-Hub-Signature-256", ""),
+        app_secret=config.META_APP_SECRET,
+    ):
+        raise HTTPException(status_code=401, detail="assinatura inválida")
+
+    try:
+        payload = json.loads(corpo_cru)
+    except ValueError:
+        # Assinatura bate mas o corpo não é JSON: não é reentrega útil.
+        return {"ok": True, "ignorado": "corpo inválido"}
+
+    for evento in parse_inbound(payload):
+        if evento.wamid and _wamid_ja_visto(db, evento.wamid):
+            continue
+        if evento.wamid:
+            _marcar_wamid_visto(evento.wamid)
+        try:
+            processar_evento_cloud(db, evento)
+        except Exception:  # noqa: BLE001
+            # Erro nosso não pode virar reentrega infinita da Meta.
+            logger.exception("falha ao processar evento cloud wamid=%s", evento.wamid)
+    return {"ok": True}
+
+
+def _wamid_ja_visto(db: Session, wamid: str) -> bool:
+    """Dedup de reentrega (spec §6.1).
+
+    O replay >5 min do Modo 1 não cobre isto: a Meta reentrega em segundos
+    quando não recebe 200 rápido, e o mesmo ``wamid`` chegaria duas vezes
+    dentro da janela.
+    """
+    if wamid in _wamids_vistos:
+        return True
+    existe = (
+        db.query(models_db.Mensagem.id)
+        .filter(models_db.Mensagem.provider_message_id == wamid)
+        .first()
+        is not None
+    )
+    if existe:
+        _wamids_vistos.add(wamid)
+    return existe
+
+
+def _loja_por_phone_number_id(db: Session, phone_number_id: str):
+    """Loja dona deste phone_number_id, ou None se ninguém cadastrou."""
+    if not phone_number_id:
+        return None
+    canal = (
+        db.query(models_db.WhatsAppCanal)
+        .filter(models_db.WhatsAppCanal.evolution_instance == phone_number_id)
+        .first()
+    )
+    if canal is not None:
+        return db.get(models_db.Loja, canal.loja_id)
+    return (
+        db.query(models_db.Loja)
+        .filter(models_db.Loja.evolution_instance == phone_number_id)
+        .first()
+    )
+
+
+def _processar_mensagem_cliente(db: Session, loja, evento: EventoCloud) -> None:
+    texto = evento.texto
+    if evento.tipo == "audio":
+        processador = processador_de_audio(2)
+        if processador is not None:
+            resultado = processador.processar(
+                evento.phone_number_id,
+                evento.media_id or evento.wamid,
+                evento.mime,
+                None,
+            )
+            texto = resultado.get("texto") or resultado.get("fallback")
+        else:
+            texto = config.AUDIO_FALLBACK_TEXT
+    servico.registrar_mensagem(
+        db,
+        evento.phone_number_id,
+        evento.remetente,
+        texto,
+        evento.wamid,
+        False,
+        False,
+        evento.tipo,
+        meta_ad_id=evento.referral_ad_id,
+    )
+
+    # Lead já travado: a central se cala, mas o cliente não pode falar sozinho
+    # (spec §5.4). Ele escreveu no número do anúncio, que é o único que conhece,
+    # e provavelmente o vendedor ainda não ligou. A própria regra tem throttle.
+    from app.pos_handoff import cliente_voltou_a_escrever
+
+    cliente_voltou_a_escrever(
+        db,
+        loja.id,
+        evento.remetente,
+        outbound=outbound_para_loja(db, loja.id),
+    )
+
+
+def processar_evento_cloud(db: Session, evento: EventoCloud) -> None:
+    """Despacha o evento para o que os cards 2 e 2b já entregaram.
+
+    Função de módulo, não bloco inline na rota: é o ponto de substituição dos
+    testes e o lugar onde o tipo novo entra sem mexer no handler HTTP.
+    """
+    loja = _loja_por_phone_number_id(db, evento.phone_number_id)
+    if loja is None:
+        logger.warning("phone_number_id sem loja: %s", evento.phone_number_id)
+        return
+
+    if evento.tipo == "clique":
+        processar_clique(
+            db, loja.id, evento.remetente, evento.oferta_id,
+            outbound=outbound_para_loja(db, loja.id),
+        )
+    elif evento.tipo == "status":
+        if evento.status == "failed":
+            logger.warning("envio falhou wamid=%s para=%s", evento.wamid, evento.remetente)
+    elif evento.tipo in ("texto", "audio", "imagem"):
+        # Fluxo do bot: texto direto; áudio transcreve antes (card 2b Task 2);
+        # imagem entra na conversa sem OCR (spec §5.10).
+        _processar_mensagem_cliente(db, loja, evento)
+    # "ignorado" não faz nada de propósito: sticker, contato, localização.
 
 
 @app.post("/webhook/mensagem")
@@ -1334,6 +1521,163 @@ def desconectar_canal_whatsapp(
 ):
     """Desconecta o canal (permanece na loja; reconectável)."""
     return channels.disconnect_channel(db, ctx.loja_id, canal_id)
+
+
+class FilaVendedorInput(BaseModel):
+    nome: str
+    telefone: str
+    ordem: int = 0
+    usuario_id: str | None = None
+
+
+class FilaVendedorPatch(BaseModel):
+    nome: str | None = None
+    telefone: str | None = None
+    ordem: int | None = None
+    ativo: bool | None = None
+    usuario_id: str | None = None
+
+
+def _fila_dict(v: FilaVendedor) -> dict:
+    return {
+        "id": v.id, "nome": v.nome, "telefone": v.telefone,
+        "ordem": v.ordem, "ativo": v.ativo, "usuario_id": v.usuario_id,
+    }
+
+
+@app.get("/v1/fila-vendedores")
+def listar_fila_vendedores(ctx=Depends(get_contexto), db: Session = Depends(get_db)):
+    from app.rodizio import _fila_ordenada
+    return [_fila_dict(v) for v in _fila_ordenada(db, ctx.loja_id)]
+
+
+ESTADOS_NAO_ENCERRADOS = ("aberta", "esgotada")
+
+
+@app.get("/v1/ofertas")
+def listar_ofertas(
+    estado: str | None = None,
+    ctx=Depends(get_contexto),
+    db: Session = Depends(get_db),
+):
+    """Estado do rodízio para a Loja desenhar (spec §5.8).
+
+    Sem ``estado``, devolve o que ainda pede ação — aberta e esgotada. Travada
+    não entra por padrão: quem travou já está no workspace de Atendimento.
+    """
+    consulta = (
+        db.query(OfertaLead, FilaVendedor)
+        .join(FilaVendedor, FilaVendedor.id == OfertaLead.vendedor_id)
+        .filter(OfertaLead.loja_id == ctx.loja_id)
+    )
+    if estado:
+        consulta = consulta.filter(OfertaLead.estado == estado)
+    else:
+        consulta = consulta.filter(OfertaLead.estado.in_(ESTADOS_NAO_ENCERRADOS))
+    return [
+        {
+            "id": oferta.id,
+            "telefone_cliente": oferta.telefone_cliente,
+            "vendedor_id": oferta.vendedor_id,
+            "vendedor_nome": vendedor.nome,
+            # É este id que o Portal usa como destinatário do sino 1:1.
+            # None = vendedor sem pessoa da Loja vinculada; o Portal pula.
+            "vendedor_usuario_id": vendedor.usuario_id,
+            "estado": oferta.estado,
+            "prazo_em": oferta.prazo_em.isoformat() if oferta.prazo_em else None,
+            "criado_em": oferta.criado_em.isoformat() if oferta.criado_em else None,
+        }
+        for oferta, vendedor in consulta.all()
+    ]
+
+
+@app.post("/v1/ofertas/{oferta_id}/assumir")
+def assumir_oferta_http(
+    oferta_id: str,
+    ctx=Depends(get_contexto),
+    db: Session = Depends(get_db),
+):
+    """Peguei pelo sino da Loja — mesmo assumir do clique no WhatsApp (§5.7)."""
+    from app.rodizio import assumir_oferta as _assumir_oferta
+
+    oferta = db.get(OfertaLead, oferta_id)
+    if oferta is None or oferta.loja_id != ctx.loja_id:
+        raise HTTPException(status_code=404, detail="oferta não encontrada")
+
+    ganhou, travada = _assumir_oferta(db, oferta_id)
+    # Contato só para quem ganhou: quem perdeu o clique não fala com o cliente.
+    return {
+        "ganhou": ganhou,
+        "telefone_cliente": travada.telefone_cliente if ganhou else "",
+    }
+
+
+@app.post("/v1/fila-vendedores", status_code=201)
+def criar_fila_vendedor(
+    entrada: FilaVendedorInput,
+    ctx=Depends(get_contexto),
+    db: Session = Depends(get_db),
+):
+    telefone = normalizar_telefone(entrada.telefone)
+    if not telefone:
+        raise HTTPException(status_code=422, detail="telefone inválido")
+    vendedor = FilaVendedor(
+        id=str(uuid.uuid4()), loja_id=ctx.loja_id, nome=entrada.nome.strip(),
+        telefone=telefone, ordem=entrada.ordem, ativo=True,
+        usuario_id=entrada.usuario_id,
+    )
+    db.add(vendedor)
+    db.commit()
+    return _fila_dict(vendedor)
+
+
+@app.patch("/v1/fila-vendedores/{vendedor_id}")
+def atualizar_fila_vendedor(
+    vendedor_id: str,
+    entrada: FilaVendedorPatch,
+    ctx=Depends(get_contexto),
+    db: Session = Depends(get_db),
+):
+    vendedor = (
+        db.query(FilaVendedor)
+        .filter(FilaVendedor.id == vendedor_id, FilaVendedor.loja_id == ctx.loja_id)
+        .first()
+    )
+    if vendedor is None:
+        raise HTTPException(status_code=404, detail="vendedor não encontrado")
+    if entrada.nome is not None:
+        vendedor.nome = entrada.nome.strip()
+    if entrada.telefone is not None:
+        telefone = normalizar_telefone(entrada.telefone)
+        if not telefone:
+            raise HTTPException(status_code=422, detail="telefone inválido")
+        vendedor.telefone = telefone
+    if entrada.ordem is not None:
+        vendedor.ordem = entrada.ordem
+    if entrada.ativo is not None:
+        vendedor.ativo = entrada.ativo
+    if entrada.usuario_id is not None:
+        vendedor.usuario_id = entrada.usuario_id
+    db.commit()
+    return _fila_dict(vendedor)
+
+
+@app.delete("/v1/fila-vendedores/{vendedor_id}", status_code=204)
+def remover_fila_vendedor(
+    vendedor_id: str,
+    ctx=Depends(get_contexto),
+    db: Session = Depends(get_db),
+):
+    """Inativação lógica: oferta antiga referencia o vendedor por FK."""
+    vendedor = (
+        db.query(FilaVendedor)
+        .filter(FilaVendedor.id == vendedor_id, FilaVendedor.loja_id == ctx.loja_id)
+        .first()
+    )
+    if vendedor is None:
+        raise HTTPException(status_code=404, detail="vendedor não encontrado")
+    vendedor.ativo = False
+    db.commit()
 
 
 # --- Operação WhatsApp (E5): números autorizados + cadastro de veículo --------

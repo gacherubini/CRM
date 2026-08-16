@@ -15,6 +15,25 @@
   </div>
 </div>
 
+{% if card_rodizio %}
+<section class="panel" id="card-rodizio-7d"
+         data-rodizio-oferecidos="{{ card_rodizio.oferecidos }}"
+         data-rodizio-atendidos="{{ card_rodizio.atendidos }}"
+         data-rodizio-aguardando="{{ card_rodizio.aguardando }}"
+         data-rodizio-perdidos="{{ card_rodizio.perdidos }}">
+  <div class="panel-heading">
+    <h2>Fila dos últimos 7 dias</h2>
+    <p class="muted">Recorte da distribuição, ao lado do mês do agente.</p>
+  </div>
+  <div class="panel-body overview-grid">
+    <div><span class="muted">Oferecidos</span><strong>{{ card_rodizio.oferecidos }}</strong></div>
+    <div><span class="muted">Atendidos</span><strong>{{ card_rodizio.atendidos }}</strong></div>
+    <div><span class="muted">Aguardando</span><strong>{{ card_rodizio.aguardando }}</strong></div>
+    <div><span class="muted">Perdidos</span><strong>{{ card_rodizio.perdidos }}</strong></div>
+  </div>
+</section>
+{% endif %}
+
 {% if erro_resumo == 'indisponivel' or visao is none %}
 <section class="panel">
   <div class="panel-empty">

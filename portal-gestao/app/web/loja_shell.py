@@ -33,6 +33,7 @@ from app.loja.types import (
     NavSection,
     StoreContext,
 )
+from app.models import SINAL_REGRAS
 
 logger = logging.getLogger(__name__)
 
@@ -138,10 +139,29 @@ def copiloto_secao_liberada(
     return module_enabled(ents, Module.COPILOTO)
 
 
+def regras_elegiveis(
+    ents, usuario, *, shell_enabled: bool, copiloto_enabled: bool, entitlements_enabled: bool
+) -> frozenset[str]:
+    if copiloto_secao_liberada(
+        ents, usuario, shell_enabled=shell_enabled,
+        copiloto_enabled=copiloto_enabled, entitlements_enabled=entitlements_enabled,
+    ):
+        return frozenset(SINAL_REGRAS)
+    return frozenset()
+
+
+def central_disponivel(ents, usuario, *, shell_enabled, copiloto_enabled, entitlements_enabled) -> bool:
+    return bool(regras_elegiveis(
+        ents, usuario, shell_enabled=shell_enabled,
+        copiloto_enabled=copiloto_enabled, entitlements_enabled=entitlements_enabled,
+    ))
+
+
 def _contar_nao_vistos_com_sessao_propria(
     loja_slug: str,
     usuario_id: str,
     db: Session | None,
+    regras: frozenset[str] | None = None,
 ) -> int | None:
     """Conta usando ``db`` se vier; senão abre e fecha uma sessão só nossa.
 
@@ -175,7 +195,11 @@ def _contar_nao_vistos_com_sessao_propria(
             return None
 
     try:
-        return copiloto_notificacoes.contar_nao_vistos(session, loja_slug, usuario_id)
+        if regras is None:
+            return copiloto_notificacoes.contar_nao_vistos(session, loja_slug, usuario_id)
+        return copiloto_notificacoes.contar_nao_vistos(
+            session, loja_slug, usuario_id, regras=regras
+        )
     except Exception:
         logger.warning(
             "copiloto: falha ao contar sinais não vistos (loja=%s)",
@@ -196,26 +220,25 @@ def _copiloto_nao_vistos(
 ) -> int | None:
     """``None`` = sem sino; ``int`` (inclusive 0) = sino com essa contagem.
 
-    ``None`` cobre: qualquer uma das quatro condições de
-    ``copiloto_secao_liberada`` faltando (shell desligado, flag global do
-    Copiloto desligada, módulo fora do entitlement/loja inativa, papel fora
-    de ``PAPEIS_GESTAO_COPILOTO``) e falha ao obter uma sessão de banco para
-    consultar. O template usa a diferença entre "sem sino" e "sino zerado"
-    — não trocar por 0 nesses casos.
+    ``None`` cobre: conjunto vazio de ``regras_elegiveis`` (hoje o mesmo
+    que as quatro condições de ``copiloto_secao_liberada``) e falha ao
+    obter uma sessão de banco para consultar. O template usa a diferença
+    entre "sem sino" e "sino zerado" — não trocar por 0 nesses casos.
     """
-    liberado = copiloto_secao_liberada(
-        ents,
-        usuario,
+    regras = regras_elegiveis(
+        ents, usuario,
         shell_enabled=revy_loja_shell_enabled(),
         copiloto_enabled=revy_loja_copiloto_enabled(),
         entitlements_enabled=revy_loja_entitlements_enabled(),
     )
-    if not liberado:
+    if not regras:
         return None
     usuario_id = getattr(usuario, "id", None)
     if not usuario_id:
         return None
-    return _contar_nao_vistos_com_sessao_propria(store.loja_slug, usuario_id, db)
+    return _contar_nao_vistos_com_sessao_propria(
+        store.loja_slug, usuario_id, db, regras=regras
+    )
 
 
 def _copiloto_nao_vistos_sem_membership(usuario: Any, db: Session | None) -> int | None:

@@ -11,6 +11,7 @@ from typing import Any, Protocol
 from urllib.parse import quote
 
 import httpx
+from sqlalchemy.orm import Session
 
 from app import config
 
@@ -215,3 +216,116 @@ def set_whatsapp_outbound(port: WhatsAppOutboundPort | None) -> None:
     """Sobrescreve o port (testes). None restaura o adapter Evolution padrão."""
     global _outbound
     _outbound = port
+
+
+class CloudWhatsAppOutbound:
+    """POST /{phone_number_id}/messages na Graph API (spec §6).
+
+    ``instance`` aqui é o ``phone_number_id`` — o mesmo slot que no Modo 1
+    carrega a instância Evolution. Assim ``send_text`` continua satisfazendo
+    ``WhatsAppOutboundPort`` sem mudar a assinatura do port.
+
+    O ``oferta_id`` vai no ``payload``/``id`` do botão porque o clique volta
+    como inbound e precisa dizer QUAL lead (spec §5.7): o mesmo vendedor pode
+    ter uma oferta viva e outra velha que ainda vale.
+    """
+
+    def __init__(
+        self,
+        base_url: str | None = None,
+        token: str | None = None,
+        timeout: float = 15,
+        transport: httpx.BaseTransport | None = None,
+    ) -> None:
+        self.base_url = (base_url or config.GRAPH_BASE_URL).rstrip("/")
+        self.token = token or config.GRAPH_TOKEN
+        self.timeout = timeout
+        self._transport = transport
+
+    def _post(self, instance: str, corpo: dict[str, Any]) -> dict[str, Any]:
+        if not self.token:
+            raise WhatsAppOutboundError("Cloud API não configurada")
+        try:
+            with httpx.Client(
+                timeout=self.timeout,
+                transport=self._transport,
+                headers={"Authorization": f"Bearer {self.token}"},
+            ) as cliente:
+                resposta = cliente.post(f"{self.base_url}/{instance}/messages", json=corpo)
+                resposta.raise_for_status()
+                return resposta.json()
+        except httpx.HTTPError as exc:
+            raise WhatsAppOutboundError(f"falha no envio Cloud: {exc}") from exc
+
+    def send_text(self, *, instance: str, number: str, text: str) -> dict[str, Any]:
+        return self._post(instance, {
+            "messaging_product": "whatsapp",
+            "to": number,
+            "type": "text",
+            "text": {"body": text},
+        })
+
+    def send_template_button(
+        self, *, instance: str, number: str, template: str,
+        variaveis: list[str], oferta_id: str, idioma: str = "pt_BR",
+    ) -> dict[str, Any]:
+        """Janela de 24 h FECHADA com aquele vendedor: template pago (~R$0,04)."""
+        return self._post(instance, {
+            "messaging_product": "whatsapp",
+            "to": number,
+            "type": "template",
+            "template": {
+                "name": template,
+                "language": {"code": idioma},
+                "components": [
+                    {
+                        "type": "body",
+                        "parameters": [{"type": "text", "text": v} for v in variaveis],
+                    },
+                    {
+                        "type": "button",
+                        "sub_type": "quick_reply",
+                        "index": "0",
+                        "parameters": [{"type": "payload", "payload": f"pego:{oferta_id}"}],
+                    },
+                ],
+            },
+        })
+
+    def send_interactive_button(
+        self, *, instance: str, number: str, texto: str, oferta_id: str,
+        rotulo: str = "Peguei",
+    ) -> dict[str, Any]:
+        """Janela ABERTA: interativa, de graça. Mesmo significado do template."""
+        return self._post(instance, {
+            "messaging_product": "whatsapp",
+            "to": number,
+            "type": "interactive",
+            "interactive": {
+                "type": "button",
+                "body": {"text": texto},
+                "action": {
+                    "buttons": [
+                        {
+                            "type": "reply",
+                            "reply": {"id": f"pego:{oferta_id}", "title": rotulo},
+                        }
+                    ]
+                },
+            },
+        })
+
+
+def outbound_para_loja(db: Session, loja_id: str) -> WhatsAppOutboundPort:
+    """Modo 1 e Modo 2 convivem no processo, em lojas diferentes.
+
+    Por isso a escolha é por loja e não pelo singleton de
+    ``get_whatsapp_outbound`` — trocar o singleton derrubaria o Modo 1 das
+    outras lojas. O singleton continua sendo o default (Modo 1) e o
+    ``set_whatsapp_outbound`` continua servindo aos testes.
+    """
+    from app.rodizio import loja_opera_modo2
+
+    if loja_opera_modo2(db, loja_id):
+        return CloudWhatsAppOutbound()
+    return get_whatsapp_outbound()

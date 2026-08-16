@@ -621,6 +621,12 @@ class CopilotoSinal(Base):
             "entidade_ref",
         ),
         Index("ix_copiloto_sinal_loja_estado", "loja_slug", "estado", "criado_em"),
+        Index(
+            "ix_copiloto_sinal_destinatario",
+            "loja_slug",
+            "destinatario_usuario_id",
+            "estado",
+        ),
     )
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=novo_id)
@@ -628,6 +634,13 @@ class CopilotoSinal(Base):
     regra: Mapped[str] = mapped_column(String(40), nullable=False, index=True)
     # Id do veículo / meta / o que a regra observa. None = sinal agregado da loja.
     entidade_ref: Mapped[Optional[str]] = mapped_column(String(120), nullable=True)
+    # Destinatário único do sinal. None = sinal da loja inteira (todas as 7
+    # regras do Copiloto). Preenchido = SÓ esta pessoa vê e conta — é o que
+    # a oferta 1:1 do rodízio (spec §5.7) precisa: dono e gerente não podem
+    # ver a oferta de um vendedor. Guarda o id do usuário, nunca telefone.
+    destinatario_usuario_id: Mapped[Optional[str]] = mapped_column(
+        String(36), nullable=True
+    )
     severidade: Mapped[str] = mapped_column(String(20), nullable=False)
     titulo: Mapped[str] = mapped_column(String(240), nullable=False)
     detalhe: Mapped[str] = mapped_column(String(600), nullable=False)

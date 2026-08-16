@@ -207,12 +207,19 @@ class UpdateStore:
 
 
 @dataclass(frozen=True)
+class SetWhatsappMode:
+    store: StoreRef
+    mode: int
+
+
+@dataclass(frozen=True)
 class StoreView:
     id: str
     name: str
     slug: str
     status: StoreStatus
     version: int
+    whatsapp_mode: int
     created_at: datetime
     updated_at: datetime
 

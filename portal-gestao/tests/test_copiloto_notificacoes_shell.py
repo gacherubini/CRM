@@ -25,7 +25,7 @@ from app.loja.copiloto.sinais import SinalCandidato
 from app.loja.copiloto.sinais_store import contar_sinais_novos, sincronizar_sinais
 from app.loja.entitlements import fail_open
 from app.models import LojaOperacionalProjecao, Usuario
-from app.web.loja_shell import copiloto_secao_liberada, template_extras
+from app.web.loja_shell import copiloto_secao_liberada, regras_elegiveis, template_extras
 
 
 class _FakeRequest:
@@ -127,6 +127,29 @@ def test_flag_global_do_copiloto_desligada_recebe_none(db, monkeypatch):
     extras = template_extras(_FakeRequest(), usuario, db)
 
     assert extras["copiloto_nao_vistos"] is None
+
+
+def test_sino_repassa_regras_elegiveis_na_contagem(db, monkeypatch):
+    """Gate do sino passa a ser regras_elegiveis; a contagem recebe esse conjunto."""
+    _ligar_shell_e_entitlements(monkeypatch)
+    criar_usuario(papel="dono", email="dono-regras@loja.test", loja_slug="loja-teste")
+    _seedar_modulo_copiloto(db)
+    usuario = _usuario(db, "dono-regras@loja.test")
+
+    visto = {}
+
+    def _espiao(loja_slug, usuario_id, db, regras=None):
+        visto["regras"] = regras
+        return 0
+
+    monkeypatch.setattr(
+        "app.web.loja_shell._contar_nao_vistos_com_sessao_propria",
+        _espiao,
+    )
+    extras = template_extras(_FakeRequest(), usuario, db)
+    assert extras["copiloto_nao_vistos"] == 0
+    assert visto.get("regras")
+    assert "estoque_parado" in visto["regras"]
 
 
 # --- copiloto_secao_liberada: fonte única dos 4 gates (sino + seção) -------
@@ -594,6 +617,22 @@ def test_paridade_sino_x_secao(
     extras = template_extras(_FakeRequest(), usuario, db)
     sino_aparece = extras.get("copiloto_nao_vistos") is not None
 
+    ents = extras.get("entitlements")
+    if ents is None:
+        ents = fail_open("loja-teste", {papel})
+    regras = regras_elegiveis(
+        ents,
+        usuario,
+        shell_enabled=shell_on,
+        copiloto_enabled=flag_on,
+        entitlements_enabled=entitlements_on,
+    )
+    assert sino_aparece == bool(regras), (
+        f"sino vs regras_elegiveis: shell={shell_on} flag={flag_on} "
+        f"modulo={modulo_on} papel={papel} entitlements={entitlements_on} -> "
+        f"sino({extras.get('copiloto_nao_vistos')!r})={sino_aparece} "
+        f"regras={set(regras)}"
+    )
     assert secao_permite == sino_aparece, (
         f"divergência: shell={shell_on} flag={flag_on} modulo={modulo_on} "
         f"papel={papel} entitlements={entitlements_on} -> "

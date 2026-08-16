@@ -57,6 +57,8 @@
 <div class="alert success" role="status">Ação de conversão vinculada.</div>
 {% elif ok == 'google_metricas_sincronizadas' %}
 <div class="alert success" role="status">Métricas Google Ads sincronizadas.</div>
+{% elif ok == 'whatsapp_modo' %}
+<div class="alert success" role="status">Modo de WhatsApp atualizado.</div>
 {% endif %}
 {% if erro %}
 <div class="alert error" role="alert">{{ erro }}</div>
@@ -120,6 +122,29 @@
       </li>
       {% endfor %}
     </ul>
+  </section>
+  {% endif %}
+
+  {% if is_admin %}
+  <section class="panel" id="loja-whatsapp-modo">
+    <div class="panel-heading">
+      <h2>Modo de WhatsApp</h2>
+      <p class="muted">Trocar o modo não migra conversas antigas.</p>
+    </div>
+    <form method="post" action="{{ public_path('/app/control/lojas/' ~ store.id ~ '/whatsapp-modo') }}" class="form-layout" id="form-whatsapp-modo">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <label>
+        <input type="radio" name="modo" value="1" {% if store.whatsapp_mode == 1 %}checked{% endif %}>
+        Baileys + grupo
+      </label>
+      {% if whatsapp_modo2_enabled %}
+      <label>
+        <input type="radio" name="modo" value="2" {% if store.whatsapp_mode == 2 %}checked{% endif %}>
+        central Cloud API
+      </label>
+      {% endif %}
+      <button class="button primary" type="submit">Salvar modo</button>
+    </form>
   </section>
   {% endif %}
 

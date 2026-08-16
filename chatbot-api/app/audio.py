@@ -155,6 +155,67 @@ class EvolutionMediaDownloader:
         return conteudo, mime
 
 
+class GraphMediaDownloader:
+    """Baixa mídia da Cloud API (spec §5.10). Implementa ``MediaDownloader``.
+
+    Dois passos, e o segundo também precisa do Bearer: ``GET /{media_id}``
+    devolve uma URL assinada de vida curta (~5 min) que ainda exige o header.
+    Sem ele o CDN responde 401 — é o erro clássico dessa integração.
+
+    Por isso o download é síncrono, no inbound: enfileirar para depois faz a
+    URL expirar antes do worker acordar.
+    """
+
+    def __init__(
+        self,
+        base_url: str | None = None,
+        token: str | None = None,
+        timeout: float | None = None,
+        transport: httpx.BaseTransport | None = None,
+    ) -> None:
+        self.base_url = (base_url or config.GRAPH_BASE_URL).rstrip("/")
+        self.token = token or config.GRAPH_TOKEN
+        self.timeout = timeout or config.AUDIO_DOWNLOAD_TIMEOUT
+        self._transport = transport
+
+    def baixar(
+        self,
+        instancia: str,
+        message_id: str,
+        mime_declarado: str | None = None,
+    ) -> tuple[bytes, str]:
+        if not self.token:
+            raise AudioIndisponivel("download Cloud não configurado")
+        headers = {"Authorization": f"Bearer {self.token}"}
+        try:
+            with httpx.Client(
+                timeout=self.timeout, transport=self._transport, headers=headers
+            ) as cliente:
+                meta = cliente.get(f"{self.base_url}/{message_id}")
+                meta.raise_for_status()
+                dados = meta.json()
+                url = dados.get("url")
+                if not url:
+                    raise AudioIndisponivel("mídia sem url na resposta do Graph")
+                binario = cliente.get(url)
+                binario.raise_for_status()
+                conteudo = binario.content
+        except AudioIndisponivel:
+            raise
+        except (httpx.HTTPError, ValueError) as exc:
+            raise AudioIndisponivel("não foi possível baixar a mídia") from exc
+
+        if len(conteudo) > config.AUDIO_MAX_BYTES:
+            raise AudioIndisponivel("mídia acima do limite")
+        mime = (
+            dados.get("mime_type")
+            or binario.headers.get("content-type")
+            or mime_declarado
+            or ""
+        )
+        return conteudo, str(mime).split(";", 1)[0].strip().lower()
+
+
 class NoopTranscriptionProvider:
     def transcrever(self, arquivo: Path, mime_type: str) -> str:
         raise AudioIndisponivel("transcrição de áudio não configurada")
@@ -163,10 +224,17 @@ class NoopTranscriptionProvider:
 class HttpTranscriptionProvider:
     """Contrato genérico: multipart `file`; resposta JSON com `text` ou `texto`."""
 
-    def __init__(self, url: str, token: str = "", timeout: float = 15):
+    def __init__(
+        self,
+        url: str,
+        token: str = "",
+        timeout: float = 15,
+        transport: httpx.BaseTransport | None = None,
+    ):
         self.url = url
         self.token = token
         self.timeout = timeout
+        self._transport = transport
 
     def transcrever(self, arquivo: Path, mime_type: str) -> str:
         if not self.url:
@@ -174,13 +242,16 @@ class HttpTranscriptionProvider:
         headers = {"Authorization": f"Bearer {self.token}"} if self.token else {}
         try:
             with arquivo.open("rb") as stream:
-                resposta = httpx.post(
-                    self.url,
-                    headers=headers,
-                    files={"file": (arquivo.name, stream, mime_type)},
-                    data={"language": "pt-BR"},
-                    timeout=self.timeout,
-                )
+                with httpx.Client(
+                    timeout=self.timeout, transport=self._transport, headers=headers
+                ) as cliente:
+                    resposta = cliente.post(
+                        self.url,
+                        files={"file": (arquivo.name, stream, mime_type)},
+                        # ISO-639-1, duas letras. "pt-BR" não é código válido: alguns
+                        # providers ignoram em silêncio (perde acurácia), outros 400.
+                        data={"language": "pt"},
+                    )
             resposta.raise_for_status()
             payload = resposta.json()
         except (OSError, httpx.HTTPError, ValueError) as exc:
@@ -248,3 +319,26 @@ def get_audio_processor() -> AudioProcessor:
     else:
         provider = NoopTranscriptionProvider()
     return AudioProcessor(EvolutionMediaDownloader(), provider)
+
+
+def processador_de_audio(modo: int) -> "AudioProcessor | None":
+    """Processador do canal, ou ``None`` quando o canal não transcreve.
+
+    Transcrição é **só do Modo 2** (spec §5.10): a central precisa ouvir para
+    responder, porque não há humano do outro lado. No Modo 1 quem recebe o
+    áudio é o vendedor, no celular dele — transcrever ali só geraria custo.
+
+    Por isso a decisão é por canal, não por variável global do processo:
+    ligar `AUDIO_TRANSCRIPTION_PROVIDER` globalmente mudaria o Modo 1 junto.
+    """
+    if modo != 2:
+        return None
+    if not config.AUDIO_TRANSCRIPTION_URL:
+        return None
+    return AudioProcessor(
+        downloader=GraphMediaDownloader(),
+        provider=HttpTranscriptionProvider(
+            url=config.AUDIO_TRANSCRIPTION_URL,
+            token=config.AUDIO_TRANSCRIPTION_TOKEN,
+        ),
+    )

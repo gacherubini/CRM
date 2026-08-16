@@ -73,6 +73,20 @@ class ProvisioningControl:
                     resource_id=store.id,
                 )
             ]
+            operational.append(
+                _envelope(
+                    db,
+                    loja_id=store.id,
+                    # Aggregate e não módulo: modo é 1 XOR 2, não ligado/desligado.
+                    # Dois módulos exclusivos deixariam "ambos" representável.
+                    aggregate="whatsapp_modo",
+                    version=store.versao,
+                    state=str(store.whatsapp_modo),
+                    effective_at=store.atualizada_em,
+                    resource_type="whatsapp_modo",
+                    resource_id=store.id,
+                )
+            )
             assignments = (
                 db.query(LojaModulo, ModuloRevy)
                 .join(ModuloRevy, ModuloRevy.id == LojaModulo.modulo_id)

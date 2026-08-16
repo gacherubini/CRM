@@ -46,6 +46,16 @@ AUDIO_FALLBACK_TEXT = os.getenv(
     "Não consegui entender o áudio. Pode me enviar por texto?",
 )[:160]
 
+# Cloud API (Modo 2). Token de System User — nunca o temporário de 24 h do painel.
+GRAPH_BASE_URL = os.getenv("CHATBOT_GRAPH_BASE_URL", "https://graph.facebook.com/v21.0")
+GRAPH_TOKEN = os.getenv("CHATBOT_GRAPH_TOKEN", "")
+GRAPH_PHONE_NUMBER_ID = os.getenv("CHATBOT_GRAPH_PHONE_NUMBER_ID", "")
+GRAPH_TEMPLATE_OFERTA = os.getenv("CHATBOT_GRAPH_TEMPLATE_OFERTA", "chama_vendedor")
+
+# Webhook da Meta (Modo 2). App Secret assina o corpo; verify token fecha o GET.
+META_APP_SECRET = os.getenv("CHATBOT_META_APP_SECRET", "")
+META_VERIFY_TOKEN = os.getenv("CHATBOT_META_VERIFY_TOKEN", "")
+
 # Imagem de veículo recebida de número autorizado. O binário só transita pela
 # API e é enviado ao Estoque; não é persistido no Chatbot/n8n.
 IMAGE_EVOLUTION_URL = os.getenv(
@@ -101,6 +111,9 @@ ESTOQUE_MEDIA_ALLOWED_HOSTS = tuple(
 
 # Prazos padrão multi-opção quando o cliente não escolhe um único prazo (CRM WhatsApp).
 PRAZOS_PADRAO_MESES: list[int] = [24, 36, 48, 60]
+
+# Rollout do Modo 2 (central Cloud API). Default OFF: invariante do projeto.
+MODO2_ENABLED = os.getenv("CHATBOT_WHATSAPP_MODO2_ENABLED", "").lower() in {"1", "true", "yes"}
 
 # Multi-WhatsApp: vários canais por loja. Default off — só 1 canal legado permitido.
 MULTI_WHATSAPP_ENABLED = os.getenv("MULTI_WHATSAPP_ENABLED", "0").strip().lower() in {

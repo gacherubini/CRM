@@ -244,6 +244,37 @@ class ChatbotClient:
         dados = self._request("GET", "/v1/whatsapp/canais")
         return list(dados.get("canais") or [])
 
+    def listar_fila_vendedores(self) -> list[dict]:
+        """Fila de rodízio da loja (Modo 2). O Chatbot é dono do dado."""
+        return self._request("GET", "/v1/fila-vendedores")
+
+    def criar_fila_vendedor(
+        self, *, nome: str, telefone: str, ordem: int, usuario_id: str | None = None
+    ) -> dict:
+        """``usuario_id`` é a pessoa da Loja — é ele que dá destinatário ao sino."""
+        return self._request(
+            "POST",
+            "/v1/fila-vendedores",
+            json={
+                "nome": nome,
+                "telefone": telefone,
+                "ordem": ordem,
+                "usuario_id": usuario_id,
+            },
+        )
+
+    def remover_fila_vendedor(self, vendedor_id: str) -> None:
+        """Inativação lógica no Chatbot — oferta antiga referencia o vendedor."""
+        self._request("DELETE", f"/v1/fila-vendedores/{vendedor_id}")
+
+    def listar_ofertas(self, estado: str | None = None) -> list[dict]:
+        params = {"estado": estado} if estado else {}
+        dados = self._request("GET", "/v1/ofertas", params=params)
+        return list(dados or [])
+
+    def assumir_oferta(self, oferta_id: str) -> dict:
+        return self._request("POST", f"/v1/ofertas/{oferta_id}/assumir")
+
     def registrar_canal_whatsapp(self, label: str) -> dict:
         """Cadastra canal. Não envia ``evolution_instance``: o Chatbot gera o nome."""
         return self._request(

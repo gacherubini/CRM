@@ -18,7 +18,11 @@ from sqlalchemy.orm import Session
 from app import provisioning
 from app.clients.chatbot import ChatbotIndisponivel
 from app.clients.estoque import EstoqueIndisponivel
-from app.config import revy_loja_copiloto_enabled, revy_loja_entitlements_enabled
+from app.config import (
+    revy_loja_copiloto_enabled,
+    revy_loja_entitlements_enabled,
+    revy_loja_shell_enabled,
+)
 from app.loja.copiloto.consultas_estoque import estoque_parado
 from app.loja.copiloto.consultas_leads import leads_status
 from app.loja.copiloto.consultas_origem import venda_origem_periodo
@@ -35,12 +39,18 @@ from app.loja.copiloto.sinais import (
     regra_meta_em_risco,
     regra_preco_fora_da_faixa,
 )
-from app.loja.copiloto.sinais_store import sincronizar_sinais
+from app.loja.copiloto.sinais_store import (
+    ESTADOS_ABERTOS,
+    criar_sinal_direcionado,
+    invalidar_contagem,
+    sincronizar_sinais,
+    transferir_sinal,
+)
+from app.models import CopilotoSinal, LojaOperacionalProjecao
 from app.loja.copiloto.tipos import CopilotoContexto
 from app.loja.estoque_overview import montar_estoque_overview
 from app.loja.types import Module
 from app.meta_ads_spend_job import env_flag, env_float, env_int
-from app.models import LojaOperacionalProjecao
 
 logger = logging.getLogger(__name__)
 
@@ -59,8 +69,8 @@ FIPE_DIAS_PARADO_DEFAULT = 60  # mesmo piso de "encalhado" da regra 1
 FIPE_POR_CICLO_DEFAULT = 10
 
 
-def _copiloto_permitido(db: Session, loja_slug: str) -> bool:
-    """Gate duplo por loja: mesmo mecanismo usado pelas rotas (``allows_processing``).
+def _loja_permite_copiloto(db: Session, loja_slug: str) -> bool:
+    """Gate das 7 regras do Copiloto: flag global + entitlement da loja.
 
     Com ``REVY_LOJA_ENTITLEMENTS_ENABLED`` desligado (default hoje, single-tenant),
     ``allows_processing`` recebe ``module=None`` e só confere a loja ativa — é o
@@ -72,7 +82,89 @@ def _copiloto_permitido(db: Session, loja_slug: str) -> bool:
     return provisioning.allows_processing(db, loja_slug, modulo)
 
 
+REGRA_OFERTA_LEAD = "oferta_lead"
+
+
+def sincronizar_ofertas(db: Session, loja_slug: str, chatbot) -> dict[str, int]:
+    """Reconcilia ofertas abertas do chatbot com sinais 1:1 do sino.
+
+    Idempotente por ``entidade_ref`` (id da oferta). O telefone do cliente
+    transita na lista do chatbot e **não** entra no sinal.
+
+    O destinatário é ``vendedor_usuario_id`` — a pessoa da Loja —, nunca o
+    ``vendedor_id`` da fila. Oferta de vendedor sem vínculo é contada em
+    ``ignorados_sem_vinculo`` e não gera sinal.
+    """
+    ofertas = list(chatbot.listar_ofertas() or [])
+    abertas = [o for o in ofertas if o.get("estado") == "aberta"]
+    refs_vivas = {str(o.get("id") or "") for o in abertas if o.get("id")}
+
+    contagem = {"criados": 0, "transferidos": 0, "resolvidos": 0,
+                "ignorados_sem_vinculo": 0}
+    abertos = (
+        db.query(CopilotoSinal)
+        .filter(
+            CopilotoSinal.loja_slug == loja_slug,
+            CopilotoSinal.regra == REGRA_OFERTA_LEAD,
+            CopilotoSinal.estado.in_(ESTADOS_ABERTOS),
+        )
+        .all()
+    )
+    por_ref = {s.entidade_ref: s for s in abertos if s.entidade_ref}
+
+    agora_utc = datetime.now(timezone.utc)
+    for sinal in abertos:
+        if sinal.entidade_ref in refs_vivas:
+            continue
+        sinal.estado = "resolvido"
+        sinal.resolvido_em = agora_utc
+        sinal.atualizado_em = agora_utc
+        db.commit()
+        invalidar_contagem(loja_slug, sinal.destinatario_usuario_id)
+        contagem["resolvidos"] += 1
+
+    for oferta in abertas:
+        ref = str(oferta.get("id") or "")
+        if not ref:
+            continue
+        # `vendedor_usuario_id` é a pessoa da Loja, não o `vendedor_id` da
+        # fila: aquele é UUID do chatbot e nunca bate com `Usuario.id`, então
+        # endereçaria o sinal a um id que ninguém tem — o sino ficaria vazio
+        # para todo mundo, inclusive para o vendedor da vez.
+        dest = str(oferta.get("vendedor_usuario_id") or "")
+        if not dest:
+            # Vendedor cadastrado sem pessoa da Loja vinculada. Melhor não
+            # tocar o sino do que endereçar a ninguém; ele segue recebendo a
+            # oferta pelo WhatsApp, que não depende deste vínculo.
+            contagem["ignorados_sem_vinculo"] += 1
+            continue
+        existente = por_ref.get(ref)
+        if existente is None:
+            criar_sinal_direcionado(
+                db,
+                loja_slug,
+                regra=REGRA_OFERTA_LEAD,
+                destinatario_usuario_id=dest,
+                entidade_ref=ref,
+                titulo=f"Lead novo para {oferta.get('vendedor_nome') or 'você'}",
+                detalhe="Toque em Peguei para assumir o atendimento.",
+            )
+            contagem["criados"] += 1
+            continue
+        if existente.destinatario_usuario_id != dest:
+            if transferir_sinal(
+                db,
+                loja_slug,
+                entidade_ref=ref,
+                de_usuario_id=existente.destinatario_usuario_id,
+                para_usuario_id=dest,
+            ):
+                contagem["transferidos"] += 1
+    return contagem
+
+
 def lojas_ativas(db: Session) -> list[str]:
+    """Todas as lojas ativas. Elegibilidade por tipo fica em ``run_once``."""
     linhas = (
         db.query(LojaOperacionalProjecao.loja_slug)
         .filter(
@@ -81,8 +173,7 @@ def lojas_ativas(db: Session) -> list[str]:
         )
         .all()
     )
-    slugs = sorted({linha[0] for linha in linhas})
-    return [slug for slug in slugs if _copiloto_permitido(db, slug)]
+    return sorted({linha[0] for linha in linhas})
 
 
 # Formato documentado da resposta real da FIPE (client.valor()["Valor"]):
@@ -402,7 +493,15 @@ class CopilotoSinaisWorker:
     def _ligado(self) -> bool:
         if not self.enabled:
             return False
-        return revy_loja_copiloto_enabled() if self._gate_flag else True
+        return revy_loja_shell_enabled() if self._gate_flag else True
+
+    def _deve_avaliar_copiloto(self, db: Session, loja_slug: str) -> bool:
+        # Testes que passam enabled=True pulam a flag de produto (mesmo
+        # contrato de _ligado). Em produção a flag do Copiloto continua
+        # gated nas 7 regras — o worker só não some mais só por ela.
+        if self._gate_flag and not revy_loja_copiloto_enabled():
+            return False
+        return _loja_permite_copiloto(db, loja_slug)
 
     def run_once(self) -> dict:
         if not self._ligado():
@@ -418,6 +517,13 @@ class CopilotoSinaisWorker:
             estoque, chatbot, fipe = self._clients()
             for loja_slug in lojas_ativas(db):
                 try:
+                    try:
+                        sincronizar_ofertas(db, loja_slug, chatbot)
+                    except (ChatbotIndisponivel, AttributeError):
+                        # Chatbot stub/fora do ar: sino de oferta some, Copiloto segue.
+                        pass
+                    if not self._deve_avaliar_copiloto(db, loja_slug):
+                        continue
                     candidatos = avaliar_loja(
                         db,
                         loja_slug,

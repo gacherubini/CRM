@@ -1,6 +1,6 @@
 # Contexto compacto para continuidade
 
-Atualizado em **2026-08-13**. Ponto de entrada de estado e prioridades.
+Atualizado em **2026-08-14**. Ponto de entrada de estado e prioridades.
 Quadro: [`../README.md`](../README.md). Fila: [`../fila/README.md`](../fila/README.md).
 Vocabulário: [`../../CONTEXT.md`](../../CONTEXT.md). As-built Control/Loja:
 [`design/2026-07-30-revy-control-loja-asbuilt-e-melhorias.md`](design/2026-07-30-revy-control-loja-asbuilt-e-melhorias.md).
@@ -21,8 +21,34 @@ Vocabulário: [`../../CONTEXT.md`](../../CONTEXT.md). As-built Control/Loja:
   existem atrás de flag; falta secrets GCP e E2E de dois canais.
 - **Revy Loja:** F0–F6/F8 + Atendimento (chat + poll), Perfil, Grupo do estoque, números
   WA, Vitrine unificada, funil clicável, página do Agente, bloco de aquisição por
-  `ctwa_source_type`. Seller AI adiado. Foto de veículo ainda é URL, não upload.
-  Sino geral (independente do Copiloto) **não** existe.
+  `ctwa_source_type`. Seller AI adiado. **Foto de veículo agora tem upload por arquivo**
+  no form de estoque (o caminho pelo grupo continua). **Sino geral existe**
+  (`regras_elegiveis` por tipo, independente do Copiloto) e aceita **destinatário por
+  pessoa** (`copiloto_sinal.destinatario_usuario_id`, migration 0024).
+
+- **WhatsApp Modo 2 (central Cloud API):** **código da Fase 1 inteiro no código**, com todas
+  as flags **OFF**. Spec canônica:
+  [`specs/2026-08-12-whatsapp-dois-modos-design.md`](specs/2026-08-12-whatsapp-dois-modos-design.md).
+  Sete cards executados, planos em [`planos/`](planos/):
+  - `chatbot-api`: `fila_vendedor`, `oferta_lead`, `rodizio_ponteiro` (migrations 0020/0021),
+    `conversas.followup_toques` (0022). Ponteiro rotativo, trava idempotente do primeiro
+    clique, worker de 10 min, adapters Cloud (`GraphMediaDownloader`,
+    `CloudWhatsAppOutbound`), três gatilhos de handoff, re-notificação com throttle,
+    `FollowupWorker`, e o webhook `/webhook/cloud` com HMAC sobre corpo cru e dedup por
+    `wamid`. Flag `CHATBOT_WHATSAPP_MODO2_ENABLED`.
+  - `revy-trafego`: `lojas.whatsapp_modo` (1 XOR 2, migration 0019), emitido como aggregate
+    no snapshot de provisionamento, escolhido na ficha da loja. Flag
+    `REVY_CONTROL_WHATSAPP_MODO2_ENABLED`.
+  - `n8n`: `workflow-cloud.json` como transporte fino (GET verify + POST `rawBody`), com
+    `validate_workflow_cloud.py`. `workflow-ai-nao-salvos.json` (Baileys) **intacto**.
+  - **Gate único:** `rodizio.loja_opera_modo2` = flag + `allows_processing` +
+    projeção `whatsapp_modo == "2"`. Loja Modo 1 não entra no rodízio.
+  - **Falta em código:** a metade do dono da loja — sino 1:1 com Peguei, faixa "N sem vendedor",
+    filtro Aguardando, card de 7 dias. O chatbot não expõe rota de oferta e
+    `criar_sinal_direcionado` não tem chamador, então **lead que ninguém pega some**. Card 5 em
+    `../fila/`.
+  - **Falta fora de código:** conta do Revy na Meta, publicar/ativar o `n8n-cloud`, provider de
+    transcrição. Card de fechamento em `../fila/`.
 - **Triagem UX 2026-08-07:** 32 itens feitos e **13 recusados** — não re-propor:
   [`2026-08-07-triagem-revisao-ux-loja-control.md`](2026-08-07-triagem-revisao-ux-loja-control.md).
 - **Marca:** `shared/brand/revy-tokens.css` é a fonte única; acento verde racing;
@@ -37,9 +63,11 @@ Vocabulário: [`../../CONTEXT.md`](../../CONTEXT.md). As-built Control/Loja:
   live (`n8n2037`, 2026-08-04): importado como `wAiNaoSalvos0001`, **inativo/draft**.
   Teste separado permanece OFF. Active ON só com smoke autorizado pelo dono.
 - **Alerta de simulação no grupo:** persistência + outbox + retry + dead-letter no
-  Chatbot. Residual = smoke, não código.
-- **WhatsApp dois modos** (Baileys+grupo **ou** Central Cloud API): spec fechada,
-  plano ainda não escrito. Coexistência por vendedor foi descartada.
+  Chatbot. Residual = smoke, não código. **Fica** no Modo 1.
+- **WhatsApp dois modos** (Baileys+grupo **ou** Central Cloud API): spec fechada
+  (revisão 2026-08-13). Plano ainda não escrito. Coexistência por vendedor foi
+  descartada. Escolha no Control; Loja muda a tela. Fallback do dono é Atendimento
+  (faixa + filtro), não WhatsApp 19h.
 - **Motor:** 4 bancos LIVE; teto 2 browsers; Playwright sob demanda em `motor2037`
   (`gru`). Resultado ao cliente continua **humano** no Portal. Worker em IP
   residencial: design aprovado, sem código; gate é o probe no PC.
@@ -66,8 +94,8 @@ Um eixo por mudança. Não misture Copiloto, RPA, rollout e n8n na mesma entrega
 | Eixo | Próximo resultado verificável |
 |---|---|
 | Copiloto | F5 (lacunas no Control e/ou RLS) **ou** F6 (ferramentas cadastro/funil) |
-| Loja — foto | Upload por arquivo no form de estoque que já existe |
-| Loja — sino | Central geral + `simulacao_pronta`, sem depender da flag do Copiloto |
+| Loja — foto | Upload por arquivo no form de estoque (os dois modos; no 2 é o único caminho) |
+| Loja — sino | B1: central geral por tipo. Sem blast `simulacao_pronta`. Oferta 1:1 = plano dos dois modos |
 | Motor | Probe Bradesco no PC (gate do worker residencial) **ou** estabilidade Bradesco |
 | Bot / n8n | Smoke virgem/CTWA/handoff/salvo no lab → Active ON pelo dono |
 | Control | Secrets GCP (Google Ads) **ou** E2E dois canais WA |
