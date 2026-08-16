@@ -44,6 +44,7 @@ from app.clients.estoque import (
     EstoqueIndisponivel,
     VeiculoNaoEncontrado,
 )
+from app.concorrencia import travar_por_loja
 from app.config import settings
 from app.loja.copiloto.consultas_estoque import (
     EscopoLojaDivergente,
@@ -137,6 +138,15 @@ def _checar_rate_limit(db: Session, loja_slug: str, agora: datetime) -> None:
     fora do ar é exatamente o caso que precisa ser freado — não só as ações
     que tiveram sucesso.
     """
+    # Antes do COUNT, não depois: sem isto o limite é "contei e decidi", e dois
+    # cliques simultâneos com o limite em N-1 passam os dois. Em Postgres a trava
+    # cobre o COUNT desta função e o commit da linha pendente em executar_acao —
+    # que vem depois — e é liberada nesse commit, antes do PATCH de rede. O que
+    # serializa a decisão é isso: a linha pendente é comitada ainda sob a trava,
+    # então um COUNT concorrente a vê. Isolamento por loja: uma loja lenta não
+    # segura as outras. Em SQLite é no-op e o comportamento é o de hoje.
+    travar_por_loja(db, loja_slug, "copiloto_acao")
+
     desde = agora - timedelta(hours=1)
     tentativas = (
         db.query(CopilotoAcao)
