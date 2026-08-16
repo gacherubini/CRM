@@ -403,3 +403,35 @@ class NotificacaoOperacional(Base):
     payload_resumo: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_agora)
     sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class CloudEventoFalho(Base):
+    """Evento da Cloud API que estourou no processamento (spec §6.1).
+
+    A §6.1 manda responder ``200`` **imediatamente** para a Meta não reentregar,
+    e processar depois. A primeira metade estava feita; a segunda virava
+    ``logger.exception`` e o lead sumia em silêncio.
+
+    Guarda o **corpo cru** — não o evento parseado — porque é dele que sai tudo
+    de novo no reprocesso, e porque a assinatura da Meta já foi conferida sobre
+    esses mesmos bytes. ``wamid`` é único: reentrega da Meta durante uma falha
+    não cria duas linhas.
+    """
+
+    __tablename__ = "cloud_evento_falho"
+    __table_args__ = (
+        Index("ix_cloud_evento_falho_estado", "estado", "tentativas"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    wamid: Mapped[str] = mapped_column(String(255), nullable=False, unique=True)
+    phone_number_id: Mapped[str | None] = mapped_column(String(60), nullable=True)
+    corpo_cru: Mapped[str] = mapped_column(Text, nullable=False)
+    # pendente | processado | desistiu
+    estado: Mapped[str] = mapped_column(String(20), nullable=False, default="pendente")
+    tentativas: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    ultimo_erro: Mapped[str | None] = mapped_column(Text, nullable=True)
+    criado_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_agora)
+    atualizado_em: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_agora, onupdate=_agora
+    )

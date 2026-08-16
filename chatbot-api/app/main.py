@@ -31,6 +31,7 @@ from app import (  # noqa: F401 (registra os modelos)
     solicitacoes_simulacao,
 )
 from app.audio import AudioProcessor, get_audio_processor, processador_de_audio
+from app.cloud_retry import registrar_evento_falho
 from app.meta_webhook import EventoCloud, assinatura_valida, parse_inbound
 from app.oferta_inbound import processar_clique
 from app.whatsapp_outbound import outbound_para_loja
@@ -425,6 +426,36 @@ class SolicitacaoSimulacaoHumanaInput(BaseModel):
         )
 
 
+class RespostaBotInput(BaseModel):
+    """Texto que o agente do ``n8n-cloud`` quer mandar ao cliente (spec §6).
+
+    Existe porque o **token do Graph não pode entrar no workflow** — a spec §6.2
+    põe o segredo da Meta no chatbot, e o validador do workflow recusa qualquer
+    vestígio dele. Então o n8n não fala com a Meta: fala com esta rota, e quem
+    fala com a Meta é o ``CloudWhatsAppOutbound``.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    telefone: str
+    texto: str = Field(min_length=1, max_length=4096)
+
+
+class HandoffHumanoInput(BaseModel):
+    """Cliente pediu humano — o 3º gatilho do handoff (spec §5.2).
+
+    Sem CPF/nascimento de propósito: a spec §5.2 diz que este gatilho pode vir
+    **antes** da simulação, e o template de oferta tem que funcionar sem o
+    campo de resultado. Exigir intake aqui mataria o gatilho justamente no caso
+    que ele existe para cobrir — o cliente que pede humano logo de cara.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    telefone: str
+    motivo: Optional[str] = Field(default=None, max_length=120)
+
+
 class MotoEscolhidaInput(BaseModel):
     """Moto única consultada no estoque — persiste para simular1 após restart n8n."""
 
@@ -524,17 +555,42 @@ async def webhook_cloud(request: Request, db: Session = Depends(get_db)):
         # Assinatura bate mas o corpo não é JSON: não é reentrega útil.
         return {"ok": True, "ignorado": "corpo inválido"}
 
+    mensagens: list[dict] = []
     for evento in parse_inbound(payload):
         if evento.wamid and _wamid_ja_visto(db, evento.wamid):
             continue
         if evento.wamid:
             _marcar_wamid_visto(evento.wamid)
         try:
-            processar_evento_cloud(db, evento)
+            pendente = processar_evento_cloud(db, evento)
+            # Commit por evento, não no fim do laço: um corpo da Meta traz
+            # vários, e o rollback do que falhar não pode desfazer o que já deu
+            # certo antes dele.
+            db.commit()
         except Exception:  # noqa: BLE001
-            # Erro nosso não pode virar reentrega infinita da Meta.
+            # Erro nosso não pode virar reentrega infinita da Meta (§6.1): já
+            # respondemos 200. Mas engolir a exceção perde o lead em silêncio,
+            # que foi o buraco anterior — então o evento cru fica guardado e o
+            # worker de reprocesso retoma.
             logger.exception("falha ao processar evento cloud wamid=%s", evento.wamid)
-    return {"ok": True}
+            db.rollback()  # a transação estourada não serve para gravar a falha
+            try:
+                registrar_evento_falho(
+                    db,
+                    wamid=evento.wamid,
+                    phone_number_id=evento.phone_number_id,
+                    corpo_cru=corpo_cru,
+                )
+                db.commit()
+            except Exception:  # noqa: BLE001
+                # Nem o registro da falha foi: só resta o log.
+                logger.exception("falha ao registrar evento cloud wamid=%s", evento.wamid)
+                db.rollback()
+        else:
+            if pendente:
+                mensagens.append(pendente)
+    # O n8n-cloud segue no agente a partir daqui (§5.9): debounce, IA e Graph.
+    return {"ok": True, "mensagens": mensagens}
 
 
 def _wamid_ja_visto(db: Session, wamid: str) -> bool:
@@ -575,7 +631,17 @@ def _loja_por_phone_number_id(db: Session, phone_number_id: str):
     )
 
 
-def _processar_mensagem_cliente(db: Session, loja, evento: EventoCloud) -> None:
+def _processar_mensagem_cliente(db: Session, loja, evento: EventoCloud) -> dict | None:
+    """Persiste a mensagem do cliente e devolve o que o bot deve responder.
+
+    Devolve ``None`` quando não há o que o agente fazer: mensagem duplicada, ou
+    lead já entregue a um vendedor (``bot_ativo=False``) — nesse caso quem fala
+    é o recado limitado da §5.4, não o bot.
+
+    O retorno é o que o ``n8n-cloud`` consome para seguir no agente (§5.9): a
+    assinatura da Meta só fecha sobre o corpo cru, então validação e persistência
+    ficam aqui e o n8n recebe o evento já normalizado.
+    """
     texto = evento.texto
     if evento.tipo == "audio":
         processador = processador_de_audio(2)
@@ -589,7 +655,7 @@ def _processar_mensagem_cliente(db: Session, loja, evento: EventoCloud) -> None:
             texto = resultado.get("texto") or resultado.get("fallback")
         else:
             texto = config.AUDIO_FALLBACK_TEXT
-    servico.registrar_mensagem(
+    registro = servico.registrar_mensagem(
         db,
         evento.phone_number_id,
         evento.remetente,
@@ -613,17 +679,41 @@ def _processar_mensagem_cliente(db: Session, loja, evento: EventoCloud) -> None:
         outbound=outbound_para_loja(db, loja.id),
     )
 
+    registro = registro or {}
+    if registro.get("duplicada") or not registro.get("bot_ativo"):
+        return None
+    if not (texto or "").strip():
+        return None
+    return {
+        "phone_number_id": evento.phone_number_id,
+        "loja_id": loja.id,
+        "telefone": evento.remetente,
+        "texto": texto,
+        "tipo": evento.tipo,
+        "wamid": evento.wamid,
+        "referral_ad_id": evento.referral_ad_id,
+        "conversa_id": registro.get("conversa_id"),
+        # O agente monta o prompt com o histórico (o Modo 1 lê o mesmo campo do
+        # /webhook/mensagem). Sem isto o bot do Modo 2 responderia sem memória
+        # da conversa em curso.
+        "historico_recente": registro.get("historico_recente"),
+    }
 
-def processar_evento_cloud(db: Session, evento: EventoCloud) -> None:
+
+def processar_evento_cloud(db: Session, evento: EventoCloud) -> dict | None:
     """Despacha o evento para o que os cards 2 e 2b já entregaram.
 
     Função de módulo, não bloco inline na rota: é o ponto de substituição dos
     testes e o lugar onde o tipo novo entra sem mexer no handler HTTP.
+
+    Devolve a mensagem normalizada quando o agente do ``n8n-cloud`` deve
+    responder; ``None`` para tudo que se resolve aqui dentro (clique do
+    vendedor, status de entrega, lead já travado).
     """
     loja = _loja_por_phone_number_id(db, evento.phone_number_id)
     if loja is None:
         logger.warning("phone_number_id sem loja: %s", evento.phone_number_id)
-        return
+        return None
 
     if evento.tipo == "clique":
         processar_clique(
@@ -636,8 +726,9 @@ def processar_evento_cloud(db: Session, evento: EventoCloud) -> None:
     elif evento.tipo in ("texto", "audio", "imagem"):
         # Fluxo do bot: texto direto; áudio transcreve antes (card 2b Task 2);
         # imagem entra na conversa sem OCR (spec §5.10).
-        _processar_mensagem_cliente(db, loja, evento)
+        return _processar_mensagem_cliente(db, loja, evento)
     # "ignorado" não faz nada de propósito: sticker, contato, localização.
+    return None
 
 
 @app.post("/webhook/mensagem")
@@ -1720,6 +1811,90 @@ def solicitar_simulacao_humana(
     if resultado.get("bloqueado"):
         return JSONResponse(status_code=200, content=resultado)
     return JSONResponse(status_code=202, content=resultado)
+
+
+@app.post("/v1/operacao/responder")
+def responder_cliente(
+    dados: RespostaBotInput,
+    ctx: Contexto = Depends(get_contexto),
+    db: Session = Depends(get_db),
+):
+    """Manda ao cliente o texto que o agente produziu, pela central Cloud.
+
+    Fail-closed no Modo 1: lá quem responde é o Baileys pelo n8n, e mandar por
+    aqui duplicaria a resposta do cliente.
+    """
+    _exigir_loja_operacional(db, ctx.loja_id)
+
+    from app.rodizio import loja_opera_modo2
+
+    telefone = normalizar_telefone(dados.telefone)
+    if not telefone:
+        raise HTTPException(status_code=422, detail="telefone inválido")
+
+    if not loja_opera_modo2(db, ctx.loja_id):
+        return {"enviado": False, "motivo": "loja_fora_do_modo_2"}
+
+    resultado = outbound_para_loja(db, ctx.loja_id).send_text(
+        instance=config.GRAPH_PHONE_NUMBER_ID,
+        number=telefone,
+        text=dados.texto,
+    )
+    wamid = ""
+    try:
+        wamid = (resultado or {}).get("messages", [{}])[0].get("id", "")
+    except (AttributeError, IndexError, TypeError):
+        pass
+
+    # A saída do bot entra na conversa igual à do Modo 1, senão o Portal mostra
+    # só o lado do cliente e o histórico fica pela metade.
+    servico.registrar_mensagem(
+        db, config.GRAPH_PHONE_NUMBER_ID, telefone, dados.texto,
+        wamid or None, True, True, "texto",
+    )
+    db.commit()
+    return {"enviado": True, "wamid": wamid}
+
+
+@app.post("/v1/operacao/handoff-humano", status_code=202)
+def acionar_handoff_humano(
+    dados: HandoffHumanoInput,
+    ctx: Contexto = Depends(get_contexto),
+    db: Session = Depends(get_db),
+):
+    """3º gatilho da §5.2: o cliente pediu para falar com gente.
+
+    Existe porque os outros dois gatilhos entram por
+    ``/v1/operacao/solicitacoes-simulacao-humana``, que **bloqueia sem CPF e
+    nascimento** — correto para simular, errado para quem só disse "quero falar
+    com uma pessoa". Sem esta rota o agente do Modo 2 não tem como abrir o
+    rodízio nesse caso.
+
+    Fail-closed em duas camadas: loja não operacional responde 423, e loja fora
+    do Modo 2 responde ``{"acionado": false}`` sem efeito nenhum — no Modo 1 o
+    handoff é o grupo de estoque, não o rodízio.
+    """
+    _exigir_loja_operacional(db, ctx.loja_id)
+
+    from app.handoff_gatilhos import disparar_handoff
+    from app.rodizio import loja_opera_modo2
+    from app.whatsapp_outbound import outbound_para_loja
+
+    telefone = normalizar_telefone(dados.telefone)
+    if not telefone:
+        raise HTTPException(status_code=422, detail="telefone inválido")
+
+    if not loja_opera_modo2(db, ctx.loja_id):
+        return {"acionado": False, "motivo": "loja_fora_do_modo_2"}
+
+    resultado = disparar_handoff(
+        db,
+        ctx.loja_id,
+        telefone,
+        motivo="pediu_humano",
+        outbound=outbound_para_loja(db, ctx.loja_id),
+    )
+    return {"acionado": True, "estado": resultado}
 
 
 @app.post("/v1/operacao/moto-escolhida")

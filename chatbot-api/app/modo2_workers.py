@@ -95,15 +95,20 @@ def start_workers(
     if not enabled or not config.MODO2_ENABLED:
         return {}
 
+    from app.cloud_retry import CloudRetryWorker
     from app.followup_job import FollowupWorker
     from app.rodizio_job import RodizioWorker
     from app.whatsapp_outbound import outbound_para_loja
 
     rodizio = RodizioWorker()
     followup = FollowupWorker()
+    cloud_retry = CloudRetryWorker()
 
     def _ciclo_rodizio(db: Any) -> None:
         rodizio.run_once(db)
+
+    def _ciclo_cloud_retry(db: Any) -> None:
+        cloud_retry.run_once(db)
 
     def _ciclo_followup(db: Any) -> None:
         # O follow-up precisa de um outbound e ele é por loja; o worker resolve
@@ -123,6 +128,15 @@ def start_workers(
             _ciclo_followup,
             db_factory=db_factory,
             interval_seconds=_numero("CHATBOT_MODO2_FOLLOWUP_INTERVAL_SECONDS", 300),
+        ),
+        # A outra metade da §6.1: respondemos 200 na hora, então quem falhou
+        # tem que ser retomado por aqui — senão "processar depois" nunca
+        # acontece e o lead se perde com uma linha de log.
+        "cloud_retry": _Periodico(
+            "cloud_retry",
+            _ciclo_cloud_retry,
+            db_factory=db_factory,
+            interval_seconds=_numero("CHATBOT_MODO2_RETRY_INTERVAL_SECONDS", 60),
         ),
     }
     for worker in _workers.values():
