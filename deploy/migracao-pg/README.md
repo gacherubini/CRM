@@ -9,7 +9,7 @@ Design: [`docs/referencia-viva/specs/2026-08-16-portal-control-para-postgres-des
 ## A ordem é obrigatória
 
 ```
-verificar  →  alembic upgrade head  →  copiar  →  validar
+verificar  →  alembic upgrade head  →  TRUNCATE  →  copiar  →  validar
 ```
 
 1. **`verificar.py`** — pré-voo. Acha tudo que o Postgres vai recusar e o SQLite
@@ -22,13 +22,51 @@ verificar  →  alembic upgrade head  →  copiar  →  validar
    schema de produção passa a divergir da cadeia de migrations em silêncio.
    **Antes dele, pré-crie a tabela de versão** (ver a seção abaixo) — sem isso o
    `upgrade head` morre no meio.
-3. **`copiar.py`** — carga em ordem topológica de FK, lotes de 500, conversão
+3. **`TRUNCATE` do schema de destino.** Medido no ensaio de 16/08/2026: o
+   `alembic upgrade head` **não** deixa as tabelas vazias. Três migrations do
+   Control semeiam catálogo com `op.bulk_insert` (`0007`, `0018`, `0019`), então
+   `control.modulos_revy` nasce com 4 linhas. Como a origem tem as mesmas linhas,
+   a carga colidiria — e o `copiar.py` recusa, com razão. Esvazie antes:
+
+   ```sql
+   -- psql -v schema=portal -f truncate.sql   (idem para control)
+   SELECT 'TRUNCATE '
+          || string_agg(format('%I.%I', schemaname, tablename), ', ')
+          || ' CASCADE'
+     FROM pg_tables
+    WHERE schemaname = :'schema'
+      AND tablename NOT LIKE 'alembic_version%'
+   \gexec
+   ```
+
+   A tabela de versão do alembic fica de fora de propósito: ela **é** o estado da
+   migração. E a recusa do `copiar.py` é a rede de segurança do passo — se você
+   esquecer o TRUNCATE, ele para antes de escrever qualquer coisa.
+4. **`copiar.py`** — carga em ordem topológica de FK, lotes de 500, conversão
    dirigida pelo tipo de destino. **Recusa carregar se o destino já tiver linha**:
    carregar duas vezes duplica tudo, e depois do fato é indistinguível de dado
    legítimo.
-4. **`validar.py`** — o portão. Compara os dois lados linha a linha e soma a
+5. **`validar.py`** — o portão. Compara os dois lados linha a linha e soma a
    soma. **Saída zero libera o corte; qualquer divergência aborta.** Enquanto
    esta lista não estiver vazia, produção continua nos `.db` e nada foi perdido.
+
+## Números medidos no ensaio (16/08/2026)
+
+Contra cópia real, em banco descartável, de dentro do `app2037`:
+
+| | Portal | Control |
+|---|---|---|
+| tabelas | 26 | 31 |
+| linhas | 172 | 243 |
+| carga | **1s** | **2s** |
+| pré-voo | 0 problemas | 0 problemas |
+
+**Zero órfão de FK** nos dois — o achado que o plano dava como mais provável não
+existe. Os bancos são muito menores do que o tamanho do arquivo sugere (610 KB e
+917 KB são quase todo página livre e índice).
+
+O gargalo da janela **não é a carga**: são segundos. É o `alembic upgrade head`
+do zero e a conferência na tela.
 
 ## Pré-crie a tabela de versão, ou o `upgrade head` morre no meio
 
