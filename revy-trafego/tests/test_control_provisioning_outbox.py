@@ -170,36 +170,34 @@ def test_process_pending_falha_marca_failed_e_incrementa_attempts():
     snapshot = ProvisioningControl(SessionLocal).snapshot(StoreRef(id=store_id))
 
     with SessionLocal() as db:
-        # destino isolado para não colidir com hooks chatbot
-        enqueue_delivery(
+        # Destino sintetico, como nos testes de retry: "motor" e um dos cinco
+        # destinos reais do fan-out dos hooks, e o snapshot muda de versao
+        # entre criar a loja e configurar o portfolio — sao dois eventos
+        # legitimos, logo duas linhas de motor. Guardamos o id para afirmar
+        # sobre a linha deste teste, nao sobre "a" linha do destino.
+        row = enqueue_delivery(
             db,
             loja_id=store_id,
             loja_slug=store_slug,
-            destination="motor",
+            destination="motor-falha",
             snapshot=snapshot,
         )
         db.commit()
+        row_id = row.id
 
     def failing_poster(destination: str, payload: dict) -> None:
-        if destination == "motor":
+        if destination == "motor-falha":
             raise RuntimeError("destino indisponivel")
 
     with SessionLocal() as db:
         delivered = process_pending(db, failing_poster, limit=20)
         db.commit()
-        row = (
-            db.query(ControlProvisioningOutbox)
-            .filter(
-                ControlProvisioningOutbox.loja_id == store_id,
-                ControlProvisioningOutbox.destination == "motor",
-            )
-            .one()
-        )
+        row = db.query(ControlProvisioningOutbox).filter_by(id=row_id).one()
         assert row.status == "failed"
         assert row.attempts == 1
         assert "RuntimeError" in (row.last_error or "")
         assert "destino indisponivel" in (row.last_error or "")
-        # outras filas chatbot dos hooks podem ter sido entregues
+        # outras filas dos hooks podem ter sido entregues
         assert delivered >= 0
 
 
