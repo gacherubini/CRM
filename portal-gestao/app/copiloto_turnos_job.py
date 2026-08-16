@@ -25,6 +25,7 @@ from app.loja.copiloto.conversas import (
     concluir_turno,
     falhar_turno,
     listar_turnos,
+    reivindicar_turno,
 )
 from app.loja.copiloto.historico import selecionar_historico
 from app.loja.copiloto.runner import executar_turno
@@ -325,10 +326,40 @@ class CopilotoTurnosWorker:
                 .limit(max(1, self.lote))
                 .all()
             )
-            permitidos = []
+            # Um único laço: reivindicar → (se ganhou) checar entitlement →
+            # processar IMEDIATAMENTE, turno por turno. `reivindicar_turno`
+            # carimba `iniciado_em` no momento em que ele ganha; se o lote
+            # inteiro fosse reivindicado antes de processar qualquer um (dois
+            # laços separados), o relógio de órfão (`expirar_orfaos`, que
+            # filtra por `iniciado_em < agora - ttl_executando`) começaria a
+            # contar para o 2º/3º turno do lote antes de o 1º sequer rodar —
+            # reivindicação virando trabalho perdido em vez de pulado.
+            #
+            # Cliente e LLM são construídos preguiçosamente: só na primeira
+            # vez que um turno passar pelo entitlement e for de fato
+            # processado. O caminho "não há trabalho" (lote vazio ou todos
+            # sem acesso) não paga o custo de montar cliente nem LLM.
+            provedores: list = []
+
+            def _provedores():
+                if not provedores:
+                    estoque, chatbot = self._clients()
+                    llm = self._llm_factory()
+                    provedores.extend([estoque, chatbot, llm])
+                return provedores
+
             for turno in pendentes:
+                if not reivindicar_turno(db, turno.id):
+                    # Outro processo pegou este turno (ou ele foi cancelado)
+                    # entre o SELECT acima e agora. Não é erro nem falha: é a
+                    # reivindicação fazendo o trabalho dela. Soltar em silêncio.
+                    continue
                 if _copiloto_permitido(db, turno.loja_slug):
-                    permitidos.append(turno)
+                    estoque, chatbot, llm = _provedores()
+                    processar_turno(
+                        db, turno, llm=llm, estoque=estoque, chatbot=chatbot
+                    )
+                    processados += 1
                 else:
                     # Falha terminal SEM chamar o provedor: turno enfileirado
                     # antes de a loja perder o entitlement (ou ser
@@ -343,14 +374,6 @@ class CopilotoTurnosWorker:
                         turno.loja_slug,
                     )
                     falhar_turno(db, turno, erro_code="sem_acesso")
-            if permitidos:
-                estoque, chatbot = self._clients()
-                llm = self._llm_factory()
-                for turno in permitidos:
-                    processar_turno(
-                        db, turno, llm=llm, estoque=estoque, chatbot=chatbot
-                    )
-                    processados += 1
             payload = {"ok": True, "processados": processados}
         except Exception as exc:
             db.rollback()

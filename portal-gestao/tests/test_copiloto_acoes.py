@@ -686,3 +686,29 @@ def test_desfazer_duas_vezes_a_segunda_nao_funciona(db):
     db.refresh(registro)
     assert desfazer_acao(db, _ctx(), registro.id, estoque=estoque, agora=AGORA) is False
     assert estoque.patches == []
+
+
+def test_rate_limit_trava_a_loja_antes_de_contar(db, monkeypatch):
+    """A trava tem que vir ANTES do COUNT, senão ela não serializa nada —
+    seria só um lock decorativo depois da decisão já tomada."""
+    ordem = []
+
+    import app.loja.copiloto.acoes as acoes_mod
+
+    monkeypatch.setattr(
+        acoes_mod,
+        "travar_por_loja",
+        lambda db, loja_slug, escopo: ordem.append(("travou", loja_slug, escopo)),
+    )
+    original_query = db.query
+
+    def query_espiao(*a, **k):
+        ordem.append(("consultou",))
+        return original_query(*a, **k)
+
+    monkeypatch.setattr(db, "query", query_espiao)
+
+    acoes_mod._checar_rate_limit(db, "loja-teste", datetime.now(timezone.utc))
+
+    assert ordem[0] == ("travou", "loja-teste", "copiloto_acao")
+    assert ("consultou",) in ordem

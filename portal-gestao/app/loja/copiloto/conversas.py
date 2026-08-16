@@ -5,6 +5,7 @@ import json
 from datetime import datetime, timezone
 from decimal import Decimal
 
+from sqlalchemy import update
 from sqlalchemy.orm import Session
 
 from app.models import PERGUNTA_MAX, CopilotoConversa, CopilotoTurno
@@ -88,6 +89,31 @@ def atualizar_progresso(
     if texto_parcial is not None:
         turno.texto_parcial = texto_parcial
     db.commit()
+
+
+def reivindicar_turno(
+    db: Session, turno_id: str, *, agora: datetime | None = None
+) -> bool:
+    """Transição atômica `pendente` → `executando`. True = este processo ganhou.
+
+    Um único UPDATE condicional: quem decide é o banco, não o Python. Sem isto,
+    dois processos rodando ``run_once`` leem o mesmo turno `pendente` no mesmo
+    lote e ambos chamam o provedor — o custo de LLM sai em dobro pela mesma
+    pergunta, e a segunda resposta sobrescreve a primeira.
+
+    ``synchronize_session=False`` porque o objeto ORM não precisa ser
+    atualizado aqui: quem ganhou dá ``db.refresh`` antes de usar. Em SQLite o
+    UPDATE condicional já é atômico dentro da transação de escrita; em Postgres
+    ele é o mecanismo inteiro.
+    """
+    resultado = db.execute(
+        update(CopilotoTurno)
+        .where(CopilotoTurno.id == turno_id, CopilotoTurno.estado == "pendente")
+        .values(estado="executando", iniciado_em=agora or datetime.now(timezone.utc))
+        .execution_options(synchronize_session=False)
+    )
+    db.commit()
+    return resultado.rowcount == 1
 
 
 def concluir_turno(
