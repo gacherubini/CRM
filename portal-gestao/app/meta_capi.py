@@ -14,6 +14,7 @@ from decimal import Decimal
 from typing import Any, Callable
 
 import httpx
+from sqlalchemy import update
 from sqlalchemy.orm import Session
 
 from app.cripto import decifrar
@@ -376,6 +377,36 @@ def _em_utc(valor: datetime) -> datetime:
     return valor.astimezone(timezone.utc)
 
 
+def reivindicar_outbox(
+    db: Session, item: MetaCapiOutbox, *, agora: datetime | None = None
+) -> bool:
+    """Compare-and-swap em ``atualizada_em``. True = este processo ganhou o item.
+
+    Sem estado novo de propósito: um status `sending` apareceria cru na tela de
+    tráfego (que lista a outbox sem filtrar status) e deixaria item preso se o
+    processo morresse no meio do POST, exigindo um reaper. Com CAS, morrer no
+    meio devolve o item para o próximo lote — só o relógio de backoff reinicia,
+    que é o certo para "alguém acabou de tentar".
+
+    Nota de custo: ``db.commit()`` expira os objetos da sessão, então os itens
+    seguintes do lote recarregam ao serem lidos. São poucos SELECTs num lote de
+    no máximo 500 — o preço da atomicidade, e é barato.
+    """
+    lida = item.atualizada_em
+    ref = agora or datetime.now(timezone.utc)
+    if lida is not None and _em_utc(lida) >= _em_utc(ref):
+        # Relógio não andou (ou andou para trás): sem CAS possível, não arrisca.
+        return False
+    resultado = db.execute(
+        update(MetaCapiOutbox)
+        .where(MetaCapiOutbox.id == item.id, MetaCapiOutbox.atualizada_em == lida)
+        .values(atualizada_em=ref)
+        .execution_options(synchronize_session=False)
+    )
+    db.commit()
+    return resultado.rowcount == 1
+
+
 def processar_outbox_automatico(
     db_factory: Callable[[], Session],
     *,
@@ -417,6 +448,9 @@ def processar_outbox_automatico(
                 if proxima > agora_utc:
                     resultado["aguardando_backoff"] += 1
                     continue
+            if not reivindicar_outbox(db, item, agora=agora_utc):
+                # Outro processo pegou este item entre o SELECT e agora.
+                continue
             resultado["processados"] += 1
             if tentar_enviar_outbox(db, item):
                 resultado["entregues"] += 1

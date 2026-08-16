@@ -7,9 +7,14 @@ import httpx
 
 from conftest import csrf_da_resposta, login
 
+from app import meta_capi
 from app.cripto import cifrar, decifrar
 from app.db import SessionLocal
-from app.meta_capi import montar_payload_purchase, processar_outbox_automatico
+from app.meta_capi import (
+    montar_payload_purchase,
+    processar_outbox_automatico,
+    reivindicar_outbox,
+)
 from app.models import MetaCapiOutbox, MetaPixelConfig, Venda
 
 
@@ -486,3 +491,60 @@ def test_worker_capi_desligado_nao_cria_thread():
     worker.start()
     assert worker._thread is None
     worker.stop()
+
+
+def _outbox_pendente(db, event_id="ev-cas-1"):
+    item = MetaCapiOutbox(
+        loja_slug="loja-teste",
+        venda_id=None,
+        event_id=event_id,
+        event_name="Purchase",
+        payload_json="{}",
+        status="pending",
+    )
+    db.add(item)
+    db.commit()
+    db.refresh(item)
+    return item
+
+
+def test_reivindicar_outbox_so_o_primeiro_vence(db):
+    """Dois processos leem o mesmo item; só um pode sair enviando."""
+    item = _outbox_pendente(db)
+    lida = item.atualizada_em
+
+    assert reivindicar_outbox(db, item) is True
+
+    # O segundo processo carregou o item ANTES do CAS: ele ainda tem o
+    # `atualizada_em` velho em mãos. É exatamente essa a disputa.
+    class ItemVelho:
+        id = item.id
+        atualizada_em = lida
+
+    assert reivindicar_outbox(db, ItemVelho()) is False
+
+
+def test_reivindicar_outbox_bumpa_atualizada_em(db):
+    item = _outbox_pendente(db, event_id="ev-cas-2")
+    antes = item.atualizada_em
+    assert reivindicar_outbox(db, item) is True
+    db.refresh(item)
+    assert item.atualizada_em > antes
+    assert item.status == "pending"  # o CAS não muda o status
+
+
+def test_processar_outbox_automatico_pula_item_ja_reivindicado(db, monkeypatch):
+    """Perdeu o CAS: não pode chamar a Meta nem contar como processado."""
+    _outbox_pendente(db, event_id="ev-cas-3")
+    monkeypatch.setattr(
+        meta_capi, "reivindicar_outbox", lambda db, item, **k: False
+    )
+
+    def _proibido(*a, **k):
+        raise AssertionError("não pode tentar enviar item não reivindicado")
+
+    monkeypatch.setattr(meta_capi, "tentar_enviar_outbox", _proibido)
+
+    resultado = meta_capi.processar_outbox_automatico(SessionLocal)
+    assert resultado["encontrados"] == 1
+    assert resultado["processados"] == 0
