@@ -4,22 +4,22 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Revy — a revenda no ritmo certo</title>
-<meta name="description" content="A Revy atende o cliente no WhatsApp, simula financiamento nos bancos da própria loja e entrega o vendedor na hora certa." />
+<meta name="description" content="A Revy conversa com o cliente no WhatsApp, faz a simulação nos bancos da sua loja e chama o vendedor na hora certa." />
 <link rel="canonical" href="https://app2037.fly.dev/site/" />
 <meta name="theme-color" content="#f9f9f9" />
 <meta property="og:type" content="website" />
 <meta property="og:locale" content="pt_BR" />
 <meta property="og:site_name" content="Revy" />
 <meta property="og:title" content="Revy — a revenda no ritmo certo" />
-<meta property="og:description" content="A Revy atende o cliente no WhatsApp, simula financiamento nos bancos da própria loja e entrega o vendedor na hora certa." />
+<meta property="og:description" content="A Revy conversa com o cliente no WhatsApp, faz a simulação nos bancos da sua loja e chama o vendedor na hora certa." />
 <meta property="og:url" content="https://app2037.fly.dev/site/" />
 <meta property="og:image" content="https://app2037.fly.dev/site/assets/og.jpg" />
 <meta property="og:image:width" content="1200" />
 <meta property="og:image:height" content="630" />
-<meta property="og:image:alt" content="Revy — seja bem-vindo à sua operação de revenda" />
+<meta property="og:image:alt" content="Revy — a gestão da sua revenda" />
 <meta name="twitter:card" content="summary_large_image" />
 <meta name="twitter:title" content="Revy — a revenda no ritmo certo" />
-<meta name="twitter:description" content="A Revy atende o cliente no WhatsApp, simula financiamento nos bancos da própria loja e entrega o vendedor na hora certa." />
+<meta name="twitter:description" content="A Revy conversa com o cliente no WhatsApp, faz a simulação nos bancos da sua loja e chama o vendedor na hora certa." />
 <meta name="twitter:image" content="https://app2037.fly.dev/site/assets/og.jpg" />
 <link rel="icon" href="assets/revy-mark.svg" type="image/svg+xml" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -27,314 +27,400 @@
 <link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&family=Newsreader:opsz,wght@6..72,300;6..72,600&display=swap" rel="stylesheet" />
 <script>document.documentElement.className='js';</script>
 <style>
-.js [data-intro]{opacity:0;transform:translateY(16px)}
-.js [data-intro].in{opacity:1;transform:none;transition:opacity .8s cubic-bezier(.22,.61,.36,1),transform .8s cubic-bezier(.22,.61,.36,1)}
-html,body{margin:0;padding:0;background:#fff;color-scheme:light;scroll-behavior:smooth}
+html,body{margin:0;padding:0;background:#f9f9f9;color-scheme:light;scroll-behavior:smooth}
 body{-webkit-font-smoothing:antialiased}
 *{box-sizing:border-box}
 a{color:#1b1b1b;text-decoration:none}
 a:hover{color:#1f4d3a}
 img{max-width:100%}
 ::selection{background:#dfeee7}
-.h1:hover{color: #1b1b1b; border-bottom-color: #1b1b1b;}
-.h2:hover{background: #000000; color: #ffffff;}
-.h3:hover{background: #ffffff; color: #1b1b1b;}
-.h4:hover{transform: translateY(-22px) scale(1.03); box-shadow: 0 60px 130px rgba(27,20,20,.18), 0 4px 10px rgba(27,20,20,.07); border-color: #cdc6c4;}
-.h5:hover{background: #000000;}
-.h6:hover{color: #1b1b1b;}
-
-.tab:hover{color:#3f3a39!important;border-left-color:#cdc6c4!important;transform:translateX(3px) scale(1.045)!important}
-.vid{position:absolute;inset:0;width:100%;height:100%;border:0;display:block;opacity:0;transform:scale(.994);transition:opacity 1s cubic-bezier(.22,.61,.36,1),transform 1s cubic-bezier(.22,.61,.36,1)}
-.vid.on{opacity:1;transform:none}
-.slide{transition:opacity .45s ease}
-.rv{opacity:0;transform:translateY(20px);transition:opacity .9s cubic-bezier(.22,.61,.36,1),transform .9s cubic-bezier(.22,.61,.36,1)}
-.rv.in{opacity:1;transform:none}
-.hvid{transform-origin:50% 50%;transition:transform .9s cubic-bezier(.22,.61,.36,1),box-shadow .9s ease,border-color .9s ease}
-.hvid:hover{transform:scale(.93)!important;box-shadow:0 14px 40px rgba(27,20,20,.09),0 2px 5px rgba(27,20,20,.04);border-color:#cdc6c4}
-@keyframes revy-dash{to{stroke-dashoffset:-100}}
+.js [data-rv]{opacity:0;transform:translateY(10px)}
+.js [data-rv].in{opacity:1;transform:none;transition:opacity .42s cubic-bezier(.4,0,.2,1),transform .42s cubic-bezier(.4,0,.2,1)}
+[data-still],[data-still].in{transform:none!important;transition:opacity .42s cubic-bezier(.4,0,.2,1)!important}
+@media (prefers-reduced-motion: reduce){
+  html{scroll-behavior:auto}
+  [data-rv]{opacity:1!important;transform:none!important;transition:none!important}
+  *{animation-duration:.001ms!important;transition-duration:.001ms!important}
+}
 @media (max-width:1115px){[data-veja-list]{position:static!important;top:auto!important;background:transparent!important;max-width:none!important}}
+.x1:hover{color: #1b1b1b !important}
+.x2:hover{background: #3f3a39 !important}
+.x3:hover{background: #e4e0de !important}
+.x4:hover{box-shadow: 0 6px 16px rgba(27,20,20,.09) !important;border-color: #cdc6c4 !important}
+.x5:focus{border-color: #1b1b1b !important}
+.x6:hover{background: #1a4231 !important}
+.js [data-rv]{opacity:0}
+.vid{position:absolute;inset:0;width:100%;height:100%;border:0;display:block;opacity:0;pointer-events:none;transition:opacity 1s cubic-bezier(.22,.61,.36,1)}
+.vid.on{opacity:1}
 </style>
 </head>
 <body>
+<main>
+<div style="font-family: 'Hanken Grotesk', 'Segoe UI', ui-sans-serif, system-ui, sans-serif; background: #f9f9f9; color: #1b1b1b; overflow-x: clip;">
 
-<div style="font-family: 'Hanken Grotesk', 'Segoe UI', ui-sans-serif, system-ui, sans-serif; background: #ffffff; color: #1b1b1b; overflow-x: clip;">
-
-  <nav data-intro="0" style="position: sticky; top: 0; z-index: 50; border-bottom: 1px solid #ded8d9; background: rgba(255,255,255,.88); backdrop-filter: blur(14px);">
-    <div style="width: min(100%, 1280px); margin-inline: auto; padding-inline: clamp(20px, 5vw, 64px); height: 68px; display: flex; align-items: center; justify-content: space-between; gap: 32px;">
-      <div style="display: flex; align-items: center; gap: 48px;">
-        <a href="#topo" aria-label="Revy"><img src="assets/revy-wordmark.svg" alt="Revy" style="display: block; width: 82px; height: auto;" /></a>
-        <div style="display: flex; align-items: center; gap: 30px;">
-          <a href="#como" style="font-size: 13px; font-weight: 600; letter-spacing: .04em; color: #6b625f; padding-block: 6px; border-bottom: 2px solid transparent;" class="h1">Como funciona</a>
-          <a href="#trafego" style="font-size: 13px; font-weight: 600; letter-spacing: .04em; color: #6b625f; padding-block: 6px; border-bottom: 2px solid transparent;" class="h1">Tráfego</a>
-          <a href="#limites" style="font-size: 13px; font-weight: 600; letter-spacing: .04em; color: #6b625f; padding-block: 6px; border-bottom: 2px solid transparent;" class="h1">Limites</a>
-          <a href="#contato" style="font-size: 13px; font-weight: 600; letter-spacing: .04em; color: #6b625f; padding-block: 6px; border-bottom: 2px solid transparent;" class="h1">Contato</a>
+  <nav style="position: sticky; top: 0; z-index: 50; background: rgba(249,249,249,.9); backdrop-filter: blur(14px);">
+    <div style="width: min(100%, 1280px); margin-inline: auto; padding-inline: clamp(20px, 5vw, 56px); height: 56px; display: flex; align-items: center; justify-content: space-between; gap: 32px;">
+      <div style="display: flex; align-items: center; gap: 40px;">
+        <a href="#topo" aria-label="Revy"><img src="assets/revy-wordmark.svg" alt="Revy" style="display: block; width: 76px; height: auto;" /></a>
+        <div style="display: flex; align-items: center; gap: 26px;">
+          <a href="#como" style="font-size: 13px; font-weight: 500; letter-spacing: .01em; color: #6b625f; transition: color .15s cubic-bezier(.4,0,.2,1);" class="x1">Como funciona</a>
+          <a href="#trafego" style="font-size: 13px; font-weight: 500; letter-spacing: .01em; color: #6b625f; transition: color .15s cubic-bezier(.4,0,.2,1);" class="x1">Anúncios</a>
+          <a href="#limites" style="font-size: 13px; font-weight: 500; letter-spacing: .01em; color: #6b625f; transition: color .15s cubic-bezier(.4,0,.2,1);" class="x1">Limites</a>
+          <a href="#contato" style="font-size: 13px; font-weight: 500; letter-spacing: .01em; color: #6b625f; transition: color .15s cubic-bezier(.4,0,.2,1);" class="x1">Contato</a>
         </div>
       </div>
-      <a href="#contato" style="display: inline-flex; align-items: center; min-height: 40px; padding-inline: 20px; border: 1px solid #1b1b1b; border-radius: 3px; background: #1b1b1b; color: #ffffff; font-size: 13px; font-weight: 600;" class="h2">Falar com a Revy</a>
+      <a href="mailto:revystartup@gmail.com?subject=Quero%20conhecer%20a%20Revy" style="display: inline-flex; align-items: center; min-height: 36px; padding-inline: 16px; border-radius: 3px; background: #1b1b1b; color: #ffffff; font-size: 13px; font-weight: 500; transition: background-color .15s cubic-bezier(.4,0,.2,1);" class="x2">Falar com a Revy</a>
     </div>
   </nav>
 
-  <header id="topo" data-screen-label="Hero" style="position: relative; padding-block: 88px 0;">
-    <div style="position: absolute; left: 0; right: 0; top: -68px; bottom: -108px; pointer-events: none; background: linear-gradient(0deg, #a8c6b6 0, #c1d8cc 240px, #dde9e3 600px, #f2f7f4 900px, rgba(255,255,255,0) 100%);">
-      <div style="position: absolute; inset: 0; background-image: linear-gradient(90deg, #ffffff 0 1px, rgba(255,255,255,0) 1px 100%); background-size: 9px 100%; background-repeat: repeat; mask-image: linear-gradient(0deg, #000000 0, #000000 220px, rgba(0,0,0,.34) 560px, rgba(0,0,0,.12) 900px, rgba(0,0,0,0) 100%); -webkit-mask-image: linear-gradient(0deg, #000000 0, #000000 220px, rgba(0,0,0,.34) 560px, rgba(0,0,0,.12) 900px, rgba(0,0,0,0) 100%);"></div>
-    </div>
-    <div style="position: relative; width: min(100%, 1280px); margin-inline: auto; padding-inline: clamp(20px, 5vw, 64px); display: flex; flex-direction: column; align-items: center; text-align: center;">
-      <div data-intro="1" id="rv-badge" style="position: relative; display: inline-flex; border-radius: 999px; border: 1px solid #ded8d9; background: #ffffff; box-shadow: 0 1px 2px rgba(27,20,20,.05);">
-        <svg aria-hidden="true" id="rv-badge-svg" style="position: absolute; left: 0; top: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none;"></svg>
-        <div style="position: relative; display: inline-flex; align-items: center; gap: 10px; padding: 8px 16px; border-radius: 999px; font-family: ui-monospace, 'SF Mono', Consolas, monospace; font-size: 12px; letter-spacing: .1em; text-transform: uppercase; color: #6b625f;">
-          <span style="width: 7px; height: 7px; border-radius: 4px; background: #1f4d3a;"></span>
-          Sistema operacional da revenda
-        </div>
+  <header id="topo" data-screen-label="Hero" style="position: relative; padding-block: 72px 0;">
+    <div aria-hidden="true" style="position: absolute; left: 0; right: 0; top: -56px; height: 820px; pointer-events: none; background: linear-gradient(0deg, rgba(168,198,182,.30) 0, rgba(193,216,204,.20) 220px, rgba(221,233,227,.11) 480px, rgba(242,247,244,0) 780px);"></div>
+    <div style="position: relative; width: min(100%, 1280px); margin-inline: auto; padding-inline: clamp(20px, 5vw, 56px); display: flex; flex-direction: column; align-items: center; text-align: center;">
+      <div data-rv="0" data-still style="display: inline-flex; align-items: center; gap: 9px; padding: 6px 12px; border-radius: 3px; border: 1px solid #ded8d9; background: #ffffff; font-family: ui-monospace, 'SF Mono', Consolas, monospace; font-size: 12px; letter-spacing: .1em; text-transform: uppercase; color: #6b625f;">
+        <span style="width: 6px; height: 6px; border-radius: 3px; background: #1f4d3a;"></span>
+        A gestão da sua revenda
       </div>
 
-      <h1 data-intro="2" style="position: relative; margin: 26px 0 0; max-width: 26ch; font-family: Newsreader, Georgia, serif; font-weight: 600; font-size: clamp(38px, 4.7vw, 68px); line-height: 1.02; letter-spacing: -.025em; text-wrap: balance;">Seja bem-vindo à sua operação de revenda.</h1>
+      <h1 data-rv="1" data-still style="margin: 24px 0 0; max-width: 26ch; font-family: Newsreader, Georgia, serif; font-weight: 600; font-size: clamp(38px, 4.7vw, 68px); line-height: 1.02; letter-spacing: -.03em; text-wrap: balance;">Toda a gestão da sua revenda em um lugar só.</h1>
 
-      <p data-intro="3" style="position: relative; margin: 22px 0 0; max-width: 620px; font-size: 19px; line-height: 1.58; color: #57514f; text-wrap: pretty;">A Revy atende o cliente no WhatsApp, simula financiamento nos bancos da própria loja e entrega o vendedor na hora certa.</p>
+      <p data-rv="2" data-still style="margin: 20px 0 0; max-width: 600px; font-size: 19px; line-height: 1.55; color: #57514f; text-wrap: pretty;">A Revy conversa com o cliente no WhatsApp, faz a simulação nos bancos da sua loja e chama o vendedor na hora certa.</p>
 
-      <div data-intro="4" style="position: relative; display: flex; flex-wrap: wrap; justify-content: center; gap: 14px; margin-top: 30px;">
-        <a href="#contato" style="display: inline-flex; align-items: center; min-height: 50px; padding-inline: 30px; border: 1px solid #1b1b1b; border-radius: 3px; background: #1b1b1b; color: #ffffff; font-size: 15px; font-weight: 600;" class="h2">Falar com a Revy</a>
-        <a href="#como" style="display: inline-flex; align-items: center; min-height: 50px; padding-inline: 30px; border: 1px solid #1b1b1b; border-radius: 3px; background: #ffffff; color: #1b1b1b; font-size: 15px; font-weight: 600;" class="h3">Ver como funciona</a>
+      <div data-rv="3" data-still style="display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin-top: 28px;">
+        <a href="mailto:revystartup@gmail.com?subject=Quero%20conhecer%20a%20Revy" style="display: inline-flex; align-items: center; min-height: 46px; padding-inline: 24px; border-radius: 3px; background: #1b1b1b; color: #ffffff; font-size: 15px; font-weight: 500; transition: background-color .15s cubic-bezier(.4,0,.2,1);" class="x2">Falar com a Revy</a>
+        <a href="#como" style="display: inline-flex; align-items: center; min-height: 46px; padding-inline: 24px; border-radius: 3px; background: #efeceb; color: #1b1b1b; font-size: 15px; font-weight: 500; transition: background-color .15s cubic-bezier(.4,0,.2,1);" class="x3">Ver como funciona →</a>
       </div>
     </div>
 
-    <div style="position: relative; width: min(100%, 1180px); margin: 54px auto 0; padding-inline: clamp(20px, 5vw, 64px);">
-      <div data-intro="5" class="hvid" style="transform-origin: 50% 50%; will-change: transform, opacity; border: 1px solid #ded8d9; border-radius: 16px; overflow: hidden; background: #ffffff; box-shadow: 0 40px 100px rgba(27,20,20,.13), 0 2px 6px rgba(27,20,20,.05);">
-        <div style="position: relative; aspect-ratio: 16 / 9; overflow: hidden; background: #ffffff;">
-          <div style="position: absolute; inset: 0; background: #ffffff;"></div>
-          <figure style="margin:0;position:absolute;inset:0;" data-demo="demos/01-fluxo-completo.html">
-                <img src="assets/poster-1.jpg" width="960" height="540" alt="Do primeiro contato no WhatsApp à moto entregue" fetchpriority="high" decoding="async" style="display:block;width:100%;height:100%;object-fit:cover;" />
-              </figure>
+    <div data-rv="4" data-hint data-still style="position: relative; display: flex; justify-content: center; align-items: center; gap: 10px; margin-top: 26px; font-family: ui-monospace, 'SF Mono', Consolas, monospace; font-size: 12px; letter-spacing: .06em; color: #8a8280;">
+      <span>arraste o vídeo para onde quiser</span>
+      <button type="button" data-reset style="border: none; background: transparent; padding: 0; font-family: inherit; font-size: 12px; letter-spacing: .06em; color: #6b625f; text-decoration: underline; cursor: pointer; transition: color .15s cubic-bezier(.4,0,.2,1);" class="x1">recolocar</button>
+    </div>
+
+    <div data-chips aria-hidden="true" style="position: absolute; inset: 0; pointer-events: none; z-index: 3;">
+      <div data-chip="0" data-target="0" style="position: absolute; left: 3%; top: 148px; pointer-events: auto; cursor: grab; touch-action: none; user-select: none; display: flex; align-items: center; gap: 9px; padding: 10px 13px; border-radius: 3px; border: 1px solid #ded8d9; background: #ffffff; box-shadow: 0 2px 5px rgba(27,20,20,.05); font-family: ui-monospace, 'SF Mono', Consolas, monospace; font-size: 12px; letter-spacing: .04em; color: #57514f; white-space: nowrap; transition: box-shadow .15s cubic-bezier(.4,0,.2,1), border-color .15s cubic-bezier(.4,0,.2,1);" class="x4">
+        <span style="width: 6px; height: 6px; border-radius: 3px; background: #1f4d3a;"></span>
+        Atendimento no WhatsApp
+      </div>
+      <div data-chip="1" data-target="1" style="position: absolute; right: 4%; top: 236px; pointer-events: auto; cursor: grab; touch-action: none; user-select: none; display: flex; align-items: center; gap: 9px; padding: 10px 13px; border-radius: 3px; border: 1px solid #ded8d9; background: #ffffff; box-shadow: 0 2px 5px rgba(27,20,20,.05); font-family: ui-monospace, 'SF Mono', Consolas, monospace; font-size: 12px; letter-spacing: .04em; color: #57514f; white-space: nowrap; transition: box-shadow .15s cubic-bezier(.4,0,.2,1), border-color .15s cubic-bezier(.4,0,.2,1);" class="x4">
+        <span style="width: 6px; height: 6px; border-radius: 3px; background: #2f7355;"></span>
+        Simulação nos bancos
+      </div>
+      <div data-chip="2" data-target="2" style="position: absolute; left: 6%; top: 402px; pointer-events: auto; cursor: grab; touch-action: none; user-select: none; display: flex; align-items: center; gap: 9px; padding: 10px 13px; border-radius: 3px; border: 1px solid #ded8d9; background: #ffffff; box-shadow: 0 2px 5px rgba(27,20,20,.05); font-family: ui-monospace, 'SF Mono', Consolas, monospace; font-size: 12px; letter-spacing: .04em; color: #57514f; white-space: nowrap; transition: box-shadow .15s cubic-bezier(.4,0,.2,1), border-color .15s cubic-bezier(.4,0,.2,1);" class="x4">
+        <span style="width: 6px; height: 6px; border-radius: 3px; background: #7fbfa3;"></span>
+        Venda confirmada
+      </div>
+    </div>
+
+    <div style="position: relative; width: min(100%, 1200px); margin: 136px auto 0; padding-inline: clamp(20px, 5vw, 56px); perspective: 1500px;">
+      <div data-rv="4" data-tilt style="padding: 10px; border-radius: 8px; border: 1px solid rgba(27,27,27,.06); background: #f4f2f1; box-shadow: 0 28px 70px rgba(27,20,20,.13), 0 14px 32px rgba(27,20,20,.07); transform-style: preserve-3d; will-change: transform;">
+        <div style="border-radius: 4px; overflow: hidden; background: #ffffff; box-shadow: 0 0 0 1px rgba(27,27,27,.08);">
+          <div style="display: flex; align-items: center; gap: 12px; height: 32px; padding-inline: 12px; background: #f9f9f9; box-shadow: inset 0 -1px 0 0 #ded8d9;">
+            <div style="display: flex; gap: 6px;">
+              <span style="width: 8px; height: 8px; border-radius: 4px; background: #d3cecc;"></span>
+              <span style="width: 8px; height: 8px; border-radius: 4px; background: #d3cecc;"></span>
+              <span style="width: 8px; height: 8px; border-radius: 4px; background: #d3cecc;"></span>
+            </div>
+            <span style="flex: 1; text-align: center; font-family: ui-monospace, 'SF Mono', Consolas, monospace; font-size: 12px; color: #6b625f;">revy loja — atendimento</span>
+            <div style="width: 44px;"></div>
+          </div>
+          <div style="position: relative; aspect-ratio: 16 / 9; overflow: hidden; background: #ffffff;">
+            <figure style="margin:0;position:absolute;inset:0;" data-demo="demos/01-fluxo-completo.html">
+              <img src="assets/poster-1.jpg" width="960" height="540" alt="Do primeiro contato no WhatsApp à moto entregue" style="display: block; width: 100%; height: 100%; object-fit: cover;" />
+            </figure>
+          </div>
         </div>
       </div>
     </div>
   </header>
 
-  <section data-screen-label="Lojas" style="position: relative; z-index: 1; margin-top: 108px; padding-block: 0;">
-    <div style="width: min(100%, 1280px); margin-inline: auto; padding-inline: clamp(20px, 5vw, 64px);">
-      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1px; background: #ded8d9; border: 1px solid #ded8d9;">
-        <div style="display: flex; flex-direction: column; justify-content: center; gap: 5px; padding: 22px 24px; background: #ffffff;">
-          <span style="font-family: Newsreader, Georgia, serif; font-weight: 300; font-size: 26px; line-height: 1.1; letter-spacing: -.01em;">Vitor Motos</span>
-          <span style="font-size: 14px; color: #6b625f;">Seminovos e financiamento</span>
+  <section data-screen-label="Lojas" style="position: relative; z-index: 1; padding-block: 64px 0;">
+    <div style="width: min(100%, 1280px); margin-inline: auto; padding-inline: clamp(20px, 5vw, 56px);">
+      <div data-rv="0" style="font-family: ui-monospace, 'SF Mono', Consolas, monospace; font-size: 12px; letter-spacing: .18em; text-transform: uppercase; color: #6b625f; margin-bottom: 20px;">Lojas na Revy</div>
+      <div data-rv="1" style="display: flex; flex-wrap: wrap; gap: 8px;">
+        <div style="flex: 1 1 220px; display: flex; flex-direction: column; gap: 3px; padding: 16px 20px; border-radius: 4px; background: #efeceb;">
+          <span style="font-family: Newsreader, Georgia, serif; font-weight: 300; font-size: 24px; line-height: 1.1; letter-spacing: -.012em;">Vitor Motos</span>
+          <span style="font-size: 13px; color: #6b625f;">Seminovos e financiamento</span>
         </div>
-        <div style="display: flex; flex-direction: column; justify-content: center; gap: 5px; padding: 22px 24px; background: #ffffff;">
-          <span style="font-family: Newsreader, Georgia, serif; font-weight: 300; font-size: 26px; line-height: 1.1; letter-spacing: -.01em;">RR Motos</span>
-          <span style="font-size: 14px; color: #6b625f;">Seminovos e financiamento</span>
+        <div style="flex: 1 1 220px; display: flex; flex-direction: column; gap: 3px; padding: 16px 20px; border-radius: 4px; background: #efeceb;">
+          <span style="font-family: Newsreader, Georgia, serif; font-weight: 300; font-size: 24px; line-height: 1.1; letter-spacing: -.012em;">RR Motos</span>
+          <span style="font-size: 13px; color: #6b625f;">Seminovos e financiamento</span>
         </div>
-        <div style="display: flex; flex-direction: column; justify-content: center; gap: 5px; padding: 22px 24px; background: #ffffff;">
-          <span style="font-family: Newsreader, Georgia, serif; font-weight: 300; font-size: 26px; line-height: 1.1; letter-spacing: -.01em;">Motos Vale</span>
-          <span style="font-size: 14px; color: #6b625f;">Seminovos e financiamento</span>
+        <div style="flex: 1 1 220px; display: flex; flex-direction: column; gap: 3px; padding: 16px 20px; border-radius: 4px; background: #efeceb;">
+          <span style="font-family: Newsreader, Georgia, serif; font-weight: 300; font-size: 24px; line-height: 1.1; letter-spacing: -.012em;">Motos Vale</span>
+          <span style="font-size: 13px; color: #6b625f;">Seminovos e financiamento</span>
         </div>
-        <div style="display: flex; flex-direction: column; justify-content: center; gap: 5px; padding: 22px 24px; background: #ffffff;">
-          <span style="font-family: Newsreader, Georgia, serif; font-weight: 300; font-size: 26px; line-height: 1.1; letter-spacing: -.01em;">Sena Motos</span>
-          <span style="font-size: 14px; color: #6b625f;">Seminovos e financiamento</span>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <section id="como" data-screen-label="Como funciona" style="margin-top: 0; padding-block: 104px; background: #ffffff;">
-    <div style="width: min(100%, 1280px); margin-inline: auto; padding-inline: clamp(20px, 5vw, 64px);">
-      <div style="max-width: 720px; margin-bottom: 64px;">
-        <div style="font-family: ui-monospace, 'SF Mono', Consolas, monospace; font-size: 12px; letter-spacing: .18em; text-transform: uppercase; color: #6b625f; margin-bottom: 20px;">Como funciona</div>
-        <h2 style="margin: 0 0 20px; font-family: Newsreader, Georgia, serif; font-weight: 300; font-size: clamp(34px, 4.4vw, 56px); line-height: 1.08; letter-spacing: -.02em;">Quatro passos, um só lugar de trabalho.</h2>
-        <p style="margin: 0; max-width: 620px; font-size: 19px; line-height: 1.6; color: #57514f;">O cliente nunca sai do WhatsApp. A loja nunca precisa abrir quatro portais de banco à mão.</p>
-      </div>
-
-      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1px; background: #ffffff; border: 1px solid #ded8d9; border-radius: 14px; overflow: hidden;">
-        <div style="background: #ffffff; padding: 36px 32px 40px; box-shadow: 0 0 0 1px #ded8d9;">
-          <div style="font-family: ui-monospace, 'SF Mono', Consolas, monospace; font-size: 13px; color: #1f4d3a; margin-bottom: 26px;">01</div>
-          <h3 style="margin: 0 0 12px; font-size: 23px; font-weight: 600; letter-spacing: -.01em;">Atende no WhatsApp</h3>
-          <p style="margin: 0; font-size: 16px; line-height: 1.6; color: #6b625f;">O cliente fala com o assistente da sua loja — white-label, com o nome da loja, não o da Revy.</p>
-        </div>
-        <div style="background: #ffffff; padding: 36px 32px 40px; box-shadow: 0 0 0 1px #ded8d9;">
-          <div style="font-family: ui-monospace, 'SF Mono', Consolas, monospace; font-size: 13px; color: #1f4d3a; margin-bottom: 26px;">02</div>
-          <h3 style="margin: 0 0 12px; font-size: 23px; font-weight: 600; letter-spacing: -.01em;">Simula nos seus bancos</h3>
-          <p style="margin: 0; font-size: 16px; line-height: 1.6; color: #6b625f;">O Motor executa os portais reais — Santander, Bradesco, Banco PAN, Fontecred — com as credenciais da própria loja.</p>
-        </div>
-        <div style="background: #ffffff; padding: 36px 32px 40px; box-shadow: 0 0 0 1px #ded8d9;">
-          <div style="font-family: ui-monospace, 'SF Mono', Consolas, monospace; font-size: 13px; color: #1f4d3a; margin-bottom: 26px;">03</div>
-          <h3 style="margin: 0 0 12px; font-size: 23px; font-weight: 600; letter-spacing: -.01em;">Entrega o vendedor</h3>
-          <p style="margin: 0; font-size: 16px; line-height: 1.6; color: #6b625f;">O bot cede ao humano na hora certa. O vendedor assume vendo a conversa inteira, sem pedir nada de novo.</p>
-        </div>
-        <div style="background: #ffffff; padding: 36px 32px 40px; box-shadow: 0 0 0 1px #ded8d9;">
-          <div style="font-family: ui-monospace, 'SF Mono', Consolas, monospace; font-size: 13px; color: #1f4d3a; margin-bottom: 26px;">04</div>
-          <h3 style="margin: 0 0 12px; font-size: 23px; font-weight: 600; letter-spacing: -.01em;">Mostra de onde veio</h3>
-          <p style="margin: 0; font-size: 16px; line-height: 1.6; color: #6b625f;">A venda confirmada carrega a campanha que a trouxe. O dono lê CPL, CPA e ROAS sem planilha paralela.</p>
+        <div style="flex: 1 1 220px; display: flex; flex-direction: column; gap: 3px; padding: 16px 20px; border-radius: 4px; background: #efeceb;">
+          <span style="font-family: Newsreader, Georgia, serif; font-weight: 300; font-size: 24px; line-height: 1.1; letter-spacing: -.012em;">Sena Motos</span>
+          <span style="font-size: 13px; color: #6b625f;">Seminovos e financiamento</span>
         </div>
       </div>
     </div>
   </section>
 
-  <section id="veja" data-screen-label="Veja funcionando" style="padding-block: 104px; border-top: 1px solid #ded8d9; background: #f9f9f9;">
-    <div style="width: min(100%, 1280px); margin-inline: auto; padding-inline: clamp(20px, 5vw, 64px);">
-      <div style="max-width: 720px; margin-bottom: 56px;">
-        <div style="font-family: ui-monospace, 'SF Mono', Consolas, monospace; font-size: 12px; letter-spacing: .18em; text-transform: uppercase; color: #6b625f; margin-bottom: 20px;">Veja funcionando</div>
-        <h2 style="margin: 0 0 20px; font-family: Newsreader, Georgia, serif; font-weight: 300; font-size: clamp(34px, 4.4vw, 56px); line-height: 1.08; letter-spacing: -.02em;">Cinco telas do dia da loja.</h2>
-        <p style="margin: 0; max-width: 620px; font-size: 19px; line-height: 1.6; color: #57514f;">Escolha um momento da operação e veja o que acontece dentro do Revy Loja.</p>
+  <section id="como" data-screen-label="Como funciona" style="padding-block: 96px;">
+    <div style="width: min(100%, 1280px); margin-inline: auto; padding-inline: clamp(20px, 5vw, 56px);">
+      <div data-rv="0" style="max-width: 700px; margin-bottom: 48px;">
+        <div style="font-family: ui-monospace, 'SF Mono', Consolas, monospace; font-size: 12px; letter-spacing: .18em; text-transform: uppercase; color: #6b625f; margin-bottom: 16px;">Como funciona</div>
+        <h2 style="margin: 0 0 16px; font-family: Newsreader, Georgia, serif; font-weight: 300; font-size: clamp(34px, 4.4vw, 56px); line-height: 1.08; letter-spacing: -.03em;">Quatro passos. Um lugar só.</h2>
+        <p style="margin: 0; max-width: 600px; font-size: 19px; line-height: 1.55; color: #57514f;">O cliente fala pelo WhatsApp. Você não precisa abrir o site de cada banco.</p>
+      </div>
+
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 8px;">
+        <div data-rv="1" style="padding: 24px; border-radius: 4px; background: #ffffff; box-shadow: 0 0 0 1px rgba(27,27,27,.055);">
+          <div style="font-family: ui-monospace, 'SF Mono', Consolas, monospace; font-size: 12px; color: #1f4d3a; margin-bottom: 20px;">01</div>
+          <h3 style="margin: 0 0 8px; font-size: 22px; font-weight: 500; letter-spacing: -.011em;">Atende no WhatsApp</h3>
+          <p style="margin: 0; font-size: 16px; line-height: 1.55; color: #6b625f;">O cliente conversa com o assistente da sua loja. Quem aparece é o nome da loja, não o da Revy.</p>
+        </div>
+        <div data-rv="2" style="padding: 24px; border-radius: 4px; background: #ffffff; box-shadow: 0 0 0 1px rgba(27,27,27,.055);">
+          <div style="font-family: ui-monospace, 'SF Mono', Consolas, monospace; font-size: 12px; color: #1f4d3a; margin-bottom: 20px;">02</div>
+          <h3 style="margin: 0 0 8px; font-size: 22px; font-weight: 500; letter-spacing: -.011em;">Simula nos seus bancos</h3>
+          <p style="margin: 0; font-size: 16px; line-height: 1.55; color: #6b625f;">A Revy consulta os bancos que a sua loja já usa — Santander, Bradesco, Banco PAN e Fontecred — com o login da própria loja.</p>
+        </div>
+        <div data-rv="3" style="padding: 24px; border-radius: 4px; background: #ffffff; box-shadow: 0 0 0 1px rgba(27,27,27,.055);">
+          <div style="font-family: ui-monospace, 'SF Mono', Consolas, monospace; font-size: 12px; color: #1f4d3a; margin-bottom: 20px;">03</div>
+          <h3 style="margin: 0 0 8px; font-size: 22px; font-weight: 500; letter-spacing: -.011em;">Chama o vendedor</h3>
+          <p style="margin: 0; font-size: 16px; line-height: 1.55; color: #6b625f;">Quando o cliente está pronto, o vendedor assume. Ele já vê toda a conversa e não pergunta nada de novo.</p>
+        </div>
+        <div data-rv="4" style="padding: 24px; border-radius: 4px; background: #ffffff; box-shadow: 0 0 0 1px rgba(27,27,27,.055);">
+          <div style="font-family: ui-monospace, 'SF Mono', Consolas, monospace; font-size: 12px; color: #1f4d3a; margin-bottom: 20px;">04</div>
+          <h3 style="margin: 0 0 8px; font-size: 22px; font-weight: 500; letter-spacing: -.011em;">Mostra de onde veio a venda</h3>
+          <p style="margin: 0; font-size: 16px; line-height: 1.55; color: #6b625f;">Cada venda mostra qual anúncio trouxe o cliente. Sem planilha por fora.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="veja" data-screen-label="Veja funcionando" style="padding-block: 96px; background: #ffffff;">
+    <div style="width: min(100%, 1280px); margin-inline: auto; padding-inline: clamp(20px, 5vw, 56px);">
+      <div data-rv="0" style="max-width: 700px; margin-bottom: 48px;">
+        <div style="font-family: ui-monospace, 'SF Mono', Consolas, monospace; font-size: 12px; letter-spacing: .18em; text-transform: uppercase; color: #6b625f; margin-bottom: 16px;">Veja funcionando</div>
+        <h2 style="margin: 0 0 16px; font-family: Newsreader, Georgia, serif; font-weight: 300; font-size: clamp(34px, 4.4vw, 56px); line-height: 1.08; letter-spacing: -.03em;">Cinco telas do dia da loja.</h2>
+        <p style="margin: 0; max-width: 600px; font-size: 19px; line-height: 1.55; color: #57514f;">Escolha um momento do dia e veja como fica na tela.</p>
       </div>
 
       <div id="veja-row" style="display: flex; flex-wrap: wrap; gap: clamp(28px, 3.5vw, 48px); align-items: flex-start;">
-        <div data-veja-list id="veja-list" style="flex: 1 1 220px; max-width: 260px; position: sticky; top: 132px; z-index: 2; background: #f9f9f9; display: flex; flex-direction: column; gap: 4px;">
-          <button type="button" data-tab="0" style="display:flex;width:100%;text-align:left;align-items:center;padding:11px 0;cursor:pointer;font-family:inherit;background:transparent;border:none;transition:color .45s ease;color:#1b1b1b;">
-            <span style="font-size: 21px; font-weight: 600; letter-spacing: -.015em;">Atendimento no WhatsApp</span>
+        <div data-veja-list id="veja-list" style="flex: 1 1 220px; max-width: 250px; position: sticky; top: 108px; z-index: 2; background: #ffffff; display: flex; flex-direction: column; gap: 2px;">
+          <button type="button" data-tab="0" style="display: flex; width: 100%; text-align: left; align-items: center; padding: 9px 0; cursor: pointer; font-family: inherit; background: transparent; border: none; transition: color .15s cubic-bezier(.4,0,.2,1); color: #1b1b1b;">
+            <span style="font-size: 20px; font-weight: 500; letter-spacing: -.011em;">Atendimento no WhatsApp</span>
           </button>
-          <button type="button" data-tab="1" style="display:flex;width:100%;text-align:left;align-items:center;padding:11px 0;cursor:pointer;font-family:inherit;background:transparent;border:none;transition:color .45s ease;color:#d3cecc;">
-            <span style="font-size: 21px; font-weight: 600; letter-spacing: -.015em;">Simulação nos bancos</span>
+          <button type="button" data-tab="1" style="display: flex; width: 100%; text-align: left; align-items: center; padding: 9px 0; cursor: pointer; font-family: inherit; background: transparent; border: none; transition: color .15s cubic-bezier(.4,0,.2,1); color: #d3cecc;">
+            <span style="font-size: 20px; font-weight: 500; letter-spacing: -.011em;">Simulação nos bancos</span>
           </button>
-          <button type="button" data-tab="2" style="display:flex;width:100%;text-align:left;align-items:center;padding:11px 0;cursor:pointer;font-family:inherit;background:transparent;border:none;transition:color .45s ease;color:#d3cecc;">
-            <span style="font-size: 21px; font-weight: 600; letter-spacing: -.015em;">Venda confirmada</span>
+          <button type="button" data-tab="2" style="display: flex; width: 100%; text-align: left; align-items: center; padding: 9px 0; cursor: pointer; font-family: inherit; background: transparent; border: none; transition: color .15s cubic-bezier(.4,0,.2,1); color: #d3cecc;">
+            <span style="font-size: 20px; font-weight: 500; letter-spacing: -.011em;">Venda confirmada</span>
           </button>
-          <button type="button" data-tab="3" style="display:flex;width:100%;text-align:left;align-items:center;padding:11px 0;cursor:pointer;font-family:inherit;background:transparent;border:none;transition:color .45s ease;color:#d3cecc;">
-            <span style="font-size: 21px; font-weight: 600; letter-spacing: -.015em;">Caixa do mês</span>
+          <button type="button" data-tab="3" style="display: flex; width: 100%; text-align: left; align-items: center; padding: 9px 0; cursor: pointer; font-family: inherit; background: transparent; border: none; transition: color .15s cubic-bezier(.4,0,.2,1); color: #d3cecc;">
+            <span style="font-size: 20px; font-weight: 500; letter-spacing: -.011em;">Caixa do mês</span>
           </button>
-          <button type="button" data-tab="4" style="display:flex;width:100%;text-align:left;align-items:center;padding:11px 0;cursor:pointer;font-family:inherit;background:transparent;border:none;transition:color .45s ease;color:#d3cecc;">
-            <span style="font-size: 21px; font-weight: 600; letter-spacing: -.015em;">Números do agente</span>
+          <button type="button" data-tab="4" style="display: flex; width: 100%; text-align: left; align-items: center; padding: 9px 0; cursor: pointer; font-family: inherit; background: transparent; border: none; transition: color .15s cubic-bezier(.4,0,.2,1); color: #d3cecc;">
+            <span style="font-size: 20px; font-weight: 500; letter-spacing: -.011em;">Números do agente</span>
           </button>
         </div>
 
-        <div style="flex: 4 1 680px; min-width: 0; display: flex; flex-direction: column;">
-
-          <div data-panel="0" style="scroll-margin-top: 132px; padding-block: clamp(40px, 5vw, 68px); border-top: 1px solid #ded8d9;">
-            <p style="margin: 0 0 34px; max-width: 34ch; font-size: clamp(24px, 2.3vw, 32px); line-height: 1.28; letter-spacing: -.015em; color: #8a8280; text-wrap: pretty;"><strong style="font-weight: 600; color: #1b1b1b;">Para quem atende o dia inteiro.</strong> O cliente pergunta a qualquer hora e é respondido na mesma hora, pelo nome da sua loja.</p>
-            <div class="hvid" style="border: 1px solid #ded8d9; border-radius: 16px; overflow: hidden; background: #ffffff; box-shadow: 0 30px 80px rgba(27,20,20,.10), 0 2px 6px rgba(27,20,20,.05);">
-              <div style="position: relative; aspect-ratio: 16 / 9; overflow: hidden; background: #ffffff;">
-                <figure style="margin:0;position:absolute;inset:0;" data-demo="demos/02-agente-atendimento.html">
-                  <img src="assets/poster-2.jpg" width="960" height="540" alt="Atendimento no WhatsApp dentro do Revy Loja" loading="lazy" decoding="async" style="display:block;width:100%;height:100%;object-fit:cover;" />
-                </figure>
+        <div style="flex: 4 1 680px; min-width: 0; display: flex; flex-direction: column; gap: 80px;">
+          <div data-panel="0" data-rv="1" style="scroll-margin-top: 108px;">
+            <p style="margin: 0 0 24px; max-width: 34ch; font-size: clamp(22px, 2.1vw, 28px); line-height: 1.3; letter-spacing: -.014em; color: #8a8280; text-wrap: pretty;"><strong style="font-weight: 500; color: #1b1b1b;">Responde a qualquer hora.</strong> O cliente pergunta de madrugada e recebe resposta na hora, com o nome da sua loja.</p>
+            <div style="padding: 8px; border-radius: 8px; border: 1px solid rgba(27,27,27,.06); background: #f4f2f1; box-shadow: 0 20px 50px rgba(27,20,20,.10), 0 8px 20px rgba(27,20,20,.05);">
+              <div style="border-radius: 4px; overflow: hidden; background: #ffffff; box-shadow: 0 0 0 1px rgba(27,27,27,.08);">
+                <div style="display: flex; align-items: center; gap: 12px; height: 32px; padding-inline: 12px; background: #f9f9f9; box-shadow: inset 0 -1px 0 0 #ded8d9;">
+                  <div style="display: flex; gap: 6px;">
+                    <span style="width: 8px; height: 8px; border-radius: 4px; background: #d3cecc;"></span>
+                    <span style="width: 8px; height: 8px; border-radius: 4px; background: #d3cecc;"></span>
+                    <span style="width: 8px; height: 8px; border-radius: 4px; background: #d3cecc;"></span>
+                  </div>
+                  <span style="flex: 1; text-align: center; font-family: ui-monospace, 'SF Mono', Consolas, monospace; font-size: 12px; color: #6b625f;">revy loja — conversas</span>
+                  <div style="width: 44px;"></div>
+                </div>
+                <div style="position: relative; aspect-ratio: 16 / 9; overflow: hidden; background: #ffffff;">
+                  <figure style="margin:0;position:absolute;inset:0;" data-demo="demos/02-agente-atendimento.html">
+                    <img src="assets/poster-2.jpg" width="960" height="540" alt="Atendimento no WhatsApp dentro do Revy Loja" loading="lazy" style="display: block; width: 100%; height: 100%; object-fit: cover;" />
+                  </figure>
+                </div>
               </div>
             </div>
           </div>
 
-          <div data-panel="1" style="scroll-margin-top: 132px; padding-block: clamp(40px, 5vw, 68px); border-top: 1px solid #ded8d9;">
-            <p style="margin: 0 0 34px; max-width: 34ch; font-size: clamp(24px, 2.3vw, 32px); line-height: 1.28; letter-spacing: -.015em; color: #8a8280; text-wrap: pretty;"><strong style="font-weight: 600; color: #1b1b1b;">Para quem vive nos portais.</strong> Os bancos da sua loja são consultados de uma vez, com as credenciais da própria loja.</p>
-            <div class="hvid" style="border: 1px solid #ded8d9; border-radius: 16px; overflow: hidden; background: #ffffff; box-shadow: 0 30px 80px rgba(27,20,20,.10), 0 2px 6px rgba(27,20,20,.05);">
-              <div style="position: relative; aspect-ratio: 16 / 9; overflow: hidden; background: #ffffff;">
-                <figure style="margin:0;position:absolute;inset:0;" data-demo="demos/03-simulacao-bancos.html">
-                  <img src="assets/poster-3.jpg" width="960" height="540" alt="Simulação de financiamento nos bancos da loja" loading="lazy" decoding="async" style="display:block;width:100%;height:100%;object-fit:cover;" />
-                </figure>
+          <div data-panel="1" data-rv="1" style="scroll-margin-top: 108px;">
+            <p style="margin: 0 0 24px; max-width: 34ch; font-size: clamp(22px, 2.1vw, 28px); line-height: 1.3; letter-spacing: -.014em; color: #8a8280; text-wrap: pretty;"><strong style="font-weight: 500; color: #1b1b1b;">Simula em vários bancos de uma vez.</strong> São os bancos que a sua loja já usa, com o login dela.</p>
+            <div style="padding: 8px; border-radius: 8px; border: 1px solid rgba(27,27,27,.06); background: #f4f2f1; box-shadow: 0 20px 50px rgba(27,20,20,.10), 0 8px 20px rgba(27,20,20,.05);">
+              <div style="border-radius: 4px; overflow: hidden; background: #ffffff; box-shadow: 0 0 0 1px rgba(27,27,27,.08);">
+                <div style="display: flex; align-items: center; gap: 12px; height: 32px; padding-inline: 12px; background: #f9f9f9; box-shadow: inset 0 -1px 0 0 #ded8d9;">
+                  <div style="display: flex; gap: 6px;">
+                    <span style="width: 8px; height: 8px; border-radius: 4px; background: #d3cecc;"></span>
+                    <span style="width: 8px; height: 8px; border-radius: 4px; background: #d3cecc;"></span>
+                    <span style="width: 8px; height: 8px; border-radius: 4px; background: #d3cecc;"></span>
+                  </div>
+                  <span style="flex: 1; text-align: center; font-family: ui-monospace, 'SF Mono', Consolas, monospace; font-size: 12px; color: #6b625f;">revy loja — simulação</span>
+                  <div style="width: 44px;"></div>
+                </div>
+                <div style="position: relative; aspect-ratio: 16 / 9; overflow: hidden; background: #ffffff;">
+                  <figure style="margin:0;position:absolute;inset:0;" data-demo="demos/03-simulacao-bancos.html">
+                    <img src="assets/poster-3.jpg" width="960" height="540" alt="Simulação de financiamento nos bancos da loja" loading="lazy" style="display: block; width: 100%; height: 100%; object-fit: cover;" />
+                  </figure>
+                </div>
               </div>
             </div>
           </div>
 
-          <div data-panel="2" style="scroll-margin-top: 132px; padding-block: clamp(40px, 5vw, 68px); border-top: 1px solid #ded8d9;">
-            <p style="margin: 0 0 34px; max-width: 34ch; font-size: clamp(24px, 2.3vw, 32px); line-height: 1.28; letter-spacing: -.015em; color: #8a8280; text-wrap: pretty;"><strong style="font-weight: 600; color: #1b1b1b;">Para quem fecha o negócio.</strong> A moto sai do estoque, o vendedor fica registrado e a campanha que trouxe o cliente vem junto.</p>
-            <div class="hvid" style="border: 1px solid #ded8d9; border-radius: 16px; overflow: hidden; background: #ffffff; box-shadow: 0 30px 80px rgba(27,20,20,.10), 0 2px 6px rgba(27,20,20,.05);">
-              <div style="position: relative; aspect-ratio: 16 / 9; overflow: hidden; background: #ffffff;">
-                <figure style="margin:0;position:absolute;inset:0;" data-demo="demos/04-venda-confirmada.html">
-                  <img src="assets/poster-4.jpg" width="960" height="540" alt="Venda confirmada no Revy Loja" loading="lazy" decoding="async" style="display:block;width:100%;height:100%;object-fit:cover;" />
-                </figure>
+          <div data-panel="2" data-rv="1" style="scroll-margin-top: 108px;">
+            <p style="margin: 0 0 24px; max-width: 34ch; font-size: clamp(22px, 2.1vw, 28px); line-height: 1.3; letter-spacing: -.014em; color: #8a8280; text-wrap: pretty;"><strong style="font-weight: 500; color: #1b1b1b;">A venda entra sozinha.</strong> A moto sai do estoque, o vendedor fica registrado e o anúncio que trouxe o cliente vem junto.</p>
+            <div style="padding: 8px; border-radius: 8px; border: 1px solid rgba(27,27,27,.06); background: #f4f2f1; box-shadow: 0 20px 50px rgba(27,20,20,.10), 0 8px 20px rgba(27,20,20,.05);">
+              <div style="border-radius: 4px; overflow: hidden; background: #ffffff; box-shadow: 0 0 0 1px rgba(27,27,27,.08);">
+                <div style="display: flex; align-items: center; gap: 12px; height: 32px; padding-inline: 12px; background: #f9f9f9; box-shadow: inset 0 -1px 0 0 #ded8d9;">
+                  <div style="display: flex; gap: 6px;">
+                    <span style="width: 8px; height: 8px; border-radius: 4px; background: #d3cecc;"></span>
+                    <span style="width: 8px; height: 8px; border-radius: 4px; background: #d3cecc;"></span>
+                    <span style="width: 8px; height: 8px; border-radius: 4px; background: #d3cecc;"></span>
+                  </div>
+                  <span style="flex: 1; text-align: center; font-family: ui-monospace, 'SF Mono', Consolas, monospace; font-size: 12px; color: #6b625f;">revy loja — venda</span>
+                  <div style="width: 44px;"></div>
+                </div>
+                <div style="position: relative; aspect-ratio: 16 / 9; overflow: hidden; background: #ffffff;">
+                  <figure style="margin:0;position:absolute;inset:0;" data-demo="demos/04-venda-confirmada.html">
+                    <img src="assets/poster-4.jpg" width="960" height="540" alt="Venda confirmada no Revy Loja" loading="lazy" style="display: block; width: 100%; height: 100%; object-fit: cover;" />
+                  </figure>
+                </div>
               </div>
             </div>
           </div>
 
-          <div data-panel="3" style="scroll-margin-top: 132px; padding-block: clamp(40px, 5vw, 68px); border-top: 1px solid #ded8d9;">
-            <p style="margin: 0 0 34px; max-width: 34ch; font-size: clamp(24px, 2.3vw, 32px); line-height: 1.28; letter-spacing: -.015em; color: #8a8280; text-wrap: pretty;"><strong style="font-weight: 600; color: #1b1b1b;">Para quem responde pelo número.</strong> Quem vendeu, quanto entrou e o que ainda está em aberto — em uma tela só.</p>
-            <div class="hvid" style="border: 1px solid #ded8d9; border-radius: 16px; overflow: hidden; background: #ffffff; box-shadow: 0 30px 80px rgba(27,20,20,.10), 0 2px 6px rgba(27,20,20,.05);">
-              <div style="position: relative; aspect-ratio: 16 / 9; overflow: hidden; background: #ffffff;">
-                <figure style="margin:0;position:absolute;inset:0;" data-demo="demos/05-caixa-do-mes.html">
-                  <img src="assets/poster-5.jpg" width="960" height="540" alt="Caixa do mês com as vendas confirmadas" loading="lazy" decoding="async" style="display:block;width:100%;height:100%;object-fit:cover;" />
-                </figure>
+          <div data-panel="3" data-rv="1" style="scroll-margin-top: 108px;">
+            <p style="margin: 0 0 24px; max-width: 34ch; font-size: clamp(22px, 2.1vw, 28px); line-height: 1.3; letter-spacing: -.014em; color: #8a8280; text-wrap: pretty;"><strong style="font-weight: 500; color: #1b1b1b;">O caixa do mês em uma tela.</strong> Quem vendeu, quanto entrou e o que ainda falta receber.</p>
+            <div style="padding: 8px; border-radius: 8px; border: 1px solid rgba(27,27,27,.06); background: #f4f2f1; box-shadow: 0 20px 50px rgba(27,20,20,.10), 0 8px 20px rgba(27,20,20,.05);">
+              <div style="border-radius: 4px; overflow: hidden; background: #ffffff; box-shadow: 0 0 0 1px rgba(27,27,27,.08);">
+                <div style="display: flex; align-items: center; gap: 12px; height: 32px; padding-inline: 12px; background: #f9f9f9; box-shadow: inset 0 -1px 0 0 #ded8d9;">
+                  <div style="display: flex; gap: 6px;">
+                    <span style="width: 8px; height: 8px; border-radius: 4px; background: #d3cecc;"></span>
+                    <span style="width: 8px; height: 8px; border-radius: 4px; background: #d3cecc;"></span>
+                    <span style="width: 8px; height: 8px; border-radius: 4px; background: #d3cecc;"></span>
+                  </div>
+                  <span style="flex: 1; text-align: center; font-family: ui-monospace, 'SF Mono', Consolas, monospace; font-size: 12px; color: #6b625f;">revy loja — caixa</span>
+                  <div style="width: 44px;"></div>
+                </div>
+                <div style="position: relative; aspect-ratio: 16 / 9; overflow: hidden; background: #ffffff;">
+                  <figure style="margin:0;position:absolute;inset:0;" data-demo="demos/05-caixa-do-mes.html">
+                    <img src="assets/poster-5.jpg" width="960" height="540" alt="Caixa do mês com as vendas confirmadas" loading="lazy" style="display: block; width: 100%; height: 100%; object-fit: cover;" />
+                  </figure>
+                </div>
               </div>
             </div>
           </div>
 
-          <div data-panel="4" style="scroll-margin-top: 132px; padding-block: clamp(40px, 5vw, 68px); border-top: 1px solid #ded8d9;">
-            <p style="margin: 0 0 34px; max-width: 34ch; font-size: clamp(24px, 2.3vw, 32px); line-height: 1.28; letter-spacing: -.015em; color: #8a8280; text-wrap: pretty;"><strong style="font-weight: 600; color: #1b1b1b;">Para quem quer saber se funciona.</strong> Quantas conversas o assistente segurou sozinho e quantas chegaram prontas para o vendedor.</p>
-            <div class="hvid" style="border: 1px solid #ded8d9; border-radius: 16px; overflow: hidden; background: #ffffff; box-shadow: 0 30px 80px rgba(27,20,20,.10), 0 2px 6px rgba(27,20,20,.05);">
-              <div style="position: relative; aspect-ratio: 16 / 9; overflow: hidden; background: #ffffff;">
-                <figure style="margin:0;position:absolute;inset:0;" data-demo="demos/06-numeros-do-agente.html">
-                  <img src="assets/poster-6.jpg" width="960" height="540" alt="Números do agente: conversas atendidas e repassadas" loading="lazy" decoding="async" style="display:block;width:100%;height:100%;object-fit:cover;" />
-                </figure>
+          <div data-panel="4" data-rv="1" style="scroll-margin-top: 108px;">
+            <p style="margin: 0 0 24px; max-width: 34ch; font-size: clamp(22px, 2.1vw, 28px); line-height: 1.3; letter-spacing: -.014em; color: #8a8280; text-wrap: pretty;"><strong style="font-weight: 500; color: #1b1b1b;">Você vê se está funcionando.</strong> Quantas conversas o assistente resolveu sozinho e quantas chegaram prontas para o vendedor.</p>
+            <div style="padding: 8px; border-radius: 8px; border: 1px solid rgba(27,27,27,.06); background: #f4f2f1; box-shadow: 0 20px 50px rgba(27,20,20,.10), 0 8px 20px rgba(27,20,20,.05);">
+              <div style="border-radius: 4px; overflow: hidden; background: #ffffff; box-shadow: 0 0 0 1px rgba(27,27,27,.08);">
+                <div style="display: flex; align-items: center; gap: 12px; height: 32px; padding-inline: 12px; background: #f9f9f9; box-shadow: inset 0 -1px 0 0 #ded8d9;">
+                  <div style="display: flex; gap: 6px;">
+                    <span style="width: 8px; height: 8px; border-radius: 4px; background: #d3cecc;"></span>
+                    <span style="width: 8px; height: 8px; border-radius: 4px; background: #d3cecc;"></span>
+                    <span style="width: 8px; height: 8px; border-radius: 4px; background: #d3cecc;"></span>
+                  </div>
+                  <span style="flex: 1; text-align: center; font-family: ui-monospace, 'SF Mono', Consolas, monospace; font-size: 12px; color: #6b625f;">revy loja — agente</span>
+                  <div style="width: 44px;"></div>
+                </div>
+                <div style="position: relative; aspect-ratio: 16 / 9; overflow: hidden; background: #ffffff;">
+                  <figure style="margin:0;position:absolute;inset:0;" data-demo="demos/06-numeros-do-agente.html">
+                    <img src="assets/poster-6.jpg" width="960" height="540" alt="Números do agente: conversas atendidas e repassadas" loading="lazy" style="display: block; width: 100%; height: 100%; object-fit: cover;" />
+                  </figure>
+                </div>
               </div>
             </div>
           </div>
-
         </div>
       </div>
     </div>
   </section>
 
-  <section id="trafego" data-screen-label="Tráfego pago" style="padding-block: 104px; border-top: 1px solid #ded8d9; background: #ffffff;">
-    <div style="width: min(100%, 1280px); margin-inline: auto; padding-inline: clamp(20px, 5vw, 64px);">
-      <div style="max-width: 760px; margin-bottom: 56px;">
-        <div style="font-family: ui-monospace, 'SF Mono', Consolas, monospace; font-size: 12px; letter-spacing: .18em; text-transform: uppercase; color: #6b625f; margin-bottom: 20px;">Tráfego pago</div>
-        <h2 style="margin: 0 0 20px; font-family: Newsreader, Georgia, serif; font-weight: 300; font-size: clamp(34px, 4.4vw, 56px); line-height: 1.08; letter-spacing: -.02em;">Um gestor de tráfego cuidando da sua loja.</h2>
-        <p style="margin: 0; max-width: 660px; font-size: 19px; line-height: 1.6; color: #57514f; text-wrap: pretty;">Anúncio sozinho não vende moto. A Revy pode entrar com um gestor dedicado à sua loja: ele monta a campanha, cuida do Pixel e do CAPI e acompanha o resultado. Você não mexe em token nem em planilha.</p>
+  <section id="trafego" data-screen-label="Tráfego pago" style="padding-block: 96px;">
+    <div style="width: min(100%, 1280px); margin-inline: auto; padding-inline: clamp(20px, 5vw, 56px); display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); gap: clamp(40px, 5vw, 72px); align-items: center;">
+      <div data-rv="0">
+        <div style="font-family: ui-monospace, 'SF Mono', Consolas, monospace; font-size: 12px; letter-spacing: .18em; text-transform: uppercase; color: #6b625f; margin-bottom: 16px;">Anúncios</div>
+        <h2 style="margin: 0 0 16px; font-family: Newsreader, Georgia, serif; font-weight: 300; font-size: clamp(32px, 3.6vw, 44px); line-height: 1.1; letter-spacing: -.024em;">Alguém cuidando dos seus anúncios.</h2>
+        <p style="margin: 0 0 32px; font-size: 17px; line-height: 1.55; color: #57514f; text-wrap: pretty;">Anúncio sozinho não vende moto. A Revy pode colocar uma pessoa para cuidar dos anúncios da sua loja: ela cria, publica e acompanha o resultado. Você não mexe em nada técnico.</p>
+        <div style="display: grid; gap: 20px;">
+          <div>
+            <h3 style="margin: 0 0 6px; font-size: 17px; font-weight: 500; letter-spacing: -.005em;">Uma pessoa responsável</h3>
+            <p style="margin: 0; font-size: 16px; line-height: 1.5; color: #6b625f;">Alguém da equipe Revy, de agência ou por conta própria, ligado à sua loja. Cria, publica e acompanha.</p>
+          </div>
+          <div>
+            <h3 style="margin: 0 0 6px; font-size: 17px; font-weight: 500; letter-spacing: -.005em;">O anúncio abre o WhatsApp</h3>
+            <p style="margin: 0; font-size: 16px; line-height: 1.5; color: #6b625f;">Quem clica no anúncio cai direto na conversa, e o assistente responde na hora — de madrugada ou no domingo.</p>
+          </div>
+          <div>
+            <h3 style="margin: 0 0 6px; font-size: 17px; font-weight: 500; letter-spacing: -.005em;">Você vê o que deu retorno</h3>
+            <p style="margin: 0; font-size: 16px; line-height: 1.5; color: #6b625f;">Cada venda mostra o anúncio que trouxe o cliente, e o quanto você gastou aparece junto. Dá para ver o que valeu a pena.</p>
+          </div>
+        </div>
       </div>
-
-      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1px; background: #ffffff; border: 1px solid #ded8d9; border-radius: 14px; overflow: hidden; margin-bottom: 64px;">
-        <div style="background: #ffffff; padding: 36px 32px 40px; box-shadow: 0 0 0 1px #ded8d9;">
-          <h3 style="margin: 0 0 12px; font-size: 22px; font-weight: 600; letter-spacing: -.01em;">Gestor dedicado</h3>
-          <p style="margin: 0; font-size: 16px; line-height: 1.6; color: #6b625f;">Um responsável de tráfego ligado à sua loja — da equipe Revy, independente ou de agência. Ele configura, publica e acompanha.</p>
-        </div>
-        <div style="background: #ffffff; padding: 36px 32px 40px; box-shadow: 0 0 0 1px #ded8d9;">
-          <h3 style="margin: 0 0 12px; font-size: 22px; font-weight: 600; letter-spacing: -.01em;">O anúncio abre o WhatsApp</h3>
-          <p style="margin: 0; font-size: 16px; line-height: 1.6; color: #6b625f;">Click-to-WhatsApp: o clique cai direto na conversa, e o assistente responde na hora — de madrugada ou no domingo.</p>
-        </div>
-        <div style="background: #ffffff; padding: 36px 32px 40px; box-shadow: 0 0 0 1px #ded8d9;">
-          <h3 style="margin: 0 0 12px; font-size: 22px; font-weight: 600; letter-spacing: -.01em;">A venda volta amarrada</h3>
-          <p style="margin: 0; font-size: 16px; line-height: 1.6; color: #6b625f;">Venda confirmada carrega a campanha que a trouxe. O gasto da Meta entra sozinho e o ROI mostra CPL, CPA e ROAS.</p>
-        </div>
-      </div>
-
-      <div class="hvid" style="transform-origin: 50% 50%; will-change: transform, opacity; max-width: 1060px; margin-inline: auto; border: 1px solid #ded8d9; border-radius: 16px; overflow: hidden; background: #ffffff; box-shadow: 0 34px 90px rgba(27,20,20,.12), 0 2px 6px rgba(27,20,20,.05);">
-        <div style="position: relative; aspect-ratio: 16 / 9; overflow: hidden; background: #ffffff;">
-          <div style="position: absolute; inset: 0; background: #ffffff;"></div>
-          <figure style="margin:0;position:absolute;inset:0;" data-demo="demos/07-trafego-pago.html">
-                <img src="assets/poster-7.jpg" width="960" height="540" alt="Campanha de tráfego pago com leads e vendas atribuídas" loading="lazy" decoding="async" style="display:block;width:100%;height:100%;object-fit:cover;" />
-              </figure>
+      <div data-rv="1" style="padding: 8px; border-radius: 8px; border: 1px solid rgba(27,27,27,.06); background: #f4f2f1; box-shadow: 0 24px 60px rgba(27,20,20,.12), 0 10px 24px rgba(27,20,20,.06);">
+        <div style="border-radius: 4px; overflow: hidden; background: #ffffff; box-shadow: 0 0 0 1px rgba(27,27,27,.08);">
+          <div style="display: flex; align-items: center; gap: 12px; height: 32px; padding-inline: 12px; background: #f9f9f9; box-shadow: inset 0 -1px 0 0 #ded8d9;">
+            <div style="display: flex; gap: 6px;">
+              <span style="width: 8px; height: 8px; border-radius: 4px; background: #d3cecc;"></span>
+              <span style="width: 8px; height: 8px; border-radius: 4px; background: #d3cecc;"></span>
+              <span style="width: 8px; height: 8px; border-radius: 4px; background: #d3cecc;"></span>
+            </div>
+            <span style="flex: 1; text-align: center; font-family: ui-monospace, 'SF Mono', Consolas, monospace; font-size: 12px; color: #6b625f;">revy loja — tráfego</span>
+            <div style="width: 44px;"></div>
+          </div>
+          <div style="position: relative; aspect-ratio: 16 / 9; overflow: hidden; background: #ffffff;">
+            <figure style="margin:0;position:absolute;inset:0;" data-demo="demos/07-trafego-pago.html">
+              <img src="assets/poster-7.jpg" width="960" height="540" alt="Campanha de tráfego pago com leads e vendas atribuídas" loading="lazy" style="display: block; width: 100%; height: 100%; object-fit: cover;" />
+            </figure>
+          </div>
         </div>
       </div>
     </div>
   </section>
 
-  <section id="limites" data-screen-label="Limites" style="padding-block: 104px; background: #0a0a0a; color: #f5f5f5;">
-    <div style="width: min(100%, 1280px); margin-inline: auto; padding-inline: clamp(20px, 5vw, 64px); display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: clamp(40px, 6vw, 88px); align-items: start;">
-      <div>
-        <div style="font-family: ui-monospace, 'SF Mono', Consolas, monospace; font-size: 12px; letter-spacing: .18em; text-transform: uppercase; color: #949494; margin-bottom: 20px;">Honestidade primeiro</div>
-        <h2 style="margin: 0 0 22px; font-family: Newsreader, Georgia, serif; font-weight: 300; font-size: clamp(34px, 4.4vw, 56px); line-height: 1.08; letter-spacing: -.02em; color: #f5f5f5;">O que a Revy não faz.</h2>
-        <p style="margin: 0; max-width: 460px; font-size: 19px; line-height: 1.6; color: #a3a3a3;">Contar o limite antes é mais barato para os dois lados. Condição definitiva e aprovação continuam sendo do banco.</p>
+  <section id="limites" data-screen-label="Limites" style="padding-block: 96px; background: #0a0a0a; color: #f5f5f5;">
+    <div style="width: min(100%, 1280px); margin-inline: auto; padding-inline: clamp(20px, 5vw, 56px); display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: clamp(40px, 5vw, 80px); align-items: start;">
+      <div data-rv="0">
+        <div style="font-family: ui-monospace, 'SF Mono', Consolas, monospace; font-size: 12px; letter-spacing: .18em; text-transform: uppercase; color: #949494; margin-bottom: 16px;">Honestidade primeiro</div>
+        <h2 style="margin: 0 0 16px; font-family: Newsreader, Georgia, serif; font-weight: 300; font-size: clamp(34px, 4.4vw, 52px); line-height: 1.08; letter-spacing: -.03em; color: #f5f5f5;">O que a Revy não faz.</h2>
+        <p style="margin: 0; max-width: 440px; font-size: 17px; line-height: 1.55; color: #a3a3a3;">É melhor falar dos limites antes. Quem aprova o financiamento é sempre o banco.</p>
       </div>
-      <div style="display: grid; gap: 1px; background: #2a2a2a; border: 1px solid #2a2a2a; border-radius: 14px; overflow: hidden;">
-        <div style="background: #111111; padding: 26px 30px; font-size: 18px; line-height: 1.5; color: #f5f5f5;">Não promete aprovação de crédito — em nenhuma tela.</div>
-        <div style="background: #111111; padding: 26px 30px; font-size: 18px; line-height: 1.5; color: #f5f5f5;">Não é banco nem marketplace de crédito. Os bancos são os da sua loja.</div>
-        <div style="background: #111111; padding: 26px 30px; font-size: 18px; line-height: 1.5; color: #f5f5f5;">Não cria nem pausa anúncio na Meta ou no Google.</div>
-        <div style="background: #111111; padding: 26px 30px; font-size: 18px; line-height: 1.5; color: #f5f5f5;">Não é CRM genérico. É a operação da revenda de moto.</div>
+      <div data-rv="1" style="display: grid; gap: 0;">
+        <div style="padding: 18px 0; font-size: 17px; line-height: 1.5; color: #f5f5f5; box-shadow: inset 0 -1px 0 0 #2a2a2a;">Não promete aprovação de crédito — em nenhuma tela.</div>
+        <div style="padding: 18px 0; font-size: 17px; line-height: 1.5; color: #f5f5f5; box-shadow: inset 0 -1px 0 0 #2a2a2a;">A Revy não é banco. Os bancos são os que a sua loja já usa.</div>
+        <div style="padding: 18px 0; font-size: 17px; line-height: 1.5; color: #f5f5f5; box-shadow: inset 0 -1px 0 0 #2a2a2a;">Não cria nem pausa anúncio no Facebook, no Instagram ou no Google.</div>
+        <div style="padding: 18px 0; font-size: 17px; line-height: 1.5; color: #f5f5f5;">Não serve para qualquer negócio. É feita para revenda de moto.</div>
       </div>
     </div>
   </section>
 
-  <section id="contato" data-screen-label="Contato" style="padding-block: 104px;">
-    <div style="width: min(100%, 1280px); margin-inline: auto; padding-inline: clamp(20px, 5vw, 64px);">
-      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); overflow: hidden; border: 1px solid #ded8d9; border-radius: 20px; background: #ffffff;">
-        <div style="padding: clamp(34px, 4.5vw, 60px); background: #ffffff; border-right: 1px solid #ded8d9;">
-          <div style="font-family: ui-monospace, 'SF Mono', Consolas, monospace; font-size: 12px; letter-spacing: .18em; text-transform: uppercase; color: #6b625f; margin-bottom: 20px;">Contato</div>
-          <h2 style="margin: 0 0 18px; font-family: Newsreader, Georgia, serif; font-weight: 300; font-size: clamp(32px, 3.6vw, 46px); line-height: 1.08; letter-spacing: -.02em;">Conversa curta, sem script.</h2>
-          <p style="margin: 0 0 34px; font-size: 18px; line-height: 1.6; color: #57514f;">Você conta como a loja atende hoje e quais bancos usa. A gente diz se a Revy encaixa — e se não encaixar, fala também.</p>
-          <div style="display: grid; gap: 14px; font-size: 16px; color: #57514f;">
-            <div style="display: flex; align-items: center; gap: 12px;"><span style="width: 6px; height: 6px; border-radius: 3px; background: #1f4d3a;"></span>Resposta no mesmo dia útil</div>
-            <div style="display: flex; align-items: center; gap: 12px;"><span style="width: 6px; height: 6px; border-radius: 3px; background: #1f4d3a;"></span>Sem compromisso de contrato</div>
+  <section id="contato" data-screen-label="Contato" style="padding-block: 96px;">
+    <div style="width: min(100%, 1280px); margin-inline: auto; padding-inline: clamp(20px, 5vw, 56px);">
+      <div data-rv="0" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 8px;">
+        <div style="padding: clamp(28px, 3.5vw, 48px); border-radius: 4px; background: #efeceb;">
+          <div style="font-family: ui-monospace, 'SF Mono', Consolas, monospace; font-size: 12px; letter-spacing: .18em; text-transform: uppercase; color: #6b625f; margin-bottom: 16px;">Contato</div>
+          <h2 style="margin: 0 0 14px; font-family: Newsreader, Georgia, serif; font-weight: 300; font-size: clamp(30px, 3.4vw, 42px); line-height: 1.1; letter-spacing: -.024em;">Uma conversa rápida.</h2>
+          <p style="margin: 0 0 28px; font-size: 17px; line-height: 1.55; color: #57514f;">Você conta como a loja atende hoje e quais bancos usa. A gente diz se a Revy serve para você — e se não servir, fala também.</p>
+          <div style="display: grid; gap: 12px; font-size: 16px; color: #57514f;">
+            <div style="display: flex; align-items: center; gap: 10px;"><span style="width: 6px; height: 6px; border-radius: 3px; background: #1f4d3a;"></span>Resposta no mesmo dia</div>
+            <div style="display: flex; align-items: center; gap: 10px;"><span style="width: 6px; height: 6px; border-radius: 3px; background: #1f4d3a;"></span>Sem compromisso</div>
           </div>
         </div>
-        <div style="padding: clamp(34px, 4.5vw, 60px); display: grid; gap: 22px; align-content: center;">
-          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 20px;">
-            <div style="display: grid; gap: 8px; min-width: 0;">
-              <label for="c-nome" style="font-size: 11px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: #6b625f;">Seu nome</label>
-              <input id="c-nome" type="text" placeholder="Como te chamam" style="width: 100%; min-width: 0; min-height: 48px; padding-inline: 14px; border: 1px solid #ded8d9; border-radius: 3px; background: #ffffff; color: #1b1b1b; font-family: inherit; font-size: 16px; outline: none;" style-focus="border-color: #1b1b1b;" />
+        <form style="padding: clamp(28px, 3.5vw, 48px); border-radius: 4px; background: #ffffff; box-shadow: 0 0 0 1px rgba(27,27,27,.055); display: grid; gap: 16px; align-content: center;">
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 16px;">
+            <div style="display: grid; gap: 6px; min-width: 0;">
+              <label for="c-nome" style="font-family: ui-monospace, 'SF Mono', Consolas, monospace; font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: #6b625f;">Seu nome</label>
+              <input id="c-nome" name="nome" type="text" placeholder="Como te chamam" style="width: 100%; min-width: 0; min-height: 44px; padding-inline: 12px; border: 1px solid #ded8d9; border-radius: 3px; background: #ffffff; color: #1b1b1b; font-family: inherit; font-size: 16px; outline: none; transition: border-color .15s cubic-bezier(.4,0,.2,1);" class="x5" />
             </div>
-            <div style="display: grid; gap: 8px; min-width: 0;">
-              <label for="c-loja" style="font-size: 11px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: #6b625f;">Loja</label>
-              <input id="c-loja" type="text" placeholder="Nome da revenda" style="width: 100%; min-width: 0; min-height: 48px; padding-inline: 14px; border: 1px solid #ded8d9; border-radius: 3px; background: #ffffff; color: #1b1b1b; font-family: inherit; font-size: 16px; outline: none;" style-focus="border-color: #1b1b1b;" />
+            <div style="display: grid; gap: 6px; min-width: 0;">
+              <label for="c-loja" style="font-family: ui-monospace, 'SF Mono', Consolas, monospace; font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: #6b625f;">Loja</label>
+              <input id="c-loja" name="loja" type="text" placeholder="Nome da revenda" style="width: 100%; min-width: 0; min-height: 44px; padding-inline: 12px; border: 1px solid #ded8d9; border-radius: 3px; background: #ffffff; color: #1b1b1b; font-family: inherit; font-size: 16px; outline: none; transition: border-color .15s cubic-bezier(.4,0,.2,1);" class="x5" />
             </div>
           </div>
-          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 20px;">
-            <div style="display: grid; gap: 8px; min-width: 0;">
-              <label for="c-zap" style="font-size: 11px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: #6b625f;">WhatsApp</label>
-              <input id="c-zap" type="tel" placeholder="(00) 00000-0000" style="width: 100%; min-width: 0; min-height: 48px; padding-inline: 14px; border: 1px solid #ded8d9; border-radius: 3px; background: #ffffff; color: #1b1b1b; font-family: ui-monospace, 'SF Mono', Consolas, monospace; font-size: 16px; outline: none;" style-focus="border-color: #1b1b1b;" />
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 16px;">
+            <div style="display: grid; gap: 6px; min-width: 0;">
+              <label for="c-zap" style="font-family: ui-monospace, 'SF Mono', Consolas, monospace; font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: #6b625f;">WhatsApp</label>
+              <input id="c-zap" name="whatsapp" type="tel" placeholder="(00) 00000-0000" style="width: 100%; min-width: 0; min-height: 44px; padding-inline: 12px; border: 1px solid #ded8d9; border-radius: 3px; background: #ffffff; color: #1b1b1b; font-family: ui-monospace, 'SF Mono', Consolas, monospace; font-size: 16px; outline: none; transition: border-color .15s cubic-bezier(.4,0,.2,1);" class="x5" />
             </div>
-            <div style="display: grid; gap: 8px; min-width: 0;">
-              <label for="c-motos" style="font-size: 11px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: #6b625f;">Motos em estoque</label>
-              <select id="c-motos" style="width: 100%; min-width: 0; min-height: 48px; padding-inline: 12px; border: 1px solid #ded8d9; border-radius: 3px; background: #ffffff; color: #1b1b1b; font-family: inherit; font-size: 16px; outline: none; cursor: pointer;" style-focus="border-color: #1b1b1b;">
+            <div style="display: grid; gap: 6px; min-width: 0;">
+              <label for="c-motos" style="font-family: ui-monospace, 'SF Mono', Consolas, monospace; font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: #6b625f;">Motos em estoque</label>
+              <select id="c-motos" name="estoque" style="width: 100%; min-width: 0; min-height: 44px; padding-inline: 10px; border: 1px solid #ded8d9; border-radius: 3px; background: #ffffff; color: #1b1b1b; font-family: inherit; font-size: 16px; outline: none; cursor: pointer; transition: border-color .15s cubic-bezier(.4,0,.2,1);" class="x5">
                 <option>Até 30</option>
                 <option>30 a 80</option>
                 <option>80 a 200</option>
@@ -342,191 +428,514 @@ img{max-width:100%}
               </select>
             </div>
           </div>
-          <button type="button" style="min-height: 52px; border: 1px solid #1b1b1b; border-radius: 3px; background: #1b1b1b; color: #ffffff; font-family: inherit; font-size: 15px; font-weight: 600; cursor: pointer;" class="h5">Falar com a Revy</button>
-          <p style="margin: 0; font-size: 14px; line-height: 1.5; color: #6b625f;">Usamos seus dados só para essa conversa.</p>
-        </div>
+          <button type="submit" data-mailform style="min-height: 46px; border: none; border-radius: 3px; background: #1b1b1b; color: #ffffff; font-family: inherit; font-size: 15px; font-weight: 500; cursor: pointer; transition: background-color .15s cubic-bezier(.4,0,.2,1);" class="x2">Enviar por e-mail</button>
+          <p style="margin: 0; font-size: 14px; line-height: 1.5; color: #6b625f;">Abre seu programa de e-mail com os dados preenchidos. Usamos seus dados só para essa conversa.</p>
+        </form>
       </div>
     </div>
   </section>
 
-  <footer style="padding-block: 62px 34px; border-top: 1px solid #ded8d9; background: #ffffff;">
-    <div style="width: min(100%, 1280px); margin-inline: auto; padding-inline: clamp(20px, 5vw, 64px);">
-      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 44px; margin-bottom: 56px;">
+  <footer style="padding-block: 56px 28px; background: #f9f9f9; box-shadow: inset 0 1px 0 0 #ded8d9;">
+    <div style="width: min(100%, 1280px); margin-inline: auto; padding-inline: clamp(20px, 5vw, 56px);">
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 40px; margin-bottom: 48px;">
         <div style="max-width: 300px;">
-          <img src="assets/revy-signature.svg" alt="Revy" style="display: block; width: 92px; height: auto; margin-bottom: 20px;" />
+          <img src="assets/revy-signature.svg" alt="Revy" style="display: block; width: 92px; height: auto; margin-bottom: 18px;" />
           <p style="margin: 0; font-family: Newsreader, Georgia, serif; font-weight: 300; font-size: 22px; line-height: 1.3; color: #57514f;">A revenda no ritmo certo.</p>
         </div>
-        <div style="display: flex; flex-direction: column; gap: 13px;">
-          <strong style="font-size: 12px; letter-spacing: .05em; margin-bottom: 4px;">Produto</strong>
-          <a href="#como" style="font-size: 15px; color: #6b625f;" class="h6">Como funciona</a>
+        <div style="display: flex; flex-direction: column; gap: 8px;">
+          <strong style="font-size: 14px; font-weight: 500; margin-bottom: 4px;">Produto</strong>
+          <a href="#como" style="font-size: 13px; color: #6b625f; transition: color .15s cubic-bezier(.4,0,.2,1);" class="x1">Como funciona</a>
         </div>
-        <div style="display: flex; flex-direction: column; gap: 13px;">
-          <strong style="font-size: 12px; letter-spacing: .05em; margin-bottom: 4px;">Transparência</strong>
-          <a href="#limites" style="font-size: 15px; color: #6b625f;" class="h6">O que não fazemos</a>
-          <a href="#limites" style="font-size: 15px; color: #6b625f;" class="h6">Crédito e bancos</a>
+        <div style="display: flex; flex-direction: column; gap: 8px;">
+          <strong style="font-size: 14px; font-weight: 500; margin-bottom: 4px;">Transparência</strong>
+          <a href="#limites" style="font-size: 13px; color: #6b625f; transition: color .15s cubic-bezier(.4,0,.2,1);" class="x1">O que não fazemos</a>
+          <a href="#limites" style="font-size: 13px; color: #6b625f; transition: color .15s cubic-bezier(.4,0,.2,1);" class="x1">Crédito e bancos</a>
         </div>
-        <div style="display: flex; flex-direction: column; gap: 13px;">
-          <strong style="font-size: 12px; letter-spacing: .05em; margin-bottom: 4px;">Contato</strong>
-          <a href="#contato" style="font-size: 15px; color: #6b625f;" class="h6">Falar com a Revy</a>
+        <div style="display: flex; flex-direction: column; gap: 8px;">
+          <strong style="font-size: 14px; font-weight: 500; margin-bottom: 4px;">Contato</strong>
+          <a href="mailto:revystartup@gmail.com?subject=Quero%20conhecer%20a%20Revy" style="font-size: 13px; color: #6b625f; transition: color .15s cubic-bezier(.4,0,.2,1);" class="x1">Falar com a Revy</a>
         </div>
       </div>
-      <div style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 18px; padding-top: 26px; border-top: 1px solid #ded8d9; font-size: 13px; color: #6b625f;">
+      <div style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 18px; padding-top: 24px; font-size: 13px; color: #6b625f; box-shadow: inset 0 1px 0 0 #ded8d9;">
         <span>© 2026 Revy</span>
-        <div style="display: flex; gap: 26px;">
-          <a href="#topo" style="color: #6b625f; text-decoration: underline;" class="h6">Privacidade</a>
-          <a href="#topo" style="color: #6b625f; text-decoration: underline;" class="h6">Termos</a>
+        <div style="display: flex; gap: 24px;">
+          <a href="#topo" style="color: #6b625f; transition: color .15s cubic-bezier(.4,0,.2,1);" class="x1">Privacidade</a>
+          <a href="#topo" style="color: #6b625f; transition: color .15s cubic-bezier(.4,0,.2,1);" class="x1">Termos</a>
         </div>
       </div>
     </div>
   </footer>
 
-  
+  <a href="https://wa.me/5551980336365?text=Ol%C3%A1!%20Vim%20pelo%20site%20da%20Revy." target="_blank" rel="noopener" aria-label="Falar no WhatsApp" data-fab style="position: fixed; right: 20px; bottom: 20px; z-index: 60; display: inline-flex; align-items: center; gap: 9px; min-height: 46px; padding-inline: 16px; border-radius: 3px; background: #1f4d3a; color: #ffffff; font-size: 14px; font-weight: 500; box-shadow: 0 8px 24px rgba(27,20,20,.18), 0 2px 6px rgba(27,20,20,.08); opacity: 0; pointer-events: none; transform: translateY(8px); transition: opacity .25s cubic-bezier(.4,0,.2,1), transform .25s cubic-bezier(.4,0,.2,1), background-color .15s cubic-bezier(.4,0,.2,1);" class="x6">
+    <span style="width: 8px; height: 8px; border-radius: 4px; background: #25d366;"></span>
+    WhatsApp
+  </a>
 </div>
+</main>
 
 <script>
-(function(){
-  // abertura: navbar, título, texto, botões e só então a caixa do vídeo
-  var intro=[].slice.call(document.querySelectorAll('[data-intro]')).sort(function(a,b){
-    return (+a.getAttribute('data-intro'))-(+b.getAttribute('data-intro'));
-  });
-  intro.forEach(function(el,i){ setTimeout(function(){ el.classList.add('in'); }, 90+i*150); });
+/* ============================================================
+   AJUSTE ANTES DE PUBLICAR: e-mail e número do WhatsApp.
+   Os mesmos valores aparecem nos href mailto:/wa.me acima.
+   ============================================================ */
+var REVY = {
+  email: 'revystartup@gmail.com',
+  whatsappNumber: '5551980336365',
+  heroChips: true,      // rótulos flutuantes acima do vídeo
+  chipsMagnet: true,    // eles reagem ao mouse no hero
+  chipsDrift: 16,       // px de deriva com o mouse
+  magnetPull: 12,       // px de atração de perto
+  cardDrag: true,       // vídeo arrastável
+  heroTilt: true,       // vídeo inclina na direção do cursor
+  tiltMax: 2.2          // graus
+};
 
-  var figs=[].slice.call(document.querySelectorAll('figure[data-demo]'));
+class DCLogic {
+  constructor(props) { this.props = props || {}; }
+}
 
-  // com JS ativo a imagem é só ponte: some na hora, para nunca aparecer ampliada
-  figs.forEach(function(fig){
-    var img=fig.querySelector('img');
-    if(img){ img.style.transition='opacity .3s ease'; img.style.opacity='0'; }
-  });
-
-  function mount(fig){
-    if(!fig||fig.dataset.mounted)return;
-    fig.dataset.mounted='1';
-    var f=document.createElement('iframe');
-    f.className='vid'; f.title='Animação Revy'; f.setAttribute('scrolling','no');
-    f.src=fig.getAttribute('data-demo');
-    f.addEventListener('load',function(){
-      requestAnimationFrame(function(){ requestAnimationFrame(function(){ f.classList.add('on'); }); });
+class Component extends DCLogic {
+  componentDidMount() {
+    // um mount anterior (hot-reload) pode ter deixado ouvintes no window: derruba tudo
+    if (window.__revyHeroKill) { try { window.__revyHeroKill(); } catch (e) {} }
+    var self = this;
+    window.__revyHeroKill = function () { self.componentWillUnmount(); };
+    // e limpa qualquer transform herdado do texto do hero
+    ['[data-still]', '[data-chip]'].forEach(function (sel) {
+      [].slice.call(document.querySelectorAll(sel)).forEach(function (el) { el.style.transform = ''; });
     });
-    fig.appendChild(f);
+    var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    var els = [].slice.call(document.querySelectorAll('[data-rv]'));
+    if (reduce) {
+      els.forEach(function (el) { el.classList.add('in'); });
+    } else {
+      var vh = window.innerHeight || 800;
+      els.forEach(function (el) {
+        if (el.getBoundingClientRect().top < vh * 0.9) {
+          var d = +el.getAttribute('data-rv') || 0;
+          setTimeout(function () { el.classList.add('in'); }, 60 + d * 70);
+        }
+      });
+      var io = new IntersectionObserver(function (es) {
+        es.forEach(function (e) {
+          if (!e.isIntersecting) return;
+          var el = e.target, d = +el.getAttribute('data-rv') || 0;
+          el.style.transitionDelay = (Math.min(d, 4) * 60) + 'ms';
+          el.classList.add('in');
+          io.unobserve(el);
+        });
+      }, { threshold: 0, rootMargin: '0px 0px -24px 0px' });
+      els.forEach(function (el) { if (!el.classList.contains('in')) io.observe(el); });
+      this._io = io;
+      // fontes e imagens mudam o layout depois do mount: revê quem já está visível
+      this._sweep = function () {
+        var h = window.innerHeight || 800;
+        els.forEach(function (el) {
+          if (el.classList.contains('in')) return;
+          var b = el.getBoundingClientRect();
+          if (b.top < h && b.bottom > 0) el.classList.add('in');
+        });
+      };
+      window.addEventListener('load', this._sweep);
+      setTimeout(this._sweep, 700);
+    }
+    this.mountTabs(reduce);
+
+    var hint = document.querySelector('[data-hint]');
+    if (this.props.heroChips ?? true) this.mountChips(reduce);
+    else {
+      var wrap = document.querySelector('[data-chips]');
+      if (wrap) wrap.style.display = 'none';
+    }
+    this.mountCard(reduce);
+    this.mountMailForm();
+    this.mountFab();
+    if (hint && !(this.props.cardDrag ?? true)) hint.style.display = 'none';
   }
 
-  // hero carrega já; o resto (telas empilhadas e tráfego) assim que se aproxima
-  var eager={};
-  if(figs[0]){ mount(figs[0]); eager[0]=1; }
-
-  var io=new IntersectionObserver(function(es){
-    es.forEach(function(e){ if(e.isIntersecting){ mount(e.target); io.unobserve(e.target); } });
-  },{threshold:0,rootMargin:'900px 0px'});
-  figs.forEach(function(fig){
-    if(fig.dataset.mounted)return;
-    io.observe(fig);
-  });
-
-  // entrada em cascata: o que está abaixo da dobra sobe conforme aparece
-  (function(){
-    var sel='section h2, section h3, section p, .tab, figure, section [style*="aspect-ratio"], section [style*="box-shadow: 0 0 0 1px #ded8d9"]';
-    var vh=window.innerHeight||800;
-    var cand=[].slice.call(document.querySelectorAll(sel)).filter(function(el){
-      return el.getBoundingClientRect().top > vh*0.92 && !el.closest('[data-intro]');
-    });
-    cand.forEach(function(el){ el.classList.add('rv'); });
-    var seen=new WeakMap();
-    var rio=new IntersectionObserver(function(es){
-      es.forEach(function(e){
-        if(!e.isIntersecting)return;
-        var el=e.target, p=el.parentNode;
-        var n=seen.get(p)||0; seen.set(p,n+1);
-        el.style.transitionDelay=(Math.min(n,6)*70)+'ms';
-        el.classList.add('in');
-        rio.unobserve(el);
-      });
-    },{threshold:0.08,rootMargin:'0px 0px -6% 0px'});
-    cand.forEach(function(el){ rio.observe(el); });
-  })();
-
-  // lista fixa + telas empilhadas: destaque por leitura e clique com scroll rápido
-  (function(){
-    var row=document.getElementById('veja-row');
-    if(!row)return;
-    var btns=[].slice.call(row.querySelectorAll('[data-tab]'));
-    var panels=[].slice.call(row.querySelectorAll('[data-panel]'));
-    if(!btns.length||btns.length!==panels.length)return;
-    var active=-1, lock=false, raf=null;
-
-    function paint(i){
-      if(i===active)return;
-      active=i;
-      btns.forEach(function(b,j){ b.style.color = j===i ? '#1b1b1b' : '#d3cecc'; });
-    }
-    // o hover respeita o item ativo: o ativo continua preto
-    btns.forEach(function(b,i){
-      b.addEventListener('mouseenter',function(){ b.style.color = i===active ? '#1b1b1b' : '#8a8280'; });
-      b.addEventListener('mouseleave',function(){ b.style.color = i===active ? '#1b1b1b' : '#d3cecc'; });
+  // 1) cartões: rótulos estáticos ancorados na faixa acima do vídeo
+  mountChips(reduce) {
+    var chips = [].slice.call(document.querySelectorAll('[data-chip]'));
+    var wrap = document.querySelector('[data-chips]');
+    var hint = document.querySelector('[data-hint]');
+    if (!chips.length || !wrap) return;
+    var self = this;
+    try { localStorage.removeItem('revy-hero-chips-v1'); localStorage.removeItem('revy-hero-block-v1'); } catch (e) {}
+    chips.forEach(function (el) {
+      el.style.transform = '';
+      el.style.cursor = 'pointer';
+      el.addEventListener('click', function () { self.jumpToPanel(+el.getAttribute('data-target')); });
     });
 
-    function sync(){
-      if(lock)return;
-      var line=window.innerHeight*0.38, idx=0;
-      panels.forEach(function(p,i){ if(p.getBoundingClientRect().top<=line) idx=i; });
-      paint(idx);
-    }
-    window.addEventListener('scroll',function(){
-      if(raf)return;
-      raf=requestAnimationFrame(function(){ raf=null; sync(); });
-    },{passive:true});
-    window.addEventListener('resize',sync);
-    sync();
-
-    btns.forEach(function(b,i){
-      b.addEventListener('click',function(){
-        var el=panels[i]; if(!el)return;
-        lock=true; paint(i);
-        // durante a rolagem o mouse não deve acender o que passa por baixo
-        row.style.pointerEvents='none';
-        var start=window.pageYOffset;
-        var dist=el.getBoundingClientRect().top+start-150-start;
-        if(Math.abs(dist)<2){ lock=false; row.style.pointerEvents=''; return; }
-        var dur=Math.min(600,Math.max(280,Math.abs(dist)*0.32)), t0=performance.now();
-        (function step(now){
-          var p=Math.min(1,(now-t0)/dur);
-          var e=p<0.5?4*p*p*p:1-Math.pow(-2*p+2,3)/2;
-          window.scrollTo(0,start+dist*e);
-          if(p<1)requestAnimationFrame(step);
-          else{ lock=false; row.style.pointerEvents=''; }
-        })(performance.now());
-      });
-    });
-  })();
-
-  // linha verde percorrendo a borda do badge — 12 segmentos com opacidade crescente
-  (function(){
-    var box=document.getElementById('rv-badge'), svg=document.getElementById('rv-badge-svg');
-    if(!box||!svg)return;
-    var SEGS=12, DASH=13, DUR=6, len=DASH/SEGS, NS='http://www.w3.org/2000/svg', rects=[];
-    for(var i=0;i<SEGS;i++){
-      var r=document.createElementNS(NS,'rect');
-      r.setAttribute('x','0.25'); r.setAttribute('y','0.25');
-      r.setAttribute('fill','none'); r.setAttribute('stroke','#2f7355');
-      r.setAttribute('stroke-width','1.5'); r.setAttribute('stroke-linecap','butt');
-      r.setAttribute('pathLength','100');
-      r.setAttribute('stroke-dasharray',(len*3.4)+' '+(100-len*3.4));
-      r.setAttribute('opacity',Math.pow((i+1)/SEGS,1.6).toFixed(3));
-      r.style.animation='revy-dash '+DUR+'s linear infinite';
-      r.style.animationDelay=(-(i*len/100)*DUR).toFixed(4)+'s';
-      svg.appendChild(r); rects.push(r);
-    }
-    function fit(){
-      var b=box.getBoundingClientRect(), w=Math.max(0,b.width-0.5), h=Math.max(0,b.height-0.5);
-      rects.forEach(function(r){
-        r.setAttribute('width',w); r.setAttribute('height',h);
-        r.setAttribute('rx',h/2); r.setAttribute('ry',h/2);
+    function narrow() { return window.innerWidth < 680; }
+    // os cartões ficam na faixa acima do mockup: nunca colidem com o texto central
+    function fit() {
+      var off = narrow();
+      wrap.style.display = off ? 'none' : 'block';
+      if (hint) hint.style.display = off ? 'none' : 'flex';
+      if (off) return;
+      var mock = document.querySelector('[data-tilt]');
+      if (!mock) return;
+      // posição de LAYOUT do card (sem o transform do arraste): a faixa de cartões
+      // fica ancorada onde o vídeo mora, não onde o usuário o estacionou
+      function layoutTop(el) {
+        var t = 0;
+        while (el && el !== wrap.offsetParent) { t += el.offsetTop; el = el.offsetParent; }
+        return t;
+      }
+      var w = wrap.getBoundingClientRect().width, pad = Math.max(18, w * 0.025);
+      var t = layoutTop(mock) - layoutTop(wrap);
+      var tops = [t - 116, t - 80, t - 108];
+      chips.forEach(function (el, i) {
+        var cw = el.offsetWidth;
+        var left = i === 0 ? pad : (i === 1 ? (w - cw) / 2 : w - pad - cw);
+        el.style.right = 'auto';
+        el.style.left = Math.max(8, Math.min(left, w - cw - 8)) + 'px';
+        el.style.top = tops[i] + 'px';
       });
     }
     fit();
-    if(window.ResizeObserver)new ResizeObserver(fit).observe(box);
-  })();
-})();
+    setTimeout(fit, 400);
+    this._onResizeChips = fit;
+    window.addEventListener('resize', fit);
+    window.addEventListener('load', fit);
+
+    if (reduce || !(this.props.chipsMagnet ?? true)) return;
+    // ímã: o cartão se aproxima do cursor quando ele passa perto — continua clicável,
+    // porque o movimento é PARA o mouse e limitado a poucos pixels
+    var R = 190, PULL = this.props.magnetPull != null ? +this.props.magnetPull : 12;
+    var DRIFT = this.props.chipsDrift != null ? +this.props.chipsDrift : 16;
+    var hero = document.getElementById('topo');
+    var st = chips.map(function (el) { return { el: el, x: 0, y: 0, r: 0, tx: 0, ty: 0, tr: 0 }; });
+    var raf = null;
+
+    function paint(s) {
+      s.el.style.transform = 'translate3d(' + s.x.toFixed(2) + 'px,' + s.y.toFixed(2) + 'px,0) rotate(' + s.r.toFixed(2) + 'deg)';
+    }
+    function step(k) {
+      var live = false;
+      st.forEach(function (s) {
+        var dx = s.tx - s.x, dy = s.ty - s.y, dr = s.tr - s.r;
+        if (Math.abs(dx) > 0.04 || Math.abs(dy) > 0.04 || Math.abs(dr) > 0.004) {
+          s.x += dx * k; s.y += dy * k; s.r += dr * k;
+          paint(s); live = true;
+        }
+      });
+      return live;
+    }
+    function loop() { raf = null; if (step(0.14)) raf = requestAnimationFrame(loop); }
+    function kick() { step(0.3); if (!raf) raf = requestAnimationFrame(loop); }
+
+    this._onMoveChips = function (e) {
+      if (narrow()) return;
+      // campo amplo: o mouse em qualquer ponto do hero já move os três cartões
+      var hb = hero ? hero.getBoundingClientRect() : null;
+      var inHero = hb && e.clientY > hb.top - 80 && e.clientY < hb.bottom + 80;
+      var hx = 0, hy = 0;
+      if (inHero) {
+        hx = (e.clientX - (hb.left + hb.width / 2)) / (hb.width / 2);
+        hy = (e.clientY - (hb.top + hb.height / 2)) / (hb.height / 2);
+        hx = Math.max(-1, Math.min(1, hx));
+        hy = Math.max(-1, Math.min(1, hy));
+      }
+      st.forEach(function (s, i) {
+        // 1) deriva suave: cada cartão numa profundidade diferente (parallax)
+        var depth = 0.6 + i * 0.35;
+        var bx = hx * DRIFT * depth, by = hy * DRIFT * 0.55 * depth;
+        var br = hx * 0.5 * depth;
+        // 2) ímã de perto: o cartão vem na direção do cursor
+        var b = s.el.getBoundingClientRect();
+        var cx = b.left + b.width / 2 - s.x, cy = b.top + b.height / 2 - s.y;
+        var dx = e.clientX - cx, dy = e.clientY - cy;
+        var d = Math.sqrt(dx * dx + dy * dy) || 1;
+        if (d < R) {
+          var f = 1 - d / R;
+          bx += (dx / d) * PULL * f;
+          by += (dy / d) * PULL * f;
+          br += (dx / d) * 0.7 * f;
+        }
+        s.tx = bx; s.ty = by; s.tr = br;
+      });
+      kick();
+    };
+    window.addEventListener('pointermove', this._onMoveChips, { passive: true });
+  }
+
+  jumpToPanel(i) {
+    var p = document.querySelector('[data-panel="' + i + '"]');
+    if (!p) return;
+    window.scrollTo({ top: p.getBoundingClientRect().top + window.pageYOffset - 108, behavior: 'smooth' });
+  }
+
+  // 2) o card do vídeo: arrasta pela tela e inclina de leve na direção do cursor
+  mountCard(reduce) {
+    var card = document.querySelector('[data-tilt]');
+    if (!card) return;
+    var dragOn = this.props.cardDrag ?? true;
+    var tiltOn = (this.props.heroTilt ?? true) && !reduce;
+    var max = this.props.tiltMax != null ? +this.props.tiltMax : 2.2;
+    var KEY = 'revy-hero-card-v4';
+    ['revy-hero-card-v1', 'revy-hero-card-v2', 'revy-hero-card-v3'].forEach(function (k) { try { localStorage.removeItem(k); } catch (e) {} });
+    var x = 0, y = 0, rx = 0, ry = 0, tx = 0, ty = 0, raf = null, drag = false;
+    // folga real: mede a posição de LAYOUT do card e nunca o deixa passar da janela
+    function slack() {
+      var b = card.getBoundingClientRect();
+      var left = b.left - x, right = left + b.width, M = 8;
+      return {
+        neg: Math.max(0, left - M),
+        pos: Math.max(0, window.innerWidth - M - right),
+        up: 56,
+        down: Math.min(520, window.innerHeight * 0.7)
+      };
+    }
+    function clampX(v) { var s = slack(); return Math.max(-s.neg, Math.min(s.pos, v)); }
+    function clampY(v) { var s = slack(); return Math.max(-s.up, Math.min(s.down, v)); }
+    if (dragOn) {
+      try {
+        var s = JSON.parse(localStorage.getItem(KEY) || '{}');
+        x = clampX(+s.x || 0);
+        y = clampY(+s.y || 0);
+      } catch (e) {}
+      card.style.cursor = 'grab';
+      card.style.touchAction = 'none';
+    }
+
+    function paint() {
+      card.style.transform = 'translate3d(' + x.toFixed(1) + 'px,' + y.toFixed(1) + 'px,0) rotateX(' + ry.toFixed(3) + 'deg) rotateY(' + rx.toFixed(3) + 'deg)';
+    }
+    function step(k) {
+      rx += (tx - rx) * k; ry += (ty - ry) * k;
+      paint();
+      return Math.abs(tx - rx) > 0.004 || Math.abs(ty - ry) > 0.004;
+    }
+    function loop() { raf = null; if (step(0.08)) raf = requestAnimationFrame(loop); }
+    function kick() { step(0.22); if (!raf) raf = requestAnimationFrame(loop); }
+    paint();
+
+    if (tiltOn) {
+      this._onMoveTilt = function (e) {
+        if (drag) return;
+        var b = card.getBoundingClientRect();
+        if (b.bottom < -200 || b.top > window.innerHeight + 200) return;
+        var nx = (e.clientX - (b.left + b.width / 2)) / (b.width / 2);
+        var ny = (e.clientY - (b.top + b.height / 2)) / (b.height / 2);
+        tx = Math.max(-1, Math.min(1, nx)) * max;
+        ty = Math.max(-1, Math.min(1, ny)) * -max;
+        kick();
+      };
+      this._onLeaveTilt = function () { tx = 0; ty = 0; kick(); };
+      window.addEventListener('pointermove', this._onMoveTilt, { passive: true });
+      document.addEventListener('pointerleave', this._onLeaveTilt);
+    }
+
+    if (!dragOn) return;
+    var sx = 0, sy = 0, bx = 0, by = 0;
+    card.addEventListener('pointerdown', function (e) {
+      if (e.target.closest('a, button')) return;
+      drag = true; sx = e.clientX; sy = e.clientY; bx = x; by = y;
+      tx = 0; ty = 0; rx = 0; ry = 0;
+      card.setPointerCapture(e.pointerId);
+      card.style.cursor = 'grabbing';
+      card.style.zIndex = '5';
+      card.style.position = 'relative';
+      // sombra barata + camada própria enquanto arrasta: sombra de 70px de blur
+      // repintada a cada quadro é o que trava o movimento
+      card.style.willChange = 'transform';
+      card.style.boxShadow = '0 12px 24px rgba(27,20,20,.14)';
+      paint();
+      e.preventDefault();
+    });
+    card.addEventListener('pointermove', function (e) {
+      if (!drag) return;
+      x = clampX(bx + (e.clientX - sx));
+      y = clampY(by + (e.clientY - sy));
+      paint();
+    });
+    function end() {
+      if (!drag) return;
+      drag = false;
+      card.style.cursor = 'grab';
+      card.style.zIndex = '';
+      card.style.willChange = '';
+      card.style.transition = 'box-shadow .2s cubic-bezier(.4,0,.2,1)';
+      card.style.boxShadow = '0 28px 70px rgba(27,20,20,.13), 0 14px 32px rgba(27,20,20,.07)';
+      setTimeout(function () { card.style.transition = ''; }, 240);
+      try { localStorage.setItem(KEY, JSON.stringify({ x: x, y: y })); } catch (err) {}
+    }
+    card.addEventListener('pointerup', end);
+    card.addEventListener('pointercancel', end);
+
+    var reset = document.querySelector('[data-reset]');
+    if (reset) reset.addEventListener('click', function () {
+      x = 0; y = 0; tx = 0; ty = 0; rx = 0; ry = 0;
+      card.style.transition = 'transform .55s cubic-bezier(.4,0,.2,1)';
+      paint();
+      setTimeout(function () { card.style.transition = ''; }, 580);
+      try { localStorage.removeItem(KEY); } catch (e) {}
+    });
+  }
+
+  mountTabs(reduce) {
+    var row = document.getElementById('veja-row');
+    if (!row) return;
+    var btns = [].slice.call(row.querySelectorAll('[data-tab]'));
+    var panels = [].slice.call(row.querySelectorAll('[data-panel]'));
+    if (!btns.length || btns.length !== panels.length) return;
+    var active = -1, lock = false, raf = null;
+
+    function paint(i) {
+      if (i === active) return;
+      active = i;
+      btns.forEach(function (b, j) { b.style.color = j === i ? '#1b1b1b' : '#d3cecc'; });
+    }
+    btns.forEach(function (b, i) {
+      b.addEventListener('mouseenter', function () { b.style.color = i === active ? '#1b1b1b' : '#8a8280'; });
+      b.addEventListener('mouseleave', function () { b.style.color = i === active ? '#1b1b1b' : '#d3cecc'; });
+    });
+    function sync() {
+      if (lock) return;
+      var line = window.innerHeight * 0.38, idx = 0;
+      panels.forEach(function (p, i) { if (p.getBoundingClientRect().top <= line) idx = i; });
+      paint(idx);
+    }
+    this._onScroll = function () {
+      if (raf) return;
+      raf = requestAnimationFrame(function () { raf = null; sync(); });
+    };
+    window.addEventListener('scroll', this._onScroll, { passive: true });
+    window.addEventListener('resize', sync);
+    sync();
+
+    btns.forEach(function (b, i) {
+      b.addEventListener('click', function () {
+        var el = panels[i];
+        if (!el) return;
+        var target = el.getBoundingClientRect().top + window.pageYOffset - 108;
+        paint(i);
+        if (reduce) { window.scrollTo(0, target); return; }
+        lock = true;
+        row.style.pointerEvents = 'none';
+        var start = window.pageYOffset, dist = target - start;
+        if (Math.abs(dist) < 2) { lock = false; row.style.pointerEvents = ''; return; }
+        var dur = Math.min(480, Math.max(240, Math.abs(dist) * 0.26)), t0 = performance.now();
+        (function step(now) {
+          var p = Math.min(1, (now - t0) / dur);
+          var e = 1 - Math.pow(1 - p, 3);
+          window.scrollTo(0, start + dist * e);
+          if (p < 1) requestAnimationFrame(step);
+          else { lock = false; row.style.pointerEvents = ''; }
+        })(performance.now());
+      });
+    });
+  }
+
+  componentWillUnmount() {
+    if (this._onScroll) window.removeEventListener('scroll', this._onScroll);
+    if (this._io) this._io.disconnect();
+    if (this._onMoveChips) window.removeEventListener('pointermove', this._onMoveChips);
+    if (this._onResizeChips) window.removeEventListener('resize', this._onResizeChips);
+    if (this._onMoveTilt) window.removeEventListener('pointermove', this._onMoveTilt);
+    if (this._onLeaveTilt) document.removeEventListener('pointerleave', this._onLeaveTilt);
+    if (this._onResizeChips) window.removeEventListener('load', this._onResizeChips);
+    if (this._sweep) window.removeEventListener('load', this._sweep);
+    if (this._onMoveHero) { window.removeEventListener('pointermove', this._onMoveHero); this._onMoveHero = null; }
+    this._onMoveTilt = this._onLeaveTilt = this._onMoveChips = null;
+    if (this._onScrollFab) { window.removeEventListener('scroll', this._onScrollFab); window.removeEventListener('resize', this._onScrollFab); }
+    if (this._fabIo) this._fabIo.disconnect();
+  }
+
+  mountMailForm() {
+    var btn = document.querySelector('[data-mailform]');
+    if (!btn) return;
+    var form = btn.closest('form');
+    if (!form) return;
+    var self = this;
+    form.addEventListener('submit', function (e) {
+      e.preventDefault();
+      var v = function (id) { var el = document.getElementById(id); return el ? el.value : ''; };
+      var corpo = [
+        'Nome: ' + v('c-nome'),
+        'Loja: ' + v('c-loja'),
+        'WhatsApp: ' + v('c-zap'),
+        'Motos em estoque: ' + v('c-motos'),
+        '', 'Enviado pelo site da Revy.'
+      ].join('\n');
+      window.location.href = 'mailto:' + self.mail()
+        + '?subject=' + encodeURIComponent('Contato pelo site — ' + (v('c-loja') || 'revenda'))
+        + '&body=' + encodeURIComponent(corpo);
+    });
+  }
+
+  mail() { return this.props.email || 'revystartup@gmail.com'; }
+
+  // o botão do WhatsApp entra depois do hero: no topo ele cobriria os cartões
+  mountFab() {
+    var fab = document.querySelector('[data-fab]');
+    var hero = document.getElementById('topo');
+    if (!fab || !hero) return;
+    var shown = null;
+    function show(on) {
+      if (on === shown) return;
+      shown = on;
+      fab.style.opacity = on ? '1' : '0';
+      fab.style.transform = on ? 'none' : 'translateY(8px)';
+      fab.style.pointerEvents = on ? 'auto' : 'none';
+    }
+    function sync() { show(hero.getBoundingClientRect().bottom < window.innerHeight * 0.5); }
+    // IntersectionObserver funciona qualquer que seja o elemento que rola
+    this._fabIo = new IntersectionObserver(function (es) {
+      es.forEach(function (e) { show(!e.isIntersecting || e.boundingClientRect.bottom < window.innerHeight * 0.5); });
+    }, { threshold: [0, 0.01, 0.5], rootMargin: '-50% 0px 0px 0px' });
+    this._fabIo.observe(hero);
+    this._onScrollFab = sync;
+    window.addEventListener('scroll', sync, { passive: true });
+    window.addEventListener('resize', sync);
+    sync();
+  }
+
+  renderVals() {
+    var zap = String(this.props.whatsappNumber || '5551980336365').replace(/\D/g, '');
+    return {
+      mailHref: 'mailto:' + this.mail() + '?subject=' + encodeURIComponent('Quero conhecer a Revy'),
+      zapHref: 'https://wa.me/' + zap + '?text=' + encodeURIComponent('Olá! Vim pelo site da Revy.')
+    };
+  }
+}
+
+/* monta as animações reais (demos/) só quando entram na tela */
+function revyDemos() {
+  var figs = [].slice.call(document.querySelectorAll('figure[data-demo]'));
+  figs.forEach(function (fig) {
+    var img = fig.querySelector('img');
+    if (img) { img.style.transition = 'opacity .3s ease'; img.style.opacity = '0'; }
+  });
+  function mount(fig) {
+    if (!fig || fig.dataset.mounted) return;
+    fig.dataset.mounted = '1';
+    var f = document.createElement('iframe');
+    f.className = 'vid'; f.title = 'Animação Revy'; f.setAttribute('scrolling', 'no');
+    f.setAttribute('tabindex', '-1');
+    f.src = fig.getAttribute('data-demo');
+    f.addEventListener('load', function () {
+      requestAnimationFrame(function () { requestAnimationFrame(function () { f.classList.add('on'); }); });
+    });
+    fig.appendChild(f);
+  }
+  if (figs[0]) mount(figs[0]);
+  var io = new IntersectionObserver(function (es) {
+    es.forEach(function (e) { if (e.isIntersecting) { mount(e.target); io.unobserve(e.target); } });
+  }, { threshold: 0, rootMargin: '900px 0px' });
+  figs.forEach(function (fig) { if (!fig.dataset.mounted) io.observe(fig); });
+}
+
+function revyBoot() {
+  revyDemos();
+  var app = new Component(REVY);
+  app.componentDidMount();
+  window.__revy = app;
+}
+if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', revyBoot);
+else revyBoot();
 </script>
 </body>
 </html>
