@@ -492,6 +492,48 @@ A ordem completa fica: **catálogo Meta → Facebook → Instagram → Webmotors
 Webmotors podendo correr em paralelo aos dois de post (não compartilham nada), e iCarros
 esperando uma conversa comercial que ainda não aconteceu.
 
+### 6.2 Agregador: procurado, não existe — e o que apareceu no lugar
+
+Levantado em 17/08. A pergunta era: existe um intermediário com API REST que a Revy chame **uma
+vez** e que publique em todos os portais, evitando homologar com cada um?
+
+**Praticamente não.** Um único candidato vende API para outro software — a Loja Conectada, com
+"API White Label", cobrindo Webmotors e iCarros, com moto de primeira classe. Mas **não publica
+uma linha de documentação técnica**: o Swagger que existe no domínio deles é de outro produto, o
+GitHub da empresa só tem forks, e o acesso ao sandbox se pede por WhatsApp. A empresa opera há
+anos; o que não dá para verificar é se a API existe como produto. Tudo o mais que aparece nessa
+busca (RevendaMais, BNDV, Auto Adm, Altimus, StockCarWeb…) é **ERP vendido ao lojista** — nesses
+a Revy é concorrente, não cliente.
+
+**Como os integradores alcançam o iCarros.** A documentação pública do Smart Dealer (ERP, produto
+errado, doc excelente) mostra o modelo canônico do mercado: `POST /connect/contract/` recebe
+`{ site_id, filial, cnpj, login, senha }` — **login e senha da conta da loja no portal**. Os
+integradores em geral não têm credencial de parceiro própria: eles agem *como se fossem a loja*.
+
+> É isso que torna o iCarros alcançável sem documentação, e é um passivo que a Revy herdaria:
+> guardar senha de portal de cliente. Isso bate de frente com os invariantes de segredo do
+> `AGENTS.md` e, se um dia for o caminho, precisa ser **decisão explícita**, nunca consequência.
+
+**O que a pesquisa achou de bom.** Três portais autoatendidos, com documentação pública, sem
+homologação formal, e **com moto**:
+
+| Portal | Documentação | Homologação | Spec |
+|---|---|---|---|
+| **OLX** | pública e completa | não | [`2026-08-17-olx-design.md`](2026-08-17-olx-design.md) |
+| **Mercado Livre** | pública | não | [`2026-08-17-mercado-livre-design.md`](2026-08-17-mercado-livre-design.md) |
+| Mobiauto | Swagger 2.0 aberto, OAuth de parceiro, moto na spec | não | **fora do escopo por decisão do dono em 17/08** |
+
+Os dois primeiros entraram no escopo em 17/08. São mais baratos que Webmotors e iCarros: o custo
+de entrada da OLX é um e-mail pedindo credencial, e o do Mercado Livre é o lojista contratar um
+pacote.
+
+**A ordem final, com sete canais:**
+
+```
+vitrine → catálogo Meta → OLX → Facebook + Instagram → Mercado Livre → Webmotors → iCarros
+   feito     sem portão    e-mail    App Review          pacote        90 dias    conversa
+```
+
 ---
 
 ## 7. Testes
