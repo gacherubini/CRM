@@ -124,16 +124,34 @@ permitiria cadastrar `tiktok` sem código atrás e criar drift silencioso.
 class Canal(Protocol):
     codigo: str                      # "vitrine" | "catalogo_meta" | "instagram" | ...
     nome: str
-    retry: Literal["idempotente", "manual"]
+    modo: Literal["api", "feed"]
+    retry: Literal["idempotente", "manual"] | None
     remove_ao_vender: bool
+    suporta_remocao: bool
 
     def requisitos(self, veiculo) -> tuple[str, ...]: ...
+
+    # só quando modo == "api"
     def publicar(self, ctx, veiculo) -> str: ...          # devolve id_externo
     def despublicar(self, ctx, veiculo, id_externo: str) -> None: ...
 ```
 
 `requisitos()` devolve o que **falta** (`("chassi", "1 foto")`); vazio significa que pode
 publicar. É a mesma função que alimenta o checkbox desabilitado de §5.1 — regra num lugar só.
+
+> **Adendo 17/08 — `modo`.** Nem todo canal é uma chamada. Canal `api` (vitrine, Instagram,
+> Facebook) publica por requisição, guarda `id_externo` e passa pelo worker. Canal `feed`
+> (catálogo Meta, e provavelmente Webmotors e iCarros) é o contrário: **o outro lado busca**
+> um arquivo que a gente hospeda, de hora em hora. Ele não tem `publicar()`, nem `id_externo`,
+> nem `tentativas`, nem retry — a próxima busca corrige tudo — e **o worker não o enxerga**
+> (§4.1). Ver [`2026-08-17-catalogo-meta-feed-design.md`](2026-08-17-catalogo-meta-feed-design.md).
+
+> **Adendo 17/08 — `suporta_remocao`.** A Graph API **não tem DELETE de mídia do Instagram**:
+> post publicado por lá não sai por código, nunca. Então `despublicar()` não pode ser
+> obrigatório no Protocol, e o botão `[ Despublicar ]` da §5.2 não pode ser renderizado para
+> quem não sabe remover — botão que não funciona é mentira na tela. Instagram fica `False`;
+> Facebook, que **aceita** DELETE de post de Página, fica `True`. É o primeiro ponto onde os
+> dois deixam de ser gêmeos.
 
 > **Regra de tamanho.** `servico.py` já tem 1210 linhas e **não cresce** nesta spec. Ele
 > grava intenção e estado. Cada canal é um arquivo isolado em `app/canais/`, testável sem
@@ -168,6 +186,12 @@ podem virar coluna, senão passam a ter que ser mantidos em sincronia:
 |---|---|
 | `◐ publicando` | `desejado=true` e `estado='pendente'` |
 | `⊘ bloqueado` | `requisitos(veiculo)` devolveu lista não vazia |
+| `◆ no feed` | canal `modo="feed"`, `desejado=true` e requisitos vazios |
+
+> **Adendo 17/08 — por que `no feed` e não `publicado`.** Canal `feed` não devolve resposta:
+> se o outro lado rejeitar a linha, o erro aparece no painel dele, não no nosso. Escrever
+> `publicado` ali seria afirmar uma coisa que o sistema não tem como verificar. Pela mesma
+> razão canal `feed` **nunca** exibe `✕ erro` — não há chamada que possa falhar.
 
 ### 3.4 `loja_canal` — a memória do padrão
 
@@ -259,12 +283,19 @@ publicar e ignora esse gate ao remover.
 
 `vender()` zera `desejado` **só** nos canais com `remove_ao_vender = True`:
 
-| Canal | `remove_ao_vender` |
-|---|---|
-| vitrine, catálogo Meta, Webmotors, iCarros | `True` |
-| Instagram, Facebook | `False` |
+| Canal | `remove_ao_vender` | `suporta_remocao` |
+|---|---|---|
+| vitrine, catálogo Meta, Webmotors, iCarros | `True` | `True` |
+| Facebook | `False` | `True` |
+| Instagram | `False` | **`False`** |
 
 É D1 escrita como atributo do canal, não como `if` espalhado.
+
+Os dois eixos são diferentes e não se confundem: `remove_ao_vender` é **se a gente quer**
+remover ao vender (D1: não queremos, o post acumula alcance); `suporta_remocao` é **se dá para
+remover**. Instagram é o único que é `False` nos dois, e pelo segundo motivo — não existe DELETE
+de mídia na Graph API. Ou seja, mesmo que o dono mudasse de ideia sobre D1, o Instagram
+continuaria sem sair.
 
 ### 4.7 Worker
 
@@ -376,6 +407,22 @@ dependência externa, e sozinha já percorre o caminho inteiro (intenção → e
 publicado). Depois dela, **cada canal novo é um arquivo** — e esta spec pode ir a produção
 enquanto App Review e homologação correm em paralelo.
 
+> **Adendo 17/08 — a ordem mudou, e o catálogo Meta subiu.** O parágrafo acima supõe que o
+> catálogo Meta só entra por API. Não é o caso: catálogo também aceita **feed agendado** — a
+> gente hospeda um arquivo por loja numa URL e o Commerce Manager do lojista busca sozinho, de
+> hora em hora. Sem app, sem token, sem `catalog_management`, **sem App Review**, porque nunca
+> chamamos a Meta.
+>
+> Isso tira o catálogo Meta da fila de prazo externo e o põe como **segundo canal**, logo depois
+> da vitrine — e ele é o único que liga publicação a Ads e ROI, porque post não vira linha de
+> ROI e item de catálogo vira. Ver [`2026-08-17-catalogo-meta-feed-design.md`](2026-08-17-catalogo-meta-feed-design.md).
+>
+> A ordem passa a ser: **catálogo Meta (feed) → Facebook → Instagram**, com o App Review aberto
+> em paralelo desde já, já que ele não bloqueia o catálogo e a submissão é **uma só** para os
+> dois canais de post. Facebook antes de Instagram por ser mais simples e reversível; Instagram
+> por último porque ainda carrega o carrossel, a foto única do cadastro (§8) e uma restrição de
+> proporção de imagem que nenhum outro canal tem.
+
 ---
 
 ## 7. Testes
@@ -415,8 +462,28 @@ o diff de `servico.py` passar de ~80 linhas, a interface `Canal` está errada.
 do servidor está incompleta. O teste de §7 cobre.
 
 **Aberto — onde mora o segredo de canal.** Vitrine não usa credencial, então esta spec não
-decide. O Control é dono das credenciais hoje (Fernet, `meta_graph_config.py`), e o Estoque
-tem `app/cripto.py` próprio. A decisão sai na spec do primeiro canal que precisar dela.
+decide. A decisão sai na spec do primeiro canal que precisar dela.
+
+> **Correção 17/08.** A versão original desta seção dizia que o Control guarda credencial Meta
+> em `meta_graph_config.py`. Está errado: esse arquivo tem 20 linhas e só guarda a versão da
+> Graph API. Os segredos reais são três, em `revy-trafego/app/models.py`, todos por loja e
+> cifrados por `app/cripto.py` do Control:
+>
+> | Onde | O quê |
+> |---|---|
+> | `meta_ads_config.token_ciphertext` + `ad_account_id` (`:580`) | token `ads_read`, **colado à mão** pelo lojista na aba Tráfego |
+> | `meta_pixel_config.token_ciphertext` + `pixel_id` (`:561`) | token do CAPI de conversões |
+> | `google_ads_connections.refresh_token_ciphertext` + `scopes` + `status` (`:817`) | OAuth de verdade, com `conectado`/`atencao`/`expirado`/`revogado` |
+>
+> O que interessa para a decisão futura: os dois tokens da Meta são colados à mão; o do Google
+> é OAuth. **O padrão de conexão OAuth que os canais Meta vão precisar já existe no Control —
+> na integração do Google, não na da Meta.** É dele que se copia.
+>
+> E o caminho recomendado para os canais `api`: uma conexão só, por Business Login, em que o
+> lojista compartilha com o BM da Revy a Página, a conta do Instagram, o catálogo, a conta de
+> anúncios e a WABA do Cloud API (`whatsapp_modo=2`) de uma vez. Token de System User, que não
+> expira — token de usuário longo dura 60 dias e cai de madrugada sem ninguém perceber. E uma
+> submissão de App Review cobre o app inteiro: pede-se tudo junto, não um pedido por canal.
 
 **Aberto — mais de uma foto no cadastro.** O formulário aceita uma foto opcional
 (`_anexar_foto_se_enviada`). Instagram publica carrossel. Quando a spec do Instagram chegar,
