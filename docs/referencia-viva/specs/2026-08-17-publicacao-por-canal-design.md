@@ -428,6 +428,15 @@ enquanto App Review e homologação correm em paralelo.
 > A ordem passa a ser: **catálogo Meta (feed) → Facebook e Instagram**, com o App Review aberto
 > em paralelo desde já, já que ele não bloqueia o catálogo.
 >
+> > **Correção 17/08 — App Review não abre em paralelo.** A frase acima está errada. A submissão
+> > exige **vídeo do fluxo funcionando** e uma conta de teste onde o revisor reproduz o caminho;
+> > não há o que gravar antes de o fluxo existir. App Review é o **fim** do desenvolvimento dos
+> > canais de post, não o começo — como a §9 da spec de post já dizia.
+> >
+> > O que abre em paralelo desde já é a **Verificação de Empresa** (documental, CNPJ, independe de
+> > código), criar o app no painel da Meta, e publicar política de privacidade e instruções de
+> > exclusão de dados. Esses são os itens de calendário que valem começar hoje.
+>
 > **E os dois de post viraram uma spec só**, contra a promessa de "uma por canal" logo acima. O
 > motivo daquela promessa era o prazo externo — cada canal esperando o dele. Facebook e Instagram
 > esperam **o mesmo**: uma submissão de App Review cobre os dois, e eles dividem conexão, token,
@@ -569,9 +578,18 @@ pacote.
 | 6 | Webmotors | homologação, janela de 90 dias | [Webmotors](2026-08-17-webmotors-design.md) |
 | 7 | iCarros | **bloqueado**: moto no marketplace | [iCarros](2026-08-17-icarros-design.md) |
 
-Dois canais precisam de algo que **não é código** e que atrasa mais que qualquer implementação:
-a submissão do App Review (canal 4) e um e-mail para `api@icarros.com.br` perguntando se o
-segmento MOTO está ativo (canal 7). Os dois deveriam sair antes de a primeira linha ser escrita.
+**O que dá para começar hoje, e não é código:**
+
+| Item | Bloqueia | Depende de código? |
+|---|---|---|
+| Verificação de Empresa na Meta | canal 4 | **não** — é documental |
+| E-mail a `api@icarros.com.br` sobre o segmento MOTO | canal 7 | **não** |
+| Credencial da OLX (`suporteintegrador@olxbr.com`) | canal 3 | **não** |
+| Pacote de anúncios do lojista no Mercado Livre | canal 5 | **não**, é comercial |
+| Submissão do App Review | canal 4 | **sim** — exige vídeo do fluxo pronto |
+
+Os quatro primeiros deveriam sair antes de a primeira linha ser escrita. O App Review **não** —
+ele fecha o canal 4, não o abre.
 
 ---
 
