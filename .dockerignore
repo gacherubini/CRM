@@ -71,5 +71,8 @@ deploy/catalogo-conectado
 #   portal-gestao/{app,alembic,alembic.ini}
 #   catalogo-publico/app
 #   motor-simulacao/{app,alembic,alembic.ini,requirements.txt,scripts}
-#   site/{index.html,assets}
 #   deploy/fly/3vm/*
+
+# Site marketing saiu do bundle (16/08/2026) — publicado no Cloudflare Pages
+site
+site/**

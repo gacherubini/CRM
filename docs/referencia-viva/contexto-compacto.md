@@ -37,6 +37,17 @@ Vocabulário: [`../../CONTEXT.md`](../../CONTEXT.md). As-built Control/Loja:
   da §6.1 saiu do `logger.exception` para uma tabela com worker. Dívida conhecida, em ordem
   de risco: **VAD do áudio** (§5.10 — o Whisper alucina em ruído e o bot age em cima),
   **recusa não cutuca** (§5.9 r.5) e `classificar_etapa` presa em `so_oi`.
+
+- **Meta e domínio próprio (16/08):** portões 1 e 2 da Meta caíram no mesmo dia — app `Revy`
+  criado, produto WhatsApp adicionado, número de teste enviando e webhook voltando. Domínio
+  **`revyapp.com.br`** registrado no **CNPJ** (o `revy.com.br` é de terceiro), DNS migrado
+  para a Cloudflare, e o **site saiu do bundle do Fly** para o Cloudflare Pages — publicar
+  landing não é mais deploy. Falta ligar o webhook no `n8n2037` e trocar o número de teste
+  pelo real. Estado verificado, armadilhas (DNSSEC do `.br`, janela de 2h do registro.br) e
+  cronograma:
+  [`design/2026-08-16-onboarding-meta-dominio-asbuilt.md`](design/2026-08-16-onboarding-meta-dominio-asbuilt.md).
+  **O CNPJ verificado não bloqueia o piloto:** o teto de 250/24h conta só conversa iniciada
+  pela empresa, e o funil é CTWA (inbound). Ele vira obrigatório na **terceira loja**.
   Spec canônica:
   [`specs/2026-08-12-whatsapp-dois-modos-design.md`](specs/2026-08-12-whatsapp-dois-modos-design.md).
   Sete cards executados, planos em [`planos/`](planos/):

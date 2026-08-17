@@ -1,4 +1,5 @@
-# VM 3 — Python APIs + portal + catalogo + site + nginx edge
+# VM 3 — Python APIs + portal + catalogo + nginx edge
+# Site marketing saiu do bundle em 16/08/2026: vive em revyapp.com.br (Cloudflare Pages).
 # n8n NÃO entra nesta imagem (npm install-g demora 10–20min e quebra o deploy).
 # n8n roda no app n8n2037 (imagem oficial n8nio/n8n) — fly.n8n.toml
 #
@@ -53,10 +54,6 @@ COPY motor-simulacao/alembic.ini /srv/motor/alembic.ini
 # psycopg e alembic. Nenhum dado sai do Fly, nenhum tunel e aberto.
 COPY deploy/migracao-pg /srv/migracao-pg
 
-COPY site/index.html /srv/site/html/index.html
-COPY site/assets /srv/site/html/assets
-COPY site/demos /srv/site/html/demos
-COPY deploy/fly/3vm/site-nginx.conf /etc/nginx/sites-available/site.conf
 COPY deploy/fly/3vm/nginx-edge.conf /etc/nginx/edge.conf
 COPY deploy/fly/3vm/nginx.conf /etc/nginx/nginx.conf
 RUN mkdir -p /etc/nginx/sites-enabled /etc/nginx/sites-available \
@@ -64,7 +61,6 @@ RUN mkdir -p /etc/nginx/sites-enabled /etc/nginx/sites-available \
                /data/motor/screenshots /data/motor/storage_state \
                /var/log/nginx /var/lib/nginx /run \
     && rm -f /etc/nginx/sites-enabled/default \
-    && ln -sf /etc/nginx/sites-available/site.conf /etc/nginx/sites-enabled/site.conf \
     && nginx -t
 
 COPY deploy/fly/3vm/supervisord.conf /etc/supervisord.conf
