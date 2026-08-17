@@ -56,3 +56,6 @@ graphify-out/
 
 # macOS
 .DS_Store
+
+# Cloudflare Wrangler (cache local de deploy)
+.wrangler/
