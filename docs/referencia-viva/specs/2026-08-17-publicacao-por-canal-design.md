@@ -140,8 +140,8 @@ class Canal(Protocol):
 publicar. É a mesma função que alimenta o checkbox desabilitado de §5.1 — regra num lugar só.
 
 > **Adendo 17/08 — `modo`.** Nem todo canal é uma chamada. Canal `api` (vitrine, Instagram,
-> Facebook) publica por requisição, guarda `id_externo` e passa pelo worker. Canal `feed`
-> (catálogo Meta, e provavelmente Webmotors e iCarros) é o contrário: **o outro lado busca**
+> Facebook e **Webmotors** — ver §6.1) publica por requisição, guarda `id_externo` e passa pelo
+> worker. Canal `feed` (catálogo Meta) é o contrário: **o outro lado busca**
 > um arquivo que a gente hospeda, de hora em hora. Ele não tem `publicar()`, nem `id_externo`,
 > nem `tentativas`, nem retry — a próxima busca corrige tudo — e **o worker não o enxerga**
 > (§4.1). Ver [`2026-08-17-catalogo-meta-feed-design.md`](2026-08-17-catalogo-meta-feed-design.md).
@@ -244,6 +244,9 @@ desistiu em silêncio).
 
 **`idempotente`** — vitrine e, depois, catálogo Meta, Webmotors, iCarros.
 Reenviar converge. O worker tenta com backoff e não desiste; o estado é a verdade.
+
+> **Adendo 17/08.** O catálogo Meta saiu desta lista: canal `feed` não tem retry porque não tem
+> chamada (§3.2). Webmotors continua aqui, mas como canal `api` — ver §6.1.
 
 **`manual`** — Instagram e Facebook.
 **Uma tentativa.** Falhou → `estado='erro'` com o motivo, visível na moto, e um humano
@@ -422,6 +425,65 @@ enquanto App Review e homologação correm em paralelo.
 > dois canais de post. Facebook antes de Instagram por ser mais simples e reversível; Instagram
 > por último porque ainda carrega o carrossel, a foto única do cadastro (§8) e uma restrição de
 > proporção de imagem que nenhum outro canal tem.
+
+### 6.1 Webmotors e iCarros — levantado em 17/08
+
+Esta seção existe porque a versão original supunha que os dois eram feed. **Um é API e o outro
+não é público.** Nenhum dos dois tem spec ainda; isto é o material para escrevê-las.
+
+#### Webmotors — é **API**, e a Revy entra como *Gestor de Estoque Terceiro*
+
+Confirmado no portal do desenvolvedor (gateway Sensedia) e na central de ajuda da Webmotors.
+Não existe opção de feed XML ou CSV: a integração é REST com OAuth 2.0.
+
+A Webmotors publica a lista de gestores de estoque homologados — Byus, ALM, RevendaPro, Boom,
+BNDV, Revenda Mais, Altimus, Disal, Click Garage, AutoGestor, EasyCar, Localiza, BRDealer,
+Batcar, Simples Veículo, DuSeller. **A Revy entraria nessa lista**, no mesmo papel.
+
+O que cada lado precisa fazer:
+
+| Lado | Passo |
+|---|---|
+| Lojista | contratar um Plano Webmotors — existe **Plano Motos** |
+| Lojista | aceitar o Termo de Adesão no Cockpit |
+| Lojista | pedir ao atendimento a criação de usuário com perfil **"Integração Revendedor"** |
+| Revy | registrar-se no portal do desenvolvedor e pedir acesso ao ambiente de homologação |
+| Revy | desenvolver, homologar, e pedir promoção para produção |
+
+> **O prazo é duro e não é o de sempre.** O acesso ao ambiente de homologação é **revogado após
+> 90 dias corridos**, ou quando a integração for aprovada e promovida. Isso inverte a ordem
+> natural: não se abre o acesso "para ir olhando". Abre-se quando houver quem termine dentro da
+> janela, senão o relógio corre sozinho e o acesso morre.
+
+Veículo publicado por integração aparece no Cockpit com a TAG `WS` — é assim que se confere de
+fora se a publicação chegou.
+
+Fora do escopo de publicação, mas registrado porque muda o Chatbot mais tarde: o mesmo portal
+expõe **Consultar Leads** e **Incluir Lead**. A Webmotors devolve lead, e hoje esse lead não
+entra na Revy por lugar nenhum.
+
+#### iCarros — **não é público**
+
+Não existe portal de desenvolvedor nem documentação de API aberta. Procurei e não achei; e a
+ausência aqui é informação, não falta de esforço.
+
+O que dá para observar de fora, pelos integradores que anunciam a integração (RevendaMais,
+Cockpit, Loja Conectada, BNDV, Auto Adm): o lojista informa **usuário e senha do classificado**
+e "libera a conta iCarros"; o portal pode pedir CNPJ e e-mail e devolver credencial por e-mail.
+Isso é a cara de acordo privado entre o iCarros e integradores homologados — não de API aberta.
+
+**Conclusão: para saber, tem que falar com o iCarros.** É contato comercial, não pesquisa, e
+nenhuma spec de iCarros deve ser escrita antes dessa conversa. Escrever agora seria inventar.
+
+#### O que isso muda no plano
+
+Webmotors não é "mais um arquivo em `app/canais/`". É canal `api` com homologação externa, uma
+contratação do lado do lojista e uma janela de 90 dias. Cabe na interface `Canal` sem forçar
+nada — o que não cabe é no cronograma junto com o resto.
+
+A ordem completa fica: **catálogo Meta → Facebook → Instagram → Webmotors → iCarros**, com
+Webmotors podendo correr em paralelo aos dois de post (não compartilham nada), e iCarros
+esperando uma conversa comercial que ainda não aconteceu.
 
 ---
 
