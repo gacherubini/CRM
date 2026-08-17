@@ -26,7 +26,7 @@ Catálogo público ──▶ Estoque API ◀────────────
 | Revy Loja | `portal-gestao/` | CRM, vendas, metas, Atendimento/chat, resultados de mídia |
 | Revy Control | `revy-trafego/` | Multi-loja: Pixel/CAPI, Ads, campanhas, gastos, ROI, prontidão |
 | Catálogo público | `catalogo-publico/` | Vitrine read-only dos publicados; CTA/UTM/Pixel |
-| Site | `site/` | Landing de marketing |
+| Site | `site/` | Landing de marketing + páginas legais. **Fora do Fly**: vive em `revyapp.com.br` (Cloudflare Pages) |
 
 `n8n/` guarda os workflows (não é biblioteca Python). Canônico:
 `n8n/workflow-ai-nao-salvos.json`.

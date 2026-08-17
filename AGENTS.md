@@ -25,7 +25,7 @@ você está relendo o monorepo — volte ao card da tarefa.
 | Revy Loja | `portal-gestao/` | CRM, vendas, metas, atendimento |
 | Revy Control | `revy-trafego/` | lojas, cargos, módulos, Ads, ROI |
 | Catálogo | `catalogo-publico/` | vitrine pública |
-| Site | `site/` | landing |
+| Site | `site/` | landing + páginas legais; publica no Cloudflare Pages, **não** no Fly |
 | n8n | `n8n/` | orquestração; canônico `workflow-ai-nao-salvos.json` |
 
 Integração **só** por HTTP/evento versionado. Sem import `app` entre produtos.
@@ -86,6 +86,9 @@ Não espalhe um eixo em vários filhos (código + Fly + n8n na mesma leva).
 - Não destruir app/volume Fly. Não `git clean -fdX`.
 - Deploy Fly só por `deploy/fly/3vm/`. Os `fly.toml` na pasta do produto apontam para
   apps monolíticos destruídos (`portal2037`, `chatbot2037`…) — não usar.
+- O **site não é Fly**: publica no Cloudflare Pages com
+  `npx wrangler pages deploy site --project-name=revyapp --branch=main`. Sem `--branch=main`
+  o deploy vira *preview* silencioso e o domínio segue na versão anterior. Ver `site/README.md`.
 - UI Loja/Control: 13 itens recusados não voltam como proposta.
 
 ## 6. Antes de dizer que acabou

@@ -59,3 +59,7 @@ deploy/chatbot-standalone
 deploy/estoque-standalone
 deploy/motor-standalone
 deploy/catalogo-conectado
+
+# Site marketing saiu do bundle (16/08/2026) — publicado no Cloudflare Pages
+site
+site/**

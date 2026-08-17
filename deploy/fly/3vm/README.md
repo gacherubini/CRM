@@ -20,7 +20,7 @@ Stack em uso no org Fly `crm-419`. Plano canônico:
 |---|---|---|---|
 | `suite-pg` | Postgres (DB por serviço) | `iad` | always-on |
 | `evolution2037` | WhatsApp (Evolution), 512 MB, isolada | `iad` | always-on |
-| `app2037` | Bundle: portal, revy-trafego, chatbot, estoque, catálogo, site, motor-api, nginx edge | `iad` | always-on |
+| `app2037` | Bundle: portal, revy-trafego, chatbot, estoque, catálogo, motor-api, nginx edge | `iad` | always-on |
 | `n8n2037` | Orquestração WhatsApp → tools HTTP no chatbot | `iad` | always-on com o lab ativo |
 | `motor2037` | Slots Playwright por banco, 2 GB | **`gru`** | on-demand, stopped no idle |
 
@@ -36,8 +36,12 @@ Ver [histórico](../../../docs/nao-plano/historico/fly-3vm.md).
 | `/trafego/` | Revy Control (`:9010`) |
 | `/catalogo/` | Catálogo público (`:8003`) — `/loja/` redireciona 301 |
 | `/public/` | **Mídia do estoque** (`:8002`) — não confundir com o catálogo |
-| `/site/` | Site marketing (`:8081`) |
+| `/site` | **Saiu do bundle** em 16/08/2026 — 301 para `revyapp.com.br` |
 | `/webhook/` `/v1/` `/health/` | Chatbot API (`:8001`) |
+
+O site marketing não é mais servido aqui. Ele vive em **`revyapp.com.br`** (Cloudflare Pages,
+upload direto da pasta `site/`), e o `/site` ficou só como 301 para não matar link antigo.
+Publicar site **não é mais deploy do Fly** — não precisa subir o `app2037` para trocar a landing.
 
 Health agregado: `https://app2037.fly.dev/healthz` (exige 2xx de Chatbot, Estoque, Portal e
 Revy). Revy: `/trafego/health/ready`.
@@ -61,7 +65,7 @@ bash deploy/fly/down-all.sh --3vm --yes  # stop os always-on E motor2037
 ## Deploy
 
 ```bash
-# App bundle (portal + revy-trafego + chatbot + estoque + catálogo + site + motor-api)
+# App bundle (portal + revy-trafego + chatbot + estoque + catálogo + motor-api)
 fly deploy . -a app2037 -c deploy/fly/3vm/fly.app.toml --ha=false
 
 # Canal WhatsApp
@@ -88,8 +92,8 @@ do repo. Não é preciso `--dockerfile` na CLI.
 | `deploy/fly/3vm/.dockerignore.worker` | `fly.worker.toml` (exclui os outros serviços) |
 
 Exclui `.venv`, `__pycache__`, `tests/`, `*.db`, `motor-simulacao/data`, `docs/`, `n8n/`,
-stacks standalone e `.git`. **Não** exclui o que `Dockerfile.app` copia (`*/app`,
-`*/alembic`, `site/`, `deploy/fly/3vm/…`).
+stacks standalone, `site/` e `.git`. **Não** exclui o que `Dockerfile.app` copia (`*/app`,
+`*/alembic`, `deploy/fly/3vm/…`).
 
 ```bash
 docker build -f deploy/fly/3vm/Dockerfile.app -t revy-app:3vm .
