@@ -352,8 +352,13 @@ Instagram          ✕ erro              [ Tentar de novo ]
                    Token expirado — reconecte a conta
 Facebook           ○ não publicado     [ Publicar ]
 Webmotors          ⊘ bloqueado
-                   falta o chassi
+                   falta o ano de fabricação
 ```
+
+> **Adendo 17/08.** O mock original dizia *"falta o chassi"* no Webmotors. O levantamento de §6.1
+> mostrou que **a Webmotors não usa chassi** — quem exige são o catálogo Meta e o Mercado Livre.
+> O requisito real dela é o ano de fabricação, que a Revy também não tem. Trocado para não induzir
+> quem implementar.
 
 Cinco estados, cada um com **forma + palavra** — cor nunca comunica sozinha (compromisso do
 `PRODUCT.md`). O verde de marca não é usado como status.
@@ -443,6 +448,17 @@ não é público.** Nenhum dos dois tem spec ainda; isto é o material para escr
 Confirmado no portal do desenvolvedor (gateway Sensedia) e na central de ajuda da Webmotors.
 Não existe opção de feed XML ou CSV: a integração é REST com OAuth 2.0.
 
+> **Correção 17/08 — não é REST.** A frase acima está errada e ficou registrada porque foi
+> afirmada com confiança. O gateway Sensedia é REST com OAuth 2.0 e serve **leads, catálogo, site
+> e classificados**. O caminho de **publicar estoque** é o serviço **SOAP** legado em
+> `integracao.webmotors.com.br` (ASP.NET `.asmx`), com autenticação própria por hash de sessão —
+> sem OAuth. O API Browser da Sensedia enumera todas as REST do gateway e não há nenhuma de gestor
+> de estoque. Ver [`2026-08-17-webmotors-design.md`](2026-08-17-webmotors-design.md).
+>
+> **E moto tem serviço próprio:** `wsEstoqueRevendedorMotos.asmx`, com objeto e catálogo
+> separados dos de carro. A pergunta eliminatória está respondida — Webmotors aceita moto, com
+> folga. O nome contratual do plano é **"Assinatura de Motos"**.
+
 A Webmotors publica a lista de gestores de estoque homologados — Byus, ALM, RevendaPro, Boom,
 BNDV, Revenda Mais, Altimus, Disal, Click Garage, AutoGestor, EasyCar, Localiza, BRDealer,
 Batcar, Simples Veículo, DuSeller. **A Revy entraria nessa lista**, no mesmo papel.
@@ -481,6 +497,20 @@ Isso é a cara de acordo privado entre o iCarros e integradores homologados — 
 
 **Conclusão: para saber, tem que falar com o iCarros.** É contato comercial, não pesquisa, e
 nenhuma spec de iCarros deve ser escrita antes dessa conversa. Escrever agora seria inventar.
+
+> **Correção 17/08 — a documentação existe.** O parágrafo acima está errado. O iCarros serve um
+> **OpenAPI 2.0 vivo e sem autenticação** em `www.icarros.com.br/rest/swagger.json`, com Swagger
+> UI em `/apidocs/` e manual de OAuth em `/apidocs/apiOauth.html`: *"API para gerenciamento de
+> anúncios no iCarros"*, 54 rotas, CRUD de estoque por revenda, Keycloak com Authorization Code.
+> Não aparece em busca porque **não está linkada em navegação nenhuma do site** — é
+> pública-mas-não-divulgada. Ver [`2026-08-17-icarros-design.md`](2026-08-17-icarros-design.md).
+>
+> **A lição vale além deste canal:** "não achei em busca" não é "não existe". A primeira pesquisa
+> parou cedo demais e a conclusão foi escrita com confiança que ela não tinha.
+>
+> E o padrão de login-e-senha descrito abaixo (§6.2) é, segundo o próprio iCarros, o método
+> **desaconselhado e possivelmente bloqueado** para integrador de terceiros. O caminho pretendido
+> é consentimento do lojista por Authorization Code, sem a Revy jamais guardar senha.
 
 #### O que isso muda no plano
 
@@ -527,12 +557,21 @@ Os dois primeiros entraram no escopo em 17/08. São mais baratos que Webmotors e
 de entrada da OLX é um e-mail pedindo credencial, e o do Mercado Livre é o lojista contratar um
 pacote.
 
-**A ordem final, com sete canais:**
+**A ordem final, com sete canais** — todos com spec escrita em 17/08:
 
-```
-vitrine → catálogo Meta → OLX → Facebook + Instagram → Mercado Livre → Webmotors → iCarros
-   feito     sem portão    e-mail    App Review          pacote        90 dias    conversa
-```
+| # | Canal | Portão externo | Spec |
+|---|---|---|---|
+| 1 | vitrine | nenhum | esta |
+| 2 | catálogo Meta | nenhum (feed) | [catálogo Meta](2026-08-17-catalogo-meta-feed-design.md) |
+| 3 | OLX | um e-mail pedindo credencial | [OLX](2026-08-17-olx-design.md) |
+| 4 | Facebook + Instagram | App Review (uma submissão) | [post](2026-08-17-instagram-facebook-post-design.md) |
+| 5 | Mercado Livre | lojista contratar pacote | [Mercado Livre](2026-08-17-mercado-livre-design.md) |
+| 6 | Webmotors | homologação, janela de 90 dias | [Webmotors](2026-08-17-webmotors-design.md) |
+| 7 | iCarros | **bloqueado**: moto no marketplace | [iCarros](2026-08-17-icarros-design.md) |
+
+Dois canais precisam de algo que **não é código** e que atrasa mais que qualquer implementação:
+a submissão do App Review (canal 4) e um e-mail para `api@icarros.com.br` perguntando se o
+segmento MOTO está ativo (canal 7). Os dois deveriam sair antes de a primeira linha ser escrita.
 
 ---
 
