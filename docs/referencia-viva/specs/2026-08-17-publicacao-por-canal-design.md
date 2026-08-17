@@ -420,11 +420,18 @@ enquanto App Review e homologação correm em paralelo.
 > da vitrine — e ele é o único que liga publicação a Ads e ROI, porque post não vira linha de
 > ROI e item de catálogo vira. Ver [`2026-08-17-catalogo-meta-feed-design.md`](2026-08-17-catalogo-meta-feed-design.md).
 >
-> A ordem passa a ser: **catálogo Meta (feed) → Facebook → Instagram**, com o App Review aberto
-> em paralelo desde já, já que ele não bloqueia o catálogo e a submissão é **uma só** para os
-> dois canais de post. Facebook antes de Instagram por ser mais simples e reversível; Instagram
-> por último porque ainda carrega o carrossel, a foto única do cadastro (§8) e uma restrição de
-> proporção de imagem que nenhum outro canal tem.
+> A ordem passa a ser: **catálogo Meta (feed) → Facebook e Instagram**, com o App Review aberto
+> em paralelo desde já, já que ele não bloqueia o catálogo.
+>
+> **E os dois de post viraram uma spec só**, contra a promessa de "uma por canal" logo acima. O
+> motivo daquela promessa era o prazo externo — cada canal esperando o dele. Facebook e Instagram
+> esperam **o mesmo**: uma submissão de App Review cobre os dois, e eles dividem conexão, token,
+> tratamento de foto e geração de texto. Separá-los daria duas specs em que a maior parte é a
+> mesma coisa escrita duas vezes. Ver
+> [`2026-08-17-instagram-facebook-post-design.md`](2026-08-17-instagram-facebook-post-design.md).
+>
+> O item aberto do §8 desta spec ("mais de uma foto no cadastro") **foi decidido lá**: o cadastro
+> passa a aceitar várias fotos.
 
 ### 6.1 Webmotors e iCarros — levantado em 17/08
 
@@ -551,6 +558,12 @@ decide. A decisão sai na spec do primeiro canal que precisar dela.
 (`_anexar_foto_se_enviada`). Instagram publica carrossel. Quando a spec do Instagram chegar,
 ou o cadastro passa a aceitar várias fotos, ou o canal só fica marcável na tela da moto.
 Não é problema desta spec porque vitrine não depende de foto.
+
+> **Fechado em 17/08:** o cadastro passa a aceitar várias fotos. Decisão P1 de
+> [`2026-08-17-instagram-facebook-post-design.md`](2026-08-17-instagram-facebook-post-design.md),
+> tomada assim porque a mesma mudança serve o carrossel do Instagram e melhora o catálogo Meta.
+> É a mudança de maior superfície daquela spec: toca o cadastro de toda moto, inclusive de loja
+> que não usa canal externo nenhum.
 
 **Não muda:** o Chatbot (D9), o n8n, e o caminho de cadastro por foto no grupo do WhatsApp,
 que continua não existindo em código.
