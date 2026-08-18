@@ -20,15 +20,42 @@ from app.models_db import WhatsAppCanal
 
 logger = logging.getLogger("chatbot.whatsapp_provider")
 
-# Estados canônicos do canal.
+# Estados canônicos do canal no Modo 1 (Baileys/Evolution). O vocabulário é o do
+# ciclo do QR: a sessão cai, reconecta, o lojista some com o celular.
 ESTADO_PENDENTE = "pendente"
 ESTADO_CONECTADO = "conectado"
 ESTADO_DESCONECTADO = "desconectado"
 ESTADO_INATIVO = "inativo"
 
-ESTADOS_VALIDOS = frozenset(
+ESTADOS_MODO1 = frozenset(
     {ESTADO_PENDENTE, ESTADO_CONECTADO, ESTADO_DESCONECTADO, ESTADO_INATIVO}
 )
+
+# Estados do canal no Modo 2 (Cloud API). Um número Cloud não "desconecta": ele
+# está registrado na WABA ou não está, e o que muda é o veredito da Meta sobre
+# ele (qualidade, limite, bloqueio). Prefixo ``cloud_`` de propósito — os dois
+# vocabulários dividem a mesma coluna e não podem colidir.
+#
+#   cloud_pendente → cadastrado na WABA, ainda não registrado/verificado.
+#   cloud_ativo    → registrado; envia e recebe.
+#   cloud_restrito → vivo, mas limitado pela Meta (qualidade baixa / rate limit).
+#   cloud_banido   → número ou WABA bloqueado; nada sai.
+ESTADO_CLOUD_PENDENTE = "cloud_pendente"
+ESTADO_CLOUD_ATIVO = "cloud_ativo"
+ESTADO_CLOUD_RESTRITO = "cloud_restrito"
+ESTADO_CLOUD_BANIDO = "cloud_banido"
+
+ESTADOS_MODO2 = frozenset(
+    {
+        ESTADO_CLOUD_PENDENTE,
+        ESTADO_CLOUD_ATIVO,
+        ESTADO_CLOUD_RESTRITO,
+        ESTADO_CLOUD_BANIDO,
+    }
+)
+
+# Acréscimo, não troca: o Modo 1 depende dos quatro primeiros e nenhum saiu.
+ESTADOS_VALIDOS = ESTADOS_MODO1 | ESTADOS_MODO2
 
 # Eventos do webhook gravados em instância nova. Origem: o script que configura
 # o webhook da instância legado em operação, `deploy/fly/3vm/set-evolution-webhook.ps1:40`

@@ -5,7 +5,7 @@ from datetime import datetime, timedelta, timezone
 
 from sqlalchemy.orm import Session
 
-from app import config
+from app.cloud_canal import credenciais_cloud_da_loja
 from app.models_db import Conversa, FilaVendedor, Mensagem, OfertaLead
 from app.operacao import variantes_telefone
 
@@ -54,10 +54,13 @@ def enviar_oferta(db: Session, oferta: OfertaLead, *, outbound) -> str:
     """
     vendedor = db.get(FilaVendedor, oferta.vendedor_id)
     resumo = f"Lead novo na loja. Toque em Peguei para assumir."
+    # Número E template saem do canal da loja: template é recurso da WABA
+    # (spec §6.2), então o nome aprovado numa loja não vale na outra.
+    cloud = credenciais_cloud_da_loja(db, oferta.loja_id)
 
     if janela_aberta(db, oferta.loja_id, vendedor.telefone):
         outbound.send_interactive_button(
-            instance=config.GRAPH_PHONE_NUMBER_ID,
+            instance=cloud.phone_number_id,
             number=vendedor.telefone,
             texto=resumo,
             oferta_id=oferta.id,
@@ -65,9 +68,9 @@ def enviar_oferta(db: Session, oferta: OfertaLead, *, outbound) -> str:
         return "interativa"
 
     outbound.send_template_button(
-        instance=config.GRAPH_PHONE_NUMBER_ID,
+        instance=cloud.phone_number_id,
         number=vendedor.telefone,
-        template=config.GRAPH_TEMPLATE_OFERTA,
+        template=cloud.template_oferta,
         variaveis=[vendedor.nome],
         oferta_id=oferta.id,
     )

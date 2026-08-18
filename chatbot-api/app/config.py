@@ -47,6 +47,10 @@ AUDIO_FALLBACK_TEXT = os.getenv(
 )[:160]
 
 # Cloud API (Modo 2). Token de System User — nunca o temporário de 24 h do painel.
+# O token é do Revy (um app na Meta, spec §6.2): global, aqui, nunca no banco.
+# Já número e template são POR LOJA e moram em ``whatsapp_canais``; as duas
+# variáveis abaixo são só o fallback da loja piloto, que não tem canal Cloud
+# cadastrado. Quem resolve é ``app.cloud_canal`` — não leia daqui no outbound.
 GRAPH_BASE_URL = os.getenv("CHATBOT_GRAPH_BASE_URL", "https://graph.facebook.com/v21.0")
 GRAPH_TOKEN = os.getenv("CHATBOT_GRAPH_TOKEN", "")
 GRAPH_PHONE_NUMBER_ID = os.getenv("CHATBOT_GRAPH_PHONE_NUMBER_ID", "")

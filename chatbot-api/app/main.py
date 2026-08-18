@@ -33,6 +33,7 @@ from app import (  # noqa: F401 (registra os modelos)
 from app.audio import AudioProcessor, get_audio_processor, processador_de_audio
 from app.cloud_retry import registrar_evento_falho
 from app.meta_webhook import EventoCloud, assinatura_valida, parse_inbound
+from app.cloud_canal import phone_number_id_da_loja
 from app.oferta_inbound import processar_clique
 from app.whatsapp_outbound import outbound_para_loja
 from app.auth import Contexto, get_contexto, verificar_webhook_token
@@ -1835,8 +1836,11 @@ def responder_cliente(
     if not loja_opera_modo2(db, ctx.loja_id):
         return {"enviado": False, "motivo": "loja_fora_do_modo_2"}
 
+    # Número da loja, não o global: com duas lojas Cloud no mesmo processo a
+    # variável de ambiente mandaria a resposta pelo número da outra.
+    numero_central = phone_number_id_da_loja(db, ctx.loja_id)
     resultado = outbound_para_loja(db, ctx.loja_id).send_text(
-        instance=config.GRAPH_PHONE_NUMBER_ID,
+        instance=numero_central,
         number=telefone,
         text=dados.texto,
     )
@@ -1848,8 +1852,10 @@ def responder_cliente(
 
     # A saída do bot entra na conversa igual à do Modo 1, senão o Portal mostra
     # só o lado do cliente e o histórico fica pela metade.
+    # Mesmo número do envio: ``registrar_mensagem`` resolve loja e canal por
+    # esta chave, então o global gravaria a mensagem na loja errada.
     servico.registrar_mensagem(
-        db, config.GRAPH_PHONE_NUMBER_ID, telefone, dados.texto,
+        db, numero_central, telefone, dados.texto,
         wamid or None, True, True, "texto",
     )
     db.commit()

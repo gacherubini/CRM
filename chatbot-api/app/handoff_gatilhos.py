@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from sqlalchemy.orm import Session
 
-from app import config
+from app.cloud_canal import phone_number_id_da_loja
 from app.models_db import OfertaLead
 from app.oferta_envio import enviar_oferta
 from app.rodizio import abrir_oferta
@@ -39,11 +39,13 @@ def disparar_handoff(
     if em_andamento is not None:
         return "ja_em_andamento"
 
+    numero_central = phone_number_id_da_loja(db, loja_id)
+
     oferta = abrir_oferta(db, loja_id, telefone_cliente)
     if oferta is None:
         # Fila vazia ou esgotada: o cliente não pode ficar no vácuo (spec §5.3).
         outbound.send_text(
-            instance=config.GRAPH_PHONE_NUMBER_ID,
+            instance=numero_central,
             number=telefone_cliente,
             text="Já estou passando seu atendimento para um vendedor. Ele te chama em instantes.",
         )
@@ -51,7 +53,7 @@ def disparar_handoff(
 
     enviar_oferta(db, oferta, outbound=outbound)
     outbound.send_text(
-        instance=config.GRAPH_PHONE_NUMBER_ID,
+        instance=numero_central,
         number=telefone_cliente,
         text="Já estou chamando um vendedor para falar com você.",
     )

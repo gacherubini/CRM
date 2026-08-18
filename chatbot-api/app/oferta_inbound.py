@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from sqlalchemy.orm import Session
 
-from app import config
+from app.cloud_canal import phone_number_id_da_loja
 from app.models_db import FilaVendedor, OfertaLead
 from app.rodizio import assumir_oferta
 
@@ -43,10 +43,12 @@ def processar_clique(
     if oferta is None:
         return "desconhecida"
 
+    numero_central = phone_number_id_da_loja(db, loja_id)
+
     if not ganhou:
         # Nada de contato aqui: quem perdeu não fala com o cliente.
         outbound.send_text(
-            instance=config.GRAPH_PHONE_NUMBER_ID,
+            instance=numero_central,
             number=telefone_remetente,
             text="Esse lead já foi pego por outro vendedor.",
         )
@@ -54,7 +56,7 @@ def processar_clique(
 
     vencedor = db.get(FilaVendedor, oferta.vendedor_id)
     outbound.send_text(
-        instance=config.GRAPH_PHONE_NUMBER_ID,
+        instance=numero_central,
         number=vencedor.telefone,
         text=(
             f"Lead é seu. Chame o cliente: https://wa.me/{oferta.telefone_cliente}\n"

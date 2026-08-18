@@ -56,12 +56,26 @@ class WhatsAppCanal(Base):
     loja_id: Mapped[str] = mapped_column(ForeignKey("lojas.id"), nullable=False, index=True)
     # Número E.164 ou rótulo operacional (ex.: "legado", "linha-2").
     e164_or_label: Mapped[str] = mapped_column(String(80), nullable=False)
+    # DOIS USOS, um nome só (economia deliberada de migration — não renomear):
+    #   Modo 1 (Baileys/Evolution) → nome da instância Evolution.
+    #   Modo 2 (Cloud API)         → ``phone_number_id`` da Meta.
+    # É a chave de roteamento do inbound nos dois modos (`_loja_por_phone_number_id`
+    # e `channels.resolve_canal_for_instance` batem nesta coluna), por isso ela
+    # continua UNIQUE: um número só pode pertencer a uma loja.
     evolution_instance: Mapped[str] = mapped_column(
         String(120), unique=True, nullable=False, index=True
     )
     ativo: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
-    # pendente | conectado | desconectado | inativo
+    # Modo 1: pendente | conectado | desconectado | inativo (ciclo do QR).
+    # Modo 2: cloud_pendente | cloud_ativo | cloud_restrito | cloud_banido.
+    # Vocabulário completo em ``whatsapp_provider.ESTADOS_VALIDOS``.
     estado: Mapped[str] = mapped_column(String(20), default="pendente", nullable=False)
+    # WABA dona do número (Modo 2). É o que marca o canal como Cloud: template de
+    # mensagem é recurso da WABA, então cada loja tem os seus. Nulo = canal Modo 1.
+    waba_id: Mapped[str | None] = mapped_column(String(60), nullable=True, index=True)
+    # Nome do template de oferta aprovado NESTA WABA (spec §5.7). Nulo = cai no
+    # ``config.GRAPH_TEMPLATE_OFERTA`` (compat com a loja piloto, sem backfill).
+    template_oferta: Mapped[str | None] = mapped_column(String(120), nullable=True)
     # Só este canal responde no grupo de estoque e envia alertas de simulação.
     principal_estoque: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     criado_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_agora)

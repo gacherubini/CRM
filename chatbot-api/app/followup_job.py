@@ -6,7 +6,7 @@ from datetime import datetime, timedelta, timezone
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from app import config
+from app.cloud_canal import phone_number_id_da_loja
 from app.models_db import Conversa, Mensagem
 
 PRIMEIRO_TOQUE = timedelta(minutes=30)
@@ -112,7 +112,7 @@ class FollowupWorker:
 
             toque = conversa.followup_toques + 1
             outbound.send_text(
-                instance=config.GRAPH_PHONE_NUMBER_ID,
+                instance=phone_number_id_da_loja(db, conversa.loja_id),
                 number=conversa.telefone,
                 text=texto_followup(classificar_etapa(conversa), toque),
             )

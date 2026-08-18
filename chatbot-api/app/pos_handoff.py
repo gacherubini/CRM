@@ -9,7 +9,7 @@ from datetime import datetime, timedelta, timezone
 
 from sqlalchemy.orm import Session
 
-from app import config
+from app.cloud_canal import phone_number_id_da_loja
 from app.models_db import FilaVendedor, OfertaLead
 from app.oferta_envio import janela_aberta
 
@@ -53,8 +53,9 @@ def cliente_voltou_a_escrever(
         return "silencio"
 
     vendedor = db.get(FilaVendedor, travada.vendedor_id)
+    numero_central = phone_number_id_da_loja(db, loja_id)
     outbound.send_text(
-        instance=config.GRAPH_PHONE_NUMBER_ID,
+        instance=numero_central,
         number=telefone_cliente,
         text=(
             f"O {vendedor.nome} já está com seu atendimento e vai te chamar "
@@ -67,7 +68,7 @@ def cliente_voltou_a_escrever(
     # nunca gasta template pago (spec §5.4).
     if janela_aberta(db, loja_id, vendedor.telefone, agora=agora):
         outbound.send_text(
-            instance=config.GRAPH_PHONE_NUMBER_ID,
+            instance=numero_central,
             number=vendedor.telefone,
             text="O cliente voltou a escrever na central. Ele está esperando seu contato.",
         )
