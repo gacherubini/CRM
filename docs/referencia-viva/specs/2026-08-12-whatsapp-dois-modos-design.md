@@ -3,6 +3,7 @@
 **Data:** 2026-08-12 (revisão 2026-08-13)
 **Status:** Spec **fechada** com o dono (brainstorm 2026-08-12 + sessão 2026-08-13).
 Pronto para o plano de implementação. Este arquivo é o canônico.
+**Adendo 2026-08-17 (§16):** credencial Cloud passou a ser **por loja** no código (`7719ffb`); **template é recurso da WABA**, logo um por loja — o §7 item 6 fala no singular e está corrigido lá; e o caminho até o embedded signup.
 **Substitui:** a abordagem anterior de coexistência **por vendedor** (`smb_message_echoes` + history
 sync), **descartada** em favor do modelo de **central só-bot** (ver §14). Os planos daquela abordagem
 (design de coexistência, spike de coexistência e regra Cloud/n8n de coexistência) foram **removidos**
@@ -519,6 +520,8 @@ O `n8n-cloud` é **um** workflow para **N lojas**, então precisa mapear número
 6. **Template Utility com botão de resposta rápida** aprovado na Meta para o "chama vendedor"
    (variáveis: nome do cliente, veículo, resultado da simulação **quando houver**; **sem**
    `wa.me` neste envelope). Mais a variante interativa grátis quando a janela está aberta.
+   **Corrigido no §16.2: é um template POR LOJA**, não um só — template pertence à WABA,
+   e cada loja tem a sua. Onboarding de loja nova inclui submeter o dela.
 7. **Atendimento (Modo 2):** faixa "N sem vendedor" + filtro **Aguardando** (dono/gerente).
 8. **Handoff:** **depois** do peguei, mandar ao vendedor que venceu o `wa.me` + **pacote completo
    do lead, com CPF/nascimento/CNH** + link do Portal (§5.7), com registro de auditoria do envio,
@@ -715,3 +718,139 @@ Nada em aberto de produto. Contrato HTTP da fila (Portal → chatbot) é detalhe
 | 17 | Cliente sabe quem vai chamar | Ao travar, a central manda ao cliente **nome + número do vendedor**. Vale pra todo handoff, não só o de erro do Motor. §5.1 |
 | 18 | Dados do lead ao vendedor | **Pacote completo por WhatsApp**, CPF/nascimento/CNH incluídos, **só depois do clique** e só pro vendedor que travou, com registro de auditoria. Link do Portal não substitui. §5.7 |
 | 19 | Identidade do clique | Botão carrega `oferta_id` (`pego:<oferta_id>`); sem isso "primeiro clique vence" não fecha com duas ofertas vivas. §5.7 |
+
+## 16. Adendo 2026-08-17 — credencial por loja, e o caminho até o self-serve
+
+Escrito depois de bater a spec contra o código. O desenho estava certo; o **código tinha parado no
+formato de uma loja só**, e a spec estava silenciosa num ponto que só aparece na segunda loja.
+
+### 16.1 O que o código já faz (commit `7719ffb`)
+
+Antes deste commit, o inbound era multi-loja (`metadata.phone_number_id` → loja, §6.2) mas **o
+outbound não**: os 13 pontos de envio liam `config.GRAPH_PHONE_NUMBER_ID`, um número global. Com
+duas lojas Cloud no mesmo processo, a resposta de uma sairia pelo número da outra.
+
+| Peça | Onde |
+|---|---|
+| Resolver único do outbound (número, WABA, template) | `chatbot-api/app/cloud_canal.py` |
+| `whatsapp_canais` ganha `waba_id` e `template_oferta` | migration `0025_canal_cloud_por_loja` |
+| `estado` ganha vocabulário Cloud sem perder o do QR | `app/whatsapp_provider.py` |
+
+**Compatibilidade:** canal sem valor gravado cai na variável de ambiente. A loja piloto continua
+funcionando sem backfill. **Token de System User, App Secret e verify token continuam globais** —
+são do Revy, um app na Meta (§6.2), e de propósito não ganharam coluna.
+
+Duas decisões de desempate que o código tomou e a spec não previa:
+
+- **Canal `cloud_banido` continua sendo escolhido.** Cair no número global mandaria a mensagem pela
+  loja errada, que é pior do que falhar o envio.
+- **Duas WABAs na mesma loja:** ativo primeiro, depois o mais antigo — mesma regra do
+  `principal_estoque`, para que ligar um segundo número não mude por acidente de quem a loja fala.
+
+### 16.2 Template é recurso da WABA — corrige o §7 item 6
+
+O §7 item 6 fala do template Utility **no singular**, como se um só servisse toda a operação. Não
+serve: **message template pertence à WABA**, e cada loja tem a WABA dela.
+
+Consequência: **cada loja nova precisa do "chama vendedor" criado e aprovado de novo**, e cada uma
+pode ser reprovada por conta própria. É item de onboarding por loja, não de setup único — e é por
+isso que o nome do template virou coluna (`template_oferta`) em vez de continuar em
+`CHATBOT_GRAPH_TEMPLATE_OFERTA`.
+
+O que **não** se repete por loja: o **webhook**. Ele é do app do Revy, configurado uma vez, e vale
+para toda WABA compartilhada com o app. Loja nova não aponta webhook nenhum.
+
+### 16.3 Cadastro do número central: deliberadamente sem tela
+
+O §5.8 promete, no Modo 2, *"Número central (Cloud) + lista ordenada de vendedores"*. A lista de
+vendedores existe. **O cadastro do número não — e não deve ser construído agora.**
+
+Hoje o `phone_number_id` entra por chamada direta a `POST /v1/whatsapp/canais` passando
+`evolution_instance`, que o endpoint aceita. Pela UI é impossível: o Portal não envia esse campo
+(`portal-gestao/app/clients/chatbot.py:279` — *"o Chatbot gera o nome"*) e a tela é o ciclo de QR.
+
+**Por que não construir:** o embedded signup (§11 Fase 2, §16.5) **é** a tela de cadastro, e devolve
+`phone_number_id` e `waba_id` programaticamente. Tela manual bonita agora é código para deletar. O
+procedimento assistido abaixo escala até um punhado de lojas, que é o horizonte da Fase 1.
+
+> **`evolution_instance` guarda duas coisas.** No Modo 1, o nome da instância Evolution; no Modo 2,
+> o `phone_number_id` da Meta. É economia deliberada de migration — a coluna já é a chave de
+> roteamento do inbound nos dois modos, e é `UNIQUE`, que é exatamente a garantia desejada (um
+> número pertence a uma loja). **Não renomear.** Está comentado no modelo.
+
+### 16.4 Escolher o número é porta de mão única
+
+Para entrar na Cloud API, o número **não pode estar ativo no app do WhatsApp/WhatsApp Business**.
+Se a loja quer usar o número que já anuncia, ele sai do aplicativo primeiro — e **o histórico de
+conversa daquele celular se perde**.
+
+A escolha é do lojista e é irreversível na prática:
+
+| | Número novo | Número que já anuncia |
+|---|---|---|
+| Histórico | nada a perder | **perde o do celular** |
+| Reconhecimento do cliente | zero | o dos anúncios |
+| CTWA | anúncios precisam ser reapontados | já aponta |
+
+Entra no checklist de onboarding (§16.6), antes de qualquer passo técnico.
+
+### 16.5 Como se consegue o embedded signup (detalha o §11 Fase 2)
+
+Seis degraus, três deles portão de outra pessoa:
+
+1. App do tipo Business na Meta com o produto WhatsApp — já existe se o piloto rodou.
+2. **Verificação de negócio do Revy.** O §8 diz *"verificação é por loja, e é da loja"* — verdade
+   para a loja **atender cliente**. Para o Revy ser Tech Provider é o **CNPJ do Revy** que precisa
+   estar verificado. São duas verificações diferentes; **a do Revy pode começar hoje** e é a de
+   prazo mais imprevisível.
+3. Registro no programa **Tech Provider** (aceite de termos; sem taxa da Meta).
+4. **App Review** de `whatsapp_business_messaging` e `whatsapp_business_management`.
+5. Configurar o Embedded Signup (Facebook Login for Business) e obter o `config_id`. **v4** — o v2
+   morre em 15/10/2026.
+6. Implementar: SDK abre o popup com o `config_id` → lojista aprova → volta um `code` → troca por
+   token com escopo na WABA dele → inscrever o app na WABA e ativar o número com PIN.
+
+> **O ovo e a galinha:** o passo 4 exige o passo 6 **pronto e funcionando** — App Review pede vídeo
+> do fluxo e conta de teste. Constrói-se o embedded signup inteiro contra o business de teste,
+> grava, e só então submete. **Embedded signup é o fim do desenvolvimento, não o começo.** Mesma
+> forma do App Review dos canais de publicação.
+
+Confiança: **alta** nos degraus 1–5; **média** na sequência exata de chamadas do 6 — conferir na doc
+da Meta antes de virar plano.
+
+### 16.6 Qual CNPJ serve para quê, e o onboarding assistido
+
+O CNPJ do Revy é identidade de **integrador**, nunca de anunciante. Ele não precisa de conta
+comercial em portal nenhum.
+
+| Credencial | CNPJ |
+|---|---|
+| App da Meta, Tech Provider, embedded signup | **Revy** |
+| WABA, número, ads, verificação de negócio para atender cliente | **cada loja** |
+
+Enquanto o self-serve não existe, o onboarding de uma loja é **assistido**:
+
+| # | Passo | Quem |
+|---|---|---|
+| 1 | Business Manager verificado | loja |
+| 2 | Decidir número novo vs. existente (§16.4) | loja |
+| 3 | Criar a WABA e adicionar o número | loja |
+| 4 | Compartilhar a WABA com o app do Revy | loja |
+| 5 | Ler `phone_number_id` e `waba_id` e gravar em `whatsapp_canais` | **Revy, à mão** |
+| 6 | Criar e submeter o template daquela WABA (§16.2) | **Revy** |
+| 7 | Meio de pagamento na WABA | loja — o Revy não fatura a mensagem (§11) |
+| 8 | Ligar `whatsapp_modo=2` no Control | Revy |
+| 9 | Cadastrar a fila de vendedores | loja, **já é autoatendido** |
+
+Os passos 5 e 6 são o custo manual que o embedded signup elimina.
+
+### 16.7 Continua em aberto
+
+- **Business Login das specs de publicação.** As specs de canais (Instagram/Facebook, catálogo Meta)
+  também pedem consentimento no Business Manager da loja. Se o WhatsApp e a publicação pedirem
+  separado, o lojista consente duas vezes no mesmo Business. Vale desenhar **um** consentimento —
+  mas a decisão é da spec de publicação, não desta.
+- **`alembic upgrade head` da `0025` contra Postgres real.** A migration só faz `add_column` × 2 e
+  um índice, mas não foi aplicada fora de teste.
+- **Rotação do token de System User.** Um token do Revy alcança N WABAs (§6.2). Se ele for revogado
+  ou expirar, **todas** as lojas param juntas. Não há tratamento desenhado.
