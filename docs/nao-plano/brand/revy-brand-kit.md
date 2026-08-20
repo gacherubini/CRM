@@ -4,6 +4,21 @@
 **Atualizado:** 2026-08-08  
 **Uso:** identidade visual, tom de voz, nomenclatura de produto e copy padrão da suíte.
 
+> ## ⚠️ O símbolo deste kit foi aposentado em 20/08/2026
+>
+> A **paleta, as fontes, o tom de voz e a nomenclatura continuam valendo**. O que
+> morreu foi o monograma: o **R vazado em quadrado de canto arredondado**, com a
+> regra do fio de 1px no fundo escuro, e o inventário de arquivos que o acompanha.
+>
+> No lugar entrou a assinatura `// Revy` — duas barras inclinadas mais a palavra em
+> **Chivo 900**. Ela não é preta-sempre: herda a cor de onde está.
+>
+> Seções desatualizadas: **símbolo**, **usos do símbolo**, o **inventário de
+> arquivos** e a linha de **foto de perfil**. Enquanto este kit não for refeito, a
+> referência de marca é
+> [`../../referencia-viva/specs/2026-08-20-assinatura-revy-design.md`](../../referencia-viva/specs/2026-08-20-assinatura-revy-design.md),
+> e os arquivos de verdade estão em `shared/brand/assets/` — gerados, não desenhados.
+
 > **O que mudou na v2.0** — a seção 4 (identidade visual) foi refeita. A v1.0 mandava usar
 > **Inter**, listava uma paleta que não estava em produção e citava uma cor "Signal" que a
 > própria tabela não definia. O produto usa **Hanken Grotesk** desde julho. Também entrou o

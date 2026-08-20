@@ -2,7 +2,10 @@
    Revy — tokens de marca. FONTE UNICA.
    Edite este arquivo; nunca as copias em static/css/revy-tokens.css.
    Depois de editar: python shared/brand/sync_tokens.py
-   Spec: docs/superpowers/specs/2026-08-08-identidade-visual-revy-design.md
+   Spec dos tokens: docs/referencia-viva/specs/2026-08-08-identidade-visual-revy-design.md
+   Spec da marca:   docs/referencia-viva/specs/2026-08-20-assinatura-revy-design.md
+   A marca nao vive aqui. Ela e gerada por shared/brand/build_marca.py e
+   distribuida por sync_marca.py; este arquivo so tem cor, forma e fonte.
    =========================================================================== */
 :root {
   /* --- neutros --- */

@@ -1,5 +1,20 @@
 # Identidade visual Revy — Plano de Implementação
 
+> ## ⚠️ Executado, e a metade da marca foi substituída em 20/08/2026
+>
+> Este plano fica em `referencia-viva/` porque a **camada de tokens** que ele
+> descreve é o código em produção: `shared/brand/revy-tokens.css`, o
+> `sync_tokens.py`, as quatro cópias e os testes de contraste. Isso continua valendo.
+>
+> O que **não** vale mais é tudo que fala do símbolo. Este arquivo traz o código do
+> `build_marca.py` antigo **colado por dentro** — quadrado `rx=9` num `viewBox 0 0 40
+> 40`, R vazado a `stroke`, wordmark em Hanken 700, descritor "GESTÃO DE REVENDA",
+> saída em `docs/brand/assets/`. Nada disso existe. Copiar de aqui reintroduz a marca
+> aposentada.
+>
+> A marca em vigor está em
+> [`../specs/2026-08-20-assinatura-revy-design.md`](../specs/2026-08-20-assinatura-revy-design.md).
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Fazer site, catálogo público, Revy Loja e Revy Control usarem a mesma marca, os mesmos tokens e a mesma tipografia, com o logo virando vetor de verdade.

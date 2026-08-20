@@ -3,9 +3,29 @@
 Decisão de design fechada com o dono em 08/08. Define a marca, os tokens e as regras
 que passam a valer nos **quatro front-ends**, e o escopo do que muda em cada um.
 
-O plano de execução vive em `docs/referencia-viva/planos/2026-08-08-identidade-visual-revy.md`.
 O material para pessoas de fora (agência, designer, quem faz criativo) é
 `docs/nao-plano/brand/revy-brand-kit.md` v2.0 — este spec é a versão para quem mexe no código.
+
+> ## ⚠️ A marca desta spec foi aposentada em 20/08/2026
+>
+> **A paleta, as fontes, a forma e as regras de componente continuam valendo** — são
+> as que estão em produção. O que morreu foi o **símbolo**: o quadrado de canto
+> arredondado com o "R" vazado, junto com a assinatura "Revy / GESTÃO DE REVENDA"
+> e todo o inventário de arquivos da §6.
+>
+> No lugar entrou a assinatura `// Revy` do kit do dono: duas barras inclinadas
+> mais a palavra em Chivo 900. **Leia
+> [`2026-08-20-assinatura-revy-design.md`](2026-08-20-assinatura-revy-design.md)
+> antes de tocar em qualquer coisa de marca.**
+>
+> Seções mortas: a linha **Símbolo**, **Comportamento do símbolo** e **Assinatura**
+> da §2, e a **§6 inteira**. O resto desta spec é as-built.
+>
+> O plano de execução
+> ([`planos/2026-08-08-identidade-visual-revy.md`](../planos/2026-08-08-identidade-visual-revy.md))
+> **fica onde está**: a camada de tokens que ele descreve é o código em produção.
+> Mas ele traz o `build_marca.py` antigo colado por dentro — leia o aviso no topo
+> dele antes de copiar qualquer coisa de lá.
 
 ---
 
@@ -48,9 +68,9 @@ Fechadas pelo dono ao longo de quatro rodadas de mockup navegável.
 
 | Peça | Decisão |
 |---|---|
-| **Símbolo** | **Bloco** — quadrado de canto arredondado com o "R" vazado, em **geometria SVG** (`<path>`), nunca `<text>` |
-| **Comportamento do símbolo** | **Preta sempre.** `#1b1b1b` no claro, `#000000` no escuro com fio de 1px `rgba(255,255,255,.16)` para não sumir na sidebar |
-| **Assinatura** | **Nome + descritor** — "Revy" sobre "GESTÃO DE REVENDA" |
+| ~~**Símbolo**~~ | ~~**Bloco** — quadrado de canto arredondado com o "R" vazado~~ · **APOSENTADO 20/08**, ver [spec da assinatura](2026-08-20-assinatura-revy-design.md) |
+| ~~**Comportamento do símbolo**~~ | ~~Preta sempre; `#000000` no escuro com fio de 1px~~ · **APOSENTADO** — a assinatura nova usa `currentColor` e o fio deixou de existir junto com o quadrado |
+| ~~**Assinatura**~~ | ~~Nome + descritor: "Revy" sobre "GESTÃO DE REVENDA"~~ · **APOSENTADA** — o kit não tem descritor |
 | **Preto da marca** | `#1b1b1b` (o de produção; aposenta `#0a0a0a` do catálogo e do logo) |
 | **Acento** | **Verde racing `#1f4d3a`**, no lugar do azul `#1f6feb` |
 | **Fonte de interface** | **Hanken Grotesk** — mantida; aposenta Inter no catálogo |
@@ -207,7 +227,16 @@ trabalho separado e maior — este spec só garante que os **valores** sejam os 
 
 ---
 
-## 6. A marca: arquivos a produzir
+## 6. A marca: arquivos a produzir ⚠️ SEÇÃO MORTA
+
+> **Nada nesta seção existe mais.** Os seis arquivos abaixo foram apagados em
+> 20/08/2026 e a pasta que os guardava (`docs/nao-plano/brand/assets/`) deixou de ser
+> a origem — a marca agora nasce em `shared/brand/assets/`, gerada por
+> `build_marca.py` e distribuída por `sync_marca.py`. Inventário em vigor na
+> [spec da assinatura](2026-08-20-assinatura-revy-design.md).
+>
+> Mantida aqui só para explicar por que os `<text>` do `site/assets/` foram jogados
+> fora: a regra "contorno, nunca fonte viva" nasceu nesta seção e continua valendo.
 
 O entregável mais importante para criativo. Todos em geometria vetorial, sem dependência de fonte.
 
