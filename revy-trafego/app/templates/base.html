@@ -5,11 +5,15 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#f9f9f9">
   <title>{% block title %}Revy Control{% endblock %}</title>
+  {# Quadrado de tinta com o R branco: sobre a aba clara ou escura do
+     navegador, so o quadrado garante que a marca apareca. #}
+  <link rel="icon" href="{{ public_path('/static/marca/favicon.svg') }}" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="{{ public_path('/static/marca/icone-app.svg') }}">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="{{ public_path('/static/css/revy-tokens.css') }}?v=v11">
-  <link rel="stylesheet" href="{{ public_path('/static/css/app.css') }}?v=v11">
+  <link rel="stylesheet" href="{{ public_path('/static/css/revy-tokens.css') }}?v=v12">
+  <link rel="stylesheet" href="{{ public_path('/static/css/app.css') }}?v=v12">
   <script>
     (() => {
       const saved = localStorage.getItem('revy-theme');
@@ -28,15 +32,13 @@
     <aside class="sidebar" id="sidebar" aria-label="Navegação Revy Control">
       <div class="sidebar-brand-row">
         <a class="brand" href="{{ public_path('/app') }}" aria-label="Revy Control">
-          <span class="brand-mark" aria-hidden="true">
-            <svg viewBox="0 0 40 40" role="img" aria-label="Revy">
-              <rect width="40" height="40" rx="9" fill="#1b1b1b"/>
-              <rect class="brand-mark-edge" x="1" y="1" width="38" height="38" rx="8" fill="none" stroke="transparent" stroke-width="2"/>
-              <path d="M15.5 30V13h6.8a4.3 4.3 0 0 1 0 8.6h-6.8" fill="none" stroke="#ffffff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
-              <path d="M21 21.6 27 30" fill="none" stroke="#ffffff" stroke-width="3" stroke-linecap="round"/>
-            </svg>
-          </span>
-          <span><strong>Revy Control</strong><small>{{ usuario.loja_slug or 'selecione loja' }}</small></span>
+          {# Aqui nao ha nome de loja disputando o topo, entao entra a
+             assinatura inteira. Inline, e nao imagem referenciada: so inline o
+             currentColor pega a cor do tema e a marca vira branca no escuro.
+             Gerada por shared/brand/build_marca.py, distribuida por
+             sync_marca.py. O "Control" ao lado completa o nome do produto. #}
+          <span class="brand-mark" aria-hidden="true">{% include "marca/revy-signature.svg" %}</span>
+          <span><strong>Control</strong><small>{{ usuario.loja_slug or 'selecione loja' }}</small></span>
         </a>
         <button class="drawer-close" type="button" aria-label="Fechar menu">×</button>
       </div>

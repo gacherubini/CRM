@@ -2172,28 +2172,30 @@ tr.roi-sem-campanha td { color: var(--ink-soft); }
    === Navegacao e shell ===
    =========================================================================== */
 
-/* A marca e preta nos dois temas — nunca verde. O simbolo agora vem do SVG
-   em docs/brand/assets; .brand-mark so posiciona. */
+/* A marca e tinta no claro e branca no escuro — nunca verde. O contorno vem
+   de shared/brand/assets pelo sync_marca.py e entra inline no base.html; como
+   ele pinta com currentColor, as tres regras por tema que viviam aqui (o fio
+   de contraste do quadrado preto) deixaram de existir junto com o quadrado.
+   .brand-mark so posiciona e da a altura. */
 .brand-mark {
-  width: 32px;
-  height: 32px;
-  display: grid;
-  place-items: center;
+  display: flex;
+  align-items: center;
   flex: 0 0 auto;
-  border-radius: var(--radius-nav);
-  background: transparent;
-  color: inherit;
-  padding: 0;
-  font-size: 14px;
-  font-weight: 700;
-  letter-spacing: -0.03em;
+  color: var(--ink);
 }
-.brand-mark svg { width: 32px; height: 32px; display: block; }
+.brand-mark svg { height: 27px; width: auto; display: block; }
 
-/* No escuro o quadrado preto sobre a sidebar #161616 sumiria sem o fio. */
-[data-theme="dark"] .brand-mark rect:first-of-type { fill: #000000; }
-[data-theme="dark"] .brand-mark .brand-mark-edge { stroke: rgba(255,255,255,.16); }
-[data-theme="dark"] .brand-mark path { stroke: #f5f5f5; }
+/* Na tela de entrada a marca e o unico elemento de identidade: cabe maior, e
+   entra a assinatura inteira no lugar do icone. */
+.brand-mark.entrada svg { height: 24px; }
+
+/* O topo da barra lateral e da loja; a Revy assina no rodape. */
+.sidebar-assinatura {
+  padding: 12px 8px 2px;
+  border-top: 1px solid var(--line);
+  color: var(--ink-soft);
+}
+.sidebar-assinatura svg { height: 13px; width: auto; display: block; }
 
 .nav-link {
   min-height: 34px;
@@ -2485,10 +2487,12 @@ tr.roi-sem-campanha td { color: var(--ink-soft); }
 }
 .login-story p { font-size: 16px; color: #9a9a9a; max-width: 36ch; }
 
-.login-sig { display: flex; flex-direction: column; gap: 5px; margin-bottom: 6px; }
-.login-sig b { font-size: 26px; font-weight: 700; letter-spacing: -.05em; line-height: 1; }
+.login-sig { display: flex; flex-direction: column; align-items: flex-start; gap: 9px; margin-bottom: 6px; }
+.login-sig svg { height: 26px; width: auto; display: block; }
+/* Descritor no padrao de rotulo do kit: mono, caixa alta, tracking +18%. */
 .login-sig > span {
-  font-size: 9px; font-weight: 700; letter-spacing: .3em;
+  font-family: var(--font-data);
+  font-size: 10px; font-weight: 400; letter-spacing: .18em;
   text-transform: uppercase; color: var(--green-300);
 }
 

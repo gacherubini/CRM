@@ -33,7 +33,7 @@ site/
   privacidade.html         # servida em /privacidade
   termos.html              # servida em /termos
   exclusao-de-dados.html   # servida em /exclusao-de-dados
-  assets/                  # og.jpg (1200x630), poster-1..7.jpg, logos, revy-tokens.css
+  assets/                  # og.jpg (1200x630), poster-1..7.jpg, marca, revy-tokens.css
   demos/                   # 01..07 — cenas animadas, embutidas em <iframe> lazy pelo index
 ```
 
@@ -66,6 +66,21 @@ Depois de copiar, **reaplicar à mão** o que o export sobrescreve:
   (o export ainda emite `revy.com.br`, que é de terceiro — ver o as-built)
 - rodapé: razão social, CNPJ, endereço e `contato@revyapp.com.br`
 - links do rodapé para `/privacidade`, `/termos`, `/exclusao-de-dados`
+- **a marca**: o export traz o símbolo antigo (quadrado preto com o R vazado).
+  A marca em vigor desde 20/08/2026 é a assinatura `// Revy` — duas barras mais
+  a palavra em Chivo 900. Os arquivos são **gerados**, não desenhados à mão:
+
+  ```bash
+  python shared/brand/build_marca.py   # gera o contorno a partir do Chivo 900
+  python shared/brand/sync_marca.py    # distribui, site/assets incluído
+  ```
+
+  Depois de rodar, apagar de `assets/` qualquer `revy-mark.svg`,
+  `revy-wordmark.svg` ou `revy-signature.svg` que o export tenha trazido de
+  volta — eles são o símbolo aposentado, e **tudo o que fica nesta pasta vai
+  ao ar**. No `index.html`, o `<img>` do topo e o do rodapé apontam para
+  `assets/revy-signature-tinta.svg` (larguras 104px e 124px), e as quatro
+  páginas usam `assets/favicon.svg` como ícone, não o `revy-mark.svg`.
 
 As animações são bundles pesados (~1,27 MB cada, React/Babel transpilando no navegador), em
 `<iframe loading="lazy"`, e carregam só ao entrar na tela. Carga inicial leve; a pasta soma

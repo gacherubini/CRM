@@ -92,11 +92,16 @@ button, input, select, textarea { font: inherit; }
 
 h1, h2, p { margin-top: 0; }
 
+/* O h1 e o unico serifado da vitrine. Vem do kit de marca: titulo em
+   Newsreader 600, tracking -3%. Vale aqui porque h1 e afirmacao — "Veiculos
+   disponiveis", o nome da moto — e nao item de lista. O h2 dos cards segue em
+   Hanken: a 14px, numa grade que se varre com o olho, serifa atrapalha. */
 h1 {
+  font-family: var(--font-brand);
   font-size: clamp(1.75rem, 4vw, 2.75rem);
   font-weight: 600;
   line-height: 1.08;
-  letter-spacing: -0.035em;
+  letter-spacing: -0.03em;
   margin-bottom: 0.5rem;
 }
 
@@ -108,12 +113,16 @@ h2 {
   margin-bottom: 0.35rem;
 }
 
+/* Rotulo: mono, caixa alta, tracking +18% — a regra do kit. O mono separa o
+   que rotula do que afirma, e o tracking e o que faz caixa alta pequena
+   continuar legivel. */
 .eyebrow {
-  margin: 0 0 0.5rem;
+  margin: 0 0 0.6rem;
   color: var(--ink-muted);
-  font-size: var(--text-xs);
-  font-weight: 600;
-  letter-spacing: 0.04em;
+  font-family: var(--font-data);
+  font-size: 11px;
+  font-weight: 400;
+  letter-spacing: 0.18em;
   text-transform: uppercase;
 }
 
@@ -472,16 +481,23 @@ a.page-btn:focus-visible {
   border: 1px solid var(--line);
 }
 
+/* Ano, quilometragem e cor sao dado rotulado: o rotulo em mono caixa alta
+   (mesma regra do .eyebrow) e o valor em tabular, para os numeros alinharem
+   entre as tres colunas. */
 .specs dt {
   color: var(--ink-muted);
-  font-size: 0.75rem;
-  font-weight: 500;
+  font-family: var(--font-data);
+  font-size: 10.5px;
+  font-weight: 400;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
 }
 
 .specs dd {
-  margin: 0.15rem 0 0;
+  margin: 0.3rem 0 0;
   font-weight: 600;
   font-size: 0.95rem;
+  font-variant-numeric: tabular-nums;
 }
 
 .whatsapp {
@@ -525,11 +541,22 @@ a.page-btn:focus-visible {
   font-size: 0.8rem;
 }
 
+/* A assinatura entra inline e pinta com currentColor: a cor sai daqui, nao do
+   SVG. Contorno gerado por shared/brand/build_marca.py. */
 .footer .powered {
-  display: block;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
   margin-top: 0.35rem;
   font-size: 0.75rem;
-  color: #9a9a9a;
+  color: var(--ink-muted);
+}
+
+.footer .powered svg {
+  height: 0.85rem;
+  width: auto;
+  display: block;
 }
 
 @media (max-width: 900px) {

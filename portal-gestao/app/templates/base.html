@@ -5,11 +5,15 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#f9f9f9">
   <title>{% block title %}Revy — Painel{% endblock %}</title>
+  {# O favicon e quadrado de tinta com o R branco: sobre a aba clara ou escura
+     do navegador, so o quadrado garante que a marca apareca. #}
+  <link rel="icon" href="/static/marca/favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="/static/marca/icone-app.svg">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/static/css/revy-tokens.css?v=v11">
-  <link rel="stylesheet" href="/static/css/app.css?v=v14">
+  <link rel="stylesheet" href="/static/css/revy-tokens.css?v=v12">
+  <link rel="stylesheet" href="/static/css/app.css?v=v15">
   <script>
     (() => {
       const saved = localStorage.getItem('revy-theme');
@@ -30,14 +34,10 @@
     <aside class="sidebar" id="sidebar" aria-label="Navegação da aplicação">
       <div class="sidebar-brand-row">
         <a class="brand" href="/app" aria-label="{% if loja_shell %}{{ loja_brand }}{% else %}Revy{% endif %} — página inicial">
-          <span class="brand-mark" aria-hidden="true">
-            <svg viewBox="0 0 40 40" role="img" aria-label="Revy">
-              <rect width="40" height="40" rx="9" fill="#1b1b1b"/>
-              <rect class="brand-mark-edge" x="1" y="1" width="38" height="38" rx="8" fill="none" stroke="transparent" stroke-width="2"/>
-              <path d="M15.5 30V13h6.8a4.3 4.3 0 0 1 0 8.6h-6.8" fill="none" stroke="#ffffff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
-              <path d="M21 21.6 27 30" fill="none" stroke="#ffffff" stroke-width="3" stroke-linecap="round"/>
-            </svg>
-          </span>
+          {# Inline, e nao imagem referenciada: so inline o currentColor do SVG
+             pega a cor do tema e a marca vira branca sozinha no escuro. Gerado
+             por shared/brand/build_marca.py, distribuido por sync_marca.py. #}
+          <span class="brand-mark" aria-hidden="true">{% include "marca/revy-icon.svg" %}</span>
           <span>
             <strong>{% if loja_shell %}{{ loja_brand }}{% else %}Revy{% endif %}</strong>
             <small>{% if store_context %}{{ store_context.loja_slug }}{% else %}{{ usuario.loja_slug }}{% endif %}</small>
@@ -144,6 +144,8 @@
           <button class="link-button" type="submit">Sair</button>
         </form>
       </div>
+      {# O topo da barra e da loja; a plataforma assina aqui embaixo. #}
+      <div class="sidebar-assinatura">{% include "marca/revy-signature.svg" %}</div>
     </aside>
     <button class="drawer-backdrop" type="button" aria-label="Fechar menu" tabindex="-1"></button>
 

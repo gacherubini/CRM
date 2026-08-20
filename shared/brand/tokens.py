@@ -18,6 +18,26 @@ DESTINOS = [
 
 RAIZ = Path(__file__).resolve().parents[2]
 
+# A marca em contorno, gerada por build_marca.py. Os SVG que herdam a cor vao
+# para templates/ porque entram inline no HTML ({% include %}) — so inline o
+# currentColor funciona; num <img> ele resolve para preto e a marca some no
+# tema escuro. Favicon e icone de app vao para static/, que e servido por URL.
+MARCA_ORIGEM = Path(__file__).resolve().parent / "assets"
+
+DESTINOS_MARCA = {
+    "portal-gestao/app/templates/marca": ["revy-icon.svg", "revy-signature.svg"],
+    "revy-trafego/app/templates/marca": ["revy-icon.svg", "revy-signature.svg"],
+    "catalogo-publico/app/templates/marca": ["revy-icon.svg", "revy-signature.svg"],
+    "portal-gestao/app/static/marca": ["favicon.svg", "icone-app.svg"],
+    "revy-trafego/app/static/marca": ["favicon.svg", "icone-app.svg"],
+    "catalogo-publico/app/static/marca": ["favicon.svg", "icone-app.svg"],
+    # O site e HTML gerado por ferramenta de design, sem a nossa folha de
+    # estilo: la a marca entra por <img>, entao recebe a versao de tinta.
+    # Tudo o que esta em site/ vai ao ar (wrangler pages nao respeita ignore),
+    # entao a lista e exatamente o que o HTML referencia — nem um arquivo a mais.
+    "site/assets": ["favicon.svg", "icone-app.svg", "revy-signature-tinta.svg"],
+}
+
 _BLOCO = re.compile(r"(?P<sel>[^{}]+)\{(?P<corpo>[^}]*)\}", re.S)
 _DECL = re.compile(r"(--[\w-]+)\s*:\s*([^;]+);")
 

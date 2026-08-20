@@ -6,9 +6,13 @@
   <meta name="description" content="{% if loja %}Veículos de {{ loja.nome }}{% else %}Catálogo de veículos{% endif %}">
   <meta name="theme-color" content="#f9f9f9">
   <title>{% block title %}Catálogo de veículos{% endblock %}</title>
+  {# Quadrado de tinta com o R branco: sobre a aba clara ou escura do
+     navegador, so o quadrado garante que a marca apareca. #}
+  <link rel="icon" href="{{ url_prefix }}/static/marca/favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="{{ url_prefix }}/static/marca/icone-app.svg">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&family=Newsreader:opsz,wght@6..72,600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="{{ url_prefix }}/static/css/revy-tokens.css">
   <link rel="stylesheet" href="{{ url_prefix }}/static/css/catalog.css">
   {% if meta_pixel_enabled and meta_pixel_id %}
@@ -42,9 +46,11 @@
     </a>
   </header>
   <main class="container">{% block content %}{% endblock %}</main>
+  {# A vitrine e da loja: o topo continua com a inicial e o nome dela. A Revy
+     assina aqui embaixo, onde uma plataforma assina. #}
   <footer class="footer">
     Estoque atualizado pela loja.
-    <span class="powered">Powered by Revy</span>
+    <span class="powered">Feito com {% include "marca/revy-signature.svg" %}</span>
   </footer>
   {% block scripts %}{% endblock %}
 </body>
