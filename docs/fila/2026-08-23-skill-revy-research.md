@@ -1398,7 +1398,8 @@ Sem esta tarefa nada do que foi construído é lido por ninguém.
 **Files:**
 - Create: `.claude/skills/revy-research/SKILL.md`
 - Create: `.claude/skills/revy-research/propostas.md`
-- Modify: `AGENTS.md` (§1, lista "Antes de qualquer ferramenta")
+- Modify: `AGENTS.md` §1 ("Antes de qualquer ferramenta") — **abre** o loop
+- Modify: `AGENTS.md` §6 ("Antes de dizer que acabou") — **fecha** o loop
 
 **Interfaces:**
 - Consumes: tudo que as tarefas anteriores produziram
@@ -1422,7 +1423,12 @@ O repo tem 722 arquivos `.py` de projeto convivendo com 10.286 quando se conta
 os cinco `.venv`. Buscar as cegas devolve o codigo-fonte do FastAPI em 93% dos
 casos. Este e o mapa que evita isso.
 
-## Tronco — sempre, antes de qualquer coisa
+Esta skill e **porta, nao caminho**. Ela da o contexto que so ela tem e entrega
+para a skill certa. Nao improvise protocolo de implementar, propor ou depurar:
+`brainstorming`, `test-driven-development` e `systematic-debugging` ja fazem
+isso e evoluem sozinhos.
+
+## 1. Tronco — sempre, antes de qualquer coisa
 
 1. **Identifique o produto.** Um dos seis. Se a tarefa cruza dois, PARE e diga
    ao dono antes de editar — integracao entre produtos e so por HTTP versionado.
@@ -1433,30 +1439,35 @@ casos. Este e o mapa que evita isso.
 3. **Abra `mapa/<produto>.md`.** Nunca `main.py` inteiro (o do portal tem 2.609
    linhas). O mapa da `arquivo:linha` de rota, modelo, worker, migration, flag,
    template, e o comando de teste nos dois SOs.
-4. **Leia `learnings/INDEX.md`** e abra so os learnings cujo `gatilho` bate com
-   a tarefa. Normalmente zero, um ou dois. Nunca todos.
+4. **Leia `learnings/INDEX.md` e `decisoes/INDEX.md`.** Abra so os que batem com
+   a tarefa — normalmente zero, um ou dois. Nunca todos. As decisoes sao lidas
+   **aqui**, antes do roteamento: se ficassem para depois, a skill destino
+   comecaria cega e re-poria o que o dono ja recusou.
 
-## Depois do tronco, o modo
+## 2. Briefing — o que atravessa junto
 
-**ORIENTAR** — implementar, corrigir, mexer em codigo.
-Siga para o codigo pelo `arquivo:linha` do mapa. Va para o Fechamento.
+Monte o pacote no formato de `docs/referencia-viva/agents/task-brief.md`:
+produto, arquivos com linha, invariantes desta tarefa, learnings que batem,
+decisoes que restringem, comando de teste nos dois SOs. Roteamento sem briefing
+e so um "va para la".
 
-**PROPOR** — sugerir, planejar, desenhar, opinar sobre rumo.
-Leia `decisoes/INDEX.md` **antes de abrir a boca**. O que esta la foi escolhido
-pelo dono e nao se re-propoe. So entao proponha.
+## 3. Roteamento — entregue para quem ja faz
 
-**DEBUGAR** — bug, teste vermelho, comportamento estranho.
-Nao improvise protocolo de depuracao: com o `arquivo:linha` e o learning em
-maos, siga para a skill `superpowers:systematic-debugging` e trabalhe por la.
+| O que o dono quer | Va para |
+|---|---|
+| construir algo novo, desenhar, decidir rumo | `superpowers:brainstorming` |
+| bug, teste vermelho, comportamento estranho | `superpowers:systematic-debugging` |
+| implementar feature ou correcao | `superpowers:test-driven-development` |
+| ja tem spec, quer plano | `superpowers:writing-plans` |
+| ja tem plano, quer executar | `superpowers:subagent-driven-development` |
+| mudar UI da Loja/Control | `frontend-design` + as 13 recusas em `decisoes/` |
+| achar que acabou | `superpowers:verification-before-completion` |
 
-## Fechamento — em qualquer modo
+Skill destino nao instalada nesta maquina? Siga o tronco e **avise**. Nunca
+improvise o protocolo que faltou.
 
-5. **Rode o teste do produto.** O comando dos dois SOs esta no mapa.
-6. **Mexeu em rota, modelo, worker, migration ou flag?** Rode o gerador e
-   **commite o mapa junto com o codigo**, no mesmo commit. O mapa nao pode
-   envelhecer numa mudanca sua.
-7. **Escreva um learning SE algo te surpreendeu.** Tarefa que correu direto nao
-   gera learning. Antes de criar arquivo novo, leia a Poda abaixo.
+O fechamento (regerar o mapa, escrever learning) **nao mora aqui** — mora no
+`AGENTS.md` §6, porque a esta altura outra skill esta no comando.
 
 ## Poda — a regra que impede a base de apodrecer
 
@@ -1500,9 +1511,10 @@ Conferir sem regerar (sai 1 se o mapa mentir):
   do `README.md` do produto, que ja existe. O mapa aponta; nao copia.
 - **Learning precisa de `gatilho`.** Sem ele ninguem acha, e learning que
   ninguem acha e learning morto.
-- **Uma skill, tres modos — nao quatro skills.** Separar em `implementar`,
-  `feature`, `debug` e `research` foi avaliado e recusado em 23/08: as
-  descricoes competem pelo mesmo gatilho e o risco vira nenhuma disparar.
+- **Uma skill que roteia — nao quatro skills, nem protocolo proprio.** Separar em
+  `implementar`/`feature`/`debug`/`research` foi recusado em 23/08 (descricoes
+  competem pelo mesmo gatilho). Escrever protocolo proprio de implementar e
+  propor tambem foi recusado no mesmo dia: o superpowers ja faz e evolui sozinho.
 ```
 
 - [ ] **Step 1b: Criar o `propostas.md` vazio**
@@ -1540,13 +1552,25 @@ Em `AGENTS.md` §1 ("Antes de qualquer ferramenta"), inserir **antes** do atual 
 
 Não renumerar os itens seguintes — o texto do repo referencia "§1 passo 3" em outros lugares. O item novo é o zero.
 
+- [ ] **Step 3b: Fechar o loop no `AGENTS.md` §6**
+
+Este passo é o que impede o loop de morrer. A skill só faz o primeiro passo; quando a tarefa acaba, quem está no comando é o `test-driven-development` ou o `systematic-debugging`, e a `revy-research` já saiu de cena. O fechamento tem que morar onde todo mundo passa.
+
+Em `AGENTS.md` §6 ("Antes de dizer que acabou"), que hoje já lista testes do produto, `alembic upgrade head`, `validate_workflow.py` e `git diff --check`, acrescentar ao fim:
+
+```markdown
+Mexeu em rota, modelo, worker, migration ou flag? Rode
+`.claude/skills/revy-research/gerar_mapa.py` e commite o mapa junto com o código.
+Algo te surpreendeu? Escreva um learning — procurando duplicata pelo gatilho antes.
+```
+
 - [ ] **Step 4: Confirmar que nada mais no `AGENTS.md` mudou**
 
 ```bash
 git diff AGENTS.md
 ```
 
-Esperado: exatamente 2 linhas acrescentadas, nenhuma removida.
+Esperado: **5 linhas acrescentadas** (2 no §1, 3 no §6), nenhuma removida. Se aparecer linha removida, alguma numeração foi mexida — desfaça.
 
 - [ ] **Step 5: Commit**
 
@@ -1561,8 +1585,8 @@ Antes de commitar, confira o teto:
 wc -l .claude/skills/revy-research/SKILL.md
 ```
 
-Esperado: até ~90 linhas. Passou muito disso, tem conteúdo no lugar de
-protocolo — mova para um arquivo vizinho.
+Esperado: até ~55 linhas. Passou muito disso, tem conteúdo no lugar de porta —
+ou protocolo que alguma skill do superpowers já faz. Mova ou corte.
 
 ---
 
@@ -1653,6 +1677,7 @@ Leia **so** os de gatilho compatavel com a sua tarefa. Normalmente 0, 1 ou 2.
 
 - cortar o diário de trabalho (o `git log` já cobre);
 - não separar a skill em quatro (`implementar` / `feature` / `debug` / `research`) — descrições competem pelo mesmo gatilho;
+- a skill **não escreve protocolo próprio** de implementar, propor ou depurar — roteia para o superpowers, que já faz e evolui sozinho;
 - o `SKILL.md` não se auto-edita; a válvula é `propostas.md`.
 
 ```bash
@@ -1725,6 +1750,14 @@ grep -in "worker\|followup" mapa/chatbot-api.md
 ```
 
 Esperado: as duas respostas saem do mapa com `arquivo:linha`. Se alguma não sair, **falta uma seção no gerador** — volte à tarefa correspondente antes de fechar. Registre o resultado do ensaio no relatório.
+
+Segunda metade do ensaio: **o roteamento aponta para skills que existem?** Uma tabela que manda ir para uma skill não instalada é pior que tabela nenhuma.
+
+```bash
+ls ~/.claude/plugins/cache/*/superpowers/*/skills/ 2>/dev/null | head -20
+```
+
+Confira que `brainstorming`, `systematic-debugging`, `test-driven-development`, `writing-plans`, `subagent-driven-development` e `verification-before-completion` aparecem. Alguma faltando: tire a linha da tabela do `SKILL.md` em vez de deixar apontando para o vazio, e anote no relatório.
 
 - [ ] **Step 2b: Cronometrar o gerador — o loop depende disso**
 

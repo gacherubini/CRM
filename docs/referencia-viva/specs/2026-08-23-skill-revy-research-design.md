@@ -175,13 +175,14 @@ não é garantido. Duas camadas:
    em qualquer produto do monorepo.
 2. Passo 0 no `AGENTS.md` §1 ("Antes de qualquer ferramenta"): **invoque
    `revy-research` antes de procurar código.** Como o `AGENTS.md` já é lido e
-   obedecido em todo boot, isso torna o disparo determinístico sem hook.
+   obedecido em todo boot, isso torna o disparo determinístico sem hook. O §6
+   ganha o fechamento (ver "Onde o loop fecha").
 
 Terceira camada disponível e **não adotada**: hook `UserPromptSubmit` injetando
 a instrução em todo turno. Custa tokens em toda mensagem; só se as duas
 primeiras falharem na prática.
 
-## Protocolo do `SKILL.md` — um gatilho, três modos
+## Protocolo do `SKILL.md` — um gatilho, uma porta
 
 **Uma skill só, não quatro.** Skill dispara por competição de `description`;
 quatro skills cujas descrições dizem quase a mesma coisa ("use ao mexer em
@@ -192,40 +193,55 @@ duplicar o protocolo do mapa, ou criar uma quinta skill "núcleo" que é a skill
 única com indireção na frente. O `AGENTS.md` já legisla contra o espalhamento
 ("não espalhe um eixo em vários filhos").
 
-O tronco, sempre:
+**E a skill não inventa protocolo que já existe.** ORIENTAR e PROPOR foram
+desenhados do zero num primeiro rascunho e recusados em 23/08: `brainstorming`,
+`systematic-debugging` e `test-driven-development` já fazem essas três coisas, e
+melhor. A skill é **porta, não caminho** — mesmo princípio que o design já
+aplicava ao julgamento ("o mapa aponta, não copia"), agora aplicado ao processo.
+
+```
+revy-research = TRONCO (contexto) → BRIEFING (empacota) → ROTEAMENTO (entrega)
+```
+
+### Tronco — o que só ela sabe fazer, porque só ela conhece o repo
 
 ```
 1. Identifique o produto (1 dos 6). Tarefa que cruza dois: PARE e diga.
 2. Cheque o frescor do mapa daquele produto.
-3. Abra mapa/<produto>.md.
-4. Leia learnings/INDEX.md; abra só os de gatilho compatível (0, 1 ou 2).
+3. Abra mapa/<produto>.md  →  arquivo:linha.
+4. Leia learnings/INDEX.md e decisoes/INDEX.md; abra só os que batem.
 ```
 
-Daí em diante, o modo:
+`decisoes/` é lido **no tronco**, não num modo. Se a leitura ficasse para depois
+do roteamento, a skill destino começaria cega e re-proporia o que o dono já
+recusou — que é exatamente o desperdício que a pasta existe para evitar.
 
-| Modo | Quando | O que muda |
-|---|---|---|
-| **ORIENTAR** | implementar, corrigir, mexer | abre código; ao fechar roda o teste do produto |
-| **PROPOR** | sugerir, planejar, desenhar | lê `decisoes/INDEX.md` **antes** de abrir a boca |
-| **DEBUGAR** | bug, teste vermelho, comportamento estranho | entrega o bastão para `superpowers:systematic-debugging` |
+### Briefing — o que atravessa o roteamento
 
-O modo DEBUGAR não reimplementa protocolo de depuração — esse já existe e é
-melhor do que qualquer coisa que se escrevesse aqui. A skill entrega o
-`arquivo:linha` e o learning que bate, e manda seguir.
+Roteamento sem contexto é só um "vá para lá". O que a skill entrega é um pacote,
+no formato do
+[`task-brief.md`](../agents/task-brief.md) que o `AGENTS.md` §4 já exige para
+subagente: produto, arquivos com linha, invariantes da tarefa, learnings que
+batem, decisões que restringem, comando de teste nos dois SOs.
 
-Fechamento, em qualquer modo:
+### Roteamento — para skills que já existem
 
-```
-5. Rode o teste do produto (o comando está no mapa).
-6. Mexeu em rota, modelo, worker, migration ou flag? Rode o gerador e
-   commite o mapa JUNTO com o código.
-7. Escreva um learning SE algo te surpreendeu — e antes disso procure
-   duplicata no índice.
-```
+| Intenção | Destino |
+|---|---|
+| construir algo novo, desenhar, decidir rumo | `superpowers:brainstorming` |
+| bug, teste vermelho, comportamento estranho | `superpowers:systematic-debugging` |
+| implementar feature ou correção | `superpowers:test-driven-development` |
+| já tem spec, quer plano | `superpowers:writing-plans` |
+| já tem plano, quer executar | `superpowers:subagent-driven-development` |
+| mudar UI da Loja/Control | `frontend-design` + as 13 recusas em `decisoes/` |
+| achar que acabou | `superpowers:verification-before-completion` |
 
-Custo por disparo: `SKILL.md` (~90) + `mapa/<produto>.md` (~150) + `INDEX.md`
-(~40) ≈ **280 linhas** para saber onde tudo está, contra 2.609 de um `main.py`
-que ainda não responde a pergunta.
+Se a skill destino não estiver instalada na máquina, a regra é seguir o tronco e
+avisar — nunca improvisar o protocolo que faltou.
+
+Custo por disparo: `SKILL.md` (~55) + `mapa/<produto>.md` (~150) + os dois
+`INDEX.md` (~55) ≈ **260 linhas** para saber onde tudo está e para onde ir,
+contra 2.609 de um `main.py` que ainda não responde a pergunta.
 
 ## O loop de auto-melhoria
 
@@ -242,6 +258,27 @@ uniforme é como o conhecimento apodrece.
 rota, modelo, worker, migration ou flag, o gerador roda e o mapa entra no mesmo
 commit. O mapa não fica velho porque envelhecer virou impossível — a mudança e o
 registro da mudança viajam juntos.
+
+### Onde o loop fecha, já que a skill saiu de cena
+
+Como a skill só faz o primeiro passo, **ela não está mais no comando quando a
+tarefa acaba** — o controle passou para `test-driven-development` ou
+`systematic-debugging`. Instrução de fechamento embutida no briefing seria
+frágil: depende de alguém lembrar dez passos depois.
+
+O fechamento entra no **`AGENTS.md` §6 "Antes de dizer que acabou"**, checklist
+que é lida em todo boot e já exige testes do produto, `alembic upgrade head`,
+`validate_workflow.py` e `git diff --check`. Duas linhas a mais:
+
+```markdown
+Mexeu em rota, modelo, worker, migration ou flag? Rode
+`.claude/skills/revy-research/gerar_mapa.py` e commite o mapa junto com o código.
+Algo te surpreendeu? Escreva um learning — procurando duplicata pelo gatilho antes.
+```
+
+Assim o loop fecha independente de qual skill esteja no comando. O `AGENTS.md`
+ganha **duas** edições no total: o passo 0 no §1 (abre) e estas duas linhas no
+§6 (fecha).
 
 **O `SKILL.md` não se auto-edita.** Um protocolo que se reescreve a cada tarefa
 deriva: em trinta tarefas vira 400 linhas que ninguém escreveu nem revisou, com
@@ -311,8 +348,10 @@ subagentes.
   de uma skill. Não re-propor.
 - **Auto-edição do `SKILL.md`.** O protocolo não se reescreve sozinho; a válvula
   é `propostas.md`. Ver "O loop de auto-melhoria".
-- **Reimplementar protocolo de depuração.** O modo DEBUGAR entrega o bastão para
-  `superpowers:systematic-debugging`.
+- **Protocolo próprio de implementar, propor ou depurar.** Um primeiro rascunho
+  desenhou modos ORIENTAR e PROPOR do zero; recusado em 23/08. `brainstorming`,
+  `test-driven-development` e `systematic-debugging` já fazem isso e evoluem
+  sozinhos — cópia local só envelheceria. A skill roteia. Não re-propor.
 - Hook de `UserPromptSubmit` (ver Disparo).
 - Reaproveitar `graphify-out/graph.json`: snapshots de 30/07 e 03/08,
   três semanas atrás, com o Modo 2 inteiro construído no meio. Grafo responde
@@ -327,8 +366,8 @@ subagentes.
 | Peça | Tamanho |
 |---|---|
 | `.gitignore` | 3 linhas |
-| `AGENTS.md` §1 | 1 linha |
-| `SKILL.md` | ~90 linhas (tronco + 3 modos + poda) |
+| `AGENTS.md` | 2 edições: passo 0 no §1 (abre), 2 linhas no §6 (fecha) |
+| `SKILL.md` | ~55 linhas (tronco + briefing + roteamento) |
 | `propostas.md` | começa com só o cabeçalho |
 | `gerar_mapa.py` | ~350 linhas |
 | `test_gerar_mapa.py` | ~60 linhas |
