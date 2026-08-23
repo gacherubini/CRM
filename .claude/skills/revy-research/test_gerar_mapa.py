@@ -1,4 +1,5 @@
 import contextlib
+import copy
 import io
 import json
 import tempfile
@@ -682,6 +683,210 @@ class TestGeracaoDoMapa(unittest.TestCase):
         texto = gerar_mapa.render("portal-gestao", coleta("portal-gestao"), "x", "y")
         for proibido in ("Bearer ", "sk-", "-----BEGIN"):
             self.assertNotIn(proibido, texto)
+
+class TestMapaVersionadoConfere(unittest.TestCase):
+    """O mapa COMO ESTA NO DISCO (o que vai pro git) tem que conferir.
+
+    E o unico teste que le a PASTA_MAPA de verdade, sem regenerar antes. Se
+    regenerasse, passaria sempre e nao provaria nada: o valor esta em pegar o
+    mapa que alguem commitou envelhecendo em relacao ao codigo.
+    """
+
+    def test_o_mapa_que_esta_no_git_confere_com_o_codigo(self):
+        problemas = gerar_mapa.verificar(varredura.raiz_repo())
+        self.assertEqual(problemas, [], "\n".join(problemas[:20]))
+
+    def test_o_mapa_do_disco_tem_as_seis_secoes_e_muita_entrada(self):
+        selo = json.loads(
+            (gerar_mapa.PASTA_MAPA / "_frescor.json").read_text(encoding="utf-8")
+        )
+        entradas = [e for lista in selo["inventario"].values() for e in lista]
+        self.assertGreater(len(entradas), 500)
+        self.assertEqual(
+            {e["secao"] for e in entradas},
+            {"rota", "modelo", "migration", "worker", "flag", "template"},
+        )
+
+
+class TestVerificacao(unittest.TestCase):
+    """Contrato: linha > 0 -> a linha contem o simbolo; linha == 0 -> o arquivo existe.
+
+    Cada teste trabalha sobre uma COPIA do selo num tempdir, com a PASTA_MAPA
+    trocada. Nada aqui reescreve o mapa versionado.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        cls.raiz = varredura.raiz_repo()
+        cls._tmp_classe = tempfile.TemporaryDirectory()
+        destino = Path(cls._tmp_classe.name) / "mapa"
+        with mock.patch.object(gerar_mapa, "PASTA_MAPA", destino):
+            with contextlib.redirect_stdout(io.StringIO()):
+                gerar_mapa.escrever_tudo(cls.raiz)
+        cls.selo_fresco = json.loads(
+            (destino / "_frescor.json").read_text(encoding="utf-8")
+        )
+
+    @classmethod
+    def tearDownClass(cls):
+        cls._tmp_classe.cleanup()
+
+    def setUp(self):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        self.destino = Path(tmp.name) / "mapa"
+        self.destino.mkdir(parents=True)
+        patch = mock.patch.object(gerar_mapa, "PASTA_MAPA", self.destino)
+        patch.start()
+        self.addCleanup(patch.stop)
+        self.selo_json = self.destino / "_frescor.json"
+
+    def selo(self) -> dict:
+        return copy.deepcopy(self.selo_fresco)
+
+    def gravar(self, selo: dict) -> None:
+        self.selo_json.write_text(
+            json.dumps(selo, ensure_ascii=False), encoding="utf-8"
+        )
+
+    def test_mapa_recem_gerado_nao_tem_divergencia(self):
+        self.gravar(self.selo())
+        self.assertEqual(gerar_mapa.verificar(self.raiz), [])
+
+    def test_entrada_mentirosa_e_pega(self):
+        selo = self.selo()
+        selo["inventario"]["chatbot-api"].append({
+            "secao": "rota", "chave": "GET /inventado",
+            "simbolo": "/rota-que-nao-existe-em-lugar-nenhum",
+            "arquivo": "app/main.py", "linha": 1,
+        })
+        self.gravar(selo)
+        problemas = gerar_mapa.verificar(self.raiz)
+        self.assertTrue(problemas)
+        self.assertIn("/rota-que-nao-existe-em-lugar-nenhum", " ".join(problemas))
+        self.assertIn("app/main.py:1", " ".join(problemas))
+
+    def test_arquivo_que_sumiu_e_pego(self):
+        selo = self.selo()
+        selo["inventario"]["portal-gestao"].append({
+            "secao": "modelo", "chave": "Fantasma",
+            "simbolo": "class Fantasma", "arquivo": "app/models_fantasma.py",
+            "linha": 3,
+        })
+        self.gravar(selo)
+        problemas = gerar_mapa.verificar(self.raiz)
+        self.assertTrue(any("models_fantasma.py" in p for p in problemas))
+
+    def test_linha_zero_so_exige_que_o_arquivo_exista(self):
+        # template solto: nenhuma rota o renderiza, entao nao ha linha a apontar.
+        selo = self.selo()
+        selo["inventario"]["portal-gestao"].append({
+            "secao": "template", "chave": "base.html",
+            "simbolo": "isto nao esta escrito em lugar nenhum do arquivo",
+            "arquivo": "app/templates/base.html", "linha": 0,
+        })
+        self.gravar(selo)
+        self.assertEqual(gerar_mapa.verificar(self.raiz), [])
+
+    def test_linha_zero_ainda_cobra_o_arquivo(self):
+        selo = self.selo()
+        selo["inventario"]["portal-gestao"].append({
+            "secao": "template", "chave": "nao_existe.html",
+            "simbolo": "nao_existe.html",
+            "arquivo": "app/templates/nao_existe.html", "linha": 0,
+        })
+        self.gravar(selo)
+        self.assertTrue(
+            any("nao_existe.html" in p for p in gerar_mapa.verificar(self.raiz))
+        )
+
+    def test_linha_alem_do_fim_do_arquivo_e_pega(self):
+        selo = self.selo()
+        selo["inventario"]["chatbot-api"].append({
+            "secao": "rota", "chave": "GET /fim", "simbolo": "/fim",
+            "arquivo": "app/main.py", "linha": 999999,
+        })
+        self.gravar(selo)
+        problemas = gerar_mapa.verificar(self.raiz)
+        self.assertTrue(any("999999" in p for p in problemas))
+
+    def test_verifica_todos_os_produtos_do_inventario(self):
+        # uma mentira por produto: se o loop parasse no primeiro, viria 1 e nao 6.
+        selo = self.selo()
+        for produto in varredura.PRODUTOS:
+            selo["inventario"][produto].append({
+                "secao": "rota", "chave": f"GET /{produto}",
+                "simbolo": f"/mentira-do-{produto}",
+                "arquivo": "nem-este-arquivo-existe.py", "linha": 1,
+            })
+        self.gravar(selo)
+        problemas = gerar_mapa.verificar(self.raiz)
+        self.assertEqual(len(problemas), len(varredura.PRODUTOS))
+        for produto in varredura.PRODUTOS:
+            self.assertTrue(any(p.startswith(produto) for p in problemas), produto)
+
+    def test_migration_do_selo_abre_a_partir_da_pasta_do_produto(self):
+        # a Task 6 ja gravou "alembic/versions/<arquivo>" no selo. Se o
+        # --verificar recompusesse a pasta de novo, toda migration divergiria.
+        selo = self.selo()
+        migs = [
+            e for e in selo["inventario"]["chatbot-api"] if e["secao"] == "migration"
+        ]
+        self.assertTrue(migs)
+        for mig in migs:
+            self.assertTrue(mig["arquivo"].startswith("alembic/versions/"), mig)
+            self.assertEqual(mig["arquivo"].count("alembic/versions/"), 1, mig)
+        self.gravar(selo)
+        self.assertEqual(gerar_mapa.verificar(self.raiz), [])
+
+    def test_selo_ausente_avisa_em_vez_de_estourar(self):
+        problemas = gerar_mapa.verificar(self.raiz)  # setUp nao gravou nada
+        self.assertEqual(len(problemas), 1)
+        self.assertIn("_frescor.json", problemas[0])
+
+    def test_verificar_nao_regenera_o_mapa(self):
+        # se regenerasse antes de conferir, passaria sempre e nao provaria nada.
+        selo = self.selo()
+        selo["inventario"]["chatbot-api"].append({
+            "secao": "rota", "chave": "GET /inventado", "simbolo": "/mentira-teimosa",
+            "arquivo": "app/main.py", "linha": 1,
+        })
+        self.gravar(selo)
+        antes = self.selo_json.read_text(encoding="utf-8")
+        self.assertTrue(gerar_mapa.verificar(self.raiz))
+        self.assertEqual(self.selo_json.read_text(encoding="utf-8"), antes)
+        self.assertEqual(list(self.destino.glob("*.md")), [])
+
+    def test_cli_verificar_sai_zero_quando_confere(self):
+        self.gravar(self.selo())
+        saida = io.StringIO()
+        with contextlib.redirect_stdout(saida):
+            codigo = gerar_mapa.main(["--verificar"])
+        self.assertEqual(codigo, 0)
+        self.assertIn("mapa confere com o codigo", saida.getvalue())
+
+    def test_cli_verificar_sai_um_quando_mente(self):
+        selo = self.selo()
+        selo["inventario"]["chatbot-api"].append({
+            "secao": "rota", "chave": "GET /inventado", "simbolo": "/mentira-do-cli",
+            "arquivo": "app/main.py", "linha": 1,
+        })
+        self.gravar(selo)
+        saida = io.StringIO()
+        with contextlib.redirect_stdout(saida):
+            codigo = gerar_mapa.main(["--verificar"])
+        self.assertEqual(codigo, 1)
+        self.assertIn("DIVERGENCIA", saida.getvalue())
+        self.assertIn("/mentira-do-cli", saida.getvalue())
+
+    def test_cli_sem_flag_continua_gerando(self):
+        saida = io.StringIO()
+        with contextlib.redirect_stdout(saida):
+            codigo = gerar_mapa.main([])
+        self.assertEqual(codigo, 0)
+        self.assertTrue(self.selo_json.exists())
+        self.assertTrue((self.destino / "chatbot-api.md").exists())
+
 
 if __name__ == "__main__":
     unittest.main()

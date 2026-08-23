@@ -186,8 +186,65 @@ def escrever_tudo(raiz: Path) -> None:
     print(f"selo de frescor: {sha}")
 
 
+def verificar(raiz: Path) -> list[str]:
+    """Reabre cada `arquivo:linha` do selo e prova que a promessa se cumpre.
+
+    Contrato da `Entrada`, literal: `linha > 0` -> o texto daquela linha
+    precisa CONTER o `simbolo`; `linha == 0` -> basta o arquivo existir.
+
+    De proposito NAO regenera nada antes de conferir. Se regenerasse, o mapa
+    concordaria consigo mesmo e o comando passaria sempre - a graca e pegar o
+    mapa commitado envelhecendo em relacao ao codigo.
+
+    O `arquivo` da `Entrada` ja e relativo a pasta do produto, migration
+    inclusive (`_com_pasta_de_migration` recompoe `alembic/versions/` na
+    geracao). Recompor de novo aqui mandaria toda migration para
+    `alembic/versions/alembic/versions/...` e inventaria centenas de
+    divergencias que nao existem.
+    """
+    caminho = PASTA_MAPA / "_frescor.json"
+    if not caminho.exists():
+        return ["mapa/_frescor.json nao existe - rode o gerador"]
+    dados = json.loads(caminho.read_text(encoding="utf-8"))
+    problemas: list[str] = []
+    for produto, entradas in dados.get("inventario", {}).items():
+        base = raiz / produto
+        for bruta in entradas:
+            alvo = base / bruta["arquivo"]
+            if not alvo.exists():
+                problemas.append(f"{produto}: sumiu {bruta['arquivo']}")
+                continue
+            if bruta["linha"] <= 0:
+                continue
+            linhas = alvo.read_text(encoding="utf-8", errors="replace").splitlines()
+            if bruta["linha"] > len(linhas):
+                problemas.append(
+                    f"{produto}: {bruta['arquivo']}:{bruta['linha']} "
+                    f"passou do fim do arquivo ({len(linhas)} linhas)"
+                )
+                continue
+            if bruta["simbolo"] not in linhas[bruta["linha"] - 1]:
+                problemas.append(
+                    f"{produto}: {bruta['arquivo']}:{bruta['linha']} "
+                    f"nao contem {bruta['simbolo']!r}"
+                )
+    return problemas
+
+
 def main(argv: list[str]) -> int:
     raiz = varredura.raiz_repo()
+    if "--verificar" in argv:
+        problemas = verificar(raiz)
+        for p in problemas:
+            print(f"DIVERGENCIA {p}")
+        if problemas:
+            print(
+                f"{len(problemas)} divergencias - o mapa esta velho. "
+                "Rode sem --verificar."
+            )
+            return 1
+        print("mapa confere com o codigo")
+        return 0
     escrever_tudo(raiz)
     return 0
 
