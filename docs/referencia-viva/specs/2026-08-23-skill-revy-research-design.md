@@ -1,4 +1,4 @@
-# Skill `revy-research` — mapa, learnings e diário do monorepo
+# Skill `revy-research` — mapa, learnings e decisões do monorepo
 
 Data: 2026-08-23 · Status: desenhado, não implementado
 
@@ -27,7 +27,11 @@ para subagentes, perdidas em qualquer troca de máquina.
 ## O que se constrói
 
 Uma skill de projeto em `.claude/skills/revy-research/`, auto-contida e
-versionada, com quatro dados e um gerador.
+versionada, com três dados e um gerador.
+
+Versionar é **requisito**, não conveniência: o dono trabalha em Mac e Windows, e
+o que não está no git não existe na outra máquina. É daí que vem a mudança no
+`.gitignore` logo abaixo.
 
 ```
 .claude/skills/revy-research/
@@ -41,7 +45,6 @@ versionada, com quatro dados e um gerador.
     estoque-api.md  revy-trafego.md   catalogo-publico.md
   learnings/  INDEX.md + um arquivo por armadilha
   decisoes/   INDEX.md + um arquivo por escolha do dono
-  diario/     2026-08.md, append por tarefa
 ```
 
 ### Pré-requisito: versionar `.claude/skills/`
@@ -67,7 +70,6 @@ Nenhuma linha do mapa é opinião. Onde há julgamento, o dono continua sendo o
 | `mapa/` | o script, sempre | não; o selo de frescor denuncia |
 | `learnings/` | o agente, ao se surpreender | não |
 | `decisoes/` | o dono, ao decidir | não |
-| `diario/` | o agente, ao fechar tarefa | sim, e tudo bem |
 | `SKILL.md` | humano, raramente | é protocolo, não conteúdo |
 
 ## O gerador
@@ -131,7 +133,7 @@ A granularidade é por produto de propósito: mexer no `site/` não pode dispara
 aviso sobre o mapa do motor. Aviso que dispara à toa é aviso que se aprende a
 ignorar.
 
-## Learnings, decisões, diário
+## Learnings e decisões
 
 **Learning** = armadilha técnica reproduzível. O campo `gatilho` é o que o torna
 achável; `INDEX.md` é uma linha por learning, e só os 1–2 que batem são abertos.
@@ -162,11 +164,6 @@ Despesa fixa não entra no lucro de cada moto; o lugar disso é o ponto de
 equilíbrio. Não é falta de implementação — foi escolha.
 ```
 
-**Diário** = só o que o `git log` não registra: caminho tentado e abandonado,
-comando de teste que realmente rodou com o resultado, pergunta em aberto. Sem
-nenhum dos três, o registro é uma linha. Regra explícita no `SKILL.md`:
-*diário não repete o `git log`.*
-
 ## Disparo
 
 Uma skill dispara por julgamento do agente lendo o `description`. Isso é bom,
@@ -191,8 +188,7 @@ primeiras falharem na prática.
 4. Leia learnings/INDEX.md; abra só os de gatilho compatível (0, 1 ou 2).
 5. Vai PROPOR algo? Leia decisoes/INDEX.md antes.
 6. Só agora abra código.
-7. Ao fechar: teste do produto, uma entrada no diário, e um learning
-   SE algo surpreendeu.
+7. Ao fechar: teste do produto, e um learning SE algo surpreendeu.
 ```
 
 Custo por disparo: `SKILL.md` (~70) + `mapa/<produto>.md` (~150) + `INDEX.md`
@@ -235,6 +231,10 @@ subagentes.
 
 ## Fora de escopo
 
+- **Diário de trabalho.** Estava no desenho e foi cortado pelo dono em 23/08: o
+  `git log` já registra o que foi feito, e o delta que sobrava (caminho
+  abandonado, pergunta em aberto) não paga o custo de um registro por tarefa.
+  Não re-propor.
 - Hook de `UserPromptSubmit` (ver Disparo).
 - Reaproveitar `graphify-out/graph.json`: snapshots de 30/07 e 03/08,
   três semanas atrás, com o Modo 2 inteiro construído no meio. Grafo responde
@@ -255,4 +255,3 @@ subagentes.
 | `test_gerar_mapa.py` | ~60 linhas |
 | `mapa/` | gerado, 8 arquivos |
 | `learnings/` + `decisoes/` | ~26 arquivos migrados |
-| `diario/2026-08.md` | começa vazio |
