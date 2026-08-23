@@ -42,7 +42,8 @@ output/
 n8n/_*.py
 
 # worktrees e ledgers efêmeros de agentes
-.claude/
+.claude/*
+!.claude/skills/
 .superpowers/
 
 # one-off fly/n8n patch scripts
