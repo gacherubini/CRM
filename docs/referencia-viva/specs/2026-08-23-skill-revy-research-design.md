@@ -4,9 +4,11 @@ Data: 2026-08-23 · Status: desenhado, não implementado
 
 ## O problema
 
-O repo tem **722 arquivos `.py` de projeto** convivendo com **10.286 quando se
-conta os cinco `.venv`**. Uma busca ingênua devolve o código-fonte do FastAPI
-em 93% dos casos — aconteceu duas vezes durante o levantamento desta spec.
+O repo tem **694 arquivos `.py` nos seis produtos** — 724 contando todo o
+projeto — dentro de uma árvore de **10.288**. Os cinco `.venv` respondem por
+**9.564 deles, 93%**: é essa a fração que uma busca ingênua devolve como
+código-fonte do FastAPI, e aconteceu duas vezes durante o levantamento desta
+spec. (Medido em 23/08 pela varredura da Task 2.)
 
 Os arquivos de entrada são grandes demais para leitura integral:
 
@@ -37,8 +39,8 @@ o que não está no git não existe na outra máquina. É daí que vem a mudanç
 
 ```
 .claude/skills/revy-research/
-  SKILL.md            protocolo (65 linhas) — única coisa sempre carregada
-  varredura.py        acha os 722 e ignora os 10.286
+  SKILL.md            protocolo (67 linhas) — única coisa sempre carregada
+  varredura.py        acha os 694 dos produtos e ignora os 9.564 dos .venv
   extratores.py       AST estático, os 7 extratores; funções puras texto → Entrada
   gerar_mapa.py       CLI, render do markdown, selo de frescor, modo --verificar
   cruzamentos.py      clientes HTTP × rotas declaradas; funções sem chamador
@@ -83,7 +85,7 @@ Nenhuma linha do mapa é opinião. Onde há julgamento, o dono continua sendo o
 
 **Decisão de fundo: AST estático da stdlib, nunca importar o app.** Respeita o
 invariante "sem import `app` entre produtos", dispensa `.venv`, roda igual no
-Mac e no Windows, não pode quebrar nada. ~722 arquivos em 2–4 segundos.
+Mac e no Windows, não pode quebrar nada. ~694 arquivos em 2–4 segundos.
 
 Verificado no levantamento: `APIRouter()` e `include_router()` são chamados sem
 `prefix=` em todo o repo, então **o path do decorator é o path real**. Se um
@@ -126,7 +128,7 @@ Quatro checagens, todas rotuladas **suspeitas, não erros**:
    declara. É o bug documentado do Modo 2 ("o `chatbot-api` não expõe rota de
    oferta"), cujo efeito prático é *lead que ninguém pega some*.
 2. **Função pública sem chamador** — `def` sem underscore, zero referências nos
-   722 arquivos. É o caso `criar_sinal_direcionado`.
+   694 arquivos dos produtos. É o caso `criar_sinal_direcionado`.
 3. **n8n × chatbot** — os `n8n/workflow-*.json` declaram webhook e chamam rotas
    do chatbot. Cruzar as duas listas. É a junta de severidade máxima do repo:
    quando ela abre, o bot fica mudo e o produto para. JSON é `json.loads`; a
@@ -426,7 +428,7 @@ subagentes.
 |---|---|
 | `.gitignore` | 3 linhas |
 | `AGENTS.md` | 2 edições, 6 linhas: passo 0 no §1 (abre), 4 no §6 (fecha) |
-| `SKILL.md` | 65 linhas — tronco, briefing, roteamento, regras e poda |
+| `SKILL.md` | 67 linhas — tronco, briefing, roteamento, regras e poda |
 | `propostas.md` | começa com só o cabeçalho |
 | `varredura.py` + `extratores.py` + `gerar_mapa.py` + `cruzamentos.py` | ~600 linhas somadas |
 | `test_gerar_mapa.py` | 42 testes, `unittest` da stdlib |
@@ -435,4 +437,4 @@ subagentes.
 
 O `SKILL.md` foi estimado em ~55 linhas contando tronco + briefing + roteamento.
 Poda e Regras, que este mesmo spec manda estarem lá, não cabiam nessa conta — o
-teto real é 65.
+teto real é ~70.

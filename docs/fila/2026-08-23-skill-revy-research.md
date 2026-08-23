@@ -4,7 +4,7 @@
 
 **Goal:** Uma skill de projeto que, ao ser invocada antes de codar, entrega ao agente `arquivo:linha` de toda rota, modelo, worker, migration, flag e template dos 6 produtos, mais as armadilhas conhecidas e as decisões do dono a não re-propor.
 
-**Architecture:** Um gerador em AST estático da stdlib varre os 722 arquivos `.py` do projeto (ignorando os 5 `.venv`, que respondem por 93% do total) e escreve `mapa/<produto>.md`. Um modo `--verificar` reabre cada `arquivo:linha` escrita e prova que o símbolo prometido está lá — o mapa não pode mentir. `SKILL.md` é só protocolo; o volume mora em arquivos vizinhos carregados sob demanda.
+**Architecture:** Um gerador em AST estático da stdlib varre os 694 arquivos `.py` dos seis produtos (a árvore inteira tem 10.288, dos quais 9.564 — 93% — vivem nos cinco `.venv`) e escreve `mapa/<produto>.md`. Um modo `--verificar` reabre cada `arquivo:linha` escrita e prova que o símbolo prometido está lá — o mapa não pode mentir. `SKILL.md` é só protocolo; o volume mora em arquivos vizinhos carregados sob demanda.
 
 **Tech Stack:** Python 3 stdlib apenas (`ast`, `pathlib`, `json`, `unittest`, `subprocess` para git). Sem dependência, sem `.venv`, sem importar o `app` de nenhum produto.
 
@@ -16,7 +16,7 @@ Valem para toda tarefa deste plano.
 
 - **Stdlib apenas.** Zero `pip install`. Zero import de `app` de qualquer produto (invariante do `AGENTS.md` §5). O gerador lê arquivo como texto e parseia com `ast`; nunca executa código de produto.
 - **Roda nos dois SOs.** Windows: `python`. macOS: `python3`. O comando `python3` **não existe** no Windows do dono e `python` puro **não existe** no Mac dele — todo comando neste plano aparece nas duas formas.
-- **A árvore de trabalho tem 9 arquivos modificados que NÃO são deste plano** (`.gitignore`, `n8n/*`, `site/*`, `deploy/fly/3vm/prepare-workflow.ps1`). Todo commit lista caminhos explícitos. **Nunca `git add -A`, nunca `git add .`, nunca `git commit -a`.** (`AGENTS.md` §6: não commitar mudança alheia.)
+- **A árvore de trabalho tem 9 arquivos modificados que NÃO são deste plano** (`.gitignore`, `n8n/*`, `site/*`, `deploy/fly/3vm/prepare-workflow.ps1`). Todo commit lista caminhos explícitos. **Nunca `git add -A`, nunca `git add .`, nunca `git commit -a`.** (`AGENTS.md` §6: não commitar mudança alheia.) Se estas tarefas rodarem **em paralelo**, o `git add` explícito não basta: um `git commit` sem pathspec leva **todo o índice**, inclusive o que outro agente acabou de estagiar. Use a forma restrita nos dois lados: `git add <caminhos> && git commit -m "..." -- <os mesmos caminhos>`.
 - **Diretórios sempre excluídos da varredura:** `.venv`, `__pycache__`, `node_modules`, `.git`, `.pytest_cache`, `.pytest-tmp`, `test-tmp-*`, `graphify-out`.
 - **Os 6 produtos são exatamente:** `chatbot-api`, `portal-gestao`, `motor-simulacao`, `estoque-api`, `revy-trafego`, `catalogo-publico`. `site/`, `n8n/`, `shared/` e `deploy/` **não** entram no mapa.
 - **`revy-trafego` não tem `.venv`** e usa o do `portal-gestao`. É a exceção que precisa aparecer no mapa.
@@ -30,7 +30,7 @@ Valem para toda tarefa deste plano.
 |---|---|
 | `.gitignore` (modificar) | Passar a versionar `.claude/skills/` mantendo o resto de `.claude/` ignorado |
 | `AGENTS.md` (modificar) | Passo 0 no §1, para o disparo ser determinístico |
-| `.claude/skills/revy-research/SKILL.md` | Só o protocolo. **Teto de ~65 linhas** — é o que carrega em todo disparo |
+| `.claude/skills/revy-research/SKILL.md` | Só o protocolo. **Teto de ~70 linhas** — é o que carrega em todo disparo |
 | `.claude/skills/revy-research/varredura.py` | Achar os arquivos do projeto e ignorar dependência |
 | `.claude/skills/revy-research/extratores.py` | Os 7 extratores. Funções puras: texto → `list[Entrada]` |
 | `.claude/skills/revy-research/gerar_mapa.py` | CLI, orquestração, render do markdown, `--verificar` |
@@ -139,7 +139,7 @@ Se o `git diff .gitignore` sair vazio, você commitou a linha do dono junto: des
 
 ---
 
-### Task 2: Varredura — achar os 722 e ignorar os 10.286
+### Task 2: Varredura — achar os 694 dos produtos e ignorar os 9.564 dos `.venv`
 
 **Files:**
 - Create: `.claude/skills/revy-research/varredura.py`
@@ -285,7 +285,7 @@ git commit -m "feat(revy-research): varredura que enxerga o projeto e ignora os 
 
 ### Task 3: Extrator de rotas
 
-O maior ganho isolado do mapa: 57 rotas do chatbot moram num `main.py` de 2.038 linhas.
+O maior ganho isolado do mapa: 56 rotas do chatbot moram num `main.py` de 2.038 linhas.
 
 **Files:**
 - Create: `.claude/skills/revy-research/extratores.py`
@@ -605,7 +605,7 @@ cd .claude/skills/revy-research && python -m unittest test_gerar_mapa -v
 cd .claude/skills/revy-research && python3 -m unittest test_gerar_mapa -v
 ```
 
-Esperado: `OK`, 14 testes (4 da varredura + 5 de rota + 5 de `prefix=`). O teste contra o repo real deve achar mais de 30 rotas no chatbot (medido: 57 decorators `@app.`, dos quais alguns são handler e não rota).
+Esperado: `OK`, 14 testes (4 da varredura + 5 de rota + 5 de `prefix=`). O teste contra o repo real deve achar mais de 30 rotas no chatbot (medido: 57 decorators `@app.`, dos quais exatamente um — `@app.exception_handler` na linha 112 — nao e rota; logo 56).
 
 - [ ] **Step 5: Commit**
 
@@ -1798,11 +1798,11 @@ Sem esta tarefa nada do que foi construído é lido por ninguém.
 
 **Interfaces:**
 - Consumes: tudo que as tarefas anteriores produziram
-- Produces: o disparo, os três modos e as três camadas do loop
+- Produces: o disparo, o tronco→briefing→roteamento e as três camadas do loop
 
 O `SKILL.md` é o único arquivo que carrega em **todo** disparo. Cada linha aqui
 custa em toda tarefa futura — escreva curto e não deixe conteúdo entrar. Teto:
-~90 linhas. Conteúdo mora nos arquivos vizinhos, carregados sob demanda.
+~70 linhas. Conteúdo mora nos arquivos vizinhos, carregados sob demanda.
 
 - [ ] **Step 1: Escrever o `SKILL.md`**
 
@@ -1814,8 +1814,8 @@ description: Use antes de codar, corrigir, implementar, debugar ou propor qualqu
 
 # revy-research
 
-722 arquivos `.py` de projeto contra 10.286 com os cinco `.venv`: buscar as cegas
-devolve o FastAPI em 93% dos casos. Esta skill e **porta, nao caminho** — da o
+694 arquivos `.py` nos seis produtos, dentro de uma arvore de 10.288: 93% do que
+uma busca as cegas devolve e codigo-fonte dos cinco `.venv`. Esta skill e **porta, nao caminho** — da o
 contexto que so ela tem e entrega para quem ja sabe o resto. Nao improvise
 protocolo de implementar, propor ou depurar.
 
@@ -1869,8 +1869,10 @@ fechamento mora no `AGENTS.md` §6 — a esta altura outra skill esta no comando
 
 ## Regerar
 
+Windows usa `python`; o Mac do dono so tem `python3`. Vale para os dois comandos.
+
     cd .claude/skills/revy-research
-    python gerar_mapa.py               # Windows; no Mac, python3
+    python gerar_mapa.py               # regera o mapa
     python gerar_mapa.py --verificar   # so confere; sai 1 se o mapa mentir
 ```
 
@@ -1943,7 +1945,7 @@ Antes de commitar, confira o teto:
 wc -l .claude/skills/revy-research/SKILL.md
 ```
 
-Esperado: **65 linhas**, teto de ~65. (O spec estimou ~55 contando só tronco
+Esperado: **67 linhas**, teto de ~70. (O spec estimou ~55 contando só tronco
 + briefing + roteamento; Poda e Regras, que o próprio spec manda estarem aqui, não
 cabiam nessa conta.) Passou muito de 65: tem conteúdo no lugar de porta, ou
 protocolo que alguma skill do superpowers já faz. Mova ou corte.

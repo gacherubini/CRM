@@ -5,8 +5,8 @@ description: Use antes de codar, corrigir, implementar, debugar ou propor qualqu
 
 # revy-research
 
-722 arquivos `.py` de projeto contra 10.286 com os cinco `.venv`: buscar as cegas
-devolve o FastAPI em 93% dos casos. Esta skill e **porta, nao caminho** — da o
+694 arquivos `.py` nos seis produtos, dentro de uma arvore de 10.288: 93% do que
+uma busca as cegas devolve e codigo-fonte dos cinco `.venv`. Esta skill e **porta, nao caminho** — da o
 contexto que so ela tem e entrega para quem ja sabe o resto. Nao improvise
 protocolo de implementar, propor ou depurar.
 
@@ -60,6 +60,8 @@ fechamento mora no `AGENTS.md` §6 — a esta altura outra skill esta no comando
 
 ## Regerar
 
+Windows usa `python`; o Mac do dono so tem `python3`. Vale para os dois comandos.
+
     cd .claude/skills/revy-research
-    python gerar_mapa.py               # Windows; no Mac, python3
+    python gerar_mapa.py               # regera o mapa
     python gerar_mapa.py --verificar   # so confere; sai 1 se o mapa mentir
