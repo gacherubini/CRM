@@ -335,9 +335,32 @@ class TestExtratorDeWorkers(unittest.TestCase):
         achados = extratores.workers(FONTE_WORKERS, "app/modo2_workers.py")
         self.assertIn("FollowupWorker", {e.chave for e in achados})
 
-    def test_acha_funcao_job(self):
+    def test_funcao_de_topo_de_job_nao_e_worker(self):
+        """Este teste ja travou a regra CONTRARIA, e travava um defeito.
+
+        A regra antiga aceitava qualquer funcao publica de topo de arquivo de
+        job, e enchia a secao com `start_worker`, `env_int` e funcao de dominio
+        — 82 linhas para 19 workers. Medido em 23/08: todo `*_job.py` do repo
+        tem sua classe `*Worker`, entao a regra larga nunca foi necessaria.
+        """
         achados = extratores.workers(FONTE_WORKERS, "app/rodizio_job.py")
-        self.assertIn("iniciar_rodizio_job", {e.chave for e in achados})
+        self.assertEqual({e.chave for e in achados}, {"FollowupWorker"})
+
+    def test_job_sem_classe_worker_avisa_em_vez_de_calar(self):
+        """Estreitar criterio sem declarar o que ficou de fora e como as 25
+        rotas sumiram calado. Hoje nao dispara para arquivo nenhum do repo."""
+        achados = extratores.workers("def roda():\n    pass\n", "app/x_job.py")
+        self.assertEqual([e.secao for e in achados], ["aviso"])
+
+    def test_no_repo_real_nenhum_job_esta_sem_worker(self):
+        raiz = varredura.raiz_repo()
+        avisos = [
+            f"{produto}/{e.arquivo}"
+            for produto in varredura.PRODUTOS
+            for e in gerar_mapa.coletar(raiz, produto)
+            if e.secao == "aviso" and "arquivo de job" in e.chave
+        ]
+        self.assertEqual(avisos, [])
 
     def test_arquivo_comum_so_da_a_classe_worker(self):
         achados = extratores.workers(FONTE_WORKERS, "app/servicos.py")
@@ -375,6 +398,93 @@ class TestExtratorDeWorkers(unittest.TestCase):
         self.assertIn("FollowupWorker", por_chave)
         linha = texto.splitlines()[por_chave["FollowupWorker"].linha - 1]
         self.assertIn("FollowupWorker", linha)
+
+
+class TestWorkerNaoEQualquerFuncaoDeJob(unittest.TestCase):
+    """A secao Workers listava 82 simbolos para 18 workers."""
+
+    FONTE = """
+def env_int(nome, default):
+    return default
+
+def texto_followup(lead):
+    return ""
+
+class FollowupWorker:
+    def run(self):
+        pass
+
+def get_worker():
+    return _worker
+
+def start_worker():
+    pass
+
+def stop_worker():
+    pass
+"""
+
+    def test_so_a_classe_worker_sai_de_um_arquivo_de_job(self):
+        achados = extratores.workers(self.FONTE, "app/followup_job.py")
+        self.assertEqual([e.chave for e in achados], ["FollowupWorker"])
+
+    def test_modulo_que_e_o_worker_entrega_o_main(self):
+        """O motor e o estoque nao tem classe: o arquivo inteiro e o worker."""
+        fonte = """
+def rodar_uma_vez():
+    pass
+
+def limpar_midias_uma_vez():
+    pass
+
+def main():
+    pass
+"""
+        achados = extratores.workers(fonte, "app/worker.py")
+        self.assertEqual([e.chave for e in achados], ["main"])
+
+    def test_funcao_chamada_worker_nao_vira_worker(self):
+        """`nome.endswith("Worker")` sem checar que e classe pegava funcao."""
+        achados = extratores.workers(
+            "def CriarWorker():\n    pass\n", "app/x_job.py")
+        # nenhum WORKER. O aviso de "job sem classe *Worker" e esperado aqui,
+        # e e justamente o ponto: sobrou um arquivo de job cujo conteudo o
+        # gerador nao reconhece, e isso ele declara em vez de engolir.
+        self.assertEqual([e for e in achados if e.secao == "worker"], [])
+        self.assertEqual([e.secao for e in achados], ["aviso"])
+
+    def test_no_repo_real_o_ruido_conhecido_sumiu(self):
+        raiz = varredura.raiz_repo()
+        nomes = set()
+        for produto in varredura.PRODUTOS:
+            nomes |= {
+                e.chave for e in gerar_mapa.coletar(raiz, produto)
+                if e.secao == "worker"
+            }
+        for lixo in ("start_worker", "stop_worker", "get_worker", "start_workers",
+                     "stop_workers", "env_int", "env_float", "env_flag",
+                     "texto_followup", "classificar_etapa", "avaliar_loja",
+                     "processar_turno", "purgar_loja", "sincronizar_ofertas"):
+            self.assertNotIn(lixo, nomes, lixo)
+
+    def test_no_repo_real_os_workers_de_verdade_continuam(self):
+        """Encolher a secao nao pode ser encolher perdendo worker."""
+        raiz = varredura.raiz_repo()
+        por_produto = {
+            produto: {e.chave for e in gerar_mapa.coletar(raiz, produto)
+                      if e.secao == "worker"}
+            for produto in varredura.PRODUTOS
+        }
+        self.assertLessEqual(
+            {"CloudRetryWorker", "FollowupWorker", "RodizioWorker",
+             "NotificacoesOutboxWorker"},
+            por_produto["chatbot-api"])
+        self.assertIn("main", por_produto["motor-simulacao"])
+        self.assertIn("main", por_produto["estoque-api"])
+        self.assertIn("OutboxWorker", por_produto["catalogo-publico"])
+        total = sum(len(v) for v in por_produto.values())
+        self.assertGreaterEqual(total, 15)
+        self.assertLessEqual(total, 25, "voltou a virar despejo")
 
 
 class TestExtratorDeFlags(unittest.TestCase):

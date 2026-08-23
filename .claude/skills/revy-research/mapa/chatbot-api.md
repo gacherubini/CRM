@@ -1,6 +1,6 @@
-# chatbot-api · 56 rotas · 17 modelos · 10 workers · 4 flags · 25 migrations
+# chatbot-api · 56 rotas · 17 modelos · 4 workers · 4 flags · 25 migrations
 
-Gerado de `7899099`. NAO editar a mao — saida de `gerar_mapa.py`.
+Gerado de `889ea2b`. NAO editar a mao — saida de `gerar_mapa.py`.
 Migration head: `0025_canal_cloud_por_loja`
 
 ## Rotas
@@ -85,14 +85,8 @@ Migration head: `0025_canal_cloud_por_loja`
 ## Workers
 
 - `CloudRetryWorker` — app/cloud_retry.py:140
-- `texto_followup` — app/followup_job.py:45
-- `classificar_etapa` — app/followup_job.py:53
 - `FollowupWorker` — app/followup_job.py:64
-- `start_workers` — app/modo2_workers.py:84
-- `stop_workers` — app/modo2_workers.py:147
 - `NotificacoesOutboxWorker` — app/notificacoes_outbox_job.py:28
-- `start_worker` — app/notificacoes_outbox_job.py:92
-- `stop_worker` — app/notificacoes_outbox_job.py:103
 - `RodizioWorker` — app/rodizio_job.py:12
 
 ## Flags

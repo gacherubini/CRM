@@ -1,6 +1,6 @@
-# revy-trafego · 120 rotas · 31 modelos · 35 workers · 59 flags · 20 migrations · 20 templates
+# revy-trafego · 120 rotas · 31 modelos · 6 workers · 59 flags · 20 migrations · 20 templates
 
-Gerado de `7899099`. NAO editar a mao — saida de `gerar_mapa.py`.
+Gerado de `889ea2b`. NAO editar a mao — saida de `gerar_mapa.py`.
 Migration head: `0020_loja_whatsapp_modo`
 
 ## Rotas
@@ -163,40 +163,11 @@ Migration head: `0020_loja_whatsapp_modo`
 ## Workers
 
 - `GoogleAdsConversionsWorker` — app/control/google_ads_conversions_job.py:55
-- `get_worker` — app/control/google_ads_conversions_job.py:194
-- `start_worker` — app/control/google_ads_conversions_job.py:198
-- `stop_worker` — app/control/google_ads_conversions_job.py:209
-- `listar_lojas_para_metrics_sync` — app/control/google_ads_metrics_job.py:46
 - `GoogleAdsMetricsSyncWorker` — app/control/google_ads_metrics_job.py:82
-- `get_worker` — app/control/google_ads_metrics_job.py:285
-- `start_worker` — app/control/google_ads_metrics_job.py:289
-- `stop_worker` — app/control/google_ads_metrics_job.py:300
 - `ProvisioningDeliveryWorker` — app/control/provisioning_job.py:28
-- `get_worker` — app/control/provisioning_job.py:139
-- `start_worker` — app/control/provisioning_job.py:143
-- `stop_worker` — app/control/provisioning_job.py:154
-- `env_float` — app/meta_ad_resolver_job.py:40
-- `env_int` — app/meta_ad_resolver_job.py:47
-- `mapa_ad_campaign_loja` — app/meta_ad_resolver_job.py:63
-- `contar_ads_nao_resolvidos` — app/meta_ad_resolver_job.py:80
-- `destravar_ads_nao_resolvidos` — app/meta_ad_resolver_job.py:98
-- `resolver_ads_pendentes` — app/meta_ad_resolver_job.py:198
-- `processar_loja` — app/meta_ad_resolver_job.py:322
-- `processar_todas_lojas` — app/meta_ad_resolver_job.py:386
 - `MetaAdResolverWorker` — app/meta_ad_resolver_job.py:444
-- `get_worker` — app/meta_ad_resolver_job.py:549
-- `start_worker` — app/meta_ad_resolver_job.py:553
-- `stop_worker` — app/meta_ad_resolver_job.py:569
-- `env_flag` — app/meta_ads_spend_job.py:20
-- `env_float` — app/meta_ads_spend_job.py:27
-- `env_int` — app/meta_ads_spend_job.py:34
 - `MetaSpendSyncWorker` — app/meta_ads_spend_job.py:41
-- `get_worker` — app/meta_ads_spend_job.py:148
-- `start_worker` — app/meta_ads_spend_job.py:152
-- `stop_worker` — app/meta_ads_spend_job.py:161
 - `MetaCapiRetryWorker` — app/meta_capi_job.py:31
-- `start_worker` — app/meta_capi_job.py:122
-- `stop_worker` — app/meta_capi_job.py:131
 
 ## Flags
 

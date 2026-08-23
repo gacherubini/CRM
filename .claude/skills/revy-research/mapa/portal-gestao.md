@@ -1,6 +1,6 @@
-# portal-gestao · 151 rotas · 26 modelos · 31 workers · 34 flags · 26 migrations · 61 templates
+# portal-gestao · 151 rotas · 26 modelos · 6 workers · 34 flags · 26 migrations · 61 templates
 
-Gerado de `7899099`. NAO editar a mao — saida de `gerar_mapa.py`.
+Gerado de `889ea2b`. NAO editar a mao — saida de `gerar_mapa.py`.
 Migration head: `0026_copiloto_sinal_destinatario`
 
 ## Rotas
@@ -188,37 +188,12 @@ Migration head: `0026_copiloto_sinal_destinatario`
 
 ## Workers
 
-- `lojas_com_turnos_elegiveis` — app/copiloto_purge_job.py:63
-- `purgar_loja` — app/copiloto_purge_job.py:77
 - `CopilotoPurgeWorker` — app/copiloto_purge_job.py:129
-- `get_worker` — app/copiloto_purge_job.py:269
-- `start_worker` — app/copiloto_purge_job.py:273
-- `stop_worker` — app/copiloto_purge_job.py:282
-- `sincronizar_ofertas` — app/copiloto_sinais_job.py:88
-- `lojas_ativas` — app/copiloto_sinais_job.py:166
-- `avaliar_loja` — app/copiloto_sinais_job.py:266
 - `CopilotoSinaisWorker` — app/copiloto_sinais_job.py:407
-- `get_worker` — app/copiloto_sinais_job.py:571
-- `start_worker` — app/copiloto_sinais_job.py:575
-- `stop_worker` — app/copiloto_sinais_job.py:584
-- `processar_turno` — app/copiloto_turnos_job.py:78
 - `CopilotoTurnosWorker` — app/copiloto_turnos_job.py:207
-- `get_worker` — app/copiloto_turnos_job.py:400
-- `start_worker` — app/copiloto_turnos_job.py:404
-- `stop_worker` — app/copiloto_turnos_job.py:413
-- `env_flag` — app/meta_ads_spend_job.py:20
-- `env_float` — app/meta_ads_spend_job.py:27
-- `env_int` — app/meta_ads_spend_job.py:34
 - `MetaSpendSyncWorker` — app/meta_ads_spend_job.py:41
-- `get_worker` — app/meta_ads_spend_job.py:148
-- `start_worker` — app/meta_ads_spend_job.py:152
-- `stop_worker` — app/meta_ads_spend_job.py:161
 - `MetaCapiRetryWorker` — app/meta_capi_job.py:31
-- `start_worker` — app/meta_capi_job.py:122
-- `stop_worker` — app/meta_capi_job.py:131
 - `RevyTrafegoOutboxWorker` — app/revy_trafego_outbox_job.py:23
-- `start_worker` — app/revy_trafego_outbox_job.py:87
-- `stop_worker` — app/revy_trafego_outbox_job.py:98
 
 ## Flags
 

@@ -407,12 +407,37 @@ def _e_arquivo_de_teste(arquivo_rel: str) -> bool:
     )
 
 
-def workers(texto: str, arquivo_rel: str) -> list[Entrada]:
-    """Classes `*Worker` e as funcoes de topo de um arquivo de job.
+# Modulos em que o arquivo INTEIRO e o worker: nao ha classe, a entrada e
+# `main`. So o motor e o estoque fazem assim.
+ARQUIVOS_QUE_SAO_O_WORKER = ("worker.py", "workers.py")
+ENTRADA_DO_MODULO = "main"
 
-    Duas regras porque o repo tem os dois estilos: `class FollowupWorker` (o
-    comum) e modulos inteiros de job cuja entrada e uma funcao solta
-    (`def main()` no `app/worker.py` do motor e do estoque).
+
+def workers(texto: str, arquivo_rel: str) -> list[Entrada]:
+    """Classes `*Worker`, mais o `main` de um modulo que E o worker.
+
+    A regra antiga aceitava **qualquer** funcao publica de topo de arquivo de
+    job, e a secao virou um despejo: 82 linhas das quais so 19 eram worker. O
+    resto era ciclo de vida (`start_worker`, `stop_worker`, `get_worker` —
+    sozinhos, 30 linhas), helper de env (`env_int`, `env_float`) e funcao de
+    dominio do modulo (`avaliar_loja`, `texto_followup`, `processar_turno`).
+
+    Nao mentia — os simbolos estavam nas linhas e o `--verificar` passava. Mas
+    quem lia "Workers: 31" no cabecalho do portal concluia que ha 31 processos
+    de fundo, quando ha 6. Secao que promete demais gasta a atencao que o mapa
+    existe para poupar.
+
+    Medido antes de trocar a regra: **todo** `*_job.py` do repo tem uma classe
+    `*Worker`, entao a regra de funcao nunca foi necessaria para eles. Ela so
+    faz falta em `app/worker.py` do motor e do estoque, onde nao ha classe. E
+    nao ha worker escondido em classe de outro nome: as unicas classes com
+    `start`/`stop` fora do padrao sao `_Periodico` (agendador privado e
+    generico do `modo2_workers.py`) e as de `motor-simulacao/app/lifecycle.py`,
+    que ligam e desligam **maquina do Fly**, nao worker.
+
+    Fica de fora, de proposito, `chatbot-api/app/modo2_workers.py`: ele importa
+    e sobe `RodizioWorker`, `FollowupWorker` e `CloudRetryWorker`, que ja estao
+    no mapa cada um no seu arquivo. E lancador, nao worker.
     """
     if _e_arquivo_de_teste(arquivo_rel):
         return []
@@ -420,16 +445,18 @@ def workers(texto: str, arquivo_rel: str) -> list[Entrada]:
         arvore = ast.parse(texto)
     except SyntaxError:
         return []
-    de_arquivo_de_job = arquivo_rel.endswith(SUFIXOS_DE_WORKER)
+    o_modulo_e_o_worker = arquivo_rel.endswith(ARQUIVOS_QUE_SAO_O_WORKER)
     achados: list[Entrada] = []
     for no in arvore.body:
         nome = getattr(no, "name", "")
         if not nome:
             continue
-        e_worker = nome.endswith("Worker") or (
-            de_arquivo_de_job
+        e_worker = (
+            isinstance(no, ast.ClassDef) and nome.endswith("Worker")
+        ) or (
+            o_modulo_e_o_worker
+            and nome == ENTRADA_DO_MODULO
             and isinstance(no, (ast.FunctionDef, ast.AsyncFunctionDef))
-            and not nome.startswith("_")
         )
         if e_worker:
             achados.append(Entrada(
@@ -439,6 +466,20 @@ def workers(texto: str, arquivo_rel: str) -> list[Entrada]:
                 arquivo=arquivo_rel,
                 linha=no.lineno,
             ))
+    if not achados and arquivo_rel.endswith(("_job.py", "_jobs.py")):
+        # Job em estilo de funcao existiria fora das duas regras acima. Hoje
+        # nao ha nenhum — todo `*_job.py` do repo tem sua classe `*Worker` — e
+        # por isso este aviso nasce mudo. Mas estreitar criterio sem declarar o
+        # que passou a ficar de fora e como as 25 rotas sumiram: o
+        # `--verificar` so reabre o que ESTA no mapa, entao ausencia ninguem ve.
+        achados.append(Entrada(
+            secao="aviso",
+            chave="arquivo de job sem classe `*Worker` - se o job aqui e uma "
+                  "funcao, ele nao esta na secao Workers",
+            simbolo="",
+            arquivo=arquivo_rel,
+            linha=0,
+        ))
     return achados
 
 

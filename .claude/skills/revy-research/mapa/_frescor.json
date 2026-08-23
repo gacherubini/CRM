@@ -1,5 +1,5 @@
 {
- "sha": "7899099",
+ "sha": "889ea2b",
  "inventario": {
   "chatbot-api": [
    {
@@ -22,20 +22,6 @@
     "simbolo": "MULTI_WHATSAPP_ENABLED",
     "arquivo": "app/config.py",
     "linha": 123
-   },
-   {
-    "secao": "worker",
-    "chave": "texto_followup",
-    "simbolo": "texto_followup",
-    "arquivo": "app/followup_job.py",
-    "linha": 45
-   },
-   {
-    "secao": "worker",
-    "chave": "classificar_etapa",
-    "simbolo": "classificar_etapa",
-    "arquivo": "app/followup_job.py",
-    "linha": 53
    },
    {
     "secao": "worker",
@@ -571,38 +557,10 @@
    },
    {
     "secao": "worker",
-    "chave": "start_workers",
-    "simbolo": "start_workers",
-    "arquivo": "app/modo2_workers.py",
-    "linha": 84
-   },
-   {
-    "secao": "worker",
-    "chave": "stop_workers",
-    "simbolo": "stop_workers",
-    "arquivo": "app/modo2_workers.py",
-    "linha": 147
-   },
-   {
-    "secao": "worker",
     "chave": "NotificacoesOutboxWorker",
     "simbolo": "NotificacoesOutboxWorker",
     "arquivo": "app/notificacoes_outbox_job.py",
     "linha": 28
-   },
-   {
-    "secao": "worker",
-    "chave": "start_worker",
-    "simbolo": "start_worker",
-    "arquivo": "app/notificacoes_outbox_job.py",
-    "linha": 92
-   },
-   {
-    "secao": "worker",
-    "chave": "stop_worker",
-    "simbolo": "stop_worker",
-    "arquivo": "app/notificacoes_outbox_job.py",
-    "linha": 103
    },
    {
     "secao": "worker",
@@ -993,45 +951,10 @@
    },
    {
     "secao": "worker",
-    "chave": "lojas_com_turnos_elegiveis",
-    "simbolo": "lojas_com_turnos_elegiveis",
-    "arquivo": "app/copiloto_purge_job.py",
-    "linha": 63
-   },
-   {
-    "secao": "worker",
-    "chave": "purgar_loja",
-    "simbolo": "purgar_loja",
-    "arquivo": "app/copiloto_purge_job.py",
-    "linha": 77
-   },
-   {
-    "secao": "worker",
     "chave": "CopilotoPurgeWorker",
     "simbolo": "CopilotoPurgeWorker",
     "arquivo": "app/copiloto_purge_job.py",
     "linha": 129
-   },
-   {
-    "secao": "worker",
-    "chave": "get_worker",
-    "simbolo": "get_worker",
-    "arquivo": "app/copiloto_purge_job.py",
-    "linha": 269
-   },
-   {
-    "secao": "worker",
-    "chave": "start_worker",
-    "simbolo": "start_worker",
-    "arquivo": "app/copiloto_purge_job.py",
-    "linha": 273
-   },
-   {
-    "secao": "worker",
-    "chave": "stop_worker",
-    "simbolo": "stop_worker",
-    "arquivo": "app/copiloto_purge_job.py",
-    "linha": 282
    },
    {
     "secao": "flag",
@@ -1042,52 +965,10 @@
    },
    {
     "secao": "worker",
-    "chave": "sincronizar_ofertas",
-    "simbolo": "sincronizar_ofertas",
-    "arquivo": "app/copiloto_sinais_job.py",
-    "linha": 88
-   },
-   {
-    "secao": "worker",
-    "chave": "lojas_ativas",
-    "simbolo": "lojas_ativas",
-    "arquivo": "app/copiloto_sinais_job.py",
-    "linha": 166
-   },
-   {
-    "secao": "worker",
-    "chave": "avaliar_loja",
-    "simbolo": "avaliar_loja",
-    "arquivo": "app/copiloto_sinais_job.py",
-    "linha": 266
-   },
-   {
-    "secao": "worker",
     "chave": "CopilotoSinaisWorker",
     "simbolo": "CopilotoSinaisWorker",
     "arquivo": "app/copiloto_sinais_job.py",
     "linha": 407
-   },
-   {
-    "secao": "worker",
-    "chave": "get_worker",
-    "simbolo": "get_worker",
-    "arquivo": "app/copiloto_sinais_job.py",
-    "linha": 571
-   },
-   {
-    "secao": "worker",
-    "chave": "start_worker",
-    "simbolo": "start_worker",
-    "arquivo": "app/copiloto_sinais_job.py",
-    "linha": 575
-   },
-   {
-    "secao": "worker",
-    "chave": "stop_worker",
-    "simbolo": "stop_worker",
-    "arquivo": "app/copiloto_sinais_job.py",
-    "linha": 584
    },
    {
     "secao": "flag",
@@ -1098,38 +979,10 @@
    },
    {
     "secao": "worker",
-    "chave": "processar_turno",
-    "simbolo": "processar_turno",
-    "arquivo": "app/copiloto_turnos_job.py",
-    "linha": 78
-   },
-   {
-    "secao": "worker",
     "chave": "CopilotoTurnosWorker",
     "simbolo": "CopilotoTurnosWorker",
     "arquivo": "app/copiloto_turnos_job.py",
     "linha": 207
-   },
-   {
-    "secao": "worker",
-    "chave": "get_worker",
-    "simbolo": "get_worker",
-    "arquivo": "app/copiloto_turnos_job.py",
-    "linha": 400
-   },
-   {
-    "secao": "worker",
-    "chave": "start_worker",
-    "simbolo": "start_worker",
-    "arquivo": "app/copiloto_turnos_job.py",
-    "linha": 404
-   },
-   {
-    "secao": "worker",
-    "chave": "stop_worker",
-    "simbolo": "stop_worker",
-    "arquivo": "app/copiloto_turnos_job.py",
-    "linha": 413
    },
    {
     "secao": "flag",
@@ -1462,52 +1315,10 @@
    },
    {
     "secao": "worker",
-    "chave": "env_flag",
-    "simbolo": "env_flag",
-    "arquivo": "app/meta_ads_spend_job.py",
-    "linha": 20
-   },
-   {
-    "secao": "worker",
-    "chave": "env_float",
-    "simbolo": "env_float",
-    "arquivo": "app/meta_ads_spend_job.py",
-    "linha": 27
-   },
-   {
-    "secao": "worker",
-    "chave": "env_int",
-    "simbolo": "env_int",
-    "arquivo": "app/meta_ads_spend_job.py",
-    "linha": 34
-   },
-   {
-    "secao": "worker",
     "chave": "MetaSpendSyncWorker",
     "simbolo": "MetaSpendSyncWorker",
     "arquivo": "app/meta_ads_spend_job.py",
     "linha": 41
-   },
-   {
-    "secao": "worker",
-    "chave": "get_worker",
-    "simbolo": "get_worker",
-    "arquivo": "app/meta_ads_spend_job.py",
-    "linha": 148
-   },
-   {
-    "secao": "worker",
-    "chave": "start_worker",
-    "simbolo": "start_worker",
-    "arquivo": "app/meta_ads_spend_job.py",
-    "linha": 152
-   },
-   {
-    "secao": "worker",
-    "chave": "stop_worker",
-    "simbolo": "stop_worker",
-    "arquivo": "app/meta_ads_spend_job.py",
-    "linha": 161
    },
    {
     "secao": "flag",
@@ -1522,20 +1333,6 @@
     "simbolo": "MetaCapiRetryWorker",
     "arquivo": "app/meta_capi_job.py",
     "linha": 31
-   },
-   {
-    "secao": "worker",
-    "chave": "start_worker",
-    "simbolo": "start_worker",
-    "arquivo": "app/meta_capi_job.py",
-    "linha": 122
-   },
-   {
-    "secao": "worker",
-    "chave": "stop_worker",
-    "simbolo": "stop_worker",
-    "arquivo": "app/meta_capi_job.py",
-    "linha": 131
    },
    {
     "secao": "flag",
@@ -1767,20 +1564,6 @@
     "simbolo": "RevyTrafegoOutboxWorker",
     "arquivo": "app/revy_trafego_outbox_job.py",
     "linha": 23
-   },
-   {
-    "secao": "worker",
-    "chave": "start_worker",
-    "simbolo": "start_worker",
-    "arquivo": "app/revy_trafego_outbox_job.py",
-    "linha": 87
-   },
-   {
-    "secao": "worker",
-    "chave": "stop_worker",
-    "simbolo": "stop_worker",
-    "arquivo": "app/revy_trafego_outbox_job.py",
-    "linha": 98
    },
    {
     "secao": "rota",
@@ -3783,27 +3566,6 @@
    },
    {
     "secao": "worker",
-    "chave": "rodar_uma_vez",
-    "simbolo": "rodar_uma_vez",
-    "arquivo": "app/worker.py",
-    "linha": 21
-   },
-   {
-    "secao": "worker",
-    "chave": "limpar_midias_uma_vez",
-    "simbolo": "limpar_midias_uma_vez",
-    "arquivo": "app/worker.py",
-    "linha": 29
-   },
-   {
-    "secao": "worker",
-    "chave": "executar_limpeza_se_devida",
-    "simbolo": "executar_limpeza_se_devida",
-    "arquivo": "app/worker.py",
-    "linha": 37
-   },
-   {
-    "secao": "worker",
     "chave": "main",
     "simbolo": "main",
     "arquivo": "app/worker.py",
@@ -4232,27 +3994,6 @@
     "linha": 55
    },
    {
-    "secao": "worker",
-    "chave": "get_worker",
-    "simbolo": "get_worker",
-    "arquivo": "app/control/google_ads_conversions_job.py",
-    "linha": 194
-   },
-   {
-    "secao": "worker",
-    "chave": "start_worker",
-    "simbolo": "start_worker",
-    "arquivo": "app/control/google_ads_conversions_job.py",
-    "linha": 198
-   },
-   {
-    "secao": "worker",
-    "chave": "stop_worker",
-    "simbolo": "stop_worker",
-    "arquivo": "app/control/google_ads_conversions_job.py",
-    "linha": 209
-   },
-   {
     "secao": "flag",
     "chave": "GOOGLE_CONVERSIONS_ENABLED",
     "simbolo": "GOOGLE_CONVERSIONS_ENABLED",
@@ -4268,38 +4009,10 @@
    },
    {
     "secao": "worker",
-    "chave": "listar_lojas_para_metrics_sync",
-    "simbolo": "listar_lojas_para_metrics_sync",
-    "arquivo": "app/control/google_ads_metrics_job.py",
-    "linha": 46
-   },
-   {
-    "secao": "worker",
     "chave": "GoogleAdsMetricsSyncWorker",
     "simbolo": "GoogleAdsMetricsSyncWorker",
     "arquivo": "app/control/google_ads_metrics_job.py",
     "linha": 82
-   },
-   {
-    "secao": "worker",
-    "chave": "get_worker",
-    "simbolo": "get_worker",
-    "arquivo": "app/control/google_ads_metrics_job.py",
-    "linha": 285
-   },
-   {
-    "secao": "worker",
-    "chave": "start_worker",
-    "simbolo": "start_worker",
-    "arquivo": "app/control/google_ads_metrics_job.py",
-    "linha": 289
-   },
-   {
-    "secao": "worker",
-    "chave": "stop_worker",
-    "simbolo": "stop_worker",
-    "arquivo": "app/control/google_ads_metrics_job.py",
-    "linha": 300
    },
    {
     "secao": "flag",
@@ -4314,27 +4027,6 @@
     "simbolo": "ProvisioningDeliveryWorker",
     "arquivo": "app/control/provisioning_job.py",
     "linha": 28
-   },
-   {
-    "secao": "worker",
-    "chave": "get_worker",
-    "simbolo": "get_worker",
-    "arquivo": "app/control/provisioning_job.py",
-    "linha": 139
-   },
-   {
-    "secao": "worker",
-    "chave": "start_worker",
-    "simbolo": "start_worker",
-    "arquivo": "app/control/provisioning_job.py",
-    "linha": 143
-   },
-   {
-    "secao": "worker",
-    "chave": "stop_worker",
-    "simbolo": "stop_worker",
-    "arquivo": "app/control/provisioning_job.py",
-    "linha": 154
    },
    {
     "secao": "flag",
@@ -4625,87 +4317,10 @@
    },
    {
     "secao": "worker",
-    "chave": "env_float",
-    "simbolo": "env_float",
-    "arquivo": "app/meta_ad_resolver_job.py",
-    "linha": 40
-   },
-   {
-    "secao": "worker",
-    "chave": "env_int",
-    "simbolo": "env_int",
-    "arquivo": "app/meta_ad_resolver_job.py",
-    "linha": 47
-   },
-   {
-    "secao": "worker",
-    "chave": "mapa_ad_campaign_loja",
-    "simbolo": "mapa_ad_campaign_loja",
-    "arquivo": "app/meta_ad_resolver_job.py",
-    "linha": 63
-   },
-   {
-    "secao": "worker",
-    "chave": "contar_ads_nao_resolvidos",
-    "simbolo": "contar_ads_nao_resolvidos",
-    "arquivo": "app/meta_ad_resolver_job.py",
-    "linha": 80
-   },
-   {
-    "secao": "worker",
-    "chave": "destravar_ads_nao_resolvidos",
-    "simbolo": "destravar_ads_nao_resolvidos",
-    "arquivo": "app/meta_ad_resolver_job.py",
-    "linha": 98
-   },
-   {
-    "secao": "worker",
-    "chave": "resolver_ads_pendentes",
-    "simbolo": "resolver_ads_pendentes",
-    "arquivo": "app/meta_ad_resolver_job.py",
-    "linha": 198
-   },
-   {
-    "secao": "worker",
-    "chave": "processar_loja",
-    "simbolo": "processar_loja",
-    "arquivo": "app/meta_ad_resolver_job.py",
-    "linha": 322
-   },
-   {
-    "secao": "worker",
-    "chave": "processar_todas_lojas",
-    "simbolo": "processar_todas_lojas",
-    "arquivo": "app/meta_ad_resolver_job.py",
-    "linha": 386
-   },
-   {
-    "secao": "worker",
     "chave": "MetaAdResolverWorker",
     "simbolo": "MetaAdResolverWorker",
     "arquivo": "app/meta_ad_resolver_job.py",
     "linha": 444
-   },
-   {
-    "secao": "worker",
-    "chave": "get_worker",
-    "simbolo": "get_worker",
-    "arquivo": "app/meta_ad_resolver_job.py",
-    "linha": 549
-   },
-   {
-    "secao": "worker",
-    "chave": "start_worker",
-    "simbolo": "start_worker",
-    "arquivo": "app/meta_ad_resolver_job.py",
-    "linha": 553
-   },
-   {
-    "secao": "worker",
-    "chave": "stop_worker",
-    "simbolo": "stop_worker",
-    "arquivo": "app/meta_ad_resolver_job.py",
-    "linha": 569
    },
    {
     "secao": "flag",
@@ -4751,52 +4366,10 @@
    },
    {
     "secao": "worker",
-    "chave": "env_flag",
-    "simbolo": "env_flag",
-    "arquivo": "app/meta_ads_spend_job.py",
-    "linha": 20
-   },
-   {
-    "secao": "worker",
-    "chave": "env_float",
-    "simbolo": "env_float",
-    "arquivo": "app/meta_ads_spend_job.py",
-    "linha": 27
-   },
-   {
-    "secao": "worker",
-    "chave": "env_int",
-    "simbolo": "env_int",
-    "arquivo": "app/meta_ads_spend_job.py",
-    "linha": 34
-   },
-   {
-    "secao": "worker",
     "chave": "MetaSpendSyncWorker",
     "simbolo": "MetaSpendSyncWorker",
     "arquivo": "app/meta_ads_spend_job.py",
     "linha": 41
-   },
-   {
-    "secao": "worker",
-    "chave": "get_worker",
-    "simbolo": "get_worker",
-    "arquivo": "app/meta_ads_spend_job.py",
-    "linha": 148
-   },
-   {
-    "secao": "worker",
-    "chave": "start_worker",
-    "simbolo": "start_worker",
-    "arquivo": "app/meta_ads_spend_job.py",
-    "linha": 152
-   },
-   {
-    "secao": "worker",
-    "chave": "stop_worker",
-    "simbolo": "stop_worker",
-    "arquivo": "app/meta_ads_spend_job.py",
-    "linha": 161
    },
    {
     "secao": "flag",
@@ -4811,20 +4384,6 @@
     "simbolo": "MetaCapiRetryWorker",
     "arquivo": "app/meta_capi_job.py",
     "linha": 31
-   },
-   {
-    "secao": "worker",
-    "chave": "start_worker",
-    "simbolo": "start_worker",
-    "arquivo": "app/meta_capi_job.py",
-    "linha": 122
-   },
-   {
-    "secao": "worker",
-    "chave": "stop_worker",
-    "simbolo": "stop_worker",
-    "arquivo": "app/meta_capi_job.py",
-    "linha": 131
    },
    {
     "secao": "flag",
