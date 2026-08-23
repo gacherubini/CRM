@@ -77,6 +77,38 @@ class TestExtratorDeRotas(unittest.TestCase):
         linha = FONTE_ROTAS.splitlines()[por_chave["POST /webhook/cloud"].linha - 1]
         self.assertIn("/webhook/cloud", linha)
 
+    def test_decorator_quebrado_em_varias_linhas_aponta_para_a_string(self):
+        # control.py e control_ui.py escrevem assim. dec.lineno daria a linha
+        # do `@router.post(`, onde o path nao esta, e o --verificar acusaria.
+        fonte = (
+            '@router.post(\n'
+            '    "/lojas/{loja_id}/google-ads/oauth/start",\n'
+            '    dependencies=[Depends(_flag)],\n'
+            ')\n'
+            'def inicia(request):\n'
+            '    return 1\n'
+        )
+        achadas = extratores.rotas(fonte, 'app/web/control.py')
+        self.assertEqual(len(achadas), 1)
+        linha = fonte.splitlines()[achadas[0].linha - 1]
+        self.assertIn(achadas[0].simbolo, linha)
+
+    def test_no_repo_real_toda_rota_cai_numa_linha_que_contem_o_path(self):
+        # a prova que o --verificar vai refazer: nenhuma rota do repo pode
+        # apontar para uma linha onde o path nao esteja escrito.
+        raiz = varredura.raiz_repo()
+        fora = []
+        for produto in varredura.PRODUTOS:
+            base = raiz / produto
+            for caminho in varredura.arquivos_py(raiz, produto):
+                texto = caminho.read_text(encoding='utf-8', errors='replace')
+                linhas = texto.splitlines()
+                rel = caminho.relative_to(base).as_posix()
+                for e in extratores.rotas(texto, rel):
+                    if e.simbolo not in linhas[e.linha - 1]:
+                        fora.append(f'{produto}/{e.arquivo}:{e.linha} {e.chave}')
+        self.assertEqual(fora, [], f'{len(fora)} rotas com linha errada')
+
     def test_no_repo_real_o_webhook_cloud_existe(self):
         raiz = varredura.raiz_repo()
         alvo = raiz / "chatbot-api" / "app" / "main.py"

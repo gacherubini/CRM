@@ -1,6 +1,6 @@
 # revy-trafego · 119 rotas · 31 modelos · 35 workers · 51 flags · 20 migrations · 20 templates
 
-Gerado de `066f6e2`. NAO editar a mao — saida de `gerar_mapa.py`.
+Gerado de `fe559da`. NAO editar a mao — saida de `gerar_mapa.py`.
 Migration head: `0020_loja_whatsapp_modo`
 
 ## Rotas
@@ -85,19 +85,19 @@ Migration head: `0020_loja_whatsapp_modo`
 - `POST /lojas/{loja_id}/gestores` — app/web/control.py:1123
 - `POST /lojas/{loja_id}/gestores/{gestor_id}/revogar` — app/web/control.py:1143
 - `GET /lojas/{loja_id}/auditoria` — app/web/control.py:1164
-- `POST /lojas/{loja_id}/google-ads/oauth/start` — app/web/control.py:1180
-- `GET /google-ads/oauth/callback` — app/web/control.py:1202
-- `GET /lojas/{loja_id}/google-ads/connection` — app/web/control.py:1221
-- `DELETE /lojas/{loja_id}/google-ads/connection` — app/web/control.py:1239
-- `GET /lojas/{loja_id}/google-ads/accounts` — app/web/control.py:1288
-- `POST /lojas/{loja_id}/google-ads/accounts/sync` — app/web/control.py:1306
-- `POST /lojas/{loja_id}/google-ads/accounts/{customer_id}/select` — app/web/control.py:1324
-- `POST /lojas/{loja_id}/google-ads/metrics/sync` — app/web/control.py:1344
-- `GET /lojas/{loja_id}/google-ads/metrics/summary` — app/web/control.py:1365
-- `GET /internal/lojas/{loja_id}/aquisicao-resumo` — app/web/control.py:1387
-- `GET /lojas/{loja_id}/google-ads/conversion-actions` — app/web/control.py:1409
-- `GET /lojas/{loja_id}/google-ads/conversion-bindings` — app/web/control.py:1430
-- `POST /lojas/{loja_id}/google-ads/conversion-bindings` — app/web/control.py:1448
+- `POST /lojas/{loja_id}/google-ads/oauth/start` — app/web/control.py:1181
+- `GET /google-ads/oauth/callback` — app/web/control.py:1203
+- `GET /lojas/{loja_id}/google-ads/connection` — app/web/control.py:1222
+- `DELETE /lojas/{loja_id}/google-ads/connection` — app/web/control.py:1240
+- `GET /lojas/{loja_id}/google-ads/accounts` — app/web/control.py:1289
+- `POST /lojas/{loja_id}/google-ads/accounts/sync` — app/web/control.py:1307
+- `POST /lojas/{loja_id}/google-ads/accounts/{customer_id}/select` — app/web/control.py:1325
+- `POST /lojas/{loja_id}/google-ads/metrics/sync` — app/web/control.py:1345
+- `GET /lojas/{loja_id}/google-ads/metrics/summary` — app/web/control.py:1366
+- `GET /internal/lojas/{loja_id}/aquisicao-resumo` — app/web/control.py:1388
+- `GET /lojas/{loja_id}/google-ads/conversion-actions` — app/web/control.py:1410
+- `GET /lojas/{loja_id}/google-ads/conversion-bindings` — app/web/control.py:1431
+- `POST /lojas/{loja_id}/google-ads/conversion-bindings` — app/web/control.py:1449
 - `GET /app/control/convite/aceitar` — app/web/control_ui.py:118
 - `POST /app/control/convite/aceitar` — app/web/control_ui.py:133
 - `GET /app/control/dashboard` — app/web/control_ui.py:350
@@ -108,22 +108,22 @@ Migration head: `0020_loja_whatsapp_modo`
 - `GET /app/control/lojas/{loja_id}` — app/web/control_ui.py:574
 - `GET /control/v1/lojas/{loja_id}/integracoes/health` — app/web/control_ui.py:611
 - `POST /app/control/lojas/{loja_id}/excluir` — app/web/control_ui.py:659
-- `POST /app/control/lojas/{loja_id}/modulos` — app/web/control_ui.py:709
-- `POST /app/control/lojas/{loja_id}/contrato` — app/web/control_ui.py:757
-- `POST /app/control/lojas/{loja_id}/cargos` — app/web/control_ui.py:842
-- `POST /app/control/lojas/{loja_id}/cargos/{cargo_id}/revogar` — app/web/control_ui.py:990
-- `POST /app/control/lojas/{loja_id}/estado` — app/web/control_ui.py:1042
-- `POST /app/control/lojas/{loja_id}/whatsapp-modo` — app/web/control_ui.py:1106
-- `POST /app/control/lojas/{loja_id}/gestores` — app/web/control_ui.py:1156
-- `POST /app/control/lojas/{loja_id}/gestores/convidar` — app/web/control_ui.py:1220
-- `POST /app/control/lojas/{loja_id}/gestores/revogar` — app/web/control_ui.py:1290
-- `POST /app/control/lojas/{loja_id}/gestores/{gestor_id}/revogar` — app/web/control_ui.py:1294
-- `POST /app/control/lojas/{loja_id}/google-ads/oauth/start` — app/web/control_ui.py:1346
-- `POST /app/control/lojas/{loja_id}/google-ads/desconectar` — app/web/control_ui.py:1396
-- `POST /app/control/lojas/{loja_id}/google-ads/accounts/sync` — app/web/control_ui.py:1449
-- `POST /app/control/lojas/{loja_id}/google-ads/accounts/select` — app/web/control_ui.py:1502
-- `POST /app/control/lojas/{loja_id}/google-ads/conversion-bindings` — app/web/control_ui.py:1575
-- `POST /app/control/lojas/{loja_id}/google-ads/metrics/sync` — app/web/control_ui.py:1654
+- `POST /app/control/lojas/{loja_id}/modulos` — app/web/control_ui.py:710
+- `POST /app/control/lojas/{loja_id}/contrato` — app/web/control_ui.py:758
+- `POST /app/control/lojas/{loja_id}/cargos` — app/web/control_ui.py:843
+- `POST /app/control/lojas/{loja_id}/cargos/{cargo_id}/revogar` — app/web/control_ui.py:991
+- `POST /app/control/lojas/{loja_id}/estado` — app/web/control_ui.py:1043
+- `POST /app/control/lojas/{loja_id}/whatsapp-modo` — app/web/control_ui.py:1107
+- `POST /app/control/lojas/{loja_id}/gestores` — app/web/control_ui.py:1157
+- `POST /app/control/lojas/{loja_id}/gestores/convidar` — app/web/control_ui.py:1221
+- `POST /app/control/lojas/{loja_id}/gestores/revogar` — app/web/control_ui.py:1291
+- `POST /app/control/lojas/{loja_id}/gestores/{gestor_id}/revogar` — app/web/control_ui.py:1295
+- `POST /app/control/lojas/{loja_id}/google-ads/oauth/start` — app/web/control_ui.py:1347
+- `POST /app/control/lojas/{loja_id}/google-ads/desconectar` — app/web/control_ui.py:1397
+- `POST /app/control/lojas/{loja_id}/google-ads/accounts/sync` — app/web/control_ui.py:1450
+- `POST /app/control/lojas/{loja_id}/google-ads/accounts/select` — app/web/control_ui.py:1503
+- `POST /app/control/lojas/{loja_id}/google-ads/conversion-bindings` — app/web/control_ui.py:1576
+- `POST /app/control/lojas/{loja_id}/google-ads/metrics/sync` — app/web/control_ui.py:1655
 
 ## Modelos
 

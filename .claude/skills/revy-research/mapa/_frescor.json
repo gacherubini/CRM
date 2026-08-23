@@ -1,5 +1,5 @@
 {
- "sha": "066f6e2",
+ "sha": "fe559da",
  "inventario": {
   "chatbot-api": [
    {
@@ -5034,91 +5034,91 @@
     "chave": "POST /lojas/{loja_id}/google-ads/oauth/start",
     "simbolo": "/lojas/{loja_id}/google-ads/oauth/start",
     "arquivo": "app/web/control.py",
-    "linha": 1180
+    "linha": 1181
    },
    {
     "secao": "rota",
     "chave": "GET /google-ads/oauth/callback",
     "simbolo": "/google-ads/oauth/callback",
     "arquivo": "app/web/control.py",
-    "linha": 1202
+    "linha": 1203
    },
    {
     "secao": "rota",
     "chave": "GET /lojas/{loja_id}/google-ads/connection",
     "simbolo": "/lojas/{loja_id}/google-ads/connection",
     "arquivo": "app/web/control.py",
-    "linha": 1221
+    "linha": 1222
    },
    {
     "secao": "rota",
     "chave": "DELETE /lojas/{loja_id}/google-ads/connection",
     "simbolo": "/lojas/{loja_id}/google-ads/connection",
     "arquivo": "app/web/control.py",
-    "linha": 1239
+    "linha": 1240
    },
    {
     "secao": "rota",
     "chave": "GET /lojas/{loja_id}/google-ads/accounts",
     "simbolo": "/lojas/{loja_id}/google-ads/accounts",
     "arquivo": "app/web/control.py",
-    "linha": 1288
+    "linha": 1289
    },
    {
     "secao": "rota",
     "chave": "POST /lojas/{loja_id}/google-ads/accounts/sync",
     "simbolo": "/lojas/{loja_id}/google-ads/accounts/sync",
     "arquivo": "app/web/control.py",
-    "linha": 1306
+    "linha": 1307
    },
    {
     "secao": "rota",
     "chave": "POST /lojas/{loja_id}/google-ads/accounts/{customer_id}/select",
     "simbolo": "/lojas/{loja_id}/google-ads/accounts/{customer_id}/select",
     "arquivo": "app/web/control.py",
-    "linha": 1324
+    "linha": 1325
    },
    {
     "secao": "rota",
     "chave": "POST /lojas/{loja_id}/google-ads/metrics/sync",
     "simbolo": "/lojas/{loja_id}/google-ads/metrics/sync",
     "arquivo": "app/web/control.py",
-    "linha": 1344
+    "linha": 1345
    },
    {
     "secao": "rota",
     "chave": "GET /lojas/{loja_id}/google-ads/metrics/summary",
     "simbolo": "/lojas/{loja_id}/google-ads/metrics/summary",
     "arquivo": "app/web/control.py",
-    "linha": 1365
+    "linha": 1366
    },
    {
     "secao": "rota",
     "chave": "GET /internal/lojas/{loja_id}/aquisicao-resumo",
     "simbolo": "/internal/lojas/{loja_id}/aquisicao-resumo",
     "arquivo": "app/web/control.py",
-    "linha": 1387
+    "linha": 1388
    },
    {
     "secao": "rota",
     "chave": "GET /lojas/{loja_id}/google-ads/conversion-actions",
     "simbolo": "/lojas/{loja_id}/google-ads/conversion-actions",
     "arquivo": "app/web/control.py",
-    "linha": 1409
+    "linha": 1410
    },
    {
     "secao": "rota",
     "chave": "GET /lojas/{loja_id}/google-ads/conversion-bindings",
     "simbolo": "/lojas/{loja_id}/google-ads/conversion-bindings",
     "arquivo": "app/web/control.py",
-    "linha": 1430
+    "linha": 1431
    },
    {
     "secao": "rota",
     "chave": "POST /lojas/{loja_id}/google-ads/conversion-bindings",
     "simbolo": "/lojas/{loja_id}/google-ads/conversion-bindings",
     "arquivo": "app/web/control.py",
-    "linha": 1448
+    "linha": 1449
    },
    {
     "secao": "rota",
@@ -5195,112 +5195,112 @@
     "chave": "POST /app/control/lojas/{loja_id}/modulos",
     "simbolo": "/app/control/lojas/{loja_id}/modulos",
     "arquivo": "app/web/control_ui.py",
-    "linha": 709
+    "linha": 710
    },
    {
     "secao": "rota",
     "chave": "POST /app/control/lojas/{loja_id}/contrato",
     "simbolo": "/app/control/lojas/{loja_id}/contrato",
     "arquivo": "app/web/control_ui.py",
-    "linha": 757
+    "linha": 758
    },
    {
     "secao": "rota",
     "chave": "POST /app/control/lojas/{loja_id}/cargos",
     "simbolo": "/app/control/lojas/{loja_id}/cargos",
     "arquivo": "app/web/control_ui.py",
-    "linha": 842
+    "linha": 843
    },
    {
     "secao": "rota",
     "chave": "POST /app/control/lojas/{loja_id}/cargos/{cargo_id}/revogar",
     "simbolo": "/app/control/lojas/{loja_id}/cargos/{cargo_id}/revogar",
     "arquivo": "app/web/control_ui.py",
-    "linha": 990
+    "linha": 991
    },
    {
     "secao": "rota",
     "chave": "POST /app/control/lojas/{loja_id}/estado",
     "simbolo": "/app/control/lojas/{loja_id}/estado",
     "arquivo": "app/web/control_ui.py",
-    "linha": 1042
+    "linha": 1043
    },
    {
     "secao": "rota",
     "chave": "POST /app/control/lojas/{loja_id}/whatsapp-modo",
     "simbolo": "/app/control/lojas/{loja_id}/whatsapp-modo",
     "arquivo": "app/web/control_ui.py",
-    "linha": 1106
+    "linha": 1107
    },
    {
     "secao": "rota",
     "chave": "POST /app/control/lojas/{loja_id}/gestores",
     "simbolo": "/app/control/lojas/{loja_id}/gestores",
     "arquivo": "app/web/control_ui.py",
-    "linha": 1156
+    "linha": 1157
    },
    {
     "secao": "rota",
     "chave": "POST /app/control/lojas/{loja_id}/gestores/convidar",
     "simbolo": "/app/control/lojas/{loja_id}/gestores/convidar",
     "arquivo": "app/web/control_ui.py",
-    "linha": 1220
+    "linha": 1221
    },
    {
     "secao": "rota",
     "chave": "POST /app/control/lojas/{loja_id}/gestores/revogar",
     "simbolo": "/app/control/lojas/{loja_id}/gestores/revogar",
     "arquivo": "app/web/control_ui.py",
-    "linha": 1290
+    "linha": 1291
    },
    {
     "secao": "rota",
     "chave": "POST /app/control/lojas/{loja_id}/gestores/{gestor_id}/revogar",
     "simbolo": "/app/control/lojas/{loja_id}/gestores/{gestor_id}/revogar",
     "arquivo": "app/web/control_ui.py",
-    "linha": 1294
+    "linha": 1295
    },
    {
     "secao": "rota",
     "chave": "POST /app/control/lojas/{loja_id}/google-ads/oauth/start",
     "simbolo": "/app/control/lojas/{loja_id}/google-ads/oauth/start",
     "arquivo": "app/web/control_ui.py",
-    "linha": 1346
+    "linha": 1347
    },
    {
     "secao": "rota",
     "chave": "POST /app/control/lojas/{loja_id}/google-ads/desconectar",
     "simbolo": "/app/control/lojas/{loja_id}/google-ads/desconectar",
     "arquivo": "app/web/control_ui.py",
-    "linha": 1396
+    "linha": 1397
    },
    {
     "secao": "rota",
     "chave": "POST /app/control/lojas/{loja_id}/google-ads/accounts/sync",
     "simbolo": "/app/control/lojas/{loja_id}/google-ads/accounts/sync",
     "arquivo": "app/web/control_ui.py",
-    "linha": 1449
+    "linha": 1450
    },
    {
     "secao": "rota",
     "chave": "POST /app/control/lojas/{loja_id}/google-ads/accounts/select",
     "simbolo": "/app/control/lojas/{loja_id}/google-ads/accounts/select",
     "arquivo": "app/web/control_ui.py",
-    "linha": 1502
+    "linha": 1503
    },
    {
     "secao": "rota",
     "chave": "POST /app/control/lojas/{loja_id}/google-ads/conversion-bindings",
     "simbolo": "/app/control/lojas/{loja_id}/google-ads/conversion-bindings",
     "arquivo": "app/web/control_ui.py",
-    "linha": 1575
+    "linha": 1576
    },
    {
     "secao": "rota",
     "chave": "POST /app/control/lojas/{loja_id}/google-ads/metrics/sync",
     "simbolo": "/app/control/lojas/{loja_id}/google-ads/metrics/sync",
     "arquivo": "app/web/control_ui.py",
-    "linha": 1654
+    "linha": 1655
    },
    {
     "secao": "template",

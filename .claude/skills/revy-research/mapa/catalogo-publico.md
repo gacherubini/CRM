@@ -1,6 +1,6 @@
 # catalogo-publico · 8 rotas · 1 workers · 1 flags · 4 templates
 
-Gerado de `066f6e2`. NAO editar a mao — saida de `gerar_mapa.py`.
+Gerado de `fe559da`. NAO editar a mao — saida de `gerar_mapa.py`.
 Migration head: `n/a`
 
 ## Rotas

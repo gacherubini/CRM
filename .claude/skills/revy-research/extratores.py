@@ -23,7 +23,12 @@ def _decorators_de_rota(no: ast.AST):
         path = dec.args[0].value
         if not isinstance(path, str):
             continue
-        yield alvo.attr.upper(), path, dec.lineno
+        # A linha e a da STRING do path, nao a do decorator. Quando o decorator
+        # quebra em varias linhas (o estilo de control.py e control_ui.py, com
+        # o path numa linha propria), dec.lineno aponta para a linha do
+        # @router.post, onde o path nao esta escrito — e o --verificar acusa
+        # mentira. Mesma armadilha que o TemplateResponse ja tinha.
+        yield alvo.attr.upper(), path, dec.args[0].lineno
 
 
 def rotas(texto: str, arquivo_rel: str) -> list[Entrada]:
