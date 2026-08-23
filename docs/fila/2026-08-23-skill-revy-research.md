@@ -1,0 +1,1679 @@
+# Skill `revy-research` — Plano de Implementação
+
+> **Para agentes:** SUB-SKILL OBRIGATÓRIA: use `superpowers:subagent-driven-development` (recomendado) ou `superpowers:executing-plans` para executar tarefa por tarefa. Os passos usam checkbox (`- [ ]`).
+
+**Goal:** Uma skill de projeto que, ao ser invocada antes de codar, entrega ao agente `arquivo:linha` de toda rota, modelo, worker, migration, flag e template dos 6 produtos, mais as armadilhas conhecidas e as decisões do dono a não re-propor.
+
+**Architecture:** Um gerador em AST estático da stdlib varre os 722 arquivos `.py` do projeto (ignorando os 5 `.venv`, que respondem por 93% do total) e escreve `mapa/<produto>.md`. Um modo `--verificar` reabre cada `arquivo:linha` escrita e prova que o símbolo prometido está lá — o mapa não pode mentir. `SKILL.md` é só protocolo; o volume mora em arquivos vizinhos carregados sob demanda.
+
+**Tech Stack:** Python 3 stdlib apenas (`ast`, `pathlib`, `json`, `unittest`, `subprocess` para git). Sem dependência, sem `.venv`, sem importar o `app` de nenhum produto.
+
+**Spec:** [`docs/referencia-viva/specs/2026-08-23-skill-revy-research-design.md`](../referencia-viva/specs/2026-08-23-skill-revy-research-design.md)
+
+## Global Constraints
+
+Valem para toda tarefa deste plano.
+
+- **Stdlib apenas.** Zero `pip install`. Zero import de `app` de qualquer produto (invariante do `AGENTS.md` §5). O gerador lê arquivo como texto e parseia com `ast`; nunca executa código de produto.
+- **Roda nos dois SOs.** Windows: `python`. macOS: `python3`. O comando `python3` **não existe** no Windows do dono e `python` puro **não existe** no Mac dele — todo comando neste plano aparece nas duas formas.
+- **A árvore de trabalho tem 9 arquivos modificados que NÃO são deste plano** (`.gitignore`, `n8n/*`, `site/*`, `deploy/fly/3vm/prepare-workflow.ps1`). Todo commit lista caminhos explícitos. **Nunca `git add -A`, nunca `git add .`, nunca `git commit -a`.** (`AGENTS.md` §6: não commitar mudança alheia.)
+- **Diretórios sempre excluídos da varredura:** `.venv`, `__pycache__`, `node_modules`, `.git`, `.pytest_cache`, `.pytest-tmp`, `test-tmp-*`, `graphify-out`.
+- **Os 6 produtos são exatamente:** `chatbot-api`, `portal-gestao`, `motor-simulacao`, `estoque-api`, `revy-trafego`, `catalogo-publico`. `site/`, `n8n/`, `shared/` e `deploy/` **não** entram no mapa.
+- **`revy-trafego` não tem `.venv`** e usa o do `portal-gestao`. É a exceção que precisa aparecer no mapa.
+- **Suspeita não vira commit, vira pergunta.** A seção de cruzamentos é rotulada como suspeita e nunca gera edição automática de código.
+- **Sem segredo no git.** Nada de token, cookie ou `.env` real em nenhum arquivo gerado.
+- Testes do gerador rodam com `unittest` da stdlib, nunca com `pytest` (que exigiria `.venv`).
+
+## File Structure
+
+| Arquivo | Responsabilidade |
+|---|---|
+| `.gitignore` (modificar) | Passar a versionar `.claude/skills/` mantendo o resto de `.claude/` ignorado |
+| `AGENTS.md` (modificar) | Passo 0 no §1, para o disparo ser determinístico |
+| `.claude/skills/revy-research/SKILL.md` | Só o protocolo. ~70 linhas |
+| `.claude/skills/revy-research/varredura.py` | Achar os arquivos do projeto e ignorar dependência |
+| `.claude/skills/revy-research/extratores.py` | Os 7 extratores. Funções puras: texto → `list[Entrada]` |
+| `.claude/skills/revy-research/gerar_mapa.py` | CLI, orquestração, render do markdown, `--verificar` |
+| `.claude/skills/revy-research/cruzamentos.py` | Clientes HTTP × rotas declaradas; funções sem chamador |
+| `.claude/skills/revy-research/test_gerar_mapa.py` | `unittest`, roda sem `.venv` |
+| `.claude/skills/revy-research/mapa/` | Gerado e commitado |
+| `.claude/skills/revy-research/learnings/` | `INDEX.md` + um arquivo por armadilha |
+| `.claude/skills/revy-research/decisoes/` | `INDEX.md` + um arquivo por escolha do dono |
+
+`varredura.py`, `extratores.py` e `cruzamentos.py` são separados de propósito: cada um é testável isolado, e `extratores.py` é o único que precisa entender `ast`.
+
+### O tipo que atravessa todas as tarefas
+
+Definido na Task 2, consumido por todas as seguintes:
+
+```python
+@dataclass(frozen=True)
+class Entrada:
+    secao: str      # "rota" | "modelo" | "migration" | "worker" | "flag" | "template"
+    chave: str      # "POST /webhook/cloud"  — o que se procura no mapa
+    simbolo: str    # "webhook_cloud"        — o que --verificar exige na linha
+    arquivo: str    # "app/main.py"          — relativo à pasta do produto
+    linha: int      # 1-based; 0 = "verificar só que o arquivo existe"
+```
+
+A regra de `linha: int` é o contrato do `--verificar`: **`linha > 0` → o texto daquela linha precisa conter `simbolo`; `linha == 0` → basta o arquivo existir.** Vale para template solto, que não é renderizado por nenhuma rota.
+
+---
+
+### Task 1: Versionar `.claude/skills/`
+
+Sem isto nada mais importa: a skill não existiria no Mac do dono, nem para subagente em worktree. `.gitignore:46` hoje ignora `.claude/` inteiro, e uma pasta excluída não pode ter arquivo re-incluído — é preciso trocar por exclusão de conteúdo.
+
+**Files:**
+- Modify: `.gitignore:46`
+
+**Interfaces:**
+- Consumes: nada
+- Produces: `.claude/skills/**` versionável. Toda tarefa seguinte depende disto.
+
+- [ ] **Step 1: Ver a linha exata antes de mexer**
+
+```bash
+grep -n "^\.claude" .gitignore
+```
+
+Esperado: `46:.claude/`
+
+- [ ] **Step 2: Provar que hoje é ignorado (o teste que precisa falhar depois)**
+
+```bash
+git check-ignore -v .claude/skills/revy-research/SKILL.md
+```
+
+Esperado: `.gitignore:46:.claude/	.claude/skills/revy-research/SKILL.md` — ou seja, ignorado.
+
+- [ ] **Step 3: Trocar a exclusão de pasta por exclusão de conteúdo**
+
+Substituir a linha `.claude/` por estas duas:
+
+```gitignore
+.claude/*
+!.claude/skills/
+```
+
+Atenção: a alteração é **só** nessa linha. O `.gitignore` já tem uma modificação não commitada do dono na linha 37 (`workflow-cloud.ready.json`) — não tocar, não commitar.
+
+- [ ] **Step 4: Provar que `skills/` passou e que o resto continua barrado**
+
+```bash
+git check-ignore -v .claude/skills/revy-research/SKILL.md ; echo "skills -> exit $?"
+git check-ignore -v .claude/settings.local.json         ; echo "settings -> exit $?"
+```
+
+Esperado: `skills -> exit 1` (não ignorado, que é o que queremos) e `settings -> exit 0` com a linha `.claude/*` (segue ignorado, que também é o que queremos).
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add .gitignore
+git commit -m "chore(git): versionar .claude/skills/ mantendo o resto de .claude ignorado"
+```
+
+Se `git status --short` mostrar que o `.gitignore` ainda tem alteração pendente, é a linha 37 do dono. Deixe pendente.
+
+---
+
+### Task 2: Varredura — achar os 722 e ignorar os 10.286
+
+**Files:**
+- Create: `.claude/skills/revy-research/varredura.py`
+- Create: `.claude/skills/revy-research/test_gerar_mapa.py`
+
+**Interfaces:**
+- Consumes: nada
+- Produces:
+  - `PRODUTOS: tuple[str, ...]` — os 6 nomes de pasta
+  - `IGNORADOS: frozenset[str]`
+  - `raiz_repo() -> Path`
+  - `arquivos_py(raiz: Path, produto: str) -> list[Path]`
+  - `dataclass Entrada(secao, chave, simbolo, arquivo, linha)`
+
+- [ ] **Step 1: Escrever o teste que falha**
+
+`.claude/skills/revy-research/test_gerar_mapa.py`:
+
+```python
+import unittest
+from pathlib import Path
+
+import varredura
+
+
+class TestVarredura(unittest.TestCase):
+    def setUp(self):
+        self.raiz = varredura.raiz_repo()
+
+    def test_raiz_do_repo_tem_agents_md(self):
+        self.assertTrue((self.raiz / "AGENTS.md").exists())
+
+    def test_acha_arquivos_do_chatbot(self):
+        arquivos = varredura.arquivos_py(self.raiz, "chatbot-api")
+        self.assertGreater(len(arquivos), 10)
+
+    def test_nunca_entra_em_venv_nem_pycache(self):
+        for produto in varredura.PRODUTOS:
+            for caminho in varredura.arquivos_py(self.raiz, produto):
+                partes = caminho.parts
+                self.assertNotIn(".venv", partes, f"venv vazou em {caminho}")
+                self.assertNotIn("__pycache__", partes, f"pycache vazou em {caminho}")
+
+    def test_projeto_e_muito_menor_que_a_arvore_toda(self):
+        do_projeto = sum(
+            len(varredura.arquivos_py(self.raiz, p)) for p in varredura.PRODUTOS
+        )
+        self.assertGreater(do_projeto, 300)
+        self.assertLess(do_projeto, 2000)
+
+
+if __name__ == "__main__":
+    unittest.main()
+```
+
+- [ ] **Step 2: Rodar e ver falhar**
+
+```bash
+# Windows
+cd .claude/skills/revy-research && python -m unittest test_gerar_mapa -v
+# macOS
+cd .claude/skills/revy-research && python3 -m unittest test_gerar_mapa -v
+```
+
+Esperado: `ModuleNotFoundError: No module named 'varredura'`
+
+- [ ] **Step 3: Implementar**
+
+`.claude/skills/revy-research/varredura.py`:
+
+```python
+"""Acha os arquivos do PROJETO, nunca os das dependencias."""
+from __future__ import annotations
+
+from dataclasses import dataclass
+from pathlib import Path
+
+PRODUTOS: tuple[str, ...] = (
+    "chatbot-api",
+    "portal-gestao",
+    "motor-simulacao",
+    "estoque-api",
+    "revy-trafego",
+    "catalogo-publico",
+)
+
+IGNORADOS: frozenset[str] = frozenset({
+    ".venv", "__pycache__", "node_modules", ".git",
+    ".pytest_cache", ".pytest-tmp", "graphify-out", ".mypy_cache",
+})
+
+
+@dataclass(frozen=True)
+class Entrada:
+    secao: str
+    chave: str
+    simbolo: str
+    arquivo: str
+    linha: int
+
+
+def raiz_repo() -> Path:
+    """Sobe de .claude/skills/revy-research/ ate a raiz do repo."""
+    return Path(__file__).resolve().parents[3]
+
+
+def _ignorado(caminho: Path, base: Path) -> bool:
+    for parte in caminho.relative_to(base).parts:
+        if parte in IGNORADOS or parte.startswith("test-tmp"):
+            return True
+    return False
+
+
+def arquivos_py(raiz: Path, produto: str) -> list[Path]:
+    base = raiz / produto
+    if not base.is_dir():
+        return []
+    return sorted(
+        p for p in base.rglob("*.py")
+        if p.is_file() and not _ignorado(p, base)
+    )
+```
+
+- [ ] **Step 4: Rodar e ver passar**
+
+```bash
+# Windows
+cd .claude/skills/revy-research && python -m unittest test_gerar_mapa -v
+# macOS
+cd .claude/skills/revy-research && python3 -m unittest test_gerar_mapa -v
+```
+
+Esperado: `OK`, 4 testes. Se `test_projeto_e_muito_menor_que_a_arvore_toda` falhar por passar de 2000, algum diretório de dependência escapou — imprima os caminhos e acrescente o culpado a `IGNORADOS`.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add .claude/skills/revy-research/varredura.py .claude/skills/revy-research/test_gerar_mapa.py
+git commit -m "feat(revy-research): varredura que enxerga o projeto e ignora os 5 venv"
+```
+
+---
+
+### Task 3: Extrator de rotas
+
+O maior ganho isolado do mapa: 57 rotas do chatbot moram num `main.py` de 2.038 linhas.
+
+**Files:**
+- Create: `.claude/skills/revy-research/extratores.py`
+- Modify: `.claude/skills/revy-research/test_gerar_mapa.py`
+
+**Interfaces:**
+- Consumes: `varredura.Entrada`
+- Produces: `extratores.rotas(texto: str, arquivo_rel: str) -> list[Entrada]` — `secao="rota"`, `chave="POST /webhook/cloud"`, `simbolo` = nome da função.
+
+Verificado no levantamento: `APIRouter()` e `include_router()` são chamados **sem `prefix=`** em todo o repo, então o path do decorator é o path real.
+
+- [ ] **Step 1: Escrever o teste que falha**
+
+Acrescentar a `test_gerar_mapa.py`:
+
+```python
+import extratores
+
+FONTE_ROTAS = '''
+from fastapi import APIRouter
+router = APIRouter()
+
+@router.get("/app/loja/agente", response_class=HTMLResponse)
+def pagina_agente(request):
+    return 1
+
+@app.post("/webhook/cloud")
+async def webhook_cloud(request):
+    return 2
+
+@app.exception_handler(RequestValidationError)
+def nao_e_rota(request, exc):
+    return 3
+'''
+
+
+class TestExtratorDeRotas(unittest.TestCase):
+    def test_le_verbo_path_e_funcao(self):
+        achadas = extratores.rotas(FONTE_ROTAS, "app/exemplo.py")
+        chaves = {e.chave for e in achadas}
+        self.assertIn("GET /app/loja/agente", chaves)
+        self.assertIn("POST /webhook/cloud", chaves)
+
+    def test_exception_handler_nao_e_rota(self):
+        achadas = extratores.rotas(FONTE_ROTAS, "app/exemplo.py")
+        self.assertEqual(len(achadas), 2)
+
+    def test_simbolo_e_o_path_porque_e_isso_que_esta_na_linha(self):
+        achadas = extratores.rotas(FONTE_ROTAS, "app/exemplo.py")
+        por_chave = {e.chave: e for e in achadas}
+        self.assertEqual(por_chave["POST /webhook/cloud"].simbolo, "/webhook/cloud")
+
+    def test_linha_aponta_para_o_decorator(self):
+        achadas = extratores.rotas(FONTE_ROTAS, "app/exemplo.py")
+        por_chave = {e.chave: e for e in achadas}
+        linha = FONTE_ROTAS.splitlines()[por_chave["POST /webhook/cloud"].linha - 1]
+        self.assertIn("/webhook/cloud", linha)
+
+    def test_no_repo_real_o_webhook_cloud_existe(self):
+        raiz = varredura.raiz_repo()
+        alvo = raiz / "chatbot-api" / "app" / "main.py"
+        achadas = extratores.rotas(alvo.read_text(encoding="utf-8"), "app/main.py")
+        self.assertIn("POST /webhook/cloud", {e.chave for e in achadas})
+        self.assertGreater(len(achadas), 30)
+```
+
+- [ ] **Step 2: Rodar e ver falhar**
+
+```bash
+# Windows
+cd .claude/skills/revy-research && python -m unittest test_gerar_mapa -v
+# macOS
+cd .claude/skills/revy-research && python3 -m unittest test_gerar_mapa -v
+```
+
+Esperado: `ModuleNotFoundError: No module named 'extratores'`
+
+- [ ] **Step 3: Implementar**
+
+`.claude/skills/revy-research/extratores.py`:
+
+```python
+"""Extratores puros: texto de um arquivo -> list[Entrada]. Nunca importam o app."""
+from __future__ import annotations
+
+import ast
+
+from varredura import Entrada
+
+VERBOS = {"get", "post", "put", "patch", "delete", "head", "options"}
+
+
+def _decorators_de_rota(no: ast.AST):
+    for dec in getattr(no, "decorator_list", []):
+        if not isinstance(dec, ast.Call):
+            continue
+        alvo = dec.func
+        if not isinstance(alvo, ast.Attribute) or alvo.attr not in VERBOS:
+            continue
+        if not dec.args or not isinstance(dec.args[0], ast.Constant):
+            continue
+        path = dec.args[0].value
+        if not isinstance(path, str):
+            continue
+        yield alvo.attr.upper(), path, dec.lineno
+
+
+def rotas(texto: str, arquivo_rel: str) -> list[Entrada]:
+    try:
+        arvore = ast.parse(texto)
+    except SyntaxError:
+        return []
+    achadas: list[Entrada] = []
+    for no in ast.walk(arvore):
+        if not isinstance(no, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            continue
+        for verbo, path, linha in _decorators_de_rota(no):
+            achadas.append(Entrada(
+                secao="rota",
+                chave=f"{verbo} {path}",
+                simbolo=path,
+                arquivo=arquivo_rel,
+                linha=linha,
+            ))
+    return achadas
+```
+
+Por que `simbolo` é o **path** e não o nome da função: `--verificar` reabre a linha do *decorator*, e o que está escrito naquela linha é o path. O nome da função existe no AST (`no.name`) mas não aparece na linha verificada, então não serve de âncora. A `chave` (`"POST /webhook/cloud"`) é o que se procura no mapa; o `simbolo` é o que prova que a linha é aquela.
+
+- [ ] **Step 4: Rodar e ver passar**
+
+```bash
+# Windows
+cd .claude/skills/revy-research && python -m unittest test_gerar_mapa -v
+# macOS
+cd .claude/skills/revy-research && python3 -m unittest test_gerar_mapa -v
+```
+
+Esperado: `OK`, 9 testes. O teste contra o repo real deve achar mais de 30 rotas no chatbot (medido: 57 decorators `@app.`, dos quais alguns são handler e não rota).
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add .claude/skills/revy-research/extratores.py .claude/skills/revy-research/test_gerar_mapa.py
+git commit -m "feat(revy-research): extrator de rotas por AST, sem importar o app"
+```
+
+---
+
+### Task 4: Extrator de modelos e de migrations
+
+**Files:**
+- Modify: `.claude/skills/revy-research/extratores.py`
+- Modify: `.claude/skills/revy-research/test_gerar_mapa.py`
+
+**Interfaces:**
+- Consumes: `varredura.Entrada`
+- Produces:
+  - `extratores.modelos(texto: str, arquivo_rel: str) -> list[Entrada]` — `secao="modelo"`, `chave` = nome da tabela, `simbolo` = nome da tabela
+  - `extratores.migrations(pasta_versions: Path) -> tuple[list[Entrada], str]` — a lista e o **head** (a revision que ninguém aponta como `down_revision`)
+
+Contagens medidas hoje, para conferir o resultado: chatbot 25, portal 26, control 20, estoque 10, motor 14.
+
+- [ ] **Step 1: Escrever os testes que falham**
+
+```python
+FONTE_MODELOS = '''
+class Loja(Base):
+    __tablename__ = "lojas"
+    id = Column(Integer)
+
+class FilaVendedor(Base):
+    __tablename__ = "fila_vendedor"
+'''
+
+
+class TestExtratorDeModelos(unittest.TestCase):
+    def test_acha_tabela_e_classe(self):
+        achados = extratores.modelos(FONTE_MODELOS, "app/models_db.py")
+        chaves = {e.chave for e in achados}
+        self.assertEqual(chaves, {"lojas", "fila_vendedor"})
+
+    def test_linha_aponta_para_o_tablename(self):
+        achados = extratores.modelos(FONTE_MODELOS, "app/models_db.py")
+        por_chave = {e.chave: e for e in achados}
+        linha = FONTE_MODELOS.splitlines()[por_chave["fila_vendedor"].linha - 1]
+        self.assertIn("fila_vendedor", linha)
+
+    def test_no_repo_real_fila_vendedor_esta_em_models_db(self):
+        raiz = varredura.raiz_repo()
+        alvo = raiz / "chatbot-api" / "app" / "models_db.py"
+        achados = extratores.modelos(alvo.read_text(encoding="utf-8"), "app/models_db.py")
+        self.assertIn("fila_vendedor", {e.chave for e in achados})
+
+
+class TestExtratorDeMigrations(unittest.TestCase):
+    def test_conta_e_acha_o_head_do_chatbot(self):
+        raiz = varredura.raiz_repo()
+        entradas, head = extratores.migrations(raiz / "chatbot-api" / "alembic" / "versions")
+        self.assertEqual(len(entradas), 25)
+        self.assertTrue(head, "head nao pode ser vazio")
+
+    def test_pasta_inexistente_nao_quebra(self):
+        entradas, head = extratores.migrations(Path("nao/existe"))
+        self.assertEqual(entradas, [])
+        self.assertEqual(head, "")
+```
+
+- [ ] **Step 2: Rodar e ver falhar**
+
+```bash
+# Windows
+cd .claude/skills/revy-research && python -m unittest test_gerar_mapa -v
+# macOS
+cd .claude/skills/revy-research && python3 -m unittest test_gerar_mapa -v
+```
+
+Esperado: `AttributeError: module 'extratores' has no attribute 'modelos'`
+
+- [ ] **Step 3: Implementar**
+
+Acrescentar a `extratores.py`:
+
+```python
+from pathlib import Path
+
+
+def modelos(texto: str, arquivo_rel: str) -> list[Entrada]:
+    try:
+        arvore = ast.parse(texto)
+    except SyntaxError:
+        return []
+    achados: list[Entrada] = []
+    for no in ast.walk(arvore):
+        if not isinstance(no, ast.ClassDef):
+            continue
+        for corpo in no.body:
+            alvo_ok = (
+                isinstance(corpo, ast.Assign)
+                and len(corpo.targets) == 1
+                and isinstance(corpo.targets[0], ast.Name)
+                and corpo.targets[0].id == "__tablename__"
+                and isinstance(corpo.value, ast.Constant)
+                and isinstance(corpo.value.value, str)
+            )
+            if alvo_ok:
+                tabela = corpo.value.value
+                achados.append(Entrada(
+                    secao="modelo",
+                    chave=tabela,
+                    simbolo=tabela,
+                    arquivo=arquivo_rel,
+                    linha=corpo.lineno,
+                ))
+    return achados
+
+
+def _revisions(texto: str) -> tuple[str, str]:
+    """(revision, down_revision) lidos como constantes de modulo."""
+    revision = down = ""
+    try:
+        arvore = ast.parse(texto)
+    except SyntaxError:
+        return "", ""
+    for no in arvore.body:
+        if not isinstance(no, ast.Assign) or len(no.targets) != 1:
+            continue
+        alvo = no.targets[0]
+        if not isinstance(alvo, ast.Name):
+            continue
+        valor = no.value.value if isinstance(no.value, ast.Constant) else ""
+        if alvo.id == "revision" and isinstance(valor, str):
+            revision = valor
+        elif alvo.id == "down_revision" and isinstance(valor, str):
+            down = valor
+    return revision, down
+
+
+def migrations(pasta_versions: Path) -> tuple[list[Entrada], str]:
+    if not pasta_versions.is_dir():
+        return [], ""
+    entradas: list[Entrada] = []
+    revisions: set[str] = set()
+    apontadas: set[str] = set()
+    for arquivo in sorted(pasta_versions.glob("*.py")):
+        texto = arquivo.read_text(encoding="utf-8", errors="replace")
+        revision, down = _revisions(texto)
+        if not revision:
+            continue
+        revisions.add(revision)
+        if down:
+            apontadas.add(down)
+        entradas.append(Entrada(
+            secao="migration",
+            chave=revision,
+            simbolo=revision,
+            arquivo=str(arquivo.name),
+            linha=0,
+        ))
+    heads = sorted(revisions - apontadas)
+    return entradas, (heads[0] if len(heads) == 1 else ",".join(heads))
+```
+
+`linha=0` para migration é intencional: o contrato do `--verificar` é "arquivo existe". O `arquivo` guarda só o nome porque a pasta é fixa por produto.
+
+- [ ] **Step 4: Rodar e ver passar**
+
+```bash
+# Windows
+cd .claude/skills/revy-research && python -m unittest test_gerar_mapa -v
+# macOS
+cd .claude/skills/revy-research && python3 -m unittest test_gerar_mapa -v
+```
+
+Esperado: `OK`. Se o head vier com vírgula, há **duas heads** no produto — isso é um achado real de migration divergente, não um bug do gerador. Pare e reporte ao dono antes de seguir.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add .claude/skills/revy-research/extratores.py .claude/skills/revy-research/test_gerar_mapa.py
+git commit -m "feat(revy-research): extratores de modelo e de migration com calculo de head"
+```
+
+---
+
+### Task 5: Extratores de worker, flag e template
+
+Três extratores pequenos com a mesma forma. Vão juntos porque um revisor aceitaria ou rejeitaria os três pelo mesmo critério.
+
+**Files:**
+- Modify: `.claude/skills/revy-research/extratores.py`
+- Modify: `.claude/skills/revy-research/test_gerar_mapa.py`
+
+**Interfaces:**
+- Consumes: `varredura.Entrada`
+- Produces:
+  - `extratores.workers(texto: str, arquivo_rel: str) -> list[Entrada]` — `secao="worker"`
+  - `extratores.flags(texto: str, arquivo_rel: str) -> list[Entrada]` — `secao="flag"`, `chave` = `"REVY_X (default: 0)"`, `simbolo` = `"REVY_X"`
+  - `extratores.templates(base_produto: Path) -> list[Entrada]` — `secao="template"`, `linha=0`
+
+Medido hoje: 74 flags `REVY_*`/`MULTI_*` no repo. Templates: portal 61, control 20, catálogo 4, estoque 3, chatbot 0.
+
+- [ ] **Step 1: Escrever os testes que falham**
+
+```python
+FONTE_WORKERS = '''
+class FollowupWorker:
+    def rodar(self):
+        pass
+
+def iniciar_rodizio_job():
+    pass
+'''
+
+FONTE_FLAGS = '''
+import os
+ATIVO = os.getenv("REVY_LOJA_COPILOTO_ENABLED", "0") == "1"
+MODO = os.environ.get("MULTI_WHATSAPP_ENABLED", "0")
+QUALQUER = os.getenv("DATABASE_URL")
+'''
+
+
+class TestExtratorDeWorkers(unittest.TestCase):
+    def test_acha_classe_worker(self):
+        achados = extratores.workers(FONTE_WORKERS, "app/modo2_workers.py")
+        self.assertIn("FollowupWorker", {e.chave for e in achados})
+
+    def test_acha_funcao_job(self):
+        achados = extratores.workers(FONTE_WORKERS, "app/rodizio_job.py")
+        self.assertIn("iniciar_rodizio_job", {e.chave for e in achados})
+
+
+class TestExtratorDeFlags(unittest.TestCase):
+    def test_pega_revy_e_multi_com_default(self):
+        achados = extratores.flags(FONTE_FLAGS, "app/config.py")
+        simbolos = {e.simbolo for e in achados}
+        self.assertEqual(simbolos, {"REVY_LOJA_COPILOTO_ENABLED", "MULTI_WHATSAPP_ENABLED"})
+
+    def test_ignora_env_que_nao_e_flag(self):
+        achados = extratores.flags(FONTE_FLAGS, "app/config.py")
+        self.assertNotIn("DATABASE_URL", {e.simbolo for e in achados})
+
+    def test_registra_o_default_do_codigo(self):
+        achados = extratores.flags(FONTE_FLAGS, "app/config.py")
+        por_simbolo = {e.simbolo: e for e in achados}
+        self.assertIn("0", por_simbolo["REVY_LOJA_COPILOTO_ENABLED"].chave)
+
+
+class TestExtratorDeTemplates(unittest.TestCase):
+    def test_portal_tem_dezenas_de_templates(self):
+        raiz = varredura.raiz_repo()
+        achados = extratores.templates(raiz / "portal-gestao")
+        self.assertGreater(len(achados), 40)
+
+    def test_chatbot_nao_tem_template(self):
+        raiz = varredura.raiz_repo()
+        self.assertEqual(extratores.templates(raiz / "chatbot-api"), [])
+```
+
+- [ ] **Step 2: Rodar e ver falhar**
+
+```bash
+# Windows
+cd .claude/skills/revy-research && python -m unittest test_gerar_mapa -v
+# macOS
+cd .claude/skills/revy-research && python3 -m unittest test_gerar_mapa -v
+```
+
+Esperado: `AttributeError: module 'extratores' has no attribute 'workers'`
+
+- [ ] **Step 3: Implementar**
+
+Acrescentar a `extratores.py`:
+
+```python
+from varredura import IGNORADOS
+
+PREFIXOS_DE_FLAG = ("REVY_", "MULTI_")
+
+
+def workers(texto: str, arquivo_rel: str) -> list[Entrada]:
+    try:
+        arvore = ast.parse(texto)
+    except SyntaxError:
+        return []
+    de_arquivo_de_job = arquivo_rel.endswith(("_job.py", "_workers.py"))
+    achados: list[Entrada] = []
+    for no in arvore.body:
+        nome = getattr(no, "name", "")
+        if not nome:
+            continue
+        e_worker = nome.endswith("Worker") or (
+            de_arquivo_de_job
+            and isinstance(no, (ast.FunctionDef, ast.AsyncFunctionDef))
+            and not nome.startswith("_")
+        )
+        if e_worker:
+            achados.append(Entrada(
+                secao="worker",
+                chave=nome,
+                simbolo=nome,
+                arquivo=arquivo_rel,
+                linha=no.lineno,
+            ))
+    return achados
+
+
+def flags(texto: str, arquivo_rel: str) -> list[Entrada]:
+    try:
+        arvore = ast.parse(texto)
+    except SyntaxError:
+        return []
+    vistos: dict[str, Entrada] = {}
+    for no in ast.walk(arvore):
+        if not isinstance(no, ast.Call) or not no.args:
+            continue
+        alvo = no.func
+        nome_chamada = getattr(alvo, "attr", "")
+        if nome_chamada not in {"getenv", "get"}:
+            continue
+        primeiro = no.args[0]
+        if not isinstance(primeiro, ast.Constant) or not isinstance(primeiro.value, str):
+            continue
+        nome = primeiro.value
+        if not nome.startswith(PREFIXOS_DE_FLAG) or nome in vistos:
+            continue
+        padrao = ""
+        if len(no.args) > 1 and isinstance(no.args[1], ast.Constant):
+            padrao = str(no.args[1].value)
+        rotulo = f"{nome} (default: {padrao})" if padrao else nome
+        vistos[nome] = Entrada(
+            secao="flag",
+            chave=rotulo,
+            simbolo=nome,
+            arquivo=arquivo_rel,
+            linha=no.lineno,
+        )
+    return list(vistos.values())
+
+
+def templates(base_produto: Path) -> list[Entrada]:
+    if not base_produto.is_dir():
+        return []
+    achados: list[Entrada] = []
+    for html in sorted(base_produto.rglob("*.html")):
+        if any(parte in IGNORADOS for parte in html.parts):
+            continue
+        rel = html.relative_to(base_produto).as_posix()
+        achados.append(Entrada(
+            secao="template",
+            chave=rel,
+            simbolo=html.name,
+            arquivo=rel,
+            linha=0,
+        ))
+    return achados
+```
+
+- [ ] **Step 4: Rodar e ver passar**
+
+```bash
+# Windows
+cd .claude/skills/revy-research && python -m unittest test_gerar_mapa -v
+# macOS
+cd .claude/skills/revy-research && python3 -m unittest test_gerar_mapa -v
+```
+
+Esperado: `OK`.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add .claude/skills/revy-research/extratores.py .claude/skills/revy-research/test_gerar_mapa.py
+git commit -m "feat(revy-research): extratores de worker, flag e template"
+```
+
+---
+
+### Task 6: Gerar o mapa e o selo de frescor
+
+**Files:**
+- Create: `.claude/skills/revy-research/gerar_mapa.py`
+- Modify: `.claude/skills/revy-research/test_gerar_mapa.py`
+- Create (gerado): `.claude/skills/revy-research/mapa/*.md`, `.claude/skills/revy-research/mapa/_frescor.json`
+
+**Interfaces:**
+- Consumes: `varredura.*`, `extratores.*`
+- Produces:
+  - `gerar_mapa.coletar(raiz: Path, produto: str) -> list[Entrada]`
+  - `gerar_mapa.render(produto: str, entradas: list[Entrada], head: str, sha: str) -> str`
+  - `gerar_mapa.escrever_tudo(raiz: Path) -> None`
+  - `gerar_mapa.TESTES: dict[str, dict[str, str]]` — comando por produto e por SO
+  - CLI: `python gerar_mapa.py` gera; `--verificar` (Task 7) confere
+
+**A tabela de testes é a única parte escrita à mão do mapa**, porque não é inferível — e é onde mora a exceção que sempre morde:
+
+```python
+TESTES: dict[str, dict[str, str]] = {
+    "chatbot-api": {
+        "macos": "cd chatbot-api && .venv/bin/python -m pytest -q",
+        "windows": r"cd chatbot-api && .\.venv\Scripts\python.exe -m pytest -q",
+    },
+    "portal-gestao": {
+        "macos": "cd portal-gestao && .venv/bin/python -m pytest -q",
+        "windows": r"cd portal-gestao && .\.venv\Scripts\python.exe -m pytest -q",
+    },
+    "motor-simulacao": {
+        "macos": "cd motor-simulacao && .venv/bin/python -m pytest -q",
+        "windows": r"cd motor-simulacao && .\.venv\Scripts\python.exe -m pytest -q",
+    },
+    "estoque-api": {
+        "macos": "cd estoque-api && .venv/bin/python -m pytest -q",
+        "windows": r"cd estoque-api && .\.venv\Scripts\python.exe -m pytest -q",
+    },
+    "catalogo-publico": {
+        "macos": "cd catalogo-publico && .venv/bin/python -m pytest -q",
+        "windows": r"cd catalogo-publico && .\.venv\Scripts\python.exe -m pytest -q",
+    },
+    "revy-trafego": {
+        "macos": "cd revy-trafego && ../portal-gestao/.venv/bin/python -m pytest -q",
+        "windows": r"cd revy-trafego && ..\portal-gestao\.venv\Scripts\python.exe -m pytest -q",
+        "nota": "NAO tem .venv proprio. Usa o do portal-gestao.",
+    },
+}
+```
+
+- [ ] **Step 1: Escrever os testes que falham**
+
+```python
+class TestGeracaoDoMapa(unittest.TestCase):
+    def test_coleta_do_chatbot_traz_rota_e_modelo(self):
+        raiz = varredura.raiz_repo()
+        entradas = gerar_mapa.coletar(raiz, "chatbot-api")
+        secoes = {e.secao for e in entradas}
+        self.assertIn("rota", secoes)
+        self.assertIn("modelo", secoes)
+
+    def test_todo_produto_tem_comando_de_teste_nos_dois_sos(self):
+        for produto in varredura.PRODUTOS:
+            self.assertIn(produto, gerar_mapa.TESTES)
+            self.assertIn("macos", gerar_mapa.TESTES[produto])
+            self.assertIn("windows", gerar_mapa.TESTES[produto])
+
+    def test_revy_trafego_avisa_que_usa_o_venv_do_portal(self):
+        self.assertIn("portal-gestao", gerar_mapa.TESTES["revy-trafego"]["macos"])
+
+    def test_render_traz_o_sha_e_as_secoes(self):
+        raiz = varredura.raiz_repo()
+        entradas = gerar_mapa.coletar(raiz, "chatbot-api")
+        texto = gerar_mapa.render("chatbot-api", entradas, head="0025_x", sha="abc1234")
+        self.assertIn("abc1234", texto)
+        self.assertIn("/webhook/cloud", texto)
+        self.assertIn("fila_vendedor", texto)
+```
+
+- [ ] **Step 2: Rodar e ver falhar**
+
+```bash
+# Windows
+cd .claude/skills/revy-research && python -m unittest test_gerar_mapa -v
+# macOS
+cd .claude/skills/revy-research && python3 -m unittest test_gerar_mapa -v
+```
+
+Esperado: `ModuleNotFoundError: No module named 'gerar_mapa'`
+
+- [ ] **Step 3: Implementar**
+
+`.claude/skills/revy-research/gerar_mapa.py` (além do `TESTES` acima):
+
+```python
+"""Gera mapa/<produto>.md a partir do codigo. Stdlib apenas."""
+from __future__ import annotations
+
+import json
+import subprocess
+import sys
+from pathlib import Path
+
+import extratores
+import varredura
+from varredura import Entrada
+
+PASTA_MAPA = Path(__file__).resolve().parent / "mapa"
+
+ORDEM = ("rota", "modelo", "worker", "flag", "migration", "template")
+TITULOS = {
+    "rota": "Rotas", "modelo": "Modelos", "worker": "Workers",
+    "flag": "Flags", "migration": "Migrations", "template": "Templates",
+}
+
+
+def sha_atual(raiz: Path) -> str:
+    saida = subprocess.run(
+        ["git", "rev-parse", "--short", "HEAD"],
+        cwd=raiz, capture_output=True, text=True, check=False,
+    )
+    return saida.stdout.strip() or "desconhecido"
+
+
+def coletar(raiz: Path, produto: str) -> list[Entrada]:
+    base = raiz / produto
+    entradas: list[Entrada] = []
+    for caminho in varredura.arquivos_py(raiz, produto):
+        rel = caminho.relative_to(base).as_posix()
+        texto = caminho.read_text(encoding="utf-8", errors="replace")
+        entradas.extend(extratores.rotas(texto, rel))
+        entradas.extend(extratores.modelos(texto, rel))
+        entradas.extend(extratores.workers(texto, rel))
+        entradas.extend(extratores.flags(texto, rel))
+    entradas.extend(extratores.templates(base))
+    de_migration, _ = extratores.migrations(base / "alembic" / "versions")
+    entradas.extend(de_migration)
+    return entradas
+
+
+def head_de(raiz: Path, produto: str) -> str:
+    _, head = extratores.migrations(raiz / produto / "alembic" / "versions")
+    return head
+
+
+def render(produto: str, entradas: list[Entrada], head: str, sha: str) -> str:
+    por_secao: dict[str, list[Entrada]] = {s: [] for s in ORDEM}
+    for e in entradas:
+        por_secao.setdefault(e.secao, []).append(e)
+
+    contagem = " · ".join(
+        f"{len(por_secao[s])} {TITULOS[s].lower()}" for s in ORDEM if por_secao[s]
+    )
+    linhas = [
+        f"# {produto} · {contagem}",
+        "",
+        f"Gerado de `{sha}`. NAO editar a mao — saida de `gerar_mapa.py`.",
+        f"Migration head: `{head or 'n/a'}`",
+        "",
+    ]
+    for secao in ORDEM:
+        itens = por_secao.get(secao) or []
+        if not itens:
+            continue
+        linhas.append(f"## {TITULOS[secao]}")
+        linhas.append("")
+        for e in sorted(itens, key=lambda x: (x.arquivo, x.linha, x.chave)):
+            alvo = f"{e.arquivo}:{e.linha}" if e.linha else e.arquivo
+            linhas.append(f"- `{e.chave}` — {alvo}")
+        linhas.append("")
+
+    testes = TESTES[produto]
+    linhas.append("## Testes")
+    linhas.append("")
+    if "nota" in testes:
+        linhas.append(f"**{testes['nota']}**")
+        linhas.append("")
+    linhas.append(f"- macOS: `{testes['macos']}`")
+    linhas.append(f"- Windows: `{testes['windows']}`")
+    linhas.append("")
+    return "\n".join(linhas)
+
+
+def escrever_tudo(raiz: Path) -> None:
+    PASTA_MAPA.mkdir(parents=True, exist_ok=True)
+    sha = sha_atual(raiz)
+    inventario: dict[str, list[dict]] = {}
+    for produto in varredura.PRODUTOS:
+        entradas = coletar(raiz, produto)
+        head = head_de(raiz, produto)
+        (PASTA_MAPA / f"{produto}.md").write_text(
+            render(produto, entradas, head, sha), encoding="utf-8"
+        )
+        inventario[produto] = [vars(e) for e in entradas]
+        print(f"{produto}: {len(entradas)} entradas")
+    (PASTA_MAPA / "_frescor.json").write_text(
+        json.dumps({"sha": sha, "inventario": inventario}, ensure_ascii=False, indent=1),
+        encoding="utf-8",
+    )
+    print(f"selo de frescor: {sha}")
+
+
+def main(argv: list[str]) -> int:
+    raiz = varredura.raiz_repo()
+    escrever_tudo(raiz)
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main(sys.argv[1:]))
+```
+
+- [ ] **Step 4: Rodar os testes e depois gerar o mapa de verdade**
+
+```bash
+# Windows
+cd .claude/skills/revy-research && python -m unittest test_gerar_mapa -v && python gerar_mapa.py
+# macOS
+cd .claude/skills/revy-research && python3 -m unittest test_gerar_mapa -v && python3 gerar_mapa.py
+```
+
+Esperado: `OK` nos testes, e depois uma linha por produto. Confira à vista que `chatbot-api` traz mais de 30 rotas e que `portal-gestao` traz mais de 40 templates. Abra `mapa/chatbot-api.md` e confirme que a seção Testes está lá.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add .claude/skills/revy-research/gerar_mapa.py .claude/skills/revy-research/test_gerar_mapa.py .claude/skills/revy-research/mapa/
+git commit -m "feat(revy-research): geracao do mapa por produto com selo de frescor"
+```
+
+---
+
+### Task 7: `--verificar` — a prova de que o mapa não mente
+
+É a peça que transforma "o mapa está desatualizado?" de opinião em teste.
+
+**Files:**
+- Modify: `.claude/skills/revy-research/gerar_mapa.py`
+- Modify: `.claude/skills/revy-research/test_gerar_mapa.py`
+
+**Interfaces:**
+- Consumes: `mapa/_frescor.json` escrito na Task 6
+- Produces: `gerar_mapa.verificar(raiz: Path) -> list[str]` — lista de divergências, vazia quando tudo bate. CLI `--verificar` sai 1 se houver divergência.
+
+Contrato, já fixado no tipo `Entrada`: **`linha > 0` → o texto daquela linha precisa conter `simbolo`; `linha == 0` → basta o arquivo existir.**
+
+- [ ] **Step 1: Escrever os testes que falham**
+
+```python
+class TestVerificacao(unittest.TestCase):
+    def test_mapa_recem_gerado_nao_tem_divergencia(self):
+        raiz = varredura.raiz_repo()
+        gerar_mapa.escrever_tudo(raiz)
+        self.assertEqual(gerar_mapa.verificar(raiz), [])
+
+    def test_entrada_mentirosa_e_pega(self):
+        raiz = varredura.raiz_repo()
+        gerar_mapa.escrever_tudo(raiz)
+        caminho = gerar_mapa.PASTA_MAPA / "_frescor.json"
+        dados = json.loads(caminho.read_text(encoding="utf-8"))
+        dados["inventario"]["chatbot-api"].append({
+            "secao": "rota", "chave": "GET /inventado",
+            "simbolo": "/rota-que-nao-existe-em-lugar-nenhum",
+            "arquivo": "app/main.py", "linha": 1,
+        })
+        caminho.write_text(json.dumps(dados, ensure_ascii=False), encoding="utf-8")
+        problemas = gerar_mapa.verificar(raiz)
+        self.assertTrue(problemas)
+        self.assertIn("/rota-que-nao-existe-em-lugar-nenhum", " ".join(problemas))
+        gerar_mapa.escrever_tudo(raiz)  # restaura
+```
+
+Acrescente `import json` no topo do arquivo de teste.
+
+- [ ] **Step 2: Rodar e ver falhar**
+
+```bash
+# Windows
+cd .claude/skills/revy-research && python -m unittest test_gerar_mapa -v
+# macOS
+cd .claude/skills/revy-research && python3 -m unittest test_gerar_mapa -v
+```
+
+Esperado: `AttributeError: module 'gerar_mapa' has no attribute 'verificar'`
+
+- [ ] **Step 3: Implementar**
+
+Acrescentar a `gerar_mapa.py`:
+
+```python
+def verificar(raiz: Path) -> list[str]:
+    caminho = PASTA_MAPA / "_frescor.json"
+    if not caminho.exists():
+        return ["mapa/_frescor.json nao existe — rode o gerador"]
+    dados = json.loads(caminho.read_text(encoding="utf-8"))
+    problemas: list[str] = []
+    for produto, entradas in dados.get("inventario", {}).items():
+        base = raiz / produto
+        for bruta in entradas:
+            if bruta["secao"] == "migration":
+                alvo = base / "alembic" / "versions" / bruta["arquivo"]
+            else:
+                alvo = base / bruta["arquivo"]
+            if not alvo.exists():
+                problemas.append(f"{produto}: sumiu {bruta['arquivo']}")
+                continue
+            if bruta["linha"] <= 0:
+                continue
+            linhas = alvo.read_text(encoding="utf-8", errors="replace").splitlines()
+            if bruta["linha"] > len(linhas):
+                problemas.append(
+                    f"{produto}: {bruta['arquivo']}:{bruta['linha']} passou do fim do arquivo"
+                )
+                continue
+            if bruta["simbolo"] not in linhas[bruta["linha"] - 1]:
+                problemas.append(
+                    f"{produto}: {bruta['arquivo']}:{bruta['linha']} "
+                    f"nao contem {bruta['simbolo']!r}"
+                )
+    return problemas
+```
+
+E trocar o `main` por:
+
+```python
+def main(argv: list[str]) -> int:
+    raiz = varredura.raiz_repo()
+    if "--verificar" in argv:
+        problemas = verificar(raiz)
+        for p in problemas:
+            print(f"DIVERGENCIA {p}")
+        if problemas:
+            print(f"{len(problemas)} divergencias — o mapa esta velho. Rode sem --verificar.")
+            return 1
+        print("mapa confere com o codigo")
+        return 0
+    escrever_tudo(raiz)
+    return 0
+```
+
+- [ ] **Step 4: Rodar e ver passar**
+
+```bash
+# Windows
+cd .claude/skills/revy-research && python -m unittest test_gerar_mapa -v && python gerar_mapa.py --verificar
+# macOS
+cd .claude/skills/revy-research && python3 -m unittest test_gerar_mapa -v && python3 gerar_mapa.py --verificar
+```
+
+Esperado: `OK` nos testes e `mapa confere com o codigo`, exit 0.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add .claude/skills/revy-research/gerar_mapa.py .claude/skills/revy-research/test_gerar_mapa.py .claude/skills/revy-research/mapa/
+git commit -m "feat(revy-research): --verificar reabre cada arquivo:linha e prova o mapa"
+```
+
+---
+
+### Task 8: `_cruzamentos.md` — rota órfã e função sem chamador
+
+O bug documentado do Modo 2 (*"o `chatbot-api` não expõe rota de oferta"*, efeito prático: **lead que ninguém pega some**) teria aparecido aqui como uma linha.
+
+**Files:**
+- Create: `.claude/skills/revy-research/cruzamentos.py`
+- Modify: `.claude/skills/revy-research/gerar_mapa.py`
+- Modify: `.claude/skills/revy-research/test_gerar_mapa.py`
+
+**Interfaces:**
+- Consumes: `varredura.arquivos_py`, `gerar_mapa.coletar`
+- Produces:
+  - `cruzamentos.ALVO_POR_CLIENTE: dict[str, str]` — arquivo de cliente → produto alvo
+  - `cruzamentos.paths_chamados(texto: str) -> set[str]` — paths literais e f-strings normalizadas
+  - `cruzamentos.normalizar(path: str) -> str` — `/v1/lojas/{id}` e `/v1/lojas/{loja_id}` viram o mesmo
+  - `cruzamentos.funcoes_publicas(raiz: Path, produto: str) -> dict[str, tuple[str, int]]`
+  - `cruzamentos.nomes_usados(raiz: Path) -> set[str]` — varredura única, cara; nunca chamar dentro de laço
+  - `cruzamentos.sem_chamador(raiz: Path, produto: str, usados: set[str]) -> list[tuple[str, str, int]]`
+  - `cruzamentos.render(raiz: Path, rotas_por_produto: dict[str, set[str]]) -> str` — os paths já chegam normalizados
+
+Padrão verificado no repo: `portal-gestao/app/clients/*.py` chamam `self._request("GET", "/v1/provedores")` e `self._request("GET", f"/v1/provedores/{nome}/credenciais")`.
+
+- [ ] **Step 1: Escrever os testes que falham**
+
+```python
+import cruzamentos
+
+FONTE_CLIENTE = '''
+class MotorClient:
+    def listar(self):
+        return self._request("GET", "/v1/provedores")
+
+    def obter(self, nome):
+        return self._request("GET", f"/v1/provedores/{nome}/credenciais")
+'''
+
+
+class TestCruzamentos(unittest.TestCase):
+    def test_acha_path_literal(self):
+        self.assertIn("/v1/provedores", cruzamentos.paths_chamados(FONTE_CLIENTE))
+
+    def test_acha_path_de_fstring_normalizado(self):
+        achados = cruzamentos.paths_chamados(FONTE_CLIENTE)
+        self.assertIn("/v1/provedores/{}/credenciais", achados)
+
+    def test_normalizar_iguala_nomes_de_parametro(self):
+        self.assertEqual(
+            cruzamentos.normalizar("/v1/lojas/{id}"),
+            cruzamentos.normalizar("/v1/lojas/{loja_id}"),
+        )
+
+    def test_todo_cliente_mapeado_aponta_para_produto_real(self):
+        for arquivo, alvo in cruzamentos.ALVO_POR_CLIENTE.items():
+            self.assertIn(alvo, varredura.PRODUTOS, f"{arquivo} aponta para {alvo}")
+```
+
+- [ ] **Step 2: Rodar e ver falhar**
+
+```bash
+# Windows
+cd .claude/skills/revy-research && python -m unittest test_gerar_mapa -v
+# macOS
+cd .claude/skills/revy-research && python3 -m unittest test_gerar_mapa -v
+```
+
+Esperado: `ModuleNotFoundError: No module named 'cruzamentos'`
+
+- [ ] **Step 3: Implementar**
+
+`.claude/skills/revy-research/cruzamentos.py`:
+
+```python
+"""Quem chama quem entre produtos. Tudo aqui e SUSPEITA, nunca erro."""
+from __future__ import annotations
+
+import ast
+import re
+from pathlib import Path
+
+import varredura
+
+# Escrito a mao: qual produto cada cliente HTTP consome.
+# fipe.py e deepseek.py sao servicos externos e ficam de fora de proposito.
+ALVO_POR_CLIENTE: dict[str, str] = {
+    "portal-gestao/app/clients/motor.py": "motor-simulacao",
+    "portal-gestao/app/clients/chatbot.py": "chatbot-api",
+    "portal-gestao/app/clients/estoque.py": "estoque-api",
+    "portal-gestao/app/clients/revy_trafego.py": "revy-trafego",
+    "chatbot-api/app/inventory.py": "estoque-api",
+    "chatbot-api/app/simulation.py": "motor-simulacao",
+}
+
+_PARAMETRO = re.compile(r"\{[^}]*\}")
+
+
+def normalizar(path: str) -> str:
+    return _PARAMETRO.sub("{}", path)
+
+
+def _de_fstring(no: ast.JoinedStr) -> str:
+    partes = []
+    for pedaco in no.values:
+        if isinstance(pedaco, ast.Constant) and isinstance(pedaco.value, str):
+            partes.append(pedaco.value)
+        else:
+            partes.append("{}")
+    return "".join(partes)
+
+
+def paths_chamados(texto: str) -> set[str]:
+    try:
+        arvore = ast.parse(texto)
+    except SyntaxError:
+        return set()
+    achados: set[str] = set()
+    for no in ast.walk(arvore):
+        if not isinstance(no, ast.Call):
+            continue
+        for arg in no.args:
+            valor = ""
+            if isinstance(arg, ast.Constant) and isinstance(arg.value, str):
+                valor = arg.value
+            elif isinstance(arg, ast.JoinedStr):
+                valor = _de_fstring(arg)
+            if valor.startswith("/"):
+                achados.add(normalizar(valor))
+    return achados
+
+
+def funcoes_publicas(raiz: Path, produto: str) -> dict[str, tuple[str, int]]:
+    achadas: dict[str, tuple[str, int]] = {}
+    base = raiz / produto
+    for caminho in varredura.arquivos_py(raiz, produto):
+        rel = caminho.relative_to(base).as_posix()
+        if rel.startswith("tests/") or rel.startswith("alembic/"):
+            continue
+        try:
+            arvore = ast.parse(caminho.read_text(encoding="utf-8", errors="replace"))
+        except SyntaxError:
+            continue
+        for no in arvore.body:
+            if isinstance(no, (ast.FunctionDef, ast.AsyncFunctionDef)) and not no.name.startswith("_"):
+                achadas.setdefault(no.name, (rel, no.lineno))
+    return achadas
+
+
+def nomes_usados(raiz: Path) -> set[str]:
+    """Todo identificador referenciado em qualquer produto. Calcular UMA vez."""
+    usados: set[str] = set()
+    for produto in varredura.PRODUTOS:
+        for caminho in varredura.arquivos_py(raiz, produto):
+            try:
+                arvore = ast.parse(caminho.read_text(encoding="utf-8", errors="replace"))
+            except SyntaxError:
+                continue
+            for no in ast.walk(arvore):
+                if isinstance(no, ast.Name):
+                    usados.add(no.id)
+                elif isinstance(no, ast.Attribute):
+                    usados.add(no.attr)
+    return usados
+
+
+def sem_chamador(raiz: Path, produto: str, usados: set[str]) -> list[tuple[str, str, int]]:
+    # a propria definicao nao conta: um `def foo` vira FunctionDef, nao Name
+    return [
+        (nome, arquivo, linha)
+        for nome, (arquivo, linha) in sorted(funcoes_publicas(raiz, produto).items())
+        if nome not in usados
+    ]
+
+
+def render(raiz: Path, rotas_por_produto: dict[str, set[str]]) -> str:
+    linhas = [
+        "# Cruzamentos entre produtos",
+        "",
+        "**Tudo aqui e SUSPEITA, nao erro.** Chamada por string montada, dispatch",
+        "dinamico e funcao consumida so por teste geram falso positivo.",
+        "Regra: suspeita nao vira commit, vira pergunta.",
+        "",
+        "## Rotas chamadas por cliente HTTP sem servidor declarado",
+        "",
+    ]
+    achou_orfa = False
+    for arquivo_cliente, alvo in sorted(ALVO_POR_CLIENTE.items()):
+        caminho = raiz / arquivo_cliente
+        if not caminho.exists():
+            linhas.append(f"- cliente sumiu do repo: `{arquivo_cliente}`")
+            achou_orfa = True
+            continue
+        chamados = paths_chamados(caminho.read_text(encoding="utf-8", errors="replace"))
+        declarados = rotas_por_produto.get(alvo, set())
+        for path in sorted(chamados - declarados):
+            linhas.append(f"- `{path}` chamado em `{arquivo_cliente}` — `{alvo}` nao declara")
+            achou_orfa = True
+    if not achou_orfa:
+        linhas.append("Nenhuma. Todo path chamado tem rota declarada no produto alvo.")
+    linhas.append("")
+
+    linhas.append("## Funcoes publicas sem nenhum chamador")
+    linhas.append("")
+    achou_solta = False
+    usados = nomes_usados(raiz)  # uma varredura so, nao uma por produto
+    for produto in varredura.PRODUTOS:
+        for nome, arquivo, linha in sem_chamador(raiz, produto, usados):
+            linhas.append(f"- `{nome}` — {produto}/{arquivo}:{linha}")
+            achou_solta = True
+    if not achou_solta:
+        linhas.append("Nenhuma.")
+    linhas.append("")
+    return "\n".join(linhas)
+```
+
+Em `gerar_mapa.py`: acrescentar `import cruzamentos` no topo, junto dos outros imports, e inserir este bloco em `escrever_tudo` **depois** do laço `for produto in varredura.PRODUTOS:` e **antes** da escrita do `_frescor.json`. Ele reaproveita o `inventario` que o laço já preencheu — não precisa de variável nova nem de segunda coleta:
+
+```python
+    rotas_por_produto = {
+        produto: {
+            cruzamentos.normalizar(item["simbolo"])
+            for item in itens
+            if item["secao"] == "rota"
+        }
+        for produto, itens in inventario.items()
+    }
+    (PASTA_MAPA / "_cruzamentos.md").write_text(
+        cruzamentos.render(raiz, rotas_por_produto), encoding="utf-8"
+    )
+    print(f"cruzamentos: {sum(len(v) for v in rotas_por_produto.values())} rotas declaradas")
+```
+
+- [ ] **Step 4: Rodar e ver passar, depois ler o resultado**
+
+```bash
+# Windows
+cd .claude/skills/revy-research && python -m unittest test_gerar_mapa -v && python gerar_mapa.py && cat mapa/_cruzamentos.md
+# macOS
+cd .claude/skills/revy-research && python3 -m unittest test_gerar_mapa -v && python3 gerar_mapa.py && cat mapa/_cruzamentos.md
+```
+
+Esperado: `OK`, e um `_cruzamentos.md` legível. **Leia a saída antes de commitar.** Se a lista de funções sem chamador vier com centenas de linhas, o detector está frouxo demais para ser útil: restrinja `funcoes_publicas` a `app/*.py` de primeiro nível e rode de novo. Uma seção que grita lobo é uma seção que ninguém lê.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add .claude/skills/revy-research/cruzamentos.py .claude/skills/revy-research/gerar_mapa.py .claude/skills/revy-research/test_gerar_mapa.py .claude/skills/revy-research/mapa/
+git commit -m "feat(revy-research): cruzamentos — rota orfa e funcao sem chamador, como suspeita"
+```
+
+---
+
+### Task 9: `SKILL.md` e o passo 0 no `AGENTS.md`
+
+Sem esta tarefa nada do que foi construído é lido por ninguém.
+
+**Files:**
+- Create: `.claude/skills/revy-research/SKILL.md`
+- Modify: `AGENTS.md` (§1, lista "Antes de qualquer ferramenta")
+
+**Interfaces:**
+- Consumes: tudo que as tarefas anteriores produziram
+- Produces: o disparo
+
+- [ ] **Step 1: Escrever o `SKILL.md`**
+
+```markdown
+---
+name: revy-research
+description: Use antes de codar, corrigir, implementar ou mexer em qualquer produto do monorepo Revy (chatbot-api, portal-gestao, motor-simulacao, estoque-api, revy-trafego, catalogo-publico). Entrega arquivo:linha de rota, modelo, worker, migration, flag e template, as armadilhas ja conhecidas e as decisoes do dono que nao devem ser re-propostas.
+---
+
+# revy-research
+
+O repo tem 722 arquivos `.py` de projeto convivendo com 10.286 quando se conta
+os cinco `.venv`. Buscar as cegas devolve o codigo-fonte do FastAPI em 93% dos
+casos. Este e o mapa que evita isso.
+
+## Protocolo
+
+1. **Identifique o produto.** Um dos seis. Se a tarefa cruza dois, PARE e diga
+   ao dono antes de editar — integracao entre produtos e so por HTTP versionado.
+2. **Cheque o frescor daquele produto:**
+   `git diff --name-only <sha_do_mapa>..HEAD -- <produto>/`
+   O `<sha_do_mapa>` esta em `mapa/_frescor.json`. Saida vazia: siga calado.
+   Saida com arquivos: avise quantos e ofereca rodar o gerador.
+3. **Abra `mapa/<produto>.md`.** Nunca `main.py` inteiro (o do portal tem 2.609
+   linhas). O mapa da `arquivo:linha` de rota, modelo, worker, migration, flag,
+   template, e o comando de teste nos dois SOs.
+4. **Leia `learnings/INDEX.md`** e abra so os learnings cujo `gatilho` bate com
+   a tarefa. Normalmente zero, um ou dois. Nunca todos.
+5. **Vai PROPOR alguma coisa?** Leia `decisoes/INDEX.md` antes. O que esta la
+   foi escolhido pelo dono e nao se re-propoe.
+6. **So agora abra codigo.**
+7. **Ao fechar:** rode o teste do produto (o comando esta no mapa) e escreva um
+   learning **se algo te surpreendeu**. Tarefa que correu direto nao gera
+   learning.
+
+## Regerar o mapa
+
+    # Windows
+    cd .claude/skills/revy-research && python gerar_mapa.py
+    # macOS
+    cd .claude/skills/revy-research && python3 gerar_mapa.py
+
+Conferir sem regerar (sai 1 se o mapa mentir):
+
+    python gerar_mapa.py --verificar
+
+## Regras
+
+- **O mapa nao se edita a mao.** E saida de script; edicao manual e perdida na
+  proxima geracao. Achou erro no mapa? o erro esta no gerador.
+- **`_cruzamentos.md` e suspeita, nao erro.** Suspeita nao vira commit, vira
+  pergunta ao dono.
+- **Julgamento nao mora aqui.** Armadilha de arquitetura e "nao mexa aqui" sao
+  do `README.md` do produto, que ja existe. O mapa aponta; nao copia.
+- **Learning precisa de `gatilho`.** Sem ele ninguem acha, e learning que
+  ninguem acha e learning morto.
+```
+
+- [ ] **Step 2: Verificar que a skill é reconhecida**
+
+```bash
+ls -la .claude/skills/revy-research/SKILL.md
+head -4 .claude/skills/revy-research/SKILL.md
+```
+
+Esperado: o arquivo existe e as 4 primeiras linhas são o frontmatter com `name:` e `description:`.
+
+- [ ] **Step 3: Acrescentar o passo 0 no `AGENTS.md`**
+
+Em `AGENTS.md` §1 ("Antes de qualquer ferramenta"), inserir **antes** do atual item 1:
+
+```markdown
+0. Invoque a skill `revy-research`. Ela dá `arquivo:linha` de tudo, as
+   armadilhas conhecidas e as decisões que não se re-propõem.
+```
+
+Não renumerar os itens seguintes — o texto do repo referencia "§1 passo 3" em outros lugares. O item novo é o zero.
+
+- [ ] **Step 4: Confirmar que nada mais no `AGENTS.md` mudou**
+
+```bash
+git diff AGENTS.md
+```
+
+Esperado: exatamente 2 linhas acrescentadas, nenhuma removida.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add .claude/skills/revy-research/SKILL.md AGENTS.md
+git commit -m "feat(revy-research): SKILL.md com o protocolo e passo 0 no AGENTS.md"
+```
+
+---
+
+### Task 10: Migrar as memórias para `learnings/` e `decisoes/`
+
+**Files:**
+- Create: `.claude/skills/revy-research/learnings/INDEX.md` + ~20 arquivos
+- Create: `.claude/skills/revy-research/decisoes/INDEX.md` + ~6 arquivos
+
+**Interfaces:**
+- Consumes: `SKILL.md` (define o formato)
+- Produces: os dois índices que o protocolo manda ler
+
+Fonte: `~/.claude/projects/C--Users-guilh-Documents-codigo-bot-whatsapp-financiamento/memory/`. Ler `MEMORY.md` (o índice) e depois cada arquivo citado.
+
+Classificação, já decidida com o dono:
+
+| Vai para | Critério | Exemplos |
+|---|---|---|
+| `learnings/` | armadilha técnica reproduzível | *o chatbot responde SQLite e mente*; *teste verde ≠ feature existe*; *pytest não roda o JS do Copiloto*; *n8n cheio derruba o bot*; *bump do `?v=` no `app.css`*; *scripts Fly falham silenciosamente no Windows*; *import do n8n desativa o workflow*; *flags do app2037 são secrets*; *nunca casar lead↔auditoria por telefone mascarado* |
+| `decisoes/` | escolha do dono a não re-propor | *financeiro sem rateio*; *vendedor confirma venda*; *Copiloto ≠ Seller AI*; *13 itens de UX recusados*; *effort xhigh é intencional* |
+| **fica na memória pessoal** | estado que expira em dias | *bancos LIVE e próximo foco*; *v114 LIVE*; *bugs de nav relatados em 02/08* |
+
+**Exceção:** *"revy-trafego não tem `.venv`, use o do portal-gestao"* **não vira learning** — já está na tabela `TESTES` do gerador (Task 6), onde é lida sempre. Não duplicar.
+
+- [ ] **Step 1: Ler o índice das memórias**
+
+```bash
+cat ~/.claude/projects/C--Users-guilh-Documents-codigo-bot-whatsapp-financiamento/memory/MEMORY.md
+```
+
+- [ ] **Step 2: Escrever um learning, no formato exato**
+
+Exemplo real, `.claude/skills/revy-research/learnings/2026-08-23-alembic-mente-sem-database-url.md`:
+
+```markdown
+---
+gatilho: rodar alembic ou conferir migration de producao
+produto: chatbot-api
+custo: 1h30
+---
+# `alembic current` responde SQLite e mente
+
+Sem `CHATBOT_DATABASE_URL` no ambiente, o `alembic current` do chatbot responde
+a partir do SQLite local, com cara de sucesso. Voce conclui que producao esta na
+head e nao esta. As migrations sao fail-fast no boot do bundle, entao o erro so
+aparece no deploy.
+
+Sempre:
+
+    CHATBOT_DATABASE_URL=<postgres> .venv/bin/alembic current
+```
+
+Regras do formato: `gatilho` em linguagem de tarefa (o que a pessoa vai *fazer*), não em jargão; corpo curto; o comando correto no fim.
+
+- [ ] **Step 3: Escrever uma decisão, no formato exato**
+
+`.claude/skills/revy-research/decisoes/2026-08-16-financeiro-sem-rateio.md`:
+
+```markdown
+---
+decidido: 2026-08-16
+nao_reproponha: rateio de despesa fixa no lucro por moto
+---
+# Despesa fixa nao entra no lucro de cada moto
+
+O lugar da despesa fixa e o ponto de equilibrio, nao o rateio por unidade.
+Nao e falta de implementacao — foi escolha do dono.
+```
+
+- [ ] **Step 4: Escrever os dois índices e conferir a contagem**
+
+`learnings/INDEX.md` — uma linha por learning, e nada mais:
+
+```markdown
+# Learnings — indice
+
+Leia **so** os de gatilho compatavel com a sua tarefa. Normalmente 0, 1 ou 2.
+
+| Gatilho | Arquivo |
+|---|---|
+| rodar alembic ou conferir migration de producao | `2026-08-23-alembic-mente-sem-database-url.md` |
+| deployar no Fly | `2026-08-23-fly-deploy-usa-arvore-local.md` |
+| mexer em app.css do portal ou do control | `2026-08-23-bump-do-v-no-base-html.md` |
+```
+
+`decisoes/INDEX.md` no mesmo molde, com a coluna `nao_reproponha` no lugar de `gatilho`. **Acrescente a decisão de 23/08 de cortar o diário de trabalho** — está registrada em "Fora de escopo" na spec.
+
+```bash
+ls .claude/skills/revy-research/learnings/*.md | wc -l   # esperado: ~20 + INDEX
+ls .claude/skills/revy-research/decisoes/*.md  | wc -l   # esperado: ~7 + INDEX
+```
+
+- [ ] **Step 5: Verificar que todo arquivo está no índice e vice-versa**
+
+```bash
+cd .claude/skills/revy-research
+for f in learnings/*.md; do
+  nome=$(basename "$f")
+  [ "$nome" = "INDEX.md" ] && continue
+  grep -q "$nome" learnings/INDEX.md || echo "FORA DO INDICE: $nome"
+done
+echo "conferencia terminada"
+```
+
+Esperado: nenhuma linha `FORA DO INDICE`. Um learning fora do índice é um learning morto.
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add .claude/skills/revy-research/learnings/ .claude/skills/revy-research/decisoes/
+git commit -m "feat(revy-research): migra learnings e decisoes das memorias de sessao para o repo"
+```
+
+---
+
+### Task 11: Ensaio de ponta a ponta e fechamento
+
+Nenhuma tarefa anterior provou que a skill **funciona na prática** — só que o código passa nos testes.
+
+**Files:**
+- Modify: `docs/fila/README.md` (mover este card para concluído)
+- Modify: `docs/referencia-viva/contexto-compacto.md`
+
+- [ ] **Step 1: Rodar a suíte inteira e o verificador**
+
+```bash
+# Windows
+cd .claude/skills/revy-research && python -m unittest test_gerar_mapa -v && python gerar_mapa.py --verificar
+# macOS
+cd .claude/skills/revy-research && python3 -m unittest test_gerar_mapa -v && python3 gerar_mapa.py --verificar
+```
+
+Esperado: `OK` e `mapa confere com o codigo`, exit 0. **Cole a saída real no relatório** — não escreva "passou" sem ela.
+
+- [ ] **Step 2: Ensaio cego — a única prova que importa**
+
+Escolha uma pergunta que o mapa deveria responder e responda **usando só o mapa**, sem abrir código:
+
+> "Onde está a rota que recebe o webhook do WhatsApp Cloud, e qual worker faz a re-notificação de 10 minutos do Modo 2?"
+
+```bash
+cd .claude/skills/revy-research
+grep -n "webhook/cloud" mapa/chatbot-api.md
+grep -in "worker\|followup" mapa/chatbot-api.md
+```
+
+Esperado: as duas respostas saem do mapa com `arquivo:linha`. Se alguma não sair, **falta uma seção no gerador** — volte à tarefa correspondente antes de fechar. Registre o resultado do ensaio no relatório.
+
+- [ ] **Step 3: Conferir que nenhuma mudança alheia entrou**
+
+```bash
+git status --short
+git log --oneline -12
+```
+
+Esperado: os arquivos do dono (`n8n/*`, `site/*`, `deploy/fly/3vm/prepare-workflow.ps1`, e a linha 37 do `.gitignore`) continuam **modificados e não commitados**. Se algum deles aparecer num commit deste plano, desfaça com `git restore --staged` e refaça o commit com caminhos explícitos.
+
+- [ ] **Step 4: Conferir que nenhum segredo entrou**
+
+```bash
+git diff --check
+git log -p --since="1 day ago" -- .claude/skills/ | grep -inE "token|secret|password|api[_-]key" | head
+```
+
+Esperado: `git diff --check` sem saída, e nenhum segredo real na segunda busca (menção à palavra em comentário é aceitável; valor real não).
+
+- [ ] **Step 5: Mover o card e atualizar o contexto**
+
+Conforme `docs/README.md`: quando um card entra no `main`, no mesmo PR move-se o arquivo, atualiza-se `fila/README.md` e `referencia-viva/contexto-compacto.md`.
+
+```bash
+git mv docs/fila/2026-08-23-skill-revy-research.md docs/referencia-viva/planos/
+```
+
+Em `fila/README.md`, tirar a linha deste card. Em `contexto-compacto.md`, acrescentar uma linha dizendo que a skill `revy-research` existe, que o mapa é gerado e commitado, e qual o comando de regerar.
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add docs/fila/README.md docs/referencia-viva/planos/2026-08-23-skill-revy-research.md docs/referencia-viva/contexto-compacto.md
+git commit -m "docs(fila): skill revy-research concluida — card para planos, contexto atualizado"
+```
