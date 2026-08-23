@@ -1141,9 +1141,15 @@ git commit -m "feat(revy-research): --verificar reabre cada arquivo:linha e prov
 
 ---
 
-### Task 8: `_cruzamentos.md` — rota órfã e função sem chamador
+### Task 8: `_cruzamentos.md` — as quatro costuras
 
 O bug documentado do Modo 2 (*"o `chatbot-api` não expõe rota de oferta"*, efeito prático: **lead que ninguém pega some**) teria aparecido aqui como uma linha.
+
+Quatro checagens, todas **suspeitas, nunca erros**: rota órfã de servidor, função pública sem chamador, **n8n × chatbot** e **`fly.toml` → app**.
+
+A costura n8n é a de maior severidade do repo: quando ela abre, o bot fica mudo e o produto para. Medido em 23/08 — 4 webhooks declarados (`whatsapp-ai` é o canônico, mais `whatsapp-cloud`, `whatsapp`, `whatsapp-ai-teste`) e 6 rotas do chatbot chamadas, **todas declaradas hoje**. O valor não é achar problema agora; é a linha aparecer no dia em que alguém renomear uma rota.
+
+**Armadilha real, colhida ao desenhar isto:** uma primeira checagem crua acusou `/pode-responder` como faltando. Era falso positivo — casou o prefixo `/v1/conversas/` contra a rota `/v1/conversas/{telefone}/mensagens`. A rota certa existe em `chatbot-api/app/main.py:921`. **O casamento é de path inteiro normalizado, nunca de substring.** O teste `test_nao_casa_por_substring` existe para travar isso.
 
 **Files:**
 - Create: `.claude/skills/revy-research/cruzamentos.py`
@@ -1159,6 +1165,8 @@ O bug documentado do Modo 2 (*"o `chatbot-api` não expõe rota de oferta"*, efe
   - `cruzamentos.funcoes_publicas(raiz: Path, produto: str) -> dict[str, tuple[str, int]]`
   - `cruzamentos.nomes_usados(raiz: Path) -> set[str]` — varredura única, cara; nunca chamar dentro de laço
   - `cruzamentos.sem_chamador(raiz: Path, produto: str, usados: set[str]) -> list[tuple[str, str, int]]`
+  - `cruzamentos.n8n_costura(raiz: Path) -> tuple[list[tuple[str, str]], set[str]]` — `[(arquivo, webhook)]` e o conjunto de paths do chatbot que os workflows chamam
+  - `cruzamentos.fly_tomls(raiz: Path) -> list[tuple[str, str]]` — `[(caminho_do_toml, app_declarado)]`
   - `cruzamentos.render(raiz: Path, rotas_por_produto: dict[str, set[str]]) -> str` — os paths já chegam normalizados
 
 Padrão verificado no repo: `portal-gestao/app/clients/*.py` chamam `self._request("GET", "/v1/provedores")` e `self._request("GET", f"/v1/provedores/{nome}/credenciais")`.
@@ -1195,6 +1203,40 @@ class TestCruzamentos(unittest.TestCase):
     def test_todo_cliente_mapeado_aponta_para_produto_real(self):
         for arquivo, alvo in cruzamentos.ALVO_POR_CLIENTE.items():
             self.assertIn(alvo, varredura.PRODUTOS, f"{arquivo} aponta para {alvo}")
+
+
+class TestCosturaN8n(unittest.TestCase):
+    def test_acha_os_quatro_webhooks(self):
+        raiz = varredura.raiz_repo()
+        webhooks, _ = cruzamentos.n8n_costura(raiz)
+        paths = {p for _, p in webhooks}
+        self.assertIn("whatsapp-ai", paths)     # o canonico
+        self.assertIn("whatsapp-cloud", paths)
+
+    def test_acha_as_rotas_do_chatbot_que_o_n8n_chama(self):
+        raiz = varredura.raiz_repo()
+        _, chamadas = cruzamentos.n8n_costura(raiz)
+        self.assertIn("/webhook/cloud", chamadas)
+        self.assertIn("/v1/operacao/roteamento", chamadas)
+        self.assertGreaterEqual(len(chamadas), 5)
+
+    def test_nao_casa_por_substring(self):
+        # /v1/conversas/{}/pode-responder NAO pode casar com
+        # /v1/conversas/{}/mensagens so porque compartilham prefixo
+        self.assertNotEqual(
+            cruzamentos.normalizar("/v1/conversas/{telefone}/pode-responder"),
+            cruzamentos.normalizar("/v1/conversas/{telefone}/mensagens"),
+        )
+
+
+class TestFlyTomls(unittest.TestCase):
+    def test_acha_os_sete_tomls_e_os_apps(self):
+        raiz = varredura.raiz_repo()
+        achados = dict(cruzamentos.fly_tomls(raiz))
+        apps = set(achados.values())
+        self.assertIn("n8n2037", apps)
+        self.assertIn("portal2037", apps)
+        self.assertGreaterEqual(len(achados), 6)
 ```
 
 - [ ] **Step 2: Rodar e ver falhar**
@@ -1313,6 +1355,59 @@ def sem_chamador(raiz: Path, produto: str, usados: set[str]) -> list[tuple[str, 
     ]
 
 
+import json
+import re as _re
+
+_APP_NO_TOML = _re.compile(r'^\s*app\s*=\s*[\'"]([^\'"]+)[\'"]', _re.MULTILINE)
+
+
+def _urls_do_json(no) -> set[str]:
+    """Desce a arvore do workflow atras de campos url/path."""
+    achados: set[str] = set()
+    if isinstance(no, dict):
+        for chave, valor in no.items():
+            if chave in {"url", "path"} and isinstance(valor, str):
+                achados.add(valor)
+            else:
+                achados |= _urls_do_json(valor)
+    elif isinstance(no, list):
+        for item in no:
+            achados |= _urls_do_json(item)
+    return achados
+
+
+def n8n_costura(raiz: Path) -> tuple[list[tuple[str, str]], set[str]]:
+    """(webhooks declarados, paths do chatbot chamados pelos workflows)."""
+    webhooks: list[tuple[str, str]] = []
+    chamadas: set[str] = set()
+    for arquivo in sorted((raiz / "n8n").glob("workflow-*.json")):
+        try:
+            dados = json.loads(arquivo.read_text(encoding="utf-8", errors="replace"))
+        except (ValueError, OSError):
+            continue
+        for bruto in _urls_do_json(dados):
+            if "chatbot-api" in bruto:
+                # tira host e expressao n8n; fica so o path
+                pedaco = bruto.split("chatbot-api:8000", 1)[-1]
+                pedaco = pedaco.split("'", 1)[0].split('"', 1)[0].strip()
+                if pedaco.startswith("/"):
+                    chamadas.add(normalizar(pedaco.rstrip("/")))
+            elif not bruto.startswith(("http", "=", "{")) and "/" not in bruto:
+                webhooks.append((arquivo.name, bruto))
+    return webhooks, chamadas
+
+
+def fly_tomls(raiz: Path) -> list[tuple[str, str]]:
+    achados: list[tuple[str, str]] = []
+    for toml in sorted(raiz.rglob("fly.toml")):
+        partes = toml.relative_to(raiz).parts
+        if any(p in varredura.IGNORADOS for p in partes):
+            continue
+        m = _APP_NO_TOML.search(toml.read_text(encoding="utf-8", errors="replace"))
+        achados.append((toml.relative_to(raiz).as_posix(), m.group(1) if m else "?"))
+    return achados
+
+
 def render(raiz: Path, rotas_por_produto: dict[str, set[str]]) -> str:
     linhas = [
         "# Cruzamentos entre produtos",
@@ -1351,6 +1446,32 @@ def render(raiz: Path, rotas_por_produto: dict[str, set[str]]) -> str:
     if not achou_solta:
         linhas.append("Nenhuma.")
     linhas.append("")
+
+    # --- costura n8n x chatbot: a junta onde o bot fica mudo ---
+    webhooks, chamadas = n8n_costura(raiz)
+    declaradas = rotas_por_produto.get("chatbot-api", set())
+    linhas.append("## n8n x chatbot")
+    linhas.append("")
+    for arquivo, path in sorted(webhooks):
+        linhas.append(f"- webhook `{path}` declarado em `n8n/{arquivo}`")
+    linhas.append("")
+    faltando = sorted(chamadas - declaradas)
+    if faltando:
+        for path in faltando:
+            linhas.append(f"- **SEM SERVIDOR** `{path}` chamado por workflow n8n")
+    else:
+        linhas.append(f"Todas as {len(chamadas)} rotas chamadas pelos workflows estao declaradas.")
+    linhas.append("")
+
+    # --- fly.toml: quais existem e para que app cada um aponta ---
+    linhas.append("## fly.toml no repo")
+    linhas.append("")
+    linhas.append("Os da pasta de cada produto apontam para apps monoliticos DESTRUIDOS")
+    linhas.append("(ver AGENTS.md secao 5). Deploy so por deploy/fly/3vm/.")
+    linhas.append("")
+    for caminho, app in fly_tomls(raiz):
+        linhas.append(f"- `{caminho}` -> `{app}`")
+    linhas.append("")
     return "\n".join(linhas)
 ```
 
@@ -1380,7 +1501,11 @@ cd .claude/skills/revy-research && python -m unittest test_gerar_mapa -v && pyth
 cd .claude/skills/revy-research && python3 -m unittest test_gerar_mapa -v && python3 gerar_mapa.py && cat mapa/_cruzamentos.md
 ```
 
-Esperado: `OK`, e um `_cruzamentos.md` legível. **Leia a saída antes de commitar.** Se a lista de funções sem chamador vier com centenas de linhas, o detector está frouxo demais para ser útil: restrinja `funcoes_publicas` a `app/*.py` de primeiro nível e rode de novo. Uma seção que grita lobo é uma seção que ninguém lê.
+Esperado: `OK`, e um `_cruzamentos.md` legível com as quatro seções. **Leia a saída antes de commitar**, conferindo três coisas:
+
+1. A lista de funções sem chamador não pode ter centenas de linhas. Se tiver, o detector está frouxo demais: restrinja `funcoes_publicas` a `app/*.py` de primeiro nível e rode de novo. Seção que grita lobo é seção que ninguém lê.
+2. A seção **n8n × chatbot** deve dizer que todas as rotas chamadas estão declaradas — foi o estado medido em 23/08. Se aparecer `SEM SERVIDOR`, **pare e leve ao dono**: ou é falso positivo de normalização, ou é o bot prestes a ficar mudo. Nenhum dos dois se resolve commitando.
+3. A tabela de `fly.toml` deve trazer **7 linhas**.
 
 - [ ] **Step 5: Commit**
 

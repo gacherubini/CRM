@@ -112,18 +112,46 @@ catálogo 4, estoque 3, chatbot 0.
 
 ### `_cruzamentos.md`
 
-Duas checagens, ambas rotuladas **suspeitas, não erros**:
+Quatro checagens, todas rotuladas **suspeitas, não erros**:
 
 1. **Rota órfã de servidor** — um cliente HTTP chama um path que nenhum produto
    declara. É o bug documentado do Modo 2 ("o `chatbot-api` não expõe rota de
    oferta"), cujo efeito prático é *lead que ninguém pega some*.
 2. **Função pública sem chamador** — `def` sem underscore, zero referências nos
    722 arquivos. É o caso `criar_sinal_direcionado`.
+3. **n8n × chatbot** — os quatro `n8n/workflow-*.json` declaram webhook e chamam
+   rotas do chatbot. Cruzar as duas listas. Medido em 23/08: 4 webhooks
+   (`whatsapp-ai` canônico, `whatsapp-cloud`, `whatsapp`, `whatsapp-ai-teste`) e
+   **6 rotas chamadas**, todas declaradas hoje. É a junta de severidade máxima
+   do repo: quando ela abre, o bot fica mudo e o produto para. JSON é
+   `json.loads`; a rota já está no mapa. Custo baixo, severidade máxima.
+4. **`fly.toml` → app declarado** — os 7 do repo, numa tabela. O `AGENTS.md`
+   avisa que os da pasta de cada produto apontam para apps **destruídos**;
+   listá-los torna a armadilha visível em vez de decorada. **Quais** estão
+   mortos não entra: isso é conhecimento humano, muda com o tempo, e nenhum
+   script verifica — vai para o README do deploy ou para um learning.
 
-Ambas geram falso positivo (dispatch dinâmico, path montado por string, função
+Todas geram falso positivo (dispatch dinâmico, path montado por string, função
 só consumida por teste). Cada linha sai com o motivo, e o `SKILL.md` fixa a
 regra: **suspeita não vira commit; vira pergunta.** Seção que grita lobo é
 seção que ninguém lê.
+
+Evidência disso, colhida em 23/08 ao desenhar a checagem 3: uma primeira versão
+crua acusou `/pode-responder` como rota faltando. Era falso positivo — casou um
+prefixo (`/v1/conversas/`) contra a rota errada; a rota existe em
+`chatbot-api/app/main.py:921`. **O casamento tem que ser de path inteiro
+normalizado, nunca de substring.**
+
+### A fronteira do mapa é a verificabilidade, não a importância
+
+O `--verificar` reabre cada `arquivo:linha` e prova o símbolo. Um fato que não
+pode ser provado assim não entra no mapa, porque fato não-verificável dentro de
+arquivo gerado **eventualmente mente** — a doença que esta skill existe para
+curar. É esse critério, e não relevância, que decide o que o mapa cobre.
+
+Por isso ficam **de fora**: `docs/` (já roteado pelo `AGENTS.md` §3 e pelo
+`docs/README.md`, e sem símbolo para ancorar), `shared/` e `site/` (CSS e HTML
+estático — pertencem a uma futura skill de UI e à do site).
 
 ### Frescor por produto
 
@@ -358,6 +386,15 @@ subagentes.
   "como isto se relaciona"; não responde `arquivo:linha`. Segue como
   ferramenta separada de exploração.
 - CI rodando `--verificar`. Possível depois; não agora.
+- **Mapear `docs/`.** Avaliado e recusado em 23/08: já é roteado pelo `AGENTS.md`
+  §3 e pelo `docs/README.md`, não tem símbolo para o `--verificar` ancorar, e é a
+  maior pasta de churn do repo (247 toques em 150 commits). Um índice gerado dela
+  seria o quarto lugar dizendo onde as coisas estão. Não re-propor.
+- **Mapear `shared/` e `site/`.** CSS e HTML estático; pertencem a uma futura
+  skill de UI e à do site, não a este mapa.
+- **Julgar qual `fly.toml` aponta para app morto.** A tabela lista os 7; dizer
+  quais estão destruídos é conhecimento humano e muda com o tempo — vai para o
+  README do deploy ou para um learning.
 - Qualquer mudança no contrato de `docs/` (segue com três pastas).
 - Mapear JS/HTML além da listagem de templates.
 
