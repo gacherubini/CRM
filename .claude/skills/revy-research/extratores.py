@@ -18,6 +18,7 @@ def _decorators_de_rota(no: ast.AST):
         alvo = dec.func
         if not isinstance(alvo, ast.Attribute) or alvo.attr not in VERBOS:
             continue
+        objeto = alvo.value.id if isinstance(alvo.value, ast.Name) else ""
         if not dec.args or not isinstance(dec.args[0], ast.Constant):
             continue
         path = dec.args[0].value
@@ -28,7 +29,36 @@ def _decorators_de_rota(no: ast.AST):
         # o path numa linha propria), dec.lineno aponta para a linha do
         # @router.post, onde o path nao esta escrito — e o --verificar acusa
         # mentira. Mesma armadilha que o TemplateResponse ja tinha.
-        yield alvo.attr.upper(), path, dec.args[0].lineno
+        yield alvo.attr.upper(), path, dec.args[0].lineno, objeto
+
+
+def _prefixos_de_construtor(arvore: ast.Module) -> dict[str, str]:
+    """{nome_da_variavel: prefixo} para `x = APIRouter(prefix="/v1")`.
+
+    O prefixo do repo mora AQUI, nao no include_router: veja
+    revy-trafego/app/api_v1.py:37. Como o construtor esta no mesmo arquivo das
+    rotas, isto resolve estaticamente sem nada cross-file — e nao ha o que
+    marcar com `?` quando o literal existe.
+    """
+    achados: dict[str, str] = {}
+    for no in ast.walk(arvore):
+        alvo = None
+        if isinstance(no, ast.Assign) and len(no.targets) == 1:
+            alvo = no.targets[0]
+        elif isinstance(no, ast.AnnAssign):
+            alvo = no.target
+        if not isinstance(alvo, ast.Name) or not isinstance(no.value, ast.Call):
+            continue
+        func = no.value.func
+        nome = func.attr if isinstance(func, ast.Attribute) else getattr(func, "id", "")
+        if nome != "APIRouter":
+            continue
+        kw = next((k for k in no.value.keywords if k.arg == "prefix"), None)
+        if kw is None:
+            continue
+        if isinstance(kw.value, ast.Constant) and isinstance(kw.value.value, str):
+            achados[alvo.id] = kw.value.value
+    return achados
 
 
 def rotas(texto: str, arquivo_rel: str) -> list[Entrada]:
@@ -42,14 +72,17 @@ def rotas(texto: str, arquivo_rel: str) -> list[Entrada]:
         arvore = ast.parse(texto)
     except SyntaxError:
         return []
+    prefixos = _prefixos_de_construtor(arvore)
     achadas: list[Entrada] = []
     for no in ast.walk(arvore):
         if not isinstance(no, (ast.FunctionDef, ast.AsyncFunctionDef)):
             continue
-        for verbo, path, linha in _decorators_de_rota(no):
+        for verbo, path, linha, objeto in _decorators_de_rota(no):
+            # `simbolo` continua o path CRU: e o texto escrito na linha, e o
+            # --verificar reabre a linha. So a `chave` leva o prefixo.
             achadas.append(Entrada(
                 secao="rota",
-                chave=f"{verbo} {path}",
+                chave=f"{verbo} {prefixos.get(objeto, '')}{path}",
                 simbolo=path,
                 arquivo=arquivo_rel,
                 linha=linha,

@@ -1,6 +1,7 @@
 import contextlib
 import copy
 import io
+import ast
 import json
 import tempfile
 import unittest
@@ -132,7 +133,7 @@ app.include_router(router_oferta)
 
 
 class TestPrefixoDeRouter(unittest.TestCase):
-    def test_armadilha_hoje_o_repo_nao_tem_nenhum_prefix(self):
+    def test_repo_nao_tem_include_router_com_prefix(self):
         """Fica vermelho no dia em que o primeiro prefix= aparecer.
 
         Quando acontecer: confira no mapa que a rota saiu com o path composto
@@ -148,6 +149,66 @@ class TestPrefixoDeRouter(unittest.TestCase):
                     caminho.relative_to(base).as_posix(),
                 ))
         self.assertEqual(achados, [], f"apareceu prefix= no repo: {achados}")
+
+    def test_prefixo_do_construtor_entra_na_chave_e_nao_no_simbolo(self):
+        fonte = (
+            "router = APIRouter(prefix=\'/v1\', tags=[\'v1\'])\n"
+            "@router.get(\'/lojas/{slug}/resultados\')\n"
+            "def r(request):\n"
+            "    return 1\n"
+        )
+        achadas = extratores.rotas(fonte, "app/api_v1.py")
+        self.assertEqual(len(achadas), 1)
+        self.assertEqual(achadas[0].chave, "GET /v1/lojas/{slug}/resultados")
+        # simbolo fica CRU: e o texto da linha, e o --verificar reabre a linha
+        self.assertEqual(achadas[0].simbolo, "/lojas/{slug}/resultados")
+
+    def test_no_repo_real_o_api_v1_do_control_sai_com_v1(self):
+        raiz = varredura.raiz_repo()
+        alvo = raiz / "revy-trafego" / "app" / "api_v1.py"
+        achadas = extratores.rotas(alvo.read_text(encoding="utf-8"), "app/api_v1.py")
+        self.assertTrue(achadas)
+        for e in achadas:
+            self.assertTrue(
+                e.chave.split(" ", 1)[1].startswith("/v1/"),
+                f"perdeu o prefixo do construtor: {e.chave}",
+            )
+
+    def test_armadilha_toda_forma_de_prefix_do_repo_e_uma_que_tratamos(self):
+        """A armadilha anterior olhava so include_router e passou verde com um
+        APIRouter(prefix=) no repo — o mesmo erro que ela existia para pegar.
+
+        Esta varre QUALQUER chamada com `prefix=` e exige que o nome chamado
+        esteja entre os que sabemos compor. Forma nova (uma fabrica de router,
+        por exemplo) fica vermelha aqui antes de o mapa mentir.
+        """
+        TRATADAS = {"APIRouter", "include_router"}
+        raiz = varredura.raiz_repo()
+        fora = []
+        for produto in varredura.PRODUTOS:
+            base = raiz / produto
+            for caminho in varredura.arquivos_py(raiz, produto):
+                try:
+                    arvore = ast.parse(
+                        caminho.read_text(encoding="utf-8", errors="replace")
+                    )
+                except SyntaxError:
+                    continue
+                for no in ast.walk(arvore):
+                    if not isinstance(no, ast.Call):
+                        continue
+                    if not any(k.arg == "prefix" for k in no.keywords):
+                        continue
+                    f = no.func
+                    nome = f.attr if isinstance(f, ast.Attribute) else getattr(f, "id", "")
+                    # so interessa quem monta rota: engine_from_config(prefix=)
+                    # do Alembic tambem tem prefix= e nao tem nada com path.
+                    if "router" not in nome.lower():
+                        continue
+                    if nome not in TRATADAS:
+                        rel = caminho.relative_to(base).as_posix()
+                        fora.append(f"{produto}/{rel}:{no.lineno} {nome}(prefix=...)")
+        self.assertEqual(fora, [], f"forma de prefix nao tratada: {fora}")
 
     def test_le_o_literal_e_marca_o_que_nao_e_literal(self):
         achados = extratores.prefixos_de_router(FONTE_PREFIXO, "app/main.py")
@@ -1179,12 +1240,9 @@ class TestCruzamentosVersionado(unittest.TestCase):
             encoding="utf-8"
         )
         raiz = varredura.raiz_repo()
+        # usa a MESMA funcao do gerador, nunca uma copia da regra
         rotas = {
-            produto: {
-                cruzamentos.normalizar(e.simbolo)
-                for e in gerar_mapa.coletar(raiz, produto)
-                if e.secao == "rota"
-            }
+            produto: gerar_mapa.paths_declarados(gerar_mapa.coletar(raiz, produto))
             for produto in varredura.PRODUTOS
         }
         self.assertEqual(atual, cruzamentos.render(raiz, rotas))

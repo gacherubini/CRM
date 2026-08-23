@@ -168,10 +168,29 @@ def render(produto: str, entradas: list[Entrada], head: str, sha: str) -> str:
     return "\n".join(linhas)
 
 
+def paths_declarados(entradas: list[Entrada]) -> set[str]:
+    """Paths normalizados das rotas de um produto, para os cruzamentos.
+
+    Sai da CHAVE, nunca do simbolo. O `simbolo` e o path cru escrito na linha do
+    decorator, que e o que o `--verificar` reabre; a `chave` e a que leva o
+    prefixo do `APIRouter(prefix=...)` ja composto. Ler o simbolo aqui faz as 4
+    rotas do `api_v1.py` do control aparecerem como orfas de servidor.
+
+    Existe como funcao para haver UMA definicao: quando isto estava copiado no
+    teste, a copia ficou para tras e o teste passou a conferir contra si mesmo.
+    """
+    return {
+        cruzamentos.normalizar(e.chave.split(" ", 1)[1])
+        for e in entradas
+        if e.secao == "rota"
+    }
+
+
 def escrever_tudo(raiz: Path) -> None:
     PASTA_MAPA.mkdir(parents=True, exist_ok=True)
     sha = sha_atual(raiz)
     inventario: dict[str, list[dict]] = {}
+    rotas_por_produto: dict[str, set[str]] = {}
     for produto in varredura.PRODUTOS:
         entradas = coletar(raiz, produto)
         head = head_de(raiz, produto)
@@ -179,18 +198,12 @@ def escrever_tudo(raiz: Path) -> None:
             render(produto, entradas, head, sha), encoding="utf-8"
         )
         inventario[produto] = [asdict(e) for e in entradas]
+        rotas_por_produto[produto] = paths_declarados(entradas)
         print(f"{produto}: {len(entradas)} entradas")
     # Cruzamentos reaproveita o `inventario` que o laco acabou de preencher -
     # sem segunda coleta. Sai para arquivo proprio e NAO entra no selo: o
     # --verificar so cobra `Entrada`, e suspeita nao vira contrato.
-    rotas_por_produto = {
-        produto: {
-            cruzamentos.normalizar(item["simbolo"])
-            for item in itens
-            if item["secao"] == "rota"
-        }
-        for produto, itens in inventario.items()
-    }
+
     (PASTA_MAPA / "_cruzamentos.md").write_text(
         cruzamentos.render(raiz, rotas_por_produto), encoding="utf-8"
     )

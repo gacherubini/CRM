@@ -296,7 +296,9 @@ O maior ganho isolado do mapa: 56 rotas do chatbot moram num `main.py` de 2.038 
 - Produces: `extratores.rotas(texto: str, arquivo_rel: str) -> list[Entrada]` — `secao="rota"`, `chave="POST /webhook/cloud"`, `simbolo` = **o path** (`"/webhook/cloud"`), que é o texto da linha do decorator. Não é o nome da função: ele está na linha de baixo e o `--verificar` não o acharia.
 - Produces (Step 3b): `extratores.prefixos_de_router(texto: str, arquivo_rel: str) -> list[tuple[str | None, str | None, str]]` e `extratores.aplicar_prefixos(entradas: list[Entrada], includes: list[tuple]) -> list[Entrada]`.
 
-Verificado no levantamento: `APIRouter()` e `include_router()` são chamados **sem `prefix=`** em todo o repo, então hoje o path do decorator é o path real.
+**ERRADO, e o erro foi caro.** O levantamento afirmava que `APIRouter()` e `include_router()` eram chamados sem `prefix=` em todo o repo. É falso: `revy-trafego/app/api_v1.py:37` tem `router = APIRouter(prefix="/v1", tags=["v1"])`, e as 4 rotas daquele arquivo saíam do mapa **sem o `/v1`**. O teste-armadilha do Step 3b passava verde porque procurava só em `include_router` — o mesmo erro que ele existia para pegar.
+
+O prefixo do construtor é **mais fácil** que o do `include_router`: mora no mesmo arquivo das rotas, então resolve dentro de `rotas()` sem nada cross-file. A armadilha agora varre **toda** chamada com `prefix=` cujo nome contenha `router` e exige que esteja entre as formas tratadas.
 
 **Hoje.** É o único ponto por onde o mapa consegue mentir sem o `--verificar` perceber: se alguém acrescentar `include_router(r, prefix="/v1")`, o decorator continua com o path nu, o `--verificar` segue verde e a `chave` do mapa passa a apontar para uma rota que não existe. Por isso o Step 3b implementa a regra do spec — **compõe o que dá para resolver estaticamente, marca `?` no que não dá, nunca inventa** — e deixa um teste-armadilha que fica vermelho no dia em que o primeiro `prefix=` aparecer.
 

@@ -1,5 +1,5 @@
 {
- "sha": "e5836cf",
+ "sha": "9793d81",
  "inventario": {
   "chatbot-api": [
    {
@@ -3652,28 +3652,28 @@
   "revy-trafego": [
    {
     "secao": "rota",
-    "chave": "GET /lojas/{loja_slug}/resultados",
+    "chave": "GET /v1/lojas/{loja_slug}/resultados",
     "simbolo": "/lojas/{loja_slug}/resultados",
     "arquivo": "app/api_v1.py",
     "linha": 90
    },
    {
     "secao": "rota",
-    "chave": "POST /lojas/{loja_slug}/eventos/venda-atualizada",
+    "chave": "POST /v1/lojas/{loja_slug}/eventos/venda-atualizada",
     "simbolo": "/lojas/{loja_slug}/eventos/venda-atualizada",
     "arquivo": "app/api_v1.py",
     "linha": 244
    },
    {
     "secao": "rota",
-    "chave": "POST /lojas/{loja_slug}/eventos/venda-confirmada",
+    "chave": "POST /v1/lojas/{loja_slug}/eventos/venda-confirmada",
     "simbolo": "/lojas/{loja_slug}/eventos/venda-confirmada",
     "arquivo": "app/api_v1.py",
     "linha": 289
    },
    {
     "secao": "rota",
-    "chave": "GET /lojas/{loja_slug}/integracoes/health",
+    "chave": "GET /v1/lojas/{loja_slug}/integracoes/health",
     "simbolo": "/lojas/{loja_slug}/integracoes/health",
     "arquivo": "app/api_v1.py",
     "linha": 456
@@ -4744,378 +4744,378 @@
    },
    {
     "secao": "rota",
-    "chave": "GET /acessos",
+    "chave": "GET /control/v1/acessos",
     "simbolo": "/acessos",
     "arquivo": "app/web/control.py",
     "linha": 437
    },
    {
     "secao": "rota",
-    "chave": "POST /acessos/{acesso_id}/desativar",
+    "chave": "POST /control/v1/acessos/{acesso_id}/desativar",
     "simbolo": "/acessos/{acesso_id}/desativar",
     "arquivo": "app/web/control.py",
     "linha": 446
    },
    {
     "secao": "rota",
-    "chave": "POST /acessos/{acesso_id}/reativar",
+    "chave": "POST /control/v1/acessos/{acesso_id}/reativar",
     "simbolo": "/acessos/{acesso_id}/reativar",
     "arquivo": "app/web/control.py",
     "linha": 458
    },
    {
     "secao": "rota",
-    "chave": "POST /convites",
+    "chave": "POST /control/v1/convites",
     "simbolo": "/convites",
     "arquivo": "app/web/control.py",
     "linha": 470
    },
    {
     "secao": "rota",
-    "chave": "POST /convites/ativar",
+    "chave": "POST /control/v1/convites/ativar",
     "simbolo": "/convites/ativar",
     "arquivo": "app/web/control.py",
     "linha": 488
    },
    {
     "secao": "rota",
-    "chave": "POST /recuperacoes",
+    "chave": "POST /control/v1/recuperacoes",
     "simbolo": "/recuperacoes",
     "arquivo": "app/web/control.py",
     "linha": 499
    },
    {
     "secao": "rota",
-    "chave": "POST /recuperacoes/consumir",
+    "chave": "POST /control/v1/recuperacoes/consumir",
     "simbolo": "/recuperacoes/consumir",
     "arquivo": "app/web/control.py",
     "linha": 514
    },
    {
     "secao": "rota",
-    "chave": "POST /pessoas",
+    "chave": "POST /control/v1/pessoas",
     "simbolo": "/pessoas",
     "arquivo": "app/web/control.py",
     "linha": 530
    },
    {
     "secao": "rota",
-    "chave": "GET /pessoas",
+    "chave": "GET /control/v1/pessoas",
     "simbolo": "/pessoas",
     "arquivo": "app/web/control.py",
     "linha": 545
    },
    {
     "secao": "rota",
-    "chave": "GET /pessoas/{pessoa_id}",
+    "chave": "GET /control/v1/pessoas/{pessoa_id}",
     "simbolo": "/pessoas/{pessoa_id}",
     "arquivo": "app/web/control.py",
     "linha": 559
    },
    {
     "secao": "rota",
-    "chave": "GET /lojas",
+    "chave": "GET /control/v1/lojas",
     "simbolo": "/lojas",
     "arquivo": "app/web/control.py",
     "linha": 574
    },
    {
     "secao": "rota",
-    "chave": "POST /lojas",
+    "chave": "POST /control/v1/lojas",
     "simbolo": "/lojas",
     "arquivo": "app/web/control.py",
     "linha": 580
    },
    {
     "secao": "rota",
-    "chave": "GET /lojas/{loja_id}",
+    "chave": "GET /control/v1/lojas/{loja_id}",
     "simbolo": "/lojas/{loja_id}",
     "arquivo": "app/web/control.py",
     "linha": 595
    },
    {
     "secao": "rota",
-    "chave": "GET /dashboard",
+    "chave": "GET /control/v1/dashboard",
     "simbolo": "/dashboard",
     "arquivo": "app/web/control.py",
     "linha": 607
    },
    {
     "secao": "rota",
-    "chave": "GET /lojas/{loja_id}/prontidao",
+    "chave": "GET /control/v1/lojas/{loja_id}/prontidao",
     "simbolo": "/lojas/{loja_id}/prontidao",
     "arquivo": "app/web/control.py",
     "linha": 614
    },
    {
     "secao": "rota",
-    "chave": "POST /lojas/{loja_id}/prontidao/alertas/{check_code}/aceitar",
+    "chave": "POST /control/v1/lojas/{loja_id}/prontidao/alertas/{check_code}/aceitar",
     "simbolo": "/lojas/{loja_id}/prontidao/alertas/{check_code}/aceitar",
     "arquivo": "app/web/control.py",
     "linha": 629
    },
    {
     "secao": "rota",
-    "chave": "GET /lojas/{loja_id}/integracoes",
+    "chave": "GET /control/v1/lojas/{loja_id}/integracoes",
     "simbolo": "/lojas/{loja_id}/integracoes",
     "arquivo": "app/web/control.py",
     "linha": 648
    },
    {
     "secao": "rota",
-    "chave": "PUT /lojas/{loja_id}/integracoes/pixel",
+    "chave": "PUT /control/v1/lojas/{loja_id}/integracoes/pixel",
     "simbolo": "/lojas/{loja_id}/integracoes/pixel",
     "arquivo": "app/web/control.py",
     "linha": 663
    },
    {
     "secao": "rota",
-    "chave": "POST /lojas/{loja_id}/integracoes/pixel/desconectar",
+    "chave": "POST /control/v1/lojas/{loja_id}/integracoes/pixel/desconectar",
     "simbolo": "/lojas/{loja_id}/integracoes/pixel/desconectar",
     "arquivo": "app/web/control.py",
     "linha": 687
    },
    {
     "secao": "rota",
-    "chave": "PUT /lojas/{loja_id}/integracoes/meta-ads",
+    "chave": "PUT /control/v1/lojas/{loja_id}/integracoes/meta-ads",
     "simbolo": "/lojas/{loja_id}/integracoes/meta-ads",
     "arquivo": "app/web/control.py",
     "linha": 705
    },
    {
     "secao": "rota",
-    "chave": "POST /lojas/{loja_id}/integracoes/meta-ads/desconectar",
+    "chave": "POST /control/v1/lojas/{loja_id}/integracoes/meta-ads/desconectar",
     "simbolo": "/lojas/{loja_id}/integracoes/meta-ads/desconectar",
     "arquivo": "app/web/control.py",
     "linha": 726
    },
    {
     "secao": "rota",
-    "chave": "GET /lojas/{loja_id}/whatsapp-canais",
+    "chave": "GET /control/v1/lojas/{loja_id}/whatsapp-canais",
     "simbolo": "/lojas/{loja_id}/whatsapp-canais",
     "arquivo": "app/web/control.py",
     "linha": 786
    },
    {
     "secao": "rota",
-    "chave": "POST /lojas/{loja_id}/whatsapp-canais",
+    "chave": "POST /control/v1/lojas/{loja_id}/whatsapp-canais",
     "simbolo": "/lojas/{loja_id}/whatsapp-canais",
     "arquivo": "app/web/control.py",
     "linha": 802
    },
    {
     "secao": "rota",
-    "chave": "POST /lojas/{loja_id}/whatsapp-canais/{canal_id}/connect",
+    "chave": "POST /control/v1/lojas/{loja_id}/whatsapp-canais/{canal_id}/connect",
     "simbolo": "/lojas/{loja_id}/whatsapp-canais/{canal_id}/connect",
     "arquivo": "app/web/control.py",
     "linha": 822
    },
    {
     "secao": "rota",
-    "chave": "POST /lojas/{loja_id}/whatsapp-canais/{canal_id}/disconnect",
+    "chave": "POST /control/v1/lojas/{loja_id}/whatsapp-canais/{canal_id}/disconnect",
     "simbolo": "/lojas/{loja_id}/whatsapp-canais/{canal_id}/disconnect",
     "arquivo": "app/web/control.py",
     "linha": 845
    },
    {
     "secao": "rota",
-    "chave": "POST /lojas/{loja_id}/whatsapp-canais/{canal_id}/inativar",
+    "chave": "POST /control/v1/lojas/{loja_id}/whatsapp-canais/{canal_id}/inativar",
     "simbolo": "/lojas/{loja_id}/whatsapp-canais/{canal_id}/inativar",
     "arquivo": "app/web/control.py",
     "linha": 862
    },
    {
     "secao": "rota",
-    "chave": "PATCH /lojas/{loja_id}",
+    "chave": "PATCH /control/v1/lojas/{loja_id}",
     "simbolo": "/lojas/{loja_id}",
     "arquivo": "app/web/control.py",
     "linha": 896
    },
    {
     "secao": "rota",
-    "chave": "GET /lojas/{loja_id}/modulos",
+    "chave": "GET /control/v1/lojas/{loja_id}/modulos",
     "simbolo": "/lojas/{loja_id}/modulos",
     "arquivo": "app/web/control.py",
     "linha": 915
    },
    {
     "secao": "rota",
-    "chave": "PUT /lojas/{loja_id}/modulos",
+    "chave": "PUT /control/v1/lojas/{loja_id}/modulos",
     "simbolo": "/lojas/{loja_id}/modulos",
     "arquivo": "app/web/control.py",
     "linha": 930
    },
    {
     "secao": "rota",
-    "chave": "POST /lojas/{loja_id}/modulos/{modulo}/suspender",
+    "chave": "POST /control/v1/lojas/{loja_id}/modulos/{modulo}/suspender",
     "simbolo": "/lojas/{loja_id}/modulos/{modulo}/suspender",
     "arquivo": "app/web/control.py",
     "linha": 947
    },
    {
     "secao": "rota",
-    "chave": "POST /lojas/{loja_id}/modulos/{modulo}/reativar",
+    "chave": "POST /control/v1/lojas/{loja_id}/modulos/{modulo}/reativar",
     "simbolo": "/lojas/{loja_id}/modulos/{modulo}/reativar",
     "arquivo": "app/web/control.py",
     "linha": 966
    },
    {
     "secao": "rota",
-    "chave": "GET /lojas/{loja_id}/contrato",
+    "chave": "GET /control/v1/lojas/{loja_id}/contrato",
     "simbolo": "/lojas/{loja_id}/contrato",
     "arquivo": "app/web/control.py",
     "linha": 985
    },
    {
     "secao": "rota",
-    "chave": "PUT /lojas/{loja_id}/contrato",
+    "chave": "PUT /control/v1/lojas/{loja_id}/contrato",
     "simbolo": "/lojas/{loja_id}/contrato",
     "arquivo": "app/web/control.py",
     "linha": 1000
    },
    {
     "secao": "rota",
-    "chave": "POST /imports/portal-usuarios",
+    "chave": "POST /control/v1/imports/portal-usuarios",
     "simbolo": "/imports/portal-usuarios",
     "arquivo": "app/web/control.py",
     "linha": 1023
    },
    {
     "secao": "rota",
-    "chave": "POST /lojas/{loja_id}/cargos",
+    "chave": "POST /control/v1/lojas/{loja_id}/cargos",
     "simbolo": "/lojas/{loja_id}/cargos",
     "arquivo": "app/web/control.py",
     "linha": 1047
    },
    {
     "secao": "rota",
-    "chave": "GET /lojas/{loja_id}/cargos",
+    "chave": "GET /control/v1/lojas/{loja_id}/cargos",
     "simbolo": "/lojas/{loja_id}/cargos",
     "arquivo": "app/web/control.py",
     "linha": 1067
    },
    {
     "secao": "rota",
-    "chave": "POST /lojas/{loja_id}/cargos/{cargo_id}/revogar",
+    "chave": "POST /control/v1/lojas/{loja_id}/cargos/{cargo_id}/revogar",
     "simbolo": "/lojas/{loja_id}/cargos/{cargo_id}/revogar",
     "arquivo": "app/web/control.py",
     "linha": 1082
    },
    {
     "secao": "rota",
-    "chave": "POST /lojas/{loja_id}/estado",
+    "chave": "POST /control/v1/lojas/{loja_id}/estado",
     "simbolo": "/lojas/{loja_id}/estado",
     "arquivo": "app/web/control.py",
     "linha": 1103
    },
    {
     "secao": "rota",
-    "chave": "POST /lojas/{loja_id}/gestores",
+    "chave": "POST /control/v1/lojas/{loja_id}/gestores",
     "simbolo": "/lojas/{loja_id}/gestores",
     "arquivo": "app/web/control.py",
     "linha": 1123
    },
    {
     "secao": "rota",
-    "chave": "POST /lojas/{loja_id}/gestores/{gestor_id}/revogar",
+    "chave": "POST /control/v1/lojas/{loja_id}/gestores/{gestor_id}/revogar",
     "simbolo": "/lojas/{loja_id}/gestores/{gestor_id}/revogar",
     "arquivo": "app/web/control.py",
     "linha": 1143
    },
    {
     "secao": "rota",
-    "chave": "GET /lojas/{loja_id}/auditoria",
+    "chave": "GET /control/v1/lojas/{loja_id}/auditoria",
     "simbolo": "/lojas/{loja_id}/auditoria",
     "arquivo": "app/web/control.py",
     "linha": 1164
    },
    {
     "secao": "rota",
-    "chave": "POST /lojas/{loja_id}/google-ads/oauth/start",
+    "chave": "POST /control/v1/lojas/{loja_id}/google-ads/oauth/start",
     "simbolo": "/lojas/{loja_id}/google-ads/oauth/start",
     "arquivo": "app/web/control.py",
     "linha": 1181
    },
    {
     "secao": "rota",
-    "chave": "GET /google-ads/oauth/callback",
+    "chave": "GET /control/v1/google-ads/oauth/callback",
     "simbolo": "/google-ads/oauth/callback",
     "arquivo": "app/web/control.py",
     "linha": 1203
    },
    {
     "secao": "rota",
-    "chave": "GET /lojas/{loja_id}/google-ads/connection",
+    "chave": "GET /control/v1/lojas/{loja_id}/google-ads/connection",
     "simbolo": "/lojas/{loja_id}/google-ads/connection",
     "arquivo": "app/web/control.py",
     "linha": 1222
    },
    {
     "secao": "rota",
-    "chave": "DELETE /lojas/{loja_id}/google-ads/connection",
+    "chave": "DELETE /control/v1/lojas/{loja_id}/google-ads/connection",
     "simbolo": "/lojas/{loja_id}/google-ads/connection",
     "arquivo": "app/web/control.py",
     "linha": 1240
    },
    {
     "secao": "rota",
-    "chave": "GET /lojas/{loja_id}/google-ads/accounts",
+    "chave": "GET /control/v1/lojas/{loja_id}/google-ads/accounts",
     "simbolo": "/lojas/{loja_id}/google-ads/accounts",
     "arquivo": "app/web/control.py",
     "linha": 1289
    },
    {
     "secao": "rota",
-    "chave": "POST /lojas/{loja_id}/google-ads/accounts/sync",
+    "chave": "POST /control/v1/lojas/{loja_id}/google-ads/accounts/sync",
     "simbolo": "/lojas/{loja_id}/google-ads/accounts/sync",
     "arquivo": "app/web/control.py",
     "linha": 1307
    },
    {
     "secao": "rota",
-    "chave": "POST /lojas/{loja_id}/google-ads/accounts/{customer_id}/select",
+    "chave": "POST /control/v1/lojas/{loja_id}/google-ads/accounts/{customer_id}/select",
     "simbolo": "/lojas/{loja_id}/google-ads/accounts/{customer_id}/select",
     "arquivo": "app/web/control.py",
     "linha": 1325
    },
    {
     "secao": "rota",
-    "chave": "POST /lojas/{loja_id}/google-ads/metrics/sync",
+    "chave": "POST /control/v1/lojas/{loja_id}/google-ads/metrics/sync",
     "simbolo": "/lojas/{loja_id}/google-ads/metrics/sync",
     "arquivo": "app/web/control.py",
     "linha": 1345
    },
    {
     "secao": "rota",
-    "chave": "GET /lojas/{loja_id}/google-ads/metrics/summary",
+    "chave": "GET /control/v1/lojas/{loja_id}/google-ads/metrics/summary",
     "simbolo": "/lojas/{loja_id}/google-ads/metrics/summary",
     "arquivo": "app/web/control.py",
     "linha": 1366
    },
    {
     "secao": "rota",
-    "chave": "GET /internal/lojas/{loja_id}/aquisicao-resumo",
+    "chave": "GET /control/v1/internal/lojas/{loja_id}/aquisicao-resumo",
     "simbolo": "/internal/lojas/{loja_id}/aquisicao-resumo",
     "arquivo": "app/web/control.py",
     "linha": 1388
    },
    {
     "secao": "rota",
-    "chave": "GET /lojas/{loja_id}/google-ads/conversion-actions",
+    "chave": "GET /control/v1/lojas/{loja_id}/google-ads/conversion-actions",
     "simbolo": "/lojas/{loja_id}/google-ads/conversion-actions",
     "arquivo": "app/web/control.py",
     "linha": 1410
    },
    {
     "secao": "rota",
-    "chave": "GET /lojas/{loja_id}/google-ads/conversion-bindings",
+    "chave": "GET /control/v1/lojas/{loja_id}/google-ads/conversion-bindings",
     "simbolo": "/lojas/{loja_id}/google-ads/conversion-bindings",
     "arquivo": "app/web/control.py",
     "linha": 1431
    },
    {
     "secao": "rota",
-    "chave": "POST /lojas/{loja_id}/google-ads/conversion-bindings",
+    "chave": "POST /control/v1/lojas/{loja_id}/google-ads/conversion-bindings",
     "simbolo": "/lojas/{loja_id}/google-ads/conversion-bindings",
     "arquivo": "app/web/control.py",
     "linha": 1449

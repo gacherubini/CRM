@@ -15,10 +15,6 @@ com `prefix=` que o mapa ainda nao aplica.
 
 - `/v1/veiculos/{}/{}` chamado em `chatbot-api/app/inventory.py` — `estoque-api` nao declara
 - `/v1/veiculos/{}/{}` chamado em `portal-gestao/app/clients/estoque.py` — `estoque-api` nao declara
-- `/v1/lojas/{}/eventos/venda-atualizada` chamado em `portal-gestao/app/clients/revy_trafego.py` — `revy-trafego` nao declara
-- `/v1/lojas/{}/eventos/venda-confirmada` chamado em `portal-gestao/app/clients/revy_trafego.py` — `revy-trafego` nao declara
-- `/v1/lojas/{}/integracoes/health` chamado em `portal-gestao/app/clients/revy_trafego.py` — `revy-trafego` nao declara
-- `/v1/lojas/{}/resultados` chamado em `portal-gestao/app/clients/revy_trafego.py` — `revy-trafego` nao declara
 
 ## Funcoes publicas sem nenhum chamador
 
