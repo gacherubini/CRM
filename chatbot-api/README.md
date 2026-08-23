@@ -44,6 +44,20 @@ Domínio em `app/servico.py`; bootstrap e rotas em `app/main.py`.
   acontece aqui; o n8n recebe o evento já normalizado e segue no agente. Mudou o formato
   desse retorno? O bot do Modo 2 para. Ver
   [`docs/referencia-viva/design/2026-08-16-whatsapp-modo2-asbuilt.md`](../docs/referencia-viva/design/2026-08-16-whatsapp-modo2-asbuilt.md).
+- **Modo 2 mudo com tudo "configurado"? Confira `subscribed_apps` da WABA.** Webhook
+  verificado, campo `messages` assinado, token válido e **nenhuma mensagem chegando** é o
+  sintoma de app não inscrito na WABA. Em 23/08 o único inscrito era o
+  `WA DevX Webhook Events 1P App` — o app interno que o botão *Teste* do painel usa, e por
+  isso o teste chegava e uma mensagem real não chegaria, sem erro em lugar nenhum.
+  Diagnóstico e correção:
+
+  ```bash
+  curl -s "https://graph.facebook.com/v21.0/<WABA_ID>/subscribed_apps?access_token=$T"
+  curl -s -X POST "https://graph.facebook.com/v21.0/<WABA_ID>/subscribed_apps" -d "access_token=$T"
+  ```
+
+  Vale para **toda WABA nova**, inclusive a de cada loja quando o §16.6 entrar. O app
+  também precisa estar **Ao Vivo**: em Desenvolvimento a Meta só entrega webhook de teste.
 - **Falha no inbound Cloud não pode virar só log.** Já respondemos `200` à Meta (§6.1), então
   ela **não reentrega**: engolir a exceção perde o lead calado. O corpo cru vai para
   `cloud_evento_falho` e o worker `cloud_retry` reprocessa (teto de 5 tentativas).

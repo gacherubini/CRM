@@ -1,7 +1,9 @@
-# Onboarding Meta + domínio próprio — as-built (16/08/2026)
+# Onboarding Meta + domínio próprio — as-built (16/08, atualizado em 23/08/2026)
 
-O que **existe e está verificado** depois da sessão de 16/08. Não é plano: cada linha
-aqui foi conferida contra o RDAP, o DNS ou uma resposta HTTP real, não contra painel.
+O que **existe e está verificado** depois das sessões de 16/08 (domínio, site, conta na
+Meta) e 23/08 (webhook, token, inscrição na WABA, template, documentos do CNPJ). Não é
+plano: cada linha aqui foi conferida contra o RDAP, o DNS, o Graph API ou uma resposta
+HTTP real — nunca contra painel.
 
 Complementa [`2026-08-16-whatsapp-modo2-asbuilt.md`](2026-08-16-whatsapp-modo2-asbuilt.md),
 que descreve o bot. Este cobre a infraestrutura que faltava para ele sair do laboratório.
@@ -19,7 +21,7 @@ anterior. Só a terceira olha o CNPJ.
 |---|---|---|
 | 1 — conta pessoal do Facebook | criar o app | **feito** 16/08 |
 | 2 — app + produto WhatsApp + vínculo | o botão "Iniciar verificação" existir | **feito** 16/08 |
-| 3 — verificação da empresa (CNPJ) | escala: sair dos 250/24h | não iniciado |
+| 3 — verificação da empresa (CNPJ) | escala: sair dos 250/24h | **documentos prontos** 23/08, não submetido |
 | 4 — nome de exibição "Revy" | o cliente ver "Revy" no lugar do número | bloqueado pelo 3 |
 
 **O portão 3 não bloqueia o piloto.** Ver "Limites sem CNPJ" no fim.
@@ -142,11 +144,140 @@ mesmo com a URL certa.
 
 ### Secrets do `app2037` (conferir por nome, nunca por valor)
 
-| Nome | Para quê |
+| Nome | Para quê | Estado |
+|---|---|---|
+| `CHATBOT_META_VERIFY_TOKEN` | tem que ser idêntico ao digitado no painel da Meta | posto 23/08 |
+| `CHATBOT_META_APP_SECRET` | Chave Secreta do app; valida a assinatura do inbound | posto 23/08 |
+| `CHATBOT_GRAPH_TOKEN` | token de **System User**, permanente — o do painel expira em 24h | posto 23/08 |
+| `CHATBOT_GRAPH_PHONE_NUMBER_ID` | número de onde a central fala; fallback do `cloud_canal.py` quando a loja não tem canal | posto 23/08 (`1227059273831581`, o de teste) |
+| `CHATBOT_GRAPH_TEMPLATE_OFERTA` | nome do template de oferta | **não posto de propósito** — o default do código já é `chama_vendedor` |
+
+## Sessão 23/08 — o encanamento do Modo 2 fechou
+
+Tudo aqui foi conferido contra resposta HTTP real (Graph API, log do `app2037`), não
+contra painel. O que o painel diz e o Graph desmente, vale o Graph.
+
+### O que passou a existir
+
+| Peça | Estado | Como foi conferido |
+|---|---|---|
+| Webhook da Meta | verificado e salvo | `hub.challenge` volta cru pelo n8n |
+| Campo `messages` | assinado | lista de webhook fields do painel |
+| App `Revy` | **Ao Vivo** | barra lateral → *Publicar* → etiqueta "Publicado" |
+| Token de System User | permanente | `debug_token`: `SYSTEM_USER`, `expires_at: 0` |
+| App inscrito na WABA | sim | `GET /{waba}/subscribed_apps` lista `Revy` |
+| Template `chama_vendedor` | `PENDING`, categoria `UTILITY` | `GET /{template_id}` |
+
+### Os cinco testes que provaram a entrada
+
+Na ordem, do mais isolado ao mais completo:
+
+| # | Teste | Esperado | Resultado |
+|---|---|---|---|
+| 1 | `GET /webhook/cloud` no chatbot, token certo | challenge cru | `12345` |
+| 2 | idem via `n8n2037` | challenge cru, **sem envelope JSON** | `12345` |
+| 3 | idem, token errado | reprova | `403 verify token inválido` |
+| 4 | `POST` assinado direto no chatbot | aceita | `200 {"ok":true,"mensagens":[]}` |
+| 5 | `POST` com assinatura forjada | recusa | `401 assinatura inválida` |
+| 6 | `POST` assinado **via n8n** | corpo cru chega inteiro | log: `POST /webhook/cloud 200 "n8n"` |
+
+O 6 é o que a Task 5 do card de fechamento chamava de *"o teste que decide tudo"*: se o
+n8n reserializasse o corpo, o HMAC não fecharia e viria `401`. Veio `200`.
+
+Depois, o botão **Teste** do campo `messages` no painel — primeiro payload assinado pela
+**Meta**, não por nós:
+
+```
+phone_number_id sem loja: 123456123
+POST /webhook/cloud 200 OK   ("n8n")
+```
+
+O `123456123` é o número fictício do payload de teste. O chatbot validou a assinatura,
+parseou, não achou loja dona e descartou logando — o comportamento que a §6.2 pede.
+
+### Armadilha: app não inscrito na WABA é silêncio, não erro
+
+Antes da inscrição, `GET /{waba}/subscribed_apps` devolvia **só** o
+`WA DevX Webhook Events 1P App` (id `2202427980234937`) — o app interno que o botão
+*Teste* do painel usa. Ou seja: **o teste do painel chegava e mensagem real não chegaria**,
+sem erro em lugar nenhum. Webhook verificado, campo assinado, token válido, e silêncio.
+
+Corrigido com `POST /{waba}/subscribed_apps` usando o token de System User. **Toda WABA
+nova precisa disso** — inclusive a de cada loja, quando o desenho do §16.6 entrar.
+
+### Armadilha: o token de System User precisa de DOIS ativos
+
+Atribuir só a WABA faz a tela *Atribuir permissões* abrir vazia, com
+*"Nenhuma permissão disponível — atribua uma função do app ao usuário do sistema"*. O
+usuário do sistema precisa de **Apps → Revy (acesso total)** *e*
+**Contas do WhatsApp → a WABA (acesso total)**. São ativos separados: um diz quem fala,
+o outro sobre o quê.
+
+Expiração: **Nunca**. A Meta recomenda 60 dias presumindo rotação automática, que não
+existe aqui — e um token que morre sozinho derruba todas as lojas em silêncio (dívida
+conhecida, §16.7 da spec).
+
+### O template de oferta, e por que ele tem exatamente uma variável
+
+`oferta_envio.py:74` manda `variaveis=[vendedor.nome]` e um botão de resposta rápida. O
+template aprovado tem que casar com isso ou o envio falha:
+
+```
+nome    chama_vendedor        idioma  pt_BR        categoria  UTILITY
+corpo   "Olá {{1}}, lead novo na loja. Toque em Peguei para assumir o atendimento."
+botão   [Peguei]  (QUICK_REPLY)
+```
+
+O corpo espelha de propósito o `resumo` do envelope interativo (`oferta_envio.py:55`) —
+a §5.7 diz *"dois envelopes, um significado"*. Sem `wa.me`, sem botão de URL, sem telefone
+do cliente: o contato só vai **depois** do clique.
+
+Ficar em `UTILITY` é o que importa. Reclassificado como `MARKETING`, cada oferta custaria
+~10× (§9).
+
+### Correção no `workflow-cloud`: `lastNode` envelopa o challenge
+
+O webhook GET do `wCloudMeta0001` estava com `responseMode: lastNode`, e o n8n serializa
+a saída do nó: a Meta recebia `{"data":"<challenge>"}` em vez do challenge. Como ela
+compara o **corpo inteiro**, a verificação reprovaria — e o sintoma seria só
+*"não foi possível validar o token"*, mandando procurar no lugar errado.
+
+Corrigido no gerador (`n8n/fork_cloud_workflow.py`): `responseMode: responseNode` mais um
+nó `Responder verificacao` (`respondToWebhook`, `respondWith: text`,
+`responseBody: {{ $json.data }}`). O `n8n/validate_workflow_cloud.py` passou a exigir
+esse formato, então não regride calado. Workflow subiu de 20 para **21 nós**.
+
+Publicação: `prepare-workflow.ps1` ganhou o **`-Mode cloud`** (antes só tratava o
+workflow do Modo 1, e o cloud precisava das quatro transformações à mão).
+
+### Verificação de CNPJ: pronta para submeter
+
+Os documentos foram gerados e batidos contra o site em 23/08.
+
+| Item | Valor |
 |---|---|
-| `CHATBOT_META_VERIFY_TOKEN` | tem que ser idêntico ao digitado no painel da Meta |
-| `CHATBOT_META_APP_SECRET` | Chave Secreta do app; valida a assinatura do inbound |
-| `CHATBOT_GRAPH_TOKEN` | token de **System User**, permanente — o do painel expira em 24h |
+| Nome legal | `66.261.888 CAUA SCARPA SCHNEIDER` — o cartão CNPJ traz *Título do Estabelecimento* vazio, então **"Revy" não entra no campo de nome legal** |
+| CNPJ | `66.261.888/0001-24` — MEI, ME, **ATIVA** desde 14/04/2026, CNAE 73.19-0-02 |
+| Endereço | `Rua Paulista, 228 — Boa Vista — Limeira/SP — 13486-107`, **sem complemento** |
+| Telefone | `+55 19 99846-9808` |
+| Site / e-mail | `https://revyapp.com.br` · `contato@revyapp.com.br` |
+
+**Documento principal: o CCMEI** (`gov.br/mei` → *Emitir Certificado de MEI*, login do
+titular), duas páginas — a 2ª é o Termo de Ciência com o QR de validação e **vai junto**.
+Ele escreve "RUA PAULISTA" por extenso, batendo letra a letra com o rodapé do site,
+enquanto o cartão CNPJ abrevia "R PAULISTA". Reserva: o cartão CNPJ
+(`solucoes.receita.fazenda.gov.br/servicos/cnpjreva/cnpjreva_solicitacao.asp`).
+
+**O telefone truncado deixou de ser pendência.** O cartão CNPJ imprime `(19) 9846-9808` —
+o mesmo número sem o nono dígito, truncagem de cadastro antigo. **O CCMEI não imprime
+telefone nenhum**, então não existe string para divergir. O que a Meta compara é nome
+legal + endereço.
+
+O site foi alinhado ao cadastro em 23/08: `+55 19 99846-9808` no bloco Contato da landing
+e no bloco de identidade das três páginas legais. O **`wa.me/5551980336365` ficou intacto
+de propósito** — é por ele que o lead fala com a Revy, e apontar o botão de WhatsApp para
+um número sem WhatsApp mataria a captação para ganhar uma linha de rodapé.
+
 
 ## Limites sem CNPJ verificado
 
@@ -175,24 +306,49 @@ ser questão de atribuição e virou questão de custo.
 
 ## O que falta
 
-**Esta semana — terminar o site e a URL**
+**Fechado em 23/08** (conferido por HTTP/Graph, não por painel)
 
-- [ ] delegação `.br` propagar e apontar para a Cloudflare (conferir por `nslookup -type=NS`, não por painel)
-- [ ] custom domain `revyapp.com.br` e `www` no projeto Pages, certificado emitido
-- [ ] testar e-mail de verdade para `contato@revyapp.com.br`
-- [ ] preencher no app da Meta: as três URLs legais, `Domínios do aplicativo`, e-mail de contato, Categoria e ícone — hoje Termos e Exclusão apontam para `facebook.com`, o que lê como não configurado
-- [ ] vincular o app ao portfólio empresarial (fim da tela Básico)
-- [ ] commit e deploy do `app2037` com a remoção do `/site` — **só depois** que `revyapp.com.br` responder, senão o 301 aponta para o vazio
+- [x] delegação `.br` propagou — `nslookup -type=NS` devolve `demi`/`scott.ns.cloudflare.com`
+- [x] `revyapp.com.br` e as três URLs legais respondem **200 em HTTPS**, certificado emitido
+- [x] ficha do app preenchida: três URLs legais, `Domínios do aplicativo`, e-mail, categoria
+      *Negócio e Páginas*, ícone
+- [x] app vinculado ao portfólio empresarial (`business_id=4040462592922875`)
+- [x] app **publicado** (Ao Vivo) — na interface nova isso mora na barra lateral em
+      **Publicar**, não num interruptor no topo; a etiqueta vira "Publicado" e aparece
+      *Tirar do ar*
+- [x] webhook apontado para o n8n, verificado, campo `messages` assinado
+- [x] os secrets no `app2037` (tabela acima) — quatro, não três
+- [x] app inscrito na WABA (`subscribed_apps`) — **não estava**, e é silêncio quando falta
+- [x] template `chama_vendedor` submetido (`UTILITY`, `pt_BR`)
+- [x] documentos da verificação de CNPJ gerados e batidos contra o site
 
-**Fim de semana de 22–23/08 — WhatsApp central da loja, para rodar segunda 24/08**
+**Ainda aberto — Meta**
 
-- [ ] apontar o webhook para o n8n e assinar `messages`
-- [ ] os três secrets acima no `app2037`
-- [ ] ciclo completo no **número de teste** antes de qualquer chip: mensagem → n8n → bot → rodízio → handoff
+- [ ] meio de pagamento na WABA (item da Etapa 2) — sem ele, mensagem iniciada pela empresa
+      não sai, e é ela que o rodízio usa com janela fechada
+- [ ] aprovação do `chama_vendedor` (estava `PENDING`)
+- [ ] submeter a verificação do CNPJ — documentos prontos, é preencher e subir
 - [ ] eSIM de operadora brasileira com **voz/SMS** — eSIM de viagem (Airalo, Holafly) é só dados, não recebe SMS e **não serve**
 - [ ] número que **nunca teve WhatsApp**; e uma vez na Cloud API ele fica **bot-only**, não volta a funcionar no app
-- [ ] Etapa 2 do painel: substituir o número de teste pelo número real
+- [ ] Etapa 2 do painel: registrar o número real ao lado do de teste
+
+**Ainda aberto — nosso lado (é o que trava o ciclo ponta a ponta)**
+
+- [ ] cadastrar o **canal Cloud** da loja: `POST /v1/whatsapp/canais` com
+      `evolution_instance = <phone_number_id>` e `waba_id` (a UI não envia esses campos, §16.3)
+- [ ] ligar `REVY_CONTROL_WHATSAPP_MODO2_ENABLED` no `app2037` — sem ela o Control **nem
+      oferece** o Modo 2 na ficha da loja
 - [ ] projetar `whatsapp_modo = 2` **numa loja só**
+- [ ] cadastrar a fila de vendedores (autoatendido na Loja)
+- [ ] ciclo completo no **número de teste** antes de qualquer chip: mensagem → n8n → bot →
+      rodízio → handoff. Hoje pararia em `phone_number_id sem loja`, que é a mesma linha
+      de log do teste do painel
+- [ ] provider de transcrição (Groq) — `CHATBOT_AUDIO_TRANSCRIPTION_URL` / `_TOKEN`
+
+**Não conferido nesta sessão**
+
+- [ ] teste de e-mail real para `contato@revyapp.com.br`
+- [ ] estado do 301 de `/site` no `app2037`
 
 **Dívida que precede cliente real:** o **VAD do áudio** (§5.10). O Whisper inventa frase
 plausível em áudio mudo e o bot **age** em cima da transcrição — dois segundos de moto

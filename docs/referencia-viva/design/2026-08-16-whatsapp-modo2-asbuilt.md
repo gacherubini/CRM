@@ -125,9 +125,19 @@ gerador produz e sai com código 1. Ajuste o gerador e rode.
 Flag `CHATBOT_WHATSAPP_MODO2_ENABLED=1` no `app2037` desde 16/08. O gate é
 fail-closed em três condições (§6.3): flag, loja operacional e projeção
 `whatsapp_modo == "2"` vinda do Control. **Nenhuma loja tem essa projeção**, então
-os workers sobem e não tocam em nada. O piloto ainda precisa das credenciais da
-Meta (`META_APP_SECRET`, verify token, `GRAPH_TOKEN`, `phone_number_id`) e da
-reimportação do workflow no n8n.
+os workers sobem e não tocam em nada.
+
+**23/08: as credenciais da Meta deixaram de ser pendência.** Verify token, App Secret,
+token de System User (permanente) e `phone_number_id` estão nos secrets do `app2037`; o
+webhook está verificado com o campo `messages` assinado; o app está Ao Vivo e **inscrito
+na WABA**; o `chama_vendedor` foi submetido. A entrada foi provada ponta a ponta, inclusive
+com payload assinado pela própria Meta. Detalhe, testes e armadilhas em
+[`2026-08-16-onboarding-meta-dominio-asbuilt.md`](2026-08-16-onboarding-meta-dominio-asbuilt.md),
+seção "Sessão 23/08".
+
+O que ainda separa o piloto de rodar, agora tudo **do nosso lado**: canal Cloud da loja em
+`whatsapp_canais`, flag `REVY_CONTROL_WHATSAPP_MODO2_ENABLED` e a projeção
+`whatsapp_modo = 2` numa loja. Sem elas, o inbound morre em `phone_number_id sem loja`.
 
 Import do workflow: ver a armadilha em
 [`../../../deploy/fly/3vm/README.md`](../../../deploy/fly/3vm/README.md) —
