@@ -1038,7 +1038,8 @@ TESTES: dict[str, dict[str, str]] = {
     },
     "portal-gestao": {
         "macos": "cd portal-gestao && .venv/bin/python -m pytest -q",
-        "windows": r"cd portal-gestao && .\.venv\Scripts\python.exe -m pytest -q",
+        "windows": r"cd portal-gestao && .\.venv\Scripts\python.exe -m pytest -p no:cacheprovider -q",
+        "nota": "No Windows, -p no:cacheprovider: o .pytest_cache do Portal quebra com WinError 183.",
     },
     "motor-simulacao": {
         "macos": "cd motor-simulacao && .venv/bin/python -m pytest -q",
@@ -1079,6 +1080,11 @@ class TestGeracaoDoMapa(unittest.TestCase):
 
     def test_revy_trafego_avisa_que_usa_o_venv_do_portal(self):
         self.assertIn("portal-gestao", gerar_mapa.TESTES["revy-trafego"]["macos"])
+
+    def test_portal_no_windows_desliga_o_cache_do_pytest(self):
+        # o .pytest_cache do Portal quebra com WinError 183 no Windows do dono.
+        # E conhecimento de "como rodar teste", entao mora no mapa, nao num learning.
+        self.assertIn("no:cacheprovider", gerar_mapa.TESTES["portal-gestao"]["windows"])
 
     def test_render_traz_o_sha_e_as_secoes(self):
         raiz = varredura.raiz_repo()
