@@ -1,0 +1,305 @@
+# revy-trafego · 119 rotas · 31 modelos · 35 workers · 51 flags · 20 migrations · 20 templates
+
+Gerado de `066f6e2`. NAO editar a mao — saida de `gerar_mapa.py`.
+Migration head: `0020_loja_whatsapp_modo`
+
+## Rotas
+
+- `GET /lojas/{loja_slug}/resultados` — app/api_v1.py:90
+- `POST /lojas/{loja_slug}/eventos/venda-atualizada` — app/api_v1.py:244
+- `POST /lojas/{loja_slug}/eventos/venda-confirmada` — app/api_v1.py:289
+- `GET /lojas/{loja_slug}/integracoes/health` — app/api_v1.py:456
+- `GET /health/live` — app/main.py:330
+- `GET /health/ready` — app/main.py:335
+- `GET /public/v1/lojas/{loja_slug}/pixel` — app/main.py:341
+- `GET /` — app/main.py:366
+- `GET /login` — app/main.py:371
+- `POST /login` — app/main.py:381
+- `POST /logout` — app/main.py:399
+- `GET /app` — app/main.py:407
+- `POST /app/loja` — app/main.py:450
+- `GET /app/trafego` — app/main.py:524
+- `POST /app/trafego` — app/main.py:551
+- `POST /app/trafego/ads/salvar` — app/main.py:618
+- `POST /app/trafego/ads/sincronizar` — app/main.py:661
+- `POST /app/trafego/capi/retentar` — app/main.py:675
+- `GET /app/trafego/pixel-auditoria` — app/main.py:689
+- `GET /app/trafego/ctwa-auditoria` — app/main.py:704
+- `GET /app/trafego/roi` — app/main.py:738
+- `GET /app/campanhas` — app/main.py:796
+- `GET /app/campanhas/nova` — app/main.py:855
+- `POST /app/campanhas/nova` — app/main.py:868
+- `GET /app/campanhas/gastos/lote` — app/main.py:912
+- `POST /app/campanhas/gastos/lote` — app/main.py:937
+- `GET /app/campanhas/gastos/csv/modelo` — app/main.py:998
+- `POST /app/campanhas/gastos/csv` — app/main.py:1011
+- `GET /app/campanhas/{campanha_id}` — app/main.py:1066
+- `GET /app/campanhas/{campanha_id}/editar` — app/main.py:1159
+- `POST /app/campanhas/{campanha_id}/editar` — app/main.py:1192
+- `POST /app/campanhas/{campanha_id}/apagar` — app/main.py:1236
+- `POST /app/campanhas/{campanha_id}/gastos` — app/main.py:1256
+- `GET /app/diagnostico/leads` — app/main.py:1296
+- `GET /app/diagnostico/leads/{lead_id}` — app/main.py:1337
+- `GET /app/diagnostico/conversas/{telefone}` — app/main.py:1368
+- `POST /internal/jobs/meta-spend-sync` — app/main.py:1423
+- `POST /internal/jobs/google-conversions-outbox` — app/main.py:1444
+- `POST /internal/jobs/google-ads-metrics-sync` — app/main.py:1467
+- `GET /acessos` — app/web/control.py:437
+- `POST /acessos/{acesso_id}/desativar` — app/web/control.py:446
+- `POST /acessos/{acesso_id}/reativar` — app/web/control.py:458
+- `POST /convites` — app/web/control.py:470
+- `POST /convites/ativar` — app/web/control.py:488
+- `POST /recuperacoes` — app/web/control.py:499
+- `POST /recuperacoes/consumir` — app/web/control.py:514
+- `POST /pessoas` — app/web/control.py:530
+- `GET /pessoas` — app/web/control.py:545
+- `GET /pessoas/{pessoa_id}` — app/web/control.py:559
+- `GET /lojas` — app/web/control.py:574
+- `POST /lojas` — app/web/control.py:580
+- `GET /lojas/{loja_id}` — app/web/control.py:595
+- `GET /dashboard` — app/web/control.py:607
+- `GET /lojas/{loja_id}/prontidao` — app/web/control.py:614
+- `POST /lojas/{loja_id}/prontidao/alertas/{check_code}/aceitar` — app/web/control.py:629
+- `GET /lojas/{loja_id}/integracoes` — app/web/control.py:648
+- `PUT /lojas/{loja_id}/integracoes/pixel` — app/web/control.py:663
+- `POST /lojas/{loja_id}/integracoes/pixel/desconectar` — app/web/control.py:687
+- `PUT /lojas/{loja_id}/integracoes/meta-ads` — app/web/control.py:705
+- `POST /lojas/{loja_id}/integracoes/meta-ads/desconectar` — app/web/control.py:726
+- `GET /lojas/{loja_id}/whatsapp-canais` — app/web/control.py:786
+- `POST /lojas/{loja_id}/whatsapp-canais` — app/web/control.py:802
+- `POST /lojas/{loja_id}/whatsapp-canais/{canal_id}/connect` — app/web/control.py:822
+- `POST /lojas/{loja_id}/whatsapp-canais/{canal_id}/disconnect` — app/web/control.py:845
+- `POST /lojas/{loja_id}/whatsapp-canais/{canal_id}/inativar` — app/web/control.py:862
+- `PATCH /lojas/{loja_id}` — app/web/control.py:896
+- `GET /lojas/{loja_id}/modulos` — app/web/control.py:915
+- `PUT /lojas/{loja_id}/modulos` — app/web/control.py:930
+- `POST /lojas/{loja_id}/modulos/{modulo}/suspender` — app/web/control.py:947
+- `POST /lojas/{loja_id}/modulos/{modulo}/reativar` — app/web/control.py:966
+- `GET /lojas/{loja_id}/contrato` — app/web/control.py:985
+- `PUT /lojas/{loja_id}/contrato` — app/web/control.py:1000
+- `POST /imports/portal-usuarios` — app/web/control.py:1023
+- `POST /lojas/{loja_id}/cargos` — app/web/control.py:1047
+- `GET /lojas/{loja_id}/cargos` — app/web/control.py:1067
+- `POST /lojas/{loja_id}/cargos/{cargo_id}/revogar` — app/web/control.py:1082
+- `POST /lojas/{loja_id}/estado` — app/web/control.py:1103
+- `POST /lojas/{loja_id}/gestores` — app/web/control.py:1123
+- `POST /lojas/{loja_id}/gestores/{gestor_id}/revogar` — app/web/control.py:1143
+- `GET /lojas/{loja_id}/auditoria` — app/web/control.py:1164
+- `POST /lojas/{loja_id}/google-ads/oauth/start` — app/web/control.py:1180
+- `GET /google-ads/oauth/callback` — app/web/control.py:1202
+- `GET /lojas/{loja_id}/google-ads/connection` — app/web/control.py:1221
+- `DELETE /lojas/{loja_id}/google-ads/connection` — app/web/control.py:1239
+- `GET /lojas/{loja_id}/google-ads/accounts` — app/web/control.py:1288
+- `POST /lojas/{loja_id}/google-ads/accounts/sync` — app/web/control.py:1306
+- `POST /lojas/{loja_id}/google-ads/accounts/{customer_id}/select` — app/web/control.py:1324
+- `POST /lojas/{loja_id}/google-ads/metrics/sync` — app/web/control.py:1344
+- `GET /lojas/{loja_id}/google-ads/metrics/summary` — app/web/control.py:1365
+- `GET /internal/lojas/{loja_id}/aquisicao-resumo` — app/web/control.py:1387
+- `GET /lojas/{loja_id}/google-ads/conversion-actions` — app/web/control.py:1409
+- `GET /lojas/{loja_id}/google-ads/conversion-bindings` — app/web/control.py:1430
+- `POST /lojas/{loja_id}/google-ads/conversion-bindings` — app/web/control.py:1448
+- `GET /app/control/convite/aceitar` — app/web/control_ui.py:118
+- `POST /app/control/convite/aceitar` — app/web/control_ui.py:133
+- `GET /app/control/dashboard` — app/web/control_ui.py:350
+- `GET /app/control/integracoes` — app/web/control_ui.py:406
+- `GET /app/control/lojas` — app/web/control_ui.py:444
+- `GET /app/control/acessos` — app/web/control_ui.py:457
+- `POST /app/control/lojas` — app/web/control_ui.py:495
+- `GET /app/control/lojas/{loja_id}` — app/web/control_ui.py:574
+- `GET /control/v1/lojas/{loja_id}/integracoes/health` — app/web/control_ui.py:611
+- `POST /app/control/lojas/{loja_id}/excluir` — app/web/control_ui.py:659
+- `POST /app/control/lojas/{loja_id}/modulos` — app/web/control_ui.py:709
+- `POST /app/control/lojas/{loja_id}/contrato` — app/web/control_ui.py:757
+- `POST /app/control/lojas/{loja_id}/cargos` — app/web/control_ui.py:842
+- `POST /app/control/lojas/{loja_id}/cargos/{cargo_id}/revogar` — app/web/control_ui.py:990
+- `POST /app/control/lojas/{loja_id}/estado` — app/web/control_ui.py:1042
+- `POST /app/control/lojas/{loja_id}/whatsapp-modo` — app/web/control_ui.py:1106
+- `POST /app/control/lojas/{loja_id}/gestores` — app/web/control_ui.py:1156
+- `POST /app/control/lojas/{loja_id}/gestores/convidar` — app/web/control_ui.py:1220
+- `POST /app/control/lojas/{loja_id}/gestores/revogar` — app/web/control_ui.py:1290
+- `POST /app/control/lojas/{loja_id}/gestores/{gestor_id}/revogar` — app/web/control_ui.py:1294
+- `POST /app/control/lojas/{loja_id}/google-ads/oauth/start` — app/web/control_ui.py:1346
+- `POST /app/control/lojas/{loja_id}/google-ads/desconectar` — app/web/control_ui.py:1396
+- `POST /app/control/lojas/{loja_id}/google-ads/accounts/sync` — app/web/control_ui.py:1449
+- `POST /app/control/lojas/{loja_id}/google-ads/accounts/select` — app/web/control_ui.py:1502
+- `POST /app/control/lojas/{loja_id}/google-ads/conversion-bindings` — app/web/control_ui.py:1575
+- `POST /app/control/lojas/{loja_id}/google-ads/metrics/sync` — app/web/control_ui.py:1654
+
+## Modelos
+
+- `lojas` — app/models.py:35
+- `modulos_revy` — app/models.py:76
+- `loja_modulos` — app/models.py:97
+- `contratos_loja` — app/models.py:149
+- `pessoas` — app/models.py:208
+- `cargos_loja` — app/models.py:224
+- `gestores_revy` — app/models.py:280
+- `acessos_control` — app/models.py:294
+- `convites_acesso_control` — app/models.py:341
+- `recuperacoes_senha_control` — app/models.py:386
+- `vinculos_trafego` — app/models.py:429
+- `auditoria_eventos` — app/models.py:475
+- `gestor_audit_log` — app/models.py:508
+- `vendas_projetadas` — app/models.py:521
+- `meta_pixel_config` — app/models.py:562
+- `meta_ads_config` — app/models.py:581
+- `pixel_capi_auditoria` — app/models.py:600
+- `meta_capi_outbox` — app/models.py:630
+- `campanhas` — app/models.py:658
+- `campanha_anuncios` — app/models.py:692
+- `meta_ad_campanha` — app/models.py:711
+- `campanha_gastos` — app/models.py:732
+- `control_provisioning_outbox` — app/models.py:757
+- `google_ads_connections` — app/models.py:794
+- `google_ads_oauth_states` — app/models.py:832
+- `google_ads_accounts` — app/models.py:858
+- `google_ads_campaign_daily` — app/models.py:900
+- `google_ads_conversion_bindings` — app/models.py:955
+- `google_ads_conversion_outbox` — app/models.py:983
+- `google_ads_upload_attempts` — app/models.py:1032
+- `readiness_alert_acceptances` — app/models.py:1065
+
+## Workers
+
+- `GoogleAdsConversionsWorker` — app/control/google_ads_conversions_job.py:55
+- `get_worker` — app/control/google_ads_conversions_job.py:194
+- `start_worker` — app/control/google_ads_conversions_job.py:198
+- `stop_worker` — app/control/google_ads_conversions_job.py:209
+- `listar_lojas_para_metrics_sync` — app/control/google_ads_metrics_job.py:46
+- `GoogleAdsMetricsSyncWorker` — app/control/google_ads_metrics_job.py:82
+- `get_worker` — app/control/google_ads_metrics_job.py:285
+- `start_worker` — app/control/google_ads_metrics_job.py:289
+- `stop_worker` — app/control/google_ads_metrics_job.py:300
+- `ProvisioningDeliveryWorker` — app/control/provisioning_job.py:28
+- `get_worker` — app/control/provisioning_job.py:139
+- `start_worker` — app/control/provisioning_job.py:143
+- `stop_worker` — app/control/provisioning_job.py:154
+- `env_float` — app/meta_ad_resolver_job.py:40
+- `env_int` — app/meta_ad_resolver_job.py:47
+- `mapa_ad_campaign_loja` — app/meta_ad_resolver_job.py:63
+- `contar_ads_nao_resolvidos` — app/meta_ad_resolver_job.py:80
+- `destravar_ads_nao_resolvidos` — app/meta_ad_resolver_job.py:98
+- `resolver_ads_pendentes` — app/meta_ad_resolver_job.py:198
+- `processar_loja` — app/meta_ad_resolver_job.py:322
+- `processar_todas_lojas` — app/meta_ad_resolver_job.py:386
+- `MetaAdResolverWorker` — app/meta_ad_resolver_job.py:444
+- `get_worker` — app/meta_ad_resolver_job.py:549
+- `start_worker` — app/meta_ad_resolver_job.py:553
+- `stop_worker` — app/meta_ad_resolver_job.py:569
+- `env_flag` — app/meta_ads_spend_job.py:20
+- `env_float` — app/meta_ads_spend_job.py:27
+- `env_int` — app/meta_ads_spend_job.py:34
+- `MetaSpendSyncWorker` — app/meta_ads_spend_job.py:41
+- `get_worker` — app/meta_ads_spend_job.py:148
+- `start_worker` — app/meta_ads_spend_job.py:152
+- `stop_worker` — app/meta_ads_spend_job.py:161
+- `MetaCapiRetryWorker` — app/meta_capi_job.py:31
+- `start_worker` — app/meta_capi_job.py:122
+- `stop_worker` — app/meta_capi_job.py:131
+
+## Flags
+
+- `REVY_TRAFEGO_DATABASE_URL (default: sqlite:///./revy_trafego.db)` — app/config.py:18
+- `REVY_TRAFEGO_SESSION_SECRET (default: dev-trafego-troque)` — app/config.py:21
+- `REVY_TRAFEGO_ENCRYPTION_KEY` — app/config.py:23
+- `REVY_TRAFEGO_SECURE_COOKIE (default: 0)` — app/config.py:26
+- `REVY_TRAFEGO_CHATBOT_TOKEN_LOJA (default: '')` — app/config.py:30
+- `REVY_TRAFEGO_CHATBOT_TOKENS_JSON (default: '')` — app/config.py:33
+- `REVY_TRAFEGO_ESTOQUE_TOKEN_LOJA (default: '')` — app/config.py:38
+- `REVY_TRAFEGO_ESTOQUE_TOKENS_JSON (default: '')` — app/config.py:41
+- `REVY_TRAFEGO_MOTOR_TOKEN_LOJA (default: '')` — app/config.py:58
+- `REVY_TRAFEGO_MOTOR_TOKENS_JSON (default: '')` — app/config.py:59
+- `REVY_TRAFEGO_HTTP_TIMEOUT (default: 5)` — app/config.py:69
+- `REVY_TRAFEGO_HTTP_RETRIES (default: 1)` — app/config.py:70
+- `REVY_TRAFEGO_HTTP_RETRY_BACKOFF (default: 0.2)` — app/config.py:72
+- `REVY_TRAFEGO_TIMEZONE (default: America/Sao_Paulo)` — app/config.py:74
+- `REVY_TRAFEGO_VERSION (default: 0.1.0)` — app/config.py:75
+- `REVY_TRAFEGO_BOOTSTRAP_EMAIL (default: trafego@revy.local)` — app/config.py:77
+- `REVY_TRAFEGO_BOOTSTRAP_SENHA (default: troque-isto)` — app/config.py:79
+- `REVY_TRAFEGO_BOOTSTRAP_NOME (default: Equipe Tráfego)` — app/config.py:80
+- `REVY_TRAFEGO_META_SPEND_SYNC_ENABLED (default: 0)` — app/config.py:83
+- `REVY_TRAFEGO_CAPI_WORKER (default: 0)` — app/config.py:87
+- `REVY_CONTROL_ENABLED (default: 0)` — app/config.py:91
+- `REVY_CONTROL_RBAC_ENABLED (default: 0)` — app/config.py:95
+- `MULTI_WHATSAPP_ENABLED` — app/config.py:137
+- `REVY_CONTROL_DASHBOARD_ENABLED` — app/config.py:140
+- `REVY_CONTROL_PROVISIONING_DELIVERY_ENABLED` — app/config.py:145
+- `REVY_TRAFEGO_JOB_SECRET (default: '')` — app/config.py:148
+- `REVY_TRAFEGO_SERVICE_TOKEN (default: '')` — app/config.py:150
+- `REVY_TRAFEGO_URL_PREFIX (default: '')` — app/config.py:152
+- `REVY_TRAFEGO_EMAIL_BACKEND (default: console)` — app/config.py:153
+- `REVY_TRAFEGO_EMAIL_FROM (default: no-reply@revy.local)` — app/config.py:154
+- `REVY_TRAFEGO_EMAIL_FROM_NAME (default: Revy Control)` — app/config.py:156
+- `REVY_TRAFEGO_SMTP_HOST (default: '')` — app/config.py:158
+- `REVY_TRAFEGO_SMTP_PORT (default: 587)` — app/config.py:159
+- `REVY_TRAFEGO_SMTP_USERNAME (default: '')` — app/config.py:160
+- `REVY_TRAFEGO_SMTP_PASSWORD (default: '')` — app/config.py:161
+- `REVY_TRAFEGO_SMTP_USE_TLS (default: 1)` — app/config.py:162
+- `REVY_TRAFEGO_PUBLIC_BASE_URL (default: '')` — app/config.py:168
+- `REVY_TRAFEGO_LOJAS` — app/config.py:245
+- `REVY_CONTROL_WHATSAPP_MODO2_ENABLED (default: '')` — app/config.py:256
+- `REVY_CONTROL_PROVISIONING_INTERVAL_SECONDS (default: 30.0)` — app/control/provisioning_job.py:45
+- `REVY_CONTROL_PROVISIONING_INITIAL_DELAY_SECONDS (default: 15.0)` — app/control/provisioning_job.py:51
+- `REVY_TRAFEGO_ENCRYPTION_KEY` — app/cripto.py:13
+- `REVY_TRAFEGO_ENV` — app/cripto.py:18
+- `REVY_TRAFEGO_LOJAS` — app/lojas.py:24
+- `REVY_TRAFEGO_SKIP_INIT` — app/main.py:90
+- `REVY_TRAFEGO_AD_RESOLVER_MAX_TENTATIVAS` — app/meta_ad_resolver_job.py:56
+- `REVY_TRAFEGO_AD_RESOLVER_COOLDOWN_SECONDS` — app/meta_ad_resolver_job.py:57
+- `REVY_TRAFEGO_AD_RESOLVER_MAX_POR_CICLO` — app/meta_ad_resolver_job.py:58
+- `REVY_TRAFEGO_AD_RESOLVER_SLEEP_ENTRE_CALLS` — app/meta_ad_resolver_job.py:59
+- `REVY_TRAFEGO_AD_RESOLVER_INTERVAL_SECONDS (default: 3600.0)` — app/meta_ad_resolver_job.py:461
+- `REVY_TRAFEGO_AD_RESOLVER_INITIAL_DELAY_SECONDS (default: 90.0)` — app/meta_ad_resolver_job.py:466
+
+## Migrations
+
+- `0001_revy_trafego_baseline` — alembic/versions/0001_revy_trafego_baseline.py
+- `0002_revy_control_lojas_rbac` — alembic/versions/0002_revy_control_lojas_rbac.py
+- `0003_revy_control_pessoas_cargos` — alembic/versions/0003_revy_control_pessoas_cargos.py
+- `0004_revy_control_acessos_control` — alembic/versions/0004_revy_control_acessos_control.py
+- `0005_revy_control_convites` — alembic/versions/0005_revy_control_convites.py
+- `0006_revy_control_recuperacoes` — alembic/versions/0006_revy_control_recuperacoes.py
+- `0007_revy_control_portfolio` — alembic/versions/0007_revy_control_portfolio.py
+- `0008_revy_control_loja_versao` — alembic/versions/0008_revy_control_loja_versao.py
+- `0009_revy_control_provisioning_outbox` — alembic/versions/0009_revy_control_provisioning_outbox.py
+- `0010_revy_control_google_ads_connections` — alembic/versions/0010_revy_control_google_ads_connections.py
+- `0011_revy_control_google_ads_metrics` — alembic/versions/0011_revy_control_google_ads_metrics.py
+- `0012_revy_control_google_ads_conversions` — alembic/versions/0012_revy_control_google_ads_conversions.py
+- `0013_revy_control_readiness_alert_acceptances` — alembic/versions/0013_revy_control_readiness_alert_acceptances.py
+- `0014_campanha_anuncios` — alembic/versions/0014_campanha_anuncios.py
+- `0015_meta_ad_campanha` — alembic/versions/0015_meta_ad_campanha.py
+- `0016_meta_ad_ultima_tentativa` — alembic/versions/0016_meta_ad_ultima_tentativa.py
+- `0017_vendas_projetadas_backfill_loja_id` — alembic/versions/0017_vendas_projetadas_backfill_loja_id.py
+- `0018_copiloto_modulo` — alembic/versions/0018_copiloto_modulo.py
+- `0019_financeiro_modulo` — alembic/versions/0019_financeiro_modulo.py
+- `0020_loja_whatsapp_modo` — alembic/versions/0020_loja_whatsapp_modo.py
+
+## Templates
+
+- `app/templates/login.html` — app/main.py:376
+- `app/templates/home.html` — app/main.py:440
+- `app/templates/trafego/form.html` — app/main.py:538
+- `app/templates/trafego/pixel_auditoria.html` — app/main.py:699
+- `app/templates/trafego/ctwa_auditoria.html` — app/main.py:726
+- `app/templates/trafego/roi.html` — app/main.py:775
+- `app/templates/campanhas/lista.html` — app/main.py:828
+- `app/templates/campanhas/form.html` — app/main.py:861
+- `app/templates/campanhas/gastos_lote.html` — app/main.py:924
+- `app/templates/campanhas/detalhe.html` — app/main.py:1136
+- `app/templates/diagnostico/leads.html` — app/main.py:1332
+- `app/templates/diagnostico/lead_detalhe.html` — app/main.py:1363
+- `app/templates/diagnostico/conversa.html` — app/main.py:1400
+- `app/templates/base.html` — app/templates/base.html
+- `app/templates/control/convite_aceitar.html` — app/web/control_ui.py:128
+- `app/templates/control/dashboard.html` — app/web/control_ui.py:387
+- `app/templates/control/integracoes.html` — app/web/control_ui.py:431
+- `app/templates/control/acessos.html` — app/web/control_ui.py:482
+- `app/templates/control/lojas.html` — app/web/control_ui.py:1811
+- `app/templates/control/loja_detail.html` — app/web/control_ui.py:2113
+
+## Testes
+
+**NAO tem .venv proprio. Usa o do portal-gestao.**
+
+- macOS: `cd revy-trafego && ../portal-gestao/.venv/bin/python -m pytest -q`
+- Windows: `cd revy-trafego && ..\portal-gestao\.venv\Scripts\python.exe -m pytest -q`

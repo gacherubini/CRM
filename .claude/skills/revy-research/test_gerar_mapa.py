@@ -1,8 +1,13 @@
+import contextlib
+import io
+import json
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 import extratores
+import gerar_mapa
 import varredura
 
 
@@ -468,6 +473,183 @@ class TestExtratorDeTemplates(unittest.TestCase):
                 self.assertNotIn(".venv", partes, entrada.chave)
                 self.assertNotIn("node_modules", partes, entrada.chave)
 
+# Coletar o repo inteiro custa ~6s. Os testes abaixo pedem a mesma coleta
+# varias vezes; sem cache a suite triplicaria de tamanho por nada.
+_CACHE_DE_COLETA: dict[str, list] = {}
+
+
+def coleta(produto: str) -> list:
+    if produto not in _CACHE_DE_COLETA:
+        _CACHE_DE_COLETA[produto] = gerar_mapa.coletar(varredura.raiz_repo(), produto)
+    return _CACHE_DE_COLETA[produto]
+
+
+FONTE_FAKE_MAIN = """
+from fastapi import APIRouter
+router = APIRouter()
+
+
+class Loja(Base):
+    __tablename__ = "lojas"
+
+
+@router.post("/webhook/cloud")
+async def webhook_cloud(request):
+    return {}
+"""
+
+FONTE_FAKE_MIGRATION = """
+revision = "0001"
+down_revision = None
+"""
+
+
+def repo_de_mentira(pasta: Path) -> Path:
+    """Um repo minimo: um produto com rota, modelo e migration."""
+    app = pasta / "chatbot-api" / "app"
+    app.mkdir(parents=True)
+    (app / "main.py").write_text(FONTE_FAKE_MAIN, encoding="utf-8")
+    versions = pasta / "chatbot-api" / "alembic" / "versions"
+    versions.mkdir(parents=True)
+    (versions / "0001_schema_inicial.py").write_text(
+        FONTE_FAKE_MIGRATION, encoding="utf-8"
+    )
+    return pasta
+
+
+class TestGeracaoDoMapa(unittest.TestCase):
+    def test_coleta_do_chatbot_traz_rota_e_modelo(self):
+        secoes = {e.secao for e in coleta("chatbot-api")}
+        self.assertIn("rota", secoes)
+        self.assertIn("modelo", secoes)
+
+    def test_todo_produto_tem_comando_de_teste_nos_dois_sos(self):
+        for produto in varredura.PRODUTOS:
+            self.assertIn(produto, gerar_mapa.TESTES)
+            self.assertIn("macos", gerar_mapa.TESTES[produto])
+            self.assertIn("windows", gerar_mapa.TESTES[produto])
+
+    def test_revy_trafego_avisa_que_usa_o_venv_do_portal(self):
+        self.assertIn("portal-gestao", gerar_mapa.TESTES["revy-trafego"]["macos"])
+        self.assertIn("portal-gestao", gerar_mapa.TESTES["revy-trafego"]["windows"])
+
+    def test_portal_no_windows_desliga_o_cache_do_pytest(self):
+        # o .pytest_cache do Portal quebra com WinError 183 no Windows do dono.
+        # E conhecimento de "como rodar teste", entao mora no mapa, nao num learning.
+        self.assertIn("no:cacheprovider", gerar_mapa.TESTES["portal-gestao"]["windows"])
+
+    def test_render_traz_o_sha_e_as_secoes(self):
+        texto = gerar_mapa.render(
+            "chatbot-api", coleta("chatbot-api"), head="0025_x", sha="abc1234"
+        )
+        self.assertIn("abc1234", texto)
+        self.assertIn("/webhook/cloud", texto)
+        self.assertIn("fila_vendedor", texto)
+
+    def test_render_traz_a_secao_de_testes_dos_dois_sos(self):
+        texto = gerar_mapa.render("revy-trafego", coleta("revy-trafego"), "0020", "a1")
+        self.assertIn("## Testes", texto)
+        self.assertIn(gerar_mapa.TESTES["revy-trafego"]["macos"], texto)
+        self.assertIn(gerar_mapa.TESTES["revy-trafego"]["windows"], texto)
+        self.assertIn(gerar_mapa.TESTES["revy-trafego"]["nota"], texto)
+
+    def test_todo_arquivo_do_mapa_existe_no_disco(self):
+        # a armadilha: a Entrada de migration guarda so o NOME do arquivo.
+        # Se `coletar` nao recompoe a pasta, o mapa aponta para nada.
+        raiz = varredura.raiz_repo()
+        for produto in varredura.PRODUTOS:
+            for e in coleta(produto):
+                if e.secao == "aviso":
+                    continue
+                self.assertTrue(
+                    (raiz / produto / e.arquivo).exists(),
+                    f"{produto}/{e.arquivo} ({e.secao} {e.chave}) nao existe",
+                )
+
+    def test_migration_aponta_para_o_arquivo_e_nao_para_a_revision(self):
+        # No motor a revision e "0014" mas o arquivo e
+        # "0014_cliente_operacional_projecao.py": montar o caminho a partir da
+        # chave daria um path que nao existe.
+        migs = [e for e in coleta("motor-simulacao") if e.secao == "migration"]
+        self.assertEqual(len(migs), 14)
+        for e in migs:
+            self.assertTrue(e.arquivo.startswith("alembic/versions/"), e.arquivo)
+            self.assertTrue(e.arquivo.endswith(".py"), e.arquivo)
+        self.assertIn("0014", {e.chave for e in migs})
+        self.assertNotIn("alembic/versions/0014.py", {e.arquivo for e in migs})
+
+    def test_render_escreve_o_caminho_da_migration(self):
+        texto = gerar_mapa.render(
+            "chatbot-api",
+            coleta("chatbot-api"),
+            head="0025_canal_cloud_por_loja",
+            sha="abc1234",
+        )
+        self.assertIn("alembic/versions/0025_canal_cloud_por_loja.py", texto)
+        self.assertIn("Migration head: `0025_canal_cloud_por_loja`", texto)
+
+    def test_linha_zero_nao_vira_dois_pontos_zero(self):
+        # linha == 0 quer dizer "basta o arquivo existir" (contrato do
+        # --verificar). Escrever "arquivo:0" viraria um alvo impossivel.
+        texto = gerar_mapa.render("portal-gestao", coleta("portal-gestao"), "x", "y")
+        self.assertNotIn(":0`", texto)
+
+    def test_produto_sem_migration_nao_quebra(self):
+        texto = gerar_mapa.render(
+            "catalogo-publico", coleta("catalogo-publico"), "", "s"
+        )
+        self.assertIn("Migration head: `n/a`", texto)
+        self.assertNotIn("## Migrations", texto)
+
+    def test_cabecalho_conta_o_que_a_secao_lista(self):
+        entradas = coleta("estoque-api")
+        texto = gerar_mapa.render("estoque-api", entradas, "0010", "s")
+        rotas = len([e for e in entradas if e.secao == "rota"])
+        self.assertIn(f"{rotas} rotas", texto.splitlines()[0])
+        self.assertIn("NAO editar a mao", texto)
+
+    def test_escrever_tudo_gera_um_md_por_produto_e_o_selo(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            pasta = Path(tmp)
+            raiz = repo_de_mentira(pasta / "repo")
+            destino = pasta / "mapa"
+            saida = io.StringIO()
+            with mock.patch.object(gerar_mapa, "PASTA_MAPA", destino):
+                with contextlib.redirect_stdout(saida):
+                    gerar_mapa.escrever_tudo(raiz)
+            for produto in varredura.PRODUTOS:
+                self.assertTrue((destino / f"{produto}.md").exists(), produto)
+            selo = json.loads((destino / "_frescor.json").read_text(encoding="utf-8"))
+            self.assertIn("sha", selo)
+            self.assertEqual(sorted(selo["inventario"]), sorted(varredura.PRODUTOS))
+            self.assertIn("chatbot-api:", saida.getvalue())
+
+    def test_selo_guarda_os_cinco_campos_da_entrada(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            pasta = Path(tmp)
+            raiz = repo_de_mentira(pasta / "repo")
+            destino = pasta / "mapa"
+            with mock.patch.object(gerar_mapa, "PASTA_MAPA", destino):
+                with contextlib.redirect_stdout(io.StringIO()):
+                    gerar_mapa.escrever_tudo(raiz)
+            selo = json.loads((destino / "_frescor.json").read_text(encoding="utf-8"))
+            itens = selo["inventario"]["chatbot-api"]
+            self.assertTrue(itens)
+            for item in itens:
+                self.assertEqual(
+                    sorted(item), ["arquivo", "chave", "linha", "secao", "simbolo"]
+                )
+            migs = [i for i in itens if i["secao"] == "migration"]
+            self.assertEqual(
+                [i["arquivo"] for i in migs],
+                ["alembic/versions/0001_schema_inicial.py"],
+            )
+
+    def test_gerador_nao_escreve_segredo_no_mapa(self):
+        # invariante do AGENTS.md: nada de token/cookie/.env no que vai pro git.
+        texto = gerar_mapa.render("portal-gestao", coleta("portal-gestao"), "x", "y")
+        for proibido in ("Bearer ", "sk-", "-----BEGIN"):
+            self.assertNotIn(proibido, texto)
 
 if __name__ == "__main__":
     unittest.main()

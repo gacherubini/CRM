@@ -1,0 +1,327 @@
+# portal-gestao · 127 rotas · 26 modelos · 31 workers · 27 flags · 26 migrations · 61 templates
+
+Gerado de `066f6e2`. NAO editar a mao — saida de `gerar_mapa.py`.
+Migration head: `0026_copiloto_sinal_destinatario`
+
+## Rotas
+
+- `GET /app/loja/atendimento` — app/loja/routes.py:166
+- `GET /app/loja/agente` — app/loja/routes.py:348
+- `GET /app/loja/atendimento/{workspace_id}` — app/loja/routes.py:384
+- `GET /app/loja/atendimento/{workspace_id}/mensagens.json` — app/loja/routes.py:595
+- `POST /app/loja/atendimento/{workspace_id}/mensagem` — app/loja/routes.py:704
+- `POST /app/loja/atendimento/{workspace_id}/handoff` — app/loja/routes.py:864
+- `POST /app/loja/atendimento/{workspace_id}/etapa` — app/loja/routes.py:943
+- `GET /health/live` — app/main.py:507
+- `GET /health/ready` — app/main.py:512
+- `GET /public/v1/lojas/{loja_slug}/pixel` — app/main.py:521
+- `GET /` — app/main.py:556
+- `GET /login` — app/main.py:561
+- `POST /login` — app/main.py:568
+- `POST /logout` — app/main.py:589
+- `GET /conta/senha` — app/main.py:596
+- `POST /conta/senha` — app/main.py:605
+- `GET /app` — app/main.py:642
+- `GET /app/estoque` — app/main.py:771
+- `GET /app/estoque/novo` — app/main.py:810
+- `GET /app/operacao/numeros` — app/main.py:881
+- `POST /app/operacao/grupo` — app/main.py:911
+- `POST /app/operacao/numeros` — app/main.py:936
+- `POST /app/operacao/numeros/remover` — app/main.py:960
+- `POST /app/estoque/novo` — app/main.py:983
+- `GET /app/estoque/{veiculo_id}` — app/main.py:1010
+- `POST /app/estoque/{veiculo_id}` — app/main.py:1041
+- `POST /app/estoque/{veiculo_id}/{acao}` — app/main.py:1069
+- `GET /app/leads` — app/main.py:1116
+- `GET /app/leads/{lead_id}` — app/main.py:1144
+- `POST /app/leads/{lead_id}/etapa` — app/main.py:1180
+- `GET /app/conversas` — app/main.py:1239
+- `GET /app/conversas/{telefone}` — app/main.py:1266
+- `POST /app/conversas/{telefone}/handoff` — app/main.py:1359
+- `GET /app/vendas` — app/main.py:1464
+- `GET /app/vendas/nova` — app/main.py:1504
+- `POST /app/vendas/nova` — app/main.py:1521
+- `POST /app/vendas/{venda_id}/confirmar` — app/main.py:1922
+- `POST /app/vendas/{venda_id}/cancelar` — app/main.py:1940
+- `GET /app/vendedor` — app/main.py:1952
+- `GET /app/funil` — app/main.py:2063
+- `GET /app/funil/dados` — app/main.py:2139
+- `GET /app/financeiro` — app/main.py:2176
+- `GET /app/financeiras` — app/main.py:2253
+- `POST /app/financeiras/{nome}` — app/main.py:2310
+- `POST /app/financeiras/{nome}/testar` — app/main.py:2413
+- `GET /app/configuracoes` — app/main.py:2524
+- `GET /app/relatorios` — app/relatorios.py:66
+- `GET /app/relatorios/vendas.csv` — app/relatorios.py:112
+- `GET /app/relatorios/metas.csv` — app/relatorios.py:157
+- `GET /app/relatorios/funil.csv` — app/relatorios.py:195
+- `GET /app/relatorios/roi.csv` — app/relatorios.py:254
+- `GET /app/equipe` — app/web/equipe.py:177
+- `GET /app/equipe/novo` — app/web/equipe.py:193
+- `POST /app/equipe/novo` — app/web/equipe.py:210
+- `GET /app/equipe/{membro_id}/editar` — app/web/equipe.py:279
+- `POST /app/equipe/{membro_id}/editar` — app/web/equipe.py:303
+- `GET /app/equipe/{membro_id}/senha` — app/web/equipe.py:355
+- `POST /app/equipe/{membro_id}/senha` — app/web/equipe.py:381
+- `POST /app/equipe/{membro_id}/{acao}` — app/web/equipe.py:425
+- `GET /app/loja/catalogo` — app/web/loja_catalogo.py:20
+- `POST /app/loja/catalogo` — app/web/loja_catalogo.py:21
+- `GET /app/loja/estoque` — app/web/loja_estoque.py:87
+- `GET /app/loja/estoque/veiculos` — app/web/loja_estoque.py:129
+- `GET /app/loja/estoque/vitrine` — app/web/loja_estoque.py:153
+- `POST /app/loja/estoque/vitrine` — app/web/loja_estoque.py:247
+- `POST /app/loja/selecionar` — app/web/loja_shell.py:357
+- `GET /app/loja/vendas` — app/web/loja_vendas.py:125
+- `GET /app/loja/vendas/dados` — app/web/loja_vendas.py:161
+- `GET /app/loja/vendas/lista` — app/web/loja_vendas.py:184
+- `POST /app/loja/vendas/{venda_id}/confirmar` — app/web/loja_vendas.py:231
+- `POST /app/loja/vendas/{venda_id}/cancelar` — app/web/loja_vendas.py:253
+- `GET /app/loja/vendas/{venda_id}/editar` — app/web/loja_vendas.py:289
+- `POST /app/loja/vendas/{venda_id}/editar` — app/web/loja_vendas.py:327
+- `POST /app/loja/vendas/{venda_id}/excluir` — app/web/loja_vendas.py:344
+- `POST /app/loja/vendas/{venda_id}/custos` — app/web/loja_vendas.py:357
+- `POST /app/loja/vendas/{venda_id}/custos/{custo_id}/remover` — app/web/loja_vendas.py:378
+- `GET /app/loja/vendas/configuracoes-financeiras` — app/web/loja_vendas.py:394
+- `GET /app/loja/equipe` — app/web/loja_vendas.py:410
+- `POST /app/loja/whatsapp/catalogo` — app/web/loja_whatsapp.py:146
+- `POST /app/loja/whatsapp/canais` — app/web/loja_whatsapp.py:207
+- `POST /app/loja/whatsapp/canais/{canal_id}/conectar` — app/web/loja_whatsapp.py:229
+- `POST /app/loja/whatsapp/canais/{canal_id}/desconectar` — app/web/loja_whatsapp.py:254
+- `POST /app/loja/whatsapp/canais/{canal_id}/inativar` — app/web/loja_whatsapp.py:273
+- `POST /app/loja/whatsapp/canais/{canal_id}/principal-estoque` — app/web/loja_whatsapp.py:293
+- `GET /app/loja/whatsapp/canais/{canal_id}/status` — app/web/loja_whatsapp.py:318
+- `GET /app/metas` — app/web/metas.py:135
+- `GET /app/metas/nova` — app/web/metas.py:167
+- `POST /app/metas/nova` — app/web/metas.py:177
+- `GET /app/metas/{meta_id}/editar` — app/web/metas.py:216
+- `POST /app/metas/{meta_id}/editar` — app/web/metas.py:237
+- `POST /app/metas/{meta_id}/desativar` — app/web/metas.py:273
+- `POST /internal/v1/lojistas/convite` — app/web/owner_invitations.py:49
+- `GET /convite/aceitar` — app/web/owner_invitations.py:117
+- `POST /convite/aceitar` — app/web/owner_invitations.py:134
+- `GET /senha/esqueci` — app/web/password_reset.py:29
+- `POST /senha/esqueci` — app/web/password_reset.py:38
+- `GET /senha/redefinir` — app/web/password_reset.py:89
+- `POST /senha/redefinir` — app/web/password_reset.py:100
+- `GET /app/simulacoes` — app/web/simulacoes.py:248
+- `POST /app/simulacoes` — app/web/simulacoes.py:278
+- `GET /app/simulacoes/job/{sim_id}` — app/web/simulacoes.py:502
+- `GET /app/simulacoes/historico` — app/web/simulacoes.py:612
+- `GET /app/simulacoes/{sim_id}/registros` — app/web/simulacoes.py:733
+- `GET /app/simulacoes/{sim_id}/registros/{evento_id}/print` — app/web/simulacoes.py:770
+- `GET /app/campanhas` — app/web/trafego.py:116
+- `GET /app/campanhas/nova` — app/web/trafego.py:177
+- `POST /app/campanhas/nova` — app/web/trafego.py:195
+- `GET /app/campanhas/gastos/lote` — app/web/trafego.py:266
+- `POST /app/campanhas/gastos/lote` — app/web/trafego.py:279
+- `GET /app/campanhas/gastos/csv/modelo` — app/web/trafego.py:335
+- `POST /app/campanhas/gastos/csv` — app/web/trafego.py:350
+- `GET /app/campanhas/{campanha_id}` — app/web/trafego.py:396
+- `GET /app/campanhas/{campanha_id}/editar` — app/web/trafego.py:479
+- `POST /app/campanhas/{campanha_id}/editar` — app/web/trafego.py:514
+- `POST /app/campanhas/{campanha_id}/apagar` — app/web/trafego.py:558
+- `POST /app/campanhas/{campanha_id}/gastos` — app/web/trafego.py:578
+- `GET /app/trafego/roi` — app/web/trafego.py:616
+- `GET /app/trafego/pixel-auditoria` — app/web/trafego.py:673
+- `GET /app/trafego/ctwa-auditoria` — app/web/trafego.py:702
+- `GET /app/trafego` — app/web/trafego.py:735
+- `POST /app/trafego/capi/retentar` — app/web/trafego.py:774
+- `POST /app/trafego/onboarding/dispensar` — app/web/trafego.py:789
+- `POST /app/trafego/ads/salvar` — app/web/trafego.py:808
+- `POST /app/trafego/ads/sincronizar` — app/web/trafego.py:869
+- `POST /internal/v1/provisioning/state` — app/web/trafego.py:883
+- `POST /internal/jobs/meta-spend-sync` — app/web/trafego.py:926
+- `POST /app/trafego` — app/web/trafego.py:961
+
+## Modelos
+
+- `usuarios` — app/models.py:44
+- `convites_acesso_loja` — app/models.py:57
+- `redefinicoes_senha` — app/models.py:74
+- `loja_operacional_projecao` — app/models.py:96
+- `vendas` — app/models.py:109
+- `venda_custos_diretos` — app/models.py:143
+- `despesa_fixa_loja` — app/models.py:168
+- `despesa_fixa_ajuste` — app/models.py:191
+- `metas` — app/models.py:210
+- `atendimento_atribuicoes` — app/models.py:224
+- `loja_operacao_auditoria` — app/models.py:242
+- `copiloto_acao` — app/models.py:298
+- `funil_eventos` — app/models.py:334
+- `meta_pixel_config` — app/models.py:375
+- `meta_ads_config` — app/models.py:393
+- `pixel_capi_auditoria` — app/models.py:411
+- `meta_capi_outbox` — app/models.py:441
+- `revy_trafego_event_outbox` — app/models.py:461
+- `campanhas` — app/models.py:482
+- `campanha_gastos` — app/models.py:512
+- `pessoa_revy_projetada` — app/models.py:534
+- `vinculo_loja_pessoa` — app/models.py:548
+- `copiloto_sinal` — app/models.py:603
+- `copiloto_sinal_visto` — app/models.py:674
+- `copiloto_conversa` — app/models.py:699
+- `copiloto_turno` — app/models.py:734
+
+## Workers
+
+- `lojas_com_turnos_elegiveis` — app/copiloto_purge_job.py:63
+- `purgar_loja` — app/copiloto_purge_job.py:77
+- `CopilotoPurgeWorker` — app/copiloto_purge_job.py:129
+- `get_worker` — app/copiloto_purge_job.py:269
+- `start_worker` — app/copiloto_purge_job.py:273
+- `stop_worker` — app/copiloto_purge_job.py:282
+- `sincronizar_ofertas` — app/copiloto_sinais_job.py:88
+- `lojas_ativas` — app/copiloto_sinais_job.py:166
+- `avaliar_loja` — app/copiloto_sinais_job.py:266
+- `CopilotoSinaisWorker` — app/copiloto_sinais_job.py:407
+- `get_worker` — app/copiloto_sinais_job.py:571
+- `start_worker` — app/copiloto_sinais_job.py:575
+- `stop_worker` — app/copiloto_sinais_job.py:584
+- `processar_turno` — app/copiloto_turnos_job.py:78
+- `CopilotoTurnosWorker` — app/copiloto_turnos_job.py:207
+- `get_worker` — app/copiloto_turnos_job.py:400
+- `start_worker` — app/copiloto_turnos_job.py:404
+- `stop_worker` — app/copiloto_turnos_job.py:413
+- `env_flag` — app/meta_ads_spend_job.py:20
+- `env_float` — app/meta_ads_spend_job.py:27
+- `env_int` — app/meta_ads_spend_job.py:34
+- `MetaSpendSyncWorker` — app/meta_ads_spend_job.py:41
+- `get_worker` — app/meta_ads_spend_job.py:148
+- `start_worker` — app/meta_ads_spend_job.py:152
+- `stop_worker` — app/meta_ads_spend_job.py:161
+- `MetaCapiRetryWorker` — app/meta_capi_job.py:31
+- `start_worker` — app/meta_capi_job.py:122
+- `stop_worker` — app/meta_capi_job.py:131
+- `RevyTrafegoOutboxWorker` — app/revy_trafego_outbox_job.py:23
+- `start_worker` — app/revy_trafego_outbox_job.py:87
+- `stop_worker` — app/revy_trafego_outbox_job.py:98
+
+## Flags
+
+- `REVY_LOJA_SHELL_ENABLED (default: 0)` — app/config.py:14
+- `REVY_LOJA_ENTITLEMENTS_ENABLED (default: 0)` — app/config.py:19
+- `REVY_LOJA_ATENDIMENTO_ENABLED (default: 0)` — app/config.py:24
+- `REVY_LOJA_WHATSAPP_ENABLED (default: 0)` — app/config.py:32
+- `REVY_LOJA_COPILOTO_ENABLED (default: 0)` — app/config.py:41
+- `REVY_LOJA_FINANCEIRO_ENABLED (default: 0)` — app/config.py:51
+- `REVY_LOJA_REDIRECT_LEGACY (default: 0)` — app/config.py:60
+- `REVY_TRAFEGO_URL` — app/config.py:123
+- `REVY_TRAFEGO_SERVICE_TOKEN (default: '')` — app/config.py:126
+- `REVY_TRAFEGO_EMAIL_BACKEND (default: console)` — app/config.py:148
+- `REVY_TRAFEGO_EMAIL_FROM (default: no-reply@revy.local)` — app/config.py:152
+- `REVY_TRAFEGO_EMAIL_FROM_NAME (default: Revy)` — app/config.py:156
+- `REVY_TRAFEGO_SMTP_HOST (default: '')` — app/config.py:159
+- `REVY_TRAFEGO_SMTP_PORT (default: 587)` — app/config.py:162
+- `REVY_TRAFEGO_SMTP_USERNAME (default: '')` — app/config.py:165
+- `REVY_TRAFEGO_SMTP_PASSWORD (default: '')` — app/config.py:168
+- `REVY_TRAFEGO_SMTP_USE_TLS (default: 1)` — app/config.py:171
+- `REVY_TRAFEGO_PUBLIC_BASE_URL (default: '')` — app/config.py:175
+- `REVY_LOJA_COPILOTO_LLM_URL (default: https://api.deepseek.com)` — app/config.py:196
+- `REVY_LOJA_COPILOTO_LLM_KEY (default: '')` — app/config.py:198
+- `REVY_LOJA_COPILOTO_LLM_MODEL (default: DeepSeek-V4-Flash-0731)` — app/config.py:200
+- `REVY_LOJA_COPILOTO_LLM_TIMEOUT (default: 40)` — app/config.py:203
+- `REVY_LOJA_COPILOTO_LLM_RETRIES (default: 1)` — app/config.py:205
+- `REVY_LOJA_COPILOTO_HISTORICO_TOKENS (default: 2000)` — app/config.py:210
+- `REVY_LOJA_COPILOTO_FIPE_URL (default: https://parallelum.com.br/fipe/api/v1)` — app/config.py:222
+- `REVY_LOJA_COPILOTO_FIPE_TIMEOUT (default: 8)` — app/config.py:225
+- `REVY_LOJA_COPILOTO_FIPE_CACHE_SEGUNDOS (default: 21600)` — app/config.py:229
+
+## Migrations
+
+- `0001_cria_usuarios` — alembic/versions/0001_cria_usuarios.py
+- `0002_cria_vendas_metas` — alembic/versions/0002_cria_vendas_metas.py
+- `0003_adiciona_meta_ativa` — alembic/versions/0003_adiciona_meta_ativa.py
+- `0004_cria_atendimento_atribuicoes` — alembic/versions/0004_cria_atendimento_atribuicoes.py
+- `0005_meta_pixel_capi` — alembic/versions/0005_meta_pixel_capi.py
+- `0006_campanhas_roi` — alembic/versions/0006_campanhas_roi.py
+- `0007_onboarding_medicao` — alembic/versions/0007_onboarding_medicao.py
+- `0008_funil_eventos` — alembic/versions/0008_funil_eventos.py
+- `0009_meta_ads_spend` — alembic/versions/0009_meta_ads_spend.py
+- `0010_campanha_codigo_ctwa` — alembic/versions/0010_campanha_codigo_ctwa.py
+- `0011_pixel_capi_auditoria` — alembic/versions/0011_pixel_capi_auditoria.py
+- `0012_revy_trafego_event_outbox` — alembic/versions/0012_revy_trafego_event_outbox.py
+- `0013_loja_operacional_projecao` — alembic/versions/0013_loja_operacional_projecao.py
+- `0014_loja_operacao_auditoria` — alembic/versions/0014_loja_operacao_auditoria.py
+- `0015_auditoria_dominio_canal` — alembic/versions/0015_auditoria_dominio_canal.py
+- `0016_convites_acesso_loja` — alembic/versions/0016_convites_acesso_loja.py
+- `0017_vinculo_loja_pessoa` — alembic/versions/0017_vinculo_loja_pessoa.py
+- `0018_redefinicoes_senha` — alembic/versions/0018_redefinicoes_senha.py
+- `0019_copiloto_sinal` — alembic/versions/0019_copiloto_sinal.py
+- `0020_copiloto_conversa_turno` — alembic/versions/0020_copiloto_conversa_turno.py
+- `0021_copiloto_acoes` — alembic/versions/0021_copiloto_acoes.py
+- `0022_copiloto_acao_pendente_e_estado_anterior` — alembic/versions/0022_copiloto_acao_pendente_e_estado_anterior.py
+- `0023_copiloto_sinal_visto` — alembic/versions/0023_copiloto_sinal_visto.py
+- `0024_venda_excluida` — alembic/versions/0024_venda_excluida.py
+- `0025_despesas_fixas_loja` — alembic/versions/0025_despesas_fixas_loja.py
+- `0026_copiloto_sinal_destinatario` — alembic/versions/0026_copiloto_sinal_destinatario.py
+
+## Templates
+
+- `app/templates/erro.html` — app/loja/routes.py:85
+- `app/templates/loja/atendimento_lista.html` — app/loja/routes.py:252
+- `app/templates/loja/agente.html` — app/loja/routes.py:372
+- `app/templates/loja/atendimento_workspace.html` — app/loja/routes.py:475
+- `app/templates/login.html` — app/main.py:565
+- `app/templates/dashboard.html` — app/main.py:752
+- `app/templates/estoque/lista.html` — app/main.py:796
+- `app/templates/estoque/form.html` — app/main.py:821
+- `app/templates/operacao/numeros.html` — app/main.py:900
+- `app/templates/leads/lista.html` — app/main.py:1133
+- `app/templates/leads/detalhe.html` — app/main.py:1168
+- `app/templates/conversas/lista.html` — app/main.py:1255
+- `app/templates/conversas/detalhe.html` — app/main.py:1291
+- `app/templates/vendas/form.html` — app/main.py:1446
+- `app/templates/vendas/lista.html` — app/main.py:1490
+- `app/templates/vendedor/dashboard.html` — app/main.py:2047
+- `app/templates/funil/index.html` — app/main.py:2126
+- `app/templates/financeiro/dashboard.html` — app/main.py:2232
+- `app/templates/financeiras/lista.html` — app/main.py:2295
+- `app/templates/configuracoes/index.html` — app/main.py:2564
+- `app/templates/relatorios/index.html` — app/relatorios.py:99
+- `app/templates/base.html` — app/templates/base.html
+- `app/templates/conta_senha.html` — app/templates/conta_senha.html
+- `app/templates/em-breve.html` — app/templates/em-breve.html
+- `app/templates/loja/catalogo.html` — app/templates/loja/catalogo.html
+- `app/templates/partials/alertas_trafego.html` — app/templates/partials/alertas_trafego.html
+- `app/templates/partials/onboarding_medicao.html` — app/templates/partials/onboarding_medicao.html
+- `app/templates/partials/resultados_periodo.html` — app/templates/partials/resultados_periodo.html
+- `app/templates/equipe/lista.html` — app/web/equipe.py:133
+- `app/templates/equipe/form.html` — app/web/equipe.py:161
+- `app/templates/equipe/senha.html` — app/web/equipe.py:370
+- `app/templates/loja/copiloto.html` — app/web/loja_copiloto.py:217
+- `app/templates/loja/estoque_visao.html` — app/web/loja_estoque.py:116
+- `app/templates/loja/vitrine_ordem.html` — app/web/loja_estoque.py:222
+- `app/templates/loja/financeiro_resultado.html` — app/web/loja_financeiro.py:102
+- `app/templates/loja/financeiro_despesas.html` — app/web/loja_financeiro.py:151
+- `app/templates/loja/integracoes.html` — app/web/loja_integracoes.py:48
+- `app/templates/loja/perfil.html` — app/web/loja_perfil.py:69
+- `app/templates/loja/vendas_visao.html` — app/web/loja_vendas.py:145
+- `app/templates/loja/vendas_lista.html` — app/web/loja_vendas.py:215
+- `app/templates/loja/venda_editar.html` — app/web/loja_vendas.py:314
+- `app/templates/loja/whatsapp_canais.html` — app/web/loja_whatsapp.py:130
+- `app/templates/loja/whatsapp_fila.html` — app/web/loja_whatsapp.py:367
+- `app/templates/metas/form.html` — app/web/metas.py:121
+- `app/templates/metas/lista.html` — app/web/metas.py:155
+- `app/templates/convite_aceitar.html` — app/web/owner_invitations.py:129
+- `app/templates/senha_esqueci.html` — app/web/password_reset.py:33
+- `app/templates/senha_redefinir.html` — app/web/password_reset.py:95
+- `app/templates/simulacoes/form.html` — app/web/simulacoes.py:267
+- `app/templates/simulacoes/resultado.html` — app/web/simulacoes.py:577
+- `app/templates/simulacoes/progresso.html` — app/web/simulacoes.py:591
+- `app/templates/simulacoes/historico.html` — app/web/simulacoes.py:658
+- `app/templates/simulacoes/registros.html` — app/web/simulacoes.py:754
+- `app/templates/campanhas/lista.html` — app/web/trafego.py:150
+- `app/templates/campanhas/form.html` — app/web/trafego.py:185
+- `app/templates/campanhas/gastos_lote.html` — app/web/trafego.py:274
+- `app/templates/campanhas/detalhe.html` — app/web/trafego.py:456
+- `app/templates/trafego/roi.html` — app/web/trafego.py:655
+- `app/templates/trafego/pixel_auditoria.html` — app/web/trafego.py:692
+- `app/templates/trafego/ctwa_auditoria.html` — app/web/trafego.py:724
+- `app/templates/trafego/form.html` — app/web/trafego.py:760
+
+## Testes
+
+**No Windows, -p no:cacheprovider: o .pytest_cache do Portal quebra com WinError 183.**
+
+- macOS: `cd portal-gestao && .venv/bin/python -m pytest -q`
+- Windows: `cd portal-gestao && .\.venv\Scripts\python.exe -m pytest -p no:cacheprovider -q`

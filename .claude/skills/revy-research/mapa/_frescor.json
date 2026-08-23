@@ -1,0 +1,5687 @@
+{
+ "sha": "066f6e2",
+ "inventario": {
+  "chatbot-api": [
+   {
+    "secao": "worker",
+    "chave": "CloudRetryWorker",
+    "simbolo": "CloudRetryWorker",
+    "arquivo": "app/cloud_retry.py",
+    "linha": 140
+   },
+   {
+    "secao": "flag",
+    "chave": "MULTI_WHATSAPP_ENABLED (default: 0)",
+    "simbolo": "MULTI_WHATSAPP_ENABLED",
+    "arquivo": "app/config.py",
+    "linha": 123
+   },
+   {
+    "secao": "worker",
+    "chave": "texto_followup",
+    "simbolo": "texto_followup",
+    "arquivo": "app/followup_job.py",
+    "linha": 45
+   },
+   {
+    "secao": "worker",
+    "chave": "classificar_etapa",
+    "simbolo": "classificar_etapa",
+    "arquivo": "app/followup_job.py",
+    "linha": 53
+   },
+   {
+    "secao": "worker",
+    "chave": "FollowupWorker",
+    "simbolo": "FollowupWorker",
+    "arquivo": "app/followup_job.py",
+    "linha": 64
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /health/live",
+    "simbolo": "/health/live",
+    "arquivo": "app/main.py",
+    "linha": 509
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /health/ready",
+    "simbolo": "/health/ready",
+    "arquivo": "app/main.py",
+    "linha": 514
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /version",
+    "simbolo": "/version",
+    "arquivo": "app/main.py",
+    "linha": 520
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /webhook/cloud",
+    "simbolo": "/webhook/cloud",
+    "arquivo": "app/main.py",
+    "linha": 525
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /webhook/cloud",
+    "simbolo": "/webhook/cloud",
+    "arquivo": "app/main.py",
+    "linha": 542
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /webhook/mensagem",
+    "simbolo": "/webhook/mensagem",
+    "arquivo": "app/main.py",
+    "linha": 735
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /webhook/audio/transcrever",
+    "simbolo": "/webhook/audio/transcrever",
+    "arquivo": "app/main.py",
+    "linha": 760
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /v1/operacao/roteamento",
+    "simbolo": "/v1/operacao/roteamento",
+    "arquivo": "app/main.py",
+    "linha": 796
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /webhook/operacao/veiculos/foto",
+    "simbolo": "/webhook/operacao/veiculos/foto",
+    "arquivo": "app/main.py",
+    "linha": 816
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /v1/conversas",
+    "simbolo": "/v1/conversas",
+    "arquivo": "app/main.py",
+    "linha": 854
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /v1/conversas/{telefone}/mensagens",
+    "simbolo": "/v1/conversas/{telefone}/mensagens",
+    "arquivo": "app/main.py",
+    "linha": 871
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /v1/conversas/{telefone}/estado",
+    "simbolo": "/v1/conversas/{telefone}/estado",
+    "arquivo": "app/main.py",
+    "linha": 904
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /v1/conversas/{telefone}/pode-responder",
+    "simbolo": "/v1/conversas/{telefone}/pode-responder",
+    "arquivo": "app/main.py",
+    "linha": 921
+   },
+   {
+    "secao": "rota",
+    "chave": "PATCH /v1/conversas/{telefone}/estado",
+    "simbolo": "/v1/conversas/{telefone}/estado",
+    "arquivo": "app/main.py",
+    "linha": 938
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /v1/conversas/{telefone}/mensagens",
+    "simbolo": "/v1/conversas/{telefone}/mensagens",
+    "arquivo": "app/main.py",
+    "linha": 997
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /v1/consentimentos",
+    "simbolo": "/v1/consentimentos",
+    "arquivo": "app/main.py",
+    "linha": 1022
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /v1/leads",
+    "simbolo": "/v1/leads",
+    "arquivo": "app/main.py",
+    "linha": 1035
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /v1/integracoes/catalogo/interesses",
+    "simbolo": "/v1/integracoes/catalogo/interesses",
+    "arquivo": "app/main.py",
+    "linha": 1046
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /v1/leads",
+    "simbolo": "/v1/leads",
+    "arquivo": "app/main.py",
+    "linha": 1080
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /v1/funil/eventos",
+    "simbolo": "/v1/funil/eventos",
+    "arquivo": "app/main.py",
+    "linha": 1090
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /v1/auditoria/ctwa",
+    "simbolo": "/v1/auditoria/ctwa",
+    "arquivo": "app/main.py",
+    "linha": 1109
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /v1/atendimento/resumo",
+    "simbolo": "/v1/atendimento/resumo",
+    "arquivo": "app/main.py",
+    "linha": 1161
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /v1/leads.csv",
+    "simbolo": "/v1/leads.csv",
+    "arquivo": "app/main.py",
+    "linha": 1173
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /v1/leads/{lead_id}",
+    "simbolo": "/v1/leads/{lead_id}",
+    "arquivo": "app/main.py",
+    "linha": 1219
+   },
+   {
+    "secao": "rota",
+    "chave": "PATCH /v1/leads/{lead_id}/etapa",
+    "simbolo": "/v1/leads/{lead_id}/etapa",
+    "arquivo": "app/main.py",
+    "linha": 1226
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /v1/config/catalogo-bot",
+    "simbolo": "/v1/config/catalogo-bot",
+    "arquivo": "app/main.py",
+    "linha": 1238
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /v1/estoque/buscar",
+    "simbolo": "/v1/estoque/buscar",
+    "arquivo": "app/main.py",
+    "linha": 1280
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /v1/estoque/por-placa/{placa}",
+    "simbolo": "/v1/estoque/por-placa/{placa}",
+    "arquivo": "app/main.py",
+    "linha": 1300
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /v1/estoque/veiculos/{veiculo_id}/midia-principal",
+    "simbolo": "/v1/estoque/veiculos/{veiculo_id}/midia-principal",
+    "arquivo": "app/main.py",
+    "linha": 1317
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /v1/internal/provisioning/state",
+    "simbolo": "/v1/internal/provisioning/state",
+    "arquivo": "app/main.py",
+    "linha": 1405
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /v1/simulacoes/solicitar",
+    "simbolo": "/v1/simulacoes/solicitar",
+    "arquivo": "app/main.py",
+    "linha": 1426
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /v1/simular",
+    "simbolo": "/v1/simular",
+    "arquivo": "app/main.py",
+    "linha": 1465
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /v1/whatsapp/canais",
+    "simbolo": "/v1/whatsapp/canais",
+    "arquivo": "app/main.py",
+    "linha": 1532
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /v1/whatsapp/canais",
+    "simbolo": "/v1/whatsapp/canais",
+    "arquivo": "app/main.py",
+    "linha": 1544
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /v1/whatsapp/canais/{canal_id}/principal-estoque",
+    "simbolo": "/v1/whatsapp/canais/{canal_id}/principal-estoque",
+    "arquivo": "app/main.py",
+    "linha": 1561
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /v1/whatsapp/canais/{canal_id}/inativar",
+    "simbolo": "/v1/whatsapp/canais/{canal_id}/inativar",
+    "arquivo": "app/main.py",
+    "linha": 1571
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /v1/whatsapp/canais/{canal_id}/connect",
+    "simbolo": "/v1/whatsapp/canais/{canal_id}/connect",
+    "arquivo": "app/main.py",
+    "linha": 1581
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /v1/whatsapp/canais/{canal_id}/status",
+    "simbolo": "/v1/whatsapp/canais/{canal_id}/status",
+    "arquivo": "app/main.py",
+    "linha": 1598
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /v1/whatsapp/canais/{canal_id}/disconnect",
+    "simbolo": "/v1/whatsapp/canais/{canal_id}/disconnect",
+    "arquivo": "app/main.py",
+    "linha": 1608
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /v1/fila-vendedores",
+    "simbolo": "/v1/fila-vendedores",
+    "arquivo": "app/main.py",
+    "linha": 1640
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /v1/ofertas",
+    "simbolo": "/v1/ofertas",
+    "arquivo": "app/main.py",
+    "linha": 1649
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /v1/ofertas/{oferta_id}/assumir",
+    "simbolo": "/v1/ofertas/{oferta_id}/assumir",
+    "arquivo": "app/main.py",
+    "linha": 1686
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /v1/fila-vendedores",
+    "simbolo": "/v1/fila-vendedores",
+    "arquivo": "app/main.py",
+    "linha": 1707
+   },
+   {
+    "secao": "rota",
+    "chave": "PATCH /v1/fila-vendedores/{vendedor_id}",
+    "simbolo": "/v1/fila-vendedores/{vendedor_id}",
+    "arquivo": "app/main.py",
+    "linha": 1726
+   },
+   {
+    "secao": "rota",
+    "chave": "DELETE /v1/fila-vendedores/{vendedor_id}",
+    "simbolo": "/v1/fila-vendedores/{vendedor_id}",
+    "arquivo": "app/main.py",
+    "linha": 1757
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /v1/operacao/solicitacoes-simulacao-humana",
+    "simbolo": "/v1/operacao/solicitacoes-simulacao-humana",
+    "arquivo": "app/main.py",
+    "linha": 1778
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /v1/operacao/responder",
+    "simbolo": "/v1/operacao/responder",
+    "arquivo": "app/main.py",
+    "linha": 1817
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /v1/operacao/handoff-humano",
+    "simbolo": "/v1/operacao/handoff-humano",
+    "arquivo": "app/main.py",
+    "linha": 1865
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /v1/operacao/moto-escolhida",
+    "simbolo": "/v1/operacao/moto-escolhida",
+    "arquivo": "app/main.py",
+    "linha": 1906
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /v1/operacao/grupo-estoque",
+    "simbolo": "/v1/operacao/grupo-estoque",
+    "arquivo": "app/main.py",
+    "linha": 1933
+   },
+   {
+    "secao": "rota",
+    "chave": "PUT /v1/operacao/grupo-estoque",
+    "simbolo": "/v1/operacao/grupo-estoque",
+    "arquivo": "app/main.py",
+    "linha": 1952
+   },
+   {
+    "secao": "rota",
+    "chave": "DELETE /v1/operacao/grupo-estoque",
+    "simbolo": "/v1/operacao/grupo-estoque",
+    "arquivo": "app/main.py",
+    "linha": 1979
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /v1/operacao/numeros-autorizados",
+    "simbolo": "/v1/operacao/numeros-autorizados",
+    "arquivo": "app/main.py",
+    "linha": 1986
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /v1/operacao/numeros-autorizados",
+    "simbolo": "/v1/operacao/numeros-autorizados",
+    "arquivo": "app/main.py",
+    "linha": 1993
+   },
+   {
+    "secao": "rota",
+    "chave": "DELETE /v1/operacao/numeros-autorizados/{telefone}",
+    "simbolo": "/v1/operacao/numeros-autorizados/{telefone}",
+    "arquivo": "app/main.py",
+    "linha": 2004
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /v1/operacao/veiculos",
+    "simbolo": "/v1/operacao/veiculos",
+    "arquivo": "app/main.py",
+    "linha": 2013
+   },
+   {
+    "secao": "modelo",
+    "chave": "lojas",
+    "simbolo": "lojas",
+    "arquivo": "app/models_db.py",
+    "linha": 19
+   },
+   {
+    "secao": "modelo",
+    "chave": "loja_operacional_projecao",
+    "simbolo": "loja_operacional_projecao",
+    "arquivo": "app/models_db.py",
+    "linha": 33
+   },
+   {
+    "secao": "modelo",
+    "chave": "whatsapp_canais",
+    "simbolo": "whatsapp_canais",
+    "arquivo": "app/models_db.py",
+    "linha": 50
+   },
+   {
+    "secao": "modelo",
+    "chave": "fila_vendedor",
+    "simbolo": "fila_vendedor",
+    "arquivo": "app/models_db.py",
+    "linha": 96
+   },
+   {
+    "secao": "modelo",
+    "chave": "oferta_lead",
+    "simbolo": "oferta_lead",
+    "arquivo": "app/models_db.py",
+    "linha": 128
+   },
+   {
+    "secao": "modelo",
+    "chave": "rodizio_ponteiro",
+    "simbolo": "rodizio_ponteiro",
+    "arquivo": "app/models_db.py",
+    "linha": 153
+   },
+   {
+    "secao": "modelo",
+    "chave": "credenciais_servico",
+    "simbolo": "credenciais_servico",
+    "arquivo": "app/models_db.py",
+    "linha": 160
+   },
+   {
+    "secao": "modelo",
+    "chave": "conversas",
+    "simbolo": "conversas",
+    "arquivo": "app/models_db.py",
+    "linha": 169
+   },
+   {
+    "secao": "modelo",
+    "chave": "mensagens",
+    "simbolo": "mensagens",
+    "arquivo": "app/models_db.py",
+    "linha": 197
+   },
+   {
+    "secao": "modelo",
+    "chave": "leads",
+    "simbolo": "leads",
+    "arquivo": "app/models_db.py",
+    "linha": 220
+   },
+   {
+    "secao": "modelo",
+    "chave": "consentimentos",
+    "simbolo": "consentimentos",
+    "arquivo": "app/models_db.py",
+    "linha": 277
+   },
+   {
+    "secao": "modelo",
+    "chave": "catalog_attributions",
+    "simbolo": "catalog_attributions",
+    "arquivo": "app/models_db.py",
+    "linha": 292
+   },
+   {
+    "secao": "modelo",
+    "chave": "ctwa_auditoria",
+    "simbolo": "ctwa_auditoria",
+    "arquivo": "app/models_db.py",
+    "linha": 324
+   },
+   {
+    "secao": "modelo",
+    "chave": "numeros_autorizados",
+    "simbolo": "numeros_autorizados",
+    "arquivo": "app/models_db.py",
+    "linha": 347
+   },
+   {
+    "secao": "modelo",
+    "chave": "grupos_estoque",
+    "simbolo": "grupos_estoque",
+    "arquivo": "app/models_db.py",
+    "linha": 375
+   },
+   {
+    "secao": "modelo",
+    "chave": "notificacoes_operacionais",
+    "simbolo": "notificacoes_operacionais",
+    "arquivo": "app/models_db.py",
+    "linha": 394
+   },
+   {
+    "secao": "modelo",
+    "chave": "cloud_evento_falho",
+    "simbolo": "cloud_evento_falho",
+    "arquivo": "app/models_db.py",
+    "linha": 435
+   },
+   {
+    "secao": "worker",
+    "chave": "start_workers",
+    "simbolo": "start_workers",
+    "arquivo": "app/modo2_workers.py",
+    "linha": 84
+   },
+   {
+    "secao": "worker",
+    "chave": "stop_workers",
+    "simbolo": "stop_workers",
+    "arquivo": "app/modo2_workers.py",
+    "linha": 147
+   },
+   {
+    "secao": "worker",
+    "chave": "NotificacoesOutboxWorker",
+    "simbolo": "NotificacoesOutboxWorker",
+    "arquivo": "app/notificacoes_outbox_job.py",
+    "linha": 28
+   },
+   {
+    "secao": "worker",
+    "chave": "start_worker",
+    "simbolo": "start_worker",
+    "arquivo": "app/notificacoes_outbox_job.py",
+    "linha": 92
+   },
+   {
+    "secao": "worker",
+    "chave": "stop_worker",
+    "simbolo": "stop_worker",
+    "arquivo": "app/notificacoes_outbox_job.py",
+    "linha": 103
+   },
+   {
+    "secao": "worker",
+    "chave": "RodizioWorker",
+    "simbolo": "RodizioWorker",
+    "arquivo": "app/rodizio_job.py",
+    "linha": 12
+   },
+   {
+    "secao": "migration",
+    "chave": "0001",
+    "simbolo": "0001",
+    "arquivo": "alembic/versions/0001_schema_inicial.py",
+    "linha": 0
+   },
+   {
+    "secao": "migration",
+    "chave": "0002",
+    "simbolo": "0002",
+    "arquivo": "alembic/versions/0002_leads_consentimentos.py",
+    "linha": 0
+   },
+   {
+    "secao": "migration",
+    "chave": "0003",
+    "simbolo": "0003",
+    "arquivo": "alembic/versions/0003_mensagens_unique_provider.py",
+    "linha": 0
+   },
+   {
+    "secao": "migration",
+    "chave": "0004",
+    "simbolo": "0004",
+    "arquivo": "alembic/versions/0004_catalog_attribution.py",
+    "linha": 0
+   },
+   {
+    "secao": "migration",
+    "chave": "0005",
+    "simbolo": "0005",
+    "arquivo": "alembic/versions/0005_numeros_autorizados.py",
+    "linha": 0
+   },
+   {
+    "secao": "migration",
+    "chave": "0006",
+    "simbolo": "0006",
+    "arquivo": "alembic/versions/0006_lead_attribution_touch.py",
+    "linha": 0
+   },
+   {
+    "secao": "migration",
+    "chave": "0007",
+    "simbolo": "0007",
+    "arquivo": "alembic/versions/0007_sessao_fotos_whatsapp.py",
+    "linha": 0
+   },
+   {
+    "secao": "migration",
+    "chave": "0008",
+    "simbolo": "0008",
+    "arquivo": "alembic/versions/0008_cadastro_sessao_e_nome.py",
+    "linha": 0
+   },
+   {
+    "secao": "migration",
+    "chave": "0009",
+    "simbolo": "0009",
+    "arquivo": "alembic/versions/0009_operacao_menu_sessao.py",
+    "linha": 0
+   },
+   {
+    "secao": "migration",
+    "chave": "0010_lead_ctwa",
+    "simbolo": "0010_lead_ctwa",
+    "arquivo": "alembic/versions/0010_lead_ctwa.py",
+    "linha": 0
+   },
+   {
+    "secao": "migration",
+    "chave": "0011_ctwa_auditoria",
+    "simbolo": "0011_ctwa_auditoria",
+    "arquivo": "alembic/versions/0011_ctwa_auditoria.py",
+    "linha": 0
+   },
+   {
+    "secao": "migration",
+    "chave": "0012_grupo_estoque_whatsapp",
+    "simbolo": "0012_grupo_estoque_whatsapp",
+    "arquivo": "alembic/versions/0012_grupo_estoque_whatsapp.py",
+    "linha": 0
+   },
+   {
+    "secao": "migration",
+    "chave": "0013_tracking_pendente_conversa",
+    "simbolo": "0013_tracking_pendente_conversa",
+    "arquivo": "alembic/versions/0013_tracking_pendente_conversa.py",
+    "linha": 0
+   },
+   {
+    "secao": "migration",
+    "chave": "0014_loja_operacional_projecao",
+    "simbolo": "0014_loja_operacional_projecao",
+    "arquivo": "alembic/versions/0014_loja_operacional_projecao.py",
+    "linha": 0
+   },
+   {
+    "secao": "migration",
+    "chave": "0015_whatsapp_canais",
+    "simbolo": "0015_whatsapp_canais",
+    "arquivo": "alembic/versions/0015_whatsapp_canais.py",
+    "linha": 0
+   },
+   {
+    "secao": "migration",
+    "chave": "0016_lead_google_click_ids",
+    "simbolo": "0016_lead_google_click_ids",
+    "arquivo": "alembic/versions/0016_lead_google_click_ids.py",
+    "linha": 0
+   },
+   {
+    "secao": "migration",
+    "chave": "0017_canal_id_conversas_msg",
+    "simbolo": "0017_canal_id_conversas_msg",
+    "arquivo": "alembic/versions/0017_canal_id_conversas_msg.py",
+    "linha": 0
+   },
+   {
+    "secao": "migration",
+    "chave": "0018_notificacoes_operacionais",
+    "simbolo": "0018_notificacoes_operacionais",
+    "arquivo": "alembic/versions/0018_notificacoes_operacionais.py",
+    "linha": 0
+   },
+   {
+    "secao": "migration",
+    "chave": "0019_canal_principal_estoque",
+    "simbolo": "0019_canal_principal_estoque",
+    "arquivo": "alembic/versions/0019_canal_principal_estoque.py",
+    "linha": 0
+   },
+   {
+    "secao": "migration",
+    "chave": "0020_fila_vendedor",
+    "simbolo": "0020_fila_vendedor",
+    "arquivo": "alembic/versions/0020_fila_vendedor.py",
+    "linha": 0
+   },
+   {
+    "secao": "migration",
+    "chave": "0021_oferta_lead",
+    "simbolo": "0021_oferta_lead",
+    "arquivo": "alembic/versions/0021_oferta_lead.py",
+    "linha": 0
+   },
+   {
+    "secao": "migration",
+    "chave": "0022_conversa_followup_toques",
+    "simbolo": "0022_conversa_followup_toques",
+    "arquivo": "alembic/versions/0022_conversa_followup_toques.py",
+    "linha": 0
+   },
+   {
+    "secao": "migration",
+    "chave": "0023_fila_vendedor_usuario",
+    "simbolo": "0023_fila_vendedor_usuario",
+    "arquivo": "alembic/versions/0023_fila_vendedor_usuario.py",
+    "linha": 0
+   },
+   {
+    "secao": "migration",
+    "chave": "0024_cloud_evento_falho",
+    "simbolo": "0024_cloud_evento_falho",
+    "arquivo": "alembic/versions/0024_cloud_evento_falho.py",
+    "linha": 0
+   },
+   {
+    "secao": "migration",
+    "chave": "0025_canal_cloud_por_loja",
+    "simbolo": "0025_canal_cloud_por_loja",
+    "arquivo": "alembic/versions/0025_canal_cloud_por_loja.py",
+    "linha": 0
+   }
+  ],
+  "portal-gestao": [
+   {
+    "secao": "flag",
+    "chave": "REVY_LOJA_SHELL_ENABLED (default: 0)",
+    "simbolo": "REVY_LOJA_SHELL_ENABLED",
+    "arquivo": "app/config.py",
+    "linha": 14
+   },
+   {
+    "secao": "flag",
+    "chave": "REVY_LOJA_ENTITLEMENTS_ENABLED (default: 0)",
+    "simbolo": "REVY_LOJA_ENTITLEMENTS_ENABLED",
+    "arquivo": "app/config.py",
+    "linha": 19
+   },
+   {
+    "secao": "flag",
+    "chave": "REVY_LOJA_ATENDIMENTO_ENABLED (default: 0)",
+    "simbolo": "REVY_LOJA_ATENDIMENTO_ENABLED",
+    "arquivo": "app/config.py",
+    "linha": 24
+   },
+   {
+    "secao": "flag",
+    "chave": "REVY_LOJA_WHATSAPP_ENABLED (default: 0)",
+    "simbolo": "REVY_LOJA_WHATSAPP_ENABLED",
+    "arquivo": "app/config.py",
+    "linha": 32
+   },
+   {
+    "secao": "flag",
+    "chave": "REVY_LOJA_COPILOTO_ENABLED (default: 0)",
+    "simbolo": "REVY_LOJA_COPILOTO_ENABLED",
+    "arquivo": "app/config.py",
+    "linha": 41
+   },
+   {
+    "secao": "flag",
+    "chave": "REVY_LOJA_FINANCEIRO_ENABLED (default: 0)",
+    "simbolo": "REVY_LOJA_FINANCEIRO_ENABLED",
+    "arquivo": "app/config.py",
+    "linha": 51
+   },
+   {
+    "secao": "flag",
+    "chave": "REVY_LOJA_REDIRECT_LEGACY (default: 0)",
+    "simbolo": "REVY_LOJA_REDIRECT_LEGACY",
+    "arquivo": "app/config.py",
+    "linha": 60
+   },
+   {
+    "secao": "flag",
+    "chave": "REVY_TRAFEGO_SMTP_PASSWORD (default: '')",
+    "simbolo": "REVY_TRAFEGO_SMTP_PASSWORD",
+    "arquivo": "app/config.py",
+    "linha": 168
+   },
+   {
+    "secao": "flag",
+    "chave": "REVY_LOJA_COPILOTO_LLM_TIMEOUT (default: 40)",
+    "simbolo": "REVY_LOJA_COPILOTO_LLM_TIMEOUT",
+    "arquivo": "app/config.py",
+    "linha": 203
+   },
+   {
+    "secao": "flag",
+    "chave": "REVY_LOJA_COPILOTO_LLM_RETRIES (default: 1)",
+    "simbolo": "REVY_LOJA_COPILOTO_LLM_RETRIES",
+    "arquivo": "app/config.py",
+    "linha": 205
+   },
+   {
+    "secao": "flag",
+    "chave": "REVY_LOJA_COPILOTO_HISTORICO_TOKENS (default: 2000)",
+    "simbolo": "REVY_LOJA_COPILOTO_HISTORICO_TOKENS",
+    "arquivo": "app/config.py",
+    "linha": 210
+   },
+   {
+    "secao": "flag",
+    "chave": "REVY_LOJA_COPILOTO_FIPE_TIMEOUT (default: 8)",
+    "simbolo": "REVY_LOJA_COPILOTO_FIPE_TIMEOUT",
+    "arquivo": "app/config.py",
+    "linha": 225
+   },
+   {
+    "secao": "flag",
+    "chave": "REVY_LOJA_COPILOTO_FIPE_CACHE_SEGUNDOS (default: 21600)",
+    "simbolo": "REVY_LOJA_COPILOTO_FIPE_CACHE_SEGUNDOS",
+    "arquivo": "app/config.py",
+    "linha": 229
+   },
+   {
+    "secao": "flag",
+    "chave": "REVY_TRAFEGO_SERVICE_TOKEN (default: '')",
+    "simbolo": "REVY_TRAFEGO_SERVICE_TOKEN",
+    "arquivo": "app/config.py",
+    "linha": 126
+   },
+   {
+    "secao": "flag",
+    "chave": "REVY_TRAFEGO_SMTP_PORT (default: 587)",
+    "simbolo": "REVY_TRAFEGO_SMTP_PORT",
+    "arquivo": "app/config.py",
+    "linha": 162
+   },
+   {
+    "secao": "flag",
+    "chave": "REVY_LOJA_COPILOTO_LLM_KEY (default: '')",
+    "simbolo": "REVY_LOJA_COPILOTO_LLM_KEY",
+    "arquivo": "app/config.py",
+    "linha": 198
+   },
+   {
+    "secao": "flag",
+    "chave": "REVY_LOJA_COPILOTO_LLM_MODEL (default: DeepSeek-V4-Flash-0731)",
+    "simbolo": "REVY_LOJA_COPILOTO_LLM_MODEL",
+    "arquivo": "app/config.py",
+    "linha": 200
+   },
+   {
+    "secao": "flag",
+    "chave": "REVY_TRAFEGO_EMAIL_FROM (default: no-reply@revy.local)",
+    "simbolo": "REVY_TRAFEGO_EMAIL_FROM",
+    "arquivo": "app/config.py",
+    "linha": 152
+   },
+   {
+    "secao": "flag",
+    "chave": "REVY_TRAFEGO_EMAIL_FROM_NAME (default: Revy)",
+    "simbolo": "REVY_TRAFEGO_EMAIL_FROM_NAME",
+    "arquivo": "app/config.py",
+    "linha": 156
+   },
+   {
+    "secao": "flag",
+    "chave": "REVY_TRAFEGO_SMTP_HOST (default: '')",
+    "simbolo": "REVY_TRAFEGO_SMTP_HOST",
+    "arquivo": "app/config.py",
+    "linha": 159
+   },
+   {
+    "secao": "flag",
+    "chave": "REVY_TRAFEGO_SMTP_USERNAME (default: '')",
+    "simbolo": "REVY_TRAFEGO_SMTP_USERNAME",
+    "arquivo": "app/config.py",
+    "linha": 165
+   },
+   {
+    "secao": "flag",
+    "chave": "REVY_LOJA_COPILOTO_LLM_URL (default: https://api.deepseek.com)",
+    "simbolo": "REVY_LOJA_COPILOTO_LLM_URL",
+    "arquivo": "app/config.py",
+    "linha": 196
+   },
+   {
+    "secao": "flag",
+    "chave": "REVY_LOJA_COPILOTO_FIPE_URL (default: https://parallelum.com.br/fipe/api/v1)",
+    "simbolo": "REVY_LOJA_COPILOTO_FIPE_URL",
+    "arquivo": "app/config.py",
+    "linha": 222
+   },
+   {
+    "secao": "flag",
+    "chave": "REVY_TRAFEGO_URL",
+    "simbolo": "REVY_TRAFEGO_URL",
+    "arquivo": "app/config.py",
+    "linha": 123
+   },
+   {
+    "secao": "flag",
+    "chave": "REVY_TRAFEGO_EMAIL_BACKEND (default: console)",
+    "simbolo": "REVY_TRAFEGO_EMAIL_BACKEND",
+    "arquivo": "app/config.py",
+    "linha": 148
+   },
+   {
+    "secao": "flag",
+    "chave": "REVY_TRAFEGO_PUBLIC_BASE_URL (default: '')",
+    "simbolo": "REVY_TRAFEGO_PUBLIC_BASE_URL",
+    "arquivo": "app/config.py",
+    "linha": 175
+   },
+   {
+    "secao": "flag",
+    "chave": "REVY_TRAFEGO_SMTP_USE_TLS (default: 1)",
+    "simbolo": "REVY_TRAFEGO_SMTP_USE_TLS",
+    "arquivo": "app/config.py",
+    "linha": 171
+   },
+   {
+    "secao": "worker",
+    "chave": "lojas_com_turnos_elegiveis",
+    "simbolo": "lojas_com_turnos_elegiveis",
+    "arquivo": "app/copiloto_purge_job.py",
+    "linha": 63
+   },
+   {
+    "secao": "worker",
+    "chave": "purgar_loja",
+    "simbolo": "purgar_loja",
+    "arquivo": "app/copiloto_purge_job.py",
+    "linha": 77
+   },
+   {
+    "secao": "worker",
+    "chave": "CopilotoPurgeWorker",
+    "simbolo": "CopilotoPurgeWorker",
+    "arquivo": "app/copiloto_purge_job.py",
+    "linha": 129
+   },
+   {
+    "secao": "worker",
+    "chave": "get_worker",
+    "simbolo": "get_worker",
+    "arquivo": "app/copiloto_purge_job.py",
+    "linha": 269
+   },
+   {
+    "secao": "worker",
+    "chave": "start_worker",
+    "simbolo": "start_worker",
+    "arquivo": "app/copiloto_purge_job.py",
+    "linha": 273
+   },
+   {
+    "secao": "worker",
+    "chave": "stop_worker",
+    "simbolo": "stop_worker",
+    "arquivo": "app/copiloto_purge_job.py",
+    "linha": 282
+   },
+   {
+    "secao": "worker",
+    "chave": "sincronizar_ofertas",
+    "simbolo": "sincronizar_ofertas",
+    "arquivo": "app/copiloto_sinais_job.py",
+    "linha": 88
+   },
+   {
+    "secao": "worker",
+    "chave": "lojas_ativas",
+    "simbolo": "lojas_ativas",
+    "arquivo": "app/copiloto_sinais_job.py",
+    "linha": 166
+   },
+   {
+    "secao": "worker",
+    "chave": "avaliar_loja",
+    "simbolo": "avaliar_loja",
+    "arquivo": "app/copiloto_sinais_job.py",
+    "linha": 266
+   },
+   {
+    "secao": "worker",
+    "chave": "CopilotoSinaisWorker",
+    "simbolo": "CopilotoSinaisWorker",
+    "arquivo": "app/copiloto_sinais_job.py",
+    "linha": 407
+   },
+   {
+    "secao": "worker",
+    "chave": "get_worker",
+    "simbolo": "get_worker",
+    "arquivo": "app/copiloto_sinais_job.py",
+    "linha": 571
+   },
+   {
+    "secao": "worker",
+    "chave": "start_worker",
+    "simbolo": "start_worker",
+    "arquivo": "app/copiloto_sinais_job.py",
+    "linha": 575
+   },
+   {
+    "secao": "worker",
+    "chave": "stop_worker",
+    "simbolo": "stop_worker",
+    "arquivo": "app/copiloto_sinais_job.py",
+    "linha": 584
+   },
+   {
+    "secao": "worker",
+    "chave": "processar_turno",
+    "simbolo": "processar_turno",
+    "arquivo": "app/copiloto_turnos_job.py",
+    "linha": 78
+   },
+   {
+    "secao": "worker",
+    "chave": "CopilotoTurnosWorker",
+    "simbolo": "CopilotoTurnosWorker",
+    "arquivo": "app/copiloto_turnos_job.py",
+    "linha": 207
+   },
+   {
+    "secao": "worker",
+    "chave": "get_worker",
+    "simbolo": "get_worker",
+    "arquivo": "app/copiloto_turnos_job.py",
+    "linha": 400
+   },
+   {
+    "secao": "worker",
+    "chave": "start_worker",
+    "simbolo": "start_worker",
+    "arquivo": "app/copiloto_turnos_job.py",
+    "linha": 404
+   },
+   {
+    "secao": "worker",
+    "chave": "stop_worker",
+    "simbolo": "stop_worker",
+    "arquivo": "app/copiloto_turnos_job.py",
+    "linha": 413
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /app/loja/atendimento",
+    "simbolo": "/app/loja/atendimento",
+    "arquivo": "app/loja/routes.py",
+    "linha": 166
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /app/loja/agente",
+    "simbolo": "/app/loja/agente",
+    "arquivo": "app/loja/routes.py",
+    "linha": 348
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /app/loja/atendimento/{workspace_id}",
+    "simbolo": "/app/loja/atendimento/{workspace_id}",
+    "arquivo": "app/loja/routes.py",
+    "linha": 384
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /app/loja/atendimento/{workspace_id}/mensagens.json",
+    "simbolo": "/app/loja/atendimento/{workspace_id}/mensagens.json",
+    "arquivo": "app/loja/routes.py",
+    "linha": 595
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /app/loja/atendimento/{workspace_id}/mensagem",
+    "simbolo": "/app/loja/atendimento/{workspace_id}/mensagem",
+    "arquivo": "app/loja/routes.py",
+    "linha": 704
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /app/loja/atendimento/{workspace_id}/handoff",
+    "simbolo": "/app/loja/atendimento/{workspace_id}/handoff",
+    "arquivo": "app/loja/routes.py",
+    "linha": 864
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /app/loja/atendimento/{workspace_id}/etapa",
+    "simbolo": "/app/loja/atendimento/{workspace_id}/etapa",
+    "arquivo": "app/loja/routes.py",
+    "linha": 943
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /health/live",
+    "simbolo": "/health/live",
+    "arquivo": "app/main.py",
+    "linha": 507
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /health/ready",
+    "simbolo": "/health/ready",
+    "arquivo": "app/main.py",
+    "linha": 512
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /public/v1/lojas/{loja_slug}/pixel",
+    "simbolo": "/public/v1/lojas/{loja_slug}/pixel",
+    "arquivo": "app/main.py",
+    "linha": 521
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /",
+    "simbolo": "/",
+    "arquivo": "app/main.py",
+    "linha": 556
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /login",
+    "simbolo": "/login",
+    "arquivo": "app/main.py",
+    "linha": 561
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /login",
+    "simbolo": "/login",
+    "arquivo": "app/main.py",
+    "linha": 568
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /logout",
+    "simbolo": "/logout",
+    "arquivo": "app/main.py",
+    "linha": 589
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /conta/senha",
+    "simbolo": "/conta/senha",
+    "arquivo": "app/main.py",
+    "linha": 596
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /conta/senha",
+    "simbolo": "/conta/senha",
+    "arquivo": "app/main.py",
+    "linha": 605
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /app",
+    "simbolo": "/app",
+    "arquivo": "app/main.py",
+    "linha": 642
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /app/estoque",
+    "simbolo": "/app/estoque",
+    "arquivo": "app/main.py",
+    "linha": 771
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /app/estoque/novo",
+    "simbolo": "/app/estoque/novo",
+    "arquivo": "app/main.py",
+    "linha": 810
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /app/operacao/numeros",
+    "simbolo": "/app/operacao/numeros",
+    "arquivo": "app/main.py",
+    "linha": 881
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /app/operacao/grupo",
+    "simbolo": "/app/operacao/grupo",
+    "arquivo": "app/main.py",
+    "linha": 911
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /app/operacao/numeros",
+    "simbolo": "/app/operacao/numeros",
+    "arquivo": "app/main.py",
+    "linha": 936
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /app/operacao/numeros/remover",
+    "simbolo": "/app/operacao/numeros/remover",
+    "arquivo": "app/main.py",
+    "linha": 960
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /app/estoque/novo",
+    "simbolo": "/app/estoque/novo",
+    "arquivo": "app/main.py",
+    "linha": 983
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /app/estoque/{veiculo_id}",
+    "simbolo": "/app/estoque/{veiculo_id}",
+    "arquivo": "app/main.py",
+    "linha": 1010
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /app/estoque/{veiculo_id}",
+    "simbolo": "/app/estoque/{veiculo_id}",
+    "arquivo": "app/main.py",
+    "linha": 1041
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /app/estoque/{veiculo_id}/{acao}",
+    "simbolo": "/app/estoque/{veiculo_id}/{acao}",
+    "arquivo": "app/main.py",
+    "linha": 1069
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /app/leads",
+    "simbolo": "/app/leads",
+    "arquivo": "app/main.py",
+    "linha": 1116
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /app/leads/{lead_id}",
+    "simbolo": "/app/leads/{lead_id}",
+    "arquivo": "app/main.py",
+    "linha": 1144
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /app/leads/{lead_id}/etapa",
+    "simbolo": "/app/leads/{lead_id}/etapa",
+    "arquivo": "app/main.py",
+    "linha": 1180
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /app/conversas",
+    "simbolo": "/app/conversas",
+    "arquivo": "app/main.py",
+    "linha": 1239
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /app/conversas/{telefone}",
+    "simbolo": "/app/conversas/{telefone}",
+    "arquivo": "app/main.py",
+    "linha": 1266
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /app/conversas/{telefone}/handoff",
+    "simbolo": "/app/conversas/{telefone}/handoff",
+    "arquivo": "app/main.py",
+    "linha": 1359
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /app/vendas",
+    "simbolo": "/app/vendas",
+    "arquivo": "app/main.py",
+    "linha": 1464
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /app/vendas/nova",
+    "simbolo": "/app/vendas/nova",
+    "arquivo": "app/main.py",
+    "linha": 1504
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /app/vendas/nova",
+    "simbolo": "/app/vendas/nova",
+    "arquivo": "app/main.py",
+    "linha": 1521
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /app/vendas/{venda_id}/confirmar",
+    "simbolo": "/app/vendas/{venda_id}/confirmar",
+    "arquivo": "app/main.py",
+    "linha": 1922
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /app/vendas/{venda_id}/cancelar",
+    "simbolo": "/app/vendas/{venda_id}/cancelar",
+    "arquivo": "app/main.py",
+    "linha": 1940
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /app/vendedor",
+    "simbolo": "/app/vendedor",
+    "arquivo": "app/main.py",
+    "linha": 1952
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /app/funil",
+    "simbolo": "/app/funil",
+    "arquivo": "app/main.py",
+    "linha": 2063
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /app/funil/dados",
+    "simbolo": "/app/funil/dados",
+    "arquivo": "app/main.py",
+    "linha": 2139
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /app/financeiro",
+    "simbolo": "/app/financeiro",
+    "arquivo": "app/main.py",
+    "linha": 2176
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /app/financeiras",
+    "simbolo": "/app/financeiras",
+    "arquivo": "app/main.py",
+    "linha": 2253
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /app/financeiras/{nome}",
+    "simbolo": "/app/financeiras/{nome}",
+    "arquivo": "app/main.py",
+    "linha": 2310
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /app/financeiras/{nome}/testar",
+    "simbolo": "/app/financeiras/{nome}/testar",
+    "arquivo": "app/main.py",
+    "linha": 2413
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /app/configuracoes",
+    "simbolo": "/app/configuracoes",
+    "arquivo": "app/main.py",
+    "linha": 2524
+   },
+   {
+    "secao": "worker",
+    "chave": "env_flag",
+    "simbolo": "env_flag",
+    "arquivo": "app/meta_ads_spend_job.py",
+    "linha": 20
+   },
+   {
+    "secao": "worker",
+    "chave": "env_float",
+    "simbolo": "env_float",
+    "arquivo": "app/meta_ads_spend_job.py",
+    "linha": 27
+   },
+   {
+    "secao": "worker",
+    "chave": "env_int",
+    "simbolo": "env_int",
+    "arquivo": "app/meta_ads_spend_job.py",
+    "linha": 34
+   },
+   {
+    "secao": "worker",
+    "chave": "MetaSpendSyncWorker",
+    "simbolo": "MetaSpendSyncWorker",
+    "arquivo": "app/meta_ads_spend_job.py",
+    "linha": 41
+   },
+   {
+    "secao": "worker",
+    "chave": "get_worker",
+    "simbolo": "get_worker",
+    "arquivo": "app/meta_ads_spend_job.py",
+    "linha": 148
+   },
+   {
+    "secao": "worker",
+    "chave": "start_worker",
+    "simbolo": "start_worker",
+    "arquivo": "app/meta_ads_spend_job.py",
+    "linha": 152
+   },
+   {
+    "secao": "worker",
+    "chave": "stop_worker",
+    "simbolo": "stop_worker",
+    "arquivo": "app/meta_ads_spend_job.py",
+    "linha": 161
+   },
+   {
+    "secao": "worker",
+    "chave": "MetaCapiRetryWorker",
+    "simbolo": "MetaCapiRetryWorker",
+    "arquivo": "app/meta_capi_job.py",
+    "linha": 31
+   },
+   {
+    "secao": "worker",
+    "chave": "start_worker",
+    "simbolo": "start_worker",
+    "arquivo": "app/meta_capi_job.py",
+    "linha": 122
+   },
+   {
+    "secao": "worker",
+    "chave": "stop_worker",
+    "simbolo": "stop_worker",
+    "arquivo": "app/meta_capi_job.py",
+    "linha": 131
+   },
+   {
+    "secao": "modelo",
+    "chave": "usuarios",
+    "simbolo": "usuarios",
+    "arquivo": "app/models.py",
+    "linha": 44
+   },
+   {
+    "secao": "modelo",
+    "chave": "convites_acesso_loja",
+    "simbolo": "convites_acesso_loja",
+    "arquivo": "app/models.py",
+    "linha": 57
+   },
+   {
+    "secao": "modelo",
+    "chave": "redefinicoes_senha",
+    "simbolo": "redefinicoes_senha",
+    "arquivo": "app/models.py",
+    "linha": 74
+   },
+   {
+    "secao": "modelo",
+    "chave": "loja_operacional_projecao",
+    "simbolo": "loja_operacional_projecao",
+    "arquivo": "app/models.py",
+    "linha": 96
+   },
+   {
+    "secao": "modelo",
+    "chave": "vendas",
+    "simbolo": "vendas",
+    "arquivo": "app/models.py",
+    "linha": 109
+   },
+   {
+    "secao": "modelo",
+    "chave": "venda_custos_diretos",
+    "simbolo": "venda_custos_diretos",
+    "arquivo": "app/models.py",
+    "linha": 143
+   },
+   {
+    "secao": "modelo",
+    "chave": "despesa_fixa_loja",
+    "simbolo": "despesa_fixa_loja",
+    "arquivo": "app/models.py",
+    "linha": 168
+   },
+   {
+    "secao": "modelo",
+    "chave": "despesa_fixa_ajuste",
+    "simbolo": "despesa_fixa_ajuste",
+    "arquivo": "app/models.py",
+    "linha": 191
+   },
+   {
+    "secao": "modelo",
+    "chave": "metas",
+    "simbolo": "metas",
+    "arquivo": "app/models.py",
+    "linha": 210
+   },
+   {
+    "secao": "modelo",
+    "chave": "atendimento_atribuicoes",
+    "simbolo": "atendimento_atribuicoes",
+    "arquivo": "app/models.py",
+    "linha": 224
+   },
+   {
+    "secao": "modelo",
+    "chave": "loja_operacao_auditoria",
+    "simbolo": "loja_operacao_auditoria",
+    "arquivo": "app/models.py",
+    "linha": 242
+   },
+   {
+    "secao": "modelo",
+    "chave": "copiloto_acao",
+    "simbolo": "copiloto_acao",
+    "arquivo": "app/models.py",
+    "linha": 298
+   },
+   {
+    "secao": "modelo",
+    "chave": "funil_eventos",
+    "simbolo": "funil_eventos",
+    "arquivo": "app/models.py",
+    "linha": 334
+   },
+   {
+    "secao": "modelo",
+    "chave": "meta_pixel_config",
+    "simbolo": "meta_pixel_config",
+    "arquivo": "app/models.py",
+    "linha": 375
+   },
+   {
+    "secao": "modelo",
+    "chave": "meta_ads_config",
+    "simbolo": "meta_ads_config",
+    "arquivo": "app/models.py",
+    "linha": 393
+   },
+   {
+    "secao": "modelo",
+    "chave": "pixel_capi_auditoria",
+    "simbolo": "pixel_capi_auditoria",
+    "arquivo": "app/models.py",
+    "linha": 411
+   },
+   {
+    "secao": "modelo",
+    "chave": "meta_capi_outbox",
+    "simbolo": "meta_capi_outbox",
+    "arquivo": "app/models.py",
+    "linha": 441
+   },
+   {
+    "secao": "modelo",
+    "chave": "revy_trafego_event_outbox",
+    "simbolo": "revy_trafego_event_outbox",
+    "arquivo": "app/models.py",
+    "linha": 461
+   },
+   {
+    "secao": "modelo",
+    "chave": "campanhas",
+    "simbolo": "campanhas",
+    "arquivo": "app/models.py",
+    "linha": 482
+   },
+   {
+    "secao": "modelo",
+    "chave": "campanha_gastos",
+    "simbolo": "campanha_gastos",
+    "arquivo": "app/models.py",
+    "linha": 512
+   },
+   {
+    "secao": "modelo",
+    "chave": "pessoa_revy_projetada",
+    "simbolo": "pessoa_revy_projetada",
+    "arquivo": "app/models.py",
+    "linha": 534
+   },
+   {
+    "secao": "modelo",
+    "chave": "vinculo_loja_pessoa",
+    "simbolo": "vinculo_loja_pessoa",
+    "arquivo": "app/models.py",
+    "linha": 548
+   },
+   {
+    "secao": "modelo",
+    "chave": "copiloto_sinal",
+    "simbolo": "copiloto_sinal",
+    "arquivo": "app/models.py",
+    "linha": 603
+   },
+   {
+    "secao": "modelo",
+    "chave": "copiloto_sinal_visto",
+    "simbolo": "copiloto_sinal_visto",
+    "arquivo": "app/models.py",
+    "linha": 674
+   },
+   {
+    "secao": "modelo",
+    "chave": "copiloto_conversa",
+    "simbolo": "copiloto_conversa",
+    "arquivo": "app/models.py",
+    "linha": 699
+   },
+   {
+    "secao": "modelo",
+    "chave": "copiloto_turno",
+    "simbolo": "copiloto_turno",
+    "arquivo": "app/models.py",
+    "linha": 734
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /app/relatorios",
+    "simbolo": "/app/relatorios",
+    "arquivo": "app/relatorios.py",
+    "linha": 66
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /app/relatorios/vendas.csv",
+    "simbolo": "/app/relatorios/vendas.csv",
+    "arquivo": "app/relatorios.py",
+    "linha": 112
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /app/relatorios/metas.csv",
+    "simbolo": "/app/relatorios/metas.csv",
+    "arquivo": "app/relatorios.py",
+    "linha": 157
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /app/relatorios/funil.csv",
+    "simbolo": "/app/relatorios/funil.csv",
+    "arquivo": "app/relatorios.py",
+    "linha": 195
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /app/relatorios/roi.csv",
+    "simbolo": "/app/relatorios/roi.csv",
+    "arquivo": "app/relatorios.py",
+    "linha": 254
+   },
+   {
+    "secao": "worker",
+    "chave": "RevyTrafegoOutboxWorker",
+    "simbolo": "RevyTrafegoOutboxWorker",
+    "arquivo": "app/revy_trafego_outbox_job.py",
+    "linha": 23
+   },
+   {
+    "secao": "worker",
+    "chave": "start_worker",
+    "simbolo": "start_worker",
+    "arquivo": "app/revy_trafego_outbox_job.py",
+    "linha": 87
+   },
+   {
+    "secao": "worker",
+    "chave": "stop_worker",
+    "simbolo": "stop_worker",
+    "arquivo": "app/revy_trafego_outbox_job.py",
+    "linha": 98
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /app/equipe",
+    "simbolo": "/app/equipe",
+    "arquivo": "app/web/equipe.py",
+    "linha": 177
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /app/equipe/novo",
+    "simbolo": "/app/equipe/novo",
+    "arquivo": "app/web/equipe.py",
+    "linha": 193
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /app/equipe/novo",
+    "simbolo": "/app/equipe/novo",
+    "arquivo": "app/web/equipe.py",
+    "linha": 210
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /app/equipe/{membro_id}/editar",
+    "simbolo": "/app/equipe/{membro_id}/editar",
+    "arquivo": "app/web/equipe.py",
+    "linha": 279
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /app/equipe/{membro_id}/editar",
+    "simbolo": "/app/equipe/{membro_id}/editar",
+    "arquivo": "app/web/equipe.py",
+    "linha": 303
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /app/equipe/{membro_id}/senha",
+    "simbolo": "/app/equipe/{membro_id}/senha",
+    "arquivo": "app/web/equipe.py",
+    "linha": 355
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /app/equipe/{membro_id}/senha",
+    "simbolo": "/app/equipe/{membro_id}/senha",
+    "arquivo": "app/web/equipe.py",
+    "linha": 381
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /app/equipe/{membro_id}/{acao}",
+    "simbolo": "/app/equipe/{membro_id}/{acao}",
+    "arquivo": "app/web/equipe.py",
+    "linha": 425
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /app/loja/catalogo",
+    "simbolo": "/app/loja/catalogo",
+    "arquivo": "app/web/loja_catalogo.py",
+    "linha": 20
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /app/loja/catalogo",
+    "simbolo": "/app/loja/catalogo",
+    "arquivo": "app/web/loja_catalogo.py",
+    "linha": 21
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /app/loja/estoque",
+    "simbolo": "/app/loja/estoque",
+    "arquivo": "app/web/loja_estoque.py",
+    "linha": 87
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /app/loja/estoque/veiculos",
+    "simbolo": "/app/loja/estoque/veiculos",
+    "arquivo": "app/web/loja_estoque.py",
+    "linha": 129
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /app/loja/estoque/vitrine",
+    "simbolo": "/app/loja/estoque/vitrine",
+    "arquivo": "app/web/loja_estoque.py",
+    "linha": 153
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /app/loja/estoque/vitrine",
+    "simbolo": "/app/loja/estoque/vitrine",
+    "arquivo": "app/web/loja_estoque.py",
+    "linha": 247
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /app/loja/selecionar",
+    "simbolo": "/app/loja/selecionar",
+    "arquivo": "app/web/loja_shell.py",
+    "linha": 357
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /app/loja/vendas",
+    "simbolo": "/app/loja/vendas",
+    "arquivo": "app/web/loja_vendas.py",
+    "linha": 125
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /app/loja/vendas/dados",
+    "simbolo": "/app/loja/vendas/dados",
+    "arquivo": "app/web/loja_vendas.py",
+    "linha": 161
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /app/loja/vendas/lista",
+    "simbolo": "/app/loja/vendas/lista",
+    "arquivo": "app/web/loja_vendas.py",
+    "linha": 184
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /app/loja/vendas/{venda_id}/confirmar",
+    "simbolo": "/app/loja/vendas/{venda_id}/confirmar",
+    "arquivo": "app/web/loja_vendas.py",
+    "linha": 231
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /app/loja/vendas/{venda_id}/cancelar",
+    "simbolo": "/app/loja/vendas/{venda_id}/cancelar",
+    "arquivo": "app/web/loja_vendas.py",
+    "linha": 253
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /app/loja/vendas/{venda_id}/editar",
+    "simbolo": "/app/loja/vendas/{venda_id}/editar",
+    "arquivo": "app/web/loja_vendas.py",
+    "linha": 289
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /app/loja/vendas/{venda_id}/editar",
+    "simbolo": "/app/loja/vendas/{venda_id}/editar",
+    "arquivo": "app/web/loja_vendas.py",
+    "linha": 327
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /app/loja/vendas/{venda_id}/excluir",
+    "simbolo": "/app/loja/vendas/{venda_id}/excluir",
+    "arquivo": "app/web/loja_vendas.py",
+    "linha": 344
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /app/loja/vendas/{venda_id}/custos",
+    "simbolo": "/app/loja/vendas/{venda_id}/custos",
+    "arquivo": "app/web/loja_vendas.py",
+    "linha": 357
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /app/loja/vendas/{venda_id}/custos/{custo_id}/remover",
+    "simbolo": "/app/loja/vendas/{venda_id}/custos/{custo_id}/remover",
+    "arquivo": "app/web/loja_vendas.py",
+    "linha": 378
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /app/loja/vendas/configuracoes-financeiras",
+    "simbolo": "/app/loja/vendas/configuracoes-financeiras",
+    "arquivo": "app/web/loja_vendas.py",
+    "linha": 394
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /app/loja/equipe",
+    "simbolo": "/app/loja/equipe",
+    "arquivo": "app/web/loja_vendas.py",
+    "linha": 410
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /app/loja/whatsapp/catalogo",
+    "simbolo": "/app/loja/whatsapp/catalogo",
+    "arquivo": "app/web/loja_whatsapp.py",
+    "linha": 146
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /app/loja/whatsapp/canais",
+    "simbolo": "/app/loja/whatsapp/canais",
+    "arquivo": "app/web/loja_whatsapp.py",
+    "linha": 207
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /app/loja/whatsapp/canais/{canal_id}/conectar",
+    "simbolo": "/app/loja/whatsapp/canais/{canal_id}/conectar",
+    "arquivo": "app/web/loja_whatsapp.py",
+    "linha": 229
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /app/loja/whatsapp/canais/{canal_id}/desconectar",
+    "simbolo": "/app/loja/whatsapp/canais/{canal_id}/desconectar",
+    "arquivo": "app/web/loja_whatsapp.py",
+    "linha": 254
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /app/loja/whatsapp/canais/{canal_id}/inativar",
+    "simbolo": "/app/loja/whatsapp/canais/{canal_id}/inativar",
+    "arquivo": "app/web/loja_whatsapp.py",
+    "linha": 273
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /app/loja/whatsapp/canais/{canal_id}/principal-estoque",
+    "simbolo": "/app/loja/whatsapp/canais/{canal_id}/principal-estoque",
+    "arquivo": "app/web/loja_whatsapp.py",
+    "linha": 293
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /app/loja/whatsapp/canais/{canal_id}/status",
+    "simbolo": "/app/loja/whatsapp/canais/{canal_id}/status",
+    "arquivo": "app/web/loja_whatsapp.py",
+    "linha": 318
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /app/metas",
+    "simbolo": "/app/metas",
+    "arquivo": "app/web/metas.py",
+    "linha": 135
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /app/metas/nova",
+    "simbolo": "/app/metas/nova",
+    "arquivo": "app/web/metas.py",
+    "linha": 167
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /app/metas/nova",
+    "simbolo": "/app/metas/nova",
+    "arquivo": "app/web/metas.py",
+    "linha": 177
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /app/metas/{meta_id}/editar",
+    "simbolo": "/app/metas/{meta_id}/editar",
+    "arquivo": "app/web/metas.py",
+    "linha": 216
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /app/metas/{meta_id}/editar",
+    "simbolo": "/app/metas/{meta_id}/editar",
+    "arquivo": "app/web/metas.py",
+    "linha": 237
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /app/metas/{meta_id}/desativar",
+    "simbolo": "/app/metas/{meta_id}/desativar",
+    "arquivo": "app/web/metas.py",
+    "linha": 273
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /internal/v1/lojistas/convite",
+    "simbolo": "/internal/v1/lojistas/convite",
+    "arquivo": "app/web/owner_invitations.py",
+    "linha": 49
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /convite/aceitar",
+    "simbolo": "/convite/aceitar",
+    "arquivo": "app/web/owner_invitations.py",
+    "linha": 117
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /convite/aceitar",
+    "simbolo": "/convite/aceitar",
+    "arquivo": "app/web/owner_invitations.py",
+    "linha": 134
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /senha/esqueci",
+    "simbolo": "/senha/esqueci",
+    "arquivo": "app/web/password_reset.py",
+    "linha": 29
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /senha/esqueci",
+    "simbolo": "/senha/esqueci",
+    "arquivo": "app/web/password_reset.py",
+    "linha": 38
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /senha/redefinir",
+    "simbolo": "/senha/redefinir",
+    "arquivo": "app/web/password_reset.py",
+    "linha": 89
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /senha/redefinir",
+    "simbolo": "/senha/redefinir",
+    "arquivo": "app/web/password_reset.py",
+    "linha": 100
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /app/simulacoes",
+    "simbolo": "/app/simulacoes",
+    "arquivo": "app/web/simulacoes.py",
+    "linha": 248
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /app/simulacoes",
+    "simbolo": "/app/simulacoes",
+    "arquivo": "app/web/simulacoes.py",
+    "linha": 278
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /app/simulacoes/job/{sim_id}",
+    "simbolo": "/app/simulacoes/job/{sim_id}",
+    "arquivo": "app/web/simulacoes.py",
+    "linha": 502
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /app/simulacoes/historico",
+    "simbolo": "/app/simulacoes/historico",
+    "arquivo": "app/web/simulacoes.py",
+    "linha": 612
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /app/simulacoes/{sim_id}/registros",
+    "simbolo": "/app/simulacoes/{sim_id}/registros",
+    "arquivo": "app/web/simulacoes.py",
+    "linha": 733
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /app/simulacoes/{sim_id}/registros/{evento_id}/print",
+    "simbolo": "/app/simulacoes/{sim_id}/registros/{evento_id}/print",
+    "arquivo": "app/web/simulacoes.py",
+    "linha": 770
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /app/campanhas",
+    "simbolo": "/app/campanhas",
+    "arquivo": "app/web/trafego.py",
+    "linha": 116
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /app/campanhas/nova",
+    "simbolo": "/app/campanhas/nova",
+    "arquivo": "app/web/trafego.py",
+    "linha": 177
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /app/campanhas/nova",
+    "simbolo": "/app/campanhas/nova",
+    "arquivo": "app/web/trafego.py",
+    "linha": 195
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /app/campanhas/gastos/lote",
+    "simbolo": "/app/campanhas/gastos/lote",
+    "arquivo": "app/web/trafego.py",
+    "linha": 266
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /app/campanhas/gastos/lote",
+    "simbolo": "/app/campanhas/gastos/lote",
+    "arquivo": "app/web/trafego.py",
+    "linha": 279
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /app/campanhas/gastos/csv/modelo",
+    "simbolo": "/app/campanhas/gastos/csv/modelo",
+    "arquivo": "app/web/trafego.py",
+    "linha": 335
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /app/campanhas/gastos/csv",
+    "simbolo": "/app/campanhas/gastos/csv",
+    "arquivo": "app/web/trafego.py",
+    "linha": 350
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /app/campanhas/{campanha_id}",
+    "simbolo": "/app/campanhas/{campanha_id}",
+    "arquivo": "app/web/trafego.py",
+    "linha": 396
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /app/campanhas/{campanha_id}/editar",
+    "simbolo": "/app/campanhas/{campanha_id}/editar",
+    "arquivo": "app/web/trafego.py",
+    "linha": 479
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /app/campanhas/{campanha_id}/editar",
+    "simbolo": "/app/campanhas/{campanha_id}/editar",
+    "arquivo": "app/web/trafego.py",
+    "linha": 514
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /app/campanhas/{campanha_id}/apagar",
+    "simbolo": "/app/campanhas/{campanha_id}/apagar",
+    "arquivo": "app/web/trafego.py",
+    "linha": 558
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /app/campanhas/{campanha_id}/gastos",
+    "simbolo": "/app/campanhas/{campanha_id}/gastos",
+    "arquivo": "app/web/trafego.py",
+    "linha": 578
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /app/trafego/roi",
+    "simbolo": "/app/trafego/roi",
+    "arquivo": "app/web/trafego.py",
+    "linha": 616
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /app/trafego/pixel-auditoria",
+    "simbolo": "/app/trafego/pixel-auditoria",
+    "arquivo": "app/web/trafego.py",
+    "linha": 673
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /app/trafego/ctwa-auditoria",
+    "simbolo": "/app/trafego/ctwa-auditoria",
+    "arquivo": "app/web/trafego.py",
+    "linha": 702
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /app/trafego",
+    "simbolo": "/app/trafego",
+    "arquivo": "app/web/trafego.py",
+    "linha": 735
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /app/trafego/capi/retentar",
+    "simbolo": "/app/trafego/capi/retentar",
+    "arquivo": "app/web/trafego.py",
+    "linha": 774
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /app/trafego/onboarding/dispensar",
+    "simbolo": "/app/trafego/onboarding/dispensar",
+    "arquivo": "app/web/trafego.py",
+    "linha": 789
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /app/trafego/ads/salvar",
+    "simbolo": "/app/trafego/ads/salvar",
+    "arquivo": "app/web/trafego.py",
+    "linha": 808
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /app/trafego/ads/sincronizar",
+    "simbolo": "/app/trafego/ads/sincronizar",
+    "arquivo": "app/web/trafego.py",
+    "linha": 869
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /internal/v1/provisioning/state",
+    "simbolo": "/internal/v1/provisioning/state",
+    "arquivo": "app/web/trafego.py",
+    "linha": 883
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /internal/jobs/meta-spend-sync",
+    "simbolo": "/internal/jobs/meta-spend-sync",
+    "arquivo": "app/web/trafego.py",
+    "linha": 926
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /app/trafego",
+    "simbolo": "/app/trafego",
+    "arquivo": "app/web/trafego.py",
+    "linha": 961
+   },
+   {
+    "secao": "template",
+    "chave": "app/templates/base.html",
+    "simbolo": "base.html",
+    "arquivo": "app/templates/base.html",
+    "linha": 0
+   },
+   {
+    "secao": "template",
+    "chave": "app/templates/campanhas/detalhe.html",
+    "simbolo": "campanhas/detalhe.html",
+    "arquivo": "app/web/trafego.py",
+    "linha": 456
+   },
+   {
+    "secao": "template",
+    "chave": "app/templates/campanhas/form.html",
+    "simbolo": "campanhas/form.html",
+    "arquivo": "app/web/trafego.py",
+    "linha": 185
+   },
+   {
+    "secao": "template",
+    "chave": "app/templates/campanhas/gastos_lote.html",
+    "simbolo": "campanhas/gastos_lote.html",
+    "arquivo": "app/web/trafego.py",
+    "linha": 274
+   },
+   {
+    "secao": "template",
+    "chave": "app/templates/campanhas/lista.html",
+    "simbolo": "campanhas/lista.html",
+    "arquivo": "app/web/trafego.py",
+    "linha": 150
+   },
+   {
+    "secao": "template",
+    "chave": "app/templates/configuracoes/index.html",
+    "simbolo": "configuracoes/index.html",
+    "arquivo": "app/main.py",
+    "linha": 2564
+   },
+   {
+    "secao": "template",
+    "chave": "app/templates/conta_senha.html",
+    "simbolo": "conta_senha.html",
+    "arquivo": "app/templates/conta_senha.html",
+    "linha": 0
+   },
+   {
+    "secao": "template",
+    "chave": "app/templates/conversas/detalhe.html",
+    "simbolo": "conversas/detalhe.html",
+    "arquivo": "app/main.py",
+    "linha": 1291
+   },
+   {
+    "secao": "template",
+    "chave": "app/templates/conversas/lista.html",
+    "simbolo": "conversas/lista.html",
+    "arquivo": "app/main.py",
+    "linha": 1255
+   },
+   {
+    "secao": "template",
+    "chave": "app/templates/convite_aceitar.html",
+    "simbolo": "convite_aceitar.html",
+    "arquivo": "app/web/owner_invitations.py",
+    "linha": 129
+   },
+   {
+    "secao": "template",
+    "chave": "app/templates/dashboard.html",
+    "simbolo": "dashboard.html",
+    "arquivo": "app/main.py",
+    "linha": 752
+   },
+   {
+    "secao": "template",
+    "chave": "app/templates/em-breve.html",
+    "simbolo": "em-breve.html",
+    "arquivo": "app/templates/em-breve.html",
+    "linha": 0
+   },
+   {
+    "secao": "template",
+    "chave": "app/templates/equipe/form.html",
+    "simbolo": "equipe/form.html",
+    "arquivo": "app/web/equipe.py",
+    "linha": 161
+   },
+   {
+    "secao": "template",
+    "chave": "app/templates/equipe/lista.html",
+    "simbolo": "equipe/lista.html",
+    "arquivo": "app/web/equipe.py",
+    "linha": 133
+   },
+   {
+    "secao": "template",
+    "chave": "app/templates/equipe/senha.html",
+    "simbolo": "equipe/senha.html",
+    "arquivo": "app/web/equipe.py",
+    "linha": 370
+   },
+   {
+    "secao": "template",
+    "chave": "app/templates/erro.html",
+    "simbolo": "erro.html",
+    "arquivo": "app/loja/routes.py",
+    "linha": 85
+   },
+   {
+    "secao": "template",
+    "chave": "app/templates/estoque/form.html",
+    "simbolo": "estoque/form.html",
+    "arquivo": "app/main.py",
+    "linha": 821
+   },
+   {
+    "secao": "template",
+    "chave": "app/templates/estoque/lista.html",
+    "simbolo": "estoque/lista.html",
+    "arquivo": "app/main.py",
+    "linha": 796
+   },
+   {
+    "secao": "template",
+    "chave": "app/templates/financeiras/lista.html",
+    "simbolo": "financeiras/lista.html",
+    "arquivo": "app/main.py",
+    "linha": 2295
+   },
+   {
+    "secao": "template",
+    "chave": "app/templates/financeiro/dashboard.html",
+    "simbolo": "financeiro/dashboard.html",
+    "arquivo": "app/main.py",
+    "linha": 2232
+   },
+   {
+    "secao": "template",
+    "chave": "app/templates/funil/index.html",
+    "simbolo": "funil/index.html",
+    "arquivo": "app/main.py",
+    "linha": 2126
+   },
+   {
+    "secao": "template",
+    "chave": "app/templates/leads/detalhe.html",
+    "simbolo": "leads/detalhe.html",
+    "arquivo": "app/main.py",
+    "linha": 1168
+   },
+   {
+    "secao": "template",
+    "chave": "app/templates/leads/lista.html",
+    "simbolo": "leads/lista.html",
+    "arquivo": "app/main.py",
+    "linha": 1133
+   },
+   {
+    "secao": "template",
+    "chave": "app/templates/login.html",
+    "simbolo": "login.html",
+    "arquivo": "app/main.py",
+    "linha": 565
+   },
+   {
+    "secao": "template",
+    "chave": "app/templates/loja/agente.html",
+    "simbolo": "loja/agente.html",
+    "arquivo": "app/loja/routes.py",
+    "linha": 372
+   },
+   {
+    "secao": "template",
+    "chave": "app/templates/loja/atendimento_lista.html",
+    "simbolo": "loja/atendimento_lista.html",
+    "arquivo": "app/loja/routes.py",
+    "linha": 252
+   },
+   {
+    "secao": "template",
+    "chave": "app/templates/loja/atendimento_workspace.html",
+    "simbolo": "loja/atendimento_workspace.html",
+    "arquivo": "app/loja/routes.py",
+    "linha": 475
+   },
+   {
+    "secao": "template",
+    "chave": "app/templates/loja/catalogo.html",
+    "simbolo": "catalogo.html",
+    "arquivo": "app/templates/loja/catalogo.html",
+    "linha": 0
+   },
+   {
+    "secao": "template",
+    "chave": "app/templates/loja/copiloto.html",
+    "simbolo": "loja/copiloto.html",
+    "arquivo": "app/web/loja_copiloto.py",
+    "linha": 217
+   },
+   {
+    "secao": "template",
+    "chave": "app/templates/loja/estoque_visao.html",
+    "simbolo": "loja/estoque_visao.html",
+    "arquivo": "app/web/loja_estoque.py",
+    "linha": 116
+   },
+   {
+    "secao": "template",
+    "chave": "app/templates/loja/financeiro_despesas.html",
+    "simbolo": "loja/financeiro_despesas.html",
+    "arquivo": "app/web/loja_financeiro.py",
+    "linha": 151
+   },
+   {
+    "secao": "template",
+    "chave": "app/templates/loja/financeiro_resultado.html",
+    "simbolo": "loja/financeiro_resultado.html",
+    "arquivo": "app/web/loja_financeiro.py",
+    "linha": 102
+   },
+   {
+    "secao": "template",
+    "chave": "app/templates/loja/integracoes.html",
+    "simbolo": "loja/integracoes.html",
+    "arquivo": "app/web/loja_integracoes.py",
+    "linha": 48
+   },
+   {
+    "secao": "template",
+    "chave": "app/templates/loja/perfil.html",
+    "simbolo": "loja/perfil.html",
+    "arquivo": "app/web/loja_perfil.py",
+    "linha": 69
+   },
+   {
+    "secao": "template",
+    "chave": "app/templates/loja/venda_editar.html",
+    "simbolo": "loja/venda_editar.html",
+    "arquivo": "app/web/loja_vendas.py",
+    "linha": 314
+   },
+   {
+    "secao": "template",
+    "chave": "app/templates/loja/vendas_lista.html",
+    "simbolo": "loja/vendas_lista.html",
+    "arquivo": "app/web/loja_vendas.py",
+    "linha": 215
+   },
+   {
+    "secao": "template",
+    "chave": "app/templates/loja/vendas_visao.html",
+    "simbolo": "loja/vendas_visao.html",
+    "arquivo": "app/web/loja_vendas.py",
+    "linha": 145
+   },
+   {
+    "secao": "template",
+    "chave": "app/templates/loja/vitrine_ordem.html",
+    "simbolo": "loja/vitrine_ordem.html",
+    "arquivo": "app/web/loja_estoque.py",
+    "linha": 222
+   },
+   {
+    "secao": "template",
+    "chave": "app/templates/loja/whatsapp_canais.html",
+    "simbolo": "loja/whatsapp_canais.html",
+    "arquivo": "app/web/loja_whatsapp.py",
+    "linha": 130
+   },
+   {
+    "secao": "template",
+    "chave": "app/templates/loja/whatsapp_fila.html",
+    "simbolo": "loja/whatsapp_fila.html",
+    "arquivo": "app/web/loja_whatsapp.py",
+    "linha": 367
+   },
+   {
+    "secao": "template",
+    "chave": "app/templates/metas/form.html",
+    "simbolo": "metas/form.html",
+    "arquivo": "app/web/metas.py",
+    "linha": 121
+   },
+   {
+    "secao": "template",
+    "chave": "app/templates/metas/lista.html",
+    "simbolo": "metas/lista.html",
+    "arquivo": "app/web/metas.py",
+    "linha": 155
+   },
+   {
+    "secao": "template",
+    "chave": "app/templates/operacao/numeros.html",
+    "simbolo": "operacao/numeros.html",
+    "arquivo": "app/main.py",
+    "linha": 900
+   },
+   {
+    "secao": "template",
+    "chave": "app/templates/partials/alertas_trafego.html",
+    "simbolo": "alertas_trafego.html",
+    "arquivo": "app/templates/partials/alertas_trafego.html",
+    "linha": 0
+   },
+   {
+    "secao": "template",
+    "chave": "app/templates/partials/onboarding_medicao.html",
+    "simbolo": "onboarding_medicao.html",
+    "arquivo": "app/templates/partials/onboarding_medicao.html",
+    "linha": 0
+   },
+   {
+    "secao": "template",
+    "chave": "app/templates/partials/resultados_periodo.html",
+    "simbolo": "resultados_periodo.html",
+    "arquivo": "app/templates/partials/resultados_periodo.html",
+    "linha": 0
+   },
+   {
+    "secao": "template",
+    "chave": "app/templates/relatorios/index.html",
+    "simbolo": "relatorios/index.html",
+    "arquivo": "app/relatorios.py",
+    "linha": 99
+   },
+   {
+    "secao": "template",
+    "chave": "app/templates/senha_esqueci.html",
+    "simbolo": "senha_esqueci.html",
+    "arquivo": "app/web/password_reset.py",
+    "linha": 33
+   },
+   {
+    "secao": "template",
+    "chave": "app/templates/senha_redefinir.html",
+    "simbolo": "senha_redefinir.html",
+    "arquivo": "app/web/password_reset.py",
+    "linha": 95
+   },
+   {
+    "secao": "template",
+    "chave": "app/templates/simulacoes/form.html",
+    "simbolo": "simulacoes/form.html",
+    "arquivo": "app/web/simulacoes.py",
+    "linha": 267
+   },
+   {
+    "secao": "template",
+    "chave": "app/templates/simulacoes/historico.html",
+    "simbolo": "simulacoes/historico.html",
+    "arquivo": "app/web/simulacoes.py",
+    "linha": 658
+   },
+   {
+    "secao": "template",
+    "chave": "app/templates/simulacoes/progresso.html",
+    "simbolo": "simulacoes/progresso.html",
+    "arquivo": "app/web/simulacoes.py",
+    "linha": 591
+   },
+   {
+    "secao": "template",
+    "chave": "app/templates/simulacoes/registros.html",
+    "simbolo": "simulacoes/registros.html",
+    "arquivo": "app/web/simulacoes.py",
+    "linha": 754
+   },
+   {
+    "secao": "template",
+    "chave": "app/templates/simulacoes/resultado.html",
+    "simbolo": "simulacoes/resultado.html",
+    "arquivo": "app/web/simulacoes.py",
+    "linha": 577
+   },
+   {
+    "secao": "template",
+    "chave": "app/templates/trafego/ctwa_auditoria.html",
+    "simbolo": "trafego/ctwa_auditoria.html",
+    "arquivo": "app/web/trafego.py",
+    "linha": 724
+   },
+   {
+    "secao": "template",
+    "chave": "app/templates/trafego/form.html",
+    "simbolo": "trafego/form.html",
+    "arquivo": "app/web/trafego.py",
+    "linha": 760
+   },
+   {
+    "secao": "template",
+    "chave": "app/templates/trafego/pixel_auditoria.html",
+    "simbolo": "trafego/pixel_auditoria.html",
+    "arquivo": "app/web/trafego.py",
+    "linha": 692
+   },
+   {
+    "secao": "template",
+    "chave": "app/templates/trafego/roi.html",
+    "simbolo": "trafego/roi.html",
+    "arquivo": "app/web/trafego.py",
+    "linha": 655
+   },
+   {
+    "secao": "template",
+    "chave": "app/templates/vendas/form.html",
+    "simbolo": "vendas/form.html",
+    "arquivo": "app/main.py",
+    "linha": 1446
+   },
+   {
+    "secao": "template",
+    "chave": "app/templates/vendas/lista.html",
+    "simbolo": "vendas/lista.html",
+    "arquivo": "app/main.py",
+    "linha": 1490
+   },
+   {
+    "secao": "template",
+    "chave": "app/templates/vendedor/dashboard.html",
+    "simbolo": "vendedor/dashboard.html",
+    "arquivo": "app/main.py",
+    "linha": 2047
+   },
+   {
+    "secao": "migration",
+    "chave": "0001_cria_usuarios",
+    "simbolo": "0001_cria_usuarios",
+    "arquivo": "alembic/versions/0001_cria_usuarios.py",
+    "linha": 0
+   },
+   {
+    "secao": "migration",
+    "chave": "0002_cria_vendas_metas",
+    "simbolo": "0002_cria_vendas_metas",
+    "arquivo": "alembic/versions/0002_cria_vendas_metas.py",
+    "linha": 0
+   },
+   {
+    "secao": "migration",
+    "chave": "0003_adiciona_meta_ativa",
+    "simbolo": "0003_adiciona_meta_ativa",
+    "arquivo": "alembic/versions/0003_adiciona_meta_ativa.py",
+    "linha": 0
+   },
+   {
+    "secao": "migration",
+    "chave": "0004_cria_atendimento_atribuicoes",
+    "simbolo": "0004_cria_atendimento_atribuicoes",
+    "arquivo": "alembic/versions/0004_cria_atendimento_atribuicoes.py",
+    "linha": 0
+   },
+   {
+    "secao": "migration",
+    "chave": "0005_meta_pixel_capi",
+    "simbolo": "0005_meta_pixel_capi",
+    "arquivo": "alembic/versions/0005_meta_pixel_capi.py",
+    "linha": 0
+   },
+   {
+    "secao": "migration",
+    "chave": "0006_campanhas_roi",
+    "simbolo": "0006_campanhas_roi",
+    "arquivo": "alembic/versions/0006_campanhas_roi.py",
+    "linha": 0
+   },
+   {
+    "secao": "migration",
+    "chave": "0007_onboarding_medicao",
+    "simbolo": "0007_onboarding_medicao",
+    "arquivo": "alembic/versions/0007_onboarding_medicao.py",
+    "linha": 0
+   },
+   {
+    "secao": "migration",
+    "chave": "0008_funil_eventos",
+    "simbolo": "0008_funil_eventos",
+    "arquivo": "alembic/versions/0008_funil_eventos.py",
+    "linha": 0
+   },
+   {
+    "secao": "migration",
+    "chave": "0009_meta_ads_spend",
+    "simbolo": "0009_meta_ads_spend",
+    "arquivo": "alembic/versions/0009_meta_ads_spend.py",
+    "linha": 0
+   },
+   {
+    "secao": "migration",
+    "chave": "0010_campanha_codigo_ctwa",
+    "simbolo": "0010_campanha_codigo_ctwa",
+    "arquivo": "alembic/versions/0010_campanha_codigo_ctwa.py",
+    "linha": 0
+   },
+   {
+    "secao": "migration",
+    "chave": "0011_pixel_capi_auditoria",
+    "simbolo": "0011_pixel_capi_auditoria",
+    "arquivo": "alembic/versions/0011_pixel_capi_auditoria.py",
+    "linha": 0
+   },
+   {
+    "secao": "migration",
+    "chave": "0012_revy_trafego_event_outbox",
+    "simbolo": "0012_revy_trafego_event_outbox",
+    "arquivo": "alembic/versions/0012_revy_trafego_event_outbox.py",
+    "linha": 0
+   },
+   {
+    "secao": "migration",
+    "chave": "0013_loja_operacional_projecao",
+    "simbolo": "0013_loja_operacional_projecao",
+    "arquivo": "alembic/versions/0013_loja_operacional_projecao.py",
+    "linha": 0
+   },
+   {
+    "secao": "migration",
+    "chave": "0014_loja_operacao_auditoria",
+    "simbolo": "0014_loja_operacao_auditoria",
+    "arquivo": "alembic/versions/0014_loja_operacao_auditoria.py",
+    "linha": 0
+   },
+   {
+    "secao": "migration",
+    "chave": "0015_auditoria_dominio_canal",
+    "simbolo": "0015_auditoria_dominio_canal",
+    "arquivo": "alembic/versions/0015_auditoria_dominio_canal.py",
+    "linha": 0
+   },
+   {
+    "secao": "migration",
+    "chave": "0016_convites_acesso_loja",
+    "simbolo": "0016_convites_acesso_loja",
+    "arquivo": "alembic/versions/0016_convites_acesso_loja.py",
+    "linha": 0
+   },
+   {
+    "secao": "migration",
+    "chave": "0017_vinculo_loja_pessoa",
+    "simbolo": "0017_vinculo_loja_pessoa",
+    "arquivo": "alembic/versions/0017_vinculo_loja_pessoa.py",
+    "linha": 0
+   },
+   {
+    "secao": "migration",
+    "chave": "0018_redefinicoes_senha",
+    "simbolo": "0018_redefinicoes_senha",
+    "arquivo": "alembic/versions/0018_redefinicoes_senha.py",
+    "linha": 0
+   },
+   {
+    "secao": "migration",
+    "chave": "0019_copiloto_sinal",
+    "simbolo": "0019_copiloto_sinal",
+    "arquivo": "alembic/versions/0019_copiloto_sinal.py",
+    "linha": 0
+   },
+   {
+    "secao": "migration",
+    "chave": "0020_copiloto_conversa_turno",
+    "simbolo": "0020_copiloto_conversa_turno",
+    "arquivo": "alembic/versions/0020_copiloto_conversa_turno.py",
+    "linha": 0
+   },
+   {
+    "secao": "migration",
+    "chave": "0021_copiloto_acoes",
+    "simbolo": "0021_copiloto_acoes",
+    "arquivo": "alembic/versions/0021_copiloto_acoes.py",
+    "linha": 0
+   },
+   {
+    "secao": "migration",
+    "chave": "0022_copiloto_acao_pendente_e_estado_anterior",
+    "simbolo": "0022_copiloto_acao_pendente_e_estado_anterior",
+    "arquivo": "alembic/versions/0022_copiloto_acao_pendente_e_estado_anterior.py",
+    "linha": 0
+   },
+   {
+    "secao": "migration",
+    "chave": "0023_copiloto_sinal_visto",
+    "simbolo": "0023_copiloto_sinal_visto",
+    "arquivo": "alembic/versions/0023_copiloto_sinal_visto.py",
+    "linha": 0
+   },
+   {
+    "secao": "migration",
+    "chave": "0024_venda_excluida",
+    "simbolo": "0024_venda_excluida",
+    "arquivo": "alembic/versions/0024_venda_excluida.py",
+    "linha": 0
+   },
+   {
+    "secao": "migration",
+    "chave": "0025_despesas_fixas_loja",
+    "simbolo": "0025_despesas_fixas_loja",
+    "arquivo": "alembic/versions/0025_despesas_fixas_loja.py",
+    "linha": 0
+   },
+   {
+    "secao": "migration",
+    "chave": "0026_copiloto_sinal_destinatario",
+    "simbolo": "0026_copiloto_sinal_destinatario",
+    "arquivo": "alembic/versions/0026_copiloto_sinal_destinatario.py",
+    "linha": 0
+   }
+  ],
+  "motor-simulacao": [
+   {
+    "secao": "rota",
+    "chave": "GET /health/live",
+    "simbolo": "/health/live",
+    "arquivo": "app/main.py",
+    "linha": 28
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /health/ready",
+    "simbolo": "/health/ready",
+    "arquivo": "app/main.py",
+    "linha": 33
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /version",
+    "simbolo": "/version",
+    "arquivo": "app/main.py",
+    "linha": 38
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /metrics",
+    "simbolo": "/metrics",
+    "arquivo": "app/main.py",
+    "linha": 43
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /v1/provedores",
+    "simbolo": "/v1/provedores",
+    "arquivo": "app/main.py",
+    "linha": 66
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /v1/provedores/credenciais",
+    "simbolo": "/v1/provedores/credenciais",
+    "arquivo": "app/main.py",
+    "linha": 83
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /v1/provedores/{nome}/credenciais",
+    "simbolo": "/v1/provedores/{nome}/credenciais",
+    "arquivo": "app/main.py",
+    "linha": 95
+   },
+   {
+    "secao": "rota",
+    "chave": "PUT /v1/provedores/{nome}/credenciais",
+    "simbolo": "/v1/provedores/{nome}/credenciais",
+    "arquivo": "app/main.py",
+    "linha": 112
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /v1/provedores/{nome}/testar-login",
+    "simbolo": "/v1/provedores/{nome}/testar-login",
+    "arquivo": "app/main.py",
+    "linha": 127
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /v1/internal/provisioning/state",
+    "simbolo": "/v1/internal/provisioning/state",
+    "arquivo": "app/main.py",
+    "linha": 159
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /v1/simulacoes",
+    "simbolo": "/v1/simulacoes",
+    "arquivo": "app/main.py",
+    "linha": 181
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /v1/simulacoes",
+    "simbolo": "/v1/simulacoes",
+    "arquivo": "app/main.py",
+    "linha": 215
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /v1/simulacoes/{sim_id}",
+    "simbolo": "/v1/simulacoes/{sim_id}",
+    "arquivo": "app/main.py",
+    "linha": 254
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /v1/simulacoes/{sim_id}/eventos",
+    "simbolo": "/v1/simulacoes/{sim_id}/eventos",
+    "arquivo": "app/main.py",
+    "linha": 271
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /v1/simulacoes/{sim_id}/eventos/{evento_id}/print",
+    "simbolo": "/v1/simulacoes/{sim_id}/eventos/{evento_id}/print",
+    "arquivo": "app/main.py",
+    "linha": 292
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /v1/simulacoes/{sim_id}/cancelar",
+    "simbolo": "/v1/simulacoes/{sim_id}/cancelar",
+    "arquivo": "app/main.py",
+    "linha": 345
+   },
+   {
+    "secao": "modelo",
+    "chave": "clientes_api",
+    "simbolo": "clientes_api",
+    "arquivo": "app/models_db.py",
+    "linha": 33
+   },
+   {
+    "secao": "modelo",
+    "chave": "cliente_operacional_projecao",
+    "simbolo": "cliente_operacional_projecao",
+    "arquivo": "app/models_db.py",
+    "linha": 48
+   },
+   {
+    "secao": "modelo",
+    "chave": "credenciais_api",
+    "simbolo": "credenciais_api",
+    "arquivo": "app/models_db.py",
+    "linha": 63
+   },
+   {
+    "secao": "modelo",
+    "chave": "credenciais_provedor",
+    "simbolo": "credenciais_provedor",
+    "arquivo": "app/models_db.py",
+    "linha": 84
+   },
+   {
+    "secao": "modelo",
+    "chave": "auditoria",
+    "simbolo": "auditoria",
+    "arquivo": "app/models_db.py",
+    "linha": 117
+   },
+   {
+    "secao": "modelo",
+    "chave": "simulacoes",
+    "simbolo": "simulacoes",
+    "arquivo": "app/models_db.py",
+    "linha": 130
+   },
+   {
+    "secao": "modelo",
+    "chave": "simulacao_resultados",
+    "simbolo": "simulacao_resultados",
+    "arquivo": "app/models_db.py",
+    "linha": 188
+   },
+   {
+    "secao": "modelo",
+    "chave": "simulacao_tentativas",
+    "simbolo": "simulacao_tentativas",
+    "arquivo": "app/models_db.py",
+    "linha": 209
+   },
+   {
+    "secao": "modelo",
+    "chave": "simulacao_eventos",
+    "simbolo": "simulacao_eventos",
+    "arquivo": "app/models_db.py",
+    "linha": 226
+   },
+   {
+    "secao": "modelo",
+    "chave": "simulacao_provedores",
+    "simbolo": "simulacao_provedores",
+    "arquivo": "app/models_db.py",
+    "linha": 247
+   },
+   {
+    "secao": "modelo",
+    "chave": "worker_slots",
+    "simbolo": "worker_slots",
+    "arquivo": "app/models_db.py",
+    "linha": 290
+   },
+   {
+    "secao": "modelo",
+    "chave": "idempotencia",
+    "simbolo": "idempotencia",
+    "arquivo": "app/models_db.py",
+    "linha": 316
+   },
+   {
+    "secao": "worker",
+    "chave": "main",
+    "simbolo": "main",
+    "arquivo": "app/worker.py",
+    "linha": 93
+   },
+   {
+    "secao": "migration",
+    "chave": "0001",
+    "simbolo": "0001",
+    "arquivo": "alembic/versions/0001_schema_inicial.py",
+    "linha": 0
+   },
+   {
+    "secao": "migration",
+    "chave": "0002",
+    "simbolo": "0002",
+    "arquivo": "alembic/versions/0002_payload_cifrado.py",
+    "linha": 0
+   },
+   {
+    "secao": "migration",
+    "chave": "0003",
+    "simbolo": "0003",
+    "arquivo": "alembic/versions/0003_job_async.py",
+    "linha": 0
+   },
+   {
+    "secao": "migration",
+    "chave": "0004",
+    "simbolo": "0004",
+    "arquivo": "alembic/versions/0004_auth_tenancy.py",
+    "linha": 0
+   },
+   {
+    "secao": "migration",
+    "chave": "0005",
+    "simbolo": "0005",
+    "arquivo": "alembic/versions/0005_job_lease.py",
+    "linha": 0
+   },
+   {
+    "secao": "migration",
+    "chave": "0006",
+    "simbolo": "0006",
+    "arquivo": "alembic/versions/0006_credenciais_provedor.py",
+    "linha": 0
+   },
+   {
+    "secao": "migration",
+    "chave": "0007",
+    "simbolo": "0007",
+    "arquivo": "alembic/versions/0007_simulacao_campos_reais.py",
+    "linha": 0
+   },
+   {
+    "secao": "migration",
+    "chave": "0008",
+    "simbolo": "0008",
+    "arquivo": "alembic/versions/0008_resultado_entrada.py",
+    "linha": 0
+   },
+   {
+    "secao": "migration",
+    "chave": "0009",
+    "simbolo": "0009",
+    "arquivo": "alembic/versions/0009_simulacao_solicitado_por.py",
+    "linha": 0
+   },
+   {
+    "secao": "migration",
+    "chave": "0010",
+    "simbolo": "0010",
+    "arquivo": "alembic/versions/0010_pan_api.py",
+    "linha": 0
+   },
+   {
+    "secao": "migration",
+    "chave": "0011",
+    "simbolo": "0011",
+    "arquivo": "alembic/versions/0011_simulacao_eventos.py",
+    "linha": 0
+   },
+   {
+    "secao": "migration",
+    "chave": "0012",
+    "simbolo": "0012",
+    "arquivo": "alembic/versions/0012_simulacao_provedores_fanout.py",
+    "linha": 0
+   },
+   {
+    "secao": "migration",
+    "chave": "0013",
+    "simbolo": "0013",
+    "arquivo": "alembic/versions/0013_evento_screenshot_blob.py",
+    "linha": 0
+   },
+   {
+    "secao": "migration",
+    "chave": "0014",
+    "simbolo": "0014",
+    "arquivo": "alembic/versions/0014_cliente_operacional_projecao.py",
+    "linha": 0
+   }
+  ],
+  "estoque-api": [
+   {
+    "secao": "rota",
+    "chave": "GET /admin/login",
+    "simbolo": "/admin/login",
+    "arquivo": "app/admin.py",
+    "linha": 36
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /admin/login",
+    "simbolo": "/admin/login",
+    "arquivo": "app/admin.py",
+    "linha": 43
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /admin/logout",
+    "simbolo": "/admin/logout",
+    "arquivo": "app/admin.py",
+    "linha": 65
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /admin",
+    "simbolo": "/admin",
+    "arquivo": "app/admin.py",
+    "linha": 72
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /admin/veiculos/novo",
+    "simbolo": "/admin/veiculos/novo",
+    "arquivo": "app/admin.py",
+    "linha": 110
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /admin/veiculos/novo",
+    "simbolo": "/admin/veiculos/novo",
+    "arquivo": "app/admin.py",
+    "linha": 122
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /admin/veiculos/{veiculo_id}",
+    "simbolo": "/admin/veiculos/{veiculo_id}",
+    "arquivo": "app/admin.py",
+    "linha": 147
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /admin/veiculos/{veiculo_id}",
+    "simbolo": "/admin/veiculos/{veiculo_id}",
+    "arquivo": "app/admin.py",
+    "linha": 158
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /admin/veiculos/{veiculo_id}/{acao}",
+    "simbolo": "/admin/veiculos/{veiculo_id}/{acao}",
+    "arquivo": "app/admin.py",
+    "linha": 183
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /admin/importar",
+    "simbolo": "/admin/importar",
+    "arquivo": "app/admin.py",
+    "linha": 206
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /health/live",
+    "simbolo": "/health/live",
+    "arquivo": "app/main.py",
+    "linha": 162
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /health/ready",
+    "simbolo": "/health/ready",
+    "arquivo": "app/main.py",
+    "linha": 167
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /version",
+    "simbolo": "/version",
+    "arquivo": "app/main.py",
+    "linha": 173
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /v1/internal/provisioning/state",
+    "simbolo": "/v1/internal/provisioning/state",
+    "arquivo": "app/main.py",
+    "linha": 178
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /v1/veiculos",
+    "simbolo": "/v1/veiculos",
+    "arquivo": "app/main.py",
+    "linha": 201
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /v1/veiculos",
+    "simbolo": "/v1/veiculos",
+    "arquivo": "app/main.py",
+    "linha": 224
+   },
+   {
+    "secao": "rota",
+    "chave": "PUT /v1/veiculos/ordem-vitrine",
+    "simbolo": "/v1/veiculos/ordem-vitrine",
+    "arquivo": "app/main.py",
+    "linha": 240
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /v1/veiculos/por-placa/{placa}",
+    "simbolo": "/v1/veiculos/por-placa/{placa}",
+    "arquivo": "app/main.py",
+    "linha": 264
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /v1/veiculos/{veiculo_id}",
+    "simbolo": "/v1/veiculos/{veiculo_id}",
+    "arquivo": "app/main.py",
+    "linha": 274
+   },
+   {
+    "secao": "rota",
+    "chave": "PATCH /v1/veiculos/{veiculo_id}",
+    "simbolo": "/v1/veiculos/{veiculo_id}",
+    "arquivo": "app/main.py",
+    "linha": 283
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /v1/veiculos/{veiculo_id}/publicar",
+    "simbolo": "/v1/veiculos/{veiculo_id}/publicar",
+    "arquivo": "app/main.py",
+    "linha": 300
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /v1/veiculos/{veiculo_id}/despublicar",
+    "simbolo": "/v1/veiculos/{veiculo_id}/despublicar",
+    "arquivo": "app/main.py",
+    "linha": 312
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /v1/veiculos/{veiculo_id}/reservar",
+    "simbolo": "/v1/veiculos/{veiculo_id}/reservar",
+    "arquivo": "app/main.py",
+    "linha": 324
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /v1/veiculos/{veiculo_id}/vender",
+    "simbolo": "/v1/veiculos/{veiculo_id}/vender",
+    "arquivo": "app/main.py",
+    "linha": 335
+   },
+   {
+    "secao": "rota",
+    "chave": "PUT /v1/veiculos/{veiculo_id}/fotos",
+    "simbolo": "/v1/veiculos/{veiculo_id}/fotos",
+    "arquivo": "app/main.py",
+    "linha": 346
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /v1/veiculos/{veiculo_id}/fotos/upload",
+    "simbolo": "/v1/veiculos/{veiculo_id}/fotos/upload",
+    "arquivo": "app/main.py",
+    "linha": 367
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /v1/auditoria",
+    "simbolo": "/v1/auditoria",
+    "arquivo": "app/main.py",
+    "linha": 424
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /v1/eventos",
+    "simbolo": "/v1/eventos",
+    "arquivo": "app/main.py",
+    "linha": 447
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /v1/webhook",
+    "simbolo": "/v1/webhook",
+    "arquivo": "app/main.py",
+    "linha": 476
+   },
+   {
+    "secao": "rota",
+    "chave": "PUT /v1/webhook",
+    "simbolo": "/v1/webhook",
+    "arquivo": "app/main.py",
+    "linha": 491
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /v1/entregas",
+    "simbolo": "/v1/entregas",
+    "arquivo": "app/main.py",
+    "linha": 505
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /v1/importacoes/csv/preview",
+    "simbolo": "/v1/importacoes/csv/preview",
+    "arquivo": "app/main.py",
+    "linha": 529
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /v1/importacoes/csv",
+    "simbolo": "/v1/importacoes/csv",
+    "arquivo": "app/main.py",
+    "linha": 537
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /v1/importacoes",
+    "simbolo": "/v1/importacoes",
+    "arquivo": "app/main.py",
+    "linha": 558
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /v1/veiculos.csv",
+    "simbolo": "/v1/veiculos.csv",
+    "arquivo": "app/main.py",
+    "linha": 587
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /public/v1/media/{loja_id}/{veiculo_id}/{arquivo}",
+    "simbolo": "/public/v1/media/{loja_id}/{veiculo_id}/{arquivo}",
+    "arquivo": "app/main.py",
+    "linha": 602
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /public/v1/lojas/{slug}",
+    "simbolo": "/public/v1/lojas/{slug}",
+    "arquivo": "app/main.py",
+    "linha": 652
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /v1/loja",
+    "simbolo": "/v1/loja",
+    "arquivo": "app/main.py",
+    "linha": 670
+   },
+   {
+    "secao": "rota",
+    "chave": "PATCH /v1/loja",
+    "simbolo": "/v1/loja",
+    "arquivo": "app/main.py",
+    "linha": 680
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /public/v1/lojas/{slug}/veiculos",
+    "simbolo": "/public/v1/lojas/{slug}/veiculos",
+    "arquivo": "app/main.py",
+    "linha": 703
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /public/v1/lojas/{slug}/veiculos/{veiculo_id}",
+    "simbolo": "/public/v1/lojas/{slug}/veiculos/{veiculo_id}",
+    "arquivo": "app/main.py",
+    "linha": 732
+   },
+   {
+    "secao": "modelo",
+    "chave": "lojas",
+    "simbolo": "lojas",
+    "arquivo": "app/models_db.py",
+    "linha": 18
+   },
+   {
+    "secao": "modelo",
+    "chave": "loja_operacional_projecao",
+    "simbolo": "loja_operacional_projecao",
+    "arquivo": "app/models_db.py",
+    "linha": 32
+   },
+   {
+    "secao": "modelo",
+    "chave": "credenciais_servico",
+    "simbolo": "credenciais_servico",
+    "arquivo": "app/models_db.py",
+    "linha": 47
+   },
+   {
+    "secao": "modelo",
+    "chave": "usuarios_estoque",
+    "simbolo": "usuarios_estoque",
+    "arquivo": "app/models_db.py",
+    "linha": 56
+   },
+   {
+    "secao": "modelo",
+    "chave": "veiculos",
+    "simbolo": "veiculos",
+    "arquivo": "app/models_db.py",
+    "linha": 73
+   },
+   {
+    "secao": "modelo",
+    "chave": "veiculo_fotos",
+    "simbolo": "veiculo_fotos",
+    "arquivo": "app/models_db.py",
+    "linha": 117
+   },
+   {
+    "secao": "modelo",
+    "chave": "idempotencias_criacao_veiculo",
+    "simbolo": "idempotencias_criacao_veiculo",
+    "arquivo": "app/models_db.py",
+    "linha": 147
+   },
+   {
+    "secao": "modelo",
+    "chave": "importacoes",
+    "simbolo": "importacoes",
+    "arquivo": "app/models_db.py",
+    "linha": 174
+   },
+   {
+    "secao": "modelo",
+    "chave": "eventos_saida",
+    "simbolo": "eventos_saida",
+    "arquivo": "app/models_db.py",
+    "linha": 188
+   },
+   {
+    "secao": "modelo",
+    "chave": "webhook_destinos",
+    "simbolo": "webhook_destinos",
+    "arquivo": "app/models_db.py",
+    "linha": 207
+   },
+   {
+    "secao": "modelo",
+    "chave": "entregas_evento",
+    "simbolo": "entregas_evento",
+    "arquivo": "app/models_db.py",
+    "linha": 222
+   },
+   {
+    "secao": "modelo",
+    "chave": "auditoria",
+    "simbolo": "auditoria",
+    "arquivo": "app/models_db.py",
+    "linha": 238
+   },
+   {
+    "secao": "worker",
+    "chave": "rodar_uma_vez",
+    "simbolo": "rodar_uma_vez",
+    "arquivo": "app/worker.py",
+    "linha": 21
+   },
+   {
+    "secao": "worker",
+    "chave": "limpar_midias_uma_vez",
+    "simbolo": "limpar_midias_uma_vez",
+    "arquivo": "app/worker.py",
+    "linha": 29
+   },
+   {
+    "secao": "worker",
+    "chave": "executar_limpeza_se_devida",
+    "simbolo": "executar_limpeza_se_devida",
+    "arquivo": "app/worker.py",
+    "linha": 37
+   },
+   {
+    "secao": "worker",
+    "chave": "main",
+    "simbolo": "main",
+    "arquivo": "app/worker.py",
+    "linha": 55
+   },
+   {
+    "secao": "template",
+    "chave": "app/templates/admin/form.html",
+    "simbolo": "admin/form.html",
+    "arquivo": "app/admin.py",
+    "linha": 118
+   },
+   {
+    "secao": "template",
+    "chave": "app/templates/admin/login.html",
+    "simbolo": "admin/login.html",
+    "arquivo": "app/admin.py",
+    "linha": 40
+   },
+   {
+    "secao": "template",
+    "chave": "app/templates/admin/painel.html",
+    "simbolo": "admin/painel.html",
+    "arquivo": "app/admin.py",
+    "linha": 91
+   },
+   {
+    "secao": "migration",
+    "chave": "0001",
+    "simbolo": "0001",
+    "arquivo": "alembic/versions/0001_schema_inicial.py",
+    "linha": 0
+   },
+   {
+    "secao": "migration",
+    "chave": "0002",
+    "simbolo": "0002",
+    "arquivo": "alembic/versions/0002_operacao_estoque.py",
+    "linha": 0
+   },
+   {
+    "secao": "migration",
+    "chave": "0003",
+    "simbolo": "0003",
+    "arquivo": "alembic/versions/0003_usuarios_estoque.py",
+    "linha": 0
+   },
+   {
+    "secao": "migration",
+    "chave": "0004",
+    "simbolo": "0004",
+    "arquivo": "alembic/versions/0004_outbox_entrega.py",
+    "linha": 0
+   },
+   {
+    "secao": "migration",
+    "chave": "0005",
+    "simbolo": "0005",
+    "arquivo": "alembic/versions/0005_veiculo_placa.py",
+    "linha": 0
+   },
+   {
+    "secao": "migration",
+    "chave": "0006",
+    "simbolo": "0006",
+    "arquivo": "alembic/versions/0006_veiculo_fotos_midias.py",
+    "linha": 0
+   },
+   {
+    "secao": "migration",
+    "chave": "0007",
+    "simbolo": "0007",
+    "arquivo": "alembic/versions/0007_idempotencia_criacao_veiculo.py",
+    "linha": 0
+   },
+   {
+    "secao": "migration",
+    "chave": "0008",
+    "simbolo": "0008",
+    "arquivo": "alembic/versions/0008_loja_operacional_projecao.py",
+    "linha": 0
+   },
+   {
+    "secao": "migration",
+    "chave": "0009",
+    "simbolo": "0009",
+    "arquivo": "alembic/versions/0009_veiculo_ordem_vitrine.py",
+    "linha": 0
+   },
+   {
+    "secao": "migration",
+    "chave": "0010",
+    "simbolo": "0010",
+    "arquivo": "alembic/versions/0010_loja_catalogo_url.py",
+    "linha": 0
+   }
+  ],
+  "revy-trafego": [
+   {
+    "secao": "rota",
+    "chave": "GET /lojas/{loja_slug}/resultados",
+    "simbolo": "/lojas/{loja_slug}/resultados",
+    "arquivo": "app/api_v1.py",
+    "linha": 90
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /lojas/{loja_slug}/eventos/venda-atualizada",
+    "simbolo": "/lojas/{loja_slug}/eventos/venda-atualizada",
+    "arquivo": "app/api_v1.py",
+    "linha": 244
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /lojas/{loja_slug}/eventos/venda-confirmada",
+    "simbolo": "/lojas/{loja_slug}/eventos/venda-confirmada",
+    "arquivo": "app/api_v1.py",
+    "linha": 289
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /lojas/{loja_slug}/integracoes/health",
+    "simbolo": "/lojas/{loja_slug}/integracoes/health",
+    "arquivo": "app/api_v1.py",
+    "linha": 456
+   },
+   {
+    "secao": "flag",
+    "chave": "REVY_TRAFEGO_DATABASE_URL (default: sqlite:///./revy_trafego.db)",
+    "simbolo": "REVY_TRAFEGO_DATABASE_URL",
+    "arquivo": "app/config.py",
+    "linha": 18
+   },
+   {
+    "secao": "flag",
+    "chave": "REVY_TRAFEGO_SESSION_SECRET (default: dev-trafego-troque)",
+    "simbolo": "REVY_TRAFEGO_SESSION_SECRET",
+    "arquivo": "app/config.py",
+    "linha": 21
+   },
+   {
+    "secao": "flag",
+    "chave": "REVY_TRAFEGO_TIMEZONE (default: America/Sao_Paulo)",
+    "simbolo": "REVY_TRAFEGO_TIMEZONE",
+    "arquivo": "app/config.py",
+    "linha": 74
+   },
+   {
+    "secao": "flag",
+    "chave": "REVY_TRAFEGO_VERSION (default: 0.1.0)",
+    "simbolo": "REVY_TRAFEGO_VERSION",
+    "arquivo": "app/config.py",
+    "linha": 75
+   },
+   {
+    "secao": "flag",
+    "chave": "REVY_TRAFEGO_BOOTSTRAP_EMAIL (default: trafego@revy.local)",
+    "simbolo": "REVY_TRAFEGO_BOOTSTRAP_EMAIL",
+    "arquivo": "app/config.py",
+    "linha": 77
+   },
+   {
+    "secao": "flag",
+    "chave": "REVY_TRAFEGO_BOOTSTRAP_SENHA (default: troque-isto)",
+    "simbolo": "REVY_TRAFEGO_BOOTSTRAP_SENHA",
+    "arquivo": "app/config.py",
+    "linha": 79
+   },
+   {
+    "secao": "flag",
+    "chave": "REVY_TRAFEGO_BOOTSTRAP_NOME (default: Equipe Tráfego)",
+    "simbolo": "REVY_TRAFEGO_BOOTSTRAP_NOME",
+    "arquivo": "app/config.py",
+    "linha": 80
+   },
+   {
+    "secao": "flag",
+    "chave": "REVY_TRAFEGO_SMTP_PASSWORD (default: '')",
+    "simbolo": "REVY_TRAFEGO_SMTP_PASSWORD",
+    "arquivo": "app/config.py",
+    "linha": 161
+   },
+   {
+    "secao": "flag",
+    "chave": "REVY_TRAFEGO_ENCRYPTION_KEY",
+    "simbolo": "REVY_TRAFEGO_ENCRYPTION_KEY",
+    "arquivo": "app/config.py",
+    "linha": 23
+   },
+   {
+    "secao": "flag",
+    "chave": "REVY_TRAFEGO_SECURE_COOKIE (default: 0)",
+    "simbolo": "REVY_TRAFEGO_SECURE_COOKIE",
+    "arquivo": "app/config.py",
+    "linha": 26
+   },
+   {
+    "secao": "flag",
+    "chave": "REVY_TRAFEGO_HTTP_TIMEOUT (default: 5)",
+    "simbolo": "REVY_TRAFEGO_HTTP_TIMEOUT",
+    "arquivo": "app/config.py",
+    "linha": 69
+   },
+   {
+    "secao": "flag",
+    "chave": "REVY_TRAFEGO_HTTP_RETRIES (default: 1)",
+    "simbolo": "REVY_TRAFEGO_HTTP_RETRIES",
+    "arquivo": "app/config.py",
+    "linha": 70
+   },
+   {
+    "secao": "flag",
+    "chave": "REVY_TRAFEGO_HTTP_RETRY_BACKOFF (default: 0.2)",
+    "simbolo": "REVY_TRAFEGO_HTTP_RETRY_BACKOFF",
+    "arquivo": "app/config.py",
+    "linha": 72
+   },
+   {
+    "secao": "flag",
+    "chave": "REVY_TRAFEGO_SMTP_PORT (default: 587)",
+    "simbolo": "REVY_TRAFEGO_SMTP_PORT",
+    "arquivo": "app/config.py",
+    "linha": 159
+   },
+   {
+    "secao": "flag",
+    "chave": "REVY_TRAFEGO_CHATBOT_TOKEN_LOJA (default: '')",
+    "simbolo": "REVY_TRAFEGO_CHATBOT_TOKEN_LOJA",
+    "arquivo": "app/config.py",
+    "linha": 30
+   },
+   {
+    "secao": "flag",
+    "chave": "REVY_TRAFEGO_CHATBOT_TOKENS_JSON (default: '')",
+    "simbolo": "REVY_TRAFEGO_CHATBOT_TOKENS_JSON",
+    "arquivo": "app/config.py",
+    "linha": 33
+   },
+   {
+    "secao": "flag",
+    "chave": "REVY_TRAFEGO_ESTOQUE_TOKEN_LOJA (default: '')",
+    "simbolo": "REVY_TRAFEGO_ESTOQUE_TOKEN_LOJA",
+    "arquivo": "app/config.py",
+    "linha": 38
+   },
+   {
+    "secao": "flag",
+    "chave": "REVY_TRAFEGO_ESTOQUE_TOKENS_JSON (default: '')",
+    "simbolo": "REVY_TRAFEGO_ESTOQUE_TOKENS_JSON",
+    "arquivo": "app/config.py",
+    "linha": 41
+   },
+   {
+    "secao": "flag",
+    "chave": "REVY_TRAFEGO_MOTOR_TOKEN_LOJA (default: '')",
+    "simbolo": "REVY_TRAFEGO_MOTOR_TOKEN_LOJA",
+    "arquivo": "app/config.py",
+    "linha": 58
+   },
+   {
+    "secao": "flag",
+    "chave": "REVY_TRAFEGO_MOTOR_TOKENS_JSON (default: '')",
+    "simbolo": "REVY_TRAFEGO_MOTOR_TOKENS_JSON",
+    "arquivo": "app/config.py",
+    "linha": 59
+   },
+   {
+    "secao": "flag",
+    "chave": "REVY_TRAFEGO_JOB_SECRET (default: '')",
+    "simbolo": "REVY_TRAFEGO_JOB_SECRET",
+    "arquivo": "app/config.py",
+    "linha": 148
+   },
+   {
+    "secao": "flag",
+    "chave": "REVY_TRAFEGO_SERVICE_TOKEN (default: '')",
+    "simbolo": "REVY_TRAFEGO_SERVICE_TOKEN",
+    "arquivo": "app/config.py",
+    "linha": 150
+   },
+   {
+    "secao": "flag",
+    "chave": "REVY_TRAFEGO_URL_PREFIX (default: '')",
+    "simbolo": "REVY_TRAFEGO_URL_PREFIX",
+    "arquivo": "app/config.py",
+    "linha": 152
+   },
+   {
+    "secao": "flag",
+    "chave": "REVY_TRAFEGO_EMAIL_FROM (default: no-reply@revy.local)",
+    "simbolo": "REVY_TRAFEGO_EMAIL_FROM",
+    "arquivo": "app/config.py",
+    "linha": 154
+   },
+   {
+    "secao": "flag",
+    "chave": "REVY_TRAFEGO_EMAIL_FROM_NAME (default: Revy Control)",
+    "simbolo": "REVY_TRAFEGO_EMAIL_FROM_NAME",
+    "arquivo": "app/config.py",
+    "linha": 156
+   },
+   {
+    "secao": "flag",
+    "chave": "REVY_TRAFEGO_SMTP_HOST (default: '')",
+    "simbolo": "REVY_TRAFEGO_SMTP_HOST",
+    "arquivo": "app/config.py",
+    "linha": 158
+   },
+   {
+    "secao": "flag",
+    "chave": "REVY_TRAFEGO_SMTP_USERNAME (default: '')",
+    "simbolo": "REVY_TRAFEGO_SMTP_USERNAME",
+    "arquivo": "app/config.py",
+    "linha": 160
+   },
+   {
+    "secao": "flag",
+    "chave": "REVY_TRAFEGO_PUBLIC_BASE_URL (default: '')",
+    "simbolo": "REVY_TRAFEGO_PUBLIC_BASE_URL",
+    "arquivo": "app/config.py",
+    "linha": 168
+   },
+   {
+    "secao": "flag",
+    "chave": "REVY_CONTROL_WHATSAPP_MODO2_ENABLED (default: '')",
+    "simbolo": "REVY_CONTROL_WHATSAPP_MODO2_ENABLED",
+    "arquivo": "app/config.py",
+    "linha": 256
+   },
+   {
+    "secao": "flag",
+    "chave": "MULTI_WHATSAPP_ENABLED",
+    "simbolo": "MULTI_WHATSAPP_ENABLED",
+    "arquivo": "app/config.py",
+    "linha": 137
+   },
+   {
+    "secao": "flag",
+    "chave": "REVY_CONTROL_DASHBOARD_ENABLED",
+    "simbolo": "REVY_CONTROL_DASHBOARD_ENABLED",
+    "arquivo": "app/config.py",
+    "linha": 140
+   },
+   {
+    "secao": "flag",
+    "chave": "REVY_CONTROL_PROVISIONING_DELIVERY_ENABLED",
+    "simbolo": "REVY_CONTROL_PROVISIONING_DELIVERY_ENABLED",
+    "arquivo": "app/config.py",
+    "linha": 145
+   },
+   {
+    "secao": "flag",
+    "chave": "REVY_TRAFEGO_EMAIL_BACKEND (default: console)",
+    "simbolo": "REVY_TRAFEGO_EMAIL_BACKEND",
+    "arquivo": "app/config.py",
+    "linha": 153
+   },
+   {
+    "secao": "flag",
+    "chave": "REVY_TRAFEGO_META_SPEND_SYNC_ENABLED (default: 0)",
+    "simbolo": "REVY_TRAFEGO_META_SPEND_SYNC_ENABLED",
+    "arquivo": "app/config.py",
+    "linha": 83
+   },
+   {
+    "secao": "flag",
+    "chave": "REVY_TRAFEGO_CAPI_WORKER (default: 0)",
+    "simbolo": "REVY_TRAFEGO_CAPI_WORKER",
+    "arquivo": "app/config.py",
+    "linha": 87
+   },
+   {
+    "secao": "flag",
+    "chave": "REVY_CONTROL_ENABLED (default: 0)",
+    "simbolo": "REVY_CONTROL_ENABLED",
+    "arquivo": "app/config.py",
+    "linha": 91
+   },
+   {
+    "secao": "flag",
+    "chave": "REVY_CONTROL_RBAC_ENABLED (default: 0)",
+    "simbolo": "REVY_CONTROL_RBAC_ENABLED",
+    "arquivo": "app/config.py",
+    "linha": 95
+   },
+   {
+    "secao": "flag",
+    "chave": "REVY_TRAFEGO_SMTP_USE_TLS (default: 1)",
+    "simbolo": "REVY_TRAFEGO_SMTP_USE_TLS",
+    "arquivo": "app/config.py",
+    "linha": 162
+   },
+   {
+    "secao": "flag",
+    "chave": "REVY_TRAFEGO_LOJAS",
+    "simbolo": "REVY_TRAFEGO_LOJAS",
+    "arquivo": "app/config.py",
+    "linha": 245
+   },
+   {
+    "secao": "worker",
+    "chave": "GoogleAdsConversionsWorker",
+    "simbolo": "GoogleAdsConversionsWorker",
+    "arquivo": "app/control/google_ads_conversions_job.py",
+    "linha": 55
+   },
+   {
+    "secao": "worker",
+    "chave": "get_worker",
+    "simbolo": "get_worker",
+    "arquivo": "app/control/google_ads_conversions_job.py",
+    "linha": 194
+   },
+   {
+    "secao": "worker",
+    "chave": "start_worker",
+    "simbolo": "start_worker",
+    "arquivo": "app/control/google_ads_conversions_job.py",
+    "linha": 198
+   },
+   {
+    "secao": "worker",
+    "chave": "stop_worker",
+    "simbolo": "stop_worker",
+    "arquivo": "app/control/google_ads_conversions_job.py",
+    "linha": 209
+   },
+   {
+    "secao": "worker",
+    "chave": "listar_lojas_para_metrics_sync",
+    "simbolo": "listar_lojas_para_metrics_sync",
+    "arquivo": "app/control/google_ads_metrics_job.py",
+    "linha": 46
+   },
+   {
+    "secao": "worker",
+    "chave": "GoogleAdsMetricsSyncWorker",
+    "simbolo": "GoogleAdsMetricsSyncWorker",
+    "arquivo": "app/control/google_ads_metrics_job.py",
+    "linha": 82
+   },
+   {
+    "secao": "worker",
+    "chave": "get_worker",
+    "simbolo": "get_worker",
+    "arquivo": "app/control/google_ads_metrics_job.py",
+    "linha": 285
+   },
+   {
+    "secao": "worker",
+    "chave": "start_worker",
+    "simbolo": "start_worker",
+    "arquivo": "app/control/google_ads_metrics_job.py",
+    "linha": 289
+   },
+   {
+    "secao": "worker",
+    "chave": "stop_worker",
+    "simbolo": "stop_worker",
+    "arquivo": "app/control/google_ads_metrics_job.py",
+    "linha": 300
+   },
+   {
+    "secao": "worker",
+    "chave": "ProvisioningDeliveryWorker",
+    "simbolo": "ProvisioningDeliveryWorker",
+    "arquivo": "app/control/provisioning_job.py",
+    "linha": 28
+   },
+   {
+    "secao": "worker",
+    "chave": "get_worker",
+    "simbolo": "get_worker",
+    "arquivo": "app/control/provisioning_job.py",
+    "linha": 139
+   },
+   {
+    "secao": "worker",
+    "chave": "start_worker",
+    "simbolo": "start_worker",
+    "arquivo": "app/control/provisioning_job.py",
+    "linha": 143
+   },
+   {
+    "secao": "worker",
+    "chave": "stop_worker",
+    "simbolo": "stop_worker",
+    "arquivo": "app/control/provisioning_job.py",
+    "linha": 154
+   },
+   {
+    "secao": "flag",
+    "chave": "REVY_CONTROL_PROVISIONING_INTERVAL_SECONDS (default: 30.0)",
+    "simbolo": "REVY_CONTROL_PROVISIONING_INTERVAL_SECONDS",
+    "arquivo": "app/control/provisioning_job.py",
+    "linha": 45
+   },
+   {
+    "secao": "flag",
+    "chave": "REVY_CONTROL_PROVISIONING_INITIAL_DELAY_SECONDS (default: 15.0)",
+    "simbolo": "REVY_CONTROL_PROVISIONING_INITIAL_DELAY_SECONDS",
+    "arquivo": "app/control/provisioning_job.py",
+    "linha": 51
+   },
+   {
+    "secao": "flag",
+    "chave": "REVY_TRAFEGO_ENCRYPTION_KEY",
+    "simbolo": "REVY_TRAFEGO_ENCRYPTION_KEY",
+    "arquivo": "app/cripto.py",
+    "linha": 13
+   },
+   {
+    "secao": "flag",
+    "chave": "REVY_TRAFEGO_ENV",
+    "simbolo": "REVY_TRAFEGO_ENV",
+    "arquivo": "app/cripto.py",
+    "linha": 18
+   },
+   {
+    "secao": "flag",
+    "chave": "REVY_TRAFEGO_LOJAS",
+    "simbolo": "REVY_TRAFEGO_LOJAS",
+    "arquivo": "app/lojas.py",
+    "linha": 24
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /health/live",
+    "simbolo": "/health/live",
+    "arquivo": "app/main.py",
+    "linha": 330
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /health/ready",
+    "simbolo": "/health/ready",
+    "arquivo": "app/main.py",
+    "linha": 335
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /public/v1/lojas/{loja_slug}/pixel",
+    "simbolo": "/public/v1/lojas/{loja_slug}/pixel",
+    "arquivo": "app/main.py",
+    "linha": 341
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /",
+    "simbolo": "/",
+    "arquivo": "app/main.py",
+    "linha": 366
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /login",
+    "simbolo": "/login",
+    "arquivo": "app/main.py",
+    "linha": 371
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /login",
+    "simbolo": "/login",
+    "arquivo": "app/main.py",
+    "linha": 381
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /logout",
+    "simbolo": "/logout",
+    "arquivo": "app/main.py",
+    "linha": 399
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /app",
+    "simbolo": "/app",
+    "arquivo": "app/main.py",
+    "linha": 407
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /app/loja",
+    "simbolo": "/app/loja",
+    "arquivo": "app/main.py",
+    "linha": 450
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /app/trafego",
+    "simbolo": "/app/trafego",
+    "arquivo": "app/main.py",
+    "linha": 524
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /app/trafego",
+    "simbolo": "/app/trafego",
+    "arquivo": "app/main.py",
+    "linha": 551
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /app/trafego/ads/salvar",
+    "simbolo": "/app/trafego/ads/salvar",
+    "arquivo": "app/main.py",
+    "linha": 618
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /app/trafego/ads/sincronizar",
+    "simbolo": "/app/trafego/ads/sincronizar",
+    "arquivo": "app/main.py",
+    "linha": 661
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /app/trafego/capi/retentar",
+    "simbolo": "/app/trafego/capi/retentar",
+    "arquivo": "app/main.py",
+    "linha": 675
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /app/trafego/pixel-auditoria",
+    "simbolo": "/app/trafego/pixel-auditoria",
+    "arquivo": "app/main.py",
+    "linha": 689
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /app/trafego/ctwa-auditoria",
+    "simbolo": "/app/trafego/ctwa-auditoria",
+    "arquivo": "app/main.py",
+    "linha": 704
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /app/trafego/roi",
+    "simbolo": "/app/trafego/roi",
+    "arquivo": "app/main.py",
+    "linha": 738
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /app/campanhas",
+    "simbolo": "/app/campanhas",
+    "arquivo": "app/main.py",
+    "linha": 796
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /app/campanhas/nova",
+    "simbolo": "/app/campanhas/nova",
+    "arquivo": "app/main.py",
+    "linha": 855
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /app/campanhas/nova",
+    "simbolo": "/app/campanhas/nova",
+    "arquivo": "app/main.py",
+    "linha": 868
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /app/campanhas/gastos/lote",
+    "simbolo": "/app/campanhas/gastos/lote",
+    "arquivo": "app/main.py",
+    "linha": 912
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /app/campanhas/gastos/lote",
+    "simbolo": "/app/campanhas/gastos/lote",
+    "arquivo": "app/main.py",
+    "linha": 937
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /app/campanhas/gastos/csv/modelo",
+    "simbolo": "/app/campanhas/gastos/csv/modelo",
+    "arquivo": "app/main.py",
+    "linha": 998
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /app/campanhas/gastos/csv",
+    "simbolo": "/app/campanhas/gastos/csv",
+    "arquivo": "app/main.py",
+    "linha": 1011
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /app/campanhas/{campanha_id}",
+    "simbolo": "/app/campanhas/{campanha_id}",
+    "arquivo": "app/main.py",
+    "linha": 1066
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /app/campanhas/{campanha_id}/editar",
+    "simbolo": "/app/campanhas/{campanha_id}/editar",
+    "arquivo": "app/main.py",
+    "linha": 1159
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /app/campanhas/{campanha_id}/editar",
+    "simbolo": "/app/campanhas/{campanha_id}/editar",
+    "arquivo": "app/main.py",
+    "linha": 1192
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /app/campanhas/{campanha_id}/apagar",
+    "simbolo": "/app/campanhas/{campanha_id}/apagar",
+    "arquivo": "app/main.py",
+    "linha": 1236
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /app/campanhas/{campanha_id}/gastos",
+    "simbolo": "/app/campanhas/{campanha_id}/gastos",
+    "arquivo": "app/main.py",
+    "linha": 1256
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /app/diagnostico/leads",
+    "simbolo": "/app/diagnostico/leads",
+    "arquivo": "app/main.py",
+    "linha": 1296
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /app/diagnostico/leads/{lead_id}",
+    "simbolo": "/app/diagnostico/leads/{lead_id}",
+    "arquivo": "app/main.py",
+    "linha": 1337
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /app/diagnostico/conversas/{telefone}",
+    "simbolo": "/app/diagnostico/conversas/{telefone}",
+    "arquivo": "app/main.py",
+    "linha": 1368
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /internal/jobs/meta-spend-sync",
+    "simbolo": "/internal/jobs/meta-spend-sync",
+    "arquivo": "app/main.py",
+    "linha": 1423
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /internal/jobs/google-conversions-outbox",
+    "simbolo": "/internal/jobs/google-conversions-outbox",
+    "arquivo": "app/main.py",
+    "linha": 1444
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /internal/jobs/google-ads-metrics-sync",
+    "simbolo": "/internal/jobs/google-ads-metrics-sync",
+    "arquivo": "app/main.py",
+    "linha": 1467
+   },
+   {
+    "secao": "flag",
+    "chave": "REVY_TRAFEGO_SKIP_INIT",
+    "simbolo": "REVY_TRAFEGO_SKIP_INIT",
+    "arquivo": "app/main.py",
+    "linha": 90
+   },
+   {
+    "secao": "worker",
+    "chave": "env_float",
+    "simbolo": "env_float",
+    "arquivo": "app/meta_ad_resolver_job.py",
+    "linha": 40
+   },
+   {
+    "secao": "worker",
+    "chave": "env_int",
+    "simbolo": "env_int",
+    "arquivo": "app/meta_ad_resolver_job.py",
+    "linha": 47
+   },
+   {
+    "secao": "worker",
+    "chave": "mapa_ad_campaign_loja",
+    "simbolo": "mapa_ad_campaign_loja",
+    "arquivo": "app/meta_ad_resolver_job.py",
+    "linha": 63
+   },
+   {
+    "secao": "worker",
+    "chave": "contar_ads_nao_resolvidos",
+    "simbolo": "contar_ads_nao_resolvidos",
+    "arquivo": "app/meta_ad_resolver_job.py",
+    "linha": 80
+   },
+   {
+    "secao": "worker",
+    "chave": "destravar_ads_nao_resolvidos",
+    "simbolo": "destravar_ads_nao_resolvidos",
+    "arquivo": "app/meta_ad_resolver_job.py",
+    "linha": 98
+   },
+   {
+    "secao": "worker",
+    "chave": "resolver_ads_pendentes",
+    "simbolo": "resolver_ads_pendentes",
+    "arquivo": "app/meta_ad_resolver_job.py",
+    "linha": 198
+   },
+   {
+    "secao": "worker",
+    "chave": "processar_loja",
+    "simbolo": "processar_loja",
+    "arquivo": "app/meta_ad_resolver_job.py",
+    "linha": 322
+   },
+   {
+    "secao": "worker",
+    "chave": "processar_todas_lojas",
+    "simbolo": "processar_todas_lojas",
+    "arquivo": "app/meta_ad_resolver_job.py",
+    "linha": 386
+   },
+   {
+    "secao": "worker",
+    "chave": "MetaAdResolverWorker",
+    "simbolo": "MetaAdResolverWorker",
+    "arquivo": "app/meta_ad_resolver_job.py",
+    "linha": 444
+   },
+   {
+    "secao": "worker",
+    "chave": "get_worker",
+    "simbolo": "get_worker",
+    "arquivo": "app/meta_ad_resolver_job.py",
+    "linha": 549
+   },
+   {
+    "secao": "worker",
+    "chave": "start_worker",
+    "simbolo": "start_worker",
+    "arquivo": "app/meta_ad_resolver_job.py",
+    "linha": 553
+   },
+   {
+    "secao": "worker",
+    "chave": "stop_worker",
+    "simbolo": "stop_worker",
+    "arquivo": "app/meta_ad_resolver_job.py",
+    "linha": 569
+   },
+   {
+    "secao": "flag",
+    "chave": "REVY_TRAFEGO_AD_RESOLVER_MAX_TENTATIVAS",
+    "simbolo": "REVY_TRAFEGO_AD_RESOLVER_MAX_TENTATIVAS",
+    "arquivo": "app/meta_ad_resolver_job.py",
+    "linha": 56
+   },
+   {
+    "secao": "flag",
+    "chave": "REVY_TRAFEGO_AD_RESOLVER_COOLDOWN_SECONDS",
+    "simbolo": "REVY_TRAFEGO_AD_RESOLVER_COOLDOWN_SECONDS",
+    "arquivo": "app/meta_ad_resolver_job.py",
+    "linha": 57
+   },
+   {
+    "secao": "flag",
+    "chave": "REVY_TRAFEGO_AD_RESOLVER_MAX_POR_CICLO",
+    "simbolo": "REVY_TRAFEGO_AD_RESOLVER_MAX_POR_CICLO",
+    "arquivo": "app/meta_ad_resolver_job.py",
+    "linha": 58
+   },
+   {
+    "secao": "flag",
+    "chave": "REVY_TRAFEGO_AD_RESOLVER_SLEEP_ENTRE_CALLS",
+    "simbolo": "REVY_TRAFEGO_AD_RESOLVER_SLEEP_ENTRE_CALLS",
+    "arquivo": "app/meta_ad_resolver_job.py",
+    "linha": 59
+   },
+   {
+    "secao": "flag",
+    "chave": "REVY_TRAFEGO_AD_RESOLVER_INTERVAL_SECONDS (default: 3600.0)",
+    "simbolo": "REVY_TRAFEGO_AD_RESOLVER_INTERVAL_SECONDS",
+    "arquivo": "app/meta_ad_resolver_job.py",
+    "linha": 461
+   },
+   {
+    "secao": "flag",
+    "chave": "REVY_TRAFEGO_AD_RESOLVER_INITIAL_DELAY_SECONDS (default: 90.0)",
+    "simbolo": "REVY_TRAFEGO_AD_RESOLVER_INITIAL_DELAY_SECONDS",
+    "arquivo": "app/meta_ad_resolver_job.py",
+    "linha": 466
+   },
+   {
+    "secao": "worker",
+    "chave": "env_flag",
+    "simbolo": "env_flag",
+    "arquivo": "app/meta_ads_spend_job.py",
+    "linha": 20
+   },
+   {
+    "secao": "worker",
+    "chave": "env_float",
+    "simbolo": "env_float",
+    "arquivo": "app/meta_ads_spend_job.py",
+    "linha": 27
+   },
+   {
+    "secao": "worker",
+    "chave": "env_int",
+    "simbolo": "env_int",
+    "arquivo": "app/meta_ads_spend_job.py",
+    "linha": 34
+   },
+   {
+    "secao": "worker",
+    "chave": "MetaSpendSyncWorker",
+    "simbolo": "MetaSpendSyncWorker",
+    "arquivo": "app/meta_ads_spend_job.py",
+    "linha": 41
+   },
+   {
+    "secao": "worker",
+    "chave": "get_worker",
+    "simbolo": "get_worker",
+    "arquivo": "app/meta_ads_spend_job.py",
+    "linha": 148
+   },
+   {
+    "secao": "worker",
+    "chave": "start_worker",
+    "simbolo": "start_worker",
+    "arquivo": "app/meta_ads_spend_job.py",
+    "linha": 152
+   },
+   {
+    "secao": "worker",
+    "chave": "stop_worker",
+    "simbolo": "stop_worker",
+    "arquivo": "app/meta_ads_spend_job.py",
+    "linha": 161
+   },
+   {
+    "secao": "worker",
+    "chave": "MetaCapiRetryWorker",
+    "simbolo": "MetaCapiRetryWorker",
+    "arquivo": "app/meta_capi_job.py",
+    "linha": 31
+   },
+   {
+    "secao": "worker",
+    "chave": "start_worker",
+    "simbolo": "start_worker",
+    "arquivo": "app/meta_capi_job.py",
+    "linha": 122
+   },
+   {
+    "secao": "worker",
+    "chave": "stop_worker",
+    "simbolo": "stop_worker",
+    "arquivo": "app/meta_capi_job.py",
+    "linha": 131
+   },
+   {
+    "secao": "modelo",
+    "chave": "lojas",
+    "simbolo": "lojas",
+    "arquivo": "app/models.py",
+    "linha": 35
+   },
+   {
+    "secao": "modelo",
+    "chave": "modulos_revy",
+    "simbolo": "modulos_revy",
+    "arquivo": "app/models.py",
+    "linha": 76
+   },
+   {
+    "secao": "modelo",
+    "chave": "loja_modulos",
+    "simbolo": "loja_modulos",
+    "arquivo": "app/models.py",
+    "linha": 97
+   },
+   {
+    "secao": "modelo",
+    "chave": "contratos_loja",
+    "simbolo": "contratos_loja",
+    "arquivo": "app/models.py",
+    "linha": 149
+   },
+   {
+    "secao": "modelo",
+    "chave": "pessoas",
+    "simbolo": "pessoas",
+    "arquivo": "app/models.py",
+    "linha": 208
+   },
+   {
+    "secao": "modelo",
+    "chave": "cargos_loja",
+    "simbolo": "cargos_loja",
+    "arquivo": "app/models.py",
+    "linha": 224
+   },
+   {
+    "secao": "modelo",
+    "chave": "gestores_revy",
+    "simbolo": "gestores_revy",
+    "arquivo": "app/models.py",
+    "linha": 280
+   },
+   {
+    "secao": "modelo",
+    "chave": "acessos_control",
+    "simbolo": "acessos_control",
+    "arquivo": "app/models.py",
+    "linha": 294
+   },
+   {
+    "secao": "modelo",
+    "chave": "convites_acesso_control",
+    "simbolo": "convites_acesso_control",
+    "arquivo": "app/models.py",
+    "linha": 341
+   },
+   {
+    "secao": "modelo",
+    "chave": "recuperacoes_senha_control",
+    "simbolo": "recuperacoes_senha_control",
+    "arquivo": "app/models.py",
+    "linha": 386
+   },
+   {
+    "secao": "modelo",
+    "chave": "vinculos_trafego",
+    "simbolo": "vinculos_trafego",
+    "arquivo": "app/models.py",
+    "linha": 429
+   },
+   {
+    "secao": "modelo",
+    "chave": "auditoria_eventos",
+    "simbolo": "auditoria_eventos",
+    "arquivo": "app/models.py",
+    "linha": 475
+   },
+   {
+    "secao": "modelo",
+    "chave": "gestor_audit_log",
+    "simbolo": "gestor_audit_log",
+    "arquivo": "app/models.py",
+    "linha": 508
+   },
+   {
+    "secao": "modelo",
+    "chave": "vendas_projetadas",
+    "simbolo": "vendas_projetadas",
+    "arquivo": "app/models.py",
+    "linha": 521
+   },
+   {
+    "secao": "modelo",
+    "chave": "meta_pixel_config",
+    "simbolo": "meta_pixel_config",
+    "arquivo": "app/models.py",
+    "linha": 562
+   },
+   {
+    "secao": "modelo",
+    "chave": "meta_ads_config",
+    "simbolo": "meta_ads_config",
+    "arquivo": "app/models.py",
+    "linha": 581
+   },
+   {
+    "secao": "modelo",
+    "chave": "pixel_capi_auditoria",
+    "simbolo": "pixel_capi_auditoria",
+    "arquivo": "app/models.py",
+    "linha": 600
+   },
+   {
+    "secao": "modelo",
+    "chave": "meta_capi_outbox",
+    "simbolo": "meta_capi_outbox",
+    "arquivo": "app/models.py",
+    "linha": 630
+   },
+   {
+    "secao": "modelo",
+    "chave": "campanhas",
+    "simbolo": "campanhas",
+    "arquivo": "app/models.py",
+    "linha": 658
+   },
+   {
+    "secao": "modelo",
+    "chave": "campanha_anuncios",
+    "simbolo": "campanha_anuncios",
+    "arquivo": "app/models.py",
+    "linha": 692
+   },
+   {
+    "secao": "modelo",
+    "chave": "meta_ad_campanha",
+    "simbolo": "meta_ad_campanha",
+    "arquivo": "app/models.py",
+    "linha": 711
+   },
+   {
+    "secao": "modelo",
+    "chave": "campanha_gastos",
+    "simbolo": "campanha_gastos",
+    "arquivo": "app/models.py",
+    "linha": 732
+   },
+   {
+    "secao": "modelo",
+    "chave": "control_provisioning_outbox",
+    "simbolo": "control_provisioning_outbox",
+    "arquivo": "app/models.py",
+    "linha": 757
+   },
+   {
+    "secao": "modelo",
+    "chave": "google_ads_connections",
+    "simbolo": "google_ads_connections",
+    "arquivo": "app/models.py",
+    "linha": 794
+   },
+   {
+    "secao": "modelo",
+    "chave": "google_ads_oauth_states",
+    "simbolo": "google_ads_oauth_states",
+    "arquivo": "app/models.py",
+    "linha": 832
+   },
+   {
+    "secao": "modelo",
+    "chave": "google_ads_accounts",
+    "simbolo": "google_ads_accounts",
+    "arquivo": "app/models.py",
+    "linha": 858
+   },
+   {
+    "secao": "modelo",
+    "chave": "google_ads_campaign_daily",
+    "simbolo": "google_ads_campaign_daily",
+    "arquivo": "app/models.py",
+    "linha": 900
+   },
+   {
+    "secao": "modelo",
+    "chave": "google_ads_conversion_bindings",
+    "simbolo": "google_ads_conversion_bindings",
+    "arquivo": "app/models.py",
+    "linha": 955
+   },
+   {
+    "secao": "modelo",
+    "chave": "google_ads_conversion_outbox",
+    "simbolo": "google_ads_conversion_outbox",
+    "arquivo": "app/models.py",
+    "linha": 983
+   },
+   {
+    "secao": "modelo",
+    "chave": "google_ads_upload_attempts",
+    "simbolo": "google_ads_upload_attempts",
+    "arquivo": "app/models.py",
+    "linha": 1032
+   },
+   {
+    "secao": "modelo",
+    "chave": "readiness_alert_acceptances",
+    "simbolo": "readiness_alert_acceptances",
+    "arquivo": "app/models.py",
+    "linha": 1065
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /acessos",
+    "simbolo": "/acessos",
+    "arquivo": "app/web/control.py",
+    "linha": 437
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /acessos/{acesso_id}/desativar",
+    "simbolo": "/acessos/{acesso_id}/desativar",
+    "arquivo": "app/web/control.py",
+    "linha": 446
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /acessos/{acesso_id}/reativar",
+    "simbolo": "/acessos/{acesso_id}/reativar",
+    "arquivo": "app/web/control.py",
+    "linha": 458
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /convites",
+    "simbolo": "/convites",
+    "arquivo": "app/web/control.py",
+    "linha": 470
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /convites/ativar",
+    "simbolo": "/convites/ativar",
+    "arquivo": "app/web/control.py",
+    "linha": 488
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /recuperacoes",
+    "simbolo": "/recuperacoes",
+    "arquivo": "app/web/control.py",
+    "linha": 499
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /recuperacoes/consumir",
+    "simbolo": "/recuperacoes/consumir",
+    "arquivo": "app/web/control.py",
+    "linha": 514
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /pessoas",
+    "simbolo": "/pessoas",
+    "arquivo": "app/web/control.py",
+    "linha": 530
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /pessoas",
+    "simbolo": "/pessoas",
+    "arquivo": "app/web/control.py",
+    "linha": 545
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /pessoas/{pessoa_id}",
+    "simbolo": "/pessoas/{pessoa_id}",
+    "arquivo": "app/web/control.py",
+    "linha": 559
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /lojas",
+    "simbolo": "/lojas",
+    "arquivo": "app/web/control.py",
+    "linha": 574
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /lojas",
+    "simbolo": "/lojas",
+    "arquivo": "app/web/control.py",
+    "linha": 580
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /lojas/{loja_id}",
+    "simbolo": "/lojas/{loja_id}",
+    "arquivo": "app/web/control.py",
+    "linha": 595
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /dashboard",
+    "simbolo": "/dashboard",
+    "arquivo": "app/web/control.py",
+    "linha": 607
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /lojas/{loja_id}/prontidao",
+    "simbolo": "/lojas/{loja_id}/prontidao",
+    "arquivo": "app/web/control.py",
+    "linha": 614
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /lojas/{loja_id}/prontidao/alertas/{check_code}/aceitar",
+    "simbolo": "/lojas/{loja_id}/prontidao/alertas/{check_code}/aceitar",
+    "arquivo": "app/web/control.py",
+    "linha": 629
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /lojas/{loja_id}/integracoes",
+    "simbolo": "/lojas/{loja_id}/integracoes",
+    "arquivo": "app/web/control.py",
+    "linha": 648
+   },
+   {
+    "secao": "rota",
+    "chave": "PUT /lojas/{loja_id}/integracoes/pixel",
+    "simbolo": "/lojas/{loja_id}/integracoes/pixel",
+    "arquivo": "app/web/control.py",
+    "linha": 663
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /lojas/{loja_id}/integracoes/pixel/desconectar",
+    "simbolo": "/lojas/{loja_id}/integracoes/pixel/desconectar",
+    "arquivo": "app/web/control.py",
+    "linha": 687
+   },
+   {
+    "secao": "rota",
+    "chave": "PUT /lojas/{loja_id}/integracoes/meta-ads",
+    "simbolo": "/lojas/{loja_id}/integracoes/meta-ads",
+    "arquivo": "app/web/control.py",
+    "linha": 705
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /lojas/{loja_id}/integracoes/meta-ads/desconectar",
+    "simbolo": "/lojas/{loja_id}/integracoes/meta-ads/desconectar",
+    "arquivo": "app/web/control.py",
+    "linha": 726
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /lojas/{loja_id}/whatsapp-canais",
+    "simbolo": "/lojas/{loja_id}/whatsapp-canais",
+    "arquivo": "app/web/control.py",
+    "linha": 786
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /lojas/{loja_id}/whatsapp-canais",
+    "simbolo": "/lojas/{loja_id}/whatsapp-canais",
+    "arquivo": "app/web/control.py",
+    "linha": 802
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /lojas/{loja_id}/whatsapp-canais/{canal_id}/connect",
+    "simbolo": "/lojas/{loja_id}/whatsapp-canais/{canal_id}/connect",
+    "arquivo": "app/web/control.py",
+    "linha": 822
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /lojas/{loja_id}/whatsapp-canais/{canal_id}/disconnect",
+    "simbolo": "/lojas/{loja_id}/whatsapp-canais/{canal_id}/disconnect",
+    "arquivo": "app/web/control.py",
+    "linha": 845
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /lojas/{loja_id}/whatsapp-canais/{canal_id}/inativar",
+    "simbolo": "/lojas/{loja_id}/whatsapp-canais/{canal_id}/inativar",
+    "arquivo": "app/web/control.py",
+    "linha": 862
+   },
+   {
+    "secao": "rota",
+    "chave": "PATCH /lojas/{loja_id}",
+    "simbolo": "/lojas/{loja_id}",
+    "arquivo": "app/web/control.py",
+    "linha": 896
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /lojas/{loja_id}/modulos",
+    "simbolo": "/lojas/{loja_id}/modulos",
+    "arquivo": "app/web/control.py",
+    "linha": 915
+   },
+   {
+    "secao": "rota",
+    "chave": "PUT /lojas/{loja_id}/modulos",
+    "simbolo": "/lojas/{loja_id}/modulos",
+    "arquivo": "app/web/control.py",
+    "linha": 930
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /lojas/{loja_id}/modulos/{modulo}/suspender",
+    "simbolo": "/lojas/{loja_id}/modulos/{modulo}/suspender",
+    "arquivo": "app/web/control.py",
+    "linha": 947
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /lojas/{loja_id}/modulos/{modulo}/reativar",
+    "simbolo": "/lojas/{loja_id}/modulos/{modulo}/reativar",
+    "arquivo": "app/web/control.py",
+    "linha": 966
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /lojas/{loja_id}/contrato",
+    "simbolo": "/lojas/{loja_id}/contrato",
+    "arquivo": "app/web/control.py",
+    "linha": 985
+   },
+   {
+    "secao": "rota",
+    "chave": "PUT /lojas/{loja_id}/contrato",
+    "simbolo": "/lojas/{loja_id}/contrato",
+    "arquivo": "app/web/control.py",
+    "linha": 1000
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /imports/portal-usuarios",
+    "simbolo": "/imports/portal-usuarios",
+    "arquivo": "app/web/control.py",
+    "linha": 1023
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /lojas/{loja_id}/cargos",
+    "simbolo": "/lojas/{loja_id}/cargos",
+    "arquivo": "app/web/control.py",
+    "linha": 1047
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /lojas/{loja_id}/cargos",
+    "simbolo": "/lojas/{loja_id}/cargos",
+    "arquivo": "app/web/control.py",
+    "linha": 1067
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /lojas/{loja_id}/cargos/{cargo_id}/revogar",
+    "simbolo": "/lojas/{loja_id}/cargos/{cargo_id}/revogar",
+    "arquivo": "app/web/control.py",
+    "linha": 1082
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /lojas/{loja_id}/estado",
+    "simbolo": "/lojas/{loja_id}/estado",
+    "arquivo": "app/web/control.py",
+    "linha": 1103
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /lojas/{loja_id}/gestores",
+    "simbolo": "/lojas/{loja_id}/gestores",
+    "arquivo": "app/web/control.py",
+    "linha": 1123
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /lojas/{loja_id}/gestores/{gestor_id}/revogar",
+    "simbolo": "/lojas/{loja_id}/gestores/{gestor_id}/revogar",
+    "arquivo": "app/web/control.py",
+    "linha": 1143
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /lojas/{loja_id}/auditoria",
+    "simbolo": "/lojas/{loja_id}/auditoria",
+    "arquivo": "app/web/control.py",
+    "linha": 1164
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /lojas/{loja_id}/google-ads/oauth/start",
+    "simbolo": "/lojas/{loja_id}/google-ads/oauth/start",
+    "arquivo": "app/web/control.py",
+    "linha": 1180
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /google-ads/oauth/callback",
+    "simbolo": "/google-ads/oauth/callback",
+    "arquivo": "app/web/control.py",
+    "linha": 1202
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /lojas/{loja_id}/google-ads/connection",
+    "simbolo": "/lojas/{loja_id}/google-ads/connection",
+    "arquivo": "app/web/control.py",
+    "linha": 1221
+   },
+   {
+    "secao": "rota",
+    "chave": "DELETE /lojas/{loja_id}/google-ads/connection",
+    "simbolo": "/lojas/{loja_id}/google-ads/connection",
+    "arquivo": "app/web/control.py",
+    "linha": 1239
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /lojas/{loja_id}/google-ads/accounts",
+    "simbolo": "/lojas/{loja_id}/google-ads/accounts",
+    "arquivo": "app/web/control.py",
+    "linha": 1288
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /lojas/{loja_id}/google-ads/accounts/sync",
+    "simbolo": "/lojas/{loja_id}/google-ads/accounts/sync",
+    "arquivo": "app/web/control.py",
+    "linha": 1306
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /lojas/{loja_id}/google-ads/accounts/{customer_id}/select",
+    "simbolo": "/lojas/{loja_id}/google-ads/accounts/{customer_id}/select",
+    "arquivo": "app/web/control.py",
+    "linha": 1324
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /lojas/{loja_id}/google-ads/metrics/sync",
+    "simbolo": "/lojas/{loja_id}/google-ads/metrics/sync",
+    "arquivo": "app/web/control.py",
+    "linha": 1344
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /lojas/{loja_id}/google-ads/metrics/summary",
+    "simbolo": "/lojas/{loja_id}/google-ads/metrics/summary",
+    "arquivo": "app/web/control.py",
+    "linha": 1365
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /internal/lojas/{loja_id}/aquisicao-resumo",
+    "simbolo": "/internal/lojas/{loja_id}/aquisicao-resumo",
+    "arquivo": "app/web/control.py",
+    "linha": 1387
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /lojas/{loja_id}/google-ads/conversion-actions",
+    "simbolo": "/lojas/{loja_id}/google-ads/conversion-actions",
+    "arquivo": "app/web/control.py",
+    "linha": 1409
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /lojas/{loja_id}/google-ads/conversion-bindings",
+    "simbolo": "/lojas/{loja_id}/google-ads/conversion-bindings",
+    "arquivo": "app/web/control.py",
+    "linha": 1430
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /lojas/{loja_id}/google-ads/conversion-bindings",
+    "simbolo": "/lojas/{loja_id}/google-ads/conversion-bindings",
+    "arquivo": "app/web/control.py",
+    "linha": 1448
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /app/control/convite/aceitar",
+    "simbolo": "/app/control/convite/aceitar",
+    "arquivo": "app/web/control_ui.py",
+    "linha": 118
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /app/control/convite/aceitar",
+    "simbolo": "/app/control/convite/aceitar",
+    "arquivo": "app/web/control_ui.py",
+    "linha": 133
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /app/control/dashboard",
+    "simbolo": "/app/control/dashboard",
+    "arquivo": "app/web/control_ui.py",
+    "linha": 350
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /app/control/integracoes",
+    "simbolo": "/app/control/integracoes",
+    "arquivo": "app/web/control_ui.py",
+    "linha": 406
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /app/control/lojas",
+    "simbolo": "/app/control/lojas",
+    "arquivo": "app/web/control_ui.py",
+    "linha": 444
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /app/control/acessos",
+    "simbolo": "/app/control/acessos",
+    "arquivo": "app/web/control_ui.py",
+    "linha": 457
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /app/control/lojas",
+    "simbolo": "/app/control/lojas",
+    "arquivo": "app/web/control_ui.py",
+    "linha": 495
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /app/control/lojas/{loja_id}",
+    "simbolo": "/app/control/lojas/{loja_id}",
+    "arquivo": "app/web/control_ui.py",
+    "linha": 574
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /control/v1/lojas/{loja_id}/integracoes/health",
+    "simbolo": "/control/v1/lojas/{loja_id}/integracoes/health",
+    "arquivo": "app/web/control_ui.py",
+    "linha": 611
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /app/control/lojas/{loja_id}/excluir",
+    "simbolo": "/app/control/lojas/{loja_id}/excluir",
+    "arquivo": "app/web/control_ui.py",
+    "linha": 659
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /app/control/lojas/{loja_id}/modulos",
+    "simbolo": "/app/control/lojas/{loja_id}/modulos",
+    "arquivo": "app/web/control_ui.py",
+    "linha": 709
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /app/control/lojas/{loja_id}/contrato",
+    "simbolo": "/app/control/lojas/{loja_id}/contrato",
+    "arquivo": "app/web/control_ui.py",
+    "linha": 757
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /app/control/lojas/{loja_id}/cargos",
+    "simbolo": "/app/control/lojas/{loja_id}/cargos",
+    "arquivo": "app/web/control_ui.py",
+    "linha": 842
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /app/control/lojas/{loja_id}/cargos/{cargo_id}/revogar",
+    "simbolo": "/app/control/lojas/{loja_id}/cargos/{cargo_id}/revogar",
+    "arquivo": "app/web/control_ui.py",
+    "linha": 990
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /app/control/lojas/{loja_id}/estado",
+    "simbolo": "/app/control/lojas/{loja_id}/estado",
+    "arquivo": "app/web/control_ui.py",
+    "linha": 1042
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /app/control/lojas/{loja_id}/whatsapp-modo",
+    "simbolo": "/app/control/lojas/{loja_id}/whatsapp-modo",
+    "arquivo": "app/web/control_ui.py",
+    "linha": 1106
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /app/control/lojas/{loja_id}/gestores",
+    "simbolo": "/app/control/lojas/{loja_id}/gestores",
+    "arquivo": "app/web/control_ui.py",
+    "linha": 1156
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /app/control/lojas/{loja_id}/gestores/convidar",
+    "simbolo": "/app/control/lojas/{loja_id}/gestores/convidar",
+    "arquivo": "app/web/control_ui.py",
+    "linha": 1220
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /app/control/lojas/{loja_id}/gestores/revogar",
+    "simbolo": "/app/control/lojas/{loja_id}/gestores/revogar",
+    "arquivo": "app/web/control_ui.py",
+    "linha": 1290
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /app/control/lojas/{loja_id}/gestores/{gestor_id}/revogar",
+    "simbolo": "/app/control/lojas/{loja_id}/gestores/{gestor_id}/revogar",
+    "arquivo": "app/web/control_ui.py",
+    "linha": 1294
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /app/control/lojas/{loja_id}/google-ads/oauth/start",
+    "simbolo": "/app/control/lojas/{loja_id}/google-ads/oauth/start",
+    "arquivo": "app/web/control_ui.py",
+    "linha": 1346
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /app/control/lojas/{loja_id}/google-ads/desconectar",
+    "simbolo": "/app/control/lojas/{loja_id}/google-ads/desconectar",
+    "arquivo": "app/web/control_ui.py",
+    "linha": 1396
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /app/control/lojas/{loja_id}/google-ads/accounts/sync",
+    "simbolo": "/app/control/lojas/{loja_id}/google-ads/accounts/sync",
+    "arquivo": "app/web/control_ui.py",
+    "linha": 1449
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /app/control/lojas/{loja_id}/google-ads/accounts/select",
+    "simbolo": "/app/control/lojas/{loja_id}/google-ads/accounts/select",
+    "arquivo": "app/web/control_ui.py",
+    "linha": 1502
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /app/control/lojas/{loja_id}/google-ads/conversion-bindings",
+    "simbolo": "/app/control/lojas/{loja_id}/google-ads/conversion-bindings",
+    "arquivo": "app/web/control_ui.py",
+    "linha": 1575
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /app/control/lojas/{loja_id}/google-ads/metrics/sync",
+    "simbolo": "/app/control/lojas/{loja_id}/google-ads/metrics/sync",
+    "arquivo": "app/web/control_ui.py",
+    "linha": 1654
+   },
+   {
+    "secao": "template",
+    "chave": "app/templates/base.html",
+    "simbolo": "base.html",
+    "arquivo": "app/templates/base.html",
+    "linha": 0
+   },
+   {
+    "secao": "template",
+    "chave": "app/templates/campanhas/detalhe.html",
+    "simbolo": "campanhas/detalhe.html",
+    "arquivo": "app/main.py",
+    "linha": 1136
+   },
+   {
+    "secao": "template",
+    "chave": "app/templates/campanhas/form.html",
+    "simbolo": "campanhas/form.html",
+    "arquivo": "app/main.py",
+    "linha": 861
+   },
+   {
+    "secao": "template",
+    "chave": "app/templates/campanhas/gastos_lote.html",
+    "simbolo": "campanhas/gastos_lote.html",
+    "arquivo": "app/main.py",
+    "linha": 924
+   },
+   {
+    "secao": "template",
+    "chave": "app/templates/campanhas/lista.html",
+    "simbolo": "campanhas/lista.html",
+    "arquivo": "app/main.py",
+    "linha": 828
+   },
+   {
+    "secao": "template",
+    "chave": "app/templates/control/acessos.html",
+    "simbolo": "control/acessos.html",
+    "arquivo": "app/web/control_ui.py",
+    "linha": 482
+   },
+   {
+    "secao": "template",
+    "chave": "app/templates/control/convite_aceitar.html",
+    "simbolo": "control/convite_aceitar.html",
+    "arquivo": "app/web/control_ui.py",
+    "linha": 128
+   },
+   {
+    "secao": "template",
+    "chave": "app/templates/control/dashboard.html",
+    "simbolo": "control/dashboard.html",
+    "arquivo": "app/web/control_ui.py",
+    "linha": 387
+   },
+   {
+    "secao": "template",
+    "chave": "app/templates/control/integracoes.html",
+    "simbolo": "control/integracoes.html",
+    "arquivo": "app/web/control_ui.py",
+    "linha": 431
+   },
+   {
+    "secao": "template",
+    "chave": "app/templates/control/loja_detail.html",
+    "simbolo": "control/loja_detail.html",
+    "arquivo": "app/web/control_ui.py",
+    "linha": 2113
+   },
+   {
+    "secao": "template",
+    "chave": "app/templates/control/lojas.html",
+    "simbolo": "control/lojas.html",
+    "arquivo": "app/web/control_ui.py",
+    "linha": 1811
+   },
+   {
+    "secao": "template",
+    "chave": "app/templates/diagnostico/conversa.html",
+    "simbolo": "diagnostico/conversa.html",
+    "arquivo": "app/main.py",
+    "linha": 1400
+   },
+   {
+    "secao": "template",
+    "chave": "app/templates/diagnostico/lead_detalhe.html",
+    "simbolo": "diagnostico/lead_detalhe.html",
+    "arquivo": "app/main.py",
+    "linha": 1363
+   },
+   {
+    "secao": "template",
+    "chave": "app/templates/diagnostico/leads.html",
+    "simbolo": "diagnostico/leads.html",
+    "arquivo": "app/main.py",
+    "linha": 1332
+   },
+   {
+    "secao": "template",
+    "chave": "app/templates/home.html",
+    "simbolo": "home.html",
+    "arquivo": "app/main.py",
+    "linha": 440
+   },
+   {
+    "secao": "template",
+    "chave": "app/templates/login.html",
+    "simbolo": "login.html",
+    "arquivo": "app/main.py",
+    "linha": 376
+   },
+   {
+    "secao": "template",
+    "chave": "app/templates/trafego/ctwa_auditoria.html",
+    "simbolo": "trafego/ctwa_auditoria.html",
+    "arquivo": "app/main.py",
+    "linha": 726
+   },
+   {
+    "secao": "template",
+    "chave": "app/templates/trafego/form.html",
+    "simbolo": "trafego/form.html",
+    "arquivo": "app/main.py",
+    "linha": 538
+   },
+   {
+    "secao": "template",
+    "chave": "app/templates/trafego/pixel_auditoria.html",
+    "simbolo": "trafego/pixel_auditoria.html",
+    "arquivo": "app/main.py",
+    "linha": 699
+   },
+   {
+    "secao": "template",
+    "chave": "app/templates/trafego/roi.html",
+    "simbolo": "trafego/roi.html",
+    "arquivo": "app/main.py",
+    "linha": 775
+   },
+   {
+    "secao": "migration",
+    "chave": "0001_revy_trafego_baseline",
+    "simbolo": "0001_revy_trafego_baseline",
+    "arquivo": "alembic/versions/0001_revy_trafego_baseline.py",
+    "linha": 0
+   },
+   {
+    "secao": "migration",
+    "chave": "0002_revy_control_lojas_rbac",
+    "simbolo": "0002_revy_control_lojas_rbac",
+    "arquivo": "alembic/versions/0002_revy_control_lojas_rbac.py",
+    "linha": 0
+   },
+   {
+    "secao": "migration",
+    "chave": "0003_revy_control_pessoas_cargos",
+    "simbolo": "0003_revy_control_pessoas_cargos",
+    "arquivo": "alembic/versions/0003_revy_control_pessoas_cargos.py",
+    "linha": 0
+   },
+   {
+    "secao": "migration",
+    "chave": "0004_revy_control_acessos_control",
+    "simbolo": "0004_revy_control_acessos_control",
+    "arquivo": "alembic/versions/0004_revy_control_acessos_control.py",
+    "linha": 0
+   },
+   {
+    "secao": "migration",
+    "chave": "0005_revy_control_convites",
+    "simbolo": "0005_revy_control_convites",
+    "arquivo": "alembic/versions/0005_revy_control_convites.py",
+    "linha": 0
+   },
+   {
+    "secao": "migration",
+    "chave": "0006_revy_control_recuperacoes",
+    "simbolo": "0006_revy_control_recuperacoes",
+    "arquivo": "alembic/versions/0006_revy_control_recuperacoes.py",
+    "linha": 0
+   },
+   {
+    "secao": "migration",
+    "chave": "0007_revy_control_portfolio",
+    "simbolo": "0007_revy_control_portfolio",
+    "arquivo": "alembic/versions/0007_revy_control_portfolio.py",
+    "linha": 0
+   },
+   {
+    "secao": "migration",
+    "chave": "0008_revy_control_loja_versao",
+    "simbolo": "0008_revy_control_loja_versao",
+    "arquivo": "alembic/versions/0008_revy_control_loja_versao.py",
+    "linha": 0
+   },
+   {
+    "secao": "migration",
+    "chave": "0009_revy_control_provisioning_outbox",
+    "simbolo": "0009_revy_control_provisioning_outbox",
+    "arquivo": "alembic/versions/0009_revy_control_provisioning_outbox.py",
+    "linha": 0
+   },
+   {
+    "secao": "migration",
+    "chave": "0010_revy_control_google_ads_connections",
+    "simbolo": "0010_revy_control_google_ads_connections",
+    "arquivo": "alembic/versions/0010_revy_control_google_ads_connections.py",
+    "linha": 0
+   },
+   {
+    "secao": "migration",
+    "chave": "0011_revy_control_google_ads_metrics",
+    "simbolo": "0011_revy_control_google_ads_metrics",
+    "arquivo": "alembic/versions/0011_revy_control_google_ads_metrics.py",
+    "linha": 0
+   },
+   {
+    "secao": "migration",
+    "chave": "0012_revy_control_google_ads_conversions",
+    "simbolo": "0012_revy_control_google_ads_conversions",
+    "arquivo": "alembic/versions/0012_revy_control_google_ads_conversions.py",
+    "linha": 0
+   },
+   {
+    "secao": "migration",
+    "chave": "0013_revy_control_readiness_alert_acceptances",
+    "simbolo": "0013_revy_control_readiness_alert_acceptances",
+    "arquivo": "alembic/versions/0013_revy_control_readiness_alert_acceptances.py",
+    "linha": 0
+   },
+   {
+    "secao": "migration",
+    "chave": "0014_campanha_anuncios",
+    "simbolo": "0014_campanha_anuncios",
+    "arquivo": "alembic/versions/0014_campanha_anuncios.py",
+    "linha": 0
+   },
+   {
+    "secao": "migration",
+    "chave": "0015_meta_ad_campanha",
+    "simbolo": "0015_meta_ad_campanha",
+    "arquivo": "alembic/versions/0015_meta_ad_campanha.py",
+    "linha": 0
+   },
+   {
+    "secao": "migration",
+    "chave": "0016_meta_ad_ultima_tentativa",
+    "simbolo": "0016_meta_ad_ultima_tentativa",
+    "arquivo": "alembic/versions/0016_meta_ad_ultima_tentativa.py",
+    "linha": 0
+   },
+   {
+    "secao": "migration",
+    "chave": "0017_vendas_projetadas_backfill_loja_id",
+    "simbolo": "0017_vendas_projetadas_backfill_loja_id",
+    "arquivo": "alembic/versions/0017_vendas_projetadas_backfill_loja_id.py",
+    "linha": 0
+   },
+   {
+    "secao": "migration",
+    "chave": "0018_copiloto_modulo",
+    "simbolo": "0018_copiloto_modulo",
+    "arquivo": "alembic/versions/0018_copiloto_modulo.py",
+    "linha": 0
+   },
+   {
+    "secao": "migration",
+    "chave": "0019_financeiro_modulo",
+    "simbolo": "0019_financeiro_modulo",
+    "arquivo": "alembic/versions/0019_financeiro_modulo.py",
+    "linha": 0
+   },
+   {
+    "secao": "migration",
+    "chave": "0020_loja_whatsapp_modo",
+    "simbolo": "0020_loja_whatsapp_modo",
+    "arquivo": "alembic/versions/0020_loja_whatsapp_modo.py",
+    "linha": 0
+   }
+  ],
+  "catalogo-publico": [
+   {
+    "secao": "flag",
+    "chave": "REVY_TRAFEGO_PUBLIC_URL",
+    "simbolo": "REVY_TRAFEGO_PUBLIC_URL",
+    "arquivo": "app/config.py",
+    "linha": 53
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /",
+    "simbolo": "/",
+    "arquivo": "app/main.py",
+    "linha": 277
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /health/live",
+    "simbolo": "/health/live",
+    "arquivo": "app/main.py",
+    "linha": 284
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /health/ready",
+    "simbolo": "/health/ready",
+    "arquivo": "app/main.py",
+    "linha": 289
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /version",
+    "simbolo": "/version",
+    "arquivo": "app/main.py",
+    "linha": 297
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /internal/v1/provisioning/state",
+    "simbolo": "/internal/v1/provisioning/state",
+    "arquivo": "app/main.py",
+    "linha": 302
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /l/{slug}",
+    "simbolo": "/l/{slug}",
+    "arquivo": "app/main.py",
+    "linha": 348
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /l/{slug}/veiculos/{vehicle_id}",
+    "simbolo": "/l/{slug}/veiculos/{vehicle_id}",
+    "arquivo": "app/main.py",
+    "linha": 460
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /l/{slug}/interesse/{vehicle_id}",
+    "simbolo": "/l/{slug}/interesse/{vehicle_id}",
+    "arquivo": "app/main.py",
+    "linha": 525
+   },
+   {
+    "secao": "worker",
+    "chave": "OutboxWorker",
+    "simbolo": "OutboxWorker",
+    "arquivo": "app/outbox.py",
+    "linha": 73
+   },
+   {
+    "secao": "template",
+    "chave": "app/templates/base.html",
+    "simbolo": "base.html",
+    "arquivo": "app/templates/base.html",
+    "linha": 0
+   },
+   {
+    "secao": "template",
+    "chave": "app/templates/error.html",
+    "simbolo": "error.html",
+    "arquivo": "app/main.py",
+    "linha": 195
+   },
+   {
+    "secao": "template",
+    "chave": "app/templates/storefront.html",
+    "simbolo": "storefront.html",
+    "arquivo": "app/main.py",
+    "linha": 439
+   },
+   {
+    "secao": "template",
+    "chave": "app/templates/vehicle.html",
+    "simbolo": "vehicle.html",
+    "arquivo": "app/main.py",
+    "linha": 512
+   }
+  ]
+ }
+}
