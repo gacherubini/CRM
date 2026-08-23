@@ -94,12 +94,20 @@ Vocabulário: [`../../CONTEXT.md`](../../CONTEXT.md). As-built Control/Loja:
   residencial: design aprovado, sem código; gate é o probe no PC.
 - **Prod `app2037` (piloto):** secrets de shell, entitlements, atendimento e WhatsApp
   Loja **ON**; redirect legado **OFF**; Copiloto **OFF** no código até ops ligar.
+- **Skill `revy-research` (23/08):** existe em `.claude/skills/revy-research/`. Dá ao agente
+  `arquivo:linha` de rota, modelo, worker, migration, flag e template dos 6 produtos sem abrir
+  `main.py` inteiro, mais `learnings/` e `decisoes/` (o que o dono já recusou). O `mapa/` é
+  **gerado e commitado junto com o código** — nunca editado à mão. Mexeu em rota, modelo,
+  worker, migration ou flag? regere e commite no mesmo commit (`AGENTS.md` §6):
+  `cd .claude/skills/revy-research && python gerar_mapa.py` (Windows) ou `python3 gerar_mapa.py`
+  (macOS), ~8s; `--verificar` reabre cada `arquivo:linha` e sai 1 se o mapa mentir.
 
 ## Fontes da verdade
 
 | Tema | Abrir |
 |---|---|
 | Fila de código | `docs/fila/README.md` |
+| Onde mora um símbolo (rota, modelo, worker, flag) | `.claude/skills/revy-research/mapa/<produto>.md` |
 | As-built Control/Loja | `docs/referencia-viva/design/2026-07-30-revy-control-loja-asbuilt-e-melhorias.md` |
 | Ops recente | `docs/referencia-viva/handoff-contexto.md` |
 | UX aceita e recusada | `docs/referencia-viva/2026-08-07-triagem-revisao-ux-loja-control.md` |

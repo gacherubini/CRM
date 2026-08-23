@@ -8,7 +8,7 @@
 
 **Tech Stack:** Python 3 stdlib apenas (`ast`, `pathlib`, `json`, `unittest`, `subprocess` para git). Sem dependência, sem `.venv`, sem importar o `app` de nenhum produto.
 
-**Spec:** [`docs/referencia-viva/specs/2026-08-23-skill-revy-research-design.md`](../referencia-viva/specs/2026-08-23-skill-revy-research-design.md)
+**Spec:** [`docs/referencia-viva/specs/2026-08-23-skill-revy-research-design.md`](../specs/2026-08-23-skill-revy-research-design.md)
 
 ## Global Constraints
 
