@@ -109,14 +109,33 @@ git check-ignore -v .claude/settings.local.json         ; echo "settings -> exit
 
 Esperado: `skills -> exit 1` (não ignorado, que é o que queremos) e `settings -> exit 0` com a linha `.claude/*` (segue ignorado, que também é o que queremos).
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 5: Commit — separando a linha do dono**
+
+`git add .gitignore` estagia o arquivo **inteiro**, e o `.gitignore` tem a linha 37 do dono (`deploy/fly/3vm/workflow-cloud.ready.json`) ainda não commitada. Commitar junto viola a Global Constraint. Como as duas mudanças estão em regiões diferentes do arquivo, dá para separá-las com `stash`:
+
+```bash
+git stash push -m "linha 37 do dono" -- .gitignore   # tira a mudanca do dono
+grep -n "^\.claude" .gitignore                        # confirma: voltou a `.claude/`
+```
+
+Agora refaça **só** a troca do Step 3 (o `stash` desfez também a sua), e commite:
 
 ```bash
 git add .gitignore
 git commit -m "chore(git): versionar .claude/skills/ mantendo o resto de .claude ignorado"
+git stash pop                                        # devolve a linha 37 ao dono
 ```
 
-Se `git status --short` mostrar que o `.gitignore` ainda tem alteração pendente, é a linha 37 do dono. Deixe pendente.
+Conferência obrigatória — as duas coisas têm que ser verdade ao mesmo tempo:
+
+```bash
+git show --stat HEAD | grep gitignore
+git diff .gitignore
+```
+
+Esperado: o commit toca `.gitignore` com **2 inserções e 1 remoção** (só a sua troca), e o `git diff` ainda mostra a linha do dono como pendente. Se o `stash pop` der conflito, a linha do dono **não** se perdeu — está em `git stash list`; resolva à mão deixando as duas mudanças no arquivo.
+
+Se o `git diff .gitignore` sair vazio, você commitou a linha do dono junto: desfaça com `git reset --soft HEAD~1` e refaça.
 
 ---
 
