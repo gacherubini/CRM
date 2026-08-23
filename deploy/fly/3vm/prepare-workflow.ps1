@@ -1,5 +1,5 @@
 param(
-  [ValidateSet("production", "test")]
+  [ValidateSet("production", "test", "cloud")]
   [string]$Mode = "production"
 )
 
@@ -10,15 +10,17 @@ $root = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
 if (-not (Test-Path (Join-Path $root "n8n\workflow-ai-nao-salvos.json"))) {
   $root = (Get-Location).Path
 }
-$canonicalName = if ($Mode -eq "test") {
-  "workflow-teste-numero-autorizado.json"
-} else {
-  "workflow-ai-nao-salvos.json"
+# cloud = Modo 2 (Cloud API da Meta). O canonico e GERADO por
+# n8n/fork_cloud_workflow.py — nao editar a mao.
+$canonicalName = switch ($Mode) {
+  "test"  { "workflow-teste-numero-autorizado.json" }
+  "cloud" { "workflow-cloud.json" }
+  default { "workflow-ai-nao-salvos.json" }
 }
-$outputName = if ($Mode -eq "test") {
-  "workflow-fly-test.ready.json"
-} else {
-  "workflow-fly.ready.json"
+$outputName = switch ($Mode) {
+  "test"  { "workflow-fly-test.ready.json" }
+  "cloud" { "workflow-cloud.ready.json" }
+  default { "workflow-fly.ready.json" }
 }
 $canonical = Join-Path $root "n8n\$canonicalName"
 $secretsFile = Join-Path $PSScriptRoot ".secrets.local"
@@ -66,7 +68,7 @@ if (-not $evoKey -and $secrets.ContainsKey("EVOLUTION_API_KEY") -and $secrets["E
 if ($evoKey) {
   $json = $json.Replace("__EVOLUTION_KEY__", $evoKey)
   Write-Host "evolution apikey: len=$($evoKey.Length)"
-} else {
+} elseif ($json.Contains("__EVOLUTION_KEY__")) {
   Write-Warning "EVOLUTION_API_KEY missing - __EVOLUTION_KEY__ left as placeholder (Evolution calls will 401)"
 }
 

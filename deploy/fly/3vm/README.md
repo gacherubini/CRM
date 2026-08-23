@@ -201,12 +201,41 @@ log, ticket ou screenshot.
 
 ### Workflow cloud (Modo 2) — outro caminho
 
-`prepare-workflow.ps1` e `upload-and-import-workflow.ps1` tratam **só** o
-`workflow-ai-nao-salvos.json`. Para o `n8n/workflow-cloud.json` as quatro substituições
-(`http://chatbot-api:8000` → `https://app2037.fly.dev`, `http://evolution:8080` →
-`https://evolution2037.fly.dev`, `__CHATBOT_*_TOKEN__` e `"active": false` → `true`) têm de
-ser repetidas à mão. Gere o arquivo com token real **fora do repo** — o `.gitignore` cobre
-apenas `workflow-fly.ready.json` e `workflow-fly-test.ready.json`.
+Desde 23/08 o `prepare-workflow.ps1` tem **`-Mode cloud`** e faz as mesmas quatro
+substituições do Modo 1 (`http://chatbot-api:8000` → `https://app2037.fly.dev`,
+`http://evolution:8080` → `https://evolution2037.fly.dev`, `__CHATBOT_*_TOKEN__` e
+`"active": false` → `true`). Antes disso era à mão, e era onde se subia workflow apontando
+para host que não resolve.
+
+```powershell
+.\deploy\fly\3vm\prepare-workflow.ps1 -Mode cloud   # -> workflow-cloud.ready.json (gitignored)
+```
+
+O `upload-and-import-workflow.ps1` continua tratando **só** o Modo 1: para o cloud, os três
+passos são na mão (o id é fixo, `wCloudMeta0001` — o mesmo do arquivo, para o import
+**atualizar** em vez de criar um segundo workflow no mesmo path):
+
+```bash
+fly ssh sftp put -a n8n2037 deploy/fly/3vm/workflow-cloud.ready.json /tmp/wf-cloud.json
+fly machine exec <machine-id> "env HOME=/home/node n8n import:workflow --input=/tmp/wf-cloud.json" -a n8n2037
+fly machine exec <machine-id> "env HOME=/home/node n8n update:workflow --id=wCloudMeta0001 --active=true" -a n8n2037
+fly apps restart n8n2037
+```
+
+Conferência que não depende de painel — o GET tem de devolver o challenge **cru**:
+
+```bash
+curl -s "https://n8n2037.fly.dev/webhook/whatsapp-cloud?hub.mode=subscribe&hub.verify_token=<token>&hub.challenge=12345"
+# esperado: 12345      (se vier {"data":"12345"}, veja a armadilha do responseNode abaixo)
+```
+
+> **Armadilha — `responseMode: lastNode` no webhook GET envelopa o challenge.** O n8n
+> serializa a saída do último nó, então a Meta recebia `{"data":"<challenge>"}` e reprovava
+> a verificação com *"não foi possível validar o token"* — erro que manda procurar no
+> `verify_token`, que estava certo. Corrigido em 23/08 no gerador: `responseMode:
+> responseNode` mais um nó `Responder verificacao` (`respondToWebhook`, `respondWith: text`,
+> `responseBody: {{ $json.data }}`). O `validate_workflow_cloud.py` passou a exigir esse
+> formato, então não regride calado.
 
 > **Armadilha — `import:workflow` DESATIVA o workflow e `publish:workflow` não reativa.**
 > O import imprime "Deactivating workflow …" e segue; o publish diz "Publishing …" e também
@@ -224,6 +253,11 @@ produz e sai com código 1.
 > Em 16/08 dois restarts seguidos do `n8n2037` **não** derrubaram o `/webhook/whatsapp-ai`
 > (ficou 200 o tempo todo) e o webhook novo registrou em ~40 s. O risco dos ~6 min continua
 > real, mas não o trate como certeza.
+>
+> Em 23/08 o restart derrubou o `/webhook/whatsapp-ai` por **menos de 30 s**: a primeira
+> sondagem pegou 404 e a seguinte, 15 s depois, já era 200. Duas amostras não viram regra —
+> continue tratando os ~6 min como possível e evite restart em horário de pico. Vale sondar
+> em laço até o 200 em vez de esperar às cegas.
 
 Hosts preferidos no workflow preparado: `https://app2037.fly.dev` e
 `https://evolution2037.fly.dev`.
