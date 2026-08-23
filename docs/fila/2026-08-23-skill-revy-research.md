@@ -1149,14 +1149,15 @@ Quatro checagens, todas **suspeitas, nunca erros**: rota órfã de servidor, fun
 
 A costura n8n é a de maior severidade do repo: quando ela abre, o bot fica mudo e o produto para. O valor não é achar problema agora — hoje está tudo certo; é a linha aparecer no dia em que alguém renomear uma rota do chatbot.
 
-**Só 2 dos 4 workflows estão no ar.** Conferido no painel do n8n em 23/08:
+**Só 2 dos 3 workflows estão no ar.** Conferido no painel do n8n em 23/08:
 
 | Arquivo | Nome declarado | No ar | Última mudança |
 |---|---|---|---|
 | `workflow-ai-nao-salvos.json` | WhatsApp IA - Somente Nao Salvos | **sim** | 11/08 |
 | `workflow-cloud.json` | whatsapp-cloud | **sim** | 16/08 |
-| `workflow-echo.json` | WhatsApp Echo | não | 12/07 |
 | `workflow-teste-numero-autorizado.json` | WhatsApp IA - TESTE 5551980336365 | não | 10/08 |
+
+(`workflow-echo.json` era o quarto — 3 nós, criado em 12/07 no primeiro checkpoint E2E, nunca publicado, sem nenhuma referência em código ou validador. Apagado em 23/08.)
 
 A checagem de rota sem servidor roda **só nos publicados**. Workflow morto chamando rota removida não é incidente, e alarme falso mata a seção.
 
@@ -1220,10 +1221,10 @@ class TestCruzamentos(unittest.TestCase):
 
 
 class TestCosturaN8n(unittest.TestCase):
-    def test_acha_os_quatro_arquivos_e_seus_webhooks(self):
+    def test_acha_os_tres_arquivos_e_seus_webhooks(self):
         raiz = varredura.raiz_repo()
         workflows, _ = cruzamentos.n8n_costura(raiz)
-        self.assertEqual(len(workflows), 4)
+        self.assertEqual(len(workflows), 3)
         paths = {w["webhook"] for w in workflows}
         self.assertIn("whatsapp-ai", paths)     # o canonico
         self.assertIn("whatsapp-cloud", paths)
@@ -1405,8 +1406,7 @@ def _urls_do_json(no) -> set[str]:
 
 # Escrito a mao: quais workflows estao PUBLICADOS no n8n. Conferido no painel
 # em 23/08. Nao e derivavel do repo — o arquivo existir nao significa estar no ar.
-# workflow-echo.json (12/07) e workflow-teste-numero-autorizado.json (10/08)
-# existem no repo e NAO estao publicados.
+# workflow-teste-numero-autorizado.json existe no repo e NAO esta publicado.
 PUBLICADOS: dict[str, str] = {
     "workflow-ai-nao-salvos.json": "WhatsApp IA - Somente Nao Salvos",
     "workflow-cloud.json": "whatsapp-cloud",
@@ -1565,7 +1565,7 @@ cd .claude/skills/revy-research && python3 -m unittest test_gerar_mapa -v && pyt
 Esperado: `OK`, e um `_cruzamentos.md` legível com as quatro seções. **Leia a saída antes de commitar**, conferindo três coisas:
 
 1. A lista de funções sem chamador não pode ter centenas de linhas. Se tiver, o detector está frouxo demais: restrinja `funcoes_publicas` a `app/*.py` de primeiro nível e rode de novo. Seção que grita lobo é seção que ninguém lê.
-2. A seção **n8n × chatbot** deve trazer 4 linhas na tabela, **2 marcadas `SIM`** em "No ar", e dizer que todas as rotas chamadas pelos publicados estão declaradas — foi o estado medido em 23/08. Se aparecer `SEM SERVIDOR`, **pare e leve ao dono**: ou é falso positivo de normalização, ou é o bot prestes a ficar mudo. Nenhum dos dois se resolve commitando.
+2. A seção **n8n × chatbot** deve trazer 3 linhas na tabela, **2 marcadas `SIM`** em "No ar", e dizer que todas as rotas chamadas pelos publicados estão declaradas — foi o estado medido em 23/08. Se aparecer `SEM SERVIDOR`, **pare e leve ao dono**: ou é falso positivo de normalização, ou é o bot prestes a ficar mudo. Nenhum dos dois se resolve commitando.
 3. A tabela de `fly.toml` deve trazer **7 linhas**.
 
 - [ ] **Step 5: Commit**

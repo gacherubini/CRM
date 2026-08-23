@@ -124,13 +124,13 @@ Quatro checagens, todas rotuladas **suspeitas, não erros**:
    quando ela abre, o bot fica mudo e o produto para. JSON é `json.loads`; a
    rota já está no mapa. Custo baixo, severidade máxima.
 
-   **Só 2 dos 4 arquivos estão publicados** (painel do n8n, 23/08):
+   **Só 2 dos 3 arquivos estão publicados** (painel do n8n, 23/08):
    `workflow-ai-nao-salvos.json` ("WhatsApp IA - Somente Nao Salvos", canônico)
-   e `workflow-cloud.json` ("whatsapp-cloud"). `workflow-echo.json` (parado
-   desde 12/07) e `workflow-teste-numero-autorizado.json` existem no repo e não
-   estão no ar. A checagem de rota sem servidor roda **só nos publicados** —
-   workflow morto chamando rota removida não é incidente, e alarme falso mata a
-   seção.
+   e `workflow-cloud.json` ("whatsapp-cloud"). `workflow-teste-numero-autorizado.json`
+   existe no repo e não está no ar. A checagem de rota sem servidor roda **só nos
+   publicados** — workflow morto chamando rota removida não é incidente, e alarme
+   falso mata a seção. (`workflow-echo.json` era o quarto e foi apagado em 23/08:
+   3 nós, nunca publicado, sem referência em código ou validador.)
 
    O `nome` do workflow é derivável (está dentro do JSON); **estar publicado não
    é**, e vira a tabela `PUBLICADOS` escrita à mão, no mesmo padrão de `TESTES` e
