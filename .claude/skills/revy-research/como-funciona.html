@@ -28,6 +28,8 @@
   --display: "Chivo", "Arial Black", sans-serif;
   --corpo: "Hanken Grotesk", -apple-system, "Segoe UI", sans-serif;
   --mono: "IBM Plex Mono", ui-monospace, "Cascadia Mono", monospace;
+  --medida: 44rem;   /* rem, nunca ch: ch muda com o font-size do elemento */
+  --leitura: 38rem;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
@@ -85,19 +87,19 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-.faixa {
-  max-width: 66ch;
+/* UMA largura de container: duas colunas centralizadas de larguras
+   diferentes produzem duas bordas esquerdas, e a pagina inteira fica
+   desalinhada. A medida de leitura e limitada no proprio paragrafo. */
+.faixa, .larga {
+  max-width: var(--medida);
   margin-inline: auto;
 }
-.larga {
-  max-width: 84ch;
-  margin-inline: auto;
-}
+p, ol.passos li, ul.limpa > li { max-width: var(--leitura); }
 
 /* ---------- topo ---------- */
 
 header.capa {
-  max-width: 84ch;
+  max-width: var(--medida);
   margin: 0 auto;
   padding: 72px 0 40px;
 }
@@ -134,7 +136,7 @@ h1 {
   font-size: clamp(18px, 2.3vw, 21px);
   line-height: 1.55;
   color: var(--ink-soft);
-  max-width: 60ch;
+  max-width: 34rem;
   margin: 0;
 }
 .tese b { color: var(--ink); font-weight: 600; }
@@ -142,7 +144,7 @@ h1 {
 /* ---------- números ---------- */
 
 .numeros {
-  max-width: 84ch;
+  max-width: var(--medida);
   margin: 40px auto 0;
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
@@ -153,6 +155,10 @@ h1 {
 .numeros div {
   background: var(--surface);
   padding: 16px 18px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 8px;
 }
 .numeros dt {
   font-family: var(--mono);
@@ -243,7 +249,7 @@ code {
   background: var(--surface-soft);
   padding: 1px 5px;
   border-radius: 3px;
-  word-break: break-word;
+  overflow-wrap: break-word;
 }
 
 ol.passos {
@@ -255,15 +261,21 @@ ol.passos {
   flex-direction: column;
   gap: 18px;
 }
+/* NAO usar grid aqui. Cada filho inline (<strong>, texto solto, <code>)
+   vira um grid item proprio, entao o texto cai alternado na coluna de 30px
+   e quebra uma palavra por linha. Marcador absoluto aguenta qualquer
+   conteudo inline. */
 ol.passos li {
   counter-increment: p;
-  display: grid;
-  grid-template-columns: 30px 1fr;
-  gap: 14px;
-  align-items: start;
+  position: relative;
+  padding-left: 46px;
+  min-height: 30px;
 }
 ol.passos li::before {
   content: counter(p);
+  position: absolute;
+  left: 0;
+  top: 1px;
   font-family: var(--mono);
   font-size: 13px;
   font-weight: 500;
@@ -274,7 +286,6 @@ ol.passos li::before {
   height: 30px;
   display: grid;
   place-items: center;
-  margin-top: 1px;
 }
 
 ul.limpa {
@@ -298,6 +309,7 @@ ul.limpa > li {
   font-family: var(--mono);
   font-size: 13.5px;
   line-height: 1.75;
+  white-space: pre;
   padding: 20px 22px;
   border-radius: 4px;
   overflow-x: auto;
@@ -358,18 +370,9 @@ td code { background: none; padding: 0; }
   margin-bottom: 12px;
 }
 
-pre.mermaid {
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: 4px;
-  padding: 24px 16px;
-  margin: 0 0 22px;
-  overflow-x: auto;
-  text-align: center;
-}
 
 footer {
-  max-width: 84ch;
+  max-width: var(--medida);
   margin: 84px auto 0;
   padding-top: 26px;
   border-top: 1px solid var(--line);
@@ -402,7 +405,7 @@ footer code { font-size: 13px; }
 
 <dl class="numeros">
   <div><dt>produtos</dt><dd data-numero="produtos">6</dd></div>
-  <div><dt>entradas no mapa</dt><dd data-numero="entradas">793</dd></div>
+  <div><dt>entradas</dt><dd data-numero="entradas">793</dd></div>
   <div><dt>learnings</dt><dd data-numero="learnings">29</dd></div>
   <div><dt>decisões</dt><dd data-numero="decisoes">12</dd></div>
   <div><dt>protocolo</dt><dd data-numero="skill_linhas">69</dd></div>
@@ -434,16 +437,6 @@ footer code { font-size: 13px; }
   <h2>O protocolo</h2>
   <p class="sub">o que acontece quando ela dispara</p>
 
-  <pre class="mermaid">
-flowchart TD
-    A["disparo<br/>tarefa em um produto"] --> B{"cruzou<br/>dois produtos?"}
-    B -->|sim| C["PARE e avise o dono<br/>entre produtos só há HTTP versionado"]
-    B -->|não| D["--frescor produto"]
-    D --> E["mapa/produto.md<br/>arquivo:linha de tudo"]
-    E --> F["learnings/INDEX.md<br/>decisoes/INDEX.md"]
-    F --> G["briefing<br/>produto, linhas, invariantes, teste"]
-    G --> H["roteia para a skill destino"]
-  </pre>
 
   <div class="faixa">
     <ol class="passos">
