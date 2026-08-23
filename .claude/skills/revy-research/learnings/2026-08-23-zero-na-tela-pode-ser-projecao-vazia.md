@@ -1,6 +1,8 @@
 ---
 gatilho: investigar numero zerado numa tela da Loja
 produto: portal-gestao
+fonte: repo
+verificado_em: nunca reconferido desde a migracao das memorias (2026-08-23)
 ---
 # Zero na tela costuma ser projecao vazia, nao dado ausente
 

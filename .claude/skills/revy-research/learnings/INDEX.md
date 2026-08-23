@@ -2,8 +2,25 @@
 
 Leia **so** os de gatilho compativel com a sua tarefa. Normalmente 0, 1 ou 2.
 
+Cada arquivo declara no cabecalho **onde mora a verdade dele** e **quando alguem
+reconferiu pela ultima vez**:
+
+- `fonte: repo` — da para confirmar lendo codigo. Se desconfiar, confirme: e barato.
+- `fonte: infra` — so com acesso ao Fly ou ao painel do n8n. **Apodrece sem sinal
+  nenhum no git**, porque o mundo muda sem commit.
+- `fonte: externo` — politica de terceiro (Meta, WhatsApp). Muda sem aviso.
+
+`verificado_em: nunca reconferido...` quer dizer o que esta escrito: o texto veio
+das memorias de sessao e ninguem bateu contra o repo depois. Nao e motivo para
+ignorar o learning — e motivo para conferir antes de decidir em cima dele.
+Conferiu? Carimbe a data. **Carimbo sem conferencia e o defeito que este campo
+existe para consertar**: o learning dos bancos afirmou "Portal e Control sao
+SQLite" por uma semana depois de os dois virarem Postgres, e quase fez um agente
+escrever migration com `batch_alter_table`.
+
 | Gatilho | Arquivo |
 |---|---|
+| propor ou planejar feature que voce ainda nao viu no codigo | `2026-08-23-confira-se-a-feature-ja-existe-antes-de-propor.md` |
 | deployar no Fly | `2026-08-23-fly-deploy-usa-arvore-local.md` |
 | rodar alembic ou conferir migration de producao | `2026-08-23-alembic-mente-sem-database-url.md` |
 | mergear branch longa que tem migration | `2026-08-23-merge-limpo-esconde-duas-cabecas-do-alembic.md` |

@@ -2,6 +2,8 @@
 gatilho: o bot do WhatsApp parou de responder sem ninguem ter mexido no codigo
 produto: n8n
 custo: um dia de bot mudo em producao
+fonte: infra
+verificado_em: nunca reconferido desde a migracao das memorias (2026-08-23)
 ---
 # Bot mudo com tudo verde = volume do n8n cheio
 

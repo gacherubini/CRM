@@ -2,6 +2,8 @@
 gatilho: mexer no logo ou na assinatura da marca
 produto: shared/brand
 custo: 14 testes vermelhos por semanas
+fonte: repo
+verificado_em: nunca reconferido desde a migracao das memorias (2026-08-23)
 ---
 # A assinatura nao se desenha a mao: gera e distribui
 

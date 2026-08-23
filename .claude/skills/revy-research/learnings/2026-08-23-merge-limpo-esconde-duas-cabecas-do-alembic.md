@@ -1,6 +1,8 @@
 ---
 gatilho: mergear branch longa que tem migration
 produto: todos
+fonte: repo
+verificado_em: nunca reconferido desde a migracao das memorias (2026-08-23)
 ---
 # Zero conflito textual nao significa que o merge esta bom
 

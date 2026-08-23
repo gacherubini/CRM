@@ -2,6 +2,8 @@
 gatilho: escrever teste do outbox de provisionamento do Control
 produto: revy-trafego
 custo: um teste vermelho acusado de bug por 8 dias
+fonte: repo
+verificado_em: nunca reconferido desde a migracao das memorias (2026-08-23)
 ---
 # Destino real no teste do outbox esta errado por construcao
 

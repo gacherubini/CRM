@@ -2,6 +2,8 @@
 gatilho: rodar alembic ou conferir migration de producao
 produto: chatbot-api
 custo: 1h30
+fonte: infra
+verificado_em: nunca reconferido desde a migracao das memorias (2026-08-23)
 ---
 # `alembic current` responde SQLite e mente
 

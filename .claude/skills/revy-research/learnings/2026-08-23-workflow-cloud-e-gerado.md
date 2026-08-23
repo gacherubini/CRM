@@ -1,6 +1,8 @@
 ---
 gatilho: mexer no workflow do n8n do Modo 2 (cloud)
 produto: n8n
+fonte: repo
+verificado_em: nunca reconferido desde a migracao das memorias (2026-08-23)
 ---
 # `workflow-cloud.json` e gerado — editar a mao sai 1
 

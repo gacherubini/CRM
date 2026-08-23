@@ -1,6 +1,8 @@
 ---
 gatilho: propor canal de entrada de lead que nao seja anuncio CTWA
 produto: chatbot-api
+fonte: externo
+verificado_em: nunca reconferido desde a migracao das memorias (2026-08-23)
 ---
 # A partir de 01/10/2026 a mensagem de servico volta a ser cobrada
 

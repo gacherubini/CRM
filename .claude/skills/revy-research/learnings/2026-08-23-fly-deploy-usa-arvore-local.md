@@ -2,6 +2,8 @@
 gatilho: deployar no Fly
 produto: deploy
 custo: um dia de reconciliacao
+fonte: infra
+verificado_em: nunca reconferido desde a migracao das memorias (2026-08-23)
 ---
 # `fly deploy` empacota a arvore local, nao o commit
 

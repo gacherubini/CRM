@@ -2,6 +2,8 @@
 gatilho: reiniciar o n8n2037 ou trocar um secret dele
 produto: n8n
 custo: mensagens perdidas em horario comercial
+fonte: infra
+verificado_em: nunca reconferido desde a migracao das memorias (2026-08-23)
 ---
 # Depois do restart o webhook responde 404, e a Evolution nao re-tenta
 

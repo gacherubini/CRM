@@ -3,6 +3,7 @@ import copy
 import io
 import ast
 import json
+import re
 import subprocess
 import tempfile
 import unittest
@@ -1490,6 +1491,100 @@ class TestFrescorValidaOAlvo(unittest.TestCase):
         self.assertIn("deploy", varredura.FONTES_DO_MAPA)
         for alvo in ("n8n", "deploy"):
             self.assertEqual(self._rodar(alvo)[0], 0, alvo)
+
+
+class TestLearningsEDecisoes(unittest.TestCase):
+    """A camada que o agente escreve tambem precisa se sustentar sozinha.
+
+    O mapa tem `--verificar`. Ate 23/08 os learnings nao tinham nada: o dos
+    bancos afirmou "Portal e Control sao SQLite" por uma semana depois de os
+    dois virarem Postgres, e o unico jeito de descobrir foi um agente conferir
+    na mao no meio de outra tarefa.
+    """
+
+    # `path/arquivo.ext:123`. Exige a barra de proposito: `db.py` solto no meio
+    # da prosa e mencao, nao citacao, e tratar mencao como citacao enche o teste
+    # de falso positivo — foi o que aconteceu na primeira versao desta busca.
+    CITACAO = re.compile(r"([\w\-./]+/[\w\-.]+\.(?:py|md|json|toml|sh|html|css|ps1)):(\d+)")
+
+    def setUp(self):
+        self.raiz = varredura.raiz_repo()
+        self.sk = self.raiz / ".claude/skills/revy-research"
+        self.learnings = sorted(
+            f for f in (self.sk / "learnings").glob("*.md") if f.name != "INDEX.md"
+        )
+        self.decisoes = sorted(
+            f for f in (self.sk / "decisoes").glob("*.md") if f.name != "INDEX.md"
+        )
+
+    def _cabecalho(self, caminho: Path) -> str:
+        txt = caminho.read_text(encoding="utf-8")
+        self.assertTrue(txt.startswith("---\n"), caminho.name)
+        return txt[4:txt.index("\n---\n", 3)]
+
+    def test_todo_learning_diz_onde_mora_a_verdade_dele(self):
+        """`fonte` separa o que se confere lendo codigo do que apodrece calado.
+
+        `infra` e `externo` mudam sem commit neste repositorio, entao nenhum
+        sinal de git jamais vai denunciar que envelheceram.
+        """
+        self.assertGreaterEqual(len(self.learnings), 28)
+        for f in self.learnings:
+            cab = self._cabecalho(f)
+            fonte = next(
+                (l.split(":", 1)[1].strip() for l in cab.splitlines()
+                 if l.startswith("fonte:")), None
+            )
+            self.assertIn(fonte, ("repo", "infra", "externo"), f.name)
+            self.assertIn("verificado_em:", cab, f.name)
+            self.assertIn("gatilho:", cab, f.name)
+
+    def test_toda_decisao_diz_o_que_nao_se_repropoe(self):
+        for f in self.decisoes:
+            cab = self._cabecalho(f)
+            self.assertIn("decidido:", cab, f.name)
+            self.assertIn("nao_reproponha:", cab, f.name)
+
+    def test_indice_e_pasta_nao_divergem(self):
+        """Learning fora do indice e inalcancavel; linha morta no indice mente.
+
+        O protocolo manda ler o INDEX e so abrir o de gatilho compativel — entao
+        arquivo que nao esta no indice, para efeito pratico, nao existe.
+        """
+        for pasta, arquivos in (("learnings", self.learnings),
+                                ("decisoes", self.decisoes)):
+            indice = (self.sk / pasta / "INDEX.md").read_text(encoding="utf-8")
+            citados = set(re.findall(r"`([\w\-.]+\.md)`", indice))
+            na_pasta = {f.name for f in arquivos}
+            self.assertEqual(na_pasta - citados, set(), f"{pasta}: fora do indice")
+            self.assertEqual(citados - na_pasta, set(), f"{pasta}: linha morta")
+
+    def test_citacao_de_arquivo_linha_ainda_aponta_para_uma_linha_que_existe(self):
+        """O `--verificar` do mapa, aplicado a terceira camada.
+
+        Nao prova que o texto continua verdadeiro — prova que ele nao aponta
+        para o vazio, que e o primeiro sintoma de aviso velho.
+        """
+        conferidas = 0
+        for f in self.learnings + self.decisoes:
+            for rel, num in self.CITACAO.findall(f.read_text(encoding="utf-8")):
+                cands = [self.raiz / rel]
+                cands += [self.raiz / p / rel for p in varredura.PRODUTOS]
+                achado = next((c for c in cands if c.is_file()), None)
+                self.assertIsNotNone(achado, f"{f.name}: nao existe {rel}")
+                total = len(achado.read_text(
+                    encoding="utf-8", errors="replace").splitlines())
+                self.assertLessEqual(
+                    int(num), total,
+                    f"{f.name}: {rel}:{num} passou do fim ({total} linhas)")
+                conferidas += 1
+        self.assertGreater(conferidas, 0, "nenhuma citacao ancorada para conferir")
+
+    def test_link_entre_notas_nao_aponta_para_o_vazio(self):
+        nomes = {f.stem for f in self.learnings + self.decisoes}
+        for f in self.learnings + self.decisoes:
+            for alvo in re.findall(r"\[\[([^\]]+)\]\]", f.read_text(encoding="utf-8")):
+                self.assertIn(alvo, nomes, f"{f.name} aponta para [[{alvo}]]")
 
 
 if __name__ == "__main__":

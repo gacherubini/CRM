@@ -1,6 +1,8 @@
 ---
 gatilho: portal e motor caindo juntos com conexao recusada no banco
 produto: deploy
+fonte: infra
+verificado_em: nunca reconferido desde a migracao das memorias (2026-08-23)
 ---
 # "server closed the connection unexpectedly" nos dois = OOM do `suite-pg`
 

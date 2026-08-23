@@ -2,6 +2,8 @@
 gatilho: subir workflow novo no n8n do Fly
 produto: n8n
 custo: um restart inteiro perdido
+fonte: infra
+verificado_em: nunca reconferido desde a migracao das memorias (2026-08-23)
 ---
 # `import:workflow` DESATIVA, e `publish` nao religa
 

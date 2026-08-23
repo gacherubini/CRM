@@ -2,6 +2,8 @@
 gatilho: procurar o banco de um produto, escolher dialeto de migration ou cruzar dados entre produtos
 produto: todos
 custo: migration escrita para o dialeto errado, que estoura no deploy
+fonte: repo
+verificado_em: 2026-08-23
 ---
 # A engine de cada produto se confere no `db.py`, nao na memoria
 

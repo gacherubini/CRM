@@ -1,6 +1,8 @@
 ---
 gatilho: testar projecao de venda no Control
 produto: revy-trafego
+fonte: repo
+verificado_em: nunca reconferido desde a migracao das memorias (2026-08-23)
 ---
 # Exercite `projetar_venda()`, nunca construa `VendaProjetada` a mao
 

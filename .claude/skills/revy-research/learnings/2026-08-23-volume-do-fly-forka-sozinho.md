@@ -1,6 +1,8 @@
 ---
 gatilho: investigar custo, volume ou RAM dos apps do Fly
 produto: deploy
+fonte: infra
+verificado_em: nunca reconferido desde a migracao das memorias (2026-08-23)
 ---
 # Cada migracao de host forka um volume, e keepalive piora
 

@@ -1,6 +1,8 @@
 ---
 gatilho: descobrir se uma flag de rollout esta ligada em producao
 produto: deploy
+fonte: infra
+verificado_em: nunca reconferido desde a migracao das memorias (2026-08-23)
 ---
 # O `[env]` do toml nao diz o estado da flag
 

@@ -1,6 +1,8 @@
 ---
 gatilho: dimensionar limite da Cloud API ou tratar verificacao de CNPJ como bloqueio
 produto: chatbot-api
+fonte: externo
+verificado_em: nunca reconferido desde a migracao das memorias (2026-08-23)
 ---
 # O teto de 250 conta so conversa que a empresa inicia
 

@@ -2,6 +2,8 @@
 gatilho: parear numero novo no Evolution ou QR que nao conecta
 produto: evolution
 custo: rollbacks e re-deploys inuteis
+fonte: externo
+verificado_em: nunca reconferido desde a migracao das memorias (2026-08-23)
 ---
 # QR que nunca fecha e passkey do WhatsApp, nao bug de config
 

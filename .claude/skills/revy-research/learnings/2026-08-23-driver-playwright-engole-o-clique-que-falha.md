@@ -2,6 +2,8 @@
 gatilho: depurar driver Playwright de banco que termina em timeout
 produto: motor-simulacao
 custo: dois diagnosticos errados (IP e captcha)
+fonte: repo
+verificado_em: nunca reconferido desde a migracao das memorias (2026-08-23)
 ---
 # O `try/except: pass` engole o clique e o driver trava ate o timeout
 
