@@ -1285,6 +1285,10 @@ Contrato, já fixado no tipo `Entrada`: **`linha > 0` → o texto daquela linha 
 
 - [ ] **Step 1: Escrever os testes que falham**
 
+**Os testes NÃO podem escrever em `mapa/`.** O mapa é versionado; teste que chama `gerar_mapa.escrever_tudo(raiz)` sem trocar `PASTA_MAPA` reescreve os 7 arquivos do git a cada `python -m unittest`, e o teste da entrada mentirosa chega a **gravar a mentira** no `_frescor.json` versionado — que fica lá se o processo morrer no meio. Use `tempfile` + `mock.patch.object(gerar_mapa, "PASTA_MAPA", ...)`.
+
+E acrescente o teste que o esqueleto abaixo não tem, que é o mais valioso dos dois: **conferir o mapa que está no git, sem regenerar nada**. Regenerar-e-conferir sempre passa e não prova coisa alguma; o que prova é reabrir o que está commitado e bater contra o código de hoje.
+
 ```python
 class TestVerificacao(unittest.TestCase):
     def test_mapa_recem_gerado_nao_tem_divergencia(self):
@@ -1336,10 +1340,12 @@ def verificar(raiz: Path) -> list[str]:
     for produto, entradas in dados.get("inventario", {}).items():
         base = raiz / produto
         for bruta in entradas:
-            if bruta["secao"] == "migration":
-                alvo = base / "alembic" / "versions" / bruta["arquivo"]
-            else:
-                alvo = base / bruta["arquivo"]
+            # Regra unica: `arquivo` ja e relativo a pasta do produto, para
+            # TODA secao. A Task 6 recompoe `alembic/versions/<nome>` ainda em
+            # `coletar`, para o selo sair correto. Recompor de novo aqui da
+            # `alembic/versions/alembic/versions/0001_x.py` e 95 divergencias
+            # fantasma — o verificador acusando o proprio bug.
+            alvo = base / bruta["arquivo"]
             if not alvo.exists():
                 problemas.append(f"{produto}: sumiu {bruta['arquivo']}")
                 continue
