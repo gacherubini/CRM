@@ -44,8 +44,20 @@ As três páginas legais existem porque a **Meta exige** as URLs de Política de
 Termos e Exclusão de dados no cadastro do app. Elas descrevem o tratamento de dados que o
 sistema realmente faz; ao mudar o que se coleta ou como se protege, elas mudam junto.
 
-O rodapé traz **razão social, CNPJ e endereço**. Não remover: é a prova de vínculo entre o
-site e a empresa que a verificação da Meta procura, e o CNPJ é novo e sem nome fantasia.
+O rodapé traz **razão social, CNPJ, endereço e telefone**. Não remover: é a prova de
+vínculo entre o site e a empresa que a verificação da Meta procura, e o CNPJ é novo e sem
+nome fantasia.
+
+**Dois telefones no site, de propósito** (desde 23/08):
+
+| Onde | Número | Por quê |
+|---|---|---|
+| bloco Contato e bloco de identidade das legais | `+55 19 99846-9808` | é o do cadastro do CNPJ — o revisor da Meta compara site e documento |
+| botão flutuante e links `wa.me` | `5551980336365` | é por onde o lead fala com a Revy |
+
+Parece incoerência e não é: apontar o botão de WhatsApp para um número que não tem WhatsApp
+mataria a captação para ganhar uma linha de rodapé. Ao mudar o telefone do cadastro do CNPJ,
+mude **o primeiro**; o `wa.me` só muda se o número comercial mudar.
 
 ## Ao trazer um export novo do design tool
 
