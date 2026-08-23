@@ -1,3 +1,4 @@
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -143,6 +144,71 @@ class TestPrefixoDeRouter(unittest.TestCase):
         self.assertEqual(len(saida), 1)
         self.assertEqual(saida[0].secao, "aviso")
         self.assertEqual(saida[0].linha, 0)
+
+
+FONTE_MODELOS = '''
+class Loja(Base):
+    __tablename__ = "lojas"
+    id = Column(Integer)
+
+class FilaVendedor(Base):
+    __tablename__ = "fila_vendedor"
+'''
+
+
+class TestExtratorDeModelos(unittest.TestCase):
+    def test_acha_tabela_e_classe(self):
+        achados = extratores.modelos(FONTE_MODELOS, "app/models_db.py")
+        chaves = {e.chave for e in achados}
+        self.assertEqual(chaves, {"lojas", "fila_vendedor"})
+
+    def test_linha_aponta_para_o_tablename(self):
+        achados = extratores.modelos(FONTE_MODELOS, "app/models_db.py")
+        por_chave = {e.chave: e for e in achados}
+        linha = FONTE_MODELOS.splitlines()[por_chave["fila_vendedor"].linha - 1]
+        self.assertIn("fila_vendedor", linha)
+
+    def test_no_repo_real_fila_vendedor_esta_em_models_db(self):
+        raiz = varredura.raiz_repo()
+        alvo = raiz / "chatbot-api" / "app" / "models_db.py"
+        achados = extratores.modelos(alvo.read_text(encoding="utf-8"), "app/models_db.py")
+        self.assertIn("fila_vendedor", {e.chave for e in achados})
+
+
+class TestExtratorDeMigrations(unittest.TestCase):
+    def test_conta_e_acha_o_head_do_chatbot(self):
+        raiz = varredura.raiz_repo()
+        entradas, head = extratores.migrations(raiz / "chatbot-api" / "alembic" / "versions")
+        self.assertEqual(len(entradas), 25)
+        self.assertTrue(head, "head nao pode ser vazio")
+
+    def test_pasta_inexistente_nao_quebra(self):
+        entradas, head = extratores.migrations(Path("nao/existe"))
+        self.assertEqual(entradas, [])
+        self.assertEqual(head, "")
+
+    def test_le_os_dois_estilos_de_revision_do_repo(self):
+        """O repo mistura `revision = "x"` e `revision: str = "x"`.
+
+        Ler so o Assign perde metade das migrations do chatbot e quebra a
+        cadeia do head (cada anotada vira uma head solta).
+        """
+        with tempfile.TemporaryDirectory() as tmp:
+            pasta = Path(tmp)
+            (pasta / "0001_base.py").write_text(
+                'revision: str = "0001"\n'
+                'down_revision: Union[str, None] = None\n',
+                encoding="utf-8",
+            )
+            (pasta / "0002_topo.py").write_text(
+                'revision = "0002"\n'
+                'down_revision = "0001"\n',
+                encoding="utf-8",
+            )
+            entradas, head = extratores.migrations(pasta)
+        self.assertEqual({e.chave for e in entradas}, {"0001", "0002"})
+        self.assertEqual(head, "0002")
+        self.assertEqual([e.linha for e in entradas], [0, 0])
 
 
 if __name__ == "__main__":

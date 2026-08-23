@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import ast
 from dataclasses import replace
+from pathlib import Path
 
 from varredura import Entrada
 
@@ -144,3 +145,114 @@ def aplicar_prefixos(entradas: list[Entrada], includes: list[tuple]) -> list[Ent
             linha=0,
         ))
     return saida
+
+
+def modelos(texto: str, arquivo_rel: str) -> list[Entrada]:
+    """Toda classe com `__tablename__ = "..."` literal deste arquivo.
+
+    A chave e o nome da TABELA, nao o da classe: e o nome da tabela que aparece
+    na migration, no SQL do dono e na linha que o `--verificar` reabre.
+    """
+    try:
+        arvore = ast.parse(texto)
+    except SyntaxError:
+        return []
+    achados: list[Entrada] = []
+    for no in ast.walk(arvore):
+        if not isinstance(no, ast.ClassDef):
+            continue
+        for corpo in no.body:
+            alvo_ok = (
+                isinstance(corpo, ast.Assign)
+                and len(corpo.targets) == 1
+                and isinstance(corpo.targets[0], ast.Name)
+                and corpo.targets[0].id == "__tablename__"
+                and isinstance(corpo.value, ast.Constant)
+                and isinstance(corpo.value.value, str)
+            )
+            if alvo_ok:
+                tabela = corpo.value.value
+                achados.append(Entrada(
+                    secao="modelo",
+                    chave=tabela,
+                    simbolo=tabela,
+                    arquivo=arquivo_rel,
+                    linha=corpo.lineno,
+                ))
+    return achados
+
+
+def _constante_str(no: ast.AST) -> tuple[str, str] | None:
+    """(nome, valor) de `x = "s"` OU de `x: T = "s"`, no topo do modulo.
+
+    As migrations do repo usam os DOIS estilos: as antigas escrevem
+    `revision: str = "0001"` (AnnAssign) e as novas `revision = "0020_..."`
+    (Assign). Ler so um dos dois perde metade dos arquivos e, pior, quebra a
+    cadeia do head: cada arquivo perdido vira uma head solta.
+    """
+    if isinstance(no, ast.Assign):
+        if len(no.targets) != 1 or not isinstance(no.targets[0], ast.Name):
+            return None
+        nome = no.targets[0].id
+    elif isinstance(no, ast.AnnAssign):
+        if not isinstance(no.target, ast.Name):
+            return None
+        nome = no.target.id
+    else:
+        return None
+    if not isinstance(no.value, ast.Constant) or not isinstance(no.value.value, str):
+        return None
+    return nome, no.value.value
+
+
+def _revisions(texto: str) -> tuple[str, str]:
+    """(revision, down_revision) lidos como constantes de modulo, por AST.
+
+    Nunca importa o modulo do Alembic: rodar uma migration para descobrir o id
+    dela executaria codigo de produto (invariante do AGENTS.md).
+    """
+    revision = down = ""
+    try:
+        arvore = ast.parse(texto)
+    except SyntaxError:
+        return "", ""
+    for no in arvore.body:
+        par = _constante_str(no)
+        if par is None:
+            continue
+        nome, valor = par
+        if nome == "revision":
+            revision = valor
+        elif nome == "down_revision":
+            down = valor
+    return revision, down
+
+
+def migrations(pasta_versions: Path) -> tuple[list[Entrada], str]:
+    """As migrations de UM produto e a head (a revision que ninguem aponta).
+
+    Head com virgula = duas heads = migration divergente naquele produto. E um
+    achado real, nao um bug do gerador: nao esconda somando ou escolhendo uma.
+    """
+    if not pasta_versions.is_dir():
+        return [], ""
+    entradas: list[Entrada] = []
+    revisions: set[str] = set()
+    apontadas: set[str] = set()
+    for arquivo in sorted(pasta_versions.glob("*.py")):
+        texto = arquivo.read_text(encoding="utf-8", errors="replace")
+        revision, down = _revisions(texto)
+        if not revision:
+            continue
+        revisions.add(revision)
+        if down:
+            apontadas.add(down)
+        entradas.append(Entrada(
+            secao="migration",
+            chave=revision,
+            simbolo=revision,
+            arquivo=str(arquivo.name),
+            linha=0,
+        ))
+    heads = sorted(revisions - apontadas)
+    return entradas, (heads[0] if len(heads) == 1 else ",".join(heads))
