@@ -25,7 +25,6 @@
   --term-bg: #0f2b20;
   --term-ink: #dfeee7;
   --term-dim: #7fbfa3;
-  --sombra: 0 1px 2px rgba(27, 20, 20, .05);
   --display: "Chivo", "Arial Black", sans-serif;
   --corpo: "Hanken Grotesk", -apple-system, "Segoe UI", sans-serif;
   --mono: "IBM Plex Mono", ui-monospace, "Cascadia Mono", monospace;
@@ -50,7 +49,6 @@
     --term-bg: #0a0f0d;
     --term-ink: #dfeee7;
     --term-dim: #7fbfa3;
-    --sombra: 0 1px 2px rgba(0, 0, 0, .3);
   }
 }
 :root[data-theme="dark"] {
@@ -72,7 +70,6 @@
   --term-bg: #0a0f0d;
   --term-ink: #dfeee7;
   --term-dim: #7fbfa3;
-  --sombra: 0 1px 2px rgba(0, 0, 0, .3);
 }
 
 * { box-sizing: border-box; }
@@ -337,23 +334,28 @@ th {
 }
 td code { background: none; padding: 0; }
 
+/* Aparte editorial, nao card: filete em cima e embaixo, sem caixa e sem barra
+   lateral de acento. A regra que sobrou merece peso de declaracao. */
 .nota {
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-left: 3px solid var(--rotulado);
-  border-radius: 3px;
-  padding: 18px 20px;
-  box-shadow: var(--sombra);
+  border-top: 1px solid var(--line-strong);
+  border-bottom: 1px solid var(--line-strong);
+  padding: 22px 0 24px;
+  margin: 4px 0 0;
 }
-.nota p:last-child { margin-bottom: 0; }
+.nota p {
+  font-size: 19px;
+  line-height: 1.55;
+  margin: 0;
+  text-wrap: pretty;
+}
 .nota .rot {
   font-family: var(--mono);
   font-size: 11px;
-  letter-spacing: .1em;
+  letter-spacing: .12em;
   text-transform: uppercase;
   color: var(--rotulado);
   display: block;
-  margin-bottom: 8px;
+  margin-bottom: 12px;
 }
 
 pre.mermaid {
