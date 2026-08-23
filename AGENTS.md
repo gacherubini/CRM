@@ -5,6 +5,8 @@ inteiro, não abra um plano de 3 mil linhas “para se contextualizar”.
 
 ## 1. Antes de qualquer ferramenta
 
+0. Invoque a skill `revy-research`. Ela dá `arquivo:linha` de tudo, as
+   armadilhas conhecidas e as decisões que não se re-propõem.
 1. Identifique o **um** produto da tarefa (tabela abaixo).
 2. Leia **só** o `README.md` daquele produto (armadilhas + onde editar).
 3. Ache o símbolo com `rg`. Leia o módulo do domínio, não o bootstrap.
@@ -97,3 +99,7 @@ Testes do produto (e consumidores do contrato, se mudou HTTP).
 Migration: `alembic upgrade head` no produto certo.
 n8n: `python n8n/validate_workflow.py` na raiz.
 `git diff --check` e `git status --short`. Não commitar mudança alheia.
+Mexeu em rota, modelo, worker, migration ou flag? Regere o mapa e commite junto
+com o código: `cd .claude/skills/revy-research && python gerar_mapa.py` (Windows)
+ou `python3 gerar_mapa.py` (macOS).
+Algo te surpreendeu? Escreva um learning — procurando duplicata pelo gatilho antes.
