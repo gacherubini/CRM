@@ -1397,18 +1397,23 @@ Sem esta tarefa nada do que foi construído é lido por ninguém.
 
 **Files:**
 - Create: `.claude/skills/revy-research/SKILL.md`
+- Create: `.claude/skills/revy-research/propostas.md`
 - Modify: `AGENTS.md` (§1, lista "Antes de qualquer ferramenta")
 
 **Interfaces:**
 - Consumes: tudo que as tarefas anteriores produziram
-- Produces: o disparo
+- Produces: o disparo, os três modos e as três camadas do loop
+
+O `SKILL.md` é o único arquivo que carrega em **todo** disparo. Cada linha aqui
+custa em toda tarefa futura — escreva curto e não deixe conteúdo entrar. Teto:
+~90 linhas. Conteúdo mora nos arquivos vizinhos, carregados sob demanda.
 
 - [ ] **Step 1: Escrever o `SKILL.md`**
 
 ```markdown
 ---
 name: revy-research
-description: Use antes de codar, corrigir, implementar ou mexer em qualquer produto do monorepo Revy (chatbot-api, portal-gestao, motor-simulacao, estoque-api, revy-trafego, catalogo-publico). Entrega arquivo:linha de rota, modelo, worker, migration, flag e template, as armadilhas ja conhecidas e as decisoes do dono que nao devem ser re-propostas.
+description: Use antes de codar, corrigir, implementar, debugar ou propor qualquer coisa em qualquer produto do monorepo Revy (chatbot-api, portal-gestao, motor-simulacao, estoque-api, revy-trafego, catalogo-publico). Entrega arquivo:linha de rota, modelo, worker, migration, flag e template, as armadilhas ja conhecidas e as decisoes do dono que nao devem ser re-propostas.
 ---
 
 # revy-research
@@ -1417,7 +1422,7 @@ O repo tem 722 arquivos `.py` de projeto convivendo com 10.286 quando se conta
 os cinco `.venv`. Buscar as cegas devolve o codigo-fonte do FastAPI em 93% dos
 casos. Este e o mapa que evita isso.
 
-## Protocolo
+## Tronco — sempre, antes de qualquer coisa
 
 1. **Identifique o produto.** Um dos seis. Se a tarefa cruza dois, PARE e diga
    ao dono antes de editar — integracao entre produtos e so por HTTP versionado.
@@ -1430,12 +1435,49 @@ casos. Este e o mapa que evita isso.
    template, e o comando de teste nos dois SOs.
 4. **Leia `learnings/INDEX.md`** e abra so os learnings cujo `gatilho` bate com
    a tarefa. Normalmente zero, um ou dois. Nunca todos.
-5. **Vai PROPOR alguma coisa?** Leia `decisoes/INDEX.md` antes. O que esta la
-   foi escolhido pelo dono e nao se re-propoe.
-6. **So agora abra codigo.**
-7. **Ao fechar:** rode o teste do produto (o comando esta no mapa) e escreva um
-   learning **se algo te surpreendeu**. Tarefa que correu direto nao gera
-   learning.
+
+## Depois do tronco, o modo
+
+**ORIENTAR** — implementar, corrigir, mexer em codigo.
+Siga para o codigo pelo `arquivo:linha` do mapa. Va para o Fechamento.
+
+**PROPOR** — sugerir, planejar, desenhar, opinar sobre rumo.
+Leia `decisoes/INDEX.md` **antes de abrir a boca**. O que esta la foi escolhido
+pelo dono e nao se re-propoe. So entao proponha.
+
+**DEBUGAR** — bug, teste vermelho, comportamento estranho.
+Nao improvise protocolo de depuracao: com o `arquivo:linha` e o learning em
+maos, siga para a skill `superpowers:systematic-debugging` e trabalhe por la.
+
+## Fechamento — em qualquer modo
+
+5. **Rode o teste do produto.** O comando dos dois SOs esta no mapa.
+6. **Mexeu em rota, modelo, worker, migration ou flag?** Rode o gerador e
+   **commite o mapa junto com o codigo**, no mesmo commit. O mapa nao pode
+   envelhecer numa mudanca sua.
+7. **Escreva um learning SE algo te surpreendeu.** Tarefa que correu direto nao
+   gera learning. Antes de criar arquivo novo, leia a Poda abaixo.
+
+## Poda — a regra que impede a base de apodrecer
+
+Base que so cresce e base que ninguem le. Se o `learnings/INDEX.md` chegar a 200
+linhas, o passo "leia o indice, e barato" morreu e a skill morre junto.
+
+- **Procure duplicata pelo gatilho antes de criar.** Ja existe learning do mesmo
+  gatilho? **Edite o existente.** Nao crie o proximo.
+- **Learning que se provou falso morre.** Voce abriu, seguiu a instrucao e ela
+  nao e mais verdade porque a armadilha foi corrigida no codigo? **Apague o
+  arquivo e a linha do indice**, no mesmo commit. Learning nao expira por data;
+  expira por evidencia.
+- **Passou de ~40 learnings?** Sinal de que falta poda. Avise o dono. E gatilho
+  de revisao, nao regra rigida.
+
+## Quando o protocolo estiver errado
+
+Se o que falhou foi **este protocolo** — nao o codigo — escreva uma linha em
+`propostas.md`: o que falhou e o que voce mudaria. **Nao edite este SKILL.md.**
+Ele carrega em todo disparo; se ele derivar sozinho, em trinta tarefas vira 400
+linhas que ninguem escreveu nem revisou. O dono le as propostas e decide.
 
 ## Regerar o mapa
 
@@ -1458,6 +1500,24 @@ Conferir sem regerar (sai 1 se o mapa mentir):
   do `README.md` do produto, que ja existe. O mapa aponta; nao copia.
 - **Learning precisa de `gatilho`.** Sem ele ninguem acha, e learning que
   ninguem acha e learning morto.
+- **Uma skill, tres modos — nao quatro skills.** Separar em `implementar`,
+  `feature`, `debug` e `research` foi avaliado e recusado em 23/08: as
+  descricoes competem pelo mesmo gatilho e o risco vira nenhuma disparar.
+```
+
+- [ ] **Step 1b: Criar o `propostas.md` vazio**
+
+`.claude/skills/revy-research/propostas.md`:
+
+```markdown
+# Propostas de mudanca no protocolo
+
+O agente escreve aqui quando **este protocolo** falhou — nao quando o codigo
+falhou. Uma linha por proposta: o que falhou, o que mudaria. O dono le e decide.
+Proposta aplicada sai desta lista e entra no `SKILL.md`.
+
+| Data | O que falhou no protocolo | O que eu mudaria |
+|---|---|---|
 ```
 
 - [ ] **Step 2: Verificar que a skill é reconhecida**
@@ -1491,9 +1551,18 @@ Esperado: exatamente 2 linhas acrescentadas, nenhuma removida.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add .claude/skills/revy-research/SKILL.md AGENTS.md
-git commit -m "feat(revy-research): SKILL.md com o protocolo e passo 0 no AGENTS.md"
+git add .claude/skills/revy-research/SKILL.md .claude/skills/revy-research/propostas.md AGENTS.md
+git commit -m "feat(revy-research): SKILL.md com tronco, 3 modos, poda e passo 0 no AGENTS.md"
 ```
+
+Antes de commitar, confira o teto:
+
+```bash
+wc -l .claude/skills/revy-research/SKILL.md
+```
+
+Esperado: até ~90 linhas. Passou muito disso, tem conteúdo no lugar de
+protocolo — mova para um arquivo vizinho.
 
 ---
 
@@ -1580,7 +1649,11 @@ Leia **so** os de gatilho compatavel com a sua tarefa. Normalmente 0, 1 ou 2.
 | mexer em app.css do portal ou do control | `2026-08-23-bump-do-v-no-base-html.md` |
 ```
 
-`decisoes/INDEX.md` no mesmo molde, com a coluna `nao_reproponha` no lugar de `gatilho`. **Acrescente a decisão de 23/08 de cortar o diário de trabalho** — está registrada em "Fora de escopo" na spec.
+`decisoes/INDEX.md` no mesmo molde, com a coluna `nao_reproponha` no lugar de `gatilho`. **Acrescente as três decisões de 23/08 que estão em "Fora de escopo" na spec**, porque são exatamente o tipo de coisa que volta como sugestão daqui a um mês:
+
+- cortar o diário de trabalho (o `git log` já cobre);
+- não separar a skill em quatro (`implementar` / `feature` / `debug` / `research`) — descrições competem pelo mesmo gatilho;
+- o `SKILL.md` não se auto-edita; a válvula é `propostas.md`.
 
 ```bash
 ls .claude/skills/revy-research/learnings/*.md | wc -l   # esperado: ~20 + INDEX
@@ -1600,6 +1673,16 @@ echo "conferencia terminada"
 ```
 
 Esperado: nenhuma linha `FORA DO INDICE`. Um learning fora do índice é um learning morto.
+
+Agora o outro lado, que é a poda: dois learnings com o **mesmo gatilho** significam que a regra "edite o existente" já foi violada na largada.
+
+```bash
+cd .claude/skills/revy-research
+grep -o "^| [^|]*" learnings/INDEX.md | sort | uniq -d
+echo "acima: gatilhos duplicados (esperado: nada)"
+```
+
+Esperado: nenhuma saída. Se houver duplicata, funda os dois learnings num só antes de commitar.
 
 - [ ] **Step 6: Commit**
 
@@ -1642,6 +1725,19 @@ grep -in "worker\|followup" mapa/chatbot-api.md
 ```
 
 Esperado: as duas respostas saem do mapa com `arquivo:linha`. Se alguma não sair, **falta uma seção no gerador** — volte à tarefa correspondente antes de fechar. Registre o resultado do ensaio no relatório.
+
+- [ ] **Step 2b: Cronometrar o gerador — o loop depende disso**
+
+O passo 6 do protocolo manda regerar o mapa e commitá-lo junto com o código sempre que a tarefa mexer em rota, modelo, worker, migration ou flag. Uma regra que custa um minuto **não é obedecida**, e o loop morre em silêncio.
+
+```bash
+# Windows
+cd .claude/skills/revy-research && powershell -c "Measure-Command { python gerar_mapa.py } | Select-Object -ExpandProperty TotalSeconds"
+# macOS
+cd .claude/skills/revy-research && time python3 gerar_mapa.py
+```
+
+Esperado: **abaixo de ~15 segundos**. Se passar disso, o gargalo quase certamente é `cruzamentos.nomes_usados`, que reparseia todos os produtos. Nesse caso, tire a geração do `_cruzamentos.md` do caminho padrão e ponha atrás de uma flag `--cruzamentos`, para o passo 6 ficar barato. Registre o tempo medido no relatório.
 
 - [ ] **Step 3: Conferir que nenhuma mudança alheia entrou**
 

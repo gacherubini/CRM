@@ -45,6 +45,7 @@ o que não está no git não existe na outra máquina. É daí que vem a mudanç
     estoque-api.md  revy-trafego.md   catalogo-publico.md
   learnings/  INDEX.md + um arquivo por armadilha
   decisoes/   INDEX.md + um arquivo por escolha do dono
+  propostas.md  o que o agente mudaria no protocolo; o dono aprova
 ```
 
 ### Pré-requisito: versionar `.claude/skills/`
@@ -70,6 +71,7 @@ Nenhuma linha do mapa é opinião. Onde há julgamento, o dono continua sendo o
 | `mapa/` | o script, sempre | não; o selo de frescor denuncia |
 | `learnings/` | o agente, ao se surpreender | não |
 | `decisoes/` | o dono, ao decidir | não |
+| `propostas.md` | o agente propõe, o dono decide | esvazia quando aplicada |
 | `SKILL.md` | humano, raramente | é protocolo, não conteúdo |
 
 ## O gerador
@@ -179,21 +181,89 @@ Terceira camada disponível e **não adotada**: hook `UserPromptSubmit` injetand
 a instrução em todo turno. Custa tokens em toda mensagem; só se as duas
 primeiras falharem na prática.
 
-## Protocolo do `SKILL.md`
+## Protocolo do `SKILL.md` — um gatilho, três modos
+
+**Uma skill só, não quatro.** Skill dispara por competição de `description`;
+quatro skills cujas descrições dizem quase a mesma coisa ("use ao mexer em
+código do Revy") competem pelo mesmo gatilho, e o modo de falha dominante passa
+a ser **nenhuma disparar**. Além disso `implementar`, `feature` e `debug`
+compartilham o mesmo primeiro passo — achar o código — e separá-las exigiria ou
+duplicar o protocolo do mapa, ou criar uma quinta skill "núcleo" que é a skill
+única com indireção na frente. O `AGENTS.md` já legisla contra o espalhamento
+("não espalhe um eixo em vários filhos").
+
+O tronco, sempre:
 
 ```
 1. Identifique o produto (1 dos 6). Tarefa que cruza dois: PARE e diga.
 2. Cheque o frescor do mapa daquele produto.
 3. Abra mapa/<produto>.md.
 4. Leia learnings/INDEX.md; abra só os de gatilho compatível (0, 1 ou 2).
-5. Vai PROPOR algo? Leia decisoes/INDEX.md antes.
-6. Só agora abra código.
-7. Ao fechar: teste do produto, e um learning SE algo surpreendeu.
 ```
 
-Custo por disparo: `SKILL.md` (~70) + `mapa/<produto>.md` (~150) + `INDEX.md`
-(~40) ≈ **260 linhas** para saber onde tudo está, contra 2.609 de um `main.py`
+Daí em diante, o modo:
+
+| Modo | Quando | O que muda |
+|---|---|---|
+| **ORIENTAR** | implementar, corrigir, mexer | abre código; ao fechar roda o teste do produto |
+| **PROPOR** | sugerir, planejar, desenhar | lê `decisoes/INDEX.md` **antes** de abrir a boca |
+| **DEBUGAR** | bug, teste vermelho, comportamento estranho | entrega o bastão para `superpowers:systematic-debugging` |
+
+O modo DEBUGAR não reimplementa protocolo de depuração — esse já existe e é
+melhor do que qualquer coisa que se escrevesse aqui. A skill entrega o
+`arquivo:linha` e o learning que bate, e manda seguir.
+
+Fechamento, em qualquer modo:
+
+```
+5. Rode o teste do produto (o comando está no mapa).
+6. Mexeu em rota, modelo, worker, migration ou flag? Rode o gerador e
+   commite o mapa JUNTO com o código.
+7. Escreva um learning SE algo te surpreendeu — e antes disso procure
+   duplicata no índice.
+```
+
+Custo por disparo: `SKILL.md` (~90) + `mapa/<produto>.md` (~150) + `INDEX.md`
+(~40) ≈ **280 linhas** para saber onde tudo está, contra 2.609 de um `main.py`
 que ainda não responde a pergunta.
+
+## O loop de auto-melhoria
+
+A skill se atualiza sozinha, mas **cada camada tem permissão diferente**. Loop
+uniforme é como o conhecimento apodrece.
+
+| Camada | Quem escreve | Loop | Por quê essa permissão |
+|---|---|---|---|
+| Mapa | o script | **automático**, no mesmo commit do código | a fonte é o código; `--verificar` prova |
+| Learnings / decisões | o agente, só append | **automático, com filtro e poda** | append-only é reversível e revisável em PR |
+| Protocolo (`SKILL.md`) | humano aprova | **proposta, nunca auto-edição** | é o que carrega sempre; deriva sai cara |
+
+**A forma mais forte do loop é mecânica e sai de graça:** se a tarefa mexeu em
+rota, modelo, worker, migration ou flag, o gerador roda e o mapa entra no mesmo
+commit. O mapa não fica velho porque envelhecer virou impossível — a mudança e o
+registro da mudança viajam juntos.
+
+**O `SKILL.md` não se auto-edita.** Um protocolo que se reescreve a cada tarefa
+deriva: em trinta tarefas vira 400 linhas que ninguém escreveu nem revisou, com
+regras contraditórias, encarecendo todo disparo. É a doença que o `AGENTS.md` de
+99 linhas foi escrito para curar. A válvula é `propostas.md`: quando o agente
+percebe que o *protocolo* falhou — não o código, o protocolo — escreve uma linha
+lá dizendo o que falhou e o que mudaria. O dono lê quando quiser.
+
+### Poda — a força contrária
+
+Base de conhecimento que só cresce é base que ninguém lê. Se o
+`learnings/INDEX.md` chegar a 200 linhas, o passo "leia o índice, é barato"
+morreu, e com ele a skill. Três regras, dentro do protocolo de escrita:
+
+1. **Antes de criar learning, procurar duplicata pelo gatilho.** Já existe um do
+   mesmo gatilho? **Edita** o existente; não cria o 201º.
+2. **Learning que se provou falso morre.** Abriu o learning, seguiu a instrução e
+   ela não é mais verdade porque a armadilha foi corrigida no código? **Apaga o
+   arquivo** no mesmo commit. Learning não expira por data — expira por
+   evidência.
+3. **Teto de revisão declarado no índice:** passou de ~40 learnings, é sinal de
+   que falta poda. Gatilho de revisão, não regra rígida.
 
 ## Verificação
 
@@ -235,6 +305,14 @@ subagentes.
   `git log` já registra o que foi feito, e o delta que sobrava (caminho
   abandonado, pergunta em aberto) não paga o custo de um registro por tarefa.
   Não re-propor.
+- **Quatro skills separadas** (`implementar` / `feature` / `debug` / `research`).
+  Avaliado e recusado em 23/08: descrições concorrentes pelo mesmo gatilho, e as
+  três primeiras compartilham o mesmo protocolo. Viraram três **modos** dentro
+  de uma skill. Não re-propor.
+- **Auto-edição do `SKILL.md`.** O protocolo não se reescreve sozinho; a válvula
+  é `propostas.md`. Ver "O loop de auto-melhoria".
+- **Reimplementar protocolo de depuração.** O modo DEBUGAR entrega o bastão para
+  `superpowers:systematic-debugging`.
 - Hook de `UserPromptSubmit` (ver Disparo).
 - Reaproveitar `graphify-out/graph.json`: snapshots de 30/07 e 03/08,
   três semanas atrás, com o Modo 2 inteiro construído no meio. Grafo responde
@@ -250,7 +328,8 @@ subagentes.
 |---|---|
 | `.gitignore` | 3 linhas |
 | `AGENTS.md` §1 | 1 linha |
-| `SKILL.md` | ~70 linhas |
+| `SKILL.md` | ~90 linhas (tronco + 3 modos + poda) |
+| `propostas.md` | começa com só o cabeçalho |
 | `gerar_mapa.py` | ~350 linhas |
 | `test_gerar_mapa.py` | ~60 linhas |
 | `mapa/` | gerado, 8 arquivos |
