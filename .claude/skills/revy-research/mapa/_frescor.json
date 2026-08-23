@@ -1,5 +1,5 @@
 {
- "sha": "9793d81",
+ "sha": "4c1d66e",
  "inventario": {
   "chatbot-api": [
    {
@@ -8,6 +8,13 @@
     "simbolo": "CloudRetryWorker",
     "arquivo": "app/cloud_retry.py",
     "linha": 140
+   },
+   {
+    "secao": "flag",
+    "chave": "CHATBOT_WHATSAPP_MODO2_ENABLED (default: '')",
+    "simbolo": "CHATBOT_WHATSAPP_MODO2_ENABLED",
+    "arquivo": "app/config.py",
+    "linha": 120
    },
    {
     "secao": "flag",
@@ -430,6 +437,20 @@
     "linha": 2013
    },
    {
+    "secao": "flag",
+    "chave": "CHATBOT_NOTIF_RETRY_ENABLED (default: 1)",
+    "simbolo": "CHATBOT_NOTIF_RETRY_ENABLED",
+    "arquivo": "app/main.py",
+    "linha": 81
+   },
+   {
+    "secao": "flag",
+    "chave": "CHATBOT_MODO2_WORKERS_ENABLED (default: 1)",
+    "simbolo": "CHATBOT_MODO2_WORKERS_ENABLED",
+    "arquivo": "app/main.py",
+    "linha": 93
+   },
+   {
     "secao": "modelo",
     "chave": "lojas",
     "simbolo": "lojas",
@@ -818,6 +839,13 @@
    },
    {
     "secao": "flag",
+    "chave": "SELLER_AI_ENABLED (default: 0)",
+    "simbolo": "SELLER_AI_ENABLED",
+    "arquivo": "app/config.py",
+    "linha": 65
+   },
+   {
+    "secao": "flag",
     "chave": "REVY_TRAFEGO_SMTP_PASSWORD (default: '')",
     "simbolo": "REVY_TRAFEGO_SMTP_PASSWORD",
     "arquivo": "app/config.py",
@@ -930,6 +958,13 @@
    },
    {
     "secao": "flag",
+    "chave": "PORTAL_META_SPEND_SYNC_ENABLED (default: 1)",
+    "simbolo": "PORTAL_META_SPEND_SYNC_ENABLED",
+    "arquivo": "app/config.py",
+    "linha": 108
+   },
+   {
+    "secao": "flag",
     "chave": "REVY_TRAFEGO_URL",
     "simbolo": "REVY_TRAFEGO_URL",
     "arquivo": "app/config.py",
@@ -999,6 +1034,13 @@
     "linha": 282
    },
    {
+    "secao": "flag",
+    "chave": "PORTAL_COPILOTO_PURGE_ENABLED (default: True)",
+    "simbolo": "PORTAL_COPILOTO_PURGE_ENABLED",
+    "arquivo": "app/copiloto_purge_job.py",
+    "linha": 171
+   },
+   {
     "secao": "worker",
     "chave": "sincronizar_ofertas",
     "simbolo": "sincronizar_ofertas",
@@ -1048,6 +1090,13 @@
     "linha": 584
    },
    {
+    "secao": "flag",
+    "chave": "PORTAL_COPILOTO_SINAIS_ENABLED (default: True)",
+    "simbolo": "PORTAL_COPILOTO_SINAIS_ENABLED",
+    "arquivo": "app/copiloto_sinais_job.py",
+    "linha": 442
+   },
+   {
     "secao": "worker",
     "chave": "processar_turno",
     "simbolo": "processar_turno",
@@ -1081,6 +1130,13 @@
     "simbolo": "stop_worker",
     "arquivo": "app/copiloto_turnos_job.py",
     "linha": 413
+   },
+   {
+    "secao": "flag",
+    "chave": "PORTAL_COPILOTO_TURNOS_ENABLED (default: True)",
+    "simbolo": "PORTAL_COPILOTO_TURNOS_ENABLED",
+    "arquivo": "app/copiloto_turnos_job.py",
+    "linha": 241
    },
    {
     "secao": "rota",
@@ -1454,6 +1510,13 @@
     "linha": 161
    },
    {
+    "secao": "flag",
+    "chave": "PORTAL_META_SPEND_SYNC_ENABLED (default: True)",
+    "simbolo": "PORTAL_META_SPEND_SYNC_ENABLED",
+    "arquivo": "app/meta_ads_spend_job.py",
+    "linha": 72
+   },
+   {
     "secao": "worker",
     "chave": "MetaCapiRetryWorker",
     "simbolo": "MetaCapiRetryWorker",
@@ -1473,6 +1536,13 @@
     "simbolo": "stop_worker",
     "arquivo": "app/meta_capi_job.py",
     "linha": 131
+   },
+   {
+    "secao": "flag",
+    "chave": "PORTAL_CAPI_RETRY_ENABLED (default: True)",
+    "simbolo": "PORTAL_CAPI_RETRY_ENABLED",
+    "arquivo": "app/meta_capi_job.py",
+    "linha": 46
    },
    {
     "secao": "modelo",
@@ -2856,6 +2926,20 @@
   ],
   "motor-simulacao": [
    {
+    "secao": "flag",
+    "chave": "MOTOR_FANOUT_ENABLED (default: 0)",
+    "simbolo": "MOTOR_FANOUT_ENABLED",
+    "arquivo": "app/config.py",
+    "linha": 84
+   },
+   {
+    "secao": "flag",
+    "chave": "MOTOR_FLY_AUTOSCALE_ENABLED (default: 0)",
+    "simbolo": "MOTOR_FLY_AUTOSCALE_ENABLED",
+    "arquivo": "app/config.py",
+    "linha": 85
+   },
+   {
     "secao": "rota",
     "chave": "GET /health/live",
     "simbolo": "/health/live",
@@ -3883,6 +3967,27 @@
    },
    {
     "secao": "flag",
+    "chave": "GOOGLE_ADS_SYNC_ENABLED",
+    "simbolo": "GOOGLE_ADS_SYNC_ENABLED",
+    "arquivo": "app/config.py",
+    "linha": 99
+   },
+   {
+    "secao": "flag",
+    "chave": "GOOGLE_CONVERSIONS_ENABLED",
+    "simbolo": "GOOGLE_CONVERSIONS_ENABLED",
+    "arquivo": "app/config.py",
+    "linha": 102
+   },
+   {
+    "secao": "flag",
+    "chave": "GOOGLE_ADS_METRICS_WORKER_ENABLED",
+    "simbolo": "GOOGLE_ADS_METRICS_WORKER_ENABLED",
+    "arquivo": "app/config.py",
+    "linha": 106
+   },
+   {
+    "secao": "flag",
     "chave": "MULTI_WHATSAPP_ENABLED",
     "simbolo": "MULTI_WHATSAPP_ENABLED",
     "arquivo": "app/config.py",
@@ -3980,6 +4085,20 @@
     "linha": 209
    },
    {
+    "secao": "flag",
+    "chave": "GOOGLE_CONVERSIONS_ENABLED",
+    "simbolo": "GOOGLE_CONVERSIONS_ENABLED",
+    "arquivo": "app/control/google_ads_conversions_job.py",
+    "linha": 42
+   },
+   {
+    "secao": "flag",
+    "chave": "GOOGLE_CONVERSIONS_WORKER_ENABLED",
+    "simbolo": "GOOGLE_CONVERSIONS_WORKER_ENABLED",
+    "arquivo": "app/control/google_ads_conversions_job.py",
+    "linha": 49
+   },
+   {
     "secao": "worker",
     "chave": "listar_lojas_para_metrics_sync",
     "simbolo": "listar_lojas_para_metrics_sync",
@@ -4013,6 +4132,13 @@
     "simbolo": "stop_worker",
     "arquivo": "app/control/google_ads_metrics_job.py",
     "linha": 300
+   },
+   {
+    "secao": "flag",
+    "chave": "GOOGLE_ADS_METRICS_WORKER_ENABLED (default: False)",
+    "simbolo": "GOOGLE_ADS_METRICS_WORKER_ENABLED",
+    "arquivo": "app/control/google_ads_metrics_job.py",
+    "linha": 100
    },
    {
     "secao": "worker",
@@ -4505,6 +4631,13 @@
     "linha": 161
    },
    {
+    "secao": "flag",
+    "chave": "PORTAL_META_SPEND_SYNC_ENABLED (default: True)",
+    "simbolo": "PORTAL_META_SPEND_SYNC_ENABLED",
+    "arquivo": "app/meta_ads_spend_job.py",
+    "linha": 72
+   },
+   {
     "secao": "worker",
     "chave": "MetaCapiRetryWorker",
     "simbolo": "MetaCapiRetryWorker",
@@ -4524,6 +4657,13 @@
     "simbolo": "stop_worker",
     "arquivo": "app/meta_capi_job.py",
     "linha": 131
+   },
+   {
+    "secao": "flag",
+    "chave": "PORTAL_CAPI_RETRY_ENABLED (default: True)",
+    "simbolo": "PORTAL_CAPI_RETRY_ENABLED",
+    "arquivo": "app/meta_capi_job.py",
+    "linha": 46
    },
    {
     "secao": "modelo",
@@ -5584,6 +5724,13 @@
    }
   ],
   "catalogo-publico": [
+   {
+    "secao": "flag",
+    "chave": "META_PIXEL_ENABLED (default: '')",
+    "simbolo": "META_PIXEL_ENABLED",
+    "arquivo": "app/config.py",
+    "linha": 66
+   },
    {
     "secao": "flag",
     "chave": "REVY_TRAFEGO_PUBLIC_URL",

@@ -444,6 +444,22 @@ class TestExtratorDeFlags(unittest.TestCase):
         fonte = 'log.warning("REVY_LOJA_COPILOTO_ENABLED ligada sem chave")\n'
         self.assertEqual(extratores.flags(fonte, "app/main.py"), [])
 
+    def test_o_gate_do_modo2_aparece_no_mapa(self):
+        """Achado do ensaio cego de 23/08.
+
+        A pergunta do ensaio era sobre o Modo 2, e a flag que liga o Modo 2
+        (`CHATBOT_WHATSAPP_MODO2_ENABLED`) nao estava no mapa: o filtro so
+        aceitava prefixo REVY_/MULTI_. Mapa que nao tem a flag que mais se
+        procura e mapa que manda abrir o codigo — o que ele existe para evitar.
+        """
+        raiz = varredura.raiz_repo()
+        alvo = raiz / "chatbot-api" / "app" / "config.py"
+        nomes = {
+            e.simbolo
+            for e in extratores.flags(alvo.read_text(encoding="utf-8"), "app/config.py")
+        }
+        self.assertIn("CHATBOT_WHATSAPP_MODO2_ENABLED", nomes)
+
     def test_no_repo_real_passa_de_sessenta_flags(self):
         """Medido em 23/08: 80 leituras, 67 nomes distintos.
 

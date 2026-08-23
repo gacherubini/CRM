@@ -1,6 +1,6 @@
-# portal-gestao · 127 rotas · 26 modelos · 31 workers · 27 flags · 26 migrations · 61 templates
+# portal-gestao · 127 rotas · 26 modelos · 31 workers · 34 flags · 26 migrations · 61 templates
 
-Gerado de `9793d81`. NAO editar a mao — saida de `gerar_mapa.py`.
+Gerado de `4c1d66e`. NAO editar a mao — saida de `gerar_mapa.py`.
 Migration head: `0026_copiloto_sinal_destinatario`
 
 ## Rotas
@@ -205,6 +205,8 @@ Migration head: `0026_copiloto_sinal_destinatario`
 - `REVY_LOJA_COPILOTO_ENABLED (default: 0)` — app/config.py:41
 - `REVY_LOJA_FINANCEIRO_ENABLED (default: 0)` — app/config.py:51
 - `REVY_LOJA_REDIRECT_LEGACY (default: 0)` — app/config.py:60
+- `SELLER_AI_ENABLED (default: 0)` — app/config.py:65
+- `PORTAL_META_SPEND_SYNC_ENABLED (default: 1)` — app/config.py:108
 - `REVY_TRAFEGO_URL` — app/config.py:123
 - `REVY_TRAFEGO_SERVICE_TOKEN (default: '')` — app/config.py:126
 - `REVY_TRAFEGO_EMAIL_BACKEND (default: console)` — app/config.py:148
@@ -225,6 +227,11 @@ Migration head: `0026_copiloto_sinal_destinatario`
 - `REVY_LOJA_COPILOTO_FIPE_URL (default: https://parallelum.com.br/fipe/api/v1)` — app/config.py:222
 - `REVY_LOJA_COPILOTO_FIPE_TIMEOUT (default: 8)` — app/config.py:225
 - `REVY_LOJA_COPILOTO_FIPE_CACHE_SEGUNDOS (default: 21600)` — app/config.py:229
+- `PORTAL_COPILOTO_PURGE_ENABLED (default: True)` — app/copiloto_purge_job.py:171
+- `PORTAL_COPILOTO_SINAIS_ENABLED (default: True)` — app/copiloto_sinais_job.py:442
+- `PORTAL_COPILOTO_TURNOS_ENABLED (default: True)` — app/copiloto_turnos_job.py:241
+- `PORTAL_META_SPEND_SYNC_ENABLED (default: True)` — app/meta_ads_spend_job.py:72
+- `PORTAL_CAPI_RETRY_ENABLED (default: True)` — app/meta_capi_job.py:46
 
 ## Migrations
 

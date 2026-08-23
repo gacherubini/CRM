@@ -1,6 +1,6 @@
-# catalogo-publico · 8 rotas · 1 workers · 1 flags · 4 templates
+# catalogo-publico · 8 rotas · 1 workers · 2 flags · 4 templates
 
-Gerado de `9793d81`. NAO editar a mao — saida de `gerar_mapa.py`.
+Gerado de `4c1d66e`. NAO editar a mao — saida de `gerar_mapa.py`.
 Migration head: `n/a`
 
 ## Rotas
@@ -21,6 +21,7 @@ Migration head: `n/a`
 ## Flags
 
 - `REVY_TRAFEGO_PUBLIC_URL` — app/config.py:53
+- `META_PIXEL_ENABLED (default: '')` — app/config.py:66
 
 ## Templates
 

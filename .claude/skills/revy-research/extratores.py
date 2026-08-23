@@ -298,6 +298,13 @@ def migrations(pasta_versions: Path) -> tuple[list[Entrada], str]:
 
 
 PREFIXOS_DE_FLAG = ("REVY_", "MULTI_")
+SUFIXOS_DE_FLAG = ("_ENABLED",)
+
+# So o prefixo REVY_/MULTI_ deixava 16 flags de rollout fora contra 13 dentro,
+# incluindo CHATBOT_WHATSAPP_MODO2_ENABLED, o gate do Modo 2 — a flag que mais
+# se procura. O ensaio cego bateu nisso. Listar todas as 216 env vars lidas
+# seria ruido (37 tem nome de secret); `_ENABLED` mira em rollout, que e o que
+# esta secao promete.
 NOME_DE_ENV = re.compile(r"[A-Z][A-Z0-9_]*")
 
 # `_job.py` e `_workers.py` sao o padrao, mas o motor e o estoque chamam o deles
@@ -407,7 +414,8 @@ def flags(texto: str, arquivo_rel: str) -> list[Entrada]:
         if not isinstance(primeiro, ast.Constant) or not isinstance(primeiro.value, str):
             continue
         nome = primeiro.value
-        if not nome.startswith(PREFIXOS_DE_FLAG) or nome in vistos:
+        e_flag = nome.startswith(PREFIXOS_DE_FLAG) or nome.endswith(SUFIXOS_DE_FLAG)
+        if not e_flag or nome in vistos:
             continue
         if not NOME_DE_ENV.fullmatch(nome):
             continue     # frase que so COMECA com o nome da flag (log, mensagem)

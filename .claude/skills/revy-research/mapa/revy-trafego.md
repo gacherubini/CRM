@@ -1,6 +1,6 @@
-# revy-trafego · 119 rotas · 31 modelos · 35 workers · 51 flags · 20 migrations · 20 templates
+# revy-trafego · 119 rotas · 31 modelos · 35 workers · 59 flags · 20 migrations · 20 templates
 
-Gerado de `9793d81`. NAO editar a mao — saida de `gerar_mapa.py`.
+Gerado de `4c1d66e`. NAO editar a mao — saida de `gerar_mapa.py`.
 Migration head: `0020_loja_whatsapp_modo`
 
 ## Rotas
@@ -221,6 +221,9 @@ Migration head: `0020_loja_whatsapp_modo`
 - `REVY_TRAFEGO_CAPI_WORKER (default: 0)` — app/config.py:87
 - `REVY_CONTROL_ENABLED (default: 0)` — app/config.py:91
 - `REVY_CONTROL_RBAC_ENABLED (default: 0)` — app/config.py:95
+- `GOOGLE_ADS_SYNC_ENABLED` — app/config.py:99
+- `GOOGLE_CONVERSIONS_ENABLED` — app/config.py:102
+- `GOOGLE_ADS_METRICS_WORKER_ENABLED` — app/config.py:106
 - `MULTI_WHATSAPP_ENABLED` — app/config.py:137
 - `REVY_CONTROL_DASHBOARD_ENABLED` — app/config.py:140
 - `REVY_CONTROL_PROVISIONING_DELIVERY_ENABLED` — app/config.py:145
@@ -238,6 +241,9 @@ Migration head: `0020_loja_whatsapp_modo`
 - `REVY_TRAFEGO_PUBLIC_BASE_URL (default: '')` — app/config.py:168
 - `REVY_TRAFEGO_LOJAS` — app/config.py:245
 - `REVY_CONTROL_WHATSAPP_MODO2_ENABLED (default: '')` — app/config.py:256
+- `GOOGLE_CONVERSIONS_ENABLED` — app/control/google_ads_conversions_job.py:42
+- `GOOGLE_CONVERSIONS_WORKER_ENABLED` — app/control/google_ads_conversions_job.py:49
+- `GOOGLE_ADS_METRICS_WORKER_ENABLED (default: False)` — app/control/google_ads_metrics_job.py:100
 - `REVY_CONTROL_PROVISIONING_INTERVAL_SECONDS (default: 30.0)` — app/control/provisioning_job.py:45
 - `REVY_CONTROL_PROVISIONING_INITIAL_DELAY_SECONDS (default: 15.0)` — app/control/provisioning_job.py:51
 - `REVY_TRAFEGO_ENCRYPTION_KEY` — app/cripto.py:13
@@ -250,6 +256,8 @@ Migration head: `0020_loja_whatsapp_modo`
 - `REVY_TRAFEGO_AD_RESOLVER_SLEEP_ENTRE_CALLS` — app/meta_ad_resolver_job.py:59
 - `REVY_TRAFEGO_AD_RESOLVER_INTERVAL_SECONDS (default: 3600.0)` — app/meta_ad_resolver_job.py:461
 - `REVY_TRAFEGO_AD_RESOLVER_INITIAL_DELAY_SECONDS (default: 90.0)` — app/meta_ad_resolver_job.py:466
+- `PORTAL_META_SPEND_SYNC_ENABLED (default: True)` — app/meta_ads_spend_job.py:72
+- `PORTAL_CAPI_RETRY_ENABLED (default: True)` — app/meta_capi_job.py:46
 
 ## Migrations
 
