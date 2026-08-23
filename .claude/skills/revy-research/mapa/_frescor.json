@@ -1,5 +1,5 @@
 {
- "sha": "4c1d66e",
+ "sha": "7899099",
  "inventario": {
   "chatbot-api": [
    {
@@ -1854,6 +1854,76 @@
    },
    {
     "secao": "rota",
+    "chave": "GET /app/loja/copiloto",
+    "simbolo": "_PAGINA",
+    "arquivo": "app/web/loja_copiloto.py",
+    "linha": 182
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /app/loja/copiloto/notificacoes.json",
+    "simbolo": "_PAGINA",
+    "arquivo": "app/web/loja_copiloto.py",
+    "linha": 297
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /app/loja/copiloto/notificacoes/{sinal_id}/visto",
+    "simbolo": "_PAGINA",
+    "arquivo": "app/web/loja_copiloto.py",
+    "linha": 321
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /app/loja/copiloto/notificacoes/{sinal_id}/dispensar",
+    "simbolo": "_PAGINA",
+    "arquivo": "app/web/loja_copiloto.py",
+    "linha": 345
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /app/loja/copiloto/notificacoes/{sinal_id}/peguei",
+    "simbolo": "_PAGINA",
+    "arquivo": "app/web/loja_copiloto.py",
+    "linha": 366
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /app/loja/copiloto/perguntar",
+    "simbolo": "_PAGINA",
+    "arquivo": "app/web/loja_copiloto.py",
+    "linha": 423
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /app/loja/copiloto/turno/{turno_id}.json",
+    "simbolo": "_PAGINA",
+    "arquivo": "app/web/loja_copiloto.py",
+    "linha": 481
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /app/loja/copiloto/turno/{turno_id}/cancelar",
+    "simbolo": "_PAGINA",
+    "arquivo": "app/web/loja_copiloto.py",
+    "linha": 507
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /app/loja/copiloto/acao",
+    "simbolo": "_PAGINA",
+    "arquivo": "app/web/loja_copiloto.py",
+    "linha": 523
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /app/loja/copiloto/acao/{acao_id}/desfazer",
+    "simbolo": "_PAGINA",
+    "arquivo": "app/web/loja_copiloto.py",
+    "linha": 576
+   },
+   {
+    "secao": "rota",
     "chave": "GET /app/loja/estoque",
     "simbolo": "/app/loja/estoque",
     "arquivo": "app/web/loja_estoque.py",
@@ -1879,6 +1949,76 @@
     "simbolo": "/app/loja/estoque/vitrine",
     "arquivo": "app/web/loja_estoque.py",
     "linha": 247
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /app/loja/financeiro",
+    "simbolo": "_PAGINA",
+    "arquivo": "app/web/loja_financeiro.py",
+    "linha": 89
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /app/loja/financeiro/dados",
+    "simbolo": "_PAGINA",
+    "arquivo": "app/web/loja_financeiro.py",
+    "linha": 114
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /app/loja/financeiro/despesas",
+    "simbolo": "_DESPESAS",
+    "arquivo": "app/web/loja_financeiro.py",
+    "linha": 128
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /app/loja/financeiro/despesas",
+    "simbolo": "_DESPESAS",
+    "arquivo": "app/web/loja_financeiro.py",
+    "linha": 183
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /app/loja/financeiro/despesas/{despesa_id}/ajuste",
+    "simbolo": "_DESPESAS",
+    "arquivo": "app/web/loja_financeiro.py",
+    "linha": 216
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /app/loja/financeiro/despesas/{despesa_id}/encerrar",
+    "simbolo": "_DESPESAS",
+    "arquivo": "app/web/loja_financeiro.py",
+    "linha": 263
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /app/loja/integracoes",
+    "simbolo": "_TELA",
+    "arquivo": "app/web/loja_integracoes.py",
+    "linha": 38
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /app/loja/integracoes/health",
+    "simbolo": "_HEALTH",
+    "arquivo": "app/web/loja_integracoes.py",
+    "linha": 54
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /app/loja/perfil",
+    "simbolo": "_TELA",
+    "arquivo": "app/web/loja_perfil.py",
+    "linha": 82
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /app/loja/perfil/senha",
+    "simbolo": "_POST_SENHA",
+    "arquivo": "app/web/loja_perfil.py",
+    "linha": 90
    },
    {
     "secao": "rota",
@@ -1973,6 +2113,13 @@
    },
    {
     "secao": "rota",
+    "chave": "GET /app/loja/whatsapp",
+    "simbolo": "_TELA",
+    "arquivo": "app/web/loja_whatsapp.py",
+    "linha": 109
+   },
+   {
+    "secao": "rota",
     "chave": "POST /app/loja/whatsapp/catalogo",
     "simbolo": "/app/loja/whatsapp/catalogo",
     "arquivo": "app/web/loja_whatsapp.py",
@@ -2019,6 +2166,27 @@
     "simbolo": "/app/loja/whatsapp/canais/{canal_id}/status",
     "arquivo": "app/web/loja_whatsapp.py",
     "linha": 318
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /app/loja/whatsapp/fila",
+    "simbolo": "_TELA_FILA",
+    "arquivo": "app/web/loja_whatsapp.py",
+    "linha": 340
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /app/loja/whatsapp/fila",
+    "simbolo": "_TELA_FILA",
+    "arquivo": "app/web/loja_whatsapp.py",
+    "linha": 382
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /app/loja/whatsapp/fila/{vendedor_id}/remover",
+    "simbolo": "_TELA_FILA",
+    "arquivo": "app/web/loja_whatsapp.py",
+    "linha": 421
    },
    {
     "secao": "rota",
@@ -5441,6 +5609,13 @@
     "simbolo": "/app/control/lojas/{loja_id}/google-ads/metrics/sync",
     "arquivo": "app/web/control_ui.py",
     "linha": 1655
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /app/control/google-ads/oauth/callback",
+    "simbolo": "GOOGLE_ADS_OAUTH_CALLBACK_PATH",
+    "arquivo": "app/web/control_ui.py",
+    "linha": 1730
    },
    {
     "secao": "template",

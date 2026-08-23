@@ -11,7 +11,7 @@ Leia **so** os de gatilho compativel com a sua tarefa. Normalmente 0, 1 ou 2.
 | ligar ou desligar as maquinas do Fly pelos scripts do repo | `2026-08-23-scripts-do-fly-usam-python3.md` |
 | investigar custo, volume ou RAM dos apps do Fly | `2026-08-23-volume-do-fly-forka-sozinho.md` |
 | portal e motor caindo juntos com conexao recusada no banco | `2026-08-23-suite-pg-oom-derruba-portal-e-motor.md` |
-| procurar o banco de um produto ou cruzar dados entre produtos | `2026-08-23-cinco-bancos-em-duas-engines.md` |
+| procurar o banco de um produto, escolher dialeto de migration ou cruzar dados | `2026-08-23-engine-do-produto-se-confere-no-db-py.md` |
 | o bot do WhatsApp parou de responder sem ninguem ter mexido no codigo | `2026-08-23-n8n-cheio-deixa-o-bot-mudo.md` |
 | reiniciar o n8n2037 ou trocar um secret dele | `2026-08-23-reiniciar-o-n8n-derruba-o-webhook.md` |
 | subir workflow novo no n8n do Fly | `2026-08-23-import-do-n8n-desativa-o-workflow.md` |

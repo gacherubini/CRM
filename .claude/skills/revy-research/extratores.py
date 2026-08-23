@@ -12,6 +12,14 @@ VERBOS = {"get", "post", "put", "patch", "delete", "head", "options"}
 
 
 def _decorators_de_rota(no: ast.AST):
+    """(verbo, no_do_path, objeto). Quem resolve o path e `_resolver_path`.
+
+    A linha usada la fora e a do NO DO PATH, nao a do decorator. Quando o
+    decorator quebra em varias linhas (o estilo de control.py e control_ui.py,
+    com o path numa linha propria), `dec.lineno` aponta para a linha do
+    @router.post, onde o path nao esta escrito — e o --verificar acusa mentira.
+    Mesma armadilha que o TemplateResponse ja tinha.
+    """
     for dec in getattr(no, "decorator_list", []):
         if not isinstance(dec, ast.Call):
             continue
@@ -19,17 +27,70 @@ def _decorators_de_rota(no: ast.AST):
         if not isinstance(alvo, ast.Attribute) or alvo.attr not in VERBOS:
             continue
         objeto = alvo.value.id if isinstance(alvo.value, ast.Name) else ""
-        if not dec.args or not isinstance(dec.args[0], ast.Constant):
+        if not dec.args:
             continue
-        path = dec.args[0].value
-        if not isinstance(path, str):
+        yield alvo.attr.upper(), dec.args[0], objeto
+
+
+def _constantes_de_modulo(arvore: ast.Module) -> dict[str, str]:
+    """{nome: valor} das constantes string do topo do modulo.
+
+    Resolve NA ORDEM do arquivo e reaproveitando o que ja resolveu, porque o
+    repo encadeia constante em cima de constante:
+
+        _PAGINA = "/app/loja/financeiro"
+        _DESPESAS = _PAGINA + "/despesas"     # loja_financeiro.py:43
+
+    Ler so o literal acha `_PAGINA` e perde `_DESPESAS` — e com ela as quatro
+    rotas de despesa. Foi exatamente o erro que este arquivo ja tinha, repetido
+    um nivel acima na primeira tentativa de conserto: assumir UMA forma onde o
+    repo usa duas. Vale mais desconfiar da propria correcao.
+    """
+    achadas: dict[str, str] = {}
+    for no in arvore.body:
+        alvo = None
+        if isinstance(no, ast.Assign) and len(no.targets) == 1:
+            alvo = no.targets[0]
+        elif isinstance(no, ast.AnnAssign):
+            alvo = no.target
+        if not isinstance(alvo, ast.Name) or no.value is None:
             continue
-        # A linha e a da STRING do path, nao a do decorator. Quando o decorator
-        # quebra em varias linhas (o estilo de control.py e control_ui.py, com
-        # o path numa linha propria), dec.lineno aponta para a linha do
-        # @router.post, onde o path nao esta escrito — e o --verificar acusa
-        # mentira. Mesma armadilha que o TemplateResponse ja tinha.
-        yield alvo.attr.upper(), path, dec.args[0].lineno, objeto
+        lido = _resolver_path(no.value, achadas)
+        if lido is not None:
+            achadas[alvo.id] = lido[0]
+    return achadas
+
+
+def _resolver_path(no: ast.AST, constantes: dict[str, str]):
+    """(path, ancora) ou None se o gerador nao souber ler.
+
+    `ancora` e o que esta ESCRITO na linha — e o que o --verificar reabre e
+    exige. Para `@router.get("/x")` a ancora e o proprio path; para
+    `@router.get(_PAGINA)` a ancora e `_PAGINA`, porque e isso que o leitor
+    encontra naquela linha.
+
+    Existe porque so `ast.Constant` deixava 25 rotas fora do mapa — e nao
+    quaisquer 25: as de loja_copiloto, loja_financeiro, loja_whatsapp,
+    loja_integracoes e loja_perfil, ou seja, exatamente os modulos novos, que
+    sao os que mais se pede para mexer. O `--verificar` seguia dizendo "mapa
+    confere com o codigo", porque ele so reabre o que esta no mapa: ausencia
+    ele nao ve. Sexta vez que a mesma assinatura aparece neste projeto —
+    assumir UMA forma sintatica onde o repo usa duas, devolver menos e
+    continuar verde.
+    """
+    if isinstance(no, ast.Constant):
+        return (no.value, no.value) if isinstance(no.value, str) else None
+    if isinstance(no, ast.Name):
+        valor = constantes.get(no.id)
+        return (valor, no.id) if valor is not None else None
+    if isinstance(no, ast.BinOp) and isinstance(no.op, ast.Add):
+        esq = _resolver_path(no.left, constantes)
+        dir_ = _resolver_path(no.right, constantes)
+        if esq is None or dir_ is None:
+            return None
+        # a ancora e a da esquerda: e ela que abre a expressao na linha
+        return esq[0] + dir_[0], esq[1]
+    return None
 
 
 def _prefixos_de_construtor(arvore: ast.Module) -> dict[str, str]:
@@ -73,19 +134,36 @@ def rotas(texto: str, arquivo_rel: str) -> list[Entrada]:
     except SyntaxError:
         return []
     prefixos = _prefixos_de_construtor(arvore)
+    constantes = _constantes_de_modulo(arvore)
     achadas: list[Entrada] = []
     for no in ast.walk(arvore):
         if not isinstance(no, (ast.FunctionDef, ast.AsyncFunctionDef)):
             continue
-        for verbo, path, linha, objeto in _decorators_de_rota(no):
-            # `simbolo` continua o path CRU: e o texto escrito na linha, e o
-            # --verificar reabre a linha. So a `chave` leva o prefixo.
+        for verbo, no_path, objeto in _decorators_de_rota(no):
+            lido = _resolver_path(no_path, constantes)
+            if lido is None:
+                # Cegueira DECLARADA. O modo de falha que este projeto repete e
+                # sumir calado: quem le um mapa que nao avisa conclui que a
+                # rota nao existe. Ancora no nome da funcao, que esta escrito
+                # na linha do `def`, entao o --verificar prova o aviso tambem.
+                achadas.append(Entrada(
+                    secao="aviso",
+                    chave=f"{verbo} com path que o gerador nao leu, "
+                          f"em `{no.name}` - a lista de rotas esta incompleta",
+                    simbolo=no.name,
+                    arquivo=arquivo_rel,
+                    linha=no.lineno,
+                ))
+                continue
+            path, ancora = lido
+            # `simbolo` e o que esta ESCRITO na linha (path cru ou o nome da
+            # constante); so a `chave` leva o prefixo do router ja composto.
             achadas.append(Entrada(
                 secao="rota",
                 chave=f"{verbo} {prefixos.get(objeto, '')}{path}",
-                simbolo=path,
+                simbolo=ancora,
                 arquivo=arquivo_rel,
-                linha=linha,
+                linha=no_path.lineno,
             ))
     return achadas
 

@@ -319,7 +319,20 @@ def main(argv: list[str]) -> int:
         print("mapa confere com o codigo")
         return 0
     if "--frescor" in argv:
-        alvos = [a for a in argv if not a.startswith("--")] or list(varredura.PRODUTOS)
+        alvos = ([a for a in argv if not a.startswith("--")]
+                 or list(varredura.FONTES_DO_MAPA))
+        # Sem esta checagem o argumento ia direto para o git como pathspec, e
+        # pasta que nao existe nao muda: `--frescor Motor` respondia "mapa em
+        # dia". E "Motor", "Estoque", "Revy Loja" sao os nomes da tabela do
+        # AGENTS.md secao 2 — o unico lugar onde o agente aprende como os
+        # produtos se chamam ensinava exatamente os argumentos que este comando
+        # engolia calado, e o passo 2 do protocolo manda seguir calado quando
+        # ouve "mapa em dia". Falso "tudo certo" e pior que erro nenhum.
+        desconhecidos = [a for a in alvos if a not in varredura.FONTES_DO_MAPA]
+        if desconhecidos:
+            print(f"nao conheco: {', '.join(desconhecidos)}")
+            print(f"use um de: {', '.join(varredura.FONTES_DO_MAPA)}")
+            return 2
         atrasados = frescor(raiz, alvos)
         if not atrasados:
             print("mapa em dia")

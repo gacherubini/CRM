@@ -1,6 +1,6 @@
 # motor-simulacao · 16 rotas · 12 modelos · 1 workers · 2 flags · 14 migrations
 
-Gerado de `4c1d66e`. NAO editar a mao — saida de `gerar_mapa.py`.
+Gerado de `7899099`. NAO editar a mao — saida de `gerar_mapa.py`.
 Migration head: `0014`
 
 ## Rotas

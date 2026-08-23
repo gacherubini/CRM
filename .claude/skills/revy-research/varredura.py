@@ -13,6 +13,14 @@ PRODUTOS: tuple[str, ...] = (
     "catalogo-publico",
 )
 
+# O mapa tambem se alimenta de fora dos produtos: `cruzamentos.n8n_costura` le
+# `n8n/workflow-*.json` e `cruzamentos.fly_tomls` varre os `fly.toml` do repo.
+# Enquanto o frescor olhava so PRODUTOS, mexer no workflow do n8n nunca acendia
+# luz nenhuma — e a secao n8n x chatbot e, pelo comentario do proprio
+# cruzamentos.py, "a junta de maior severidade do repo: quando abre, o bot
+# emudece". Achado no ensaio cego de 23/08.
+FONTES_DO_MAPA: tuple[str, ...] = PRODUTOS + ("n8n", "deploy")
+
 IGNORADOS: frozenset[str] = frozenset({
     ".venv", "__pycache__", "node_modules", ".git",
     ".pytest_cache", ".pytest-tmp", "graphify-out", ".mypy_cache",

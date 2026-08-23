@@ -1,6 +1,6 @@
-# portal-gestao · 127 rotas · 26 modelos · 31 workers · 34 flags · 26 migrations · 61 templates
+# portal-gestao · 151 rotas · 26 modelos · 31 workers · 34 flags · 26 migrations · 61 templates
 
-Gerado de `4c1d66e`. NAO editar a mao — saida de `gerar_mapa.py`.
+Gerado de `7899099`. NAO editar a mao — saida de `gerar_mapa.py`.
 Migration head: `0026_copiloto_sinal_destinatario`
 
 ## Rotas
@@ -66,10 +66,30 @@ Migration head: `0026_copiloto_sinal_destinatario`
 - `POST /app/equipe/{membro_id}/{acao}` — app/web/equipe.py:425
 - `GET /app/loja/catalogo` — app/web/loja_catalogo.py:20
 - `POST /app/loja/catalogo` — app/web/loja_catalogo.py:21
+- `GET /app/loja/copiloto` — app/web/loja_copiloto.py:182
+- `GET /app/loja/copiloto/notificacoes.json` — app/web/loja_copiloto.py:297
+- `POST /app/loja/copiloto/notificacoes/{sinal_id}/visto` — app/web/loja_copiloto.py:321
+- `POST /app/loja/copiloto/notificacoes/{sinal_id}/dispensar` — app/web/loja_copiloto.py:345
+- `POST /app/loja/copiloto/notificacoes/{sinal_id}/peguei` — app/web/loja_copiloto.py:366
+- `POST /app/loja/copiloto/perguntar` — app/web/loja_copiloto.py:423
+- `GET /app/loja/copiloto/turno/{turno_id}.json` — app/web/loja_copiloto.py:481
+- `POST /app/loja/copiloto/turno/{turno_id}/cancelar` — app/web/loja_copiloto.py:507
+- `POST /app/loja/copiloto/acao` — app/web/loja_copiloto.py:523
+- `POST /app/loja/copiloto/acao/{acao_id}/desfazer` — app/web/loja_copiloto.py:576
 - `GET /app/loja/estoque` — app/web/loja_estoque.py:87
 - `GET /app/loja/estoque/veiculos` — app/web/loja_estoque.py:129
 - `GET /app/loja/estoque/vitrine` — app/web/loja_estoque.py:153
 - `POST /app/loja/estoque/vitrine` — app/web/loja_estoque.py:247
+- `GET /app/loja/financeiro` — app/web/loja_financeiro.py:89
+- `GET /app/loja/financeiro/dados` — app/web/loja_financeiro.py:114
+- `GET /app/loja/financeiro/despesas` — app/web/loja_financeiro.py:128
+- `POST /app/loja/financeiro/despesas` — app/web/loja_financeiro.py:183
+- `POST /app/loja/financeiro/despesas/{despesa_id}/ajuste` — app/web/loja_financeiro.py:216
+- `POST /app/loja/financeiro/despesas/{despesa_id}/encerrar` — app/web/loja_financeiro.py:263
+- `GET /app/loja/integracoes` — app/web/loja_integracoes.py:38
+- `GET /app/loja/integracoes/health` — app/web/loja_integracoes.py:54
+- `GET /app/loja/perfil` — app/web/loja_perfil.py:82
+- `POST /app/loja/perfil/senha` — app/web/loja_perfil.py:90
 - `POST /app/loja/selecionar` — app/web/loja_shell.py:357
 - `GET /app/loja/vendas` — app/web/loja_vendas.py:125
 - `GET /app/loja/vendas/dados` — app/web/loja_vendas.py:161
@@ -83,6 +103,7 @@ Migration head: `0026_copiloto_sinal_destinatario`
 - `POST /app/loja/vendas/{venda_id}/custos/{custo_id}/remover` — app/web/loja_vendas.py:378
 - `GET /app/loja/vendas/configuracoes-financeiras` — app/web/loja_vendas.py:394
 - `GET /app/loja/equipe` — app/web/loja_vendas.py:410
+- `GET /app/loja/whatsapp` — app/web/loja_whatsapp.py:109
 - `POST /app/loja/whatsapp/catalogo` — app/web/loja_whatsapp.py:146
 - `POST /app/loja/whatsapp/canais` — app/web/loja_whatsapp.py:207
 - `POST /app/loja/whatsapp/canais/{canal_id}/conectar` — app/web/loja_whatsapp.py:229
@@ -90,6 +111,9 @@ Migration head: `0026_copiloto_sinal_destinatario`
 - `POST /app/loja/whatsapp/canais/{canal_id}/inativar` — app/web/loja_whatsapp.py:273
 - `POST /app/loja/whatsapp/canais/{canal_id}/principal-estoque` — app/web/loja_whatsapp.py:293
 - `GET /app/loja/whatsapp/canais/{canal_id}/status` — app/web/loja_whatsapp.py:318
+- `GET /app/loja/whatsapp/fila` — app/web/loja_whatsapp.py:340
+- `POST /app/loja/whatsapp/fila` — app/web/loja_whatsapp.py:382
+- `POST /app/loja/whatsapp/fila/{vendedor_id}/remover` — app/web/loja_whatsapp.py:421
 - `GET /app/metas` — app/web/metas.py:135
 - `GET /app/metas/nova` — app/web/metas.py:167
 - `POST /app/metas/nova` — app/web/metas.py:177

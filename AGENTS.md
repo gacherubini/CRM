@@ -75,6 +75,15 @@ Se o card do plano tem 1k+ linhas, o brief cola **só** a Task N + Global Constr
 
 Não espalhe um eixo em vários filhos (código + Fly + n8n na mesma leva).
 
+**Um filho por vez.** Não dispare subagentes em paralelo. Cada filho relê o repo
+por conta própria, então o custo em token multiplica em vez de somar, e leva
+junto o risco de dois filhos editarem o mesmo arquivo. Paralelizar só com pedido
+explícito do dono — e dizendo antes quantos filhos e por quê.
+
+Filho caro é filho mal briefado: sem `arquivo:linha` e sem a lista de docs
+permitidos ele varre o monorepo inteiro para descobrir o que o brief já sabia.
+Antes de disparar, pergunte se você mesmo não resolve em duas leituras.
+
 ## 5. Invariantes (quebrar = revert)
 
 - Sem secret, token, cookie, `.env*` real ou `workflow-fly.ready.json` no git ou no log.

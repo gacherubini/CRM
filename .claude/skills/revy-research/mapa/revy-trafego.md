@@ -1,6 +1,6 @@
-# revy-trafego · 119 rotas · 31 modelos · 35 workers · 59 flags · 20 migrations · 20 templates
+# revy-trafego · 120 rotas · 31 modelos · 35 workers · 59 flags · 20 migrations · 20 templates
 
-Gerado de `4c1d66e`. NAO editar a mao — saida de `gerar_mapa.py`.
+Gerado de `7899099`. NAO editar a mao — saida de `gerar_mapa.py`.
 Migration head: `0020_loja_whatsapp_modo`
 
 ## Rotas
@@ -124,6 +124,7 @@ Migration head: `0020_loja_whatsapp_modo`
 - `POST /app/control/lojas/{loja_id}/google-ads/accounts/select` — app/web/control_ui.py:1503
 - `POST /app/control/lojas/{loja_id}/google-ads/conversion-bindings` — app/web/control_ui.py:1576
 - `POST /app/control/lojas/{loja_id}/google-ads/metrics/sync` — app/web/control_ui.py:1655
+- `GET /app/control/google-ads/oauth/callback` — app/web/control_ui.py:1730
 
 ## Modelos
 

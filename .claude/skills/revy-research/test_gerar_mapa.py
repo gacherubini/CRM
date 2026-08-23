@@ -1358,5 +1358,139 @@ class TestFrescor(unittest.TestCase):
         self.assertIn(gerar_mapa.CAMINHO_DO_MAPA_NO_GIT.replace("\\", "/"), tocados)
 
 
+class TestRotaComPathEmVariavel(unittest.TestCase):
+    """Achado do ensaio cego de 23/08: 25 rotas fora do mapa, caladas."""
+
+    FONTE = """
+_PAGINA = "/app/loja/financeiro"
+_DESPESAS = _PAGINA + "/despesas"
+
+@router.get(_PAGINA, response_class=HTMLResponse)
+async def financeiro_resultado():
+    pass
+
+@router.get(_PAGINA + "/dados")
+async def financeiro_dados():
+    pass
+
+@router.post(_DESPESAS + "/{despesa_id}/ajuste")
+async def despesa_ajuste():
+    pass
+"""
+
+    def test_constante_simples_encadeada_e_concatenada(self):
+        achadas = extratores.rotas(self.FONTE, "app/web/loja_financeiro.py")
+        chaves = {e.chave for e in achadas if e.secao == "rota"}
+        self.assertEqual(chaves, {
+            "GET /app/loja/financeiro",
+            "GET /app/loja/financeiro/dados",
+            "POST /app/loja/financeiro/despesas/{despesa_id}/ajuste",
+        })
+
+    def test_a_ancora_esta_escrita_na_linha_que_o_mapa_aponta(self):
+        """O --verificar reabre a linha e exige o simbolo nela.
+
+        Com path em variavel o simbolo NAO pode ser o path (ele nao esta
+        escrito ali) e sim o nome da constante, que esta.
+        """
+        linhas = self.FONTE.splitlines()
+        for e in extratores.rotas(self.FONTE, "x.py"):
+            self.assertIn(e.simbolo, linhas[e.linha - 1], e.chave)
+
+    def test_path_que_o_gerador_nao_le_vira_aviso_e_nao_silencio(self):
+        """Sumir calado e o modo de falha que este projeto repete.
+
+        Quem le um mapa que nao avisa conclui que a rota nao existe — foi assim
+        que o ensaio quase escreveu um plano para reconstruir um modulo pronto.
+        """
+        fonte = """
+@router.get(f"/app/{tenant}/x")
+async def handler_exotico():
+    pass
+"""
+        achadas = extratores.rotas(fonte, "app/web/x.py")
+        self.assertEqual([e.secao for e in achadas], ["aviso"])
+        self.assertIn("nao leu", achadas[0].chave)
+        # o aviso tambem precisa ser verificavel, senao e so barulho
+        self.assertIn(achadas[0].simbolo, fonte.splitlines()[achadas[0].linha - 1])
+
+    def test_no_repo_real_nenhuma_rota_some_calada(self):
+        """Antirregressao da classe inteira, nao de um caso.
+
+        Todo decorator de rota do repo tem que virar OU uma entrada de rota OU
+        um aviso. O que nao pode e o gerador dar de ombros: o --verificar so
+        reabre o que esta no mapa, entao ausencia ele nao ve, e o mapa seguia
+        dizendo "confere com o codigo" com 25 rotas faltando.
+        """
+        raiz = varredura.raiz_repo()
+        decorators = extraidas = 0
+        for produto in varredura.PRODUTOS:
+            for arq in varredura.arquivos_py(raiz, produto):
+                texto = arq.read_text(encoding="utf-8", errors="replace")
+                try:
+                    arvore = ast.parse(texto)
+                except SyntaxError:
+                    continue
+                for no in ast.walk(arvore):
+                    if not isinstance(no, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                        continue
+                    for dec in no.decorator_list:
+                        if not isinstance(dec, ast.Call):
+                            continue
+                        f = dec.func
+                        if isinstance(f, ast.Attribute) and f.attr in extratores.VERBOS \
+                                and dec.args:
+                            decorators += 1
+                rel = arq.relative_to(raiz / produto).as_posix()
+                extraidas += len(extratores.rotas(texto, rel))
+        self.assertGreater(decorators, 380)
+        self.assertEqual(decorators, extraidas)
+
+    def test_o_financeiro_da_loja_esta_no_mapa(self):
+        """O modulo concreto que o ensaio procurou e nao achou."""
+        mapa = (gerar_mapa.PASTA_MAPA / "portal-gestao.md").read_text(encoding="utf-8")
+        self.assertIn("GET /app/loja/financeiro", mapa)
+        self.assertIn("POST /app/loja/financeiro/despesas", mapa)
+
+
+class TestFrescorValidaOAlvo(unittest.TestCase):
+    def _rodar(self, *args):
+        saida = io.StringIO()
+        with contextlib.redirect_stdout(saida):
+            code = gerar_mapa.main(["--frescor", *args])
+        return code, saida.getvalue()
+
+    def test_nome_da_tabela_do_agents_md_nao_passa_por_produto(self):
+        """`Motor` e `Revy Loja` respondiam "mapa em dia".
+
+        Sao os nomes da coluna Produto da tabela do AGENTS.md secao 2 — o unico
+        lugar onde o agente aprende como os produtos se chamam. O documento que
+        manda rodar o comando ensinava os argumentos que o comando engolia, e o
+        passo 2 do protocolo manda seguir calado ao ouvir "mapa em dia".
+        """
+        for nome in ("Motor", "Estoque", "Revy Loja", "Revy Control", "chatbot"):
+            code, texto = self._rodar(nome)
+            self.assertEqual(code, 2, nome)
+            self.assertIn("nao conheco", texto)
+            self.assertNotIn("mapa em dia", texto)
+
+    def test_produto_de_verdade_passa(self):
+        code, texto = self._rodar("portal-gestao")
+        self.assertEqual(code, 0)
+        self.assertNotIn("nao conheco", texto)
+
+    def test_n8n_e_deploy_alimentam_o_mapa_entao_tem_frescor(self):
+        """`cruzamentos` le n8n/workflow-*.json e os fly.toml do repo.
+
+        Enquanto o frescor olhava so PRODUTOS, mexer no workflow nunca acendia
+        luz — e e a secao que o proprio cruzamentos.py chama de "junta de maior
+        severidade do repo: quando abre, o bot emudece".
+        """
+        self.assertIn("n8n", varredura.FONTES_DO_MAPA)
+        self.assertIn("deploy", varredura.FONTES_DO_MAPA)
+        for alvo in ("n8n", "deploy"):
+            self.assertEqual(self._rodar(alvo)[0], 0, alvo)
+
+
 if __name__ == "__main__":
     unittest.main()
