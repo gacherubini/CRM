@@ -14,8 +14,8 @@ protocolo de implementar, propor ou depurar.
 
 1. **Um produto, dos seis.** Cruzou dois? PARE e diga ao dono: entre produtos so
    ha HTTP versionado.
-2. **Frescor:** `git diff --name-only <sha>..HEAD -- <produto>/`, `<sha>` de
-   `mapa/_frescor.json`. Vazio: siga calado. Nao vazio: diga quantos e ofereca regerar.
+2. **Frescor:** `python gerar_mapa.py --frescor <produto>` (no Mac, `python3`).
+   `mapa em dia`: siga calado. Listou arquivos: diga quantos e ofereca regerar.
 3. **Abra `mapa/<produto>.md`**, nunca `main.py` inteiro (o do portal tem 2.609
    linhas): `arquivo:linha` de rota, modelo, worker, migration, flag e template,
    mais o comando de teste nos dois SOs.

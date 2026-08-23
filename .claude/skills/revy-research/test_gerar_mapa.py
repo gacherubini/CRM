@@ -3,6 +3,7 @@ import copy
 import io
 import ast
 import json
+import subprocess
 import tempfile
 import unittest
 from pathlib import Path
@@ -1262,6 +1263,100 @@ class TestCruzamentosVersionado(unittest.TestCase):
             for produto in varredura.PRODUTOS
         }
         self.assertEqual(atual, cruzamentos.render(raiz, rotas))
+
+class TestFrescor(unittest.TestCase):
+    """O frescor sai do commit que atualizou `mapa/`, nunca do sha do selo."""
+
+    def _git(self, *args):
+        subprocess.run(
+            ["git", *args], cwd=self.repo,
+            capture_output=True, text=True, check=True,
+        )
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.repo = Path(self.tmp.name)
+        self.mapa = self.repo / gerar_mapa.CAMINHO_DO_MAPA_NO_GIT
+        self.mapa.mkdir(parents=True)
+        (self.repo / "chatbot-api").mkdir()
+        self._git("init", "-q")
+        self._git("config", "user.email", "t@t")
+        self._git("config", "user.name", "t")
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def _commit(self, msg):
+        self._git("add", "-A")
+        self._git("commit", "-q", "-m", msg)
+        r = subprocess.run(
+            ["git", "rev-parse", "HEAD"], cwd=self.repo,
+            capture_output=True, text=True, check=True,
+        )
+        return r.stdout.strip()
+
+    def test_o_bug_que_esta_proposta_consertou(self):
+        """Codigo e mapa no MESMO commit nao pode acusar desatualizado.
+
+        E o cenario que o `AGENTS.md` §6 manda produzir: mexeu em rota, regerou
+        o mapa, commitou os dois juntos. Com o sha do selo (lido ANTES do
+        commit) o diff lista as mudancas do proprio commit certo, e o aviso
+        dispara justamente quando o agente acertou.
+        """
+        (self.repo / "chatbot-api" / "main.py").write_text("v1", encoding="utf-8")
+        (self.mapa / "chatbot-api.md").write_text("mapa v1", encoding="utf-8")
+        selo = self._commit("estado inicial")
+
+        # agora o passo certo: muda o produto E regera o mapa, no mesmo commit
+        (self.repo / "chatbot-api" / "main.py").write_text("v2", encoding="utf-8")
+        (self.mapa / "chatbot-api.md").write_text("mapa v2", encoding="utf-8")
+        self._commit("feat: rota nova + mapa regerado")
+
+        # o jeito antigo (sha do selo) acusaria o proprio commit certo
+        antigo = subprocess.run(
+            ["git", "diff", "--name-only", f"{selo}..HEAD", "--", "chatbot-api/"],
+            cwd=self.repo, capture_output=True, text=True, check=True,
+        ).stdout.split()
+        self.assertEqual(antigo, ["chatbot-api/main.py"], "o bug tem que existir")
+
+        # o jeito novo fica calado, que e a resposta certa
+        self.assertEqual(gerar_mapa.frescor(self.repo, ["chatbot-api"]), {})
+
+    def test_produto_mexido_depois_do_mapa_aparece(self):
+        (self.mapa / "chatbot-api.md").write_text("mapa", encoding="utf-8")
+        self._commit("mapa")
+        (self.repo / "chatbot-api" / "novo.py").write_text("x", encoding="utf-8")
+        self._commit("feat: mexe no produto sem regerar")
+        atrasados = gerar_mapa.frescor(self.repo, ["chatbot-api"])
+        self.assertEqual(list(atrasados), ["chatbot-api"])
+        self.assertEqual(atrasados["chatbot-api"], ["chatbot-api/novo.py"])
+
+    def test_mexer_num_produto_nao_avisa_sobre_outro(self):
+        """Aviso que dispara a toa e aviso que se aprende a ignorar."""
+        (self.repo / "motor-simulacao").mkdir()
+        (self.mapa / "x.md").write_text("mapa", encoding="utf-8")
+        self._commit("mapa")
+        (self.repo / "chatbot-api" / "novo.py").write_text("x", encoding="utf-8")
+        self._commit("feat: so o chatbot")
+        atrasados = gerar_mapa.frescor(self.repo, ["chatbot-api", "motor-simulacao"])
+        self.assertEqual(list(atrasados), ["chatbot-api"])
+
+    def test_sem_mapa_no_historico_nao_estoura(self):
+        (self.repo / "chatbot-api" / "a.py").write_text("x", encoding="utf-8")
+        self._commit("sem mapa nenhum")
+        self.assertEqual(gerar_mapa.commit_do_mapa(self.repo), "")
+        self.assertEqual(gerar_mapa.frescor(self.repo, ["chatbot-api"]), {})
+
+    def test_no_repo_real_o_commit_do_mapa_tocou_o_mapa(self):
+        raiz = varredura.raiz_repo()
+        sha = gerar_mapa.commit_do_mapa(raiz)
+        self.assertTrue(sha)
+        tocados = subprocess.run(
+            ["git", "show", "--name-only", "--format=", sha],
+            cwd=raiz, capture_output=True, text=True, check=True,
+        ).stdout
+        self.assertIn(gerar_mapa.CAMINHO_DO_MAPA_NO_GIT.replace("\\", "/"), tocados)
+
 
 if __name__ == "__main__":
     unittest.main()

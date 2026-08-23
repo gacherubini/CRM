@@ -186,9 +186,20 @@ estático — pertencem a uma futura skill de UI e à do site).
 
 ### Frescor por produto
 
-`_frescor.json` guarda o SHA da geração. Ao disparar, a skill roda
-`git diff --name-only <sha>..HEAD -- <produto>/`. Vazio → silêncio. Não vazio →
-aviso nomeando os arquivos e oferecendo regerar.
+Ao disparar, a skill roda `gerar_mapa.py --frescor <produto>`. Vazio → silêncio.
+Não vazio → aviso nomeando os arquivos e oferecendo regerar.
+
+A base da comparação é **o commit que atualizou `mapa/` por último**
+(`git log -1 -- mapa/`), **não** o SHA gravado no selo. O selo é lido antes do
+commit que grava o mapa, então fica sempre um commit atrás: quando o §6 é
+obedecido — mexeu em rota, regerou o mapa, commitou os dois juntos — o diff a
+partir do selo lista as mudanças do próprio commit certo e acusa o produto de
+desatualizado. O aviso dispararia justamente quando o agente acertou.
+
+Isso não foi previsto aqui; foi achado pelo ensaio cego da Task 11 em 23/08,
+virou a primeira linha de `propostas.md`, e o dono aprovou no mesmo dia. O selo
+continua no `_frescor.json` como procedência e como fonte do inventário que o
+`--verificar` reabre — só não serve para medir frescor.
 
 A granularidade é por produto de propósito: mexer no `site/` não pode disparar
 aviso sobre o mapa do motor. Aviso que dispara à toa é aviso que se aprende a

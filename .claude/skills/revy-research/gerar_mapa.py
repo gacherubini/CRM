@@ -80,6 +80,50 @@ def sha_atual(raiz: Path) -> str:
     return saida.stdout.strip() or "desconhecido"
 
 
+# Onde o mapa vive no git. O frescor so faz sentido para a copia versionada,
+# entao este caminho e fixo mesmo quando PASTA_MAPA e trocada em teste.
+CAMINHO_DO_MAPA_NO_GIT = ".claude/skills/revy-research/mapa"
+
+
+def commit_do_mapa(raiz: Path) -> str:
+    """O commit que atualizou `mapa/` por ultimo. String vazia se nunca houve.
+
+    NAO usar o sha do selo para isto. O selo e lido ANTES do commit que grava o
+    mapa, entao fica sempre um commit atras — e quando o `AGENTS.md` §6 e
+    obedecido (regerar e commitar junto com o codigo), o diff a partir do selo
+    lista as mudancas do proprio commit certo e acusa o produto de
+    desatualizado. O aviso dispararia justamente quando o agente acertou, que e
+    o modo de falha que o desenho existe para evitar.
+    """
+    saida = subprocess.run(
+        ["git", "log", "-1", "--format=%H", "--", CAMINHO_DO_MAPA_NO_GIT],
+        cwd=raiz, capture_output=True, text=True, check=False,
+    )
+    return saida.stdout.strip()
+
+
+def frescor(raiz: Path, produtos: list[str]) -> dict[str, list[str]]:
+    """{produto: arquivos mudados desde o commit que atualizou o mapa}.
+
+    Produto sem mudanca nao aparece: silencio e a resposta certa. A
+    granularidade e por produto de proposito — mexer no `site/` nao pode
+    disparar aviso sobre o mapa do motor.
+    """
+    base = commit_do_mapa(raiz)
+    if not base:
+        return {}
+    atrasados: dict[str, list[str]] = {}
+    for produto in produtos:
+        saida = subprocess.run(
+            ["git", "diff", "--name-only", f"{base}..HEAD", "--", f"{produto}/"],
+            cwd=raiz, capture_output=True, text=True, check=False,
+        )
+        mudados = [linha for linha in saida.stdout.splitlines() if linha.strip()]
+        if mudados:
+            atrasados[produto] = mudados
+    return atrasados
+
+
 def _com_pasta_de_migration(entrada: Entrada) -> Entrada:
     """Recompoe `alembic/versions/<nome>` no `arquivo` da migration.
 
@@ -274,6 +318,20 @@ def main(argv: list[str]) -> int:
             return 1
         print("mapa confere com o codigo")
         return 0
+    if "--frescor" in argv:
+        alvos = [a for a in argv if not a.startswith("--")] or list(varredura.PRODUTOS)
+        atrasados = frescor(raiz, alvos)
+        if not atrasados:
+            print("mapa em dia")
+            return 0
+        for produto, arquivos in atrasados.items():
+            print(f"{produto}: {len(arquivos)} arquivo(s) mudaram desde o mapa")
+            for a in arquivos[:5]:
+                print(f"  {a}")
+            if len(arquivos) > 5:
+                print(f"  ... e mais {len(arquivos) - 5}")
+        print("regere com `python gerar_mapa.py` (no Mac, python3)")
+        return 0   # aviso, nao erro: quem falha e o --verificar
     escrever_tudo(raiz)
     return 0
 
