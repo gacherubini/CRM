@@ -64,8 +64,19 @@ def main() -> None:
     )
 
     get = next(n for n in webhooks if n["parameters"].get("httpMethod") == "GET")
-    assert get["parameters"].get("responseMode") == "lastNode", (
-        "webhook GET precisa devolver o challenge do chatbot"
+    # `lastNode` devolveria {"data":"<challenge>"}: a Meta compara o corpo
+    # inteiro e reprova. O challenge tem que voltar cru, em texto.
+    assert get["parameters"].get("responseMode") == "responseNode", (
+        "webhook GET com lastNode envelopa o challenge em JSON e a Meta reprova"
+    )
+    respostas = por_tipo.get("n8n-nodes-base.respondToWebhook", [])
+    assert respostas, "sem nó de resposta: o challenge da Meta não volta em texto puro"
+    resposta = respostas[0]
+    assert resposta["parameters"].get("respondWith") == "text", (
+        "resposta da verificação tem que ser texto puro, não JSON"
+    )
+    assert "$json.data" in resposta["parameters"].get("responseBody", ""), (
+        "a resposta tem que ecoar o corpo que o chatbot devolveu (challenge)"
     )
 
     # --- o bot existe (§5.9) -------------------------------------------------

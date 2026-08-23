@@ -194,7 +194,11 @@ def novos_nos() -> list[dict]:
             "parameters": {
                 "httpMethod": "GET",
                 "path": "whatsapp-cloud",
-                "responseMode": "lastNode",
+                # responseNode, não lastNode: com lastNode o n8n serializa a
+                # saída do HTTP Request e devolve {"data":"<challenge>"}. A Meta
+                # compara o corpo INTEIRO com o challenge — o envelope reprova a
+                # verificação com "não foi possível validar o token".
+                "responseMode": "responseNode",
                 "options": {},
             },
             "id": "webhook-get",
@@ -234,6 +238,19 @@ def novos_nos() -> list[dict]:
             "type": "n8n-nodes-base.httpRequest",
             "typeVersion": 4.2,
             "position": [-240, -160],
+        },
+        {
+            "parameters": {
+                # `data` é o outputPropertyName default do responseFormat text.
+                "respondWith": "text",
+                "responseBody": "={{ $json.data }}",
+                "options": {},
+            },
+            "id": "respond-get",
+            "name": "Responder verificacao",
+            "type": "n8n-nodes-base.respondToWebhook",
+            "typeVersion": 1.1,
+            "position": [-20, -160],
         },
         {
             "parameters": {
@@ -342,6 +359,9 @@ def novos_nos() -> list[dict]:
 
 CONEXOES = {
     "Meta verificacao": {"main": [[{"node": "Repassar verificacao", "type": "main", "index": 0}]]},
+    "Repassar verificacao": {
+        "main": [[{"node": "Responder verificacao", "type": "main", "index": 0}]]
+    },
     "Meta inbound": {"main": [[{"node": "Repassar inbound", "type": "main", "index": 0}]]},
     "Repassar inbound": {"main": [[{"node": "Extrair1", "type": "main", "index": 0}]]},
     "Extrair1": {
