@@ -11,6 +11,7 @@ import sys
 from dataclasses import asdict, replace
 from pathlib import Path
 
+import cruzamentos
 import extratores
 import varredura
 from varredura import Entrada
@@ -179,6 +180,21 @@ def escrever_tudo(raiz: Path) -> None:
         )
         inventario[produto] = [asdict(e) for e in entradas]
         print(f"{produto}: {len(entradas)} entradas")
+    # Cruzamentos reaproveita o `inventario` que o laco acabou de preencher -
+    # sem segunda coleta. Sai para arquivo proprio e NAO entra no selo: o
+    # --verificar so cobra `Entrada`, e suspeita nao vira contrato.
+    rotas_por_produto = {
+        produto: {
+            cruzamentos.normalizar(item["simbolo"])
+            for item in itens
+            if item["secao"] == "rota"
+        }
+        for produto, itens in inventario.items()
+    }
+    (PASTA_MAPA / "_cruzamentos.md").write_text(
+        cruzamentos.render(raiz, rotas_por_produto), encoding="utf-8"
+    )
+    print(f"cruzamentos: {sum(len(v) for v in rotas_por_produto.values())} rotas declaradas")
     (PASTA_MAPA / "_frescor.json").write_text(
         json.dumps({"sha": sha, "inventario": inventario}, ensure_ascii=False, indent=1),
         encoding="utf-8",

@@ -7,6 +7,7 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
+import cruzamentos
 import extratores
 import gerar_mapa
 import varredura
@@ -887,6 +888,306 @@ class TestVerificacao(unittest.TestCase):
         self.assertTrue(self.selo_json.exists())
         self.assertTrue((self.destino / "chatbot-api.md").exists())
 
+
+# ---------------------------------------------------------------- Task 8
+# Cruzamentos: rota orfa, funcao sem chamador, n8n x chatbot, fly.toml.
+
+FONTE_CLIENTE = '''
+class MotorClient:
+    def __init__(self, base_url):
+        self.base_url = base_url.rstrip("/")
+
+    def listar(self):
+        return self._request("GET", "/v1/provedores")
+
+    def obter(self, nome):
+        return self._request("GET", f"/v1/provedores/{nome}/credenciais")
+
+    def criar(self, payload):
+        url = f"{self.base_url}/v1/simulacoes"
+        return httpx.post(url, json=payload)
+'''
+
+
+class TestCruzamentos(unittest.TestCase):
+    def test_acha_path_literal(self):
+        self.assertIn("/v1/provedores", cruzamentos.paths_chamados(FONTE_CLIENTE))
+
+    def test_acha_path_de_fstring_normalizado(self):
+        achados = cruzamentos.paths_chamados(FONTE_CLIENTE)
+        self.assertIn("/v1/provedores/{}/credenciais", achados)
+
+    def test_acha_path_montado_sobre_base_url(self):
+        # chatbot-api/app/simulation.py e inventory.py so tem esta forma:
+        # f"{self.base_url}/v1/..." — a versao que so olhava argumento de
+        # chamada com barra inicial devolvia ZERO path para esses dois.
+        self.assertIn("/v1/simulacoes", cruzamentos.paths_chamados(FONTE_CLIENTE))
+
+    def test_a_barra_do_rstrip_nao_e_um_path(self):
+        # `base_url.rstrip("/")` e um ast.Call com argumento "/". Sem este
+        # filtro, TODO cliente HTTP do repo aparecia com uma rota orfa "/".
+        self.assertNotIn("/", cruzamentos.paths_chamados(FONTE_CLIENTE))
+
+    def test_normalizar_iguala_nomes_de_parametro(self):
+        self.assertEqual(
+            cruzamentos.normalizar("/v1/lojas/{id}"),
+            cruzamentos.normalizar("/v1/lojas/{loja_id}"),
+        )
+
+    def test_todo_cliente_mapeado_aponta_para_produto_real(self):
+        for arquivo, alvo in cruzamentos.ALVO_POR_CLIENTE.items():
+            self.assertIn(alvo, varredura.PRODUTOS, f"{arquivo} aponta para {alvo}")
+
+    def test_todo_cliente_mapeado_existe_no_repo(self):
+        raiz = varredura.raiz_repo()
+        for arquivo in cruzamentos.ALVO_POR_CLIENTE:
+            self.assertTrue((raiz / arquivo).exists(), arquivo)
+
+    def test_cada_cliente_real_rende_pelo_menos_um_path(self):
+        # mede contra o repo, nao contra fonte de exemplo: se um cliente
+        # passar a montar a URL de um jeito que o extrator nao le, a checagem
+        # daquele cliente vira no-op em silencio.
+        raiz = varredura.raiz_repo()
+        for arquivo in cruzamentos.ALVO_POR_CLIENTE:
+            texto = (raiz / arquivo).read_text(encoding="utf-8", errors="replace")
+            self.assertTrue(cruzamentos.paths_chamados(texto), arquivo)
+
+
+class TestFuncoesSemChamador(unittest.TestCase):
+    def setUp(self):
+        self.raiz = varredura.raiz_repo()
+
+    def test_handler_de_rota_nao_conta_como_orfao(self):
+        # handler tem decorator: quem chama e o framework, nunca o nome.
+        # Sem esta regra a secao vinha com 336 linhas e ninguem leria.
+        publicas = cruzamentos.funcoes_publicas(self.raiz, "chatbot-api")
+        # @app.post("/v1/operacao/handoff-humano") em app/main.py:1865
+        self.assertNotIn("acionar_handoff_humano", publicas)
+        # @app.exception_handler(RequestValidationError) em app/main.py:112
+        self.assertNotIn("erro_validacao_request", publicas)
+
+    def test_funcao_sem_decorator_continua_entrando(self):
+        publicas = cruzamentos.funcoes_publicas(self.raiz, "estoque-api")
+        self.assertIn("atualizar_whatsapp_loja", publicas)
+
+    def test_nao_olha_dentro_de_tests_nem_de_alembic(self):
+        for produto in varredura.PRODUTOS:
+            for _, (arquivo, _) in cruzamentos.funcoes_publicas(
+                self.raiz, produto
+            ).items():
+                self.assertFalse(arquivo.startswith("tests/"), arquivo)
+                self.assertFalse(arquivo.startswith("alembic/"), arquivo)
+
+    def test_nome_so_importado_conta_como_usado(self):
+        # payload_form entra so por `from app.campanhas import payload_form as
+        # campanha_payload_form` — ast.alias, nem Name nem Attribute.
+        usados = cruzamentos.nomes_usados(self.raiz)
+        self.assertIn("payload_form", usados)
+
+    def test_a_secao_nao_grita_lobo(self):
+        usados = cruzamentos.nomes_usados(self.raiz)
+        total = sum(
+            len(cruzamentos.sem_chamador(self.raiz, p, usados))
+            for p in varredura.PRODUTOS
+        )
+        self.assertGreater(total, 0, "detector cego nao serve para nada")
+        self.assertLess(total, 40, f"{total} linhas: heuristica frouxa demais")
+
+
+class TestCosturaN8n(unittest.TestCase):
+    def test_acha_os_tres_arquivos_e_seus_webhooks(self):
+        raiz = varredura.raiz_repo()
+        workflows, _ = cruzamentos.n8n_costura(raiz)
+        self.assertEqual(len(workflows), 3)
+        paths = {w["webhook"] for w in workflows}
+        self.assertIn("whatsapp-ai", paths)     # o canonico
+        self.assertIn("whatsapp-cloud", paths)
+
+    def test_so_dois_estao_no_ar(self):
+        raiz = varredura.raiz_repo()
+        workflows, _ = cruzamentos.n8n_costura(raiz)
+        no_ar = {w["arquivo"] for w in workflows if w["publicado"]}
+        self.assertEqual(no_ar, {"workflow-ai-nao-salvos.json", "workflow-cloud.json"})
+
+    def test_nome_declarado_vem_do_proprio_json(self):
+        raiz = varredura.raiz_repo()
+        workflows, _ = cruzamentos.n8n_costura(raiz)
+        por_arquivo = {w["arquivo"]: w["nome"] for w in workflows}
+        self.assertEqual(por_arquivo["workflow-cloud.json"], "whatsapp-cloud")
+
+    def test_so_conta_rota_de_workflow_no_ar(self):
+        raiz = varredura.raiz_repo()
+        _, chamadas = cruzamentos.n8n_costura(raiz)
+        self.assertIn("/webhook/cloud", chamadas)
+        self.assertIn("/v1/operacao/roteamento", chamadas)
+        self.assertGreaterEqual(len(chamadas), 5)
+
+    def test_url_de_expressao_do_n8n_vira_o_path_inteiro(self):
+        # a URL do n8n e 'http://chatbot-api:8000/v1/conversas/' + expr +
+        # '/pode-responder'. Cortar no primeiro apostrofo devolvia
+        # "/v1/conversas/" e acusava rota faltando que nunca faltou.
+        raiz = varredura.raiz_repo()
+        _, chamadas = cruzamentos.n8n_costura(raiz)
+        self.assertIn("/v1/conversas/{}/pode-responder", chamadas)
+        self.assertNotIn("/v1/conversas", chamadas)
+        self.assertNotIn("/v1/conversas/", chamadas)
+
+    def test_nao_puxa_rota_de_workflow_fora_do_ar(self):
+        # /webhook/mensagem esta nos dois: no publicado e no de teste.
+        # /v1/operacao/responder so no cloud (publicado). Nada exclusivo do
+        # workflow de teste pode entrar — e ele nao tem rota exclusiva hoje,
+        # entao o que se prova e o tamanho do conjunto.
+        raiz = varredura.raiz_repo()
+        workflows, chamadas = cruzamentos.n8n_costura(raiz)
+        fora = [w for w in workflows if not w["publicado"]]
+        self.assertTrue(fora, "sem workflow fora do ar o teste nao prova nada")
+        so_dos_publicados = set()
+        for arquivo in cruzamentos.PUBLICADOS:
+            so_dos_publicados |= cruzamentos.paths_do_workflow(
+                raiz / "n8n" / arquivo
+            )
+        self.assertEqual(chamadas, so_dos_publicados)
+
+    def test_todas_as_rotas_no_ar_estao_declaradas_no_chatbot(self):
+        # a costura de maior severidade do repo: quando ela abre, o bot emudece.
+        raiz = varredura.raiz_repo()
+        _, chamadas = cruzamentos.n8n_costura(raiz)
+        declaradas = {
+            cruzamentos.normalizar(e.simbolo)
+            for e in gerar_mapa.coletar(raiz, "chatbot-api")
+            if e.secao == "rota"
+        }
+        self.assertEqual(sorted(chamadas - declaradas), [])
+
+    def test_nao_casa_por_substring(self):
+        # /v1/conversas/{}/pode-responder NAO pode casar com
+        # /v1/conversas/{}/mensagens so porque compartilham prefixo
+        self.assertNotEqual(
+            cruzamentos.normalizar("/v1/conversas/{telefone}/pode-responder"),
+            cruzamentos.normalizar("/v1/conversas/{telefone}/mensagens"),
+        )
+
+
+class TestFlyTomls(unittest.TestCase):
+    def test_acha_os_sete_tomls_e_os_apps(self):
+        raiz = varredura.raiz_repo()
+        achados = dict(cruzamentos.fly_tomls(raiz))
+        apps = set(achados.values())
+        self.assertIn("n8n2037", apps)
+        self.assertIn("portal2037", apps)
+        self.assertGreaterEqual(len(achados), 6)
+
+    def test_sao_exatamente_sete_e_nenhum_sem_app(self):
+        raiz = varredura.raiz_repo()
+        achados = cruzamentos.fly_tomls(raiz)
+        self.assertEqual(len(achados), 7)
+        for caminho, app in achados:
+            self.assertNotEqual(app, "?", caminho)
+
+    def test_nao_entra_em_venv_nem_em_pasta_de_teste(self):
+        raiz = varredura.raiz_repo()
+        for caminho, _ in cruzamentos.fly_tomls(raiz):
+            partes = caminho.split("/")
+            self.assertNotIn(".venv", partes, caminho)
+            self.assertNotIn("node_modules", partes, caminho)
+            for parte in partes:
+                self.assertFalse(parte.startswith("test-tmp"), caminho)
+
+
+class TestRenderDosCruzamentos(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        # render() faz uma varredura cara (nomes_usados); uma vez por classe.
+        cls.raiz = varredura.raiz_repo()
+        rotas = {
+            produto: {
+                cruzamentos.normalizar(e.simbolo)
+                for e in gerar_mapa.coletar(cls.raiz, produto)
+                if e.secao == "rota"
+            }
+            for produto in varredura.PRODUTOS
+        }
+        cls.texto = cruzamentos.render(cls.raiz, rotas)
+
+    def test_traz_as_quatro_secoes(self):
+        for titulo in (
+            "## Rotas chamadas por cliente HTTP sem servidor declarado",
+            "## Funcoes publicas sem nenhum chamador",
+            "## n8n x chatbot",
+            "## fly.toml no repo",
+        ):
+            self.assertIn(titulo, self.texto)
+
+    def test_diz_que_e_suspeita_e_nao_erro(self):
+        self.assertIn("SUSPEITA", self.texto)
+
+    def test_tabela_do_n8n_tem_tres_linhas_e_duas_no_ar(self):
+        linhas = [
+            ln for ln in self.texto.splitlines()
+            if ln.startswith("| `workflow-")
+        ]
+        self.assertEqual(len(linhas), 3)
+        self.assertEqual(sum(1 for ln in linhas if ln.rstrip().endswith("SIM |")), 2)
+
+    def test_denuncia_workflow_fora_da_tabela_publicados(self):
+        self.assertIn("workflow-teste-numero-autorizado.json", self.texto)
+        self.assertIn("PUBLICADOS", self.texto)
+
+    def test_nenhuma_rota_do_n8n_aparece_sem_servidor(self):
+        self.assertNotIn("SEM SERVIDOR", self.texto)
+
+    def test_lista_os_sete_fly_tomls(self):
+        linhas = [ln for ln in self.texto.splitlines() if "fly.toml` ->" in ln]
+        self.assertEqual(len(linhas), 7)
+
+    def test_nao_tem_secao_gritando(self):
+        self.assertLess(len(self.texto.splitlines()), 120)
+
+
+class TestCruzamentosNoGerador(unittest.TestCase):
+    def test_escrever_tudo_gera_o_arquivo_de_cruzamentos(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            destino = Path(tmp) / "mapa"
+            with mock.patch.object(gerar_mapa, "PASTA_MAPA", destino):
+                saida = io.StringIO()
+                with contextlib.redirect_stdout(saida):
+                    gerar_mapa.escrever_tudo(varredura.raiz_repo())
+            gerado = (destino / "_cruzamentos.md").read_text(encoding="utf-8")
+            self.assertIn("## n8n x chatbot", gerado)
+            self.assertIn("cruzamentos:", saida.getvalue())
+
+    def test_cruzamentos_nao_entra_no_selo_de_frescor(self):
+        # o selo so guarda Entrada; suspeita nao vira contrato de --verificar.
+        with tempfile.TemporaryDirectory() as tmp:
+            destino = Path(tmp) / "mapa"
+            with mock.patch.object(gerar_mapa, "PASTA_MAPA", destino):
+                with contextlib.redirect_stdout(io.StringIO()):
+                    gerar_mapa.escrever_tudo(varredura.raiz_repo())
+                selo = json.loads(
+                    (destino / "_frescor.json").read_text(encoding="utf-8")
+                )
+                self.assertEqual(
+                    set(selo["inventario"]), set(varredura.PRODUTOS)
+                )
+                problemas = gerar_mapa.verificar(varredura.raiz_repo())
+            self.assertEqual(problemas, [])
+
+
+class TestCruzamentosVersionado(unittest.TestCase):
+    def test_o_arquivo_commitado_existe_e_confere_com_o_codigo(self):
+        atual = (gerar_mapa.PASTA_MAPA / "_cruzamentos.md").read_text(
+            encoding="utf-8"
+        )
+        raiz = varredura.raiz_repo()
+        rotas = {
+            produto: {
+                cruzamentos.normalizar(e.simbolo)
+                for e in gerar_mapa.coletar(raiz, produto)
+                if e.secao == "rota"
+            }
+            for produto in varredura.PRODUTOS
+        }
+        self.assertEqual(atual, cruzamentos.render(raiz, rotas))
 
 if __name__ == "__main__":
     unittest.main()
