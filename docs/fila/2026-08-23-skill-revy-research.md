@@ -30,7 +30,7 @@ Valem para toda tarefa deste plano.
 |---|---|
 | `.gitignore` (modificar) | Passar a versionar `.claude/skills/` mantendo o resto de `.claude/` ignorado |
 | `AGENTS.md` (modificar) | Passo 0 no §1, para o disparo ser determinístico |
-| `.claude/skills/revy-research/SKILL.md` | Só o protocolo. ~70 linhas |
+| `.claude/skills/revy-research/SKILL.md` | Só o protocolo. **Teto de ~65 linhas** — é o que carrega em todo disparo |
 | `.claude/skills/revy-research/varredura.py` | Achar os arquivos do projeto e ignorar dependência |
 | `.claude/skills/revy-research/extratores.py` | Os 7 extratores. Funções puras: texto → `list[Entrada]` |
 | `.claude/skills/revy-research/gerar_mapa.py` | CLI, orquestração, render do markdown, `--verificar` |
@@ -51,12 +51,14 @@ Definido na Task 2, consumido por todas as seguintes:
 class Entrada:
     secao: str      # "rota" | "modelo" | "migration" | "worker" | "flag" | "template"
     chave: str      # "POST /webhook/cloud"  — o que se procura no mapa
-    simbolo: str    # "webhook_cloud"        — o que --verificar exige na linha
+    simbolo: str    # "/webhook/cloud"       — o que --verificar exige na linha
     arquivo: str    # "app/main.py"          — relativo à pasta do produto
     linha: int      # 1-based; 0 = "verificar só que o arquivo existe"
 ```
 
 A regra de `linha: int` é o contrato do `--verificar`: **`linha > 0` → o texto daquela linha precisa conter `simbolo`; `linha == 0` → basta o arquivo existir.** Vale para template solto, que não é renderizado por nenhuma rota.
+
+`simbolo` é o **texto escrito naquela linha**, não o nome lógico do símbolo. Para rota é o path, porque é o path que aparece no decorator — o nome da função está na linha de baixo e o `--verificar` não o acharia lá.
 
 ---
 
@@ -272,9 +274,12 @@ O maior ganho isolado do mapa: 57 rotas do chatbot moram num `main.py` de 2.038 
 
 **Interfaces:**
 - Consumes: `varredura.Entrada`
-- Produces: `extratores.rotas(texto: str, arquivo_rel: str) -> list[Entrada]` — `secao="rota"`, `chave="POST /webhook/cloud"`, `simbolo` = nome da função.
+- Produces: `extratores.rotas(texto: str, arquivo_rel: str) -> list[Entrada]` — `secao="rota"`, `chave="POST /webhook/cloud"`, `simbolo` = **o path** (`"/webhook/cloud"`), que é o texto da linha do decorator. Não é o nome da função: ele está na linha de baixo e o `--verificar` não o acharia.
+- Produces (Step 3b): `extratores.prefixos_de_router(texto: str, arquivo_rel: str) -> list[tuple[str | None, str | None, str]]` e `extratores.aplicar_prefixos(entradas: list[Entrada], includes: list[tuple]) -> list[Entrada]`.
 
-Verificado no levantamento: `APIRouter()` e `include_router()` são chamados **sem `prefix=`** em todo o repo, então o path do decorator é o path real.
+Verificado no levantamento: `APIRouter()` e `include_router()` são chamados **sem `prefix=`** em todo o repo, então hoje o path do decorator é o path real.
+
+**Hoje.** É o único ponto por onde o mapa consegue mentir sem o `--verificar` perceber: se alguém acrescentar `include_router(r, prefix="/v1")`, o decorator continua com o path nu, o `--verificar` segue verde e a `chave` do mapa passa a apontar para uma rota que não existe. Por isso o Step 3b implementa a regra do spec — **compõe o que dá para resolver estaticamente, marca `?` no que não dá, nunca inventa** — e deixa um teste-armadilha que fica vermelho no dia em que o primeiro `prefix=` aparecer.
 
 - [ ] **Step 1: Escrever o teste que falha**
 
@@ -394,6 +399,184 @@ def rotas(texto: str, arquivo_rel: str) -> list[Entrada]:
 
 Por que `simbolo` é o **path** e não o nome da função: `--verificar` reabre a linha do *decorator*, e o que está escrito naquela linha é o path. O nome da função existe no AST (`no.name`) mas não aparece na linha verificada, então não serve de âncora. A `chave` (`"POST /webhook/cloud"`) é o que se procura no mapa; o `simbolo` é o que prova que a linha é aquela.
 
+- [ ] **Step 3b: Fechar o buraco do `prefix=`**
+
+Regra do spec: *"o gerador compõe quando conseguir resolver estaticamente e marca `?` quando não conseguir — nunca inventa"*. Hoje o repo tem zero `prefix=`, então este código não muda nenhuma linha do mapa. Ele existe para o dia em que mudar.
+
+Acrescentar a `extratores.py`:
+
+```python
+from dataclasses import replace
+
+
+def _alias_para_modulo(arvore: ast.Module) -> dict[str, str]:
+    """{nome_local: stem_do_modulo} para os imports deste arquivo."""
+    mapa: dict[str, str] = {}
+    for no in ast.walk(arvore):
+        if isinstance(no, ast.ImportFrom):
+            origem = (no.module or "").rsplit(".", 1)[-1]
+            for a in no.names:
+                mapa[a.asname or a.name] = origem
+        elif isinstance(no, ast.Import):
+            for a in no.names:
+                mapa[a.asname or a.name] = a.name.rsplit(".", 1)[-1]
+    return mapa
+
+
+def prefixos_de_router(texto: str, arquivo_rel: str) -> list[tuple]:
+    """Todo `include_router(x, prefix=...)` deste arquivo.
+
+    Devolve [(stem_do_modulo | None, prefixo | None, "arquivo:linha")].
+    None em qualquer posicao = nao deu para resolver estaticamente.
+    include_router SEM prefix= nao entra: nao altera path nenhum.
+    """
+    try:
+        arvore = ast.parse(texto)
+    except SyntaxError:
+        return []
+    alias = _alias_para_modulo(arvore)
+    achados: list[tuple] = []
+    for no in ast.walk(arvore):
+        if not isinstance(no, ast.Call):
+            continue
+        alvo = no.func
+        nome = alvo.attr if isinstance(alvo, ast.Attribute) else getattr(alvo, "id", "")
+        if nome != "include_router":
+            continue
+        kw = next((k for k in no.keywords if k.arg == "prefix"), None)
+        if kw is None:
+            continue
+        prefixo = kw.value.value if isinstance(kw.value, ast.Constant) else None
+        if not isinstance(prefixo, str):
+            prefixo = None
+        primeiro = no.args[0] if no.args else None
+        stem = None
+        if isinstance(primeiro, ast.Name):
+            stem = alias.get(primeiro.id)
+        elif isinstance(primeiro, ast.Attribute) and isinstance(primeiro.value, ast.Name):
+            stem = alias.get(primeiro.value.id)
+        achados.append((stem, prefixo, f"{arquivo_rel}:{no.lineno}"))
+    return achados
+
+
+def aplicar_prefixos(entradas: list[Entrada], includes: list[tuple]) -> list[Entrada]:
+    """Compoe prefixo + path na `chave` das rotas. Nunca inventa.
+
+    `simbolo` NUNCA muda: continua o path do decorator, que e o texto escrito na
+    linha e o que o `--verificar` reabre. E por isso que compor a `chave` nao
+    quebra a verificacao.
+    """
+    if not includes:
+        return entradas
+    por_stem: dict[str, set] = {}
+    orfaos: list[str] = []
+    for stem, prefixo, onde in includes:
+        if stem is None:
+            orfaos.append(onde)          # nao da para saber a quais rotas se aplica
+        else:
+            por_stem.setdefault(stem, set()).add(prefixo)
+
+    saida: list[Entrada] = []
+    for e in entradas:
+        if e.secao != "rota":
+            saida.append(e)
+            continue
+        stem = e.arquivo.rsplit("/", 1)[-1].removesuffix(".py")
+        prefixos = por_stem.get(stem)
+        if not prefixos:
+            saida.append(e)
+        elif len(prefixos) == 1 and None not in prefixos:
+            verbo, path = e.chave.split(" ", 1)
+            saida.append(replace(e, chave=f"{verbo} {next(iter(prefixos))}{path}"))
+        else:
+            # prefixo nao literal, ou dois prefixos diferentes para o mesmo modulo
+            saida.append(replace(e, chave=f"{e.chave} ?"))
+
+    for onde in sorted(set(orfaos)):
+        arquivo, _, _linha = onde.rpartition(":")
+        saida.append(Entrada(
+            secao="aviso",
+            chave="`include_router` com `prefix=` que nao deu para rastrear - "
+                  "os paths deste produto podem estar incompletos",
+            simbolo="",
+            arquivo=arquivo,
+            linha=0,
+        ))
+    return saida
+```
+
+O aviso é uma `Entrada` de `linha=0` de propósito: assim ele atravessa `coletar` → `render` → `_frescor.json` → `--verificar` sem mudar assinatura nenhuma, e o `--verificar` só confere que o arquivo existe (o contrato de `linha == 0`).
+
+Acrescentar aos testes:
+
+```python
+FONTE_PREFIXO = '''
+from fastapi import FastAPI
+from .rotas_oferta import router as router_oferta
+from .rotas_misterio import router as router_misterio
+
+app = FastAPI()
+app.include_router(router_oferta, prefix="/v1")
+app.include_router(router_misterio, prefix=PREFIXO_QUE_E_VARIAVEL)
+app.include_router(router_oferta)
+'''
+
+
+class TestPrefixoDeRouter(unittest.TestCase):
+    def test_armadilha_hoje_o_repo_nao_tem_nenhum_prefix(self):
+        """Fica vermelho no dia em que o primeiro prefix= aparecer.
+
+        Quando acontecer: confira no mapa que a rota saiu com o path composto
+        (ou com `?`) e so entao apague este teste.
+        """
+        raiz = varredura.raiz_repo()
+        achados = []
+        for produto in varredura.PRODUTOS:
+            base = raiz / produto
+            for caminho in varredura.arquivos_py(raiz, produto):
+                achados.extend(extratores.prefixos_de_router(
+                    caminho.read_text(encoding="utf-8", errors="replace"),
+                    caminho.relative_to(base).as_posix(),
+                ))
+        self.assertEqual(achados, [], f"apareceu prefix= no repo: {achados}")
+
+    def test_le_o_literal_e_marca_o_que_nao_e_literal(self):
+        achados = extratores.prefixos_de_router(FONTE_PREFIXO, "app/main.py")
+        self.assertEqual(len(achados), 2)  # o include_router sem prefix= nao conta
+        por_stem = {s: p for s, p, _ in achados}
+        self.assertEqual(por_stem["rotas_oferta"], "/v1")
+        self.assertIsNone(por_stem["rotas_misterio"])
+
+    def test_compoe_o_resolvido_sem_tocar_no_simbolo(self):
+        rota = varredura.Entrada(
+            secao="rota", chave="POST /oferta", simbolo="/oferta",
+            arquivo="app/rotas_oferta.py", linha=10,
+        )
+        saida = extratores.aplicar_prefixos(
+            [rota], [("rotas_oferta", "/v1", "app/main.py:7")]
+        )
+        self.assertEqual(saida[0].chave, "POST /v1/oferta")
+        self.assertEqual(saida[0].simbolo, "/oferta")  # o --verificar continua achando
+
+    def test_marca_interrogacao_quando_nao_resolve(self):
+        rota = varredura.Entrada(
+            secao="rota", chave="POST /x", simbolo="/x",
+            arquivo="app/rotas_misterio.py", linha=3,
+        )
+        saida = extratores.aplicar_prefixos(
+            [rota], [("rotas_misterio", None, "app/main.py:8")]
+        )
+        self.assertEqual(saida[0].chave, "POST /x ?")
+        self.assertEqual(saida[0].simbolo, "/x")
+
+    def test_include_sem_alias_rastreavel_vira_aviso(self):
+        saida = extratores.aplicar_prefixos([], [(None, "/v1", "app/main.py:9")])
+        self.assertEqual(len(saida), 1)
+        self.assertEqual(saida[0].secao, "aviso")
+        self.assertEqual(saida[0].linha, 0)
+```
+
+
 - [ ] **Step 4: Rodar e ver passar**
 
 ```bash
@@ -403,7 +586,7 @@ cd .claude/skills/revy-research && python -m unittest test_gerar_mapa -v
 cd .claude/skills/revy-research && python3 -m unittest test_gerar_mapa -v
 ```
 
-Esperado: `OK`, 9 testes. O teste contra o repo real deve achar mais de 30 rotas no chatbot (medido: 57 decorators `@app.`, dos quais alguns são handler e não rota).
+Esperado: `OK`, 14 testes (4 da varredura + 5 de rota + 5 de `prefix=`). O teste contra o repo real deve achar mais de 30 rotas no chatbot (medido: 57 decorators `@app.`, dos quais alguns são handler e não rota).
 
 - [ ] **Step 5: Commit**
 
@@ -890,8 +1073,9 @@ from varredura import Entrada
 
 PASTA_MAPA = Path(__file__).resolve().parent / "mapa"
 
-ORDEM = ("rota", "modelo", "worker", "flag", "migration", "template")
+ORDEM = ("aviso", "rota", "modelo", "worker", "flag", "migration", "template")
 TITULOS = {
+    "aviso": "Avisos do gerador",   # so aparece quando ha algo a avisar
     "rota": "Rotas", "modelo": "Modelos", "worker": "Workers",
     "flag": "Flags", "migration": "Migrations", "template": "Templates",
 }
@@ -908,6 +1092,7 @@ def sha_atual(raiz: Path) -> str:
 def coletar(raiz: Path, produto: str) -> list[Entrada]:
     base = raiz / produto
     entradas: list[Entrada] = []
+    includes: list[tuple] = []
     for caminho in varredura.arquivos_py(raiz, produto):
         rel = caminho.relative_to(base).as_posix()
         texto = caminho.read_text(encoding="utf-8", errors="replace")
@@ -915,6 +1100,10 @@ def coletar(raiz: Path, produto: str) -> list[Entrada]:
         entradas.extend(extratores.modelos(texto, rel))
         entradas.extend(extratores.workers(texto, rel))
         entradas.extend(extratores.flags(texto, rel))
+        includes.extend(extratores.prefixos_de_router(texto, rel))
+    # Task 3 Step 3b: prefix= e cross-file, entao so da para aplicar aqui,
+    # com o produto inteiro na mao. Hoje `includes` vem vazio e isto e no-op.
+    entradas = extratores.aplicar_prefixos(entradas, includes)
     entradas.extend(extratores.templates(base))
     de_migration, _ = extratores.migrations(base / "alembic" / "versions")
     entradas.extend(de_migration)
@@ -932,7 +1121,8 @@ def render(produto: str, entradas: list[Entrada], head: str, sha: str) -> str:
         por_secao.setdefault(e.secao, []).append(e)
 
     contagem = " · ".join(
-        f"{len(por_secao[s])} {TITULOS[s].lower()}" for s in ORDEM if por_secao[s]
+        f"{len(por_secao[s])} {TITULOS[s].lower()}"
+        for s in ORDEM if s != "aviso" and por_secao[s]
     )
     linhas = [
         f"# {produto} · {contagem}",
@@ -1605,39 +1795,31 @@ description: Use antes de codar, corrigir, implementar, debugar ou propor qualqu
 
 # revy-research
 
-O repo tem 722 arquivos `.py` de projeto convivendo com 10.286 quando se conta
-os cinco `.venv`. Buscar as cegas devolve o codigo-fonte do FastAPI em 93% dos
-casos. Este e o mapa que evita isso.
-
-Esta skill e **porta, nao caminho**. Ela da o contexto que so ela tem e entrega
-para a skill certa. Nao improvise protocolo de implementar, propor ou depurar:
-`brainstorming`, `test-driven-development` e `systematic-debugging` ja fazem
-isso e evoluem sozinhos.
+722 arquivos `.py` de projeto contra 10.286 com os cinco `.venv`: buscar as cegas
+devolve o FastAPI em 93% dos casos. Esta skill e **porta, nao caminho** — da o
+contexto que so ela tem e entrega para quem ja sabe o resto. Nao improvise
+protocolo de implementar, propor ou depurar.
 
 ## 1. Tronco — sempre, antes de qualquer coisa
 
-1. **Identifique o produto.** Um dos seis. Se a tarefa cruza dois, PARE e diga
-   ao dono antes de editar — integracao entre produtos e so por HTTP versionado.
-2. **Cheque o frescor daquele produto:**
-   `git diff --name-only <sha_do_mapa>..HEAD -- <produto>/`
-   O `<sha_do_mapa>` esta em `mapa/_frescor.json`. Saida vazia: siga calado.
-   Saida com arquivos: avise quantos e ofereca rodar o gerador.
-3. **Abra `mapa/<produto>.md`.** Nunca `main.py` inteiro (o do portal tem 2.609
-   linhas). O mapa da `arquivo:linha` de rota, modelo, worker, migration, flag,
-   template, e o comando de teste nos dois SOs.
-4. **Leia `learnings/INDEX.md` e `decisoes/INDEX.md`.** Abra so os que batem com
-   a tarefa — normalmente zero, um ou dois. Nunca todos. As decisoes sao lidas
-   **aqui**, antes do roteamento: se ficassem para depois, a skill destino
-   comecaria cega e re-poria o que o dono ja recusou.
+1. **Um produto, dos seis.** Cruzou dois? PARE e diga ao dono: entre produtos so
+   ha HTTP versionado.
+2. **Frescor:** `git diff --name-only <sha>..HEAD -- <produto>/`, `<sha>` de
+   `mapa/_frescor.json`. Vazio: siga calado. Nao vazio: diga quantos e ofereca regerar.
+3. **Abra `mapa/<produto>.md`**, nunca `main.py` inteiro (o do portal tem 2.609
+   linhas): `arquivo:linha` de rota, modelo, worker, migration, flag e template,
+   mais o comando de teste nos dois SOs.
+4. **Leia `learnings/INDEX.md` e `decisoes/INDEX.md`;** abra so os que batem —
+   normalmente zero, um ou dois. As decisoes sao lidas **aqui**, antes de rotear:
+   depois, a skill destino ja comecou cega e re-poe o que o dono recusou.
 
-## 2. Briefing — o que atravessa junto
+## 2. Briefing
 
-Monte o pacote no formato de `docs/referencia-viva/agents/task-brief.md`:
-produto, arquivos com linha, invariantes desta tarefa, learnings que batem,
-decisoes que restringem, comando de teste nos dois SOs. Roteamento sem briefing
-e so um "va para la".
+Empacote no formato de `docs/referencia-viva/agents/task-brief.md`: produto,
+arquivos com linha, invariantes, learnings que batem, decisoes que restringem,
+comando de teste nos dois SOs. Roteamento sem briefing e so um "va para la".
 
-## 3. Roteamento — entregue para quem ja faz
+## 3. Roteamento
 
 | O que o dono quer | Va para |
 |---|---|
@@ -1649,58 +1831,28 @@ e so um "va para la".
 | mudar UI da Loja/Control | `frontend-design` + as 13 recusas em `decisoes/` |
 | achar que acabou | `superpowers:verification-before-completion` |
 
-Skill destino nao instalada nesta maquina? Siga o tronco e **avise**. Nunca
-improvise o protocolo que faltou.
-
-O fechamento (regerar o mapa, escrever learning) **nao mora aqui** — mora no
-`AGENTS.md` §6, porque a esta altura outra skill esta no comando.
-
-## Poda — a regra que impede a base de apodrecer
-
-Base que so cresce e base que ninguem le. Se o `learnings/INDEX.md` chegar a 200
-linhas, o passo "leia o indice, e barato" morreu e a skill morre junto.
-
-- **Procure duplicata pelo gatilho antes de criar.** Ja existe learning do mesmo
-  gatilho? **Edite o existente.** Nao crie o proximo.
-- **Learning que se provou falso morre.** Voce abriu, seguiu a instrucao e ela
-  nao e mais verdade porque a armadilha foi corrigida no codigo? **Apague o
-  arquivo e a linha do indice**, no mesmo commit. Learning nao expira por data;
-  expira por evidencia.
-- **Passou de ~40 learnings?** Sinal de que falta poda. Avise o dono. E gatilho
-  de revisao, nao regra rigida.
-
-## Quando o protocolo estiver errado
-
-Se o que falhou foi **este protocolo** — nao o codigo — escreva uma linha em
-`propostas.md`: o que falhou e o que voce mudaria. **Nao edite este SKILL.md.**
-Ele carrega em todo disparo; se ele derivar sozinho, em trinta tarefas vira 400
-linhas que ninguem escreveu nem revisou. O dono le as propostas e decide.
-
-## Regerar o mapa
-
-    # Windows
-    cd .claude/skills/revy-research && python gerar_mapa.py
-    # macOS
-    cd .claude/skills/revy-research && python3 gerar_mapa.py
-
-Conferir sem regerar (sai 1 se o mapa mentir):
-
-    python gerar_mapa.py --verificar
+Destino nao instalado? Siga o tronco e **avise**; nunca improvise o que faltou. O
+fechamento mora no `AGENTS.md` §6 — a esta altura outra skill esta no comando.
 
 ## Regras
 
-- **O mapa nao se edita a mao.** E saida de script; edicao manual e perdida na
-  proxima geracao. Achou erro no mapa? o erro esta no gerador.
-- **`_cruzamentos.md` e suspeita, nao erro.** Suspeita nao vira commit, vira
-  pergunta ao dono.
-- **Julgamento nao mora aqui.** Armadilha de arquitetura e "nao mexa aqui" sao
-  do `README.md` do produto, que ja existe. O mapa aponta; nao copia.
-- **Learning precisa de `gatilho`.** Sem ele ninguem acha, e learning que
-  ninguem acha e learning morto.
-- **Uma skill que roteia — nao quatro skills, nem protocolo proprio.** Separar em
-  `implementar`/`feature`/`debug`/`research` foi recusado em 23/08 (descricoes
-  competem pelo mesmo gatilho). Escrever protocolo proprio de implementar e
-  propor tambem foi recusado no mesmo dia: o superpowers ja faz e evolui sozinho.
+- **O mapa nao se edita a mao.** E saida de script: erro no mapa e erro no gerador.
+- **`_cruzamentos.md` e suspeita, nao erro.** Suspeita nao vira commit, vira pergunta.
+- **Julgamento nao mora aqui.** Armadilha de arquitetura e "nao mexa aqui" sao do
+  `README.md` do produto. O mapa aponta; nao copia.
+- **Poda.** Learning sem `gatilho` ninguem acha. Ja ha um do mesmo gatilho? edite o
+  existente. Seguiu um e ele nao e mais verdade? apague arquivo e linha do indice
+  no mesmo commit. Passou de ~40? avise: indice de 200 linhas mata o passo 4.
+- **Nao edite este `SKILL.md`.** Protocolo errado vira uma linha em `propostas.md`.
+  Ele carrega em todo disparo: derivando sozinho vira 400 linhas que ninguem revisou.
+- **Nao re-proponha:** separar isto em quatro skills, nem escrever protocolo proprio
+  de implementar/propor/depurar. Recusado em 23/08.
+
+## Regerar
+
+    cd .claude/skills/revy-research
+    python gerar_mapa.py               # Windows; no Mac, python3
+    python gerar_mapa.py --verificar   # so confere; sai 1 se o mapa mentir
 ```
 
 - [ ] **Step 1b: Criar o `propostas.md` vazio**
@@ -1745,8 +1897,9 @@ Este passo é o que impede o loop de morrer. A skill só faz o primeiro passo; q
 Em `AGENTS.md` §6 ("Antes de dizer que acabou"), que hoje já lista testes do produto, `alembic upgrade head`, `validate_workflow.py` e `git diff --check`, acrescentar ao fim:
 
 ```markdown
-Mexeu em rota, modelo, worker, migration ou flag? Rode
-`.claude/skills/revy-research/gerar_mapa.py` e commite o mapa junto com o código.
+Mexeu em rota, modelo, worker, migration ou flag? Regere o mapa e commite junto
+com o código: `cd .claude/skills/revy-research && python gerar_mapa.py` (Windows)
+ou `python3 gerar_mapa.py` (macOS).
 Algo te surpreendeu? Escreva um learning — procurando duplicata pelo gatilho antes.
 ```
 
@@ -1756,13 +1909,13 @@ Algo te surpreendeu? Escreva um learning — procurando duplicata pelo gatilho a
 git diff AGENTS.md
 ```
 
-Esperado: **5 linhas acrescentadas** (2 no §1, 3 no §6), nenhuma removida. Se aparecer linha removida, alguma numeração foi mexida — desfaça.
+Esperado: **6 linhas acrescentadas** (2 no §1, 4 no §6), nenhuma removida. Se aparecer linha removida, alguma numeração foi mexida — desfaça.
 
 - [ ] **Step 5: Commit**
 
 ```bash
 git add .claude/skills/revy-research/SKILL.md .claude/skills/revy-research/propostas.md AGENTS.md
-git commit -m "feat(revy-research): SKILL.md com tronco, 3 modos, poda e passo 0 no AGENTS.md"
+git commit -m "feat(revy-research): SKILL.md com tronco, briefing, roteamento e passo 0 no AGENTS.md"
 ```
 
 Antes de commitar, confira o teto:
@@ -1771,8 +1924,10 @@ Antes de commitar, confira o teto:
 wc -l .claude/skills/revy-research/SKILL.md
 ```
 
-Esperado: até ~55 linhas. Passou muito disso, tem conteúdo no lugar de porta —
-ou protocolo que alguma skill do superpowers já faz. Mova ou corte.
+Esperado: **65 linhas**, teto de ~65. (O spec estimou ~55 contando só tronco
++ briefing + roteamento; Poda e Regras, que o próprio spec manda estarem aqui, não
+cabiam nessa conta.) Passou muito de 65: tem conteúdo no lugar de porta, ou
+protocolo que alguma skill do superpowers já faz. Mova ou corte.
 
 ---
 
@@ -1859,7 +2014,7 @@ Leia **so** os de gatilho compatavel com a sua tarefa. Normalmente 0, 1 ou 2.
 | mexer em app.css do portal ou do control | `2026-08-23-bump-do-v-no-base-html.md` |
 ```
 
-`decisoes/INDEX.md` no mesmo molde, com a coluna `nao_reproponha` no lugar de `gatilho`. **Acrescente as três decisões de 23/08 que estão em "Fora de escopo" na spec**, porque são exatamente o tipo de coisa que volta como sugestão daqui a um mês:
+`decisoes/INDEX.md` no mesmo molde, com a coluna `nao_reproponha` no lugar de `gatilho`. **Acrescente as quatro decisões de 23/08 que estão em "Fora de escopo" na spec**, porque são exatamente o tipo de coisa que volta como sugestão daqui a um mês:
 
 - cortar o diário de trabalho (o `git log` já cobre);
 - não separar a skill em quatro (`implementar` / `feature` / `debug` / `research`) — descrições competem pelo mesmo gatilho;
@@ -1867,8 +2022,8 @@ Leia **so** os de gatilho compatavel com a sua tarefa. Normalmente 0, 1 ou 2.
 - o `SKILL.md` não se auto-edita; a válvula é `propostas.md`.
 
 ```bash
-ls .claude/skills/revy-research/learnings/*.md | wc -l   # esperado: ~20 + INDEX
-ls .claude/skills/revy-research/decisoes/*.md  | wc -l   # esperado: ~7 + INDEX
+ls .claude/skills/revy-research/learnings/*.md | wc -l   # esperado: ~21 (20 + INDEX)
+ls .claude/skills/revy-research/decisoes/*.md  | wc -l   # esperado: ~11 (6 migradas + 4 de 23/08 + INDEX)
 ```
 
 - [ ] **Step 5: Verificar que todo arquivo está no índice e vice-versa**

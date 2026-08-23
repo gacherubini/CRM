@@ -27,7 +27,9 @@ para subagentes, perdidas em qualquer troca de máquina.
 ## O que se constrói
 
 Uma skill de projeto em `.claude/skills/revy-research/`, auto-contida e
-versionada, com três dados e um gerador.
+versionada, com três dados e um gerador. O gerador nasceu como um arquivo só e
+virou quatro no plano de implementação: cada um é testável isolado, e só
+`extratores.py` precisa entender `ast`.
 
 Versionar é **requisito**, não conveniência: o dono trabalha em Mac e Windows, e
 o que não está no git não existe na outra máquina. É daí que vem a mudança no
@@ -35,11 +37,14 @@ o que não está no git não existe na outra máquina. É daí que vem a mudanç
 
 ```
 .claude/skills/revy-research/
-  SKILL.md            protocolo (~70 linhas) — única coisa sempre carregada
-  gerar_mapa.py       AST estático, 7 extratores, modo --verificar
-  test_gerar_mapa.py
+  SKILL.md            protocolo (65 linhas) — única coisa sempre carregada
+  varredura.py        acha os 722 e ignora os 10.286
+  extratores.py       AST estático, os 7 extratores; funções puras texto → Entrada
+  gerar_mapa.py       CLI, render do markdown, selo de frescor, modo --verificar
+  cruzamentos.py      clientes HTTP × rotas declaradas; funções sem chamador
+  test_gerar_mapa.py  unittest da stdlib, roda sem .venv
   mapa/
-    _frescor.json     SHA da geração
+    _frescor.json     SHA da geração + o inventário que o --verificar reabre
     _cruzamentos.md   quem chama quem + suspeitas de órfão
     chatbot-api.md  portal-gestao.md  motor-simulacao.md
     estoque-api.md  revy-trafego.md   catalogo-publico.md
@@ -83,7 +88,10 @@ Mac e no Windows, não pode quebrar nada. ~722 arquivos em 2–4 segundos.
 Verificado no levantamento: `APIRouter()` e `include_router()` são chamados sem
 `prefix=` em todo o repo, então **o path do decorator é o path real**. Se um
 `prefix=` aparecer no futuro, o gerador compõe quando conseguir resolver
-estaticamente e marca `?` quando não conseguir — nunca inventa.
+estaticamente e marca `?` quando não conseguir — nunca inventa. É o único
+ponto por onde o mapa consegue mentir com o `--verificar` verde (o decorator
+continua com o path nu), então a regra virou código e um teste-armadilha que
+fica vermelho no dia em que o primeiro `prefix=` aparecer.
 
 Extratores, por produto:
 
@@ -311,8 +319,9 @@ que é lida em todo boot e já exige testes do produto, `alembic upgrade head`,
 `validate_workflow.py` e `git diff --check`. Duas linhas a mais:
 
 ```markdown
-Mexeu em rota, modelo, worker, migration ou flag? Rode
-`.claude/skills/revy-research/gerar_mapa.py` e commite o mapa junto com o código.
+Mexeu em rota, modelo, worker, migration ou flag? Regere o mapa e commite junto
+com o código: `cd .claude/skills/revy-research && python gerar_mapa.py` (Windows)
+ou `python3 gerar_mapa.py` (macOS).
 Algo te surpreendeu? Escreva um learning — procurando duplicata pelo gatilho antes.
 ```
 
@@ -349,7 +358,8 @@ a linha contém o símbolo prometido.** Uma entrada fora do lugar → exit 1. Is
 transforma "o mapa está desatualizado?" de opinião em teste, e torna auditável a
 promessa de que o mapa não mente. Cabe no `AGENTS.md` §6.
 
-`test_gerar_mapa.py`, três testes:
+`test_gerar_mapa.py` — três testes são o **piso** obrigatório (o plano de
+implementação chegou a 42, um por comportamento):
 
 1. os 6 produtos aparecem no mapa;
 2. fatos conhecidos existem (`POST /webhook/cloud` no chatbot; `fila_vendedor`
@@ -384,8 +394,8 @@ subagentes.
   Não re-propor.
 - **Quatro skills separadas** (`implementar` / `feature` / `debug` / `research`).
   Avaliado e recusado em 23/08: descrições concorrentes pelo mesmo gatilho, e as
-  três primeiras compartilham o mesmo protocolo. Viraram três **modos** dentro
-  de uma skill. Não re-propor.
+  três primeiras compartilham o mesmo protocolo. Viraram um tronco único que
+  roteia — ver "um gatilho, uma porta". Não re-propor.
 - **Auto-edição do `SKILL.md`.** O protocolo não se reescreve sozinho; a válvula
   é `propostas.md`. Ver "O loop de auto-melhoria".
 - **Protocolo próprio de implementar, propor ou depurar.** Um primeiro rascunho
@@ -415,10 +425,14 @@ subagentes.
 | Peça | Tamanho |
 |---|---|
 | `.gitignore` | 3 linhas |
-| `AGENTS.md` | 2 edições: passo 0 no §1 (abre), 2 linhas no §6 (fecha) |
-| `SKILL.md` | ~55 linhas (tronco + briefing + roteamento) |
+| `AGENTS.md` | 2 edições, 6 linhas: passo 0 no §1 (abre), 4 no §6 (fecha) |
+| `SKILL.md` | 65 linhas — tronco, briefing, roteamento, regras e poda |
 | `propostas.md` | começa com só o cabeçalho |
-| `gerar_mapa.py` | ~350 linhas |
-| `test_gerar_mapa.py` | ~60 linhas |
+| `varredura.py` + `extratores.py` + `gerar_mapa.py` + `cruzamentos.py` | ~600 linhas somadas |
+| `test_gerar_mapa.py` | 42 testes, `unittest` da stdlib |
 | `mapa/` | gerado, 8 arquivos |
-| `learnings/` + `decisoes/` | ~26 arquivos migrados |
+| `learnings/` + `decisoes/` | ~32 arquivos: 20 learnings, 10 decisões, 2 índices |
+
+O `SKILL.md` foi estimado em ~55 linhas contando tronco + briefing + roteamento.
+Poda e Regras, que este mesmo spec manda estarem lá, não cabiam nessa conta — o
+teto real é 65.
