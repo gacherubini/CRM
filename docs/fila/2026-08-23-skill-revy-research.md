@@ -1147,7 +1147,20 @@ O bug documentado do Modo 2 (*"o `chatbot-api` não expõe rota de oferta"*, efe
 
 Quatro checagens, todas **suspeitas, nunca erros**: rota órfã de servidor, função pública sem chamador, **n8n × chatbot** e **`fly.toml` → app**.
 
-A costura n8n é a de maior severidade do repo: quando ela abre, o bot fica mudo e o produto para. Medido em 23/08 — 4 webhooks declarados (`whatsapp-ai` é o canônico, mais `whatsapp-cloud`, `whatsapp`, `whatsapp-ai-teste`) e 6 rotas do chatbot chamadas, **todas declaradas hoje**. O valor não é achar problema agora; é a linha aparecer no dia em que alguém renomear uma rota.
+A costura n8n é a de maior severidade do repo: quando ela abre, o bot fica mudo e o produto para. O valor não é achar problema agora — hoje está tudo certo; é a linha aparecer no dia em que alguém renomear uma rota do chatbot.
+
+**Só 2 dos 4 workflows estão no ar.** Conferido no painel do n8n em 23/08:
+
+| Arquivo | Nome declarado | No ar | Última mudança |
+|---|---|---|---|
+| `workflow-ai-nao-salvos.json` | WhatsApp IA - Somente Nao Salvos | **sim** | 11/08 |
+| `workflow-cloud.json` | whatsapp-cloud | **sim** | 16/08 |
+| `workflow-echo.json` | WhatsApp Echo | não | 12/07 |
+| `workflow-teste-numero-autorizado.json` | WhatsApp IA - TESTE 5551980336365 | não | 10/08 |
+
+A checagem de rota sem servidor roda **só nos publicados**. Workflow morto chamando rota removida não é incidente, e alarme falso mata a seção.
+
+O `nome` é derivável (está dentro do JSON); **estar publicado não é** — vira a tabela `PUBLICADOS` escrita à mão, no mesmo padrão de `TESTES` e `ALVO_POR_CLIENTE`. Para ela não envelhecer em silêncio, o render **denuncia** qualquer `workflow-*.json` que não esteja classificado: publicou um terceiro, a linha aparece pedindo para acrescentar.
 
 **Armadilha real, colhida ao desenhar isto:** uma primeira checagem crua acusou `/pode-responder` como faltando. Era falso positivo — casou o prefixo `/v1/conversas/` contra a rota `/v1/conversas/{telefone}/mensagens`. A rota certa existe em `chatbot-api/app/main.py:921`. **O casamento é de path inteiro normalizado, nunca de substring.** O teste `test_nao_casa_por_substring` existe para travar isso.
 
@@ -1165,7 +1178,8 @@ A costura n8n é a de maior severidade do repo: quando ela abre, o bot fica mudo
   - `cruzamentos.funcoes_publicas(raiz: Path, produto: str) -> dict[str, tuple[str, int]]`
   - `cruzamentos.nomes_usados(raiz: Path) -> set[str]` — varredura única, cara; nunca chamar dentro de laço
   - `cruzamentos.sem_chamador(raiz: Path, produto: str, usados: set[str]) -> list[tuple[str, str, int]]`
-  - `cruzamentos.n8n_costura(raiz: Path) -> tuple[list[tuple[str, str]], set[str]]` — `[(arquivo, webhook)]` e o conjunto de paths do chatbot que os workflows chamam
+  - `cruzamentos.PUBLICADOS: dict[str, str]` — arquivo → nome no n8n, só os que estão no ar
+  - `cruzamentos.n8n_costura(raiz: Path) -> tuple[list[dict], set[str]]` — um dict por workflow (`arquivo`, `nome`, `webhook`, `publicado`) e o conjunto de paths do chatbot chamados **apenas pelos publicados**
   - `cruzamentos.fly_tomls(raiz: Path) -> list[tuple[str, str]]` — `[(caminho_do_toml, app_declarado)]`
   - `cruzamentos.render(raiz: Path, rotas_por_produto: dict[str, set[str]]) -> str` — os paths já chegam normalizados
 
@@ -1206,14 +1220,27 @@ class TestCruzamentos(unittest.TestCase):
 
 
 class TestCosturaN8n(unittest.TestCase):
-    def test_acha_os_quatro_webhooks(self):
+    def test_acha_os_quatro_arquivos_e_seus_webhooks(self):
         raiz = varredura.raiz_repo()
-        webhooks, _ = cruzamentos.n8n_costura(raiz)
-        paths = {p for _, p in webhooks}
+        workflows, _ = cruzamentos.n8n_costura(raiz)
+        self.assertEqual(len(workflows), 4)
+        paths = {w["webhook"] for w in workflows}
         self.assertIn("whatsapp-ai", paths)     # o canonico
         self.assertIn("whatsapp-cloud", paths)
 
-    def test_acha_as_rotas_do_chatbot_que_o_n8n_chama(self):
+    def test_so_dois_estao_no_ar(self):
+        raiz = varredura.raiz_repo()
+        workflows, _ = cruzamentos.n8n_costura(raiz)
+        no_ar = {w["arquivo"] for w in workflows if w["publicado"]}
+        self.assertEqual(no_ar, {"workflow-ai-nao-salvos.json", "workflow-cloud.json"})
+
+    def test_nome_declarado_vem_do_proprio_json(self):
+        raiz = varredura.raiz_repo()
+        workflows, _ = cruzamentos.n8n_costura(raiz)
+        por_arquivo = {w["arquivo"]: w["nome"] for w in workflows}
+        self.assertEqual(por_arquivo["workflow-cloud.json"], "whatsapp-cloud")
+
+    def test_so_conta_rota_de_workflow_no_ar(self):
         raiz = varredura.raiz_repo()
         _, chamadas = cruzamentos.n8n_costura(raiz)
         self.assertIn("/webhook/cloud", chamadas)
@@ -1376,25 +1403,43 @@ def _urls_do_json(no) -> set[str]:
     return achados
 
 
-def n8n_costura(raiz: Path) -> tuple[list[tuple[str, str]], set[str]]:
-    """(webhooks declarados, paths do chatbot chamados pelos workflows)."""
-    webhooks: list[tuple[str, str]] = []
+# Escrito a mao: quais workflows estao PUBLICADOS no n8n. Conferido no painel
+# em 23/08. Nao e derivavel do repo — o arquivo existir nao significa estar no ar.
+# workflow-echo.json (12/07) e workflow-teste-numero-autorizado.json (10/08)
+# existem no repo e NAO estao publicados.
+PUBLICADOS: dict[str, str] = {
+    "workflow-ai-nao-salvos.json": "WhatsApp IA - Somente Nao Salvos",
+    "workflow-cloud.json": "whatsapp-cloud",
+}
+
+
+def n8n_costura(raiz: Path) -> tuple[list[dict], set[str]]:
+    """(um dict por workflow, paths do chatbot chamados pelos PUBLICADOS)."""
+    workflows: list[dict] = []
     chamadas: set[str] = set()
     for arquivo in sorted((raiz / "n8n").glob("workflow-*.json")):
         try:
             dados = json.loads(arquivo.read_text(encoding="utf-8", errors="replace"))
         except (ValueError, OSError):
             continue
+        publicado = arquivo.name in PUBLICADOS
+        webhook = ""
         for bruto in _urls_do_json(dados):
             if "chatbot-api" in bruto:
                 # tira host e expressao n8n; fica so o path
                 pedaco = bruto.split("chatbot-api:8000", 1)[-1]
                 pedaco = pedaco.split("'", 1)[0].split('"', 1)[0].strip()
-                if pedaco.startswith("/"):
+                if pedaco.startswith("/") and publicado:
                     chamadas.add(normalizar(pedaco.rstrip("/")))
             elif not bruto.startswith(("http", "=", "{")) and "/" not in bruto:
-                webhooks.append((arquivo.name, bruto))
-    return webhooks, chamadas
+                webhook = bruto
+        workflows.append({
+            "arquivo": arquivo.name,
+            "nome": dados.get("name", "?"),
+            "webhook": webhook,
+            "publicado": publicado,
+        })
+    return workflows, chamadas
 
 
 def fly_tomls(raiz: Path) -> list[tuple[str, str]]:
@@ -1448,19 +1493,35 @@ def render(raiz: Path, rotas_por_produto: dict[str, set[str]]) -> str:
     linhas.append("")
 
     # --- costura n8n x chatbot: a junta onde o bot fica mudo ---
-    webhooks, chamadas = n8n_costura(raiz)
+    workflows, chamadas = n8n_costura(raiz)
     declaradas = rotas_por_produto.get("chatbot-api", set())
     linhas.append("## n8n x chatbot")
     linhas.append("")
-    for arquivo, path in sorted(webhooks):
-        linhas.append(f"- webhook `{path}` declarado em `n8n/{arquivo}`")
+    linhas.append("| Arquivo | Nome | Webhook | No ar |")
+    linhas.append("|---|---|---|---|")
+    for w in workflows:
+        marca = "SIM" if w["publicado"] else "nao"
+        linhas.append(f"| `{w['arquivo']}` | {w['nome']} | `{w['webhook'] or '-'}` | {marca} |")
+    linhas.append("")
+    nao_classificados = [
+        w["arquivo"] for w in workflows
+        if not w["publicado"] and w["arquivo"] not in PUBLICADOS
+    ]
+    if nao_classificados:
+        linhas.append(
+            "Workflows fora da tabela PUBLICADOS em `cruzamentos.py`: "
+            + ", ".join(f"`{a}`" for a in nao_classificados)
+            + ". Se algum entrou no ar, acrescente — senao a checagem abaixo o ignora."
+        )
+        linhas.append("")
+    linhas.append("Rotas chamadas pelos workflows **no ar**:")
     linhas.append("")
     faltando = sorted(chamadas - declaradas)
     if faltando:
         for path in faltando:
-            linhas.append(f"- **SEM SERVIDOR** `{path}` chamado por workflow n8n")
+            linhas.append(f"- **SEM SERVIDOR** `{path}` — nenhuma rota do chatbot declara")
     else:
-        linhas.append(f"Todas as {len(chamadas)} rotas chamadas pelos workflows estao declaradas.")
+        linhas.append(f"Todas as {len(chamadas)} estao declaradas no chatbot.")
     linhas.append("")
 
     # --- fly.toml: quais existem e para que app cada um aponta ---
@@ -1504,7 +1565,7 @@ cd .claude/skills/revy-research && python3 -m unittest test_gerar_mapa -v && pyt
 Esperado: `OK`, e um `_cruzamentos.md` legível com as quatro seções. **Leia a saída antes de commitar**, conferindo três coisas:
 
 1. A lista de funções sem chamador não pode ter centenas de linhas. Se tiver, o detector está frouxo demais: restrinja `funcoes_publicas` a `app/*.py` de primeiro nível e rode de novo. Seção que grita lobo é seção que ninguém lê.
-2. A seção **n8n × chatbot** deve dizer que todas as rotas chamadas estão declaradas — foi o estado medido em 23/08. Se aparecer `SEM SERVIDOR`, **pare e leve ao dono**: ou é falso positivo de normalização, ou é o bot prestes a ficar mudo. Nenhum dos dois se resolve commitando.
+2. A seção **n8n × chatbot** deve trazer 4 linhas na tabela, **2 marcadas `SIM`** em "No ar", e dizer que todas as rotas chamadas pelos publicados estão declaradas — foi o estado medido em 23/08. Se aparecer `SEM SERVIDOR`, **pare e leve ao dono**: ou é falso positivo de normalização, ou é o bot prestes a ficar mudo. Nenhum dos dois se resolve commitando.
 3. A tabela de `fly.toml` deve trazer **7 linhas**.
 
 - [ ] **Step 5: Commit**

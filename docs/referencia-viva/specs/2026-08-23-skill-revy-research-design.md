@@ -119,12 +119,24 @@ Quatro checagens, todas rotuladas **suspeitas, não erros**:
    oferta"), cujo efeito prático é *lead que ninguém pega some*.
 2. **Função pública sem chamador** — `def` sem underscore, zero referências nos
    722 arquivos. É o caso `criar_sinal_direcionado`.
-3. **n8n × chatbot** — os quatro `n8n/workflow-*.json` declaram webhook e chamam
-   rotas do chatbot. Cruzar as duas listas. Medido em 23/08: 4 webhooks
-   (`whatsapp-ai` canônico, `whatsapp-cloud`, `whatsapp`, `whatsapp-ai-teste`) e
-   **6 rotas chamadas**, todas declaradas hoje. É a junta de severidade máxima
-   do repo: quando ela abre, o bot fica mudo e o produto para. JSON é
-   `json.loads`; a rota já está no mapa. Custo baixo, severidade máxima.
+3. **n8n × chatbot** — os `n8n/workflow-*.json` declaram webhook e chamam rotas
+   do chatbot. Cruzar as duas listas. É a junta de severidade máxima do repo:
+   quando ela abre, o bot fica mudo e o produto para. JSON é `json.loads`; a
+   rota já está no mapa. Custo baixo, severidade máxima.
+
+   **Só 2 dos 4 arquivos estão publicados** (painel do n8n, 23/08):
+   `workflow-ai-nao-salvos.json` ("WhatsApp IA - Somente Nao Salvos", canônico)
+   e `workflow-cloud.json` ("whatsapp-cloud"). `workflow-echo.json` (parado
+   desde 12/07) e `workflow-teste-numero-autorizado.json` existem no repo e não
+   estão no ar. A checagem de rota sem servidor roda **só nos publicados** —
+   workflow morto chamando rota removida não é incidente, e alarme falso mata a
+   seção.
+
+   O `nome` do workflow é derivável (está dentro do JSON); **estar publicado não
+   é**, e vira a tabela `PUBLICADOS` escrita à mão, no mesmo padrão de `TESTES` e
+   `ALVO_POR_CLIENTE`. Para não envelhecer em silêncio, o render denuncia
+   qualquer `workflow-*.json` não classificado: publicar um terceiro faz aparecer
+   a linha pedindo para acrescentá-lo.
 4. **`fly.toml` → app declarado** — os 7 do repo, numa tabela. O `AGENTS.md`
    avisa que os da pasta de cada produto apontam para apps **destruídos**;
    listá-los torna a armadilha visível em vez de decorada. **Quais** estão
