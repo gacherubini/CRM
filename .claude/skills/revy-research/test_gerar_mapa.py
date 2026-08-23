@@ -211,5 +211,256 @@ class TestExtratorDeMigrations(unittest.TestCase):
         self.assertEqual([e.linha for e in entradas], [0, 0])
 
 
+FONTE_WORKERS = '''
+class FollowupWorker:
+    def rodar(self):
+        pass
+
+def iniciar_rodizio_job():
+    pass
+'''
+
+FONTE_FLAGS = '''
+import os
+ATIVO = os.getenv("REVY_LOJA_COPILOTO_ENABLED", "0") == "1"
+MODO = os.environ.get("MULTI_WHATSAPP_ENABLED", "0")
+QUALQUER = os.getenv("DATABASE_URL")
+'''
+
+
+class TestExtratorDeWorkers(unittest.TestCase):
+    def test_acha_classe_worker(self):
+        achados = extratores.workers(FONTE_WORKERS, "app/modo2_workers.py")
+        self.assertIn("FollowupWorker", {e.chave for e in achados})
+
+    def test_acha_funcao_job(self):
+        achados = extratores.workers(FONTE_WORKERS, "app/rodizio_job.py")
+        self.assertIn("iniciar_rodizio_job", {e.chave for e in achados})
+
+    def test_arquivo_comum_so_da_a_classe_worker(self):
+        achados = extratores.workers(FONTE_WORKERS, "app/servicos.py")
+        self.assertEqual({e.chave for e in achados}, {"FollowupWorker"})
+
+    def test_arquivo_de_teste_nao_tem_worker(self):
+        """`tests/test_rodizio_job.py` casa com `_job.py` e nao e worker.
+
+        Sao 7 arquivos assim no repo; sem a guarda, cada `def test_...` deles
+        entraria no mapa como job de producao.
+        """
+        fonte = "def test_rodizio_gira(db):\n    pass\n"
+        self.assertEqual(extratores.workers(fonte, "tests/test_rodizio_job.py"), [])
+
+    def test_worker_py_sem_underscore_tambem_conta(self):
+        """O motor e o estoque chamam o worker deles de `app/worker.py`.
+
+        So com os sufixos `_job.py`/`_workers.py` do plano, esses dois produtos
+        ficariam com ZERO worker no mapa.
+        """
+        raiz = varredura.raiz_repo()
+        for produto in ("motor-simulacao", "estoque-api"):
+            alvo = raiz / produto / "app" / "worker.py"
+            achados = extratores.workers(
+                alvo.read_text(encoding="utf-8"), "app/worker.py"
+            )
+            self.assertIn("main", {e.chave for e in achados}, produto)
+
+    def test_no_repo_real_o_followup_worker_esta_no_chatbot(self):
+        raiz = varredura.raiz_repo()
+        alvo = raiz / "chatbot-api" / "app" / "followup_job.py"
+        texto = alvo.read_text(encoding="utf-8")
+        achados = extratores.workers(texto, "app/followup_job.py")
+        por_chave = {e.chave: e for e in achados}
+        self.assertIn("FollowupWorker", por_chave)
+        linha = texto.splitlines()[por_chave["FollowupWorker"].linha - 1]
+        self.assertIn("FollowupWorker", linha)
+
+
+class TestExtratorDeFlags(unittest.TestCase):
+    def test_pega_revy_e_multi_com_default(self):
+        achados = extratores.flags(FONTE_FLAGS, "app/config.py")
+        simbolos = {e.simbolo for e in achados}
+        self.assertEqual(
+            simbolos, {"REVY_LOJA_COPILOTO_ENABLED", "MULTI_WHATSAPP_ENABLED"}
+        )
+
+    def test_ignora_env_que_nao_e_flag(self):
+        achados = extratores.flags(FONTE_FLAGS, "app/config.py")
+        self.assertNotIn("DATABASE_URL", {e.simbolo for e in achados})
+
+    def test_registra_o_default_do_codigo(self):
+        achados = extratores.flags(FONTE_FLAGS, "app/config.py")
+        por_simbolo = {e.simbolo: e for e in achados}
+        self.assertIn("0", por_simbolo["REVY_LOJA_COPILOTO_ENABLED"].chave)
+
+    def test_escrever_no_environ_nao_e_declarar_flag(self):
+        """`os.environ["REVY_X"] = "1"` e teste ESCREVENDO no ambiente.
+
+        Sao 11 linhas assim no repo (quase todas no conftest do revy-trafego).
+        Se entrassem, o mapa diria que a flag nasce ligada.
+        """
+        fonte = 'import os\nos.environ["REVY_TRAFEGO_SKIP_INIT"] = "1"\n'
+        self.assertEqual(extratores.flags(fonte, "tests/conftest.py"), [])
+
+    def test_linha_aponta_para_a_string_da_flag(self):
+        achados = extratores.flags(FONTE_FLAGS, "app/config.py")
+        for entrada in achados:
+            linha = FONTE_FLAGS.splitlines()[entrada.linha - 1]
+            self.assertIn(entrada.simbolo, linha)
+
+    def test_flag_lida_por_helper_tambem_entra(self):
+        """As flags que mais importam NAO passam por `os.getenv`.
+
+        O portal le por `_env_bool(nome, "0")` e o control por `_env_flag(nome)`.
+        Casar so `getenv` deixaria de fora REVY_LOJA_COPILOTO_ENABLED,
+        REVY_LOJA_SHELL_ENABLED, REVY_CONTROL_DASHBOARD_ENABLED e companhia -
+        17 flags de rollout, justo as que alguem procura no mapa.
+        """
+        fonte = (
+            'ATIVO = _env_bool("REVY_LOJA_COPILOTO_ENABLED", "0")\n'
+            'DASH = _env_flag("REVY_CONTROL_DASHBOARD_ENABLED")\n'
+            'TENT = _numero("REVY_TRAFEGO_RETRY", 60)\n'
+        )
+        por_simbolo = {e.simbolo: e for e in extratores.flags(fonte, "app/config.py")}
+        self.assertEqual(
+            set(por_simbolo),
+            {
+                "REVY_LOJA_COPILOTO_ENABLED",
+                "REVY_CONTROL_DASHBOARD_ENABLED",
+                "REVY_TRAFEGO_RETRY",
+            },
+        )
+        self.assertIn("0", por_simbolo["REVY_LOJA_COPILOTO_ENABLED"].chave)
+        # sem default literal na chamada nao se inventa default nenhum
+        self.assertEqual(
+            por_simbolo["REVY_CONTROL_DASHBOARD_ENABLED"].chave,
+            "REVY_CONTROL_DASHBOARD_ENABLED",
+        )
+
+    def test_monkeypatch_setenv_nao_e_leitura(self):
+        fonte = 'def test_x(monkeypatch):\n    monkeypatch.setenv("REVY_X", "1")\n'
+        self.assertEqual(extratores.flags(fonte, "tests/test_x.py"), [])
+
+    def test_frase_que_so_comeca_com_o_nome_da_flag_nao_entra(self):
+        fonte = 'log.warning("REVY_LOJA_COPILOTO_ENABLED ligada sem chave")\n'
+        self.assertEqual(extratores.flags(fonte, "app/main.py"), [])
+
+    def test_no_repo_real_passa_de_sessenta_flags(self):
+        """Medido em 23/08: 80 leituras, 67 nomes distintos.
+
+        O plano dizia 74; 74 e o `grep -o REVY_|MULTI_ | sort -u` cru, que conta
+        pedaco de nome (`REVY_TRAFEGO_`) e nome que so aparece em comentario.
+        """
+        raiz = varredura.raiz_repo()
+        nomes = set()
+        for produto in varredura.PRODUTOS:
+            base = raiz / produto
+            for caminho in varredura.arquivos_py(raiz, produto):
+                nomes.update(
+                    e.simbolo for e in extratores.flags(
+                        caminho.read_text(encoding="utf-8", errors="replace"),
+                        caminho.relative_to(base).as_posix(),
+                    )
+                )
+        self.assertGreater(len(nomes), 60)
+        self.assertIn("REVY_LOJA_COPILOTO_ENABLED", nomes)
+        self.assertIn("MULTI_WHATSAPP_ENABLED", nomes)
+
+
+class TestExtratorDeTemplates(unittest.TestCase):
+    def test_portal_tem_dezenas_de_templates(self):
+        raiz = varredura.raiz_repo()
+        achados = extratores.templates(raiz / "portal-gestao")
+        self.assertGreater(len(achados), 40)
+
+    def test_chatbot_nao_tem_template(self):
+        raiz = varredura.raiz_repo()
+        self.assertEqual(extratores.templates(raiz / "chatbot-api"), [])
+
+    def test_produto_inexistente_nao_quebra(self):
+        self.assertEqual(extratores.templates(Path("nao/existe")), [])
+
+    def test_le_as_tres_sintaxes_de_template_response(self):
+        """O repo escreve TemplateResponse de tres jeitos.
+
+        Nome primeiro (assinatura antiga), request primeiro (assinatura nova do
+        Starlette) e tudo por keyword. Ler so um jeito perderia a maioria dos
+        templates do portal e do control.
+        """
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            (base / "app").mkdir()
+            (base / "app" / "templates").mkdir()
+            for nome in ("antiga.html", "nova.html", "keyword.html", "solta.html"):
+                (base / "app" / "templates" / nome).write_text("x", encoding="utf-8")
+            (base / "app" / "main.py").write_text(
+                "def a(request):\n"
+                '    return t.TemplateResponse("antiga.html", {"request": request})\n'
+                "def b(request):\n"
+                '    return t.TemplateResponse(request, "nova.html", {})\n'
+                "def c(request):\n"
+                "    return t.TemplateResponse(\n"
+                "        request=request,\n"
+                '        name="keyword.html",\n'
+                "    )\n",
+                encoding="utf-8",
+            )
+            achados = extratores.templates(base)
+            por_chave = {e.chave: e for e in achados}
+            linhas = (base / "app" / "main.py").read_text(encoding="utf-8").splitlines()
+
+        self.assertEqual(len(achados), 4)
+        for nome in ("antiga.html", "nova.html", "keyword.html"):
+            entrada = por_chave["app/templates/" + nome]
+            self.assertEqual(entrada.arquivo, "app/main.py", nome)
+            self.assertGreater(entrada.linha, 0, nome)
+            self.assertIn(entrada.simbolo, linhas[entrada.linha - 1], nome)
+
+    def test_template_solto_fica_com_linha_zero(self):
+        """linha=0 no contrato do --verificar = basta o arquivo existir.
+
+        Nao se inventa linha para template que nenhuma rota renderiza.
+        """
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            (base / "orfao.html").write_text("x", encoding="utf-8")
+            achados = extratores.templates(base)
+        self.assertEqual(len(achados), 1)
+        self.assertEqual(achados[0].linha, 0)
+        self.assertEqual(achados[0].arquivo, "orfao.html")
+        self.assertEqual(achados[0].simbolo, "orfao.html")
+
+    def test_no_repo_real_a_linha_do_template_contem_o_nome(self):
+        """O contrato do --verificar, checado contra o repo de verdade.
+
+        Como quase toda chamada do repo quebra em varias linhas, a linha tem de
+        ser a da STRING, nao a do `TemplateResponse(`.
+        """
+        raiz = varredura.raiz_repo()
+        for produto in ("portal-gestao", "revy-trafego", "catalogo-publico"):
+            base = raiz / produto
+            renderizados = 0
+            for entrada in extratores.templates(base):
+                if entrada.linha == 0:
+                    continue
+                renderizados += 1
+                texto = (base / entrada.arquivo).read_text(
+                    encoding="utf-8", errors="replace"
+                )
+                linha = texto.splitlines()[entrada.linha - 1]
+                self.assertIn(
+                    entrada.simbolo, linha,
+                    f"{produto} {entrada.arquivo}:{entrada.linha}",
+                )
+            self.assertGreater(renderizados, 0, produto)
+
+    def test_nenhum_template_vem_de_venv_ou_node_modules(self):
+        raiz = varredura.raiz_repo()
+        for produto in varredura.PRODUTOS:
+            for entrada in extratores.templates(raiz / produto):
+                partes = entrada.chave.split("/")
+                self.assertNotIn(".venv", partes, entrada.chave)
+                self.assertNotIn("node_modules", partes, entrada.chave)
+
+
 if __name__ == "__main__":
     unittest.main()
