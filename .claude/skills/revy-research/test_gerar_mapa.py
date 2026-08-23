@@ -1697,5 +1697,78 @@ class TestLearningsEDecisoes(unittest.TestCase):
                 self.assertIn(alvo, nomes, f"{f.name} aponta para [[{alvo}]]")
 
 
+class TestPaginaComoFunciona(unittest.TestCase):
+    """`como-funciona.html` explica a skill; os numeros dela tem que ser reais.
+
+    Uma pagina de explicacao com numero chumbado e a mesma classe de defeito do
+    learning que afirmou "Portal e Control sao SQLite" por uma semana depois de
+    os dois virarem Postgres: texto que descreve um mundo que ja mudou, sem
+    nenhum sinal de que mudou. Aqui o sinal e a suite ficar vermelha.
+    """
+
+    NUMERO = re.compile(r'data-numero="([a-z_]+)">([\d.]+)<')
+
+    def setUp(self):
+        self.raiz = varredura.raiz_repo()
+        self.sk = self.raiz / ".claude/skills/revy-research"
+        self.pagina = self.sk / "como-funciona.html"
+
+    def _declarados(self) -> dict[str, int]:
+        html = self.pagina.read_text(encoding="utf-8")
+        return {
+            chave: int(valor.replace(".", ""))
+            for chave, valor in self.NUMERO.findall(html)
+        }
+
+    def test_a_pagina_existe_e_declara_numeros(self):
+        self.assertTrue(self.pagina.exists(), "como-funciona.html sumiu")
+        self.assertGreaterEqual(len(self._declarados()), 5)
+
+    def test_contagem_estrutural_bate_exatamente(self):
+        """Produto, learning, decisao e tamanho do protocolo mudam raramente e
+        de proposito — entao aqui a exigencia e exata, e atualizar a pagina faz
+        parte de mudar a skill."""
+        vivos = {
+            "produtos": len(varredura.PRODUTOS),
+            "learnings": len([f for f in (self.sk / "learnings").glob("*.md")
+                              if f.name != "INDEX.md"]),
+            "decisoes": len([f for f in (self.sk / "decisoes").glob("*.md")
+                             if f.name != "INDEX.md"]),
+            "skill_linhas": len(
+                (self.sk / "SKILL.md").read_text(encoding="utf-8").splitlines()),
+        }
+        declarados = self._declarados()
+        for chave, esperado in vivos.items():
+            self.assertIn(chave, declarados, chave)
+            self.assertEqual(
+                declarados[chave], esperado,
+                f"como-funciona.html diz {chave}={declarados[chave]}, "
+                f"o repo tem {esperado} - atualize a pagina")
+
+    def test_entradas_do_mapa_com_folga(self):
+        """Esta muda a cada rota nova, entao exigir exato so faria a suite
+        reprovar por ruido. 10% de folga pega deriva de verdade sem virar
+        alarme falso — e alarme falso mata a checagem inteira."""
+        selo = json.loads(
+            (gerar_mapa.PASTA_MAPA / "_frescor.json").read_text(encoding="utf-8"))
+        vivo = sum(len(v) for v in selo["inventario"].values())
+        declarado = self._declarados()["entradas"]
+        self.assertLess(
+            abs(declarado - vivo) / vivo, 0.10,
+            f"como-funciona.html diz {declarado} entradas, o mapa tem {vivo}")
+
+    def test_a_pagina_nao_promete_o_que_a_skill_nao_faz(self):
+        """Ela vende a skill; o teste guarda a parte honesta.
+
+        A secao de limites e a que um dia alguem corta para a pagina ficar mais
+        bonita. Sem ela vira folheto.
+        """
+        html = self.pagina.read_text(encoding="utf-8").lower()
+        for limite in ("não sabe o estado de produção",
+                       "rotulados, não provados",
+                       "não impede o agente de errar"):
+            self.assertIn(limite, html, limite)
+
+
 if __name__ == "__main__":
     unittest.main()

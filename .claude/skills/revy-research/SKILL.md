@@ -58,6 +58,8 @@ fechamento mora no `AGENTS.md` §6 — a esta altura outra skill esta no comando
 - **Nao re-proponha:** separar isto em quatro skills, nem escrever protocolo proprio
   de implementar/propor/depurar. Recusado em 23/08.
 
+Como tudo isto funciona, para humano: `como-funciona.html`.
+
 ## Regerar
 
 Windows usa `python`; o Mac do dono so tem `python3`. Vale para os dois comandos.

@@ -1,0 +1,652 @@
+<title>revy-research</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chivo:wght@700;900&family=Hanken+Grotesk:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+
+<style>
+/* Paleta e fontes vêm de shared/brand/revy-tokens.css — o sistema que já
+   existe no monorepo. Nada aqui foi inventado do zero. */
+:root {
+  --paper: #f9f9f9;
+  --surface: #ffffff;
+  --surface-soft: #efeceb;
+  --ink: #1b1b1b;
+  --ink-soft: #57514f;
+  --ink-muted: #6b625f;
+  --line: #ded8d9;
+  --line-strong: #cdc6c4;
+  --brand: #1f4d3a;
+  --brand-deep: #0f2b20;
+  --brand-tint: rgba(31, 77, 58, .09);
+  --brand-line: rgba(31, 77, 58, .32);
+  --provado: #1f4d3a;
+  --rotulado: #8a6d1d;
+  --rotulado-tint: rgba(138, 109, 29, .12);
+  --term-bg: #0f2b20;
+  --term-ink: #dfeee7;
+  --term-dim: #7fbfa3;
+  --sombra: 0 1px 2px rgba(27, 20, 20, .05);
+  --display: "Chivo", "Arial Black", sans-serif;
+  --corpo: "Hanken Grotesk", -apple-system, "Segoe UI", sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "Cascadia Mono", monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #101614;
+    --surface: #171f1b;
+    --surface-soft: #1d2723;
+    --ink: #e9e5e2;
+    --ink-soft: #b8b2ae;
+    --ink-muted: #928b87;
+    --line: #2a3531;
+    --line-strong: #3a4844;
+    --brand: #7fbfa3;
+    --brand-deep: #dfeee7;
+    --brand-tint: rgba(127, 191, 163, .12);
+    --brand-line: rgba(127, 191, 163, .34);
+    --provado: #7fbfa3;
+    --rotulado: #d3ac52;
+    --rotulado-tint: rgba(211, 172, 82, .14);
+    --term-bg: #0a0f0d;
+    --term-ink: #dfeee7;
+    --term-dim: #7fbfa3;
+    --sombra: 0 1px 2px rgba(0, 0, 0, .3);
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #101614;
+  --surface: #171f1b;
+  --surface-soft: #1d2723;
+  --ink: #e9e5e2;
+  --ink-soft: #b8b2ae;
+  --ink-muted: #928b87;
+  --line: #2a3531;
+  --line-strong: #3a4844;
+  --brand: #7fbfa3;
+  --brand-deep: #dfeee7;
+  --brand-tint: rgba(127, 191, 163, .12);
+  --brand-line: rgba(127, 191, 163, .34);
+  --provado: #7fbfa3;
+  --rotulado: #d3ac52;
+  --rotulado-tint: rgba(211, 172, 82, .14);
+  --term-bg: #0a0f0d;
+  --term-ink: #dfeee7;
+  --term-dim: #7fbfa3;
+  --sombra: 0 1px 2px rgba(0, 0, 0, .3);
+}
+
+* { box-sizing: border-box; }
+
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--corpo);
+  font-size: 17px;
+  line-height: 1.65;
+  margin: 0;
+  padding: 0 20px 96px;
+  -webkit-font-smoothing: antialiased;
+}
+
+.faixa {
+  max-width: 66ch;
+  margin-inline: auto;
+}
+.larga {
+  max-width: 84ch;
+  margin-inline: auto;
+}
+
+/* ---------- topo ---------- */
+
+header.capa {
+  max-width: 84ch;
+  margin: 0 auto;
+  padding: 72px 0 40px;
+}
+.barras {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 22px;
+}
+.barras i {
+  display: block;
+  width: 5px;
+  height: 26px;
+  background: var(--brand);
+  transform: skewX(-12deg);
+}
+.barras span {
+  font-family: var(--mono);
+  font-size: 12px;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+}
+h1 {
+  font-family: var(--display);
+  font-weight: 900;
+  font-size: clamp(38px, 7vw, 62px);
+  line-height: 1.02;
+  letter-spacing: -.022em;
+  margin: 0 0 20px;
+  text-wrap: balance;
+}
+.tese {
+  font-size: clamp(18px, 2.3vw, 21px);
+  line-height: 1.55;
+  color: var(--ink-soft);
+  max-width: 60ch;
+  margin: 0;
+}
+.tese b { color: var(--ink); font-weight: 600; }
+
+/* ---------- números ---------- */
+
+.numeros {
+  max-width: 84ch;
+  margin: 40px auto 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
+  gap: 1px;
+  background: var(--line);
+  border: 1px solid var(--line);
+}
+.numeros div {
+  background: var(--surface);
+  padding: 16px 18px;
+}
+.numeros dt {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+  margin: 0 0 6px;
+}
+.numeros dd {
+  font-family: var(--mono);
+  font-weight: 500;
+  font-size: 24px;
+  font-variant-numeric: tabular-nums;
+  color: var(--brand);
+  margin: 0;
+}
+
+/* ---------- selos: a tese da página ---------- */
+
+.selo {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  padding: 3px 8px;
+  border-radius: 2px;
+  white-space: nowrap;
+}
+.selo::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex: none;
+}
+.selo.p { color: var(--provado); background: var(--brand-tint); }
+.selo.p::before { background: var(--provado); }
+.selo.r { color: var(--rotulado); background: var(--rotulado-tint); }
+.selo.r::before {
+  background: transparent;
+  border: 1.5px solid var(--rotulado);
+}
+
+/* ---------- texto ---------- */
+
+section { margin-top: 68px; }
+
+h2 {
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: clamp(24px, 3.4vw, 31px);
+  line-height: 1.15;
+  letter-spacing: -.014em;
+  margin: 0 0 6px;
+  text-wrap: balance;
+}
+h2 + .sub {
+  font-family: var(--mono);
+  font-size: 12px;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+  margin: 0 0 26px;
+}
+h3 {
+  font-family: var(--corpo);
+  font-weight: 600;
+  font-size: 18px;
+  margin: 36px 0 10px;
+}
+p { margin: 0 0 18px; }
+strong { font-weight: 600; }
+a { color: var(--brand); text-decoration-thickness: 1px; text-underline-offset: 3px; }
+a:focus-visible, summary:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 3px;
+  border-radius: 2px;
+}
+
+code {
+  font-family: var(--mono);
+  font-size: .875em;
+  background: var(--surface-soft);
+  padding: 1px 5px;
+  border-radius: 3px;
+  word-break: break-word;
+}
+
+ol.passos {
+  counter-reset: p;
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+ol.passos li {
+  counter-increment: p;
+  display: grid;
+  grid-template-columns: 30px 1fr;
+  gap: 14px;
+  align-items: start;
+}
+ol.passos li::before {
+  content: counter(p);
+  font-family: var(--mono);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--brand);
+  border: 1px solid var(--brand-line);
+  border-radius: 50%;
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  margin-top: 1px;
+}
+
+ul.limpa {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+ul.limpa > li {
+  padding-left: 18px;
+  border-left: 2px solid var(--line-strong);
+}
+
+/* ---------- blocos de prova ---------- */
+
+.term {
+  background: var(--term-bg);
+  color: var(--term-ink);
+  font-family: var(--mono);
+  font-size: 13.5px;
+  line-height: 1.75;
+  padding: 20px 22px;
+  border-radius: 4px;
+  overflow-x: auto;
+  margin: 0 0 10px;
+}
+.term .c { color: var(--term-dim); }
+.term .ok { color: #9fd9bd; }
+.legenda {
+  font-size: 14px;
+  color: var(--ink-muted);
+  margin: 0 0 22px;
+}
+
+.rolo { overflow-x: auto; margin-bottom: 22px; }
+table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 15px;
+}
+th, td {
+  text-align: left;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--line);
+  vertical-align: top;
+}
+th {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+  border-bottom-color: var(--line-strong);
+  white-space: nowrap;
+}
+td code { background: none; padding: 0; }
+
+.nota {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--rotulado);
+  border-radius: 3px;
+  padding: 18px 20px;
+  box-shadow: var(--sombra);
+}
+.nota p:last-child { margin-bottom: 0; }
+.nota .rot {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--rotulado);
+  display: block;
+  margin-bottom: 8px;
+}
+
+pre.mermaid {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 24px 16px;
+  margin: 0 0 22px;
+  overflow-x: auto;
+  text-align: center;
+}
+
+footer {
+  max-width: 84ch;
+  margin: 84px auto 0;
+  padding-top: 26px;
+  border-top: 1px solid var(--line);
+  font-size: 14px;
+  color: var(--ink-muted);
+}
+footer code { font-size: 13px; }
+
+@media (prefers-reduced-motion: reduce) {
+  * { animation: none !important; transition: none !important; }
+}
+@media (max-width: 640px) {
+  body { font-size: 16px; padding-inline: 16px; }
+  header.capa { padding-top: 48px; }
+  section { margin-top: 52px; }
+}
+</style>
+
+<header class="capa">
+  <div class="barras" aria-hidden="true">
+    <i></i><i></i><span>skill do monorepo Revy</span>
+  </div>
+  <h1>revy-research</h1>
+  <p class="tese">
+    Um índice de <b>793 linhas de afirmação</b> sobre 144 mil linhas de Python.
+    O que o torna diferente de mais uma pasta de documentação é que
+    <b>toda linha dele pode ser reprovada por um comando</b> — e é.
+  </p>
+</header>
+
+<dl class="numeros">
+  <div><dt>produtos</dt><dd data-numero="produtos">6</dd></div>
+  <div><dt>entradas no mapa</dt><dd data-numero="entradas">793</dd></div>
+  <div><dt>learnings</dt><dd data-numero="learnings">29</dd></div>
+  <div><dt>decisões</dt><dd data-numero="decisoes">12</dd></div>
+  <div><dt>protocolo</dt><dd data-numero="skill_linhas">69</dd></div>
+</dl>
+
+<main>
+
+<section class="faixa">
+  <h2>O problema que ela resolve</h2>
+  <p class="sub">por que existe</p>
+  <p>
+    O monorepo tem seis produtos e cerca de <b>144 mil linhas</b> de Python. Uma
+    busca às cegas devolve sobretudo lixo: dos 10.288 arquivos da árvore, 93% são
+    código-fonte dos cinco <code>.venv</code>.
+  </p>
+  <p>
+    Todo agente começa cego, em toda sessão. Sem um índice, ele lê
+    <code>main.py</code> inteiro — o do portal tem 2.609 linhas — e ainda assim
+    não sabe quais armadilhas já custaram caro nem o que o dono já recusou.
+  </p>
+  <p>
+    A skill é <strong>porta, não caminho</strong>: entrega o contexto que só ela
+    tem e roteia para quem sabe o resto. Ela não tem protocolo próprio de
+    implementar, propor ou depurar.
+  </p>
+</section>
+
+<section class="larga">
+  <h2>O protocolo</h2>
+  <p class="sub">o que acontece quando ela dispara</p>
+
+  <pre class="mermaid">
+flowchart TD
+    A["disparo<br/>tarefa em um produto"] --> B{"cruzou<br/>dois produtos?"}
+    B -->|sim| C["PARE e avise o dono<br/>entre produtos só há HTTP versionado"]
+    B -->|não| D["--frescor produto"]
+    D --> E["mapa/produto.md<br/>arquivo:linha de tudo"]
+    E --> F["learnings/INDEX.md<br/>decisoes/INDEX.md"]
+    F --> G["briefing<br/>produto, linhas, invariantes, teste"]
+    G --> H["roteia para a skill destino"]
+  </pre>
+
+  <div class="faixa">
+    <ol class="passos">
+      <li><strong>Um produto, dos seis.</strong> Tarefa que cruza dois vira conversa com o dono, não código — entre produtos só existe HTTP versionado.</li>
+      <li><strong>Frescor.</strong> <code>--frescor &lt;produto&gt;</code>. Respondeu <em>mapa em dia</em>, segue calado; listou arquivos, diz quantos e oferece regerar.</li>
+      <li><strong>Abre o mapa do produto</strong>, nunca o <code>main.py</code> inteiro. Rota, modelo, worker, migration, flag e template, com o comando de teste nos dois sistemas operacionais.</li>
+      <li><strong>Lê os dois índices</strong> e abre só os que batem com o gatilho — normalmente zero, um ou dois.</li>
+    </ol>
+    <p style="margin-top:22px">
+      As decisões são lidas <strong>no passo 4, antes de rotear</strong>. Depois
+      já é tarde: a skill destino começa cega e re-propõe o que o dono recusou.
+    </p>
+  </div>
+</section>
+
+<section class="larga">
+  <h2>Três camadas, três donos da caneta</h2>
+  <p class="sub">quem pode escrever o quê</p>
+
+  <div class="faixa">
+    <p>
+      É a separação que impede a skill de virar mais uma pasta de docs
+      apodrecendo. Cada camada tem um dono da escrita diferente — e uma garantia
+      diferente, que a página anuncia em vez de esconder.
+    </p>
+  </div>
+
+  <div class="rolo">
+    <table>
+      <thead>
+        <tr><th>Camada</th><th>Quem escreve</th><th>Garantia</th><th>O que é</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>mapa/</code></td>
+          <td>script</td>
+          <td><span class="selo p">provado</span></td>
+          <td>Saída de <code>gerar_mapa.py</code>. Nunca se edita à mão: erro no mapa é erro no gerador.</td>
+        </tr>
+        <tr>
+          <td><code>learnings/</code><br><code>decisoes/</code></td>
+          <td>agente</td>
+          <td><span class="selo r">rotulado</span></td>
+          <td>Por acréscimo, com poda. Armadilha que já custou caro; decisão que não se re-propõe.</td>
+        </tr>
+        <tr>
+          <td><code>SKILL.md</code></td>
+          <td>humano</td>
+          <td><span class="selo p">aprovado</span></td>
+          <td>O protocolo. A skill <strong>não se auto-edita</strong> — carrega em todo disparo e derivando sozinha vira 400 linhas que ninguém revisou.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="faixa">
+    <p>
+      Quando um ensaio achou um defeito no próprio protocolo, ele não se
+      corrigiu: escreveu uma linha em <code>propostas.md</code> e esperou o dono
+      aprovar. Essa é a válvula, e é o que mantém o passo 3 de cima honesto.
+    </p>
+  </div>
+</section>
+
+<section class="larga">
+  <h2>Por que o mapa não mente</h2>
+  <p class="sub">a diferença entre isto e documentação</p>
+
+  <div class="faixa">
+    <p>
+      Cada linha do mapa é um par <code>arquivo:linha</code> mais o símbolo que
+      tem que estar escrito naquela linha. <code>--verificar</code> reabre todas
+      elas e prova, uma a uma. Documento errado fica quieto; esse falha alto e
+      sai com código 1.
+    </p>
+  </div>
+
+  <div class="term">$ python gerar_mapa.py --verificar
+<span class="ok">mapa confere com o codigo</span>
+
+$ python gerar_mapa.py --frescor portal-gestao
+<span class="ok">mapa em dia</span></div>
+  <p class="legenda faixa">
+    O contrato é literal: <code>linha &gt; 0</code> exige o símbolo naquela
+    linha; <code>linha == 0</code> exige só que o arquivo exista.
+  </p>
+
+  <div class="faixa">
+    <h3>Como o mapa é feito</h3>
+    <p>
+      Por análise estática de AST, com a biblioteca padrão. O gerador
+      <strong>nunca importa nem executa</strong> código de produto — não sobe
+      app, não abre banco, não lê secret.
+    </p>
+  </div>
+
+  <div class="rolo">
+    <table>
+      <thead><tr><th>Módulo</th><th>Papel</th></tr></thead>
+      <tbody>
+        <tr><td><code>varredura.py</code></td><td>Enxerga o projeto e ignora os cinco <code>.venv</code>. Define o contrato <code>Entrada</code>.</td></tr>
+        <tr><td><code>extratores.py</code></td><td>Rota, modelo, worker, migration, flag, template — um extrator por seção.</td></tr>
+        <tr><td><code>cruzamentos.py</code></td><td>Juntas entre produtos: n8n → chatbot, rota órfã, os <code>fly.toml</code>.</td></tr>
+        <tr><td><code>gerar_mapa.py</code></td><td>Junta tudo, renderiza, e implementa <code>--verificar</code> e <code>--frescor</code>.</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="faixa">
+  <h2>Frescor sai do commit do mapa</h2>
+  <p class="sub">e não do selo, por um motivo</p>
+  <p>
+    O selo em <code>_frescor.json</code> guarda o SHA de quando o mapa foi
+    gerado — o que é sempre <strong>um commit antes</strong> do commit que grava
+    o mapa. Comparar a partir dele listava as mudanças do próprio commit certo.
+  </p>
+  <p>
+    Ou seja: o aviso de "desatualizado" disparava justamente quando o agente
+    tinha acertado — mexeu na rota, regerou o mapa e commitou os dois juntos,
+    como o <code>AGENTS.md</code> §6 manda.
+  </p>
+  <p>
+    A base agora é <code>git log -1 -- mapa/</code>, o commit que atualizou o
+    mapa por último. O selo continua ali como procedência e como fonte do
+    inventário que o <code>--verificar</code> reabre — só não serve para medir
+    frescor.
+  </p>
+</section>
+
+<section class="faixa">
+  <h2>Cegueira declarada</h2>
+  <p class="sub">a regra que veio de errar seis vezes</p>
+  <p>
+    O modo de falha que mais se repetiu na construção da skill:
+    <strong>o gerador assumia uma forma sintática onde o repo usava duas</strong>,
+    devolvia menos e continuava verde. Aconteceu com <code>revision</code>, com
+    <code>os.getenv</code>, com <code>TemplateResponse</code>, com <code>prefix=</code>.
+  </p>
+  <p>
+    O pior caso: rotas cujo path é variável — <code>@router.get(_PAGINA)</code> —
+    ficavam fora do mapa. Eram 25, e não quaisquer 25: as do Copiloto, do
+    Financeiro e do WhatsApp, ou seja, os módulos novos. E
+    <code>--verificar</code> seguia dizendo que estava tudo certo, porque ele só
+    reabre o que <em>está</em> no mapa.
+  </p>
+  <div class="nota">
+    <span class="rot">a regra que sobrou</span>
+    <p>
+      <strong>Ausência num mapa nunca prova ausência no código.</strong> Path
+      que o gerador não consegue ler agora vira aviso explícito, ancorado no
+      nome da função. Hoje não dispara para arquivo nenhum — nasce mudo e fala
+      no dia em que aparecer uma forma nova.
+    </p>
+  </div>
+</section>
+
+<section class="faixa">
+  <h2>O que ela não faz</h2>
+  <p class="sub">os limites, declarados</p>
+  <ul class="limpa">
+    <li>
+      <strong>Não sabe o estado de produção.</strong> Flag ligada é secret. O
+      mapa diz que a flag existe e onde ela é lida, não se está ativa.
+    </li>
+    <li>
+      <strong>Os learnings são rotulados, não provados.</strong> Cada um declara
+      onde mora a verdade dele — <code>repo</code> se confere lendo código;
+      <code>infra</code> e <code>externo</code> apodrecem sem sinal nenhum no
+      git. A maioria está marcada como nunca reconferida. Trate como pista.
+    </li>
+    <li>
+      <strong>Não impede o agente de errar.</strong> Ela torna o erro mais
+      barato de pegar, que não é a mesma coisa.
+    </li>
+    <li>
+      <strong>Não julga arquitetura.</strong> "Não mexa aqui" mora no
+      <code>README.md</code> do produto. O mapa aponta; não copia.
+    </li>
+  </ul>
+</section>
+
+<section class="larga">
+  <h2>Comandos</h2>
+  <p class="sub">Windows usa python; o Mac do dono só tem python3</p>
+  <div class="term">$ cd .claude/skills/revy-research
+
+$ python gerar_mapa.py               <span class="c"># regera o mapa</span>
+$ python gerar_mapa.py --verificar   <span class="c"># confere; sai 1 se o mapa mentir</span>
+$ python gerar_mapa.py --frescor portal-gestao
+$ python -m pytest test_gerar_mapa.py -q -p no:cacheprovider</div>
+  <p class="legenda faixa">
+    Mexeu em rota, modelo, worker, migration ou flag? Regere o mapa e
+    <strong>commite junto com o código</strong>.
+  </p>
+</section>
+
+</main>
+
+<footer>
+  <p>
+    Esta página mora em <code>.claude/skills/revy-research/como-funciona.html</code>
+    e é versionada com a skill. Os números do topo são conferidos por
+    <code>test_gerar_mapa.py</code> contra o repo de verdade: se a skill mudar e
+    a página não, a suíte reprova. Foi a lição do dia em que um learning afirmou
+    SQLite por uma semana depois de tudo virar Postgres.
+  </p>
+</footer>
