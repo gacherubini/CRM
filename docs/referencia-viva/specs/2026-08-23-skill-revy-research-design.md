@@ -103,7 +103,7 @@ Extratores, por produto:
 | Modelos | classe com `__tablename__` → tabela, classe, `arquivo:linha` |
 | Migrations | `alembic/versions/*.py`; calcula o head por `down_revision` |
 | Workers | `*_job.py`, `*_workers.py`, classes `*Worker` |
-| Flags | `REVY_*` / `MULTI_*` em `os.getenv` + default no código (74 hoje) |
+| Flags | `REVY_*` / `MULTI_*` lidas do ambiente + default no código (67 nomes, 80 leituras) |
 | Templates | `.html` + a rota que faz `TemplateResponse` |
 | Testes | tabela fixa no gerador, macOS **e** Windows |
 
@@ -116,9 +116,18 @@ outro sistema operacional nem para subagente em worktree. O gerador roda sob
 demanda em dois casos: o agente oferece quando o selo de frescor acusa atraso, e
 o dono pede quando quiser. Não roda sozinho em hook nem em commit.
 
-Contagens atuais para conferência: chatbot 25 migrations, portal 26,
-control 20, estoque 10, motor 14. Templates: portal 61, control 20,
-catálogo 4, estoque 3, chatbot 0.
+Contagens medidas em 23/08 pelo próprio gerador: chatbot 25 migrations,
+portal 26, control 20, estoque 10, motor 14 — **head única nos cinco**.
+Templates: portal 61, control 20, catálogo 4, estoque 3, chatbot 0, motor 0
+(os 4 `.html` do motor são fixtures do Playwright sob `tests/`, não templates).
+Flags: 67 nomes distintos em 80 leituras.
+
+**Uma lição que atravessou três extratores:** onde a spec supôs uma forma
+sintática, o repo usa duas ou três — `revision =` contra `revision: str =`,
+`os.getenv` direto contra `_env_bool`/`_env_flag`, e três assinaturas de
+`TemplateResponse`. Em todos os casos a versão ingênua não quebrava: devolvia
+menos e seguia verde. É por isso que cada extrator tem um teste que conta
+contra o repo real, e não só contra uma fonte de exemplo.
 
 ### `_cruzamentos.md`
 

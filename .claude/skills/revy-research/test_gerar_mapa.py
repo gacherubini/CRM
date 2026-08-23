@@ -372,6 +372,13 @@ class TestExtratorDeTemplates(unittest.TestCase):
         achados = extratores.templates(raiz / "portal-gestao")
         self.assertGreater(len(achados), 40)
 
+    def test_html_de_fixture_de_teste_nao_e_template(self):
+        # o motor so tem .html sob tests/fixtures (paginas de banco salvas para
+        # o Playwright). Se entrassem, o mapa diria que o motor renderiza HTML.
+        raiz = varredura.raiz_repo()
+        achados = extratores.templates(raiz / "motor-simulacao")
+        self.assertEqual(achados, [])
+
     def test_chatbot_nao_tem_template(self):
         raiz = varredura.raiz_repo()
         self.assertEqual(extratores.templates(raiz / "chatbot-api"), [])

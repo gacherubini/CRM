@@ -834,7 +834,17 @@ Três extratores pequenos com a mesma forma. Vão juntos porque um revisor aceit
   - `extratores.flags(texto: str, arquivo_rel: str) -> list[Entrada]` — `secao="flag"`, `chave` = `"REVY_X (default: 0)"`, `simbolo` = `"REVY_X"`
   - `extratores.templates(base_produto: Path) -> list[Entrada]` — `secao="template"`, `linha=0`
 
-Medido hoje: 74 flags `REVY_*`/`MULTI_*` no repo. Templates: portal 61, control 20, catálogo 4, estoque 3, chatbot 0.
+Medido em 23/08 **pelo extrator**, não por `grep`: **80 leituras de flag, 67 nomes distintos** (`revy-trafego` 51, `portal-gestao` 27, chatbot 1, catálogo 1, motor 0, estoque 0). O número 74 que circulava vinha de `grep -oE '(REVY_|MULTI_)[A-Z0-9_]+' | sort -u`, que conta pedaço de nome (`REVY_TRAFEGO_`), nome citado só em comentário, e casa no meio de `PORTAL_REVY_TRAFEGO_TIMEOUT`. Não confie nele.
+
+Templates: portal 61, control 20, catálogo 4, estoque 3, chatbot 0, **motor 0**.
+
+**Três armadilhas sintáticas, todas achadas ao executar esta task — é o mesmo padrão do `revision:` da Task 4: o repo usa mais de uma forma onde o plano supunha uma.**
+
+1. **Flag quase nunca é lida por `os.getenv` direto.** O portal lê por `_env_bool("REVY_LOJA_COPILOTO_ENABLED", "0")` (`portal-gestao/app/config.py:5`) e o control por `_env_flag("REVY_CONTROL_DASHBOARD_ENABLED")` (`revy-trafego/app/config.py:6`). Casar só `getenv`/`get` perde **17 flags — justamente as de rollout** da Loja e do Control (Copiloto, Shell, Entitlements, Atendimento, Financeiro, WhatsApp, Dashboard, Provisioning, `MULTI_WHATSAPP_ENABLED`), e o mapa diria "50 flags" sem reclamar. A regra certa é a inversa: **quem recebe o nome da flag como 1º argumento está lendo**, salvo uma lista de escritas (`setenv`, `delenv`, `pop`, …). Assim o próximo helper entra sozinho.
+2. **`TemplateResponse` tem três sintaxes, todas vivas no repo:** `("x.html", ctx)` (antiga), `(request, "x.html", ctx)` (Starlette nova) e `(request=request, name="x.html")` (keyword — é o `revy-trafego/app/web/control_ui.py` inteiro). E ~150 das 152 chamadas quebram em várias linhas: **a `linha` da entrada tem de ser a da string, não a do `TemplateResponse(`**, senão o `--verificar` reabre a linha errada e dá falso negativo em todo template.
+3. **Worker também mora em `app/worker.py`.** Só os sufixos `_job.py`/`_workers.py` deixam **motor e estoque com zero worker**. E na direção oposta: 7 arquivos de teste casam com o sufixo (`tests/test_rodizio_job.py`, `estoque-api/tests/test_worker.py`) e enfiariam cada `def test_...` no mapa como job de produção — precisa de guarda contra arquivo de teste.
+
+**HTML sob `tests/` não é template.** Os 4 `.html` do motor são páginas de banco salvas como fixture do Playwright (`tests/fixtures/bradesco/ofertas.html`). Listá-las faria o mapa afirmar que o motor renderiza HTML — falso, e é a única forma que sobra de o mapa mentir. Conferido que a exclusão derruba só essas 4: os outros cinco produtos têm zero `.html` sob `tests/`. Teste: `test_html_de_fixture_de_teste_nao_e_template`.
 
 - [ ] **Step 1: Escrever os testes que falham**
 
