@@ -626,9 +626,11 @@ git commit -m "feat(revy-research): extrator de rotas por AST, sem importar o ap
 - Consumes: `varredura.Entrada`
 - Produces:
   - `extratores.modelos(texto: str, arquivo_rel: str) -> list[Entrada]` — `secao="modelo"`, `chave` = nome da tabela, `simbolo` = nome da tabela
-  - `extratores.migrations(pasta_versions: Path) -> tuple[list[Entrada], str]` — a lista e o **head** (a revision que ninguém aponta como `down_revision`)
+  - `extratores.migrations(pasta_versions: Path) -> tuple[list[Entrada], str]` — a lista e o **head** (a revision que ninguém aponta como `down_revision`). **Atenção**: o `arquivo` da `Entrada` de migration guarda só o **nome do arquivo**, não o caminho relativo ao produto (a pasta é fixa, `alembic/versions/`). Rota e modelo guardam caminho relativo. Quem consumir isso — `render` na Task 6 e `--verificar` na Task 7 — precisa recompor `alembic/versions/<nome>`.
 
-Contagens medidas hoje, para conferir o resultado: chatbot 25, portal 26, control 20, estoque 10, motor 14.
+Contagens medidas hoje, para conferir o resultado: chatbot 25, portal 26, control 20, estoque 10, motor 14. Heads medidas em 23/08: `0025_canal_cloud_por_loja`, `0026_copiloto_sinal_destinatario`, `0020_loja_whatsapp_modo`, `0010`, `0014` — **head única nos cinco**, nenhuma divergente.
+
+**Armadilha, achada ao executar esta task:** as migrations do repo usam **dois estilos** de declaração. As antigas escrevem `revision: str = "0001"` (`ast.AnnAssign`, é o caso do motor inteiro e de 8 do estoque); as novas escrevem `revision = "0025_x"` (`ast.Assign`). Ler só `Assign` acha **0 de 14** no motor e 2 de 10 no estoque — e como cada arquivo perdido vira uma head solta, o cálculo do head quebra junto. Daí o helper `_constante_str`, que trata os dois, e o teste `test_le_os_dois_estilos_de_revision_do_repo` que trava a regressão.
 
 - [ ] **Step 1: Escrever os testes que falham**
 
@@ -724,23 +726,48 @@ def modelos(texto: str, arquivo_rel: str) -> list[Entrada]:
     return achados
 
 
+def _constante_str(no: ast.AST) -> tuple[str, str] | None:
+    """(nome, valor) de `x = "s"` OU de `x: T = "s"`, no topo do modulo.
+
+    As migrations do repo usam os DOIS estilos: as antigas escrevem
+    `revision: str = "0001"` (AnnAssign) e as novas `revision = "0020_..."`
+    (Assign). Ler so um dos dois perde metade dos arquivos e, pior, quebra a
+    cadeia do head: cada arquivo perdido vira uma head solta.
+    """
+    if isinstance(no, ast.Assign):
+        if len(no.targets) != 1 or not isinstance(no.targets[0], ast.Name):
+            return None
+        nome = no.targets[0].id
+    elif isinstance(no, ast.AnnAssign):
+        if not isinstance(no.target, ast.Name):
+            return None
+        nome = no.target.id
+    else:
+        return None
+    if not isinstance(no.value, ast.Constant) or not isinstance(no.value.value, str):
+        return None
+    return nome, no.value.value
+
+
 def _revisions(texto: str) -> tuple[str, str]:
-    """(revision, down_revision) lidos como constantes de modulo."""
+    """(revision, down_revision) lidos como constantes de modulo, por AST.
+
+    Nunca importa o modulo do Alembic: rodar uma migration para descobrir o id
+    dela executaria codigo de produto (invariante do AGENTS.md).
+    """
     revision = down = ""
     try:
         arvore = ast.parse(texto)
     except SyntaxError:
         return "", ""
     for no in arvore.body:
-        if not isinstance(no, ast.Assign) or len(no.targets) != 1:
+        par = _constante_str(no)
+        if par is None:
             continue
-        alvo = no.targets[0]
-        if not isinstance(alvo, ast.Name):
-            continue
-        valor = no.value.value if isinstance(no.value, ast.Constant) else ""
-        if alvo.id == "revision" and isinstance(valor, str):
+        nome, valor = par
+        if nome == "revision":
             revision = valor
-        elif alvo.id == "down_revision" and isinstance(valor, str):
+        elif nome == "down_revision":
             down = valor
     return revision, down
 
