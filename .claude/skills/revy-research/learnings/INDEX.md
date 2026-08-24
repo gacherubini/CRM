@@ -32,6 +32,7 @@ escrever migration com `batch_alter_table`.
 | o bot do WhatsApp parou de responder sem ninguem ter mexido no codigo | `2026-08-23-n8n-cheio-deixa-o-bot-mudo.md` |
 | reiniciar o n8n2037 ou trocar um secret dele | `2026-08-23-reiniciar-o-n8n-derruba-o-webhook.md` |
 | subir workflow novo no n8n do Fly | `2026-08-23-import-do-n8n-desativa-o-workflow.md` |
+| mudar o prompt do bot, o tom da IA ou o que ela pode responder | `2026-08-23-o-prompt-do-bot-mora-no-n8n.md` |
 | mexer no workflow do n8n do Modo 2 (cloud) | `2026-08-23-workflow-cloud-e-gerado.md` |
 | parear numero novo no Evolution ou QR que nao conecta | `2026-08-23-qr-do-evolution-nao-fecha-por-passkey.md` |
 | responder se uma feature ja foi implementada | `2026-08-23-teste-verde-nao-prova-que-a-feature-existe.md` |
@@ -49,3 +50,5 @@ escrever migration com `batch_alter_table`.
 | depurar driver Playwright de banco que termina em timeout | `2026-08-23-driver-playwright-engole-o-clique-que-falha.md` |
 | propor canal de entrada de lead que nao seja anuncio CTWA | `2026-08-23-mensagem-de-servico-volta-a-ser-paga.md` |
 | dimensionar limite da Cloud API ou tratar verificacao de CNPJ como bloqueio | `2026-08-23-teto-de-250-conta-so-outbound.md` |
+| submeter a verificacao de empresa (CNPJ) no portfolio da Meta | `2026-08-23-verificacao-da-meta-so-o-email-aceita-endereco.md` |
+| ligar o Modo 2 numa loja ou cadastrar o canal Cloud dela | `2026-08-23-canal-cloud-nao-se-cadastra-pela-api.md` |
