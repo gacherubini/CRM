@@ -39,8 +39,8 @@ exercitado* — código verde não é caminho andado.
 | §5.2 | Gatilho *simulação pronta* | ✅ via `solicitacoes-simulacao-humana` — não exercitado no piloto |
 | §5.2 | Gatilho *simulação falhou* | ✅ mesmo caminho, `motivo=simulacao_falhou` — não exercitado no piloto |
 | §5.2 | Gatilho *cliente pede humano* | ✅ `POST /v1/operacao/handoff-humano` — **provado 24/08** |
-| §5.3 | Rodízio, ponteiro, 10 min, uma volta | ✅ `rodizio.py` + worker — **primeira oferta provada 24/08**; ponteiro, prazo de 10 min e volta completa **não**: a fila do piloto tem um vendedor só |
-| §5.4 | Silêncio pós-handoff, re-notificação | ✅ `pos_handoff.py` — **silêncio provado 24/08** (`bot_ativo=False`); re-notificação não exercitada |
+| §5.3 | Rodízio, ponteiro, 10 min, uma volta | ⚠️ `rodizio.py` + worker — **primeira oferta provada 24/08**. A **reoferta nunca era enviada** (só trocava de dono no banco); corrigido em 24/08, ver abaixo. Ponteiro, prazo e volta completa seguem **sem prova em produção**: a fila do piloto tem um vendedor só |
+| §5.4 | Silêncio pós-handoff, re-notificação | ✅ `pos_handoff.py` — **silêncio provado 24/08** (`bot_ativo=False`); re-notificação não exercitada. O **follow-up estava quebrado** pelo mesmo defeito de outbound do rodízio, corrigido junto em 24/08 |
 | §5.5 | Vendedor × cliente por variantes | ✅ |
 | §5.7 | "Peguei" = clique, primeiro vence | ✅ trava idempotente — **clicado em produção 24/08**, oferta ficou `travada`. "Primeiro vence" com dois cliques concorrentes segue não exercitado |
 | §5.8 | Control escolhe o modo | ✅ `whatsapp_modo` por loja; no piloto a projeção foi semeada à mão, o Control não escreveu |
@@ -191,7 +191,8 @@ E saiu **de graça**: com a janela de 24 h do vendedor aberta, a oferta foi
 ### O que continua sem prova
 
 - **Fila com mais de um vendedor:** ponteiro, prazo de 10 min e a volta que para
-  no fim. A fila do piloto tem um só, então o rodízio nunca rodou.
+  no fim. A fila do piloto tem um só, então o rodízio nunca rodou — e foi ao
+  preparar esse teste que se descobriu que a reoferta **nem sairia**.
 - **Dois cliques concorrentes** — o "primeiro vence" nunca disputou.
 - **Re-notificação do §5.4** e o follow-up de 30 min / 1 h.
 - **Template com janela fechada:** todo o piloto correu dentro da janela, então o
@@ -230,6 +231,95 @@ O piloto roda com **uma** loja porque o Modo 2 hoje só atende uma: um workflow
 `n8n-cloud` serve N lojas mas autentica com um token que pertence a UMA loja.
 Card próprio, não se re-descobre aqui:
 [`../../fila/2026-08-23-modo2-multiloja-credencial-de-integracao.md`](../../fila/2026-08-23-modo2-multiloja-credencial-de-integracao.md).
+
+## Noite de 24/08 — dois furos entre o banco e o WhatsApp
+
+A volta completa provou o caminho feliz com **um** vendedor. Ao preparar o teste
+com dois, apareceram dois furos que o caminho feliz não toca. Os dois tinham
+teste verde por cima. Corrigidos e no ar em `app2037` v158 (`f355ba6`).
+
+### 1. A reoferta trocava de dono no banco e ninguém era avisado
+
+`RodizioWorker.run_once` expirava a oferta vencida, chamava `abrir_oferta` para o
+próximo vendedor e **parava ali**: `enviar_oferta` só existia no caminho da
+primeira oferta, em `handoff_gatilhos`. O `_ciclo_rodizio` nem outbound recebia.
+
+Efeito: passados os 10 min o lead mudava de dono no banco e **o celular do
+vendedor 2 nunca tocava**. O rodízio inteiro — ponteiro, prazo, a volta que para
+— existia só como estado.
+
+O teste que deixou isso passar (`tests/test_rodizio_job.py`) afirmava
+`nova.vendedor_id != oferta.vendedor_id`: a linha do banco, nunca o envio. É o
+mesmo defeito do `n8n-cloud` de 4 nós que abre este documento — verde e vazio.
+
+Junto: a volta esgotada passou a avisar o cliente, **uma vez só**. Antes ele ouvia
+"já estou chamando um vendedor" e depois silêncio para sempre.
+
+**O achado de tabela:** acrescentar `send_template_button` e
+`send_interactive_button` ao `_OutboundPorLoja` **não bastava**. Ele passava o
+`phone_number_id` para `outbound_para_loja`, que pergunta "a loja `<pnid>` é
+Modo 2?", ouve não e devolve o transporte do **Modo 1** — `AttributeError`.
+Corrigido com `loja_id_do_phone_number_id` em `cloud_canal.py`, que
+`_loja_por_phone_number_id` passou a usar em vez de duplicar.
+
+**Colateral:** o mesmo defeito quebrava o **follow-up do Modo 2** — todo cutucão
+saía pelo adapter Evolution com um `phone_number_id` da Cloud no lugar da
+instância. Consertou junto, sem ninguém ter tocado no `followup_job.py`.
+
+### 2. O handoff falava duas vezes
+
+Na conversa do piloto, às 00:06 de 24/08, o cliente recebeu duas mensagens
+seguidas dizendo a mesma coisa: `Já estou chamando um vendedor para falar com
+você.` (backend, `handoff_gatilhos.py`) e `pronto, ja estou chamando um vendedor
+pra falar com voce.` (agente).
+
+A segunda é a tool `solicitar_handoff1`, que devolve
+`{"mensagem": "pronto, ja estou chamando..."}` — texto que o agente ecoa como
+resposta dele e o `Responder WhatsApp1` envia.
+
+No Modo 1 isso não acontece: lá o handoff avisa o **grupo** e o backend não fala
+com o cliente. O fork por recorte manteve a `mensagem` da tool enquanto o Modo 2
+ganhou o aviso no backend, e ninguém viu que os dois passaram a se sobrepor.
+
+`disparar_handoff` ganhou `avisar_cliente`; a rota `/v1/operacao/handoff-humano`
+passa `False`. `solicitacoes_simulacao` fica com o default `True`: naquele caminho
+não há agente no turno e o backend segue sendo a única voz.
+
+**A §5.3 mudou de dono.** "O cliente não fica no vácuo" continua valendo, mas quem
+avisa agora é o agente — o backend deixou de ser a rede. Se o turno do agente
+morrer depois da chamada da tool, o cliente fica sem resposta. O caminho inverso
+seria pior: o `Responder WhatsApp1` **sempre** envia o output do agente, então
+calá-lo exigiria um nó IF dentro do fork gerado.
+
+## O bot do Modo 2 fala igual ao do Baileys, mas não soa igual
+
+Pergunta levantada em 24/08 ao reler a conversa do piloto: o Modo 2 parece menos
+humano. O `systemMessage` **não** é a causa — ele é byte a byte o mesmo nos dois
+workflows (17.090 caracteres, mesmo sha), assim como o Gemini, a memória e 4 das
+5 tools. Dos 16 nós compartilhados só 5 divergem, e 4 divergem por motivo
+legítimo: o payload da Meta não é o da Evolution.
+
+A diferença está na **entrega**:
+
+| Peça | Modo 1 (Baileys) | Modo 2 (cloud) |
+|---|---|---|
+| `Atraso anti-ban1` | calcula `__delayAntiBan` | **byte a byte idêntico**, calcula igual |
+| `Responder WhatsApp1` | manda `{ number, text, delay }` | manda `{ telefone, texto }` |
+| Resultado | a Evolution segura a mensagem mostrando **"digitando…"** e espaça os envios | delay **descartado**: mensagens instantâneas e em rajada |
+
+O nó continua vivo e a saída é órfã. E não há para onde mandar mesmo que
+quisesse: `WhatsAppOutboundPort.send_text` é `(instance, number, text)`, sem
+delay, e `/v1/operacao/responder` também não aceita. Na Cloud API o "digitando"
+não é parâmetro de envio — é chamada à parte, e precisa do `wamid` da mensagem do
+cliente, que a rota hoje não recebe.
+
+Dois pontos menores do mesmo nó: o filtro que força minúsculas, tira emoji e troca
+`!` por `.` é **incondicional** no Modo 2, enquanto no Modo 1 só vale para
+`fluxo.acao === 'cliente'`; e ele passa por cima de **URL e código** — um slug com
+maiúscula quebra o link, e o `Cód:` do CTWA viraria `cód:`.
+
+Trabalho pendente, com card próprio:
+[`../../fila/2026-08-24-modo2-humanizacao-da-entrega.md`](../../fila/2026-08-24-modo2-humanizacao-da-entrega.md).
 
 Import do workflow: ver a armadilha em
 [`../../../deploy/fly/3vm/README.md`](../../../deploy/fly/3vm/README.md) —

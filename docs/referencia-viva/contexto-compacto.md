@@ -25,6 +25,12 @@ Vocabulário: [`../../CONTEXT.md`](../../CONTEXT.md). As-built Control/Loja:
   no form de estoque (o caminho pelo grupo continua). **Sino geral existe**
   (`regras_elegiveis` por tipo, independente do Copiloto) e aceita **destinatário por
   pessoa** (`copiloto_sinal.destinatario_usuario_id`, migration 0024).
+  **Troca de loja consertada em 24/08:** o seletor era montado com as memberships do Control
+  (3 lojas para o dono) e o `POST /app/loja/selecionar` autorizava só por `usuario.loja_slug`,
+  então **2 das 3 opções do próprio seletor sempre caíam** em `/app?erro=loja-nao-autorizada`.
+  Fonte única agora (`control_memberships_for`), com o cargo filtrado por `ROLES_OPERACIONAIS`
+  para `admin_plataforma` não virar acesso de loja pela porta dos fundos. O `?erro=` também
+  **não era renderizado em lugar nenhum** — agora a tela explica, sem detalhe interno.
 
 - **WhatsApp Modo 2 (central Cloud API):** no `main`, **deployado e rodando em produção**.
   Placar do que existe e do que falta:
@@ -59,6 +65,16 @@ Vocabulário: [`../../CONTEXT.md`](../../CONTEXT.md). As-built Control/Loja:
   [`../fila/2026-08-23-modo2-multiloja-credencial-de-integracao.md`](../fila/2026-08-23-modo2-multiloja-credencial-de-integracao.md).
   Dívida conhecida, em ordem de risco: **VAD do áudio** (§5.10 — o Whisper alucina em ruído e o
   bot age em cima), **recusa não cutuca** (§5.9 r.5) e `classificar_etapa` presa em `so_oi`.
+  **Noite de 24/08, ao preparar o teste com 2 vendedores, dois furos apareceram e foram
+  corrigidos** (no ar, `app2037` v158): (a) a **reoferta do rodízio nunca era enviada** — o worker
+  trocava o dono da oferta no banco e ninguém avisava o vendedor 2, e o teste só conferia a linha
+  do banco; junto, a volta esgotada passou a avisar o cliente. O mesmo defeito de outbound
+  quebrava o **follow-up do Modo 2**, que consertou de carona. (b) o **handoff falava duas vezes**
+  (backend + agente) — a rota agora cala o backend, e a §5.3 mudou de dono: quem avisa o cliente
+  é o agente, sem rede se o turno dele morrer.
+  **O bot fala igual ao do Baileys mas não soa igual:** o `systemMessage` é byte a byte o mesmo;
+  o que divergiu é a entrega — o `Atraso anti-ban1` calcula o "digitando…" e o Modo 2 **descarta**
+  o delay. Card: [`../fila/2026-08-24-modo2-humanizacao-da-entrega.md`](../fila/2026-08-24-modo2-humanizacao-da-entrega.md).
 
 - **Meta e domínio próprio (16/08):** portões 1 e 2 da Meta caíram no mesmo dia — app `Revy`
   criado, produto WhatsApp adicionado, número de teste enviando e webhook voltando. Domínio
@@ -151,7 +167,7 @@ Um eixo por mudança. Não misture Copiloto, RPA, rollout e n8n na mesma entrega
 | Loja — sino | B1: central geral por tipo. Sem blast `simulacao_pronta`. Oferta 1:1 = plano dos dois modos |
 | Motor | Probe Bradesco no PC (gate do worker residencial) **ou** estabilidade Bradesco |
 | Bot / n8n | Smoke virgem/CTWA/handoff/salvo no lab → Active ON pelo dono |
-| Modo 2 (piloto) | Volta completa **feita em 24/08** (oferta travada, central calada). Próximo: fila com 2+ vendedores — ponteiro, 10 min e a volta que para no fim nunca rodaram com um vendedor só |
+| Modo 2 (piloto) | Fila com 2+ vendedores, agora contra o código corrigido (a reoferta não saía; conserto no ar em 24/08). Falta o manual: allow-list **sem o nono dígito**, o vendedor 2 abrindo a janela de 24 h, e `POST /v1/fila-vendedores` com `ordem=2` |
 | Control | Secrets GCP (Google Ads) **ou** E2E dois canais WA |
 | CTWA | Task 4: `Cód:` na mensagem do anúncio (config, não PR) |
 | Site | Adiado — não pegar sem o dono pedir |

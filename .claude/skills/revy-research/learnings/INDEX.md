@@ -52,3 +52,5 @@ escrever migration com `batch_alter_table`.
 | dimensionar limite da Cloud API ou tratar verificacao de CNPJ como bloqueio | `2026-08-23-teto-de-250-conta-so-outbound.md` |
 | submeter a verificacao de empresa (CNPJ) no portfolio da Meta | `2026-08-23-verificacao-da-meta-so-o-email-aceita-endereco.md` |
 | ligar o Modo 2 numa loja ou cadastrar o canal Cloud dela | `2026-08-23-canal-cloud-nao-se-cadastra-pela-api.md` |
+| mandar mensagem de dentro de um worker do Modo 2 | `2026-08-24-outbound-por-loja-quer-loja-id.md` |
+| mexer em multi-loja, no seletor de lojas ou em quem pode trocar de loja | `2026-08-24-seletor-e-rota-leem-fontes-diferentes.md` |
