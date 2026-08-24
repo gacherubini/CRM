@@ -21,7 +21,7 @@ from dataclasses import dataclass
 from sqlalchemy.orm import Session
 
 from app import config
-from app.models_db import WhatsAppCanal
+from app.models_db import Loja, WhatsAppCanal
 
 
 @dataclass(frozen=True)
@@ -88,3 +88,32 @@ def phone_number_id_da_loja(db: Session, loja_id: str) -> str:
 def template_oferta_da_loja(db: Session, loja_id: str) -> str:
     """Template de oferta aprovado na WABA da loja (spec §5.7, §6.2)."""
     return credenciais_cloud_da_loja(db, loja_id).template_oferta
+
+
+def loja_id_do_phone_number_id(db: Session, phone_number_id: str) -> str | None:
+    """Caminho inverso de ``phone_number_id_da_loja``: quem fala por este número.
+
+    Quem envia conhece o número, não a loja — o ``phone_number_id`` é o
+    ``instance`` de todo outbound. Os workers precisam voltar dele para a loja
+    para escolher o transporte (Cloud × Modo 1), e é isso que esta função faz.
+
+    Duas buscas porque há duas formas de o número estar cadastrado: no canal
+    Cloud da loja, e — na loja piloto, sem canal — em ``lojas.evolution_instance``.
+    Mesma resolução que o inbound de ``/webhook/cloud`` usa, de propósito: se o
+    número entra por uma loja, a resposta tem de sair pela mesma.
+
+    ``None`` quando ninguém cadastrou o número.
+    """
+    if not phone_number_id:
+        return None
+    canal = (
+        db.query(WhatsAppCanal)
+        .filter(WhatsAppCanal.evolution_instance == phone_number_id)
+        .first()
+    )
+    if canal is not None:
+        return canal.loja_id
+    loja = (
+        db.query(Loja).filter(Loja.evolution_instance == phone_number_id).first()
+    )
+    return loja.id if loja is not None else None

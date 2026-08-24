@@ -16,6 +16,7 @@ import threading
 from typing import Any, Callable
 
 from app import config
+from app.cloud_canal import loja_id_do_phone_number_id
 
 logger = logging.getLogger("chatbot.modo2_workers")
 
@@ -105,7 +106,9 @@ def start_workers(
     cloud_retry = CloudRetryWorker()
 
     def _ciclo_rodizio(db: Any) -> None:
-        rodizio.run_once(db)
+        # Sem outbound aqui, a reoferta vira só uma linha no banco: o worker
+        # passa o lead ao vendedor 2 e o celular dele nunca toca (spec §5.3).
+        rodizio.run_once(db, outbound=_OutboundPorLoja(db, outbound_para_loja))
 
     def _ciclo_cloud_retry(db: Any) -> None:
         cloud_retry.run_once(db)
@@ -152,11 +155,15 @@ def stop_workers() -> None:
 
 
 class _OutboundPorLoja:
-    """Adapta o resolvedor por loja à interface que o follow-up espera.
+    """Adapta o resolvedor por loja à interface de envio que os workers usam.
 
-    O follow-up varre conversas de lojas diferentes num ciclo só, então o
-    outbound não pode ser fixado antes — é resolvido no envio, pela loja da
-    conversa.
+    Rodízio e follow-up varrem lojas diferentes num ciclo só, então o outbound
+    não pode ser fixado antes — é resolvido no envio.
+
+    O ``instance`` que chega aqui é o ``phone_number_id`` do canal, **não** o id
+    da loja. Sem traduzir um no outro, o resolvedor pergunta "a loja <pnid> é
+    Modo 2?", ouve não e devolve o adapter do Modo 1 — que nem tem
+    ``send_template_button``.
     """
 
     def __init__(self, db: Any, resolvedor: Callable[[Any, str], Any]) -> None:
@@ -164,12 +171,27 @@ class _OutboundPorLoja:
         self._resolvedor = resolvedor
         self._cache: dict[str, Any] = {}
 
+    def _loja_de(self, instance: str) -> str:
+        # Número não cadastrado cai no comportamento antigo (a chave crua), que
+        # é o que o resolvedor sabe recusar sozinho.
+        return loja_id_do_phone_number_id(self._db, instance) or instance
+
     def _para(self, instance: str) -> Any:
         if instance not in self._cache:
-            self._cache[instance] = self._resolvedor(self._db, instance)
+            self._cache[instance] = self._resolvedor(self._db, self._loja_de(instance))
         return self._cache[instance]
 
     def send_text(self, *, instance: str, number: str, text: str) -> Any:
         return self._para(instance).send_text(
             instance=instance, number=number, text=text
+        )
+
+    def send_template_button(self, *, instance: str, **kwargs: Any) -> Any:
+        """Oferta com a janela de 24 h do vendedor fechada (``enviar_oferta``)."""
+        return self._para(instance).send_template_button(instance=instance, **kwargs)
+
+    def send_interactive_button(self, *, instance: str, **kwargs: Any) -> Any:
+        """Oferta com a janela aberta — mesmo significado, de graça."""
+        return self._para(instance).send_interactive_button(
+            instance=instance, **kwargs
         )

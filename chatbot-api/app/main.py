@@ -33,7 +33,7 @@ from app import (  # noqa: F401 (registra os modelos)
 from app.audio import AudioProcessor, get_audio_processor, processador_de_audio
 from app.cloud_retry import registrar_evento_falho
 from app.meta_webhook import EventoCloud, assinatura_valida, parse_inbound
-from app.cloud_canal import phone_number_id_da_loja
+from app.cloud_canal import loja_id_do_phone_number_id, phone_number_id_da_loja
 from app.oferta_inbound import processar_clique
 from app.whatsapp_outbound import outbound_para_loja
 from app.auth import Contexto, get_contexto, verificar_webhook_token
@@ -615,21 +615,13 @@ def _wamid_ja_visto(db: Session, wamid: str) -> bool:
 
 
 def _loja_por_phone_number_id(db: Session, phone_number_id: str):
-    """Loja dona deste phone_number_id, ou None se ninguém cadastrou."""
-    if not phone_number_id:
-        return None
-    canal = (
-        db.query(models_db.WhatsAppCanal)
-        .filter(models_db.WhatsAppCanal.evolution_instance == phone_number_id)
-        .first()
-    )
-    if canal is not None:
-        return db.get(models_db.Loja, canal.loja_id)
-    return (
-        db.query(models_db.Loja)
-        .filter(models_db.Loja.evolution_instance == phone_number_id)
-        .first()
-    )
+    """Loja dona deste phone_number_id, ou None se ninguém cadastrou.
+
+    A resolução mora em ``cloud_canal`` porque o outbound dos workers precisa
+    dela também — inbound e outbound têm de concordar sobre de quem é o número.
+    """
+    loja_id = loja_id_do_phone_number_id(db, phone_number_id)
+    return db.get(models_db.Loja, loja_id) if loja_id else None
 
 
 def _processar_mensagem_cliente(db: Session, loja, evento: EventoCloud) -> dict | None:
@@ -1893,12 +1885,17 @@ def acionar_handoff_humano(
     if not loja_opera_modo2(db, ctx.loja_id):
         return {"acionado": False, "motivo": "loja_fora_do_modo_2"}
 
+    # ``avisar_cliente=False``: quem chama esta rota é a tool do agente, e ela
+    # devolve a frase para o agente dizer. Se o backend falasse aqui também, o
+    # cliente ouviria a mesma coisa duas vezes — o caminho de
+    # ``solicitacoes_simulacao`` não tem agente no turno e por isso mantém o aviso.
     resultado = disparar_handoff(
         db,
         ctx.loja_id,
         telefone,
         motivo="pediu_humano",
         outbound=outbound_para_loja(db, ctx.loja_id),
+        avisar_cliente=False,
     )
     return {"acionado": True, "estado": resultado}
 

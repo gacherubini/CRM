@@ -85,8 +85,11 @@ def test_pediu_humano_abre_o_rodizio_sem_exigir_cpf(
         .one()
     )
     assert oferta.estado == "aberta"
-    # O cliente nao pode ficar no vacuo (§5.3): ele e avisado de que vao chamar.
-    assert any(tipo == "texto" for tipo, _ in outbound_fake.enviados)
+    # §5.3 (o cliente nao fica no vacuo) segue valendo, mas mudou de dono: quem
+    # avisa agora e o agente, com a frase que a tool ``solicitar_handoff`` devolve
+    # para ele. O backend cala para nao falar por cima — ver
+    # ``test_rota_nao_fala_com_o_cliente_porque_o_agente_ja_responde``.
+    assert _textos_para(outbound_fake, CLIENTE_MODO2) == []
 
 
 def test_loja_fora_do_modo_2_nao_abre_oferta(
@@ -121,3 +124,46 @@ def test_telefone_invalido_recusado(client, db, loja_a, monkeypatch):
         headers=loja_a["headers"],
     )
     assert resposta.status_code == 422
+
+
+def _textos_para(fake, numero):
+    """Só os send_text destinados àquele número (a oferta ao vendedor não é send_text)."""
+    return [kw for tipo, kw in fake.enviados if tipo == "texto" and kw.get("number") == numero]
+
+
+def test_rota_nao_fala_com_o_cliente_porque_o_agente_ja_responde(
+    client, db, loja_a, monkeypatch, _fila, outbound_fake
+):
+    """Quem chama esta rota é a tool do agente, e ela devolve a fala ao agente.
+
+    Se o backend também mandar texto, o cliente recebe a mesma frase duas vezes
+    — foi o que aconteceu em produção em 24/08, às 00:06.
+    """
+    _ligar_modo2(db, loja_a["loja_id"], monkeypatch)
+
+    resposta = client.post(
+        "/v1/operacao/handoff-humano",
+        json={"telefone": CLIENTE_MODO2},
+        headers=loja_a["headers"],
+    )
+
+    assert resposta.status_code == 202, resposta.text
+    assert resposta.json()["estado"] == "ofertado"
+    assert _textos_para(outbound_fake, CLIENTE_MODO2) == []
+
+
+def test_rota_sem_vendedor_na_fila_tambem_nao_fala_com_o_cliente(
+    client, db, loja_a, monkeypatch, outbound_fake
+):
+    """Fila vazia não muda quem fala: a tool devolve a frase ao agente do mesmo jeito."""
+    _ligar_modo2(db, loja_a["loja_id"], monkeypatch)
+
+    resposta = client.post(
+        "/v1/operacao/handoff-humano",
+        json={"telefone": CLIENTE_MODO2},
+        headers=loja_a["headers"],
+    )
+
+    assert resposta.status_code == 202, resposta.text
+    assert resposta.json()["estado"] == "aguardando"
+    assert _textos_para(outbound_fake, CLIENTE_MODO2) == []

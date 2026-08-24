@@ -86,3 +86,30 @@ def test_segundo_gatilho_no_mesmo_lead_nao_duplica(db, loja_a):
 
     assert segundo == "ja_em_andamento"
     assert _abertas(db, loja_a["loja_id"]) == 1
+
+
+def test_avisar_cliente_desligado_nao_manda_texto_mas_oferta_o_lead(db, loja_a):
+    """Quem chamou vai falar com o cliente por conta própria (o agente do Modo 2)."""
+    _fila(db, loja_a["loja_id"])
+    fake = _OutboundFake()
+
+    resultado = disparar_handoff(
+        db, loja_a["loja_id"], "5511988887777",
+        motivo="pediu_humano", outbound=fake, avisar_cliente=False,
+    )
+
+    assert resultado == "ofertado"
+    assert _abertas(db, loja_a["loja_id"]) == 1
+    assert [e for e in fake.enviados if e.get("number") == "5511988887777"] == []
+
+
+def test_avisar_cliente_desligado_e_sem_fila_segue_calado(db, loja_a):
+    fake = _OutboundFake()
+
+    resultado = disparar_handoff(
+        db, loja_a["loja_id"], "5511988887777",
+        motivo="pediu_humano", outbound=fake, avisar_cliente=False,
+    )
+
+    assert resultado == "aguardando"
+    assert fake.enviados == []

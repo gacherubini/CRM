@@ -18,11 +18,18 @@ def disparar_handoff(
     *,
     motivo: str,
     outbound,
+    avisar_cliente: bool = True,
 ) -> str:
     """O que vier primeiro dispara; os seguintes não duplicam a oferta.
 
     ``simulacao_falhou`` existe para o lead não ficar parado esperando um
     resultado que não vem (spec §5.11): o vendedor simula à mão.
+
+    ``avisar_cliente=False`` cala o texto ao cliente porque quem chamou já vai
+    falar por conta própria. É o caso do agente do Modo 2: a tool
+    ``solicitar_handoff`` devolve a frase para ELE dizer, então com os dois
+    falando o cliente ouve a mesma coisa duas vezes (aconteceu em 24/08, 00:06).
+    O lead é ofertado igual — o que muda é só quem fala.
     """
     if motivo not in MOTIVOS:
         raise ValueError(f"motivo desconhecido: {motivo}")
@@ -44,17 +51,19 @@ def disparar_handoff(
     oferta = abrir_oferta(db, loja_id, telefone_cliente)
     if oferta is None:
         # Fila vazia ou esgotada: o cliente não pode ficar no vácuo (spec §5.3).
-        outbound.send_text(
-            instance=numero_central,
-            number=telefone_cliente,
-            text="Já estou passando seu atendimento para um vendedor. Ele te chama em instantes.",
-        )
+        if avisar_cliente:
+            outbound.send_text(
+                instance=numero_central,
+                number=telefone_cliente,
+                text="Já estou passando seu atendimento para um vendedor. Ele te chama em instantes.",
+            )
         return "aguardando"
 
     enviar_oferta(db, oferta, outbound=outbound)
-    outbound.send_text(
-        instance=numero_central,
-        number=telefone_cliente,
-        text="Já estou chamando um vendedor para falar com você.",
-    )
+    if avisar_cliente:
+        outbound.send_text(
+            instance=numero_central,
+            number=telefone_cliente,
+            text="Já estou chamando um vendedor para falar com você.",
+        )
     return "ofertado"
