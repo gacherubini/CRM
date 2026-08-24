@@ -1,6 +1,6 @@
 # Contexto compacto para continuidade
 
-Atualizado em **2026-08-14**. Ponto de entrada de estado e prioridades.
+Atualizado em **2026-08-24**. Ponto de entrada de estado e prioridades.
 Quadro: [`../README.md`](../README.md). Fila: [`../fila/README.md`](../fila/README.md).
 Vocabulário: [`../../CONTEXT.md`](../../CONTEXT.md). As-built Control/Loja:
 [`design/2026-07-30-revy-control-loja-asbuilt-e-melhorias.md`](design/2026-07-30-revy-control-loja-asbuilt-e-melhorias.md).
@@ -26,28 +26,46 @@ Vocabulário: [`../../CONTEXT.md`](../../CONTEXT.md). As-built Control/Loja:
   (`regras_elegiveis` por tipo, independente do Copiloto) e aceita **destinatário por
   pessoa** (`copiloto_sinal.destinatario_usuario_id`, migration 0024).
 
-- **WhatsApp Modo 2 (central Cloud API):** no `main` e **deployado**; flag
-  `CHATBOT_WHATSAPP_MODO2_ENABLED=1` no `app2037` desde 16/08, mas **nenhuma loja tem a
-  projeção `whatsapp_modo=2`** — o gate é fail-closed em três condições, então nada roda.
+- **WhatsApp Modo 2 (central Cloud API):** no `main`, **deployado e rodando em produção**.
   Placar do que existe e do que falta:
   [`design/2026-08-16-whatsapp-modo2-asbuilt.md`](design/2026-08-16-whatsapp-modo2-asbuilt.md).
   **Em 16/08 o `n8n-cloud` era um transporte de 4 nós — havia rodízio e handoff e nenhum bot
   respondendo o cliente.** Corrigido: o workflow virou fork gerado do Modo 1 (20 nós, com
   agente, ferramentas e debounce), `solicitar_handoff` passou a abrir o rodízio, e o retry
-  da §6.1 saiu do `logger.exception` para uma tabela com worker. Dívida conhecida, em ordem
-  de risco: **VAD do áudio** (§5.10 — o Whisper alucina em ruído e o bot age em cima),
-  **recusa não cutuca** (§5.9 r.5) e `classificar_etapa` presa em `so_oi`.
+  da §6.1 saiu do `logger.exception` para uma tabela com worker.
+  **Piloto de 23/08 (número de teste da Meta), o que PROVOU:** loja `teste` no Postgres do
+  chatbot com as projeções `loja=ativa` e `whatsapp_modo=2` semeadas à mão (`version=1`, baixa
+  de propósito para o Control sobrescrever sem ficar `stale`), um vendedor na fila,
+  `loja_opera_modo2()` = `True`, as **três** flags do Modo 2 em `1`
+  (`REVY_CONTROL_WHATSAPP_MODO2_ENABLED` + `CHATBOT_WHATSAPP_MODO2_ENABLED` +
+  `MULTI_WHATSAPP_ENABLED`) e o `wCloudMeta0001` ativo no `n8n2037`. Cadeia com carimbo de log:
+  `/webhook/cloud` 200 (loja resolvida pelo `phone_number_id`) → `pode-responder` 200 →
+  `/v1/operacao/responder` **200 às 23:49:17 de 23/08**. O bot respondeu ao cliente de verdade.
+  **O que NÃO foi provado:** handoff → rodízio → oferta com "Peguei" → trava e entrega do
+  contato — desbloqueado, não executado. O piloto **não** está concluído.
+  Três achados: (1) bug corrigido em prod (`922a365`) — `_wamid_ja_visto` chamava `.add()` de
+  `set` num `OrderedDict`, alcançável só em reentrega pós-restart, e o 500 virava laço porque a
+  Meta reentrega sem 200; suíte do `chatbot-api` verde. (2) template `chama_vendedor`
+  reclassificado pela Meta de `UTILITY` para `MARKETING` e ainda `PENDING` — ~R$0,32 contra
+  ~R$0,03–0,04, ~10× por oferta; contorno é mandar a oferta como `interactive` na janela de 24 h
+  do vendedor. (3) allow-list do número de teste casa a string enviada e o `wa_id` brasileiro vem
+  **sem o nono dígito** — cadastrar o número sem o 9; em número real não há allow-list.
+  **Modo 2 atende uma loja por vez** (workflow serve N lojas com token de UMA):
+  [`../fila/2026-08-23-modo2-multiloja-credencial-de-integracao.md`](../fila/2026-08-23-modo2-multiloja-credencial-de-integracao.md).
+  Dívida conhecida, em ordem de risco: **VAD do áudio** (§5.10 — o Whisper alucina em ruído e o
+  bot age em cima), **recusa não cutuca** (§5.9 r.5) e `classificar_etapa` presa em `so_oi`.
 
 - **Meta e domínio próprio (16/08):** portões 1 e 2 da Meta caíram no mesmo dia — app `Revy`
   criado, produto WhatsApp adicionado, número de teste enviando e webhook voltando. Domínio
   **`revyapp.com.br`** registrado no **CNPJ** (o `revy.com.br` é de terceiro), DNS migrado
   para a Cloudflare, e o **site saiu do bundle do Fly** para o Cloudflare Pages — publicar
-  landing não é mais deploy. Falta ligar o webhook no `n8n2037` e trocar o número de teste
-  pelo real. Estado verificado, armadilhas (DNSSEC do `.br`, janela de 2h do registro.br) e
-  cronograma:
+  landing não é mais deploy. Em 23/08 o webhook foi ligado no `n8n2037` e o workflow ativado;
+  falta **trocar o número de teste pelo real**. Estado verificado, armadilhas (DNSSEC do `.br`,
+  janela de 2h do registro.br) e cronograma:
   [`design/2026-08-16-onboarding-meta-dominio-asbuilt.md`](design/2026-08-16-onboarding-meta-dominio-asbuilt.md).
   **O CNPJ verificado não bloqueia o piloto:** o teto de 250/24h conta só conversa iniciada
   pela empresa, e o funil é CTWA (inbound). Ele vira obrigatório na **terceira loja**.
+  A verificação foi submetida em 23/08 e está em análise (~2 dias úteis).
   Spec canônica:
   [`specs/2026-08-12-whatsapp-dois-modos-design.md`](specs/2026-08-12-whatsapp-dois-modos-design.md).
   Sete cards executados, planos em [`planos/`](planos/):
@@ -68,8 +86,9 @@ Vocabulário: [`../../CONTEXT.md`](../../CONTEXT.md). As-built Control/Loja:
     filtro Aguardando, card de 7 dias. O chatbot não expõe rota de oferta e
     `criar_sinal_direcionado` não tem chamador, então **lead que ninguém pega some**. Card 5 em
     `../fila/`.
-  - **Falta fora de código:** conta do Revy na Meta, publicar/ativar o `n8n-cloud`, provider de
-    transcrição. Card de fechamento em `../fila/`.
+  - **Falta fora de código:** provider de transcrição e o número real. Conta na Meta e
+    publicação/ativação do `n8n-cloud` **saíram da lista em 23/08**. Card de fechamento em
+    `../fila/`.
 - **Triagem UX 2026-08-07:** 32 itens feitos e **13 recusados** — não re-propor:
   [`2026-08-07-triagem-revisao-ux-loja-control.md`](2026-08-07-triagem-revisao-ux-loja-control.md).
 - **Marca:** `shared/brand/revy-tokens.css` é a fonte única; acento verde racing;
@@ -127,6 +146,7 @@ Um eixo por mudança. Não misture Copiloto, RPA, rollout e n8n na mesma entrega
 | Loja — sino | B1: central geral por tipo. Sem blast `simulacao_pronta`. Oferta 1:1 = plano dos dois modos |
 | Motor | Probe Bradesco no PC (gate do worker residencial) **ou** estabilidade Bradesco |
 | Bot / n8n | Smoke virgem/CTWA/handoff/salvo no lab → Active ON pelo dono |
+| Modo 2 (piloto) | Handoff → rodízio → oferta → clique em "Peguei" → trava e contato entregue, em produção |
 | Control | Secrets GCP (Google Ads) **ou** E2E dois canais WA |
 | CTWA | Task 4: `Cód:` na mensagem do anúncio (config, não PR) |
 | Site | Adiado — não pegar sem o dono pedir |

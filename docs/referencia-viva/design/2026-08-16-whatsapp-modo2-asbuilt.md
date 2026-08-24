@@ -3,6 +3,8 @@
 Spec: [`../specs/2026-08-12-whatsapp-dois-modos-design.md`](../specs/2026-08-12-whatsapp-dois-modos-design.md).
 Este arquivo diz **o que existe no `main`**, não o que foi planejado. Onde houver
 divergência com a spec, a spec é o alvo e este documento é o placar.
+Última atualização: **23–24/08**, com o piloto em produção (seção "Piloto do
+Modo 2").
 
 ## O buraco que este dia fechou
 
@@ -27,18 +29,22 @@ Um validador que sanciona o stub é pior que nenhum, porque dá aval.
 
 ## Placar por seção da spec
 
+✅ significa **existe no `main`**. Onde o piloto de 23/08 exercitou a peça em
+produção, está escrito *provado*; onde não exercitou, está escrito *não
+exercitado* — código verde não é caminho andado.
+
 | Spec | Peça | Estado |
 |---|---|---|
-| §5.1 | Bot atende o cliente na central | ✅ agente no `n8n-cloud` (fork de 20 nós) |
-| §5.2 | Gatilho *simulação pronta* | ✅ via `solicitacoes-simulacao-humana` |
-| §5.2 | Gatilho *simulação falhou* | ✅ mesmo caminho, `motivo=simulacao_falhou` |
-| §5.2 | Gatilho *cliente pede humano* | ✅ `POST /v1/operacao/handoff-humano` |
-| §5.3 | Rodízio, ponteiro, 10 min, uma volta | ✅ `rodizio.py` + worker |
-| §5.4 | Silêncio pós-handoff, re-notificação | ✅ `pos_handoff.py` |
+| §5.1 | Bot atende o cliente na central | ✅ agente no `n8n-cloud` (fork de 20 nós) — **provado em produção 23/08** |
+| §5.2 | Gatilho *simulação pronta* | ✅ via `solicitacoes-simulacao-humana` — não exercitado no piloto |
+| §5.2 | Gatilho *simulação falhou* | ✅ mesmo caminho, `motivo=simulacao_falhou` — não exercitado no piloto |
+| §5.2 | Gatilho *cliente pede humano* | ✅ `POST /v1/operacao/handoff-humano` — não exercitado no piloto |
+| §5.3 | Rodízio, ponteiro, 10 min, uma volta | ✅ `rodizio.py` + worker — não exercitado no piloto |
+| §5.4 | Silêncio pós-handoff, re-notificação | ✅ `pos_handoff.py` — não exercitado no piloto |
 | §5.5 | Vendedor × cliente por variantes | ✅ |
-| §5.7 | "Peguei" = clique, primeiro vence | ✅ trava idempotente |
-| §5.8 | Control escolhe o modo | ✅ `whatsapp_modo` por loja |
-| §5.9 | Fork do fluxo atual | ✅ gerado, 20 nós |
+| §5.7 | "Peguei" = clique, primeiro vence | ✅ trava idempotente — **o botão nunca foi clicado em produção** |
+| §5.8 | Control escolhe o modo | ✅ `whatsapp_modo` por loja; no piloto a projeção foi semeada à mão, o Control não escreveu |
+| §5.9 | Fork do fluxo atual | ✅ gerado, 20 nós; publicado e **ativo** no `n8n2037` desde 23/08 |
 | §5.9 | Debounce 40 s | ✅ herdado |
 | §5.9 | Follow-up 30 min + 1 h | ✅ prazos e regras |
 | §5.9 | Classificação das 6 etapas | ⚠️ **só `so_oi`** |
@@ -47,9 +53,10 @@ Um validador que sanciona o stub é pior que nenhum, porque dá aval.
 | §5.10 | Transcrição só no Modo 2 | ✅ |
 | §5.10 | VAD / baixa confiança → fallback | ❌ **não existe** |
 | §5.11 | Simulação que falha | ✅ |
-| §6.1 | 200 imediato + dedup por `wamid` | ✅ |
+| §6.1 | 200 imediato + dedup por `wamid` | ✅ — o dedup tinha um bug de reentrega pós-restart, corrigido em produção (`922a365`, abaixo) |
 | §6.1 | "Processar depois" (retry) | ✅ `cloud_evento_falho` + worker |
 | §6.2 | Segredo da Meta só no chatbot | ✅ validador recusa vestígio |
+| §6.3 | Gate fail-closed (flag + loja + projeção) | ✅ — **provado 23/08**: com a loja `teste` semeada, `loja_opera_modo2()` devolve `True` e a linha `phone_number_id sem loja` sumiu do log |
 
 ## O fork é gerado, não escrito à mão
 
@@ -124,8 +131,8 @@ gerador produz e sai com código 1. Ajuste o gerador e rode.
 
 Flag `CHATBOT_WHATSAPP_MODO2_ENABLED=1` no `app2037` desde 16/08. O gate é
 fail-closed em três condições (§6.3): flag, loja operacional e projeção
-`whatsapp_modo == "2"` vinda do Control. **Nenhuma loja tem essa projeção**, então
-os workers sobem e não tocam em nada.
+`whatsapp_modo == "2"` vinda do Control. Até 23/08 **nenhuma loja tinha essa
+projeção**, então os workers subiam e não tocavam em nada.
 
 **23/08: as credenciais da Meta deixaram de ser pendência.** Verify token, App Secret,
 token de System User (permanente) e `phone_number_id` estão nos secrets do `app2037`; o
@@ -133,11 +140,71 @@ webhook está verificado com o campo `messages` assinado; o app está Ao Vivo e 
 na WABA**; o `chama_vendedor` foi submetido. A entrada foi provada ponta a ponta, inclusive
 com payload assinado pela própria Meta. Detalhe, testes e armadilhas em
 [`2026-08-16-onboarding-meta-dominio-asbuilt.md`](2026-08-16-onboarding-meta-dominio-asbuilt.md),
-seção "Sessão 23/08".
+seção "Sessão 23/08". A verificação de CNPJ da Revy foi submetida em 23/08 e está
+em análise (~2 dias úteis) — não bloqueia o piloto.
 
-O que ainda separa o piloto de rodar, agora tudo **do nosso lado**: canal Cloud da loja em
-`whatsapp_canais`, flag `REVY_CONTROL_WHATSAPP_MODO2_ENABLED` e a projeção
-`whatsapp_modo = 2` numa loja. Sem elas, o inbound morre em `phone_number_id sem loja`.
+## Piloto do Modo 2 — noite de 23/08, em produção
+
+Rodou no `app2037` com o **número de teste** da Meta (`+1 555 200-0666`, WABA
+`1057786396969642`). O que foi montado do nosso lado:
+
+| Peça | Estado no piloto |
+|---|---|
+| Loja `teste` no Postgres do chatbot | `loja_id = 63cb8fba-8fc2-4767-b2cd-de92532850fb`, `evolution_instance = 1227059273831581` (o `phone_number_id` do número de teste) |
+| Projeções operacionais | semeadas **à mão** com `version=1`: `loja = ativa` e `whatsapp_modo = 2`. Version baixa de propósito, para o Control sobrescrever depois sem ficar `stale` |
+| Fila de vendedores | um vendedor, `5551995941020`, ordem 1 |
+| Gate | `rodizio.loja_opera_modo2()` devolve `True` |
+| Flags | as **três** em `1`: `REVY_CONTROL_WHATSAPP_MODO2_ENABLED` (Control), `CHATBOT_WHATSAPP_MODO2_ENABLED` e `MULTI_WHATSAPP_ENABLED` (chatbot). As duas do chatbot já estavam ligadas — são três, não uma |
+| Workflow | `wCloudMeta0001` republicado no `n8n2037` com o token de serviço da loja `teste`, ativado com `update:workflow --active=true`, n8n reiniciado, webhook respondendo |
+
+### O que o ciclo provou
+
+Nesta ordem, cada passo com carimbo de log:
+
+1. `POST /webhook/cloud` → **200**, com a loja resolvida pelo `phone_number_id`.
+   A linha `phone_number_id sem loja` deixou de aparecer.
+2. `POST /v1/conversas/{tel}/pode-responder` → **200**.
+3. O bot formulou resposta e `POST /v1/operacao/responder` → **200 às 23:49:17
+   de 23/08**. O bot respondeu ao cliente de verdade.
+
+### O que ainda não foi provado
+
+Handoff → rodízio → oferta com botão "Peguei" → trava e entrega do contato.
+Está **desbloqueado**, não executado. Enquanto ninguém clicar "Peguei" em
+produção, a metade da distribuição continua sendo código verde, não caminho
+andado — e o piloto **não** está concluído.
+
+### Três achados que valem registro
+
+**1. Bug corrigido em produção (`922a365`).** Em `main.py`, `_wamid_ja_visto`
+chamava `_wamids_vistos.add(wamid)` — `.add()` é método de `set`, e a estrutura é
+`OrderedDict`. O ramo só é alcançado quando o wamid já está em `mensagens` mas
+saiu do cache em memória, isto é, **reentrega depois de restart do processo**.
+Efeito: o webhook devolvia 500, a Meta reentregava por não receber 200, e o 500 se
+repetia em laço. Trocado por `_marcar_wamid_visto`. Suíte do `chatbot-api`: 459
+testes passando.
+
+**2. O template `chama_vendedor` foi reclassificado pela Meta de `UTILITY` para
+`MARKETING`, e segue `PENDING`.** Utility custa ~R$ 0,03–0,04 por entrega e
+Marketing ~R$ 0,32 — cerca de **10× por oferta**. Contorno usado no piloto: com a
+janela de 24 h do vendedor aberta, a oferta sai como mensagem `interactive`,
+grátis e sem template. Ações possíveis: contestar a categoria no painel, ou
+reescrever o corpo para parecer transacional (hoje ele manda exatamente uma
+variável, o nome do vendedor).
+
+**3. Armadilha do número de teste: a allow-list casa a string enviada, e o
+`wa_id` brasileiro chega sem o nono dígito.** O bot responde para
+`conversa.telefone`, que guarda o `wa_id`, então o envio era recusado com
+`(#131030) Recipient phone number not in allowed list` até o número **sem o 9**
+ser cadastrado no painel. É limitação de número de teste — em número real não
+existe allow-list, e o código está correto.
+
+### Uma loja por vez
+
+O piloto roda com **uma** loja porque o Modo 2 hoje só atende uma: um workflow
+`n8n-cloud` serve N lojas mas autentica com um token que pertence a UMA loja.
+Card próprio, não se re-descobre aqui:
+[`../../fila/2026-08-23-modo2-multiloja-credencial-de-integracao.md`](../../fila/2026-08-23-modo2-multiloja-credencial-de-integracao.md).
 
 Import do workflow: ver a armadilha em
 [`../../../deploy/fly/3vm/README.md`](../../../deploy/fly/3vm/README.md) —
