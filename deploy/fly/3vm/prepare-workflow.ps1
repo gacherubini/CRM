@@ -51,7 +51,15 @@ $json = $json.Replace("http://evolution:8080", $evolutionBase)
 if ($json.Contains("__INSTANCE__")) {
   Write-Warning "canonical still has __INSTANCE__; multi-WA expects dynamic body.instance only"
 }
-$json = $json.Replace("__CHATBOT_TOKEN__", $secrets["CHATBOT_API_TOKEN"])
+# O Modo 2 autentica com uma credencial de INTEGRACAO (papel=integracao, sem loja):
+# um workflow serve N lojas e resolve a loja pela instance de cada chamada (spec 6.2).
+# O token do Modo 1 aponta para UMA loja -- reusa-lo aqui ressuscita exatamente o bug
+# que a 6.2 fechou, e o sintoma e silencio, nao erro. Por isso fail-fast, nao fallback.
+$chatbotTokenKey = if ($Mode -eq "cloud") { "CHATBOT_API_TOKEN_CLOUD" } else { "CHATBOT_API_TOKEN" }
+if (-not $secrets.ContainsKey($chatbotTokenKey) -or -not $secrets[$chatbotTokenKey]) {
+  throw "missing $chatbotTokenKey in $secretsFile (mode=$Mode). Crie a credencial com: python -m app.cli criar-credencial-integracao"
+}
+$json = $json.Replace("__CHATBOT_TOKEN__", $secrets[$chatbotTokenKey])
 $json = $json.Replace("__CHATBOT_WEBHOOK_TOKEN__", $secrets["CHATBOT_WEBHOOK_TOKEN"])
 
 # Evolution apikey: env > .evolution_key.local > .secrets.local EVOLUTION_API_KEY
@@ -77,4 +85,4 @@ $json = $json.Replace('"active": false', '"active": true')
 
 [System.IO.File]::WriteAllText($outFile, $json, [System.Text.UTF8Encoding]::new($false))
 Write-Host "wrote $outFile (len=$($json.Length)) mode=$Mode chatbot=$chatbotBase evolution=$evolutionBase instance=dynamic(body.instance)"
-Write-Host "tokens: chatbot_api=$($secrets['CHATBOT_API_TOKEN'].Length) webhook=$($secrets['CHATBOT_WEBHOOK_TOKEN'].Length)"
+Write-Host "tokens: $chatbotTokenKey=$($secrets[$chatbotTokenKey].Length) webhook=$($secrets['CHATBOT_WEBHOOK_TOKEN'].Length)"

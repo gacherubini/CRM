@@ -1,18 +1,22 @@
 param(
-  [ValidateSet("production", "test")]
+  [ValidateSet("production", "test", "cloud")]
   [string]$Mode = "production"
 )
 
 $ErrorActionPreference = "Stop"
 $root = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
 Set-Location $root
-$localName = if ($Mode -eq "test") {
-  "workflow-fly-test.ready.json"
-} else {
-  "workflow-fly.ready.json"
+$localName = switch ($Mode) {
+  "test"  { "workflow-fly-test.ready.json" }
+  "cloud" { "workflow-cloud.ready.json" }
+  default { "workflow-fly.ready.json" }
 }
 $stamp = Get-Date -Format "yyyyMMddHHmmssfff"
-$remote = if ($Mode -eq "test") { "/tmp/wf-test-$stamp.json" } else { "/tmp/wf-$stamp.json" }
+$remote = switch ($Mode) {
+  "test"  { "/tmp/wf-test-$stamp.json" }
+  "cloud" { "/tmp/wf-cloud-$stamp.json" }
+  default { "/tmp/wf-$stamp.json" }
+}
 $local = Join-Path $PSScriptRoot $localName
 if (-not (Test-Path $local)) { throw "missing $local - run prepare-workflow.ps1 first" }
 $workflow = Get-Content $local -Raw -Encoding UTF8 | ConvertFrom-Json
@@ -38,6 +42,13 @@ fly machine exec $machineId "env HOME=/home/node n8n publish:workflow --id=$work
 Write-Host "Listing workflows..."
 fly machine exec $machineId "env HOME=/home/node n8n list:workflow" -a n8n2037 --timeout 60
 
+# O import DESATIVA o workflow e o publish NAO reativa: sem este update o webhook
+# responde 404 para sempre, e a Evolution CANCELA o retry no 404. O n8n avisa que
+# update:workflow esta deprecated -- ignore, nesta versao e o unico que liga.
+Write-Host "Activating workflow (import deactivates; publish does not reactivate)..."
+fly machine exec $machineId "env HOME=/home/node n8n update:workflow --id=$workflowId --active=true" -a n8n2037 --timeout 120
+
 Write-Host "Restart n8n so the published webhook registers:"
 Write-Host "  fly apps restart n8n2037"
+Write-Host "  (conte ~6 min de 404 ate o webhook registrar)"
 Write-Host "Done import/publish step (mode=$Mode id=$workflowId)."
