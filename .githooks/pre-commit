@@ -1,0 +1,33 @@
+#!/bin/sh
+# Mantem o mapa da revy-research junto do codigo (AGENTS.md secao 6).
+#
+# Instrucao nao segurou: em 24/08 dois commits seguidos do chatbot entraram sem
+# regerar e o `--verificar` ficou vermelho em minutos. O que precisa ser
+# lembrado nao acontece.
+#
+# Instale (uma vez por maquina):   git config core.hooksPath .githooks
+# Pule uma vez:                    REVY_SKIP_MAPA=1 git commit ...
+# Desinstale:                      git config --unset core.hooksPath
+
+[ -n "$REVY_SKIP_MAPA" ] && exit 0
+
+TOPO=$(git rev-parse --show-toplevel 2>/dev/null) || exit 0
+SKILL="$TOPO/.claude/skills/revy-research"
+[ -d "$SKILL" ] || exit 0
+
+# O Mac do dono so tem `python3`; o Windows so tem `python` — e no Windows o
+# `python3` do PATH costuma ser o stub da Microsoft Store, que existe e nao
+# roda. Por isso testa executar, nao so encontrar.
+PY=""
+for cand in python3 python py; do
+  if command -v "$cand" >/dev/null 2>&1 && "$cand" -c "import sys" >/dev/null 2>&1; then
+    PY="$cand"; break
+  fi
+done
+if [ -z "$PY" ]; then
+  echo "AVISO: nenhum python executavel no PATH; mapa nao conferido."
+  exit 0
+fi
+
+cd "$SKILL" || exit 0
+"$PY" gerar_mapa.py --pre-commit || exit 1

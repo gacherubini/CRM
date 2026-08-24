@@ -3,15 +3,18 @@ import copy
 import io
 import ast
 import json
+import os
 import re
 import subprocess
 import tempfile
 import unittest
+from datetime import date
 from pathlib import Path
 from unittest import mock
 
 import cruzamentos
 import extratores
+import saude
 import gerar_mapa
 import varredura
 
@@ -279,9 +282,20 @@ class TestExtratorDeModelos(unittest.TestCase):
 
 class TestExtratorDeMigrations(unittest.TestCase):
     def test_conta_e_acha_o_head_do_chatbot(self):
+        """A contagem sai da pasta, nao de um numero chumbado.
+
+        Estava `25`. Em 24/08 o chatbot ganhou a `0026_credencial_integracao` e
+        a suite reprovou por isso — falha que nao diz nada sobre o extrator e
+        cobra manutencao de quem so acrescentou migration. O que o teste tem a
+        provar e que o extrator nao PERDE migration: um arquivo de versao, uma
+        entrada.
+        """
         raiz = varredura.raiz_repo()
-        entradas, head = extratores.migrations(raiz / "chatbot-api" / "alembic" / "versions")
-        self.assertEqual(len(entradas), 25)
+        versions = raiz / "chatbot-api" / "alembic" / "versions"
+        entradas, head = extratores.migrations(versions)
+        na_pasta = [f for f in versions.glob("*.py") if f.name != "__init__.py"]
+        self.assertGreater(len(na_pasta), 20, "pasta de migration vazia demais")
+        self.assertEqual(len(entradas), len(na_pasta))
         self.assertTrue(head, "head nao pode ser vazio")
 
     def test_pasta_inexistente_nao_quebra(self):
@@ -1768,6 +1782,298 @@ class TestPaginaComoFunciona(unittest.TestCase):
                        "rotulados, não provados",
                        "não impede o agente de errar"):
             self.assertIn(limite, html, limite)
+
+
+class TestCitacoesMortas(unittest.TestCase):
+    """A terceira camada tambem aponta para arquivo — e arquivo se renomeia.
+
+    `test_citacao_de_arquivo_linha_...` so olha citacao COM `:linha`, e dessas
+    ha 4 no repo inteiro. As outras 30 sao caminho puro em backtick
+    (`deploy/fly/down-all.sh`, `shared/brand/sync_tokens.py`): um `git mv`
+    nelas nao acende luz nenhuma e o learning segue mandando o agente abrir um
+    arquivo que nao existe mais. O mesmo vale para o nome de teste que o
+    learning promete estar guardando a armadilha.
+    """
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+
+    def _monta(self, corpo, extras=()):
+        raiz = Path(self.tmp.name) / f"r{len(list(Path(self.tmp.name).iterdir()))}"
+        (raiz / "portal-gestao/app/static/css").mkdir(parents=True)
+        (raiz / "portal-gestao/app/static/css/app.css").write_text("x", encoding="utf-8")
+        (raiz / "portal-gestao/tests").mkdir(parents=True)
+        (raiz / "portal-gestao/tests/test_loja_financeiro_gate.py").write_text(
+            "def test_nenhuma_grade_de_metricas_passa_de_quatro():\n    pass\n",
+            encoding="utf-8")
+        for extra in extras:
+            alvo = raiz / extra
+            alvo.parent.mkdir(parents=True, exist_ok=True)
+            alvo.write_text("x", encoding="utf-8")
+        pasta = raiz / ".claude/skills/revy-research/learnings"
+        pasta.mkdir(parents=True)
+        cab = ("---\ngatilho: g\nproduto: portal-gestao\nfonte: repo\n"
+               "verificado_em: 2026-08-24\n---\n")
+        (pasta / "2026-08-24-teste.md").write_text(cab + corpo, encoding="utf-8")
+        return pasta.parent, raiz
+
+    def test_caminho_citado_que_sumiu_do_repo_vira_problema(self):
+        sk, raiz = self._monta("abra `portal-gestao/app/nao_existe.py` e chore")
+        problemas = saude.citacoes_mortas(sk, raiz)
+        self.assertEqual(len(problemas), 1, problemas)
+        self.assertIn("portal-gestao/app/nao_existe.py", problemas[0])
+
+    def test_caminho_citado_que_existe_nao_vira_problema(self):
+        sk, raiz = self._monta("mexeu em `portal-gestao/app/static/css/app.css`?")
+        self.assertEqual(saude.citacoes_mortas(sk, raiz), [])
+
+    def test_nome_de_arquivo_de_teste_nao_e_confundido_com_funcao(self):
+        """`tests/test_x.py::test_y` cita UM arquivo e UMA funcao, nao duas
+        funcoes. A primeira versao desta busca acusou
+        `test_loja_financeiro_gate` de nao existir — ele e o modulo."""
+        sk, raiz = self._monta(
+            "guardado por `portal-gestao/tests/test_loja_financeiro_gate.py"
+            "::test_nenhuma_grade_de_metricas_passa_de_quatro`")
+        self.assertEqual(saude.citacoes_mortas(sk, raiz), [])
+
+    def test_funcao_de_teste_renomeada_vira_problema(self):
+        sk, raiz = self._monta("guardado por `test_que_alguem_renomeou_ontem`")
+        problemas = saude.citacoes_mortas(sk, raiz)
+        self.assertEqual(len(problemas), 1, problemas)
+        self.assertIn("test_que_alguem_renomeou_ontem", problemas[0])
+
+    def test_caminho_fora_dos_produtos_tambem_conta(self):
+        """`deploy/`, `shared/brand/` e `n8n/` nao sao produto, e e la que
+        moram cinco learnings de deploy e dois de marca."""
+        sk, raiz = self._monta("rode `shared/brand/sync_tokens.py`",
+                               extras=("shared/brand/sync_tokens.py",))
+        self.assertEqual(saude.citacoes_mortas(sk, raiz), [])
+        sk2, raiz2 = self._monta("rode `deploy/fly/sumiu.sh`")
+        self.assertEqual(len(saude.citacoes_mortas(sk2, raiz2)), 1)
+
+    def test_no_repo_real_nenhuma_citacao_esta_morta(self):
+        raiz = varredura.raiz_repo()
+        sk = raiz / ".claude/skills/revy-research"
+        self.assertEqual(saude.citacoes_mortas(sk, raiz), [])
+
+    def test_a_busca_no_repo_real_nao_esta_vazia(self):
+        """Sem esta contagem o teste acima passa tambem quando a regex para de
+        casar com qualquer coisa — verde por nao ter olhado nada."""
+        sk = varredura.raiz_repo() / ".claude/skills/revy-research"
+        self.assertGreaterEqual(len(saude.citacoes(sk)), 25)
+
+
+class TestAReconferir(unittest.TestCase):
+    """`verificado_em` so vira sinal se alguem for cobrado por ele.
+
+    O proprio INDEX conta o custo de nao cobrar: o learning dos bancos afirmou
+    "Portal e Control sao SQLite" por uma semana depois de os dois virarem
+    Postgres. Carimbo que ninguem cobra e campo decorativo.
+    """
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.sk = Path(self.tmp.name) / ".claude/skills/revy-research"
+        (self.sk / "learnings").mkdir(parents=True)
+
+    def _learning(self, nome, fonte, verificado, produto="portal-gestao"):
+        (self.sk / "learnings" / nome).write_text(
+            f"---\ngatilho: g\nproduto: {produto}\nfonte: {fonte}\n"
+            f"verificado_em: {verificado}\n---\n# t\n", encoding="utf-8")
+
+    def test_learning_nunca_reconferido_entra_na_lista(self):
+        self._learning("a.md", "infra", "nunca reconferido desde a migracao (2026-08-23)")
+        vencidos = saude.a_reconferir(self.sk, date(2026, 8, 24))
+        self.assertEqual([v.arquivo for v in vencidos], ["a.md"])
+        self.assertIn("nunca", vencidos[0].motivo)
+
+    def test_data_entre_parenteses_nao_conta_como_carimbo(self):
+        """`nunca reconferido ... (2026-08-23)` tem uma data no meio do texto.
+        Ler a primeira que aparecer transforma "nunca" em "conferido ontem" —
+        o campo passaria a mentir exatamente o que existe para denunciar."""
+        self._learning("a.md", "infra", "nunca reconferido desde a migracao (2026-08-23)")
+        self.assertEqual(len(saude.a_reconferir(self.sk, date(2026, 8, 24))), 1)
+
+    def test_learning_carimbado_hoje_nao_entra(self):
+        self._learning("a.md", "infra", "2026-08-24")
+        self.assertEqual(saude.a_reconferir(self.sk, date(2026, 8, 24)), [])
+
+    def test_carimbo_velho_demais_volta_a_entrar(self):
+        self._learning("a.md", "infra", "2026-01-01")
+        vencidos = saude.a_reconferir(self.sk, date(2026, 8, 24))
+        self.assertEqual([v.arquivo for v in vencidos], ["a.md"])
+        self.assertIn("235 dias", vencidos[0].motivo)
+
+    def test_repo_tem_prazo_maior_que_infra_e_externo(self):
+        """`fonte: repo` se confere lendo codigo, e o `--verificar` ja vigia as
+        citacoes dele. `infra` e `externo` mudam sem commit nenhum neste
+        repositorio: nada aqui jamais vai denunciar que envelheceram."""
+        self._learning("r.md", "repo", "2026-05-01")
+        self._learning("i.md", "infra", "2026-05-01")
+        vencidos = saude.a_reconferir(self.sk, date(2026, 8, 24))
+        self.assertEqual([v.arquivo for v in vencidos], ["i.md"])
+
+    def test_filtra_por_produto_porque_o_aviso_anda_junto_do_frescor(self):
+        """O passo 2 do protocolo roda `--frescor <produto>`. Despejar ali os
+        learnings dos outros cinco produtos e o jeito mais rapido de ensinar o
+        agente a ignorar a saida inteira."""
+        self._learning("p.md", "infra", "nunca", produto="portal-gestao")
+        self._learning("c.md", "infra", "nunca", produto="chatbot-api")
+        vencidos = saude.a_reconferir(self.sk, date(2026, 8, 24), produto="chatbot-api")
+        self.assertEqual([v.arquivo for v in vencidos], ["c.md"])
+
+    def test_produto_todos_aparece_para_qualquer_um(self):
+        self._learning("t.md", "infra", "nunca", produto="todos")
+        for p in ("chatbot-api", "revy-trafego"):
+            vencidos = saude.a_reconferir(self.sk, date(2026, 8, 24), produto=p)
+            self.assertEqual([v.arquivo for v in vencidos], ["t.md"], p)
+
+    def test_produto_composto_casa_com_os_dois_lados(self):
+        self._learning("d.md", "infra", "nunca", produto="portal-gestao / revy-trafego")
+        for p in ("portal-gestao", "revy-trafego"):
+            vencidos = saude.a_reconferir(self.sk, date(2026, 8, 24), produto=p)
+            self.assertEqual([v.arquivo for v in vencidos], ["d.md"], p)
+
+
+class TestNumerosDaPaginaSaoGerados(unittest.TestCase):
+    """A pagina tinha contador chumbado na mao — e ficou errado.
+
+    Em 24/08 a suite reprovou porque `como-funciona.html` dizia 32 learnings e
+    a pasta tinha 34. O teste estava certo; o defeito e a pagina depender de
+    alguem lembrar. Contador e saida de script, como o mapa.
+    """
+
+    def setUp(self):
+        self.raiz = varredura.raiz_repo()
+        self.sk = self.raiz / ".claude/skills/revy-research"
+        self.pagina = self.sk / "como-funciona.html"
+        original = self.pagina.read_text(encoding="utf-8")
+        self.addCleanup(self.pagina.write_text, original, "utf-8")
+        self.original = original
+
+    def test_atualizar_pagina_corrige_contador_mentiroso(self):
+        self.pagina.write_text(
+            re.sub(r'(data-numero="learnings">)[\d.]+<', r'\g<1>99<', self.original),
+            encoding="utf-8")
+        gerar_mapa.atualizar_pagina(self.sk)
+        vivos = len([f for f in (self.sk / "learnings").glob("*.md")
+                     if f.name != "INDEX.md"])
+        self.assertIn(f'data-numero="learnings">{vivos}<',
+                      self.pagina.read_text(encoding="utf-8"))
+
+    def test_atualizar_pagina_nao_mexe_em_mais_nada(self):
+        """Ela e uma pagina desenhada a mao; o script tem permissao de tocar
+        nos numeros e em nada mais."""
+        gerar_mapa.atualizar_pagina(self.sk)
+        depois = self.pagina.read_text(encoding="utf-8")
+        limpa = lambda t: re.sub(r'(data-numero="\w+">)[\d.]+<', r'\g<1><', t)
+        self.assertEqual(limpa(depois), limpa(self.original))
+
+    def test_gerador_redirecionado_nao_toca_a_pagina_de_verdade(self):
+        """A suite roda `escrever_tudo` com `PASTA_MAPA` apontando para tmp.
+
+        Procurar a pagina pelo `__file__` em vez de pela `PASTA_MAPA` faz o
+        gerador escrever na pagina do repo no meio da suite: rodar teste
+        passava a sujar o working tree. Aconteceu na primeira versao deste
+        patch, em 24/08.
+        """
+        errada = re.sub(r'(data-numero="learnings">)[\d.]+<', r'\g<1>99<',
+                        self.original)
+        self.pagina.write_text(errada, encoding="utf-8")
+        with tempfile.TemporaryDirectory() as tmp:
+            with mock.patch.object(gerar_mapa, "PASTA_MAPA", Path(tmp) / "mapa"):
+                gerar_mapa.escrever_tudo(self.raiz)
+        # O numero errado tem que CONTINUAR errado: o gerador so cuida da
+        # pagina que mora ao lado do mapa que ele acabou de escrever. Comparar
+        # o arquivo inteiro nao serve — se os contadores por acaso ja baterem,
+        # o vazamento passa despercebido.
+        self.assertEqual(self.pagina.read_text(encoding="utf-8"), errada)
+
+    def test_escrever_tudo_passa_pela_pagina(self):
+        """Se so `atualizar_pagina` soubesse, alguem teria que lembrar de
+        chama-la — que e exatamente o defeito que este teste fecha."""
+        with mock.patch.object(gerar_mapa, "atualizar_pagina") as espiao:
+            with tempfile.TemporaryDirectory() as tmp:
+                with mock.patch.object(gerar_mapa, "PASTA_MAPA", Path(tmp)):
+                    gerar_mapa.escrever_tudo(self.raiz)
+        espiao.assert_called_once()
+
+
+class TestGatilhoDePreCommit(unittest.TestCase):
+    """Instrucao nao segura o mapa: o AGENTS.md secao 6 manda regerar e
+    commitar junto, e em 24/08 dois commits seguidos do chatbot entraram sem
+    regerar — o `--verificar` ficou vermelho em minutos. O que precisa ser
+    lembrado nao acontece; o gatilho decide sozinho quando regerar.
+    """
+
+    def test_mexer_em_produto_pede_regeracao(self):
+        self.assertTrue(gerar_mapa.mexeu_em_fonte_do_mapa(
+            ["chatbot-api/app/models_db.py"]))
+
+    def test_mexer_so_em_docs_nao_pede(self):
+        """Commit de documentacao nao paga 9s de gerador."""
+        self.assertFalse(gerar_mapa.mexeu_em_fonte_do_mapa(
+            ["docs/fila/card.md", "AGENTS.md"]))
+
+    def test_mexer_no_n8n_pede(self):
+        """`n8n/` alimenta `_cruzamentos.md`, a junta que quando abre emudece
+        o bot. Ficar de fora era o buraco do frescor antigo."""
+        self.assertTrue(gerar_mapa.mexeu_em_fonte_do_mapa(
+            ["n8n/workflow-cloud.json"]))
+
+    def test_o_proprio_mapa_nao_se_pede(self):
+        """Senao o gatilho se realimenta: regera porque o mapa mudou."""
+        self.assertFalse(gerar_mapa.mexeu_em_fonte_do_mapa(
+            [".claude/skills/revy-research/mapa/chatbot-api.md"]))
+
+    def test_a_propria_skill_nao_e_produto(self):
+        self.assertFalse(gerar_mapa.mexeu_em_fonte_do_mapa(
+            [".claude/skills/revy-research/saude.py"]))
+
+    def test_nome_de_produto_so_conta_como_pasta_raiz(self):
+        """`docs/chatbot-api-notas.md` fala de produto e nao e produto."""
+        self.assertFalse(gerar_mapa.mexeu_em_fonte_do_mapa(
+            ["docs/chatbot-api-notas.md"]))
+
+
+class TestPreCommitCuidaDaPaginaSozinho(unittest.TestCase):
+    """Commit que so acrescenta learning tambem desatualiza a pagina.
+
+    Os contadores vem de `learnings/`, `decisoes/` e do `SKILL.md` — nenhum
+    deles e fonte do mapa. Prender a correcao a regeracao do mapa deixava de
+    fora exatamente o commit mais comum da camada: em 24/08 a pagina furou tres
+    vezes no mesmo dia, e das tres, duas foram commit so de learning.
+    """
+
+    def setUp(self):
+        self.raiz = varredura.raiz_repo()
+        self.sk = self.raiz / ".claude/skills/revy-research"
+        self.pagina = self.sk / "como-funciona.html"
+        self.original = self.pagina.read_text(encoding="utf-8")
+        self.addCleanup(self.pagina.write_text, self.original, "utf-8")
+
+    def test_pagina_errada_e_corrigida_mesmo_sem_mexer_no_mapa(self):
+        self.pagina.write_text(
+            re.sub(r'(data-numero="learnings">)[\d.]+<', r'\g<1>99<', self.original),
+            encoding="utf-8")
+        with tempfile.TemporaryDirectory() as tmp:
+            # Indice proprio: o `git add` do hook nao pode escrever no indice de
+            # quem estiver commitando neste repo agora. E a lista de staged vai
+            # explicita: deixar o git respondendo faz o indice vazio parecer
+            # "todo o repo mudou", e o teste passa pelo caminho errado — o do
+            # mapa, justamente o que ele existe para nao usar.
+            with mock.patch.dict(
+                os.environ, {"GIT_INDEX_FILE": str(Path(tmp) / "index")}
+            ):
+                self.assertEqual(gerar_mapa.pre_commit(self.raiz, staged=[
+                    ".claude/skills/revy-research/learnings/2026-08-24-x.md",
+                ]), 0)
+        vivos = len([f for f in (self.sk / "learnings").glob("*.md")
+                     if f.name != "INDEX.md"])
+        self.assertIn(f'data-numero="learnings">{vivos}<',
+                      self.pagina.read_text(encoding="utf-8"))
 
 
 if __name__ == "__main__":

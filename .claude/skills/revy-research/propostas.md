@@ -6,6 +6,8 @@ Proposta aplicada sai desta lista e entra no `SKILL.md`.
 
 | Data | O que falhou no protocolo | O que eu mudaria |
 |---|---|---|
+| 2026-08-24 | O passo 2 manda seguir calado quando ouve `mapa em dia`, e agora o `--frescor` pode imprimir tambem os learnings que pedem reconferencia — saida que o protocolo nao descreve. | Uma frase no passo 2: "listou learning a reconferir? confira antes de decidir em cima dele e carimbe `verificado_em`". |
+| 2026-08-24 | Nada no protocolo diz que `fonte: repo` podia declarar a afirmacao que o script confere. Hoje o `--verificar` so prova que o caminho citado existe; que `.metric-grid` ainda seja `repeat(4, 1fr)` continua dependendo de alguem reler. | Campo opcional `ancora:` no cabecalho do learning (`arquivo` + trecho que precisa continuar la), conferido pelo `--verificar`. Custa uma linha por learning e transforma apodrecimento silencioso em suite vermelha. |
 
 ## Aplicadas
 

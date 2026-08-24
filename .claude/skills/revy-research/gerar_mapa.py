@@ -6,13 +6,16 @@ que entra aqui foi lido como texto e parseado com `ast` pelos extratores.
 from __future__ import annotations
 
 import json
+import re
 import subprocess
 import sys
 from dataclasses import asdict, replace
+from datetime import date
 from pathlib import Path
 
 import cruzamentos
 import extratores
+import saude
 import varredura
 from varredura import Entrada
 
@@ -230,6 +233,76 @@ def paths_declarados(entradas: list[Entrada]) -> set[str]:
     }
 
 
+NUMERO_DA_PAGINA = re.compile(r'(data-numero="(\w+)">)[\d.]*<')
+
+
+def numeros_vivos(sk: Path) -> dict[str, int]:
+    """O que a `como-funciona.html` promete, medido no repo agora."""
+    conta = lambda p: len([f for f in (sk / p).glob("*.md") if f.name != "INDEX.md"])
+    vivos = {
+        "produtos": len(varredura.PRODUTOS),
+        "learnings": conta("learnings"),
+        "decisoes": conta("decisoes"),
+        "skill_linhas": len((sk / "SKILL.md").read_text(encoding="utf-8").splitlines()),
+    }
+    selo = PASTA_MAPA / "_frescor.json"
+    if selo.exists():
+        dados = json.loads(selo.read_text(encoding="utf-8"))
+        vivos["entradas"] = sum(len(v) for v in dados.get("inventario", {}).values())
+    return vivos
+
+
+def atualizar_pagina(sk: Path) -> list[str]:
+    """Reescreve so os `data-numero` da pagina; o resto e desenho a mao.
+
+    Em 24/08 a suite reprovou porque a pagina dizia 32 learnings e a pasta
+    tinha 34 — dois escritos na noite anterior. O teste estava certo: o defeito
+    era a pagina depender de alguem lembrar de contar. Contador e saida de
+    script, como o mapa.
+    """
+    pagina = sk / "como-funciona.html"
+    if not pagina.exists():
+        return []
+    vivos = numeros_vivos(sk)
+    trocados: list[str] = []
+
+    def troca(m: re.Match) -> str:
+        chave = m.group(2)
+        if chave not in vivos:
+            return m.group(0)
+        antes = m.group(0)
+        depois = f"{m.group(1)}{vivos[chave]}<"
+        if antes != depois:
+            trocados.append(chave)
+        return depois
+
+    novo = NUMERO_DA_PAGINA.sub(troca, pagina.read_text(encoding="utf-8"))
+    if trocados:
+        pagina.write_text(novo, encoding="utf-8")
+    return trocados
+
+
+CAMINHO_DA_SKILL_NO_GIT = ".claude/skills/revy-research"
+_PAGINA_NO_GIT = f"{CAMINHO_DA_SKILL_NO_GIT}/como-funciona.html"
+
+
+def mexeu_em_fonte_do_mapa(arquivos) -> bool:
+    """O commit toca alguma coisa de que o mapa e feito?
+
+    Nome de produto so conta como PASTA RAIZ: `docs/chatbot-api-notas.md` fala
+    de produto e nao e produto. E a propria skill fica de fora — senao o
+    gatilho se realimenta, regerando porque o mapa mudou.
+    """
+    for bruto in arquivos:
+        rel = bruto.replace("\\", "/").strip()
+        if not rel or rel.startswith(CAMINHO_DA_SKILL_NO_GIT):
+            continue
+        raiz = rel.split("/", 1)[0]
+        if raiz in varredura.FONTES_DO_MAPA:
+            return True
+    return False
+
+
 def escrever_tudo(raiz: Path) -> None:
     PASTA_MAPA.mkdir(parents=True, exist_ok=True)
     sha = sha_atual(raiz)
@@ -257,6 +330,12 @@ def escrever_tudo(raiz: Path) -> None:
         encoding="utf-8",
     )
     print(f"selo de frescor: {sha}")
+    # Pela PASTA_MAPA, nunca pelo `__file__`: a suite redireciona a PASTA_MAPA
+    # para tmp, e olhar o `__file__` fazia o gerador escrever na pagina do repo
+    # no meio do teste — rodar teste sujava o working tree.
+    trocados = atualizar_pagina(PASTA_MAPA.parent)
+    if trocados:
+        print(f"como-funciona.html: {', '.join(trocados)} atualizado(s)")
 
 
 def verificar(raiz: Path) -> list[str]:
@@ -304,19 +383,112 @@ def verificar(raiz: Path) -> list[str]:
     return problemas
 
 
+def avisar_reconferencia(sk: Path, alvos: list[str], hoje: date | None = None) -> int:
+    """Cola o carimbo dos learnings na saida que o passo 2 ja roda.
+
+    Sem isto o `verificado_em` e campo decorativo: ninguem o cobra, e o
+    learning dos bancos prova o que um campo nao-cobrado vale — afirmou
+    "Portal e Control sao SQLite" por uma semana depois de os dois virarem
+    Postgres. Aviso, nunca erro: quem falha e o `--verificar`.
+    """
+    hoje = hoje or date.today()
+    vistos: dict[str, saude.Reconferir] = {}
+    for alvo in alvos:
+        for v in saude.a_reconferir(sk, hoje, produto=alvo):
+            vistos[v.arquivo] = v
+    if not vistos:
+        return 0
+    vencidos = sorted(vistos.values(), key=lambda v: v.arquivo)
+    print(f"{len(vencidos)} learning(s) pedem reconferencia antes de decidir em cima:")
+    for v in vencidos[:4]:
+        print(f"  {v.arquivo} ({v.fonte}, {v.motivo})")
+    if len(vencidos) > 4:
+        print(f"  ... e mais {len(vencidos) - 4}")
+    print("conferiu? carimbe `verificado_em` no arquivo. Carimbo sem conferencia "
+          "e o defeito que o campo existe para consertar.")
+    return len(vencidos)
+
+
+def pre_commit(raiz: Path, staged: list[str] | None = None) -> int:
+    """Roda dentro do hook `.githooks/pre-commit`.
+
+    Divide o trabalho pelo que da para automatizar com honestidade: o que e
+    **saida de script** (o mapa e os contadores da pagina) ele conserta e
+    coloca no proprio commit; o que precisa de **julgamento humano** (learning
+    apontando para arquivo que nao existe mais) ele bloqueia, porque nenhum
+    script sabe reescrever o texto certo.
+
+    Nao bloqueia por erro do gerador: ferramenta quebrada travando o commit de
+    todo mundo e pior que mapa velho, e o `--verificar` da suite ainda pega.
+    """
+    sk = Path(__file__).resolve().parent
+    if staged is None:
+        saida = subprocess.run(
+            ["git", "diff", "--cached", "--name-only"],
+            cwd=raiz, capture_output=True, text=True, check=False,
+        )
+        staged = [linha for linha in saida.stdout.splitlines() if linha.strip()]
+    if mexeu_em_fonte_do_mapa(staged):
+        try:
+            escrever_tudo(raiz)   # ja passa pela pagina no fim
+        except Exception as erro:   # noqa: BLE001 - ver docstring
+            print(f"AVISO: o gerador do mapa falhou ({erro}); commit segue.")
+        else:
+            subprocess.run(
+                ["git", "add", "--", CAMINHO_DO_MAPA_NO_GIT, _PAGINA_NO_GIT],
+                cwd=raiz, check=False,
+            )
+            print("mapa regerado e incluido no commit (AGENTS.md secao 6)")
+    elif atualizar_pagina(sk):
+        # Os contadores da pagina vem de `learnings/`, `decisoes/` e do
+        # `SKILL.md` — nenhum deles e fonte do mapa. Sem este ramo, o commit
+        # mais comum da camada (so learning) continuava deixando a pagina
+        # mentindo, que foi o que aconteceu tres vezes em 24/08.
+        subprocess.run(
+            ["git", "add", "--", _PAGINA_NO_GIT], cwd=raiz, check=False,
+        )
+        print("como-funciona.html: contadores atualizados e incluidos no commit")
+    mortas = saude.citacoes_mortas(sk, raiz)
+    for m in mortas:
+        print(f"CITACAO MORTA {m}")
+    if mortas:
+        print(
+            f"{len(mortas)} citacao(oes) morta(s): um learning manda abrir algo "
+            "que nao existe mais. Conserte o texto ou apague a nota — script "
+            "nenhum sabe escrever a frase certa no lugar."
+        )
+        return 1
+    return 0
+
+
 def main(argv: list[str]) -> int:
     raiz = varredura.raiz_repo()
+    if "--pre-commit" in argv:
+        return pre_commit(raiz)
     if "--verificar" in argv:
+        sk = Path(__file__).resolve().parent
         problemas = verificar(raiz)
         for p in problemas:
             print(f"DIVERGENCIA {p}")
+        # A camada de prosa entra no MESMO comando de proposito: checagem que
+        # precisa ser lembrada e checagem que nao acontece.
+        mortas = saude.citacoes_mortas(sk, raiz)
+        for p in mortas:
+            print(f"CITACAO MORTA {p}")
         if problemas:
             print(
                 f"{len(problemas)} divergencias - o mapa esta velho. "
                 "Rode sem --verificar."
             )
+        if mortas:
+            print(
+                f"{len(mortas)} citacao(oes) morta(s) em learnings/decisoes - "
+                "conserte o texto ou apague a nota."
+            )
+        if problemas or mortas:
             return 1
         print("mapa confere com o codigo")
+        print("learnings e decisoes nao apontam para o vazio")
         return 0
     if "--frescor" in argv:
         alvos = ([a for a in argv if not a.startswith("--")]
@@ -336,14 +508,15 @@ def main(argv: list[str]) -> int:
         atrasados = frescor(raiz, alvos)
         if not atrasados:
             print("mapa em dia")
-            return 0
-        for produto, arquivos in atrasados.items():
-            print(f"{produto}: {len(arquivos)} arquivo(s) mudaram desde o mapa")
-            for a in arquivos[:5]:
-                print(f"  {a}")
-            if len(arquivos) > 5:
-                print(f"  ... e mais {len(arquivos) - 5}")
-        print("regere com `python gerar_mapa.py` (no Mac, python3)")
+        else:
+            for produto, arquivos in atrasados.items():
+                print(f"{produto}: {len(arquivos)} arquivo(s) mudaram desde o mapa")
+                for a in arquivos[:5]:
+                    print(f"  {a}")
+                if len(arquivos) > 5:
+                    print(f"  ... e mais {len(arquivos) - 5}")
+            print("regere com `python gerar_mapa.py` (no Mac, python3)")
+        avisar_reconferencia(Path(__file__).resolve().parent, alvos)
         return 0   # aviso, nao erro: quem falha e o --verificar
     escrever_tudo(raiz)
     return 0

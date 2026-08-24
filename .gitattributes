@@ -1,1 +1,2 @@
 deploy/fly/**/*.sh text eol=lf
+.githooks/* text eol=lf
