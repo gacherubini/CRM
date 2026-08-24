@@ -22,9 +22,20 @@ Sem o passo 3 o webhook responde **404 para sempre**, mesmo depois de restart. C
 com `n8n list:workflow --active=true` (o `list:workflow` puro mostra todos e nao
 distingue).
 
+**Desde 24/08 os quatro passos estao nos scripts.** O `upload-and-import-workflow.ps1`
+aceita `-Mode cloud` e faz o passo 3 sozinho; antes ele parava no `publish` e a ativacao
+ficava na mao. O texto acima continua valendo como **explicacao de por que** o passo 3
+existe — se um dia o script sumir ou voce publicar por outro caminho, e isso que falta.
+
 **Preparar para o Fly:** o canonico usa nomes internos (`http://chatbot-api:8000`,
 `http://evolution:8080`) e `"active": false`. Quem reescreve host, troca placeholder de
-token e vira `active: true` e o `deploy/fly/3vm/prepare-workflow.ps1` — **que so trata o
-`workflow-ai-nao-salvos.json`**. Workflow novo (o cloud, por exemplo) precisa das quatro
-transformacoes na mao, senao sobe apontando para host que nao resolve. O `.gitignore`
-cobre so os `*.ready.json`: gere o arquivo com token real **fora do repo**.
+token e vira `active: true` e o `deploy/fly/3vm/prepare-workflow.ps1`, que trata os **tres**
+modos (`production`, `test`, `cloud`). Uma versao anterior deste arquivo dizia que ele so
+tratava o `workflow-ai-nao-salvos.json`: falso desde 23/08.
+
+**O `-Mode cloud` usa outro token.** Ele le `CHATBOT_API_TOKEN_CLOUD` (credencial de
+`papel="integracao"`, sem loja) e **falha** se ela nao existir. Reusar o token do Modo 1
+ali faz o chatbot procurar a conversa na loja errada — silencio, nao erro. Ver
+[[2026-08-24-instance-nao-conserta-toda-rota]].
+
+O `.gitignore` cobre so os `*.ready.json`: gere o arquivo com token real **fora do repo**.

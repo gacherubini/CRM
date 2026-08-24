@@ -61,8 +61,12 @@ Vocabulário: [`../../CONTEXT.md`](../../CONTEXT.md). As-built Control/Loja:
   ~R$0,03–0,04, ~10× por oferta; contorno é mandar a oferta como `interactive` na janela de 24 h
   do vendedor. (3) allow-list do número de teste casa a string enviada e o `wa_id` brasileiro vem
   **sem o nono dígito** — cadastrar o número sem o 9; em número real não há allow-list.
-  **Modo 2 atende uma loja por vez** (workflow serve N lojas com token de UMA):
-  [`../fila/2026-08-23-modo2-multiloja-credencial-de-integracao.md`](../fila/2026-08-23-modo2-multiloja-credencial-de-integracao.md).
+  **Multi-loja: consertado e no ar em 24/08** (`654f5d4`). O workflow servia N lojas com
+  o token de UMA, então o chatbot procurava a conversa na loja errada e o agente parava
+  sem erro. Agora há credencial de `papel="integracao"` (sem loja) e toda rota do bot
+  resolve a loja pela `instance` do pedido; sem ela é `400`, nunca um fallback. Card com
+  o as-built e o que sobrou:
+  [`../fila/2026-08-23-modo2-multiloja-credencial-de-integracao.md`](../fila/2026-08-23-modo2-multiloja-credencial-de-integracao.md). **Ainda não provado com duas lojas** — falta a central Cloud da segunda.
   Dívida conhecida, em ordem de risco: **VAD do áudio** (§5.10 — o Whisper alucina em ruído e o
   bot age em cima), **recusa não cutuca** (§5.9 r.5) e `classificar_etapa` presa em `so_oi`.
   **Noite de 24/08, ao preparar o teste com 2 vendedores, dois furos apareceram e foram

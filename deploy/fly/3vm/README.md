@@ -211,14 +211,25 @@ para host que não resolve.
 .\deploy\fly\3vm\prepare-workflow.ps1 -Mode cloud   # -> workflow-cloud.ready.json (gitignored)
 ```
 
-O `upload-and-import-workflow.ps1` continua tratando **só** o Modo 1: para o cloud, os três
-passos são na mão (o id é fixo, `wCloudMeta0001` — o mesmo do arquivo, para o import
-**atualizar** em vez de criar um segundo workflow no mesmo path):
+**O token do cloud é outro, e é obrigatório.** Desde 24/08 o `-Mode cloud` lê
+`CHATBOT_API_TOKEN_CLOUD` do `.secrets.local` e **falha** se ela não existir. O token do
+Modo 1 aponta para **uma** loja; usá-lo aqui ressuscita o bug que a spec §6.2 fechou, e o
+sintoma é silêncio, não erro. Crie a credencial uma vez, em produção:
 
 ```bash
-fly ssh sftp put -a n8n2037 deploy/fly/3vm/workflow-cloud.ready.json /tmp/wf-cloud.json
-fly machine exec <machine-id> "env HOME=/home/node n8n import:workflow --input=/tmp/wf-cloud.json" -a n8n2037
-fly machine exec <machine-id> "env HOME=/home/node n8n update:workflow --id=wCloudMeta0001 --active=true" -a n8n2037
+fly ssh console -a app2037 -C "/bin/sh -c 'cd /srv/chatbot && DATABASE_URL=\$CHATBOT_DATABASE_URL python -m app.cli criar-credencial-integracao'"
+```
+
+O `DATABASE_URL=` não é enfeite: sem ele o CLI grava num SQLite dentro do contêiner e
+devolve um token que **não funciona**, sem reclamar. Guarde a saída em
+`CHATBOT_API_TOKEN_CLOUD=` no `.secrets.local` (gitignored).
+
+Desde 24/08 o `upload-and-import-workflow.ps1` **também trata o cloud** — e faz a ativação
+que antes era na mão (o id é fixo, `wCloudMeta0001` — o mesmo do arquivo, para o import
+**atualizar** em vez de criar um segundo workflow no mesmo path):
+
+```powershell
+.\deploy\fly\3vm\upload-and-import-workflow.ps1 -Mode cloud
 fly apps restart n8n2037
 ```
 

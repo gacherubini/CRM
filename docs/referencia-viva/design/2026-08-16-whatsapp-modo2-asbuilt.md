@@ -225,11 +225,37 @@ variável, o nome do vendedor).
 ser cadastrado no painel. É limitação de número de teste — em número real não
 existe allow-list, e o código está correto.
 
-### Uma loja por vez
+### Uma loja por vez — **fechado em 24/08**
 
-O piloto roda com **uma** loja porque o Modo 2 hoje só atende uma: um workflow
-`n8n-cloud` serve N lojas mas autentica com um token que pertence a UMA loja.
-Card próprio, não se re-descobre aqui:
+O piloto rodou com **uma** loja porque o Modo 2 só atendia uma: um workflow
+`n8n-cloud` serve N lojas mas autenticava com um token que pertence a UMA loja.
+O chatbot então procurava a conversa na loja do token, não na de quem falou, e
+devolvia `conversa_nao_encontrada` — o agente parava **sem erro nenhum**, só `200`
+e silêncio.
+
+Consertado e no ar em `654f5d4`. O desenho é o da spec §6.2:
+
+- `CredencialServico.loja_id` aceita `NULL`, e o papel `integracao` marca o token da
+  plataforma (`python -m app.cli criar-credencial-integracao`, migration `0026`);
+- `auth.resolver_loja_id(db, ctx, instance)` decide de quem é o pedido: credencial de
+  loja manda como sempre, credencial de integração resolve pela `instance`. **Sem
+  `instance` é `400`** — fail-closed, porque cair em "alguma" loja mandaria a mensagem
+  de uma loja pela outra;
+- toda rota do bot passou a usar o resolvedor, e o `fork_cloud_workflow.py` injeta a
+  `instance` nas seis chamadas. Quem cobra é o `validate_workflow_cloud.py`;
+- o `-Mode cloud` do `prepare-workflow.ps1` passou a exigir `CHATBOT_API_TOKEN_CLOUD`
+  e **falha** sem ela — reusar o token do Modo 1 era o próprio bug.
+
+**O que ainda não está provado:** o multi-loja de verdade. Tudo foi verificado com
+uma loja — e com uma loja o código quebrado se comporta igual ao consertado. Falta
+cadastrar a central Cloud de uma **segunda** loja, que hoje só sai por escrita direta
+no banco: `POST /v1/whatsapp/canais` não grava `waba_id`.
+
+Exceção deliberada, fora do escopo daquele card: `GET /v1/config/catalogo-bot` é cega
+para loja e `instance` não a conserta — ela não lê `ctx.loja_id`, quem responde é o
+cliente do Estoque com bearer global e sem slug. É buraco do contrato com o Estoque.
+
+Detalhe do card:
 [`../../fila/2026-08-23-modo2-multiloja-credencial-de-integracao.md`](../../fila/2026-08-23-modo2-multiloja-credencial-de-integracao.md).
 
 ## Noite de 24/08 — dois furos entre o banco e o WhatsApp

@@ -1,6 +1,14 @@
 # Plano — Modo 2 multi-loja: credencial de integração
 
-> **Status 2026-08-23: FILA / NÃO IMPLEMENTADO.**
+> **Status 2026-08-24: IMPLEMENTADO E NO AR** (`654f5d4`, `app2037` + `n8n2037`).
+> As seis tasks estão feitas; o que sobrou está em **Fora de escopo** no fim.
+> Provado em produção: a credencial de integração autentica e, sem `instance`,
+> responde `400` com a mensagem de fail-closed. **Não provado: o multi-loja de
+> verdade** — tudo foi verificado com uma loja, e com uma loja o código quebrado
+> se comporta igual ao consertado. Falta cadastrar a central Cloud de uma segunda
+> loja, que hoje só sai por escrita direta no banco (ver o learning
+> `canal-cloud-nao-se-cadastra-pela-api`).
+>
 > Descoberto durante o smoke do piloto Modo 2 no número de teste. Não altera o
 > contrato do webhook nem o comportamento de loja única já em produção.
 > Implementa o §6.2 da spec [`2026-08-12-whatsapp-dois-modos-design.md`](../referencia-viva/specs/2026-08-12-whatsapp-dois-modos-design.md).

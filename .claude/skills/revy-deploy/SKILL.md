@@ -53,17 +53,26 @@ quebrada = VM que nao sobe. Antes de deploy que altera schema, snapshot do volum
 
 Nao e Fly. Nao precisa subir o `app2037` para trocar a landing.
 
-**n8n2037** — a sequencia completa esta em
-`revy-research/learnings/2026-08-23-import-do-n8n-desativa-o-workflow.md`. O resumo
-que importa: `prepare-workflow.ps1` **so trata o `workflow-ai-nao-salvos.json`**;
-`upload-and-import-workflow.ps1` faz sftp + import + publish e **para ai**; o passo
-que realmente ativa e
+**n8n2037** — desde 24/08 os dois scripts cobrem os tres modos, e a sequencia inteira
+cabe em tres comandos:
 
-    fly machine exec <id> "env HOME=/home/node n8n update:workflow --id=<id> --active=true" -a n8n2037
+    .\deploy\fly\3vm\prepare-workflow.ps1 -Mode production|test|cloud
+    .\deploy\fly\3vm\upload-and-import-workflow.ps1 -Mode production|test|cloud
+    fly apps restart n8n2037
 
-O n8n avisa que esta deprecated e manda usar `publish`. Ignore: nesta versao o
-publish sozinho nao liga. Depois `fly apps restart n8n2037` — e conte ~6 min de 404
-ate o webhook registrar, durante os quais a Evolution cancela o retry.
+O `upload` agora faz o `update:workflow --active=true` sozinho — antes ele parava no
+`publish` e o passo que realmente ativa ficava na mao, esquecido. O n8n avisa que o
+comando esta deprecated e manda usar `publish`: ignore, nesta versao o publish sozinho
+nao liga e o webhook fica **404 para sempre**. Confira com
+`n8n list:workflow --active=true` (o `list:workflow` puro nao distingue).
+
+**`-Mode cloud` exige `CHATBOT_API_TOKEN_CLOUD`** no `.secrets.local` e falha sem ela.
+Reusar o `CHATBOT_API_TOKEN` ali ressuscita o bug multi-loja da spec §6.2 — o token do
+Modo 1 aponta para uma loja so, e o sintoma e silencio. Ver
+`deploy/fly/3vm/README.md`, secao Workflow cloud.
+
+Depois do restart, conte ate ~6 min de 404 com a Evolution cancelando retry. (Em 24/08 o
+webhook voltou em ~30 s; um caso so nao derruba o numero — planeje pelo pior.)
 
 **motor2037** — so sob pedido explicito. Pre-cutover, valide sem tocar nas machines
 com `--build-only`.
