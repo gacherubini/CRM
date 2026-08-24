@@ -18,8 +18,36 @@ def hash_token(token: str) -> str:
 
 @dataclass
 class Contexto:
-    loja_id: str
+    # ``None`` = credencial de integração: o token é da plataforma, não de uma
+    # loja, e a loja de cada pedido vem da instância (spec §6.2).
+    loja_id: str | None
     papel: str
+
+
+def resolver_loja_id(db: Session, ctx: Contexto, instance: str | None) -> str:
+    """Loja deste pedido. Credencial de loja manda; integração resolve pela instância.
+
+    O ``n8n-cloud`` é **um** workflow para N lojas: se a loja viesse do token, ele
+    procuraria a conversa na loja errada e o bot calaria sem erro nenhum — só
+    ``200`` e silêncio. Era esse o sintoma no smoke do piloto.
+
+    Fail-closed de propósito: integração sem instância é ``400``, nunca um
+    fallback para "alguma" loja — isso mandaria a mensagem de uma loja pela
+    outra. Instância desconhecida é ``404``, decidido por
+    ``resolve_canal_for_instance``.
+    """
+    if ctx.loja_id:
+        return ctx.loja_id
+    if not (instance or "").strip():
+        raise HTTPException(
+            status_code=400,
+            detail="instance é obrigatório para credencial de integração",
+        )
+    # Import tardio: servico importa auth (hash_token), então o topo daria ciclo.
+    from app.servico import resolver_loja_e_canal_por_instancia
+
+    loja, _canal = resolver_loja_e_canal_por_instancia(db, instance)
+    return loja.id
 
 
 def get_contexto(
