@@ -172,7 +172,9 @@ try {
     method: 'POST',
     url: 'CHATBOT_BASE/v1/operacao/handoff-humano',
     headers: { Authorization: 'Bearer __CHATBOT_TOKEN__', 'Content-Type': 'application/json' },
-    body: { telefone, motivo },
+    // instance = o phone_number_id: um workflow serve N lojas (spec 6.2), e sem
+    // ele o chatbot abriria o rodizio na loja do token, nao na de quem falou.
+    body: { telefone, motivo, instance: String(origem.instance || '') || null },
     json: true,
     timeout: 15000,
   });
@@ -344,7 +346,11 @@ def novos_nos() -> list[dict]:
                     ".replace(/\\s{2,}/g, ' ')"
                     ".replace(/\\s+([.,?])/g, '$1').trim(); "
                     "return { telefone: $('Extrair1').first().json.telefone, text"
-                    "o: limpo }; })() }}"
+                    # instance: sem ela a resposta sai pelo numero da loja do
+                    # token, e com duas lojas Cloud isso e a mensagem de uma
+                    # indo pela outra (spec 6.2).
+                    "o: limpo, instance: $('Extrair1').first().json.instance }; "
+                    "})() }}"
                 ),
                 "options": {"timeout": 30000},
             },
@@ -396,6 +402,60 @@ CONEXOES = {
 }
 
 
+# Expressao, nao a variavel `instance` do proprio no: em `consultar_estoque1` a
+# chamada ao estoque acontece ANTES do `const instance` (temporal dead zone),
+# entao referenciar a variavel ali daria ReferenceError em producao.
+INSTANCE_JS = "String(($('Extrair1').first().json || {}).instance || '')"
+
+# Cada par e (trecho de hoje, trecho com instance). Sao assercoes: se o Modo 1
+# mudar a forma da chamada, o fork PARA em vez de gerar um workflow que serve
+# uma loja so -- que e o modo de falhar caro, porque o sintoma e silencio.
+INJECOES_INSTANCE = {
+    "consultar_estoque1": [
+        ("  qs,", "  qs: { ...qs, instance: " + INSTANCE_JS + " },"),
+    ],
+    "simular1": [
+        (
+            "        qs: { termo: termoBusca },",
+            "        qs: { termo: termoBusca, instance: " + INSTANCE_JS + " },",
+        ),
+        (
+            "    body: bodyMotor,",
+            "    body: { ...bodyMotor, instance: " + INSTANCE_JS + " },",
+        ),
+        (
+            "    body: bodyHumano,",
+            "    body: { ...bodyHumano, instance: " + INSTANCE_JS + " },",
+        ),
+    ],
+    "TEMP continuar sem estoque1": [
+        (
+            "    body: bodyHumano,",
+            "    body: { ...bodyHumano, instance: " + INSTANCE_JS + " },",
+        ),
+    ],
+}
+
+
+def _injetar_instance(no: dict) -> None:
+    """Faz cada chamada ao chatbot dizer de qual loja fala (spec 6.2)."""
+    trocas = INJECOES_INSTANCE.get(no["name"])
+    if not trocas:
+        return
+    codigo = no["parameters"]["jsCode"]
+    for antigo, novo in trocas:
+        if novo in codigo:
+            continue
+        if codigo.count(antigo) != 1:
+            sys.exit(
+                f"ERRO: {no['name']} mudou de forma no Modo 1 -- esperava uma "
+                f"ocorrencia de {antigo!r}, achei {codigo.count(antigo)}. "
+                "Ajuste INJECOES_INSTANCE antes de gerar."
+            )
+        codigo = codigo.replace(antigo, novo, 1)
+    no["parameters"]["jsCode"] = codigo
+
+
 def main() -> None:
     base = json.loads(BASE.read_text(encoding="utf-8"))
     por_nome = {n["name"]: n for n in base["nodes"]}
@@ -405,6 +465,9 @@ def main() -> None:
         sys.exit(f"ERRO: o Modo 1 não tem mais estes nós (renomeados?): {faltando}")
 
     nos = [json.loads(json.dumps(por_nome[n])) for n in HERDADOS]
+    for n in nos:
+        if n.get("parameters", {}).get("jsCode"):
+            _injetar_instance(n)
 
     # A única ferramenta que muda de conteúdo: no Modo 1 avisa a equipe pela
     # Evolution, aqui abre o rodízio.

@@ -22,6 +22,22 @@ WORKFLOW = RAIZ / "workflow-cloud.json"
 GERADOR = RAIZ / "fork_cloud_workflow.py"
 CHATBOT = "http://chatbot-api:8000"
 
+# §6.2: um workflow serve N lojas, então cada chamada carrega a instância
+# (o `phone_number_id`, que o Extrair1 já publica). `config/catalogo-bot` não
+# está aqui: ela é cega para loja por outro motivo — o contrato com o Estoque.
+ROTAS_QUE_EXIGEM_INSTANCE = (
+    "/v1/operacao/responder",
+    "/v1/operacao/handoff-humano",
+    "/v1/operacao/moto-escolhida",
+    "/v1/operacao/solicitacoes-simulacao-humana",
+    "/v1/simulacoes/solicitar",
+    "/v1/estoque/buscar",
+)
+
+# Quantos caracteres depois da URL ainda contam como "o corpo desta chamada".
+# Folgado de proposito: erra para o lado de reprovar, que e o lado barato.
+JANELA_CORPO = 400
+
 # §5.9: herdados "sem discutir de novo" do Modo 1.
 FERRAMENTAS_ESPERADAS = {
     "consultar_estoque1",
@@ -124,6 +140,36 @@ def main() -> None:
                 f"{n['name']} fala direto com {host_proibido} — §6.2 põe esse "
                 "segredo no chatbot"
             )
+
+    # --- toda chamada ao chatbot diz de qual loja fala (§6.2) ---------------
+    # Sem isto o workflow volta a servir uma loja só — e o sintoma é silêncio,
+    # não erro: o chatbot procura a conversa na loja errada e o agente para.
+    # `catalogo-bot` fica de fora de propósito: ela não lê loja nenhuma, e
+    # mandar `instance` ali só fingiria conserto (ver o card, Fora de escopo).
+    # Nó HTTP Request tem UMA url, então a pergunta é do nó inteiro. Nó de
+    # código faz várias chamadas — `solicitar_handoff1` manda `instance` no
+    # PATCH /estado e é o POST seguinte que falta — então ali a busca é por
+    # ocorrência, dentro de uma janela a partir da url.
+    sem_instance = []
+    for n in nos:
+        parametros = json.dumps(n.get("parameters") or {}, ensure_ascii=False)
+        e_codigo = "jsCode" in (n.get("parameters") or {})
+        for rota in ROTAS_QUE_EXIGEM_INSTANCE:
+            if rota not in parametros:
+                continue
+            if not e_codigo:
+                if "instance" not in parametros:
+                    sem_instance.append(f"{n.get('name', '?')} → {rota}")
+                continue
+            inicio = 0
+            while (achado := parametros.find(rota, inicio)) != -1:
+                inicio = achado + len(rota)
+                if "instance" not in parametros[achado : achado + JANELA_CORPO]:
+                    sem_instance.append(f"{n.get('name', '?')} → {rota}")
+    assert not sem_instance, (
+        f"chamada ao chatbot sem `instance`: {sorted(sem_instance)} — com N lojas "
+        "no Modo 2 isso procura a conversa na loja errada e o bot cala"
+    )
 
     # --- referências órfãs ---------------------------------------------------
     nomes = {n["name"] for n in nos}
