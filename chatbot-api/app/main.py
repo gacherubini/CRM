@@ -440,6 +440,9 @@ class RespostaBotInput(BaseModel):
 
     telefone: str
     texto: str = Field(min_length=1, max_length=4096)
+    # Opcional: credencial de loja segue mandando o corpo de hoje. Só a
+    # credencial de integração precisa dizer de qual loja fala (spec §6.2).
+    instance: Optional[str] = Field(default=None, max_length=120)
 
 
 class HandoffHumanoInput(BaseModel):
@@ -455,6 +458,9 @@ class HandoffHumanoInput(BaseModel):
 
     telefone: str
     motivo: Optional[str] = Field(default=None, max_length=120)
+    # Opcional: credencial de loja segue mandando o corpo de hoje. Só a
+    # credencial de integração precisa dizer de qual loja fala (spec §6.2).
+    instance: Optional[str] = Field(default=None, max_length=120)
 
 
 class MotoEscolhidaInput(BaseModel):
@@ -1818,7 +1824,11 @@ def responder_cliente(
     Fail-closed no Modo 1: lá quem responde é o Baileys pelo n8n, e mandar por
     aqui duplicaria a resposta do cliente.
     """
-    _exigir_loja_operacional(db, ctx.loja_id)
+    # Resolve a loja ANTES do gate operacional: com credencial de integração
+    # ``ctx.loja_id`` é None, e ``_exigir_loja_operacional(db, None)`` responderia
+    # 423 no lugar do 400 que diz qual é o erro de verdade.
+    loja_id = resolver_loja_id(db, ctx, dados.instance)
+    _exigir_loja_operacional(db, loja_id)
 
     from app.rodizio import loja_opera_modo2
 
@@ -1826,13 +1836,13 @@ def responder_cliente(
     if not telefone:
         raise HTTPException(status_code=422, detail="telefone inválido")
 
-    if not loja_opera_modo2(db, ctx.loja_id):
+    if not loja_opera_modo2(db, loja_id):
         return {"enviado": False, "motivo": "loja_fora_do_modo_2"}
 
     # Número da loja, não o global: com duas lojas Cloud no mesmo processo a
     # variável de ambiente mandaria a resposta pelo número da outra.
-    numero_central = phone_number_id_da_loja(db, ctx.loja_id)
-    resultado = outbound_para_loja(db, ctx.loja_id).send_text(
+    numero_central = phone_number_id_da_loja(db, loja_id)
+    resultado = outbound_para_loja(db, loja_id).send_text(
         instance=numero_central,
         number=telefone,
         text=dados.texto,
@@ -1873,7 +1883,9 @@ def acionar_handoff_humano(
     do Modo 2 responde ``{"acionado": false}`` sem efeito nenhum — no Modo 1 o
     handoff é o grupo de estoque, não o rodízio.
     """
-    _exigir_loja_operacional(db, ctx.loja_id)
+    # Resolve antes do gate, pelo mesmo motivo da rota ``responder``.
+    loja_id = resolver_loja_id(db, ctx, dados.instance)
+    _exigir_loja_operacional(db, loja_id)
 
     from app.handoff_gatilhos import disparar_handoff
     from app.rodizio import loja_opera_modo2
@@ -1883,7 +1895,7 @@ def acionar_handoff_humano(
     if not telefone:
         raise HTTPException(status_code=422, detail="telefone inválido")
 
-    if not loja_opera_modo2(db, ctx.loja_id):
+    if not loja_opera_modo2(db, loja_id):
         return {"acionado": False, "motivo": "loja_fora_do_modo_2"}
 
     # ``avisar_cliente=False``: quem chama esta rota é a tool do agente, e ela
@@ -1892,10 +1904,10 @@ def acionar_handoff_humano(
     # ``solicitacoes_simulacao`` não tem agente no turno e por isso mantém o aviso.
     resultado = disparar_handoff(
         db,
-        ctx.loja_id,
+        loja_id,
         telefone,
         motivo="pediu_humano",
-        outbound=outbound_para_loja(db, ctx.loja_id),
+        outbound=outbound_para_loja(db, loja_id),
         avisar_cliente=False,
     )
     return {"acionado": True, "estado": resultado}
