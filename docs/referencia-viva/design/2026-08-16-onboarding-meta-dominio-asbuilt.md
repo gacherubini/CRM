@@ -21,7 +21,7 @@ anterior. Só a terceira olha o CNPJ.
 |---|---|---|
 | 1 — conta pessoal do Facebook | criar o app | **feito** 16/08 |
 | 2 — app + produto WhatsApp + vínculo | o botão "Iniciar verificação" existir | **feito** 16/08 |
-| 3 — verificação da empresa (CNPJ) | escala: sair dos 250/24h | **documentos prontos** 23/08, não submetido |
+| 3 — verificação da empresa (CNPJ) | escala: sair dos 250/24h | **submetida** 23/08, em análise (~2 dias úteis) |
 | 4 — nome de exibição "Revy" | o cliente ver "Revy" no lugar do número | bloqueado pelo 3 |
 
 **O portão 3 não bloqueia o piloto.** Ver "Limites sem CNPJ" no fim.
@@ -250,9 +250,10 @@ esse formato, então não regride calado. Workflow subiu de 20 para **21 nós**.
 Publicação: `prepare-workflow.ps1` ganhou o **`-Mode cloud`** (antes só tratava o
 workflow do Modo 1, e o cloud precisava das quatro transformações à mão).
 
-### Verificação de CNPJ: pronta para submeter
+### Verificação de CNPJ: submetida em 23/08
 
-Os documentos foram gerados e batidos contra o site em 23/08.
+Os documentos foram gerados e batidos contra o site, e a verificação foi **submetida em
+23/08**. A Meta anunciou análise de ~2 dias úteis.
 
 | Item | Valor |
 |---|---|
@@ -278,6 +279,48 @@ e no bloco de identidade das três páginas legais. O **`wa.me/5551980336365` fi
 de propósito** — é por ele que o lead fala com a Revy, e apontar o botão de WhatsApp para
 um número sem WhatsApp mataria a captação para ganhar uma linha de rodapé.
 
+
+### O caminho na interface, e as três armadilhas dele
+
+**Não é em *Autorizações e verificações*** — essa tela só trata autorização de anúncio
+(CBD, apostas, Singapura). O fluxo mora em **Central de Segurança**, rolando até o fim, na
+seção *Verificação da empresa*; o caso de uso é **"O app exige acesso a permissões no Meta
+for Developers"**. O botão *Ver detalhes*, ao lado de *Não verificada* em
+*Informações da empresa*, cai no mesmo lugar.
+
+Respostas do questionário: **Empresa individual** (MEI é um titular só; *Empresa privada* é
+Ltda) e **Tem registro** — a própria descrição dessa opção cita o CCMEI pelo nome.
+
+**Armadilha 1 — o fluxo lê os *Detalhes da empresa*, e eles estavam podres.** Razão social
+era `Revy`, site era `https://app2037.fly.dev/site/`, telefone vazio e endereço só `Brasil`.
+Corrigir isso é **pré-requisito**, não detalhe: é esse bloco que o revisor compara com o
+documento. Ao digitar o endereço, o `228` virou `22` — conferir depois de salvar. O campo
+*Nome comercial alternativo* fica **vazio**: não há documento que ligue "Revy" ao CNPJ, e
+preencher convida a Meta a pedir um que não existe.
+
+**Armadilha 2 — o telefone truncado voltou, e só o e-mail o dissolve.** A tela de upload tem
+**duas** seções: *Verificar a razão social* e *Verificar telefone*. O CCMEI **não aparece na
+lista da segunda**, porque não imprime telefone — e o único documento que imprime é o
+cartão CNPJ, com `(19) 9846-9808`, sem o nono dígito. O que resolve é a tela seguinte, de
+conexão com a empresa, onde as exigências documentais **diferem por método**:
+
+| Método | O documento precisa ter |
+|---|---|
+| **Email** | razão social **e o endereço _ou_ o telefone** |
+| Ligação / SMS / WhatsApp | razão social **e o telefone** |
+
+Só o **Email** aceita endereço no lugar do telefone — e o CCMEI tem razão social + endereço.
+É por isso, e não por ser o "Recomendado", que ele é o caminho: entrega um documento só, que
+bate limpo, e tira o cartão CNPJ da jogada. Nunca alinhar o telefone declarado à versão de 8
+dígitos para "casar" com o cartão: número truncado não recebe SMS e trava a confirmação.
+
+**Armadilha 3 — voltar consome o método.** Depois de um *Voltar* na tela do código, **Email**
+e **Verificação de domínio** sumiram da lista, deixando só as três que exigem telefone no
+documento. Reabrir o fluxo pelo *Ver detalhes* devolve as opções.
+
+O e-mail tem que ser **`contato@revyapp.com.br`**: o catch-all está desligado de propósito,
+então qualquer outro endereço do domínio não existe e o código se perde sem erro. Código
+válido por 60 minutos, e ele cai na aba **Social** do Gmail, não na Primary.
 
 ## Limites sem CNPJ verificado
 
@@ -327,17 +370,24 @@ ser questão de atribuição e virou questão de custo.
 - [ ] meio de pagamento na WABA (item da Etapa 2) — sem ele, mensagem iniciada pela empresa
       não sai, e é ela que o rodízio usa com janela fechada
 - [ ] aprovação do `chama_vendedor` (estava `PENDING`)
-- [ ] submeter a verificação do CNPJ — documentos prontos, é preencher e subir
+- [ ] **resultado** da verificação do CNPJ — submetida 23/08 (CCMEI + confirmação por
+      e-mail), análise ~2 dias úteis
 - [ ] eSIM de operadora brasileira com **voz/SMS** — eSIM de viagem (Airalo, Holafly) é só dados, não recebe SMS e **não serve**
 - [ ] número que **nunca teve WhatsApp**; e uma vez na Cloud API ele fica **bot-only**, não volta a funcionar no app
 - [ ] Etapa 2 do painel: registrar o número real ao lado do de teste
 
 **Ainda aberto — nosso lado (é o que trava o ciclo ponta a ponta)**
 
-- [ ] cadastrar o **canal Cloud** da loja: `POST /v1/whatsapp/canais` com
-      `evolution_instance = <phone_number_id>` e `waba_id` (a UI não envia esses campos, §16.3)
-- [ ] ligar `REVY_CONTROL_WHATSAPP_MODO2_ENABLED` no `app2037` — sem ela o Control **nem
-      oferece** o Modo 2 na ficha da loja
+- [ ] cadastrar o canal da loja. **A instrução antiga estava errada**: `POST
+      /v1/whatsapp/canais` **não aceita `waba_id`** — o schema tem só `evolution_instance` e
+      `e164_or_label`, e `register_channel` nunca grava WABA nem template. Para o piloto basta
+      um canal com `evolution_instance = <phone_number_id>` (cura o inbound; o outbound cai no
+      fallback do ambiente). Loja real precisa de `waba_id` + `template_oferta`, hoje só por
+      escrita direta no banco. Ver o learning `canal-cloud-nao-se-cadastra-pela-api`
+- [x] flags do Modo 2 no `app2037` — **são três**, e as três ficaram em `1` em 23/08:
+      `REVY_CONTROL_WHATSAPP_MODO2_ENABLED` (o rádio na ficha da loja),
+      `CHATBOT_WHATSAPP_MODO2_ENABLED` (rodízio e workers) e `MULTI_WHATSAPP_ENABLED`
+      (a rota de canais, que sem ela responde 404). As duas do chatbot já estavam ligadas
 - [ ] projetar `whatsapp_modo = 2` **numa loja só**
 - [ ] cadastrar a fila de vendedores (autoatendido na Loja)
 - [ ] ciclo completo no **número de teste** antes de qualquer chip: mensagem → n8n → bot →
@@ -345,10 +395,12 @@ ser questão de atribuição e virou questão de custo.
       de log do teste do painel
 - [ ] provider de transcrição (Groq) — `CHATBOT_AUDIO_TRANSCRIPTION_URL` / `_TOKEN`
 
-**Não conferido nesta sessão**
+**Conferido em 23/08, no fim da sessão**
 
-- [ ] teste de e-mail real para `contato@revyapp.com.br`
-- [ ] estado do 301 de `/site` no `app2037`
+- [x] `contato@revyapp.com.br` entrega de verdade — o código da Meta chegou no
+      `revystartup@gmail.com` pelo Email Routing, na aba **Social** do Gmail
+- [x] 301 de `/site` no `app2037` — `https://app2037.fly.dev/site/` responde
+      `301 → https://revyapp.com.br/`, e as páginas legais respondem 200
 
 **Dívida que precede cliente real:** o **VAD do áudio** (§5.10). O Whisper inventa frase
 plausível em áudio mudo e o bot **age** em cima da transcrição — dois segundos de moto
@@ -366,5 +418,10 @@ passando viram uma frase que não existiu. O as-built do Modo 2 já marca como r
   for verificar — antes disso não serve para nada.
 - Nome fantasia na JUCESP **não é marca**. Marca é INPI, e uma agência já segurou o
   `revy.com.br`.
-- Telefone do cartão CNPJ está truncado em 8 dígitos: `(19) 98469808`. O site anuncia
-  `+55 51 98033-6365`. **Declarar o mesmo número dos dois lados** na verificação.
+- Telefone do cartão CNPJ está truncado em 8 dígitos: `(19) 9846-9808`, sem o nono. Dar isso
+  por encerrado foi **cedo demais**: a seção *Verificar telefone* do fluxo de verificação
+  pede documento com telefone, e aí o cartão é o único que serve. Nesta submissão o caminho
+  do e-mail contornou (ver "as três armadilhas"), mas se a Meta recusar, o conserto de raiz
+  é atualizar o telefone no cadastro do MEI e reemitir o cartão com nove dígitos. O site já
+  anuncia `+55 19 99846-9808` nas quatro páginas; o `wa.me/5551980336365` da landing é o
+  canal de captação e fica como está.
