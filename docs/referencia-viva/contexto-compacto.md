@@ -41,8 +41,13 @@ Vocabulário: [`../../CONTEXT.md`](../../CONTEXT.md). As-built Control/Loja:
   `MULTI_WHATSAPP_ENABLED`) e o `wCloudMeta0001` ativo no `n8n2037`. Cadeia com carimbo de log:
   `/webhook/cloud` 200 (loja resolvida pelo `phone_number_id`) → `pode-responder` 200 →
   `/v1/operacao/responder` **200 às 23:49:17 de 23/08**. O bot respondeu ao cliente de verdade.
-  **O que NÃO foi provado:** handoff → rodízio → oferta com "Peguei" → trava e entrega do
-  contato — desbloqueado, não executado. O piloto **não** está concluído.
+  **A volta completa veio na madrugada de 24/08:** cliente pediu humano → rodízio ofereceu →
+  vendedor tocou em "Peguei" → oferta `5034a589` em `estado=travada`, conversa do cliente com
+  `bot_ativo=False` / `status=handoff`. Primeira vez desde o merge de 16/08 que um vendedor foi
+  chamado, e saiu de graça (janela do vendedor aberta → `interactive`, sem tocar no template).
+  **Segue sem prova:** fila com 2+ vendedores (ponteiro, 10 min, a volta que para), dois cliques
+  concorrentes, re-notificação, follow-up, o caminho pago com janela fechada, e áudio.
+  O piloto **não** está concluído.
   Três achados: (1) bug corrigido em prod (`922a365`) — `_wamid_ja_visto` chamava `.add()` de
   `set` num `OrderedDict`, alcançável só em reentrega pós-restart, e o 500 virava laço porque a
   Meta reentrega sem 200; suíte do `chatbot-api` verde. (2) template `chama_vendedor`
