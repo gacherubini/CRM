@@ -593,6 +593,25 @@ def criar_loja(
     return loja, token
 
 
+def criar_credencial_integracao(db: Session) -> str:
+    """Credencial da plataforma: sem loja. A loja de cada pedido vem da instância.
+
+    Existe porque o ``n8n-cloud`` é **um** workflow para N lojas (spec §6.2): um
+    token preso a uma loja faria o bot procurar a conversa na loja errada e calar
+    sem erro nenhum.
+
+    Devolve o token em claro **uma vez**; o banco guarda só o hash.
+    """
+    token = secrets.token_urlsafe(24)
+    db.add(
+        CredencialServico(
+            token_hash=hash_token(token), loja_id=None, papel="integracao"
+        )
+    )
+    db.commit()
+    return token
+
+
 def resolver_loja_por_instancia(db: Session, instancia: str) -> Loja:
     """Resolve loja pela instância Evolution (compat).
 

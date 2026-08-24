@@ -36,6 +36,55 @@ Com a loja `teste` em Modo 2 e o número de teste apontado para ela:
 O caminho do webhook é multi-loja; o caminho da API não é. Nunca apareceu porque só existia
 uma loja em produção.
 
+## Adendo 2026-08-24 — o que envelheceu neste card
+
+Conferido contra o repo antes de executar. O plano continua valendo; três detalhes
+mudaram e travariam quem colasse os trechos como estao.
+
+**1. As fixtures dos testes nao existem com esses nomes.** O card escreve `loja`,
+`loja_com_canal` e `conversa_com_entrada`. O `tests/conftest.py` oferece `client`,
+`db`, `loja_a`, `loja_b` e `loja_sem_projecao` — e as tres de loja devolvem um
+**dict**, nao um objeto: `{"loja_id", "slug", "instance", "headers"}`. Use `loja_a`
+e `loja_b`: sao exatamente as duas lojas que este bug precisa, entao o teste de
+regressao e escrivivel **na suite**, sem depender de duas lojas em producao.
+Conversa com mensagem de entrada nao tem fixture — semeie no proprio teste.
+
+**2. Ha dois resolvedores de instancia, e eles nao sao iguais.** A Task 2 delega
+para `resolver_loja_e_canal_por_instancia` (`app/servico.py:606`), que chama
+`channels.resolve_canal_for_instance` (`app/channels.py:432`) e **faz backfill**:
+cria o canal como efeito colateral quando o numero so existe em
+`lojas.evolution_instance`. Desde 24/08 existe tambem
+`cloud_canal.loja_id_do_phone_number_id` (`app/cloud_canal.py:93`), que faz as
+**mesmas duas buscas** e e **so leitura**. Escolha consciente: a rota autenticada
+pode aceitar o backfill (e o mesmo que o inbound ja faz), mas nao deixe as duas
+divergirem sem alguem ter decidido. Ver
+[[2026-08-24-outbound-por-loja-quer-loja-id]].
+
+**3. Os numeros de linha do `main.py` andaram** (mexido em 24/08 no handoff e no
+`_loja_por_phone_number_id`). Atuais:
+
+| Simbolo | Linha |
+|---|---|
+| `PodeResponderInput` | 285 |
+| `SimularInput` | 355 |
+| `RespostaBotInput` | 430 |
+| `HandoffHumanoInput` | 445 |
+| `pode_responder` | 914 |
+| `config_catalogo_bot` | 1231 |
+| `buscar_estoque` | 1273 |
+| `solicitar_simulacao` | 1419 |
+| `solicitar_simulacao_humana` | 1771 |
+| `responder_cliente` | 1810 |
+| `acionar_handoff_humano` | 1857 |
+
+Confirme com `rg` antes de editar; nao confie nesta tabela depois da primeira task.
+
+Baseline confirmado: `criar_credencial_integracao` e `resolver_loja_id` **nao
+existem** ainda, `CredencialServico.loja_id` segue `nullable=False`
+(`models_db.py:163`), `Contexto.loja_id` segue `str` (`auth.py:19-22`) e a ultima
+migration e mesmo `0025_canal_cloud_por_loja` — o `down_revision` do Step 4 esta
+certo.
+
 ## Global Constraints
 
 - **Expand-only.** Token de loja existente continua autenticando e resolvendo igual. Nenhuma

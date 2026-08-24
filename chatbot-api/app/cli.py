@@ -37,6 +37,11 @@ def main() -> None:
         help="cadastra/atualiza como inativo",
     )
 
+    sub.add_parser(
+        "criar-credencial-integracao",
+        help="cria credencial da plataforma (sem loja) para o n8n",
+    )
+
     args = parser.parse_args()
 
     if args.comando == "criar-loja":
@@ -48,6 +53,15 @@ def main() -> None:
         finally:
             db.close()
         print(f"Loja criada: {loja.nome}  (slug={loja.slug}  instance={loja.evolution_instance})")
+        print(f"TOKEN (guarde agora, não será mostrado de novo): {token}")
+
+    elif args.comando == "criar-credencial-integracao":
+        db = SessionLocal()
+        try:
+            token = servico.criar_credencial_integracao(db)
+        finally:
+            db.close()
+        print("Credencial de integração criada (papel=integracao, sem loja).")
         print(f"TOKEN (guarde agora, não será mostrado de novo): {token}")
 
     elif args.comando == "autorizar-numero":

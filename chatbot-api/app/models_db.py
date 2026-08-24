@@ -160,7 +160,11 @@ class CredencialServico(Base):
     __tablename__ = "credenciais_servico"
 
     token_hash: Mapped[str] = mapped_column(String, primary_key=True)
-    loja_id: Mapped[str] = mapped_column(ForeignKey("lojas.id"), index=True)
+    # Nulo = credencial de integração (papel "integracao"): não é de loja
+    # nenhuma, e a loja de cada pedido vem da instância (spec §6.2).
+    loja_id: Mapped[str | None] = mapped_column(
+        ForeignKey("lojas.id"), index=True, nullable=True
+    )
     papel: Mapped[str] = mapped_column(String, default="dono")
     criada_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_agora)
 
