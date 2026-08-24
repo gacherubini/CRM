@@ -371,6 +371,8 @@ class SimularInput(BaseModel):
     placa: Optional[str] = None
     telefone: Optional[str] = None
     referencia_externa: Optional[str] = None
+    # Opcional: só a credencial de integração precisa dizer de qual loja fala.
+    instance: Optional[str] = None
 
     @model_validator(mode="after")
     def exige_placa_ou_valor(self):
@@ -1242,6 +1244,16 @@ def config_catalogo_bot(
     """Link do catálogo configurado na Loja (bot manda quando o cliente pede as motos).
 
     Fonte: Estoque ``lojas.catalogo_url``, editável em Revy Loja → Números/Catálogo.
+
+    **Esta rota é cega para loja, e ``instance`` não a conserta.** Ela não lê
+    ``ctx.loja_id``: quem responde é ``InventoryWriteClient.obter_loja()``, que
+    bate em ``/v1/loja`` do Estoque com **um bearer global**, sem slug. Com N
+    lojas no Modo 2, todas recebem o catálogo da loja daquele token.
+
+    É um buraco multi-loja **do contrato com o Estoque**, não da credencial
+    (spec §6.2) — receber ``instance`` aqui só daria a impressão de estar
+    resolvido. Precisa de card próprio: ou o Estoque expõe o catálogo por slug,
+    ou o chatbot passa a guardar a URL.
     """
     if not write_client.disponivel():
         return {
@@ -1279,12 +1291,18 @@ def config_catalogo_bot(
 @app.get("/v1/estoque/buscar")
 def buscar_estoque(
     termo: Optional[str] = None,
+    instance: Optional[str] = None,
     ctx: Contexto = Depends(get_contexto),
     db: Session = Depends(get_db),
     provider: InventoryProvider = Depends(get_inventory_provider),
 ):
-    """Ferramenta do bot: consulta o Estoque Lite; sem resultado, oferece fallback."""
-    loja = db.get(models_db.Loja, ctx.loja_id)
+    """Ferramenta do bot: consulta o Estoque Lite; sem resultado, oferece fallback.
+
+    ``instance`` na query pelo mesmo motivo das rotas POST (spec §6.2). Sem o
+    resolvedor, uma credencial de integração chegava aqui com ``loja_id`` nulo e
+    estourava ``AttributeError`` no ``.slug`` — 500, não 400.
+    """
+    loja = db.get(models_db.Loja, resolver_loja_id(db, ctx, instance))
     veiculos = provider.buscar(loja.slug, termo)
     if not veiculos:
         return {
@@ -1432,7 +1450,7 @@ def solicitar_simulacao(
     inventory: InventoryProvider = Depends(get_inventory_provider),
 ):
     """Enfileira jobs para o vendedor, sem devolver resultados ao canal do bot."""
-    _exigir_loja_operacional(db, ctx.loja_id)
+    _exigir_loja_operacional(db, resolver_loja_id(db, ctx, dados.instance))
     valor, categoria, prazos = _resolver_pedido_simulacao(dados, provider, inventory)
 
     solicitacoes = []
@@ -1789,12 +1807,13 @@ def solicitar_simulacao_humana(
     """
     from fastapi.responses import JSONResponse
 
-    _exigir_loja_operacional(db, ctx.loja_id)
+    loja_id = resolver_loja_id(db, ctx, dados.instance)
+    _exigir_loja_operacional(db, loja_id)
     if not idempotency_key or not str(idempotency_key).strip():
         raise HTTPException(status_code=422, detail="Idempotency-Key obrigatória")
     resultado = solicitacoes_simulacao.solicitar_simulacao_humana(
         db,
-        ctx.loja_id,
+        loja_id,
         telefone=dados.telefone,
         interesse=dados.interesse,
         tem_cnh=dados.tem_cnh,
@@ -1923,10 +1942,11 @@ def salvar_moto_escolhida(
 
     n8n grava após consultar_estoque com 1 resultado. Reinício do n8n não perde a moto.
     """
-    _exigir_loja_operacional(db, ctx.loja_id)
+    loja_id = resolver_loja_id(db, ctx, dados.instance)
+    _exigir_loja_operacional(db, loja_id)
     moto = servico.salvar_moto_escolhida_conversa(
         db,
-        ctx.loja_id,
+        loja_id,
         dados.telefone,
         {
             "id": dados.id,

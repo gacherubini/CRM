@@ -669,6 +669,15 @@ git commit -m "feat(n8n): workflow cloud manda instance em toda chamada ao chatb
 
 ## Fora de escopo
 
+- **`GET /v1/config/catalogo-bot`.** A Task 5 mandava dar `instance` a ela. Nao da:
+  a rota **nao le `ctx.loja_id`**. Quem responde e `InventoryWriteClient.obter_loja()`
+  (`app/inventory.py:461`), que bate em `/v1/loja` do Estoque com **um bearer global,
+  sem slug** — enquanto `provider.buscar` (`inventory.py:205`) usa
+  `/public/v1/lojas/{slug}/veiculos` e por isso *e* multi-loja. Com N lojas no Modo 2,
+  todas recebem o catalogo da loja daquele token. E buraco do **contrato com o
+  Estoque**, nao da credencial: `instance` ali so daria a impressao de estar
+  resolvido. Card proprio — ou o Estoque expoe catalogo por slug, ou o chatbot guarda
+  a URL. A rota ficou com o aviso no docstring.
 - **Um workflow por loja.** Serve de muleta para 2–3 lojas e multiplica o que o
   `fork_cloud_workflow.py` existe para não deixar divergir.
 - **Rotação do token de integração.** Continua em aberto (§16.7): um token alcança N WABAs
