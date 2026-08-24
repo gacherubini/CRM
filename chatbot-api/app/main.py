@@ -35,7 +35,7 @@ from app.cloud_retry import registrar_evento_falho
 from app.meta_webhook import EventoCloud, assinatura_valida, parse_inbound
 from app.cloud_canal import loja_id_do_phone_number_id, phone_number_id_da_loja
 from app.oferta_inbound import processar_clique
-from app.whatsapp_outbound import outbound_para_loja
+from app.whatsapp_outbound import acender_digitando, outbound_para_loja
 from app.auth import Contexto, get_contexto, resolver_loja_id, verificar_webhook_token
 from app.db import get_db
 from app.models_db import FilaVendedor, OfertaLead
@@ -925,15 +925,36 @@ def pode_responder(
     ctx: Contexto = Depends(get_contexto),
     db: Session = Depends(get_db),
 ):
-    """Debounce do n8n: só a última entrada pendente pode chegar à IA."""
+    """Debounce do n8n: só a última entrada pendente pode chegar à IA.
+
+    Também é o lugar do "digitando…" do Modo 2. Este é o instante exato em que
+    o agente começa a pensar: acender aqui faz a latência real do turno virar
+    a janela do indicador, e o envio da resposta o dispensa. Acender no
+    ``/webhook/cloud`` não serviria — o debounce do n8n é de 40 s e o indicador
+    da Meta morre em 25 s, então ele expiraria antes de o agente começar.
+
+    Fica a ressalva de que a Meta pede indicador só para quem vai responder, e
+    o workflow ainda checa a origem depois desta rota: existe uma janela
+    estreita em que o "digitando…" acende e a execução para no gate seguinte.
+    O preço de fechá-la seria um nó a mais no n8n.
+    """
     # Credencial de integração não tem loja: a loja vem da instância (spec §6.2).
-    return servico.pode_responder_mensagem(
+    loja_id = resolver_loja_id(db, ctx, dados.instance)
+    resultado = servico.pode_responder_mensagem(
         db,
-        resolver_loja_id(db, ctx, dados.instance),
+        loja_id,
         telefone,
         dados.provider_message_id,
         instance=dados.instance,
     )
+    if resultado.get("pode_responder") is True:
+        acender_digitando(
+            db,
+            loja_id,
+            instance=dados.instance,
+            wamid=dados.provider_message_id,
+        )
+    return resultado
 
 
 @app.patch("/v1/conversas/{telefone}/estado")

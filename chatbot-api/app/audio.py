@@ -5,7 +5,9 @@ import base64
 import binascii
 import json
 import logging
+import math
 import tempfile
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol
 from urllib.parse import quote
@@ -36,6 +38,215 @@ MIMES_AUDIO_PERMITIDOS = frozenset(
 
 class AudioIndisponivel(RuntimeError):
     pass
+
+
+# Frases que o Whisper inventa em trecho mudo — legenda de vídeo que vazou do
+# treino, não fala de cliente. A comparação é feita já normalizada (ver
+# ``_normalizar_frase``), então aqui elas também vão sem pontuação e minúsculas.
+FRASES_ALUCINACAO_CONHECIDAS = frozenset(
+    {
+        "legendas pela comunidade amara org",
+        "tradução e legendas pela comunidade amara org",
+        "legendado pela comunidade amara org",
+        "amara org",
+        "obrigado por assistir",
+        "obrigado por assistir ao vídeo",
+        "inscreva se no canal",
+        "se inscreva no canal",
+        "não se esqueça de se inscrever no canal",
+        "até o próximo vídeo",
+    }
+)
+
+
+def _normalizar_frase(texto: str) -> str:
+    """Minúscula, sem pontuação e com um espaço só entre palavras."""
+    sem_pontuacao = "".join(
+        caractere if caractere.isalnum() or caractere.isspace() else " "
+        for caractere in texto
+    )
+    return " ".join(sem_pontuacao.casefold().split())
+
+
+def frase_de_alucinacao_conhecida(texto: str) -> bool:
+    """A transcrição inteira é uma frase da lista (repetida ou não)?
+
+    Só reprova quando **nada** sobra depois de tirar a frase conhecida: um
+    "obrigado por assistir" isolado é legenda, mas "obrigado, quero ver a moto"
+    é cliente falando e tem de passar.
+    """
+    normalizado = _normalizar_frase(texto)
+    if not normalizado:
+        return False
+    for frase in FRASES_ALUCINACAO_CONHECIDAS:
+        if normalizado == frase or not normalizado.replace(frase, " ").strip():
+            return True
+    return False
+
+
+def _numero(valor: object) -> float | None:
+    """Float finito, ou ``None`` quando o provider mandou outra coisa."""
+    if isinstance(valor, bool):
+        return None
+    if isinstance(valor, (int, float)):
+        convertido = float(valor)
+    elif isinstance(valor, str):
+        try:
+            convertido = float(valor.strip())
+        except ValueError:
+            return None
+    else:
+        return None
+    return convertido if math.isfinite(convertido) else None
+
+
+@dataclass(frozen=True)
+class SinaisTranscricao:
+    """O que o ``verbose_json`` diz sobre a própria transcrição.
+
+    ``None`` em um campo = o provider não mandou aquele sinal. Nunca guarda o
+    texto: isto é medida, não conteúdo — fala de cliente não entra em log.
+    """
+
+    no_speech_prob: float | None = None
+    avg_logprob: float | None = None
+    compression_ratio: float | None = None
+    duration_seconds: float | None = None
+
+    @property
+    def tem_confianca(self) -> bool:
+        """Veio pelo menos um dos três sinais de confiança?"""
+        return any(
+            valor is not None
+            for valor in (
+                self.no_speech_prob,
+                self.avg_logprob,
+                self.compression_ratio,
+            )
+        )
+
+
+def _media_ponderada(pares: list[tuple[float, float]]) -> float | None:
+    if not pares:
+        return None
+    total_peso = sum(peso for _, peso in pares)
+    if total_peso <= 0:
+        return sum(valor for valor, _ in pares) / len(pares)
+    return sum(valor * peso for valor, peso in pares) / total_peso
+
+
+def extrair_sinais(payload: object) -> SinaisTranscricao:
+    """Agrega os sinais dos segmentos do ``verbose_json`` em um número por eixo.
+
+    Como agrega, e por quê:
+
+    * ``no_speech_prob`` e ``avg_logprob``: **média ponderada pela duração** do
+      segmento. São medidas do áudio inteiro — um respiro mudo de 0,3 s no meio
+      de 20 s de fala não pode reprovar o áudio todo, e trecho longo pesa mais
+      que trecho curto porque é mais do que o cliente falou. Segmento sem
+      duração utilizável entra com peso 1.
+    * ``compression_ratio``: **o pior segmento** (máximo). Aqui a média mentiria:
+      esse número é assinatura de *loop* — "obrigado obrigado obrigado" — e loop
+      é local por natureza. Um único segmento em repetição já é evidência de
+      alucinação; diluí-lo em segmentos limpos é exatamente como ela passaria.
+    * ``duration``: o topo do payload, ou o maior ``end`` dos segmentos.
+
+    Segmento que não traz um campo não entra na conta daquele campo — o eixo
+    fica ``None`` (sem sinal) em vez de virar zero.
+    """
+    if not isinstance(payload, dict):
+        return SinaisTranscricao()
+
+    bruto = payload.get("segments")
+    segmentos = (
+        [s for s in bruto if isinstance(s, dict)] if isinstance(bruto, list) else []
+    )
+
+    no_speech: list[tuple[float, float]] = []
+    logprob: list[tuple[float, float]] = []
+    compressoes: list[float] = []
+    fim_maximo: float | None = None
+
+    for segmento in segmentos:
+        inicio = _numero(segmento.get("start"))
+        fim = _numero(segmento.get("end"))
+        peso = 1.0
+        if inicio is not None and fim is not None and fim > inicio:
+            peso = fim - inicio
+        if fim is not None:
+            fim_maximo = fim if fim_maximo is None else max(fim_maximo, fim)
+
+        valor = _numero(segmento.get("no_speech_prob"))
+        if valor is not None:
+            no_speech.append((valor, peso))
+        valor = _numero(segmento.get("avg_logprob"))
+        if valor is not None:
+            logprob.append((valor, peso))
+        valor = _numero(segmento.get("compression_ratio"))
+        if valor is not None:
+            compressoes.append(valor)
+
+    # Provider que devolve os sinais no topo (segmento único, ou outro formato).
+    if not no_speech:
+        valor = _numero(payload.get("no_speech_prob"))
+        if valor is not None:
+            no_speech.append((valor, 1.0))
+    if not logprob:
+        valor = _numero(payload.get("avg_logprob"))
+        if valor is not None:
+            logprob.append((valor, 1.0))
+    if not compressoes:
+        valor = _numero(payload.get("compression_ratio"))
+        if valor is not None:
+            compressoes.append(valor)
+
+    duracao = _numero(payload.get("duration"))
+    if duracao is None:
+        duracao = fim_maximo
+
+    return SinaisTranscricao(
+        no_speech_prob=_media_ponderada(no_speech),
+        avg_logprob=_media_ponderada(logprob),
+        compression_ratio=max(compressoes) if compressoes else None,
+        duration_seconds=duracao,
+    )
+
+
+def motivo_de_reprovacao(sinais: SinaisTranscricao) -> str | None:
+    """Nome do sinal que reprova a transcrição, ou ``None`` se ela passa.
+
+    Os tetos são os do próprio Whisper (``config.AUDIO_*``), não valores
+    inventados aqui.
+
+    Falha-abre: campo ausente (``None``) nunca reprova. Se o provider trocar e
+    parar de mandar os sinais, o bot volta a ser o de hoje — surdo em silêncio
+    seria pior que o problema que este gate resolve.
+
+    ``duration`` só reprova acima do teto (é o guard de duração da §5.10 valendo
+    no Modo 2, onde a Meta não manda duração no inbound): duração zerada é
+    placeholder de provider, não evidência de áudio longo demais.
+    """
+    if (
+        sinais.no_speech_prob is not None
+        and sinais.no_speech_prob > config.AUDIO_NO_SPEECH_PROB_MAX
+    ):
+        return "no_speech_prob"
+    if (
+        sinais.avg_logprob is not None
+        and sinais.avg_logprob < config.AUDIO_AVG_LOGPROB_MIN
+    ):
+        return "avg_logprob"
+    if (
+        sinais.compression_ratio is not None
+        and sinais.compression_ratio > config.AUDIO_COMPRESSION_RATIO_MAX
+    ):
+        return "compression_ratio"
+    if (
+        sinais.duration_seconds is not None
+        and sinais.duration_seconds > config.AUDIO_MAX_DURATION_SECONDS
+    ):
+        return "duracao"
+    return None
 
 
 class MediaDownloader(Protocol):
@@ -222,7 +433,14 @@ class NoopTranscriptionProvider:
 
 
 class HttpTranscriptionProvider:
-    """Contrato genérico: multipart `file`; resposta JSON com `text` ou `texto`."""
+    """Contrato genérico: multipart `file`; resposta JSON com `text` ou `texto`.
+
+    Pede `response_format=verbose_json` porque o texto sozinho não diz se havia
+    fala: o Whisper devolve frase plausível para dois segundos de rua. Com o
+    formato verboso vêm `no_speech_prob`, `avg_logprob`, `compression_ratio` e
+    `duration`, e é sobre eles que o gate decide (`motivo_de_reprovacao`).
+    Provider que ignora o campo continua funcionando — sem sinal, o texto passa.
+    """
 
     def __init__(
         self,
@@ -230,11 +448,37 @@ class HttpTranscriptionProvider:
         token: str = "",
         timeout: float = 15,
         transport: httpx.BaseTransport | None = None,
+        model: str | None = None,
     ):
         self.url = url
         self.token = token
         self.timeout = timeout
         self._transport = transport
+        # `model` é obrigatório no Groq e em qualquer API compatível com a da
+        # OpenAI — sem ele a resposta é 400 e **todo** áudio cairia no fallback,
+        # em silêncio, parecendo um bot que simplesmente não ouve. Por isso o
+        # default vem preenchido em vez de vazio: esquecer de configurar não
+        # pode ser um modo de falha calado. Provider que não quer o campo se
+        # declara com string vazia e ele não é enviado.
+        self.model = config.AUDIO_TRANSCRIPTION_MODEL if model is None else model
+
+    def _campos(self) -> dict[str, str]:
+        """Campos do multipart, fora o arquivo.
+
+        `temperature=0` porque o assunto aqui é alucinação: temperatura acima de
+        zero deixa o Whisper mais criativo exatamente onde não se quer nenhuma
+        criatividade. É o valor que a própria Groq recomenda.
+        """
+        campos = {
+            # ISO-639-1, duas letras. "pt-BR" não é código válido: alguns
+            # providers ignoram em silêncio (perde acurácia), outros 400.
+            "language": "pt",
+            "response_format": "verbose_json",
+            "temperature": "0",
+        }
+        if self.model:
+            campos["model"] = self.model
+        return campos
 
     def transcrever(self, arquivo: Path, mime_type: str) -> str:
         if not self.url:
@@ -248,9 +492,7 @@ class HttpTranscriptionProvider:
                     resposta = cliente.post(
                         self.url,
                         files={"file": (arquivo.name, stream, mime_type)},
-                        # ISO-639-1, duas letras. "pt-BR" não é código válido: alguns
-                        # providers ignoram em silêncio (perde acurácia), outros 400.
-                        data={"language": "pt"},
+                        data=self._campos(),
                     )
             resposta.raise_for_status()
             payload = resposta.json()
@@ -261,7 +503,20 @@ class HttpTranscriptionProvider:
             texto = payload.get("text") or payload.get("texto")
         if not isinstance(texto, str) or not texto.strip():
             raise AudioIndisponivel("transcrição vazia")
-        return texto.strip()
+        texto = texto.strip()
+
+        sinais = extrair_sinais(payload)
+        if not sinais.tem_confianca:
+            # Falha-abre: sem sinal o texto passa, como antes deste gate.
+            logger.info("gate de confiança sem sinal do provider")
+        motivo = motivo_de_reprovacao(sinais)
+        if motivo is None and frase_de_alucinacao_conhecida(texto):
+            motivo = "frase_conhecida"
+        if motivo is not None:
+            # Só o motivo: o texto é fala de cliente e não entra em log.
+            logger.warning("transcrição reprovada motivo=%s", motivo)
+            raise AudioIndisponivel("transcrição reprovada pelo gate de confiança")
+        return texto
 
 
 class AudioProcessor:
@@ -285,12 +540,21 @@ class AudioProcessor:
             conteudo, mime = self.downloader.baixar(
                 instancia, message_id, mime_type
             )
+            # A extensão não é cosmética: APIs no padrão da OpenAI (Groq
+            # inclusive) decidem o decoder pelo NOME do arquivo, e `.audio`
+            # é recusado. Mime aceito aqui sem entrada nesta tabela vira um
+            # 400 no provider e um fallback que ninguém entende.
             sufixo = {
                 "audio/ogg": ".ogg",
+                "audio/opus": ".ogg",
                 "audio/mpeg": ".mp3",
                 "audio/mp4": ".m4a",
+                "audio/m4a": ".m4a",
                 "audio/webm": ".webm",
                 "audio/wav": ".wav",
+                "audio/x-wav": ".wav",
+                "audio/aac": ".aac",
+                "audio/amr": ".amr",
             }.get(mime, ".audio")
             with tempfile.TemporaryDirectory(prefix="revy-audio-") as diretorio:
                 arquivo = Path(diretorio) / f"entrada{sufixo}"

@@ -75,9 +75,32 @@ Domínio em `app/servico.py`; bootstrap e rotas em `app/main.py`.
 - **Falha no inbound Cloud não pode virar só log.** Já respondemos `200` à Meta (§6.1), então
   ela **não reentrega**: engolir a exceção perde o lead calado. O corpo cru vai para
   `cloud_evento_falho` e o worker `cloud_retry` reprocessa (teto de 5 tentativas).
-- **O bot do Modo 2 pode responder a áudio inventado.** O Whisper alucina frase plausível em
-  trecho mudo ou com ruído, e o VAD que a spec §5.10 exige **ainda não existe**. Áudio curto
-  de rua pode virar texto que o cliente não disse — e o bot age em cima.
+- **Áudio do Modo 2 passa por um gate de confiança pós-transcrição** (`app/audio.py`). O
+  Whisper alucina frase plausível em trecho mudo ou com ruído, e o bot agiria em cima. O
+  provider pede `response_format=verbose_json` e a transcrição é reprovada por
+  `no_speech_prob > 0.6`, `avg_logprob < -1.0`, `compression_ratio > 2.4` (loop), frase da
+  lista de legenda ("Legendas pela comunidade Amara.org") ou duração acima do teto — esta
+  **depois** da transcrição, porque a Meta não manda duração no inbound. Reprovou, cai no
+  fallback "manda por texto" de sempre. **Falha-abre de propósito:** provider que não devolve
+  os sinais volta a ter o texto aprovado — bot surdo em silêncio numa troca de fornecedor
+  seria pior. Não há VAD sobre o sinal, e não se adiciona dependência de áudio para isso.
+  No log vai só o motivo (`transcrição reprovada motivo=...`), **nunca** o texto do cliente.
+- **Ligar a transcrição são dois secrets, e o `model` não é um deles.** O Modo 2 transcreve
+  assim que `CHATBOT_AUDIO_TRANSCRIPTION_URL` existir — `processador_de_audio` (`app/audio.py`)
+  olha só a URL, não o `..._PROVIDER`, que é do Modo 1. Para o Groq:
+  `CHATBOT_AUDIO_TRANSCRIPTION_URL=https://api.groq.com/openai/v1/audio/transcriptions` e
+  `CHATBOT_AUDIO_TRANSCRIPTION_TOKEN=<chave>`. O `model` é **obrigatório** no Groq, e por isso
+  tem default no código (`whisper-large-v3`) em vez de vazio: esquecê-lo daria 400 em todo
+  áudio e um bot que parece apenas não ouvir. Trocar para `whisper-large-v3-turbo` é só
+  `CHATBOT_AUDIO_TRANSCRIPTION_MODEL`. O Groq cobra **no mínimo 10 s** por chamada, então um
+  "oi" de 2 s custa como 10 s — irrelevante no volume do piloto, não em campanha.
+- **Portfólio verificado desde 24/08 — e isso não destrava nada aqui.** A verificação da
+  empresa (CNPJ) saiu `Verificada` em 24/08/2026, um dia depois de submetida. Ela **não**
+  muda limite: o teto de 250 clientes únicos/24h da conta não verificada já contava **só
+  conversa iniciada pela empresa**, e o funil é CTWA (inbound), que roda inteiro dentro da
+  janela do cliente. O que ela compra é **nome de exibição**, **mais de 2 números** (a
+  terceira loja) e disparo para a base — os três inúteis enquanto o número for o de teste
+  da Meta. Não planeje nenhum passo do Modo 2 como "agora que estamos verificados".
 
 ## Rodar e testar
 

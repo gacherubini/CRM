@@ -35,6 +35,14 @@ AUDIO_EVOLUTION_API_KEY = os.getenv("CHATBOT_AUDIO_EVOLUTION_API_KEY", "")
 AUDIO_TRANSCRIPTION_PROVIDER = os.getenv("CHATBOT_AUDIO_TRANSCRIPTION_PROVIDER", "none")
 AUDIO_TRANSCRIPTION_URL = os.getenv("CHATBOT_AUDIO_TRANSCRIPTION_URL", "")
 AUDIO_TRANSCRIPTION_TOKEN = os.getenv("CHATBOT_AUDIO_TRANSCRIPTION_TOKEN", "")
+# Obrigatório no Groq e em qualquer API compatível com a da OpenAI. Default
+# `whisper-large-v3` e não o `-turbo`: o turbo é destilado e perde justamente em
+# língua que não é inglês, e aqui o bot **age** sobre o que ouviu — errar o que
+# o cliente disse custa mais que a diferença de preço, que no volume do piloto é
+# de centavos por dia. Trocar é só esta variável.
+AUDIO_TRANSCRIPTION_MODEL = os.getenv(
+    "CHATBOT_AUDIO_TRANSCRIPTION_MODEL", "whisper-large-v3"
+)
 AUDIO_MAX_BYTES = int(os.getenv("CHATBOT_AUDIO_MAX_BYTES", str(8 * 1024 * 1024)))
 AUDIO_MAX_DURATION_SECONDS = int(os.getenv("CHATBOT_AUDIO_MAX_DURATION_SECONDS", "180"))
 AUDIO_DOWNLOAD_TIMEOUT = float(os.getenv("CHATBOT_AUDIO_DOWNLOAD_TIMEOUT", "10"))
@@ -45,6 +53,16 @@ AUDIO_FALLBACK_TEXT = os.getenv(
     "CHATBOT_AUDIO_FALLBACK_TEXT",
     "Não consegui entender o áudio. Pode me enviar por texto?",
 )[:160]
+
+# Gate de confiança pós-transcrição (§5.10). Os tetos são os do próprio Whisper —
+# são os mesmos que o decoder usa para descartar um segmento — e não se inventa
+# outro valor aqui. Acima/abaixo deles a transcrição é evidência de alucinação e
+# o áudio cai no fallback "manda por texto". Sem sinal no payload, o texto passa.
+AUDIO_NO_SPEECH_PROB_MAX = float(os.getenv("CHATBOT_AUDIO_NO_SPEECH_PROB_MAX", "0.6"))
+AUDIO_AVG_LOGPROB_MIN = float(os.getenv("CHATBOT_AUDIO_AVG_LOGPROB_MIN", "-1.0"))
+AUDIO_COMPRESSION_RATIO_MAX = float(
+    os.getenv("CHATBOT_AUDIO_COMPRESSION_RATIO_MAX", "2.4")
+)
 
 # Cloud API (Modo 2). Token de System User — nunca o temporário de 24 h do painel.
 # O token é do Revy (um app na Meta, spec §6.2): global, aqui, nunca no banco.

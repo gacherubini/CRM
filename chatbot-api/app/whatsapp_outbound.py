@@ -265,6 +265,27 @@ class CloudWhatsAppOutbound:
             "text": {"body": text},
         })
 
+    def marcar_lido_e_digitando(self, *, instance: str, wamid: str) -> dict[str, Any]:
+        """Acende o "digitando…" para o cliente — e marca a entrada como lida.
+
+        Na Cloud API o indicador **não** é parâmetro de envio, como o ``delay``
+        da Evolution é no Modo 1: é esta chamada à parte, que precisa do
+        ``wamid`` da mensagem **do cliente** e vai no mesmo endpoint de
+        ``/messages``. Os dois efeitos vêm juntos e não se separam — ligar o
+        indicador liga o tique azul.
+
+        A Meta dispensa o indicador quando a resposta sai, ou sozinha em 25 s,
+        o que vier primeiro. Por isso quem chama é o juiz do debounce, no
+        instante em que o agente começa a pensar: a espera real do turno vira
+        a janela do "digitando…", sem nenhum atraso simulado.
+        """
+        return self._post(instance, {
+            "messaging_product": "whatsapp",
+            "status": "read",
+            "message_id": wamid,
+            "typing_indicator": {"type": "text"},
+        })
+
     def send_template_button(
         self, *, instance: str, number: str, template: str,
         variaveis: list[str], oferta_id: str, idioma: str = "pt_BR",
@@ -314,6 +335,32 @@ class CloudWhatsAppOutbound:
                 },
             },
         })
+
+
+def acender_digitando(
+    db: Session, loja_id: str, *, instance: str, wamid: str
+) -> bool:
+    """Liga o "digitando…" quando a loja fala pela central Cloud.
+
+    Devolve ``True`` só quando o indicador foi mesmo aceso, para o teste poder
+    distinguir "não era Modo 2" de "a Meta recusou".
+
+    **Enfeite nunca derruba resposta.** Qualquer falha aqui é engolida e vira
+    log: o cliente prefere receber a mensagem sem o "digitando…" a não receber
+    mensagem nenhuma. No Modo 1 não há o que fazer — quem mostra o indicador é
+    a Evolution, pelo ``delay`` que já viaja no envio.
+    """
+    port = outbound_para_loja(db, loja_id)
+    if not isinstance(port, CloudWhatsAppOutbound):
+        return False
+    if not wamid:
+        return False
+    try:
+        port.marcar_lido_e_digitando(instance=instance, wamid=wamid)
+        return True
+    except Exception:
+        logger.warning("digitando nao acendeu")
+        return False
 
 
 def outbound_para_loja(db: Session, loja_id: str) -> WhatsAppOutboundPort:
