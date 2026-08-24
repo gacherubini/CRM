@@ -76,6 +76,24 @@ Vocabulário: [`../../CONTEXT.md`](../../CONTEXT.md). As-built Control/Loja:
   quebrava o **follow-up do Modo 2**, que consertou de carona. (b) o **handoff falava duas vezes**
   (backend + agente) — a rota agora cala o backend, e a §5.3 mudou de dono: quem avisa o cliente
   é o agente, sem rede se o turno dele morrer.
+  **Áudio ganhou gate de confiança (24/08), e o "digitando…" existe.** Até aqui o Whisper
+  alucinava frase plausível em trecho mudo e o bot **agia** em cima; não havia checagem nenhuma
+  de que houve fala. Agora o provider pede `response_format=verbose_json` e a transcrição é
+  reprovada por `no_speech_prob > 0.6`, `avg_logprob < -1.0`, `compression_ratio > 2.4` (loop),
+  frase de legenda conhecida, ou duração acima do teto — esta **depois** da transcrição, porque
+  a Meta não manda duração no inbound (conferido no webhook e no `GET /{media_id}`). Reprovou,
+  cai no fallback "manda por texto" que já existia. **Falha-abre de propósito:** provider sem os
+  sinais volta a aprovar o texto — bot surdo em silêncio numa troca de fornecedor seria pior.
+  Não é VAD sobre o sinal, e é deliberado: um VAD de energia aprovaria "moto passando", que é o
+  exemplo da própria spec; e o gate pós é necessário de qualquer jeito. Groq configurado
+  (`whisper-large-v3`, `temperature=0`); o `model` tem **default no código** porque esquecê-lo
+  daria 400 em todo áudio, calado.
+  **O "digitando…" do Modo 2** é `CloudWhatsAppOutbound.marcar_lido_e_digitando`, disparado do
+  `pode-responder` — o instante em que o agente começa a pensar, para a latência real virar a
+  janela do indicador. Não precisou do `delay` do Modo 1: na API oficial não há anti-ban a
+  imitar, e o indicador da Cloud é chamada à parte que exige o `wamid` do cliente (que a rota
+  já recebia como `provider_message_id`). Acende o **tique azul** junto, e não há como separar.
+  Acender no `/webhook/cloud` não serviria: o debounce é de 40 s e o indicador morre em 25 s.
   **O bot fala igual ao do Baileys mas não soa igual:** o `systemMessage` é byte a byte o mesmo;
   o que divergiu é a entrega — o `Atraso anti-ban1` calcula o "digitando…" e o Modo 2 **descarta**
   o delay. Card: [`../fila/2026-08-24-modo2-humanizacao-da-entrega.md`](../fila/2026-08-24-modo2-humanizacao-da-entrega.md).
@@ -90,7 +108,10 @@ Vocabulário: [`../../CONTEXT.md`](../../CONTEXT.md). As-built Control/Loja:
   [`design/2026-08-16-onboarding-meta-dominio-asbuilt.md`](design/2026-08-16-onboarding-meta-dominio-asbuilt.md).
   **O CNPJ verificado não bloqueia o piloto:** o teto de 250/24h conta só conversa iniciada
   pela empresa, e o funil é CTWA (inbound). Ele vira obrigatório na **terceira loja**.
-  A verificação foi submetida em 23/08 e está em análise (~2 dias úteis).
+  A verificação foi submetida em 23/08 e saiu **Verificada em 24/08** — portão 3 fechado.
+  Fechá-lo **não destravou nenhum passo do piloto**: o que ele compra (nome de exibição,
+  terceiro número, disparo para a base) só serve com número real, que segue sendo a
+  pendência de hardware (chip/eSIM com voz-SMS, num número que nunca teve WhatsApp).
   Spec canônica:
   [`specs/2026-08-12-whatsapp-dois-modos-design.md`](specs/2026-08-12-whatsapp-dois-modos-design.md).
   Sete cards executados, planos em [`planos/`](planos/):
@@ -107,13 +128,13 @@ Vocabulário: [`../../CONTEXT.md`](../../CONTEXT.md). As-built Control/Loja:
     `validate_workflow_cloud.py`. `workflow-ai-nao-salvos.json` (Baileys) **intacto**.
   - **Gate único:** `rodizio.loja_opera_modo2` = flag + `allows_processing` +
     projeção `whatsapp_modo == "2"`. Loja Modo 1 não entra no rodízio.
-  - **Falta em código:** a metade do dono da loja — sino 1:1 com Peguei, faixa "N sem vendedor",
-    filtro Aguardando, card de 7 dias. O chatbot não expõe rota de oferta e
-    `criar_sinal_direcionado` não tem chamador, então **lead que ninguém pega some**. Card 5 em
-    `../fila/`.
-  - **Falta fora de código:** provider de transcrição e o número real. Conta na Meta e
-    publicação/ativação do `n8n-cloud` **saíram da lista em 23/08**. Card de fechamento em
-    `../fila/`.
+  - **A metade do dono da loja entrou** (Card 5, agora em `planos/`): `GET /v1/ofertas` e
+    `POST /v1/ofertas/{id}/assumir` no chatbot, produtor do sinal no `copiloto_sinais_job`,
+    botão Peguei no sino, faixa "N sem vendedor" e card de 7 dias em `loja/routes.py`.
+    **Lead que ninguém pega não some mais.**
+  - **Falta fora de código:** o **número real** (chip/eSIM com voz-SMS, número que nunca teve
+    WhatsApp) e o meio de pagamento na WABA. Conta na Meta, publicação/ativação do `n8n-cloud`
+    e o provider de transcrição **saíram da lista**. Card de fechamento em `../fila/`.
 - **Triagem UX 2026-08-07:** 32 itens feitos e **13 recusados** — não re-propor:
   [`2026-08-07-triagem-revisao-ux-loja-control.md`](2026-08-07-triagem-revisao-ux-loja-control.md).
 - **Marca:** `shared/brand/revy-tokens.css` é a fonte única; acento verde racing;

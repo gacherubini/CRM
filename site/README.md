@@ -48,6 +48,15 @@ O rodapé traz **razão social, CNPJ, endereço e telefone**. Não remover: é a
 vínculo entre o site e a empresa que a verificação da Meta procura, e o CNPJ é novo e sem
 nome fantasia.
 
+**Isso deixou de ser teoria em 24/08/2026:** a verificação da empresa saiu `Verificada` —
+CCMEI como documento único, confirmação pelo método **Email** em `contato@revyapp.com.br`,
+um dia após submeter. O revisor compara o documento com os *Detalhes da empresa* do
+portfólio e com **este rodapé**; o CCMEI escreve "RUA PAULISTA" por extenso e o rodapé
+precisa continuar batendo letra a letra. Ao mexer em razão social, CNPJ, endereço ou
+telefone daqui, saiba que está mexendo na prova de uma verificação já concedida — a Meta
+revalida. Detalhes:
+[`../docs/referencia-viva/design/2026-08-16-onboarding-meta-dominio-asbuilt.md`](../docs/referencia-viva/design/2026-08-16-onboarding-meta-dominio-asbuilt.md).
+
 **Dois telefones no site, de propósito** (desde 23/08):
 
 | Onde | Número | Por quê |

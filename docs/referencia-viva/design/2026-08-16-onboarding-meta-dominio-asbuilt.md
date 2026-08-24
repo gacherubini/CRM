@@ -21,10 +21,12 @@ anterior. Só a terceira olha o CNPJ.
 |---|---|---|
 | 1 — conta pessoal do Facebook | criar o app | **feito** 16/08 |
 | 2 — app + produto WhatsApp + vínculo | o botão "Iniciar verificação" existir | **feito** 16/08 |
-| 3 — verificação da empresa (CNPJ) | escala: sair dos 250/24h | **submetida** 23/08, em análise (~2 dias úteis) |
-| 4 — nome de exibição "Revy" | o cliente ver "Revy" no lugar do número | bloqueado pelo 3 |
+| 3 — verificação da empresa (CNPJ) | escala: sair dos 250/24h | **VERIFICADA** em 24/08 (submetida 23/08; ~1 dia) |
+| 4 — nome de exibição "Revy" | o cliente ver "Revy" no lugar do número | destravado pelo 3, **espera o número real** |
 
-**O portão 3 não bloqueia o piloto.** Ver "Limites sem CNPJ" no fim.
+**O portão 3 nunca bloqueou o piloto, e fechá-lo também não destrava nada agora.** O que
+ele compra — nome de exibição, terceiro número, disparo para a base — só tem uso com número
+real na mão. Ver "Limites sem CNPJ" no fim.
 
 ## Domínio
 
@@ -250,10 +252,14 @@ esse formato, então não regride calado. Workflow subiu de 20 para **21 nós**.
 Publicação: `prepare-workflow.ps1` ganhou o **`-Mode cloud`** (antes só tratava o
 workflow do Modo 1, e o cloud precisava das quatro transformações à mão).
 
-### Verificação de CNPJ: submetida em 23/08
+### Verificação de CNPJ: submetida em 23/08, **verificada em 24/08**
 
-Os documentos foram gerados e batidos contra o site, e a verificação foi **submetida em
-23/08**. A Meta anunciou análise de ~2 dias úteis.
+Os documentos foram gerados e batidos contra o site, a verificação foi **submetida em
+23/08** e a Central de Segurança marcou **Verificada em 24/08** — um dia, não os ~2 dias
+úteis anunciados. O caso de uso usado foi *"O app exige acesso a permissões no Meta for
+Developers"*, e o método de conexão foi o **Email** (`contato@revyapp.com.br`), com o CCMEI
+como documento único. O caminho descrito abaixo passou de primeira; nada precisou de
+reenvio.
 
 | Item | Valor |
 |---|---|
@@ -370,8 +376,8 @@ ser questão de atribuição e virou questão de custo.
 - [ ] meio de pagamento na WABA (item da Etapa 2) — sem ele, mensagem iniciada pela empresa
       não sai, e é ela que o rodízio usa com janela fechada
 - [ ] aprovação do `chama_vendedor` (estava `PENDING`)
-- [ ] **resultado** da verificação do CNPJ — submetida 23/08 (CCMEI + confirmação por
-      e-mail), análise ~2 dias úteis
+- [x] **resultado** da verificação do CNPJ — **Verificada em 24/08** (CCMEI + confirmação
+      por e-mail); o portão 4 (nome de exibição) passou a depender só do número real
 - [ ] eSIM de operadora brasileira com **voz/SMS** — eSIM de viagem (Airalo, Holafly) é só dados, não recebe SMS e **não serve**
 - [ ] número que **nunca teve WhatsApp**; e uma vez na Cloud API ele fica **bot-only**, não volta a funcionar no app
 - [ ] Etapa 2 do painel: registrar o número real ao lado do de teste
@@ -393,7 +399,13 @@ ser questão de atribuição e virou questão de custo.
 - [ ] ciclo completo no **número de teste** antes de qualquer chip: mensagem → n8n → bot →
       rodízio → handoff. Hoje pararia em `phone_number_id sem loja`, que é a mesma linha
       de log do teste do painel
-- [ ] provider de transcrição (Groq) — `CHATBOT_AUDIO_TRANSCRIPTION_URL` / `_TOKEN`
+- [x] provider de transcrição (Groq) — `CHATBOT_AUDIO_TRANSCRIPTION_URL` / `_TOKEN` **staged**
+      em 24/08 (`fly secrets set --stage`, entra em vigor no deploy). Endpoint
+      `https://api.groq.com/openai/v1/audio/transcriptions`, modelo `whisper-large-v3` com
+      default **no código** — `model` é obrigatório no Groq e esquecê-lo daria 400 em todo
+      áudio, calado. O upgrade para o Developer tier estava indisponível ("high demand"), e o
+      **Free basta**: 20 req/min, 2 mil/dia, 8 h de áudio/dia. `429` cai no fallback
+      "manda por texto", em silêncio para o cliente
 
 **Conferido em 23/08, no fim da sessão**
 

@@ -2,7 +2,7 @@
 gatilho: dimensionar limite da Cloud API ou tratar verificacao de CNPJ como bloqueio
 produto: chatbot-api
 fonte: externo
-verificado_em: nunca reconferido desde a migracao das memorias (2026-08-23)
+verificado_em: 2026-08-24 (o CNPJ foi verificado e nada no piloto mudou — a tese se sustentou)
 ---
 # O teto de 250 conta so conversa que a empresa inicia
 
@@ -24,7 +24,13 @@ portfolio de cada loja.
 
 Como o funil e inbound por CTWA, o bot inteiro roda dentro da janela e o gasto real dos 250
 e so follow-up de quem sumiu (ordem de 15-20/dia). Tratar o CNPJ como bloqueador atrasa o
-lancamento a toa: priorize-o na terceira loja ou na primeira campanha para a base. O risco
-a vigiar no lugar do teto e a **nota de qualidade** — bloqueio/denuncia acima de 2-3%
+lancamento a toa: priorize-o na terceira loja ou na primeira campanha para a base.
+
+**Fechou em 24/08 e confirmou a tese pelo avesso:** o CNPJ saiu `Verificada` e **nenhum
+passo do piloto destravou**. Nome de exibicao e terceiro numero, que e o que ela compra,
+seguem esperando o **numero real**. Verificacao nao e marco de progresso do Modo 2; e
+pre-requisito da terceira loja.
+
+O risco a vigiar no lugar do teto e a **nota de qualidade** — bloqueio/denuncia acima de 2-3%
 derruba o numero, e cutucada repetida em quem nao responde cabe na regra e mesmo assim
 queima.

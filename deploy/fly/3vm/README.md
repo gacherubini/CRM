@@ -122,6 +122,8 @@ vence `[env]`. O toml pode dizer uma coisa e o efetivo ser outra.
 | `REVY_TRAFEGO_DATABASE_URL` | **secret**, `postgresql+psycopg://control_app:…@suite-pg.flycast:5432/revy` (schema `control`). Idem `PORTAL_DATABASE_URL`, schema `portal`. Desde o corte de 16/08/2026 **não** têm default no `[env]` do toml: se o secret sumir, o boot morre com mensagem em vez de subir um SQLite vazio |
 | `REVY_TRAFEGO_SERVICE_TOKEN` | autentica Portal → Revy |
 | `REVY_TRAFEGO_CHATBOT_TOKENS_JSON` | JSON `loja_slug → token` (recomendado em multi-loja) |
+| `CHATBOT_AUDIO_TRANSCRIPTION_URL` / `_TOKEN` | Groq (`https://api.groq.com/openai/v1/audio/transcriptions`). **É a URL que liga a transcrição do Modo 2** — `processador_de_audio` olha só ela, não o `..._PROVIDER`, que é do Modo 1. Sem a URL, todo áudio vira o fallback "manda por texto" |
+| `CHATBOT_AUDIO_TRANSCRIPTION_MODEL` | opcional; default `whisper-large-v3` no código. Trocar para `whisper-large-v3-turbo` é mais barato e pior fora do inglês |
 
 No `fly.app.toml` o processo motor roda com `MOTOR_ORCHESTRATOR_ONLY=1` e
 `MOTOR_WORKER_TIPOS=api,mock` — mock/API **não** sobem a VM 4.

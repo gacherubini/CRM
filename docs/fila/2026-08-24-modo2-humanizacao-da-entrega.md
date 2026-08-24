@@ -14,6 +14,40 @@ saída dele chegar na central Cloud.
 [`../referencia-viva/design/2026-08-16-whatsapp-modo2-asbuilt.md`](../referencia-viva/design/2026-08-16-whatsapp-modo2-asbuilt.md),
 seção "O bot do Modo 2 fala igual ao do Baileys, mas não soa igual".
 
+## Atualização 2026-08-24 — a Task 1 saiu, e a premissa dela caiu
+
+**A Task 1 está feita no `chatbot-api`, mas não como este card descrevia.** O dono apontou o
+que o card não tinha visto: o `Atraso anti-ban1` existe porque o Baileys é cliente não-oficial
+e parecer humano reduz risco de ban. **Na Cloud API isso não se aplica** — mandar rápido não
+bane ninguém. Então o `delay` não foi portado, e com ele caíram o campo novo no corpo de
+`/v1/operacao/responder`, o refactor de `responder_cliente` para `async` e o risco de segurar
+uma thread do pool por 16 s. A Task 1b (n8n) deixou de existir: não há delay a repassar.
+
+O que ficou no lugar: `CloudWhatsAppOutbound.marcar_lido_e_digitando`, disparado do
+`pode-responder`. Três fatos que decidiram o desenho:
+
+- Na Cloud o indicador **não** é parâmetro de envio: é `POST /{phone_number_id}/messages` com
+  `{"messaging_product","status":"read","message_id":<wamid do cliente>,"typing_indicator":{"type":"text"}}`.
+  É a **mesma** chamada que marca como lido — acende o tique azul junto, e não separa.
+- Dura **25 s** ou até a resposta sair. Acender no `/webhook/cloud` não serve: o debounce é de
+  40 s, o indicador expiraria antes de o agente começar.
+- O `wamid` **já chegava** na rota, como `provider_message_id` do `PodeResponderInput`. Sem
+  consulta ao banco, sem mudar contrato com o n8n.
+
+Falha no indicador nunca derruba a resposta (`acender_digitando` engole e loga).
+
+**Correção de fato registrada:** o card afirmava que o Modo 2 espaça mensagens. Ele **não**
+espaça: `AI Agent1 → Atraso anti-ban1 → Responder WhatsApp1`, um item por execução, sem nó de
+split em nenhum dos dois workflows — o bot manda **uma** mensagem por turno. E o `delay` é
+calculado e descartado, então o throttle global (`throttle-next:<instância>`, 3–6 s entre
+envios da mesma instância, teto de 12 s de fila) **não tem efeito nenhum no Modo 2 hoje**.
+Não há espaçamento a preservar nem a cortar.
+
+**O que sobrou deste card:** a Task 2 (o filtro que minuscula URL e `Cód:`) e a Task 3 (o tom,
+decisão do dono). Mais um item cosmético: `Atraso anti-ban1` ficou sem consumidor no fork
+cloud e pode sair do `fork_cloud_workflow.py` — custa um deploy do `n8n2037` (~6 min de 404)
+por zero mudança de comportamento, então não foi feito.
+
 ## O que já está estabelecido
 
 O `systemMessage` é **byte a byte idêntico** nos dois workflows. A personalidade

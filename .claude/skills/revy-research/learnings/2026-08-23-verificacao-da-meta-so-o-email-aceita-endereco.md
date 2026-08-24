@@ -2,9 +2,14 @@
 gatilho: submeter a verificacao de empresa (CNPJ) no portfolio da Meta
 produto: chatbot-api
 fonte: externo
-verificado_em: 2026-08-23
+verificado_em: 2026-08-24 (aprovada — a receita abaixo passou de primeira)
 ---
 # Na verificação da Meta, só o método Email aceita endereço no lugar do telefone
+
+**Confirmado pelo resultado:** submetida em 23/08 por este caminho, a verificação saiu
+`Verificada` em **24/08/2026** — um dia, contra os ~2 dias úteis anunciados, sem pedido de
+documento extra. O CCMEI sozinho bastou, e o cartão CNPJ (com o telefone truncado) nunca
+entrou. Quem repetir isto numa segunda empresa: siga a receita como está.
 
 A tela de upload de documentos tem **duas** seções — *Verificar a razão social* e
 *Verificar telefone* — e o **CCMEI não aparece na lista da segunda**, porque não imprime

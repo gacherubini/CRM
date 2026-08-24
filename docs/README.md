@@ -33,12 +33,11 @@ Sete planos executados, todos em [`referencia-viva/planos/`](referencia-viva/pla
 
 **Todas as flags estão OFF.**
 
-Falta em código a **metade do dono da loja** — sino 1:1 com botão Peguei, faixa "N sem vendedor",
-filtro Aguardando e card de 7 dias. Os sete planos acima foram recortados por produto e a interface
-entre eles ficou no vão: o `chatbot-api` não expõe rota de oferta, e `criar_sinal_direcionado` não
-tem chamador. Efeito prático: **lead que ninguém pega some** — vira `esgotou_fila` no chatbot e
-ninguém é avisado. Card em
-[`fila/2026-08-14-wa-modo2-5-loja-visao-do-dono.md`](fila/2026-08-14-wa-modo2-5-loja-visao-do-dono.md).
+A **metade do dono da loja** — sino 1:1 com botão Peguei, faixa "N sem vendedor", filtro
+Aguardando e card de 7 dias — **entrou no `main`**. O `chatbot-api` expõe `GET /v1/ofertas` e
+`POST /v1/ofertas/{id}/assumir`, e `criar_sinal_direcionado` passou a ter chamador no
+`copiloto_sinais_job`. Lead que ninguém pega **não some mais**. Plano em
+[`referencia-viva/planos/2026-08-14-wa-modo2-5-loja-visao-do-dono.md`](referencia-viva/planos/2026-08-14-wa-modo2-5-loja-visao-do-dono.md).
 
 O que falta fora de código (Meta, n8n, transcrição) está em
 [`fila/2026-08-14-wa-modo2-fechamento-piloto.md`](fila/2026-08-14-wa-modo2-fechamento-piloto.md).
