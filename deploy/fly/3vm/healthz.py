@@ -25,6 +25,10 @@ if os.getenv("HEALTH_REQUIRE_N8N", "0").strip() in {"1", "true", "yes", "on"}:
 
 PORT = int(os.getenv("HEALTHZ_PORT", "8099"))
 
+# Carimbo do Dockerfile.app (ARG GIT_SHA). Sem ele nao ha como perguntar a prod
+# qual commit ela roda — foi assim que prod e repo divergiram sem ninguem ver.
+GIT_SHA = os.getenv("REVY_GIT_SHA", "desconhecido")
+
 
 def _ok(url: str) -> bool:
     try:
@@ -49,7 +53,7 @@ class Handler(BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(body)
             return
-        body = b"ok\n"
+        body = f"ok sha:{GIT_SHA}\n".encode()
         self.send_response(200)
         self.send_header("Content-Type", "text/plain")
         self.send_header("Content-Length", str(len(body)))

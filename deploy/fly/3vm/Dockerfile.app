@@ -77,6 +77,11 @@ COPY deploy/fly/3vm/run-motor.sh /srv/scripts/run-motor.sh
 
 RUN chmod +x /srv/entrypoint-app.sh /srv/scripts/*.sh
 
+# Carimbo de versao. Fica no FIM de proposito: mudar o SHA invalida so este layer,
+# nao o apt-get nem o pip acima. A revy-deploy passa --build-arg GIT_SHA=<sha>.
+ARG GIT_SHA=desconhecido
+ENV REVY_GIT_SHA=$GIT_SHA
+
 EXPOSE 8080
 
 ENTRYPOINT ["/usr/bin/tini", "--"]
