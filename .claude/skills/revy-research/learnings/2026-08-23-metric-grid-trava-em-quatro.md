@@ -2,7 +2,7 @@
 gatilho: acrescentar metrica numa tela da Loja ou do Control
 produto: portal-gestao
 fonte: repo
-verificado_em: nunca reconferido desde a migracao das memorias (2026-08-23)
+verificado_em: 2026-08-24
 ---
 # `.metric-grid` e grid fixo de 4 colunas, sem separacao entre linhas
 

@@ -3,7 +3,7 @@ gatilho: ligar ou desligar as maquinas do Fly pelos scripts do repo
 produto: deploy
 custo: lab ligado a noite inteira
 fonte: repo
-verificado_em: nunca reconferido desde a migracao das memorias (2026-08-23)
+verificado_em: 2026-08-24
 ---
 # `down-all.sh` diz "nenhuma machine" e nao para nada
 

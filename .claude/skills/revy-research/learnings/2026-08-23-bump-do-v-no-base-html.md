@@ -3,7 +3,7 @@ gatilho: mexer em app.css do portal ou do control
 produto: portal-gestao / revy-trafego
 custo: um deploy com layout quebrado em producao
 fonte: repo
-verificado_em: nunca reconferido desde a migracao das memorias (2026-08-23)
+verificado_em: 2026-08-24
 ---
 # Sao dois `app.css`, e cada mudanca precisa de `?v=` novo
 

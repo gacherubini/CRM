@@ -3,7 +3,7 @@ gatilho: mexer no JS de uma tela do portal
 produto: portal-gestao
 custo: 2 bugs em producao em 2 dias
 fonte: repo
-verificado_em: nunca reconferido desde a migracao das memorias (2026-08-23)
+verificado_em: 2026-08-24
 ---
 # `pytest` renderiza o HTML e nao executa uma linha de JS
 

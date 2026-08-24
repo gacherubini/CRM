@@ -3,7 +3,7 @@ gatilho: responder se uma feature ja foi implementada
 produto: todos
 custo: um produto morto em producao por dias
 fonte: repo
-verificado_em: nunca reconferido desde a migracao das memorias (2026-08-23)
+verificado_em: 2026-08-24
 ---
 # Confira contra a spec, nunca contra a suite
 

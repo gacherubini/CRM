@@ -3,7 +3,7 @@ gatilho: ligar lead a anuncio ou mexer em atribuicao CTWA
 produto: chatbot-api / revy-trafego
 custo: um diagnostico inteiro retratado
 fonte: repo
-verificado_em: nunca reconferido desde a migracao das memorias (2026-08-23)
+verificado_em: 2026-08-24
 ---
 # Nunca casar lead com auditoria CTWA por telefone mascarado
 

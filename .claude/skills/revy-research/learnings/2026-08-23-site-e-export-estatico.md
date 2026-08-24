@@ -2,7 +2,7 @@
 gatilho: reexportar ou editar o site de marketing
 produto: site
 fonte: repo
-verificado_em: nunca reconferido desde a migracao das memorias (2026-08-23)
+verificado_em: 2026-08-24
 ---
 # `site/` e export estatico: nao ha o que "consertar" no HTML
 

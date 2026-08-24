@@ -2,7 +2,7 @@
 gatilho: mudar cor, fonte ou token de marca
 produto: shared/brand
 fonte: repo
-verificado_em: nunca reconferido desde a migracao das memorias (2026-08-23)
+verificado_em: 2026-08-24
 ---
 # A fonte unica e `shared/brand/revy-tokens.css`, e as copias sao geradas
 

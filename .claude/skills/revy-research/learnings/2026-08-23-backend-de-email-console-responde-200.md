@@ -2,7 +2,7 @@
 gatilho: testar envio de convite ou de e-mail
 produto: portal-gestao / revy-trafego
 fonte: repo
-verificado_em: nunca reconferido desde a migracao das memorias (2026-08-23)
+verificado_em: 2026-08-24
 ---
 # Backend `console` devolve 200 e ninguem recebe nada
 
