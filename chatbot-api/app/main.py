@@ -36,7 +36,7 @@ from app.meta_webhook import EventoCloud, assinatura_valida, parse_inbound
 from app.cloud_canal import loja_id_do_phone_number_id, phone_number_id_da_loja
 from app.oferta_inbound import processar_clique
 from app.whatsapp_outbound import outbound_para_loja
-from app.auth import Contexto, get_contexto, verificar_webhook_token
+from app.auth import Contexto, get_contexto, resolver_loja_id, verificar_webhook_token
 from app.db import get_db
 from app.models_db import FilaVendedor, OfertaLead
 from app.operacao import normalizar_telefone
@@ -918,9 +918,10 @@ def pode_responder(
     db: Session = Depends(get_db),
 ):
     """Debounce do n8n: só a última entrada pendente pode chegar à IA."""
+    # Credencial de integração não tem loja: a loja vem da instância (spec §6.2).
     return servico.pode_responder_mensagem(
         db,
-        ctx.loja_id,
+        resolver_loja_id(db, ctx, dados.instance),
         telefone,
         dados.provider_message_id,
         instance=dados.instance,
