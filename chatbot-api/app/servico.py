@@ -593,6 +593,29 @@ def criar_loja(
     return loja, token
 
 
+def criar_credencial_loja(db: Session, loja_slug: str) -> str:
+    """Credencial nova para uma loja que **já existe**.
+
+    ``criar_loja`` emite uma no nascimento e nunca mais; até aqui não havia
+    caminho para a segunda. Isso obrigava um deploy multi-loja do Portal a usar
+    um token só — e como o chatbot resolve a loja pelo token, toda loja via os
+    números da loja daquele token.
+
+    Emitir outra não revoga a anterior: as duas valem, o que é o que permite
+    trocar sem janela de indisponibilidade.
+
+    Devolve o token em claro **uma vez**; o banco guarda só o hash.
+    """
+    slug = (loja_slug or "").strip()
+    loja = db.query(Loja).filter(Loja.slug == slug).first()
+    if loja is None:
+        raise ValueError(f"loja não encontrada: {slug}")
+    token = secrets.token_urlsafe(24)
+    db.add(CredencialServico(token_hash=hash_token(token), loja_id=loja.id))
+    db.commit()
+    return token
+
+
 def criar_credencial_integracao(db: Session) -> str:
     """Credencial da plataforma: sem loja. A loja de cada pedido vem da instância.
 

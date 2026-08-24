@@ -42,6 +42,12 @@ def main() -> None:
         help="cria credencial da plataforma (sem loja) para o n8n",
     )
 
+    c = sub.add_parser(
+        "criar-credencial-loja",
+        help="emite credencial nova para uma loja que ja existe (nao revoga a antiga)",
+    )
+    c.add_argument("--slug", required=True, help="slug da loja no Chatbot")
+
     args = parser.parse_args()
 
     if args.comando == "criar-loja":
@@ -54,6 +60,15 @@ def main() -> None:
             db.close()
         print(f"Loja criada: {loja.nome}  (slug={loja.slug}  instance={loja.evolution_instance})")
         print(f"TOKEN (guarde agora, não será mostrado de novo): {token}")
+
+    elif args.comando == "criar-credencial-loja":
+        db = SessionLocal()
+        try:
+            token = servico.criar_credencial_loja(db, args.slug)
+        finally:
+            db.close()
+        print(f"Credencial criada para a loja {args.slug} (a anterior segue valendo).")
+        print(f"TOKEN (guarde agora, nao sera mostrado de novo): {token}")
 
     elif args.comando == "criar-credencial-integracao":
         db = SessionLocal()

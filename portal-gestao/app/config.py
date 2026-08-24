@@ -1,3 +1,4 @@
+import json
 import os
 from dataclasses import dataclass
 
@@ -89,6 +90,10 @@ class Settings:
     # segundo deploy do Portal compartilhar o mesmo chatbot precisa ser
     # configurado — aí protege contra devolver o "sem resposta" de outra loja.
     chatbot_loja_slug: str = os.getenv("CHATBOT_API_LOJA_SLUG", "")
+    # Multi-loja num deploy só: o que o `chatbot_loja_slug` acima protege para
+    # UMA loja, este mapa resolve para N. Mesmo formato do Control
+    # (`REVY_TRAFEGO_CHATBOT_TOKENS_JSON`): JSON `loja_slug -> token`.
+    chatbot_tokens_json: str = os.getenv("CHATBOT_API_TOKENS_JSON", "")
     motor_url: str = (
         os.getenv("MOTOR_URL")
         or os.getenv("MOTOR_API_URL", "http://motor-simulacao:8000")
@@ -244,6 +249,44 @@ class Settings:
     def absolute_url(self, path: str) -> str:
         normalized = path if path.startswith("/") else f"/{path}"
         return f"{self.public_base_url}{normalized}" if self.public_base_url else normalized
+
+
+    def chatbot_token_para(self, loja_slug: str | None) -> str:
+        """Credencial do chatbot para ESTA loja. Falha fechado quando ambíguo.
+
+        O chatbot resolve a loja **pelo token**, então usar um token só num
+        deploy multi-loja faz toda tela mostrar a loja daquele token — foi
+        assim que a `teste` exibiu os 1104 atendimentos da `moto-center`.
+
+        Três modos, do mais explícito ao legado (mesma ordem do Control, em
+        `revy-trafego/app/config.py::_token_para_slug`):
+
+        1. `chatbot_tokens_json` — mapa `slug -> token`. Slug fora do mapa
+           devolve `""`: preferimos a tela dizer "indisponível" a ela mostrar,
+           com confiança, o número de outra loja.
+        2. `chatbot_loja_slug` — um token só, com a loja dele declarada. Serve
+           quem ainda não emitiu credencial por loja.
+        3. Nada configurado — devolve o token global, que é o contrato de
+           "deploy de uma loja só" descrito no campo acima. **Não** falha
+           fechado aqui, ao contrário do Control: fazer isso derrubaria toda
+           instalação existente no primeiro deploy. O corolário é que este
+           código sozinho não estanca o vazamento — ele torna o conserto
+           possível, e quem configura o mapa é quem o aplica.
+        """
+        slug = (loja_slug or "").strip()
+        if self.chatbot_tokens_json:
+            if not slug:
+                return ""
+            try:
+                tokens = json.loads(self.chatbot_tokens_json)
+            except (TypeError, ValueError):
+                return ""
+            if not isinstance(tokens, dict):
+                return ""
+            return str(tokens.get(slug) or "").strip()
+        if self.chatbot_loja_slug:
+            return self.chatbot_token if self.chatbot_loja_slug == slug else ""
+        return self.chatbot_token
 
 
 settings = Settings()

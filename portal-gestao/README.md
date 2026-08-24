@@ -8,6 +8,19 @@ Tokens das APIs ficam **somente no servidor**; o navegador recebe uma sessão as
 
 ## Armadilhas — leia antes de mexer
 
+- **O Portal fala com o chatbot pela credencial da loja da SESSÃO.** O chatbot resolve a
+  loja **pelo token**, então um token só num deploy multi-loja faz toda tela mostrar a
+  mesma loja — em 24/08 a tela do Agente com a loja `teste` selecionada exibiu os 1104
+  atendimentos da `moto-center`, número a número. `get_chatbot_client` (`app/main.py`)
+  recebe o `Request` por isso; **não** volte a montá-lo sem ele, e não chame o
+  `ChatbotClient` direto passando `settings.chatbot_token`. O mapa é
+  `CHATBOT_API_TOKENS_JSON` (`{"slug": "token"}`), no formato do Control. Loja fora do
+  mapa fica **sem token** de propósito: a tela diz "indisponível" em vez de mostrar,
+  com confiança, o número de outra loja. Sem mapa e sem `CHATBOT_API_LOJA_SLUG`, o token
+  global vale — é o contrato de "deploy de uma loja só", e é o que mantém instalação
+  antiga de pé. Emitir o token de cada loja:
+  `python -m app.cli criar-credencial-loja --slug <loja>` no `chatbot-api`.
+
 - **Custo do veículo, lucro, tokens e credenciais do Motor nunca aparecem para vendedor.**
   Aplique RBAC no backend, não escondendo item de menu. Vale para toda superfície
   do módulo Financeiro (telas e JSON).

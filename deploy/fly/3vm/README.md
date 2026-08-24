@@ -123,6 +123,7 @@ vence `[env]`. O toml pode dizer uma coisa e o efetivo ser outra.
 | `REVY_TRAFEGO_SERVICE_TOKEN` | autentica Portal → Revy |
 | `REVY_TRAFEGO_CHATBOT_TOKENS_JSON` | JSON `loja_slug → token` (recomendado em multi-loja) |
 | `CHATBOT_AUDIO_TRANSCRIPTION_URL` / `_TOKEN` | Groq (`https://api.groq.com/openai/v1/audio/transcriptions`). **É a URL que liga a transcrição do Modo 2** — `processador_de_audio` olha só ela, não o `..._PROVIDER`, que é do Modo 1. Sem a URL, todo áudio vira o fallback "manda por texto" |
+| `CHATBOT_API_TOKENS_JSON` | **multi-loja**: JSON `loja_slug → token` que o Portal usa para falar com o chatbot pela credencial da loja da sessão. Sem ele, um token só atende N lojas e **toda tela mostra a loja daquele token**. Loja fora do mapa fica sem token de propósito (tela diz "indisponível"). Emitir: `python -m app.cli criar-credencial-loja --slug <loja>` |
 | `CHATBOT_AUDIO_TRANSCRIPTION_MODEL` | opcional; default `whisper-large-v3` no código. Trocar para `whisper-large-v3-turbo` é mais barato e pior fora do inglês |
 
 No `fly.app.toml` o processo motor roda com `MOTOR_ORCHESTRATOR_ONLY=1` e

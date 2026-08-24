@@ -42,6 +42,14 @@ def iniciar_sessao(request: Request, usuario: Usuario) -> None:
     request.session.clear()
     request.session["usuario_id"] = usuario.id
     request.session["csrf"] = secrets.token_urlsafe(24)
+    # A loja entra já aqui, e não só no primeiro render: `get_chatbot_client`
+    # escolhe a credencial do chatbot por ela, e ela era preenchida por
+    # `ensure_session_loja` dentro de `contexto()` — depois do handler. O
+    # primeiro request após o login caía sem loja e ficava "indisponível".
+    # `ensure_session_loja` continua valendo para sessão antiga, já criada.
+    slug = str(getattr(usuario, "loja_slug", "") or "").strip()
+    if slug:
+        request.session["loja_slug"] = slug
 
 
 def encerrar_sessao(request: Request) -> None:

@@ -108,6 +108,7 @@ from app.config import (
     revy_loja_shell_enabled,
     settings,
 )
+from app.loja import identity as loja_identity
 from app.loja.navigation import nav_item_is_active
 from app.loja.redirects import resolve_legacy_redirect, should_consider_request
 from app.web.loja_shell import check_module_access, router as loja_shell_router
@@ -407,8 +408,35 @@ def get_estoque_client() -> EstoqueClient:
     return EstoqueClient(settings.estoque_url, settings.estoque_token, settings.request_timeout)
 
 
-def get_chatbot_client() -> ChatbotClient:
-    return ChatbotClient(settings.chatbot_url, settings.chatbot_token, settings.request_timeout)
+def get_chatbot_client(request: Request) -> ChatbotClient:
+    """Cliente do chatbot **da loja da sessão**, não de uma loja fixa.
+
+    Recebe o ``Request`` de propósito: o chatbot resolve a loja pelo token, e
+    sem saber qual loja está selecionada esta função devolvia sempre a mesma —
+    foi assim que a tela do Agente da `teste` mostrou os 1104 atendimentos da
+    `moto-center`, número a número.
+
+    Sem token para a loja (mapa configurado e slug ausente ou fora dele),
+    ``ChatbotClient`` fica ``configurado = False`` e as chamadas levantam
+    ``ChatbotIndisponivel`` — que as telas já tratam como "indisponível". É o
+    resultado desejado: melhor a tela não dizer nada do que dizer, com
+    confiança, o número de outra loja.
+
+    Aresta conhecida: ``ensure_session_loja`` roda dentro de ``contexto()``,
+    depois do handler, então o **primeiro** request após o login ainda não tem
+    ``loja_slug`` na sessão e cai no indisponível. Do segundo em diante está
+    preenchido. Só aparece com o mapa configurado.
+    """
+    try:
+        sessao = request.session
+    except (AssertionError, AttributeError):  # sem SessionMiddleware (testes)
+        sessao = None
+    slug = loja_identity.session_loja_slug(sessao)
+    return ChatbotClient(
+        settings.chatbot_url,
+        settings.chatbot_token_para(slug),
+        settings.request_timeout,
+    )
 
 
 def get_motor_client() -> MotorClient:

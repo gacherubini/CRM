@@ -135,7 +135,7 @@ def campanhas_lista(request: Request, db: Session = Depends(get_db)):
     custo_por_msg: dict[str, Decimal] = {}
     chatbot_erro = None
     try:
-        leads = get_chatbot_client().listar_leads()
+        leads = get_chatbot_client(request).listar_leads()
     except ChatbotIndisponivel:
         leads = []
         chatbot_erro = "indisponivel"
@@ -638,7 +638,7 @@ def trafego_roi(
     chatbot_erro = None
     leads: list[dict] = []
     try:
-        leads = get_chatbot_client().listar_leads()
+        leads = get_chatbot_client(request).listar_leads()
     except ChatbotIndisponivel:
         chatbot_erro = "indisponivel"
     linhas = calcular_roi_loja(

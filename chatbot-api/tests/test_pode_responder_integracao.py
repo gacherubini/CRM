@@ -71,3 +71,44 @@ def test_credencial_de_loja_segue_presa_a_propria_loja(client, db, loja_a, loja_
     )
 
     assert r.status_code == 404
+
+
+def test_credencial_nova_de_loja_alcanca_a_propria_loja_e_so_ela(client, db, loja_a, loja_b):
+    """O conserto do vazamento multi-loja no Portal depende desta emissão.
+
+    Até existir isto, um deploy com N lojas só tinha o token de UMA — e como o
+    chatbot resolve a loja pelo token, toda tela mostrava a mesma loja.
+    """
+    tel = "5511977712001"
+    _semear_entrada(client, loja_a["instance"], tel, "CRED-A-1")
+    token = servico.criar_credencial_loja(db, loja_a["slug"])
+    h = {"Authorization": f"Bearer {token}"}
+
+    r = client.post(
+        f"/v1/conversas/{tel}/pode-responder",
+        json={"instance": loja_a["instance"], "provider_message_id": "CRED-A-1"},
+        headers=h,
+    )
+    assert r.status_code == 200, r.text
+    assert r.json()["pode_responder"] is True
+
+    # e nao alcanca a loja B, mesmo mandando a instance dela
+    _semear_entrada(client, loja_b["instance"], tel, "CRED-B-1")
+    proibido = client.post(
+        f"/v1/conversas/{tel}/pode-responder",
+        json={"instance": loja_b["instance"], "provider_message_id": "CRED-B-1"},
+        headers=h,
+    )
+    assert proibido.status_code == 404, proibido.text
+
+
+def test_credencial_de_loja_inexistente_recusa():
+    import pytest
+    from app.db import SessionLocal
+
+    s = SessionLocal()
+    try:
+        with pytest.raises(ValueError):
+            servico.criar_credencial_loja(s, "nao-existe")
+    finally:
+        s.close()
