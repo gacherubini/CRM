@@ -610,7 +610,7 @@ def _wamid_ja_visto(db: Session, wamid: str) -> bool:
         is not None
     )
     if existe:
-        _wamids_vistos.add(wamid)
+        _marcar_wamid_visto(wamid)
     return existe
 
 

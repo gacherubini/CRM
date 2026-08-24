@@ -79,3 +79,36 @@ def test_memoria_de_wamid_nao_cresce_sem_limite():
     # FIFO: o mais recente fica, o mais antigo saiu.
     assert "wamid.crescimento.0" not in _wamids_vistos
     assert f"wamid.crescimento.{_WAMIDS_MEMORIA_MAX + 499}" in _wamids_vistos
+
+
+def test_wamid_no_banco_mas_fora_do_cache_nao_estoura(db, loja_a):
+    """Reentrega depois de restart: o wamid está em `mensagens`, o cache não.
+
+    Era o único ramo de `_wamid_ja_visto` sem cobertura, e derrubava o webhook
+    com 500 — a Meta então reentregava e o 500 se repetia em laço.
+    """
+    import uuid
+
+    from app.main import _wamid_ja_visto, _wamids_vistos
+    from app.models_db import Conversa, Mensagem
+
+    wamid = "wamid.REENTREGA"
+    conversa = Conversa(
+        id=str(uuid.uuid4()), loja_id=loja_a["loja_id"], telefone="5551999999999"
+    )
+    db.add(conversa)
+    db.add(
+        Mensagem(
+            id=str(uuid.uuid4()),
+            loja_id=loja_a["loja_id"],
+            conversa_id=conversa.id,
+            direcao="entrada",
+            provider_message_id=wamid,
+            texto="oi",
+        )
+    )
+    db.commit()
+    _wamids_vistos.pop(wamid, None)  # cache vazio, como depois de um restart
+
+    assert _wamid_ja_visto(db, wamid) is True
+    assert wamid in _wamids_vistos
