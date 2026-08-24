@@ -146,7 +146,7 @@ Um eixo por mudança. Não misture Copiloto, RPA, rollout e n8n na mesma entrega
 | Loja — sino | B1: central geral por tipo. Sem blast `simulacao_pronta`. Oferta 1:1 = plano dos dois modos |
 | Motor | Probe Bradesco no PC (gate do worker residencial) **ou** estabilidade Bradesco |
 | Bot / n8n | Smoke virgem/CTWA/handoff/salvo no lab → Active ON pelo dono |
-| Modo 2 (piloto) | Handoff → rodízio → oferta → clique em "Peguei" → trava e contato entregue, em produção |
+| Modo 2 (piloto) | Volta completa **feita em 24/08** (oferta travada, central calada). Próximo: fila com 2+ vendedores — ponteiro, 10 min e a volta que para no fim nunca rodaram com um vendedor só |
 | Control | Secrets GCP (Google Ads) **ou** E2E dois canais WA |
 | CTWA | Task 4: `Cód:` na mensagem do anúncio (config, não PR) |
 | Site | Adiado — não pegar sem o dono pedir |

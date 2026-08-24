@@ -38,11 +38,11 @@ exercitado* — código verde não é caminho andado.
 | §5.1 | Bot atende o cliente na central | ✅ agente no `n8n-cloud` (fork de 20 nós) — **provado em produção 23/08** |
 | §5.2 | Gatilho *simulação pronta* | ✅ via `solicitacoes-simulacao-humana` — não exercitado no piloto |
 | §5.2 | Gatilho *simulação falhou* | ✅ mesmo caminho, `motivo=simulacao_falhou` — não exercitado no piloto |
-| §5.2 | Gatilho *cliente pede humano* | ✅ `POST /v1/operacao/handoff-humano` — não exercitado no piloto |
-| §5.3 | Rodízio, ponteiro, 10 min, uma volta | ✅ `rodizio.py` + worker — não exercitado no piloto |
-| §5.4 | Silêncio pós-handoff, re-notificação | ✅ `pos_handoff.py` — não exercitado no piloto |
+| §5.2 | Gatilho *cliente pede humano* | ✅ `POST /v1/operacao/handoff-humano` — **provado 24/08** |
+| §5.3 | Rodízio, ponteiro, 10 min, uma volta | ✅ `rodizio.py` + worker — **primeira oferta provada 24/08**; ponteiro, prazo de 10 min e volta completa **não**: a fila do piloto tem um vendedor só |
+| §5.4 | Silêncio pós-handoff, re-notificação | ✅ `pos_handoff.py` — **silêncio provado 24/08** (`bot_ativo=False`); re-notificação não exercitada |
 | §5.5 | Vendedor × cliente por variantes | ✅ |
-| §5.7 | "Peguei" = clique, primeiro vence | ✅ trava idempotente — **o botão nunca foi clicado em produção** |
+| §5.7 | "Peguei" = clique, primeiro vence | ✅ trava idempotente — **clicado em produção 24/08**, oferta ficou `travada`. "Primeiro vence" com dois cliques concorrentes segue não exercitado |
 | §5.8 | Control escolhe o modo | ✅ `whatsapp_modo` por loja; no piloto a projeção foi semeada à mão, o Control não escreveu |
 | §5.9 | Fork do fluxo atual | ✅ gerado, 20 nós; publicado e **ativo** no `n8n2037` desde 23/08 |
 | §5.9 | Debounce 40 s | ✅ herdado |
@@ -167,12 +167,37 @@ Nesta ordem, cada passo com carimbo de log:
 3. O bot formulou resposta e `POST /v1/operacao/responder` → **200 às 23:49:17
    de 23/08**. O bot respondeu ao cliente de verdade.
 
-### O que ainda não foi provado
+### A volta completa, na madrugada de 24/08
 
-Handoff → rodízio → oferta com botão "Peguei" → trava e entrega do contato.
-Está **desbloqueado**, não executado. Enquanto ninguém clicar "Peguei" em
-produção, a metade da distribuição continua sendo código verde, não caminho
-andado — e o piloto **não** está concluído.
+O cliente pediu um humano, o rodízio ofereceu o lead, o vendedor tocou em
+**Peguei**, e o banco ficou assim:
+
+```
+ofertas:    5034a589  estado=travada  vendedor=827819cc  cliente=555180336365
+conversas:  555195941020  bot_ativo=True   status=aberta     (o vendedor)
+            555180336365  bot_ativo=False  status=handoff    (o cliente)
+```
+
+`estado=travada` é a trava idempotente do §5.7; `bot_ativo=False` com
+`status=handoff` é a central se calando. O vendedor `827819cc` é o único da fila.
+
+**É a primeira volta completa do Modo 2 em produção.** A feature foi mergeada em
+16/08 com a metade da distribuição pronta e, até esta noite, **nenhum vendedor
+tinha sido chamado, nunca** — era exatamente o buraco que abre este documento.
+
+E saiu **de graça**: com a janela de 24 h do vendedor aberta, a oferta foi
+`interactive`, sem tocar no `chama_vendedor`, que segue `PENDING`.
+
+### O que continua sem prova
+
+- **Fila com mais de um vendedor:** ponteiro, prazo de 10 min e a volta que para
+  no fim. A fila do piloto tem um só, então o rodízio nunca rodou.
+- **Dois cliques concorrentes** — o "primeiro vence" nunca disputou.
+- **Re-notificação do §5.4** e o follow-up de 30 min / 1 h.
+- **Template com janela fechada:** todo o piloto correu dentro da janela, então o
+  caminho pago nunca foi exercitado — e ele depende do `chama_vendedor`, hoje
+  `PENDING` e reclassificado como `MARKETING`.
+- **Áudio:** não há provider de transcrição configurado, e o VAD não existe.
 
 ### Três achados que valem registro
 
