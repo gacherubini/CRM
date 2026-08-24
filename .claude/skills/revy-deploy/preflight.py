@@ -207,9 +207,18 @@ def sha_do_healthz(corpo: str) -> str | None:
     return achado.group(1) if achado else None
 
 
+# A Cloudflare recusa o User-Agent padrao do urllib ("Python-urllib/3.x") com
+# 403 na frente do revyapp.com.br. Sem este cabecalho o pos-flight do site da
+# **falso negativo**: o deploy foi certo, o `curl` responde 200, e o verificar.py
+# anuncia "nao respondeu" — indistinguivel de falha real, que e como se aprende a
+# ignorar a checagem que existe para pegar falha silenciosa.
+_UA = "revy-deploy/1.0 (+https://revyapp.com.br)"
+
+
 def buscar(url: str, timeout: float = 8.0) -> str | None:
+    pedido = urllib.request.Request(url, headers={"User-Agent": _UA})
     try:
-        with urllib.request.urlopen(url, timeout=timeout) as resp:
+        with urllib.request.urlopen(pedido, timeout=timeout) as resp:
             return resp.read().decode("utf-8", errors="ignore")
     except (urllib.error.URLError, TimeoutError, OSError):
         return None
