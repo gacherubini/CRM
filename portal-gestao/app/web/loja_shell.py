@@ -46,6 +46,27 @@ def _actor_for(usuario: Any, control_memberships=None) -> ActorLoja:
     return identity.actor_from_usuario(usuario, memberships=control_memberships)
 
 
+def control_memberships_for(usuario: Any, db: Session | None):
+    """Memberships da pessoa na projeção do Control; ``None`` quando não há fonte.
+
+    Fonte ÚNICA para as duas entradas que precisam da mesma lista: o shell, que
+    desenha o seletor de loja (``template_extras`` → ``lojas_disponiveis``), e o
+    POST que troca a loja da sessão (``loja_selecionar``). As duas já divergiram:
+    o seletor listava as lojas do Control e o POST montava o actor só com
+    ``usuario.loja_slug``, então toda opção do seletor que não fosse a loja
+    legada caía em ``/app?erro=loja-nao-autorizada``. Não voltar a chamar o port
+    direto de um dos lados só.
+    """
+    from app.loja.control_projection import HttpControlProjectionPort
+
+    if db is None or not revy_loja_entitlements_enabled():
+        return None
+    pessoa_id = str(getattr(usuario, "id", "") or "")
+    if not pessoa_id:
+        return None
+    return HttpControlProjectionPort(db_session=db).get_memberships(pessoa_id) or None
+
+
 def resolve_store_and_entitlements(
     request: Request,
     usuario: Any,
@@ -54,17 +75,8 @@ def resolve_store_and_entitlements(
     control_memberships=None,
     control_entitlements: EntitlementState | None = None,
 ) -> tuple[StoreContext, EntitlementState, ActorLoja]:
-    from app.loja.control_projection import HttpControlProjectionPort
-
-    if (
-        control_memberships is None
-        and db is not None
-        and revy_loja_entitlements_enabled()
-    ):
-        port = HttpControlProjectionPort(db_session=db)
-        pessoa_id = str(getattr(usuario, "id", "") or "")
-        if pessoa_id:
-            control_memberships = port.get_memberships(pessoa_id) or None
+    if control_memberships is None:
+        control_memberships = control_memberships_for(usuario, db)
 
     actor = _actor_for(usuario, control_memberships)
     store = identity.resolve_store_context(
@@ -367,11 +379,15 @@ async def loja_selecionar(
     if not csrf_valido(request, form.get("csrf")):
         return RedirectResponse("/app?erro=csrf", status_code=303)
     actor = _actor_for(usuario)
-    # Em F1 o Control port pode enriquecer memberships; cutover usa só Usuario.
-    # Testes injetam memberships extras via monkeypatch de actor se necessário.
     try:
-        # memberships multi-loja podem vir de request.state (testes / futuro Control)
+        # memberships multi-loja podem vir de request.state (testes) ou, em
+        # produção, da MESMA projeção do Control que desenhou o seletor —
+        # ver control_memberships_for(). Autorizar aqui só por
+        # ``usuario.loja_slug`` rejeitava toda loja listada pelo seletor que
+        # não fosse a legada.
         extra = getattr(request.state, "loja_memberships", None)
+        if extra is None:
+            extra = control_memberships_for(usuario, db)
         if extra is not None:
             actor = identity.actor_from_usuario(usuario, memberships=extra)
         slug = identity.select_store_slug(actor, str(form.get("loja_slug") or ""))

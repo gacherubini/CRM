@@ -231,17 +231,22 @@ class HttpControlProjectionPort:
             out: dict[str, StoreMembership] = {}
             for row in rows:
                 key = row.loja_slug
+                # Mesmo filtro de parse_memberships_from_payload: só cargo
+                # operacional da Loja vira role. `admin_plataforma` gravado num
+                # vínculo não pode virar acesso de loja por esta porta — a
+                # decisão está em identity.py::_roles_from_papel.
+                cargo = _roles_from_payload([row.cargo])
                 if key in out:
                     existing = out[key]
                     out[key] = StoreMembership(
                         loja_slug=existing.loja_slug,
-                        roles=frozenset(existing.roles | {row.cargo}),
+                        roles=frozenset(existing.roles | cargo),
                         ativo=True,
                     )
                 else:
                     out[key] = StoreMembership(
                         loja_slug=row.loja_slug,
-                        roles=frozenset({row.cargo}),
+                        roles=cargo,
                         ativo=True,
                     )
             return list(out.values())

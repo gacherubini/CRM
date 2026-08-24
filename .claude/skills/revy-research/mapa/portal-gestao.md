@@ -1,6 +1,6 @@
 # portal-gestao · 151 rotas · 26 modelos · 6 workers · 34 flags · 26 migrations · 61 templates
 
-Gerado de `889ea2b`. NAO editar a mao — saida de `gerar_mapa.py`.
+Gerado de `28bdf86`. NAO editar a mao — saida de `gerar_mapa.py`.
 Migration head: `0026_copiloto_sinal_destinatario`
 
 ## Rotas
@@ -90,7 +90,7 @@ Migration head: `0026_copiloto_sinal_destinatario`
 - `GET /app/loja/integracoes/health` — app/web/loja_integracoes.py:54
 - `GET /app/loja/perfil` — app/web/loja_perfil.py:82
 - `POST /app/loja/perfil/senha` — app/web/loja_perfil.py:90
-- `POST /app/loja/selecionar` — app/web/loja_shell.py:357
+- `POST /app/loja/selecionar` — app/web/loja_shell.py:369
 - `GET /app/loja/vendas` — app/web/loja_vendas.py:125
 - `GET /app/loja/vendas/dados` — app/web/loja_vendas.py:161
 - `GET /app/loja/vendas/lista` — app/web/loja_vendas.py:184

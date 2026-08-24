@@ -13,6 +13,12 @@
 {% include "partials/resultados_periodo.html" %}
 {% include "partials/onboarding_medicao.html" %}
 
+{# Os dois únicos ?erro= que caem em /app vêm da troca de loja
+   (app/web/loja_shell.py::loja_selecionar). Sem isto o redirect voltava para cá
+   mudo, com a query string na barra e nenhuma explicação na tela. #}
+{% if request.query_params.get('erro') == 'loja-nao-autorizada' %}<div class="alert error" role="alert"><strong>Loja não trocada.</strong> Você não tem acesso a essa loja. Continuamos na loja atual — se isso estiver errado, fale com quem administra o seu acesso.</div>
+{% elif request.query_params.get('erro') == 'csrf' %}<div class="alert error" role="alert"><strong>Loja não trocada.</strong> A sessão expirou. Recarregue a página e selecione a loja de novo.</div>{% endif %}
+
 {% if integracao_erro %}<div class="alert warning" role="alert"><strong>Estoque offline.</strong> {{ integracao_erro }}</div>{% endif %}
 
 <section class="dashboard-grid" aria-label="Resumo da operação">

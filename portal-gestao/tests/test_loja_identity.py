@@ -2,6 +2,7 @@
 from types import SimpleNamespace
 
 import pytest
+from conftest import csrf_da_resposta, login, seed_loja_operacional
 
 from app.loja.identity import (
     SESSION_LOJA_KEY,
@@ -122,3 +123,111 @@ def test_session_loja_slug():
     assert session_loja_slug({SESSION_LOJA_KEY: "x"}) == "x"
     assert session_loja_slug({}) is None
     assert session_loja_slug(None) is None
+
+
+# ---------------------------------------------------------------------------
+# Troca de loja pela rota: o seletor e o POST têm que olhar a MESMA fonte
+# ---------------------------------------------------------------------------
+
+
+def _semear_vinculos(email, slugs, cargo="dono", state="ativo"):
+    """Projeção do Control para esta pessoa: um vínculo por loja."""
+    from app.db import SessionLocal
+    from app.models import PessoaRevyProjetada, Usuario, VinculoLojaPessoa
+
+    sessao = SessionLocal()
+    try:
+        usuario = sessao.query(Usuario).filter(Usuario.email == email).one()
+        if sessao.get(PessoaRevyProjetada, usuario.id) is None:
+            sessao.add(
+                PessoaRevyProjetada(
+                    id=usuario.id, email=usuario.email, nome=usuario.nome
+                )
+            )
+        for slug in slugs:
+            sessao.add(
+                VinculoLojaPessoa(
+                    pessoa_id=usuario.id,
+                    loja_slug=slug,
+                    cargo=cargo,
+                    state=state,
+                    versao=1,
+                )
+            )
+            seed_loja_operacional(sessao, loja_slug=slug)
+        sessao.commit()
+        return usuario.id
+    finally:
+        sessao.close()
+
+
+def _selecionar(client, slug):
+    pagina = client.get("/app")
+    return client.post(
+        "/app/loja/selecionar",
+        data={"loja_slug": slug, "csrf": csrf_da_resposta(pagina)},
+        follow_redirects=False,
+    )
+
+
+def test_selecionar_aceita_loja_que_o_seletor_lista(client, monkeypatch):
+    """Regressão: `lojas_disponiveis` vinha do Control e o POST autorizava só
+    ``usuario.loja_slug`` — toda opção do seletor fora da loja legada caía em
+    ``/app?erro=loja-nao-autorizada``."""
+    monkeypatch.setenv("REVY_LOJA_SHELL_ENABLED", "1")
+    monkeypatch.setenv("REVY_LOJA_ENTITLEMENTS_ENABLED", "1")
+    login(client, papel="dono", loja_slug="loja-teste")
+    _semear_vinculos("dono@loja.test", ["loja-teste", "loja-b"])
+
+    resposta = _selecionar(client, "loja-b")
+
+    assert resposta.status_code == 303
+    assert resposta.headers["location"] == "/app"
+
+
+def test_selecionar_recusa_loja_sem_vinculo(client, monkeypatch):
+    """O conserto não pode virar acesso amplo: sem vínculo, continua recusando."""
+    monkeypatch.setenv("REVY_LOJA_SHELL_ENABLED", "1")
+    monkeypatch.setenv("REVY_LOJA_ENTITLEMENTS_ENABLED", "1")
+    login(client, papel="dono", loja_slug="loja-teste")
+    _semear_vinculos("dono@loja.test", ["loja-teste", "loja-b"])
+
+    resposta = _selecionar(client, "loja-alheia")
+
+    assert resposta.status_code == 303
+    assert resposta.headers["location"] == "/app?erro=loja-nao-autorizada"
+
+
+def test_vinculo_com_cargo_nao_operacional_nao_autoriza(client, monkeypatch):
+    """`admin_plataforma` não é cargo operacional da Loja (identity.py) — um
+    vínculo gravado com ele não pode virar acesso por esta porta."""
+    monkeypatch.setenv("REVY_LOJA_SHELL_ENABLED", "1")
+    monkeypatch.setenv("REVY_LOJA_ENTITLEMENTS_ENABLED", "1")
+    login(client, papel="dono", loja_slug="loja-teste")
+    _semear_vinculos("dono@loja.test", ["loja-teste"])
+    _semear_vinculos("dono@loja.test", ["loja-c"], cargo="admin_plataforma")
+
+    resposta = _selecionar(client, "loja-c")
+
+    assert resposta.status_code == 303
+    assert resposta.headers["location"] == "/app?erro=loja-nao-autorizada"
+
+
+def test_app_explica_por_que_a_loja_nao_trocou(client):
+    """O redirect largava o dono em /app com a query string e tela muda."""
+    login(client)
+
+    pagina = client.get("/app?erro=loja-nao-autorizada")
+
+    assert pagina.status_code == 200
+    assert "Você não tem acesso a essa loja" in pagina.text
+    assert "loja-nao-autorizada" not in pagina.text.split("<body")[-1]
+
+
+def test_app_explica_sessao_expirada_na_troca_de_loja(client):
+    login(client)
+
+    pagina = client.get("/app?erro=csrf")
+
+    assert pagina.status_code == 200
+    assert "A sessão expirou" in pagina.text
