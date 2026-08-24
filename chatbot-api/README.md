@@ -35,6 +35,20 @@ Domínio em `app/servico.py`; bootstrap e rotas em `app/main.py`.
   (`CHATBOT_WEBHOOK_MAX_*`, `CHATBOT_WEBHOOK_RATE_LIMIT_*`; corpo limitado a 32 KiB).
 - **O LLM não escolhe identidade autorizada.** `telefone_solicitante` e `Idempotency-Key`
   vêm do webhook real, não do modelo.
+- **A loja de um pedido do bot vem da `instance`, não do token.** O `n8n-cloud` é **um**
+  workflow para N lojas (spec §6.2), então as rotas do bot chamam
+  `auth.resolver_loja_id(db, ctx, instance)` em vez de ler `ctx.loja_id`. Três armadilhas
+  ao migrar mais uma rota: **(a)** resolva **antes** de `_exigir_loja_operacional`, senão o
+  gate responde `423` e engole o `400` que diz o erro de verdade; **(b)** rota que usa o
+  `loja_id` para buscar um objeto estoura `AttributeError` (500) em vez de recusar; **(c)**
+  se a rota não lê `ctx.loja_id`, `instance` ali é teatro — foi o caso de
+  `GET /v1/config/catalogo-bot`, cega para loja pelo **contrato com o Estoque**.
+- **`alembic upgrade head` não roda neste produto fora do Postgres.** A cadeia para na
+  `0017` (`add_column` NOT NULL) com `NotImplementedError` do SQLite, **do zero** — não é o
+  seu banco de dev fora de sincronia. Para conferir uma migration nova sem conectar em
+  lugar nenhum, gere o SQL do dialeto de produção:
+  `DATABASE_URL="postgresql+psycopg://u:p@localhost/x" .venv/bin/python -m alembic upgrade <anterior>:<nova> --sql`.
+  Corolário: `batch_alter_table` aqui só serviria ao SQLite que a cadeia já não atende.
 - **Não existe IA aqui dentro.** Nem Gemini, nem OpenAI, nem LangChain: o agente vive nos
   workflows do n8n, nos **dois** modos. Este produto expõe as ferramentas que ele chama.
   Foi confundir isso que deixou o Modo 2 sem bot por dois dias — havia rodízio, oferta e
@@ -69,9 +83,15 @@ Domínio em `app/servico.py`; bootstrap e rotas em `app/main.py`.
 
 ```bash
 cd chatbot-api
-.venv/bin/python -m pytest -q
-.venv/bin/python -m alembic upgrade head    # head: confira com `alembic heads`
+.venv/bin/python -m pytest tests -q         # `pytest -q` da raiz não coleta: ver abaixo
 ```
+
+`pytest -q` sem o `tests` estoura `PermissionError` no scandir por causa de dois
+diretórios órfãos (`test-tmp-run4/`, `test-tmp-run5/`). No Windows:
+`.\.venv\Scripts\python.exe -m pytest tests -q`.
+
+`alembic upgrade head` **não roda aqui sem Postgres** (armadilha acima). Confira uma
+migration nova pelo SQL offline, e `alembic heads` para achar a head.
 
 Testes que cobrem os pontos sensíveis:
 
@@ -98,6 +118,24 @@ O agente do Modo 2 vive no `n8n/workflow-cloud.json` (gerado — ver
 | `GET /webhook/cloud` | verificação do webhook da Meta (`hub.challenge`) |
 | `POST /v1/operacao/responder` | saída do bot. Existe porque o token do Graph **não pode entrar no workflow** (spec §6.2) |
 | `POST /v1/operacao/handoff-humano` | 3º gatilho da §5.2. Sem CPF/nascimento de propósito — "pediu humano" pode vir antes da simulação |
+
+**Toda chamada do bot carrega `instance`** (o `phone_number_id`, que o nó `Extrair1` do
+workflow publica). Credencial de **loja** segue mandando o corpo de hoje, sem o campo;
+credencial de **integração** (`papel="integracao"`, criada por
+`python -m app.cli criar-credencial-integracao`) não tem loja e é **`400` sem `instance`** —
+fail-closed de propósito, porque cair em "alguma" loja mandaria a mensagem de uma pela
+outra. Quem exige o campo do lado do n8n é `validate_workflow_cloud.py`.
+
+| Rota | Onde vai o `instance` |
+|---|---|
+| `POST /v1/conversas/{tel}/pode-responder` | corpo, **obrigatório** desde sempre |
+| `POST /v1/operacao/responder` | corpo |
+| `POST /v1/operacao/handoff-humano` | corpo |
+| `POST /v1/operacao/moto-escolhida` | corpo |
+| `POST /v1/operacao/solicitacoes-simulacao-humana` | corpo |
+| `POST /v1/simulacoes/solicitar` | corpo |
+| `GET /v1/estoque/buscar` | query |
+| `GET /v1/config/catalogo-bot` | **não recebe** — é cega para loja por outro motivo |
 
 Workers do Modo 2 (`app/modo2_workers.py`, todos atrás de `MODO2_ENABLED`): `rodizio`
 (expira oferta), `followup` (30 min + 1 h) e `cloud_retry` (reprocessa inbound que falhou).

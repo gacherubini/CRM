@@ -18,6 +18,22 @@ são gerados com endereços e credenciais locais apenas na hora da publicação.
 - Placeholders de deploy: só `__EVOLUTION_KEY__`, `__CHATBOT_TOKEN__`,
   `__CHATBOT_WEBHOOK_TOKEN__` (e URLs). **Um workflow serve N números.**
 
+No **Modo 2** (`workflow-cloud.json`) vale o mesmo princípio, com duas diferenças
+que já custaram um bug silencioso:
+
+- a `instance` é o **`phone_number_id` da Meta**, não um nome de instância Evolution;
+- **um workflow serve N lojas, não só N números** — então a `instance` tem de ir em
+  **toda** chamada ao chatbot, não só no inbound. O `__CHATBOT_TOKEN__` do Modo 2 é
+  uma **credencial de integração** (sem loja): se a chamada não disser de qual loja
+  fala, o chatbot procura a conversa na loja errada e o agente para — sem erro, só
+  `200` e silêncio.
+
+Quem garante isso é `validate_workflow_cloud.py`, que reprova chamada sem `instance`.
+A injeção mora em `fork_cloud_workflow.py` (`INJECOES_INSTANCE`) e **para o gerador**
+se a forma da chamada mudar no Modo 1, em vez de gerar um fork que serve uma loja só.
+Exceção deliberada: `GET /v1/config/catalogo-bot`, que é cega para loja pelo contrato
+com o Estoque — `instance` ali não consertaria nada.
+
 O fluxo atual tem 27 nós e trabalha com:
 
 - mensagens de texto de clientes;
@@ -158,6 +174,12 @@ O modelo usado fica em `Google Gemini Chat Model1`. A memória fica em
 - `workflow-teste-numero-autorizado.json`: cópia de teste gerada (não usar no número da loja).
 - `validate_workflow.py`: protege as regras do fluxo oficial.
 - `validate_test_workflow.py`: garante que o teste continue restrito.
+- `fork_cloud_workflow.py`: **gera** o workflow do Modo 2 a partir do oficial. É aqui
+  que se mexe no lado n8n do Modo 2 — nunca no JSON.
+- `workflow-cloud.json`: saída do gerador (Modo 2, central Cloud API). **Não editar a
+  mão**: o validador compara o arquivo com o que o gerador produz e sai `1` se divergir.
+- `validate_workflow_cloud.py`: protege as regras do Modo 2 — sem segredo da Meta, sem
+  resíduo de Evolution, assinatura no corpo cru e `instance` em toda chamada.
 
 ## Validar e publicar
 
@@ -167,6 +189,8 @@ Na raiz do projeto:
 python n8n\validate_workflow.py
 node n8n\build_test_workflow.js
 python n8n\validate_test_workflow.py
+python n8n\fork_cloud_workflow.py        # Modo 2: regera o fork
+python n8n\validate_workflow_cloud.py    # e confere que o JSON e o que o gerador produz
 ```
 
 Para preparar e publicar o teste:
