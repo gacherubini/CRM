@@ -248,6 +248,12 @@ def main() -> None:
     assert "/v1/config/catalogo-bot" in catalog_code, (
         "tool de catálogo deve ler o link configurado no Chatbot/Estoque"
     )
+    # Sem `instance` a rota nao sabe de qual loja falar: com credencial de
+    # integracao responde 400, e com token de loja devolve o catalogo da loja
+    # errada. Foi o bug que ela teve ate 25/08.
+    assert "instance" in catalog_code and "Extrair1" in catalog_code, (
+        "tool de catálogo não diz de qual loja fala"
+    )
     assert "enviar_link_catalogo" in system_message_lower, (
         "prompt deve mandar o link do catálogo quando o cliente pede para ver as motos"
     )

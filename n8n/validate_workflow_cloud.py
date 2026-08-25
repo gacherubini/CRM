@@ -33,6 +33,12 @@ ROTAS_QUE_EXIGEM_INSTANCE = (
     "/v1/simulacoes/solicitar",
     "/v1/estoque/buscar",
     "/v1/agente/config",
+    # Entrou em 25/08, quando deixou de ser cega para loja. Antes ela era a
+    # excecao explicita desta lista: o dado vinha de `/v1/loja` do Estoque com
+    # bearer global, e mandar `instance` daria a impressao de estar resolvido sem
+    # mudar nada. O conserto foi a FONTE (o Estoque passou a devolver o catalogo
+    # por slug); so depois disso o parametro significa alguma coisa.
+    "/v1/config/catalogo-bot",
 )
 
 # Quantos caracteres depois da URL ainda contam como "o corpo desta chamada".
@@ -167,8 +173,6 @@ def main() -> None:
     # --- toda chamada ao chatbot diz de qual loja fala (§6.2) ---------------
     # Sem isto o workflow volta a servir uma loja só — e o sintoma é silêncio,
     # não erro: o chatbot procura a conversa na loja errada e o agente para.
-    # `catalogo-bot` fica de fora de propósito: ela não lê loja nenhuma, e
-    # mandar `instance` ali só fingiria conserto (ver o card, Fora de escopo).
     # Nó HTTP Request tem UMA url, então a pergunta é do nó inteiro. Nó de
     # código faz várias chamadas — `solicitar_handoff1` manda `instance` no
     # PATCH /estado e é o POST seguinte que falta — então ali a busca é por

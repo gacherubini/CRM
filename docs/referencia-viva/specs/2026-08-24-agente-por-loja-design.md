@@ -646,13 +646,26 @@ E a armadilha que nenhum dos dois pega, do learning: **saída órfã** — nó q
 recorte, continua rodando e tem o resultado descartado do outro lado. Ao comparar os
 modos, comparar o que cada nó **consome**, não só quais existem.
 
-## 8. Dívida herdada (não é desta feature, mas encosta)
+## 8. Dívida herdada — **resolvida em 25/08**
 
-`GET /v1/config/catalogo-bot` é cega para loja: `InventoryWriteClient.obter_loja()`
-(`chatbot-api/app/inventory.py:461`) bate em `/v1/loja` do Estoque com bearer global,
-sem slug. Com N lojas no Modo 2, todas recebem o catálogo de uma. É buraco do **contrato
-com o Estoque**, não da credencial. Precisa de card próprio: ou o Estoque expõe catálogo
-por slug, ou o chatbot passa a guardar a URL.
+`GET /v1/config/catalogo-bot` era cega para loja: `InventoryWriteClient.obter_loja()`
+batia em `/v1/loja` do Estoque com bearer global, sem slug, e com N lojas no Modo 2 todas
+recebiam o catálogo de uma — o cliente da loja B ganhava o link da vitrine da loja A, sem
+erro e sem log.
+
+**O dono escolheu a saída (a):** o Estoque passou a devolver `catalogo_url` em
+`GET /public/v1/lojas/{slug}` — a mesma rota que `provider.buscar` já usava, multi-loja
+por natureza. O chatbot lê por slug, e só **depois disso** `instance` significa alguma
+coisa ali; a tool `enviar_link_catalogo1` passou a mandá-la.
+
+O que isso custa, escolhido de olhos abertos: antes era preciso conversar com o bot para
+receber o link, agora basta adivinhar um slug. Não é vazamento — é a URL que o bot entrega
+a quem pedir, e a vitrine que ela abre já é pública. Havia um teste no Estoque afirmando o
+contrário (`assert "catalogo_url" not in pub`); ele foi invertido no mesmo commit, com o
+motivo escrito onde estava o antigo.
+
+Se um dia incomodar, a saída seguinte é credencial de integração no Estoque
+(`CredencialServico.loja_id` hoje é `NOT NULL`) — e aí é card próprio.
 
 ## 9. Ordem de implementação
 

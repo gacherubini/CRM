@@ -198,7 +198,10 @@ def test_patch_whatsapp_loja_normaliza_e_reflete_no_publico(client, loja_a):
 
     pub = client.get(f"/public/v1/lojas/{slug}").json()
     assert pub["whatsapp"] == "5521988887777"
-    assert "catalogo_url" not in pub
+    # Invertido em 25/08 junto com o payload: o chatbot precisa do link por slug,
+    # e ele e a URL que o bot ja entrega a qualquer cliente que peca as motos.
+    # Ver o docstring de `_loja_publica`.
+    assert pub["catalogo_url"] is None
 
     limpa = client.patch("/v1/loja", json={"whatsapp": ""}, headers=h)
     assert limpa.status_code == 200
@@ -221,3 +224,27 @@ def test_patch_catalogo_url_loja(client, loja_a):
     limpa = client.patch("/v1/loja", json={"catalogo_url": ""}, headers=h)
     assert limpa.status_code == 200
     assert limpa.json()["catalogo_url"] is None
+
+
+def test_publico_por_slug_devolve_o_catalogo_de_cada_loja(client, loja_a, loja_b):
+    """O motivo de o campo existir aqui: o chatbot precisa do link POR SLUG.
+
+    Com `/v1/loja` (escopada pelo token) e um token global, todas as lojas
+    recebiam o catálogo de uma só — o cliente da loja B ganhava o link da
+    vitrine da loja A, sem erro e sem log.
+    """
+    client.patch(
+        "/v1/loja",
+        json={"catalogo_url": "https://exemplo.com/a"},
+        headers=loja_a["headers"],
+    )
+    client.patch(
+        "/v1/loja",
+        json={"catalogo_url": "https://exemplo.com/b"},
+        headers=loja_b["headers"],
+    )
+
+    pub_a = client.get(f"/public/v1/lojas/{loja_a['slug']}").json()
+    pub_b = client.get(f"/public/v1/lojas/{loja_b['slug']}").json()
+    assert pub_a["catalogo_url"] == "https://exemplo.com/a"
+    assert pub_b["catalogo_url"] == "https://exemplo.com/b"

@@ -13,7 +13,6 @@ deploy. Ops sem código novo não ganha card.
 
 | Card | Produto | O que falta no `main` |
 |---|---|---|
-| [Catálogo do bot por loja](2026-08-25-catalogo-por-loja.md) | Estoque / Chatbot / n8n | `GET /v1/config/catalogo-bot` é cega para loja: com duas lojas no Modo 2, o cliente de uma recebe o link da vitrine da outra — sem erro e sem log. **Não é pesquisa, é decisão do dono**: o card compara as três saídas com o custo de cada uma e recomenda uma. Só morde com a segunda loja Modo 2. |
 | [Postgres 2 — o corte](2026-08-16-postgres-2-corte.md) | Loja / Control / Deploy | Portal e Control ainda rodam **SQLite em arquivo** no volume do `app2037`. O card leva os dois para o banco `revy` no `suite-pg`, com schema e role por produto. Traz ferramenta com teste (pré-voo, carga, validação) e o runbook do corte com caminho de aborto. **Ler o spec junto.** |
 | [Postgres 1 — concorrência](2026-08-16-postgres-1-concorrencia.md) | Loja | Três "lê-depois-escreve" viram transições atômicas. Só o rate-limit de ações vaza hoje; o resto é **pré-requisito do segundo processo**, não do corte. Independente do card acima — qualquer ordem. |
 | [Modo 2 — humanização da entrega](2026-08-24-modo2-humanizacao-da-entrega.md) | n8n | **Encolheu em 24/08.** A Task 1 saiu: o "digitando…" da Cloud API está no `chatbot-api` e não precisou do `delay` do Modo 1 — na API oficial não há anti-ban a imitar. Restam o filtro que minuscula URL e `Cód:` (Task 2) e o tom, que é decisão do dono (Task 3). |

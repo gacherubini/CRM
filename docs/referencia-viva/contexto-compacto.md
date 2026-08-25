@@ -31,6 +31,13 @@ Vocabulário: [`../../CONTEXT.md`](../../CONTEXT.md). As-built Control/Loja:
   Teste de aceite que importa: a vitor motos entra com a config semeada e o bot **não
   muda de jeito de falar** no dia do deploy. Se mudar, é bug, não feature.
 
+- **Catálogo do bot por loja (25/08):** `GET /v1/config/catalogo-bot` era cega para loja —
+  com N lojas no Modo 2, o cliente de uma recebia o link da vitrine da outra, sem erro e
+  sem log. O dono escolheu expor `catalogo_url` em `GET /public/v1/lojas/{slug}` do
+  Estoque; o chatbot lê por slug e a tool `enviar_link_catalogo1` manda `instance`. Sai da
+  §8 do spec do agente por loja como **resolvida**. Sobe junto no mesmo deploy (é
+  `estoque-api` + `chatbot-api` no `app2037`, e o workflow no `n8n2037`).
+
 - **Copiloto de Vendas (Loja):** F1–F4 no `main`. Seção própria no shell (dono/gerente),
   chat com LLM (DeepSeek, turno assíncrono), 7 regras de sinal (`estoque_parado`,
   `lead_sem_resposta`, `meta_em_risco`, `margem_incompleta`, `cadastro_incompleto`,

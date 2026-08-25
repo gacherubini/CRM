@@ -1,3 +1,12 @@
+> **EXECUTADO em 25/08/2026.** O dono escolheu a saída **(a)**. O Estoque devolve
+> `catalogo_url` em `GET /public/v1/lojas/{slug}`, o chatbot lê por slug e a tool
+> `enviar_link_catalogo1` manda `instance`. O teste que afirmava o contrário
+> (`assert "catalogo_url" not in pub`) foi invertido no mesmo commit, com o motivo escrito
+> onde estava o antigo. **Não reexecutar.**
+>
+> O que ficou registrado para o futuro: se enumerar catálogo por slug um dia incomodar, a
+> saída seguinte é a **(b)** — credencial de integração no Estoque.
+
 # Catálogo do bot é cego para loja — três saídas, uma decisão
 
 **Produto:** `estoque-api` (dono do dado) + `chatbot-api` (consumidor) + `n8n`.

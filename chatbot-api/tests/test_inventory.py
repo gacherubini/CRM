@@ -19,6 +19,9 @@ class _FakeProvider:
         self.midias_consultadas.append((slug, veiculo_id))
         return self._midia
 
+    def obter_loja_publica(self, slug):
+        return {}
+
 
 def test_busca_estoque_com_resultado(client, loja_a):
     app.dependency_overrides[get_inventory_provider] = lambda: _FakeProvider(
@@ -407,21 +410,35 @@ def test_http_provider_resolve_midia_em_detalhe_publico_tenant_scoped(monkeypatc
     assert midia["content_type"] == "image/webp"
 
 
-def test_config_catalogo_bot_configurado(client, loja_a, monkeypatch):
-    class _Write:
-        def disponivel(self):
-            return True
+class _CatalogoPorSlug:
+    """Estoque de mentira: cada slug tem o seu link, como a rota pública real."""
 
-        def obter_loja(self):
-            return {
-                "slug": "x",
-                "catalogo_url": "https://exemplo.com/catalogo/l/loja",
-            }
+    def __init__(self, por_slug=None, erro=False):
+        self._por_slug = por_slug or {}
+        self._erro = erro
+        self.consultados = []
 
-    from app.main import app
-    from app.inventory import get_inventory_write_client
+    def buscar(self, slug, termo=None):
+        return []
 
-    app.dependency_overrides[get_inventory_write_client] = lambda: _Write()
+    def obter_por_placa(self, placa):
+        return None
+
+    def obter_midia_principal(self, slug, veiculo_id):
+        return None
+
+    def obter_loja_publica(self, slug):
+        self.consultados.append(slug)
+        # O provider real engole erro e devolve {} — o bot cai na mensagem de
+        # "não configurado" em vez de ficar mudo.
+        if self._erro:
+            return {}
+        return {"slug": slug, "catalogo_url": self._por_slug.get(slug)}
+
+
+def test_config_catalogo_bot_configurado(client, loja_a):
+    fake = _CatalogoPorSlug({loja_a["slug"]: "https://exemplo.com/catalogo/l/loja"})
+    app.dependency_overrides[get_inventory_provider] = lambda: fake
     try:
         r = client.get("/v1/config/catalogo-bot", headers=loja_a["headers"])
         assert r.status_code == 200, r.text
@@ -434,22 +451,14 @@ def test_config_catalogo_bot_configurado(client, loja_a, monkeypatch):
         )
         # Nunca instrução interna ("manda este link pro cliente…").
         assert "pro cliente" not in body["mensagem"].lower()
+        # A consulta é POR SLUG: era isto que não acontecia.
+        assert fake.consultados == [loja_a["slug"]]
     finally:
-        app.dependency_overrides.pop(get_inventory_write_client, None)
+        app.dependency_overrides.pop(get_inventory_provider, None)
 
 
-def test_config_catalogo_bot_sem_url(client, loja_a, monkeypatch):
-    class _Write:
-        def disponivel(self):
-            return True
-
-        def obter_loja(self):
-            return {"slug": "x", "catalogo_url": None}
-
-    from app.main import app
-    from app.inventory import get_inventory_write_client
-
-    app.dependency_overrides[get_inventory_write_client] = lambda: _Write()
+def test_config_catalogo_bot_sem_url(client, loja_a):
+    app.dependency_overrides[get_inventory_provider] = lambda: _CatalogoPorSlug({})
     try:
         r = client.get("/v1/config/catalogo-bot", headers=loja_a["headers"])
         assert r.status_code == 200
@@ -458,4 +467,62 @@ def test_config_catalogo_bot_sem_url(client, loja_a, monkeypatch):
         assert body["configurado"] is False
         assert body["catalogo_url"] is None
     finally:
-        app.dependency_overrides.pop(get_inventory_write_client, None)
+        app.dependency_overrides.pop(get_inventory_provider, None)
+
+
+def test_config_catalogo_bot_estoque_fora_do_ar_nao_deixa_o_bot_mudo(client, loja_a):
+    """O provider engole o erro e devolve {}: o agente pede o modelo em vez de
+    dizer que o catálogo quebrou."""
+    app.dependency_overrides[get_inventory_provider] = lambda: _CatalogoPorSlug(erro=True)
+    try:
+        r = client.get("/v1/config/catalogo-bot", headers=loja_a["headers"])
+        assert r.status_code == 200
+        body = r.json()
+        assert body["ok"] is False
+        assert "use consultar_estoque" in body["mensagem"]
+    finally:
+        app.dependency_overrides.pop(get_inventory_provider, None)
+
+
+def test_cada_loja_recebe_o_proprio_catalogo(client, db, loja_a, loja_b):
+    """O bug que esta rota tinha: um bearer global em `/v1/loja` fazia toda loja
+    receber o catálogo de uma só — o cliente da loja B ganhava o link da vitrine
+    da loja A, sem erro e sem log."""
+    fake = _CatalogoPorSlug(
+        {loja_a["slug"]: "https://exemplo.com/a", loja_b["slug"]: "https://exemplo.com/b"}
+    )
+    app.dependency_overrides[get_inventory_provider] = lambda: fake
+    try:
+        a = client.get("/v1/config/catalogo-bot", headers=loja_a["headers"]).json()
+        b = client.get("/v1/config/catalogo-bot", headers=loja_b["headers"]).json()
+        assert a["catalogo_url"] == "https://exemplo.com/a"
+        assert b["catalogo_url"] == "https://exemplo.com/b"
+    finally:
+        app.dependency_overrides.pop(get_inventory_provider, None)
+
+
+def test_integracao_escolhe_a_loja_pela_instance(client, db, loja_a, loja_b):
+    """Agora `instance` significa alguma coisa aqui — antes seria teatro, porque
+    o dado vinha de um lugar que não sabe de qual loja se fala."""
+    from app import servico
+
+    fake = _CatalogoPorSlug(
+        {loja_a["slug"]: "https://exemplo.com/a", loja_b["slug"]: "https://exemplo.com/b"}
+    )
+    app.dependency_overrides[get_inventory_provider] = lambda: fake
+    token = servico.criar_credencial_integracao(db)
+    db.commit()
+    headers = {"Authorization": f"Bearer {token}"}
+    try:
+        r = client.get(
+            f"/v1/config/catalogo-bot?instance={loja_b['instance']}", headers=headers
+        )
+        assert r.status_code == 200
+        assert r.json()["catalogo_url"] == "https://exemplo.com/b"
+
+        # Sem instance, 400 — nunca um fallback para "alguma" loja.
+        sem = client.get("/v1/config/catalogo-bot", headers=headers)
+        assert sem.status_code == 400
+        assert "instance" in sem.json()["detail"]
+    finally:
+        app.dependency_overrides.pop(get_inventory_provider, None)

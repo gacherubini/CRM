@@ -1,6 +1,6 @@
 # estoque-api · 41 rotas · 12 modelos · 1 workers · 10 migrations · 3 templates
 
-Gerado de `0358bd7`. NAO editar a mao — saida de `gerar_mapa.py`.
+Gerado de `c4700c5`. NAO editar a mao — saida de `gerar_mapa.py`.
 Migration head: `0010`
 
 ## Rotas
@@ -41,11 +41,11 @@ Migration head: `0010`
 - `GET /v1/importacoes` — app/main.py:558
 - `GET /v1/veiculos.csv` — app/main.py:587
 - `GET /public/v1/media/{loja_id}/{veiculo_id}/{arquivo}` — app/main.py:602
-- `GET /public/v1/lojas/{slug}` — app/main.py:652
-- `GET /v1/loja` — app/main.py:670
-- `PATCH /v1/loja` — app/main.py:680
-- `GET /public/v1/lojas/{slug}/veiculos` — app/main.py:703
-- `GET /public/v1/lojas/{slug}/veiculos/{veiculo_id}` — app/main.py:732
+- `GET /public/v1/lojas/{slug}` — app/main.py:673
+- `GET /v1/loja` — app/main.py:691
+- `PATCH /v1/loja` — app/main.py:701
+- `GET /public/v1/lojas/{slug}/veiculos` — app/main.py:724
+- `GET /public/v1/lojas/{slug}/veiculos/{veiculo_id}` — app/main.py:753
 
 ## Modelos
 

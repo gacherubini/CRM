@@ -22,6 +22,8 @@ from app import config
 class InventoryProvider(Protocol):
     def buscar(self, slug: str, termo: str | None = None) -> list[dict]: ...
 
+    def obter_loja_publica(self, slug: str) -> dict: ...
+
     def obter_por_placa(self, placa: str) -> dict | None: ...
 
     def obter_midia_principal(self, slug: str, veiculo_id: str) -> dict | None: ...
@@ -219,6 +221,30 @@ class HttpInventoryProvider:
             for veiculo in veiculos
             if (projetado := projetar_veiculo_chatbot(veiculo)) is not None
         ]
+
+    def obter_loja_publica(self, slug: str) -> dict:
+        """Metadados públicos da loja **por slug** — hoje só o `catalogo_url`.
+
+        Existe porque `InventoryWriteClient.obter_loja()` usa `/v1/loja`, que é
+        escopada pelo token do Estoque, e o token daqui é global: com N lojas no
+        Modo 2 todas recebiam o catálogo de uma só. Esta rota é a mesma família
+        do `buscar`, que já é multi-loja por slug desde sempre.
+
+        Erro vira `{}`, não exceção: o bot cai na mensagem de "catálogo não
+        configurado" e segue pedindo o modelo — nunca fica mudo por causa disto.
+        """
+        if not self.base_url or not slug:
+            return {}
+        try:
+            r = httpx.get(
+                f"{self.base_url}/public/v1/lojas/{slug}",
+                timeout=self.timeout,
+            )
+            r.raise_for_status()
+            corpo = r.json()
+        except Exception:
+            return {}
+        return corpo if isinstance(corpo, dict) else {}
 
     def obter_por_placa(self, placa: str) -> dict | None:
         """GET privado /v1/veiculos/por-placa/{placa}. 404/erros → None."""

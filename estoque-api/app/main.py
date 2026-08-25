@@ -630,8 +630,29 @@ def _loja_dict(loja) -> dict:
 
 
 def _loja_publica(loja) -> dict:
-    # Público da vitrine: só CTA WhatsApp (URL do bot não precisa no HTML público).
-    return {"slug": loja.slug, "nome": loja.nome, "whatsapp": loja.whatsapp}
+    """Vitrine e bot: CTA WhatsApp e link do catálogo.
+
+    Até 25/08 isto era só o WhatsApp, com a nota de que "a URL do bot não precisa
+    no HTML público". Não precisava mesmo — até o `chatbot-api` precisar dela
+    **por slug**. Ele lia `/v1/loja`, que é escopado pelo token, e o token dele é
+    global: com N lojas no Modo 2, todas recebiam o catálogo de uma só, sem erro
+    e sem log. O cliente da loja B ganhava o link da vitrine da loja A.
+
+    Pôr aqui é a saída barata, e o dono escolheu ela sabendo o que ela custa:
+    antes era preciso conversar com o bot para receber o link; agora basta
+    adivinhar um slug. Não é vazamento — é literalmente a URL que o bot entrega a
+    qualquer cliente que peça para ver as motos, e a vitrine que ela abre já é
+    pública. O que continua fora daqui é o que só a gestão vê.
+
+    Se um dia isso incomodar, a saída é credencial de integração no Estoque
+    (`CredencialServico.loja_id` hoje é `NOT NULL`) — e aí é card próprio.
+    """
+    return {
+        "slug": loja.slug,
+        "nome": loja.nome,
+        "whatsapp": loja.whatsapp,
+        "catalogo_url": loja.catalogo_url,
+    }
 
 
 def _resposta_publica_cache(request: Request, payload: dict, atualizado_em) -> Response:

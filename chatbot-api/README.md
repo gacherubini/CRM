@@ -303,13 +303,10 @@ Fora da v1, com motivo registrado no spec e na
 loja (§4.4.2), `só lead de anúncio` (§4.6, depende de atribuição CTWA confiável), e tela
 no Control para trocar modelo (§7, o modelo é global).
 
-Dívida herdada que encosta nesta feature: `GET /v1/config/catalogo-bot` é cega para loja
-(§8). **Não é conserto, é decisão** — o Estoque não tem credencial sem loja
-(`CredencialServico.loja_id` é `NOT NULL`) e a rota pública por slug omite o
-`catalogo_url` **de propósito**, com teste afirmando isso. As três saídas, com o custo de
-cada uma e uma recomendação, estão em
-[`../docs/fila/2026-08-25-catalogo-por-loja.md`](../docs/fila/2026-08-25-catalogo-por-loja.md).
-Só morde com a segunda loja no Modo 2.
+A dívida herdada que encostava nesta feature — `GET /v1/config/catalogo-bot` cega para
+loja — **foi resolvida em 25/08**, com o dono escolhendo expor `catalogo_url` na rota
+pública por slug do Estoque. Ver §8 do spec e
+[`../docs/referencia-viva/planos/2026-08-25-catalogo-por-loja.md`](../docs/referencia-viva/planos/2026-08-25-catalogo-por-loja.md).
 
 ## Rodar e testar
 

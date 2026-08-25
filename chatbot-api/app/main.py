@@ -1270,39 +1270,32 @@ def atualizar_etapa_lead(
 
 @app.get("/v1/config/catalogo-bot")
 def config_catalogo_bot(
+    instance: Optional[str] = None,
     ctx: Contexto = Depends(get_contexto),
-    write_client: InventoryWriteClient = Depends(get_inventory_write_client),
+    db: Session = Depends(get_db),
+    provider: InventoryProvider = Depends(get_inventory_provider),
 ):
     """Link do catálogo configurado na Loja (bot manda quando o cliente pede as motos).
 
     Fonte: Estoque ``lojas.catalogo_url``, editável em Revy Loja → Números/Catálogo.
 
-    **Esta rota é cega para loja, e ``instance`` não a conserta.** Ela não lê
-    ``ctx.loja_id``: quem responde é ``InventoryWriteClient.obter_loja()``, que
-    bate em ``/v1/loja`` do Estoque com **um bearer global**, sem slug. Com N
-    lojas no Modo 2, todas recebem o catálogo da loja daquele token.
+    **Foi cega para loja até 25/08**, e é a rota que o learning
+    ``2026-08-24-instance-nao-conserta-toda-rota`` usava de exemplo: ela lia
+    ``InventoryWriteClient.obter_loja()``, que bate em ``/v1/loja`` do Estoque
+    com um bearer **global**. Com N lojas no Modo 2 todas recebiam o catálogo de
+    uma só, e aceitar ``instance`` ali teria sido teatro — o dado vinha de um
+    lugar que não sabe de qual loja se fala.
 
-    É um buraco multi-loja **do contrato com o Estoque**, não da credencial
-    (spec §6.2) — receber ``instance`` aqui só daria a impressão de estar
-    resolvido. Precisa de card próprio: ou o Estoque expõe o catálogo por slug,
-    ou o chatbot passa a guardar a URL.
+    O conserto foi mudar a **fonte**, não o parâmetro: o Estoque passou a
+    devolver ``catalogo_url`` em ``/public/v1/lojas/{slug}``, que é multi-loja
+    por natureza — a mesma rota que ``provider.buscar`` já usava. Só depois disso
+    ``instance`` significa alguma coisa aqui.
+
+    ``resolver_loja_id`` vem antes de tudo: com credencial de integração
+    ``ctx.loja_id`` é ``None``, e ler ``.slug`` de ``None`` seria 500, não 400.
     """
-    if not write_client.disponivel():
-        return {
-            "ok": False,
-            "configurado": False,
-            "catalogo_url": None,
-            "mensagem": "catálogo ainda não configurado. peça o modelo que o cliente procura e use consultar_estoque.",
-        }
-    try:
-        meta = write_client.obter_loja()
-    except HTTPException:
-        return {
-            "ok": False,
-            "configurado": False,
-            "catalogo_url": None,
-            "mensagem": "não consegui carregar o catálogo agora. peça o modelo que o cliente procura e use consultar_estoque.",
-        }
+    loja = db.get(models_db.Loja, resolver_loja_id(db, ctx, instance))
+    meta = provider.obter_loja_publica(loja.slug) if loja else {}
     url = str((meta or {}).get("catalogo_url") or "").strip()
     if not url:
         return {
