@@ -97,6 +97,12 @@ conhecidos que ela não pode repetir
 Evolution; no Modo 2 é o `phone_number_id` da Meta, e precisa passar por
 `loja_id_do_phone_number_id` (`app/cloud_canal.py`) antes.
 
+**O fallback do §9 não vale para 423.** A rota aplica `_exigir_loja_operacional`, então
+loja suspensa responde **423**. Se o n8n tratasse isso como "falhou, usa o padrão Revy",
+a loja suspensa continuaria sendo atendida pelo bot — quebrando o invariante do
+`AGENTS.md` §5 ("suspensão de loja é gate de backend"). Regra: **fallback só em falha
+técnica (timeout, 5xx). Em 423 o workflow para.**
+
 ### 3.4 Montagem do prompt — o sanduíche
 
 ```
