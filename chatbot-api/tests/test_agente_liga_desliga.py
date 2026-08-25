@@ -35,6 +35,20 @@ def test_agente_ligado_segue_o_fluxo_normal(client, db, loja_a):
     assert r.json().get("motivo") != "agente_desligado"
 
 
+def test_loja_sem_config_nenhuma_responde_normalmente(client, db, loja_b):
+    """Protege o default: campos_publicados cai em CAMPOS_PADRAO_REVY quando a loja
+    nunca publicou config, e agente_ativo=True nesse padrão. Quebrar isto deixa o
+    bot mudo em produção para toda loja que nunca configurou o agente."""
+    r = client.post(
+        "/v1/conversas/5519999999999/pode-responder",
+        json={"instance": loja_b["instance"], "provider_message_id": "m3"},
+        headers=loja_b["headers"],
+    )
+    assert r.status_code == 200
+    assert r.json().get("motivo") != "agente_desligado"
+    assert r.json().get("motivo") != "fora_de_horario"
+
+
 def test_fora_do_horario_quando_a_loja_pediu_so_comercial(db):
     """14h de uma terça está dentro; 23h não. Fuso fixo America/Sao_Paulo."""
     campos = CamposAgente(
