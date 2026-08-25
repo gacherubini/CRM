@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Revy — hero</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500&family=Newsreader:opsz,wght@6..72,300&display=swap" rel="stylesheet" />
+<style>
+  :root{
+    --paper:#f9f9f9; --surface:#fff; --raised:#f4f2f1; --soft:#efeceb;
+    --ink:#1b1b1b; --ink-soft:#57514f; --ink-muted:#6b625f;
+    --line:#ded8d9; --line-strong:#cdc6c4;
+    --g900:#0f2b20; --g700:#1f4d3a; --g500:#2f7355; --g100:#dfeee7; --wa:#25d366;
+    --ui:'Hanken Grotesk','Segoe UI',system-ui,sans-serif;
+    --ser:'Newsreader',Georgia,serif;
+    --mono:ui-monospace,'SF Mono',Consolas,monospace;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{height:100%;overflow:hidden;background:var(--paper)}
+  body{font-family:var(--ui);color:var(--ink);-webkit-font-smoothing:antialiased}
+  #fit{position:fixed;inset:0;overflow:hidden}
+  #stage{width:1920px;height:1080px;position:absolute;left:0;top:0;background:var(--paper);transform-origin:0 0;overflow:hidden}
+  .win{position:absolute;left:40px;top:40px;width:1840px;height:1120px;border-radius:20px;overflow:hidden;
+       background:var(--surface);box-shadow:0 40px 100px rgba(27,20,20,.16),0 8px 24px rgba(27,20,20,.08)}
+  .bar{position:absolute;left:0;top:0;width:100%;height:58px;background:var(--raised);border-bottom:1px solid var(--line);
+       display:flex;align-items:center;padding:0 28px;will-change:transform}
+  .lights{display:flex;gap:12px}
+  .lights i{width:15px;height:15px;border-radius:99px;display:block}
+  .bar b{position:absolute;left:0;width:100%;text-align:center;font:400 18px/1 var(--ui);color:var(--ink-muted)}
+  .content{position:absolute;left:0;top:58px;width:100%;bottom:0;overflow:hidden}
+  .mono{font:400 22px/1.3 var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--ink-muted);white-space:nowrap}
+
+  /* painel WhatsApp */
+  .panel{position:absolute;left:0;top:0;bottom:0;width:900px;background:var(--soft);border-right:1px solid var(--line)}
+  .whead{position:absolute;left:0;top:0;width:100%;height:96px;background:var(--raised);border-bottom:1px solid var(--line);
+         display:flex;align-items:center;gap:16px;padding:0 32px}
+  .av{width:52px;height:52px;border-radius:99px;background:var(--g900);color:#fff;font:500 24px/52px var(--ui);text-align:center;flex-shrink:0}
+  .wname{font:500 27px/1.2 var(--ui);white-space:nowrap}
+  .wstat{font:400 21px/1.35 var(--ui);color:var(--ink-muted);white-space:nowrap}
+  .wtag{margin-left:auto;display:flex;align-items:center;gap:10px}
+  .wtag i{width:11px;height:11px;border-radius:99px;background:var(--wa);display:block}
+  .msgs{position:absolute;left:0;top:96px;width:100%;height:754px;padding:24px 32px;overflow:hidden;
+        display:flex;flex-direction:column;justify-content:flex-end;gap:14px}
+  .row{display:flex;will-change:transform,opacity}
+  .row.me{justify-content:flex-end}
+  .b{max-width:700px;flex-shrink:0;width:fit-content;padding:16px 22px 12px;border-radius:12px;
+     border:1px solid var(--line);background:var(--surface);box-shadow:0 1px 2px rgba(27,20,20,.05)}
+  .row.me .b{background:var(--g100);border-color:rgba(31,77,58,.10);color:var(--g900);border-top-right-radius:4px}
+  .row.them .b{border-top-left-radius:4px}
+  .b p{font:400 28px/1.4 var(--ui);text-wrap:pretty}
+  .b p.m{font:400 27px/1.4 var(--mono)}
+  .meta{margin-top:4px;display:flex;align-items:center;justify-content:flex-end;gap:6px;font:400 17px/1 var(--ui);color:var(--ink-muted)}
+  .meta s{text-decoration:none;color:var(--g500);font-size:18px}
+  .typing{display:flex;gap:9px;align-items:center;height:24px;padding-left:8px}
+  .typing i{width:10px;height:10px;border-radius:99px;background:var(--line-strong);display:block}
+  .composer{position:absolute;left:0;top:850px;width:100%;padding:16px 32px;display:flex;align-items:center;gap:16px;
+            background:var(--raised);border-top:1px solid var(--line)}
+  .field{flex:1;height:60px;border-radius:12px;background:var(--surface);border:1px solid var(--line);
+         display:flex;align-items:center;padding:0 22px;font:400 24px/1 var(--ui);color:var(--ink-muted)}
+  .send{width:60px;height:60px;border-radius:99px;background:var(--g700);color:#fff;font:400 26px/60px var(--ui);text-align:center;flex-shrink:0}
+
+  /* simulação */
+  .sim{position:absolute;left:956px;top:44px;width:824px}
+  .wait{position:absolute;left:18px;top:66px;font:400 26px/1.4 var(--ui);color:var(--line-strong);white-space:nowrap}
+  .brow{display:flex;align-items:center;justify-content:space-between;padding:0 18px;height:84px;border-bottom:1px solid var(--line);
+        will-change:transform,opacity}
+  .bank{font:500 30px/1 var(--ui);white-space:nowrap}
+  .vals{display:flex;align-items:center;gap:22px}
+  .num{position:relative;width:230px;text-align:right;height:30px}
+  .num .q{font:400 24px/30px var(--mono);letter-spacing:.08em;color:var(--line-strong)}
+  .num .v{position:absolute;inset:0;text-align:right;font:500 29px/30px var(--mono);opacity:0}
+  .pill{width:168px;opacity:0;display:flex;align-items:center;justify-content:center;gap:9px;padding:9px 0;border-radius:3px;
+        border:1px solid rgba(31,77,58,.16);background:var(--g100);font:500 20px/1 var(--mono);letter-spacing:.1em;
+        text-transform:uppercase;color:var(--g700)}
+  .pill i{width:8px;height:8px;border-radius:99px;background:var(--g500);display:block}
+  .pill.off{border-color:var(--line);background:var(--raised);color:var(--ink-muted)}
+  .pill.off i{background:var(--line-strong)}
+  .best{margin-top:30px;transform-origin:0 50%;opacity:0}
+  .best .big{font:300 104px/1 var(--ser);letter-spacing:-.03em;color:var(--g900)}
+  .best .sub{margin-top:14px;font:400 28px/1.4 var(--ui);color:var(--ink-soft)}
+
+  /* vendedor */
+  .vend{position:absolute;left:956px;top:680px;width:824px;border-top:1px solid var(--line);padding-top:28px}
+  .vend h2{margin-top:12px;font:300 50px/1.08 var(--ser);letter-spacing:-.03em;font-weight:300}
+  .vcard{max-width:810px;padding:20px 26px;border-radius:12px;background:var(--surface);border:1px solid var(--line);
+         box-shadow:0 1px 2px rgba(27,20,20,.05)}
+  .vcard .who{font:500 19px/1 var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--g700);margin-bottom:10px}
+  .vcard p{font:400 26px/1.38 var(--ui);text-wrap:pretty}
+
+  /* final */
+  .moto{position:absolute;inset:0;opacity:0;will-change:opacity}
+  .moto img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:50% 46%;will-change:transform}
+  .selo{position:absolute;left:50%;bottom:120px;opacity:0;white-space:nowrap;padding:26px 44px;border-radius:12px;text-align:center;
+        background:rgba(255,255,255,.93);border:1px solid var(--line);box-shadow:0 8px 24px rgba(27,20,20,.08)}
+  .selo .k{font:500 22px/1 var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--g700);margin-bottom:14px}
+  .selo .t{font:300 50px/1.1 var(--ser);letter-spacing:-.03em}
+</style>
+</head>
+<body>
+<div id="fit"><div id="stage">
+  <div class="win">
+    <div class="bar" id="bar">
+      <div class="lights"><i style="background:#FF5F57"></i><i style="background:#FEBC2E"></i><i style="background:#28C840"></i></div>
+      <b>revy loja</b>
+    </div>
+    <div class="content">
+      <div id="stations" style="position:absolute;inset:0">
+      <div class="panel">
+        <div class="whead">
+          <div class="av">M</div>
+          <div style="flex-shrink:0">
+            <div class="wname">Motos Vale</div>
+            <div class="wstat" id="status">assistente online</div>
+          </div>
+          <div class="wtag"><i></i><div class="mono" style="font-size:18px">WhatsApp</div></div>
+        </div>
+        <div class="msgs">
+          <div class="row me" data-at="0.45"><div class="b"><p>Oi! Vi a GSX-S750 no anúncio</p><div class="meta">9:38</div></div></div>
+          <div class="row them" data-at="1.05"><div class="b"><p>Sou o assistente da Motos Vale. Posso buscar as condições de financiamento pra você?</p><div class="meta">9:38 <s>✓✓</s></div></div></div>
+          <div class="row me" data-at="1.62"><div class="b"><p>Pode sim!</p><div class="meta">9:39</div></div></div>
+          <div class="row them" data-at="2.20"><div class="b"><p>Show. Me manda seu CPF e a data de nascimento?</p><div class="meta">9:39 <s>✓✓</s></div></div></div>
+          <div class="row me" data-at="3.00"><div class="b"><p class="m">123.456.789-00 · 14/03/1994</p><div class="meta">9:41</div></div></div>
+          <div class="row them" data-at="3.75"><div class="b"><p>Valeu! Já estou simulando nos bancos da loja.</p><div class="meta">9:41 <s>✓✓</s></div></div></div>
+          <div class="typing" id="typing"><i></i><i></i><i></i></div>
+        </div>
+        <div class="composer">
+          <div class="field">Mensagem</div>
+          <div class="send">→</div>
+        </div>
+      </div>
+
+      <div class="sim">
+        <div class="mono" style="margin-bottom:8px">Simulação nos bancos da loja</div>
+        <div class="wait" id="wait">aguardando os dados do cliente</div>
+        <div class="brow" data-at="4.30" data-solve="5.00" id="rowWin">
+          <div class="bank">Santander</div>
+          <div class="vals"><div class="num"><div class="q">consultando…</div><div class="v">48x · R$ 489</div></div><div class="pill"><i></i>aprovado</div></div>
+        </div>
+        <div class="brow" data-at="4.50" data-solve="5.20">
+          <div class="bank">Bradesco</div>
+          <div class="vals"><div class="num"><div class="q">consultando…</div><div class="v">48x · R$ 512</div></div><div class="pill"><i></i>aprovado</div></div>
+        </div>
+        <div class="brow" data-at="4.70" data-solve="5.40">
+          <div class="bank">Banco PAN</div>
+          <div class="vals"><div class="num"><div class="q">consultando…</div><div class="v">60x · R$ 431</div></div><div class="pill"><i></i>aprovado</div></div>
+        </div>
+        <div class="brow" data-at="4.90" data-solve="5.60">
+          <div class="bank">Fontecred</div>
+          <div class="vals"><div class="num"><div class="q">consultando…</div><div class="v" style="color:var(--ink-muted)">sem retorno</div></div><div class="pill off"><i></i>—</div></div>
+        </div>
+        <div class="best" id="best">
+          <div class="mono" style="color:var(--g700);margin-bottom:12px">Melhor condição · Santander</div>
+          <div class="big">48x de R$ 489</div>
+          <div class="sub">GSX-S750 · entrada de R$ 3.000</div>
+        </div>
+      </div>
+
+        <div class="vend">
+        <div data-at="7.65"><div class="mono">Vendedor assume</div></div>
+        <h2 data-at="7.85">Rafael entra já sabendo de tudo.</h2>
+        <div data-at="8.30" style="margin-top:22px;display:flex">
+          <div class="vcard">
+            <div class="who">Rafael · plantão</div>
+            <p>Saiu 48x de R$ 489 na sua GSX-S750. Bora fechar hoje?</p>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="moto" id="moto">
+      <img src="../assets/moto.jpg" alt="GSX-S750 entregue" id="motoImg" />
+      <div class="selo" id="selo">
+        <div class="k">Venda confirmada</div>
+        <div class="t">GSX-S750 · 48x de R$ 489</div>
+      </div>
+    </div>
+    </div>
+  </div>
+</div></div>
+
+<script>
+(function () {
+  var DUR = 12, E = 9.4;
+  var outCubic = function (p) { return 1 - Math.pow(1 - p, 3); };
+  var inOut = function (p) { return p < .5 ? 4 * p * p * p : 1 - Math.pow(-2 * p + 2, 3) / 2; };
+  function tw(t, a, b, s, e, f) {
+    if (t <= s) return a;
+    if (t >= e) return b;
+    return a + (b - a) * (f || inOut)((t - s) / (e - s));
+  }
+
+  /* escala do palco */
+  var stage = document.getElementById('stage');
+  function fit() {
+    var k = Math.min(innerWidth / 1920, innerHeight / 1080);
+    stage.style.transform = 'translate(' + ((innerWidth - 1920 * k) / 2).toFixed(2) + 'px,' +
+      ((innerHeight - 1080 * k) / 2).toFixed(2) + 'px) scale(' + k + ')';
+  }
+  addEventListener('resize', fit, { passive: true });
+  fit();
+
+  /* elementos */
+  var enters = [].map.call(document.querySelectorAll('[data-at]'), function (el) {
+    return { el: el, at: parseFloat(el.dataset.at) };
+  });
+  var rows = [].map.call(document.querySelectorAll('.brow'), function (el) {
+    return { el: el, at: parseFloat(el.dataset.solve), q: el.querySelector('.q'), v: el.querySelector('.v'), p: el.querySelector('.pill') };
+  });
+  var stations = document.getElementById('stations'),
+      statusEl = document.getElementById('status'),
+      typing = document.getElementById('typing'),
+      dots = typing.children,
+      wait = document.getElementById('wait'),
+      best = document.getElementById('best'),
+      rowWin = document.getElementById('rowWin'),
+      moto = document.getElementById('moto'),
+      motoImg = document.getElementById('motoImg'),
+      selo = document.getElementById('selo');
+  var lastStatus = '';
+
+  function render(T) {
+    var i, o, y;
+    for (i = 0; i < enters.length; i++) {
+      o = enters[i]; var a = o.at;
+      o.el.style.opacity = tw(T, 0, 1, a, a + .36, outCubic);
+      o.el.style.transform = 'translateY(' + tw(T, 34, 0, a, a + .52, outCubic).toFixed(2) + 'px)';
+    }
+    for (i = 0; i < rows.length; i++) {
+      var r = rows[i], s = tw(T, 0, 1, r.at, r.at + .35, inOut);
+      r.q.style.opacity = 1 - s; r.v.style.opacity = s; r.p.style.opacity = s;
+    }
+    /* melhor condição */
+    var hi = tw(T, 0, 1, 6.5, 6.9, inOut);
+    rowWin.style.background = 'rgba(223,238,231,' + (hi * .9).toFixed(3) + ')';
+    best.style.opacity = tw(T, 0, 1, 6.6, 6.86, outCubic);
+    best.style.transform = 'scale(' + tw(T, .92, 1, 6.6, 7.18, outCubic).toFixed(3) + ')';
+    wait.style.opacity = 1 - tw(T, 0, 1, 4.0, 4.3, inOut);
+
+    /* cabeçalho do chat */
+    var st = T >= 7.75 ? 'Rafael assumiu o atendimento' : T >= 4.2 ? 'digitando…' : 'assistente online';
+    if (st !== lastStatus) { statusEl.textContent = st; lastStatus = st; }
+
+    /* reticências */
+    var on = (T > .7 && T < 1.05) || (T > 3.35 && T < 3.75);
+    typing.style.opacity = on ? 1 : 0;
+    if (on) for (i = 0; i < 3; i++) dots[i].style.opacity = .25 + .75 * Math.abs(Math.sin((T * 3.4 - i * .5) % Math.PI));
+
+    /* final */
+    stations.style.opacity = 1 - tw(T, 0, 1, E + .15, E + .9, inOut);
+
+    var mo = tw(T, 0, 1, E + .6, E + 1.35, inOut);
+    moto.style.opacity = mo;
+    if (mo > 0) {
+      motoImg.style.transform = 'scale(' + tw(T, 1.12, 1, E + .55, E + 2.4, outCubic).toFixed(4) + ')';
+      selo.style.opacity = tw(T, 0, 1, E + 1.8, E + 2.2, inOut);
+      selo.style.transform = 'translate(-50%,' + tw(T, 28, 0, E + 1.8, E + 2.4, outCubic).toFixed(1) + 'px)';
+    }
+  }
+
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) { render(DUR); return; }
+
+  var t0 = 0;
+  function frame(now) {
+    if (!t0) t0 = now;
+    var T = (now - t0) / 1000;
+    if (T >= DUR) { render(DUR); return; }   /* último frame e para: nada roda depois */
+    render(T);
+    requestAnimationFrame(frame);
+  }
+  render(0);
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
