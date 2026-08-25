@@ -15,15 +15,23 @@ Idempotente: rodar de novo republica o mesmo texto e cria mais uma versão no
 histórico; não apaga nada.
 
     cd chatbot-api
-    .venv/bin/python -m scripts.semear_config_agente vitor-motos        # macOS
-    .\\.venv\\Scripts\\python.exe -m scripts.semear_config_agente vitor-motos
+    .venv/bin/python -m scripts.semear_config_agente moto-center        # macOS
+    .\\.venv\\Scripts\\python.exe -m scripts.semear_config_agente moto-center
 
-Em produção, com o banco certo (senão o alembic/engine responde SQLite e mente):
+Em produção, dentro do `app2037`. **A variável é `DATABASE_URL`, não
+`CHATBOT_DATABASE_URL`**: `app/db.py` lê a primeira, e quem traduz uma na outra é
+o entrypoint, para os processos do bundle. Num shell avulso de `fly ssh console`
+essa tradução não aconteceu, e passar só a segunda faz o engine resolver
+`sqlite:///./chatbot.db` — o mesmo "o alembic mente" que este script alerta.
+Conferido em 25/08: com só `CHATBOT_DATABASE_URL` definido, `alembic current`
+respondeu `SQLiteImpl`.
 
-    CHATBOT_DATABASE_URL=postgres://... .venv/bin/python -m scripts.semear_config_agente vitor-motos
+    fly ssh console -a app2037 -C "sh -lc 'cd /srv/chatbot && \\
+      DATABASE_URL=\\$CHATBOT_DATABASE_URL python -m scripts.semear_config_agente moto-center'"
 """
 from __future__ import annotations
 
+import os
 import sys
 
 from app.agente_prompt import CamposAgente
@@ -64,7 +72,38 @@ CAMPOS_VITOR_MOTOS = CamposAgente(
     instrucoes="",
 )
 
-CAMPOS_POR_SLUG = {"vitor-motos": CAMPOS_VITOR_MOTOS}
+# A loja do piloto está gravada como `moto-center` — slug de exemplo herdado do
+# plano de deploy de julho — enquanto o nome que o cliente ouve, e que o
+# `systemMessage` de hoje diz, é "vitor motos". Conferido no Postgres de produção
+# em 25/08: `moto-center` é a única loja com conversa (1.235) e instância
+# Evolution, e é para ela que o `CHATBOT_API_TOKEN` do workflow do Modo 1 aponta.
+# Semear por `vitor-motos` parava o passo 2 do rollout com "loja não existe".
+CAMPOS_POR_SLUG = {
+    "moto-center": CAMPOS_VITOR_MOTOS,
+    # Continua aceito para o dia em que a linha for renomeada.
+    "vitor-motos": CAMPOS_VITOR_MOTOS,
+}
+
+
+def _banco_errado() -> str | None:
+    """Motivo para parar antes de escrever, ou ``None`` quando o banco confere.
+
+    `app/db.py` lê `DATABASE_URL`. Quem passa só `CHATBOT_DATABASE_URL` — que é o
+    nome do secret, e por isso o palpite natural — escreve num SQLite de mentira
+    sem perceber. Recusar aqui é barato; descobrir depois é a loja estreando com
+    o prompt padrão.
+    """
+    from app import db as db_module
+
+    if db_module.DATABASE_URL.startswith("sqlite") and os.getenv(
+        "CHATBOT_DATABASE_URL"
+    ):
+        return (
+            "CHATBOT_DATABASE_URL está definido, mas o engine resolveu "
+            f"{db_module.DATABASE_URL!r} — app/db.py lê DATABASE_URL. "
+            "Rode com DATABASE_URL=$CHATBOT_DATABASE_URL."
+        )
+    return None
 
 
 def main(argv: list[str]) -> int:
@@ -73,16 +112,26 @@ def main(argv: list[str]) -> int:
         return 2
     slug = argv[1]
 
-    from app import agente_config, models_db
-    from app.db import SessionLocal
+    motivo = _banco_errado()
+    if motivo is not None:
+        print(f"erro: {motivo}", file=sys.stderr)
+        return 2
 
-    db = SessionLocal()
+    from app import agente_config, models_db
+    from app import db as db_module
+
+    db = db_module.SessionLocal()
     try:
         loja = (
             db.query(models_db.Loja).filter(models_db.Loja.slug == slug).one_or_none()
         )
         if loja is None:
-            print(f"loja {slug!r} não existe neste banco", file=sys.stderr)
+            existentes = sorted(s for (s,) in db.query(models_db.Loja.slug).all())
+            print(
+                f"loja {slug!r} não existe neste banco. "
+                f"lojas presentes: {', '.join(existentes) or '(nenhuma)'}",
+                file=sys.stderr,
+            )
             return 1
         agente_config.salvar_rascunho(
             db, loja.id, CAMPOS_POR_SLUG[slug], autor="semear_config_agente"

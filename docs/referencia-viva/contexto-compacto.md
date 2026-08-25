@@ -22,7 +22,8 @@ Vocabulário: [`../../CONTEXT.md`](../../CONTEXT.md). As-built Control/Loja:
   operação, e nenhum foi dado:
   1. ligar `REVY_LOJA_AGENTE_CONFIG_ENABLED` no app2037 (é **secret**, não `[env]`);
   2. semear a config da loja que já atendia **antes** de o workflow subir —
-     `python -m scripts.semear_config_agente vitor-motos` — senão ela estreia se
+     `DATABASE_URL=$CHATBOT_DATABASE_URL python -m scripts.semear_config_agente moto-center`
+     (slug `moto-center`, e `DATABASE_URL`, não `CHATBOT_DATABASE_URL`) — senão ela estreia se
      apresentando como "loja";
   3. publicar os workflows (`-Mode production` e `-Mode preview`) e apontar
      `CHATBOT_AGENTE_PREVIEW_URL`. **Chatbot antes do n8n**: workflow subindo primeiro

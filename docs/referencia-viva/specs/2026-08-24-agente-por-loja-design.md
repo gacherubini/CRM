@@ -3,7 +3,8 @@
 Status: **os quatro cards implementados** (25/08/2026). Card 1 em `7083d6f..0ee8798`;
 cards 2, 3 e 4 em seguida. **Nada disto chega ao lojista sem três passos de operação**:
 ligar `REVY_LOJA_AGENTE_CONFIG_ENABLED`, semear a config da loja que já atendia
-(`python -m scripts.semear_config_agente vitor-motos`) e publicar os dois workflows
+(`python -m scripts.semear_config_agente moto-center` — o slug da loja do piloto em
+produção) e publicar os dois workflows
 (`-Mode production` e `-Mode preview`), com `CHATBOT_AGENTE_PREVIEW_URL` apontada.
 
 Plano do card 1: [`../planos/2026-08-25-agente-por-loja-1-dado-e-texto.md`](../planos/2026-08-25-agente-por-loja-1-dado-e-texto.md).

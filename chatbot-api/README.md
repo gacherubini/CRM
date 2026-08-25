@@ -235,7 +235,9 @@ Dois nós novos, entre o debounce e o agente:
 - **Os dois nós estão em `HERDADOS`** no `fork_cloud_workflow.py`. O gerador reclama de nó
   que sumiu do Modo 1, nunca de nó que ele deixou de copiar.
 - **Loja que já atendia precisa de config antes do deploy do workflow**, senão estreia com
-  o padrão Revy: `python -m scripts.semear_config_agente vitor-motos` (spec §11).
+  o padrão Revy: `python -m scripts.semear_config_agente moto-center` (spec §11).
+  **O slug é `moto-center`**: é assim que a loja do piloto está gravada, embora o nome
+  que o cliente ouve seja "vitor motos". Conferido no Postgres de produção em 25/08.
 
 O `modo` do rascunho existe porque o formulário esconde o que não existe do lado dele
 (spec §4.4.1): não há tool de foto no Modo 2, nem worker de follow-up no Modo 1. Quem sabe
@@ -286,7 +288,7 @@ decisão do dono (25/08): ele quer acompanhar o passo que muda o que o cliente o
 | # | Passo | Muda o que o cliente ouve? |
 |---|---|---|
 | 1 | `fly deploy` do `app2037` | **não** — sobe os ajustes dos cards 2–4 nas rotas, e ninguém as chama. Sem migration nova: a `0027` já está aplicada |
-| 2 | `python -m scripts.semear_config_agente vitor-motos` (com `CHATBOT_DATABASE_URL` do Postgres) | **não** — só o `pode_responder` lê `agente_config` hoje, e a config semeada é equivalente ao estado atual (`agente_ativo` ligado, sem janela de horário) |
+| 2 | `DATABASE_URL=$CHATBOT_DATABASE_URL python -m scripts.semear_config_agente moto-center`, por `fly ssh console -a app2037` em `/srv/chatbot` (a variável é `DATABASE_URL`: é ela que o `app/db.py` lê, e num shell avulso o entrypoint não traduziu) | **não** — só o `pode_responder` lê `agente_config` hoje, e a config semeada é equivalente ao estado atual (`agente_ativo` ligado, sem janela de horário) |
 | 3 | `prepare-workflow.ps1 -Mode production` + `upload-and-import` + restart | **sim** — é aqui que o bot passa a montar o prompt a partir da config |
 | 4 | secret `REVY_LOJA_AGENTE_CONFIG_ENABLED=1` | libera a tela para o lojista |
 | 5 | `-Mode preview` + secret `CHATBOT_AGENTE_PREVIEW_URL` | libera o botão Testar |

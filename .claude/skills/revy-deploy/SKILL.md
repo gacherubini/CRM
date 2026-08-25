@@ -93,9 +93,12 @@ Modo 1 aponta para uma loja so, e o sintoma e silencio. Ver
 1. `app2037` primeiro. Workflow subindo antes busca `GET /v1/agente/config` numa rota que
    nao existe — e por isso o fallback do no de config nao e luxo.
 2. **Semear a config da loja que ja atendia**, ainda antes do workflow:
-   `python -m scripts.semear_config_agente vitor-motos` (com `CHATBOT_DATABASE_URL` do
-   Postgres, senao o alembic/engine responde SQLite e mente). Sem isso ela estreia se
-   apresentando como "loja".
+   `fly ssh console -a app2037 -C "sh -lc 'cd /srv/chatbot && DATABASE_URL=\$CHATBOT_DATABASE_URL python -m scripts.semear_config_agente moto-center'"`.
+   Duas coisas que o palpite natural erra: o slug e **`moto-center`** (e assim que a loja
+   do piloto esta gravada; "vitor motos" e so o nome no prompt), e a variavel e
+   **`DATABASE_URL`** — `app/db.py` le essa, e num shell avulso o entrypoint nao traduziu
+   `CHATBOT_DATABASE_URL`, entao so ela faz o engine responder SQLite e mentir. O script
+   recusa os dois casos. Sem este passo a loja estreia se apresentando como "loja".
 3. So entao `-Mode production`. Teste de aceite: a loja **nao muda de jeito de falar** no
    dia do deploy. Se mudar, e bug.
 

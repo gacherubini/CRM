@@ -1,5 +1,5 @@
 ---
-gatilho: rodar alembic ou conferir migration de producao
+gatilho: rodar alembic, conferir migration de producao, ou rodar script do chatbot contra o banco de producao
 produto: chatbot-api
 custo: 1h30
 fonte: infra
