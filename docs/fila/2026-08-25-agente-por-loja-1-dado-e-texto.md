@@ -19,7 +19,7 @@ produz.
 Pydantic, pytest.
 
 **Spec:** [`../referencia-viva/specs/2026-08-24-agente-por-loja-design.md`](../referencia-viva/specs/2026-08-24-agente-por-loja-design.md)
-— §3 (arquitetura), §4 (campos), §5 (núcleo), §7 (modelo/tokens).
+— §3 (arquitetura), §4 (campos), §5 (núcleo), §7 (modelo global e teto de tokens).
 
 ## Os quatro cards
 
@@ -29,12 +29,10 @@ Pydantic, pytest.
 | 2 | n8n — slots, nó de config, migração das assertivas do validador | depende do card 1 e do spike (§7 do spec) |
 | 3 | `portal-gestao` — tela, rascunho, publicar | depende do card 1 |
 | 4 | preview — workflow `whatsapp-ai-preview` + modo seco | depende dos cards 1–3 |
-| 5? | Control — tela para trocar o modelo da loja | **decisão adiada até o spike** (spec §7) |
 
-O card 5 pode não existir. A rota do modelo entra aqui na Task 8 de qualquer jeito, mas a
-tela do Control só se justifica se o spike do passo 0 (§9 do spec) mostrar que a expressão
-resolve no sub-nó. Se cair no plano B — 2 ou 3 faixas pré-montadas — o dono decide se ainda
-vale tela. **Não construa tela do Control por conta própria.**
+**O Control não entra em card nenhum.** O dono decidiu em 25/08 que o modelo de LLM é
+global — um só para todas as lojas. Nada de coluna `modelo`, nada de rota para trocá-lo,
+nada de tela no Control. Não re-proponha.
 
 Não misture. O card 2 mexe em JSON gerado e em validadores; o 3 é JS de tela que pytest não
 verifica; o 4 depende dos dois.
@@ -67,7 +65,7 @@ Suíte na abertura: rode e anote o número antes de tocar em qualquer coisa.
 - Nenhum secret, token ou `.env` real no git ou no log.
 - Ao terminar o card: `git diff --check`, `git status --short`, e regerar o mapa —
   `cd .claude/skills/revy-research && python gerar_mapa.py` (Windows) / `python3` (macOS) —
-  commitando junto, porque este card cria rota, modelo e migration.
+  commitando junto, porque este card cria rota, modelo (ORM) e migration.
 
 ---
 
@@ -475,7 +473,7 @@ git commit -m "feat(chatbot): gerador de prompt por loja com nucleo Revy no fim"
 **Files:**
 - Modify: `chatbot-api/app/models_db.py` (adicionar ao fim do arquivo)
 - Create: `chatbot-api/alembic/versions/0027_agente_config.py`
-- Test: `chatbot-api/tests/test_agente_config_modelo.py`
+- Test: `chatbot-api/tests/test_agente_config_tabelas.py`
 
 **Interfaces:**
 - Consumes: nada da Task 1 (as tabelas guardam JSON, não `CamposAgente`).
@@ -483,7 +481,7 @@ git commit -m "feat(chatbot): gerador de prompt por loja com nucleo Revy no fim"
 
 - [ ] **Step 1: Escreva o teste que falha**
 
-Crie `chatbot-api/tests/test_agente_config_modelo.py`:
+Crie `chatbot-api/tests/test_agente_config_tabelas.py`:
 
 ```python
 """Tabelas da config do agente (spec §3.2)."""
@@ -522,19 +520,18 @@ def test_config_aponta_para_a_versao_publicada(db, loja_a):
     db.flush()
     db.add(
         models_db.AgenteConfig(
-            loja_id=loja_a["loja_id"], versao_publicada_id=versao.id, modelo=None
+            loja_id=loja_a["loja_id"], versao_publicada_id=versao.id
         )
     )
     db.commit()
 
     cfg = db.get(models_db.AgenteConfig, loja_a["loja_id"])
     assert cfg.versao_publicada_id == versao.id
-    assert cfg.modelo is None  # nulo = padrão global do Revy (spec §7)
 ```
 
 - [ ] **Step 2: Rode e confirme que falha**
 
-`pytest tests/test_agente_config_modelo.py -q` → `AttributeError: module 'app.models_db' has no attribute 'AgenteConfigVersao'`.
+`pytest tests/test_agente_config_tabelas.py -q` → `AttributeError: module 'app.models_db' has no attribute 'AgenteConfigVersao'`.
 
 - [ ] **Step 3: Escreva os modelos**
 
@@ -568,7 +565,7 @@ class AgenteConfigVersao(Base):
 
 
 class AgenteConfig(Base):
-    """Uma linha por loja: qual versão está no ar e qual modelo ela usa."""
+    """Uma linha por loja: qual versão está no ar."""
 
     __tablename__ = "agente_config"
 
@@ -578,8 +575,6 @@ class AgenteConfig(Base):
     versao_publicada_id: Mapped[str | None] = mapped_column(
         ForeignKey("agente_config_versao.id"), nullable=True
     )
-    # Nulo = padrão global do Revy. Editável só pelo Control (spec §7).
-    modelo: Mapped[str | None] = mapped_column(String(80), nullable=True)
 ```
 
 **O import precisa mudar.** A linha 8 de `models_db.py` hoje é:
@@ -639,7 +634,6 @@ def upgrade() -> None:
             sa.ForeignKey("agente_config_versao.id"),
             nullable=True,
         ),
-        sa.Column("modelo", sa.String(length=80), nullable=True),
     )
 
 
@@ -651,7 +645,7 @@ def downgrade() -> None:
 
 - [ ] **Step 5: Rode os testes**
 
-`pytest tests/test_agente_config_modelo.py -q` → verde (o conftest cria as tabelas por
+`pytest tests/test_agente_config_tabelas.py -q` → verde (o conftest cria as tabelas por
 `Base.metadata.create_all`, não pela migration).
 
 Depois a suíte inteira: `pytest -q`.
@@ -665,7 +659,7 @@ Esperado: exatamente uma linha, `0027_agente_config`.
 - [ ] **Step 7: Commit**
 
 ```bash
-git add chatbot-api/app/models_db.py chatbot-api/alembic/versions/0027_agente_config.py chatbot-api/tests/test_agente_config_modelo.py
+git add chatbot-api/app/models_db.py chatbot-api/alembic/versions/0027_agente_config.py chatbot-api/tests/test_agente_config_tabelas.py
 git commit -m "feat(chatbot): tabelas de config do agente por loja (migration 0027)"
 ```
 
@@ -688,7 +682,6 @@ git commit -m "feat(chatbot): tabelas de config do agente por loja (migration 00
   - `restaurar(db, loja_id, versao_id: str, autor: str | None) -> AgenteConfigVersao`
   - `campos_publicados(db, loja_id) -> CamposAgente`
   - `prompt_publicado(db, loja_id) -> str`
-  - `modelo_da_loja(db, loja_id) -> str | None`
 
 - [ ] **Step 1: Escreva o teste que falha**
 
@@ -753,10 +746,6 @@ def test_config_de_uma_loja_nao_vaza_para_outra(db, loja_a, loja_b):
 
     assert "loja a" not in agente_config.prompt_publicado(db, loja_b["loja_id"]).lower()
 
-
-def test_modelo_nulo_por_padrao(db, loja_a):
-    """Nulo = padrão global do Revy (spec §7)."""
-    assert agente_config.modelo_da_loja(db, loja_a["loja_id"]) is None
 ```
 
 - [ ] **Step 2: Rode e confirme que falha**
@@ -895,10 +884,6 @@ def prompt_publicado(db: Session, loja_id: str) -> str:
         return montar_prompt(CAMPOS_PADRAO_REVY)
     return versao.prompt_gerado
 
-
-def modelo_da_loja(db: Session, loja_id: str) -> str | None:
-    cfg = db.get(models_db.AgenteConfig, loja_id)
-    return cfg.modelo if cfg is not None else None
 ```
 
 - [ ] **Step 4: Rode e confirme que passa**
@@ -927,10 +912,10 @@ git commit -m "feat(chatbot): rascunho, publicar e restaurar da config do agente
 - Test: `chatbot-api/tests/test_agente_config_rota.py`
 
 **Interfaces:**
-- Consumes: `agente_config.prompt_publicado`, `campos_publicados`, `modelo_da_loja`;
+- Consumes: `agente_config.prompt_publicado`, `campos_publicados`;
   `agente_prompt.max_output_tokens`; `auth.resolver_loja_id`; `_exigir_loja_operacional`.
 - Produces: `GET /v1/agente/config?instance=<x>` →
-  `{"prompt": str, "modelo": str | None, "max_output_tokens": int, "agente_ativo": bool}`.
+  `{"prompt": str, "max_output_tokens": int, "agente_ativo": bool}`.
 
 - [ ] **Step 1: Escreva o teste que falha**
 
@@ -1033,7 +1018,7 @@ def config_agente(
     ctx: Contexto = Depends(get_contexto),
     db: Session = Depends(get_db),
 ):
-    """Prompt e modelo do agente desta loja (spec §3.3).
+    """Prompt do agente desta loja (spec §3.3). O modelo é global, não vem aqui.
 
     **A ordem aqui não é estilo.** ``resolver_loja_id`` vem ANTES do gate: com
     credencial de integração ``ctx.loja_id`` é ``None``, e o gate responderia
@@ -1048,7 +1033,6 @@ def config_agente(
     campos = agente_config.campos_publicados(db, loja_id)
     return {
         "prompt": agente_config.prompt_publicado(db, loja_id),
-        "modelo": agente_config.modelo_da_loja(db, loja_id),
         "max_output_tokens": agente_prompt.max_output_tokens(campos),
         "agente_ativo": campos.agente_ativo,
     }
@@ -1067,7 +1051,7 @@ def config_agente(
 
 ```bash
 git add chatbot-api/app/main.py chatbot-api/tests/test_agente_config_rota.py
-git commit -m "feat(chatbot): GET /v1/agente/config serve prompt e modelo por loja"
+git commit -m "feat(chatbot): GET /v1/agente/config serve o prompt da loja"
 ```
 
 ---
@@ -1568,135 +1552,12 @@ git commit -m "feat(chatbot): loja pode desligar o follow-up (spec 4.4.2)"
 
 ---
 
-### Task 8: `PUT /v1/agente/modelo` — o canário de troca de modelo
-
-Spec §7: o modelo fica por loja, mas quem edita é o Control, nunca o lojista. É isso que dá
-canário na troca de modelo — uma loja antes de todas.
-
-**Files:**
-- Modify: `chatbot-api/app/agente_config.py` (função `definir_modelo`)
-- Modify: `chatbot-api/app/main.py` (rota, depois das rotas da Task 5)
-- Test: `chatbot-api/tests/test_agente_modelo.py`
-
-**Interfaces:**
-- Consumes: `models_db.AgenteConfig`.
-- Produces: `agente_config.definir_modelo(db, loja_id, modelo: str | None) -> None`;
-  `PUT /v1/agente/modelo` com body `{"modelo": str | None}` → `{"modelo": str | None}`.
-
-**Limite conhecido, e é honesto escrever:** o chatbot não distingue "Control" de "Loja" —
-os dois chegam com credencial de loja. A restrição de quem edita é da **tela**: a Revy Loja
-simplesmente não mostra este campo. Endurecer isso com papel próprio é card de hardening,
-não deste. Não invente um papel novo aqui.
-
-**Nesta task a rota nasce sem consumidor, e é de propósito.** Não existe tela para ela em
-card nenhum: a do Control está adiada até o spike (spec §7). Até lá, trocar o modelo de uma
-loja é chamada direta na rota. Não construa tela, não escreva método no
-`revy-trafego/app/clients/chatbot.py`, não mexa no Control.
-
-- [ ] **Step 1: Escreva o teste que falha**
-
-Crie `chatbot-api/tests/test_agente_modelo.py`:
-
-```python
-"""Modelo de LLM por loja — canário de troca de modelo (spec §7)."""
-
-
-def test_modelo_nasce_nulo(client, loja_a):
-    """Nulo = padrão global do Revy."""
-    assert client.get("/v1/agente/config", headers=loja_a["headers"]).json()["modelo"] is None
-
-
-def test_definir_modelo_aparece_na_config(client, loja_a):
-    r = client.put(
-        "/v1/agente/modelo",
-        json={"modelo": "models/gemini-3.1-pro"},
-        headers=loja_a["headers"],
-    )
-    assert r.status_code == 200
-    lido = client.get("/v1/agente/config", headers=loja_a["headers"]).json()
-    assert lido["modelo"] == "models/gemini-3.1-pro"
-
-
-def test_modelo_de_uma_loja_nao_vaza_para_outra(client, loja_a, loja_b):
-    client.put("/v1/agente/modelo", json={"modelo": "models/x"}, headers=loja_a["headers"])
-    assert client.get("/v1/agente/config", headers=loja_b["headers"]).json()["modelo"] is None
-
-
-def test_voltar_para_o_padrao_com_nulo(client, loja_a):
-    client.put("/v1/agente/modelo", json={"modelo": "models/x"}, headers=loja_a["headers"])
-    client.put("/v1/agente/modelo", json={"modelo": None}, headers=loja_a["headers"])
-    assert client.get("/v1/agente/config", headers=loja_a["headers"]).json()["modelo"] is None
-```
-
-- [ ] **Step 2: Rode e confirme que falha**
-
-`pytest tests/test_agente_modelo.py -q` → 404 no `PUT`.
-
-- [ ] **Step 3: Escreva o setter no serviço**
-
-Em `chatbot-api/app/agente_config.py`, junto de `modelo_da_loja`:
-
-```python
-def definir_modelo(db: Session, loja_id: str, modelo: str | None) -> None:
-    """Nulo devolve a loja ao modelo padrão do Revy (spec §7)."""
-    _config(db, loja_id).modelo = (modelo or None)
-    db.commit()
-```
-
-- [ ] **Step 4: Escreva a rota**
-
-Em `chatbot-api/app/main.py`, junto do bloco de modelos Pydantic onde moram os outros
-(`PodeResponderInput` e vizinhos):
-
-```python
-class ModeloAgenteInput(BaseModel):
-    modelo: Optional[str] = None
-```
-
-E a rota, depois de `restaurar_versao_agente`:
-
-```python
-@app.put("/v1/agente/modelo")
-def definir_modelo_agente(
-    dados: ModeloAgenteInput,
-    instance: Optional[str] = None,
-    ctx: Contexto = Depends(get_contexto),
-    db: Session = Depends(get_db),
-):
-    """Modelo de LLM desta loja. Quem edita é o Control — a Loja não mostra o campo.
-
-    Nulo = padrão global do Revy. Existir por loja é o que dá canário: modelo
-    novo entra numa loja, roda uma semana, depois nas outras.
-    """
-    loja_id = resolver_loja_id(db, ctx, instance)
-    _exigir_loja_operacional(db, loja_id)
-    agente_config.definir_modelo(db, loja_id, dados.modelo)
-    return {"modelo": agente_config.modelo_da_loja(db, loja_id)}
-```
-
-- [ ] **Step 5: Rode e confirme que passa**
-
-`pytest tests/test_agente_modelo.py -q` → verde.
-
-- [ ] **Step 6: Suíte inteira**
-
-`pytest -q` → verde.
-
-- [ ] **Step 7: Commit**
-
-```bash
-git add chatbot-api/app/agente_config.py chatbot-api/app/main.py chatbot-api/tests/test_agente_modelo.py
-git commit -m "feat(chatbot): modelo de LLM por loja, editavel pelo Control"
-```
-
----
-
 ## Fechamento do card
 
 - [ ] `cd chatbot-api && pytest -q` verde, com o número de testes **maior** que o da abertura.
 - [ ] `cd chatbot-api && alembic heads` → uma cabeça só, `0027_agente_config`.
 - [ ] `git diff --check` limpo e `git status --short` sem arquivo alheio.
-- [ ] Regerar o mapa (este card cria rota, modelo e migration):
+- [ ] Regerar o mapa (este card cria rota, modelo ORM e migration):
       `cd .claude/skills/revy-research && python gerar_mapa.py` (Windows) ou `python3` (macOS),
       e commitar junto.
 - [ ] Nada foi deployado. As rotas existem e ninguém as chama ainda — é o esperado.

@@ -42,7 +42,7 @@ Isso é também argumento comercial: a tela de configuração e o núcleo visív
 | Fuso horário | `America/Sao_Paulo` fixo, sem coluna (§4.1) |
 | Módulo próprio para a tela | não; mesmo gate da tela vizinha (§6) |
 | n8n de teste | **não** — workflow gerado no mesmo n8n2037 |
-| Escolha do modelo de LLM | por loja no dado, editável **só no Control** |
+| Escolha do modelo de LLM | **global, um modelo para todas as lojas** (revisto em 25/08) |
 
 ## 3. Arquitetura
 
@@ -59,7 +59,7 @@ Fronteira de sempre: HTTP versionado, sem import `app` entre produtos.
 ### 3.2 Modelo de dados (`chatbot-api`, migration `0027`)
 
 ```
-agente_config          loja_id (PK/FK) · versao_publicada_id · modelo (nullable)
+agente_config          loja_id (PK/FK) · versao_publicada_id
 agente_config_versao   id · loja_id · estado (rascunho|publicada|arquivada)
                        campos (JSON do formulário)
                        prompt_gerado (texto final, congelado)
@@ -70,14 +70,12 @@ agente_config_versao   id · loja_id · estado (rascunho|publicada|arquivada)
 auditar o texto que o bot realmente recebeu naquela versão. Melhorar o gerador amanhã
 não reescreve o histórico.
 
-`modelo` nulo = padrão global do Revy. Ver §7.
-
 Voltar para uma versão anterior **cria versão nova** a partir dela. Nada é apagado.
 
 ### 3.3 Rota nova: `GET /v1/agente/config`
 
-Autenticada pela credencial de integração. Devolve os blocos montados + `modelo` +
-`max_output_tokens`.
+Autenticada pela credencial de integração. Devolve o prompt montado e o
+`max_output_tokens` da loja (§7.1). **Não devolve modelo** — o modelo é global (§7).
 
 **A rota TEM que ler `ctx.loja_id` resolvido, antes do gate operacional.** Três erros
 conhecidos que ela não pode repetir
@@ -427,8 +425,9 @@ cai embaixo da primeira e lê como continuação do mesmo card. Precisa de mais?
 
 - **`I4`** — o bot ter quatro nomes (Agente / Agente de atendimento / chatbot / o bot) foi
   **recusado**. Não unifique a nomenclatura de carona; use o nome que a tela vizinha já usa.
-- **`C8`** — tela do Control como item de menu de primeiro nível foi **recusada**. A edição
-  de modelo no Control entra onde a ficha da loja já está, não como item novo no menu.
+- **`C8`** — tela do Control como item de menu de primeiro nível foi **recusada**. Nenhuma
+  tela desta feature entra no Control de todo modo (§7), mas a regra vale se algum dia
+  entrar: vai onde a ficha da loja já está, não como item novo de menu.
 
 **A tela não se verifica com pytest.** Formulário e janela de teste são JS; isso já passou
 dois bugs no Copiloto. Verificação é no navegador, com portal local semeado.
@@ -519,58 +518,25 @@ workflow antes de produção seria útil, mas é outro problema.
 
 ## 7. Modelo de LLM e teto de tokens
 
-Hoje o nó é fixo, e trocar de modelo troca para todas as lojas de uma vez, sem canário:
+O nó do modelo é fixo, e continua fixo:
 
 ```json
 "modelName": "models/gemini-3.1-flash-lite",
 "options": { "maxOutputTokens": 250, "temperature": 0.3 }
 ```
 
-**Decisão:** `modelo` fica em `agente_config`, nullable, **editável só no Control**.
-Nulo = padrão global do Revy.
+**Decisão do dono (25/08): o modelo é global — um só para todas as lojas.** Nada de
+`modelo` em `agente_config`, nada de rota para trocá-lo, nada de tela no Control.
 
-Ganhos: canário na troca de modelo (uma loja antes de todas); amarrar modelo a plano
-comercial depois, sem migration nova. E o lojista nunca vê a pergunta — o custo é do
-Revy e a escolha não é de dono de loja de moto.
+O que se perde, conscientemente: canário na troca de modelo (hoje trocar é all-or-nothing)
+e a possibilidade de amarrar modelo a plano comercial. Se um dia doer, a coluna volta — é
+migration pequena, e o dado por loja já existe ao lado dela.
 
-Quem edita é o Control, e há uma restrição operacional: o Control fala com o chatbot com
-um **mapa loja → token** (`REVY_TRAFEGO_CHATBOT_TOKENS_JSON`,
-`revy-trafego/app/config.py:33`). Ele só edita a config das lojas cujo token ele tem —
-loja provisionada sem entrada nesse mapa não aparece para edição.
+**Não re-proponha modelo por loja.** Foi desenhado, avaliado e recusado nesta data.
 
-**Limite técnico — e aqui há uma suposição que precisa de teste antes de virar Task.**
+### 7.1 O teto de tokens, esse sim, é por loja
 
-Trocar de **provedor** (Gemini → outro) exige nó diferente, credencial diferente, nós
-paralelos e um switch: trabalho de migração, não configuração por loja. **Não desenhar
-para troca de provedor por loja.** Isso é certo.
-
-O que **não** está confirmado é se `modelName` e `maxOutputTokens` aceitam expressão. O
-nó do modelo (`@n8n/n8n-nodes-langchain.lmChatGoogleGemini`) é **sub-nó** do AI Agent, e
-sub-nó em n8n tem contexto de expressão limitado — não é invocado no fluxo principal.
-**Isso não se verifica lendo o repo.**
-
-Spike obrigatório antes da Task de n8n (§9, passo 0): pôr uma expressão em `modelName` no
-n8n2037 e ver se resolve. Plano B se não resolver: um nó de modelo por faixa + switch
-antes do agente — bem mais caro, e é a diferença entre um campo e um sub-projeto.
-
-**Ponto de decisão do dono, adiado até o spike (25/08).** A rota `PUT /v1/agente/modelo`
-entra na v1 de qualquer jeito — é barata e o canário depende dela. O que fica aberto é se
-existe **tela no Control** para isso:
-
-| Resultado do spike | O que muda |
-|---|---|
-| expressão resolve | modelo por loja é livre dentro do Gemini; tela no Control passa a valer a pena |
-| expressão não resolve | vira escolha entre 2–3 faixas pré-montadas; talvez nem mereça tela, e talvez nem o campo |
-
-Enquanto não há tela, a troca é por chamada direta à rota. O caminho do Control já existe e
-não precisa de arquitetura nova: `revy-trafego/app/clients/chatbot.py` tem `_request`
-genérico e já faz POST/PATCH no chatbot (`definir_bot_ativo` é o mesmo formato) — falta um
-método e o token daquela loja em `REVY_TRAFEGO_CHATBOT_TOKENS_JSON`.
-
-Se virar tela: campo na ficha da loja que o Control já tem, **nunca item de menu novo** —
-a recusa `C8` do dono (§6.0).
-
-**`maxOutputTokens` é amarrado ao campo "Tamanho da resposta"**, por loja, via expressão:
+`maxOutputTokens` está amarrado ao campo **"Tamanho da resposta"** (§4.2):
 
 | Tamanho da resposta | maxOutputTokens |
 |---|---|
@@ -578,10 +544,24 @@ a recusa `C8` do dono (§6.0).
 | até 3 | 400 |
 | pode explicar | 700 |
 
-Sem isso, "pode explicar" bate no teto de 250 e a resposta corta no meio da frase — o
-campo seria mentira.
+Sem isso, "pode explicar" bate no teto de 250 e a resposta corta no meio da frase — o campo
+seria mentira.
 
-## 7.1 O que esta feature quebra no n8n (e como não afrouxar a rede)
+**E aqui mora a única suposição que não se verifica lendo o repo.** O nó do modelo
+(`@n8n/n8n-nodes-langchain.lmChatGoogleGemini`) é **sub-nó** do AI Agent, e sub-nó em n8n
+tem contexto de expressão limitado — não é invocado no fluxo principal. Se `maxOutputTokens`
+não aceitar expressão, o teto não varia por loja.
+
+Spike obrigatório antes da Task de n8n (§9, passo 0): pôr uma expressão em
+`maxOutputTokens` no n8n2037 e ver se resolve.
+
+**Plano B, se não resolver** — e ele é barato, porque o modelo saiu de cena: subir o teto
+global para 700 e deixar o comprimento por conta do prompt, que já diz "seja minimalista:
+uma ou duas frases curtas". O teto vira só uma trava de segurança contra resposta
+descontrolada, e o campo continua funcionando por instrução em vez de por parâmetro. Sem
+switch, sem nós paralelos.
+
+## 7.2 O que esta feature quebra no n8n (e como não afrouxar a rede)
 
 ### `validate_workflow.py` — as assertivas de prompt caem
 
