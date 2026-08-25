@@ -42,7 +42,7 @@ Pydantic, pytest.
 | # | Eixo | Situação |
 |---|---|---|
 | **1** | `chatbot-api` — dado e texto | **este card** |
-| 2 | n8n — slots, nó de config, migração das assertivas do validador | depende do card 1 e do spike (§7 do spec) |
+| 2 | n8n — slots, nó de config, migração das assertivas do validador | depende só do card 1; o spike foi removido em 25/08 (§7.1 do spec) |
 | 3 | `portal-gestao` — tela, rascunho, publicar | depende do card 1 |
 | 4 | preview — workflow `whatsapp-ai-preview` + modo seco | depende dos cards 1–3 |
 

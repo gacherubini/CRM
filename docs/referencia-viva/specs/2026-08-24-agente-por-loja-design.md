@@ -551,32 +551,44 @@ migration pequena, e o dado por loja já existe ao lado dela.
 
 **Não re-proponha modelo por loja.** Foi desenhado, avaliado e recusado nesta data.
 
-### 7.1 O teto de tokens, esse sim, é por loja
+### 7.1 O teto de tokens fica fixo, e o campo funciona por instrução
 
-`maxOutputTokens` está amarrado ao campo **"Tamanho da resposta"** (§4.2):
+**Decisão do dono (25/08), revendo o desenho de 24/08.** `maxOutputTokens` **não varia por
+loja**. Fica em 250, global, como já está.
 
-| Tamanho da resposta | maxOutputTokens |
+O campo **"Tamanho da resposta"** (§4.2) continua existindo e continua sendo por loja — ele
+só passa a agir pelo **texto do prompt**, gerado no `chatbot-api`, e não por parâmetro do
+n8n:
+
+| Tamanho da resposta | Linha gerada no bloco PERSONALIDADE |
 |---|---|
-| 1–2 frases | 250 |
-| até 3 | 400 |
-| pode explicar | 700 |
+| 1–2 frases | `seja minimalista: uma ou duas frases curtas.` |
+| até 3 | `use até três frases.` |
+| pode explicar | `pode explicar com calma quando o assunto pedir.` |
 
-Sem isso, "pode explicar" bate no teto de 250 e a resposta corta no meio da frase — o campo
-seria mentira.
+**Por que isso funciona:** 250 tokens são cerca de **175 palavras** em português — já um
+parágrafo respeitável, e muito mais longo do que qualquer resposta que este bot deva mandar
+no WhatsApp. "Pode explicar" cabe folgado dentro do teto. O teto nunca foi o limitador; a
+instrução é.
 
-**E aqui mora a única suposição que não se verifica lendo o repo.** O nó do modelo
-(`@n8n/n8n-nodes-langchain.lmChatGoogleGemini`) é **sub-nó** do AI Agent, e sub-nó em n8n
-tem contexto de expressão limitado — não é invocado no fluxo principal. Se `maxOutputTokens`
-não aceitar expressão, o teto não varia por loja.
+**O que isso compra, e é o motivo da revisão:** o teto variável era a **única** peça do
+card 2 que exigia expressão em **sub-nó** do n8n — o nó do modelo
+(`@n8n/n8n-nodes-langchain.lmChatGoogleGemini`) não roda no fluxo principal, e não dá para
+saber lendo o repo se ele resolve expressão. Com o teto fixo, essa incerteza **sai do
+projeto**. O `systemMessage` também vira expressão, mas o `AI Agent` é nó **raiz**: expressão
+ali é uso padrão, sem dúvida nenhuma.
 
-Spike obrigatório antes da Task de n8n (§9, passo 0): pôr uma expressão em
-`maxOutputTokens` no n8n2037 e ver se resolve.
+**O spike do passo 0 foi REMOVIDO.** Não é mais pré-requisito de nada.
 
-**Plano B, se não resolver** — e ele é barato, porque o modelo saiu de cena: subir o teto
-global para 700 e deixar o comprimento por conta do prompt, que já diz "seja minimalista:
-uma ou duas frases curtas". O teto vira só uma trava de segurança contra resposta
-descontrolada, e o campo continua funcionando por instrução em vez de por parâmetro. Sem
-switch, sem nós paralelos.
+**E o teto fixo em 250 é trabalho, não sobra:** ele é a rede que impede uma resposta
+descontrolada de virar um muro de texto no WhatsApp do cliente — para **todas** as lojas.
+O plano B anterior (subir o global para 700) afrouxaria essa rede para todo mundo, a fim de
+servir as poucas lojas que querem resposta longa. Descartado.
+
+**Ressalva registrada:** as 175 palavras são estimativa de tokens-por-palavra, não medição.
+O sinal de que a decisão está errada é concreto e observável: **resposta do bot saindo
+cortada no meio da frase** em produção. Se isso aparecer, o teto por loja volta à mesa — e
+aí o spike do sub-nó volta junto, desta vez com um problema real para justificá-lo.
 
 ## 7.2 O que esta feature quebra no n8n (e como não afrouxar a rede)
 
@@ -629,15 +641,12 @@ por slug, ou o chatbot passa a guardar a URL.
 
 Ordem de risco, não de tela.
 
-0. **Spike de expressão no n8n** (§7). Uma expressão em `modelName` no n8n2037 resolve ou
-   não? A resposta muda o tamanho do passo 3. Meia hora, e é a única coisa aqui que não
-   se responde lendo código.
 1. **Gerador de prompt + núcleo** no `chatbot-api`. Função pura: campos entram, texto
    sai. Sem rede, sem banco, sem n8n.
 2. **Tabelas + migration `0027` + `GET /v1/agente/config`**, com `ctx.loja_id` resolvido
    antes do gate (§3.3).
 3. **n8n**: slots no `systemMessage` do canônico + nó que busca a config (**entrando em
-   `HERDADOS`**) + `modelName`/`maxOutputTokens` conforme o resultado do passo 0.
+   `HERDADOS`**). `modelName` e `maxOutputTokens` **não mudam** — são globais (§7, §7.1).
    Migrar as assertivas do `validate_workflow.py` (§7.1) **no mesmo commit**. Regerar o
    fork do Modo 2 e o de teste.
    **Com fallback**: rota falhou ou loja sem config → padrão Revy. O bot nunca fica sem
@@ -710,5 +719,5 @@ Só depois de o comportamento bater é que se mexe nos campos dela.
 | Modo 2 nascer sem o nó de config | entrar em `HERDADOS`; o gerador não avisa (§7.1) |
 | Campo configurado que não faz nada no modo da loja | formulário consciente do modo (§4.4.1) |
 | Lojista estranhar o follow-up falando fora da voz que ele escolheu | incoerência aceita e documentada (§4.4.2); o interruptor permite desligar |
-| Expressão em sub-nó do modelo não resolver | spike no passo 0 (§9) antes de dimensionar a Task |
+| Resposta cortada no meio da frase em produção | sinal de que o teto fixo de 250 não bastou (§7.1); só então o teto por loja volta à mesa |
 | Lojista pedir para reabrir a regra 3 (insistir) | decisão registrada em §2 |

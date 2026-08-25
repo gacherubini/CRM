@@ -167,9 +167,16 @@ que o bot recebeu naquela versão — melhorar o gerador amanhã não reescreve 
   uma grade sem zero à esquerda deixa o bot mudo o dia inteiro, sem log e sem erro.
 - **Fuso fixo `America/Sao_Paulo`.** A tabela `lojas` não tem coluna de timezone. Vira
   coluna quando existir loja fora do fuso de Brasília, não antes.
-- **O modelo de LLM é global**, não por loja (decisão do dono, 25/08). Não existe coluna
-  `modelo`, nem rota para trocá-lo. O que é por loja é o `max_output_tokens`, amarrado ao
-  campo "tamanho da resposta".
+- **O modelo de LLM e o teto de tokens são globais**, não por loja (decisões do dono,
+  25/08). Não existe coluna `modelo`, nem rota para trocá-lo, e `maxOutputTokens` fica em
+  250 para todas as lojas. O campo "tamanho da resposta" é por loja, mas age pelo **texto
+  do prompt**, não por parâmetro do n8n — 250 tokens são ~175 palavras, que já é bem mais
+  do que qualquer resposta de WhatsApp deste bot. O teto fixo é a rede que impede resposta
+  descontrolada; o sinal de que ele não bastou seria **resposta cortada no meio da frase**
+  em produção. A rota `GET /v1/agente/config` **continua devolvendo** `max_output_tokens`, e
+  ele varia mesmo (250/400/700) — o que não varia é o que o n8n aplica, que segue sendo o
+  250 fixo do nó. O valor fica ali informativo, pronto para o dia em que o teto por loja
+  se justificar.
 - **`pode_responder` passou a consultar `agente_config`.** É o caminho quente: toda
   mensagem de cliente passa por lá. Loja que nunca configurou nada cai no padrão Revy com
   `agente_ativo=True` e continua respondendo — há teste explícito para isso, porque
@@ -182,8 +189,9 @@ Isto é o card 1 de quatro. Nada disto chega ao cliente sem os outros três:
 1. **n8n** (card 2) — tirar `vitor motos` e `limeira-sp` do `systemMessage`, pôr os slots,
    e um nó que busca `GET /v1/agente/config`. Atenção: `validate_workflow.py` afirma ~40
    frases literais do prompt e vai ficar vermelho; as assertivas **mudam de lugar**, não
-   somem. Depende de um spike de 30 min: `maxOutputTokens` aceita expressão em sub-nó do
-   n8n? Não dá para responder lendo o repo.
+   somem. Sem pré-requisito: o `AI Agent` é nó **raiz**, então expressão no `systemMessage`
+   é uso padrão do n8n. `modelName` e `maxOutputTokens` **não mudam** — são globais, e é
+   isso que mantém o card 2 longe de expressão em sub-nó (§7.1 do spec).
 2. **Tela na Revy Loja** (card 3) — o formulário, em `/app/loja/agente/configuracao`.
 3. **Preview** (card 4) — workflow `whatsapp-ai-preview` no mesmo n8n2037, com as tools
    em modo seco. `consultar_estoque1` **escreve** no CRM, então o preview usa telefone
