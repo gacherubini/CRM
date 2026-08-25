@@ -22,6 +22,8 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app import (  # noqa: F401 (registra os modelos)
+    agente_config,
+    agente_prompt,
     channels,
     config,
     models_db,
@@ -1306,6 +1308,32 @@ def config_catalogo_bot(
         "catalogo_url": url,
         # Texto cliente-facing: o Agent ecoa `mensagem` no WhatsApp.
         "mensagem": f"olha o catálogo completo aqui: {url}",
+    }
+
+
+@app.get("/v1/agente/config")
+def config_agente(
+    instance: Optional[str] = None,
+    ctx: Contexto = Depends(get_contexto),
+    db: Session = Depends(get_db),
+):
+    """Prompt do agente desta loja (spec §3.3). O modelo é global, não vem aqui.
+
+    **A ordem aqui não é estilo.** ``resolver_loja_id`` vem ANTES do gate: com
+    credencial de integração ``ctx.loja_id`` é ``None``, e o gate responderia
+    423 engolindo o 400 que diz qual é o erro de verdade ("faltou instance").
+
+    E o 423 de loja suspensa é resposta, não falha: o n8n só pode cair no prompt
+    padrão em erro técnico. Tratar 423 como fallback deixaria o bot atendendo
+    loja suspensa, contra o gate de backend.
+    """
+    loja_id = resolver_loja_id(db, ctx, instance)
+    _exigir_loja_operacional(db, loja_id)
+    campos = agente_config.campos_publicados(db, loja_id)
+    return {
+        "prompt": agente_config.prompt_publicado(db, loja_id),
+        "max_output_tokens": agente_prompt.max_output_tokens(campos),
+        "agente_ativo": campos.agente_ativo,
     }
 
 
