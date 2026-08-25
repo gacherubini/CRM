@@ -56,3 +56,4 @@ escrever migration com `batch_alter_table`.
 | mexer em multi-loja, no seletor de lojas ou em quem pode trocar de loja | `2026-08-24-seletor-e-rota-leem-fontes-diferentes.md` |
 | por uma rota do chatbot na credencial de integracao, ou achar que `instance` resolve multi-loja | `2026-08-24-instance-nao-conserta-toda-rota.md` |
 | trabalhar no repo com outra sessao de agente aberta | `2026-08-24-outra-sessao-move-o-chao-no-meio-da-tarefa.md` |
+| bot do Modo 2 fica mudo com audio, imagem ou qualquer midia | `2026-08-25-corpo-assinado-pela-meta-nao-sobrevive-ao-n8n.md` |

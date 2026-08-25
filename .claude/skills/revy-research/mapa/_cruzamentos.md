@@ -59,13 +59,6 @@ So a lista: qual arquivo aponta para qual app. Quais desses apps
 ainda existem e conhecimento humano que muda com o tempo — ver
 `AGENTS.md` secao 5. Deploy so por `deploy/fly/3vm/`.
 
-- `.claude/worktrees/agent-ad9d226a50e69b1a6/catalogo-publico/fly.toml` -> `catalogo2037`
-- `.claude/worktrees/agent-ad9d226a50e69b1a6/chatbot-api/fly.toml` -> `chatbot2037`
-- `.claude/worktrees/agent-ad9d226a50e69b1a6/deploy/fly/evolution/fly.toml` -> `evolution2037`
-- `.claude/worktrees/agent-ad9d226a50e69b1a6/deploy/fly/n8n/fly.toml` -> `n8n2037`
-- `.claude/worktrees/agent-ad9d226a50e69b1a6/estoque-api/fly.toml` -> `estoque2037`
-- `.claude/worktrees/agent-ad9d226a50e69b1a6/motor-simulacao/fly.toml` -> `motor2037`
-- `.claude/worktrees/agent-ad9d226a50e69b1a6/portal-gestao/fly.toml` -> `portal2037`
 - `catalogo-publico/fly.toml` -> `catalogo2037`
 - `chatbot-api/fly.toml` -> `chatbot2037`
 - `deploy/fly/evolution/fly.toml` -> `evolution2037`

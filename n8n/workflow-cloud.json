@@ -329,9 +329,8 @@
           ]
         },
         "sendBody": true,
-        "contentType": "raw",
-        "rawContentType": "application/json",
-        "body": "={{ $json.body }}",
+        "contentType": "binaryData",
+        "inputDataFieldName": "data",
         "options": {
           "response": {
             "response": {

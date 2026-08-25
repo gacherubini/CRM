@@ -286,9 +286,15 @@ def novos_nos() -> list[dict]:
                     ]
                 },
                 "sendBody": True,
-                "contentType": "raw",
-                "rawContentType": "application/json",
-                "body": "={{ $json.body }}",
+                # Os bytes que a Meta assinou, não o corpo remontado. O
+                # `rawBody` do webhook deixa o original em `binary.data`;
+                # `$json.body` é o parseado, e o `JSON.stringify` do n8n não
+                # escapa barra — a Meta assina `"audio\/ogg"`. Qualquer payload
+                # com barra (toda mídia, texto com link) dava 401 e o bot calava
+                # sem rastro: nada em `mensagens`, nada em `cloud_evento_falho`
+                # e a execução marcada `success` por causa do `neverError`.
+                "contentType": "binaryData",
+                "inputDataFieldName": "data",
                 "options": {"response": {"response": {"neverError": True}}},
             },
             "id": "http-post",

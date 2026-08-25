@@ -79,6 +79,27 @@ def main() -> None:
         "webhook POST tem que responder 200 na hora, senão a Meta reentrega"
     )
 
+    # Capturar o corpo cru não basta — o nó que repassa tem de mandar os **bytes**.
+    # `$json.body` é o corpo já parseado, e o `JSON.stringify` do n8n não escapa
+    # barra; a Meta assina o que o `json_encode` do PHP produz, que escapa
+    # (`"audio\/ogg"`). Toda mídia carrega `mime_type` e a URL do lookaside, então
+    # mídia dava 401 sempre — e calada, porque `registrar_evento_falho` só roda
+    # depois da assinatura passar e o repasse tem `neverError`.
+    # Ancorado na conexão, não na URL: o repasse da verificação (GET) aponta para
+    # a mesma rota e casaria primeiro numa busca por URL.
+    destinos = dados["connections"][post["name"]]["main"][0]
+    repasse = next(n for n in nos if n["name"] == destinos[0]["node"])["parameters"]
+    assert "$json.body" not in json.dumps(repasse, ensure_ascii=False), (
+        "o repasse manda o corpo parseado: o n8n re-serializa e a assinatura da "
+        "Meta não bate para nada que tenha barra (toda mídia)"
+    )
+    assert repasse.get("contentType") == "binaryData", (
+        "o repasse tem que mandar o binário do webhook, não JSON remontado"
+    )
+    assert repasse.get("inputDataFieldName") == "data", (
+        "o corpo cru do webhook chega em `binary.data`; é esse campo que viaja"
+    )
+
     get = next(n for n in webhooks if n["parameters"].get("httpMethod") == "GET")
     # `lastNode` devolveria {"data":"<challenge>"}: a Meta compara o corpo
     # inteiro e reprova. O challenge tem que voltar cru, em texto.
