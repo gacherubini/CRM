@@ -9,6 +9,15 @@ O fluxo de teste é gerado a partir dele e atende somente o número configurado 
 Edite o arquivo principal. Não edite os arquivos `workflow-fly*.ready.json`: eles
 são gerados com endereços e credenciais locais apenas na hora da publicação.
 
+**Três dos quatro JSON são gerados e não se editam à mão:** o de teste
+(`build_test_workflow.js`), o do Modo 2 (`fork_cloud_workflow.py`) e o do preview
+(`build_preview_workflow.py`). Os validadores comparam o arquivo com o que o gerador
+produz e saem `1` se alguém mexeu.
+
+**Estado em 25/08:** o `workflow-ai-nao-salvos.json` e o `workflow-preview.json` estão no
+`main` com o agente por loja, e **nenhum dos dois foi publicado no n8n2037** — decisão do
+dono. O que roda em produção é a versão anterior, com o prompt fixo.
+
 ## Multi-WhatsApp (um workflow)
 
 - A Evolution envia `body.instance` em todo webhook.

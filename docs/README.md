@@ -16,6 +16,31 @@ Quando um card entra no `main`, no mesmo PR: mover o arquivo, atualizar
 `fila/README.md` e `referencia-viva/contexto-compacto.md`. Código vence o
 bloco Status do plano.
 
+## Agente por loja — o que foi construído (2026-08-25)
+
+Spec canônica: [`referencia-viva/specs/2026-08-24-agente-por-loja-design.md`](referencia-viva/specs/2026-08-24-agente-por-loja-design.md).
+Antes disto existia **um** agente, com `vitor motos` e `limeira-sp` escritos à mão dentro
+do `systemMessage` do n8n — a segunda loja se apresentaria como a primeira.
+
+| Card | Produto | O que entrou no código |
+|---|---|---|
+| 1 · dado e texto | Chatbot | `agente_config` + `agente_config_versao` (0027), gerador de prompt por campo, núcleo Revy em código, rascunho/publicar/restaurar/histórico, liga-desliga por loja dentro do `pode_responder`. Plano em [`referencia-viva/planos/`](referencia-viva/planos/2026-08-25-agente-por-loja-1-dado-e-texto.md). |
+| 2 · n8n | n8n / Chatbot | `systemMessage` virou expressão: operação literal no JSON, prompt da loja num slot no fim, terminando no núcleo. Nós `Buscar config do agente1` + `Gate config do agente1` (200 → loja · 423 → para · falha → padrão). Higienização da saída passou a obedecer a loja. Assertivas de prompt migradas para snapshots. |
+| 3 · tela | Loja | `/app/loja/agente/configuracao`: formulário consciente do modo, autosave, aviso de conflito, publicar, histórico. |
+| 4 · preview | n8n / Chatbot | `workflow-preview.json` gerado, nó-ponte `Extrair1`, telefone sintético e ferramentas em modo seco. `POST /v1/agente/preview`. |
+
+**O cliente não sente nada disto ainda, e é decisão do dono** (25/08): ele quer
+acompanhar o passo que muda o que o bot fala. Só o card 1 está deployado — as rotas
+existem no `app2037` e ninguém as chama; o `n8n2037` roda o workflow anterior. A ordem do
+rollout, com o efeito de cada passo, está em
+[`../chatbot-api/README.md`](../chatbot-api/README.md), seção "O que falta" — e na skill
+`revy-deploy`.
+
+O que ficou **deliberadamente de fora** (modelo por loja, teto de tokens por loja,
+cadência de follow-up, "só lead de anúncio", persona pronta) está em
+`.claude/skills/revy-research/decisoes/2026-08-25-agente-por-loja-o-que-ficou-de-fora.md`.
+Não re-propor.
+
 ## WhatsApp Modo 2 — o que foi construído (2026-08-12 a 14)
 
 Spec canônica: [`referencia-viva/specs/2026-08-12-whatsapp-dois-modos-design.md`](referencia-viva/specs/2026-08-12-whatsapp-dois-modos-design.md).

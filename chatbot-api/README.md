@@ -108,10 +108,20 @@ Desde 25/08 o `chatbot-api` guarda, versiona e serve **o prompt do agente de cad
 Antes disso existia um agente só, com `vitor motos` escrito à mão dentro do
 `n8n/workflow-ai-nao-salvos.json` — a segunda loja se apresentaria como a primeira.
 
-**O bot já consome isto** (card 2, 25/08): o `systemMessage` do n8n perdeu `vitor motos` e
-`limeira-sp` e passa a colar o prompt desta loja no fim da mensagem, vindo de
-`GET /v1/agente/config`. Falta a **tela** (card 3) e o **preview** (card 4) — hoje o
-lojista não edita nada sozinho. Ver "O que falta", no fim desta seção.
+**Os quatro cards estão no código. O cliente não sente nenhum deles ainda.**
+
+| Card | O que é | Onde | Em produção? |
+|---|---|---|---|
+| 1 · dado e texto | gerador, núcleo, tabelas, migration `0027`, rotas | `chatbot-api` | **sim** (25/08) — as rotas existem e ninguém as chama |
+| 2 · n8n | slot no `systemMessage`, nó de config, fallback, assertivas migradas | `n8n` | não |
+| 3 · tela | formulário, rascunho, publicar, histórico | `portal-gestao` | não |
+| 4 · preview | workflow gerado, modo seco, telefone sintético | `n8n` + `chatbot-api` | não |
+
+O `app2037` de hoje já tem a migration `0027` e as cinco rotas do card 1; o que falta
+deployar dele são os **ajustes** que os cards 2–4 trouxeram (o campo `saida` e o `modo`
+nas rotas, a rota de preview, e as correções do gerador). O `n8n2037` ainda roda o
+workflow anterior, com `vitor motos` escrito à mão. Ver "O que foi feito" e "O que
+falta", no fim desta seção.
 
 Spec: [`../docs/referencia-viva/specs/2026-08-24-agente-por-loja-design.md`](../docs/referencia-viva/specs/2026-08-24-agente-por-loja-design.md).
 
@@ -179,6 +189,21 @@ que o bot recebeu naquela versão — melhorar o gerador amanhã não reescreve 
   ele varia mesmo (250/400/700) — o que não varia é o que o n8n aplica, que segue sendo o
   250 fixo do nó. O valor fica ali informativo, pronto para o dia em que o teto por loja
   se justificar.
+- **A trava contra endereço inventado só sai quando existe endereço.** `endereco_completo`
+  sozinho não desliga nada: sem `endereco` preenchido o gerador mantém "não informe rua,
+  número, bairro nem ponto de referência". Marcar a opção e deixar o campo vazio deixava o
+  agente sem endereço **e** sem a trava — livre para inventar rua e número.
+- **`oferece` não pode ser lista vazia (422).** O gerador diz ao cliente o que a loja
+  **não** faz; com zero marcado ele passava a afirmar que a loja não faz financiamento,
+  nem à vista, nem troca, nem consignação. Ninguém notaria até um cliente reclamar.
+- **O prompt padrão existe em dois lugares.** Aqui, em `montar_prompt(CAMPOS_PADRAO_REVY)`,
+  e como constante JS dentro do nó `Gate config do agente1` (o fallback do n8n). Mudou o
+  gerador? `python -m scripts.sincronizar_fallback_n8n`, e regere os três workflows
+  derivados. `tests/test_agente_prompt_fallback_do_n8n.py` reprova a divergência.
+- **`tests/snapshots/agente_prompt.txt` guarda o texto inteiro** em sete combinações,
+  incluindo as feias. Mudou de propósito? confira o diff e regenere com
+  `python -m tests.test_agente_prompt_snapshot`. Foi ele que achou os dois campos
+  perigosos acima — assertiva por frase não pegaria nenhum dos dois.
 - **`pode_responder` passou a consultar `agente_config`.** É o caminho quente: toda
   mensagem de cliente passa por lá. Loja que nunca configurou nada cai no padrão Revy com
   `agente_ativo=True` e continua respondendo — há teste explícito para isso, porque
@@ -203,7 +228,7 @@ Dois nós novos, entre o debounce e o agente:
   `AGENTS.md` §5. Só falha técnica (timeout, 5xx, rede) cai no padrão.
 - **O fallback é uma cópia** de `montar_prompt(CAMPOS_PADRAO_REVY)` dentro do `jsCode`.
   `tests/test_agente_prompt_fallback_do_n8n.py` compara os dois e reprova a divergência;
-  mudou o gerador, recole o texto no nó.
+  a correção é `python -m scripts.sincronizar_fallback_n8n`, nunca editar o nó à mão.
 - **A higienização da saída passou a obedecer a loja.** O `Responder WhatsApp1` forçava
   minúsculas e removia emoji de toda resposta de cliente. Se continuasse incondicional,
   `escrita` e `emoji` seriam campos decorativos — por isso a rota devolve `saida`.
@@ -236,20 +261,43 @@ produto**; o papel daqui é de porteiro.
   ainda pensa. Curto demais mostra "o preview não respondeu" para um agente que
   respondeu — e o lojista conclui que a configuração dele está errada.
 
+### O que foi feito
+
+Neste produto: o gerador de prompt e o núcleo (`app/agente_prompt.py`), as versões
+(`app/agente_config.py`), as seis rotas `/v1/agente`, o porteiro do preview
+(`app/agente_preview.py`), o gate por loja dentro do `pode_responder`, e dois scripts —
+`semear_config_agente` (a config que reproduz o prompt de hoje) e
+`sincronizar_fallback_n8n`.
+
+Nos outros: o slot e os dois nós no n8n, o workflow de preview gerado, e a tela em
+`/app/loja/agente/configuracao`. Os READMEs de `portal-gestao/` e `n8n/GUIA-WORKFLOW.md`
+contam o lado deles.
+
 ### O que falta
 
-Os quatro cards estão implementados. Para chegar ao lojista, falta **operação**:
+**Só operação — nenhuma linha de código.** Os cards 2–4 não foram deployados, por
+decisão do dono (25/08): ele quer acompanhar o passo que muda o que o cliente ouve.
 
-1. **Ligar a flag** `REVY_LOJA_AGENTE_CONFIG_ENABLED` (default 0, e no app2037 flags são
-   *secrets*, não `[env]` do toml).
-2. **Semear a config da loja que já atendia**, antes do workflow subir:
-   `python -m scripts.semear_config_agente vitor-motos`.
-3. **Publicar os workflows** (`-Mode production` e `-Mode preview`) e apontar
-   `CHATBOT_AGENTE_PREVIEW_URL` para o webhook do preview.
+| # | Passo | Muda o que o cliente ouve? |
+|---|---|---|
+| 1 | `fly deploy` do `app2037` | **não** — sobe os ajustes dos cards 2–4 nas rotas, e ninguém as chama. Sem migration nova: a `0027` já está aplicada |
+| 2 | `python -m scripts.semear_config_agente vitor-motos` (com `CHATBOT_DATABASE_URL` do Postgres) | **não** — só o `pode_responder` lê `agente_config` hoje, e a config semeada é equivalente ao estado atual (`agente_ativo` ligado, sem janela de horário) |
+| 3 | `prepare-workflow.ps1 -Mode production` + `upload-and-import` + restart | **sim** — é aqui que o bot passa a montar o prompt a partir da config |
+| 4 | secret `REVY_LOJA_AGENTE_CONFIG_ENABLED=1` | libera a tela para o lojista |
+| 5 | `-Mode preview` + secret `CHATBOT_AGENTE_PREVIEW_URL` | libera o botão Testar |
 
-Fora da v1, com motivo registrado no spec: cadência de follow-up por loja (§4.4.2),
-`só lead de anúncio` (§4.6, depende de atribuição CTWA confiável), e tela no Control para
-trocar modelo (§7, o modelo é global).
+**A ordem 1 → 2 → 3 não é preferência.** Workflow subindo antes da rota busca o que não
+existe (por isso o fallback), e antes da semente a vitor motos estreia se apresentando
+como "loja". Sequência completa na skill `revy-deploy`.
+
+**Teste de aceite do passo 3:** a vitor motos **não muda de jeito de falar**. Se mudar, é
+bug — reverte republicando o workflow anterior.
+
+Fora da v1, com motivo registrado no spec e na
+`decisoes/2026-08-25-agente-por-loja-o-que-ficou-de-fora.md`: cadência de follow-up por
+loja (§4.4.2), `só lead de anúncio` (§4.6, depende de atribuição CTWA confiável), e tela
+no Control para trocar modelo (§7, o modelo é global). Dívida herdada que encosta:
+`GET /v1/config/catalogo-bot` é cega para loja (§8) — card próprio.
 
 ## Rodar e testar
 

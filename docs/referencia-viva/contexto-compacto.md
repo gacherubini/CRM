@@ -16,7 +16,10 @@ Vocabulário: [`../../CONTEXT.md`](../../CONTEXT.md). As-built Control/Loja:
   terminando no **núcleo Revy** — a ordem é o mecanismo de segurança inteiro.
   Spec: [`specs/2026-08-24-agente-por-loja-design.md`](specs/2026-08-24-agente-por-loja-design.md).
 
-  **Nada disto chega ao lojista sem três passos de operação**, e nenhum foi dado:
+  **Só o card 1 está deployado** (25/08): as rotas existem no `app2037` e ninguém as
+  chama. Os cards 2–4 estão no `main` e **não** subiram — o `n8n2037` roda o workflow
+  anterior, com `vitor motos` escrito à mão. Para chegar ao lojista faltam três passos de
+  operação, e nenhum foi dado:
   1. ligar `REVY_LOJA_AGENTE_CONFIG_ENABLED` no app2037 (é **secret**, não `[env]`);
   2. semear a config da loja que já atendia **antes** de o workflow subir —
      `python -m scripts.semear_config_agente vitor-motos` — senão ela estreia se

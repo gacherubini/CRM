@@ -92,9 +92,10 @@ read-only Meta/Google/WA) · **Acessos bancos** (credenciais do Motor cifradas; 
 ações com confirmação/desfazer, sino — flag + módulo OFF por default) · **editar e
 apagar venda** com o efeito propagado ao Control · **Financeiro** (lucro por moto,
 lucro operacional do mês, ponto de equilíbrio e despesas fixas recorrentes — flag +
-módulo OFF por default). Foto de veículo ainda é URL. Sino geral fora do Copiloto
-ainda não existe. A página Hoje do Copiloto foi removida em 16/08: o sino cobre os
-sinais.
+módulo OFF por default) · **Configuração do agente por loja** (formulário, rascunho com
+autosave, conversa de teste com o rascunho, publicar e histórico — flag OFF por default,
+**não deployado**). Foto de veículo ainda é URL. Sino geral fora do Copiloto ainda não
+existe. A página Hoje do Copiloto foi removida em 16/08: o sino cobre os sinais.
 
 ## Flags (defaults de código OFF)
 
@@ -126,6 +127,18 @@ Config técnica de Pixel/CAPI/campanhas **não fica aqui** — é operada no `re
 O lojista escreve **campos**, não prompt. A Loja aqui é **só tela**: os campos, o texto
 gerado, o núcleo Revy, as versões e o histórico moram no `chatbot-api` e chegam pelo
 `ChatbotClient`. Nenhuma tabela nova, nenhuma montagem de texto neste produto.
+
+**Está no código e não está no ar.** Falta ligar `REVY_LOJA_AGENTE_CONFIG_ENABLED` no
+`app2037` (é *secret*) e publicar os workflows do n8n. Sequência completa e ordem no
+`chatbot-api/README.md`, seção "O que falta".
+
+**Feito:** rota da tela + três rotas de escrita (`configuracao.json` para o autosave,
+`publicar`, `restaurar`), a conversa de teste (`testar.json`), o formulário inteiro
+(identidade, personalidade, FAQ, regras da conversa, instruções livres, liga/desliga),
+o resumo "o que o Revy garante", o prompt montado à vista, e o histórico de versões.
+Arquivos: `app/loja/routes.py`, `app/templates/loja/agente_configuracao.html`,
+`app/static/js/agente_configuracao.js`, estilos `.agente-config-*`/`.agente-teste-*` no
+`app.css`.
 
 - **Gate: sessão + flag + papel dono/gerente. São três, não quatro** — a tela vizinha
   (`/app/loja/agente`) não tem gate de módulo, e a configuração segue o gate da tela onde
@@ -160,7 +173,16 @@ gerado, o núcleo Revy, as versões e o histórico moram no `chatbot-api` e cheg
   regra, clica e conversa com a versão anterior do próprio agente.
 - Expressões e "nunca diga" são **texto separado por vírgula**, não chips: um editor de
   chips é estado escondido a mais numa tela que já tem autosave. O dado no backend é lista
-  nos dois casos.
+  nos dois casos. **Desvio consciente da spec §4.2**, que pedia chips — trocar depois é
+  meia hora e não muda o contrato.
+- **O JS tem um teste de sintaxe** (`tests/test_js_sintaxe.py` roda `node --check` em
+  `app/static/js/*.js`, e pula sem node). Ele não substitui olhar no navegador: existe
+  porque um `\n` que virou quebra de linha de verdade derrubou o arquivo inteiro, e o
+  sintoma na tela foi "nada acontece ao digitar" — que não parece erro de sintaxe.
+- **Mexeu no `app.css`? são cinco arquivos de `?v=`, não um.** O `base.html` e as quatro
+  telas de auth (`login`, `senha_esqueci`, `senha_redefinir`, `convite_aceitar`), que não
+  estendem o base. `python .claude/skills/revy-deploy/preflight.py` reprova a divergência
+  — e reprovou esta feature quando só o `base.html` foi bumpado.
 
 ## Usar o chat no Atendimento
 
