@@ -406,7 +406,7 @@ escreve **"Ajustes"** — o comentário está no `agente.html:3`.
 
 | Shell | Arquivo | Linha do `<link>` | Valor hoje |
 |---|---|---|---|
-| Revy Loja | `portal-gestao/app/static/css/app.css` | `portal-gestao/app/templates/base.html:16` | `?v=v15` |
+| Revy Loja | `portal-gestao/app/static/css/app.css` | `portal-gestao/app/templates/base.html:16` | `?v=v16` |
 | Revy Control | `revy-trafego/app/static/css/app.css` | `revy-trafego/app/templates/base.html:16` | `?v=v12` |
 
 O `StaticFiles` do Starlette não manda `cache-control`: sem trocar a URL, o navegador reusa
@@ -417,6 +417,10 @@ telas de auth **não estendem** o `base.html` — cada uma tem o seu `?v=`.
 `shared/brand/revy-tokens.css`; rode `python shared/brand/sync_tokens.py` (`python3` no
 Mac). Editar `*/static/css/revy-tokens.css` quebra a suíte de propósito. O acento é o verde
 racing — há teste que falha se o azul antigo voltar.
+
+**`.overview-grid` não existe em CSS nenhum.** Um template do Agente usava essa classe e
+saía com rótulo e número colados ("Oferecidos0") — corrigido em `472ea5f`. Use
+`.metric-grid`, e confira no navegador que a classe que você escreveu tem regra.
 
 **Máximo 4 métricas por grade.** `.metric-grid` é `repeat(4, 1fr)` sem `row-gap`: a quinta
 cai embaixo da primeira e lê como continuação do mesmo card. Precisa de mais? grade nova.
