@@ -301,8 +301,15 @@ bug — reverte republicando o workflow anterior.
 Fora da v1, com motivo registrado no spec e na
 `decisoes/2026-08-25-agente-por-loja-o-que-ficou-de-fora.md`: cadência de follow-up por
 loja (§4.4.2), `só lead de anúncio` (§4.6, depende de atribuição CTWA confiável), e tela
-no Control para trocar modelo (§7, o modelo é global). Dívida herdada que encosta:
-`GET /v1/config/catalogo-bot` é cega para loja (§8) — card próprio.
+no Control para trocar modelo (§7, o modelo é global).
+
+Dívida herdada que encosta nesta feature: `GET /v1/config/catalogo-bot` é cega para loja
+(§8). **Não é conserto, é decisão** — o Estoque não tem credencial sem loja
+(`CredencialServico.loja_id` é `NOT NULL`) e a rota pública por slug omite o
+`catalogo_url` **de propósito**, com teste afirmando isso. As três saídas, com o custo de
+cada uma e uma recomendação, estão em
+[`../docs/fila/2026-08-25-catalogo-por-loja.md`](../docs/fila/2026-08-25-catalogo-por-loja.md).
+Só morde com a segunda loja no Modo 2.
 
 ## Rodar e testar
 

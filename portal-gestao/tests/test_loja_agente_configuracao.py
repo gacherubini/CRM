@@ -435,3 +435,27 @@ def test_primeira_mensagem_chega_ao_preview(client, config_on):
         },
     )
     assert fake.testes[0]["primeira_mensagem"] is True
+
+
+def test_chips_vem_renderizados_do_servidor(client, config_on):
+    """Renderizar no servidor evita o pisca-vazio antes do JS — e é o que faz o
+    formulário mostrar o que está salvo mesmo se o JS demorar."""
+    login(client)
+
+    class _ComChips(_FakeChatbot):
+        def obter_rascunho_agente(self):
+            corpo = super().obter_rascunho_agente()
+            corpo["campos"] = dict(
+                corpo["campos"], expressoes=["beleza", "fechou"], nunca_diga=["parceiro"]
+            )
+            return corpo
+
+    _override(_ComChips())
+    r = client.get("/app/loja/agente/configuracao")
+    assert 'data-campo="expressoes"' in r.text
+    assert 'data-termo="beleza"' in r.text
+    assert 'data-termo="fechou"' in r.text
+    assert 'data-termo="parceiro"' in r.text
+    # O input de texto separado por virgula nao pode voltar: seriam duas fontes
+    # de verdade para a mesma lista.
+    assert 'name="expressoes"' not in r.text

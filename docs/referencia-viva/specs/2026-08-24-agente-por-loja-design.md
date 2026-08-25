@@ -19,6 +19,8 @@ preview).
 | §6 | o formulário pergunta o modo ao chatbot (`modo` em `GET /v1/agente/rascunho`) | a Loja reimplementar o gate de Modo 2 é divergir dele na primeira mudança |
 | §6.1.2 | `consultar_estoque1` também perde a **gravação** no CRM no preview (só a busca roda) | a gravação de `moto-escolhida` **cria `Conversa`** — o preview apareceria em Conversas com o telefone sintético |
 | §11 | a config da vitor motos virou script (`scripts/semear_config_agente.py`), com snapshot por frase | o teste de aceite ("reproduz o prompt de hoje") precisa ser executável, não uma conferência a olho |
+| §4.1 | entrou o campo **endereço** (texto), e `endereco_completo` só desliga a trava anti-invenção quando ele está preenchido | não havia campo de endereço em lugar nenhum: marcar "pode passar" tirava o "não informe rua, número, bairro" e não punha nada no lugar |
+| §4.4 | `oferece` passou a exigir ao menos uma opção (422) | o gerador lista o que a loja **não** faz; com zero marcado o agente afirmava a todo cliente que a loja não faz nada |
 
 ## 1. O problema
 

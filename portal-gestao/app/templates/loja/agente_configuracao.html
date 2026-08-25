@@ -171,16 +171,42 @@
             <option value="longo" {% if c.tamanho_resposta == 'longo' %}selected{% endif %}>Pode explicar</option>
           </select>
         </label>
-        <label class="wide">Expressões da casa
-          <input name="expressoes" value="{{ (c.expressoes or [])|join(', ') }}"
-                 placeholder="beleza, fechou, certinho">
-          <small>Separe por vírgula. O agente usa quando combinar, sem virar bordão.</small>
-        </label>
-        <label class="wide">Nunca diga
-          <input name="nunca_diga" value="{{ (c.nunca_diga or [])|join(', ') }}"
-                 placeholder="parceiro, amigão">
-          <small>Separe por vírgula. Palavras que o agente nunca escreve.</small>
-        </label>
+{# Chips (spec §4.2). Renderizados no servidor para não piscar vazios antes do
+   JS; o JS só adiciona, remove e coleta. #}
+        <div class="wide agente-chips-campo">
+          <span class="agente-chips-rotulo" id="rotulo-expressoes">Expressões da casa</span>
+          <div class="agente-chips" data-campo="expressoes">
+            <ul class="agente-chips-lista" role="list">
+              {% for termo in c.expressoes or [] %}
+              <li class="agente-chip" data-termo="{{ termo }}">
+                <span>{{ termo }}</span>
+                <button type="button" class="agente-chip-x" aria-label="Remover {{ termo }}">&times;</button>
+              </li>
+              {% endfor %}
+            </ul>
+            <input class="agente-chips-entrada" type="text" maxlength="40"
+                   aria-labelledby="rotulo-expressoes"
+                   placeholder="beleza">
+          </div>
+          <small>Enter ou vírgula adiciona. O agente usa quando combinar, sem virar bordão.</small>
+        </div>
+        <div class="wide agente-chips-campo">
+          <span class="agente-chips-rotulo" id="rotulo-nunca-diga">Nunca diga</span>
+          <div class="agente-chips" data-campo="nunca_diga">
+            <ul class="agente-chips-lista" role="list">
+              {% for termo in c.nunca_diga or [] %}
+              <li class="agente-chip" data-termo="{{ termo }}">
+                <span>{{ termo }}</span>
+                <button type="button" class="agente-chip-x" aria-label="Remover {{ termo }}">&times;</button>
+              </li>
+              {% endfor %}
+            </ul>
+            <input class="agente-chips-entrada" type="text" maxlength="40"
+                   aria-labelledby="rotulo-nunca-diga"
+                   placeholder="parceiro">
+          </div>
+          <small>Enter ou vírgula adiciona. Palavras que o agente nunca escreve.</small>
+        </div>
       </div>
     </div>
   </section>
@@ -439,5 +465,5 @@
 {% endif %}
 {% endif %}
 
-<script src="/static/js/agente_configuracao.js?v=4" defer></script>
+<script src="/static/js/agente_configuracao.js?v=5" defer></script>
 {% endblock %}

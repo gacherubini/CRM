@@ -37,11 +37,13 @@
     const el = form.querySelector(`[name="${nome}"]`);
     return Boolean(el && el.checked);
   };
-  const lista = (nome) =>
-    val(nome)
-      .split(',')
-      .map((t) => t.trim())
-      .filter(Boolean);
+  // Chips: a fonte é o DOM da lista, não um input escondido. Input escondido
+  // seria um segundo estado para manter em sincronia, e é assim que uma remoção
+  // deixa de chegar ao backend sem ninguém ver.
+  const chipsDe = (nome) =>
+    Array.from(
+      form.querySelectorAll(`.agente-chips[data-campo="${nome}"] .agente-chip`),
+    ).map((li) => li.dataset.termo);
   const grupo = (nome) =>
     Array.from(form.querySelectorAll(`[data-grupo="${nome}"]:checked`)).map(
       (el) => el.value,
@@ -87,8 +89,8 @@
       escrita: val('escrita'),
       emoji: val('emoji'),
       tamanho_resposta: val('tamanho_resposta'),
-      expressoes: lista('expressoes'),
-      nunca_diga: lista('nunca_diga'),
+      expressoes: chipsDe('expressoes'),
+      nunca_diga: chipsDe('nunca_diga'),
       faq: faq(),
       oferece: grupo('oferece'),
       // `disabled` não entra em FormData e o select some do payload: no Modo 2 o
@@ -185,6 +187,81 @@
     if (!faqVazioEl) return;
     faqVazioEl.hidden = faqEl.querySelectorAll('.agente-config-faq-item').length > 0;
   }
+
+  function adicionarChip(caixa, texto) {
+    const termo = String(texto || '').trim().replace(/\s+/g, ' ').slice(0, 40);
+    if (!termo) return false;
+    const nome = caixa.dataset.campo;
+    // Duplicata não é erro do lojista, é ruído no prompt: o gerador listaria o
+    // mesmo termo duas vezes.
+    if (chipsDe(nome).some((t) => t.toLowerCase() === termo.toLowerCase())) return false;
+    const li = document.createElement('li');
+    li.className = 'agente-chip';
+    li.dataset.termo = termo;
+    const span = document.createElement('span');
+    span.textContent = termo;
+    const x = document.createElement('button');
+    x.type = 'button';
+    x.className = 'agente-chip-x';
+    x.setAttribute('aria-label', `Remover ${termo}`);
+    x.innerHTML = '&times;';
+    li.append(span, x);
+    caixa.querySelector('.agente-chips-lista').appendChild(li);
+    return true;
+  }
+
+  form.querySelectorAll('.agente-chips').forEach((caixa) => {
+    const entrada = caixa.querySelector('.agente-chips-entrada');
+
+    const confirmar = () => {
+      // Colar "beleza, fechou, certinho" vira três chips, não um.
+      const partes = entrada.value.split(',');
+      let mudou = false;
+      for (const parte of partes) mudou = adicionarChip(caixa, parte) || mudou;
+      entrada.value = '';
+      if (mudou) agendar();
+    };
+
+    entrada.addEventListener('keydown', (ev) => {
+      if (ev.key === 'Enter' || ev.key === ',') {
+        ev.preventDefault();
+        confirmar();
+        return;
+      }
+      // Backspace no campo vazio apaga o último chip — atalho que quem usa
+      // chips espera, e evita ter que mirar no ×.
+      if (ev.key === 'Backspace' && entrada.value === '') {
+        const ultimo = caixa.querySelector('.agente-chip:last-child');
+        if (ultimo) {
+          ultimo.remove();
+          agendar();
+        }
+      }
+    });
+    // Sair do campo com texto digitado não pode perder o termo em silêncio.
+    entrada.addEventListener('blur', confirmar);
+    entrada.addEventListener('paste', (ev) => {
+      const texto = (ev.clipboardData || window.clipboardData)?.getData('text');
+      if (!texto || !texto.includes(',')) return;
+      ev.preventDefault();
+      let mudou = false;
+      for (const parte of texto.split(',')) mudou = adicionarChip(caixa, parte) || mudou;
+      if (mudou) agendar();
+    });
+
+    caixa.addEventListener('click', (ev) => {
+      const x = ev.target.closest('.agente-chip-x');
+      if (x) {
+        x.closest('.agente-chip').remove();
+        agendar();
+        return;
+      }
+      // Clicar na área vazia da caixa foca a entrada, como um campo de verdade.
+      if (ev.target === caixa || ev.target.closest('.agente-chips-lista') === ev.target) {
+        entrada.focus();
+      }
+    });
+  });
 
   document.getElementById('agente-faq-add')?.addEventListener('click', () => {
     const item = document.createElement('div');

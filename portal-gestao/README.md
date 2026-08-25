@@ -171,10 +171,13 @@ Arquivos: `app/loja/routes.py`, `app/templates/loja/agente_configuracao.html`,
   lojista testaria com o próprio número.
 - **Clicar em Testar publica o rascunho pendente antes.** Sem isso ele digita uma
   regra, clica e conversa com a versão anterior do próprio agente.
-- Expressões e "nunca diga" são **texto separado por vírgula**, não chips: um editor de
-  chips é estado escondido a mais numa tela que já tem autosave. O dado no backend é lista
-  nos dois casos. **Desvio consciente da spec §4.2**, que pedia chips — trocar depois é
-  meia hora e não muda o contrato.
+- **Expressões e "nunca diga" são chips** (spec §4.2), e a fonte da verdade é o **DOM da
+  lista** — não um input escondido em paralelo. Input escondido seria um segundo estado
+  para manter em sincronia, e é assim que uma remoção deixa de chegar ao backend sem
+  ninguém ver. Os chips são renderizados no servidor para não piscarem vazios antes do JS.
+  Enter e vírgula adicionam, colar `a, b, c` vira três, duplicata (ignorando maiúsculas)
+  não entra, Backspace no campo vazio apaga o último, e sair do campo com texto digitado
+  não perde o termo.
 - **O JS tem um teste de sintaxe** (`tests/test_js_sintaxe.py` roda `node --check` em
   `app/static/js/*.js`, e pula sem node). Ele não substitui olhar no navegador: existe
   porque um `\n` que virou quebra de linha de verdade derrubou o arquivo inteiro, e o
