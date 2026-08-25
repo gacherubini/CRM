@@ -50,6 +50,9 @@ CAMPOS_VITOR_MOTOS = CamposAgente(
     expressoes=["certinho", "beleza"],
     nunca_diga=[],
     faq=[],
+    # Confirmado pelo dono em 25/08: financiamento, a vista e troca; consignacao
+    # NAO. O gerador diz ao cliente o que a loja nao faz, entao esta linha vira
+    # afirmacao no WhatsApp — nao e palpite a partir do prompt antigo.
     oferece=["financiamento", "a_vista", "troca"],
     fotos="so_quando_pedir",
     sem_moto_anuncio="segura",
