@@ -1337,6 +1337,97 @@ def config_agente(
     }
 
 
+def _rascunho_para_saida(db: Session, loja_id: str) -> dict:
+    versao = agente_config.obter_rascunho(db, loja_id)
+    return {
+        "campos": versao.campos,
+        "prompt": versao.prompt_gerado,
+        "conflitos": agente_prompt.detectar_conflitos(
+            str(versao.campos.get("instrucoes") or "")
+        ),
+    }
+
+
+@app.get("/v1/agente/rascunho")
+def obter_rascunho_agente(
+    instance: Optional[str] = None,
+    ctx: Contexto = Depends(get_contexto),
+    db: Session = Depends(get_db),
+):
+    loja_id = resolver_loja_id(db, ctx, instance)
+    _exigir_loja_operacional(db, loja_id)
+    return _rascunho_para_saida(db, loja_id)
+
+
+@app.put("/v1/agente/rascunho")
+def salvar_rascunho_agente(
+    campos: agente_prompt.CamposAgente,
+    instance: Optional[str] = None,
+    autor: Optional[str] = None,
+    ctx: Contexto = Depends(get_contexto),
+    db: Session = Depends(get_db),
+):
+    """Salva sem publicar. Conflito com o núcleo vira aviso, nunca recusa."""
+    loja_id = resolver_loja_id(db, ctx, instance)
+    _exigir_loja_operacional(db, loja_id)
+    agente_config.salvar_rascunho(db, loja_id, campos, autor)
+    return _rascunho_para_saida(db, loja_id)
+
+
+@app.post("/v1/agente/publicar")
+def publicar_agente(
+    instance: Optional[str] = None,
+    autor: Optional[str] = None,
+    ctx: Contexto = Depends(get_contexto),
+    db: Session = Depends(get_db),
+):
+    loja_id = resolver_loja_id(db, ctx, instance)
+    _exigir_loja_operacional(db, loja_id)
+    versao = agente_config.publicar(db, loja_id, autor)
+    return {
+        "versao_id": versao.id,
+        "publicado_em": versao.publicado_em.isoformat() if versao.publicado_em else None,
+    }
+
+
+@app.get("/v1/agente/versoes")
+def listar_versoes_agente(
+    instance: Optional[str] = None,
+    ctx: Contexto = Depends(get_contexto),
+    db: Session = Depends(get_db),
+):
+    loja_id = resolver_loja_id(db, ctx, instance)
+    _exigir_loja_operacional(db, loja_id)
+    return [
+        {
+            "id": v.id,
+            "estado": v.estado,
+            "autor": v.autor,
+            "criado_em": v.criado_em.isoformat() if v.criado_em else None,
+            "publicado_em": v.publicado_em.isoformat() if v.publicado_em else None,
+        }
+        for v in agente_config.listar_versoes(db, loja_id)
+    ]
+
+
+@app.post("/v1/agente/versoes/{versao_id}/restaurar")
+def restaurar_versao_agente(
+    versao_id: str,
+    instance: Optional[str] = None,
+    autor: Optional[str] = None,
+    ctx: Contexto = Depends(get_contexto),
+    db: Session = Depends(get_db),
+):
+    """Cria rascunho novo a partir da versão antiga. Não apaga histórico."""
+    loja_id = resolver_loja_id(db, ctx, instance)
+    _exigir_loja_operacional(db, loja_id)
+    try:
+        agente_config.restaurar(db, loja_id, versao_id, autor)
+    except LookupError:
+        raise HTTPException(status_code=404, detail="versão não encontrada nesta loja")
+    return _rascunho_para_saida(db, loja_id)
+
+
 @app.get("/v1/estoque/buscar")
 def buscar_estoque(
     termo: Optional[str] = None,
