@@ -66,6 +66,7 @@ def salvar_rascunho(
             models_db.AgenteConfigVersao.loja_id == loja_id,
             models_db.AgenteConfigVersao.estado == "rascunho",
         )
+        .order_by(models_db.AgenteConfigVersao.criado_em.desc())
         .first()
     )
     if atual is None:

@@ -17,6 +17,21 @@ def test_loja_sem_config_cai_no_padrao_revy(db, loja_a):
     assert "[REGRAS DO REVY" in prompt
 
 
+def test_salvar_rascunho_duas_vezes_reaproveita_a_mesma_linha(db, loja_a):
+    """Escritor e leitor do rascunho tinham ordenação diferente: com duas
+    linhas 'rascunho' da mesma loja, o PUT escrevia numa e a resposta do
+    próprio PUT devolvia outra. Duas chamadas seguidas têm que devolver o
+    MESMO id, e o que `obter_rascunho` lê tem que ser o que acabou de ser
+    escrito."""
+    primeira = agente_config.salvar_rascunho(db, loja_a["loja_id"], _campos("Loja Um"), autor="a")
+    segunda = agente_config.salvar_rascunho(db, loja_a["loja_id"], _campos("Loja Dois"), autor="a")
+
+    assert segunda.id == primeira.id
+    rascunho = agente_config.obter_rascunho(db, loja_a["loja_id"])
+    assert rascunho.id == primeira.id
+    assert rascunho.campos["nome_loja"] == "Loja Dois"
+
+
 def test_rascunho_nao_vai_ao_ar(db, loja_a):
     agente_config.salvar_rascunho(db, loja_a["loja_id"], _campos(), autor="dono@x")
     assert "motos do léo" not in agente_config.prompt_publicado(db, loja_a["loja_id"]).lower()
@@ -37,7 +52,7 @@ def test_publicar_congela_o_prompt_da_versao(db, loja_a):
     assert versao.publicado_em is not None
 
 
-def test_restaurar_cria_versao_nova_e_nao_apaga_historico(db, loja_a):
+def test_restaurar_traz_a_versao_antiga_de_volta_sem_apagar_historico(db, loja_a):
     agente_config.salvar_rascunho(db, loja_a["loja_id"], _campos("Loja Um"), autor="a")
     primeira = agente_config.publicar(db, loja_a["loja_id"], autor="a")
     agente_config.salvar_rascunho(db, loja_a["loja_id"], _campos("Loja Dois"), autor="a")

@@ -1,5 +1,5 @@
 {
- "sha": "50da4f3",
+ "sha": "89bfc4d",
  "inventario": {
   "chatbot-api": [
    {
@@ -609,7 +609,7 @@
     "chave": "agente_config",
     "simbolo": "agente_config",
     "arquivo": "app/models_db.py",
-    "linha": 487
+    "linha": 502
    },
    {
     "secao": "worker",

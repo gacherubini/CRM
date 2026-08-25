@@ -1,4 +1,5 @@
 """Gerador de prompt por loja: campos entram, texto sai (spec §3.4, §4, §5)."""
+import pydantic
 import pytest
 
 from app.agente_prompt import (
@@ -80,3 +81,68 @@ def test_combinacao_feia_nao_gera_contradicao():
     prompt = montar_prompt(_campos(tom="formal", escrita="minusculas")).lower()
     assert "letras minúsculas" in prompt
     assert "formal" in prompt
+
+
+@pytest.mark.parametrize(
+    "campo,invalido",
+    [
+        ("assume_ia", "as_vezes"),
+        ("tom", "amigavel"),
+        ("tratamento", "apelido"),
+        ("escrita", "MINUSCULAS"),
+        ("emoji", "sempre"),
+        ("tamanho_resposta", "gigante"),
+        ("fotos", "so_quando_pedir "),
+        ("sem_moto_anuncio", "segura "),
+    ],
+)
+def test_valor_invalido_em_campo_de_escolha_e_recusado(campo, invalido):
+    """Antes: lookup direto em dicionário — `{"tom": "amigavel"}` virava 500
+    (KeyError), e um typo com espaço a mais (`"segura "`) caía no `else` e
+    trocava o comportamento em silêncio, sem erro nenhum. Agora é 422 do
+    pydantic antes de qualquer um dos dois."""
+    with pytest.raises(pydantic.ValidationError):
+        _campos(**{campo: invalido})
+
+
+@pytest.mark.parametrize(
+    "opcao,trecho",
+    [
+        ("quando_pedir", "quando o cliente pedir explicitamente"),
+        ("depois_da_simulacao", "depois que a simulação for concluída"),
+        ("fora_do_horario", "fora do horário de atendimento"),
+    ],
+)
+def test_cada_opcao_de_handoff_aparece_no_prompt(opcao, trecho):
+    """spec §3.4: REGRAS DA LOJA inclui handoff. Antes, o campo era persistido
+    e publicado mas nunca virava texto nenhum."""
+    prompt = montar_prompt(_campos(handoff=[opcao])).lower()
+    assert trecho in prompt
+
+
+def test_handoff_vazio_nao_gera_linha_orfa():
+    prompt = montar_prompt(_campos(handoff=[])).lower()
+    assert "encaminhe o atendimento" not in prompt
+
+
+def test_horario_sem_zero_a_esquerda_e_recusado():
+    """"8:00" compara errado em `esta_em_horario` (comparação de string) e
+    deixa o bot mudo o dia inteiro sem erro nenhum — bloqueia na entrada."""
+    with pytest.raises(pydantic.ValidationError):
+        _campos(horario={"ter": ["8:00", "18:00"]})
+
+
+def test_horario_com_uma_entrada_e_recusado():
+    with pytest.raises(pydantic.ValidationError):
+        _campos(horario={"ter": ["08:00"]})
+
+
+def test_horario_com_zero_a_esquerda_e_aceito():
+    campos = _campos(horario={"ter": ["08:00", "18:00"]})
+    assert campos.horario["ter"] == ["08:00", "18:00"]
+
+
+def test_so_lead_anuncio_foi_removido():
+    """Decisão do dono: campo morto sai do schema (nada no produto o consome
+    — o gate dependeria da atribuição CTWA, que tem buraco conhecido)."""
+    assert "so_lead_anuncio" not in CamposAgente.model_fields

@@ -5,7 +5,7 @@ leads e consentimentos entram no próximo incremento.
 from datetime import datetime, timezone
 from typing import Optional
 
-from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Index, Integer, String, Text, UniqueConstraint
+from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Index, Integer, String, Text, UniqueConstraint, text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db import Base
@@ -464,6 +464,21 @@ class AgenteConfigVersao(Base):
     """
 
     __tablename__ = "agente_config_versao"
+    __table_args__ = (
+        # No máximo um rascunho por loja. Parcial (não índice simples de
+        # loja_id): duas versões "arquivada" da mesma loja são o histórico
+        # que a feature promete guardar. Espelha a migration 0027 — aqui
+        # dá para declarar via Index normal (sem batch_alter_table, que só
+        # entra ao ALTERAR tabela existente) porque create_all cria a
+        # tabela nova direto com o índice junto.
+        Index(
+            "uq_agente_config_versao_rascunho_por_loja",
+            "loja_id",
+            unique=True,
+            postgresql_where=text("estado = 'rascunho'"),
+            sqlite_where=text("estado = 'rascunho'"),
+        ),
+    )
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True)
     loja_id: Mapped[str] = mapped_column(

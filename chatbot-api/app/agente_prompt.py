@@ -6,9 +6,14 @@ texto sair bem escrito mesmo quando o lojista não é.
 """
 from __future__ import annotations
 
-from pydantic import BaseModel, Field
+import re
+from typing import Literal
+
+from pydantic import BaseModel, Field, field_validator
 
 MAX_INSTRUCOES_LIVRES = 1000
+
+_HORARIO_RE = re.compile(r"^\d{2}:\d{2}$")
 
 _TOKENS_POR_TAMANHO = {"curto": 250, "medio": 400, "longo": 700}
 
@@ -67,12 +72,12 @@ class CamposAgente(BaseModel):
 
     # personalidade (§4.2)
     nome_agente: str = Field(default="", max_length=40)
-    assume_ia: str = "nunca"  # nunca | se_perguntarem | na_abertura
-    tom: str = "direto"  # direto | simpatico | consultivo | formal
-    tratamento: str = "primeiro_nome"  # primeiro_nome | voce | senhor
-    escrita: str = "minusculas"  # minusculas | normal
-    emoji: str = "nunca"  # nunca | raro | a_vontade
-    tamanho_resposta: str = "curto"  # curto | medio | longo
+    assume_ia: Literal["nunca", "se_perguntarem", "na_abertura"] = "nunca"
+    tom: Literal["direto", "simpatico", "consultivo", "formal"] = "direto"
+    tratamento: Literal["primeiro_nome", "voce", "senhor"] = "primeiro_nome"
+    escrita: Literal["minusculas", "normal"] = "minusculas"
+    emoji: Literal["nunca", "raro", "a_vontade"] = "nunca"
+    tamanho_resposta: Literal["curto", "medio", "longo"] = "curto"
     expressoes: list[str] = Field(default_factory=list)
     nunca_diga: list[str] = Field(default_factory=list)
 
@@ -81,8 +86,8 @@ class CamposAgente(BaseModel):
 
     # regras da conversa (§4.4)
     oferece: list[str] = Field(default_factory=lambda: ["financiamento", "a_vista"])
-    fotos: str = "so_quando_pedir"  # so_quando_pedir | na_abertura
-    sem_moto_anuncio: str = "segura"  # segura | oferece_parecida
+    fotos: Literal["so_quando_pedir", "na_abertura"] = "so_quando_pedir"
+    sem_moto_anuncio: Literal["segura", "oferece_parecida"] = "segura"
     handoff: list[str] = Field(default_factory=lambda: ["quando_pedir"])
     cita_vendedor: bool = False
     followup_ativo: bool = True
@@ -90,10 +95,33 @@ class CamposAgente(BaseModel):
     # liga/desliga (§4.6)
     agente_ativo: bool = True
     so_horario_comercial: bool = False
-    so_lead_anuncio: bool = False
 
     # instruções livres (§4.5)
     instrucoes: str = Field(default="", max_length=MAX_INSTRUCOES_LIVRES)
+
+    @field_validator("horario")
+    @classmethod
+    def _valida_horario(cls, valor: dict[str, list[str]]) -> dict[str, list[str]]:
+        """Cada dia precisa de [abertura, fechamento] em HH:MM com zero à
+        esquerda — string sem zero ("8:00") compara errado em
+        ``esta_em_horario`` e deixa o bot mudo o dia inteiro sem erro nenhum.
+        """
+        for dia, faixa in valor.items():
+            if len(faixa) != 2:
+                raise ValueError(
+                    f"horario[{dia!r}] precisa de exatamente 2 horários "
+                    "(abertura e fechamento)"
+                )
+            for hhmm in faixa:
+                if not _HORARIO_RE.match(hhmm):
+                    raise ValueError(
+                        f"horario[{dia!r}] precisa do formato HH:MM com zero "
+                        f"à esquerda: {hhmm!r}"
+                    )
+                hh, mm = hhmm.split(":")
+                if not (0 <= int(hh) <= 23 and 0 <= int(mm) <= 59):
+                    raise ValueError(f"horario[{dia!r}] tem hora inválida: {hhmm!r}")
+        return valor
 
 
 CAMPOS_PADRAO_REVY = CamposAgente(nome_loja="a loja", cidade="", uf="")
@@ -128,6 +156,11 @@ _OFERECE = {
     "a_vista": "venda à vista",
     "troca": "moto na troca",
     "consignacao": "consignação",
+}
+_HANDOFF = {
+    "quando_pedir": "encaminhe o atendimento para uma pessoa quando o cliente pedir explicitamente.",
+    "depois_da_simulacao": "encaminhe o atendimento para uma pessoa depois que a simulação for concluída.",
+    "fora_do_horario": "encaminhe o atendimento para uma pessoa quando a conversa cair fora do horário de atendimento.",
 }
 
 
@@ -212,6 +245,9 @@ def _bloco_regras(c: CamposAgente) -> str:
             "se a consulta não achar a moto do anúncio, ofereça uma parecida do "
             "estoque, sempre com dados reais da consulta."
         )
+    for h in c.handoff:
+        if h in _HANDOFF:
+            linhas.append(_HANDOFF[h])
     if c.cita_vendedor:
         linhas.append("você pode citar o vendedor pelo nome ao encaminhar o atendimento.")
     else:

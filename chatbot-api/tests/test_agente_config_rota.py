@@ -1,6 +1,6 @@
 """GET /v1/agente/config — multi-loja de verdade (spec §3.3)."""
 from app import agente_config, servico
-from app.agente_prompt import CamposAgente
+from app.agente_prompt import NUCLEO_REVY, CamposAgente
 
 
 def _publicar(db, loja_id, nome):
@@ -15,6 +15,14 @@ def test_credencial_de_loja_recebe_o_proprio_prompt(client, db, loja_a):
     r = client.get("/v1/agente/config", headers=loja_a["headers"])
     assert r.status_code == 200
     assert "loja a" in r.json()["prompt"].lower()
+
+
+def test_prompt_da_rota_termina_no_nucleo(client, db, loja_a):
+    """Fronteira que o n8n de fato lê: um rodapé colado depois do núcleo,
+    dentro da rota, tem que derrubar este teste."""
+    _publicar(db, loja_a["loja_id"], "Loja A")
+    r = client.get("/v1/agente/config", headers=loja_a["headers"])
+    assert r.json()["prompt"].rstrip().endswith(NUCLEO_REVY.rstrip())
 
 
 def test_integracao_sem_instance_da_400_e_nao_423(client, db):
