@@ -253,7 +253,18 @@ e corrige antes de publicar.
 
 ### 4.6 Liga/desliga
 
-Agente ativo · só em horário comercial · só lead de anúncio.
+Agente ativo · só em horário comercial.
+
+**`só lead de anúncio` saiu da v1 (25/08).** Ele estava listado aqui, virou campo em
+`CamposAgente`, e a revisão final do card 1 pegou que era **campo morto**: o lojista
+ligaria e nada aconteceria. O gate exige saber, dentro de `pode_responder`, se aquela
+conversa veio de anúncio — e isso depende da atribuição CTWA, que tem buraco conhecido
+(`learnings/2026-08-24-telefone-mascarado-de-4-digitos-colide.md`). Fazer isso às pressas
+no caminho quente troca um campo decorativo por um bot que cala na conversa errada.
+
+Campo **removido do schema**, não deixado inerte: se ficasse, o card 3 desenharia o
+controle e o lojista teria um interruptor de mentira. Volta com card próprio, junto de
+uma origem de anúncio confiável.
 
 **`bot_ativo` de hoje não serve: é por conversa, não por loja**
 (`chatbot-api/app/models_db.py:186`, na `Conversa`). O liga/desliga da loja é campo novo
