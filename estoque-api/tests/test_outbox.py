@@ -178,11 +178,56 @@ def test_sem_destino_nao_falha_evento(db, loja_a):
 
     resumo = processar_pendentes(db, FakePoster((200, None)))
 
-    assert resumo["sem_destino"] == 1
+    # Loja sem destino não entra no lote (ver o teste do giro em falso logo
+    # abaixo): o que este teste guarda é que o evento sobrevive intacto.
+    assert resumo["sem_destino"] == 0
     db.refresh(evento)
     assert evento.status == "pendente"
     assert evento.tentativas == 0
     assert db.query(EntregaEvento).filter_by(evento_id=evento.id).count() == 0
+
+
+def test_loja_sem_destino_nao_gira_em_falso(db, loja_a):
+    """Sem destino configurado, o lote sai vazio — não 100 eventos pulados.
+
+    Em produção isto girou de 14/07 a 25/08: 1.429 eventos da mesma loja, nenhum
+    `webhook_destinos`, e o worker relendo os mesmos 100 a cada 5s. O `continue`
+    do `sem_destino` não mexia em `proxima_tentativa_em`, então o mesmo lote
+    voltava para sempre — e como o resumo era "truthy", o worker logava a cada
+    tick e afogava o log do app inteiro.
+    """
+    _preparar_evento(db, loja_a, com_destino=False)
+    poster = FakePoster((200, None))
+
+    resumo = processar_pendentes(db, poster)
+
+    assert resumo == {"entregues": 0, "reagendados": 0, "descartados": 0, "sem_destino": 0}
+    # É o resumo todo-zero que faz o worker calar (`if any(resumo.values())`).
+    assert not any(resumo.values())
+    assert not poster.chamadas
+
+
+def test_destino_configurado_depois_entrega_sem_esperar(db, loja_a):
+    """Ignorar o evento não pode virar atraso quando o destino enfim aparece.
+
+    A alternativa (empurrar `proxima_tentativa_em` para o futuro) também mataria
+    o giro, mas deixaria o primeiro lote preso pelo backoff depois da
+    configuração. Por isso o filtro é na consulta, e o evento fica pronto.
+    """
+    evento = _preparar_evento(db, loja_a, com_destino=False)
+    assert processar_pendentes(db, FakePoster((200, None)))["entregues"] == 0
+    db.refresh(evento)
+    assert evento.proxima_tentativa_em is None
+
+    servico.configurar_webhook_destino(db, loja_a["slug"], URL, SEGREDO)
+    poster = FakePoster((200, None))
+
+    resumo = processar_pendentes(db, poster)
+
+    assert resumo["entregues"] == 1
+    assert len(poster.chamadas) == 1
+    db.refresh(evento)
+    assert evento.status == "entregue"
 
 
 def test_backoff_cresce_entre_tentativas(db, loja_a):

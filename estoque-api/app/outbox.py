@@ -53,9 +53,17 @@ def _corpo(evento: EventoSaida) -> bytes:
 
 
 def _pendentes_prontos(db: Session, agora: datetime, limite: int) -> list[EventoSaida]:
+    # O join com o destino não é otimização: evento de loja sem webhook ativo
+    # nunca fica pronto, e sem o filtro ele voltava no lote a cada rodada. Como
+    # o `sem_destino` só faz `continue`, `proxima_tentativa_em` seguia `None` e
+    # o mesmo lote era relido para sempre — 1.429 eventos girando de 14/07 a
+    # 25/08, logando a cada 5s. Fora do lote, o evento espera a configuração
+    # sem custo e sai na primeira rodada depois dela (`proxima_tentativa_em`
+    # continua `None`, então não herda atraso nenhum).
     candidatos = (
         db.query(EventoSaida)
-        .filter(EventoSaida.status == "pendente")
+        .join(WebhookDestino, WebhookDestino.loja_id == EventoSaida.loja_id)
+        .filter(EventoSaida.status == "pendente", WebhookDestino.ativo.is_(True))
         .order_by(EventoSaida.criada_em.asc())
         .limit(limite * 4)
         .all()
