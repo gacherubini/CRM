@@ -38,6 +38,9 @@ Isso é também argumento comercial: a tela de configuração e o núcleo visív
 | Escopo da v1 | identidade + personalidade + FAQ + regras da conversa + instruções livres + liga/desliga |
 | Campo livre de instruções | **entra** (§4.5), teto 1000 chars, antes do núcleo |
 | Conflito do campo livre com o núcleo | **avisa, não bloqueia** |
+| Follow-up configurável | **fora da v1** (§4.4.2) — pendente de confirmação do dono |
+| Fuso horário | `America/Sao_Paulo` fixo, sem coluna (§4.1) |
+| Módulo próprio para a tela | não; mesmo gate da tela vizinha (§6) |
 | n8n de teste | **não** — workflow gerado no mesmo n8n2037 |
 | Escolha do modelo de LLM | por loja no dado, editável **só no Control** |
 
@@ -129,6 +132,12 @@ quiser e o núcleo continua vencendo.
 | Horário de atendimento | grade semanal |
 | Link do catálogo | vem do Estoque (ver §8, dívida) |
 
+**Fuso: `America/Sao_Paulo`, fixo, não é campo.** `lojas`
+(`chatbot-api/app/models_db.py:19`) tem só id, nome, slug, `evolution_instance`,
+`whatsapp` e `criada_em` — **não existe timezone no modelo**. Tudo que depende de hora
+(horário de atendimento, "só em horário comercial", handoff fora do horário) usa o fuso
+fixo. Vira coluna quando existir loja fora do fuso de Brasília, não antes.
+
 ### 4.2 Personalidade
 
 | Campo | Opções |
@@ -153,11 +162,45 @@ exatamente: "Y"`.
 | Campo | Opções |
 |---|---|
 | Ofereço | financiamento · à vista · troca na troca · consignação |
-| Fotos | só quando pedir · mando na abertura |
+| Fotos | só quando pedir · mando na abertura (**só Modo 1**) |
 | Sem a moto do anúncio | seguro no veículo · posso oferecer parecida |
 | Passa pro humano | quando pedir · depois da simulação · fora do horário |
 | Pode citar vendedor pelo nome? | sim · não |
-| Follow-up | N toques, a cada H horas |
+| Follow-up | **fora da v1** — ver §4.4.2 |
+
+#### 4.4.1 O formulário é consciente do modo da loja
+
+**Os dois modos não têm as mesmas tools**, então o mesmo formulário produz
+comportamentos diferentes — e alguns campos simplesmente não existem de um lado.
+`n8n/fork_cloud_workflow.py:69` (`DESCARTADOS`) tira `enviar_foto_veiculo1` e
+`cadastrar_veiculo1` do Modo 2, com motivo registrado: a central Cloud precisaria de
+envio de imagem pelo Graph, que ainda não existe.
+
+| Campo | Modo 1 (Evolution) | Modo 2 (Cloud) |
+|---|---|---|
+| Fotos | funciona | **não existe tool de foto** |
+| Follow-up | **não existe worker** | funciona (§4.4.2) |
+| Passa pro humano | avisa a equipe pela Evolution | abre o rodízio |
+
+A tela **esconde ou desabilita** o que não se aplica ao modo da loja, com a razão à
+vista. Campo que o lojista configura e que não faz nada é o pior tipo de bug de produto:
+não dá erro, não dá log, e ele conclui que a configuração inteira é decorativa.
+
+#### 4.4.2 Follow-up ficou fora da v1
+
+`chatbot-api/app/followup_job.py:1` diz **"Só Modo 2, só com bot_ativo"**. A cadência são
+constantes de módulo (`PRIMEIRO_TOQUE = 30min`, `SEGUNDO_TOQUE = 1h`) e `texto_followup`
+levanta `ValueError` para toque fora de (1,2): *"Terceiro toque não existe — a spec para
+em dois"*.
+
+Um campo "N toques a cada H horas" seria três features empilhadas: cadência por loja,
+N > 2, e follow-up no Modo 1. E tem um problema que não se resolve com campo nenhum: **o
+texto do follow-up é fixo e não passa pela IA** (`_TEXTOS`, por etapa). A loja que
+configurar "formal, sem gírias" continua mandando *"e aí amigo, ainda tá aí?"* — uma
+incoerência que o cliente final vê.
+
+Fica como card próprio: *follow-up por loja e com a voz do agente*. Antes dele, o
+follow-up é do Revy, não da loja.
 
 ### 4.5 Instruções da loja (o campo livre)
 
@@ -195,6 +238,15 @@ e corrige antes de publicar.
 ### 4.6 Liga/desliga
 
 Agente ativo · só em horário comercial · só lead de anúncio.
+
+**`bot_ativo` de hoje não serve: é por conversa, não por loja**
+(`chatbot-api/app/models_db.py:186`, na `Conversa`). O liga/desliga da loja é campo novo
+em `agente_config`.
+
+Ponto de aplicação: `POST /v1/conversas/{telefone}/pode-responder`
+(`chatbot-api/app/main.py:921`). É o gate que o n8n já chama antes de acionar a IA, já
+resolve a loja por `resolver_loja_id` e já é onde mora o debounce — o desligamento por
+loja e a janela de horário entram aí, não num nó novo do workflow.
 
 ### 4.7 Exemplo de texto gerado
 
@@ -279,8 +331,19 @@ querer que o bot tente de novo. Fica fechada.
 `/app/loja/agente` ganha duas abas: *Desempenho* (a que já existe,
 `portal-gestao/app/loja/routes.py:348`) e *Configuração*.
 
-Gate quádruplo de sempre: sessão + flag `REVY_LOJA_AGENTE_CONFIG_ENABLED` (default 0) +
-módulo contratado + papel dono/gerente. O dono continua editando por cima pelo Control.
+Gate: sessão + flag `REVY_LOJA_AGENTE_CONFIG_ENABLED` (default 0) + papel dono/gerente.
+
+**São três, não quatro.** A tela vizinha (`portal-gestao/app/loja/routes.py:348`) hoje
+checa só `atendimento_habilitado()` e `pode_usar_atendimento(usuario)`
+(`app/loja/attendance.py:117`) — **não tem gate de módulo**. A config do agente segue o
+mesmo gate da tela onde ela mora.
+
+Módulo próprio fica para depois, e não é de graça: `modulos_revy` tem CHECK constraint no
+código (`'vendas', 'estoque', 'copiloto', 'financeiro'`) e um código novo exige migration
+que recria o CHECK — o padrão está em
+`revy-trafego/alembic/versions/0018_copiloto_modulo.py`.
+
+O dono continua editando por cima pelo Control (§7).
 
 Fluxo: rascunho salva enquanto digita → **Testar** → **Publicar**. Publicado vale na
 próxima mensagem de cliente (o n8n busca a config no começo de cada conversa; sem cache
@@ -294,6 +357,39 @@ Roda o agente de verdade — mesmo modelo, mesmas tools, mesmo núcleo — com o
 Caminho: Portal → `chatbot-api` monta o prompt do rascunho → webhook
 `whatsapp-ai-preview` no n8n → resposta volta na tela.
 
+#### 6.1.1 O preview precisa de um nó-ponte chamado `Extrair1`
+
+As tools **não** são nós HTTP: são `toolCode` (JS) que chamam
+`http://chatbot-api:8000/...` com `Bearer __CHATBOT_TOKEN__`, e **todas** leem
+`$('Extrair1').first().json` para achar `instance` e `telefone`.
+
+Um workflow de preview com entrada HTTP não tem `Extrair1` — e tool que referencia nó
+inexistente falha. É exatamente o erro que o fork do Modo 2 cometeu calado, e lá a
+correção foi **criar nós-ponte de mesmo nome**, não reescrever as tools
+(`learnings/2026-08-23-workflow-cloud-e-gerado.md`). O preview faz igual: um nó chamado
+`Extrair1` que emite `{ instance, telefone, ... }` no formato do Modo 1.
+
+Duas diferenças obrigatórias em relação ao `Extrair1` real: ele é acoplado ao body do
+webhook da Evolution, e tem **trava fail-closed de 300 s de idade da mensagem**
+(`MAX_MESSAGE_AGE_SECONDS`) que descartaria toda mensagem de teste. A ponte não replica
+nem o parsing nem a trava.
+
+#### 6.1.2 Telefone sintético — `consultar_estoque` escreve no CRM
+
+`consultar_estoque1` não é só leitura: quando a busca devolve **um** veículo, ela grava a
+moto escolhida via `POST /v1/operacao/moto-escolhida`, chaveada por telefone + instance.
+
+O lojista vai testar usando o próprio número — que é um número real, com conversa real.
+Sem freio, ele sobrescreve o estado de uma conversa de verdade.
+
+Por isso o preview usa **telefone sintético por loja** (fora da faixa de número real),
+nunca o do usuário logado. Isso resolve a escrita no CRM e ainda mantém
+`consultar_estoque` executando de verdade, que é o que faz o teste valer.
+
+O `$getWorkflowStaticData('global')` **não** colide, porque é escopado por workflow — e
+essa é mais uma razão de o preview ser workflow separado, e não um modo dentro do
+canônico (§6.2).
+
 **Modo seco das tools — é a armadilha central desta feature.** As tools têm efeito
 colateral no mundo real: `simular` cria lead no portal, avisa a equipe no WhatsApp e
 pausa o bot. Sem freio, o lojista testa digitando um CPF e toca o celular do vendedor
@@ -301,8 +397,10 @@ num sábado.
 
 | Tool | No preview |
 |---|---|
-| `consultar_estoque`, `enviar_link_catalogo` | **executam de verdade** (senão o teste não vale nada) |
-| `simular`, `solicitar_handoff`, `enviar_foto_veiculo`, `cadastrar_veiculo` | devolvem a mensagem certa, **sem executar** |
+| `consultar_estoque1` | **executa de verdade**, com telefone sintético (§6.1.2) |
+| `enviar_link_catalogo1` | **executa de verdade** (só lê) |
+| `simular1`, `TEMP continuar sem estoque1` | devolvem a mensagem certa, **sem criar lead, sem notificar, sem pausar bot** |
+| `solicitar_handoff1`, `enviar_foto_veiculo1`, `cadastrar_veiculo1` | devolvem a mensagem certa, **sem executar** |
 
 A conversa de teste é efêmera: não entra em Conversas, não vira lead, some ao sair.
 
@@ -351,10 +449,25 @@ Ganhos: canário na troca de modelo (uma loja antes de todas); amarrar modelo a 
 comercial depois, sem migration nova. E o lojista nunca vê a pergunta — o custo é do
 Revy e a escolha não é de dono de loja de moto.
 
-Limite técnico, medido no workflow: trocar o **nome do modelo dentro do Gemini** sai por
-expressão no nó, credencial é a mesma — barato. Trocar de **provedor** exige nó
-diferente, credencial diferente, nós paralelos e um switch — trabalho de migração, não
-de configuração por loja. **Não desenhar para troca de provedor por loja.**
+Quem edita é o Control, e há uma restrição operacional: o Control fala com o chatbot com
+um **mapa loja → token** (`REVY_TRAFEGO_CHATBOT_TOKENS_JSON`,
+`revy-trafego/app/config.py:33`). Ele só edita a config das lojas cujo token ele tem —
+loja provisionada sem entrada nesse mapa não aparece para edição.
+
+**Limite técnico — e aqui há uma suposição que precisa de teste antes de virar Task.**
+
+Trocar de **provedor** (Gemini → outro) exige nó diferente, credencial diferente, nós
+paralelos e um switch: trabalho de migração, não configuração por loja. **Não desenhar
+para troca de provedor por loja.** Isso é certo.
+
+O que **não** está confirmado é se `modelName` e `maxOutputTokens` aceitam expressão. O
+nó do modelo (`@n8n/n8n-nodes-langchain.lmChatGoogleGemini`) é **sub-nó** do AI Agent, e
+sub-nó em n8n tem contexto de expressão limitado — não é invocado no fluxo principal.
+**Isso não se verifica lendo o repo.**
+
+Spike obrigatório antes da Task de n8n (§9, passo 0): pôr uma expressão em `modelName` no
+n8n2037 e ver se resolve. Plano B se não resolver: um nó de modelo por faixa + switch
+antes do agente — bem mais caro, e é a diferença entre um campo e um sub-projeto.
 
 **`maxOutputTokens` é amarrado ao campo "Tamanho da resposta"**, por loja, via expressão:
 
@@ -366,6 +479,45 @@ de configuração por loja. **Não desenhar para troca de provedor por loja.**
 
 Sem isso, "pode explicar" bate no teto de 250 e a resposta corta no meio da frase — o
 campo seria mentira.
+
+## 7.1 O que esta feature quebra no n8n (e como não afrouxar a rede)
+
+### `validate_workflow.py` — as assertivas de prompt caem
+
+O validador afirma **~40 frases literais** dentro do `systemMessage`
+(`n8n/validate_workflow.py:121` em diante): *"privacidade do resultado"*, *"nunca crie
+lead por cumprimento"*, *"mande as fotos do catálogo ou prefere"*, *"não exija foto
+antes"*, *"recusa e não insistir"*, *"nunca peça placa ao cliente"*, *"texto genérico do
+botão do anúncio"*, entre outras.
+
+Assim que o texto sai do JSON e vira gerado por loja, essas assertivas quebram — e
+`python n8n/validate_workflow.py` é gate do `AGENTS.md` §6.
+
+**A rede não se afrouxa; ela muda de lugar**, e isso é Task explícita:
+
+| Assertiva | Vai para |
+|---|---|
+| frases do núcleo Revy (§5) | continua no `validate_workflow.py`, contra o template |
+| slots presentes e núcleo em último | assertiva **nova** no `validate_workflow.py` |
+| frases de comportamento que viraram texto gerado | **snapshots do gerador** no `chatbot-api` (§10) |
+
+Deletar assertiva sem destino é regressão silenciosa de prompt — é justamente o que esse
+validador já pegou antes.
+
+### `fork_cloud_workflow.py` — dois pontos que abortam
+
+1. **`HERDADOS`** (`:54`) é a lista fechada de nós que o Modo 2 herda. O nó novo que
+   busca a config **precisa entrar nessa lista**, senão o Modo 2 nasce sem ele — e sem
+   erro, porque o gerador só reclama de nó que sumiu do Modo 1, não de nó que ele não
+   copiou.
+2. **`INJECOES_INSTANCE`** (`:419`) faz substituição de **string literal** dentro do
+   `jsCode` de `consultar_estoque1`, `simular1` e `TEMP continuar sem estoque1`, e aborta
+   se o trecho não aparecer exatamente uma vez. Qualquer edição nessas tools para o modo
+   seco **quebra o gerador do Modo 2** e precisa de ajuste no mesmo commit.
+
+E a armadilha que nenhum dos dois pega, do learning: **saída órfã** — nó que sobrevive ao
+recorte, continua rodando e tem o resultado descartado do outro lado. Ao comparar os
+modos, comparar o que cada nó **consome**, não só quais existem.
 
 ## 8. Dívida herdada (não é desta feature, mas encosta)
 
@@ -379,17 +531,23 @@ por slug, ou o chatbot passa a guardar a URL.
 
 Ordem de risco, não de tela.
 
+0. **Spike de expressão no n8n** (§7). Uma expressão em `modelName` no n8n2037 resolve ou
+   não? A resposta muda o tamanho do passo 3. Meia hora, e é a única coisa aqui que não
+   se responde lendo código.
 1. **Gerador de prompt + núcleo** no `chatbot-api`. Função pura: campos entram, texto
    sai. Sem rede, sem banco, sem n8n.
 2. **Tabelas + migration `0027` + `GET /v1/agente/config`**, com `ctx.loja_id` resolvido
    antes do gate (§3.3).
-3. **n8n**: slots no `systemMessage` do canônico + nó que busca a config + expressões de
-   `modelName` e `maxOutputTokens`. Regerar o fork do Modo 2 e o de teste.
+3. **n8n**: slots no `systemMessage` do canônico + nó que busca a config (**entrando em
+   `HERDADOS`**) + `modelName`/`maxOutputTokens` conforme o resultado do passo 0.
+   Migrar as assertivas do `validate_workflow.py` (§7.1) **no mesmo commit**. Regerar o
+   fork do Modo 2 e o de teste.
    **Com fallback**: rota falhou ou loja sem config → padrão Revy. O bot nunca fica sem
    prompt.
-4. **Tela da Loja** — formulário, campo livre com contador e aviso de conflito, rascunho,
-   publicar, histórico. Flag OFF.
-5. **Preview** — workflow gerado + modo seco das tools.
+4. **Tela da Loja** — formulário consciente do modo (§4.4.1), campo livre com contador e
+   aviso de conflito, rascunho, publicar, histórico. Flag OFF.
+5. **Preview** — workflow gerado + nó-ponte `Extrair1` + telefone sintético + modo seco
+   das tools.
 
 ## 10. Testes
 
@@ -403,11 +561,15 @@ Windows `.\.venv\Scripts\python.exe -m pytest -q`):
 - teto de 1000 chars do campo livre, e o detector de conflito avisando sem bloquear;
 - isolamento por loja: credencial da A jamais recebe config da B;
 - publicar / reverter / histórico;
-- **modo seco não cria lead nem notificação** — teste explícito, é o risco nº 1.
+- **modo seco não cria lead nem notificação** — teste explícito, é o risco nº 1;
+- **preview não escreve `moto-escolhida` de telefone real** (§6.1.2);
+- as assertivas de comportamento migradas do `validate_workflow.py` (§7.1) — cada frase
+  que saiu do JSON tem que ter um snapshot aqui. Assertiva sem destino é regressão.
 
-**n8n**: validador novo garantindo que o núcleo Revy está presente **e é o último
-bloco**. Mais os três existentes: `validate_workflow.py`,
-`validate_workflow_cloud.py` (sai 1 se o fork for editado à mão), `validate_test_workflow.py`.
+**n8n**: assertiva nova garantindo que o núcleo Revy está presente **e é o último bloco**,
+mais a migração descrita em §7.1. Os três existentes têm que voltar ao verde:
+`validate_workflow.py`, `validate_workflow_cloud.py` (sai 1 se o fork for editado à mão)
+e `validate_test_workflow.py`.
 
 **`portal-gestao`**: a tela **não se verifica com pytest** — formulário e janela de teste
 são JS, e isso já passou dois bugs no Copiloto. Verificação no navegador, com portal
@@ -442,4 +604,10 @@ Só depois de o comportamento bater é que se mexe nos campos dela.
 | Lojista escreve no campo livre, não pega, acha o produto quebrado | aviso de conflito na tela + preview antes de publicar |
 | Loja sem config derruba o bot | fallback para o padrão Revy no nó do n8n |
 | Fork do Modo 2 divergir do canônico | `validate_workflow_cloud.py` sai 1; nunca editar o fork à mão |
+| Assertiva de prompt deletada em vez de migrada (§7.1) | tabela de destino por assertiva; snapshot no chatbot para cada frase que saiu do JSON |
+| Preview corrompendo conversa real via `moto-escolhida` | telefone sintético por loja (§6.1.2) |
+| Tool referenciando `Extrair1` inexistente no preview | nó-ponte de mesmo nome (§6.1.1) |
+| Modo 2 nascer sem o nó de config | entrar em `HERDADOS`; o gerador não avisa (§7.1) |
+| Campo configurado que não faz nada no modo da loja | formulário consciente do modo (§4.4.1) |
+| Expressão em sub-nó do modelo não resolver | spike no passo 0 (§9) antes de dimensionar a Task |
 | Lojista pedir para reabrir a regra 3 (insistir) | decisão registrada em §2 |
