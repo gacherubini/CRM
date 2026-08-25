@@ -70,3 +70,28 @@ def test_loja_sem_config_recebe_o_padrao_revy(client, loja_a):
     r = client.get("/v1/agente/config", headers=loja_a["headers"])
     assert r.status_code == 200
     assert "[REGRAS DO REVY" in r.json()["prompt"]
+
+
+def test_rota_diz_ao_n8n_como_higienizar_a_saida(client, db, loja_a):
+    """O `Responder WhatsApp1` limpa a resposta antes de mandar. Sem estes dois
+    sinais ele limparia igual para todo mundo, e a loja que escolhesse
+    "pontuação normal" veria a escolha desfeita no envio — configurada na tela,
+    invisível no WhatsApp, sem erro e sem log."""
+    agente_config.salvar_rascunho(
+        db,
+        loja_a["loja_id"],
+        CamposAgente(
+            nome_loja="X", cidade="Y", uf="SP", escrita="normal", emoji="a_vontade"
+        ),
+        autor="t",
+    )
+    agente_config.publicar(db, loja_a["loja_id"], autor="t")
+    r = client.get("/v1/agente/config", headers=loja_a["headers"])
+    assert r.json()["saida"] == {"minusculas": False, "sem_emoji": False}
+
+
+def test_loja_sem_config_higieniza_como_sempre_higienizou(client, loja_a):
+    """Default conservador: quem nunca configurou nada continua em minúsculas e
+    sem emoji, que é o comportamento que já estava no ar."""
+    r = client.get("/v1/agente/config", headers=loja_a["headers"])
+    assert r.json()["saida"] == {"minusculas": True, "sem_emoji": True}

@@ -44,8 +44,9 @@ Fora da tabela PUBLICADOS em `cruzamentos.py` (nao conferidos): `workflow-teste-
 
 Rotas chamadas pelos workflows **no ar**:
 
-Todas as 6 estao declaradas no chatbot:
+Todas as 7 estao declaradas no chatbot:
 
+- `/v1/agente/config`
 - `/v1/conversas/{}/pode-responder`
 - `/v1/operacao/responder`
 - `/v1/operacao/roteamento`

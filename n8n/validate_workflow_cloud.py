@@ -32,6 +32,7 @@ ROTAS_QUE_EXIGEM_INSTANCE = (
     "/v1/operacao/solicitacoes-simulacao-humana",
     "/v1/simulacoes/solicitar",
     "/v1/estoque/buscar",
+    "/v1/agente/config",
 )
 
 # Quantos caracteres depois da URL ainda contam como "o corpo desta chamada".
@@ -52,6 +53,7 @@ def main() -> None:
     dados = json.loads(WORKFLOW.read_text(encoding="utf-8"))
     serializado = json.dumps(dados, ensure_ascii=False)
     nos = dados.get("nodes", [])
+    por_nome = {n.get("name"): n for n in nos}
     por_tipo: dict[str, list] = {}
     for n in nos:
         por_tipo.setdefault(n.get("type", ""), []).append(n)
@@ -191,6 +193,21 @@ def main() -> None:
         f"chamada ao chatbot sem `instance`: {sorted(sem_instance)} — com N lojas "
         "no Modo 2 isso procura a conversa na loja errada e o bot cala"
     )
+
+    # --- o agente por loja veio junto (spec §7.2) ----------------------------
+    # O gerador reclama de nó que sumiu do Modo 1, nunca de nó que ele deixou de
+    # copiar: sem esta checagem o Modo 2 nasce sem a config e toda loja Cloud se
+    # apresenta com o prompt padrão — sem erro, sem log, e o dono só descobre
+    # quando a segunda loja se apresentar como "loja".
+    for nome_config in ("Buscar config do agente1", "Gate config do agente1"):
+        assert nome_config in por_nome, (
+            f"{nome_config} não veio no fork: o Modo 2 fica sem o agente por loja"
+        )
+    agente_cloud = por_nome["AI Agent1"]
+    sm_cloud = agente_cloud["parameters"]["options"]["systemMessage"]
+    assert sm_cloud.rstrip().endswith(
+        "{{ $('Gate config do agente1').first().json.promptAgente }}"
+    ), "no Modo 2 o prompt da loja deixou de ser o último bloco da system message"
 
     # --- referências órfãs ---------------------------------------------------
     nomes = {n["name"] for n in nos}

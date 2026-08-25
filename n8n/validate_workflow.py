@@ -199,23 +199,27 @@ def main() -> None:
     assert "quer dar uma olhada nas motos disponíveis?" in system_message_lower, (
         "primeiro contato ainda oferece simulação antes da escolha"
     )
-    assert "certinho" in system_message_lower and "minimalista" in system_message_lower, (
-        "prompt não aplica o tom brasileiro minimalista"
-    )
+    # "certinho"/"minimalista" saíram daqui: viraram `expressoes` e
+    # `tamanho_resposta` no gerador do chatbot-api (spec §7.2). A garantia mudou
+    # de lugar, não sumiu — ver test_agente_prompt_migrado_do_n8n.py.
     assert "gostaria de seguir com uma simulação?" in system_message_lower, (
         "prompt não bloqueia a frase engessada"
     )
-    assert "vitor motos" in system_message_lower and "primeira_mensagem" in system_message, (
-        "primeiro contato não apresenta a vitor motos"
+    assert "primeira_mensagem" in system_message, (
+        "sinal de primeiro contato não chega ao prompt"
     )
-    assert "letras minúsculas" in system_message_lower and "não use emojis" in system_message_lower, (
-        "prompt não força a conversa leve em minúsculas e sem emojis"
-    )
+    # Nome, cidade e escrita da loja vêm de GET /v1/agente/config. Voltar a
+    # escrever qualquer um deles aqui é a regressão que esta feature existe para
+    # impedir: a segunda loja se apresentando como a primeira.
+    for marca_de_loja in ("vitor motos", "limeira"):
+        assert marca_de_loja not in system_message_lower, (
+            f"template do prompt voltou a trazer dado de loja escrito à mão: {marca_de_loja}"
+        )
     assert "exclamações" in system_message_lower and "me conta" in system_message_lower, (
         "prompt não bloqueia exclamações e o convite desnecessário"
     )
-    assert "oi, [primeiro nome]. aqui é da vitor motos." in system_message_lower, (
-        "abertura minimalista da vitor motos ausente"
+    assert "oi, [primeiro nome]. aqui é da [nome da loja]." in system_message_lower, (
+        "abertura minimalista com o nome vindo da configuração da loja ausente"
     )
     assert "veio_de_anuncio" in system_message and "à vista ou no financiamento" in system_message_lower, (
         "prompt não abre a mensagem de anúncio perguntando à vista ou financiamento"
@@ -524,9 +528,9 @@ def main() -> None:
     ), "tool de foto não está conectada ao AI Agent"
 
     nodes_by_name = {node.get("name"): node for node in data.get("nodes", [])}
-    assert len(nodes_by_name) == 32, (
-        "workflow deve ter 32 nós (inclui debounce, juiz, fallback, link catálogo "
-        "e atraso anti-ban)"
+    assert len(nodes_by_name) == 34, (
+        "workflow deve ter 34 nós (inclui debounce, juiz, fallback, link catálogo, "
+        "atraso anti-ban e os dois nós da config do agente por loja)"
     )
     # Anti-ban: "Atraso anti-ban1" fica ENTRE o gerador da resposta e o envio,
     # calculando o delay (typing + throttle por instância) que a Evolution honra
@@ -638,7 +642,9 @@ def main() -> None:
     )
     assert connections.get(debounce_gate_name, {}).get("main", [[]])[0][0][
         "node"
-    ] == "AI Agent1"
+    ] == "Buscar config do agente1", (
+        "o debounce alimenta a busca da config, que alimenta o Agent"
+    )
     assert connections.get("AI Agent1", {}).get("main", [[]])[0][0]["node"] == (
         "Atraso anti-ban1"
     ), "AI Agent deve passar pelo atraso anti-ban antes do envio"
@@ -798,8 +804,97 @@ def main() -> None:
         "workflow de produção não pode depender de __INSTANCE__ fixo"
     )
 
+    # --- agente por loja (spec §3.3, §3.4, §7.2) ----------------------------
+    # O template perdeu a identidade da loja e ganhou um slot. O que guarda a
+    # feature é a ORDEM: o slot é a última coisa da system message, e o texto que
+    # ele traz termina no núcleo Revy. Qualquer coisa colada depois dele — rodapé,
+    # marca d'água, debug — desliga o mecanismo de segurança inteiro.
+    assert system_message.startswith("="), (
+        "systemMessage deixou de ser expressão: o prompt da loja não entra mais"
+    )
+    slot = "{{ $('Gate config do agente1').first().json.promptAgente }}"
+    assert slot in system_message, "prompt da loja não é lido do gate de config"
+    assert system_message.rstrip().endswith(slot), (
+        "algo foi colado depois do prompt da loja — o núcleo Revy deixa de ser o "
+        "último bloco e para de prevalecer"
+    )
+    assert "[configuração desta loja]" in system_message_lower, (
+        "o slot precisa vir rotulado, senão o modelo lê o texto da loja como "
+        "continuação da operação"
+    )
+
+    busca_config = nodes_by_name.get("Buscar config do agente1")
+    assert busca_config is not None, "nó que busca a config do agente por loja sumiu"
+    busca_params = busca_config.get("parameters", {})
+    assert "/v1/agente/config" in busca_params.get("url", ""), (
+        "nó de config deve chamar GET /v1/agente/config"
+    )
+    assert "instance" in busca_params.get("url", "") and "Extrair1" in busca_params.get("url", ""), (
+        "config do agente sem instance serve a mesma loja para todo mundo (multi-WA)"
+    )
+    busca_headers = {
+        h.get("name"): h.get("value")
+        for h in busca_params.get("headerParameters", {}).get("parameters", [])
+    }
+    assert busca_headers.get("Authorization") == f"Bearer {CHATBOT_TOKEN_PLACEHOLDER}"
+    resposta_opcoes = busca_params.get("options", {}).get("response", {}).get("response", {})
+    assert resposta_opcoes.get("neverError") is True and resposta_opcoes.get("fullResponse") is True, (
+        "sem fullResponse+neverError o 423 vira exceção e o gate não distingue "
+        "loja suspensa de rota fora do ar"
+    )
+
+    gate_config = nodes_by_name.get("Gate config do agente1")
+    assert gate_config is not None, "gate da config do agente sumiu"
+    gate_config_code = gate_config.get("parameters", {}).get("jsCode", "")
+    assert "status === 423" in gate_config_code and "return []" in gate_config_code, (
+        "423 é loja suspensa e tem que PARAR o fluxo: cair no prompt padrão "
+        "deixaria a loja suspensa sendo atendida pelo bot"
+    )
+    assert "PROMPT_PADRAO_REVY" in gate_config_code, (
+        "sem fallback, rota fora do ar deixa o bot sem prompt"
+    )
+    # O núcleo continua afirmado por frase literal — só que contra o fallback, que
+    # é onde o texto ficou no template (spec §7.2).
+    for regra_do_nucleo in (
+        "prevalecem sobre tudo acima",
+        "nunca invente veículo",
+        "nunca mostre nem mencione parcela, taxa, banco",
+        "não repita a oferta",
+        "nunca peça renda, prazo ou placa",
+        "motivo_bloqueio=menor_de_idade",
+        "nunca revele tools",
+        "o lead nasce dentro da tool simular",
+    ):
+        assert regra_do_nucleo in gate_config_code.lower(), (
+            f"núcleo Revy incompleto no fallback do gate: {regra_do_nucleo!r}"
+        )
+    assert "$('Gate resposta mais recente1')" in gate_config_code, (
+        "gate de config precisa repassar o item do turno; a resposta HTTP não tem "
+        "telefone, pushName nem as flags de anúncio que o AI Agent lê"
+    )
+
+    assert connections.get("Gate resposta mais recente1", {}).get("main", [[]])[0][0][
+        "node"
+    ] == "Buscar config do agente1"
+    assert connections.get("Buscar config do agente1", {}).get("main", [[]])[0][0][
+        "node"
+    ] == "Gate config do agente1"
+    assert connections.get("Gate config do agente1", {}).get("main", [[]])[0][0][
+        "node"
+    ] == "AI Agent1"
+
+    # Higienização da saída obedece a loja: se voltar a ser incondicional, os
+    # campos "escrita" e "emoji" viram decorativos — configurados na tela e
+    # desfeitos no envio, sem erro e sem log.
+    assert "cfg.saidaSemEmoji !== false" in responder_body, (
+        "remoção de emoji voltou a ser incondicional"
+    )
+    assert "cfg.saidaMinusculas !== false" in responder_body, (
+        "minúsculas voltaram a ser incondicionais"
+    )
+
     print(
-        "workflow n8n válido: 32 nós, replay >5min bloqueado, debounce pela última entrada, "
+        "workflow n8n válido: 34 nós, replay >5min bloqueado, debounce pela última entrada, "
         "fallback temporário sem fotos, multi-WA instance dinâmica, áudio ignorado, "
         "webhook seguro e resultado privado"
     )

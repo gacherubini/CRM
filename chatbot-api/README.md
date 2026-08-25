@@ -108,9 +108,10 @@ Desde 25/08 o `chatbot-api` guarda, versiona e serve **o prompt do agente de cad
 Antes disso existia um agente só, com `vitor motos` escrito à mão dentro do
 `n8n/workflow-ai-nao-salvos.json` — a segunda loja se apresentaria como a primeira.
 
-**Ainda não está no ar para o cliente final.** As rotas existem e ninguém as chama: o n8n
-continua com o `systemMessage` fixo, não há tela, e nenhuma flag foi ligada. O bot fala
-exatamente igual ao de antes. Ver "O que falta", no fim desta seção.
+**O bot já consome isto** (card 2, 25/08): o `systemMessage` do n8n perdeu `vitor motos` e
+`limeira-sp` e passa a colar o prompt desta loja no fim da mensagem, vindo de
+`GET /v1/agente/config`. Falta a **tela** (card 3) e o **preview** (card 4) — hoje o
+lojista não edita nada sozinho. Ver "O que falta", no fim desta seção.
 
 Spec: [`../docs/referencia-viva/specs/2026-08-24-agente-por-loja-design.md`](../docs/referencia-viva/specs/2026-08-24-agente-por-loja-design.md).
 
@@ -134,7 +135,7 @@ que o bot recebeu naquela versão — melhorar o gerador amanhã não reescreve 
 
 | Rota | Papel |
 |---|---|
-| `GET /v1/agente/config` | o que o n8n vai consumir: prompt + `max_output_tokens` + `agente_ativo` |
+| `GET /v1/agente/config` | o que o n8n consome: prompt + `max_output_tokens` + `agente_ativo` + `saida` |
 | `GET` / `PUT /v1/agente/rascunho` | a tela edita aqui; devolve `campos`, `prompt` e `conflitos` |
 | `POST /v1/agente/publicar` | leva o rascunho ao ar |
 | `GET /v1/agente/versoes` | histórico |
@@ -182,21 +183,43 @@ que o bot recebeu naquela versão — melhorar o gerador amanhã não reescreve 
   `agente_ativo=True` e continua respondendo — há teste explícito para isso, porque
   quebrar essa invariante deixa o bot mudo em produção, em silêncio.
 
+### Como o n8n consome (card 2)
+
+O `systemMessage` do `AI Agent1` virou **expressão**: a operação do atendimento (jornada,
+ferramentas, anti-alucinação) continua literal no JSON, e a última coisa da mensagem é o
+prompt desta loja — que termina no núcleo Revy. **A ordem é o mecanismo de segurança
+inteiro**: `validate_workflow.py` reprova qualquer coisa colada depois do slot.
+
+Dois nós novos, entre o debounce e o agente:
+
+| Nó | Papel |
+|---|---|
+| `Buscar config do agente1` | `GET /v1/agente/config?instance=…`, com `fullResponse` + `neverError` |
+| `Gate config do agente1` | 200 → prompt da loja · **423 → para o fluxo** · resto → padrão Revy |
+
+- **423 não cai no fallback.** Loja suspensa responde 423, e tratar isso como "falhou, usa
+  o padrão" deixaria a loja suspensa sendo atendida pelo bot — contra o gate de backend do
+  `AGENTS.md` §5. Só falha técnica (timeout, 5xx, rede) cai no padrão.
+- **O fallback é uma cópia** de `montar_prompt(CAMPOS_PADRAO_REVY)` dentro do `jsCode`.
+  `tests/test_agente_prompt_fallback_do_n8n.py` compara os dois e reprova a divergência;
+  mudou o gerador, recole o texto no nó.
+- **A higienização da saída passou a obedecer a loja.** O `Responder WhatsApp1` forçava
+  minúsculas e removia emoji de toda resposta de cliente. Se continuasse incondicional,
+  `escrita` e `emoji` seriam campos decorativos — por isso a rota devolve `saida`.
+- **Os dois nós estão em `HERDADOS`** no `fork_cloud_workflow.py`. O gerador reclama de nó
+  que sumiu do Modo 1, nunca de nó que ele deixou de copiar.
+- **Loja que já atendia precisa de config antes do deploy do workflow**, senão estreia com
+  o padrão Revy: `python -m scripts.semear_config_agente vitor-motos` (spec §11).
+
 ### O que falta
 
-Isto é o card 1 de quatro. Nada disto chega ao cliente sem os outros três:
+Isto são os cards 1 e 2 de quatro. O lojista ainda não edita nada:
 
-1. **n8n** (card 2) — tirar `vitor motos` e `limeira-sp` do `systemMessage`, pôr os slots,
-   e um nó que busca `GET /v1/agente/config`. Atenção: `validate_workflow.py` afirma ~40
-   frases literais do prompt e vai ficar vermelho; as assertivas **mudam de lugar**, não
-   somem. Sem pré-requisito: o `AI Agent` é nó **raiz**, então expressão no `systemMessage`
-   é uso padrão do n8n. `modelName` e `maxOutputTokens` **não mudam** — são globais, e é
-   isso que mantém o card 2 longe de expressão em sub-nó (§7.1 do spec).
-2. **Tela na Revy Loja** (card 3) — o formulário, em `/app/loja/agente/configuracao`.
-3. **Preview** (card 4) — workflow `whatsapp-ai-preview` no mesmo n8n2037, com as tools
+1. **Tela na Revy Loja** (card 3) — o formulário, em `/app/loja/agente/configuracao`.
+2. **Preview** (card 4) — workflow `whatsapp-ai-preview` no mesmo n8n2037, com as tools
    em modo seco. `consultar_estoque1` **escreve** no CRM, então o preview usa telefone
    sintético.
-4. **Ligar a flag** `REVY_LOJA_AGENTE_CONFIG_ENABLED` (default 0, e no app2037 flags são
+3. **Ligar a flag** `REVY_LOJA_AGENTE_CONFIG_ENABLED` (default 0, e no app2037 flags são
    *secrets*, não `[env]` do toml).
 
 Fora da v1, com motivo registrado no spec: cadência de follow-up por loja (§4.4.2),

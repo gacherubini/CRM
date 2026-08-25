@@ -124,7 +124,10 @@ class CamposAgente(BaseModel):
         return valor
 
 
-CAMPOS_PADRAO_REVY = CamposAgente(nome_loja="a loja", cidade="", uf="")
+# Rede de segurança, não estreia: é o que a loja sem config publicada recebe, e
+# é o texto que o n8n usa quando a rota falha. "a loja" geraria "você atende os
+# clientes da a loja"; o artigo já vem da frase do gerador.
+CAMPOS_PADRAO_REVY = CamposAgente(nome_loja="loja", cidade="", uf="")
 
 _TOM = {
     "direto": "fale de forma direta e objetiva, sem rodeio.",
@@ -174,7 +177,7 @@ def _bloco_identidade(c: CamposAgente) -> str:
                 "passe só a cidade."
             )
     if c.entrega:
-        linhas.append(f"entrega: {c.entrega.lower()}")
+        linhas.append(f"entrega: {c.entrega.lower().rstrip('.')}.")
     if c.horario:
         dias = "; ".join(
             f"{dia} das {faixa[0]} às {faixa[1]}" for dia, faixa in c.horario.items()
@@ -284,6 +287,21 @@ def montar_prompt(campos: CamposAgente) -> str:
 def max_output_tokens(campos: CamposAgente) -> int:
     """Sem isto, 'pode explicar' bate no teto de 250 e corta no meio da frase."""
     return _TOKENS_POR_TAMANHO[campos.tamanho_resposta]
+
+
+def saida_do_agente(campos: CamposAgente) -> dict[str, bool]:
+    """Higienização que o n8n aplica na resposta antes de mandar ao cliente.
+
+    Sem isto ``escrita`` e ``emoji`` seriam campos decorativos: o
+    ``Responder WhatsApp1`` força minúsculas e remove emoji de **toda**
+    resposta de cliente, então a loja que escolhesse "pontuação normal" ou
+    "emoji à vontade" veria a escolha ser desfeita no envio — configurada na
+    tela, invisível no WhatsApp, sem erro e sem log.
+    """
+    return {
+        "minusculas": campos.escrita == "minusculas",
+        "sem_emoji": campos.emoji == "nunca",
+    }
 
 
 def detectar_conflitos(texto: str) -> list[str]:

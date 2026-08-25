@@ -34,7 +34,30 @@ se a forma da chamada mudar no Modo 1, em vez de gerar um fork que serve uma loj
 Exceção deliberada: `GET /v1/config/catalogo-bot`, que é cega para loja pelo contrato
 com o Estoque — `instance` ali não consertaria nada.
 
-O fluxo atual tem 27 nós e trabalha com:
+## O prompt não mora mais aqui inteiro
+
+Desde 25/08 o `systemMessage` do `AI Agent1` é **expressão**, e a última coisa que ele
+manda ao modelo é o prompt **daquela loja**, buscado em `GET /v1/agente/config` pelos nós
+`Buscar config do agente1` → `Gate config do agente1`. O que ficou no JSON é a operação do
+atendimento (jornada, ferramentas, anti-alucinação); identidade, tom, FAQ e regras da loja
+são dado no `chatbot-api`.
+
+Três consequências práticas:
+
+- **Não escreva nome, cidade nem tom de loja neste arquivo.** `validate_workflow.py`
+  reprova `vitor motos` e `limeira` no template — era exatamente assim que a segunda loja
+  se apresentaria como a primeira.
+- **Nada pode ser colado depois do slot.** O prompt da loja termina no núcleo Revy, e o
+  núcleo só prevalece porque é o último bloco. O validador reprova rodapé, marca d'água ou
+  debug depois dele.
+- **423 para o fluxo, e só falha técnica cai no padrão.** Loja suspensa responde 423; se o
+  gate tratasse isso como falha, o bot atenderia loja suspensa.
+
+Para mudar como **uma loja** fala, mexa na config dela (hoje por rota; a tela é o card 3).
+Para mudar como **toda loja** opera, mexa aqui — e no núcleo Revy, que vive em
+`chatbot-api/app/agente_prompt.py`.
+
+O fluxo atual tem 34 nós e trabalha com:
 
 - mensagens de texto de clientes;
 - contexto de anúncios;
@@ -152,7 +175,9 @@ O modelo usado fica em `Google Gemini Chat Model1`. A memória fica em
 
 | Mudança desejada | Local |
 |---|---|
-| Tom de voz, frases e regras | `AI Agent1` → `System Message` |
+| Tom de voz, identidade e regras **de uma loja** | config da loja no `chatbot-api` (`app/agente_prompt.py` gera o texto) |
+| Operação do atendimento (vale para toda loja) | `AI Agent1` → `System Message` |
+| Núcleo Revy (o que nenhuma loja edita) | `chatbot-api/app/agente_prompt.py`, `NUCLEO_REVY` |
 | Primeira mensagem / prioridade do pedido | seções `prioridade absoluta` e `primeiro contato` |
 | Histórico no prompt | registrar (`historico_recente`) + template `text` do Agent |
 | Tranca virgem / handoff / fail-open | `Gate somente nao salvos1` (`atendeLeadVirgem`) + backend `decidir_roteamento` |

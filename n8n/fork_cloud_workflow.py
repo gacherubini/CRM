@@ -55,6 +55,12 @@ HERDADOS = [
     "Aguardar 40s cliente1",
     "Verificar mensagem mais recente1",
     "Gate resposta mais recente1",
+    # Os dois nós do agente por loja. Precisam estar AQUI: o gerador reclama de
+    # nó que sumiu do Modo 1, nunca de nó que ele deixou de copiar — sem esta
+    # linha o Modo 2 nasce sem a config e toda loja Cloud se apresenta com o
+    # prompt padrão, sem erro nenhum.
+    "Buscar config do agente1",
+    "Gate config do agente1",
     "AI Agent1",
     "Google Gemini Chat Model1",
     "Memoria da conversa1",
@@ -341,14 +347,18 @@ def novos_nos() -> list[dict]:
                 },
                 "sendBody": True,
                 "specifyBody": "json",
-                # Mesma higienizacao do Modo 1 (minusculas, sem emoji, sem "!"),
-                # que la vive no jsonBody do Responder WhatsApp1.
+                # Mesma higienizacao do Modo 1, e igualmente condicionada a
+                # loja: minusculas e emoji sao campos do formulario, entao
+                # higienizar todo mundo igual desfaria a escolha no envio.
                 "jsonBody": (
-                    "={{ (() => { const texto = String($json.output || ''); "
-                    "const limpo = texto.toLocaleLowerCase('pt-BR')"
-                    ".replace(/[\\p{Extended_Pictographic}\\uFE0F\\u200D]/gu, '')"
-                    ".replace(/!+/g, '.')"
-                    ".replace(/\\bme conta[:,]?\\s*/g, '')"
+                    "={{ (() => { const cfg = $('Gate config do agente1').first().json || {}; "
+                    "const texto = String($json.output || ''); "
+                    "let limpo = texto; "
+                    "if (cfg.saidaSemEmoji !== false) limpo = limpo"
+                    ".replace(/[\\p{Extended_Pictographic}\\uFE0F\\u200D]/gu, ''); "
+                    "if (cfg.saidaMinusculas !== false) limpo = limpo"
+                    ".toLocaleLowerCase('pt-BR').replace(/!+/g, '.'); "
+                    "limpo = limpo.replace(/\\bme conta[:,]?\\s*/g, '')"
                     ".replace(/\\s{2,}/g, ' ')"
                     ".replace(/\\s+([.,?])/g, '$1').trim(); "
                     "return { telefone: $('Extrair1').first().json.telefone, text"
@@ -391,7 +401,13 @@ CONEXOES = {
     "Verificar mensagem mais recente1": {
         "main": [[{"node": "Gate resposta mais recente1", "type": "main", "index": 0}]]
     },
-    "Gate resposta mais recente1": {"main": [[{"node": "AI Agent1", "type": "main", "index": 0}]]},
+    "Gate resposta mais recente1": {
+        "main": [[{"node": "Buscar config do agente1", "type": "main", "index": 0}]]
+    },
+    "Buscar config do agente1": {
+        "main": [[{"node": "Gate config do agente1", "type": "main", "index": 0}]]
+    },
+    "Gate config do agente1": {"main": [[{"node": "AI Agent1", "type": "main", "index": 0}]]},
     "AI Agent1": {"main": [[{"node": "Atraso anti-ban1", "type": "main", "index": 0}]]},
     "Atraso anti-ban1": {"main": [[{"node": "Responder WhatsApp1", "type": "main", "index": 0}]]},
     "Google Gemini Chat Model1": {
@@ -486,7 +502,8 @@ def main() -> None:
     # Reposiciona a esteira para o editor não virar espaguete.
     trilha = [
         "Aguardar 40s cliente1", "Verificar mensagem mais recente1",
-        "Gate resposta mais recente1", "AI Agent1", "Atraso anti-ban1",
+        "Gate resposta mais recente1", "Buscar config do agente1",
+        "Gate config do agente1", "AI Agent1", "Atraso anti-ban1",
     ]
     for i, nome in enumerate(trilha):
         for n in nos:

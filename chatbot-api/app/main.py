@@ -1341,6 +1341,10 @@ def config_agente(
         "prompt": agente_config.prompt_publicado(db, loja_id),
         "max_output_tokens": agente_prompt.max_output_tokens(campos),
         "agente_ativo": campos.agente_ativo,
+        # O n8n higieniza a saída antes de mandar ao cliente. Sem estes dois
+        # sinais ele higienizaria igual para todo mundo e as escolhas de
+        # escrita e emoji morreriam no envio (ver `saida_do_agente`).
+        "saida": agente_prompt.saida_do_agente(campos),
     }
 
 
