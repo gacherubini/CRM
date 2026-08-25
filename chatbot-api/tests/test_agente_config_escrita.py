@@ -10,9 +10,11 @@ def test_put_rascunho_devolve_o_prompt_gerado(client, loja_a):
 
 
 def test_rascunho_salvo_nao_muda_o_publicado(client, loja_a):
+    antes = client.get("/v1/agente/config", headers=loja_a["headers"]).json()["prompt"]
     client.put("/v1/agente/rascunho", json=CAMPOS, headers=loja_a["headers"])
-    publicado = client.get("/v1/agente/config", headers=loja_a["headers"]).json()["prompt"]
-    assert "motos do léo" not in publicado.lower()
+    depois = client.get("/v1/agente/config", headers=loja_a["headers"]).json()["prompt"]
+    assert depois == antes
+    assert "motos do léo" not in depois.lower()
 
 
 def test_publicar_leva_ao_ar(client, loja_a):

@@ -1,6 +1,6 @@
 # chatbot-api · 62 rotas · 19 modelos · 4 workers · 4 flags · 27 migrations
 
-Gerado de `95abfb1`. NAO editar a mao — saida de `gerar_mapa.py`.
+Gerado de `399e4f4`. NAO editar a mao — saida de `gerar_mapa.py`.
 Migration head: `0027_agente_config`
 
 ## Rotas
