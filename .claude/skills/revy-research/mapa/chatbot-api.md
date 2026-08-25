@@ -1,7 +1,7 @@
-# chatbot-api · 56 rotas · 17 modelos · 4 workers · 4 flags · 26 migrations
+# chatbot-api · 56 rotas · 19 modelos · 4 workers · 4 flags · 27 migrations
 
-Gerado de `fe0e7e4`. NAO editar a mao — saida de `gerar_mapa.py`.
-Migration head: `0026_credencial_integracao`
+Gerado de `7083d6f`. NAO editar a mao — saida de `gerar_mapa.py`.
+Migration head: `0027_agente_config`
 
 ## Rotas
 
@@ -81,6 +81,8 @@ Migration head: `0026_credencial_integracao`
 - `grupos_estoque` — app/models_db.py:379
 - `notificacoes_operacionais` — app/models_db.py:398
 - `cloud_evento_falho` — app/models_db.py:439
+- `agente_config_versao` — app/models_db.py:466
+- `agente_config` — app/models_db.py:487
 
 ## Workers
 
@@ -124,6 +126,7 @@ Migration head: `0026_credencial_integracao`
 - `0024_cloud_evento_falho` — alembic/versions/0024_cloud_evento_falho.py
 - `0025_canal_cloud_por_loja` — alembic/versions/0025_canal_cloud_por_loja.py
 - `0026_credencial_integracao` — alembic/versions/0026_credencial_integracao.py
+- `0027_agente_config` — alembic/versions/0027_agente_config.py
 
 ## Testes
 

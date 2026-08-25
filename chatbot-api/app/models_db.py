@@ -5,7 +5,7 @@ leads e consentimentos entram no próximo incremento.
 from datetime import datetime, timezone
 from typing import Optional
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Index, Integer, String, Text, UniqueConstraint
+from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Index, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db import Base
@@ -452,4 +452,43 @@ class CloudEventoFalho(Base):
     criado_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_agora)
     atualizado_em: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=_agora, onupdate=_agora
+    )
+
+
+class AgenteConfigVersao(Base):
+    """Rascunho, versão publicada e histórico da config do agente (spec §3.2).
+
+    ``prompt_gerado`` fica congelado junto com ``campos``: é o que permite
+    auditar o texto que o bot realmente recebeu naquela versão. Melhorar o
+    gerador amanhã não reescreve o histórico.
+    """
+
+    __tablename__ = "agente_config_versao"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    loja_id: Mapped[str] = mapped_column(
+        ForeignKey("lojas.id"), nullable=False, index=True
+    )
+    estado: Mapped[str] = mapped_column(String(16), nullable=False)  # rascunho|publicada|arquivada
+    campos: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+    prompt_gerado: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    autor: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    criado_em: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_agora
+    )
+    publicado_em: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+
+
+class AgenteConfig(Base):
+    """Uma linha por loja: qual versão está no ar."""
+
+    __tablename__ = "agente_config"
+
+    loja_id: Mapped[str] = mapped_column(
+        ForeignKey("lojas.id"), primary_key=True, nullable=False
+    )
+    versao_publicada_id: Mapped[str | None] = mapped_column(
+        ForeignKey("agente_config_versao.id"), nullable=True
     )

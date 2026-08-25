@@ -1,6 +1,6 @@
 # revy-trafego · 120 rotas · 31 modelos · 6 workers · 59 flags · 20 migrations · 20 templates
 
-Gerado de `fe0e7e4`. NAO editar a mao — saida de `gerar_mapa.py`.
+Gerado de `7083d6f`. NAO editar a mao — saida de `gerar_mapa.py`.
 Migration head: `0020_loja_whatsapp_modo`
 
 ## Rotas

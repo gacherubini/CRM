@@ -1,5 +1,5 @@
 {
- "sha": "fe0e7e4",
+ "sha": "7083d6f",
  "inventario": {
   "chatbot-api": [
    {
@@ -556,6 +556,20 @@
     "linha": 439
    },
    {
+    "secao": "modelo",
+    "chave": "agente_config_versao",
+    "simbolo": "agente_config_versao",
+    "arquivo": "app/models_db.py",
+    "linha": 466
+   },
+   {
+    "secao": "modelo",
+    "chave": "agente_config",
+    "simbolo": "agente_config",
+    "arquivo": "app/models_db.py",
+    "linha": 487
+   },
+   {
     "secao": "worker",
     "chave": "NotificacoesOutboxWorker",
     "simbolo": "NotificacoesOutboxWorker",
@@ -749,6 +763,13 @@
     "chave": "0026_credencial_integracao",
     "simbolo": "0026_credencial_integracao",
     "arquivo": "alembic/versions/0026_credencial_integracao.py",
+    "linha": 0
+   },
+   {
+    "secao": "migration",
+    "chave": "0027_agente_config",
+    "simbolo": "0027_agente_config",
+    "arquivo": "alembic/versions/0027_agente_config.py",
     "linha": 0
    }
   ],
