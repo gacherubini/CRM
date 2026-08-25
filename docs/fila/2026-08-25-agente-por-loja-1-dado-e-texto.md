@@ -29,6 +29,12 @@ Pydantic, pytest.
 | 2 | n8n — slots, nó de config, migração das assertivas do validador | depende do card 1 e do spike (§7 do spec) |
 | 3 | `portal-gestao` — tela, rascunho, publicar | depende do card 1 |
 | 4 | preview — workflow `whatsapp-ai-preview` + modo seco | depende dos cards 1–3 |
+| 5? | Control — tela para trocar o modelo da loja | **decisão adiada até o spike** (spec §7) |
+
+O card 5 pode não existir. A rota do modelo entra aqui na Task 8 de qualquer jeito, mas a
+tela do Control só se justifica se o spike do passo 0 (§9 do spec) mostrar que a expressão
+resolve no sub-nó. Se cair no plano B — 2 ou 3 faixas pré-montadas — o dono decide se ainda
+vale tela. **Não construa tela do Control por conta própria.**
 
 Não misture. O card 2 mexe em JSON gerado e em validadores; o 3 é JS de tela que pytest não
 verifica; o 4 depende dos dois.
@@ -1581,6 +1587,11 @@ canário na troca de modelo — uma loja antes de todas.
 os dois chegam com credencial de loja. A restrição de quem edita é da **tela**: a Revy Loja
 simplesmente não mostra este campo. Endurecer isso com papel próprio é card de hardening,
 não deste. Não invente um papel novo aqui.
+
+**Nesta task a rota nasce sem consumidor, e é de propósito.** Não existe tela para ela em
+card nenhum: a do Control está adiada até o spike (spec §7). Até lá, trocar o modelo de uma
+loja é chamada direta na rota. Não construa tela, não escreva método no
+`revy-trafego/app/clients/chatbot.py`, não mexa no Control.
 
 - [ ] **Step 1: Escreva o teste que falha**
 

@@ -553,6 +553,23 @@ Spike obrigatório antes da Task de n8n (§9, passo 0): pôr uma expressão em `
 n8n2037 e ver se resolve. Plano B se não resolver: um nó de modelo por faixa + switch
 antes do agente — bem mais caro, e é a diferença entre um campo e um sub-projeto.
 
+**Ponto de decisão do dono, adiado até o spike (25/08).** A rota `PUT /v1/agente/modelo`
+entra na v1 de qualquer jeito — é barata e o canário depende dela. O que fica aberto é se
+existe **tela no Control** para isso:
+
+| Resultado do spike | O que muda |
+|---|---|
+| expressão resolve | modelo por loja é livre dentro do Gemini; tela no Control passa a valer a pena |
+| expressão não resolve | vira escolha entre 2–3 faixas pré-montadas; talvez nem mereça tela, e talvez nem o campo |
+
+Enquanto não há tela, a troca é por chamada direta à rota. O caminho do Control já existe e
+não precisa de arquitetura nova: `revy-trafego/app/clients/chatbot.py` tem `_request`
+genérico e já faz POST/PATCH no chatbot (`definir_bot_ativo` é o mesmo formato) — falta um
+método e o token daquela loja em `REVY_TRAFEGO_CHATBOT_TOKENS_JSON`.
+
+Se virar tela: campo na ficha da loja que o Control já tem, **nunca item de menu novo** —
+a recusa `C8` do dono (§6.0).
+
 **`maxOutputTokens` é amarrado ao campo "Tamanho da resposta"**, por loja, via expressão:
 
 | Tamanho da resposta | maxOutputTokens |
