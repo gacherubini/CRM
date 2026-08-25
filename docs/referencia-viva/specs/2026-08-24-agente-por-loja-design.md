@@ -367,6 +367,72 @@ Fluxo: rascunho salva enquanto digita → **Testar** → **Publicar**. Publicado
 próxima mensagem de cliente (o n8n busca a config no começo de cada conversa; sem cache
 longo, no máximo segundos).
 
+### 6.0 Design: seguir o padrão, não inventar
+
+Vale para **todo card que mexer em tela** (3 e 4). Não é "capriche no visual" — são regras
+com endereço.
+
+**Não existe componente de abas.** Procure por `.tabs`, `.subnav` ou `.segmented` em
+`portal-gestao/app/static/css/app.css`: não há nenhum. Criar "abas" significa **inventar
+componente novo**, e isso é decisão de design, não detalhe de implementação.
+
+O padrão da casa para telas irmãs é **rota própria + link no cabeçalho**, como o
+`/app/loja/agente` já faz:
+
+```html
+<div class="page-heading">
+  <div>
+    <span class="eyebrow">Vendas</span>
+    <h1>Agente de atendimento</h1>
+    <p>Uma linha dizendo o que a tela mostra.</p>
+  </div>
+  <div class="heading-actions">
+    <a class="button secondary" href="/app/loja/atendimento">Ver fila</a>
+  </div>
+</div>
+```
+
+Então a configuração vira `/app/loja/agente/configuracao`, com link recíproco no
+`.heading-actions` das duas. **Se depois disso o dono quiser abas de verdade**, elas viram
+componente compartilhado com card próprio — não nascem escondidas dentro deste.
+
+**Estrutura de bloco:** `.panel` > `.panel-heading` (`h2` + `p.muted`) > `.panel-body`, e
+`.panel-empty` para estado vazio. Estilo novo vai para o `app.css`, não para `<style>` no
+template; o topo do template leva um comentário dizendo quais classes ele usa, como o
+`agente.html` faz.
+
+**`{% block page_title %}` é obrigatório.** Sem ele a topbar cai no `else` do `base.html` e
+escreve **"Ajustes"** — o comentário está no `agente.html:3`.
+
+**Bump do `?v=` ao mexer em CSS, e são dois arquivos diferentes:**
+
+| Shell | Arquivo | Linha do `<link>` | Valor hoje |
+|---|---|---|---|
+| Revy Loja | `portal-gestao/app/static/css/app.css` | `portal-gestao/app/templates/base.html:16` | `?v=v15` |
+| Revy Control | `revy-trafego/app/static/css/app.css` | `revy-trafego/app/templates/base.html:16` | `?v=v12` |
+
+O `StaticFiles` do Starlette não manda `cache-control`: sem trocar a URL, o navegador reusa
+o CSS velho. Foi assim que o redesign do Copiloto foi para produção quebrado em 14/08. E as
+telas de auth **não estendem** o `base.html` — cada uma tem o seu `?v=`.
+
+**Cor, fonte e token: nunca editar a cópia.** A fonte única é
+`shared/brand/revy-tokens.css`; rode `python shared/brand/sync_tokens.py` (`python3` no
+Mac). Editar `*/static/css/revy-tokens.css` quebra a suíte de propósito. O acento é o verde
+racing — há teste que falha se o azul antigo voltar.
+
+**Máximo 4 métricas por grade.** `.metric-grid` é `repeat(4, 1fr)` sem `row-gap`: a quinta
+cai embaixo da primeira e lê como continuação do mesmo card. Precisa de mais? grade nova.
+
+**Duas recusas do dono encostam nesta tela** (`decisoes/2026-08-07-treze-recusas-de-ux.md`):
+
+- **`I4`** — o bot ter quatro nomes (Agente / Agente de atendimento / chatbot / o bot) foi
+  **recusado**. Não unifique a nomenclatura de carona; use o nome que a tela vizinha já usa.
+- **`C8`** — tela do Control como item de menu de primeiro nível foi **recusada**. A edição
+  de modelo no Control entra onde a ficha da loja já está, não como item novo no menu.
+
+**A tela não se verifica com pytest.** Formulário e janela de teste são JS; isso já passou
+dois bugs no Copiloto. Verificação é no navegador, com portal local semeado.
+
 ### 6.1 A janela de teste
 
 Roda o agente de verdade — mesmo modelo, mesmas tools, mesmo núcleo — com o prompt do

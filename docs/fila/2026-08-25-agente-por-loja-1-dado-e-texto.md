@@ -1695,6 +1695,10 @@ git commit -m "feat(chatbot): modelo de LLM por loja, editavel pelo Control"
 
 - Não muda uma vírgula do prompt que está no ar. O bot continua falando exatamente igual,
   porque o `systemMessage` do n8n não foi tocado. Isso é o card 2.
-- Não tem tela. Ninguém consegue editar nada pela Revy Loja ainda — card 3.
+- Não tem tela. Ninguém consegue editar nada pela Revy Loja ainda — card 3. **Se você é o
+  agente do card 3 ou 4, leia a §6.0 do spec antes de escrever a primeira linha de HTML**:
+  não existe componente de abas no `app.css`, o padrão é rota própria com link no
+  `.heading-actions`, o `?v=` do `app.css` tem que subir (são dois arquivos, Loja em `v15` e
+  Control em `v12`), e duas das 13 recusas do dono encostam nesta tela.
 - Não tem preview nem modo seco das tools — card 4.
 - Não liga flag nenhuma e não deploya.
