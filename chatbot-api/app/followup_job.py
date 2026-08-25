@@ -66,6 +66,11 @@ class FollowupWorker:
 
     def run_once(self, db: Session, *, outbound) -> dict[str, int]:
         from app.rodizio import loja_opera_modo2
+        from app import agente_config
+
+        # Cache por loja: o laço é por conversa, e sem isto seria uma consulta
+        # de config por conversa calada.
+        followup_ligado: dict[str, bool] = {}
 
         agora = datetime.now(timezone.utc)
         contagem = {"toques": 0, "zerados": 0}
@@ -102,6 +107,14 @@ class FollowupWorker:
 
             if not loja_opera_modo2(db, conversa.loja_id):
                 continue
+
+            if conversa.loja_id not in followup_ligado:
+                followup_ligado[conversa.loja_id] = agente_config.campos_publicados(
+                    db, conversa.loja_id
+                ).followup_ativo
+            if not followup_ligado[conversa.loja_id]:
+                continue
+
             if conversa.followup_toques >= 2:
                 continue  # não existe terceiro toque
 
