@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
 
 from sqlalchemy.orm import Session
 
@@ -133,3 +134,21 @@ def prompt_publicado(db: Session, loja_id: str) -> str:
     if versao is None:
         return montar_prompt(CAMPOS_PADRAO_REVY)
     return versao.prompt_gerado
+
+
+# lojas não tem coluna de timezone (models_db.py:19). Fuso fixo até existir
+# loja fora do horário de Brasília (spec §4.1).
+FUSO_LOJA = ZoneInfo("America/Sao_Paulo")
+
+_DIAS = ("seg", "ter", "qua", "qui", "sex", "sab", "dom")
+
+
+def esta_em_horario(campos: CamposAgente, agora: datetime) -> bool:
+    """Grade vazia = atende sempre. Dia ausente da grade = fechado naquele dia."""
+    if not campos.so_horario_comercial or not campos.horario:
+        return True
+    local = agora.astimezone(FUSO_LOJA)
+    faixa = campos.horario.get(_DIAS[local.weekday()])
+    if not faixa or len(faixa) != 2:
+        return False
+    return faixa[0] <= local.strftime("%H:%M") < faixa[1]

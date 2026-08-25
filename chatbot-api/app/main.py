@@ -942,6 +942,13 @@ def pode_responder(
     """
     # Credencial de integração não tem loja: a loja vem da instância (spec §6.2).
     loja_id = resolver_loja_id(db, ctx, dados.instance)
+    # Liga/desliga por loja e janela de horário (spec §4.6). Fica aqui, e não
+    # num nó do n8n, porque este é o gate que o workflow já chama antes da IA.
+    campos_agente = agente_config.campos_publicados(db, loja_id)
+    if not campos_agente.agente_ativo:
+        return {"pode_responder": False, "motivo": "agente_desligado"}
+    if not agente_config.esta_em_horario(campos_agente, datetime.now(timezone.utc)):
+        return {"pode_responder": False, "motivo": "fora_de_horario"}
     resultado = servico.pode_responder_mensagem(
         db,
         loja_id,
