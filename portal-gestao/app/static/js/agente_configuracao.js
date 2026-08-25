@@ -77,6 +77,7 @@
       cidade: val('cidade').trim(),
       uf: val('uf').trim().toUpperCase(),
       endereco_completo: val('endereco_completo') === '1',
+      endereco: val('endereco').trim(),
       entrega: val('entrega').trim(),
       horario: horario(),
       nome_agente: val('nome_agente').trim(),

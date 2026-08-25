@@ -106,7 +106,8 @@ Antes de disparar, pergunte se você mesmo não resolve em duas leituras.
 
 Testes do produto (e consumidores do contrato, se mudou HTTP).
 Migration: `alembic upgrade head` no produto certo.
-n8n: `python n8n/validate_workflow.py` na raiz.
+n8n: `python n8n/validate_workflow.py` na raiz — e, se mexeu na topologia ou no jsCode
+de algum no, os `node n8n/test_*.js` (lista em `n8n/GUIA-WORKFLOW.md`).
 `git diff --check` e `git status --short`. Não commitar mudança alheia.
 Mexeu em rota, modelo, worker, migration ou flag? Regere o mapa e commite junto
 com o código: `cd .claude/skills/revy-research && python gerar_mapa.py` (Windows)

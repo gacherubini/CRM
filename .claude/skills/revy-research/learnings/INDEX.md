@@ -57,3 +57,6 @@ escrever migration com `batch_alter_table`.
 | por uma rota do chatbot na credencial de integracao, ou achar que `instance` resolve multi-loja | `2026-08-24-instance-nao-conserta-toda-rota.md` |
 | trabalhar no repo com outra sessao de agente aberta | `2026-08-24-outra-sessao-move-o-chao-no-meio-da-tarefa.md` |
 | bot do Modo 2 fica mudo com audio, imagem ou qualquer midia | `2026-08-25-corpo-assinado-pela-meta-nao-sobrevive-ao-n8n.md` |
+| por um formulario do portal para gravar em rota do chatbot | `2026-08-25-o-422-do-chatbot-chega-como-indisponivel.md` |
+| rodar as ferramentas do agente fora de uma conversa real (preview, lab, carga) | `2026-08-25-consultar-estoque-cria-conversa.md` |
+| mexer no prompt do bot, no systemMessage ou na config do agente por loja | `2026-08-25-o-prompt-e-metade-template-metade-dado.md` |

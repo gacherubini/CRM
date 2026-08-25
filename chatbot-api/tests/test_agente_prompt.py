@@ -154,3 +154,11 @@ def test_cidade_sem_uf_nao_deixa_hifen_orfao():
     prompt = montar_prompt(CamposAgente(nome_loja="X", cidade="Piracicaba", uf="")).lower()
     assert "a loja fica em piracicaba." in prompt
     assert "piracicaba-." not in prompt
+
+
+def test_loja_sem_nenhuma_forma_de_venda_e_recusada():
+    """O gerador lista o que a loja NÃO faz. Com zero marcado, o agente passa a
+    dizer a todo cliente que a loja não faz financiamento, nem à vista, nem
+    troca, nem consignação — e ninguém notaria até um cliente reclamar."""
+    with pytest.raises(pydantic.ValidationError):
+        _campos(oferece=[])

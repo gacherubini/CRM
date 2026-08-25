@@ -1,11 +1,32 @@
 # Contexto compacto para continuidade
 
-Atualizado em **2026-08-24**. Ponto de entrada de estado e prioridades.
+Atualizado em **2026-08-25**. Ponto de entrada de estado e prioridades.
 Quadro: [`../README.md`](../README.md). Fila: [`../fila/README.md`](../fila/README.md).
 Vocabulário: [`../../CONTEXT.md`](../../CONTEXT.md). As-built Control/Loja:
 [`design/2026-07-30-revy-control-loja-asbuilt-e-melhorias.md`](design/2026-07-30-revy-control-loja-asbuilt-e-melhorias.md).
 
 ## Estado atual
+
+- **Agente por loja (25/08):** os **quatro cards estão no `main`** — o dado e o texto
+  (`chatbot-api`), o n8n, a tela da Loja e o preview. Cada loja tem o seu agente:
+  identidade, personalidade, FAQ, regras de conversa, instruções livres e liga/desliga,
+  por formulário em `/app/loja/agente/configuracao`, com rascunho → testar → publicar e
+  histórico. O `systemMessage` do n8n perdeu `vitor motos` e `limeira-sp`: a operação do
+  atendimento continua literal no JSON e o prompt da loja entra por um slot no fim,
+  terminando no **núcleo Revy** — a ordem é o mecanismo de segurança inteiro.
+  Spec: [`specs/2026-08-24-agente-por-loja-design.md`](specs/2026-08-24-agente-por-loja-design.md).
+
+  **Nada disto chega ao lojista sem três passos de operação**, e nenhum foi dado:
+  1. ligar `REVY_LOJA_AGENTE_CONFIG_ENABLED` no app2037 (é **secret**, não `[env]`);
+  2. semear a config da loja que já atendia **antes** de o workflow subir —
+     `python -m scripts.semear_config_agente vitor-motos` — senão ela estreia se
+     apresentando como "loja";
+  3. publicar os workflows (`-Mode production` e `-Mode preview`) e apontar
+     `CHATBOT_AGENTE_PREVIEW_URL`. **Chatbot antes do n8n**: workflow subindo primeiro
+     busca rota que não existe.
+
+  Teste de aceite que importa: a vitor motos entra com a config semeada e o bot **não
+  muda de jeito de falar** no dia do deploy. Se mudar, é bug, não feature.
 
 - **Copiloto de Vendas (Loja):** F1–F4 no `main`. Seção própria no shell (dono/gerente),
   chat com LLM (DeepSeek, turno assíncrono), 7 regras de sinal (`estoque_parado`,

@@ -80,6 +80,14 @@
           </select>
           <small>Com "só a cidade", o agente nunca inventa rua nem bairro.</small>
         </label>
+        <label class="wide">Endereço completo
+          <input name="endereco" maxlength="200" value="{{ c.endereco or '' }}"
+                 placeholder="Ex.: rua das flores, 120 — centro">
+          <small>
+            Só é usado com "pode passar o endereço completo" acima. Em branco, o agente
+            continua passando só a cidade — ele nunca inventa o que não está aqui.
+          </small>
+        </label>
         <label class="wide">Entrega
           <input name="entrega" maxlength="200" value="{{ c.entrega or '' }}"
                  placeholder="Ex.: cortesia para todo o estado de são paulo">

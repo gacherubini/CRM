@@ -3,18 +3,26 @@ gatilho: mudar o prompt do bot, o tom da IA ou o que ela pode responder
 produto: n8n
 custo: um deploy do bundle inteiro sem efeito nenhum
 fonte: repo
-verificado_em: 2026-08-23
+verificado_em: 2026-08-25
 ---
-# O prompt do bot nao esta no chatbot-api
+# Metade do prompt do bot nao esta no chatbot-api
 
-O `systemMessage` do AI Agent mora em **`n8n/workflow-ai-nao-salvos.json`** (no
-`workflow-cloud.json`, para o Modo 2). O `chatbot-api` nao tem nenhum prompt de
-LLM: ele so monta o texto compacto das ultimas mensagens **para** esse prompt
-(`chatbot-api/app/servico.py:713`) e expoe as tools HTTP que o agente chama.
+**Atualizado em 25/08:** desde o agente por loja o prompt tem duas metades. A
+**operacao do atendimento** (jornada, tools, anti-alucinacao) continua literal em
+`n8n/workflow-ai-nao-salvos.json`; a **identidade, o tom e as regras da loja**, mais o
+nucleo Revy, sao gerados em `chatbot-api/app/agente_prompt.py` e entram por um slot no
+fim do `systemMessage`. Qual metade voce quer mudar decide onde mexer — e a ordem
+entre elas e o mecanismo de seguranca: ver
+[[2026-08-25-o-prompt-e-metade-template-metade-dado]].
 
-Consequencia no deploy: mexer no prompt e deployar o `app2037` nao muda nada — o
-bot continua falando igual. O alvo e o **n8n2037**, com a sequencia de
-`2026-08-23-import-do-n8n-desativa-o-workflow.md`.
+O que continua valendo: nao existe **IA** dentro do `chatbot-api` (sem gemini/openai/
+langchain). O agente roda no n8n nos dois modos; o produto gera texto e expoe as tools.
+
+Consequencia no deploy, e ela tambem virou dupla: mexer na **operacao** e deployar o
+`app2037` nao muda nada — o alvo e o **n8n2037**, com a sequencia de
+`2026-08-23-import-do-n8n-desativa-o-workflow.md`. Mexer no **gerador de texto da
+loja** e o contrario: e deploy do `app2037`, e o bot muda na proxima mensagem, sem
+tocar no n8n.
 
 O canonico e gerado: nao editar o `*.ready.json`, e no Modo 2 nao editar o
 `workflow-cloud.json` a mao (ver `2026-08-23-workflow-cloud-e-gerado.md`).
@@ -22,7 +30,7 @@ O canonico e gerado: nao editar o `*.ready.json`, e no Modo 2 nao editar o
 ## O `validate_workflow.py` prende o prompt por frase literal
 
 Mexer no `systemMessage` não é só editar JSON: `n8n/validate_workflow.py:121` em diante
-afirma **~40 frases literais** do texto — "privacidade do resultado", "nunca crie lead
+afirma **frases literais** do texto — "privacidade do resultado", "nunca crie lead
 por cumprimento", "mande as fotos do catálogo ou prefere", "não exija foto antes",
 "recusa e não insistir", "nunca peça placa ao cliente". Reescrever uma delas deixa o
 validador vermelho, e ele é gate do `AGENTS.md` §6.

@@ -4171,10 +4171,13 @@ a.metric-link:focus-visible { outline: 2px solid var(--brand); outline-offset: 2
   white-space: pre-wrap;
   word-break: break-word;
 }
+/* A do cliente ganha o acento da marca: `--surface-soft` e `--surface-raised`
+   ficam a 4 pontos de diferenca no escuro, e as duas bolhas viravam a mesma
+   cor — sobrava so o alinhamento para dizer quem falou. */
 .agente-teste-cliente {
   justify-self: end;
-  background: var(--surface-soft);
-  border: 1px solid var(--line);
+  background: var(--brand-tint);
+  border: 1px solid var(--brand-line);
 }
 .agente-teste-agente {
   justify-self: start;

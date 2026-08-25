@@ -67,6 +67,7 @@ class CamposAgente(BaseModel):
     cidade: str = Field(max_length=60)
     uf: str = Field(max_length=2)
     endereco_completo: bool = False
+    endereco: str = Field(default="", max_length=200)
     entrega: str = Field(default="", max_length=200)
     horario: dict[str, list[str]] = Field(default_factory=dict)
 
@@ -98,6 +99,22 @@ class CamposAgente(BaseModel):
 
     # instruções livres (§4.5)
     instrucoes: str = Field(default="", max_length=MAX_INSTRUCOES_LIVRES)
+
+    @field_validator("oferece")
+    @classmethod
+    def _valida_oferece(cls, valor: list[str]) -> list[str]:
+        """Loja sem nada marcado não é loja sem preferência — é um agente
+        dizendo a todo cliente que a loja não faz financiamento, nem à vista,
+        nem troca, nem consignação. O gerador lista o que ficou de fora, então
+        marcar zero produz exatamente essa frase. Ninguém notaria até um cliente
+        reclamar.
+        """
+        if not valor:
+            raise ValueError(
+                "marque pelo menos uma forma de venda: sem nenhuma, o agente diz "
+                "ao cliente que a loja não faz nada"
+            )
+        return valor
 
     @field_validator("horario")
     @classmethod
@@ -175,11 +192,20 @@ def _bloco_identidade(c: CamposAgente) -> str:
         # combinação (UF é opcional).
         local = f"{c.cidade.lower()}-{c.uf.lower()}" if c.uf else c.cidade.lower()
         linhas.append(f"a loja fica em {local}.")
-        if not c.endereco_completo:
-            linhas.append(
-                "não informe rua, número, bairro nem ponto de referência: "
-                "passe só a cidade."
-            )
+    # A trava contra endereço inventado só sai quando existe endereço de verdade
+    # para pôr no lugar dela. Marcar "pode passar o endereço" sem preencher o
+    # campo desligava a trava e não dava dado nenhum — o agente ficava livre para
+    # inventar rua e número, que é a pior forma de errar sobre localização.
+    if c.endereco_completo and c.endereco.strip():
+        linhas.append(
+            f"o endereço da loja é {c.endereco.strip().lower()}; pode informá-lo "
+            "quando o cliente pedir."
+        )
+    else:
+        fim = "passe só a cidade." if c.cidade else "você não sabe o endereço da loja."
+        linhas.append(
+            f"não informe rua, número, bairro nem ponto de referência: {fim}"
+        )
     if c.entrega:
         linhas.append(f"entrega: {c.entrega.lower().rstrip('.')}.")
     if c.horario:

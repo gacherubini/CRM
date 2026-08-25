@@ -93,7 +93,11 @@ const next = (name, branch = 0) =>
 assert.strictEqual(next("Se resposta controle1", 1), waitName);
 assert.strictEqual(next(waitName), checkName);
 assert.strictEqual(next(checkName), gateName);
-assert.strictEqual(next(gateName), "AI Agent1");
+// Desde o agente por loja o debounce nao alimenta o Agent direto: entre os dois
+// esta a busca da config da loja (e o gate que decide prompt da loja / 423 / padrao).
+assert.strictEqual(next(gateName), "Buscar config do agente1");
+assert.strictEqual(next("Buscar config do agente1"), "Gate config do agente1");
+assert.strictEqual(next("Gate config do agente1"), "AI Agent1");
 // AI Agent passa pelo atraso anti-ban (typing + throttle) antes do envio.
 assert.strictEqual(next("AI Agent1"), "Atraso anti-ban1");
 assert.strictEqual(next("Atraso anti-ban1"), "Responder WhatsApp1");

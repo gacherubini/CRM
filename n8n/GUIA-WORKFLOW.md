@@ -227,6 +227,22 @@ python n8n\build_preview_workflow.py     # preview da tela de configuracao do ag
 python n8n\validate_preview_workflow.py  # e confere o modo seco das ferramentas
 ```
 
+E os testes que **executam** o JS dos nós fora do n8n. Os validadores conferem forma;
+estes conferem comportamento, e é a única prova que se tem antes de produção:
+
+```powershell
+node n8n\test_gate_somente_nao_salvos.js     # a tranca do lead virgem
+node n8n\test_replay_e_debounce.js           # replay >5min e rajada
+node n8n\test_fallback_estoque_temporario.js # estoque vazio sem inventar moto
+node n8n\test_gate_config_agente.js          # 200 usa a loja, 423 PARA, falha cai no padrao
+node n8n\test_higienizacao_saida.js          # minusculas/emoji seguem a loja nos 3 modos
+node n8n\test_pontes_preview.js              # os nos-ponte do preview
+```
+
+**Mexeu na topologia?** `test_replay_e_debounce.js` afirma a esteira nó a nó e é o que
+pega um nó inserido no meio do caminho — foi ele que reprovou quando a busca da config
+entrou entre o debounce e o Agent.
+
 ## O preview da configuração do agente
 
 `workflow-preview.json` roda o agente do **rascunho** de uma loja, sem WhatsApp, para o
