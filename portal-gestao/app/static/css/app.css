@@ -2842,11 +2842,14 @@ a.vitrine-page-btn:hover {
   gap: var(--space-5);
 }
 
+/* O lede explica o numero, entao anda com ele. Com justify-content:space-between
+   ele ia parar na borda direita e, num monitor largo, ficavam 900px de vazio
+   entre a figura e a frase que a explica. */
 .agente-hero-top {
   display: flex;
   flex-wrap: wrap;
   align-items: flex-end;
-  justify-content: space-between;
+  justify-content: flex-start;
   gap: var(--space-4) var(--space-6);
 }
 .agente-hero-figure > span {
@@ -3706,3 +3709,307 @@ a.metric-link:focus-visible { outline: 2px solid var(--brand); outline-offset: 2
 
 .copiloto-notif-acoes { display: flex; gap: var(--space-2); flex-wrap: wrap; }
 /* === fim: sino de notificacoes (F4/Task 2) === */
+
+/* ===========================================================================
+   Fila de atendimento — o rodizio
+   A ordem e a informacao principal da tela, entao ela e o marcador, nao uma
+   coluna de tabela. O fio liga um chamado ao proximo e fecha na volta.
+   =========================================================================== */
+.rodizio {
+  margin: 0;
+  padding: var(--space-3) var(--space-5) 0;
+  display: grid;
+  list-style: none;
+}
+.rodizio > li {
+  position: relative;
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-3) 0;
+}
+/* O fio corre atras dos marcadores: comeca no primeiro e segue ate a volta. */
+.rodizio > li::before {
+  content: "";
+  position: absolute;
+  left: 14px;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: var(--line);
+}
+.rodizio > li:first-child::before { top: 50%; }
+
+.rodizio-ordem {
+  position: relative;
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--ink-soft);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.rodizio > li:first-child .rodizio-ordem {
+  border-color: var(--brand-line);
+  background: var(--brand-tint);
+  color: var(--brand);
+}
+
+.rodizio-quem { display: grid; gap: 2px; min-width: 0; }
+.rodizio-quem strong { font-size: var(--text-base); }
+.rodizio-quem small {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--ink-muted);
+  font-size: var(--text-xs);
+}
+
+/* Nota do sino: e explicacao, nao estado — por isso nao usa .status. */
+.rodizio-nota { display: inline-flex; align-items: center; gap: var(--space-1); }
+.rodizio-nota::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: currentColor;
+}
+.rodizio-nota.ok { color: var(--ok); }
+.rodizio-nota.atencao { color: var(--warn); }
+
+.rodizio-volta {
+  position: relative;
+  margin: 0;
+  padding: var(--space-3) var(--space-5) var(--space-5);
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-4);
+  color: var(--ink-muted);
+  font-size: var(--text-xs);
+}
+.rodizio-volta-marca {
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border: 1px dashed var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--ink-muted);
+}
+.rodizio-volta-marca svg { width: 14px; height: 14px; }
+/* O fio desce do ultimo vendedor ate a marca da volta. */
+.rodizio-volta::before {
+  content: "";
+  position: absolute;
+  left: calc(var(--space-5) + 14px);
+  top: 0;
+  height: 50%;
+  width: 1px;
+  background: var(--line);
+}
+
+@media (max-width: 640px) {
+  .rodizio > li { grid-template-columns: 30px minmax(0, 1fr); }
+  .rodizio > li > form { grid-column: 2; justify-self: start; }
+}
+
+/* Campo numerico nao precisa da largura da coluna: um valor de 4 digitos numa
+   caixa de 540px nao comunica o tamanho esperado do dado. */
+.form-grid input[type="number"],
+.form-layout > label input[type="number"] { max-width: 12rem; }
+
+/* ===========================================================================
+   Numeros de WhatsApp — um cartao por numero
+   Cada numero e um aparelho ligado ou nao: cartao com o estado no topo le mais
+   rapido que uma linha de tabela com quatro colunas, uma delas so um traco.
+   =========================================================================== */
+.canal-grid {
+  padding: var(--space-4) var(--space-5);
+  display: grid;
+  /* Teto de 320px: com 1fr e uma loja de um numero so, o cartao esticava por
+     1150px e o nome ficava perdido no meio do vazio. */
+  grid-template-columns: repeat(auto-fill, minmax(260px, 320px));
+  justify-content: start;
+  gap: var(--space-4);
+}
+.canal-card {
+  display: grid;
+  /* O nome ocupa a folga: assim a linha das acoes fica na mesma altura em
+     cartoes com dois e com quatro botoes. */
+  grid-template-rows: auto 1fr auto;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-srf);
+  background: var(--surface-soft);
+}
+.canal-topo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 22px;
+}
+.canal-nome {
+  font-size: var(--text-lg);
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+/* Etiqueta de papel, nao de estado: o verde da marca separa "este e o do
+   estoque" do ponto colorido que diz se a conexao esta de pe. */
+.canal-tag {
+  padding: 2px var(--space-2);
+  border: 1px solid var(--brand-line);
+  border-radius: var(--radius-ctl);
+  background: var(--brand-tint);
+  color: var(--brand);
+  font-size: var(--text-xs);
+  font-weight: 600;
+}
+.canal-acoes {
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--line);
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+.canal-acoes .button { min-height: 32px; padding: 0 10px; font-size: var(--text-xs); }
+.canal-rodape {
+  margin: 0;
+  padding: 0 var(--space-5) var(--space-5);
+  color: var(--ink-muted);
+  font-size: var(--text-xs);
+}
+
+/* QR: o codigo e o passo a passo lado a lado. Sozinho no meio do painel, o
+   dono nao sabia em qual celular ler. */
+.qr-body {
+  padding: var(--space-4) var(--space-5) var(--space-5);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-6);
+}
+.qr-passos {
+  margin: 0;
+  padding-left: var(--space-5);
+  display: grid;
+  gap: var(--space-2);
+  color: var(--ink-soft);
+  font-size: var(--text-sm);
+}
+.qr-passos strong { color: var(--ink); }
+
+/* ===========================================================================
+   Despesas fixas
+   O custo fixo do mes e a resposta que a tela existe para dar: ele sai do
+   canto direito do cabecalho, em 12px cinza, e vira figura.
+   =========================================================================== */
+.despesa-mes {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.despesa-mes label {
+  color: var(--ink-muted);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  white-space: nowrap;
+}
+.panel-heading .despesa-mes input { width: auto; min-height: 32px; }
+.despesa-mes .button { min-height: 32px; padding: 0 12px; font-size: var(--text-xs); }
+
+.despesa-total {
+  padding: var(--space-5);
+  display: grid;
+  gap: var(--space-1);
+  border-bottom: 1px solid var(--line);
+}
+.despesa-total > span {
+  color: var(--ink-muted);
+  font-size: var(--text-xs);
+  font-weight: 600;
+}
+.despesa-total > strong {
+  font-size: var(--text-metric);
+  font-weight: 600;
+  letter-spacing: -.03em;
+  font-variant-numeric: tabular-nums;
+}
+.despesa-total > small { color: var(--ink-soft); font-size: var(--text-xs); }
+
+.despesa-lista {
+  margin: 0;
+  padding: 0 var(--space-5);
+  display: grid;
+  list-style: none;
+}
+.despesa-lista > li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-4) 0;
+  border-bottom: 1px solid var(--line);
+}
+.despesa-lista > li:last-child { border-bottom: 0; }
+.despesa-quem { flex: 1 1 220px; min-width: 0; display: grid; gap: 3px; }
+.despesa-quem strong { font-size: var(--text-base); }
+.despesa-quem small {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--ink-muted);
+  font-size: var(--text-xs);
+}
+.despesa-cat {
+  padding: 1px var(--space-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-ctl);
+  background: var(--surface-soft);
+  color: var(--ink-soft);
+  font-weight: 600;
+}
+.despesa-ajuste { color: var(--warn); }
+
+.despesa-valor { display: flex; align-items: center; gap: var(--space-2); }
+/* Prefixo dentro do campo: "1200" sem moeda ao lado ja foi lido como parcela. */
+.despesa-moeda { position: relative; display: inline-flex; align-items: center; }
+.despesa-moeda i {
+  position: absolute;
+  left: 10px;
+  color: var(--ink-muted);
+  font-size: var(--text-xs);
+  font-style: normal;
+  font-weight: 600;
+  pointer-events: none;
+}
+/* Especificidade alta de proposito: a regra base dos campos e
+   `input:not([type=checkbox]):not([type=radio])` (0,3,1) e usa o atalho
+   `padding`, que apagava o padding-left do prefixo — o "$" ficava embaixo do
+   numero ("R6800.00"). Quatro classes passam na frente sem !important. */
+.panel .despesa-lista .despesa-valor .despesa-moeda input {
+  width: 8.5rem;
+  min-height: 34px;
+  padding: 0 var(--space-3) 0 32px;
+  font-variant-numeric: tabular-nums;
+}
+.despesa-valor .button { min-height: 34px; padding: 0 12px; font-size: var(--text-xs); }
+.despesa-lista .button.ghost { min-height: 34px; padding: 0 10px; font-size: var(--text-xs); }
+
+.despesa-lista.is-encerrada .despesa-quem strong { color: var(--ink-soft); font-weight: 500; }
+
+@media (max-width: 720px) {
+  .panel-heading:has(.despesa-mes) { flex-wrap: wrap; }
+  .despesa-lista > li { align-items: flex-start; }
+}

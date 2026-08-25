@@ -11,7 +11,7 @@
     <p>Quanto o agente atendeu sozinho e quanto passou para uma pessoa, no mês corrente.</p>
   </div>
   <div class="heading-actions">
-    <a class="button secondary" href="/app/loja/atendimento">Ver fila</a>
+    <a class="button secondary" href="/app/loja/atendimento">Abrir Atendimento</a>
   </div>
 </div>
 
@@ -22,14 +22,32 @@
          data-rodizio-aguardando="{{ card_rodizio.aguardando }}"
          data-rodizio-perdidos="{{ card_rodizio.perdidos }}">
   <div class="panel-heading">
-    <h2>Fila dos últimos 7 dias</h2>
-    <p class="muted">Recorte da distribuição, ao lado do mês do agente.</p>
+    <div>
+      <span class="mono-label">Últimos 7 dias</span>
+      <h2>Fila de atendimento</h2>
+    </div>
+    <a href="/app/loja/whatsapp/fila">Quem está na fila</a>
   </div>
-  <div class="panel-body overview-grid">
-    <div><span class="muted">Oferecidos</span><strong>{{ card_rodizio.oferecidos }}</strong></div>
-    <div><span class="muted">Atendidos</span><strong>{{ card_rodizio.atendidos }}</strong></div>
-    <div><span class="muted">Aguardando</span><strong>{{ card_rodizio.aguardando }}</strong></div>
-    <div><span class="muted">Perdidos</span><strong>{{ card_rodizio.perdidos }}</strong></div>
+  {# .metric-grid, nao .overview-grid: a segunda nunca existiu no CSS e o
+     rotulo saia colado no numero ("Oferecidos0"). Sao 4 metricas — o teto da
+     grade; a quinta cairia embaixo da primeira e leria como o mesmo card. #}
+  <div class="metric-grid">
+    <div class="metric">
+      <span>Oferecidos</span><strong>{{ card_rodizio.oferecidos }}</strong>
+      <small>leads que a fila ofereceu</small>
+    </div>
+    <div class="metric">
+      <span>Atendidos</span><strong>{{ card_rodizio.atendidos }}</strong>
+      <small>alguém clicou e ficou com o lead</small>
+    </div>
+    <div class="metric">
+      <span>Aguardando</span><strong>{{ card_rodizio.aguardando }}</strong>
+      <small>passou por todos, sem resposta</small>
+    </div>
+    <div class="metric">
+      <span>Perdidos</span><strong>{{ card_rodizio.perdidos }}</strong>
+      <small>o prazo da oferta venceu</small>
+    </div>
   </div>
 </section>
 {% endif %}

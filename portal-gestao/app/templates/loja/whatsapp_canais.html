@@ -2,6 +2,7 @@
 {% block title %}Números de WhatsApp — Revy Loja{% endblock %}
 {% block page_title %}Números de WhatsApp{% endblock %}
 {% block content %}
+{# Estilos: .canal-* em app.css #}
 <div class="page-heading">
   <div>
     <span class="eyebrow">Ajustes</span>
@@ -26,21 +27,25 @@
    vitrine estava partida entre duas seções do menu. #}
 
 {% if qr %}
-<section class="panel" id="qr-card" data-canal="{{ qr.canal_id }}" aria-labelledby="qr-titulo">
+<section class="panel qr-panel" id="qr-card" data-canal="{{ qr.canal_id }}" aria-labelledby="qr-titulo">
   <div class="panel-heading">
     <div>
       <span class="mono-label">Conexão</span>
       <h2 id="qr-titulo">Leia o QR no celular</h2>
     </div>
+    <span class="status pendente" id="qr-estado">Aguardando leitura do QR…</span>
   </div>
-  <p class="muted">
-    WhatsApp → Aparelhos conectados → Conectar aparelho. Se expirar, clique em
-    <strong>Conectar</strong> outra vez.
-  </p>
-  {# A Evolution devolve o base64 já com data URI em algumas versões. #}
-  <img class="qr-image" alt="QR de conexão"
-       src="{% if qr.payload.startswith('data:') %}{{ qr.payload }}{% else %}data:image/png;base64,{{ qr.payload }}{% endif %}">
-  <p class="muted" id="qr-estado">Aguardando leitura do QR…</p>
+  <div class="qr-body">
+    {# A Evolution devolve o base64 já com data URI em algumas versões. #}
+    <img class="qr-image" alt="QR de conexão"
+         src="{% if qr.payload.startswith('data:') %}{{ qr.payload }}{% else %}data:image/png;base64,{{ qr.payload }}{% endif %}">
+    <ol class="qr-passos">
+      <li>Abra o WhatsApp <strong>no celular deste número</strong>.</li>
+      <li>Vá em <strong>Aparelhos conectados</strong> › <strong>Conectar aparelho</strong>.</li>
+      <li>Aponte a câmera para o código ao lado.</li>
+      <li>Se o código expirar, clique em <strong>Conectar</strong> outra vez.</li>
+    </ol>
+  </div>
 </section>
 <script>
   (function () {
@@ -57,6 +62,8 @@
         .then(function (d) {
           if (!d) return;
           alvo.textContent = d.rotulo;
+          // A classe carrega a cor do ponto: sem trocar, "Conectado" ficava âmbar.
+          alvo.className = "status " + d.estado;
           if (d.estado === "conectado") {
             clearInterval(timer);
             window.location.reload();
@@ -68,92 +75,88 @@
 </script>
 {% endif %}
 
-{% if view.pode_adicionar %}
-<form class="filter-bar" method="post" action="/app/loja/whatsapp/canais">
-  <input type="hidden" name="csrf" value="{{ csrf }}">
-  <label class="search">
-    <span class="sr-only">Nome do número</span>
-    <input name="label" maxlength="80" placeholder="Ex.: Linha 2 — vendas" required>
-  </label>
-  <button class="button primary" type="submit">Adicionar número</button>
-</form>
-{% endif %}
-
 <section class="panel" aria-labelledby="canais-titulo">
   <div class="panel-heading">
     <div>
       <span class="mono-label">Cadastrados</span>
       <h2 id="canais-titulo">Seus números</h2>
     </div>
+    {% if view.canais %}
+    <span class="muted">
+      {{ view.canais | length }} número{{ '' if view.canais | length == 1 else 's' }}
+    </span>
+    {% endif %}
   </div>
-  <p class="muted" style="padding: 0 var(--space-5) var(--space-3)">
+  {% if view.canais %}
+  <div class="canal-grid">
+    {% for canal in view.canais %}
+    <article class="canal-card">
+      <div class="canal-topo">
+        <span class="status {{ canal.estado }}">{{ canal.rotulo }}</span>
+        {% if canal.principal_estoque %}
+        <span class="canal-tag" title="Responde no grupo do estoque e envia o aviso de simulação">
+          Principal do estoque
+        </span>
+        {% endif %}
+      </div>
+      <strong class="canal-nome">{{ canal.label }}</strong>
+      <div class="canal-acoes">
+        {% if canal.pode_conectar %}
+        <form method="post" action="/app/loja/whatsapp/canais/{{ canal.id }}/conectar">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          <button class="button primary" type="submit">Conectar</button>
+        </form>
+        {% endif %}
+        {% if canal.pode_desconectar %}
+        <form method="post" action="/app/loja/whatsapp/canais/{{ canal.id }}/desconectar">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          <button class="button secondary" type="submit">Desconectar</button>
+        </form>
+        {% endif %}
+        {% if canal.pode_marcar_principal_estoque %}
+        <form method="post" action="/app/loja/whatsapp/canais/{{ canal.id }}/principal-estoque">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          <button class="button secondary" type="submit">Usar no estoque</button>
+        </form>
+        {% endif %}
+        <form method="post" action="/app/loja/whatsapp/canais/{{ canal.id }}/inativar"
+              onsubmit="return confirm('Apagar este número? Ele sai da lista. O histórico das conversas é preservado.')">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          <button class="button ghost" type="submit">Apagar</button>
+        </form>
+      </div>
+    </article>
+    {% endfor %}
+  </div>
+  <p class="canal-rodape">
     O <strong>principal do estoque</strong> é o único que responde no grupo do estoque
     e envia o aviso quando um cliente pede simulação. Os outros números só atendem
     conversas de cliente.
   </p>
-  {% if view.canais %}
-  <div class="table-wrap">
-    <table>
-      <caption class="sr-only">Números de WhatsApp da loja e situação da conexão</caption>
-      <thead>
-        <tr>
-          <th scope="col">Nome</th>
-          <th scope="col">Situação</th>
-          <th scope="col">Estoque</th>
-          <th scope="col"><span class="sr-only">Ações</span></th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for canal in view.canais %}
-        <tr>
-          <td>
-            <div class="cell-stack"><strong>{{ canal.label }}</strong></div>
-          </td>
-          <td><span class="status {{ canal.estado }}">{{ canal.rotulo }}</span></td>
-          <td>
-            {% if canal.principal_estoque %}
-            <span class="status conectado">Principal do estoque</span>
-            {% else %}
-            <span class="muted">—</span>
-            {% endif %}
-          </td>
-          <td>
-            <div class="row-actions">
-              {% if canal.pode_conectar %}
-              <form method="post" action="/app/loja/whatsapp/canais/{{ canal.id }}/conectar">
-                <input type="hidden" name="csrf" value="{{ csrf }}">
-                <button class="button primary" type="submit">Conectar</button>
-              </form>
-              {% endif %}
-              {% if canal.pode_desconectar %}
-              <form method="post" action="/app/loja/whatsapp/canais/{{ canal.id }}/desconectar">
-                <input type="hidden" name="csrf" value="{{ csrf }}">
-                <button class="button secondary" type="submit">Desconectar</button>
-              </form>
-              {% endif %}
-              {% if canal.pode_marcar_principal_estoque %}
-              <form method="post" action="/app/loja/whatsapp/canais/{{ canal.id }}/principal-estoque">
-                <input type="hidden" name="csrf" value="{{ csrf }}">
-                <button class="button secondary" type="submit">Usar no estoque</button>
-              </form>
-              {% endif %}
-              <form method="post" action="/app/loja/whatsapp/canais/{{ canal.id }}/inativar"
-                    onsubmit="return confirm('Apagar este número? Ele sai da lista. O histórico das conversas é preservado.')">
-                <input type="hidden" name="csrf" value="{{ csrf }}">
-                <button class="button danger" type="submit">Apagar</button>
-              </form>
-            </div>
-          </td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
   {% else %}
   <div class="empty">
     <strong>Nenhum número por aqui</strong>
-    <p>Quando um número for adicionado, ele aparece aqui com a situação da conexão.</p>
+    <p>Cadastre o primeiro abaixo. Depois de conectar, ele começa a atender conversas.</p>
   </div>
   {% endif %}
 </section>
+
+{% if view.pode_adicionar %}
+<section class="panel form-section" aria-labelledby="canal-novo">
+  <div class="panel-heading">
+    <div>
+      <span class="mono-label">Novo</span>
+      <h2 id="canal-novo">Adicionar número</h2>
+    </div>
+  </div>
+  <form class="form-layout" method="post" action="/app/loja/whatsapp/canais">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <label>Nome do número
+      <input name="label" maxlength="80" placeholder="Ex.: Linha 2 — vendas" required>
+      <small>Só para você reconhecer na lista. O número em si vem da leitura do QR.</small>
+    </label>
+    <button class="button primary" type="submit">Adicionar número</button>
+  </form>
+</section>
+{% endif %}
 {% endblock %}

@@ -251,8 +251,13 @@ def test_lista_usa_coluna_nome_e_botao_apagar(client, chatbot_fake, monkeypatch)
     login(client)
     r = client.get(TELA)
     assert r.status_code == 200
-    # Coluna é "Nome" (o valor é o rótulo digitado), não "Número".
-    assert ">Nome<" in r.text
+    # O que aparece é o rótulo digitado, não um número de telefone: a tela
+    # nunca teve o E.164 para mostrar. (A lista virou cartão em 25/08 — a
+    # asserção era no <th>Nome</th> da tabela, que deixou de existir; o
+    # invariante é o rótulo na tela, não o cabeçalho da coluna.)
+    for canal in chatbot_fake.canais:
+        assert canal["e164_or_label"] in r.text
+    assert "Nome do número" in r.text
     # Ação de remover é "Apagar".
     assert "Apagar" in r.text
 

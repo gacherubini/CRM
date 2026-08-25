@@ -284,6 +284,16 @@ def flatten_nav(sections: tuple[NavSection, ...] | list[NavSection]) -> list[Nav
     return items
 
 
+# Rotas que são prefixo da rota de um irmão no menu. Cada uma acende só na
+# própria rota — o filho cuida de si.
+_SO_NA_PROPRIA_ROTA = frozenset({
+    "/app/loja/estoque",     # não acende em /veiculos nem /vitrine
+    "/app/loja/vendas",      # não acende em /lista
+    "/app/loja/financeiro",  # não acende em /despesas
+    "/app/loja/whatsapp",    # não acende em /fila
+})
+
+
 def nav_item_is_active(item: NavItem, path: str) -> bool:
     if path == item.href:
         return True
@@ -298,14 +308,11 @@ def nav_item_is_active(item: NavItem, path: str) -> bool:
 
     prefix = item.active_prefix or item.href
     if prefix and path.startswith(prefix):
-        # Evita que Visão geral do estoque marque subpáginas (veículos, vitrine)
-        if item.href == "/app/loja/estoque" and path != "/app/loja/estoque":
-            return False
-        # Mesmo caso em Vendas: Resultado não acende na lista de vendas.
-        if item.href == "/app/loja/vendas" and path != "/app/loja/vendas":
-            return False
-        # Idem no Financeiro: o resultado não acende em /despesas.
-        if item.href == "/app/loja/financeiro" and path != "/app/loja/financeiro":
+        # Item cuja rota é prefixo da rota de um irmão só acende na própria
+        # rota: senão pai e filho ficam os dois marcados. Aconteceu em
+        # /app/loja/whatsapp/fila, com "Números de WhatsApp" e "Fila de
+        # atendimento" acesos ao mesmo tempo.
+        if item.href in _SO_NA_PROPRIA_ROTA and path != item.href:
             return False
         return True
     return False

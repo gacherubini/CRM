@@ -2,6 +2,7 @@
 {% block title %}Fila de atendimento — Revy Loja{% endblock %}
 {% block page_title %}Fila de atendimento{% endblock %}
 {% block content %}
+{# Estilos: .rodizio-* em app.css #}
 <div class="page-heading">
   <div>
     <span class="eyebrow">Ajustes</span>
@@ -24,92 +25,90 @@
 <div class="alert success" role="status">{{ acao_mensagem }}</div>
 {% endif %}
 
-<form class="filter-bar" method="post" action="/app/loja/whatsapp/fila">
-  <input type="hidden" name="csrf" value="{{ csrf }}">
-  <label class="search">
-    <span class="sr-only">Vendedor</span>
-    <select name="usuario_id" required>
-      <option value="">Escolha o vendedor…</option>
-      {% for membro in equipe %}
-      <option value="{{ membro.id }}">{{ membro.nome or membro.email }}</option>
-      {% endfor %}
-    </select>
-  </label>
-  <label class="search">
-    <span class="sr-only">WhatsApp do vendedor</span>
-    <input name="telefone" maxlength="20" placeholder="WhatsApp: (11) 99999-0000" required>
-  </label>
-  <label class="search">
-    <span class="sr-only">Posição na fila</span>
-    <input name="ordem" type="number" min="0" step="1" value="0" placeholder="Ordem">
-  </label>
-  <button class="button primary" type="submit">Adicionar à fila</button>
-</form>
-
 <section class="panel" aria-labelledby="fila-titulo">
   <div class="panel-heading">
     <div>
-      <span class="mono-label">Ordem de chamada</span>
+      <span class="mono-label">Rodízio</span>
       <h2 id="fila-titulo">Quem atende</h2>
     </div>
+    {% if fila %}
+    <span class="muted">{{ fila | length }} na fila</span>
+    {% endif %}
   </div>
-  <p class="muted" style="padding: 0 var(--space-5) var(--space-3)">
-    O vendedor recebe o aviso <strong>no WhatsApp dele</strong> e também no sino da
-    Loja. Ele fala com o cliente do próprio número — o Revy não entra nessa conversa.
-  </p>
   {% if fila %}
-  <div class="table-wrap">
-    <table>
-      <caption class="sr-only">Vendedores na fila de rodízio, em ordem de chamada</caption>
-      <thead>
-        <tr>
-          <th scope="col">Ordem</th>
-          <th scope="col">Vendedor</th>
-          <th scope="col">WhatsApp</th>
-          <th scope="col">Sino da Loja</th>
-          <th scope="col"><span class="sr-only">Ações</span></th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for vendedor in fila %}
-        <tr>
-          <td><strong>{{ loop.index }}º</strong></td>
-          <td>
-            <div class="cell-stack"><strong>{{ vendedor.nome }}</strong></div>
-          </td>
-          <td><span class="mono">{{ vendedor.telefone }}</span></td>
-          <td>
-            {% if vendedor.usuario_id %}
-            <span class="status conectado">Recebe</span>
-            {% else %}
-            {# Sem vínculo com pessoa da Loja, o sinal 1:1 não tem para quem ir. #}
-            <span class="status desconectado">Só WhatsApp — sem acesso à Loja</span>
-            {% endif %}
-          </td>
-          <td>
-            <div class="row-actions">
-              <form method="post"
-                    action="/app/loja/whatsapp/fila/{{ vendedor.id }}/remover"
-                    onsubmit="return confirm('Tirar {{ vendedor.nome }} da fila? Ele para de receber leads novos. Os leads que já são dele continuam.')">
-                <input type="hidden" name="csrf" value="{{ csrf }}">
-                <button class="button danger" type="submit">Tirar da fila</button>
-              </form>
-            </div>
-          </td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
+  <ol class="rodizio">
+    {% for vendedor in fila %}
+    <li>
+      <span class="rodizio-ordem" aria-hidden="true">{{ loop.index }}</span>
+      <div class="rodizio-quem">
+        <strong><span class="sr-only">{{ loop.index }}º na fila: </span>{{ vendedor.nome }}</strong>
+        <small>
+          <span class="mono">{{ vendedor.telefone }}</span>
+          {% if vendedor.usuario_id %}
+          <span class="rodizio-nota ok">avisado no WhatsApp e no sino da Loja</span>
+          {% else %}
+          {# Sem vínculo com pessoa da Loja, o sinal 1:1 não tem para quem ir. #}
+          <span class="rodizio-nota atencao">avisado só no WhatsApp — sem acesso à Loja</span>
+          {% endif %}
+        </small>
+      </div>
+      <form method="post"
+            action="/app/loja/whatsapp/fila/{{ vendedor.id }}/remover"
+            onsubmit="return confirm('Tirar {{ vendedor.nome }} da fila? Ele para de receber leads novos. Os leads que já são dele continuam.')">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <button class="button secondary" type="submit">Tirar da fila</button>
+      </form>
+    </li>
+    {% endfor %}
+  </ol>
+  <p class="rodizio-volta">
+    <span class="rodizio-volta-marca" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m17 2 4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="m7 22-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/></svg>
+    </span>
+    Depois do último, a vez volta para o primeiro. O vendedor fala com o cliente
+    do próprio número — o Revy não entra nessa conversa.
+  </p>
   {% else %}
   <div class="empty">
     <strong>Ninguém na fila ainda</strong>
     <p>
       Sem vendedor na fila, o cliente que pede atendimento fica esperando e o lead
-      aparece como <strong>sem vendedor</strong> no Atendimento. Adicione pelo menos
-      um acima.
+      aparece como <strong>sem vendedor</strong> no Atendimento. Adicione o primeiro
+      no formulário abaixo.
     </p>
   </div>
   {% endif %}
+</section>
+
+<section class="panel form-section" aria-labelledby="fila-nova">
+  <div class="panel-heading">
+    <div>
+      <span class="mono-label">Novo</span>
+      <h2 id="fila-nova">Adicionar vendedor</h2>
+    </div>
+  </div>
+  <form class="form-layout" method="post" action="/app/loja/whatsapp/fila">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <div class="form-grid">
+      <label>Pessoa da equipe
+        <select name="usuario_id" required>
+          <option value="">Escolha…</option>
+          {% for membro in equipe %}
+          <option value="{{ membro.id }}">{{ membro.nome or membro.email }}</option>
+          {% endfor %}
+        </select>
+        <small>Quem não está na equipe não entra na fila.</small>
+      </label>
+      <label>WhatsApp do vendedor
+        <input name="telefone" maxlength="20" placeholder="(11) 99999-0000" required>
+        <small>Com DDD. É neste número que ele recebe a oferta do lead.</small>
+      </label>
+      <label>Posição na fila
+        <input name="ordem" type="number" min="0" step="1" value="0">
+        <small>Menor número é chamado primeiro. Empate segue a ordem de cadastro.</small>
+      </label>
+    </div>
+    <button class="button primary" type="submit">Adicionar à fila</button>
+  </form>
 </section>
 {% endblock %}

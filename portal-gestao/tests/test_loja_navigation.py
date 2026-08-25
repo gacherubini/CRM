@@ -301,3 +301,24 @@ def test_nav_copiloto_nao_aparece_para_vendedor():
         _store(roles=("vendedor",)), ents, shell_enabled=True, copiloto_enabled=True
     )
     assert "Copiloto" not in [s.title for s in sections]
+
+
+def test_fila_nao_acende_junto_com_numeros_de_whatsapp():
+    """Os dois itens de WhatsApp acendiam juntos em /fila.
+
+    ``Números de WhatsApp`` mora em ``/app/loja/whatsapp`` e ``Fila de
+    atendimento`` em ``/app/loja/whatsapp/fila`` — o prefixo do pai casa com a
+    rota do filho, então o menu marcava dois itens ativos ao mesmo tempo.
+    """
+    numeros, fila = None, None
+    for item in flatten_nav(build_nav(_store(), _ents(), whatsapp_enabled=True)):
+        if item.href == "/app/loja/whatsapp":
+            numeros = item
+        if item.href == "/app/loja/whatsapp/fila":
+            fila = item
+    assert numeros is not None and fila is not None
+
+    assert nav_item_is_active(numeros, "/app/loja/whatsapp") is True
+    assert nav_item_is_active(numeros, "/app/loja/whatsapp/fila") is False
+    assert nav_item_is_active(fila, "/app/loja/whatsapp/fila") is True
+    assert nav_item_is_active(fila, "/app/loja/whatsapp") is False

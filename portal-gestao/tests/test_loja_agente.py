@@ -65,7 +65,10 @@ def test_agente_mostra_cards(client, atendimento_on):
     assert "65" in r.text
     assert "Transferidos" in r.text
     assert "em construção" in r.text  # placeholder de simulações (rodapé)
-    assert "Ver fila" in r.text
+    # Era "Ver fila", renomeado em 25/08: o card do rodízio ganhou um link
+    # para /whatsapp/fila e os dois "fila" iam para telas diferentes.
+    assert 'href="/app/loja/atendimento"' in r.text
+    assert "Abrir Atendimento" in r.text
     assert "panel-body" in r.text
     assert "split-bar" in r.text
 

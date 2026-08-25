@@ -2,6 +2,14 @@
 {% block title %}Despesas fixas — Revy Loja{% endblock %}
 {% block page_title %}Despesas fixas{% endblock %}
 {% block content %}
+{# Estilos: .despesa-* em app.css #}
+{# O <input type="month"> escreve o mes no idioma do NAVEGADOR, nao no da
+   pagina: no Chrome em ingles sai "August 2026". Por isso a competencia
+   aparece por extenso nos titulos, em portugues, vinda daqui. #}
+{% set MESES = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho',
+                'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'] %}
+{% set mes_extenso = MESES[competencia[5:7] | int - 1] ~ ' de ' ~ competencia[:4] %}
+{% set total = itens | map(attribute=1) | sum(start=0) if itens else 0 %}
 <div class="page-heading">
   <div>
     <span class="eyebrow">Financeiro</span>
@@ -19,52 +27,59 @@
 {% if aviso_erro == 'valor' %}<div class="alert error" role="alert">Valor inválido. Use um número maior que zero.</div>{% endif %}
 {% if aviso_erro == 'dados' %}<div class="alert error" role="alert">Preencha categoria e descrição.</div>{% endif %}
 
-<form class="filter-bar" method="get">
-  <label class="search"><span class="sr-only">Mês</span>
-    <input type="month" name="mes" value="{{ competencia }}">
-  </label>
-  <button class="button secondary" type="submit">Ver mês</button>
-</form>
-
 <section class="panel" aria-labelledby="bloco-vigentes">
   <div class="panel-heading">
-    <div><span class="mono-label">Vigentes</span><h2 id="bloco-vigentes">Estrutura deste mês</h2></div>
-    <span class="muted">
-      total: {{ formatar_brl(itens | map(attribute=1) | sum(start=0) if itens else 0) }}
-    </span>
+    <div>
+      <span class="mono-label">Vigentes</span>
+      <h2 id="bloco-vigentes">Estrutura de {{ mes_extenso }}</h2>
+    </div>
+    <form class="despesa-mes" method="get">
+      <label for="despesa-mes">Ver outro mês</label>
+      <input id="despesa-mes" type="month" name="mes" value="{{ competencia }}">
+      <button class="button secondary" type="submit">Ver</button>
+    </form>
   </div>
+
+  <div class="despesa-total">
+    <span>Custo fixo de {{ mes_extenso }}</span>
+    <strong>{{ formatar_brl(total) }}</strong>
+    <small>É o que a loja paga mesmo sem vender nenhuma moto.</small>
+  </div>
+
   {% if not itens %}
   <div class="empty">
     <strong>Nenhuma despesa fixa cadastrada.</strong>
     <p>Sem ela o lucro operacional do mês fica igual ao lucro bruto, e não dá para saber quantas motos pagam a casa.</p>
   </div>
   {% else %}
-  <ul class="list-rows">
+  <ul class="despesa-lista">
     {% for despesa, valor in itens %}
     <li>
-      <div>
+      <div class="despesa-quem">
         <strong>{{ despesa.descricao }}</strong>
-        <small class="muted">
-          {{ despesa.categoria | capitalize }} · {{ formatar_brl(valor) }}
+        <small>
+          <span class="despesa-cat">{{ despesa.categoria | capitalize }}</span>
           {% if valor != despesa.valor_mensal %}
-          · ajustado neste mês (cadastro: {{ formatar_brl(despesa.valor_mensal) }})
+          <span class="despesa-ajuste">ajustado neste mês · cadastro: {{ formatar_brl(despesa.valor_mensal) }}</span>
           {% endif %}
         </small>
       </div>
-      <div class="heading-actions">
-        <form method="post" action="/app/loja/financeiro/despesas/{{ despesa.id }}/ajuste">
-          <input type="hidden" name="csrf" value="{{ csrf }}">
-          <input type="hidden" name="mes" value="{{ competencia }}">
+      <form class="despesa-valor" method="post" action="/app/loja/financeiro/despesas/{{ despesa.id }}/ajuste">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <input type="hidden" name="mes" value="{{ competencia }}">
+        <span class="despesa-moeda">
+          <i aria-hidden="true">R$</i>
           <input type="number" step="0.01" min="0" name="valor" value="{{ valor }}"
-                 aria-label="Valor de {{ despesa.descricao }} neste mês">
-          <button class="button secondary" type="submit">Ajustar só este mês</button>
-        </form>
-        <form method="post" action="/app/loja/financeiro/despesas/{{ despesa.id }}/encerrar">
-          <input type="hidden" name="csrf" value="{{ csrf }}">
-          <input type="hidden" name="mes" value="{{ competencia }}">
-          <button class="button ghost" type="submit">Encerrar</button>
-        </form>
-      </div>
+                 aria-label="Valor de {{ despesa.descricao }} em {{ mes_extenso }}">
+        </span>
+        <button class="button secondary" type="submit">Ajustar só este mês</button>
+      </form>
+      <form method="post" action="/app/loja/financeiro/despesas/{{ despesa.id }}/encerrar"
+            onsubmit="return confirm('Encerrar {{ despesa.descricao }}? Ela para de contar a partir de {{ mes_extenso }}. Os meses anteriores continuam como estavam.')">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <input type="hidden" name="mes" value="{{ competencia }}">
+        <button class="button ghost" type="submit">Encerrar</button>
+      </form>
     </li>
     {% endfor %}
   </ul>
@@ -79,15 +94,20 @@
     <input type="hidden" name="csrf" value="{{ csrf }}">
     <input type="hidden" name="mes" value="{{ competencia }}">
     <div class="form-grid">
+      <label class="wide">Descrição
+        <input name="descricao" required placeholder="Aluguel da loja">
+        <small>O nome que você usa para essa conta.</small>
+      </label>
       <label>Categoria
         <select name="categoria" required>
           {% for c in categorias %}<option value="{{ c }}">{{ c | capitalize }}</option>{% endfor %}
         </select>
       </label>
-      <label>Descrição<input name="descricao" required placeholder="Aluguel da loja"></label>
-      <label>Valor por mês<input type="number" step="0.01" min="0" name="valor" required placeholder="0,00"></label>
+      <label>Valor por mês
+        <input type="number" step="0.01" min="0" name="valor" required placeholder="0,00">
+        <small>Vale a partir de {{ mes_extenso }} — meses anteriores não mudam.</small>
+      </label>
     </div>
-    <p class="muted">Vale a partir de {{ competencia }} — meses anteriores não mudam.</p>
     <button class="button primary" type="submit">Cadastrar</button>
   </form>
 </section>
@@ -95,22 +115,25 @@
 {% if encerradas %}
 <section class="panel" aria-labelledby="bloco-encerradas">
   <div class="panel-heading">
-    <div><span class="mono-label">Fora de vigência</span><h2 id="bloco-encerradas">Não contam neste mês</h2></div>
+    <div><span class="mono-label">Fora de vigência</span><h2 id="bloco-encerradas">Não contam em {{ mes_extenso }}</h2></div>
   </div>
-  <ul class="list-rows">
+  <ul class="despesa-lista is-encerrada">
     {% for despesa in encerradas %}
     <li>
-      <div>
+      <div class="despesa-quem">
         <strong>{{ despesa.descricao }}</strong>
-        <small class="muted">
-          {{ formatar_brl(despesa.valor_mensal) }} · de {{ despesa.inicio_competencia }}
-          {% if despesa.fim_competencia %}até {{ despesa.fim_competencia }}{% else %}em diante{% endif %}
+        <small>
+          <span class="despesa-cat">{{ despesa.categoria | capitalize }}</span>
+          <span>{{ formatar_brl(despesa.valor_mensal) }} · de {{ despesa.inicio_competencia }}
+            {% if despesa.fim_competencia %}até {{ despesa.fim_competencia }}{% else %}em diante{% endif %}</span>
         </small>
       </div>
     </li>
     {% endfor %}
   </ul>
-  <p class="muted">Ficam no cadastro para que os meses em que valeram continuem corretos.</p>
+  <p class="canal-rodape">
+    Ficam no cadastro para que os meses em que valeram continuem corretos.
+  </p>
 </section>
 {% endif %}
 {% endblock %}
