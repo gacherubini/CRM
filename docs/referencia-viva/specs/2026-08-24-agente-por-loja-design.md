@@ -35,7 +35,9 @@ Isso é também argumento comercial: a tela de configuração e o núcleo visív
 | Trava "não citar vendedor/transferir" | **ABERTA** — virou campo da loja |
 | Trava "nunca falar parcela/taxa/banco" | **FECHADA** — invariante do Motor |
 | Trava "não insistir depois da recusa" | **FECHADA** |
-| Escopo da v1 | identidade + personalidade + FAQ + regras da conversa + liga/desliga |
+| Escopo da v1 | identidade + personalidade + FAQ + regras da conversa + instruções livres + liga/desliga |
+| Campo livre de instruções | **entra** (§4.5), teto 1000 chars, antes do núcleo |
+| Conflito do campo livre com o núcleo | **avisa, não bloqueia** |
 | n8n de teste | **não** — workflow gerado no mesmo n8n2037 |
 | Escolha do modelo de LLM | por loja no dado, editável **só no Control** |
 
@@ -95,19 +97,24 @@ Evolution; no Modo 2 é o `phone_number_id` da Meta, e precisa passar por
 ### 3.4 Montagem do prompt — o sanduíche
 
 ```
-1. IDENTIDADE      ← gerado dos campos
-2. PERSONALIDADE   ← gerado dos campos
-3. FAQ DA LOJA     ← pares pergunta/resposta
-4. REGRAS DA LOJA  ← o que oferece, foto, handoff, follow-up
-5. NÚCLEO REVY     ← imutável, POR ÚLTIMO
+1. IDENTIDADE          ← gerado dos campos
+2. PERSONALIDADE       ← gerado dos campos
+3. FAQ DA LOJA         ← pares pergunta/resposta
+4. REGRAS DA LOJA      ← o que oferece, foto, handoff, follow-up
+5. INSTRUÇÕES DA LOJA  ← texto livre do lojista (§4.5)
+6. NÚCLEO REVY         ← imutável, POR ÚLTIMO
 ```
 
 **A ordem é o mecanismo de segurança.** O núcleo vem depois e diz explicitamente que
 nada acima dele pode contradizê-lo.
 
-**O lojista nunca escreve prompt.** Cada campo tem um gerador de texto no
+**O lojista não escreve prompt — escreve campos.** Cada campo tem um gerador de texto no
 `chatbot-api`. É isso que faz o resultado sair bem escrito mesmo quando o lojista não é
 — e é a razão de o formulário ter ganhado da caixa de texto livre.
+
+A única exceção é o bloco 5 (§4.5), que é texto do lojista mesmo. Ele fica **depois** de
+tudo que o formulário gera e **antes** do núcleo — de propósito: o lojista escreve o que
+quiser e o núcleo continua vencendo.
 
 ## 4. Os campos
 
@@ -152,11 +159,44 @@ exatamente: "Y"`.
 | Pode citar vendedor pelo nome? | sim · não |
 | Follow-up | N toques, a cada H horas |
 
-### 4.5 Liga/desliga
+### 4.5 Instruções da loja (o campo livre)
+
+O formulário cobre o previsível. Sempre sobra a regra que só aquela loja tem. Sem essa
+válvula, ou o Revy vira suporte de exceção, ou o produto parece engessado.
+
+Na tela, com nome que ensina o formato — nunca rotulado como "campo livre":
+
+> **O que mais o seu agente precisa saber?**
+> Escreva regras da sua loja que não couberam acima.
+> *Ex.: "não financiamos quem tem CNH suspensa" · "aos sábados só atendemos com hora
+> marcada" · "moto acima de 2020 tem 6 meses de garantia"*
+
+**Teto de 1000 caracteres.** Não é burocracia: esse texto entra em **toda** mensagem de
+**toda** conversa. Sem teto o lojista cola três páginas, o custo por conversa sobe e o
+agente se perde — instrução demais dilui as que importam.
+
+Entra no prompt como bloco 5, rotulado como instrução da loja, sempre **antes** do
+núcleo.
+
+**Conflito com o núcleo: avisa, não bloqueia** (decisão do dono, 24/08). Detector simples
+por palavra-chave sobre os temas fechados — parcela/taxa/banco, insistir depois da
+recusa, pedir renda ou placa, inventar disponibilidade. Ao detectar, alerta na tela:
+*"isso conflita com uma regra do Revy e o agente vai ignorar"*. Ele salva assim mesmo se
+quiser.
+
+O risco real é zero — o núcleo vem depois e vence de qualquer jeito. O aviso existe para
+o lojista **não achar que o produto está quebrado** quando escrever algo que não pega.
+Bloquear foi descartado: depende de detecção por palavra-chave, que erra nos dois
+sentidos, e falso positivo vira ligação para o dono.
+
+**A rede de segurança de verdade é o preview**: ele escreve, testa, vê o agente estranho
+e corrige antes de publicar.
+
+### 4.6 Liga/desliga
 
 Agente ativo · só em horário comercial · só lead de anúncio.
 
-### 4.6 Exemplo de texto gerado
+### 4.7 Exemplo de texto gerado
 
 Campos de uma loja fictícia ("Motos do Léo", Piracicaba-SP) produzem:
 
@@ -186,6 +226,12 @@ não mande fotos por conta própria: só quando o cliente pedir.
 se a consulta não achar a moto do anúncio, mantenha o foco nela e não ofereça outra
 moto por iniciativa própria.
 você pode citar o vendedor pelo nome ao encaminhar o atendimento.
+
+[INSTRUÇÕES DA LOJA]
+o lojista escreveu as instruções abaixo. siga-as, exceto onde contrariarem as
+regras do revy que vêm depois.
+não financiamos quem tem cnh suspensa.
+aos sábados o atendimento é só com hora marcada.
 ```
 
 ## 5. O núcleo Revy
@@ -341,7 +387,8 @@ Ordem de risco, não de tela.
    `modelName` e `maxOutputTokens`. Regerar o fork do Modo 2 e o de teste.
    **Com fallback**: rota falhou ou loja sem config → padrão Revy. O bot nunca fica sem
    prompt.
-4. **Tela da Loja** — formulário, rascunho, publicar, histórico. Flag OFF.
+4. **Tela da Loja** — formulário, campo livre com contador e aviso de conflito, rascunho,
+   publicar, histórico. Flag OFF.
 5. **Preview** — workflow gerado + modo seco das tools.
 
 ## 10. Testes
@@ -351,6 +398,9 @@ Windows `.\.venv\Scripts\python.exe -m pytest -q`):
 
 - snapshot do gerador em ~6 combinações de campo, incluindo as feias (formal +
   minúsculas; emoji à vontade + tom direto);
+- **o núcleo continua sendo o último bloco mesmo com o campo livre preenchido**, e mesmo
+  quando o texto livre tenta contrariá-lo;
+- teto de 1000 chars do campo livre, e o detector de conflito avisando sem bloquear;
 - isolamento por loja: credencial da A jamais recebe config da B;
 - publicar / reverter / histórico;
 - **modo seco não cria lead nem notificação** — teste explícito, é o risco nº 1.
@@ -388,6 +438,8 @@ Só depois de o comportamento bater é que se mexe nos campos dela.
 |---|---|
 | Modo seco vaza efeito colateral: lojista testa e cria lead falso | teste explícito (§10); tools que agem nunca executam no preview |
 | Prompt gerado ruim em combinação estranha de campos | snapshot de ~6 combinações, incluindo as feias |
+| Campo livre inflando custo e diluindo instrução (entra em toda mensagem) | teto de 1000 chars (§4.5) |
+| Lojista escreve no campo livre, não pega, acha o produto quebrado | aviso de conflito na tela + preview antes de publicar |
 | Loja sem config derruba o bot | fallback para o padrão Revy no nó do n8n |
 | Fork do Modo 2 divergir do canônico | `validate_workflow_cloud.py` sai 1; nunca editar o fork à mão |
 | Lojista pedir para reabrir a regra 3 (insistir) | decisão registrada em §2 |
