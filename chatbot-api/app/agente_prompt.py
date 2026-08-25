@@ -198,7 +198,10 @@ def _bloco_personalidade(c: CamposAgente) -> str:
     linhas.append("fale em português do brasil, de forma humana e simples.")
     linhas.append(_TOM[c.tom])
     if c.escrita == "minusculas":
-        linhas.append("escreva toda resposta ao cliente em letras minúsculas.")
+        linhas.append(
+            "escreva toda resposta ao cliente em letras minúsculas e não use "
+            "exclamações."
+        )
     if c.emoji == "nunca":
         linhas.append("não use emojis.")
     elif c.emoji == "raro":

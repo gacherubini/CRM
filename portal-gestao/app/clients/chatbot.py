@@ -479,7 +479,12 @@ class ChatbotClient:
     PREVIEW_TIMEOUT = 60.0
 
     def preview_agente(
-        self, texto: str, *, historico: str = "", turno: int = 1
+        self,
+        texto: str,
+        *,
+        historico: str = "",
+        turno: int = 1,
+        primeira_mensagem: bool = False,
     ) -> dict:
         """Um turno de conversa com o agente do rascunho, sem WhatsApp no meio.
 
@@ -490,6 +495,14 @@ class ChatbotClient:
         return self._request(
             "POST",
             "/v1/agente/preview",
-            json={"texto": texto, "historico": historico, "turno": turno},
+            json={
+                "texto": texto,
+                "historico": historico,
+                "turno": turno,
+                # Sem isto o primeiro turno do teste nunca é primeiro contato, e
+                # o lojista não consegue ver justamente a abertura que acabou de
+                # configurar.
+                "primeira_mensagem": primeira_mensagem,
+            },
             timeout=self.PREVIEW_TIMEOUT,
         )

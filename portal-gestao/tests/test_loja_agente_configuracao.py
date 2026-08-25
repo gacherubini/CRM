@@ -76,9 +76,16 @@ class _FakeChatbot:
             "preview_disponivel": self.preview_disponivel,
         }
 
-    def preview_agente(self, texto, historico="", turno=1):
+    def preview_agente(self, texto, historico="", turno=1, primeira_mensagem=False):
         self._talvez_cair()
-        self.testes.append({"texto": texto, "historico": historico, "turno": turno})
+        self.testes.append(
+            {
+                "texto": texto,
+                "historico": historico,
+                "turno": turno,
+                "primeira_mensagem": primeira_mensagem,
+            }
+        )
         return {"resposta": "oi, tudo bem?"}
 
     def listar_versoes_agente(self):
@@ -374,3 +381,57 @@ def test_com_workflow_de_preview_a_tela_oferece_o_teste(client, config_on):
     _override(_FakeChatbot(preview_disponivel=True))
     r = client.get("/app/loja/agente/configuracao")
     assert "agente-teste-enviar" in r.text
+
+
+# --- arestas achadas na revisão ----------------------------------------------
+
+
+def test_corpo_nao_json_e_400_e_nao_500(client, config_on):
+    """500 aqui faz a tela dizer "sem conexão" para um pedido que chegou."""
+    login(client)
+    _override(_FakeChatbot())
+    r = client.put(
+        "/app/loja/agente/configuracao.json",
+        content=b"nao sou json",
+        headers={"Content-Type": "application/json"},
+    )
+    assert r.status_code == 400
+
+
+def test_turno_nao_numerico_nao_derruba_o_teste(client, config_on):
+    login(client)
+    fake = _override(_FakeChatbot())
+    pagina = client.get("/app/loja/agente/configuracao")
+    r = client.post(
+        "/app/loja/agente/configuracao/testar.json",
+        json={"csrf": csrf_da_resposta(pagina), "texto": "oi", "turno": "dois"},
+    )
+    assert r.status_code == 200
+    assert fake.testes[0]["turno"] == 1
+
+
+def test_modo_1_carrega_o_followup_guardado_para_o_autosave(client, config_on):
+    """O interruptor só existe no Modo 2. Sem o valor guardado viajando no
+    formulário, o autosave do Modo 1 mandaria o default e religaria o follow-up
+    de uma loja que o desligou."""
+    login(client)
+    _override(_FakeChatbot(modo="1"))
+    r = client.get("/app/loja/agente/configuracao")
+    assert 'data-followup-ativo="1"' in r.text
+
+
+def test_primeira_mensagem_chega_ao_preview(client, config_on):
+    """Sem isso o primeiro turno do teste nunca é primeiro contato, e o lojista
+    não vê justamente a abertura que acabou de configurar."""
+    login(client)
+    fake = _override(_FakeChatbot())
+    pagina = client.get("/app/loja/agente/configuracao")
+    client.post(
+        "/app/loja/agente/configuracao/testar.json",
+        json={
+            "csrf": csrf_da_resposta(pagina),
+            "texto": "oi",
+            "primeira_mensagem": True,
+        },
+    )
+    assert fake.testes[0]["primeira_mensagem"] is True

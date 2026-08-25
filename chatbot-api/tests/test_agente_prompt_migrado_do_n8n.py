@@ -36,6 +36,21 @@ def test_minusculas_e_sem_emoji():
     assert "não use emojis" in prompt
 
 
+def test_exclamacao_acompanha_a_escrita_da_loja():
+    """Era `assert "exclamações" in system_message_lower` no validador.
+
+    Como regra de toda loja ela contradiz quem escolhe "pontuação normal" — e
+    contradiz a higienização da saída, que desde o card 2 respeita a escolha:
+    o prompt proibiria o "!" que o envio deixa passar."""
+    from app.agente_prompt import CamposAgente
+
+    assert "não use exclamações" in _prompt_vitor()
+    solto = montar_prompt(
+        CamposAgente(nome_loja="X", cidade="Y", uf="SP", escrita="normal")
+    ).lower()
+    assert "não use exclamações" not in solto
+
+
 def test_nao_diz_que_e_ia():
     """Trava aberta pelo dono (spec §2): virou campo, não sumiu."""
     assert "não diga que é ia" in _prompt_vitor()

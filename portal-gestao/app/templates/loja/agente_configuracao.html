@@ -44,6 +44,9 @@
       class="agente-config"
       data-csrf="{{ csrf }}"
       data-modo="{{ modo }}"
+      {# O interruptor de follow-up só existe no Modo 2. No Modo 1 o valor
+         guardado viaja por aqui, para o autosave não reescrevê-lo. #}
+      data-followup-ativo="{{ 1 if c.followup_ativo else 0 }}"
       data-max-instrucoes="{{ max_instrucoes }}">
 
   <p class="agente-config-status muted" id="agente-status" role="status" aria-live="polite">
@@ -310,7 +313,11 @@
         <input type="checkbox" name="so_horario_comercial" {% if c.so_horario_comercial %}checked{% endif %}>
         <span>Só dentro do horário de atendimento</span>
       </label>
-      <p class="muted">Desligado, o agente não responde ninguém — as mensagens continuam chegando no Atendimento.</p>
+      <p class="muted">
+        Desligado, o agente não responde ninguém — as mensagens continuam chegando
+        no Atendimento. E "só dentro do horário" precisa da grade preenchida lá em
+        cima: sem ela, o agente atende sempre.
+      </p>
     </div>
   </section>
 
@@ -345,6 +352,8 @@
         <p class="muted">
           É o agente de verdade, com o texto que você acabou de escrever. Nada daqui
           vira lead, avisa a equipe ou aparece no Atendimento — e some quando você sai.
+          O teste responde mesmo com o agente desligado: é para você conferir antes
+          de ligar.
         </p>
       </div>
     </div>
@@ -397,11 +406,14 @@
     </div>
   </div>
   <div class="panel-body">
+    {# `rascunho`/`publicada`/`arquivada` são estados do banco. Na tela o lojista
+       precisa saber o que está no ar, não o nome da coluna. #}
+      {% set rotulos = {'rascunho': 'não publicado', 'publicada': 'no ar', 'arquivada': 'anterior'} %}
     <ul class="agente-config-versoes">
       {% for v in versoes %}
       <li>
-        <span class="mono-label">{{ v.estado }}</span>
-        <span>{{ (v.publicado_em or v.criado_em or '')[:16]|replace('T', ' ') }}</span>
+        <span class="mono-label">{{ rotulos.get(v.estado, v.estado) }}</span>
+        <span>{{ formatar_data(v.publicado_em or v.criado_em) }}</span>
         <span class="muted">{{ v.autor or 'sem autor' }}</span>
         {% if v.estado != 'rascunho' %}
         <form method="post" action="/app/loja/agente/configuracao/restaurar"

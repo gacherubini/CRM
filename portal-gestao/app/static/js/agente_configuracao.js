@@ -100,9 +100,11 @@
       so_horario_comercial: marcado('so_horario_comercial'),
       instrucoes: val('instrucoes'),
     };
-    // Só Modo 2 tem o interruptor na tela. Mandar `false` a partir de um campo
-    // que não existe desligaria o follow-up de quem nunca viu a opção.
-    if (modo === '2') dados.followup_ativo = marcado('followup_ativo');
+    // Só Modo 2 tem o interruptor na tela. No Modo 1 o valor guardado é
+    // repassado como veio: mandar o default a partir de um campo que não existe
+    // ligaria de volta o follow-up de uma loja que o desligou quando era Modo 2.
+    dados.followup_ativo =
+      modo === '2' ? marcado('followup_ativo') : form.dataset.followupAtivo === '1';
     return dados;
   }
 
@@ -131,8 +133,11 @@
   let pendente = null;
   let salvando = false;
 
+  // `salvar` devolve se deu certo: Publicar leva o RASCUNHO ao ar, então
+  // publicar depois de um autosave que falhou põe no ar o texto anterior — e o
+  // lojista vê "Publicado" para uma edição que nunca foi salva.
   async function salvar() {
-    if (salvando) return;
+    if (salvando) return false;
     salvando = true;
     status.textContent = 'Salvando…';
     try {
@@ -151,15 +156,17 @@
             ? `Não salvei: confira ${quais || 'os campos'}.`
             : corpo.message || 'Não foi possível salvar agora.';
         status.classList.add('agente-config-status-erro');
-        return;
+        return false;
       }
       status.classList.remove('agente-config-status-erro');
       status.textContent = 'Rascunho salvo.';
       if (promptEl && typeof corpo.prompt === 'string') promptEl.textContent = corpo.prompt;
       mostrarConflitos(corpo.conflitos);
+      return true;
     } catch (e) {
       status.textContent = 'Sem conexão. O que você digitou ainda não foi salvo.';
       status.classList.add('agente-config-status-erro');
+      return false;
     } finally {
       salvando = false;
     }
@@ -211,8 +218,9 @@
       ev.preventDefault();
       clearTimeout(pendente);
       pendente = null;
-      await salvar();
-      ev.target.submit();
+      if (await salvar()) ev.target.submit();
+      // Falhou: o status já diz o que houve, e publicar poria no ar o texto
+      // anterior — pior que não publicar, porque diz "Publicado".
     });
 
   // Restaurar sobrescreve o rascunho aberto. Confirmação antes, não depois.
@@ -229,7 +237,12 @@
   const textoEl = document.getElementById('agente-teste-texto');
   const enviarEl = document.getElementById('agente-teste-enviar');
   const vazioEl = document.getElementById('agente-teste-vazio');
+  // Mesmo formato de `historico_recente` do bot real
+  // (`- [entrada] …` / `- [saida] …`, últimas 10): o prompt manda usar o
+  // histórico como contexto, e um formato diferente aqui faria o preview
+  // responder diferente do WhatsApp por um motivo que ninguém veria.
   const historico = [];
+  const MAX_HISTORICO = 10;
 
   function bolha(quem, texto) {
     const li = document.createElement('li');
@@ -249,7 +262,7 @@
     if (pendente) {
       clearTimeout(pendente);
       pendente = null;
-      await salvar();
+      if (!(await salvar())) return;
     }
     textoEl.value = '';
     bolha('cliente', texto);
@@ -263,8 +276,9 @@
         body: JSON.stringify({
           csrf,
           texto,
-          historico: historico.join('\n'),
+          historico: historico.slice(-MAX_HISTORICO).join('\n'),
           turno: historico.length + 1,
+          primeira_mensagem: historico.length === 0,
         }),
       });
       const corpo = await r.json().catch(() => ({}));
@@ -275,7 +289,7 @@
         return;
       }
       esperando.textContent = corpo.resposta || '(sem resposta)';
-      historico.push('cliente: ' + texto, 'agente: ' + (corpo.resposta || ''));
+      historico.push('- [entrada] ' + texto, '- [saida] ' + (corpo.resposta || ''));
     } catch (e) {
       esperando.classList.remove('agente-teste-esperando');
       esperando.classList.add('agente-teste-erro');

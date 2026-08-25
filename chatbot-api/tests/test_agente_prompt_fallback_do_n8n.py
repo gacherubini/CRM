@@ -11,8 +11,9 @@ rota HTTP. O que ele guarda é justamente o texto que serve quando essa rota
 **não** responde, que é o único ponto em que os dois lados precisam concordar
 sem falar entre si.
 
-Mudou o gerador? rode o gerador, cole o texto novo no `jsCode` do nó e rode
-`python n8n/validate_workflow.py`.
+Mudou o gerador? `python -m scripts.sincronizar_fallback_n8n`, e depois regere os
+três workflows derivados (fork do Modo 2, teste e preview) — o fallback viaja
+para todos eles.
 """
 import json
 from pathlib import Path

@@ -1045,6 +1045,16 @@ def agente_config_habilitado() -> bool:
     return bool(settings.revy_loja_agente_config_enabled)
 
 
+async def _corpo_json(request: Request) -> dict | None:
+    """Corpo JSON, ou ``None``. ``request.json()`` levanta em corpo malformado, e
+    a exceção virava 500 — a tela dizia "sem conexão" para um pedido que chegou."""
+    try:
+        corpo = await request.json()
+    except (ValueError, UnicodeDecodeError):
+        return None
+    return corpo if isinstance(corpo, dict) else None
+
+
 def _guard_agente_config(request: Request, db: Session, *, json_: bool):
     """Sessão + flag + papel dono/gerente. São três, não quatro.
 
@@ -1128,10 +1138,12 @@ async def agente_configuracao_salvar(
     usuario, recusa = _guard_agente_config(request, db, json_=True)
     if recusa is not None:
         return recusa
-    corpo = await request.json()
-    if not csrf_valido(request, (corpo or {}).get("csrf")):
+    corpo = await _corpo_json(request)
+    if corpo is None:
+        return _json_erro(400, "corpo", "Corpo inválido")
+    if not csrf_valido(request, corpo.get("csrf")):
         return _json_erro(403, "sessao", "Sessão expirada")
-    campos = (corpo or {}).get("campos")
+    campos = corpo.get("campos")
     if not isinstance(campos, dict):
         return _json_erro(400, "campos", "Campos ausentes")
     try:
@@ -1168,17 +1180,26 @@ async def agente_configuracao_testar(
     usuario, recusa = _guard_agente_config(request, db, json_=True)
     if recusa is not None:
         return recusa
-    corpo = await request.json()
-    if not csrf_valido(request, (corpo or {}).get("csrf")):
+    corpo = await _corpo_json(request)
+    if corpo is None:
+        return _json_erro(400, "corpo", "Corpo inválido")
+    if not csrf_valido(request, corpo.get("csrf")):
         return _json_erro(403, "sessao", "Sessão expirada")
-    texto = str((corpo or {}).get("texto") or "").strip()
+    texto = str(corpo.get("texto") or "").strip()
     if not texto:
         return _json_erro(400, "texto", "Escreva uma mensagem para testar")
     try:
+        # `turno` vem do navegador: um valor não numérico aqui virava 500, e a
+        # tela dizia "sem conexão" para um pedido que chegou.
+        turno = max(1, min(200, int(corpo.get("turno") or 1)))
+    except (TypeError, ValueError):
+        turno = 1
+    try:
         resultado = chatbot.preview_agente(
             texto[:2000],
-            historico=str((corpo or {}).get("historico") or "")[:8000],
-            turno=int((corpo or {}).get("turno") or 1),
+            historico=str(corpo.get("historico") or "")[:8000],
+            turno=turno,
+            primeira_mensagem=bool(corpo.get("primeira_mensagem")),
         )
     except ChatbotIndisponivel:
         return _json_erro(

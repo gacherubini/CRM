@@ -1,5 +1,5 @@
 {
- "sha": "c3d3f09",
+ "sha": "c61bf13",
  "inventario": {
   "chatbot-api": [
    {
@@ -1129,35 +1129,35 @@
     "chave": "GET /app/loja/agente/configuracao",
     "simbolo": "/app/loja/agente/configuracao",
     "arquivo": "app/loja/routes.py",
-    "linha": 1087
+    "linha": 1097
    },
    {
     "secao": "rota",
     "chave": "PUT /app/loja/agente/configuracao.json",
     "simbolo": "/app/loja/agente/configuracao.json",
     "arquivo": "app/loja/routes.py",
-    "linha": 1117
+    "linha": 1127
    },
    {
     "secao": "rota",
     "chave": "POST /app/loja/agente/configuracao/testar.json",
     "simbolo": "/app/loja/agente/configuracao/testar.json",
     "arquivo": "app/loja/routes.py",
-    "linha": 1156
+    "linha": 1168
    },
    {
     "secao": "rota",
     "chave": "POST /app/loja/agente/configuracao/publicar",
     "simbolo": "/app/loja/agente/configuracao/publicar",
     "arquivo": "app/loja/routes.py",
-    "linha": 1190
+    "linha": 1211
    },
    {
     "secao": "rota",
     "chave": "POST /app/loja/agente/configuracao/restaurar",
     "simbolo": "/app/loja/agente/configuracao/restaurar",
     "arquivo": "app/loja/routes.py",
-    "linha": 1212
+    "linha": 1233
    },
    {
     "secao": "rota",
@@ -2564,7 +2564,7 @@
     "chave": "app/templates/loja/agente_configuracao.html",
     "simbolo": "loja/agente_configuracao.html",
     "arquivo": "app/loja/routes.py",
-    "linha": 1105
+    "linha": 1115
    },
    {
     "secao": "template",

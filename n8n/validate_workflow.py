@@ -215,8 +215,15 @@ def main() -> None:
         assert marca_de_loja not in system_message_lower, (
             f"template do prompt voltou a trazer dado de loja escrito à mão: {marca_de_loja}"
         )
-    assert "exclamações" in system_message_lower and "me conta" in system_message_lower, (
-        "prompt não bloqueia exclamações e o convite desnecessário"
+    assert "me conta" in system_message_lower, (
+        "prompt não bloqueia o convite desnecessário"
+    )
+    # "não use exclamações" saiu daqui: virou parte do campo `escrita` no gerador
+    # do chatbot-api (spec §7.2). Ficar como regra de toda loja contradiria a
+    # loja que escolhe "pontuação normal" — e a higienização da saída, que desde
+    # o card 2 respeita essa escolha.
+    assert "seguem a escrita escolhida pela loja" in system_message_lower, (
+        "a regra de escrita voltou a ser do template em vez de ser da loja"
     )
     assert "oi, [primeiro nome]. aqui é da [nome da loja]." in system_message_lower, (
         "abertura minimalista com o nome vindo da configuração da loja ausente"

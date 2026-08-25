@@ -1,6 +1,6 @@
 # portal-gestao · 156 rotas · 26 modelos · 6 workers · 35 flags · 26 migrations · 62 templates
 
-Gerado de `c3d3f09`. NAO editar a mao — saida de `gerar_mapa.py`.
+Gerado de `c61bf13`. NAO editar a mao — saida de `gerar_mapa.py`.
 Migration head: `0026_copiloto_sinal_destinatario`
 
 ## Rotas
@@ -12,11 +12,11 @@ Migration head: `0026_copiloto_sinal_destinatario`
 - `POST /app/loja/atendimento/{workspace_id}/mensagem` — app/loja/routes.py:712
 - `POST /app/loja/atendimento/{workspace_id}/handoff` — app/loja/routes.py:872
 - `POST /app/loja/atendimento/{workspace_id}/etapa` — app/loja/routes.py:951
-- `GET /app/loja/agente/configuracao` — app/loja/routes.py:1087
-- `PUT /app/loja/agente/configuracao.json` — app/loja/routes.py:1117
-- `POST /app/loja/agente/configuracao/testar.json` — app/loja/routes.py:1156
-- `POST /app/loja/agente/configuracao/publicar` — app/loja/routes.py:1190
-- `POST /app/loja/agente/configuracao/restaurar` — app/loja/routes.py:1212
+- `GET /app/loja/agente/configuracao` — app/loja/routes.py:1097
+- `PUT /app/loja/agente/configuracao.json` — app/loja/routes.py:1127
+- `POST /app/loja/agente/configuracao/testar.json` — app/loja/routes.py:1168
+- `POST /app/loja/agente/configuracao/publicar` — app/loja/routes.py:1211
+- `POST /app/loja/agente/configuracao/restaurar` — app/loja/routes.py:1233
 - `GET /health/live` — app/main.py:535
 - `GET /health/ready` — app/main.py:540
 - `GET /public/v1/lojas/{loja_slug}/pixel` — app/main.py:549
@@ -273,7 +273,7 @@ Migration head: `0026_copiloto_sinal_destinatario`
 - `app/templates/loja/atendimento_lista.html` — app/loja/routes.py:259
 - `app/templates/loja/agente.html` — app/loja/routes.py:379
 - `app/templates/loja/atendimento_workspace.html` — app/loja/routes.py:483
-- `app/templates/loja/agente_configuracao.html` — app/loja/routes.py:1105
+- `app/templates/loja/agente_configuracao.html` — app/loja/routes.py:1115
 - `app/templates/login.html` — app/main.py:593
 - `app/templates/dashboard.html` — app/main.py:780
 - `app/templates/estoque/lista.html` — app/main.py:824
