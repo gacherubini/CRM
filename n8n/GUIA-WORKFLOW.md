@@ -205,6 +205,13 @@ O modelo usado fica em `Google Gemini Chat Model1`. A memória fica em
   mão**: o validador compara o arquivo com o que o gerador produz e sai `1` se divergir.
 - `validate_workflow_cloud.py`: protege as regras do Modo 2 — sem segredo da Meta, sem
   resíduo de Evolution, assinatura no corpo cru e `instance` em toda chamada.
+- `build_preview_workflow.py`: **gera** o workflow do preview da tela de configuração do
+  agente (Revy Loja). Mesma disciplina do fork do Modo 2: agente, modelo, memória e
+  ferramentas saem byte a byte do Modo 1.
+- `workflow-preview.json`: saída do gerador. **Não editar a mão** — o validador compara.
+- `validate_preview_workflow.py`: protege o preview. A checagem central é de
+  **alcançabilidade**: em cada ferramenta que age, o freio do modo seco vem *antes* da
+  chamada que causa efeito. Conferir que a string "MODO SECO" existe não bastaria.
 
 ## Validar e publicar
 
@@ -216,7 +223,42 @@ node n8n\build_test_workflow.js
 python n8n\validate_test_workflow.py
 python n8n\fork_cloud_workflow.py        # Modo 2: regera o fork
 python n8n\validate_workflow_cloud.py    # e confere que o JSON e o que o gerador produz
+python n8n\build_preview_workflow.py     # preview da tela de configuracao do agente
+python n8n\validate_preview_workflow.py  # e confere o modo seco das ferramentas
 ```
+
+## O preview da configuração do agente
+
+`workflow-preview.json` roda o agente do **rascunho** de uma loja, sem WhatsApp, para o
+lojista testar antes de publicar. Três coisas o definem, e nenhuma é opcional:
+
+1. **Nó-ponte `Extrair1`.** As ferramentas leem `$('Extrair1').first().json`; sem um nó
+   com esse nome exato, toda ferramenta falha. A ponte **não** replica o parsing do corpo
+   da Evolution nem a trava de 300 s de idade da mensagem — ela descartaria todo teste.
+2. **Telefone sintético**, escolhido pelo `chatbot-api` e nunca pela tela. Começa em `0`,
+   então não é MSISDN nenhum. `consultar_estoque` grava a moto escolhida chaveada por
+   telefone: o lojista testando com o próprio número sobrescreveria uma conversa real.
+3. **Modo seco.** `simular1` cria lead, avisa a equipe e pausa o bot; `solicitar_handoff1`
+   pausa e chama vendedor; `cadastrar_veiculo1` põe moto no Estoque; `consultar_estoque1`
+   grava no CRM (e essa gravação **cria `Conversa`**). Todos travados — e a busca no
+   estoque continua rodando de verdade, que é o que faz o teste valer.
+
+O modo seco é injeção cirúrgica: a validação inteira continua rodando (falta CPF ainda
+pede CPF, menor de idade ainda bloqueia) e só a chamada que age sai do caminho. Se o Modo
+1 mudar de forma, o gerador **para** em vez de produzir um preview que cria lead.
+
+Publicar:
+
+```powershell
+python n8n\build_preview_workflow.py
+python n8n\validate_preview_workflow.py
+& 'deploy\fly\3vm\prepare-workflow.ps1' -Mode preview
+& 'deploy\fly\3vm\upload-and-import-workflow.ps1' -Mode preview
+```
+
+Depois, `CHATBOT_AGENTE_PREVIEW_URL` no app2037 apontando para
+`https://n8n2037.fly.dev/webhook/whatsapp-ai-preview`. Sem ela a rota responde 503 e a
+tela esconde o botão Testar — default seguro, não bug.
 
 Para preparar e publicar o teste:
 

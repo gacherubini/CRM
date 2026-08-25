@@ -1,5 +1,5 @@
 param(
-  [ValidateSet("production", "test", "cloud")]
+  [ValidateSet("production", "test", "cloud", "preview")]
   [string]$Mode = "production"
 )
 
@@ -12,15 +12,19 @@ if (-not (Test-Path (Join-Path $root "n8n\workflow-ai-nao-salvos.json"))) {
 }
 # cloud = Modo 2 (Cloud API da Meta). O canonico e GERADO por
 # n8n/fork_cloud_workflow.py — nao editar a mao.
+# preview = tela de configuracao do agente na Revy Loja. Tambem GERADO
+# (n8n/build_preview_workflow.py) e com as ferramentas em modo seco.
 $canonicalName = switch ($Mode) {
-  "test"  { "workflow-teste-numero-autorizado.json" }
-  "cloud" { "workflow-cloud.json" }
-  default { "workflow-ai-nao-salvos.json" }
+  "test"    { "workflow-teste-numero-autorizado.json" }
+  "cloud"   { "workflow-cloud.json" }
+  "preview" { "workflow-preview.json" }
+  default   { "workflow-ai-nao-salvos.json" }
 }
 $outputName = switch ($Mode) {
-  "test"  { "workflow-fly-test.ready.json" }
-  "cloud" { "workflow-cloud.ready.json" }
-  default { "workflow-fly.ready.json" }
+  "test"    { "workflow-fly-test.ready.json" }
+  "cloud"   { "workflow-cloud.ready.json" }
+  "preview" { "workflow-preview.ready.json" }
+  default   { "workflow-fly.ready.json" }
 }
 $canonical = Join-Path $root "n8n\$canonicalName"
 $secretsFile = Join-Path $PSScriptRoot ".secrets.local"
@@ -55,7 +59,10 @@ if ($json.Contains("__INSTANCE__")) {
 # um workflow serve N lojas e resolve a loja pela instance de cada chamada (spec 6.2).
 # O token do Modo 1 aponta para UMA loja -- reusa-lo aqui ressuscita exatamente o bug
 # que a 6.2 fechou, e o sintoma e silencio, nao erro. Por isso fail-fast, nao fallback.
-$chatbotTokenKey = if ($Mode -eq "cloud") { "CHATBOT_API_TOKEN_CLOUD" } else { "CHATBOT_API_TOKEN" }
+# O preview usa a credencial de INTEGRACAO pela mesma razao do Modo 2: ele serve
+# N lojas e diz de qual fala pela instance que o chatbot manda no corpo. Com o
+# token de UMA loja, o lojista da loja B testaria contra o estoque da loja A.
+$chatbotTokenKey = if ($Mode -eq "cloud" -or $Mode -eq "preview") { "CHATBOT_API_TOKEN_CLOUD" } else { "CHATBOT_API_TOKEN" }
 if (-not $secrets.ContainsKey($chatbotTokenKey) -or -not $secrets[$chatbotTokenKey]) {
   throw "missing $chatbotTokenKey in $secretsFile (mode=$Mode). Crie a credencial com: python -m app.cli criar-credencial-integracao"
 }

@@ -149,3 +149,12 @@ MULTI_WHATSAPP_ENABLED = os.getenv("MULTI_WHATSAPP_ENABLED", "0").strip().lower(
 WHATSAPP_PROVIDER = os.getenv("CHATBOT_WHATSAPP_PROVIDER", "stub").strip().lower()
 # URL do webhook n8n gravada em instância nova. Um workflow serve N instâncias.
 EVOLUTION_WEBHOOK_URL = os.getenv("CHATBOT_EVOLUTION_WEBHOOK_URL", "").strip()
+
+# Preview da config do agente: webhook do `workflow-preview.json`, no mesmo
+# n8n2037. Vazio = a rota responde 503 e a tela some com o botão Testar — é
+# default seguro, não bug: sem o workflow importado não há o que chamar.
+AGENTE_PREVIEW_URL = os.getenv("CHATBOT_AGENTE_PREVIEW_URL", "").strip()
+# Generoso de propósito: o agente pode encadear consulta ao estoque e ainda
+# pensar. Curto demais mostra "o preview não respondeu" para um agente que
+# respondeu — e o lojista conclui que a configuração dele está errada.
+AGENTE_PREVIEW_TIMEOUT = float(os.getenv("CHATBOT_AGENTE_PREVIEW_TIMEOUT", "45"))

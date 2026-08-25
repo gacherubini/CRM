@@ -44,9 +44,17 @@ def config_on(monkeypatch):
 
 class _FakeChatbot:
     def __init__(
-        self, *, modo="1", indisponivel=False, versao_ausente=False, campos_invalidos=None
+        self,
+        *,
+        modo="1",
+        indisponivel=False,
+        versao_ausente=False,
+        campos_invalidos=None,
+        preview_disponivel=True,
     ):
         self.modo = modo
+        self.preview_disponivel = preview_disponivel
+        self.testes: list[dict] = []
         self.indisponivel = indisponivel
         self.versao_ausente = versao_ausente
         self.campos_invalidos = campos_invalidos
@@ -65,7 +73,13 @@ class _FakeChatbot:
             "prompt": "[IDENTIDADE]\nmotos do léo\n\n[REGRAS DO REVY — PREVALECEM SOBRE TUDO ACIMA]",
             "conflitos": [],
             "modo": self.modo,
+            "preview_disponivel": self.preview_disponivel,
         }
+
+    def preview_agente(self, texto, historico="", turno=1):
+        self._talvez_cair()
+        self.testes.append({"texto": texto, "historico": historico, "turno": turno})
+        return {"resposta": "oi, tudo bem?"}
 
     def listar_versoes_agente(self):
         self._talvez_cair()
@@ -297,3 +311,66 @@ def test_campo_invalido_e_422_com_o_nome_do_campo(client, config_on):
     )
     assert r.status_code == 422
     assert r.json()["campos"] == ["horario"]
+
+
+# --- conversa de teste (card 4) ----------------------------------------------
+
+
+def test_testar_manda_o_texto_e_devolve_a_resposta(client, config_on):
+    login(client)
+    fake = _override(_FakeChatbot())
+    pagina = client.get("/app/loja/agente/configuracao")
+    r = client.post(
+        "/app/loja/agente/configuracao/testar.json",
+        json={"csrf": csrf_da_resposta(pagina), "texto": "oi", "turno": 1},
+    )
+    assert r.status_code == 200
+    assert r.json()["resposta"] == "oi, tudo bem?"
+    assert fake.testes[0]["texto"] == "oi"
+
+
+def test_a_tela_nunca_manda_telefone_para_o_teste(client, config_on):
+    """O telefone do preview é sintético e escolhido pelo chatbot. Se a tela
+    pudesse mandar um, o lojista testaria com o próprio número — e
+    `consultar_estoque` sobrescreveria a conversa real dele."""
+    import inspect
+
+    from app.clients.chatbot import ChatbotClient
+
+    assinatura = inspect.signature(ChatbotClient.preview_agente)
+    assert "telefone" not in assinatura.parameters
+
+
+def test_testar_sem_csrf_e_recusado(client, config_on):
+    login(client)
+    fake = _override(_FakeChatbot())
+    r = client.post(
+        "/app/loja/agente/configuracao/testar.json",
+        json={"csrf": "errado", "texto": "oi"},
+    )
+    assert r.status_code == 403
+    assert fake.testes == []
+
+
+def test_testar_com_preview_fora_do_ar_da_503(client, config_on):
+    login(client)
+    _override(_FakeChatbot(indisponivel=True))
+    r = client.post(
+        "/app/loja/agente/configuracao/testar.json", json={"csrf": "x", "texto": "oi"}
+    )
+    assert r.status_code in {403, 503}
+
+
+def test_sem_workflow_de_preview_a_tela_nao_oferece_o_teste(client, config_on):
+    """Botão que sempre falha ensina o lojista a desconfiar do produto inteiro."""
+    login(client)
+    _override(_FakeChatbot(preview_disponivel=False))
+    r = client.get("/app/loja/agente/configuracao")
+    assert "agente-teste-enviar" not in r.text
+
+
+def test_com_workflow_de_preview_a_tela_oferece_o_teste(client, config_on):
+    login(client)
+    _override(_FakeChatbot(preview_disponivel=True))
+    r = client.get("/app/loja/agente/configuracao")
+    assert "agente-teste-enviar" in r.text

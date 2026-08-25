@@ -4150,3 +4150,39 @@ a.metric-link:focus-visible { outline: 2px solid var(--brand); outline-offset: 2
   .agente-config-dia { flex-wrap: wrap; }
   .agente-config-dia-check { min-width: 100%; }
 }
+
+/* Conversa de teste do agente. Bolhas, e não uma lista: o lojista precisa
+   reconhecer na hora que aquilo é o WhatsApp dele, não um log. */
+.agente-teste-conversa {
+  margin: 0 0 var(--space-4);
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: var(--space-2);
+  max-height: 26rem;
+  overflow-y: auto;
+}
+.agente-teste-bolha {
+  max-width: 34rem;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-nav);
+  font-size: var(--text-sm);
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.agente-teste-cliente {
+  justify-self: end;
+  background: var(--surface-soft);
+  border: 1px solid var(--line);
+}
+.agente-teste-agente {
+  justify-self: start;
+  background: var(--surface-raised);
+  border: 1px solid var(--line);
+}
+.agente-teste-esperando { color: var(--ink-muted); font-style: italic; }
+.agente-teste-erro { color: var(--warn); border-color: var(--warn); }
+.agente-teste-vazio { margin-bottom: var(--space-4); }
+.agente-teste-entrada { display: flex; align-items: end; gap: var(--space-3); }
+.agente-teste-entrada label { flex: 1; }

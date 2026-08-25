@@ -336,6 +336,35 @@
     </div>
   </section>
 
+  {% if rascunho.preview_disponivel %}
+  <section class="panel" id="agente-teste">
+    <div class="panel-heading">
+      <div>
+        <span class="mono-label">Testar</span>
+        <h2>Converse com o seu agente antes de publicar</h2>
+        <p class="muted">
+          É o agente de verdade, com o texto que você acabou de escrever. Nada daqui
+          vira lead, avisa a equipe ou aparece no Atendimento — e some quando você sai.
+        </p>
+      </div>
+    </div>
+    <div class="panel-body">
+      <ol class="agente-teste-conversa" id="agente-teste-conversa" aria-live="polite"></ol>
+      <p class="panel-empty agente-teste-vazio" id="agente-teste-vazio">
+        <strong>Escreva como um cliente escreveria.</strong>
+        <span class="muted">"oi", "tem biz 2020?", "quero financiar".</span>
+      </p>
+      <div class="agente-teste-entrada">
+        <label class="wide">
+          <span class="sr-only">Mensagem de teste</span>
+          <input id="agente-teste-texto" maxlength="2000" placeholder="oi, tem biz 2020?">
+        </label>
+        <button type="button" class="button" id="agente-teste-enviar">Enviar</button>
+      </div>
+    </div>
+  </section>
+  {% endif %}
+
   <section class="panel">
     <div class="panel-heading">
       <div>
@@ -390,5 +419,5 @@
 {% endif %}
 {% endif %}
 
-<script src="/static/js/agente_configuracao.js?v=2" defer></script>
+<script src="/static/js/agente_configuracao.js?v=4" defer></script>
 {% endblock %}

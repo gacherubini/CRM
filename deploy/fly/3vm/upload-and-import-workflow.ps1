@@ -1,5 +1,5 @@
 param(
-  [ValidateSet("production", "test", "cloud")]
+  [ValidateSet("production", "test", "cloud", "preview")]
   [string]$Mode = "production"
 )
 
@@ -7,15 +7,17 @@ $ErrorActionPreference = "Stop"
 $root = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
 Set-Location $root
 $localName = switch ($Mode) {
-  "test"  { "workflow-fly-test.ready.json" }
-  "cloud" { "workflow-cloud.ready.json" }
-  default { "workflow-fly.ready.json" }
+  "test"    { "workflow-fly-test.ready.json" }
+  "cloud"   { "workflow-cloud.ready.json" }
+  "preview" { "workflow-preview.ready.json" }
+  default   { "workflow-fly.ready.json" }
 }
 $stamp = Get-Date -Format "yyyyMMddHHmmssfff"
 $remote = switch ($Mode) {
-  "test"  { "/tmp/wf-test-$stamp.json" }
-  "cloud" { "/tmp/wf-cloud-$stamp.json" }
-  default { "/tmp/wf-$stamp.json" }
+  "test"    { "/tmp/wf-test-$stamp.json" }
+  "cloud"   { "/tmp/wf-cloud-$stamp.json" }
+  "preview" { "/tmp/wf-preview-$stamp.json" }
+  default   { "/tmp/wf-$stamp.json" }
 }
 $local = Join-Path $PSScriptRoot $localName
 if (-not (Test-Path $local)) { throw "missing $local - run prepare-workflow.ps1 first" }

@@ -222,6 +222,78 @@
     });
   });
 
+  // --- conversa de teste ---------------------------------------------------
+  // O histórico vive só aqui, no navegador: a conversa de teste não entra em
+  // Conversas, não vira lead e some quando o lojista sai da tela.
+  const conversaEl = document.getElementById('agente-teste-conversa');
+  const textoEl = document.getElementById('agente-teste-texto');
+  const enviarEl = document.getElementById('agente-teste-enviar');
+  const vazioEl = document.getElementById('agente-teste-vazio');
+  const historico = [];
+
+  function bolha(quem, texto) {
+    const li = document.createElement('li');
+    li.className = 'agente-teste-bolha agente-teste-' + quem;
+    li.textContent = texto;
+    conversaEl.appendChild(li);
+    if (vazioEl) vazioEl.hidden = true;
+    li.scrollIntoView({ block: 'nearest' });
+    return li;
+  }
+
+  async function testar() {
+    const texto = (textoEl.value || '').trim();
+    if (!texto || enviarEl.disabled) return;
+    // Publica o rascunho pendente antes de testar: sem isso o lojista digita uma
+    // regra, clica em Enviar e conversa com a versão anterior do próprio agente.
+    if (pendente) {
+      clearTimeout(pendente);
+      pendente = null;
+      await salvar();
+    }
+    textoEl.value = '';
+    bolha('cliente', texto);
+    const esperando = bolha('agente', 'digitando…');
+    esperando.classList.add('agente-teste-esperando');
+    enviarEl.disabled = true;
+    try {
+      const r = await fetch('/app/loja/agente/configuracao/testar.json', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          csrf,
+          texto,
+          historico: historico.join('\n'),
+          turno: historico.length + 1,
+        }),
+      });
+      const corpo = await r.json().catch(() => ({}));
+      esperando.classList.remove('agente-teste-esperando');
+      if (!r.ok) {
+        esperando.classList.add('agente-teste-erro');
+        esperando.textContent = corpo.message || 'O teste não respondeu agora.';
+        return;
+      }
+      esperando.textContent = corpo.resposta || '(sem resposta)';
+      historico.push('cliente: ' + texto, 'agente: ' + (corpo.resposta || ''));
+    } catch (e) {
+      esperando.classList.remove('agente-teste-esperando');
+      esperando.classList.add('agente-teste-erro');
+      esperando.textContent = 'Sem conexão com o teste.';
+    } finally {
+      enviarEl.disabled = false;
+      textoEl.focus();
+    }
+  }
+
+  enviarEl?.addEventListener('click', testar);
+  textoEl?.addEventListener('keydown', (ev) => {
+    if (ev.key === 'Enter') {
+      ev.preventDefault();
+      testar();
+    }
+  });
+
   contador();
   atualizarFaqVazio();
 })();

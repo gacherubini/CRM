@@ -23,6 +23,7 @@ from sqlalchemy.orm import Session
 
 from app import (  # noqa: F401 (registra os modelos)
     agente_config,
+    agente_preview,
     agente_prompt,
     channels,
     config,
@@ -1362,6 +1363,10 @@ def _rascunho_para_saida(db: Session, loja_id: str) -> dict:
         # follow-up no Modo 1. Quem sabe o modo é este produto — a Loja
         # perguntar aqui é mais barato que ela reimplementar o gate e divergir.
         "modo": "2" if rodizio.loja_opera_modo2(db, loja_id) else "1",
+        # A tela esconde o botão Testar quando não há workflow de preview
+        # importado. Oferecer um teste que sempre falha ensina o lojista a
+        # desconfiar do produto inteiro.
+        "preview_disponivel": bool(config.AGENTE_PREVIEW_URL),
     }
 
 
@@ -1405,6 +1410,68 @@ def publicar_agente(
         "versao_id": versao.id,
         "publicado_em": versao.publicado_em.isoformat() if versao.publicado_em else None,
     }
+
+
+class PreviewAgenteInput(BaseModel):
+    """Um turno de conversa de teste. Sem telefone: quem o escolhe é o backend."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    texto: str = Field(min_length=1, max_length=2000)
+    historico: str = Field(default="", max_length=8000)
+    turno: int = Field(default=1, ge=1, le=200)
+    primeira_mensagem: bool = False
+
+
+@app.post("/v1/agente/preview")
+def preview_agente(
+    dados: PreviewAgenteInput,
+    instance: Optional[str] = None,
+    ctx: Contexto = Depends(get_contexto),
+    db: Session = Depends(get_db),
+):
+    """Conversa com o agente do RASCUNHO, sem WhatsApp e sem efeito no mundo.
+
+    O prompt é o do rascunho — testar o publicado não serviria para nada: o
+    lojista está justamente decidindo se publica. O telefone é sintético e vem
+    daqui, nunca da tela: ``consultar_estoque`` grava a moto escolhida chaveada
+    por telefone, e o lojista testaria com o próprio número, que tem conversa
+    real do outro lado.
+
+    As ferramentas rodam em **modo seco** no workflow de preview: nenhum lead é
+    criado, nenhum vendedor é avisado e nenhum bot é pausado.
+    """
+    loja_id = resolver_loja_id(db, ctx, instance)
+    _exigir_loja_operacional(db, loja_id)
+    canal = None
+    if instance:
+        canal = instance.strip()
+    else:
+        loja = db.get(models_db.Loja, loja_id)
+        canal = (loja.evolution_instance or "").strip() if loja else ""
+    if not canal:
+        raise HTTPException(
+            status_code=409,
+            detail="loja sem canal de WhatsApp: o preview precisa de um para consultar o estoque",
+        )
+    rascunho = agente_config.obter_rascunho(db, loja_id)
+    campos = agente_prompt.CamposAgente(**rascunho.campos)
+    saida = agente_prompt.saida_do_agente(campos)
+    try:
+        resposta = agente_preview.conversar(
+            instance=canal,
+            loja_id=loja_id,
+            texto=dados.texto,
+            prompt=rascunho.prompt_gerado,
+            historico=dados.historico,
+            minusculas=saida["minusculas"],
+            sem_emoji=saida["sem_emoji"],
+            turno=dados.turno,
+            primeira_mensagem=dados.primeira_mensagem,
+        )
+    except agente_preview.PreviewIndisponivel as e:
+        raise HTTPException(status_code=503, detail=str(e))
+    return {"resposta": resposta}
 
 
 @app.get("/v1/agente/versoes")

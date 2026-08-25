@@ -38,9 +38,10 @@ nao entra: quem chama e o framework.
 |---|---|---|---|
 | `workflow-ai-nao-salvos.json` | WhatsApp IA - Somente Nao Salvos | `whatsapp-ai` | SIM |
 | `workflow-cloud.json` | whatsapp-cloud | `whatsapp-cloud` | SIM |
+| `workflow-preview.json` | WhatsApp IA - PREVIEW (config do agente) | `whatsapp-ai-preview` | nao |
 | `workflow-teste-numero-autorizado.json` | WhatsApp IA - TESTE 5551980336365 | `whatsapp-ai-teste` | nao |
 
-Fora da tabela PUBLICADOS em `cruzamentos.py` (nao conferidos): `workflow-teste-numero-autorizado.json`. Se algum entrou no ar, acrescente — senao a checagem abaixo o ignora.
+Fora da tabela PUBLICADOS em `cruzamentos.py` (nao conferidos): `workflow-preview.json`, `workflow-teste-numero-autorizado.json`. Se algum entrou no ar, acrescente — senao a checagem abaixo o ignora.
 
 Rotas chamadas pelos workflows **no ar**:
 

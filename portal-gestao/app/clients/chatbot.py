@@ -470,3 +470,26 @@ class ChatbotClient:
             erro_404=VersaoAgenteNaoEncontrada,
             params=params,
         )
+
+    # Timeout próprio, e generoso: o preview roda o agente de verdade — modelo,
+    # ferramentas e consulta ao estoque. Os 5 s do padrão do portal cortariam a
+    # resposta no meio e a tela diria "não respondeu" para um agente que
+    # respondeu. Sem `Idempotency-Key`, o helper de retry não repete POST — e
+    # aqui repetir seria pedir a mesma coisa ao modelo duas vezes.
+    PREVIEW_TIMEOUT = 60.0
+
+    def preview_agente(
+        self, texto: str, *, historico: str = "", turno: int = 1
+    ) -> dict:
+        """Um turno de conversa com o agente do rascunho, sem WhatsApp no meio.
+
+        Sem `telefone`: quem escolhe é o chatbot, e é sintético. Se a tela
+        pudesse mandar um, o lojista testaria com o próprio número — e
+        `consultar_estoque` sobrescreveria a conversa real dele.
+        """
+        return self._request(
+            "POST",
+            "/v1/agente/preview",
+            json={"texto": texto, "historico": historico, "turno": turno},
+            timeout=self.PREVIEW_TIMEOUT,
+        )

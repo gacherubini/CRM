@@ -148,6 +148,16 @@ gerado, o núcleo Revy, as versões e o histórico moram no `chatbot-api` e cheg
 - **A tela não se verifica com pytest.** Formulário e autosave são JS. Verificação é no
   navegador, com portal local semeado — foi assim que o `422`→`502` apareceu, com um
   horário sem zero à esquerda.
+- **A conversa de teste vive só no navegador.** O histórico é uma lista em JS; nada
+  entra em Conversas, vira lead ou avisa a equipe — as ferramentas rodam em modo seco
+  no workflow de preview. O botão só aparece quando o chatbot diz
+  `preview_disponivel: true`; sem workflow importado, oferecer um teste que sempre
+  falha ensinaria o lojista a desconfiar do produto inteiro.
+- **A tela nunca manda telefone para o teste.** Quem o escolhe é o chatbot, e é
+  sintético: `consultar_estoque` guarda a moto escolhida chaveada por telefone, e o
+  lojista testaria com o próprio número.
+- **Clicar em Testar publica o rascunho pendente antes.** Sem isso ele digita uma
+  regra, clica e conversa com a versão anterior do próprio agente.
 - Expressões e "nunca diga" são **texto separado por vírgula**, não chips: um editor de
   chips é estado escondido a mais numa tela que já tem autosave. O dado no backend é lista
   nos dois casos.

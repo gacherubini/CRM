@@ -1,6 +1,6 @@
-# portal-gestao · 155 rotas · 26 modelos · 6 workers · 35 flags · 26 migrations · 62 templates
+# portal-gestao · 156 rotas · 26 modelos · 6 workers · 35 flags · 26 migrations · 62 templates
 
-Gerado de `3f36b77`. NAO editar a mao — saida de `gerar_mapa.py`.
+Gerado de `c3d3f09`. NAO editar a mao — saida de `gerar_mapa.py`.
 Migration head: `0026_copiloto_sinal_destinatario`
 
 ## Rotas
@@ -14,8 +14,9 @@ Migration head: `0026_copiloto_sinal_destinatario`
 - `POST /app/loja/atendimento/{workspace_id}/etapa` — app/loja/routes.py:951
 - `GET /app/loja/agente/configuracao` — app/loja/routes.py:1087
 - `PUT /app/loja/agente/configuracao.json` — app/loja/routes.py:1117
-- `POST /app/loja/agente/configuracao/publicar` — app/loja/routes.py:1156
-- `POST /app/loja/agente/configuracao/restaurar` — app/loja/routes.py:1178
+- `POST /app/loja/agente/configuracao/testar.json` — app/loja/routes.py:1156
+- `POST /app/loja/agente/configuracao/publicar` — app/loja/routes.py:1190
+- `POST /app/loja/agente/configuracao/restaurar` — app/loja/routes.py:1212
 - `GET /health/live` — app/main.py:535
 - `GET /health/ready` — app/main.py:540
 - `GET /public/v1/lojas/{loja_slug}/pixel` — app/main.py:549

@@ -35,6 +35,7 @@ deploy/fly/3vm/.evolution_key.local
 deploy/fly/3vm/workflow-fly.ready.json
 deploy/fly/3vm/workflow-fly-test.ready.json
 deploy/fly/3vm/workflow-cloud.ready.json
+deploy/fly/3vm/workflow-preview.ready.json
 
 # PDFs/artefatos gerados de manuais (fonte é docs/tutorial-*.md)
 output/

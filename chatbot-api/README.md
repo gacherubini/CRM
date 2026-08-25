@@ -140,6 +140,7 @@ que o bot recebeu naquela versão — melhorar o gerador amanhã não reescreve 
 | `POST /v1/agente/publicar` | leva o rascunho ao ar |
 | `GET /v1/agente/versoes` | histórico |
 | `POST /v1/agente/versoes/{id}/restaurar` | traz uma versão antiga **para dentro do rascunho** |
+| `POST /v1/agente/preview` | um turno de conversa com o agente do **rascunho**, sem WhatsApp |
 
 ### Armadilhas desta feature
 
@@ -216,15 +217,35 @@ O `modo` do rascunho existe porque o formulário esconde o que não existe do la
 o modo é este produto — a Loja reimplementar o gate seria divergir dele na primeira
 mudança.
 
+### O preview (card 4)
+
+`POST /v1/agente/preview` monta o pedido e chama o webhook `whatsapp-ai-preview` do
+n8n (`CHATBOT_AGENTE_PREVIEW_URL`). Quem roda o agente é o n8n — **não existe IA neste
+produto**; o papel daqui é de porteiro.
+
+- **O telefone é sintético e nasce aqui** (`agente_preview.telefone_sintetico`), nunca
+  vem da tela. Começa em `0`, então não é MSISDN nenhum. `consultar_estoque` guarda a
+  moto escolhida chaveada por telefone: o lojista testando com o próprio número
+  sobrescreveria uma conversa real. A rota **recusa** `telefone` no corpo (422).
+- **O prompt é o do rascunho**, não o publicado. Testar o publicado não serviria para
+  nada: o lojista está justamente decidindo se publica.
+- **`AGENTE_PREVIEW_URL` vazio responde 503** e o rascunho devolve
+  `preview_disponivel: false`, para a tela esconder o botão em vez de oferecer um teste
+  que sempre falha.
+- **Timeout de 45 s**, generoso de propósito: o agente encadeia consulta ao estoque e
+  ainda pensa. Curto demais mostra "o preview não respondeu" para um agente que
+  respondeu — e o lojista conclui que a configuração dele está errada.
+
 ### O que falta
 
-Isto são os cards 1, 2 e 3 de quatro:
+Os quatro cards estão implementados. Para chegar ao lojista, falta **operação**:
 
-1. **Preview** (card 4) — workflow `whatsapp-ai-preview` no mesmo n8n2037, com as tools
-   em modo seco. `consultar_estoque1` **escreve** no CRM, então o preview usa telefone
-   sintético.
-2. **Ligar a flag** `REVY_LOJA_AGENTE_CONFIG_ENABLED` (default 0, e no app2037 flags são
+1. **Ligar a flag** `REVY_LOJA_AGENTE_CONFIG_ENABLED` (default 0, e no app2037 flags são
    *secrets*, não `[env]` do toml).
+2. **Semear a config da loja que já atendia**, antes do workflow subir:
+   `python -m scripts.semear_config_agente vitor-motos`.
+3. **Publicar os workflows** (`-Mode production` e `-Mode preview`) e apontar
+   `CHATBOT_AGENTE_PREVIEW_URL` para o webhook do preview.
 
 Fora da v1, com motivo registrado no spec: cadência de follow-up por loja (§4.4.2),
 `só lead de anúncio` (§4.6, depende de atribuição CTWA confiável), e tela no Control para

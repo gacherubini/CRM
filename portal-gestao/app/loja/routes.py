@@ -1153,6 +1153,40 @@ async def agente_configuracao_salvar(
     return JSONResponse({"ok": True, **salvo})
 
 
+@router.post("/app/loja/agente/configuracao/testar.json")
+async def agente_configuracao_testar(
+    request: Request,
+    db: Session = Depends(get_db),
+    chatbot: ChatbotClient = Depends(get_chatbot_client),
+):
+    """Conversa de teste com o agente do rascunho.
+
+    A tela não manda telefone: quem escolhe é o chatbot, e é sintético. O
+    histórico vive só no navegador — a conversa de teste não entra em Conversas,
+    não vira lead e some quando o lojista sai da tela.
+    """
+    usuario, recusa = _guard_agente_config(request, db, json_=True)
+    if recusa is not None:
+        return recusa
+    corpo = await request.json()
+    if not csrf_valido(request, (corpo or {}).get("csrf")):
+        return _json_erro(403, "sessao", "Sessão expirada")
+    texto = str((corpo or {}).get("texto") or "").strip()
+    if not texto:
+        return _json_erro(400, "texto", "Escreva uma mensagem para testar")
+    try:
+        resultado = chatbot.preview_agente(
+            texto[:2000],
+            historico=str((corpo or {}).get("historico") or "")[:8000],
+            turno=int((corpo or {}).get("turno") or 1),
+        )
+    except ChatbotIndisponivel:
+        return _json_erro(
+            503, "preview", "O teste não está disponível agora. Tente em instantes."
+        )
+    return JSONResponse({"ok": True, "resposta": resultado.get("resposta", "")})
+
+
 @router.post("/app/loja/agente/configuracao/publicar")
 async def agente_configuracao_publicar(
     request: Request,

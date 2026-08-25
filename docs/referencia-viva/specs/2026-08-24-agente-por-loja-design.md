@@ -1,9 +1,24 @@
 # Agente por loja — design
 
-Status: **card 1 de 4 implementado e no ar** (25/08/2026, commits `7083d6f..0ee8798`).
-Cards 2 (n8n), 3 (tela) e 4 (preview) não começaram — nada disto chega ao cliente ainda.
-Plano executado: [`../planos/2026-08-25-agente-por-loja-1-dado-e-texto.md`](../planos/2026-08-25-agente-por-loja-1-dado-e-texto.md).
-Produtos tocados: `chatbot-api` (dono do dado), `portal-gestao` (tela), `n8n` (prompt).
+Status: **os quatro cards implementados** (25/08/2026). Card 1 em `7083d6f..0ee8798`;
+cards 2, 3 e 4 em seguida. **Nada disto chega ao lojista sem três passos de operação**:
+ligar `REVY_LOJA_AGENTE_CONFIG_ENABLED`, semear a config da loja que já atendia
+(`python -m scripts.semear_config_agente vitor-motos`) e publicar os dois workflows
+(`-Mode production` e `-Mode preview`), com `CHATBOT_AGENTE_PREVIEW_URL` apontada.
+
+Plano do card 1: [`../planos/2026-08-25-agente-por-loja-1-dado-e-texto.md`](../planos/2026-08-25-agente-por-loja-1-dado-e-texto.md).
+Produtos tocados: `chatbot-api` (dono do dado), `portal-gestao` (tela), `n8n` (prompt e
+preview).
+
+### O que mudou em relação a este desenho, durante a execução
+
+| Onde | Mudança | Por quê |
+|---|---|---|
+| §4.2 · §7.1 | a rota devolve `saida` (`minusculas`, `sem_emoji`) e o n8n higieniza a resposta **conforme a loja** | o `Responder WhatsApp1` forçava minúsculas e removia emoji de todo mundo: `escrita` e `emoji` seriam campos decorativos, desfeitos no envio |
+| §3.4 | o slot fica no **fim** do `systemMessage`; a operação do atendimento continua literal no JSON | o prompt gerado tem identidade + regras da loja, não a coreografia das ferramentas. Com o slot no fim, o núcleo Revy continua sendo o último bloco de tudo |
+| §6 | o formulário pergunta o modo ao chatbot (`modo` em `GET /v1/agente/rascunho`) | a Loja reimplementar o gate de Modo 2 é divergir dele na primeira mudança |
+| §6.1.2 | `consultar_estoque1` também perde a **gravação** no CRM no preview (só a busca roda) | a gravação de `moto-escolhida` **cria `Conversa`** — o preview apareceria em Conversas com o telefone sintético |
+| §11 | a config da vitor motos virou script (`scripts/semear_config_agente.py`), com snapshot por frase | o teste de aceite ("reproduz o prompt de hoje") precisa ser executável, não uma conferência a olho |
 
 ## 1. O problema
 
