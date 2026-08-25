@@ -18,3 +18,26 @@ bot continua falando igual. O alvo e o **n8n2037**, com a sequencia de
 
 O canonico e gerado: nao editar o `*.ready.json`, e no Modo 2 nao editar o
 `workflow-cloud.json` a mao (ver `2026-08-23-workflow-cloud-e-gerado.md`).
+
+## O `validate_workflow.py` prende o prompt por frase literal
+
+Mexer no `systemMessage` não é só editar JSON: `n8n/validate_workflow.py:121` em diante
+afirma **~40 frases literais** do texto — "privacidade do resultado", "nunca crie lead
+por cumprimento", "mande as fotos do catálogo ou prefere", "não exija foto antes",
+"recusa e não insistir", "nunca peça placa ao cliente". Reescrever uma delas deixa o
+validador vermelho, e ele é gate do `AGENTS.md` §6.
+
+Isso é proteção, não estorvo: foi o que já pegou regressão de prompt. **Nunca apague uma
+assertiva para o validador passar** — mova a garantia para onde o texto foi morar (teste
+de snapshot, se o texto virou dado) e deixe registrado o destino.
+
+## As tools do agente dependem do nó `Extrair1`
+
+Elas não são nós HTTP: são `toolCode` (JS) que chamam `http://chatbot-api:8000/...` com
+`Bearer __CHATBOT_TOKEN__`, e **todas** leem `$('Extrair1').first().json` para achar
+`instance` e `telefone`. Qualquer workflow novo que reaproveite as tools precisa de um nó
+com esse nome exato — foi assim que o fork do Modo 2 se consertou, com nó-ponte.
+
+E `consultar_estoque1` **não é só leitura**: com resultado único ela grava a moto
+escolhida no CRM (`POST /v1/operacao/moto-escolhida`), chaveada por telefone. Workflow de
+laboratório que use telefone real corrompe conversa real.
