@@ -38,7 +38,7 @@ Isso é também argumento comercial: a tela de configuração e o núcleo visív
 | Escopo da v1 | identidade + personalidade + FAQ + regras da conversa + instruções livres + liga/desliga |
 | Campo livre de instruções | **entra** (§4.5), teto 1000 chars, antes do núcleo |
 | Conflito do campo livre com o núcleo | **avisa, não bloqueia** |
-| Follow-up configurável | **fora da v1** (§4.4.2) — pendente de confirmação do dono |
+| Follow-up | só **liga/desliga**, visível apenas no Modo 2 (§4.4.2). Cadência, nº de toques e texto na voz do agente ficam fora da v1 |
 | Fuso horário | `America/Sao_Paulo` fixo, sem coluna (§4.1) |
 | Módulo próprio para a tela | não; mesmo gate da tela vizinha (§6) |
 | n8n de teste | **não** — workflow gerado no mesmo n8n2037 |
@@ -166,7 +166,7 @@ exatamente: "Y"`.
 | Sem a moto do anúncio | seguro no veículo · posso oferecer parecida |
 | Passa pro humano | quando pedir · depois da simulação · fora do horário |
 | Pode citar vendedor pelo nome? | sim · não |
-| Follow-up | **fora da v1** — ver §4.4.2 |
+| Follow-up | ligado · desligado (**só Modo 2** — ver §4.4.2) |
 
 #### 4.4.1 O formulário é consciente do modo da loja
 
@@ -186,21 +186,33 @@ A tela **esconde ou desabilita** o que não se aplica ao modo da loja, com a raz
 vista. Campo que o lojista configura e que não faz nada é o pior tipo de bug de produto:
 não dá erro, não dá log, e ele conclui que a configuração inteira é decorativa.
 
-#### 4.4.2 Follow-up ficou fora da v1
+#### 4.4.2 Follow-up: só liga/desliga na v1
 
-`chatbot-api/app/followup_job.py:1` diz **"Só Modo 2, só com bot_ativo"**. A cadência são
-constantes de módulo (`PRIMEIRO_TOQUE = 30min`, `SEGUNDO_TOQUE = 1h`) e `texto_followup`
-levanta `ValueError` para toque fora de (1,2): *"Terceiro toque não existe — a spec para
-em dois"*.
+**Decisão do dono (25/08):** entra o interruptor, não a configuração.
 
-Um campo "N toques a cada H horas" seria três features empilhadas: cadência por loja,
-N > 2, e follow-up no Modo 1. E tem um problema que não se resolve com campo nenhum: **o
-texto do follow-up é fixo e não passa pela IA** (`_TEXTOS`, por etapa). A loja que
-configurar "formal, sem gírias" continua mandando *"e aí amigo, ainda tá aí?"* — uma
-incoerência que o cliente final vê.
+O que o código permite hoje (`chatbot-api/app/followup_job.py`): é **só Modo 2, só com
+`bot_ativo`**; a cadência são constantes de módulo (`PRIMEIRO_TOQUE = 30 min`,
+`SEGUNDO_TOQUE = 1 h`); e `texto_followup` levanta `ValueError` para toque fora de (1,2)
+— *"Terceiro toque não existe — a spec para em dois"*.
 
-Fica como card próprio: *follow-up por loja e com a voz do agente*. Antes dele, o
-follow-up é do Revy, não da loja.
+**Na v1:** campo booleano `followup_ativo` em `agente_config`. O `FollowupWorker` passa a
+consultá-lo junto com os filtros que já aplica (`loja_opera_modo2` e
+`Conversa.bot_ativo`). Uma coluna e uma condição.
+
+**Fora da v1:** cadência por loja, mais de dois toques, e follow-up no Modo 1.
+
+**Visível só no Modo 2** (§4.4.1). Isso cria assimetria conhecida e aceita: a loja do
+piloto está no Modo 1 e não verá o campo; loja nova entra no Modo 2 e verá. O dono
+decidiu com essa consequência à vista.
+
+**Incoerência conhecida e aceita — não é bug, não abrir chamado:** o texto do follow-up é
+fixo em `_TEXTOS`, por etapa, e **nunca passa pela IA**. A loja que configurar um agente
+formal, sem gírias, tratando por "senhor", ainda assim manda *"e aí amigo, ainda tá aí?"*
+trinta minutos depois do cliente sumir. O interruptor existe justamente para ela poder
+desligar isso.
+
+Card próprio, depois: *follow-up por loja e com a voz do agente* — cadência configurável
+e texto gerado pelo mesmo prompt do agente. É ele que fecha essa incoerência.
 
 ### 4.5 Instruções da loja (o campo livre)
 
@@ -563,6 +575,8 @@ Windows `.\.venv\Scripts\python.exe -m pytest -q`):
 - publicar / reverter / histórico;
 - **modo seco não cria lead nem notificação** — teste explícito, é o risco nº 1;
 - **preview não escreve `moto-escolhida` de telefone real** (§6.1.2);
+- `FollowupWorker` respeita `followup_ativo=False` (§4.4.2) — loja desligada não recebe
+  toque nenhum, e loja sem config continua recebendo (default ligado);
 - as assertivas de comportamento migradas do `validate_workflow.py` (§7.1) — cada frase
   que saiu do JSON tem que ter um snapshot aqui. Assertiva sem destino é regressão.
 
@@ -609,5 +623,6 @@ Só depois de o comportamento bater é que se mexe nos campos dela.
 | Tool referenciando `Extrair1` inexistente no preview | nó-ponte de mesmo nome (§6.1.1) |
 | Modo 2 nascer sem o nó de config | entrar em `HERDADOS`; o gerador não avisa (§7.1) |
 | Campo configurado que não faz nada no modo da loja | formulário consciente do modo (§4.4.1) |
+| Lojista estranhar o follow-up falando fora da voz que ele escolheu | incoerência aceita e documentada (§4.4.2); o interruptor permite desligar |
 | Expressão em sub-nó do modelo não resolver | spike no passo 0 (§9) antes de dimensionar a Task |
 | Lojista pedir para reabrir a regra 3 (insistir) | decisão registrada em §2 |
