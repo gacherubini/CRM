@@ -239,6 +239,19 @@ node n8n\test_higienizacao_saida.js          # minusculas/emoji seguem a loja no
 node n8n\test_pontes_preview.js              # os nos-ponte do preview
 ```
 
+E um que precisa de dependencia, e por isso **pula** por default — instale antes de
+mexer no `systemMessage`, que desde o agente por loja e uma expressao de ~17 mil
+caracteres:
+
+```powershell
+npm install --no-save @n8n/tournament
+node n8n\test_expressoes.js   # as 46 expressoes compilam no motor real do n8n
+```
+
+Ele e a unica coisa que responde "isso parseia?" sem subir n8n. Expressao que nao
+parseia passa por todo validador de forma, o import e aceito sem reclamar, e o
+sintoma e o bot mudo em producao.
+
 **Mexeu na topologia?** `test_replay_e_debounce.js` afirma a esteira nó a nó e é o que
 pega um nó inserido no meio do caminho — foi ele que reprovou quando a busca da config
 entrou entre o debounce e o Agent.

@@ -64,3 +64,6 @@ graphify-out/
 # Cloudflare Wrangler (cache local de deploy)
 .wrangler/
 site/build.txt
+
+# `npm install --no-save @n8n/tournament` para rodar n8n/test_expressoes.js
+node_modules/
