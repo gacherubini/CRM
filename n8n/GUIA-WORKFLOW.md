@@ -246,7 +246,19 @@ node n8n\test_fallback_estoque_temporario.js # estoque vazio sem inventar moto
 node n8n\test_gate_config_agente.js          # 200 usa a loja, 423 PARA, falha cai no padrao
 node n8n\test_higienizacao_saida.js          # minusculas/emoji seguem a loja nos 3 modos
 node n8n\test_pontes_preview.js              # os nos-ponte do preview
+node n8n\test_modo_seco.js                  # as tools do preview NAO criam lead
 ```
+
+**`test_modo_seco.js` e o que guarda o risco n 1 da feature.** Ele *executa* cada
+ferramenta do preview no caminho feliz — aquele em que a versao de producao cria lead,
+avisa a equipe e pausa o bot — com um `helpers.httpRequest` de mentira, e afirma que
+nenhuma chamada que age acontece. O `validate_preview_workflow.py` so confere a **ordem
+no texto**, e ordem nao e execucao: um `return` dentro de um `if` passa nele. Conferido
+por mutacao.
+
+Ele tambem afirma o contrario nos dois pontos onde o contrario importa: a busca no
+estoque **tem** que acontecer (senao o preview nao prova nada), e o `simular1` do Modo 1
+**tem** que continuar criando lead (senao o teste virou vazio).
 
 E um que precisa de dependencia, e por isso **pula** por default — instale antes de
 mexer no `systemMessage`, que desde o agente por loja e uma expressao de ~17 mil

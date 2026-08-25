@@ -10,6 +10,12 @@ Então a checagem central aqui é de **alcançabilidade**: em cada ferramenta qu
 age, o `return` do modo seco tem de vir **antes** de toda chamada que causa
 efeito. Conferir que a string "MODO SECO" existe não bastaria — ela pode estar
 num comentário no fim do arquivo, depois do estrago.
+
+**O que este arquivo NÃO cobre, e por isso existe `test_modo_seco.js`:** ordem no
+texto não é o mesmo que execução. Um `return` embrulhado num `if` continua vindo
+antes da chamada e passa aqui — conferido por mutação: com o freio do `simular1`
+virando condicional no gerador, este validador aprova e o teste de execução
+reprova. Rode os dois.
 """
 
 from __future__ import annotations

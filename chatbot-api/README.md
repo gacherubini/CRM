@@ -260,6 +260,11 @@ produto**; o papel daqui é de porteiro.
 - **Timeout de 45 s**, generoso de propósito: o agente encadeia consulta ao estoque e
   ainda pensa. Curto demais mostra "o preview não respondeu" para um agente que
   respondeu — e o lojista conclui que a configuração dele está errada.
+- **O modo seco das ferramentas é guardado por dois testes, e são dois de propósito.**
+  `n8n/validate_preview_workflow.py` confere a ordem no texto; `n8n/test_modo_seco.js`
+  **executa** cada ferramenta no caminho feliz e afirma que nenhuma chamada que age
+  acontece. Ordem não é execução: um `return` dentro de um `if` passa no primeiro e
+  reprova no segundo — conferido por mutação.
 
 ### O que foi feito
 
