@@ -53,8 +53,9 @@ img{max-width:100%}
 .js [data-rv]{opacity:0}
 .lift,.lift.in{transition:transform .5s cubic-bezier(.22,.61,.36,1),box-shadow .5s cubic-bezier(.22,.61,.36,1),opacity .42s cubic-bezier(.4,0,.2,1)!important;transition-delay:0s!important}
 .lift:hover{transform:translateY(-26px) scale(1.012)!important;box-shadow:0 56px 120px rgba(27,20,20,.20),0 24px 50px rgba(27,20,20,.10)!important}
+.lift-sm:hover{transform:translateY(-9px) scale(1.005)!important}
 @media (prefers-reduced-motion: reduce){.lift:hover{transform:none!important}}
-[data-trafego-grid]{grid-template-columns:minmax(300px,0.82fr) minmax(420px,1.18fr)}
+[data-trafego-grid]{grid-template-columns:minmax(260px,0.60fr) minmax(520px,1.40fr)}
 @media (max-width:860px){[data-trafego-grid]{grid-template-columns:1fr!important}}
 .vid{position:absolute;inset:0;width:100%;height:100%;border:0;display:block;opacity:0;pointer-events:none;transition:opacity 1s cubic-bezier(.22,.61,.36,1)}
 .vid.on{opacity:1}
@@ -211,7 +212,7 @@ img{max-width:100%}
         <div style="flex: 4 1 680px; min-width: 0; display: flex; flex-direction: column; gap: 80px;">
           <div data-panel="0" data-rv="1" style="scroll-margin-top: 108px;">
             <p style="margin: 0 0 24px; max-width: 34ch; font-size: clamp(22px, 2.1vw, 28px); line-height: 1.3; letter-spacing: -.014em; color: #8a8280; text-wrap: pretty;"><strong style="font-weight: 500; color: #1b1b1b;">Responde a qualquer hora.</strong> O cliente pergunta de madrugada e recebe resposta na hora, com o nome da sua loja.</p>
-            <div class="lift" style="border-radius: 24px; overflow: hidden; border: 1px solid rgba(27,27,27,.09); box-shadow: 0 10px 30px rgba(27,20,20,.15), 0 3px 8px rgba(27,20,20,.07);">
+            <div class="lift lift-sm" style="border-radius: 24px; overflow: hidden; border: 1px solid rgba(27,27,27,.09); box-shadow: none !important;">
               <div>
                 <div style="position: relative; aspect-ratio: 16 / 9; overflow: hidden; background: #ffffff;">
                   <figure style="margin:0;position:absolute;inset:0;" data-demo="demos/02-atendimento-revy-lite.html">
@@ -224,7 +225,7 @@ img{max-width:100%}
 
           <div data-panel="1" data-rv="1" style="scroll-margin-top: 108px;">
             <p style="margin: 0 0 24px; max-width: 34ch; font-size: clamp(22px, 2.1vw, 28px); line-height: 1.3; letter-spacing: -.014em; color: #8a8280; text-wrap: pretty;"><strong style="font-weight: 500; color: #1b1b1b;">Simula em vários bancos de uma vez.</strong> São os bancos que a sua loja já usa, com o login dela.</p>
-            <div class="lift" style="border-radius: 24px; overflow: hidden; border: 1px solid rgba(27,27,27,.09); box-shadow: 0 10px 30px rgba(27,20,20,.15), 0 3px 8px rgba(27,20,20,.07);">
+            <div class="lift lift-sm" style="border-radius: 24px; overflow: hidden; border: 1px solid rgba(27,27,27,.09); box-shadow: none !important;">
               <div>
                 <div style="position: relative; aspect-ratio: 16 / 9; overflow: hidden; background: #ffffff;">
                   <figure style="margin:0;position:absolute;inset:0;" data-demo="demos/03-simulacao-revy-lite.html">
@@ -237,7 +238,7 @@ img{max-width:100%}
 
           <div data-panel="2" data-rv="1" style="scroll-margin-top: 108px;">
             <p style="margin: 0 0 24px; max-width: 34ch; font-size: clamp(22px, 2.1vw, 28px); line-height: 1.3; letter-spacing: -.014em; color: #8a8280; text-wrap: pretty;"><strong style="font-weight: 500; color: #1b1b1b;">A venda entra sozinha.</strong> A moto sai do estoque, o vendedor fica registrado e o anúncio que trouxe o cliente vem junto.</p>
-            <div class="lift" style="border-radius: 24px; overflow: hidden; border: 1px solid rgba(27,27,27,.09); box-shadow: 0 10px 30px rgba(27,20,20,.15), 0 3px 8px rgba(27,20,20,.07);">
+            <div class="lift lift-sm" style="border-radius: 24px; overflow: hidden; border: 1px solid rgba(27,27,27,.09); box-shadow: none !important;">
               <div>
                 <div style="position: relative; aspect-ratio: 16 / 9; overflow: hidden; background: #ffffff;">
                   <figure style="margin:0;position:absolute;inset:0;" data-demo="demos/04-resultado-revy-lite.html">
@@ -250,7 +251,7 @@ img{max-width:100%}
 
           <div data-panel="3" data-rv="1" style="scroll-margin-top: 108px;">
             <p style="margin: 0 0 24px; max-width: 34ch; font-size: clamp(22px, 2.1vw, 28px); line-height: 1.3; letter-spacing: -.014em; color: #8a8280; text-wrap: pretty;"><strong style="font-weight: 500; color: #1b1b1b;">O caixa do mês em uma tela.</strong> Quem vendeu, quanto entrou e o que ainda falta receber.</p>
-            <div class="lift" style="border-radius: 24px; overflow: hidden; border: 1px solid rgba(27,27,27,.09); box-shadow: 0 10px 30px rgba(27,20,20,.15), 0 3px 8px rgba(27,20,20,.07);">
+            <div class="lift lift-sm" style="border-radius: 24px; overflow: hidden; border: 1px solid rgba(27,27,27,.09); box-shadow: none !important;">
               <div>
                 <div style="position: relative; aspect-ratio: 16 / 9; overflow: hidden; background: #ffffff;">
                   <figure style="margin:0;position:absolute;inset:0;" data-demo="demos/05-caixa-revy-lite.html">
@@ -263,7 +264,7 @@ img{max-width:100%}
 
           <div data-panel="4" data-rv="1" style="scroll-margin-top: 108px;">
             <p style="margin: 0 0 24px; max-width: 34ch; font-size: clamp(22px, 2.1vw, 28px); line-height: 1.3; letter-spacing: -.014em; color: #8a8280; text-wrap: pretty;"><strong style="font-weight: 500; color: #1b1b1b;">Você vê se está funcionando.</strong> Quantas conversas o assistente resolveu sozinho e quantas chegaram prontas para o vendedor.</p>
-            <div class="lift" style="border-radius: 24px; overflow: hidden; border: 1px solid rgba(27,27,27,.09); box-shadow: 0 10px 30px rgba(27,20,20,.15), 0 3px 8px rgba(27,20,20,.07);">
+            <div class="lift lift-sm" style="border-radius: 24px; overflow: hidden; border: 1px solid rgba(27,27,27,.09); box-shadow: none !important;">
               <div>
                 <div style="position: relative; aspect-ratio: 16 / 9; overflow: hidden; background: #ffffff;">
                   <figure style="margin:0;position:absolute;inset:0;" data-demo="demos/06-agente-revy-lite.html">
@@ -282,24 +283,24 @@ img{max-width:100%}
     <div data-trafego-grid style="width: min(100%, 1280px); margin-inline: auto; padding-inline: clamp(20px, 5vw, 56px); display: grid; gap: clamp(40px, 5vw, 72px); align-items: center;">
       <div data-rv="0">
         <div style="font-family: ui-monospace, 'SF Mono', Consolas, monospace; font-size: 12px; letter-spacing: .18em; text-transform: uppercase; color: #6b625f; margin-bottom: 16px;">Anúncios</div>
-        <h2 style="margin: 0 0 16px; font-family: Newsreader, Georgia, serif; font-weight: 300; font-size: clamp(32px, 3.6vw, 44px); line-height: 1.1; letter-spacing: -.024em;">Alguém cuidando dos seus anúncios.</h2>
-        <p style="margin: 0 0 32px; font-size: 17px; line-height: 1.55; color: #57514f; text-wrap: pretty;">Anúncio sozinho não vende moto. A Revy pode colocar uma pessoa para cuidar dos anúncios da sua loja: ela cria, publica e acompanha o resultado. Você não mexe em nada técnico.</p>
-        <div style="display: grid; gap: 20px;">
+        <h2 style="margin: 0 0 16px; font-family: Newsreader, Georgia, serif; font-weight: 300; font-size: clamp(27px, 2.6vw, 36px); line-height: 1.12; letter-spacing: -.024em;">Alguém cuidando dos seus anúncios.</h2>
+        <p style="margin: 0 0 26px; font-size: 15px; line-height: 1.55; color: #57514f; text-wrap: pretty;">Anúncio sozinho não vende moto. A Revy pode colocar uma pessoa para cuidar dos anúncios da sua loja: ela cria, publica e acompanha o resultado. Você não mexe em nada técnico.</p>
+        <div style="display: grid; gap: 16px;">
           <div>
-            <h3 style="margin: 0 0 6px; font-size: 17px; font-weight: 500; letter-spacing: -.005em;">Uma pessoa responsável</h3>
-            <p style="margin: 0; font-size: 16px; line-height: 1.5; color: #6b625f;">Alguém da equipe Revy, de agência ou por conta própria, ligado à sua loja. Cria, publica e acompanha.</p>
+            <h3 style="margin: 0 0 5px; font-size: 15px; font-weight: 500; letter-spacing: -.005em;">Uma pessoa responsável</h3>
+            <p style="margin: 0; font-size: 14px; line-height: 1.5; color: #6b625f;">Alguém da equipe Revy, de agência ou por conta própria, ligado à sua loja. Cria, publica e acompanha.</p>
           </div>
           <div>
-            <h3 style="margin: 0 0 6px; font-size: 17px; font-weight: 500; letter-spacing: -.005em;">O anúncio abre o WhatsApp</h3>
-            <p style="margin: 0; font-size: 16px; line-height: 1.5; color: #6b625f;">Quem clica no anúncio cai direto na conversa, e o assistente responde na hora — de madrugada ou no domingo.</p>
+            <h3 style="margin: 0 0 5px; font-size: 15px; font-weight: 500; letter-spacing: -.005em;">O anúncio abre o WhatsApp</h3>
+            <p style="margin: 0; font-size: 14px; line-height: 1.5; color: #6b625f;">Quem clica no anúncio cai direto na conversa, e o assistente responde na hora — de madrugada ou no domingo.</p>
           </div>
           <div>
-            <h3 style="margin: 0 0 6px; font-size: 17px; font-weight: 500; letter-spacing: -.005em;">Você vê o que deu retorno</h3>
-            <p style="margin: 0; font-size: 16px; line-height: 1.5; color: #6b625f;">Cada venda mostra o anúncio que trouxe o cliente, e o quanto você gastou aparece junto. Dá para ver o que valeu a pena.</p>
+            <h3 style="margin: 0 0 5px; font-size: 15px; font-weight: 500; letter-spacing: -.005em;">Você vê o que deu retorno</h3>
+            <p style="margin: 0; font-size: 14px; line-height: 1.5; color: #6b625f;">Cada venda mostra o anúncio que trouxe o cliente, e o quanto você gastou aparece junto. Dá para ver o que valeu a pena.</p>
           </div>
         </div>
       </div>
-      <div data-rv="1" class="lift" style="border-radius: 24px; overflow: hidden; border: 1px solid rgba(27,27,27,.09); box-shadow: 0 10px 30px rgba(27,20,20,.15), 0 3px 8px rgba(27,20,20,.07);">
+      <div data-rv="1" class="lift lift-sm" style="border-radius: 24px; overflow: hidden; border: 1px solid rgba(27,27,27,.09); box-shadow: none !important;">
         <div>
           <div style="position: relative; aspect-ratio: 16 / 9; overflow: hidden; background: #ffffff;">
             <figure style="margin:0;position:absolute;inset:0;" data-demo="demos/trafego-revy-lite.html">
