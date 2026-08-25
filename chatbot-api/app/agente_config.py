@@ -1,6 +1,8 @@
 """Versões da config do agente: rascunho, publicada, histórico (spec §3.2).
 
-Voltar para uma versão anterior CRIA versão nova a partir dela. Nada é apagado.
+Restaurar uma versão antiga carrega os campos dela para dentro do rascunho
+atual (sobrescrevendo o que estava lá). Nenhuma versão publicada ou arquivada
+é alterada, e nada do histórico é apagado.
 """
 from __future__ import annotations
 
@@ -104,7 +106,14 @@ def listar_versoes(db: Session, loja_id: str) -> list[models_db.AgenteConfigVers
 def restaurar(
     db: Session, loja_id: str, versao_id: str, autor: str | None
 ) -> models_db.AgenteConfigVersao:
-    """Cria rascunho novo a partir de uma versão antiga. Não apaga nada."""
+    """Carrega os campos de uma versão antiga para dentro do rascunho atual.
+
+    Não cria versão publicada nem arquivada nova, e não apaga nada do
+    histórico: quem muda é só o rascunho, via `salvar_rascunho` (que
+    reaproveita a linha de rascunho em andamento, se houver uma). Se o
+    lojista tiver um rascunho não publicado em curso, o conteúdo dele é
+    sobrescrito em silêncio — a tela é quem avisa antes de chamar isto.
+    """
     antiga = db.get(models_db.AgenteConfigVersao, versao_id)
     if antiga is None or antiga.loja_id != loja_id:
         raise LookupError("versão não é desta loja")

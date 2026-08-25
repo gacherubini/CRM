@@ -22,7 +22,6 @@ Funcao de modulo, publica, SEM decorator e sem nenhuma mencao ao
 nome em nenhum produto (import conta como mencao). Handler de rota
 nao entra: quem chama e o framework.
 
-- `campos_publicados` — chatbot-api/app/agente_config.py:114
 - `enfileirar_purchase_venda` — portal-gestao/app/meta_capi.py:118
 - `pixel_id_valido` — portal-gestao/app/meta_pixel.py:16
 - `pode_escrever_operacional` — portal-gestao/app/loja/permissions.py:68
