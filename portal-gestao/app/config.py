@@ -52,6 +52,17 @@ def revy_loja_financeiro_enabled() -> bool:
     return _env_bool("REVY_LOJA_FINANCEIRO_ENABLED", "0")
 
 
+def revy_loja_agente_config_enabled() -> bool:
+    """Tela de configuração do agente por loja. Default off.
+
+    Mora dentro do Atendimento e segue o gate da tela vizinha
+    (``/app/loja/agente``): sessão + esta flag + papel dono/gerente. **Não** tem
+    gate de módulo — `modulos_revy` tem CHECK constraint no código e um módulo
+    novo exigiria migration só para esta tela (spec §6).
+    """
+    return _env_bool("REVY_LOJA_AGENTE_CONFIG_ENABLED", "0")
+
+
 def revy_loja_redirect_legacy_enabled() -> bool:
     """Redirects 303 de rotas legadas → shell Loja (F8 cutover). Default off.
 
@@ -191,6 +202,9 @@ class Settings:
     revy_loja_copiloto_enabled: bool = _env_bool("REVY_LOJA_COPILOTO_ENABLED", "0")
     revy_loja_financeiro_enabled: bool = _env_bool(
         "REVY_LOJA_FINANCEIRO_ENABLED", "0"
+    )
+    revy_loja_agente_config_enabled: bool = _env_bool(
+        "REVY_LOJA_AGENTE_CONFIG_ENABLED", "0"
     )
     revy_loja_redirect_legacy_enabled: bool = _env_bool(
         "REVY_LOJA_REDIRECT_LEGACY", "0"

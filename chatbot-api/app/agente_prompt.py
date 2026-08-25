@@ -170,7 +170,11 @@ _HANDOFF = {
 def _bloco_identidade(c: CamposAgente) -> str:
     linhas = [f"você atende os clientes da {c.nome_loja.lower()} pelo whatsapp."]
     if c.cidade:
-        linhas.append(f"a loja fica em {c.cidade.lower()}-{c.uf.lower()}.")
+        # UF vazia com cidade preenchida gerava "a loja fica em piracicaba-." —
+        # o hífen órfão vai para o WhatsApp do cliente, e o formulário aceita a
+        # combinação (UF é opcional).
+        local = f"{c.cidade.lower()}-{c.uf.lower()}" if c.uf else c.cidade.lower()
+        linhas.append(f"a loja fica em {local}.")
         if not c.endereco_completo:
             linhas.append(
                 "não informe rua, número, bairro nem ponto de referência: "

@@ -136,7 +136,7 @@ que o bot recebeu naquela versão — melhorar o gerador amanhã não reescreve 
 | Rota | Papel |
 |---|---|
 | `GET /v1/agente/config` | o que o n8n consome: prompt + `max_output_tokens` + `agente_ativo` + `saida` |
-| `GET` / `PUT /v1/agente/rascunho` | a tela edita aqui; devolve `campos`, `prompt` e `conflitos` |
+| `GET` / `PUT /v1/agente/rascunho` | a tela edita aqui; devolve `campos`, `prompt`, `conflitos` e `modo` |
 | `POST /v1/agente/publicar` | leva o rascunho ao ar |
 | `GET /v1/agente/versoes` | histórico |
 | `POST /v1/agente/versoes/{id}/restaurar` | traz uma versão antiga **para dentro do rascunho** |
@@ -211,15 +211,19 @@ Dois nós novos, entre o debounce e o agente:
 - **Loja que já atendia precisa de config antes do deploy do workflow**, senão estreia com
   o padrão Revy: `python -m scripts.semear_config_agente vitor-motos` (spec §11).
 
+O `modo` do rascunho existe porque o formulário esconde o que não existe do lado dele
+(spec §4.4.1): não há tool de foto no Modo 2, nem worker de follow-up no Modo 1. Quem sabe
+o modo é este produto — a Loja reimplementar o gate seria divergir dele na primeira
+mudança.
+
 ### O que falta
 
-Isto são os cards 1 e 2 de quatro. O lojista ainda não edita nada:
+Isto são os cards 1, 2 e 3 de quatro:
 
-1. **Tela na Revy Loja** (card 3) — o formulário, em `/app/loja/agente/configuracao`.
-2. **Preview** (card 4) — workflow `whatsapp-ai-preview` no mesmo n8n2037, com as tools
+1. **Preview** (card 4) — workflow `whatsapp-ai-preview` no mesmo n8n2037, com as tools
    em modo seco. `consultar_estoque1` **escreve** no CRM, então o preview usa telefone
    sintético.
-3. **Ligar a flag** `REVY_LOJA_AGENTE_CONFIG_ENABLED` (default 0, e no app2037 flags são
+2. **Ligar a flag** `REVY_LOJA_AGENTE_CONFIG_ENABLED` (default 0, e no app2037 flags são
    *secrets*, não `[env]` do toml).
 
 Fora da v1, com motivo registrado no spec: cadência de follow-up por loja (§4.4.2),

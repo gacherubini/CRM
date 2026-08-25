@@ -146,3 +146,11 @@ def test_so_lead_anuncio_foi_removido():
     """Decisão do dono: campo morto sai do schema (nada no produto o consome
     — o gate dependeria da atribuição CTWA, que tem buraco conhecido)."""
     assert "so_lead_anuncio" not in CamposAgente.model_fields
+
+
+def test_cidade_sem_uf_nao_deixa_hifen_orfao():
+    """Gerava "a loja fica em piracicaba-." e o hífen ia para o WhatsApp do
+    cliente. O formulário aceita cidade sem UF, então o gerador tem que aceitar."""
+    prompt = montar_prompt(CamposAgente(nome_loja="X", cidade="Piracicaba", uf="")).lower()
+    assert "a loja fica em piracicaba." in prompt
+    assert "piracicaba-." not in prompt

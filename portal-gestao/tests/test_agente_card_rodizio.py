@@ -1,9 +1,16 @@
 from dataclasses import replace
+from datetime import datetime, timedelta, timezone
 
 from conftest import login
 
 from app.config import settings as portal_settings
 from app.main import app, get_chatbot_client
+
+# "Atendidos" e "Perdidos" contam os últimos 7 dias. Com data fixa no corpo do
+# teste, ele passa na semana em que foi escrito e reprova sozinho na seguinte —
+# foi o que aconteceu: `2026-08-13` saiu da janela em 20/08 e o vermelho não
+# tinha nada a ver com o código.
+ONTEM = (datetime.now(timezone.utc) - timedelta(days=1)).isoformat()
 
 
 class _ChatbotAgente:
@@ -38,10 +45,10 @@ def test_card_mostra_quatro_numeros(client, monkeypatch):
     _ligar(monkeypatch)
     login(client, email="dono-card@loja.test")
     _override(_ChatbotAgente([
-        {"id": "1", "estado": "aberta", "criado_em": "2026-08-13T00:00:00+00:00"},
-        {"id": "2", "estado": "esgotada", "criado_em": "2026-08-13T00:00:00+00:00"},
-        {"id": "3", "estado": "travada", "criado_em": "2026-08-13T00:00:00+00:00"},
-        {"id": "4", "estado": "expirada", "criado_em": "2026-08-13T00:00:00+00:00"},
+        {"id": "1", "estado": "aberta", "criado_em": ONTEM},
+        {"id": "2", "estado": "esgotada", "criado_em": ONTEM},
+        {"id": "3", "estado": "travada", "criado_em": ONTEM},
+        {"id": "4", "estado": "expirada", "criado_em": ONTEM},
     ]))
 
     r = client.get("/app/loja/agente")
@@ -58,9 +65,9 @@ def test_aguardando_nao_e_perdidos(client, monkeypatch):
     _ligar(monkeypatch)
     login(client, email="dono-dist@loja.test")
     _override(_ChatbotAgente([
-        {"id": "e1", "estado": "esgotada", "criado_em": "2026-08-13T00:00:00+00:00"},
-        {"id": "e2", "estado": "esgotada", "criado_em": "2026-08-13T00:00:00+00:00"},
-        {"id": "x1", "estado": "expirada", "criado_em": "2026-08-13T00:00:00+00:00"},
+        {"id": "e1", "estado": "esgotada", "criado_em": ONTEM},
+        {"id": "e2", "estado": "esgotada", "criado_em": ONTEM},
+        {"id": "x1", "estado": "expirada", "criado_em": ONTEM},
     ]))
 
     r = client.get("/app/loja/agente")

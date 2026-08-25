@@ -19,7 +19,9 @@ from app.clients.chatbot import (
     ChatbotClient,
     ChatbotIndisponivel,
     ConversaNaoEncontrada,
+    CamposAgenteInvalidos,
     LeadNaoEncontrado,
+    VersaoAgenteNaoEncontrada,
 )
 from app.config import settings
 from app.db import get_db
@@ -48,6 +50,11 @@ from app.loja.human_messaging import (
 from app.models import Usuario
 
 router = APIRouter()
+
+# Espelha `MAX_INSTRUCOES_LIVRES` do `chatbot-api`: o contador da tela precisa do
+# número, e o produto vizinho é quem recusa acima dele. Se um dia divergirem,
+# quem vence é o 422 de lá — o contador aqui só deixaria de avisar antes.
+MAX_INSTRUCOES_AGENTE = 1000
 
 # Import tardio de helpers do main (mesmo padrão de app.relatorios).
 from app.main import (  # noqa: E402
@@ -377,6 +384,7 @@ def agente_desempenho(
             visao=montar_visao_agente(resumo, datetime.now(timezone.utc).date()),
             erro_resumo=erro_resumo,
             card_rodizio=montar_card_rodizio(chatbot),
+            agente_config_habilitado=agente_config_habilitado(),
         ),
     )
 
@@ -1026,3 +1034,174 @@ async def atendimento_atualizar_etapa(
     return RedirectResponse(
         _append_query(destino, ok="etapa-atualizada"), status_code=303
     )
+
+
+# --- Configuração do agente (spec 2026-08-24-agente-por-loja) -----------------
+# A Loja é só tela. Campos, geração do prompt, núcleo Revy, versões e histórico
+# moram no `chatbot-api`; aqui não há tabela nem montagem de texto.
+
+
+def agente_config_habilitado() -> bool:
+    return bool(settings.revy_loja_agente_config_enabled)
+
+
+def _guard_agente_config(request: Request, db: Session, *, json_: bool):
+    """Sessão + flag + papel dono/gerente. São três, não quatro.
+
+    A tela vizinha (`/app/loja/agente`) não tem gate de módulo, e a configuração
+    segue o gate da tela onde ela mora (spec §6). Devolve `(usuario, None)` ou
+    `(None, resposta)`.
+    """
+    usuario = usuario_atual(request, db)
+    if not usuario:
+        if json_:
+            return None, _json_erro(401, "auth", "Não autenticado")
+        return None, redirecionar_login()
+    if not agente_config_habilitado():
+        if json_:
+            return None, _json_erro(404, "flag", "Configuração do agente não habilitada")
+        return None, templates.TemplateResponse(
+            "erro.html",
+            contexto(
+                request,
+                usuario,
+                erro="A configuração do agente ainda não está habilitada nesta loja.",
+            ),
+            status_code=404,
+        )
+    if not pode_ver_todo_atendimento(usuario):
+        if json_:
+            return None, _json_erro(403, "perm", "Sem permissão")
+        return None, templates.TemplateResponse(
+            "erro.html",
+            contexto(
+                request,
+                usuario,
+                erro="Só o dono ou o gerente configuram o agente.",
+            ),
+            status_code=403,
+        )
+    return usuario, None
+
+
+@router.get("/app/loja/agente/configuracao", response_class=HTMLResponse)
+def agente_configuracao(
+    request: Request,
+    db: Session = Depends(get_db),
+    chatbot: ChatbotClient = Depends(get_chatbot_client),
+):
+    usuario, recusa = _guard_agente_config(request, db, json_=False)
+    if recusa is not None:
+        return recusa
+    rascunho = None
+    versoes: list[dict] = []
+    erro_integracao = False
+    try:
+        rascunho = chatbot.obter_rascunho_agente()
+        versoes = list(chatbot.listar_versoes_agente() or [])
+    except ChatbotIndisponivel:
+        erro_integracao = True
+    return templates.TemplateResponse(
+        "loja/agente_configuracao.html",
+        contexto(
+            request,
+            usuario,
+            rascunho=rascunho,
+            versoes=versoes,
+            erro_integracao=erro_integracao,
+            max_instrucoes=MAX_INSTRUCOES_AGENTE,
+        ),
+    )
+
+
+@router.put("/app/loja/agente/configuracao.json")
+async def agente_configuracao_salvar(
+    request: Request,
+    db: Session = Depends(get_db),
+    chatbot: ChatbotClient = Depends(get_chatbot_client),
+):
+    """Autosave do rascunho. Devolve o prompt remontado e os conflitos.
+
+    O aviso de conflito é aviso: 422 aqui é campo inválido (Literal fora da
+    lista, horário sem zero à esquerda), nunca "você escreveu algo proibido".
+    """
+    usuario, recusa = _guard_agente_config(request, db, json_=True)
+    if recusa is not None:
+        return recusa
+    corpo = await request.json()
+    if not csrf_valido(request, (corpo or {}).get("csrf")):
+        return _json_erro(403, "sessao", "Sessão expirada")
+    campos = (corpo or {}).get("campos")
+    if not isinstance(campos, dict):
+        return _json_erro(400, "campos", "Campos ausentes")
+    try:
+        salvo = chatbot.salvar_rascunho_agente(campos, autor=usuario.email)
+    except CamposAgenteInvalidos as e:
+        # 422 tem que chegar como 422: virando 502 a tela culpa a conexão por um
+        # campo errado, e o lojista não descobre qual.
+        return JSONResponse(
+            {
+                "ok": False,
+                "error": "campos",
+                "message": "Confira os campos: algum valor não é aceito.",
+                "campos": e.campos,
+            },
+            status_code=422,
+        )
+    except ChatbotIndisponivel:
+        return _json_erro(502, "integracao", "Não foi possível salvar agora")
+    return JSONResponse({"ok": True, **salvo})
+
+
+@router.post("/app/loja/agente/configuracao/publicar")
+async def agente_configuracao_publicar(
+    request: Request,
+    db: Session = Depends(get_db),
+    chatbot: ChatbotClient = Depends(get_chatbot_client),
+):
+    usuario, recusa = _guard_agente_config(request, db, json_=False)
+    if recusa is not None:
+        return recusa
+    form = await request.form()
+    destino = "/app/loja/agente/configuracao"
+    if not csrf_valido(request, form.get("csrf")):
+        return RedirectResponse(_append_query(destino, erro="sessao"), status_code=303)
+    try:
+        chatbot.publicar_agente(autor=usuario.email)
+    except ChatbotIndisponivel:
+        return RedirectResponse(
+            _append_query(destino, erro="integracao"), status_code=303
+        )
+    return RedirectResponse(_append_query(destino, ok="publicado"), status_code=303)
+
+
+@router.post("/app/loja/agente/configuracao/restaurar")
+async def agente_configuracao_restaurar(
+    request: Request,
+    db: Session = Depends(get_db),
+    chatbot: ChatbotClient = Depends(get_chatbot_client),
+):
+    """Traz uma versão antiga para dentro do rascunho — e apaga o que estava lá.
+
+    Nada publicado é alterado e nenhuma versão some, mas o rascunho em andamento
+    é sobrescrito em silêncio do lado do chatbot. Quem avisa é a tela, antes.
+    """
+    usuario, recusa = _guard_agente_config(request, db, json_=False)
+    if recusa is not None:
+        return recusa
+    form = await request.form()
+    destino = "/app/loja/agente/configuracao"
+    if not csrf_valido(request, form.get("csrf")):
+        return RedirectResponse(_append_query(destino, erro="sessao"), status_code=303)
+    versao_id = (form.get("versao_id") or "").strip()
+    if not versao_id:
+        return RedirectResponse(_append_query(destino, erro="versao"), status_code=303)
+    try:
+        chatbot.restaurar_versao_agente(versao_id, autor=usuario.email)
+    except VersaoAgenteNaoEncontrada:
+        return RedirectResponse(_append_query(destino, erro="versao"), status_code=303)
+    except ChatbotIndisponivel:
+        return RedirectResponse(
+            _append_query(destino, erro="integracao"), status_code=303
+        )
+    return RedirectResponse(_append_query(destino, ok="restaurado"), status_code=303)

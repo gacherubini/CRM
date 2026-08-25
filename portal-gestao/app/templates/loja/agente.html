@@ -11,6 +11,10 @@
     <p>Quanto o agente atendeu sozinho e quanto passou para uma pessoa, no mês corrente.</p>
   </div>
   <div class="heading-actions">
+    {# Rota irmã, não aba: nao existe componente de abas no app.css. #}
+    {% if agente_config_habilitado %}
+    <a class="button secondary" href="/app/loja/agente/configuracao">Configurar agente</a>
+    {% endif %}
     <a class="button secondary" href="/app/loja/atendimento">Abrir Atendimento</a>
   </div>
 </div>

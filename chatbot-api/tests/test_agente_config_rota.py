@@ -95,3 +95,12 @@ def test_loja_sem_config_higieniza_como_sempre_higienizou(client, loja_a):
     sem emoji, que é o comportamento que já estava no ar."""
     r = client.get("/v1/agente/config", headers=loja_a["headers"])
     assert r.json()["saida"] == {"minusculas": True, "sem_emoji": True}
+
+
+def test_rascunho_diz_o_modo_da_loja(client, loja_a):
+    """O formulário esconde o que não existe no modo da loja (spec §4.4.1).
+    Quem sabe o modo é este produto; a Loja reimplementar o gate seria divergir
+    dele na primeira mudança."""
+    r = client.get("/v1/agente/rascunho", headers=loja_a["headers"])
+    assert r.status_code == 200
+    assert r.json()["modo"] in {"1", "2"}

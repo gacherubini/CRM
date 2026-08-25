@@ -29,6 +29,7 @@ from app import (  # noqa: F401 (registra os modelos)
     models_db,
     operacao,
     provisioning,
+    rodizio,
     servico,
     solicitacoes_simulacao,
 )
@@ -1356,6 +1357,11 @@ def _rascunho_para_saida(db: Session, loja_id: str) -> dict:
         "conflitos": agente_prompt.detectar_conflitos(
             str(versao.campos.get("instrucoes") or "")
         ),
+        # O formulário precisa saber o modo para esconder o que não existe do
+        # lado dele (spec §4.4.1): não há tool de foto no Modo 2, nem worker de
+        # follow-up no Modo 1. Quem sabe o modo é este produto — a Loja
+        # perguntar aqui é mais barato que ela reimplementar o gate e divergir.
+        "modo": "2" if rodizio.loja_opera_modo2(db, loja_id) else "1",
     }
 
 

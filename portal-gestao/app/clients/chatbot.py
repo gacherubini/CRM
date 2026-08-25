@@ -22,8 +22,39 @@ class ConversaNaoEncontrada(RuntimeError):
     pass
 
 
+class VersaoAgenteNaoEncontrada(RuntimeError):
+    pass
+
+
+class CamposAgenteInvalidos(ValueError):
+    """422 do chatbot: o formulário mandou valor que o schema recusa.
+
+    Existe porque sem ela o `raise_for_status` transformava o 422 em
+    `ChatbotIndisponivel`, e a tela dizia "não foi possível salvar agora" para
+    um erro de digitação — culpando a conexão pelo campo errado, sem dizer qual.
+    """
+
+    def __init__(self, campos: list[str]):
+        super().__init__("campos inválidos")
+        self.campos = campos
+
+
 class SimulacaoIndisponivel(RuntimeError):
     pass
+
+
+def _campos_do_422(resposta: Any) -> list[str]:
+    """Nomes dos campos que o pydantic recusou, para a tela apontar onde é."""
+    try:
+        detalhe = resposta.json().get("detail") or []
+    except ValueError:
+        return []
+    nomes = []
+    for item in detalhe if isinstance(detalhe, list) else []:
+        loc = [str(p) for p in (item or {}).get("loc", []) if p != "body"]
+        if loc:
+            nomes.append(".".join(loc))
+    return nomes
 
 
 class ChatbotClient:
@@ -58,6 +89,7 @@ class ChatbotClient:
         path: str,
         erro_404: type[Exception] | None = None,
         erro_409: type[Exception] | None = None,
+        erro_422: bool = False,
         **kwargs,
     ) -> Any:
         if not self.configurado:
@@ -78,8 +110,12 @@ class ChatbotClient:
                     raise erro_404("recurso não encontrado")
                 if resposta.status_code == 409 and erro_409 is not None:
                     raise erro_409("recurso não habilitado")
+                if resposta.status_code == 422 and erro_422:
+                    raise CamposAgenteInvalidos(_campos_do_422(resposta))
                 resposta.raise_for_status()
                 return resposta.json()
+        except CamposAgenteInvalidos:
+            raise
         except (httpx.HTTPError, ValueError):
             raise ChatbotIndisponivel(
                 "Não foi possível acessar o chatbot agora"
@@ -394,3 +430,43 @@ class ChatbotClient:
 
     def remover_numero_cadastro(self, telefone: str) -> dict:
         return self._request("DELETE", f"/v1/operacao/numeros-autorizados/{telefone}")
+
+    # --- Agente por loja (config do prompt) -----------------------------------
+    # A Loja é só tela: o dado, o gerador de texto e o núcleo Revy moram no
+    # `chatbot-api`. Ela não guarda tabela nem remonta prompt — pede e mostra.
+
+    def obter_rascunho_agente(self) -> dict:
+        """`campos`, `prompt`, `conflitos` e `modo` da loja da sessão.
+
+        Não é idempotente do lado de lá: para loja sem rascunho, o GET **cria**
+        a linha. É de propósito (a tela precisa de algo para editar), mas
+        surpreende quem espera um GET puro.
+        """
+        return self._request("GET", "/v1/agente/rascunho")
+
+    def salvar_rascunho_agente(self, campos: dict, autor: str | None = None) -> dict:
+        params = {"autor": autor} if autor else {}
+        return self._request(
+            "PUT", "/v1/agente/rascunho", params=params, erro_422=True, json=campos
+        )
+
+    def publicar_agente(self, autor: str | None = None) -> dict:
+        params = {"autor": autor} if autor else {}
+        return self._request("POST", "/v1/agente/publicar", params=params)
+
+    def listar_versoes_agente(self) -> list[dict]:
+        return self._request("GET", "/v1/agente/versoes")
+
+    def restaurar_versao_agente(self, versao_id: str, autor: str | None = None) -> dict:
+        """Carrega a versão antiga **para dentro do rascunho atual**.
+
+        Não cria versão publicada nova e não apaga histórico — mas sobrescreve o
+        rascunho em andamento. A tela avisa antes de chamar.
+        """
+        params = {"autor": autor} if autor else {}
+        return self._request(
+            "POST",
+            f"/v1/agente/versoes/{versao_id}/restaurar",
+            erro_404=VersaoAgenteNaoEncontrada,
+            params=params,
+        )

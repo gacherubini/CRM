@@ -65,7 +65,7 @@ Tokens das APIs ficam **somente no servidor**; o navegador recebe uma sessão as
 | `app/loja/` + `app/web/loja_*.py` | Shell Revy Loja (domínio + rotas) |
 | `app/loja/copiloto/` + `app/web/loja_copiloto.py` | Copiloto: tools, sinais, FIPE, ações, chat, sino |
 | `app/copiloto_sinais_job.py` · `app/copiloto_purge_job.py` | Worker de regras e retenção |
-| `app/loja/routes.py` | Atendimento (chat, envio, polling, visão do agente) |
+| `app/loja/routes.py` | Atendimento (chat, envio, polling, visão do agente) e **configuração do agente** |
 | `app/loja/sales_overview.py` | Visão geral de Vendas e painel de aquisição |
 | `app/web/simulacoes.py` | Simulação manual, jobs, histórico, prints |
 | `app/web/trafego.py` | Campanhas, ROI, Pixel/CAPI, Ads e jobs de tráfego |
@@ -110,6 +110,7 @@ entitlements, atendimento e WhatsApp por secrets; redirect legado segue off.
 | `REVY_LOJA_REDIRECT_LEGACY` | 303 de paths legados → shell (exige shell on) |
 | `REVY_LOJA_COPILOTO_ENABLED` | Seção e rotas `/app/loja/copiloto` (exige shell + módulo) |
 | `REVY_LOJA_FINANCEIRO_ENABLED` | Seção e rotas `/app/loja/financeiro` (exige shell + módulo) |
+| `REVY_LOJA_AGENTE_CONFIG_ENABLED` | Tela `/app/loja/agente/configuracao` (sem gate de módulo) |
 | `SELLER_AI_ENABLED` | Seller AI (F7+); ainda não altera rotas |
 
 Integração com o Revy Control: `REVY_TRAFEGO_URL`, `REVY_TRAFEGO_SERVICE_TOKEN`,
@@ -119,6 +120,37 @@ Integração com o Revy Control: `REVY_TRAFEGO_URL`, `REVY_TRAFEGO_SERVICE_TOKEN
 `PORTAL_ENCRYPTION_KEY` (Fernet do outbox e demais segredos locais).
 
 Config técnica de Pixel/CAPI/campanhas **não fica aqui** — é operada no `revy-trafego`.
+
+## Configuração do agente (`/app/loja/agente/configuracao`)
+
+O lojista escreve **campos**, não prompt. A Loja aqui é **só tela**: os campos, o texto
+gerado, o núcleo Revy, as versões e o histórico moram no `chatbot-api` e chegam pelo
+`ChatbotClient`. Nenhuma tabela nova, nenhuma montagem de texto neste produto.
+
+- **Gate: sessão + flag + papel dono/gerente. São três, não quatro** — a tela vizinha
+  (`/app/loja/agente`) não tem gate de módulo, e a configuração segue o gate da tela onde
+  ela mora. Módulo próprio exigiria recriar o CHECK de `modulos_revy` numa migration.
+- **Rota irmã, não aba.** Não existe componente de abas no `app.css`; inventar um é
+  decisão de design. O padrão da casa é rota própria + link recíproco no
+  `.heading-actions`.
+- **O formulário é consciente do modo da loja.** No Modo 2 não existe tool de foto (campo
+  desabilitado, com a razão à vista) e existe follow-up (interruptor aparece). No Modo 1 é
+  o contrário. O modo vem do `chatbot-api`, em `GET /v1/agente/rascunho` — a Loja não
+  reimplementa o gate.
+- **O aviso de conflito avisa, não bloqueia.** `422` é campo inválido; conflito com o
+  núcleo é texto amarelo e o lojista salva assim mesmo.
+- **`422` precisa chegar como `422`.** O `raise_for_status` do `ChatbotClient`
+  transformava o `422` em `ChatbotIndisponivel`, e a tela dizia "não foi possível salvar
+  agora" para um erro de digitação — culpando a conexão, sem dizer qual campo. Hoje há
+  `CamposAgenteInvalidos`, e a mensagem nomeia o campo.
+- **Restaurar sobrescreve o rascunho aberto.** A confirmação é da tela: o chatbot faz em
+  silêncio.
+- **A tela não se verifica com pytest.** Formulário e autosave são JS. Verificação é no
+  navegador, com portal local semeado — foi assim que o `422`→`502` apareceu, com um
+  horário sem zero à esquerda.
+- Expressões e "nunca diga" são **texto separado por vírgula**, não chips: um editor de
+  chips é estado escondido a mais numa tela que já tem autosave. O dado no backend é lista
+  nos dois casos.
 
 ## Usar o chat no Atendimento
 

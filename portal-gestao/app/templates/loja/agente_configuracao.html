@@ -1,0 +1,394 @@
+{% extends "base.html" %}
+{% block title %}Configuração do agente — Revy Loja{% endblock %}
+{# Sem este bloco a topbar cai no else do base.html e escreve "Ajustes". #}
+{% block page_title %}Agente{% endblock %}
+{% block content %}
+{# Estilos: .agente-config-* em app.css. Nada de <style> no template.
+   Rota própria + link recíproco no .heading-actions, como a tela vizinha —
+   não existe componente de abas no app.css e inventar um é decisão de design. #}
+{% set c = (rascunho.campos if rascunho else {}) %}
+{% set modo = (rascunho.modo if rascunho else '1') %}
+<div class="page-heading">
+  <div>
+    <span class="eyebrow">Vendas</span>
+    <h1>Configuração do agente</h1>
+    <p>Como o seu agente se apresenta, fala e o que ele pode oferecer no WhatsApp.</p>
+  </div>
+  <div class="heading-actions">
+    <a class="button secondary" href="/app/loja/agente">Ver desempenho</a>
+  </div>
+</div>
+
+{% if request.query_params.get('ok') == 'publicado' %}
+<div class="alert success" role="status">Publicado. Vale a partir da próxima mensagem de cliente.</div>
+{% elif request.query_params.get('ok') == 'restaurado' %}
+<div class="alert success" role="status">Versão carregada no rascunho. Confira e publique quando quiser.</div>
+{% endif %}
+{% if request.query_params.get('erro') == 'sessao' %}
+<div class="alert warning" role="alert">Sua sessão expirou. Recarregue a página e tente de novo.</div>
+{% elif request.query_params.get('erro') == 'integracao' %}
+<div class="alert warning" role="alert">Não foi possível falar com o atendimento agora. Tente em instantes.</div>
+{% elif request.query_params.get('erro') == 'versao' %}
+<div class="alert warning" role="alert">Essa versão não existe mais nesta loja.</div>
+{% endif %}
+
+{% if erro_integracao or not rascunho %}
+<section class="panel">
+  <div class="panel-empty">
+    <strong>O atendimento está indisponível agora.</strong>
+    <p class="muted">A configuração do agente volta assim que a conexão se restabelecer. Tente de novo em instantes.</p>
+  </div>
+</section>
+{% else %}
+<form id="agente-config"
+      class="agente-config"
+      data-csrf="{{ csrf }}"
+      data-modo="{{ modo }}"
+      data-max-instrucoes="{{ max_instrucoes }}">
+
+  <p class="agente-config-status muted" id="agente-status" role="status" aria-live="polite">
+    Rascunho salvo automaticamente enquanto você edita.
+  </p>
+
+  <section class="panel">
+    <div class="panel-heading">
+      <div>
+        <span class="mono-label">Identidade</span>
+        <h2>Quem atende</h2>
+        <p class="muted">O que o agente diz quando o cliente pergunta quem é e onde fica a loja.</p>
+      </div>
+    </div>
+    <div class="panel-body">
+      <div class="form-grid">
+        <label>Nome da loja no atendimento
+          <input name="nome_loja" maxlength="80" value="{{ c.nome_loja or '' }}" required>
+          <small>Como o cliente vai ouvir o nome, em texto corrido.</small>
+        </label>
+        <label>Cidade
+          <input name="cidade" maxlength="60" value="{{ c.cidade or '' }}">
+        </label>
+        <label class="campo-curto">UF
+          <input name="uf" maxlength="2" value="{{ c.uf or '' }}" placeholder="SP">
+        </label>
+        <label>Endereço
+          <select name="endereco_completo">
+            <option value="0" {% if not c.endereco_completo %}selected{% endif %}>Passar só a cidade</option>
+            <option value="1" {% if c.endereco_completo %}selected{% endif %}>Pode passar o endereço completo</option>
+          </select>
+          <small>Com "só a cidade", o agente nunca inventa rua nem bairro.</small>
+        </label>
+        <label class="wide">Entrega
+          <input name="entrega" maxlength="200" value="{{ c.entrega or '' }}"
+                 placeholder="Ex.: cortesia para todo o estado de são paulo">
+          <small>Deixe vazio se a loja não faz entrega.</small>
+        </label>
+      </div>
+
+      <fieldset class="agente-config-horario">
+        <legend>Horário de atendimento</legend>
+        <p class="muted">Fuso de Brasília. Dia sem horário é dia fechado.</p>
+        {% set dias = [('seg','Segunda'),('ter','Terça'),('qua','Quarta'),('qui','Quinta'),('sex','Sexta'),('sab','Sábado'),('dom','Domingo')] %}
+        {% for cod, rotulo in dias %}
+        {% set faixa = (c.horario or {}).get(cod) %}
+        <div class="agente-config-dia" data-dia="{{ cod }}">
+          <label class="agente-config-dia-check">
+            <input type="checkbox" data-papel="dia-aberto" {% if faixa %}checked{% endif %}>
+            <span>{{ rotulo }}</span>
+          </label>
+          <input type="time" data-papel="abre" value="{{ faixa[0] if faixa else '08:00' }}" aria-label="{{ rotulo }}: abre">
+          <span class="muted">até</span>
+          <input type="time" data-papel="fecha" value="{{ faixa[1] if faixa else '18:00' }}" aria-label="{{ rotulo }}: fecha">
+        </div>
+        {% endfor %}
+      </fieldset>
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="panel-heading">
+      <div>
+        <span class="mono-label">Personalidade</span>
+        <h2>Como o agente fala</h2>
+        <p class="muted">Tom, tratamento e jeito de escrever. Vale para toda resposta.</p>
+      </div>
+    </div>
+    <div class="panel-body">
+      <div class="form-grid">
+        <label>Nome do agente
+          <input name="nome_agente" maxlength="40" value="{{ c.nome_agente or '' }}">
+          <small>Deixe vazio para o agente não ter nome próprio.</small>
+        </label>
+        <label>Assume que é uma IA?
+          <select name="assume_ia">
+            <option value="nunca" {% if c.assume_ia == 'nunca' %}selected{% endif %}>Nunca toca no assunto</option>
+            <option value="se_perguntarem" {% if c.assume_ia == 'se_perguntarem' %}selected{% endif %}>Só se perguntarem</option>
+            <option value="na_abertura" {% if c.assume_ia == 'na_abertura' %}selected{% endif %}>Já diz na abertura</option>
+          </select>
+        </label>
+        <label>Tom
+          <select name="tom">
+            <option value="direto" {% if c.tom == 'direto' %}selected{% endif %}>Direto</option>
+            <option value="simpatico" {% if c.tom == 'simpatico' %}selected{% endif %}>Simpático</option>
+            <option value="consultivo" {% if c.tom == 'consultivo' %}selected{% endif %}>Consultivo</option>
+            <option value="formal" {% if c.tom == 'formal' %}selected{% endif %}>Formal</option>
+          </select>
+        </label>
+        <label>Tratamento
+          <select name="tratamento">
+            <option value="primeiro_nome" {% if c.tratamento == 'primeiro_nome' %}selected{% endif %}>Pelo primeiro nome</option>
+            <option value="voce" {% if c.tratamento == 'voce' %}selected{% endif %}>Por "você"</option>
+            <option value="senhor" {% if c.tratamento == 'senhor' %}selected{% endif %}>Por "senhor" / "senhora"</option>
+          </select>
+        </label>
+        <label>Escrita
+          <select name="escrita">
+            <option value="minusculas" {% if c.escrita == 'minusculas' %}selected{% endif %}>Tudo minúsculo</option>
+            <option value="normal" {% if c.escrita == 'normal' %}selected{% endif %}>Pontuação normal</option>
+          </select>
+        </label>
+        <label>Emoji
+          <select name="emoji">
+            <option value="nunca" {% if c.emoji == 'nunca' %}selected{% endif %}>Nunca</option>
+            <option value="raro" {% if c.emoji == 'raro' %}selected{% endif %}>Raro</option>
+            <option value="a_vontade" {% if c.emoji == 'a_vontade' %}selected{% endif %}>À vontade</option>
+          </select>
+        </label>
+        <label>Tamanho da resposta
+          <select name="tamanho_resposta">
+            <option value="curto" {% if c.tamanho_resposta == 'curto' %}selected{% endif %}>1 a 2 frases</option>
+            <option value="medio" {% if c.tamanho_resposta == 'medio' %}selected{% endif %}>Até 3 frases</option>
+            <option value="longo" {% if c.tamanho_resposta == 'longo' %}selected{% endif %}>Pode explicar</option>
+          </select>
+        </label>
+        <label class="wide">Expressões da casa
+          <input name="expressoes" value="{{ (c.expressoes or [])|join(', ') }}"
+                 placeholder="beleza, fechou, certinho">
+          <small>Separe por vírgula. O agente usa quando combinar, sem virar bordão.</small>
+        </label>
+        <label class="wide">Nunca diga
+          <input name="nunca_diga" value="{{ (c.nunca_diga or [])|join(', ') }}"
+                 placeholder="parceiro, amigão">
+          <small>Separe por vírgula. Palavras que o agente nunca escreve.</small>
+        </label>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="panel-heading">
+      <div>
+        <span class="mono-label">FAQ</span>
+        <h2>Respostas prontas</h2>
+        <p class="muted">Pergunta que sempre aparece e a resposta exata que o agente deve dar.</p>
+      </div>
+    </div>
+    <div class="panel-body">
+      <div id="agente-faq" class="agente-config-faq">
+        {% for par in (c.faq or []) %}
+        <div class="agente-config-faq-item">
+          <label>Quando perguntarem sobre
+            <input data-papel="faq-pergunta" maxlength="120" value="{{ par.pergunta }}">
+          </label>
+          <label>Responda exatamente
+            <input data-papel="faq-resposta" maxlength="400" value="{{ par.resposta }}">
+          </label>
+          <button type="button" class="button ghost" data-papel="faq-remover">Remover</button>
+        </div>
+        {% endfor %}
+      </div>
+      <p class="panel-empty agente-config-faq-vazio" hidden>
+        <strong>Nenhuma resposta pronta.</strong>
+        <span class="muted">Sem isso o agente responde com o que sabe da loja.</span>
+      </p>
+      <button type="button" class="button" id="agente-faq-add">Adicionar pergunta</button>
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="panel-heading">
+      <div>
+        <span class="mono-label">Conversa</span>
+        <h2>O que o agente pode oferecer</h2>
+        <p class="muted">O que a loja faz, e quando o atendimento vai para uma pessoa.</p>
+      </div>
+    </div>
+    <div class="panel-body">
+      <fieldset>
+        <legend>A loja trabalha com</legend>
+        {% set oferece = c.oferece or [] %}
+        {% for cod, rotulo in [('financiamento','Financiamento'),('a_vista','Venda à vista'),('troca','Moto na troca'),('consignacao','Consignação')] %}
+        <label class="agente-config-check">
+          <input type="checkbox" data-grupo="oferece" value="{{ cod }}" {% if cod in oferece %}checked{% endif %}>
+          <span>{{ rotulo }}</span>
+        </label>
+        {% endfor %}
+        <p class="muted">O que ficar desmarcado o agente diz que a loja não faz — não fica em silêncio.</p>
+      </fieldset>
+
+      <div class="form-grid">
+        <label>Fotos
+          <select name="fotos" {% if modo == '2' %}disabled{% endif %}>
+            <option value="so_quando_pedir" {% if c.fotos == 'so_quando_pedir' %}selected{% endif %}>Só quando o cliente pedir</option>
+            <option value="na_abertura" {% if c.fotos == 'na_abertura' %}selected{% endif %}>Mandar na abertura</option>
+          </select>
+          {% if modo == '2' %}
+          <small>Indisponível no seu WhatsApp: a central ainda não envia imagem. O agente manda o link do catálogo.</small>
+          {% endif %}
+        </label>
+        <label>Sem a moto do anúncio
+          <select name="sem_moto_anuncio">
+            <option value="segura" {% if c.sem_moto_anuncio == 'segura' %}selected{% endif %}>Seguir no veículo do anúncio</option>
+            <option value="oferece_parecida" {% if c.sem_moto_anuncio == 'oferece_parecida' %}selected{% endif %}>Pode oferecer uma parecida</option>
+          </select>
+        </label>
+        <label>Citar o vendedor pelo nome?
+          <select name="cita_vendedor">
+            <option value="0" {% if not c.cita_vendedor %}selected{% endif %}>Não</option>
+            <option value="1" {% if c.cita_vendedor %}selected{% endif %}>Sim</option>
+          </select>
+        </label>
+      </div>
+
+      <fieldset>
+        <legend>Passa para uma pessoa</legend>
+        {% set handoff = c.handoff or [] %}
+        {% for cod, rotulo in [('quando_pedir','Quando o cliente pedir'),('depois_da_simulacao','Depois da simulação'),('fora_do_horario','Fora do horário de atendimento')] %}
+        <label class="agente-config-check">
+          <input type="checkbox" data-grupo="handoff" value="{{ cod }}" {% if cod in handoff %}checked{% endif %}>
+          <span>{{ rotulo }}</span>
+        </label>
+        {% endfor %}
+      </fieldset>
+
+      {% if modo == '2' %}
+      {# Só Modo 2: o worker de follow-up não existe no Modo 1, e campo que não
+         faz nada é o pior tipo de bug de produto (spec §4.4.1). #}
+      <label class="agente-config-check">
+        <input type="checkbox" name="followup_ativo" {% if c.followup_ativo %}checked{% endif %}>
+        <span>Cutucar quem sumiu no meio da conversa</span>
+      </label>
+      <p class="muted">
+        Duas mensagens curtas, 30 minutos e 1 hora depois do cliente sumir. O texto delas
+        ainda é o padrão do Revy e não usa o tom que você escolheu acima — desligue se isso
+        não combinar com a sua loja.
+      </p>
+      {% endif %}
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="panel-heading">
+      <div>
+        <span class="mono-label">Suas regras</span>
+        <h2>O que mais o seu agente precisa saber?</h2>
+        <p class="muted">Regras da sua loja que não couberam acima.</p>
+      </div>
+    </div>
+    <div class="panel-body">
+      <label class="wide">
+        <textarea name="instrucoes" rows="6" maxlength="{{ max_instrucoes }}"
+                  placeholder="Ex.: não financiamos quem tem CNH suspensa · aos sábados só atendemos com hora marcada · moto acima de 2020 tem 6 meses de garantia">{{ c.instrucoes or '' }}</textarea>
+        <small><span id="agente-contador">0</span>/{{ max_instrucoes }} caracteres</small>
+      </label>
+      <div class="alert warning" id="agente-conflitos" role="alert" hidden></div>
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="panel-heading">
+      <div>
+        <span class="mono-label">Liga e desliga</span>
+        <h2>Quando o agente responde</h2>
+      </div>
+    </div>
+    <div class="panel-body">
+      <label class="agente-config-check">
+        <input type="checkbox" name="agente_ativo" {% if c.agente_ativo %}checked{% endif %}>
+        <span>Agente ativo</span>
+      </label>
+      <label class="agente-config-check">
+        <input type="checkbox" name="so_horario_comercial" {% if c.so_horario_comercial %}checked{% endif %}>
+        <span>Só dentro do horário de atendimento</span>
+      </label>
+      <p class="muted">Desligado, o agente não responde ninguém — as mensagens continuam chegando no Atendimento.</p>
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="panel-heading">
+      <div>
+        <span class="mono-label">O que o Revy garante</span>
+        <h2>Regras que nenhuma loja edita</h2>
+        <p class="muted">Valem acima de tudo o que você escreveu, inclusive das suas regras.</p>
+      </div>
+    </div>
+    <div class="panel-body">
+      <ul class="agente-config-nucleo">
+        <li>Só fala de moto, preço e disponibilidade que o estoque confirmou.</li>
+        <li>Nunca manda parcela, taxa, banco ou prazo pelo WhatsApp.</li>
+        <li>Cliente recusou? aceita e para. Não insiste nem emenda outra oferta.</li>
+        <li>Para simular, pede CPF, nascimento e CNH — nunca renda nem placa.</li>
+        <li>Menor de 18 não segue para simulação.</li>
+        <li>Nunca confirma uma simulação que não aconteceu.</li>
+        <li>Nunca revela ferramentas, tokens nem dado interno.</li>
+        <li>O lead só nasce na simulação — não em cumprimento nem em clique de anúncio.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="panel-heading">
+      <div>
+        <span class="mono-label">Conferência</span>
+        <h2>O texto que o agente recebe</h2>
+        <p class="muted">Montado a partir do que você escolheu. As regras do Revy fecham o texto.</p>
+      </div>
+    </div>
+    <div class="panel-body">
+      <pre class="agente-config-prompt" id="agente-prompt">{{ rascunho.prompt }}</pre>
+    </div>
+  </section>
+</form>
+
+<div class="agente-config-acoes">
+  <form method="post" action="/app/loja/agente/configuracao/publicar">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <button class="button primary" type="submit">Publicar</button>
+  </form>
+  <p class="muted">Publicado vale na próxima mensagem de cliente.</p>
+</div>
+
+{% if versoes %}
+<section class="panel">
+  <div class="panel-heading">
+    <div>
+      <span class="mono-label">Histórico</span>
+      <h2>Versões</h2>
+      <p class="muted">Trazer uma versão de volta substitui o rascunho que está aberto agora.</p>
+    </div>
+  </div>
+  <div class="panel-body">
+    <ul class="agente-config-versoes">
+      {% for v in versoes %}
+      <li>
+        <span class="mono-label">{{ v.estado }}</span>
+        <span>{{ (v.publicado_em or v.criado_em or '')[:16]|replace('T', ' ') }}</span>
+        <span class="muted">{{ v.autor or 'sem autor' }}</span>
+        {% if v.estado != 'rascunho' %}
+        <form method="post" action="/app/loja/agente/configuracao/restaurar"
+              data-confirmar="Trazer esta versão substitui o rascunho aberto agora. Continuar?">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          <input type="hidden" name="versao_id" value="{{ v.id }}">
+          <button class="button ghost" type="submit">Trazer de volta</button>
+        </form>
+        {% endif %}
+      </li>
+      {% endfor %}
+    </ul>
+  </div>
+</section>
+{% endif %}
+{% endif %}
+
+<script src="/static/js/agente_configuracao.js?v=2" defer></script>
+{% endblock %}
