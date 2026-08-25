@@ -576,8 +576,17 @@ class AgenteConfig(Base):
     modelo: Mapped[str | None] = mapped_column(String(80), nullable=True)
 ```
 
-Confira o topo do arquivo: se `JSON` ou `Text` não estiverem no import de
-`sqlalchemy`, acrescente-os ao import existente.
+**O import precisa mudar.** A linha 8 de `models_db.py` hoje é:
+
+```python
+from sqlalchemy import Boolean, DateTime, ForeignKey, Index, Integer, String, Text, UniqueConstraint
+```
+
+`Text` já está lá; **`JSON` não**. Acrescente:
+
+```python
+from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Index, Integer, String, Text, UniqueConstraint
+```
 
 - [ ] **Step 4: Escreva a migration**
 
@@ -994,8 +1003,22 @@ def test_loja_sem_config_recebe_o_padrao_revy(client, loja_a):
 
 - [ ] **Step 3: Escreva a rota**
 
-Em `chatbot-api/app/main.py`, logo depois de `config_catalogo_bot`. Confira que
-`agente_config` e `agente_prompt` estão nos imports do topo:
+**Primeiro o import.** `main.py:24` tem o bloco que registra os módulos:
+
+```python
+from app import (  # noqa: F401 (registra os modelos)
+    channels,
+    config,
+    models_db,
+    ...
+)
+```
+
+Acrescente `agente_config` e `agente_prompt` nessa lista, em ordem alfabética (ficam antes
+de `channels`). `datetime`, `timezone`, `Optional`, `BaseModel`, `HTTPException`,
+`resolver_loja_id` e `_exigir_loja_operacional` **já estão** disponíveis — não mexa neles.
+
+Agora a rota, em `chatbot-api/app/main.py`, logo depois de `config_catalogo_bot`:
 
 ```python
 @app.get("/v1/agente/config")
@@ -1273,12 +1296,14 @@ def _publicar(db, loja_id, **over):
 
 
 def test_agente_desligado_nao_responde(client, db, loja_a):
+    """`instance` é obrigatório no corpo: PodeResponderInput tem extra='forbid'."""
     _publicar(db, loja_a["loja_id"], agente_ativo=False)
     r = client.post(
         "/v1/conversas/5519999999999/pode-responder",
-        json={"provider_message_id": "m1"},
+        json={"instance": loja_a["instance"], "provider_message_id": "m1"},
         headers=loja_a["headers"],
     )
+    assert r.status_code == 200
     assert r.json()["pode_responder"] is False
     assert r.json()["motivo"] == "agente_desligado"
 
@@ -1287,11 +1312,11 @@ def test_agente_ligado_segue_o_fluxo_normal(client, db, loja_a):
     _publicar(db, loja_a["loja_id"], agente_ativo=True)
     r = client.post(
         "/v1/conversas/5519999999999/pode-responder",
-        json={"provider_message_id": "m2"},
+        json={"instance": loja_a["instance"], "provider_message_id": "m2"},
         headers=loja_a["headers"],
     )
     assert r.status_code == 200
-    assert "motivo" not in r.json() or r.json().get("motivo") != "agente_desligado"
+    assert r.json().get("motivo") != "agente_desligado"
 
 
 def test_fora_do_horario_quando_a_loja_pediu_so_comercial(db):
@@ -1357,8 +1382,11 @@ Em `chatbot-api/app/main.py`, dentro de `pode_responder`, logo **depois** de
         return {"pode_responder": False, "motivo": "fora_de_horario"}
 ```
 
-Confira que `datetime` e `timezone` já estão importados no topo de `main.py`; se não,
-acrescente ao import existente.
+O formato do retorno **não é invenção**: é o mesmo que `servico.pode_responder_mensagem`
+já devolve (`{"pode_responder": False, "motivo": "bot_inativo"}`), e o gate do n8n lê
+`pode_responder !== true`. Nada no workflow precisa mudar por causa desta task.
+
+`datetime` e `timezone` já estão importados em `main.py:11`. Não mexa no import.
 
 - [ ] **Step 5: Rode e confirme que passa**
 
@@ -1480,18 +1508,42 @@ toque é enviado mesmo com o interruptor desligado.
 
 - [ ] **Step 4: Escreva o filtro**
 
-Em `FollowupWorker.run_once`, junto dos filtros que já existem:
+O laço é **por conversa**, não por loja. No topo de `run_once`, junto do import tardio que
+já existe:
 
 ```python
+    def run_once(self, db: Session, *, outbound) -> dict[str, int]:
+        from app.rodizio import loja_opera_modo2
         from app import agente_config
 
-        if not agente_config.campos_publicados(db, loja_id).followup_ativo:
-            continue
+        # Cache por loja: o laço é por conversa, e sem isto seria uma consulta
+        # de config por conversa calada.
+        followup_ligado: dict[str, bool] = {}
 ```
 
-Import tardio pelo mesmo motivo do `auth`: `agente_config` importa `models_db`, e o topo
-daria ciclo. Ponha o `continue` no laço por loja; se o worker varre conversas e não lojas,
-resolva a loja da conversa antes e mantenha o filtro no mesmo ponto de `loja_opera_modo2`.
+Import tardio pelo mesmo motivo do `auth`: `agente_config` importa `models_db` e o topo
+daria ciclo.
+
+Dentro do laço, **logo depois** da linha que já existe:
+
+```python
+            if not loja_opera_modo2(db, conversa.loja_id):
+                continue
+```
+
+acrescente:
+
+```python
+            if conversa.loja_id not in followup_ligado:
+                followup_ligado[conversa.loja_id] = agente_config.campos_publicados(
+                    db, conversa.loja_id
+                ).followup_ativo
+            if not followup_ligado[conversa.loja_id]:
+                continue
+```
+
+Nada mais muda: a cadência, o teto de dois toques e os textos de `_TEXTOS` ficam como
+estão. Esta task é o interruptor, não a configuração (spec §4.4.2).
 
 - [ ] **Step 5: Rode e confirme que passa**
 
