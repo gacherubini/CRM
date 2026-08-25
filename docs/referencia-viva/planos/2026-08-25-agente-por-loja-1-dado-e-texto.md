@@ -1,5 +1,21 @@
 # Agente por loja — 1/4: o dado e o texto — Implementation Plan
 
+> **EXECUTADO em 25/08/2026.** As sete tasks foram implementadas, revisadas uma a uma e
+> passaram por uma revisão final do conjunto. Suíte do `chatbot-api`: **518 → 581**.
+> Commits `7083d6f..0ee8798`. Deployado no `app2037`.
+>
+> A revisão final achou cinco defeitos que as revisões por task não viam, todos
+> corrigidos em `0f6456c`. O mais caro: `salvar_rascunho` e `obter_rascunho` liam a linha
+> de rascunho com ordenações diferentes — com duas linhas, o `PUT` escrevia numa e
+> devolvia outra, e o `publicar` seguinte punha no ar um texto que o lojista não escreveu.
+> Consertado com ordenação alinhada e índice único **parcial** (`estado = 'rascunho'`).
+>
+> Duas mudanças de escopo durante a execução, com motivo no spec: o modelo de LLM ficou
+> **global** (§7) e `só lead de anúncio` foi **removido do schema** (§4.6).
+>
+> **Não reexecutar.** O que falta são os cards 2 (n8n), 3 (tela) e 4 (preview) —
+> resumidos em `chatbot-api/README.md`, seção "Configuração do agente por loja".
+
 > **For agentic workers:** REQUIRED SUB-SKILL: use `superpowers:subagent-driven-development`
 > (recomendado) ou `superpowers:executing-plans` para executar task a task. Os passos usam
 > checkbox (`- [ ]`).

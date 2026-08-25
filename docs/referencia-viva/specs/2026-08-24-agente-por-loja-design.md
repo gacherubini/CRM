@@ -1,6 +1,8 @@
 # Agente por loja — design
 
-Status: desenho aprovado pelo dono em 24/08/2026. Não implementado.
+Status: **card 1 de 4 implementado e no ar** (25/08/2026, commits `7083d6f..0ee8798`).
+Cards 2 (n8n), 3 (tela) e 4 (preview) não começaram — nada disto chega ao cliente ainda.
+Plano executado: [`../planos/2026-08-25-agente-por-loja-1-dado-e-texto.md`](../planos/2026-08-25-agente-por-loja-1-dado-e-texto.md).
 Produtos tocados: `chatbot-api` (dono do dado), `portal-gestao` (tela), `n8n` (prompt).
 
 ## 1. O problema

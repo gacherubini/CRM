@@ -102,6 +102,99 @@ Domínio em `app/servico.py`; bootstrap e rotas em `app/main.py`.
   terceira loja) e disparo para a base — os três inúteis enquanto o número for o de teste
   da Meta. Não planeje nenhum passo do Modo 2 como "agora que estamos verificados".
 
+## Configuração do agente por loja
+
+Desde 25/08 o `chatbot-api` guarda, versiona e serve **o prompt do agente de cada loja**.
+Antes disso existia um agente só, com `vitor motos` escrito à mão dentro do
+`n8n/workflow-ai-nao-salvos.json` — a segunda loja se apresentaria como a primeira.
+
+**Ainda não está no ar para o cliente final.** As rotas existem e ninguém as chama: o n8n
+continua com o `systemMessage` fixo, não há tela, e nenhuma flag foi ligada. O bot fala
+exatamente igual ao de antes. Ver "O que falta", no fim desta seção.
+
+Spec: [`../docs/referencia-viva/specs/2026-08-24-agente-por-loja-design.md`](../docs/referencia-viva/specs/2026-08-24-agente-por-loja-design.md).
+
+### Onde mora o quê
+
+| Coisa | Onde |
+|---|---|
+| Campos do formulário | `agente_config_versao.campos` (JSON) |
+| Texto final do prompt, congelado | `agente_config_versao.prompt_gerado` |
+| Qual versão está no ar | `agente_config.versao_publicada_id` |
+| Núcleo Revy (regras que o lojista não edita) | `app/agente_prompt.py`, em **código**, não em dado |
+| Geradores de texto por campo | `app/agente_prompt.py` |
+| Rascunho, publicar, restaurar, histórico | `app/agente_config.py` |
+| Rotas | `app/main.py`, prefixo `/v1/agente` |
+
+O prompt é **montado uma vez, no `salvar_rascunho`**, e congelado em `prompt_gerado`.
+`GET /v1/agente/config` faz um `SELECT`, não remonta. Isso é o que permite auditar o texto
+que o bot recebeu naquela versão — melhorar o gerador amanhã não reescreve o histórico.
+
+### Rotas
+
+| Rota | Papel |
+|---|---|
+| `GET /v1/agente/config` | o que o n8n vai consumir: prompt + `max_output_tokens` + `agente_ativo` |
+| `GET` / `PUT /v1/agente/rascunho` | a tela edita aqui; devolve `campos`, `prompt` e `conflitos` |
+| `POST /v1/agente/publicar` | leva o rascunho ao ar |
+| `GET /v1/agente/versoes` | histórico |
+| `POST /v1/agente/versoes/{id}/restaurar` | traz uma versão antiga **para dentro do rascunho** |
+
+### Armadilhas desta feature
+
+- **O núcleo Revy é o último bloco do prompt, sempre.** É o mecanismo de segurança
+  inteiro: o lojista escreve os cinco blocos de cima, e o núcleo vem depois dizendo que
+  nada acima pode contradizê-lo. Não é confiança no lojista, é ordem de leitura. Se
+  alguém acrescentar qualquer coisa depois dele — rodapé, marca d'água, debug — a
+  proteção acabou. Há teste no nível do serviço **e** no nível HTTP guardando isso.
+- **`restaurar` sobrescreve o rascunho em andamento.** Ele não cria versão nova: carrega
+  os campos da versão antiga para dentro da linha de rascunho que já existe. Nenhuma
+  versão publicada ou arquivada é alterada. A tela precisa avisar antes.
+- **`GET /v1/agente/rascunho` escreve.** Para loja sem rascunho, `obter_rascunho` cria a
+  linha e commita. Um GET não idempotente — de propósito, mas surpreende.
+- **Só existe um rascunho por loja, e há índice único parcial garantindo isso**
+  (`uq_agente_config_versao_rascunho_por_loja`, restrito a `estado = 'rascunho'`). Ele é
+  **parcial** porque um `UniqueConstraint(loja_id, estado)` simples proibiria duas versões
+  `arquivada` da mesma loja — ou seja, mataria o histórico. Sem esse índice, duas linhas de
+  rascunho fazem o `PUT` escrever numa e devolver outra, e o `publicar` seguinte põe no ar
+  um texto que o lojista não escreveu.
+- **Os campos de escolha são `Literal`, não `str`.** Já foram `str`, e um espaço a mais
+  vindo do formulário (`"so_quando_pedir "`) caía no `else` e **invertia o comportamento**
+  em silêncio — o bot passava a mandar foto na abertura. Hoje isso é 422. Ao acrescentar
+  opção nova, mude o `Literal` **e** o dicionário gerador juntos.
+- **`horario` é validado na forma: `HH:MM` com zero à esquerda, sempre 2 valores.**
+  `esta_em_horario` compara string, então `"8:00" <= "14:00"` é `False` — sem a validação,
+  uma grade sem zero à esquerda deixa o bot mudo o dia inteiro, sem log e sem erro.
+- **Fuso fixo `America/Sao_Paulo`.** A tabela `lojas` não tem coluna de timezone. Vira
+  coluna quando existir loja fora do fuso de Brasília, não antes.
+- **O modelo de LLM é global**, não por loja (decisão do dono, 25/08). Não existe coluna
+  `modelo`, nem rota para trocá-lo. O que é por loja é o `max_output_tokens`, amarrado ao
+  campo "tamanho da resposta".
+- **`pode_responder` passou a consultar `agente_config`.** É o caminho quente: toda
+  mensagem de cliente passa por lá. Loja que nunca configurou nada cai no padrão Revy com
+  `agente_ativo=True` e continua respondendo — há teste explícito para isso, porque
+  quebrar essa invariante deixa o bot mudo em produção, em silêncio.
+
+### O que falta
+
+Isto é o card 1 de quatro. Nada disto chega ao cliente sem os outros três:
+
+1. **n8n** (card 2) — tirar `vitor motos` e `limeira-sp` do `systemMessage`, pôr os slots,
+   e um nó que busca `GET /v1/agente/config`. Atenção: `validate_workflow.py` afirma ~40
+   frases literais do prompt e vai ficar vermelho; as assertivas **mudam de lugar**, não
+   somem. Depende de um spike de 30 min: `maxOutputTokens` aceita expressão em sub-nó do
+   n8n? Não dá para responder lendo o repo.
+2. **Tela na Revy Loja** (card 3) — o formulário, em `/app/loja/agente/configuracao`.
+3. **Preview** (card 4) — workflow `whatsapp-ai-preview` no mesmo n8n2037, com as tools
+   em modo seco. `consultar_estoque1` **escreve** no CRM, então o preview usa telefone
+   sintético.
+4. **Ligar a flag** `REVY_LOJA_AGENTE_CONFIG_ENABLED` (default 0, e no app2037 flags são
+   *secrets*, não `[env]` do toml).
+
+Fora da v1, com motivo registrado no spec: cadência de follow-up por loja (§4.4.2),
+`só lead de anúncio` (§4.6, depende de atribuição CTWA confiável), e tela no Control para
+trocar modelo (§7, o modelo é global).
+
 ## Rodar e testar
 
 ```bash
