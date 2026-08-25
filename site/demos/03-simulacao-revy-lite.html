@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Revy — 03 simulação</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500&family=Newsreader:opsz,wght@6..72,300&display=swap" rel="stylesheet" />
+<style>
+  :root{
+    --paper:#f9f9f9; --surface:#fff; --raised:#f4f2f1; --soft:#efeceb;
+    --ink:#1b1b1b; --ink-soft:#57514f; --ink-muted:#6b625f;
+    --line:#ded8d9; --line-strong:#cdc6c4;
+    --g900:#0f2b20; --g700:#1f4d3a; --g500:#2f7355; --g100:#dfeee7; --wa:#25d366;
+    --ui:'Hanken Grotesk','Segoe UI',system-ui,sans-serif;
+    --ser:'Newsreader',Georgia,serif;
+    --mono:ui-monospace,'SF Mono',Consolas,monospace;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{height:100%;overflow:hidden;background:var(--paper)}
+  body{font-family:var(--ui);color:var(--ink);-webkit-font-smoothing:antialiased}
+  #fit{position:fixed;inset:0;overflow:hidden}
+  #stage{width:1920px;height:1080px;position:absolute;left:0;top:0;background:transparent;transform-origin:0 0;overflow:visible}
+  [data-at]{will-change:transform,opacity}
+  .mono{font:400 22px/1.3 var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--ink-muted);white-space:nowrap}
+  .kl{font:400 20px/1 var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--ink-muted);white-space:nowrap}
+  h1{font:300 88px/1.02 var(--ser);letter-spacing:-.035em}
+  .lede{font:400 27px/1.5 var(--ui);color:var(--ink-soft);text-wrap:pretty}
+  .mark{position:absolute;left:96px;height:6px;background:var(--g500);transform-origin:0 50%}
+  .panel{position:absolute;background:var(--surface);border:1px solid var(--line);border-radius:18px;
+         box-shadow:0 2px 6px rgba(27,20,20,.05);padding:38px 42px}
+  .ph{display:flex;align-items:flex-start;justify-content:space-between;gap:24px}
+  .ph h2{font:500 36px/1.15 var(--ui);letter-spacing:-.015em}
+  .ph .sub{margin-top:8px;font:400 25px/1.3 var(--ui);color:var(--ink-muted);white-space:nowrap}
+  .live{display:flex;align-items:center;gap:10px;padding:0 20px;height:44px;border-radius:99px;
+        background:var(--g100);color:var(--g700);font:400 22px/1 var(--ui);white-space:nowrap}
+  .live i{width:9px;height:9px;border-radius:99px;background:var(--wa)}
+  .tile{background:var(--raised);border:1px solid var(--line);border-radius:14px;padding:22px 26px}
+  .big{font:300 76px/1 var(--ser);letter-spacing:-.03em}
+  .bar{height:10px;border-radius:99px;background:var(--soft);overflow:hidden}
+  .bar i{display:block;height:100%;border-radius:99px;background:var(--g700);transform-origin:0 50%;transform:scaleX(0)}
+  .foot{display:flex;align-items:center;gap:18px;padding:22px 26px;border-radius:14px;
+        background:var(--g100);border:1px solid rgba(31,77,58,.16)}
+  .foot .ck{width:38px;height:38px;border-radius:99px;background:var(--g700);color:#fff;flex-shrink:0;
+            display:flex;align-items:center;justify-content:center;font:400 22px/1 var(--ui)}
+  .row{position:relative;display:grid;grid-template-columns:64px 1fr 200px 280px;align-items:center;
+       height:98px;padding:0 22px;border-radius:14px;border:1px solid transparent}
+  .row+.row{margin-top:4px}
+  .bg{width:44px;height:44px;border-radius:99px;background:var(--raised);border:1px solid var(--line);
+      display:flex;align-items:center;justify-content:center;font:500 22px/1 var(--ui);color:var(--ink-soft)}
+  .bn{font:400 28px/1.2 var(--ui);white-space:nowrap}
+  .st{position:relative;height:30px}
+  .st span{position:absolute;left:0;top:0;white-space:nowrap;font:400 23px/30px var(--ui);color:var(--ink-muted);
+           display:flex;align-items:center;gap:10px}
+  .st i{width:8px;height:8px;border-radius:99px;background:var(--line-strong);display:block}
+  .vl{text-align:right;font:400 28px/1.2 var(--ui);white-space:nowrap}
+</style>
+</head>
+<body>
+<div id="fit"><div id="stage">
+
+  <div class="mono" data-at="0" style="position:absolute;left:96px;top:150px">Simulação</div>
+  <h1 data-at="0.12" style="position:absolute;left:96px;top:212px;width:620px">Quatro portais<br />de banco,<br />uma resposta.</h1>
+  <div class="mark" data-grow="2.6,3.3" style="top:498px;width:470px"></div>
+  <p class="lede" data-at="0.8" style="position:absolute;left:96px;top:546px;width:600px">O motor executa os portais reais com as credenciais da própria loja. O que volta é simulação — a aprovação continua sendo do banco.</p>
+  <div class="mono" data-at="3.2" style="position:absolute;left:96px;bottom:150px;color:var(--g700)">Bancos da sua loja, não os nossos</div>
+
+  <div class="panel" data-at="1.5" style="left:800px;top:140px;width:1024px">
+    <div class="ph">
+      <div><h2>Simulações</h2><div class="sub">Marcelo A. · Suzuki GSX-S750 · R$ 42.900 · entrada R$ 8.000</div></div>
+      <div style="text-align:right"><div class="kl">Tempo</div><div id="clock" style="margin-top:8px;font:400 46px/1 var(--mono);letter-spacing:-.02em">0:00</div></div>
+    </div>
+    <div class="kl" data-at="2.2" style="margin:34px 0 16px">Portais dos bancos da loja</div>
+    <div class="row" id="row0" data-at="2.6">
+      <div class="bg">S</div>
+      <div class="bn">Santander</div>
+      <div class="st"><span id="w0"><i></i>consultando</span><span id="s0" style="opacity:0;color:var(--ink-muted)"><i style="background:var(--wa)"></i>respondeu</span></div>
+      <div class="vl" id="v0" style="opacity:0">48x de R$ 1.284</div>
+    </div>
+    <div class="row" id="row1" data-at="3">
+      <div class="bg">B</div>
+      <div class="bn">Bradesco</div>
+      <div class="st"><span id="w1"><i></i>consultando</span><span id="s1" style="opacity:0;color:var(--ink-muted)"><i style="background:var(--line-strong)"></i>não respondeu</span></div>
+      <div class="vl" id="v1" style="opacity:0;color:var(--ink-muted)">sem retorno agora</div>
+    </div>
+    <div class="row" id="row2" data-at="3.4000000000000004">
+      <div class="bg">P</div>
+      <div class="bn" style="display:flex;align-items:center;gap:16px">Banco PAN<span class="kl" id="best" data-at="6.9" style="color:var(--g700);padding:7px 14px;border:1px solid rgba(31,77,58,.22);border-radius:99px">melhor condição</span></div>
+      <div class="st"><span id="w2"><i></i>consultando</span><span id="s2" style="opacity:0;color:var(--g700)"><i style="background:var(--wa)"></i>respondeu</span></div>
+      <div class="vl" id="v2" style="opacity:0;color:var(--g900);font-weight:500">48x de R$ 1.189</div>
+    </div>
+    <div class="row" id="row3" data-at="3.8000000000000003">
+      <div class="bg">F</div>
+      <div class="bn">Fontecred</div>
+      <div class="st"><span id="w3"><i></i>consultando</span><span id="s3" style="opacity:0;color:var(--ink-muted)"><i style="background:var(--wa)"></i>respondeu</span></div>
+      <div class="vl" id="v3" style="opacity:0">48x de R$ 1.240</div>
+    </div>
+    <div class="foot" data-at="8.6" style="margin-top:34px">
+      <div class="ck">✓</div>
+      <div>
+        <div style="font:500 26px/1.2 var(--ui);color:var(--g900)">Resposta enviada no WhatsApp</div>
+        <div style="margin-top:5px;font:400 23px/1.2 var(--ui);color:var(--g700);white-space:nowrap">“Melhor condição: Banco PAN, 48x de R$ 1.189.” · 1m42 desde a pergunta</div>
+      </div>
+    </div>
+  </div>
+
+</div></div>
+
+<script>
+(function () {
+  var DUR = 11;
+  var outCubic = function (p) { return 1 - Math.pow(1 - p, 3); };
+  var inOut = function (p) { return p < .5 ? 4 * p * p * p : 1 - Math.pow(-2 * p + 2, 3) / 2; };
+  function tw(t, a, b, s, e, f) {
+    if (t <= s) return a;
+    if (t >= e) return b;
+    return a + (b - a) * (f || inOut)((t - s) / (e - s));
+  }
+  function $(id) { return document.getElementById(id); }
+  function pad(n) { return n < 10 ? '0' + n : '' + n; }
+  function br(n) { return Math.round(n).toLocaleString('pt-BR'); }
+
+  var stage = document.getElementById('stage');
+  function fit() {
+    var k = Math.min(innerWidth / 1920, innerHeight / 1080);
+    stage.style.transform = 'translate(' + ((innerWidth - 1920 * k) / 2).toFixed(2) + 'px,' +
+      ((innerHeight - 1080 * k) / 2).toFixed(2) + 'px) scale(' + k + ')';
+  }
+  addEventListener('resize', fit, { passive: true });
+  fit();
+
+  var enters = [].map.call(document.querySelectorAll('[data-at]'), function (el) {
+    return { el: el, at: parseFloat(el.dataset.at) };
+  });
+  var marks = [].map.call(document.querySelectorAll('[data-grow]'), function (el) {
+    var v = el.dataset.grow.split(',');
+    return { el: el, s: parseFloat(v[0]), e: parseFloat(v[1]) };
+  });
+
+  var BK = [4.2, 6.4, 5.4, 6.0];
+  function extra(T) {
+    var t = tw(T, 0, 102, 2.2, 8.4, inOut);
+    $('clock').textContent = Math.floor(t / 60) + ':' + pad(Math.floor(t % 60));
+    for (var i = 0; i < 4; i++) {
+      var s = BK[i];
+      $('w' + i).style.opacity = tw(T, 1, 0, s, s + .3, outCubic);
+      $('s' + i).style.opacity = tw(T, 0, 1, s + .18, s + .52, outCubic);
+      $('v' + i).style.opacity = tw(T, 0, 1, s + .18, s + .52, outCubic);
+    }
+    var g = tw(T, 0, 1, 6.5, 7.1, outCubic);
+    var r = $('row2');
+    r.style.backgroundColor = 'rgba(223,238,231,' + g.toFixed(3) + ')';
+    r.style.borderColor = 'rgba(31,77,58,' + (g * .18).toFixed(3) + ')';
+  }
+
+  function render(T) {
+    var i, o, a;
+    for (i = 0; i < enters.length; i++) {
+      o = enters[i]; a = o.at;
+      o.el.style.opacity = tw(T, 0, 1, a, a + .36, outCubic);
+      o.el.style.transform = 'translateY(' + tw(T, 34, 0, a, a + .52, outCubic).toFixed(2) + 'px)';
+    }
+    for (i = 0; i < marks.length; i++) {
+      o = marks[i];
+      o.el.style.transform = 'scaleX(' + tw(T, 0, 1, o.s, o.e, outCubic).toFixed(4) + ')';
+    }
+    extra(T);
+  }
+
+  window.render = render;  /* congelar um instante: render(6.3) */
+
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) { render(DUR); return; }
+
+  var t0 = 0;
+  function frame(now) {
+    if (!t0) t0 = now;
+    var T = (now - t0) / 1000;
+    if (T >= DUR) { render(DUR); return; }
+    render(T);
+    requestAnimationFrame(frame);
+  }
+  render(0);
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
