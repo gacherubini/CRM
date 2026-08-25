@@ -1,6 +1,6 @@
 # chatbot-api · 56 rotas · 17 modelos · 4 workers · 4 flags · 26 migrations
 
-Gerado de `dae1afd`. NAO editar a mao — saida de `gerar_mapa.py`.
+Gerado de `fe0e7e4`. NAO editar a mao — saida de `gerar_mapa.py`.
 Migration head: `0026_credencial_integracao`
 
 ## Rotas
