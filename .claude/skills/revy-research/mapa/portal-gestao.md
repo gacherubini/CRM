@@ -1,6 +1,6 @@
 # portal-gestao · 156 rotas · 26 modelos · 6 workers · 35 flags · 26 migrations · 62 templates
 
-Gerado de `af0c153`. NAO editar a mao — saida de `gerar_mapa.py`.
+Gerado de `8547ed0`. NAO editar a mao — saida de `gerar_mapa.py`.
 Migration head: `0026_copiloto_sinal_destinatario`
 
 ## Rotas

@@ -29,12 +29,20 @@ Primeira vez apos o carimbo entrar no ar, prod ainda nao tem SHA — use
 |---|---|
 | `<produto>/app/**`, `<produto>/alembic/**` | `app2037` |
 | `site/**` | Cloudflare Pages |
-| `n8n/**` — inclui o **`systemMessage`, que e o prompt do bot** | `n8n2037` |
+| `n8n/**` — inclui o **`systemMessage`, que e a operacao do bot** | `n8n2037` |
+| `chatbot-api/app/agente_prompt.py` — identidade e tom **de cada loja** | `app2037` |
 | `motor-simulacao/app/**` | `app2037` (motor-api) **e** `motor2037` (worker) |
 | `docs/`, `tests/`, `AGENTS.md`, mapa da revy-research | nada |
 
-O prompt do bot **nao esta no chatbot-api**. Subir o `app2037` depois de mexer no
-prompt deixa o bot falando exatamente igual.
+**Desde 25/08 o prompt do bot tem duas metades, e elas sobem em lugares diferentes.**
+A **operacao** (jornada, ferramentas, anti-alucinacao) e o `systemMessage` no
+`n8n/workflow-ai-nao-salvos.json` → `n8n2037`. A **identidade, o tom e as regras de cada
+loja**, mais o nucleo Revy, sao gerados em `chatbot-api/app/agente_prompt.py` e servidos
+por `GET /v1/agente/config` → `app2037`, e valem na proxima mensagem de cliente, sem
+tocar no n8n.
+
+Se voce nao sabe qual metade mexeu: procure o texto no `systemMessage`. Se nao estiver la,
+e do gerador.
 
 ## 3. Deploy
 
@@ -56,8 +64,8 @@ Nao e Fly. Nao precisa subir o `app2037` para trocar a landing.
 **n8n2037** — desde 24/08 os dois scripts cobrem os tres modos, e a sequencia inteira
 cabe em tres comandos:
 
-    .\deploy\fly\3vm\prepare-workflow.ps1 -Mode production|test|cloud
-    .\deploy\fly\3vm\upload-and-import-workflow.ps1 -Mode production|test|cloud
+    .\deploy\fly\3vm\prepare-workflow.ps1 -Mode production|test|cloud|preview
+    .\deploy\fly\3vm\upload-and-import-workflow.ps1 -Mode production|test|cloud|preview
     fly apps restart n8n2037
 
 O `upload` agora faz o `update:workflow --active=true` sozinho — antes ele parava no
@@ -66,10 +74,30 @@ comando esta deprecated e manda usar `publish`: ignore, nesta versao o publish s
 nao liga e o webhook fica **404 para sempre**. Confira com
 `n8n list:workflow --active=true` (o `list:workflow` puro nao distingue).
 
-**`-Mode cloud` exige `CHATBOT_API_TOKEN_CLOUD`** no `.secrets.local` e falha sem ela.
+**`-Mode preview`** publica o workflow da tela de configuracao do agente (o lojista
+conversa com o rascunho antes de publicar). Ele e **gerado** —
+`python n8n/build_preview_workflow.py` — e usa `CHATBOT_API_TOKEN_CLOUD` pela mesma razao
+do Modo 2: serve N lojas e diz de qual fala pela `instance`. Depois de publicar, o secret
+`CHATBOT_AGENTE_PREVIEW_URL` no `app2037` aponta para
+`https://n8n2037.fly.dev/webhook/whatsapp-ai-preview`; sem ele a rota responde 503 e a
+tela esconde o botao Testar (default seguro, nao bug).
+
+**`-Mode cloud` e `-Mode preview` exigem `CHATBOT_API_TOKEN_CLOUD`** no `.secrets.local` e
+falham sem ela.
 Reusar o `CHATBOT_API_TOKEN` ali ressuscita o bug multi-loja da spec §6.2 — o token do
 Modo 1 aponta para uma loja so, e o sintoma e silencio. Ver
 `deploy/fly/3vm/README.md`, secao Workflow cloud.
+
+**Agente por loja: a ordem importa, e ela tem tres passos, nao um.**
+
+1. `app2037` primeiro. Workflow subindo antes busca `GET /v1/agente/config` numa rota que
+   nao existe — e por isso o fallback do no de config nao e luxo.
+2. **Semear a config da loja que ja atendia**, ainda antes do workflow:
+   `python -m scripts.semear_config_agente vitor-motos` (com `CHATBOT_DATABASE_URL` do
+   Postgres, senao o alembic/engine responde SQLite e mente). Sem isso ela estreia se
+   apresentando como "loja".
+3. So entao `-Mode production`. Teste de aceite: a loja **nao muda de jeito de falar** no
+   dia do deploy. Se mudar, e bug.
 
 Depois do restart, conte ate ~6 min de 404 com a Evolution cancelando retry. (Em 24/08 o
 webhook voltou em ~30 s; um caso so nao derruba o numero — planeje pelo pior.)
