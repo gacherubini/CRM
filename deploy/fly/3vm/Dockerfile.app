@@ -28,6 +28,12 @@ RUN pip install --no-cache-dir -r /tmp/requirements-app.txt
 COPY chatbot-api/app /srv/chatbot/app
 COPY chatbot-api/alembic /srv/chatbot/alembic
 COPY chatbot-api/alembic.ini /srv/chatbot/alembic.ini
+# Scripts de operacao rodam por `fly ssh console`, e sem esta linha eles nao
+# existem na imagem: em 25/08 o passo 2 do rollout do agente por loja parou em
+# `No module named scripts` no meio da janela, e o script teve de subir por sftp
+# na mao. Rotina de operacao que o README manda rodar em producao precisa estar
+# na imagem, como o alembic ja estava.
+COPY chatbot-api/scripts /srv/chatbot/scripts
 
 COPY estoque-api/app /srv/estoque/app
 COPY estoque-api/alembic /srv/estoque/alembic

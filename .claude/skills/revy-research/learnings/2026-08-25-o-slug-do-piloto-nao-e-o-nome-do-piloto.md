@@ -35,4 +35,18 @@ Hoje o script aceita os dois slugs, recusa banco SQLite quando só
 e, quando não acha a loja, **lista as que existem** — para o operador não ficar preso
 sem saber o que perguntar.
 
+## E a imagem não levava o script
+
+Terceiro defeito da mesma família, achado às 20h50 do dia do deploy, com o passo 2 já em
+execução: `Dockerfile.app` copiava `chatbot-api/app`, `alembic` e `alembic.ini` — **nunca
+`scripts/`**. O comando que o README, o spec e a skill de deploy mandavam rodar dentro do
+`app2037` respondia `No module named scripts` e não tinha como funcionar nunca.
+
+O contorno na hora foi `fly ssh sftp put` do arquivo (no Git Bash, com
+`MSYS_NO_PATHCONV=1`, senão `/srv/...` vira `C:/Program Files/Git/srv/...`). O conserto
+é a linha `COPY chatbot-api/scripts /srv/chatbot/scripts`.
+
+**A regra:** rotina de operação que a documentação manda rodar em produção precisa estar
+**na imagem**, como o alembic já estava. Se ela só existe no repo, ela não existe.
+
 Ver [[2026-08-23-teste-verde-nao-prova-que-a-feature-existe]].
