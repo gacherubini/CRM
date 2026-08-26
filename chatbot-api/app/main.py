@@ -1441,7 +1441,13 @@ def preview_agente(
         canal = instance.strip()
     else:
         loja = db.get(models_db.Loja, loja_id)
-        canal = (loja.evolution_instance or "").strip() if loja else ""
+        # `Loja.evolution_instance` drifta por construção: cada novo pareamento
+        # cria instância nova (o QR não fecha por passkey e a pessoa tenta de
+        # novo). Em 25/08 a loja do piloto tinha 8 instâncias na Evolution, uma
+        # só aberta, e o campo apontava para um canal inativo desde 06/08 — o
+        # lojista testaria contra um canal morto. O helper prefere o principal
+        # de estoque, depois o conectado ativo, e só cai no campo legado no fim.
+        canal = channels.resolve_evolution_instance_for_loja(db, loja) if loja else ""
     if not canal:
         raise HTTPException(
             status_code=409,

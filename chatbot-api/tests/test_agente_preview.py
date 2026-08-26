@@ -178,3 +178,38 @@ def test_n8n_fora_do_ar_vira_503_e_nao_500(client, loja_a, preview_ligado, monke
     monkeypatch.setattr(agente_preview, "conversar", _cai)
     r = client.post("/v1/agente/preview", json={"texto": "oi"}, headers=loja_a["headers"])
     assert r.status_code == 503
+
+
+# --- o canal do preview é o que está no ar, não o campo legado ---------------
+
+
+def test_preview_usa_o_canal_ativo_e_nao_o_campo_legado_da_loja(
+    client, db, loja_a, preview_ligado, monkeypatch
+):
+    """`Loja.evolution_instance` envelhece; o canal conectado é a verdade.
+
+    Em produção, em 25/08, a moto-center tinha `evolution_instance` apontando
+    para `moto-center-48a9` — canal inativo desde 06/08 — enquanto quem atendia
+    era `moto-center-f447`, com 485 conversas. Cada novo pareamento cria
+    instância nova (o QR não fecha por passkey e a pessoa tenta de novo), então
+    o campo legado drifta por construção: são 8 instâncias na Evolution, uma só
+    aberta. O preview mandaria o lojista testar contra um canal morto.
+
+    O resto do produto já resolve isso com `resolve_evolution_instance_for_loja`
+    (principal de estoque → conectado ativo → ativo → legado). O preview era o
+    único que lia o campo cru.
+    """
+    from app import channels, models_db
+
+    espiao = _espiar(monkeypatch)
+    loja = db.get(models_db.Loja, loja_a["loja_id"])
+    canal = channels.register_channel(db, loja.id, "viva-1", "atendimento")
+    db.query(models_db.WhatsAppCanal).filter(
+        models_db.WhatsAppCanal.id == canal["id"]
+    ).update({"estado": channels.ESTADO_CONECTADO, "ativo": True})
+    db.commit()
+
+    client.post("/v1/agente/preview", json={"texto": "oi"}, headers=loja_a["headers"])
+
+    assert espiao.chamadas[-1]["instance"] == "viva-1"
+    assert espiao.chamadas[-1]["instance"] != loja.evolution_instance
