@@ -8,6 +8,7 @@ e template ja existente e SUCESSO, nao erro: tratar isso como falha transforma
 retry inofensivo em laco.
 """
 import json
+import logging
 
 import httpx
 import pytest
@@ -87,14 +88,18 @@ def test_elo_3_registra_com_pin():
     def handler(pedido: httpx.Request) -> httpx.Response:
         visto["url"] = str(pedido.url)
         visto["corpo"] = json.loads(pedido.content)
+        visto["auth"] = pedido.headers.get("authorization")
         return httpx.Response(200, json={"success": True})
 
     _cliente(handler).registrar_numero(
-        phone_number_id="123", pin="048512", token="tok"
+        phone_number_id="123", pin="048512", token="EAAG-token-da-loja"
     )
 
     assert visto["url"].endswith("/123/register")
     assert visto["corpo"] == {"messaging_product": "whatsapp", "pin": "048512"}
+    # O token e o DA LOJA. Sem este assert da para mandar o token global do Revy
+    # aqui e a suite fica verde — o erro so apareceria no lojista real.
+    assert visto["auth"] == "Bearer EAAG-token-da-loja"
 
 
 def test_elo_3_teto_da_meta_vira_erro_nomeado():
@@ -118,11 +123,13 @@ def test_elo_4_cria_o_template_no_formato_do_envio():
     def handler(pedido: httpx.Request) -> httpx.Response:
         visto["url"] = str(pedido.url)
         visto["corpo"] = json.loads(pedido.content)
+        visto["auth"] = pedido.headers.get("authorization")
         return httpx.Response(200, json={"id": "tpl-1", "status": "PENDING"})
 
-    _cliente(handler).criar_template(waba_id="waba-1", token="tok")
+    _cliente(handler).criar_template(waba_id="waba-1", token="EAAG-token-da-loja")
 
     assert visto["url"].endswith("/waba-1/message_templates")
+    assert visto["auth"] == "Bearer EAAG-token-da-loja"
     corpo = visto["corpo"]
     assert corpo["name"] == "chama_vendedor"
     assert corpo["language"] == "pt_BR"
@@ -143,3 +150,22 @@ def test_elo_4_template_ja_existente_e_sucesso():
     )
 
     _cliente(handler).criar_template(waba_id="waba-1", token="tok")
+
+
+def test_elo_1_nao_vaza_o_app_secret_no_LOG(caplog):
+    """O httpx loga a URL inteira em INFO — e a do elo 1 leva `client_secret`
+    e `code` na query string. Sai no caminho FELIZ, sem erro nenhum.
+
+    Hoje isso nao aparece em producao por acaso: nada em app/ chama
+    basicConfig, e o dictConfig padrao do uvicorn deixa o root em WARNING. Um
+    `--log-level debug` para depurar outra coisa poe o App Secret no stdout do
+    Fly. Invariante do repo (AGENTS.md §5): segredo nao vai para o log.
+    """
+    def handler(pedido: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json={"access_token": "EAAG-token-da-loja"})
+
+    with caplog.at_level(logging.INFO):
+        _cliente(handler).trocar_code_por_token("code-do-popup")
+
+    assert "segredo-do-revy" not in caplog.text
+    assert "code-do-popup" not in caplog.text

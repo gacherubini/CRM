@@ -12,6 +12,8 @@ enviados, e um deles é o App Secret.
 """
 from __future__ import annotations
 
+import logging
+from contextlib import contextmanager
 from typing import Any
 
 import httpx
@@ -32,6 +34,48 @@ _CODIGO_TETO_REGISTRO = 133016
 TEXTO_TEMPLATE = (
     "Oi {{1}}, chegou um lead novo pra você. Toque em Peguei para assumir."
 )
+
+
+class _SemSegredoNoLog(logging.Filter):
+    """Descarta o registro de log que contiver um dos segredos dados.
+
+    Existe por causa do ``httpx``: ele loga ``request.url`` inteira em INFO, e
+    a URL do elo 1 leva ``client_secret`` e ``code`` na query string. Isso sai
+    no caminho **feliz**, sem erro nenhum.
+
+    Hoje não aparece em produção por acaso — nada em ``app/`` chama
+    ``basicConfig`` e o dictConfig padrão do uvicorn deixa o root em WARNING.
+    Um ``--log-level debug`` para depurar outra coisa poria o App Secret no
+    stdout do Fly. O invariante do repo (AGENTS.md §5) não admite esse acaso.
+
+    Descarta a linha inteira em vez de redigir: a única linha atingida é a que
+    contém o segredo, e ela não tem valor de diagnóstico sem ele.
+    """
+
+    def __init__(self, *segredos: str) -> None:
+        super().__init__()
+        self._segredos = tuple(s for s in segredos if s)
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        if not self._segredos:
+            return True
+        try:
+            texto = record.getMessage()
+        except Exception:  # noqa: BLE001 - log quebrado não pode derrubar o elo
+            return True
+        return not any(segredo in texto for segredo in self._segredos)
+
+
+@contextmanager
+def _log_sem(*segredos: str):
+    """Silencia, só durante a chamada, a linha de log que carregaria o segredo."""
+    filtro = _SemSegredoNoLog(*segredos)
+    log = logging.getLogger("httpx")
+    log.addFilter(filtro)
+    try:
+        yield
+    finally:
+        log.removeFilter(filtro)
 
 
 class OnboardingErro(RuntimeError):
@@ -81,7 +125,7 @@ class MetaOnboarding:
     def trocar_code_por_token(self, code: str) -> str:
         """``code`` tem TTL de 30 s e **não** é retomável: falhou, volta ao popup."""
         try:
-            with self._cliente() as cliente:
+            with self._cliente() as cliente, _log_sem(self.app_secret, code):
                 resposta = cliente.get(
                     f"{self.base_url}/oauth/access_token",
                     params={
