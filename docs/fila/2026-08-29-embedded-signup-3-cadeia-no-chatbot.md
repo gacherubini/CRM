@@ -87,7 +87,7 @@ seguintes avançam `onboarding_elo` nele. A numeração dos elos continua a do s
 **Por que este módulo não conhece banco:** é o que deixa a Task 4 testar a cadeia inteira
 com um duplo em memória, sem HTTP nenhum, e este aqui testar HTTP sem banco nenhum.
 
-- [ ] **Passo 1: escrever o teste que falha**
+- [x] **Passo 1: escrever o teste que falha**
 
 ```python
 # chatbot-api/tests/test_meta_onboarding.py
@@ -238,12 +238,12 @@ def test_elo_4_template_ja_existente_e_sucesso():
     _cliente(handler).criar_template(waba_id="waba-1", token="tok")
 ```
 
-- [ ] **Passo 2: rodar e ver falhar**
+- [x] **Passo 2: rodar e ver falhar**
 
 Rode: `.\.venv\Scripts\python.exe -m pytest tests/test_meta_onboarding.py -q`
 Esperado: erro de coleta — `ModuleNotFoundError` / `ImportError` em `app.meta_onboarding`.
 
-- [ ] **Passo 3: acrescentar o App ID ao config**
+- [x] **Passo 3: acrescentar o App ID ao config**
 
 Em `chatbot-api/app/config.py`, junto de `META_APP_SECRET` (hoje linha 78):
 
@@ -253,7 +253,7 @@ Em `chatbot-api/app/config.py`, junto de `META_APP_SECRET` (hoje linha 78):
 META_APP_ID = os.getenv("CHATBOT_META_APP_ID", "")
 ```
 
-- [ ] **Passo 4: escrever o módulo**
+- [x] **Passo 4: escrever o módulo**
 
 ```python
 # chatbot-api/app/meta_onboarding.py
@@ -439,12 +439,23 @@ class MetaOnboarding:
         raise OnboardingErro(mensagem, elo=elo)
 ```
 
-- [ ] **Passo 5: rodar e ver passar**
+- [x] **Passo 5: rodar e ver passar**
 
 Rode: `.\.venv\Scripts\python.exe -m pytest tests/test_meta_onboarding.py -q`
-Esperado: 9 passed.
+Esperado: 10 passed.
 
-- [ ] **Passo 6: commitar**
+**Dois testes não estavam no card e vieram de auditoria de mutação depois de executá-lo:**
+
+- os asserts de `Authorization` nos elos **3 e 4**. Só o elo 2 conferia o token, então dava
+  para mandar o token global do Revy nos outros dois com a suíte verde — e o escopo da WABA
+  vem justamente desse token, então o erro só apareceria no lojista real;
+- `test_elo_1_nao_vaza_o_app_secret_no_LOG`. O `httpx` loga `request.url` em INFO e a URL do
+  elo 1 leva `client_secret` e `code` na query string — **no caminho feliz**. Não sai em
+  produção hoje por acaso (root em WARNING); um `--log-level debug` bastaria. O módulo instala
+  um filtro de log durante a chamada. A correção estrutural seria mandar os três campos no
+  corpo do POST: **confirmar no Card 1 (spike) se a Graph aceita `POST /oauth/access_token`.**
+
+- [x] **Passo 6: commitar**
 
 ```bash
 git add chatbot-api/app/meta_onboarding.py chatbot-api/app/config.py chatbot-api/tests/test_meta_onboarding.py
@@ -484,7 +495,14 @@ git commit -m "feat(onboarding): os quatro elos que falam com a Graph, sem tocar
    cadeia para sem chamar a Meta.
 5. Nada do corpo da Meta em `onboarding_erro`.
 
-- [ ] **Passo 1: escrever o teste que falha**
+- [x] **Passo 1: escrever o teste que falha**
+
+**Antes de copiar:** cada teste precisa do **seu próprio** `phone_number_id`. O banco de
+teste é um SQLite em memória compartilhado pela sessão inteira de pytest e nunca limpo, e
+`evolution_instance` é `UNIQUE` **global**, não por loja — com o número fixo do helper, seis
+dos oito testes morrem em "este número já está conectado a outra loja". Passe
+`phone_number_id=` em cada chamada (`...590` a `...597` estão em uso). Learning:
+`2026-08-29-o-banco-de-teste-do-chatbot-e-um-so.md`.
 
 ```python
 # chatbot-api/tests/test_onboarding_cloud.py
@@ -492,6 +510,9 @@ git commit -m "feat(onboarding): os quatro elos que falam com a Graph, sem tocar
 
 O cliente da Meta e um duplo em memoria: aqui se testa ORDEM, RETOMADA e TETO,
 nao formato de corpo — isso e do test_meta_onboarding.py.
+
+Cada teste usa o SEU phone_number_id: o banco e compartilhado e a coluna e
+UNIQUE global.
 """
 import pytest
 
@@ -645,12 +666,12 @@ def test_numero_de_outra_loja_nao_e_sequestrado(db, loja_a, loja_b):
         _conectar(db, loja_b["loja_id"], _MetaFalsa())
 ```
 
-- [ ] **Passo 2: rodar e ver falhar**
+- [x] **Passo 2: rodar e ver falhar**
 
 Rode: `.\.venv\Scripts\python.exe -m pytest tests/test_onboarding_cloud.py -q`
 Esperado: erro de coleta — `ImportError` em `app.onboarding_cloud`.
 
-- [ ] **Passo 3: escrever o orquestrador**
+- [x] **Passo 3: escrever o orquestrador**
 
 ```python
 # chatbot-api/app/onboarding_cloud.py
@@ -793,19 +814,33 @@ def conectar(
     return canal
 ```
 
-- [ ] **Passo 4: rodar e ver passar**
+- [x] **Passo 4: rodar e ver passar**
 
 Rode: `.\.venv\Scripts\python.exe -m pytest tests/test_onboarding_cloud.py -q`
-Esperado: 8 passed.
+Esperado: 9 passed — os oito daqui mais
+`test_retomada_depois_do_elo_2_nao_reinscreve_o_app`, que cobre a guarda do elo 2 (nenhum
+dos oito chega à retomada com `onboarding_elo >= 2`).
 
-- [ ] **Passo 5: provar que os testes de retomada testam o que dizem**
+- [x] **Passo 5: provar que os testes de retomada testam o que dizem**
 
-Comente o `if (canal.onboarding_elo or 0) < 2:` e rode de novo. `test_retomada_nao_repete_o_elo_1`
-tem de ficar vermelho. Restaure. **Isto não é zelo:** no Card 2 quatro testes passaram com
-metade de um gancho apagada, e é como o learning
+**Corrigido depois de executar — a mutação que estava escrita aqui não provava nada.**
+Comentar `if (canal.onboarding_elo or 0) < 2:` deixa os testes **verdes**: em
+`test_retomada_nao_repete_o_elo_1` a primeira chamada falha *no* elo 2, o canal fica em
+`onboarding_elo=1`, e na retomada a condição `< 2` seria verdadeira de qualquer jeito. A
+guarda que aquele teste trava é a do **elo 1** (`if canal is None:`).
+
+As mutações que valem:
+
+| Mutação | Quem tem de ficar vermelho |
+|---|---|
+| chamar `meta.trocar_code_por_token(code)` fora da guarda `if canal is None:` | `test_retomada_nao_repete_o_elo_1` |
+| trocar `if (canal.onboarding_elo or 0) < 2:` por `if True:` | `test_retomada_depois_do_elo_2_nao_reinscreve_o_app` |
+
+**Isto não é zelo:** nesta mesma sessão três testes passaram com o código que deveriam
+proteger apagado — foi assim que o learning
 `2026-08-29-o-conftest-do-chatbot-nao-semeia-todo-aggregate.md` nasceu.
 
-- [ ] **Passo 6: commitar**
+- [x] **Passo 6: commitar**
 
 ```bash
 git add chatbot-api/app/onboarding_cloud.py chatbot-api/tests/test_onboarding_cloud.py
