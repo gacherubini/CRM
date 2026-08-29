@@ -298,10 +298,17 @@ def test_sucesso_devolve_o_estado_do_canal():
     assert resposta["estado"] == "cloud_pendente"
 ```
 
-**Antes de copiar:** confirme como `ChatbotClient` recebe transporte de teste. Se o
-construtor **não** aceitar `transport=`, veja como os outros testes de cliente do portal
-isolam o HTTP (`rg "MockTransport" portal-gestao/tests/`) e siga o padrão que já existe —
-**não** acrescente parâmetro novo ao construtor só para o teste.
+**Conferido no código, e o padrão existente NÃO serve aqui.** `ChatbotClient.__init__`
+(`app/clients/chatbot.py:61`) não aceita `transport=`, e o jeito que
+`tests/test_chatbot_client_ofertas.py:7` isola o HTTP é **sobrescrevendo `_request`** numa
+subclasse — o que funciona para testar *qual rota foi chamada*, mas é inútil aqui: o objeto
+desta task **é o `_request` real**, e um teste que o substitui provaria só que a subclasse do
+teste funciona.
+
+Então esta task acrescenta `transport: httpx.BaseTransport | None = None` como parâmetro
+keyword-only do construtor, usado em `_request`. Não é invenção: é exatamente o que
+`CloudWhatsAppOutbound` (`chatbot-api/app/whatsapp_outbound.py:238`) já faz no outro produto.
+Comente no construtor por que ele existe, senão o próximo leitor o remove por parecer morto.
 
 - [ ] **Passo 2: rodar e ver falhar**
 
@@ -395,6 +402,10 @@ que não é admin dentro do popup é o pior lugar possível.
 
 - [ ] **Passo 1: escrever o teste que falha**
 
+**As fixtures de papel já existem:** `conftest.py:903` tem
+`login(client, papel="dono"|"gerente"|"vendedor", email=...)`, e
+`tests/test_atendimento.py:89` mostra o uso. **Não crie fixture nova** — use `login`.
+
 ```python
 # portal-gestao/tests/test_tela_decidir_whatsapp.py
 """A tela de decisao do §16.4.
@@ -439,10 +450,9 @@ def test_vendedor_nao_entra(client_loja_vendedor):
     assert resposta.status_code in (302, 303, 307)
 ```
 
-**As fixtures de papel não existem prontas.** Antes de escrever, veja como os testes de tela
-da Loja montam usuário com papel (`rg "papel=" portal-gestao/tests/ | head`) e **siga o
-padrão que já existe** — se não houver, crie as três no arquivo do próprio teste, não no
-`conftest`.
+Os nomes `client_loja_dono` / `client_loja_gerente` / `client_loja_vendedor` acima são
+ilustrativos: monte cada um com `login(client, papel=...)` do `conftest`, no próprio arquivo
+do teste.
 
 - [ ] **Passo 2 a 4:** ver falhar, implementar a rota `GET /app/loja/whatsapp/conectar` e o
       template, ver passar. A rota reusa `_habilitado()` e `_autorizado()` para **ver**, e
