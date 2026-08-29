@@ -1,5 +1,5 @@
 {
- "sha": "2b33203",
+ "sha": "ab78c90",
  "inventario": {
   "chatbot-api": [
    {
@@ -2032,77 +2032,84 @@
     "chave": "GET /app/loja/whatsapp",
     "simbolo": "_TELA",
     "arquivo": "app/web/loja_whatsapp.py",
-    "linha": 109
+    "linha": 119
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /app/loja/whatsapp/conectar",
+    "simbolo": "_TELA_DECIDIR",
+    "arquivo": "app/web/loja_whatsapp.py",
+    "linha": 156
    },
    {
     "secao": "rota",
     "chave": "POST /app/loja/whatsapp/catalogo",
     "simbolo": "/app/loja/whatsapp/catalogo",
     "arquivo": "app/web/loja_whatsapp.py",
-    "linha": 146
+    "linha": 188
    },
    {
     "secao": "rota",
     "chave": "POST /app/loja/whatsapp/canais",
     "simbolo": "/app/loja/whatsapp/canais",
     "arquivo": "app/web/loja_whatsapp.py",
-    "linha": 207
+    "linha": 249
    },
    {
     "secao": "rota",
     "chave": "POST /app/loja/whatsapp/canais/{canal_id}/conectar",
     "simbolo": "/app/loja/whatsapp/canais/{canal_id}/conectar",
     "arquivo": "app/web/loja_whatsapp.py",
-    "linha": 229
+    "linha": 271
    },
    {
     "secao": "rota",
     "chave": "POST /app/loja/whatsapp/canais/{canal_id}/desconectar",
     "simbolo": "/app/loja/whatsapp/canais/{canal_id}/desconectar",
     "arquivo": "app/web/loja_whatsapp.py",
-    "linha": 254
+    "linha": 296
    },
    {
     "secao": "rota",
     "chave": "POST /app/loja/whatsapp/canais/{canal_id}/inativar",
     "simbolo": "/app/loja/whatsapp/canais/{canal_id}/inativar",
     "arquivo": "app/web/loja_whatsapp.py",
-    "linha": 273
+    "linha": 315
    },
    {
     "secao": "rota",
     "chave": "POST /app/loja/whatsapp/canais/{canal_id}/principal-estoque",
     "simbolo": "/app/loja/whatsapp/canais/{canal_id}/principal-estoque",
     "arquivo": "app/web/loja_whatsapp.py",
-    "linha": 293
+    "linha": 335
    },
    {
     "secao": "rota",
     "chave": "GET /app/loja/whatsapp/canais/{canal_id}/status",
     "simbolo": "/app/loja/whatsapp/canais/{canal_id}/status",
     "arquivo": "app/web/loja_whatsapp.py",
-    "linha": 318
+    "linha": 360
    },
    {
     "secao": "rota",
     "chave": "GET /app/loja/whatsapp/fila",
     "simbolo": "_TELA_FILA",
     "arquivo": "app/web/loja_whatsapp.py",
-    "linha": 340
+    "linha": 382
    },
    {
     "secao": "rota",
     "chave": "POST /app/loja/whatsapp/fila",
     "simbolo": "_TELA_FILA",
     "arquivo": "app/web/loja_whatsapp.py",
-    "linha": 382
+    "linha": 424
    },
    {
     "secao": "rota",
     "chave": "POST /app/loja/whatsapp/fila/{vendedor_id}/remover",
     "simbolo": "_TELA_FILA",
     "arquivo": "app/web/loja_whatsapp.py",
-    "linha": 421
+    "linha": 463
    },
    {
     "secao": "rota",
@@ -2676,14 +2683,21 @@
     "chave": "app/templates/loja/whatsapp_canais.html",
     "simbolo": "loja/whatsapp_canais.html",
     "arquivo": "app/web/loja_whatsapp.py",
-    "linha": 130
+    "linha": 140
+   },
+   {
+    "secao": "template",
+    "chave": "app/templates/loja/whatsapp_decidir.html",
+    "simbolo": "loja/whatsapp_decidir.html",
+    "arquivo": "app/web/loja_whatsapp.py",
+    "linha": 177
    },
    {
     "secao": "template",
     "chave": "app/templates/loja/whatsapp_fila.html",
     "simbolo": "loja/whatsapp_fila.html",
     "arquivo": "app/web/loja_whatsapp.py",
-    "linha": 367
+    "linha": 409
    },
    {
     "secao": "template",

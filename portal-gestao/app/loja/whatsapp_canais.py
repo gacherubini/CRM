@@ -12,6 +12,14 @@ ROTULOS = {
     "pendente": "Aguardando leitura do QR",
     "desconectado": "Caiu — reconectar",
     "inativo": "Desativado",
+    # Modo 2 (Cloud API). O vocabulário técnico mora em
+    # ``whatsapp_provider.ESTADOS_VALIDOS``, no chatbot; aqui ele vira frase de
+    # dono de loja. Restrito e banido vêm da Meta e NÃO se consertam clicando —
+    # o rótulo precisa dizer isso, senão o lojista fica tentando.
+    "cloud_pendente": "Conectado — aguardando liberação da Revy",
+    "cloud_ativo": "No ar",
+    "cloud_restrito": "Limitado pela Meta — falar com a Revy",
+    "cloud_banido": "Bloqueado pela Meta — falar com a Revy",
 }
 
 
@@ -23,6 +31,7 @@ class CanalView:
     estado: str
     rotulo: str
     ativo: bool
+    cloud: bool
     principal_estoque: bool
     pode_conectar: bool
     pode_desconectar: bool
@@ -56,6 +65,9 @@ def montar_canais_view(
         if not ativo or estado == "inativo":
             continue
         principal = bool(bruto.get("principal_estoque"))
+        # Canal Cloud se reconhece pelo waba_id, que é o que o Modo 2 grava e o
+        # Modo 1 deixa nulo — mesma regra do ``cloud_canal.py`` no chatbot.
+        cloud = bool(bruto.get("waba_id"))
         itens.append(
             CanalView(
                 id=str(bruto.get("id") or ""),
@@ -64,9 +76,13 @@ def montar_canais_view(
                 estado=estado,
                 rotulo=ROTULOS.get(estado, estado),
                 ativo=ativo,
+                cloud=cloud,
                 principal_estoque=principal,
-                pode_conectar=estado != "conectado",
-                pode_desconectar=estado == "conectado",
+                # Conectar/desconectar são ações da Evolution (QR). Num canal
+                # Cloud o botão chamaria ``conectar_canal_whatsapp``, que pede
+                # QR para um número que é da Cloud API.
+                pode_conectar=not cloud and estado != "conectado",
+                pode_desconectar=not cloud and estado == "conectado",
                 pode_marcar_principal_estoque=not principal,
             )
         )
@@ -81,6 +97,7 @@ def montar_canais_view(
             estado=primeiro.estado,
             rotulo=primeiro.rotulo,
             ativo=primeiro.ativo,
+            cloud=primeiro.cloud,
             principal_estoque=True,
             pode_conectar=primeiro.pode_conectar,
             pode_desconectar=primeiro.pode_desconectar,
@@ -95,6 +112,7 @@ def montar_canais_view(
                 estado=c.estado,
                 rotulo=c.rotulo,
                 ativo=c.ativo,
+                cloud=c.cloud,
                 principal_estoque=False,
                 pode_conectar=c.pode_conectar,
                 pode_desconectar=c.pode_desconectar,
