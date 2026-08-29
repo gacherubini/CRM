@@ -1695,7 +1695,9 @@ def _resolver_instance_envio(
     )
 
 
-def _enviar_texto_evolution(
+def _enviar_texto_saida(
+    db: Session,
+    loja_id: str,
     *,
     instance: str,
     number: str,
@@ -1703,16 +1705,21 @@ def _enviar_texto_evolution(
     mensagem_id: str,
     canal_id: str | None,
 ) -> None:
-    """Push sendText. Em falha: mensagem já persistida e bot permanece pausado.
+    """Push sendText **pelo transporte da loja** (spec §6.3).
+
+    O transporte sai de ``outbound_para_loja``, nunca do singleton: numa loja
+    Modo 2 o ``instance`` é o ``phone_number_id`` da Meta, e mandá-lo ao
+    Evolution é pedir por uma instância que não existe lá. Era o defeito que
+    impedia o vendedor de responder pelo portal.
 
     Política: se o humano já assumiu (bot_ativo=False / handoff), NÃO reativamos
-    o bot quando a Evolution falha — o atendimento humano continua no histórico
+    o bot quando o envio falha — o atendimento humano continua no histórico
     e o Portal deve reenviar com nova idempotency_key se necessário.
     """
-    from app.whatsapp_outbound import WhatsAppOutboundError, get_whatsapp_outbound
+    from app.whatsapp_outbound import WhatsAppOutboundError, outbound_para_loja
 
     try:
-        get_whatsapp_outbound().send_text(
+        outbound_para_loja(db, loja_id).send_text(
             instance=instance, number=number, text=text
         )
     except WhatsAppOutboundError as exc:
@@ -1853,7 +1860,9 @@ def enviar_mensagem_humana(
         }
 
     # Após persistir + pausar: push real. Falha → 502; não desfaz handoff.
-    _enviar_texto_evolution(
+    _enviar_texto_saida(
+        db,
+        loja_id,
         instance=instance_envio,
         number=telefone_norm,
         text=texto_limpo,

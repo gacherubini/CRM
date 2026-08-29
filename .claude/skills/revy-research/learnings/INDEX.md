@@ -53,7 +53,7 @@ escrever migration com `batch_alter_table`.
 | submeter a verificacao de empresa (CNPJ) no portfolio da Meta | `2026-08-23-verificacao-da-meta-so-o-email-aceita-endereco.md` |
 | ligar o Modo 2 numa loja ou cadastrar o canal Cloud dela | `2026-08-23-canal-cloud-nao-se-cadastra-pela-api.md` |
 | por uma loja cliente no Modo 2, ou seguir o onboarding assistido do §16.6 | `2026-08-29-onboarding-assistido-do-16-6-nao-roda.md` |
-| mandar mensagem de dentro de um worker do Modo 2 | `2026-08-24-outbound-por-loja-quer-loja-id.md` |
+| mandar mensagem do lado do servidor numa loja Modo 2 (worker, rota, envio humano) | `2026-08-24-outbound-por-loja-quer-loja-id.md` |
 | mexer em multi-loja, no seletor de lojas ou em quem pode trocar de loja | `2026-08-24-seletor-e-rota-leem-fontes-diferentes.md` |
 | por uma rota do chatbot na credencial de integracao, ou achar que `instance` resolve multi-loja | `2026-08-24-instance-nao-conserta-toda-rota.md` |
 | trabalhar no repo com outra sessao de agente aberta | `2026-08-24-outra-sessao-move-o-chao-no-meio-da-tarefa.md` |
