@@ -158,17 +158,63 @@ O Control ganha **visão**: estado do canal, elo que falhou, status do template.
 **Tech Provider:** aceite de termos, sem taxa. O degrau que costuma travar — verificação de
 negócio da Revy — já está feito.
 
-**App Review** de `whatsapp_business_messaging` e `whatsapp_business_management`, ambos em
-Advanced. É documental e "screencast-driven". Pede **três** demonstrações, não uma:
+### 10.1 Pré-requisitos antes de submeter
 
-1. o fluxo de signup,
-2. **envio de mensagem**,
-3. **criação de template**.
+| Pré-requisito | Estado |
+|---|---|
+| Protótipo funcionando do caso de uso | é o que este spec constrói |
+| Verificação de negócio da Revy | **feito** 24/08 |
+| Ficha do app: ícone, política de privacidade, categoria, URLs legais | **feito** 16/08 |
+| App Ao Vivo | **feito** 16/08 |
+| Usuários de teste com papel **dev ou admin** no app | fazer antes de gravar |
 
-Turnaround médio ~24 h depois de submetido. O custo é montar a submissão, não esperar.
+### 10.2 O que se submete — por permissão, nunca do projeto
 
-**A ordem é contra-intuitiva:** constrói-se contra um business de teste, grava, e só então
-submete. Usuários de teste precisam de papel dev ou admin no app.
+Duas permissões, ambas em Advanced:
+
+| Permissão | Justificativa escrita | Screencast |
+|---|---|---|
+| `whatsapp_business_management` | somos Tech Provider e gerenciamos números e **templates** dos clientes | criação de template |
+| `whatsapp_business_messaging` | somos Tech Provider e **enviamos e recebemos** mensagens pelos clientes | envio e recebimento |
+
+Cada uma leva **justificativa própria e vídeo próprio**. Um vídeo demonstrando as duas é
+causa comum de reprovação.
+
+**O screencast tem de ser gravado na interface do negócio, não na experiência do
+consumidor.** Isto é requisito de produto, não de gravação — ver §10.4.
+
+**Não pedir `whatsapp_business_manage_events`.** Pedir permissão desnecessária é a causa de
+reprovação nº 1, e a atribuição CTWA de hoje vem do `ad_id` no payload da mensagem, não
+dela.
+
+### 10.3 Onde se submete
+
+App Dashboard → **App Review** → **Permissions and Features**, pedindo Advanced Access em
+cada permissão separadamente. Cada linha abre três campos: o texto da justificativa, o
+upload do vídeo, e o botão de submeter. O progresso fica visível na mesma tela.
+
+**Deixar em rascunho conta como não submetido** e é causa de reprovação registrada.
+Turnaround médio ~24 h depois de submetido de verdade.
+
+### 10.4 Consequência de produto: o `management` precisa de tela
+
+`whatsapp_business_messaging` já tem o que gravar — a tela de **Atendimento** da Loja é
+interface de negócio, com vendedor mandando e recebendo.
+
+`whatsapp_business_management` **não tem**. No desenho da §7 o template nasce no elo 4,
+automático e invisível. Screencast de servidor rodando sozinho não sustenta o pedido.
+
+Então entra no escopo uma superfície visível de templates na Revy Loja: listar os templates
+da WABA da loja com o status de cada um, e **criar/reenviar o `chama_vendedor` por ação
+explícita**. O caminho automático do elo 4 continua sendo o normal; a tela é o mesmo código
+com um botão na frente, e é ela que a câmera grava.
+
+Não é tela de fachada para o revisor: é também o conserto de um buraco real — hoje, template
+reprovado ou pausado pela Meta não tem lugar nenhum onde a loja veja ou refaça.
+
+### 10.5 A ordem é contra-intuitiva
+
+Constrói-se contra um business de teste, grava, e só então submete.
 
 ## 11. Testes
 
@@ -195,6 +241,7 @@ consertado em 24/08 e nunca exercitado com mais de uma loja.
 | Sequência exata de chamadas dos elos 1 e 3 não confirmada | Spike contra o business de teste **antes** de virar task |
 | Elo 2 falha calado | Teste dedicado; é o defeito que esta base já cometeu uma vez |
 | Lojista perde o histórico sem ter entendido | A tela `decidindo` é requisito, não enfeite |
+| Reprovação por forma, não por mérito: vídeo único para as duas permissões, justificativa faltando, permissão a mais, submissão deixada em rascunho | São as causas de reprovação que a própria Meta lista. §10.2 e §10.3 existem para isso |
 
 ## 13. Fora de escopo / não re-propor
 
@@ -203,6 +250,7 @@ consertado em 24/08 e nunca exercitado com mais de uma loja.
 - Derivar `whatsapp_modo` do canal (decisão 4).
 - Renomear `evolution_instance`.
 - Embedded Signup v2.
+- Pedir `whatsapp_business_manage_events` no App Review (§10.2).
 
 ## 14. Ordem de execução
 
@@ -211,8 +259,10 @@ Um eixo por vez, na ordem:
 1. **Spike** da sequência exata de chamadas contra o business de teste (elos 1 e 3).
 2. Cadeia no `chatbot-api` (rota, elos, dados, segredos).
 3. Tela na Revy Loja (`decidindo` → popup → `conectando` → `pendente`).
-4. Visão e portão no Revy Control.
-5. Gravar as três demonstrações e submeter o App Review.
+4. **Tela de templates na Revy Loja** (§10.4) — sem ela não há screencast do `management`.
+5. Visão e portão no Revy Control.
+6. Gravar **dois** screencasts, escrever **duas** justificativas, submeter em
+   App Review → Permissions and Features.
 
 O spike vem primeiro porque o §16.5 marcou confiança "média" na sequência do passo 6, e a
 conferência de 29/08 confirmou a forma, não todos os endpoints.
