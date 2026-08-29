@@ -50,7 +50,7 @@ chamada à Meta neste card** — por isso ele não depende do Card 1 e pode ser 
   O Card 3 grava `onboarding_elo` a cada elo concluído e retoma a partir dele, e incrementa
   `registro_tentativas` **antes** de cada chamada ao elo 3.
 
-- [ ] **Passo 1: escrever o teste que falha**
+- [x] **Passo 1: escrever o teste que falha**
 
 ```python
 # chatbot-api/tests/test_canal_onboarding_campos.py
@@ -111,12 +111,12 @@ def test_campos_de_onboarding_guardam_valor(db, loja_a):
     assert canal.onboarding_erro == "numero ainda ativo no aplicativo"
 ```
 
-- [ ] **Passo 2: rodar e ver falhar**
+- [x] **Passo 2: rodar e ver falhar**
 
 Rode: `.\.venv\Scripts\python.exe -m pytest tests/test_canal_onboarding_campos.py -q`
 Esperado: FAIL com `TypeError: 'business_id' is an invalid keyword argument`.
 
-- [ ] **Passo 3: acrescentar as colunas ao modelo**
+- [x] **Passo 3: acrescentar as colunas ao modelo**
 
 Em `app/models_db.py`, na classe `WhatsAppCanal`, logo depois de `template_oferta`:
 
@@ -146,7 +146,7 @@ Em `app/models_db.py`, na classe `WhatsAppCanal`, logo depois de `template_ofert
 Confirme que `Integer` e `Text` estão no import de `sqlalchemy` no topo do arquivo;
 acrescente o que faltar.
 
-- [ ] **Passo 4: escrever a migration**
+- [x] **Passo 4: escrever a migration**
 
 ```python
 # chatbot-api/alembic/versions/0028_canal_onboarding.py
@@ -216,18 +216,18 @@ def downgrade() -> None:
     op.drop_column("whatsapp_canais", "business_id")
 ```
 
-- [ ] **Passo 5: rodar e ver passar**
+- [x] **Passo 5: rodar e ver passar**
 
 Rode: `.\.venv\Scripts\python.exe -m pytest tests/test_canal_onboarding_campos.py -q`
 Esperado: 2 passed.
 
-- [ ] **Passo 6: rodar a suíte inteira**
+- [x] **Passo 6: rodar a suíte inteira**
 
 Rode: `.\.venv\Scripts\python.exe -m pytest -q`
 Esperado: verde. Se `test_cloud_canal_por_loja.py` quebrar, é sinal de que uma coluna
 ganhou default não-nulo por engano — todas nascem `None`.
 
-- [ ] **Passo 7: commitar**
+- [x] **Passo 7: commitar**
 
 ```bash
 git add chatbot-api/app/models_db.py chatbot-api/alembic/versions/0028_canal_onboarding.py chatbot-api/tests/test_canal_onboarding_campos.py
@@ -248,7 +248,7 @@ git commit -m "feat(canal): o canal guarda ate onde o onboarding chegou"
   `SegredoIndisponivel`. O Card 3 chama `cifrar` antes de gravar o token do elo 1 e o PIN
   do elo 3.
 
-- [ ] **Passo 1: escrever o teste que falha**
+- [x] **Passo 1: escrever o teste que falha**
 
 ```python
 # chatbot-api/tests/test_segredo_canal.py
@@ -263,7 +263,7 @@ import pytest
 from app import segredo_canal
 
 
-CHAVE = "L1Ni0nJ0aGVzZWNyZXRrZXlmb3J0ZXN0aW5nMTIzNDU2Nzg="
+CHAVE = "LvALLRsc3ZykD4ZrrFrm25elgLGhYThKQ7Z2ili9KYw="
 
 
 def test_cifrado_nao_e_o_texto(monkeypatch):
@@ -294,12 +294,12 @@ def test_sem_chave_falha_fechado(monkeypatch):
         segredo_canal.cifrar("qualquer")
 ```
 
-- [ ] **Passo 2: rodar e ver falhar**
+- [x] **Passo 2: rodar e ver falhar**
 
 Rode: `.\.venv\Scripts\python.exe -m pytest tests/test_segredo_canal.py -q`
 Esperado: FAIL com `ModuleNotFoundError: No module named 'app.segredo_canal'`.
 
-- [ ] **Passo 3: acrescentar a dependência**
+- [x] **Passo 3: acrescentar a dependência**
 
 Em `chatbot-api/requirements.txt`, depois de `psycopg[binary]==3.*`:
 
@@ -309,7 +309,7 @@ cryptography==43.*
 
 Instale: `.\.venv\Scripts\python.exe -m pip install -r requirements.txt`
 
-- [ ] **Passo 4: acrescentar a chave ao config**
+- [x] **Passo 4: acrescentar a chave ao config**
 
 Em `chatbot-api/app/config.py`, junto das outras leituras de ambiente:
 
@@ -319,7 +319,7 @@ Em `chatbot-api/app/config.py`, junto das outras leituras de ambiente:
 CANAL_SECRET_KEY = os.getenv("CHATBOT_CANAL_SECRET_KEY", "")
 ```
 
-- [ ] **Passo 5: escrever o módulo**
+- [x] **Passo 5: escrever o módulo**
 
 ```python
 # chatbot-api/app/segredo_canal.py
@@ -364,12 +364,12 @@ def decifrar(cifrado: str) -> str:
         raise SegredoIndisponivel("valor cifrado não abre com esta chave") from exc
 ```
 
-- [ ] **Passo 6: rodar e ver passar**
+- [x] **Passo 6: rodar e ver passar**
 
 Rode: `.\.venv\Scripts\python.exe -m pytest tests/test_segredo_canal.py -q`
 Esperado: 4 passed.
 
-- [ ] **Passo 7: commitar**
+- [x] **Passo 7: commitar**
 
 ```bash
 git add chatbot-api/app/segredo_canal.py chatbot-api/app/config.py chatbot-api/requirements.txt chatbot-api/tests/test_segredo_canal.py
@@ -382,12 +382,12 @@ git commit -m "feat(canal): segredo de loja e cifrado em repouso, e falha fechad
 
 **Files:**
 - Test: `chatbot-api/tests/test_canal_nao_vaza_segredo.py`
-- Modify: `chatbot-api/app/main.py` (só se o teste reprovar)
+- Modify: `chatbot-api/app/channels.py` (só se o teste reprovar)
 
 **Interfaces:**
 - Consumes: as colunas da Task 1.
 
-- [ ] **Passo 1: escrever o teste que falha (ou não)**
+- [x] **Passo 1: escrever o teste que falha (ou não)**
 
 ```python
 # chatbot-api/tests/test_canal_nao_vaza_segredo.py
@@ -430,14 +430,15 @@ def test_listagem_nao_traz_campo_de_segredo(client, db, loja_a):
 As fixtures `client`, `db` e `loja_a` são as do `tests/conftest.py`; `loja_a["headers"]`
 já traz o `Authorization: Bearer`. Não crie fixture nova.
 
-- [ ] **Passo 2: rodar**
+- [x] **Passo 2: rodar**
 
 Rode: `.\.venv\Scripts\python.exe -m pytest tests/test_canal_nao_vaza_segredo.py -q`
-Esperado: PASS, porque o serializer de canais é explícito campo a campo. **Se falhar**,
+Esperado: PASS, porque o serializer de canais (`app/channels.py:27`, `_canal_dict`) é
+explícito campo a campo. **Se falhar**,
 o serializer está devolvendo o modelo inteiro — conserte listando os campos, nunca com um
 `exclude`, que volta a vazar na próxima coluna.
 
-- [ ] **Passo 3: commitar**
+- [x] **Passo 3: commitar**
 
 ```bash
 git add chatbot-api/tests/test_canal_nao_vaza_segredo.py
@@ -461,7 +462,7 @@ git commit -m "test(canal): a listagem de canais nao pode devolver segredo"
 **Por que aqui:** é o portão da §9 do spec. O Control não ganha rota nova — ele já projeta
 `whatsapp_modo` com versionamento, e "liberar a loja" continua sendo só isso.
 
-- [ ] **Passo 1: escrever o teste que falha**
+- [x] **Passo 1: escrever o teste que falha**
 
 ```python
 # chatbot-api/tests/test_canal_ativa_pela_projecao.py
@@ -562,12 +563,12 @@ def test_loja_sem_canal_nao_estoura(db, loja_sem_projecao):
 para a loja, e `_apply_envelope` é monotônico — envelope com versão menor volta `"stale"` e
 o teste passaria sem exercitar nada.
 
-- [ ] **Passo 2: rodar e ver falhar**
+- [x] **Passo 2: rodar e ver falhar**
 
 Rode: `.\.venv\Scripts\python.exe -m pytest tests/test_canal_ativa_pela_projecao.py -q`
 Esperado: FAIL no primeiro teste — `assert 'cloud_pendente' == 'cloud_ativo'`.
 
-- [ ] **Passo 3: escrever a ativação**
+- [x] **Passo 3: escrever a ativação**
 
 Em `app/provisioning.py`, acrescente o import do modelo no topo:
 
@@ -618,17 +619,17 @@ São dois pontos porque a projeção tem caminho de update e caminho de insert. 
 segundo faz a **primeira** liberação de cada loja não ativar nada — que é justamente o
 caso real, já que a loja nova nunca teve projeção antes.
 
-- [ ] **Passo 4: rodar e ver passar**
+- [x] **Passo 4: rodar e ver passar**
 
 Rode: `.\.venv\Scripts\python.exe -m pytest tests/test_canal_ativa_pela_projecao.py -q`
 Esperado: 4 passed.
 
-- [ ] **Passo 5: rodar a suíte inteira**
+- [x] **Passo 5: rodar a suíte inteira**
 
 Rode: `.\.venv\Scripts\python.exe -m pytest -q`
 Esperado: verde, incluindo `test_provisioning*` e `test_rodizio*`.
 
-- [ ] **Passo 6: commitar**
+- [x] **Passo 6: commitar**
 
 ```bash
 git add chatbot-api/app/provisioning.py chatbot-api/tests/test_canal_ativa_pela_projecao.py
@@ -639,14 +640,14 @@ git commit -m "feat(canal): liberar a loja no Control ativa o canal Cloud que es
 
 ### Task 5: fechamento
 
-- [ ] **Passo 1:** `alembic upgrade head` no `chatbot-api`, com `CHATBOT_DATABASE_URL`
+- [x] **Passo 1:** `alembic upgrade head` no `chatbot-api`, com `CHATBOT_DATABASE_URL`
       apontando para o banco certo. Sem a variável o alembic responde SQLite e **mente**.
-- [ ] **Passo 2:** Gerar a chave Fernet e pô-la como **secret** (nunca `[env]`):
+- [x] **Passo 2:** Gerar a chave Fernet e pô-la como **secret** (nunca `[env]`):
       `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"`
       e `fly secrets set CHATBOT_CANAL_SECRET_KEY=... -a app2037`. Agrupe com outros
       secrets se houver — `fly secrets set` reinicia a máquina.
-- [ ] **Passo 3:** `git diff --check` e `git status --short`.
-- [ ] **Passo 4:** Regerar o mapa e commitar junto:
+- [x] **Passo 3:** `git diff --check` e `git status --short`.
+- [x] **Passo 4:** Regerar o mapa e commitar junto:
       `cd .claude/skills/revy-research && python gerar_mapa.py`.
 
 ## Como saber que acabou
@@ -654,3 +655,45 @@ git commit -m "feat(canal): liberar a loja no Control ativa o canal Cloud que es
 `.\.venv\Scripts\python.exe -m pytest -q` verde a partir de `chatbot-api/`, `alembic
 current` mostrando `0028_canal_onboarding`, e um canal `cloud_pendente` virando
 `cloud_ativo` quando o Control projeta `whatsapp_modo=2`.
+
+---
+
+## Executado em 29/08/2026 — o que o card errou
+
+Quatro commits: `dadb6be`, `96533e5`, `ff82264`, `ffc51e7`. Suíte do chatbot-api
+em **633 passed**. Três coisas escritas aqui não sobreviveram ao contato com o
+código, e já estão corrigidas acima:
+
+1. **A chave Fernet de exemplo era inválida.** Tinha 48 caracteres base64 → 35
+   bytes; `Fernet()` exige 32 e teria levantado no primeiro teste. Trocada por
+   uma gerada de verdade. Chave de teste não se escreve à mão.
+2. **O serializer de canais não mora em `app/main.py`.** A rota
+   `GET /v1/whatsapp/canais` (`main.py:1772`) delega para
+   `channels.list_channels`, e quem monta o dicionário é `_canal_dict`
+   (`app/channels.py:27`). O card mandava consertar no arquivo errado.
+3. **Os quatro testes da Task 4 passavam com o gancho do caminho de update
+   apagado.** O `conftest` só semeia projeção de `loja`, `vendas` e `estoque`,
+   nunca `whatsapp_modo` — então todo primeiro envelope desse aggregate cai no
+   *insert*, e o `return "applied"` do update ficava sem rede. Acrescentado
+   `test_loja_ja_projetada_ativa_ao_virar_modo_2`, que é o caso real da loja já
+   no Modo 1 sendo promovida. Verificado comentando o gancho: só o teste novo
+   quebra. Virou learning
+   (`2026-08-29-o-conftest-do-chatbot-nao-semeia-todo-aggregate.md`).
+
+A migration foi exercitada sozinha contra um SQLite descartável stampado em
+`0027`: as seis colunas entram e um canal Modo 1 pré-existente fica com tudo
+`None` e `registro_tentativas = 0`. **O Postgres não foi exercitado** — a cadeia
+completa não roda em SQLite (uma migration antiga altera constraint), e aplicar
+em produção é o `alembic upgrade head` do boot do bundle, no deploy.
+
+## Task 5 — o que falta, e é do dono
+
+- [ ] `CHATBOT_CANAL_SECRET_KEY` como **secret** no `app2037`. Gerar com
+      `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"`.
+      `fly secrets set` reinicia a máquina — agrupe com outros secrets se houver.
+      **Sem esta chave o Card 3 falha fechado**, que é o comportamento desejado,
+      mas o onboarding não anda.
+- [ ] Deploy do `app2037` (roda a `0028` no boot, fail-fast). Nada aqui muda
+      comportamento de loja nenhuma antes do Card 3 — a única mudança visível é
+      o canal `cloud_pendente` passando a `cloud_ativo` quando o Control projeta
+      `whatsapp_modo=2`, e hoje não existe canal nesse estado.

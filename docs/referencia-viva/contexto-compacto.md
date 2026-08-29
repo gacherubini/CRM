@@ -16,10 +16,17 @@ Vocabulário: [`../../CONTEXT.md`](../../CONTEXT.md). As-built Control/Loja:
   Cards: [`../fila/2026-08-29-embedded-signup-1-spike-endpoints.md`](../fila/2026-08-29-embedded-signup-1-spike-endpoints.md)
   e [`../fila/2026-08-29-embedded-signup-2-canal-estado-e-segredos.md`](../fila/2026-08-29-embedded-signup-2-canal-estado-e-segredos.md).
 
-  **Decisao em aberto que muda o plano (§4.1 do spec):** existe **Hosted ES** — a Meta hospeda
-  a pagina do signup e voce so distribui um link. Se for por ai, somem o SDK, o `config_id`, a
-  corrida de 30 s e provavelmente o token por loja (e com ele as tasks de cifra do Card 2).
-  **Ler a tela do App Dashboard antes de construir.**
+  **Card 2 FEITO em 29/08** (`dadb6be`, `96533e5`, `ff82264`, `ffc51e7`), suite do chatbot-api
+  em 633 passed. O canal ja guarda ate onde o onboarding chegou (`onboarding_elo`,
+  `onboarding_erro`, `business_id`, `registro_tentativas`) e os segredos da loja cifrados
+  (`token_cifrado`, `pin_cifrado`, modulo `app/segredo_canal.py`, Fernet, **fail-closed**).
+  Liberar a loja no Control — projetar `whatsapp_modo=2` — passou a ativar o canal
+  `cloud_pendente`. **Nao deployado e falta o secret `CHATBOT_CANAL_SECRET_KEY` no `app2037`;**
+  sem ele o Card 3 falha fechado de proposito. Nada muda para loja nenhuma antes do Card 3.
+
+  **Hosted ES foi descartado (decisao 8 do spec, 29/08):** fica o **SDK canonico**. Ele e o
+  documentado, mantem o lojista dentro do Revy e preserva o token por loja — que e o que as
+  tasks de cifra do Card 2 assumem. Nao re-propor o Hosted ES.
 
   Ja resolvido e fechado: o app **ja e** Independent Tech Provider; os endpoints dos elos 1 e 3
   sairam da doc; a configuracao do Login nasce com **token de usuario do sistema + expiracao

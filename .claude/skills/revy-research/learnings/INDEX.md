@@ -62,3 +62,4 @@ escrever migration com `batch_alter_table`.
 | rodar as ferramentas do agente fora de uma conversa real (preview, lab, carga) | `2026-08-25-consultar-estoque-cria-conversa.md` |
 | mexer no prompt do bot, no systemMessage ou na config do agente por loja | `2026-08-25-o-prompt-e-metade-template-metade-dado.md` |
 | escrever ou revisar script de operacao que aponta para uma loja por slug | `2026-08-25-o-slug-do-piloto-nao-e-o-nome-do-piloto.md` |
+| escrever teste que exercita projecao do Control (`_apply_envelope`) no chatbot-api | `2026-08-29-o-conftest-do-chatbot-nao-semeia-todo-aggregate.md` |
