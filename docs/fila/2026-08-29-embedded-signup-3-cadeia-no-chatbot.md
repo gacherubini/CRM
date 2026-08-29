@@ -1079,15 +1079,26 @@ git commit -m "feat(onboarding): a rota do embedded signup, e o webhook conta do
 
 ### Task 4: fechamento
 
-- [ ] **Passo 1:** suíte do `chatbot-api` verde a partir da pasta do produto.
-- [ ] **Passo 2:** `CHATBOT_META_APP_ID` como `[env]` (não é segredo) e
+**Feito em 29/08.** Prod (`app2037`) em `2ec51e3`, confirmado pelo carimbo do `/healthz`.
+`alembic current` respondeu `0028_canal_onboarding (head)` com `Context impl PostgresqlImpl`
+— Postgres certo, não o SQLite que mentiria sem `CHATBOT_DATABASE_URL`. Snapshot do volume
+`pg_data` do `suite-pg` tirado antes (o banco do chatbot mora lá, **não** no volume do
+`app2037` — quem for repetir, não tire snapshot do volume errado). O secret entrou com
+`--stage`, para o deploy aplicar sem custar um restart a mais. A rota responde `401` sem
+credencial, prova de que está no ar e protegida.
+
+- [x] **Passo 1:** suíte do `chatbot-api` verde a partir da pasta do produto.
+- [ ] **Passo 2 — PENDENTE, falta o valor:** `CHATBOT_META_APP_ID` como `[env]` (não é segredo) e
       **`CHATBOT_CANAL_SECRET_KEY` como secret** no `app2037` — esta é a pendência herdada
       do Card 2. Gerar com
       `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"`.
-      `fly secrets set` reinicia a máquina: agrupe as duas.
-- [ ] **Passo 3:** deploy do `app2037` pela skill `revy-deploy` (o boot roda a `0028` em
+      **A chave Fernet já está lá** (`fly secrets list` mostra `CHATBOT_CANAL_SECRET_KEY`
+      Deployed). Falta só o App ID, que não existe em lugar nenhum do repo — é do painel da
+      Meta.
+- [x] **Passo 3:** deploy do `app2037` pela skill `revy-deploy` (o boot roda a `0028` em
       fail-fast). Confirmar o SHA no `/healthz`.
-- [ ] **Passo 4:** `git diff --check`, `git status --short`, e regerar o mapa.
+- [x] **Passo 4:** `git diff --check`, `git status --short`, e regerar o mapa (um hook do
+      repo já regenera e inclui no commit).
 
 ## Como saber que acabou
 

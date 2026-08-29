@@ -24,6 +24,27 @@ Vocabulário: [`../../CONTEXT.md`](../../CONTEXT.md). As-built Control/Loja:
   `cloud_pendente`. **Nao deployado e falta o secret `CHATBOT_CANAL_SECRET_KEY` no `app2037`;**
   sem ele o Card 3 falha fechado de proposito. Nada muda para loja nenhuma antes do Card 3.
 
+  **Card 3 FEITO em 29/08** (`245255d`, `978ff00`, `a5bcf52`, `3706b58`, `2ec51e3`), suite em
+  **664 passed**. A cadeia inteira existe no `chatbot-api`: `app/meta_onboarding.py` (cliente
+  HTTP dos quatro elos, sem banco), `app/onboarding_cloud.py` (ordem, retomada e teto do elo 3
+  em 5 tentativas) e `POST /v1/whatsapp/canais/cloud/onboarding`. O status do template chega
+  pelo `/webhook/cloud` que ja existia — **sem rota nova**. Tudo testado com
+  `httpx.MockTransport`: **nenhuma chamada real a Meta foi feita**.
+
+  **Dois defeitos serios so a auditoria de mutacao achou**, e valem como metodo: (a) o App
+  Secret ia para o log no caminho **feliz** — o httpx loga a URL inteira em INFO e a do elo 1
+  leva `client_secret`; nao saia em producao so porque o root esta em WARNING, o que e acaso,
+  nao protecao; (b) so o elo 2 conferia o header `Authorization`, entao dava para mandar o
+  token global do Revy nos elos 3 e 4 com a suite verde, e o erro so apareceria no lojista
+  real. Ambos corrigidos.
+
+  **Falta `CHATBOT_META_APP_ID`** como `[env]` no `app2037` — sem ele o elo 1 nao tem
+  `client_id`. Nao bloqueia nada hoje: sem a tela (Card 4), ninguem chama a rota.
+
+  **Proximo:** Card 4 (a tela na Revy Loja: `decidindo` -> popup -> `conectando` ->
+  `pendente`), que e onde o `config_id` do App Review entra. Depois: tela de templates (§10.4),
+  visao no Control, e o spike (Card 1) contra a Meta de verdade.
+
   **Hosted ES foi descartado (decisao 8 do spec, 29/08):** fica o **SDK canonico**. Ele e o
   documentado, mantem o lojista dentro do Revy e preserva o token por loja — que e o que as
   tasks de cifra do Card 2 assumem. Nao re-propor o Hosted ES.
