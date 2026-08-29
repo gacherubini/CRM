@@ -32,6 +32,22 @@ na Revy Loja, e a Revy tem Advanced Access aprovado para operar a WABA dele.
 | 3 | Cadeia pós-popup **toda automática**, canal nasce `pendente`, portão de liberação no Control | tudo automático sem freio; automático só até o canal |
 | 4 | O **Control continua dono do modo**. Conectar propõe; liberar decide | conectar ligar `whatsapp_modo=2` sozinho; derivar o modo do canal |
 | 5 | O fluxo aceita **número novo e número existente**, com a decisão do §16.4 numa tela antes do popup | só número novo na v1 |
+| 6 | **Só o dono** da loja pode conectar o WhatsApp | gerente também poder |
+| 7 | O aviso de loja aguardando liberação é **a visão no Control**, e basta | sino, e-mail ou notificação dedicada |
+| 8 | Fica o **SDK canônico**, não o Hosted ES (§4.1) | Hosta ES como plano A |
+
+A decisão 6 não é permissão por preferência: quem clica precisa ser **admin do portfólio
+empresarial na Meta**, e gerente normalmente não é — ele abriria o popup e travaria lá dentro,
+num erro que não temos como explicar.
+
+A decisão 8 pesou que o SDK é o caminho que a Meta documenta, que o lojista não sai da Revy, e
+que ele preserva o token por loja (raio de falha de uma loja, §8). O Hosted ES fica registrado
+na §4.1 como alternativa avaliada, para não ser redescoberto do zero daqui a três meses.
+
+**Ainda em aberto, e é omissão consciente:** desconexão. O spec cobre conectar e não cobre o
+inverso — lojista que sai da Revy, ou que revoga o app no Business Manager dele. Hoje o sistema
+não perceberia: seguiria tentando falar por uma WABA que não autoriza mais, e falhando calado.
+Decidir na v2, não esquecer.
 
 Herdadas e **não re-propostas**: billing (cada loja põe o cartão dela na WABA dela e paga a
 Meta direto; a Revy fatura só o software — Tech Provider não tem linha de crédito) e
