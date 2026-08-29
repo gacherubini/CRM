@@ -1,5 +1,5 @@
 {
- "sha": "b147256",
+ "sha": "1b61c0f",
  "inventario": {
   "chatbot-api": [
    {
@@ -14,14 +14,14 @@
     "chave": "CHATBOT_WHATSAPP_MODO2_ENABLED (default: '')",
     "simbolo": "CHATBOT_WHATSAPP_MODO2_ENABLED",
     "arquivo": "app/config.py",
-    "linha": 138
+    "linha": 142
    },
    {
     "secao": "flag",
     "chave": "MULTI_WHATSAPP_ENABLED (default: 0)",
     "simbolo": "MULTI_WHATSAPP_ENABLED",
     "arquivo": "app/config.py",
-    "linha": 141
+    "linha": 145
    },
    {
     "secao": "worker",
@@ -511,112 +511,112 @@
     "chave": "fila_vendedor",
     "simbolo": "fila_vendedor",
     "arquivo": "app/models_db.py",
-    "linha": 96
+    "linha": 116
    },
    {
     "secao": "modelo",
     "chave": "oferta_lead",
     "simbolo": "oferta_lead",
     "arquivo": "app/models_db.py",
-    "linha": 128
+    "linha": 148
    },
    {
     "secao": "modelo",
     "chave": "rodizio_ponteiro",
     "simbolo": "rodizio_ponteiro",
     "arquivo": "app/models_db.py",
-    "linha": 153
+    "linha": 173
    },
    {
     "secao": "modelo",
     "chave": "credenciais_servico",
     "simbolo": "credenciais_servico",
     "arquivo": "app/models_db.py",
-    "linha": 160
+    "linha": 180
    },
    {
     "secao": "modelo",
     "chave": "conversas",
     "simbolo": "conversas",
     "arquivo": "app/models_db.py",
-    "linha": 173
+    "linha": 193
    },
    {
     "secao": "modelo",
     "chave": "mensagens",
     "simbolo": "mensagens",
     "arquivo": "app/models_db.py",
-    "linha": 201
+    "linha": 221
    },
    {
     "secao": "modelo",
     "chave": "leads",
     "simbolo": "leads",
     "arquivo": "app/models_db.py",
-    "linha": 224
+    "linha": 244
    },
    {
     "secao": "modelo",
     "chave": "consentimentos",
     "simbolo": "consentimentos",
     "arquivo": "app/models_db.py",
-    "linha": 281
+    "linha": 301
    },
    {
     "secao": "modelo",
     "chave": "catalog_attributions",
     "simbolo": "catalog_attributions",
     "arquivo": "app/models_db.py",
-    "linha": 296
+    "linha": 316
    },
    {
     "secao": "modelo",
     "chave": "ctwa_auditoria",
     "simbolo": "ctwa_auditoria",
     "arquivo": "app/models_db.py",
-    "linha": 328
+    "linha": 348
    },
    {
     "secao": "modelo",
     "chave": "numeros_autorizados",
     "simbolo": "numeros_autorizados",
     "arquivo": "app/models_db.py",
-    "linha": 351
+    "linha": 371
    },
    {
     "secao": "modelo",
     "chave": "grupos_estoque",
     "simbolo": "grupos_estoque",
     "arquivo": "app/models_db.py",
-    "linha": 379
+    "linha": 399
    },
    {
     "secao": "modelo",
     "chave": "notificacoes_operacionais",
     "simbolo": "notificacoes_operacionais",
     "arquivo": "app/models_db.py",
-    "linha": 398
+    "linha": 418
    },
    {
     "secao": "modelo",
     "chave": "cloud_evento_falho",
     "simbolo": "cloud_evento_falho",
     "arquivo": "app/models_db.py",
-    "linha": 439
+    "linha": 459
    },
    {
     "secao": "modelo",
     "chave": "agente_config_versao",
     "simbolo": "agente_config_versao",
     "arquivo": "app/models_db.py",
-    "linha": 466
+    "linha": 486
    },
    {
     "secao": "modelo",
     "chave": "agente_config",
     "simbolo": "agente_config",
     "arquivo": "app/models_db.py",
-    "linha": 502
+    "linha": 522
    },
    {
     "secao": "worker",
@@ -819,6 +819,13 @@
     "chave": "0027_agente_config",
     "simbolo": "0027_agente_config",
     "arquivo": "alembic/versions/0027_agente_config.py",
+    "linha": 0
+   },
+   {
+    "secao": "migration",
+    "chave": "0028_canal_onboarding",
+    "simbolo": "0028_canal_onboarding",
+    "arquivo": "alembic/versions/0028_canal_onboarding.py",
     "linha": 0
    }
   ],

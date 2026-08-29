@@ -76,6 +76,26 @@ class WhatsAppCanal(Base):
     # Nome do template de oferta aprovado NESTA WABA (spec §5.7). Nulo = cai no
     # ``config.GRAPH_TEMPLATE_OFERTA`` (compat com a loja piloto, sem backfill).
     template_oferta: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    # Portfólio empresarial do cliente, devolvido pelo embedded signup. Só
+    # identificador, não é segredo.
+    business_id: Mapped[str | None] = mapped_column(String(60), nullable=True)
+    # Até qual elo da cadeia do onboarding chegou (spec §7). Nulo = canal que
+    # não nasceu pelo embedded signup — todo canal Modo 1 e a loja piloto.
+    onboarding_elo: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # Motivo da parada, em texto para a tela. Nunca guarda corpo de resposta da
+    # Meta: resposta de erro pode carregar identificador de token.
+    onboarding_erro: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    # Token de negócio da loja e PIN de duas etapas, CIFRADOS (ver
+    # app/segredo_canal.py). Nunca saem em rota de leitura nem em log.
+    token_cifrado: Mapped[str | None] = mapped_column(Text, nullable=True)
+    pin_cifrado: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    # Quantas vezes o elo 3 (POST /{phone_number_id}/register) foi chamado.
+    # A Meta permite 10 por número em 72h móveis; estourar devolve 133016 e
+    # TRAVA o número por três dias. O Card 3 para bem antes de 10 — por isso o
+    # contador é coluna, não métrica.
+    registro_tentativas: Mapped[int] = mapped_column(
+        Integer, default=0, nullable=False, server_default="0"
+    )
     # Só este canal responde no grupo de estoque e envia alertas de simulação.
     principal_estoque: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     criado_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_agora)

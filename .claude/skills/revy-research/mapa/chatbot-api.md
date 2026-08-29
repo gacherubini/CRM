@@ -1,7 +1,7 @@
-# chatbot-api · 63 rotas · 19 modelos · 4 workers · 4 flags · 27 migrations
+# chatbot-api · 63 rotas · 19 modelos · 4 workers · 4 flags · 28 migrations
 
-Gerado de `b147256`. NAO editar a mao — saida de `gerar_mapa.py`.
-Migration head: `0027_agente_config`
+Gerado de `1b61c0f`. NAO editar a mao — saida de `gerar_mapa.py`.
+Migration head: `0028_canal_onboarding`
 
 ## Rotas
 
@@ -74,22 +74,22 @@ Migration head: `0027_agente_config`
 - `lojas` — app/models_db.py:19
 - `loja_operacional_projecao` — app/models_db.py:33
 - `whatsapp_canais` — app/models_db.py:50
-- `fila_vendedor` — app/models_db.py:96
-- `oferta_lead` — app/models_db.py:128
-- `rodizio_ponteiro` — app/models_db.py:153
-- `credenciais_servico` — app/models_db.py:160
-- `conversas` — app/models_db.py:173
-- `mensagens` — app/models_db.py:201
-- `leads` — app/models_db.py:224
-- `consentimentos` — app/models_db.py:281
-- `catalog_attributions` — app/models_db.py:296
-- `ctwa_auditoria` — app/models_db.py:328
-- `numeros_autorizados` — app/models_db.py:351
-- `grupos_estoque` — app/models_db.py:379
-- `notificacoes_operacionais` — app/models_db.py:398
-- `cloud_evento_falho` — app/models_db.py:439
-- `agente_config_versao` — app/models_db.py:466
-- `agente_config` — app/models_db.py:502
+- `fila_vendedor` — app/models_db.py:116
+- `oferta_lead` — app/models_db.py:148
+- `rodizio_ponteiro` — app/models_db.py:173
+- `credenciais_servico` — app/models_db.py:180
+- `conversas` — app/models_db.py:193
+- `mensagens` — app/models_db.py:221
+- `leads` — app/models_db.py:244
+- `consentimentos` — app/models_db.py:301
+- `catalog_attributions` — app/models_db.py:316
+- `ctwa_auditoria` — app/models_db.py:348
+- `numeros_autorizados` — app/models_db.py:371
+- `grupos_estoque` — app/models_db.py:399
+- `notificacoes_operacionais` — app/models_db.py:418
+- `cloud_evento_falho` — app/models_db.py:459
+- `agente_config_versao` — app/models_db.py:486
+- `agente_config` — app/models_db.py:522
 
 ## Workers
 
@@ -100,8 +100,8 @@ Migration head: `0027_agente_config`
 
 ## Flags
 
-- `CHATBOT_WHATSAPP_MODO2_ENABLED (default: '')` — app/config.py:138
-- `MULTI_WHATSAPP_ENABLED (default: 0)` — app/config.py:141
+- `CHATBOT_WHATSAPP_MODO2_ENABLED (default: '')` — app/config.py:142
+- `MULTI_WHATSAPP_ENABLED (default: 0)` — app/config.py:145
 - `CHATBOT_NOTIF_RETRY_ENABLED (default: 1)` — app/main.py:85
 - `CHATBOT_MODO2_WORKERS_ENABLED (default: 1)` — app/main.py:97
 
@@ -134,6 +134,7 @@ Migration head: `0027_agente_config`
 - `0025_canal_cloud_por_loja` — alembic/versions/0025_canal_cloud_por_loja.py
 - `0026_credencial_integracao` — alembic/versions/0026_credencial_integracao.py
 - `0027_agente_config` — alembic/versions/0027_agente_config.py
+- `0028_canal_onboarding` — alembic/versions/0028_canal_onboarding.py
 
 ## Testes
 
