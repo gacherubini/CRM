@@ -31,6 +31,12 @@ _SUBCODE_TEMPLATE_EXISTE = 2388023
 # Teto de registros por número numa janela móvel de 72 h estourado.
 _CODIGO_TETO_REGISTRO = 133016
 
+# Nome do template de oferta. Fonte única: ele aparece no que criamos aqui, no
+# que o webhook aceita como aprovação e no fallback da loja piloto
+# (``config.GRAPH_TEMPLATE_OFERTA``). Escrito à mão em cada lugar, um deles
+# envelhece sozinho e o envio passa a chamar um modelo que não existe.
+NOME_TEMPLATE = "chama_vendedor"
+
 TEXTO_TEMPLATE = (
     "Oi {{1}}, chegou um lead novo pra você. Toque em Peguei para assumir."
 )
@@ -184,7 +190,7 @@ class MetaOnboarding:
 
     # --- elo 4 ------------------------------------------------------------
     def criar_template(
-        self, *, waba_id: str, token: str, nome: str = "chama_vendedor"
+        self, *, waba_id: str, token: str, nome: str = NOME_TEMPLATE
     ) -> None:
         """Formato travado por ``send_template_button``: uma variável e um
         QUICK_REPLY no índice 0. Divergiu, o envio da oferta falha."""

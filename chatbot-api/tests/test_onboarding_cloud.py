@@ -187,3 +187,18 @@ def test_retomada_depois_do_elo_2_nao_reinscreve_o_app(db, loja_a):
               phone_number_id="1227059273831597")
 
     assert segunda.chamadas == ["elo3", "elo4"], "reinscreveu o app sem precisar"
+
+
+def test_o_elo_4_nao_marca_o_template_antes_da_aprovacao(db, loja_a):
+    """Criar o template devolve PENDING, nao APPROVED.
+
+    Quem marca `template_oferta` e o webhook `message_template_status_update`,
+    quando a Meta APROVA. Marcar no elo 4 faz o canal parecer pronto enquanto a
+    Meta ainda analisa — e um envio de oferta nesse intervalo quebra na Graph,
+    ja com o lead esperando do outro lado.
+    """
+    canal = _conectar(db, loja_a["loja_id"], _MetaFalsa(),
+                      phone_number_id="1227059273831598")
+
+    assert canal.onboarding_elo == 5
+    assert canal.template_oferta is None

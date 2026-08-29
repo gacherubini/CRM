@@ -129,7 +129,10 @@ def conectar(
         except OnboardingErro as erro:
             _parar(db, canal, erro)
         canal.onboarding_elo = 4
-        canal.template_oferta = "chama_vendedor"
+        # `template_oferta` NÃO se marca aqui: a Meta acabou de responder
+        # PENDING. Quem marca é o webhook, quando ela aprova. Marcar agora faz o
+        # canal parecer pronto durante a análise, e um envio nesse intervalo
+        # quebra na Graph com o lead já esperando.
         db.commit()
 
     canal.onboarding_elo = 5
