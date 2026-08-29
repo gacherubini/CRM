@@ -65,10 +65,17 @@ sobrevive a fila, backoff ou máquina fria.
 `WhatsAppCanal` já tem `waba_id` e `template_oferta` sem caminho de escrita
 (`models_db.py:75-79`). Este projeto é esse caminho. Somam-se:
 
-- `estado`: `pendente` | `ativo` | `falhou`
 - `business_id` do cliente
-- `elo_concluido`: até onde a cadeia chegou (para retomada)
+- `onboarding_elo`: até onde a cadeia chegou (para retomada)
+- `onboarding_erro`: por que parou, em texto para a tela
 - token da loja e PIN de duas etapas, **cifrados em repouso**
+
+**`estado` não ganha coluna nem vocabulário novo.** `WhatsAppCanal.estado` já existe e o
+Modo 2 já tem os seus valores em `whatsapp_provider.ESTADOS_VALIDOS`: `cloud_pendente`,
+`cloud_ativo`, `cloud_restrito`, `cloud_banido`. O `falhou` de uma versão anterior deste
+spec era vocabulário duplicado: a cadeia que quebra deixa o canal em `cloud_pendente` e diz
+onde parou em `onboarding_elo` / `onboarding_erro`. Estado é onde o canal está; o par de
+onboarding é por que ele ainda não saiu de lá.
 
 `evolution_instance` continua guardando o `phone_number_id`, como o §16.3 manda.
 **Não renomear** — é a chave de roteamento do inbound nos dois modos e é `UNIQUE`, que é
@@ -101,7 +108,9 @@ Business. Quem conduz a escolha do número, o SMS e a migração é a Meta.
 (lojista), fila de vendedores (lojista, autoatendida) — e empurra para a fila, a única
 acionável na hora. Diz que a liberação é da Revy, sem fingir que ele está no ar.
 
-**`falhou`** nomeia o elo e o dono. O caso mais comum — número ainda ativo no aplicativo —
+**`falhou`** é estado de tela, não de banco: o canal continua `cloud_pendente` e a tela lê
+`onboarding_elo` e `onboarding_erro` (§5). Ela nomeia o elo e o dono. O caso mais comum —
+número ainda ativo no aplicativo —
 falha **dentro** do popup e pode não gerar evento nenhum; por isso `autorizando` precisa de
 saída explícita de "não deu certo", nunca espera infinita.
 
