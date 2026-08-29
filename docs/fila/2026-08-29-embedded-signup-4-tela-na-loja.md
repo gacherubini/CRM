@@ -66,7 +66,7 @@ Já existe canal Cloud em produção. Isto não é hipótese.
   `pode_conectar` e `pode_desconectar` passam a ser `False` em canal Cloud — as ações do
   Modo 1 não se aplicam a ele.
 
-- [ ] **Passo 1: escrever o teste que falha**
+- [x] **Passo 1: escrever o teste que falha**
 
 ```python
 # portal-gestao/tests/test_canais_view_modo2.py
@@ -142,13 +142,13 @@ def test_canal_do_modo_1_nao_muda():
     assert canal.cloud is False
 ```
 
-- [ ] **Passo 2: rodar e ver falhar**
+- [x] **Passo 2: rodar e ver falhar**
 
 Rode: `.\.venv\Scripts\python.exe -m pytest tests/test_canais_view_modo2.py -q`
 Esperado: FAIL — `AttributeError: 'CanalView' object has no attribute 'cloud'` e
 `assert 'cloud_pendente' != 'cloud_pendente'`.
 
-- [ ] **Passo 3: implementar**
+- [x] **Passo 3: implementar**
 
 Em `app/loja/whatsapp_canais.py`, acrescente os rótulos do Modo 2 ao dicionário `ROTULOS`:
 
@@ -194,12 +194,12 @@ com dois canais Cloud, é obrigatório. (Apagar a linha inteira explode com `Typ
 o campo não tem default; isso protege contra o esquecimento literal, não contra o valor
 errado.)
 
-- [ ] **Passo 4: rodar e ver passar**
+- [x] **Passo 4: rodar e ver passar**
 
 Rode: `.\.venv\Scripts\python.exe -m pytest tests/test_canais_view_modo2.py -q`
 Esperado: 5 passed.
 
-- [ ] **Passo 5: provar por mutação**
+- [x] **Passo 5: provar por mutação**
 
 Volte `pode_conectar` para `estado != "conectado"` e confirme que
 `test_canal_cloud_nao_oferece_o_botao_do_modo_1` fica vermelho. Depois apague um `cloud=cloud`
@@ -207,7 +207,7 @@ de uma das reconstruções do `principal_estoque` e confirme que algum teste peg
 nenhum pegar, acrescente o teste com dois canais**, porque é exatamente esse o caminho que
 some sem aviso.
 
-- [ ] **Passo 6: suíte e commit**
+- [x] **Passo 6: suíte e commit**
 
 ```bash
 .\.venv\Scripts\python.exe -m pytest -q
@@ -240,7 +240,7 @@ conexão" quando o que houve foi a Meta recusar o registro do número.
 que já custou uma tela culpando a conexão por um erro de digitação. Só `404`, `409` e `422`
 têm escape hoje; **o default do cliente é engolir**.
 
-- [ ] **Passo 1: escrever o teste que falha**
+- [x] **Passo 1: escrever o teste que falha**
 
 ```python
 # portal-gestao/tests/test_chatbot_client_onboarding.py
@@ -318,11 +318,11 @@ keyword-only do construtor, usado em `_request`. Não é invenção: é exatamen
 `CloudWhatsAppOutbound` (`chatbot-api/app/whatsapp_outbound.py:238`) já faz no outro produto.
 Comente no construtor por que ele existe, senão o próximo leitor o remove por parecer morto.
 
-- [ ] **Passo 2: rodar e ver falhar**
+- [x] **Passo 2: rodar e ver falhar**
 
 Esperado: `ImportError` em `OnboardingFalhou`.
 
-- [ ] **Passo 3: implementar**
+- [x] **Passo 3: implementar**
 
 ```python
 class OnboardingFalhou(Exception):
@@ -384,13 +384,13 @@ precisa.** `CamposAgenteInvalidos` herda de `ValueError` e por isso é capturada
 capturada por nenhum dos dois. Pô-la lá é redundante — vale só como proteção se alguém trocar
 a base da exceção depois.
 
-- [ ] **Passo 4: rodar, ver passar, e provar por mutação**
+- [x] **Passo 4: rodar, ver passar, e provar por mutação**
 
 Apague o bloco do `erro_502` e confirme que `test_erro_de_elo_chega_com_o_numero_do_elo` fica
 vermelho — e que `test_chatbot_fora_do_ar_continua_indisponivel` **continua verde**, que é o
 que separa as duas situações.
 
-- [ ] **Passo 5: commit**
+- [x] **Passo 5: commit**
 
 ```bash
 git commit -m "fix(loja): o erro de elo chegava como 'chatbot indisponivel'"
@@ -414,7 +414,7 @@ Três linhas de trade-off, e a lista do que ele precisa ter em mãos **antes** d
 popup: ser admin do portfólio empresarial na Meta, cartão para a WABA, e o chip. Descobrir
 que não é admin dentro do popup é o pior lugar possível.
 
-- [ ] **Passo 1: escrever o teste que falha**
+- [x] **Passo 1: escrever o teste que falha**
 
 **As fixtures de papel já existem:** `conftest.py:903` tem
 `login(client, papel="dono"|"gerente"|"vendedor", email=...)`, e
@@ -468,11 +468,11 @@ Os nomes `client_loja_dono` / `client_loja_gerente` / `client_loja_vendedor` aci
 ilustrativos: monte cada um com `login(client, papel=...)` do `conftest`, no próprio arquivo
 do teste.
 
-- [ ] **Passo 2 a 4:** ver falhar, implementar a rota `GET /app/loja/whatsapp/conectar` e o
+- [x] **Passo 2 a 4:** ver falhar, implementar a rota `GET /app/loja/whatsapp/conectar` e o
       template, ver passar. A rota reusa `_habilitado()` e `_autorizado()` para **ver**, e
       calcula `pode_conectar_cloud = papel == DONO` para o botão.
 
-- [ ] **Passo 5: commit**
+- [x] **Passo 5: commit**
 
 ---
 
@@ -507,6 +507,13 @@ Quando destravar:
 ---
 
 ### Task 5: `conectando`, `pendente` e `falhou` na tela
+
+**Primeiro, o que a Task 3 deixou pendente por estar fora dos arquivos dela: a tela de
+decisão não está ligada a lugar nenhum.** `GET /app/loja/whatsapp/conectar` existe, é
+testada e ninguém a alcança clicando. Ligue-a a partir da tela de canais que já existe
+(`/app/loja/whatsapp`), que é onde o lojista já vai — **não** como item de menu novo, que
+seria uma segunda porta para a mesma coisa. O link só aparece quando a loja **não** tem
+canal Cloud; com canal Cloud, o lugar do estado é a própria tela de canais.
 
 **Files:**
 - Modify: `portal-gestao/app/loja/whatsapp_canais.py`, o template
