@@ -39,6 +39,19 @@ class CamposAgenteInvalidos(ValueError):
         self.campos = campos
 
 
+class OnboardingFalhou(Exception):
+    """Um elo da cadeia do embedded signup parou, e sabemos qual.
+
+    Separado de ``ChatbotIndisponivel`` de propósito: "a Meta recusou o registro
+    do número" e "o chatbot está fora do ar" pedem frases diferentes na tela e
+    ações diferentes do lojista.
+    """
+
+    def __init__(self, mensagem: str, *, elo: int | None = None) -> None:
+        super().__init__(mensagem)
+        self.elo = elo
+
+
 class SimulacaoIndisponivel(RuntimeError):
     pass
 
@@ -57,6 +70,19 @@ def _campos_do_422(resposta: Any) -> list[str]:
     return nomes
 
 
+def _detalhe_do_502(resposta: Any) -> dict:
+    """``detail`` do 502 do onboarding, ou ``{}`` quando não é ele que respondeu.
+
+    502 também vem de proxy, e proxy manda HTML — não ``{"detail": {...}}``.
+    Sem este `{}` o cliente estouraria dentro do próprio tratamento de erro.
+    """
+    try:
+        detalhe = resposta.json().get("detail")
+    except (ValueError, AttributeError):
+        return {}
+    return detalhe if isinstance(detalhe, dict) else {}
+
+
 class ChatbotClient:
     def __init__(
         self,
@@ -67,7 +93,13 @@ class ChatbotClient:
         retries: int | None = None,
         retry_backoff: float | None = None,
         sleeper: Callable[[float], None] = time.sleep,
+        transport: httpx.BaseTransport | None = None,
     ):
+        # ``transport`` não é código morto: é o único jeito de um teste exercitar
+        # o `_request` DE VERDADE (status, escapes, retry) sem rede. Sem ele, o
+        # teste teria de sobrescrever `_request` numa subclasse — e aí provaria
+        # que a subclasse do teste funciona, não que o cliente funciona.
+        # Mesmo recurso que `CloudWhatsAppOutbound` usa no chatbot-api.
         self.base_url = base_url.rstrip("/")
         self.token = token
         self.timeout = timeout
@@ -78,6 +110,7 @@ class ChatbotClient:
             else max(0.0, retry_backoff)
         )
         self.sleeper = sleeper
+        self._transport = transport
 
     @property
     def configurado(self) -> bool:
@@ -90,13 +123,19 @@ class ChatbotClient:
         erro_404: type[Exception] | None = None,
         erro_409: type[Exception] | None = None,
         erro_422: bool = False,
+        erro_502: bool = False,
         **kwargs,
     ) -> Any:
         if not self.configurado:
             raise ChatbotIndisponivel("Integração do chatbot ainda não configurada")
         headers = {"Authorization": f"Bearer {self.token}"}
         try:
-            with httpx.Client(base_url=self.base_url, headers=headers, timeout=self.timeout) as client:
+            with httpx.Client(
+                base_url=self.base_url,
+                headers=headers,
+                timeout=self.timeout,
+                transport=self._transport,
+            ) as client:
                 resposta = requisicao_com_retry(
                     client,
                     method,
@@ -112,9 +151,15 @@ class ChatbotClient:
                     raise erro_409("recurso não habilitado")
                 if resposta.status_code == 422 and erro_422:
                     raise CamposAgenteInvalidos(_campos_do_422(resposta))
+                if resposta.status_code == 502 and erro_502:
+                    detalhe = _detalhe_do_502(resposta)
+                    raise OnboardingFalhou(
+                        detalhe.get("mensagem") or "não deu para conectar agora",
+                        elo=detalhe.get("elo"),
+                    )
                 resposta.raise_for_status()
                 return resposta.json()
-        except CamposAgenteInvalidos:
+        except (CamposAgenteInvalidos, OnboardingFalhou):
             raise
         except (httpx.HTTPError, ValueError):
             raise ChatbotIndisponivel(
@@ -323,6 +368,26 @@ class ChatbotClient:
         """Inicia pareamento. A resposta traz ``qr_payload`` efêmero — nunca logar."""
         return self._request(
             "POST", f"/v1/whatsapp/canais/{canal_id}/connect"
+        )
+
+    def conectar_whatsapp_cloud(
+        self, *, code: str, waba_id: str, phone_number_id: str, business_id: str
+    ) -> dict:
+        """Repassa ao Chatbot o que o popup da Meta devolveu (spec §4).
+
+        O portal não vê segredo da Meta: quem troca o ``code`` por token é o
+        Chatbot, porque a troca exige o App Secret e ele não ganha segunda cópia.
+        """
+        return self._request(
+            "POST",
+            "/v1/whatsapp/canais/cloud/onboarding",
+            erro_502=True,
+            json={
+                "code": code,
+                "waba_id": waba_id,
+                "phone_number_id": phone_number_id,
+                "business_id": business_id,
+            },
         )
 
     def desconectar_canal_whatsapp(self, canal_id: str) -> dict:
