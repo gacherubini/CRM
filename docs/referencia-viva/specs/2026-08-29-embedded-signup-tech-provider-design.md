@@ -35,6 +35,18 @@ na Revy Loja, e a Revy tem Advanced Access aprovado para operar a WABA dele.
 | 6 | **Só o dono** da loja pode conectar o WhatsApp | gerente também poder |
 | 7 | O aviso de loja aguardando liberação é **a visão no Control**, e basta | sino, e-mail ou notificação dedicada |
 | 8 | Fica o **SDK canônico**, não o Hosted ES (§4.1) | Hosta ES como plano A |
+| 9 | Gerente **vê** a tela de WhatsApp; só o dono **conecta** | esconder a tela do gerente |
+| 10 | O Card 4 conserta os rótulos Cloud **e** constrói o fluxo novo | deixar o conserto para depois |
+
+A decisão 9 (29/08) é o recorte fino da 6: esconder a tela inteira do gerente tiraria dele a
+resposta de "por que o WhatsApp ainda não está no ar", que é pergunta de rotina de quem toca
+a loja. Ele vê o estado e o que falta; o botão que abre o popup é só do dono.
+
+A decisão 10 (29/08) veio de um defeito achado ao levantar o Card 4: com `estado` valendo
+`cloud_pendente`, a view de canais mostra o **nome técnico cru** como rótulo e calcula
+`pode_conectar = True` — ou seja, oferece o botão Conectar do **Modo 1**, que pede QR na
+Evolution, para um canal que é Cloud. Como já existe canal Cloud em produção, o conserto não
+espera o fluxo novo: os dois vão no mesmo card, para a tela não ficar meio consertada.
 
 A decisão 6 não é permissão por preferência: quem clica precisa ser **admin do portfólio
 empresarial na Meta**, e gerente normalmente não é — ele abriria o popup e travaria lá dentro,
