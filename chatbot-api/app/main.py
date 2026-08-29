@@ -28,6 +28,7 @@ from app import (  # noqa: F401 (registra os modelos)
     channels,
     config,
     models_db,
+    onboarding_cloud,
     operacao,
     provisioning,
     rodizio,
@@ -37,6 +38,7 @@ from app import (  # noqa: F401 (registra os modelos)
 from app.audio import AudioProcessor, get_audio_processor, processador_de_audio
 from app.cloud_retry import registrar_evento_falho
 from app.meta_webhook import EventoCloud, assinatura_valida, parse_inbound
+from app.meta_onboarding import NOME_TEMPLATE, OnboardingErro
 from app.cloud_canal import loja_id_do_phone_number_id, phone_number_id_da_loja
 from app.oferta_inbound import processar_clique
 from app.whatsapp_outbound import acender_digitando, outbound_para_loja
@@ -568,6 +570,28 @@ async def webhook_cloud(request: Request, db: Session = Depends(get_db)):
         # Assinatura bate mas o corpo não é JSON: não é reentrega útil.
         return {"ok": True, "ignorado": "corpo inválido"}
 
+    # Status de template chega neste mesmo webhook, e ``parse_inbound`` nao o
+    # enxerga: ele le so ``value.messages`` e ``value.statuses`` e ignora o
+    # ``field``. O gancho fica aqui, antes do laco, e nao em rota nova — a
+    # assinatura da Meta ja foi conferida acima, e uma segunda porta seria uma
+    # segunda superficie para autenticar. O ``waba_id`` desses eventos vem em
+    # ``entry[].id``; o ``value`` nem traz ``metadata``.
+    for entrada in payload.get("entry") or []:
+        if not isinstance(entrada, dict):
+            continue
+        for mudanca in entrada.get("changes") or []:
+            if not isinstance(mudanca, dict):
+                continue
+            if mudanca.get("field") != "message_template_status_update":
+                continue
+            try:
+                aplicar_status_de_template(db, mudanca, waba_id=entrada.get("id"))
+            except Exception:  # noqa: BLE001
+                # Mesma regra do inbound: ja respondemos 200, entao falha nossa
+                # nao pode virar reentrega infinita da Meta.
+                logger.exception("falha ao aplicar status de template")
+                db.rollback()
+
     mensagens: list[dict] = []
     for evento in parse_inbound(payload):
         if evento.wamid and _wamid_ja_visto(db, evento.wamid):
@@ -604,6 +628,45 @@ async def webhook_cloud(request: Request, db: Session = Depends(get_db)):
                 mensagens.append(pendente)
     # O n8n-cloud segue no agente a partir daqui (§5.9): debounce, IA e Graph.
     return {"ok": True, "mensagens": mensagens}
+
+
+def aplicar_status_de_template(
+    db: Session, mudanca: dict, *, waba_id: str | None
+) -> None:
+    """Grava no canal o template que a Meta acabou de aprovar (spec §5.7).
+
+    O elo 4 do onboarding cria o template e a Meta responde ``PENDING``: a
+    aprovacao so chega depois, por webhook. Sem isto a tela de numeros ficaria
+    "pendente" para sempre e mandaria o lojista abrir o painel da Meta — que e
+    exatamente o que o embedded signup existe para evitar.
+
+    So ``APPROVED`` marca: gravar um template reprovado faria o primeiro envio
+    de oferta quebrar na Graph, ja com o lead esperando.
+    """
+    if not waba_id:
+        return
+    valor = mudanca.get("value")
+    if not isinstance(valor, dict) or valor.get("event") != "APPROVED":
+        return
+    nome = valor.get("message_template_name")
+    if not isinstance(nome, str) or not nome:
+        return
+    # Só o template que NÓS criamos. A WABA é da loja e pode ter outros
+    # aprovados; aceitar qualquer nome faria a última aprovação virar o
+    # template de oferta, e o envio chamaria um modelo com outro corpo.
+    if nome != NOME_TEMPLATE:
+        return
+    canais = (
+        db.query(models_db.WhatsAppCanal)
+        .filter(models_db.WhatsAppCanal.waba_id == waba_id)
+        .all()
+    )
+    if not canais:
+        # WABA que nao e nossa (ou canal ainda nao gravado): nada a fazer.
+        return
+    for canal in canais:
+        canal.template_oferta = nome
+    db.commit()
 
 
 def _wamid_ja_visto(db: Session, wamid: str) -> bool:
@@ -1796,6 +1859,61 @@ def registrar_canal_whatsapp(
         dados.evolution_instance,
         dados.e164_or_label,
     )
+
+
+class OnboardingCloudInput(BaseModel):
+    """O que o popup da Meta devolve ao navegador. A loja NAO vem aqui."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    code: str = Field(min_length=1, max_length=512)
+    waba_id: str = Field(min_length=1, max_length=60)
+    phone_number_id: str = Field(min_length=1, max_length=60)
+    business_id: str = Field(min_length=1, max_length=60)
+
+
+@app.post("/v1/whatsapp/canais/cloud/onboarding")
+def conectar_canal_cloud(
+    dados: OnboardingCloudInput,
+    ctx: Contexto = Depends(get_contexto),
+    db: Session = Depends(get_db),
+):
+    """Roda a cadeia do embedded signup para a loja da credencial (spec §7).
+
+    O 400 vem antes do gate operacional de proposito: com credencial de
+    integracao ``ctx.loja_id`` e ``None`` e ``_exigir_loja_operacional``
+    responderia 423, engolindo o erro que diz o que de fato falta.
+
+    A resposta e a tela de numeros da Loja: estado e elo, nunca token, PIN ou o
+    ``code`` do popup.
+    """
+    if not ctx.loja_id:
+        raise HTTPException(
+            status_code=400,
+            detail="esta rota exige credencial de loja, nao de integracao",
+        )
+    _exigir_loja_operacional(db, ctx.loja_id)
+    try:
+        canal = onboarding_cloud.conectar(
+            db,
+            ctx.loja_id,
+            code=dados.code,
+            waba_id=dados.waba_id,
+            phone_number_id=dados.phone_number_id,
+            business_id=dados.business_id,
+        )
+    except OnboardingErro as erro:
+        # 502: quem falhou foi a Meta, nao o pedido do lojista.
+        raise HTTPException(
+            status_code=502, detail={"elo": erro.elo, "mensagem": str(erro)}
+        ) from erro
+    return {
+        "canal_id": canal.id,
+        "estado": canal.estado,
+        "onboarding_elo": canal.onboarding_elo,
+        "onboarding_erro": canal.onboarding_erro,
+        "template_oferta": canal.template_oferta,
+    }
 
 
 @app.post("/v1/whatsapp/canais/{canal_id}/principal-estoque")
