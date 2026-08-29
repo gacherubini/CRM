@@ -1,11 +1,40 @@
 # Contexto compacto para continuidade
 
-Atualizado em **2026-08-25**. Ponto de entrada de estado e prioridades.
+Atualizado em **2026-08-29**. Ponto de entrada de estado e prioridades.
 Quadro: [`../README.md`](../README.md). Fila: [`../fila/README.md`](../fila/README.md).
 Vocabulário: [`../../CONTEXT.md`](../../CONTEXT.md). As-built Control/Loja:
 [`design/2026-07-30-revy-control-loja-asbuilt-e-melhorias.md`](design/2026-07-30-revy-control-loja-asbuilt-e-melhorias.md).
 
 ## Estado atual
+
+- **Embedded Signup / Tech Provider (29/08):** o onboarding assistido do §16.6 **estava
+  bloqueado e ninguem sabia** — tocar a WABA de um cliente exige Advanced Access em
+  `whatsapp_business_management`, que so sai por App Review. O dono recusou o contorno (pendurar
+  o numero do cliente na WABA da Revy) e o alvo virou o App Review.
+  **Submetido em 29/08**, as duas permissoes, com video por permissao. Aguardando (~24 h).
+  Spec: [`specs/2026-08-29-embedded-signup-tech-provider-design.md`](specs/2026-08-29-embedded-signup-tech-provider-design.md).
+  Cards: [`../fila/2026-08-29-embedded-signup-1-spike-endpoints.md`](../fila/2026-08-29-embedded-signup-1-spike-endpoints.md)
+  e [`../fila/2026-08-29-embedded-signup-2-canal-estado-e-segredos.md`](../fila/2026-08-29-embedded-signup-2-canal-estado-e-segredos.md).
+
+  **Decisao em aberto que muda o plano (§4.1 do spec):** existe **Hosted ES** — a Meta hospeda
+  a pagina do signup e voce so distribui um link. Se for por ai, somem o SDK, o `config_id`, a
+  corrida de 30 s e provavelmente o token por loja (e com ele as tasks de cifra do Card 2).
+  **Ler a tela do App Dashboard antes de construir.**
+
+  Ja resolvido e fechado: o app **ja e** Independent Tech Provider; os endpoints dos elos 1 e 3
+  sairam da doc; a configuracao do Login nasce com **token de usuario do sistema + expiracao
+  Nunca** (as duas escolhas sao irreversiveis, e o "60 days" da Meta pressupoe rotacao que aqui
+  nao existe). Armadilha nova: o registro de numero aceita **10 chamadas por numero em 72 h** e
+  estourar trava o numero por tres dias (`133016`) — retry automatico nesse elo esta proibido.
+
+- **Dois bugs do Atendimento corrigidos e no ar em 29/08** (`app2037` sha `cfcc8f8`):
+  (a) o envio humano usava o singleton do Modo 1 em vez de `outbound_para_loja`, entao em loja
+  Modo 2 **o vendedor nao conseguia responder pelo portal**; (b) a tela usa **dois clientes com
+  dois tokens** — o GET do historico resolvia o token pela loja da sessao e o POST do envio usava
+  o token global, o que dava "Conversa nao encontrada" com a conversa existindo. O (b) falhou
+  fechado por sorte: com outro token, a mensagem sairia pela loja errada, calada.
+  Sobra um terceiro caso do (a) em `solicitacoes_simulacao.py:123`, **nao corrigido**.
+
 
 - **Agente por loja (25/08):** os **quatro cards estão no `main`** — o dado e o texto
   (`chatbot-api`), o n8n, a tela da Loja e o preview. Cada loja tem o seu agente:
@@ -89,7 +118,7 @@ Vocabulário: [`../../CONTEXT.md`](../../CONTEXT.md). As-built Control/Loja:
   Três achados: (1) bug corrigido em prod (`922a365`) — `_wamid_ja_visto` chamava `.add()` de
   `set` num `OrderedDict`, alcançável só em reentrega pós-restart, e o 500 virava laço porque a
   Meta reentrega sem 200; suíte do `chatbot-api` verde. (2) template `chama_vendedor`
-  reclassificado pela Meta de `UTILITY` para `MARKETING` e ainda `PENDING` — ~R$0,32 contra
+  reclassificado pela Meta de `UTILITY` para `MARKETING` e **aprovado assim** (29/08; contestacao ate 22/10) — ~R$0,32 contra
   ~R$0,03–0,04, ~10× por oferta; contorno é mandar a oferta como `interactive` na janela de 24 h
   do vendedor. (3) allow-list do número de teste casa a string enviada e o `wa_id` brasileiro vem
   **sem o nono dígito** — cadastrar o número sem o 9; em número real não há allow-list.

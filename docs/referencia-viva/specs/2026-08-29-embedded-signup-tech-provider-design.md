@@ -60,6 +60,35 @@ loja sai da credencial, nunca do corpo.
 **Síncrona de ponta a ponta no primeiro elo.** O `code` tem TTL de **30 segundos** — não
 sobrevive a fila, backoff ou máquina fria.
 
+## 4.1 Bifurcação em aberto: Hosted ES vs. SDK
+
+**Descoberto em 29/08, depois de o design estar fechado.** O painel do caso de uso oferece
+**"Cadastro incorporado hospedado pela Meta"**: *"Hosted ES is a pre-configured
+implementation of Embedded Signup that is hosted by Meta. You can get a link to Hosted ES
+in the App Dashboard and add it to your website or customer portal."*
+
+São dois caminhos, e o §4 acima descreve **só o segundo**:
+
+| | Hosted (Meta hospeda) | Custom (SDK, o do §4) |
+|---|---|---|
+| Página do signup | da Meta | sua, na Revy Loja |
+| SDK, `config_id`, troca do `code` | **não existem** | todo o §4 e §7 elo 1 |
+| Corrida de 30 s | **não existe** | restrição de arquitetura |
+| Token por loja | provavelmente **não** — System User com Advanced access sobre WABA compartilhada | sim, cifrado (§8) |
+| Como se sabe que conectou | webhook (`account_update` / `PARTNER_ADDED`), a confirmar | retorno do popup |
+| Tela `decidindo` do §16.4 | página sua **antes** do link | dentro do fluxo |
+
+**O que isso muda se for Hosted:** o §4 encolhe para um redirecionamento, o elo 1 do §7 some,
+e o §8 muda de assunto — sem token por loja não há o que cifrar, e o "efeito colateral bom"
+(raio de falha por loja) deixa de valer, voltando ao token único do §16.7.
+
+**O que NÃO muda:** o portão do Control (§9), as colunas de retomada (§5), o template por
+WABA (§7 elo 4) e a tela de decisão do §16.4 — esta só muda de lugar.
+
+**Como decidir:** a doc pública da Meta não descreve o Hosted ES; ele aparece no painel e não
+em `developers.facebook.com`. A leitura decisiva é a própria tela do App Dashboard. **Fazer
+isso antes de começar o Card 3**, e antes das tasks de cifra do Card 2.
+
 ## 5. Dados
 
 `WhatsAppCanal` já tem `waba_id` e `template_oferta` sem caminho de escrita

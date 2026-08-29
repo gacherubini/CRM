@@ -186,7 +186,7 @@ conversas:  555195941020  bot_ativo=True   status=aberta     (o vendedor)
 tinha sido chamado, nunca** — era exatamente o buraco que abre este documento.
 
 E saiu **de graça**: com a janela de 24 h do vendedor aberta, a oferta foi
-`interactive`, sem tocar no `chama_vendedor`, que segue `PENDING`.
+`interactive`, sem tocar no `chama_vendedor`.
 
 ### O que continua sem prova
 
@@ -197,7 +197,7 @@ E saiu **de graça**: com a janela de 24 h do vendedor aberta, a oferta foi
 - **Re-notificação do §5.4** e o follow-up de 30 min / 1 h.
 - **Template com janela fechada:** todo o piloto correu dentro da janela, então o
   caminho pago nunca foi exercitado — e ele depende do `chama_vendedor`, hoje
-  `PENDING` e reclassificado como `MARKETING`.
+  reclassificado como `MARKETING`.
 - **Áudio:** não há provider de transcrição configurado, e o VAD não existe.
 
 ### Três achados que valem registro
@@ -211,7 +211,7 @@ repetia em laço. Trocado por `_marcar_wamid_visto`. Suíte do `chatbot-api`: 45
 testes passando.
 
 **2. O template `chama_vendedor` foi reclassificado pela Meta de `UTILITY` para
-`MARKETING`, e segue `PENDING`.** Utility custa ~R$ 0,03–0,04 por entrega e
+`MARKETING` — e foi **aprovado assim**.** Utility custa ~R$ 0,03–0,04 por entrega e
 Marketing ~R$ 0,32 — cerca de **10× por oferta**. Contorno usado no piloto: com a
 janela de 24 h do vendedor aberta, a oferta sai como mensagem `interactive`,
 grátis e sem template. Ações possíveis: contestar a categoria no painel, ou
@@ -351,3 +351,22 @@ Import do workflow: ver a armadilha em
 [`../../../deploy/fly/3vm/README.md`](../../../deploy/fly/3vm/README.md) —
 `import:workflow` **desativa** o workflow e `publish:workflow` não reativa; só
 `update:workflow --active=true` liga.
+
+## 2026-08-29 — o template saiu da fila, e saiu como Marketing
+
+Conferido no WhatsApp Manager: `chama_vendedor` esta **`Ativo`, categoria Marketing**. Nao
+esta mais `PENDING` — o que significa que o custo de ~10x por oferta **ja vale em
+producao**, nao e mais risco futuro.
+
+O aviso no painel diz: *"Este modelo nao atendeu as nossas diretrizes de utilidade e foi
+atualizado para marketing"*, com **analise disponivel ate 22/10/2026**.
+
+**Vale contestar, e o argumento e forte:** o destinatario do `chama_vendedor` e o
+**vendedor da propria loja**, nao o consumidor. E notificacao operacional sobre um evento
+especifico (um lead que acabou de chegar), com botao para atribuir o atendimento, sem
+oferta, preco ou chamada promocional. O classificador provavelmente leu "lead novo na
+loja" como divulgacao.
+
+**O custo real e menor do que os 10x sugerem**, porque o template so entra quando a janela
+de 24 h do vendedor esta **fechada** — com ela aberta o codigo manda `interactive`, que e
+gratis. Foi por causa desta reclassificacao que esse contorno existe.

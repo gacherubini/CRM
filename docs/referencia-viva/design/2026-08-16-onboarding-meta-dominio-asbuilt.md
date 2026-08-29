@@ -375,7 +375,7 @@ ser questão de atribuição e virou questão de custo.
 
 - [ ] meio de pagamento na WABA (item da Etapa 2) — sem ele, mensagem iniciada pela empresa
       não sai, e é ela que o rodízio usa com janela fechada
-- [ ] aprovação do `chama_vendedor` (estava `PENDING`)
+- [x] aprovação do `chama_vendedor` — **aprovado, mas como `MARKETING`** (conferido 29/08). O motivo esta no painel: *"nao atendeu as diretrizes de utilidade"*. Contestacao aberta ate **22/10/2026**; o argumento e que o destinatario e o **vendedor da loja**, nao o consumidor, e a mensagem e notificacao de um evento especifico, sem oferta
 - [x] **resultado** da verificação do CNPJ — **Verificada em 24/08** (CCMEI + confirmação
       por e-mail); o portão 4 (nome de exibição) passou a depender só do número real
 - [ ] eSIM de operadora brasileira com **voz/SMS** — eSIM de viagem (Airalo, Holafly) é só dados, não recebe SMS e **não serve**
