@@ -1085,16 +1085,19 @@ git commit -m "feat(onboarding): a rota do embedded signup, e o webhook conta do
 `pg_data` do `suite-pg` tirado antes (o banco do chatbot mora lá, **não** no volume do
 `app2037` — quem for repetir, não tire snapshot do volume errado). O secret entrou com
 `--stage`, para o deploy aplicar sem custar um restart a mais. A rota responde `401` sem
-credencial, prova de que está no ar e protegida.
+credencial, prova de que está no ar e protegida. Segunda leva (`ecc58c4`) levou o App ID;
+conferido no processo com `printenv`, e a cifra provada lá dentro
+(`decifrar(cifrar(x)) == x` respondeu `True`) — o módulo é fail-closed, então chave
+malformada só apareceria no Card 4, com o lojista na frente.
 
 - [x] **Passo 1:** suíte do `chatbot-api` verde a partir da pasta do produto.
-- [ ] **Passo 2 — PENDENTE, falta o valor:** `CHATBOT_META_APP_ID` como `[env]` (não é segredo) e
+- [x] **Passo 2:** `CHATBOT_META_APP_ID` como `[env]` (não é segredo) e
       **`CHATBOT_CANAL_SECRET_KEY` como secret** no `app2037` — esta é a pendência herdada
       do Card 2. Gerar com
       `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"`.
-      **A chave Fernet já está lá** (`fly secrets list` mostra `CHATBOT_CANAL_SECRET_KEY`
-      Deployed). Falta só o App ID, que não existe em lugar nenhum do repo — é do painel da
-      Meta.
+      **Ambos no ar em 29/08.** `CHATBOT_CANAL_SECRET_KEY` como secret (Deployed) e
+      `CHATBOT_META_APP_ID = "1370395535203964"` no `[env]` do `fly.app.toml` — ele não é
+      segredo (vai no popup, do lado do navegador) e no git fica rastreável.
 - [x] **Passo 3:** deploy do `app2037` pela skill `revy-deploy` (o boot roda a `0028` em
       fail-fast). Confirmar o SHA no `/healthz`.
 - [x] **Passo 4:** `git diff --check`, `git status --short`, e regerar o mapa (um hook do
@@ -1148,8 +1151,6 @@ dinheiro e fica irreversível por 72 h pelo teto do elo 3.
 - **A sequência de chamadas não foi conferida contra a Meta de verdade.** É o Card 1 (spike),
   que depende do App Review. O risco vive nos formatos de corpo de `test_meta_onboarding.py`,
   isolados de propósito num módulo só deles.
-- **Falta `CHATBOT_META_APP_ID` no `app2037`.** Sem ele o elo 1 não tem `client_id`. Não
-  bloqueia nada hoje: sem a tela do Card 4, ninguém chama a rota.
 - **Confirmar no spike se a Graph aceita `POST /oauth/access_token` com os campos no corpo.**
   Se aceitar, é a correção estrutural do vazamento de log — melhor que o filtro.
 - **`onboarding_erro` não é lido por ninguém ainda.** Quem lê é a tela do Card 4.
