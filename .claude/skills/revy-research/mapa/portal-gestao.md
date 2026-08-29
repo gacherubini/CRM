@@ -1,22 +1,22 @@
 # portal-gestao · 156 rotas · 26 modelos · 6 workers · 35 flags · 26 migrations · 62 templates
 
-Gerado de `a622345`. NAO editar a mao — saida de `gerar_mapa.py`.
+Gerado de `b147256`. NAO editar a mao — saida de `gerar_mapa.py`.
 Migration head: `0026_copiloto_sinal_destinatario`
 
 ## Rotas
 
-- `GET /app/loja/atendimento` — app/loja/routes.py:173
-- `GET /app/loja/agente` — app/loja/routes.py:355
-- `GET /app/loja/atendimento/{workspace_id}` — app/loja/routes.py:392
-- `GET /app/loja/atendimento/{workspace_id}/mensagens.json` — app/loja/routes.py:603
-- `POST /app/loja/atendimento/{workspace_id}/mensagem` — app/loja/routes.py:712
-- `POST /app/loja/atendimento/{workspace_id}/handoff` — app/loja/routes.py:872
-- `POST /app/loja/atendimento/{workspace_id}/etapa` — app/loja/routes.py:951
-- `GET /app/loja/agente/configuracao` — app/loja/routes.py:1097
-- `PUT /app/loja/agente/configuracao.json` — app/loja/routes.py:1127
-- `POST /app/loja/agente/configuracao/testar.json` — app/loja/routes.py:1168
-- `POST /app/loja/agente/configuracao/publicar` — app/loja/routes.py:1211
-- `POST /app/loja/agente/configuracao/restaurar` — app/loja/routes.py:1233
+- `GET /app/loja/atendimento` — app/loja/routes.py:191
+- `GET /app/loja/agente` — app/loja/routes.py:373
+- `GET /app/loja/atendimento/{workspace_id}` — app/loja/routes.py:410
+- `GET /app/loja/atendimento/{workspace_id}/mensagens.json` — app/loja/routes.py:621
+- `POST /app/loja/atendimento/{workspace_id}/mensagem` — app/loja/routes.py:730
+- `POST /app/loja/atendimento/{workspace_id}/handoff` — app/loja/routes.py:890
+- `POST /app/loja/atendimento/{workspace_id}/etapa` — app/loja/routes.py:969
+- `GET /app/loja/agente/configuracao` — app/loja/routes.py:1115
+- `PUT /app/loja/agente/configuracao.json` — app/loja/routes.py:1145
+- `POST /app/loja/agente/configuracao/testar.json` — app/loja/routes.py:1186
+- `POST /app/loja/agente/configuracao/publicar` — app/loja/routes.py:1229
+- `POST /app/loja/agente/configuracao/restaurar` — app/loja/routes.py:1251
 - `GET /health/live` — app/main.py:535
 - `GET /health/ready` — app/main.py:540
 - `GET /public/v1/lojas/{loja_slug}/pixel` — app/main.py:549
@@ -269,11 +269,11 @@ Migration head: `0026_copiloto_sinal_destinatario`
 
 ## Templates
 
-- `app/templates/erro.html` — app/loja/routes.py:92
-- `app/templates/loja/atendimento_lista.html` — app/loja/routes.py:259
-- `app/templates/loja/agente.html` — app/loja/routes.py:379
-- `app/templates/loja/atendimento_workspace.html` — app/loja/routes.py:483
-- `app/templates/loja/agente_configuracao.html` — app/loja/routes.py:1115
+- `app/templates/erro.html` — app/loja/routes.py:110
+- `app/templates/loja/atendimento_lista.html` — app/loja/routes.py:277
+- `app/templates/loja/agente.html` — app/loja/routes.py:397
+- `app/templates/loja/atendimento_workspace.html` — app/loja/routes.py:501
+- `app/templates/loja/agente_configuracao.html` — app/loja/routes.py:1133
 - `app/templates/login.html` — app/main.py:593
 - `app/templates/dashboard.html` — app/main.py:780
 - `app/templates/estoque/lista.html` — app/main.py:824

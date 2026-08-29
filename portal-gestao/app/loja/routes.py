@@ -25,6 +25,7 @@ from app.clients.chatbot import (
 )
 from app.config import settings
 from app.db import get_db
+from app.loja import identity as loja_identity
 from app.loja.attendance import (
     ATTENDANCE_STATE_LABELS,
     AttendanceState,
@@ -72,15 +73,32 @@ _PAPEIS_MUTACAO_ATENDIMENTO = frozenset(
 )
 
 
-def _human_messaging_port() -> HumanMessagingPort:
+def _human_messaging_port(token: str) -> HumanMessagingPort:
     """Factory default; testes sobrescrevem via dependency_overrides."""
     from app.loja.human_messaging import HttpHumanMessagingPort
 
-    return HttpHumanMessagingPort()
+    return HttpHumanMessagingPort(token=token)
 
 
-def get_human_messaging_port() -> HumanMessagingPort:
-    return _human_messaging_port()
+def get_human_messaging_port(request: Request) -> HumanMessagingPort:
+    """Porta de envio do chatbot **da loja da sessão**, não de uma loja fixa.
+
+    Simétrico a ``main.get_chatbot_client``: o chatbot resolve a loja pelo
+    token, então um token só num deploy multi-loja manda a mensagem pela loja
+    errada. Esta função não recebia o ``Request`` e usava o token global — em
+    29/08 isso fazia o GET do histórico responder 200 pela loja da sessão e o
+    POST do envio devolver 404, porque o canal pertencia a uma loja e o token a
+    outra.
+
+    O 404 foi sorte: falhou fechado. Com um token cuja loja tivesse aquele
+    canal, a mensagem sairia pela loja errada, calada.
+    """
+    try:
+        sessao = request.session
+    except (AssertionError, AttributeError):  # sem SessionMiddleware (testes)
+        sessao = None
+    slug = loja_identity.session_loja_slug(sessao)
+    return _human_messaging_port(settings.chatbot_token_para(slug))
 
 
 def atendimento_habilitado() -> bool:

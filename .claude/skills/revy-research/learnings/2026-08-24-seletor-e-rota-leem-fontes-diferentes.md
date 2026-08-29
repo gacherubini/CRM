@@ -28,3 +28,27 @@ contra a escolha deliberada de `app/loja/identity.py:22`, onde `admin_plataforma
 Detalhe que dobrou o tempo de diagnóstico: o `?erro=` do redirect não era renderizado em
 lugar nenhum. A pessoa voltava para `/app` com uma query string e nenhuma explicação. Se
 você criar um `?erro=` novo, renderize junto.
+
+## Terceira ocorrencia, 29/08: a tela de Atendimento usa DOIS clientes
+
+O historico e o envio da mesma tela falam com o chatbot por portas diferentes:
+
+- `GET`  -> `main.get_chatbot_client(request)` — recebe o `Request` e resolve o
+  token com `settings.chatbot_token_para(slug_da_sessao)`;
+- `POST` -> `loja/routes.get_human_messaging_port()` — **nao recebia o
+  `Request`** e usava `settings.chatbot_token`, o global.
+
+Em producao isso dava GET 200 e POST 404 na mesma conversa, com o mesmo
+`canal_id`: o chatbot resolvia `ctx.loja_id` pelo token, o canal pertencia a
+loja da sessao e o token apontava para outra, entao
+`_canal_id_opcional_por_instance` devolvia "instancia nao reconhecida".
+
+**O 404 foi sorte — ele falhou fechado.** Se o token fixo pertencesse a uma loja
+que *tem* aquele canal, o portal mandaria a mensagem pela loja errada, sem erro
+nenhum. E o mesmo vazamento que `chatbot_token_para` existe para estancar (foi
+assim que a `teste` mostrou os 1104 atendimentos da `moto-center`).
+
+**A regra:** toda dependencia que fala com o chatbot precisa do `Request`.
+Dependencia sem `Request` num deploy multi-loja e um vazamento esperando o
+token certo. Procure por `Depends(` que devolva cliente do chatbot e nao receba
+`Request` — cada uma e uma candidata.
