@@ -869,7 +869,7 @@ git commit -m "feat(onboarding): a cadeia retoma de onde parou, e o elo 3 tem te
 - O webhook **não ganha rota nova**: `message_template_status_update` entra no
   `POST /webhook/cloud` que já existe e já valida a assinatura.
 
-- [ ] **Passo 1: escrever o teste que falha**
+- [x] **Passo 1: escrever o teste que falha**
 
 ```python
 # chatbot-api/tests/test_rota_onboarding_cloud.py
@@ -948,13 +948,13 @@ Se o `conftest` tiver fixture de credencial de integração (`ctx.loja_id is Non
 também um teste de que a rota responde **400** — e não 423 — nesse caso. Se não tiver, **não
 invente fixture**: registre no relatório que esse caminho ficou sem teste.
 
-- [ ] **Passo 2: rodar e ver falhar**
+- [x] **Passo 2: rodar e ver falhar**
 
 Rode: `.\.venv\Scripts\python.exe -m pytest tests/test_rota_onboarding_cloud.py -q`
 Esperado: FAIL — `AttributeError: module 'app.main' has no attribute 'onboarding_cloud'`,
 ou 404 na rota.
 
-- [ ] **Passo 3: escrever a rota**
+- [x] **Passo 3: escrever a rota**
 
 Em `app/main.py`, junto das outras rotas de `/v1/whatsapp/canais` (hoje a partir da linha
 1772), com o import de `onboarding_cloud` no topo:
@@ -1009,12 +1009,12 @@ def conectar_canal_cloud(
     }
 ```
 
-- [ ] **Passo 4: rodar e ver passar**
+- [x] **Passo 4: rodar e ver passar**
 
 Rode: `.\.venv\Scripts\python.exe -m pytest tests/test_rota_onboarding_cloud.py -q`
 Esperado: 3 passed (4 se você acrescentou o da credencial de integração).
 
-- [ ] **Passo 5: o status do template no webhook**
+- [x] **Passo 5: o status do template no webhook**
 
 Acrescente ao teste:
 
@@ -1063,12 +1063,12 @@ com `entrada.get("id")` como `waba_id`. Não mexa em `parse_inbound`: ele devolv
 que é vocabulário de mensagem de cliente, e status de template não é mensagem — foi assim que
 `statuses` quase virou lead fantasma.
 
-- [ ] **Passo 6: suíte inteira**
+- [x] **Passo 6: suíte inteira**
 
 Rode: `.\.venv\Scripts\python.exe -m pytest -q`
 Esperado: verde.
 
-- [ ] **Passo 7: commitar**
+- [x] **Passo 7: commitar**
 
 ```bash
 git add chatbot-api/app/main.py chatbot-api/tests/test_rota_onboarding_cloud.py
@@ -1099,3 +1099,46 @@ token cifrado no banco e nenhum segredo na resposta.
 verdade. Isso é o Card 1 (spike), que depende do App Review sair. Até lá o risco vive nos
 formatos de corpo do `test_meta_onboarding.py` — é o arquivo que o spike vai corrigir, e é
 por isso que o cliente HTTP está isolado num módulo só dele.
+
+---
+
+## Executado em 29/08/2026 — o que o card errou
+
+Commits: `245255d`, `978ff00`, `a5bcf52`, `3706b58`, `2ec51e3`. Suíte do `chatbot-api` em
+**664 passed** (era 632 antes do Card 2). Cinco coisas escritas aqui não sobreviveram ao
+contato com o código — as quatro primeiras já corrigidas acima:
+
+1. **A mutação do Passo 5 da Task 2 não provava nada.** Comentar a guarda do elo 2 deixa os
+   oito testes verdes. A guarda que aquele teste trava é a do elo 1.
+2. **O helper de teste fixava um `phone_number_id` para os oito testes.** O banco de teste é
+   um SQLite compartilhado pela sessão inteira e `evolution_instance` é `UNIQUE` **global** —
+   seis testes morriam na colisão, não no que testavam. Learning:
+   `2026-08-29-o-banco-de-teste-do-chatbot-e-um-so.md`.
+3. **Só o elo 2 conferia o `Authorization`.** Dava para mandar o token global do Revy nos
+   elos 3 e 4 com a suíte verde. O escopo da WABA vem desse token: o erro só apareceria no
+   lojista real, nunca no CI. Achado por auditoria de mutação.
+4. **O App Secret ia para o log no caminho feliz.** O `httpx` loga `request.url` em INFO e a
+   URL do elo 1 leva `client_secret` e `code` na query string. Não sai hoje só porque o root
+   está em WARNING — acaso, não proteção. Corrigido com filtro de log durante a chamada.
+5. **A guarda do elo 2 não tinha teste** e o card afirmava que tinha. Coberta agora, e
+   conferida por mutação.
+
+Um bug de desenho do próprio card, corrigido no código: **o elo 4 marcava
+`template_oferta` assim que criava o template**, quando a Meta ainda responde `PENDING`. O
+canal parecia pronto durante a análise e um envio no intervalo quebraria na Graph com o lead
+esperando. Agora quem marca é o webhook, na aprovação — que é a razão de ele existir.
+
+O gate operacional da rota **não** estava no card e foi acrescentado: sem ele a exigência de
+"400 antes do gate" seria vacuosa, e loja suspensa poderia abrir número na Meta — o que custa
+dinheiro e fica irreversível por 72 h pelo teto do elo 3.
+
+## O que este card NÃO entregou
+
+- **A sequência de chamadas não foi conferida contra a Meta de verdade.** É o Card 1 (spike),
+  que depende do App Review. O risco vive nos formatos de corpo de `test_meta_onboarding.py`,
+  isolados de propósito num módulo só deles.
+- **Falta `CHATBOT_META_APP_ID` no `app2037`.** Sem ele o elo 1 não tem `client_id`. Não
+  bloqueia nada hoje: sem a tela do Card 4, ninguém chama a rota.
+- **Confirmar no spike se a Graph aceita `POST /oauth/access_token` com os campos no corpo.**
+  Se aceitar, é a correção estrutural do vazamento de log — melhor que o filtro.
+- **`onboarding_erro` não é lido por ninguém ainda.** Quem lê é a tela do Card 4.
