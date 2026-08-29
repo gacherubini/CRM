@@ -43,36 +43,46 @@ que é exatamente o que um plano não pode ter.
 
 ### Task 2: Elo 1 — trocar o `code` por token de negócio
 
-**Entregável:** endpoint, parâmetros e forma da resposta escritos no §7 do spec.
+**A chamada já está confirmada pela doc** e escrita no §7 do spec:
+`GET /{v}/oauth/access_token` com `client_id`, `client_secret` e `code`. O que sobrou aqui
+são as três coisas que só a execução responde.
 
 - [ ] **Passo 1:** Rodar o popup contra o business de teste e capturar o
       `response.authResponse.code`.
-- [ ] **Passo 2:** Trocar o `code` por token **no servidor**, medindo quanto tempo a troca
-      leva de ponta a ponta. O TTL é de 30 s e a decisão de arquitetura do §4 depende
-      dessa medida — se a troca sozinha já consome uma fatia grande, o desenho síncrono
-      precisa de folga, não de fila.
-- [ ] **Passo 3:** Registrar, **sem valores**: método, caminho, parâmetros exigidos, e se a
-      resposta traz `expires_in` ou é permanente. O spec assume token por loja de vida
-      longa (§8) — se ele expirar, o §8 muda e vira dívida com prazo.
-- [ ] **Passo 4:** Testar o caminho triste: `code` reusado e `code` expirado. Anotar o erro
-      exato de cada, porque é o que a tela `falhou` do §6 precisa distinguir de erro nosso.
+- [ ] **Passo 2:** Trocar o `code` por token no servidor **medindo o tempo** de ponta a
+      ponta. O TTL é de 30 s e o desenho síncrono do §4 depende dessa folga: se a troca
+      sozinha já come uma fatia grande, o desenho precisa de margem, não de fila.
+- [ ] **Passo 3:** **A pergunta aberta que mais importa:** a resposta traz `expires_in`?
+      O §8 assume token de vida longa. O template de configuração do Login se chama
+      *"With 60 Expiration Token"*, o que levanta a suspeita de 60 dias — se o token
+      expirar, o §8 muda e nasce uma dívida com prazo (renovação por loja), que hoje não
+      existe em lugar nenhum do desenho. Anotar o campo, **nunca o valor**.
+- [ ] **Passo 4:** Caminho triste: `code` reusado e `code` expirado. Anotar o erro exato de
+      cada — é o que a tela do §6 precisa distinguir de erro nosso.
 
 ---
 
 ### Task 3: Elo 3 — registrar o número com PIN
 
-**Entregável:** endpoint, parâmetros e comportamento de repetição escritos no §7 do spec.
+**A chamada já está confirmada pela doc:** `POST /{phone_number_id}/register` com
+`messaging_product=whatsapp` e `pin` de 6 dígitos, e duas etapas **não se desliga** pela API.
 
-- [ ] **Passo 1:** Registrar o número de teste e anotar método, caminho e parâmetros,
-      incluindo como o PIN de duas etapas entra.
-- [ ] **Passo 2:** **Repetir a chamada** com o número já registrado. O §7 do spec assume
-      que "já registrado" é sucesso, não erro — confirmar, e anotar o código exato de
-      retorno. Se for erro, o Card 3 precisa tratá-lo como sucesso explicitamente, e é uma
-      linha de código que só existe se este passo for feito.
+> **CUIDADO — este é o único passo do card com custo irreversível.** O registro tem teto de
+> **10 chamadas por número em 72 h móveis**; estourar devolve `133016` e trava o número por
+> três dias. Faça os passos abaixo **contando as tentativas**, e pare em 5. Se travar o
+> número de teste, o spike inteiro para por 72 h.
+
+- [ ] **Passo 1:** Registrar o número de teste e confirmar que a chamada da doc é a que
+      funciona. (tentativa 1)
+- [ ] **Passo 2:** **Repetir a chamada** com o número já registrado. O §7 assume que "já
+      registrado" é sucesso, não erro — confirmar e anotar o código exato. Se for erro, o
+      Card 3 precisa tratá-lo como sucesso explicitamente. (tentativa 2)
 - [ ] **Passo 3:** Anotar o que acontece com número que ainda está ativo no aplicativo do
-      WhatsApp. É o erro mais comum previsto no §6 e ele acontece **dentro** do popup —
-      confirmar se chega evento até nós ou se a tela precisa mesmo da saída manual de
-      "não deu certo".
+      WhatsApp. Isso falha **dentro** do popup — confirmar se chega evento até nós ou se a
+      tela precisa mesmo da saída manual de "não deu certo". **Não gaste tentativa de
+      registro nisto**: o teste é no popup, não no elo 3.
+- [ ] **Passo 4:** Escrever no §7 quantas tentativas foram gastas e quando a janela de 72 h
+      zera, para o Card 3 não começar já perto do teto.
 
 ---
 

@@ -116,21 +116,34 @@ saída explícita de "não deu certo", nunca espera infinita.
 
 ## 7. A cadeia no servidor
 
-| # | Elo | Retentável | Estado da informação |
+| # | Elo | Retentável | Chamada |
 |---|---|---|---|
-| 1 | `code` -> token de negócio | **não** (TTL 30 s) | endpoint a confirmar |
-| 2 | inscrever o app na WABA (`POST /{waba_id}/subscribed_apps`) | sim, idempotente | **verificado em produção 23/08** |
-| 3 | registrar o número com PIN | sim | endpoint a confirmar |
-| 4 | criar e submeter o template na WABA do cliente | sim | corpo fixado pelo §16.2 |
-| 5 | gravar o canal `pendente` | sim | rota nova |
+| 1 | `code` → token de negócio | **não** (TTL 30 s) | `GET /{v}/oauth/access_token` com `client_id`, `client_secret`, `code` |
+| 2 | inscrever o app na WABA | sim, idempotente | `POST /{waba_id}/subscribed_apps` — **verificado em produção 23/08** |
+| 3 | registrar o número com PIN | **com teto** — ver abaixo | `POST /{phone_number_id}/register` com `messaging_product=whatsapp` e `pin` de 6 dígitos |
+| 4 | criar e submeter o template na WABA do cliente | sim | `POST /{waba_id}/message_templates`, corpo fixado pelo §16.2 |
+| 5 | gravar o canal `cloud_pendente` | sim | rota nova |
+
+**O elo 3 tem teto duro e caro: 10 chamadas por número numa janela móvel de 72 h.**
+Estourar devolve o erro `133016` e **impede o registro daquele número pelas 72 h
+seguintes** — o cliente fica sem WhatsApp por três dias por causa de um botão. Então o
+"tentar de novo" do §6 **não pode chamar o elo 3 livremente**: ele conta as tentativas no
+canal, para em um limite bem abaixo de 10, e a partir daí a tela diz para falar com a Revy
+em vez de oferecer outro clique. Um retry automático com backoff neste elo está **proibido**.
+
+O token do elo 1 é um **Business Integration System User access token**, com escopo no
+cliente onboardado — é ele que vai cifrado no canal (§8).
+
+**Duas etapas não se desliga pela API**, então o PIN é obrigatório e nosso: é por isso que
+o §8 guarda o PIN, não por conveniência.
 
 **Depois do elo 1 o popup nunca mais é necessário** — o token já está guardado. Falha do
 elo 2 em diante retoma no servidor a partir de `elo_concluido`. Só o elo 1 devolve o
 lojista ao popup.
 
-**Os elos 2-4 são idempotentes de propósito.** `subscribed_apps` repetido não dói; número
-já registrado e template já existente são **sucesso**, não erro. Tratá-los como falha
-transforma retry inofensivo em laço.
+**Os elos 2 e 4 são idempotentes de propósito.** `subscribed_apps` repetido não dói e
+template já existente é **sucesso**, não erro. Tratá-los como falha transforma retry
+inofensivo em laço. O elo 3 é a exceção — ver o teto acima.
 
 **O elo 2 é o que precisa de teste dedicado.** É o que falhou calado na WABA da Revy em
 23/08: sem ele, o teste do painel funciona e mensagem real nunca chega. Num fluxo
@@ -249,6 +262,7 @@ consertado em 24/08 e nunca exercitado com mais de uma loja.
 | **Advanced Access negado** — mata o projeto inteiro; sem ele a WABA do cliente é intocável | Não há como reduzir antes de submeter, e não há como submeter antes de construir. Seguir a submissão-modelo da Meta ao pé da letra e contar com uma rodada de ida e volta |
 | Sequência exata de chamadas dos elos 1 e 3 não confirmada | Spike contra o business de teste **antes** de virar task |
 | Elo 2 falha calado | Teste dedicado; é o defeito que esta base já cometeu uma vez |
+| **Retry do elo 3 queima o número por 72 h** (`133016`, teto de 10/72 h) | Contador no canal, teto bem abaixo de 10, e nenhum retry automático. É a única tentativa do fluxo que tem custo irreversível de dias |
 | Lojista perde o histórico sem ter entendido | A tela `decidindo` é requisito, não enfeite |
 | Reprovação por forma, não por mérito: vídeo único para as duas permissões, justificativa faltando, permissão a mais, submissão deixada em rascunho | São as causas de reprovação que a própria Meta lista. §10.2 e §10.3 existem para isso |
 

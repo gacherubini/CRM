@@ -45,8 +45,10 @@ chamada à Meta neste card** — por isso ele não depende do Card 1 e pode ser 
 **Interfaces:**
 - Produces: `WhatsAppCanal.business_id: str | None`,
   `WhatsAppCanal.onboarding_elo: int | None`, `WhatsAppCanal.onboarding_erro: str | None`,
-  `WhatsAppCanal.token_cifrado: str | None`, `WhatsAppCanal.pin_cifrado: str | None`.
-  O Card 3 grava `onboarding_elo` a cada elo concluído e retoma a partir dele.
+  `WhatsAppCanal.token_cifrado: str | None`, `WhatsAppCanal.pin_cifrado: str | None`,
+  `WhatsAppCanal.registro_tentativas: int` (default `0`, nunca nulo).
+  O Card 3 grava `onboarding_elo` a cada elo concluído e retoma a partir dele, e incrementa
+  `registro_tentativas` **antes** de cada chamada ao elo 3.
 
 - [ ] **Passo 1: escrever o teste que falha**
 
@@ -87,6 +89,8 @@ def test_campos_de_onboarding_nascem_nulos(db, loja_a):
     assert canal.onboarding_erro is None
     assert canal.token_cifrado is None
     assert canal.pin_cifrado is None
+    # Contador do teto de 10/72h do elo 3: nasce 0, nunca None.
+    assert canal.registro_tentativas == 0
 
 
 def test_campos_de_onboarding_guardam_valor(db, loja_a):
@@ -130,6 +134,13 @@ Em `app/models_db.py`, na classe `WhatsAppCanal`, logo depois de `template_ofert
     # app/segredo_canal.py). Nunca saem em rota de leitura nem em log.
     token_cifrado: Mapped[str | None] = mapped_column(Text, nullable=True)
     pin_cifrado: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    # Quantas vezes o elo 3 (POST /{phone_number_id}/register) foi chamado.
+    # A Meta permite 10 por número em 72h móveis; estourar devolve 133016 e
+    # TRAVA o número por três dias. O Card 3 para bem antes de 10 — por isso o
+    # contador é coluna, não métrica.
+    registro_tentativas: Mapped[int] = mapped_column(
+        Integer, default=0, nullable=False, server_default="0"
+    )
 ```
 
 Confirme que `Integer` e `Text` estão no import de `sqlalchemy` no topo do arquivo;
@@ -183,9 +194,21 @@ def upgrade() -> None:
         "whatsapp_canais",
         sa.Column("pin_cifrado", sa.String(length=255), nullable=True),
     )
+    # NOT NULL com server_default: canal antigo nasce com 0 sem backfill, e o
+    # contador nunca e None no codigo que decide se ainda pode tentar.
+    op.add_column(
+        "whatsapp_canais",
+        sa.Column(
+            "registro_tentativas",
+            sa.Integer(),
+            nullable=False,
+            server_default="0",
+        ),
+    )
 
 
 def downgrade() -> None:
+    op.drop_column("whatsapp_canais", "registro_tentativas")
     op.drop_column("whatsapp_canais", "pin_cifrado")
     op.drop_column("whatsapp_canais", "token_cifrado")
     op.drop_column("whatsapp_canais", "onboarding_erro")
