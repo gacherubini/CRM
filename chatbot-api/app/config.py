@@ -78,6 +78,10 @@ GRAPH_TEMPLATE_OFERTA = os.getenv("CHATBOT_GRAPH_TEMPLATE_OFERTA", "chama_vended
 META_APP_SECRET = os.getenv("CHATBOT_META_APP_SECRET", "")
 META_VERIFY_TOKEN = os.getenv("CHATBOT_META_VERIFY_TOKEN", "")
 
+# Chave Fernet (urlsafe base64, 32 bytes) da cifra dos segredos por loja.
+# É secret no app2037, nunca [env]: ela abre o token de WhatsApp de todo cliente.
+CANAL_SECRET_KEY = os.getenv("CHATBOT_CANAL_SECRET_KEY", "")
+
 # Imagem de veículo recebida de número autorizado. O binário só transita pela
 # API e é enviado ao Estoque; não é persistido no Chatbot/n8n.
 IMAGE_EVOLUTION_URL = os.getenv(
