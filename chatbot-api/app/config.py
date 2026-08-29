@@ -78,6 +78,10 @@ GRAPH_TEMPLATE_OFERTA = os.getenv("CHATBOT_GRAPH_TEMPLATE_OFERTA", "chama_vended
 META_APP_SECRET = os.getenv("CHATBOT_META_APP_SECRET", "")
 META_VERIFY_TOKEN = os.getenv("CHATBOT_META_VERIFY_TOKEN", "")
 
+# App ID do app da Revy na Meta. Não é segredo (vai no popup do lado do
+# navegador), mas o elo 1 do onboarding precisa dele como ``client_id``.
+META_APP_ID = os.getenv("CHATBOT_META_APP_ID", "")
+
 # Chave Fernet (urlsafe base64, 32 bytes) da cifra dos segredos por loja.
 # É secret no app2037, nunca [env]: ela abre o token de WhatsApp de todo cliente.
 CANAL_SECRET_KEY = os.getenv("CHATBOT_CANAL_SECRET_KEY", "")

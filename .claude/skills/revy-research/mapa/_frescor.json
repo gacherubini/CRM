@@ -1,5 +1,5 @@
 {
- "sha": "ff82264",
+ "sha": "6d3b3bf",
  "inventario": {
   "chatbot-api": [
    {
@@ -14,14 +14,14 @@
     "chave": "CHATBOT_WHATSAPP_MODO2_ENABLED (default: '')",
     "simbolo": "CHATBOT_WHATSAPP_MODO2_ENABLED",
     "arquivo": "app/config.py",
-    "linha": 142
+    "linha": 146
    },
    {
     "secao": "flag",
     "chave": "MULTI_WHATSAPP_ENABLED (default: 0)",
     "simbolo": "MULTI_WHATSAPP_ENABLED",
     "arquivo": "app/config.py",
-    "linha": 145
+    "linha": 149
    },
    {
     "secao": "worker",

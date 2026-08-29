@@ -1,6 +1,6 @@
 # chatbot-api · 63 rotas · 19 modelos · 4 workers · 4 flags · 28 migrations
 
-Gerado de `ff82264`. NAO editar a mao — saida de `gerar_mapa.py`.
+Gerado de `6d3b3bf`. NAO editar a mao — saida de `gerar_mapa.py`.
 Migration head: `0028_canal_onboarding`
 
 ## Rotas
@@ -100,8 +100,8 @@ Migration head: `0028_canal_onboarding`
 
 ## Flags
 
-- `CHATBOT_WHATSAPP_MODO2_ENABLED (default: '')` — app/config.py:142
-- `MULTI_WHATSAPP_ENABLED (default: 0)` — app/config.py:145
+- `CHATBOT_WHATSAPP_MODO2_ENABLED (default: '')` — app/config.py:146
+- `MULTI_WHATSAPP_ENABLED (default: 0)` — app/config.py:149
 - `CHATBOT_NOTIF_RETRY_ENABLED (default: 1)` — app/main.py:85
 - `CHATBOT_MODO2_WORKERS_ENABLED (default: 1)` — app/main.py:97
 
