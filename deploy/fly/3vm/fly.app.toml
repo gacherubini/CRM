@@ -61,6 +61,10 @@ primary_region = "iad"
   CHATBOT_AUDIO_EVOLUTION_URL = "https://evolution2037.fly.dev"
   CHATBOT_IMAGE_EVOLUTION_URL = "https://evolution2037.fly.dev"
   CHATBOT_SKIP_INIT = "1"
+  # App ID do app da Revy na Meta. Fica AQUI, e nao em secret, de proposito: ele
+  # nao e segredo — vai no popup do embedded signup, do lado do navegador — e no
+  # git ele fica rastreavel. O par dele, CHATBOT_META_APP_SECRET, e secret.
+  CHATBOT_META_APP_ID = "1370395535203964"
   ESTOQUE_SKIP_INIT = "1"
   ESTOQUE_SESSION_SECURE_COOKIE = "1"
   ESTOQUE_MEDIA_STORAGE_DIR = "/data/estoque/media"
