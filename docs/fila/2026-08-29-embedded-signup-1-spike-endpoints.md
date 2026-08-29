@@ -24,13 +24,35 @@ que é exatamente o que um plano não pode ter.
 
 ---
 
+### Task 0: Declarar o app como Independent Tech Provider
+
+**Sem isto a Task 1 não existe.** Conferido em 29/08: num app de WhatsApp "direto" (WABA
+própria, o arranjo do piloto) a criação de configuração só oferece a variação *General* —
+a de **WhatsApp Embedded Signup não aparece na lista**.
+
+- [ ] **Passo 1:** App Dashboard → **WhatsApp → Início rápido**, seção *Scale your
+      Business*, escolher **Independent Tech Provider**.
+- [ ] **Passo 2:** Conferir que o piloto não caiu junto: `GET /{waba_id}/subscribed_apps`
+      ainda lista o app da Revy, e uma mensagem ao número de teste ainda gera resposta.
+      É o mesmo app que está em produção.
+- [ ] **Passo 3:** Se o piloto quebrar, **parar aqui** e avisar. Reverter logo depois é
+      barato; três dias depois, não.
+
+---
+
 ### Task 1: Configuração v4 do Facebook Login for Business
 
 **Entregável:** o `config_id` existe e o popup abre.
 
-- [ ] **Passo 1:** No App Dashboard, criar a configuração em **Facebook Login for Business
-      → Configurations**, usando o template *"WhatsApp Embedded Signup Configuration With
-      60 Expiration Token"* ou uma custom equivalente.
+**Já decidido em 29/08, ao percorrer a tela** (as duas escolhas são irreversíveis):
+tipo **token de acesso do usuário do sistema**, expiração **Nunca**. O "60 days
+(recomendado)" da Meta pressupõe rotação automática, que não existe aqui — e token que
+morre sozinho deixa a loja muda em silêncio. Mesma razão pela qual o token de System User
+da Revy já está em Nunca.
+
+- [ ] **Passo 1:** No App Dashboard, criar a configuração em **Login do Facebook para
+      empresas → Configurações** (a **segunda** do menu, entre *Início rápido* e *Modelos* —
+      a primeira é a de OAuth e não é essa).
 - [ ] **Passo 2:** Selecionar **só** os ativos e permissões que o §10.2 do spec lista.
       Catálogos, contas de anúncio, Pages, datasets e contas de Instagram ficam **fora** —
       pedir ativo desnecessário é a causa de reprovação nº 1 e ela vale aqui também.

@@ -180,6 +180,20 @@ O Control ganha **visão**: estado do canal, elo que falhou, status do template.
 **Tech Provider:** aceite de termos, sem taxa. O degrau que costuma travar — verificação de
 negócio da Revy — já está feito.
 
+> **A declaração de Tech Provider é PRÉ-REQUISITO DE TUDO, não etapa final.** Descoberto em
+> 29/08 tentando criar a configuração: enquanto o app for um app de WhatsApp "direto" (WABA
+> própria, o arranjo do piloto), a única variação de login oferecida é *General* — a de
+> **WhatsApp Embedded Signup não existe na lista**. Sem ela não há `config_id`, sem
+> `config_id` não há popup, e sem popup não há nada para construir nem para filmar.
+>
+> Onde se declara: **WhatsApp → Início rápido**, seção *Scale your Business*, opção
+> **Independent Tech Provider**.
+>
+> **Risco a conferir na hora:** é o mesmo app que serve o piloto em produção. Depois de
+> declarar, confirmar que `GET /{waba_id}/subscribed_apps` ainda lista o app e que o número
+> de teste ainda responde. Painel que muda arranjo em silêncio é defeito conhecido desta
+> base.
+
 ### 10.1 Pré-requisitos antes de submeter
 
 | Pré-requisito | Estado |
@@ -279,6 +293,8 @@ consertado em 24/08 e nunca exercitado com mais de uma loja.
 
 Um eixo por vez, na ordem:
 
+0. **Declarar o app como Independent Tech Provider** (§10). É portão, não etapa final: sem
+   ele a variação de Embedded Signup não existe e o passo 1 não tem como começar.
 1. **Spike** da sequência exata de chamadas contra o business de teste (elos 1 e 3).
 2. Cadeia no `chatbot-api` (rota, elos, dados, segredos).
 3. Tela na Revy Loja (`decidindo` → popup → `conectando` → `pendente`).
