@@ -5,7 +5,7 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
-from app.models_db import LojaOperacionalProjecao, _agora
+from app.models_db import LojaOperacionalProjecao, WhatsAppCanal, _agora
 
 
 def apply_payload(db: Session, loja_id: str, payload: dict[str, Any]) -> list[str]:
@@ -69,6 +69,25 @@ def capture_only(
     return not allows_processing(db, loja_id, module)
 
 
+def _liberar_canal_cloud(db: Session, loja_id: str) -> None:
+    """Portão do Control (spec §9): liberar a loja ativa o canal que esperava.
+
+    Só sobe de ``cloud_pendente``. Canal restrito ou banido pela Meta não volta
+    por decisão nossa, e canal já ativo não é tocado.
+    """
+    canais = (
+        db.query(WhatsAppCanal)
+        .filter(
+            WhatsAppCanal.loja_id == loja_id,
+            WhatsAppCanal.waba_id.isnot(None),
+            WhatsAppCanal.estado == "cloud_pendente",
+        )
+        .all()
+    )
+    for canal in canais:
+        canal.estado = "cloud_ativo"
+
+
 def _apply_envelope(
     db: Session,
     loja_id: str,
@@ -89,6 +108,8 @@ def _apply_envelope(
         existing.state = state
         existing.event_id = event_id
         existing.atualizado_em = _agora()
+        if aggregate == "whatsapp_modo" and state == "2":
+            _liberar_canal_cloud(db, loja_id)
         return "applied"
 
     db.add(
@@ -101,4 +122,6 @@ def _apply_envelope(
             atualizado_em=_agora(),
         )
     )
+    if aggregate == "whatsapp_modo" and state == "2":
+        _liberar_canal_cloud(db, loja_id)
     return "applied"
