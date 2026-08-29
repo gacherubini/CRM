@@ -182,9 +182,17 @@ e troque os dois cálculos de ação:
 ```
 
 **Atenção ao bloco do `principal_estoque` no fim da função:** ele reconstrói cada `CanalView`
-campo a campo. Todo campo novo tem de ser repassado nas **três** reconstruções, senão o canal
-volta com `cloud=False` e o defeito ressuscita só quando a loja tem mais de um canal — que é
-o caso que ninguém testa à mão.
+campo a campo, em duas reconstruções (a do `primeiro` e a do loop) além da construção
+original. Todo campo novo tem de ser repassado nas três, senão o canal volta com
+`cloud=False` e o defeito ressuscita só quando a loja tem mais de um canal — o caso que
+ninguém testa à mão. Ali o campo se repassa como `cloud=primeiro.cloud` / `cloud=c.cloud`;
+`cloud` é variável do loop de montagem e não está em escopo.
+
+**Confirmado ao executar, e não era hipótese:** trocar um deles por `cloud=False` — que é o
+defeito real — passa pelos cinco testes acima sem nenhum vermelho. Por isso o sexto teste,
+com dois canais Cloud, é obrigatório. (Apagar a linha inteira explode com `TypeError`, porque
+o campo não tem default; isso protege contra o esquecimento literal, não contra o valor
+errado.)
 
 - [ ] **Passo 4: rodar e ver passar**
 
@@ -367,8 +375,14 @@ No `_request`, o escape:
 ```
 
 com um `_detalhe_do_502` que devolve `{}` quando o corpo não é o JSON esperado — 502 também
-vem de proxy, e proxy não manda `detail`. E `OnboardingFalhou` no `except` que hoje
-re-levanta `CamposAgenteInvalidos`, senão ela é reengolida logo em seguida.
+vem de proxy, e proxy não manda `detail`.
+
+**Correção, verificada ao executar:** este card afirmava que `OnboardingFalhou` *precisa*
+entrar no `except` que re-levanta `CamposAgenteInvalidos`, senão seria reengolida. **Não
+precisa.** `CamposAgenteInvalidos` herda de `ValueError` e por isso é capturada por
+`except (httpx.HTTPError, ValueError)`; `OnboardingFalhou` herda de `Exception` e não é
+capturada por nenhum dos dois. Pô-la lá é redundante — vale só como proteção se alguém trocar
+a base da exceção depois.
 
 - [ ] **Passo 4: rodar, ver passar, e provar por mutação**
 
