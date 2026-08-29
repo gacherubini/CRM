@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+{% block title %}Conectar o WhatsApp — Revy Loja{% endblock %}
+{% block page_title %}Conectar o WhatsApp{% endblock %}
+{% block content %}
+{# Sem CSS novo: só .page-heading, .panel, .alert e .button que já existem em app.css. #}
+<div class="page-heading">
+  <div>
+    <span class="eyebrow">Ajustes</span>
+    <h1>Conectar o WhatsApp</h1>
+    <p>
+      Antes de abrir a janela da Meta, decida qual número o Agente vai atender.
+      Essa escolha não volta atrás.
+    </p>
+  </div>
+</div>
+
+<section class="panel" aria-labelledby="decidir-titulo">
+  <div class="panel-heading">
+    <div>
+      <span class="mono-label">Decisão</span>
+      <h2 id="decidir-titulo">Qual número vai para a nuvem</h2>
+    </div>
+  </div>
+  <div class="panel-body">
+    <p>
+      <strong>Um número novo (um chip só para o Agente).</strong>
+      O celular da loja continua como está, com as conversas e o histórico de
+      sempre. Você passa a divulgar o número novo nos anúncios.
+    </p>
+    <p>
+      <strong>O número que você já anuncia.</strong>
+      Quem já conhece a loja continua chamando no mesmo número — e é isso que se
+      paga: ao migrar, <strong>o histórico daquele celular fica para trás</strong>
+      e o número sai do aparelho. Ele passa a existir só aqui dentro, atendido
+      pelo Agente e pela sua equipe por esta tela. O WhatsApp no celular
+      <strong>não volta</strong> para aquele número.
+    </p>
+    <p class="muted">
+      Não há um "li e concordo" depois: continuar daqui já é a escolha.
+    </p>
+  </div>
+</section>
+
+<section class="panel" aria-labelledby="antes-titulo">
+  <div class="panel-heading">
+    <div>
+      <span class="mono-label">Antes de começar</span>
+      <h2 id="antes-titulo">Tenha isto em mãos</h2>
+    </div>
+  </div>
+  <div class="panel-body">
+    <p>
+      A janela seguinte é da Meta, não da Revy. Descobrir lá dentro que falta
+      alguma destas três coisas obriga a começar tudo de novo.
+    </p>
+    <ol>
+      <li>
+        <strong>Ser admin do portfólio empresarial da loja na Meta.</strong>
+        É o mesmo lugar onde ficam a Página e a conta de anúncios. Sem esse
+        acesso, a janela para no meio e não há como seguir.
+      </li>
+      <li>
+        <strong>Um cartão de crédito para a conta de WhatsApp.</strong>
+        A cobrança das conversas é da Meta, direto no cartão que você informar lá.
+      </li>
+      <li>
+        <strong>O chip do número, no celular, para receber o código.</strong>
+        A Meta manda um código por SMS ou ligação e ele precisa ser digitado na hora.
+      </li>
+    </ol>
+  </div>
+</section>
+
+<section class="panel" aria-labelledby="conectar-titulo">
+  <div class="panel-heading">
+    <div>
+      <span class="mono-label">Conexão</span>
+      <h2 id="conectar-titulo">Abrir a janela da Meta</h2>
+    </div>
+  </div>
+  <div class="panel-body">
+    {% if pode_conectar_cloud %}
+    {# Sem ação: o popup do SDK entra na próxima etapa, depois da liberação da Meta. #}
+    <button class="button primary" type="button" id="conectar-whatsapp" disabled>
+      Conectar o WhatsApp
+    </button>
+    <p class="muted">
+      A janela ainda está em liberação com a Meta. Assim que sair, o botão abre
+      aqui mesmo — sem sair da Revy.
+    </p>
+    {% else %}
+    <div class="alert warning">
+      <strong>Só o dono da loja conecta o WhatsApp.</strong>
+      Quem clica precisa ser admin do portfólio empresarial da loja na Meta, e
+      esse acesso costuma ser só do dono. Você acompanha esta tela para saber em
+      que pé está a conexão.
+    </div>
+    {% endif %}
+  </div>
+</section>
+{% endblock %}

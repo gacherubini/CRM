@@ -27,7 +27,7 @@ from app.config import (  # noqa: E402
 )
 from app.db import get_db  # noqa: E402
 from app.loja import qr_efemero  # noqa: E402
-from app.loja.types import ROLES_GESTAO  # noqa: E402
+from app.loja.types import ROLES_GESTAO, Role  # noqa: E402
 from app.loja.whatsapp_canais import ROTULOS, montar_canais_view  # noqa: E402
 from app.loja_operacao_auditoria import registrar_auditoria_canal  # noqa: E402
 from app.main import (  # noqa: E402
@@ -40,6 +40,7 @@ from app.main import (  # noqa: E402
 
 _TELA = "/app/loja/whatsapp"
 _TELA_FILA = "/app/loja/whatsapp/fila"
+_TELA_DECIDIR = "/app/loja/whatsapp/conectar"
 # Erro genérico: nenhuma mensagem de canal carrega QR nem detalhe de provedor.
 _ERRO_CHATBOT = "chatbot_indisponivel"
 
@@ -51,6 +52,15 @@ def _habilitado() -> bool:
 
 def _autorizado(usuario) -> bool:
     return (getattr(usuario, "papel", "") or "").strip().casefold() in ROLES_GESTAO
+
+
+def _e_dono(usuario) -> bool:
+    """Quem conecta o WhatsApp na nuvem precisa ser admin do portfólio
+    empresarial na Meta — gerente normalmente não é. Ele vê a tela, mas o
+    botão é só do dono."""
+    return (
+        getattr(usuario, "papel", "") or ""
+    ).strip().casefold() == Role.DONO.value
 
 
 def _para_app() -> RedirectResponse:
@@ -138,6 +148,38 @@ def loja_whatsapp_canais(
             qr=qr_efemero.consumir(request.session.pop("canal_qr_token", None)),
             acao_erro=request.session.pop("canal_erro", None),
             acao_mensagem=request.session.pop("canal_mensagem", None),
+        ),
+        headers={"Cache-Control": "no-store"},
+    )
+
+
+@router.get(_TELA_DECIDIR, response_class=HTMLResponse)
+def loja_whatsapp_decidir(
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """A escolha que não volta atrás: número novo ou o que a loja já anuncia.
+
+    Migrar o número anunciado para a nuvem apaga o histórico do celular e o
+    torna bot-only para sempre. A escolha aqui **é** o aceite — não existe um
+    "li e concordo" separado.
+
+    Gerente vê (precisa responder por que o WhatsApp não está no ar); só o dono
+    tem o botão, porque quem clica precisa ser admin do portfólio na Meta.
+    """
+    usuario = usuario_atual(request, db)
+    if not usuario:
+        return redirecionar_login()
+    if not _habilitado() or not _autorizado(usuario):
+        return _para_app()
+
+    return templates.TemplateResponse(
+        "loja/whatsapp_decidir.html",
+        contexto(
+            request,
+            usuario,
+            db,
+            pode_conectar_cloud=_e_dono(usuario),
         ),
         headers={"Cache-Control": "no-store"},
     )
