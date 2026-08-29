@@ -76,7 +76,7 @@ loja sai da credencial, nunca do corpo.
 **Síncrona de ponta a ponta no primeiro elo.** O `code` tem TTL de **30 segundos** — não
 sobrevive a fila, backoff ou máquina fria.
 
-## 4.1 Bifurcação em aberto: Hosted ES vs. SDK
+## 4.1 Bifurcação DECIDIDA: fica o SDK (Hosted ES descartado, 29/08)
 
 **Descoberto em 29/08, depois de o design estar fechado.** O painel do caso de uso oferece
 **"Cadastro incorporado hospedado pela Meta"**: *"Hosted ES is a pre-configured
@@ -101,9 +101,11 @@ e o §8 muda de assunto — sem token por loja não há o que cifrar, e o "efeit
 **O que NÃO muda:** o portão do Control (§9), as colunas de retomada (§5), o template por
 WABA (§7 elo 4) e a tela de decisão do §16.4 — esta só muda de lugar.
 
-**Como decidir:** a doc pública da Meta não descreve o Hosted ES; ele aparece no painel e não
-em `developers.facebook.com`. A leitura decisiva é a própria tela do App Dashboard. **Fazer
-isso antes de começar o Card 3**, e antes das tasks de cifra do Card 2.
+**Decidido em 29/08 (decisão 8 do §2): fica o SDK, o caminho do §4.** Ele é o documentado
+na doc pública — o Hosted ES aparece só no painel, e não em `developers.facebook.com` —,
+mantém o lojista dentro da Revy e preserva o token por loja, que é o que dá o raio de falha
+por loja do §8. **Não re-propor o Hosted ES.** O Card 2 foi executado nessa premissa e já
+está em `main`.
 
 ## 5. Dados
 
@@ -167,7 +169,13 @@ saída explícita de "não deu certo", nunca espera infinita.
 | 2 | inscrever o app na WABA | sim, idempotente | `POST /{waba_id}/subscribed_apps` — **verificado em produção 23/08** |
 | 3 | registrar o número com PIN | **com teto** — ver abaixo | `POST /{phone_number_id}/register` com `messaging_product=whatsapp` e `pin` de 6 dígitos |
 | 4 | criar e submeter o template na WABA do cliente | sim | `POST /{waba_id}/message_templates`, corpo fixado pelo §16.2 |
-| 5 | gravar o canal `cloud_pendente` | sim | rota nova |
+| 5 | fechar o canal como `cloud_pendente` | sim | rota nova |
+
+**Correção de 29/08, escrevendo o Card 3: a linha do canal nasce depois do elo 1, não no
+elo 5.** A tabela e o parágrafo abaixo se contradiziam — se o canal só aparecesse no fim,
+uma falha no elo 2 perderia o token do elo 1, que tem TTL de 30 s e não é retomável, e o
+lojista voltaria ao popup, o oposto do que o parágrafo promete. O elo 5 continua existindo:
+ele é o *fecho* da cadeia (`onboarding_elo = 5`), não a criação da linha.
 
 **O elo 3 tem teto duro e caro: 10 chamadas por número numa janela móvel de 72 h.**
 Estourar devolve o erro `133016` e **impede o registro daquele número pelas 72 h
