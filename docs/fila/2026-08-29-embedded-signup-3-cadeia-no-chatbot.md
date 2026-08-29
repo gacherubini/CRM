@@ -1016,10 +1016,17 @@ E implemente `aplicar_status_de_template` em `main.py`, chamada de dentro do
 `message_template_status_update`. **Não crie rota nova** — a assinatura da Meta já é
 validada lá, e uma segunda porta seria uma segunda superfície para autenticar.
 
-Leia o corpo real do handler antes de escrever: o formato do envelope (`entry` →
-`changes` → `field`/`value`) tem de bater com o que o código já desempacota. Se o handler
-atual não expõe o `waba_id` do envelope, **pare e relate** em vez de adivinhar — ele vem em
-`entry[].id` para eventos de WABA, e não no `value`.
+**Conferido no código em 29/08, não adivinhe:** `parse_inbound` (`app/meta_webhook.py:50`)
+percorre `entry[].changes[]` e lê **só** `value.messages` e `value.statuses` — ele **ignora
+`field` por completo**. Um evento de template hoje entra pelo webhook, não vira evento
+nenhum e o handler responde `200` calado. E o `waba_id` desses eventos vem em **`entry[].id`**,
+não no `value` (que só tem `metadata.phone_number_id`, ausente aqui).
+
+Então o gancho vai **no `webhook_cloud` (`main.py:554`), antes do laço de `parse_inbound`**,
+varrendo `payload["entry"]` e casando `mudanca.get("field") == "message_template_status_update"`
+com `entrada.get("id")` como `waba_id`. Não mexa em `parse_inbound`: ele devolve `EventoCloud`,
+que é vocabulário de mensagem de cliente, e status de template não é mensagem — foi assim que
+`statuses` quase virou lead fantasma.
 
 - [ ] **Passo 6: suíte inteira**
 
