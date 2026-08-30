@@ -276,6 +276,37 @@ class TestLayout(unittest.TestCase):
         self.assertEqual(len(chaves), len(set(chaves)))
 
 
+class TestVMs(unittest.TestCase):
+    # A correcao determinada pelo dono: desenhar a VM foi escolha explicita
+    # dele (blast radius — app2037 carrega seis produtos), nao decisao de
+    # implementador dropar. dispor() precisa emitir uma Caixa tipo "vm" por
+    # VM, com os produtos do seu `contem` geometricamente dentro dela.
+    def test_toda_vm_vira_caixa_e_todo_produto_de_contem_cai_dentro_dela(self):
+        raiz = varredura.raiz_repo()
+        frescor_path = Path(__file__).resolve().parent / "mapa" / "_frescor.json"
+        frescor = json.loads(frescor_path.read_text(encoding="utf-8"))
+        modelo = arq_modelo.carregar(
+            raiz, frescor, arquitetura.NOS,
+            arquitetura.ARESTAS, arquitetura.VMS, arquitetura.FLUXOS)
+        cena = arq_layout.dispor(modelo)
+        por_chave = {c.chave: c for c in cena.caixas}
+
+        for chave_vm, bruto_vm in arquitetura.VMS.items():
+            self.assertIn(chave_vm, por_chave, chave_vm)
+            caixa_vm = por_chave[chave_vm]
+            self.assertEqual(caixa_vm.tipo, "vm", chave_vm)
+            for produto in bruto_vm["contem"]:
+                chave_dentro = f"{chave_vm}.{produto}"
+                self.assertIn(chave_dentro, por_chave, chave_dentro)
+                p = por_chave[chave_dentro]
+                self.assertGreaterEqual(p.x, caixa_vm.x, chave_dentro)
+                self.assertGreaterEqual(p.y, caixa_vm.y, chave_dentro)
+                self.assertLessEqual(p.x + p.w, caixa_vm.x + caixa_vm.w + 0.01,
+                                     chave_dentro)
+                self.assertLessEqual(p.y + p.h, caixa_vm.y + caixa_vm.h + 0.01,
+                                     chave_dentro)
+
+
 class TestRender(unittest.TestCase):
     def _html(self):
         raiz = varredura.raiz_repo()
@@ -288,9 +319,16 @@ class TestRender(unittest.TestCase):
         return arq_render.render(arq_layout.dispor(modelo), modelo, "/* js */")
 
     def test_e_auto_contido_sem_nenhuma_url_externa(self):
+        # "http" cru no HTML nao e' erro: o _frescor.json real carrega
+        # "https://" como TEXTO dentro de descricao de flag — isso e' dado,
+        # nao recurso. O que nao pode existir e' src=/href=/fetch( apontando
+        # pra fora (file:// bloqueia fetch mesmo, mas nao custa garantir).
         sem_comentario = re.sub(r"<!--.*?-->", "", self._html(), flags=re.S)
-        self.assertNotIn("http://", sem_comentario)
-        self.assertNotIn("https://", sem_comentario)
+        proibido = re.compile(
+            r'(?:src|href)\s*=\s*["\']https?://|fetch\(\s*["\']https?://',
+            re.IGNORECASE)
+        achado = proibido.search(sem_comentario)
+        self.assertIsNone(achado, achado.group(0) if achado else None)
 
     def test_emite_as_duas_rampas(self):
         html = self._html()

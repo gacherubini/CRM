@@ -28,7 +28,7 @@ from __future__ import annotations
 import html
 
 from arq_layout import Caixa, Cena, ALTURA_TITULO, MARGEM
-from arq_modelo import Aresta, Modelo, No
+from arq_modelo import Aresta, Modelo, No, Vm
 
 # Cores de shared/brand/revy-tokens.css. Nao inventar paleta — ver o learning
 # 2026-08-23-tokens-de-marca-tem-fonte-unica.md.
@@ -49,16 +49,31 @@ def _fonte_titulo(nivel: int) -> float:
     return max(1.5, round(26 / (nivel ** 1.35), 1))
 
 
-def _spof_por_chave(nos: tuple[No, ...], prefixo: str = "") -> dict[str, bool]:
+def _marcar_spof(no: No, prefixo: str, resultado: dict[str, bool]) -> None:
+    chave = f"{prefixo}.{no.chave}" if prefixo else no.chave
+    if no.spof:
+        resultado[chave] = True
+    for filho in no.filhos:
+        _marcar_spof(filho, chave, resultado)
+
+
+def _spof_por_chave(nos: tuple[No, ...], vms: tuple[Vm, ...] = ()) -> dict[str, bool]:
     """Mapeia chave-completa (mesmo esquema de arq_layout: caminho separado
     por ".") -> spof. `Caixa` nao carrega `spof` (nao esta na lista fixa de
-    campos do contrato), entao esta e a unica forma de saber."""
+    campos do contrato), entao esta e a unica forma de saber.
+
+    Um produto dentro de uma VM tem a chave da Caixa prefixada por
+    `vm.chave.` (arq_layout._dispor_vm) — sem isso o SPOF do Motor de
+    Simulacao, por exemplo, nunca bateria contra `app2037.motor-simulacao`.
+    """
     resultado: dict[str, bool] = {}
     for no in nos:
-        chave = f"{prefixo}.{no.chave}" if prefixo else no.chave
-        if no.spof:
-            resultado[chave] = True
-        resultado.update(_spof_por_chave(no.filhos, chave))
+        _marcar_spof(no, "", resultado)
+    for vm in vms:
+        for chave_produto in vm.contem:
+            for no in nos:
+                if no.chave == chave_produto:
+                    _marcar_spof(no, vm.chave, resultado)
     return resultado
 
 
@@ -74,6 +89,18 @@ def _rect_no(c: Caixa, spof: bool) -> str:
     return (
         f'<rect x="{c.x:.2f}" y="{c.y:.2f}" width="{c.w:.2f}" height="{c.h:.2f}" '
         f'rx="6" fill="{SURFACE}" stroke="{BRAND}" stroke-width="{largura}"/>'
+    )
+
+
+def _rect_vm(c: Caixa) -> str:
+    # Moldura, nao caixa: fill="none" e tracejado. A VM e infra, nao
+    # produto — o dono pediu que ela fique visualmente distinta (blast
+    # radius: uma maquina caindo leva tudo que esta dentro dela junto).
+    largura = round(max(0.3, 1.5 / max(1, c.nivel)), 2)
+    return (
+        f'<rect x="{c.x:.2f}" y="{c.y:.2f}" width="{c.w:.2f}" height="{c.h:.2f}" '
+        f'rx="6" fill="none" stroke="{INK_SOFT}" stroke-width="{largura}" '
+        f'stroke-dasharray="8 5"/>'
     )
 
 
@@ -115,25 +142,40 @@ def _item(c: Caixa) -> str:
 
 def _no_recursivo(caixa: Caixa, por_pai: dict, spof_map: dict) -> str:
     filhos = por_pai.get(caixa.chave, [])
-    subs_no = [f for f in filhos if f.tipo == "no"]
+    subs_no = [f for f in filhos if f.tipo in ("no", "vm")]
     itens = [f for f in filhos if f.tipo == "item"]
     spof = spof_map.get(caixa.chave, False)
 
     interior = "".join(_item(i) for i in itens)
     interior += "".join(_no_recursivo(s, por_pai, spof_map) for s in subs_no)
     kmin_attr = f' data-k-min="{caixa.k_min:.3f}"' if caixa.k_min > 0 else ""
+    retangulo = _rect_vm(caixa) if caixa.tipo == "vm" else _rect_no(caixa, spof)
 
     return (
         f'<g id="{html.escape(caixa.chave)}" data-titulo="{html.escape(caixa.titulo)}" data-navegavel>'
-        + _rect_no(caixa, spof)
+        + retangulo
         + _face(caixa, spof)
         + f"<g{kmin_attr}>{interior}</g>"
         + "</g>"
     )
 
 
-def _aresta(a: Aresta, caixas_por_chave: dict[str, Caixa]) -> str:
-    de, para = caixas_por_chave[a.de], caixas_por_chave[a.para]
+def _resolver_produto(chave_produto: str, caixas_por_chave: dict[str, Caixa]) -> Caixa | None:
+    """Acha a Caixa de um produto pra fim de aresta. Um produto dentro de
+    uma VM tem a chave da Caixa prefixada (`app2037.portal-gestao`), entao
+    a chave crua da Aresta (`portal-gestao`) nunca bate direto — casa pelo
+    sufixo. Produto em mais de uma VM (portal-gestao: app2037 e suite-pg)
+    escolhe a primeira em ordem alfabetica, sempre a mesma — determinismo,
+    nao acaso — o que tambem prioriza a VM que roda o codigo (app2037) sobre
+    a que so guarda o schema (suite-pg)."""
+    if chave_produto in caixas_por_chave:
+        return caixas_por_chave[chave_produto]
+    candidatos = sorted(
+        k for k in caixas_por_chave if k.endswith("." + chave_produto))
+    return caixas_por_chave[candidatos[0]] if candidatos else None
+
+
+def _aresta(a: Aresta, de: Caixa, para: Caixa) -> str:
     x1, y1 = de.x + de.w / 2, de.y + de.h / 2
     x2, y2 = para.x + para.w / 2, para.y + para.h / 2
 
@@ -153,18 +195,20 @@ def _aresta(a: Aresta, caixas_por_chave: dict[str, Caixa]) -> str:
 
 
 def render(cena: Cena, modelo: Modelo, js: str) -> str:
-    spof_map = _spof_por_chave(modelo.nos)
+    spof_map = _spof_por_chave(modelo.nos, modelo.vms)
     por_pai = _agrupar_por_pai(cena.caixas)
     raizes = sorted(por_pai.get(None, []), key=lambda c: c.chave)
 
     corpo_svg = "".join(_no_recursivo(r, por_pai, spof_map) for r in raizes)
 
     caixas_por_chave = {c.chave: c for c in cena.caixas}
-    arestas_svg = "".join(
-        _aresta(a, caixas_por_chave)
-        for a in modelo.arestas
-        if a.de in caixas_por_chave and a.para in caixas_por_chave
-    )
+    resolvidas = []
+    for a in modelo.arestas:
+        de = _resolver_produto(a.de, caixas_por_chave)
+        para = _resolver_produto(a.para, caixas_por_chave)
+        if de is not None and para is not None:
+            resolvidas.append((a, de, para))
+    arestas_svg = "".join(_aresta(a, de, para) for a, de, para in resolvidas)
 
     largura = max(cena.largura, 1.0)
     altura = max(cena.altura, 1.0)
@@ -183,7 +227,7 @@ def render(cena: Cena, modelo: Modelo, js: str) -> str:
   [data-k-min],[data-face-ate]{{transition:opacity .1s linear}}
 </style>
 <div id="trilha">Revy</div>
-<div id="dica">clique numa caixa para cair dentro · <strong>Esc</strong> volta · roda dá zoom · borda grossa é SPOF, linha tracejada é aresta assíncrona</div>
+<div id="dica">clique numa caixa para cair dentro · <strong>Esc</strong> volta · roda dá zoom · borda grossa é SPOF, linha tracejada é aresta assíncrona, moldura tracejada é máquina (VM)</div>
 
 <svg id="mapa" viewBox="0 0 {largura:.2f} {altura:.2f}">
 {corpo_svg}<g stroke="{BRAND}" stroke-width="1.5" fill="none">

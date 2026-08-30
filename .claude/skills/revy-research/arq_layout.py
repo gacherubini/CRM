@@ -22,7 +22,7 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass, replace
 
-from arq_modelo import Modelo, No
+from arq_modelo import Modelo, No, Vm
 
 MARGEM = 24.0
 ALTURA_TITULO = 34.0
@@ -160,11 +160,67 @@ def _dispor_no(no: No, chave_completa: str, nivel: int) -> tuple[Caixa, list[Cai
     return caixa_no, descendentes
 
 
+def _dispor_vm(vm: Vm, por_chave: dict[str, No], nivel: int) -> tuple[Caixa, list[Caixa]]:
+    """Devolve a caixa da VM (moldura, sem preenchimento — ver arq_render) e
+    a lista achatada dos produtos que ela contem (e seus descendentes), com
+    coordenadas absolutas dentro do frame local da VM.
+
+    Um produto listado em duas VMs (ex.: portal-gestao roda em `app2037` e
+    tem schema em `suite-pg`) e desenhado DENTRO DE CADA UMA — e o mesmo
+    fato de blast radius, sob dois angulos de infra diferentes — com chave
+    prefixada pela VM (`app2037.portal-gestao` vs `suite-pg.portal-gestao`)
+    pra nao colidir. `arq_render` resolve qual copia uma aresta usa.
+    """
+    sub = [
+        _dispor_no(por_chave[chave], f"{vm.chave}.{chave}", nivel + 1)
+        for chave in vm.contem
+        if chave in por_chave
+    ]
+    largura_conteudo, altura_conteudo, posicoes = _grade(
+        [(caixa.w, caixa.h) for caixa, _ in sub])
+
+    largura_total = MARGEM * 2 + largura_conteudo
+    altura_total = ALTURA_TITULO + MARGEM * 2 + altura_conteudo
+    if not sub:
+        # VM sem produto (motor2037, n8n2037, evolution2037): ainda precisa
+        # de espaco pro nome + nota nao ficarem cortados.
+        largura_total = max(largura_total, ITEM_W + MARGEM * 2)
+
+    origem_x, origem_y = MARGEM, ALTURA_TITULO + MARGEM
+    descendentes: list[Caixa] = []
+    for (caixa, desc), (dx, dy) in zip(sub, posicoes):
+        bx, by = origem_x + dx, origem_y + dy
+        descendentes.append(replace(caixa, x=bx, y=by, pai=vm.chave))
+        for d in desc:
+            descendentes.append(replace(d, x=d.x + bx, y=d.y + by))
+
+    caixa_vm = Caixa(
+        chave=vm.chave, tipo="vm", titulo=vm.chave, subtitulo=vm.nota,
+        x=0.0, y=0.0, w=largura_total, h=altura_total,
+        pai=None, nivel=nivel,
+    )
+    return caixa_vm, descendentes
+
+
 def dispor(modelo: Modelo) -> Cena:
     # modelo.nos ja vem ordenado por chave (arq_modelo.carregar itera
     # `sorted(nos)`) — a ordem de construcao aqui e, portanto, ja
     # deterministica; nao ha necessidade de reordenar por conta propria.
-    raizes = [_dispor_no(no, no.chave, 1) for no in modelo.nos]
+    #
+    # A VM e o novo nivel 1: uma Caixa tipo "vm" por `modelo.vms`, envolvendo
+    # os produtos do seu `contem`. Produto que nao esta em nenhuma VM fica
+    # solto, no mesmo nivel das VMs — nao existe hoje nos dados reais (as
+    # seis produtos vivem em app2037), mas o modelo precisa aceitar.
+    por_chave_no = {no.chave: no for no in modelo.nos}
+    contidos: set[str] = set()
+    for vm in modelo.vms:
+        contidos.update(vm.contem)
+
+    # modelo.vms ja vem ordenado por chave (arq_modelo.carregar faz
+    # `sorted(vms)`).
+    raizes = [_dispor_vm(vm, por_chave_no, 1) for vm in modelo.vms]
+    soltos = [no for no in modelo.nos if no.chave not in contidos]
+    raizes += [_dispor_no(no, no.chave, 1) for no in soltos]
 
     largura, altura, posicoes = _grade([(c.w, c.h) for c, _ in raizes])
 
