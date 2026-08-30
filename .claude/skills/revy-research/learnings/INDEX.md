@@ -64,3 +64,4 @@ escrever migration com `batch_alter_table`.
 | escrever ou revisar script de operacao que aponta para uma loja por slug | `2026-08-25-o-slug-do-piloto-nao-e-o-nome-do-piloto.md` |
 | escrever teste que exercita projecao do Control (`_apply_envelope`) no chatbot-api | `2026-08-29-o-conftest-do-chatbot-nao-semeia-todo-aggregate.md` |
 | escrever teste no chatbot-api que grava canal, ou qualquer linha com coluna UNIQUE global | `2026-08-29-o-banco-de-teste-do-chatbot-e-um-so.md` |
+| escrever teste de read-model do portal que le dicionario vindo de outro produto | `2026-08-29-dicionario-sintetico-no-teste-esconde-contrato.md` |
