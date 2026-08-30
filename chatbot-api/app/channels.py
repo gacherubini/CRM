@@ -34,6 +34,15 @@ def _canal_dict(canal: WhatsAppCanal) -> dict[str, Any]:
         "estado": canal.estado,
         "principal_estoque": bool(canal.principal_estoque),
         "criado_em": canal.criado_em.isoformat() if canal.criado_em else None,
+        # Estado do onboarding Cloud, lido pela tela da Revy Loja: `waba_id` é o
+        # que marca o canal como Modo 2, os dois `onboarding_*` dizem em que elo
+        # parou. Canal Modo 1 devolve `None`, não ausência — a Loja lê direto.
+        # Campos listados um a um de propósito: nunca devolver o modelo inteiro
+        # nem usar `exclude`, senão a próxima coluna (token/PIN) volta a vazar.
+        "waba_id": canal.waba_id,
+        "template_oferta": canal.template_oferta,
+        "onboarding_elo": canal.onboarding_elo,
+        "onboarding_erro": canal.onboarding_erro,
     }
 
 
