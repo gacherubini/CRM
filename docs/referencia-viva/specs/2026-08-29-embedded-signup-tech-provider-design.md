@@ -370,3 +370,74 @@ Um eixo por vez, na ordem:
 
 O spike vem primeiro porque o §16.5 marcou confiança "média" na sequência do passo 6, e a
 conferência de 29/08 confirmou a forma, não todos os endpoints.
+
+**A ordem foi quebrada de propósito em 29/08.** Os passos 2, 3 e 6 foram feitos antes do 1,
+porque o spike depende do App Review e o App Review depende de haver o que mostrar. Toda a
+cadeia foi escrita a partir da documentação e testada com transporte falso — por isso o
+cliente HTTP mora num módulo só dele, `app/meta_onboarding.py`: quando o spike corrigir um
+formato de corpo, o conserto é local.
+
+## 15. O que falta (29/08/2026)
+
+Estado: passos 0, 2, 3 e 6 feitos; 1, 4 e 5 não. `app2037` em `ce4e2ab`.
+
+### O gate — nada anda sem isto
+
+**App Review submetido em 29/08, sem resposta.** Sem Advanced Access não há `config_id`; sem
+`config_id` o popup não abre; sem popup nenhuma loja conecta. Não há contorno: o que existe
+de código não conecta ninguém enquanto a Meta não responder.
+
+Se for aprovado, a sequência é curta: criar a configuração do Login, copiar o `config_id`,
+pôr `PORTAL_META_APP_ID` e `PORTAL_META_CONFIG_ID` no `[env]` do `fly.app.toml`, deployar.
+O botão da tela acende sozinho — **nenhuma linha de código muda**.
+
+Se for reprovado, o §12 lista as causas que a própria Meta publica, e todas são de forma:
+vídeo único para as duas permissões, justificativa faltando, permissão a mais, submissão
+deixada em rascunho. Reprovação por forma se corrige e se resubmete.
+
+### O que não tem prova
+
+**O JS do popup nunca rodou em navegador.** Os testes renderizam o template como texto e
+provam que os ids saem no HTML e que o `disabled` some. `FB.login`, o listener de `message`
+e os três caminhos de desistência não foram exercitados uma vez. É o mesmo buraco que deixou
+passar dois bugs em 15-16/08. A lista do que precisa ser clicado está no fim do card 4
+(`../planos/2026-08-29-embedded-signup-4-tela-na-loja.md`).
+
+**A sequência de chamadas nunca foi conferida contra a Meta.** É o passo 1, e é o risco que
+o §12 já apontava. Fica concentrado nos formatos de corpo de `tests/test_meta_onboarding.py`.
+
+### Os dois eixos que não viraram card
+
+**Tela de templates na Loja (§10.4).** Não existe. O motivo original — sem ela não há
+screencast do `management` — foi contornado gravando o painel da Meta, então ela deixou de
+ser pré-requisito da submissão. Continua sendo pré-requisito do produto: sem ela o lojista
+não vê se o template dele foi aprovado, e o webhook que grava esse status já está no ar
+alimentando uma tela que ninguém construiu.
+
+**Visão no Control (§14.5).** O **portão** funciona: projetar `whatsapp_modo=2` ativa o
+canal. A **visão** não existe — hoje não há onde olhar em que passo cada loja está, qual elo
+falhou, nem o status do template. O dado está todo no canal (`onboarding_elo`,
+`onboarding_erro`, `template_oferta`); falta a tela.
+
+### Depois que a primeira loja conectar
+
+Nada disto é código:
+
+- liberar a loja no Control (projetar `whatsapp_modo=2`);
+- cadastrar a fila de vendedores dela — sem fila o handoff não tem para quem ir;
+- esperar a Meta aprovar o template **na WABA dela**, que chega pelo webhook;
+- conectar uma **segunda** loja, que é a primeira prova real do multi-loja (§11).
+
+### Dívidas pequenas, nenhuma bloqueante
+
+- A tela de canais ainda fala de **QR** no cabeçalho e em "Adicionar número", mesmo para loja
+  que só tem canal Cloud.
+- `version: "v21.0"` está fixo no template do popup e não é o mesmo lugar onde o chatbot fixa
+  a versão da Graph. Divergirem não dá aviso.
+- "Tentar de novo" leva à tela de decisão; não há rota de retry dedicada.
+- A auditoria do POST usa `acao="conectar", provedor="cloud"`; `ACOES_CANAL` não tem ação
+  própria para o embedded signup.
+- `registro_tentativas` não sai no `_canal_dict`, então a tela não sabe quantas tentativas
+  restam antes do teto.
+- **Contestar a categoria do `chama_vendedor`** — aprovado como `MARKETING`, ≈10x o custo por
+  mensagem, prazo até **22/10/2026**. É a única pendência deste spec com data.
