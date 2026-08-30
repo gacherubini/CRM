@@ -159,23 +159,44 @@ gerador degrada sem quebrar — um `arquitetura.py` com 3 nós e nada mais já p
 não aviso — é exatamente o modo como este arquivo apodreceria em silêncio. `saude.py`
 já faz essa checagem para learnings e decisões (`citacoes_mortas`); o mesmo espírito.
 
-## 5. Os níveis — recursivos, não dois
+## 5. Duas vistas, níveis recursivos
 
-**Corrigido em 30/08 depois de ver o protótipo no navegador.** A versão anterior deste
-spec tinha dois níveis fixos: produto, e dentro dele uma lista de rotas/workers. Errado.
-Entrar num nó tem que **trocar o que está na tela** pela estrutura interna daquele nó —
-o Chatbot vira Evolution + n8n + os canais WhatsApp por loja + Conversa + workers, com
-setas próprias. Não é o mesmo desenho maior; é outro desenho no mesmo lugar.
+**Revisado duas vezes em 30/08, as duas depois de abrir a página no navegador.**
 
-Então `NOS` é **recursivo**: todo nó pode ter `dentro`, um dicionário de sub-nós com a
-mesma forma. A profundidade é decidida pelo `arquitetura.py`, não pelo gerador — se um
-dia o canal WhatsApp merecer três níveis, ele ganha três.
+A primeira versão tinha dois níveis fixos: produto, e dentro dele uma lista de rotas.
+Errado — entrar num nó tem que **trocar o que está na tela** pela estrutura interna
+dele. Então `NOS` é recursivo: todo nó pode ter `dentro`, um dicionário de sub-nós com
+a mesma forma, e a profundidade é decidida pelo `arquitetura.py`, não pelo gerador.
+
+A segunda correção veio de olhar o resultado: uma vista só, com tudo junto, é densa
+demais para ser lida.
+
+### As duas vistas
+
+| Vista | Seções do `_frescor.json` | Tem arestas e fluxos? |
+|---|---|---|
+| **Arquitetura** | `rota`, `worker`, `flag`, `template` | sim |
+| **Schema** | `modelo`, `migration` | não |
+
+Schema é **vista separada, não caixa dentro da arquitetura**. Fluxo é caminho de
+execução; relação de dado é outra coisa, e misturar as duas foi o que deixou a
+página ilegível. Um alternador no topo troca entre elas.
+
+Um nó que fica sem item numa vista — e sem filho que tenha — é podado daquela cena.
+Sem a poda, a vista Schema fica cheia de moldura vazia.
+
+**Seção nova avisa.** Se o `_frescor.json` passar a trazer uma seção que não está em
+`SECOES_ARQUITETURA` nem em `SECOES_SCHEMA`, o gerador imprime um aviso e segue. Dado
+que some calado é como este arquivo apodreceria.
+
+### Os níveis, dentro de cada vista
 
 | Camada | O que se vê | De onde vem |
 |---|---|---|
-| **Raiz** | VMs como molduras, produtos como caixas com uma **face** (título + resumo de uma linha) | `arquitetura.py` |
-| **Dentro de um nó** | o diagrama interno daquele nó: sub-nós, suas setas, seus invariantes; a face do pai some | `arquitetura.py` → `dentro` |
-| **Folha** | quando o sub-nó não tem `dentro`, ele mostra as entradas do `_frescor.json` que casam com ele: `arquivo:linha` | `_frescor.json` |
+| **Raiz** | VMs como molduras, produtos como caixas com uma **face** (título + resumo). **Nenhum interior aberto** — é o escopo inteiro e mais nada | `arquitetura.py` |
+| **Dentro de um nó** | o diagrama interno daquele nó; a face do pai some | `arquitetura.py` → `dentro` |
+| **Automáticos** | o que sobra vira árvore derivada do caminho do arquivo: diretório → arquivo | `_frescor.json` |
+| **Folha** | as entradas daquele arquivo, com `arquivo:linha` | `_frescor.json` |
 
 Decisões e termos do `CONTEXT.md` ancoram em qualquer nível.
 
@@ -190,6 +211,13 @@ até aquela caixa preencher a viewport. É a diferença entre cair dentro e troc
 - `data-k-min` — o **interior entra**: fica opaco conforme você se aproxima.
 - `data-face-ate` — a **face sai**: o título grande e o resumo do nó desaparecem no
   mesmo intervalo. Sem esta segunda rampa, entrar numa caixa só aumenta a fonte.
+
+**E uma trava de ancestralidade.** Escala sozinha não basta: caixas irmãs de tamanho
+parecido abriam juntas, e entrar no Chatbot mostrava o interior do Portal ao lado. O
+interior de um nó só acende se aquele nó for o foco atual ou um ancestral dele. Como os
+`id` são caminhos pontuados (`app2037.chatbot-api.app.main.py`), o teste é de prefixo:
+`atual === id || atual.indexOf(id + ".") === 0` — com o ponto, senão `chatbot-api`
+casaria com `chatbot-apix`. Cada grupo de interior declara `data-dono`.
 
 Quatro coisas decidem se fica bom:
 
