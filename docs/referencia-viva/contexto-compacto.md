@@ -41,9 +41,25 @@ Vocabulário: [`../../CONTEXT.md`](../../CONTEXT.md). As-built Control/Loja:
   **Falta `CHATBOT_META_APP_ID`** como `[env]` no `app2037` — sem ele o elo 1 nao tem
   `client_id`. Nao bloqueia nada hoje: sem a tela (Card 4), ninguem chama a rota.
 
-  **Proximo:** Card 4 (a tela na Revy Loja: `decidindo` -> popup -> `conectando` ->
-  `pendente`), que e onde o `config_id` do App Review entra. Depois: tela de templates (§10.4),
-  visao no Control, e o spike (Card 1) contra a Meta de verdade.
+  **Card 4 FEITO em 29/08** (`1859e94`, `2dcf2f2`, `be3ade0`, `9aca30e`, `3a1133d`, `e9d39c4`),
+  portal em **1412 passed** e chatbot em **667**. A Loja tem a tela de decisao (a escolha
+  irreversivel do numero), o popup do SDK, o POST que repassa a cadeia, os rotulos Cloud e o
+  passo em que o onboarding parou. **O botao do popup acende sozinho** quando
+  `PORTAL_META_APP_ID` e `PORTAL_META_CONFIG_ID` entrarem no `[env]` — nenhum codigo muda no
+  dia em que a Meta liberar.
+
+  **Dois defeitos achados aqui, e um deles quase passou:** a tela decide se um canal e Cloud
+  lendo `waba_id`, e o serializer do chatbot nao devolvia `waba_id` — testes verdes com
+  dicionario sintetico, feature inerte em producao (learning
+  `2026-08-29-dicionario-sintetico-no-teste-esconde-contrato.md`). E o `_request` do
+  ChatbotClient engolia o 502 com o elo em ChatbotIndisponivel, entao "a Meta recusou o
+  registro do numero" chegaria ao lojista como "erro de conexao".
+
+  **O JS do popup NAO foi verificado em navegador** — a lista do que falta clicar esta no fim
+  do card 4. E o buraco que ja deixou passar dois bugs em 15-16/08.
+
+  **Proximo:** tela de templates (§10.4, sem ela nao ha screencast do `management`), visao no
+  Control, e o spike (Card 1) contra a Meta de verdade — os tres esperam o App Review.
 
   **Hosted ES foi descartado (decisao 8 do spec, 29/08):** fica o **SDK canonico**. Ele e o
   documentado, mantem o lojista dentro do Revy e preserva o token por loja — que e o que as
