@@ -100,6 +100,32 @@
         {% endif %}
       </div>
       <strong class="canal-nome">{{ canal.label }}</strong>
+      {# Onboarding Cloud: diz em que passo parou e de quem é a vez. "Falhou" é
+         estado de tela — no banco o canal segue pendente. Sem CSS novo: .alert
+         e .muted já são usados nesta página. #}
+      {% if canal.onboarding_texto %}
+      {% if canal.onboarding_falhou %}
+      <div class="alert warning">
+        <strong>{{ canal.onboarding_texto }}</strong>
+        {% if canal.pode_tentar_de_novo %}
+        <p><a href="{{ canal.onboarding_acao_url }}">{{ canal.onboarding_acao }}</a></p>
+        {% else %}
+        <p>{{ canal.onboarding_acao }}</p>
+        {% endif %}
+      </div>
+      {% else %}
+      <p class="muted">
+        {{ canal.onboarding_texto }}
+        {% if canal.onboarding_acao %}
+        {% if canal.onboarding_acao_url %}
+        <a href="{{ canal.onboarding_acao_url }}">{{ canal.onboarding_acao }}</a>
+        {% else %}
+        {{ canal.onboarding_acao }}
+        {% endif %}
+        {% endif %}
+      </p>
+      {% endif %}
+      {% endif %}
       <div class="canal-acoes">
         {% if canal.pode_conectar %}
         <form method="post" action="/app/loja/whatsapp/canais/{{ canal.id }}/conectar">
@@ -140,6 +166,32 @@
   </div>
   {% endif %}
 </section>
+
+{# A tela de decisão só se alcança daqui: item de menu próprio seria uma segunda
+   porta para a mesma coisa. Com canal Cloud o convite some — o estado dele mora
+   no card acima. #}
+{% if view.mostrar_link_conectar %}
+<section class="panel" aria-labelledby="conectar-nuvem">
+  <div class="panel-heading">
+    <div>
+      <span class="mono-label">Nuvem</span>
+      <h2 id="conectar-nuvem">Conectar o WhatsApp pela Revy</h2>
+    </div>
+  </div>
+  <div class="panel-body">
+    <p>
+      Sem QR e sem celular ligado: o número passa a atender pela nuvem da Meta.
+      Antes de abrir a janela da Meta você escolhe qual número vai — e essa
+      escolha não volta atrás.
+    </p>
+    <p>
+      <a class="button secondary" href="/app/loja/whatsapp/conectar">
+        Ver como conectar
+      </a>
+    </p>
+  </div>
+</section>
+{% endif %}
 
 {% if view.pode_adicionar %}
 <section class="panel form-section" aria-labelledby="canal-novo">
