@@ -159,34 +159,56 @@ gerador degrada sem quebrar — um `arquitetura.py` com 3 nós e nada mais já p
 não aviso — é exatamente o modo como este arquivo apodreceria em silêncio. `saude.py`
 já faz essa checagem para learnings e decisões (`citacoes_mortas`); o mesmo espírito.
 
-## 5. Os três níveis
+## 5. Os níveis — recursivos, não dois
 
-| Nível | O que se vê | De onde vem |
+**Corrigido em 30/08 depois de ver o protótipo no navegador.** A versão anterior deste
+spec tinha dois níveis fixos: produto, e dentro dele uma lista de rotas/workers. Errado.
+Entrar num nó tem que **trocar o que está na tela** pela estrutura interna daquele nó —
+o Chatbot vira Evolution + n8n + os canais WhatsApp por loja + Conversa + workers, com
+setas próprias. Não é o mesmo desenho maior; é outro desenho no mesmo lugar.
+
+Então `NOS` é **recursivo**: todo nó pode ter `dentro`, um dicionário de sub-nós com a
+mesma forma. A profundidade é decidida pelo `arquitetura.py`, não pelo gerador — se um
+dia o canal WhatsApp merecer três níveis, ele ganha três.
+
+| Camada | O que se vê | De onde vem |
 |---|---|---|
-| **1 — Contexto** | VMs como molduras, produtos como caixas dentro delas, setas com protocolo, SPOF marcado | `arquitetura.py` |
-| **2 — Interior** | rotas, workers, flags, migrations do produto, agrupados por seção; decisões e termo ancorados na moldura | `_frescor.json` + `CONTEXT.md` + `decisoes/` |
-| **3 — Item** | `arquivo:linha`, símbolo, e o texto da decisão que o governa | `_frescor.json` |
+| **Raiz** | VMs como molduras, produtos como caixas com uma **face** (título + resumo de uma linha) | `arquitetura.py` |
+| **Dentro de um nó** | o diagrama interno daquele nó: sub-nós, suas setas, seus invariantes; a face do pai some | `arquitetura.py` → `dentro` |
+| **Folha** | quando o sub-nó não tem `dentro`, ele mostra as entradas do `_frescor.json` que casam com ele: `arquivo:linha` | `_frescor.json` |
 
-Fluxos são uma camada por cima: escolher um fluxo acende o caminho e apaga o resto.
-Não é um quarto nível.
+Decisões e termos do `CONTEXT.md` ancoram em qualquer nível.
 
 ## 6. O zoom — mecânica
 
-**Um `<svg>` só, tudo dentro dele desde o load.** O conteúdo do nível 2 é desenhado
-*dentro* da caixa do produto, em escala minúscula. Clicar não troca de tela: anima o
-`viewBox` até aquela caixa preencher a viewport. O detalhe já estava lá — nada aparece,
-você só chega perto. É a diferença entre cair dentro e trocar de slide.
+**Um `<svg>` só, tudo dentro dele desde o load.** O interior de cada nó é desenhado
+*dentro* da caixa dele, em escala minúscula. Clicar não troca de tela: anima o `viewBox`
+até aquela caixa preencher a viewport. É a diferença entre cair dentro e trocar de slide.
 
-Três coisas decidem se fica bom:
+**As duas rampas.** É o que faz o efeito, e o protótipo provou que uma só não basta:
 
-1. **LOD por escala.** Cada camada de texto tem um par `escala_min`/`escala_max`; a
-   opacidade interpola nas bordas. Sem isso, 714 labels sobrepostos no nível 1 —
-   ilegível e lento.
-2. **Layout determinístico.** Posições calculadas no Python por empacotamento em grade
+- `data-k-min` — o **interior entra**: fica opaco conforme você se aproxima.
+- `data-face-ate` — a **face sai**: o título grande e o resumo do nó desaparecem no
+  mesmo intervalo. Sem esta segunda rampa, entrar numa caixa só aumenta a fonte.
+
+Quatro coisas decidem se fica bom:
+
+1. **LOD por escala, por grupo.** Nunca por elemento: escrever opacidade em 714 nós a
+   cada quadro trava; ~10 grupos não.
+2. **Os limiares saem do layout, nunca de constante.** O protótipo mostrou o erro:
+   `K_MIN` fixo em 3 com uma caixa que só chega a `k=2.27` ao ser clicada deixa o
+   interior invisível para sempre — você entra e não vê nada. O limiar de um filho é
+   derivado da largura do pai: `k_min = 0.6 * (largura_da_cena / largura_do_pai)`.
+3. **Layout determinístico.** Posições calculadas no Python por empacotamento em grade
    aninhada, ordenado por chave. **Nunca force-directed:** posição diferente a cada run
    faz o diff do arquivo commitado virar ruído puro.
-3. **Caminho de volta.** Breadcrumb clicável, `Esc` sobe um nível, wheel dá zoom livre,
+4. **Caminho de volta.** Breadcrumb clicável, `Esc` sobe um nível, wheel dá zoom livre,
    arrastar dá pan. Sem isso o usuário se perde no nível 3.
+
+**Armadilha achada no navegador:** não use `setPointerCapture` no `<svg>` para o pan.
+Capturar o ponteiro faz o `click` seguinte ter o próprio svg como alvo, e o
+`closest("[data-navegavel]")` devolve `null` — o clique nunca navega, e nada no console
+avisa. Use um limiar de 3px para separar arrasto de clique.
 
 Animação: `requestAnimationFrame` interpolando o `viewBox`, `cubic-bezier(.4,0,.2,1)`,
 ~450 ms. `prefers-reduced-motion` corta pra 0 ms (salta em vez de voar).
