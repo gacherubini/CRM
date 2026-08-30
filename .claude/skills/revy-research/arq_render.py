@@ -740,8 +740,8 @@ def render(vistas: tuple[Vista, ...], js: str) -> str:
   [id^="fluxos-"] summary{{cursor:pointer;font-weight:600;font-size:11px;
     letter-spacing:.04em;color:{INK_MUTED};list-style:none}}
   [id^="fluxos-"] summary::-webkit-details-marker{{display:none}}
-  [id^="fluxos-"] summary::after{{content:" \25be"}}
-  [id^="fluxos-"][open] summary::after{{content:" \25b4"}}
+  [id^="fluxos-"] summary::after{{content:" ▾"}}
+  [id^="fluxos-"][open] summary::after{{content:" ▴"}}
   [id^="fluxos-"] button{{font-size:11px;margin:2px 2px 0 0;border:1px solid {LINE_STRONG};
     border-radius:4px;background:{SURFACE_SOFT};color:{INK};cursor:pointer;padding:3px 7px;
     font-family:{MONO}}}

@@ -26,6 +26,7 @@ commitado, entao posicao instavel vira ruido no diff do git.
 from __future__ import annotations
 
 import math
+import math
 from dataclasses import dataclass, replace
 
 from arq_modelo import Modelo, No, Vm
@@ -190,6 +191,38 @@ def _dispor_no(no: No, chave_completa: str, nivel: int) -> tuple[Caixa, list[Cai
     return caixa_no, descendentes
 
 
+# Area do produto: comprimida pela raiz, nao proporcional a contagem.
+#
+# O tamanho de uma caixa emerge do empacotamento do que ela contem, entao a
+# Loja (154 entradas) nascia com ~8x a area do Catalogo (15). Na visao de
+# escopo isso vira um vazio grande e titulos de 20px ao lado de 7px: e' peso
+# demais para um sinal que o desenho ja da pela ordem. Com area proporcional
+# a raiz, a ORDEM se mantem — Loja continua maior que Chatbot — e a razao
+# entre a maior e a menor cai de ~8x para ~3x.
+#
+# A escala e' aplicada a SUBARVORE inteira (a caixa e todos os descendentes,
+# que vivem em coordenadas relativas ao frame dela), nunca so a moldura: sem
+# isso o conteudo vazaria para fora da propria caixa. Os limiares de LOD nao
+# precisam de ajuste — sao derivados de largura_cena/largura_pai depois
+# disto, entao acompanham sozinhos.
+AREA_REFERENCIA = 900_000.0
+
+
+def _comprimir(caixa: Caixa, descendentes: list[Caixa]) -> tuple[Caixa, list[Caixa]]:
+    area = caixa.w * caixa.h
+    if area <= 0:
+        return caixa, descendentes
+    alvo = math.sqrt(area * AREA_REFERENCIA)
+    s = math.sqrt(alvo / area)
+    if abs(s - 1.0) < 1e-9:
+        return caixa, descendentes
+    escalada = replace(caixa, w=caixa.w * s, h=caixa.h * s)
+    return escalada, [
+        replace(d, x=d.x * s, y=d.y * s, w=d.w * s, h=d.h * s)
+        for d in descendentes
+    ]
+
+
 def _dispor_vm(vm: Vm, por_chave: dict[str, No], nivel: int) -> tuple[Caixa, list[Caixa]]:
     """Devolve a caixa da VM (moldura, sem preenchimento — ver arq_render) e
     a lista achatada dos produtos que ela contem (e seus descendentes), com
@@ -202,7 +235,7 @@ def _dispor_vm(vm: Vm, por_chave: dict[str, No], nivel: int) -> tuple[Caixa, lis
     pra nao colidir. `arq_render` resolve qual copia uma aresta usa.
     """
     sub = [
-        _dispor_no(por_chave[chave], f"{vm.chave}.{chave}", nivel + 1)
+        _comprimir(*_dispor_no(por_chave[chave], f"{vm.chave}.{chave}", nivel + 1))
         for chave in vm.contem
         if chave in por_chave
     ]
