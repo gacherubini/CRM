@@ -10,6 +10,15 @@ Fatos verificados em deploy/fly/3vm/ (supervisord.conf, nginx-edge.conf,
 fly.*.toml) e nos READMEs dos produtos — ver task-3-brief.md para os
 comandos usados. Papeis (`conversa`, `banco`, `veiculos`, `venda`,
 `estrutura`, `vitrine`) sao os mesmos substantivos da AGENTS.md secao 5.
+
+`dentro` e RECURSIVO (arq_modelo.carregar desce sem profundidade fixa). Todo
+sub-no abaixo veio de `ls <produto>/app/` de verdade — nao ha diretorio nem
+arquivo inventado. `modulo`, quando presente, e o prefixo de caminho que
+arq_modelo usa pra puxar as entradas do `_frescor.json` pra dentro daquela
+caixa; varios sub-nos ficam sem `modulo` (grupo de dominio, nao arquivo) ou
+com um `modulo` que hoje nao casa nenhuma entrada do frescor (o extrator so
+pega rota/worker/modelo/flag/migration — um helper puro fica sem entrada, e
+isso e esperado, nao bug).
 """
 from __future__ import annotations
 
@@ -18,10 +27,43 @@ NOS: dict[str, dict] = {
         "titulo": "Chatbot API",
         "papel": "conversa",
         "vm": "app2037",
-        "decisoes": [
-            "2026-08-13-whatsapp-dois-modos-sem-coexistencia.md",
-            "2026-08-25-agente-por-loja-o-que-ficou-de-fora.md",
-        ],
+        "dentro": {
+            "canais": {
+                "titulo": "Canais",
+                "papel": "canal",
+                "termo": "Cloud API (Meta) e Baileys (Evolution), credenciais por loja",
+                "decisoes": ["2026-08-13-whatsapp-dois-modos-sem-coexistencia.md"],
+                "dentro": {
+                    "cloud": {"titulo": "Canal Cloud (Meta)", "papel": "canal",
+                              "modulo": "app/meta_"},
+                    "baileys": {"titulo": "Canal Baileys (Evolution)", "papel": "canal",
+                                "modulo": "app/whatsapp_"},
+                    "credenciais": {"titulo": "Credenciais por loja", "papel": "canal",
+                                    "modulo": "app/segredo_canal.py"},
+                },
+            },
+            "agente": {
+                "titulo": "Agente por loja",
+                "papel": "IA",
+                "modulo": "app/agente_",
+                "decisoes": ["2026-08-25-agente-por-loja-o-que-ficou-de-fora.md"],
+            },
+            "workers": {
+                "titulo": "Workers assíncronos",
+                "papel": "fundo",
+                "dentro": {
+                    "followup": {"titulo": "Follow-up", "papel": "worker",
+                                 "modulo": "app/followup_job.py"},
+                    "rodizio": {"titulo": "Rodízio de atendimento", "papel": "worker",
+                                "modulo": "app/rodizio_job.py"},
+                    "notificacoes-outbox": {"titulo": "Notificações (outbox)",
+                                             "papel": "worker",
+                                             "modulo": "app/notificacoes_outbox_job.py"},
+                    "cloud-retry": {"titulo": "Retry do canal cloud", "papel": "worker",
+                                    "modulo": "app/cloud_retry.py"},
+                },
+            },
+        },
     },
     "motor-simulacao": {
         "titulo": "Motor de Simulação",
@@ -32,12 +74,36 @@ NOS: dict[str, dict] = {
             "Playwright single-flight e o driver engole o clique que falha — ver "
             "learnings/2026-08-23-driver-playwright-engole-o-clique-que-falha.md"
         ),
+        "dentro": {
+            "bancos": {
+                "titulo": "Drivers bancários (Playwright)",
+                "papel": "banco",
+                "termo": "amortizacao, base, bradesco, fontecred, pan, santander, mock",
+                "modulo": "app/motor/",
+            },
+            "worker": {
+                "titulo": "Worker assíncrono",
+                "papel": "fundo",
+                "modulo": "app/worker.py",
+            },
+        },
     },
     "estoque-api": {
         "titulo": "Estoque API",
         "papel": "veiculos",
         "vm": "app2037",
         "termo": "fonte unica de verdade dos veiculos",
+        "dentro": {
+            "midia": {"titulo": "Mídia", "papel": "veiculos", "modulo": "app/media.py"},
+            "outbox": {"titulo": "Outbox (vehicle.*)", "papel": "fundo",
+                       "modulo": "app/outbox.py"},
+            "worker": {"titulo": "Worker de entrega/limpeza", "papel": "fundo",
+                       "modulo": "app/worker.py"},
+            "provisioning": {"titulo": "Projeção do Control", "papel": "estrutura",
+                              "modulo": "app/provisioning.py"},
+            "admin": {"titulo": "Admin HTMX", "papel": "operacao",
+                      "modulo": "app/admin"},
+        },
     },
     "portal-gestao": {
         "titulo": "Revy Loja",
@@ -46,9 +112,22 @@ NOS: dict[str, dict] = {
         "decisoes": [
             "2026-08-07-vendedor-pode-confirmar-venda.md",
             "2026-08-16-financeiro-sem-rateio.md",
-            "2026-08-11-copiloto-nao-e-o-seller-ai.md",
             "2026-08-07-treze-recusas-de-ux.md",
         ],
+        "dentro": {
+            "loja": {"titulo": "Revy Loja (tela)", "papel": "venda",
+                     "modulo": "app/loja/"},
+            "web": {"titulo": "Rotas HTTP", "papel": "venda", "modulo": "app/web/"},
+            "clients": {"titulo": "Clientes HTTP de outros produtos",
+                        "papel": "integracao", "modulo": "app/clients/"},
+            "conversions": {"titulo": "Conversões Meta (CAPI)", "papel": "integracao",
+                             "modulo": "app/conversions/"},
+            "outbox-control": {"titulo": "Outbox → Control", "papel": "fundo",
+                                "modulo": "app/revy_trafego_outbox"},
+            "copiloto": {"titulo": "Copiloto de Vendas", "papel": "IA",
+                         "modulo": "app/copiloto_",
+                         "decisoes": ["2026-08-11-copiloto-nao-e-o-seller-ai.md"]},
+        },
     },
     "revy-trafego": {
         "titulo": "Revy Control",
@@ -57,11 +136,39 @@ NOS: dict[str, dict] = {
         "decisoes": [
             "2026-08-07-treze-recusas-de-ux.md",
         ],
+        "dentro": {
+            "control": {
+                "titulo": "Núcleo do Control",
+                "papel": "estrutura",
+                "modulo": "app/control/",
+                "dentro": {
+                    "google-ads": {"titulo": "Google Ads", "papel": "integracao",
+                                   "modulo": "app/control/google_ads"},
+                    "provisionamento": {"titulo": "Provisionamento → Estoque/Loja",
+                                        "papel": "estrutura",
+                                        "modulo": "app/control/provisioning"},
+                },
+            },
+            "web": {"titulo": "Telas do Control", "papel": "estrutura",
+                    "modulo": "app/web/"},
+            "clients": {"titulo": "Clientes HTTP de outros produtos",
+                        "papel": "integracao", "modulo": "app/clients/"},
+            "email": {"titulo": "E-mail transacional", "papel": "estrutura",
+                      "modulo": "app/email/"},
+        },
     },
     "catalogo-publico": {
         "titulo": "Catálogo Público",
         "papel": "vitrine",
         "vm": "app2037",
+        "dentro": {
+            "outbox": {"titulo": "Outbox (interest_clicked)", "papel": "fundo",
+                       "modulo": "app/outbox.py"},
+            "pixel": {"titulo": "Pixel Meta (via Portal)", "papel": "integracao",
+                      "modulo": "app/pixel.py"},
+            "provider": {"titulo": "Cliente da Estoque API", "papel": "veiculos",
+                         "modulo": "app/provider.py"},
+        },
     },
 }
 
