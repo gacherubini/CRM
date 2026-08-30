@@ -74,7 +74,7 @@ O serializer passa a devolver `waba_id`, `template_oferta`, `onboarding_elo` e
 `onboarding_erro`. **Nada além disso:** `token_cifrado` e `pin_cifrado` continuam fora, e
 `tests/test_canal_nao_vaza_segredo.py` já guarda essa porta — rode-o junto.
 
-- [ ] **Passo 1: o teste que falha**
+- [x] **Passo 1: o teste que falha**
 
 ```python
 # chatbot-api/tests/test_canal_dict_expoe_onboarding.py
@@ -135,12 +135,12 @@ def test_continua_sem_devolver_segredo():
     assert "gAAAA" not in str(dados)
 ```
 
-- [ ] **Passo 2:** rodar e ver falhar (`KeyError: 'waba_id'`).
-- [ ] **Passo 3:** acrescentar os quatro campos ao `_canal_dict`, **listando-os um a um** —
+- [x] **Passo 2:** rodar e ver falhar (`KeyError: 'waba_id'`).
+- [x] **Passo 3:** acrescentar os quatro campos ao `_canal_dict`, **listando-os um a um** —
       nunca devolvendo o modelo inteiro nem usando `exclude`, que volta a vazar na próxima
       coluna.
-- [ ] **Passo 4:** rodar, ver passar, e rodar junto `tests/test_canal_nao_vaza_segredo.py`.
-- [ ] **Passo 5:** commitar.
+- [x] **Passo 4:** rodar, ver passar, e rodar junto `tests/test_canal_nao_vaza_segredo.py`.
+- [x] **Passo 5:** commitar.
 
 ---
 
@@ -578,18 +578,18 @@ depois de o app ter Advanced Access. As Tasks 1, 2, 3 e 5 **não** dependem dela
 
 Quando destravar:
 
-- [ ] `PORTAL_META_APP_ID` e `PORTAL_META_CONFIG_ID` no `[env]` do `fly.app.toml` — nenhum
+- [x] `PORTAL_META_APP_ID` e `PORTAL_META_CONFIG_ID` no `[env]` do `fly.app.toml` — nenhum
       dos dois é segredo, os dois vão para o navegador. O App ID já está no `app2037` como
       `CHATBOT_META_APP_ID = "1370395535203964"`; **é o mesmo app**, e o valor não se
       duplica à toa: se divergirem, o popup abre com um app e o `code` é trocado com outro,
       e a Meta recusa sem dizer por quê.
-- [ ] O JS do popup, com `FB.login` e `config_id`, escutando a mensagem de retorno com
+- [x] O JS do popup, com `FB.login` e `config_id`, escutando a mensagem de retorno com
       `waba_id`, `phone_number_id` e `business_id`.
-- [ ] **Saída explícita de "não deu certo".** O caso mais comum — número ainda ativo no
+- [x] **Saída explícita de "não deu certo".** O caso mais comum — número ainda ativo no
       aplicativo — falha **dentro** do popup e pode não gerar evento nenhum. A tela não pode
       ficar em espera infinita.
-- [ ] `POST /app/loja/whatsapp/conectar` chamando `conectar_whatsapp_cloud` (Task 2).
-- [ ] **Verificação no navegador, obrigatória.** `pytest` não roda o popup, e dois bugs já
+- [x] `POST /app/loja/whatsapp/conectar` chamando `conectar_whatsapp_cloud` (Task 2).
+- [x] **Verificação no navegador, obrigatória.** `pytest` não roda o popup, e dois bugs já
       passaram por isso (15-16/08). Receita do portal local semeado no learning
       `2026-08-23-copiloto-so-se-verifica-no-navegador.md`.
 
@@ -610,16 +610,16 @@ canal Cloud; com canal Cloud, o lugar do estado é a própria tela de canais.
 
 A tela lê `onboarding_elo` e `onboarding_erro` do canal (Card 3) e:
 
-- [ ] **nomeia o elo e o dono da vez.** "Parou ao registrar o número" é útil; "erro" não é.
-- [ ] **`falhou` é estado de tela, não de banco.** O canal continua `cloud_pendente`; quem
+- [x] **nomeia o elo e o dono da vez.** "Parou ao registrar o número" é útil; "erro" não é.
+- [x] **`falhou` é estado de tela, não de banco.** O canal continua `cloud_pendente`; quem
       diz que falhou é `onboarding_erro` preenchido.
-- [ ] **em `pendente`, mostra o que falta e de quem é:** template em análise (Meta), meio de
+- [x] **em `pendente`, mostra o que falta e de quem é:** template em análise (Meta), meio de
       pagamento (lojista), fila de vendedores (lojista, autoatendida) — e empurra para a
       fila, a única acionável na hora.
-- [ ] **não oferece "tentar de novo" depois do teto do elo 3.** O chatbot para em 5
+- [x] **não oferece "tentar de novo" depois do teto do elo 3.** O chatbot para em 5
       tentativas; a tela a partir daí diz para falar com a Revy, em vez de oferecer um clique
       que vai recusar.
-- [ ] Não repetir os 13 itens de UI recusados em 07/08.
+- [x] Não repetir os 13 itens de UI recusados em 07/08.
 
 ---
 
@@ -636,3 +636,63 @@ A tela lê `onboarding_elo` e `onboarding_erro` do canal (Card 3) e:
 Um dono de loja abre a Revy Loja, entende o que vai perder, clica um botão, passa pelo popup
 da Meta e volta para uma tela que diz em que pé está — sem nunca abrir o painel da Meta, e
 sem ninguém da Revy escrever no banco.
+
+---
+
+## Executado em 29/08/2026
+
+Commits: `1859e94`, `2dcf2f2`, `be3ade0`, `9aca30e`, `3a1133d`, `e9d39c4`.
+Suítes: `portal-gestao` **1412 passed**, `chatbot-api` **667 passed**.
+
+### O defeito que o card não previu, e era o mais grave
+
+A Task 1 decide se um canal é Cloud lendo `waba_id`, e `_canal_dict` não devolvia `waba_id`.
+Os testes usavam dicionários sintéticos e ficavam verdes; em produção a feature seria
+**inerte** — todo canal viria como Modo 1 e o botão errado continuaria na tela. Virou a
+Task 0 e o learning `2026-08-29-dicionario-sintetico-no-teste-esconde-contrato.md`.
+
+### Três erros do próprio card, corrigidos ao executar
+
+1. **A afirmação sobre `OnboardingFalhou` estava errada.** Ela não precisa do re-raise:
+   `CamposAgenteInvalidos` herda de `ValueError` e por isso é capturada; a outra herda de
+   `Exception`.
+2. **As asserções da tela eram frouxas.** `"anuncia"` casava com um comentário de
+   acessibilidade no `base.html`, `"dono"` com a barra do topo. Quatro mutações sobreviviam;
+   viraram frases inteiras.
+3. **A hipótese do campo esquecido era fato.** Trocar `cloud=` por `False` numa reconstrução
+   do `principal_estoque` passava pelos cinco primeiros testes. Resolvido de vez trocando as
+   reconstruções manuais por `dataclasses.replace` — a armadilha deixa de existir por
+   construção.
+
+### Duas melhorias além do plano
+
+- Dois testes de template eram **grep no arquivo `.html`** e não pegavam mutação nenhuma.
+  Viraram render Jinja de verdade, com um `base.html` de mentira. É o que fecha, para esta
+  tela, o buraco conhecido de "pytest não roda a tela".
+- O botão do popup acende sozinho: basta preencher `PORTAL_META_APP_ID` e
+  `PORTAL_META_CONFIG_ID` no `[env]`. **Nenhum código muda no dia em que a Meta liberar.**
+
+### O que NÃO foi verificado
+
+**O JS do popup não rodou em navegador nenhum.** `pytest` renderiza o template como texto e
+prova só que os ids saem no HTML e que o `disabled` some. O `FB.login`, o listener de
+`message` e os três caminhos de desistência não foram exercitados. É exatamente o buraco que
+deixou passar os dois bugs de 15-16/08. Falta clicar:
+
+1. botão aceso e popup abrindo (só isto depende do App Review);
+2. fluxo até o fim — `code` e os três ids se encontrando, form postando **uma vez só**;
+3. fechar o popup no meio — o `desistir()` pelo callback sem `authResponse`;
+4. número ainda ativo no aparelho — o teto de 8 s, o botão virando "Tentar de novo";
+5. segunda tentativa depois de desistir;
+6. console limpo e `connect.facebook.net` carregando em produção.
+
+### Pendências registradas, fora do escopo deste card
+
+- O cabeçalho da tela de canais e o texto de "Adicionar número" ainda falam de QR mesmo para
+  loja que só tem canal Cloud. É linguagem de Modo 1 aparecendo para Modo 2, e mexe no que a
+  loja piloto vê.
+- "Tentar de novo" leva à tela de decisão, porque não existe rota de retry dedicada.
+- `version: "v21.0"` está fixo no template do popup e **não** é o mesmo lugar onde o chatbot
+  fixa a versão da Graph. Se divergirem, ninguém percebe até quebrar.
+- A auditoria do POST usa `acao="conectar", provedor="cloud"`: `ACOES_CANAL` não tem ação
+  própria para o embedded signup.
