@@ -1468,28 +1468,42 @@ As Tasks 1 a 8 estao **feitas e commitadas** na branch `arquitetura-viva`
 
 ### Lote de 30/08 — FEITO
 
-Tasks 9 a 12, todas commitadas. 63 testes verdes,
+Tasks 9 a 13 e mais, todas commitadas. 73 testes verdes,
 `python3 gerar_arquitetura.py --verificar` sai 0.
 
-1. **Duas vistas** (`24550c0` modelo/layout, `c8d4aa0` html). `SECOES_ARQUITETURA`
-   (`rota`, `worker`, `flag`, `template`) e `SECOES_SCHEMA` (`modelo`,
-   `migration`), `arq_modelo.filtrar()` refazendo os nos automaticos e podando
-   no vazio, alternador no topo, e `Zoom.criar()` no lugar do singleton — duas
-   cenas na mesma pagina nao podem dividir estado de zoom. Secao desconhecida
-   avisa no stdout, nao falha.
-2. **Schema agrupado por banco.** `BANCOS` em `arquitetura.py`: `suite-pg` com
-   Loja e Control lado a lado, Chatbot/Estoque/Motor com os seus. Catalogo tem
-   zero `modelo` e zero `migration`, entao e podado da vista Schema.
-3. **A pele** (`71a9d7a`). Tokens claros da marca, tudo em mono, vocabulario de
-   forma (retangulo = no, moldura tracejada = maquina, cilindro = banco, elipse
-   = software de terceiro), traco rabiscado com `feTurbulence` +
-   `feDisplacementMap` so nas formas, tremida escalando com o `k`, arestas
-   ortogonais com rotulo so do protocolo.
-4. **Trava de linhagem** (`9695c4a`). O interior so acende no no em foco, nos
-   ancestrais e nos filhos diretos; durante o voo vale a uniao das duas
-   linhagens. `data-dono` no grupo, teste de prefixo sobre o id pontuado.
-5. **Area comprimida pela raiz** (`91a0b3e`), escolha do dono: a razao entre a
-   maior e a menor caixa cai de ~8x para ~3x, mantendo a ordem.
+**Tres vistas** no alternador: Arquitetura, Schema (por banco) e Design (os 35
+tokens de `shared/brand/revy-tokens.css`, lidos na geracao — editar la muda a
+pagina).
+
+**A camada de componente existe, mas so no Chatbot**: 10 componentes e 20
+arestas internas escritos a mao em `arquitetura.py`, cada um com
+`arquivo:linha` verificado no codigo. Os outros cinco produtos ainda mostram a
+arvore de arquivos derivada do caminho.
+
+Os dois motivos de o interior de um produto ser arvore de arquivos, os dois em
+`arq_modelo.py`, os dois destravados:
+
+1. `carregar()` so aceitava ponta de aresta que fosse chave de raiz. Sem
+   enderecar sub-no nao existe diagrama DENTRO de um produto.
+2. `_podar` removia todo no escrito a mao sem entradas proprias. O inventario
+   so conhece worker, flag e template; um componente nao e nenhum dos tres.
+   **Os componentes estavam escritos desde a Task 3 e nunca viraram caixa** —
+   era a poda comendo a intencao, nao falta de intencao. A poda agora e por
+   vista: na Arquitetura o componente E' o conteudo.
+
+**`rota` saiu da pagina** (decisao do dono, 30/08): 407 das 816 entradas do
+inventario sao rota, e elas viravam uma parede de fichas que ocupava metade do
+produto. Virou `SECOES_DISPENSADAS` — dispensada nao avisa, desconhecida avisa.
+`mapa/<produto>.md` continua listando todas.
+
+### O que falta, e tem card proprio
+
+**[`2026-08-30-arestas-internas-legiveis.md`](2026-08-30-arestas-internas-legiveis.md)**
+— as 20 arestas internas ligam centro a centro: **20 de 20 atravessam alguma
+caixa, 145 travessias no total**. O card traz o script que mede, as duas
+saidas (roteamento com desvio de obstaculo x aresta sob demanda) e a
+recomendacao. **Replicar a formula de componentes nos outros cinco produtos
+depende dele fechar** — senao o problema se multiplica por seis.
 
 ### O que so o navegador acusou (e por que isso volta a acontecer)
 
