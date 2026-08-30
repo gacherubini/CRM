@@ -1,7 +1,11 @@
 # Handoff técnico
 
-Atualizado em **2026-08-13**. Só o checkpoint. Narrativa de entrega fica no Git
-e em [`../nao-plano/historico/`](../nao-plano/historico/).
+Só o checkpoint. Narrativa de entrega fica no Git e em
+[`../nao-plano/historico/`](../nao-plano/historico/).
+
+O bloco **29/08** abaixo é o recente. O resto do checkpoint é de **2026-08-13** e
+envelheceu em partes — onde ele contradiz o
+[`contexto-compacto.md`](contexto-compacto.md), o contexto compacto vence.
 
 Leia primeiro:
 
@@ -9,7 +13,32 @@ Leia primeiro:
 2. [`../fila/README.md`](../fila/README.md) — o que ainda é código
 3. [`design/2026-07-30-revy-control-loja-asbuilt-e-melhorias.md`](design/2026-07-30-revy-control-loja-asbuilt-e-melhorias.md) — as-built
 
-## Checkpoint de código (o que o `main` tem hoje)
+## Checkpoint de 2026-08-29 — Embedded Signup
+
+Tudo no `main` e **no ar** (`app2037` sha `ce4e2ab`). Suítes: chatbot **667**,
+portal **1412**.
+
+- **O onboarding assistido do Modo 2 não roda.** Tocar a WABA de um cliente exige
+  Advanced Access, que só sai por App Review. **Submetido em 29/08, sem resposta.**
+  Enquanto não sair, nenhuma loja nova conecta — é o gate de tudo.
+- **A cadeia inteira existe no Chatbot:** `app/meta_onboarding.py` (os quatro elos),
+  `app/onboarding_cloud.py` (ordem, retomada, teto), `app/segredo_canal.py` (Fernet,
+  fail-closed), migration `0028`, a rota `POST /v1/whatsapp/canais/cloud/onboarding`
+  e o `/webhook/cloud` entendendo o status do template.
+- **A Loja tem as telas:** decisão (`/app/loja/whatsapp/conectar`), popup do SDK,
+  rótulos `cloud_*` e o passo em que o onboarding parou.
+- **O botão do popup está desabilitado e acende sozinho** quando
+  `PORTAL_META_APP_ID` e `PORTAL_META_CONFIG_ID` entrarem no `[env]`. Nenhum código
+  muda no dia da liberação.
+- **Duas armadilhas caras:** registrar número tem teto de 10 por número em 72 h
+  móveis — estourar deixa o cliente três dias sem WhatsApp, e por isso o código para
+  em 5 e não tem retry automático. E o template `chama_vendedor` foi reclassificado
+  para `MARKETING` (≈10x o custo), com prazo de contestação até **22/10/2026**.
+- **Sem prova:** o JS do popup nunca rodou em navegador.
+- Não existem ainda: tela de templates (§10.4), visão no Control (§14.5) e o spike
+  contra a Meta de verdade.
+
+## Checkpoint de 2026-08-13 (o que o `main` tinha então)
 
 - **Copiloto F1–F4** no Portal: `app/loja/copiloto/`, `app/web/loja_copiloto.py`,
   workers `copiloto_sinais_job` e `copiloto_purge_job`. 7 regras em `SINAL_REGRAS`.

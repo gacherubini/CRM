@@ -13,7 +13,7 @@ chamada à Meta neste card** — por isso ele não depende do Card 1 e pode ser 
 
 **Tech Stack:** FastAPI, SQLAlchemy 2, Alembic, pytest, `cryptography` (dependência nova).
 
-**Spec:** [`../referencia-viva/specs/2026-08-29-embedded-signup-tech-provider-design.md`](../referencia-viva/specs/2026-08-29-embedded-signup-tech-provider-design.md)
+**Spec:** [`../referencia-viva/specs/2026-08-29-embedded-signup-tech-provider-design.md`](../specs/2026-08-29-embedded-signup-tech-provider-design.md)
 
 ## Global Constraints
 

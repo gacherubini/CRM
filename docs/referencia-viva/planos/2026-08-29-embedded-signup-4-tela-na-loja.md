@@ -15,7 +15,7 @@ a cadeia inteira já está no chatbot (Card 3), e este card é a superfície del
 
 **Tech Stack:** FastAPI, Jinja2, JS sem framework (o padrão da Loja), pytest.
 
-**Spec:** [`../referencia-viva/specs/2026-08-29-embedded-signup-tech-provider-design.md`](../referencia-viva/specs/2026-08-29-embedded-signup-tech-provider-design.md) — §6 é a seção desta tela.
+**Spec:** [`../referencia-viva/specs/2026-08-29-embedded-signup-tech-provider-design.md`](../specs/2026-08-29-embedded-signup-tech-provider-design.md) — §6 é a seção desta tela.
 
 **Depende de:** Card 3 (feito e no ar, `ecc58c4`). O `config_id` do popup **depende do App
 Review**, e por isso a Task 4 é a única que não pode ser concluída hoje — as outras quatro
@@ -325,7 +325,7 @@ chega à tela como *"não foi possível acessar o chatbot agora"*. O lojista ver
 conexão" quando o que houve foi a Meta recusar o registro do número.
 
 É o mesmo defeito do learning
-[`2026-08-25-o-422-do-chatbot-chega-como-indisponivel.md`](../../.claude/skills/revy-research/learnings/2026-08-25-o-422-do-chatbot-chega-como-indisponivel.md),
+[`2026-08-25-o-422-do-chatbot-chega-como-indisponivel.md`](../../../.claude/skills/revy-research/learnings/2026-08-25-o-422-do-chatbot-chega-como-indisponivel.md),
 que já custou uma tela culpando a conexão por um erro de digitação. Só `404`, `409` e `422`
 têm escape hoje; **o default do cliente é engolir**.
 

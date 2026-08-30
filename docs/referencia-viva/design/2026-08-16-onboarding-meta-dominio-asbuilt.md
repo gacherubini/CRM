@@ -1,16 +1,28 @@
-# Onboarding Meta + domínio próprio — as-built (16/08, atualizado em 23/08/2026)
+# Onboarding Meta + domínio próprio — as-built (16/08, atualizado em 29/08/2026)
 
 O que **existe e está verificado** depois das sessões de 16/08 (domínio, site, conta na
-Meta) e 23/08 (webhook, token, inscrição na WABA, template, documentos do CNPJ). Não é
-plano: cada linha aqui foi conferida contra o RDAP, o DNS, o Graph API ou uma resposta
-HTTP real — nunca contra painel.
+Meta), 23/08 (webhook, token, inscrição na WABA, template, documentos do CNPJ) e 29/08
+(Embedded Signup, App Review, a cadeia dos cinco elos no código). Não é plano: cada linha
+aqui foi conferida contra o RDAP, o DNS, o Graph API, o código ou uma resposta HTTP real —
+nunca contra painel.
 
 Complementa [`2026-08-16-whatsapp-modo2-asbuilt.md`](2026-08-16-whatsapp-modo2-asbuilt.md),
 que descreve o bot. Este cobre a infraestrutura que faltava para ele sair do laboratório.
 
+> **29/08 — leia isto antes de usar qualquer instrução manual daqui.** Até 28/08 este
+> documento (e o §16.6 da spec dos dois modos) descrevia o onboarding de uma loja como
+> assistido: a loja cria a WABA, compartilha com a Revy, e um humano da Revy faz o resto —
+> inclusive gravando `waba_id` direto no banco. **Esse caminho não existe.** Tocar a WABA de
+> um cliente pela Graph exige **Advanced Access** em `whatsapp_business_management`, e isso
+> só sai por **App Review**. Sem ele a Graph recusa com erro de código `200` (permissão, não
+> HTTP). O caminho real virou o **Embedded Signup**, com a Revy como Tech Provider. Ver a
+> seção "Sessão 29/08" no fim e o learning
+> `2026-08-29-onboarding-assistido-do-16-6-nao-roda.md`.
+
 Versão de leitura, com os mesmos fatos em checklists clicáveis — útil para acompanhar do
 celular enquanto se clica nos painéis: <https://claude.ai/code/artifact/bff93889-3be9-4e75-af3c-a8cae3c29218>
-(privada, acessível apenas pelo dono da conta).
+(privada, acessível apenas pelo dono da conta). **Ela parou em 23/08** e não tem nada de
+29/08 — quem quiser o estado de hoje lê este arquivo, não a página.
 
 ## Placar dos quatro portões da Meta
 
@@ -21,12 +33,18 @@ anterior. Só a terceira olha o CNPJ.
 |---|---|---|
 | 1 — conta pessoal do Facebook | criar o app | **feito** 16/08 |
 | 2 — app + produto WhatsApp + vínculo | o botão "Iniciar verificação" existir | **feito** 16/08 |
-| 3 — verificação da empresa (CNPJ) | escala: sair dos 250/24h | **VERIFICADA** em 24/08 (submetida 23/08; ~1 dia) |
+| 3 — verificação da empresa (CNPJ) | escala: sair dos 250/24h — e, desde 29/08, ser Tech Provider | **VERIFICADA** em 24/08 (submetida 23/08; ~1 dia) |
 | 4 — nome de exibição "Revy" | o cliente ver "Revy" no lugar do número | destravado pelo 3, **espera o número real** |
+| 5 — **App Review** (Advanced Access) | tocar a WABA de **outro** negócio: é ele que faz existir o onboarding de loja cliente | **submetido em 29/08**, sem resposta |
 
-**O portão 3 nunca bloqueou o piloto, e fechá-lo também não destrava nada agora.** O que
-ele compra — nome de exibição, terceiro número, disparo para a base — só tem uso com número
+**O portão 3 nunca bloqueou o piloto.** Em 23–24/08 este documento dizia que fechá-lo também
+não destravava nada — **isso deixou de valer em 29/08**: a verificação de CNPJ virou
+pré-requisito do Tech Provider, que é o único uso dela que se concretizou. O resto do que ela
+compra — nome de exibição, terceiro número, disparo para a base — segue precisando de número
 real na mão. Ver "Limites sem CNPJ" no fim.
+
+**O portão 5 é novo e é o gate de tudo.** Sem App Review não há `config_id`; sem `config_id` o
+popup do Embedded Signup não abre; sem popup nenhum lojista conecta. Ver "Sessão 29/08".
 
 ## Domínio
 
@@ -153,6 +171,9 @@ mesmo com a URL certa.
 | `CHATBOT_GRAPH_TOKEN` | token de **System User**, permanente — o do painel expira em 24h | posto 23/08 |
 | `CHATBOT_GRAPH_PHONE_NUMBER_ID` | número de onde a central fala; fallback do `cloud_canal.py` quando a loja não tem canal | posto 23/08 (`1227059273831581`, o de teste) |
 | `CHATBOT_GRAPH_TEMPLATE_OFERTA` | nome do template de oferta | **não posto de propósito** — o default do código já é `chama_vendedor` |
+| `CHATBOT_CANAL_SECRET_KEY` | chave Fernet que cifra token e PIN **de cada loja** (`app/segredo_canal.py`) | posto 29/08, como **secret**. Ausente, o onboarding levanta em vez de gravar em claro |
+| `CHATBOT_META_APP_ID` | `client_id` do elo 1 (troca do `code` por token) | posto 29/08 no **`[env]` do `fly.app.toml`**, não em secret — App ID é público (`1370395535203964`) |
+| `PORTAL_META_APP_ID` / `PORTAL_META_CONFIG_ID` | o que o popup do SDK precisa na tela da Loja | **ainda vazios** — o `config_id` só existe depois do App Review. Vazio = botão desabilitado, e nada quebra |
 
 ## Sessão 23/08 — o encanamento do Modo 2 fechou
 
@@ -168,7 +189,7 @@ contra painel. O que o painel diz e o Graph desmente, vale o Graph.
 | App `Revy` | **Ao Vivo** | barra lateral → *Publicar* → etiqueta "Publicado" |
 | Token de System User | permanente | `debug_token`: `SYSTEM_USER`, `expires_at: 0` |
 | App inscrito na WABA | sim | `GET /{waba}/subscribed_apps` lista `Revy` |
-| Template `chama_vendedor` | `PENDING`, categoria `UTILITY` | `GET /{template_id}` |
+| Template `chama_vendedor` | `PENDING`, categoria `UTILITY` | `GET /{template_id}` — **snapshot de 23/08**; em 29/08 saiu `Ativo` e como `MARKETING`, ver "O template de oferta" abaixo |
 
 ### Os cinco testes que provaram a entrada
 
@@ -205,7 +226,12 @@ Antes da inscrição, `GET /{waba}/subscribed_apps` devolvia **só** o
 sem erro em lugar nenhum. Webhook verificado, campo assinado, token válido, e silêncio.
 
 Corrigido com `POST /{waba}/subscribed_apps` usando o token de System User. **Toda WABA
-nova precisa disso** — inclusive a de cada loja, quando o desenho do §16.6 entrar.
+nova precisa disso** — inclusive a de cada loja.
+
+**29/08:** essa chamada deixou de ser passo manual. É o **elo 2** da cadeia do Embedded
+Signup (`MetaOnboarding.inscrever_app`), rodado com o token **da loja**, não com o nosso.
+A docstring dele cita esta armadilha pelo nome, porque foi ela que ensinou que a falta é
+silêncio.
 
 ### Armadilha: o token de System User precisa de DOIS ativos
 
@@ -234,8 +260,19 @@ O corpo espelha de propósito o `resumo` do envelope interativo (`oferta_envio.p
 a §5.7 diz *"dois envelopes, um significado"*. Sem `wa.me`, sem botão de URL, sem telefone
 do cliente: o contato só vai **depois** do clique.
 
-Ficar em `UTILITY` é o que importa. Reclassificado como `MARKETING`, cada oferta custaria
-~10× (§9).
+Ficar em `UTILITY` era o que importava — e **não ficou**. Em 29/08 a Meta aprovou o template
+já reclassificado como `MARKETING` (*"não atendeu as nossas diretrizes de utilidade"*): cada
+oferta com janela fechada passou a custar ~10× (§9). O custo já vale em produção, não é risco
+futuro. **Análise disponível até 22/10/2026**, e o argumento é forte: o destinatário é o
+**vendedor da própria loja**, não o consumidor, e a mensagem é notificação de um evento
+específico, com botão para assumir o atendimento, sem oferta nem preço. Detalhe e contorno em
+[`2026-08-16-whatsapp-modo2-asbuilt.md`](2026-08-16-whatsapp-modo2-asbuilt.md), seção
+"2026-08-29 — o template saiu da fila".
+
+**Isso não é problema só da Revy.** O elo 4 do Embedded Signup cria o `chama_vendedor` na WABA
+**de cada loja** pedindo `category: "UTILITY"` (`chatbot-api/app/meta_onboarding.py`,
+`criar_template`). Se o classificador da Meta reclassificar de novo, ele reclassifica loja por
+loja, e ninguém percebe até a fatura.
 
 ### Correção no `workflow-cloud`: `lastNode` envelopa o challenge
 
@@ -328,6 +365,107 @@ O e-mail tem que ser **`contato@revyapp.com.br`**: o catch-all está desligado d
 então qualquer outro endereço do domínio não existe e o código se perde sem erro. Código
 válido por 60 minutos, e ele cai na aba **Social** do Gmail, não na Primary.
 
+## Sessão 29/08 — o onboarding de loja virou Embedded Signup
+
+Tudo desta seção está em `main` e **no ar** no `app2037` (sha `ce4e2ab`).
+
+### O pressuposto que caiu
+
+O §16.6 da spec dos dois modos, e este documento junto com ele, descreviam o onboarding de
+uma loja cliente como **assistido**: a loja cria a WABA, compartilha com a Revy por
+*Assign partner*, e a Revy executa os passos na mão — incluindo escrever `waba_id` direto no
+banco, porque `POST /v1/whatsapp/canais` não grava WABA.
+
+Nada disso roda. Para um token da Revy tocar numa WABA que **não pertence ao negócio dono do
+app**, o app precisa de **Advanced Access** em `whatsapp_business_management`. Sem ele a Graph
+devolve erro de código `200` — permissão, não HTTP. Advanced Access só sai por **App Review**.
+Compartilhar a WABA funciona do lado do lojista e não adianta nada do nosso: o ativo aparece
+no portfólio e a API recusa.
+
+Isso fecha um círculo: o App Review pede vídeo do fluxo funcionando, e o fluxo depende do App
+Review. **Não há caminho manual que contorne, porque é o manual que está bloqueado.**
+
+O contorno que roda hoje — pendurar o número da loja **dentro da WABA da Revy**, que foi
+exatamente o que o piloto de 23–24/08 provou — **o dono recusou em 29/08**. O preço seria a
+Revy faturada pela mensagem e, pior, **nota de qualidade e teto compartilhados** entre todas
+as lojas: uma loja que toma bloqueio queimaria a reputação das outras.
+
+### App Review: submetido em 29/08, sem resposta
+
+As **duas** permissões (`whatsapp_business_management` e `whatsapp_business_messaging`), com
+**vídeo por permissão** — a Meta pede demonstração de cada uma, não uma do projeto inteiro.
+
+É o gate de tudo o que falta: sem App Review não há `config_id`, sem `config_id` o popup não
+abre, sem popup ninguém conecta. Enquanto ele não sai, o código abaixo existe inteiro e não
+tem como ser exercitado contra a Meta de verdade.
+
+Design completo — decisões, elos, riscos, o que se submete — em
+[`../specs/2026-08-29-embedded-signup-tech-provider-design.md`](../specs/2026-08-29-embedded-signup-tech-provider-design.md).
+Não repetido aqui de propósito.
+
+### Duas decisões do dono, em 29/08
+
+- **Fica o SDK canônico. O Hosted ES (a versão hospedada pela Meta) foi descartado.** O SDK é
+  o documentado, mantém o lojista dentro do Revy e preserva o token por loja — que é o que a
+  cifra por canal assume. Não re-propor.
+- **Gerente vê a tela de WhatsApp, só o dono conecta.** Quem clica precisa ser admin do
+  portfólio empresarial da loja na Meta, e esse acesso costuma ser só do dono. Na prática o
+  guarda de papel da tela deixa o gerente passar (`ROLES_GESTAO`), então o gate de dono é
+  **explícito e separado** em `portal-gestao/app/web/loja_whatsapp.py::_e_dono`; o gerente
+  recebe a tela com um aviso no lugar do botão.
+
+### O que existe em código
+
+**Chatbot** (`chatbot-api/`):
+
+| Peça | Onde | O que faz |
+|---|---|---|
+| Os quatro elos que falam com a Graph | `app/meta_onboarding.py` | troca do `code` por token, `subscribed_apps`, `register`, `message_templates`. Sem banco |
+| Ordem, retomada e teto | `app/onboarding_cloud.py` | `conectar()`: cada elo só roda se `onboarding_elo` for menor |
+| Cifra dos segredos da loja | `app/segredo_canal.py` | Fernet, **fail-closed**: sem `CHATBOT_CANAL_SECRET_KEY` levanta em vez de gravar em claro |
+| Colunas de retomada | migration `0028_canal_onboarding` | `business_id`, `onboarding_elo`, `onboarding_erro`, `token_cifrado`, `pin_cifrado`, `registro_tentativas`. Expand-only, tudo nullable, sem backfill — canal de Modo 1 não muda |
+| A rota | `POST /v1/whatsapp/canais/cloud/onboarding` | recebe `code` + três ids do popup. Devolve estado e elo, **nunca** token, PIN ou o `code` |
+| Aprovação do template | `/webhook/cloud`, campo `message_template_status_update` | **sem rota nova**: a assinatura da Meta já é conferida ali, e uma segunda porta seria uma segunda superfície para autenticar |
+
+**Loja** (`portal-gestao/`): a tela de decisão em `/app/loja/whatsapp/conectar` (a escolha do
+número é irreversível — número que entra na Cloud API não volta ao aplicativo), o popup do
+SDK, o POST que repassa a cadeia ao chatbot, os rótulos dos estados `cloud_*` e a frase do
+passo em que o onboarding parou.
+
+**O canal nasce depois do elo 1, não no fim.** O `code` do popup tem TTL de **30 segundos** e
+não é retomável. Se o canal só existisse no fim da cadeia, qualquer falha do elo 2 em diante
+perderia o token e mandaria o lojista de volta ao popup — que é justamente o que o desenho
+promete não fazer. Guardando `onboarding_elo` (1 a 5) e `onboarding_erro`, a retomada continua
+de onde parou.
+
+O que a Loja mostra vem desses dois campos, traduzidos em
+`portal-gestao/app/loja/whatsapp_canais.py` (`PASSOS_ONBOARDING`, `ANDAMENTO_ONBOARDING`): só
+o passo 1 é do lojista; do 2 ao 4 quem chama a Meta é a Revy; no 5 falta a liberação no
+Control.
+
+### A armadilha cara: registrar número tem teto de 72 h
+
+A Meta aceita **10 chamadas de registro por número numa janela móvel de 72 h**. Estourar
+devolve o código **`133016`** e deixa o número **três dias sem WhatsApp** — o custo é do
+lojista, em dias parado.
+
+Por isso o elo 3 **para em 5 tentativas** (`onboarding_cloud.TETO_REGISTRO`), conta em
+`registro_tentativas` no próprio canal, e **não tem retry automático**. Retry automático neste
+elo está proibido: é o único da cadeia em que tentar de novo custa caro. Quando o teto bate, a
+tela deixa de oferecer "Tentar de novo" e diz para falar com a Revy — oferecer um clique que
+já se sabe recusado é pior que não oferecer nada.
+
+### O que ainda não tem prova
+
+**O JS do popup nunca rodou em navegador.** O `pytest` renderiza o template como texto: prova
+que os ids saem no HTML e que o `disabled` some, e nada mais. O `FB.login`, o listener de
+`message` e os três caminhos de desistência não foram exercitados. É o mesmo buraco que
+deixou passar dois bugs em 15–16/08 (learning
+`2026-08-23-copiloto-so-se-verifica-no-navegador.md`). A lista do que falta clicar está no fim de
+[`../planos/2026-08-29-embedded-signup-4-tela-na-loja.md`](../planos/2026-08-29-embedded-signup-4-tela-na-loja.md).
+
+Nada da cadeia tocou a Meta de verdade: os testes usam `httpx.MockTransport`.
+
 ## Limites sem CNPJ verificado
 
 O teto de **250 clientes únicos por 24h rolantes** conta **só conversa iniciada pela
@@ -347,6 +485,11 @@ O que a verificação compra não é volume:
 
 Desde 07/10/2025 o limite é **por portfólio**, não por número: não dá para ganhar
 capacidade espalhando em mais números.
+
+**29/08: apareceu um terceiro uso, e é o que valeu.** Ser **Tech Provider** — condição do
+Embedded Signup, e portanto de qualquer loja cliente conectar sozinha — exige empresa
+verificada. Foi o único uso da verificação de CNPJ que se concretizou até agora; os outros
+dois seguem esperando número real.
 
 **01/10/2026** — mensagem de serviço volta a ser cobrada. Conversa nascida de anúncio
 Click-to-WhatsApp entra como *free entry point* e **continua grátis**, com janela de 72h.
@@ -378,27 +521,38 @@ ser questão de atribuição e virou questão de custo.
 - [x] aprovação do `chama_vendedor` — **aprovado, mas como `MARKETING`** (conferido 29/08). O motivo esta no painel: *"nao atendeu as diretrizes de utilidade"*. Contestacao aberta ate **22/10/2026**; o argumento e que o destinatario e o **vendedor da loja**, nao o consumidor, e a mensagem e notificacao de um evento especifico, sem oferta
 - [x] **resultado** da verificação do CNPJ — **Verificada em 24/08** (CCMEI + confirmação
       por e-mail); o portão 4 (nome de exibição) passou a depender só do número real
+- [ ] **App Review das duas permissões** — submetido em 29/08 com vídeo por permissão, **sem
+      resposta**. É o gate de tudo: sem ele não há `config_id`, e sem `config_id` o popup do
+      Embedded Signup não abre
 - [ ] eSIM de operadora brasileira com **voz/SMS** — eSIM de viagem (Airalo, Holafly) é só dados, não recebe SMS e **não serve**
 - [ ] número que **nunca teve WhatsApp**; e uma vez na Cloud API ele fica **bot-only**, não volta a funcionar no app
 - [ ] Etapa 2 do painel: registrar o número real ao lado do de teste
 
 **Ainda aberto — nosso lado (é o que trava o ciclo ponta a ponta)**
 
-- [ ] cadastrar o canal da loja. **A instrução antiga estava errada**: `POST
-      /v1/whatsapp/canais` **não aceita `waba_id`** — o schema tem só `evolution_instance` e
-      `e164_or_label`, e `register_channel` nunca grava WABA nem template. Para o piloto basta
-      um canal com `evolution_instance = <phone_number_id>` (cura o inbound; o outbound cai no
-      fallback do ambiente). Loja real precisa de `waba_id` + `template_oferta`, hoje só por
-      escrita direta no banco. Ver o learning `canal-cloud-nao-se-cadastra-pela-api`
+- [x] cadastrar o canal da loja. Duas correções em cima da instrução original. **(1)** `POST
+      /v1/whatsapp/canais` de fato **não aceita `waba_id`** — o schema tem só
+      `evolution_instance` e `e164_or_label`, e `register_channel` nunca grava WABA nem
+      template (learning `canal-cloud-nao-se-cadastra-pela-api`). **(2) Mas a escrita direta no
+      banco deixou de ser o caminho, em 29/08:** quem cria canal Cloud com `waba_id`,
+      `business_id`, token e PIN cifrados é `POST /v1/whatsapp/canais/cloud/onboarding`, pelo
+      Embedded Signup. Para o piloto continua valendo um canal com
+      `evolution_instance = <phone_number_id>` (cura o inbound; o outbound cai no fallback do
+      ambiente). **Rota escrita, nunca exercitada contra a Meta** — espera o App Review
 - [x] flags do Modo 2 no `app2037` — **são três**, e as três ficaram em `1` em 23/08:
       `REVY_CONTROL_WHATSAPP_MODO2_ENABLED` (o rádio na ficha da loja),
       `CHATBOT_WHATSAPP_MODO2_ENABLED` (rodízio e workers) e `MULTI_WHATSAPP_ENABLED`
       (a rota de canais, que sem ela responde 404). As duas do chatbot já estavam ligadas
-- [ ] projetar `whatsapp_modo = 2` **numa loja só**
-- [ ] cadastrar a fila de vendedores (autoatendido na Loja)
-- [ ] ciclo completo no **número de teste** antes de qualquer chip: mensagem → n8n → bot →
-      rodízio → handoff. Hoje pararia em `phone_number_id sem loja`, que é a mesma linha
-      de log do teste do painel
+- [x] projetar `whatsapp_modo = 2` **numa loja só** — semeado à mão na loja `teste` em 23/08.
+      **Desde 29/08 essa projeção faz mais uma coisa:** ela **ativa** o canal que estava
+      `cloud_pendente` (`chatbot-api/app/provisioning.py::_liberar_canal_cloud`). É o portão do
+      Control, e continua sem rota nova
+- [x] cadastrar a fila de vendedores (autoatendido na Loja) — um vendedor, no piloto de 23/08
+- [x] ciclo completo no **número de teste** antes de qualquer chip: mensagem → n8n → bot →
+      rodízio → handoff — **provado na madrugada de 24/08**. A linha `phone_number_id sem loja`
+      deixou de aparecer. Ver
+      [`2026-08-16-whatsapp-modo2-asbuilt.md`](2026-08-16-whatsapp-modo2-asbuilt.md),
+      "A volta completa"
 - [x] provider de transcrição (Groq) — `CHATBOT_AUDIO_TRANSCRIPTION_URL` / `_TOKEN` **staged**
       em 24/08 (`fly secrets set --stage`, entra em vigor no deploy). Endpoint
       `https://api.groq.com/openai/v1/audio/transcriptions`, modelo `whisper-large-v3` com

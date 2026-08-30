@@ -21,6 +21,17 @@ Tokens das APIs ficam **somente no servidor**; o navegador recebe uma sessão as
   antiga de pé. Emitir o token de cada loja:
   `python -m app.cli criar-credencial-loja --slug <loja>` no `chatbot-api`.
 
+- **Todo erro HTTP do `ChatbotClient` vira "não foi possível acessar o chatbot agora"
+  se não ganhar escape.** O `_request` (`app/clients/chatbot.py`) termina em
+  `raise_for_status()` dentro de um `except (httpx.HTTPError, ValueError)` que levanta
+  `ChatbotIndisponivel` — e `HTTPStatusError` **é** `HTTPError`. Status que a tela
+  precisa distinguir pede escape explícito: hoje existem `erro_404`, `erro_409`,
+  `erro_422` e `erro_502` (este levanta `OnboardingFalhou(mensagem, elo=...)`, para o
+  lojista ler qual passo parou em vez de "erro de conexão"). Falha de rede **continua**
+  `ChatbotIndisponivel`: são situações diferentes e pedem frases diferentes. Já custou
+  uma tela errada duas vezes. O construtor aceita `transport=` (keyword-only) porque é
+  o único jeito de um teste exercitar o `_request` de verdade — o padrão de sobrescrever
+  `_request` numa subclasse não serve quando o que está sob teste é o próprio `_request`.
 - **Custo do veículo, lucro, tokens e credenciais do Motor nunca aparecem para vendedor.**
   Aplique RBAC no backend, não escondendo item de menu. Vale para toda superfície
   do módulo Financeiro (telas e JSON).
@@ -63,6 +74,7 @@ Tokens das APIs ficam **somente no servidor**; o navegador recebe uma sessão as
 |---|---|
 | `app/main.py` | Bootstrap, middleware, auth, rotas legadas restantes, helpers de template |
 | `app/loja/` + `app/web/loja_*.py` | Shell Revy Loja (domínio + rotas) |
+| `app/web/loja_whatsapp.py` + `app/loja/whatsapp_canais.py` | Números de WhatsApp: canais Evolution, conexão pela nuvem e fila do Modo 2 |
 | `app/loja/copiloto/` + `app/web/loja_copiloto.py` | Copiloto: tools, sinais, FIPE, ações, chat, sino |
 | `app/copiloto_sinais_job.py` · `app/copiloto_purge_job.py` | Worker de regras e retenção |
 | `app/loja/routes.py` | Atendimento (chat, envio, polling, visão do agente) e **configuração do agente** |
@@ -87,14 +99,15 @@ polling `after_id`, multi-canal) · **Perfil** com troca de senha · veículos (
 filtrar, cadastrar, editar, publicar, despublicar, reservar, vender) · custo oculto para
 vendedor · vendas, metas e resultados de mídia · **Grupo do estoque** e **números de
 WhatsApp** (QR efêmero, sem expor a API key da Evolution) · **Integrações** (status
-read-only Meta/Google/WA) · **Acessos bancos** (credenciais do Motor cifradas; exige
+read-only Meta/Google/WA) · **Conectar o WhatsApp pela nuvem** (embedded signup da
+Meta, Modo 2 — a tela abre para dono e gerente, o botão é só do dono) · **Acessos bancos** (credenciais do Motor cifradas; exige
 `MOTOR_ENCRYPTION_KEY` no Motor) · **Copiloto de Vendas** (F1–F4: chat, 7 sinais, FIPE,
 ações com confirmação/desfazer, sino — flag + módulo OFF por default) · **editar e
 apagar venda** com o efeito propagado ao Control · **Financeiro** (lucro por moto,
 lucro operacional do mês, ponto de equilíbrio e despesas fixas recorrentes — flag +
 módulo OFF por default) · **Configuração do agente por loja** (formulário, rascunho com
-autosave, conversa de teste com o rascunho, publicar e histórico — flag OFF por default,
-**não deployado**). Foto de veículo ainda é URL. Sino geral fora do Copiloto ainda não
+autosave, conversa de teste com o rascunho, publicar e histórico — no ar desde 29/08;
+falta só o workflow do n8n). Foto de veículo ainda é URL. Sino geral fora do Copiloto ainda não
 existe. A página Hoje do Copiloto foi removida em 16/08: o sino cobre os sinais.
 
 ## Flags (defaults de código OFF)
@@ -120,6 +133,11 @@ Integração com o Revy Control: `REVY_TRAFEGO_URL`, `REVY_TRAFEGO_SERVICE_TOKEN
 `PORTAL_REVY_TRAFEGO_RETRY_INTERVAL_SECONDS` (60), `PORTAL_TRAFEGO_UI_LEGACY` (rollback),
 `PORTAL_ENCRYPTION_KEY` (Fernet do outbox e demais segredos locais).
 
+Embedded signup: `PORTAL_META_APP_ID` e `PORTAL_META_CONFIG_ID`. **Nenhum dos dois é
+segredo** — os dois vão para o HTML da tela, então moram no `[env]` do `fly.app.toml` e
+nunca em `fly secrets`. O segredo do embedded signup é o App Secret, e ele fica só no
+`chatbot-api`, que é quem troca o `code` por token.
+
 Config técnica de Pixel/CAPI/campanhas **não fica aqui** — é operada no `revy-trafego`.
 
 ## Configuração do agente (`/app/loja/agente/configuracao`)
@@ -128,9 +146,11 @@ O lojista escreve **campos**, não prompt. A Loja aqui é **só tela**: os campo
 gerado, o núcleo Revy, as versões e o histórico moram no `chatbot-api` e chegam pelo
 `ChatbotClient`. Nenhuma tabela nova, nenhuma montagem de texto neste produto.
 
-**Está no código e não está no ar.** Falta ligar `REVY_LOJA_AGENTE_CONFIG_ENABLED` no
-`app2037` (é *secret*) e publicar os workflows do n8n. Sequência completa e ordem no
-`chatbot-api/README.md`, seção "O que falta".
+**Conferido em produção em 29/08:** `REVY_LOJA_AGENTE_CONFIG_ENABLED` e
+`CHATBOT_AGENTE_PREVIEW_URL` aparecem como `Deployed` no `fly secrets list` do `app2037`,
+e o banco tem a `agente_config` da loja piloto. **Falta publicar o workflow do n8n** — que
+é o passo que muda o que o cliente ouve, e o único ainda pendente. Sequência completa e
+ordem no `chatbot-api/README.md`, seção "O que falta".
 
 **Feito:** rota da tela + três rotas de escrita (`configuracao.json` para o autosave,
 `publicar`, `restaurar`), a conversa de teste (`testar.json`), o formulário inteiro
@@ -186,6 +206,48 @@ Arquivos: `app/loja/routes.py`, `app/templates/loja/agente_configuracao.html`,
   telas de auth (`login`, `senha_esqueci`, `senha_redefinir`, `convite_aceitar`), que não
   estendem o base. `python .claude/skills/revy-deploy/preflight.py` reprova a divergência
   — e reprovou esta feature quando só o `base.html` foi bumpado.
+
+## Conectar o WhatsApp pela nuvem (`/app/loja/whatsapp/conectar`)
+
+Embedded signup da Meta: o lojista abre a janela da Meta sem sair da Loja e o número
+passa a ser Cloud API (Modo 2). A Loja aqui é **tela e repasse**: o `GET` monta a
+decisão, o `POST` da mesma rota recebe o que o popup devolveu e entrega ao `chatbot-api`.
+Quem troca o `code` por token é o chatbot, porque a troca exige o App Secret — e ele não
+ganha segunda cópia neste produto. Card:
+[`../docs/referencia-viva/planos/2026-08-29-embedded-signup-4-tela-na-loja.md`](../docs/referencia-viva/planos/2026-08-29-embedded-signup-4-tela-na-loja.md).
+
+- **Gerente vê a tela, só o dono conecta.** Decisão do dono (29/08): quem clica precisa
+  ser admin do portfólio empresarial na Meta, e gerente normalmente não é. O gerente
+  precisa responder por que o WhatsApp não está no ar, então a tela abre para ele. O gate
+  do POST é `_e_dono` explícito — o `_guarda`, que todas as escritas usam, aceita
+  `ROLES_GESTAO` e deixaria o gerente passar.
+- **A escolha da tela é o aceite, e é a única coisa irreversível do fluxo.** Migrar o
+  número que a loja já anuncia deixa o histórico daquele celular para trás e tira o
+  número do aparelho. Não existe um "li e concordo" depois; continuar já é a escolha. A
+  tela também lista o que precisa estar em mãos antes (ser admin do portfólio, cartão, o
+  chip do número): descobrir isso dentro da janela da Meta obriga a recomeçar do zero.
+- **O botão acende sozinho.** `portal_meta_app_id()` e `portal_meta_config_id()`
+  (`app/config.py`) são lidos em **runtime**, não do `Settings`, que é snapshot de boot —
+  assim o botão liga no dia em que as variáveis existirem, sem redeploy. Com qualquer um
+  vazio ele fica `disabled` e a tela diz que a janela está em liberação com a Meta; com
+  um só, o popup abriria e a Meta recusaria sem dizer por quê.
+- **O JS do popup nunca foi verificado em navegador.** Pytest não abre a janela da Meta e
+  `node --check` só olha sintaxe. Quem mexer no `<script>` do `whatsapp_decidir.html`
+  confere no navegador antes de dizer que funciona.
+- **Canal Cloud não oferece botão de QR.** `pode_conectar` e `pode_desconectar` são
+  `False` em canal Cloud (reconhecido pelo `waba_id`) porque o botão do Modo 1 chama a
+  Evolution pedindo QR para um número que é da Cloud API. `ROTULOS` traduz os quatro
+  estados `cloud_*` para frase de dono de loja, e a view diz qual passo do onboarding
+  parou e de quem é a vez — sem oferecer "tentar de novo" quando o erro é o teto de 72 h
+  da Meta, que é um clique já se sabendo recusado.
+- **`montar_canais_view` reconstrói `CanalView` com `dataclasses.replace`, de propósito.**
+  É no bloco do `principal_estoque`. Com reconstrução campo a campo, esquecer um campo
+  novo passa por todos os testes e o defeito só aparece em loja com mais de um canal —
+  foi assim que o `cloud` sumiu uma vez. Não volte a construir à mão.
+- **Campo novo no chatbot não chega sozinho ao read-model.** O que `whatsapp_canais.py`
+  lê é um dicionário montado campo a campo em `chatbot-api/app/channels.py`. Ler um campo
+  que não está listado lá dá feature verde no CI e inerte em produção — já custou isso.
+  Abra o serializer e confirme antes.
 
 ## Usar o chat no Atendimento
 

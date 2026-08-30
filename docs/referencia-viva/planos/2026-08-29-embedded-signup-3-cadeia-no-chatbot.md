@@ -16,7 +16,7 @@ tocar a Meta.
 
 **Tech Stack:** FastAPI, SQLAlchemy 2, httpx, pytest, `app/segredo_canal.py` (Card 2).
 
-**Spec:** [`../referencia-viva/specs/2026-08-29-embedded-signup-tech-provider-design.md`](../referencia-viva/specs/2026-08-29-embedded-signup-tech-provider-design.md)
+**Spec:** [`../referencia-viva/specs/2026-08-29-embedded-signup-tech-provider-design.md`](../specs/2026-08-29-embedded-signup-tech-provider-design.md)
 
 **Depende de:** Card 2 (feito — `dadb6be`…`ffc51e7`). **Não** depende do Card 1 nem do
 resultado do App Review: tudo aqui é testado com transporte falso.

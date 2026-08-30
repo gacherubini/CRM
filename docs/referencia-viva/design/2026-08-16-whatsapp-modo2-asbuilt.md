@@ -3,8 +3,9 @@
 Spec: [`../specs/2026-08-12-whatsapp-dois-modos-design.md`](../specs/2026-08-12-whatsapp-dois-modos-design.md).
 Este arquivo diz **o que existe no `main`**, não o que foi planejado. Onde houver
 divergência com a spec, a spec é o alvo e este documento é o placar.
-Última atualização: **23–24/08**, com o piloto em produção (seção "Piloto do
-Modo 2").
+Última atualização: **29/08**, quando o onboarding de loja cliente mudou de
+caminho (seção "2026-08-29 — como uma segunda loja entra"). O piloto em produção
+está em "Piloto do Modo 2", de 23–24/08.
 
 ## O buraco que este dia fechou
 
@@ -43,7 +44,7 @@ exercitado* — código verde não é caminho andado.
 | §5.4 | Silêncio pós-handoff, re-notificação | ✅ `pos_handoff.py` — **silêncio provado 24/08** (`bot_ativo=False`); re-notificação não exercitada. O **follow-up estava quebrado** pelo mesmo defeito de outbound do rodízio, corrigido junto em 24/08 |
 | §5.5 | Vendedor × cliente por variantes | ✅ |
 | §5.7 | "Peguei" = clique, primeiro vence | ✅ trava idempotente — **clicado em produção 24/08**, oferta ficou `travada`. "Primeiro vence" com dois cliques concorrentes segue não exercitado |
-| §5.8 | Control escolhe o modo | ✅ `whatsapp_modo` por loja; no piloto a projeção foi semeada à mão, o Control não escreveu |
+| §5.8 | Control escolhe o modo | ✅ `whatsapp_modo` por loja; no piloto a projeção foi semeada à mão, o Control não escreveu. **Desde 29/08 a projeção `2` também ativa** o canal `cloud_pendente` — mesmo lever, sem rota nova. O Control **ainda não** mostra o estado de cada loja |
 | §5.9 | Fork do fluxo atual | ✅ gerado, 20 nós; publicado e **ativo** no `n8n2037` desde 23/08 |
 | §5.9 | Debounce 40 s | ✅ herdado |
 | §5.9 | Follow-up 30 min + 1 h | ✅ prazos e regras |
@@ -123,6 +124,10 @@ Precisa de envio de imagem pelo Graph + rota no chatbot.
 | Áudio (download, transcrição) | `chatbot-api/app/audio.py` |
 | Retry do inbound | `chatbot-api/app/cloud_retry.py` |
 | Workers do Modo 2 | `chatbot-api/app/modo2_workers.py` |
+| Elos que falam com a Graph (29/08) | `chatbot-api/app/meta_onboarding.py` |
+| Ordem, retomada e teto do onboarding (29/08) | `chatbot-api/app/onboarding_cloud.py` |
+| Portão do Control que ativa o canal (29/08) | `chatbot-api/app/provisioning.py::_liberar_canal_cloud` |
+| Tela de conexão na Loja (29/08) | `portal-gestao/app/web/loja_whatsapp.py` + `app/loja/whatsapp_canais.py` |
 
 **Nunca edite `n8n/workflow-cloud.json` à mão** — o validador compara com o que o
 gerador produz e sai com código 1. Ajuste o gerador e rode.
@@ -140,8 +145,9 @@ webhook está verificado com o campo `messages` assinado; o app está Ao Vivo e 
 na WABA**; o `chama_vendedor` foi submetido. A entrada foi provada ponta a ponta, inclusive
 com payload assinado pela própria Meta. Detalhe, testes e armadilhas em
 [`2026-08-16-onboarding-meta-dominio-asbuilt.md`](2026-08-16-onboarding-meta-dominio-asbuilt.md),
-seção "Sessão 23/08". A verificação de CNPJ da Revy foi submetida em 23/08 e está
-em análise (~2 dias úteis) — não bloqueia o piloto.
+seção "Sessão 23/08". A verificação de CNPJ da Revy foi submetida em 23/08 e saiu
+**Verificada em 24/08** — não bloqueou o piloto, e em 29/08 virou pré-requisito do
+Tech Provider.
 
 ## Piloto do Modo 2 — noite de 23/08, em produção
 
@@ -248,15 +254,19 @@ Consertado e no ar em `654f5d4`. O desenho é o da spec §6.2:
 
 **O que ainda não está provado:** o multi-loja de verdade. Tudo foi verificado com
 uma loja — e com uma loja o código quebrado se comporta igual ao consertado. Falta
-cadastrar a central Cloud de uma **segunda** loja, que hoje só sai por escrita direta
-no banco: `POST /v1/whatsapp/canais` não grava `waba_id`.
+cadastrar a central Cloud de uma **segunda** loja.
+
+*(Escrito em 24/08: "hoje só sai por escrita direta no banco: `POST /v1/whatsapp/canais`
+não grava `waba_id`". A primeira metade **deixou de valer em 29/08** — existe rota. A
+segunda continua verdadeira: `POST /v1/whatsapp/canais` segue sem `waba_id`. Ver a seção
+de 29/08 no fim.)*
 
 Exceção deliberada, fora do escopo daquele card: `GET /v1/config/catalogo-bot` é cega
 para loja e `instance` não a conserta — ela não lê `ctx.loja_id`, quem responde é o
 cliente do Estoque com bearer global e sem slug. É buraco do contrato com o Estoque.
 
 Detalhe do card:
-[`../../fila/2026-08-23-modo2-multiloja-credencial-de-integracao.md`](../../fila/2026-08-23-modo2-multiloja-credencial-de-integracao.md).
+[`../planos/2026-08-23-modo2-multiloja-credencial-de-integracao.md`](../planos/2026-08-23-modo2-multiloja-credencial-de-integracao.md).
 
 ## Noite de 24/08 — dois furos entre o banco e o WhatsApp
 
@@ -370,3 +380,48 @@ loja" como divulgacao.
 **O custo real e menor do que os 10x sugerem**, porque o template so entra quando a janela
 de 24 h do vendedor esta **fechada** — com ela aberta o codigo manda `interactive`, que e
 gratis. Foi por causa desta reclassificacao que esse contorno existe.
+
+## 2026-08-29 — como uma segunda loja entra
+
+O piloto rodou com **uma** loja, e a seção "Uma loja por vez" fechou o lado do
+código. Faltava o lado da Meta: como o número de uma loja cliente chega à
+central. Em 29/08 essa resposta mudou.
+
+**O caminho que este documento pressupunha não existe.** O §16.6 descrevia um
+onboarding assistido — a loja compartilha a WABA, a Revy faz o resto na mão.
+Tocar a WABA de outro negócio exige **Advanced Access** em
+`whatsapp_business_management`, e isso só sai por **App Review**. Sem ele a Graph
+recusa. O contorno que funcionaria — pendurar o número da loja dentro da WABA da
+Revy — **o dono recusou**: nota de qualidade e teto passariam a ser
+compartilhados, e uma loja bloqueada queimaria a reputação das outras.
+
+O caminho novo é o **Embedded Signup**, com a Revy como Tech Provider: o lojista
+conecta sozinho, por um botão na Revy Loja. **App Review submetido em 29/08, sem
+resposta.** Enquanto não sai, não há `config_id`, o popup não abre, e nenhuma
+segunda loja entra.
+
+Existe código, no ar em `app2037` (`ce4e2ab`): a cadeia dos cinco elos no
+chatbot, a rota `POST /v1/whatsapp/canais/cloud/onboarding`, os segredos da loja
+cifrados, e a tela na Loja. **Nada disso tocou a Meta de verdade** — os testes
+usam `httpx.MockTransport`, e o JS do popup nunca rodou em navegador.
+
+Detalhe, armadilhas e o que falta clicar em
+[`2026-08-16-onboarding-meta-dominio-asbuilt.md`](2026-08-16-onboarding-meta-dominio-asbuilt.md),
+seção "Sessão 29/08". O design está em
+[`../specs/2026-08-29-embedded-signup-tech-provider-design.md`](../specs/2026-08-29-embedded-signup-tech-provider-design.md).
+
+### O que muda para o Modo 2 propriamente
+
+- **O portão do Control é o mesmo lever, e ganhou um efeito.** Projetar
+  `whatsapp_modo = 2` continua sendo o que liga a loja (§6.3), e desde 29/08
+  também **ativa** o canal parado em `cloud_pendente`. Sem rota nova. O que
+  **não** foi feito: o Control não tem visão nenhuma do estado de cada loja —
+  quem quiser saber em que pé está uma conexão olha a tela da Loja ou o banco.
+- **Registrar número é a chamada mais cara da cadeia.** A Meta aceita 10 por
+  número em 72 h móveis; estourar devolve `133016` e deixa o número **três dias
+  sem WhatsApp**. O elo 3 para em 5 tentativas e **não tem retry automático** —
+  retry aqui está proibido. Nenhum worker do Modo 2 pode ganhar essa chamada
+  depois.
+- **O `chama_vendedor` de cada loja nasce pedindo `UTILITY`**, e o da Revy foi
+  aprovado como `MARKETING` (seção anterior). Se a Meta repetir a
+  reclassificação, ela repete loja por loja.

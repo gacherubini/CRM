@@ -16,6 +16,33 @@ Quando um card entra no `main`, no mesmo PR: mover o arquivo, atualizar
 `fila/README.md` e `referencia-viva/contexto-compacto.md`. Código vence o
 bloco Status do plano.
 
+## Embedded Signup — o que foi construído (2026-08-29)
+
+Spec canônica: [`referencia-viva/specs/2026-08-29-embedded-signup-tech-provider-design.md`](referencia-viva/specs/2026-08-29-embedded-signup-tech-provider-design.md).
+
+O onboarding assistido que a spec do Modo 2 descrevia **não roda**: tocar a WABA de um
+cliente exige Advanced Access, que só sai por App Review. Descoberto em 29/08 tentando pôr
+uma loja real no ar. O caminho passou a ser o lojista conectar sozinho, com a Revy como
+Tech Provider.
+
+| Card | Produto | O que entrou no código |
+|---|---|---|
+| 2 · canal, estado e segredos | Chatbot | Migration `0028`: `business_id`, `onboarding_elo`, `onboarding_erro`, `token_cifrado`, `pin_cifrado`, `registro_tentativas`. `app/segredo_canal.py` (Fernet, **fail-closed**). Projetar `whatsapp_modo=2` no Control passou a ativar o canal `cloud_pendente`. |
+| 3 · a cadeia | Chatbot | `app/meta_onboarding.py` (os quatro elos que falam com a Graph, sem banco), `app/onboarding_cloud.py` (ordem, retomada, teto de 5 no registro), `POST /v1/whatsapp/canais/cloud/onboarding`, e o `/webhook/cloud` entendendo `message_template_status_update` — **sem rota nova**. |
+| 4 · a tela | Loja / Chatbot | Tela de decisão (`/app/loja/whatsapp/conectar`), popup do SDK, rótulos dos estados `cloud_*`, o passo em que o onboarding parou, e o erro de elo chegando como elo em vez de "chatbot indisponível". |
+
+Planos em [`referencia-viva/planos/`](referencia-viva/planos/). O card 1 (spike contra a
+Meta de verdade) continua em [`fila/`](fila/README.md).
+
+**Nada disto conecta loja nenhuma ainda.** O App Review foi submetido em 29/08 e não teve
+resposta; sem ele não há `config_id`, sem `config_id` o popup não abre. O botão está
+desabilitado e **acende sozinho** quando `PORTAL_META_APP_ID` e `PORTAL_META_CONFIG_ID`
+entrarem no `[env]` — nenhum código muda. Faltam também a tela de templates (§10.4) e a
+visão no Control (§14.5), que não viraram card.
+
+**O JS do popup nunca rodou em navegador.** A lista do que precisa ser clicado está no fim
+do card 4.
+
 ## Agente por loja — o que foi construído (2026-08-25)
 
 Spec canônica: [`referencia-viva/specs/2026-08-24-agente-por-loja-design.md`](referencia-viva/specs/2026-08-24-agente-por-loja-design.md).

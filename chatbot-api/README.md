@@ -70,8 +70,10 @@ Domínio em `app/servico.py`; bootstrap e rotas em `app/main.py`.
   curl -s -X POST "https://graph.facebook.com/v21.0/<WABA_ID>/subscribed_apps" -d "access_token=$T"
   ```
 
-  Vale para **toda WABA nova**, inclusive a de cada loja quando o §16.6 entrar. O app
-  também precisa estar **Ao Vivo**: em Desenvolvimento a Meta só entrega webhook de teste.
+  Vale para **toda WABA nova**. Desde 29/08 o elo 2 do embedded signup faz essa inscrição
+  sozinho (seção abaixo) — mas só para o canal que nasceu por lá; WABA conectada à mão
+  continua exigindo o `curl`. O app também precisa estar **Ao Vivo**: em Desenvolvimento a
+  Meta só entrega webhook de teste.
 - **Falha no inbound Cloud não pode virar só log.** Já respondemos `200` à Meta (§6.1), então
   ela **não reentrega**: engolir a exceção perde o lead calado. O corpo cru vai para
   `cloud_evento_falho` e o worker `cloud_retry` reprocessa (teto de 5 tentativas).
@@ -282,12 +284,19 @@ contam o lado deles.
 
 ### O que falta
 
-**Só operação — nenhuma linha de código.** Os cards 2–4 não foram deployados, por
-decisão do dono (25/08): ele quer acompanhar o passo que muda o que o cliente ouve.
+**Só operação — nenhuma linha de código.** O dono quis acompanhar passo a passo (25/08),
+porque um deles muda o que o cliente ouve.
+
+**Conferido em produção em 29/08: os passos 1, 2, 4 e 5 já estão feitos.** O `app2037`
+roda o código; `fly secrets list` mostra `REVY_LOJA_AGENTE_CONFIG_ENABLED` e
+`CHATBOT_AGENTE_PREVIEW_URL` como `Deployed`; e o banco de produção tem **uma**
+`agente_config` — a semente da loja piloto. **Falta o passo 3**, que é justamente o único
+que muda o que o cliente ouve. Ele não foi verificado nesta conferência: o estado do
+workflow se confere no `n8n2037`, não daqui.
 
 | # | Passo | Muda o que o cliente ouve? |
 |---|---|---|
-| 1 | `fly deploy` do `app2037` | **não** — sobe os ajustes dos cards 2–4 nas rotas, e ninguém as chama. Sem migration nova: a `0027` já está aplicada |
+| 1 | ~~`fly deploy` do `app2037`~~ **feito** | **não** — sobe os ajustes dos cards 2–4 nas rotas, e ninguém as chama. Sem migration nova: a `0027` já está aplicada |
 | 2 | `DATABASE_URL=$CHATBOT_DATABASE_URL python -m scripts.semear_config_agente moto-center`, por `fly ssh console -a app2037` em `/srv/chatbot` (a variável é `DATABASE_URL`: é ela que o `app/db.py` lê, e num shell avulso o entrypoint não traduziu) | **não** — só o `pode_responder` lê `agente_config` hoje, e a config semeada é equivalente ao estado atual (`agente_ativo` ligado, sem janela de horário) |
 | 3 | `prepare-workflow.ps1 -Mode production` + `upload-and-import` + restart | **sim** — é aqui que o bot passa a montar o prompt a partir da config |
 | 4 | secret `REVY_LOJA_AGENTE_CONFIG_ENABLED=1` | libera a tela para o lojista |
@@ -309,6 +318,87 @@ A dívida herdada que encostava nesta feature — `GET /v1/config/catalogo-bot` 
 loja — **foi resolvida em 25/08**, com o dono escolhendo expor `catalogo_url` na rota
 pública por slug do Estoque. Ver §8 do spec e
 [`../docs/referencia-viva/planos/2026-08-25-catalogo-por-loja.md`](../docs/referencia-viva/planos/2026-08-25-catalogo-por-loja.md).
+
+## Onboarding do canal Cloud (embedded signup)
+
+Desde 29/08 a loja conecta o próprio número da Cloud API pelo popup da Meta: de lá vem um
+`code`, e este produto roda os quatro elos até o número estar registrado e o template
+criado. Está em produção (`app2037`, `ce4e2ab`).
+
+Card: [`../docs/referencia-viva/planos/2026-08-29-embedded-signup-3-cadeia-no-chatbot.md`](../docs/referencia-viva/planos/2026-08-29-embedded-signup-3-cadeia-no-chatbot.md) ·
+spec: [`../docs/referencia-viva/specs/2026-08-29-embedded-signup-tech-provider-design.md`](../docs/referencia-viva/specs/2026-08-29-embedded-signup-tech-provider-design.md).
+
+### Onde mora o quê
+
+| Coisa | Onde |
+|---|---|
+| Cliente HTTP dos quatro elos, **sem banco** | `app/meta_onboarding.py` |
+| Ordem dos elos, retomada e teto | `app/onboarding_cloud.py` |
+| Cifra Fernet do token e do PIN | `app/segredo_canal.py` |
+| Colunas novas do canal | migration `0028_canal_onboarding` |
+| Rota | `POST /v1/whatsapp/canais/cloud/onboarding`, em `app/main.py` |
+| Estado que a tela da Loja lê | `channels._canal_dict` |
+
+Os elos: **1** troca o `code` por token · **2** inscreve o app na WABA · **3** registra o
+número com o PIN · **4** cria o template. `NOME_TEMPLATE`, em `app/meta_onboarding.py`, é a
+fonte única de `chama_vendedor`.
+
+`0028` acrescenta seis colunas a `whatsapp_canais` — `business_id`, `onboarding_elo` (1 a
+5), `onboarding_erro` (texto que a tela mostra), `token_cifrado`, `pin_cifrado` e
+`registro_tentativas`. Expand-only e sem backfill: canal que não nasceu pelo embedded
+signup segue com tudo nulo, e `registro_tentativas` é NOT NULL só porque tem
+`server_default "0"`.
+
+Dois configs novos, e a diferença entre eles importa: `CHATBOT_META_APP_ID` **não é
+segredo** — vai no popup, e por isso está no `[env]` do `fly.app.toml`;
+`CHATBOT_CANAL_SECRET_KEY` é **secret**, nunca `[env]`, porque ela abre o token de WhatsApp
+de todos os clientes.
+
+### Armadilhas desta feature
+
+- **O canal nasce depois do elo 1, não no fim da cadeia.** Parece cedo demais gravar linha
+  para um onboarding que ainda pode falhar, e é de propósito: o `code` do popup vale **30
+  segundos** e não é retomável. Canal criado só no fim perderia o token numa falha do elo
+  2, e o lojista teria de abrir o popup de novo. Por isso ele já nasce com
+  `token_cifrado` — os elos seguintes decifram e continuam de onde pararam.
+- **`TETO_REGISTRO = 5`, metade do limite da Meta, e o elo 3 não tem retry automático.**
+  Estourar o limite dela devolve `133016` e deixa o número do cliente **três dias sem
+  WhatsApp**. Um retry "para ajudar" queima o orçamento de tentativas de quem já está
+  errando o PIN. Falhou, o lojista lê o erro e tenta de novo à mão.
+- **A mensagem de erro é sempre nossa, nunca o corpo da Meta.** O erro dela ecoa os
+  parâmetros enviados, e um deles é o **App Secret**. `OnboardingErro` carrega o número do
+  elo e um texto escrito por nós; a rota devolve isso como `502` com
+  `detail={"elo": N, "mensagem": ...}`.
+- **O filtro de log do elo 1 não é enfeite.** O `httpx` loga a URL inteira em INFO, e a URL
+  do elo 1 leva `client_secret` e `code` na query string — no caminho **feliz**, sem erro
+  nenhum. Hoje não aparece porque o root está em WARNING; um `--log-level debug` para
+  depurar outra coisa poria o App Secret no stdout do Fly. Por isso o módulo instala o
+  filtro durante o elo, em vez de confiar no nível de log.
+- **Sem `CHATBOT_CANAL_SECRET_KEY` nada é gravado: `segredo_canal` levanta
+  `SegredoIndisponivel`.** Fail-closed de propósito — secret esquecido tem de virar erro
+  visível, e não token de cliente em claro no banco. O que é do Revy (App Secret, verify
+  token) continua em variável de ambiente e não passa por aqui; a cifra é só para o que é
+  **da loja**.
+- **A loja sai de `ctx.loja_id`, nunca do corpo.** E a recusa de credencial de integração
+  responde **400 antes** de `_exigir_loja_operacional`: sem loja no contexto o gate
+  responderia `423` e engoliria o erro que diz o que de fato falta — a mesma armadilha (a)
+  da seção de `instance`, lá em cima.
+- **`_canal_dict` lista os campos um a um, e é isso que segura o segredo dentro.**
+  `waba_id`, `template_oferta`, `onboarding_elo` e `onboarding_erro` entraram porque a Revy
+  Loja desenha a tela lendo esse dicionário; `token_cifrado` e `pin_cifrado` ficam fora, e
+  há teste guardando. Devolver o modelo inteiro seria a forma óbvia de vazar os dois.
+- **`message_template_status_update` chega no `/webhook/cloud`, sem rota nova** — a
+  assinatura da Meta já é validada ali, e uma segunda rota teria de repetir essa validação.
+  Dois fatos que custaram pesquisa: `parse_inbound` (`app/meta_webhook.py:50`) lê **só**
+  `value.messages` e `value.statuses` e ignora o `field`, então o evento de template não
+  passa por ele; e o `waba_id` desse evento vem em **`entry[].id`**, não no `value` — o
+  `value` nem traz `metadata`. Só `APPROVED` marca o canal, e só para o template que **nós**
+  criamos: gravar um reprovado faria o primeiro envio falhar em produção.
+- **Projetar `whatsapp_modo=2` ativa o canal `cloud_pendente` da loja**
+  (`provisioning._apply_envelope`). O gancho está nos **dois** pontos que devolvem
+  `"applied"`, insert e update. O do update tem teste próprio porque o `conftest` só semeia
+  `loja`, `vendas` e `estoque`: o primeiro envelope de qualquer outro aggregate cai sempre
+  no insert, e um gancho só ali passaria despercebido.
 
 ## Rodar e testar
 
@@ -337,6 +427,9 @@ Testes que cobrem os pontos sensíveis:
   → trava. Existe porque os testes unitários passavam com o produto morto: cada função tinha
   teste chamando ela direto e ninguém percorria "chega mensagem → o rodízio começa".
 - `tests/test_cloud_retry.py` — o "processar depois" da §6.1, incluindo o teto de tentativas.
+- `tests/test_onboarding_cloud.py` + `tests/test_meta_onboarding.py` — a cadeia dos elos,
+  a retomada e o teto de registro. `tests/test_canal_nao_vaza_segredo.py` é o que impede
+  `token_cifrado`/`pin_cifrado` de voltarem para a resposta HTTP.
 
 ## Rotas do Modo 2 que o `n8n-cloud` chama
 
@@ -345,7 +438,7 @@ O agente do Modo 2 vive no `n8n/workflow-cloud.json` (gerado — ver
 
 | Rota | Papel |
 |---|---|
-| `POST /webhook/cloud` | inbound da Meta; confere assinatura no corpo cru, deduplica por `wamid`, persiste e **devolve `mensagens[]`** para o agente seguir |
+| `POST /webhook/cloud` | inbound da Meta; confere assinatura no corpo cru, deduplica por `wamid`, persiste e **devolve `mensagens[]`** para o agente seguir. Também é por onde entra o `message_template_status_update` do onboarding |
 | `GET /webhook/cloud` | verificação do webhook da Meta (`hub.challenge`) |
 | `POST /v1/operacao/responder` | saída do bot. Existe porque o token do Graph **não pode entrar no workflow** (spec §6.2) |
 | `POST /v1/operacao/handoff-humano` | 3º gatilho da §5.2. Sem CPF/nascimento de propósito — "pediu humano" pode vir antes da simulação |
