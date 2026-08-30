@@ -138,16 +138,25 @@
   function acender(ids) {
     var dentro = {};
     for (var i = 0; i < ids.length; i++) dentro[ids[i]] = true;
+    // O id de um produto vem prefixado pela VM ("app2037.chatbot-api"), mas o
+    // fluxo cita o nome cru ("chatbot-api"). Sem casar por sufixo, so as VMs
+    // acendiam e os produtos do caminho ficavam apagados.
+    function noCaminho(id) {
+      if (dentro[id]) return true;
+      var corte = id.lastIndexOf(".");
+      return corte > -1 && dentro[id.slice(corte + 1)] === true;
+    }
     // Caixa fora do fluxo nao some: apaga. Sumir tira a referencia espacial e
     // o usuario perde onde estava.
     var todas = svg.querySelectorAll("[data-navegavel]");
     for (var j = 0; j < todas.length; j++) {
-      todas[j].style.opacity = dentro[todas[j].id] ? "1" : "0.18";
+      todas[j].style.opacity = noCaminho(todas[j].id) ? "1" : "0.18";
     }
     var setas = svg.querySelectorAll("[data-aresta]");
     for (var s = 0; s < setas.length; s++) {
       var par = setas[s].getAttribute("data-aresta").split("->");
-      setas[s].style.opacity = (dentro[par[0]] && dentro[par[1]]) ? "1" : "0.12";
+      setas[s].style.opacity =
+        (noCaminho(par[0]) && noCaminho(par[1])) ? "1" : "0.12";
     }
   }
 

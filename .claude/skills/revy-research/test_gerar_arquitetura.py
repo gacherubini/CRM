@@ -452,8 +452,13 @@ class TestFluxos(unittest.TestCase):
         html = arq_render.render(arq_layout.dispor(modelo), modelo, "")
         self.assertIn("WhatsApp → simulação", html)
         self.assertIn("a parcela nao volta ao cliente pelo bot", html)
-        # a ordem dos passos e o conteudo do fluxo, nao pode sair alfabetica
-        self.assertLess(html.index("interpreta"), html.index("simula"))
+        # A ordem dos passos e conteudo do fluxo, nao pode sair alfabetica.
+        # Conferida no JSON embutido, nao no <ol>: a lista passou a ser montada
+        # no navegador, so para o fluxo escolhido — concatenar os quatro no HTML
+        # fazia cada clique mostrar os passos de todos os fluxos somados.
+        bruto = html.split("var FLUXOS = ", 1)[1].split(";</script>", 1)[0]
+        passos = json.loads(bruto.replace("\\u003c", "<"))["simular"]["passos"]
+        self.assertEqual([p["faz"] for p in passos], ["interpreta", "simula"])
 
     def test_passo_pode_citar_vm_que_nao_e_no(self):
         # evolution2037 e n8n2037 aparecem em fluxo sem serem produto.

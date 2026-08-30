@@ -45,11 +45,16 @@ LINE_STRONG = "#cdc6c4"
 BRAND = "#1f4d3a"
 
 
-def _fonte_titulo(nivel: int) -> float:
-    # O texto de um filho e desenhado nas coordenadas absolutas do pai (sem
-    # transform de escala), entao precisa encolher junto — e o que faz o
-    # texto ficar legivel exatamente quando a caixa enche a tela.
-    return max(1.5, round(26 / (nivel ** 1.35), 1))
+def _fonte_titulo(c: Caixa) -> float:
+    """Fonte proporcional a CAIXA, nunca ao nivel.
+
+    Amarrar ao nivel produzia 26 no nivel 1 — numa cena de 11 mil de largura,
+    3,6px na tela, ilegivel. O texto de um filho vive nas coordenadas absolutas
+    do pai (sem transform de escala), entao a unica referencia que faz sentido
+    e o tamanho da propria caixa: assim o titulo fica legivel exatamente quando
+    a caixa enche a tela, em qualquer profundidade.
+    """
+    return max(1.5, round(min(c.w * 0.055, c.h * 0.30), 1))
 
 
 def _marcar_spof(no: No, prefixo: str, resultado: dict[str, bool]) -> None:
@@ -108,17 +113,24 @@ def _rect_vm(c: Caixa) -> str:
 
 
 def _face(c: Caixa, spof: bool) -> str:
-    fonte_titulo = _fonte_titulo(c.nivel)
+    fonte_titulo = _fonte_titulo(c)
     fonte_sub = round(max(1.2, fonte_titulo * 0.55), 1)
-    px = c.x + max(6.0, MARGEM / c.nivel) * 0.5
-    py_titulo = c.y + max(10.0, fonte_titulo * 1.15)
+    px = c.x + fonte_titulo * 0.6
+    py_titulo = c.y + fonte_titulo * 1.25
     py_sub = py_titulo + fonte_sub * 1.7
+    # Cortar na largura da caixa: a `nota` de uma VM tem ~200 caracteres e sem
+    # isso ela sai numa linha unica atravessando a cena inteira por cima de tudo.
+    # 0.52em por caractere e a media de uma sans-serif.
+    cabe = max(0, int((c.w - fonte_titulo * 1.2) / (fonte_sub * 0.52)))
+    sub = c.subtitulo
+    if len(sub) > cabe:
+        sub = sub[:max(0, cabe - 1)] + "\u2026"
 
     partes = [
         f'<text x="{px:.2f}" y="{py_titulo:.2f}" font-size="{fonte_titulo}" '
         f'font-weight="600">{html.escape(c.titulo)}</text>',
         f'<text x="{px:.2f}" y="{py_sub:.2f}" font-size="{fonte_sub}" '
-        f'fill="{INK_SOFT}">{html.escape(c.subtitulo)}</text>',
+        f'fill="{INK_SOFT}">{html.escape(sub)}</text>',
     ]
     if spof:
         py_spof = c.y + c.h - max(8.0, fonte_sub * 1.2)
@@ -133,13 +145,19 @@ def _face(c: Caixa, spof: bool) -> str:
 
 def _item(c: Caixa) -> str:
     fonte_titulo, fonte_sub = 4.2, 3.0
+    # Mesmo corte da face: o subtitulo de um item e o `arquivo:linha`, que
+    # facilmente passa da largura da caixa.
+    cabe = max(0, int((c.w - 8) / (fonte_sub * 0.52)))
+    sub = c.subtitulo
+    if len(sub) > cabe:
+        sub = "\u2026" + sub[-max(0, cabe - 1):]   # o fim importa mais: :linha
     return (
         f'<rect x="{c.x:.2f}" y="{c.y:.2f}" width="{c.w:.2f}" height="{c.h:.2f}" '
         f'rx="2" fill="{SURFACE_SOFT}" stroke="{LINE_STRONG}" stroke-width=".3"/>'
         f'<text x="{c.x + 4:.2f}" y="{c.y + 5.5:.2f}" font-size="{fonte_titulo}">'
         f'{html.escape(c.titulo)}</text>'
         f'<text x="{c.x + 4:.2f}" y="{c.y + 9.5:.2f}" font-size="{fonte_sub}" '
-        f'fill="{INK_SOFT}">{html.escape(c.subtitulo)}</text>'
+        f'fill="{INK_SOFT}">{html.escape(sub)}</text>'
     )
 
 
@@ -216,22 +234,12 @@ def _fluxos_html(cena: Cena, modelo: Modelo) -> str:
         }
     json_fluxos = (json.dumps(dados, ensure_ascii=False, sort_keys=True)
                    .replace("<", "\\u003c"))
-    passos_html = "".join(
-        f'<li>{_e(p.faz)} — <b>{_e(p.no)}</b>'
-        f'{"" if p.sincrono else " <i>(fila)</i>"}</li>'
-        for f in modelo.fluxos for p in f.passos)
-    invariantes = "".join(f'<p class="inv">{_e(f.invariante)}</p>'
-                          for f in modelo.fluxos if f.invariante)
-    # A lista de passos vem ANTES dos botoes no HTML (mesmo escondida por
-    # `hidden`): o titulo de um fluxo pode conter o mesmo radical de um
-    # passo (ex.: botao "...simulação" e passo "simula"), e colocar os
-    # botoes primeiro faria o texto do botao aparecer no HTML antes do
-    # passo correspondente — quebrando qualquer verificacao de ordem que
-    # procure pela primeira ocorrencia de cada palavra no documento.
+    # A lista e o invariante sao montados no navegador a partir do FLUXOS,
+    # so para o fluxo escolhido. Concatenar os quatro no HTML fazia cada
+    # clique mostrar os passos de todos os fluxos somados.
     return (f'<div id="fluxos"><b>Fluxos</b> '
-            f'<ol id="passos" hidden>{passos_html}</ol>'
             f'{"".join(botoes)}<button data-fluxo="">limpar</button>'
-            f'{invariantes}</div>'
+            f'<ol id="passos" hidden></ol><p id="inv" hidden></p></div>'
             f'<script>var FLUXOS = {json_fluxos};</script>')
 
 
@@ -272,6 +280,7 @@ def render(cena: Cena, modelo: Modelo, js: str) -> str:
     border-radius:4px;background:{SURFACE_SOFT};color:{INK};cursor:pointer;padding:3px 7px}}
   #fluxos button:hover{{background:{LINE}}}
   #passos{{margin:6px 0 0;padding-left:18px}}
+  #inv{{margin:6px 0 0;font-style:italic}}
   #passos li{{margin:2px 0}}
   #fluxos p.inv{{margin:6px 0 0;color:{INK_SOFT};font-style:italic}}
   [data-k-min],[data-face-ate]{{transition:opacity .1s linear}}
@@ -300,9 +309,21 @@ def render(cena: Cena, modelo: Modelo, js: str) -> str:
     elFluxos.addEventListener("click", function (ev) {{
       var chave = ev.target.getAttribute("data-fluxo");
       if (chave === null) return;
-      if (!chave) {{ Zoom.apagar(); document.getElementById("passos").hidden = true; return; }}
-      Zoom.acender(FLUXOS[chave].passos.map(function (p) {{ return p.no; }}));
-      document.getElementById("passos").hidden = false;
+      var ol = document.getElementById("passos"), inv = document.getElementById("inv");
+      if (!chave) {{
+        Zoom.apagar(); ol.hidden = true; inv.hidden = true; return;
+      }}
+      var f = FLUXOS[chave];
+      Zoom.acender(f.passos.map(function (p) {{ return p.no; }}));
+      ol.textContent = "";
+      f.passos.forEach(function (p) {{
+        var li = document.createElement("li");
+        li.textContent = p.faz + " \u2014 " + p.no + (p.sincrono ? "" : " (fila)");
+        ol.appendChild(li);
+      }});
+      ol.hidden = false;
+      inv.textContent = f.invariante || "";
+      inv.hidden = !f.invariante;
     }});
   }}
 </script>
