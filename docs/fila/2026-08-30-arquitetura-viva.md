@@ -725,20 +725,46 @@ git commit -m "feat(arquitetura): a camada de intencao, com as decisoes ancorada
 
 ---
 
-### Task 4: `arq_layout.py` — posições determinísticas
+### Task 4: `arq_layout.py` — layout recursivo com limiares derivados
+
+**Reescrita em 30/08.** A versão anterior tinha dois níveis fixos e `K_MIN` constante.
+O protótipo no navegador provou os dois errados. Leia o §5 e o §6 do spec antes.
 
 **Files:**
 - Create: `.claude/skills/revy-research/arq_layout.py`
 - Modify: `.claude/skills/revy-research/test_gerar_arquitetura.py`
 
 **Interfaces:**
-- Consumes: `arq_modelo.Modelo`.
-- Produces: dataclasses congeladas `Caixa(chave, tipo, titulo, x, y, w, h, pai, nivel,
-  k_min)` e `Cena(caixas, largura, altura)`; `dispor(modelo: Modelo) -> Cena`.
-  `tipo` é um de `"vm" | "no" | "secao" | "item"`. `nivel` é 1, 2 ou 3.
-  Task 5 (`render`) consome `Cena`.
+- Consumes: `arq_modelo.Modelo`, `arq_modelo.No` (recursivo: `No.filhos: tuple[No, ...]`,
+  `No.entradas: tuple[Entrada, ...]`).
+- Produces:
+  `Caixa(chave, tipo, titulo, subtitulo, x, y, w, h, pai, nivel, k_min, k_face)` congelada;
+  `Cena(caixas, largura, altura)` congelada;
+  `dispor(modelo: Modelo) -> Cena`.
+  `tipo` e um de `"vm" | "no" | "item"`. `nivel` e a profundidade (1 = raiz).
 
-- [ ] **Step 1: Escrever o teste que falha**
+**As duas regras que o protótipo cobrou:**
+
+1. **Recursão.** `_dispor_no(no, x, y, nivel)` desenha o nó e chama a si mesma para
+   cada `no.filhos`, posicionando o filho DENTRO da caixa do pai. A profundidade vem
+   do modelo, não de constante. As `no.entradas` (frescor) viram caixas `item` no fundo
+   do nó, depois dos filhos.
+2. **Limiar derivado, nunca constante.** Depois de conhecer `largura_total`, um segundo
+   passe define, para cada caixa que tem pai:
+   `k_min = k_face = 0.6 * (largura_total / largura_do_pai)`.
+   `k_min` é onde o interior da caixa ENTRA; `k_face` é onde a face do PAI SAI — são o
+   mesmo número de propósito: a troca acontece no mesmo intervalo. Caixas de nível 1
+   ficam com `k_min = 0.0`. Use `dataclasses.replace` (a `Caixa` é congelada).
+   Sem isso, uma caixa que só chega a `k=2.27` ao ser clicada, com limiar 3, fica
+   invisível para sempre — você entra e não vê nada. Foi o bug real, achado no navegador.
+
+**Constantes:** `MARGEM = 24.0`, `ALTURA_TITULO = 34.0`, `ITEM_H = 13.0`,
+`ITEM_W = 190.0`. Grade quadrada (`ceil(sqrt(n))` colunas) para o zoom não virar corredor.
+
+**Determinismo:** ordene tudo por chave; nada de `set` iterado sem `sorted()`, nada de
+força dirigida. O HTML é commitado, então posição instável vira ruído no diff.
+
+- [ ] **Step 1: Escrever os testes que falham**
 
 ```python
 import arq_layout
@@ -747,54 +773,48 @@ import arq_layout
 class TestLayout(unittest.TestCase):
     def _modelo(self):
         raiz = varredura.raiz_repo()
-        return arq_modelo.carregar(
-            raiz, FRESCOR_FALSO, NOS_FALSOS, (),
-            {"app2037": {"contem": ["chatbot-api"]}}, {})
+        frescor = {"sha": "a", "inventario": {"chatbot-api": [
+            {"secao": "worker", "chave": "FollowupWorker", "simbolo": "F",
+             "arquivo": "app/followup_job.py", "linha": 64}]}}
+        nos = {"chatbot-api": {"titulo": "Chatbot", "papel": "conversa", "dentro": {
+            "canais": {"titulo": "Canais", "papel": "entrada", "dentro": {
+                "loja-a": {"titulo": "WhatsApp loja A", "papel": "canal"}}}}}}
+        return arq_modelo.carregar(raiz, frescor, nos)
 
     def test_e_deterministico_byte_a_byte(self):
-        a = arq_layout.dispor(self._modelo())
-        b = arq_layout.dispor(self._modelo())
-        self.assertEqual(a, b)
+        self.assertEqual(arq_layout.dispor(self._modelo()),
+                         arq_layout.dispor(self._modelo()))
 
-    def test_o_no_cabe_dentro_da_vm_que_o_contem(self):
+    def test_desce_ate_o_neto(self):
+        niveis = {c.nivel for c in arq_layout.dispor(self._modelo()).caixas}
+        self.assertIn(3, niveis, "o neto (loja-a) nao virou caixa")
+
+    def test_filho_cabe_dentro_do_pai_em_todo_nivel(self):
         cena = arq_layout.dispor(self._modelo())
         por_chave = {c.chave: c for c in cena.caixas}
-        vm, no = por_chave["app2037"], por_chave["chatbot-api"]
-        self.assertGreaterEqual(no.x, vm.x)
-        self.assertGreaterEqual(no.y, vm.y)
-        self.assertLessEqual(no.x + no.w, vm.x + vm.w)
-        self.assertLessEqual(no.y + no.h, vm.y + vm.h)
+        for c in cena.caixas:
+            if not c.pai or c.pai not in por_chave:
+                continue
+            p = por_chave[c.pai]
+            self.assertGreaterEqual(c.x, p.x, c.chave)
+            self.assertGreaterEqual(c.y, p.y, c.chave)
+            self.assertLessEqual(c.x + c.w, p.x + p.w + 0.01, c.chave)
+            self.assertLessEqual(c.y + c.h, p.y + p.h + 0.01, c.chave)
 
-    def test_caixas_irmas_nao_se_sobrepoem(self):
+    def test_o_limiar_e_alcancavel_clicando_no_pai(self):
+        # O bug real: k_min acima do k que clicar no pai atinge deixa o
+        # interior invisivel para sempre.
         cena = arq_layout.dispor(self._modelo())
-        for nivel in (1, 2, 3):
-            irmas = [c for c in cena.caixas if c.nivel == nivel]
-            for i, a in enumerate(irmas):
-                for b in irmas[i + 1:]:
-                    if a.pai != b.pai:
-                        continue
-                    separadas = (a.x + a.w <= b.x or b.x + b.w <= a.x
-                                 or a.y + a.h <= b.y or b.y + b.h <= a.y)
-                    self.assertTrue(separadas, f"{a.chave} colide com {b.chave}")
+        por_chave = {c.chave: c for c in cena.caixas}
+        for c in cena.caixas:
+            if not c.pai or c.pai not in por_chave:
+                continue
+            k_do_pai_cheio = cena.largura / por_chave[c.pai].w
+            self.assertLess(c.k_min, k_do_pai_cheio, f"{c.chave} nunca acende")
 
-    def test_id_de_item_e_unico(self):
-        # Duas entradas com a MESMA secao e chave, em arquivos diferentes.
-        raiz = varredura.raiz_repo()
-        frescor = {"sha": "a", "inventario": {"chatbot-api": [
-            {"secao": "rota", "chave": "GET /x", "simbolo": "/x",
-             "arquivo": "app/a.py", "linha": 1},
-            {"secao": "rota", "chave": "GET /x", "simbolo": "/x",
-             "arquivo": "app/b.py", "linha": 2}]}}
-        modelo = arq_modelo.carregar(raiz, frescor, NOS_FALSOS)
-        chaves = [c.chave for c in arq_layout.dispor(modelo).caixas]
+    def test_id_de_caixa_e_unico(self):
+        chaves = [c.chave for c in arq_layout.dispor(self._modelo()).caixas]
         self.assertEqual(len(chaves), len(set(chaves)))
-
-    def test_toda_entrada_do_modelo_virou_caixa(self):
-        modelo = self._modelo()
-        cena = arq_layout.dispor(modelo)
-        itens = [c for c in cena.caixas if c.tipo == "item"]
-        esperado = sum(len(n.entradas) for n in modelo.nos)
-        self.assertEqual(len(itens), esperado)
 ```
 
 - [ ] **Step 2: Rodar e ver falhar**
@@ -804,162 +824,69 @@ cd .claude/skills/revy-research && python3 -m unittest test_gerar_arquitetura -v
 ```
 Esperado: `ModuleNotFoundError: No module named 'arq_layout'`.
 
-- [ ] **Step 3: Escrever `arq_layout.py`**
+- [ ] **Step 3: Escrever `arq_layout.py`** conforme as regras acima.
 
-Empacotamento em grade aninhada. **Nada de força dirigida** — posição diferente a cada
-execução faz o diff do HTML commitado virar ruído puro.
+- [ ] **Step 4: Rodar e ver passar** (mesmo comando; todos verdes).
 
-```python
-"""Modelo -> Cena. Puro, sem I/O, deterministico. Stdlib apenas.
-
-Grade aninhada, nunca forca dirigida: o HTML e commitado, entao posicao
-instavel transforma o diff do git em ruido.
-"""
-from __future__ import annotations
-
-import math
-from dataclasses import dataclass
-
-from arq_modelo import Modelo
-
-MARGEM = 24.0
-ALTURA_TITULO = 34.0
-ITEM_H = 13.0
-ITEM_W = 190.0
-
-# Escala em que cada nivel fica legivel. arq_zoom.js le isso como data-k-min.
-K_MIN = {1: 0.0, 2: 2.5, 3: 7.0}
-
-
-@dataclass(frozen=True)
-class Caixa:
-    chave: str
-    tipo: str          # "vm" | "no" | "secao" | "item"
-    titulo: str
-    x: float
-    y: float
-    w: float
-    h: float
-    pai: str | None
-    nivel: int
-    k_min: float
-
-
-@dataclass(frozen=True)
-class Cena:
-    caixas: tuple[Caixa, ...]
-    largura: float
-    altura: float
-
-
-def _grade(n: int) -> int:
-    """Colunas para n filhos. Quadrada, para o zoom nao virar corredor."""
-    return max(1, math.ceil(math.sqrt(n))) if n else 1
-
-
-def _dispor_no(no, x: float, y: float) -> tuple[list, float, float]:
-    """Um produto e seu interior. Devolve (caixas, largura, altura)."""
-    caixas = []
-    secoes: dict[str, list] = {}
-    for e in no.entradas:                     # ja vem ordenado do modelo
-        secoes.setdefault(e.secao, []).append(e)
-
-    cx, cy, larg_max = x + MARGEM, y + ALTURA_TITULO, 0.0
-    for secao in sorted(secoes):
-        itens = secoes[secao]
-        h_secao = ALTURA_TITULO + len(itens) * ITEM_H + MARGEM
-        caixas.append(Caixa(f"{no.chave}::{secao}", "secao", secao,
-                            cx, cy, ITEM_W + MARGEM, h_secao,
-                            no.chave, 2, K_MIN[2]))
-        iy = cy + ALTURA_TITULO
-        for i, e in enumerate(itens):
-            # O indice entra no id porque duas entradas podem ter a mesma secao
-            # e a mesma chave em arquivos diferentes; id duplicado faz o
-            # getElementById devolver a primeira e o zoom voar para a caixa errada.
-            caixas.append(Caixa(
-                f"{no.chave}::{secao}::{i}", "item", e.chave,
-                cx + MARGEM / 2, iy, ITEM_W, ITEM_H,
-                f"{no.chave}::{secao}", 3, K_MIN[3]))
-            iy += ITEM_H
-        larg_max = max(larg_max, ITEM_W + MARGEM * 2)
-        cy += h_secao + MARGEM / 2
-
-    w = larg_max + MARGEM * 2
-    h = max(cy - y + MARGEM, ALTURA_TITULO + MARGEM * 2)
-    caixas.insert(0, Caixa(no.chave, "no", no.titulo, x, y, w, h,
-                           no.vm, 1, K_MIN[1]))
-    return caixas, w, h
-
-
-def dispor(modelo: Modelo) -> Cena:
-    por_chave = {n.chave: n for n in modelo.nos}
-    dentro_de_vm = {c for v in modelo.vms for c in v.contem}
-    soltos = [n for n in modelo.nos if n.chave not in dentro_de_vm]
-
-    caixas: list[Caixa] = []
-    cursor_y, largura_total = MARGEM, 0.0
-
-    grupos = [(v.chave, v.tipo, [por_chave[c] for c in v.contem if c in por_chave])
-              for v in modelo.vms]
-    grupos += [(n.chave, "solto", [n]) for n in soltos]
-
-    for chave, _tipo, filhos in grupos:
-        cols = _grade(len(filhos))
-        x0, y0 = MARGEM * 2, cursor_y + ALTURA_TITULO
-        cx, cy, alt_linha, larg_grupo = x0, y0, 0.0, 0.0
-        for i, no in enumerate(filhos):
-            filhas, w, h = _dispor_no(no, cx, cy)
-            caixas.extend(filhas)
-            alt_linha = max(alt_linha, h)
-            cx += w + MARGEM
-            larg_grupo = max(larg_grupo, cx - x0)
-            if (i + 1) % cols == 0:
-                cx, cy = x0, cy + alt_linha + MARGEM
-                alt_linha = 0.0
-        altura_grupo = (cy + alt_linha + MARGEM) - cursor_y
-
-        e_vm = any(v.chave == chave for v in modelo.vms)
-        if e_vm:
-            caixas.append(Caixa(chave, "vm", chave, MARGEM, cursor_y,
-                                larg_grupo + MARGEM * 3, altura_grupo,
-                                None, 1, K_MIN[1]))
-        largura_total = max(largura_total, larg_grupo + MARGEM * 4)
-        cursor_y += altura_grupo + MARGEM * 2
-
-    caixas.sort(key=lambda c: (c.nivel, c.chave))   # ordem estavel na saida
-    return Cena(tuple(caixas), largura_total + MARGEM, cursor_y + MARGEM)
-```
-
-- [ ] **Step 4: Rodar e ver passar**
-
-```
-cd .claude/skills/revy-research && python3 -m unittest test_gerar_arquitetura -v
-```
-Esperado: 13 testes, OK.
-
-- [ ] **Step 5: Commitar**
-
-```bash
-git add .claude/skills/revy-research/arq_layout.py \
-        .claude/skills/revy-research/test_gerar_arquitetura.py
-git commit -m "feat(arquitetura): layout em grade aninhada, deterministico byte a byte"
-```
+- [ ] **Step 5: Commitar** com a mensagem
+`feat(arquitetura): layout recursivo, com o limiar saindo do layout`.
+Adicione nominalmente só `arq_layout.py` e `test_gerar_arquitetura.py`.
 
 ---
 
-### Task 5: `arq_render.py` — SVG auto-contido com o zoom embutido
+### Task 5: `arq_render.py` — o HTML, com o demo como alvo
+
+**Reescrita em 30/08.** Existe um alvo visual já aprovado no navegador:
+`.claude/skills/revy-research/arq_zoom_demo.html`. **Leia esse arquivo primeiro.** Ele é
+o critério de aceite: o seu `render()` tem que produzir um HTML com a MESMA estrutura,
+só que gerado a partir da `Cena` em vez de escrito à mão.
 
 **Files:**
 - Create: `.claude/skills/revy-research/arq_render.py`
 - Modify: `.claude/skills/revy-research/test_gerar_arquitetura.py`
 
 **Interfaces:**
-- Consumes: `arq_layout.Cena`, `arq_modelo.Modelo`, e o texto de `arq_zoom.js` (Task 1).
+- Consumes: `arq_layout.Cena`, `arq_layout.Caixa`, `arq_modelo.Modelo`, e o texto de
+  `arq_zoom.js`.
 - Produces: `render(cena: Cena, modelo: Modelo, js: str) -> str`.
-  Emite os atributos que `arq_zoom.js` espera: `id`, `data-navegavel`, `data-titulo`,
-  `data-pai`, `data-k-min`. Task 6 consome `render`.
 
-- [ ] **Step 1: Escrever o teste que falha**
+**O contrato de atributos** que `arq_zoom.js` já lê (não invente outros):
+`id`, `data-navegavel`, `data-titulo`, `data-k-min` (o interior ENTRA),
+`data-face-ate` (a face do pai SAI), `data-aresta="de->para"`.
+
+**A estrutura de cada caixa**, igual à do demo:
+
+```
+<g id="..." data-titulo="..." data-navegavel>
+  <rect .../>
+  <g data-face-ate="{c.k_face}">     titulo grande + subtitulo. SOME ao entrar.
+  <g data-k-min="{c.k_min}">         os filhos e os itens. APARECEM ao entrar.
+</g>
+```
+
+Emita `data-k-min` / `data-face-ate` **apenas quando o valor for > 0**. Nível 1 é sempre
+visível, e se uma caixa navegável carregasse `data-k-min`, o `aplicarLod` (que escreve
+opacity a cada quadro) brigaria com o `Zoom.acender` da Task 7 e o fluxo piscaria.
+
+**Tamanho de fonte por nível:** o texto de um filho é desenhado nas coordenadas do pai,
+então precisa encolher junto — use `fonte = 26 / (nivel ** 1.35)`, uma casa decimal, piso
+de 1.5. É o que faz o texto ficar legível exatamente quando a caixa enche a tela. Confira
+contra o demo, que usa 30 / 6.5 / 2.4 em três níveis.
+
+**Cores:** de `shared/brand/revy-tokens.css`. Não invente paleta — o learning
+`2026-08-23-tokens-de-marca-tem-fonte-unica.md` existe por isso.
+`paper #f9f9f9`, `surface #ffffff`, `surface-soft #efeceb`, `ink #1b1b1b`,
+`ink-soft #57514f`, `line #ded8d9`, `line-strong #cdc6c4`, `brand #1f4d3a`.
+
+**SPOF** = `stroke-width` grosso na caixa. **Aresta assíncrona** = `stroke-dasharray`.
+**Sem retry** = o rótulo `"· sem retry"` no meio da linha. Tudo com legenda na página,
+como no demo.
+
+**Escape:** todo texto por `html.escape`, e o JSON embutido com
+`.replace("<", "\\u003c")` — `json.dumps` não escapa, e uma chave contendo `</script>`
+sairia crua dentro do `<script>`.
+
+- [ ] **Step 1: Escrever os testes que falham**
 
 ```python
 import re
@@ -970,45 +897,49 @@ import arq_render
 class TestRender(unittest.TestCase):
     def _html(self):
         raiz = varredura.raiz_repo()
-        modelo = arq_modelo.carregar(
-            raiz, FRESCOR_FALSO, NOS_FALSOS, (),
-            {"app2037": {"contem": ["chatbot-api"]}}, {})
-        cena = arq_layout.dispor(modelo)
-        return arq_render.render(cena, modelo, "/* js */")
+        frescor = {"sha": "a", "inventario": {"chatbot-api": [
+            {"secao": "worker", "chave": "FollowupWorker", "simbolo": "F",
+             "arquivo": "app/followup_job.py", "linha": 64}]}}
+        nos = {"chatbot-api": {"titulo": "Chatbot", "papel": "conversa", "dentro": {
+            "canais": {"titulo": "Canais", "papel": "entrada"}}}}
+        modelo = arq_modelo.carregar(raiz, frescor, nos)
+        return arq_render.render(arq_layout.dispor(modelo), modelo, "/* js */")
 
     def test_e_auto_contido_sem_nenhuma_url_externa(self):
-        # file:// bloqueia fetch e a pagina tem que abrir sem internet.
         sem_comentario = re.sub(r"<!--.*?-->", "", self._html(), flags=re.S)
         self.assertNotIn("http://", sem_comentario)
         self.assertNotIn("https://", sem_comentario)
 
-    def test_toda_entrada_aparece_com_arquivo_e_linha(self):
-        # O par inteiro: "64" sozinho casaria com qualquer coordenada do SVG.
-        self.assertIn("app/followup_job.py:64", self._html())
-
-    def test_emite_os_atributos_que_o_zoom_espera(self):
+    def test_emite_as_duas_rampas(self):
         html = self._html()
-        self.assertIn('data-navegavel', html)
-        self.assertIn('data-titulo=', html)
-        self.assertIn('data-k-min=', html)
+        self.assertIn("data-k-min=", html)
+        self.assertIn("data-face-ate=", html)
+
+    def test_caixa_navegavel_nao_carrega_data_k_min(self):
+        # Senao o aplicarLod briga com o Zoom.acender e o fluxo pisca.
+        for grupo in re.findall(r"<g [^>]*>", self._html()):
+            if "data-navegavel" in grupo:
+                self.assertNotIn("data-k-min", grupo, grupo)
+
+    def test_o_arquivo_e_linha_chega_no_html(self):
+        self.assertIn("app/followup_job.py:64", self._html())
 
     def test_escapa_o_que_viria_a_ser_markup(self):
         raiz = varredura.raiz_repo()
         frescor = {"sha": "a", "inventario": {"chatbot-api": [
             {"secao": "rota", "chave": "GET /a<b>&c", "simbolo": "x",
              "arquivo": "app/main.py", "linha": 1}]}}
-        modelo = arq_modelo.carregar(raiz, frescor, NOS_FALSOS)
+        nos = {"chatbot-api": {"titulo": "C", "papel": "x"}}
+        modelo = arq_modelo.carregar(raiz, frescor, nos)
         html = arq_render.render(arq_layout.dispor(modelo), modelo, "")
         self.assertNotIn("<b>", html)
-        self.assertIn("&lt;b&gt;", html)
 
     def test_o_js_entra_inteiro(self):
         self.assertIn("/* js */", self._html())
 
     def test_aresta_assincrona_sai_tracejada_e_marca_falta_de_retry(self):
         raiz = varredura.raiz_repo()
-        frescor = {"sha": "a", "inventario": {"chatbot-api": [],
-                                              "estoque-api": []}}
+        frescor = {"sha": "a", "inventario": {"chatbot-api": [], "estoque-api": []}}
         nos = {"chatbot-api": {"titulo": "A", "papel": "x"},
                "estoque-api": {"titulo": "B", "papel": "y"}}
         arestas = [{"de": "chatbot-api", "para": "estoque-api",
@@ -1017,164 +948,17 @@ class TestRender(unittest.TestCase):
         html = arq_render.render(arq_layout.dispor(modelo), modelo, "")
         self.assertIn("stroke-dasharray", html)
         self.assertIn("sem retry", html)
-        self.assertIn("marker-end", html)
 ```
 
-- [ ] **Step 2: Rodar e ver falhar**
+- [ ] **Step 2: Rodar e ver falhar** (`ModuleNotFoundError: arq_render`).
 
-```
-cd .claude/skills/revy-research && python3 -m unittest test_gerar_arquitetura -v
-```
-Esperado: `ModuleNotFoundError: No module named 'arq_render'`.
+- [ ] **Step 3: Escrever `arq_render.py`** conforme as regras e o demo.
 
-- [ ] **Step 3: Escrever `arq_render.py`**
+- [ ] **Step 4: Rodar e ver passar.**
 
-Tokens de `shared/brand/revy-tokens.css` (o learning
-`2026-08-23-tokens-de-marca-tem-fonte-unica.md` existe por um motivo). Copie os valores
-de lá; não invente paleta.
-
-```python
-"""Cena -> HTML auto-contido. Stdlib apenas.
-
-Nenhuma URL externa: file:// bloqueia fetch, e a pagina tem que abrir
-sem internet. Por isso o JS e o dado vao embutidos.
-"""
-from __future__ import annotations
-
-import html as _html
-import json
-
-from arq_layout import Cena
-from arq_modelo import Modelo
-
-# Copiados de shared/brand/revy-tokens.css — fonte unica de marca.
-COR = {
-    "paper": "#f9f9f9", "surface": "#ffffff", "surface_soft": "#efeceb",
-    "ink": "#1b1b1b", "ink_soft": "#57514f", "line": "#ded8d9",
-    "line_strong": "#cdc6c4", "brand": "#1f4d3a", "brand_deep": "#0f2b20",
-}
-
-
-def _e(texto) -> str:
-    return _html.escape(str(texto), quote=True)
-
-
-def _caixa_svg(c, spofs: set) -> str:
-    fill = {"vm": "none", "no": COR["surface"],
-            "secao": COR["surface_soft"], "item": "none"}[c.tipo]
-    stroke = {"vm": COR["brand"], "no": COR["line_strong"],
-              "secao": COR["line"], "item": "none"}[c.tipo]
-    tracejado = ' stroke-dasharray="6 5"' if c.tipo == "vm" else ""
-    # SPOF = borda grossa. Esta na legenda, entao tem que existir no desenho.
-    grossura = ' stroke-width="3"' if c.chave in spofs else ""
-    navegavel = ' data-navegavel="1"' if c.tipo in ("vm", "no") else ""
-    # data-k-min SO onde ele faz algo. O nivel 1 e sempre visivel, e se a caixa
-    # navegavel carregasse o atributo, o aplicarLod (que escreve opacity a cada
-    # quadro) brigaria com o Zoom.acender da Task 7 e o fluxo piscaria.
-    lod = f' data-k-min="{c.k_min}"' if c.k_min > 0 else ""
-    fonte = {"vm": 22, "no": 15, "secao": 9, "item": 6}[c.tipo]
-    return (
-        f'<g id="{_e(c.chave)}" data-titulo="{_e(c.titulo)}"'
-        f'{" data-pai=" + chr(34) + _e(c.pai) + chr(34) if c.pai else ""}'
-        f'{navegavel}{lod}>'
-        f'<rect x="{c.x:.1f}" y="{c.y:.1f}" width="{c.w:.1f}" height="{c.h:.1f}"'
-        f' rx="4" fill="{fill}" stroke="{stroke}"{tracejado}{grossura}/>'
-        f'<text x="{c.x + 8:.1f}" y="{c.y + fonte + 4:.1f}" font-size="{fonte}"'
-        f' fill="{COR["ink"]}">{_e(c.titulo)}</text>'
-        f'</g>'
-    )
-
-
-def _arestas_svg(cena: Cena, modelo: Modelo) -> str:
-    """Setas entre produtos. Tracejado = assincrono; ponta vazada = sem retry."""
-    centro = {c.chave: (c.x + c.w / 2, c.y + c.h / 2)
-              for c in cena.caixas if c.tipo == "no"}
-    partes = ['<defs><marker id="ponta" viewBox="0 0 10 10" refX="9" refY="5"'
-              ' markerWidth="6" markerHeight="6" orient="auto-start-reverse">'
-              f'<path d="M0,0 L10,5 L0,10 z" fill="{COR["brand"]}"/>'
-              '</marker></defs>']
-    for a in modelo.arestas:
-        if a.de not in centro or a.para not in centro:
-            continue
-        x1, y1 = centro[a.de]
-        x2, y2 = centro[a.para]
-        traco = "" if a.sincrono else ' stroke-dasharray="7 5"'
-        largura = 1.5 if a.retry else 2.5
-        partes.append(
-            f'<g data-aresta="{_e(a.de)}->{_e(a.para)}">'
-            f'<line x1="{x1:.1f}" y1="{y1:.1f}" x2="{x2:.1f}" y2="{y2:.1f}"'
-            f' stroke="{COR["brand"]}" stroke-width="{largura}"{traco}'
-            f' marker-end="url(#ponta)"/>'
-            f'<text x="{(x1 + x2) / 2:.1f}" y="{(y1 + y2) / 2 - 4:.1f}"'
-            f' font-size="9" text-anchor="middle" fill="{COR["ink_soft"]}">'
-            f'{_e(a.protocolo)}{"" if a.retry else " · sem retry"}</text></g>')
-    return "".join(partes)
-
-
-def render(cena: Cena, modelo: Modelo, js: str) -> str:
-    # Indice consultado pelo painel lateral: chave -> arquivo:linha, decisoes.
-    indice = {}
-    for no in modelo.nos:
-        indice[no.chave] = {
-            "papel": no.papel, "spof": no.spof, "porque": no.spof_porque,
-            "decisoes": list(no.decisoes),
-            "itens": [{"chave": e.chave, "onde": f"{e.arquivo}:{e.linha}"}
-                      for e in no.entradas],
-        }
-    spofs = {n.chave for n in modelo.nos if n.spof}
-    corpo = ("".join(_caixa_svg(c, spofs) for c in cena.caixas)
-             + _arestas_svg(cena, modelo))
-    # `<` escapado: json.dumps nao escapa, e uma chave com "</script>" ou
-    # "<b>" sairia crua dentro do <script>. E o que o teste de escape cobra.
-    dados = (json.dumps(indice, ensure_ascii=False, sort_keys=True)
-             .replace("<", "\\u003c"))
-    return f"""<!doctype html>
-<meta charset="utf-8">
-<title>Arquitetura da Revy</title>
-<!-- GERADO por gerar_arquitetura.py. Nao editar a mao. sha={_e(modelo.sha)} -->
-<style>
-html,body{{margin:0;height:100%;background:{COR['paper']};
-  font-family:system-ui,-apple-system,sans-serif;color:{COR['ink']}}}
-svg{{width:100vw;height:100vh;display:block;cursor:grab;touch-action:none}}
-#trilha{{position:fixed;top:12px;left:12px;background:{COR['surface']};
-  padding:6px 12px;border:1px solid {COR['line']};border-radius:6px;font-size:13px}}
-#legenda{{position:fixed;bottom:12px;left:12px;background:{COR['surface']};
-  padding:8px 12px;border:1px solid {COR['line']};border-radius:6px;
-  font-size:11px;color:{COR['ink_soft']};line-height:1.7}}
-[data-k-min]{{transition:opacity .12s linear}}
-</style>
-<div id="trilha">Revy</div>
-<div id="legenda">
-  tracejado = VM &nbsp;·&nbsp; borda grossa = SPOF &nbsp;·&nbsp;
-  clique entra &nbsp;·&nbsp; <b>Esc</b> volta &nbsp;·&nbsp; roda dá zoom
-</div>
-<svg id="mapa" viewBox="0 0 {cena.largura:.0f} {cena.altura:.0f}">{corpo}</svg>
-<script>var INDICE = {dados};</script>
-<script>{js}</script>
-<script>
-var svg = document.getElementById("mapa");
-svg.addEventListener("zoom:mudou", function (ev) {{
-  document.getElementById("trilha").textContent = ev.detail.titulo || "Revy";
-}});
-Zoom.init(svg, {{}});
-</script>
-"""
-```
-
-- [ ] **Step 4: Rodar e ver passar**
-
-```
-cd .claude/skills/revy-research && python3 -m unittest test_gerar_arquitetura -v
-```
-Esperado: 18 testes, OK.
-
-- [ ] **Step 5: Commitar**
-
-```bash
-git add .claude/skills/revy-research/arq_render.py \
-        .claude/skills/revy-research/test_gerar_arquitetura.py
-git commit -m "feat(arquitetura): render auto-contido, sem CDN e sem markup vazado"
-```
+- [ ] **Step 5: Commitar** com a mensagem
+`feat(arquitetura): o HTML, com as duas rampas e o demo como alvo`.
+Adicione nominalmente só `arq_render.py` e `test_gerar_arquitetura.py`.
 
 ---
 
