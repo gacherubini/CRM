@@ -150,7 +150,9 @@ def _item(c: Caixa) -> str:
     cabe = max(0, int((c.w - 8) / (fonte_sub * 0.52)))
     sub = c.subtitulo
     if len(sub) > cabe:
-        sub = "\u2026" + sub[-max(0, cabe - 1):]   # o fim importa mais: :linha
+        # `sub[-0:]` devolve a string INTEIRA, nao vazia — sem esta guarda,
+        # cabe==0 produzia "…" + texto completo, pior que nao truncar.
+        sub = "\u2026" + sub[len(sub) - cabe + 1:] if cabe > 1 else "\u2026"
     return (
         f'<rect x="{c.x:.2f}" y="{c.y:.2f}" width="{c.w:.2f}" height="{c.h:.2f}" '
         f'rx="2" fill="{SURFACE_SOFT}" stroke="{LINE_STRONG}" stroke-width=".3"/>'

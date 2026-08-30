@@ -415,6 +415,17 @@ class TestRender(unittest.TestCase):
         html = arq_render.render(arq_layout.dispor(modelo), modelo, "")
         self.assertNotIn("<b>", html)
 
+    def test_subtitulo_truncado_nunca_fica_maior_que_o_original(self):
+        # `sub[-0:]` devolve a string inteira, nao vazia: sem guarda, uma caixa
+        # estreita produzia "…" + texto completo — pior que nao truncar.
+        import arq_layout as _al
+        estreita = _al.Caixa(chave="x", tipo="item", titulo="t",
+                             subtitulo="app/um/caminho/bem/longo.py:1234",
+                             x=0, y=0, w=6, h=13, pai="p", nivel=3,
+                             k_min=2.0, k_face=2.0)
+        saida = arq_render._item(estreita)
+        self.assertNotIn("app/um/caminho/bem/longo.py:1234", saida)
+
     def test_o_js_entra_inteiro(self):
         self.assertIn("/* js */", self._html())
 

@@ -10,7 +10,7 @@ no frescor. A validacao de `decisoes/` vale em qualquer profundidade.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass, field, replace
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 from varredura import Entrada
@@ -215,7 +215,10 @@ def _pilha_auto(entradas: list, nivel: int, chave_prefixo: str) -> list:
     filhos = []
     for seg in sorted(grupos):
         grupo = grupos[seg]
-        chave = f"{chave_prefixo}.{seg}"
+        # Sem prefixo vazio virando ".seg": o caminho do pai e
+        # concatenado pelo arq_layout, entao repetir a chave do produto
+        # aqui inflava todo id com o nome do produto duas vezes.
+        chave = f"{chave_prefixo}.{seg}" if chave_prefixo else seg
         termina_todas = all(
             nivel >= len(e.arquivo.split("/")) - 1 for e in grupo
         )
@@ -244,7 +247,7 @@ def _com_auto(no: No) -> No:
     filhos = tuple(_com_auto(f) for f in no.filhos)
     if no.modulo or not no.entradas:
         return replace(no, filhos=filhos)
-    auto_filhos = tuple(_pilha_auto(list(no.entradas), 0, no.chave))
+    auto_filhos = tuple(_pilha_auto(list(no.entradas), 0, ""))
     todos = tuple(sorted(filhos + auto_filhos, key=lambda n: n.chave))
     return replace(no, entradas=(), filhos=todos)
 
