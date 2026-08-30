@@ -94,29 +94,51 @@ def _entradas_de(inventario: dict, produto: str) -> list[Entrada]:
     return sorted(achatadas, key=lambda e: (e.secao, e.chave, e.arquivo))
 
 
-def _distribuir(pool: list[Entrada], dentro: dict) -> tuple[tuple[Entrada, ...], dict]:
-    """Reparte `pool` entre os filhos por prefixo de `modulo`; o resto fica aqui.
+def _coletar_modulos(bruto: dict, caminho: tuple) -> list:
+    """Lista `(modulo, caminho_do_no)` pra todo no do bruto que declara
+    `modulo`, em qualquer profundidade. `caminho` vazio = a raiz do produto.
 
-    So o primeiro filho (em ordem de chave) que casa fica com a entrada — os
-    `modulo` sao escritos a mao em arquitetura.py, entao nao deveriam colidir,
-    mas o desempate por ordem alfabetica mantem isso deterministico mesmo
-    assim.
+    Um no sem `modulo` (grupo de dominio, tipo "canais" ou "workers") nao
+    entra aqui — mas isso NAO bloqueia os filhos dele, que sao percorridos
+    do mesmo jeito. E assim que um sub-no sem modulo proprio deixa passar
+    a competicao ate os netos.
     """
-    sobrando = list(pool)
-    designadas: dict = {}
-    for subchave in sorted(dentro):
-        modulo = dentro[subchave].get("modulo")
-        casa = []
-        if modulo:
-            casa = [e for e in sobrando if e.arquivo.startswith(modulo)]
-            for e in casa:
-                sobrando.remove(e)
-        designadas[subchave] = casa
-    entradas_aqui = tuple(sorted(sobrando, key=lambda e: (e.secao, e.chave, e.arquivo)))
-    return entradas_aqui, designadas
+    resultado = []
+    modulo = bruto.get("modulo")
+    if modulo:
+        resultado.append((modulo, caminho))
+    dentro = bruto.get("dentro") or {}
+    for subchave in dentro:
+        resultado.extend(_coletar_modulos(dentro[subchave], caminho + (subchave,)))
+    return resultado
 
 
-def _construir_no(chave: str, bruto: dict, pool: list[Entrada],
+def _designar_por_caminho(pool: list[Entrada], bruto_raiz: dict) -> dict:
+    """Devolve `{caminho_do_no: [Entrada, ...]}` pra uma arvore inteira.
+
+    Prefixo mais especifico (mais longo) ganha — e assim que
+    `app/control/google_ads` (o sub-no) fica com a entrada em vez de
+    `app/control/` (o pai dele) quando os dois casam o mesmo arquivo.
+    Nada casando: fica na raiz (`caminho == ()`), nunca preso num
+    intermediario sem `modulo`. `sorted()` no desempate por tamanho garante
+    ordem deterministica mesmo com dois `modulo` do mesmo tamanho.
+    """
+    candidatos = sorted(
+        _coletar_modulos(bruto_raiz, ()),
+        key=lambda mc: (-len(mc[0]), mc[1]),
+    )
+    designacao: dict = {(): []}
+    for e in pool:
+        alvo = ()
+        for modulo, caminho in candidatos:
+            if e.arquivo.startswith(modulo):
+                alvo = caminho
+                break
+        designacao.setdefault(alvo, []).append(e)
+    return designacao
+
+
+def _construir_no(chave: str, bruto: dict, caminho: tuple, designacao: dict,
                    pasta_decisoes: Path) -> No:
     decisoes = tuple(bruto.get("decisoes") or ())
     for d in decisoes:
@@ -126,13 +148,15 @@ def _construir_no(chave: str, bruto: dict, pool: list[Entrada],
             )
 
     dentro = bruto.get("dentro") or {}
-    entradas_aqui, designadas_filhos = _distribuir(pool, dentro)
-
     filhos = tuple(
-        _construir_no(subchave, dentro[subchave], designadas_filhos[subchave],
-                      pasta_decisoes)
+        _construir_no(subchave, dentro[subchave], caminho + (subchave,),
+                      designacao, pasta_decisoes)
         for subchave in sorted(dentro)
     )
+    entradas_aqui = tuple(sorted(
+        designacao.get(caminho, []),
+        key=lambda e: (e.secao, e.chave, e.arquivo),
+    ))
 
     return No(
         chave=chave,
@@ -164,7 +188,8 @@ def carregar(raiz: Path, frescor: dict, nos: dict,
                 f"Produtos conhecidos: {', '.join(sorted(inventario))}"
             )
         pool = _entradas_de(inventario, chave)
-        construidos.append(_construir_no(chave, bruto, pool, pasta_decisoes))
+        designacao = _designar_por_caminho(pool, bruto)
+        construidos.append(_construir_no(chave, bruto, (), designacao, pasta_decisoes))
 
     conhecidos = {n.chave for n in construidos}
     feitas = []
