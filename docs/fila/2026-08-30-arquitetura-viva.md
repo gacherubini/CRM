@@ -777,6 +777,18 @@ class TestLayout(unittest.TestCase):
                                  or a.y + a.h <= b.y or b.y + b.h <= a.y)
                     self.assertTrue(separadas, f"{a.chave} colide com {b.chave}")
 
+    def test_id_de_item_e_unico(self):
+        # Duas entradas com a MESMA secao e chave, em arquivos diferentes.
+        raiz = varredura.raiz_repo()
+        frescor = {"sha": "a", "inventario": {"chatbot-api": [
+            {"secao": "rota", "chave": "GET /x", "simbolo": "/x",
+             "arquivo": "app/a.py", "linha": 1},
+            {"secao": "rota", "chave": "GET /x", "simbolo": "/x",
+             "arquivo": "app/b.py", "linha": 2}]}}
+        modelo = arq_modelo.carregar(raiz, frescor, NOS_FALSOS)
+        chaves = [c.chave for c in arq_layout.dispor(modelo).caixas]
+        self.assertEqual(len(chaves), len(set(chaves)))
+
     def test_toda_entrada_do_modelo_virou_caixa(self):
         modelo = self._modelo()
         cena = arq_layout.dispor(modelo)
@@ -860,9 +872,12 @@ def _dispor_no(no, x: float, y: float) -> tuple[list, float, float]:
                             cx, cy, ITEM_W + MARGEM, h_secao,
                             no.chave, 2, K_MIN[2]))
         iy = cy + ALTURA_TITULO
-        for e in itens:
+        for i, e in enumerate(itens):
+            # O indice entra no id porque duas entradas podem ter a mesma secao
+            # e a mesma chave em arquivos diferentes; id duplicado faz o
+            # getElementById devolver a primeira e o zoom voar para a caixa errada.
             caixas.append(Caixa(
-                f"{no.chave}::{secao}::{e.chave}", "item", e.chave,
+                f"{no.chave}::{secao}::{i}", "item", e.chave,
                 cx + MARGEM / 2, iy, ITEM_W, ITEM_H,
                 f"{no.chave}::{secao}", 3, K_MIN[3]))
             iy += ITEM_H
@@ -920,7 +935,7 @@ def dispor(modelo: Modelo) -> Cena:
 ```
 cd .claude/skills/revy-research && python3 -m unittest test_gerar_arquitetura -v
 ```
-Esperado: 12 testes, OK.
+Esperado: 13 testes, OK.
 
 - [ ] **Step 5: Commitar**
 
@@ -968,9 +983,8 @@ class TestRender(unittest.TestCase):
         self.assertNotIn("https://", sem_comentario)
 
     def test_toda_entrada_aparece_com_arquivo_e_linha(self):
-        html = self._html()
-        self.assertIn("app/followup_job.py", html)
-        self.assertIn("64", html)
+        # O par inteiro: "64" sozinho casaria com qualquer coordenada do SVG.
+        self.assertIn("app/followup_job.py:64", self._html())
 
     def test_emite_os_atributos_que_o_zoom_espera(self):
         html = self._html()
@@ -1054,11 +1068,15 @@ def _caixa_svg(c, spofs: set) -> str:
     # SPOF = borda grossa. Esta na legenda, entao tem que existir no desenho.
     grossura = ' stroke-width="3"' if c.chave in spofs else ""
     navegavel = ' data-navegavel="1"' if c.tipo in ("vm", "no") else ""
+    # data-k-min SO onde ele faz algo. O nivel 1 e sempre visivel, e se a caixa
+    # navegavel carregasse o atributo, o aplicarLod (que escreve opacity a cada
+    # quadro) brigaria com o Zoom.acender da Task 7 e o fluxo piscaria.
+    lod = f' data-k-min="{c.k_min}"' if c.k_min > 0 else ""
     fonte = {"vm": 22, "no": 15, "secao": 9, "item": 6}[c.tipo]
     return (
         f'<g id="{_e(c.chave)}" data-titulo="{_e(c.titulo)}"'
         f'{" data-pai=" + chr(34) + _e(c.pai) + chr(34) if c.pai else ""}'
-        f'{navegavel} data-k-min="{c.k_min}">'
+        f'{navegavel}{lod}>'
         f'<rect x="{c.x:.1f}" y="{c.y:.1f}" width="{c.w:.1f}" height="{c.h:.1f}"'
         f' rx="4" fill="{fill}" stroke="{stroke}"{tracejado}{grossura}/>'
         f'<text x="{c.x + 8:.1f}" y="{c.y + fonte + 4:.1f}" font-size="{fonte}"'
@@ -1083,7 +1101,7 @@ def _arestas_svg(cena: Cena, modelo: Modelo) -> str:
         traco = "" if a.sincrono else ' stroke-dasharray="7 5"'
         largura = 1.5 if a.retry else 2.5
         partes.append(
-            f'<g data-k-min="0.0" data-aresta="{_e(a.de)}->{_e(a.para)}">'
+            f'<g data-aresta="{_e(a.de)}->{_e(a.para)}">'
             f'<line x1="{x1:.1f}" y1="{y1:.1f}" x2="{x2:.1f}" y2="{y2:.1f}"'
             f' stroke="{COR["brand"]}" stroke-width="{largura}"{traco}'
             f' marker-end="url(#ponta)"/>'
@@ -1469,18 +1487,22 @@ quadro. `acender` escreve nos `[data-navegavel]` e `[data-aresta]`, que são gru
 diferentes — não brigam. Se você fizer um elemento ter os dois atributos, o LOD ganha
 e o fluxo pisca.
 
-- [ ] **Step 5: Rodar e ver passar**
+- [ ] **Step 5: Regerar o HTML ANTES de rodar a suite**
+
+```
+cd .claude/skills/revy-research && python3 gerar_arquitetura.py
+```
+
+A ordem importa: voce acabou de mudar `render()`, entao o `arquitetura.html` que a
+Task 6 commitou ficou velho, e `test_verificar_passa_com_o_html_commitado` falharia.
+
+- [ ] **Step 6: Rodar e ver passar, depois conferir no navegador**
 
 ```
 cd .claude/skills/revy-research && python3 -m unittest test_gerar_arquitetura -v
+open .claude/skills/revy-research/arquitetura.html
 ```
-Esperado: 20 testes, OK.
-
-- [ ] **Step 6: Regerar, abrir e conferir no navegador**
-
-```
-cd .claude/skills/revy-research && python3 gerar_arquitetura.py && open arquitetura.html
-```
+Esperado: 23 testes, OK.
 
 Clique em "WhatsApp → simulação": só as caixas do caminho ficam acesas, as outras
 apagam sem sumir, os passos aparecem em ordem e o invariante fica visível. "limpar"
