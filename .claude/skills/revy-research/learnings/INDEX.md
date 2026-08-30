@@ -37,6 +37,7 @@ escrever migration com `batch_alter_table`.
 | parear numero novo no Evolution ou QR que nao conecta | `2026-08-23-qr-do-evolution-nao-fecha-por-passkey.md` |
 | responder se uma feature ja foi implementada | `2026-08-23-teste-verde-nao-prova-que-a-feature-existe.md` |
 | mexer no JS de uma tela do portal | `2026-08-23-copiloto-so-se-verifica-no-navegador.md` |
+| SVG interativo em que arrastar funciona mas clicar nao navega | `2026-08-30-setpointercapture-no-svg-engole-o-clique.md` |
 | mexer em app.css do portal ou do control | `2026-08-23-bump-do-v-no-base-html.md` |
 | acrescentar metrica numa tela da Loja ou do Control | `2026-08-23-metric-grid-trava-em-quatro.md` |
 | mudar cor, fonte ou token de marca | `2026-08-23-tokens-de-marca-tem-fonte-unica.md` |
