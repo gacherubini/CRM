@@ -42,7 +42,7 @@ import html
 import json
 from dataclasses import dataclass
 
-from arq_layout import Caixa, Cena, ALTURA_TITULO, MARGEM
+from arq_layout import Caixa, Cena, ALTURA_TITULO, MARGEM, banda_titulo
 from arq_modelo import Aresta, Modelo, No, Vm
 
 _e = html.escape
@@ -91,7 +91,10 @@ def _fonte_titulo(c: Caixa) -> float:
     e o tamanho da propria caixa: assim o titulo fica legivel exatamente quando
     a caixa enche a tela, em qualquer profundidade.
     """
-    return max(1.5, round(min(c.w * 0.055, c.h * 0.30), 1))
+    # O teto pela FAIXA e o que impede o titulo de invadir os filhos: eles
+    # comecam logo abaixo dela (arq_layout.banda_titulo).
+    banda = banda_titulo(max(0.0, c.w - MARGEM * 2))
+    return max(1.5, round(min(c.w * 0.055, c.h * 0.30, banda * 0.62), 1))
 
 
 def _marcar_spof(no: No, prefixo: str, resultado: dict[str, bool]) -> None:
@@ -231,7 +234,8 @@ def _fonte_rotulo_grupo(c: Caixa, largura_cena: float) -> float:
     """
     alvo = largura_cena * 0.0075
     cabe = (c.w - largura_cena * 0.004) / max(1, len(c.titulo)) / 0.60
-    return max(1.5, round(min(alvo, cabe, c.h * 0.30), 1))
+    banda = banda_titulo(max(0.0, c.w - MARGEM * 2), 0.02)
+    return max(1.5, round(min(alvo, cabe, c.h * 0.30, banda * 0.55), 1))
 
 
 def _face(c: Caixa, spof: bool, largura_cena: float) -> str:
@@ -247,10 +251,14 @@ def _face(c: Caixa, spof: bool, largura_cena: float) -> str:
     if eh_grupo:
         py_titulo = c.y + fonte_titulo * 1.25
     else:
-        # Bloco centrado na vertical. Com o interior fechado (nivel 1 = escopo
-        # puro), o titulo encostado no topo deixava a caixa parecendo um
-        # retangulo vazio com uma legenda solta em cima.
-        py_titulo = c.y + c.h * 0.5
+        # Na FAIXA RESERVADA do topo, sempre. Centrar na vertical ficava mais
+        # bonito com o interior fechado, mas `arq_layout` reserva ALTURA_TITULO
+        # no topo e comeca os filhos ABAIXO dela: fora dessa faixa o titulo cai
+        # em cima dos filhos. E como face e interior fazem crossfade (as duas
+        # rampas se cruzam em 50/50), nao e um quadro — e um intervalo inteiro
+        # de zoom com os dois sobrepostos. Foi o que aconteceu com "Workers
+        # assincronos" por cima dos quatro workers.
+        py_titulo = c.y + fonte_titulo * 1.15
     py_sub = py_titulo + fonte_sub * 1.7
     # Cortar na largura: a `nota` de uma VM tem ~200 caracteres e sem isso ela
     # sai numa linha unica por cima de tudo. 0.52em por caractere e a media.

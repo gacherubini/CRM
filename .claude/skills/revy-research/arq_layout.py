@@ -128,6 +128,22 @@ def _grade(tamanhos: list[tuple[float, float]]) -> tuple[float, float, list[tupl
     return largura_total, altura_total, posicoes
 
 
+def banda_titulo(largura_conteudo: float, proporcao: float = 0.08) -> float:
+    """Altura reservada para o titulo, no topo da caixa.
+
+    Era a constante `ALTURA_TITULO` (34 unidades) em qualquer profundidade,
+    enquanto a fonte do titulo cresce com a caixa e chega a 85 num produto: o
+    titulo simplesmente nao cabia na propria faixa, e caia por cima dos
+    filhos, que comecam logo abaixo dela. Como face e interior fazem crossfade
+    (as duas rampas se cruzam em 50/50), isso nao e um quadro — e um intervalo
+    inteiro de zoom com titulo e conteudo sobrepostos.
+
+    A faixa sai da largura do CONTEUDO, que ja esta calculada quando esta
+    funcao e chamada — nao da altura da caixa, que ainda nao existe.
+    """
+    return max(ALTURA_TITULO, largura_conteudo * proporcao)
+
+
 def _caixa_item(no_chave: str, idx: int, entrada, nivel: int) -> Caixa:
     # chave = caminho completo do no + indice sequencial: unico globalmente
     # sem precisar sanitizar texto arbitrario da entrada (que pode conter
@@ -166,11 +182,12 @@ def _dispor_no(no: No, chave_completa: str, nivel: int) -> tuple[Caixa, list[Cai
     if sub_itens:
         altura_conteudo += (MARGEM if sub_filhos else 0.0) + altura_itens
 
+    banda = banda_titulo(largura_conteudo)
     largura_total = MARGEM * 2 + largura_conteudo
-    altura_total = ALTURA_TITULO + MARGEM * 2 + altura_conteudo
+    altura_total = banda + MARGEM * 2 + altura_conteudo
 
     origem_x = MARGEM
-    origem_y_filhos = ALTURA_TITULO + MARGEM
+    origem_y_filhos = banda + MARGEM
     origem_y_itens = origem_y_filhos + altura_filhos + (MARGEM if sub_filhos else 0.0)
 
     descendentes: list[Caixa] = []
@@ -242,14 +259,15 @@ def _dispor_vm(vm: Vm, por_chave: dict[str, No], nivel: int) -> tuple[Caixa, lis
     largura_conteudo, altura_conteudo, posicoes = _grade(
         [(caixa.w, caixa.h) for caixa, _ in sub])
 
+    banda = banda_titulo(largura_conteudo, 0.02)
     largura_total = MARGEM * 2 + largura_conteudo
-    altura_total = ALTURA_TITULO + MARGEM * 2 + altura_conteudo
+    altura_total = banda + MARGEM * 2 + altura_conteudo
     if not sub:
         # VM sem produto (motor2037, n8n2037, evolution2037): ainda precisa
         # de espaco pro nome + nota nao ficarem cortados.
         largura_total = max(largura_total, ITEM_W + MARGEM * 2)
 
-    origem_x, origem_y = MARGEM, ALTURA_TITULO + MARGEM
+    origem_x, origem_y = MARGEM, banda + MARGEM
     descendentes: list[Caixa] = []
     for (caixa, desc), (dx, dy) in zip(sub, posicoes):
         bx, by = origem_x + dx, origem_y + dy
