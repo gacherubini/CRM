@@ -10,7 +10,7 @@ no frescor. A validacao de `decisoes/` vale em qualquer profundidade.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 
 from varredura import Entrada
@@ -37,6 +37,7 @@ class No:
     spof_porque: str | None = None
     entradas: tuple[Entrada, ...] = ()
     filhos: tuple["No", ...] = ()
+    auto: bool = False
 
 
 @dataclass(frozen=True)
@@ -173,6 +174,81 @@ def _construir_no(chave: str, bruto: dict, caminho: tuple, designacao: dict,
     )
 
 
+def _pilha_auto(entradas: list, nivel: int, chave_prefixo: str) -> list:
+    """Constroi, recursivamente, a subarvore diretorio/arquivo pro que sobrou
+    sem `modulo` casado a mao. `entradas` aqui todas compartilham o caminho
+    ate `nivel` (exclusive).
+
+    Colapso: enquanto TODAS as entradas tiverem o MESMO segmento em `nivel`
+    e NENHUMA terminar exatamente ali (ainda ha caminho pela frente), avanca
+    sem criar caixa pro segmento — e assim que `app/a/b/c.py` sozinho vira
+    UM no (`c.py`), nao tres aninhados, e que um `modulo` que so cobre um
+    arquivo (`app/followup_job.py`) nao aninha nada. So cria no quando ha
+    DIVERGENCIA (mais de um segmento distinto) ou quando o segmento e' a
+    ultima parte do caminho (nome de arquivo).
+    """
+    while True:
+        primeiro = None
+        todas_iguais = True
+        alguma_termina = False
+        for e in entradas:
+            partes = e.arquivo.split("/")
+            idx = min(nivel, len(partes) - 1)
+            seg = partes[idx]
+            if primeiro is None:
+                primeiro = seg
+            elif seg != primeiro:
+                todas_iguais = False
+            if idx == len(partes) - 1:
+                alguma_termina = True
+        if todas_iguais and not alguma_termina:
+            nivel += 1
+            continue
+        break
+
+    grupos: dict = {}
+    for e in entradas:
+        partes = e.arquivo.split("/")
+        idx = min(nivel, len(partes) - 1)
+        grupos.setdefault(partes[idx], []).append(e)
+
+    filhos = []
+    for seg in sorted(grupos):
+        grupo = grupos[seg]
+        chave = f"{chave_prefixo}.{seg}"
+        termina_todas = all(
+            nivel >= len(e.arquivo.split("/")) - 1 for e in grupo
+        )
+        if termina_todas:
+            filhos.append(No(
+                chave=chave, titulo=seg, papel="arquivo", auto=True,
+                entradas=tuple(sorted(
+                    grupo, key=lambda e: (e.secao, e.chave, e.arquivo))),
+            ))
+        else:
+            sub = _pilha_auto(grupo, nivel + 1, chave)
+            filhos.append(No(
+                chave=chave, titulo=seg, papel="modulo", auto=True,
+                filhos=tuple(sorted(sub, key=lambda n: n.chave)),
+            ))
+    return filhos
+
+
+def _com_auto(no: No) -> No:
+    """Aplica a regra dos nos automaticos em toda a arvore (pos-ordem): um
+    no com `modulo` escrito a mao ja tem dono, fica intocado. Um no SEM
+    `modulo` que sobrou com entradas (hoje, so a raiz do produto — ver
+    `_designar_por_caminho`) ganha a subarvore derivada do caminho, e suas
+    proprias `entradas` esvaziam.
+    """
+    filhos = tuple(_com_auto(f) for f in no.filhos)
+    if no.modulo or not no.entradas:
+        return replace(no, filhos=filhos)
+    auto_filhos = tuple(_pilha_auto(list(no.entradas), 0, no.chave))
+    todos = tuple(sorted(filhos + auto_filhos, key=lambda n: n.chave))
+    return replace(no, entradas=(), filhos=todos)
+
+
 def carregar(raiz: Path, frescor: dict, nos: dict,
              arestas: list = (), vms: dict = None,
              fluxos: dict = None) -> Modelo:
@@ -189,7 +265,8 @@ def carregar(raiz: Path, frescor: dict, nos: dict,
             )
         pool = _entradas_de(inventario, chave)
         designacao = _designar_por_caminho(pool, bruto)
-        construidos.append(_construir_no(chave, bruto, (), designacao, pasta_decisoes))
+        raiz_no = _construir_no(chave, bruto, (), designacao, pasta_decisoes)
+        construidos.append(_com_auto(raiz_no))
 
     conhecidos = {n.chave for n in construidos}
     feitas = []

@@ -25,6 +25,17 @@ FRESCOR_FALSO = {
 NOS_FALSOS = {"chatbot-api": {"titulo": "Chatbot API", "papel": "conversa"}}
 
 
+def _todas_entradas(no, acc=None):
+    # Entrada sem `modulo` casado a mao vira no automatico (Task 8) — nao
+    # fica mais em `no.entradas` direto, entao os testes que so querem saber
+    # "a entrada chegou em algum lugar da arvore" precisam somar recursivo.
+    acc = acc if acc is not None else []
+    acc.extend(no.entradas)
+    for f in no.filhos:
+        _todas_entradas(f, acc)
+    return acc
+
+
 class TestCarregar(unittest.TestCase):
     def setUp(self):
         self.raiz = varredura.raiz_repo()
@@ -33,7 +44,7 @@ class TestCarregar(unittest.TestCase):
         m = arq_modelo.carregar(self.raiz, FRESCOR_FALSO, NOS_FALSOS)
         self.assertEqual(len(m.nos), 1)
         self.assertEqual(m.nos[0].titulo, "Chatbot API")
-        self.assertEqual(len(m.nos[0].entradas), 2)
+        self.assertEqual(len(_todas_entradas(m.nos[0])), 2)
 
     def test_produto_que_nao_existe_no_frescor_falha_nomeando_o_produto(self):
         nos = {"produto-fantasma": {"titulo": "Fantasma", "papel": "nada"}}
@@ -58,6 +69,9 @@ class TestCarregar(unittest.TestCase):
         self.assertEqual([n.chave for n in m.nos], ["chatbot-api", "estoque-api"])
 
 
+FRESCOR_VAZIO = {"sha": "abc1234", "inventario": {"chatbot-api": []}}
+
+
 class TestRecursivo(unittest.TestCase):
     def setUp(self):
         self.raiz = varredura.raiz_repo()
@@ -76,7 +90,10 @@ class TestRecursivo(unittest.TestCase):
                 },
             },
         }
-        m = arq_modelo.carregar(self.raiz, FRESCOR_FALSO, nos)
+        # Frescor vazio: o foco aqui e' a recursao de `dentro`, nao os nos
+        # automaticos da Task 8 (que so entram quando sobra entrada sem
+        # `modulo` casado a mao).
+        m = arq_modelo.carregar(self.raiz, FRESCOR_VAZIO, nos)
         self.assertEqual(len(m.nos[0].filhos), 1)
         self.assertEqual(m.nos[0].filhos[0].chave, "canais")
         self.assertEqual(len(m.nos[0].filhos[0].filhos), 1)
@@ -93,7 +110,7 @@ class TestRecursivo(unittest.TestCase):
         }
         # Nao deve levantar: "evolution" nunca vai existir em _frescor.json,
         # e nao deveria precisar — e estrutura de dominio, nao produto.
-        m = arq_modelo.carregar(self.raiz, FRESCOR_FALSO, nos)
+        m = arq_modelo.carregar(self.raiz, FRESCOR_VAZIO, nos)
         self.assertEqual(m.nos[0].filhos[0].chave, "evolution")
 
     def test_sub_no_com_modulo_recebe_a_entrada_e_ela_some_da_raiz(self):
@@ -108,9 +125,15 @@ class TestRecursivo(unittest.TestCase):
         }
         m = arq_modelo.carregar(self.raiz, FRESCOR_FALSO, nos)
         raiz = m.nos[0]
-        workers = raiz.filhos[0]
+        workers = next(f for f in raiz.filhos if f.chave == "workers")
         self.assertEqual([e.chave for e in workers.entradas], ["FollowupWorker"])
-        self.assertEqual([e.chave for e in raiz.entradas], ["GET /health/live"])
+        # A raiz nao fica com a entrada direto — quem nao casou `modulo`
+        # (GET /health/live, de app/main.py) vira no automatico (Task 8).
+        self.assertEqual(raiz.entradas, ())
+        self.assertEqual(
+            [e.chave for e in _todas_entradas(raiz) if e.chave != "FollowupWorker"],
+            ["GET /health/live"],
+        )
 
     def test_sub_no_com_decisao_inexistente_ainda_levanta_referencia_morta(self):
         nos = {
@@ -152,6 +175,58 @@ class TestArquiteturaReal(unittest.TestCase):
         for chave, no in arquitetura.NOS.items():
             self.assertIn("titulo", no, chave)
             self.assertIn("papel", no, chave)
+
+
+class TestNosAutomaticos(unittest.TestCase):
+    def _carrega(self, arquivos):
+        raiz = varredura.raiz_repo()
+        frescor = {"sha": "a", "inventario": {"chatbot-api": [
+            {"secao": "rota", "chave": f"GET /{i}", "simbolo": f"s{i}",
+             "arquivo": a, "linha": i + 1}
+            for i, a in enumerate(arquivos)]}}
+        nos = {"chatbot-api": {"titulo": "Chatbot", "papel": "conversa"}}
+        return arq_modelo.carregar(raiz, frescor, nos)
+
+    def _todos(self, no, acc=None):
+        acc = acc if acc is not None else []
+        acc.append(no)
+        for f in no.filhos:
+            self._todos(f, acc)
+        return acc
+
+    def test_diretorio_vira_no(self):
+        m = self._carrega(["app/loja/vendas.py", "app/loja/metas.py",
+                           "app/canais/whatsapp.py"])
+        titulos = {n.titulo for n in self._todos(m.nos[0])}
+        self.assertIn("loja", titulos)
+        self.assertIn("canais", titulos)
+
+    def test_arquivo_vira_folha_com_as_entradas(self):
+        m = self._carrega(["app/loja/vendas.py", "app/loja/vendas.py"])
+        folhas = [n for n in self._todos(m.nos[0]) if n.papel == "arquivo"]
+        self.assertEqual(len(folhas), 1)
+        self.assertEqual(len(folhas[0].entradas), 2)
+
+    def test_nenhuma_entrada_fica_solta_na_raiz_do_produto(self):
+        # E o defeito que motivou esta task: 154 entradas paradas no produto.
+        m = self._carrega(["app/loja/vendas.py", "app/canais/whatsapp.py",
+                           "app/main.py"])
+        self.assertEqual(len(m.nos[0].entradas), 0)
+
+    def test_diretorio_de_filho_unico_colapsa(self):
+        m = self._carrega(["app/a/b/c.py"])
+        auto = [n for n in self._todos(m.nos[0]) if n.auto]
+        self.assertLessEqual(len(auto), 2, [n.chave for n in auto])
+
+    def test_no_escrito_a_mao_nao_vem_marcado_como_auto(self):
+        m = self._carrega(["app/main.py"])
+        self.assertFalse(m.nos[0].auto)
+
+    def test_continua_deterministico(self):
+        a = self._carrega(["app/loja/vendas.py", "app/canais/whatsapp.py"])
+        b = self._carrega(["app/canais/whatsapp.py", "app/loja/vendas.py"])
+        self.assertEqual([n.chave for n in self._todos(a.nos[0])],
+                         [n.chave for n in self._todos(b.nos[0])])
 
 
 class TestLayout(unittest.TestCase):
