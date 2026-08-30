@@ -1,9 +1,11 @@
 import json
+import re
 import unittest
 from pathlib import Path
 
 import arq_layout
 import arq_modelo
+import arq_render
 import arquitetura
 import varredura
 
@@ -197,6 +199,62 @@ class TestLayout(unittest.TestCase):
     def test_id_de_caixa_e_unico(self):
         chaves = [c.chave for c in arq_layout.dispor(self._modelo()).caixas]
         self.assertEqual(len(chaves), len(set(chaves)))
+
+
+class TestRender(unittest.TestCase):
+    def _html(self):
+        raiz = varredura.raiz_repo()
+        frescor = {"sha": "a", "inventario": {"chatbot-api": [
+            {"secao": "worker", "chave": "FollowupWorker", "simbolo": "F",
+             "arquivo": "app/followup_job.py", "linha": 64}]}}
+        nos = {"chatbot-api": {"titulo": "Chatbot", "papel": "conversa", "dentro": {
+            "canais": {"titulo": "Canais", "papel": "entrada"}}}}
+        modelo = arq_modelo.carregar(raiz, frescor, nos)
+        return arq_render.render(arq_layout.dispor(modelo), modelo, "/* js */")
+
+    def test_e_auto_contido_sem_nenhuma_url_externa(self):
+        sem_comentario = re.sub(r"<!--.*?-->", "", self._html(), flags=re.S)
+        self.assertNotIn("http://", sem_comentario)
+        self.assertNotIn("https://", sem_comentario)
+
+    def test_emite_as_duas_rampas(self):
+        html = self._html()
+        self.assertIn("data-k-min=", html)
+        self.assertIn("data-face-ate=", html)
+
+    def test_caixa_navegavel_nao_carrega_data_k_min(self):
+        # Senao o aplicarLod briga com o Zoom.acender e o fluxo pisca.
+        for grupo in re.findall(r"<g [^>]*>", self._html()):
+            if "data-navegavel" in grupo:
+                self.assertNotIn("data-k-min", grupo, grupo)
+
+    def test_o_arquivo_e_linha_chega_no_html(self):
+        self.assertIn("app/followup_job.py:64", self._html())
+
+    def test_escapa_o_que_viria_a_ser_markup(self):
+        raiz = varredura.raiz_repo()
+        frescor = {"sha": "a", "inventario": {"chatbot-api": [
+            {"secao": "rota", "chave": "GET /a<b>&c", "simbolo": "x",
+             "arquivo": "app/main.py", "linha": 1}]}}
+        nos = {"chatbot-api": {"titulo": "C", "papel": "x"}}
+        modelo = arq_modelo.carregar(raiz, frescor, nos)
+        html = arq_render.render(arq_layout.dispor(modelo), modelo, "")
+        self.assertNotIn("<b>", html)
+
+    def test_o_js_entra_inteiro(self):
+        self.assertIn("/* js */", self._html())
+
+    def test_aresta_assincrona_sai_tracejada_e_marca_falta_de_retry(self):
+        raiz = varredura.raiz_repo()
+        frescor = {"sha": "a", "inventario": {"chatbot-api": [], "estoque-api": []}}
+        nos = {"chatbot-api": {"titulo": "A", "papel": "x"},
+               "estoque-api": {"titulo": "B", "papel": "y"}}
+        arestas = [{"de": "chatbot-api", "para": "estoque-api",
+                    "protocolo": "http", "sincrono": False, "retry": False}]
+        modelo = arq_modelo.carregar(raiz, frescor, nos, arestas)
+        html = arq_render.render(arq_layout.dispor(modelo), modelo, "")
+        self.assertIn("stroke-dasharray", html)
+        self.assertIn("sem retry", html)
 
 
 if __name__ == "__main__":
