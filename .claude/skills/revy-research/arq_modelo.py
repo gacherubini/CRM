@@ -290,6 +290,22 @@ def _entradas_da_arvore(no: No) -> list:
     return acc
 
 
+def _todos_os_caminhos(nos, prefixo: str = "") -> set:
+    """Todo endereco valido de nó, em qualquer profundidade, no formato
+    pontuado que as arestas usam (`chatbot-api.workers.cloud-retry`).
+
+    Os automaticos entram junto: eles sao endereçaveis do mesmo jeito, e
+    proibir uma aresta de apontar pra um arquivo especifico seria uma regra
+    sem motivo.
+    """
+    caminhos = set()
+    for no in nos:
+        caminho = f"{prefixo}.{no.chave}" if prefixo else no.chave
+        caminhos.add(caminho)
+        caminhos |= _todos_os_caminhos(no.filhos, caminho)
+    return caminhos
+
+
 def _construir_grupos(bruto: dict, conhecidos: set, rotulo: str) -> list:
     """Constroi `[Vm, ...]` a partir de um dict cru no formato de `VMS`/
     `BANCOS` (chave, tipo, contem, nota), validando que todo `contem` cite
@@ -336,14 +352,22 @@ def carregar(raiz: Path, frescor: dict, nos: dict,
     # Aresta pode terminar numa VM, nao so num produto: "portal-gestao fala TCP
     # com suite-pg" e uma seta, nao contencao. Modelar isso como `contem` fazia
     # a arvore inteira do produto ser desenhada uma vez por VM.
-    conhecidos_e_vms = conhecidos | set(vms or {})
+    #
+    # E pode terminar num SUB-NO, endereçado pelo caminho pontuado
+    # (`chatbot-api.workers.cloud-retry`). Sem isso nao existe diagrama DENTRO
+    # de um produto: so daria pra ligar produto a produto, e entrar num
+    # produto continuaria mostrando caixas sem relacao nenhuma entre elas.
+    # `arq_render._resolver_produto` ja casa por sufixo em qualquer
+    # profundidade; era so a validacao de carga que parou na raiz.
+    conhecidos_e_vms = _todos_os_caminhos(construidos) | set(vms or {})
     feitas = []
     for a in arestas or ():
         for ponta in ("de", "para"):
             if a[ponta] not in conhecidos_e_vms:
                 raise ReferenciaMorta(
                     f"aresta {a['de']} -> {a['para']} usa '{a[ponta]}', "
-                    "que nao esta em NOS nem em VMS"
+                    "que nao e caminho de no em NOS (em nenhuma profundidade) "
+                    "nem chave de VMS"
                 )
         feitas.append(Aresta(
             de=a["de"], para=a["para"],
@@ -407,29 +431,47 @@ def _filtrar_arvore(no: No, secoes: frozenset) -> No:
     return replace(no, entradas=entradas_filtradas, filhos=filhos_novos)
 
 
-def _podar(no: No) -> No | None:
-    """Regra 3 de `filtrar`: um no escrito a mao (`auto=False`) sem
-    `entradas` e sem filho com conteudo sai do modelo — um no de raiz
-    (produto) que caia nessa regra sai tambem (devolve `None`, quem chama
-    remove da lista). Um no `auto=True` nunca chega vazio aqui: ele so
-    existe porque `_construir_arvore_auto` foi chamado com entradas de
-    verdade (lista vazia devolve `()`, nunca um No)."""
+def _podar(no: No, manter_manuais: bool) -> No | None:
+    """Regra 3 de `filtrar`. Devolve `None` quando o no inteiro sai.
+
+    `manter_manuais` separa dois casos que a regra unica confundia:
+
+    - **Vista Arquitetura (`True`)**: um componente escrito a mao E' o
+      conteudo. "Canal Cloud (Meta)" nao tem entrada no inventario nenhuma
+      — o inventario so conhece rota, worker, flag e template, e um canal
+      nao e nada disso — mas a existencia dele e' justamente a afirmacao que
+      a vista faz. Podar por ausencia de entrada apagava a camada de
+      intencao inteira: os componentes estavam escritos em `arquitetura.py`
+      desde a Task 3 e nunca chegaram a virar caixa. Era esse o motivo de
+      entrar num produto mostrar arvore de arquivos.
+    - **Vista Schema (`False`)**: aqui o conteudo E' a entrada (modelo,
+      migration). Manter no vazio encheria a vista de moldura sem tabela
+      dentro, e `catalogo-publico` (zero modelo, zero migration) tem mesmo
+      que sumir dela.
+
+    Um no `auto=True` nunca chega vazio aqui: ele so existe porque
+    `_construir_arvore_auto` foi chamado com entradas de verdade (lista
+    vazia devolve `()`, nunca um No).
+    """
     filhos_podados = []
     for f in no.filhos:
         if f.auto:
             filhos_podados.append(f)
             continue
-        podado = _podar(f)
+        podado = _podar(f, manter_manuais)
         if podado is not None:
             filhos_podados.append(podado)
 
     novo = replace(no, filhos=tuple(sorted(filhos_podados, key=lambda n: n.chave)))
+    if manter_manuais:
+        return novo
     if not novo.auto and not novo.entradas and not novo.filhos:
         return None
     return novo
 
 
-def filtrar(modelo: Modelo, secoes: frozenset) -> Modelo:
+def filtrar(modelo: Modelo, secoes: frozenset,
+            manter_manuais: bool = False) -> Modelo:
     """Devolve um `Modelo` NOVO (funcao pura — os dataclasses sao frozen,
     nada aqui muta o `modelo` recebido) contendo so as entradas cuja
     `secao` esta em `secoes`.
@@ -441,10 +483,12 @@ def filtrar(modelo: Modelo, secoes: frozenset) -> Modelo:
     2. Os nos automaticos (Task 8) sao refeitos do zero a partir das
        entradas que sobraram — nao apenas podados (`_construir_arvore_auto`
        reusada de `_com_auto`, ver o docstring dela pro porque).
-    3. Um no escrito a mao sem `entradas` e sem filho com conteudo sai do
-       modelo (`_podar`). Um no de raiz (produto) que caia nessa regra sai
-       tambem — e o caso do `catalogo-publico` (zero `modelo`/`migration`)
-       na vista Schema.
+    3. `_podar`, governado por `manter_manuais`. Com `False` (vista Schema),
+       um no escrito a mao sem `entradas` e sem filho com conteudo sai do
+       modelo, e um no de raiz que caia nessa regra sai tambem — e o caso do
+       `catalogo-publico` (zero `modelo`/`migration`). Com `True` (vista
+       Arquitetura), componente escrito a mao fica mesmo sem entrada: ali ele
+       E' o conteudo. Ver o docstring de `_podar`.
     4. `arestas` e `fluxos` que citem um no podado saem junto.
     5. `vms` e `bancos`: o `contem` de cada grupo perde as chaves podadas.
        Um grupo que fica com `contem` vazio CONTINUA no modelo — `motor2037`
@@ -461,7 +505,7 @@ def filtrar(modelo: Modelo, secoes: frozenset) -> Modelo:
     desconhecida.
     """
     filtrados = [_filtrar_arvore(no, secoes) for no in modelo.nos]
-    podados = [_podar(no) for no in filtrados]
+    podados = [_podar(no, manter_manuais) for no in filtrados]
     nos_novos = tuple(n for n in podados if n is not None)
 
     chaves_removidas = {no.chave for no in modelo.nos} - {n.chave for n in nos_novos}

@@ -454,14 +454,27 @@ def _pontos_da_aresta(de: Caixa, para: Caixa, deslocamento: float) -> list[tuple
     return _pontos_ortogonais(p1, lado_de, p2)
 
 
+def _sem_rede(a: Aresta) -> bool:
+    """A aresta fica dentro do mesmo produto?
+
+    Isso decide a COR. `retry=False` significa risco quando a chamada
+    atravessa fronteira de processo: se o outro lado esta fora do ar, o
+    evento se perde. Dentro do mesmo produto e' funcao chamando funcao — nao
+    ha o que retentar, e nao ha risco nenhum a sinalizar. Pintar as duas
+    coisas de vermelho fazia o interior do Chatbot sair inteiro em vermelho
+    e o vermelho parar de querer dizer qualquer coisa.
+    """
+    return a.de.split(".")[0] == a.para.split(".")[0]
+
+
 def _aresta_forma(a: Aresta, de: Caixa, para: Caixa, deslocamento: float) -> str:
     pontos = _pontos_da_aresta(de, para, deslocamento)
     marca = f"{html.escape(a.de)}->{html.escape(a.para)}"
-    marcador = "seta-sem" if not a.retry else "seta"
+    marcador = "seta-sem" if not a.retry and not _sem_rede(a) else "seta"
     tracejado = ' stroke-dasharray="6 4"' if not a.sincrono else ""
-    # Vermelho SO onde o dado manda: `retry=False`. Nada de "vermelho porque
-    # e importante" — ver docstring do modulo.
-    cor = f' stroke="{DANGER}"' if not a.retry else ""
+    # Vermelho SO onde o dado manda: `retry=False` E atravessando produto.
+    # Nada de "vermelho porque e importante" — ver docstring do modulo.
+    cor = f' stroke="{DANGER}"' if not a.retry and not _sem_rede(a) else ""
     txt_pontos = " ".join(f"{x:.2f},{y:.2f}" for x, y in pontos)
     return (
         f'<polyline data-aresta="{marca}" points="{txt_pontos}"{tracejado}{cor} '
@@ -476,7 +489,7 @@ def _aresta_texto(a: Aresta, de: Caixa, para: Caixa, deslocamento: float) -> str
     pontos = _pontos_da_aresta(de, para, deslocamento)
     mx = (pontos[1][0] + pontos[2][0]) / 2
     my = (pontos[1][1] + pontos[2][1]) / 2
-    cor = DANGER if not a.retry else INK_SOFT
+    cor = DANGER if not a.retry and not _sem_rede(a) else INK_SOFT
     # `class="protocolo"` so pra marcar QUAL <text> e' rotulo de aresta —
     # arquivo:linha de item (app/cloud_retry.py) legitimamente contem a
     # palavra "retry" em outro lugar da cena, entao o teste que garante

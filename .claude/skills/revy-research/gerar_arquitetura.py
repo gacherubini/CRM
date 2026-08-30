@@ -48,11 +48,14 @@ def montar(raiz: Path) -> str:
     frescor = json.loads(FRESCOR.read_text(encoding="utf-8"))
     _avisar_secoes_desconhecidas(frescor)
     completo = arq_modelo.carregar(
-        raiz, frescor, arquitetura.NOS, arquitetura.ARESTAS,
+        raiz, frescor, arquitetura.NOS, arquitetura.ARESTAS + arquitetura.ARESTAS_INTERNAS,
         arquitetura.VMS, arquitetura.FLUXOS, arquitetura.BANCOS)
     # Task 10: as duas vistas (Arquitetura x Schema) entram no MESMO html,
     # com um alternador — arq_render.render agora recebe as duas de uma vez.
-    arq = arq_modelo.filtrar(completo, arquitetura.SECOES_ARQUITETURA)
+    # manter_manuais=True: na Arquitetura o componente escrito a mao e' o
+    # conteudo, mesmo sem entrada de inventario. Ver arq_modelo._podar.
+    arq = arq_modelo.filtrar(completo, arquitetura.SECOES_ARQUITETURA,
+                             manter_manuais=True)
     sch = arq_modelo.filtrar(completo, arquitetura.SECOES_SCHEMA)
     # `filtrar` so poda NO (por secao); arestas e fluxos que nao citem um no
     # podado sobrevivem intactos — por isso a Schema ainda carregaria as

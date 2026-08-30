@@ -759,9 +759,18 @@ class TestPeleRevy(unittest.TestCase):
         svg = self._svg("arquitetura")
         rotulos = re.findall(r'<text[^>]*class="protocolo"[^>]*>([^<]*)</text>', svg)
         self.assertGreater(len(rotulos), 0)
-        self.assertEqual(set(rotulos), {"http", "outbox", "tcp"})
+        # O conjunto sai do DADO, nao de uma lista fixa: cravar
+        # {"http","outbox","tcp"} fazia o teste quebrar toda vez que uma
+        # aresta nova trouxesse um protocolo novo ("timer", "chamada"), o que
+        # e' crescimento normal do modelo, nao regressao.
+        protocolos = {a["protocolo"]
+                      for a in list(arquitetura.ARESTAS)
+                      + list(arquitetura.ARESTAS_INTERNAS)}
+        self.assertTrue(set(rotulos) <= protocolos, set(rotulos) - protocolos)
         for r in rotulos:
+            # o que a task proibe: rotulo composto. So o protocolo, cru.
             self.assertNotIn("retry", r)
+            self.assertNotIn("\u00b7", r)
 
     def test_4_vocabulario_de_forma_banco_terceiro_no_comum(self):
         # banco (Schema: tipo postgres/banco-proprio) -> cilindro (<path>).
@@ -786,8 +795,27 @@ class TestPeleRevy(unittest.TestCase):
 
     def test_5_vermelho_so_em_aresta_sem_retry_e_no_spof(self):
         svg = self._svg("arquitetura")
-        esperado_arestas = sum(1 for a in arquitetura.ARESTAS if not a.get("retry", False))
+        # Contar as arestas DESENHADAS, nao as declaradas: nem toda aresta
+        # declarada vira linha (as duas pontas precisam existir na cena
+        # daquela vista), entao contar `arquitetura.ARESTAS` prometia um
+        # numero que a cena nao tem obrigacao de cumprir.
+        retry_por_par = {(a["de"], a["para"]): a.get("retry", False)
+                         for a in list(arquitetura.ARESTAS)
+                         + list(arquitetura.ARESTAS_INTERNAS)}
+        desenhadas = re.findall(r'data-aresta="([^"]+)"', svg)
+        esperado_arestas = 0
+        for marca in desenhadas:
+            de, _, para = marca.partition("-&gt;")
+            if not para:
+                de, _, para = marca.partition("->")
+            self.assertIn((de, para), retry_por_par, marca)
+            # Mesma regra de arq_render._sem_rede: sem retry so e' risco
+            # quando a chamada atravessa fronteira de produto.
+            atravessa = de.split(".")[0] != para.split(".")[0]
+            if not retry_por_par[(de, para)] and atravessa:
+                esperado_arestas += 1
         esperado_nos_spof = sum(_contar_spof_bruto(v) for v in arquitetura.NOS.values())
+        self.assertGreater(len(desenhadas), 0)
         self.assertGreater(esperado_arestas, 0)
         self.assertGreater(esperado_nos_spof, 0)
         # 1 stroke (forma) + 1 fill (rotulo) por aresta sem retry; 1 stroke
@@ -884,53 +912,65 @@ class TestComponentesDoChatbot(unittest.TestCase):
                 self.assertFalse(a["sincrono"], a)
                 self.assertTrue(a["retry"], a)
 
-    def test_as_arestas_internas_ainda_nao_entram_no_gerador(self):
-        """APAGUE ESTE TESTE quando `arq_modelo` aceitar chave de sub-no.
+    def test_aresta_interna_endereca_sub_no_e_vira_linha(self):
+        """Bloqueio 1 da Task 13, destravado.
 
-        Bloqueio 1 da Task 13: `arq_modelo.carregar` so aceita ponta de
-        aresta que seja chave de NOS de raiz ou de VMS, entao ligar
-        `ARESTAS_INTERNAS` em `ARESTAS` hoje derruba o gerador inteiro com
-        `ReferenciaMorta`. `arq_render._resolver_produto` ja resolveria
-        todas elas (o teste acima prova) — falta so a validacao de carga
-        usar o mesmo enderecamento. `arq_modelo.py` e' de outro dono, entao
-        aqui isto fica REGISTRADO, nao corrigido.
+        `arq_modelo.carregar` passou a aceitar ponta de aresta em caminho
+        pontuado (`chatbot-api.workers.cloud-retry`), nao so chave de raiz.
+        Sem isso nao existe diagrama DENTRO de um produto — so daria pra
+        ligar produto a produto.
         """
-        with self.assertRaises(arq_modelo.ReferenciaMorta):
-            arq_modelo.carregar(
-                self.raiz, self.frescor, arquitetura.NOS,
-                list(arquitetura.ARESTAS) + list(arquitetura.ARESTAS_INTERNAS),
-                arquitetura.VMS, arquitetura.FLUXOS, arquitetura.BANCOS)
+        modelo = arq_modelo.carregar(
+            self.raiz, self.frescor, arquitetura.NOS,
+            list(arquitetura.ARESTAS) + list(arquitetura.ARESTAS_INTERNAS),
+            arquitetura.VMS, arquitetura.FLUXOS, arquitetura.BANCOS)
+        internas = {(a["de"], a["para"]) for a in arquitetura.ARESTAS_INTERNAS}
+        carregadas = {(a.de, a.para) for a in modelo.arestas}
+        self.assertTrue(internas <= carregadas, internas - carregadas)
 
-    def test_seis_componentes_ainda_nao_viram_caixa_na_vista_arquitetura(self):
-        """APAGUE ESTE TESTE quando `_podar` parar de comer componente.
+        html_gerado = gerar_arquitetura.montar(self.raiz)
+        inicio = html_gerado.index('<svg id="mapa-arquitetura"')
+        svg = html_gerado[inicio:html_gerado.index("</svg>", inicio)]
+        desenhadas = set()
+        for marca in re.findall(r'data-aresta="([^"]+)"', svg):
+            de, _, para = marca.partition("-&gt;")
+            if not para:
+                de, _, para = marca.partition("->")
+            desenhadas.add((de, para))
+        # Toda aresta interna declarada tem que virar linha: se uma sumir em
+        # silencio, o diagrama mente por omissao.
+        self.assertTrue(internas <= desenhadas, internas - desenhadas)
 
-        Bloqueio 2 da Task 13: `arq_modelo.filtrar`/`_podar` remove todo no
-        escrito a mao sem `entradas` proprias. O inventario do Chatbot so
-        tem rota (todas em app/main.py), worker (4 arquivos) e flag
-        (config.py, main.py) — entao um componente que nao seja dono de um
-        desses tres some da cena. Foi essa regra, e nao falta de intencao
-        escrita, que manteve "Canal Cloud (Meta)" e "Agente por loja" fora
-        do HTML desde a Task 3.
+    def test_componente_escrito_a_mao_sobrevive_sem_entrada_de_inventario(self):
+        """Bloqueio 2 da Task 13, destravado.
+
+        O inventario do Chatbot so conhece rota, worker e flag. Um
+        componente como "Canal Cloud (Meta)" nao e nenhum dos tres, entao
+        `_podar` o comia — e era ESSA regra, nao falta de intencao escrita,
+        que fazia entrar num produto mostrar arvore de arquivos. Na vista
+        Arquitetura o componente E' o conteudo.
         """
         completo = arq_modelo.carregar(
             self.raiz, self.frescor, arquitetura.NOS, arquitetura.ARESTAS,
             arquitetura.VMS, arquitetura.FLUXOS, arquitetura.BANCOS)
-        arq = arq_modelo.filtrar(completo, arquitetura.SECOES_ARQUITETURA)
+        arq = arq_modelo.filtrar(completo, arquitetura.SECOES_ARQUITETURA,
+                                 manter_manuais=True)
         chatbot = next(n for n in arq.nos if n.chave == "chatbot-api")
         sobreviveram = {n.chave for n in _todos_nos(chatbot) if not n.auto}
         escritos = {chave.split(".")[-1]
                     for chave, _ in _percorrer_bruto(arquitetura.NOS["chatbot-api"])}
-        podados = escritos - sobreviveram
-        self.assertEqual(
-            podados,
-            {"agente", "cloud", "baileys", "credenciais", "conversa",
-             "simulacao", "saida", "integracoes", "estoque", "motor",
-             "provisionamento"},
-            "mudou quem `_podar` come: reveja o bloqueio 2 da Task 13",
-        )
+        self.assertEqual(escritos - sobreviveram, set())
 
+    def test_vista_schema_continua_podando_no_vazio(self):
+        """A contrapartida: na Schema o conteudo E' a entrada, entao no sem
+        tabela dentro tem que sumir — senao a vista vira moldura vazia, e
+        `catalogo-publico` (zero modelo, zero migration) apareceria."""
+        completo = arq_modelo.carregar(
+            self.raiz, self.frescor, arquitetura.NOS, arquitetura.ARESTAS,
+            arquitetura.VMS, arquitetura.FLUXOS, arquitetura.BANCOS)
+        sch = arq_modelo.filtrar(completo, arquitetura.SECOES_SCHEMA)
+        self.assertNotIn("catalogo-publico", {n.chave for n in sch.nos})
 
-class TestZoomJs(unittest.TestCase):
     def test_esc_guard_usa_hasattribute_nao_a_propriedade_hidden(self):
         # Mesmo achado do teste acima, do lado do arq_zoom.js: o guard do
         # Esc (`Zoom.criar`) tem que testar `svg.hasAttribute("hidden")`,
