@@ -1,7 +1,9 @@
+import json
 import unittest
 from pathlib import Path
 
 import arq_modelo
+import arquitetura
 import varredura
 
 
@@ -51,6 +53,33 @@ class TestCarregar(unittest.TestCase):
         frescor = {"sha": "a", "inventario": {"chatbot-api": [], "estoque-api": []}}
         m = arq_modelo.carregar(self.raiz, frescor, nos)
         self.assertEqual([n.chave for n in m.nos], ["chatbot-api", "estoque-api"])
+
+
+class TestArquiteturaReal(unittest.TestCase):
+    def setUp(self):
+        self.raiz = varredura.raiz_repo()
+        frescor_path = (Path(__file__).resolve().parent / "mapa" / "_frescor.json")
+        self.frescor = json.loads(frescor_path.read_text(encoding="utf-8"))
+
+    def test_o_arquivo_real_carrega_sem_referencia_morta(self):
+        m = arq_modelo.carregar(
+            self.raiz, self.frescor, arquitetura.NOS,
+            arquitetura.ARESTAS, arquitetura.VMS, arquitetura.FLUXOS)
+        self.assertGreaterEqual(len(m.nos), 6)
+
+    def test_todo_produto_do_frescor_tem_no(self):
+        faltando = set(self.frescor["inventario"]) - set(arquitetura.NOS)
+        self.assertEqual(faltando, set(), f"produto sem no: {faltando}")
+
+    def test_app2037_carrega_seis_produtos(self):
+        # O fato de infra que hoje nao esta desenhado em lugar nenhum: uma
+        # maquina que cai leva seis coisas junto.
+        self.assertEqual(len(arquitetura.VMS["app2037"]["contem"]), 6)
+
+    def test_todo_no_tem_titulo_e_papel(self):
+        for chave, no in arquitetura.NOS.items():
+            self.assertIn("titulo", no, chave)
+            self.assertIn("papel", no, chave)
 
 
 if __name__ == "__main__":
