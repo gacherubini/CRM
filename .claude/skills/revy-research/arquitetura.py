@@ -29,7 +29,22 @@ from __future__ import annotations
 # onde. As duas vistas juntas tem que cobrir toda secao que o extrator emite
 # (arq_modelo.filtrar avisa no stdout se aparecer uma secao nova que nao
 # caia em nenhuma das duas — nunca falha calado).
-SECOES_ARQUITETURA: frozenset[str] = frozenset({"rota", "worker", "flag", "template"})
+SECOES_ARQUITETURA: frozenset[str] = frozenset({"worker", "flag", "template"})
+
+# Deliberadamente fora das duas vistas — nao e' secao desconhecida, e' secao
+# DISPENSADA, e a diferenca importa: desconhecida avisa no stdout, dispensada
+# nao.
+#
+# `rota` saiu por decisao do dono em 30/08: 407 das 816 entradas do inventario
+# sao rota, e so o Chatbot tem 64. Elas viravam uma parede de fichas em tres
+# colunas dentro de "Borda HTTP", que sozinha ocupava quase metade do produto
+# e espremia todos os outros componentes ate o titulo nao caber. E o que a
+# parede respondia — QUAIS sao as rotas — nao e' o que esta pagina existe pra
+# responder: aqui a pergunta e' como as partes se falam.
+#
+# O dado nao se perde: `mapa/<produto>.md` continua listando toda rota com
+# `arquivo:linha`, e o `_frescor.json` continua sendo a fonte dos dois.
+SECOES_DISPENSADAS: frozenset[str] = frozenset({"rota"})
 SECOES_SCHEMA: frozenset[str] = frozenset({"modelo", "migration"})
 
 NOS: dict[str, dict] = {

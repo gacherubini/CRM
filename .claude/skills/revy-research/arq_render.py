@@ -495,6 +495,13 @@ def _aresta_texto(a: Aresta, de: Caixa, para: Caixa, deslocamento: float) -> str
     # arquivo:linha de item (app/cloud_retry.py) legitimamente contem a
     # palavra "retry" em outro lugar da cena, entao o teste que garante
     # "rotulo de aresta nunca diz retry" precisa mirar so' nestes.
+    # "chamada" e' o protocolo mudo: dentro do mesmo processo, uma funcao
+    # chamando outra. Rotular todas fazia a palavra aparecer catorze vezes no
+    # interior do Chatbot, sobrepondo as proprias linhas — e nao dizia nada
+    # que a seta ja nao dissesse. O rotulo fica so onde ele acrescenta:
+    # http, outbox, tcp, timer.
+    if a.protocolo == "chamada":
+        return ""
     return (f'<text x="{mx:.2f}" y="{my:.2f}" font-size="8" fill="{cor}" class="protocolo">'
             f'{html.escape(a.protocolo)}</text>')
 

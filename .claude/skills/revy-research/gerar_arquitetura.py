@@ -35,7 +35,9 @@ def _avisar_secoes_desconhecidas(frescor: dict) -> None:
     exatamente como este arquivo apodreceria. Um aviso por SECAO, nao por
     entrada (816 entradas nao viram 816 linhas de aviso).
     """
-    conhecidas = arquitetura.SECOES_ARQUITETURA | arquitetura.SECOES_SCHEMA
+    conhecidas = (arquitetura.SECOES_ARQUITETURA
+                  | arquitetura.SECOES_SCHEMA
+                  | arquitetura.SECOES_DISPENSADAS)
     desconhecidas = set()
     for entradas in frescor.get("inventario", {}).values():
         for e in entradas:

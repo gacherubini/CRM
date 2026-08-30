@@ -182,6 +182,17 @@ def _dispor_no(no: No, chave_completa: str, nivel: int) -> tuple[Caixa, list[Cai
     if sub_itens:
         altura_conteudo += (MARGEM if sub_filhos else 0.0) + altura_itens
 
+    if not sub_filhos and not sub_itens:
+        # Componente folha escrito a mao pode nao ter conteudo NENHUM: na
+        # vista Arquitetura ele E' o conteudo, e o inventario nao sabe dele
+        # (nao e' rota, nem worker, nem flag). Sem um piso vindo do proprio
+        # texto, a caixa nasce so das margens — 49 unidades de largura, fonte
+        # 2,7 — e vira um retangulo anonimo ao lado dos irmaos cheios. Foi
+        # assim que 'Conversa e lead', 'Saida WhatsApp', 'Agente por loja',
+        # 'Simulacao humana' e 'Projecao do Control' apareceram sem nome.
+        largura_conteudo = max(largura_conteudo, ITEM_W, len(no.titulo) * 9.0)
+        altura_conteudo = max(altura_conteudo, ITEM_H * 4)
+
     banda = banda_titulo(largura_conteudo)
     largura_total = MARGEM * 2 + largura_conteudo
     altura_total = banda + MARGEM * 2 + altura_conteudo
