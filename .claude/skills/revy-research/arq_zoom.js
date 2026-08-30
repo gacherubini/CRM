@@ -1,6 +1,6 @@
 // Motor de zoom continuo. Nao sabe o que e um produto — so caixas e viewBox.
 (function () {
-  var svg, base, alvo, atual, anim = null, dur = 450;
+  var svg, base, atual, anim = null, dur = 450, moveu = false;
   var pilha = [];   // caminho de volta: ids ja visitados
 
   function vb(el) {
@@ -15,6 +15,7 @@
   function suavizar(t) { return t < 0.5 ? 4*t*t*t : 1 - Math.pow(-2*t + 2, 3) / 2; }
 
   function aplicarLod(k) {
+    // ENTRA: o interior do no aparece conforme voce se aproxima.
     var grupos = svg.querySelectorAll("[data-k-min]");
     for (var i = 0; i < grupos.length; i++) {
       var kmin = parseFloat(grupos[i].getAttribute("data-k-min"));
@@ -22,6 +23,15 @@
       var o = (k - kmin) / (kmin * 0.6);
       grupos[i].style.opacity = Math.max(0, Math.min(1, o));
       grupos[i].style.pointerEvents = o > 0.5 ? "auto" : "none";
+    }
+    // SAI: a face do no (o titulo grande, o resumo) some enquanto o interior
+    // aparece. Sem isso o zoom so aumenta a fonte; com isso a tela TROCA de
+    // conteudo no mesmo lugar, que e o efeito de cair dentro.
+    var faces = svg.querySelectorAll("[data-face-ate]");
+    for (var j = 0; j < faces.length; j++) {
+      var kmax = parseFloat(faces[j].getAttribute("data-face-ate"));
+      var f = 1 - (k - kmax) / (kmax * 0.6);
+      faces[j].style.opacity = Math.max(0, Math.min(1, f));
     }
   }
 
@@ -85,6 +95,8 @@
         window.matchMedia("(prefers-reduced-motion: reduce)").matches) dur = 0;
 
     svg.addEventListener("click", function (ev) {
+      // Arrastar termina em click; sem esta guarda, todo pan tambem voava.
+      if (moveu) return;
       var alvo = ev.target.closest("[data-navegavel]");
       if (alvo && alvo.id) voarPara(alvo.id);
     });
@@ -102,17 +114,23 @@
 
     var arrastando = false, px = 0, py = 0;
     svg.addEventListener("pointerdown", function (ev) {
-      arrastando = true; px = ev.clientX; py = ev.clientY;
-      svg.setPointerCapture(ev.pointerId);
+      arrastando = true; moveu = false; px = ev.clientX; py = ev.clientY;
+      // NADA de setPointerCapture aqui. Capturar o ponteiro no <svg> faz o
+      // `click` seguinte ter como alvo o proprio svg, e ai o
+      // closest("[data-navegavel]") devolve null e o clique nunca navega.
     });
     svg.addEventListener("pointermove", function (ev) {
       if (!arrastando) return;
+      // Limiar: mao tremida nao vira arrasto, senao o clique some.
+      if (Math.abs(ev.clientX - px) + Math.abs(ev.clientY - py) > 3) moveu = true;
+      if (!moveu) return;
       var v = vb(svg), r = svg.getBoundingClientRect();
       setVb({ x: v.x - (ev.clientX - px) / r.width * v.w,
               y: v.y - (ev.clientY - py) / r.height * v.h, w: v.w, h: v.h });
       px = ev.clientX; py = ev.clientY;
     });
     svg.addEventListener("pointerup", function () { arrastando = false; });
+    svg.addEventListener("pointerleave", function () { arrastando = false; });
 
     setVb(base);
   }
