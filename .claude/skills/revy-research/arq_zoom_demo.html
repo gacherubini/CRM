@@ -1,0 +1,45 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>zoom — demo</title>
+<style>
+  html,body{margin:0;height:100%;background:#f9f9f9;font-family:system-ui}
+  svg{width:100vw;height:100vh;display:block;cursor:grab}
+  #trilha{position:fixed;top:12px;left:12px;background:#fff;padding:6px 12px;
+          border:1px solid #ded8d9;border-radius:6px;font-size:13px}
+</style>
+<div id="trilha">Revy</div>
+<svg id="mapa" viewBox="0 0 1000 600">
+  <g id="app2037" data-navegavel data-titulo="app2037">
+    <rect x="40" y="40" width="440" height="480" fill="#fff" stroke="#1f4d3a"/>
+    <text x="60" y="80" font-size="24" fill="#1b1b1b">app2037</text>
+    <g id="chatbot" data-navegavel data-titulo="Chatbot API">
+      <rect x="70" y="110" width="380" height="180" fill="#efeceb" stroke="#cdc6c4"/>
+      <text x="86" y="140" font-size="16">Chatbot API</text>
+      <g data-k-min="3">
+        <text x="86" y="170" font-size="6">POST /webhook/mensagem</text>
+        <text x="86" y="182" font-size="6">GET /v1/agente/config</text>
+        <text x="86" y="194" font-size="6">FollowupWorker</text>
+      </g>
+    </g>
+    <g id="motor" data-navegavel data-titulo="Motor de Simulação">
+      <rect x="70" y="320" width="380" height="160" fill="#efeceb" stroke="#cdc6c4"/>
+      <text x="86" y="350" font-size="16">Motor</text>
+      <g data-k-min="3">
+        <text x="86" y="380" font-size="6">POST /v1/simulacoes</text>
+        <text x="86" y="392" font-size="6">SPOF: Playwright single-flight</text>
+      </g>
+    </g>
+  </g>
+  <g id="n8n" data-navegavel data-titulo="n8n2037">
+    <rect x="560" y="40" width="400" height="200" fill="#fff" stroke="#1f4d3a"/>
+    <text x="580" y="80" font-size="24">n8n2037</text>
+  </g>
+</svg>
+<script src="arq_zoom.js"></script>
+<script>
+  var svg = document.getElementById("mapa");
+  svg.addEventListener("zoom:mudou", function (ev) {
+    document.getElementById("trilha").textContent = ev.detail.titulo || "Revy";
+  });
+  Zoom.init(svg, {});
+</script>
