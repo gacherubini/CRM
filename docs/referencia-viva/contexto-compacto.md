@@ -301,6 +301,29 @@ Um eixo por mudança. Não misture Copiloto, RPA, rollout e n8n na mesma entrega
 | Control | Secrets GCP (Google Ads) **ou** E2E dois canais WA |
 | CTWA | Task 4: `Cód:` na mensagem do anúncio (config, não PR) |
 | Site | Adiado — não pegar sem o dono pedir |
+| Embedded Signup | **Clicar o popup no navegador** (o JS nunca rodou) e, quando o App Review sair, pôr `PORTAL_META_APP_ID`/`PORTAL_META_CONFIG_ID` no `[env]`. Depois: tela de templates (§10.4), visão no Control, spike |
+
+### Dívidas pequenas que não têm card (29/08)
+
+Nenhuma bloqueia nada; ficam aqui para não morrerem no chat.
+
+- `_despachar_alerta` (`chatbot-api/app/solicitacoes_simulacao.py:123`) — terceiro caso do
+  transporte errado: usa o singleton em vez de `outbound_para_loja`. Os outros dois já foram
+  consertados.
+- A tela de canais da Loja ainda fala de **QR** no cabeçalho e em "Adicionar número", mesmo
+  para loja que só tem canal Cloud. Mexe no que a loja piloto vê.
+- `version: "v21.0"` está fixo no template do popup e **não** é o mesmo lugar onde o chatbot
+  fixa a versão da Graph. Divergirem não dá aviso: quebra e pronto.
+- "Tentar de novo" leva à tela de decisão — não há rota de retry dedicada.
+- A auditoria do POST do popup usa `acao="conectar", provedor="cloud"`; `ACOES_CANAL` não tem
+  ação própria para o embedded signup.
+- CPF malformado não é mascarado.
+- Contestar a categoria do template `chama_vendedor` (virou `MARKETING`, ~10x o custo) —
+  **prazo 22/10/2026**.
+- `chatbot-api/test-tmp-run4/` e `run5/` quebram `pytest` sem argumento (`PermissionError`).
+  Estão no `.gitignore`; é lixo local, mas some do radar até alguém tropeçar.
+- O índice de learnings passou de **46 entradas**. A própria skill avisa que acima de ~40 ele
+  começa a atrapalhar o passo 4 do tronco. Vale uma poda.
 
 ## Fronteiras permanentes
 
