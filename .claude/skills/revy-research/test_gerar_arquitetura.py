@@ -52,6 +52,19 @@ def _todos_nos(no, acc=None):
     return acc
 
 
+def _percorrer_bruto(bruto, prefixo="", acc=None):
+    # Anda o dict CRU de `arquitetura.NOS` (nao o Modelo): a Task 13 precisa
+    # conferir o que esta ESCRITO, inclusive o que `filtrar` depois poda.
+    # Devolve [(caminho_pontilhado, dict_do_no), ...] sem incluir a raiz.
+    acc = acc if acc is not None else []
+    for chave in sorted(bruto.get("dentro") or {}):
+        sub = bruto["dentro"][chave]
+        caminho = f"{prefixo}.{chave}" if prefixo else chave
+        acc.append((caminho, sub))
+        _percorrer_bruto(sub, caminho, acc)
+    return acc
+
+
 class TestCarregar(unittest.TestCase):
     def setUp(self):
         self.raiz = varredura.raiz_repo()
@@ -787,6 +800,134 @@ class TestPeleRevy(unittest.TestCase):
         # Ja coberto por TestCli.test_gerar_duas_vezes_da_bytes_identicos —
         # aqui so' reconfirma com o montar() usado nos testes acima.
         self.assertEqual(gerar_arquitetura.montar(self.raiz), self.html)
+
+
+class TestComponentesDoChatbot(unittest.TestCase):
+    """Task 13: a camada de componente do Chatbot API, escrita a mao.
+
+    Estes testes miram o DADO (`arquitetura.NOS`/`ARESTAS_INTERNAS`), nao o
+    HTML, porque hoje boa parte dos componentes nao chega ao HTML — ver
+    `test_seis_componentes_ainda_nao_viram_caixa_na_vista_arquitetura`.
+    """
+
+    def setUp(self):
+        self.raiz = varredura.raiz_repo()
+        self.no = arquitetura.NOS["chatbot-api"]
+        frescor_path = Path(__file__).resolve().parent / "mapa" / "_frescor.json"
+        self.frescor = json.loads(frescor_path.read_text(encoding="utf-8"))
+
+    def test_o_chatbot_tem_entre_seis_e_dez_componentes(self):
+        # Menos de seis nao conta a historia do produto; mais de dez e a
+        # arvore de arquivos com outro nome.
+        componentes = self.no["dentro"]
+        self.assertGreaterEqual(len(componentes), 6, sorted(componentes))
+        self.assertLessEqual(len(componentes), 10, sorted(componentes))
+
+    def test_todo_componente_tem_titulo_papel_e_prova(self):
+        # `termo` e o lugar do arquivo:linha que prova que o componente
+        # existe — componente sem prova e componente inventado.
+        for chave, bruto in _percorrer_bruto(self.no):
+            self.assertIn("titulo", bruto, chave)
+            self.assertIn("papel", bruto, chave)
+            self.assertTrue(bruto.get("termo") or bruto.get("modulo"), chave)
+
+    def test_todo_modulo_de_componente_existe_no_repo(self):
+        # `modulo` e prefixo de caminho, nao necessariamente um arquivo
+        # (`app/agente_` cobre quatro). Basta que ALGUM caminho real do
+        # produto comece com ele — senao a caixa aponta para o vazio.
+        produto = self.raiz / "chatbot-api"
+        reais = sorted(
+            str(p.relative_to(produto)).replace("\\", "/")
+            for p in produto.rglob("*.py")
+        )
+        for chave, bruto in _percorrer_bruto(self.no):
+            modulo = bruto.get("modulo")
+            if not modulo:
+                continue
+            self.assertTrue(
+                any(caminho.startswith(modulo) for caminho in reais),
+                f"'{chave}' cita o modulo '{modulo}', que nao existe em chatbot-api/",
+            )
+
+    def test_toda_aresta_interna_endereca_dois_nos_que_existem(self):
+        # A regra da Task 13: seta que aponta pro vazio e pior que seta
+        # ausente. Medido no modelo COMPLETO (sem `filtrar`) porque e nele
+        # que todo componente escrito a mao ainda esta de pe.
+        completo = arq_modelo.carregar(
+            self.raiz, self.frescor, arquitetura.NOS, arquitetura.ARESTAS,
+            arquitetura.VMS, arquitetura.FLUXOS, arquitetura.BANCOS)
+        cena = arq_layout.dispor(completo, completo.vms)
+        caixas = {c.chave: c for c in cena.caixas}
+        for a in arquitetura.ARESTAS_INTERNAS:
+            for ponta in ("de", "para"):
+                self.assertIsNotNone(
+                    arq_render._resolver_produto(a[ponta], caixas),
+                    f"aresta {a['de']} -> {a['para']}: '{a[ponta]}' nao tem caixa",
+                )
+
+    def test_aresta_interna_nunca_liga_um_no_nele_mesmo(self):
+        for a in arquitetura.ARESTAS_INTERNAS:
+            self.assertNotEqual(a["de"], a["para"])
+
+    def test_o_protocolo_interno_vem_de_um_vocabulario_curto(self):
+        # Tres palavras, nao trinta: "chamada" (mesmo processo), "outbox"
+        # (uma grava, a outra consome) e "timer" (thread periodica).
+        for a in arquitetura.ARESTAS_INTERNAS:
+            self.assertIn(a["protocolo"], {"chamada", "outbox", "timer"},
+                          f"{a['de']} -> {a['para']}")
+
+    def test_toda_aresta_outbox_e_assincrona_e_tem_retry(self):
+        # Outbox existe justamente porque quem grava nao espera; marcar uma
+        # como sincrona seria mentir sobre a unica coisa que ela garante.
+        for a in arquitetura.ARESTAS_INTERNAS:
+            if a["protocolo"] == "outbox":
+                self.assertFalse(a["sincrono"], a)
+                self.assertTrue(a["retry"], a)
+
+    def test_as_arestas_internas_ainda_nao_entram_no_gerador(self):
+        """APAGUE ESTE TESTE quando `arq_modelo` aceitar chave de sub-no.
+
+        Bloqueio 1 da Task 13: `arq_modelo.carregar` so aceita ponta de
+        aresta que seja chave de NOS de raiz ou de VMS, entao ligar
+        `ARESTAS_INTERNAS` em `ARESTAS` hoje derruba o gerador inteiro com
+        `ReferenciaMorta`. `arq_render._resolver_produto` ja resolveria
+        todas elas (o teste acima prova) — falta so a validacao de carga
+        usar o mesmo enderecamento. `arq_modelo.py` e' de outro dono, entao
+        aqui isto fica REGISTRADO, nao corrigido.
+        """
+        with self.assertRaises(arq_modelo.ReferenciaMorta):
+            arq_modelo.carregar(
+                self.raiz, self.frescor, arquitetura.NOS,
+                list(arquitetura.ARESTAS) + list(arquitetura.ARESTAS_INTERNAS),
+                arquitetura.VMS, arquitetura.FLUXOS, arquitetura.BANCOS)
+
+    def test_seis_componentes_ainda_nao_viram_caixa_na_vista_arquitetura(self):
+        """APAGUE ESTE TESTE quando `_podar` parar de comer componente.
+
+        Bloqueio 2 da Task 13: `arq_modelo.filtrar`/`_podar` remove todo no
+        escrito a mao sem `entradas` proprias. O inventario do Chatbot so
+        tem rota (todas em app/main.py), worker (4 arquivos) e flag
+        (config.py, main.py) — entao um componente que nao seja dono de um
+        desses tres some da cena. Foi essa regra, e nao falta de intencao
+        escrita, que manteve "Canal Cloud (Meta)" e "Agente por loja" fora
+        do HTML desde a Task 3.
+        """
+        completo = arq_modelo.carregar(
+            self.raiz, self.frescor, arquitetura.NOS, arquitetura.ARESTAS,
+            arquitetura.VMS, arquitetura.FLUXOS, arquitetura.BANCOS)
+        arq = arq_modelo.filtrar(completo, arquitetura.SECOES_ARQUITETURA)
+        chatbot = next(n for n in arq.nos if n.chave == "chatbot-api")
+        sobreviveram = {n.chave for n in _todos_nos(chatbot) if not n.auto}
+        escritos = {chave.split(".")[-1]
+                    for chave, _ in _percorrer_bruto(arquitetura.NOS["chatbot-api"])}
+        podados = escritos - sobreviveram
+        self.assertEqual(
+            podados,
+            {"agente", "cloud", "baileys", "credenciais", "conversa",
+             "simulacao", "saida", "integracoes", "estoque", "motor",
+             "provisionamento"},
+            "mudou quem `_podar` come: reveja o bloqueio 2 da Task 13",
+        )
 
 
 class TestZoomJs(unittest.TestCase):
