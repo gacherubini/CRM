@@ -234,12 +234,30 @@ class TestNosAutomaticos(unittest.TestCase):
 class TestLayout(unittest.TestCase):
     def _modelo(self):
         raiz = varredura.raiz_repo()
-        frescor = {"sha": "a", "inventario": {"chatbot-api": [
-            {"secao": "worker", "chave": "FollowupWorker", "simbolo": "F",
-             "arquivo": "app/followup_job.py", "linha": 64}]}}
-        nos = {"chatbot-api": {"titulo": "Chatbot", "papel": "conversa", "dentro": {
-            "canais": {"titulo": "Canais", "papel": "entrada", "dentro": {
-                "loja-a": {"titulo": "WhatsApp loja A", "papel": "canal"}}}}}}
+        frescor = {"sha": "a", "inventario": {
+            "chatbot-api": [
+                {"secao": "worker", "chave": "FollowupWorker", "simbolo": "F",
+                 "arquivo": "app/followup_job.py", "linha": 64}],
+            "estoque-api": [
+                {"secao": "rota", "chave": "GET /public/veiculos",
+                 "simbolo": "listar_veiculos", "arquivo": "app/main.py",
+                 "linha": 10}],
+        }}
+        nos = {
+            "chatbot-api": {"titulo": "Chatbot", "papel": "conversa", "dentro": {
+                "canais": {"titulo": "Canais", "papel": "entrada", "dentro": {
+                    "loja-a": {"titulo": "WhatsApp loja A", "papel": "canal"}}}}},
+            # Segundo produto solto, sem relacao com o chatbot-api alem de
+            # dividir o nivel 1. Sem ele, chatbot-api e o UNICO no do
+            # nivel 1 e cena.largura == chatbot-api.w sempre (razao 1.0
+            # exata) — nenhum piso de k_min > 0 passaria no teste abaixo, e
+            # nao por empacotamento ruim: uma cena de UM no nao tem como
+            # ter um pai que nao seja "a tela inteira". O dado real sempre
+            # tem produtos/VMs irmaos (arquitetura.py tem 6 produtos e 5
+            # VMs); o mock precisa do mesmo formato pra nao testar uma
+            # forma que nunca ocorre fora do teste.
+            "estoque-api": {"titulo": "Estoque", "papel": "veiculos"},
+        }
         return arq_modelo.carregar(raiz, frescor, nos)
 
     def test_e_deterministico_byte_a_byte(self):
@@ -276,6 +294,47 @@ class TestLayout(unittest.TestCase):
     def test_id_de_caixa_e_unico(self):
         chaves = [c.chave for c in arq_layout.dispor(self._modelo()).caixas]
         self.assertEqual(len(chaves), len(set(chaves)))
+
+    def _modelo_real(self):
+        raiz = varredura.raiz_repo()
+        frescor_path = Path(__file__).resolve().parent / "mapa" / "_frescor.json"
+        frescor = json.loads(frescor_path.read_text(encoding="utf-8"))
+        return arq_modelo.carregar(
+            raiz, frescor, arquitetura.NOS,
+            arquitetura.ARESTAS, arquitetura.VMS, arquitetura.FLUXOS)
+
+    def test_limiar_nunca_abre_sozinho_no_zoom_inicial(self):
+        # Defeito A: `k_min = 0.6 * (cena/pai)` supoe o pai bem menor que a
+        # cena. app2037 e 97% da largura da cena original, entao a razao
+        # dava ~1.03 e k_min saia 0.62 — abaixo do zoom inicial (k=1), e o
+        # interior de todo produto ja abria no primeiro quadro. Piso: 1.6.
+        cena = arq_layout.dispor(self._modelo_real())
+        por_chave = {c.chave: c for c in cena.caixas}
+        for c in cena.caixas:
+            if c.pai and c.pai in por_chave:
+                self.assertGreaterEqual(c.k_min, 1.6, c.chave)
+
+    def test_a_cena_nao_e_uma_tira(self):
+        # Defeito B: a grade `ceil(sqrt(n))` colunas nao levava em conta que
+        # os filhos tem larguras muito diferentes, e a cena saia 19348x3739
+        # (razao 5.2) — uma tira. Meta: entre 1.0 e 2.2 (~16:10 a ~2.2:1).
+        cena = arq_layout.dispor(self._modelo_real())
+        razao = cena.largura / cena.altura
+        self.assertGreaterEqual(razao, 1.0, f"cena {cena.largura:.0f}x{cena.altura:.0f}")
+        self.assertLessEqual(razao, 2.2, f"cena {cena.largura:.0f}x{cena.altura:.0f}")
+
+    def test_vm_vazia_tem_tamanho_visivel(self):
+        # Defeito C: motor2037, n8n2037, evolution2037 e suite-pg nao
+        # contem produto, entao saiam do tamanho do titulo — um selo de
+        # 238x82 ao lado de uma VM de 18824, ilegivel e mal clicavel no
+        # nivel 1.
+        cena = arq_layout.dispor(self._modelo_real())
+        vms = [c for c in cena.caixas if c.tipo == "vm"]
+        maior_w = max(c.w for c in vms)
+        maior_h = max(c.h for c in vms)
+        for c in vms:
+            self.assertGreaterEqual(c.w, maior_w * 0.12, c.chave)
+            self.assertGreaterEqual(c.h, maior_h * 0.12, c.chave)
 
 
 class TestVMs(unittest.TestCase):

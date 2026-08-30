@@ -11,7 +11,13 @@ arq_zoom_demo.html e o proprio arq_zoom.js). As duas licoes daquele ensaio:
    com o interior invisivel para sempre porque o limiar (`3`, no bug real)
    nunca e alcancado. Por isso: `k_min = k_face = 0.6 * (largura_total /
    largura_do_pai)` — o mesmo numero que "clicar no pai" de fato atinge,
-   nunca acima dele.
+   nunca acima dele. Corrigido em 30/08 (2a leva) com um PISO de 1.6: sem
+   ele, um pai que domina a cena (app2037 e 97% da largura) faz a formula
+   sair abaixo do zoom inicial (k=1), e o interior de todo produto ja abre
+   no primeiro quadro. O piso e seguro porque a cena deixou de ser uma tira
+   dominada por um unico filho (ver `_grade` abaixo) — se algum pai ainda
+   ficar pequeno demais para o piso, o defeito e o empacotamento, nao o
+   piso (`test_o_limiar_e_alcancavel_clicando_no_pai` continua de pe).
 
 Stdlib apenas. Determinismo total: toda ordem vem de chave ja ordenada por
 `arq_modelo` (nunca `set` sem `sorted()`), nada de forca dirigida — o HTML e
@@ -54,13 +60,29 @@ class Cena:
 
 
 def _grade(tamanhos: list[tuple[float, float]]) -> tuple[float, float, list[tuple[float, float]]]:
-    """Empacota `tamanhos` (`[(w, h), ...]`) numa grade `ceil(sqrt(n))`
-    colunas, pra que o zoom nunca vire um corredor de 1 caixa de largura.
+    """Empacota `tamanhos` (`[(w, h), ...]`) em prateleiras (shelf packing),
+    mirando a proporcao de tela ~16:10, pra que a cena nunca vire uma tira
+    de 5:1 (filhos com larguras muito diferentes faziam a antiga grade
+    `ceil(sqrt(n))` colunas ficar larguissima).
 
-    Cada coluna/linha usa a maior celula que contem (layout tipo tabela);
-    `MARGEM` separa as celulas. A ordem de entrada e a UNICA fonte de
-    posicao — determinismo sem depender de nenhum `sorted()` aqui dentro,
-    porque quem chama ja entrega os itens em ordem de chave.
+    `largura_alvo = sqrt(area total * 2.8)`. O fator comecou em 1.6 (mira
+    literal ~16:10), mas o empacotamento e RECURSIVO — cada nivel encaixa
+    os filhos do nivel de baixo, que ja saiu um pouco mais alto que o
+    proprio alvo, e o desvio composto de nivel em nivel deixava a cena
+    real (`_frescor.json` + `arquitetura.py`) com razao 0.96 (mais alta
+    que larga). 2.8 foi medido contra o modelo real ate cair dentro da
+    meta (razao entre 1.0 e 2.2 — ver `test_a_cena_nao_e_uma_tira`) E manter
+    o limiar de app2037 alcancavel (ver `FRACAO_MIN_VM` em `dispor()`: os
+    dois numeros foram calibrados juntos, um 2.0 mais "redondo" deixava o
+    piso de VM vazia entrar na mesma prateleira de app2037 de um jeito que
+    NUNCA satisfazia `test_o_limiar_e_alcancavel_clicando_no_pai`).
+
+    Percorre os itens NA ORDEM DE ENTRADA (unica fonte de posicao —
+    determinismo sem `sorted()` aqui dentro, porque quem chama ja entrega
+    em ordem de chave), acumulando numa linha; quando o proximo item
+    estouraria `largura_alvo`, quebra a linha. Uma linha nunca fica vazia —
+    um item maior que o alvo sozinho ocupa a linha inteira. Linhas se
+    alinham pelo topo; a altura de cada linha e a do item mais alto dela.
 
     Devolve `(largura_total, altura_total, [(x, y), ...])`, posicoes na
     mesma ordem de `tamanhos`.
@@ -69,31 +91,39 @@ def _grade(tamanhos: list[tuple[float, float]]) -> tuple[float, float, list[tupl
     if n == 0:
         return 0.0, 0.0, []
 
-    cols = math.ceil(math.sqrt(n))
-    rows = math.ceil(n / cols)
+    area = sum(w * h for w, h in tamanhos)
+    largura_alvo = math.sqrt(area * 2.8) if area > 0 else 0.0
 
-    larg_col = [0.0] * cols
-    alt_lin = [0.0] * rows
+    linhas: list[list[int]] = []
+    linha_atual: list[int] = []
+    largura_linha = 0.0
     for i, (w, h) in enumerate(tamanhos):
-        col, lin = i % cols, i // cols
-        larg_col[col] = max(larg_col[col], w)
-        alt_lin[lin] = max(alt_lin[lin], h)
+        acrescida = largura_linha + (MARGEM if linha_atual else 0.0) + w
+        if linha_atual and acrescida > largura_alvo:
+            linhas.append(linha_atual)
+            linha_atual = [i]
+            largura_linha = w
+        else:
+            linha_atual.append(i)
+            largura_linha = acrescida
+    if linha_atual:
+        linhas.append(linha_atual)
 
-    x_col = [0.0] * cols
-    acumulado = 0.0
-    for c in range(cols):
-        x_col[c] = acumulado
-        acumulado += larg_col[c] + MARGEM
-    largura_total = acumulado - MARGEM
+    posicoes: list[tuple[float, float]] = [(0.0, 0.0)] * n
+    largura_total = 0.0
+    y = 0.0
+    for linha in linhas:
+        x = 0.0
+        alt_linha = 0.0
+        for idx in linha:
+            w, h = tamanhos[idx]
+            posicoes[idx] = (x, y)
+            x += w + MARGEM
+            alt_linha = max(alt_linha, h)
+        largura_total = max(largura_total, x - MARGEM)
+        y += alt_linha + MARGEM
+    altura_total = y - MARGEM
 
-    y_lin = [0.0] * rows
-    acumulado = 0.0
-    for r in range(rows):
-        y_lin[r] = acumulado
-        acumulado += alt_lin[r] + MARGEM
-    altura_total = acumulado - MARGEM
-
-    posicoes = [(x_col[i % cols], y_lin[i // cols]) for i in range(n)]
     return largura_total, altura_total, posicoes
 
 
@@ -222,6 +252,30 @@ def dispor(modelo: Modelo) -> Cena:
     soltos = [no for no in modelo.nos if no.chave not in contidos]
     raizes += [_dispor_no(no, no.chave, 1) for no in soltos]
 
+    # VM sem produto (motor2037, n8n2037, evolution2037, suite-pg) saia do
+    # _dispor_vm mal maior que o texto do titulo — um selo de 238x82 ao lado
+    # de uma VM de 18824. Piso: no MINIMO 12% da maior VM em cada eixo, pra
+    # ficar clicavel e legivel no nivel 1. So VM, nunca no solto (que ja tem
+    # seu proprio tamanho de conteudo).
+    #
+    # Na pratica uso 30%, nao o minimo de 12%: com so 4 VMs vazias ao lado
+    # de app2037 (que domina a area), 12% deixa a soma das 4 pequena demais
+    # pra desafogar app2037 — o piso de k_min (1.6, defeito A) nunca fica
+    # alcancavel para os filhos diretos de app2037 (cena/app2037.w ficava
+    # ~1.50, abaixo de 1.6). 30% resolve com folga sem violar "no minimo
+    # 12%" (test_vm_vazia_tem_tamanho_visivel so exige >=). Calibrado junto
+    # com o 2.8 de `_grade`: os dois mudam quantas VMs cabem na mesma
+    # prateleira de app2037, e so a combinacao dos dois fecha a conta.
+    FRACAO_MIN_VM = 0.30
+    larguras_vm = [c.w for c, _ in raizes if c.tipo == "vm"]
+    alturas_vm = [c.h for c, _ in raizes if c.tipo == "vm"]
+    piso_w = max(larguras_vm) * FRACAO_MIN_VM if larguras_vm else 0.0
+    piso_h = max(alturas_vm) * FRACAO_MIN_VM if alturas_vm else 0.0
+    raizes = [
+        (replace(c, w=max(c.w, piso_w), h=max(c.h, piso_h)) if c.tipo == "vm" else c, desc)
+        for c, desc in raizes
+    ]
+
     largura, altura, posicoes = _grade([(c.w, c.h) for c, _ in raizes])
 
     caixas: list[Caixa] = []
@@ -241,7 +295,11 @@ def dispor(modelo: Modelo) -> Cena:
             finais.append(c)
             continue
         pai = por_chave[c.pai]
-        k = round(0.6 * (largura / pai.w), 4) if pai.w else 0.0
+        # Piso 1.6: sem ele, um pai que domina a cena (app2037 e 97% da
+        # largura) faz `0.6 * cena/pai` sair menor que o zoom inicial (k=1)
+        # e o interior ja abre no primeiro quadro. Voce tem que entrar em
+        # algo antes do interior dela abrir.
+        k = round(max(1.6, 0.6 * (largura / pai.w)), 4) if pai.w else 0.0
         finais.append(replace(c, k_min=k, k_face=k))
 
     finais.sort(key=lambda c: c.chave)
