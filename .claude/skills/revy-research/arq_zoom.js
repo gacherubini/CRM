@@ -27,7 +27,7 @@ window.Zoom = {
     // caro — ver "custo" abaixo).
     var ALVO_PX_DESLOC = 2.2;    // tremida alvo, em pixel de tela: "levemente rabiscado"
     var CICLOS_POR_PX = 0.045;   // grao do ruido: ~1 ciclo a cada 22px de tela
-    var pxPorUnidade0 = 1, c1 = 0, c2 = 0;
+    var pxPorUnidade0 = 1, c1 = 0, c2 = 0, medido_visivel = false;
     var filtroDesloc = document.getElementById("rabisco-deslocamento");
     var filtroTurb = document.getElementById("rabisco-turbulencia");
     var K_LIMIAR_FILTRO = 26; // acima disso a caixa e' grande na tela e a
@@ -35,14 +35,22 @@ window.Zoom = {
     // ver relatorio da Task 11: cena real ~1600 formas, 60fps parado,
     // ~45fps durante o voo SEM este corte, fluido com ele).
 
+    // A vista que nao abre nasce com `hidden`, e um elemento em display:none
+    // mede 0. Cair no `base.w` fazia px_por_unidade valer 1 em vez de ~0.15:
+    // a tremida da vista Schema saia 7x menor que a da Arquitetura, e o grao
+    // do ruido 7x mais fino. Enquanto a medida nao for tirada com o svg na
+    // tela ela fica marcada como provisoria, e a primeira pintura visivel
+    // remede.
     function medirPxPorUnidade() {
       var r = svg.getBoundingClientRect();
-      pxPorUnidade0 = (r.width || base.w) / base.w;
+      medido_visivel = r.width > 0;
+      pxPorUnidade0 = (r.width || window.innerWidth || base.w) / base.w;
       c1 = ALVO_PX_DESLOC / pxPorUnidade0;
       c2 = CICLOS_POR_PX * pxPorUnidade0;
     }
 
     function aplicarFiltro(k) {
+      if (!medido_visivel) medirPxPorUnidade();
       if (filtroDesloc) filtroDesloc.setAttribute("scale", (c1 / k).toFixed(3));
       if (filtroTurb) filtroTurb.setAttribute("baseFrequency", (c2 * k).toFixed(5));
       svg.classList.toggle("k-alto", k > K_LIMIAR_FILTRO);
