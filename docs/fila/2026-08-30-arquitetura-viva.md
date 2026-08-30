@@ -1302,6 +1302,143 @@ git add .claude/skills/revy-research/arq_render.py \
 git commit -m "feat(arquitetura): o fluxo acende o caminho e apaga o resto"
 ```
 
+---
+
+### Task 8: os nós automáticos — detalhe até o último arquivo
+
+**Acrescentada em 30/08**, depois de medir a distribuição real: 816 entradas caíram em
+38 nós, mas mal. `portal-gestao` segurava 154 entradas soltas na raiz, `revy-trafego`
+161, `chatbot-api` 115, e o nó `web` do Portal era um balde único de 136 — enquanto
+`agente`, `midia`, `outbox`, `provisioning`, `clients`, `conversions` e `email` ficaram
+vazios. Agrupar à mão não alcança 816 itens, e o dono pediu detalhe até as partes menores.
+
+A correção: as entradas que **não** casam com nenhum `modulo` escrito à mão viram
+sub-nós **derivados do caminho do arquivo**. `app/loja/vendas.py` vira o nó
+`loja` → `vendas.py`. O `arquitetura.py` continua sendo a camada de domínio; a árvore
+de arquivos vira a camada de baixo, de graça e sempre atualizada.
+
+**Files:**
+- Modify: `.claude/skills/revy-research/arq_modelo.py`
+- Modify: `.claude/skills/revy-research/test_gerar_arquitetura.py`
+
+**Interfaces:**
+- Consumes: `No`, `carregar` (já existentes).
+- Produces: `No` ganha o campo `auto: bool = False`. Nós derivados de caminho vêm com
+  `auto=True`; nós escritos à mão continuam `False`. Nada mais muda de forma, então
+  `arq_layout` e `arq_render` continuam funcionando sem alteração.
+
+**A regra:**
+
+Ao final de `carregar()`, para cada nó que sobrou com entradas, agrupe essas entradas
+pelo `arquivo` e construa a subárvore de diretórios:
+
+- O prefixo comum a todos (tipicamente `app/`) é descartado — não vira nó, seria uma
+  caixa só envolvendo tudo.
+- Cada diretório restante vira um `No` com `auto=True`, `papel="modulo"`,
+  `titulo=` o nome do diretório.
+- Cada arquivo vira um `No` com `auto=True`, `papel="arquivo"`,
+  `titulo=` o nome do arquivo, e as entradas daquele arquivo em `entradas`.
+- Diretório com um único filho colapsa no filho (`a/b/c.py` sozinho não gera três
+  caixas aninhadas, gera uma).
+- `chave` do nó automático = o caminho, prefixado pela chave do pai, para não colidir.
+- Ordem por chave, sempre. Determinismo continua obrigatório.
+
+**Não** aplique isso dentro de nós que já têm `modulo` casado à mão com poucas entradas —
+a regra vale para o que sobrou, não para o que já tem dono.
+
+- [ ] **Step 1: Escrever os testes que falham**
+
+```python
+class TestNosAutomaticos(unittest.TestCase):
+    def _carrega(self, arquivos):
+        raiz = varredura.raiz_repo()
+        frescor = {"sha": "a", "inventario": {"chatbot-api": [
+            {"secao": "rota", "chave": f"GET /{i}", "simbolo": f"s{i}",
+             "arquivo": a, "linha": i + 1}
+            for i, a in enumerate(arquivos)]}}
+        nos = {"chatbot-api": {"titulo": "Chatbot", "papel": "conversa"}}
+        return arq_modelo.carregar(raiz, frescor, nos)
+
+    def _todos(self, no, acc=None):
+        acc = acc if acc is not None else []
+        acc.append(no)
+        for f in no.filhos:
+            self._todos(f, acc)
+        return acc
+
+    def test_diretorio_vira_no(self):
+        m = self._carrega(["app/loja/vendas.py", "app/loja/metas.py",
+                           "app/canais/whatsapp.py"])
+        titulos = {n.titulo for n in self._todos(m.nos[0])}
+        self.assertIn("loja", titulos)
+        self.assertIn("canais", titulos)
+
+    def test_arquivo_vira_folha_com_as_entradas(self):
+        m = self._carrega(["app/loja/vendas.py", "app/loja/vendas.py"])
+        folhas = [n for n in self._todos(m.nos[0]) if n.papel == "arquivo"]
+        self.assertEqual(len(folhas), 1)
+        self.assertEqual(len(folhas[0].entradas), 2)
+
+    def test_nenhuma_entrada_fica_solta_na_raiz_do_produto(self):
+        # E o defeito que motivou esta task: 154 entradas paradas no produto.
+        m = self._carrega(["app/loja/vendas.py", "app/canais/whatsapp.py",
+                           "app/main.py"])
+        self.assertEqual(len(m.nos[0].entradas), 0)
+
+    def test_diretorio_de_filho_unico_colapsa(self):
+        m = self._carrega(["app/a/b/c.py"])
+        auto = [n for n in self._todos(m.nos[0]) if n.auto]
+        self.assertLessEqual(len(auto), 2, [n.chave for n in auto])
+
+    def test_no_escrito_a_mao_nao_vem_marcado_como_auto(self):
+        m = self._carrega(["app/main.py"])
+        self.assertFalse(m.nos[0].auto)
+
+    def test_continua_deterministico(self):
+        a = self._carrega(["app/loja/vendas.py", "app/canais/whatsapp.py"])
+        b = self._carrega(["app/canais/whatsapp.py", "app/loja/vendas.py"])
+        self.assertEqual([n.chave for n in self._todos(a.nos[0])],
+                         [n.chave for n in self._todos(b.nos[0])])
+```
+
+- [ ] **Step 2: Rodar e ver falhar**
+
+```
+cd .claude/skills/revy-research && python3 -m unittest test_gerar_arquitetura -v
+```
+Esperado: falha em `test_diretorio_vira_no` (`AssertionError: 'loja' not found`).
+
+- [ ] **Step 3: Implementar** a regra acima em `arq_modelo.py`.
+
+- [ ] **Step 4: Rodar e ver passar**, e depois medir contra o repo real:
+
+```
+cd .claude/skills/revy-research && python3 -c "
+import json, arq_modelo, arquitetura, varredura
+f = json.load(open('mapa/_frescor.json'))
+m = arq_modelo.carregar(varredura.raiz_repo(), f, arquitetura.NOS,
+                        arquitetura.ARESTAS, arquitetura.VMS, arquitetura.FLUXOS)
+def anda(n, d=0, acc=None):
+    acc = acc if acc is not None else []
+    acc.append((d, n.chave, len(n.entradas)))
+    for c in n.filhos: anda(c, d + 1, acc)
+    return acc
+soltas = sum(len(r.entradas) for r in m.nos)
+tudo = [x for r in m.nos for x in anda(r)]
+print('nos:', len(tudo), '| entradas:', sum(e for _, _, e in tudo),
+      '| soltas na raiz:', soltas, '| profundidade:', max(d for d, _, _ in tudo))
+"
+```
+
+Esperado: **`soltas na raiz: 0`**, número de nós na casa das centenas, e profundidade
+maior que 3. Se ainda houver entrada solta, a regra não cobriu algum formato de caminho.
+
+- [ ] **Step 5: Commitar** com a mensagem
+`feat(arquitetura): os nos automaticos, o detalhe desce ate o arquivo`.
+Adicione nominalmente só `arq_modelo.py` e `test_gerar_arquitetura.py`.
+
+---
+
 ## Antes de dizer que acabou
 
 - `python3 -m unittest test_gerar_arquitetura -v` — verde
@@ -1311,6 +1448,7 @@ git commit -m "feat(arquitetura): o fluxo acende o caminho e apaga o resto"
 - `git diff --check` e `git status --short` limpos
 - `arq_zoom_demo.html` não existe mais
 - Um fluxo acende no navegador e o "limpar" devolve tudo
+- Nenhuma entrada do `_frescor.json` ficou solta na raiz de um produto
 - O HTML abriu no navegador e você chegou num `arquivo:linha` de verdade
 
 Não mexe em produto nenhum, então não há teste de produto a rodar, nem migration,
