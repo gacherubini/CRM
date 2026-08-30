@@ -1454,6 +1454,88 @@ Adicione nominalmente só `arq_modelo.py` e `test_gerar_arquitetura.py`.
 Não mexe em produto nenhum, então não há teste de produto a rodar, nem migration,
 nem n8n, nem deploy.
 
+---
+
+## Estado em 30/08 — o que falta
+
+As Tasks 1 a 8 estao **feitas e commitadas** na branch `arquitetura-viva`
+(worktree em `.claude/worktrees/arquitetura-viva`, 24 commits sobre `69f5e6c`).
+40 testes verdes, `python3 gerar_arquitetura.py --verificar` sai 0, e o
+`arquitetura.html` (329 KB) abre e funciona: nivel 1 -> produto -> arquivo ->
+`arquivo:linha`, com `Esc` voltando e o realce de fluxo funcionando.
+
+**Nao mergeado, nao pusheado.** Isso e decisao do dono.
+
+### Proximo lote — aprovado pelo dono em 30/08, ainda NAO implementado
+
+O dono viu o resultado no navegador, apontou tres coisas feias e pediu para ver
+a proposta antes de codar. A proposta foi mostrada como mockup estatico e
+aprovada com duas escolhas dele:
+
+1. **Nivel 1 vira escopo puro.** Hoje o LOD e so por escala, entao caixas irmas
+   de tamanho parecido abrem o interior juntas — entrar no Chatbot mostra o
+   interior do Portal ao lado. Regra nova: o interior de um no so acende se ele
+   for o foco atual ou um ancestral do foco. Como os `id` sao caminhos pontuados
+   (`app2037.chatbot-api.app.main.py`), e teste de prefixo:
+   `atual === id || atual.indexOf(id + ".") === 0` — com o ponto, senao
+   `chatbot-api` casa com `chatbot-apix`. Cada grupo de interior passa a emitir
+   `data-dono="<id do no>"`.
+
+2. **Schema sai da arquitetura — DECIDIDO: vista separada com alternador.**
+   Dois botoes no topo trocam entre duas cenas independentes no mesmo HTML.
+   - Vista Arquitetura: secoes `rota`, `worker`, `flag`, `template`. Tem arestas
+     e fluxos.
+   - Vista Schema: secoes `modelo`, `migration`. Sem aresta e sem fluxo —
+     fluxo e caminho de execucao, nao relacao de dado.
+   - `dispor(modelo, secoes: frozenset)` filtra; no sem item na vista **e sem
+     filho com item** e podado dela, senao a vista Schema vira moldura vazia.
+   - Secao nova no `_frescor.json` que nao caia em nenhum dos dois conjuntos
+     tem que **avisar no stdout** (nao falhar). Dado que some calado e como
+     isso apodreceria.
+
+3. **Schema agrupado por BANCO — DECIDIDO pelo dono, nao por produto.**
+   `suite-pg` (banco `revy`) contendo os schemas da Loja e do Control lado a
+   lado; Estoque, Chatbot e Motor com bancos proprios. Mostra de cara quem
+   divide banco com quem, que e a historia do corte de 16/08 e a causa do OOM
+   que ja derrubou Portal e Motor juntos
+   (`learnings/2026-08-23-suite-pg-oom-derruba-portal-e-motor.md`).
+
+4. **Arestas ortogonais.** Hoje ligam centro a centro e cortam a cena em
+   diagonal. Trocar por `<polyline>` com no maximo dois cotovelos, saindo pela
+   borda mais proxima do alvo, rotulo `protocolo · sem retry` no segmento do
+   meio. Manter `marker-end` e `stroke-dasharray` para assincrono.
+
+### Ainda em aberto, nao perguntado ao dono
+
+- Onde `template` mora. Esta na vista Arquitetura, mas e apresentacao, nao
+  estrutura.
+- A face das caixas mostra contagem de itens ("115 itens") no mockup. Foi
+  invencao, pode ser ruido.
+
+### Decisoes do dono que nao se re-propoem
+
+- Schema e vista separada, nao caixa dentro da arquitetura.
+- Schema agrupa por banco, nao por produto.
+- As VMs sao desenhadas (um implementador cortou alegando profundidade; foi
+  revertido — a moldura existe para mostrar que a `app2037` carrega seis
+  produtos).
+- `suite-pg` NAO contem Loja e Control: eles falam TCP com o banco. Modelar
+  como contencao desenhava a arvore dos dois em duplicata.
+
+### Pendencias que sao do dono
+
+1. Aprovar o voo e o ritmo abrindo o `arquitetura.html`.
+2. Mergear ou nao.
+3. Conferir as 6 `ARESTAS` e o `FLUXOS["login"]` do `arquitetura.py` — sao
+   inferencia de subagente lendo codigo, com fonte citada, mas nunca lidas por
+   humano.
+4. `test_gerar_mapa.py` tem 2 falhas de drift do n8n **anteriores** a esta
+   branch (4 workflows no repo contra 3 na tabela `PUBLICADOS` de
+   `cruzamentos.py`). Atualizar a tabela ou tirar workflow do ar.
+5. O painel Axiom (secao 13 do spec): decidido que **nao leva machine propria**
+   — vira rota no Control com endpoint proxy. Sem plano escrito, e o primeiro
+   passo e instrumentacao, nao tela: hoje nao ha nenhum Axiom no repo.
+
 ## Fora de escopo
 
 Painel Axiom (§13 do spec) — projeto irmão, spec próprio, começa por instrumentação.
