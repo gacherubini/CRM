@@ -1,3 +1,5 @@
+import contextlib
+import io
 import json
 import re
 import tempfile
@@ -35,6 +37,16 @@ def _todas_entradas(no, acc=None):
     acc.extend(no.entradas)
     for f in no.filhos:
         _todas_entradas(f, acc)
+    return acc
+
+
+def _todos_nos(no, acc=None):
+    # Mesma ideia de _todas_entradas, so que devolvendo os NOS (pra checar
+    # titulo/chave/auto de qualquer profundidade, nao so as entradas).
+    acc = acc if acc is not None else []
+    acc.append(no)
+    for f in no.filhos:
+        _todos_nos(f, acc)
     return acc
 
 
@@ -161,8 +173,10 @@ class TestArquiteturaReal(unittest.TestCase):
     def test_o_arquivo_real_carrega_sem_referencia_morta(self):
         m = arq_modelo.carregar(
             self.raiz, self.frescor, arquitetura.NOS,
-            arquitetura.ARESTAS, arquitetura.VMS, arquitetura.FLUXOS)
+            arquitetura.ARESTAS, arquitetura.VMS, arquitetura.FLUXOS,
+            arquitetura.BANCOS)
         self.assertGreaterEqual(len(m.nos), 6)
+        self.assertEqual(len(m.bancos), len(arquitetura.BANCOS))
 
     def test_todo_produto_do_frescor_tem_no(self):
         faltando = set(self.frescor["inventario"]) - set(arquitetura.NOS)
@@ -231,6 +245,97 @@ class TestNosAutomaticos(unittest.TestCase):
                          [n.chave for n in self._todos(b.nos[0])])
 
 
+class TestFiltrar(unittest.TestCase):
+    # Task 9: as secoes viram duas vistas (Arquitetura x Schema). O teste
+    # que importa e o catalogo-publico: zero `modelo`/`migration` (ver
+    # contagem real na task), entao ele tem que sumir da vista Schema.
+    def setUp(self):
+        self.raiz = varredura.raiz_repo()
+        frescor_path = Path(__file__).resolve().parent / "mapa" / "_frescor.json"
+        self.frescor = json.loads(frescor_path.read_text(encoding="utf-8"))
+        self.modelo = arq_modelo.carregar(
+            self.raiz, self.frescor, arquitetura.NOS,
+            arquitetura.ARESTAS, arquitetura.VMS, arquitetura.FLUXOS,
+            arquitetura.BANCOS)
+
+    def test_catalogo_publico_some_da_vista_schema(self):
+        schema = arq_modelo.filtrar(self.modelo, arquitetura.SECOES_SCHEMA)
+        self.assertNotIn("catalogo-publico", {n.chave for n in schema.nos})
+
+    def test_suite_pg_mantem_portal_e_trafego_na_vista_schema(self):
+        schema = arq_modelo.filtrar(self.modelo, arquitetura.SECOES_SCHEMA)
+        chaves = {n.chave for n in schema.nos}
+        self.assertIn("portal-gestao", chaves)
+        self.assertIn("revy-trafego", chaves)
+        suite_pg = next(b for b in schema.bancos if b.chave == "suite-pg")
+        self.assertEqual(suite_pg.contem, ("portal-gestao", "revy-trafego"))
+
+    def test_nenhuma_entrada_de_rota_sobrevive_na_vista_schema(self):
+        schema = arq_modelo.filtrar(self.modelo, arquitetura.SECOES_SCHEMA)
+        for no in schema.nos:
+            for e in _todas_entradas(no):
+                self.assertNotEqual(e.secao, "rota", f"{no.chave}: {e.chave}")
+
+    def test_nenhuma_entrada_de_modelo_sobrevive_na_vista_arquitetura(self):
+        arq = arq_modelo.filtrar(self.modelo, arquitetura.SECOES_ARQUITETURA)
+        for no in arq.nos:
+            for e in _todas_entradas(no):
+                self.assertNotEqual(e.secao, "modelo", f"{no.chave}: {e.chave}")
+
+    def test_no_auto_cujo_arquivo_so_tinha_rota_some_da_vista_schema(self):
+        # Modelo pequeno a mao (nao depende do inventario real): um arquivo
+        # so com `rota` e outro so com `modelo`, ambos sem `modulo` casado —
+        # os dois viram no automatico (Task 8). Filtrar pra Schema tem que
+        # refazer a arvore automatica, nao so podar a antiga, senao o
+        # diretorio do arquivo-so-rota sobra vazio.
+        frescor = {"sha": "a", "inventario": {"chatbot-api": [
+            {"secao": "rota", "chave": "GET /x", "simbolo": "x",
+             "arquivo": "app/so_rota.py", "linha": 1},
+            {"secao": "modelo", "chave": "Pessoa", "simbolo": "Pessoa",
+             "arquivo": "app/modelos.py", "linha": 1},
+        ]}}
+        nos = {"chatbot-api": {"titulo": "Chatbot", "papel": "conversa"}}
+        modelo = arq_modelo.carregar(self.raiz, frescor, nos)
+        schema = arq_modelo.filtrar(modelo, arquitetura.SECOES_SCHEMA)
+        titulos = {n.titulo for n in _todos_nos(schema.nos[0])}
+        self.assertNotIn("so_rota.py", titulos)
+        self.assertIn("modelos.py", titulos)
+
+    def test_secao_desconhecida_avisa_e_nao_levanta(self):
+        frescor = {"sha": "a", "inventario": {"chatbot-api": [
+            {"secao": "trigger-fantasma", "chave": "X", "simbolo": "x",
+             "arquivo": "app/x.py", "linha": 1}]}}
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            gerar_arquitetura._avisar_secoes_desconhecidas(frescor)
+        self.assertIn("trigger-fantasma", buf.getvalue())
+
+    def test_referencia_morta_quando_banco_contem_no_inexistente(self):
+        bancos = {"banco-fantasma": {"tipo": "postgres",
+                                      "contem": ["produto-fantasma"]}}
+        with self.assertRaises(arq_modelo.ReferenciaMorta) as ctx:
+            arq_modelo.carregar(self.raiz, FRESCOR_FALSO, NOS_FALSOS,
+                                 (), None, None, bancos)
+        self.assertIn("produto-fantasma", str(ctx.exception))
+
+
+class TestDisporSchema(unittest.TestCase):
+    def test_vista_schema_produz_cena_valida_sem_caixa_orfa(self):
+        raiz = varredura.raiz_repo()
+        frescor_path = Path(__file__).resolve().parent / "mapa" / "_frescor.json"
+        frescor = json.loads(frescor_path.read_text(encoding="utf-8"))
+        modelo = arq_modelo.carregar(
+            raiz, frescor, arquitetura.NOS, arquitetura.ARESTAS,
+            arquitetura.VMS, arquitetura.FLUXOS, arquitetura.BANCOS)
+        m = arq_modelo.filtrar(modelo, arquitetura.SECOES_SCHEMA)
+        cena = arq_layout.dispor(m, m.bancos)
+        self.assertGreater(cena.largura, 0)
+        por_chave = {c.chave: c for c in cena.caixas}
+        for c in cena.caixas:
+            if c.pai is not None:
+                self.assertIn(c.pai, por_chave, f"caixa orfa: {c.chave} (pai {c.pai})")
+
+
 class TestLayout(unittest.TestCase):
     def _modelo(self):
         raiz = varredura.raiz_repo()
@@ -261,15 +366,15 @@ class TestLayout(unittest.TestCase):
         return arq_modelo.carregar(raiz, frescor, nos)
 
     def test_e_deterministico_byte_a_byte(self):
-        self.assertEqual(arq_layout.dispor(self._modelo()),
-                         arq_layout.dispor(self._modelo()))
+        self.assertEqual(arq_layout.dispor(self._modelo(), self._modelo().vms),
+                         arq_layout.dispor(self._modelo(), self._modelo().vms))
 
     def test_desce_ate_o_neto(self):
-        niveis = {c.nivel for c in arq_layout.dispor(self._modelo()).caixas}
+        niveis = {c.nivel for c in arq_layout.dispor(self._modelo(), self._modelo().vms).caixas}
         self.assertIn(3, niveis, "o neto (loja-a) nao virou caixa")
 
     def test_filho_cabe_dentro_do_pai_em_todo_nivel(self):
-        cena = arq_layout.dispor(self._modelo())
+        cena = arq_layout.dispor(self._modelo(), self._modelo().vms)
         por_chave = {c.chave: c for c in cena.caixas}
         for c in cena.caixas:
             if not c.pai or c.pai not in por_chave:
@@ -283,7 +388,7 @@ class TestLayout(unittest.TestCase):
     def test_o_limiar_e_alcancavel_clicando_no_pai(self):
         # O bug real: k_min acima do k que clicar no pai atinge deixa o
         # interior invisivel para sempre.
-        cena = arq_layout.dispor(self._modelo())
+        cena = arq_layout.dispor(self._modelo(), self._modelo().vms)
         por_chave = {c.chave: c for c in cena.caixas}
         for c in cena.caixas:
             if not c.pai or c.pai not in por_chave:
@@ -292,7 +397,7 @@ class TestLayout(unittest.TestCase):
             self.assertLess(c.k_min, k_do_pai_cheio, f"{c.chave} nunca acende")
 
     def test_id_de_caixa_e_unico(self):
-        chaves = [c.chave for c in arq_layout.dispor(self._modelo()).caixas]
+        chaves = [c.chave for c in arq_layout.dispor(self._modelo(), self._modelo().vms).caixas]
         self.assertEqual(len(chaves), len(set(chaves)))
 
     def _modelo_real(self):
@@ -308,7 +413,7 @@ class TestLayout(unittest.TestCase):
         # cena. app2037 e 97% da largura da cena original, entao a razao
         # dava ~1.03 e k_min saia 0.62 — abaixo do zoom inicial (k=1), e o
         # interior de todo produto ja abria no primeiro quadro. Piso: 1.6.
-        cena = arq_layout.dispor(self._modelo_real())
+        cena = arq_layout.dispor(self._modelo_real(), self._modelo_real().vms)
         por_chave = {c.chave: c for c in cena.caixas}
         for c in cena.caixas:
             if c.pai and c.pai in por_chave:
@@ -318,7 +423,7 @@ class TestLayout(unittest.TestCase):
         # Defeito B: a grade `ceil(sqrt(n))` colunas nao levava em conta que
         # os filhos tem larguras muito diferentes, e a cena saia 19348x3739
         # (razao 5.2) — uma tira. Meta: entre 1.0 e 2.2 (~16:10 a ~2.2:1).
-        cena = arq_layout.dispor(self._modelo_real())
+        cena = arq_layout.dispor(self._modelo_real(), self._modelo_real().vms)
         razao = cena.largura / cena.altura
         self.assertGreaterEqual(razao, 1.0, f"cena {cena.largura:.0f}x{cena.altura:.0f}")
         self.assertLessEqual(razao, 2.2, f"cena {cena.largura:.0f}x{cena.altura:.0f}")
@@ -328,7 +433,7 @@ class TestLayout(unittest.TestCase):
         # contem produto, entao saiam do tamanho do titulo — um selo de
         # 238x82 ao lado de uma VM de 18824, ilegivel e mal clicavel no
         # nivel 1.
-        cena = arq_layout.dispor(self._modelo_real())
+        cena = arq_layout.dispor(self._modelo_real(), self._modelo_real().vms)
         vms = [c for c in cena.caixas if c.tipo == "vm"]
         maior_w = max(c.w for c in vms)
         maior_h = max(c.h for c in vms)
@@ -349,7 +454,7 @@ class TestVMs(unittest.TestCase):
         modelo = arq_modelo.carregar(
             raiz, frescor, arquitetura.NOS,
             arquitetura.ARESTAS, arquitetura.VMS, arquitetura.FLUXOS)
-        cena = arq_layout.dispor(modelo)
+        cena = arq_layout.dispor(modelo, modelo.vms)
         por_chave = {c.chave: c for c in cena.caixas}
 
         for chave_vm, bruto_vm in arquitetura.VMS.items():
@@ -377,7 +482,7 @@ class TestRender(unittest.TestCase):
         nos = {"chatbot-api": {"titulo": "Chatbot", "papel": "conversa", "dentro": {
             "canais": {"titulo": "Canais", "papel": "entrada"}}}}
         modelo = arq_modelo.carregar(raiz, frescor, nos)
-        return arq_render.render(arq_layout.dispor(modelo), modelo, "/* js */")
+        return arq_render.render(arq_layout.dispor(modelo, modelo.vms), modelo, "/* js */")
 
     def test_e_auto_contido_sem_nenhuma_url_externa(self):
         # "http" cru no HTML nao e' erro: o _frescor.json real carrega
@@ -412,7 +517,7 @@ class TestRender(unittest.TestCase):
              "arquivo": "app/main.py", "linha": 1}]}}
         nos = {"chatbot-api": {"titulo": "C", "papel": "x"}}
         modelo = arq_modelo.carregar(raiz, frescor, nos)
-        html = arq_render.render(arq_layout.dispor(modelo), modelo, "")
+        html = arq_render.render(arq_layout.dispor(modelo, modelo.vms), modelo, "")
         self.assertNotIn("<b>", html)
 
     def test_subtitulo_truncado_nunca_fica_maior_que_o_original(self):
@@ -437,7 +542,7 @@ class TestRender(unittest.TestCase):
         arestas = [{"de": "chatbot-api", "para": "estoque-api",
                     "protocolo": "http", "sincrono": False, "retry": False}]
         modelo = arq_modelo.carregar(raiz, frescor, nos, arestas)
-        html = arq_render.render(arq_layout.dispor(modelo), modelo, "")
+        html = arq_render.render(arq_layout.dispor(modelo, modelo.vms), modelo, "")
         self.assertIn("stroke-dasharray", html)
         self.assertIn("sem retry", html)
 
@@ -460,7 +565,7 @@ class TestFluxos(unittest.TestCase):
                         "sincrono": False}],
             "invariante": "a parcela nao volta ao cliente pelo bot"}}
         modelo = arq_modelo.carregar(raiz, frescor, nos, (), None, fluxos)
-        html = arq_render.render(arq_layout.dispor(modelo), modelo, "")
+        html = arq_render.render(arq_layout.dispor(modelo, modelo.vms), modelo, "")
         self.assertIn("WhatsApp → simulação", html)
         self.assertIn("a parcela nao volta ao cliente pelo bot", html)
         # A ordem dos passos e conteudo do fluxo, nao pode sair alfabetica.

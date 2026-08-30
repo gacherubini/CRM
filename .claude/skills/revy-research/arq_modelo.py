@@ -79,6 +79,10 @@ class Modelo:
     nos: tuple[No, ...] = ()
     arestas: tuple[Aresta, ...] = ()
     vms: tuple[Vm, ...] = ()
+    # Grupos de topo da vista Schema (Task 9) — mesma forma de `vms`, banco
+    # em vez de maquina Fly. Vazio por padrao pra nao quebrar quem monta um
+    # Modelo a mao sem se importar com Schema (a maioria dos testes antigos).
+    bancos: tuple[Vm, ...] = ()
     fluxos: tuple[Fluxo, ...] = ()
     sha: str = ""
 
@@ -237,6 +241,23 @@ def _pilha_auto(entradas: list, nivel: int, chave_prefixo: str) -> list:
     return filhos
 
 
+def _construir_arvore_auto(entradas: list) -> tuple["No", ...]:
+    """Constroi a floresta de nos automaticos do ZERO a partir de uma lista
+    chata de entradas — nivel 0, sem prefixo de chave. Extraido pra ser
+    reusado tanto por `_com_auto` (carregar) quanto por `filtrar` (Task 9),
+    que precisa refazer os nos automaticos depois de podar secao: podar a
+    arvore automatica antiga em vez de reconstrui-la deixa diretorio vazio
+    pra tras (ver docstring de `filtrar`).
+
+    `_pilha_auto` entra em loop infinito com lista vazia (o `while True`
+    nunca acha `alguma_termina` numa lista sem elemento) — por isso a guarda
+    aqui, no unico lugar que chama `_pilha_auto` de fora.
+    """
+    if not entradas:
+        return ()
+    return tuple(sorted(_pilha_auto(list(entradas), 0, ""), key=lambda n: n.chave))
+
+
 def _com_auto(no: No) -> No:
     """Aplica a regra dos nos automaticos em toda a arvore (pos-ordem): um
     no com `modulo` escrito a mao ja tem dono, fica intocado. Um no SEM
@@ -247,14 +268,45 @@ def _com_auto(no: No) -> No:
     filhos = tuple(_com_auto(f) for f in no.filhos)
     if no.modulo or not no.entradas:
         return replace(no, filhos=filhos)
-    auto_filhos = tuple(_pilha_auto(list(no.entradas), 0, ""))
+    auto_filhos = _construir_arvore_auto(list(no.entradas))
     todos = tuple(sorted(filhos + auto_filhos, key=lambda n: n.chave))
     return replace(no, entradas=(), filhos=todos)
 
 
+def _entradas_da_arvore(no: No) -> list:
+    """Achata `entradas` de `no` e de toda a subarvore abaixo dele, em
+    ordem de visita. Usado por `filtrar` pra recolher o que uma subarvore
+    automatica continha antes de refaze-la com a secao filtrada."""
+    acc = list(no.entradas)
+    for f in no.filhos:
+        acc.extend(_entradas_da_arvore(f))
+    return acc
+
+
+def _construir_grupos(bruto: dict, conhecidos: set, rotulo: str) -> list:
+    """Constroi `[Vm, ...]` a partir de um dict cru no formato de `VMS`/
+    `BANCOS` (chave, tipo, contem, nota), validando que todo `contem` cite
+    um no que existe. Reusado por `carregar` pros dois grupos de topo (VMs
+    da Arquitetura, bancos da Schema) — o formato e identico, so muda o
+    `rotulo` que entra na mensagem de erro ("vm" ou "banco").
+    """
+    grupos = []
+    for chave in sorted(bruto or {}):
+        b = (bruto or {})[chave]
+        for dentro in b.get("contem", ()):
+            if dentro not in conhecidos:
+                raise ReferenciaMorta(
+                    f"{rotulo} '{chave}' contem '{dentro}', que nao esta em NOS"
+                )
+        grupos.append(Vm(chave=chave, tipo=b.get("tipo", "fly-machine"),
+                          contem=tuple(sorted(b.get("contem", ()))),
+                          nota=b.get("nota", "")))
+    return grupos
+
+
 def carregar(raiz: Path, frescor: dict, nos: dict,
              arestas: list = (), vms: dict = None,
-             fluxos: dict = None) -> Modelo:
+             fluxos: dict = None, bancos: dict = None) -> Modelo:
     inventario = frescor.get("inventario", {})
     pasta_decisoes = Path(__file__).resolve().parent / "decisoes"
 
@@ -293,17 +345,8 @@ def carregar(raiz: Path, frescor: dict, nos: dict,
         ))
     feitas.sort(key=lambda a: (a.de, a.para, a.protocolo))
 
-    maquinas = []
-    for chave in sorted(vms or {}):
-        b = (vms or {})[chave]
-        for dentro in b.get("contem", ()):
-            if dentro not in conhecidos:
-                raise ReferenciaMorta(
-                    f"vm '{chave}' contem '{dentro}', que nao esta em NOS"
-                )
-        maquinas.append(Vm(chave=chave, tipo=b.get("tipo", "fly-machine"),
-                           contem=tuple(sorted(b.get("contem", ()))),
-                           nota=b.get("nota", "")))
+    maquinas = _construir_grupos(vms, conhecidos, "vm")
+    bancos_construidos = _construir_grupos(bancos, conhecidos, "banco")
 
     caminhos = []
     for chave in sorted(fluxos or {}):
@@ -316,5 +359,120 @@ def carregar(raiz: Path, frescor: dict, nos: dict,
                               invariante=b.get("invariante")))
 
     return Modelo(nos=tuple(construidos), arestas=tuple(feitas),
-                  vms=tuple(maquinas), fluxos=tuple(caminhos),
-                  sha=frescor.get("sha", ""))
+                  vms=tuple(maquinas), bancos=tuple(bancos_construidos),
+                  fluxos=tuple(caminhos), sha=frescor.get("sha", ""))
+
+
+def _filtrar_arvore(no: No, secoes: frozenset) -> No:
+    """Devolve `no` com so as `entradas` cuja `secao` esta em `secoes`, em
+    qualquer profundidade.
+
+    Um filho `auto=True` nao e podado no lugar: a subarvore automatica
+    inteira e achatada (`_entradas_da_arvore`) e RECONSTRUIDA do zero
+    (`_construir_arvore_auto`) a partir das entradas que sobraram do
+    filtro. Podar a arvore automatica antiga em vez de refaze-la deixaria
+    diretorio cujo conteudo inteiro foi filtrado pendurado como caixa
+    vazia — exatamente o "no auto derivado do caminho do arquivo" que a
+    Task 8 existe pra evitar.
+
+    Filhos escritos a mao (`auto=False`) recursam normalmente; ficar sem
+    conteudo e problema de `_podar`, nao daqui.
+    """
+    entradas_filtradas = tuple(e for e in no.entradas if e.secao in secoes)
+
+    filhos_manuais = [f for f in no.filhos if not f.auto]
+    filhos_auto = [f for f in no.filhos if f.auto]
+
+    novos_manuais = [_filtrar_arvore(f, secoes) for f in filhos_manuais]
+
+    novos_auto: tuple[No, ...] = ()
+    if filhos_auto:
+        entradas_auto = []
+        for f in filhos_auto:
+            entradas_auto.extend(_entradas_da_arvore(f))
+        entradas_auto_filtradas = [e for e in entradas_auto if e.secao in secoes]
+        novos_auto = _construir_arvore_auto(entradas_auto_filtradas)
+
+    filhos_novos = tuple(sorted(novos_manuais + list(novos_auto),
+                                key=lambda n: n.chave))
+    return replace(no, entradas=entradas_filtradas, filhos=filhos_novos)
+
+
+def _podar(no: No) -> No | None:
+    """Regra 3 de `filtrar`: um no escrito a mao (`auto=False`) sem
+    `entradas` e sem filho com conteudo sai do modelo — um no de raiz
+    (produto) que caia nessa regra sai tambem (devolve `None`, quem chama
+    remove da lista). Um no `auto=True` nunca chega vazio aqui: ele so
+    existe porque `_construir_arvore_auto` foi chamado com entradas de
+    verdade (lista vazia devolve `()`, nunca um No)."""
+    filhos_podados = []
+    for f in no.filhos:
+        if f.auto:
+            filhos_podados.append(f)
+            continue
+        podado = _podar(f)
+        if podado is not None:
+            filhos_podados.append(podado)
+
+    novo = replace(no, filhos=tuple(sorted(filhos_podados, key=lambda n: n.chave)))
+    if not novo.auto and not novo.entradas and not novo.filhos:
+        return None
+    return novo
+
+
+def filtrar(modelo: Modelo, secoes: frozenset) -> Modelo:
+    """Devolve um `Modelo` NOVO (funcao pura — os dataclasses sao frozen,
+    nada aqui muta o `modelo` recebido) contendo so as entradas cuja
+    `secao` esta em `secoes`.
+
+    Regras, nesta ordem (ver Task 9 / docs/fila/2026-08-30-arquitetura-viva.md):
+
+    1. Em todo no, em qualquer profundidade, mantem so as `entradas` cuja
+       `secao` esta em `secoes` (`_filtrar_arvore`).
+    2. Os nos automaticos (Task 8) sao refeitos do zero a partir das
+       entradas que sobraram — nao apenas podados (`_construir_arvore_auto`
+       reusada de `_com_auto`, ver o docstring dela pro porque).
+    3. Um no escrito a mao sem `entradas` e sem filho com conteudo sai do
+       modelo (`_podar`). Um no de raiz (produto) que caia nessa regra sai
+       tambem — e o caso do `catalogo-publico` (zero `modelo`/`migration`)
+       na vista Schema.
+    4. `arestas` e `fluxos` que citem um no podado saem junto.
+    5. `vms` e `bancos`: o `contem` de cada grupo perde as chaves podadas.
+       Um grupo que fica com `contem` vazio CONTINUA no modelo — `motor2037`
+       e `n8n2037` ja sao legitimamente vazios hoje (ver a `nota` deles em
+       `arquitetura.py`), e a vista Schema depende do mesmo comportamento
+       pra bancos como `motor-db` que podem ficar sem produto.
+
+    NAO valida secao desconhecida aqui. Essa checagem mora em
+    `gerar_arquitetura.py` (`_avisar_secoes_desconhecidas`), que e quem
+    enxerga as duas vistas (`SECOES_ARQUITETURA` + `SECOES_SCHEMA`) juntas
+    antes de decidir se uma secao do inventario nao caiu em nenhuma delas —
+    aqui dentro so se conhece o conjunto que a chamada corrente pediu, o que
+    faria toda secao fora dele (inclusive a da OUTRA vista) soar como
+    desconhecida.
+    """
+    filtrados = [_filtrar_arvore(no, secoes) for no in modelo.nos]
+    podados = [_podar(no) for no in filtrados]
+    nos_novos = tuple(n for n in podados if n is not None)
+
+    chaves_removidas = {no.chave for no in modelo.nos} - {n.chave for n in nos_novos}
+
+    arestas_novas = tuple(
+        a for a in modelo.arestas
+        if a.de not in chaves_removidas and a.para not in chaves_removidas
+    )
+    fluxos_novos = tuple(
+        f for f in modelo.fluxos
+        if not any(p.no in chaves_removidas for p in f.passos)
+    )
+    vms_novas = tuple(
+        replace(v, contem=tuple(c for c in v.contem if c not in chaves_removidas))
+        for v in modelo.vms
+    )
+    bancos_novos = tuple(
+        replace(b, contem=tuple(c for c in b.contem if c not in chaves_removidas))
+        for b in modelo.bancos
+    )
+
+    return replace(modelo, nos=nos_novos, arestas=arestas_novas,
+                    vms=vms_novas, bancos=bancos_novos, fluxos=fluxos_novos)

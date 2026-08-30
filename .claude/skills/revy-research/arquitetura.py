@@ -22,6 +22,16 @@ isso e esperado, nao bug).
 """
 from __future__ import annotations
 
+# Task 9: o inventario passa a ter duas vistas. `rota`/`worker`/`flag` sao
+# comportamento em producao; `template` fica aqui por decisao do dono, mesmo
+# sendo apresentacao — nao e dado persistido, e ele nao quis mais uma vista
+# so pra isso. `modelo`/`migration` sao o outro angulo: o que persiste, e
+# onde. As duas vistas juntas tem que cobrir toda secao que o extrator emite
+# (arq_modelo.filtrar avisa no stdout se aparecer uma secao nova que nao
+# caia em nenhuma das duas — nunca falha calado).
+SECOES_ARQUITETURA: frozenset[str] = frozenset({"rota", "worker", "flag", "template"})
+SECOES_SCHEMA: frozenset[str] = frozenset({"modelo", "migration"})
+
 NOS: dict[str, dict] = {
     "chatbot-api": {
         "titulo": "Chatbot API",
@@ -250,6 +260,40 @@ VMS: dict[str, dict] = {
             "em fly.app.toml). Os demais produtos mantem banco e migrations "
             "proprios fora do suite-pg."
         ),
+    },
+}
+
+# Grupos de topo da vista Schema (Task 9): reusa o dataclass Vm de
+# arq_modelo.py:52 porque a forma e identica a VMS (chave, tipo, contem,
+# nota) — so troca "maquina Fly" por "banco". `catalogo-publico` NAO aparece
+# aqui de proposito: ele nao tem `modelo` nem `migration`, entao some da
+# vista Schema (arq_modelo.filtrar poda o no de raiz sem conteudo).
+BANCOS: dict[str, dict] = {
+    "suite-pg": {
+        "tipo": "postgres",
+        "contem": ["portal-gestao", "revy-trafego"],
+        "nota": (
+            "banco `revy`, um schema por produto. PORTAL_DATABASE_URL "
+            "(portal-gestao/app/config.py:116) e REVY_TRAFEGO_DATABASE_URL "
+            "(revy-trafego/app/config.py:17) apontam para o mesmo Postgres "
+            "desde o corte de 16/08/2026. Dividir banco e o que faz um OOM "
+            "derrubar Loja e Control juntos."
+        ),
+    },
+    "chatbot-db": {
+        "tipo": "banco-proprio",
+        "contem": ["chatbot-api"],
+        "nota": "DATABASE_URL propria (chatbot-api/app/db.py:14), default sqlite:///./chatbot.db",
+    },
+    "estoque-db": {
+        "tipo": "banco-proprio",
+        "contem": ["estoque-api"],
+        "nota": "DATABASE_URL propria (estoque-api/app/db.py:14), default sqlite:///./estoque.db",
+    },
+    "motor-db": {
+        "tipo": "banco-proprio",
+        "contem": ["motor-simulacao"],
+        "nota": "DATABASE_URL propria (motor-simulacao/app/db.py:18), default sqlite:///./motor.db",
     },
 }
 

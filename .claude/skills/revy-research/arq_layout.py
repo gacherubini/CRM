@@ -232,23 +232,30 @@ def _dispor_vm(vm: Vm, por_chave: dict[str, No], nivel: int) -> tuple[Caixa, lis
     return caixa_vm, descendentes
 
 
-def dispor(modelo: Modelo) -> Cena:
-    # modelo.nos ja vem ordenado por chave (arq_modelo.carregar itera
-    # `sorted(nos)`) — a ordem de construcao aqui e, portanto, ja
-    # deterministica; nao ha necessidade de reordenar por conta propria.
-    #
-    # A VM e o novo nivel 1: uma Caixa tipo "vm" por `modelo.vms`, envolvendo
-    # os produtos do seu `contem`. Produto que nao esta em nenhuma VM fica
-    # solto, no mesmo nivel das VMs — nao existe hoje nos dados reais (as
-    # seis produtos vivem em app2037), mas o modelo precisa aceitar.
+def dispor(modelo: Modelo, grupos: tuple[Vm, ...]) -> Cena:
+    """`grupos` e o nivel 1 da cena: `modelo.vms` pra vista Arquitetura,
+    `modelo.bancos` pra vista Schema (Task 9) — quem chama escolhe, porque
+    so quem filtrou o modelo (`arq_modelo.filtrar`) sabe qual das duas vistas
+    esta desenhando. Nada mais no empacotamento muda entre as duas vistas.
+
+    modelo.nos ja vem ordenado por chave (arq_modelo.carregar itera
+    `sorted(nos)`) — a ordem de construcao aqui e, portanto, ja
+    deterministica; nao ha necessidade de reordenar por conta propria.
+
+    A VM/banco e o novo nivel 1: uma Caixa tipo "vm" por item de `grupos`,
+    envolvendo os produtos do seu `contem`. Produto que nao esta em nenhum
+    grupo fica solto, no mesmo nivel — nao existe hoje nos dados reais (as
+    seis produtos vivem em app2037), mas o modelo precisa aceitar.
+    """
     por_chave_no = {no.chave: no for no in modelo.nos}
     contidos: set[str] = set()
-    for vm in modelo.vms:
+    for vm in grupos:
         contidos.update(vm.contem)
 
-    # modelo.vms ja vem ordenado por chave (arq_modelo.carregar faz
-    # `sorted(vms)`).
-    raizes = [_dispor_vm(vm, por_chave_no, 1) for vm in modelo.vms]
+    # `grupos` ja vem ordenado por chave (arq_modelo.carregar faz
+    # `sorted(vms)`/`sorted(bancos)`, e `filtrar` preserva a ordem porque so
+    # filtra o `contem`, nunca reordena os grupos).
+    raizes = [_dispor_vm(vm, por_chave_no, 1) for vm in grupos]
     soltos = [no for no in modelo.nos if no.chave not in contidos]
     raizes += [_dispor_no(no, no.chave, 1) for no in soltos]
 
