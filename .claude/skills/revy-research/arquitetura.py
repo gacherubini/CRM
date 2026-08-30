@@ -228,6 +228,10 @@ VMS: dict[str, dict] = {
             "mora em app2037, esta VM so roda o navegador headless que "
             "acessa banco. Nao contem produto porque nao serve HTTP de produto."
         ),
+        # Task 11: o rotulo da forma interna (retangulo — nao e terceiro,
+        # e' codigo do proprio Motor) sai literal da nota acima.
+        "roda": "worker Playwright · RPA",
+        "terceiro": False,
     },
     "n8n2037": {
         "tipo": "fly-machine",
@@ -238,6 +242,8 @@ VMS: dict[str, dict] = {
             "2026-07-14-evolution-e-n8n-nao-dormem.md. Nao e produto Revy, "
             "por isso nao vira No."
         ),
+        "roda": "n8n · orquestração",
+        "terceiro": True,
     },
     "evolution2037": {
         "tipo": "fly-machine",
@@ -247,6 +253,8 @@ VMS: dict[str, dict] = {
             "Sempre ligado pela mesma decisao 2026-07-14-evolution-e-n8n-nao-dormem.md "
             "— a sessao cai se a maquina suspender."
         ),
+        "roda": "evolution-api · sessão WhatsApp",
+        "terceiro": True,
     },
     "suite-pg": {
         "tipo": "postgres",

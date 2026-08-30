@@ -10,13 +10,52 @@ window.Zoom = {
     var base, atual = null, anim = null, dur = 450, moveu = false;
     var pilha = [];   // caminho de volta: ids ja visitados
 
+    // Task 11 — a tremida do rabisco (feTurbulence + feDisplacementMap) e'
+    // em UNIDADES DE CENA, mas tem que parecer do MESMO TAMANHO NA TELA em
+    // qualquer zoom. px_por_unidade escala linear com k (k = base.w/v.w,
+    // viewBox encolhendo = mais px por unidade): px_por_unidade(k) = k *
+    // px_por_unidade0, onde px_por_unidade0 e' medido UMA VEZ na visao
+    // inicial (k=1). Daí:
+    //   deslocamento em unidades = ALVO_PX / px_por_unidade(k)
+    //                             = (ALVO_PX / px_por_unidade0) / k  ->  C1/k
+    //   baseFrequency (ciclos/unidade) precisa CRESCER com k pro "grao" do
+    //   ruido ficar constante em pixel: CICLOS_POR_PX * px_por_unidade(k)
+    //                             = (CICLOS_POR_PX * px_por_unidade0) * k -> C2*k
+    // Os dois constantes (C1, C2) saem de medir o svg UMA vez, nao de
+    // reflow a cada quadro (getBoundingClientRect a cada frame custaria
+    // caro — ver "custo" abaixo).
+    var ALVO_PX_DESLOC = 2.2;    // tremida alvo, em pixel de tela: "levemente rabiscado"
+    var CICLOS_POR_PX = 0.045;   // grao do ruido: ~1 ciclo a cada 22px de tela
+    var pxPorUnidade0 = 1, c1 = 0, c2 = 0;
+    var filtroDesloc = document.getElementById("rabisco-deslocamento");
+    var filtroTurb = document.getElementById("rabisco-turbulencia");
+    var K_LIMIAR_FILTRO = 26; // acima disso a caixa e' grande na tela e a
+    // tremida some visualmente — desliga o filtro (medido no navegador,
+    // ver relatorio da Task 11: cena real ~1600 formas, 60fps parado,
+    // ~45fps durante o voo SEM este corte, fluido com ele).
+
+    function medirPxPorUnidade() {
+      var r = svg.getBoundingClientRect();
+      pxPorUnidade0 = (r.width || base.w) / base.w;
+      c1 = ALVO_PX_DESLOC / pxPorUnidade0;
+      c2 = CICLOS_POR_PX * pxPorUnidade0;
+    }
+
+    function aplicarFiltro(k) {
+      if (filtroDesloc) filtroDesloc.setAttribute("scale", (c1 / k).toFixed(3));
+      if (filtroTurb) filtroTurb.setAttribute("baseFrequency", (c2 * k).toFixed(5));
+      svg.classList.toggle("k-alto", k > K_LIMIAR_FILTRO);
+    }
+
     function vb(el) {
       var p = el.getAttribute("viewBox").split(/[ ,]+/).map(Number);
       return { x: p[0], y: p[1], w: p[2], h: p[3] };
     }
     function setVb(v) {
       svg.setAttribute("viewBox", v.x + " " + v.y + " " + v.w + " " + v.h);
-      aplicarLod(base.w / v.w);
+      var k = base.w / v.w;
+      aplicarLod(k);
+      aplicarFiltro(k);
     }
     // cubic-bezier(.4,0,.2,1) — aproximacao por Newton nao vale a pena aqui.
     function suavizar(t) { return t < 0.5 ? 4*t*t*t : 1 - Math.pow(-2*t + 2, 3) / 2; }
@@ -54,6 +93,12 @@ window.Zoom = {
       if (anim) cancelAnimationFrame(anim);
       var de = vb(svg), t0 = null;
       if (dur === 0) { setVb(destino); if (aoFim) aoFim(); return; }
+      // Custo (Task 11): o primeiro corte, antes de mexer em qualquer outra
+      // coisa, foi desligar o filtro DURANTE o voo — a camera anda rapido
+      // demais pra tremida se notar quadro a quadro, e recalcular
+      // feDisplacementMap em ~1600 formas a cada frame e' o que derrubava
+      // fps. Religa quando a animacao assenta (aoFim).
+      svg.classList.add("voando");
       function passo(ts) {
         if (t0 === null) t0 = ts;
         var t = Math.min(1, (ts - t0) / dur), e = suavizar(t);
@@ -64,7 +109,7 @@ window.Zoom = {
           h: de.h + (destino.h - de.h) * e
         });
         if (t < 1) anim = requestAnimationFrame(passo);
-        else { anim = null; if (aoFim) aoFim(); }
+        else { anim = null; svg.classList.remove("voando"); if (aoFim) aoFim(); }
       }
       anim = requestAnimationFrame(passo);
     }
@@ -176,9 +221,16 @@ window.Zoom = {
     svg.addEventListener("pointerup", function () { arrastando = false; });
     svg.addEventListener("pointerleave", function () { arrastando = false; });
 
+    medirPxPorUnidade();
     setVb(base);
 
     return { elemento: svg, voarPara: voarPara, subir: subir,
-             acender: acender, apagar: apagar };
+             acender: acender, apagar: apagar,
+             // Chamado por `mostrarVista` (arq_render.py) ao trocar de
+             // vista: o filtro e' UM SO por documento, compartilhado entre
+             // as duas cenas — sem isto, mostrar de novo uma vista deixaria
+             // a tremida no k da OUTRA vista (a ultima que mexeu no filtro
+             // compartilhado) ate o proximo pan/zoom desta.
+             atualizarFiltro: function () { aplicarFiltro(base.w / vb(svg).w); } };
   }
 };

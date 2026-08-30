@@ -56,6 +56,13 @@ class Vm:
     tipo: str = "fly-machine"
     contem: tuple[str, ...] = ()
     nota: str = ""
+    # Task 11 (a pele): so pra grupo com `contem` vazio — a forma interna
+    # que a vocabulario de forma desenha quando nao ha produto Revy dentro
+    # (worker Playwright do proprio Motor, n8n, evolution-api). `roda` e' o
+    # rotulo (sai da `nota` que ja existia, nunca inventado); `terceiro`
+    # escolhe elipse (software de terceiro) vs retangulo (software Revy).
+    roda: str = ""
+    terceiro: bool = False
 
 
 @dataclass(frozen=True)
@@ -300,7 +307,9 @@ def _construir_grupos(bruto: dict, conhecidos: set, rotulo: str) -> list:
                 )
         grupos.append(Vm(chave=chave, tipo=b.get("tipo", "fly-machine"),
                           contem=tuple(sorted(b.get("contem", ()))),
-                          nota=b.get("nota", "")))
+                          nota=b.get("nota", ""),
+                          roda=b.get("roda", ""),
+                          terceiro=bool(b.get("terceiro", False))))
     return grupos
 
 

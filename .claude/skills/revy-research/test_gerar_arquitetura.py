@@ -524,7 +524,11 @@ class TestRender(unittest.TestCase):
         vista = arq_render.Vista("arquitetura", "Arquitetura",
                                  arq_layout.dispor(modelo, modelo.vms), modelo)
         html = arq_render.render((vista,), "")
-        self.assertNotIn("<b>", html)
+        # Nao pode ser "assertNotIn('<b>', html)" cru: o cromo do topo (Task
+        # 11) tem um <b>arquitetura</b> legitimo. O que importa e' que o
+        # DADO do usuario saiu escapado, nao a tag em si em lugar nenhum.
+        self.assertNotIn("a<b>&c", html)
+        self.assertIn("GET /a&lt;b&gt;&amp;c", html)
 
     def test_subtitulo_truncado_nunca_fica_maior_que_o_original(self):
         # `sub[-0:]` devolve a string inteira, nao vazia: sem guarda, uma caixa
@@ -534,13 +538,19 @@ class TestRender(unittest.TestCase):
                              subtitulo="app/um/caminho/bem/longo.py:1234",
                              x=0, y=0, w=6, h=13, pai="p", nivel=3,
                              k_min=2.0, k_face=2.0)
-        saida = arq_render._item(estreita)
+        # Task 11: `_item` virou `_item_texto` (rect e texto separaram em
+        # camadas por causa do filtro de rabisco) — a truncagem que este
+        # teste protege so existe do lado do texto.
+        saida = arq_render._item_texto(estreita)
         self.assertNotIn("app/um/caminho/bem/longo.py:1234", saida)
 
     def test_o_js_entra_inteiro(self):
         self.assertIn("/* js */", self._html())
 
-    def test_aresta_assincrona_sai_tracejada_e_marca_falta_de_retry(self):
+    def test_aresta_assincrona_sai_tracejada_e_vermelha_sem_retry(self):
+        # Task 11: o "sem retry" deixou de ser texto (o rotulo de aresta e'
+        # so o protocolo agora) e virou COR — vermelho e' o dado dizendo
+        # retry=False, nao um aviso escrito.
         raiz = varredura.raiz_repo()
         frescor = {"sha": "a", "inventario": {"chatbot-api": [], "estoque-api": []}}
         nos = {"chatbot-api": {"titulo": "A", "papel": "x"},
@@ -552,7 +562,8 @@ class TestRender(unittest.TestCase):
                                  arq_layout.dispor(modelo, modelo.vms), modelo)
         html = arq_render.render((vista,), "")
         self.assertIn("stroke-dasharray", html)
-        self.assertIn("sem retry", html)
+        self.assertIn(f'stroke="{arq_render.DANGER}"', html)
+        self.assertNotIn("retry", html)
 
 
 class TestFluxos(unittest.TestCase):
@@ -675,6 +686,107 @@ class TestDuasVistasNoHtml(unittest.TestCase):
         self.assertIn('svgEl.setAttribute("hidden"', script)
         self.assertIn("svgEl.removeAttribute(\"hidden\")", script)
         self.assertNotIn("svgEl.hidden", script)
+
+
+def _contar_spof_bruto(bruto: dict) -> int:
+    n = 1 if bruto.get("spof") else 0
+    for filho in (bruto.get("dentro") or {}).values():
+        n += _contar_spof_bruto(filho)
+    return n
+
+
+class TestPeleRevy(unittest.TestCase):
+    # Task 11 — a pele: marca Revy, vocabulario de forma, arestas
+    # ortogonais. Os seis itens do "como saber que acabou" do card, contra
+    # o HTML REAL (gerar_arquitetura.montar da raiz de verdade) — e' o que
+    # o navegador abre, nao um modelo de brinquedo.
+    def setUp(self):
+        self.raiz = varredura.raiz_repo()
+        self.html = gerar_arquitetura.montar(self.raiz)
+
+    def _svg(self, chave):
+        inicio = self.html.index(f'<svg id="mapa-{chave}"')
+        fim = self.html.index("</svg>", inicio) + len("</svg>")
+        return self.html[inicio:fim]
+
+    def _forma_imediata(self, chave):
+        # A primeira tag depois do `<g id="chave" ...data-navegavel>` e'
+        # SEMPRE a forma do proprio no/vm (rect/path), antes de qualquer
+        # filho — mesmo quando ha filhos (eles vem depois, dentro do
+        # `<g data-k-min>`).
+        padrao = re.compile(
+            r'<g id="' + re.escape(chave) + r'" data-titulo="[^"]*" data-navegavel>(<[a-z]+)')
+        m = padrao.search(self.html)
+        self.assertIsNotNone(m, chave)
+        return m.group(1)
+
+    def test_1_um_filtro_rabisco_nunca_aplicado_a_grupo_com_texto(self):
+        self.assertEqual(self.html.count('<filter id="rabisco"'), 1)
+        for chave in ("arquitetura", "schema"):
+            svg = self._svg(chave)
+            inicio = svg.index('<g class="formas"')
+            fim = svg.index('<g class="textos">', inicio)
+            self.assertNotIn("<text", svg[inicio:fim], chave)
+
+    def test_2_toda_aresta_e_polyline_ortogonal(self):
+        polylines = re.findall(r'<polyline data-aresta="[^"]*" points="([^"]+)"',
+                                self._svg("arquitetura"))
+        self.assertGreater(len(polylines), 0)
+        for pontos_str in polylines:
+            pontos = [tuple(map(float, p.split(","))) for p in pontos_str.split(" ")]
+            for (x1, y1), (x2, y2) in zip(pontos, pontos[1:]):
+                self.assertTrue(abs(x1 - x2) < 0.01 or abs(y1 - y2) < 0.01,
+                                 f"segmento diagonal em {pontos_str}")
+
+    def test_3_rotulo_de_aresta_e_so_o_protocolo(self):
+        # "retry" pode legitimamente aparecer em OUTRO texto da cena
+        # (app/cloud_retry.py e' um arquivo de verdade) — o que a task
+        # proibe e' a palavra no ROTULO DE ARESTA, marcado por
+        # class="protocolo" (ver _aresta_texto).
+        svg = self._svg("arquitetura")
+        rotulos = re.findall(r'<text[^>]*class="protocolo"[^>]*>([^<]*)</text>', svg)
+        self.assertGreater(len(rotulos), 0)
+        self.assertEqual(set(rotulos), {"http", "outbox", "tcp"})
+        for r in rotulos:
+            self.assertNotIn("retry", r)
+
+    def test_4_vocabulario_de_forma_banco_terceiro_no_comum(self):
+        # banco (Schema: tipo postgres/banco-proprio) -> cilindro (<path>).
+        self.assertEqual(self._forma_imediata("suite-pg"), "<path")
+        self.assertEqual(self._forma_imediata("chatbot-db"), "<path")
+        # no comum (produto Revy) -> retangulo, mesmo tendo filhos.
+        self.assertEqual(self._forma_imediata("app2037.chatbot-api"), "<rect")
+        # terceiro=True (n8n2037, sem produto dentro) -> a forma interna
+        # (o "roda") e' elipse; terceiro=False (motor2037) e' retangulo.
+        svg_arq = self._svg("arquitetura")
+
+        def _bloco(chave):
+            inicio = svg_arq.index(f'<g id="{chave}"')
+            prox = svg_arq.find('<g id="', inicio + 10)
+            fim = prox if prox != -1 else min(len(svg_arq), inicio + 600)
+            return svg_arq[inicio:fim]
+
+        self.assertIn("<ellipse", _bloco("n8n2037"))
+        bloco_motor = _bloco("motor2037")
+        self.assertNotIn("<ellipse", bloco_motor)
+        self.assertIn("<rect", bloco_motor)
+
+    def test_5_vermelho_so_em_aresta_sem_retry_e_no_spof(self):
+        svg = self._svg("arquitetura")
+        esperado_arestas = sum(1 for a in arquitetura.ARESTAS if not a.get("retry", False))
+        esperado_nos_spof = sum(_contar_spof_bruto(v) for v in arquitetura.NOS.values())
+        self.assertGreater(esperado_arestas, 0)
+        self.assertGreater(esperado_nos_spof, 0)
+        # 1 stroke (forma) + 1 fill (rotulo) por aresta sem retry; 1 stroke
+        # (caixa) + 1 fill (texto "SPOF") por no spof — nenhum outro uso do
+        # vermelho na cena real (a legenda, fora deste svg, nao entra aqui).
+        esperado_total = esperado_arestas * 2 + esperado_nos_spof * 2
+        self.assertEqual(svg.count(arq_render.DANGER), esperado_total)
+
+    def test_6_gerar_duas_vezes_da_bytes_identicos(self):
+        # Ja coberto por TestCli.test_gerar_duas_vezes_da_bytes_identicos —
+        # aqui so' reconfirma com o montar() usado nos testes acima.
+        self.assertEqual(gerar_arquitetura.montar(self.raiz), self.html)
 
 
 class TestZoomJs(unittest.TestCase):
