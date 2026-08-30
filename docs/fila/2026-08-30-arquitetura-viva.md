@@ -1466,61 +1466,50 @@ As Tasks 1 a 8 estao **feitas e commitadas** na branch `arquitetura-viva`
 
 **Nao mergeado, nao pusheado.** Isso e decisao do dono.
 
-### Proximo lote — aprovado pelo dono em 30/08, ainda NAO implementado
+### Lote de 30/08 — FEITO
 
-O dono viu o resultado no navegador, apontou tres coisas feias e pediu para ver
-a proposta antes de codar. A proposta foi mostrada como mockup estatico e
-aprovada com duas escolhas dele:
+Tasks 9 a 12, todas commitadas. 63 testes verdes,
+`python3 gerar_arquitetura.py --verificar` sai 0.
 
-1. **Nivel 1 vira escopo puro.** Hoje o LOD e so por escala, entao caixas irmas
-   de tamanho parecido abrem o interior juntas — entrar no Chatbot mostra o
-   interior do Portal ao lado. Regra nova: o interior de um no so acende se ele
-   for o foco atual ou um ancestral do foco. Como os `id` sao caminhos pontuados
-   (`app2037.chatbot-api.app.main.py`), e teste de prefixo:
-   `atual === id || atual.indexOf(id + ".") === 0` — com o ponto, senao
-   `chatbot-api` casa com `chatbot-apix`. Cada grupo de interior passa a emitir
-   `data-dono="<id do no>"`.
+1. **Duas vistas** (`24550c0` modelo/layout, `c8d4aa0` html). `SECOES_ARQUITETURA`
+   (`rota`, `worker`, `flag`, `template`) e `SECOES_SCHEMA` (`modelo`,
+   `migration`), `arq_modelo.filtrar()` refazendo os nos automaticos e podando
+   no vazio, alternador no topo, e `Zoom.criar()` no lugar do singleton — duas
+   cenas na mesma pagina nao podem dividir estado de zoom. Secao desconhecida
+   avisa no stdout, nao falha.
+2. **Schema agrupado por banco.** `BANCOS` em `arquitetura.py`: `suite-pg` com
+   Loja e Control lado a lado, Chatbot/Estoque/Motor com os seus. Catalogo tem
+   zero `modelo` e zero `migration`, entao e podado da vista Schema.
+3. **A pele** (`71a9d7a`). Tokens claros da marca, tudo em mono, vocabulario de
+   forma (retangulo = no, moldura tracejada = maquina, cilindro = banco, elipse
+   = software de terceiro), traco rabiscado com `feTurbulence` +
+   `feDisplacementMap` so nas formas, tremida escalando com o `k`, arestas
+   ortogonais com rotulo so do protocolo.
+4. **Trava de linhagem** (`9695c4a`). O interior so acende no no em foco, nos
+   ancestrais e nos filhos diretos; durante o voo vale a uniao das duas
+   linhagens. `data-dono` no grupo, teste de prefixo sobre o id pontuado.
+5. **Area comprimida pela raiz** (`91a0b3e`), escolha do dono: a razao entre a
+   maior e a menor caixa cai de ~8x para ~3x, mantendo a ordem.
 
-2. **Schema sai da arquitetura — DECIDIDO: vista separada com alternador.**
-   Dois botoes no topo trocam entre duas cenas independentes no mesmo HTML.
-   - Vista Arquitetura: secoes `rota`, `worker`, `flag`, `template`. Tem arestas
-     e fluxos.
-   - Vista Schema: secoes `modelo`, `migration`. Sem aresta e sem fluxo —
-     fluxo e caminho de execucao, nao relacao de dado.
-   - `dispor(modelo, secoes: frozenset)` filtra; no sem item na vista **e sem
-     filho com item** e podado dela, senao a vista Schema vira moldura vazia.
-   - Secao nova no `_frescor.json` que nao caia em nenhum dos dois conjuntos
-     tem que **avisar no stdout** (nao falhar). Dado que some calado e como
-     isso apodreceria.
+### O que so o navegador acusou (e por que isso volta a acontecer)
 
-3. **Schema agrupado por BANCO — DECIDIDO pelo dono, nao por produto.**
-   `suite-pg` (banco `revy`) contendo os schemas da Loja e do Control lado a
-   lado; Estoque, Chatbot e Motor com bancos proprios. Mostra de cara quem
-   divide banco com quem, que e a historia do corte de 16/08 e a causa do OOM
-   que ja derrubou Portal e Motor juntos
-   (`learnings/2026-08-23-suite-pg-oom-derruba-portal-e-motor.md`).
+Nesta rodada, cinco defeitos invisiveis em teste: traco em unidade de cena
+virando subpixel (`vector-effect="non-scaling-stroke"` resolve), etiqueta de
+moldura a 51px, nota de VM atravessando por cima dos produtos de dentro,
+painel de fluxos cobrindo duas maquinas, e a vista escondida medindo zero
+(`display:none` mede 0 — a tremida da Schema saia 7x menor). Mais o marcador
+`\25be` do `<details>`, que num f-string do Python e' a sequencia OCTAL `\25`
+seguida de "be".
 
-4. **Arestas ortogonais.** Hoje ligam centro a centro e cortam a cena em
-   diagonal. Trocar por `<polyline>` com no maximo dois cotovelos, saindo pela
-   borda mais proxima do alvo, rotulo `protocolo · sem retry` no segmento do
-   meio. Manter `marker-end` e `stroke-dasharray` para assincrono.
+Dois learnings novos: `2026-08-30-hidden-nao-esconde-svg.md` e o de
+`setPointercapture`.
 
-### Ainda em aberto, nao perguntado ao dono
-
-- Onde `template` mora. Esta na vista Arquitetura, mas e apresentacao, nao
-  estrutura.
-- A face das caixas mostra contagem de itens ("115 itens") no mockup. Foi
-  invencao, pode ser ruido.
-
-### Decisoes do dono que nao se re-propoem
-
-- Schema e vista separada, nao caixa dentro da arquitetura.
-- Schema agrupa por banco, nao por produto.
-- As VMs sao desenhadas (um implementador cortou alegando profundidade; foi
-  revertido — a moldura existe para mostrar que a `app2037` carrega seis
-  produtos).
-- `suite-pg` NAO contem Loja e Control: eles falam TCP com o banco. Modelar
-  como contencao desenhava a arvore dos dois em duplicata.
+**Nao verificado:** o VOO. `requestAnimationFrame` nao roda com a aba em
+background, que e' como a automacao de navegador desta sessao ve a pagina
+(`document.hidden === true`, zero quadros em 1,1s). O estado final da trava de
+linhagem foi conferido na mao (entrar no Chatbot deixa o interior dele em
+opacity 1 e os do Portal e do Estoque em 0); o RITMO da animacao so quem abre
+a pagina julga.
 
 ### Pendencias que sao do dono
 
