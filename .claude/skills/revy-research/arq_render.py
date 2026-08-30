@@ -43,6 +43,7 @@ import json
 from dataclasses import dataclass
 
 from arq_layout import Caixa, Cena, ALTURA_TITULO, MARGEM, banda_titulo
+from arq_design import Grupo
 from arq_modelo import Aresta, Modelo, No, Vm
 
 _e = html.escape
@@ -498,6 +499,54 @@ def _aresta_texto(a: Aresta, de: Caixa, para: Caixa, deslocamento: float) -> str
             f'{html.escape(a.protocolo)}</text>')
 
 
+def _amostra(tok) -> str:
+    """A amostra tem que MOSTRAR o token, nao descrever. Cor vira mancha,
+    raio vira canto, fonte vira frase, sombra vira sombra."""
+    if tok.tipo == "cor":
+        return f'<span class="dsw" style="background:{_e(tok.valor)}"></span>'
+    if tok.tipo == "forma":
+        return (f'<span class="dsw dbox" style="border-radius:{_e(tok.valor)}">'
+                f'</span>')
+    if tok.tipo == "fonte":
+        return (f'<span class="dfonte" style="font-family:{_e(tok.valor)}">'
+                f'Revy 123</span>')
+    if tok.tipo == "sombra":
+        return f'<span class="dsw dbox" style="box-shadow:{_e(tok.valor)}"></span>'
+    return '<span class="dsw dbox"></span>'
+
+
+def _design_html(grupos: tuple[Grupo, ...], oculto: bool) -> str:
+    """A vista Design: os tokens de `shared/brand/revy-tokens.css`.
+
+    Nao e' uma cena de caixas, entao nao e' uma `Vista` com `Cena`/`Modelo` —
+    e' HTML, e o alternador trata as duas coisas do mesmo jeito (ver
+    `mostrarVista`). Forcar isso a virar SVG so pra caber no molde daria uma
+    pagina pior por simetria.
+    """
+    if not grupos:
+        return ""
+    secoes = []
+    for g in grupos:
+        chips = []
+        for tok in g.tokens:
+            # A heranca so aparece quando existe: `--brand: var(--green-700)`
+            # diz mais que `--brand: #1f4d3a`, porque diz de ONDE vem.
+            heranca = (f'<em class="dher">{_e(tok.bruto)}</em>'
+                       if tok.bruto != tok.valor else "")
+            chips.append(
+                f'<div class="dchip">{_amostra(tok)}'
+                f'<code>{_e(tok.nome)}</code>'
+                f'<em>{_e(tok.valor)}</em>{heranca}</div>'
+            )
+        secoes.append(f'<section><h3>{_e(g.titulo)}</h3>'
+                      f'<div class="dchips">{"".join(chips)}</div></section>')
+    hidden_attr = " hidden" if oculto else ""
+    return (f'<div id="painel-design"{hidden_attr}>'
+            f'<p class="dfonte-arq">lido de <code>shared/brand/revy-tokens.css</code>'
+            f' na geracao — nao copiado. Editar la muda esta pagina.</p>'
+            f'{"".join(secoes)}</div>')
+
+
 def _fluxos_html(modelo: Modelo, chave: str, oculto: bool) -> str:
     """Seletor de fluxo da vista `chave`: um botao por `Fluxo`, que acende so
     as caixas dos seus passos (`Zoom.acender`) e lista os passos EM ORDEM (a
@@ -625,7 +674,8 @@ def _legenda_html() -> str:
 </svg></div>'''
 
 
-def render(vistas: tuple[Vista, ...], js: str) -> str:
+def render(vistas: tuple[Vista, ...], js: str,
+           tokens: tuple[Grupo, ...] = ()) -> str:
     """Monta a pagina inteira a partir de N `Vista`. A primeira da tupla abre
     visivel; as demais saem com `hidden`. Cada vista ganha o proprio
     `<svg id="mapa-{chave}">`, o proprio botao no alternador (`data-vista`) e
@@ -640,6 +690,8 @@ def render(vistas: tuple[Vista, ...], js: str) -> str:
     paineis_fluxo, scripts_fluxo = [], []
     linhas_instancia, linhas_trilha = [], []
     rotulos: dict[str, str] = {}
+
+    design_html = _design_html(tokens, oculto=True)
 
     for i, vista in enumerate(vistas):
         ativa = i == 0
@@ -684,6 +736,7 @@ def render(vistas: tuple[Vista, ...], js: str) -> str:
         botoes.append(f'<button data-vista="{_e(vista.chave)}"{classe}>{_e(vista.rotulo)}</button>')
         rotulos[vista.chave] = vista.rotulo
 
+
         # A vista Schema nao tem `modelo.fluxos` (fluxo e caminho de
         # execucao, nao relacao de dado) — so a vista Arquitetura emite
         # painel hoje, mas o codigo nao amarra nisso: qualquer vista com
@@ -707,6 +760,11 @@ def render(vistas: tuple[Vista, ...], js: str) -> str:
     rotulos_json = (json.dumps(rotulos, ensure_ascii=False, sort_keys=True)
                      .replace("<", "\\u003c"))
     corpo_botoes = "".join(botoes)
+    botao_design = ('<button data-vista="design">Design</button>' if design_html else "")
+    chaves_vistas = [v.chave for v in vistas] + (["design"] if design_html else [])
+    vistas_json = json.dumps(chaves_vistas).replace("<", "\\u003c")
+    if design_html:
+        rotulos["design"] = "Design"
     corpo_svgs = "\n".join(svgs)
     corpo_fluxos = "".join(paineis_fluxo)
     corpo_scripts_fluxo = "".join(scripts_fluxo)
@@ -742,6 +800,22 @@ def render(vistas: tuple[Vista, ...], js: str) -> str:
     background:{SURFACE};border-bottom:1px solid {LINE};box-sizing:border-box}}
   .marca{{font-family:{BRAND_FONT};font-size:15px;letter-spacing:-.01em}}
   .marca b{{color:{BRAND};font-weight:600}}
+  #painel-design{{position:fixed;top:41px;left:0;right:0;bottom:0;overflow:auto;
+    background:{PAPER};padding:22px 26px 60px;z-index:1}}
+  #painel-design section{{margin:0 0 26px}}
+  #painel-design h3{{font-size:11px;letter-spacing:.08em;text-transform:uppercase;
+    color:{BRAND};margin:0 0 10px;font-weight:600}}
+  #painel-design .dchips{{display:flex;flex-wrap:wrap;gap:10px}}
+  #painel-design .dchip{{display:flex;align-items:center;gap:8px;background:{SURFACE};
+    border:1px solid {LINE};border-radius:6px;padding:7px 11px;font-size:11px}}
+  #painel-design code{{color:{INK};font-size:11px}}
+  #painel-design em{{font-style:normal;color:{INK_MUTED};font-size:10.5px}}
+  #painel-design .dher{{color:{BRAND};opacity:.75}}
+  #painel-design .dsw{{width:26px;height:18px;border-radius:3px;
+    border:1px solid {LINE_STRONG};display:inline-block;flex:none}}
+  #painel-design .dbox{{background:{SURFACE_SOFT}}}
+  #painel-design .dfonte{{font-size:15px;color:{INK}}}
+  #painel-design .dfonte-arq{{margin:0 0 22px;font-size:11px;color:{INK_MUTED}}}
   #alternador{{display:inline-flex;border:1px solid {LINE_STRONG};border-radius:3px;
     overflow:hidden;font-size:11px}}
   #alternador button{{border:none;background:{SURFACE};color:{INK_SOFT};cursor:pointer;
@@ -776,12 +850,13 @@ def render(vistas: tuple[Vista, ...], js: str) -> str:
 {_defs_compartilhadas()}
 <header id="cromo">
   <span class="marca">Revy · <b>arquitetura</b></span>
-  <nav id="alternador">{corpo_botoes}</nav>
+  <nav id="alternador">{corpo_botoes}{botao_design}</nav>
   <span id="trilha">Revy</span>
 </header>
 <div id="dica">clique numa caixa para cair dentro · <strong>Esc</strong> volta · roda dá zoom · arraste para navegar · borda grossa vermelha é SPOF, tracejado é assíncrono, moldura tracejada é máquina (VM)</div>
 {_legenda_html()}
 {corpo_fluxos}
+{design_html}
 
 {corpo_svgs}
 
@@ -798,8 +873,12 @@ def render(vistas: tuple[Vista, ...], js: str) -> str:
     if (!alvo) return;
     mostrarVista(alvo.getAttribute("data-vista"));
   }});
+  // A lista vem do gerador, nao de `Object.keys(zoomInstancias)`: a vista
+  // Design nao tem instancia de Zoom (nao e' cena), e derivar as chaves das
+  // instancias a deixaria de fora do alternador.
+  var VISTAS = {vistas_json};
   function mostrarVista(chave) {{
-    var chaves = Object.keys(zoomInstancias);
+    var chaves = VISTAS;
     for (var i = 0; i < chaves.length; i++) {{
       var v = chaves[i];
       var svgEl = document.getElementById("mapa-" + v);
@@ -813,11 +892,21 @@ def render(vistas: tuple[Vista, ...], js: str) -> str:
       }}
       var painel = document.getElementById("fluxos-" + v);
       if (painel) painel.hidden = (v !== chave);
+      var pagina = document.getElementById("painel-" + v);
+      if (pagina) pagina.hidden = (v !== chave);
       var botao = document.querySelector('[data-vista="' + v + '"]');
       if (botao) botao.className = (v === chave) ? "ativo" : "";
     }}
     var trilhaEl = document.getElementById("trilha");
     if (trilhaEl) trilhaEl.textContent = ROTULOS[chave] || "Revy";
+    // A dica de navegacao e o vocabulario de forma falam de CENA. Na vista
+    // Design nao ha caixa pra clicar nem forma pra decifrar, e deixa-los la
+    // seria instrucao para uma coisa que nao esta na tela.
+    var temCena = !!document.getElementById("mapa-" + chave);
+    var dica = document.getElementById("dica");
+    if (dica) dica.hidden = !temCena;
+    var legenda = document.getElementById("legenda");
+    if (legenda) legenda.hidden = !temCena;
     // O filtro compartilhado (um `<filter>` so pro documento) guarda os
     // parametros da ULTIMA vista que mexeu nele — sem isto, trocar de vista
     // deixaria a tremida no k tunado da vista anterior ate o proximo pan/zoom.

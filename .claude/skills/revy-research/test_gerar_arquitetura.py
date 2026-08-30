@@ -653,9 +653,12 @@ class TestDuasVistasNoHtml(unittest.TestCase):
 
     def test_um_botao_data_vista_por_vista_e_so_um_ativo(self):
         botoes = re.findall(r'<button data-vista="[^"]*"[^>]*>', self.html)
-        self.assertEqual(len(botoes), 2, botoes)
         chaves = {re.search(r'data-vista="([^"]*)"', b).group(1) for b in botoes}
-        self.assertEqual(chaves, {"arquitetura", "schema"})
+        # "design" nao e' cena (nao tem Cena nem Modelo, e' HTML) mas E' vista:
+        # o alternador trata as duas do mesmo jeito, e por isso a lista de
+        # vistas vem do gerador, nao de `Object.keys(zoomInstancias)`.
+        self.assertEqual(chaves, {"arquitetura", "schema", "design"})
+        self.assertEqual(len(botoes), 3, botoes)
         ativos = [b for b in botoes if 'class="ativo"' in b]
         self.assertEqual(len(ativos), 1, botoes)
 

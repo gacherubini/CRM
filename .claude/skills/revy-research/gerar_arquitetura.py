@@ -12,6 +12,7 @@ from pathlib import Path
 
 import arq_layout
 import arq_modelo
+import arq_design
 import arq_render
 import arquitetura
 import varredura
@@ -70,7 +71,11 @@ def montar(raiz: Path) -> str:
         arq_render.Vista("schema", "Schema",
                          arq_layout.dispor(sch, sch.bancos), sch),
     )
-    return arq_render.render(vistas, ZOOM.read_text(encoding="utf-8"))
+    # Os tokens da marca sao LIDOS na geracao. `revy-tokens.css` se declara
+    # fonte unica; uma pagina de design system que repete os valores a mao
+    # vira mentira no primeiro sync_tokens.py.
+    tokens = arq_design.ler_tokens(raiz / "shared" / "brand" / "revy-tokens.css")
+    return arq_render.render(vistas, ZOOM.read_text(encoding="utf-8"), tokens)
 
 
 def gerar(raiz: Path, destino: Path) -> None:
