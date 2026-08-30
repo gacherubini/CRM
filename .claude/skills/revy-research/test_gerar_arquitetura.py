@@ -431,6 +431,42 @@ class TestRender(unittest.TestCase):
         self.assertIn("sem retry", html)
 
 
+class TestFluxos(unittest.TestCase):
+    # Task 7: sem isto, FLUXOS e carregado, validado e ignorado — os itens
+    # "fluxo de auth" e "fluxo critico do produto" do pedido original
+    # ficam sem resposta. `_fluxos_html` e o seletor; `Zoom.acender`
+    # (arq_zoom.js) e quem apaga o resto da cena sem faze-lo sumir.
+    def test_o_fluxo_vira_seletor_com_os_passos_em_ordem(self):
+        raiz = varredura.raiz_repo()
+        frescor = {"sha": "a", "inventario": {"chatbot-api": [],
+                                              "motor-simulacao": []}}
+        nos = {"chatbot-api": {"titulo": "Chatbot", "papel": "conversa"},
+               "motor-simulacao": {"titulo": "Motor", "papel": "banco"}}
+        fluxos = {"simular": {
+            "titulo": "WhatsApp → simulação",
+            "passos": [{"no": "chatbot-api", "faz": "interpreta"},
+                       {"no": "motor-simulacao", "faz": "simula",
+                        "sincrono": False}],
+            "invariante": "a parcela nao volta ao cliente pelo bot"}}
+        modelo = arq_modelo.carregar(raiz, frescor, nos, (), None, fluxos)
+        html = arq_render.render(arq_layout.dispor(modelo), modelo, "")
+        self.assertIn("WhatsApp → simulação", html)
+        self.assertIn("a parcela nao volta ao cliente pelo bot", html)
+        # a ordem dos passos e o conteudo do fluxo, nao pode sair alfabetica
+        self.assertLess(html.index("interpreta"), html.index("simula"))
+
+    def test_passo_pode_citar_vm_que_nao_e_no(self):
+        # evolution2037 e n8n2037 aparecem em fluxo sem serem produto.
+        raiz = varredura.raiz_repo()
+        frescor = {"sha": "a", "inventario": {"chatbot-api": []}}
+        nos = {"chatbot-api": {"titulo": "Chatbot", "papel": "conversa"}}
+        fluxos = {"f": {"titulo": "T", "passos": [
+            {"no": "evolution2037", "faz": "recebe"},
+            {"no": "chatbot-api", "faz": "responde"}]}}
+        m = arq_modelo.carregar(raiz, frescor, nos, (), None, fluxos)
+        self.assertEqual(m.fluxos[0].passos[0].no, "evolution2037")
+
+
 class TestCli(unittest.TestCase):
     def test_gerar_escreve_arquivo_nao_vazio(self):
         raiz = varredura.raiz_repo()

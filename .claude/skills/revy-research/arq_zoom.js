@@ -135,5 +135,27 @@
     setVb(base);
   }
 
-  window.Zoom = { init: init, voarPara: voarPara, subir: subir };
+  function acender(ids) {
+    var dentro = {};
+    for (var i = 0; i < ids.length; i++) dentro[ids[i]] = true;
+    // Caixa fora do fluxo nao some: apaga. Sumir tira a referencia espacial e
+    // o usuario perde onde estava.
+    var todas = svg.querySelectorAll("[data-navegavel]");
+    for (var j = 0; j < todas.length; j++) {
+      todas[j].style.opacity = dentro[todas[j].id] ? "1" : "0.18";
+    }
+    var setas = svg.querySelectorAll("[data-aresta]");
+    for (var s = 0; s < setas.length; s++) {
+      var par = setas[s].getAttribute("data-aresta").split("->");
+      setas[s].style.opacity = (dentro[par[0]] && dentro[par[1]]) ? "1" : "0.12";
+    }
+  }
+
+  function apagar() {
+    var todas = svg.querySelectorAll("[data-navegavel],[data-aresta]");
+    for (var i = 0; i < todas.length; i++) todas[i].style.opacity = "";
+  }
+
+  window.Zoom = { init: init, voarPara: voarPara, subir: subir,
+                  acender: acender, apagar: apagar };
 })();

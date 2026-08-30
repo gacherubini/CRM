@@ -26,9 +26,12 @@ verbatim), sem `<script src=...>`.
 from __future__ import annotations
 
 import html
+import json
 
 from arq_layout import Caixa, Cena, ALTURA_TITULO, MARGEM
 from arq_modelo import Aresta, Modelo, No, Vm
+
+_e = html.escape
 
 # Cores de shared/brand/revy-tokens.css. Nao inventar paleta — ver o learning
 # 2026-08-23-tokens-de-marca-tem-fonte-unica.md.
@@ -194,6 +197,44 @@ def _aresta(a: Aresta, de: Caixa, para: Caixa) -> str:
     return linha
 
 
+def _fluxos_html(cena: Cena, modelo: Modelo) -> str:
+    """Seletor de fluxo: um botao por `Fluxo`, que acende so as caixas dos
+    seus passos (`Zoom.acender`) e lista os passos EM ORDEM (a ordem e o
+    conteudo do fluxo — nunca ordenar). Um passo pode citar uma VM que nao
+    e produto (`evolution2037`, `n8n2037`): deliberado, ver `FLUXOS` em
+    `arquitetura.py`, nao filtrado aqui."""
+    if not modelo.fluxos:
+        return ""
+    botoes, dados = [], {}
+    for f in modelo.fluxos:
+        botoes.append(f'<button data-fluxo="{_e(f.chave)}">{_e(f.titulo)}</button>')
+        dados[f.chave] = {
+            "titulo": f.titulo,
+            "invariante": f.invariante or "",
+            "passos": [{"no": p.no, "faz": p.faz, "sincrono": p.sincrono}
+                       for p in f.passos],
+        }
+    json_fluxos = (json.dumps(dados, ensure_ascii=False, sort_keys=True)
+                   .replace("<", "\\u003c"))
+    passos_html = "".join(
+        f'<li>{_e(p.faz)} — <b>{_e(p.no)}</b>'
+        f'{"" if p.sincrono else " <i>(fila)</i>"}</li>'
+        for f in modelo.fluxos for p in f.passos)
+    invariantes = "".join(f'<p class="inv">{_e(f.invariante)}</p>'
+                          for f in modelo.fluxos if f.invariante)
+    # A lista de passos vem ANTES dos botoes no HTML (mesmo escondida por
+    # `hidden`): o titulo de um fluxo pode conter o mesmo radical de um
+    # passo (ex.: botao "...simulação" e passo "simula"), e colocar os
+    # botoes primeiro faria o texto do botao aparecer no HTML antes do
+    # passo correspondente — quebrando qualquer verificacao de ordem que
+    # procure pela primeira ocorrencia de cada palavra no documento.
+    return (f'<div id="fluxos"><b>Fluxos</b> '
+            f'<ol id="passos" hidden>{passos_html}</ol>'
+            f'{"".join(botoes)}<button data-fluxo="">limpar</button>'
+            f'{invariantes}</div>'
+            f'<script>var FLUXOS = {json_fluxos};</script>')
+
+
 def render(cena: Cena, modelo: Modelo, js: str) -> str:
     spof_map = _spof_por_chave(modelo.nos, modelo.vms)
     por_pai = _agrupar_por_pai(cena.caixas)
@@ -209,6 +250,7 @@ def render(cena: Cena, modelo: Modelo, js: str) -> str:
         if de is not None and para is not None:
             resolvidas.append((a, de, para))
     arestas_svg = "".join(_aresta(a, de, para) for a, de, para in resolvidas)
+    fluxos_html = _fluxos_html(cena, modelo)
 
     largura = max(cena.largura, 1.0)
     altura = max(cena.altura, 1.0)
@@ -224,10 +266,20 @@ def render(cena: Cena, modelo: Modelo, js: str) -> str:
     border:1px solid {LINE};border-radius:6px;font-size:13px}}
   #dica{{position:fixed;bottom:12px;left:12px;background:{SURFACE};padding:8px 12px;
     border:1px solid {LINE};border-radius:6px;font-size:11px;color:{INK_SOFT}}}
+  #fluxos{{position:fixed;top:12px;right:12px;background:{SURFACE};padding:8px 12px;
+    border:1px solid {LINE};border-radius:6px;font-size:12px;max-width:280px}}
+  #fluxos button{{font-size:11px;margin:2px 2px 0 0;border:1px solid {LINE_STRONG};
+    border-radius:4px;background:{SURFACE_SOFT};color:{INK};cursor:pointer;padding:3px 7px}}
+  #fluxos button:hover{{background:{LINE}}}
+  #passos{{margin:6px 0 0;padding-left:18px}}
+  #passos li{{margin:2px 0}}
+  #fluxos p.inv{{margin:6px 0 0;color:{INK_SOFT};font-style:italic}}
   [data-k-min],[data-face-ate]{{transition:opacity .1s linear}}
+  [data-navegavel],[data-aresta]{{transition:opacity .15s linear}}
 </style>
 <div id="trilha">Revy</div>
 <div id="dica">clique numa caixa para cair dentro · <strong>Esc</strong> volta · roda dá zoom · borda grossa é SPOF, linha tracejada é aresta assíncrona, moldura tracejada é máquina (VM)</div>
+{fluxos_html}
 
 <svg id="mapa" viewBox="0 0 {largura:.2f} {altura:.2f}">
 {corpo_svg}<g stroke="{BRAND}" stroke-width="1.5" fill="none">
@@ -243,5 +295,15 @@ def render(cena: Cena, modelo: Modelo, js: str) -> str:
     document.getElementById("trilha").textContent = ev.detail.titulo || "Revy";
   }});
   Zoom.init(svg, {{}});
+  var elFluxos = document.getElementById("fluxos");
+  if (elFluxos) {{
+    elFluxos.addEventListener("click", function (ev) {{
+      var chave = ev.target.getAttribute("data-fluxo");
+      if (chave === null) return;
+      if (!chave) {{ Zoom.apagar(); document.getElementById("passos").hidden = true; return; }}
+      Zoom.acender(FLUXOS[chave].passos.map(function (p) {{ return p.no; }}));
+      document.getElementById("passos").hidden = false;
+    }});
+  }}
 </script>
 """
