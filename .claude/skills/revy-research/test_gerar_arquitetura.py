@@ -1,5 +1,6 @@
 import json
 import re
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -7,6 +8,7 @@ import arq_layout
 import arq_modelo
 import arq_render
 import arquitetura
+import gerar_arquitetura
 import varredura
 
 
@@ -368,6 +370,27 @@ class TestRender(unittest.TestCase):
         html = arq_render.render(arq_layout.dispor(modelo), modelo, "")
         self.assertIn("stroke-dasharray", html)
         self.assertIn("sem retry", html)
+
+
+class TestCli(unittest.TestCase):
+    def test_gerar_escreve_arquivo_nao_vazio(self):
+        raiz = varredura.raiz_repo()
+        with tempfile.TemporaryDirectory() as tmp:
+            destino = Path(tmp) / "arquitetura.html"
+            gerar_arquitetura.gerar(raiz, destino)
+            self.assertGreater(len(destino.read_text(encoding="utf-8")), 5000)
+
+    def test_gerar_duas_vezes_da_bytes_identicos(self):
+        raiz = varredura.raiz_repo()
+        with tempfile.TemporaryDirectory() as tmp:
+            a, b = Path(tmp) / "a.html", Path(tmp) / "b.html"
+            gerar_arquitetura.gerar(raiz, a)
+            gerar_arquitetura.gerar(raiz, b)
+            self.assertEqual(a.read_bytes(), b.read_bytes())
+
+    def test_verificar_passa_com_o_html_commitado(self):
+        # Se falhar: rode `python3 gerar_arquitetura.py` e commite o resultado.
+        self.assertEqual(gerar_arquitetura.main(["--verificar"]), 0)
 
 
 if __name__ == "__main__":

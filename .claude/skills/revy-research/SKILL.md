@@ -67,3 +67,5 @@ Windows usa `python`; o Mac do dono so tem `python3`. Vale para os dois comandos
     cd .claude/skills/revy-research
     python gerar_mapa.py               # regera o mapa
     python gerar_mapa.py --verificar   # so confere; sai 1 se o mapa mentir
+    python gerar_arquitetura.py             # regera arquitetura.html
+    python gerar_arquitetura.py --verificar # so confere; sai 1 se estiver velho

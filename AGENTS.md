@@ -109,7 +109,8 @@ Migration: `alembic upgrade head` no produto certo.
 n8n: `python n8n/validate_workflow.py` na raiz — e, se mexeu na topologia ou no jsCode
 de algum no, os `node n8n/test_*.js` (lista em `n8n/GUIA-WORKFLOW.md`).
 `git diff --check` e `git status --short`. Não commitar mudança alheia.
-Mexeu em rota, modelo, worker, migration ou flag? Regere o mapa e commite junto
-com o código: `cd .claude/skills/revy-research && python gerar_mapa.py` (Windows)
-ou `python3 gerar_mapa.py` (macOS).
+Mexeu em rota, modelo, worker, migration ou flag? Regere o mapa **e a arquitetura** e
+commite junto com o código: `cd .claude/skills/revy-research && python gerar_mapa.py &&
+python gerar_arquitetura.py` (Windows) ou `python3 gerar_mapa.py && python3
+gerar_arquitetura.py` (macOS).
 Algo te surpreendeu? Escreva um learning — procurando duplicata pelo gatilho antes.
