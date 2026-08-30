@@ -1,6 +1,12 @@
 """Funde arquitetura.py + _frescor.json + decisoes/ num Modelo. Stdlib apenas.
 
 Nao importa `app` de produto nenhum (AGENTS.md secao 5).
+
+O modelo e RECURSIVO: um `No` pode ter `filhos`, sem profundidade fixa (dict
+`dentro` no dict cru). So a RAIZ de NOS e cobrada contra o `_frescor.json` —
+e la que moram os nomes de produto. Sub-no e estrutura de dominio (um canal
+por loja, um worker, um modulo), nao produto, entao nao teria como existir
+no frescor. A validacao de `decisoes/` vale em qualquer profundidade.
 """
 from __future__ import annotations
 
@@ -25,10 +31,12 @@ class No:
     papel: str
     vm: str | None = None
     termo: str | None = None
+    modulo: str | None = None
     decisoes: tuple[str, ...] = ()
     spof: bool = False
     spof_porque: str | None = None
     entradas: tuple[Entrada, ...] = ()
+    filhos: tuple["No", ...] = ()
 
 
 @dataclass(frozen=True)
@@ -74,7 +82,7 @@ class Modelo:
     sha: str = ""
 
 
-def _entradas_de(inventario: dict, produto: str) -> tuple[Entrada, ...]:
+def _entradas_de(inventario: dict, produto: str) -> list[Entrada]:
     # sorted() aqui e no resto do modulo: layout deve ser determinstico, e a
     # ordem do JSON nao e contrato.
     brutas = inventario.get(produto, [])
@@ -83,7 +91,62 @@ def _entradas_de(inventario: dict, produto: str) -> tuple[Entrada, ...]:
                 arquivo=e["arquivo"], linha=e["linha"])
         for e in brutas
     ]
-    return tuple(sorted(achatadas, key=lambda e: (e.secao, e.chave, e.arquivo)))
+    return sorted(achatadas, key=lambda e: (e.secao, e.chave, e.arquivo))
+
+
+def _distribuir(pool: list[Entrada], dentro: dict) -> tuple[tuple[Entrada, ...], dict]:
+    """Reparte `pool` entre os filhos por prefixo de `modulo`; o resto fica aqui.
+
+    So o primeiro filho (em ordem de chave) que casa fica com a entrada — os
+    `modulo` sao escritos a mao em arquitetura.py, entao nao deveriam colidir,
+    mas o desempate por ordem alfabetica mantem isso deterministico mesmo
+    assim.
+    """
+    sobrando = list(pool)
+    designadas: dict = {}
+    for subchave in sorted(dentro):
+        modulo = dentro[subchave].get("modulo")
+        casa = []
+        if modulo:
+            casa = [e for e in sobrando if e.arquivo.startswith(modulo)]
+            for e in casa:
+                sobrando.remove(e)
+        designadas[subchave] = casa
+    entradas_aqui = tuple(sorted(sobrando, key=lambda e: (e.secao, e.chave, e.arquivo)))
+    return entradas_aqui, designadas
+
+
+def _construir_no(chave: str, bruto: dict, pool: list[Entrada],
+                   pasta_decisoes: Path) -> No:
+    decisoes = tuple(bruto.get("decisoes") or ())
+    for d in decisoes:
+        if not (pasta_decisoes / d).exists():
+            raise ReferenciaMorta(
+                f"no '{chave}' cita a decisao '{d}', que nao existe em decisoes/"
+            )
+
+    dentro = bruto.get("dentro") or {}
+    entradas_aqui, designadas_filhos = _distribuir(pool, dentro)
+
+    filhos = tuple(
+        _construir_no(subchave, dentro[subchave], designadas_filhos[subchave],
+                      pasta_decisoes)
+        for subchave in sorted(dentro)
+    )
+
+    return No(
+        chave=chave,
+        titulo=bruto["titulo"],
+        papel=bruto["papel"],
+        vm=bruto.get("vm"),
+        termo=bruto.get("termo"),
+        modulo=bruto.get("modulo"),
+        decisoes=decisoes,
+        spof=bool(bruto.get("spof")),
+        spof_porque=bruto.get("spof_porque"),
+        entradas=entradas_aqui,
+        filhos=filhos,
+    )
 
 
 def carregar(raiz: Path, frescor: dict, nos: dict,
@@ -100,23 +163,8 @@ def carregar(raiz: Path, frescor: dict, nos: dict,
                 f"no '{chave}' nao existe no _frescor.json. "
                 f"Produtos conhecidos: {', '.join(sorted(inventario))}"
             )
-        decisoes = tuple(bruto.get("decisoes") or ())
-        for d in decisoes:
-            if not (pasta_decisoes / d).exists():
-                raise ReferenciaMorta(
-                    f"no '{chave}' cita a decisao '{d}', que nao existe em decisoes/"
-                )
-        construidos.append(No(
-            chave=chave,
-            titulo=bruto["titulo"],
-            papel=bruto["papel"],
-            vm=bruto.get("vm"),
-            termo=bruto.get("termo"),
-            decisoes=decisoes,
-            spof=bool(bruto.get("spof")),
-            spof_porque=bruto.get("spof_porque"),
-            entradas=_entradas_de(inventario, chave),
-        ))
+        pool = _entradas_de(inventario, chave)
+        construidos.append(_construir_no(chave, bruto, pool, pasta_decisoes))
 
     conhecidos = {n.chave for n in construidos}
     feitas = []

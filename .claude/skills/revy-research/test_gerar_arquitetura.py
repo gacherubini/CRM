@@ -55,6 +55,75 @@ class TestCarregar(unittest.TestCase):
         self.assertEqual([n.chave for n in m.nos], ["chatbot-api", "estoque-api"])
 
 
+class TestRecursivo(unittest.TestCase):
+    def setUp(self):
+        self.raiz = varredura.raiz_repo()
+
+    def test_no_com_dentro_de_dois_niveis_carrega_e_filhos_de_filhos_existe(self):
+        nos = {
+            "chatbot-api": {
+                "titulo": "Chatbot API", "papel": "conversa",
+                "dentro": {
+                    "canais": {
+                        "titulo": "Canais", "papel": "entrada",
+                        "dentro": {
+                            "whatsapp": {"titulo": "WhatsApp", "papel": "canal"},
+                        },
+                    },
+                },
+            },
+        }
+        m = arq_modelo.carregar(self.raiz, FRESCOR_FALSO, nos)
+        self.assertEqual(len(m.nos[0].filhos), 1)
+        self.assertEqual(m.nos[0].filhos[0].chave, "canais")
+        self.assertEqual(len(m.nos[0].filhos[0].filhos), 1)
+        self.assertEqual(m.nos[0].filhos[0].filhos[0].chave, "whatsapp")
+
+    def test_sub_no_fora_do_frescor_carrega_sem_referencia_morta(self):
+        nos = {
+            "chatbot-api": {
+                "titulo": "Chatbot API", "papel": "conversa",
+                "dentro": {
+                    "evolution": {"titulo": "Evolution", "papel": "canal"},
+                },
+            },
+        }
+        # Nao deve levantar: "evolution" nunca vai existir em _frescor.json,
+        # e nao deveria precisar — e estrutura de dominio, nao produto.
+        m = arq_modelo.carregar(self.raiz, FRESCOR_FALSO, nos)
+        self.assertEqual(m.nos[0].filhos[0].chave, "evolution")
+
+    def test_sub_no_com_modulo_recebe_a_entrada_e_ela_some_da_raiz(self):
+        nos = {
+            "chatbot-api": {
+                "titulo": "Chatbot API", "papel": "conversa",
+                "dentro": {
+                    "workers": {"titulo": "Workers", "papel": "fundo",
+                                "modulo": "app/followup_job.py"},
+                },
+            },
+        }
+        m = arq_modelo.carregar(self.raiz, FRESCOR_FALSO, nos)
+        raiz = m.nos[0]
+        workers = raiz.filhos[0]
+        self.assertEqual([e.chave for e in workers.entradas], ["FollowupWorker"])
+        self.assertEqual([e.chave for e in raiz.entradas], ["GET /health/live"])
+
+    def test_sub_no_com_decisao_inexistente_ainda_levanta_referencia_morta(self):
+        nos = {
+            "chatbot-api": {
+                "titulo": "Chatbot API", "papel": "conversa",
+                "dentro": {
+                    "evolution": {"titulo": "Evolution", "papel": "canal",
+                                  "decisoes": ["2099-01-01-nunca-escrita.md"]},
+                },
+            },
+        }
+        with self.assertRaises(arq_modelo.ReferenciaMorta) as ctx:
+            arq_modelo.carregar(self.raiz, FRESCOR_FALSO, nos)
+        self.assertIn("2099-01-01-nunca-escrita.md", str(ctx.exception))
+
+
 class TestArquiteturaReal(unittest.TestCase):
     def setUp(self):
         self.raiz = varredura.raiz_repo()
