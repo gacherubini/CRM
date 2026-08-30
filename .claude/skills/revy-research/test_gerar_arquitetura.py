@@ -2,6 +2,7 @@ import json
 import unittest
 from pathlib import Path
 
+import arq_layout
 import arq_modelo
 import arquitetura
 import varredura
@@ -149,6 +150,53 @@ class TestArquiteturaReal(unittest.TestCase):
         for chave, no in arquitetura.NOS.items():
             self.assertIn("titulo", no, chave)
             self.assertIn("papel", no, chave)
+
+
+class TestLayout(unittest.TestCase):
+    def _modelo(self):
+        raiz = varredura.raiz_repo()
+        frescor = {"sha": "a", "inventario": {"chatbot-api": [
+            {"secao": "worker", "chave": "FollowupWorker", "simbolo": "F",
+             "arquivo": "app/followup_job.py", "linha": 64}]}}
+        nos = {"chatbot-api": {"titulo": "Chatbot", "papel": "conversa", "dentro": {
+            "canais": {"titulo": "Canais", "papel": "entrada", "dentro": {
+                "loja-a": {"titulo": "WhatsApp loja A", "papel": "canal"}}}}}}
+        return arq_modelo.carregar(raiz, frescor, nos)
+
+    def test_e_deterministico_byte_a_byte(self):
+        self.assertEqual(arq_layout.dispor(self._modelo()),
+                         arq_layout.dispor(self._modelo()))
+
+    def test_desce_ate_o_neto(self):
+        niveis = {c.nivel for c in arq_layout.dispor(self._modelo()).caixas}
+        self.assertIn(3, niveis, "o neto (loja-a) nao virou caixa")
+
+    def test_filho_cabe_dentro_do_pai_em_todo_nivel(self):
+        cena = arq_layout.dispor(self._modelo())
+        por_chave = {c.chave: c for c in cena.caixas}
+        for c in cena.caixas:
+            if not c.pai or c.pai not in por_chave:
+                continue
+            p = por_chave[c.pai]
+            self.assertGreaterEqual(c.x, p.x, c.chave)
+            self.assertGreaterEqual(c.y, p.y, c.chave)
+            self.assertLessEqual(c.x + c.w, p.x + p.w + 0.01, c.chave)
+            self.assertLessEqual(c.y + c.h, p.y + p.h + 0.01, c.chave)
+
+    def test_o_limiar_e_alcancavel_clicando_no_pai(self):
+        # O bug real: k_min acima do k que clicar no pai atinge deixa o
+        # interior invisivel para sempre.
+        cena = arq_layout.dispor(self._modelo())
+        por_chave = {c.chave: c for c in cena.caixas}
+        for c in cena.caixas:
+            if not c.pai or c.pai not in por_chave:
+                continue
+            k_do_pai_cheio = cena.largura / por_chave[c.pai].w
+            self.assertLess(c.k_min, k_do_pai_cheio, f"{c.chave} nunca acende")
+
+    def test_id_de_caixa_e_unico(self):
+        chaves = [c.chave for c in arq_layout.dispor(self._modelo()).caixas]
+        self.assertEqual(len(chaves), len(set(chaves)))
 
 
 if __name__ == "__main__":
