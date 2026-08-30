@@ -1,4 +1,10 @@
-"""O HTML do zoom continuo: `Cena` + `Modelo` -> uma pagina SVG auto-contida.
+"""O HTML do zoom continuo: `Vista` (uma por cena) -> uma pagina SVG
+auto-contida com um alternador no topo.
+
+Task 10: a pagina passa a ter duas cenas independentes (Arquitetura e
+Schema, uma `Vista` cada) no MESMO documento — um `<svg id="mapa-{chave}">`
+por vista, so a primeira visivel de saida, e um `Zoom.criar(...)` (arq_zoom.js)
+por vista, porque as duas nao podem dividir estado de zoom.
 
 O alvo visual e `arq_zoom_demo.html`, ja aprovado no navegador — esta
 funcao produz a MESMA estrutura por caixa, so que gerada:
@@ -27,11 +33,26 @@ from __future__ import annotations
 
 import html
 import json
+from dataclasses import dataclass
 
 from arq_layout import Caixa, Cena, ALTURA_TITULO, MARGEM
 from arq_modelo import Aresta, Modelo, No, Vm
 
 _e = html.escape
+
+
+@dataclass(frozen=True)
+class Vista:
+    """Uma cena renderizavel: a vista Arquitetura ou a vista Schema (Task 10).
+
+    `cena` e `modelo` sao SEMPRE o par que saiu do mesmo `arq_modelo.filtrar`
+    + `arq_layout.dispor` — nada e compartilhado entre vistas, cada uma tem a
+    propria geometria e o proprio conjunto de arestas/fluxos.
+    """
+    chave: str      # "arquitetura" | "schema" — vira id/atributo no HTML e no JS
+    rotulo: str     # "Arquitetura" | "Schema" — texto do botao e da trilha
+    cena: Cena
+    modelo: Modelo
 
 # Cores de shared/brand/revy-tokens.css. Nao inventar paleta — ver o learning
 # 2026-08-23-tokens-de-marca-tem-fonte-unica.md.
@@ -217,12 +238,20 @@ def _aresta(a: Aresta, de: Caixa, para: Caixa) -> str:
     return linha
 
 
-def _fluxos_html(cena: Cena, modelo: Modelo) -> str:
-    """Seletor de fluxo: um botao por `Fluxo`, que acende so as caixas dos
-    seus passos (`Zoom.acender`) e lista os passos EM ORDEM (a ordem e o
-    conteudo do fluxo — nunca ordenar). Um passo pode citar uma VM que nao
-    e produto (`evolution2037`, `n8n2037`): deliberado, ver `FLUXOS` em
-    `arquitetura.py`, nao filtrado aqui."""
+def _fluxos_html(modelo: Modelo, chave: str, oculto: bool) -> str:
+    """Seletor de fluxo da vista `chave`: um botao por `Fluxo`, que acende so
+    as caixas dos seus passos (`Zoom.acender`) e lista os passos EM ORDEM (a
+    ordem e o conteudo do fluxo — nunca ordenar). Um passo pode citar uma VM
+    que nao e produto (`evolution2037`, `n8n2037`): deliberado, ver `FLUXOS`
+    em `arquitetura.py`, nao filtrado aqui.
+
+    So `modelo.fluxos` decide se o painel existe — a vista Schema nao tem
+    fluxo (fluxo e caminho de execucao, relacao de dado e outra coisa), entao
+    hoje so a vista Arquitetura emite este bloco. Os ids sao sufixados por
+    `chave` porque, em tese, mais de uma vista pode ter painel de fluxo na
+    mesma pagina — sem sufixo, colidiriam. `oculto` marca o painel com
+    `hidden` de saida quando a vista dona dele nao e a que abre.
+    """
     if not modelo.fluxos:
         return ""
     botoes, dados = [], {}
@@ -236,34 +265,115 @@ def _fluxos_html(cena: Cena, modelo: Modelo) -> str:
         }
     json_fluxos = (json.dumps(dados, ensure_ascii=False, sort_keys=True)
                    .replace("<", "\\u003c"))
+    hidden_attr = " hidden" if oculto else ""
     # A lista e o invariante sao montados no navegador a partir do FLUXOS,
     # so para o fluxo escolhido. Concatenar os quatro no HTML fazia cada
     # clique mostrar os passos de todos os fluxos somados.
-    return (f'<div id="fluxos"><b>Fluxos</b> '
+    return (f'<div id="fluxos-{chave}"{hidden_attr}><b>Fluxos</b> '
             f'{"".join(botoes)}<button data-fluxo="">limpar</button>'
-            f'<ol id="passos" hidden></ol><p id="inv" hidden></p></div>'
-            f'<script>var FLUXOS = {json_fluxos};</script>')
+            f'<ol id="passos-{chave}" hidden></ol><p id="inv-{chave}" hidden></p></div>'
+            f'<script>var FLUXOS_{chave} = {json_fluxos};</script>')
 
 
-def render(cena: Cena, modelo: Modelo, js: str) -> str:
-    spof_map = _spof_por_chave(modelo.nos, modelo.vms)
-    por_pai = _agrupar_por_pai(cena.caixas)
-    raizes = sorted(por_pai.get(None, []), key=lambda c: c.chave)
+def _fluxos_script(chave: str) -> str:
+    """Listener de clique do painel de fluxo da vista `chave`. Cada vista tem
+    o proprio painel (ids sufixados) e a propria instancia de `Zoom`
+    (`zoomInstancias[chave]`, montada em `render`) — acender/apagar tem que
+    ir para o `Zoom.criar` da MESMA vista, senao o realce de fluxo de uma
+    vista mexeria no zoom da outra."""
+    return f"""
+  var elFluxos_{chave} = document.getElementById("fluxos-{chave}");
+  if (elFluxos_{chave}) {{
+    elFluxos_{chave}.addEventListener("click", function (ev) {{
+      var k = ev.target.getAttribute("data-fluxo");
+      if (k === null) return;
+      var ol = document.getElementById("passos-{chave}"), inv = document.getElementById("inv-{chave}");
+      if (!k) {{
+        zoomInstancias["{chave}"].apagar(); ol.hidden = true; inv.hidden = true; return;
+      }}
+      var f = FLUXOS_{chave}[k];
+      zoomInstancias["{chave}"].acender(f.passos.map(function (p) {{ return p.no; }}));
+      ol.textContent = "";
+      f.passos.forEach(function (p) {{
+        var li = document.createElement("li");
+        li.textContent = p.faz + " — " + p.no + (p.sincrono ? "" : " (fila)");
+        ol.appendChild(li);
+      }});
+      ol.hidden = false;
+      inv.textContent = f.invariante || "";
+      inv.hidden = !f.invariante;
+    }});
+  }}"""
 
-    corpo_svg = "".join(_no_recursivo(r, por_pai, spof_map) for r in raizes)
 
-    caixas_por_chave = {c.chave: c for c in cena.caixas}
-    resolvidas = []
-    for a in modelo.arestas:
-        de = _resolver_produto(a.de, caixas_por_chave)
-        para = _resolver_produto(a.para, caixas_por_chave)
-        if de is not None and para is not None:
-            resolvidas.append((a, de, para))
-    arestas_svg = "".join(_aresta(a, de, para) for a, de, para in resolvidas)
-    fluxos_html = _fluxos_html(cena, modelo)
+def render(vistas: tuple[Vista, ...], js: str) -> str:
+    """Monta a pagina inteira a partir de N `Vista`. A primeira da tupla abre
+    visivel; as demais saem com `hidden`. Cada vista ganha o proprio
+    `<svg id="mapa-{chave}">`, o proprio botao no alternador (`data-vista`) e
+    a propria instancia de `Zoom.criar` — nada de estado, geometria ou
+    arestas e compartilhado entre elas."""
+    svgs, botoes = [], []
+    paineis_fluxo, scripts_fluxo = [], []
+    linhas_instancia, linhas_trilha = [], []
+    rotulos: dict[str, str] = {}
 
-    largura = max(cena.largura, 1.0)
-    altura = max(cena.altura, 1.0)
+    for i, vista in enumerate(vistas):
+        ativa = i == 0
+        spof_map = _spof_por_chave(vista.modelo.nos, vista.modelo.vms)
+        por_pai = _agrupar_por_pai(vista.cena.caixas)
+        raizes = sorted(por_pai.get(None, []), key=lambda c: c.chave)
+        corpo_svg = "".join(_no_recursivo(r, por_pai, spof_map) for r in raizes)
+
+        caixas_por_chave = {c.chave: c for c in vista.cena.caixas}
+        resolvidas = []
+        for a in vista.modelo.arestas:
+            de = _resolver_produto(a.de, caixas_por_chave)
+            para = _resolver_produto(a.para, caixas_por_chave)
+            if de is not None and para is not None:
+                resolvidas.append((a, de, para))
+        arestas_svg = "".join(_aresta(a, de, para) for a, de, para in resolvidas)
+
+        largura = max(vista.cena.largura, 1.0)
+        altura = max(vista.cena.altura, 1.0)
+        hidden_attr = "" if ativa else " hidden"
+        svgs.append(
+            f'<svg id="mapa-{vista.chave}" viewBox="0 0 {largura:.2f} {altura:.2f}"{hidden_attr}>\n'
+            f'{corpo_svg}<g stroke="{BRAND}" stroke-width="1.5" fill="none">\n'
+            f'{arestas_svg}</g>\n</svg>'
+        )
+
+        classe = ' class="ativo"' if ativa else ""
+        botoes.append(f'<button data-vista="{_e(vista.chave)}"{classe}>{_e(vista.rotulo)}</button>')
+        rotulos[vista.chave] = vista.rotulo
+
+        # A vista Schema nao tem `modelo.fluxos` (fluxo e caminho de
+        # execucao, nao relacao de dado) — so a vista Arquitetura emite
+        # painel hoje, mas o codigo nao amarra nisso: qualquer vista com
+        # fluxo ganha o proprio painel, escondido junto com o svg dela.
+        fluxo_html = _fluxos_html(vista.modelo, vista.chave, oculto=not ativa)
+        if fluxo_html:
+            paineis_fluxo.append(fluxo_html)
+            scripts_fluxo.append(_fluxos_script(vista.chave))
+
+        linhas_instancia.append(
+            f'  zoomInstancias["{vista.chave}"] = '
+            f'Zoom.criar(document.getElementById("mapa-{vista.chave}"), {{}});'
+        )
+        linhas_trilha.append(
+            f'  document.getElementById("mapa-{vista.chave}")'
+            f'.addEventListener("zoom:mudou", function (ev) {{\n'
+            f'    document.getElementById("trilha").textContent = ev.detail.titulo || "Revy";\n'
+            f'  }});'
+        )
+
+    rotulos_json = (json.dumps(rotulos, ensure_ascii=False, sort_keys=True)
+                     .replace("<", "\\u003c"))
+    corpo_botoes = "".join(botoes)
+    corpo_svgs = "\n".join(svgs)
+    corpo_fluxos = "".join(paineis_fluxo)
+    corpo_scripts_fluxo = "".join(scripts_fluxo)
+    corpo_instancias = "\n".join(linhas_instancia)
+    corpo_trilha = "\n".join(linhas_trilha)
 
     return f"""<!doctype html>
 <meta charset="utf-8">
@@ -272,61 +382,73 @@ def render(cena: Cena, modelo: Modelo, js: str) -> str:
   html,body{{margin:0;height:100%;background:{PAPER};
     font-family:system-ui,-apple-system,sans-serif;color:{INK}}}
   svg{{width:100vw;height:100vh;display:block;cursor:grab;touch-action:none}}
+  /* Task 10: com duas cenas na pagina, hidden esconde a vista que nao esta
+     ativa — sem esta regra, o svg{{display:block}} acima (que ja existia
+     antes de haver mais de um svg) pisa a regra padrao do navegador pra
+     [hidden] e as duas cenas ficam sobrepostas. */
+  svg[hidden]{{display:none}}
+  #alternador{{position:fixed;top:12px;left:50%;transform:translateX(-50%);
+    background:{SURFACE};padding:4px;border:1px solid {LINE};border-radius:8px;
+    font-size:13px;z-index:2}}
+  #alternador button{{border:none;background:none;color:{INK_SOFT};cursor:pointer;
+    padding:6px 14px;border-radius:6px;font-size:13px}}
+  #alternador button.ativo{{background:{BRAND};color:{SURFACE}}}
   #trilha{{position:fixed;top:12px;left:12px;background:{SURFACE};padding:6px 12px;
     border:1px solid {LINE};border-radius:6px;font-size:13px}}
   #dica{{position:fixed;bottom:12px;left:12px;background:{SURFACE};padding:8px 12px;
     border:1px solid {LINE};border-radius:6px;font-size:11px;color:{INK_SOFT}}}
-  #fluxos{{position:fixed;top:12px;right:12px;background:{SURFACE};padding:8px 12px;
+  [id^="fluxos-"]{{position:fixed;top:12px;right:12px;background:{SURFACE};padding:8px 12px;
     border:1px solid {LINE};border-radius:6px;font-size:12px;max-width:280px}}
-  #fluxos button{{font-size:11px;margin:2px 2px 0 0;border:1px solid {LINE_STRONG};
+  [id^="fluxos-"] button{{font-size:11px;margin:2px 2px 0 0;border:1px solid {LINE_STRONG};
     border-radius:4px;background:{SURFACE_SOFT};color:{INK};cursor:pointer;padding:3px 7px}}
-  #fluxos button:hover{{background:{LINE}}}
-  #passos{{margin:6px 0 0;padding-left:18px}}
-  #inv{{margin:6px 0 0;font-style:italic}}
-  #passos li{{margin:2px 0}}
-  #fluxos p.inv{{margin:6px 0 0;color:{INK_SOFT};font-style:italic}}
+  [id^="fluxos-"] button:hover{{background:{LINE}}}
+  [id^="passos-"]{{margin:6px 0 0;padding-left:18px}}
+  [id^="inv-"]{{margin:6px 0 0;font-style:italic}}
+  [id^="passos-"] li{{margin:2px 0}}
   [data-k-min],[data-face-ate]{{transition:opacity .1s linear}}
   [data-navegavel],[data-aresta]{{transition:opacity .15s linear}}
 </style>
+<div id="alternador">{corpo_botoes}</div>
 <div id="trilha">Revy</div>
 <div id="dica">clique numa caixa para cair dentro · <strong>Esc</strong> volta · roda dá zoom · borda grossa é SPOF, linha tracejada é aresta assíncrona, moldura tracejada é máquina (VM)</div>
-{fluxos_html}
+{corpo_fluxos}
 
-<svg id="mapa" viewBox="0 0 {largura:.2f} {altura:.2f}">
-{corpo_svg}<g stroke="{BRAND}" stroke-width="1.5" fill="none">
-{arestas_svg}</g>
-</svg>
+{corpo_svgs}
 
 <script>
 {js}
 </script>
 <script>
-  var svg = document.getElementById("mapa");
-  svg.addEventListener("zoom:mudou", function (ev) {{
-    document.getElementById("trilha").textContent = ev.detail.titulo || "Revy";
+  var ROTULOS = {rotulos_json};
+  var zoomInstancias = {{}};
+{corpo_instancias}
+{corpo_trilha}
+  document.getElementById("alternador").addEventListener("click", function (ev) {{
+    var alvo = ev.target.closest("[data-vista]");
+    if (!alvo) return;
+    mostrarVista(alvo.getAttribute("data-vista"));
   }});
-  Zoom.init(svg, {{}});
-  var elFluxos = document.getElementById("fluxos");
-  if (elFluxos) {{
-    elFluxos.addEventListener("click", function (ev) {{
-      var chave = ev.target.getAttribute("data-fluxo");
-      if (chave === null) return;
-      var ol = document.getElementById("passos"), inv = document.getElementById("inv");
-      if (!chave) {{
-        Zoom.apagar(); ol.hidden = true; inv.hidden = true; return;
+  function mostrarVista(chave) {{
+    var chaves = Object.keys(zoomInstancias);
+    for (var i = 0; i < chaves.length; i++) {{
+      var v = chaves[i];
+      var svgEl = document.getElementById("mapa-" + v);
+      // setAttribute, nao a propriedade `.hidden`: em SVGSVGElement (o
+      // <svg> raiz) `.hidden = true` NAO reflete no atributo nem some da
+      // tela neste Chrome — so aparece lendo `getAttribute`. So achado
+      // abrindo no navegador; `<div>` (o painel de fluxo, abaixo) reflete
+      // normalmente, so o <svg> raiz tem a quebra.
+      if (svgEl) {{
+        if (v !== chave) svgEl.setAttribute("hidden", ""); else svgEl.removeAttribute("hidden");
       }}
-      var f = FLUXOS[chave];
-      Zoom.acender(f.passos.map(function (p) {{ return p.no; }}));
-      ol.textContent = "";
-      f.passos.forEach(function (p) {{
-        var li = document.createElement("li");
-        li.textContent = p.faz + " \u2014 " + p.no + (p.sincrono ? "" : " (fila)");
-        ol.appendChild(li);
-      }});
-      ol.hidden = false;
-      inv.textContent = f.invariante || "";
-      inv.hidden = !f.invariante;
-    }});
+      var painel = document.getElementById("fluxos-" + v);
+      if (painel) painel.hidden = (v !== chave);
+      var botao = document.querySelector('[data-vista="' + v + '"]');
+      if (botao) botao.className = (v === chave) ? "ativo" : "";
+    }}
+    var trilhaEl = document.getElementById("trilha");
+    if (trilhaEl) trilhaEl.textContent = ROTULOS[chave] || "Revy";
   }}
+{corpo_scripts_fluxo}
 </script>
 """

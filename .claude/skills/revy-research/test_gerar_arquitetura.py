@@ -13,6 +13,8 @@ import arquitetura
 import gerar_arquitetura
 import varredura
 
+ZOOM_JS = Path(__file__).resolve().parent.joinpath("arq_zoom.js").read_text(encoding="utf-8")
+
 
 FRESCOR_FALSO = {
     "sha": "abc1234",
@@ -482,7 +484,9 @@ class TestRender(unittest.TestCase):
         nos = {"chatbot-api": {"titulo": "Chatbot", "papel": "conversa", "dentro": {
             "canais": {"titulo": "Canais", "papel": "entrada"}}}}
         modelo = arq_modelo.carregar(raiz, frescor, nos)
-        return arq_render.render(arq_layout.dispor(modelo, modelo.vms), modelo, "/* js */")
+        vista = arq_render.Vista("arquitetura", "Arquitetura",
+                                 arq_layout.dispor(modelo, modelo.vms), modelo)
+        return arq_render.render((vista,), "/* js */")
 
     def test_e_auto_contido_sem_nenhuma_url_externa(self):
         # "http" cru no HTML nao e' erro: o _frescor.json real carrega
@@ -517,7 +521,9 @@ class TestRender(unittest.TestCase):
              "arquivo": "app/main.py", "linha": 1}]}}
         nos = {"chatbot-api": {"titulo": "C", "papel": "x"}}
         modelo = arq_modelo.carregar(raiz, frescor, nos)
-        html = arq_render.render(arq_layout.dispor(modelo, modelo.vms), modelo, "")
+        vista = arq_render.Vista("arquitetura", "Arquitetura",
+                                 arq_layout.dispor(modelo, modelo.vms), modelo)
+        html = arq_render.render((vista,), "")
         self.assertNotIn("<b>", html)
 
     def test_subtitulo_truncado_nunca_fica_maior_que_o_original(self):
@@ -542,7 +548,9 @@ class TestRender(unittest.TestCase):
         arestas = [{"de": "chatbot-api", "para": "estoque-api",
                     "protocolo": "http", "sincrono": False, "retry": False}]
         modelo = arq_modelo.carregar(raiz, frescor, nos, arestas)
-        html = arq_render.render(arq_layout.dispor(modelo, modelo.vms), modelo, "")
+        vista = arq_render.Vista("arquitetura", "Arquitetura",
+                                 arq_layout.dispor(modelo, modelo.vms), modelo)
+        html = arq_render.render((vista,), "")
         self.assertIn("stroke-dasharray", html)
         self.assertIn("sem retry", html)
 
@@ -565,14 +573,18 @@ class TestFluxos(unittest.TestCase):
                         "sincrono": False}],
             "invariante": "a parcela nao volta ao cliente pelo bot"}}
         modelo = arq_modelo.carregar(raiz, frescor, nos, (), None, fluxos)
-        html = arq_render.render(arq_layout.dispor(modelo, modelo.vms), modelo, "")
+        vista = arq_render.Vista("arquitetura", "Arquitetura",
+                                 arq_layout.dispor(modelo, modelo.vms), modelo)
+        html = arq_render.render((vista,), "")
         self.assertIn("WhatsApp → simulação", html)
         self.assertIn("a parcela nao volta ao cliente pelo bot", html)
         # A ordem dos passos e conteudo do fluxo, nao pode sair alfabetica.
         # Conferida no JSON embutido, nao no <ol>: a lista passou a ser montada
         # no navegador, so para o fluxo escolhido — concatenar os quatro no HTML
         # fazia cada clique mostrar os passos de todos os fluxos somados.
-        bruto = html.split("var FLUXOS = ", 1)[1].split(";</script>", 1)[0]
+        # `FLUXOS_arquitetura` (nao `FLUXOS`): Task 10 sufixa por vista, senao
+        # duas vistas com fluxo colidiriam em nome de variavel.
+        bruto = html.split("var FLUXOS_arquitetura = ", 1)[1].split(";</script>", 1)[0]
         passos = json.loads(bruto.replace("\\u003c", "<"))["simular"]["passos"]
         self.assertEqual([p["faz"] for p in passos], ["interpreta", "simula"])
 
@@ -586,6 +598,96 @@ class TestFluxos(unittest.TestCase):
             {"no": "chatbot-api", "faz": "responde"}]}}
         m = arq_modelo.carregar(raiz, frescor, nos, (), None, fluxos)
         self.assertEqual(m.fluxos[0].passos[0].no, "evolution2037")
+
+
+class TestDuasVistasNoHtml(unittest.TestCase):
+    # Task 10: as duas vistas (Arquitetura x Schema) no MESMO html, com
+    # alternador. `montar()` e o caminho real (o que gerar_arquitetura.py
+    # escreve em arquitetura.html) — sem mock, porque o que importa aqui e
+    # o HTML final que o navegador abre.
+    def setUp(self):
+        self.raiz = varredura.raiz_repo()
+        self.html = gerar_arquitetura.montar(self.raiz)
+
+    def _svg(self, chave):
+        # Recorta o <svg id="mapa-{chave}" ...>...</svg> inteiro, sem pegar
+        # o svg da outra vista (os dois tem os mesmos filhos superficiais).
+        inicio = self.html.index(f'<svg id="mapa-{chave}"')
+        fim = self.html.index("</svg>", inicio) + len("</svg>")
+        return self.html[inicio:fim]
+
+    def test_as_duas_vistas_tem_svg_proprio(self):
+        self.assertIn('id="mapa-arquitetura"', self.html)
+        self.assertIn('id="mapa-schema"', self.html)
+
+    def test_svg_da_schema_nao_tem_aresta(self):
+        self.assertNotIn("data-aresta", self._svg("schema"))
+
+    def test_catalogo_publico_so_aparece_na_arquitetura(self):
+        self.assertIn("catalogo-publico", self._svg("arquitetura"))
+        self.assertNotIn("catalogo-publico", self._svg("schema"))
+
+    def test_um_botao_data_vista_por_vista_e_so_um_ativo(self):
+        botoes = re.findall(r'<button data-vista="[^"]*"[^>]*>', self.html)
+        self.assertEqual(len(botoes), 2, botoes)
+        chaves = {re.search(r'data-vista="([^"]*)"', b).group(1) for b in botoes}
+        self.assertEqual(chaves, {"arquitetura", "schema"})
+        ativos = [b for b in botoes if 'class="ativo"' in b]
+        self.assertEqual(len(ativos), 1, botoes)
+
+    def test_so_o_primeiro_svg_sai_visivel(self):
+        primeiro = self.html.index('<svg id="mapa-')
+        tag_primeiro = self.html[primeiro:self.html.index(">", primeiro) + 1]
+        self.assertNotIn("hidden", tag_primeiro, tag_primeiro)
+
+        segundo = self.html.index('<svg id="mapa-', primeiro + 1)
+        tag_segundo = self.html[segundo:self.html.index(">", segundo) + 1]
+        self.assertIn("hidden", tag_segundo, tag_segundo)
+
+    def test_zoom_criar_uma_vez_por_vista_sem_depender_de_init(self):
+        self.assertIn("criar:", ZOOM_JS)
+        # window.Zoom nao expoe mais `init` — a fabrica e a UNICA porta de
+        # entrada, e o render chama `criar` uma vez por svg.
+        self.assertNotIn("init:", ZOOM_JS)
+        self.assertEqual(self.html.count("Zoom.criar("), 2)
+
+    def test_regra_svg_hidden_display_none_existe(self):
+        # Achado no navegador (nao aparecia so lendo o codigo): `svg{
+        # display:block }` (regra que ja existia antes de haver mais de um
+        # <svg>) e CSS de autor, que pisa a regra padrao do navegador pra
+        # `[hidden]` (CSS do user-agent, sempre perde de CSS de autor,
+        # independente de especificidade). Sem uma regra `svg[hidden]{
+        # display:none }` propria, o atributo `hidden` no segundo <svg> nao
+        # esconde nada e as duas vistas ficam sobrepostas na tela, mesmo com
+        # o atributo presente no HTML.
+        estilo = self.html[self.html.index("<style>"):self.html.index("</style>")]
+        self.assertIn("svg[hidden]", estilo)
+        self.assertIn("display:none", estilo[estilo.index("svg[hidden]"):])
+
+    def test_troca_de_vista_usa_atributo_hidden_nao_a_propriedade(self):
+        # Achado no navegador: neste Chrome o <svg> RAIZ (SVGSVGElement) nao
+        # implementa a propriedade IDL `hidden` — le `undefined`, e
+        # atribuir `svgEl.hidden = true/false` nao muda o atributo nem o
+        # `display` computado. `mostrarVista` (arq_render.py) tem que
+        # esconder/mostrar o svg com `setAttribute`/`removeAttribute`, nunca
+        # com `svgEl.hidden = ...`.
+        script = self.html[self.html.rindex("<script>"):self.html.rindex("</script>")]
+        self.assertIn('svgEl.setAttribute("hidden"', script)
+        self.assertIn("svgEl.removeAttribute(\"hidden\")", script)
+        self.assertNotIn("svgEl.hidden", script)
+
+
+class TestZoomJs(unittest.TestCase):
+    def test_esc_guard_usa_hasattribute_nao_a_propriedade_hidden(self):
+        # Mesmo achado do teste acima, do lado do arq_zoom.js: o guard do
+        # Esc (`Zoom.criar`) tem que testar `svg.hasAttribute("hidden")`,
+        # nao `svg.hidden` — a propriedade le `undefined` no <svg> raiz
+        # neste Chrome, entao `!svg.hidden` seria sempre true e o guard
+        # nunca guardaria nada (Esc na vista escondida subiria a arvore da
+        # vista visivel, invisivelmente — exatamente o defeito que o guard
+        # existe para evitar).
+        self.assertIn('svg.hasAttribute("hidden")', ZOOM_JS)
+        self.assertNotIn("!svg.hidden", ZOOM_JS)
 
 
 class TestCli(unittest.TestCase):

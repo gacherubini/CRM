@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import json
 import sys
+from dataclasses import replace
 from pathlib import Path
 
 import arq_layout
@@ -46,16 +47,27 @@ def _avisar_secoes_desconhecidas(frescor: dict) -> None:
 def montar(raiz: Path) -> str:
     frescor = json.loads(FRESCOR.read_text(encoding="utf-8"))
     _avisar_secoes_desconhecidas(frescor)
-    modelo = arq_modelo.carregar(
+    completo = arq_modelo.carregar(
         raiz, frescor, arquitetura.NOS, arquitetura.ARESTAS,
         arquitetura.VMS, arquitetura.FLUXOS, arquitetura.BANCOS)
-    # A vista Schema (SECOES_SCHEMA + modelo.bancos) ainda nao vai pro HTML
-    # nesta task — so o caminho fica pronto e coberto por teste
-    # (test_gerar_arquitetura.py). arquitetura.html continua sendo so a
-    # vista Arquitetura, agora filtrada.
-    m = arq_modelo.filtrar(modelo, arquitetura.SECOES_ARQUITETURA)
-    cena = arq_layout.dispor(m, m.vms)
-    return arq_render.render(cena, m, ZOOM.read_text(encoding="utf-8"))
+    # Task 10: as duas vistas (Arquitetura x Schema) entram no MESMO html,
+    # com um alternador — arq_render.render agora recebe as duas de uma vez.
+    arq = arq_modelo.filtrar(completo, arquitetura.SECOES_ARQUITETURA)
+    sch = arq_modelo.filtrar(completo, arquitetura.SECOES_SCHEMA)
+    # `filtrar` so poda NO (por secao); arestas e fluxos que nao citem um no
+    # podado sobrevivem intactos — por isso a Schema ainda carregaria as
+    # mesmas arestas/fluxos da Arquitetura se nao fossem zerados aqui. A
+    # decisao "Schema nao tem aresta nem fluxo" (fluxo e caminho de
+    # execucao, nao relacao de dado) e desta vista, entao e aqui que ela se
+    # aplica — nao em `arq_modelo.filtrar`, que e generico para as duas.
+    sch = replace(sch, arestas=(), fluxos=())
+    vistas = (
+        arq_render.Vista("arquitetura", "Arquitetura",
+                         arq_layout.dispor(arq, arq.vms), arq),
+        arq_render.Vista("schema", "Schema",
+                         arq_layout.dispor(sch, sch.bancos), sch),
+    )
+    return arq_render.render(vistas, ZOOM.read_text(encoding="utf-8"))
 
 
 def gerar(raiz: Path, destino: Path) -> None:
