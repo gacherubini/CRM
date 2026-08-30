@@ -8,6 +8,7 @@ window.Zoom = {
   criar: function (elemento, opts) {
     var svg = elemento;
     var base, atual = null, anim = null, dur = 450, moveu = false;
+    var saindo = null;   // foco anterior, vivo so enquanto a camera voa
     var pilha = [];   // caminho de volta: ids ja visitados
 
     // Task 11 — a tremida do rabisco (feTurbulence + feDisplacementMap) e'
@@ -60,23 +61,64 @@ window.Zoom = {
     // cubic-bezier(.4,0,.2,1) — aproximacao por Newton nao vale a pena aqui.
     function suavizar(t) { return t < 0.5 ? 4*t*t*t : 1 - Math.pow(-2*t + 2, 3) / 2; }
 
+    // Trava de linhagem. Escala sozinha nao basta: caixas irmas de tamanho
+    // parecido tem k_min parecido, entao entrar no Chatbot abria o interior
+    // do Portal ao lado — o nivel 1 deixava de ser escopo. O interior de um
+    // no so pode acender se ele estiver no caminho do foco:
+    //
+    //   - o proprio foco, ou um ancestral dele  -> a trilha que voce desceu
+    //   - um filho DIRETO do foco               -> um nivel de antecipacao,
+    //     que e' o que mantem a sensacao de cair dentro em vez de piscar
+    //
+    // Sem foco (`atual` null) o foco e' a raiz, e os filhos diretos dela sao
+    // os nos de topo (id sem ponto). E' por isso que a primeira tela mostra
+    // as maquinas com os produtos dentro, e nada alem disso.
+    //
+    // Os ids sao caminhos pontuados (`app2037.chatbot-api.app.main.py`),
+    // entao tudo isso e' teste de prefixo. O ponto no `dono + "."` e'
+    // obrigatorio: sem ele `chatbot-api` casaria com `chatbot-apix`.
+    function noCaminhoDe(foco, dono) {
+      if (foco === dono) return true;
+      if (foco && foco.indexOf(dono + ".") === 0) return true;
+      var resto = null;
+      if (foco === "") resto = dono;
+      else if (dono.indexOf(foco + ".") === 0) resto = dono.slice(foco.length + 1);
+      return resto !== null && resto.indexOf(".") === -1;
+    }
+
+    // Durante o voo vale a UNIAO das duas linhagens, a de onde voce saiu e a
+    // de onde voce esta chegando. Sem isso o interior que fica para tras
+    // apaga de uma vez no primeiro quadro, em vez de sair pela rampa de
+    // escala junto com a camera — vira um estalo no meio da animacao.
+    function naLinhagem(dono) {
+      if (dono === null) return true;
+      if (noCaminhoDe(atual || "", dono)) return true;
+      return saindo !== null && noCaminhoDe(saindo || "", dono);
+    }
+
     function aplicarLod(k) {
-      // ENTRA: o interior do no aparece conforme voce se aproxima.
+      // ENTRA: o interior do no aparece conforme voce se aproxima — e so se
+      // ele estiver na linhagem do foco.
       var grupos = svg.querySelectorAll("[data-k-min]");
       for (var i = 0; i < grupos.length; i++) {
         var kmin = parseFloat(grupos[i].getAttribute("data-k-min"));
         // Rampa: invisivel em kmin, opaco em 1.6*kmin. Sem degrade fica piscando.
         var o = (k - kmin) / (kmin * 0.6);
+        if (!naLinhagem(grupos[i].getAttribute("data-dono"))) o = 0;
         grupos[i].style.opacity = Math.max(0, Math.min(1, o));
         grupos[i].style.pointerEvents = o > 0.5 ? "auto" : "none";
       }
       // SAI: a face do no (o titulo grande, o resumo) some enquanto o interior
       // aparece. Sem isso o zoom so aumenta a fonte; com isso a tela TROCA de
       // conteudo no mesmo lugar, que e o efeito de cair dentro.
+      //
+      // A face obedece a MESMA trava: se o interior nao pode abrir, a face
+      // nao pode sumir, senao a caixa do irmao fica vazia na tela.
       var faces = svg.querySelectorAll("[data-face-ate]");
       for (var j = 0; j < faces.length; j++) {
         var kmax = parseFloat(faces[j].getAttribute("data-face-ate"));
         var f = 1 - (k - kmax) / (kmax * 0.6);
+        if (!naLinhagem(faces[j].getAttribute("data-dono"))) f = 1;
         faces[j].style.opacity = Math.max(0, Math.min(1, f));
       }
     }
@@ -114,18 +156,27 @@ window.Zoom = {
       anim = requestAnimationFrame(passo);
     }
 
+    // Fim do voo: solta a linhagem antiga e REPINTA. Sem o repintar, o
+    // ultimo quadro da animacao continuaria valendo — a uniao das duas
+    // linhagens ficaria congelada na tela e o irmao nao fecharia nunca.
+    function assentar() {
+      saindo = null;
+      aplicarLod(base.w / vb(svg).w);
+    }
+
     function voarPara(id) {
       var c = caixaDe(id);
       if (!c) return;
-      if (atual !== id) { pilha.push(atual); atual = id; }
-      voar(c);
+      if (atual !== id) { saindo = atual; pilha.push(atual); atual = id; }
+      voar(c, assentar);
       anunciar();
     }
 
     function subir() {
       if (!pilha.length) return;
+      saindo = atual;
       atual = pilha.pop();
-      voar(atual ? caixaDe(atual) : base);
+      voar(atual ? caixaDe(atual) : base, assentar);
       anunciar();
     }
 

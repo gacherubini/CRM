@@ -28,7 +28,9 @@ deixa k_min=k_face=0.0 nesse caso), e uma caixa navegavel carregando
 com o `Zoom.acender` da Task 7 — o realce de fluxo piscaria.
 
 `arq_zoom.js` nao le nenhum outro atributo alem de: id, data-navegavel,
-data-titulo, data-k-min, data-face-ate, data-aresta. Nao inventar outros.
+data-titulo, data-k-min, data-face-ate, data-dono, data-aresta. Nao inventar
+outros. `data-dono` e' a chave do no daquele grupo, e existe exatamente onde
+existe data-k-min/data-face-ate — e' o que a trava de linhagem le.
 
 Stdlib apenas. Auto-contido: nenhum `http://`/`https://` no HTML gerado —
 `file://` bloqueia `fetch()`, entao o JS entra inline (`js` embutido
@@ -138,10 +140,10 @@ def _agrupar_por_pai(caixas: tuple[Caixa, ...]) -> dict[str | None, list[Caixa]]
 
 def _rect_no(c: Caixa, spof: bool) -> str:
     cor = DANGER if spof else INK
-    largura = round(max(0.4, (3.2 if spof else 1.5) / max(1, c.nivel)), 2)
+    largura = 2.4 if spof else 1.0
     return (
         f'<rect x="{c.x:.2f}" y="{c.y:.2f}" width="{c.w:.2f}" height="{c.h:.2f}" '
-        f'rx="4" fill="{SURFACE}" stroke="{cor}" stroke-width="{largura}"/>'
+        f'rx="4" fill="{SURFACE}" stroke="{cor}" stroke-width="{largura}" vector-effect="non-scaling-stroke"/>'
     )
 
 
@@ -151,11 +153,10 @@ def _rect_vm(c: Caixa) -> str:
     # (blast radius: uma maquina caindo leva tudo que esta dentro dela
     # junto). E' o UNICO lugar (com o nome da VM e o alternador ativo) onde
     # o verde da marca aparece — ver docstring do modulo.
-    largura = round(max(0.3, 1.4 / max(1, c.nivel)), 2)
     return (
         f'<rect x="{c.x:.2f}" y="{c.y:.2f}" width="{c.w:.2f}" height="{c.h:.2f}" '
-        f'rx="10" fill="none" stroke="{BRAND_LINE}" stroke-width="{largura}" '
-        f'stroke-dasharray="8 5"/>'
+        f'rx="10" fill="none" stroke="{BRAND_LINE}" stroke-width="1.2"'
+        f' vector-effect="non-scaling-stroke" stroke-dasharray="8 5"/>'
     )
 
 
@@ -179,11 +180,11 @@ def _cilindro(c: Caixa) -> str:
         f'a{rx:.2f},{ry:.2f} 0 0 1 {w:.2f},0 '
         f'V{cy_base:.2f} '
         f'a{rx:.2f},{ry:.2f} 0 0 1 {-w:.2f},0 Z" '
-        f'fill="{SURFACE}" stroke="{INK}" stroke-width="1.4"/>'
+        f'fill="{SURFACE}" stroke="{INK}" stroke-width="1.4" vector-effect="non-scaling-stroke"/>'
     )
     costura = (
         f'<path d="M{x:.2f},{cy_topo:.2f} a{rx:.2f},{ry:.2f} 0 0 0 {w:.2f},0" '
-        f'fill="none" stroke="{LINE_STRONG}" stroke-width="1"/>'
+        f'fill="none" stroke="{LINE_STRONG}" stroke-width="1" vector-effect="non-scaling-stroke"/>'
     )
     return corpo + costura
 
@@ -202,9 +203,9 @@ def _forma_roda(c: Caixa, vm: Vm) -> str:
     if vm.terceiro:
         rx, ry = iw / 2, ih / 2
         return (f'<ellipse cx="{ix + rx:.2f}" cy="{iy + ry:.2f}" rx="{rx:.2f}" '
-                f'ry="{ry:.2f}" fill="{SURFACE_SOFT}" stroke="{INK}" stroke-width="1.4"/>')
+                f'ry="{ry:.2f}" fill="{SURFACE_SOFT}" stroke="{INK}" stroke-width="1.4" vector-effect="non-scaling-stroke"/>')
     return (f'<rect x="{ix:.2f}" y="{iy:.2f}" width="{iw:.2f}" height="{ih:.2f}" '
-            f'rx="4" fill="{SURFACE}" stroke="{INK}" stroke-width="1.4"/>')
+            f'rx="4" fill="{SURFACE}" stroke="{INK}" stroke-width="1.4" vector-effect="non-scaling-stroke"/>')
 
 
 def _rotulo_roda(c: Caixa, vm: Vm) -> str:
@@ -215,18 +216,51 @@ def _rotulo_roda(c: Caixa, vm: Vm) -> str:
             f'text-anchor="middle">{html.escape(vm.roda)}</text>')
 
 
-def _face(c: Caixa, spof: bool) -> str:
+def _fonte_rotulo_grupo(c: Caixa, largura_cena: float) -> float:
+    """Uma moldura de grupo (VM, banco) leva ETIQUETA, nao titulo de caixa.
+
+    `_fonte_titulo` deriva da largura da caixa, e para uma caixa isso esta
+    certo: mantem o titulo do mesmo tamanho na tela quando a caixa enche a
+    tela, em qualquer profundidade. Mas a moldura da `app2037` ocupa 62% da
+    cena, e a mesma regra dava 347 unidades — 51px na tela, contra 6px do
+    nome do Catalogo ao lado. Isso nao e hierarquia, e um grito.
+
+    A moldura nao e' o assunto: ela e' o contorno em volta do assunto. Entao
+    a etiqueta sai da CENA, igual para todas as molduras, e so encolhe se
+    nao couber na largura da propria moldura.
+    """
+    alvo = largura_cena * 0.0075
+    cabe = (c.w - largura_cena * 0.004) / max(1, len(c.titulo)) / 0.60
+    return max(1.5, round(min(alvo, cabe, c.h * 0.30), 1))
+
+
+def _face(c: Caixa, spof: bool, largura_cena: float) -> str:
     """Titulo + subtitulo (+ SPOF) de uma caixa. So texto — nunca teve forma,
     entao nao precisou mudar de camada com a Task 11."""
-    fonte_titulo = _fonte_titulo(c)
+    fonte_titulo = (
+        _fonte_rotulo_grupo(c, largura_cena) if c.tipo == "vm"
+        else _fonte_titulo(c)
+    )
     fonte_sub = round(max(1.2, fonte_titulo * 0.55), 1)
+    eh_grupo = c.tipo == "vm"
     px = c.x + fonte_titulo * 0.6
-    py_titulo = c.y + fonte_titulo * 1.25
+    if eh_grupo:
+        py_titulo = c.y + fonte_titulo * 1.25
+    else:
+        # Bloco centrado na vertical. Com o interior fechado (nivel 1 = escopo
+        # puro), o titulo encostado no topo deixava a caixa parecendo um
+        # retangulo vazio com uma legenda solta em cima.
+        py_titulo = c.y + c.h * 0.5
     py_sub = py_titulo + fonte_sub * 1.7
-    # Cortar na largura da caixa: a `nota` de uma VM tem ~200 caracteres e sem
-    # isso ela sai numa linha unica atravessando a cena inteira por cima de tudo.
-    # 0.52em por caractere e a media de uma sans-serif.
-    cabe = max(0, int((c.w - fonte_titulo * 1.2) / (fonte_sub * 0.52)))
+    # Cortar na largura: a `nota` de uma VM tem ~200 caracteres e sem isso ela
+    # sai numa linha unica por cima de tudo. 0.52em por caractere e a media.
+    largura_util = c.w - fonte_titulo * 1.2
+    if eh_grupo:
+        # Uma moldura e larga justamente porque contem coisas: deixar a nota
+        # usar a largura INTEIRA dela e' atravessar por cima dos produtos que
+        # estao dentro. Etiqueta de moldura e etiqueta, nao paragrafo.
+        largura_util *= 0.34
+    cabe = max(0, int(largura_util / (fonte_sub * 0.52)))
     sub = c.subtitulo
     if len(sub) > cabe:
         sub = sub[:max(0, cabe - 1)] + "…"
@@ -244,14 +278,17 @@ def _face(c: Caixa, spof: bool) -> str:
             f'font-weight="600" fill="{DANGER}">SPOF</text>'
         )
 
-    atributo = f' data-face-ate="{c.k_face:.3f}"' if c.k_face > 0 else ""
+    atributo = (
+        f' data-face-ate="{c.k_face:.3f}" data-dono="{html.escape(c.chave)}"'
+        if c.k_face > 0 else ""
+    )
     return f"<g{atributo}>" + "".join(partes) + "</g>"
 
 
 def _item_forma(c: Caixa) -> str:
     return (
         f'<rect x="{c.x:.2f}" y="{c.y:.2f}" width="{c.w:.2f}" height="{c.h:.2f}" '
-        f'rx="2" fill="{SURFACE_SOFT}" stroke="{LINE_STRONG}" stroke-width=".3"/>'
+        f'rx="2" fill="{SURFACE_SOFT}" stroke="{LINE_STRONG}" stroke-width=".6" vector-effect="non-scaling-stroke"/>'
     )
 
 
@@ -274,7 +311,8 @@ def _item_texto(c: Caixa) -> str:
 
 
 def _no_recursivo(caixa: Caixa, por_pai: dict, spof_map: dict,
-                   grupos_por_chave: dict[str, Vm]) -> tuple[str, str]:
+                   grupos_por_chave: dict[str, Vm],
+                   largura_cena: float) -> tuple[str, str]:
     """Devolve `(forma, texto)` — a caixa inteira dividida nas duas camadas
     que o filtro de rabisco exige (ver docstring do modulo). Recursivo: cada
     filho contribui a propria forma e o proprio texto pras duas somas."""
@@ -286,7 +324,8 @@ def _no_recursivo(caixa: Caixa, por_pai: dict, spof_map: dict,
     interior_forma = "".join(_item_forma(i) for i in itens)
     interior_texto = "".join(_item_texto(i) for i in itens)
     for s in subs_no:
-        f_forma, f_texto = _no_recursivo(s, por_pai, spof_map, grupos_por_chave)
+        f_forma, f_texto = _no_recursivo(s, por_pai, spof_map, grupos_por_chave,
+                                         largura_cena)
         interior_forma += f_forma
         interior_texto += f_texto
 
@@ -302,7 +341,14 @@ def _no_recursivo(caixa: Caixa, por_pai: dict, spof_map: dict,
     else:
         retangulo = _rect_no(caixa, spof)
 
-    kmin_attr = f' data-k-min="{caixa.k_min:.3f}"' if caixa.k_min > 0 else ""
+    # `data-dono` anda junto do limiar: sem ele o LOD e' so escala, e caixas
+    # irmas de tamanho parecido abrem o interior JUNTAS — entrar no Chatbot
+    # mostrava o interior do Portal ao lado. Ver a trava de linhagem em
+    # arq_zoom.js.
+    kmin_attr = (
+        f' data-k-min="{caixa.k_min:.3f}" data-dono="{html.escape(caixa.chave)}"'
+        if caixa.k_min > 0 else ""
+    )
 
     forma = (
         f'<g id="{html.escape(caixa.chave)}" data-titulo="{html.escape(caixa.titulo)}" data-navegavel>'
@@ -311,7 +357,7 @@ def _no_recursivo(caixa: Caixa, por_pai: dict, spof_map: dict,
         + "</g>"
     )
     texto = (
-        "<g>" + _face(caixa, spof) + extra_texto
+        "<g>" + _face(caixa, spof, largura_cena) + extra_texto
         + f"<g{kmin_attr}>{interior_texto}</g>"
         + "</g>"
     )
@@ -462,9 +508,13 @@ def _fluxos_html(modelo: Modelo, chave: str, oculto: bool) -> str:
     # A lista e o invariante sao montados no navegador a partir do FLUXOS,
     # so para o fluxo escolhido. Concatenar os quatro no HTML fazia cada
     # clique mostrar os passos de todos os fluxos somados.
-    return (f'<div id="fluxos-{chave}"{hidden_attr}><b>Fluxos</b> '
+    # `<details>` fechado de saida: aberto, o painel cobria as molduras da
+    # direita (evolution2037, motor2037) justamente na visao de escopo, que e'
+    # a que precisa estar desobstruida. Elemento nativo, sem JS.
+    return (f'<details id="fluxos-{chave}"{hidden_attr}>'
+            f'<summary>Fluxos</summary>'
             f'{"".join(botoes)}<button data-fluxo="">limpar</button>'
-            f'<ol id="passos-{chave}" hidden></ol><p id="inv-{chave}" hidden></p></div>'
+            f'<ol id="passos-{chave}" hidden></ol><p id="inv-{chave}" hidden></p></details>'
             f'<script>var FLUXOS_{chave} = {json_fluxos};</script>')
 
 
@@ -577,7 +627,8 @@ def render(vistas: tuple[Vista, ...], js: str) -> str:
         raizes = sorted(por_pai.get(None, []), key=lambda c: c.chave)
         grupos_por_chave: dict[str, Vm] = {v.chave: v for v in vista.modelo.vms}
         grupos_por_chave.update({v.chave: v for v in vista.modelo.bancos})
-        pares = [_no_recursivo(r, por_pai, spof_map, grupos_por_chave) for r in raizes]
+        pares = [_no_recursivo(r, por_pai, spof_map, grupos_por_chave,
+                               vista.cena.largura) for r in raizes]
         corpo_forma = "".join(p[0] for p in pares)
         corpo_texto = "".join(p[1] for p in pares)
 
@@ -602,7 +653,8 @@ def render(vistas: tuple[Vista, ...], js: str) -> str:
         svgs.append(
             f'<svg id="mapa-{vista.chave}" viewBox="0 0 {largura:.2f} {altura:.2f}"{hidden_attr}>\n'
             f'<g class="formas" filter="url(#rabisco)">{corpo_forma}'
-            f'<g stroke="{INK_SOFT}" stroke-width="1.4" fill="none">{arestas_forma}</g></g>\n'
+            f'<g stroke="{INK_SOFT}" stroke-width="1.4" fill="none"'
+            f' vector-effect="non-scaling-stroke">{arestas_forma}</g></g>\n'
             f'<g class="textos">{corpo_texto}{arestas_texto}</g>\n'
             f'</svg>'
         )
@@ -685,6 +737,11 @@ def render(vistas: tuple[Vista, ...], js: str) -> str:
   #legenda text{{fill:{INK_SOFT}}}
   [id^="fluxos-"]{{position:fixed;top:53px;right:12px;background:{SURFACE};padding:8px 12px;
     border:1px solid {LINE};border-radius:6px;font-size:12px;max-width:280px;z-index:2}}
+  [id^="fluxos-"] summary{{cursor:pointer;font-weight:600;font-size:11px;
+    letter-spacing:.04em;color:{INK_MUTED};list-style:none}}
+  [id^="fluxos-"] summary::-webkit-details-marker{{display:none}}
+  [id^="fluxos-"] summary::after{{content:" \25be"}}
+  [id^="fluxos-"][open] summary::after{{content:" \25b4"}}
   [id^="fluxos-"] button{{font-size:11px;margin:2px 2px 0 0;border:1px solid {LINE_STRONG};
     border-radius:4px;background:{SURFACE_SOFT};color:{INK};cursor:pointer;padding:3px 7px;
     font-family:{MONO}}}
