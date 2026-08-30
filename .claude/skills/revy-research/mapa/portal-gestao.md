@@ -1,6 +1,6 @@
-# portal-gestao · 157 rotas · 26 modelos · 6 workers · 35 flags · 26 migrations · 63 templates
+# portal-gestao · 158 rotas · 26 modelos · 6 workers · 35 flags · 26 migrations · 63 templates
 
-Gerado de `3ef3be3`. NAO editar a mao — saida de `gerar_mapa.py`.
+Gerado de `9aca30e`. NAO editar a mao — saida de `gerar_mapa.py`.
 Migration head: `0026_copiloto_sinal_destinatario`
 
 ## Rotas
@@ -108,18 +108,19 @@ Migration head: `0026_copiloto_sinal_destinatario`
 - `POST /app/loja/vendas/{venda_id}/custos/{custo_id}/remover` — app/web/loja_vendas.py:378
 - `GET /app/loja/vendas/configuracoes-financeiras` — app/web/loja_vendas.py:394
 - `GET /app/loja/equipe` — app/web/loja_vendas.py:410
-- `GET /app/loja/whatsapp` — app/web/loja_whatsapp.py:119
-- `GET /app/loja/whatsapp/conectar` — app/web/loja_whatsapp.py:156
-- `POST /app/loja/whatsapp/catalogo` — app/web/loja_whatsapp.py:188
-- `POST /app/loja/whatsapp/canais` — app/web/loja_whatsapp.py:249
-- `POST /app/loja/whatsapp/canais/{canal_id}/conectar` — app/web/loja_whatsapp.py:271
-- `POST /app/loja/whatsapp/canais/{canal_id}/desconectar` — app/web/loja_whatsapp.py:296
-- `POST /app/loja/whatsapp/canais/{canal_id}/inativar` — app/web/loja_whatsapp.py:315
-- `POST /app/loja/whatsapp/canais/{canal_id}/principal-estoque` — app/web/loja_whatsapp.py:335
-- `GET /app/loja/whatsapp/canais/{canal_id}/status` — app/web/loja_whatsapp.py:360
-- `GET /app/loja/whatsapp/fila` — app/web/loja_whatsapp.py:382
-- `POST /app/loja/whatsapp/fila` — app/web/loja_whatsapp.py:424
-- `POST /app/loja/whatsapp/fila/{vendedor_id}/remover` — app/web/loja_whatsapp.py:463
+- `GET /app/loja/whatsapp` — app/web/loja_whatsapp.py:134
+- `GET /app/loja/whatsapp/conectar` — app/web/loja_whatsapp.py:171
+- `POST /app/loja/whatsapp/catalogo` — app/web/loja_whatsapp.py:209
+- `POST /app/loja/whatsapp/conectar` — app/web/loja_whatsapp.py:280
+- `POST /app/loja/whatsapp/canais` — app/web/loja_whatsapp.py:351
+- `POST /app/loja/whatsapp/canais/{canal_id}/conectar` — app/web/loja_whatsapp.py:373
+- `POST /app/loja/whatsapp/canais/{canal_id}/desconectar` — app/web/loja_whatsapp.py:398
+- `POST /app/loja/whatsapp/canais/{canal_id}/inativar` — app/web/loja_whatsapp.py:417
+- `POST /app/loja/whatsapp/canais/{canal_id}/principal-estoque` — app/web/loja_whatsapp.py:437
+- `GET /app/loja/whatsapp/canais/{canal_id}/status` — app/web/loja_whatsapp.py:462
+- `GET /app/loja/whatsapp/fila` — app/web/loja_whatsapp.py:484
+- `POST /app/loja/whatsapp/fila` — app/web/loja_whatsapp.py:526
+- `POST /app/loja/whatsapp/fila/{vendedor_id}/remover` — app/web/loja_whatsapp.py:565
 - `GET /app/metas` — app/web/metas.py:135
 - `GET /app/metas/nova` — app/web/metas.py:167
 - `POST /app/metas/nova` — app/web/metas.py:177
@@ -212,27 +213,27 @@ Migration head: `0026_copiloto_sinal_destinatario`
 - `REVY_LOJA_AGENTE_CONFIG_ENABLED (default: 0)` — app/config.py:63
 - `REVY_LOJA_REDIRECT_LEGACY (default: 0)` — app/config.py:72
 - `SELLER_AI_ENABLED (default: 0)` — app/config.py:77
-- `PORTAL_META_SPEND_SYNC_ENABLED (default: 1)` — app/config.py:124
-- `REVY_TRAFEGO_URL` — app/config.py:139
-- `REVY_TRAFEGO_SERVICE_TOKEN (default: '')` — app/config.py:142
-- `REVY_TRAFEGO_EMAIL_BACKEND (default: console)` — app/config.py:164
-- `REVY_TRAFEGO_EMAIL_FROM (default: no-reply@revy.local)` — app/config.py:168
-- `REVY_TRAFEGO_EMAIL_FROM_NAME (default: Revy)` — app/config.py:172
-- `REVY_TRAFEGO_SMTP_HOST (default: '')` — app/config.py:175
-- `REVY_TRAFEGO_SMTP_PORT (default: 587)` — app/config.py:178
-- `REVY_TRAFEGO_SMTP_USERNAME (default: '')` — app/config.py:181
-- `REVY_TRAFEGO_SMTP_PASSWORD (default: '')` — app/config.py:184
-- `REVY_TRAFEGO_SMTP_USE_TLS (default: 1)` — app/config.py:187
-- `REVY_TRAFEGO_PUBLIC_BASE_URL (default: '')` — app/config.py:191
-- `REVY_LOJA_COPILOTO_LLM_URL (default: https://api.deepseek.com)` — app/config.py:215
-- `REVY_LOJA_COPILOTO_LLM_KEY (default: '')` — app/config.py:217
-- `REVY_LOJA_COPILOTO_LLM_MODEL (default: DeepSeek-V4-Flash-0731)` — app/config.py:219
-- `REVY_LOJA_COPILOTO_LLM_TIMEOUT (default: 40)` — app/config.py:222
-- `REVY_LOJA_COPILOTO_LLM_RETRIES (default: 1)` — app/config.py:224
-- `REVY_LOJA_COPILOTO_HISTORICO_TOKENS (default: 2000)` — app/config.py:229
-- `REVY_LOJA_COPILOTO_FIPE_URL (default: https://parallelum.com.br/fipe/api/v1)` — app/config.py:241
-- `REVY_LOJA_COPILOTO_FIPE_TIMEOUT (default: 8)` — app/config.py:244
-- `REVY_LOJA_COPILOTO_FIPE_CACHE_SEGUNDOS (default: 21600)` — app/config.py:248
+- `PORTAL_META_SPEND_SYNC_ENABLED (default: 1)` — app/config.py:158
+- `REVY_TRAFEGO_URL` — app/config.py:173
+- `REVY_TRAFEGO_SERVICE_TOKEN (default: '')` — app/config.py:176
+- `REVY_TRAFEGO_EMAIL_BACKEND (default: console)` — app/config.py:198
+- `REVY_TRAFEGO_EMAIL_FROM (default: no-reply@revy.local)` — app/config.py:202
+- `REVY_TRAFEGO_EMAIL_FROM_NAME (default: Revy)` — app/config.py:206
+- `REVY_TRAFEGO_SMTP_HOST (default: '')` — app/config.py:209
+- `REVY_TRAFEGO_SMTP_PORT (default: 587)` — app/config.py:212
+- `REVY_TRAFEGO_SMTP_USERNAME (default: '')` — app/config.py:215
+- `REVY_TRAFEGO_SMTP_PASSWORD (default: '')` — app/config.py:218
+- `REVY_TRAFEGO_SMTP_USE_TLS (default: 1)` — app/config.py:221
+- `REVY_TRAFEGO_PUBLIC_BASE_URL (default: '')` — app/config.py:225
+- `REVY_LOJA_COPILOTO_LLM_URL (default: https://api.deepseek.com)` — app/config.py:249
+- `REVY_LOJA_COPILOTO_LLM_KEY (default: '')` — app/config.py:251
+- `REVY_LOJA_COPILOTO_LLM_MODEL (default: DeepSeek-V4-Flash-0731)` — app/config.py:253
+- `REVY_LOJA_COPILOTO_LLM_TIMEOUT (default: 40)` — app/config.py:256
+- `REVY_LOJA_COPILOTO_LLM_RETRIES (default: 1)` — app/config.py:258
+- `REVY_LOJA_COPILOTO_HISTORICO_TOKENS (default: 2000)` — app/config.py:263
+- `REVY_LOJA_COPILOTO_FIPE_URL (default: https://parallelum.com.br/fipe/api/v1)` — app/config.py:275
+- `REVY_LOJA_COPILOTO_FIPE_TIMEOUT (default: 8)` — app/config.py:278
+- `REVY_LOJA_COPILOTO_FIPE_CACHE_SEGUNDOS (default: 21600)` — app/config.py:282
 - `PORTAL_COPILOTO_PURGE_ENABLED (default: True)` — app/copiloto_purge_job.py:171
 - `PORTAL_COPILOTO_SINAIS_ENABLED (default: True)` — app/copiloto_sinais_job.py:442
 - `PORTAL_COPILOTO_TURNOS_ENABLED (default: True)` — app/copiloto_turnos_job.py:241
@@ -312,9 +313,9 @@ Migration head: `0026_copiloto_sinal_destinatario`
 - `app/templates/loja/vendas_visao.html` — app/web/loja_vendas.py:145
 - `app/templates/loja/vendas_lista.html` — app/web/loja_vendas.py:215
 - `app/templates/loja/venda_editar.html` — app/web/loja_vendas.py:314
-- `app/templates/loja/whatsapp_canais.html` — app/web/loja_whatsapp.py:140
-- `app/templates/loja/whatsapp_decidir.html` — app/web/loja_whatsapp.py:177
-- `app/templates/loja/whatsapp_fila.html` — app/web/loja_whatsapp.py:409
+- `app/templates/loja/whatsapp_canais.html` — app/web/loja_whatsapp.py:155
+- `app/templates/loja/whatsapp_decidir.html` — app/web/loja_whatsapp.py:193
+- `app/templates/loja/whatsapp_fila.html` — app/web/loja_whatsapp.py:511
 - `app/templates/metas/form.html` — app/web/metas.py:121
 - `app/templates/metas/lista.html` — app/web/metas.py:155
 - `app/templates/convite_aceitar.html` — app/web/owner_invitations.py:129

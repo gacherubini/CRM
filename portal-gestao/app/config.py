@@ -77,6 +77,40 @@ def seller_ai_enabled() -> bool:
     return _env_bool("SELLER_AI_ENABLED", "0")
 
 
+# --- Meta / Embedded Signup do WhatsApp (público: os dois vão para o navegador) ---
+#
+# NÃO SÃO SEGREDO. Os dois são impressos no HTML da tela de decisão e viajam
+# para o navegador do lojista dentro do `FB.init`/`FB.login`. Vão no `[env]` do
+# fly.app.toml, não em `fly secrets` — transformá-los em secret não protege
+# nada e só esconde de quem precisa conferir se batem com o app da Meta.
+#
+# O segredo do embedded signup é o App Secret, que troca o `code` por token. Ele
+# mora só no chatbot-api, que faz a troca. O portal nunca vê segredo da Meta.
+#
+# Lidos em runtime (e não no `Settings`, que é snapshot de boot) para que a tela
+# acenda o botão assim que o App Review sair e as variáveis forem setadas.
+
+
+def portal_meta_app_id() -> str:
+    """App ID do app da Meta que abre o popup do Embedded Signup.
+
+    É o **mesmo app** do chatbot (`CHATBOT_META_APP_ID`): se os dois divergirem,
+    o popup abre com um app e o `code` é trocado com outro, e a Meta recusa sem
+    dizer por quê. Vazio = botão desabilitado na tela de decisão.
+    """
+    return os.getenv("PORTAL_META_APP_ID", "").strip()
+
+
+def portal_meta_config_id() -> str:
+    """`config_id` da configuração v4 do Facebook Login for Business.
+
+    Só existe depois de o App Review dar Advanced Access ao app — é a única
+    peça deste card que depende dele. Vazio = botão desabilitado, e nada
+    quebra enquanto não sai.
+    """
+    return os.getenv("PORTAL_META_CONFIG_ID", "").strip()
+
+
 @dataclass(frozen=True)
 class Settings:
     database_url: str = os.getenv("PORTAL_DATABASE_URL", "sqlite:///./portal.db")

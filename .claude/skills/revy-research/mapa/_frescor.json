@@ -1,5 +1,5 @@
 {
- "sha": "3ef3be3",
+ "sha": "9aca30e",
  "inventario": {
   "chatbot-api": [
    {
@@ -905,147 +905,147 @@
     "chave": "REVY_TRAFEGO_SMTP_PASSWORD (default: '')",
     "simbolo": "REVY_TRAFEGO_SMTP_PASSWORD",
     "arquivo": "app/config.py",
-    "linha": 184
+    "linha": 218
    },
    {
     "secao": "flag",
     "chave": "REVY_LOJA_COPILOTO_LLM_TIMEOUT (default: 40)",
     "simbolo": "REVY_LOJA_COPILOTO_LLM_TIMEOUT",
     "arquivo": "app/config.py",
-    "linha": 222
+    "linha": 256
    },
    {
     "secao": "flag",
     "chave": "REVY_LOJA_COPILOTO_LLM_RETRIES (default: 1)",
     "simbolo": "REVY_LOJA_COPILOTO_LLM_RETRIES",
     "arquivo": "app/config.py",
-    "linha": 224
+    "linha": 258
    },
    {
     "secao": "flag",
     "chave": "REVY_LOJA_COPILOTO_HISTORICO_TOKENS (default: 2000)",
     "simbolo": "REVY_LOJA_COPILOTO_HISTORICO_TOKENS",
     "arquivo": "app/config.py",
-    "linha": 229
+    "linha": 263
    },
    {
     "secao": "flag",
     "chave": "REVY_LOJA_COPILOTO_FIPE_TIMEOUT (default: 8)",
     "simbolo": "REVY_LOJA_COPILOTO_FIPE_TIMEOUT",
     "arquivo": "app/config.py",
-    "linha": 244
+    "linha": 278
    },
    {
     "secao": "flag",
     "chave": "REVY_LOJA_COPILOTO_FIPE_CACHE_SEGUNDOS (default: 21600)",
     "simbolo": "REVY_LOJA_COPILOTO_FIPE_CACHE_SEGUNDOS",
     "arquivo": "app/config.py",
-    "linha": 248
+    "linha": 282
    },
    {
     "secao": "flag",
     "chave": "REVY_TRAFEGO_SERVICE_TOKEN (default: '')",
     "simbolo": "REVY_TRAFEGO_SERVICE_TOKEN",
     "arquivo": "app/config.py",
-    "linha": 142
+    "linha": 176
    },
    {
     "secao": "flag",
     "chave": "REVY_TRAFEGO_SMTP_PORT (default: 587)",
     "simbolo": "REVY_TRAFEGO_SMTP_PORT",
     "arquivo": "app/config.py",
-    "linha": 178
+    "linha": 212
    },
    {
     "secao": "flag",
     "chave": "REVY_LOJA_COPILOTO_LLM_KEY (default: '')",
     "simbolo": "REVY_LOJA_COPILOTO_LLM_KEY",
     "arquivo": "app/config.py",
-    "linha": 217
+    "linha": 251
    },
    {
     "secao": "flag",
     "chave": "REVY_LOJA_COPILOTO_LLM_MODEL (default: DeepSeek-V4-Flash-0731)",
     "simbolo": "REVY_LOJA_COPILOTO_LLM_MODEL",
     "arquivo": "app/config.py",
-    "linha": 219
+    "linha": 253
    },
    {
     "secao": "flag",
     "chave": "REVY_TRAFEGO_EMAIL_FROM (default: no-reply@revy.local)",
     "simbolo": "REVY_TRAFEGO_EMAIL_FROM",
     "arquivo": "app/config.py",
-    "linha": 168
+    "linha": 202
    },
    {
     "secao": "flag",
     "chave": "REVY_TRAFEGO_EMAIL_FROM_NAME (default: Revy)",
     "simbolo": "REVY_TRAFEGO_EMAIL_FROM_NAME",
     "arquivo": "app/config.py",
-    "linha": 172
+    "linha": 206
    },
    {
     "secao": "flag",
     "chave": "REVY_TRAFEGO_SMTP_HOST (default: '')",
     "simbolo": "REVY_TRAFEGO_SMTP_HOST",
     "arquivo": "app/config.py",
-    "linha": 175
+    "linha": 209
    },
    {
     "secao": "flag",
     "chave": "REVY_TRAFEGO_SMTP_USERNAME (default: '')",
     "simbolo": "REVY_TRAFEGO_SMTP_USERNAME",
     "arquivo": "app/config.py",
-    "linha": 181
+    "linha": 215
    },
    {
     "secao": "flag",
     "chave": "REVY_LOJA_COPILOTO_LLM_URL (default: https://api.deepseek.com)",
     "simbolo": "REVY_LOJA_COPILOTO_LLM_URL",
     "arquivo": "app/config.py",
-    "linha": 215
+    "linha": 249
    },
    {
     "secao": "flag",
     "chave": "REVY_LOJA_COPILOTO_FIPE_URL (default: https://parallelum.com.br/fipe/api/v1)",
     "simbolo": "REVY_LOJA_COPILOTO_FIPE_URL",
     "arquivo": "app/config.py",
-    "linha": 241
+    "linha": 275
    },
    {
     "secao": "flag",
     "chave": "PORTAL_META_SPEND_SYNC_ENABLED (default: 1)",
     "simbolo": "PORTAL_META_SPEND_SYNC_ENABLED",
     "arquivo": "app/config.py",
-    "linha": 124
+    "linha": 158
    },
    {
     "secao": "flag",
     "chave": "REVY_TRAFEGO_URL",
     "simbolo": "REVY_TRAFEGO_URL",
     "arquivo": "app/config.py",
-    "linha": 139
+    "linha": 173
    },
    {
     "secao": "flag",
     "chave": "REVY_TRAFEGO_EMAIL_BACKEND (default: console)",
     "simbolo": "REVY_TRAFEGO_EMAIL_BACKEND",
     "arquivo": "app/config.py",
-    "linha": 164
+    "linha": 198
    },
    {
     "secao": "flag",
     "chave": "REVY_TRAFEGO_PUBLIC_BASE_URL (default: '')",
     "simbolo": "REVY_TRAFEGO_PUBLIC_BASE_URL",
     "arquivo": "app/config.py",
-    "linha": 191
+    "linha": 225
    },
    {
     "secao": "flag",
     "chave": "REVY_TRAFEGO_SMTP_USE_TLS (default: 1)",
     "simbolo": "REVY_TRAFEGO_SMTP_USE_TLS",
     "arquivo": "app/config.py",
-    "linha": 187
+    "linha": 221
    },
    {
     "secao": "worker",
@@ -2032,84 +2032,91 @@
     "chave": "GET /app/loja/whatsapp",
     "simbolo": "_TELA",
     "arquivo": "app/web/loja_whatsapp.py",
-    "linha": 119
+    "linha": 134
    },
    {
     "secao": "rota",
     "chave": "GET /app/loja/whatsapp/conectar",
     "simbolo": "_TELA_DECIDIR",
     "arquivo": "app/web/loja_whatsapp.py",
-    "linha": 156
+    "linha": 171
    },
    {
     "secao": "rota",
     "chave": "POST /app/loja/whatsapp/catalogo",
     "simbolo": "/app/loja/whatsapp/catalogo",
     "arquivo": "app/web/loja_whatsapp.py",
-    "linha": 188
+    "linha": 209
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /app/loja/whatsapp/conectar",
+    "simbolo": "_TELA_DECIDIR",
+    "arquivo": "app/web/loja_whatsapp.py",
+    "linha": 280
    },
    {
     "secao": "rota",
     "chave": "POST /app/loja/whatsapp/canais",
     "simbolo": "/app/loja/whatsapp/canais",
     "arquivo": "app/web/loja_whatsapp.py",
-    "linha": 249
+    "linha": 351
    },
    {
     "secao": "rota",
     "chave": "POST /app/loja/whatsapp/canais/{canal_id}/conectar",
     "simbolo": "/app/loja/whatsapp/canais/{canal_id}/conectar",
     "arquivo": "app/web/loja_whatsapp.py",
-    "linha": 271
+    "linha": 373
    },
    {
     "secao": "rota",
     "chave": "POST /app/loja/whatsapp/canais/{canal_id}/desconectar",
     "simbolo": "/app/loja/whatsapp/canais/{canal_id}/desconectar",
     "arquivo": "app/web/loja_whatsapp.py",
-    "linha": 296
+    "linha": 398
    },
    {
     "secao": "rota",
     "chave": "POST /app/loja/whatsapp/canais/{canal_id}/inativar",
     "simbolo": "/app/loja/whatsapp/canais/{canal_id}/inativar",
     "arquivo": "app/web/loja_whatsapp.py",
-    "linha": 315
+    "linha": 417
    },
    {
     "secao": "rota",
     "chave": "POST /app/loja/whatsapp/canais/{canal_id}/principal-estoque",
     "simbolo": "/app/loja/whatsapp/canais/{canal_id}/principal-estoque",
     "arquivo": "app/web/loja_whatsapp.py",
-    "linha": 335
+    "linha": 437
    },
    {
     "secao": "rota",
     "chave": "GET /app/loja/whatsapp/canais/{canal_id}/status",
     "simbolo": "/app/loja/whatsapp/canais/{canal_id}/status",
     "arquivo": "app/web/loja_whatsapp.py",
-    "linha": 360
+    "linha": 462
    },
    {
     "secao": "rota",
     "chave": "GET /app/loja/whatsapp/fila",
     "simbolo": "_TELA_FILA",
     "arquivo": "app/web/loja_whatsapp.py",
-    "linha": 382
+    "linha": 484
    },
    {
     "secao": "rota",
     "chave": "POST /app/loja/whatsapp/fila",
     "simbolo": "_TELA_FILA",
     "arquivo": "app/web/loja_whatsapp.py",
-    "linha": 424
+    "linha": 526
    },
    {
     "secao": "rota",
     "chave": "POST /app/loja/whatsapp/fila/{vendedor_id}/remover",
     "simbolo": "_TELA_FILA",
     "arquivo": "app/web/loja_whatsapp.py",
-    "linha": 463
+    "linha": 565
    },
    {
     "secao": "rota",
@@ -2683,21 +2690,21 @@
     "chave": "app/templates/loja/whatsapp_canais.html",
     "simbolo": "loja/whatsapp_canais.html",
     "arquivo": "app/web/loja_whatsapp.py",
-    "linha": 140
+    "linha": 155
    },
    {
     "secao": "template",
     "chave": "app/templates/loja/whatsapp_decidir.html",
     "simbolo": "loja/whatsapp_decidir.html",
     "arquivo": "app/web/loja_whatsapp.py",
-    "linha": 177
+    "linha": 193
    },
    {
     "secao": "template",
     "chave": "app/templates/loja/whatsapp_fila.html",
     "simbolo": "loja/whatsapp_fila.html",
     "arquivo": "app/web/loja_whatsapp.py",
-    "linha": 409
+    "linha": 511
    },
    {
     "secao": "template",

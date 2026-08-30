@@ -19,9 +19,11 @@ from sqlalchemy.orm import Session
 router = APIRouter()
 
 from app.auth import csrf_valido, usuario_atual  # noqa: E402
-from app.clients.chatbot import ChatbotIndisponivel  # noqa: E402
+from app.clients.chatbot import ChatbotIndisponivel, OnboardingFalhou  # noqa: E402
 from app.clients.estoque import EstoqueClient, EstoqueIndisponivel  # noqa: E402
 from app.config import (  # noqa: E402
+    portal_meta_app_id,
+    portal_meta_config_id,
     revy_loja_shell_enabled,
     revy_loja_whatsapp_enabled,
 )
@@ -43,6 +45,19 @@ _TELA_FILA = "/app/loja/whatsapp/fila"
 _TELA_DECIDIR = "/app/loja/whatsapp/conectar"
 # Erro genérico: nenhuma mensagem de canal carrega QR nem detalhe de provedor.
 _ERRO_CHATBOT = "chatbot_indisponivel"
+
+# As três saídas do popup pedem frases diferentes. Juntá-las faria o lojista
+# tentar de novo quando o problema é dele (número ainda no aparelho), ou
+# desistir quando o problema é nosso (chatbot fora do ar).
+_ERRO_POPUP_INCOMPLETO = (
+    "A janela da Meta fechou sem concluir a conexão. Nenhum número foi migrado. "
+    "O motivo mais comum é o número ainda estar ativo no aplicativo de WhatsApp "
+    "em algum aparelho: apague a conta dele no aplicativo e comece de novo."
+)
+_ERRO_CLOUD_INDISPONIVEL = (
+    "A janela da Meta concluiu, mas a Revy não conseguiu registrar a conexão "
+    "agora. Não refaça a janela: tente de novo em instantes."
+)
 
 
 def _habilitado() -> bool:
@@ -173,6 +188,7 @@ def loja_whatsapp_decidir(
     if not _habilitado() or not _autorizado(usuario):
         return _para_app()
 
+    app_id, config_id = portal_meta_app_id(), portal_meta_config_id()
     return templates.TemplateResponse(
         "loja/whatsapp_decidir.html",
         contexto(
@@ -180,6 +196,11 @@ def loja_whatsapp_decidir(
             usuario,
             db,
             pode_conectar_cloud=_e_dono(usuario),
+            meta_app_id=app_id,
+            meta_config_id=config_id,
+            # O botão acende sozinho no dia em que as duas variáveis existirem:
+            # com uma só, o popup abriria e a Meta recusaria sem dizer por quê.
+            popup_pronto=bool(app_id and config_id),
         ),
         headers={"Cache-Control": "no-store"},
     )
@@ -233,17 +254,98 @@ async def _guarda(request: Request, db: Session):
     return usuario, form, None
 
 
-def _auditar(db: Session, usuario, acao: str, *, success: bool, error_code=None) -> None:
+def _auditar(
+    db: Session,
+    usuario,
+    acao: str,
+    *,
+    success: bool,
+    error_code=None,
+    provedor: str = "evolution",
+) -> None:
+    """`acao` continua no vocabulário de ACOES_CANAL; quem separa Cloud de
+    Evolution é o `provedor`, não uma ação nova."""
     registrar_auditoria_canal(
         db,
         loja_slug=usuario.loja_slug,
         acao=acao,
         ator_email=usuario.email,
-        provedor="evolution",
+        provedor=provedor,
         success=success,
         error_code=error_code,
         commit=True,
     )
+
+
+@router.post(_TELA_DECIDIR)
+async def loja_whatsapp_conectar_cloud(
+    request: Request,
+    db: Session = Depends(get_db),
+    chatbot=Depends(get_chatbot_client),
+):
+    """Recebe o que o popup da Meta devolveu e repassa ao Chatbot (spec §4).
+
+    O portal não vê segredo da Meta: o que chega aqui é um `code` de uso único
+    e três ids públicos. Quem troca o `code` por token é o Chatbot, porque a
+    troca exige o App Secret — e ele não ganha segunda cópia aqui.
+
+    Decisão 9: `_guarda` deixa o gerente passar (ROLES_GESTAO), então o gate de
+    dono é explícito. Quem clica precisa ser admin do portfólio na Meta.
+    """
+    usuario, form, erro = await _guarda(request, db)
+    if erro is not None:
+        return erro
+    if not _e_dono(usuario):
+        return _para_app()
+
+    code = (form.get("code") or "").strip()
+    waba_id = (form.get("waba_id") or "").strip()
+    phone_number_id = (form.get("phone_number_id") or "").strip()
+    business_id = (form.get("business_id") or "").strip()
+    if not (code and waba_id and phone_number_id and business_id):
+        # O popup fechou no meio. O `code` sozinho não conecta nada, e mandar
+        # meia conexão ao Chatbot só queimaria o code de uso único.
+        request.session["canal_erro"] = _ERRO_POPUP_INCOMPLETO
+        return _para_tela()
+
+    try:
+        chatbot.conectar_whatsapp_cloud(
+            code=code,
+            waba_id=waba_id,
+            phone_number_id=phone_number_id,
+            business_id=business_id,
+        )
+        request.session["canal_mensagem"] = (
+            "Número recebido. A Meta ainda está concluindo o registro — "
+            "acompanhe aqui, não é preciso refazer a janela."
+        )
+        _auditar(db, usuario, "conectar", success=True, provedor="cloud")
+    except OnboardingFalhou as exc:
+        # A cadeia parou e sabemos onde. A mensagem do Chatbot nomeia o elo;
+        # repeti-la é o que separa "a Meta recusou o número" de "estamos fora
+        # do ar", que pedem ações opostas do lojista.
+        request.session["canal_erro"] = (
+            f"A conexão parou no caminho da Meta: {exc}"
+        )
+        _auditar(
+            db,
+            usuario,
+            "conectar",
+            success=False,
+            error_code=f"onboarding_elo_{exc.elo}",
+            provedor="cloud",
+        )
+    except ChatbotIndisponivel:
+        request.session["canal_erro"] = _ERRO_CLOUD_INDISPONIVEL
+        _auditar(
+            db,
+            usuario,
+            "conectar",
+            success=False,
+            error_code=_ERRO_CHATBOT,
+            provedor="cloud",
+        )
+    return _para_tela()
 
 
 @router.post("/app/loja/whatsapp/canais")

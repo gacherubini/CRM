@@ -80,14 +80,158 @@
   </div>
   <div class="panel-body">
     {% if pode_conectar_cloud %}
-    {# Sem ação: o popup do SDK entra na próxima etapa, depois da liberação da Meta. #}
-    <button class="button primary" type="button" id="conectar-whatsapp" disabled>
+    {# O botão acende sozinho quando PORTAL_META_APP_ID e PORTAL_META_CONFIG_ID
+       existirem. Com um deles vazio o popup abriria com o app errado e a Meta
+       recusaria sem dizer por quê — então continua desabilitado. #}
+    <button
+      class="button primary"
+      type="button"
+      id="conectar-whatsapp"
+      {% if not popup_pronto %}disabled{% endif %}
+    >
       Conectar o WhatsApp
     </button>
+    {% if not popup_pronto %}
     <p class="muted">
       A janela ainda está em liberação com a Meta. Assim que sair, o botão abre
       aqui mesmo — sem sair da Revy.
     </p>
+    {% else %}
+    {# O form não tem campos visíveis: quem os preenche é o retorno do popup.
+       O POST só sai com as quatro peças na mão. #}
+    <form method="post" action="/app/loja/whatsapp/conectar" id="conectar-form">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <input type="hidden" name="code">
+      <input type="hidden" name="waba_id">
+      <input type="hidden" name="phone_number_id">
+      <input type="hidden" name="business_id">
+    </form>
+    <div class="alert warning" id="conectar-sem-retorno" role="alert" hidden>
+      <strong>A janela fechou sem concluir.</strong>
+      Nenhum número foi migrado e nada se perdeu. O motivo mais comum é o número
+      <strong>ainda estar ativo no aplicativo de WhatsApp</strong> em algum
+      aparelho — apague a conta dele no aplicativo e clique de novo. Se você
+      fechou a janela por engano, é só clicar de novo.
+    </div>
+    <script>
+      (function () {
+        // Popup do Embedded Signup. Nenhum segredo da Meta passa por aqui: o
+        // App ID e o config_id são públicos, e o `code` que volta é de uso
+        // único e só vale trocado com o App Secret, que mora no chatbot.
+        var APP_ID = {{ meta_app_id|tojson }};
+        var CONFIG_ID = {{ meta_config_id|tojson }};
+        var ORIGENS_META = ["https://www.facebook.com", "https://web.facebook.com"];
+        // Quanto esperamos os ids depois de o `code` chegar. O caso comum de
+        // falha (número ainda ativo no aparelho) morre DENTRO do popup e pode
+        // não gerar evento nenhum: sem este teto a tela ficaria em espera para
+        // sempre, que é o pior desfecho possível.
+        var ESPERA_MAXIMA_MS = 8000;
+
+        var botao = document.getElementById("conectar-whatsapp");
+        var form = document.getElementById("conectar-form");
+        var aviso = document.getElementById("conectar-sem-retorno");
+        if (!botao || !form) { return; }
+
+        // As duas metades chegam por caminhos diferentes: o `code` volta no
+        // retorno do FB.login e os três ids chegam por postMessage. Só postamos
+        // com as quatro na mão.
+        var code = null;
+        var ids = null;
+        var encerrado = false;
+        var relogio = null;
+
+        function enviar() {
+          if (encerrado || !code || !ids) { return; }
+          if (!ids.waba_id || !ids.phone_number_id || !ids.business_id) { return; }
+          encerrado = true;
+          window.clearTimeout(relogio);
+          form.code.value = code;
+          form.waba_id.value = ids.waba_id;
+          form.phone_number_id.value = ids.phone_number_id;
+          form.business_id.value = ids.business_id;
+          form.submit();
+        }
+
+        function desistir() {
+          if (encerrado) { return; }
+          encerrado = true;
+          window.clearTimeout(relogio);
+          code = null;
+          ids = null;
+          botao.disabled = false;
+          botao.textContent = "Tentar de novo";
+          if (aviso) { aviso.hidden = false; }
+        }
+
+        window.addEventListener("message", function (evento) {
+          if (ORIGENS_META.indexOf(evento.origin) === -1) { return; }
+          var dados;
+          try {
+            dados = JSON.parse(evento.data);
+          } catch (e) {
+            return;
+          }
+          if (!dados || dados.type !== "WA_EMBEDDED_SIGNUP") { return; }
+          if (dados.event === "FINISH" || dados.event === "FINISH_ONLY_WABA") {
+            var d = dados.data || {};
+            ids = {
+              waba_id: d.waba_id || "",
+              phone_number_id: d.phone_number_id || "",
+              business_id: d.business_id || ""
+            };
+            enviar();
+          } else {
+            // CANCEL e ERROR: a Meta avisa que parou, e a tela para junto.
+            desistir();
+          }
+        });
+
+        botao.addEventListener("click", function () {
+          if (typeof window.FB === "undefined") {
+            // SDK bloqueado (extensão, rede). Melhor dizer que não abriu do que
+            // deixar o botão morto na mão do lojista.
+            desistir();
+            return;
+          }
+          encerrado = false;
+          code = null;
+          ids = null;
+          botao.disabled = true;
+          if (aviso) { aviso.hidden = true; }
+          window.FB.login(
+            function (resposta) {
+              var auth = resposta && resposta.authResponse;
+              if (!auth || !auth.code) {
+                desistir();
+                return;
+              }
+              code = auth.code;
+              enviar();
+              // O `code` chegou; os ids vêm por postMessage e podem não vir.
+              relogio = window.setTimeout(desistir, ESPERA_MAXIMA_MS);
+            },
+            {
+              config_id: CONFIG_ID,
+              response_type: "code",
+              override_default_response_type: true,
+              extras: { setup: {}, featureType: "", sessionInfoVersion: "3" }
+            }
+          );
+        });
+
+        window.fbAsyncInit = function () {
+          window.FB.init({
+            appId: APP_ID,
+            autoLogAppEvents: true,
+            xfbml: true,
+            version: "v21.0"
+          });
+        };
+      })();
+    </script>
+    <script async defer crossorigin="anonymous"
+            src="https://connect.facebook.net/pt_BR/sdk.js"></script>
+    {% endif %}
     {% else %}
     <div class="alert warning">
       <strong>Só o dono da loja conecta o WhatsApp.</strong>
