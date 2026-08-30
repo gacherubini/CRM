@@ -177,6 +177,12 @@ NOS: dict[str, dict] = {
 # outbox assincrona ou clientes que o AST-scan nao cobre (catalogo-publico e
 # revy-trafego nao tem entrada em ALVO_POR_CLIENTE).
 ARESTAS: list[dict] = [
+    # As duas que substituem a contencao errada em suite-pg. Desde o corte de
+    # 16/08/2026 os dois vivem no banco `revy`, com schema por produto.
+    {"de": "portal-gestao", "para": "suite-pg",
+     "protocolo": "tcp", "sincrono": True, "retry": False},
+    {"de": "revy-trafego", "para": "suite-pg",
+     "protocolo": "tcp", "sincrono": True, "retry": False},
     {"de": "portal-gestao", "para": "revy-trafego",
      "protocolo": "outbox", "sincrono": False, "retry": True},
     {"de": "estoque-api", "para": "chatbot-api",
@@ -234,7 +240,10 @@ VMS: dict[str, dict] = {
     },
     "suite-pg": {
         "tipo": "postgres",
-        "contem": ["portal-gestao", "revy-trafego"],
+        # Vazio de proposito: Loja e Control NAO rodam dentro do Postgres, eles
+        # FALAM com ele. Modelar isso como contencao fazia a arvore inteira dos
+        # dois ser desenhada duas vezes. Virou aresta tcp em ARESTAS.
+        "contem": [],
         "nota": (
             "banco `revy`, schema por produto, desde o corte de 16/08/2026 "
             "(PORTAL_DATABASE_URL e REVY_TRAFEGO_DATABASE_URL viraram secrets "

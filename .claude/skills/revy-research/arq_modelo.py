@@ -269,13 +269,17 @@ def carregar(raiz: Path, frescor: dict, nos: dict,
         construidos.append(_com_auto(raiz_no))
 
     conhecidos = {n.chave for n in construidos}
+    # Aresta pode terminar numa VM, nao so num produto: "portal-gestao fala TCP
+    # com suite-pg" e uma seta, nao contencao. Modelar isso como `contem` fazia
+    # a arvore inteira do produto ser desenhada uma vez por VM.
+    conhecidos_e_vms = conhecidos | set(vms or {})
     feitas = []
     for a in arestas or ():
         for ponta in ("de", "para"):
-            if a[ponta] not in conhecidos:
+            if a[ponta] not in conhecidos_e_vms:
                 raise ReferenciaMorta(
                     f"aresta {a['de']} -> {a['para']} usa '{a[ponta]}', "
-                    "que nao esta em NOS"
+                    "que nao esta em NOS nem em VMS"
                 )
         feitas.append(Aresta(
             de=a["de"], para=a["para"],
