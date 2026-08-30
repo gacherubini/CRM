@@ -29,7 +29,7 @@ Quatro camadas. **Três já existem.**
 CONTEXT.md         ── Language: termos do domínio          JÁ EXISTE
 decisoes/*.md      ── 13 ADRs                              JÁ EXISTE
 mapa/_frescor.json ── 714 entradas, arquivo:linha          JÁ EXISTE (gerado)
-arquitetura.yaml   ── caixas, setas, VMs, fluxos, SPOF     NOVO, à mão, ~120 linhas
+arquitetura.py     ── caixas, setas, VMs, fluxos, SPOF     NOVO, à mão, ~150 linhas
         │
         ▼
 gerar_arquitetura.py  ── layout determinístico + SVG + JSON embutido   NOVO
@@ -40,13 +40,13 @@ arquitetura.html      ── arquivo único, auto-contido, commitado        NOVO
 O `_frescor.json` sabe que `FollowupWorker` mora em `chatbot-api/app/followup_job.py:64`.
 Ele **não** sabe que o Chatbot fala com o Motor por HTTP, que o Playwright do Motor é
 single-flight, nem que "venda → outbox → Control" é um caminho com nome. Isso é o
-`arquitetura.yaml`: a única parte escrita à mão, e a única que não muda quando você
+`arquitetura.py`: a única parte escrita à mão, e a única que não muda quando você
 acrescenta uma rota.
 
-### Por que YAML à mão e não inferência total
+### Por que uma camada à mão e não inferência total
 
 Inferir tudo do código produz um grafo de 700 nós sem hierarquia e sem semântica —
-não dá pra saber qual seta é crítica. As ~120 linhas à mão são o que transforma
+não dá pra saber qual seta é crítica. As ~150 linhas à mão são o que transforma
 um grafo em um mapa. E elas mudam com a topologia (raro), não com o código (toda hora).
 
 ## 3. Reuso — o que NÃO reescrever
@@ -75,72 +75,95 @@ Isso torna visível o fato mais importante da infra e que hoje não está desenh
 em lugar nenhum: **a `app2037` carrega cinco produtos e a API do Motor.** Uma caixa
 que cai leva seis coisas junto.
 
-## 4. `arquitetura.yaml` — schema
+## 4. `arquitetura.py` — schema
 
-Um arquivo, quatro seções. Mora em `.claude/skills/revy-research/arquitetura.yaml`.
+### Por que não é YAML
 
-```yaml
-# 1. NÓS — só o que o código não diz. Nome, papel, e onde ancorar.
-nos:
-  motor-simulacao:
-    titulo: Motor de Simulação
-    papel: banco
-    vm: app2037            # API; o worker vive na motor2037
-    termo: null            # entrada do ## Language do CONTEXT.md, se houver
-    decisoes: []           # arquivos de decisoes/ ancorados nesta caixa
-                           # (ex.: 2026-08-13-whatsapp-dois-modos-sem-coexistencia.md
-                           #  ancora em chatbot-api, não aqui)
-    spof: true
-    spof_porque: >
-      Playwright single-flight. Sem retry entre a falha do driver e o chamador —
-      ver learnings/2026-08-23-driver-playwright-engole-o-clique-que-falha.md
+O Mac do dono roda **Python 3.9.6**, sem `pyyaml` instalado, e `tomllib` só existe
+no 3.11+. A pasta é **stdlib apenas** por invariante (`gerar_mapa.py:1`). Sobram
+JSON — que não aceita comentário, justamente onde o valor está na prosa — ou um
+módulo Python de dados.
 
-# 2. ARESTAS — só as que cruzamentos.py não infere, ou que precisam de semântica.
-arestas:
-  - de: portal-gestao
-    para: revy-trafego
-    protocolo: outbox      # http | outbox | evento | webhook | tcp
-    sincrono: false
-    retry: true
+Módulo Python, então. E não é invenção: `gerar_mapa.py:39` já tem exatamente isso —
+`TESTES`, um dict literal comentado, descrito no próprio arquivo como "a ÚNICA parte
+escrita a mão do mapa". `arquitetura.py` é o mesmo padrão, um nível acima.
+
+Ganha comentário livre, vírgula final, tipo declarado, e zero parser para manter.
+É código executável como config, o que seria risco se viesse de fora — vem do repo.
+
+### O schema
+
+Um arquivo, quatro dicts. Mora em `.claude/skills/revy-research/arquitetura.py`.
+
+```python
+"""Intencao da arquitetura: o que o codigo nao diz de si mesmo.
+
+Escrito a mao. Muda quando a TOPOLOGIA muda, nao quando nasce uma rota.
+Mesmo padrao do TESTES em gerar_mapa.py:39.
+"""
+
+# 1. NOS — nome, papel, e onde ancorar prosa que ja existe no repo.
+NOS: dict[str, dict] = {
+    "motor-simulacao": {
+        "titulo": "Motor de Simulação",
+        "papel": "banco",
+        "vm": "app2037",        # a API; o worker vive na motor2037
+        "termo": None,          # entrada do ## Language do CONTEXT.md, se houver
+        "decisoes": [],         # arquivos de decisoes/ ancorados nesta caixa
+        "spof": True,
+        # Sem retry entre a falha do driver e o chamador.
+        "spof_porque": (
+            "Playwright single-flight — ver learnings/"
+            "2026-08-23-driver-playwright-engole-o-clique-que-falha.md"
+        ),
+    },
+}
+
+# 2. ARESTAS — so as que cruzamentos.py nao infere, ou que precisam de semantica.
+#    protocolo: http | outbox | evento | webhook | tcp
+ARESTAS: list[dict] = [
+    {"de": "portal-gestao", "para": "revy-trafego",
+     "protocolo": "outbox", "sincrono": False, "retry": True},
+]
 
 # 3. VMs — agrupamento e blast radius.
-vms:
-  app2037:
-    tipo: fly-machine
-    contem: [chatbot-api, estoque-api, portal-gestao, revy-trafego,
-             catalogo-publico, motor-simulacao]
-    nota: nginx-edge:8080 na frente, supervisord por trás
+VMS: dict[str, dict] = {
+    "app2037": {
+        "tipo": "fly-machine",
+        "contem": ["chatbot-api", "estoque-api", "portal-gestao",
+                   "revy-trafego", "catalogo-publico", "motor-simulacao"],
+        "nota": "nginx-edge:8080 na frente, supervisord por tras",
+    },
+}
 
 # 4. FLUXOS — o caminho com nome, em passos.
-fluxos:
-  whatsapp-simulacao:
-    titulo: WhatsApp → simulação
-    passos:
-      - no: evolution2037
-        faz: recebe a mensagem
-      - no: n8n2037
-        faz: roteia
-        protocolo: webhook
-      - no: chatbot-api
-        faz: interpreta e decide
-      - no: motor-simulacao
-        faz: simula no banco
-        sincrono: false
-    invariante: a parcela não volta ao cliente pelo bot
+FLUXOS: dict[str, dict] = {
+    "whatsapp-simulacao": {
+        "titulo": "WhatsApp → simulação",
+        "passos": [
+            {"no": "evolution2037", "faz": "recebe a mensagem"},
+            {"no": "n8n2037", "faz": "roteia", "protocolo": "webhook"},
+            {"no": "chatbot-api", "faz": "interpreta e decide"},
+            {"no": "motor-simulacao", "faz": "simula no banco", "sincrono": False},
+        ],
+        "invariante": "a parcela nao volta ao cliente pelo bot",
+    },
+}
 ```
 
-**Campos obrigatórios:** `nos[].titulo`, `nos[].papel`. Todo o resto é opcional e
-o gerador degrada sem quebrar — um `arquitetura.yaml` de 20 linhas já produz página.
+**Campos obrigatórios:** `titulo` e `papel` em cada nó. Todo o resto é opcional e o
+gerador degrada sem quebrar — um `arquitetura.py` com 3 nós e nada mais já produz página.
 
-**Validação:** o gerador falha alto se o yaml citar um produto que não existe no
-`_frescor.json`, ou um arquivo de `decisoes/` que não existe. Referência morta é
-erro, não aviso — é exatamente o modo como este arquivo apodreceria.
+**Validação:** o gerador falha alto se o arquivo citar um produto que não existe no
+`_frescor.json`, ou um arquivo de `decisoes/` que não existe. Referência morta é erro,
+não aviso — é exatamente o modo como este arquivo apodreceria em silêncio. `saude.py`
+já faz essa checagem para learnings e decisões (`citacoes_mortas`); o mesmo espírito.
 
 ## 5. Os três níveis
 
 | Nível | O que se vê | De onde vem |
 |---|---|---|
-| **1 — Contexto** | VMs como molduras, produtos como caixas dentro delas, setas com protocolo, SPOF marcado | `arquitetura.yaml` |
+| **1 — Contexto** | VMs como molduras, produtos como caixas dentro delas, setas com protocolo, SPOF marcado | `arquitetura.py` |
 | **2 — Interior** | rotas, workers, flags, migrations do produto, agrupados por seção; decisões e termo ancorados na moldura | `_frescor.json` + `CONTEXT.md` + `decisoes/` |
 | **3 — Item** | `arquivo:linha`, símbolo, e o texto da decisão que o governa | `_frescor.json` |
 
@@ -194,7 +217,7 @@ Convenções do desenho, todas com legenda na própria página:
 
 - Não mostra dado de runtime. Isso é o painel Axiom, projeto separado.
 - Não roda em CI e não bloqueia commit.
-- Não edita o yaml sozinho — o gerador só lê.
+- Não edita o `arquitetura.py` sozinho — o gerador só lê.
 - Não vira rota do Control. É ferramenta de dev, não superfície de cliente.
 - Não desenha a arquitetura-alvo ao lado da atual. Depois, se doer.
 
@@ -208,7 +231,7 @@ def gerar(raiz: Path, destino: Path) -> None
 
 Tudo o mais é privado. Internamente, três estágios com fronteira testável:
 
-1. `carregar(raiz) -> Modelo` — funde yaml + frescor + cruzamentos + decisões.
+1. `carregar(raiz) -> Modelo` — funde `arquitetura.py` + frescor + cruzamentos + decisões.
    Falha alto em referência morta.
 2. `dispor(modelo) -> Cena` — layout determinístico; puro, sem I/O.
 3. `render(cena) -> str` — SVG + JS + CSS numa string.
@@ -218,11 +241,13 @@ o mesmo resultado.
 
 ## 10. Como saber que acabou
 
-`test_gerar_arquitetura.py`, ao lado do `test_gerar_mapa.py` que já existe:
+`test_gerar_arquitetura.py`, ao lado do `test_gerar_mapa.py` que já existe.
+**`unittest` da stdlib, não pytest** — não há pytest neste Python, e o teste vizinho
+usa `unittest.TestCase`:
 
-- yaml mínimo (só `nos`) produz HTML válido
-- yaml citando produto inexistente **falha** com mensagem nomeando o produto
-- yaml citando `decisoes/` inexistente **falha** nomeando o arquivo
+- `NOS` mínimo (3 nós, sem aresta) produz HTML válido
+- nó citando produto inexistente **falha** com mensagem nomeando o produto
+- nó citando `decisoes/` inexistente **falha** nomeando o arquivo
 - `dispor()` é determinístico: duas chamadas, saída idêntica
 - toda entrada do `_frescor.json` aparece no HTML (nada some no caminho)
 - o HTML não contém `http://` nem `https://` fora de comentário (auto-contido)
@@ -236,11 +261,11 @@ Comandos (o dono usa Mac e Windows; esta pasta é stdlib, não tem `.venv`):
 ```
 # macOS
 cd .claude/skills/revy-research && python3 gerar_arquitetura.py --verificar
-cd .claude/skills/revy-research && python3 -m pytest test_gerar_arquitetura.py -q
+cd .claude/skills/revy-research && python3 -m unittest test_gerar_arquitetura -v
 
 # Windows
 cd .claude\skills\revy-research && python gerar_arquitetura.py --verificar
-cd .claude\skills\revy-research && python -m pytest test_gerar_arquitetura.py -q
+cd .claude\skills\revy-research && python -m unittest test_gerar_arquitetura -v
 ```
 
 Prova final que teste não dá: abrir `arquitetura.html` no navegador, cair dentro do
@@ -251,13 +276,13 @@ Chatbot, chegar num `arquivo:linha`, voltar com `Esc`. O learning
 
 `gerar_arquitetura.py` entra na mesma linha do `gerar_mapa.py` no AGENTS.md §6.
 Atualizar a arquitetura passa a custar zero token: um comando que você já é obrigado
-a rodar. Prompt só quando a **topologia** muda — e aí é diff no yaml, não redesenho.
+a rodar. Prompt só quando a **topologia** muda — e aí é diff no `arquitetura.py`, não redesenho.
 
 ## 12. Riscos
 
 | Risco | Mitigação |
 |---|---|
-| yaml apodrece em silêncio | referência morta é erro de build, não aviso |
+| `arquitetura.py` apodrece em silêncio | referência morta é erro de build, não aviso |
 | HTML de ~250 KB churnando no git | `_frescor.json` (145 KB) já churna; layout determinístico mantém o diff proporcional à mudança real |
 | zoom bonito e inútil | o nível 3 tem que chegar em `arquivo:linha` — se não chegar, é enfeite |
 | escopo virar "e também runtime" | §8 |
