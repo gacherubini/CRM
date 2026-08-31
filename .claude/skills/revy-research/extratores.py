@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import ast
 import re
-from dataclasses import replace
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 from varredura import IGNORADOS, Entrada
@@ -654,3 +654,115 @@ def templates(base_produto: Path) -> list[Entrada]:
                 linha=linha,
             ))
     return achados
+
+
+@dataclass(frozen=True)
+class Relacao:
+    """Uma chave estrangeira, com a cardinalidade que o SQLAlchemy ja declara.
+
+    `de` e `para` sao nomes de TABELA (mesma chave que `modelos` emite), nao de
+    classe — e' o nome da tabela que aparece na migration e no SQL do dono.
+    """
+    de: str
+    para: str
+    coluna: str
+    cardinalidade: str      # "n:1" | "1:1"
+    opcional: bool          # nullable=True -> a ponta pode nao existir
+    arquivo: str
+    linha: int
+
+
+def _fk_alvo(no: ast.AST) -> str | None:
+    """`ForeignKey("lojas.id")` -> `"lojas"`. Qualquer outra coisa -> None."""
+    if not (isinstance(no, ast.Call) and _nome_chamado(no) == "ForeignKey"):
+        return None
+    if not (no.args and isinstance(no.args[0], ast.Constant)
+            and isinstance(no.args[0].value, str)):
+        return None
+    return no.args[0].value.split(".")[0] or None
+
+
+def _nome_chamado(no: ast.Call) -> str:
+    alvo = no.func
+    if isinstance(alvo, ast.Name):
+        return alvo.id
+    if isinstance(alvo, ast.Attribute):
+        return alvo.attr
+    return ""
+
+
+def _kw_verdadeiro(chamada: ast.Call, nome: str) -> bool:
+    for kw in chamada.keywords:
+        if kw.arg == nome and isinstance(kw.value, ast.Constant):
+            return bool(kw.value.value)
+    return False
+
+
+def relacoes(texto: str, arquivo_rel: str) -> list[Relacao]:
+    """As arestas do mapa conceitual de banco, lidas do proprio modelo.
+
+    A cardinalidade NAO e' chutada — ela ja esta escrita no SQLAlchemy, e so
+    nao estava sendo lida:
+
+    - `ForeignKey("lojas.id")` numa coluna comum: varias linhas daqui apontam
+      pra UMA de la. **n:1**.
+    - a mesma FK com `primary_key=True` ou `unique=True`: a FK E' a chave, entao
+      existe no maximo UMA linha daqui por linha de la. **1:1**. E' o caso de
+      `agente_config`, `rodizio_ponteiro` e `loja_operacional_projecao` no
+      Chatbot — tres tabelas que sao extensao de `lojas`, e o desenho antigo
+      mostrava igualzinho a uma tabela de muitos.
+    - `nullable=True`: a ponta pode nao existir (`opcional`), que e' diferente
+      de nao existir relacao.
+
+    n:n nao e' inferido aqui de proposito: no SQLAlchemy ele aparece como
+    `relationship(secondary=...)` ou como tabela de associacao (PK composta so
+    de FK). Nenhum produto da Revy tem uma hoje — inventar o caso sem ter onde
+    conferir seria desenhar o que nao existe.
+
+    Le como TEXTO (`ast`), nunca importando `app` (AGENTS.md secao 5).
+    """
+    try:
+        arvore = ast.parse(texto)
+    except SyntaxError:
+        return []
+    achados: list[Relacao] = []
+    for no in ast.walk(arvore):
+        if not isinstance(no, ast.ClassDef):
+            continue
+        tabela = _tabela_da_classe(no)
+        if not tabela:
+            continue
+        for corpo in no.body:
+            # `x: Mapped[str] = mapped_column(ForeignKey(...))` (AnnAssign) e
+            # `x = Column(ForeignKey(...))` (Assign): os dois estilos existem
+            # no repo, entao os dois entram.
+            valor = getattr(corpo, "value", None)
+            alvos = getattr(corpo, "targets", None) or [getattr(corpo, "target", None)]
+            if not isinstance(valor, ast.Call) or not alvos or alvos[0] is None:
+                continue
+            if not isinstance(alvos[0], ast.Name):
+                continue
+            for arg in list(valor.args) + [kw.value for kw in valor.keywords]:
+                destino = _fk_alvo(arg)
+                if not destino:
+                    continue
+                um_pra_um = (_kw_verdadeiro(valor, "primary_key")
+                             or _kw_verdadeiro(valor, "unique"))
+                achados.append(Relacao(
+                    de=tabela, para=destino, coluna=alvos[0].id,
+                    cardinalidade="1:1" if um_pra_um else "n:1",
+                    opcional=_kw_verdadeiro(valor, "nullable"),
+                    arquivo=arquivo_rel, linha=corpo.lineno,
+                ))
+    return achados
+
+
+def _tabela_da_classe(classe: ast.ClassDef) -> str | None:
+    for corpo in classe.body:
+        if (isinstance(corpo, ast.Assign) and len(corpo.targets) == 1
+                and isinstance(corpo.targets[0], ast.Name)
+                and corpo.targets[0].id == "__tablename__"
+                and isinstance(corpo.value, ast.Constant)
+                and isinstance(corpo.value.value, str)):
+            return corpo.value.value
+    return None

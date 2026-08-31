@@ -594,3 +594,95 @@ def _agrupar_flags_no(no: "No", limiar: int) -> "No":
     contagem = Entrada(secao="flag", chave=rotulo, simbolo=rotulo,
                        arquivo=onde, linha=0)
     return replace(no, entradas=resto + (contagem,), filhos=filhos)
+
+
+# --------------------------------------------------------------------------
+# Task 14 — a vista Schema vira mapa CONCEITUAL de banco.
+# --------------------------------------------------------------------------
+
+def como_mapa_conceitual(modelo: "Modelo", relacoes: dict) -> "Modelo":
+    """Reescreve a vista Schema: uma caixa por TABELA, ligadas por FK.
+
+    Antes daqui a Schema era a arvore de arquivo outra vez, e pior que a da
+    Arquitetura: o Chatbot abria com 28 caixas de migration de UMA ficha cada
+    (as tais que "abrem vazias") e as 19 tabelas espremidas como pilulas
+    dentro de uma caixa chamada `models_db.py`. Nao dava pra ver o que um
+    mapa de banco existe pra mostrar — quem aponta pra quem, e quantos.
+
+    Agora cada tabela e' uma caixa e cada FK e' uma seta ROTULADA com a
+    cardinalidade que o SQLAlchemy ja declarava (`extratores.relacoes`).
+
+    As 28 migrations viram UMA caixa com a contagem e o head. Elas sao
+    HISTORIA de como o schema chegou aqui, nao a forma dele — e a pergunta
+    desta vista e' a forma. O `mapa/<produto>.md` continua listando todas.
+
+    Funcao pura, no mesmo molde de `filtrar` e `agrupar_flags`.
+    """
+    nos_novos = []
+    arestas_novas: list[Aresta] = []
+    for no in modelo.nos:
+        tabelas, migrations = _colher(no)
+        if not tabelas and not migrations:
+            nos_novos.append(no)
+            continue
+        filhos = [
+            No(chave=t.chave, titulo=t.chave, papel="tabela",
+               termo=f"{t.arquivo}:{t.linha}", auto=True)
+            for t in sorted(tabelas, key=lambda e: e.chave)
+        ]
+        if migrations:
+            nomes = sorted(e.chave for e in migrations)
+            filhos.append(No(
+                chave="migrations", titulo="migrations", papel="migration",
+                auto=True,
+                termo=f"{len(nomes)} até {nomes[-1]}"))
+        nos_novos.append(replace(no, filhos=tuple(filhos), entradas=()))
+        arestas_novas.extend(_arestas_de_relacao(
+            no.chave, relacoes.get(no.chave, ()), {t.chave for t in tabelas}))
+    return replace(modelo, nos=tuple(nos_novos), arestas=tuple(arestas_novas))
+
+
+def _colher(no: "No") -> tuple[list, list]:
+    """Todas as entradas de `modelo` e de `migration` da subarvore, em duas
+    listas. Recursivo porque hoje elas estao enterradas na arvore de
+    diretorio (`app > models_db.py`, `alembic > versions > ...`)."""
+    tabelas = [e for e in no.entradas if e.secao == "modelo"]
+    migrations = [e for e in no.entradas if e.secao == "migration"]
+    for f in no.filhos:
+        t, m = _colher(f)
+        tabelas.extend(t)
+        migrations.extend(m)
+    return tabelas, migrations
+
+
+def _arestas_de_relacao(produto: str, relacoes, tabelas: set) -> list:
+    """Uma seta por FK, com a cardinalidade no rotulo.
+
+    Descarta relacao cuja ponta nao virou caixa (tabela declarada num arquivo
+    que a varredura nao le, ou FK apontando pra fora do produto): seta pro
+    vazio e' pior que seta ausente — e' a mesma regra da camada de
+    componente.
+
+    `sincrono=True` sempre: aqui a seta nao fala de execucao, fala de forma.
+    Tracejado nesta vista diria "assincrono", que nao quer dizer nada sobre
+    uma chave estrangeira.
+    """
+    vistas = set()
+    saida = []
+    for r in relacoes:
+        de, para = r["de"], r["para"]
+        if de not in tabelas or para not in tabelas or de == para:
+            continue
+        # Duas FK entre as mesmas tabelas (mensagens tem `loja_id` e
+        # `canal_id`) dao UMA seta: o mapa conceitual responde "estas duas se
+        # ligam, e quantos", e nao "por quantas colunas".
+        alvo = r["cardinalidade"]
+        if r["opcional"]:
+            alvo = alvo.replace(":1", ":0..1")
+        chave = (de, para, alvo)
+        if chave in vistas:
+            continue
+        vistas.add(chave)
+        saida.append(Aresta(de=f"{produto}.{de}", para=f"{produto}.{para}",
+                            protocolo=alvo, sincrono=True, retry=True))
+    return saida

@@ -69,12 +69,16 @@ def montar(raiz: Path) -> str:
     # decisao "Schema nao tem aresta nem fluxo" (fluxo e caminho de
     # execucao, nao relacao de dado) e desta vista, entao e aqui que ela se
     # aplica — nao em `arq_modelo.filtrar`, que e generico para as duas.
-    sch = replace(sch, arestas=(), fluxos=())
+    # A Schema tem arestas SIM, desde a Task 14 — mas nao as da Arquitetura.
+    # As dela sao as chaves estrangeiras, e vem do proprio schema.
+    sch = replace(sch, fluxos=())
+    sch = arq_modelo.como_mapa_conceitual(sch, frescor.get("relacoes", {}))
     vistas = (
         arq_render.Vista("arquitetura", "Arquitetura",
                          arq_layout.dispor(arq, arq.vms, arquitetura.POSICOES), arq),
         arq_render.Vista("schema", "Schema",
-                         arq_layout.dispor(sch, sch.bancos), sch),
+                         arq_layout.dispor(sch, sch.bancos), sch,
+                         arestas_sempre_visiveis=True),
     )
     # Os tokens da marca sao LIDOS na geracao. `revy-tokens.css` se declara
     # fonte unica; uma pagina de design system que repete os valores a mao

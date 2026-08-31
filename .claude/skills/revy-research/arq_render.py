@@ -62,6 +62,12 @@ class Vista:
     rotulo: str     # "Arquitetura" | "Schema" — texto do botao e da trilha
     cena: Cena
     modelo: Modelo
+    # Task 14. Na Arquitetura, aresta dentro do mesmo produto nasce APAGADA e
+    # so acende sob o mouse — sao 99 marcadores, e ninguem pergunta pelas 20
+    # do Chatbot ao mesmo tempo. Na Schema a regra se inverte: a seta E' o
+    # conteudo. Um mapa conceitual de banco com as relacoes escondidas e' uma
+    # lista de tabelas, que e' exatamente o que ele existe pra deixar de ser.
+    arestas_sempre_visiveis: bool = False
 
 # Cores de shared/brand/revy-tokens.css (tema claro), copiadas como literal —
 # o HTML gerado nao importa CSS de fora (ver o learning
@@ -574,7 +580,8 @@ def _sem_rede(a: Aresta) -> bool:
     return a.de.split(".")[0] == a.para.split(".")[0]
 
 
-def _marcas_da_aresta(a: Aresta, de: Caixa, para: Caixa, idx: int) -> str:
+def _marcas_da_aresta(a: Aresta, de: Caixa, para: Caixa, idx: int,
+                      sempre_visivel: bool = False) -> str:
     """Atributos que `arq_zoom.js` le pra decidir a opacidade de cada seta.
 
     `data-de`/`data-para` sao os ids ABSOLUTOS (com prefixo de VM), nao as
@@ -596,7 +603,7 @@ def _marcas_da_aresta(a: Aresta, de: Caixa, para: Caixa, idx: int) -> str:
     quantas arestas existem; repetir no rotulo contaria cada uma duas vezes.
     Por isso o seletor do JS e' `[data-de]`, nao `[data-aresta]`.
     """
-    interna = ' data-interna=""' if _sem_rede(a) else ""
+    interna = ' data-interna=""' if _sem_rede(a) and not sempre_visivel else ""
     # `data-i` e' o indice da aresta na lista resolvida. A forma e o rotulo
     # levam o MESMO indice: e' por ele que o JS acha os dois pedacos da mesma
     # seta ao recalcular o tracado enquanto voce arrasta uma caixa.
@@ -604,7 +611,8 @@ def _marcas_da_aresta(a: Aresta, de: Caixa, para: Caixa, idx: int) -> str:
             f' data-para="{html.escape(para.chave)}"{interna}')
 
 
-def _aresta_forma(a: Aresta, de: Caixa, para: Caixa, deslocamento: float, idx: int) -> str:
+def _aresta_forma(a: Aresta, de: Caixa, para: Caixa, deslocamento: float, idx: int,
+                  sempre_visivel: bool = False) -> str:
     pontos = _pontos_da_aresta(de, para, deslocamento)
     marca = f"{html.escape(a.de)}->{html.escape(a.para)}"
     marcador = "seta-sem" if not a.retry and not _sem_rede(a) else "seta"
@@ -615,12 +623,13 @@ def _aresta_forma(a: Aresta, de: Caixa, para: Caixa, deslocamento: float, idx: i
     txt_pontos = " ".join(f"{x:.2f},{y:.2f}" for x, y in pontos)
     return (
         f'<polyline data-aresta="{marca}" points="{txt_pontos}"'
-        f'{_marcas_da_aresta(a, de, para, idx)}{tracejado}{cor} '
+        f'{_marcas_da_aresta(a, de, para, idx, sempre_visivel)}{tracejado}{cor} '
         f'marker-end="url(#{marcador})"/>'
     )
 
 
-def _aresta_texto(a: Aresta, de: Caixa, para: Caixa, deslocamento: float, idx: int) -> str:
+def _aresta_texto(a: Aresta, de: Caixa, para: Caixa, deslocamento: float, idx: int,
+                  sempre_visivel: bool = False) -> str:
     # Rotulo e' SO o protocolo — sincrono/assincrono ja esta no tracejado da
     # forma, e "sem retry" ja esta na cor vermelha; repetir em texto era
     # ruido (e a palavra "retry" nunca aparece em texto nenhum).
@@ -642,7 +651,7 @@ def _aresta_texto(a: Aresta, de: Caixa, para: Caixa, deslocamento: float, idx: i
     # As mesmas marcas da forma: o rotulo tem que acender e apagar JUNTO com
     # a seta dele. Sem isso, esconder as arestas internas deixaria as
     # palavras soltas boiando no vazio, apontando pra nada.
-    return (f'<text{_marcas_da_aresta(a, de, para, idx)} x="{mx:.2f}" y="{my:.2f}" '
+    return (f'<text{_marcas_da_aresta(a, de, para, idx, sempre_visivel)} x="{mx:.2f}" y="{my:.2f}" '
             f'font-size="8" fill="{cor}" class="protocolo">'
             f'{html.escape(a.protocolo)}</text>')
 
@@ -894,11 +903,12 @@ def render(vistas: tuple[Vista, ...], js: str,
             if de is not None and para is not None:
                 resolvidas.append((a, de, para))
         offsets = _offsets_de_saida(resolvidas)
+        sempre = vista.arestas_sempre_visiveis
         arestas_forma = "".join(
-            _aresta_forma(a, de, para, offsets[idx], idx)
+            _aresta_forma(a, de, para, offsets[idx], idx, sempre)
             for idx, (a, de, para) in enumerate(resolvidas))
         arestas_texto = "".join(
-            _aresta_texto(a, de, para, offsets[idx], idx)
+            _aresta_texto(a, de, para, offsets[idx], idx, sempre)
             for idx, (a, de, para) in enumerate(resolvidas))
 
         largura = max(vista.cena.largura, 1.0)

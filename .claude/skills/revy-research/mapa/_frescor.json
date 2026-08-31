@@ -1,5 +1,5 @@
 {
- "sha": "c8d4aa0",
+ "sha": "d615d75",
  "inventario": {
   "chatbot-api": [
    {
@@ -5725,5 +5725,873 @@
     "linha": 512
    }
   ]
+ },
+ "relacoes": {
+  "chatbot-api": [
+   {
+    "de": "agente_config",
+    "para": "agente_config_versao",
+    "coluna": "versao_publicada_id",
+    "cardinalidade": "n:1",
+    "opcional": true,
+    "arquivo": "app/models_db.py",
+    "linha": 527
+   },
+   {
+    "de": "agente_config",
+    "para": "lojas",
+    "coluna": "loja_id",
+    "cardinalidade": "1:1",
+    "opcional": false,
+    "arquivo": "app/models_db.py",
+    "linha": 524
+   },
+   {
+    "de": "agente_config_versao",
+    "para": "lojas",
+    "coluna": "loja_id",
+    "cardinalidade": "n:1",
+    "opcional": false,
+    "arquivo": "app/models_db.py",
+    "linha": 504
+   },
+   {
+    "de": "catalog_attributions",
+    "para": "leads",
+    "coluna": "lead_id",
+    "cardinalidade": "n:1",
+    "opcional": true,
+    "arquivo": "app/models_db.py",
+    "linha": 340
+   },
+   {
+    "de": "catalog_attributions",
+    "para": "lojas",
+    "coluna": "loja_id",
+    "cardinalidade": "n:1",
+    "opcional": false,
+    "arquivo": "app/models_db.py",
+    "linha": 323
+   },
+   {
+    "de": "consentimentos",
+    "para": "leads",
+    "coluna": "lead_id",
+    "cardinalidade": "n:1",
+    "opcional": true,
+    "arquivo": "app/models_db.py",
+    "linha": 305
+   },
+   {
+    "de": "consentimentos",
+    "para": "lojas",
+    "coluna": "loja_id",
+    "cardinalidade": "n:1",
+    "opcional": false,
+    "arquivo": "app/models_db.py",
+    "linha": 304
+   },
+   {
+    "de": "conversas",
+    "para": "lojas",
+    "coluna": "loja_id",
+    "cardinalidade": "n:1",
+    "opcional": false,
+    "arquivo": "app/models_db.py",
+    "linha": 200
+   },
+   {
+    "de": "conversas",
+    "para": "whatsapp_canais",
+    "coluna": "canal_id",
+    "cardinalidade": "n:1",
+    "opcional": true,
+    "arquivo": "app/models_db.py",
+    "linha": 202
+   },
+   {
+    "de": "credenciais_servico",
+    "para": "lojas",
+    "coluna": "loja_id",
+    "cardinalidade": "n:1",
+    "opcional": true,
+    "arquivo": "app/models_db.py",
+    "linha": 185
+   },
+   {
+    "de": "ctwa_auditoria",
+    "para": "leads",
+    "coluna": "lead_id",
+    "cardinalidade": "n:1",
+    "opcional": true,
+    "arquivo": "app/models_db.py",
+    "linha": 352
+   },
+   {
+    "de": "ctwa_auditoria",
+    "para": "lojas",
+    "coluna": "loja_id",
+    "cardinalidade": "n:1",
+    "opcional": false,
+    "arquivo": "app/models_db.py",
+    "linha": 351
+   },
+   {
+    "de": "fila_vendedor",
+    "para": "lojas",
+    "coluna": "loja_id",
+    "cardinalidade": "n:1",
+    "opcional": false,
+    "arquivo": "app/models_db.py",
+    "linha": 122
+   },
+   {
+    "de": "grupos_estoque",
+    "para": "lojas",
+    "coluna": "loja_id",
+    "cardinalidade": "1:1",
+    "opcional": false,
+    "arquivo": "app/models_db.py",
+    "linha": 401
+   },
+   {
+    "de": "leads",
+    "para": "lojas",
+    "coluna": "loja_id",
+    "cardinalidade": "n:1",
+    "opcional": false,
+    "arquivo": "app/models_db.py",
+    "linha": 247
+   },
+   {
+    "de": "loja_operacional_projecao",
+    "para": "lojas",
+    "coluna": "loja_id",
+    "cardinalidade": "1:1",
+    "opcional": false,
+    "arquivo": "app/models_db.py",
+    "linha": 35
+   },
+   {
+    "de": "mensagens",
+    "para": "conversas",
+    "coluna": "conversa_id",
+    "cardinalidade": "n:1",
+    "opcional": false,
+    "arquivo": "app/models_db.py",
+    "linha": 236
+   },
+   {
+    "de": "mensagens",
+    "para": "lojas",
+    "coluna": "loja_id",
+    "cardinalidade": "n:1",
+    "opcional": false,
+    "arquivo": "app/models_db.py",
+    "linha": 232
+   },
+   {
+    "de": "mensagens",
+    "para": "whatsapp_canais",
+    "coluna": "canal_id",
+    "cardinalidade": "n:1",
+    "opcional": true,
+    "arquivo": "app/models_db.py",
+    "linha": 233
+   },
+   {
+    "de": "notificacoes_operacionais",
+    "para": "lojas",
+    "coluna": "loja_id",
+    "cardinalidade": "n:1",
+    "opcional": false,
+    "arquivo": "app/models_db.py",
+    "linha": 426
+   },
+   {
+    "de": "notificacoes_operacionais",
+    "para": "whatsapp_canais",
+    "coluna": "canal_id",
+    "cardinalidade": "n:1",
+    "opcional": true,
+    "arquivo": "app/models_db.py",
+    "linha": 427
+   },
+   {
+    "de": "numeros_autorizados",
+    "para": "lojas",
+    "coluna": "loja_id",
+    "cardinalidade": "n:1",
+    "opcional": false,
+    "arquivo": "app/models_db.py",
+    "linha": 377
+   },
+   {
+    "de": "oferta_lead",
+    "para": "fila_vendedor",
+    "coluna": "vendedor_id",
+    "cardinalidade": "n:1",
+    "opcional": false,
+    "arquivo": "app/models_db.py",
+    "linha": 157
+   },
+   {
+    "de": "oferta_lead",
+    "para": "lojas",
+    "coluna": "loja_id",
+    "cardinalidade": "n:1",
+    "opcional": false,
+    "arquivo": "app/models_db.py",
+    "linha": 155
+   },
+   {
+    "de": "rodizio_ponteiro",
+    "para": "lojas",
+    "coluna": "loja_id",
+    "cardinalidade": "1:1",
+    "opcional": false,
+    "arquivo": "app/models_db.py",
+    "linha": 175
+   },
+   {
+    "de": "whatsapp_canais",
+    "para": "lojas",
+    "coluna": "loja_id",
+    "cardinalidade": "n:1",
+    "opcional": false,
+    "arquivo": "app/models_db.py",
+    "linha": 56
+   }
+  ],
+  "portal-gestao": [
+   {
+    "de": "campanha_gastos",
+    "para": "campanhas",
+    "coluna": "campanha_id",
+    "cardinalidade": "n:1",
+    "opcional": false,
+    "arquivo": "app/models.py",
+    "linha": 518
+   },
+   {
+    "de": "convites_acesso_loja",
+    "para": "usuarios",
+    "coluna": "usuario_id",
+    "cardinalidade": "n:1",
+    "opcional": false,
+    "arquivo": "app/models.py",
+    "linha": 63
+   },
+   {
+    "de": "copiloto_sinal_visto",
+    "para": "copiloto_sinal",
+    "coluna": "sinal_id",
+    "cardinalidade": "n:1",
+    "opcional": false,
+    "arquivo": "app/models.py",
+    "linha": 683
+   },
+   {
+    "de": "copiloto_turno",
+    "para": "copiloto_conversa",
+    "coluna": "conversa_id",
+    "cardinalidade": "n:1",
+    "opcional": false,
+    "arquivo": "app/models.py",
+    "linha": 744
+   },
+   {
+    "de": "despesa_fixa_ajuste",
+    "para": "despesa_fixa_loja",
+    "coluna": "despesa_id",
+    "cardinalidade": "n:1",
+    "opcional": false,
+    "arquivo": "app/models.py",
+    "linha": 199
+   },
+   {
+    "de": "redefinicoes_senha",
+    "para": "usuarios",
+    "coluna": "usuario_id",
+    "cardinalidade": "n:1",
+    "opcional": false,
+    "arquivo": "app/models.py",
+    "linha": 80
+   },
+   {
+    "de": "venda_custos_diretos",
+    "para": "vendas",
+    "coluna": "venda_id",
+    "cardinalidade": "n:1",
+    "opcional": false,
+    "arquivo": "app/models.py",
+    "linha": 146
+   },
+   {
+    "de": "vinculo_loja_pessoa",
+    "para": "pessoa_revy_projetada",
+    "coluna": "pessoa_id",
+    "cardinalidade": "n:1",
+    "opcional": false,
+    "arquivo": "app/models.py",
+    "linha": 558
+   }
+  ],
+  "motor-simulacao": [
+   {
+    "de": "auditoria",
+    "para": "clientes_api",
+    "coluna": "cliente_id",
+    "cardinalidade": "n:1",
+    "opcional": false,
+    "arquivo": "app/models_db.py",
+    "linha": 120
+   },
+   {
+    "de": "cliente_operacional_projecao",
+    "para": "clientes_api",
+    "coluna": "cliente_id",
+    "cardinalidade": "1:1",
+    "opcional": false,
+    "arquivo": "app/models_db.py",
+    "linha": 50
+   },
+   {
+    "de": "credenciais_api",
+    "para": "clientes_api",
+    "coluna": "cliente_id",
+    "cardinalidade": "n:1",
+    "opcional": false,
+    "arquivo": "app/models_db.py",
+    "linha": 66
+   },
+   {
+    "de": "credenciais_provedor",
+    "para": "clientes_api",
+    "coluna": "cliente_id",
+    "cardinalidade": "n:1",
+    "opcional": false,
+    "arquivo": "app/models_db.py",
+    "linha": 90
+   },
+   {
+    "de": "idempotencia",
+    "para": "clientes_api",
+    "coluna": "cliente_id",
+    "cardinalidade": "1:1",
+    "opcional": false,
+    "arquivo": "app/models_db.py",
+    "linha": 318
+   },
+   {
+    "de": "idempotencia",
+    "para": "simulacoes",
+    "coluna": "simulacao_id",
+    "cardinalidade": "n:1",
+    "opcional": false,
+    "arquivo": "app/models_db.py",
+    "linha": 323
+   },
+   {
+    "de": "simulacao_eventos",
+    "para": "simulacoes",
+    "coluna": "simulacao_id",
+    "cardinalidade": "n:1",
+    "opcional": false,
+    "arquivo": "app/models_db.py",
+    "linha": 229
+   },
+   {
+    "de": "simulacao_provedores",
+    "para": "clientes_api",
+    "coluna": "cliente_id",
+    "cardinalidade": "n:1",
+    "opcional": false,
+    "arquivo": "app/models_db.py",
+    "linha": 258
+   },
+   {
+    "de": "simulacao_provedores",
+    "para": "simulacoes",
+    "coluna": "simulacao_id",
+    "cardinalidade": "n:1",
+    "opcional": false,
+    "arquivo": "app/models_db.py",
+    "linha": 255
+   },
+   {
+    "de": "simulacao_resultados",
+    "para": "simulacoes",
+    "coluna": "simulacao_id",
+    "cardinalidade": "n:1",
+    "opcional": false,
+    "arquivo": "app/models_db.py",
+    "linha": 191
+   },
+   {
+    "de": "simulacao_tentativas",
+    "para": "simulacoes",
+    "coluna": "simulacao_id",
+    "cardinalidade": "n:1",
+    "opcional": false,
+    "arquivo": "app/models_db.py",
+    "linha": 212
+   },
+   {
+    "de": "simulacoes",
+    "para": "clientes_api",
+    "coluna": "cliente_id",
+    "cardinalidade": "n:1",
+    "opcional": false,
+    "arquivo": "app/models_db.py",
+    "linha": 133
+   }
+  ],
+  "estoque-api": [
+   {
+    "de": "auditoria",
+    "para": "lojas",
+    "coluna": "loja_id",
+    "cardinalidade": "n:1",
+    "opcional": false,
+    "arquivo": "app/models_db.py",
+    "linha": 241
+   },
+   {
+    "de": "credenciais_servico",
+    "para": "lojas",
+    "coluna": "loja_id",
+    "cardinalidade": "n:1",
+    "opcional": false,
+    "arquivo": "app/models_db.py",
+    "linha": 50
+   },
+   {
+    "de": "entregas_evento",
+    "para": "eventos_saida",
+    "coluna": "evento_id",
+    "cardinalidade": "n:1",
+    "opcional": false,
+    "arquivo": "app/models_db.py",
+    "linha": 225
+   },
+   {
+    "de": "entregas_evento",
+    "para": "lojas",
+    "coluna": "loja_id",
+    "cardinalidade": "n:1",
+    "opcional": false,
+    "arquivo": "app/models_db.py",
+    "linha": 228
+   },
+   {
+    "de": "eventos_saida",
+    "para": "lojas",
+    "coluna": "loja_id",
+    "cardinalidade": "n:1",
+    "opcional": false,
+    "arquivo": "app/models_db.py",
+    "linha": 191
+   },
+   {
+    "de": "idempotencias_criacao_veiculo",
+    "para": "lojas",
+    "coluna": "loja_id",
+    "cardinalidade": "n:1",
+    "opcional": false,
+    "arquivo": "app/models_db.py",
+    "linha": 152
+   },
+   {
+    "de": "idempotencias_criacao_veiculo",
+    "para": "veiculos",
+    "coluna": "veiculo_id",
+    "cardinalidade": "n:1",
+    "opcional": false,
+    "arquivo": "app/models_db.py",
+    "linha": 157
+   },
+   {
+    "de": "importacoes",
+    "para": "lojas",
+    "coluna": "loja_id",
+    "cardinalidade": "n:1",
+    "opcional": false,
+    "arquivo": "app/models_db.py",
+    "linha": 177
+   },
+   {
+    "de": "loja_operacional_projecao",
+    "para": "lojas",
+    "coluna": "loja_id",
+    "cardinalidade": "1:1",
+    "opcional": false,
+    "arquivo": "app/models_db.py",
+    "linha": 34
+   },
+   {
+    "de": "usuarios_estoque",
+    "para": "lojas",
+    "coluna": "loja_id",
+    "cardinalidade": "n:1",
+    "opcional": false,
+    "arquivo": "app/models_db.py",
+    "linha": 59
+   },
+   {
+    "de": "veiculo_fotos",
+    "para": "lojas",
+    "coluna": "loja_id",
+    "cardinalidade": "n:1",
+    "opcional": false,
+    "arquivo": "app/models_db.py",
+    "linha": 120
+   },
+   {
+    "de": "veiculo_fotos",
+    "para": "veiculos",
+    "coluna": "veiculo_id",
+    "cardinalidade": "n:1",
+    "opcional": false,
+    "arquivo": "app/models_db.py",
+    "linha": 121
+   },
+   {
+    "de": "veiculos",
+    "para": "lojas",
+    "coluna": "loja_id",
+    "cardinalidade": "n:1",
+    "opcional": false,
+    "arquivo": "app/models_db.py",
+    "linha": 76
+   },
+   {
+    "de": "webhook_destinos",
+    "para": "lojas",
+    "coluna": "loja_id",
+    "cardinalidade": "1:1",
+    "opcional": false,
+    "arquivo": "app/models_db.py",
+    "linha": 209
+   }
+  ],
+  "revy-trafego": [
+   {
+    "de": "acessos_control",
+    "para": "gestores_revy",
+    "coluna": "gestor_legado_id",
+    "cardinalidade": "n:1",
+    "opcional": true,
+    "arquivo": "app/models.py",
+    "linha": 330
+   },
+   {
+    "de": "acessos_control",
+    "para": "pessoas",
+    "coluna": "pessoa_id",
+    "cardinalidade": "n:1",
+    "opcional": false,
+    "arquivo": "app/models.py",
+    "linha": 319
+   },
+   {
+    "de": "auditoria_eventos",
+    "para": "gestores_revy",
+    "coluna": "ator_gestor_id",
+    "cardinalidade": "n:1",
+    "opcional": true,
+    "arquivo": "app/models.py",
+    "linha": 487
+   },
+   {
+    "de": "auditoria_eventos",
+    "para": "lojas",
+    "coluna": "loja_id",
+    "cardinalidade": "n:1",
+    "opcional": true,
+    "arquivo": "app/models.py",
+    "linha": 484
+   },
+   {
+    "de": "campanha_anuncios",
+    "para": "campanhas",
+    "coluna": "campanha_id",
+    "cardinalidade": "n:1",
+    "opcional": false,
+    "arquivo": "app/models.py",
+    "linha": 699
+   },
+   {
+    "de": "campanha_gastos",
+    "para": "campanhas",
+    "coluna": "campanha_id",
+    "cardinalidade": "n:1",
+    "opcional": false,
+    "arquivo": "app/models.py",
+    "linha": 738
+   },
+   {
+    "de": "campanha_gastos",
+    "para": "lojas",
+    "coluna": "loja_id",
+    "cardinalidade": "n:1",
+    "opcional": true,
+    "arquivo": "app/models.py",
+    "linha": 740
+   },
+   {
+    "de": "campanhas",
+    "para": "lojas",
+    "coluna": "loja_id",
+    "cardinalidade": "n:1",
+    "opcional": true,
+    "arquivo": "app/models.py",
+    "linha": 662
+   },
+   {
+    "de": "cargos_loja",
+    "para": "lojas",
+    "coluna": "loja_id",
+    "cardinalidade": "n:1",
+    "opcional": false,
+    "arquivo": "app/models.py",
+    "linha": 262
+   },
+   {
+    "de": "cargos_loja",
+    "para": "pessoas",
+    "coluna": "pessoa_id",
+    "cardinalidade": "n:1",
+    "opcional": false,
+    "arquivo": "app/models.py",
+    "linha": 265
+   },
+   {
+    "de": "contratos_loja",
+    "para": "lojas",
+    "coluna": "loja_id",
+    "cardinalidade": "n:1",
+    "opcional": false,
+    "arquivo": "app/models.py",
+    "linha": 185
+   },
+   {
+    "de": "control_provisioning_outbox",
+    "para": "lojas",
+    "coluna": "loja_id",
+    "cardinalidade": "n:1",
+    "opcional": false,
+    "arquivo": "app/models.py",
+    "linha": 774
+   },
+   {
+    "de": "convites_acesso_control",
+    "para": "acessos_control",
+    "coluna": "acesso_id",
+    "cardinalidade": "n:1",
+    "opcional": false,
+    "arquivo": "app/models.py",
+    "linha": 362
+   },
+   {
+    "de": "convites_acesso_control",
+    "para": "gestores_revy",
+    "coluna": "criado_por_gestor_id",
+    "cardinalidade": "n:1",
+    "opcional": false,
+    "arquivo": "app/models.py",
+    "linha": 376
+   },
+   {
+    "de": "google_ads_accounts",
+    "para": "lojas",
+    "coluna": "loja_id",
+    "cardinalidade": "n:1",
+    "opcional": false,
+    "arquivo": "app/models.py",
+    "linha": 874
+   },
+   {
+    "de": "google_ads_campaign_daily",
+    "para": "lojas",
+    "coluna": "loja_id",
+    "cardinalidade": "n:1",
+    "opcional": false,
+    "arquivo": "app/models.py",
+    "linha": 928
+   },
+   {
+    "de": "google_ads_connections",
+    "para": "lojas",
+    "coluna": "loja_id",
+    "cardinalidade": "n:1",
+    "opcional": false,
+    "arquivo": "app/models.py",
+    "linha": 809
+   },
+   {
+    "de": "google_ads_conversion_bindings",
+    "para": "lojas",
+    "coluna": "loja_id",
+    "cardinalidade": "n:1",
+    "opcional": false,
+    "arquivo": "app/models.py",
+    "linha": 965
+   },
+   {
+    "de": "google_ads_conversion_outbox",
+    "para": "lojas",
+    "coluna": "loja_id",
+    "cardinalidade": "n:1",
+    "opcional": false,
+    "arquivo": "app/models.py",
+    "linha": 1007
+   },
+   {
+    "de": "google_ads_oauth_states",
+    "para": "gestores_revy",
+    "coluna": "actor_id",
+    "cardinalidade": "n:1",
+    "opcional": false,
+    "arquivo": "app/models.py",
+    "linha": 844
+   },
+   {
+    "de": "google_ads_oauth_states",
+    "para": "lojas",
+    "coluna": "loja_id",
+    "cardinalidade": "n:1",
+    "opcional": false,
+    "arquivo": "app/models.py",
+    "linha": 841
+   },
+   {
+    "de": "google_ads_upload_attempts",
+    "para": "google_ads_conversion_outbox",
+    "coluna": "outbox_id",
+    "cardinalidade": "n:1",
+    "opcional": false,
+    "arquivo": "app/models.py",
+    "linha": 1047
+   },
+   {
+    "de": "loja_modulos",
+    "para": "lojas",
+    "coluna": "loja_id",
+    "cardinalidade": "n:1",
+    "opcional": false,
+    "arquivo": "app/models.py",
+    "linha": 120
+   },
+   {
+    "de": "loja_modulos",
+    "para": "modulos_revy",
+    "coluna": "modulo_id",
+    "cardinalidade": "n:1",
+    "opcional": false,
+    "arquivo": "app/models.py",
+    "linha": 123
+   },
+   {
+    "de": "meta_ads_config",
+    "para": "lojas",
+    "coluna": "loja_id",
+    "cardinalidade": "n:1",
+    "opcional": true,
+    "arquivo": "app/models.py",
+    "linha": 584
+   },
+   {
+    "de": "meta_capi_outbox",
+    "para": "lojas",
+    "coluna": "loja_id",
+    "cardinalidade": "n:1",
+    "opcional": true,
+    "arquivo": "app/models.py",
+    "linha": 641
+   },
+   {
+    "de": "meta_pixel_config",
+    "para": "lojas",
+    "coluna": "loja_id",
+    "cardinalidade": "n:1",
+    "opcional": true,
+    "arquivo": "app/models.py",
+    "linha": 565
+   },
+   {
+    "de": "pixel_capi_auditoria",
+    "para": "lojas",
+    "coluna": "loja_id",
+    "cardinalidade": "n:1",
+    "opcional": true,
+    "arquivo": "app/models.py",
+    "linha": 604
+   },
+   {
+    "de": "readiness_alert_acceptances",
+    "para": "gestores_revy",
+    "coluna": "accepted_by",
+    "cardinalidade": "n:1",
+    "opcional": false,
+    "arquivo": "app/models.py",
+    "linha": 1087
+   },
+   {
+    "de": "readiness_alert_acceptances",
+    "para": "lojas",
+    "coluna": "loja_id",
+    "cardinalidade": "n:1",
+    "opcional": false,
+    "arquivo": "app/models.py",
+    "linha": 1083
+   },
+   {
+    "de": "recuperacoes_senha_control",
+    "para": "acessos_control",
+    "coluna": "acesso_id",
+    "cardinalidade": "n:1",
+    "opcional": false,
+    "arquivo": "app/models.py",
+    "linha": 407
+   },
+   {
+    "de": "recuperacoes_senha_control",
+    "para": "gestores_revy",
+    "coluna": "criado_por_gestor_id",
+    "cardinalidade": "n:1",
+    "opcional": false,
+    "arquivo": "app/models.py",
+    "linha": 421
+   },
+   {
+    "de": "vendas_projetadas",
+    "para": "lojas",
+    "coluna": "loja_id",
+    "cardinalidade": "n:1",
+    "opcional": true,
+    "arquivo": "app/models.py",
+    "linha": 528
+   },
+   {
+    "de": "vinculos_trafego",
+    "para": "gestores_revy",
+    "coluna": "gestor_id",
+    "cardinalidade": "n:1",
+    "opcional": false,
+    "arquivo": "app/models.py",
+    "linha": 464
+   },
+   {
+    "de": "vinculos_trafego",
+    "para": "lojas",
+    "coluna": "loja_id",
+    "cardinalidade": "n:1",
+    "opcional": false,
+    "arquivo": "app/models.py",
+    "linha": 461
+   }
+  ],
+  "catalogo-publico": []
  }
 }

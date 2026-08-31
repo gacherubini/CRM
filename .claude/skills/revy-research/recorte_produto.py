@@ -39,28 +39,36 @@ from pathlib import Path
 import arq_modelo, arq_layout, arquitetura, gerar_arquitetura
 
 alvo = sys.argv[1]
+vista = sys.argv[2] if len(sys.argv) > 2 else "arquitetura"
 frescor = json.loads(gerar_arquitetura.FRESCOR.read_text(encoding="utf-8"))
 completo = arq_modelo.carregar(
     Path("../../.."), frescor, arquitetura.NOS,
     arquitetura.ARESTAS + arquitetura.ARESTAS_INTERNAS,
     arquitetura.VMS, arquitetura.FLUXOS, arquitetura.BANCOS)
-arq = arq_modelo.filtrar(completo, arquitetura.SECOES_ARQUITETURA,
-                         manter_manuais=True)
-cena = arq_layout.dispor(arq, arq.vms)
+if vista == "schema":
+    m = arq_modelo.como_mapa_conceitual(
+        arq_modelo.filtrar(completo, arquitetura.SECOES_SCHEMA),
+        frescor.get("relacoes", {}))
+else:
+    m = arq_modelo.agrupar_flags(arq_modelo.filtrar(
+        completo, arquitetura.SECOES_ARQUITETURA, manter_manuais=True))
+cena = arq_layout.dispor(m, m.vms, arquitetura.POSICOES)
 caixa = next(c for c in cena.caixas if c.chave.endswith(alvo))
 m = 4
 vb = f"{caixa.x-m} {caixa.y-m} {caixa.w+2*m} {caixa.h+2*m}"
 
 doc = open("arquitetura.html", encoding="utf-8").read()
-i = doc.index('<svg id="mapa-arquitetura"')
+i = doc.index(f'<svg id="mapa-{vista}"')
 j = doc.index("</svg>", i) + 6
 svg = doc[i:j]
+# na pagina a vista inativa sai com `hidden`; no recorte ela E a vista
+svg = svg.replace(" hidden>", ">", 1)
 svg = re.sub(r'viewBox="[^"]*"', f'viewBox="{vb}"', svg, count=1)
 svg = svg.replace("data-k-min", "x-k-min").replace("data-face-ate", "x-face-ate")
-svg = svg.replace('<svg id="mapa-arquitetura"',
-                  '<svg id="mapa-arquitetura" width="1360" height="820"', 1)
+svg = svg.replace(f'<svg id="mapa-{vista}"',
+                  f'<svg id="mapa-{vista}" width="1360" height="820"', 1)
 est = doc[doc.index("<style>"):doc.index("</style>") + 8]
-open(f"recorte-{alvo}.html", "w", encoding="utf-8").write(
+open(f"recorte-{vista}-{alvo}.html", "w", encoding="utf-8").write(
     "<!doctype html><meta charset=utf-8>" + est +
     "<body style='margin:0;background:#fff'>" + svg + "</body>")
-print(f"recorte-{alvo}.html  viewBox={vb}")
+print(f"recorte-{vista}-{alvo}.html  viewBox={vb}")

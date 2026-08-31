@@ -645,8 +645,28 @@ class TestDuasVistasNoHtml(unittest.TestCase):
         self.assertIn('id="mapa-arquitetura"', self.html)
         self.assertIn('id="mapa-schema"', self.html)
 
-    def test_svg_da_schema_nao_tem_aresta(self):
-        self.assertNotIn("data-aresta", self._svg("schema"))
+    def test_a_schema_tem_aresta_de_chave_estrangeira(self):
+        """Isto ja foi o contrario, e a troca foi pedido do dono (31/08).
+
+        A regra antiga era "Schema nao tem aresta", e ela vinha de uma boa
+        razao: FLUXO e' caminho de execucao, nao relacao de dado, e as setas
+        da Arquitetura nao querem dizer nada sobre um schema. Ela continua
+        valendo pra AQUELAS setas — `fluxos` segue zerado aqui.
+
+        O que mudou e' que a Schema ganhou setas PROPRIAS: uma por chave
+        estrangeira, rotulada com a cardinalidade. Um mapa de banco sem elas
+        e' uma lista de tabelas.
+        """
+        svg = self._svg("schema")
+        self.assertIn("data-aresta", svg)
+        # O rotulo E' a cardinalidade — e' ele que faz a seta valer.
+        self.assertIn(">n:1<", svg)
+        self.assertIn(">1:1<", svg)
+
+    def test_a_schema_nao_tem_fluxo(self):
+        # A metade da regra antiga que continua de pe: fluxo e' caminho de
+        # execucao, e nao se pergunta isso a um schema.
+        self.assertNotIn('id="fluxos-schema"', self.html)
 
     def test_catalogo_publico_so_aparece_na_arquitetura(self):
         self.assertIn("catalogo-publico", self._svg("arquitetura"))

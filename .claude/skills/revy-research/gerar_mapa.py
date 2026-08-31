@@ -303,13 +303,34 @@ def mexeu_em_fonte_do_mapa(arquivos) -> bool:
     return False
 
 
+def coletar_relacoes(raiz: Path, produto: str) -> list:
+    """As chaves estrangeiras do produto, com a cardinalidade ja lida.
+
+    Separado de `coletar` porque o produto delas nao e' `Entrada`: uma relacao
+    liga duas tabelas, e `Entrada` descreve um lugar so.
+    """
+    base = raiz / produto
+    achadas: list = []
+    for caminho in varredura.arquivos_py(raiz, produto):
+        rel = caminho.relative_to(base).as_posix()
+        texto = caminho.read_text(encoding="utf-8", errors="replace")
+        achadas.extend(extratores.relacoes(texto, rel))
+    return sorted(achadas, key=lambda r: (r.de, r.para, r.coluna))
+
+
 def escrever_tudo(raiz: Path) -> None:
     PASTA_MAPA.mkdir(parents=True, exist_ok=True)
     sha = sha_atual(raiz)
     inventario: dict[str, list[dict]] = {}
+    # Task 14: as arestas do mapa conceitual de banco. Chave propria, e nao
+    # mais uma secao do inventario, porque `Entrada` descreve UM lugar no
+    # codigo e uma relacao liga DOIS — enfiar isso em `Entrada` obrigaria a
+    # inventar campo que so uma secao usa.
+    relacoes: dict[str, list[dict]] = {}
     rotas_por_produto: dict[str, set[str]] = {}
     for produto in varredura.PRODUTOS:
         entradas = coletar(raiz, produto)
+        relacoes[produto] = [asdict(r) for r in coletar_relacoes(raiz, produto)]
         head = head_de(raiz, produto)
         (PASTA_MAPA / f"{produto}.md").write_text(
             render(produto, entradas, head, sha), encoding="utf-8"
@@ -326,7 +347,8 @@ def escrever_tudo(raiz: Path) -> None:
     )
     print(f"cruzamentos: {sum(len(v) for v in rotas_por_produto.values())} rotas declaradas")
     (PASTA_MAPA / "_frescor.json").write_text(
-        json.dumps({"sha": sha, "inventario": inventario}, ensure_ascii=False, indent=1),
+        json.dumps({"sha": sha, "inventario": inventario, "relacoes": relacoes},
+                   ensure_ascii=False, indent=1),
         encoding="utf-8",
     )
     print(f"selo de frescor: {sha}")
