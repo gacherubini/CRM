@@ -1212,3 +1212,59 @@ class TestPosicoesAMao(unittest.TestCase):
             for eixo in ("data-x", "data-y", "data-w", "data-h"):
                 self.assertIn(eixo, atributos, chave)
             self.assertIn(chave, textos, f"{chave} nao tem camada de texto pareada")
+
+
+class TestProvaCabeNaCaixa(unittest.TestCase):
+    """O `termo` de um componente e' a PROVA de que ele existe (arquivo:linha).
+
+    `arq_render._face` corta o subtitulo que nao cabe na largura e poe "…" —
+    e o que sobra de fora e' justamente o final, onde mora o arquivo:linha.
+    Um termo comprido nao da erro, nao aparece no console e nao quebra teste
+    nenhum: ele so apaga a prova em silencio. Aconteceu em seis dos nove
+    componentes do Estoque na primeira escrita.
+
+    O orcamento e' de ~59 caracteres na caixa de um componente. Isso e' uma
+    disciplina, nao uma limitacao: termo de componente e' uma afirmacao curta
+    com o arquivo:linha no fim, nao uma frase.
+
+    Vale so pros componentes ESCRITOS A MAO. Nota de VM e subtitulo de
+    produto tem outro orcamento (a nota de VM usa 34% da largura de
+    proposito, pra nao atravessar por cima dos produtos) e alguns ja nascem
+    cortados — nao e' o que este teste guarda.
+    """
+
+    def test_todo_termo_de_componente_cabe_sem_reticencia(self):
+        raiz = varredura.raiz_repo()
+        frescor_path = Path(__file__).resolve().parent / "mapa" / "_frescor.json"
+        frescor = json.loads(frescor_path.read_text(encoding="utf-8"))
+        completo = arq_modelo.carregar(
+            raiz, frescor, arquitetura.NOS,
+            list(arquitetura.ARESTAS) + list(arquitetura.ARESTAS_INTERNAS),
+            arquitetura.VMS, arquitetura.FLUXOS, arquitetura.BANCOS)
+        arq = arq_modelo.filtrar(completo, arquitetura.SECOES_ARQUITETURA,
+                                 manter_manuais=True)
+        cena = arq_layout.dispor(arq, arq.vms, arquitetura.POSICOES)
+
+        # Produtos que ja tem a camada de componente escrita a mao. Ao
+        # escrever a de um produto novo, acrescente-o aqui — e o teste passa a
+        # cobrir os termos dele.
+        com_componente = ("chatbot-api", "estoque-api")
+
+        cortados = []
+        for c in cena.caixas:
+            if c.tipo != "no" or not c.subtitulo:
+                continue
+            # so componente: tem que estar DENTRO de um dos produtos acima
+            if not any(f".{p}." in c.chave for p in com_componente):
+                continue
+            fonte_titulo = arq_render._fonte_titulo(c)
+            fonte_sub = round(max(1.2, fonte_titulo * 0.55), 1)
+            # A mesma conta de `arq_render._face`; se ela mudar la, muda aqui.
+            cabe = max(0, int((c.w - fonte_titulo * 1.2) / (fonte_sub * 0.52)))
+            if len(c.subtitulo) > cabe:
+                cortados.append(f"{c.chave}: {len(c.subtitulo)} caracteres, "
+                                f"cabem {cabe} — '{c.subtitulo}'")
+        self.assertEqual(
+            cortados, [],
+            "termo cortado esconde o arquivo:linha que prova o componente:\n  "
+            + "\n  ".join(cortados))

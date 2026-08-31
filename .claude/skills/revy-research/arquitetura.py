@@ -244,8 +244,7 @@ NOS: dict[str, dict] = {
                                  "modulo": "app/followup_job.py"},
                     "notificacoes-outbox": {"titulo": "Drenador do outbox",
                                              "papel": "worker",
-                                             "termo": "reprocessa alerta pending/failed "
-                                                      "(notificacoes_outbox_job.py:71)",
+                                             "termo": "reprocessa alerta pending/failed (linha 71)",
                                              "modulo": "app/notificacoes_outbox_job.py"},
                     "cloud-retry": {"titulo": "Retomada do inbound Cloud",
                                     "papel": "worker",
@@ -286,17 +285,98 @@ NOS: dict[str, dict] = {
         "titulo": "Estoque API",
         "papel": "veiculos",
         "vm": "app2037",
-        "termo": "fonte unica de verdade dos veiculos",
+        "termo": "fonte única de verdade dos veículos",
+        # Camada de componente escrita a mao (30/08), no mesmo molde do
+        # Chatbot. Antes daqui as caixas eram PASTA (`app/admin`), nao
+        # responsabilidade, e nao havia aresta interna nenhuma: entrar no
+        # produto mostrava arvore de arquivo.
+        #
+        # Cada caixa saiu da tabela "Onde editar" do README do produto e foi
+        # conferida no codigo — o `termo` traz o `arquivo:linha` que prova.
+        # As arestas sairam de IMPORT REAL (quem importa quem, e quantas
+        # vezes usa), nao de intuicao.
+        #
+        # Sem grupo, de proposito: nenhum conjunto destes nove diz algo que a
+        # caixa sozinha nao diga. `outbox` + `worker` chegou a ser candidato,
+        # mas o worker faz duas coisas (entrega o outbox E roda a limpeza de
+        # midia), entao a gaveta mentiria.
         "dentro": {
-            "midia": {"titulo": "Mídia", "papel": "veiculos", "modulo": "app/media.py"},
-            "outbox": {"titulo": "Outbox (vehicle.*)", "papel": "fundo",
-                       "modulo": "app/outbox.py"},
-            "worker": {"titulo": "Worker de entrega/limpeza", "papel": "fundo",
-                       "modulo": "app/worker.py"},
-            "provisioning": {"titulo": "Projeção do Control", "papel": "estrutura",
-                              "modulo": "app/provisioning.py"},
-            "admin": {"titulo": "Admin HTMX", "papel": "operacao",
-                      "modulo": "app/admin"},
+            "borda": {
+                "titulo": "Borda HTTP",
+                "papel": "veiculos",
+                # O corte publico e' de borda, nao de dominio: `/public/v1`
+                # escapa do rate limit privado (main.py:48) e `_pode_ver_custo`
+                # (main.py:139) decide se o custo sai. Custo fora da API
+                # publica e' armadilha declarada no README.
+                "termo": "/v1 privada, /public/v1 sem custo, health (main.py:48,139)",
+                "modulo": "app/main.py",
+            },
+            "veiculos": {
+                "titulo": "Veículos, publicação e CSV",
+                "papel": "veiculos",
+                # O dominio inteiro num modulo so. Reservar (535) e vender
+                # (558) sao transicoes de estado que geram evento; a
+                # importacao CSV adivinha o delimitador (773).
+                "termo": "cadastro, publicação, venda, CSV (servico.py:535,558,773)",
+                "modulo": "app/servico.py",
+            },
+            "midia": {
+                "titulo": "Mídia",
+                "papel": "veiculos",
+                # O banco guarda so URL e metadado — nunca base64 nem path
+                # local (README). A limpeza de orfas falha FECHADO: sem
+                # ESTOQUE_MEDIA_PUBLIC_BASE_URL nao remove arquivo nenhum.
+                "termo": "assinatura, escrita atômica, órfãs (media.py:35,87,180)",
+                "modulo": "app/media.py",
+            },
+            "outbox": {
+                "titulo": "Outbox (vehicle.*)",
+                "papel": "fundo",
+                # Entrega NAO e' garantida para sempre: descarta apos 5
+                # tentativas (outbox.py:19). O receptor precisa validar o HMAC
+                # e deduplicar por X-Evento-Id.
+                "termo": "HMAC, backoff, desiste em 5 (outbox.py:19,27,83)",
+                "modulo": "app/outbox.py",
+            },
+            "worker": {
+                "titulo": "Worker de entrega e limpeza",
+                "papel": "fundo",
+                # Duas tarefas no mesmo laco. A limpeza periodica nunca
+                # propaga a propria falha (worker.py:37) — derrubar a entrega
+                # do outbox por causa de uma varredura de arquivo seria pior.
+                "termo": "entrega o outbox e limpa mídia (worker.py:21,37)",
+                "modulo": "app/worker.py",
+            },
+            "credenciais": {
+                "titulo": "Credenciais e papéis",
+                "papel": "estrutura",
+                # auth.py e cripto.py nao tem prefixo comum, entao `modulo`
+                # aponta so o primeiro e o termo carrega o outro. Quem cifra o
+                # segredo do webhook e' `cripto.cifrar` (cripto.py:20); quem
+                # decifra na hora de assinar e' o outbox.
+                "termo": "token e papel (auth.py:16); cifra (cripto.py:20)",
+                "modulo": "app/auth.py",
+            },
+            "admin": {
+                "titulo": "Admin HTMX",
+                "papel": "operacao",
+                "termo": "painel de operação, sessão própria (admin.py:37,73)",
+                "modulo": "app/admin",
+            },
+            "provisionamento": {
+                "titulo": "Projeção do Control",
+                "papel": "estrutura",
+                # Mesmo padrao do Chatbot: gate de backend, fail-closed quando
+                # a projecao da loja nao existe (provisioning.py:30).
+                "termo": "gate de loja e módulo, fail-closed (provisioning.py:30)",
+                "modulo": "app/provisioning.py",
+            },
+            "cli": {
+                "titulo": "Comandos de operação",
+                "papel": "operacao",
+                "termo": "criar-loja, credencial, webhook, limpar-mídias (cli.py:11)",
+                "modulo": "app/cli.py",
+            },
         },
     },
     "portal-gestao": {
@@ -525,6 +605,46 @@ ARESTAS_INTERNAS: list[dict] = [
     {"de": "chatbot-api.conversa", "para": "chatbot-api.saida",
      "protocolo": "chamada", "sincrono": True, "retry": False},
 ]
+# --- Estoque API (30/08) -----------------------------------------------
+# Derivadas de IMPORT REAL, nao de intuicao: `main` importa e usa `servico`
+# 40 vezes, `media` 7, `provisioning` 3; `servico` usa `media` 4; `admin` usa
+# `servico` 11; `cli`, 5. Onde o import nao conta a historia toda, o
+# comentario diz por que.
+ARESTAS_ESTOQUE = [
+    {"de": "estoque-api.borda", "para": "estoque-api.veiculos",
+     "protocolo": "chamada", "sincrono": True, "retry": True},
+    {"de": "estoque-api.borda", "para": "estoque-api.midia",
+     "protocolo": "chamada", "sincrono": True, "retry": True},
+    {"de": "estoque-api.borda", "para": "estoque-api.credenciais",
+     "protocolo": "chamada", "sincrono": True, "retry": True},
+    {"de": "estoque-api.borda", "para": "estoque-api.provisionamento",
+     "protocolo": "chamada", "sincrono": True, "retry": True},
+    {"de": "estoque-api.veiculos", "para": "estoque-api.midia",
+     "protocolo": "chamada", "sincrono": True, "retry": True},
+    # A UNICA assincrona daqui: o dominio nao chama o outbox, ele GRAVA na
+    # fila (`EventoSaida`, servico.py:61) e vai embora. Quem entrega e' o
+    # worker, depois, com backoff — e desiste em 5.
+    {"de": "estoque-api.veiculos", "para": "estoque-api.outbox",
+     "protocolo": "outbox", "sincrono": False, "retry": True},
+    {"de": "estoque-api.worker", "para": "estoque-api.outbox",
+     "protocolo": "chamada", "sincrono": True, "retry": True},
+    # A limpeza de midia passa pelo dominio (`servico.limpar_midias_orfas`,
+    # servico.py:639), nao direto no modulo de midia — por isso a seta vai
+    # para `veiculos` e nao para `midia`.
+    {"de": "estoque-api.worker", "para": "estoque-api.veiculos",
+     "protocolo": "chamada", "sincrono": True, "retry": True},
+    # O outbox precisa do segredo do webhook em claro pra assinar; quem
+    # decifra e' `cripto.decifrar` (outbox.py:16).
+    {"de": "estoque-api.outbox", "para": "estoque-api.credenciais",
+     "protocolo": "chamada", "sincrono": True, "retry": True},
+    {"de": "estoque-api.admin", "para": "estoque-api.veiculos",
+     "protocolo": "chamada", "sincrono": True, "retry": True},
+    {"de": "estoque-api.cli", "para": "estoque-api.veiculos",
+     "protocolo": "chamada", "sincrono": True, "retry": True},
+]
+
+ARESTAS_INTERNAS = ARESTAS_INTERNAS + ARESTAS_ESTOQUE
+
 
 VMS: dict[str, dict] = {
     "app2037": {
