@@ -1,7 +1,75 @@
 # Arestas internas legíveis
 
+**FEITO em 30/08** (commit `4e22376`). O que foi feito, o que ficou de fora e
+os números medidos estão em [Resultado](#resultado); o resto do card fica como
+registro do estado anterior. Quem pegar o próximo passo — replicar a fôrma de
+componentes nos outros cinco produtos — lê o Resultado e para.
+
 Card de handoff. Quem pegar isto **não** precisa ler a branch inteira nem o
 card grande da arquitetura viva — está tudo o que importa aqui.
+
+## Resultado
+
+O dono pediu para abrir no navegador antes de escolher, e escolheu 1+2+3.
+
+**A métrica do card estava inflada.** Ela contava 145 travessias, mas 60 delas
+eram a aresta cruzando a caixa do **próprio produto** — coisa que toda aresta
+interna faz por definição, porque ela vive dentro dele. Ancestral de ponta tem
+a mesma natureza (sair de dentro de `workers` obriga a cruzar a borda de
+`workers`). Excluindo os dois, o número honesto era **20 arestas, 16 sujas, 75
+travessias**. As pontas já estavam certas: 0 de 40 fora da borda — o defeito
+era só o caminho no meio.
+
+| | antes | depois |
+|---|---|---|
+| arestas internas | 20 | 20 |
+| que atravessam caixa alheia | 16 | 13 |
+| travessias | **75** | **43** |
+| arestas internas visíveis sem pedir | 20 | **0** |
+
+Não zerou, e o card pedia que se dissesse em quanto ficou: **43**. As 43 só
+aparecem quando alguém pede por elas (item 2), então o desenho parado tem
+zero seta interna.
+
+Três consertos, mais um achado no caminho:
+
+1. **Ordem por afinidade** (`arq_layout._ordem_por_afinidade`). O
+   empacotamento lia os irmãos em ordem alfabética, que não tem relação com
+   quem chama quem. Agora minimiza o arranjo linear ponderado por subida de
+   encosta. 75 → 43. **A semente óbvia piora**: começar pelo vizinho mais
+   próximo dá 52, porque põe a Borda HTTP (que fala com quase todos) no
+   começo da fila e a subida trava num ótimo local pior. Está medido na
+   docstring — não "melhore" de volta sem medir.
+2. **Aresta interna sob demanda.** Nasce apagada pelo CSS (`[data-interna]`),
+   acende sob o mouse só as que tocam aquele componente. O renderer escreve
+   `data-de`/`data-para` com o id **absoluto** para o JS testar linhagem por
+   prefixo; `data-aresta` fica só na polyline, porque o valor dele carrega um
+   `>` literal que quebra o regex de dois testes.
+3. **Aresta entre produtos apaga quando só atravessa.** Estando dentro de um
+   nó, uma aresta que não toca a linhagem dele cai para 0.10. A linha vermelha
+   Loja→Motor cortando o Chatbot aberto não dizia nada sobre o Chatbot.
+4. **De brinde:** quatro dos 81 títulos transbordavam por cima da caixa
+   vizinha ("Clientes HTTP de outros produtos" em cima de "Projeção do
+   Control"). O teto de fonte passou a olhar o comprimento — e a **truncar**,
+   porque `round(8.26, 1)` dá 8.3 e reintroduzia o estouro em dois deles.
+
+**A métrica virou teste** (`TestArestasInternasLegiveis`, teto 43, 74 no
+total). Sabotar a ordenação devolve 75 e ele falha — verificado.
+
+Verificado no navegador (não só nos testes): hover na Borda HTTP acende as 11
+pontas dela e só elas; sair apaga as 11; entrar no Chatbot apaga as 12 arestas
+entre produtos que não o tocam e mantém as 4 que tocam.
+
+**Armadilha nova, que custou uma investigação errada:** `getComputedStyle(el).opacity`
+lido logo depois de mexer na opacidade devolve o valor **no meio da transição**
+(a folha tem `transition:opacity .15s`), não o final — mediu 0 onde já havia
+"1". Leia o atributo `style` inline, ou corte a transição, quando for verificar
+opacidade por script.
+
+**O que NÃO foi feito:** a saída A (roteamento com desvio de obstáculo)
+continua sem fazer, de propósito — 43 travessias escondidas atrás do hover não
+justificam meio dia e o risco de `--verificar` passar a falhar sozinho.
+Podar arestas também não foi feito; as 20 continuam declaradas.
 
 ## Objetivo
 
