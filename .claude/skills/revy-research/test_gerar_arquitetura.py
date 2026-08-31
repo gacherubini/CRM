@@ -1026,80 +1026,111 @@ if __name__ == "__main__":
     unittest.main()
 
 
-class TestOrdemDoFluxo(unittest.TestCase):
-    """O que faz o interior do Chatbot ser legivel e a ordem dos estagios.
+class TestArestasInternasLegiveis(unittest.TestCase):
+    """Quantas setas internas passam por cima de caixa que nao tem nada a ver
+    com elas. E' a metrica do card `2026-08-30-arestas-internas-legiveis.md`.
 
-    Este teste substituiu a metrica de travessias que o card
-    `2026-08-30-arestas-internas-legiveis.md` propunha, e vale registrar por
-    que — o candidato obvio era ela, e ela PAROU DE MEDIR LEGIBILIDADE.
+    Cuidado com a definicao, que o card original errava: contar TODA caixa
+    atravessada dava 145, mas 60 dessas eram a caixa do proprio produto, que
+    toda aresta interna cruza por definicao. Ancestral de ponta tem a mesma
+    natureza — sair de dentro de `workers` obriga a cruzar a borda de
+    `workers`. So conta caixa que a aresta atravessa sem ter relacao com ela.
 
-    Enquanto os componentes eram irmaos soltos, "quantas setas cortam caixa
-    alheia" era um bom proxy: 75 na ordem alfabetica, 43 ordenando por
-    afinidade. Depois do reagrupamento por estagio (entra/decide/sai) ela
-    inverteu de sinal. A ordem LEGIVEL poe `decide` no meio, entao toda seta
-    de `entra` para `sai` atravessa a caixa de `decide` — e essa travessia e'
-    o pipeline, nao confusao. Medido nas duas ordens, com o agrupamento novo:
+    Historia do numero, porque ela e' o motivo de este teste existir e quase
+    ter sido jogado fora:
 
-        ordem alfabetica (config, decide, entra, sai)   37 travessias
-        ordem do fluxo  (entra, decide, sai, config)    57 travessias
+        75  ordem alfabetica, componentes soltos
+        43  ordem por afinidade, componentes soltos
+        --- reagrupamento por estagio (entra/decide/sai), depois RECUSADO ---
+        57  ordem do fluxo          37  ordem alfabetica   <- metrica invertida
+        --- reagrupamento por grupo concreto, o que esta no ar ---
+        77  sem ordenacao           38  com ordenacao dirigida
 
-    So em caixa-folha, ignorando moldura de grupo, da 29 contra 37 — mesmo
-    sinal. Ou seja: a metrica premia o desenho que ninguem consegue ler.
-    Subir o teto ate o numero passar seria fraudar o teste; manter o teto
-    reprovaria o desenho certo. Entao ela sai, e entra o que de fato importa.
-
-    O que importa: aresta entre estagios tem que andar para FRENTE na fila.
-    Sobra uma que anda para tras (`decide.simulacao` grava no outbox que o
-    worker de `entra` drena) e ela e' real — o produto tem esse retorno.
+    Durante a fase dos estagios a metrica PREMIAVA o desenho ilegivel (a
+    ordem certa poe um estagio no meio, e cruza-lo e' o pipeline, nao
+    confusao), e o teste foi retirado por isso. Com os grupos concretos ela
+    voltou a discriminar na direcao certa — 77 contra 38 — entao voltou.
+    Se o agrupamento mudar de eixo outra vez, conferir isto ANTES de mexer
+    no teto: teto ajustado ate passar nao e' teste, e' enfeite.
     """
 
-    def _ordem_dos_estagios(self):
-        # `sorted`, nao a ordem do dicionario: `arq_modelo._no_de` monta os
-        # filhos com `for subchave in sorted(dentro)` (arq_modelo.py:166),
-        # entao e' alfabetica que a ordenacao recebe de verdade. Alimentar o
-        # teste com a ordem em que o dict foi escrito no arquivo tornava tudo
-        # isto vacuoso — a resposta certa ja entrava pronta, e sabotar
-        # `_ordem_por_afinidade` continuava passando.
-        estagios = sorted(arquitetura.NOS["chatbot-api"]["dentro"])
-        caminhos = ["chatbot-api." + e for e in estagios]
-        arestas = [(a["de"], a["para"]) for a in arquitetura.ARESTAS_INTERNAS]
-        indices = arq_layout._ordem_por_afinidade(caminhos, arestas)
-        return [estagios[i] for i in indices]
+    LIMITE = 38
 
-    def _arestas_para_tras(self, ordem):
-        posicao = {e: i for i, e in enumerate(ordem)}
-        def estagio(ponta):
-            return ponta.split(".")[1]
-        tras = []
-        for a in arquitetura.ARESTAS_INTERNAS:
-            de, para = estagio(a["de"]), estagio(a["para"])
-            if de == para:
+    def setUp(self):
+        self.raiz = varredura.raiz_repo()
+        frescor_path = Path(__file__).resolve().parent / "mapa" / "_frescor.json"
+        frescor = json.loads(frescor_path.read_text(encoding="utf-8"))
+        completo = arq_modelo.carregar(
+            self.raiz, frescor, arquitetura.NOS,
+            list(arquitetura.ARESTAS) + list(arquitetura.ARESTAS_INTERNAS),
+            arquitetura.VMS, arquitetura.FLUXOS, arquitetura.BANCOS)
+        self.arq = arq_modelo.filtrar(
+            completo, arquitetura.SECOES_ARQUITETURA, manter_manuais=True)
+        self.cena = arq_layout.dispor(self.arq, self.arq.vms, arquitetura.POSICOES)
+        html_gerado = gerar_arquitetura.montar(self.raiz)
+        inicio = html_gerado.index('<svg id="mapa-arquitetura"')
+        self.svg = html_gerado[inicio:html_gerado.index("</svg>", inicio)]
+
+    @staticmethod
+    def _cruza(segmento, caixa):
+        """Segmento ortogonal contra retangulo. `_pontos_da_aresta` so produz
+        horizontal ou vertical (ver test_2_toda_aresta_e_polyline_ortogonal),
+        entao os dois casos cobrem tudo — nada de diagonal pra tratar."""
+        (x1, y1), (x2, y2) = segmento
+        if abs(y1 - y2) < 0.01:
+            return (caixa.y < y1 < caixa.y + caixa.h) and not (
+                max(x1, x2) <= caixa.x or min(x1, x2) >= caixa.x + caixa.w)
+        if abs(x1 - x2) < 0.01:
+            return (caixa.x < x1 < caixa.x + caixa.w) and not (
+                max(y1, y2) <= caixa.y or min(y1, y2) >= caixa.y + caixa.h)
+        return False
+
+    def _travessias(self):
+        por_chave = {c.chave: c for c in self.cena.caixas}
+
+        def caixa_de(chave):
+            if chave in por_chave:
+                return por_chave[chave]
+            achados = sorted(k for k in por_chave if k.endswith("." + chave))
+            return por_chave[achados[0]] if achados else None
+
+        internas = {f'{a["de"]}->{a["para"]}' for a in arquitetura.ARESTAS_INTERNAS}
+        total = 0
+        for marca, pontos_txt in re.findall(
+                r'<polyline data-aresta="([^"]+)" points="([^"]+)"', self.svg):
+            if marca not in internas:
                 continue
-            if posicao[para] < posicao[de]:
-                tras.append(f'{a["de"]} -> {a["para"]}')
-        return tras
+            de, _, para = marca.partition("->")
+            c_de, c_para = caixa_de(de), caixa_de(para)
+            self.assertIsNotNone(c_de, marca)
+            self.assertIsNotNone(c_para, marca)
+            pontos = [tuple(float(v) for v in par.split(","))
+                      for par in pontos_txt.split()]
+            for segmento in zip(pontos, pontos[1:]):
+                for caixa in self.cena.caixas:
+                    if caixa.tipo == "item":
+                        continue
+                    if caixa.chave in (c_de.chave, c_para.chave):
+                        continue
+                    if (c_de.chave.startswith(caixa.chave + ".")
+                            or c_para.chave.startswith(caixa.chave + ".")):
+                        continue   # ancestral de ponta: cruzar e' obrigatorio
+                    if not caixa.chave.startswith("app2037.chatbot-api"):
+                        continue
+                    if self._cruza(segmento, caixa):
+                        total += 1
+        return total
 
-    def test_os_estagios_saem_na_ordem_do_fluxo(self):
-        # Nao e' lista cravada: a ordem sai de `_ordem_por_afinidade`, que le
-        # so as arestas. Se ela voltar a ignorar direcao, "sai" nasce antes de
-        # "entra" e a pagina passa a ser lida de tras para frente.
-        ordem = self._ordem_dos_estagios()
-        self.assertLess(ordem.index("entra"), ordem.index("decide"), ordem)
-        self.assertLess(ordem.index("decide"), ordem.index("sai"), ordem)
-
-    def test_so_uma_aresta_entre_estagios_anda_para_tras(self):
-        tras = self._arestas_para_tras(self._ordem_dos_estagios())
-        # O retorno real: a simulacao grava no outbox, o worker drena.
-        self.assertEqual(
-            tras, ["chatbot-api.decide.simulacao"
-                   " -> chatbot-api.entra.workers.notificacoes-outbox"], tras)
-
-    def test_a_ordem_alfabetica_seria_pior(self):
-        # Prova que o teste acima nao passa por sorte: sem ordenacao nenhuma,
-        # a ordem dos estagios e' alfabetica e seis arestas andam para tras.
-        alfabetica = sorted(arquitetura.NOS["chatbot-api"]["dentro"])
-        self.assertGreater(len(self._arestas_para_tras(alfabetica)), 1,
-                           "a ordenacao deixou de fazer diferenca")
+    def test_as_arestas_internas_nao_voltam_a_atravessar_o_produto(self):
+        atual = self._travessias()
+        self.assertGreater(atual, 0, "metrica quebrada: nao achou aresta interna")
+        self.assertLessEqual(
+            atual, self.LIMITE,
+            f"as arestas internas voltaram a cortar caixa alheia: {atual} "
+            f"travessias, teto {self.LIMITE}. Ver "
+            f"arq_layout._ordem_por_afinidade e PENA_DE_VOLTA — sem ordenacao "
+            f"este numero e' 77."
+        )
 
 
 class TestPosicoesAMao(unittest.TestCase):
@@ -1124,7 +1155,7 @@ class TestPosicoesAMao(unittest.TestCase):
 
     def test_posicao_a_mao_move_a_caixa_e_a_subarvore(self):
         base = {c.chave: c for c in arq_layout.dispor(self.arq, self.arq.vms).caixas}
-        alvo = "app2037.chatbot-api.decide"
+        alvo = "app2037.chatbot-api.workers"
         movida = arq_layout.dispor(self.arq, self.arq.vms, {alvo: (100.0, 50.0)})
 
         mexidas = [c.chave for c in movida.caixas
@@ -1143,7 +1174,7 @@ class TestPosicoesAMao(unittest.TestCase):
     def test_deslocamento_de_pai_e_filho_soma(self):
         # A mesma regra do `deslocamentoDe` em arq_zoom.js. Se as duas contas
         # divergirem, a pagina mostra uma coisa e o HTML gerado outra.
-        pai, filho = "app2037.chatbot-api", "app2037.chatbot-api.decide"
+        pai, filho = "app2037.chatbot-api", "app2037.chatbot-api.workers"
         base = {c.chave: c for c in arq_layout.dispor(self.arq, self.arq.vms).caixas}
         cena = arq_layout.dispor(self.arq, self.arq.vms,
                                  {pai: (10.0, 0.0), filho: (5.0, 0.0)})

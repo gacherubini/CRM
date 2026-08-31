@@ -32,10 +32,20 @@ from dataclasses import dataclass, replace
 from arq_modelo import Modelo, No, Vm
 
 # Quanto uma aresta que anda para TRAS na fila custa a mais que uma que anda
-# para frente (`_ordem_por_afinidade`). 3 foi o menor valor que poe os quatro
-# estagios do Chatbot em ordem de fluxo — com 1 (sem pena) a ordenacao so
-# olha proximidade e "Sai" pode nascer antes de "Entra".
-PENA_DE_VOLTA = 3
+# para frente (`_ordem_por_afinidade`).
+#
+# Medido contra o modelo real (travessias de caixa alheia no interior do
+# Chatbot, quanto menor melhor), depois do reagrupamento por grupo concreto:
+#
+#     1 (sem direcao)   63     3   45
+#     2                 38     5   45
+#                              8   45
+#
+# 1 e' claramente pior: sem pena a ordenacao so olha PROXIMIDADE, e nada
+# impede que a fila fique de tras para frente. Acima de 3 satura. O numero
+# saiu de medir, nao de gosto — se o modelo mudar bastante, meca de novo em
+# vez de confiar neste comentario.
+PENA_DE_VOLTA = 2
 
 MARGEM = 24.0
 ALTURA_TITULO = 34.0
