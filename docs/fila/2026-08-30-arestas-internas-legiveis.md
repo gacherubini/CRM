@@ -193,11 +193,12 @@ Saída: `arquitetura.html`, commitado, verificado por
   sem fluxo.
 - **Design** — os 35 tokens da marca, lidos de `revy-tokens.css` na geração.
 
-**A camada de componente (C4 nível 3)** existe só no `chatbot-api`: 10
-componentes e 20 arestas internas, cada um com `arquivo:linha` verificado no
-código. Os outros cinco produtos ainda mostram a árvore de arquivos. Replicar
-a fôrma neles é o passo seguinte — **e depende deste card fechar primeiro**,
-senão o problema das setas se multiplica por seis.
+**A camada de componente (C4 nível 3)** existe no `chatbot-api` (16 folhas em 4
+gavetas, 20 arestas) e no `estoque-api` (9 folhas, 11 arestas), cada caixa com
+`arquivo:linha` verificado no código. Os outros quatro — Catálogo, Motor,
+Control e Loja — ainda mostram a árvore de arquivos, e estão no card
+[Componentes dos quatro produtos](2026-08-30-componentes-dos-quatro-produtos.md),
+que já traz a receita e o ponto de partida de cada um.
 
 ## Invariantes
 
