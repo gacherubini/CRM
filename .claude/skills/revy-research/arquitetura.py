@@ -435,13 +435,97 @@ NOS: dict[str, dict] = {
         "titulo": "Catálogo Público",
         "papel": "vitrine",
         "vm": "app2037",
+        # A vitrine e' o produto mais fechado do monorepo, e isso e' desenho:
+        # ela consome SOMENTE o contrato HTTP publico da Estoque
+        # (`/public/v1`, provider.py:58) e guarda so os proprios eventos de
+        # interesse, em SQLite dela (events.py:39). Nao ha banco compartilhado,
+        # nao ha import de `app` alheio, e o dado do veiculo nao persiste aqui.
+        #
+        # Camada de componente escrita a mao (30/08). Antes daqui eram tres
+        # caixas-arquivo (`outbox`, `pixel`, `provider`) e nenhuma aresta: os
+        # 625 linhas do `main.py`, o SQLite de interesse e o gate do Control
+        # simplesmente nao apareciam.
+        #
+        # Sem grupo: nenhum conjunto destes sete diz algo que a caixa sozinha
+        # nao diga. `contratos` chegou a ser candidato a virar campo do
+        # `provider`, mas ele e' o formato que a Estoque PROMETE — quando o
+        # contrato muda, muda ali, e nao no cliente.
+        #
+        # Ficaram de fora por serem infraestrutura, nao responsabilidade:
+        # `app/config.py` (leitura de env) e `app/templates/` (Jinja, inclusive
+        # `templates/marca/`). Entram se alguem precisar de seta pra elas.
         "dentro": {
-            "outbox": {"titulo": "Outbox (interest_clicked)", "papel": "fundo",
-                       "modulo": "app/outbox.py"},
-            "pixel": {"titulo": "Pixel Meta (via Portal)", "papel": "integracao",
-                      "modulo": "app/pixel.py"},
-            "provider": {"titulo": "Cliente da Estoque API", "papel": "veiculos",
-                         "modulo": "app/provider.py"},
+            "borda": {
+                "titulo": "Vitrine HTTP",
+                "papel": "vitrine",
+                # A superficie inteira sao 3 telas publicas (:348 lista,
+                # :460 ficha, :525 interesse) mais health/version. O middleware
+                # de :105 poe CSP/nosniff/DENY em toda resposta, e o cookie
+                # anonimo `catalog_visitor` nasce aqui (visitor_id, :232) —
+                # nao ha login nesta vitrine.
+                "termo": "lista, ficha e CSP (main.py:105,348,460)",
+                "modulo": "app/main.py",
+            },
+            "interesse": {
+                "titulo": "Clique de interesse",
+                "papel": "vitrine",
+                # O clique e a linha da outbox entram na MESMA transacao
+                # (events.py:163 abre, :166 e :194 inserem): ou o interesse e'
+                # gravado com o evento pendente, ou nada foi gravado. O payload
+                # nao leva telefone nem o id anonimo do visitante — o que sai
+                # daqui pro cliente e' o `public_ref`, no texto do wa.me.
+                "termo": "clique e evento na mesma transação (events.py:163,194)",
+                "modulo": "app/events.py",
+            },
+            "outbox": {
+                "titulo": "Outbox (catalog.interest_clicked)",
+                "papel": "fundo",
+                # Mesma promessa da outbox da Estoque, e a mesma armadilha:
+                # entrega NAO e' pra sempre, descarta em 5 tentativas
+                # (outbox.py:31,60). O `event_id` e' estavel entre tentativas,
+                # entao o Chatbot deduplica por Idempotency-Key.
+                "termo": "backoff, desiste em 5 (outbox.py:31,60,73)",
+                "modulo": "app/outbox.py",
+            },
+            "provider": {
+                "titulo": "Cliente da Estoque",
+                "papel": "veiculos",
+                # A unica porta pra dado de veiculo. `/public/v1` nao devolve
+                # custo (decisao de borda da Estoque), entao a vitrine nao tem
+                # como vazar preco de compra nem que queira.
+                "termo": "só o /public/v1 da Estoque (provider.py:32,58)",
+                "modulo": "app/provider.py",
+            },
+            "contratos": {
+                "titulo": "Contrato da vitrine",
+                "papel": "veiculos",
+                # O formato que a Estoque promete, escrito deste lado. Quando
+                # o contrato HTTP muda, o erro aparece aqui na validacao — nao
+                # no meio de um template.
+                "termo": "Store, Vehicle, VehiclePage (contracts.py:6,14,47)",
+                "modulo": "app/contracts.py",
+            },
+            "pixel": {
+                "titulo": "Pixel Meta (via Portal)",
+                "papel": "integracao",
+                # O Pixel ID vem do Portal, nao do env: quem salvou foi o dono,
+                # em Trafego. O env so e' fallback. Cache com TTL curto quando
+                # a consulta FALHA (pixel.py:83), pra nao congelar o erro.
+                # O token CAPI nunca passa por aqui — isso e' do Portal.
+                "termo": "Pixel por loja, do Portal (pixel.py:66,97)",
+                "modulo": "app/pixel.py",
+            },
+            "provisionamento": {
+                "titulo": "Projeção do Control",
+                "papel": "estrutura",
+                # ATENCAO: aqui o gate e' fail-OPEN (provisioning.py:107), ao
+                # contrario do da Estoque e do Chatbot, que sao fail-closed.
+                # Sem projecao de loja a vitrine continua abrindo — foi escolha
+                # do cutover, pra loja nao sumir da internet se o Control
+                # estiver mudo. Com projecao, `state != ativa` esconde a loja.
+                "termo": "gate de loja, fail-open (provisioning.py:99,107)",
+                "modulo": "app/provisioning.py",
+            },
         },
     },
 }
@@ -644,6 +728,42 @@ ARESTAS_ESTOQUE = [
 ]
 
 ARESTAS_INTERNAS = ARESTAS_INTERNAS + ARESTAS_ESTOQUE
+
+# --- Catalogo Publico (30/08) -------------------------------------------
+# Derivadas de IMPORT REAL: `main` importa events, pixel, provider, outbox e
+# provisioning (main.py:17-21) e nada mais; `outbox` importa InterestStore
+# (outbox.py:7); `provider` importa os contratos (provider.py:6). Nao ha
+# import de `app` de outro produto — o que sai daqui sai por HTTP.
+ARESTAS_CATALOGO = [
+    {"de": "catalogo-publico.borda", "para": "catalogo-publico.provider",
+     "protocolo": "chamada", "sincrono": True, "retry": True},
+    {"de": "catalogo-publico.borda", "para": "catalogo-publico.interesse",
+     "protocolo": "chamada", "sincrono": True, "retry": True},
+    {"de": "catalogo-publico.borda", "para": "catalogo-publico.pixel",
+     "protocolo": "chamada", "sincrono": True, "retry": True},
+    # O gate roda ANTES de qualquer uma das tres telas (storefront_hidden,
+    # main.py:165) — loja escondida nem chega a consultar a Estoque.
+    {"de": "catalogo-publico.borda", "para": "catalogo-publico.provisionamento",
+     "protocolo": "chamada", "sincrono": True, "retry": True},
+    # A thread da outbox sobe no lifespan da propria API (main.py:20,58):
+    # nao ha processo separado neste produto.
+    {"de": "catalogo-publico.borda", "para": "catalogo-publico.outbox",
+     "protocolo": "timer", "sincrono": False, "retry": False},
+    {"de": "catalogo-publico.provider", "para": "catalogo-publico.contratos",
+     "protocolo": "chamada", "sincrono": True, "retry": True},
+    # A UNICA assincrona daqui, e o espelho da do Estoque: a rota nao chama a
+    # entrega, ela GRAVA a linha `event_outbox` na mesma transacao do clique
+    # (events.py:194) e redireciona o visitante pro wa.me. Quem entrega e' a
+    # thread, depois.
+    {"de": "catalogo-publico.interesse", "para": "catalogo-publico.outbox",
+     "protocolo": "outbox", "sincrono": False, "retry": True},
+    # E a volta: `process_pending` le a fila e marca entregue/falho pelo mesmo
+    # InterestStore (outbox.py:7,25) — o SQLite de interesse e' um so.
+    {"de": "catalogo-publico.outbox", "para": "catalogo-publico.interesse",
+     "protocolo": "chamada", "sincrono": True, "retry": True},
+]
+
+ARESTAS_INTERNAS = ARESTAS_INTERNAS + ARESTAS_CATALOGO
 
 
 VMS: dict[str, dict] = {

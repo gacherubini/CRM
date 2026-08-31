@@ -1248,7 +1248,7 @@ class TestProvaCabeNaCaixa(unittest.TestCase):
         # Produtos que ja tem a camada de componente escrita a mao. Ao
         # escrever a de um produto novo, acrescente-o aqui — e o teste passa a
         # cobrir os termos dele.
-        com_componente = ("chatbot-api", "estoque-api")
+        com_componente = ("chatbot-api", "estoque-api", "catalogo-publico")
 
         cortados = []
         for c in cena.caixas:
