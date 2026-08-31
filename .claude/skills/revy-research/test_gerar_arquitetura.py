@@ -916,10 +916,21 @@ class TestComponentesDoChatbot(unittest.TestCase):
             self.assertNotEqual(a["de"], a["para"])
 
     def test_o_protocolo_interno_vem_de_um_vocabulario_curto(self):
-        # Tres palavras, nao trinta: "chamada" (mesmo processo), "outbox"
-        # (uma grava, a outra consome) e "timer" (thread periodica).
+        # Quatro palavras, nao trinta: "chamada" (mesmo processo), "outbox"
+        # (uma grava, a outra consome), "timer" (thread periodica) e "http".
+        #
+        # `http` entrou em 30/08, com o Motor, e a quarta palavra so se paga
+        # porque o Motor e' o UNICO produto cujo interior mora em duas VMs: a
+        # API no app2037, os slots Playwright no motor2037. O wake
+        # (orquestrador -> worker) e' uma chamada a Machines API do Fly. Nao
+        # da pra chamar isso de "chamada", que quer dizer mesmo processo, nem
+        # de "outbox", que quer dizer que alguem grava e outro consome depois:
+        # e' exatamente a fronteira onde o outro lado pode estar fora do ar.
+        #
+        # Se aparecer uma quinta candidata, o teste a fazer antes e': ela diz
+        # algo que estas quatro nao dizem, ou e' sinonimo de uma delas?
         for a in arquitetura.ARESTAS_INTERNAS:
-            self.assertIn(a["protocolo"], {"chamada", "outbox", "timer"},
+            self.assertIn(a["protocolo"], {"chamada", "outbox", "timer", "http"},
                           f"{a['de']} -> {a['para']}")
 
     def test_toda_aresta_outbox_e_assincrona_e_tem_retry(self):
@@ -1248,7 +1259,8 @@ class TestProvaCabeNaCaixa(unittest.TestCase):
         # Produtos que ja tem a camada de componente escrita a mao. Ao
         # escrever a de um produto novo, acrescente-o aqui — e o teste passa a
         # cobrir os termos dele.
-        com_componente = ("chatbot-api", "estoque-api", "catalogo-publico")
+        com_componente = ("chatbot-api", "estoque-api", "catalogo-publico",
+                          "motor-simulacao")
 
         cortados = []
         for c in cena.caixas:

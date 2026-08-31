@@ -267,17 +267,154 @@ NOS: dict[str, dict] = {
             "Playwright single-flight e o driver engole o clique que falha — ver "
             "learnings/2026-08-23-driver-playwright-engole-o-clique-que-falha.md"
         ),
+        # Camada de componente escrita a mao (30/08), do mesmo molde do Estoque.
+        # Antes daqui eram duas caixas, e uma delas (`bancos`) era a LISTA DE
+        # BANCOS: o produto inteiro — idempotencia, fila, lease, teto de
+        # browser, credencial cifrada — nao aparecia.
+        #
+        # Cada caixa saiu da tabela "Onde editar" do README e foi conferida no
+        # codigo. As arestas sairam de import real.
+        #
+        # SEGREDO BANCARIO SO VIVE AQUI (AGENTS.md secao 5). Por isso
+        # `credenciais` e' caixa propria e recebe seta de quatro lugares: e' a
+        # unica porta pro segredo em claro, e nenhum termo aqui carrega valor
+        # de env.
+        #
+        # Ficaram de fora por serem infraestrutura, e nao responsabilidade:
+        # `app/models_db.py` + `app/db.py` (ORM), `app/config.py`,
+        # `app/auth.py`, `app/validadores.py`, `app/observabilidade.py`,
+        # `app/provisioning.py` e `app/cli.py`. Entram quando alguem precisar
+        # de seta pra elas.
         "dentro": {
-            "bancos": {
-                "titulo": "Drivers bancários (Playwright)",
+            "borda": {
+                "titulo": "Borda HTTP",
                 "papel": "banco",
-                "termo": "amortizacao, base, bradesco, fontecred, pan, santander, mock",
-                "modulo": "app/motor/",
+                # O contrato publico inteiro em 359 linhas: criar (:181),
+                # consultar, cancelar (:345), e o CRUD de credencial por
+                # provedor (:112). A criacao responde 202 com `recebida` — a
+                # execucao e' de outro processo, possivelmente de outra VM.
+                "termo": "/v1/simulacoes e credenciais (main.py:181,112)",
+                "modulo": "app/main.py",
+            },
+            "simulacao": {
+                "titulo": "Domínio da simulação",
+                "papel": "banco",
+                # Idempotencia real, nao "ignora repetido": mesma chave com o
+                # MESMO hash de payload devolve o mesmo id; com payload
+                # diferente levanta ErroIdempotencia (:106) e a borda responde
+                # 409. O ciclo e' recebida -> processando -> concluida |
+                # parcial | falhou | aguardando_intervencao.
+                "termo": "idempotência por hash de payload (servico.py:103,106)",
+                "modulo": "app/servico.py",
+            },
+            "fila": {
+                "titulo": "Fan-out por provedor",
+                "papel": "banco",
+                # Uma tarefa por provedor pedido (:47), cada uma ja marcada com
+                # `tipo_driver` (:26) — e' esse campo que decide se a tarefa
+                # precisa de um slot de browser na motor2037 ou roda no
+                # app2037 mesmo. Parcial e' status normal: um banco responde,
+                # outro falha.
+                "termo": "uma tarefa por provedor (fanout.py:26,47)",
+                "modulo": "app/fanout.py",
+            },
+            "orquestrador": {
+                "titulo": "Slots e wake das Machines",
+                "papel": "fundo",
+                # O teto de 2 browsers simultaneos (:116) e' decisao B+D de
+                # captcha/IP, e conta o que ja esta EM VOO, nao so o wake deste
+                # tick — subir esse teto piora o scoring de IP e derruba os
+                # logins. Quem fala com a Machines API e' `WorkerLifecycle`
+                # (lifecycle.py); sem FLY_AUTOSCALE_ENABLED isto e' no-op.
+                "termo": "teto de 2 browsers, wake Fly (orquestrador.py:77,116)",
+                "modulo": "app/orquestrador.py",
             },
             "worker": {
-                "titulo": "Worker assíncrono",
+                "titulo": "Worker e execução do job",
                 "papel": "fundo",
+                # Reserva com lease (processamento.py:162) e devolve a fila o
+                # que expirou depois de uma queda (:118) — por isso o worker
+                # pode morrer no meio sem perder o job.
+                # ARMADILHA: com MOTOR_WORKER_PROVEDOR definido o modo
+                # on-demand liga sozinho e o processo sai `exit 0` no idle
+                # (worker.py:96). No Fly isso e' certo (a Machine para e o
+                # orquestrador reacorda); FORA do Fly e' o processo morrendo
+                # sem ninguem pra reiniciar — use IDLE_STOP_SECONDS=0.
+                "termo": "lease (processamento.py:162), exit 0 (worker.py:96)",
                 "modulo": "app/worker.py",
+            },
+            "registro": {
+                "titulo": "Contrato e seleção de driver",
+                "papel": "banco",
+                # E' aqui que mora a armadilha numero um do README: o contrato
+                # NAO muda entre mock e real. `resolver_drivers` (:185) escolhe
+                # pela credencial existir, e sem credencial NAO cai no mock
+                # silencioso. A taxonomia de erro (ErroTransitorio :25,
+                # RejeicaoNegocio :31, IntervencaoNecessaria :37) e' o que
+                # todo driver promete devolver — e' o que faz o cliente ver so
+                # `codigo_erro`, nunca mensagem tecnica ou pagina bancaria.
+                # `providers.py:66` e' o catalogo; `mock.py` e a amortizacao
+                # Price fecham o lado ficticio.
+                "termo": "resolve driver, sem mock mudo (drivers.py:185,25)",
+                "modulo": "app/motor/drivers.py",
+            },
+            "api-parceiro": {
+                "titulo": "Driver de API (Pan)",
+                "papel": "banco",
+                # Pan e BV tem API de parceiro; Santander, Bradesco e Fontecred
+                # nao — por isso o RPA daqueles tres e' permanente, e nao
+                # remendo. Este caminho NAO consome slot do teto de browser
+                # (api_base.py:28), entao e' o unico banco que escala sem
+                # esbarrar no captcha de IP. `_pan_dispatch` (drivers.py:162)
+                # e' quem decide entre este e o `pan_portal` do RPA.
+                "termo": "API de parceiro, sem slot (pan.py:11; api_base.py:28)",
+                "modulo": "app/motor/pan.py",
+            },
+            "credenciais": {
+                "titulo": "Credenciais cifradas",
+                "papel": "banco",
+                # A chave e' MOTOR_ENCRYPTION_KEY e ela tem que ser a MESMA no
+                # app2037 e no motor2037 — divergiu, credencial nao abre. O
+                # Portal e' so BFF: cifra e envia; decifrar so acontece aqui.
+                # `indice_cego` (cripto.py:37) permite buscar por CPF sem
+                # guardar o CPF em claro. Toda escrita passa por auditoria
+                # (credenciais.py:101).
+                "termo": "cifra e índice cego (cripto.py:29,37)",
+                "modulo": "app/credenciais.py",
+            },
+            "rpa": {
+                "titulo": "RPA Playwright (motor2037)",
+                "papel": "banco",
+                # O grupo diz o que a caixa sozinha nao diz: estes sobem
+                # Chromium DE VERDADE, num slot da motor2037, sob o teto de 2
+                # simultaneos — e e' so aqui que o captcha e o scoring de IP
+                # existem. `pan` ficou de fora de proposito: e' API de
+                # parceiro, nao consome slot, e meter ele aqui faria a gaveta
+                # mentir.
+                "termo": "Chromium real, sob o teto de 2 slots",
+                "dentro": {
+                    "bancos": {
+                        "titulo": "Drivers por banco",
+                        "papel": "banco",
+                        # Quatro drivers de browser. Cada um busca o proprio
+                        # segredo direto em `credenciais` na hora de logar
+                        # (santander.py:424, bradesco.py:376, fontecred.py:403,
+                        # pan_portal.py:378) — nao ha segredo viajando no
+                        # payload da tarefa.
+                        "termo": "santander, bradesco, fontecred, pan_portal",
+                        "modulo": "app/motor/",
+                    },
+                    "base": {
+                        "titulo": "Base RPA e sessão quente",
+                        "papel": "banco",
+                        # `storage_state` por (cliente, provedor) e' o que
+                        # mantem a sessao quente entre jobs; hoje ela renasce
+                        # em IP de datacenter, que e' justamente a hipotese do
+                        # card do worker em IP residencial.
+                        "termo": "storage_state por loja (sessao_browser.py:26,57)",
+                        "modulo": "app/motor/playwright_base.py",
+                    },
+                },
             },
         },
     },
@@ -764,6 +901,83 @@ ARESTAS_CATALOGO = [
 ]
 
 ARESTAS_INTERNAS = ARESTAS_INTERNAS + ARESTAS_CATALOGO
+
+# --- Motor de Simulacao (30/08) -----------------------------------------
+# Derivadas de IMPORT REAL: main.py:12 e :199 (servico), :91/:122/:135
+# (credenciais), :16 (providers); servico.py:18 (fanout) e :29 (orquestrador,
+# import tardio de proposito); worker.py:21 e :71; processamento.py:20,:29,:38;
+# drivers.py:141-144,:172-173,:177,:223; santander.py:33,:424 e os irmaos.
+#
+# Duas coisas que o import NAO conta, e por isso estao comentadas na aresta:
+# a entrega do job nao e' chamada de funcao (e' linha no banco, reservada
+# depois por lease), e o wake do worker sai pela Machines API do Fly — de um
+# processo pro outro, possivelmente de uma VM pra outra.
+ARESTAS_MOTOR = [
+    {"de": "motor-simulacao.borda", "para": "motor-simulacao.simulacao",
+     "protocolo": "chamada", "sincrono": True, "retry": True},
+    {"de": "motor-simulacao.borda", "para": "motor-simulacao.credenciais",
+     "protocolo": "chamada", "sincrono": True, "retry": True},
+    # main.py:16 lista os provedores reais pro cliente saber o que pedir.
+    {"de": "motor-simulacao.borda", "para": "motor-simulacao.registro",
+     "protocolo": "chamada", "sincrono": True, "retry": True},
+    {"de": "motor-simulacao.simulacao", "para": "motor-simulacao.fila",
+     "protocolo": "chamada", "sincrono": True, "retry": True},
+    # servico.py:29 importa acordar_workers DENTRO da funcao, e engole
+    # qualquer excecao (:33): problema na Fly API nunca derruba a criacao do
+    # job. Best-effort de verdade.
+    {"de": "motor-simulacao.simulacao", "para": "motor-simulacao.orquestrador",
+     "protocolo": "chamada", "sincrono": True, "retry": False},
+    # A UNICA assincrona daqui, e a razao do 202: o dominio grava a simulacao
+    # com status `recebida` e responde; quem executa e' o worker, depois, e
+    # noutro processo. Nao ha import de servico->worker porque nao ha chamada
+    # — o que liga os dois e' a linha no banco, reservada por lease.
+    {"de": "motor-simulacao.simulacao", "para": "motor-simulacao.worker",
+     "protocolo": "outbox", "sincrono": False, "retry": True},
+    # O wake atravessa processo (e VM): acordar_workers chama a Machines API
+    # do Fly via WorkerLifecycle (lifecycle.py) pra ligar um slot da
+    # motor2037. Nao ha retry aqui — o proximo tick tenta de novo.
+    {"de": "motor-simulacao.orquestrador", "para": "motor-simulacao.worker",
+     "protocolo": "http", "sincrono": False, "retry": False},
+    {"de": "motor-simulacao.worker", "para": "motor-simulacao.fila",
+     "protocolo": "chamada", "sincrono": True, "retry": True},
+    {"de": "motor-simulacao.worker", "para": "motor-simulacao.registro",
+     "protocolo": "chamada", "sincrono": True, "retry": True},
+    # worker.py:71 so acorda Machine quando WORKER_ON_DEMAND e' FALSO (:69) —
+    # um worker on-demand acordando outro seria laco.
+    {"de": "motor-simulacao.worker", "para": "motor-simulacao.orquestrador",
+     "protocolo": "chamada", "sincrono": True, "retry": False},
+    # processamento.py:38 pergunta se a sessao ja esta quente antes de decidir
+    # o caminho do job.
+    {"de": "motor-simulacao.worker", "para": "motor-simulacao.rpa.base",
+     "protocolo": "chamada", "sincrono": True, "retry": True},
+    # drivers.py:141-144 e :173: as fabricas dos quatro drivers de browser
+    # sao importadas TARDE, dentro de _registrar_drivers_reais, pra nao
+    # arrastar Playwright pro processo da API.
+    {"de": "motor-simulacao.registro", "para": "motor-simulacao.rpa.bancos",
+     "protocolo": "chamada", "sincrono": True, "retry": True},
+    # drivers.py:162 _pan_dispatch escolhe entre a API do parceiro e o portal.
+    {"de": "motor-simulacao.registro", "para": "motor-simulacao.api-parceiro",
+     "protocolo": "chamada", "sincrono": True, "retry": True},
+    # drivers.py:223 configuracao_completa — a selecao pergunta se ha
+    # credencial ANTES de escolher o driver real.
+    {"de": "motor-simulacao.registro", "para": "motor-simulacao.credenciais",
+     "protocolo": "chamada", "sincrono": True, "retry": True},
+    {"de": "motor-simulacao.rpa.bancos", "para": "motor-simulacao.rpa.base",
+     "protocolo": "chamada", "sincrono": True, "retry": True},
+    # A seta que importa pra AGENTS.md secao 5: o segredo em claro so existe
+    # no momento do login, e so aqui dentro. Cada driver chama
+    # obter_segredo_para_uso na hora (santander.py:424, bradesco.py:376,
+    # fontecred.py:403, pan_portal.py:378) — nada de segredo no payload da
+    # tarefa nem no log.
+    {"de": "motor-simulacao.rpa.bancos", "para": "motor-simulacao.credenciais",
+     "protocolo": "chamada", "sincrono": True, "retry": True},
+    # pan.py:174 obter_configuracao_para_uso: a API de parceiro tambem pega a
+    # credencial daqui, e nao de env.
+    {"de": "motor-simulacao.api-parceiro", "para": "motor-simulacao.credenciais",
+     "protocolo": "chamada", "sincrono": True, "retry": True},
+]
+
+ARESTAS_INTERNAS = ARESTAS_INTERNAS + ARESTAS_MOTOR
 
 
 VMS: dict[str, dict] = {
