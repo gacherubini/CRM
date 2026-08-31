@@ -547,25 +547,181 @@ NOS: dict[str, dict] = {
         "decisoes": [
             "2026-08-07-treze-recusas-de-ux.md",
         ],
+        # Camada de componente escrita a mao (30/08). Antes daqui eram quatro
+        # caixas e tres delas eram PASTA (`app/web/`, `app/clients/`,
+        # `app/email/`) — a arvore de arquivo com outro nome. As dez abaixo
+        # vieram da tabela "Onde editar" do README, que ja lista
+        # responsabilidade de verdade, e cada uma foi conferida no codigo.
+        #
+        # SEM GAVETA, de proposito. Duas foram cogitadas e recusadas:
+        # - "Anuncios" (`meta` + `google-ads`): nomeia PLATAFORMA, nao
+        #   responsabilidade, e as duas nao compartilham nada de verdade —
+        #   nenhum import, nenhuma tabela, nenhum token.
+        # - "Workers" (as seis threads): aqui ela mentiria pelo mesmo motivo
+        #   que mentiu no Estoque. Cada worker e' so o RELOGIO de uma regra
+        #   que mora no dominio, entao ele esta dentro da caixa da regra —
+        #   mesmo movimento que `workers.rodizio` -> `atendimento` no Chatbot.
+        #   O fato que a gaveta contaria fica no comentario de `borda`.
+        #
+        # As 59 flags do inventario se penduram sozinhas, por prefixo de
+        # `modulo`. Prefixo mais LONGO ganha (arq_modelo:139), entao
+        # `app/control/google_ads` fica com as dele e nao vaza pra `estrutura`,
+        # que declara so `app/control/`.
+        #
+        # Ficaram de fora por serem infraestrutura: `app/models.py` (1093
+        # linhas de ORM), `app/db.py`, `app/config.py`, `app/auth.py`,
+        # `app/cripto.py`, `app/audit.py`, `app/email/` e `app/clients/` (os
+        # sete clientes HTTP — eles aparecem como ARESTA pra outro produto,
+        # que e' onde a informacao serve).
         "dentro": {
-            "control": {
-                "titulo": "Núcleo do Control",
+            "borda": {
+                "titulo": "Borda HTTP e bootstrap",
                 "papel": "estrutura",
-                "modulo": "app/control/",
-                "dentro": {
-                    "google-ads": {"titulo": "Google Ads", "papel": "integracao",
-                                   "modulo": "app/control/google_ads"},
-                    "provisionamento": {"titulo": "Provisionamento → Estoque/Loja",
-                                        "papel": "estrutura",
-                                        "modulo": "app/control/provisioning"},
-                },
+                # `/v1` com X-Service-Token, `/public/v1/.../pixel` sem auth
+                # nenhuma (e' o Catalogo que le), `/internal/jobs/*` com
+                # X-Job-Token. O router de `/v1` mora em `app/api_v1.py`.
+                #
+                # AQUI SOBEM AS SEIS THREADS, todas no mesmo lifespan
+                # (main.py:96 a :129): spend, CAPI, resolver de ad_id,
+                # provisionamento, conversoes Google e metricas Google. Cada
+                # uma atras da PROPRIA flag, todas default OFF no codigo
+                # (AGENTS.md secao 5) — em producao o piloto liga por secret.
+                # Por isso nao ha gaveta "workers": o que elas tem em comum e'
+                # o lifespan, e isso e' fato da borda.
+                "termo": "/v1 e as seis threads do lifespan (main.py:96,129)",
+                "modulo": "app/main.py",
             },
-            "web": {"titulo": "Telas do Control", "papel": "estrutura",
-                    "modulo": "app/web/"},
-            "clients": {"titulo": "Clientes HTTP de outros produtos",
-                        "papel": "integracao", "modulo": "app/clients/"},
-            "email": {"titulo": "E-mail transacional", "papel": "estrutura",
-                      "modulo": "app/email/"},
+            "telas": {
+                "titulo": "Telas do Control",
+                "papel": "estrutura",
+                # Nao e' "a camada web": e' um SEGUNDO app Jinja. `app.main` e
+                # `app.web.control_ui` tem instancias separadas, e um global
+                # novo precisa ser registrado nas DUAS (main.py:263 e
+                # control_ui.py:116) — senao um lado nao enxerga, sem erro.
+                # Essa e' a armadilha declarada no README, e e' o que faz
+                # disto uma caixa em vez de uma pasta.
+                # Toda tela esta atras de REVY_CONTROL_ENABLED (senao 404).
+                "termo": "Jinja próprio, registrar nos dois (control_ui.py:116)",
+                "modulo": "app/web/",
+            },
+            "estrutura": {
+                "titulo": "Lojas, pessoas e cargos",
+                "papel": "estrutura",
+                # O substantivo do produto (AGENTS.md secao 2). `stores.py`,
+                # `people.py`, `accounts.py`, `roles.py`, `access.py`,
+                # `invitations.py`.
+                #
+                # O `modulo` e' `app/control/` inteiro, entao esta caixa e'
+                # tambem o DESTINO PADRAO do que nao ganhou caixa propria por
+                # causa do teto de dez: `dashboard.py` (paineis operacionais,
+                # atras de REVY_CONTROL_DASHBOARD_ENABLED), `integrations.py`
+                # + `integrations_health.py` + `graph_probe.py` (configuracao
+                # e saude das credenciais de Pixel/CAPI/Ads),
+                # `whatsapp_channels.py` (proxy de canais, atras de
+                # MULTI_WHATSAPP_ENABLED) e `traffic_onboarding.py`. Sao
+                # coisas reais; ganham caixa quando alguem precisar de seta
+                # pra elas.
+                #
+                # O isolamento e' explicito e falha ALTO:
+                # `assert_no_bleed` (permissions.py:84) levanta PermissionBleed
+                # se um ator carregar `control:*` e `store:*` junto — nao ha
+                # "prefixo correto" que passe (permissions.py:112).
+                "termo": "control:* nunca com store:* (permissions.py:20,84)",
+                "modulo": "app/control/",
+            },
+            "portfolio": {
+                "titulo": "Módulos contratáveis",
+                "papel": "estrutura",
+                # O que a loja pode ter ligado, `copiloto` inclusive (:24). E'
+                # daqui que sai a projecao de modulo que o Estoque, a Loja e o
+                # Chatbot usam como gate de backend — suspensao de loja NUNCA
+                # e' item de menu (AGENTS.md secao 5).
+                "termo": "catálogo de módulos, com copiloto (portfolio.py:24)",
+                "modulo": "app/control/portfolio.py",
+            },
+            "prontidao": {
+                "titulo": "Prontidão da loja",
+                "papel": "estrutura",
+                # `REQUIRED_CODES` (:44) e' o que separa BLOQUEIO de alerta:
+                # codigo de fora da lista vira severity "alert" (:301) e nao
+                # segura a loja. Isso e' regra de negocio, nao formatacao.
+                "termo": "required separa bloqueio de alerta (readiness.py:44,301)",
+                "modulo": "app/control/readiness.py",
+            },
+            "provisionamento": {
+                "titulo": "Provisionamento → outros produtos",
+                "papel": "estrutura",
+                # O Control e' a FONTE do estado operacional; Estoque, Loja,
+                # Chatbot e Catalogo so guardam projecao. O envelope sai em
+                # `provisioning.py:163`, vira linha de outbox
+                # (provisioning_outbox.py:88) e um poster multi-destino
+                # (:207) entrega pros varios produtos. Worker atras de
+                # REVY_CONTROL_PROVISIONING_DELIVERY_ENABLED.
+                "termo": "envelope e entrega multi-destino (provisioning.py:163)",
+                "modulo": "app/control/provisioning",
+            },
+            "vendas": {
+                "titulo": "Projeção de vendas",
+                "papel": "venda",
+                # Materializa o outbox que a Loja manda em `vendas_projetadas`
+                # (:81), idempotente. ARMADILHA: `campanha_id` fica NULL DE
+                # PROPOSITO — o vinculo venda<->campanha existe so no calculo
+                # do ROI, e e' isso que faz a atribuicao valer retroativamente.
+                # "Consertar" com backfill quebra a regra.
+                "termo": "materializa o outbox da Loja (vendas_projection.py:81)",
+                "modulo": "app/vendas_projection.py",
+            },
+            "roi": {
+                "titulo": "ROI e atribuição",
+                "papel": "estrutura",
+                # `herdar_campanhas_de_leads` (:90) e' onde a venda encontra a
+                # campanha, no momento do calculo. ARMADILHA que ja custou
+                # receita inventada: NUNCA casar lead com `ctwa_auditoria` por
+                # telefone mascarado — a mascara sao 4 digitos e a colisao e'
+                # real (08/08). E este numero e' o relatorio da Revy, nao a
+                # atribuicao da Meta: divergir do Gerenciador e' esperado.
+                "termo": "herda campanha no cálculo (roi_calc.py:76,90)",
+                "modulo": "app/roi_calc.py",
+            },
+            "meta": {
+                "titulo": "Meta: Pixel, CAPI e gasto",
+                "papel": "integracao",
+                # Uma caixa, e nao duas, porque a Graph da Meta e' UMA: a
+                # versao vem de `meta_graph_config.py` e e' fonte unica —
+                # `meta_capi.py:22` e `meta_ads_spend.py:19` leem dali, e
+                # hardcodar versao noutro lugar e' armadilha declarada no
+                # README. Aqui dentro andam os dois sentidos: o CAPI manda
+                # conversao PRA Meta (enfileirar_purchase, :143, idempotente),
+                # o spend puxa gasto DA Meta (:218, janela de 24h), e
+                # `meta_ad_resolver_job.py` resolve `ad_id -> campaign_id`
+                # pelo Graph.
+                #
+                # DONO UNICO: ligar o worker CAPI nos dois processos sobre a
+                # mesma outbox manda evento duplicado pra Meta. O Portal roda
+                # com PORTAL_*_ENABLED=0.
+                #
+                # Duas armadilhas mais, que so aparecem aqui: o erro da Meta e'
+                # sanitizado antes de virar log (meta_capi.py:32,
+                # meta_ads_spend.py:89); e nao se aceita `campanha_id` vindo do
+                # Portal — `Campanha.id` e' local, e gravar UUID de fora
+                # desliga o casamento por UTM sem erro visivel.
+                #
+                # E' este caminho — e so ele — que faz a compra chegar ao
+                # Gerenciador de Anuncios, e ele exige `ctwa_clid` no lead.
+                # Divergir da linha de venda do relatorio e' esperado.
+                "termo": "dono único da outbox CAPI (meta_capi.py:143,32)",
+                "modulo": "app/meta_",
+            },
+            "google-ads": {
+                "titulo": "Google Ads",
+                "papel": "integracao",
+                # OAuth, contas, metricas e conversoes offline — 3.600 linhas
+                # atras de GOOGLE_ADS_SYNC_ENABLED e GOOGLE_CONVERSIONS_ENABLED,
+                # as duas default OFF. Sem GOOGLE_ADS_OAUTH_* a UI nem oferece
+                # a conexao.
+                "termo": "OAuth, métricas e conversões (google_ads.py:1)",
+                "modulo": "app/control/google_ads",
+            },
         },
     },
     "catalogo-publico": {
@@ -978,6 +1134,81 @@ ARESTAS_MOTOR = [
 ]
 
 ARESTAS_INTERNAS = ARESTAS_INTERNAS + ARESTAS_MOTOR
+
+# --- Revy Control (30/08) -----------------------------------------------
+# Derivadas de IMPORT REAL: main.py:55,61-63,73,80-82; api_v1.py:16,30,34,36;
+# control_ui.py:20-22,30,51,94-95; control.py:15-17,32; readiness.py:7-8;
+# portfolio.py:9-10; provisioning.py:9; stores.py:10; roles.py:9.
+#
+# `app/campanhas.py`, `app/resultados.py` e `app/financeiro_calc.py` sao a
+# vizinhanca de calculo do ROI (roi_calc.py:9,10 importa os dois primeiros),
+# mas nao ha prefixo de `modulo` que os pegue junto com `roi_calc.py` sem
+# arrastar meia dezena de outros arquivos — entao eles ficam na raiz do
+# produto, e isto aqui e' o registro de onde eles pertencem.
+ARESTAS_CONTROL = [
+    # main.py:80-82 e :174-176 montam os tres routers no mesmo app.
+    {"de": "revy-trafego.borda", "para": "revy-trafego.telas",
+     "protocolo": "chamada", "sincrono": True, "retry": True},
+    {"de": "revy-trafego.borda", "para": "revy-trafego.estrutura",
+     "protocolo": "chamada", "sincrono": True, "retry": True},
+    # api_v1.py:34 calcular_roi_loja no GET /v1/lojas/{slug}/resultados.
+    {"de": "revy-trafego.borda", "para": "revy-trafego.roi",
+     "protocolo": "chamada", "sincrono": True, "retry": True},
+    # api_v1.py:36 projetar_venda no POST venda-atualizada — idempotente.
+    {"de": "revy-trafego.borda", "para": "revy-trafego.vendas",
+     "protocolo": "chamada", "sincrono": True, "retry": True},
+    # main.py:61-63 (spend, outbox CAPI, pixel) e api_v1.py:30
+    # (enfileirar_purchase na venda confirmada). Duas das seis threads do
+    # lifespan tambem saem daqui: meta_ads_spend_job e meta_capi_job.
+    {"de": "revy-trafego.borda", "para": "revy-trafego.meta",
+     "protocolo": "chamada", "sincrono": True, "retry": True},
+    # api_v1.py:16,21 mais os dois jobs Google do lifespan (main.py:117,127).
+    {"de": "revy-trafego.borda", "para": "revy-trafego.google-ads",
+     "protocolo": "chamada", "sincrono": True, "retry": True},
+    # A borda so TOCA o provisionamento pelo relogio: main.py:112 importa
+    # provisioning_job dentro do lifespan e :114 sobe a thread. Quem enfileira
+    # e' o dominio, nas duas arestas de outbox mais abaixo.
+    {"de": "revy-trafego.borda", "para": "revy-trafego.provisionamento",
+     "protocolo": "timer", "sincrono": False, "retry": False},
+
+    # --- as telas leem o dominio (e nao escrevem sem passar por ele)
+    {"de": "revy-trafego.telas", "para": "revy-trafego.estrutura",
+     "protocolo": "chamada", "sincrono": True, "retry": True},
+    {"de": "revy-trafego.telas", "para": "revy-trafego.portfolio",
+     "protocolo": "chamada", "sincrono": True, "retry": True},
+    # control_ui.py:94 importa REQUIRED_CODES pra pintar bloqueio e alerta
+    # diferente — a regra e' do dominio, a tela so mostra.
+    {"de": "revy-trafego.telas", "para": "revy-trafego.prontidao",
+     "protocolo": "chamada", "sincrono": True, "retry": True},
+    {"de": "revy-trafego.telas", "para": "revy-trafego.google-ads",
+     "protocolo": "chamada", "sincrono": True, "retry": True},
+
+    # --- o dominio
+    # readiness.py:8 pixel_configured/vendas_module_active — a prontidao
+    # pergunta se a credencial existe, e nao guarda copia dela.
+    {"de": "revy-trafego.prontidao", "para": "revy-trafego.estrutura",
+     "protocolo": "chamada", "sincrono": True, "retry": True},
+    {"de": "revy-trafego.portfolio", "para": "revy-trafego.estrutura",
+     "protocolo": "chamada", "sincrono": True, "retry": True},
+    {"de": "revy-trafego.provisionamento", "para": "revy-trafego.estrutura",
+     "protocolo": "chamada", "sincrono": True, "retry": True},
+
+    # --- as duas assincronas: mexeu na estrutura, o mundo precisa saber
+    # stores.py:10 e roles.py:9 chamam `safe_enqueue_store_snapshot`
+    # (provisioning_hooks.py:52 -> enqueue_delivery). Ninguem espera a
+    # entrega: grava a linha e segue. O "safe" e' literal — a funcao engole a
+    # falha (provisioning_hooks.py:75) pra nao derrubar o cadastro por causa
+    # do correio.
+    {"de": "revy-trafego.estrutura", "para": "revy-trafego.provisionamento",
+     "protocolo": "outbox", "sincrono": False, "retry": True},
+    # portfolio.py:9, mesmo caminho: ligar ou desligar um modulo da loja e' o
+    # que faz o gate de backend mudar no Estoque, na Loja e no Chatbot. E' por
+    # esta seta que "suspensao de loja e' gate, nao item de menu" acontece.
+    {"de": "revy-trafego.portfolio", "para": "revy-trafego.provisionamento",
+     "protocolo": "outbox", "sincrono": False, "retry": True},
+]
+
+ARESTAS_INTERNAS = ARESTAS_INTERNAS + ARESTAS_CONTROL
 
 
 VMS: dict[str, dict] = {

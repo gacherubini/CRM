@@ -1260,7 +1260,7 @@ class TestProvaCabeNaCaixa(unittest.TestCase):
         # escrever a de um produto novo, acrescente-o aqui — e o teste passa a
         # cobrir os termos dele.
         com_componente = ("chatbot-api", "estoque-api", "catalogo-publico",
-                          "motor-simulacao")
+                          "motor-simulacao", "revy-trafego")
 
         cortados = []
         for c in cena.caixas:
