@@ -22,14 +22,13 @@ isso e esperado, nao bug).
 """
 from __future__ import annotations
 
-# Task 9: o inventario passa a ter duas vistas. `rota`/`worker`/`flag` sao
-# comportamento em producao; `template` fica aqui por decisao do dono, mesmo
-# sendo apresentacao — nao e dado persistido, e ele nao quis mais uma vista
-# so pra isso. `modelo`/`migration` sao o outro angulo: o que persiste, e
-# onde. As duas vistas juntas tem que cobrir toda secao que o extrator emite
-# (arq_modelo.filtrar avisa no stdout se aparecer uma secao nova que nao
-# caia em nenhuma das duas — nunca falha calado).
-SECOES_ARQUITETURA: frozenset[str] = frozenset({"worker", "flag", "template"})
+# Task 9: o inventario passa a ter duas vistas. `worker` e `flag` sao
+# comportamento em producao; `modelo`/`migration` sao o outro angulo: o que
+# persiste, e onde. As duas vistas juntas mais SECOES_DISPENSADAS tem que
+# cobrir toda secao que o extrator emite (arq_modelo.filtrar avisa no stdout
+# se aparecer uma secao nova que nao caia em nenhuma delas — nunca falha
+# calado).
+SECOES_ARQUITETURA: frozenset[str] = frozenset({"worker", "flag"})
 
 # Deliberadamente fora das duas vistas — nao e' secao desconhecida, e' secao
 # DISPENSADA, e a diferenca importa: desconhecida avisa no stdout, dispensada
@@ -42,9 +41,22 @@ SECOES_ARQUITETURA: frozenset[str] = frozenset({"worker", "flag", "template"})
 # parede respondia — QUAIS sao as rotas — nao e' o que esta pagina existe pra
 # responder: aqui a pergunta e' como as partes se falam.
 #
-# O dado nao se perde: `mapa/<produto>.md` continua listando toda rota com
-# `arquivo:linha`, e o `_frescor.json` continua sendo a fonte dos dois.
-SECOES_DISPENSADAS: frozenset[str] = frozenset({"rota"})
+# `template` saiu por decisao do dono em 31/08, pelo MESMO motivo e um ano-luz
+# do mesmo jeito: sao 90 fichas (63 so na Loja, 20 no Control), e elas viravam
+# uma caixa alta e sem titulo cheia de `app/templates/.../x.html` — o dono
+# olhou e disse "nao faz sentido". Template e' apresentacao: ele responde COMO
+# a tela e', e esta pagina pergunta como as partes se falam.
+#
+# Foi cogitado, e recusado, trocar a ficha por um PRINT da tela renderizada.
+# Nao da: renderizar Jinja exige subir os quatro produtos com banco e sessao,
+# esta skill e' stdlib puro e nao pode importar `app` (AGENTS.md secao 5), e
+# `arquitetura.html` e' commitado com `--verificar` byte a byte — 90 imagens
+# viram binario que apodrece calado a cada mudanca de CSS. Seria uma parede
+# mais bonita, e ainda parede.
+#
+# O dado nao se perde: `mapa/<produto>.md` continua listando toda rota e todo
+# template com `arquivo:linha`, e o `_frescor.json` continua sendo a fonte.
+SECOES_DISPENSADAS: frozenset[str] = frozenset({"rota", "template"})
 SECOES_SCHEMA: frozenset[str] = frozenset({"modelo", "migration"})
 
 NOS: dict[str, dict] = {
@@ -232,6 +244,7 @@ NOS: dict[str, dict] = {
             "workers": {
                 "titulo": "Workers de fundo",
                 "papel": "fundo",
+                "forma": "worker",
                 # O timer e' do produto, nao Wait do n8n (spec 5.3). As tres
                 # threads sobem no lifespan (main.py:93 e main.py:106); o
                 # ciclo de vida em si mora em modo2_workers.py:85. E' isso que
@@ -310,6 +323,7 @@ NOS: dict[str, dict] = {
             "fila": {
                 "titulo": "Fan-out por provedor",
                 "papel": "banco",
+                "forma": "fila",
                 # Uma tarefa por provedor pedido (:47), cada uma ja marcada com
                 # `tipo_driver` (:26) — e' esse campo que decide se a tarefa
                 # precisa de um slot de browser na motor2037 ou roda no
@@ -321,6 +335,7 @@ NOS: dict[str, dict] = {
             "orquestrador": {
                 "titulo": "Slots e wake das Machines",
                 "papel": "fundo",
+                "forma": "worker",
                 # O teto de 2 browsers simultaneos (:116) e' decisao B+D de
                 # captcha/IP, e conta o que ja esta EM VOO, nao so o wake deste
                 # tick — subir esse teto piora o scoring de IP e derruba os
@@ -332,6 +347,7 @@ NOS: dict[str, dict] = {
             "worker": {
                 "titulo": "Worker e execução do job",
                 "papel": "fundo",
+                "forma": "worker",
                 # Reserva com lease (processamento.py:162) e devolve a fila o
                 # que expirou depois de uma queda (:118) — por isso o worker
                 # pode morrer no meio sem perder o job.
@@ -385,6 +401,7 @@ NOS: dict[str, dict] = {
             "rpa": {
                 "titulo": "RPA Playwright (motor2037)",
                 "papel": "banco",
+                "forma": "browser",
                 # O grupo diz o que a caixa sozinha nao diz: estes sobem
                 # Chromium DE VERDADE, num slot da motor2037, sob o teto de 2
                 # simultaneos — e e' so aqui que o captcha e o scoring de IP
@@ -407,6 +424,7 @@ NOS: dict[str, dict] = {
                     "base": {
                         "titulo": "Base RPA e sessão quente",
                         "papel": "banco",
+                        "forma": "cache",
                         # `storage_state` por (cliente, provedor) e' o que
                         # mantem a sessao quente entre jobs; hoje ela renasce
                         # em IP de datacenter, que e' justamente a hipotese do
@@ -469,6 +487,7 @@ NOS: dict[str, dict] = {
             "outbox": {
                 "titulo": "Outbox (vehicle.*)",
                 "papel": "fundo",
+                "forma": "fila",
                 # Entrega NAO e' garantida para sempre: descarta apos 5
                 # tentativas (outbox.py:19). O receptor precisa validar o HMAC
                 # e deduplicar por X-Evento-Id.
@@ -478,6 +497,7 @@ NOS: dict[str, dict] = {
             "worker": {
                 "titulo": "Worker de entrega e limpeza",
                 "papel": "fundo",
+                "forma": "worker",
                 # Duas tarefas no mesmo laco. A limpeza periodica nunca
                 # propaga a propria falha (worker.py:37) — derrubar a entrega
                 # do outbox por causa de uma varredura de arquivo seria pior.
@@ -687,6 +707,7 @@ NOS: dict[str, dict] = {
             "outbox-control": {
                 "titulo": "Outbox → Control",
                 "papel": "fundo",
+                "forma": "fila",
                 # A invariante do AGENTS.md secao 2 em codigo: venda e' da
                 # Loja, e ela chega ao Control POR OUTBOX, nunca por consulta
                 # do outro lado. `_enfileirar` (:51) grava o snapshot da venda;
@@ -808,6 +829,7 @@ NOS: dict[str, dict] = {
             "provisionamento": {
                 "titulo": "Provisionamento → outros produtos",
                 "papel": "estrutura",
+                "forma": "fila",
                 # O Control e' a FONTE do estado operacional; Estoque, Loja,
                 # Chatbot e Catalogo so guardam projecao. O envelope sai em
                 # `provisioning.py:163`, vira linha de outbox
@@ -930,6 +952,7 @@ NOS: dict[str, dict] = {
             "outbox": {
                 "titulo": "Outbox (catalog.interest_clicked)",
                 "papel": "fundo",
+                "forma": "fila",
                 # Mesma promessa da outbox da Estoque, e a mesma armadilha:
                 # entrega NAO e' pra sempre, descarta em 5 tentativas
                 # (outbox.py:31,60). O `event_id` e' estavel entre tentativas,
@@ -958,6 +981,7 @@ NOS: dict[str, dict] = {
             "pixel": {
                 "titulo": "Pixel Meta (via Portal)",
                 "papel": "integracao",
+                "forma": "cache",
                 # O Pixel ID vem do Portal, nao do env: quem salvou foi o dono,
                 # em Trafego. O env so e' fallback. Cache com TTL curto quando
                 # a consulta FALHA (pixel.py:83), pra nao congelar o erro.

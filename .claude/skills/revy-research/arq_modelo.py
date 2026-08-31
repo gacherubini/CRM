@@ -10,6 +10,7 @@ no frescor. A validacao de `decisoes/` vale em qualquer profundidade.
 """
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, replace
 from pathlib import Path
 
@@ -35,6 +36,12 @@ class No:
     decisoes: tuple[str, ...] = ()
     spof: bool = False
     spof_porque: str | None = None
+    # Vocabulario TECNICO de forma (31/08). O `papel` diz de que dominio a
+    # caixa e' (conversa, venda, banco); `forma` diz o que ela E'
+    # tecnicamente — fila, worker, cache, browser. Sao perguntas diferentes,
+    # e a forma responde a segunda ANTES de voce ler o texto. Vazio = o
+    # retangulo de sempre.
+    forma: str = ""
     entradas: tuple[Entrada, ...] = ()
     filhos: tuple["No", ...] = ()
     auto: bool = False
@@ -180,6 +187,7 @@ def _construir_no(chave: str, bruto: dict, caminho: tuple, designacao: dict,
         decisoes=decisoes,
         spof=bool(bruto.get("spof")),
         spof_porque=bruto.get("spof_porque"),
+        forma=bruto.get("forma", ""),
         entradas=entradas_aqui,
         filhos=filhos,
     )
@@ -529,3 +537,60 @@ def filtrar(modelo: Modelo, secoes: frozenset,
 
     return replace(modelo, nos=nos_novos, arestas=arestas_novas,
                     vms=vms_novas, bancos=bancos_novos, fluxos=fluxos_novos)
+
+
+# --------------------------------------------------------------------------
+# Contagem de flag (31/08) — a parede que sobrou depois da `template` sair.
+# --------------------------------------------------------------------------
+
+_ROLLOUT_OFF = re.compile(r"\(default: (?:0|'')\)$")
+
+# Abaixo disto a lista ainda se le, e ler as duas flags do Motor vale mais
+# que contar ate dois. Acima, vira parede: o `config.py` do Control chegava a
+# 42 fichas empilhadas numa coluna so.
+LIMIAR_FLAG = 4
+
+
+def agrupar_flags(modelo: "Modelo", limiar: int = LIMIAR_FLAG) -> "Modelo":
+    """Troca uma pilha de `flag` por UMA ficha que conta.
+
+    O dono olhou o `config.py` do Control — 59 fichas de env empilhadas — e
+    disse que aquilo tinha que ser mostrado de outra forma. E' o mesmo caso
+    da `rota` e da `template`: a parede responde QUAIS existem, e esta pagina
+    pergunta como as partes se falam.
+
+    O rotulo diz duas coisas, e nao uma, porque o extrator mente um pouco: a
+    secao se chama `flag`, mas o que ele emite e' TODA variavel de ambiente —
+    `REVY_TRAFEGO_TIMEZONE` esta no meio. Das 59 do Control, so 19 sao flag
+    de rollout de verdade (`default: 0` ou `''`). Escrever "59 flags, todas
+    default OFF" seria uma mentira que o desenho afirma sozinho; entao o
+    rotulo separa as duas contas, e e' justamente a segunda que interessa a
+    invariante do AGENTS.md secao 5 (rollout nasce OFF no codigo).
+
+    Funcao pura, como `filtrar`: devolve um `Modelo` novo. O dado inteiro
+    continua em `mapa/<produto>.md`.
+    """
+    return replace(modelo, nos=tuple(_agrupar_flags_no(n, limiar)
+                                     for n in modelo.nos))
+
+
+def _agrupar_flags_no(no: "No", limiar: int) -> "No":
+    flags = [e for e in no.entradas if e.secao == "flag"]
+    filhos = tuple(_agrupar_flags_no(f, limiar) for f in no.filhos)
+    if len(flags) < limiar:
+        return replace(no, filhos=filhos)
+
+    resto = tuple(e for e in no.entradas if e.secao != "flag")
+    off = sum(1 for e in flags if _ROLLOUT_OFF.search(e.chave))
+    rotulo = f"{len(flags)} env"
+    if off:
+        rotulo += f" · {off} rollout OFF"
+    arquivos = {e.arquivo for e in flags}
+    # Um arquivo so: vale nomear (quase sempre `app/config.py`). Varios: o
+    # numero, porque listar tres caminhos e' voltar a ser a parede.
+    onde = arquivos.pop() if len(arquivos) == 1 else f"{len(arquivos)} arquivos"
+    # `linha=0` e' o combinado com `arq_layout._caixa_item`: ficha sintetica
+    # nao tem linha, e o subtitulo sai sem o `:0`.
+    contagem = Entrada(secao="flag", chave=rotulo, simbolo=rotulo,
+                       arquivo=onde, linha=0)
+    return replace(no, entradas=resto + (contagem,), filhos=filhos)

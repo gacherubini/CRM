@@ -59,6 +59,9 @@ def montar(raiz: Path) -> str:
     # conteudo, mesmo sem entrada de inventario. Ver arq_modelo._podar.
     arq = arq_modelo.filtrar(completo, arquitetura.SECOES_ARQUITETURA,
                              manter_manuais=True)
+    # So na Arquitetura: a Schema nao tem flag nenhuma pra agrupar, e chamar
+    # ali seria trabalho sem efeito com cara de regra.
+    arq = arq_modelo.agrupar_flags(arq)
     sch = arq_modelo.filtrar(completo, arquitetura.SECOES_SCHEMA)
     # `filtrar` so poda NO (por secao); arestas e fluxos que nao citem um no
     # podado sobrevivem intactos — por isso a Schema ainda carregaria as
