@@ -570,9 +570,11 @@ def dispor(modelo: Modelo, grupos: tuple[Vm, ...],
     # arq_render omite o atributo quando o valor e 0, entao elas nunca
     # brigam com o Zoom.acender da Task 7.
     por_chave = {c.chave: c for c in caixas}
+    # Conta so filho que e' CAIXA, nunca ficha (`tipo == "item"`) — ver o
+    # comentario do `face` logo abaixo.
     filhos: dict[str, int] = {}
     for c in caixas:
-        if c.pai:
+        if c.pai and c.tipo != "item":
             filhos[c.pai] = filhos.get(c.pai, 0) + 1
     finais = []
     for c in caixas:
@@ -589,15 +591,20 @@ def dispor(modelo: Modelo, grupos: tuple[Vm, ...],
         # apaga. E' o caso de quem nao tem o que por no lugar dela.
         #
         # A troca que o zoom faz e': o titulo e a linha de prova saem, o
-        # interior entra. Ela so se paga quando ha interior. Numa caixa vazia
-        # (`estoque-api.outbox`, que nao casa entrada nenhuma de inventario)
-        # voce clicava e ficava com uma TELA BRANCA — tinha "HMAC, backoff,
-        # desiste em 5 (outbox.py:19,27,83)" e passava a nao ter nada. Com uma
-        # ficha so, trocava o titulo por `main / app/worker.py:55`.
+        # interior entra. Ela so se paga quando o que entra vale mais que o
+        # que sai. Numa caixa vazia (`estoque-api.outbox`, que nao casa
+        # entrada nenhuma de inventario) voce clicava e ficava com uma TELA
+        # BRANCA — tinha "HMAC, backoff, desiste em 5 (outbox.py:19,27,83)" e
+        # passava a nao ter nada.
         #
-        # Entao: de dois filhos pra cima, a face apaga (o efeito de cair
-        # dentro, que e' o que faz um produto de dez componentes funcionar);
-        # de um pra baixo, ela fica.
+        # E o que conta e' filho que e' CAIXA, nao ficha. Este e' o segundo
+        # corte, e ele veio de olhar a tela: com a contagem crua, `Copiloto
+        # de Vendas` perdia o titulo pra mostrar seis pilulas de env, e
+        # `Google Ads` perdia pra mostrar cinco. Ficha nao substitui titulo
+        # com `arquivo:linha` — ela ACOMPANHA. Cair dentro so' vale quando o
+        # que aparece sao outras caixas COM NOME: os dez componentes de um
+        # produto, os dois drivers da gaveta `rpa`, as tres threads de
+        # `workers`.
         face = k if filhos.get(c.chave, 0) >= 2 else 0.0
         finais.append(replace(c, k_min=k, k_face=face))
 

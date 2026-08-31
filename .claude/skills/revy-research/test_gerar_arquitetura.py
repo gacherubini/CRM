@@ -1037,10 +1037,14 @@ class TestComponentesDoChatbot(unittest.TestCase):
         (outbox.py:19,27,83)" e passava a nao ter nada. Com uma ficha so,
         trocava o titulo por `main / app/worker.py:55`.
 
+        Conta so filho que e' CAIXA. Ficha nao substitui titulo, ela
+        ACOMPANHA: com a contagem crua, `Copiloto de Vendas` perdia o titulo
+        pra mostrar seis pilulas de env.
+
         `k_face = 0` faz arq_render omitir `data-face-ate`, e sem o atributo o
         `aplicarLod` nunca mexe naquela face — ela fica preta, em qualquer
-        zoom. Nao confunda com `k_min`, que continua valendo: a ficha unica
-        ainda aparece, so que ABAIXO do titulo, em vez de no lugar dele.
+        zoom. Nao confunda com `k_min`, que continua valendo: a ficha ainda
+        aparece, so que ABAIXO do titulo, em vez de no lugar dele.
         """
         completo = arq_modelo.carregar(
             self.raiz, self.frescor, arquitetura.NOS,
@@ -1051,7 +1055,7 @@ class TestComponentesDoChatbot(unittest.TestCase):
         cena = arq_layout.dispor(arq, arq.vms, arquitetura.POSICOES)
         filhos: dict[str, int] = {}
         for c in cena.caixas:
-            if c.pai:
+            if c.pai and c.tipo != "item":
                 filhos[c.pai] = filhos.get(c.pai, 0) + 1
         magras, gordas = [], []
         for c in cena.caixas:
@@ -1061,7 +1065,7 @@ class TestComponentesDoChatbot(unittest.TestCase):
                 if c.k_face <= 0:
                     gordas.append(c.chave)
             elif c.k_face > 0:
-                magras.append(f"{c.chave} ({filhos.get(c.chave, 0)} filhos)")
+                magras.append(f"{c.chave} ({filhos.get(c.chave, 0)} caixas)")
         self.assertEqual(magras, [], "face apagando sem ter o que por no lugar")
         self.assertEqual(gordas, [], "caixa cheia que nunca troca de conteudo")
 
