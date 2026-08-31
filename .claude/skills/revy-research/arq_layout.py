@@ -31,6 +31,12 @@ from dataclasses import dataclass, replace
 
 from arq_modelo import Modelo, No, Vm
 
+# Quanto uma aresta que anda para TRAS na fila custa a mais que uma que anda
+# para frente (`_ordem_por_afinidade`). 3 foi o menor valor que poe os quatro
+# estagios do Chatbot em ordem de fluxo — com 1 (sem pena) a ordenacao so
+# olha proximidade e "Sai" pode nascer antes de "Entra".
+PENA_DE_VOLTA = 3
+
 MARGEM = 24.0
 ALTURA_TITULO = 34.0
 ITEM_H = 13.0
@@ -151,9 +157,18 @@ def _ordem_por_afinidade(caminhos: list[str], arestas: tuple[tuple[str, str], ..
     layout que nao deveria ter esse formato; e' mais barato dar ao
     empacotamento uma ordem que ja nasce sem a travessia.
 
-    Minimiza `sum(peso[i][j] * distancia_na_fila(i, j))` — o arranjo linear
-    ponderado — por subida de encosta: troca dois irmaos de lugar enquanto
-    alguma troca diminuir o custo, partindo da propria ordem alfabetica.
+    Minimiza `sum(peso[i][j] * custo(posicao[j] - posicao[i]))` — o arranjo
+    linear ponderado, com DIRECAO — por subida de encosta: troca dois irmaos
+    de lugar enquanto alguma troca diminuir o custo, partindo da ordem
+    alfabetica.
+
+    O peso e' dirigido e andar para tras custa `PENA_DE_VOLTA` vezes mais que
+    andar para frente. Sem isso a ordenacao so sabia PROXIMIDADE: ela punha
+    quem conversa lado a lado, mas nada a impedia de deixar o estagio "Sai"
+    antes do "Entra" — foi exatamente o que ela fez na primeira tentativa com
+    os grupos por estagio do Chatbot, e a pagina ficava lendo de tras para a
+    frente. Com a pena, a fila sai na ordem do fluxo sozinha, a partir do
+    dado: nada de lista de nomes cravada no codigo.
 
     Medido no modelo real (as 20 arestas internas do Chatbot, contando
     travessia de caixa que nao e' ponta nem ancestral de ponta):
@@ -190,6 +205,7 @@ def _ordem_por_afinidade(caminhos: list[str], arestas: tuple[tuple[str, str], ..
     if n < 3:
         return list(range(n))
 
+    # DIRIGIDO: peso[i][j] conta so as arestas que vao de i PARA j.
     peso = [[0] * n for _ in range(n)]
     for de, para in arestas:
         i = _indice_dono(caminhos, de)
@@ -197,7 +213,6 @@ def _ordem_por_afinidade(caminhos: list[str], arestas: tuple[tuple[str, str], ..
         if i is None or j is None or i == j:
             continue
         peso[i][j] += 1
-        peso[j][i] += 1
 
     # Sem nenhuma aresta entre os irmaos, nenhuma troca melhora nada e a
     # subida devolveria a identidade de qualquer jeito — o atalho e' so pra
@@ -216,6 +231,10 @@ def _ordem_por_afinidade(caminhos: list[str], arestas: tuple[tuple[str, str], ..
     for p, k in enumerate(ordem):
         posicao[k] = p
 
+    def custo(d: int) -> int:
+        """Distancia na fila, mais cara quando a seta anda para tras."""
+        return d if d > 0 else -d * PENA_DE_VOLTA
+
     def delta(a: int, b: int) -> int:
         u, v = ordem[a], ordem[b]
         d = 0
@@ -223,8 +242,14 @@ def _ordem_por_afinidade(caminhos: list[str], arestas: tuple[tuple[str, str], ..
             if k == u or k == v:
                 continue
             p = posicao[k]
-            d += peso[u][k] * (abs(b - p) - abs(a - p))
-            d += peso[v][k] * (abs(a - p) - abs(b - p))
+            d += peso[u][k] * (custo(p - b) - custo(p - a))
+            d += peso[k][u] * (custo(b - p) - custo(a - p))
+            d += peso[v][k] * (custo(p - a) - custo(p - b))
+            d += peso[k][v] * (custo(a - p) - custo(b - p))
+        # O par trocado entre si TAMBEM muda, ao contrario do caso simetrico:
+        # inverter u e v inverte o sentido da aresta entre os dois na fila.
+        d += peso[u][v] * (custo(a - b) - custo(b - a))
+        d += peso[v][u] * (custo(b - a) - custo(a - b))
         return d
 
     # Teto de voltas: a subida so anda quando ha melhora ESTRITA, entao ela
