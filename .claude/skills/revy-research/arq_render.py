@@ -380,14 +380,26 @@ def _no_recursivo(caixa: Caixa, por_pai: dict, spof_map: dict,
         if caixa.k_min > 0 else ""
     )
 
+    # `data-x/y/w/h`: a geometria ORIGINAL da caixa, pra o JS nao precisar de
+    # getBBox nem de decifrar o <rect> (uma VM-banco nem tem rect, tem path).
+    # Arrastar soma um deslocamento a estes numeros; o valor no atributo nunca
+    # muda, entao "voltar ao automatico" e' so jogar o deslocamento fora.
+    geo = (f' data-x="{caixa.x:.2f}" data-y="{caixa.y:.2f}"'
+           f' data-w="{caixa.w:.2f}" data-h="{caixa.h:.2f}"')
+    chave_esc = html.escape(caixa.chave)
     forma = (
-        f'<g id="{html.escape(caixa.chave)}" data-titulo="{html.escape(caixa.titulo)}" data-navegavel>'
+        f'<g id="{chave_esc}" data-titulo="{html.escape(caixa.titulo)}" data-navegavel{geo}>'
         + retangulo + extra_forma
         + f"<g{kmin_attr}>{interior_forma}</g>"
         + "</g>"
     )
+    # `data-texto-de` casa esta camada com a forma de mesma chave. Forma e
+    # texto vivem em <g> IRMAOS (o filtro de rabisco so pode pegar a forma —
+    # ver docstring do modulo), entao mover uma caixa e' mover DOIS grupos; sem
+    # marca, o texto ficaria para tras. O <g> do texto nao pode levar `id`:
+    # `svg.getElementById` e o `voarPara` acertariam o alvo errado.
     texto = (
-        "<g>" + _face(caixa, spof, largura_cena) + extra_texto
+        f'<g data-texto-de="{chave_esc}">' + _face(caixa, spof, largura_cena) + extra_texto
         + f"<g{kmin_attr}>{interior_texto}</g>"
         + "</g>"
     )
@@ -489,7 +501,7 @@ def _sem_rede(a: Aresta) -> bool:
     return a.de.split(".")[0] == a.para.split(".")[0]
 
 
-def _marcas_da_aresta(a: Aresta, de: Caixa, para: Caixa) -> str:
+def _marcas_da_aresta(a: Aresta, de: Caixa, para: Caixa, idx: int) -> str:
     """Atributos que `arq_zoom.js` le pra decidir a opacidade de cada seta.
 
     `data-de`/`data-para` sao os ids ABSOLUTOS (com prefixo de VM), nao as
@@ -512,11 +524,14 @@ def _marcas_da_aresta(a: Aresta, de: Caixa, para: Caixa) -> str:
     Por isso o seletor do JS e' `[data-de]`, nao `[data-aresta]`.
     """
     interna = ' data-interna=""' if _sem_rede(a) else ""
-    return (f' data-de="{html.escape(de.chave)}" data-para="{html.escape(para.chave)}"'
-            f'{interna}')
+    # `data-i` e' o indice da aresta na lista resolvida. A forma e o rotulo
+    # levam o MESMO indice: e' por ele que o JS acha os dois pedacos da mesma
+    # seta ao recalcular o tracado enquanto voce arrasta uma caixa.
+    return (f' data-i="{idx}" data-de="{html.escape(de.chave)}"'
+            f' data-para="{html.escape(para.chave)}"{interna}')
 
 
-def _aresta_forma(a: Aresta, de: Caixa, para: Caixa, deslocamento: float) -> str:
+def _aresta_forma(a: Aresta, de: Caixa, para: Caixa, deslocamento: float, idx: int) -> str:
     pontos = _pontos_da_aresta(de, para, deslocamento)
     marca = f"{html.escape(a.de)}->{html.escape(a.para)}"
     marcador = "seta-sem" if not a.retry and not _sem_rede(a) else "seta"
@@ -527,12 +542,12 @@ def _aresta_forma(a: Aresta, de: Caixa, para: Caixa, deslocamento: float) -> str
     txt_pontos = " ".join(f"{x:.2f},{y:.2f}" for x, y in pontos)
     return (
         f'<polyline data-aresta="{marca}" points="{txt_pontos}"'
-        f'{_marcas_da_aresta(a, de, para)}{tracejado}{cor} '
+        f'{_marcas_da_aresta(a, de, para, idx)}{tracejado}{cor} '
         f'marker-end="url(#{marcador})"/>'
     )
 
 
-def _aresta_texto(a: Aresta, de: Caixa, para: Caixa, deslocamento: float) -> str:
+def _aresta_texto(a: Aresta, de: Caixa, para: Caixa, deslocamento: float, idx: int) -> str:
     # Rotulo e' SO o protocolo — sincrono/assincrono ja esta no tracejado da
     # forma, e "sem retry" ja esta na cor vermelha; repetir em texto era
     # ruido (e a palavra "retry" nunca aparece em texto nenhum).
@@ -554,7 +569,7 @@ def _aresta_texto(a: Aresta, de: Caixa, para: Caixa, deslocamento: float) -> str
     # As mesmas marcas da forma: o rotulo tem que acender e apagar JUNTO com
     # a seta dele. Sem isso, esconder as arestas internas deixaria as
     # palavras soltas boiando no vazio, apontando pra nada.
-    return (f'<text{_marcas_da_aresta(a, de, para)} x="{mx:.2f}" y="{my:.2f}" '
+    return (f'<text{_marcas_da_aresta(a, de, para, idx)} x="{mx:.2f}" y="{my:.2f}" '
             f'font-size="8" fill="{cor}" class="protocolo">'
             f'{html.escape(a.protocolo)}</text>')
 
@@ -774,10 +789,10 @@ def render(vistas: tuple[Vista, ...], js: str,
                 resolvidas.append((a, de, para))
         offsets = _offsets_de_saida(resolvidas)
         arestas_forma = "".join(
-            _aresta_forma(a, de, para, offsets[idx])
+            _aresta_forma(a, de, para, offsets[idx], idx)
             for idx, (a, de, para) in enumerate(resolvidas))
         arestas_texto = "".join(
-            _aresta_texto(a, de, para, offsets[idx])
+            _aresta_texto(a, de, para, offsets[idx], idx)
             for idx, (a, de, para) in enumerate(resolvidas))
 
         largura = max(vista.cena.largura, 1.0)
@@ -913,6 +928,24 @@ def render(vistas: tuple[Vista, ...], js: str,
      opacity inline, que ganha desta regra; `Zoom.apagar()` limpa o inline e
      elas voltam a sumir sozinhas. */
   [data-interna]{{opacity:0}}
+  /* Rodape esquerdo, nao topo: em cima ela cobria o rotulo da VM
+     (`app2037`), que fica no canto superior esquerdo da cena. */
+  #posicoes{{position:fixed;left:12px;bottom:52px;z-index:6;display:flex;gap:6px;
+    align-items:center;background:{SURFACE};border:1px solid {LINE};border-radius:6px;
+    padding:5px 8px;font-size:11px;color:{INK_MUTED}}}
+  #posicoes button{{font-size:11px;font-family:{MONO};cursor:pointer;padding:3px 7px;
+    border:1px solid {LINE_STRONG};border-radius:4px;background:{SURFACE_SOFT};color:{INK}}}
+  #posicoes button:hover{{background:{LINE}}}
+  #saida-posicoes{{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);
+    z-index:9;background:{SURFACE};border:1px solid {LINE_STRONG};border-radius:8px;
+    padding:14px;width:min(620px,90vw);box-shadow:0 8px 30px rgba(0,0,0,.18)}}
+  #saida-posicoes p{{margin:0 0 8px;font-size:12px;color:{INK_MUTED};line-height:1.5}}
+  #saida-posicoes textarea{{width:100%;font-family:{MONO};font-size:11px;
+    border:1px solid {LINE};border-radius:4px;padding:8px;background:{SURFACE_SOFT};
+    color:{INK};resize:vertical;box-sizing:border-box}}
+  #saida-posicoes button{{margin-top:8px;font-size:11px;font-family:{MONO};cursor:pointer;
+    padding:3px 9px;border:1px solid {LINE_STRONG};border-radius:4px;
+    background:{SURFACE_SOFT};color:{INK}}}
 </style>
 {_defs_compartilhadas()}
 <header id="cromo">
@@ -920,7 +953,17 @@ def render(vistas: tuple[Vista, ...], js: str,
   <nav id="alternador">{corpo_botoes}{botao_design}</nav>
   <span id="trilha">Revy</span>
 </header>
-<div id="dica">clique numa caixa para cair dentro · <strong>Esc</strong> volta · roda dá zoom · arraste para navegar · <strong>passe o mouse</strong> numa caixa para ver o que ela chama · borda grossa vermelha é SPOF, tracejado é assíncrono, moldura tracejada é máquina (VM)</div>
+<div id="posicoes">
+  <span>arraste as caixas</span>
+  <button id="btn-auto" title="descarta o que você moveu e volta ao layout calculado">automático</button>
+  <button id="btn-exportar" title="gera o bloco POSICOES para colar em arquitetura.py">exportar</button>
+</div>
+<div id="saida-posicoes" hidden>
+  <p>Cole este bloco no lugar do <code>POSICOES</code> em <code>arquitetura.py</code> e rode <code>gerar_arquitetura.py</code>. A partir daí a posição é dado versionado, não só deste navegador.</p>
+  <textarea id="texto-posicoes" readonly rows="10" spellcheck="false"></textarea>
+  <button id="btn-fechar-posicoes">fechar</button>
+</div>
+<div id="dica">clique numa caixa para cair dentro · <strong>Esc</strong> volta · roda dá zoom · arraste o <strong>fundo</strong> para navegar · <strong>passe o mouse</strong> numa caixa para ver o que ela chama · borda grossa vermelha é SPOF, tracejado é assíncrono, moldura tracejada é máquina (VM)</div>
 {_legenda_html()}
 {corpo_fluxos}
 {design_html}
@@ -981,6 +1024,49 @@ def render(vistas: tuple[Vista, ...], js: str,
       zoomInstancias[chave].atualizarFiltro();
     }}
   }}
+
+  // ---- barra de posicoes ----
+  // A vista visivel e' a dona dos botoes: cada <svg> tem a propria instancia
+  // de Zoom, com o proprio conjunto de caixas movidas.
+  function instanciaVisivel() {{
+    for (var chave in zoomInstancias) {{
+      if (!zoomInstancias[chave].elemento.hasAttribute("hidden")) return zoomInstancias[chave];
+    }}
+    return null;
+  }}
+  document.getElementById("btn-auto").addEventListener("click", function () {{
+    var z = instanciaVisivel();
+    if (z) z.voltarAoAutomatico();
+  }});
+  document.getElementById("btn-exportar").addEventListener("click", function () {{
+    var z = instanciaVisivel();
+    if (!z) return;
+    var movidos = z.posicoesMovidas();
+    // `sort`: o bloco exportado tem que sair igual duas vezes, senao colar
+    // duas vezes seguidas produz diff de ordem no git sem nada ter mudado.
+    var chaves = Object.keys(movidos).sort();
+    var linhas = ['POSICOES: dict[str, tuple[float, float]] = {{'];
+    for (var i = 0; i < chaves.length; i++) {{
+      var m = movidos[chaves[i]];
+      linhas.push('    "' + chaves[i] + '": (' +
+                  m.dx.toFixed(1) + ', ' + m.dy.toFixed(1) + '),');
+    }}
+    linhas.push('}}');
+    var texto = chaves.length ? linhas.join("\\n")
+              : "# nada movido ainda — arraste uma caixa primeiro";
+    var area = document.getElementById("texto-posicoes");
+    area.value = texto;
+    document.getElementById("saida-posicoes").hidden = false;
+    area.focus(); area.select();
+    // Copiar pode ser negado (file:// sem permissao, foco perdido): o
+    // textarea ja esta selecionado, entao Cmd+C funciona de qualquer jeito.
+    if (navigator.clipboard && navigator.clipboard.writeText) {{
+      navigator.clipboard.writeText(texto).catch(function () {{}});
+    }}
+  }});
+  document.getElementById("btn-fechar-posicoes").addEventListener("click", function () {{
+    document.getElementById("saida-posicoes").hidden = true;
+  }});
 {corpo_scripts_fluxo}
 </script>
 """

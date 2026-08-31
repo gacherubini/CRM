@@ -730,8 +730,13 @@ class TestPeleRevy(unittest.TestCase):
         # SEMPRE a forma do proprio no/vm (rect/path), antes de qualquer
         # filho — mesmo quando ha filhos (eles vem depois, dentro do
         # `<g data-k-min>`).
+        # `[^>]*` depois de data-navegavel: desde 30/08 a caixa leva tambem a
+        # geometria (data-x/y/w/h), que o JS usa pra recalcular as setas
+        # enquanto voce arrasta. O que o teste garante continua sendo o
+        # mesmo — qual forma vem primeiro dentro do grupo.
         padrao = re.compile(
-            r'<g id="' + re.escape(chave) + r'" data-titulo="[^"]*" data-navegavel>(<[a-z]+)')
+            r'<g id="' + re.escape(chave)
+            + r'" data-titulo="[^"]*" data-navegavel[^>]*>(<[a-z]+)')
         m = padrao.search(self.html)
         self.assertIsNotNone(m, chave)
         return m.group(1)
@@ -1095,3 +1100,84 @@ class TestOrdemDoFluxo(unittest.TestCase):
         alfabetica = sorted(arquitetura.NOS["chatbot-api"]["dentro"])
         self.assertGreater(len(self._arestas_para_tras(alfabetica)), 1,
                            "a ordenacao deixou de fazer diferenca")
+
+
+class TestPosicoesAMao(unittest.TestCase):
+    """Arrastar so vale se a posicao puder virar dado versionado.
+
+    O caminho e': arrasta na pagina -> "exportar" -> cola o bloco em
+    `arquitetura.POSICOES` -> `gerar_arquitetura.py`. Daqui em diante a
+    posicao esta no git e o `--verificar` volta a valer. Sem esta ponte,
+    arrastar viveria so no localStorage de uma maquina — e o dono usa duas.
+    """
+
+    def setUp(self):
+        self.raiz = varredura.raiz_repo()
+        frescor_path = Path(__file__).resolve().parent / "mapa" / "_frescor.json"
+        frescor = json.loads(frescor_path.read_text(encoding="utf-8"))
+        completo = arq_modelo.carregar(
+            self.raiz, frescor, arquitetura.NOS,
+            list(arquitetura.ARESTAS) + list(arquitetura.ARESTAS_INTERNAS),
+            arquitetura.VMS, arquitetura.FLUXOS, arquitetura.BANCOS)
+        self.arq = arq_modelo.filtrar(
+            completo, arquitetura.SECOES_ARQUITETURA, manter_manuais=True)
+
+    def test_posicao_a_mao_move_a_caixa_e_a_subarvore(self):
+        base = {c.chave: c for c in arq_layout.dispor(self.arq, self.arq.vms).caixas}
+        alvo = "app2037.chatbot-api.decide"
+        movida = arq_layout.dispor(self.arq, self.arq.vms, {alvo: (100.0, 50.0)})
+
+        mexidas = [c.chave for c in movida.caixas
+                   if (c.x, c.y) != (base[c.chave].x, base[c.chave].y)]
+        self.assertGreater(len(mexidas), 1, "a subarvore ficou para tras")
+        # SO a caixa e o que esta dentro dela: mover um estagio nao pode
+        # arrastar o vizinho junto.
+        for chave in mexidas:
+            self.assertTrue(chave == alvo or chave.startswith(alvo + "."), chave)
+        # E o deslocamento e' exatamente o pedido, em todas.
+        for c in movida.caixas:
+            if c.chave in mexidas:
+                self.assertAlmostEqual(c.x - base[c.chave].x, 100.0, places=6)
+                self.assertAlmostEqual(c.y - base[c.chave].y, 50.0, places=6)
+
+    def test_deslocamento_de_pai_e_filho_soma(self):
+        # A mesma regra do `deslocamentoDe` em arq_zoom.js. Se as duas contas
+        # divergirem, a pagina mostra uma coisa e o HTML gerado outra.
+        pai, filho = "app2037.chatbot-api", "app2037.chatbot-api.decide"
+        base = {c.chave: c for c in arq_layout.dispor(self.arq, self.arq.vms).caixas}
+        cena = arq_layout.dispor(self.arq, self.arq.vms,
+                                 {pai: (10.0, 0.0), filho: (5.0, 0.0)})
+        por = {c.chave: c for c in cena.caixas}
+        self.assertAlmostEqual(por[pai].x - base[pai].x, 10.0, places=6)
+        self.assertAlmostEqual(por[filho].x - base[filho].x, 15.0, places=6)
+
+    def test_sem_posicoes_a_cena_e_identica(self):
+        # O default nao pode mexer em nada: `POSICOES` vazio e' o estado de
+        # hoje, e `--verificar` compara byte a byte.
+        sem = arq_layout.dispor(self.arq, self.arq.vms)
+        vazio = arq_layout.dispor(self.arq, self.arq.vms, {})
+        self.assertEqual(sem.caixas, vazio.caixas)
+
+    def test_a_pagina_traz_a_barra_e_o_bloco_para_colar(self):
+        html_gerado = gerar_arquitetura.montar(self.raiz)
+        self.assertIn('id="btn-exportar"', html_gerado)
+        self.assertIn('id="btn-auto"', html_gerado)
+        # O nome do bloco exportado tem que bater com o nome real em
+        # arquitetura.py, senao o dono cola um bloco que o gerador ignora.
+        self.assertIn("POSICOES: dict[str, tuple[float, float]]", html_gerado)
+        self.assertIn("POSICOES", Path(arquitetura.__file__).read_text(encoding="utf-8"))
+
+    def test_toda_caixa_leva_geometria_e_par_de_texto(self):
+        # O JS move DOIS grupos irmaos (forma e texto) e recalcula as setas a
+        # partir de data-x/y/w/h. Faltando qualquer um dos dois, arrastar
+        # deixa metade da caixa para tras — e nao ha erro no console.
+        html_gerado = gerar_arquitetura.montar(self.raiz)
+        inicio = html_gerado.index('<svg id="mapa-arquitetura"')
+        svg = html_gerado[inicio:html_gerado.index("</svg>", inicio)]
+        navegaveis = re.findall(r'<g id="([^"]+)" data-titulo="[^"]*" data-navegavel([^>]*)>', svg)
+        self.assertGreater(len(navegaveis), 10)
+        textos = set(re.findall(r'<g data-texto-de="([^"]+)">', svg))
+        for chave, atributos in navegaveis:
+            for eixo in ("data-x", "data-y", "data-w", "data-h"):
+                self.assertIn(eixo, atributos, chave)
+            self.assertIn(chave, textos, f"{chave} nao tem camada de texto pareada")

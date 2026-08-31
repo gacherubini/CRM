@@ -452,7 +452,40 @@ def _dispor_vm(vm: Vm, por_chave: dict[str, No], nivel: int,
     return caixa_vm, descendentes
 
 
-def dispor(modelo: Modelo, grupos: tuple[Vm, ...]) -> Cena:
+def _aplicar_posicoes(caixas: list[Caixa],
+                      a_mao: dict[str, tuple[float, float]]) -> list[Caixa]:
+    """Soma os deslocamentos escritos a mao (`arquitetura.POSICOES`).
+
+    O layout automatico acerta a estrutura e nao adivinha o que o dono quer
+    ver perto do que. Ele arrasta a caixa na pagina, exporta, e cola o bloco
+    em `arquitetura.py` — dali em diante a posicao e' DADO, versionada e
+    commitada junto do resto, e `gerar_arquitetura.py --verificar` volta a
+    valer. Sem isso, arrastar so vivia no localStorage de uma maquina.
+
+    Deslocamento, nao coordenada absoluta: a caixa continua sendo colocada
+    pelo empacotamento e so ANDA a partir dali. Assim, acrescentar um
+    componente novo nao invalida o que ja foi arrumado a mao — a vizinhanca
+    inteira se move junto e o ajuste continua valendo em cima dela.
+
+    Mover um pai leva a subarvore (o filho vive em coordenada absoluta, nao
+    relativa), e um deslocamento no filho SOMA ao do pai — a mesma regra do
+    `deslocamentoDe` em arq_zoom.js, e as duas precisam continuar iguais.
+    """
+    if not a_mao:
+        return caixas
+    movidas = []
+    for c in caixas:
+        dx = dy = 0.0
+        for chave, (mx, my) in sorted(a_mao.items()):
+            if c.chave == chave or c.chave.startswith(chave + "."):
+                dx += mx
+                dy += my
+        movidas.append(replace(c, x=c.x + dx, y=c.y + dy) if (dx or dy) else c)
+    return movidas
+
+
+def dispor(modelo: Modelo, grupos: tuple[Vm, ...],
+           a_mao: dict[str, tuple[float, float]] | None = None) -> Cena:
     """`grupos` e o nivel 1 da cena: `modelo.vms` pra vista Arquitetura,
     `modelo.bancos` pra vista Schema (Task 9) — quem chama escolhe, porque
     so quem filtrou o modelo (`arq_modelo.filtrar`) sabe qual das duas vistas
@@ -467,6 +500,7 @@ def dispor(modelo: Modelo, grupos: tuple[Vm, ...]) -> Cena:
     grupo fica solto, no mesmo nivel — nao existe hoje nos dados reais (as
     seis produtos vivem em app2037), mas o modelo precisa aceitar.
     """
+    a_mao = a_mao or {}
     por_chave_no = {no.chave: no for no in modelo.nos}
     contidos: set[str] = set()
     for vm in grupos:
@@ -533,5 +567,6 @@ def dispor(modelo: Modelo, grupos: tuple[Vm, ...]) -> Cena:
         k = round(max(1.6, 0.6 * (largura / pai.w)), 4) if pai.w else 0.0
         finais.append(replace(c, k_min=k, k_face=k))
 
+    finais = _aplicar_posicoes(finais, a_mao)
     finais.sort(key=lambda c: c.chave)
     return Cena(caixas=tuple(finais), largura=largura, altura=altura)

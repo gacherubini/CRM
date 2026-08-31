@@ -285,6 +285,172 @@ window.Zoom = {
       }
     }
 
+    // ================================================================
+    // ARRASTAR (30/08, 4a leva). O layout automatico acerta a estrutura mas
+    // nao adivinha o que voce quer ver perto do que; entao a caixa se move.
+    //
+    // Mover uma caixa e' mover DOIS grupos irmaos — a forma (<g id=chave>) e
+    // o texto (<g data-texto-de=chave>) — porque o filtro de rabisco so pode
+    // pegar a forma. Os filhos vao junto de graca: eles estao ANINHADOS
+    // dentro dos dois grupos, entao um `transform` no pai leva a subarvore.
+    //
+    // As setas nao vao de graca. O tracado delas e' calculado em Python, na
+    // geracao, e sai em coordenadas absolutas — entao arrastar sem recalcular
+    // deixaria a seta apontando pro lugar velho. `recalcularArestas` refaz o
+    // mesmo caminho de `_pontos_da_aresta` (arq_render.py), em JS, a cada
+    // quadro do arrasto. Manter as duas contas iguais e' o preco de a seta
+    // acompanhar a mao; se uma mudar, a outra tem que mudar junto.
+    // ================================================================
+    var CHAVE_STORAGE = "revy-arquitetura-posicoes";
+    var movidos = {};          // chave -> {dx, dy}, so o que o humano mexeu
+    var arrastandoCaixa = null;
+    var LIMIAR_ARRASTO = 3;
+
+    function lerSalvo() {
+      try {
+        var cru = window.localStorage.getItem(CHAVE_STORAGE);
+        if (!cru) return {};
+        var todo = JSON.parse(cru);
+        return todo[svg.id] || {};
+      } catch (e) { return {}; }   // modo anonimo, storage bloqueado: segue sem
+    }
+    function salvar() {
+      try {
+        var cru = window.localStorage.getItem(CHAVE_STORAGE);
+        var todo = cru ? JSON.parse(cru) : {};
+        todo[svg.id] = movidos;    // uma gaveta por vista; Schema tem a dela
+        window.localStorage.setItem(CHAVE_STORAGE, JSON.stringify(todo));
+      } catch (e) { /* sem storage: a posicao vale so nesta aba */ }
+    }
+
+    // O deslocamento de uma caixa e' o dela MAIS o dos ancestrais: mover o
+    // grupo "Entra" move a Borda que esta dentro dele, e se voce depois
+    // mover a Borda, os dois somam. Os ids sao caminhos pontuados, entao
+    // "ancestral" e' teste de prefixo.
+    function deslocamentoDe(id) {
+      var dx = 0, dy = 0;
+      for (var chave in movidos) {
+        if (id === chave || id.indexOf(chave + ".") === 0) {
+          dx += movidos[chave].dx; dy += movidos[chave].dy;
+        }
+      }
+      return [dx, dy];
+    }
+
+    function geometriaDe(id) {
+      var el = svg.getElementById(id);
+      if (!el || !el.hasAttribute("data-x")) return null;
+      var d = deslocamentoDe(id);
+      return { x: parseFloat(el.getAttribute("data-x")) + d[0],
+               y: parseFloat(el.getAttribute("data-y")) + d[1],
+               w: parseFloat(el.getAttribute("data-w")),
+               h: parseFloat(el.getAttribute("data-h")) };
+    }
+
+    function aplicarTransformes() {
+      var formas = svg.querySelectorAll("[data-navegavel]");
+      for (var i = 0; i < formas.length; i++) {
+        var id = formas[i].id, m = movidos[id];
+        var t = m ? "translate(" + m.dx + " " + m.dy + ")" : null;
+        var par = svg.querySelector('[data-texto-de="' + cssEscape(id) + '"]');
+        if (t) {
+          formas[i].setAttribute("transform", t);
+          if (par) par.setAttribute("transform", t);
+        } else {
+          formas[i].removeAttribute("transform");
+          if (par) par.removeAttribute("transform");
+        }
+      }
+    }
+
+    // Os ids tem ponto e hifen; um seletor de atributo aceita isso entre
+    // aspas, mas aspas dentro do valor nao. Nenhuma chave tem aspas hoje —
+    // isto e' cinto de seguranca, nao remendo de bug conhecido.
+    function cssEscape(v) { return String(v).replace(/"/g, '\\"'); }
+
+    // ---- o mesmo roteamento de arq_render._pontos_da_aresta, em JS ----
+    var LADO_OPOSTO = { direita: "esquerda", esquerda: "direita",
+                        cima: "baixo", baixo: "cima" };
+    var PASSO_SAIDA = 9.0;
+
+    function ladoSaida(de, para) {
+      var dx = (para.x + para.w / 2) - (de.x + de.w / 2);
+      var dy = (para.y + para.h / 2) - (de.y + de.h / 2);
+      if (Math.abs(dx) >= Math.abs(dy)) return dx >= 0 ? "direita" : "esquerda";
+      return dy >= 0 ? "baixo" : "cima";
+    }
+    function pontoBorda(c, lado, off) {
+      if (lado === "direita") return [c.x + c.w, c.y + c.h / 2 + off];
+      if (lado === "esquerda") return [c.x, c.y + c.h / 2 + off];
+      if (lado === "baixo") return [c.x + c.w / 2 + off, c.y + c.h];
+      return [c.x + c.w / 2 + off, c.y];
+    }
+    function pontosOrtogonais(p1, lado1, p2) {
+      if (lado1 === "esquerda" || lado1 === "direita") {
+        var xm = (p1[0] + p2[0]) / 2;
+        return [p1, [xm, p1[1]], [xm, p2[1]], p2];
+      }
+      var ym = (p1[1] + p2[1]) / 2;
+      return [p1, [p1[0], ym], [p2[0], ym], p2];
+    }
+
+    function recalcularArestas() {
+      var linhas = svg.querySelectorAll("polyline[data-i]");
+      var pares = [], contagem = {};
+      var i, k;
+      // 1o passe: geometria e lado de saida, e quantas saem da MESMA borda
+      for (i = 0; i < linhas.length; i++) {
+        var el = linhas[i];
+        var de = geometriaDe(el.getAttribute("data-de"));
+        var para = geometriaDe(el.getAttribute("data-para"));
+        if (!de || !para) { pares.push(null); continue; }
+        var lado = ladoSaida(de, para);
+        k = el.getAttribute("data-de") + "|" + lado;
+        contagem[k] = (contagem[k] || 0) + 1;
+        pares.push({ el: el, de: de, para: para, lado: lado, grupo: k,
+                     i: el.getAttribute("data-i") });
+      }
+      // 2o passe: espalha em torno do centro da borda, na ordem de aparicao —
+      // a mesma regra de `_offsets_de_saida`, e a mesma ordem, porque o DOM
+      // esta na ordem em que o Python emitiu.
+      var vistos = {};
+      for (i = 0; i < pares.length; i++) {
+        var p = pares[i];
+        if (!p) continue;
+        var n = contagem[p.grupo];
+        var pos = (vistos[p.grupo] || 0);
+        vistos[p.grupo] = pos + 1;
+        var off = (pos - (n - 1) / 2) * PASSO_SAIDA;
+        var p1 = pontoBorda(p.de, p.lado, off);
+        var p2 = pontoBorda(p.para, LADO_OPOSTO[p.lado], 0);
+        var pts = pontosOrtogonais(p1, p.lado, p2);
+        var txt = "";
+        for (k = 0; k < pts.length; k++) {
+          txt += (k ? " " : "") + pts[k][0].toFixed(2) + "," + pts[k][1].toFixed(2);
+        }
+        p.el.setAttribute("points", txt);
+        var rotulo = svg.querySelector('text[data-i="' + p.i + '"]');
+        if (rotulo) {
+          rotulo.setAttribute("x", ((pts[1][0] + pts[2][0]) / 2).toFixed(2));
+          rotulo.setAttribute("y", ((pts[1][1] + pts[2][1]) / 2).toFixed(2));
+        }
+      }
+    }
+
+    function repintarTudo() {
+      aplicarTransformes();
+      recalcularArestas();
+      pintarArestas();
+    }
+
+    function voltarAoAutomatico() {
+      movidos = {};
+      salvar();
+      repintarTudo();
+    }
+
+    function posicoesMovidas() { return movidos; }
+
     base = vb(svg);
     dur = (opts && opts.dur !== undefined) ? opts.dur : 450;
     // prefers-reduced-motion: salta em vez de voar. Nao e enfeite — quem sente
@@ -323,6 +489,15 @@ window.Zoom = {
     var arrastando = false, px = 0, py = 0;
     svg.addEventListener("pointerdown", function (ev) {
       arrastando = true; moveu = false; px = ev.clientX; py = ev.clientY;
+      // Comecou em cima de uma caixa? Entao o arrasto move A CAIXA; comecou
+      // no vazio, move a CAMERA. So decide no primeiro movimento — antes do
+      // limiar isto ainda pode virar um clique, que navega.
+      //
+      // `closest` da a caixa mais INTERNA sob o cursor, que e' a que voce
+      // enxerga: `aplicarLod` poe pointer-events:none no interior que ainda
+      // nao abriu, entao um filho invisivel nunca rouba o arrasto do pai.
+      var caixa = ev.target.closest("[data-navegavel]");
+      arrastandoCaixa = (caixa && caixa.id) ? caixa.id : null;
       // NADA de setPointerCapture aqui. Capturar o ponteiro no <svg> faz o
       // `click` seguinte ter como alvo o proprio svg, e ai o
       // closest("[data-navegavel]") devolve null e o clique nunca navega.
@@ -330,16 +505,30 @@ window.Zoom = {
     svg.addEventListener("pointermove", function (ev) {
       if (!arrastando) return;
       // Limiar: mao tremida nao vira arrasto, senao o clique some.
-      if (Math.abs(ev.clientX - px) + Math.abs(ev.clientY - py) > 3) moveu = true;
+      if (Math.abs(ev.clientX - px) + Math.abs(ev.clientY - py) > LIMIAR_ARRASTO) moveu = true;
       if (!moveu) return;
       var v = vb(svg), r = svg.getBoundingClientRect();
-      setVb({ x: v.x - (ev.clientX - px) / r.width * v.w,
-              y: v.y - (ev.clientY - py) / r.height * v.h, w: v.w, h: v.h });
+      // Pixel de tela -> unidade de cena. O viewBox encolhe conforme voce se
+      // aproxima, entao o mesmo movimento de mao vale menos unidades: sem
+      // esta conversao a caixa dispararia longe do cursor no zoom fechado.
+      var dx = (ev.clientX - px) / r.width * v.w;
+      var dy = (ev.clientY - py) / r.height * v.h;
+      if (arrastandoCaixa) {
+        var m = movidos[arrastandoCaixa] || { dx: 0, dy: 0 };
+        movidos[arrastandoCaixa] = { dx: m.dx + dx, dy: m.dy + dy };
+        repintarTudo();
+      } else {
+        setVb({ x: v.x - dx, y: v.y - dy, w: v.w, h: v.h });
+      }
       px = ev.clientX; py = ev.clientY;
     });
-    svg.addEventListener("pointerup", function () { arrastando = false; });
+    svg.addEventListener("pointerup", function () {
+      if (arrastando && moveu && arrastandoCaixa) salvar();
+      arrastando = false; arrastandoCaixa = null;
+    });
     svg.addEventListener("pointerleave", function () {
-      arrastando = false;
+      if (arrastando && moveu && arrastandoCaixa) salvar();
+      arrastando = false; arrastandoCaixa = null;
       if (sob !== null) { sob = null; pintarArestas(); }
     });
 
@@ -356,10 +545,16 @@ window.Zoom = {
 
     medirPxPorUnidade();
     setVb(base);
-    pintarArestas();
+    // As posicoes que o humano moveu voltam ANTES da primeira pintura, senao
+    // a pagina abre no layout automatico e salta pro arrumado no quadro
+    // seguinte.
+    movidos = lerSalvo();
+    repintarTudo();
 
     return { elemento: svg, voarPara: voarPara, subir: subir,
              acender: acender, apagar: apagar,
+             voltarAoAutomatico: voltarAoAutomatico,
+             posicoesMovidas: posicoesMovidas,
              // Chamado por `mostrarVista` (arq_render.py) ao trocar de
              // vista: o filtro e' UM SO por documento, compartilhado entre
              // as duas cenas — sem isto, mostrar de novo uma vista deixaria

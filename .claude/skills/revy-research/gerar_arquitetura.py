@@ -69,7 +69,7 @@ def montar(raiz: Path) -> str:
     sch = replace(sch, arestas=(), fluxos=())
     vistas = (
         arq_render.Vista("arquitetura", "Arquitetura",
-                         arq_layout.dispor(arq, arq.vms), arq),
+                         arq_layout.dispor(arq, arq.vms, arquitetura.POSICOES), arq),
         arq_render.Vista("schema", "Schema",
                          arq_layout.dispor(sch, sch.bancos), sch),
     )

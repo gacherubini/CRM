@@ -427,6 +427,21 @@ ARESTAS: list[dict] = [
 # Vocabulario de `protocolo`, de proposito curto: "chamada" (import + chamada
 # no mesmo processo), "outbox" (uma grava numa tabela, a outra consome depois)
 # e "timer" (thread periodica que aciona a outra).
+
+# Posicoes ajustadas a mao, em DESLOCAMENTO (dx, dy) a partir de onde o
+# empacotamento pos a caixa — nunca coordenada absoluta. Ver
+# `arq_layout._aplicar_posicoes`.
+#
+# Como preencher: abra `arquitetura.html`, arraste as caixas ate ficar do
+# jeito que voce quer, clique em "exportar" no canto e cole o bloco aqui.
+# O botao "automatico" na mesma barra joga fora o que voce moveu.
+#
+# Por que deslocamento e nao coordenada: acrescentar um componente novo
+# reempacota tudo. Com coordenada absoluta, todo ajuste feito a mao viraria
+# lixo no dia seguinte; com deslocamento, a vizinhanca anda junto e o ajuste
+# continua valendo em cima dela.
+POSICOES: dict[str, tuple[float, float]] = {}
+
 ARESTAS_INTERNAS: list[dict] = [
     # --- a borda HTTP e' o unico ponto de entrada, entao ela fala com quase tudo
     # main.py:809 (/webhook/mensagem, Modo 1) e main.py:726 (inbound Cloud):
