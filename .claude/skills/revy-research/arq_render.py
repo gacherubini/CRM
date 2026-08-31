@@ -164,12 +164,85 @@ def _agrupar_por_pai(caixas: tuple[Caixa, ...]) -> dict[str | None, list[Caixa]]
 # --------------------------------------------------------------------------
 
 def _rect_no(c: Caixa, spof: bool) -> str:
+    """A caixa de um no. `c.forma` troca o DESENHO, nunca a cor.
+
+    Vocabulario TECNICO (31/08, a pedido do dono): ele le o desenho pela
+    forma antes de ler o texto, e caixa toda igual obriga a ler cada legenda
+    pra saber o que e' o que — ai o diagrama vira lista. A forma diz o que a
+    coisa E' (fila, worker, cache, browser); o `papel` continua dizendo de
+    que dominio ela e'. Sao perguntas diferentes.
+
+    Regra que nao se quebra: forma sai do DADO (`forma:` escrito a mao em
+    `arquitetura.py`), nunca de importancia. E cor continua sendo so' o SPOF —
+    nada de "vermelho porque e' importante", nem de verde pra decorar.
+    """
     cor = DANGER if spof else INK
     largura = 2.4 if spof else 1.0
-    return (
+    base = (
         f'<rect x="{c.x:.2f}" y="{c.y:.2f}" width="{c.w:.2f}" height="{c.h:.2f}" '
         f'rx="4" fill="{SURFACE}" stroke="{cor}" stroke-width="{largura}" vector-effect="non-scaling-stroke"/>'
     )
+    return base + _marca_tecnica(c, cor)
+
+
+def _marca_tecnica(c: Caixa, cor: str) -> str:
+    """O tracinho que diferencia a forma tecnica, desenhado SOBRE a caixa.
+
+    Marca, e nao silhueta trocada, por dois motivos praticos: o layout ja
+    calculou largura e altura contando com um retangulo (mudar a silhueta
+    moveria o texto e as pontas de aresta), e a marca some junto com a caixa
+    no LOD sem tratamento nenhum. Tudo em `vector-effect="non-scaling-stroke"`
+    pra a espessura nao inchar no zoom.
+    """
+    if not c.forma:
+        return ""
+    x, y, w, h = c.x, c.y, c.w, c.h
+    fina = f' stroke="{cor}" stroke-width="1.0" fill="none" vector-effect="non-scaling-stroke"'
+
+    if c.forma == "fila":
+        # Tres divisorias na base = os lugares da fila. E' a unica forma que
+        # aparece nos quatro produtos (toda outbox do monorepo), entao ela
+        # precisa ser reconhecivel de longe e barata de desenhar.
+        passo = w / 12.0
+        base_y = y + h
+        linhas = "".join(
+            f'<line x1="{x + passo * (i + 1):.2f}" y1="{base_y - h * 0.16:.2f}" '
+            f'x2="{x + passo * (i + 1):.2f}" y2="{base_y:.2f}"{fina}/>'
+            for i in range(3))
+        return linhas
+
+    if c.forma == "worker":
+        # Duas barras verticais junto das laterais: o simbolo classico de
+        # "processo predefinido" de fluxograma. Quer dizer que aquilo roda
+        # sozinho, num laco proprio, e nao quando alguem chama.
+        d = min(w * 0.03, 6.0)
+        return (f'<line x1="{x + d:.2f}" y1="{y:.2f}" x2="{x + d:.2f}" y2="{y + h:.2f}"{fina}/>'
+                f'<line x1="{x + w - d:.2f}" y1="{y:.2f}" x2="{x + w - d:.2f}" y2="{y + h:.2f}"{fina}/>')
+
+    if c.forma == "cache":
+        # Boca de cilindro TRACEJADA no topo: guarda como um banco, mas o
+        # tracejado diz que pode sumir a qualquer momento e ninguem perde
+        # dado por isso (TTL do Pixel, storage_state do Playwright).
+        rx = w / 2
+        ry = min(max(rx * 0.10, 3.0), 14.0)
+        ry = min(ry, max(1.0, h / 2 - 1))
+        return (f'<path d="M{x:.2f},{y + ry:.2f} a{rx:.2f},{ry:.2f} 0 0 1 {w:.2f},0" '
+                f'stroke="{cor}" stroke-width="1.0" fill="none" stroke-dasharray="5 4"'
+                f' vector-effect="non-scaling-stroke"/>')
+
+    if c.forma == "browser":
+        # Barra de janela no topo: ali dentro sobe Chromium DE VERDADE. E' a
+        # forma que separa o RPA de todo o resto do monorepo, e por isso ela
+        # e' a mais literal das quatro.
+        bh = min(h * 0.10, 10.0)
+        r = min(bh * 0.22, 2.0)
+        pontos = "".join(
+            f'<circle cx="{x + bh * (0.7 + i * 0.75):.2f}" cy="{y + bh / 2:.2f}" '
+            f'r="{r:.2f}" fill="{cor}"/>' for i in range(3))
+        return (f'<line x1="{x:.2f}" y1="{y + bh:.2f}" x2="{x + w:.2f}" '
+                f'y2="{y + bh:.2f}"{fina}/>' + pontos)
+
+    raise ValueError(f"forma tecnica desconhecida: {c.forma!r} em {c.chave}")
 
 
 def _rect_vm(c: Caixa) -> str:
@@ -723,29 +796,62 @@ def _defs_compartilhadas() -> str:
     )
 
 
+# As formas tecnicas que a legenda desenha. `_marca_tecnica` levanta em
+# forma desconhecida e `test_toda_forma_tecnica_usada_esta_na_legenda` liga as
+# duas pontas: vocabulario sem legenda e' codigo secreto, e o dono le o
+# desenho pela forma antes de ler o texto.
+FORMAS_TECNICAS: frozenset[str] = frozenset({"fila", "worker", "cache", "browser"})
+
+
 def _legenda_html() -> str:
     """A caixa de legenda do vocabulario (mockup aprovado). Conteudo fixo —
-    as quatro formas sao o contrato desta pagina, nao dado do modelo — entao
-    nao ha nada aqui pra derivar de `Modelo`. Fica dentro do MESMO filtro
-    compartilhado pra combinar com o resto do desenho."""
+    as formas sao o contrato desta pagina, nao dado do modelo — entao nao ha
+    nada aqui pra derivar de `Modelo`. Fica dentro do MESMO filtro
+    compartilhado pra combinar com o resto do desenho.
+
+    Duas colunas: a esquerda diz O QUE A CAIXA E' no mundo (produto, maquina,
+    terceiro, banco), a direita, o que ela E' TECNICAMENTE (fila, worker,
+    cache, browser) mais o que as setas querem dizer. As duas perguntas sao
+    diferentes, e por isso as duas colunas existem.
+    """
     return f'''<div id="legenda"><b>Vocabulário</b>
-<svg viewBox="0 0 210 118" width="210" height="118">
+<svg viewBox="0 0 268 214" width="268" height="214">
 <g filter="url(#rabisco)">
 <rect x="4" y="4" width="30" height="18" rx="3" fill="{SURFACE}" stroke="{INK}" stroke-width="1.3"/>
 <rect x="4" y="30" width="30" height="18" rx="8" fill="none" stroke="{BRAND_LINE}" stroke-width="1.3" stroke-dasharray="5 4"/>
 <ellipse cx="19" cy="66" rx="15" ry="9" fill="{SURFACE_SOFT}" stroke="{INK}" stroke-width="1.3"/>
 <path d="M4,90 a15,4 0 0 1 30,0 v14 a15,4 0 0 1 -30,0 z" fill="{SURFACE}" stroke="{INK}" stroke-width="1.3"/>
-<line x1="110" y1="14" x2="140" y2="14" stroke="{INK_SOFT}" stroke-width="1.2" marker-end="url(#seta)"/>
-<line x1="110" y1="34" x2="140" y2="34" stroke="{INK_SOFT}" stroke-width="1.2" stroke-dasharray="5 4" marker-end="url(#seta)"/>
-<rect x="106" y="52" width="30" height="16" rx="3" fill="{SURFACE}" stroke="{DANGER}" stroke-width="2.4"/>
+<line x1="168" y1="14" x2="198" y2="14" stroke="{INK_SOFT}" stroke-width="1.2" marker-end="url(#seta)"/>
+<line x1="168" y1="34" x2="198" y2="34" stroke="{INK_SOFT}" stroke-width="1.2" stroke-dasharray="5 4" marker-end="url(#seta)"/>
+<rect x="164" y="52" width="30" height="16" rx="3" fill="{SURFACE}" stroke="{DANGER}" stroke-width="2.4"/>
 </g>
 <text x="42" y="17" font-size="9">produto Revy</text>
 <text x="42" y="43" font-size="9">máquina Fly</text>
 <text x="42" y="70" font-size="9">software de terceiro</text>
 <text x="42" y="101" font-size="9">banco</text>
-<text x="146" y="17" font-size="9">síncrono</text>
-<text x="146" y="37" font-size="9">assíncrono</text>
-<text x="142" y="63" font-size="9">SPOF</text>
+<text x="204" y="17" font-size="9">síncrono</text>
+<text x="204" y="37" font-size="9">assíncrono</text>
+<text x="200" y="63" font-size="9">SPOF</text>
+<g filter="url(#rabisco)">
+<rect x="4" y="126" width="30" height="18" rx="3" fill="{SURFACE}" stroke="{INK}" stroke-width="1.3"/>
+<line x1="11.5" y1="141" x2="11.5" y2="144" stroke="{INK}" stroke-width="1"/>
+<line x1="19" y1="141" x2="19" y2="144" stroke="{INK}" stroke-width="1"/>
+<line x1="26.5" y1="141" x2="26.5" y2="144" stroke="{INK}" stroke-width="1"/>
+<rect x="4" y="150" width="30" height="18" rx="3" fill="{SURFACE}" stroke="{INK}" stroke-width="1.3"/>
+<line x1="8" y1="150" x2="8" y2="168" stroke="{INK}" stroke-width="1"/>
+<line x1="30" y1="150" x2="30" y2="168" stroke="{INK}" stroke-width="1"/>
+<rect x="4" y="174" width="30" height="18" rx="3" fill="{SURFACE}" stroke="{INK}" stroke-width="1.3"/>
+<path d="M4,177 a15,3 0 0 1 30,0" fill="none" stroke="{INK}" stroke-width="1" stroke-dasharray="4 3"/>
+<rect x="4" y="198" width="30" height="18" rx="3" fill="{SURFACE}" stroke="{INK}" stroke-width="1.3"/>
+<line x1="4" y1="203" x2="34" y2="203" stroke="{INK}" stroke-width="1"/>
+<circle cx="7.5" cy="200.5" r="1" fill="{INK}"/>
+<circle cx="11" cy="200.5" r="1" fill="{INK}"/>
+<circle cx="14.5" cy="200.5" r="1" fill="{INK}"/>
+</g>
+<text x="42" y="139" font-size="9">fila (outbox)</text>
+<text x="42" y="163" font-size="9">worker</text>
+<text x="42" y="187" font-size="9">cache</text>
+<text x="42" y="211" font-size="9">browser (RPA)</text>
 </svg></div>'''
 
 
@@ -903,7 +1009,7 @@ def render(vistas: tuple[Vista, ...], js: str,
     border:1px solid {LINE};border-radius:6px;font-size:10px;color:{INK_SOFT};z-index:2}}
   #legenda b{{display:block;margin-bottom:4px;letter-spacing:.04em;color:{INK_MUTED};
     font-weight:600;font-size:10px}}
-  #legenda svg{{width:210px;height:118px;display:block;pointer-events:none}}
+  #legenda svg{{width:268px;height:214px;display:block;pointer-events:none}}
   #legenda text{{fill:{INK_SOFT}}}
   [id^="fluxos-"]{{position:fixed;top:53px;right:12px;background:{SURFACE};padding:8px 12px;
     border:1px solid {LINE};border-radius:6px;font-size:12px;max-width:280px;z-index:2}}
