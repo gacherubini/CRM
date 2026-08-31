@@ -525,19 +525,176 @@ NOS: dict[str, dict] = {
             "2026-08-16-financeiro-sem-rateio.md",
             "2026-08-07-treze-recusas-de-ux.md",
         ],
+        # Camada de componente escrita a mao (30/08). E' o produto mais caro do
+        # monorepo (26 mil linhas, 314 entradas de inventario) e era o pior
+        # desenhado: as SEIS caixas antigas eram TODAS pasta — `app/loja/`,
+        # `app/web/`, `app/clients/`, `app/conversions/`, o outbox e o
+        # copiloto. `app/loja/` e `app/web/` nao sao responsabilidades, sao
+        # CAMADAS: quase todo dominio daqui mora nas duas ao mesmo tempo
+        # (financeiro = app/loja/financeiro.py + app/web/loja_financeiro.py +
+        # app/financeiro_calc.py). Desenhar as camadas escondia isso.
+        #
+        # Por isso quase nenhuma caixa abaixo tem um `modulo` que cubra tudo
+        # dela: o prefixo aponta UM arquivo, e o comentario nomeia os irmaos.
+        # Mesmo precedente de `estoque-api.credenciais`.
+        #
+        # E o prefixo escolhido e' o que TEM entrada de inventario, que aqui
+        # quase sempre e' o arquivo de rota em `app/web/`, nao o do dominio em
+        # `app/loja/`. Isso foi visto no navegador, nao deduzido: com o
+        # prefixo no dominio, `app/loja/financeiro.py` e os irmaos nao casavam
+        # entrada nenhuma, as caixas saiam vazias, e as fichas de template
+        # caiam numa caixa automatica chamada `web` — a arvore de pastas
+        # voltando pela porta dos fundos, no unico produto que este trabalho
+        # existia pra desfazer. Com o prefixo na rota, cada dominio mostra as
+        # telas que ele mesmo desenha.
+        # Excecao: `copiloto` aponta `app/copiloto_`, que pega os TRES jobs
+        # (regras, retencao, turnos) — worker em producao vale mais que a
+        # unica ficha de template de `loja_copiloto.py`.
+        #
+        # SEM GAVETA. A unica agrupacao que o codigo oferece de graca e' por
+        # pasta, e gaveta por camada e' exatamente o que este trabalho existe
+        # pra desfazer. Nao ha aqui nada como as tres threads do mesmo
+        # lifespan do Chatbot.
+        #
+        # Fora por causa do teto de dez, e nao por nao existirem:
+        # `app/clients/` (os quatro clientes HTTP — a informacao util deles ja
+        # esta nas ARESTAS pra Chatbot, Motor e Estoque; mesma decisao tomada
+        # no Control), `app/web/loja_shell.py` + `app/loja/navigation.py` (o
+        # shell e o menu; a armadilha do `page_title`/`loja_icons` vive la),
+        # `app/loja/estoque_overview.py` + `app/web/loja_estoque.py` (leitura
+        # da Estoque), `app/models.py` e `app/config.py`.
         "dentro": {
-            "loja": {"titulo": "Revy Loja (tela)", "papel": "venda",
-                     "modulo": "app/loja/"},
-            "web": {"titulo": "Rotas HTTP", "papel": "venda", "modulo": "app/web/"},
-            "clients": {"titulo": "Clientes HTTP de outros produtos",
-                        "papel": "integracao", "modulo": "app/clients/"},
-            "conversions": {"titulo": "Conversões Meta (CAPI)", "papel": "integracao",
-                             "modulo": "app/conversions/"},
-            "outbox-control": {"titulo": "Outbox → Control", "papel": "fundo",
-                                "modulo": "app/revy_trafego_outbox"},
-            "copiloto": {"titulo": "Copiloto de Vendas", "papel": "IA",
-                         "modulo": "app/copiloto_",
-                         "decisoes": ["2026-08-11-copiloto-nao-e-o-seller-ai.md"]},
+            "borda": {
+                "titulo": "Borda HTTP, sessão e venda",
+                "papel": "venda",
+                # 2637 linhas: bootstrap, auth, middleware — e o registro da
+                # VENDA, que nunca saiu daqui (:1543 gate de papel, :1721
+                # confirma, :1768 atualiza).
+                #
+                # ARMADILHA numero um do produto: `get_chatbot_client` (:411)
+                # recebe o `Request` DE PROPOSITO. O Chatbot resolve a loja
+                # pelo TOKEN, entao um token so num deploy multi-loja faz toda
+                # tela mostrar a mesma loja — em 24/08 a tela do Agente da
+                # `teste` exibiu os 1104 atendimentos da `moto-center`, numero
+                # a numero. Loja fora de CHATBOT_API_TOKENS_JSON fica sem
+                # token de proposito: a tela diz "indisponivel" em vez de
+                # mostrar, com confianca, o numero de outra loja.
+                #
+                # Outra que ja custou consulta errada: `excluida` nao e'
+                # `cancelada`. Cancelada e' negocio desfeito e fica no
+                # historico; excluida e' registro errado e sai de listas e
+                # totais, mas a linha permanece com autoria.
+                "termo": "cliente por loja da sessão (main.py:411,1721)",
+                "modulo": "app/main.py",
+            },
+            "atendimento": {
+                "titulo": "Atendimento e agente",
+                "papel": "venda",
+                # Chat, envio, polling, visao do agente e a configuracao do
+                # agente. O dominio (estado do atendimento, quem pode ver o
+                # que) mora em `app/loja/attendance.py:31,116,120`; as rotas em
+                # `routes.py`. Nada disto grava conversa: o dono da conversa e'
+                # o Chatbot, e o que existe aqui e' leitura pelo cliente HTTP.
+                "termo": "chat e visão do agente (routes.py:53; attendance.py:31)",
+                "modulo": "app/loja/routes.py",
+            },
+            "copiloto": {
+                "titulo": "Copiloto de Vendas",
+                "papel": "IA",
+                # Tools, sinais, FIPE, acoes, chat e sino. Nao e' o "seller
+                # AI" (ADR abaixo): ele sugere ao VENDEDOR, nao fala com o
+                # cliente. Acao executada e' desfazivel (`acoes.py`), e ha dois
+                # workers proprios — `copiloto_sinais_job.py` (regras) e
+                # `copiloto_purge_job.py` (retencao). As rotas ficam em
+                # `app/web/loja_copiloto.py`.
+                "termo": "tools, sinais e ações desfazíveis (runner.py; acoes.py)",
+                "modulo": "app/copiloto_",
+                "decisoes": ["2026-08-11-copiloto-nao-e-o-seller-ai.md"],
+            },
+            "vendas": {
+                "titulo": "Visão de vendas e aquisição",
+                "papel": "venda",
+                # A leitura: visao geral de vendas e painel de aquisicao
+                # (`sales_overview.py`), com as rotas em
+                # `app/web/loja_vendas.py`. Quem ESCREVE a venda e' a borda —
+                # esta caixa so le, e por isso ela nao aparece na aresta do
+                # outbox.
+                "termo": "visão geral e aquisição (sales_overview.py)",
+                "modulo": "app/web/loja_vendas.py",
+            },
+            "metas-equipe": {
+                "titulo": "Metas, equipe e acesso",
+                "papel": "venda",
+                # `app/web/metas.py` e `app/web/equipe.py`. Os dois fazem
+                # import TARDIO de `app.main` (metas.py:7, equipe.py:7) porque
+                # o main registra estes routers no fim do arquivo (:2624) —
+                # a seta desenhada e' a do registro, que e' o sentido que
+                # importa pra ler o produto.
+                "termo": "metas e papéis da loja (metas.py:7; equipe.py:7)",
+                "modulo": "app/web/metas.py",
+            },
+            "financeiro": {
+                "titulo": "Financeiro (DRE e equilíbrio)",
+                "papel": "venda",
+                # DECISAO DO DONO, 16/08: despesa fixa NAO e' rateada por
+                # venda — ratear faria o lucro de uma moto depender de quantas
+                # outras foram vendidas no mes. Quem responde "essa moto pagou
+                # a estrutura?" e' o ponto de equilibrio (:140). E margem
+                # parcial nao vira estimativa: faltando custo em alguma venda,
+                # lucro operacional e ponto de equilibrio ficam INDISPONIVEIS,
+                # nunca zero (:141,142).
+                # Custo, lucro e credencial nao aparecem pra vendedor, e o
+                # corte e' RBAC de backend — telas E JSON.
+                "termo": "sem rateio; indisponível, nunca zero (financeiro.py:140)",
+                "modulo": "app/web/loja_financeiro.py",
+                "decisoes": ["2026-08-16-financeiro-sem-rateio.md"],
+            },
+            "simulacao": {
+                "titulo": "Simulação manual",
+                "papel": "banco",
+                # A unica porta da Loja pro Motor: o gestor pede a simulacao na
+                # mao, acompanha o job e ve o print. A Loja e' so BFF do
+                # segredo — ela CIFRA e envia a credencial bancaria, e nunca
+                # executa nem guarda a chave (AGENTS.md secao 5).
+                "termo": "job, histórico e print (simulacoes.py:7)",
+                "modulo": "app/web/simulacoes.py",
+            },
+            "trafego": {
+                "titulo": "Campanhas, ROI e Pixel",
+                "papel": "integracao",
+                # A vista que o lojista tem do que o Control calcula: campanhas,
+                # ROI, Pixel/CAPI e Ads. O calculo local vive em
+                # `app/roi_calc.py`, `app/campanhas.py` e `app/meta_capi.py`.
+                # ARMADILHA: o worker CAPI e o sync de spend rodam com
+                # PORTAL_*_ENABLED=0 aqui — o dono unico da outbox CAPI e' o
+                # Control. Ligar os dois manda evento duplicado pra Meta.
+                "termo": "vista do que o Control calcula (trafego.py:8)",
+                "modulo": "app/web/trafego.py",
+            },
+            "whatsapp": {
+                "titulo": "Canais de WhatsApp",
+                "papel": "conversa",
+                # Numeros da loja: canais Evolution, conexao pela nuvem e a
+                # fila do Modo 2. `montar_canais_view` (:161) monta o estado do
+                # onboarding (:101) que a tela mostra passo a passo — e' por
+                # isso que o `OnboardingFalhou(elo=...)` do cliente do Chatbot
+                # existe: o lojista precisa ler QUAL passo parou, e nao "erro
+                # de conexao". Rotas em `app/web/loja_whatsapp.py`; o QR e'
+                # efemero (`app/loja/qr_efemero.py`).
+                "termo": "canais e onboarding passo a passo (whatsapp_canais.py:161)",
+                "modulo": "app/web/loja_whatsapp.py",
+            },
+            "outbox-control": {
+                "titulo": "Outbox → Control",
+                "papel": "fundo",
+                # A invariante do AGENTS.md secao 2 em codigo: venda e' da
+                # Loja, e ela chega ao Control POR OUTBOX, nunca por consulta
+                # do outro lado. `_enfileirar` (:51) grava o snapshot da venda;
+                # `_reivindicar` (:182) e' o lease que evita dois entregadores
+                # na mesma linha; `processar_pendentes` (:209) entrega.
+                "termo": "snapshot com lease (revy_trafego_outbox.py:51,182)",
+                "modulo": "app/revy_trafego_outbox",
+            },
         },
     },
     "revy-trafego": {
@@ -1209,6 +1366,75 @@ ARESTAS_CONTROL = [
 ]
 
 ARESTAS_INTERNAS = ARESTAS_INTERNAS + ARESTAS_CONTROL
+
+# --- Revy Loja (30/08) --------------------------------------------------
+# Aqui o import ENGANA mais do que nos outros tres, e por um motivo so: sete
+# modulos de `app/web/` fazem `from app.main import ...` TARDE (trafego.py:8,
+# simulacoes.py:7, metas.py:7, equipe.py:7, loja_vendas.py:31,
+# loja_financeiro.py:32, loja_copiloto.py:58) porque o `main` registra os
+# routers deles no fim do proprio arquivo (main.py:2609-2632). Seguir a seta
+# do import daria um produto em que tudo aponta pra borda, que e' o contrario
+# de como ele funciona.
+#
+# Entao a direcao desenhada e' a do REGISTRO e da chamada: a borda monta o
+# router e a requisicao entra por ela. O import invertido esta anotado onde
+# aparece.
+ARESTAS_LOJA = [
+    # main.py:2621,:2633 — o router do atendimento.
+    {"de": "portal-gestao.borda", "para": "portal-gestao.atendimento",
+     "protocolo": "chamada", "sincrono": True, "retry": True},
+    {"de": "portal-gestao.borda", "para": "portal-gestao.copiloto",
+     "protocolo": "chamada", "sincrono": True, "retry": True},
+    {"de": "portal-gestao.borda", "para": "portal-gestao.vendas",
+     "protocolo": "chamada", "sincrono": True, "retry": True},
+    {"de": "portal-gestao.borda", "para": "portal-gestao.metas-equipe",
+     "protocolo": "chamada", "sincrono": True, "retry": True},
+    {"de": "portal-gestao.borda", "para": "portal-gestao.financeiro",
+     "protocolo": "chamada", "sincrono": True, "retry": True},
+    {"de": "portal-gestao.borda", "para": "portal-gestao.simulacao",
+     "protocolo": "chamada", "sincrono": True, "retry": True},
+    # main.py:119 roi_calc e :86 campanhas: a borda usa o calculo de trafego
+    # direto, alem de montar o router de :2627.
+    {"de": "portal-gestao.borda", "para": "portal-gestao.trafego",
+     "protocolo": "chamada", "sincrono": True, "retry": True},
+    {"de": "portal-gestao.borda", "para": "portal-gestao.whatsapp",
+     "protocolo": "chamada", "sincrono": True, "retry": True},
+
+    # A UNICA assincrona do produto, e a invariante da AGENTS.md secao 2:
+    # confirmar (main.py:1721) e atualizar (:1768, e mais quatro pontos ate
+    # :1941) GRAVAM na fila e seguem. Ninguem espera o Control. Quem entrega
+    # e' o worker que sobe no lifespan (main.py:351).
+    {"de": "portal-gestao.borda", "para": "portal-gestao.outbox-control",
+     "protocolo": "outbox", "sincrono": False, "retry": True},
+
+    # --- entre dominios
+    # loja_vendas.py:49 importa `_membros_da_loja` de app.web.equipe: quem
+    # vendeu vem do cadastro de equipe, nao de um campo solto na venda.
+    {"de": "portal-gestao.vendas", "para": "portal-gestao.metas-equipe",
+     "protocolo": "chamada", "sincrono": True, "retry": True},
+    # loja_vendas.py:50 MotorClient: a tela de venda oferece a simulacao.
+    {"de": "portal-gestao.vendas", "para": "portal-gestao.simulacao",
+     "protocolo": "chamada", "sincrono": True, "retry": True},
+    # attendance.py:22 e financeiro.py:31 leem `app/financeiro_calc.py`, que
+    # mora na caixa do financeiro: `identidade_telefone` e `lucro_bruto_venda`
+    # saem do mesmo modulo compartilhado.
+    {"de": "portal-gestao.atendimento", "para": "portal-gestao.financeiro",
+     "protocolo": "chamada", "sincrono": True, "retry": True},
+    # loja_copiloto.py:34 ChatbotIndisponivel e o `consultas_vendas.py` do
+    # copiloto: o sino e as sugestoes leem o atendimento.
+    {"de": "portal-gestao.copiloto", "para": "portal-gestao.atendimento",
+     "protocolo": "chamada", "sincrono": True, "retry": True},
+    # `app/loja/copiloto/consultas_vendas.py` — o copiloto sugere em cima do
+    # que ja foi vendido.
+    {"de": "portal-gestao.copiloto", "para": "portal-gestao.vendas",
+     "protocolo": "chamada", "sincrono": True, "retry": True},
+    # loja_whatsapp.py:22 OnboardingFalhou: e' a tela de canais que precisa
+    # dizer qual ELO parou, e por isso aquele escape existe no cliente.
+    {"de": "portal-gestao.whatsapp", "para": "portal-gestao.atendimento",
+     "protocolo": "chamada", "sincrono": True, "retry": True},
+]
+
+ARESTAS_INTERNAS = ARESTAS_INTERNAS + ARESTAS_LOJA
 
 
 VMS: dict[str, dict] = {
