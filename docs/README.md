@@ -16,6 +16,31 @@ Quando um card entra no `main`, no mesmo PR: mover o arquivo, atualizar
 `fila/README.md` e `referencia-viva/contexto-compacto.md`. Código vence o
 bloco Status do plano.
 
+## Arquitetura viva — o que foi construído (2026-08-30 a 31)
+
+A arquitetura deixou de ser diagrama que alguém redesenha e virou **artefato
+gerado**, do mesmo jeito que `mapa/*.md` já era:
+`.claude/skills/revy-research/arquitetura.html`, por `gerar_arquitetura.py`.
+
+Duas cenas navegáveis por zoom. **Arquitetura**: produto, componente e as
+arestas entre eles — os seis produtos têm de 7 a 16 unidades de
+responsabilidade, cada uma com `arquivo:linha` provando que existe.
+**Schema**: mapa conceitual de banco — uma caixa por tabela, os atributos
+dentro, e uma seta por chave estrangeira rotulada com a cardinalidade lida do
+próprio SQLAlchemy.
+
+A intenção mora em `arquitetura.py`, escrita à mão; o inventário vem do
+`_frescor.json`. `rota` (407) e `template` (90) são **dispensadas** de
+propósito, e `flag` (102) vira contagem: parede de ficha responde *quais
+arquivos existem*, que não é a pergunta desta página.
+
+Spec canônica, com o porquê de cada decisão e o que ficou aberto:
+[`referencia-viva/specs/2026-08-30-arquitetura-viva-design.md`](referencia-viva/specs/2026-08-30-arquitetura-viva-design.md)
+— a **§14** é o as-built e vence o resto do documento onde os dois divergirem.
+
+**Conferir no navegador não é opcional**: sete defeitos desta página só
+apareceram abrindo ela, e dois não deixavam rastro no console. Ver §14.8.
+
 ## Embedded Signup — o que foi construído (2026-08-29)
 
 Spec canônica: [`referencia-viva/specs/2026-08-29-embedded-signup-tech-provider-design.md`](referencia-viva/specs/2026-08-29-embedded-signup-tech-provider-design.md).

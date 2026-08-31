@@ -60,6 +60,29 @@ fechamento mora no `AGENTS.md` §6 — a esta altura outra skill esta no comando
 
 Como tudo isto funciona, para humano: `como-funciona.html`.
 
+## A pagina de arquitetura
+
+`arquitetura.html` (gerado, commitado) tem duas cenas navegaveis por zoom:
+
+- **Arquitetura** — produto, componente e as arestas entre eles. A intencao vem
+  de `arquitetura.py`, escrito A MAO; o inventario (`worker`, `flag`) vem do
+  `_frescor.json`. `rota` e `template` sao DISPENSADAS de proposito — parede de
+  ficha responde "quais arquivos existem", que nao e a pergunta desta pagina.
+- **Schema** — mapa conceitual de banco: uma caixa por tabela, os atributos
+  dentro, e uma seta por chave estrangeira rotulada com a cardinalidade
+  (`n:1`, `1:1`, `n:0..1`), lida do proprio SQLAlchemy.
+
+O as-built, com o porque de cada decisao e o que ainda esta aberto:
+`docs/referencia-viva/specs/2026-08-30-arquitetura-viva-design.md` (secao 14).
+
+**Conferir no navegador nao e opcional** — sete defeitos desta pagina so
+apareceram abrindo ela, e dois nao deixavam rastro no console. A extensao de
+navegador bloqueia `file://`, entao sirva por HTTP:
+
+    python3 -m http.server 8899
+    python3 recorte_produto.py chatbot-api          # o interior de um produto
+    python3 recorte_produto.py chatbot-api schema   # o mesmo na Schema
+
 ## Regerar
 
 Windows usa `python`; o Mac do dono so tem `python3`. Vale para os dois comandos.

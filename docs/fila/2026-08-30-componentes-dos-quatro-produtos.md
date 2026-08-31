@@ -1,23 +1,39 @@
 # A camada de componente nos quatro produtos que faltam
 
-> **Status (2026-08-30): FEITO, os quatro.** Catálogo (7 caixas, 8 arestas),
-> Motor (10 e 17), Control (10 e 16) e Loja (10 e 15). 80 testes verdes,
-> `--verificar` em 0, os quatro conferidos no navegador. O que este card
-> continua servindo pra explicar é o **método** — se for dar a mesma camada a
-> um produto novo, a receita abaixo vale inteira. Código e testes vencem este
-> bloco.
+> **Status (2026-08-31): FECHADO.** A camada de componente saiu nos quatro, e
+> depois o dono abriu a página e pediu mais cinco coisas, que também saíram.
+> **Não continue por este card** — ele descreve só a primeira metade. Quem
+> pegar a branch daqui em diante lê
+> [`docs/referencia-viva/specs/2026-08-30-arquitetura-viva-design.md` §14](../referencia-viva/specs/2026-08-30-arquitetura-viva-design.md#14-revisão-de-3108--o-que-o-navegador-mudou),
+> que é o as-built, e volta aqui só se for dar a mesma camada a um **produto
+> novo** — para isso a receita abaixo vale inteira.
 >
-> Três coisas mudaram em relação ao que o card previa, e estão registradas
-> onde importa:
-> - o vocabulário de protocolo interno virou **quatro** palavras (`http`
->   entrou pro wake do Motor, que atravessa VM) — o porquê está na docstring
->   de `test_o_protocolo_interno_vem_de_um_vocabulario_curto`;
-> - o `modulo` de um componente aponta o arquivo que **tem entrada de
->   inventário**, que quase sempre é o da rota e não o do domínio — apontar
->   pro domínio devolve a árvore de pastas
->   (`learnings/2026-08-30-modulo-no-dominio-devolve-a-arvore-de-pastas.md`);
-> - o recorte pra conferir no navegador virou script:
->   `.claude/skills/revy-research/recorte_produto.py`.
+> **O que aconteceu, em ordem:**
+>
+> | | |
+> |---|---|
+> | camada de componente | Catálogo 7/8, Motor 10/17, Control 10/16, Loja 10/15 |
+> | parede de ficha | `template` (90) dispensada; `flag` (102) virou contagem |
+> | zoom | a face só apaga quando há **caixa** para pôr no lugar |
+> | forma | vocabulário técnico: fila, worker, cache, browser |
+> | Schema | virou mapa conceitual de banco: tabela, atributo, FK com cardinalidade |
+>
+> **91 testes verdes**, `--verificar` em 0. Os quatro produtos conferidos no
+> navegador na Arquitetura; na Schema, **só o Chatbot**.
+>
+> **O que continua aberto** (detalhe em §14.7 da spec):
+> 1. o hub `loja_id` na Schema — 17 das 26 relações do Chatbot apontam para
+>    `lojas`, e isso é multi-tenancy, não modelagem. Tirar essas setas esconde
+>    dado, então é decisão do dono. Recomendação: tirar.
+> 2. os outros cinco produtos na Schema, nunca abertos no navegador;
+> 3. `TestArestasInternasLegiveis` ainda só olha o Chatbot — **confira o sinal
+>    dela antes de estender**, ver §14.7.
+>
+> **Fora do escopo desta branch, e não é meu:** `test_gerar_mapa` tem 2 falhas
+> anteriores a este trabalho — há 4 workflows em `n8n/` e o teste espera 3
+> (`workflow-teste-numero-autorizado.json` entrou sem atualizar o teste).
+>
+> Código e testes vencem este bloco.
 
 Card de handoff. Quem pegar isto **não** precisa ler a branch, o card grande da
 arquitetura viva, nem a conversa que gerou isto — está tudo aqui.
@@ -205,7 +221,8 @@ python3 gerar_arquitetura.py --verificar           # exit 0
 
 Windows: `python -m unittest test_gerar_arquitetura -q` e `python gerar_arquitetura.py`.
 
-Os 80 testes atuais verdes, mais o produto novo dentro de `com_componente` em
+Os testes atuais verdes (eram 80 quando este card foi escrito, são 91 hoje),
+mais o produto novo dentro de `com_componente` em
 `TestProvaCabeNaCaixa`.
 
 **Verificação no navegador é obrigatória.** Sete defeitos desta página só

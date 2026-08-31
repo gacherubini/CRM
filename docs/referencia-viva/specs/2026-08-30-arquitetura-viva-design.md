@@ -1,6 +1,9 @@
 # Arquitetura viva — mapa navegável por zoom contínuo
 
-**Status:** design aprovado, não implementado.
+**Status:** **implementado e em uso** (`.claude/skills/revy-research/arquitetura.html`,
+gerado por `gerar_arquitetura.py`). O desenho abaixo é o de 30/08; o que mudou depois
+de abrir a página no navegador está na [§14](#14-revisão-de-3108--o-que-o-navegador-mudou),
+que **vence este documento** onde os dois divergirem.
 **Produto:** ferramenta interna (`.claude/skills/revy-research/`), não é produto do cliente.
 **Decisão em uma frase:** a arquitetura deixa de ser um diagrama que alguém redesenha e
 vira um artefato gerado, do mesmo jeito que `mapa/*.md` já é.
@@ -173,14 +176,22 @@ demais para ser lida.
 
 ### As duas vistas
 
-| Vista | Seções do `_frescor.json` | Tem arestas e fluxos? |
-|---|---|---|
-| **Arquitetura** | `rota`, `worker`, `flag`, `template` | sim |
-| **Schema** | `modelo`, `migration` | não |
+| Vista | Seções do `_frescor.json` | Arestas | Fluxos |
+|---|---|---|---|
+| **Arquitetura** | `worker`, `flag` | sim (chamada/outbox/timer/http) | sim |
+| **Schema** | `modelo`, `migration` | sim (chave estrangeira) | não |
+| *dispensadas* | `rota`, `template` | — | — |
+
+> Atualizado em 31/08 — ver §14. `rota` e `template` saíram das duas vistas por
+> decisão do dono; a Schema **ganhou** arestas próprias (as FK). A tabela original
+> desta seção listava `rota`/`template` na Arquitetura e dizia que a Schema não tinha
+> aresta nenhuma.
 
 Schema é **vista separada, não caixa dentro da arquitetura**. Fluxo é caminho de
 execução; relação de dado é outra coisa, e misturar as duas foi o que deixou a
-página ilegível. Um alternador no topo troca entre elas.
+página ilegível. Um alternador no topo troca entre elas. A metade da regra que
+continua de pé: a Schema não tem **fluxo** — não se pergunta caminho de execução a
+um schema.
 
 Um nó que fica sem item numa vista — e sem filho que tenha — é podado daquela cena.
 Sem a poda, a vista Schema fica cheia de moldura vazia.
@@ -259,9 +270,16 @@ por um motivo.
 Convenções do desenho, todas com legenda na própria página:
 
 - traço **cheio** = síncrono; **tracejado** = assíncrono/fila
-- borda **grossa** = SPOF; ícone de aviso = sem retry
+- borda **grossa vermelha** = SPOF (hoje só o Motor)
 - moldura pontilhada = VM
-- caixa **acinzentada** = existe no código mas nenhuma seta chega (candidata a morta)
+- **forma técnica** (31/08): fila, worker, cache, browser — ver §14
+
+Duas regras que valem para tudo, e que já foram quebradas uma vez cada:
+
+- **cor é só o SPOF.** Nada de "vermelho porque é importante", nada de verde para
+  decorar — o verde da marca aparece só na moldura da VM e no alternador ativo.
+  Quem quiser destacar uma caixa muda a **forma**, não a tinta.
+- **rótulo de aresta é só o protocolo**, e `chamada` não leva rótulo nenhum.
 
 ## 8. O que NÃO faz
 
@@ -345,3 +363,195 @@ Painel de usuários reais sobre Axiom. Decidido em conversa, não especificado a
 cache de 20–30 s contra o polling, e o dashboard nativo do Axiom como *break-glass*
 quando a `app2037` cair. Hoje não há **nenhuma** instrumentação Axiom no repo, então
 o primeiro passo daquele projeto é schema de evento e instrumentação, não tela.
+
+---
+
+## 14. Revisão de 31/08 — o que o navegador mudou
+
+Tudo nesta seção saiu de **abrir a página e olhar**, não de raciocínio sobre o
+código. Onde ela discorda das seções acima, ela vence.
+
+### 14.1 A camada de componente, nos seis produtos
+
+Cada produto deixou de ser uma caixa com árvore de arquivo dentro e passou a ter
+**unidades de responsabilidade** com `arquivo:linha` provando que existem.
+
+| Produto | Componentes | Arestas internas |
+|---|---|---|
+| Chatbot API | 16 folhas em 4 gavetas | 20 |
+| Estoque API | 9, sem gaveta | 11 |
+| Catálogo Público | 7, sem gaveta | 8 |
+| Motor de Simulação | 10 (8 soltas + gaveta `rpa`) | 17 |
+| Revy Control | 10, sem gaveta | 16 |
+| Revy Loja | 10, sem gaveta | 15 |
+
+Teto de **seis a dez folhas** por produto: abaixo de seis não conta a história,
+acima de dez volta a ser a lista de arquivos com outro nome. O que ficou de fora
+por causa do teto está escrito em comentário, na caixa que o absorveu.
+
+**Gaveta só onde ela diz algo que a caixa sozinha não diz.** Sobraram cinco:
+`canais`, `config`, `integracoes` e `workers` no Chatbot, e `rpa` no Motor (fato de
+deploy — ali dentro sobe Chromium num slot da `motor2037`). Recusadas: "Anúncios"
+(nomeia plataforma), "Workers" no Control (cada worker é o relógio de uma regra que
+já mora no domínio) e agrupar por camada (`web`, `clients`, `jobs`) — que é a árvore
+de pastas com outro nome.
+
+**O `modulo` aponta o arquivo que TEM entrada de inventário**, que quase sempre é o
+de rota, não o de domínio. Isso saiu do navegador: com o prefixo no domínio, as dez
+caixas da Loja saíam vazias e as fichas caíam numa caixa automática chamada `web` —
+a árvore de pastas voltando pela porta dos fundos.
+Learning: `learnings/2026-08-30-modulo-no-dominio-devolve-a-arvore-de-pastas.md`.
+
+### 14.2 Parede de ficha não é desenho
+
+Três seções do inventário viravam colunas de fichas que respondiam *quais arquivos
+existem* — pergunta que esta página não faz. O `mapa/<produto>.md` continua listando
+todas, com `arquivo:linha`.
+
+| Seção | Quantas | O que virou |
+|---|---|---|
+| `rota` | 407 | dispensada (30/08) |
+| `template` | 90 | dispensada (31/08) |
+| `flag` | 102 | **contagem**, acima de 4 por caixa |
+
+O rótulo da contagem diz **duas** contas — `59 env · 19 rollout OFF` — porque o
+extrator emite toda variável de ambiente sob o nome `flag`, e `REVY_TRAFEGO_TIMEZONE`
+está no meio. "Todas default OFF" seria uma mentira que o desenho afirma sozinho.
+Abaixo de quatro a lista fica: ler as duas flags do Motor vale mais que contar até dois.
+
+**Print de tela renderizada foi cogitado e recusado** como substituto das fichas de
+`template`: renderizar Jinja exige subir os quatro produtos com banco e sessão, a
+skill é stdlib puro e não pode importar `app` (AGENTS.md §5), e o `arquitetura.html` é
+commitado com `--verificar` byte a byte — 90 imagens viram binário que apodrece calado
+a cada mudança de CSS. Seria uma parede mais bonita, e ainda parede.
+
+### 14.3 A face só apaga quando há o que pôr no lugar dela
+
+O zoom **troca** conteúdo: o título e a linha de prova saem, o interior entra. A troca
+só se paga quando o que entra vale mais que o que sai. Clicar no `Outbox (vehicle.*)`
+do Estoque deixava uma **tela branca** — você tinha `HMAC, backoff, desiste em 5
+(outbox.py:19,27,83)` e passava a não ter nada.
+
+A regra final conta filho que é **caixa**, não filho qualquer: ficha não substitui
+título, ela **acompanha**. Com a contagem crua, `Copiloto de Vendas` perdia o título
+para mostrar seis pílulas de env.
+
+Hoje apagam a face **11 caixas** — os 6 produtos e as 5 gavetas —, e **70 das 81**
+caixas de nó ficam com o título preto fixo em qualquer zoom.
+Guardado por `test_a_face_so_apaga_quando_ha_o_que_por_no_lugar`.
+
+### 14.4 Vocabulário técnico de forma
+
+O dono lê o desenho pela forma antes de ler o texto; caixa toda igual obriga a ler
+cada legenda, e aí o diagrama vira lista. A forma diz o que a caixa **é
+tecnicamente**; o `papel` continua dizendo de que **domínio** ela é.
+
+| Forma | Marca | Onde |
+|---|---|---|
+| `fila` | três divisórias na base | toda outbox do monorepo + fan-out do Motor (5) |
+| `worker` | duas barras verticais (processo predefinido) | roda sozinho, em laço próprio (4) |
+| `cache` | boca de cilindro tracejada | TTL do Pixel, `storage_state` do Playwright (2) |
+| `browser` | barra de janela | o RPA, onde sobe Chromium (1) |
+
+Sai do **dado** (`forma:` escrito à mão), nunca de importância, e **não troca a cor**.
+Desenhada *sobre* o retângulo, não trocando a silhueta: o layout já calculou tamanho
+contando com retângulo, e mudar a silhueta moveria o texto e as pontas de aresta.
+As quatro estão na legenda, com teste ligando as duas pontas.
+
+### 14.5 A Schema virou mapa conceitual de banco
+
+Era a árvore de arquivo outra vez, e pior que a da Arquitetura: o Chatbot abria com
+**28 caixas de migration de uma ficha cada** e as 19 tabelas espremidas como pílulas
+dentro de `models_db.py`.
+
+Agora cada **tabela é uma caixa**, com os **atributos** dentro, e cada **FK é uma seta
+rotulada** com a cardinalidade — que não é chutada, já estava escrita no SQLAlchemy:
+
+| No modelo | Cardinalidade |
+|---|---|
+| `ForeignKey` em coluna comum | `n:1` |
+| a mesma FK com `primary_key` ou `unique` | `1:1` |
+| `nullable=True` (ou `Mapped[T \| None]`) | `:0..1` |
+
+No Chatbot isso revelou **4 tabelas que são extensão 1:1 de `lojas`**
+(`agente_config`, `rodizio_ponteiro`, `grupos_estoque`,
+`loja_operacional_projecao`), que o desenho antigo mostrava iguaizinhas a uma tabela
+de muitos.
+
+A coluna traz tipo, chave e nulidade (`canal_id · str · FK whatsapp_canais · nulo`).
+O tipo sai da **anotação** (`Mapped[str | None]`), não do argumento do
+`mapped_column`: é ela que o autor escreveu pensando no domínio, e é ela que o mypy
+cobra. A ordem é a do **arquivo**, nunca alfabética — quem escreveu pôs a PK primeiro
+e os carimbos de tempo no fim, e isso é informação.
+
+As 28 migrations viram **uma** caixa com contagem e head: são a história de como o
+schema chegou aqui, não a forma dele.
+
+Duas regras se inverteram de propósito:
+
+- aresta interna nasce **apagada** na Arquitetura (são 99 marcadores, ninguém pergunta
+  pelas 20 do Chatbot ao mesmo tempo) e nasce **acesa** na Schema — ali a seta *é* o
+  conteúdo, e um mapa de relações escondidas é uma lista de tabelas;
+- `dispor` ganhou `folga` e a Schema usa o **triplo** da Arquitetura. A `MARGEM` não
+  mudou: ela é também o padding *dentro* da caixa, e mexer nas duas juntas incha o
+  desenho sem separar nada.
+
+`relacoes` e `colunas` entram no `_frescor.json` com **chave própria**, não como seção
+do inventário: `Entrada` descreve *um* lugar no código, e uma relação liga *dois*;
+uma coluna não é um lugar que alguém procura, é o *conteúdo* de uma tabela.
+
+### 14.6 O vocabulário de protocolo interno tem quatro palavras
+
+`chamada` (mesmo processo), `outbox` (uma grava, a outra consome), `timer` (thread
+periódica) e `http`. A quarta entrou com o Motor, único produto cujo **interior**
+atravessa VM: o wake do orquestrador é uma chamada à Machines API do Fly
+(`app2037` → `motor2037`). Não é `chamada`, que quer dizer mesmo processo, nem
+`outbox`, que quer dizer que alguém grava e outro consome depois.
+
+Antes de propor uma quinta, o teste é: ela diz algo que estas quatro não dizem, ou é
+sinônimo de uma delas?
+
+### 14.7 O que ficou aberto
+
+1. **O hub `loja_id` na Schema.** 17 das 26 relações do Chatbot apontam para `lojas`
+   — isso é *multi-tenancy*, não modelagem, e afoga as 9 que descrevem o domínio.
+   Nenhum arranjo resolve: `lojas` tem 17 vizinhos, o cruzamento é geométrico.
+   Ou se tiram essas setas do desenho (marcando as tabelas como "por loja") ou se
+   aceita o emaranhado. **Esconde dado, então é decisão do dono.** Recomendação:
+   tirar.
+2. **Só o Chatbot foi conferido na Schema.** Os outros cinco já ganharam a mesma
+   mecânica automaticamente (Loja tem 266 colunas, Control 300), mas ninguém abriu
+   nenhum deles no navegador.
+3. **`TestArestasInternasLegiveis` continua olhando só o Chatbot.** Ela não reprovou
+   com os cinco produtos novos porque não os enxerga. Antes de estender, **confira o
+   sinal dela** — na fase dos estágios ela premiava o desenho ilegível, e subir o teto
+   até passar não é teste, é enfeite. A história está na docstring da classe.
+
+### 14.8 Como conferir no navegador
+
+Obrigatório, e não opcional: **sete defeitos desta página só apareceram abrindo ela**,
+e dois não deixavam rastro no console.
+
+```bash
+cd .claude/skills/revy-research
+python3 -m http.server 8899          # a extensão de navegador bloqueia file://
+python3 recorte_produto.py chatbot-api           # o interior de um produto
+python3 recorte_produto.py chatbot-api schema    # a mesma coisa na Schema
+```
+
+O `recorte_produto.py` existe porque a automação de navegador vê a aba em **segundo
+plano**: `document.hidden` é `true`, o `requestAnimationFrame` não roda, e mexer no
+`viewBox` pelo DOM muda o atributo mas o screenshot volta do quadro antigo. **Só
+navegação repinta.** A docstring dele tem o resto, inclusive que a sobreposição
+face × interior **no recorte** não é defeito da página.
+
+Armadilhas que custaram caro, todas com learning em
+`.claude/skills/revy-research/learnings/`:
+
+- termo comprido **apaga a própria prova em silêncio** (~59 caracteres na caixa de um
+  componente); `TestProvaCabeNaCaixa` pega — desde que o produto esteja na lista
+  `com_componente` dele;
+- `getComputedStyle(el).opacity` devolve o **meio** da transição — leia o atributo
+  `style` inline;
+- `hidden` não esconde um `<svg>`, por dois motivos independentes;
+- `setPointerCapture` no `<svg>` engole todo clique, sem rastro no console.
