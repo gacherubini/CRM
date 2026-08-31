@@ -266,8 +266,15 @@ window.Zoom = {
         var de = el.getAttribute("data-de"), para = el.getAttribute("data-para");
         if (de === null || para === null) continue;
         if (el.hasAttribute("data-interna")) {
-          el.style.opacity =
-            (sob !== null && (dentroDe(de, sob) || dentroDe(para, sob))) ? "1" : "";
+          // PONTA EXATA, nao linhagem. Com `dentroDe` aqui, parar o mouse na
+          // caixa do PRODUTO acendia as 20 de uma vez (toda aresta interna
+          // esta dentro dele por definicao) — que foi exatamente a queixa: um
+          // feixe de linhas no mesmo corredor, ilegivel. Grupo tambem
+          // estourava: `workers` acendia 6. Agora a caixa sob o mouse tem que
+          // SER a ponta, entao a pergunta que a pagina responde e' sempre a
+          // mesma, em qualquer profundidade: "o que ESTA caixa chama, e quem
+          // chama ela".
+          el.style.opacity = (sob !== null && (de === sob || para === sob)) ? "1" : "";
         } else if (atual) {
           var toca = dentroDe(de, atual) || dentroDe(para, atual) ||
                      dentroDe(atual, de) || dentroDe(atual, para);
