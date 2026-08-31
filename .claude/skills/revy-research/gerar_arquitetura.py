@@ -72,13 +72,16 @@ def montar(raiz: Path) -> str:
     # A Schema tem arestas SIM, desde a Task 14 — mas nao as da Arquitetura.
     # As dela sao as chaves estrangeiras, e vem do proprio schema.
     sch = replace(sch, fluxos=())
-    sch = arq_modelo.como_mapa_conceitual(sch, frescor.get("relacoes", {}))
+    sch = arq_modelo.como_mapa_conceitual(sch, frescor.get("relacoes", {}),
+                                          frescor.get("colunas", {}))
     vistas = (
         arq_render.Vista("arquitetura", "Arquitetura",
                          arq_layout.dispor(arq, arq.vms, arquitetura.POSICOES), arq),
+        # Folga tripla: na Schema toda caixa tem seta chegando ou saindo, e
+        # com o respiro da Arquitetura elas passam raspando na caixa vizinha.
         arq_render.Vista("schema", "Schema",
-                         arq_layout.dispor(sch, sch.bancos), sch,
-                         arestas_sempre_visiveis=True),
+                         arq_layout.dispor(sch, sch.bancos, folga=arq_layout.MARGEM * 3),
+                         sch, arestas_sempre_visiveis=True),
     )
     # Os tokens da marca sao LIDOS na geracao. `revy-tokens.css` se declara
     # fonte unica; uma pagina de design system que repete os valores a mao

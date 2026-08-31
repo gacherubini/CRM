@@ -77,7 +77,8 @@ class Cena:
     altura: float
 
 
-def _grade(tamanhos: list[tuple[float, float]]) -> tuple[float, float, list[tuple[float, float]]]:
+def _grade(tamanhos: list[tuple[float, float]],
+           gap: float = MARGEM) -> tuple[float, float, list[tuple[float, float]]]:
     """Empacota `tamanhos` (`[(w, h), ...]`) em prateleiras (shelf packing),
     mirando a proporcao de tela ~16:10, pra que a cena nunca vire uma tira
     de 5:1 (filhos com larguras muito diferentes faziam a antiga grade
@@ -116,7 +117,7 @@ def _grade(tamanhos: list[tuple[float, float]]) -> tuple[float, float, list[tupl
     linha_atual: list[int] = []
     largura_linha = 0.0
     for i, (w, h) in enumerate(tamanhos):
-        acrescida = largura_linha + (MARGEM if linha_atual else 0.0) + w
+        acrescida = largura_linha + (gap if linha_atual else 0.0) + w
         if linha_atual and acrescida > largura_alvo:
             linhas.append(linha_atual)
             linha_atual = [i]
@@ -136,11 +137,11 @@ def _grade(tamanhos: list[tuple[float, float]]) -> tuple[float, float, list[tupl
         for idx in linha:
             w, h = tamanhos[idx]
             posicoes[idx] = (x, y)
-            x += w + MARGEM
+            x += w + gap
             alt_linha = max(alt_linha, h)
-        largura_total = max(largura_total, x - MARGEM)
-        y += alt_linha + MARGEM
-    altura_total = y - MARGEM
+        largura_total = max(largura_total, x - gap)
+        y += alt_linha + gap
+    altura_total = y - gap
 
     return largura_total, altura_total, posicoes
 
@@ -304,10 +305,16 @@ def _caixa_item(no_chave: str, idx: int, entrada, nivel: int) -> Caixa:
         chave=f"{no_chave}.item{idx}",
         tipo="item",
         titulo=entrada.chave,
-        # `linha=0` = ficha sintetica (a contagem de flag de
-        # arq_modelo.agrupar_flags). Nao existe linha 0 num arquivo, e
-        # "app/config.py:0" seria um endereco falso na tela.
-        subtitulo=(f"{entrada.arquivo}:{entrada.linha}" if entrada.linha
+        # Tres casos, nesta ordem:
+        # - `coluna`: o subtitulo e' o TIPO e o papel (PK, FK, nulo). O
+        #   arquivo seria o mesmo pras 48 colunas de `leads`, e a tabela ja
+        #   carrega o `arquivo:linha` no proprio termo.
+        # - `linha=0`: ficha sintetica (a contagem de flag de
+        #   `arq_modelo.agrupar_flags`). Nao existe linha 0 num arquivo, e
+        #   "app/config.py:0" seria um endereco falso na tela.
+        # - o resto: `arquivo:linha`, que e' o endereco de verdade.
+        subtitulo=(entrada.simbolo if entrada.secao == "coluna"
+                   else f"{entrada.arquivo}:{entrada.linha}" if entrada.linha
                    else entrada.arquivo),
         x=0.0, y=0.0, w=ITEM_W, h=ITEM_H,
         pai=no_chave, nivel=nivel,
@@ -316,7 +323,8 @@ def _caixa_item(no_chave: str, idx: int, entrada, nivel: int) -> Caixa:
 
 def _dispor_no(no: No, chave_completa: str, nivel: int,
                arestas: tuple[tuple[str, str], ...] = (),
-               caminho: str | None = None) -> tuple[Caixa, list[Caixa]]:
+               caminho: str | None = None,
+               folga: float = MARGEM) -> tuple[Caixa, list[Caixa]]:
     """Devolve a caixa do proprio `no` (pai=None — quem chama decide o pai)
     mais a lista achatada de TODOS os descendentes, com coordenadas ja
     absolutas dentro do frame local deste no (offset 0,0 no canto do no).
@@ -334,7 +342,7 @@ def _dispor_no(no: No, chave_completa: str, nivel: int,
     sub_filhos = [
         (chave_completa + "." + filhos[i].chave,)
         + _dispor_no(filhos[i], chave_completa + "." + filhos[i].chave, nivel + 1,
-                     arestas, caminho + "." + filhos[i].chave)
+                     arestas, caminho + "." + filhos[i].chave, folga)
         for i in ordem
     ]
     sub_itens = [
@@ -343,7 +351,7 @@ def _dispor_no(no: No, chave_completa: str, nivel: int,
     ]
 
     largura_filhos, altura_filhos, pos_filhos = _grade(
-        [(caixa.w, caixa.h) for _, caixa, _ in sub_filhos])
+        [(caixa.w, caixa.h) for _, caixa, _ in sub_filhos], folga)
     largura_itens, altura_itens, pos_itens = _grade(
         [(caixa.w, caixa.h) for _, caixa, _ in sub_itens])
 
@@ -423,7 +431,8 @@ def _comprimir(caixa: Caixa, descendentes: list[Caixa]) -> tuple[Caixa, list[Cai
 
 
 def _dispor_vm(vm: Vm, por_chave: dict[str, No], nivel: int,
-               arestas: tuple[tuple[str, str], ...] = ()) -> tuple[Caixa, list[Caixa]]:
+               arestas: tuple[tuple[str, str], ...] = (),
+               folga: float = MARGEM) -> tuple[Caixa, list[Caixa]]:
     """Devolve a caixa da VM (moldura, sem preenchimento — ver arq_render) e
     a lista achatada dos produtos que ela contem (e seus descendentes), com
     coordenadas absolutas dentro do frame local da VM.
@@ -438,11 +447,11 @@ def _dispor_vm(vm: Vm, por_chave: dict[str, No], nivel: int,
     contidos = [contidos[i] for i in _ordem_por_afinidade(contidos, arestas)]
     sub = [
         _comprimir(*_dispor_no(por_chave[chave], f"{vm.chave}.{chave}", nivel + 1,
-                               arestas, chave))
+                               arestas, chave, folga))
         for chave in contidos
     ]
     largura_conteudo, altura_conteudo, posicoes = _grade(
-        [(caixa.w, caixa.h) for caixa, _ in sub])
+        [(caixa.w, caixa.h) for caixa, _ in sub], folga)
 
     banda = banda_titulo(largura_conteudo, 0.02)
     largura_total = MARGEM * 2 + largura_conteudo
@@ -501,7 +510,8 @@ def _aplicar_posicoes(caixas: list[Caixa],
 
 
 def dispor(modelo: Modelo, grupos: tuple[Vm, ...],
-           a_mao: dict[str, tuple[float, float]] | None = None) -> Cena:
+           a_mao: dict[str, tuple[float, float]] | None = None,
+           folga: float = MARGEM) -> Cena:
     """`grupos` e o nivel 1 da cena: `modelo.vms` pra vista Arquitetura,
     `modelo.bancos` pra vista Schema (Task 9) — quem chama escolhe, porque
     so quem filtrou o modelo (`arq_modelo.filtrar`) sabe qual das duas vistas
@@ -515,6 +525,14 @@ def dispor(modelo: Modelo, grupos: tuple[Vm, ...],
     envolvendo os produtos do seu `contem`. Produto que nao esta em nenhum
     grupo fica solto, no mesmo nivel — nao existe hoje nos dados reais (as
     seis produtos vivem em app2037), mas o modelo precisa aceitar.
+
+    `folga` e' o respiro ENTRE caixas irmas. O default e' a `MARGEM` de
+    sempre, que a Arquitetura usa; a Schema pede mais, e por um motivo que se
+    ve na tela: ali toda caixa tem seta chegando ou saindo, e com o respiro da
+    Arquitetura as setas passam raspando nas caixas vizinhas — o dono olhou e
+    disse que estava "tudo amontoado". Nao mexa na `MARGEM`: ela tambem e' o
+    padding DENTRO da caixa, e aumentar as duas juntas incha o desenho todo
+    sem separar nada.
     """
     a_mao = a_mao or {}
     por_chave_no = {no.chave: no for no in modelo.nos}
@@ -529,9 +547,9 @@ def dispor(modelo: Modelo, grupos: tuple[Vm, ...],
     # layout so precisa de quem-com-quem, nunca do protocolo.
     arestas = tuple((a.de, a.para) for a in modelo.arestas)
 
-    raizes = [_dispor_vm(vm, por_chave_no, 1, arestas) for vm in grupos]
+    raizes = [_dispor_vm(vm, por_chave_no, 1, arestas, folga) for vm in grupos]
     soltos = [no for no in modelo.nos if no.chave not in contidos]
-    raizes += [_dispor_no(no, no.chave, 1, arestas, no.chave) for no in soltos]
+    raizes += [_dispor_no(no, no.chave, 1, arestas, no.chave, folga) for no in soltos]
 
     # VM sem produto (motor2037, n8n2037, evolution2037, suite-pg) saia do
     # _dispor_vm mal maior que o texto do titulo — um selo de 238x82 ao lado

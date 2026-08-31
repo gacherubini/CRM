@@ -600,7 +600,8 @@ def _agrupar_flags_no(no: "No", limiar: int) -> "No":
 # Task 14 — a vista Schema vira mapa CONCEITUAL de banco.
 # --------------------------------------------------------------------------
 
-def como_mapa_conceitual(modelo: "Modelo", relacoes: dict) -> "Modelo":
+def como_mapa_conceitual(modelo: "Modelo", relacoes: dict,
+                         colunas: dict | None = None) -> "Modelo":
     """Reescreve a vista Schema: uma caixa por TABELA, ligadas por FK.
 
     Antes daqui a Schema era a arvore de arquivo outra vez, e pior que a da
@@ -625,9 +626,11 @@ def como_mapa_conceitual(modelo: "Modelo", relacoes: dict) -> "Modelo":
         if not tabelas and not migrations:
             nos_novos.append(no)
             continue
+        por_tabela = _colunas_por_tabela((colunas or {}).get(no.chave, ()))
         filhos = [
             No(chave=t.chave, titulo=t.chave, papel="tabela",
-               termo=f"{t.arquivo}:{t.linha}", auto=True)
+               termo=f"{t.arquivo}:{t.linha}", auto=True,
+               entradas=por_tabela.get(t.chave, ()))
             for t in sorted(tabelas, key=lambda e: e.chave)
         ]
         if migrations:
@@ -640,6 +643,41 @@ def como_mapa_conceitual(modelo: "Modelo", relacoes: dict) -> "Modelo":
         arestas_novas.extend(_arestas_de_relacao(
             no.chave, relacoes.get(no.chave, ()), {t.chave for t in tabelas}))
     return replace(modelo, nos=tuple(nos_novos), arestas=tuple(arestas_novas))
+
+
+def _colunas_por_tabela(colunas) -> dict:
+    """`{tabela: (Entrada, ...)}` com uma ficha por atributo.
+
+    O dono olhou uma caixa de tabela vazia e disse "isso nao diz nada pra
+    mim" — e estava certo: um mapa conceitual sem os atributos e' uma lista
+    de nomes de tabela com setas.
+
+    A ficha usa `simbolo` como subtitulo (via `arq_layout._caixa_item`), e nao
+    o `arquivo:linha` de sempre. E' a unica secao que faz isso, e faz porque
+    o que interessa numa coluna e' o TIPO e o papel dela (PK, FK, nulo) — o
+    arquivo e' o mesmo pra todas as colunas da tabela, e repeti-lo 48 vezes
+    dentro de `leads` nao ajudaria ninguem. A tabela ja carrega o
+    `arquivo:linha` no proprio termo.
+
+    A ordem e' a do ARQUIVO, nunca alfabetica: quem escreveu o modelo pos a
+    PK primeiro e os carimbos de tempo no fim, e isso e' informacao.
+    """
+    saida: dict = {}
+    for c in colunas:
+        marcas = []
+        if c["pk"]:
+            marcas.append("PK")
+        if c["fk_para"]:
+            marcas.append(f"FK {c['fk_para']}")
+        if c["unico"] and not c["pk"]:
+            marcas.append("único")
+        if c["nulo"]:
+            marcas.append("nulo")
+        detalhe = " · ".join([c["tipo"] or "?"] + marcas)
+        saida.setdefault(c["tabela"], []).append(Entrada(
+            secao="coluna", chave=c["nome"], simbolo=detalhe,
+            arquivo=c["arquivo"], linha=c["linha"]))
+    return {t: tuple(v) for t, v in saida.items()}
 
 
 def _colher(no: "No") -> tuple[list, list]:

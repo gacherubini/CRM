@@ -45,14 +45,17 @@ completo = arq_modelo.carregar(
     Path("../../.."), frescor, arquitetura.NOS,
     arquitetura.ARESTAS + arquitetura.ARESTAS_INTERNAS,
     arquitetura.VMS, arquitetura.FLUXOS, arquitetura.BANCOS)
+# Espelha `gerar_arquitetura.montar` — inclusive a folga da Schema. Recorte
+# que monta a cena de um jeito proprio confere outra pagina, nao esta.
 if vista == "schema":
     m = arq_modelo.como_mapa_conceitual(
         arq_modelo.filtrar(completo, arquitetura.SECOES_SCHEMA),
-        frescor.get("relacoes", {}))
+        frescor.get("relacoes", {}), frescor.get("colunas", {}))
+    cena = arq_layout.dispor(m, m.bancos, folga=arq_layout.MARGEM * 3)
 else:
     m = arq_modelo.agrupar_flags(arq_modelo.filtrar(
         completo, arquitetura.SECOES_ARQUITETURA, manter_manuais=True))
-cena = arq_layout.dispor(m, m.vms, arquitetura.POSICOES)
+    cena = arq_layout.dispor(m, m.vms, arquitetura.POSICOES)
 caixa = next(c for c in cena.caixas if c.chave.endswith(alvo))
 m = 4
 vb = f"{caixa.x-m} {caixa.y-m} {caixa.w+2*m} {caixa.h+2*m}"

@@ -766,3 +766,123 @@ def _tabela_da_classe(classe: ast.ClassDef) -> str | None:
                 and isinstance(corpo.value.value, str)):
             return corpo.value.value
     return None
+
+
+@dataclass(frozen=True)
+class Coluna:
+    """Um atributo de tabela, do jeito que o modelo declara.
+
+    E' o conteudo das caixas do mapa conceitual: caixa de tabela vazia nao diz
+    nada, e o dono disse isso com estas palavras.
+    """
+    tabela: str
+    nome: str
+    tipo: str          # do `Mapped[...]`: "str", "datetime", "int"...
+    pk: bool
+    fk_para: str       # tabela alvo, ou "" — o marcador que faz a seta existir
+    unico: bool
+    nulo: bool
+    arquivo: str
+    linha: int
+
+
+def _tipo_anotado(no: ast.AST) -> tuple[str, bool]:
+    """`Mapped[str | None]` -> ("str", True). Devolve (tipo, aceita_nulo).
+
+    Le a ANOTACAO, e nao o argumento do `mapped_column`, porque e' ela que o
+    autor escreveu pensando no dominio: `Mapped[datetime]` diz mais que
+    `DateTime(timezone=True)`, e e' ela que o mypy cobra.
+    """
+    if not isinstance(no, ast.Subscript):
+        return "", False
+    interno = no.slice
+    partes: list[str] = []
+    nulo = False
+
+    def desce(n: ast.AST) -> None:
+        nonlocal nulo
+        if isinstance(n, ast.BinOp) and isinstance(n.op, ast.BitOr):
+            desce(n.left)
+            desce(n.right)
+            return
+        if isinstance(n, ast.Constant) and n.value is None:
+            nulo = True
+            return
+        if isinstance(n, ast.Name):
+            if n.id == "None":
+                nulo = True
+            else:
+                partes.append(n.id)
+            return
+        if isinstance(n, ast.Attribute):
+            partes.append(n.attr)
+            return
+        if isinstance(n, ast.Subscript):
+            desce(n.value)
+            return
+
+    desce(interno)
+    return (" | ".join(partes), nulo)
+
+
+def colunas(texto: str, arquivo_rel: str) -> list[Coluna]:
+    """Os atributos de cada tabela, lidos como TEXTO (`ast`).
+
+    Pega os dois estilos que o repo usa: `x: Mapped[T] = mapped_column(...)`
+    (AnnAssign, o normal) e `x = Column(...)` (Assign, o legado). No segundo
+    nao ha anotacao, entao o tipo sai do primeiro argumento posicional.
+
+    `nulo` vem da anotacao (`Mapped[str | None]`) OU do `nullable=True` — os
+    dois aparecem, e as vezes juntos.
+    """
+    try:
+        arvore = ast.parse(texto)
+    except SyntaxError:
+        return []
+    achados: list[Coluna] = []
+    for no in ast.walk(arvore):
+        if not isinstance(no, ast.ClassDef):
+            continue
+        tabela = _tabela_da_classe(no)
+        if not tabela:
+            continue
+        for corpo in no.body:
+            valor = getattr(corpo, "value", None)
+            if not isinstance(valor, ast.Call):
+                continue
+            if _nome_chamado(valor) not in ("mapped_column", "Column"):
+                continue
+            alvo = getattr(corpo, "target", None)
+            if alvo is None:
+                alvos = getattr(corpo, "targets", None) or []
+                alvo = alvos[0] if alvos else None
+            if not isinstance(alvo, ast.Name):
+                continue
+            tipo, nulo_anot = _tipo_anotado(getattr(corpo, "annotation", None) or ast.Pass())
+            if not tipo:
+                tipo = _tipo_posicional(valor)
+            fk = ""
+            for arg in list(valor.args) + [kw.value for kw in valor.keywords]:
+                fk = _fk_alvo(arg) or fk
+            achados.append(Coluna(
+                tabela=tabela, nome=alvo.id, tipo=tipo,
+                pk=_kw_verdadeiro(valor, "primary_key"),
+                fk_para=fk,
+                unico=_kw_verdadeiro(valor, "unique"),
+                nulo=nulo_anot or _kw_verdadeiro(valor, "nullable"),
+                arquivo=arquivo_rel, linha=corpo.lineno,
+            ))
+    return achados
+
+
+def _tipo_posicional(chamada: ast.Call) -> str:
+    """`Column(String(36), ...)` -> "String". So pro estilo legado, sem
+    anotacao — no estilo novo a anotacao ganha, e e' melhor."""
+    for arg in chamada.args:
+        if isinstance(arg, ast.Name):
+            return arg.id
+        if isinstance(arg, ast.Call):
+            nome = _nome_chamado(arg)
+            if nome and nome != "ForeignKey":
+                return nome
+    return ""

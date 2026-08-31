@@ -318,6 +318,19 @@ def coletar_relacoes(raiz: Path, produto: str) -> list:
     return sorted(achadas, key=lambda r: (r.de, r.para, r.coluna))
 
 
+def coletar_colunas(raiz: Path, produto: str) -> list:
+    """Os atributos de todas as tabelas do produto."""
+    base = raiz / produto
+    achadas: list = []
+    for caminho in varredura.arquivos_py(raiz, produto):
+        rel = caminho.relative_to(base).as_posix()
+        texto = caminho.read_text(encoding="utf-8", errors="replace")
+        achadas.extend(extratores.colunas(texto, rel))
+    # Ordem do ARQUIVO dentro da tabela, nao alfabetica: a ordem em que o autor
+    # declarou e' informacao (a PK vem primeiro, os carimbos de tempo no fim).
+    return sorted(achadas, key=lambda c: (c.tabela, c.linha))
+
+
 def escrever_tudo(raiz: Path) -> None:
     PASTA_MAPA.mkdir(parents=True, exist_ok=True)
     sha = sha_atual(raiz)
@@ -327,10 +340,15 @@ def escrever_tudo(raiz: Path) -> None:
     # codigo e uma relacao liga DOIS — enfiar isso em `Entrada` obrigaria a
     # inventar campo que so uma secao usa.
     relacoes: dict[str, list[dict]] = {}
+    # Os atributos de cada tabela. Mesma razao de `relacoes` pra ficar fora do
+    # inventario: uma coluna nao e' um lugar no codigo que alguem procura, e'
+    # o CONTEUDO de uma tabela. Caixa de tabela vazia nao diz nada.
+    colunas: dict[str, list[dict]] = {}
     rotas_por_produto: dict[str, set[str]] = {}
     for produto in varredura.PRODUTOS:
         entradas = coletar(raiz, produto)
         relacoes[produto] = [asdict(r) for r in coletar_relacoes(raiz, produto)]
+        colunas[produto] = [asdict(c) for c in coletar_colunas(raiz, produto)]
         head = head_de(raiz, produto)
         (PASTA_MAPA / f"{produto}.md").write_text(
             render(produto, entradas, head, sha), encoding="utf-8"
@@ -347,7 +365,8 @@ def escrever_tudo(raiz: Path) -> None:
     )
     print(f"cruzamentos: {sum(len(v) for v in rotas_por_produto.values())} rotas declaradas")
     (PASTA_MAPA / "_frescor.json").write_text(
-        json.dumps({"sha": sha, "inventario": inventario, "relacoes": relacoes},
+        json.dumps({"sha": sha, "inventario": inventario,
+                    "relacoes": relacoes, "colunas": colunas},
                    ensure_ascii=False, indent=1),
         encoding="utf-8",
     )
