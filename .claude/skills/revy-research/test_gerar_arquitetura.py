@@ -513,10 +513,11 @@ class TestRender(unittest.TestCase):
         achado = proibido.search(sem_comentario)
         self.assertIsNone(achado, achado.group(0) if achado else None)
 
-    def test_emite_as_duas_rampas(self):
-        html = self._html()
-        self.assertIn("data-k-min=", html)
-        self.assertIn("data-face-ate=", html)
+    def test_emite_a_rampa_de_entrada(self):
+        # A rampa de SAIDA (`data-face-ate`) nao cabe nesta cena falsa: ela so
+        # existe em caixa com dois filhos ou mais, e aqui nenhuma tem. A regra
+        # esta em `test_a_face_so_apaga_quando_ha_o_que_por_no_lugar`.
+        self.assertIn("data-k-min=", self._html())
 
     def test_caixa_navegavel_nao_carrega_data_k_min(self):
         # Senao o aplicarLod briga com o Zoom.acender e o fluxo pisca.
@@ -838,6 +839,118 @@ class TestPeleRevy(unittest.TestCase):
         self.assertEqual(gerar_arquitetura.montar(self.raiz), self.html)
 
 
+class TestVocabularioDeFormaTecnica(unittest.TestCase):
+    """A forma diz o que a caixa E' TECNICAMENTE — fila, worker, cache,
+    browser — antes de voce ler o texto dela.
+
+    Pedido do dono em 31/08: caixa toda igual obriga a ler cada legenda pra
+    saber o que e' o que, e ai o diagrama vira lista. O `papel` continua
+    respondendo de que DOMINIO a caixa e'; sao perguntas diferentes.
+    """
+
+    def _formas_escritas(self):
+        achadas = {}
+        for caminho, bruto in _percorrer_bruto({"dentro": arquitetura.NOS}):
+            if bruto.get("forma"):
+                achadas[caminho] = bruto["forma"]
+        return achadas
+
+    def test_toda_forma_escrita_e_conhecida(self):
+        # `_marca_tecnica` levanta em forma desconhecida, mas so quando aquela
+        # caixa chega a ser desenhada — um erro de digitacao num componente
+        # podado passaria calado ate alguem despodar.
+        for chave, forma in self._formas_escritas().items():
+            self.assertIn(forma, arq_render.FORMAS_TECNICAS, chave)
+
+    def test_toda_forma_tecnica_usada_esta_na_legenda(self):
+        # Vocabulario sem legenda e' codigo secreto.
+        legenda = arq_render._legenda_html()
+        rotulos = {"fila": "fila (outbox)", "worker": "worker",
+                   "cache": "cache", "browser": "browser (RPA)"}
+        for forma in set(self._formas_escritas().values()):
+            self.assertIn(rotulos[forma], legenda, forma)
+
+    def test_a_forma_nao_troca_a_cor(self):
+        """Cor continua sendo SO' o SPOF. A regra antiga ("nunca vermelho
+        porque e' importante") vale igual pro vocabulario novo: quem quiser
+        destacar uma caixa muda a forma, nunca a tinta."""
+        caixa = arq_layout.Caixa(
+            chave="p.x", tipo="no", titulo="X", subtitulo="s",
+            x=0, y=0, w=100, h=40, pai="p", nivel=2, forma="fila")
+        svg = arq_render._rect_no(caixa, spof=False)
+        self.assertNotIn(arq_render.DANGER, svg)
+        self.assertNotIn(arq_render.BRAND_LINE, svg)
+
+    def test_caixa_sem_forma_sai_igualzinha_a_de_antes(self):
+        # A forma e' opt-in: quem nao declara nada nao ganha tracinho nenhum.
+        nua = arq_layout.Caixa(chave="p.x", tipo="no", titulo="X",
+                               subtitulo="s", x=0, y=0, w=100, h=40,
+                               pai="p", nivel=2)
+        self.assertEqual(arq_render._marca_tecnica(nua, arq_render.INK), "")
+
+    def test_forma_desconhecida_falha_alto(self):
+        errada = arq_layout.Caixa(chave="p.x", tipo="no", titulo="X",
+                                  subtitulo="s", x=0, y=0, w=100, h=40,
+                                  pai="p", nivel=2, forma="cilindro")
+        with self.assertRaises(ValueError):
+            arq_render._marca_tecnica(errada, arq_render.INK)
+
+
+class TestContagemDeFlag(unittest.TestCase):
+    """`arq_modelo.agrupar_flags`: a parede de env vira uma ficha que conta.
+
+    Foi a segunda parede a cair, depois da `template`. O `config.py` do
+    Control empilhava 42 fichas numa coluna so; o dono olhou e pediu outra
+    forma.
+    """
+
+    def _no(self, *chaves):
+        ent = tuple(varredura.Entrada(secao="flag", chave=c, simbolo=c,
+                                      arquivo="app/config.py", linha=i + 1)
+                    for i, c in enumerate(chaves))
+        return arq_modelo.No(chave="p", titulo="P", papel="x", entradas=ent)
+
+    def test_pilha_acima_do_limiar_vira_uma_ficha_so(self):
+        no = self._no("A (default: 0)", "B (default: 0)", "C (default: '')",
+                      "D (default: America/Sao_Paulo)", "E")
+        m = arq_modelo.agrupar_flags(
+            arq_modelo.Modelo(nos=(no,)), limiar=4)
+        (novo_no,) = m.nos
+        self.assertEqual(len(novo_no.entradas), 1)
+        self.assertEqual(novo_no.entradas[0].chave, "5 env · 3 rollout OFF")
+        self.assertEqual(novo_no.entradas[0].arquivo, "app/config.py")
+        # `linha=0` combina com arq_layout._caixa_item: ficha sintetica sai
+        # sem o `:0`, que seria um endereco falso na tela.
+        self.assertEqual(novo_no.entradas[0].linha, 0)
+
+    def test_abaixo_do_limiar_a_lista_fica(self):
+        # Ler as duas flags do Motor vale mais que contar ate dois.
+        no = self._no("A (default: 0)", "B (default: 0)")
+        m = arq_modelo.agrupar_flags(arq_modelo.Modelo(nos=(no,)), limiar=4)
+        self.assertEqual(len(m.nos[0].entradas), 2)
+
+    def test_o_rotulo_nao_promete_rollout_que_nao_existe(self):
+        """A secao se chama `flag`, mas o extrator emite TODA variavel de
+        ambiente — `REVY_TRAFEGO_TIMEZONE` esta no meio das 59 do Control.
+        Escrever "todas default OFF" seria uma mentira que o desenho afirma
+        sozinho, entao a contagem de rollout so aparece quando ha rollout."""
+        no = self._no("A (default: x)", "B (default: y)", "C (default: z)",
+                      "D (default: w)")
+        m = arq_modelo.agrupar_flags(arq_modelo.Modelo(nos=(no,)), limiar=4)
+        self.assertEqual(m.nos[0].entradas[0].chave, "4 env")
+
+    def test_desce_a_arvore_inteira(self):
+        # A parede do Control esta num no AUTOMATICO (`config.py`), que e
+        # filho — agrupar so a raiz nao resolveria nada.
+        filho = self._no("A (default: 0)", "B (default: 0)", "C (default: 0)",
+                         "D (default: 0)")
+        pai = arq_modelo.No(chave="pai", titulo="Pai", papel="x",
+                            filhos=(filho,))
+        m = arq_modelo.agrupar_flags(arq_modelo.Modelo(nos=(pai,)), limiar=4)
+        self.assertEqual(m.nos[0].filhos[0].entradas[0].chave,
+                         "4 env · 4 rollout OFF")
+
+
 class TestComponentesDoChatbot(unittest.TestCase):
     """Task 13: a camada de componente do Chatbot API, escrita a mao.
 
@@ -914,6 +1027,43 @@ class TestComponentesDoChatbot(unittest.TestCase):
     def test_aresta_interna_nunca_liga_um_no_nele_mesmo(self):
         for a in arquitetura.ARESTAS_INTERNAS:
             self.assertNotEqual(a["de"], a["para"])
+
+    def test_a_face_so_apaga_quando_ha_o_que_por_no_lugar(self):
+        """O zoom TROCA: o titulo e a linha de prova saem, o interior entra.
+
+        A troca so se paga quando ha interior. Antes desta regra, clicar em
+        `estoque-api.outbox` — que nao casa entrada nenhuma de inventario —
+        deixava uma TELA BRANCA: voce tinha "HMAC, backoff, desiste em 5
+        (outbox.py:19,27,83)" e passava a nao ter nada. Com uma ficha so,
+        trocava o titulo por `main / app/worker.py:55`.
+
+        `k_face = 0` faz arq_render omitir `data-face-ate`, e sem o atributo o
+        `aplicarLod` nunca mexe naquela face — ela fica preta, em qualquer
+        zoom. Nao confunda com `k_min`, que continua valendo: a ficha unica
+        ainda aparece, so que ABAIXO do titulo, em vez de no lugar dele.
+        """
+        completo = arq_modelo.carregar(
+            self.raiz, self.frescor, arquitetura.NOS,
+            list(arquitetura.ARESTAS) + list(arquitetura.ARESTAS_INTERNAS),
+            arquitetura.VMS, arquitetura.FLUXOS, arquitetura.BANCOS)
+        arq = arq_modelo.filtrar(completo, arquitetura.SECOES_ARQUITETURA,
+                                 manter_manuais=True)
+        cena = arq_layout.dispor(arq, arq.vms, arquitetura.POSICOES)
+        filhos: dict[str, int] = {}
+        for c in cena.caixas:
+            if c.pai:
+                filhos[c.pai] = filhos.get(c.pai, 0) + 1
+        magras, gordas = [], []
+        for c in cena.caixas:
+            if c.pai is None:
+                continue          # nivel 1 nunca teve face-ate
+            if filhos.get(c.chave, 0) >= 2:
+                if c.k_face <= 0:
+                    gordas.append(c.chave)
+            elif c.k_face > 0:
+                magras.append(f"{c.chave} ({filhos.get(c.chave, 0)} filhos)")
+        self.assertEqual(magras, [], "face apagando sem ter o que por no lugar")
+        self.assertEqual(gordas, [], "caixa cheia que nunca troca de conteudo")
 
     def test_o_protocolo_interno_vem_de_um_vocabulario_curto(self):
         # Quatro palavras, nao trinta: "chamada" (mesmo processo), "outbox"

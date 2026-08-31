@@ -67,6 +67,7 @@ class Caixa:
     nivel: int          # profundidade; 1 = raiz
     k_min: float = 0.0
     k_face: float = 0.0
+    forma: str = ""      # vocabulario tecnico; ver No.forma em arq_modelo
 
 
 @dataclass(frozen=True)
@@ -303,7 +304,11 @@ def _caixa_item(no_chave: str, idx: int, entrada, nivel: int) -> Caixa:
         chave=f"{no_chave}.item{idx}",
         tipo="item",
         titulo=entrada.chave,
-        subtitulo=f"{entrada.arquivo}:{entrada.linha}",
+        # `linha=0` = ficha sintetica (a contagem de flag de
+        # arq_modelo.agrupar_flags). Nao existe linha 0 num arquivo, e
+        # "app/config.py:0" seria um endereco falso na tela.
+        subtitulo=(f"{entrada.arquivo}:{entrada.linha}" if entrada.linha
+                   else entrada.arquivo),
         x=0.0, y=0.0, w=ITEM_W, h=ITEM_H,
         pai=no_chave, nivel=nivel,
     )
@@ -380,6 +385,7 @@ def _dispor_no(no: No, chave_completa: str, nivel: int,
         chave=chave_completa, tipo="no", titulo=no.titulo,
         subtitulo=(no.termo or no.papel), x=0.0, y=0.0,
         w=largura_total, h=altura_total, pai=None, nivel=nivel,
+        forma=no.forma,
     )
     return caixa_no, descendentes
 
@@ -564,6 +570,10 @@ def dispor(modelo: Modelo, grupos: tuple[Vm, ...],
     # arq_render omite o atributo quando o valor e 0, entao elas nunca
     # brigam com o Zoom.acender da Task 7.
     por_chave = {c.chave: c for c in caixas}
+    filhos: dict[str, int] = {}
+    for c in caixas:
+        if c.pai:
+            filhos[c.pai] = filhos.get(c.pai, 0) + 1
     finais = []
     for c in caixas:
         if c.pai is None or c.pai not in por_chave:
@@ -575,7 +585,21 @@ def dispor(modelo: Modelo, grupos: tuple[Vm, ...],
         # e o interior ja abre no primeiro quadro. Voce tem que entrar em
         # algo antes do interior dela abrir.
         k = round(max(1.6, 0.6 * (largura / pai.w)), 4) if pai.w else 0.0
-        finais.append(replace(c, k_min=k, k_face=k))
+        # `k_face = 0` -> arq_render omite `data-face-ate` -> a face NUNCA
+        # apaga. E' o caso de quem nao tem o que por no lugar dela.
+        #
+        # A troca que o zoom faz e': o titulo e a linha de prova saem, o
+        # interior entra. Ela so se paga quando ha interior. Numa caixa vazia
+        # (`estoque-api.outbox`, que nao casa entrada nenhuma de inventario)
+        # voce clicava e ficava com uma TELA BRANCA — tinha "HMAC, backoff,
+        # desiste em 5 (outbox.py:19,27,83)" e passava a nao ter nada. Com uma
+        # ficha so, trocava o titulo por `main / app/worker.py:55`.
+        #
+        # Entao: de dois filhos pra cima, a face apaga (o efeito de cair
+        # dentro, que e' o que faz um produto de dez componentes funcionar);
+        # de um pra baixo, ela fica.
+        face = k if filhos.get(c.chave, 0) >= 2 else 0.0
+        finais.append(replace(c, k_min=k, k_face=face))
 
     finais = _aplicar_posicoes(finais, a_mao)
     finais.sort(key=lambda c: c.chave)
