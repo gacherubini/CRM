@@ -170,6 +170,8 @@ window.Zoom = {
     function assentar() {
       saindo = null;
       aplicarLod(base.w / vb(svg).w);
+      // O foco mudou, entao quem "so atravessa" mudou junto.
+      pintarArestas();
     }
 
     function voarPara(id) {
@@ -221,8 +223,59 @@ window.Zoom = {
     }
 
     function apagar() {
-      var todas = svg.querySelectorAll("[data-navegavel],[data-aresta]");
+      var todas = svg.querySelectorAll("[data-navegavel],[data-aresta],[data-de]");
       for (var i = 0; i < todas.length; i++) todas[i].style.opacity = "";
+      // Limpar o inline devolve TODA aresta ao padrao do CSS, inclusive a
+      // enfase que nao veio de fluxo nenhum. Repinta.
+      pintarArestas();
+    }
+
+    // ----------------------------------------------------------------
+    // Enfase das arestas (30/08, 2a leva). Duas regras, uma funcao so —
+    // ter dois lugares escrevendo style.opacity na mesma seta e' como o
+    // fluxo e o LOD ja brigaram uma vez.
+    //
+    //   1. Aresta INTERNA (mesmo produto) nasce apagada pelo CSS e acende
+    //      quando o mouse esta numa das duas pontas. Vinte setas ligando
+    //      dez componentes davam 43 travessias de caixa alheia mesmo com o
+    //      layout por afinidade; e ninguem le as vinte de uma vez.
+    //   2. Aresta ENTRE PRODUTOS apaga quando voce esta DENTRO de um no que
+    //      ela apenas atravessa. A linha vermelha Loja->Motor cortando o
+    //      interior aberto do Chatbot de ponta a ponta nao diz nada sobre o
+    //      Chatbot — ela so estava no caminho.
+    //
+    // "Tocar" e' linhagem nos dois sentidos: a ponta esta dentro do foco
+    // (Chatbot -> um componente dele) ou o foco esta dentro da ponta (voce
+    // desceu num componente, e a aresta sai do produto inteiro).
+    // ----------------------------------------------------------------
+    var sob = null;   // id do no sob o mouse
+
+    function dentroDe(id, raiz) {
+      return id === raiz || id.indexOf(raiz + ".") === 0;
+    }
+
+    function pintarArestas() {
+      // `[data-de]`, nao `[data-aresta]`: o rotulo tem que acender junto com
+      // a seta, e ele nao pode carregar `data-aresta` (o valor tem um `>`
+      // literal dentro, que quebra o regex de dois testes, e o atributo e' o
+      // que um deles conta pra saber quantas arestas existem). Ver
+      // `_marcas_da_aresta` em arq_render.py.
+      var setas = svg.querySelectorAll("[data-de]");
+      for (var i = 0; i < setas.length; i++) {
+        var el = setas[i];
+        var de = el.getAttribute("data-de"), para = el.getAttribute("data-para");
+        if (de === null || para === null) continue;
+        if (el.hasAttribute("data-interna")) {
+          el.style.opacity =
+            (sob !== null && (dentroDe(de, sob) || dentroDe(para, sob))) ? "1" : "";
+        } else if (atual) {
+          var toca = dentroDe(de, atual) || dentroDe(para, atual) ||
+                     dentroDe(atual, de) || dentroDe(atual, para);
+          el.style.opacity = toca ? "" : "0.10";
+        } else {
+          el.style.opacity = "";
+        }
+      }
     }
 
     base = vb(svg);
@@ -278,10 +331,25 @@ window.Zoom = {
       px = ev.clientX; py = ev.clientY;
     });
     svg.addEventListener("pointerup", function () { arrastando = false; });
-    svg.addEventListener("pointerleave", function () { arrastando = false; });
+    svg.addEventListener("pointerleave", function () {
+      arrastando = false;
+      if (sob !== null) { sob = null; pintarArestas(); }
+    });
+
+    // `pointerover` borbulha (ao contrario de `pointerenter`), entao UM
+    // ouvinte no <svg> cobre as ~1600 formas. Sair de uma caixa para o vazio
+    // tambem dispara — o alvo passa a ser o fundo, `closest` devolve null, e
+    // as internas apagam. Nada de setPointerCapture perto disto: capturar o
+    // ponteiro no <svg> faz todo evento seguinte ter o svg como alvo.
+    svg.addEventListener("pointerover", function (ev) {
+      var alvo = ev.target.closest("[data-navegavel]");
+      var id = alvo ? alvo.id : null;
+      if (id !== sob) { sob = id; pintarArestas(); }
+    });
 
     medirPxPorUnidade();
     setVb(base);
+    pintarArestas();
 
     return { elemento: svg, voarPara: voarPara, subir: subir,
              acender: acender, apagar: apagar,

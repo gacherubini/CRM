@@ -40,6 +40,7 @@ from __future__ import annotations
 
 import html
 import json
+import math
 from dataclasses import dataclass
 
 from arq_layout import Caixa, Cena, ALTURA_TITULO, MARGEM, banda_titulo
@@ -95,7 +96,27 @@ def _fonte_titulo(c: Caixa) -> float:
     # O teto pela FAIXA e o que impede o titulo de invadir os filhos: eles
     # comecam logo abaixo dela (arq_layout.banda_titulo).
     banda = banda_titulo(max(0.0, c.w - MARGEM * 2))
-    return max(1.5, round(min(c.w * 0.055, c.h * 0.30, banda * 0.62), 1))
+
+    # ...e o teto pelo COMPRIMENTO e o que impede o titulo de invadir o
+    # VIZINHO. Os tres tetos acima olham so a geometria da caixa, entao um
+    # titulo longo numa caixa estreita transbordava pela direita: achado no
+    # navegador em 30/08, "Clientes HTTP de outros produtos" saindo por cima
+    # da caixa "Projecao do Control" ao lado. Quatro dos 81 titulos da cena
+    # real estouravam, todos entre 15% e 18% — o teto so morde nesses, os
+    # outros 77 continuam com a fonte que ja tinham.
+    #
+    # 0.6 e' o avanco de uma fonte monoespacada (largura do glifo / em);
+    # MONO e' mono em toda a pagina, entao a conta e' exata, nao estimativa.
+    # A margem de folga usa a mesma MARGEM do layout.
+    largura_util = max(0.0, c.w - MARGEM)
+    por_comprimento = largura_util / (len(c.titulo) * 0.6) if c.titulo else float("inf")
+
+    # TRUNCA em vez de arredondar. `round(8.26, 1)` da 8.3, e 8.3 volta a
+    # estourar a caixa por uma fracao — o teto acima e' exato, o arredondamento
+    # e' que o desfazia (dois dos quatro titulos continuavam saindo). Truncar
+    # nunca AUMENTA uma fonte, entao nao cria estouro em lugar nenhum.
+    teto = min(c.w * 0.055, c.h * 0.30, banda * 0.62, por_comprimento)
+    return max(1.5, math.floor(teto * 10) / 10)
 
 
 def _marcar_spof(no: No, prefixo: str, resultado: dict[str, bool]) -> None:
@@ -468,6 +489,33 @@ def _sem_rede(a: Aresta) -> bool:
     return a.de.split(".")[0] == a.para.split(".")[0]
 
 
+def _marcas_da_aresta(a: Aresta, de: Caixa, para: Caixa) -> str:
+    """Atributos que `arq_zoom.js` le pra decidir a opacidade de cada seta.
+
+    `data-de`/`data-para` sao os ids ABSOLUTOS (com prefixo de VM), nao as
+    chaves cruas de `Aresta`. O JS precisa perguntar "esta ponta esta dentro
+    do no em foco?", que e' teste de prefixo — e `chatbot-api.workers` nunca
+    e' prefixo de `app2037.chatbot-api.workers`. Resolver isso no JS por
+    sufixo (como `Zoom.acender` faz) funciona pro caso raso e erra assim que
+    a pergunta e' de linhagem; aqui o render ja sabe a resposta certa, entao
+    ele escreve.
+
+    `data-interna` marca aresta que nao cruza fronteira de produto — as 20
+    do Chatbot. Sao elas que nascem apagadas e so acendem sob o mouse.
+
+    Estes tres vao na forma E no rotulo, pra os dois acenderem juntos.
+    `data-aresta` NAO: o valor dele carrega um `>` literal (`de->para`), e
+    dois testes leem o SVG com regex `<text[^>]*...>` — o `[^>]*` para no
+    sinal de dentro do atributo. Alem disso `data-aresta` e' o que
+    `test_5_vermelho_so_em_aresta_sem_retry_e_no_spof` conta pra saber
+    quantas arestas existem; repetir no rotulo contaria cada uma duas vezes.
+    Por isso o seletor do JS e' `[data-de]`, nao `[data-aresta]`.
+    """
+    interna = ' data-interna=""' if _sem_rede(a) else ""
+    return (f' data-de="{html.escape(de.chave)}" data-para="{html.escape(para.chave)}"'
+            f'{interna}')
+
+
 def _aresta_forma(a: Aresta, de: Caixa, para: Caixa, deslocamento: float) -> str:
     pontos = _pontos_da_aresta(de, para, deslocamento)
     marca = f"{html.escape(a.de)}->{html.escape(a.para)}"
@@ -478,7 +526,8 @@ def _aresta_forma(a: Aresta, de: Caixa, para: Caixa, deslocamento: float) -> str
     cor = f' stroke="{DANGER}"' if not a.retry and not _sem_rede(a) else ""
     txt_pontos = " ".join(f"{x:.2f},{y:.2f}" for x, y in pontos)
     return (
-        f'<polyline data-aresta="{marca}" points="{txt_pontos}"{tracejado}{cor} '
+        f'<polyline data-aresta="{marca}" points="{txt_pontos}"'
+        f'{_marcas_da_aresta(a, de, para)}{tracejado}{cor} '
         f'marker-end="url(#{marcador})"/>'
     )
 
@@ -502,7 +551,11 @@ def _aresta_texto(a: Aresta, de: Caixa, para: Caixa, deslocamento: float) -> str
     # http, outbox, tcp, timer.
     if a.protocolo == "chamada":
         return ""
-    return (f'<text x="{mx:.2f}" y="{my:.2f}" font-size="8" fill="{cor}" class="protocolo">'
+    # As mesmas marcas da forma: o rotulo tem que acender e apagar JUNTO com
+    # a seta dele. Sem isso, esconder as arestas internas deixaria as
+    # palavras soltas boiando no vazio, apontando pra nada.
+    return (f'<text{_marcas_da_aresta(a, de, para)} x="{mx:.2f}" y="{my:.2f}" '
+            f'font-size="8" fill="{cor}" class="protocolo">'
             f'{html.escape(a.protocolo)}</text>')
 
 
@@ -852,7 +905,14 @@ def render(vistas: tuple[Vista, ...], js: str,
   [id^="inv-"]{{margin:6px 0 0;font-style:italic}}
   [id^="passos-"] li{{margin:2px 0}}
   [data-k-min],[data-face-ate]{{transition:opacity .1s linear}}
-  [data-navegavel],[data-aresta]{{transition:opacity .15s linear}}
+  [data-navegavel],[data-aresta],[data-de]{{transition:opacity .15s linear}}
+  /* Aresta dentro do mesmo produto nasce APAGADA. Medido em 30/08: as 20
+     do Chatbot davam 43 travessias de caixa alheia mesmo depois do layout
+     por afinidade, e ninguem esta perguntando por todas as 20 ao mesmo
+     tempo. `arq_zoom.js` acende as do componente sob o mouse escrevendo
+     opacity inline, que ganha desta regra; `Zoom.apagar()` limpa o inline e
+     elas voltam a sumir sozinhas. */
+  [data-interna]{{opacity:0}}
 </style>
 {_defs_compartilhadas()}
 <header id="cromo">
@@ -860,7 +920,7 @@ def render(vistas: tuple[Vista, ...], js: str,
   <nav id="alternador">{corpo_botoes}{botao_design}</nav>
   <span id="trilha">Revy</span>
 </header>
-<div id="dica">clique numa caixa para cair dentro · <strong>Esc</strong> volta · roda dá zoom · arraste para navegar · borda grossa vermelha é SPOF, tracejado é assíncrono, moldura tracejada é máquina (VM)</div>
+<div id="dica">clique numa caixa para cair dentro · <strong>Esc</strong> volta · roda dá zoom · arraste para navegar · <strong>passe o mouse</strong> numa caixa para ver o que ela chama · borda grossa vermelha é SPOF, tracejado é assíncrono, moldura tracejada é máquina (VM)</div>
 {_legenda_html()}
 {corpo_fluxos}
 {design_html}

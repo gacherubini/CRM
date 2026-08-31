@@ -1009,3 +1009,100 @@ class TestCli(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestArestasInternasLegiveis(unittest.TestCase):
+    """A metrica do card `2026-08-30-arestas-internas-legiveis.md`, virada
+    teste: quantas arestas internas passam por cima de caixa que nao e' ponta
+    delas nem ancestral de uma ponta.
+
+    Ela e' calculavel sem navegador — a geometria toda esta na `Cena` e nos
+    `points` das polylines — e e' o unico jeito de a melhora nao regredir em
+    silencio quando alguem acrescentar um componente ou uma aresta.
+
+    Cuidado com a definicao, que o card original errava: contar TODA caixa
+    atravessada da 145, mas 60 dessas sao a caixa do proprio produto, que
+    toda aresta interna cruza por definicao (ela vive dentro dele). Ancestral
+    de ponta tem a mesma natureza — uma aresta que sai de um componente
+    dentro de `workers` PRECISA cruzar a borda de `workers`. So conta caixa
+    que a aresta atravessa sem ter nada a ver com ela.
+    """
+
+    LIMITE = 43   # medido em 30/08 apos o layout por afinidade; era 75 antes
+
+    def setUp(self):
+        self.raiz = varredura.raiz_repo()
+        frescor_path = Path(__file__).resolve().parent / "mapa" / "_frescor.json"
+        frescor = json.loads(frescor_path.read_text(encoding="utf-8"))
+        completo = arq_modelo.carregar(
+            self.raiz, frescor, arquitetura.NOS,
+            list(arquitetura.ARESTAS) + list(arquitetura.ARESTAS_INTERNAS),
+            arquitetura.VMS, arquitetura.FLUXOS, arquitetura.BANCOS)
+        self.arq = arq_modelo.filtrar(
+            completo, arquitetura.SECOES_ARQUITETURA, manter_manuais=True)
+        self.cena = arq_layout.dispor(self.arq, self.arq.vms)
+        html_gerado = gerar_arquitetura.montar(self.raiz)
+        inicio = html_gerado.index('<svg id="mapa-arquitetura"')
+        self.svg = html_gerado[inicio:html_gerado.index("</svg>", inicio)]
+
+    @staticmethod
+    def _cruza(segmento, caixa):
+        """Segmento ortogonal contra retangulo. `_pontos_da_aresta` so produz
+        horizontal ou vertical (ver test_2_toda_aresta_e_polyline_ortogonal),
+        entao os dois casos cobrem tudo — nada de diagonal pra tratar."""
+        (x1, y1), (x2, y2) = segmento
+        if abs(y1 - y2) < 0.01:
+            return (caixa.y < y1 < caixa.y + caixa.h) and not (
+                max(x1, x2) <= caixa.x or min(x1, x2) >= caixa.x + caixa.w)
+        if abs(x1 - x2) < 0.01:
+            return (caixa.x < x1 < caixa.x + caixa.w) and not (
+                max(y1, y2) <= caixa.y or min(y1, y2) >= caixa.y + caixa.h)
+        return False
+
+    def _travessias(self):
+        por_sufixo = {}
+        for c in self.cena.caixas:
+            por_sufixo[c.chave] = c
+        def caixa_de(chave):
+            if chave in por_sufixo:
+                return por_sufixo[chave]
+            achados = sorted(k for k in por_sufixo if k.endswith("." + chave))
+            return por_sufixo[achados[0]] if achados else None
+
+        internas = {f'{a["de"]}->{a["para"]}' for a in arquitetura.ARESTAS_INTERNAS}
+        total = 0
+        for marca, pontos_txt in re.findall(
+                r'<polyline data-aresta="([^"]+)" points="([^"]+)"', self.svg):
+            if marca not in internas:
+                continue
+            de, _, para = marca.partition("->")
+            c_de, c_para = caixa_de(de), caixa_de(para)
+            self.assertIsNotNone(c_de, marca)
+            self.assertIsNotNone(c_para, marca)
+            pontos = [tuple(float(v) for v in par.split(","))
+                      for par in pontos_txt.split()]
+            for segmento in zip(pontos, pontos[1:]):
+                for caixa in self.cena.caixas:
+                    if caixa.tipo == "item":
+                        continue
+                    if caixa.chave in (c_de.chave, c_para.chave):
+                        continue
+                    if (c_de.chave.startswith(caixa.chave + ".")
+                            or c_para.chave.startswith(caixa.chave + ".")):
+                        continue   # ancestral de ponta: cruzar e' obrigatorio
+                    if not caixa.chave.startswith("app2037.chatbot-api"):
+                        continue
+                    if self._cruza(segmento, caixa):
+                        total += 1
+        return total
+
+    def test_as_arestas_internas_nao_voltam_a_atravessar_o_produto(self):
+        atual = self._travessias()
+        self.assertGreater(atual, 0, "metrica quebrada: nao achou aresta interna")
+        self.assertLessEqual(
+            atual, self.LIMITE,
+            f"as arestas internas voltaram a cortar caixa alheia: {atual} "
+            f"travessias, teto {self.LIMITE}. Ver "
+            f"arq_layout._ordem_por_afinidade — provavelmente um componente "
+            f"ou uma aresta nova desarrumou a fila."
+        )

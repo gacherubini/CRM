@@ -128,6 +128,122 @@ def _grade(tamanhos: list[tuple[float, float]]) -> tuple[float, float, list[tupl
     return largura_total, altura_total, posicoes
 
 
+def _indice_dono(caminhos: list[str], ponta: str) -> int | None:
+    """Qual irmao contem esta ponta de aresta? Irmaos sao disjuntos, entao no
+    maximo um casa. `ponta` e' caminho pontuado no espaco do MODELO
+    (`chatbot-api.workers.followup`), sem o prefixo da VM."""
+    for i, c in enumerate(caminhos):
+        if ponta == c or ponta.startswith(c + "."):
+            return i
+    return None
+
+
+def _ordem_por_afinidade(caminhos: list[str], arestas: tuple[tuple[str, str], ...]) -> list[int]:
+    """Permutacao dos irmaos que poe lado a lado quem fala com quem.
+
+    O empacotamento (`_grade`) le a ordem de entrada e so ela; a ordem vinha
+    alfabetica, que nao tem relacao nenhuma com quem chama quem. O resultado
+    medido no navegador em 30/08: das 20 arestas internas do Chatbot, 16
+    atravessavam caixa alheia, 75 travessias no total — e os pares mais
+    conversados (`workers`->`atendimento`, `atendimento`->`provisionamento`)
+    estavam em pontas opostas do tabuleiro, com o maior grupo do produto
+    plantado no meio do caminho. Roteamento com desvio contornaria bem um
+    layout que nao deveria ter esse formato; e' mais barato dar ao
+    empacotamento uma ordem que ja nasce sem a travessia.
+
+    Minimiza `sum(peso[i][j] * distancia_na_fila(i, j))` — o arranjo linear
+    ponderado — por subida de encosta: troca dois irmaos de lugar enquanto
+    alguma troca diminuir o custo, partindo da propria ordem alfabetica.
+
+    Medido no modelo real (as 20 arestas internas do Chatbot, contando
+    travessia de caixa que nao e' ponta nem ancestral de ponta):
+
+        ordem alfabetica (o que havia)   75 travessias, 16 arestas sujas
+        vizinho mais proximo             58 travessias, 13 arestas sujas
+        subida de encosta                43 travessias, 13 arestas sujas
+        vizinho mais proximo + subida    52 travessias, 12 arestas sujas
+
+    A ultima linha e' o motivo de nao haver semente esperta aqui. Comecar
+    pelo vizinho mais proximo — o passo obvio, e o que eu tinha escrito
+    primeiro — poe a Borda HTTP (que fala com quase todos) no comeco da
+    fila, e a subida termina num otimo local PIOR que partindo do
+    alfabetico. Semente boa para o primeiro passo nao e' semente boa para o
+    resultado; se alguem for "melhorar" isto com uma semente, meca de novo.
+
+    Nao e' otimo (arranjo linear minimo e' NP-dificil) e nao precisa ser —
+    precisa ser melhor que alfabetico e ser sempre o mesmo. O custo de uma
+    troca e' calculado por DELTA, em O(n): so os termos das duas pontas
+    trocadas mudam. Recalcular o custo inteiro seria O(n^2) por troca e
+    O(n^4) por volta, o que e' irrelevante nos 10 componentes de hoje e
+    deixaria de ser se alguem modelasse um produto com cem.
+
+    Determinismo, que aqui nao e' detalhe (o HTML e' commitado e
+    `gerar_arquitetura.py --verificar` compara byte a byte): a varredura de
+    trocas tem ordem fixa, aceita a primeira que melhora, e todo desempate
+    cai no indice de entrada, que ja vem ordenado por chave de
+    `arq_modelo.carregar`. Sem aresta nenhuma entre os irmaos — o caso de
+    todo produto que ainda nao tem componente, e da vista Schema inteira,
+    que nao tem aresta por decisao — devolve a identidade, entao a pagina
+    fora do Chatbot nao se mexe.
+    """
+    n = len(caminhos)
+    if n < 3:
+        return list(range(n))
+
+    peso = [[0] * n for _ in range(n)]
+    for de, para in arestas:
+        i = _indice_dono(caminhos, de)
+        j = _indice_dono(caminhos, para)
+        if i is None or j is None or i == j:
+            continue
+        peso[i][j] += 1
+        peso[j][i] += 1
+
+    # Sem nenhuma aresta entre os irmaos, nenhuma troca melhora nada e a
+    # subida devolveria a identidade de qualquer jeito — o atalho e' so pra
+    # deixar essa garantia explicita, que e' o que mantem a pagina inteira
+    # fora do Chatbot (e a vista Schema, sem aresta por decisao) parada.
+    if not any(any(linha) for linha in peso):
+        return list(range(n))
+
+    ordem = list(range(n))
+
+    # Subida de encosta por troca de pares. `posicao[k]` = onde o irmao k
+    # esta na fila; o delta de trocar as posicoes a e b so envolve os pesos
+    # das duas pontas contra o resto (o termo entre elas nao muda, a
+    # distancia |a-b| e' a mesma depois da troca).
+    posicao = [0] * n
+    for p, k in enumerate(ordem):
+        posicao[k] = p
+
+    def delta(a: int, b: int) -> int:
+        u, v = ordem[a], ordem[b]
+        d = 0
+        for k in range(n):
+            if k == u or k == v:
+                continue
+            p = posicao[k]
+            d += peso[u][k] * (abs(b - p) - abs(a - p))
+            d += peso[v][k] * (abs(a - p) - abs(b - p))
+        return d
+
+    # Teto de voltas: a subida so anda quando ha melhora ESTRITA, entao ela
+    # termina sozinha. O teto e' cinto de seguranca contra um empate ciclico
+    # que eu nao tenha previsto — travar a geracao seria pior que uma ordem
+    # um pouco pior.
+    for _ in range(100):
+        melhorou = False
+        for a in range(n):
+            for b in range(a + 1, n):
+                if delta(a, b) < 0:
+                    ordem[a], ordem[b] = ordem[b], ordem[a]
+                    posicao[ordem[a]], posicao[ordem[b]] = a, b
+                    melhorou = True
+        if not melhorou:
+            break
+    return ordem
+
+
 def banda_titulo(largura_conteudo: float, proporcao: float = 0.08) -> float:
     """Altura reservada para o titulo, no topo da caixa.
 
@@ -158,14 +274,28 @@ def _caixa_item(no_chave: str, idx: int, entrada, nivel: int) -> Caixa:
     )
 
 
-def _dispor_no(no: No, chave_completa: str, nivel: int) -> tuple[Caixa, list[Caixa]]:
+def _dispor_no(no: No, chave_completa: str, nivel: int,
+               arestas: tuple[tuple[str, str], ...] = (),
+               caminho: str | None = None) -> tuple[Caixa, list[Caixa]]:
     """Devolve a caixa do proprio `no` (pai=None — quem chama decide o pai)
     mais a lista achatada de TODOS os descendentes, com coordenadas ja
-    absolutas dentro do frame local deste no (offset 0,0 no canto do no)."""
+    absolutas dentro do frame local deste no (offset 0,0 no canto do no).
 
+    `caminho` e' a chave no espaco do MODELO (`chatbot-api.canais`), que e'
+    onde as pontas de aresta vivem; `chave_completa` e' a mesma coisa com o
+    prefixo da VM (`app2037.chatbot-api.canais`), que e' o id no SVG. Os dois
+    andam juntos porque so o primeiro casa com `Aresta.de`/`Aresta.para` e so
+    o segundo e' unico quando um produto aparece em duas VMs.
+    """
+    caminho = no.chave if caminho is None else caminho
+
+    filhos = list(no.filhos)
+    ordem = _ordem_por_afinidade([caminho + "." + f.chave for f in filhos], arestas)
     sub_filhos = [
-        (chave_completa + "." + filho.chave,) + _dispor_no(filho, chave_completa + "." + filho.chave, nivel + 1)
-        for filho in no.filhos
+        (chave_completa + "." + filhos[i].chave,)
+        + _dispor_no(filhos[i], chave_completa + "." + filhos[i].chave, nivel + 1,
+                     arestas, caminho + "." + filhos[i].chave)
+        for i in ordem
     ]
     sub_itens = [
         (None, _caixa_item(chave_completa, idx, entrada, nivel + 1), [])
@@ -251,7 +381,8 @@ def _comprimir(caixa: Caixa, descendentes: list[Caixa]) -> tuple[Caixa, list[Cai
     ]
 
 
-def _dispor_vm(vm: Vm, por_chave: dict[str, No], nivel: int) -> tuple[Caixa, list[Caixa]]:
+def _dispor_vm(vm: Vm, por_chave: dict[str, No], nivel: int,
+               arestas: tuple[tuple[str, str], ...] = ()) -> tuple[Caixa, list[Caixa]]:
     """Devolve a caixa da VM (moldura, sem preenchimento — ver arq_render) e
     a lista achatada dos produtos que ela contem (e seus descendentes), com
     coordenadas absolutas dentro do frame local da VM.
@@ -262,10 +393,12 @@ def _dispor_vm(vm: Vm, por_chave: dict[str, No], nivel: int) -> tuple[Caixa, lis
     prefixada pela VM (`app2037.portal-gestao` vs `suite-pg.portal-gestao`)
     pra nao colidir. `arq_render` resolve qual copia uma aresta usa.
     """
+    contidos = [chave for chave in vm.contem if chave in por_chave]
+    contidos = [contidos[i] for i in _ordem_por_afinidade(contidos, arestas)]
     sub = [
-        _comprimir(*_dispor_no(por_chave[chave], f"{vm.chave}.{chave}", nivel + 1))
-        for chave in vm.contem
-        if chave in por_chave
+        _comprimir(*_dispor_no(por_chave[chave], f"{vm.chave}.{chave}", nivel + 1,
+                               arestas, chave))
+        for chave in contidos
     ]
     largura_conteudo, altura_conteudo, posicoes = _grade(
         [(caixa.w, caixa.h) for caixa, _ in sub])
@@ -317,9 +450,13 @@ def dispor(modelo: Modelo, grupos: tuple[Vm, ...]) -> Cena:
     # `grupos` ja vem ordenado por chave (arq_modelo.carregar faz
     # `sorted(vms)`/`sorted(bancos)`, e `filtrar` preserva a ordem porque so
     # filtra o `contem`, nunca reordena os grupos).
-    raizes = [_dispor_vm(vm, por_chave_no, 1) for vm in grupos]
+    # As pontas de aresta vivem no espaco do modelo (sem prefixo de VM); o
+    # layout so precisa de quem-com-quem, nunca do protocolo.
+    arestas = tuple((a.de, a.para) for a in modelo.arestas)
+
+    raizes = [_dispor_vm(vm, por_chave_no, 1, arestas) for vm in grupos]
     soltos = [no for no in modelo.nos if no.chave not in contidos]
-    raizes += [_dispor_no(no, no.chave, 1) for no in soltos]
+    raizes += [_dispor_no(no, no.chave, 1, arestas, no.chave) for no in soltos]
 
     # VM sem produto (motor2037, n8n2037, evolution2037, suite-pg) saia do
     # _dispor_vm mal maior que o texto do titulo — um selo de 238x82 ao lado
