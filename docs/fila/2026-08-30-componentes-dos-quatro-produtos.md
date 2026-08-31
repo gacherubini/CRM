@@ -1,5 +1,24 @@
 # A camada de componente nos quatro produtos que faltam
 
+> **Status (2026-08-30): FEITO, os quatro.** Catálogo (7 caixas, 8 arestas),
+> Motor (10 e 17), Control (10 e 16) e Loja (10 e 15). 80 testes verdes,
+> `--verificar` em 0, os quatro conferidos no navegador. O que este card
+> continua servindo pra explicar é o **método** — se for dar a mesma camada a
+> um produto novo, a receita abaixo vale inteira. Código e testes vencem este
+> bloco.
+>
+> Três coisas mudaram em relação ao que o card previa, e estão registradas
+> onde importa:
+> - o vocabulário de protocolo interno virou **quatro** palavras (`http`
+>   entrou pro wake do Motor, que atravessa VM) — o porquê está na docstring
+>   de `test_o_protocolo_interno_vem_de_um_vocabulario_curto`;
+> - o `modulo` de um componente aponta o arquivo que **tem entrada de
+>   inventário**, que quase sempre é o da rota e não o do domínio — apontar
+>   pro domínio devolve a árvore de pastas
+>   (`learnings/2026-08-30-modulo-no-dominio-devolve-a-arvore-de-pastas.md`);
+> - o recorte pra conferir no navegador virou script:
+>   `.claude/skills/revy-research/recorte_produto.py`.
+
 Card de handoff. Quem pegar isto **não** precisa ler a branch, o card grande da
 arquitetura viva, nem a conversa que gerou isto — está tudo aqui.
 
