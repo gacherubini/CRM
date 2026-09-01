@@ -263,23 +263,28 @@ Fontes e CSS também inline: a página tem que abrir sem internet.
 
 ## 7. Aparência
 
-Tokens de `shared/brand/revy-tokens.css`, como `como-funciona.html` já faz. Nada de
-paleta inventada — o learning `2026-08-23-tokens-de-marca-tem-fonte-unica.md` existe
-por um motivo.
+Tokens de `shared/brand/revy-tokens.css` para tudo que é **cromo** (fundo, tinta,
+linhas, fontes). O diagrama em si tem **uma paleta categórica própria**, só dele
+(`PALETA_PRODUTO` em `arq_render.py`) — ver §15.1. Ela não entra nos tokens porque
+não é identidade, é codificação de dado: *qual produto*.
 
-Convenções do desenho, todas com legenda na própria página:
+Convenções do desenho, todas com legenda no rodapé da própria página:
 
+- **cor da borda e da banda do título = o produto.** A seta herda a cor de quem chama;
+  o componente leva um filete na cor do produto pela esquerda.
 - traço **cheio** = síncrono; **tracejado** = assíncrono/fila
-- borda **grossa vermelha** = SPOF (hoje só o Motor)
-- moldura pontilhada = VM
-- **forma técnica** (31/08): fila, worker, cache, browser — ver §14
+- **vermelho** só onde o dado diz risco: borda grossa = SPOF (hoje só o Motor), seta
+  vermelha = chamada entre produtos sem retentativa
+- moldura tracejada verde = máquina Fly; elipse cinza = software de terceiro;
+  cilindro = banco
+- **forma técnica** (31/08): fila, worker, cache, browser — ver §14.4
 
-Duas regras que valem para tudo, e que já foram quebradas uma vez cada:
+Duas regras que valem para tudo:
 
-- **cor é só o SPOF.** Nada de "vermelho porque é importante", nada de verde para
-  decorar — o verde da marca aparece só na moldura da VM e no alternador ativo.
-  Quem quiser destacar uma caixa muda a **forma**, não a tinta.
-- **rótulo de aresta é só o protocolo**, e `chamada` não leva rótulo nenhum.
+- **cor por entidade, nunca por importância.** Verde-marca é só cromo (moldura da VM,
+  alternador ativo, etiqueta da máquina). Quem quiser destacar uma caixa muda a
+  **forma**, não a tinta; o vermelho continua reservado ao risco.
+- **rótulo de aresta é só o protocolo**, numa pílula, e `chamada` não leva rótulo.
 
 ## 8. O que NÃO faz
 
@@ -555,3 +560,99 @@ Armadilhas que custaram caro, todas com learning em
   `style` inline;
 - `hidden` não esconde um `<svg>`, por dois motivos independentes;
 - `setPointerCapture` no `<svg>` engole todo clique, sem rastro no console.
+
+## 15. Revisão de 01/09 — a pele de design system
+
+O dono abriu a página e disse que estava feia. Estava: retângulos ocos com um
+título, setas finas atravessando caixas alheias, elipses gigantes com nome de 4px,
+quatro painéis flutuantes tapando a fila de baixo, tudo em mono cinza com um filtro
+de rabisco. Ele aprovou quatro blocos de mudança, mais três decisões de estilo, e o
+que saiu disso está aqui. Onde esta seção discorda das anteriores, ela vence.
+
+### 15.1 Cor por produto
+
+Seis matizes, um por produto, escolhidos em OKLCH com luminosidade parecida e
+validados pelo validador de paleta categórica (banda de luminosidade, piso de croma,
+separação para daltonismo entre vizinhos, contraste ≥ 3:1 contra o papel). O teal do
+Control fica um fio abaixo do piso de croma — o sRGB não alcança mais nesse matiz —
+e foi aceito porque a cor nunca anda sozinha: o nome do produto está sempre ao lado.
+
+| Produto | Traço | Tinta |
+|---|---|---|
+| Chatbot API | `#246e3a` | `#e3efe6` |
+| Estoque API | `#1a95d8` | `#e2f0f9` |
+| Revy Loja | `#aa442b` | `#f6e6e1` |
+| Revy Control | `#008991` | `#dff0f1` |
+| Catálogo Público | `#b576c3` | `#f3e8f5` |
+| Motor de Simulação | `#ab8704` | `#f5efd9` |
+
+A paleta vive **só** em `arq_render.PALETA_PRODUTO` e aparece na vista Design numa
+seção própria, marcada "só aqui, não é token". Terceiro é cinza, banco é cinza mais
+claro em cilindro — a forma já os distingue.
+
+### 15.2 A face do nível 1 tem conteúdo
+
+O produto era um retângulo com título porque o interior só acende no zoom. Agora a
+caixa tem duas partes:
+
+- **a banda do título**, com o nome, o chip do `papel` e o selo SPOF — **fixa**, é o
+  cabeçalho que sobrevive ao zoom (antes o título sumia quando o interior abria e
+  você não sabia mais onde estava);
+- **o resumo**, que some quando o interior abre: o termo do produto, a contagem por
+  forma técnica (`11 componentes · 1 worker`) e os nomes dos componentes em pílulas.
+
+A fonte do resumo sai da **área** do corpo, não da banda: o produto é uma caixa grande
+(o tamanho vem do interior empacotado) e um resumo em fonte de banda deixava 80% dela
+vazia — o retângulo oco de antes, com letra miúda no canto. Na Schema o resumo conta
+**tabelas**, não componentes.
+
+A rampa do LOD encurtou de `1.6·k_min` para `1.3·k_min`: com os produtos mais largos
+que altos e a viewport 2:1, o voo assentava em `1.5·k_min` e a face ficava a 16% por
+cima do interior, para sempre.
+
+### 15.3 A seta desvia de caixa
+
+`arq_rotas.py`: grade de corredores a uma folga de cada borda de cada obstáculo,
+Dijkstra com pena por dobra. Obstáculo é irmão de qualquer uma das duas pontas, fora
+ancestral (sair de dentro de uma moldura obriga a cruzar a moldura). A métrica de
+travessias do card `2026-08-30-arestas-internas-legiveis.md` caiu de 38 para **zero**,
+e o teste virou igualdade; um teste novo garante o mesmo para as setas entre produtos.
+
+A ponta da seta é um triângulo próprio, não `<marker>`: o marcador escala com a
+`stroke-width`, que é non-scaling, e saía com 3px no nível 1. Rótulo em **pílula**
+(`<rect>` na camada de forma + `<text>` na de texto, com as mesmas marcas `data-*`),
+fonte proporcional à menor das duas pontas — legível entre produtos, discreto entre
+componentes. Setas internas de um produto vivem num `<g data-k-min data-dono>` próprio
+e só aparecem com o produto aberto; na Schema isso tirou o emaranhado de FKs de cima
+das pílulas do nível 1.
+
+`arq_zoom.js` tem a mesma conta em JavaScript para a seta acompanhar a caixa durante
+o arrasto; mudar a regra num lado obriga a mudar no outro.
+
+### 15.4 Escala, layout e painéis
+
+- **Raiz**: a máquina com produtos em cima e as quatro sem produto (`evolution2037`,
+  `motor2037`, `n8n2037`, `suite-pg`) numa **faixa** embaixo, com larguras iguais
+  (`_grade_raiz`). Lê-se "a aplicação, e a infra que a cerca". A forma interna delas
+  (elipse, retângulo) ocupa ~70% da moldura, com nome em fonte de verdade.
+- **Entre produtos** a folga é o triplo da entre componentes: a pílula "outbox" não
+  cabia no vão de 24 unidades.
+- **Componente folha** encolheu de 134 para ~62 de altura: eram duas linhas de texto
+  num cartão vazio.
+- **Nada flutua sobre a cena**: cromo em cima (marca, alternador, trilha, Fluxos,
+  posições, `?` com a dica), vocabulário num rodapé fixo. A cena ganha 2% de respiro
+  no `viewBox`.
+- **Tipografia**: título e nome em `--font-ui`; `arquivo:linha`, contagem e protocolo
+  em mono. Nada é baixado — a página segue auto-contida.
+- **O rabisco saiu** (feTurbulence + feDisplacementMap): traço limpo e zoom mais leve.
+- Colunas da Schema empilham numa coluna só, na ordem do arquivo, nome à esquerda e
+  tipo à direita — a grade de três colunas embaralhava a ordem.
+
+### 15.5 O que ficou aberto
+
+1. A escolha do lado de saída da seta ainda é por delta de centro; Loja → suite-pg sai
+   pela direita e contorna o Motor por baixo quando sair por baixo seria mais curto.
+2. O `hub loja_id` da Schema (§14.7) continua: o roteador tira a travessia, não o
+   número de setas que chegam em `lojas`.
+3. As posições arrastadas ficam no `localStorage` **por origem** — abrir por
+   `file://` e por `http://127.0.0.1` são dois cofres diferentes.

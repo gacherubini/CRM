@@ -69,3 +69,4 @@ escrever migration com `batch_alter_table`.
 | escrever teste que exercita projecao do Control (`_apply_envelope`) no chatbot-api | `2026-08-29-o-conftest-do-chatbot-nao-semeia-todo-aggregate.md` |
 | escrever teste no chatbot-api que grava canal, ou qualquer linha com coluna UNIQUE global | `2026-08-29-o-banco-de-teste-do-chatbot-e-um-so.md` |
 | escrever teste de read-model do portal que le dicionario vindo de outro produto | `2026-08-29-dicionario-sintetico-no-teste-esconde-contrato.md` |
+| screenshot da extensão do Chrome igual ao de antes da ação | `2026-09-01-screenshot-do-chrome-mostra-o-quadro-anterior.md` |

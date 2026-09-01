@@ -762,8 +762,11 @@ class TestPeleRevy(unittest.TestCase):
         self.assertIsNotNone(m, chave)
         return m.group(1)
 
-    def test_1_um_filtro_rabisco_nunca_aplicado_a_grupo_com_texto(self):
-        self.assertEqual(self.html.count('<filter id="rabisco"'), 1)
+    def test_1_sem_filtro_de_rabisco_e_texto_fora_da_camada_de_forma(self):
+        # 01/09: o rabisco saiu (traco limpo de design system, e o zoom ficou
+        # mais leve). As duas camadas ficam: forma embaixo, texto em cima com
+        # pointer-events:none — e' o que faz o clique acertar a forma.
+        self.assertNotIn("<filter", self.html)
         for chave in ("arquitetura", "schema"):
             svg = self._svg(chave)
             inicio = svg.index('<g class="formas"')
@@ -847,10 +850,12 @@ class TestPeleRevy(unittest.TestCase):
         self.assertGreater(len(desenhadas), 0)
         self.assertGreater(esperado_arestas, 0)
         self.assertGreater(esperado_nos_spof, 0)
-        # 1 stroke (forma) + 1 fill (rotulo) por aresta sem retry; 1 stroke
-        # (caixa) + 1 fill (texto "SPOF") por no spof — nenhum outro uso do
-        # vermelho na cena real (a legenda, fora deste svg, nao entra aqui).
-        esperado_total = esperado_arestas * 2 + esperado_nos_spof * 2
+        # 1 stroke (linha) + 1 fill (ponta) + 1 fill (rotulo) por aresta sem
+        # retry; 1 stroke (caixa) + 1 fill (selo "SPOF") por no spof — nenhum
+        # outro uso do vermelho na cena real (a legenda, fora deste svg, nao
+        # entra aqui). Cor por produto (01/09) nao muda a conta: o vermelho
+        # continua sendo so' o dado dizendo risco.
+        esperado_total = esperado_arestas * 3 + esperado_nos_spof * 2
         self.assertEqual(svg.count(arq_render.DANGER), esperado_total)
 
     def test_6_gerar_duas_vezes_da_bytes_identicos(self):
@@ -1249,8 +1254,11 @@ class TestArestasInternasLegiveis(unittest.TestCase):
             self.raiz, frescor, arquitetura.NOS,
             list(arquitetura.ARESTAS) + list(arquitetura.ARESTAS_INTERNAS),
             arquitetura.VMS, arquitetura.FLUXOS, arquitetura.BANCOS)
-        self.arq = arq_modelo.filtrar(
-            completo, arquitetura.SECOES_ARQUITETURA, manter_manuais=True)
+        # `agrupar_flags` como em `gerar_arquitetura.montar`: sem ele a cena
+        # daqui tinha outra geometria que a do HTML, e a metrica comparava
+        # polylines de um desenho contra caixas de outro.
+        self.arq = arq_modelo.agrupar_flags(arq_modelo.filtrar(
+            completo, arquitetura.SECOES_ARQUITETURA, manter_manuais=True))
         self.cena = arq_layout.dispor(self.arq, self.arq.vms, arquitetura.POSICOES)
         html_gerado = gerar_arquitetura.montar(self.raiz)
         inicio = html_gerado.index('<svg id="mapa-arquitetura"')
@@ -1281,10 +1289,12 @@ class TestArestasInternasLegiveis(unittest.TestCase):
 
         internas = {f'{a["de"]}->{a["para"]}' for a in arquitetura.ARESTAS_INTERNAS}
         total = 0
+        self.achadas = 0
         for marca, pontos_txt in re.findall(
                 r'<polyline data-aresta="([^"]+)" points="([^"]+)"', self.svg):
             if marca not in internas:
                 continue
+            self.achadas += 1
             de, _, para = marca.partition("->")
             c_de, c_para = caixa_de(de), caixa_de(para)
             self.assertIsNotNone(c_de, marca)
@@ -1307,14 +1317,16 @@ class TestArestasInternasLegiveis(unittest.TestCase):
         return total
 
     def test_as_arestas_internas_nao_voltam_a_atravessar_o_produto(self):
+        # 01/09: com o roteador que desvia de caixa (arq_rotas.py) a metrica
+        # caiu de 38 pra ZERO, e o teto virou igualdade. A ordenacao por
+        # afinidade continua valendo — ela e' o que deixa as setas curtas; o
+        # roteador so garante que o que sobrou nao corta ninguem.
         atual = self._travessias()
-        self.assertGreater(atual, 0, "metrica quebrada: nao achou aresta interna")
-        self.assertLessEqual(
-            atual, self.LIMITE,
-            f"as arestas internas voltaram a cortar caixa alheia: {atual} "
-            f"travessias, teto {self.LIMITE}. Ver "
-            f"arq_layout._ordem_por_afinidade e PENA_DE_VOLTA — sem ordenacao "
-            f"este numero e' 77."
+        self.assertGreater(self.achadas, 0, "metrica quebrada: nao achou aresta interna")
+        self.assertEqual(
+            atual, 0,
+            f"aresta interna voltou a cortar caixa alheia: {atual} travessias. "
+            f"Ver arq_rotas.rotear e arq_render._obstaculos."
         )
 
 
@@ -1426,8 +1438,8 @@ class TestProvaCabeNaCaixa(unittest.TestCase):
             raiz, frescor, arquitetura.NOS,
             list(arquitetura.ARESTAS) + list(arquitetura.ARESTAS_INTERNAS),
             arquitetura.VMS, arquitetura.FLUXOS, arquitetura.BANCOS)
-        arq = arq_modelo.filtrar(completo, arquitetura.SECOES_ARQUITETURA,
-                                 manter_manuais=True)
+        arq = arq_modelo.agrupar_flags(arq_modelo.filtrar(
+            completo, arquitetura.SECOES_ARQUITETURA, manter_manuais=True))
         cena = arq_layout.dispor(arq, arq.vms, arquitetura.POSICOES)
 
         # Produtos que ja tem a camada de componente escrita a mao. Ao
@@ -1455,3 +1467,148 @@ class TestProvaCabeNaCaixa(unittest.TestCase):
             cortados, [],
             "termo cortado esconde o arquivo:linha que prova o componente:\n  "
             + "\n  ".join(cortados))
+
+
+class TestRoteador(unittest.TestCase):
+    """`arq_rotas.rotear`: ortogonal, desvia de caixa, deterministico."""
+
+    def _cruza_algum(self, pontos, obstaculos):
+        import arq_rotas
+        for a, b in zip(pontos, pontos[1:]):
+            for r in obstaculos:
+                if arq_rotas._cruza(a, b, r):
+                    return True
+        return False
+
+    def test_sem_obstaculo_e_o_cotovelo_duplo(self):
+        import arq_rotas
+        de, para = arq_rotas.Ret(0, 0, 100, 50), arq_rotas.Ret(300, 0, 100, 50)
+        pontos = arq_rotas.rotear(de, para, [])
+        self.assertEqual(pontos[0], (100, 25.0))
+        self.assertEqual(pontos[-1], (300, 25.0))
+        self.assertLessEqual(len(pontos), 4)
+
+    def test_desvia_da_caixa_no_meio(self):
+        import arq_rotas
+        de, para = arq_rotas.Ret(0, 0, 100, 50), arq_rotas.Ret(300, 0, 100, 50)
+        meio = arq_rotas.Ret(150, -10, 100, 70)
+        pontos = arq_rotas.rotear(de, para, [meio])
+        self.assertFalse(self._cruza_algum(pontos, [meio]), pontos)
+        for (x1, y1), (x2, y2) in zip(pontos, pontos[1:]):
+            self.assertTrue(abs(x1 - x2) < 0.01 or abs(y1 - y2) < 0.01, pontos)
+
+    def test_nao_atravessa_a_propria_origem(self):
+        # Sem as pontas no bloqueio, o caminho podia cortar `de` pra sair pelo
+        # outro lado dela.
+        import arq_rotas
+        de, para = arq_rotas.Ret(0, 0, 100, 50), arq_rotas.Ret(0, 200, 100, 50)
+        meio = arq_rotas.Ret(-20, 80, 140, 60)
+        pontos = arq_rotas.rotear(de, para, [meio])
+        self.assertFalse(self._cruza_algum(pontos, [meio, de, para]), pontos)
+
+    def test_e_deterministico(self):
+        import arq_rotas
+        de, para = arq_rotas.Ret(0, 0, 100, 50), arq_rotas.Ret(300, 120, 100, 50)
+        obs = [arq_rotas.Ret(150, -10, 100, 70), arq_rotas.Ret(120, 100, 60, 60)]
+        self.assertEqual(arq_rotas.rotear(de, para, obs), arq_rotas.rotear(de, para, obs))
+
+
+class TestPeleDesignSystem(unittest.TestCase):
+    """01/09 — o que o dono aprovou depois de dizer que a pagina estava feia:
+    cor por produto, face com conteudo no nivel 1, seta que desvia de caixa
+    com rotulo em pilula, sem rabisco, legenda no rodape."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.raiz = varredura.raiz_repo()
+        cls.html = gerar_arquitetura.montar(cls.raiz)
+        inicio = cls.html.index('<svg id="mapa-arquitetura"')
+        cls.svg = cls.html[inicio:cls.html.index("</svg>", inicio)]
+        frescor = json.loads((Path(__file__).resolve().parent / "mapa" / "_frescor.json")
+                             .read_text(encoding="utf-8"))
+        completo = arq_modelo.carregar(
+            cls.raiz, frescor, arquitetura.NOS,
+            list(arquitetura.ARESTAS) + list(arquitetura.ARESTAS_INTERNAS),
+            arquitetura.VMS, arquitetura.FLUXOS, arquitetura.BANCOS)
+        arq = arq_modelo.agrupar_flags(arq_modelo.filtrar(
+            completo, arquitetura.SECOES_ARQUITETURA, manter_manuais=True))
+        cls.cena = arq_layout.dispor(arq, arq.vms, arquitetura.POSICOES)
+
+    def test_todo_produto_tem_cor_propria_e_ela_esta_na_borda(self):
+        for chave, (traco, tinta) in arq_render.PALETA_PRODUTO.items():
+            self.assertIn(f'stroke="{traco}"', self.svg, chave)
+            self.assertIn(f'fill="{tinta}"', self.svg, chave)
+        # seis cores distintas — cor por produto, nao por importancia
+        tracos = [t for t, _ in arq_render.PALETA_PRODUTO.values()]
+        self.assertEqual(len(set(tracos)), len(tracos))
+
+    def test_a_face_do_produto_conta_os_componentes(self):
+        # "11 componentes" no Chatbot, "1 worker" etc. — o resumo que some
+        # quando o interior abre.
+        self.assertIn(">11 componentes<", self.svg)
+        self.assertIn(">1 worker<", self.svg)
+        # E os nomes dos componentes aparecem no nivel 1, em pilula.
+        self.assertIn(">Workers de fundo<", self.svg)
+
+    def test_a_banda_do_titulo_sobrevive_ao_zoom(self):
+        # O titulo do produto NAO esta dentro do <g data-face-ate>: e' o
+        # cabecalho que fica quando o interior abre. So o resumo some.
+        m = re.search(r'<g data-texto-de="app2037\.chatbot-api">(.*?)<g data-face-ate', self.svg)
+        self.assertIsNotNone(m)
+        self.assertIn(">Chatbot API<", m.group(1))
+
+    def test_seta_entre_produtos_nao_atravessa_produto_alheio(self):
+        por = {c.chave: c for c in self.cena.caixas}
+        produtos = [c for c in self.cena.caixas if c.tipo == "no" and c.pai in por
+                    and por[c.pai].tipo == "vm"]
+        externas = {f'{a["de"]}->{a["para"]}' for a in arquitetura.ARESTAS}
+
+        def cruza(seg, c):
+            (x1, y1), (x2, y2) = seg
+            if abs(y1 - y2) < 0.01:
+                return (c.y < y1 < c.y + c.h) and not (max(x1, x2) <= c.x or min(x1, x2) >= c.x + c.w)
+            if abs(x1 - x2) < 0.01:
+                return (c.x < x1 < c.x + c.w) and not (max(y1, y2) <= c.y or min(y1, y2) >= c.y + c.h)
+            return False
+
+        achadas = 0
+        for marca, pts in re.findall(r'<polyline data-aresta="([^"]+)" points="([^"]+)"', self.svg):
+            if marca not in externas:
+                continue
+            achadas += 1
+            de, _, para = marca.partition("->")
+            pontos = [tuple(float(v) for v in p.split(",")) for p in pts.split()]
+            for seg in zip(pontos, pontos[1:]):
+                for c in produtos:
+                    if c.chave.endswith("." + de) or c.chave.endswith("." + para):
+                        continue
+                    self.assertFalse(cruza(seg, c), f"{marca} atravessa {c.chave}")
+        self.assertGreater(achadas, 0)
+
+    def test_rotulo_de_aresta_tem_pilula_com_as_mesmas_marcas(self):
+        # rect (forma) e text (rotulo) com o mesmo data-i, pra acenderem juntos
+        # e pra o arrasto mover os dois.
+        pilulas = re.findall(r'<rect data-rw="[^"]+" data-rh="[^"]+"[^>]*data-i="(\d+)"', self.svg)
+        rotulos = re.findall(r'<text data-i="(\d+)"[^>]*class="protocolo"', self.svg)
+        self.assertGreater(len(pilulas), 0)
+        self.assertEqual(sorted(pilulas), sorted(rotulos))
+
+    def test_aresta_interna_vive_num_grupo_com_limiar(self):
+        # As setas entre componentes do Chatbot ficam num <g data-k-min
+        # data-dono="app2037.chatbot-api">: so' aparecem com o produto aberto.
+        self.assertIn('data-dono="app2037.chatbot-api"><polyline', self.svg)
+
+    def test_sem_rabisco_e_legenda_no_rodape(self):
+        self.assertNotIn("<filter", self.html)
+        self.assertNotIn("feTurbulence", self.html)
+        self.assertIn('<footer id="legenda">', self.html)
+
+    def test_as_maquinas_pequenas_formam_uma_faixa_sob_a_grande(self):
+        vms = {c.chave: c for c in self.cena.caixas if c.tipo == "vm"}
+        grande = max(vms.values(), key=lambda c: c.w * c.h)
+        pequenas = [c for c in vms.values() if c is not grande]
+        self.assertGreaterEqual(len(pequenas), 2)
+        for c in pequenas:
+            self.assertGreaterEqual(c.y, grande.y + grande.h, c.chave)
+        larguras = {round(c.w, 2) for c in pequenas}
+        self.assertEqual(len(larguras), 1, "faixa com larguras desiguais")

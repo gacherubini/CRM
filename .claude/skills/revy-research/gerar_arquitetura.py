@@ -80,7 +80,8 @@ def montar(raiz: Path) -> str:
         # Folga tripla: na Schema toda caixa tem seta chegando ou saindo, e
         # com o respiro da Arquitetura elas passam raspando na caixa vizinha.
         arq_render.Vista("schema", "Schema",
-                         arq_layout.dispor(sch, sch.bancos, folga=arq_layout.MARGEM * 3),
+                         arq_layout.dispor(sch, sch.bancos, folga=arq_layout.MARGEM * 3,
+                                           folga_produtos=arq_layout.MARGEM * 3),
                          sch, arestas_sempre_visiveis=True),
     )
     # Os tokens da marca sao LIDOS na geracao. `revy-tokens.css` se declara

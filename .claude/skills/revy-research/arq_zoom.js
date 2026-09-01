@@ -11,60 +11,13 @@ window.Zoom = {
     var saindo = null;   // foco anterior, vivo so enquanto a camera voa
     var pilha = [];   // caminho de volta: ids ja visitados
 
-    // Task 11 — a tremida do rabisco (feTurbulence + feDisplacementMap) e'
-    // em UNIDADES DE CENA, mas tem que parecer do MESMO TAMANHO NA TELA em
-    // qualquer zoom. px_por_unidade escala linear com k (k = base.w/v.w,
-    // viewBox encolhendo = mais px por unidade): px_por_unidade(k) = k *
-    // px_por_unidade0, onde px_por_unidade0 e' medido UMA VEZ na visao
-    // inicial (k=1). Daí:
-    //   deslocamento em unidades = ALVO_PX / px_por_unidade(k)
-    //                             = (ALVO_PX / px_por_unidade0) / k  ->  C1/k
-    //   baseFrequency (ciclos/unidade) precisa CRESCER com k pro "grao" do
-    //   ruido ficar constante em pixel: CICLOS_POR_PX * px_por_unidade(k)
-    //                             = (CICLOS_POR_PX * px_por_unidade0) * k -> C2*k
-    // Os dois constantes (C1, C2) saem de medir o svg UMA vez, nao de
-    // reflow a cada quadro (getBoundingClientRect a cada frame custaria
-    // caro — ver "custo" abaixo).
-    var ALVO_PX_DESLOC = 2.2;    // tremida alvo, em pixel de tela: "levemente rabiscado"
-    var CICLOS_POR_PX = 0.045;   // grao do ruido: ~1 ciclo a cada 22px de tela
-    var pxPorUnidade0 = 1, c1 = 0, c2 = 0, medido_visivel = false;
-    var filtroDesloc = document.getElementById("rabisco-deslocamento");
-    var filtroTurb = document.getElementById("rabisco-turbulencia");
-    var K_LIMIAR_FILTRO = 26; // acima disso a caixa e' grande na tela e a
-    // tremida some visualmente — desliga o filtro (medido no navegador,
-    // ver relatorio da Task 11: cena real ~1600 formas, 60fps parado,
-    // ~45fps durante o voo SEM este corte, fluido com ele).
-
-    // A vista que nao abre nasce com `hidden`, e um elemento em display:none
-    // mede 0. Cair no `base.w` fazia px_por_unidade valer 1 em vez de ~0.15:
-    // a tremida da vista Schema saia 7x menor que a da Arquitetura, e o grao
-    // do ruido 7x mais fino. Enquanto a medida nao for tirada com o svg na
-    // tela ela fica marcada como provisoria, e a primeira pintura visivel
-    // remede.
-    function medirPxPorUnidade() {
-      var r = svg.getBoundingClientRect();
-      medido_visivel = r.width > 0;
-      pxPorUnidade0 = (r.width || window.innerWidth || base.w) / base.w;
-      c1 = ALVO_PX_DESLOC / pxPorUnidade0;
-      c2 = CICLOS_POR_PX * pxPorUnidade0;
-    }
-
-    function aplicarFiltro(k) {
-      if (!medido_visivel) medirPxPorUnidade();
-      if (filtroDesloc) filtroDesloc.setAttribute("scale", (c1 / k).toFixed(3));
-      if (filtroTurb) filtroTurb.setAttribute("baseFrequency", (c2 * k).toFixed(5));
-      svg.classList.toggle("k-alto", k > K_LIMIAR_FILTRO);
-    }
-
     function vb(el) {
       var p = el.getAttribute("viewBox").split(/[ ,]+/).map(Number);
       return { x: p[0], y: p[1], w: p[2], h: p[3] };
     }
     function setVb(v) {
       svg.setAttribute("viewBox", v.x + " " + v.y + " " + v.w + " " + v.h);
-      var k = base.w / v.w;
-      aplicarLod(k);
-      aplicarFiltro(k);
+      aplicarLod(base.w / v.w);
     }
     // cubic-bezier(.4,0,.2,1) — aproximacao por Newton nao vale a pena aqui.
     function suavizar(t) { return t < 0.5 ? 4*t*t*t : 1 - Math.pow(-2*t + 2, 3) / 2; }
@@ -110,8 +63,11 @@ window.Zoom = {
       var grupos = svg.querySelectorAll("[data-k-min]");
       for (var i = 0; i < grupos.length; i++) {
         var kmin = parseFloat(grupos[i].getAttribute("data-k-min"));
-        // Rampa: invisivel em kmin, opaco em 1.6*kmin. Sem degrade fica piscando.
-        var o = (k - kmin) / (kmin * 0.6);
+        // Rampa: invisivel em kmin, opaco em 1.3*kmin. Sem degrade fica
+        // piscando. Era 1.6: com o layout de 01/09 (produtos mais largos que
+        // altos, viewport 2:1) o voo pra dentro do Chatbot assentava em
+        // k = 1.5*kmin e a face ficava a 16% por cima do interior, pra sempre.
+        var o = (k - kmin) / (kmin * 0.3);
         if (!naLinhagem(grupos[i].getAttribute("data-dono"))) o = 0;
         grupos[i].style.opacity = Math.max(0, Math.min(1, o));
         grupos[i].style.pointerEvents = o > 0.5 ? "auto" : "none";
@@ -125,7 +81,7 @@ window.Zoom = {
       var faces = svg.querySelectorAll("[data-face-ate]");
       for (var j = 0; j < faces.length; j++) {
         var kmax = parseFloat(faces[j].getAttribute("data-face-ate"));
-        var f = 1 - (k - kmax) / (kmax * 0.6);
+        var f = 1 - (k - kmax) / (kmax * 0.3);
         if (!naLinhagem(faces[j].getAttribute("data-dono"))) f = 1;
         faces[j].style.opacity = Math.max(0, Math.min(1, f));
       }
@@ -143,11 +99,6 @@ window.Zoom = {
       if (anim) cancelAnimationFrame(anim);
       var de = vb(svg), t0 = null;
       if (dur === 0) { setVb(destino); if (aoFim) aoFim(); return; }
-      // Custo (Task 11): o primeiro corte, antes de mexer em qualquer outra
-      // coisa, foi desligar o filtro DURANTE o voo — a camera anda rapido
-      // demais pra tremida se notar quadro a quadro, e recalcular
-      // feDisplacementMap em ~1600 formas a cada frame e' o que derrubava
-      // fps. Religa quando a animacao assenta (aoFim).
       svg.classList.add("voando");
       function passo(ts) {
         if (t0 === null) t0 = ts;
@@ -212,7 +163,12 @@ window.Zoom = {
       // o usuario perde onde estava.
       var todas = svg.querySelectorAll("[data-navegavel]");
       for (var j = 0; j < todas.length; j++) {
-        todas[j].style.opacity = noCaminho(todas[j].id) ? "1" : "0.18";
+        var o = noCaminho(todas[j].id) ? "1" : "0.18";
+        todas[j].style.opacity = o;
+        // O texto vive num <g> irmao (camada sem filtro, por cima): apagar
+        // so a forma deixava o titulo preto em cima da caixa esmaecida.
+        var par = svg.querySelector('[data-texto-de="' + cssEscape(todas[j].id) + '"]');
+        if (par) par.style.opacity = o;
       }
       var setas = svg.querySelectorAll("[data-aresta]");
       for (var s = 0; s < setas.length; s++) {
@@ -223,7 +179,7 @@ window.Zoom = {
     }
 
     function apagar() {
-      var todas = svg.querySelectorAll("[data-navegavel],[data-aresta],[data-de]");
+      var todas = svg.querySelectorAll("[data-navegavel],[data-texto-de],[data-aresta],[data-de]");
       for (var i = 0; i < todas.length; i++) todas[i].style.opacity = "";
       // Limpar o inline devolve TODA aresta ao padrao do CSS, inclusive a
       // enfase que nao veio de fluxo nenhum. Repinta.
@@ -368,10 +324,15 @@ window.Zoom = {
     // isto e' cinto de seguranca, nao remendo de bug conhecido.
     function cssEscape(v) { return String(v).replace(/"/g, '\\"'); }
 
-    // ---- o mesmo roteamento de arq_render._pontos_da_aresta, em JS ----
+    // ---- o mesmo roteamento de arq_rotas.py, em JS ----
+    // Grade de corredores a `FOLGA` de cada borda de cada obstaculo, Dijkstra
+    // com pena por dobra. Se mudar a regra la, mude aqui — e' o preco de a
+    // seta acompanhar a caixa enquanto voce arrasta.
     var LADO_OPOSTO = { direita: "esquerda", esquerda: "direita",
                         cima: "baixo", baixo: "cima" };
     var PASSO_SAIDA = 9.0;
+    var FOLGA = 24.0 * 0.6;
+    var PENA_COTOVELO = 90.0;
 
     function ladoSaida(de, para) {
       var dx = (para.x + para.w / 2) - (de.x + de.w / 2);
@@ -385,6 +346,12 @@ window.Zoom = {
       if (lado === "baixo") return [c.x + c.w / 2 + off, c.y + c.h];
       return [c.x + c.w / 2 + off, c.y];
     }
+    function afastar(p, lado, f) {
+      if (lado === "direita") return [p[0] + f, p[1]];
+      if (lado === "esquerda") return [p[0] - f, p[1]];
+      if (lado === "baixo") return [p[0], p[1] + f];
+      return [p[0], p[1] - f];
+    }
     function pontosOrtogonais(p1, lado1, p2) {
       if (lado1 === "esquerda" || lado1 === "direita") {
         var xm = (p1[0] + p2[0]) / 2;
@@ -393,21 +360,159 @@ window.Zoom = {
       var ym = (p1[1] + p2[1]) / 2;
       return [p1, [p1[0], ym], [p2[0], ym], p2];
     }
+    function cruza(p, q, r) {
+      var eps = 0.01;
+      if (Math.abs(p[1] - q[1]) < eps) {
+        return (r.y + eps < p[1] && p[1] < r.y + r.h - eps) &&
+          !(Math.max(p[0], q[0]) <= r.x + eps || Math.min(p[0], q[0]) >= r.x + r.w - eps);
+      }
+      if (Math.abs(p[0] - q[0]) < eps) {
+        return (r.x + eps < p[0] && p[0] < r.x + r.w - eps) &&
+          !(Math.max(p[1], q[1]) <= r.y + eps || Math.min(p[1], q[1]) >= r.y + r.h - eps);
+      }
+      return true;
+    }
+    function dentroDeRet(r, c) {
+      return r.x >= c.x - 0.01 && r.y >= c.y - 0.01 &&
+             r.x + r.w <= c.x + c.w + 0.01 && r.y + r.h <= c.y + c.h + 0.01;
+    }
+    function simplificar(pts) {
+      if (pts.length < 3) return pts;
+      var saida = [pts[0]];
+      for (var i = 1; i < pts.length - 1; i++) {
+        var a = saida[saida.length - 1], b = pts[i], c = pts[i + 1];
+        var h = Math.abs(a[1] - b[1]) < 0.01 && Math.abs(b[1] - c[1]) < 0.01;
+        var v = Math.abs(a[0] - b[0]) < 0.01 && Math.abs(b[0] - c[0]) < 0.01;
+        if (!(h || v)) saida.push(b);
+      }
+      saida.push(pts[pts.length - 1]);
+      return saida;
+    }
+    function rotear(de, para, obstaculos, off) {
+      var ladoDe = ladoSaida(de, para), ladoPara = LADO_OPOSTO[ladoDe];
+      var p1 = pontoBorda(de, ladoDe, off), p2 = pontoBorda(para, ladoPara, 0);
+      var x0 = Math.min(de.x, para.x) - FOLGA * 2, y0 = Math.min(de.y, para.y) - FOLGA * 2;
+      var x1 = Math.max(de.x + de.w, para.x + para.w) + FOLGA * 2;
+      var y1 = Math.max(de.y + de.h, para.y + para.h) + FOLGA * 2;
+      var obs = [];
+      for (var i = 0; i < obstaculos.length; i++) {
+        var r = obstaculos[i];
+        if (r.x + r.w < x0 || r.x > x1 || r.y + r.h < y0 || r.y > y1) continue;
+        if (dentroDeRet(r, para) || dentroDeRet(r, de)) continue;
+        obs.push(r);
+      }
+      var simples = pontosOrtogonais(p1, ladoDe, p2), k;
+      var limpo = true;
+      for (k = 0; k < simples.length - 1 && limpo; k++) {
+        for (i = 0; i < obs.length; i++) if (cruza(simples[k], simples[k + 1], obs[i])) { limpo = false; break; }
+      }
+      if (!obs.length || limpo) return simplificar(simples);
+
+      var a = afastar(p1, ladoDe, FOLGA), b = afastar(p2, ladoPara, FOLGA);
+      var xs = {}, ys = {};
+      xs[a[0]] = 1; xs[b[0]] = 1; ys[a[1]] = 1; ys[b[1]] = 1;
+      var todos = obs.concat([de, para]);
+      for (i = 0; i < todos.length; i++) {
+        r = todos[i];
+        xs[r.x - FOLGA] = 1; xs[r.x + r.w + FOLGA] = 1;
+        ys[r.y - FOLGA] = 1; ys[r.y + r.h + FOLGA] = 1;
+      }
+      var xsL = Object.keys(xs).map(Number).sort(function (m, n) { return m - n; });
+      var ysL = Object.keys(ys).map(Number).sort(function (m, n) { return m - n; });
+      var ix = {}, iy = {};
+      for (i = 0; i < xsL.length; i++) ix[xsL[i]] = i;
+      for (i = 0; i < ysL.length; i++) iy[ysL[i]] = i;
+      var bloqueio = obs.concat([de, para]);
+      function livre(p, q) {
+        for (var j = 0; j < bloqueio.length; j++) if (cruza(p, q, bloqueio[j])) return false;
+        return true;
+      }
+      var inicio = ix[a[0]] + "," + iy[a[1]], fim = ix[b[0]] + "," + iy[b[1]];
+      var DIRS = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+      // Fila de prioridade simples (lista ordenada por insercao): a grade
+      // tem no maximo algumas dezenas de nos, entao busca linear basta.
+      var fila = [{ custo: 0, no: inicio, dir: -1, de: null }];
+      var melhor = {}, anterior = {}, achado = null;
+      while (fila.length) {
+        var mi = 0;
+        for (i = 1; i < fila.length; i++) if (fila[i].custo < fila[mi].custo) mi = i;
+        var atual = fila.splice(mi, 1)[0];
+        var chave = atual.no + "|" + atual.dir;
+        if (melhor[chave] !== undefined) continue;
+        melhor[chave] = atual.custo;
+        anterior[chave] = atual.de;
+        if (atual.no === fim) { achado = chave; break; }
+        var cxy = atual.no.split(",").map(Number);
+        for (var d = 0; d < 4; d++) {
+          var nx = cxy[0] + DIRS[d][0], ny = cxy[1] + DIRS[d][1];
+          if (nx < 0 || ny < 0 || nx >= xsL.length || ny >= ysL.length) continue;
+          var p = [xsL[cxy[0]], ysL[cxy[1]]], q = [xsL[nx], ysL[ny]];
+          if (!livre(p, q)) continue;
+          var passo = Math.abs(q[0] - p[0]) + Math.abs(q[1] - p[1]);
+          var dobra = (atual.dir !== -1 && atual.dir !== d) ? 1 : 0;
+          var prox = nx + "," + ny;
+          if (melhor[prox + "|" + d] !== undefined) continue;
+          fila.push({ custo: atual.custo + passo + PENA_COTOVELO * dobra, no: prox, dir: d, de: chave });
+        }
+      }
+      if (achado === null) return simplificar(simples);
+      var caminho = [];
+      var cur = achado;
+      while (cur !== null) {
+        var partes = cur.split("|")[0].split(",").map(Number);
+        caminho.push([xsL[partes[0]], ysL[partes[1]]]);
+        cur = anterior[cur];
+      }
+      caminho.reverse();
+      return simplificar([p1].concat(caminho, [p2]));
+    }
+
+    // Irmaos das duas pontas, fora as pontas e os ancestrais delas — a mesma
+    // regra de `arq_render._obstaculos`.
+    function paiDe(id) { var c = id.lastIndexOf("."); return c === -1 ? "" : id.slice(0, c); }
+    function obstaculosDe(idDe, idPara) {
+      var pais = {}; pais[paiDe(idDe)] = 1; pais[paiDe(idPara)] = 1;
+      var formas = svg.querySelectorAll("[data-navegavel]");
+      var saida = [];
+      for (var i = 0; i < formas.length; i++) {
+        var id = formas[i].id;
+        if (!pais[paiDe(id)]) continue;
+        if (id === idDe || id === idPara) continue;
+        if (idDe.indexOf(id + ".") === 0 || idPara.indexOf(id + ".") === 0) continue;
+        var g = geometriaDe(id);
+        if (g) saida.push(g);
+      }
+      return saida;
+    }
+
+    function meioDoMaiorSegmento(pts) {
+      var melhor = -1, mx = pts[0][0], my = pts[0][1];
+      for (var i = 0; i < pts.length - 1; i++) {
+        var comp = Math.abs(pts[i + 1][0] - pts[i][0]) + Math.abs(pts[i + 1][1] - pts[i][1]);
+        if (comp > melhor) { melhor = comp; mx = (pts[i][0] + pts[i + 1][0]) / 2; my = (pts[i][1] + pts[i + 1][1]) / 2; }
+      }
+      return [mx, my];
+    }
 
     function recalcularArestas() {
-      var linhas = svg.querySelectorAll("polyline[data-i]");
+      // Ordenadas por `data-i` (a ordem de `resolvidas` no Python), nao pela
+      // ordem do DOM: as arestas com dono vivem em <g> proprios, entao o DOM
+      // ja nao segue o indice — e o espalhamento na borda depende da ordem.
+      var linhas = Array.prototype.slice.call(svg.querySelectorAll("polyline[data-i]"));
+      linhas.sort(function (m, n) { return parseInt(m.getAttribute("data-i"), 10) - parseInt(n.getAttribute("data-i"), 10); });
       var pares = [], contagem = {};
       var i, k;
       // 1o passe: geometria e lado de saida, e quantas saem da MESMA borda
       for (i = 0; i < linhas.length; i++) {
         var el = linhas[i];
-        var de = geometriaDe(el.getAttribute("data-de"));
-        var para = geometriaDe(el.getAttribute("data-para"));
+        var idDe = el.getAttribute("data-de"), idPara = el.getAttribute("data-para");
+        var de = geometriaDe(idDe);
+        var para = geometriaDe(idPara);
         if (!de || !para) { pares.push(null); continue; }
         var lado = ladoSaida(de, para);
-        k = el.getAttribute("data-de") + "|" + lado;
+        k = idDe + "|" + lado;
         contagem[k] = (contagem[k] || 0) + 1;
-        pares.push({ el: el, de: de, para: para, lado: lado, grupo: k,
+        pares.push({ el: el, de: de, para: para, idDe: idDe, idPara: idPara, grupo: k,
                      i: el.getAttribute("data-i") });
       }
       // 2o passe: espalha em torno do centro da borda, na ordem de aparicao —
@@ -421,18 +526,34 @@ window.Zoom = {
         var pos = (vistos[p.grupo] || 0);
         vistos[p.grupo] = pos + 1;
         var off = (pos - (n - 1) / 2) * PASSO_SAIDA;
-        var p1 = pontoBorda(p.de, p.lado, off);
-        var p2 = pontoBorda(p.para, LADO_OPOSTO[p.lado], 0);
-        var pts = pontosOrtogonais(p1, p.lado, p2);
+        var pts = rotear(p.de, p.para, obstaculosDe(p.idDe, p.idPara), off);
         var txt = "";
         for (k = 0; k < pts.length; k++) {
           txt += (k ? " " : "") + pts[k][0].toFixed(2) + "," + pts[k][1].toFixed(2);
         }
         p.el.setAttribute("points", txt);
+        var meio = meioDoMaiorSegmento(pts);
         var rotulo = svg.querySelector('text[data-i="' + p.i + '"]');
         if (rotulo) {
-          rotulo.setAttribute("x", ((pts[1][0] + pts[2][0]) / 2).toFixed(2));
-          rotulo.setAttribute("y", ((pts[1][1] + pts[2][1]) / 2).toFixed(2));
+          rotulo.setAttribute("x", meio[0].toFixed(2));
+          rotulo.setAttribute("y", (meio[1] + 8 * 0.36).toFixed(2));
+        }
+        var ponta = svg.querySelector('path[data-ponta][data-i="' + p.i + '"]');
+        if (ponta && pts.length >= 2) {
+          var a2 = pts[pts.length - 2], b2 = pts[pts.length - 1];
+          var ddx = b2[0] - a2[0], ddy = b2[1] - a2[1], comp = Math.hypot(ddx, ddy) || 1;
+          var ux = ddx / comp, uy = ddy / comp;
+          var tam = parseFloat(ponta.getAttribute("data-tam")) || 8;
+          var bx = b2[0] - ux * tam, by = b2[1] - uy * tam, ox = -uy * tam * 0.45, oy = ux * tam * 0.45;
+          ponta.setAttribute("d", "M" + b2[0].toFixed(2) + "," + b2[1].toFixed(2) +
+            " L" + (bx + ox).toFixed(2) + "," + (by + oy).toFixed(2) +
+            " L" + (bx - ox).toFixed(2) + "," + (by - oy).toFixed(2) + " Z");
+        }
+        var pilula = svg.querySelector('rect[data-i="' + p.i + '"]');
+        if (pilula) {
+          var rw = parseFloat(pilula.getAttribute("data-rw")), rh = parseFloat(pilula.getAttribute("data-rh"));
+          pilula.setAttribute("x", (meio[0] - rw / 2).toFixed(2));
+          pilula.setAttribute("y", (meio[1] - rh / 2).toFixed(2));
         }
       }
     }
@@ -543,7 +664,6 @@ window.Zoom = {
       if (id !== sob) { sob = id; pintarArestas(); }
     });
 
-    medirPxPorUnidade();
     setVb(base);
     // As posicoes que o humano moveu voltam ANTES da primeira pintura, senao
     // a pagina abre no layout automatico e salta pro arrumado no quadro
@@ -554,12 +674,6 @@ window.Zoom = {
     return { elemento: svg, voarPara: voarPara, subir: subir,
              acender: acender, apagar: apagar,
              voltarAoAutomatico: voltarAoAutomatico,
-             posicoesMovidas: posicoesMovidas,
-             // Chamado por `mostrarVista` (arq_render.py) ao trocar de
-             // vista: o filtro e' UM SO por documento, compartilhado entre
-             // as duas cenas — sem isto, mostrar de novo uma vista deixaria
-             // a tremida no k da OUTRA vista (a ultima que mexeu no filtro
-             // compartilhado) ate o proximo pan/zoom desta.
-             atualizarFiltro: function () { aplicarFiltro(base.w / vb(svg).w); } };
+             posicoesMovidas: posicoesMovidas };
   }
 };

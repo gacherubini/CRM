@@ -68,6 +68,12 @@ class Caixa:
     k_min: float = 0.0
     k_face: float = 0.0
     forma: str = ""      # vocabulario tecnico; ver No.forma em arq_modelo
+    # 01/09 — a face do nivel 1 ganhou conteudo. `papel` vira o chip ao lado
+    # do titulo (antes so aparecia como subtitulo quando nao havia termo);
+    # `estilo` distingue a ficha de COLUNA da Schema (nome a esquerda, tipo a
+    # direita, numa linha so) da ficha comum (arquivo:linha embaixo).
+    papel: str = ""
+    estilo: str = ""
 
 
 @dataclass(frozen=True)
@@ -316,8 +322,11 @@ def _caixa_item(no_chave: str, idx: int, entrada, nivel: int) -> Caixa:
         subtitulo=(entrada.simbolo if entrada.secao == "coluna"
                    else f"{entrada.arquivo}:{entrada.linha}" if entrada.linha
                    else entrada.arquivo),
-        x=0.0, y=0.0, w=ITEM_W, h=ITEM_H,
+        x=0.0, y=0.0,
+        w=ITEM_W * 1.35 if entrada.secao == "coluna" else ITEM_W,
+        h=ITEM_H * 0.8 if entrada.secao == "coluna" else ITEM_H,
         pai=no_chave, nivel=nivel,
+        estilo="coluna" if entrada.secao == "coluna" else "",
     )
 
 
@@ -352,8 +361,17 @@ def _dispor_no(no: No, chave_completa: str, nivel: int,
 
     largura_filhos, altura_filhos, pos_filhos = _grade(
         [(caixa.w, caixa.h) for _, caixa, _ in sub_filhos], folga)
-    largura_itens, altura_itens, pos_itens = _grade(
-        [(caixa.w, caixa.h) for _, caixa, _ in sub_itens])
+    if sub_itens and all(c.estilo == "coluna" for _, c, _ in sub_itens):
+        # Tabela de banco le-se de cima pra baixo, como no ER: uma coluna
+        # por linha, sem grade. A grade de 3 colunas embaralhava a ordem do
+        # arquivo (PK primeiro, carimbos no fim), que e' informacao.
+        largura_itens = max(c.w for _, c, _ in sub_itens)
+        passo = sub_itens[0][1].h + 1.5
+        altura_itens = passo * len(sub_itens) - 1.5
+        pos_itens = [(0.0, i * passo) for i in range(len(sub_itens))]
+    else:
+        largura_itens, altura_itens, pos_itens = _grade(
+            [(caixa.w, caixa.h) for _, caixa, _ in sub_itens])
 
     largura_conteudo = max(largura_filhos, largura_itens)
     altura_conteudo = altura_filhos
@@ -369,11 +387,17 @@ def _dispor_no(no: No, chave_completa: str, nivel: int,
         # assim que 'Conversa e lead', 'Saida WhatsApp', 'Agente por loja',
         # 'Simulacao humana' e 'Projecao do Control' apareceram sem nome.
         largura_conteudo = max(largura_conteudo, ITEM_W, len(no.titulo) * 9.0)
-        altura_conteudo = max(altura_conteudo, ITEM_H * 4)
+        # 01/09: era ITEM_H * 4 (52) mais duas margens — um cartao de 134
+        # de altura pra duas linhas de texto, e o dono viu "caixa vazia".
+        # Duas linhas (titulo na banda, termo logo abaixo) cabem em ITEM_H*2.
+        altura_conteudo = max(altura_conteudo, ITEM_H * 1.3)
 
     banda = banda_titulo(largura_conteudo)
     largura_total = MARGEM * 2 + largura_conteudo
-    altura_total = banda + MARGEM * 2 + altura_conteudo
+    folha = not sub_filhos and not sub_itens
+    # Folha leva UMA margem vertical (a de baixo): o termo encosta na banda,
+    # nao precisa de respiro em cima dele.
+    altura_total = banda + (MARGEM * 0.6 if folha else MARGEM * 2) + altura_conteudo
 
     origem_x = MARGEM
     origem_y_filhos = banda + MARGEM
@@ -393,7 +417,7 @@ def _dispor_no(no: No, chave_completa: str, nivel: int,
         chave=chave_completa, tipo="no", titulo=no.titulo,
         subtitulo=(no.termo or no.papel), x=0.0, y=0.0,
         w=largura_total, h=altura_total, pai=None, nivel=nivel,
-        forma=no.forma,
+        forma=no.forma, papel=no.papel,
     )
     return caixa_no, descendentes
 
@@ -432,7 +456,8 @@ def _comprimir(caixa: Caixa, descendentes: list[Caixa]) -> tuple[Caixa, list[Cai
 
 def _dispor_vm(vm: Vm, por_chave: dict[str, No], nivel: int,
                arestas: tuple[tuple[str, str], ...] = (),
-               folga: float = MARGEM) -> tuple[Caixa, list[Caixa]]:
+               folga: float = MARGEM,
+               folga_produtos: float | None = None) -> tuple[Caixa, list[Caixa]]:
     """Devolve a caixa da VM (moldura, sem preenchimento — ver arq_render) e
     a lista achatada dos produtos que ela contem (e seus descendentes), com
     coordenadas absolutas dentro do frame local da VM.
@@ -450,8 +475,12 @@ def _dispor_vm(vm: Vm, por_chave: dict[str, No], nivel: int,
                                arestas, chave, folga))
         for chave in contidos
     ]
+    # Entre PRODUTOS o respiro e' maior que entre componentes: a seta que
+    # liga dois vizinhos leva um rotulo ("outbox"), e com 24 unidades de
+    # vao a pilula saia por cima das duas bordas.
     largura_conteudo, altura_conteudo, posicoes = _grade(
-        [(caixa.w, caixa.h) for caixa, _ in sub], folga)
+        [(caixa.w, caixa.h) for caixa, _ in sub],
+        folga * 3 if folga_produtos is None else folga_produtos)
 
     banda = banda_titulo(largura_conteudo, 0.02)
     largura_total = MARGEM * 2 + largura_conteudo
@@ -475,6 +504,62 @@ def _dispor_vm(vm: Vm, por_chave: dict[str, No], nivel: int,
         pai=None, nivel=nivel,
     )
     return caixa_vm, descendentes
+
+
+def _ajustar_faixa(raizes: list) -> list:
+    """Prepara a faixa de `_grade_raiz`: as molduras pequenas (sem
+    descendente) recebem a MESMA largura, a fatia da moldura grande. O piso
+    de 30% (`FRACAO_MIN_VM`) as deixava mais largas que a fatia, e ai a
+    regra da faixa nunca se aplicava. So mexe em moldura sem filho — a
+    forma interna dela (`roda`) e' calculada no render a partir da caixa."""
+    if len(raizes) < 3:
+        return raizes
+    ordenadas = sorted(range(len(raizes)), key=lambda i: -raizes[i][0].w * raizes[i][0].h)
+    grande = ordenadas[0]
+    pequenas = ordenadas[1:]
+    if any(raizes[i][1] for i in pequenas):
+        return raizes
+    n = len(pequenas)
+    largura_cada = (raizes[grande][0].w - MARGEM * (n - 1)) / n
+    saida = list(raizes)
+    for i in pequenas:
+        c, desc = raizes[i]
+        saida[i] = (replace(c, w=largura_cada), desc)
+    return saida
+
+
+def _grade_raiz(raizes: list) -> tuple[float, float, list[tuple[float, float]]]:
+    """O nivel 1 tem uma forma que o empacotamento generico nao adivinha: UMA
+    moldura grande (a maquina que carrega os produtos) e algumas pequenas
+    sem produto (worker, n8n, evolution, banco). Com `_grade` a moldura
+    grande decidia a largura-alvo e as pequenas caiam onde coubessem — duas
+    ao lado, duas embaixo, um buraco no canto. Aqui: a grande em cima, e as
+    pequenas numa FAIXA embaixo dela, esticadas pra dividir a largura em
+    partes iguais. Le-se como "a aplicacao, e a infra que a cerca".
+
+    So vale quando ha exatamente uma moldura grande e as outras cabem lado
+    a lado embaixo dela; fora disso, `_grade` de sempre.
+    """
+    if len(raizes) < 3:
+        return _grade([(c.w, c.h) for c, _ in raizes])
+    ordenadas = sorted(range(len(raizes)), key=lambda i: -raizes[i][0].w * raizes[i][0].h)
+    grande = ordenadas[0]
+    pequenas = sorted(ordenadas[1:], key=lambda i: raizes[i][0].chave)
+    w_grande = raizes[grande][0].w
+    n = len(pequenas)
+    largura_cada = (w_grande - MARGEM * (n - 1)) / n
+    if any(raizes[i][0].w > largura_cada for i in pequenas):
+        return _grade([(c.w, c.h) for c, _ in raizes])
+    altura_faixa = max(raizes[i][0].h for i in pequenas)
+    posicoes: list[tuple[float, float]] = [(0.0, 0.0)] * len(raizes)
+    y_faixa = raizes[grande][0].h + MARGEM
+    for k, i in enumerate(pequenas):
+        # Centrada na propria fatia — a moldura nao e' esticada (a forma
+        # interna dela ja foi calculada), so ganha o lugar.
+        c = raizes[i][0]
+        x = k * (largura_cada + MARGEM) + (largura_cada - c.w) / 2
+        posicoes[i] = (x, y_faixa)
+    return w_grande, y_faixa + altura_faixa, posicoes
 
 
 def _aplicar_posicoes(caixas: list[Caixa],
@@ -511,7 +596,8 @@ def _aplicar_posicoes(caixas: list[Caixa],
 
 def dispor(modelo: Modelo, grupos: tuple[Vm, ...],
            a_mao: dict[str, tuple[float, float]] | None = None,
-           folga: float = MARGEM) -> Cena:
+           folga: float = MARGEM,
+           folga_produtos: float | None = None) -> Cena:
     """`grupos` e o nivel 1 da cena: `modelo.vms` pra vista Arquitetura,
     `modelo.bancos` pra vista Schema (Task 9) — quem chama escolhe, porque
     so quem filtrou o modelo (`arq_modelo.filtrar`) sabe qual das duas vistas
@@ -547,7 +633,7 @@ def dispor(modelo: Modelo, grupos: tuple[Vm, ...],
     # layout so precisa de quem-com-quem, nunca do protocolo.
     arestas = tuple((a.de, a.para) for a in modelo.arestas)
 
-    raizes = [_dispor_vm(vm, por_chave_no, 1, arestas, folga) for vm in grupos]
+    raizes = [_dispor_vm(vm, por_chave_no, 1, arestas, folga, folga_produtos) for vm in grupos]
     soltos = [no for no in modelo.nos if no.chave not in contidos]
     raizes += [_dispor_no(no, no.chave, 1, arestas, no.chave, folga) for no in soltos]
 
@@ -575,7 +661,8 @@ def dispor(modelo: Modelo, grupos: tuple[Vm, ...],
         for c, desc in raizes
     ]
 
-    largura, altura, posicoes = _grade([(c.w, c.h) for c, _ in raizes])
+    raizes = _ajustar_faixa(raizes)
+    largura, altura, posicoes = _grade_raiz(raizes)
 
     caixas: list[Caixa] = []
     for (caixa, desc), (dx, dy) in zip(raizes, posicoes):
