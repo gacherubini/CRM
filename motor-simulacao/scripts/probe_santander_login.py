@@ -1,4 +1,13 @@
-"""Smoke: abre login Santander com a mesma stack anti-WAF do worker."""
+"""Smoke: abre login Santander com a mesma stack anti-WAF do worker.
+
+So o login — se voce quer o fluxo inteiro dos quatro bancos, use
+``scripts/probe_todos.py``.
+"""
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
 from playwright.sync_api import sync_playwright
 
 from app.motor.santander import fabrica_santander
@@ -33,10 +42,12 @@ def main() -> None:
             print("title", page.title())
             print("url", (page.url or "")[:160])
             print("blocked", blocked, "has_login_ui", has_login)
-            page.screenshot(
-                path="/srv/data/screenshots/probe_headed.png", full_page=True
-            )
-            print("shot ok")
+            # Caminho relativo ao cwd: /srv/... so existe no container do Fly.
+            destino = Path(d.screenshot_dir or "data/screenshots")
+            destino.mkdir(parents=True, exist_ok=True)
+            shot = destino / "santander_probe_login.png"
+            page.screenshot(path=str(shot), full_page=True)
+            print("shot", shot)
             if blocked:
                 d._assert_portal_acessivel(page)
             print("RESULT", "BLOQUEADO" if blocked else "OK")

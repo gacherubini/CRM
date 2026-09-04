@@ -43,6 +43,13 @@ PROVEDOR = "pan"
 
 LOGIN_URL_DEFAULT = "https://veiculos.bancopan.com.br/login"
 
+# Modal de agente/operador do go!PAN (componente `mahoe-select`, ids proprios:
+# certifiedAgent / commercialOperator).
+MODAL_AGENTE_TITULO = re.compile(r"Configure seu agente", re.I)
+# Botao fixo no cabecalho da Nova Proposta. Abrir por ele e deterministico; esperar
+# o modal auto-abrir nao e (ver `_modal_agente_aberto`).
+MODAL_AGENTE_BOTAO = re.compile(r"Agente e operador", re.I)
+
 # UF -> nome por extenso (o dropdown pode listar sigla ou nome completo).
 _UF_NOME: dict[str, str] = {
     "AC": "ACRE", "AL": "ALAGOAS", "AP": "AMAPÁ", "AM": "AMAZONAS",
@@ -278,6 +285,12 @@ class PanPortalDriver(PlaywrightBankDriver):
                 self._evento(
                     ctx, "login_confirmado", "Login confirmado pelo portal.", page, True
                 )
+                self._configurar_agente_operador(page)
+                self._evento(
+                    ctx,
+                    "agente_definido",
+                    "Agente certificado e operador confirmados no portal.",
+                )
                 self._passo_cliente(page, sol)
                 self._passo_veiculo(page, sol)
                 self._passo_valor(page, sol)
@@ -512,6 +525,129 @@ class PanPortalDriver(PlaywrightBankDriver):
             except Exception:
                 continue
         raise self._falha_campo(campo)
+
+    def _modal_agente_aberto(self, page) -> bool:
+        """Diz se o dialogo esta REALMENTE aberto, pela altura do container.
+
+        O go!PAN deixa o `.mahoe-modal__dialog` no DOM com `height: 0` e
+        `overflow: hidden` quando fechado. O conteudo continua la, com geometria
+        propria, apenas recortado. Playwright nao analisa clipping, entao o
+        titulo responde `is_visible() == True` com o modal fechado e o clique
+        seguinte estoura o timeout sem explicacao (sim 20260904-151456). A altura
+        do dialogo e o unico sinal que separa os dois estados.
+        """
+        try:
+            return bool(
+                page.evaluate(
+                    """() => {
+                        const d = document.querySelector('.mahoe-modal__dialog');
+                        return !!d && d.getBoundingClientRect().height > 0;
+                    }"""
+                )
+            )
+        except Exception:
+            return False
+
+    def _abrir_modal_agente(self, page) -> None:
+        """Abre o dialogo pelo botao do cabecalho, que existe sempre."""
+        if self._modal_agente_aberto(page):
+            return
+        page.get_by_role("button", name=MODAL_AGENTE_BOTAO).first.click(
+            timeout=min(self.timeout_ms, 10_000)
+        )
+        page.wait_for_timeout(800)
+        if not self._modal_agente_aberto(page):
+            raise ErroTransitorio(
+                "pan_modal_agente_nao_abriu",
+                "botao 'Agente e operador' nao abriu o dialogo de configuracao",
+            )
+
+    def _configurar_agente_operador(self, page) -> None:
+        """Fixa agente certificado e operador antes de comecar a proposta.
+
+        Eles definem a quem a proposta e atribuida. Com sessao quente o portal
+        as vezes NAO abre o modal sozinho, entao esperar por ele nao serve:
+        abrimos pelo botao do cabecalho e escolhemos sempre.
+
+        Sem nome configurado so agimos se o modal estiver bloqueando a tela —
+        senao o passo seguinte morre em `campo_nao_encontrado` culpando o campo
+        Celular, que na verdade estava atras do overlay (sim 20260904-150259).
+        """
+        quer_definir = bool(config.PAN_AGENTE_CERTIFICADO or config.PAN_OPERADOR)
+        if not quer_definir and not self._modal_agente_aberto(page):
+            return
+
+        self._abrir_modal_agente(page)
+        self._escolher_no_combo(
+            page, "certifiedAgent", config.PAN_AGENTE_CERTIFICADO, "agente certificado"
+        )
+        self._escolher_no_combo(
+            page, "commercialOperator", config.PAN_OPERADOR, "operador"
+        )
+
+        page.get_by_role(
+            "button", name=re.compile(r"^\s*Salvar\s*$", re.I)
+        ).first.click(timeout=min(self.timeout_ms, 10_000))
+        for _ in range(20):
+            page.wait_for_timeout(500)
+            if not self._modal_agente_aberto(page):
+                return
+        raise ErroTransitorio(
+            "pan_agente_nao_salvou",
+            "dialogo de agente/operador continuou aberto depois do Salvar",
+        )
+
+    def _escolher_no_combo(
+        self, page, campo_id: str, nome: str, rotulo: str
+    ) -> None:
+        """Escolhe no `mahoe-select` a opcao que casa com ``nome``.
+
+        O portal TRUNCA o texto da opcao em 20 caracteres ("Bruna Cristina Mulle"),
+        entao a comparacao e por prefixo nos dois sentidos, nunca igualdade. Dois
+        candidatos = erro, para nao atribuir a proposta a pessoa errada em silencio.
+        """
+        if not nome:
+            return
+        alvo = nome.strip().lower()
+        entrada = page.locator(f"#{campo_id}-value")
+        entrada.click(timeout=min(self.timeout_ms, 8_000))
+        # O listbox so renderiza depois do clique; enumerar antes devolve zero.
+        page.locator(f"#{campo_id}-listbox").first.wait_for(
+            state="visible", timeout=min(self.timeout_ms, 8_000)
+        )
+
+        opcoes = page.locator(f"#{campo_id}-listbox [role='option']")
+        disponiveis: list[str] = []
+        casados: list[int] = []
+        for i in range(opcoes.count()):
+            texto = (opcoes.nth(i).inner_text() or "").strip()
+            disponiveis.append(texto)
+            curto = texto.lower()
+            if curto and (curto.startswith(alvo) or alvo.startswith(curto)):
+                casados.append(i)
+
+        if not casados:
+            raise IntervencaoNecessaria(
+                "pan_agente_indisponivel",
+                f"{rotulo} '{nome}' nao esta na lista do portal: {disponiveis}",
+            )
+        if len(casados) > 1:
+            raise IntervencaoNecessaria(
+                "pan_agente_ambiguo",
+                f"{rotulo} '{nome}' casa com mais de uma opcao: "
+                f"{[disponiveis[i] for i in casados]}",
+            )
+
+        opcoes.nth(casados[0]).click(timeout=min(self.timeout_ms, 8_000))
+        # Le de volta: clique engolido deixaria o combo vazio e o Salvar seguiria.
+        lido = (entrada.input_value() or "").strip().lower()
+        if not lido or not (
+            lido.startswith(alvo) or alvo.startswith(lido) or lido in disponiveis[casados[0]].lower()
+        ):
+            raise ErroTransitorio(
+                "pan_agente_nao_aplicou",
+                f"{rotulo} nao ficou selecionado apos o clique",
+            )
 
     def _fechar_got_it(self, page) -> None:
         """Fecha banners que bloqueiam a tela: onboarding 'Got it!' e o

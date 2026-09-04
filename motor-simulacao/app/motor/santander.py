@@ -869,8 +869,15 @@ class SantanderDriver(PlaywrightBankDriver):
         como skeleton (sem texto). So o texto real de parcela ("48x de") conta;
         exige 2 leituras seguidas para nao pegar o instante do primeiro card sair
         do skeleton.
+
+        A espera usa `config.OFERTAS_TIMEOUT_MS`, o mesmo botao do Bradesco
+        (`bradesco.py:841`). Antes eram 90s cravados aqui, ignorando a config: em
+        dia lento o portal passava disso e o driver desistia com o skeleton ainda
+        na tela (sim 20260904-154158, 225s). Orcamento: pior login observado
+        (~135s ate `simulacao_enviada`) + 240s = 375s, ainda sob os 420s de
+        MOTOR_DRIVER_TIMEOUT_SECONDS.
         """
-        timeout = max(self.timeout_ms, 90_000)
+        timeout = max(self.timeout_ms, config.OFERTAS_TIMEOUT_MS)
         prazo_fim = time.monotonic() + (timeout / 1000.0)
         cards = re.compile(r"\d+\s*x\s*de", re.I)
         # Seleciona a aba Padrao cedo (default) para os cards certos carregarem.

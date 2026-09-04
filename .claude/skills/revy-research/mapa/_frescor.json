@@ -1,5 +1,5 @@
 {
- "sha": "e9e6ae8",
+ "sha": "dad262d",
  "inventario": {
   "chatbot-api": [
    {
@@ -3042,14 +3042,14 @@
     "chave": "MOTOR_FANOUT_ENABLED (default: 0)",
     "simbolo": "MOTOR_FANOUT_ENABLED",
     "arquivo": "app/config.py",
-    "linha": 84
+    "linha": 101
    },
    {
     "secao": "flag",
     "chave": "MOTOR_FLY_AUTOSCALE_ENABLED (default: 0)",
     "simbolo": "MOTOR_FLY_AUTOSCALE_ENABLED",
     "arquivo": "app/config.py",
-    "linha": 85
+    "linha": 102
    },
    {
     "secao": "rota",
@@ -3253,6 +3253,20 @@
     "simbolo": "main",
     "arquivo": "app/worker.py",
     "linha": 93
+   },
+   {
+    "secao": "template",
+    "chave": "data/probes/_diag_bv/login_html.html",
+    "simbolo": "login_html.html",
+    "arquivo": "data/probes/_diag_bv/login_html.html",
+    "linha": 0
+   },
+   {
+    "secao": "template",
+    "chave": "data/probes/_diag_pan_modal/modal.html",
+    "simbolo": "modal.html",
+    "arquivo": "data/probes/_diag_pan_modal/modal.html",
+    "linha": 0
    },
    {
     "secao": "migration",

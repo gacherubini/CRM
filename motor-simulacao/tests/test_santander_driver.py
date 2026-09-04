@@ -1,10 +1,17 @@
 from decimal import Decimal
 from pathlib import Path
+from unittest.mock import MagicMock
 
 import pytest
 
+from app import config
 from app.motor.base import Condicoes, Pessoa, SolicitacaoSimulacao, Veiculo
-from app.motor.drivers import DriverContext, IntervencaoNecessaria, resolver_drivers
+from app.motor.drivers import (
+    DriverContext,
+    ErroTransitorio,
+    IntervencaoNecessaria,
+    resolver_drivers,
+)
 from app.motor.santander import (
     PROVEDOR,
     parse_entrada,
@@ -183,3 +190,28 @@ def test_gating_santander_com_credencial_resolve(db):
             d.html_simulacao = html
     out = d(_sol(), DriverContext(db=db, cliente_id=TEST_CLIENT_ID))
     assert len(out) >= 1
+
+
+def test_espera_de_ofertas_usa_o_botao_da_config(monkeypatch):
+    """A janela de espera vem de `config.OFERTAS_TIMEOUT_MS`, nao de 90s cravados.
+
+    Com os 90s antigos o Santander desistia com o skeleton ainda na tela em dia
+    lento do portal (sim 20260904-154158). Aqui a config manda: apertada, o laco
+    sai rapido; se o driver ignorasse a config, levaria 90 segundos.
+    """
+    import time as _time
+
+    monkeypatch.setattr(config, "OFERTAS_TIMEOUT_MS", 1_000)
+    driver = SantanderDriver(timeout_ms=500)
+    monkeypatch.setattr(driver, "_assert_portal_acessivel", lambda page: None)
+
+    page = MagicMock()
+    page.get_by_text.return_value.count.return_value = 0  # nunca aparece card
+
+    inicio = _time.monotonic()
+    with pytest.raises(ErroTransitorio) as ei:
+        driver._passo_aguardar_simulacao(page)
+    decorrido = _time.monotonic() - inicio
+
+    assert ei.value.codigo == "portal_falhou"
+    assert decorrido < 30, f"esperou {decorrido:.0f}s — ignorou a config"

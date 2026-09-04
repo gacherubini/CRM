@@ -66,6 +66,23 @@ PAN_PORTAL_LOGIN_URL = os.getenv(
     "MOTOR_PAN_PORTAL_LOGIN_URL",
     "https://veiculos.bancopan.com.br/login",
 )
+MOTRIX_LOGIN_URL = os.getenv(
+    "MOTOR_MOTRIX_LOGIN_URL",
+    "https://motrix.joinbank.com.br/sign-in?redirectURL=%2Fdashboard",
+)
+# O wizard de simulacao vive numa rota fixa; o menu de produtos lista um card so
+# ("Simulacao de Financiamento Veicular - 950009"). Navegar por URL evita depender
+# da sidebar, que e colapsavel e nao leva a lugar nenhum quando fechada.
+MOTRIX_MENU_URL = os.getenv(
+    "MOTOR_MOTRIX_MENU_URL",
+    "https://motrix.joinbank.com.br/loan-simulations/menu",
+)
+# O go!PAN abre um modal obrigatorio pedindo agente certificado e operador antes
+# de liberar a Nova Proposta. Eles definem a quem a proposta e atribuida, entao
+# nao ficam no codigo: sao por loja. Vazio = aceita o que o portal pre-seleciona.
+# Nome parcial basta — o portal trunca o texto da opcao em 20 caracteres.
+PAN_AGENTE_CERTIFICADO = (os.getenv("MOTOR_PAN_AGENTE_CERTIFICADO") or "").strip()
+PAN_OPERADOR = (os.getenv("MOTOR_PAN_OPERADOR") or "").strip()
 
 # Banco PAN OpenAPI Veículos. Sandbox é o default deliberado; produção exige
 # override explícito depois da homologação comercial do parceiro.

@@ -1,0 +1,64 @@
+# Captura real do modal de simulacao do Motrix em 04/09/2026, com o cliente
+# de teste. CPF, telefone, chassi e renavam foram trocados por zeros: o resto
+# e o texto que o portal devolveu. O desfecho foi recusa de negocio.
+Início
+Propostas
+Simulações
+Veículos
+Notificações
+Voltar
+Simulação
+Siga o passo a passo para simular e cadastrar uma proposta
+Consulta CPF
+Para prosseguir com a simulação é obrigatório consultar o CPF do cliente
+2
+Simulação de Proposta
+Adicione uma ou mais simulações
+3
+Confirmação
+Confirme ou ajuste os dados da proposta antes de formalizar.
+4
+Formalização
+Envie o link para o cliente formalizar as propostas.
+Dados do Cliente
+Nome
+-
+CPF
+000.000.000-00
+Telefone
+(11) 90000-0000
+Simulações
+Adicionar Simulação
+Voltar
+2
+/
+4
+Próximo
+Simulação
+Tipo do veículo
+Usado
+Placa
+Chassi
+search
+Buscar
+lock
+Dados do veículo obtidos na consulta. Altere a placa ou o chassi para editar manualmente.
+Dados do veículo
+Marca
+YAMAHA
+Modelo
+FZ25
+Versão
+250 FAZER FLEX
+Ano Modelo
+2021
+UF do Licenciamento
+SP
+Renavam
+Valor da entrada
+Valor de venda
+Valor de mercado: R$ 19.610,00
+Tabela
+R0
+Não há oferta de crédito disponível para este cliente.
+Simular

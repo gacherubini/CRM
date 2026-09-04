@@ -48,6 +48,10 @@ escrever migration com `batch_alter_table`.
 | ligar lead a anuncio ou mexer em atribuicao CTWA | `2026-08-23-telefone-mascarado-de-4-digitos-colide.md` |
 | testar envio de convite ou de e-mail | `2026-08-23-backend-de-email-console-responde-200.md` |
 | depurar driver Playwright de banco que termina em timeout | `2026-08-23-driver-playwright-engole-o-clique-que-falha.md` |
+| clique do Playwright estoura timeout num elemento que existe e parece visivel | `2026-09-04-is-visible-mente-com-modal-recortado.md` |
+| rodar os drivers de banco ao vivo na maquina local | `2026-09-04-probe-todos-roda-os-bancos-de-uma-vez.md` |
+| logar num portal bancario por script, ou repetir um login que acabou de funcionar | `2026-09-04-portal-do-banco-desativa-login-repetido.md` |
+| achar API JSON atras do portal de um banco e querer trocar Playwright por HTTP | `2026-09-04-spa-com-api-nao-e-driver-de-api.md` |
 | propor canal de entrada de lead que nao seja anuncio CTWA | `2026-08-23-mensagem-de-servico-volta-a-ser-paga.md` |
 | dimensionar limite da Cloud API ou tratar verificacao de CNPJ como bloqueio | `2026-08-23-teto-de-250-conta-so-outbound.md` |
 | submeter a verificacao de empresa (CNPJ) no portfolio da Meta | `2026-08-23-verificacao-da-meta-so-o-email-aceita-endereco.md` |

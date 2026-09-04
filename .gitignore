@@ -28,6 +28,8 @@ data/storage_state/
 # Ambiente
 .env
 .env.local
+# O template de env ja foi preenchido com senha real uma vez. Fora do git tambem.
+.env.local.exemplo
 deploy/fly/.env.production.local
 deploy/fly/3vm/.secrets.local
 deploy/fly/3vm/.evolution_key.local

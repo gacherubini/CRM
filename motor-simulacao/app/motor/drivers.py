@@ -133,15 +133,21 @@ DRIVERS: dict[str, Driver] = {
 # sombrear o provedor mock homônimo.
 REAL_DRIVERS: dict[str, Driver] = {}
 
+# Nomes canônicos dos drivers reais. Estava escrito à mão em dois lugares (o guard
+# do registro e o filtro de `resolver_drivers`); acrescentar banco e esquecer o
+# segundo fazia o provedor ser descartado em silêncio, sem erro. Uma constante só.
+NOMES_REAIS = frozenset({"santander", "pan", "fontecred", "bradesco", "motrix"})
+
 
 def _registrar_drivers_reais() -> None:
     """Import tardio evita ciclos com os adapters concretos."""
-    if {"santander", "pan", "fontecred", "bradesco"}.issubset(REAL_DRIVERS):
+    if NOMES_REAIS.issubset(REAL_DRIVERS):
         return
     from app.motor.santander import fabrica_santander
     from app.motor.pan import fabrica_pan
     from app.motor.fontecred import fabrica_fontecred
     from app.motor.bradesco import fabrica_bradesco
+    from app.motor.motrix import fabrica_motrix
 
     driver = fabrica_santander()
     # Registrado apenas em minúsculo ("santander"): é o nome canônico usado para
@@ -157,6 +163,8 @@ def _registrar_drivers_reais() -> None:
     REAL_DRIVERS["fontecred"] = fabrica_fontecred()
     # Bradesco (Turbo Lojista): banco novo, sem homônimo mock.
     REAL_DRIVERS["bradesco"] = fabrica_bradesco()
+    # Motrix (plataforma joinbank): banco novo, sem homônimo mock.
+    REAL_DRIVERS["motrix"] = fabrica_motrix()
 
 
 def _pan_dispatch(
@@ -201,7 +209,7 @@ def resolver_drivers(
             nomes.extend(DRIVERS.keys())
         elif p in DRIVERS:
             nomes.append(p)
-        elif p in REAL_DRIVERS or p in {"santander", "pan", "fontecred", "bradesco"}:
+        elif p in REAL_DRIVERS or p in NOMES_REAIS:
             nomes.append(p)
     vistos: set[str] = set()
     pares: list[tuple[str, Driver]] = []

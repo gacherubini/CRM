@@ -1,6 +1,6 @@
-# motor-simulacao · 16 rotas · 12 modelos · 1 workers · 2 flags · 14 migrations
+# motor-simulacao · 16 rotas · 12 modelos · 1 workers · 2 flags · 14 migrations · 2 templates
 
-Gerado de `e9e6ae8`. NAO editar a mao — saida de `gerar_mapa.py`.
+Gerado de `dad262d`. NAO editar a mao — saida de `gerar_mapa.py`.
 Migration head: `0014`
 
 ## Rotas
@@ -43,8 +43,8 @@ Migration head: `0014`
 
 ## Flags
 
-- `MOTOR_FANOUT_ENABLED (default: 0)` — app/config.py:84
-- `MOTOR_FLY_AUTOSCALE_ENABLED (default: 0)` — app/config.py:85
+- `MOTOR_FANOUT_ENABLED (default: 0)` — app/config.py:101
+- `MOTOR_FLY_AUTOSCALE_ENABLED (default: 0)` — app/config.py:102
 
 ## Migrations
 
@@ -62,6 +62,11 @@ Migration head: `0014`
 - `0012` — alembic/versions/0012_simulacao_provedores_fanout.py
 - `0013` — alembic/versions/0013_evento_screenshot_blob.py
 - `0014` — alembic/versions/0014_cliente_operacional_projecao.py
+
+## Templates
+
+- `data/probes/_diag_bv/login_html.html` — data/probes/_diag_bv/login_html.html
+- `data/probes/_diag_pan_modal/modal.html` — data/probes/_diag_pan_modal/modal.html
 
 ## Testes
 

@@ -56,6 +56,19 @@ PROVEDORES_REAIS: dict[str, dict[str, Any]] = {
             {"nome": "senha", "rotulo": "Senha do portal", "secreto": True},
         ],
     },
+    "motrix": {
+        "nome": "motrix",
+        "rotulo": "Motrix",
+        "habilitado": True,
+        "real": True,
+        # Plataforma joinbank. Tem API REST por trás do SPA, mas as chamadas exigem
+        # um header assinado pelo JS da página — ver o docstring de app/motor/motrix.py.
+        "modo": "playwright",
+        "campos_credencial": [
+            {"nome": "usuario", "rotulo": "Usuário/CPF do portal Motrix", "secreto": False},
+            {"nome": "senha", "rotulo": "Senha do portal", "secreto": True},
+        ],
+    },
 }
 
 

@@ -46,6 +46,16 @@ PROVEDOR = "fontecred"
 LOGIN_URL_DEFAULT = "https://app.fontecred.com.br/login#step-1"
 NOVA_PROPOSTA_URL = "https://app.fontecred.com.br/clientes/criarComProposta"
 
+# O portal usa os dois titulos: "COMUNICADOS" no dashboard e "COMUNICADO" (singular)
+# na tela de proposta. Casar so o plural fazia o driver achar que nao havia modal,
+# seguir em frente e bater no overlay ao clicar no CPF (sim 20260904-150259).
+COMUNICADO_TITULO = r"^\s*COMUNICADOS?\s*$"
+
+# Placa que casa com mais de uma versao abre "Selecione o modelo correto para esta
+# placa" (ex.: FUV7G58 -> tres FZ25 250 FAZER com FIPE diferente). Enquanto o modal
+# fica aberto, TODO o resto do formulario falha calado.
+MODAL_PLACA_TITULO = re.compile(r"Selecione o modelo correto", re.I)
+
 # Cards de resultado: "24x 1.212,76" (o "R$" costuma vir em outra tag ou ausente).
 # Non-greedy com folga curta para casar "24x" e "1.212,76" em nos separados.
 _RE_PARCELA = re.compile(
@@ -464,7 +474,7 @@ class FontecredDriver(PlaywrightBankDriver):
                 return True
         except Exception:
             pass
-        for texto in (r"^\s*COMUNICADOS\s*$", r"^\s*Dashboard\s*$"):
+        for texto in (COMUNICADO_TITULO, r"^\s*Dashboard\s*$"):
             try:
                 if page.get_by_text(re.compile(texto, re.I)).first.is_visible():
                     return True
@@ -481,7 +491,7 @@ class FontecredDriver(PlaywrightBankDriver):
                 """() => {
                     const texto = document.body?.innerText || '';
                     return !/\\/login\\b/i.test(location.pathname)
-                        || /COMUNICADOS/i.test(texto)
+                        || /COMUNICADOS?/i.test(texto)
                         || /Dashboard/i.test(texto);
                 }""",
                 timeout=timeout,
@@ -538,14 +548,12 @@ class FontecredDriver(PlaywrightBankDriver):
         except Exception:
             pass
 
-    def _fechar_comunicados(self, page) -> None:
-        """Fecha o pop-up COMUNICADOS e confirma que não bloqueia mais a tela."""
-        titulo = page.get_by_text(
-            re.compile(r"^\s*COMUNICADOS\s*$", re.I)
-        ).first
+    def _fechar_comunicados(self, page, espera_ms: int = 5_000) -> None:
+        """Fecha o pop-up COMUNICADO(S) e confirma que não bloqueia mais a tela."""
+        titulo = page.get_by_text(re.compile(COMUNICADO_TITULO, re.I)).first
         try:
             titulo.wait_for(
-                state="visible", timeout=min(self.timeout_ms, 5_000)
+                state="visible", timeout=min(self.timeout_ms, espera_ms)
             )
         except Exception:
             if not self._comunicados_visivel(page):
@@ -580,9 +588,7 @@ class FontecredDriver(PlaywrightBankDriver):
 
     def _comunicados_visivel(self, page) -> bool:
         try:
-            titulo = page.get_by_text(
-                re.compile(r"^\s*COMUNICADOS\s*$", re.I)
-            ).first
+            titulo = page.get_by_text(re.compile(COMUNICADO_TITULO, re.I)).first
             return titulo.is_visible()
         except Exception:
             return False
@@ -601,6 +607,9 @@ class FontecredDriver(PlaywrightBankDriver):
             # Nesse caso o goto lança timeout, mas o formulário já está utilizável.
             pass
         self._aguardar_dom_pronto(page)
+        # O modal reaparece nesta tela, nao so no dashboard. Sem fechar aqui, o
+        # campo CPF fica visivel mas o clique bate no overlay.
+        self._fechar_comunicados(page, espera_ms=2_500)
         try:
             cpf_box.wait_for(state="visible", timeout=min(self.timeout_ms, 15_000))
             cpf_box.click(trial=True, timeout=min(self.timeout_ms, 15_000))
@@ -668,20 +677,73 @@ class FontecredDriver(PlaywrightBankDriver):
         placa_box.first.fill(placa)
         page.keyboard.press("Tab")
         page.wait_for_timeout(1_200)
-        # Portal resolve o veículo pela placa e mostra uma linha p/ selecionar.
+        if not self._resolver_modal_placa(page):
+            # Versão única: o portal mostra uma linha para confirmar, sem modal.
+            try:
+                selecionar = page.get_by_role("row").filter(
+                    has=page.get_by_role("button")
+                ).first.get_by_role("button")
+                selecionar.wait_for(
+                    state="visible", timeout=min(self.timeout_ms, 10_000)
+                )
+                selecionar.click(timeout=min(self.timeout_ms, 10_000))
+            except Exception:
+                # Não decide nada aqui: quem julga é a leitura do #produto abaixo.
+                pass
+        page.wait_for_timeout(500)
+        self._confirmar_produto_resolvido(page)
+
+    def _confirmar_produto_resolvido(self, page) -> None:
+        """A placa só está resolvida quando o portal escolhe um produto.
+
+        Critério lido da página (`select#produto`), não "o clique não deu erro".
+        Desde que o modal de versões passou a ser tratado, não sobra nenhuma
+        "linha com botão" para clicar, e o caminho antigo acusava
+        `veiculo_nao_resolvido` com marca, ano e produto já preenchidos na tela
+        (sim 20260904-152805).
+        """
         try:
-            selecionar = page.get_by_role("row").filter(
-                has=page.get_by_role("button")
-            ).first.get_by_role("button")
-            selecionar.wait_for(state="visible", timeout=self.timeout_ms)
-            selecionar.click(timeout=self.timeout_ms)
+            produto = page.locator("#produto").first.input_value(
+                timeout=min(self.timeout_ms, 10_000)
+            )
         except Exception:
-            # Sem linha => placa não resolveu.
+            produto = ""
+        if not (produto or "").strip():
             raise ErroTransitorio(
                 "veiculo_nao_resolvido",
                 "Portal não resolveu o veículo pela placa informada.",
             )
+
+    def _resolver_modal_placa(self, page) -> bool:
+        """Escolhe a versão do veículo quando a placa casa com mais de um modelo.
+
+        Devolve ``True`` se o modal apareceu e uma versão foi escolhida. Quem
+        chama usa isso para não repetir a escolha pelo caminho antigo.
+
+        Mesma regra já decidida para o Bradesco (`bradesco.py:648`): primeira
+        versão da lista. Sem tratar, o modal fica por cima e o resto do
+        formulário falha em silêncio — na sim 20260904-151456 o "Valor de venda"
+        ficou vazio e o driver ainda assim registrou `dados_preenchidos`.
+        """
+        titulo = page.get_by_text(MODAL_PLACA_TITULO).first
+        try:
+            titulo.wait_for(state="visible", timeout=min(self.timeout_ms, 6_000))
+        except Exception:
+            # Placa com versão única não abre o modal.
+            return False
+
+        page.get_by_role(
+            "button", name=re.compile(r"^\s*Selecionar\s*$", re.I)
+        ).first.click(timeout=min(self.timeout_ms, 10_000))
+        try:
+            titulo.wait_for(state="hidden", timeout=min(self.timeout_ms, 10_000))
+        except Exception as exc:
+            raise ErroTransitorio(
+                "modelo_placa_nao_escolhido",
+                "modal de modelos da placa continuou aberto apos escolher a versao",
+            ) from exc
         page.wait_for_timeout(500)
+        return True
 
     def _passo_financiamento(self, page, sol: SolicitacaoSimulacao) -> None:
         # 1) Valor de venda -> blur para o portal calcular o financiamento.
@@ -692,6 +754,14 @@ class FontecredDriver(PlaywrightBankDriver):
         valor_box.fill(valor_fmt)
         valor_box.blur()  # "clicar fora" — sem isso o financiamento não atualiza
         page.wait_for_timeout(1_200)
+        # Le de volta: overlay bloqueando o form deixava o campo vazio e o driver
+        # seguia ate morrer no "Simular", 90s depois, culpando a tela errada.
+        lido = re.sub(r"\D", "", valor_box.input_value() or "")
+        if lido != re.sub(r"\D", "", valor_fmt):
+            raise ErroTransitorio(
+                "valor_venda_nao_aplicou",
+                "campo Valor de venda nao ficou preenchido (provavel overlay no formulario)",
+            )
 
         # 2) Prazo (dropdown) precisa ser selecionado antes de simular; o resultado
         #    devolve todos os prazos de qualquer forma.
@@ -717,13 +787,68 @@ class FontecredDriver(PlaywrightBankDriver):
         except Exception:
             pass
 
-        # 4) Autorização SCR (obrigatória antes de simular).
+        # 4) Autorização LGPD/SCR — obrigatória antes de simular.
+        self._marcar_autorizacao(page)
+
+    def _autorizacao_marcada(self, page) -> bool:
+        """Lê o estado real do checkbox de autorização, ache-o como achar.
+
+        Procura pelo texto ao redor em vez do nome acessível: o rótulo não está
+        associado ao input, então `get_by_label` devolve vazio nesta tela.
+        """
         try:
-            page.get_by_role(
-                "checkbox", name=re.compile(r"autoriza a consulta", re.I)
-            ).check()
+            return bool(
+                page.evaluate(
+                    """() => {
+                        const caixas = document.querySelectorAll(
+                            "input[type=checkbox]"
+                        );
+                        for (const i of caixas) {
+                            const perto = (i.closest('label') || {}).innerText
+                                || (i.parentElement || {}).innerText || '';
+                            if (/Autorizo a Fontecred/i.test(perto)) return i.checked;
+                        }
+                        return false;
+                    }"""
+                )
+            )
         except Exception:
-            pass
+            return False
+
+    def _marcar_autorizacao(self, page) -> None:
+        """Marca a autorização LGPD/SCR e confirma que ficou marcada.
+
+        O portal recusa o Simular sem ela ("Marque esta caixa se deseja
+        continuar"). O regex antigo procurava "autoriza a consulta", mas o texto
+        é "Autorizo a Fontecred a consultar" — nunca casava, e o `except: pass`
+        escondia a falha ate o driver morrer 90s depois no botao Simular, com um
+        codigo que apontava para a tela errada (sim 20260904-153642).
+        """
+        if self._autorizacao_marcada(page):
+            return
+        tentativas = (
+            lambda: page.get_by_role(
+                "checkbox", name=re.compile(r"Autorizo a Fontecred", re.I)
+            ).first.check(timeout=min(self.timeout_ms, 5_000)),
+            lambda: page.get_by_text(
+                re.compile(r"Autorizo a Fontecred", re.I)
+            ).first.click(timeout=min(self.timeout_ms, 5_000)),
+            lambda: page.locator(
+                "input[type='checkbox']"
+            ).first.check(timeout=min(self.timeout_ms, 5_000), force=True),
+        )
+        for tentativa in tentativas:
+            try:
+                tentativa()
+                page.wait_for_timeout(300)
+                if self._autorizacao_marcada(page):
+                    return
+            except Exception:
+                continue
+        raise ErroTransitorio(
+            "autorizacao_scr_nao_marcada",
+            "checkbox de autorizacao LGPD/SCR nao ficou marcado; o portal recusa o Simular",
+        )
 
     def _selecionar_prazo(self, page, prazo: int) -> None:
         """Prazo pode ser <select> nativo ou combobox pesquisável (select2)."""

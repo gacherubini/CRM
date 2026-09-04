@@ -176,3 +176,75 @@ Commits do endurecimento:
 - Fan-out por banco e workers sob demanda continuam planejados, não implementados.
 - `storage_state` ainda depende do volume da Machine; object storage privado é necessário antes de
   escalar para múltiplos workers.
+
+---
+
+## Rodada de 2026-09-04 — três quebras empilhadas no mesmo driver
+
+> Driver voltou a **OK** (53s, prazos 24/36/48). Achados de uma corrida local headed com
+> `scripts/probe_todos.py`. Cada correção revelava a próxima falha: o driver seguia adiante
+> sem verificar nada, então só o último passo reclamava.
+
+### 1. O título do modal é `COMUNICADO`, singular, na tela de proposta
+
+O regex era `^\s*COMUNICADOS\s*$` — plural, ancorado. No dashboard casa; em
+`clientes/criarComProposta` o portal escreve **COMUNICADO**. Resultado: `_comunicados_visivel`
+devolvia `False`, o driver registrava "comunicados fechados" sem ter clicado em nada, navegava
+para a proposta e batia no overlay ao clicar no CPF. O código que saía era
+`nova_proposta_falhou`, apontando para uma tela que tinha carregado normalmente.
+
+Agora existe a constante `COMUNICADO_TITULO = r"^\s*COMUNICADOS?\s*$"`, usada nos quatro pontos
+que antes repetiam o regex, e o modal é fechado **também** dentro de `_passo_nova_proposta`
+(espera curta de 2,5s) — não só depois do login.
+
+### 2. Placa com mais de uma versão abre um segundo modal
+
+`FUV7G58` casa com três Yamaha FZ25 250 FAZER de FIPE diferente (827107-0, 827116-0, 827117-8),
+e o portal abre **"Selecione o modelo correto para esta placa"** com um botão `Selecionar` por
+linha. O driver não conhecia essa tela.
+
+Regra aplicada: **primeira versão da lista**, a mesma que o dono já tinha definido para o
+Bradesco (`bradesco.py:648`). Vale saber que as três têm FIPE diferente, então valor e parcela
+mudam conforme a escolha — para placa de teste tanto faz, em produção é o valor do bem.
+
+### 3. O sinal de "veículo resolvido" é `select#produto`, não um clique que não deu erro
+
+O caminho antigo clicava na primeira "linha com botão" (`get_by_role("row")`) e tratava exceção
+como `veiculo_nao_resolvido`. Essa lista de linhas **era o modal**. Depois que o modal passou a
+ser tratado, sobram zero linhas, e o driver acusava `veiculo_nao_resolvido` com marca, ano e
+produto já preenchidos na tela.
+
+DOM real depois da placa resolver:
+
+    #type_product   value='1'      sel='Moto'
+    #used_product   value='0'      sel='Não'      (label "Veículo 0KM:")
+    #brand          value='YAMAHA'
+    #year_model     value='2021'
+    #produto        value='8049'   sel='FZ25 250 FAZER FLEX'
+    rows com botão: 0
+
+`_confirmar_produto_resolvido` agora lê `#produto`. **`get_by_label("Selecione um produto")`
+devolve string vazia** — o rótulo não está associado ao input, então esse caminho nunca serviria.
+
+### 4. O checkbox LGPD/SCR nunca era marcado
+
+O regex procurava `autoriza a consulta`. O texto do portal é *"**Autorizo** a Fontecred a
+**consultar** e tratar meus dados em bases de crédito, inclusive SCR…"*. Nunca casou — e a
+tentativa estava dentro de `except: pass`, num campo que é obrigação legal. O portal recusava o
+Simular com o balão *"Marque esta caixa se deseja continuar"*, e o driver morria 90s depois no
+botão, com código apontando para a tela errada.
+
+`_marcar_autorizacao` tenta três estratégias e **confirma pelo `.checked` real**, achando o input
+pelo texto ao redor (`i.closest('label')`), já que o rótulo não está associado. Sem confirmação,
+falha com `autorizacao_scr_nao_marcada`.
+
+### O que os quatro têm em comum
+
+Nenhum passo lia de volta o que tinha escrito. `_passo_financiamento` rodou inteiro contra uma
+tela bloqueada e registrou `dados_preenchidos` com o campo de valor vazio e o erro vermelho na
+cara. É o padrão do commit `4879c47` (Bradesco, julho/2026), que na época não foi varrido nos
+outros drivers. Hoje cada etapa lê de volta: `valor_venda_nao_aplicou`,
+`modelo_placa_nao_escolhido`, `autorizacao_scr_nao_marcada`, `comunicados_nao_fechou`.
+
+Efeito colateral bom: o trecho `proposta_aberta → dados_preenchidos` caiu de **188s para 10s**.
+A lentidão era o modal segurando cada `wait_for` até o timeout.

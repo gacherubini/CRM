@@ -105,3 +105,70 @@ por extenso. Testado ao vivo com RJ.
 4. Espera final **por condição** (estabiliza + sinal de conclusão), nunca sleep longo.
 5. Ligar um **dump de debug** do texto lido cedo — economiza horas de adivinhação.
 6. `networkidle` é armadilha em portais com chat/analytics.
+
+---
+
+## Rodada de 2026-09-04 — modal de agente/operador e o clipping que mente
+
+> Driver voltou a **OK** (41s). Extensão direta da lição central acima: o problema continua
+> sendo o web component `mahoe`, agora no `mahoe-select` e no `mahoe-modal`.
+
+### O modal "Configure seu agente certificado e operador"
+
+Depois do login o go!PAN pede agente certificado e operador. O driver não conhecia essa tela e
+morria em `campo_nao_encontrado` dizendo *"campo Celular do cliente não encontrado"* — o campo
+existia, estava atrás do overlay. Terceiro caso do dia em que o `codigo_erro` culpou a tela errada.
+
+Ao contrário do resto do portal, estes campos **têm `id` estável**:
+
+    mahoe-select#certifiedAgent      input#certifiedAgent-value      #certifiedAgent-listbox
+    mahoe-select#commercialOperator  input#commercialOperator-value  #commercialOperator-listbox
+
+O `<input>` é `readonly role="combobox"`; o listbox só renderiza depois do clique (enumerar antes
+devolve zero opções). Opções são `div.combo-option[role=option]`, a atual com `option-current` +
+`aria-selected="true"`. Botão de confirmar: `Salvar`.
+
+### O portal trunca o texto da opção em 20 caracteres
+
+`Bruna Cristina Mulle`, `DANIEL RICARDO SILVE`, `Patricia Gomide Buen`. Comparação exata de nome
+falha nos dois sentidos, então `_escolher_no_combo` casa por **prefixo em ambas as direções** e
+lê o valor de volta em `input_value()`.
+
+Dois candidatos param com `pan_agente_ambiguo` em vez de escolher. Agente e operador definem a
+quem a proposta é atribuída; escolher no chute é prejuízo comercial silencioso, do tipo que
+ninguém descobre por meses.
+
+Os nomes vivem em `config.PAN_AGENTE_CERTIFICADO` / `config.PAN_OPERADOR`
+(`MOTOR_PAN_AGENTE_CERTIFICADO`, `MOTOR_PAN_OPERADOR`), vazios por padrão — o Motor serve várias
+lojas, então nome de pessoa não entra no código. Vazio mantém o pré-selecionado do portal.
+
+### `is_visible()` não enxerga clipping — mediu errado, clicou no vazio
+
+Diagnóstico que custou uma hipótese errada. Eu supus overlay por cima; o DOM mostrou outra coisa:
+
+    #certifiedAgent-value → rect y=869  (viewport 768)
+    elementFromPoint(centro) → null
+    ancestral .mahoe-modal__dialog → position:fixed  overflow:hidden  height:0
+
+O diálogo **fica no DOM quando fechado**, com altura zero e overflow escondido. O conteúdo mantém
+geometria própria, por isso o título responde `is_visible() == True`, mas está recortado.
+Playwright checa display/visibility/opacity/bounding box e **não analisa clipping por ancestral**.
+`scrollIntoView` também não resolve: a altura do ancestral é zero.
+
+`_modal_agente_aberto` mede a altura do `.mahoe-modal__dialog` via `evaluate`. É o único sinal que
+separa aberto de fechado.
+
+### Sessão quente muda o comportamento do modal
+
+Com `storage_state` salvo o portal **não** abre o modal; com sessão fria abre. A primeira rodada
+do dia passava e a segunda não. Por isso `_abrir_modal_agente` abre pelo botão **"Agente e
+operador"** do cabeçalho, que existe sempre, em vez de esperar. Se o botão não abrir o diálogo,
+falha com `pan_modal_agente_nao_abriu`.
+
+Vale para qualquer portal com `MOTOR_WARM_SESSION=1`: um teste que passa com sessão fria não
+prova nada sobre a quente, e vice-versa.
+
+### Em aberto: o Pan devolve só o prazo 48
+
+Pedindo 24/36/48 volta uma oferta só (48x). Fontecred, Bradesco e Santander devolvem as três na
+mesma rodada. Pode ser o portal, pode ser o parser — não investigado em 04/09.
