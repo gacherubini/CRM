@@ -113,3 +113,19 @@ Mexeu em rota, modelo, worker, migration ou flag? Regere o mapa e commite junto
 com o código: `cd .claude/skills/revy-research && python gerar_mapa.py` (Windows)
 ou `python3 gerar_mapa.py` (macOS).
 Algo te surpreendeu? Escreva um learning — procurando duplicata pelo gatilho antes.
+
+## Agent skills
+
+As skills de engenharia do plugin `mattpocock-skills` leem estes três arquivos.
+
+### Issue tracker
+
+Issues vivem no GitHub (`gacherubini/CRM`), via `gh` CLI. Ver `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Os cinco labels canônicos, sem renomear. Ver `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Contexto único: `CONTEXT.md` na raiz + `docs/adr/`. Ver `docs/agents/domain.md`.
