@@ -365,6 +365,25 @@ class MotrixDriver(PlaywrightBankDriver):
             )
         return campo
 
+    def _aguardar_condicao(
+        self, page, condicao, timeout_ms: int, intervalo_ms: int = 250
+    ) -> bool:
+        """Espera a condicao em vez de dormir um numero fixo.
+
+        Nao levanta: quem chama ja tem checagem propria com erro legivel, e
+        transformar "ainda nao apareceu" em excecao aqui trocaria um codigo de
+        erro util por um generico. Devolve se a condicao deu certo no prazo.
+        """
+        tentativas = max(1, int(timeout_ms // max(intervalo_ms, 1)))
+        for _ in range(tentativas):
+            try:
+                if condicao():
+                    return True
+            except Exception:
+                pass  # locator que ainda nao existe e "ainda nao", nao falha
+            page.wait_for_timeout(intervalo_ms)
+        return False
+
     def _passo_login(self, page, usuario: str, senha: str) -> None:
         page.goto(self.login_url, wait_until="domcontentloaded", timeout=self.timeout_ms)
         page.wait_for_timeout(3_000)
@@ -386,7 +405,11 @@ class MotrixDriver(PlaywrightBankDriver):
         # O botão diz "Login" e não tem type=submit; procurar "Entrar" só gera
         # timeout num botão que nunca existiu.
         page.get_by_role("button", name="Login", exact=True).first.click()
-        page.wait_for_timeout(10_000)
+        # Espera o portal sair do sign-in em vez de dormir 10s: o login leva ~2s
+        # com sessao quente. Se ele recusar, a checagem logo abaixo e que decide.
+        self._aguardar_condicao(
+            page, lambda: "sign-in" not in (page.url or ""), 12_000
+        )
 
         if "sign-in" in page.url:
             texto = page.inner_text("body")[:2_000]
@@ -405,7 +428,9 @@ class MotrixDriver(PlaywrightBankDriver):
 
     def _passo_abrir_produto(self, page) -> None:
         page.goto(self.menu_url, wait_until="domcontentloaded", timeout=self.timeout_ms)
-        page.wait_for_timeout(4_000)
+        self._aguardar_condicao(
+            page, lambda: page.get_by_text(PRODUTO_CARD).first.count() > 0, 15_000
+        )
         card = page.get_by_text(PRODUTO_CARD).first
         if not card.count():
             raise ErroTransitorio(
@@ -413,7 +438,10 @@ class MotrixDriver(PlaywrightBankDriver):
                 "card 'Simulação de Financiamento Veicular' não apareceu no menu",
             )
         card.click()
-        page.wait_for_timeout(6_000)
+        # O wizard so serve para alguma coisa quando o campo de CPF existe.
+        self._aguardar_condicao(
+            page, lambda: self._campo(page, "cpf") is not None, 20_000
+        )
 
     def _passo_consulta_cpf(
         self, page, sol: SolicitacaoSimulacao, ctx: DriverContext | None
@@ -459,7 +487,16 @@ class MotrixDriver(PlaywrightBankDriver):
         proximo = page.get_by_role("button", name=re.compile(r"Pr[óo]ximo", re.I)).first
         self._aguardar_habilitado(proximo, "proximo_passo1")
         proximo.click()
-        page.wait_for_timeout(8_000)
+        # Passo 2 chegou quando o modal do veiculo esta la, ou quando sobrou o
+        # botao que o abre. Sao as duas portas que `_passo_veiculo` conhece.
+        self._aguardar_condicao(
+            page,
+            lambda: self._campo(page, "tipo do ve", "select") is not None
+            or page.get_by_role(
+                "button", name=re.compile(r"Adicionar Simula", re.I)
+            ).first.count() > 0,
+            20_000,
+        )
 
     def _passo_veiculo(
         self, page, sol: SolicitacaoSimulacao, ctx: DriverContext | None
@@ -471,16 +508,29 @@ class MotrixDriver(PlaywrightBankDriver):
             ).first
             if adicionar.count():
                 adicionar.click()
-                page.wait_for_timeout(5_000)
+                self._aguardar_condicao(
+                    page,
+                    lambda: self._campo(page, "tipo do ve", "select") is not None,
+                    15_000,
+                )
 
         tipo = self._campo(page, "tipo do ve", "select")
         if tipo is None:
             raise self._falha_campo("tipo do veículo")
         # Placa só existe em "Usado" — em "Novo" o campo nem é renderizado.
         tipo.click()
-        page.wait_for_timeout(1_500)
+        self._aguardar_condicao(
+            page,
+            lambda: page.get_by_role("option", name="Usado", exact=True).first.count()
+            > 0,
+            10_000,
+        )
         page.get_by_role("option", name="Usado", exact=True).first.click()
-        page.wait_for_timeout(4_000)
+        # "Usado" e o que faz o campo Placa ser renderizado; esperar por ele e
+        # esperar a coisa certa.
+        self._aguardar_condicao(
+            page, lambda: self._campo(page, "placa") is not None, 15_000
+        )
 
         placa = (sol.veiculo.placa or "").strip().upper().replace("-", "")
         self._preencher(page, "placa", placa)

@@ -259,3 +259,46 @@ def test_motrix_nao_usa_browser_alem_do_teto():
 def test_pedido_de_prazo_fora_da_faixa_nao_e_lido_como_oferta():
     assert parse_ofertas("2021 x R$ 100,00") == []
     assert parse_ofertas("72x R$ 100,00") == []
+
+
+# --- espera por condicao ---------------------------------------------------
+
+
+def test_aguardar_condicao_volta_assim_que_a_condicao_da_certo():
+    """13 esperas fixas somavam 49s no Motrix, o pior do repo. Dormir um numero
+    e apostar no pior caso toda vez; esperar a condicao paga so o que custou."""
+    driver = MotrixDriver()
+    page = MagicMock()
+    chamadas = []
+
+    def condicao():
+        chamadas.append(1)
+        return len(chamadas) >= 3
+
+    assert driver._aguardar_condicao(page, condicao, 10_000, intervalo_ms=10) is True
+    assert len(chamadas) == 3
+    # Dormiu 2 intervalos curtos, nao os 10s.
+    assert page.wait_for_timeout.call_count == 2
+
+
+def test_aguardar_condicao_desiste_sem_levantar():
+    """Quem chama tem checagem propria com erro legivel; o esperador nao decide."""
+    driver = MotrixDriver()
+    page = MagicMock()
+
+    assert driver._aguardar_condicao(page, lambda: False, 100, intervalo_ms=10) is False
+
+
+def test_aguardar_condicao_ignora_excecao_da_condicao():
+    """Locator que ainda nao existe levanta; isso e "ainda nao", nao falha."""
+    driver = MotrixDriver()
+    page = MagicMock()
+    tentativas = []
+
+    def condicao():
+        tentativas.append(1)
+        if len(tentativas) < 2:
+            raise RuntimeError("elemento ainda nao existe")
+        return True
+
+    assert driver._aguardar_condicao(page, condicao, 10_000, intervalo_ms=10) is True
