@@ -45,6 +45,14 @@ primary_region = "iad"
   # Portal NÃO processa CAPI/spend; publica vendas pelo outbox Portal -> Revy.
   PORTAL_CAPI_RETRY_ENABLED = "0"
   PORTAL_META_SPEND_SYNC_ENABLED = "0"
+  # Embedded Signup do WhatsApp (Modo 2). Os dois sao publicos: viajam para o
+  # navegador do lojista dentro do FB.init/FB.login, na tela de decisao da Loja.
+  # PORTAL_META_APP_ID tem de ser o MESMO de CHATBOT_META_APP_ID: divergindo, o
+  # popup abre com um app e o `code` e trocado com outro, e a Meta recusa calada.
+  # O config_id saiu da configuracao v4 do Login for Business, criada em 07/09/2026
+  # depois do App Review aprovar whatsapp_business_messaging e _management.
+  PORTAL_META_APP_ID = "1370395535203964"
+  PORTAL_META_CONFIG_ID = "1092096256576691"
   # Revy Tráfego assume workers (força PORTAL_*=1 só no processo :9010).
   REVY_TRAFEGO_CAPI_WORKER = "1"
   REVY_TRAFEGO_META_SPEND_SYNC_ENABLED = "1"
