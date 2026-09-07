@@ -215,3 +215,25 @@ def test_espera_de_ofertas_usa_o_botao_da_config(monkeypatch):
 
     assert ei.value.codigo == "portal_falhou"
     assert decorrido < 30, f"esperou {decorrido:.0f}s — ignorou a config"
+
+
+def test_login_do_santander_nao_bloqueia_em_networkidle():
+    """96s dos 136s da rodada 20260907-002428 foram o login, e o driver so tem
+    4,8s de espera fixa — nao era sleep, era o `goto(wait_until="networkidle")`.
+
+    `timeout_ms` do Santander e `BROWSER_TIMEOUT_MS` = 90_000. Portal com Akamai
+    e Angular mantem conexao aberta, networkidle nunca estabiliza e o goto queima
+    os 90s antes de cair no fallback. O Pan ja tinha aprendido isso
+    (`pan_portal.py:407`): domcontentloaded e espera-se o campo de login.
+    """
+    import contextlib
+
+    driver = SantanderDriver(timeout_ms=90_000)
+    page = MagicMock()
+    with contextlib.suppress(Exception):
+        driver._passo_login(page, "47100000000", "senha")
+
+    esperas = [c.kwargs.get("wait_until") for c in page.goto.call_args_list]
+    assert esperas, "o login nem navegou"
+    assert "networkidle" not in esperas
+    assert esperas[0] == "domcontentloaded"

@@ -389,8 +389,12 @@ class BradescoDriver(PlaywrightBankDriver):
         url = self.login_url
         if url.startswith("http://"):
             url = "https://" + url[len("http://") :]
+        # domcontentloaded, nao networkidle: o portal mantem conexao aberta e o
+        # goto queimava `timeout_ms` (90s) antes de seguir — foi o que custou 96s
+        # de login no Santander (rodada 20260907-002428). Sessao quente continua
+        # sendo decidida por `_portal_autenticado` logo abaixo.
         try:
-            page.goto(url, wait_until="networkidle", timeout=self.timeout_ms)
+            page.goto(url, wait_until="domcontentloaded", timeout=self.timeout_ms)
         except Exception:
             # Storage state valido pode redirecionar direto ao portal autenticado;
             # networkidle expira mas a sessao ja esta pronta.

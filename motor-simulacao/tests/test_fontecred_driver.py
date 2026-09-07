@@ -297,18 +297,21 @@ def test_pos_login_aguarda_dashboard_e_dom_pronto():
     )
 
 
-def test_login_reutiliza_sessao_autenticada_apos_timeout_networkidle():
+def test_login_reutiliza_sessao_autenticada_quando_o_goto_estoura():
+    """Sessao quente redireciona /login para o Dashboard; se o goto estourar, o
+    driver nao pode sair procurando campo de e-mail. O `wait_until` deixou de ser
+    networkidle em 07/09 (queimava 90s), mas este caminho continua valendo."""
     driver = FontecredDriver(timeout_ms=20_000)
     page = MagicMock()
     page.url = "https://app.fontecred.com.br/login#step-1"
-    page.goto.side_effect = RuntimeError("networkidle timeout")
+    page.goto.side_effect = RuntimeError("goto timeout")
     page.get_by_text.return_value.first.is_visible.return_value = True
 
     driver._passo_login(page, "nao-deve-usar", "nao-deve-usar")
 
     page.goto.assert_called_once_with(
         "https://app.fontecred.com.br/login#step-1",
-        wait_until="networkidle",
+        wait_until="domcontentloaded",
         timeout=20_000,
     )
     page.get_by_role.assert_not_called()
@@ -491,3 +494,24 @@ def test_autorizacao_marcada_na_segunda_tentativa():
     driver._marcar_autorizacao(page)
 
     page.get_by_text.return_value.first.click.assert_called_once()
+
+
+def test_login_do_fontecred_nao_bloqueia_em_networkidle():
+    """Mesma bomba que custou 90s no Santander (`santander.py:441`).
+
+    O proprio comentario do driver dizia que com sessao quente "o portal mantem
+    conexoes abertas, networkidle expira" — ou seja, o caminho COMUM em producao
+    paga `timeout_ms` inteiro (BROWSER_TIMEOUT_MS = 90_000) antes de seguir. Hoje
+    loga em 5s por sorte, nao por desenho. O `_portal_autenticado` que decide
+    sessao quente ja roda no caminho principal, depois do try.
+    """
+    import contextlib
+
+    driver = FontecredDriver(timeout_ms=90_000)
+    page = MagicMock()
+    with contextlib.suppress(Exception):
+        driver._passo_login(page, "loja@exemplo.com", "senha")
+
+    esperas = [c.kwargs.get("wait_until") for c in page.goto.call_args_list]
+    assert esperas, "o login nem navegou"
+    assert "networkidle" not in esperas

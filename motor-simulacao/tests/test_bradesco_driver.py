@@ -424,3 +424,20 @@ def test_passo_login_espera_grecaptcha_antes_de_entrar():
         arg0 = call.args[0] if call.args else ""
         scripts.append(arg0 if isinstance(arg0, str) else str(arg0))
     assert any("grecaptcha" in s for s in scripts), scripts
+
+
+def test_login_do_bradesco_nao_bloqueia_em_networkidle():
+    """Mesma bomba de 90s que o Santander pagava (`santander.py:441`): o driver
+    documenta que com sessao quente "networkidle expira", e nesse caminho gasta
+    `timeout_ms` inteiro antes de seguir. `_portal_autenticado` ja decide sessao
+    quente no caminho principal, depois do try."""
+    import contextlib
+
+    driver = BradescoDriver(timeout_ms=90_000)
+    page = MagicMock()
+    with contextlib.suppress(Exception):
+        driver._passo_login(page, "47100000000", "senha")
+
+    esperas = [c.kwargs.get("wait_until") for c in page.goto.call_args_list]
+    assert esperas, "o login nem navegou"
+    assert "networkidle" not in esperas

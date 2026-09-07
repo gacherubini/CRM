@@ -436,11 +436,16 @@ class SantanderDriver(PlaywrightBankDriver):
         url = self.login_url
         if url.startswith("http://"):
             url = "https://" + url[len("http://") :]
-        # networkidle costuma ajudar a passar desafios JS do WAF; fallback domcontentloaded.
+        # O portal (Akamai + Angular) mantem conexao aberta: networkidle nunca
+        # estabiliza e o goto queimava os 90s de BROWSER_TIMEOUT_MS antes de cair
+        # no fallback — 96s dos 136s da rodada 20260907-002428, com apenas 4,8s de
+        # espera fixa no driver inteiro. Mesma licao ja aplicada no Pan
+        # (`pan_portal.py:407`): carrega o DOM e espera o CAMPO de login, que e a
+        # condicao que interessa, em vez da rede ficar quieta.
         try:
-            page.goto(url, wait_until="networkidle", timeout=self.timeout_ms)
-        except Exception:
             page.goto(url, wait_until="domcontentloaded", timeout=self.timeout_ms)
+        except Exception:
+            pass
         # Pausa curta “humana” — bots disparam fill imediato.
         page.wait_for_timeout(800)
         self._assert_portal_acessivel(page)
