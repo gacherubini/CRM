@@ -1,3 +1,5 @@
+import json
+import re
 from decimal import Decimal
 from pathlib import Path
 from unittest.mock import MagicMock
@@ -13,9 +15,11 @@ from app.motor.drivers import (
     resolver_drivers,
 )
 from app.motor.motrix import (
+    JS_TEM_RESPOSTA,
     PROVEDOR,
     MotrixDriver,
     _formatar_moeda_input,
+    _resumo_painel,
     parse_moeda_br,
     parse_ofertas,
     parse_taxa,
@@ -124,10 +128,54 @@ def test_recusa_do_portal_vira_rejeicao_de_negocio():
     assert exc.value.codigo == "motrix_sem_oferta"
 
 
-def test_tela_sem_parcela_nao_vira_sucesso_vazio():
+def test_painel_ilegivel_nao_vira_recusa_de_credito():
+    """Painel sem a frase de recusa E sem parcela legivel = falha de leitura.
+
+    Reportar isso como `motrix_sem_oferta` esconde parser quebrado atras de uma
+    decisao de credito, e ninguem vai olhar. O parser de ofertas nunca viu texto
+    real (o portal recusou o cliente de teste em 04/09 e em 06/09), entao esta e
+    exatamente a falha que pode aparecer no primeiro cliente aprovado.
+    """
     driver = MotrixDriver(html_simulacao="Simulacao\nTabela R0\n")
-    with pytest.raises(RejeicaoNegocio):
+    with pytest.raises(IntervencaoNecessaria) as exc:
         driver.simular(_sol())
+    assert exc.value.codigo == "ofertas_ilegiveis"
+
+
+def test_painel_ilegivel_guarda_o_texto_para_diagnostico():
+    """Sem o texto no erro, o proximo agente repete o reconhecimento do zero."""
+    driver = MotrixDriver(html_simulacao="Simulacao\nParcelamento em 6 vezes\n")
+    with pytest.raises(IntervencaoNecessaria) as exc:
+        driver.simular(_sol())
+    assert "Parcelamento em 6 vezes" in str(exc.value)
+
+
+def test_resumo_do_painel_nao_carrega_o_cpf_do_cliente():
+    """O painel do passo 2 mostra "CPF 854.860.940-00" em Dados do Cliente, e o
+    docstring deste modulo promete nunca logar CPF. A mensagem de erro vai para
+    evento e log, entao o resumo mascara antes de sair."""
+    painel = "Dados do Cliente CPF 854.860.940-00 Telefone (51) 98033-6365 Tabela R0"
+    resumo = _resumo_painel(painel)
+    assert "854.860.940-00" not in resumo
+    assert "85486094000" not in resumo
+    assert "Tabela R0" in resumo, "mascarar nao pode comer o resto do painel"
+
+
+def test_espera_de_ofertas_usa_o_padrao_do_parser():
+    """A espera e o parser tem de concordar, senao a tela "responde" cedo demais.
+
+    A espera antiga era `\\d{1,3}\\s*x`, sem o `(?<!\\d)` que o parser tem: ela
+    fecha em "Ano Modelo 2021 x" antes de a oferta renderizar, e o driver le um
+    painel vazio. Um padrao so, usado nos dois lugares.
+    """
+    bruto = re.search(r'new RegExp\((".*?")\s*,', JS_TEM_RESPOSTA)
+    assert bruto, "JS_TEM_RESPOSTA nao expoe mais um literal de regex legivel"
+    padrao = re.compile(json.loads(bruto.group(1)), re.I)
+
+    assert padrao.search("48x R$ 995,69"), "espera nao reconhece uma oferta real"
+    assert padrao.search("Não há oferta de crédito disponível para este cliente")
+    assert not padrao.search("Ano Modelo 2021 x"), "espera fecha antes da oferta"
+    assert not padrao.search("Simulação de Financiamento Veicular 950009 x")
 
 
 def test_prazo_ofertado_diferente_do_pedido_e_rejeicao_explicita():

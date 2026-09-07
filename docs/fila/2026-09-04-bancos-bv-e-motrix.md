@@ -10,6 +10,27 @@
 >   portal recusa o cliente de teste (`motrix_sem_oferta`), com entrada 0 e com R$ 6.000.
 >   Falta **um CPF que o Motrix aprove** para ver parcela e fixar o parser contra captura
 >   real em vez de texto sintético.
+>
+> **Correção de 06/09 — a causa escrita acima estava sem prova.** A recusa é
+> `POST /loan-vehicle-simulations/calculation → 200 []`, lista vazia sem motivo nenhum no
+> corpo. Derrubado por captura: **não é LTV** (112% e 75% recusam igual), **não é a máscara
+> da entrada** (`downPaymentValue` chega `5000.00`), **não é a regra R0** (sem limite de
+> valor ou prazo) e **não é conta sem crédito** (a loja fechou 3 propostas em 20, 21 e
+> 27/08 pela mesma R0, prazo 48, taxa ~5,1% a.m., financiado 17,4k–18,0k, uma delas com
+> entrada 0). "Cliente Elegível" do passo 1 é checagem cadastral, não aprovação: o
+> `person-validation` manda só CPF e celular. **E não é o tomador:** três CPFs diferentes,
+> todos elegíveis, todos `[]`, incluindo um perfil de 64 anos parecido com os aprovados; e
+> o CPF de teste recebeu oferta dos outros quatro bancos no mesmo dia. Sobra a conta ou o
+> funding do FIDC — pergunta para o gerente do Motrix, mesma prateleira do BV.
+> Detalhe em `learnings/2026-09-06-motrix-recusa-sem-motivo-e-200-com-lista-vazia.md`.
+>
+> Feito em 06/09 no código: `motrix_sem_oferta` deixou de cobrir dois casos diferentes.
+> Painel com a frase de recusa segue `RejeicaoNegocio`; painel sem recusa e sem parcela
+> legível agora é `IntervencaoNecessaria("ofertas_ilegiveis")` com o texto do painel (sem
+> CPF) na mensagem — o parser de ofertas ainda não viu oferta real, e essa é a falha que
+> pode aparecer no primeiro cliente aprovado. A espera do painel passou a usar o mesmo
+> padrão do parser, senão fechava em "Ano Modelo 2021 x" antes de a oferta renderizar.
+> Suíte 278 verdes (eram 275).
 > - **BV parado.** O passo 1 do card foi respondido — *não há API acessível a esta loja*
 >   (evidência no `motor-simulacao/README.md`, seção "Motrix e BV") — mas o login do
 >   portal foi **desativado** durante o reconhecimento, depois de três logins em dez

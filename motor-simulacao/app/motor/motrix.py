@@ -34,6 +34,7 @@ Nunca logar usuario, senha ou CPF.
 """
 from __future__ import annotations
 
+import json
 import re
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
@@ -64,6 +65,16 @@ _RE_PARCELA = re.compile(
     r"(?<!\d)(\d{1,3})\s*x\b[^0-9]{0,20}?(?:R\$\s*)?(\d[\d.]*,\d{2})", re.IGNORECASE
 )
 _RE_TAXA = re.compile(r"(\d{1,2},\d{2})\s*%\s*a\.?\s*m", re.IGNORECASE)
+
+# A espera do painel e o parser leem a MESMA tela. Se discordarem, a espera fecha
+# numa tela que o parser nao sabe ler: a versao anterior era `\d{1,3}\s*x`, sem o
+# `(?<!\d)`, e fechava em "Ano Modelo 2021 x" antes de a oferta renderizar. Os dois
+# padroes saem daqui para nao poderem divergir de novo.
+JS_TEM_RESPOSTA = (
+    "() => new RegExp("
+    + json.dumps(SEM_OFERTA.pattern + "|" + _RE_PARCELA.pattern)
+    + ", 'i').test(document.body.innerText)"
+)
 
 # Acha o input/select pelo rotulo do mat-form-field. Devolve um id estavel que a
 # gente mesmo carimba, porque mat-input-N muda de numero entre os passos.
@@ -118,6 +129,19 @@ def parse_taxa(texto: str) -> Decimal | None:
         return parse_moeda_br(achado.group(1))
     except ValueError:
         return None
+
+
+_RE_CPF = re.compile(r"\b\d{3}\.\d{3}\.\d{3}-\d{2}\b|\b\d{11}\b")
+
+
+def _resumo_painel(texto: str, limite: int = 600) -> str:
+    """Painel em uma linha, sem CPF, para caber na mensagem de erro.
+
+    O painel do passo 2 traz Dados do Cliente. Esta mensagem vai para evento e
+    log, e o modulo promete no cabecalho nunca logar CPF.
+    """
+    achatado = " ".join((texto or "").split())
+    return _RE_CPF.sub("<cpf>", achatado)[:limite]
 
 
 def _formatar_moeda_input(valor: float) -> str:
@@ -199,7 +223,14 @@ class MotrixDriver(PlaywrightBankDriver):
             )
         ofertas = parse_ofertas(texto)
         if not ofertas:
-            raise RejeicaoNegocio("motrix_sem_oferta", "nenhuma parcela lida na tela")
+            # Painel sem a frase de recusa e sem parcela legivel nao e decisao de
+            # credito: e o parser nao entendendo a tela. Sair por `motrix_sem_oferta`
+            # aqui esconderia parser quebrado atras de "o banco negou", e o parser
+            # de ofertas ainda nao viu texto real de oferta nenhum.
+            raise IntervencaoNecessaria(
+                "ofertas_ilegiveis",
+                f"painel sem recusa e sem parcela legivel: {_resumo_painel(texto)}",
+            )
 
         pedidos = set(sol.condicoes.prazos_meses or [])
         taxa = parse_taxa(texto)
@@ -497,11 +528,7 @@ class MotrixDriver(PlaywrightBankDriver):
     def _passo_ler_ofertas(self, page, ctx: DriverContext | None) -> str:
         prazo = int(getattr(config, "OFERTAS_TIMEOUT_MS", 240_000))
         try:
-            page.wait_for_function(
-                "() => /N[ãa]o h[áa] oferta de cr[ée]dito|\\d{1,3}\\s*x/i"
-                ".test(document.body.innerText)",
-                timeout=prazo,
-            )
+            page.wait_for_function(JS_TEM_RESPOSTA, timeout=prazo)
         except Exception as exc:
             raise ErroTransitorio(
                 "ofertas_sem_resposta", "portal não devolveu oferta nem recusa"
