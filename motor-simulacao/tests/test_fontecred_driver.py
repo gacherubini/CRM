@@ -515,3 +515,28 @@ def test_login_do_fontecred_nao_bloqueia_em_networkidle():
     esperas = [c.kwargs.get("wait_until") for c in page.goto.call_args_list]
     assert esperas, "o login nem navegou"
     assert "networkidle" not in esperas
+
+
+def test_modal_de_placa_nao_gasta_10s_esperando_janela_que_nao_fecha():
+    """`_diag_tempos` de 07/09: `_resolver_modal_placa` levou 10,6s de 106s, e
+    quase tudo era o `wait_for(state="hidden", timeout=10_000)` — o portal deixa
+    a janela aberta de proposito, entao a espera longa e paga TODA rodada para
+    chegar na mesma conclusao. O produto escolhido decide; a janela e consultada
+    de passagem."""
+    driver = FontecredDriver(timeout_ms=90_000)
+    page = MagicMock()
+    titulo = page.get_by_text.return_value.first
+    titulo.wait_for.side_effect = [None, RuntimeError("nunca fecha")]
+    page.locator.return_value.first.input_value.return_value = "8049"
+
+    assert driver._resolver_modal_placa(page) is True
+
+    esperas_hidden = [
+        c.kwargs.get("timeout")
+        for c in titulo.wait_for.call_args_list
+        if c.kwargs.get("state") == "hidden"
+    ]
+    assert esperas_hidden, "nao esperou o fechamento de forma nenhuma"
+    assert max(esperas_hidden) <= 2_000, (
+        f"ainda bloqueia {max(esperas_hidden)}ms na janela em vez de olhar o produto"
+    )

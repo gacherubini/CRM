@@ -763,15 +763,24 @@ class FontecredDriver(PlaywrightBankDriver):
                 "Portal não resolveu o veículo pela placa informada.",
             )
 
-    def _produto_escolhido(self, page) -> bool:
+    def _produto_escolhido(self, page, timeout_ms: int | None = None) -> bool:
         """`select#produto` preenchido — a unica prova de que a placa resolveu."""
+        limite = timeout_ms if timeout_ms is not None else min(self.timeout_ms, 10_000)
         try:
-            produto = page.locator("#produto").first.input_value(
-                timeout=min(self.timeout_ms, 10_000)
-            )
+            produto = page.locator("#produto").first.input_value(timeout=limite)
         except Exception:
             produto = ""
         return bool((produto or "").strip())
+
+    def _aguardar_produto(self, page, timeout_ms: int, intervalo_ms: int = 250) -> bool:
+        """Poll curto no `#produto`: o portal preenche o campo alguns instantes
+        depois do clique, e o `input_value` longo transformaria cada olhada numa
+        espera de 10s."""
+        for _ in range(max(1, int(timeout_ms // max(intervalo_ms, 1)))):
+            if self._produto_escolhido(page, timeout_ms=intervalo_ms * 2):
+                return True
+            page.wait_for_timeout(intervalo_ms)
+        return False
 
     def _resolver_modal_placa(self, page) -> bool:
         """Escolhe a versão do veículo quando a placa casa com mais de um modelo.
@@ -794,14 +803,15 @@ class FontecredDriver(PlaywrightBankDriver):
         page.get_by_role(
             "button", name=re.compile(r"^\s*Selecionar\s*$", re.I)
         ).first.click(timeout=min(self.timeout_ms, 10_000))
+        # Espera curta pela janela: ela costuma NAO fechar (sim 20260907-001124,
+        # onde o formulario atras ja mostrava "FZ25 250 FAZER FLEX"). Bloquear
+        # 10s nela era pagar o pior caso toda rodada para chegar na mesma
+        # conclusao — 10,6s dos 106s no `_diag_tempos` de 07/09.
         try:
-            titulo.wait_for(state="hidden", timeout=min(self.timeout_ms, 10_000))
+            titulo.wait_for(state="hidden", timeout=min(self.timeout_ms, 1_500))
         except Exception as exc:
-            # O modal pode ficar na tela com a escolha ja aplicada: na sim
-            # 20260907-001124 o formulario atras mostrava "FZ25 250 FAZER FLEX"
-            # em Selecione um produto e o driver reprovou assim mesmo. Quem
-            # decide e o `select#produto`, nao a janela.
-            if not self._produto_escolhido(page):
+            # Quem decide e o `select#produto`, nao a janela.
+            if not self._aguardar_produto(page, 8_000):
                 raise ErroTransitorio(
                     "modelo_placa_nao_escolhido",
                     "modal de modelos da placa continuou aberto e nenhum produto "
