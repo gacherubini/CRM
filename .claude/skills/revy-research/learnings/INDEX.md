@@ -47,6 +47,8 @@ escrever migration com `batch_alter_table`.
 | investigar numero zerado numa tela da Loja | `2026-08-23-zero-na-tela-pode-ser-projecao-vazia.md` |
 | ligar lead a anuncio ou mexer em atribuicao CTWA | `2026-08-23-telefone-mascarado-de-4-digitos-colide.md` |
 | testar envio de convite ou de e-mail | `2026-08-23-backend-de-email-console-responde-200.md` |
+| simulacao de banco volta "sem oferta" e voce vai procurar bug no driver | `2026-09-06-motrix-recusa-sem-motivo-e-200-com-lista-vazia.md` |
+| driver de banco reprova um passo olhando o estado da janela em vez do campo | `2026-09-07-modal-aberto-nao-quer-dizer-passo-falhou.md` |
 | depurar driver Playwright de banco que termina em timeout | `2026-08-23-driver-playwright-engole-o-clique-que-falha.md` |
 | clique do Playwright estoura timeout num elemento que existe e parece visivel | `2026-09-04-is-visible-mente-com-modal-recortado.md` |
 | rodar os drivers de banco ao vivo na maquina local | `2026-09-04-probe-todos-roda-os-bancos-de-uma-vez.md` |

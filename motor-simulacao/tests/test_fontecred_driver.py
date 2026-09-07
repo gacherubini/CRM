@@ -195,6 +195,43 @@ def test_fechar_comunicados_falha_se_modal_persistir():
     page.keyboard.press.assert_called_once_with("Escape")
 
 
+def test_fechar_comunicados_tenta_o_x_generico_antes_de_desistir():
+    """O comunicado de 06/09 tinha arte e so um "x" no canto: nenhum dos seletores
+    Bootstrap pegou. A varredura por afordancia de fechar (texto x, aria/classe
+    close|fechar|dismiss) nao depende do markup daquele portal."""
+    driver = FontecredDriver()
+    page = MagicMock()
+    page.get_by_text.return_value.first.is_visible.return_value = True
+    page.get_by_role.return_value.first.click.side_effect = RuntimeError("sem botão")
+    page.locator.return_value.first.click.side_effect = RuntimeError("sem X")
+
+    with pytest.raises(ErroTransitorio):
+        driver._fechar_comunicados(page)
+
+    seletores = " ".join(str(c.args[0]) for c in page.locator.call_args_list)
+    assert "close" in seletores.lower()
+    assert "fechar" in seletores.lower()
+
+
+def test_comunicados_que_nao_fecham_levam_o_markup_no_erro():
+    """Sem markup no erro, a proxima ocorrencia custa outra rodada perdida — foi
+    exatamente o que aconteceu em 07/09: o comunicado e diario, sumiu antes do
+    diag, e o erro nao guardava nada sobre ele."""
+    driver = FontecredDriver()
+    page = MagicMock()
+    page.get_by_text.return_value.first.is_visible.return_value = True
+    page.get_by_role.return_value.first.click.side_effect = RuntimeError("sem botão")
+    page.locator.return_value.first.click.side_effect = RuntimeError("sem X")
+    page.evaluate.return_value = [
+        {"tag": "DIV", "cls": "comunicado-arte", "texto": "RETORNOS PENDENTE"}
+    ]
+
+    with pytest.raises(ErroTransitorio) as ei:
+        driver._fechar_comunicados(page)
+
+    assert "comunicado-arte" in str(ei.value)
+
+
 def test_comunicado_no_singular_tambem_e_detectado():
     """O portal usa COMUNICADO na tela de proposta e COMUNICADOS no dashboard.
 
@@ -370,6 +407,34 @@ def test_modal_de_placa_tratado_dispensa_a_linha_com_botao():
     page.get_by_role.return_value.first.click.return_value = None
 
     assert driver._resolver_modal_placa(page) is True
+
+
+def test_modal_que_nao_fecha_mas_escolheu_o_produto_segue_em_frente():
+    """Sim 20260907-001124: o "Selecionar" funcionou — o formulario atras ja
+    mostrava "FZ25 250 FAZER FLEX" em Selecione um produto — e o modal ficou
+    aberto assim mesmo. Exigir que o modal suma reprova uma escolha que deu
+    certo. O criterio e o mesmo do `_confirmar_produto_resolvido`: le o
+    `select#produto`, nao o estado da janela."""
+    driver = FontecredDriver(timeout_ms=20_000)
+    page = MagicMock()
+    titulo = page.get_by_text.return_value.first
+    titulo.wait_for.side_effect = [None, RuntimeError("modal continuou aberto")]
+    page.locator.return_value.first.input_value.return_value = "8049"
+
+    assert driver._resolver_modal_placa(page) is True
+
+
+def test_modal_que_nao_fecha_e_sem_produto_continua_falhando():
+    driver = FontecredDriver(timeout_ms=20_000)
+    page = MagicMock()
+    titulo = page.get_by_text.return_value.first
+    titulo.wait_for.side_effect = [None, RuntimeError("modal continuou aberto")]
+    page.locator.return_value.first.input_value.return_value = ""
+
+    with pytest.raises(ErroTransitorio) as ei:
+        driver._resolver_modal_placa(page)
+
+    assert ei.value.codigo == "modelo_placa_nao_escolhido"
 
 
 def test_placa_de_versao_unica_nao_abre_modal():

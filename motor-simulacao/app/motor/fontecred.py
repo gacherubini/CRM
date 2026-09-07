@@ -51,6 +51,35 @@ NOVA_PROPOSTA_URL = "https://app.fontecred.com.br/clientes/criarComProposta"
 # seguir em frente e bater no overlay ao clicar no CPF (sim 20260904-150259).
 COMUNICADO_TITULO = r"^\s*COMUNICADOS?\s*$"
 
+# Despejo do dialogo que resistiu a todos os fechamentos. Nao filtra por classe do
+# Bootstrap de proposito: a hipotese e que o modal problematico NAO seja um .modal.
+_DUMP_COMUNICADO = """() => {
+  const vis = (el) => {
+    const r = el.getBoundingClientRect();
+    const s = getComputedStyle(el);
+    return r.width > 40 && r.height > 40 && s.visibility !== 'hidden' &&
+           s.display !== 'none' && Number(s.opacity) > 0.05;
+  };
+  const cand = [...document.querySelectorAll(
+    '[role=dialog], dialog, [class*=modal], [class*=popup], [class*=comunicad]'
+  )].filter(vis);
+  const externos = cand.filter((el) => !cand.some((o) => o !== el && o.contains(el)));
+  return externos.slice(0, 3).map((el) => ({
+    tag: el.tagName,
+    cls: (el.className || '').toString().slice(0, 120),
+    id: el.id || null,
+    texto: (el.innerText || '').trim().slice(0, 120),
+    fechaveis: [...el.querySelectorAll('button, a, [role=button], span, i, svg')]
+      .filter(vis).slice(0, 8)
+      .map((b) => ({
+        tag: b.tagName,
+        texto: (b.innerText || '').trim().slice(0, 20),
+        cls: (b.className || '').toString().slice(0, 60),
+        aria: b.getAttribute('aria-label'),
+      })),
+  }));
+}"""
+
 # Placa que casa com mais de uma versao abre "Selecione o modelo correto para esta
 # placa" (ex.: FUV7G58 -> tres FZ25 250 FAZER com FIPE diferente). Enquanto o modal
 # fica aberto, TODO o resto do formulario falha calado.
@@ -568,6 +597,15 @@ class FontecredDriver(PlaywrightBankDriver):
                 ".modal .btn-close, .modal [data-bs-dismiss='modal'], "
                 ".modal button.close, .modal [data-dismiss='modal']"
             ).first.click(timeout=3_000, force=True),
+            # O comunicado de 06/09 tinha arte e so um "x" no canto: nenhum dos
+            # seletores Bootstrap acima pegou nele. Esta varredura procura a
+            # afordancia de fechar por classe/aria, sem depender do markup.
+            lambda: page.locator(
+                "[role=dialog] [aria-label*='ech' i], [role=dialog] [aria-label*='lose' i], "
+                "[class*=modal] [class*=close], [class*=modal] [class*=fechar], "
+                "[class*=modal] [class*=dismiss], [class*=popup] [class*=close], "
+                "[class*=popup] [class*=fechar]"
+            ).first.click(timeout=3_000, force=True),
             lambda: page.keyboard.press("Escape"),
         ):
             try:
@@ -583,8 +621,21 @@ class FontecredDriver(PlaywrightBankDriver):
                 continue
         raise ErroTransitorio(
             "comunicados_nao_fechou",
-            "modal de comunicados permaneceu aberto após o login",
+            "modal de comunicados permaneceu aberto após o login; "
+            f"markup: {self._descrever_comunicado(page)}",
         )
+
+    def _descrever_comunicado(self, page, limite: int = 700) -> str:
+        """Markup do modal que resistiu, para o erro valer como diagnostico.
+
+        O comunicado e diario: quando alguem for investigar, ele ja sumiu da tela.
+        Em 07/09 foi assim — o diag rodou e achou zero modal. Sem este dump, cada
+        ocorrencia custa um dia de espera e um login."""
+        try:
+            achado = page.evaluate(_DUMP_COMUNICADO)
+        except Exception as exc:  # nunca deixar o dump derrubar o erro de verdade
+            return f"<dump falhou: {type(exc).__name__}>"
+        return str(achado)[:limite]
 
     def _comunicados_visivel(self, page) -> bool:
         try:
@@ -702,17 +753,21 @@ class FontecredDriver(PlaywrightBankDriver):
         `veiculo_nao_resolvido` com marca, ano e produto já preenchidos na tela
         (sim 20260904-152805).
         """
+        if not self._produto_escolhido(page):
+            raise ErroTransitorio(
+                "veiculo_nao_resolvido",
+                "Portal não resolveu o veículo pela placa informada.",
+            )
+
+    def _produto_escolhido(self, page) -> bool:
+        """`select#produto` preenchido — a unica prova de que a placa resolveu."""
         try:
             produto = page.locator("#produto").first.input_value(
                 timeout=min(self.timeout_ms, 10_000)
             )
         except Exception:
             produto = ""
-        if not (produto or "").strip():
-            raise ErroTransitorio(
-                "veiculo_nao_resolvido",
-                "Portal não resolveu o veículo pela placa informada.",
-            )
+        return bool((produto or "").strip())
 
     def _resolver_modal_placa(self, page) -> bool:
         """Escolhe a versão do veículo quando a placa casa com mais de um modelo.
@@ -738,10 +793,22 @@ class FontecredDriver(PlaywrightBankDriver):
         try:
             titulo.wait_for(state="hidden", timeout=min(self.timeout_ms, 10_000))
         except Exception as exc:
-            raise ErroTransitorio(
-                "modelo_placa_nao_escolhido",
-                "modal de modelos da placa continuou aberto apos escolher a versao",
-            ) from exc
+            # O modal pode ficar na tela com a escolha ja aplicada: na sim
+            # 20260907-001124 o formulario atras mostrava "FZ25 250 FAZER FLEX"
+            # em Selecione um produto e o driver reprovou assim mesmo. Quem
+            # decide e o `select#produto`, nao a janela.
+            if not self._produto_escolhido(page):
+                raise ErroTransitorio(
+                    "modelo_placa_nao_escolhido",
+                    "modal de modelos da placa continuou aberto e nenhum produto "
+                    "foi escolhido",
+                ) from exc
+            # Escolheu, mas a janela sobrou: ela vira overlay e esvazia os campos
+            # do financiamento mais adiante (sim 20260904-151456).
+            try:
+                page.keyboard.press("Escape")
+            except Exception:
+                pass
         page.wait_for_timeout(500)
         return True
 
