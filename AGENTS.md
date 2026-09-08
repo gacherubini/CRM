@@ -33,6 +33,9 @@ você está relendo o monorepo — volte ao card da tarefa.
 Integração **só** por HTTP/evento versionado. Sem import `app` entre produtos.
 Cada produto tem banco e migrations próprios.
 
+`skills/` não é produto: é ferramenta de agente, sem banco, sem deploy e sem
+consumidor. Regra própria em [`skills/README.md`](skills/README.md).
+
 WhatsApp: Evolution → n8n → Chatbot → Motor/Estoque; parcela **não** vai ao cliente pelo bot.
 Veículos: só Estoque. Venda: Loja → outbox → Control. Segredo bancário: só Motor.
 
