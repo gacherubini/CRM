@@ -1,0 +1,3 @@
+display_name: Production DB (read-only)
+short_description: Safely inspect PostgreSQL through named read-only aliases
+default_prompt: Inspect the requested PostgreSQL alias with a minimal read-only query.

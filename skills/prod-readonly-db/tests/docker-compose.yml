@@ -1,0 +1,22 @@
+name: prod-readonly-db-tests
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    ports:
+      - "55432:5432"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: integration-only
+      POSTGRES_DB: fixturedb
+    volumes:
+      - ./init:/docker-entrypoint-initdb.d:ro
+      - fixturedata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d fixturedb"]
+      interval: 2s
+      timeout: 2s
+      retries: 20
+
+volumes:
+  fixturedata:
