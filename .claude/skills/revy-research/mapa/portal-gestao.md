@@ -1,6 +1,6 @@
 # portal-gestao · 158 rotas · 26 modelos · 6 workers · 35 flags · 26 migrations · 63 templates
 
-Gerado de `0360f14`. NAO editar a mao — saida de `gerar_mapa.py`.
+Gerado de `7a63ecc`. NAO editar a mao — saida de `gerar_mapa.py`.
 Migration head: `0026_copiloto_sinal_destinatario`
 
 ## Rotas
@@ -17,45 +17,45 @@ Migration head: `0026_copiloto_sinal_destinatario`
 - `POST /app/loja/agente/configuracao/testar.json` — app/loja/routes.py:1186
 - `POST /app/loja/agente/configuracao/publicar` — app/loja/routes.py:1229
 - `POST /app/loja/agente/configuracao/restaurar` — app/loja/routes.py:1251
-- `GET /health/live` — app/main.py:535
-- `GET /health/ready` — app/main.py:540
-- `GET /public/v1/lojas/{loja_slug}/pixel` — app/main.py:549
-- `GET /` — app/main.py:584
-- `GET /login` — app/main.py:589
-- `POST /login` — app/main.py:596
-- `POST /logout` — app/main.py:617
-- `GET /conta/senha` — app/main.py:624
-- `POST /conta/senha` — app/main.py:633
-- `GET /app` — app/main.py:670
-- `GET /app/estoque` — app/main.py:799
-- `GET /app/estoque/novo` — app/main.py:838
-- `GET /app/operacao/numeros` — app/main.py:909
-- `POST /app/operacao/grupo` — app/main.py:939
-- `POST /app/operacao/numeros` — app/main.py:964
-- `POST /app/operacao/numeros/remover` — app/main.py:988
-- `POST /app/estoque/novo` — app/main.py:1011
-- `GET /app/estoque/{veiculo_id}` — app/main.py:1038
-- `POST /app/estoque/{veiculo_id}` — app/main.py:1069
-- `POST /app/estoque/{veiculo_id}/{acao}` — app/main.py:1097
-- `GET /app/leads` — app/main.py:1144
-- `GET /app/leads/{lead_id}` — app/main.py:1172
-- `POST /app/leads/{lead_id}/etapa` — app/main.py:1208
-- `GET /app/conversas` — app/main.py:1267
-- `GET /app/conversas/{telefone}` — app/main.py:1294
-- `POST /app/conversas/{telefone}/handoff` — app/main.py:1387
-- `GET /app/vendas` — app/main.py:1492
-- `GET /app/vendas/nova` — app/main.py:1532
-- `POST /app/vendas/nova` — app/main.py:1549
-- `POST /app/vendas/{venda_id}/confirmar` — app/main.py:1950
-- `POST /app/vendas/{venda_id}/cancelar` — app/main.py:1968
-- `GET /app/vendedor` — app/main.py:1980
-- `GET /app/funil` — app/main.py:2091
-- `GET /app/funil/dados` — app/main.py:2167
-- `GET /app/financeiro` — app/main.py:2204
-- `GET /app/financeiras` — app/main.py:2281
-- `POST /app/financeiras/{nome}` — app/main.py:2338
-- `POST /app/financeiras/{nome}/testar` — app/main.py:2441
-- `GET /app/configuracoes` — app/main.py:2552
+- `GET /health/live` — app/main.py:538
+- `GET /health/ready` — app/main.py:543
+- `GET /public/v1/lojas/{loja_slug}/pixel` — app/main.py:552
+- `GET /` — app/main.py:587
+- `GET /login` — app/main.py:592
+- `POST /login` — app/main.py:599
+- `POST /logout` — app/main.py:620
+- `GET /conta/senha` — app/main.py:627
+- `POST /conta/senha` — app/main.py:636
+- `GET /app` — app/main.py:673
+- `GET /app/estoque` — app/main.py:802
+- `GET /app/estoque/novo` — app/main.py:841
+- `GET /app/operacao/numeros` — app/main.py:925
+- `POST /app/operacao/grupo` — app/main.py:958
+- `POST /app/operacao/numeros` — app/main.py:986
+- `POST /app/operacao/numeros/remover` — app/main.py:1013
+- `POST /app/estoque/novo` — app/main.py:1039
+- `GET /app/estoque/{veiculo_id}` — app/main.py:1066
+- `POST /app/estoque/{veiculo_id}` — app/main.py:1097
+- `POST /app/estoque/{veiculo_id}/{acao}` — app/main.py:1125
+- `GET /app/leads` — app/main.py:1172
+- `GET /app/leads/{lead_id}` — app/main.py:1200
+- `POST /app/leads/{lead_id}/etapa` — app/main.py:1236
+- `GET /app/conversas` — app/main.py:1295
+- `GET /app/conversas/{telefone}` — app/main.py:1322
+- `POST /app/conversas/{telefone}/handoff` — app/main.py:1415
+- `GET /app/vendas` — app/main.py:1520
+- `GET /app/vendas/nova` — app/main.py:1560
+- `POST /app/vendas/nova` — app/main.py:1577
+- `POST /app/vendas/{venda_id}/confirmar` — app/main.py:1978
+- `POST /app/vendas/{venda_id}/cancelar` — app/main.py:1996
+- `GET /app/vendedor` — app/main.py:2008
+- `GET /app/funil` — app/main.py:2119
+- `GET /app/funil/dados` — app/main.py:2195
+- `GET /app/financeiro` — app/main.py:2232
+- `GET /app/financeiras` — app/main.py:2309
+- `POST /app/financeiras/{nome}` — app/main.py:2366
+- `POST /app/financeiras/{nome}/testar` — app/main.py:2469
+- `GET /app/configuracoes` — app/main.py:2580
 - `GET /app/relatorios` — app/relatorios.py:66
 - `GET /app/relatorios/vendas.csv` — app/relatorios.py:112
 - `GET /app/relatorios/metas.csv` — app/relatorios.py:157
@@ -95,7 +95,7 @@ Migration head: `0026_copiloto_sinal_destinatario`
 - `GET /app/loja/integracoes/health` — app/web/loja_integracoes.py:54
 - `GET /app/loja/perfil` — app/web/loja_perfil.py:82
 - `POST /app/loja/perfil/senha` — app/web/loja_perfil.py:90
-- `POST /app/loja/selecionar` — app/web/loja_shell.py:369
+- `POST /app/loja/selecionar` — app/web/loja_shell.py:378
 - `GET /app/loja/vendas` — app/web/loja_vendas.py:125
 - `GET /app/loja/vendas/dados` — app/web/loja_vendas.py:161
 - `GET /app/loja/vendas/lista` — app/web/loja_vendas.py:184
@@ -108,19 +108,19 @@ Migration head: `0026_copiloto_sinal_destinatario`
 - `POST /app/loja/vendas/{venda_id}/custos/{custo_id}/remover` — app/web/loja_vendas.py:378
 - `GET /app/loja/vendas/configuracoes-financeiras` — app/web/loja_vendas.py:394
 - `GET /app/loja/equipe` — app/web/loja_vendas.py:410
-- `GET /app/loja/whatsapp` — app/web/loja_whatsapp.py:134
-- `GET /app/loja/whatsapp/conectar` — app/web/loja_whatsapp.py:171
-- `POST /app/loja/whatsapp/catalogo` — app/web/loja_whatsapp.py:209
-- `POST /app/loja/whatsapp/conectar` — app/web/loja_whatsapp.py:280
-- `POST /app/loja/whatsapp/canais` — app/web/loja_whatsapp.py:351
-- `POST /app/loja/whatsapp/canais/{canal_id}/conectar` — app/web/loja_whatsapp.py:373
-- `POST /app/loja/whatsapp/canais/{canal_id}/desconectar` — app/web/loja_whatsapp.py:398
-- `POST /app/loja/whatsapp/canais/{canal_id}/inativar` — app/web/loja_whatsapp.py:417
-- `POST /app/loja/whatsapp/canais/{canal_id}/principal-estoque` — app/web/loja_whatsapp.py:437
-- `GET /app/loja/whatsapp/canais/{canal_id}/status` — app/web/loja_whatsapp.py:462
-- `GET /app/loja/whatsapp/fila` — app/web/loja_whatsapp.py:484
-- `POST /app/loja/whatsapp/fila` — app/web/loja_whatsapp.py:526
-- `POST /app/loja/whatsapp/fila/{vendedor_id}/remover` — app/web/loja_whatsapp.py:565
+- `GET /app/loja/whatsapp` — app/web/loja_whatsapp.py:149
+- `GET /app/loja/whatsapp/conectar` — app/web/loja_whatsapp.py:186
+- `POST /app/loja/whatsapp/catalogo` — app/web/loja_whatsapp.py:228
+- `POST /app/loja/whatsapp/conectar` — app/web/loja_whatsapp.py:299
+- `POST /app/loja/whatsapp/canais` — app/web/loja_whatsapp.py:372
+- `POST /app/loja/whatsapp/canais/{canal_id}/conectar` — app/web/loja_whatsapp.py:396
+- `POST /app/loja/whatsapp/canais/{canal_id}/desconectar` — app/web/loja_whatsapp.py:423
+- `POST /app/loja/whatsapp/canais/{canal_id}/inativar` — app/web/loja_whatsapp.py:444
+- `POST /app/loja/whatsapp/canais/{canal_id}/principal-estoque` — app/web/loja_whatsapp.py:464
+- `GET /app/loja/whatsapp/canais/{canal_id}/status` — app/web/loja_whatsapp.py:491
+- `GET /app/loja/whatsapp/fila` — app/web/loja_whatsapp.py:513
+- `POST /app/loja/whatsapp/fila` — app/web/loja_whatsapp.py:557
+- `POST /app/loja/whatsapp/fila/{vendedor_id}/remover` — app/web/loja_whatsapp.py:598
 - `GET /app/metas` — app/web/metas.py:135
 - `GET /app/metas/nova` — app/web/metas.py:167
 - `POST /app/metas/nova` — app/web/metas.py:177
@@ -276,22 +276,22 @@ Migration head: `0026_copiloto_sinal_destinatario`
 - `app/templates/loja/agente.html` — app/loja/routes.py:397
 - `app/templates/loja/atendimento_workspace.html` — app/loja/routes.py:501
 - `app/templates/loja/agente_configuracao.html` — app/loja/routes.py:1133
-- `app/templates/login.html` — app/main.py:593
-- `app/templates/dashboard.html` — app/main.py:780
-- `app/templates/estoque/lista.html` — app/main.py:824
-- `app/templates/estoque/form.html` — app/main.py:849
-- `app/templates/operacao/numeros.html` — app/main.py:928
-- `app/templates/leads/lista.html` — app/main.py:1161
-- `app/templates/leads/detalhe.html` — app/main.py:1196
-- `app/templates/conversas/lista.html` — app/main.py:1283
-- `app/templates/conversas/detalhe.html` — app/main.py:1319
-- `app/templates/vendas/form.html` — app/main.py:1474
-- `app/templates/vendas/lista.html` — app/main.py:1518
-- `app/templates/vendedor/dashboard.html` — app/main.py:2075
-- `app/templates/funil/index.html` — app/main.py:2154
-- `app/templates/financeiro/dashboard.html` — app/main.py:2260
-- `app/templates/financeiras/lista.html` — app/main.py:2323
-- `app/templates/configuracoes/index.html` — app/main.py:2592
+- `app/templates/login.html` — app/main.py:596
+- `app/templates/dashboard.html` — app/main.py:783
+- `app/templates/estoque/lista.html` — app/main.py:827
+- `app/templates/estoque/form.html` — app/main.py:852
+- `app/templates/operacao/numeros.html` — app/main.py:947
+- `app/templates/leads/lista.html` — app/main.py:1189
+- `app/templates/leads/detalhe.html` — app/main.py:1224
+- `app/templates/conversas/lista.html` — app/main.py:1311
+- `app/templates/conversas/detalhe.html` — app/main.py:1347
+- `app/templates/vendas/form.html` — app/main.py:1502
+- `app/templates/vendas/lista.html` — app/main.py:1546
+- `app/templates/vendedor/dashboard.html` — app/main.py:2103
+- `app/templates/funil/index.html` — app/main.py:2182
+- `app/templates/financeiro/dashboard.html` — app/main.py:2288
+- `app/templates/financeiras/lista.html` — app/main.py:2351
+- `app/templates/configuracoes/index.html` — app/main.py:2620
 - `app/templates/relatorios/index.html` — app/relatorios.py:99
 - `app/templates/base.html` — app/templates/base.html
 - `app/templates/conta_senha.html` — app/templates/conta_senha.html
@@ -313,9 +313,9 @@ Migration head: `0026_copiloto_sinal_destinatario`
 - `app/templates/loja/vendas_visao.html` — app/web/loja_vendas.py:145
 - `app/templates/loja/vendas_lista.html` — app/web/loja_vendas.py:215
 - `app/templates/loja/venda_editar.html` — app/web/loja_vendas.py:314
-- `app/templates/loja/whatsapp_canais.html` — app/web/loja_whatsapp.py:155
-- `app/templates/loja/whatsapp_decidir.html` — app/web/loja_whatsapp.py:193
-- `app/templates/loja/whatsapp_fila.html` — app/web/loja_whatsapp.py:511
+- `app/templates/loja/whatsapp_canais.html` — app/web/loja_whatsapp.py:170
+- `app/templates/loja/whatsapp_decidir.html` — app/web/loja_whatsapp.py:212
+- `app/templates/loja/whatsapp_fila.html` — app/web/loja_whatsapp.py:542
 - `app/templates/metas/form.html` — app/web/metas.py:121
 - `app/templates/metas/lista.html` — app/web/metas.py:155
 - `app/templates/convite_aceitar.html` — app/web/owner_invitations.py:129
