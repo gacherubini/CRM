@@ -13,6 +13,62 @@ Leia primeiro:
 2. [`../fila/README.md`](../fila/README.md) — o que ainda é código
 3. [`design/2026-07-30-revy-control-loja-asbuilt-e-melhorias.md`](design/2026-07-30-revy-control-loja-asbuilt-e-melhorias.md) — as-built
 
+## Checkpoint de 2026-09-08 — o popup abriu de verdade, e o corte do chip tem plano
+
+`main` em **`0360f14`**. `app2037` segue no ar em `a24ad91` (o commit de hoje e script +
+docs, nada que exija deploy). Suite do chatbot: **677** (eram 667).
+
+### O popup do embedded signup ABRIU
+
+Faltava um **terceiro** campo de OAuth, na mesma tela dos dois de ontem
+(`/apps/1370395535203964/business-login/settings/`): **"URIs de redirecionamento do OAuth
+validos"**, que estava **vazio** com **"Usar modo estrito" ligado** — e modo estrito com
+lista vazia nao deixa nenhum redirect passar. Preenchido com `https://app2037.fly.dev/`, o
+validador da Meta ficou verde e a janela abriu em *"Conecte sua conta facilmente a Revy"*.
+
+**Armadilha que custou duas tentativas:** no campo de URIs, o Enter cria o chip e dispara
+um toast verde *"As alteracoes foram salvas"* que **mente**. Quem salva e o botao
+**"Salvar alteracoes"** no rodape, abaixo da dobra, encoberto pelo proprio toast. Confira
+sempre com o validador do topo da pagina **depois de um reload**.
+
+Detalhe em `.claude/skills/revy-research/learnings/2026-09-07-o-config-id-nao-basta-para-o-popup-abrir.md`
+(reescrito hoje: eram tres campos, nao dois).
+
+### Descartado no caminho, para ninguem reabrir
+
+- **`v21.0` do `FB.init` nao e problema.** O app esta em v26.0 nas duas caixas de
+  "Atualizar a versao da API", mas v21.0 so sai do ar em **21/01/2027**.
+- **`public_profile` em "Pronto para teste" e pista falsa.** O Login for Business e regido
+  pelo `config_id`, que substitui o `scope`. Nao submeter para analise por causa disto.
+- **O JS da Loja esta certo.** `whatsapp_decidir.html:201-219` manda `config_id`,
+  `response_type: "code"`, `override_default_response_type` e `sessionInfoVersion: "3"`.
+  O `response_type=code` visto na URL do popup prova que as opcoes chegaram ao SDK.
+- O app **nao tem caso de uso de autenticacao** (so os dois de Ads e o de WhatsApp). Nao
+  impediu o popup de abrir. Fica anotado, nao vira acao.
+
+### Ainda por olhar
+
+O alerta de App Review de 07/09 diz *"Further action may be required before your app can go
+live… address any outstanding questions"*. A pagina de submissoes nao foi aberta. Como o
+popup abriu, isto **nao e bloqueio** — mas continua sem leitura.
+
+### O chip: um so, e ha plano escrito
+
+O dono decidiu em 07/09 usar **um unico chip Vivo** para as duas fases: entra pelo popup na
+loja `teste`, e depois vira para a loja real trocando `whatsapp_canais.loja_id`. WABA no
+portfolio **do amigo**; a loja de destino **ja existe e ja opera Modo 1**; os dados do teste
+sao **apagados** no corte.
+
+- Spec + runbook das 5 fases: `docs/referencia-viva/specs/2026-09-07-um-chip-teste-depois-loja-real-design.md`
+- Card: `docs/fila/2026-09-07-mover-canal-de-loja.md`
+- Ferramenta pronta e testada: `chatbot-api/scripts/mover_canal_de_loja.py` (10 testes)
+
+**A consequencia que nao e de codigo:** projetar `whatsapp_modo=2` na loja do amigo manda
+**todo** o outbound dela pela Cloud, inclusive a resposta a quem escrever no numero
+Evolution antigo. Marcar aquele canal como inativo nao segura
+(`resolve_canal_for_instance` ignora `ativo`) — o numero velho tem de sair da Evolution no
+corte.
+
 ## Checkpoint de 2026-09-07 — o App Review saiu e o popup abriu
 
 `main` limpo, `app2037` no ar em **`a24ad91`**. `motor2037` continua em `ce4e2ab`

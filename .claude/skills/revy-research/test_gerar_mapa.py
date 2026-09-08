@@ -1198,13 +1198,19 @@ class TestFuncoesSemChamador(unittest.TestCase):
 
 
 class TestCosturaN8n(unittest.TestCase):
-    def test_acha_os_tres_arquivos_e_seus_webhooks(self):
+    def test_acha_os_workflows_versionados_e_seus_webhooks(self):
         raiz = varredura.raiz_repo()
         workflows, _ = cruzamentos.n8n_costura(raiz)
-        self.assertEqual(len(workflows), 3)
-        paths = {w["webhook"] for w in workflows}
-        self.assertIn("whatsapp-ai", paths)     # o canonico
-        self.assertIn("whatsapp-cloud", paths)
+        por_arquivo = {w["arquivo"]: w["webhook"] for w in workflows}
+        self.assertEqual(
+            por_arquivo,
+            {
+                "workflow-ai-nao-salvos.json": "whatsapp-ai",
+                "workflow-cloud.json": "whatsapp-cloud",
+                "workflow-preview.json": "whatsapp-ai-preview",
+                "workflow-teste-numero-autorizado.json": "whatsapp-ai-teste",
+            },
+        )
 
     def test_so_dois_estao_no_ar(self):
         raiz = varredura.raiz_repo()
@@ -1324,13 +1330,34 @@ class TestRenderDosCruzamentos(unittest.TestCase):
     def test_diz_que_e_suspeita_e_nao_erro(self):
         self.assertIn("SUSPEITA", self.texto)
 
-    def test_tabela_do_n8n_tem_tres_linhas_e_duas_no_ar(self):
+    def test_tabela_do_n8n_classifica_publicados_e_nao_publicados(self):
         linhas = [
             ln for ln in self.texto.splitlines()
             if ln.startswith("| `workflow-")
         ]
-        self.assertEqual(len(linhas), 3)
-        self.assertEqual(sum(1 for ln in linhas if ln.rstrip().endswith("SIM |")), 2)
+        por_arquivo = {
+            nome: next(ln for ln in linhas if f"`{nome}`" in ln)
+            for nome in (
+                "workflow-ai-nao-salvos.json",
+                "workflow-cloud.json",
+                "workflow-preview.json",
+                "workflow-teste-numero-autorizado.json",
+            )
+        }
+        self.assertTrue(
+            por_arquivo["workflow-ai-nao-salvos.json"].rstrip().endswith("SIM |")
+        )
+        self.assertTrue(
+            por_arquivo["workflow-cloud.json"].rstrip().endswith("SIM |")
+        )
+        self.assertTrue(
+            por_arquivo["workflow-preview.json"].rstrip().endswith("nao |")
+        )
+        self.assertTrue(
+            por_arquivo["workflow-teste-numero-autorizado.json"]
+            .rstrip()
+            .endswith("nao |")
+        )
 
     def test_denuncia_workflow_fora_da_tabela_publicados(self):
         self.assertIn("workflow-teste-numero-autorizado.json", self.texto)

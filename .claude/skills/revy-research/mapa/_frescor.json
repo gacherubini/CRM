@@ -1,5 +1,5 @@
 {
- "sha": "bd39c42",
+ "sha": "0360f14",
  "inventario": {
   "chatbot-api": [
    {
@@ -3253,20 +3253,6 @@
     "simbolo": "main",
     "arquivo": "app/worker.py",
     "linha": 93
-   },
-   {
-    "secao": "template",
-    "chave": "data/probes/_diag_bv/login_html.html",
-    "simbolo": "login_html.html",
-    "arquivo": "data/probes/_diag_bv/login_html.html",
-    "linha": 0
-   },
-   {
-    "secao": "template",
-    "chave": "data/probes/_diag_pan_modal/modal.html",
-    "simbolo": "modal.html",
-    "arquivo": "data/probes/_diag_pan_modal/modal.html",
-    "linha": 0
    },
    {
     "secao": "migration",

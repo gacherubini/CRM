@@ -1,6 +1,6 @@
-# motor-simulacao · 16 rotas · 12 modelos · 1 workers · 2 flags · 14 migrations · 2 templates
+# motor-simulacao · 16 rotas · 12 modelos · 1 workers · 2 flags · 14 migrations
 
-Gerado de `bd39c42`. NAO editar a mao — saida de `gerar_mapa.py`.
+Gerado de `0360f14`. NAO editar a mao — saida de `gerar_mapa.py`.
 Migration head: `0014`
 
 ## Rotas
@@ -62,11 +62,6 @@ Migration head: `0014`
 - `0012` — alembic/versions/0012_simulacao_provedores_fanout.py
 - `0013` — alembic/versions/0013_evento_screenshot_blob.py
 - `0014` — alembic/versions/0014_cliente_operacional_projecao.py
-
-## Templates
-
-- `data/probes/_diag_bv/login_html.html` — data/probes/_diag_bv/login_html.html
-- `data/probes/_diag_pan_modal/modal.html` — data/probes/_diag_pan_modal/modal.html
 
 ## Testes
 

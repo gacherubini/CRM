@@ -627,12 +627,13 @@ def templates(base_produto: Path) -> list[Entrada]:
     for html in sorted(base_produto.rglob("*.html")):
         if not html.is_file() or _fora_do_projeto(html, base_produto):
             continue
-        # HTML sob tests/ nao e template: no motor sao paginas de banco salvas
-        # como fixture do Playwright. Lista-las faria o mapa dizer que o motor
+        # HTML sob tests/ e data/probes/ nao e template: no motor sao paginas de
+        # banco salvas pelo Playwright. Lista-las faria o mapa dizer que o motor
         # renderiza HTML, que e falso — a unica forma que sobra de o mapa mentir.
-        if "tests" in html.relative_to(base_produto).parts:
+        relativo = html.relative_to(base_produto)
+        if "tests" in relativo.parts or relativo.parts[:2] == ("data", "probes"):
             continue
-        rel = html.relative_to(base_produto).as_posix()
+        rel = relativo.as_posix()
         casado = next(
             (n for n in nomes if rel == n or rel.endswith("/" + n.lstrip("/"))), None
         )
