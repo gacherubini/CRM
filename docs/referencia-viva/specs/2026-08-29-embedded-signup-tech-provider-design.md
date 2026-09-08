@@ -391,6 +391,14 @@ Se for aprovado, a sequência é curta: criar a configuração do Login, copiar 
 pôr `PORTAL_META_APP_ID` e `PORTAL_META_CONFIG_ID` no `[env]` do `fly.app.toml`, deployar.
 O botão da tela acende sozinho — **nenhuma linha de código muda**.
 
+> **07/09/2026 — aprovado, e a sequência acima estava incompleta.** Ela foi executada
+> (`config_id` `1092096256576691`, commit `a24ad91`, `app2037` no ar): o botão acendeu e o
+> `FB.login` reprovou com *"A opção JSSDK não está ativada"*. Faltavam dois campos na tela de
+> OAuth do app — **Entrar com o SDK do JavaScript = Sim** e **Domínios permitidos para o SDK
+> do JavaScript = `https://app2037.fly.dev/`**, ambos ligados no mesmo dia. Só então a janela
+> passou. Detalhes e as armadilhas de navegação do painel no learning
+> `2026-09-07-o-config-id-nao-basta-para-o-popup-abrir.md`.
+
 Se for reprovado, o §12 lista as causas que a própria Meta publica, e todas são de forma:
 vídeo único para as duas permissões, justificativa faltando, permissão a mais, submissão
 deixada em rascunho. Reprovação por forma se corrige e se resubmete.
