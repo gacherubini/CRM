@@ -880,6 +880,35 @@ def seed_loja_operacional(db, loja_slug="loja-teste", state="ativa", version=1):
     )
 
 
+def seed_whatsapp_modo(db, modo, loja_slug="loja-teste"):
+    """Projeta o `whatsapp_modo` do Control (1 XOR 2) para a loja do teste.
+
+    Sem projeção a Loja opera o Modo 1 — que é o default de produção. Teste de
+    superfície do Modo 2 (fila, central Cloud) precisa dizer isso aqui.
+    """
+    linha = db.get(LojaOperacionalProjecao, (loja_slug, "whatsapp_modo"))
+    if linha is not None:
+        linha.state = str(modo)
+        linha.version = 1
+    else:
+        db.add(
+            LojaOperacionalProjecao(
+                loja_slug=loja_slug,
+                aggregate="whatsapp_modo",
+                version=1,
+                state=str(modo),
+                event_id=f"seed-modo-{modo}",
+            )
+        )
+    db.commit()
+
+
+def ligar_modo_2(loja_slug="loja-teste"):
+    """Mesma coisa, abrindo sessão própria — para teste sem fixture `db`."""
+    with SessionLocal() as sessao:
+        seed_whatsapp_modo(sessao, 2, loja_slug=loja_slug)
+
+
 def criar_usuario(papel="dono", email="dono@loja.test", loja_slug="loja-teste"):
     db = SessionLocal()
     usuario = Usuario(

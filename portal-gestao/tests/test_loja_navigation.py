@@ -311,7 +311,9 @@ def test_fila_nao_acende_junto_com_numeros_de_whatsapp():
     rota do filho, então o menu marcava dois itens ativos ao mesmo tempo.
     """
     numeros, fila = None, None
-    for item in flatten_nav(build_nav(_store(), _ents(), whatsapp_enabled=True)):
+    # A fila só existe no Modo 2 — é lá que os dois itens convivem no menu.
+    nav = build_nav(_store(), _ents(), whatsapp_enabled=True, whatsapp_modo=2)
+    for item in flatten_nav(nav):
         if item.href == "/app/loja/whatsapp":
             numeros = item
         if item.href == "/app/loja/whatsapp/fila":

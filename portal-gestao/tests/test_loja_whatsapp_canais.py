@@ -373,6 +373,7 @@ def _ents():
 
 
 def test_nav_com_flag_on_mostra_item_em_ajustes():
+    """Modo 1: números + grupo do estoque. A fila é do Modo 2 (spec §5.8)."""
     sections = build_nav(
         _store(), _ents(), shell_enabled=True, whatsapp_enabled=True
     )
@@ -380,7 +381,6 @@ def test_nav_com_flag_on_mostra_item_em_ajustes():
     assert [i.label for i in ajustes.items] == [
         "Acessos bancários",
         "Números de WhatsApp",
-        "Fila de atendimento",
         "Grupo do estoque",
         "Integrações",
         "Equipe",

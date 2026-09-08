@@ -7,10 +7,22 @@
   <div>
     <span class="eyebrow">Ajustes</span>
     <h1>Números de WhatsApp</h1>
+    {# O texto muda com o modo que o Control gravou: no Modo 2 não há QR nem
+       número de vendedor, e prometer os dois manda o lojista procurar tela que
+       não existe. #}
+    {% if view.baileys %}
     <p>
       Cada número atende conversas separadamente. Ao conectar, leia o QR no
       celular do número — ele expira em cerca de 1 minuto.
     </p>
+    {% else %}
+    <p>
+      Sua loja atende pela central da Revy na nuvem: um número só, sem QR e sem
+      celular ligado. Quem fala com o cliente é o vendedor da vez, pelo próprio
+      WhatsApp — a ordem está em <a href="/app/loja/whatsapp/fila">Fila de
+      atendimento</a>.
+    </p>
+    {% endif %}
   </div>
 </div>
 
@@ -93,7 +105,7 @@
     <article class="canal-card">
       <div class="canal-topo">
         <span class="status {{ canal.estado }}">{{ canal.rotulo }}</span>
-        {% if canal.principal_estoque %}
+        {% if canal.principal_estoque and view.baileys %}
         <span class="canal-tag" title="Responde no grupo do estoque e envia o aviso de simulação">
           Principal do estoque
         </span>
@@ -145,6 +157,9 @@
           <button class="button secondary" type="submit">Usar no estoque</button>
         </form>
         {% endif %}
+        {# Apagar existe nos dois modos: é como se tira da lista o número que
+           sobrou do Modo 1, e como se refaz a janela da Meta quando o número
+           errado foi conectado. #}
         <form method="post" action="/app/loja/whatsapp/canais/{{ canal.id }}/inativar"
               onsubmit="return confirm('Apagar este número? Ele sai da lista. O histórico das conversas é preservado.')">
           <input type="hidden" name="csrf" value="{{ csrf }}">
@@ -154,15 +169,21 @@
     </article>
     {% endfor %}
   </div>
+  {% if view.baileys %}
   <p class="canal-rodape">
     O <strong>principal do estoque</strong> é o único que responde no grupo do estoque
     e envia o aviso quando um cliente pede simulação. Os outros números só atendem
     conversas de cliente.
   </p>
+  {% endif %}
   {% else %}
   <div class="empty">
     <strong>Nenhum número por aqui</strong>
+    {% if view.baileys %}
     <p>Cadastre o primeiro abaixo. Depois de conectar, ele começa a atender conversas.</p>
+    {% else %}
+    <p>A central ainda não foi conectada. Comece pela janela da Meta, abaixo.</p>
+    {% endif %}
   </div>
   {% endif %}
 </section>

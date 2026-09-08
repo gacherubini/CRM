@@ -7,6 +7,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass, replace
 
+from app.loja.whatsapp_modo import MODO_BAILEYS, MODO_CLOUD
+
 ROTULOS = {
     "conectado": "Conectado",
     "pendente": "Aguardando leitura do QR",
@@ -96,6 +98,18 @@ class CanaisView:
     # nunca a alcança clicando. Com canal Cloud, o lugar do estado é esta tela
     # mesmo — um segundo convite seria uma segunda porta para a mesma coisa.
     mostrar_link_conectar: bool = False
+    # O modo que o Control gravou. A tela não decide nada por conta própria:
+    # tudo o que muda entre um modo e outro sai daqui.
+    modo: int = MODO_BAILEYS
+
+    @property
+    def baileys(self) -> bool:
+        """Modo 1: QR, vários números e grupo do estoque.
+
+        Derivado, e não um segundo booleano guardado ao lado de ``modo``: dois
+        campos que precisam concordar acabam discordando.
+        """
+        return self.modo != MODO_CLOUD
 
 
 def _onboarding(bruto: dict, *, cloud: bool, estado: str) -> dict:
@@ -163,14 +177,25 @@ def montar_canais_view(
     *,
     erro: str | None = None,
     multi_habilitado: bool = True,
+    modo: int = MODO_BAILEYS,
 ) -> CanaisView:
-    """Monta a view. ``canais=None`` significa falha de leitura, não lista vazia."""
+    """Monta a view. ``canais=None`` significa falha de leitura, não lista vazia.
+
+    ``modo`` vem de ``whatsapp_modo.modo_da_loja``: no Modo 2 a loja não pareia
+    número por QR nem opera grupo, então as ações do Modo 1 não são só
+    escondidas no template — elas saem da view.
+    """
+    modo_cloud = modo == MODO_CLOUD
     if canais is None:
         # Sem a lista não dá para saber se a loja já tem canal Cloud — e
         # convidar a conectar de novo quem já conectou é pior do que não
         # convidar.
         return CanaisView(
-            canais=(), erro=erro, pode_adicionar=False, mostrar_link_conectar=False
+            canais=(),
+            erro=erro,
+            pode_adicionar=False,
+            mostrar_link_conectar=False,
+            modo=modo,
         )
 
     itens: list[CanalView] = []
@@ -185,7 +210,7 @@ def montar_canais_view(
         principal = bool(bruto.get("principal_estoque"))
         # Canal Cloud se reconhece pelo waba_id, que é o que o Modo 2 grava e o
         # Modo 1 deixa nulo — mesma regra do ``cloud_canal.py`` no chatbot.
-        cloud = bool(bruto.get("waba_id"))
+        canal_cloud = bool(bruto.get("waba_id"))
         itens.append(
             CanalView(
                 id=str(bruto.get("id") or ""),
@@ -194,22 +219,26 @@ def montar_canais_view(
                 estado=estado,
                 rotulo=ROTULOS.get(estado, estado),
                 ativo=ativo,
-                cloud=cloud,
+                cloud=canal_cloud,
                 principal_estoque=principal,
                 # Conectar/desconectar são ações da Evolution (QR). Num canal
                 # Cloud o botão chamaria ``conectar_canal_whatsapp``, que pede
                 # QR para um número que é da Cloud API.
-                pode_conectar=not cloud and estado != "conectado",
-                pode_desconectar=not cloud and estado == "conectado",
-                pode_marcar_principal_estoque=not principal,
-                **_onboarding(bruto, cloud=cloud, estado=estado),
+                # No Modo 2 nem um canal Evolution remanescente oferece QR: a
+                # loja migrou de modo, não de tela.
+                pode_conectar=not modo_cloud and not canal_cloud and estado != "conectado",
+                pode_desconectar=(
+                    not modo_cloud and not canal_cloud and estado == "conectado"
+                ),
+                pode_marcar_principal_estoque=not modo_cloud and not principal,
+                **_onboarding(bruto, cloud=canal_cloud, estado=estado),
             )
         )
     # Se a API ainda não marcou ninguém, o primeiro da lista é o implícito
     # (mesmo fallback do Chatbot: ativo mais antigo). ``replace`` copia todo o
     # resto: reconstruir campo a campo já apagou ``cloud`` uma vez, sem nenhum
     # teste ficar vermelho.
-    if itens and not any(c.principal_estoque for c in itens):
+    if not modo_cloud and itens and not any(c.principal_estoque for c in itens):
         itens[0] = replace(
             itens[0],
             principal_estoque=True,
@@ -224,6 +253,11 @@ def montar_canais_view(
     return CanaisView(
         canais=tuple(itens),
         erro=erro,
-        pode_adicionar=bool(multi_habilitado),
-        mostrar_link_conectar=not any(c.cloud for c in itens),
+        # Número novo por QR é ação do Modo 1. No Modo 2 o número vem da janela
+        # da Meta, e é a central da loja — não existe "adicionar mais um".
+        pode_adicionar=bool(multi_habilitado) and not modo_cloud,
+        # O convite para a nuvem só faz sentido em quem está no Modo 2 e ainda
+        # não conectou a central.
+        mostrar_link_conectar=modo_cloud and not any(c.cloud for c in itens),
+        modo=modo,
     )

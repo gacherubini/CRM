@@ -19,6 +19,7 @@ from app.loja.types import (
     NavSection,
     StoreContext,
 )
+from app.loja.whatsapp_modo import MODO_BAILEYS, MODO_CLOUD
 
 
 def build_nav(
@@ -27,6 +28,7 @@ def build_nav(
     *,
     shell_enabled: bool = True,
     whatsapp_enabled: bool | None = None,
+    whatsapp_modo: int = MODO_BAILEYS,
     copiloto_enabled: bool | None = None,
     financeiro_enabled: bool | None = None,
 ) -> tuple[NavSection, ...]:
@@ -215,6 +217,9 @@ def build_nav(
                     active_prefix="/app/loja/whatsapp",
                 )
             )
+        # Fila de rodízio só existe no Modo 2 — no Modo 1 quem atende é o
+        # vendedor no próprio número pareado, não há rodízio para cadastrar.
+        if whatsapp_enabled and whatsapp_modo == MODO_CLOUD:
             ajustes.append(
                 NavItem(
                     label="Fila de atendimento",
@@ -226,7 +231,11 @@ def build_nav(
             )
         # Grupo WA de fotos/cadastro + números autorizados (aviso simulação/handoff).
         # Rota legada /app/operacao/numeros — precisa aparecer no shell (antes sumia do menu).
-        if entitlements.estoque_enabled or entitlements.vendas_enabled:
+        # Modo 2 não passa por grupo: foto e aviso de simulação não têm grupo
+        # para onde ir, então o item sai do menu junto com o QR.
+        if (entitlements.estoque_enabled or entitlements.vendas_enabled) and (
+            whatsapp_modo != MODO_CLOUD
+        ):
             ajustes.append(
                 NavItem(
                     label="Grupo do estoque",

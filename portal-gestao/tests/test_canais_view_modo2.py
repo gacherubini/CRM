@@ -6,6 +6,7 @@ Modo 1 — que pede QR na Evolution — para um numero que e da Cloud API.
 import re
 
 from app.loja.whatsapp_canais import montar_canais_view
+from app.loja.whatsapp_modo import MODO_CLOUD
 
 
 def _bruto(estado, **extra):
@@ -131,7 +132,7 @@ def _render(canais):
         autoescape=True,
     )
     return env.get_template("loja/whatsapp_canais.html").render(
-        view=montar_canais_view(canais),
+        view=montar_canais_view(canais, modo=MODO_CLOUD),
         csrf="tok",
         qr=None,
         acao_erro=None,
@@ -140,14 +141,14 @@ def _render(canais):
 
 
 def test_sem_canal_cloud_a_tela_leva_para_a_de_conectar():
-    """A tela de decisao nao tem porta: quem so tem Modo 1 nunca a alcanca."""
-    view = montar_canais_view([_bruto("conectado")])
+    """A tela de decisao nao tem porta: so o Modo 2 a alcanca, e so daqui."""
+    view = montar_canais_view([_bruto("conectado")], modo=MODO_CLOUD)
 
     assert view.mostrar_link_conectar is True
 
 
 def test_loja_sem_nenhum_canal_tambem_leva_para_a_de_conectar():
-    view = montar_canais_view([])
+    view = montar_canais_view([], modo=MODO_CLOUD)
 
     assert view.mostrar_link_conectar is True
 
@@ -157,14 +158,14 @@ def test_com_canal_cloud_a_tela_nao_repete_o_convite():
     view = montar_canais_view([
         _bruto("conectado", id="c1"),
         _bruto("cloud_pendente", id="c2", waba_id="waba-1"),
-    ])
+    ], modo=MODO_CLOUD)
 
     assert view.mostrar_link_conectar is False
 
 
 def test_chatbot_fora_do_ar_nao_convida_a_conectar():
     """Sem a lista nao da para saber se a loja ja tem canal Cloud."""
-    view = montar_canais_view(None, erro="chatbot_indisponivel")
+    view = montar_canais_view(None, erro="chatbot_indisponivel", modo=MODO_CLOUD)
 
     assert view.mostrar_link_conectar is False
 
@@ -406,5 +407,7 @@ def test_no_teto_a_tela_nao_renderiza_clique_nenhum():
     assert "Tentar de novo" not in html
     assert CONECTAR not in html
     assert "133016" not in html
-    # Nem um link morto: no teto, o unico caminho e falar com a Revy.
-    assert "<a " not in html
+    # Nem um link morto: no teto, o unico caminho e falar com a Revy. O recorte
+    # e o card do canal — o cabecalho da tela tem link proprio (a fila).
+    card = html.split("canal-card")[1].split("</article>")[0]
+    assert "<a " not in card

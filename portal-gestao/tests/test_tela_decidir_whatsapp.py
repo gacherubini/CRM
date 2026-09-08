@@ -7,7 +7,7 @@ o historico do celular fica para tras e aquele numero vira bot-only.
 Flags lidas em runtime via env (Settings e dataclass frozen — snapshot de boot).
 """
 from app.clients.chatbot import ChatbotIndisponivel, OnboardingFalhou
-from conftest import csrf_da_resposta, login
+from conftest import csrf_da_resposta, ligar_modo_2, login
 
 TELA = "/app/loja/whatsapp/conectar"
 
@@ -18,12 +18,19 @@ def _ligar(monkeypatch, whatsapp="1", shell="1"):
     monkeypatch.setenv("REVY_LOJA_ENTITLEMENTS_ENABLED", "0")
 
 
+def _entrar(client, **kwargs):
+    """Login numa loja Modo 2 — esta tela só existe lá (spec §5.8)."""
+    resposta = login(client, **kwargs)
+    ligar_modo_2(kwargs.get("loja_slug", "loja-teste"))
+    return resposta
+
+
 # --- Gates -------------------------------------------------------------------
 
 
 def test_flag_off_esconde_a_tela(client, monkeypatch):
     _ligar(monkeypatch, whatsapp="0")
-    login(client)
+    _entrar(client)
     r = client.get(TELA, follow_redirects=False)
     assert r.status_code == 303
     assert r.headers["location"] == "/app"
@@ -31,7 +38,7 @@ def test_flag_off_esconde_a_tela(client, monkeypatch):
 
 def test_shell_off_esconde_a_tela(client, monkeypatch):
     _ligar(monkeypatch, shell="0")
-    login(client)
+    _entrar(client)
     r = client.get(TELA, follow_redirects=False)
     assert r.status_code == 303
 
@@ -45,7 +52,7 @@ def test_sem_login_vai_para_o_login(client, monkeypatch):
 
 def test_vendedor_nao_entra(client, monkeypatch):
     _ligar(monkeypatch)
-    login(client, papel="vendedor", email="vendedor@loja.test")
+    _entrar(client, papel="vendedor", email="vendedor@loja.test")
     r = client.get(TELA, follow_redirects=False)
     assert r.status_code in (302, 303, 307)
     assert r.headers["location"] == "/app"
@@ -58,7 +65,7 @@ def test_gerente_ve_a_tela(client, monkeypatch):
     """Esconder a tela do gerente foi recusado: ele precisa saber responder
     'por que o WhatsApp ainda nao esta no ar'."""
     _ligar(monkeypatch)
-    login(client, papel="gerente", email="gerente@loja.test")
+    _entrar(client, papel="gerente", email="gerente@loja.test")
     r = client.get(TELA)
     assert r.status_code == 200
 
@@ -67,7 +74,7 @@ def test_gerente_nao_ve_o_botao_de_conectar(client, monkeypatch):
     """Decisao 9: gerente ve o estado, so o dono conecta. Quem clica precisa ser
     admin do portfolio empresarial na Meta, e gerente normalmente nao e."""
     _ligar(monkeypatch)
-    login(client, papel="gerente", email="gerente@loja.test")
+    _entrar(client, papel="gerente", email="gerente@loja.test")
     r = client.get(TELA)
     assert 'id="conectar-whatsapp"' not in r.text
 
@@ -79,14 +86,14 @@ def test_gerente_le_por_que_nao_pode_conectar(client, monkeypatch):
     cargo de quem esta logado.
     """
     _ligar(monkeypatch)
-    login(client, papel="gerente", email="gerente@loja.test")
+    _entrar(client, papel="gerente", email="gerente@loja.test")
     texto = client.get(TELA).text.lower()
     assert "só o dono da loja" in texto
 
 
 def test_dono_ve_o_botao(client, monkeypatch):
     _ligar(monkeypatch)
-    login(client, papel="dono", email="dono@loja.test")
+    _entrar(client, papel="dono", email="dono@loja.test")
     r = client.get(TELA)
     assert r.status_code == 200
     assert 'id="conectar-whatsapp"' in r.text
@@ -103,7 +110,7 @@ def test_a_tela_diz_o_que_se_perde(client, monkeypatch):
     do numero novo — a perda tem de estar escrita onde ela acontece.
     """
     _ligar(monkeypatch)
-    login(client)
+    _entrar(client)
     texto = client.get(TELA).text.lower()
 
     assert "histórico" in texto
@@ -115,7 +122,7 @@ def test_a_tela_avisa_do_admin_antes_do_popup(client, monkeypatch):
     """Descobrir que nao e admin do portfolio dentro do popup da Meta e o pior
     lugar possivel para descobrir. Idem cartao e chip."""
     _ligar(monkeypatch)
-    login(client)
+    _entrar(client)
     texto = client.get(TELA).text.lower()
 
     assert "admin do portfólio" in texto, "tem de avisar do admin do portfólio"
@@ -126,7 +133,7 @@ def test_a_tela_avisa_do_admin_antes_do_popup(client, monkeypatch):
 def test_a_tela_oferece_as_duas_saidas(client, monkeypatch):
     """Numero novo (guarda o celular) x numero anunciado (perde o historico)."""
     _ligar(monkeypatch)
-    login(client)
+    _entrar(client)
     texto = client.get(TELA).text.lower()
 
     assert "um número novo" in texto
@@ -163,7 +170,7 @@ def test_sem_config_o_botao_fica_desabilitado(client, monkeypatch):
     """Enquanto o App Review nao sai, o botao nao acende — e a tela diz por que."""
     _ligar(monkeypatch)
     _sem_config_meta(monkeypatch)
-    login(client, papel="dono", email="dono@loja.test")
+    _entrar(client, papel="dono", email="dono@loja.test")
     texto = client.get(TELA).text
 
     assert "disabled" in _botao(texto)
@@ -175,7 +182,7 @@ def test_so_o_app_id_nao_acende_o_botao(client, monkeypatch):
     sem dizer por que."""
     _ligar(monkeypatch)
     _config_meta(monkeypatch, config_id="")
-    login(client, papel="dono", email="dono@loja.test")
+    _entrar(client, papel="dono", email="dono@loja.test")
     texto = client.get(TELA).text
 
     assert "disabled" in _botao(texto)
@@ -185,7 +192,7 @@ def test_so_o_app_id_nao_acende_o_botao(client, monkeypatch):
 def test_so_o_config_id_nao_acende_o_botao(client, monkeypatch):
     _ligar(monkeypatch)
     _config_meta(monkeypatch, app_id="")
-    login(client, papel="dono", email="dono@loja.test")
+    _entrar(client, papel="dono", email="dono@loja.test")
     texto = client.get(TELA).text
 
     assert "disabled" in _botao(texto)
@@ -196,7 +203,7 @@ def test_com_as_duas_variaveis_o_botao_acende(client, monkeypatch):
     tocar em codigo."""
     _ligar(monkeypatch)
     _config_meta(monkeypatch)
-    login(client, papel="dono", email="dono@loja.test")
+    _entrar(client, papel="dono", email="dono@loja.test")
     texto = client.get(TELA).text
 
     assert "disabled" not in _botao(texto)
@@ -208,7 +215,7 @@ def test_o_popup_recebe_app_id_e_config_id(client, monkeypatch):
     nao abre a variacao de Embedded Signup."""
     _ligar(monkeypatch)
     _config_meta(monkeypatch, app_id="1370395535203964", config_id="998877")
-    login(client, papel="dono", email="dono@loja.test")
+    _entrar(client, papel="dono", email="dono@loja.test")
     texto = client.get(TELA).text
 
     assert "1370395535203964" in texto
@@ -220,7 +227,7 @@ def test_gerente_nao_ganha_o_botao_nem_com_a_config_pronta(client, monkeypatch):
     """Decisao 9 nao depende do App Review."""
     _ligar(monkeypatch)
     _config_meta(monkeypatch)
-    login(client, papel="gerente", email="gerente@loja.test")
+    _entrar(client, papel="gerente", email="gerente@loja.test")
 
     assert 'id="conectar-whatsapp"' not in client.get(TELA).text
 
@@ -231,7 +238,7 @@ def test_a_tela_tem_saida_para_o_popup_que_fecha_no_meio(client, monkeypatch):
     espera infinita."""
     _ligar(monkeypatch)
     _config_meta(monkeypatch)
-    login(client, papel="dono", email="dono@loja.test")
+    _entrar(client, papel="dono", email="dono@loja.test")
     texto = client.get(TELA).text
 
     assert 'id="conectar-sem-retorno"' in texto
@@ -251,7 +258,7 @@ CAMPOS = {
 def _conectar(client, monkeypatch, chatbot_fake, papel="dono", campos=None, csrf=True):
     _ligar(monkeypatch)
     _config_meta(monkeypatch)
-    login(client, papel=papel, email=f"{papel}@loja.test")
+    _entrar(client, papel=papel, email=f"{papel}@loja.test")
     pagina = client.get(TELA)
     dados = dict(CAMPOS if campos is None else campos)
     if csrf:

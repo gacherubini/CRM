@@ -33,6 +33,7 @@ from app.loja.types import (
     NavSection,
     StoreContext,
 )
+from app.loja.whatsapp_modo import modo_da_loja
 from app.models import SINAL_REGRAS
 
 logger = logging.getLogger(__name__)
@@ -102,10 +103,18 @@ def resolve_store_and_entitlements(
 def build_loja_nav(
     store: StoreContext,
     entitlements: EntitlementState,
+    db: Session | None = None,
 ) -> tuple[NavSection, ...]:
     if not revy_loja_shell_enabled():
         return ()
-    return navigation.build_nav(store, entitlements, shell_enabled=True)
+    # O modo do WhatsApp muda o menu (spec §5.8). Sem o ``db`` o default é o
+    # legado: menu de Modo 1, nunca fila de rodízio sem saber que a loja é 2.
+    return navigation.build_nav(
+        store,
+        entitlements,
+        shell_enabled=True,
+        whatsapp_modo=modo_da_loja(db, store.loja_slug),
+    )
 
 
 def copiloto_secao_liberada(
@@ -312,7 +321,7 @@ def template_extras(
             "entitlements": None,
             "copiloto_nao_vistos": _copiloto_nao_vistos_sem_membership(usuario, db),
         }
-    nav = build_loja_nav(store, ents)
+    nav = build_loja_nav(store, ents, db)
     return {
         "loja_shell": True,
         "loja_brand": BRAND_NAME,

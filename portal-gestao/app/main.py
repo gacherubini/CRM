@@ -104,7 +104,6 @@ from app.resultados_dono import (
     resumo_periodo,
 )
 from app.config import (
-    revy_loja_entitlements_enabled,
     revy_loja_shell_enabled,
     settings,
 )
@@ -519,7 +518,11 @@ def contexto(request: Request, usuario=None, db: Session | None = None, **extra)
     ):
         session = db
         owned = False
-        if session is None and revy_loja_entitlements_enabled():
+        # O shell lê a projeção do Control a cada render (entitlements e, desde
+        # o §5.8, o modo de WhatsApp que decide o menu). Sem sessão o menu cairia
+        # no legado só nas rotas que não passam `db` — a mesma loja com dois
+        # menus diferentes conforme a página.
+        if session is None:
             session = SessionLocal()
             owned = True
         try:
@@ -906,6 +909,19 @@ async def _anexar_foto_se_enviada(estoque, veiculo_id: str | None, form) -> None
     )
 
 
+def _grupo_estoque_fora_do_modo(db: Session, usuario) -> RedirectResponse | None:
+    """Modo 2 não passa por grupo (spec §5.8): redireciona para os números.
+
+    Gate de backend, não item de menu escondido — a URL desta tela é antiga e
+    continua nos favoritos de quem usava o Modo 1.
+    """
+    from app.loja.whatsapp_modo import MODO_CLOUD, modo_da_loja
+
+    if modo_da_loja(db, getattr(usuario, "loja_slug", "") or "") == MODO_CLOUD:
+        return RedirectResponse("/app/loja/whatsapp", status_code=303)
+    return None
+
+
 @app.get("/app/operacao/numeros", response_class=HTMLResponse)
 def operacao_numeros(
     request: Request,
@@ -917,6 +933,9 @@ def operacao_numeros(
         return redirecionar_login()
     if usuario.papel not in ("dono", "gerente"):
         return RedirectResponse("/app", status_code=303)
+    fora = _grupo_estoque_fora_do_modo(db, usuario)
+    if fora is not None:
+        return fora
     numeros, erro = [], None
     grupo_config = {"selecionado": None, "grupos": [], "aviso": None}
     try:
@@ -950,6 +969,9 @@ async def operacao_grupo_salvar(
         request, form.get("csrf")
     ):
         return RedirectResponse("/app/operacao/numeros", status_code=303)
+    fora = _grupo_estoque_fora_do_modo(db, usuario)
+    if fora is not None:
+        return fora
     grupo_jid = (form.get("grupo_jid") or "").strip()
     try:
         if grupo_jid:
@@ -975,6 +997,9 @@ async def operacao_numeros_add(
         request, form.get("csrf")
     ):
         return RedirectResponse("/app/operacao/numeros", status_code=303)
+    fora = _grupo_estoque_fora_do_modo(db, usuario)
+    if fora is not None:
+        return fora
     telefone = (form.get("telefone") or "").strip()
     nome = (form.get("nome") or "").strip() or None
     if telefone:
@@ -999,6 +1024,9 @@ async def operacao_numeros_remover(
         request, form.get("csrf")
     ):
         return RedirectResponse("/app/operacao/numeros", status_code=303)
+    fora = _grupo_estoque_fora_do_modo(db, usuario)
+    if fora is not None:
+        return fora
     telefone = (form.get("telefone") or "").strip()
     if telefone:
         try:

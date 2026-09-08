@@ -31,6 +31,7 @@ from app.db import get_db  # noqa: E402
 from app.loja import qr_efemero  # noqa: E402
 from app.loja.types import ROLES_GESTAO, Role  # noqa: E402
 from app.loja.whatsapp_canais import ROTULOS, montar_canais_view  # noqa: E402
+from app.loja.whatsapp_modo import MODO_CLOUD, modo_da_loja  # noqa: E402
 from app.loja_operacao_auditoria import registrar_auditoria_canal  # noqa: E402
 from app.main import (  # noqa: E402
     contexto,
@@ -106,6 +107,20 @@ def _para_tela() -> RedirectResponse:
     return RedirectResponse(_TELA, status_code=303)
 
 
+def _modo(db: Session, usuario) -> int:
+    return modo_da_loja(db, getattr(usuario, "loja_slug", "") or "")
+
+
+def _e_cloud(db: Session, usuario) -> bool:
+    """A loja está no Modo 2 (central Cloud)?
+
+    Quem pergunta são os gates das ações que só existem num dos modos — QR e
+    grupo no Modo 1, fila e central no Modo 2. Gate de backend, e não botão
+    escondido no template: a URL antiga continua no favorito de quem migrou.
+    """
+    return _modo(db, usuario) == MODO_CLOUD
+
+
 def _carregar_meta_catalogo(
     estoque: EstoqueClient,
 ) -> tuple[str, str, str | None]:
@@ -150,7 +165,7 @@ def loja_whatsapp_canais(
     except ChatbotIndisponivel as exc:
         erro = str(exc)
 
-    view = montar_canais_view(canais, erro=erro)
+    view = montar_canais_view(canais, erro=erro, modo=_modo(db, usuario))
     return templates.TemplateResponse(
         "loja/whatsapp_canais.html",
         contexto(
@@ -187,6 +202,10 @@ def loja_whatsapp_decidir(
         return redirecionar_login()
     if not _habilitado() or not _autorizado(usuario):
         return _para_app()
+    # A central Cloud é o Modo 2. Numa loja Modo 1 esta tela não é só ruído:
+    # concluir a janela da Meta migra o número e não volta atrás.
+    if not _e_cloud(db, usuario):
+        return _para_tela()
 
     app_id, config_id = portal_meta_app_id(), portal_meta_config_id()
     return templates.TemplateResponse(
@@ -297,6 +316,8 @@ async def loja_whatsapp_conectar_cloud(
         return erro
     if not _e_dono(usuario):
         return _para_app()
+    if not _e_cloud(db, usuario):  # central Cloud: Modo 2 apenas
+        return _para_tela()
 
     code = (form.get("code") or "").strip()
     waba_id = (form.get("waba_id") or "").strip()
@@ -357,6 +378,8 @@ async def loja_whatsapp_criar(
     usuario, form, erro = await _guarda(request, db)
     if erro is not None:
         return erro
+    if _e_cloud(db, usuario):  # ação da Evolution: Modo 1 apenas
+        return _para_tela()
     label = (form.get("label") or "").strip()
     if not label:
         request.session["canal_erro"] = "Informe um nome para o número."
@@ -380,6 +403,8 @@ async def loja_whatsapp_conectar(
     usuario, _form, erro = await _guarda(request, db)
     if erro is not None:
         return erro
+    if _e_cloud(db, usuario):  # ação da Evolution: Modo 1 apenas
+        return _para_tela()
     try:
         resultado = chatbot.conectar_canal_whatsapp(canal_id)
         # Pareamento consumido no próximo GET. Nunca em log, nunca em auditoria.
@@ -405,6 +430,8 @@ async def loja_whatsapp_desconectar(
     usuario, _form, erro = await _guarda(request, db)
     if erro is not None:
         return erro
+    if _e_cloud(db, usuario):  # ação da Evolution: Modo 1 apenas
+        return _para_tela()
     try:
         chatbot.desconectar_canal_whatsapp(canal_id)
         _auditar(db, usuario, "desconectar", success=True)
@@ -445,6 +472,8 @@ async def loja_whatsapp_principal_estoque(
     usuario, _form, erro = await _guarda(request, db)
     if erro is not None:
         return erro
+    if _e_cloud(db, usuario):  # ação da Evolution: Modo 1 apenas
+        return _para_tela()
     try:
         chatbot.definir_principal_estoque_whatsapp(canal_id)
         request.session["canal_mensagem"] = (
@@ -499,6 +528,8 @@ def loja_whatsapp_fila(
         return redirecionar_login()
     if not _habilitado() or not _autorizado(usuario):
         return _para_app()
+    if not _e_cloud(db, usuario):  # rodízio: Modo 2 apenas
+        return _para_tela()
 
     fila, erro = [], None
     try:
@@ -532,6 +563,8 @@ async def loja_whatsapp_fila_criar(
     usuario, form, erro = await _guarda(request, db)
     if erro is not None:
         return erro
+    if not _e_cloud(db, usuario):  # rodízio: Modo 2 apenas
+        return _para_tela()
 
     escolhido = (form.get("usuario_id") or "").strip()
     telefone = (form.get("telefone") or "").strip()
@@ -569,9 +602,11 @@ async def loja_whatsapp_fila_remover(
     db: Session = Depends(get_db),
     chatbot=Depends(get_chatbot_client),
 ):
-    _usuario, _form, erro = await _guarda(request, db)
+    usuario, _form, erro = await _guarda(request, db)
     if erro is not None:
         return erro
+    if not _e_cloud(db, usuario):  # rodízio: Modo 2 apenas
+        return _para_tela()
     try:
         chatbot.remover_fila_vendedor(vendedor_id)
         request.session["fila_mensagem"] = "Vendedor saiu da fila."
