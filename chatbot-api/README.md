@@ -400,6 +400,38 @@ de todos os clientes.
   `loja`, `vendas` e `estoque`: o primeiro envelope de qualquer outro aggregate cai sempre
   no insert, e um gancho só ali passaria despercebido.
 
+### Virar um número de uma loja para outra
+
+Um chip testado na loja `teste` vira para a loja real por
+`scripts/mover_canal_de_loja.py`. **Não existe caminho pela API**, e não é esquecimento:
+`evolution_instance` é UNIQUE global, o elo 1 recusa número já cadastrado, e uma rota de
+mover canal daria a qualquer loja um jeito de tomar o número de outra.
+
+    python -m scripts.mover_canal_de_loja \
+      --phone-number-id <id> --para-slug <slug> [--apagar-dados-da-origem] [--dry-run]
+
+Spec e runbook do corte:
+[`../docs/referencia-viva/specs/2026-09-07-um-chip-teste-depois-loja-real-design.md`](../docs/referencia-viva/specs/2026-09-07-um-chip-teste-depois-loja-real-design.md).
+
+Três coisas que o script existe para não deixar você esquecer:
+
+- **Trocar `loja_id` não solta os telefones do teste.** `Conversa` é única por
+  `(canal_id, telefone)` e `_get_or_create_conversa` devolve a conversa achada **sem
+  conferir `loja_id`**. O `canal_id` não muda na virada, então o seu telefone e o dos
+  vendedores de teste voltariam a cair na conversa da loja de origem. É o que
+  `--apagar-dados-da-origem` resolve — e `fila_vendedor` fica, porque é cadastro.
+- **Destino sem projeção `ativa` aborta.** O Modo 2 é fail-closed: o número chegaria mudo
+  na loja nova, e o sintoma não aponta para cá.
+- **Oferta aberta na origem aborta.** `OfertaLead.vendedor_id` aponta para `fila_vendedor`
+  da loja de origem; mover no meio do rodízio deixa o lead pendurado em vendedor de outra
+  loja.
+
+E uma que o script **não** resolve, porque não é dele: assim que o Control projetar
+`whatsapp_modo=2` na loja de destino, `outbound_para_loja` manda **todo** o outbound dela
+pela Cloud — inclusive a resposta a quem escreveu no número Evolution antigo. Marcar o
+canal Modo 1 como inativo não segura (`resolve_canal_for_instance` ignora `ativo`): o
+número velho tem de sair da Evolution no corte.
+
 ## Rodar e testar
 
 ```bash

@@ -1,5 +1,5 @@
 {
- "sha": "9e2a105",
+ "sha": "bd39c42",
  "inventario": {
   "chatbot-api": [
    {
@@ -511,119 +511,119 @@
     "chave": "whatsapp_canais",
     "simbolo": "whatsapp_canais",
     "arquivo": "app/models_db.py",
-    "linha": 50
+    "linha": 57
    },
    {
     "secao": "modelo",
     "chave": "fila_vendedor",
     "simbolo": "fila_vendedor",
     "arquivo": "app/models_db.py",
-    "linha": 116
+    "linha": 123
    },
    {
     "secao": "modelo",
     "chave": "oferta_lead",
     "simbolo": "oferta_lead",
     "arquivo": "app/models_db.py",
-    "linha": 148
+    "linha": 155
    },
    {
     "secao": "modelo",
     "chave": "rodizio_ponteiro",
     "simbolo": "rodizio_ponteiro",
     "arquivo": "app/models_db.py",
-    "linha": 173
+    "linha": 180
    },
    {
     "secao": "modelo",
     "chave": "credenciais_servico",
     "simbolo": "credenciais_servico",
     "arquivo": "app/models_db.py",
-    "linha": 180
+    "linha": 187
    },
    {
     "secao": "modelo",
     "chave": "conversas",
     "simbolo": "conversas",
     "arquivo": "app/models_db.py",
-    "linha": 193
+    "linha": 200
    },
    {
     "secao": "modelo",
     "chave": "mensagens",
     "simbolo": "mensagens",
     "arquivo": "app/models_db.py",
-    "linha": 221
+    "linha": 228
    },
    {
     "secao": "modelo",
     "chave": "leads",
     "simbolo": "leads",
     "arquivo": "app/models_db.py",
-    "linha": 244
+    "linha": 251
    },
    {
     "secao": "modelo",
     "chave": "consentimentos",
     "simbolo": "consentimentos",
     "arquivo": "app/models_db.py",
-    "linha": 301
+    "linha": 308
    },
    {
     "secao": "modelo",
     "chave": "catalog_attributions",
     "simbolo": "catalog_attributions",
     "arquivo": "app/models_db.py",
-    "linha": 316
+    "linha": 323
    },
    {
     "secao": "modelo",
     "chave": "ctwa_auditoria",
     "simbolo": "ctwa_auditoria",
     "arquivo": "app/models_db.py",
-    "linha": 348
+    "linha": 355
    },
    {
     "secao": "modelo",
     "chave": "numeros_autorizados",
     "simbolo": "numeros_autorizados",
     "arquivo": "app/models_db.py",
-    "linha": 371
+    "linha": 378
    },
    {
     "secao": "modelo",
     "chave": "grupos_estoque",
     "simbolo": "grupos_estoque",
     "arquivo": "app/models_db.py",
-    "linha": 399
+    "linha": 406
    },
    {
     "secao": "modelo",
     "chave": "notificacoes_operacionais",
     "simbolo": "notificacoes_operacionais",
     "arquivo": "app/models_db.py",
-    "linha": 418
+    "linha": 425
    },
    {
     "secao": "modelo",
     "chave": "cloud_evento_falho",
     "simbolo": "cloud_evento_falho",
     "arquivo": "app/models_db.py",
-    "linha": 459
+    "linha": 466
    },
    {
     "secao": "modelo",
     "chave": "agente_config_versao",
     "simbolo": "agente_config_versao",
     "arquivo": "app/models_db.py",
-    "linha": 486
+    "linha": 493
    },
    {
     "secao": "modelo",
     "chave": "agente_config",
     "simbolo": "agente_config",
     "arquivo": "app/models_db.py",
-    "linha": 522
+    "linha": 529
    },
    {
     "secao": "worker",

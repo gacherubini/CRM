@@ -1,6 +1,6 @@
 # chatbot-api · 64 rotas · 19 modelos · 4 workers · 4 flags · 28 migrations
 
-Gerado de `9e2a105`. NAO editar a mao — saida de `gerar_mapa.py`.
+Gerado de `bd39c42`. NAO editar a mao — saida de `gerar_mapa.py`.
 Migration head: `0028_canal_onboarding`
 
 ## Rotas
@@ -74,23 +74,23 @@ Migration head: `0028_canal_onboarding`
 
 - `lojas` — app/models_db.py:19
 - `loja_operacional_projecao` — app/models_db.py:33
-- `whatsapp_canais` — app/models_db.py:50
-- `fila_vendedor` — app/models_db.py:116
-- `oferta_lead` — app/models_db.py:148
-- `rodizio_ponteiro` — app/models_db.py:173
-- `credenciais_servico` — app/models_db.py:180
-- `conversas` — app/models_db.py:193
-- `mensagens` — app/models_db.py:221
-- `leads` — app/models_db.py:244
-- `consentimentos` — app/models_db.py:301
-- `catalog_attributions` — app/models_db.py:316
-- `ctwa_auditoria` — app/models_db.py:348
-- `numeros_autorizados` — app/models_db.py:371
-- `grupos_estoque` — app/models_db.py:399
-- `notificacoes_operacionais` — app/models_db.py:418
-- `cloud_evento_falho` — app/models_db.py:459
-- `agente_config_versao` — app/models_db.py:486
-- `agente_config` — app/models_db.py:522
+- `whatsapp_canais` — app/models_db.py:57
+- `fila_vendedor` — app/models_db.py:123
+- `oferta_lead` — app/models_db.py:155
+- `rodizio_ponteiro` — app/models_db.py:180
+- `credenciais_servico` — app/models_db.py:187
+- `conversas` — app/models_db.py:200
+- `mensagens` — app/models_db.py:228
+- `leads` — app/models_db.py:251
+- `consentimentos` — app/models_db.py:308
+- `catalog_attributions` — app/models_db.py:323
+- `ctwa_auditoria` — app/models_db.py:355
+- `numeros_autorizados` — app/models_db.py:378
+- `grupos_estoque` — app/models_db.py:406
+- `notificacoes_operacionais` — app/models_db.py:425
+- `cloud_evento_falho` — app/models_db.py:466
+- `agente_config_versao` — app/models_db.py:493
+- `agente_config` — app/models_db.py:529
 
 ## Workers
 

@@ -45,7 +45,14 @@ class LojaOperacionalProjecao(Base):
 
 
 class WhatsAppCanal(Base):
-    """Canal WhatsApp da loja (Fase 5 multi-WA). loja_id é imutável após criação."""
+    """Canal WhatsApp da loja (Fase 5 multi-WA).
+
+    ``loja_id`` é imutável pela API: nenhuma rota o altera, e a UNIQUE global de
+    ``evolution_instance`` existe para impedir que uma loja tome o número de
+    outra. Quem muda é ``scripts/mover_canal_de_loja.py``, operação
+    administrativa fora do produto — um chip testado na loja `teste` e depois
+    virado para a loja real não passa pelo popup de novo.
+    """
 
     __tablename__ = "whatsapp_canais"
     __table_args__ = (
