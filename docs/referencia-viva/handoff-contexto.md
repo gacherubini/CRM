@@ -3,7 +3,7 @@
 Só o checkpoint. Narrativa de entrega fica no Git e em
 [`../nao-plano/historico/`](../nao-plano/historico/).
 
-O bloco **29/08** abaixo é o recente. O resto do checkpoint é de **2026-08-13** e
+O bloco **07/09** abaixo é o recente. O resto do checkpoint é de **2026-08-13** e
 envelheceu em partes — onde ele contradiz o
 [`contexto-compacto.md`](contexto-compacto.md), o contexto compacto vence.
 
@@ -12,6 +12,67 @@ Leia primeiro:
 1. [`contexto-compacto.md`](contexto-compacto.md) — estado e prioridades
 2. [`../fila/README.md`](../fila/README.md) — o que ainda é código
 3. [`design/2026-07-30-revy-control-loja-asbuilt-e-melhorias.md`](design/2026-07-30-revy-control-loja-asbuilt-e-melhorias.md) — as-built
+
+## Checkpoint de 2026-09-07 — o App Review saiu e o popup abriu
+
+`main` limpo, `app2037` no ar em **`a24ad91`**. `motor2037` continua em `ce4e2ab`
+(os drivers Playwright novos subiram na API, nao no worker).
+
+**O gate de 29/08 caiu.** App Review **aprovado em 07/09 11:18 GMT-3**, as duas
+permissoes: `whatsapp_business_messaging` e `whatsapp_business_management`.
+
+O que foi feito hoje, em ordem:
+
+1. Criada a configuracao v4 do Login for Business pelo modelo *"cadastro incorporado
+   do WhatsApp com token de expiracao em 60 dias"* → **`config_id 1092096256576691`**.
+   (App ID `1370395535203964`, business_id `4040462592922875`.)
+2. `PORTAL_META_APP_ID` e `PORTAL_META_CONFIG_ID` no `[env]` do `fly.app.toml`
+   (`a24ad91`), deployado e conferido: o botao da Loja **acendeu**.
+3. O `FB.login` reprovou com *"A opcao JSSDK nao esta ativada"*. Faltavam dois campos
+   que o §15 do spec nao previa, na tela de OAuth do app
+   (`/apps/<id>/business-login/settings/`): **Entrar com o SDK do JavaScript = Sim** e
+   **Dominios permitidos para o SDK do JavaScript = `https://app2037.fly.dev/`**.
+   Ligados, salvos — e **a janela da Meta passou**.
+
+Detalhe em `.claude/skills/revy-research/learnings/2026-09-07-o-config-id-nao-basta-para-o-popup-abrir.md`.
+
+### Duas horas que nao se repetem
+
+- **"Pronto para publicar" NAO e gate.** E o rotulo das permissoes aprovadas no caso
+  de uso. Nao existe botao de publicar permissao: a pagina `Publicar`
+  (`/apps/<id>/go_live/`) so oferece "Tirar do ar" (o app ja esta no ar desde 23/08) e
+  o menu Acoes da permissao so oferece "Reduzir o acesso" — que so existe para quem ja
+  esta no nivel de cima. Procurar esse botao custou boa parte da noite.
+- **O "60 dias" do modelo nao morde.** O token do popup fica em `token_cifrado` e so os
+  elos de `onboarding_cloud.py` o usam; o envio do dia a dia usa `CHATBOT_GRAPH_TOKEN`.
+  Expirar so significa que uma retomada muito atrasada pede popup de novo.
+- **"Recurso indisponivel — o Login do Facebook esta indisponivel para ele no momento"**
+  apareceu ~2 h depois, com a janela ja tendo passado. Nao ha acao pendente
+  (`Ações necessárias`: a unica, Verificacao de Uso de Dados, esta **Concluida em
+  07/09**) e nada nos 5 alertas indica restricao. Leitura: propagacao da propria
+  mudanca de OAuth. **Tentar de novo mais tarde antes de mexer em qualquer coisa.**
+
+### O que continua sem prova
+
+- **Os quatro elos nunca falaram com a Graph de verdade.** Inscrever app na WABA,
+  registrar numero, criar template: so mock. E o risco concentrado.
+- Os **tres caminhos de desistencia** do popup nao foram exercitados.
+- Teto do elo 3: paramos em 5 tentativas; a Meta trava o numero por **3 dias**.
+  **A primeira conexao tem de ser num chip descartavel, nunca no do cliente.**
+
+### Depois que uma loja conectar (nada disto e codigo)
+
+Canal nasce `pendente`. Liberar no Control (projetar `whatsapp_modo=2`), cadastrar a
+fila de vendedores, esperar a Meta aprovar o template na WABA dela.
+
+### Estado da loja `teste` (conferido em prod, 07/09)
+
+Projecao: `('teste','loja','ativa')` e `('teste','whatsapp_modo','2')`. As tres
+condicoes de `rodizio.loja_opera_modo2` passam; a tela do Agente renderiza o
+interruptor de follow-up (so existe no Modo 2) e a de Numeros mostra o card de nuvem.
+**A Loja nunca escreve "Modo 2"** — mostra o efeito, nao o nome. Divida viva: o
+cabecalho da tela de Numeros ainda fala de QR mesmo em loja Cloud.
+
 
 ## Checkpoint de 2026-08-29 — Embedded Signup
 
