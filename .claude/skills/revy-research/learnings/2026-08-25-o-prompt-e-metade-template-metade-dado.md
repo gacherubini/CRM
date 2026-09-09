@@ -36,4 +36,4 @@ E o prompt padrão vive **duas vezes**: no gerador do chatbot e como constante J
 scripts.sincronizar_fallback_n8n` no `chatbot-api` reescreve a cópia; um teste reprova a
 divergência.
 
-Ver [[2026-08-23-o-prompt-do-bot-mora-no-n8n]] e [[2026-08-23-workflow-cloud-e-gerado]].
+Ver [[2026-08-23-workflow-cloud-e-gerado]].

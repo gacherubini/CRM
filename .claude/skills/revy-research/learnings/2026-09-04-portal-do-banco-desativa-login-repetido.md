@@ -35,5 +35,5 @@ Duas regras que saíram daí, já aplicadas em `scripts/_diag_bv.py` e `_diag_mo
 Vale para qualquer portal bancário, não só o BV. O Motrix aguentou quatro logins sem
 reclamar, o que não prova nada sobre o quinto.
 
-Primo deste: [[2026-09-04-probe-todos-roda-os-bancos-de-uma-vez]] — lá a sessão quente é
-economia de tempo; aqui é o que impede de queimar a credencial da loja.
+O runner e os cuidados com sessao quente ficam no README do Motor; aqui ela e o
+que impede de queimar a credencial da loja.

@@ -25,8 +25,7 @@ piloto não tem canal Cloud cadastrado, só a coluna.
 Isto derrubava **duas** coisas ao mesmo tempo, as duas caladas: a reoferta do rodízio e o
 follow-up do Modo 2. A segunda ninguém tinha notado, e consertou de carona.
 
-Ver [[2026-08-23-canal-cloud-nao-se-cadastra-pela-api]] (por que a loja piloto não tem
-canal) e [[2026-08-23-teste-verde-nao-prova-que-a-feature-existe]].
+Ver [[2026-08-23-teste-verde-nao-prova-que-a-feature-existe]].
 
 ## Segunda ocorrencia, 29/08: o envio humano do Atendimento
 

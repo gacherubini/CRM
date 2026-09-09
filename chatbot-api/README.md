@@ -354,6 +354,12 @@ segredo** — vai no popup, e por isso está no `[env]` do `fly.app.toml`;
 `CHATBOT_CANAL_SECRET_KEY` é **secret**, nunca `[env]`, porque ela abre o token de WhatsApp
 de todos os clientes.
 
+O rollout do Modo 2 cruza **três flags**, não uma:
+`REVY_CONTROL_WHATSAPP_MODO2_ENABLED` libera a escolha no Control,
+`CHATBOT_WHATSAPP_MODO2_ENABLED` liga os caminhos Cloud no Chatbot e
+`MULTI_WHATSAPP_ENABLED` libera as rotas de canais. Mudar somente uma deixa a
+cadeia parcialmente ligada.
+
 ### Armadilhas desta feature
 
 - **O canal nasce depois do elo 1, não no fim da cadeia.** Parece cedo demais gravar linha

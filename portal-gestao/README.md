@@ -181,6 +181,8 @@ Arquivos: `app/loja/routes.py`, `app/templates/loja/agente_configuracao.html`,
 - **A tela não se verifica com pytest.** Formulário e autosave são JS. Verificação é no
   navegador, com portal local semeado — foi assim que o `422`→`502` apareceu, com um
   horário sem zero à esquerda.
+- **Teste também trocando de aba durante a espera.** Aba oculta pode suspender
+  `requestAnimationFrame`; a conclusão do fluxo não pode depender somente dele.
 - **A conversa de teste vive só no navegador.** O histórico é uma lista em JS; nada
   entra em Conversas, vira lead ou avisa a equipe — as ferramentas rodam em modo seco
   no workflow de preview. O botão só aparece quando o chatbot diz

@@ -44,5 +44,4 @@ que se concretizou.
 
 Design completo em
 [`docs/referencia-viva/specs/2026-08-29-embedded-signup-tech-provider-design.md`].
-Ver tambem [[2026-08-23-canal-cloud-nao-se-cadastra-pela-api]], que e a metade do problema
-que mora no nosso lado.
+O fluxo HTTP atual que substituiu o retrato antigo esta no README do chatbot.

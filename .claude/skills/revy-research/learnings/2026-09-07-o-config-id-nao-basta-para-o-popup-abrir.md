@@ -69,6 +69,5 @@ a *configuration* v4 (`config_id`), e as configuracoes de OAuth do app — que s
 sao **tres** campos. Ter quase todos em dia da erro dentro do popup, onde nem log nosso nem
 teste alcanca.
 
-E o erro so aparece quando alguem clica. Ver
-[[2026-08-23-copiloto-so-se-verifica-no-navegador]]: o JS desta tela tinha teste que
-renderizava o template como texto e passava verde.
+E o erro so aparece quando alguem clica. O JS desta tela tinha teste que
+renderizava o template como texto e passava verde; exercite-o no navegador.

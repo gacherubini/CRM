@@ -66,6 +66,10 @@ Para mudar como **uma loja** fala, mexa na config dela (hoje por rota; a tela é
 Para mudar como **toda loja** opera, mexa aqui — e no núcleo Revy, que vive em
 `chatbot-api/app/agente_prompt.py`.
 
+Isso também separa o alvo do deploy: mudar a operação literal exige publicar o
+workflow no n8n; mudar o gerador de identidade e regras da loja exige deploy do
+`chatbot-api` (ou apenas salvar a config, quando a mudança é dado da loja).
+
 O fluxo atual tem 34 nós e trabalha com:
 
 - mensagens de texto de clientes;
