@@ -1,6 +1,9 @@
 {% extends "base.html" %}
 {% block title %}Atendimento — Revy Loja{% endblock %}
 {% block content %}
+{% if request.app.state.prototype_atendimento | default(false) %}
+{% include "loja/prototype_atendimento.html" %}
+{% else %}
 {# Estilos: .chat-column / .thread / .composer em app.css #}
 <div class="page-heading">
   <div>
@@ -240,4 +243,5 @@
   </div>
 </div>
 <script src="/static/js/atendimento_workspace.js" defer></script>
+{% endif %}
 {% endblock %}

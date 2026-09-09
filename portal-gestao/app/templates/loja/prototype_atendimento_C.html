@@ -1,0 +1,9 @@
+<section class="pa-variant pa-c" data-panel="C" {% if variant != 'C' %}hidden{% endif %} aria-label="C: Ficha de trabalho">
+  <header class="pa-dossier-top"><button type="button" class="button ghost" data-action="list">Voltar à lista</button><span>Atendimento <span class="pa-muted">/ Marina Demo</span></span></header>
+  <div class="pa-layout-c"><aside class="pa-dossier" aria-label="Ficha de trabalho">{{ ui.identity() }}{{ ui.ownership() }}
+    <div class="pa-dossier-interest"><span class="pa-muted">Interesse da cliente</span><h2>Yamaha Fazer FZ25</h2><p>2024 · Azul</p>{{ ui.actions() }}<small>A simulação abre com o celular preenchido.</small></div>
+    {{ ui.stage('C') }}
+    <details class="pa-disclosure" open><summary>Contato e origem</summary>{{ ui.facts() }}</details>
+    <details class="pa-disclosure"><summary>Responsável e bot</summary>{{ ui.handoff() }}</details>{{ ui.links() }}
+  </aside><div class="pa-chat-wrap">{{ ui.notice() }}{{ ui.chat('C') }}</div></div>
+</section>

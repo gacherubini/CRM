@@ -1,5 +1,5 @@
 {
- "sha": "39ebc82",
+ "sha": "db8aee8",
  "inventario": {
   "chatbot-api": [
    {
@@ -1178,273 +1178,273 @@
     "chave": "GET /health/live",
     "simbolo": "/health/live",
     "arquivo": "app/main.py",
-    "linha": 538
+    "linha": 539
    },
    {
     "secao": "rota",
     "chave": "GET /health/ready",
     "simbolo": "/health/ready",
     "arquivo": "app/main.py",
-    "linha": 543
+    "linha": 544
    },
    {
     "secao": "rota",
     "chave": "GET /public/v1/lojas/{loja_slug}/pixel",
     "simbolo": "/public/v1/lojas/{loja_slug}/pixel",
     "arquivo": "app/main.py",
-    "linha": 552
+    "linha": 553
    },
    {
     "secao": "rota",
     "chave": "GET /",
     "simbolo": "/",
     "arquivo": "app/main.py",
-    "linha": 587
+    "linha": 588
    },
    {
     "secao": "rota",
     "chave": "GET /login",
     "simbolo": "/login",
     "arquivo": "app/main.py",
-    "linha": 592
+    "linha": 593
    },
    {
     "secao": "rota",
     "chave": "POST /login",
     "simbolo": "/login",
     "arquivo": "app/main.py",
-    "linha": 599
+    "linha": 600
    },
    {
     "secao": "rota",
     "chave": "POST /logout",
     "simbolo": "/logout",
     "arquivo": "app/main.py",
-    "linha": 620
+    "linha": 621
    },
    {
     "secao": "rota",
     "chave": "GET /conta/senha",
     "simbolo": "/conta/senha",
     "arquivo": "app/main.py",
-    "linha": 627
+    "linha": 628
    },
    {
     "secao": "rota",
     "chave": "POST /conta/senha",
     "simbolo": "/conta/senha",
     "arquivo": "app/main.py",
-    "linha": 636
+    "linha": 637
    },
    {
     "secao": "rota",
     "chave": "GET /app",
     "simbolo": "/app",
     "arquivo": "app/main.py",
-    "linha": 673
+    "linha": 674
    },
    {
     "secao": "rota",
     "chave": "GET /app/estoque",
     "simbolo": "/app/estoque",
     "arquivo": "app/main.py",
-    "linha": 802
+    "linha": 803
    },
    {
     "secao": "rota",
     "chave": "GET /app/estoque/novo",
     "simbolo": "/app/estoque/novo",
     "arquivo": "app/main.py",
-    "linha": 841
+    "linha": 842
    },
    {
     "secao": "rota",
     "chave": "GET /app/operacao/numeros",
     "simbolo": "/app/operacao/numeros",
     "arquivo": "app/main.py",
-    "linha": 935
+    "linha": 936
    },
    {
     "secao": "rota",
     "chave": "POST /app/operacao/grupo",
     "simbolo": "/app/operacao/grupo",
     "arquivo": "app/main.py",
-    "linha": 968
+    "linha": 969
    },
    {
     "secao": "rota",
     "chave": "POST /app/operacao/numeros",
     "simbolo": "/app/operacao/numeros",
     "arquivo": "app/main.py",
-    "linha": 996
+    "linha": 997
    },
    {
     "secao": "rota",
     "chave": "POST /app/operacao/numeros/remover",
     "simbolo": "/app/operacao/numeros/remover",
     "arquivo": "app/main.py",
-    "linha": 1023
+    "linha": 1024
    },
    {
     "secao": "rota",
     "chave": "POST /app/estoque/novo",
     "simbolo": "/app/estoque/novo",
     "arquivo": "app/main.py",
-    "linha": 1049
+    "linha": 1050
    },
    {
     "secao": "rota",
     "chave": "GET /app/estoque/{veiculo_id}",
     "simbolo": "/app/estoque/{veiculo_id}",
     "arquivo": "app/main.py",
-    "linha": 1076
+    "linha": 1077
    },
    {
     "secao": "rota",
     "chave": "POST /app/estoque/{veiculo_id}",
     "simbolo": "/app/estoque/{veiculo_id}",
     "arquivo": "app/main.py",
-    "linha": 1107
+    "linha": 1108
    },
    {
     "secao": "rota",
     "chave": "POST /app/estoque/{veiculo_id}/{acao}",
     "simbolo": "/app/estoque/{veiculo_id}/{acao}",
     "arquivo": "app/main.py",
-    "linha": 1135
+    "linha": 1136
    },
    {
     "secao": "rota",
     "chave": "GET /app/leads",
     "simbolo": "/app/leads",
     "arquivo": "app/main.py",
-    "linha": 1182
+    "linha": 1183
    },
    {
     "secao": "rota",
     "chave": "GET /app/leads/{lead_id}",
     "simbolo": "/app/leads/{lead_id}",
     "arquivo": "app/main.py",
-    "linha": 1210
+    "linha": 1211
    },
    {
     "secao": "rota",
     "chave": "POST /app/leads/{lead_id}/etapa",
     "simbolo": "/app/leads/{lead_id}/etapa",
     "arquivo": "app/main.py",
-    "linha": 1246
+    "linha": 1247
    },
    {
     "secao": "rota",
     "chave": "GET /app/conversas",
     "simbolo": "/app/conversas",
     "arquivo": "app/main.py",
-    "linha": 1305
+    "linha": 1306
    },
    {
     "secao": "rota",
     "chave": "GET /app/conversas/{telefone}",
     "simbolo": "/app/conversas/{telefone}",
     "arquivo": "app/main.py",
-    "linha": 1332
+    "linha": 1333
    },
    {
     "secao": "rota",
     "chave": "POST /app/conversas/{telefone}/handoff",
     "simbolo": "/app/conversas/{telefone}/handoff",
     "arquivo": "app/main.py",
-    "linha": 1425
+    "linha": 1426
    },
    {
     "secao": "rota",
     "chave": "GET /app/vendas",
     "simbolo": "/app/vendas",
     "arquivo": "app/main.py",
-    "linha": 1530
+    "linha": 1539
    },
    {
     "secao": "rota",
     "chave": "GET /app/vendas/nova",
     "simbolo": "/app/vendas/nova",
     "arquivo": "app/main.py",
-    "linha": 1570
+    "linha": 1579
    },
    {
     "secao": "rota",
     "chave": "POST /app/vendas/nova",
     "simbolo": "/app/vendas/nova",
     "arquivo": "app/main.py",
-    "linha": 1587
+    "linha": 1596
    },
    {
     "secao": "rota",
     "chave": "POST /app/vendas/{venda_id}/confirmar",
     "simbolo": "/app/vendas/{venda_id}/confirmar",
     "arquivo": "app/main.py",
-    "linha": 1988
+    "linha": 1999
    },
    {
     "secao": "rota",
     "chave": "POST /app/vendas/{venda_id}/cancelar",
     "simbolo": "/app/vendas/{venda_id}/cancelar",
     "arquivo": "app/main.py",
-    "linha": 2006
+    "linha": 2017
    },
    {
     "secao": "rota",
     "chave": "GET /app/vendedor",
     "simbolo": "/app/vendedor",
     "arquivo": "app/main.py",
-    "linha": 2018
+    "linha": 2029
    },
    {
     "secao": "rota",
     "chave": "GET /app/funil",
     "simbolo": "/app/funil",
     "arquivo": "app/main.py",
-    "linha": 2129
+    "linha": 2140
    },
    {
     "secao": "rota",
     "chave": "GET /app/funil/dados",
     "simbolo": "/app/funil/dados",
     "arquivo": "app/main.py",
-    "linha": 2205
+    "linha": 2216
    },
    {
     "secao": "rota",
     "chave": "GET /app/financeiro",
     "simbolo": "/app/financeiro",
     "arquivo": "app/main.py",
-    "linha": 2242
+    "linha": 2253
    },
    {
     "secao": "rota",
     "chave": "GET /app/financeiras",
     "simbolo": "/app/financeiras",
     "arquivo": "app/main.py",
-    "linha": 2319
+    "linha": 2330
    },
    {
     "secao": "rota",
     "chave": "POST /app/financeiras/{nome}",
     "simbolo": "/app/financeiras/{nome}",
     "arquivo": "app/main.py",
-    "linha": 2376
+    "linha": 2387
    },
    {
     "secao": "rota",
     "chave": "POST /app/financeiras/{nome}/testar",
     "simbolo": "/app/financeiras/{nome}/testar",
     "arquivo": "app/main.py",
-    "linha": 2479
+    "linha": 2490
    },
    {
     "secao": "rota",
     "chave": "GET /app/configuracoes",
     "simbolo": "/app/configuracoes",
     "arquivo": "app/main.py",
-    "linha": 2590
+    "linha": 2601
    },
    {
     "secao": "worker",
@@ -1948,84 +1948,84 @@
     "chave": "GET /app/loja/vendas",
     "simbolo": "/app/loja/vendas",
     "arquivo": "app/web/loja_vendas.py",
-    "linha": 125
+    "linha": 126
    },
    {
     "secao": "rota",
     "chave": "GET /app/loja/vendas/dados",
     "simbolo": "/app/loja/vendas/dados",
     "arquivo": "app/web/loja_vendas.py",
-    "linha": 161
+    "linha": 162
    },
    {
     "secao": "rota",
     "chave": "GET /app/loja/vendas/lista",
     "simbolo": "/app/loja/vendas/lista",
     "arquivo": "app/web/loja_vendas.py",
-    "linha": 184
+    "linha": 185
    },
    {
     "secao": "rota",
     "chave": "POST /app/loja/vendas/{venda_id}/confirmar",
     "simbolo": "/app/loja/vendas/{venda_id}/confirmar",
     "arquivo": "app/web/loja_vendas.py",
-    "linha": 231
+    "linha": 232
    },
    {
     "secao": "rota",
     "chave": "POST /app/loja/vendas/{venda_id}/cancelar",
     "simbolo": "/app/loja/vendas/{venda_id}/cancelar",
     "arquivo": "app/web/loja_vendas.py",
-    "linha": 253
+    "linha": 254
    },
    {
     "secao": "rota",
     "chave": "GET /app/loja/vendas/{venda_id}/editar",
     "simbolo": "/app/loja/vendas/{venda_id}/editar",
     "arquivo": "app/web/loja_vendas.py",
-    "linha": 289
+    "linha": 290
    },
    {
     "secao": "rota",
     "chave": "POST /app/loja/vendas/{venda_id}/editar",
     "simbolo": "/app/loja/vendas/{venda_id}/editar",
     "arquivo": "app/web/loja_vendas.py",
-    "linha": 327
+    "linha": 328
    },
    {
     "secao": "rota",
     "chave": "POST /app/loja/vendas/{venda_id}/excluir",
     "simbolo": "/app/loja/vendas/{venda_id}/excluir",
     "arquivo": "app/web/loja_vendas.py",
-    "linha": 344
+    "linha": 345
    },
    {
     "secao": "rota",
     "chave": "POST /app/loja/vendas/{venda_id}/custos",
     "simbolo": "/app/loja/vendas/{venda_id}/custos",
     "arquivo": "app/web/loja_vendas.py",
-    "linha": 357
+    "linha": 358
    },
    {
     "secao": "rota",
     "chave": "POST /app/loja/vendas/{venda_id}/custos/{custo_id}/remover",
     "simbolo": "/app/loja/vendas/{venda_id}/custos/{custo_id}/remover",
     "arquivo": "app/web/loja_vendas.py",
-    "linha": 378
+    "linha": 379
    },
    {
     "secao": "rota",
     "chave": "GET /app/loja/vendas/configuracoes-financeiras",
     "simbolo": "/app/loja/vendas/configuracoes-financeiras",
     "arquivo": "app/web/loja_vendas.py",
-    "linha": 394
+    "linha": 395
    },
    {
     "secao": "rota",
     "chave": "GET /app/loja/equipe",
     "simbolo": "/app/loja/equipe",
     "arquivo": "app/web/loja_vendas.py",
-    "linha": 410
+    "linha": 411
    },
    {
     "secao": "rota",
@@ -2413,6 +2413,27 @@
     "linha": 961
    },
    {
+    "secao": "rota",
+    "chave": "GET /",
+    "simbolo": "/",
+    "arquivo": "prototype_atendimento.py",
+    "linha": 50
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /app/loja/atendimento",
+    "simbolo": "/app/loja/atendimento",
+    "arquivo": "prototype_atendimento.py",
+    "linha": 51
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /app/loja/atendimento/{workspace_id}",
+    "simbolo": "/app/loja/atendimento/{workspace_id}",
+    "arquivo": "prototype_atendimento.py",
+    "linha": 56
+   },
+   {
     "secao": "template",
     "chave": "app/templates/base.html",
     "simbolo": "base.html",
@@ -2452,7 +2473,7 @@
     "chave": "app/templates/configuracoes/index.html",
     "simbolo": "configuracoes/index.html",
     "arquivo": "app/main.py",
-    "linha": 2630
+    "linha": 2641
    },
    {
     "secao": "template",
@@ -2466,14 +2487,14 @@
     "chave": "app/templates/conversas/detalhe.html",
     "simbolo": "conversas/detalhe.html",
     "arquivo": "app/main.py",
-    "linha": 1357
+    "linha": 1358
    },
    {
     "secao": "template",
     "chave": "app/templates/conversas/lista.html",
     "simbolo": "conversas/lista.html",
     "arquivo": "app/main.py",
-    "linha": 1321
+    "linha": 1322
    },
    {
     "secao": "template",
@@ -2487,7 +2508,7 @@
     "chave": "app/templates/dashboard.html",
     "simbolo": "dashboard.html",
     "arquivo": "app/main.py",
-    "linha": 783
+    "linha": 784
    },
    {
     "secao": "template",
@@ -2529,56 +2550,56 @@
     "chave": "app/templates/estoque/form.html",
     "simbolo": "estoque/form.html",
     "arquivo": "app/main.py",
-    "linha": 852
+    "linha": 853
    },
    {
     "secao": "template",
     "chave": "app/templates/estoque/lista.html",
     "simbolo": "estoque/lista.html",
     "arquivo": "app/main.py",
-    "linha": 827
+    "linha": 828
    },
    {
     "secao": "template",
     "chave": "app/templates/financeiras/lista.html",
     "simbolo": "financeiras/lista.html",
     "arquivo": "app/main.py",
-    "linha": 2361
+    "linha": 2372
    },
    {
     "secao": "template",
     "chave": "app/templates/financeiro/dashboard.html",
     "simbolo": "financeiro/dashboard.html",
     "arquivo": "app/main.py",
-    "linha": 2298
+    "linha": 2309
    },
    {
     "secao": "template",
     "chave": "app/templates/funil/index.html",
     "simbolo": "funil/index.html",
     "arquivo": "app/main.py",
-    "linha": 2192
+    "linha": 2203
    },
    {
     "secao": "template",
     "chave": "app/templates/leads/detalhe.html",
     "simbolo": "leads/detalhe.html",
     "arquivo": "app/main.py",
-    "linha": 1234
+    "linha": 1235
    },
    {
     "secao": "template",
     "chave": "app/templates/leads/lista.html",
     "simbolo": "leads/lista.html",
     "arquivo": "app/main.py",
-    "linha": 1199
+    "linha": 1200
    },
    {
     "secao": "template",
     "chave": "app/templates/login.html",
     "simbolo": "login.html",
     "arquivo": "app/main.py",
-    "linha": 596
+    "linha": 597
    },
    {
     "secao": "template",
@@ -2659,24 +2680,59 @@
    },
    {
     "secao": "template",
+    "chave": "app/templates/loja/prototype_atendimento.html",
+    "simbolo": "prototype_atendimento.html",
+    "arquivo": "app/templates/loja/prototype_atendimento.html",
+    "linha": 0
+   },
+   {
+    "secao": "template",
+    "chave": "app/templates/loja/prototype_atendimento_A.html",
+    "simbolo": "prototype_atendimento_A.html",
+    "arquivo": "app/templates/loja/prototype_atendimento_A.html",
+    "linha": 0
+   },
+   {
+    "secao": "template",
+    "chave": "app/templates/loja/prototype_atendimento_B.html",
+    "simbolo": "prototype_atendimento_B.html",
+    "arquivo": "app/templates/loja/prototype_atendimento_B.html",
+    "linha": 0
+   },
+   {
+    "secao": "template",
+    "chave": "app/templates/loja/prototype_atendimento_C.html",
+    "simbolo": "prototype_atendimento_C.html",
+    "arquivo": "app/templates/loja/prototype_atendimento_C.html",
+    "linha": 0
+   },
+   {
+    "secao": "template",
+    "chave": "app/templates/loja/prototype_atendimento_parts.html",
+    "simbolo": "prototype_atendimento_parts.html",
+    "arquivo": "app/templates/loja/prototype_atendimento_parts.html",
+    "linha": 0
+   },
+   {
+    "secao": "template",
     "chave": "app/templates/loja/venda_editar.html",
     "simbolo": "loja/venda_editar.html",
     "arquivo": "app/web/loja_vendas.py",
-    "linha": 314
+    "linha": 315
    },
    {
     "secao": "template",
     "chave": "app/templates/loja/vendas_lista.html",
     "simbolo": "loja/vendas_lista.html",
     "arquivo": "app/web/loja_vendas.py",
-    "linha": 215
+    "linha": 216
    },
    {
     "secao": "template",
     "chave": "app/templates/loja/vendas_visao.html",
     "simbolo": "loja/vendas_visao.html",
     "arquivo": "app/web/loja_vendas.py",
-    "linha": 145
+    "linha": 146
    },
    {
     "secao": "template",
@@ -2725,7 +2781,7 @@
     "chave": "app/templates/operacao/numeros.html",
     "simbolo": "operacao/numeros.html",
     "arquivo": "app/main.py",
-    "linha": 957
+    "linha": 958
    },
    {
     "secao": "template",
@@ -2837,21 +2893,21 @@
     "chave": "app/templates/vendas/form.html",
     "simbolo": "vendas/form.html",
     "arquivo": "app/main.py",
-    "linha": 1512
+    "linha": 1521
    },
    {
     "secao": "template",
     "chave": "app/templates/vendas/lista.html",
     "simbolo": "vendas/lista.html",
     "arquivo": "app/main.py",
-    "linha": 1556
+    "linha": 1565
    },
    {
     "secao": "template",
     "chave": "app/templates/vendedor/dashboard.html",
     "simbolo": "vendedor/dashboard.html",
     "arquivo": "app/main.py",
-    "linha": 2113
+    "linha": 2124
    },
    {
     "secao": "migration",

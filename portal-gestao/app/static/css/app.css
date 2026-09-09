@@ -4259,3 +4259,84 @@ a.metric-link:focus-visible { outline: 2px solid var(--brand); outline-offset: 2
   border: 0;
 }
 .agente-chips-entrada:focus { outline: none; box-shadow: none; }
+
+/* --- Estoque: hero de disponibilidade (redesign Task 2, 09/09) ---
+   Superfícies planas nos tokens existentes; sem :root novo. */
+.estoque-hero-body > .mono-label { margin-bottom: 0; }
+.estoque-hero-num {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+  margin: var(--space-2) 0;
+  color: var(--ink);
+}
+.estoque-hero-num strong {
+  font-size: var(--text-display);
+  font-weight: 600;
+  letter-spacing: -.03em;
+  line-height: 1;
+}
+.estoque-hero-num span { font-size: var(--text-lg); color: var(--ink-soft); }
+.estoque-sec {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-4);
+  margin: var(--space-5) 0 0;
+  padding: var(--space-5) 0 0;
+  border-top: 1px solid var(--line);
+}
+.estoque-sec > div { min-width: 0; }
+.estoque-sec dt {
+  color: var(--ink-muted);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: .01em;
+}
+.estoque-sec dd {
+  margin: var(--space-1) 0 0;
+  font-size: var(--text-metric);
+  font-weight: 600;
+  letter-spacing: -.02em;
+  line-height: 1.15;
+}
+.estoque-sec-nota { font-size: var(--text-xs); font-weight: 400; color: var(--ink-soft); }
+/* Aside "Veículos" (recusa L5): faixa horizontal no desktop. */
+.estoque-aside { margin-bottom: var(--space-4); }
+@media (min-width: 900px) {
+  .estoque-aside {
+    display: flex;
+    align-items: center;
+    gap: var(--space-6);
+  }
+  .estoque-aside .integration-heading { flex: 0 0 auto; }
+  .estoque-aside > p { flex: 1 1 auto; margin: 0; }
+  .estoque-aside .integration-action { flex: 0 0 auto; }
+}
+/* Idade do estoque: faixas com barra proporcional ao total com data. */
+.estoque-idade {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-3);
+}
+.estoque-idade li {
+  display: grid;
+  grid-template-columns: 140px minmax(0, 1fr) 3ch;
+  align-items: center;
+  gap: var(--space-4);
+  font-size: var(--text-base);
+}
+.estoque-idade strong { text-align: right; font-variant-numeric: tabular-nums; }
+.estoque-bar {
+  display: block;
+  height: 8px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--surface-soft);
+}
+.estoque-bar i { display: block; height: 100%; background: var(--brand); }
+@media (max-width: 720px) {
+  .estoque-sec { grid-template-columns: 1fr; }
+  .estoque-idade li { grid-template-columns: 110px minmax(0, 1fr) 3ch; }
+}

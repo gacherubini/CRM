@@ -1,0 +1,90 @@
+r"""Descartável: três hierarquias para Atendimento, na rota existente, ?variant=A/B/C.
+
+Windows: .\.venv\Scripts\python.exe prototype_atendimento.py
+macOS: .venv/bin/python prototype_atendimento.py
+Não importa app/config/main, não lê .env, não conecta integrações. SQLite em memória.
+"""
+from pathlib import Path
+from types import SimpleNamespace as NS
+import argparse
+import re
+import sqlite3
+
+from fastapi import FastAPI, Request
+from fastapi.responses import HTMLResponse, RedirectResponse, PlainTextResponse
+from fastapi.staticfiles import StaticFiles
+from jinja2 import Environment, FileSystemLoader, select_autoescape
+import uvicorn
+
+ROOT = Path(__file__).resolve().parent
+app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
+app.state.prototype_atendimento = True  # Único local que habilita o gancho.
+db = sqlite3.connect(':memory:', check_same_thread=False)
+db.execute('CREATE TABLE mensagens (direcao TEXT, texto TEXT, hora TEXT)')
+db.executemany('INSERT INTO mensagens VALUES (?, ?, ?)', [
+    ('entrada', 'Oi! Vi a Fazer azul no anúncio. Ainda está disponível?', '10:12'),
+    ('saida', 'Olá, Marina! A Fazer FZ25 2024 está disponível, sim. Você pensa em financiar?', '10:12'),
+    ('entrada', 'Sim! Tenho R$ 6 mil para dar de entrada. Uso a moto para trabalhar.', '10:14'),
+    ('saida', 'Entendi. Vou chamar alguém da equipe para seguir com a simulação e tirar suas dúvidas.', '10:14'),
+    ('entrada', 'Perfeito. Se der certo, consigo passar aí amanhã de manhã.', '10:15'),
+    ('entrada', 'Pode ver as opções para mim?', '10:16'),
+])
+env = Environment(loader=FileSystemLoader(ROOT / 'app/templates'), autoescape=select_autoescape())
+app.mount('/static', StaticFiles(directory=ROOT / 'app/static'), name='static')
+
+
+@app.middleware('http')
+async def local_only(request: Request, call_next):
+    if request.method not in ('GET', 'HEAD'):
+        return PlainTextResponse('Demonstração: nenhuma alteração é persistida.', status_code=405)
+    response = await call_next(request)
+    response.headers['Cache-Control'] = 'no-store'
+    response.headers['Content-Security-Policy'] = (
+        "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; "
+        "font-src 'self'; img-src 'self' data:; connect-src 'none'; form-action 'none'; "
+        "object-src 'none'; base-uri 'none'; frame-ancestors 'none'"
+    )
+    return response
+
+
+@app.get('/')
+@app.get('/app/loja/atendimento')
+async def index():
+    return RedirectResponse('/app/loja/atendimento/demo-marina?variant=A')
+
+
+@app.get('/app/loja/atendimento/{workspace_id}', response_class=HTMLResponse)
+async def workspace(request: Request, workspace_id: str):
+    variant = request.query_params.get('variant', 'A').upper()
+    if variant not in ('A', 'B', 'C'):
+        variant = 'A'
+    nav = [NS(title=title, items=[NS(label=label, href=href) for label, href in items]) for title, items in [
+        ('Vendas', [('Resultado', '/app/loja/vendas'), ('Atendimento', '/app/loja/atendimento'),
+                    ('Vendas da loja', '/app/loja/vendas/lista'), ('Agente do WhatsApp', '/app/loja/agente'),
+                    ('Simulações', '/app/simulacoes')]),
+        ('Estoque', [('Situação do estoque', '/app/loja/estoque'), ('Veículos', '/app/loja/estoque/veiculos'),
+                     ('Vitrine', '/app/loja/estoque/vitrine')]),
+        ('Ajustes', [('Equipe', '/app/equipe'), ('Acessos dos bancos', '/app/financeiras')]),
+    ]]
+    context = dict(
+        request=request, variant=variant, loja_shell=True, loja_brand='Revy Loja', loja_nav=nav,
+        nav_item_is_active=lambda item, path: item.href == '/app/loja/atendimento',
+        usuario=NS(nome='Rafael Demo', email='rafael@example.invalid', papel='gerente', loja_slug='Horizonte Motos'),
+        store_context=NS(loja_slug='Horizonte Motos'), lojas_disponiveis=[],
+        entitlements=NS(vendas_enabled=True, estoque_enabled=True), csrf='',
+        workspace=NS(id=workspace_id, nome='Marina Demo', telefone='(00) 00000-0142',
+                     canal_label='WhatsApp da loja', veiculo_interesse='Yamaha Fazer FZ25',
+                     mensagens=[NS(direcao=d, texto=t, hora=h) for d, t, h in db.execute('SELECT * FROM mensagens')]),
+    )
+    html = env.get_template('loja/atendimento_workspace.html').render(**context)
+    # O shell mantém sua fonte/fallback; estes links externos não fazem parte da demo offline.
+    html = re.sub(r'<link\b[^>]*https://fonts\.(?:googleapis|gstatic)\.com[^>]*>', '', html)
+    return HTMLResponse(html)
+
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--port', type=int, default=8766)
+    args = parser.parse_args()
+    print(f'Demonstração local: http://127.0.0.1:{args.port}/app/loja/atendimento/demo-marina?variant=A')
+    uvicorn.run(app, host='127.0.0.1', port=args.port, access_log=False)

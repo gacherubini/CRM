@@ -38,40 +38,53 @@
 </section>
 
 {% else %}
-{# ok ou parcial — contagens reais da lista #}
+{# ok ou parcial — contagens reais da lista.
+   Hero "Disponíveis" como protagonista; Reservados/Vendidos/Publicados em
+   faixa secundária. Nenhum número mudou, nenhuma ação saiu. #}
 {% set c = overview.contagens %}
-<section class="dashboard-grid" aria-label="Resumo do estoque">
-  <article class="operations-card">
-    <div class="operations-copy">
-      <h2>Disponibilidade</h2>
-      <p>
-        {% if overview.status == 'parcial' %}
-        Totais contados na lista atual. As faixas de idade não aparecem: nenhum veículo ativo tem data de entrada.
-        {% else %}
-        Totais por disponibilidade, contados na lista atual de veículos.
-        {% endif %}
-      </p>
-    </div>
-    <div class="metric-grid">
-      <div class="metric"><span>Disponíveis</span><strong>{{ c.disponivel }}</strong></div>
-      <div class="metric"><span>Reservados</span><strong>{{ c.reservado }}</strong></div>
-      <div class="metric"><span>Vendidos</span><strong>{{ c.vendido }}</strong></div>
-      <div class="metric"><span>Publicados</span><strong>{{ c.publicados }}</strong><small>no catálogo · total {{ c.total }}</small></div>
-    </div>
-  </article>
-
-  <aside class="integration-card">
-    <div class="integration-heading">
+<section class="panel estoque-hero" aria-label="Resumo do estoque">
+  <div class="panel-body estoque-hero-body">
+    <span class="mono-label">Disponibilidade</span>
+    <p class="estoque-hero-num"><strong>{{ c.disponivel }}</strong> <span>Disponíveis para venda</span></p>
+    <p class="muted">De {{ c.total }} veículos no cadastro · {{ c.publicados }} publicados no catálogo.</p>
+    <p class="muted">
+      {% if overview.status == 'parcial' %}
+      Totais contados na lista atual. As faixas de idade não aparecem: nenhum veículo ativo tem data de entrada.
+      {% else %}
+      Totais por disponibilidade, contados na lista atual de veículos.
+      {% endif %}
+    </p>
+    <dl class="estoque-sec">
       <div>
-        <strong>Veículos</strong>
-        <small>cadastro, fotos e publicação</small>
+        <dt>Reservados</dt>
+        <dd>{{ c.reservado }}</dd>
       </div>
-      <span class="status-chip"><i></i>Operacional</span>
-    </div>
-    <p>Cadastrar, editar, reservar, vender e publicar no catálogo: tudo acontece na lista de veículos.</p>
-    <a class="button secondary integration-action" href="{{ caminho_veiculos }}">Abrir lista de veículos</a>
-  </aside>
+      <div>
+        <dt>Vendidos</dt>
+        <dd>{{ c.vendido }}</dd>
+      </div>
+      <div>
+        <dt>Publicados</dt>
+        <dd>{{ c.publicados }}</dd>
+        <dd class="estoque-sec-nota">no catálogo</dd>
+      </div>
+    </dl>
+  </div>
 </section>
+
+{# Aside "Veículos" mantido por decisão do dono (recusa L5 de 07/08): mesmo
+   conteúdo e mesma ação, em faixa horizontal abaixo do resumo. #}
+<aside class="integration-card estoque-aside">
+  <div class="integration-heading">
+    <div>
+      <strong>Veículos</strong>
+      <small>cadastro, fotos e publicação</small>
+    </div>
+    <span class="status-chip"><i></i>Operacional</span>
+  </div>
+  <p>Cadastrar, editar, reservar, vender e publicar no catálogo: tudo acontece na lista de veículos.</p>
+  <a class="button secondary integration-action" href="{{ caminho_veiculos }}">Abrir lista de veículos</a>
+</aside>
 
 {% if overview.idade %}
 {% set idade = overview.idade %}
@@ -82,12 +95,30 @@
       <h2 id="idade-titulo">Dias desde a entrada</h2>
     </div>
   </div>
-  <p class="muted">Somente disponíveis e reservados com data de entrada ({{ idade.com_data }} com data{% if idade.sem_data %}, {{ idade.sem_data }} sem data{% endif %}).</p>
-  <div class="metric-grid">
-    <div class="metric"><span>Até 30 dias</span><strong>{{ idade.ate_30 }}</strong></div>
-    <div class="metric"><span>31 a 60 dias</span><strong>{{ idade.de_31_a_60 }}</strong></div>
-    <div class="metric"><span>61 a 90 dias</span><strong>{{ idade.de_61_a_90 }}</strong></div>
-    <div class="metric"><span>Acima de 90 dias</span><strong>{{ idade.acima_90 }}</strong></div>
+  <div class="panel-body">
+    <p class="muted">Somente disponíveis e reservados com data de entrada ({{ idade.com_data }} com data{% if idade.sem_data %}, {{ idade.sem_data }} sem data{% endif %}).</p>
+    <ul class="estoque-idade">
+      <li>
+        <span>Até 30 dias</span>
+        <span class="estoque-bar" aria-hidden="true"><i style="width:{% if idade.com_data %}{{ (idade.ate_30 / idade.com_data * 100) | round(0) | int }}{% else %}0{% endif %}%"></i></span>
+        <strong>{{ idade.ate_30 }}</strong>
+      </li>
+      <li>
+        <span>31 a 60 dias</span>
+        <span class="estoque-bar" aria-hidden="true"><i style="width:{% if idade.com_data %}{{ (idade.de_31_a_60 / idade.com_data * 100) | round(0) | int }}{% else %}0{% endif %}%"></i></span>
+        <strong>{{ idade.de_31_a_60 }}</strong>
+      </li>
+      <li>
+        <span>61 a 90 dias</span>
+        <span class="estoque-bar" aria-hidden="true"><i style="width:{% if idade.com_data %}{{ (idade.de_61_a_90 / idade.com_data * 100) | round(0) | int }}{% else %}0{% endif %}%"></i></span>
+        <strong>{{ idade.de_61_a_90 }}</strong>
+      </li>
+      <li>
+        <span>Acima de 90 dias</span>
+        <span class="estoque-bar" aria-hidden="true"><i style="width:{% if idade.com_data %}{{ (idade.acima_90 / idade.com_data * 100) | round(0) | int }}{% else %}0{% endif %}%"></i></span>
+        <strong>{{ idade.acima_90 }}</strong>
+      </li>
+    </ul>
   </div>
 </section>
 {% endif %}
