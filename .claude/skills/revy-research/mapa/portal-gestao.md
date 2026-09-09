@@ -1,6 +1,6 @@
-# portal-gestao · 161 rotas · 26 modelos · 6 workers · 35 flags · 26 migrations · 68 templates
+# portal-gestao · 162 rotas · 26 modelos · 6 workers · 35 flags · 26 migrations · 68 templates
 
-Gerado de `1cff2f1`. NAO editar a mao — saida de `gerar_mapa.py`.
+Gerado de `62e3ff9`. NAO editar a mao — saida de `gerar_mapa.py`.
 Migration head: `0026_copiloto_sinal_destinatario`
 
 ## Rotas
@@ -165,7 +165,8 @@ Migration head: `0026_copiloto_sinal_destinatario`
 - `POST /app/trafego` — app/web/trafego.py:961
 - `GET /` — prototype_atendimento.py:50
 - `GET /app/loja/atendimento` — prototype_atendimento.py:51
-- `GET /app/loja/atendimento/{workspace_id}` — prototype_atendimento.py:56
+- `GET /app/loja/estoque/demo` — prototype_atendimento.py:74
+- `GET /app/loja/atendimento/{workspace_id}` — prototype_atendimento.py:89
 
 ## Modelos
 

@@ -88,6 +88,10 @@ Idade do estoque continuam vindos do cadastro). Manter `page_title`,
 **Não faça:** remover informação, reordenar por conta própria o que o dono não
 pediu, reabrir `:root` em `app.css` (tokens têm fonte única).
 
+**Feedback do dono (09/09, pós-preview):** a v1 do redesign (hero
+"Disponíveis" + faixa secundária + idade em barras) continua **feia**.
+Voltar com nova direção visual antes de considerar a Task 2 feita.
+
 ## Task 3 — redesign: Vitrine (config compacta, catálogo protagonista)
 
 **Pedido do dono:** a seção "Catálogo e vitrine" (WhatsApp CTA + link) tem de

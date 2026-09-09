@@ -53,6 +53,39 @@ async def index():
     return RedirectResponse('/app/loja/atendimento/demo-marina?variant=A')
 
 
+def _shell_demo(request: Request):
+    nav = [NS(title=title, items=[NS(label=label, href=href) for label, href in items]) for title, items in [
+        ('Vendas', [('Resultado', '/app/loja/vendas'), ('Atendimento', '/app/loja/atendimento'),
+                    ('Vendas da loja', '/app/loja/vendas/lista'), ('Agente do WhatsApp', '/app/loja/agente'),
+                    ('Simulações', '/app/simulacoes')]),
+        ('Estoque', [('Situação do estoque', '/app/loja/estoque'), ('Veículos', '/app/loja/estoque/veiculos'),
+                     ('Vitrine', '/app/loja/estoque/vitrine')]),
+        ('Ajustes', [('Equipe', '/app/equipe'), ('Acessos dos bancos', '/app/financeiras')]),
+    ]]
+    return dict(
+        request=request, loja_shell=True, loja_brand='Revy Loja', loja_nav=nav,
+        nav_item_is_active=lambda item, path: False,
+        usuario=NS(nome='Rafael Demo', email='rafael@example.invalid', papel='gerente', loja_slug='Horizonte Motos'),
+        store_context=NS(loja_slug='Horizonte Motos'), lojas_disponiveis=[],
+        entitlements=NS(vendas_enabled=True, estoque_enabled=True), csrf='',
+    )
+
+
+@app.get('/app/loja/estoque/demo', response_class=HTMLResponse)
+async def estoque_demo(request: Request):
+    context = _shell_demo(request)
+    context.update(
+        caminho_veiculos='/app/loja/estoque/veiculos', caminho_novo='/app/loja/estoque/veiculos/novo',
+        pode_gerir=True,
+        overview=NS(status='ok',
+                     contagens=NS(disponivel=14, reservado=3, vendido=5, publicados=11, total=22),
+                     idade=NS(com_data=15, sem_data=2, ate_30=6, de_31_a_60=4, de_61_a_90=3, acima_90=2)),
+    )
+    html = env.get_template('loja/estoque_visao.html').render(**context)
+    html = re.sub(r'<link\b[^>]*https://fonts\.(?:googleapis|gstatic)\.com[^>]*>', '', html)
+    return HTMLResponse(html)
+
+
 @app.get('/app/loja/atendimento/{workspace_id}', response_class=HTMLResponse)
 async def workspace(request: Request, workspace_id: str):
     variant = request.query_params.get('variant', 'A').upper()
