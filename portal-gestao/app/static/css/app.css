@@ -3903,6 +3903,72 @@ a.metric-link:focus-visible { outline: 2px solid var(--brand); outline-offset: 2
   font-size: var(--text-xs);
 }
 
+/* ===========================================================================
+   Números de WhatsApp, direção B: lista + ficha (Task 6).
+   Uma ficha por vez — os forms dos outros números continuam no DOM, só
+   escondidos, então endpoints, CSRF e hooks do JS não mudam. Mobile empilha.
+   =========================================================================== */
+.wx-mestre {
+  display: grid;
+  gap: var(--space-4);
+}
+@media (min-width: 960px) {
+  .wx-mestre { grid-template-columns: 280px minmax(0, 1fr); align-items: start; }
+}
+.wx-lista {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: var(--space-2);
+}
+.wx-lista button {
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+  padding: var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-ctl);
+  background: var(--surface-soft);
+  color: var(--ink);
+  font-size: var(--text-sm);
+}
+.wx-lista button[aria-selected="true"] {
+  border-color: var(--brand-line);
+  background: var(--brand-tint);
+}
+.wx-lista small { display: block; color: var(--ink-muted); }
+.wx-ficha {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-srf);
+  background: var(--surface-soft);
+  padding: var(--space-5);
+}
+.wx-ficha h2 {
+  margin: 0 0 var(--space-2);
+  font-size: var(--text-lg);
+  overflow-wrap: anywhere;
+}
+.wx-ficha .wx-linha-acao {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+.wx-ficha .wx-linha-acao .button { min-height: 32px; padding: 0 10px; font-size: var(--text-xs); }
+.wx-quiet { margin-top: var(--space-4); }
+.wx-quiet summary { cursor: pointer; color: var(--ink-soft); font-size: var(--text-sm); }
+/* Vazio sem ícone: aqui o estado já vem em frase ("Nenhum número…"), e o
+   convite à ação mora no painel/disclosure ao lado, não no pictograma. */
+.wx-vazio {
+  display: grid;
+  gap: var(--space-1);
+  margin-bottom: var(--space-4);
+  color: var(--ink-soft);
+  font-size: var(--text-sm);
+}
+.wx-vazio strong { color: var(--ink); }
+
 /* QR: o codigo e o passo a passo lado a lado. Sozinho no meio do painel, o
    dono nao sabia em qual celular ler. */
 .qr-body {

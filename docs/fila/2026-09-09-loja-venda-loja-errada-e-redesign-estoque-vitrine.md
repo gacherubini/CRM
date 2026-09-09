@@ -192,6 +192,16 @@ agente com `mattpocock-skills:prototype`.
 prometer coexistência dos dois modos (recusa de 13/08: dois modos, sem
 coexistência).
 
+**Implementado (09/09, dono escolheu B):** lista + ficha — números à esquerda
+(nome + palavra de estado), uma ficha por vez à direita (estado, onboarding,
+QR ancorado no número dele, todas as ações; forms dos demais seguem no DOM,
+só escondidos). Adicionar número e nuvem viram disclosures quietos; sem canal
+nenhum, o convite da nuvem é o bloco principal e o vazio é texto sem ícone.
+Mesmos endpoints, campos, CSRF, polling do QR, permissões e textos de
+segurança; CSS novo só `.wx-*` (`.canal-*` intacto — Despesas usa
+`.canal-rodape`). Protótipos A/B/C aposentados (3 arquivos).
+Preview no runner: `/app/loja/whatsapp/demo` (template real, `?modo=1|2|2novo`).
+
 ## Task 7 — simplificar: Resultado
 
 **Pedido do dono:** página poluída; dá para ser mais simples.

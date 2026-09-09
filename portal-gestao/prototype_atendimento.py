@@ -193,6 +193,81 @@ async def workspace(request: Request, workspace_id: str):
     return HTMLResponse(html)
 
 
+QR_FICTICIO = (
+    "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 29 29'%3E"
+    "%3Crect width='29' height='29' fill='white'/%3E"
+    "%3Cg fill='black'%3E%3Crect x='2' y='2' width='7' height='7'/%3E"
+    "%3Crect x='20' y='2' width='7' height='7'/%3E%3Crect x='2' y='20' width='7' height='7'/%3E"
+    "%3C/g%3E%3Cg fill='white'%3E%3Crect x='3' y='3' width='5' height='5'/%3E"
+    "%3Crect x='21' y='3' width='5' height='5'/%3E%3Crect x='3' y='21' width='5' height='5'/%3E"
+    "%3C/g%3E%3Cg fill='black'%3E%3Crect x='4' y='4' width='3' height='3'/%3E"
+    "%3Crect x='22' y='4' width='3' height='3'/%3E%3Crect x='4' y='22' width='3' height='3'/%3E"
+    "%3Cpath d='M11 3h2v1h-2zM14 5h1v2h-1zM11 8h1v1h-1zM16 10h2v2h-2zM12 13h1v1h-1z"
+    "M24 12h1v2h-1zM11 16h2v1h-2zM18 18h1v1h-1zM25 20h1v1h-1zM13 22h1v2h-1z"
+    "M17 24h2v1h-2zM24 25h1v1h-1zM11 26h1v1h-1z'/%3E%3C/g%3E%3C/svg%3E"
+)
+
+
+@app.get('/app/loja/whatsapp/demo', response_class=HTMLResponse)
+async def whatsapp_demo(request: Request):
+    # Task 6 definitiva (direcao B): rende o template real com dados ficticios
+    # e sem persistencia. ?modo=1|2|2novo troca o cenario; ?variant= legado e
+    # ignorado. Sem ?variant= — os prototipos A/B/C foram aposentados.
+    modo_param = request.query_params.get('modo', '1')
+    if modo_param not in ('1', '2', '2novo'):
+        modo_param = '1'
+    cloud = modo_param == '2'
+    if modo_param == '2novo':
+        canais = []
+        qr, view = None, NS(baileys=False, erro=None, canais=canais,
+                            mostrar_link_conectar=True, pode_adicionar=False)
+    elif cloud:
+        canais = [NS(id='n1', label='Central Revy na nuvem', estado='cloud_pendente',
+                      rotulo='Conectado — aguardando liberação da Revy',
+                      principal_estoque=False,
+                      pode_conectar=False, pode_desconectar=False,
+                      pode_marcar_principal_estoque=False,
+                      onboarding_texto='Tudo feito do seu lado — falta a liberação da Revy.',
+                      onboarding_falhou=False,
+                      onboarding_acao='Enquanto isso, monte a fila de vendedores que atende as conversas.',
+                      onboarding_acao_url='/app/loja/whatsapp/fila', pode_tentar_de_novo=False)]
+        qr, view = None, NS(baileys=False, erro=None, canais=canais,
+                            mostrar_link_conectar=False, pode_adicionar=False)
+    else:
+        canais = [
+            NS(id='c1', label='Linha 1 \u2014 vendas', estado='conectado',
+               rotulo='Conectado', principal_estoque=True,
+               pode_conectar=False, pode_desconectar=True,
+               pode_marcar_principal_estoque=False,
+               onboarding_texto='', onboarding_falhou=False, onboarding_acao='',
+               onboarding_acao_url='', pode_tentar_de_novo=False),
+            NS(id='c2', label='Linha 2 \u2014 suporte', estado='pendente',
+               rotulo='Aguardando leitura do QR', principal_estoque=False,
+               pode_conectar=True, pode_desconectar=False,
+               pode_marcar_principal_estoque=True,
+               onboarding_texto='', onboarding_falhou=False, onboarding_acao='',
+               onboarding_acao_url='', pode_tentar_de_novo=False),
+            NS(id='c3', label='Linha 3 \u2014 pe\u00e7as', estado='desconectado',
+               rotulo='Caiu \u2014 reconectar', principal_estoque=False,
+               pode_conectar=True, pode_desconectar=False,
+               pode_marcar_principal_estoque=True,
+               onboarding_texto='', onboarding_falhou=False, onboarding_acao='',
+               onboarding_acao_url='', pode_tentar_de_novo=False),
+        ]
+        qr = NS(canal_id='c2', payload=QR_FICTICIO)
+        view = NS(baileys=True, erro=None, canais=canais,
+                  mostrar_link_conectar=False, pode_adicionar=True)
+    context = _shell_demo(request)
+    context.update(
+        nav_item_is_active=lambda item, path: False,
+        view=view, qr=qr, csrf='demonstracao',
+        acao_erro=None, acao_mensagem=None,
+    )
+    html = env.get_template('loja/whatsapp_canais.html').render(**context)
+    html = re.sub(r'<link\b[^>]*https://fonts\.(?:googleapis|gstatic)\.com[^>]*>', '', html)
+    return HTMLResponse(html)
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--port', type=int, default=8766)

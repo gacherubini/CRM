@@ -408,6 +408,6 @@ def test_no_teto_a_tela_nao_renderiza_clique_nenhum():
     assert CONECTAR not in html
     assert "133016" not in html
     # Nem um link morto: no teto, o unico caminho e falar com a Revy. O recorte
-    # e o card do canal — o cabecalho da tela tem link proprio (a fila).
-    card = html.split("canal-card")[1].split("</article>")[0]
+    # e a ficha do canal — o cabecalho da tela tem link proprio (a fila).
+    card = html.split("wx-ficha")[1].split("</section>")[0]
     assert "<a " not in card
