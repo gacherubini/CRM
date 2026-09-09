@@ -133,16 +133,21 @@
     </div>
     <form method="post" action="{{ public_path('/app/control/lojas/' ~ store.id ~ '/whatsapp-modo') }}" class="form-layout" id="form-whatsapp-modo">
       <input type="hidden" name="csrf" value="{{ csrf }}">
-      <label>
-        <input type="radio" name="modo" value="1" {% if store.whatsapp_mode == 1 %}checked{% endif %}>
-        Baileys + grupo
-      </label>
-      {% if whatsapp_modo2_enabled %}
-      <label>
-        <input type="radio" name="modo" value="2" {% if store.whatsapp_mode == 2 %}checked{% endif %}>
-        central Cloud API
-      </label>
-      {% endif %}
+      {# Radio solto vira filho de .form-layout, que empilha rotulo sobre campo:
+         a bolinha subia para uma linha propria. .option-group e o padrao de
+         escolha do Control (label em flex, bolinha ao lado do texto). #}
+      <div class="option-group">
+        <label>
+          <input type="radio" name="modo" value="1" {% if store.whatsapp_mode == 1 %}checked{% endif %}>
+          Baileys + grupo
+        </label>
+        {% if whatsapp_modo2_enabled %}
+        <label>
+          <input type="radio" name="modo" value="2" {% if store.whatsapp_mode == 2 %}checked{% endif %}>
+          Central Cloud API
+        </label>
+        {% endif %}
+      </div>
       <button class="button primary" type="submit">Salvar modo</button>
     </form>
   </section>

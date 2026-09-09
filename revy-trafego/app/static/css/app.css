@@ -927,6 +927,8 @@ tr:hover td { background: var(--surface-soft); }
    nao comunica o tamanho esperado do dado. */
 .form-layout > label { max-width: 44ch; }
 .form-layout > label.wide { max-width: none; }
+/* Escolha dentro de formulario: a faixa de hover ia de ponta a ponta do painel. */
+.form-layout > .option-group { max-width: 44ch; }
 
 /* Texto de apoio abaixo do campo: nao compete com o rotulo. */
 .form-grid label > small,
