@@ -1,6 +1,6 @@
-# portal-gestao · 162 rotas · 26 modelos · 6 workers · 35 flags · 26 migrations · 68 templates
+# portal-gestao · 163 rotas · 26 modelos · 6 workers · 35 flags · 26 migrations · 63 templates
 
-Gerado de `62e3ff9`. NAO editar a mao — saida de `gerar_mapa.py`.
+Gerado de `db6ad7d`. NAO editar a mao — saida de `gerar_mapa.py`.
 Migration head: `0026_copiloto_sinal_destinatario`
 
 ## Rotas
@@ -166,7 +166,8 @@ Migration head: `0026_copiloto_sinal_destinatario`
 - `GET /` — prototype_atendimento.py:50
 - `GET /app/loja/atendimento` — prototype_atendimento.py:51
 - `GET /app/loja/estoque/demo` — prototype_atendimento.py:74
-- `GET /app/loja/atendimento/{workspace_id}` — prototype_atendimento.py:89
+- `GET /app/loja/vitrine/demo` — prototype_atendimento.py:91
+- `GET /app/loja/atendimento/{workspace_id}` — prototype_atendimento.py:124
 
 ## Modelos
 
@@ -301,11 +302,6 @@ Migration head: `0026_copiloto_sinal_destinatario`
 - `app/templates/conta_senha.html` — app/templates/conta_senha.html
 - `app/templates/em-breve.html` — app/templates/em-breve.html
 - `app/templates/loja/catalogo.html` — app/templates/loja/catalogo.html
-- `app/templates/loja/prototype_atendimento.html` — app/templates/loja/prototype_atendimento.html
-- `app/templates/loja/prototype_atendimento_A.html` — app/templates/loja/prototype_atendimento_A.html
-- `app/templates/loja/prototype_atendimento_B.html` — app/templates/loja/prototype_atendimento_B.html
-- `app/templates/loja/prototype_atendimento_C.html` — app/templates/loja/prototype_atendimento_C.html
-- `app/templates/loja/prototype_atendimento_parts.html` — app/templates/loja/prototype_atendimento_parts.html
 - `app/templates/partials/alertas_trafego.html` — app/templates/partials/alertas_trafego.html
 - `app/templates/partials/onboarding_medicao.html` — app/templates/partials/onboarding_medicao.html
 - `app/templates/partials/resultados_periodo.html` — app/templates/partials/resultados_periodo.html

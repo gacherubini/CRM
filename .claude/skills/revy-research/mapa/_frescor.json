@@ -1,5 +1,5 @@
 {
- "sha": "62e3ff9",
+ "sha": "db6ad7d",
  "inventario": {
   "chatbot-api": [
    {
@@ -2435,10 +2435,17 @@
    },
    {
     "secao": "rota",
+    "chave": "GET /app/loja/vitrine/demo",
+    "simbolo": "/app/loja/vitrine/demo",
+    "arquivo": "prototype_atendimento.py",
+    "linha": 91
+   },
+   {
+    "secao": "rota",
     "chave": "GET /app/loja/atendimento/{workspace_id}",
     "simbolo": "/app/loja/atendimento/{workspace_id}",
     "arquivo": "prototype_atendimento.py",
-    "linha": 89
+    "linha": 124
    },
    {
     "secao": "template",
@@ -2684,41 +2691,6 @@
     "simbolo": "loja/perfil.html",
     "arquivo": "app/web/loja_perfil.py",
     "linha": 69
-   },
-   {
-    "secao": "template",
-    "chave": "app/templates/loja/prototype_atendimento.html",
-    "simbolo": "prototype_atendimento.html",
-    "arquivo": "app/templates/loja/prototype_atendimento.html",
-    "linha": 0
-   },
-   {
-    "secao": "template",
-    "chave": "app/templates/loja/prototype_atendimento_A.html",
-    "simbolo": "prototype_atendimento_A.html",
-    "arquivo": "app/templates/loja/prototype_atendimento_A.html",
-    "linha": 0
-   },
-   {
-    "secao": "template",
-    "chave": "app/templates/loja/prototype_atendimento_B.html",
-    "simbolo": "prototype_atendimento_B.html",
-    "arquivo": "app/templates/loja/prototype_atendimento_B.html",
-    "linha": 0
-   },
-   {
-    "secao": "template",
-    "chave": "app/templates/loja/prototype_atendimento_C.html",
-    "simbolo": "prototype_atendimento_C.html",
-    "arquivo": "app/templates/loja/prototype_atendimento_C.html",
-    "linha": 0
-   },
-   {
-    "secao": "template",
-    "chave": "app/templates/loja/prototype_atendimento_parts.html",
-    "simbolo": "prototype_atendimento_parts.html",
-    "arquivo": "app/templates/loja/prototype_atendimento_parts.html",
-    "linha": 0
    },
    {
     "secao": "template",

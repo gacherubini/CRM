@@ -73,6 +73,8 @@ def _shell_demo(request: Request):
 
 @app.get('/app/loja/estoque/demo', response_class=HTMLResponse)
 async def estoque_demo(request: Request):
+    # Direcao "patio" definitiva desde 09/09: o demo rende o template real
+    # com dados ficticios. Sem ?variant= — os prototipos A/B foram aposentados.
     context = _shell_demo(request)
     context.update(
         caminho_veiculos='/app/loja/estoque/veiculos', caminho_novo='/app/loja/estoque/veiculos/novo',
@@ -82,6 +84,39 @@ async def estoque_demo(request: Request):
                      idade=NS(com_data=15, sem_data=2, ate_30=6, de_31_a_60=4, de_61_a_90=3, acima_90=2)),
     )
     html = env.get_template('loja/estoque_visao.html').render(**context)
+    html = re.sub(r'<link\b[^>]*https://fonts\.(?:googleapis|gstatic)\.com[^>]*>', '', html)
+    return HTMLResponse(html)
+
+
+@app.get('/app/loja/vitrine/demo', response_class=HTMLResponse)
+async def vitrine_demo(request: Request):
+    # Task 3: rende o template real com dados ficticios (sem persistencia).
+    context = _shell_demo(request)
+    veiculos = [
+        NS(id='v1', foto_url=None, midia_principal=None, marca='Honda',
+           modelo='CG 160 Fan', tipo='moto', ano_modelo=2024, km=12500, preco=18900),
+        NS(id='v2', foto_url=None, midia_principal=None, marca='Yamaha',
+           modelo='Fazer FZ25', tipo='moto', ano_modelo=2023, km=20800, preco=21500),
+        NS(id='v3', foto_url=None, midia_principal=None, marca='Honda',
+           modelo='NXR 160 Bros', tipo='moto', ano_modelo=2024, km=8300, preco=22400),
+        NS(id='v4', foto_url=None, midia_principal=None, marca='Yamaha',
+           modelo='Factor 150', tipo='moto', ano_modelo=2022, km=31400, preco=15900),
+        NS(id='v5', foto_url=None, midia_principal=None, marca='Honda',
+           modelo='CB 300F Twister', tipo='moto', ano_modelo=2023, km=15600, preco=24900),
+    ]
+    context.update(
+        pode_gerir=True, csrf='',
+        veiculos=veiculos, all_ids=[v.id for v in veiculos],
+        total_items=len(veiculos), limit=12, offset=0,
+        previous_url=None, next_url=None,
+        page_links=[{'kind': 'page', 'number': 1, 'url': '#', 'current': True}],
+        showing_from=1, showing_to=len(veiculos),
+        erro=None, mensagem=None,
+        catalogo_whatsapp='(11) 98888-7777',
+        catalogo_url='https://revyapp.com.br/catalogo/l/horizonte-motos',
+        catalogo_erro=None, catalogo_mensagem=None,
+    )
+    html = env.get_template('loja/vitrine_ordem.html').render(**context)
     html = re.sub(r'<link\b[^>]*https://fonts\.(?:googleapis|gstatic)\.com[^>]*>', '', html)
     return HTMLResponse(html)
 
@@ -105,9 +140,19 @@ async def workspace(request: Request, workspace_id: str):
         usuario=NS(nome='Rafael Demo', email='rafael@example.invalid', papel='gerente', loja_slug='Horizonte Motos'),
         store_context=NS(loja_slug='Horizonte Motos'), lojas_disponiveis=[],
         entitlements=NS(vendas_enabled=True, estoque_enabled=True), csrf='',
+        # Helpers que o template real espera (versões fictícias, sem backend).
+        mascarar_telefone=lambda t: t, formatar_horario=lambda v: v or '',
+        pode_enviar=True, pode_handoff=True, pode_atualizar_etapa=False,
+        origem_lead=None, etapas={},
         workspace=NS(id=workspace_id, nome='Marina Demo', telefone='(00) 00000-0142',
                      canal_label='WhatsApp da loja', veiculo_interesse='Yamaha Fazer FZ25',
-                     mensagens=[NS(direcao=d, texto=t, hora=h) for d, t, h in db.execute('SELECT * FROM mensagens')]),
+                     estado='aguardando_simulacao', estado_label='Aguardando simulação',
+                     canal_estado='conectado', canal_ativo=True, canal_id=None, lead=None,
+                     assignment=NS(vendedor_email='rafael@example.invalid'),
+                     venda_status=None, erros_bloco=None, envio_bloqueado_canal=False,
+                     conversa_resumo=NS(bot_ativo=False),
+                     mensagens=[NS(direcao=d, texto=t, hora=h, criada_em=h, id=None)
+                                for d, t, h in db.execute('SELECT * FROM mensagens')]),
     )
     html = env.get_template('loja/atendimento_workspace.html').render(**context)
     # O shell mantém sua fonte/fallback; estes links externos não fazem parte da demo offline.

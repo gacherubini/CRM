@@ -6,9 +6,9 @@
   <div>
     <span class="eyebrow">Estoque</span>
     <h1>Situação do estoque</h1>
-    <p>Como está o estoque da loja hoje. Todos os números vêm do cadastro dos veículos — nada é estimado.</p>
+    <p>Como está o estoque da loja hoje. Todos os números vêm do cadastro dos veículos. Nada é estimado.</p>
   </div>
-  <div class="heading-actions">
+  <div class="heading-actions keep-row">
     <a class="button secondary" href="{{ caminho_veiculos }}">Ver veículos</a>
     {% if pode_gerir %}<a class="button primary" href="{{ caminho_novo }}">Cadastrar veículo</a>{% endif %}
   </div>
@@ -19,7 +19,7 @@
   <div class="empty" role="alert">
     <strong id="estoque-erro-titulo">Estoque indisponível</strong>
     <p>{{ overview.erro or 'Não foi possível carregar o estoque agora. Tente novamente em instantes.' }}</p>
-    <p class="muted">Nenhum indicador é exibido enquanto a integração estiver offline — contagens zeradas não seriam confiáveis.</p>
+    <p class="muted">Nenhum indicador é exibido enquanto a integração estiver offline. Contagens zeradas não seriam confiáveis.</p>
     <a class="button secondary" href="/app/loja/estoque">Tentar de novo</a>
   </div>
 </section>
@@ -38,42 +38,29 @@
 </section>
 
 {% else %}
-{# ok ou parcial — contagens reais da lista.
-   Hero "Disponíveis" como protagonista; Reservados/Vendidos/Publicados em
-   faixa secundária. Nenhum número mudou, nenhuma ação saiu. #}
+{# Direção "pátio" (Task 2 v3, escolhida pelo dono em 09/09): número de
+   disponíveis em serif da marca como frase, mix numa única barra de
+   proporção e idade como índice sem barras. Mesmos números e ações. #}
 {% set c = overview.contagens %}
-<section class="panel estoque-hero" aria-label="Resumo do estoque">
-  <div class="panel-body estoque-hero-body">
-    <span class="mono-label">Disponibilidade</span>
-    <p class="estoque-hero-num"><strong>{{ c.disponivel }}</strong> <span>Disponíveis para venda</span></p>
-    <p class="muted">De {{ c.total }} veículos no cadastro · {{ c.publicados }} publicados no catálogo.</p>
-    <p class="muted">
-      {% if overview.status == 'parcial' %}
-      Totais contados na lista atual. As faixas de idade não aparecem: nenhum veículo ativo tem data de entrada.
-      {% else %}
-      Totais por disponibilidade, contados na lista atual de veículos.
-      {% endif %}
-    </p>
-    <dl class="estoque-sec">
-      <div>
-        <dt>Reservados</dt>
-        <dd>{{ c.reservado }}</dd>
-      </div>
-      <div>
-        <dt>Vendidos</dt>
-        <dd>{{ c.vendido }}</dd>
-      </div>
-      <div>
-        <dt>Publicados</dt>
-        <dd>{{ c.publicados }}</dd>
-        <dd class="estoque-sec-nota">no catálogo</dd>
-      </div>
+<section class="panel" aria-labelledby="estc-disponibilidade">
+  <div class="panel-body estc">
+    <h2 id="estc-disponibilidade" class="estc-kicker">Disponibilidade</h2>
+    <p class="estc-lede"><strong>{{ c.disponivel }}</strong> veículos prontos para vender</p>
+    <p class="muted">De {{ c.total }} no cadastro · {{ c.publicados }} publicados no catálogo.</p>
+    <div class="estc-mix" role="img" aria-label="{{ c.disponivel }} disponíveis, {{ c.reservado }} reservados e {{ c.vendido }} vendidos, de {{ c.total }} no cadastro."><i class="m1" style="flex:{{ c.disponivel }}"></i><i class="m2" style="flex:{{ c.reservado }}"></i><i class="m3" style="flex:{{ c.vendido }}"></i></div>
+    <dl class="estc-mix-legend">
+      <div><dt>Disponíveis</dt><dd>{{ c.disponivel }}</dd></div>
+      <div><dt>Reservados</dt><dd>{{ c.reservado }}</dd></div>
+      <div><dt>Vendidos</dt><dd>{{ c.vendido }}</dd></div>
     </dl>
+    <p class="estc-cross">Publicados no catálogo <strong>{{ c.publicados }}</strong> · total no cadastro <strong>{{ c.total }}</strong></p>
+    {% if overview.status == 'parcial' %}
+    <p class="muted">Totais contados na lista atual. As faixas de idade não aparecem: nenhum veículo ativo tem data de entrada.</p>
+    {% endif %}
   </div>
 </section>
 
-{# Aside "Veículos" mantido por decisão do dono (recusa L5 de 07/08): mesmo
-   conteúdo e mesma ação, em faixa horizontal abaixo do resumo. #}
+{# Aside "Veículos" mantido por decisão do dono (recusa L5 de 07/08). #}
 <aside class="integration-card estoque-aside">
   <div class="integration-heading">
     <div>
@@ -88,44 +75,19 @@
 
 {% if overview.idade %}
 {% set idade = overview.idade %}
-<section class="panel" aria-labelledby="idade-titulo">
-  <div class="panel-heading">
-    <div>
-      <span class="mono-label">Idade do estoque</span>
-      <h2 id="idade-titulo">Dias desde a entrada</h2>
-    </div>
-  </div>
-  <div class="panel-body">
+<section class="panel" aria-labelledby="estc-idade">
+  <div class="panel-body estc">
+    <h2 id="estc-idade" class="estc-kicker">Dias desde a entrada</h2>
     <p class="muted">Somente disponíveis e reservados com data de entrada ({{ idade.com_data }} com data{% if idade.sem_data %}, {{ idade.sem_data }} sem data{% endif %}).</p>
-    <ul class="estoque-idade">
-      <li>
-        <span>Até 30 dias</span>
-        <span class="estoque-bar" aria-hidden="true"><i style="width:{% if idade.com_data %}{{ (idade.ate_30 / idade.com_data * 100) | round(0) | int }}{% else %}0{% endif %}%"></i></span>
-        <strong>{{ idade.ate_30 }}</strong>
-      </li>
-      <li>
-        <span>31 a 60 dias</span>
-        <span class="estoque-bar" aria-hidden="true"><i style="width:{% if idade.com_data %}{{ (idade.de_31_a_60 / idade.com_data * 100) | round(0) | int }}{% else %}0{% endif %}%"></i></span>
-        <strong>{{ idade.de_31_a_60 }}</strong>
-      </li>
-      <li>
-        <span>61 a 90 dias</span>
-        <span class="estoque-bar" aria-hidden="true"><i style="width:{% if idade.com_data %}{{ (idade.de_61_a_90 / idade.com_data * 100) | round(0) | int }}{% else %}0{% endif %}%"></i></span>
-        <strong>{{ idade.de_61_a_90 }}</strong>
-      </li>
-      <li>
-        <span>Acima de 90 dias</span>
-        <span class="estoque-bar" aria-hidden="true"><i style="width:{% if idade.com_data %}{{ (idade.acima_90 / idade.com_data * 100) | round(0) | int }}{% else %}0{% endif %}%"></i></span>
-        <strong>{{ idade.acima_90 }}</strong>
-      </li>
+    <ul class="estc-index">
+      <li><span>Até 30 dias</span><strong>{{ idade.ate_30 }}</strong></li>
+      <li><span>31 a 60 dias</span><strong>{{ idade.de_31_a_60 }}</strong></li>
+      <li><span>61 a 90 dias</span><strong>{{ idade.de_61_a_90 }}</strong></li>
+      <li><span>Acima de 90 dias</span><strong>{{ idade.acima_90 }}</strong></li>
     </ul>
   </div>
 </section>
 {% endif %}
-
-{# Fora daqui: "Cadastro › Pendências" e "Reservas e vendas recentes".
-   O primeiro saiu a pedido do dono do produto; o segundo era log — quatro
-   colunas sem link para o veículo, que não respondiam nenhuma pergunta. #}
 {% endif %}
 
 <p class="muted page-shortcuts">

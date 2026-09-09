@@ -358,6 +358,8 @@ p { color: var(--ink-soft); }
   gap: var(--space-2);
   align-items: center;
 }
+/* Estoque: os dois botoes do cabecalho ficam lado a lado ate no mobile. */
+.heading-actions.keep-row { flex-wrap: nowrap; }
 
 .metric-grid-3 {
   grid-template-columns: repeat(3, 1fr);
@@ -1169,16 +1171,14 @@ tr:hover td { background: var(--surface-soft); }
 .thread {
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
+  gap: var(--space-3);
   padding: var(--space-4) var(--space-5);
   max-width: 100%;
   flex: 1 1 auto;
   min-height: 240px;
   overflow-y: auto;
   scroll-behavior: smooth;
-  background:
-    radial-gradient(circle at 12% 8%, color-mix(in srgb, var(--ink) 4%, transparent) 0 1px, transparent 1.5px) 0 0 / 18px 18px,
-    var(--paper);
+  background: var(--paper);
 }
 .thread .bolha {
   max-width: min(78%, 36rem);
@@ -1188,7 +1188,6 @@ tr:hover td { background: var(--surface-soft); }
   line-height: 1.45;
   font-size: var(--text-sm);
   word-break: break-word;
-  box-shadow: 0 1px 0 color-mix(in srgb, var(--ink) 6%, transparent);
 }
 .thread .bolha small {
   display: block;
@@ -1197,21 +1196,21 @@ tr:hover td { background: var(--surface-soft); }
   font-size: 0.7rem;
   letter-spacing: .01em;
 }
-/* Entrada = cliente (esquerda). Saida = loja (direita, tinta). */
+/* Entrada = cliente (esquerda, cartao). Saida = loja (direita, tinta da marca). */
 .thread .entrada {
   align-self: flex-start;
-  border-bottom-left-radius: 4px;
-  background: var(--surface-soft);
+  border-bottom-left-radius: var(--radius-ctl);
+  background: var(--surface);
   color: var(--ink);
 }
 .thread .saida {
   align-self: flex-end;
-  border-color: var(--ink);
-  border-bottom-right-radius: 4px;
-  background: var(--ink);
-  color: var(--paper);
+  border-color: var(--brand-line);
+  border-bottom-right-radius: var(--radius-ctl);
+  background: var(--brand-tint);
+  color: var(--ink);
 }
-.thread .saida small { color: color-mix(in srgb, var(--paper) 70%, transparent); }
+.thread .saida small { color: var(--ink-muted); }
 
 .thread-empty {
   margin: auto;
@@ -1299,6 +1298,33 @@ tr:hover td { background: var(--surface-soft); }
 .action-links li { display: flex; align-items: baseline; gap: var(--space-2); }
 .action-links a { font-size: var(--text-sm); font-weight: 500; }
 .action-links .muted { font-size: var(--text-xs); }
+
+/* --- Atendimento: ficha em disclosures (Task 4, direção A) ---
+   Mesmo vocabulário do summary da Vitrine (.vitrine-config); escopo próprio.
+   Somente tokens existentes; sem :root novo. */
+.workspace-disclosure > summary {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  padding: var(--space-4) var(--space-5);
+  cursor: pointer;
+  list-style: none;
+  color: var(--ink);
+  font-size: var(--text-base);
+  font-weight: 600;
+}
+.workspace-disclosure > summary::-webkit-details-marker { display: none; }
+.workspace-disclosure > summary::marker { content: ""; }
+.workspace-disclosure > summary::before {
+  content: "+";
+  flex: 0 0 auto;
+  color: var(--ink-soft);
+  font-variant-numeric: tabular-nums;
+}
+.workspace-disclosure[open] > summary::before { content: "−"; }
+.workspace-disclosure[open] > summary { border-bottom: 1px solid var(--line); }
+.workspace-disclosure + .workspace-disclosure > summary { border-top: 1px solid var(--line); }
+.workspace-disclosure-follow { border-top: 1px solid var(--line); }
 
 /* Barra de atingimento de meta (dentro de .metric). */
 .meta-bar {
@@ -1404,6 +1430,8 @@ tr:hover td { background: var(--surface-soft); }
   }
   .dashboard-heading .button,
   .page-heading .button { width: 100%; }
+  .page-heading .heading-actions.keep-row { align-self: stretch; flex-direction: row; }
+  .page-heading .heading-actions.keep-row .button { width: auto; flex: 1 1 0; }
   .operations-card { padding: var(--space-5); }
   .metric-grid { grid-template-columns: 1fr; gap: var(--space-2); }
   .panel-heading {
@@ -2537,7 +2565,30 @@ tr.roi-sem-campanha td { color: var(--ink-soft); }
 .panel-vitrine .panel-body-vitrine {
   padding-top: var(--space-4);
 }
-.vitrine-hint { margin: 0 0 var(--space-5); }
+/* --- Vitrine: config recolhida (Task 3) ---
+   Uma linha (titulo + estado atual); o corpo usa .panel-body, .form-grid e
+   .form-actions existentes. Somente tokens existentes; sem :root novo. */
+.vitrine-config summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-2) var(--space-3);
+  padding: var(--space-4) var(--space-5);
+  cursor: pointer;
+  list-style: none;
+}
+.vitrine-config summary::-webkit-details-marker { display: none; }
+.vitrine-config summary::marker { content: ""; }
+.vitrine-config summary::before {
+  content: "+";
+  flex: 0 0 auto;
+  color: var(--ink-soft);
+  font-variant-numeric: tabular-nums;
+}
+.vitrine-config details[open] > summary::before { content: "−"; }
+.vitrine-config details[open] > summary { border-bottom: 1px solid var(--line); }
+.vitrine-config-title { color: var(--ink); font-size: var(--text-base); font-weight: 600; }
+.vitrine-config-state { font-variant-numeric: tabular-nums; }
 .vitrine-form {
   display: flex;
   flex-direction: column;
@@ -4340,3 +4391,68 @@ a.metric-link:focus-visible { outline: 2px solid var(--brand); outline-offset: 2
   .estoque-sec { grid-template-columns: 1fr; }
   .estoque-idade li { grid-template-columns: 110px minmax(0, 1fr) 3ch; }
 }
+
+/* --- Estoque: direcao "patio" (Task 2 v3, definitiva desde 09/09) ---
+   Numero de disponiveis em serif da marca como frase, mix numa unica barra
+   de proporcao (flex exato, sem erro de arredondamento) e idade como indice
+   tipografico sem barras. Somente tokens existentes; sem :root novo. */
+.estc-kicker { margin: 0; font-size: var(--text-lg); letter-spacing: -.01em; }
+.estc-kicker + .muted { margin: var(--space-1) 0 0; }
+.estc-lede {
+  margin: var(--space-4) 0 0;
+  font-family: var(--font-brand);
+  font-size: clamp(2rem, 4.5vw, 3.25rem);
+  line-height: 1.05;
+  letter-spacing: -.015em;
+  text-wrap: balance;
+  max-width: 20ch;
+}
+.estc-lede strong { color: var(--brand); font-weight: 600; }
+.estc-mix {
+  display: flex;
+  height: 12px;
+  overflow: hidden;
+  border-radius: var(--radius-srf);
+  background: var(--surface-soft);
+  margin-top: var(--space-4);
+}
+.estc-mix > i { display: block; height: 100%; background: var(--brand); }
+.estc-mix .m2 { opacity: .55; }
+.estc-mix .m3 { opacity: .3; }
+.estc-mix-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-6);
+  margin: var(--space-3) 0 0;
+  padding: 0;
+}
+.estc-mix-legend > div { display: flex; align-items: baseline; gap: var(--space-2); }
+.estc-mix-legend dt { color: var(--ink-soft); font-size: var(--text-base); }
+.estc-mix-legend dd {
+  margin: 0;
+  font-size: var(--text-lg);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.estc-cross {
+  margin: var(--space-4) 0 0;
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--line-strong);
+  color: var(--ink-soft);
+  font-size: var(--text-base);
+}
+.estc-cross strong { color: var(--ink); font-variant-numeric: tabular-nums; }
+/* Idade: indice em linhas com hairline, sem barras (o B ja usa barra). */
+.estc-index { list-style: none; margin: var(--space-4) 0 0; padding: 0; }
+.estc-index li {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: var(--space-3) 0;
+  border-top: 1px solid var(--line);
+  font-size: var(--text-base);
+}
+.estc-index li:last-child { border-bottom: 1px solid var(--line); }
+.estc-index span { color: var(--ink-soft); }
+.estc-index strong { font-size: var(--text-lg); font-variant-numeric: tabular-nums; }

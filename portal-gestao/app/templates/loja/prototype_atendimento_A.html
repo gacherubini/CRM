@@ -1,7 +1,0 @@
-<section class="pa-variant pa-a" data-panel="A" {% if variant != 'A' %}hidden{% endif %} aria-label="A: Conversa e contexto">
-  <header class="pa-page-head"><div>{{ ui.identity() }}{{ ui.ownership() }}</div><button type="button" class="button ghost" data-action="list">Voltar à lista</button></header>
-  <div class="pa-layout-a">
-    <div class="pa-chat-wrap">{{ ui.notice() }}{{ ui.chat('A') }}</div>
-    <aside class="pa-context" aria-label="Contexto do atendimento"><div class="pa-context-section"><h2>Próximo passo</h2><p>Simular a Fazer da Marina</p>{{ ui.actions() }}<small>A simulação abre com o celular preenchido.</small></div><div class="pa-context-section"><h2>Interesse</h2><strong>Yamaha Fazer FZ25</strong><p class="pa-muted">2024 · Azul</p>{{ ui.stage('A') }}</div><details class="pa-disclosure"><summary>Dados do contato e origem</summary>{{ ui.facts() }}</details><details class="pa-disclosure"><summary>Responsável e bot</summary>{{ ui.handoff() }}</details>{{ ui.links() }}</aside>
-  </div>
-</section>

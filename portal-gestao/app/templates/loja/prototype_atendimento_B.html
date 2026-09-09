@@ -1,8 +1,0 @@
-<section class="pa-variant pa-b" data-panel="B" {% if variant != 'B' %}hidden{% endif %} aria-label="B: Conversa em foco">
-  <div class="pa-focus-top"><button type="button" class="button ghost" data-action="list">Voltar à lista</button><span data-bot>Pausado (humano)</span></div>
-  <div class="pa-focus-shell"><header class="pa-focus-head">{{ ui.identity() }}<button type="button" class="button secondary" data-open-details>Ficha e detalhes</button></header>{{ ui.ownership() }}
-    <div class="pa-toolbar"><span><strong>Yamaha Fazer FZ25</strong><small>2024 · Azul</small></span>{{ ui.actions() }}</div>
-    {{ ui.notice() }}{{ ui.chat('B') }}
-  </div>
-  <dialog class="pa-details-dialog" data-details-dialog aria-labelledby="pa-details-title"><header class="pa-dialog-head"><div><h2 id="pa-details-title">Ficha da Marina</h2><span>Contexto deste atendimento</span></div><button type="button" class="button ghost" data-close-dialog>Fechar</button></header>{{ ui.stage('B') }}{{ ui.facts() }}<h3>Responsável e bot</h3>{{ ui.handoff() }}{{ ui.links() }}</dialog>
-</section>

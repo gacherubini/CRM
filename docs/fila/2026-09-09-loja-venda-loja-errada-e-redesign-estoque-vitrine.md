@@ -92,6 +92,20 @@ pediu, reabrir `:root` em `app.css` (tokens têm fonte única).
 "Disponíveis" + faixa secundária + idade em barras) continua **feia**.
 Voltar com nova direção visual antes de considerar a Task 2 feita.
 
+**v2 (09/09, aguardando preview do dono):** protótipo B lado a lado no runner
+(`portal-gestao/prototype_atendimento.py`, `/app/loja/estoque/demo?variant=B`;
+A segue na v1). Direção "balanço": razão em linhas com régua em vez de hero,
+idade em barra única empilhada com legenda em vez de 4 barras. Mesma ordem,
+mesmos números e ações; template novo em
+`app/templates/loja/prototype_estoque_B.html`, CSS só com tokens existentes.
+
+**v3 (09/09, dono escolheu C):** direção "pátio" implementada como definitiva
+em `estoque_visao.html` (manifesto serif + barra de proporção + idade em
+índice sem barras). Extras do dono: botões do cabeçalho lado a lado até no
+mobile (`.heading-actions.keep-row`), travessão do subtítulo removido.
+Protótipos B/C e `?variant=` aposentados (o runner rende o template real com
+dados fictícios); CSS do B removido do `app.css`.
+
 ## Task 3 — redesign: Vitrine (config compacta, catálogo protagonista)
 
 **Pedido do dono:** a seção "Catálogo e vitrine" (WhatsApp CTA + link) tem de
@@ -113,6 +127,12 @@ de campo; quebrar o JS de ordenação (`vitrine_ordem.js`, ids `vitrine-*`).
 continuar contendo "Catálogo e vitrine" ou "Link do catálogo" — o `summary` e o
 `label` mantêm as duas strings.
 
+**Implementado (09/09):** grade do catálogo protagonista no topo, config em
+`<details>` recolhido com tira de estado (`botão <nº>`/`sem botão de contato`
+· `bot envia link`/`bot sem link`; abre sozinho com erro/mensagem), campos em
+`.form-grid`, Salvar em `.form-actions`, CSS novo só para o `summary`.
+Preview no runner: `/app/loja/vitrine/demo` (template real, dados fictícios).
+
 ## Task 4 — simplificar/embelezar: Atendimento (workspace da conversa)
 
 **Pedido do dono:** a conversa do Atendimento está poluída; dá para deixar mais
@@ -127,6 +147,17 @@ aprovada pelo dono.
 **Não faça:** mexer no `get_human_messaging_port` sem `Request` (vazamento
 multi-loja documentado no learning de 29/08); mudar texto que teste amarra
 (conferir `tests/test_atendimento*.py` antes).
+
+**Implementado (09/09, dono escolheu A):** trilho de contexto reordenado no
+template real — Próximo passo, Interesse (+etapa), ficha em dois disclosures
+(Dados do contato e origem; Responsável e bot) + links. Mesmos endpoints,
+nomes, CSRF, hooks do JS e textos amarrados; CSS novo só para o `summary`
+(mesmo vocabulário da Vitrine). Protótipos A/B/C aposentados (7 arquivos).
+Preview no runner: `/app/loja/atendimento/demo-marina` (template real).
+**Conversa (09/09, pedido do dono):** bolhas no vocabulário do protótipo —
+saída em tinta da marca, entrada em cartão, fundo liso, meta com remetente
+(`Cliente`/`Equipe`/nome do lead + horário). Só CSS + linha do `<small>`;
+hooks do JS e textos amarrados intactos.
 
 ## Task 5 — embelezar: Agente do WhatsApp
 
