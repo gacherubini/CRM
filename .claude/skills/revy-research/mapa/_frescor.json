@@ -1,5 +1,5 @@
 {
- "sha": "51ef920",
+ "sha": "9d4bd6c",
  "inventario": {
   "chatbot-api": [
    {
@@ -1262,189 +1262,189 @@
     "chave": "GET /app/operacao/numeros",
     "simbolo": "/app/operacao/numeros",
     "arquivo": "app/main.py",
-    "linha": 925
+    "linha": 935
    },
    {
     "secao": "rota",
     "chave": "POST /app/operacao/grupo",
     "simbolo": "/app/operacao/grupo",
     "arquivo": "app/main.py",
-    "linha": 958
+    "linha": 968
    },
    {
     "secao": "rota",
     "chave": "POST /app/operacao/numeros",
     "simbolo": "/app/operacao/numeros",
     "arquivo": "app/main.py",
-    "linha": 986
+    "linha": 996
    },
    {
     "secao": "rota",
     "chave": "POST /app/operacao/numeros/remover",
     "simbolo": "/app/operacao/numeros/remover",
     "arquivo": "app/main.py",
-    "linha": 1013
+    "linha": 1023
    },
    {
     "secao": "rota",
     "chave": "POST /app/estoque/novo",
     "simbolo": "/app/estoque/novo",
     "arquivo": "app/main.py",
-    "linha": 1039
+    "linha": 1049
    },
    {
     "secao": "rota",
     "chave": "GET /app/estoque/{veiculo_id}",
     "simbolo": "/app/estoque/{veiculo_id}",
     "arquivo": "app/main.py",
-    "linha": 1066
+    "linha": 1076
    },
    {
     "secao": "rota",
     "chave": "POST /app/estoque/{veiculo_id}",
     "simbolo": "/app/estoque/{veiculo_id}",
     "arquivo": "app/main.py",
-    "linha": 1097
+    "linha": 1107
    },
    {
     "secao": "rota",
     "chave": "POST /app/estoque/{veiculo_id}/{acao}",
     "simbolo": "/app/estoque/{veiculo_id}/{acao}",
     "arquivo": "app/main.py",
-    "linha": 1125
+    "linha": 1135
    },
    {
     "secao": "rota",
     "chave": "GET /app/leads",
     "simbolo": "/app/leads",
     "arquivo": "app/main.py",
-    "linha": 1172
+    "linha": 1182
    },
    {
     "secao": "rota",
     "chave": "GET /app/leads/{lead_id}",
     "simbolo": "/app/leads/{lead_id}",
     "arquivo": "app/main.py",
-    "linha": 1200
+    "linha": 1210
    },
    {
     "secao": "rota",
     "chave": "POST /app/leads/{lead_id}/etapa",
     "simbolo": "/app/leads/{lead_id}/etapa",
     "arquivo": "app/main.py",
-    "linha": 1236
+    "linha": 1246
    },
    {
     "secao": "rota",
     "chave": "GET /app/conversas",
     "simbolo": "/app/conversas",
     "arquivo": "app/main.py",
-    "linha": 1295
+    "linha": 1305
    },
    {
     "secao": "rota",
     "chave": "GET /app/conversas/{telefone}",
     "simbolo": "/app/conversas/{telefone}",
     "arquivo": "app/main.py",
-    "linha": 1322
+    "linha": 1332
    },
    {
     "secao": "rota",
     "chave": "POST /app/conversas/{telefone}/handoff",
     "simbolo": "/app/conversas/{telefone}/handoff",
     "arquivo": "app/main.py",
-    "linha": 1415
+    "linha": 1425
    },
    {
     "secao": "rota",
     "chave": "GET /app/vendas",
     "simbolo": "/app/vendas",
     "arquivo": "app/main.py",
-    "linha": 1520
+    "linha": 1530
    },
    {
     "secao": "rota",
     "chave": "GET /app/vendas/nova",
     "simbolo": "/app/vendas/nova",
     "arquivo": "app/main.py",
-    "linha": 1560
+    "linha": 1570
    },
    {
     "secao": "rota",
     "chave": "POST /app/vendas/nova",
     "simbolo": "/app/vendas/nova",
     "arquivo": "app/main.py",
-    "linha": 1577
+    "linha": 1587
    },
    {
     "secao": "rota",
     "chave": "POST /app/vendas/{venda_id}/confirmar",
     "simbolo": "/app/vendas/{venda_id}/confirmar",
     "arquivo": "app/main.py",
-    "linha": 1978
+    "linha": 1988
    },
    {
     "secao": "rota",
     "chave": "POST /app/vendas/{venda_id}/cancelar",
     "simbolo": "/app/vendas/{venda_id}/cancelar",
     "arquivo": "app/main.py",
-    "linha": 1996
+    "linha": 2006
    },
    {
     "secao": "rota",
     "chave": "GET /app/vendedor",
     "simbolo": "/app/vendedor",
     "arquivo": "app/main.py",
-    "linha": 2008
+    "linha": 2018
    },
    {
     "secao": "rota",
     "chave": "GET /app/funil",
     "simbolo": "/app/funil",
     "arquivo": "app/main.py",
-    "linha": 2119
+    "linha": 2129
    },
    {
     "secao": "rota",
     "chave": "GET /app/funil/dados",
     "simbolo": "/app/funil/dados",
     "arquivo": "app/main.py",
-    "linha": 2195
+    "linha": 2205
    },
    {
     "secao": "rota",
     "chave": "GET /app/financeiro",
     "simbolo": "/app/financeiro",
     "arquivo": "app/main.py",
-    "linha": 2232
+    "linha": 2242
    },
    {
     "secao": "rota",
     "chave": "GET /app/financeiras",
     "simbolo": "/app/financeiras",
     "arquivo": "app/main.py",
-    "linha": 2309
+    "linha": 2319
    },
    {
     "secao": "rota",
     "chave": "POST /app/financeiras/{nome}",
     "simbolo": "/app/financeiras/{nome}",
     "arquivo": "app/main.py",
-    "linha": 2366
+    "linha": 2376
    },
    {
     "secao": "rota",
     "chave": "POST /app/financeiras/{nome}/testar",
     "simbolo": "/app/financeiras/{nome}/testar",
     "arquivo": "app/main.py",
-    "linha": 2469
+    "linha": 2479
    },
    {
     "secao": "rota",
     "chave": "GET /app/configuracoes",
     "simbolo": "/app/configuracoes",
     "arquivo": "app/main.py",
-    "linha": 2580
+    "linha": 2590
    },
    {
     "secao": "worker",
@@ -2032,91 +2032,91 @@
     "chave": "GET /app/loja/whatsapp",
     "simbolo": "_TELA",
     "arquivo": "app/web/loja_whatsapp.py",
-    "linha": 149
+    "linha": 165
    },
    {
     "secao": "rota",
     "chave": "GET /app/loja/whatsapp/conectar",
     "simbolo": "_TELA_DECIDIR",
     "arquivo": "app/web/loja_whatsapp.py",
-    "linha": 186
+    "linha": 202
    },
    {
     "secao": "rota",
     "chave": "POST /app/loja/whatsapp/catalogo",
     "simbolo": "/app/loja/whatsapp/catalogo",
     "arquivo": "app/web/loja_whatsapp.py",
-    "linha": 228
+    "linha": 244
    },
    {
     "secao": "rota",
     "chave": "POST /app/loja/whatsapp/conectar",
     "simbolo": "_TELA_DECIDIR",
     "arquivo": "app/web/loja_whatsapp.py",
-    "linha": 299
+    "linha": 315
    },
    {
     "secao": "rota",
     "chave": "POST /app/loja/whatsapp/canais",
     "simbolo": "/app/loja/whatsapp/canais",
     "arquivo": "app/web/loja_whatsapp.py",
-    "linha": 372
+    "linha": 388
    },
    {
     "secao": "rota",
     "chave": "POST /app/loja/whatsapp/canais/{canal_id}/conectar",
     "simbolo": "/app/loja/whatsapp/canais/{canal_id}/conectar",
     "arquivo": "app/web/loja_whatsapp.py",
-    "linha": 396
+    "linha": 412
    },
    {
     "secao": "rota",
     "chave": "POST /app/loja/whatsapp/canais/{canal_id}/desconectar",
     "simbolo": "/app/loja/whatsapp/canais/{canal_id}/desconectar",
     "arquivo": "app/web/loja_whatsapp.py",
-    "linha": 423
+    "linha": 439
    },
    {
     "secao": "rota",
     "chave": "POST /app/loja/whatsapp/canais/{canal_id}/inativar",
     "simbolo": "/app/loja/whatsapp/canais/{canal_id}/inativar",
     "arquivo": "app/web/loja_whatsapp.py",
-    "linha": 444
+    "linha": 460
    },
    {
     "secao": "rota",
     "chave": "POST /app/loja/whatsapp/canais/{canal_id}/principal-estoque",
     "simbolo": "/app/loja/whatsapp/canais/{canal_id}/principal-estoque",
     "arquivo": "app/web/loja_whatsapp.py",
-    "linha": 464
+    "linha": 480
    },
    {
     "secao": "rota",
     "chave": "GET /app/loja/whatsapp/canais/{canal_id}/status",
     "simbolo": "/app/loja/whatsapp/canais/{canal_id}/status",
     "arquivo": "app/web/loja_whatsapp.py",
-    "linha": 491
+    "linha": 507
    },
    {
     "secao": "rota",
     "chave": "GET /app/loja/whatsapp/fila",
     "simbolo": "_TELA_FILA",
     "arquivo": "app/web/loja_whatsapp.py",
-    "linha": 513
+    "linha": 529
    },
    {
     "secao": "rota",
     "chave": "POST /app/loja/whatsapp/fila",
     "simbolo": "_TELA_FILA",
     "arquivo": "app/web/loja_whatsapp.py",
-    "linha": 557
+    "linha": 573
    },
    {
     "secao": "rota",
     "chave": "POST /app/loja/whatsapp/fila/{vendedor_id}/remover",
     "simbolo": "_TELA_FILA",
     "arquivo": "app/web/loja_whatsapp.py",
-    "linha": 598
+    "linha": 614
    },
    {
     "secao": "rota",
@@ -2452,7 +2452,7 @@
     "chave": "app/templates/configuracoes/index.html",
     "simbolo": "configuracoes/index.html",
     "arquivo": "app/main.py",
-    "linha": 2620
+    "linha": 2630
    },
    {
     "secao": "template",
@@ -2466,14 +2466,14 @@
     "chave": "app/templates/conversas/detalhe.html",
     "simbolo": "conversas/detalhe.html",
     "arquivo": "app/main.py",
-    "linha": 1347
+    "linha": 1357
    },
    {
     "secao": "template",
     "chave": "app/templates/conversas/lista.html",
     "simbolo": "conversas/lista.html",
     "arquivo": "app/main.py",
-    "linha": 1311
+    "linha": 1321
    },
    {
     "secao": "template",
@@ -2543,35 +2543,35 @@
     "chave": "app/templates/financeiras/lista.html",
     "simbolo": "financeiras/lista.html",
     "arquivo": "app/main.py",
-    "linha": 2351
+    "linha": 2361
    },
    {
     "secao": "template",
     "chave": "app/templates/financeiro/dashboard.html",
     "simbolo": "financeiro/dashboard.html",
     "arquivo": "app/main.py",
-    "linha": 2288
+    "linha": 2298
    },
    {
     "secao": "template",
     "chave": "app/templates/funil/index.html",
     "simbolo": "funil/index.html",
     "arquivo": "app/main.py",
-    "linha": 2182
+    "linha": 2192
    },
    {
     "secao": "template",
     "chave": "app/templates/leads/detalhe.html",
     "simbolo": "leads/detalhe.html",
     "arquivo": "app/main.py",
-    "linha": 1224
+    "linha": 1234
    },
    {
     "secao": "template",
     "chave": "app/templates/leads/lista.html",
     "simbolo": "leads/lista.html",
     "arquivo": "app/main.py",
-    "linha": 1189
+    "linha": 1199
    },
    {
     "secao": "template",
@@ -2690,21 +2690,21 @@
     "chave": "app/templates/loja/whatsapp_canais.html",
     "simbolo": "loja/whatsapp_canais.html",
     "arquivo": "app/web/loja_whatsapp.py",
-    "linha": 170
+    "linha": 186
    },
    {
     "secao": "template",
     "chave": "app/templates/loja/whatsapp_decidir.html",
     "simbolo": "loja/whatsapp_decidir.html",
     "arquivo": "app/web/loja_whatsapp.py",
-    "linha": 212
+    "linha": 228
    },
    {
     "secao": "template",
     "chave": "app/templates/loja/whatsapp_fila.html",
     "simbolo": "loja/whatsapp_fila.html",
     "arquivo": "app/web/loja_whatsapp.py",
-    "linha": 542
+    "linha": 558
    },
    {
     "secao": "template",
@@ -2725,7 +2725,7 @@
     "chave": "app/templates/operacao/numeros.html",
     "simbolo": "operacao/numeros.html",
     "arquivo": "app/main.py",
-    "linha": 947
+    "linha": 957
    },
    {
     "secao": "template",
@@ -2837,21 +2837,21 @@
     "chave": "app/templates/vendas/form.html",
     "simbolo": "vendas/form.html",
     "arquivo": "app/main.py",
-    "linha": 1502
+    "linha": 1512
    },
    {
     "secao": "template",
     "chave": "app/templates/vendas/lista.html",
     "simbolo": "vendas/lista.html",
     "arquivo": "app/main.py",
-    "linha": 1546
+    "linha": 1556
    },
    {
     "secao": "template",
     "chave": "app/templates/vendedor/dashboard.html",
     "simbolo": "vendedor/dashboard.html",
     "arquivo": "app/main.py",
-    "linha": 2103
+    "linha": 2113
    },
    {
     "secao": "migration",

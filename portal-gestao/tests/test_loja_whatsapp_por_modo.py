@@ -275,3 +275,65 @@ def test_menu_segue_o_modo_tambem_onde_a_rota_nao_passa_o_db(
     html = client.get("/app/leads").text
     assert "Fila de atendimento" in html
     assert "Grupo do estoque" not in html
+
+
+# --- Loja selecionada x loja de origem -------------------------------------
+
+
+def _trocar_para_loja(client, monkeypatch, slug="loja-teste"):
+    """Troca a loja ativa na sessão pelo caminho público (seletor).
+
+    O `select_store_slug` é gabaritado só aqui, no setup: o ator do teste tem
+    membership só na loja de origem, e o que está sob teste é a tela — não o
+    seletor.
+    """
+    from app.loja import identity
+    from conftest import csrf_da_resposta
+
+    monkeypatch.setattr(identity, "select_store_slug", lambda actor, pedido: slug)
+    csrf = csrf_da_resposta(client.get(TELA))
+    r = client.post(
+        "/app/loja/selecionar",
+        data={"loja_slug": slug, "csrf": csrf},
+        follow_redirects=False,
+    )
+    assert r.status_code == 303
+
+
+def test_tela_usa_a_loja_selecionada_e_nao_a_de_origem(client, db, monkeypatch):
+    """Regressão: menu em Modo 2 com corpo em Modo 1.
+
+    A rota calculava o modo por `usuario.loja_slug` (origem do login) em vez
+    da loja selecionada na sessão — trocar de loja no seletor não trocava a
+    tela, e o convite da Meta sumia.
+    """
+    _ligar(monkeypatch)
+    login(client, email="dono@origem.test", loja_slug="loja-origem")
+    _projetar_modo(db, 2, loja_slug="loja-teste")
+    _trocar_para_loja(client, monkeypatch)
+    html = client.get(TELA).text
+    assert "leia o qr" not in html.casefold()
+    assert "Conectar o WhatsApp pela Revy" in html
+
+
+def test_decidir_abre_na_loja_selecionada_mesmo_com_origem_modo_1(
+    client, db, monkeypatch
+):
+    _ligar(monkeypatch)
+    login(client, email="dono@origem.test", loja_slug="loja-origem")
+    _projetar_modo(db, 2, loja_slug="loja-teste")
+    _trocar_para_loja(client, monkeypatch)
+    r = client.get(TELA_DECIDIR, follow_redirects=False)
+    assert r.status_code == 200
+
+
+def test_grupo_redireciona_na_loja_selecionada_mesmo_com_origem_modo_1(
+    client, chatbot_fake, db, monkeypatch
+):
+    _ligar(monkeypatch)
+    login(client, email="dono@origem.test", loja_slug="loja-origem")
+    _projetar_modo(db, 2, loja_slug="loja-teste")
+    _trocar_para_loja(client, monkeypatch)
+    r = client.get("/app/operacao/numeros", follow_redirects=False)
+    assert r.status_code == 303
+    assert r.headers["location"] == TELA

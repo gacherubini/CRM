@@ -909,15 +909,25 @@ async def _anexar_foto_se_enviada(estoque, veiculo_id: str | None, form) -> None
     )
 
 
-def _grupo_estoque_fora_do_modo(db: Session, usuario) -> RedirectResponse | None:
+def _grupo_estoque_fora_do_modo(
+    request: Request, db: Session, usuario
+) -> RedirectResponse | None:
     """Modo 2 não passa por grupo (spec §5.8): redireciona para os números.
 
     Gate de backend, não item de menu escondido — a URL desta tela é antiga e
-    continua nos favoritos de quem usava o Modo 1.
+    continua nos favoritos de quem usava o Modo 1. Lê a loja selecionada na
+    sessão (mesma fonte do menu), não a de origem do login.
     """
     from app.loja.whatsapp_modo import MODO_CLOUD, modo_da_loja
 
-    if modo_da_loja(db, getattr(usuario, "loja_slug", "") or "") == MODO_CLOUD:
+    try:
+        sessao = request.session
+    except (AssertionError, AttributeError):  # sem SessionMiddleware (testes)
+        sessao = None
+    slug = loja_identity.session_loja_slug(sessao) or (
+        getattr(usuario, "loja_slug", "") or ""
+    )
+    if modo_da_loja(db, slug) == MODO_CLOUD:
         return RedirectResponse("/app/loja/whatsapp", status_code=303)
     return None
 
@@ -933,7 +943,7 @@ def operacao_numeros(
         return redirecionar_login()
     if usuario.papel not in ("dono", "gerente"):
         return RedirectResponse("/app", status_code=303)
-    fora = _grupo_estoque_fora_do_modo(db, usuario)
+    fora = _grupo_estoque_fora_do_modo(request, db, usuario)
     if fora is not None:
         return fora
     numeros, erro = [], None
@@ -969,7 +979,7 @@ async def operacao_grupo_salvar(
         request, form.get("csrf")
     ):
         return RedirectResponse("/app/operacao/numeros", status_code=303)
-    fora = _grupo_estoque_fora_do_modo(db, usuario)
+    fora = _grupo_estoque_fora_do_modo(request, db, usuario)
     if fora is not None:
         return fora
     grupo_jid = (form.get("grupo_jid") or "").strip()
@@ -997,7 +1007,7 @@ async def operacao_numeros_add(
         request, form.get("csrf")
     ):
         return RedirectResponse("/app/operacao/numeros", status_code=303)
-    fora = _grupo_estoque_fora_do_modo(db, usuario)
+    fora = _grupo_estoque_fora_do_modo(request, db, usuario)
     if fora is not None:
         return fora
     telefone = (form.get("telefone") or "").strip()
@@ -1024,7 +1034,7 @@ async def operacao_numeros_remover(
         request, form.get("csrf")
     ):
         return RedirectResponse("/app/operacao/numeros", status_code=303)
-    fora = _grupo_estoque_fora_do_modo(db, usuario)
+    fora = _grupo_estoque_fora_do_modo(request, db, usuario)
     if fora is not None:
         return fora
     telefone = (form.get("telefone") or "").strip()
