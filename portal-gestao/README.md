@@ -67,6 +67,13 @@ Tokens das APIs ficam **somente no servidor**; o navegador recebe uma sessão as
 - **Copiloto some com qualquer um dos três gates off:** `REVY_LOJA_SHELL_ENABLED`,
   `REVY_LOJA_COPILOTO_ENABLED` e entitlement `Module.COPILOTO`. Só dono/gerente.
   A chave `REVY_LOJA_COPILOTO_LLM_KEY` nunca vai ao `[env]` do Fly nem ao git.
+- **Vendas sempre lêem a loja da SESSÃO, nunca a loja legada do usuário.**
+  `usuario_vendas_atual` (`app/loja/vendas_contexto.py`) resolve o `loja_slug`
+  pela sessão com validação de membership e fallback para `usuario.loja_slug`;
+  todas as rotas de vendas (`app/main.py`, `app/web/loja_vendas.py`) usam ele.
+  E `_validar_estoque_venda` (`app/main.py`) recusa baixar/vincular veículo de
+  outra loja — a credencial de Estoque é única por deploy. Regressão de dois
+  slugs: `tests/test_vendas_loja_ativa.py`.
 
 ## Onde editar
 
@@ -78,6 +85,7 @@ Tokens das APIs ficam **somente no servidor**; o navegador recebe uma sessão as
 | `app/loja/copiloto/` + `app/web/loja_copiloto.py` | Copiloto: tools, sinais, FIPE, ações, chat, sino |
 | `app/copiloto_sinais_job.py` · `app/copiloto_purge_job.py` | Worker de regras e retenção |
 | `app/loja/routes.py` | Atendimento (chat, envio, polling, visão do agente) e **configuração do agente** |
+| `app/loja/vendas_contexto.py` | Loja ativa das vendas: sessão + membership, fallback legado |
 | `app/loja/sales_overview.py` | Visão geral de Vendas e painel de aquisição |
 | `app/web/simulacoes.py` | Simulação manual, jobs, histórico, prints |
 | `app/web/trafego.py` | Campanhas, ROI, Pixel/CAPI, Ads e jobs de tráfego |

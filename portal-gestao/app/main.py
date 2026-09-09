@@ -108,6 +108,7 @@ from app.config import (
     settings,
 )
 from app.loja import identity as loja_identity
+from app.loja.vendas_contexto import usuario_vendas_atual
 from app.loja.navigation import nav_item_is_active
 from app.loja.redirects import resolve_legacy_redirect, should_consider_request
 from app.web.loja_shell import check_module_access, router as loja_shell_router
@@ -1464,8 +1465,15 @@ TIPOS_META = {
 }
 
 
+def _validar_estoque_venda(estoque: EstoqueClient, loja_slug: str) -> None:
+    # A credencial de Estoque ainda é única por deploy. Não vincular nem
+    # baixar veículo de outra loja ao operar a loja selecionada no shell.
+    if estoque.obter_loja().get("slug") != loja_slug:
+        raise EstoqueIndisponivel("Estoque não configurado para a loja selecionada")
+
+
 def _carregar_opcoes_venda(
-    chatbot: ChatbotClient, estoque: EstoqueClient
+    chatbot: ChatbotClient, estoque: EstoqueClient, loja_slug: str
 ) -> tuple[list[dict] | None, list[dict] | None, list[str]]:
     """Carrega cada integração isoladamente para o formulário continuar utilizável."""
     avisos: list[str] = []
@@ -1475,6 +1483,7 @@ def _carregar_opcoes_venda(
         leads = None
         avisos.append("Leads indisponíveis; a referência manual será validada na confirmação.")
     try:
+        _validar_estoque_venda(estoque, loja_slug)
         veiculos = [
             veiculo
             for veiculo in estoque.listar()
@@ -1507,7 +1516,7 @@ def _render_venda_form(
     erro: str | None = None,
     status_code: int = 200,
 ):
-    leads, veiculos, avisos = _carregar_opcoes_venda(chatbot, estoque)
+    leads, veiculos, avisos = _carregar_opcoes_venda(chatbot, estoque, usuario.loja_slug)
     return templates.TemplateResponse(
         "vendas/form.html",
         contexto(
@@ -1535,7 +1544,7 @@ def vendas_lista(
     fim: str | None = None,
     db: Session = Depends(get_db),
 ):
-    usuario = usuario_atual(request, db)
+    usuario = usuario_vendas_atual(request, db)
     if not usuario:
         return redirecionar_login()
     d_inicio, d_fim = periodo_padrao(inicio, fim)
@@ -1575,7 +1584,7 @@ def vendas_nova(
     chatbot: ChatbotClient = Depends(get_chatbot_client),
     estoque: EstoqueClient = Depends(get_estoque_client),
 ):
-    usuario = usuario_atual(request, db)
+    usuario = usuario_vendas_atual(request, db)
     if not usuario:
         return redirecionar_login()
     if not pode_registrar_venda(usuario):
@@ -1591,7 +1600,7 @@ async def vendas_criar(
     chatbot: ChatbotClient = Depends(get_chatbot_client),
     estoque: EstoqueClient = Depends(get_estoque_client),
 ):
-    usuario = usuario_atual(request, db)
+    usuario = usuario_vendas_atual(request, db)
     if not usuario:
         return redirecionar_login()
     form = await request.form()
@@ -1644,6 +1653,7 @@ async def vendas_criar(
             referencias_pendentes = True
     if veiculo_ref:
         try:
+            _validar_estoque_venda(estoque, usuario.loja_slug)
             veiculo = estoque.obter(veiculo_ref)
             if veiculo.get("status") not in {"disponivel", "reservado"}:
                 return _render_venda_form(
@@ -1737,6 +1747,7 @@ def executar_confirmacao_venda(
     estoque_baixado = False
     if venda.veiculo_ref:
         try:
+            _validar_estoque_venda(estoque, usuario.loja_slug)
             veiculo = estoque.obter(venda.veiculo_ref)
             if veiculo.get("status") not in {"disponivel", "reservado"}:
                 return "erro=conflito-estoque"
@@ -1993,7 +2004,7 @@ async def vendas_confirmar(
     chatbot: ChatbotClient = Depends(get_chatbot_client),
     estoque: EstoqueClient = Depends(get_estoque_client),
 ):
-    usuario = usuario_atual(request, db)
+    usuario = usuario_vendas_atual(request, db)
     if not usuario:
         return redirecionar_login()
     form = await request.form()
@@ -2005,7 +2016,7 @@ async def vendas_confirmar(
 
 @app.post("/app/vendas/{venda_id}/cancelar")
 async def vendas_cancelar(request: Request, venda_id: str, db: Session = Depends(get_db)):
-    usuario = usuario_atual(request, db)
+    usuario = usuario_vendas_atual(request, db)
     if not usuario:
         return redirecionar_login()
     form = await request.form()
@@ -2023,7 +2034,7 @@ def vendedor_dashboard(
     db: Session = Depends(get_db),
     chatbot: ChatbotClient = Depends(get_chatbot_client),
 ):
-    usuario = usuario_atual(request, db)
+    usuario = usuario_vendas_atual(request, db)
     if not usuario:
         return redirecionar_login()
     if usuario.papel != "vendedor":
@@ -2250,7 +2261,7 @@ def financeiro_dashboard(
     db: Session = Depends(get_db),
     chatbot: ChatbotClient = Depends(get_chatbot_client),
 ):
-    usuario = usuario_atual(request, db)
+    usuario = usuario_vendas_atual(request, db)
     if not usuario:
         return redirecionar_login()
     if not pode_ver_financeiro(usuario):

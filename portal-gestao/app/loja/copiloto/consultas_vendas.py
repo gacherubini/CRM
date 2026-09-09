@@ -97,7 +97,7 @@ def vendas_resumo(
     fim: str | None = None,
 ) -> VendasResumo:
     """Receita, ticket médio, margem (com cobertura) e Δ vs período anterior."""
-    janela = janela_do_periodo(inicio, fim)
+    janela = janela_do_periodo(inicio, fim, hoje=ctx.hoje)
     anterior = janela_anterior(janela)
 
     atual = calcular_metricas_vendas(db, ctx.loja_slug, janela.inicio, janela.fim)
@@ -237,7 +237,7 @@ def ranking_vendedores(
     limite: int = 10,
 ) -> RankingVendedores:
     """Vendedores ordenados por receita, com quem subiu e quem caiu."""
-    janela = janela_do_periodo(inicio, fim)
+    janela = janela_do_periodo(inicio, fim, hoje=ctx.hoje)
     anterior = janela_anterior(janela)
 
     atual = _totais_por_vendedor(db, ctx.loja_slug, janela)

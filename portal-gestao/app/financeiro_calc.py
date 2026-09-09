@@ -43,16 +43,27 @@ def ultimo_dia_mes(dia: date) -> date:
     return date(dia.year, dia.month, calendar.monthrange(dia.year, dia.month)[1])
 
 
-def periodo_padrao(inicio: str | None, fim: str | None) -> tuple[date, date]:
-    hoje = hoje_portal()
+def periodo_padrao(
+    inicio: str | None,
+    fim: str | None,
+    *,
+    hoje: date | None = None,
+) -> tuple[date, date]:
+    """Mês corrente por default, ancorado em ``hoje`` (default: hoje real).
+
+    O Copiloto ancora em ``ctx.hoje`` para que resumo, ferramentas e sinais
+    acompanhem a data de referência do contexto em vez do relógio da máquina.
+    Rotas HTTP continuam sem ``hoje`` — comportamento idêntico ao anterior.
+    """
+    ref = hoje_portal() if hoje is None else hoje
     try:
-        d_inicio = date.fromisoformat(inicio) if inicio else hoje.replace(day=1)
+        d_inicio = date.fromisoformat(inicio) if inicio else ref.replace(day=1)
     except ValueError:
-        d_inicio = hoje.replace(day=1)
+        d_inicio = ref.replace(day=1)
     try:
-        d_fim = date.fromisoformat(fim) if fim else ultimo_dia_mes(hoje)
+        d_fim = date.fromisoformat(fim) if fim else ultimo_dia_mes(ref)
     except ValueError:
-        d_fim = ultimo_dia_mes(hoje)
+        d_fim = ultimo_dia_mes(ref)
     return d_inicio, d_fim
 
 
