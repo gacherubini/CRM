@@ -1,5 +1,5 @@
 {
- "sha": "db6ad7d",
+ "sha": "4e0dbaf",
  "inventario": {
   "chatbot-api": [
    {
@@ -1101,77 +1101,77 @@
     "chave": "GET /app/loja/agente",
     "simbolo": "/app/loja/agente",
     "arquivo": "app/loja/routes.py",
-    "linha": 373
+    "linha": 407
    },
    {
     "secao": "rota",
     "chave": "GET /app/loja/atendimento/{workspace_id}",
     "simbolo": "/app/loja/atendimento/{workspace_id}",
     "arquivo": "app/loja/routes.py",
-    "linha": 410
+    "linha": 458
    },
    {
     "secao": "rota",
     "chave": "GET /app/loja/atendimento/{workspace_id}/mensagens.json",
     "simbolo": "/app/loja/atendimento/{workspace_id}/mensagens.json",
     "arquivo": "app/loja/routes.py",
-    "linha": 621
+    "linha": 669
    },
    {
     "secao": "rota",
     "chave": "POST /app/loja/atendimento/{workspace_id}/mensagem",
     "simbolo": "/app/loja/atendimento/{workspace_id}/mensagem",
     "arquivo": "app/loja/routes.py",
-    "linha": 730
+    "linha": 778
    },
    {
     "secao": "rota",
     "chave": "POST /app/loja/atendimento/{workspace_id}/handoff",
     "simbolo": "/app/loja/atendimento/{workspace_id}/handoff",
     "arquivo": "app/loja/routes.py",
-    "linha": 890
+    "linha": 938
    },
    {
     "secao": "rota",
     "chave": "POST /app/loja/atendimento/{workspace_id}/etapa",
     "simbolo": "/app/loja/atendimento/{workspace_id}/etapa",
     "arquivo": "app/loja/routes.py",
-    "linha": 969
+    "linha": 1017
    },
    {
     "secao": "rota",
     "chave": "GET /app/loja/agente/configuracao",
     "simbolo": "/app/loja/agente/configuracao",
     "arquivo": "app/loja/routes.py",
-    "linha": 1115
+    "linha": 1163
    },
    {
     "secao": "rota",
     "chave": "PUT /app/loja/agente/configuracao.json",
     "simbolo": "/app/loja/agente/configuracao.json",
     "arquivo": "app/loja/routes.py",
-    "linha": 1145
+    "linha": 1193
    },
    {
     "secao": "rota",
     "chave": "POST /app/loja/agente/configuracao/testar.json",
     "simbolo": "/app/loja/agente/configuracao/testar.json",
     "arquivo": "app/loja/routes.py",
-    "linha": 1186
+    "linha": 1234
    },
    {
     "secao": "rota",
     "chave": "POST /app/loja/agente/configuracao/publicar",
     "simbolo": "/app/loja/agente/configuracao/publicar",
     "arquivo": "app/loja/routes.py",
-    "linha": 1229
+    "linha": 1277
    },
    {
     "secao": "rota",
     "chave": "POST /app/loja/agente/configuracao/restaurar",
     "simbolo": "/app/loja/agente/configuracao/restaurar",
     "arquivo": "app/loja/routes.py",
-    "linha": 1251
+    "linha": 1299
    },
    {
     "secao": "rota",
@@ -2417,35 +2417,42 @@
     "chave": "GET /",
     "simbolo": "/",
     "arquivo": "prototype_atendimento.py",
-    "linha": 50
+    "linha": 51
    },
    {
     "secao": "rota",
     "chave": "GET /app/loja/atendimento",
     "simbolo": "/app/loja/atendimento",
     "arquivo": "prototype_atendimento.py",
-    "linha": 51
+    "linha": 52
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /app/loja/agente",
+    "simbolo": "/app/loja/agente",
+    "arquivo": "prototype_atendimento.py",
+    "linha": 75
    },
    {
     "secao": "rota",
     "chave": "GET /app/loja/estoque/demo",
     "simbolo": "/app/loja/estoque/demo",
     "arquivo": "prototype_atendimento.py",
-    "linha": 74
+    "linha": 107
    },
    {
     "secao": "rota",
     "chave": "GET /app/loja/vitrine/demo",
     "simbolo": "/app/loja/vitrine/demo",
     "arquivo": "prototype_atendimento.py",
-    "linha": 91
+    "linha": 124
    },
    {
     "secao": "rota",
     "chave": "GET /app/loja/atendimento/{workspace_id}",
     "simbolo": "/app/loja/atendimento/{workspace_id}",
     "arquivo": "prototype_atendimento.py",
-    "linha": 124
+    "linha": 157
    },
    {
     "secao": "template",
@@ -2620,14 +2627,14 @@
     "chave": "app/templates/loja/agente.html",
     "simbolo": "loja/agente.html",
     "arquivo": "app/loja/routes.py",
-    "linha": 397
+    "linha": 436
    },
    {
     "secao": "template",
     "chave": "app/templates/loja/agente_configuracao.html",
     "simbolo": "loja/agente_configuracao.html",
     "arquivo": "app/loja/routes.py",
-    "linha": 1133
+    "linha": 1181
    },
    {
     "secao": "template",
@@ -2641,7 +2648,7 @@
     "chave": "app/templates/loja/atendimento_workspace.html",
     "simbolo": "loja/atendimento_workspace.html",
     "arquivo": "app/loja/routes.py",
-    "linha": 501
+    "linha": 549
    },
    {
     "secao": "template",

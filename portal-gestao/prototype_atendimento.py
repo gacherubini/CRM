@@ -1,9 +1,10 @@
-r"""Descartável: três hierarquias para Atendimento, na rota existente, ?variant=A/B/C.
+r"""Runner local dos previews da Loja, com templates reais e dados fictícios.
 
 Windows: .\.venv\Scripts\python.exe prototype_atendimento.py
 macOS: .venv/bin/python prototype_atendimento.py
 Não importa app/config/main, não lê .env, não conecta integrações. SQLite em memória.
 """
+from datetime import date, timedelta
 from pathlib import Path
 from types import SimpleNamespace as NS
 import argparse
@@ -50,7 +51,7 @@ async def local_only(request: Request, call_next):
 @app.get('/')
 @app.get('/app/loja/atendimento')
 async def index():
-    return RedirectResponse('/app/loja/atendimento/demo-marina?variant=A')
+    return RedirectResponse('/app/loja/agente?periodo=mes')
 
 
 def _shell_demo(request: Request):
@@ -69,6 +70,38 @@ def _shell_demo(request: Request):
         store_context=NS(loja_slug='Horizonte Motos'), lojas_disponiveis=[],
         entitlements=NS(vendas_enabled=True, estoque_enabled=True), csrf='',
     )
+
+
+@app.get('/app/loja/agente', response_class=HTMLResponse)
+async def agente_demo(request: Request):
+    # Task 5 definitiva: template real com dados fictícios e sem persistência.
+    chave = request.query_params.get('periodo', 'mes')
+    hoje = date.today()
+    if chave == 'hoje':
+        inicio, rotulo, vazio = hoje, 'Hoje', 'hoje'
+    elif chave == 'semana':
+        inicio, rotulo, vazio = hoje - timedelta(days=6), 'Últimos 7 dias', 'nos últimos 7 dias'
+    else:
+        chave, inicio, rotulo, vazio = 'mes', hoje.replace(day=1), 'Este mês', 'neste mês'
+    valores = (4, 7, 1, 9, 12, 5, 8, 3, 10)
+    serie = []
+    for i in range((hoje - inicio).days + 1):
+        valor = valores[i % len(valores)]
+        serie.append(NS(dia=f'{(inicio + timedelta(days=i)).day:02d}', atendimentos=valor,
+                        altura=round(valor / 12 * 100), pico=valor == 12))
+    context = _shell_demo(request)
+    context.update(
+        nav_item_is_active=lambda item, path: item.href == '/app/loja/agente',
+        agente_config_habilitado=True, erro_resumo=None,
+        periodo=NS(chave=chave, inicio=inicio, fim=hoje, rotulo=rotulo, vazio=vazio),
+        visao=NS(atendimentos=65, so_agente=27, transferidos=38,
+                 so_agente_pct=.42, transferidos_pct=.58, serie=serie,
+                 maximo=12, pico=NS(atendimentos=12, dia='05')),
+        card_rodizio=NS(oferecidos=18, atendidos=11, aguardando=4, perdidos=3),
+    )
+    html = env.get_template('loja/agente.html').render(**context)
+    html = re.sub(r'<link\b[^>]*https://fonts\.(?:googleapis|gstatic)\.com[^>]*>', '', html)
+    return HTMLResponse(html)
 
 
 @app.get('/app/loja/estoque/demo', response_class=HTMLResponse)
@@ -164,5 +197,5 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--port', type=int, default=8766)
     args = parser.parse_args()
-    print(f'Demonstração local: http://127.0.0.1:{args.port}/app/loja/atendimento/demo-marina?variant=A')
+    print(f'Demonstração local: http://127.0.0.1:{args.port}/app/loja/agente?periodo=mes')
     uvicorn.run(app, host='127.0.0.1', port=args.port, access_log=False)

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import replace
+from datetime import date
 
 import pytest
 from conftest import login
@@ -23,8 +24,10 @@ class _FakeChatbot:
     def __init__(self, resumo=None, indisponivel=False):
         self._resumo = resumo
         self._indisponivel = indisponivel
+        self.intervalos = []
 
     def resumo_atendimento(self, desde=None, ate=None):
+        self.intervalos.append((desde, ate))
         if self._indisponivel:
             from app.clients.chatbot import ChatbotIndisponivel
 
@@ -63,14 +66,13 @@ def test_agente_mostra_cards(client, atendimento_on):
     assert r.status_code == 200
     assert "Agente de atendimento" in r.text
     assert "65" in r.text
-    assert "Transferidos" in r.text
+    assert "Passaram para a equipe" in r.text
     assert "em construção" in r.text  # placeholder de simulações (rodapé)
     # Era "Ver fila", renomeado em 25/08: o card do rodízio ganhou um link
     # para /whatsapp/fila e os dois "fila" iam para telas diferentes.
     assert 'href="/app/loja/atendimento"' in r.text
     assert "Abrir Atendimento" in r.text
-    assert "panel-body" in r.text
-    assert "split-bar" in r.text
+    assert "agente-relay" in r.text
 
 
 def test_agente_degrada_quando_chatbot_offline(client, atendimento_on):
@@ -96,9 +98,49 @@ def test_agente_mostra_divisao_entre_agente_e_handoff(client, atendimento_on):
     login(client)
     r = client.get("/app/loja/agente")
     assert r.status_code == 200
-    assert "Só com o agente" in r.text
+    assert "Resolvidas pelo agente" in r.text
     assert "<strong>6</strong>" in r.text  # 10 atendimentos - 4 transferidos
     assert "40% das conversas" in r.text
+
+
+def test_agente_semana_filtra_resumo_e_marca_periodo(client, atendimento_on):
+    fake = _FakeChatbot(
+        resumo={
+            "atendimentos": 10,
+            "transferidos": 4,
+            "transferidos_pct": 0.4,
+            "por_dia": [],
+            "simulacoes": None,
+        }
+    )
+    _override(fake)
+    login(client)
+
+    r = client.get("/app/loja/agente?periodo=semana")
+
+    desde, ate = fake.intervalos[-1]
+    assert (date.fromisoformat(ate) - date.fromisoformat(desde)).days == 6
+    assert 'href="?periodo=semana" aria-current="page"' in r.text
+
+
+def test_agente_hoje_nao_mostra_grafico_de_uma_barra(client, atendimento_on):
+    _override(
+        _FakeChatbot(
+            resumo={
+                "atendimentos": 3,
+                "transferidos": 1,
+                "transferidos_pct": 1 / 3,
+                "por_dia": [],
+                "simulacoes": None,
+            }
+        )
+    )
+    login(client)
+
+    r = client.get("/app/loja/agente?periodo=hoje")
+
+    assert "Hoje, até agora" in r.text
+    assert 'id="agente-por-dia"' not in r.text
 
 
 def test_agente_sem_atendimentos_mostra_estado_vazio(client, atendimento_on):
@@ -117,7 +159,7 @@ def test_agente_sem_atendimentos_mostra_estado_vazio(client, atendimento_on):
     r = client.get("/app/loja/agente")
     assert r.status_code == 200
     assert "Nenhum atendimento neste mês." in r.text
-    assert "split-bar" not in r.text
+    assert "agente-relay" not in r.text
 
 
 def test_visao_agente_preenche_dias_sem_atendimento():

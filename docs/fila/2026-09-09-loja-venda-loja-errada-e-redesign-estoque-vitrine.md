@@ -170,6 +170,13 @@ Template `app/templates/loja/agente.html` (hero "Atendimentos no mês" :78,
 não inventar métrica nova). Direção escolhida pelo dono entre as opções
 visuais preparadas pelo agente com `mattpocock-skills:prototype`.
 
+**Implementado e aceito pelo dono (09/09):** variante A, "Revezamento". Todas
+as conversas começam num bloco de origem e se dividem entre resolvidas pelo
+agente e passadas para a equipe. O seletor Hoje/Semana/Mês altera junto o
+resumo, a série diária e a fila; Mês continua sendo o padrão. Hoje não mostra
+um gráfico de uma barra. Protótipos B/C e o seletor de variantes foram
+removidos; o runner rende o template real em `/app/loja/agente?periodo=mes`.
+
 ## Task 6 — simplificar: Números de WhatsApp
 
 **Pedido do dono:** página poluída; dá para ser mais simples.
