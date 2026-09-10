@@ -268,6 +268,163 @@ async def whatsapp_demo(request: Request):
     return HTMLResponse(html)
 
 
+@app.get('/app/loja/vendas/demo', response_class=HTMLResponse)
+async def vendas_demo(request: Request):
+    # Task 7 (direcao "balanco"): rende o template real com dados ficticios
+    # e sem persistencia. Cenario rico: margem incompleta + aquisicao ok.
+    hoje = date.today()
+    inicio = hoje.replace(day=1)
+
+    def formatar_brl(valor):
+        try:
+            numero = float(valor)
+        except (TypeError, ValueError):
+            return '—'
+        texto = f'{numero:,.2f}'.replace(',', '_').replace('.', ',').replace('_', '.')
+        return f'R$ {texto}'
+
+    def formatar_data(iso):
+        if not iso:
+            return ''
+        try:
+            return date.fromisoformat(str(iso)[:10]).strftime('%d/%m/%Y')
+        except ValueError:
+            return str(iso)
+
+    overview = NS(
+        escopo='loja', vendas_status='ok', qtd_vendas=12, receita=243500.0,
+        margem_completa=False, vendas_lucro_incompleto=2, margem=31200.0,
+        funil_status='ok', leads_count=48,
+        funil=NS(taxa_resposta_pct=62, taxa_conversao_pct=25,
+                 auditavel=NS(disponivel=True, atendidos=31, vendas_vinculadas=9)),
+        aquisicao_status='ok',
+        aquisicao=NS(investimento_disponivel=True, investimento=5200.0,
+                     cac_disponivel=True, cac=433.33,
+                     roas_disponivel=True, roas=46.83, mensagem=None),
+        aquisicao_campanhas=[
+            NS(nome='Civic — julho', canal='Meta', gasto=2100.0, leads=19,
+               vendas=4, faturamento=86200.0, roas=41.05),
+            NS(nome='Fazer — agosto', canal='Meta', gasto=1750.0, leads=14,
+               vendas=3, faturamento=64800.0, roas=37.03),
+            NS(nome='Bros — vitrine', canal='Catálogo', gasto=None, leads=6,
+               vendas=2, faturamento=44900.0, roas=None),
+        ],
+        aquisicao_canais=[NS(canal='Meta', gasto=3850.0, roas=39.17)],
+        aquisicao_origens=[
+            NS(rotulo='Anúncio', nota='9 sem identificação de campanha', leads=27, share='56.3'),
+            NS(rotulo='Link direto', nota=None, leads=12, share='25.0'),
+            NS(rotulo='Catálogo', nota=None, leads=6, share='12.5'),
+            NS(rotulo='Procurou no WhatsApp', nota=None, leads=3, share='6.2'),
+        ],
+    )
+    context = _shell_demo(request)
+    context.update(
+        nav_item_is_active=lambda item, path: item.href == '/app/loja/vendas',
+        overview=overview, periodo={'inicio': inicio.isoformat(), 'fim': hoje.isoformat()},
+        pode_ver_margem=True, pode_ver_aquisicao=True,
+        formatar_brl=formatar_brl, formatar_data=formatar_data,
+    )
+    html = env.get_template('loja/vendas_visao.html').render(**context)
+    html = re.sub(r'<link\b[^>]*https://fonts\.(?:googleapis|gstatic)\.com[^>]*>', '', html)
+    return HTMLResponse(html)
+
+
+@app.get('/app/loja/financeiro/demo', response_class=HTMLResponse)
+async def financeiro_demo(request: Request):
+    # Task 8 (direcao "fechamento"): rende o template real com dados ficticios
+    # e sem persistencia. Cenario: margem parcial + equilibrio alcancado.
+    hoje = date.today()
+    competencia = hoje.strftime('%Y-%m')
+
+    def formatar_brl(valor):
+        try:
+            numero = float(valor)
+        except (TypeError, ValueError):
+            return '—'
+        texto = f'{numero:,.2f}'.replace(',', '_').replace('.', ',').replace('_', '.')
+        return f'R$ {texto}'
+
+    def formatar_data(iso):
+        if not iso:
+            return ''
+        try:
+            return date.fromisoformat(str(iso)[:10]).strftime('%d/%m/%Y')
+        except ValueError:
+            return str(iso)
+
+    resultado = NS(
+        qtd_vendas=5, receita=79500.0, custo_veiculo_total=61200.0,
+        custo_vendas=61200.0, custos_diretos=2300.0, lucro_bruto=16000.0,
+        margem_completa=False, vendas_sem_custo=1,
+        despesa_fixa=6000.0, tem_despesa_cadastrada=True,
+        lucro_operacional=10000.0,
+        ponto_equilibrio_disponivel=True, margem_media=3200.0,
+        ponto_equilibrio=2, vendas_ate_equilibrio=2,
+        dia_do_equilibrio=hoje.replace(day=9).isoformat(),
+        ponto_equilibrio_motivo=None,
+        linhas=[
+            NS(descricao='Honda CG 160 Fan', data=hoje.replace(day=3).isoformat(),
+               preco=18900.0, custo=14500.0, custos_diretos=600.0, lucro=3800.0, venda_id=11),
+            NS(descricao='Yamaha Fazer FZ25', data=hoje.replace(day=9).isoformat(),
+               preco=21500.0, custo=17200.0, custos_diretos=800.0, lucro=3500.0, venda_id=12),
+            NS(descricao='Honda NXR 160 Bros', data=hoje.replace(day=14).isoformat(),
+               preco=22400.0, custo=None, custos_diretos=900.0, lucro=None, venda_id=13),
+        ],
+    )
+    context = _shell_demo(request)
+    context.update(
+        nav_item_is_active=lambda item, path: False,
+        resultado=resultado, competencia=competencia, competencia_hoje=competencia,
+        formatar_brl=formatar_brl, formatar_data=formatar_data,
+    )
+    html = env.get_template('loja/financeiro_resultado.html').render(**context)
+    html = re.sub(r'<link\b[^>]*https://fonts\.(?:googleapis|gstatic)\.com[^>]*>', '', html)
+    return HTMLResponse(html)
+
+
+@app.get('/app/loja/financeiro/despesas/demo', response_class=HTMLResponse)
+async def despesas_demo(request: Request):
+    # Task 9 (direcao "arquivo"): rende o template real com dados ficticios
+    # e sem persistencia. Uma linha com ajuste no mes + arquivo com 2 itens.
+    hoje = date.today()
+    competencia = hoje.strftime('%Y-%m')
+
+    def formatar_brl(valor):
+        try:
+            numero = float(valor)
+        except (TypeError, ValueError):
+            return '—'
+        texto = f'{numero:,.2f}'.replace(',', '_').replace('.', ',').replace('_', '.')
+        return f'R$ {texto}'
+
+    itens = [
+        (NS(id='d1', descricao='Aluguel da loja', categoria='aluguel',
+            valor_mensal=2500.0), 2500.0),
+        (NS(id='d2', descricao='Salários', categoria='pessoal',
+            valor_mensal=2800.0), 2800.0),
+        (NS(id='d3', descricao='Energia', categoria='contas',
+            valor_mensal=400.0), 320.0),
+    ]
+    encerradas = [
+        NS(id='d9', descricao='Anúncio antigo', categoria='marketing',
+           valor_mensal=900.0, inicio_competencia='2026-01', fim_competencia='2026-06'),
+        NS(id='d8', descricao='Contador avulso', categoria='servicos',
+           valor_mensal=600.0, inicio_competencia='2026-02', fim_competencia=None),
+    ]
+    context = _shell_demo(request)
+    context.update(
+        nav_item_is_active=lambda item, path: False,
+        competencia=competencia, competencia_hoje=competencia,
+        itens=itens, encerradas=encerradas,
+        categorias=['aluguel', 'pessoal', 'contas', 'marketing', 'servicos'],
+        aviso_ok=None, aviso_erro=None, csrf='demonstracao',
+        formatar_brl=formatar_brl,
+    )
+    html = env.get_template('loja/financeiro_despesas.html').render(**context)
+    html = re.sub(r'<link\b[^>]*https://fonts\.(?:googleapis|gstatic)\.com[^>]*>', '', html)
+    return HTMLResponse(html)
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--port', type=int, default=8766)

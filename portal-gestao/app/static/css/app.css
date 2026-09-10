@@ -964,6 +964,10 @@ tr:hover td { background: var(--surface-soft); }
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 16px;
+  /* Labels com quantidades diferentes de filhos (campo + ajuda) esticavam
+     até a altura da linha e as trilhas auto absorviam a folga por igual —
+     o select afundava ao lado do input. Alinha pelo topo. */
+  align-items: start;
 }
 .form-grid label,
 .stack-form label,
@@ -2568,7 +2572,8 @@ tr.roi-sem-campanha td { color: var(--ink-soft); }
 /* --- Vitrine: config recolhida (Task 3) ---
    Uma linha (titulo + estado atual); o corpo usa .panel-body, .form-grid e
    .form-actions existentes. Somente tokens existentes; sem :root novo. */
-.vitrine-config summary {
+.vitrine-config summary,
+.despesa-arquivo summary {
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;
@@ -2577,9 +2582,12 @@ tr.roi-sem-campanha td { color: var(--ink-soft); }
   cursor: pointer;
   list-style: none;
 }
-.vitrine-config summary::-webkit-details-marker { display: none; }
-.vitrine-config summary::marker { content: ""; }
-.vitrine-config summary::before {
+.vitrine-config summary::-webkit-details-marker,
+.despesa-arquivo summary::-webkit-details-marker { display: none; }
+.vitrine-config summary::marker,
+.despesa-arquivo summary::marker { content: ""; }
+.vitrine-config summary::before,
+.despesa-arquivo summary::before {
   content: "+";
   flex: 0 0 auto;
   color: var(--ink-soft);
@@ -2587,8 +2595,13 @@ tr.roi-sem-campanha td { color: var(--ink-soft); }
 }
 .vitrine-config details[open] > summary::before { content: "−"; }
 .vitrine-config details[open] > summary { border-bottom: 1px solid var(--line); }
-.vitrine-config-title { color: var(--ink); font-size: var(--text-base); font-weight: 600; }
-.vitrine-config-state { font-variant-numeric: tabular-nums; }
+/* O arquivo de Despesas põe a classe no próprio details (Task 9). */
+.despesa-arquivo[open] > summary::before { content: "−"; }
+.despesa-arquivo[open] > summary { border-bottom: 1px solid var(--line); }
+.vitrine-config-title,
+.despesa-arquivo-title { color: var(--ink); font-size: var(--text-base); font-weight: 600; }
+.vitrine-config-state,
+.despesa-arquivo-state { font-variant-numeric: tabular-nums; }
 .vitrine-form {
   display: flex;
   flex-direction: column;
@@ -4088,9 +4101,59 @@ a.metric-link:focus-visible { outline: 2px solid var(--brand); outline-offset: 2
 
 .despesa-lista.is-encerrada .despesa-quem strong { color: var(--ink-soft); font-weight: 500; }
 
+/* Task 9b — livro-caixa: valor do mês à direita, editor em disclosure quieto.
+   Somente tokens existentes; sem :root novo. */
+.despesa-lado {
+  margin-left: auto;
+  display: grid;
+  gap: var(--space-1);
+  justify-items: end;
+  text-align: right;
+}
+.despesa-valor-mes {
+  font-size: var(--text-lg);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.despesa-editor { display: grid; gap: var(--space-2); justify-items: end; }
+.despesa-editor > summary {
+  list-style: none;
+  cursor: pointer;
+  color: var(--ink-soft);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.despesa-editor > summary::-webkit-details-marker { display: none; }
+.despesa-editor > summary::marker { content: ""; }
+.despesa-editor > summary:hover { color: var(--ink); }
+.despesa-editor[open] > summary { color: var(--ink-muted); }
+.despesa-encerrar {
+  background: none;
+  border: 0;
+  padding: 0;
+  color: var(--ink-muted);
+  font-size: var(--text-xs);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+.despesa-encerrar:hover { color: var(--ink); }
+
+/* Nova despesa: o .form-section empilha padding da seção + padding e hairline
+   do .panel-heading, e o título ficava ilhado do próprio formulário. Aqui o
+   título escorre para o form, sem hairline e sem padding duplo. Escopo só
+   desta tela — .form-section é vocabulário compartilhado. */
+.despesa-nova.panel { padding: 0; }
+.despesa-nova .panel-heading { border-bottom: 0; padding-bottom: 0; }
+.despesa-nova .form-layout { padding: var(--space-4) var(--space-5) var(--space-5); }
+
 @media (max-width: 720px) {
   .panel-heading:has(.despesa-mes) { flex-wrap: wrap; }
   .despesa-lista > li { align-items: flex-start; }
+  .despesa-lado { margin-left: 0; justify-items: start; text-align: left; }
+  .despesa-editor { justify-items: start; }
 }
 
 /* --- Configuração do agente por loja -------------------------------------- */
@@ -4484,3 +4547,70 @@ a.metric-link:focus-visible { outline: 2px solid var(--brand); outline-offset: 2
 .estc-index li:last-child { border-bottom: 1px solid var(--line); }
 .estc-index span { color: var(--ink-soft); }
 .estc-index strong { font-size: var(--text-lg); font-variant-numeric: tabular-nums; }
+/* Task 7 — Resultado "balanco": resumo-manifesto + indice em linhas no
+   vocabulario do Estoque "patio", funil como tira de fluxo (sequencia de
+   verdade) e aquisicao como indice honesto. Somente tokens existentes. */
+.res-kicker { margin: 0; font-size: var(--text-lg); letter-spacing: -.01em; }
+.res-lede {
+  margin: var(--space-4) 0 0;
+  font-family: var(--font-brand);
+  font-size: clamp(1.75rem, 4vw, 2.75rem);
+  line-height: 1.08;
+  letter-spacing: -.015em;
+  text-wrap: balance;
+  max-width: 24ch;
+}
+.res-lede strong { color: var(--brand); font-weight: 600; }
+.res-index { list-style: none; margin: var(--space-4) 0 0; padding: 0; }
+.res-index li {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: var(--space-3) 0;
+  border-top: 1px solid var(--line);
+  font-size: var(--text-base);
+}
+.res-index li:last-child { border-bottom: 1px solid var(--line); }
+.res-index span { color: var(--ink-soft); }
+.res-index strong { font-size: var(--text-lg); font-variant-numeric: tabular-nums; }
+.res-index .res-note { padding: var(--space-1) 0 var(--space-3); border-top: 0; }
+.res-index .res-note:last-child { border-bottom: 0; }
+.res-index .res-note span { font-size: var(--text-sm); }
+.res-flow {
+  list-style: none;
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+  margin: var(--space-4) 0 0;
+  padding: 0;
+}
+.res-flow li {
+  position: relative;
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+.res-flow li + li { padding-left: var(--space-6); }
+.res-flow li + li::before {
+  content: "";
+  position: absolute;
+  left: 2px;
+  top: 10px;
+  width: 9px;
+  height: 9px;
+  border-top: 2px solid var(--line-strong);
+  border-right: 2px solid var(--line-strong);
+  transform: rotate(45deg);
+}
+.res-flow strong { font-size: var(--text-xl); font-variant-numeric: tabular-nums; }
+.res-flow span { color: var(--ink-soft); font-size: var(--text-base); }
+.res-flow small { color: var(--ink-soft); font-size: var(--text-sm); }
+.res-taxas strong { color: var(--ink); font-variant-numeric: tabular-nums; }
+@media (max-width: 640px) {
+  .res-flow { flex-direction: column; gap: var(--space-3); }
+  .res-flow li + li { padding-left: 0; padding-top: var(--space-4); }
+  .res-flow li + li::before { left: 4px; top: 2px; transform: rotate(135deg); }
+}

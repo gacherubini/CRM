@@ -14,10 +14,6 @@
   <div>
     <span class="eyebrow">Financeiro</span>
     <h1>Despesas fixas</h1>
-    <p>
-      A estrutura da loja: cadastre uma vez e vale todo mês. Se num mês o valor mudou,
-      ajuste só aquele mês — o cadastro fica intacto.
-    </p>
   </div>
 </div>
 
@@ -40,10 +36,9 @@
     </form>
   </div>
 
-  <div class="despesa-total">
-    <span>Custo fixo de {{ mes_extenso }}</span>
-    <strong>{{ formatar_brl(total) }}</strong>
-    <small>É o que a loja paga mesmo sem vender nenhuma moto.</small>
+  <div class="panel-body res">
+    <p class="res-lede"><strong>{{ formatar_brl(total) }}</strong> de custo fixo em {{ mes_extenso }}</p>
+    <p class="muted">É o que a loja paga mesmo sem vender nenhuma moto.</p>
   </div>
 
   {% if not itens %}
@@ -52,6 +47,8 @@
     <p>Sem ela o lucro operacional do mês fica igual ao lucro bruto, e não dá para saber quantas motos pagam a casa.</p>
   </div>
   {% else %}
+  {# Livro-caixa (Task 9b): a linha mostra o valor do mês; o editor (ajuste +
+     encerrar) mora num disclosure. Formulários, campos, CSRF e textos iguais. #}
   <ul class="despesa-lista">
     {% for despesa, valor in itens %}
     <li>
@@ -64,29 +61,35 @@
           {% endif %}
         </small>
       </div>
-      <form class="despesa-valor" method="post" action="/app/loja/financeiro/despesas/{{ despesa.id }}/ajuste">
-        <input type="hidden" name="csrf" value="{{ csrf }}">
-        <input type="hidden" name="mes" value="{{ competencia }}">
-        <span class="despesa-moeda">
-          <i aria-hidden="true">R$</i>
-          <input type="number" step="0.01" min="0" name="valor" value="{{ valor }}"
-                 aria-label="Valor de {{ despesa.descricao }} em {{ mes_extenso }}">
-        </span>
-        <button class="button secondary" type="submit">Ajustar só este mês</button>
-      </form>
-      <form method="post" action="/app/loja/financeiro/despesas/{{ despesa.id }}/encerrar"
-            onsubmit="return confirm('Encerrar {{ despesa.descricao }}? Ela para de contar a partir de {{ mes_extenso }}. Os meses anteriores continuam como estavam.')">
-        <input type="hidden" name="csrf" value="{{ csrf }}">
-        <input type="hidden" name="mes" value="{{ competencia }}">
-        <button class="button ghost" type="submit">Encerrar</button>
-      </form>
+      <div class="despesa-lado">
+        <strong class="despesa-valor-mes">{{ formatar_brl(valor) }}</strong>
+        <details class="despesa-editor">
+          <summary>Ajustar só este mês</summary>
+          <form class="despesa-valor" method="post" action="/app/loja/financeiro/despesas/{{ despesa.id }}/ajuste">
+            <input type="hidden" name="csrf" value="{{ csrf }}">
+            <input type="hidden" name="mes" value="{{ competencia }}">
+            <span class="despesa-moeda">
+              <i aria-hidden="true">R$</i>
+              <input type="number" step="0.01" min="0" name="valor" value="{{ valor }}"
+                     aria-label="Valor de {{ despesa.descricao }} em {{ mes_extenso }}">
+            </span>
+            <button class="button secondary" type="submit">Ajustar só este mês</button>
+          </form>
+          <form method="post" action="/app/loja/financeiro/despesas/{{ despesa.id }}/encerrar"
+                onsubmit="return confirm('Encerrar {{ despesa.descricao }}? Ela para de contar a partir de {{ mes_extenso }}. Os meses anteriores continuam como estavam.')">
+            <input type="hidden" name="csrf" value="{{ csrf }}">
+            <input type="hidden" name="mes" value="{{ competencia }}">
+            <button class="despesa-encerrar" type="submit">Encerrar</button>
+          </form>
+        </details>
+      </div>
     </li>
     {% endfor %}
   </ul>
   {% endif %}
 </section>
 
-<section class="panel form-section" aria-labelledby="bloco-nova">
+<section class="panel form-section despesa-nova" aria-labelledby="bloco-nova">
   <div class="panel-heading">
     <div><span class="mono-label">Nova</span><h2 id="bloco-nova">Cadastrar despesa fixa</h2></div>
   </div>
@@ -113,27 +116,32 @@
 </section>
 
 {% if encerradas %}
+{# Direção "arquivo" (Task 9): fora de vigência recolhido em disclosure, no
+   vocabulário do summary da Vitrine. Mesma lista, mesmos textos. #}
 <section class="panel" aria-labelledby="bloco-encerradas">
-  <div class="panel-heading">
-    <div><span class="mono-label">Fora de vigência</span><h2 id="bloco-encerradas">Não contam em {{ mes_extenso }}</h2></div>
-  </div>
-  <ul class="despesa-lista is-encerrada">
-    {% for despesa in encerradas %}
-    <li>
-      <div class="despesa-quem">
-        <strong>{{ despesa.descricao }}</strong>
-        <small>
-          <span class="despesa-cat">{{ despesa.categoria | capitalize }}</span>
-          <span>{{ formatar_brl(despesa.valor_mensal) }} · de {{ despesa.inicio_competencia }}
-            {% if despesa.fim_competencia %}até {{ despesa.fim_competencia }}{% else %}em diante{% endif %}</span>
-        </small>
-      </div>
-    </li>
-    {% endfor %}
-  </ul>
-  <p class="canal-rodape">
-    Ficam no cadastro para que os meses em que valeram continuem corretos.
-  </p>
+  <details class="despesa-arquivo">
+    <summary>
+      <span class="despesa-arquivo-title" id="bloco-encerradas">Não contam em {{ mes_extenso }}</span>
+      <span class="muted despesa-arquivo-state">{{ encerradas | length }} no arquivo</span>
+    </summary>
+    <ul class="despesa-lista is-encerrada">
+      {% for despesa in encerradas %}
+      <li>
+        <div class="despesa-quem">
+          <strong>{{ despesa.descricao }}</strong>
+          <small>
+            <span class="despesa-cat">{{ despesa.categoria | capitalize }}</span>
+            <span>{{ formatar_brl(despesa.valor_mensal) }} · de {{ despesa.inicio_competencia }}
+              {% if despesa.fim_competencia %}até {{ despesa.fim_competencia }}{% else %}em diante{% endif %}</span>
+          </small>
+        </div>
+      </li>
+      {% endfor %}
+    </ul>
+    <p class="canal-rodape">
+      Ficam no cadastro para que os meses em que valeram continuem corretos.
+    </p>
+  </details>
 </section>
 {% endif %}
 {% endblock %}
