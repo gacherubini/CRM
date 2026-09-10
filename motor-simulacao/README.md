@@ -182,6 +182,14 @@ conversa, perguntar se a loja pode ser habilitada nas APIs de parceiro F&I. O ro
 pronto está em
 `docs/referencia-viva/planos/2026-07-13-plano1a-task12-bancos-reconhecimento.md`.
 
+**10/09/2026: login-robô inviável por anti-bot (não por credencial).** Com senha
+válida (provada no navegador do dono no mesmo dia): vanilla recusa
+("usuário ou senha inválidos"), stealth + digitação humana trava no spinner.
+A captura de rede, sem logar, mostra o porquê — sensor Akamai BM ativo e
+`GET …/api-security/user` respondendo **403** para o Chromium automatizado.
+Cada tentativa contamina o score e ameaça o acesso manual: **não insistir**.
+Detalhe e decisão em `docs/fila/2026-09-04-bancos-bv-e-motrix.md` (§ 10/09).
+
 ## Deploy
 
 A **API** roda no bundle `app2037` (`127.0.0.1:8004`) com `MOTOR_ORCHESTRATOR_ONLY=1` e
