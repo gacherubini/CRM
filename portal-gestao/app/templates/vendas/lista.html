@@ -54,4 +54,7 @@
   {% elif filtros.status %}<div class="empty"><strong>Nenhuma venda para esse filtro.</strong><p>Ajuste o status ou o período selecionado.</p></div>
   {% else %}<div class="empty"><strong>Nenhuma venda no período.</strong><p>Registre a primeira venda para começar a acompanhar o comercial.</p></div>{% endif %}
 </section>
+{# Date-picker próprio em pt-BR (resultado_periodo.js): enhancement
+   progressivo — sem JS os <input type="date"> acima seguem nativos. #}
+<script src="/static/js/resultado_periodo.js" defer></script>
 {% endblock %}
