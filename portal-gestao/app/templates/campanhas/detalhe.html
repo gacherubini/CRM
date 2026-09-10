@@ -111,4 +111,7 @@
   <div class="section-title"><span>03</span><div><h2>Link com atribuição</h2><p>Use estes parâmetros no link do catálogo publicado no anúncio.</p></div></div>
   <code style="display:block;overflow-wrap:anywhere">?utm_source={{ campanha.utm_source or campanha.canal }}&amp;utm_medium={{ campanha.utm_medium or 'paid' }}&amp;utm_campaign={{ campanha.utm_campaign }}{% if campanha.utm_content %}&amp;utm_content={{ campanha.utm_content }}{% endif %}</code>
 </section>
+{# Date-picker próprio em pt-BR (resultado_periodo.js): enhancement
+   progressivo — sem JS os <input type="date"> acima seguem nativos. #}
+<script src="/static/js/resultado_periodo.js" defer></script>
 {% endblock %}
