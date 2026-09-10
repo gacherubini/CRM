@@ -1,6 +1,6 @@
 # motor-simulacao · 16 rotas · 12 modelos · 1 workers · 2 flags · 14 migrations
 
-Gerado de `39ebc82`. NAO editar a mao — saida de `gerar_mapa.py`.
+Gerado de `bdb6113`. NAO editar a mao — saida de `gerar_mapa.py`.
 Migration head: `0014`
 
 ## Rotas
@@ -43,8 +43,8 @@ Migration head: `0014`
 
 ## Flags
 
-- `MOTOR_FANOUT_ENABLED (default: 0)` — app/config.py:101
-- `MOTOR_FLY_AUTOSCALE_ENABLED (default: 0)` — app/config.py:102
+- `MOTOR_FANOUT_ENABLED (default: 0)` — app/config.py:113
+- `MOTOR_FLY_AUTOSCALE_ENABLED (default: 0)` — app/config.py:114
 
 ## Migrations
 

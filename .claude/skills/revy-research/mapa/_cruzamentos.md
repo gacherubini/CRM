@@ -26,6 +26,7 @@ nao entra: quem chama e o framework.
 - `pixel_id_valido` — portal-gestao/app/meta_pixel.py:16
 - `pode_escrever_operacional` — portal-gestao/app/loja/permissions.py:68
 - `require_roles` — portal-gestao/app/loja/permissions.py:58
+- `fmt_moeda` — motor-simulacao/scripts/_diag_omni_sim11.py:57
 - `atualizar_whatsapp_loja` — estoque-api/app/servico.py:1077
 - `as_tuple` — revy-trafego/app/clients/meta_graph.py:117
 - `chatbot_poster` — revy-trafego/app/control/provisioning_outbox.py:193
@@ -61,6 +62,34 @@ So a lista: qual arquivo aponta para qual app. Quais desses apps
 ainda existem e conhecimento humano que muda com o tempo — ver
 `AGENTS.md` secao 5. Deploy so por `deploy/fly/3vm/`.
 
+- `.claude/worktrees/agent-ad9d226a50e69b1a6/catalogo-publico/fly.toml` -> `catalogo2037`
+- `.claude/worktrees/agent-ad9d226a50e69b1a6/chatbot-api/fly.toml` -> `chatbot2037`
+- `.claude/worktrees/agent-ad9d226a50e69b1a6/deploy/fly/evolution/fly.toml` -> `evolution2037`
+- `.claude/worktrees/agent-ad9d226a50e69b1a6/deploy/fly/n8n/fly.toml` -> `n8n2037`
+- `.claude/worktrees/agent-ad9d226a50e69b1a6/estoque-api/fly.toml` -> `estoque2037`
+- `.claude/worktrees/agent-ad9d226a50e69b1a6/motor-simulacao/fly.toml` -> `motor2037`
+- `.claude/worktrees/agent-ad9d226a50e69b1a6/portal-gestao/fly.toml` -> `portal2037`
+- `.claude/worktrees/arquitetura-viva/catalogo-publico/fly.toml` -> `catalogo2037`
+- `.claude/worktrees/arquitetura-viva/chatbot-api/fly.toml` -> `chatbot2037`
+- `.claude/worktrees/arquitetura-viva/deploy/fly/evolution/fly.toml` -> `evolution2037`
+- `.claude/worktrees/arquitetura-viva/deploy/fly/n8n/fly.toml` -> `n8n2037`
+- `.claude/worktrees/arquitetura-viva/estoque-api/fly.toml` -> `estoque2037`
+- `.claude/worktrees/arquitetura-viva/motor-simulacao/fly.toml` -> `motor2037`
+- `.claude/worktrees/arquitetura-viva/portal-gestao/fly.toml` -> `portal2037`
+- `.claude/worktrees/loja-datepicker-ptbr/catalogo-publico/fly.toml` -> `catalogo2037`
+- `.claude/worktrees/loja-datepicker-ptbr/chatbot-api/fly.toml` -> `chatbot2037`
+- `.claude/worktrees/loja-datepicker-ptbr/deploy/fly/evolution/fly.toml` -> `evolution2037`
+- `.claude/worktrees/loja-datepicker-ptbr/deploy/fly/n8n/fly.toml` -> `n8n2037`
+- `.claude/worktrees/loja-datepicker-ptbr/estoque-api/fly.toml` -> `estoque2037`
+- `.claude/worktrees/loja-datepicker-ptbr/motor-simulacao/fly.toml` -> `motor2037`
+- `.claude/worktrees/loja-datepicker-ptbr/portal-gestao/fly.toml` -> `portal2037`
+- `.claude/worktrees/loja-venda-redesign/catalogo-publico/fly.toml` -> `catalogo2037`
+- `.claude/worktrees/loja-venda-redesign/chatbot-api/fly.toml` -> `chatbot2037`
+- `.claude/worktrees/loja-venda-redesign/deploy/fly/evolution/fly.toml` -> `evolution2037`
+- `.claude/worktrees/loja-venda-redesign/deploy/fly/n8n/fly.toml` -> `n8n2037`
+- `.claude/worktrees/loja-venda-redesign/estoque-api/fly.toml` -> `estoque2037`
+- `.claude/worktrees/loja-venda-redesign/motor-simulacao/fly.toml` -> `motor2037`
+- `.claude/worktrees/loja-venda-redesign/portal-gestao/fly.toml` -> `portal2037`
 - `catalogo-publico/fly.toml` -> `catalogo2037`
 - `chatbot-api/fly.toml` -> `chatbot2037`
 - `deploy/fly/evolution/fly.toml` -> `evolution2037`

@@ -1,5 +1,5 @@
 {
- "sha": "39ebc82",
+ "sha": "bdb6113",
  "inventario": {
   "chatbot-api": [
    {
@@ -3042,14 +3042,14 @@
     "chave": "MOTOR_FANOUT_ENABLED (default: 0)",
     "simbolo": "MOTOR_FANOUT_ENABLED",
     "arquivo": "app/config.py",
-    "linha": 101
+    "linha": 113
    },
    {
     "secao": "flag",
     "chave": "MOTOR_FLY_AUTOSCALE_ENABLED (default: 0)",
     "simbolo": "MOTOR_FLY_AUTOSCALE_ENABLED",
     "arquivo": "app/config.py",
-    "linha": 102
+    "linha": 114
    },
    {
     "secao": "rota",

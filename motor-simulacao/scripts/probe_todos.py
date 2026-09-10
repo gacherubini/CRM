@@ -1,4 +1,4 @@
-r"""Roda os quatro drivers Playwright ao vivo, um de cada vez, e diz quais falham.
+r"""Roda os drivers Playwright ao vivo, um de cada vez, e diz quais falham.
 
 Um lugar so para responder "quais bancos estao funcionando hoje". Cada banco roda
 headed (janela visivel), com log de etapa ao vivo, screenshot na falha e um
@@ -123,9 +123,17 @@ BANCOS: dict[str, dict[str, object]] = {
         "env_senha": "MOTOR_MOTRIX_PORTAL_SENHA",
         "rotulo_usuario": "usuario do portal Motrix",
     },
+    "omni": {
+        "rotulo": "Omni (Omni+ motos)",
+        "modulo": "app.motor.omni",
+        "fabrica": "fabrica_omni",
+        "env_usuario": "MOTOR_OMNI_PORTAL_USUARIO",
+        "env_senha": "MOTOR_OMNI_PORTAL_SENHA",
+        "rotulo_usuario": "usuario do portal Omni+",
+    },
 }
 
-ORDEM_PADRAO = ["fontecred", "pan", "bradesco", "santander", "motrix"]
+ORDEM_PADRAO = ["fontecred", "pan", "bradesco", "santander", "motrix", "omni"]
 
 # Fixtures desviam o driver do portal real e devolveriam um OK falso.
 ENVS_FIXTURE = [
@@ -134,6 +142,7 @@ ENVS_FIXTURE = [
     "MOTOR_BRADESCO_FIXTURE_HTML",
     "MOTOR_PAN_PORTAL_FIXTURE_HTML",
     "MOTOR_MOTRIX_FIXTURE_HTML",
+    "MOTOR_OMNI_FIXTURE_HTML",
 ]
 
 

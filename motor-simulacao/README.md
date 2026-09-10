@@ -69,7 +69,7 @@ aqui** — cifradas — e em nenhum outro produto.
 | `app/orquestrador.py` · `app/fanout.py` | Fila, fan-out por provedor, wake de workers Fly |
 | `app/worker.py` · `app/processamento.py` | Execução dos jobs |
 | `app/motor/drivers.py` · `providers.py` | Registro e seleção de driver |
-| `app/motor/{santander,fontecred,bradesco,pan_portal,pan,motrix}.py` | Drivers por banco |
+| `app/motor/{santander,fontecred,bradesco,pan_portal,pan,motrix,omni}.py` | Drivers por banco |
 | `app/motor/playwright_base.py` · `sessao_browser.py` | Base RPA, sessão quente |
 | `app/motor/mock.py` | Driver mock (taxas fictícias) |
 | `app/credenciais.py` · `app/cripto.py` | Credenciais cifradas por loja |
@@ -110,6 +110,12 @@ em `data/probes/<carimbo>/`, também fora do git.
 Rodada de referência (04/09/2026, IP residencial, placa de moto a R$ 21.900): Fontecred 48s,
 Pan 35s, Bradesco 55s, Santander 136s — os quatro OK — e Motrix 48s **RECUSA**. **O Pan devolve
 só o prazo 48**, mesmo pedindo 24/36/48; os outros três devolvem os três. Não investigado.
+
+Omni (10/09/2026, mesma placa/moto): login OK sem captcha, proposta criada no
+portal e resultado em ~2min — 48x R$ 710,71 · 36x R$ 746,72 · 24x R$ 994,11 ·
+18x R$ 1.246,05 · 12x R$ 1.754,30, com entrada padrão do portal (30%,
+R$ 5.760 sobre cotação R$ 19.200). O driver **para no resultado** e nunca clica o
+Continuar final. Detalhe do fluxo em `docs/fila/2026-09-10-motor-driver-omni.md`.
 
 `RECUSA` e `FALHA` são estados diferentes no relatório e no código de saída: recusa é o banco
 dizendo não (`RejeicaoNegocio`) com o driver funcionando, e **não reprova a rodada**; só
