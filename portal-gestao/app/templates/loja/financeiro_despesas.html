@@ -29,11 +29,17 @@
       <span class="mono-label">Vigentes</span>
       <h2 id="bloco-vigentes">Estrutura de {{ mes_extenso }}</h2>
     </div>
-    <form class="despesa-mes" method="get">
-      <label for="despesa-mes">Ver outro mês</label>
-      <input id="despesa-mes" type="month" name="mes" value="{{ competencia }}">
-      <button class="button secondary" type="submit">Ver</button>
-    </form>
+    {% set ano = competencia[:4] | int %}{% set mesn = competencia[5:7] | int %}
+    {% set mes_ant = '%04d-%02d' | format(ano if mesn > 1 else ano - 1, mesn - 1 if mesn > 1 else 12) %}
+    {% set mes_prox = '%04d-%02d' | format(ano if mesn < 12 else ano + 1, mesn + 1 if mesn < 12 else 1) %}
+    <nav class="mes-nav" aria-label="Trocar de mês">
+      <a href="?mes={{ mes_ant }}" aria-label="Ver mês anterior">‹ Anterior</a>
+      {% if competencia < competencia_hoje %}
+      <a href="?mes={{ mes_prox }}" aria-label="Ver próximo mês">Próximo ›</a>
+      {% else %}
+      <span class="muted" aria-hidden="true">Próximo ›</span>
+      {% endif %}
+    </nav>
   </div>
 
   <div class="panel-body res">

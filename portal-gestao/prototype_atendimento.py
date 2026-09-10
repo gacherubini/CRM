@@ -387,7 +387,9 @@ async def despesas_demo(request: Request):
     # Task 9 (direcao "arquivo"): rende o template real com dados ficticios
     # e sem persistencia. Uma linha com ajuste no mes + arquivo com 2 itens.
     hoje = date.today()
-    competencia = hoje.strftime('%Y-%m')
+    # Mês passado de propósito: mostra o "Próximo ›" vivo no trocador.
+    competencia = (hoje.replace(day=1) - timedelta(days=1)).strftime('%Y-%m')
+    competencia_hoje = hoje.strftime('%Y-%m')
 
     def formatar_brl(valor):
         try:
@@ -414,7 +416,7 @@ async def despesas_demo(request: Request):
     context = _shell_demo(request)
     context.update(
         nav_item_is_active=lambda item, path: False,
-        competencia=competencia, competencia_hoje=competencia,
+        competencia=competencia, competencia_hoje=competencia_hoje,
         itens=itens, encerradas=encerradas,
         categorias=['aluguel', 'pessoal', 'contas', 'marketing', 'servicos'],
         aviso_ok=None, aviso_erro=None, csrf='demonstracao',

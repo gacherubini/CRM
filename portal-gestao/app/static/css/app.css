@@ -698,6 +698,45 @@ code {
   min-width: 160px;
 }
 
+/* Trocador de mês (Despesas + Financeiro): anterior/atual/próximo em vez do
+   <input type="month"> cru ("2026-09"). Mesma query string, sem formulário. */
+.mes-nav {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-2) var(--space-4);
+  margin-bottom: var(--space-4);
+}
+.panel-heading .mes-nav { margin-bottom: 0; }
+.mes-nav a {
+  color: var(--ink-soft);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.mes-nav a:hover { color: var(--ink); text-decoration: underline; }
+.mes-nav strong { font-size: var(--text-base); font-variant-numeric: tabular-nums; }
+.mes-nav .muted { font-size: var(--text-sm); }
+
+/* Período do Resultado: controle composto De/Até com rótulos visíveis, no
+   vocabulário dos rótulos de formulário (legenda miúda sobre o campo). */
+.periodo-nav {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: var(--space-2) var(--space-3);
+  margin-bottom: var(--space-2);
+}
+.periodo-nav label {
+  display: grid;
+  gap: 2px;
+  color: var(--ink-soft);
+  font-size: var(--text-xs);
+  font-weight: 600;
+}
+.periodo-nav input[type="date"] { width: auto; }
+
 .funil-filter {
   grid-template-columns: minmax(170px, 220px) minmax(170px, 220px) auto;
   justify-content: start;
@@ -1328,7 +1367,14 @@ tr:hover td { background: var(--surface-soft); }
 .workspace-disclosure[open] > summary::before { content: "−"; }
 .workspace-disclosure[open] > summary { border-bottom: 1px solid var(--line); }
 .workspace-disclosure + .workspace-disclosure > summary { border-top: 1px solid var(--line); }
-.workspace-disclosure-follow { border-top: 1px solid var(--line); }
+.workspace-disclosure-follow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-3);
+  border-top: 1px solid var(--line);
+  margin: 0;
+  padding: var(--space-4) var(--space-5);
+}
 
 /* Barra de atingimento de meta (dentro de .metric). */
 .meta-bar {
@@ -4006,39 +4052,6 @@ a.metric-link:focus-visible { outline: 2px solid var(--brand); outline-offset: 2
    O custo fixo do mes e a resposta que a tela existe para dar: ele sai do
    canto direito do cabecalho, em 12px cinza, e vira figura.
    =========================================================================== */
-.despesa-mes {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-}
-.despesa-mes label {
-  color: var(--ink-muted);
-  font-size: var(--text-xs);
-  font-weight: 600;
-  white-space: nowrap;
-}
-.panel-heading .despesa-mes input { width: auto; min-height: 32px; }
-.despesa-mes .button { min-height: 32px; padding: 0 12px; font-size: var(--text-xs); }
-
-.despesa-total {
-  padding: var(--space-5);
-  display: grid;
-  gap: var(--space-1);
-  border-bottom: 1px solid var(--line);
-}
-.despesa-total > span {
-  color: var(--ink-muted);
-  font-size: var(--text-xs);
-  font-weight: 600;
-}
-.despesa-total > strong {
-  font-size: var(--text-metric);
-  font-weight: 600;
-  letter-spacing: -.03em;
-  font-variant-numeric: tabular-nums;
-}
-.despesa-total > small { color: var(--ink-soft); font-size: var(--text-xs); }
-
 .despesa-lista {
   margin: 0;
   padding: 0 var(--space-5);
@@ -4148,9 +4161,12 @@ a.metric-link:focus-visible { outline: 2px solid var(--brand); outline-offset: 2
 .despesa-nova.panel { padding: 0; }
 .despesa-nova .panel-heading { border-bottom: 0; padding-bottom: 0; }
 .despesa-nova .form-layout { padding: var(--space-4) var(--space-5) var(--space-5); }
+/* Select e inputs nunca assentam na mesma altura sozinhos (cada navegador
+   compõe o chrome nativo por dentro): altura explícita trava o padrão. */
+.despesa-nova .form-grid label > input,
+.despesa-nova .form-grid label > select { height: 44px; }
 
 @media (max-width: 720px) {
-  .panel-heading:has(.despesa-mes) { flex-wrap: wrap; }
   .despesa-lista > li { align-items: flex-start; }
   .despesa-lado { margin-left: 0; justify-items: start; text-align: left; }
   .despesa-editor { justify-items: start; }

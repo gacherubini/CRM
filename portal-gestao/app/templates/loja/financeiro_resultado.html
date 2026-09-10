@@ -11,12 +11,21 @@
   </div>
 </div>
 
-<form class="filter-bar" method="get">
-  <label class="search"><span class="sr-only">Mês</span>
-    <input type="month" name="mes" value="{{ competencia }}" max="{{ competencia_hoje }}">
-  </label>
-  <button class="button secondary" type="submit">Ver mês</button>
-</form>
+{% set MESES_PT = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho',
+                'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'] %}
+{% set mes_extenso_fin = MESES_PT[competencia[5:7] | int - 1] ~ ' de ' ~ competencia[:4] %}
+{% set ano_fin = competencia[:4] | int %}{% set mesn_fin = competencia[5:7] | int %}
+{% set mes_ant_fin = '%04d-%02d' | format(ano_fin if mesn_fin > 1 else ano_fin - 1, mesn_fin - 1 if mesn_fin > 1 else 12) %}
+{% set mes_prox_fin = '%04d-%02d' | format(ano_fin if mesn_fin < 12 else ano_fin + 1, mesn_fin + 1 if mesn_fin < 12 else 1) %}
+<nav class="mes-nav" aria-label="Trocar de mês">
+  <a href="?mes={{ mes_ant_fin }}" aria-label="Ver mês anterior">‹ Anterior</a>
+  <strong>{{ mes_extenso_fin }}</strong>
+  {% if competencia < competencia_hoje %}
+  <a href="?mes={{ mes_prox_fin }}" aria-label="Ver próximo mês">Próximo ›</a>
+  {% else %}
+  <span class="muted" aria-hidden="true">Próximo ›</span>
+  {% endif %}
+</nav>
 
 {# --- Fechamento do mês --- #}
 {# Direção "fechamento" (Task 8): o mês em frase-manifesto + índice em linhas,

@@ -243,12 +243,14 @@
           {% endif %}
         </div>
       </details>
-      <ul class="action-links workspace-disclosure-follow">
+      {# Rodapé de ações (Task 4b): os saltos viram botões secundários lado a
+         lado, na linguagem do "Próximo passo". Mesmos hrefs e textos. #}
+      <div class="workspace-disclosure-follow">
         {% if workspace.lead and workspace.lead.id %}
-        <li><a href="/app/leads/{{ workspace.lead.id }}">Abrir ficha do lead</a></li>
+        <a class="button secondary" href="/app/leads/{{ workspace.lead.id }}">Abrir ficha do lead</a>
         {% endif %}
-        <li><a href="/app/conversas/{{ workspace.telefone }}">Ver histórico da conversa</a></li>
-      </ul>
+        <a class="button secondary" href="/app/conversas/{{ workspace.telefone }}">Ver histórico da conversa</a>
+      </div>
     </section>
 
   </div>

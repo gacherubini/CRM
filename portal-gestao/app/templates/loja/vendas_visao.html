@@ -16,11 +16,13 @@
   </div>
 </div>
 
-<form class="filter-bar" method="get">
-  <label class="search"><span class="sr-only">Início do período</span>
+{# Período como controle composto (De/Até rotulados) em vez de duas caixas
+   nuas. Mesmos campos, nomes e ação — só template + CSS. #}
+<form class="periodo-nav" method="get" aria-label="Escolher período">
+  <label>De
     <input type="date" name="inicio" value="{{ periodo.inicio }}">
   </label>
-  <label class="search"><span class="sr-only">Fim do período</span>
+  <label>Até
     <input type="date" name="fim" value="{{ periodo.fim }}">
   </label>
   <button class="button secondary" type="submit">Aplicar período</button>
