@@ -38,8 +38,9 @@ Duas regras que sairam dai:
 Como achar isso rapido em qualquer portal: `getBoundingClientRect()` do alvo,
 `document.elementFromPoint(centro)` e os `getComputedStyle` de uns 8 ancestrais
 (`position`, `overflow`, altura). Se `elementFromPoint` devolve `null` ou outro elemento,
-o alvo nao esta onde o Playwright vai clicar. Modelo em `scripts/_diag_pan_modal.py`
-(fora do git por `scripts/_diag*.py`).
+o alvo nao esta onde o Playwright vai clicar. Os diags que fizeram isso sao descartaveis e
+nao entram no git (`scripts/_diag*.py` e ignorado), entao a receita acima e a nota — nao ha
+arquivo para abrir.
 
 Primo deste: [`2026-08-23-driver-playwright-engole-o-clique-que-falha.md`] — la o clique
 falhava e o `except: pass` escondia; aqui o clique nem era possivel e o sintoma era um

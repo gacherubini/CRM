@@ -22,7 +22,9 @@ Não sei dizer se o gatilho foi a frequência, sessões simultâneas do lado do 
 política de acesso ocioso. O que dá para afirmar: três logins em dez minutos foram
 suficientes, e o custo de descobrir de novo é alto demais para valer o experimento.
 
-Duas regras que saíram daí, já aplicadas em `scripts/_diag_bv.py` e `_diag_motrix.py`:
+Duas regras que saíram daí, aplicadas nos diags do BV e do Motrix — que são descartáveis e
+ficam fora do git (`scripts/_diag*.py` é ignorado), então valem como regra, não como arquivo
+para abrir:
 
 1. **Todo script que loga grava `storage_state` e reusa.** Um login por dia, não um por
    rodada. No Motrix isso levou o reconhecimento inteiro (menu, API, wizard, ofertas) a
