@@ -1,12 +1,19 @@
 {% extends "base.html" %}
-{% block title %}Estoque — Revy{% endblock %}
+{% block title %}Veículos — Revy{% endblock %}
+{% block page_title %}{% if loja_shell %}Veículos{% else %}Estoque{% endif %}{% endblock %}
 {% block content %}
+{% macro brl(valor) %}R$ {{ "{:,.2f}".format(valor).replace(',', 'X').replace('.', ',').replace('X', '.') }}{% endmacro %}
+{% set rotulos = {'disponivel':'Disponível','reservado':'Reservado','vendido':'Vendido','indisponivel':'Indisponível'} %}
+{% set caminho_novo = '/app/loja/estoque/veiculos/novo' if loja_shell else '/app/estoque/novo' %}
+{% set base_veiculo = '/app/loja/estoque/veiculos/' if loja_shell else '/app/estoque/' %}
+
 <div class="page-heading">
   <div>
-    <h1>Estoque</h1>
+    <span class="eyebrow">Estoque</span>
+    <h1>Veículos</h1>
     <p>Cadastre, publique e acompanhe cada veículo.</p>
   </div>
-  {% if pode_gerir %}<a class="button primary" href="/app/estoque/novo">Cadastrar veículo</a>{% endif %}
+  {% if pode_gerir %}<div class="heading-actions keep-row"><a class="button primary" href="{{ caminho_novo }}">Cadastrar veículo</a></div>{% endif %}
 </div>
 
 {% if request.query_params.get('ok') %}<div class="alert success">Ação concluída.</div>{% endif %}
@@ -36,26 +43,35 @@
 
 <section class="panel flush">
   {% if veiculos %}
-  <div class="table-wrap"><table>
-    <thead><tr><th>Veículo</th><th>Placa</th><th>Status</th><th>Publicação</th><th>Preço</th>{% if pode_custo %}<th>Custo</th>{% endif %}<th><span class="sr-only">Ações</span></th></tr></thead>
-    <tbody>{% for v in veiculos %}<tr>
-      <td><div class="vehicle-cell"><div class="vehicle-photo small">{% if v.foto_url %}<img src="{{ v.foto_url }}{% if '/public/v1/media/' in v.foto_url %}?w=160{% endif %}" alt="" loading="lazy" decoding="async">{% else %}<span>{{ v.marca[:1] }}</span>{% endif %}</div><div class="cell-stack"><strong>{{ v.marca }} {{ v.modelo }}</strong><small>{{ v.ano_modelo }}{% if v.versao %} · {{ v.versao }}{% endif %} · {{ "{:,.0f}".format(v.km).replace(',', '.') }} km</small></div></div></td>
-      <td class="muted mono-inline">{% if v.placa %}{{ v.placa }}{% else %}—{% endif %}</td>
-      <td><span class="status {{ v.status }}">{{ {'disponivel':'Disponível','reservado':'Reservado','vendido':'Vendido','indisponivel':'Indisponível'}.get(v.status, v.status) }}</span></td>
-      <td>{% if v.publicado %}<span class="published">Publicado</span>{% else %}<span class="muted">Interno</span>{% endif %}</td>
-      <td><strong>R$ {{ "{:,.2f}".format(v.preco).replace(',', 'X').replace('.', ',').replace('X', '.') }}</strong></td>
-      {% if pode_custo %}<td class="muted">{% if v.custo is not none %}R$ {{ "{:,.2f}".format(v.custo).replace(',', 'X').replace('.', ',').replace('X', '.') }}{% else %}—{% endif %}</td>{% endif %}
-      <td><a class="table-action" href="/app/estoque/{{ v.id }}">Abrir</a></td>
-    </tr>{% endfor %}</tbody>
-  </table></div>
+  <ul class="vei-lista">
+    {% for v in veiculos %}
+    <li class="vei-ficha">
+      <span class="vehicle-photo vei-foto">{% if v.foto_url %}<img src="{{ v.foto_url }}{% if '/public/v1/media/' in v.foto_url %}?w=240{% endif %}" alt="" loading="lazy" decoding="async">{% else %}<span>{{ v.marca[:1] }}</span>{% endif %}</span>
+      <div class="vei-ident">
+        <strong class="vei-nome">{{ v.marca }} {{ v.modelo }}</strong>
+        <span class="vei-meta">{{ v.ano_modelo }}{% if v.versao %} · {{ v.versao }}{% endif %} · {{ "{:,.0f}".format(v.km).replace(',', '.') }} km</span>
+        <span class="vei-selos">
+          <span class="status {{ v.status }}">{{ rotulos.get(v.status, v.status) }}</span>
+          {% if v.publicado %}<span class="published">Publicado</span>{% else %}<span class="muted">Interno</span>{% endif %}
+          {% if v.placa %}<span class="mono-inline">{{ v.placa }}</span>{% endif %}
+        </span>
+      </div>
+      <div class="vei-lado">
+        <strong class="vei-preco">{{ brl(v.preco) }}</strong>
+        {% if pode_custo %}<span class="vei-custo">{% if v.custo is not none %}custo {{ brl(v.custo) }}{% else %}custo —{% endif %}</span>{% endif %}
+        <a class="table-action" href="{{ base_veiculo }}{{ v.id }}">Abrir</a>
+      </div>
+    </li>
+    {% endfor %}
+  </ul>
   {% else %}
   <div class="empty">
     <strong>Nenhum veículo encontrado</strong>
     <p>{% if filtros.busca or filtros.tipo or filtros.status or filtros.publicado %}Ajuste os filtros ou limpe a busca.{% else %}Cadastre o primeiro veículo para começar.{% endif %}</p>
     {% if pode_gerir and not (filtros.busca or filtros.tipo or filtros.status or filtros.publicado) %}
-    <a class="button primary" href="/app/estoque/novo">Cadastrar veículo</a>
+    <a class="button primary" href="{{ caminho_novo }}">Cadastrar veículo</a>
     {% elif filtros.busca or filtros.tipo or filtros.status or filtros.publicado %}
-    <a class="button secondary" href="/app/estoque">Limpar filtros</a>
+    <a class="button secondary" href="{{ request.url.path }}">Limpar filtros</a>
     {% endif %}
   </div>
   {% endif %}

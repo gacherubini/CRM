@@ -5,6 +5,7 @@ from conftest import login
 
 from app.config import settings as portal_settings
 from app.main import app, get_chatbot_client
+from app.loja import routes as loja_routes
 
 # "Atendidos" e "Perdidos" contam os últimos 7 dias. Com data fixa no corpo do
 # teste, ele passa na semana em que foi escrito e reprova sozinho na seguinte —
@@ -53,7 +54,7 @@ def test_card_mostra_quatro_numeros(client, monkeypatch):
 
     r = client.get("/app/loja/agente")
     assert r.status_code == 200
-    assert "id=\"card-rodizio-7d\"" in r.text or 'id="card-rodizio-7d"' in r.text
+    assert 'id="card-rodizio-periodo"' in r.text
     assert "Oferecidos" in r.text
     assert "Atendidos" in r.text
     assert "Aguardando" in r.text
@@ -85,3 +86,22 @@ def test_modo1_sem_ofertas_esconde_o_card(client, monkeypatch):
     r = client.get("/app/loja/agente")
     assert r.status_code == 200
     assert "card-rodizio-7d" not in r.text
+
+
+def test_card_filtra_todos_os_estados_desde_o_inicio_do_periodo():
+    agora = datetime(2026, 9, 9, 18, tzinfo=timezone.utc)
+    hoje = datetime(2026, 9, 9, tzinfo=timezone.utc)
+    ontem = datetime(2026, 9, 8, 12, tzinfo=timezone.utc).isoformat()
+    ofertas = [
+        {"id": f"{estado}-antiga", "estado": estado, "criado_em": ontem}
+        for estado in ("aberta", "esgotada", "travada", "expirada")
+    ] + [
+        {"id": f"{estado}-hoje", "estado": estado, "criado_em": agora.isoformat()}
+        for estado in ("aberta", "esgotada", "travada", "expirada")
+    ]
+
+    card = loja_routes.montar_card_rodizio(
+        _ChatbotAgente(ofertas), agora=agora, desde=hoje
+    )
+
+    assert card == {"oferecidos": 1, "aguardando": 1, "atendidos": 1, "perdidos": 1}

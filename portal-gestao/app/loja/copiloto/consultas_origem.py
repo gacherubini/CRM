@@ -161,7 +161,7 @@ def venda_origem_periodo(
     fim: str | None = None,
 ) -> OrigemPeriodo:
     """Origem de todas as vendas do período, com cobertura declarada."""
-    janela = janela_do_periodo(inicio, fim)
+    janela = janela_do_periodo(inicio, fim, hoje=ctx.hoje)
     vendas = _vendas_confirmadas(db, ctx.loja_slug, janela)
     if not vendas:
         return OrigemPeriodo(

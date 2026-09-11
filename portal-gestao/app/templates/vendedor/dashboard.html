@@ -61,4 +61,7 @@
   </tr>{% endfor %}</tbody></table></div>
   {% else %}<div class="empty"><strong>Nenhuma venda sua no período.</strong><p>Vendas de outros vendedores nunca aparecem neste painel.</p></div>{% endif %}
 </section>
+{# Date-picker próprio em pt-BR (resultado_periodo.js): enhancement
+   progressivo — sem JS os <input type="date"> acima seguem nativos. #}
+<script src="/static/js/resultado_periodo.js" defer></script>
 {% endblock %}

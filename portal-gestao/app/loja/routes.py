@@ -293,7 +293,30 @@ def atendimento_lista(
     )
 
 
-def montar_visao_agente(resumo: dict | None, hoje: date) -> dict | None:
+def resolver_periodo_agente(valor: str, hoje: date) -> SimpleNamespace:
+    if valor == "hoje":
+        inicio, rotulo, vazio = hoje, "Hoje", "hoje"
+    elif valor == "semana":
+        inicio, rotulo, vazio = (
+            hoje - timedelta(days=6),
+            "Últimos 7 dias",
+            "nos últimos 7 dias",
+        )
+    else:
+        valor, inicio, rotulo, vazio = (
+            "mes",
+            hoje.replace(day=1),
+            "Este mês",
+            "neste mês",
+        )
+    return SimpleNamespace(
+        chave=valor, inicio=inicio, fim=hoje, rotulo=rotulo, vazio=vazio
+    )
+
+
+def montar_visao_agente(
+    resumo: dict | None, hoje: date, inicio: date | None = None
+) -> dict | None:
     """View-model do desempenho do agente a partir do resumo do Chatbot.
 
     O Chatbot devolve ``por_dia`` só com os dias que tiveram conversa, o que faz
@@ -312,11 +335,17 @@ def montar_visao_agente(resumo: dict | None, hoje: date) -> dict | None:
         for item in (resumo.get("por_dia") or [])
     }
 
+    inicio = inicio or hoje.replace(day=1)
     serie: list[dict] = []
-    for numero in range(1, hoje.day + 1):
-        data = hoje.replace(day=numero).isoformat()
+    for deslocamento in range((hoje - inicio).days + 1):
+        data_atual = inicio + timedelta(days=deslocamento)
+        data = data_atual.isoformat()
         serie.append(
-            {"data": data, "dia": f"{numero:02d}", "atendimentos": por_dia.get(data, 0)}
+            {
+                "data": data,
+                "dia": f"{data_atual.day:02d}",
+                "atendimentos": por_dia.get(data, 0),
+            }
         )
 
     maximo = max((d["atendimentos"] for d in serie), default=0)
@@ -337,7 +366,7 @@ def montar_visao_agente(resumo: dict | None, hoje: date) -> dict | None:
     }
 
 
-def _oferta_nos_ultimos_dias(oferta: dict, dias: int, agora: datetime) -> bool:
+def _oferta_desde(oferta: dict, desde: datetime) -> bool:
     cru = oferta.get("criado_em") or oferta.get("travada_em")
     if not cru:
         return True
@@ -347,12 +376,17 @@ def _oferta_nos_ultimos_dias(oferta: dict, dias: int, agora: datetime) -> bool:
         return True
     if quando.tzinfo is None:
         quando = quando.replace(tzinfo=timezone.utc)
-    return quando >= agora - timedelta(days=dias)
+    return quando >= desde
 
 
-def montar_card_rodizio(chatbot: ChatbotClient, agora: datetime | None = None) -> dict | None:
-    """Quatro números da fila nos últimos 7 dias (spec §5.4). Só Modo 2."""
+def montar_card_rodizio(
+    chatbot: ChatbotClient,
+    agora: datetime | None = None,
+    desde: datetime | None = None,
+) -> dict | None:
+    """Quatro números da fila no período selecionado. Só Modo 2."""
     agora = agora or datetime.now(timezone.utc)
+    desde = desde or agora - timedelta(days=7)
     try:
         abertas = list(chatbot.listar_ofertas(estado="aberta") or [])
         esgotadas = list(chatbot.listar_ofertas(estado="esgotada") or [])
@@ -363,16 +397,17 @@ def montar_card_rodizio(chatbot: ChatbotClient, agora: datetime | None = None) -
     if not (abertas or esgotadas or travadas or expiradas):
         return None
     return {
-        "oferecidos": len(abertas),
-        "aguardando": len(esgotadas),
-        "atendidos": sum(1 for o in travadas if _oferta_nos_ultimos_dias(o, 7, agora)),
-        "perdidos": sum(1 for o in expiradas if _oferta_nos_ultimos_dias(o, 7, agora)),
+        "oferecidos": sum(1 for o in abertas if _oferta_desde(o, desde)),
+        "aguardando": sum(1 for o in esgotadas if _oferta_desde(o, desde)),
+        "atendidos": sum(1 for o in travadas if _oferta_desde(o, desde)),
+        "perdidos": sum(1 for o in expiradas if _oferta_desde(o, desde)),
     }
 
 
 @router.get("/app/loja/agente", response_class=HTMLResponse)
 def agente_desempenho(
     request: Request,
+    periodo: str = "mes",
     db: Session = Depends(get_db),
     chatbot: ChatbotClient = Depends(get_chatbot_client),
 ):
@@ -387,10 +422,14 @@ def agente_desempenho(
             contexto(request, usuario, erro="Sem permissão para o Atendimento."),
             status_code=403,
         )
+    hoje = datetime.now(timezone.utc).date()
+    janela = resolver_periodo_agente(periodo, hoje)
     resumo = None
     erro_resumo = None
     try:
-        resumo = chatbot.resumo_atendimento()
+        resumo = chatbot.resumo_atendimento(
+            desde=janela.inicio.isoformat(), ate=janela.fim.isoformat()
+        )
     except ChatbotIndisponivel:
         erro_resumo = "indisponivel"
     return templates.TemplateResponse(
@@ -399,9 +438,18 @@ def agente_desempenho(
             request,
             usuario,
             resumo=resumo,
-            visao=montar_visao_agente(resumo, datetime.now(timezone.utc).date()),
+            visao=montar_visao_agente(resumo, janela.fim, janela.inicio),
             erro_resumo=erro_resumo,
-            card_rodizio=montar_card_rodizio(chatbot),
+            card_rodizio=montar_card_rodizio(
+                chatbot,
+                desde=datetime(
+                    janela.inicio.year,
+                    janela.inicio.month,
+                    janela.inicio.day,
+                    tzinfo=timezone.utc,
+                ),
+            ),
+            periodo=janela,
             agente_config_habilitado=agente_config_habilitado(),
         ),
     )

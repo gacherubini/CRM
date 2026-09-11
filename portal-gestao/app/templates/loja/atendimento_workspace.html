@@ -1,7 +1,10 @@
 {% extends "base.html" %}
 {% block title %}Atendimento — Revy Loja{% endblock %}
 {% block content %}
-{# Estilos: .chat-column / .thread / .composer em app.css #}
+{# Estilos: .chat-column / .thread / .composer em app.css.
+   Direção A (Task 4, escolhida pelo dono em 09/09): conversa à esquerda,
+   trilho de contexto à direita — Próximo passo, Interesse, ficha em
+   disclosures. Protótipos A/B/C aposentados. #}
 <div class="page-heading">
   <div>
     <span class="eyebrow">Atendimento</span>
@@ -83,7 +86,7 @@
       <div class="thread" data-thread role="log" aria-live="polite" aria-relevant="additions">
         {% if workspace.mensagens %}
         {% for m in workspace.mensagens %}
-        <div class="bolha {{ m.direcao }}"{% if m.id %} data-msg-id="{{ m.id }}"{% endif %}>{{ m.texto or '—' }}<small>{{ formatar_horario(m.criada_em) }}</small></div>
+        <div class="bolha {{ m.direcao }}"{% if m.id %} data-msg-id="{{ m.id }}"{% endif %}>{{ m.texto or '—' }}<small>{% if m.direcao == 'entrada' %}{% if workspace.lead and workspace.lead.nome %}{{ workspace.lead.nome }}{% else %}Cliente{% endif %}{% else %}Equipe{% endif %} · {{ formatar_horario(m.criada_em) }}</small></div>
         {% endfor %}
         {% else %}
         <div class="thread-empty" data-thread-empty>
@@ -132,8 +135,8 @@
   </div>
 
   <div class="action-stack">
-    <section class="panel" id="acoes-rapidas">
-      <h2>Ações rápidas</h2>
+    <section class="panel" aria-labelledby="proximo-passo-titulo">
+      <h2 id="proximo-passo-titulo">Próximo passo</h2>
       <div class="heading-actions" style="padding:0 var(--space-5) var(--space-4)">
         <a class="button primary" href="/app/simulacoes?celular={{ workspace.telefone }}">Nova simulação</a>
         {% if workspace.lead and workspace.lead.id %}
@@ -144,98 +147,111 @@
       </div>
       <ul class="action-links">
         <li><span class="muted">A simulação já abre com o celular preenchido.</span></li>
-        {% if workspace.lead and workspace.lead.id %}
-        <li><a href="/app/leads/{{ workspace.lead.id }}">Abrir ficha do lead</a></li>
-        {% endif %}
-        <li><a href="/app/conversas/{{ workspace.telefone }}">Ver histórico da conversa</a></li>
       </ul>
     </section>
-    <section class="panel">
-      <h2>Resumo</h2>
-      <dl class="meta-list">
-        <dt>Telefone</dt>
-        <dd>{{ mascarar_telefone(workspace.telefone) }}</dd>
-        <dt>Canal</dt>
-        <dd>
-          {% if workspace.canal_label %}
-            {{ workspace.canal_label }}
-            {% if workspace.canal_estado %}<span class="muted"> · {{ workspace.canal_estado }}</span>{% endif %}
-          {% else %}
-            <span class="muted">WhatsApp</span>
-          {% endif %}
-        </dd>
-        {% if origem_lead %}
-        <dt>Veio de</dt>
-        <dd>
-          {{ origem_lead.nome }}
-          {% if origem_lead.canal %}<span class="muted"> · {{ origem_lead.canal }}</span>{% endif %}
-          {% if origem_lead.primeiro_clique %}
-          <br><small class="muted">Primeiro contato: {{ origem_lead.primeiro_clique }}</small>
-          {% endif %}
-        </dd>
-        {% endif %}
-        <dt>Responsável</dt>
-        <dd>{% if workspace.assignment and workspace.assignment.vendedor_email %}{{ workspace.assignment.vendedor_email }}{% else %}<span class="muted">Fila (sem responsável)</span>{% endif %}</dd>
-        <dt>Interesse</dt>
-        <dd>{% if workspace.veiculo_interesse %}{{ workspace.veiculo_interesse }}{% else %}<span class="muted">—</span>{% endif %}</dd>
-        <dt>Venda</dt>
-        <dd>{% if workspace.venda_status %}{{ workspace.venda_status }}{% else %}<span class="muted">Sem venda</span>{% endif %}</dd>
-        <dt>Bot</dt>
-        <dd>
-          {% if workspace.conversa_resumo and workspace.conversa_resumo.bot_ativo is not none %}
-            {% if workspace.conversa_resumo.bot_ativo %}<span class="status novo" data-bot-status>Ativo</span>{% else %}<span class="status em_atendimento" data-bot-status>Pausado (humano)</span>{% endif %}
-          {% else %}<span class="muted">—</span>{% endif %}
-        </dd>
-      </dl>
-    </section>
 
-    {% if pode_handoff %}
-    <section class="panel">
-      <h2>Handoff</h2>
-      <div class="handoff-bar">
-        {% set bot_ativo = workspace.conversa_resumo.bot_ativo if workspace.conversa_resumo and workspace.conversa_resumo.bot_ativo is not none else true %}
-        {% if bot_ativo %}
-        <span class="status novo">Bot ativo</span>
-        <form method="post" action="/app/loja/atendimento/{{ workspace.id }}/handoff">
+    <section class="panel" aria-labelledby="interesse-titulo">
+      <h2 id="interesse-titulo">Interesse</h2>
+      <div class="panel-body">
+        <p><strong>{% if workspace.veiculo_interesse %}{{ workspace.veiculo_interesse }}{% else %}<span class="muted">—</span>{% endif %}</strong></p>
+        {% if pode_atualizar_etapa and workspace.lead and workspace.lead.id %}
+        {# form-layout (1 coluna): em cartao estreito o form-grid esticava o botao. #}
+        <form method="post" action="/app/loja/atendimento/{{ workspace.id }}/etapa" class="form-layout">
           <input type="hidden" name="csrf" value="{{ csrf }}">
-          <input type="hidden" name="acao" value="assumir">
+          <input type="hidden" name="lead_id" value="{{ workspace.lead.id }}">
           {% if workspace.canal_id %}<input type="hidden" name="canal_id" value="{{ workspace.canal_id }}">{% endif %}
-          <button class="button" type="submit">Assumir atendimento</button>
+          <label>Etapa
+            <select name="etapa" required>
+              {% for valor, rotulo in etapas.items() %}
+              <option value="{{ valor }}" {{ 'selected' if workspace.lead.etapa == valor }}>{{ rotulo }}</option>
+              {% endfor %}
+            </select>
+          </label>
+          <button class="button primary" type="submit">Salvar etapa</button>
         </form>
-        <p class="muted">Ao assumir, o bot para de responder este contato e você vira o responsável.</p>
-        {% else %}
-        <span class="status em_atendimento">Atendimento humano</span>
-        <form method="post" action="/app/loja/atendimento/{{ workspace.id }}/handoff">
-          <input type="hidden" name="csrf" value="{{ csrf }}">
-          <input type="hidden" name="acao" value="devolver">
-          {% if workspace.canal_id %}<input type="hidden" name="canal_id" value="{{ workspace.canal_id }}">{% endif %}
-          <button class="button secondary" type="submit">Devolver ao bot</button>
-        </form>
-        <p class="muted">O bot volta a responder este contato e a atribuição local é encerrada.</p>
         {% endif %}
       </div>
     </section>
-    {% endif %}
 
-    {% if pode_atualizar_etapa and workspace.lead and workspace.lead.id %}
-    <section class="panel">
-      <h2>Etapa do lead</h2>
-      {# form-layout (1 coluna): em cartao estreito o form-grid esticava o botao. #}
-      <form method="post" action="/app/loja/atendimento/{{ workspace.id }}/etapa" class="form-layout">
-        <input type="hidden" name="csrf" value="{{ csrf }}">
-        <input type="hidden" name="lead_id" value="{{ workspace.lead.id }}">
-        {% if workspace.canal_id %}<input type="hidden" name="canal_id" value="{{ workspace.canal_id }}">{% endif %}
-        <label>Etapa
-          <select name="etapa" required>
-            {% for valor, rotulo in etapas.items() %}
-            <option value="{{ valor }}" {{ 'selected' if workspace.lead.etapa == valor }}>{{ rotulo }}</option>
-            {% endfor %}
-          </select>
-        </label>
-        <button class="button primary" type="submit">Salvar etapa</button>
-      </form>
+    <section class="panel" aria-label="Ficha do atendimento">
+      <details class="workspace-disclosure">
+        <summary>Dados do contato e origem</summary>
+        <div class="panel-body">
+          <dl class="meta-list">
+            <dt>Telefone</dt>
+            <dd>{{ mascarar_telefone(workspace.telefone) }}</dd>
+            <dt>Canal</dt>
+            <dd>
+              {% if workspace.canal_label %}
+                {{ workspace.canal_label }}
+                {% if workspace.canal_estado %}<span class="muted"> · {{ workspace.canal_estado }}</span>{% endif %}
+              {% else %}
+                <span class="muted">WhatsApp</span>
+              {% endif %}
+            </dd>
+            {% if origem_lead %}
+            <dt>Veio de</dt>
+            <dd>
+              {{ origem_lead.nome }}
+              {% if origem_lead.canal %}<span class="muted"> · {{ origem_lead.canal }}</span>{% endif %}
+              {% if origem_lead.primeiro_clique %}
+              <br><small class="muted">Primeiro contato: {{ origem_lead.primeiro_clique }}</small>
+              {% endif %}
+            </dd>
+            {% endif %}
+            <dt>Venda</dt>
+            <dd>{% if workspace.venda_status %}{{ workspace.venda_status }}{% else %}<span class="muted">Sem venda</span>{% endif %}</dd>
+          </dl>
+        </div>
+      </details>
+      <details class="workspace-disclosure">
+        <summary>Responsável e bot</summary>
+        <div class="panel-body">
+          <dl class="meta-list">
+            <dt>Responsável</dt>
+            <dd>{% if workspace.assignment and workspace.assignment.vendedor_email %}{{ workspace.assignment.vendedor_email }}{% else %}<span class="muted">Fila (sem responsável)</span>{% endif %}</dd>
+            <dt>Bot</dt>
+            <dd>
+              {% if workspace.conversa_resumo and workspace.conversa_resumo.bot_ativo is not none %}
+                {% if workspace.conversa_resumo.bot_ativo %}<span class="status novo" data-bot-status>Ativo</span>{% else %}<span class="status em_atendimento" data-bot-status>Pausado (humano)</span>{% endif %}
+              {% else %}<span class="muted">—</span>{% endif %}
+            </dd>
+          </dl>
+          {% if pode_handoff %}
+          <div class="handoff-bar">
+            {% set bot_ativo = workspace.conversa_resumo.bot_ativo if workspace.conversa_resumo and workspace.conversa_resumo.bot_ativo is not none else true %}
+            {% if bot_ativo %}
+            <span class="status novo">Bot ativo</span>
+            <form method="post" action="/app/loja/atendimento/{{ workspace.id }}/handoff">
+              <input type="hidden" name="csrf" value="{{ csrf }}">
+              <input type="hidden" name="acao" value="assumir">
+              {% if workspace.canal_id %}<input type="hidden" name="canal_id" value="{{ workspace.canal_id }}">{% endif %}
+              <button class="button" type="submit">Assumir atendimento</button>
+            </form>
+            <p class="muted">Ao assumir, o bot para de responder este contato e você vira o responsável.</p>
+            {% else %}
+            <span class="status em_atendimento">Atendimento humano</span>
+            <form method="post" action="/app/loja/atendimento/{{ workspace.id }}/handoff">
+              <input type="hidden" name="csrf" value="{{ csrf }}">
+              <input type="hidden" name="acao" value="devolver">
+              {% if workspace.canal_id %}<input type="hidden" name="canal_id" value="{{ workspace.canal_id }}">{% endif %}
+              <button class="button secondary" type="submit">Devolver ao bot</button>
+            </form>
+            <p class="muted">O bot volta a responder este contato e a atribuição local é encerrada.</p>
+            {% endif %}
+          </div>
+          {% endif %}
+        </div>
+      </details>
+      {# Rodapé de ações (Task 4b): os saltos viram botões secundários lado a
+         lado, na linguagem do "Próximo passo". Mesmos hrefs e textos. #}
+      <div class="workspace-disclosure-follow">
+        {% if workspace.lead and workspace.lead.id %}
+        <a class="button secondary" href="/app/leads/{{ workspace.lead.id }}">Abrir ficha do lead</a>
+        {% endif %}
+        <a class="button secondary" href="/app/conversas/{{ workspace.telefone }}">Ver histórico da conversa</a>
+      </div>
     </section>
-    {% endif %}
 
   </div>
 </div>

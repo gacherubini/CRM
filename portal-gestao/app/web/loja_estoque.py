@@ -1,7 +1,8 @@
 """Rotas HTML do módulo Estoque no shell Revy Loja (Fase 2).
 
 - ``GET /app/loja/estoque`` — visão geral (read model determinístico).
-- ``GET /app/loja/estoque/veiculos`` — entrada para a lista/CRUD legado.
+- ``GET /app/loja/estoque/veiculos`` — lista de veículos no shell (filtros e
+  estados); o formulário e as ações seguem no CRUD legado.
 - ``GET/POST /app/loja/estoque/vitrine`` — ordem manual na vitrine pública.
 
 Gated por ``REVY_LOJA_SHELL_ENABLED`` (default off). Rotas legadas
@@ -21,16 +22,26 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy.orm import Session
 
 from app.auth import csrf_valido, pode_gerir_estoque, pode_ver_custo, usuario_atual
-from app.clients.estoque import EstoqueClient, EstoqueIndisponivel, VeiculoNaoEncontrado
+from app.clients.estoque import (
+    ConflitoEstoque,
+    EstoqueClient,
+    EstoqueIndisponivel,
+    VeiculoNaoEncontrado,
+)
 from app.config import revy_loja_shell_enabled
 from app.db import get_db
 from app.loja.estoque_overview import montar_estoque_overview
+from app.loja.types import Module
+from app.web.loja_shell import check_module_access
 
 router = APIRouter()
 
 # Import tardio de helpers do main (mesmo padrão de app.relatorios) — evita ciclo.
 from app.main import (  # noqa: E402
+    _anexar_foto_se_enviada,
+    anos_modelo,
     contexto,
+    dados_veiculo,
     get_estoque_client,
     redirecionar_login,
     templates,
@@ -119,9 +130,9 @@ def loja_estoque_visao(
             usuario,
             overview=overview,
             pode_gerir=pode_gerir_estoque(usuario),
-            # Documenta na UI que CRUD/publicação ficam no caminho legado.
-            caminho_veiculos="/app/estoque",
-            caminho_novo="/app/estoque/novo",
+            # Lista e formulário no shell; o legado segue disponível na flag off.
+            caminho_veiculos="/app/loja/estoque/veiculos",
+            caminho_novo="/app/loja/estoque/veiculos/novo",
         ),
     )
 
@@ -129,25 +140,260 @@ def loja_estoque_visao(
 @router.get("/app/loja/estoque/veiculos", response_class=HTMLResponse)
 def loja_estoque_veiculos(
     request: Request,
+    tipo: str | None = None,
+    status: str | None = None,
+    publicado: str | None = None,
+    busca: str | None = None,
     db: Session = Depends(get_db),
+    estoque: EstoqueClient = Depends(get_estoque_client),
 ):
-    """Entrada de Veículos: reutiliza a lista/CRUD legada até cutover completo.
+    """Lista de veículos no shell, com os mesmos filtros do legado.
 
-    Publicar, despublicar, reservar, vender e edição de custo permanecem em
-    ``/app/estoque*`` (Estoque API como fonte de verdade).
+    Não redireciona mais para fora do shell (o redirect caía no middleware de
+    rotas legadas e devolvia a visão geral). Formulário e ações continuam em
+    ``/app/estoque*`` até o cutover do formulário.
     """
     usuario = usuario_atual(request, db)
     if not usuario:
         return redirecionar_login()
     if not _shell_ativo():
-        return RedirectResponse("/app/estoque", status_code=303)
+        # Preserva query string (filtros) ao redirecionar para o legado.
+        qs = request.url.query
+        destino = "/app/estoque"
+        if qs:
+            destino = f"{destino}?{qs}"
+        return RedirectResponse(destino, status_code=303)
 
-    # Preserva query string (filtros) ao redirecionar para o legado.
-    qs = request.url.query
-    destino = "/app/estoque"
-    if qs:
-        destino = f"{destino}?{qs}"
+    blocked = check_module_access(request, usuario, db, Module.ESTOQUE)
+    if blocked is not None:
+        return blocked
+
+    veiculos, erro = [], None
+    publicado_bool = None if publicado in (None, "") else publicado == "true"
+    try:
+        veiculos = estoque.listar(
+            tipo=tipo, status=status, publicado=publicado_bool, busca=busca
+        )
+    except EstoqueIndisponivel as exc:
+        erro = str(exc)
+
+    return templates.TemplateResponse(
+        "estoque/lista.html",
+        contexto(
+            request,
+            usuario,
+            db=db,
+            veiculos=veiculos,
+            filtros={
+                "tipo": tipo or "",
+                "status": status or "",
+                "publicado": publicado or "",
+                "busca": busca or "",
+            },
+            integracao_erro=erro,
+            pode_gerir=pode_gerir_estoque(usuario),
+            pode_custo=pode_ver_custo(usuario),
+        ),
+    )
+
+
+_LISTA_VEICULOS = "/app/loja/estoque/veiculos"
+_ACOES_VEICULO = {"publicar", "despublicar", "reservar", "vender"}
+
+
+def _lista_redirect(**params: str) -> RedirectResponse:
+    query = {chave: valor for chave, valor in params.items() if valor}
+    destino = _LISTA_VEICULOS
+    if query:
+        destino = f"{destino}?{urlencode(query)}"
     return RedirectResponse(destino, status_code=303)
+
+
+def _bloqueio_shell(request: Request, usuario, db: Session):
+    """Gate comum das rotas de formulário: módulo, permissão e modo legado.
+
+    Devolve uma resposta (redirect/erro) quando não pode seguir, ou ``None``.
+    """
+    if not _shell_ativo():
+        return None  # o chamador decide o destino legado
+    blocked = check_module_access(request, usuario, db, Module.ESTOQUE)
+    if blocked is not None:
+        return blocked
+    if not pode_gerir_estoque(usuario):
+        return RedirectResponse(_LISTA_VEICULOS, status_code=303)
+    return None
+
+
+@router.get("/app/loja/estoque/veiculos/novo", response_class=HTMLResponse)
+def loja_estoque_veiculo_novo(
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """Cadastro no shell; gestão apenas, como no formulário legado."""
+    usuario = usuario_atual(request, db)
+    if not usuario:
+        return redirecionar_login()
+    if not _shell_ativo():
+        return RedirectResponse("/app/estoque/novo", status_code=303)
+    bloqueio = _bloqueio_shell(request, usuario, db)
+    if bloqueio is not None:
+        return bloqueio
+    return templates.TemplateResponse(
+        "estoque/form.html",
+        contexto(
+            request,
+            usuario,
+            db=db,
+            veiculo=None,
+            titulo="Cadastrar veículo",
+            pode_custo=True,
+            anos=anos_modelo(),
+        ),
+    )
+
+
+@router.post("/app/loja/estoque/veiculos/novo")
+async def loja_estoque_veiculo_criar(
+    request: Request,
+    db: Session = Depends(get_db),
+    estoque: EstoqueClient = Depends(get_estoque_client),
+):
+    usuario = usuario_atual(request, db)
+    if not usuario:
+        return redirecionar_login()
+    if not _shell_ativo():
+        return RedirectResponse("/app/estoque/novo", status_code=303)
+    bloqueio = _bloqueio_shell(request, usuario, db)
+    if bloqueio is not None:
+        return bloqueio
+    form = await request.form()
+    if not csrf_valido(request, form.get("csrf")):
+        return _lista_redirect(erro="csrf")
+    try:
+        criado = estoque.criar(dados_veiculo(form, pode_ver_custo(usuario)))
+        await _anexar_foto_se_enviada(estoque, (criado or {}).get("id"), form)
+    except (EstoqueIndisponivel, ConflitoEstoque, ValueError) as exc:
+        return templates.TemplateResponse(
+            "estoque/form.html",
+            contexto(
+                request,
+                usuario,
+                db=db,
+                veiculo=dict(form),
+                titulo="Cadastrar veículo",
+                erro=str(exc),
+                pode_custo=pode_ver_custo(usuario),
+                anos=anos_modelo(),
+            ),
+            status_code=422,
+        )
+    return _lista_redirect(ok="criado")
+
+
+@router.get("/app/loja/estoque/veiculos/{veiculo_id}", response_class=HTMLResponse)
+def loja_estoque_veiculo_editar(
+    request: Request,
+    veiculo_id: str,
+    db: Session = Depends(get_db),
+    estoque: EstoqueClient = Depends(get_estoque_client),
+):
+    usuario = usuario_atual(request, db)
+    if not usuario:
+        return redirecionar_login()
+    if not _shell_ativo():
+        return RedirectResponse(f"/app/estoque/{veiculo_id}", status_code=303)
+    bloqueio = _bloqueio_shell(request, usuario, db)
+    if bloqueio is not None:
+        return bloqueio
+    try:
+        veiculo = estoque.obter(veiculo_id)
+    except VeiculoNaoEncontrado as exc:
+        return templates.TemplateResponse(
+            "erro.html", contexto(request, usuario, db=db, erro=str(exc)), status_code=404
+        )
+    except EstoqueIndisponivel as exc:
+        return templates.TemplateResponse(
+            "erro.html", contexto(request, usuario, db=db, erro=str(exc)), status_code=503
+        )
+    return templates.TemplateResponse(
+        "estoque/form.html",
+        contexto(
+            request,
+            usuario,
+            db=db,
+            veiculo=veiculo,
+            titulo="Editar veículo",
+            pode_custo=pode_ver_custo(usuario),
+            anos=anos_modelo(),
+        ),
+    )
+
+
+@router.post("/app/loja/estoque/veiculos/{veiculo_id}")
+async def loja_estoque_veiculo_atualizar(
+    request: Request,
+    veiculo_id: str,
+    db: Session = Depends(get_db),
+    estoque: EstoqueClient = Depends(get_estoque_client),
+):
+    usuario = usuario_atual(request, db)
+    if not usuario:
+        return redirecionar_login()
+    if not _shell_ativo():
+        return RedirectResponse(f"/app/estoque/{veiculo_id}", status_code=303)
+    bloqueio = _bloqueio_shell(request, usuario, db)
+    if bloqueio is not None:
+        return bloqueio
+    form = await request.form()
+    if not csrf_valido(request, form.get("csrf")):
+        return _lista_redirect(erro="csrf")
+    try:
+        estoque.atualizar(veiculo_id, dados_veiculo(form, pode_ver_custo(usuario)))
+        await _anexar_foto_se_enviada(estoque, veiculo_id, form)
+    except (ConflitoEstoque, EstoqueIndisponivel, VeiculoNaoEncontrado, ValueError) as exc:
+        return templates.TemplateResponse(
+            "estoque/form.html",
+            contexto(
+                request,
+                usuario,
+                db=db,
+                veiculo={**dict(form), "id": veiculo_id},
+                titulo="Editar veículo",
+                erro=str(exc),
+                pode_custo=pode_ver_custo(usuario),
+                anos=anos_modelo(),
+            ),
+            status_code=422,
+        )
+    return _lista_redirect(ok="atualizado")
+
+
+@router.post("/app/loja/estoque/veiculos/{veiculo_id}/{acao}")
+async def loja_estoque_veiculo_acao(
+    request: Request,
+    veiculo_id: str,
+    acao: str,
+    db: Session = Depends(get_db),
+    estoque: EstoqueClient = Depends(get_estoque_client),
+):
+    usuario = usuario_atual(request, db)
+    if not usuario:
+        return redirecionar_login()
+    if not _shell_ativo():
+        return RedirectResponse("/app/estoque", status_code=303)
+    bloqueio = _bloqueio_shell(request, usuario, db)
+    if bloqueio is not None:
+        return bloqueio
+    form = await request.form()
+    if not csrf_valido(request, form.get("csrf")):
+        return _lista_redirect(erro="csrf")
+    if acao not in _ACOES_VEICULO:
+        return _lista_redirect(erro="acao")
+    try:
+        estoque.acao(veiculo_id, acao)
+    except (ConflitoEstoque, EstoqueIndisponivel, VeiculoNaoEncontrado, ValueError):
+        return _lista_redirect(erro="acao")
+    return _lista_redirect(ok=acao)
 
 
 @router.get("/app/loja/estoque/vitrine", response_class=HTMLResponse)

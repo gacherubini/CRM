@@ -11,14 +11,25 @@
   </div>
 </div>
 
-<form class="filter-bar" method="get">
-  <label class="search"><span class="sr-only">Mês</span>
-    <input type="month" name="mes" value="{{ competencia }}" max="{{ competencia_hoje }}">
-  </label>
-  <button class="button secondary" type="submit">Ver mês</button>
-</form>
+{% set MESES_PT = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho',
+                'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'] %}
+{% set mes_extenso_fin = MESES_PT[competencia[5:7] | int - 1] ~ ' de ' ~ competencia[:4] %}
+{% set ano_fin = competencia[:4] | int %}{% set mesn_fin = competencia[5:7] | int %}
+{% set mes_ant_fin = '%04d-%02d' | format(ano_fin if mesn_fin > 1 else ano_fin - 1, mesn_fin - 1 if mesn_fin > 1 else 12) %}
+{% set mes_prox_fin = '%04d-%02d' | format(ano_fin if mesn_fin < 12 else ano_fin + 1, mesn_fin + 1 if mesn_fin < 12 else 1) %}
+<nav class="mes-nav" aria-label="Trocar de mês">
+  <a href="?mes={{ mes_ant_fin }}" aria-label="Ver mês anterior">‹ Anterior</a>
+  <strong>{{ mes_extenso_fin }}</strong>
+  {% if competencia < competencia_hoje %}
+  <a href="?mes={{ mes_prox_fin }}" aria-label="Ver próximo mês">Próximo ›</a>
+  {% else %}
+  <span class="muted" aria-hidden="true">Próximo ›</span>
+  {% endif %}
+</nav>
 
 {# --- Fechamento do mês --- #}
+{# Direção "fechamento" (Task 8): o mês em frase-manifesto + índice em linhas,
+   no vocabulário do Resultado (Task 7). Mesmos números, estados e textos. #}
 <section class="panel" aria-labelledby="bloco-mes">
   <div class="panel-heading">
     <div><span class="mono-label">Mês</span><h2 id="bloco-mes">Como o mês fechou</h2></div>
@@ -29,38 +40,34 @@
     <p>Assim que houver venda confirmada, o resultado aparece aqui.</p>
   </div>
   {% else %}
-  <div class="metric-grid">
-    <div class="metric">
-      <span>Receita</span>
-      <strong>{{ formatar_brl(r.receita) }}</strong>
-      <small>{{ r.qtd_vendas }} {{ 'moto vendida' if r.qtd_vendas == 1 else 'motos vendidas' }}</small>
-    </div>
-    <div class="metric">
-      <span>Custo das motos</span>
-      <strong>{{ formatar_brl(r.custo_vendas) }}</strong>
-    </div>
-    <div class="metric">
-      <span>Custos diretos</span>
-      <strong>{{ formatar_brl(r.custos_diretos) }}</strong>
-      <small>documentação, frete, comissão</small>
-    </div>
-    <div class="metric accent">
-      <span>Lucro bruto</span>
-      <strong>{{ formatar_brl(r.lucro_bruto) }}</strong>
-      {% if not r.margem_completa %}
-      <small>
-        subtotal — {{ r.vendas_sem_custo }}
-        {{ 'venda sem custo informado' if r.vendas_sem_custo == 1 else 'vendas sem custo informado' }}
-      </small>
-      {% endif %}
-    </div>
+  <div class="panel-body res">
+    <p class="res-lede"><strong>{{ r.qtd_vendas }} {{ 'moto vendida' if r.qtd_vendas == 1 else 'motos vendidas' }}</strong> · {{ formatar_brl(r.receita) }} de receita</p>
+    <ul class="res-index">
+      <li>
+        <span>Custo das motos</span>
+        <strong>{{ formatar_brl(r.custo_vendas) }}</strong>
+      </li>
+      <li>
+        <span>Custos diretos</span>
+        <strong>{{ formatar_brl(r.custos_diretos) }}</strong>
+      </li>
+      <li>
+        <span>Lucro bruto</span>
+        <strong>{{ formatar_brl(r.lucro_bruto) }}</strong>
+      </li>
+    </ul>
+    {% if not r.margem_completa %}
+    <p class="muted">Subtotal — {{ r.vendas_sem_custo }} {{ 'venda sem custo informado' if r.vendas_sem_custo == 1 else 'vendas sem custo informado' }}. Documentação, frete e comissão entram nos custos diretos.</p>
+    {% else %}
+    <p class="muted">Documentação, frete e comissão entram nos custos diretos.</p>
+    {% endif %}
   </div>
   {% endif %}
 </section>
 
-{# --- Estrutura: painel próprio de propósito. `.metric-grid` é um grid fixo de 4
-     colunas sem separação entre linhas, então 6 métricas numa grade só fazem a
-     quinta parecer continuação da primeira. Máximo 4 por grade. --- #}
+{# --- Estrutura: a única grade de métricas da página (2 itens). O teste
+     test_nenhuma_grade_de_metricas_passa_de_quatro exige ao menos uma grade
+     com no máximo 4 métricas — manter `.metric-grid` aqui, não espalhar. --- #}
 {% if r.qtd_vendas > 0 or r.tem_despesa_cadastrada %}
 <section class="panel" aria-labelledby="bloco-estrutura">
   <div class="panel-heading">

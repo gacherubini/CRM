@@ -108,6 +108,7 @@ from app.config import (
     settings,
 )
 from app.loja import identity as loja_identity
+from app.loja.vendas_contexto import usuario_vendas_atual
 from app.loja.navigation import nav_item_is_active
 from app.loja.redirects import resolve_legacy_redirect, should_consider_request
 from app.web.loja_shell import check_module_access, router as loja_shell_router
@@ -857,6 +858,7 @@ def estoque_novo(request: Request, db: Session = Depends(get_db)):
             veiculo=None,
             titulo="Cadastrar veículo",
             pode_custo=True,
+            anos=anos_modelo(),
         ),
     )
 
@@ -878,6 +880,11 @@ def dados_veiculo(form, incluir_custo: bool) -> dict:
     if incluir_custo and form.get("custo"):
         dados["custo"] = float(str(form.get("custo")).replace(",", "."))
     return dados
+
+
+def anos_modelo() -> list[int]:
+    """Anos do select do formulário: do próximo ano até 1980."""
+    return list(range(datetime.now(timezone.utc).year + 1, 1979, -1))
 
 
 _FOTO_MIMES = {"image/jpeg", "image/png", "image/webp"}
@@ -1067,7 +1074,7 @@ async def estoque_criar(
     except (EstoqueIndisponivel, ConflitoEstoque, ValueError) as exc:
         return templates.TemplateResponse(
             "estoque/form.html",
-            contexto(request, usuario, db=db, veiculo=dict(form), titulo="Cadastrar veículo", erro=str(exc), pode_custo=pode_ver_custo(usuario)),
+            contexto(request, usuario, db=db, veiculo=dict(form), titulo="Cadastrar veículo", erro=str(exc), pode_custo=pode_ver_custo(usuario), anos=anos_modelo()),
             status_code=422,
         )
     return RedirectResponse("/app/estoque?ok=criado", status_code=303)
@@ -1100,7 +1107,7 @@ def estoque_editar_pagina(
         )
     return templates.TemplateResponse(
         "estoque/form.html",
-        contexto(request, usuario, db=db, veiculo=veiculo, titulo="Editar veículo", pode_custo=pode_ver_custo(usuario)),
+        contexto(request, usuario, db=db, veiculo=veiculo, titulo="Editar veículo", pode_custo=pode_ver_custo(usuario), anos=anos_modelo()),
     )
 
 
@@ -1126,7 +1133,7 @@ async def estoque_editar(
     except (ConflitoEstoque, EstoqueIndisponivel, VeiculoNaoEncontrado, ValueError) as exc:
         return templates.TemplateResponse(
             "estoque/form.html",
-            contexto(request, usuario, db=db, veiculo={**dict(form), "id": veiculo_id}, titulo="Editar veículo", erro=str(exc), pode_custo=pode_ver_custo(usuario)),
+            contexto(request, usuario, db=db, veiculo={**dict(form), "id": veiculo_id}, titulo="Editar veículo", erro=str(exc), pode_custo=pode_ver_custo(usuario), anos=anos_modelo()),
             status_code=422,
         )
     return RedirectResponse("/app/estoque?ok=atualizado", status_code=303)
@@ -1464,8 +1471,15 @@ TIPOS_META = {
 }
 
 
+def _validar_estoque_venda(estoque: EstoqueClient, loja_slug: str) -> None:
+    # A credencial de Estoque ainda é única por deploy. Não vincular nem
+    # baixar veículo de outra loja ao operar a loja selecionada no shell.
+    if estoque.obter_loja().get("slug") != loja_slug:
+        raise EstoqueIndisponivel("Estoque não configurado para a loja selecionada")
+
+
 def _carregar_opcoes_venda(
-    chatbot: ChatbotClient, estoque: EstoqueClient
+    chatbot: ChatbotClient, estoque: EstoqueClient, loja_slug: str
 ) -> tuple[list[dict] | None, list[dict] | None, list[str]]:
     """Carrega cada integração isoladamente para o formulário continuar utilizável."""
     avisos: list[str] = []
@@ -1475,6 +1489,7 @@ def _carregar_opcoes_venda(
         leads = None
         avisos.append("Leads indisponíveis; a referência manual será validada na confirmação.")
     try:
+        _validar_estoque_venda(estoque, loja_slug)
         veiculos = [
             veiculo
             for veiculo in estoque.listar()
@@ -1507,7 +1522,7 @@ def _render_venda_form(
     erro: str | None = None,
     status_code: int = 200,
 ):
-    leads, veiculos, avisos = _carregar_opcoes_venda(chatbot, estoque)
+    leads, veiculos, avisos = _carregar_opcoes_venda(chatbot, estoque, usuario.loja_slug)
     return templates.TemplateResponse(
         "vendas/form.html",
         contexto(
@@ -1535,7 +1550,7 @@ def vendas_lista(
     fim: str | None = None,
     db: Session = Depends(get_db),
 ):
-    usuario = usuario_atual(request, db)
+    usuario = usuario_vendas_atual(request, db)
     if not usuario:
         return redirecionar_login()
     d_inicio, d_fim = periodo_padrao(inicio, fim)
@@ -1575,7 +1590,7 @@ def vendas_nova(
     chatbot: ChatbotClient = Depends(get_chatbot_client),
     estoque: EstoqueClient = Depends(get_estoque_client),
 ):
-    usuario = usuario_atual(request, db)
+    usuario = usuario_vendas_atual(request, db)
     if not usuario:
         return redirecionar_login()
     if not pode_registrar_venda(usuario):
@@ -1591,7 +1606,7 @@ async def vendas_criar(
     chatbot: ChatbotClient = Depends(get_chatbot_client),
     estoque: EstoqueClient = Depends(get_estoque_client),
 ):
-    usuario = usuario_atual(request, db)
+    usuario = usuario_vendas_atual(request, db)
     if not usuario:
         return redirecionar_login()
     form = await request.form()
@@ -1644,6 +1659,7 @@ async def vendas_criar(
             referencias_pendentes = True
     if veiculo_ref:
         try:
+            _validar_estoque_venda(estoque, usuario.loja_slug)
             veiculo = estoque.obter(veiculo_ref)
             if veiculo.get("status") not in {"disponivel", "reservado"}:
                 return _render_venda_form(
@@ -1737,6 +1753,7 @@ def executar_confirmacao_venda(
     estoque_baixado = False
     if venda.veiculo_ref:
         try:
+            _validar_estoque_venda(estoque, usuario.loja_slug)
             veiculo = estoque.obter(venda.veiculo_ref)
             if veiculo.get("status") not in {"disponivel", "reservado"}:
                 return "erro=conflito-estoque"
@@ -1993,7 +2010,7 @@ async def vendas_confirmar(
     chatbot: ChatbotClient = Depends(get_chatbot_client),
     estoque: EstoqueClient = Depends(get_estoque_client),
 ):
-    usuario = usuario_atual(request, db)
+    usuario = usuario_vendas_atual(request, db)
     if not usuario:
         return redirecionar_login()
     form = await request.form()
@@ -2005,7 +2022,7 @@ async def vendas_confirmar(
 
 @app.post("/app/vendas/{venda_id}/cancelar")
 async def vendas_cancelar(request: Request, venda_id: str, db: Session = Depends(get_db)):
-    usuario = usuario_atual(request, db)
+    usuario = usuario_vendas_atual(request, db)
     if not usuario:
         return redirecionar_login()
     form = await request.form()
@@ -2023,7 +2040,7 @@ def vendedor_dashboard(
     db: Session = Depends(get_db),
     chatbot: ChatbotClient = Depends(get_chatbot_client),
 ):
-    usuario = usuario_atual(request, db)
+    usuario = usuario_vendas_atual(request, db)
     if not usuario:
         return redirecionar_login()
     if usuario.papel != "vendedor":
@@ -2250,7 +2267,7 @@ def financeiro_dashboard(
     db: Session = Depends(get_db),
     chatbot: ChatbotClient = Depends(get_chatbot_client),
 ):
-    usuario = usuario_atual(request, db)
+    usuario = usuario_vendas_atual(request, db)
     if not usuario:
         return redirecionar_login()
     if not pode_ver_financeiro(usuario):

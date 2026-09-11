@@ -26,84 +26,91 @@
 {% if aviso_erro == 'custo-lancado' %}<div class="alert success" role="status">Custo lançado.</div>{% endif %}
 {% if aviso_erro == 'custo-removido' %}<div class="alert success" role="status">Custo removido.</div>{% endif %}
 
-<form method="post" action="/app/loja/vendas/{{ venda.id }}/editar" class="form-layout">
-  <input type="hidden" name="csrf" value="{{ csrf }}">
-  <section class="panel form-section">
-    <div class="panel-heading">
-      <div><span class="mono-label">Venda</span><h2>Valores</h2></div>
-    </div>
-    <div class="form-grid">
-      {% if 'descricao' in campos %}
-      <label class="wide">Descrição<input name="descricao" value="{{ venda.descricao }}" required></label>
-      {% endif %}
-      <label>Preço de venda
-        <input type="number" step="0.01" min="0" name="preco_venda" value="{{ venda.preco_venda }}" required>
-      </label>
-      <label>Custo do veículo
-        <input type="number" step="0.01" min="0" name="custo_veiculo" value="{{ venda.custo_veiculo if venda.custo_veiculo is not none else '' }}">
-        <small class="muted">Em branco = custo ainda desconhecido. A margem fica marcada como incompleta.</small>
-      </label>
-      {% if 'lead_ref' in campos %}
-      <label>Referência do lead<input name="lead_ref" value="{{ venda.lead_ref or '' }}"></label>
-      {% endif %}
-      {% if 'veiculo_ref' in campos %}
-      <label>Referência do veículo<input name="veiculo_ref" value="{{ venda.veiculo_ref or '' }}"></label>
-      {% endif %}
-    </div>
-    {% if confirmada %}
-    <p class="muted">
-      Lead: <strong>{{ venda.lead_ref or '—' }}</strong> ·
-      Veículo: <strong>{{ venda.veiculo_ref or '—' }}</strong> — fixos desde a confirmação.
-    </p>
-    {% endif %}
-  </section>
-  <div class="heading-actions">
-    <button class="button primary" type="submit">Salvar alterações</button>
-    <a class="button ghost" href="/app/loja/vendas/lista">Cancelar</a>
-  </div>
-</form>
-
-<section class="panel" aria-labelledby="bloco-custos">
-  <div class="panel-heading">
-    <div>
-      <span class="mono-label">Custos diretos</span>
-      <h2 id="bloco-custos">O que mais saiu do bolso nesta venda</h2>
-    </div>
-  </div>
-  {% if venda.custos_diretos %}
-  <ul class="list-rows">
-    {% for custo in venda.custos_diretos %}
-    <li>
-      <div>
-        <strong>{{ custo.categoria | capitalize }}</strong>
-        <small class="muted">{{ formatar_brl(custo.valor) }}</small>
-      </div>
-      <form method="post" action="/app/loja/vendas/{{ venda.id }}/custos/{{ custo.id }}/remover">
-        <input type="hidden" name="csrf" value="{{ csrf }}">
-        <button class="button ghost" type="submit">Remover</button>
-      </form>
-    </li>
-    {% endfor %}
-  </ul>
-  {% else %}
-  <div class="empty">
-    <strong>Nenhum custo direto lançado.</strong>
-    <p>Frete, documentação e comissão entram aqui e saem da margem desta moto.</p>
-  </div>
-  {% endif %}
-  <form method="post" action="/app/loja/vendas/{{ venda.id }}/custos" class="filter-bar">
+{# Ficha da venda: valores à esquerda e livro de custos à direita; o fecho de
+   salvar separado por fio. Campos, validações e RBAC intactos. #}
+<div class="vnd-corpo">
+  <form method="post" action="/app/loja/vendas/{{ venda.id }}/editar">
     <input type="hidden" name="csrf" value="{{ csrf }}">
-    <label>Categoria
-      <select name="categoria" required>
-        {% for c in categorias %}<option value="{{ c }}">{{ c | capitalize }}</option>{% endfor %}
-      </select>
-    </label>
-    <label>Valor
-      <input type="number" step="0.01" min="0" name="valor" required placeholder="0,00">
-    </label>
-    <button class="button secondary" type="submit">Lançar custo</button>
+    <section class="panel">
+      <div class="panel-heading">
+        <div><span class="mono-label">Venda</span><h2>Valores</h2></div>
+      </div>
+      <div class="panel-body">
+        <div class="form-grid">
+          {% if 'descricao' in campos %}
+          <label class="wide">Descrição<input name="descricao" value="{{ venda.descricao }}" required></label>
+          {% endif %}
+          <label>Preço de venda
+            <input type="number" step="0.01" min="0" name="preco_venda" value="{{ venda.preco_venda }}" required>
+          </label>
+          <label>Custo do veículo
+            <input type="number" step="0.01" min="0" name="custo_veiculo" value="{{ venda.custo_veiculo if venda.custo_veiculo is not none else '' }}">
+            <small class="muted">Em branco = custo ainda desconhecido. A margem fica marcada como incompleta.</small>
+          </label>
+          {% if 'lead_ref' in campos %}
+          <label>Referência do lead<input name="lead_ref" value="{{ venda.lead_ref or '' }}"></label>
+          {% endif %}
+          {% if 'veiculo_ref' in campos %}
+          <label>Referência do veículo<input name="veiculo_ref" value="{{ venda.veiculo_ref or '' }}"></label>
+          {% endif %}
+        </div>
+        {% if confirmada %}
+        <p class="muted">
+          Lead: <strong>{{ venda.lead_ref or '—' }}</strong> ·
+          Veículo: <strong>{{ venda.veiculo_ref or '—' }}</strong> — fixos desde a confirmação.
+        </p>
+        {% endif %}
+      </div>
+    </section>
+    <div class="vnd-form-acoes">
+      <a class="button ghost" href="/app/loja/vendas/lista">Cancelar</a>
+      <button class="button primary" type="submit">Salvar alterações</button>
+    </div>
   </form>
-</section>
+
+  <section class="panel" aria-labelledby="bloco-custos">
+    <div class="panel-heading">
+      <div>
+        <span class="mono-label">Custos diretos</span>
+        <h2 id="bloco-custos">O que mais saiu do bolso nesta venda</h2>
+      </div>
+    </div>
+    {% if venda.custos_diretos %}
+    <ul class="vnd-custos">
+      {% for custo in venda.custos_diretos %}
+      <li>
+        <strong>{{ custo.categoria | capitalize }}</strong>
+        <span class="vnd-custo-valor">{{ formatar_brl(custo.valor) }}</span>
+        <form method="post" action="/app/loja/vendas/{{ venda.id }}/custos/{{ custo.id }}/remover">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          <button class="vnd-remover" type="submit">Remover</button>
+        </form>
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <div class="empty">
+      <strong>Nenhum custo direto lançado.</strong>
+      <p>Frete, documentação e comissão entram aqui e saem da margem desta moto.</p>
+    </div>
+    {% endif %}
+    <details class="vnd-custo-novo"{% if not venda.custos_diretos %} open{% endif %}>
+      <summary>Lançar custo</summary>
+      <form method="post" action="/app/loja/vendas/{{ venda.id }}/custos" class="form-grid">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <label>Categoria
+          <select name="categoria" required>
+            {% for c in categorias %}<option value="{{ c }}">{{ c | capitalize }}</option>{% endfor %}
+          </select>
+        </label>
+        <label>Valor
+          <input type="number" step="0.01" min="0" name="valor" required placeholder="0,00">
+        </label>
+        <div class="vnd-custo-acao wide"><button class="button secondary" type="submit">Lançar custo</button></div>
+      </form>
+    </details>
+  </section>
+</div>
 
 <section class="panel" aria-labelledby="bloco-excluir">
   <div class="panel-heading">

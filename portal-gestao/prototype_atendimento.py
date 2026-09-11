@@ -1,0 +1,598 @@
+r"""Runner local dos previews da Loja, com templates reais e dados fictícios.
+
+Windows: .\.venv\Scripts\python.exe prototype_atendimento.py
+macOS: .venv/bin/python prototype_atendimento.py
+Não importa app/config/main, não lê .env, não conecta integrações. SQLite em memória.
+"""
+from datetime import date, timedelta
+from pathlib import Path
+from types import SimpleNamespace as NS
+import argparse
+import re
+import sqlite3
+from urllib.parse import quote
+
+from fastapi import FastAPI, Request
+from fastapi.responses import HTMLResponse, RedirectResponse, PlainTextResponse
+from fastapi.staticfiles import StaticFiles
+from jinja2 import Environment, FileSystemLoader, select_autoescape
+import uvicorn
+
+ROOT = Path(__file__).resolve().parent
+app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
+app.state.prototype_atendimento = True  # Único local que habilita o gancho.
+db = sqlite3.connect(':memory:', check_same_thread=False)
+db.execute('CREATE TABLE mensagens (direcao TEXT, texto TEXT, hora TEXT)')
+db.executemany('INSERT INTO mensagens VALUES (?, ?, ?)', [
+    ('entrada', 'Oi! Vi a Fazer azul no anúncio. Ainda está disponível?', '10:12'),
+    ('saida', 'Olá, Marina! A Fazer FZ25 2024 está disponível, sim. Você pensa em financiar?', '10:12'),
+    ('entrada', 'Sim! Tenho R$ 6 mil para dar de entrada. Uso a moto para trabalhar.', '10:14'),
+    ('saida', 'Entendi. Vou chamar alguém da equipe para seguir com a simulação e tirar suas dúvidas.', '10:14'),
+    ('entrada', 'Perfeito. Se der certo, consigo passar aí amanhã de manhã.', '10:15'),
+    ('entrada', 'Pode ver as opções para mim?', '10:16'),
+])
+env = Environment(loader=FileSystemLoader(ROOT / 'app/templates'), autoescape=select_autoescape())
+app.mount('/static', StaticFiles(directory=ROOT / 'app/static'), name='static')
+
+
+@app.middleware('http')
+async def local_only(request: Request, call_next):
+    if request.method not in ('GET', 'HEAD'):
+        return PlainTextResponse('Demonstração: nenhuma alteração é persistida.', status_code=405)
+    response = await call_next(request)
+    response.headers['Cache-Control'] = 'no-store'
+    response.headers['Content-Security-Policy'] = (
+        "default-src 'self'; script-src 'self' 'unsafe-inline'; "
+        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+        "font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'none'; "
+        "form-action 'none'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'"
+    )
+    return response
+
+
+@app.get('/')
+@app.get('/app/loja/atendimento')
+async def index():
+    return RedirectResponse('/app/loja/agente?periodo=mes')
+
+
+def _shell_demo(request: Request):
+    nav = [NS(title=title, items=[NS(label=label, href=href) for label, href in items]) for title, items in [
+        ('Vendas', [('Resultado', '/app/loja/vendas'), ('Atendimento', '/app/loja/atendimento'),
+                    ('Vendas da loja', '/app/loja/vendas/lista'), ('Agente do WhatsApp', '/app/loja/agente'),
+                    ('Simulações', '/app/simulacoes')]),
+        ('Estoque', [('Situação do estoque', '/app/loja/estoque'), ('Veículos', '/app/loja/estoque/veiculos'),
+                     ('Vitrine', '/app/loja/estoque/vitrine')]),
+        ('Ajustes', [('Equipe', '/app/equipe'), ('Acessos dos bancos', '/app/financeiras')]),
+    ]]
+    return dict(
+        request=request, loja_shell=True, loja_brand='Revy Loja', loja_nav=nav,
+        nav_item_is_active=lambda item, path: False,
+        usuario=NS(nome='Rafael Demo', email='rafael@example.invalid', papel='gerente', loja_slug='Horizonte Motos'),
+        store_context=NS(loja_slug='Horizonte Motos'), lojas_disponiveis=[],
+        entitlements=NS(vendas_enabled=True, estoque_enabled=True), csrf='',
+    )
+
+
+@app.get('/app/loja/agente', response_class=HTMLResponse)
+async def agente_demo(request: Request):
+    # Task 5 definitiva: template real com dados fictícios e sem persistência.
+    chave = request.query_params.get('periodo', 'mes')
+    hoje = date.today()
+    if chave == 'hoje':
+        inicio, rotulo, vazio = hoje, 'Hoje', 'hoje'
+    elif chave == 'semana':
+        inicio, rotulo, vazio = hoje - timedelta(days=6), 'Últimos 7 dias', 'nos últimos 7 dias'
+    else:
+        chave, inicio, rotulo, vazio = 'mes', hoje.replace(day=1), 'Este mês', 'neste mês'
+    valores = (4, 7, 1, 9, 12, 5, 8, 3, 10)
+    serie = []
+    for i in range((hoje - inicio).days + 1):
+        valor = valores[i % len(valores)]
+        serie.append(NS(dia=f'{(inicio + timedelta(days=i)).day:02d}', atendimentos=valor,
+                        altura=round(valor / 12 * 100), pico=valor == 12))
+    context = _shell_demo(request)
+    context.update(
+        nav_item_is_active=lambda item, path: item.href == '/app/loja/agente',
+        agente_config_habilitado=True, erro_resumo=None,
+        periodo=NS(chave=chave, inicio=inicio, fim=hoje, rotulo=rotulo, vazio=vazio),
+        visao=NS(atendimentos=65, so_agente=27, transferidos=38,
+                 so_agente_pct=.42, transferidos_pct=.58, serie=serie,
+                 maximo=12, pico=NS(atendimentos=12, dia='05')),
+        card_rodizio=NS(oferecidos=18, atendidos=11, aguardando=4, perdidos=3),
+    )
+    html = env.get_template('loja/agente.html').render(**context)
+    html = re.sub(r'<link\b[^>]*https://fonts\.(?:googleapis|gstatic)\.com[^>]*>', '', html)
+    return HTMLResponse(html)
+
+
+@app.get('/app/loja/estoque/demo', response_class=HTMLResponse)
+async def estoque_demo(request: Request):
+    # Direcao "patio" definitiva desde 09/09: o demo rende o template real
+    # com dados ficticios. Sem ?variant= — os prototipos A/B foram aposentados.
+    context = _shell_demo(request)
+    context.update(
+        caminho_veiculos='/app/loja/estoque/veiculos', caminho_novo='/app/loja/estoque/veiculos/novo',
+        pode_gerir=True,
+        overview=NS(status='ok',
+                     contagens=NS(disponivel=14, reservado=3, vendido=5, publicados=11, total=22),
+                     idade=NS(com_data=15, sem_data=2, ate_30=6, de_31_a_60=4, de_61_a_90=3, acima_90=2)),
+    )
+    html = env.get_template('loja/estoque_visao.html').render(**context)
+    html = re.sub(r'<link\b[^>]*https://fonts\.(?:googleapis|gstatic)\.com[^>]*>', '', html)
+    return HTMLResponse(html)
+
+
+@app.get('/app/loja/vitrine/demo', response_class=HTMLResponse)
+async def vitrine_demo(request: Request):
+    # Task 3: rende o template real com dados ficticios (sem persistencia).
+    context = _shell_demo(request)
+    veiculos = [
+        NS(id='v1', foto_url=None, midia_principal=None, marca='Honda',
+           modelo='CG 160 Fan', tipo='moto', ano_modelo=2024, km=12500, preco=18900),
+        NS(id='v2', foto_url=None, midia_principal=None, marca='Yamaha',
+           modelo='Fazer FZ25', tipo='moto', ano_modelo=2023, km=20800, preco=21500),
+        NS(id='v3', foto_url=None, midia_principal=None, marca='Honda',
+           modelo='NXR 160 Bros', tipo='moto', ano_modelo=2024, km=8300, preco=22400),
+        NS(id='v4', foto_url=None, midia_principal=None, marca='Yamaha',
+           modelo='Factor 150', tipo='moto', ano_modelo=2022, km=31400, preco=15900),
+        NS(id='v5', foto_url=None, midia_principal=None, marca='Honda',
+           modelo='CB 300F Twister', tipo='moto', ano_modelo=2023, km=15600, preco=24900),
+    ]
+    context.update(
+        pode_gerir=True, csrf='',
+        veiculos=veiculos, all_ids=[v.id for v in veiculos],
+        total_items=len(veiculos), limit=12, offset=0,
+        previous_url=None, next_url=None,
+        page_links=[{'kind': 'page', 'number': 1, 'url': '#', 'current': True}],
+        showing_from=1, showing_to=len(veiculos),
+        erro=None, mensagem=None,
+        catalogo_whatsapp='(11) 98888-7777',
+        catalogo_url='https://revyapp.com.br/catalogo/l/horizonte-motos',
+        catalogo_erro=None, catalogo_mensagem=None,
+    )
+    html = env.get_template('loja/vitrine_ordem.html').render(**context)
+    html = re.sub(r'<link\b[^>]*https://fonts\.(?:googleapis|gstatic)\.com[^>]*>', '', html)
+    return HTMLResponse(html)
+
+
+@app.get('/app/loja/atendimento/{workspace_id}', response_class=HTMLResponse)
+async def workspace(request: Request, workspace_id: str):
+    variant = request.query_params.get('variant', 'A').upper()
+    if variant not in ('A', 'B', 'C'):
+        variant = 'A'
+    nav = [NS(title=title, items=[NS(label=label, href=href) for label, href in items]) for title, items in [
+        ('Vendas', [('Resultado', '/app/loja/vendas'), ('Atendimento', '/app/loja/atendimento'),
+                    ('Vendas da loja', '/app/loja/vendas/lista'), ('Agente do WhatsApp', '/app/loja/agente'),
+                    ('Simulações', '/app/simulacoes')]),
+        ('Estoque', [('Situação do estoque', '/app/loja/estoque'), ('Veículos', '/app/loja/estoque/veiculos'),
+                     ('Vitrine', '/app/loja/estoque/vitrine')]),
+        ('Ajustes', [('Equipe', '/app/equipe'), ('Acessos dos bancos', '/app/financeiras')]),
+    ]]
+    context = dict(
+        request=request, variant=variant, loja_shell=True, loja_brand='Revy Loja', loja_nav=nav,
+        nav_item_is_active=lambda item, path: item.href == '/app/loja/atendimento',
+        usuario=NS(nome='Rafael Demo', email='rafael@example.invalid', papel='gerente', loja_slug='Horizonte Motos'),
+        store_context=NS(loja_slug='Horizonte Motos'), lojas_disponiveis=[],
+        entitlements=NS(vendas_enabled=True, estoque_enabled=True), csrf='',
+        # Helpers que o template real espera (versões fictícias, sem backend).
+        mascarar_telefone=lambda t: t, formatar_horario=lambda v: v or '',
+        pode_enviar=True, pode_handoff=True, pode_atualizar_etapa=False,
+        origem_lead=None, etapas={},
+        workspace=NS(id=workspace_id, nome='Marina Demo', telefone='(00) 00000-0142',
+                     canal_label='WhatsApp da loja', veiculo_interesse='Yamaha Fazer FZ25',
+                     estado='aguardando_simulacao', estado_label='Aguardando simulação',
+                     canal_estado='conectado', canal_ativo=True, canal_id=None, lead=None,
+                     assignment=NS(vendedor_email='rafael@example.invalid'),
+                     venda_status=None, erros_bloco=None, envio_bloqueado_canal=False,
+                     conversa_resumo=NS(bot_ativo=False),
+                     mensagens=[NS(direcao=d, texto=t, hora=h, criada_em=h, id=None)
+                                for d, t, h in db.execute('SELECT * FROM mensagens')]),
+    )
+    html = env.get_template('loja/atendimento_workspace.html').render(**context)
+    # O shell mantém sua fonte/fallback; estes links externos não fazem parte da demo offline.
+    html = re.sub(r'<link\b[^>]*https://fonts\.(?:googleapis|gstatic)\.com[^>]*>', '', html)
+    return HTMLResponse(html)
+
+
+QR_FICTICIO = (
+    "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 29 29'%3E"
+    "%3Crect width='29' height='29' fill='white'/%3E"
+    "%3Cg fill='black'%3E%3Crect x='2' y='2' width='7' height='7'/%3E"
+    "%3Crect x='20' y='2' width='7' height='7'/%3E%3Crect x='2' y='20' width='7' height='7'/%3E"
+    "%3C/g%3E%3Cg fill='white'%3E%3Crect x='3' y='3' width='5' height='5'/%3E"
+    "%3Crect x='21' y='3' width='5' height='5'/%3E%3Crect x='3' y='21' width='5' height='5'/%3E"
+    "%3C/g%3E%3Cg fill='black'%3E%3Crect x='4' y='4' width='3' height='3'/%3E"
+    "%3Crect x='22' y='4' width='3' height='3'/%3E%3Crect x='4' y='22' width='3' height='3'/%3E"
+    "%3Cpath d='M11 3h2v1h-2zM14 5h1v2h-1zM11 8h1v1h-1zM16 10h2v2h-2zM12 13h1v1h-1z"
+    "M24 12h1v2h-1zM11 16h2v1h-2zM18 18h1v1h-1zM25 20h1v1h-1zM13 22h1v2h-1z"
+    "M17 24h2v1h-2zM24 25h1v1h-1zM11 26h1v1h-1z'/%3E%3C/g%3E%3C/svg%3E"
+)
+
+
+@app.get('/app/loja/whatsapp/demo', response_class=HTMLResponse)
+async def whatsapp_demo(request: Request):
+    # Task 6 definitiva (direcao B): rende o template real com dados ficticios
+    # e sem persistencia. ?modo=1|2|2novo troca o cenario; ?variant= legado e
+    # ignorado. Sem ?variant= — os prototipos A/B/C foram aposentados.
+    modo_param = request.query_params.get('modo', '1')
+    if modo_param not in ('1', '2', '2novo'):
+        modo_param = '1'
+    cloud = modo_param == '2'
+    if modo_param == '2novo':
+        canais = []
+        qr, view = None, NS(baileys=False, erro=None, canais=canais,
+                            mostrar_link_conectar=True, pode_adicionar=False)
+    elif cloud:
+        canais = [NS(id='n1', label='Central Revy na nuvem', estado='cloud_pendente',
+                      rotulo='Conectado — aguardando liberação da Revy',
+                      principal_estoque=False,
+                      pode_conectar=False, pode_desconectar=False,
+                      pode_marcar_principal_estoque=False,
+                      onboarding_texto='Tudo feito do seu lado — falta a liberação da Revy.',
+                      onboarding_falhou=False,
+                      onboarding_acao='Enquanto isso, monte a fila de vendedores que atende as conversas.',
+                      onboarding_acao_url='/app/loja/whatsapp/fila', pode_tentar_de_novo=False)]
+        qr, view = None, NS(baileys=False, erro=None, canais=canais,
+                            mostrar_link_conectar=False, pode_adicionar=False)
+    else:
+        canais = [
+            NS(id='c1', label='Linha 1 \u2014 vendas', estado='conectado',
+               rotulo='Conectado', principal_estoque=True,
+               pode_conectar=False, pode_desconectar=True,
+               pode_marcar_principal_estoque=False,
+               onboarding_texto='', onboarding_falhou=False, onboarding_acao='',
+               onboarding_acao_url='', pode_tentar_de_novo=False),
+            NS(id='c2', label='Linha 2 \u2014 suporte', estado='pendente',
+               rotulo='Aguardando leitura do QR', principal_estoque=False,
+               pode_conectar=True, pode_desconectar=False,
+               pode_marcar_principal_estoque=True,
+               onboarding_texto='', onboarding_falhou=False, onboarding_acao='',
+               onboarding_acao_url='', pode_tentar_de_novo=False),
+            NS(id='c3', label='Linha 3 \u2014 pe\u00e7as', estado='desconectado',
+               rotulo='Caiu \u2014 reconectar', principal_estoque=False,
+               pode_conectar=True, pode_desconectar=False,
+               pode_marcar_principal_estoque=True,
+               onboarding_texto='', onboarding_falhou=False, onboarding_acao='',
+               onboarding_acao_url='', pode_tentar_de_novo=False),
+        ]
+        qr = NS(canal_id='c2', payload=QR_FICTICIO)
+        view = NS(baileys=True, erro=None, canais=canais,
+                  mostrar_link_conectar=False, pode_adicionar=True)
+    context = _shell_demo(request)
+    context.update(
+        nav_item_is_active=lambda item, path: False,
+        view=view, qr=qr, csrf='demonstracao',
+        acao_erro=None, acao_mensagem=None,
+    )
+    html = env.get_template('loja/whatsapp_canais.html').render(**context)
+    html = re.sub(r'<link\b[^>]*https://fonts\.(?:googleapis|gstatic)\.com[^>]*>', '', html)
+    return HTMLResponse(html)
+
+
+@app.get('/app/loja/vendas/demo', response_class=HTMLResponse)
+async def vendas_demo(request: Request):
+    # Task 7 (direcao "balanco"): rende o template real com dados ficticios
+    # e sem persistencia. Cenario rico: margem incompleta + aquisicao ok.
+    hoje = date.today()
+    inicio = hoje.replace(day=1)
+
+    def formatar_brl(valor):
+        try:
+            numero = float(valor)
+        except (TypeError, ValueError):
+            return '—'
+        texto = f'{numero:,.2f}'.replace(',', '_').replace('.', ',').replace('_', '.')
+        return f'R$ {texto}'
+
+    def formatar_data(iso):
+        if not iso:
+            return ''
+        try:
+            return date.fromisoformat(str(iso)[:10]).strftime('%d/%m/%Y')
+        except ValueError:
+            return str(iso)
+
+    overview = NS(
+        escopo='loja', vendas_status='ok', qtd_vendas=12, receita=243500.0,
+        margem_completa=False, vendas_lucro_incompleto=2, margem=31200.0,
+        funil_status='ok', leads_count=48,
+        funil=NS(taxa_resposta_pct=62, taxa_conversao_pct=25,
+                 auditavel=NS(disponivel=True, atendidos=31, vendas_vinculadas=9)),
+        aquisicao_status='ok',
+        aquisicao=NS(investimento_disponivel=True, investimento=5200.0,
+                     cac_disponivel=True, cac=433.33,
+                     roas_disponivel=True, roas=46.83, mensagem=None),
+        aquisicao_campanhas=[
+            NS(nome='Civic — julho', canal='Meta', gasto=2100.0, leads=19,
+               vendas=4, faturamento=86200.0, roas=41.05),
+            NS(nome='Fazer — agosto', canal='Meta', gasto=1750.0, leads=14,
+               vendas=3, faturamento=64800.0, roas=37.03),
+            NS(nome='Bros — vitrine', canal='Catálogo', gasto=None, leads=6,
+               vendas=2, faturamento=44900.0, roas=None),
+        ],
+        aquisicao_canais=[NS(canal='Meta', gasto=3850.0, roas=39.17)],
+        aquisicao_origens=[
+            NS(rotulo='Anúncio', nota='9 sem identificação de campanha', leads=27, share='56.3'),
+            NS(rotulo='Link direto', nota=None, leads=12, share='25.0'),
+            NS(rotulo='Catálogo', nota=None, leads=6, share='12.5'),
+            NS(rotulo='Procurou no WhatsApp', nota=None, leads=3, share='6.2'),
+        ],
+    )
+    context = _shell_demo(request)
+    context.update(
+        nav_item_is_active=lambda item, path: item.href == '/app/loja/vendas',
+        overview=overview, periodo={'inicio': inicio.isoformat(), 'fim': hoje.isoformat()},
+        pode_ver_margem=True, pode_ver_aquisicao=True,
+        formatar_brl=formatar_brl, formatar_data=formatar_data,
+    )
+    html = env.get_template('loja/vendas_visao.html').render(**context)
+    html = re.sub(r'<link\b[^>]*https://fonts\.(?:googleapis|gstatic)\.com[^>]*>', '', html)
+    return HTMLResponse(html)
+
+
+@app.get('/app/loja/vendas/lista/demo', response_class=HTMLResponse)
+async def vendas_lista_demo(request: Request):
+    # Lista redesenhada em 11/09: livro-caixa com valor à direita, ações na
+    # linha e cancelamento em disclosure. Cenário com os três estados.
+    def formatar_brl(valor):
+        try:
+            numero = float(valor)
+        except (TypeError, ValueError):
+            return '—'
+        texto = f'{numero:,.2f}'.replace(',', '_').replace('.', ',').replace('_', '.')
+        return f'R$ {texto}'
+
+    def formatar_data(iso):
+        if not iso:
+            return ''
+        try:
+            return date.fromisoformat(str(iso)[:10]).strftime('%d/%m/%Y')
+        except ValueError:
+            return str(iso)
+
+    vendas = [
+        NS(id='v1', descricao='Honda CG 160 Titan 2022', preco_venda=14900.0,
+           criada_em='2026-09-09', vendedor_email='rafael@example.invalid',
+           status='registrada', motivo_cancelamento=None),
+        NS(id='v2', descricao='Yamaha Fazer FZ25 2023 — Marina', preco_venda=21500.0,
+           criada_em='2026-09-08', vendedor_email='rafael@example.invalid',
+           status='confirmada', motivo_cancelamento=None),
+        NS(id='v3', descricao='Honda Biz 125 2021', preco_venda=11500.0,
+           criada_em='2026-09-05', vendedor_email='barbara@example.invalid',
+           status='cancelada', motivo_cancelamento='Cliente desistiu — entrada não aprovada'),
+    ]
+    context = _shell_demo(request)
+    context.update(
+        nav_item_is_active=lambda item, path: item.href == '/app/loja/vendas/lista',
+        vendas=vendas, escopo_proprio=False, pode_agir=True, pode_registrar=True,
+        pode_editar=True, aviso_ok=None, aviso_erro=None, csrf='demonstracao',
+        formatar_brl=formatar_brl, formatar_data=formatar_data,
+    )
+    html = env.get_template('loja/vendas_lista.html').render(**context)
+    html = re.sub(r'<link\b[^>]*https://fonts\.(?:googleapis|gstatic)\.com[^>]*>', '', html)
+    return HTMLResponse(html)
+
+
+@app.get('/app/loja/vendas/editar/demo', response_class=HTMLResponse)
+async def venda_editar_demo(request: Request):
+    # Ficha de edição redesenhada em 11/09: venda confirmada (só valores
+    # editáveis) com custos diretos lançados. Sem persistência.
+    def formatar_brl(valor):
+        try:
+            numero = float(valor)
+        except (TypeError, ValueError):
+            return '—'
+        texto = f'{numero:,.2f}'.replace(',', '_').replace('.', ',').replace('_', '.')
+        return f'R$ {texto}'
+
+    venda = NS(
+        id='v2', descricao='Yamaha Fazer FZ25 2023 — Marina', status='confirmada',
+        preco_venda=21500.0, custo_veiculo=17200.0,
+        lead_ref='lead_marina', veiculo_ref='v9',
+        custos_diretos=[
+            NS(id='c1', categoria='documentacao', valor=450.0),
+            NS(id='c2', categoria='frete', valor=300.0),
+        ],
+    )
+    context = _shell_demo(request)
+    context.update(
+        nav_item_is_active=lambda item, path: item.href == '/app/loja/vendas/lista',
+        venda=venda, campos=('preco_venda', 'custo_veiculo'),
+        categorias=['documentacao', 'frete', 'comissao'],
+        aviso_erro=None, csrf='demonstracao', formatar_brl=formatar_brl,
+    )
+    html = env.get_template('loja/venda_editar.html').render(**context)
+    html = re.sub(r'<link\b[^>]*https://fonts\.(?:googleapis|gstatic)\.com[^>]*>', '', html)
+    return HTMLResponse(html)
+
+
+@app.get('/app/loja/financeiro/demo', response_class=HTMLResponse)
+async def financeiro_demo(request: Request):
+    # Task 8 (direcao "fechamento"): rende o template real com dados ficticios
+    # e sem persistencia. Cenario: margem parcial + equilibrio alcancado.
+    hoje = date.today()
+    competencia = hoje.strftime('%Y-%m')
+
+    def formatar_brl(valor):
+        try:
+            numero = float(valor)
+        except (TypeError, ValueError):
+            return '—'
+        texto = f'{numero:,.2f}'.replace(',', '_').replace('.', ',').replace('_', '.')
+        return f'R$ {texto}'
+
+    def formatar_data(iso):
+        if not iso:
+            return ''
+        try:
+            return date.fromisoformat(str(iso)[:10]).strftime('%d/%m/%Y')
+        except ValueError:
+            return str(iso)
+
+    resultado = NS(
+        qtd_vendas=5, receita=79500.0, custo_veiculo_total=61200.0,
+        custo_vendas=61200.0, custos_diretos=2300.0, lucro_bruto=16000.0,
+        margem_completa=False, vendas_sem_custo=1,
+        despesa_fixa=6000.0, tem_despesa_cadastrada=True,
+        lucro_operacional=10000.0,
+        ponto_equilibrio_disponivel=True, margem_media=3200.0,
+        ponto_equilibrio=2, vendas_ate_equilibrio=2,
+        dia_do_equilibrio=hoje.replace(day=9).isoformat(),
+        ponto_equilibrio_motivo=None,
+        linhas=[
+            NS(descricao='Honda CG 160 Fan', data=hoje.replace(day=3).isoformat(),
+               preco=18900.0, custo=14500.0, custos_diretos=600.0, lucro=3800.0, venda_id=11),
+            NS(descricao='Yamaha Fazer FZ25', data=hoje.replace(day=9).isoformat(),
+               preco=21500.0, custo=17200.0, custos_diretos=800.0, lucro=3500.0, venda_id=12),
+            NS(descricao='Honda NXR 160 Bros', data=hoje.replace(day=14).isoformat(),
+               preco=22400.0, custo=None, custos_diretos=900.0, lucro=None, venda_id=13),
+        ],
+    )
+    context = _shell_demo(request)
+    context.update(
+        nav_item_is_active=lambda item, path: False,
+        resultado=resultado, competencia=competencia, competencia_hoje=competencia,
+        formatar_brl=formatar_brl, formatar_data=formatar_data,
+    )
+    html = env.get_template('loja/financeiro_resultado.html').render(**context)
+    html = re.sub(r'<link\b[^>]*https://fonts\.(?:googleapis|gstatic)\.com[^>]*>', '', html)
+    return HTMLResponse(html)
+
+
+def _foto_placeholder(svg: str) -> str:
+    return 'data:image/svg+xml,' + quote(svg)
+
+
+# Silhuetas de apoio: o cadastro fictício não tem foto real; em vez de uma
+# parede de letras, o protótipo mostra o estado "com foto" e "sem foto".
+_PLACEHOLDER_MOTO = _foto_placeholder(
+    "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 160 108'>"
+    "<g fill='none' stroke='#b5adaa' stroke-width='4' stroke-linecap='round' stroke-linejoin='round'>"
+    "<circle cx='46' cy='76' r='14'/><circle cx='118' cy='76' r='14'/>"
+    "<path d='M46 76l16-22h22l10 10'/><path d='M64 72l12-18'/>"
+    "<path d='M84 54h24l10 10'/><path d='M118 76l-8-22'/><path d='M104 48h14'/>"
+    "</g></svg>"
+)
+_PLACEHOLDER_CARRO = _foto_placeholder(
+    "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 160 108'>"
+    "<g fill='none' stroke='#b5adaa' stroke-width='4' stroke-linecap='round' stroke-linejoin='round'>"
+    "<path d='M25 74c0-7 4-11 11-12l17-14c4-3 8-5 14-5h26c6 0 10 2 14 5l15 14h7c7 0 11 5 11 12v6H25v-6Z'/>"
+    "<circle cx='52' cy='80' r='10'/><circle cx='112' cy='80' r='10'/>"
+    "<path d='M62 43v16M88 43v16'/>"
+    "</g></svg>"
+)
+
+
+def _veiculos_ficticios():
+    def veiculo(vid, marca, modelo, versao, ano, km, placa, status, publicado, preco, custo, foto):
+        return NS(id=vid, marca=marca, modelo=modelo, versao=versao, ano_modelo=ano,
+                  km=km, placa=placa, status=status, publicado=publicado,
+                  preco=preco, custo=custo, foto_url=foto)
+
+    return [
+        veiculo('v1', 'Honda', 'CG 160 Titan', 'ABS', 2022, 18400, 'ABC1D23', 'disponivel', True, 14900.0, 12400.0, _PLACEHOLDER_MOTO),
+        veiculo('v2', 'Honda', 'Biz 125', 'ES', 2021, 32100, 'XYZ-4B56', 'reservado', True, 11500.0, 10200.0, _PLACEHOLDER_MOTO),
+        veiculo('v3', 'Yamaha', 'Factor 150', 'DX', 2023, 8200, 'QRA2C34', 'disponivel', True, 16200.0, 13800.0, _PLACEHOLDER_MOTO),
+        veiculo('v4', 'Honda', 'Pop 110i', '', 2020, 41500, 'DEF5G67', 'disponivel', False, 8900.0, 7400.0, None),
+        veiculo('v5', 'Chevrolet', 'Onix 1.0', 'LT', 2019, 67200, 'HIJ7K89', 'vendido', False, 52900.0, 46000.0, _PLACEHOLDER_CARRO),
+        veiculo('v6', 'Fiat', 'Argo Drive 1.3', '', 2021, 39800, 'LMN8P01', 'disponivel', True, 64500.0, 57800.0, _PLACEHOLDER_CARRO),
+        veiculo('v7', 'Honda', 'CB 250 Twister', 'ABS', 2022, 22300, 'RST9U12', 'indisponivel', False, 21900.0, 18600.0, _PLACEHOLDER_MOTO),
+        veiculo('v8', 'Hyundai', 'HB20 Vision', '1.0', 2020, 55100, 'VWX0Y23', 'reservado', True, 56300.0, 49700.0, _PLACEHOLDER_CARRO),
+        veiculo('v9', 'Yamaha', 'Fazer FZ25', 'ABS', 2023, 12700, 'BRA3E45', 'disponivel', True, 21500.0, 18300.0, _PLACEHOLDER_MOTO),
+        veiculo('v10', 'Renault', 'Kwid Zen', '', 2021, 45900, 'CIV6R78', 'disponivel', False, 42900.0, 38100.0, None),
+        veiculo('v11', 'Honda', 'NXR 160 Bros', 'ABS', 2024, 8300, 'MTO0D11', 'vendido', False, 22400.0, 19100.0, _PLACEHOLDER_MOTO),
+        veiculo('v12', 'Jeep', 'Renegade Sport', 'T270', 2021, 51200, 'JEP4T90', 'indisponivel', False, 89900.0, 81200.0, _PLACEHOLDER_CARRO),
+    ]
+
+
+@app.get('/app/loja/estoque/veiculos/demo', response_class=HTMLResponse)
+async def veiculos_demo(request: Request):
+    # Lista definitiva (direção A, escolhida em 11/09): o demo rende o template
+    # real com dados fictícios e sem persistência. Fontes do Google mantidas de
+    # propósito: a tipografia (Hanken no dado) faz parte do que se avalia.
+    veiculos = _veiculos_ficticios()
+    context = _shell_demo(request)
+    context.update(
+        nav_item_is_active=lambda item, path: item.href == '/app/loja/estoque/veiculos',
+        veiculos=veiculos,
+        filtros=NS(busca='', tipo='', status='', publicado=''),
+        pode_gerir=True, pode_custo=True, integracao_erro=None,
+    )
+    html = env.get_template('estoque/lista.html').render(**context)
+    return HTMLResponse(html)
+
+
+@app.get('/app/loja/estoque/veiculos/form/demo', response_class=HTMLResponse)
+async def veiculo_form_demo(request: Request):
+    # Formulário definitivo (direção A, escolhida em 11/09): o demo rende o
+    # template real com dados fictícios e sem persistência. Estado de edição
+    # com publicação pendente: mostra os botões de ação.
+    veiculo = NS(
+        id='v1', tipo='moto', marca='Honda', modelo='CG 160 Titan', versao='ABS',
+        ano_modelo=2022, cor='Vermelha', placa='ABC1D23', preco=14900.0,
+        custo=12400.0, km=18400, codigo_interno='H01',
+        foto_url=_PLACEHOLDER_MOTO, status='disponivel', publicado=False,
+    )
+    context = _shell_demo(request)
+    context.update(
+        nav_item_is_active=lambda item, path: item.href == '/app/loja/estoque/veiculos',
+        veiculo=veiculo, titulo='Editar veículo',
+        erro=None, csrf='demonstracao', pode_custo=True,
+        anos=list(range(date.today().year + 1, 1979, -1)),
+    )
+    html = env.get_template('estoque/form.html').render(**context)
+    return HTMLResponse(html)
+
+
+@app.get('/app/loja/financeiro/despesas/demo', response_class=HTMLResponse)
+async def despesas_demo(request: Request):
+    # Task 9 (direcao "arquivo"): rende o template real com dados ficticios
+    # e sem persistencia. Uma linha com ajuste no mes + arquivo com 2 itens.
+    hoje = date.today()
+    # Mês passado de propósito: mostra o "Próximo ›" vivo no trocador.
+    competencia = (hoje.replace(day=1) - timedelta(days=1)).strftime('%Y-%m')
+    competencia_hoje = hoje.strftime('%Y-%m')
+
+    def formatar_brl(valor):
+        try:
+            numero = float(valor)
+        except (TypeError, ValueError):
+            return '—'
+        texto = f'{numero:,.2f}'.replace(',', '_').replace('.', ',').replace('_', '.')
+        return f'R$ {texto}'
+
+    itens = [
+        (NS(id='d1', descricao='Aluguel da loja', categoria='aluguel',
+            valor_mensal=2500.0), 2500.0),
+        (NS(id='d2', descricao='Salários', categoria='pessoal',
+            valor_mensal=2800.0), 2800.0),
+        (NS(id='d3', descricao='Energia', categoria='contas',
+            valor_mensal=400.0), 320.0),
+    ]
+    encerradas = [
+        NS(id='d9', descricao='Anúncio antigo', categoria='marketing',
+           valor_mensal=900.0, inicio_competencia='2026-01', fim_competencia='2026-06'),
+        NS(id='d8', descricao='Contador avulso', categoria='servicos',
+           valor_mensal=600.0, inicio_competencia='2026-02', fim_competencia=None),
+    ]
+    context = _shell_demo(request)
+    context.update(
+        nav_item_is_active=lambda item, path: False,
+        competencia=competencia, competencia_hoje=competencia_hoje,
+        itens=itens, encerradas=encerradas,
+        categorias=['aluguel', 'pessoal', 'contas', 'marketing', 'servicos'],
+        aviso_ok=None, aviso_erro=None, csrf='demonstracao',
+        formatar_brl=formatar_brl,
+    )
+    html = env.get_template('loja/financeiro_despesas.html').render(**context)
+    html = re.sub(r'<link\b[^>]*https://fonts\.(?:googleapis|gstatic)\.com[^>]*>', '', html)
+    return HTMLResponse(html)
+
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--port', type=int, default=8766)
+    args = parser.parse_args()
+    print(f'Demonstração local: http://127.0.0.1:{args.port}/app/loja/agente?periodo=mes')
+    uvicorn.run(app, host='127.0.0.1', port=args.port, access_log=False)

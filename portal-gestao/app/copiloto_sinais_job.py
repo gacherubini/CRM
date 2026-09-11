@@ -286,7 +286,7 @@ def avaliar_loja(
         ator_email="sistema@copiloto",
         hoje=ref.date(),
     )
-    janela = janela_do_periodo(None, None)
+    janela = janela_do_periodo(None, None, hoje=ctx.hoje)
 
     candidatos: list[SinalCandidato] = []
 

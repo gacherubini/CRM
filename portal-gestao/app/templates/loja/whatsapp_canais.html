@@ -2,7 +2,7 @@
 {% block title %}Números de WhatsApp — Revy Loja{% endblock %}
 {% block page_title %}Números de WhatsApp{% endblock %}
 {% block content %}
-{# Estilos: .canal-* em app.css #}
+{# Estilos: .wx-* em app.css #}
 <div class="page-heading">
   <div>
     <span class="eyebrow">Ajustes</span>
@@ -17,10 +17,13 @@
     </p>
     {% else %}
     <p>
-      Sua loja atende pela central da Revy na nuvem: um número só, sem QR e sem
-      celular ligado. Quem fala com o cliente é o vendedor da vez, pelo próprio
-      WhatsApp — a ordem está em <a href="/app/loja/whatsapp/fila">Fila de
-      atendimento</a>.
+      Um número só na nuvem da Revy, sem QR e sem celular ligado. Quem atende
+      é o vendedor da vez.
+    </p>
+    <p>
+      <a class="button secondary" href="/app/loja/whatsapp/fila">
+        Fila de atendimento
+      </a>
     </p>
     {% endif %}
   </div>
@@ -38,83 +41,25 @@
 {# "Catálogo e vitrine" mudou para Estoque › Vitrine: a configuração da
    vitrine estava partida entre duas seções do menu. #}
 
-{% if qr %}
-<section class="panel qr-panel" id="qr-card" data-canal="{{ qr.canal_id }}" aria-labelledby="qr-titulo">
-  <div class="panel-heading">
-    <div>
-      <span class="mono-label">Conexão</span>
-      <h2 id="qr-titulo">Leia o QR no celular</h2>
-    </div>
-    <span class="status pendente" id="qr-estado">Aguardando leitura do QR…</span>
-  </div>
-  <div class="qr-body">
-    {# A Evolution devolve o base64 já com data URI em algumas versões. #}
-    <img class="qr-image" alt="QR de conexão"
-         src="{% if qr.payload.startswith('data:') %}{{ qr.payload }}{% else %}data:image/png;base64,{{ qr.payload }}{% endif %}">
-    <ol class="qr-passos">
-      <li>Abra o WhatsApp <strong>no celular deste número</strong>.</li>
-      <li>Vá em <strong>Aparelhos conectados</strong> › <strong>Conectar aparelho</strong>.</li>
-      <li>Aponte a câmera para o código ao lado.</li>
-      <li>Se o código expirar, clique em <strong>Conectar</strong> outra vez.</li>
-    </ol>
-  </div>
-</section>
-<script>
-  (function () {
-    var card = document.getElementById("qr-card");
-    if (!card) return;
-    var canal = card.dataset.canal;
-    var alvo = document.getElementById("qr-estado");
-    var tentativas = 0;
-    var timer = setInterval(function () {
-      tentativas += 1;
-      if (tentativas > 40) { clearInterval(timer); return; }
-      fetch("/app/loja/whatsapp/canais/" + canal + "/status")
-        .then(function (r) { return r.ok ? r.json() : null; })
-        .then(function (d) {
-          if (!d) return;
-          alvo.textContent = d.rotulo;
-          // A classe carrega a cor do ponto: sem trocar, "Conectado" ficava âmbar.
-          alvo.className = "status " + d.estado;
-          if (d.estado === "conectado") {
-            clearInterval(timer);
-            window.location.reload();
-          }
-        })
-        .catch(function () {});
-    }, 3000);
-  })();
-</script>
-{% endif %}
-
-<section class="panel" aria-labelledby="canais-titulo">
-  <div class="panel-heading">
-    <div>
-      <span class="mono-label">Cadastrados</span>
-      <h2 id="canais-titulo">Seus números</h2>
-    </div>
-    {% if view.canais %}
-    <span class="muted">
-      {{ view.canais | length }} número{{ '' if view.canais | length == 1 else 's' }}
-    </span>
-    {% endif %}
-  </div>
-  {% if view.canais %}
-  <div class="canal-grid">
+{% if view.canais %}
+{% set sel = qr.canal_id if qr else (view.canais[0].id if view.canais else '') %}
+<div class="wx-mestre">
+  <ol class="wx-lista" aria-label="Números">
     {% for canal in view.canais %}
-    <article class="canal-card">
-      <div class="canal-topo">
-        <span class="status {{ canal.estado }}">{{ canal.rotulo }}</span>
-        {% if canal.principal_estoque and view.baileys %}
-        <span class="canal-tag" title="Responde no grupo do estoque e envia o aviso de simulação">
-          Principal do estoque
-        </span>
-        {% endif %}
-      </div>
-      <strong class="canal-nome">{{ canal.label }}</strong>
+    <li><button type="button" data-ficha="ficha-{{ canal.id }}" aria-selected="{{ 'true' if canal.id == sel else 'false' }}">{{ canal.label }}<small>{{ canal.rotulo }}</small></button></li>
+    {% endfor %}
+  </ol>
+  <div>
+    {% for canal in view.canais %}
+    <section class="wx-ficha" id="ficha-{{ canal.id }}" aria-label="Ficha de {{ canal.label }}" {% if canal.id != sel %}hidden{% endif %}>
+      <span class="status {{ canal.estado }}">{{ canal.rotulo }}</span>
+      <h2>{{ canal.label }}</h2>
+      {% if canal.principal_estoque and view.baileys %}
+      <p><span class="canal-tag" title="Responde no grupo do estoque e envia o aviso de simulação">Principal do estoque</span></p>
+      <p class="muted">É o único que responde no grupo do estoque e envia o aviso quando um cliente pede simulação.</p>
+      {% endif %}
       {# Onboarding Cloud: diz em que passo parou e de quem é a vez. "Falhou" é
-         estado de tela — no banco o canal segue pendente. Sem CSS novo: .alert
-         e .muted já são usados nesta página. #}
+         estado de tela — no banco o canal segue pendente. #}
       {% if canal.onboarding_texto %}
       {% if canal.onboarding_falhou %}
       <div class="alert warning">
@@ -138,7 +83,29 @@
       </p>
       {% endif %}
       {% endif %}
-      <div class="canal-acoes">
+      {% if qr and qr.canal_id == canal.id %}
+      <section class="panel qr-panel" id="qr-card" data-canal="{{ qr.canal_id }}" aria-labelledby="qr-titulo">
+        <div class="panel-heading">
+          <div>
+            <span class="mono-label">Conexão</span>
+            <h2 id="qr-titulo">Leia o QR no celular</h2>
+          </div>
+          <span class="status pendente" id="qr-estado">Aguardando leitura do QR…</span>
+        </div>
+        <div class="qr-body">
+          {# A Evolution devolve o base64 já com data URI em algumas versões. #}
+          <img class="qr-image" alt="QR de conexão"
+               src="{% if qr.payload.startswith('data:') %}{{ qr.payload }}{% else %}data:image/png;base64,{{ qr.payload }}{% endif %}">
+          <ol class="qr-passos">
+            <li>Abra o WhatsApp <strong>no celular deste número</strong>.</li>
+            <li>Vá em <strong>Aparelhos conectados</strong> › <strong>Conectar aparelho</strong>.</li>
+            <li>Aponte a câmera para o código ao lado.</li>
+            <li>Se o código expirar, clique em <strong>Conectar</strong> outra vez.</li>
+          </ol>
+        </div>
+      </section>
+      {% endif %}
+      <div class="wx-linha-acao">
         {% if canal.pode_conectar %}
         <form method="post" action="/app/loja/whatsapp/canais/{{ canal.id }}/conectar">
           <input type="hidden" name="csrf" value="{{ csrf }}">
@@ -166,32 +133,77 @@
           <button class="button ghost" type="submit">Apagar</button>
         </form>
       </div>
-    </article>
+    </section>
     {% endfor %}
   </div>
+</div>
+{% if view.baileys %}
+<p class="canal-rodape">
+  O <strong>principal do estoque</strong> é o único que responde no grupo do estoque
+  e envia o aviso quando um cliente pede simulação. Os outros números só atendem
+  conversas de cliente.
+</p>
+{% endif %}
+<script>
+  (function () {
+    var botoes = document.querySelectorAll(".wx-lista button");
+    botoes.forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        botoes.forEach(function (b) { b.setAttribute("aria-selected", "false"); });
+        btn.setAttribute("aria-selected", "true");
+        document.querySelectorAll(".wx-ficha").forEach(function (f) {
+          f.hidden = f.id !== btn.dataset.ficha;
+        });
+      });
+    });
+  })();
+</script>
+{% if qr %}
+<script>
+  (function () {
+    var card = document.getElementById("qr-card");
+    if (!card) return;
+    var canal = card.dataset.canal;
+    var alvo = document.getElementById("qr-estado");
+    var tentativas = 0;
+    var timer = setInterval(function () {
+      tentativas += 1;
+      if (tentativas > 40) { clearInterval(timer); return; }
+      fetch("/app/loja/whatsapp/canais/" + canal + "/status")
+        .then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (d) {
+          if (!d) return;
+          alvo.textContent = d.rotulo;
+          // A classe carrega a cor do ponto: sem trocar, "Conectado" ficava âmbar.
+          alvo.className = "status " + d.estado;
+          if (d.estado === "conectado") {
+            clearInterval(timer);
+            window.location.reload();
+          }
+        })
+        .catch(function () {});
+    }, 3000);
+  })();
+</script>
+{% endif %}
+{% endif %}
+
+{% if not view.canais and not view.mostrar_link_conectar %}
+<div class="wx-vazio">
+  <strong>Nenhum número por aqui</strong>
   {% if view.baileys %}
-  <p class="canal-rodape">
-    O <strong>principal do estoque</strong> é o único que responde no grupo do estoque
-    e envia o aviso quando um cliente pede simulação. Os outros números só atendem
-    conversas de cliente.
-  </p>
-  {% endif %}
+  <p>Cadastre o primeiro abaixo. Depois de conectar, ele começa a atender conversas.</p>
   {% else %}
-  <div class="empty">
-    <strong>Nenhum número por aqui</strong>
-    {% if view.baileys %}
-    <p>Cadastre o primeiro abaixo. Depois de conectar, ele começa a atender conversas.</p>
-    {% else %}
-    <p>A central ainda não foi conectada. Comece pela janela da Meta, abaixo.</p>
-    {% endif %}
-  </div>
+  <p>A central ainda não foi conectada. Comece pela janela da Meta, abaixo.</p>
   {% endif %}
-</section>
+</div>
+{% endif %}
 
 {# A tela de decisão só se alcança daqui: item de menu próprio seria uma segunda
    porta para a mesma coisa. Com canal Cloud o convite some — o estado dele mora
-   no card acima. #}
+   na ficha acima. Sem canal nenhum, o convite é o bloco principal. #}
 {% if view.mostrar_link_conectar %}
+{% if not view.canais %}
 <section class="panel" aria-labelledby="conectar-nuvem">
   <div class="panel-heading">
     <div>
@@ -212,16 +224,26 @@
     </p>
   </div>
 </section>
+{% else %}
+<details class="wx-quiet">
+  <summary>Conectar o WhatsApp pela Revy</summary>
+  <p>
+    Sem QR e sem celular ligado: o número passa a atender pela nuvem da Meta.
+    Antes de abrir a janela da Meta você escolhe qual número vai — e essa
+    escolha não volta atrás.
+  </p>
+  <p>
+    <a class="button secondary" href="/app/loja/whatsapp/conectar">
+      Ver como conectar
+    </a>
+  </p>
+</details>
+{% endif %}
 {% endif %}
 
 {% if view.pode_adicionar %}
-<section class="panel form-section" aria-labelledby="canal-novo">
-  <div class="panel-heading">
-    <div>
-      <span class="mono-label">Novo</span>
-      <h2 id="canal-novo">Adicionar número</h2>
-    </div>
-  </div>
+<details class="wx-quiet">
+  <summary>Adicionar número</summary>
   <form class="form-layout" method="post" action="/app/loja/whatsapp/canais">
     <input type="hidden" name="csrf" value="{{ csrf }}">
     <label>Nome do número
@@ -230,6 +252,6 @@
     </label>
     <button class="button primary" type="submit">Adicionar número</button>
   </form>
-</section>
+</details>
 {% endif %}
 {% endblock %}

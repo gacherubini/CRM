@@ -56,11 +56,17 @@ class Janela:
 def janela_do_periodo(
     inicio: str | date | None = None,
     fim: str | date | None = None,
+    *,
+    hoje: date | None = None,
 ) -> Janela:
-    """Normaliza o período com a MESMA regra do painel (mês corrente default)."""
+    """Normaliza o período com a MESMA regra do painel (mês corrente default).
+
+    O mês corrente ancora em ``hoje`` (default: hoje real) — o Copiloto
+    passa ``ctx.hoje`` para não depender do relógio da máquina.
+    """
     ini_s = inicio.isoformat() if isinstance(inicio, date) else inicio
     fim_s = fim.isoformat() if isinstance(fim, date) else fim
-    d_inicio, d_fim = periodo_padrao(ini_s, fim_s)
+    d_inicio, d_fim = periodo_padrao(ini_s, fim_s, hoje=hoje)
     return Janela(inicio=d_inicio, fim=d_fim)
 
 

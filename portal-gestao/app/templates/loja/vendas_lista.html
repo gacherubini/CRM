@@ -2,6 +2,10 @@
 {% block title %}{% if escopo_proprio %}Minhas vendas{% else %}Vendas da loja{% endif %} — Revy Loja{% endblock %}
 {% block page_title %}{% if escopo_proprio %}Minhas vendas{% else %}Vendas da loja{% endif %}{% endblock %}
 {% block content %}
+{# Livro de fechamento: o dia é o capítulo (rail de data com fio) e o valor é a
+   espinha — Newsreader da marca à direita, alinhado, com o estado logo abaixo.
+   Confirmar é o único botão cheio; cancelar mora em disclosure. Mesmos
+   endpoints, campos, CSRF, permissões e textos. #}
 <div class="page-heading">
   <div>
     <span class="eyebrow">Vendas</span>
@@ -38,42 +42,57 @@
 {% if aviso_erro == 'reconciliacao' %}<div class="alert error" role="alert">O veículo foi baixado mas a venda não gravou. Confira antes de repetir.</div>{% endif %}
 {% if aviso_erro == 'loja-nao-operacional' %}<div class="alert error" role="alert">A loja não está operacional no momento.</div>{% endif %}
 
-<section class="panel">
+<section class="panel flush">
   {% if not vendas %}
   <div class="empty">
     <strong>Nenhuma venda registrada ainda.</strong>
     <p>Fechou negócio? Registre a venda — é o que leva o resultado para o painel e para a campanha.</p>
   </div>
   {% else %}
-  <ul class="list-rows">
+  {% set dia_anterior = namespace(valor=None) %}
+  <ul class="vnd-lista">
     {% for venda in vendas %}
-    <li>
-      <div>
-        <strong>{{ venda.descricao }}</strong>
-        <small class="muted">
-          {{ formatar_brl(venda.preco_venda) }}
-          · {{ formatar_data(venda.criada_em) }}
-          {% if not escopo_proprio %} · {{ venda.vendedor_email }}{% endif %}
-          {% if venda.status == 'cancelada' and venda.motivo_cancelamento %}
-          · motivo: {{ venda.motivo_cancelamento }}
-          {% endif %}
+    {% set dia = formatar_data(venda.criada_em) %}
+    {% if dia != dia_anterior.valor %}
+    {% set dia_anterior.valor = dia %}
+    <li class="vnd-dia"><span>{{ dia }}</span></li>
+    {% endif %}
+    {% set tem_motivo = venda.status == 'cancelada' and venda.motivo_cancelamento %}
+    <li class="vnd-ficha{% if venda.status == 'cancelada' %} vnd-ficha--terminal{% endif %}">
+      <div class="vnd-quem">
+        <strong class="vnd-nome">{{ venda.descricao }}</strong>
+        {% if not escopo_proprio or tem_motivo %}
+        <small class="vnd-meta">
+          {% if not escopo_proprio %}{{ venda.vendedor_email }}{% endif %}
+          {% if tem_motivo %}{% if not escopo_proprio %} · {% endif %}motivo: {{ venda.motivo_cancelamento }}{% endif %}
         </small>
-      </div>
-      <div class="heading-actions">
-        <span class="status {{ venda.status }}">{{ venda.status | capitalize }}</span>
-        {% if pode_agir and venda.status == 'registrada' %}
-        <form method="post" action="/app/loja/vendas/{{ venda.id }}/confirmar">
-          <input type="hidden" name="csrf" value="{{ csrf }}">
-          <button class="button primary" type="submit">Confirmar</button>
-        </form>
-        <form method="post" action="/app/loja/vendas/{{ venda.id }}/cancelar">
-          <input type="hidden" name="csrf" value="{{ csrf }}">
-          <input type="text" name="motivo" placeholder="Motivo do cancelamento" required aria-label="Motivo do cancelamento">
-          <button class="button ghost" type="submit">Cancelar</button>
-        </form>
         {% endif %}
-        {% if pode_editar and venda.status in ('registrada', 'confirmada') %}
-        <a class="button secondary" href="/app/loja/vendas/{{ venda.id }}/editar">Editar</a>
+      </div>
+      <div class="vnd-lado">
+        <strong class="vnd-valor">{{ formatar_brl(venda.preco_venda) }}</strong>
+        <span class="status {{ venda.status }}">{{ venda.status | capitalize }}</span>
+        {% if (pode_agir and venda.status == 'registrada') or (pode_editar and venda.status in ('registrada', 'confirmada')) %}
+        <div class="vnd-acoes">
+          {% if pode_agir and venda.status == 'registrada' %}
+          <form method="post" action="/app/loja/vendas/{{ venda.id }}/confirmar">
+            <input type="hidden" name="csrf" value="{{ csrf }}">
+            <button class="button primary" type="submit">Confirmar</button>
+          </form>
+          {% endif %}
+          {% if pode_editar and venda.status in ('registrada', 'confirmada') %}
+          <a class="button secondary" href="/app/loja/vendas/{{ venda.id }}/editar">Editar</a>
+          {% endif %}
+          {% if pode_agir and venda.status == 'registrada' %}
+          <details class="vnd-cancelar">
+            <summary>Cancelar venda</summary>
+            <form method="post" action="/app/loja/vendas/{{ venda.id }}/cancelar">
+              <input type="hidden" name="csrf" value="{{ csrf }}">
+              <input type="text" name="motivo" placeholder="Motivo do cancelamento" required aria-label="Motivo do cancelamento">
+              <button class="button ghost" type="submit">Cancelar</button>
+            </form>
+          </details>
+          {% endif %}
+        </div>
         {% endif %}
       </div>
     </li>

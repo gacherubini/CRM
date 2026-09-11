@@ -1,17 +1,13 @@
 {% extends "base.html" %}
 {% block title %}Agente de atendimento — Revy Loja{% endblock %}
-{# Sem este bloco a topbar cai no else do base.html e escreve "Ajustes". #}
 {% block page_title %}Agente{% endblock %}
 {% block content %}
-{# Estilos: .agente-* / .split-bar / .day-chart em app.css #}
 <div class="page-heading">
   <div>
-    <span class="eyebrow">Vendas</span>
     <h1>Agente de atendimento</h1>
-    <p>Quanto o agente atendeu sozinho e quanto passou para uma pessoa, no mês corrente.</p>
+    <p>Quanto o agente resolveu sozinho e quanto passou para a equipe no período escolhido.</p>
   </div>
   <div class="heading-actions">
-    {# Rota irmã, não aba: nao existe componente de abas no app.css. #}
     {% if agente_config_habilitado %}
     <a class="button secondary" href="/app/loja/agente/configuracao">Configurar agente</a>
     {% endif %}
@@ -19,42 +15,14 @@
   </div>
 </div>
 
-{% if card_rodizio %}
-<section class="panel" id="card-rodizio-7d"
-         data-rodizio-oferecidos="{{ card_rodizio.oferecidos }}"
-         data-rodizio-atendidos="{{ card_rodizio.atendidos }}"
-         data-rodizio-aguardando="{{ card_rodizio.aguardando }}"
-         data-rodizio-perdidos="{{ card_rodizio.perdidos }}">
-  <div class="panel-heading">
-    <div>
-      <span class="mono-label">Últimos 7 dias</span>
-      <h2>Fila de atendimento</h2>
-    </div>
-    <a href="/app/loja/whatsapp/fila">Quem está na fila</a>
-  </div>
-  {# .metric-grid, nao .overview-grid: a segunda nunca existiu no CSS e o
-     rotulo saia colado no numero ("Oferecidos0"). Sao 4 metricas — o teto da
-     grade; a quinta cairia embaixo da primeira e leria como o mesmo card. #}
-  <div class="metric-grid">
-    <div class="metric">
-      <span>Oferecidos</span><strong>{{ card_rodizio.oferecidos }}</strong>
-      <small>leads que a fila ofereceu</small>
-    </div>
-    <div class="metric">
-      <span>Atendidos</span><strong>{{ card_rodizio.atendidos }}</strong>
-      <small>alguém clicou e ficou com o lead</small>
-    </div>
-    <div class="metric">
-      <span>Aguardando</span><strong>{{ card_rodizio.aguardando }}</strong>
-      <small>passou por todos, sem resposta</small>
-    </div>
-    <div class="metric">
-      <span>Perdidos</span><strong>{{ card_rodizio.perdidos }}</strong>
-      <small>o prazo da oferta venceu</small>
-    </div>
-  </div>
-</section>
-{% endif %}
+<div class="agente-periodo-row">
+  <span>Período</span>
+  <nav class="agente-periodo" aria-label="Período do desempenho do agente">
+    <a href="?periodo=hoje" {% if periodo.chave == 'hoje' %}aria-current="page"{% endif %}>Hoje</a>
+    <a href="?periodo=semana" {% if periodo.chave == 'semana' %}aria-current="page"{% endif %}>Semana</a>
+    <a href="?periodo=mes" {% if periodo.chave == 'mes' %}aria-current="page"{% endif %}>Mês</a>
+  </nav>
+</div>
 
 {% if erro_resumo == 'indisponivel' or visao is none %}
 <section class="panel">
@@ -66,74 +34,49 @@
 {% elif visao.atendimentos == 0 %}
 <section class="panel">
   <div class="panel-empty">
-    <strong>Nenhum atendimento neste mês.</strong>
+    <strong>Nenhum atendimento {{ periodo.vazio }}.</strong>
     <p class="muted">Quando alguém chamar no WhatsApp, o agente responde e o desempenho aparece aqui.</p>
   </div>
 </section>
 {% else %}
-<section class="panel agente-hero" aria-labelledby="agente-hero-titulo">
-  <div class="panel-body">
-    <div class="agente-hero-top">
-      <div class="agente-hero-figure">
-        <span id="agente-hero-titulo">Atendimentos no mês</span>
-        <strong>{{ visao.atendimentos }}</strong>
-      </div>
-      {% if visao.transferidos_pct is not none %}
-      <p class="agente-hero-lede">
-        O agente passou <strong>{{ (visao.transferidos_pct * 100) | round(0) | int }}%</strong>
-        das conversas para uma pessoa.
-      </p>
-      {% else %}
-      <p class="agente-hero-lede">Ainda sem base para calcular a taxa de transferência.</p>
-      {% endif %}
-    </div>
-
-    <div class="split-bar" role="img"
-         aria-label="{{ visao.so_agente }} atendimentos só com o agente e {{ visao.transferidos }} transferidos, de {{ visao.atendimentos }} no total.">
-      {% if visao.so_agente %}
-      <span class="split-bar-seg agente" style="flex-grow:{{ visao.so_agente }}"></span>
-      {% endif %}
-      {% if visao.transferidos %}
-      <span class="split-bar-seg handoff" style="flex-grow:{{ visao.transferidos }}"></span>
-      {% endif %}
-    </div>
-
-    <ul class="split-legend">
-      <li>
-        <span class="legend-swatch">
-          <span class="legend-dot agente" aria-hidden="true"></span>
-          <span class="legend-label">Só com o agente</span>
-        </span>
-        <strong>{{ visao.so_agente }}</strong>
+<section class="agente-relay" aria-label="{{ visao.atendimentos }} atendimentos: {{ visao.so_agente }} resolvidos pelo agente e {{ visao.transferidos }} transferidos para a equipe">
+  <div class="agente-relay-start">
+    <span>Começaram com o agente</span>
+    <strong>{{ visao.atendimentos }}</strong>
+    <small>{{ periodo.rotulo }}</small>
+  </div>
+  <div class="agente-relay-branches">
+    <div class="agente-relay-branch is-agent">
+      <div>
+        <span>Resolvidas pelo agente</span>
         <small>{% if visao.so_agente_pct is not none %}{{ (visao.so_agente_pct * 100) | round(0) | int }}% das conversas{% else %}—{% endif %}</small>
-      </li>
-      <li>
-        <span class="legend-swatch">
-          <span class="legend-dot handoff" aria-hidden="true"></span>
-          <span class="legend-label">Transferidos</span>
-        </span>
-        <strong>{{ visao.transferidos }}</strong>
+      </div>
+      <strong>{{ visao.so_agente }}</strong>
+    </div>
+    <div class="agente-relay-branch">
+      <div>
+        <span>Passaram para a equipe</span>
         <small>{% if visao.transferidos_pct is not none %}{{ (visao.transferidos_pct * 100) | round(0) | int }}% das conversas{% else %}—{% endif %}</small>
-      </li>
-    </ul>
+      </div>
+      <strong>{{ visao.transferidos }}</strong>
+    </div>
   </div>
 </section>
 
+{% if periodo.chave == 'hoje' %}
+<p class="agente-today-note"><strong>Hoje, até agora.</strong> Os totais acima acompanham as conversas do dia.</p>
+{% else %}
 <section class="panel" id="agente-por-dia" aria-labelledby="agente-por-dia-titulo">
   <div class="panel-heading">
     <div>
-      <span class="mono-label">Mês corrente</span>
       <h2 id="agente-por-dia-titulo">Atendimentos por dia</h2>
+      <p class="muted">{{ periodo.rotulo }}. Dias sem conversa contam como zero.</p>
     </div>
-    <p class="muted day-chart-hint">Do dia 1 até hoje. Dias sem conversa contam como zero.</p>
   </div>
-
   <div class="panel-body day-chart">
-    <div class="day-chart-track" role="img"
-         aria-label="Atendimentos por dia do mês. Pico de {{ visao.maximo }} no dia {{ visao.pico.dia if visao.pico else '—' }}.">
+    <div class="day-chart-track" role="img" aria-label="Atendimentos por dia. Pico de {{ visao.maximo }} no dia {{ visao.pico.dia if visao.pico else '—' }}.">
       {% for d in visao.serie %}
-      <div class="day-col{% if d.pico %} is-peak{% endif %}{% if not d.atendimentos %} is-empty{% endif %}"
-           title="Dia {{ d.dia }}: {{ d.atendimentos }} atendimento{{ '' if d.atendimentos == 1 else 's' }}">
+      <div class="day-col{% if d.pico %} is-peak{% endif %}{% if not d.atendimentos %} is-empty{% endif %}" title="Dia {{ d.dia }}: {{ d.atendimentos }} atendimento{{ '' if d.atendimentos == 1 else 's' }}">
         <span class="day-bar-slot">
           <span class="day-bar{% if not d.atendimentos %} is-zero{% endif %}" style="height:{{ d.altura }}%">
             {% if d.atendimentos %}<span class="day-value">{{ d.atendimentos }}</span>{% endif %}
@@ -143,18 +86,30 @@
       </div>
       {% endfor %}
     </div>
-    {% if visao.pico %}
-    <p class="day-chart-foot">
-      Pico de <strong>{{ visao.pico.atendimentos }}</strong> no dia {{ visao.pico.dia }}.
-    </p>
-    {% endif %}
+    {% if visao.pico %}<p class="day-chart-foot">Pico de <strong>{{ visao.pico.atendimentos }}</strong> no dia {{ visao.pico.dia }}.</p>{% endif %}
   </div>
 </section>
+{% endif %}
 
-{# Placeholder demovido para o rodapé (triagem L6): não compete com número real. #}
-<p class="agente-next-metric" aria-label="Próxima métrica">
-  <strong>Simulações pelo agente</strong>
-  <span class="muted"> — em construção: em breve, quantas simulações o agente enviou sem ajuda.</span>
-</p>
+{% if card_rodizio %}
+<section class="panel" id="card-rodizio-periodo"
+         data-rodizio-oferecidos="{{ card_rodizio.oferecidos }}"
+         data-rodizio-atendidos="{{ card_rodizio.atendidos }}"
+         data-rodizio-aguardando="{{ card_rodizio.aguardando }}"
+         data-rodizio-perdidos="{{ card_rodizio.perdidos }}">
+  <div class="panel-heading">
+    <div><h2>Fila de atendimento</h2><p class="muted">{{ periodo.rotulo }}</p></div>
+    <a href="/app/loja/whatsapp/fila">Quem está na fila</a>
+  </div>
+  <div class="metric-grid">
+    <div class="metric"><span>Oferecidos</span><strong>{{ card_rodizio.oferecidos }}</strong><small>leads que a fila ofereceu</small></div>
+    <div class="metric"><span>Atendidos</span><strong>{{ card_rodizio.atendidos }}</strong><small>alguém clicou e ficou com o lead</small></div>
+    <div class="metric"><span>Aguardando</span><strong>{{ card_rodizio.aguardando }}</strong><small>passou por todos, sem resposta</small></div>
+    <div class="metric"><span>Perdidos</span><strong>{{ card_rodizio.perdidos }}</strong><small>o prazo da oferta venceu</small></div>
+  </div>
+</section>
+{% endif %}
+
+<p class="agente-next-metric" aria-label="Próxima métrica"><strong>Simulações pelo agente</strong><span class="muted"> · em construção: em breve, quantas simulações o agente enviou sem ajuda.</span></p>
 {% endif %}
 {% endblock %}

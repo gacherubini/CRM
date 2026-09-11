@@ -133,7 +133,7 @@ def montar_resumo_hoje(
 ) -> ResumoHoje:
     """Conjunto fixo de leituras + view-model. Nenhuma chamada de LLM."""
     ref = agora or datetime.now(timezone.utc)
-    janela = janela_do_periodo(None, None)
+    janela = janela_do_periodo(None, None, hoje=ctx.hoje)
 
     vendas = vendas_resumo(db, ctx)
     ranking = ranking_vendedores(db, ctx, limite=TOP_RANKING)

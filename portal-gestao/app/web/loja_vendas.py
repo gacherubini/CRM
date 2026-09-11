@@ -49,6 +49,7 @@ from app.main import (  # noqa: E402
 from app.web.equipe import _membros_da_loja  # noqa: E402
 from app.clients.motor import MotorClient  # noqa: E402
 from app.models import Usuario, Venda  # noqa: E402
+from app.loja.vendas_contexto import usuario_vendas_atual  # noqa: E402
 
 _LISTA = "/app/loja/vendas/lista"
 
@@ -134,7 +135,7 @@ def loja_vendas_visao(
     if not _shell_ativo():
         return _shell_desligado()
 
-    usuario = usuario_atual(request, db)
+    usuario = usuario_vendas_atual(request, db)
     if not usuario:
         return redirecionar_login()
     if not _papel_autorizado(usuario):
@@ -171,7 +172,7 @@ def loja_vendas_dados(
     if not _shell_ativo():
         return _shell_desligado()
 
-    usuario = usuario_atual(request, db)
+    usuario = usuario_vendas_atual(request, db)
     if not usuario:
         return redirecionar_login()
     if not _papel_autorizado(usuario):
@@ -195,7 +196,7 @@ def loja_vendas_lista(
     if not _shell_ativo():
         return _shell_desligado()
 
-    usuario = usuario_atual(request, db)
+    usuario = usuario_vendas_atual(request, db)
     if not usuario:
         return redirecionar_login()
     if not _papel_autorizado(usuario):
@@ -240,7 +241,7 @@ async def loja_venda_confirmar(
     if not _shell_ativo():
         return _shell_desligado()
 
-    usuario = usuario_atual(request, db)
+    usuario = usuario_vendas_atual(request, db)
     if not usuario:
         return redirecionar_login()
     form = await request.form()
@@ -259,7 +260,7 @@ async def loja_venda_cancelar(
     if not _shell_ativo():
         return _shell_desligado()
 
-    usuario = usuario_atual(request, db)
+    usuario = usuario_vendas_atual(request, db)
     if not usuario:
         return redirecionar_login()
     form = await request.form()
@@ -277,7 +278,7 @@ async def _gate_edicao(request: Request, db: Session):
     """
     if not _shell_ativo():
         return None, None, _shell_desligado()
-    usuario = usuario_atual(request, db)
+    usuario = usuario_vendas_atual(request, db)
     if not usuario:
         return None, None, redirecionar_login()
     form = await request.form()
@@ -296,7 +297,7 @@ def loja_venda_editar_form(
     if not _shell_ativo():
         return _shell_desligado()
 
-    usuario = usuario_atual(request, db)
+    usuario = usuario_vendas_atual(request, db)
     if not usuario:
         return redirecionar_login()
     if not pode_editar_venda(usuario):
