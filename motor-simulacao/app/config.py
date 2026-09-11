@@ -83,6 +83,18 @@ MOTRIX_MENU_URL = os.getenv(
 # Nome parcial basta — o portal trunca o texto da opcao em 20 caracteres.
 PAN_AGENTE_CERTIFICADO = (os.getenv("MOTOR_PAN_AGENTE_CERTIFICADO") or "").strip()
 PAN_OPERADOR = (os.getenv("MOTOR_PAN_OPERADOR") or "").strip()
+# Omni+ (financiamento de motocicletas): login simples usuario+senha, sem WAF
+# observado em 10/09/2026. Vendedor define a quem a proposta e atribuida, entao
+# nao fica no codigo: e por loja. Nome parcial basta; vazio = primeiro da lista.
+OMNI_LOGIN_URL = os.getenv(
+    "MOTOR_OMNI_LOGIN_URL",
+    "https://omni-mais.omni.com.br/login",
+)
+OMNI_VISAO_URL = os.getenv(
+    "MOTOR_OMNI_VISAO_URL",
+    "https://omni-mais.omni.com.br/app/rodas/visao-geral",
+)
+OMNI_VENDEDOR = (os.getenv("MOTOR_OMNI_VENDEDOR") or "").strip()
 
 # Banco PAN OpenAPI Veículos. Sandbox é o default deliberado; produção exige
 # override explícito depois da homologação comercial do parceiro.

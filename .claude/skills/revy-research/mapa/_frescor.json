@@ -1,5 +1,5 @@
 {
- "sha": "4e0dbaf",
+ "sha": "c428317",
  "inventario": {
   "chatbot-api": [
    {
@@ -2455,6 +2455,34 @@
     "linha": 157
    },
    {
+    "secao": "rota",
+    "chave": "GET /app/loja/whatsapp/demo",
+    "simbolo": "/app/loja/whatsapp/demo",
+    "arquivo": "prototype_atendimento.py",
+    "linha": 211
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /app/loja/vendas/demo",
+    "simbolo": "/app/loja/vendas/demo",
+    "arquivo": "prototype_atendimento.py",
+    "linha": 271
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /app/loja/financeiro/demo",
+    "simbolo": "/app/loja/financeiro/demo",
+    "arquivo": "prototype_atendimento.py",
+    "linha": 332
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /app/loja/financeiro/despesas/demo",
+    "simbolo": "/app/loja/financeiro/despesas/demo",
+    "arquivo": "prototype_atendimento.py",
+    "linha": 385
+   },
+   {
     "secao": "template",
     "chave": "app/templates/base.html",
     "simbolo": "base.html",
@@ -3084,14 +3112,14 @@
     "chave": "MOTOR_FANOUT_ENABLED (default: 0)",
     "simbolo": "MOTOR_FANOUT_ENABLED",
     "arquivo": "app/config.py",
-    "linha": 101
+    "linha": 113
    },
    {
     "secao": "flag",
     "chave": "MOTOR_FLY_AUTOSCALE_ENABLED (default: 0)",
     "simbolo": "MOTOR_FLY_AUTOSCALE_ENABLED",
     "arquivo": "app/config.py",
-    "linha": 102
+    "linha": 114
    },
    {
     "secao": "rota",
