@@ -240,13 +240,15 @@ def test_shell_nav_todos_os_itens_tem_icone(client, monkeypatch):
     assert sem_icone == []
 
 
-def test_shell_on_estoque_veiculos_redireciona_legado(client, monkeypatch):
+def test_shell_on_estoque_veiculos_renderiza_lista(client, monkeypatch):
     monkeypatch.setenv("REVY_LOJA_SHELL_ENABLED", "1")
     monkeypatch.setenv("REVY_LOJA_ENTITLEMENTS_ENABLED", "0")
     login(client)
     r2 = client.get("/app/loja/estoque/veiculos", follow_redirects=False)
-    assert r2.status_code == 303
-    assert r2.headers["location"] == "/app/estoque"
+    assert r2.status_code == 200
+    assert "Honda Civic" in r2.text
+    # O item "Veículos" do menu é o ativo nesta rota.
+    assert 'href="/app/loja/estoque/veiculos" aria-current="page"' in r2.text
 
 
 def test_atendimento_sem_flag_retorna_404(client, monkeypatch):

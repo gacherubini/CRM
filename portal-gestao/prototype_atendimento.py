@@ -10,6 +10,7 @@ from types import SimpleNamespace as NS
 import argparse
 import re
 import sqlite3
+from urllib.parse import quote
 
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, RedirectResponse, PlainTextResponse
@@ -41,9 +42,10 @@ async def local_only(request: Request, call_next):
     response = await call_next(request)
     response.headers['Cache-Control'] = 'no-store'
     response.headers['Content-Security-Policy'] = (
-        "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; "
-        "font-src 'self'; img-src 'self' data:; connect-src 'none'; form-action 'none'; "
-        "object-src 'none'; base-uri 'none'; frame-ancestors 'none'"
+        "default-src 'self'; script-src 'self' 'unsafe-inline'; "
+        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+        "font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'none'; "
+        "form-action 'none'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'"
     )
     return response
 
@@ -379,6 +381,69 @@ async def financeiro_demo(request: Request):
     )
     html = env.get_template('loja/financeiro_resultado.html').render(**context)
     html = re.sub(r'<link\b[^>]*https://fonts\.(?:googleapis|gstatic)\.com[^>]*>', '', html)
+    return HTMLResponse(html)
+
+
+def _foto_placeholder(svg: str) -> str:
+    return 'data:image/svg+xml,' + quote(svg)
+
+
+# Silhuetas de apoio: o cadastro fictício não tem foto real; em vez de uma
+# parede de letras, o protótipo mostra o estado "com foto" e "sem foto".
+_PLACEHOLDER_MOTO = _foto_placeholder(
+    "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 160 108'>"
+    "<g fill='none' stroke='#b5adaa' stroke-width='4' stroke-linecap='round' stroke-linejoin='round'>"
+    "<circle cx='46' cy='76' r='14'/><circle cx='118' cy='76' r='14'/>"
+    "<path d='M46 76l16-22h22l10 10'/><path d='M64 72l12-18'/>"
+    "<path d='M84 54h24l10 10'/><path d='M118 76l-8-22'/><path d='M104 48h14'/>"
+    "</g></svg>"
+)
+_PLACEHOLDER_CARRO = _foto_placeholder(
+    "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 160 108'>"
+    "<g fill='none' stroke='#b5adaa' stroke-width='4' stroke-linecap='round' stroke-linejoin='round'>"
+    "<path d='M25 74c0-7 4-11 11-12l17-14c4-3 8-5 14-5h26c6 0 10 2 14 5l15 14h7c7 0 11 5 11 12v6H25v-6Z'/>"
+    "<circle cx='52' cy='80' r='10'/><circle cx='112' cy='80' r='10'/>"
+    "<path d='M62 43v16M88 43v16'/>"
+    "</g></svg>"
+)
+
+
+def _veiculos_ficticios():
+    def veiculo(vid, marca, modelo, versao, ano, km, placa, status, publicado, preco, custo, foto):
+        return NS(id=vid, marca=marca, modelo=modelo, versao=versao, ano_modelo=ano,
+                  km=km, placa=placa, status=status, publicado=publicado,
+                  preco=preco, custo=custo, foto_url=foto)
+
+    return [
+        veiculo('v1', 'Honda', 'CG 160 Titan', 'ABS', 2022, 18400, 'ABC1D23', 'disponivel', True, 14900.0, 12400.0, _PLACEHOLDER_MOTO),
+        veiculo('v2', 'Honda', 'Biz 125', 'ES', 2021, 32100, 'XYZ-4B56', 'reservado', True, 11500.0, 10200.0, _PLACEHOLDER_MOTO),
+        veiculo('v3', 'Yamaha', 'Factor 150', 'DX', 2023, 8200, 'QRA2C34', 'disponivel', True, 16200.0, 13800.0, _PLACEHOLDER_MOTO),
+        veiculo('v4', 'Honda', 'Pop 110i', '', 2020, 41500, 'DEF5G67', 'disponivel', False, 8900.0, 7400.0, None),
+        veiculo('v5', 'Chevrolet', 'Onix 1.0', 'LT', 2019, 67200, 'HIJ7K89', 'vendido', False, 52900.0, 46000.0, _PLACEHOLDER_CARRO),
+        veiculo('v6', 'Fiat', 'Argo Drive 1.3', '', 2021, 39800, 'LMN8P01', 'disponivel', True, 64500.0, 57800.0, _PLACEHOLDER_CARRO),
+        veiculo('v7', 'Honda', 'CB 250 Twister', 'ABS', 2022, 22300, 'RST9U12', 'indisponivel', False, 21900.0, 18600.0, _PLACEHOLDER_MOTO),
+        veiculo('v8', 'Hyundai', 'HB20 Vision', '1.0', 2020, 55100, 'VWX0Y23', 'reservado', True, 56300.0, 49700.0, _PLACEHOLDER_CARRO),
+        veiculo('v9', 'Yamaha', 'Fazer FZ25', 'ABS', 2023, 12700, 'BRA3E45', 'disponivel', True, 21500.0, 18300.0, _PLACEHOLDER_MOTO),
+        veiculo('v10', 'Renault', 'Kwid Zen', '', 2021, 45900, 'CIV6R78', 'disponivel', False, 42900.0, 38100.0, None),
+        veiculo('v11', 'Honda', 'NXR 160 Bros', 'ABS', 2024, 8300, 'MTO0D11', 'vendido', False, 22400.0, 19100.0, _PLACEHOLDER_MOTO),
+        veiculo('v12', 'Jeep', 'Renegade Sport', 'T270', 2021, 51200, 'JEP4T90', 'indisponivel', False, 89900.0, 81200.0, _PLACEHOLDER_CARRO),
+    ]
+
+
+@app.get('/app/loja/estoque/veiculos/demo', response_class=HTMLResponse)
+async def veiculos_demo(request: Request):
+    # Lista definitiva (direção A, escolhida em 11/09): o demo rende o template
+    # real com dados fictícios e sem persistência. Fontes do Google mantidas de
+    # propósito: a tipografia (Hanken no dado) faz parte do que se avalia.
+    veiculos = _veiculos_ficticios()
+    context = _shell_demo(request)
+    context.update(
+        nav_item_is_active=lambda item, path: item.href == '/app/loja/estoque/veiculos',
+        veiculos=veiculos,
+        filtros=NS(busca='', tipo='', status='', publicado=''),
+        pode_gerir=True, pode_custo=True, integracao_erro=None,
+    )
+    html = env.get_template('estoque/lista.html').render(**context)
     return HTMLResponse(html)
 
 

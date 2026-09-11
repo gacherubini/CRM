@@ -1,7 +1,8 @@
 """Rotas HTML do módulo Estoque no shell Revy Loja (Fase 2).
 
 - ``GET /app/loja/estoque`` — visão geral (read model determinístico).
-- ``GET /app/loja/estoque/veiculos`` — entrada para a lista/CRUD legado.
+- ``GET /app/loja/estoque/veiculos`` — lista de veículos no shell (filtros e
+  estados); o formulário e as ações seguem no CRUD legado.
 - ``GET/POST /app/loja/estoque/vitrine`` — ordem manual na vitrine pública.
 
 Gated por ``REVY_LOJA_SHELL_ENABLED`` (default off). Rotas legadas
@@ -25,6 +26,8 @@ from app.clients.estoque import EstoqueClient, EstoqueIndisponivel, VeiculoNaoEn
 from app.config import revy_loja_shell_enabled
 from app.db import get_db
 from app.loja.estoque_overview import montar_estoque_overview
+from app.loja.types import Module
+from app.web.loja_shell import check_module_access
 
 router = APIRouter()
 
@@ -119,8 +122,8 @@ def loja_estoque_visao(
             usuario,
             overview=overview,
             pode_gerir=pode_gerir_estoque(usuario),
-            # Documenta na UI que CRUD/publicação ficam no caminho legado.
-            caminho_veiculos="/app/estoque",
+            # Lista no shell; só o formulário segue no caminho legado.
+            caminho_veiculos="/app/loja/estoque/veiculos",
             caminho_novo="/app/estoque/novo",
         ),
     )
@@ -129,25 +132,61 @@ def loja_estoque_visao(
 @router.get("/app/loja/estoque/veiculos", response_class=HTMLResponse)
 def loja_estoque_veiculos(
     request: Request,
+    tipo: str | None = None,
+    status: str | None = None,
+    publicado: str | None = None,
+    busca: str | None = None,
     db: Session = Depends(get_db),
+    estoque: EstoqueClient = Depends(get_estoque_client),
 ):
-    """Entrada de Veículos: reutiliza a lista/CRUD legada até cutover completo.
+    """Lista de veículos no shell, com os mesmos filtros do legado.
 
-    Publicar, despublicar, reservar, vender e edição de custo permanecem em
-    ``/app/estoque*`` (Estoque API como fonte de verdade).
+    Não redireciona mais para fora do shell (o redirect caía no middleware de
+    rotas legadas e devolvia a visão geral). Formulário e ações continuam em
+    ``/app/estoque*`` até o cutover do formulário.
     """
     usuario = usuario_atual(request, db)
     if not usuario:
         return redirecionar_login()
     if not _shell_ativo():
-        return RedirectResponse("/app/estoque", status_code=303)
+        # Preserva query string (filtros) ao redirecionar para o legado.
+        qs = request.url.query
+        destino = "/app/estoque"
+        if qs:
+            destino = f"{destino}?{qs}"
+        return RedirectResponse(destino, status_code=303)
 
-    # Preserva query string (filtros) ao redirecionar para o legado.
-    qs = request.url.query
-    destino = "/app/estoque"
-    if qs:
-        destino = f"{destino}?{qs}"
-    return RedirectResponse(destino, status_code=303)
+    blocked = check_module_access(request, usuario, db, Module.ESTOQUE)
+    if blocked is not None:
+        return blocked
+
+    veiculos, erro = [], None
+    publicado_bool = None if publicado in (None, "") else publicado == "true"
+    try:
+        veiculos = estoque.listar(
+            tipo=tipo, status=status, publicado=publicado_bool, busca=busca
+        )
+    except EstoqueIndisponivel as exc:
+        erro = str(exc)
+
+    return templates.TemplateResponse(
+        "estoque/lista.html",
+        contexto(
+            request,
+            usuario,
+            db=db,
+            veiculos=veiculos,
+            filtros={
+                "tipo": tipo or "",
+                "status": status or "",
+                "publicado": publicado or "",
+                "busca": busca or "",
+            },
+            integracao_erro=erro,
+            pode_gerir=pode_gerir_estoque(usuario),
+            pode_custo=pode_ver_custo(usuario),
+        ),
+    )
 
 
 @router.get("/app/loja/estoque/vitrine", response_class=HTMLResponse)

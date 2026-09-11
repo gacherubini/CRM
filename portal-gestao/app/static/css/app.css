@@ -4753,3 +4753,78 @@ form[data-periodo-melhorado] { position: relative; }
   .periodo-cal-hoje,
   .periodo-cal-fechar { transition: none; }
 }
+
+/* --- Veículos (lista): fichas com foto, decisão do dono em 11/09 ---
+   Direção A dos protótipos: foto grande, identidade em Hanken, preço tabular
+   à direita. Mesmos filtros, ações e estados da lista antiga; o dado e o
+   status (componente .status) não mudam. Só tokens existentes. */
+.vei-lista { margin: 0; padding: 0; list-style: none; }
+.vei-ficha {
+  display: grid;
+  grid-template-columns: 112px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-4) var(--space-6);
+  padding: var(--space-4) var(--space-5);
+  border-top: 1px solid var(--line);
+}
+.vei-ficha:first-child { border-top: 0; }
+.vei-ficha:hover { background: var(--surface-soft); }
+.vei-foto { width: 112px; height: 76px; border-radius: var(--radius-nav); }
+.vei-ident { min-width: 0; }
+.vei-nome {
+  display: block;
+  color: var(--ink);
+  font-size: 19px;
+  font-weight: 600;
+  letter-spacing: -.015em;
+  line-height: 1.2;
+}
+.vei-meta {
+  display: block;
+  margin-top: 3px;
+  color: var(--ink-soft);
+  font-size: var(--text-sm);
+}
+.vei-selos {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-4);
+  margin-top: var(--space-2);
+}
+.vei-lado {
+  display: grid;
+  justify-items: end;
+  gap: 2px;
+  text-align: right;
+}
+.vei-preco {
+  color: var(--ink);
+  font-size: 18px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -.01em;
+}
+.vei-custo {
+  color: var(--ink-muted);
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+}
+.vei-lado .table-action { margin-top: var(--space-1); }
+
+@media (max-width: 720px) {
+  .vei-ficha {
+    grid-template-columns: 72px minmax(0, 1fr);
+    gap: var(--space-3) var(--space-4);
+  }
+  .vei-foto { width: 72px; height: 54px; }
+  .vei-lado {
+    grid-column: 1 / -1;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--space-2) var(--space-4);
+    text-align: left;
+  }
+}

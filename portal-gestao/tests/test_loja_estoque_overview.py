@@ -283,13 +283,22 @@ def test_rota_visao_erro_api(client, shell_on, estoque_fake):
     assert "prontos para venda" not in resp.text
 
 
-def test_rota_veiculos_redireciona_legado_com_flag(client, shell_on):
+def test_rota_veiculos_renderiza_lista_no_shell(client, shell_on, estoque_fake):
     login(client)
-    resp = client.get(
-        "/app/loja/estoque/veiculos?status=disponivel", follow_redirects=False
-    )
-    assert resp.status_code == 303
-    assert resp.headers["location"] == "/app/estoque?status=disponivel"
+    resp = client.get("/app/loja/estoque/veiculos")
+    assert resp.status_code == 200
+    assert "Honda Civic" in resp.text
+    # Filtros e ações continuam na própria rota; sem redirect ao legado.
+    assert '<form class="filter-bar" method="get">' in resp.text
+    assert 'href="/app/estoque/novo"' in resp.text
+
+
+def test_rota_veiculos_filtra_no_shell(client, shell_on, estoque_fake):
+    login(client)
+    resp = client.get("/app/loja/estoque/veiculos?status=disponivel")
+    assert resp.status_code == 200
+    assert "Honda Civic" in resp.text
+    assert "Yamaha" not in resp.text
 
 
 def test_legado_estoque_permanece(client):

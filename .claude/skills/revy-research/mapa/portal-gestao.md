@@ -1,6 +1,6 @@
-# portal-gestao · 168 rotas · 26 modelos · 6 workers · 35 flags · 26 migrations · 63 templates
+# portal-gestao · 169 rotas · 26 modelos · 6 workers · 35 flags · 26 migrations · 63 templates
 
-Gerado de `c428317`. NAO editar a mao — saida de `gerar_mapa.py`.
+Gerado de `459cbd3`. NAO editar a mao — saida de `gerar_mapa.py`.
 Migration head: `0026_copiloto_sinal_destinatario`
 
 ## Rotas
@@ -81,10 +81,10 @@ Migration head: `0026_copiloto_sinal_destinatario`
 - `POST /app/loja/copiloto/turno/{turno_id}/cancelar` — app/web/loja_copiloto.py:507
 - `POST /app/loja/copiloto/acao` — app/web/loja_copiloto.py:523
 - `POST /app/loja/copiloto/acao/{acao_id}/desfazer` — app/web/loja_copiloto.py:576
-- `GET /app/loja/estoque` — app/web/loja_estoque.py:87
-- `GET /app/loja/estoque/veiculos` — app/web/loja_estoque.py:129
-- `GET /app/loja/estoque/vitrine` — app/web/loja_estoque.py:153
-- `POST /app/loja/estoque/vitrine` — app/web/loja_estoque.py:247
+- `GET /app/loja/estoque` — app/web/loja_estoque.py:90
+- `GET /app/loja/estoque/veiculos` — app/web/loja_estoque.py:132
+- `GET /app/loja/estoque/vitrine` — app/web/loja_estoque.py:192
+- `POST /app/loja/estoque/vitrine` — app/web/loja_estoque.py:286
 - `GET /app/loja/financeiro` — app/web/loja_financeiro.py:89
 - `GET /app/loja/financeiro/dados` — app/web/loja_financeiro.py:114
 - `GET /app/loja/financeiro/despesas` — app/web/loja_financeiro.py:128
@@ -163,16 +163,17 @@ Migration head: `0026_copiloto_sinal_destinatario`
 - `POST /internal/v1/provisioning/state` — app/web/trafego.py:883
 - `POST /internal/jobs/meta-spend-sync` — app/web/trafego.py:926
 - `POST /app/trafego` — app/web/trafego.py:961
-- `GET /` — prototype_atendimento.py:51
-- `GET /app/loja/atendimento` — prototype_atendimento.py:52
-- `GET /app/loja/agente` — prototype_atendimento.py:75
-- `GET /app/loja/estoque/demo` — prototype_atendimento.py:107
-- `GET /app/loja/vitrine/demo` — prototype_atendimento.py:124
-- `GET /app/loja/atendimento/{workspace_id}` — prototype_atendimento.py:157
-- `GET /app/loja/whatsapp/demo` — prototype_atendimento.py:211
-- `GET /app/loja/vendas/demo` — prototype_atendimento.py:271
-- `GET /app/loja/financeiro/demo` — prototype_atendimento.py:332
-- `GET /app/loja/financeiro/despesas/demo` — prototype_atendimento.py:385
+- `GET /` — prototype_atendimento.py:53
+- `GET /app/loja/atendimento` — prototype_atendimento.py:54
+- `GET /app/loja/agente` — prototype_atendimento.py:77
+- `GET /app/loja/estoque/demo` — prototype_atendimento.py:109
+- `GET /app/loja/vitrine/demo` — prototype_atendimento.py:126
+- `GET /app/loja/atendimento/{workspace_id}` — prototype_atendimento.py:159
+- `GET /app/loja/whatsapp/demo` — prototype_atendimento.py:213
+- `GET /app/loja/vendas/demo` — prototype_atendimento.py:273
+- `GET /app/loja/financeiro/demo` — prototype_atendimento.py:334
+- `GET /app/loja/estoque/veiculos/demo` — prototype_atendimento.py:433
+- `GET /app/loja/financeiro/despesas/demo` — prototype_atendimento.py:450
 
 ## Modelos
 
@@ -314,8 +315,8 @@ Migration head: `0026_copiloto_sinal_destinatario`
 - `app/templates/equipe/form.html` — app/web/equipe.py:161
 - `app/templates/equipe/senha.html` — app/web/equipe.py:370
 - `app/templates/loja/copiloto.html` — app/web/loja_copiloto.py:217
-- `app/templates/loja/estoque_visao.html` — app/web/loja_estoque.py:116
-- `app/templates/loja/vitrine_ordem.html` — app/web/loja_estoque.py:222
+- `app/templates/loja/estoque_visao.html` — app/web/loja_estoque.py:119
+- `app/templates/loja/vitrine_ordem.html` — app/web/loja_estoque.py:261
 - `app/templates/loja/financeiro_resultado.html` — app/web/loja_financeiro.py:102
 - `app/templates/loja/financeiro_despesas.html` — app/web/loja_financeiro.py:151
 - `app/templates/loja/integracoes.html` — app/web/loja_integracoes.py:48

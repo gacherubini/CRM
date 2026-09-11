@@ -1,5 +1,5 @@
 {
- "sha": "c428317",
+ "sha": "459cbd3",
  "inventario": {
   "chatbot-api": [
    {
@@ -1843,28 +1843,28 @@
     "chave": "GET /app/loja/estoque",
     "simbolo": "/app/loja/estoque",
     "arquivo": "app/web/loja_estoque.py",
-    "linha": 87
+    "linha": 90
    },
    {
     "secao": "rota",
     "chave": "GET /app/loja/estoque/veiculos",
     "simbolo": "/app/loja/estoque/veiculos",
     "arquivo": "app/web/loja_estoque.py",
-    "linha": 129
+    "linha": 132
    },
    {
     "secao": "rota",
     "chave": "GET /app/loja/estoque/vitrine",
     "simbolo": "/app/loja/estoque/vitrine",
     "arquivo": "app/web/loja_estoque.py",
-    "linha": 153
+    "linha": 192
    },
    {
     "secao": "rota",
     "chave": "POST /app/loja/estoque/vitrine",
     "simbolo": "/app/loja/estoque/vitrine",
     "arquivo": "app/web/loja_estoque.py",
-    "linha": 247
+    "linha": 286
    },
    {
     "secao": "rota",
@@ -2417,70 +2417,77 @@
     "chave": "GET /",
     "simbolo": "/",
     "arquivo": "prototype_atendimento.py",
-    "linha": 51
+    "linha": 53
    },
    {
     "secao": "rota",
     "chave": "GET /app/loja/atendimento",
     "simbolo": "/app/loja/atendimento",
     "arquivo": "prototype_atendimento.py",
-    "linha": 52
+    "linha": 54
    },
    {
     "secao": "rota",
     "chave": "GET /app/loja/agente",
     "simbolo": "/app/loja/agente",
     "arquivo": "prototype_atendimento.py",
-    "linha": 75
+    "linha": 77
    },
    {
     "secao": "rota",
     "chave": "GET /app/loja/estoque/demo",
     "simbolo": "/app/loja/estoque/demo",
     "arquivo": "prototype_atendimento.py",
-    "linha": 107
+    "linha": 109
    },
    {
     "secao": "rota",
     "chave": "GET /app/loja/vitrine/demo",
     "simbolo": "/app/loja/vitrine/demo",
     "arquivo": "prototype_atendimento.py",
-    "linha": 124
+    "linha": 126
    },
    {
     "secao": "rota",
     "chave": "GET /app/loja/atendimento/{workspace_id}",
     "simbolo": "/app/loja/atendimento/{workspace_id}",
     "arquivo": "prototype_atendimento.py",
-    "linha": 157
+    "linha": 159
    },
    {
     "secao": "rota",
     "chave": "GET /app/loja/whatsapp/demo",
     "simbolo": "/app/loja/whatsapp/demo",
     "arquivo": "prototype_atendimento.py",
-    "linha": 211
+    "linha": 213
    },
    {
     "secao": "rota",
     "chave": "GET /app/loja/vendas/demo",
     "simbolo": "/app/loja/vendas/demo",
     "arquivo": "prototype_atendimento.py",
-    "linha": 271
+    "linha": 273
    },
    {
     "secao": "rota",
     "chave": "GET /app/loja/financeiro/demo",
     "simbolo": "/app/loja/financeiro/demo",
     "arquivo": "prototype_atendimento.py",
-    "linha": 332
+    "linha": 334
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /app/loja/estoque/veiculos/demo",
+    "simbolo": "/app/loja/estoque/veiculos/demo",
+    "arquivo": "prototype_atendimento.py",
+    "linha": 433
    },
    {
     "secao": "rota",
     "chave": "GET /app/loja/financeiro/despesas/demo",
     "simbolo": "/app/loja/financeiro/despesas/demo",
     "arquivo": "prototype_atendimento.py",
-    "linha": 385
+    "linha": 450
    },
    {
     "secao": "template",
@@ -2697,7 +2704,7 @@
     "chave": "app/templates/loja/estoque_visao.html",
     "simbolo": "loja/estoque_visao.html",
     "arquivo": "app/web/loja_estoque.py",
-    "linha": 116
+    "linha": 119
    },
    {
     "secao": "template",
@@ -2753,7 +2760,7 @@
     "chave": "app/templates/loja/vitrine_ordem.html",
     "simbolo": "loja/vitrine_ordem.html",
     "arquivo": "app/web/loja_estoque.py",
-    "linha": 222
+    "linha": 261
    },
    {
     "secao": "template",
