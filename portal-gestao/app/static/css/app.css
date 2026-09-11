@@ -320,10 +320,12 @@ a.avatar[aria-current="page"] {
   padding-inline: var(--page-inline);
   padding-block: var(--space-7) var(--space-9);
 }
-/* Shell: em tela cheia o conteúdo não estica até a borda. Alinhado à
-   esquerda, junto da barra lateral — centralizar deslocaria o cabeçalho
-   para longe do contexto da página no topo. */
-.app-shell-loja .content { max-width: 76rem; }
+/* Shell: o conteúdo acompanha a janela e só para em 110rem. Num monitor de
+   1920 a área útil (~1690px) fica abaixo do teto, entao ele enche a tela; o
+   teto existe para ultrawide, onde a linha de tabela ficaria ilegível.
+   Alinhado à esquerda, junto da barra lateral — centralizar deslocaria o
+   cabeçalho para longe do contexto da página no topo. */
+.app-shell-loja .content { max-width: 110rem; }
 
 h1, h2, h3, p { margin-top: 0; }
 h1, h2, h3 { letter-spacing: -.025em; font-weight: 600; }
@@ -2895,6 +2897,15 @@ a.vitrine-page-btn:hover {
 }
 .vitrine-footer #vitrine-status { margin-left: auto; }
 
+/* Em tela cheia 3 cards viram cartazes; a quarta coluna mantém a foto no
+   tamanho que ela tem no catálogo e encurta a rolagem. */
+@media (min-width: 1400px) {
+  .panel-vitrine .vitrine-grid,
+  .vitrine-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  }
+}
+
 @media (max-width: 960px) {
   .panel-vitrine .vitrine-grid,
   .vitrine-grid {
@@ -4474,7 +4485,10 @@ a.metric-link:focus-visible { outline: 2px solid var(--brand); outline-offset: 2
   }
   .estoque-aside .integration-heading { flex: 0 0 auto; }
   .estoque-aside > p { flex: 1 1 auto; margin: 0; }
-  .estoque-aside .integration-action { flex: 0 0 auto; }
+  /* width:auto anula o width:100% de .integration-action (pensado para o card
+     vertical): na faixa horizontal ele pedia a largura toda do aside, o que
+     espremia o <p> ao lado e, sem teto de largura, vazava da página. */
+  .estoque-aside .integration-action { flex: 0 0 auto; width: auto; }
 }
 /* Idade do estoque: faixas com barra proporcional ao total com data. */
 .estoque-idade {
@@ -4583,7 +4597,9 @@ a.metric-link:focus-visible { outline: 2px solid var(--brand); outline-offset: 2
   max-width: 24ch;
 }
 .res-lede strong { color: var(--brand); font-weight: 600; }
-.res-index { list-style: none; margin: var(--space-4) 0 0; padding: 0; }
+/* Rótulo de um lado, número do outro: sem teto, em tela cheia os dois ficam a
+   mais de mil pixels de distância e o olho perde o par. */
+.res-index { list-style: none; margin: var(--space-4) 0 0; padding: 0; max-width: 64rem; }
 .res-index li {
   display: flex;
   align-items: baseline;
