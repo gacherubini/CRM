@@ -242,3 +242,17 @@ com `mattpocock-skills:prototype`.
 
 **Não faça:** mudar semântica de recorrência/ajuste; esconder ação por papel no
 template em vez do backend.
+
+## Entrega (11/09/2026)
+
+Implementado na branch `loja-venda-redesign` (PR #7), sem migration e sem rota
+nova de app — só template, CSS e o runner de preview. As nove tasks saíram com
+as direções escolhidas pelo dono: Estoque C ("pátio"), Atendimento A, Agente A
+("Revezamento"), WhatsApp B (lista + ficha), Vitrine recolhida e
+Resultado/Financeiro/Despesas nas direções "balanço"/"fechamento"/"arquivo". A
+Task 1 tem regressão de dois slugs em `tests/test_vendas_loja_ativa.py`.
+
+Depois do card, o mesmo shell recebeu a lista e o formulário de Veículos em
+ficha (direção A, 11/09) e a lista de Vendas em livro de fechamento com ficha de
+edição (11/09). Os previews saem do `prototype_atendimento.py`, que rende os
+templates reais com dados fictícios. Suíte do portal: 1462 verdes.

@@ -288,6 +288,10 @@ docker compose exec portal python -m app.cli criar-dono --email dono@loja.com --
 Abre em `http://localhost:9000`. Para o estoque real aparecer, preencha `ESTOQUE_API_TOKEN`
 no `.env`.
 
+Para revisar as telas do shell sem banco e sem integração, o
+`prototype_atendimento.py` rende os templates reais com dados fictícios:
+`python prototype_atendimento.py` (padrão em `http://127.0.0.1:8766`).
+
 ---
 
 Histórico (painel de aquisição 08/08, triagem de UX 08/07, piloto de flags):
