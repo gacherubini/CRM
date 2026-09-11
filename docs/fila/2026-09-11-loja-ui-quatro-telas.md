@@ -94,11 +94,16 @@ decide): colunas de largura fixa em vez de `space-between`; a régua de leitura
 virar padding do painel; ou o painel "Como o mês fechou" ganhar duas colunas acima
 de 1440px, que é a reorganização que o dono já disse ser o passo seguinte.
 
-Vale também para as mesmas linhas em `/app/loja/vendas` (Resultado) e no bloco
-`Estrutura` desta tela.
+**As duas telas têm o defeito, não só o Financeiro.** Em `/app/loja/vendas`
+(Resultado), com venda no período, cortam no mesmo 1024px: "Margem (lucro bruto)"
+no painel *Receita e vendas*, e "Investimento" / "CAC" no painel *Investimento e
+retorno* (`app/templates/loja/vendas_visao.html:51` e `:129`). O contraste fica
+pior porque o painel do meio, *Leads e conversão*, usa `.res-flow`
+(`app.css:4602`) e **enche** a largura: dois painéis largos com um cortado no meio.
+Vale também para o bloco `Estrutura` do Resultado financeiro.
 
-Feito quando: em 1920 o conteúdo do painel vai até a borda interna dele, e em 390
-nada empilha errado.
+Feito quando: em 1920 o conteúdo do painel vai até a borda interna dele nas duas
+telas, com e sem venda no período, e em 390 nada empilha errado.
 
 ## Task 4 — Editar venda: redesenhar
 
