@@ -447,6 +447,28 @@ async def veiculos_demo(request: Request):
     return HTMLResponse(html)
 
 
+@app.get('/app/loja/estoque/veiculos/form/demo', response_class=HTMLResponse)
+async def veiculo_form_demo(request: Request):
+    # Formulário definitivo (direção A, escolhida em 11/09): o demo rende o
+    # template real com dados fictícios e sem persistência. Estado de edição
+    # com publicação pendente: mostra os botões de ação.
+    veiculo = NS(
+        id='v1', tipo='moto', marca='Honda', modelo='CG 160 Titan', versao='ABS',
+        ano_modelo=2022, cor='Vermelha', placa='ABC1D23', preco=14900.0,
+        custo=12400.0, km=18400, codigo_interno='H01',
+        foto_url=_PLACEHOLDER_MOTO, status='disponivel', publicado=False,
+    )
+    context = _shell_demo(request)
+    context.update(
+        nav_item_is_active=lambda item, path: item.href == '/app/loja/estoque/veiculos',
+        veiculo=veiculo, titulo='Editar veículo',
+        erro=None, csrf='demonstracao', pode_custo=True,
+        anos=list(range(date.today().year + 1, 1979, -1)),
+    )
+    html = env.get_template('estoque/form.html').render(**context)
+    return HTMLResponse(html)
+
+
 @app.get('/app/loja/financeiro/despesas/demo', response_class=HTMLResponse)
 async def despesas_demo(request: Request):
     # Task 9 (direcao "arquivo"): rende o template real com dados ficticios

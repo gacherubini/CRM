@@ -858,6 +858,7 @@ def estoque_novo(request: Request, db: Session = Depends(get_db)):
             veiculo=None,
             titulo="Cadastrar veículo",
             pode_custo=True,
+            anos=anos_modelo(),
         ),
     )
 
@@ -879,6 +880,11 @@ def dados_veiculo(form, incluir_custo: bool) -> dict:
     if incluir_custo and form.get("custo"):
         dados["custo"] = float(str(form.get("custo")).replace(",", "."))
     return dados
+
+
+def anos_modelo() -> list[int]:
+    """Anos do select do formulário: do próximo ano até 1980."""
+    return list(range(datetime.now(timezone.utc).year + 1, 1979, -1))
 
 
 _FOTO_MIMES = {"image/jpeg", "image/png", "image/webp"}
@@ -1068,7 +1074,7 @@ async def estoque_criar(
     except (EstoqueIndisponivel, ConflitoEstoque, ValueError) as exc:
         return templates.TemplateResponse(
             "estoque/form.html",
-            contexto(request, usuario, db=db, veiculo=dict(form), titulo="Cadastrar veículo", erro=str(exc), pode_custo=pode_ver_custo(usuario)),
+            contexto(request, usuario, db=db, veiculo=dict(form), titulo="Cadastrar veículo", erro=str(exc), pode_custo=pode_ver_custo(usuario), anos=anos_modelo()),
             status_code=422,
         )
     return RedirectResponse("/app/estoque?ok=criado", status_code=303)
@@ -1101,7 +1107,7 @@ def estoque_editar_pagina(
         )
     return templates.TemplateResponse(
         "estoque/form.html",
-        contexto(request, usuario, db=db, veiculo=veiculo, titulo="Editar veículo", pode_custo=pode_ver_custo(usuario)),
+        contexto(request, usuario, db=db, veiculo=veiculo, titulo="Editar veículo", pode_custo=pode_ver_custo(usuario), anos=anos_modelo()),
     )
 
 
@@ -1127,7 +1133,7 @@ async def estoque_editar(
     except (ConflitoEstoque, EstoqueIndisponivel, VeiculoNaoEncontrado, ValueError) as exc:
         return templates.TemplateResponse(
             "estoque/form.html",
-            contexto(request, usuario, db=db, veiculo={**dict(form), "id": veiculo_id}, titulo="Editar veículo", erro=str(exc), pode_custo=pode_ver_custo(usuario)),
+            contexto(request, usuario, db=db, veiculo={**dict(form), "id": veiculo_id}, titulo="Editar veículo", erro=str(exc), pode_custo=pode_ver_custo(usuario), anos=anos_modelo()),
             status_code=422,
         )
     return RedirectResponse("/app/estoque?ok=atualizado", status_code=303)

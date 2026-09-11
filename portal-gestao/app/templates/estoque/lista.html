@@ -4,6 +4,8 @@
 {% block content %}
 {% macro brl(valor) %}R$ {{ "{:,.2f}".format(valor).replace(',', 'X').replace('.', ',').replace('X', '.') }}{% endmacro %}
 {% set rotulos = {'disponivel':'Disponível','reservado':'Reservado','vendido':'Vendido','indisponivel':'Indisponível'} %}
+{% set caminho_novo = '/app/loja/estoque/veiculos/novo' if loja_shell else '/app/estoque/novo' %}
+{% set base_veiculo = '/app/loja/estoque/veiculos/' if loja_shell else '/app/estoque/' %}
 
 <div class="page-heading">
   <div>
@@ -11,7 +13,7 @@
     <h1>Veículos</h1>
     <p>Cadastre, publique e acompanhe cada veículo.</p>
   </div>
-  {% if pode_gerir %}<div class="heading-actions keep-row"><a class="button primary" href="/app/estoque/novo">Cadastrar veículo</a></div>{% endif %}
+  {% if pode_gerir %}<div class="heading-actions keep-row"><a class="button primary" href="{{ caminho_novo }}">Cadastrar veículo</a></div>{% endif %}
 </div>
 
 {% if request.query_params.get('ok') %}<div class="alert success">Ação concluída.</div>{% endif %}
@@ -57,7 +59,7 @@
       <div class="vei-lado">
         <strong class="vei-preco">{{ brl(v.preco) }}</strong>
         {% if pode_custo %}<span class="vei-custo">{% if v.custo is not none %}custo {{ brl(v.custo) }}{% else %}custo —{% endif %}</span>{% endif %}
-        <a class="table-action" href="/app/estoque/{{ v.id }}">Abrir</a>
+        <a class="table-action" href="{{ base_veiculo }}{{ v.id }}">Abrir</a>
       </div>
     </li>
     {% endfor %}
@@ -67,7 +69,7 @@
     <strong>Nenhum veículo encontrado</strong>
     <p>{% if filtros.busca or filtros.tipo or filtros.status or filtros.publicado %}Ajuste os filtros ou limpe a busca.{% else %}Cadastre o primeiro veículo para começar.{% endif %}</p>
     {% if pode_gerir and not (filtros.busca or filtros.tipo or filtros.status or filtros.publicado) %}
-    <a class="button primary" href="/app/estoque/novo">Cadastrar veículo</a>
+    <a class="button primary" href="{{ caminho_novo }}">Cadastrar veículo</a>
     {% elif filtros.busca or filtros.tipo or filtros.status or filtros.publicado %}
     <a class="button secondary" href="{{ request.url.path }}">Limpar filtros</a>
     {% endif %}

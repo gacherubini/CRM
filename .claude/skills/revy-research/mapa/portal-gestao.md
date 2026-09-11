@@ -1,6 +1,6 @@
-# portal-gestao · 169 rotas · 26 modelos · 6 workers · 35 flags · 26 migrations · 63 templates
+# portal-gestao · 175 rotas · 26 modelos · 6 workers · 35 flags · 26 migrations · 63 templates
 
-Gerado de `459cbd3`. NAO editar a mao — saida de `gerar_mapa.py`.
+Gerado de `3fb18c9`. NAO editar a mao — saida de `gerar_mapa.py`.
 Migration head: `0026_copiloto_sinal_destinatario`
 
 ## Rotas
@@ -29,33 +29,33 @@ Migration head: `0026_copiloto_sinal_destinatario`
 - `GET /app` — app/main.py:674
 - `GET /app/estoque` — app/main.py:803
 - `GET /app/estoque/novo` — app/main.py:842
-- `GET /app/operacao/numeros` — app/main.py:936
-- `POST /app/operacao/grupo` — app/main.py:969
-- `POST /app/operacao/numeros` — app/main.py:997
-- `POST /app/operacao/numeros/remover` — app/main.py:1024
-- `POST /app/estoque/novo` — app/main.py:1050
-- `GET /app/estoque/{veiculo_id}` — app/main.py:1077
-- `POST /app/estoque/{veiculo_id}` — app/main.py:1108
-- `POST /app/estoque/{veiculo_id}/{acao}` — app/main.py:1136
-- `GET /app/leads` — app/main.py:1183
-- `GET /app/leads/{lead_id}` — app/main.py:1211
-- `POST /app/leads/{lead_id}/etapa` — app/main.py:1247
-- `GET /app/conversas` — app/main.py:1306
-- `GET /app/conversas/{telefone}` — app/main.py:1333
-- `POST /app/conversas/{telefone}/handoff` — app/main.py:1426
-- `GET /app/vendas` — app/main.py:1539
-- `GET /app/vendas/nova` — app/main.py:1579
-- `POST /app/vendas/nova` — app/main.py:1596
-- `POST /app/vendas/{venda_id}/confirmar` — app/main.py:1999
-- `POST /app/vendas/{venda_id}/cancelar` — app/main.py:2017
-- `GET /app/vendedor` — app/main.py:2029
-- `GET /app/funil` — app/main.py:2140
-- `GET /app/funil/dados` — app/main.py:2216
-- `GET /app/financeiro` — app/main.py:2253
-- `GET /app/financeiras` — app/main.py:2330
-- `POST /app/financeiras/{nome}` — app/main.py:2387
-- `POST /app/financeiras/{nome}/testar` — app/main.py:2490
-- `GET /app/configuracoes` — app/main.py:2601
+- `GET /app/operacao/numeros` — app/main.py:942
+- `POST /app/operacao/grupo` — app/main.py:975
+- `POST /app/operacao/numeros` — app/main.py:1003
+- `POST /app/operacao/numeros/remover` — app/main.py:1030
+- `POST /app/estoque/novo` — app/main.py:1056
+- `GET /app/estoque/{veiculo_id}` — app/main.py:1083
+- `POST /app/estoque/{veiculo_id}` — app/main.py:1114
+- `POST /app/estoque/{veiculo_id}/{acao}` — app/main.py:1142
+- `GET /app/leads` — app/main.py:1189
+- `GET /app/leads/{lead_id}` — app/main.py:1217
+- `POST /app/leads/{lead_id}/etapa` — app/main.py:1253
+- `GET /app/conversas` — app/main.py:1312
+- `GET /app/conversas/{telefone}` — app/main.py:1339
+- `POST /app/conversas/{telefone}/handoff` — app/main.py:1432
+- `GET /app/vendas` — app/main.py:1545
+- `GET /app/vendas/nova` — app/main.py:1585
+- `POST /app/vendas/nova` — app/main.py:1602
+- `POST /app/vendas/{venda_id}/confirmar` — app/main.py:2005
+- `POST /app/vendas/{venda_id}/cancelar` — app/main.py:2023
+- `GET /app/vendedor` — app/main.py:2035
+- `GET /app/funil` — app/main.py:2146
+- `GET /app/funil/dados` — app/main.py:2222
+- `GET /app/financeiro` — app/main.py:2259
+- `GET /app/financeiras` — app/main.py:2336
+- `POST /app/financeiras/{nome}` — app/main.py:2393
+- `POST /app/financeiras/{nome}/testar` — app/main.py:2496
+- `GET /app/configuracoes` — app/main.py:2607
 - `GET /app/relatorios` — app/relatorios.py:66
 - `GET /app/relatorios/vendas.csv` — app/relatorios.py:112
 - `GET /app/relatorios/metas.csv` — app/relatorios.py:157
@@ -81,10 +81,15 @@ Migration head: `0026_copiloto_sinal_destinatario`
 - `POST /app/loja/copiloto/turno/{turno_id}/cancelar` — app/web/loja_copiloto.py:507
 - `POST /app/loja/copiloto/acao` — app/web/loja_copiloto.py:523
 - `POST /app/loja/copiloto/acao/{acao_id}/desfazer` — app/web/loja_copiloto.py:576
-- `GET /app/loja/estoque` — app/web/loja_estoque.py:90
-- `GET /app/loja/estoque/veiculos` — app/web/loja_estoque.py:132
-- `GET /app/loja/estoque/vitrine` — app/web/loja_estoque.py:192
-- `POST /app/loja/estoque/vitrine` — app/web/loja_estoque.py:286
+- `GET /app/loja/estoque` — app/web/loja_estoque.py:98
+- `GET /app/loja/estoque/veiculos` — app/web/loja_estoque.py:140
+- `GET /app/loja/estoque/veiculos/novo` — app/web/loja_estoque.py:227
+- `POST /app/loja/estoque/veiculos/novo` — app/web/loja_estoque.py:255
+- `GET /app/loja/estoque/veiculos/{veiculo_id}` — app/web/loja_estoque.py:293
+- `POST /app/loja/estoque/veiculos/{veiculo_id}` — app/web/loja_estoque.py:332
+- `POST /app/loja/estoque/veiculos/{veiculo_id}/{acao}` — app/web/loja_estoque.py:371
+- `GET /app/loja/estoque/vitrine` — app/web/loja_estoque.py:399
+- `POST /app/loja/estoque/vitrine` — app/web/loja_estoque.py:493
 - `GET /app/loja/financeiro` — app/web/loja_financeiro.py:89
 - `GET /app/loja/financeiro/dados` — app/web/loja_financeiro.py:114
 - `GET /app/loja/financeiro/despesas` — app/web/loja_financeiro.py:128
@@ -173,7 +178,8 @@ Migration head: `0026_copiloto_sinal_destinatario`
 - `GET /app/loja/vendas/demo` — prototype_atendimento.py:273
 - `GET /app/loja/financeiro/demo` — prototype_atendimento.py:334
 - `GET /app/loja/estoque/veiculos/demo` — prototype_atendimento.py:433
-- `GET /app/loja/financeiro/despesas/demo` — prototype_atendimento.py:450
+- `GET /app/loja/estoque/veiculos/form/demo` — prototype_atendimento.py:450
+- `GET /app/loja/financeiro/despesas/demo` — prototype_atendimento.py:472
 
 ## Modelos
 
@@ -291,18 +297,18 @@ Migration head: `0026_copiloto_sinal_destinatario`
 - `app/templates/dashboard.html` — app/main.py:784
 - `app/templates/estoque/lista.html` — app/main.py:828
 - `app/templates/estoque/form.html` — app/main.py:853
-- `app/templates/operacao/numeros.html` — app/main.py:958
-- `app/templates/leads/lista.html` — app/main.py:1200
-- `app/templates/leads/detalhe.html` — app/main.py:1235
-- `app/templates/conversas/lista.html` — app/main.py:1322
-- `app/templates/conversas/detalhe.html` — app/main.py:1358
-- `app/templates/vendas/form.html` — app/main.py:1521
-- `app/templates/vendas/lista.html` — app/main.py:1565
-- `app/templates/vendedor/dashboard.html` — app/main.py:2124
-- `app/templates/funil/index.html` — app/main.py:2203
-- `app/templates/financeiro/dashboard.html` — app/main.py:2309
-- `app/templates/financeiras/lista.html` — app/main.py:2372
-- `app/templates/configuracoes/index.html` — app/main.py:2641
+- `app/templates/operacao/numeros.html` — app/main.py:964
+- `app/templates/leads/lista.html` — app/main.py:1206
+- `app/templates/leads/detalhe.html` — app/main.py:1241
+- `app/templates/conversas/lista.html` — app/main.py:1328
+- `app/templates/conversas/detalhe.html` — app/main.py:1364
+- `app/templates/vendas/form.html` — app/main.py:1527
+- `app/templates/vendas/lista.html` — app/main.py:1571
+- `app/templates/vendedor/dashboard.html` — app/main.py:2130
+- `app/templates/funil/index.html` — app/main.py:2209
+- `app/templates/financeiro/dashboard.html` — app/main.py:2315
+- `app/templates/financeiras/lista.html` — app/main.py:2378
+- `app/templates/configuracoes/index.html` — app/main.py:2647
 - `app/templates/relatorios/index.html` — app/relatorios.py:99
 - `app/templates/base.html` — app/templates/base.html
 - `app/templates/conta_senha.html` — app/templates/conta_senha.html
@@ -315,8 +321,8 @@ Migration head: `0026_copiloto_sinal_destinatario`
 - `app/templates/equipe/form.html` — app/web/equipe.py:161
 - `app/templates/equipe/senha.html` — app/web/equipe.py:370
 - `app/templates/loja/copiloto.html` — app/web/loja_copiloto.py:217
-- `app/templates/loja/estoque_visao.html` — app/web/loja_estoque.py:119
-- `app/templates/loja/vitrine_ordem.html` — app/web/loja_estoque.py:261
+- `app/templates/loja/estoque_visao.html` — app/web/loja_estoque.py:127
+- `app/templates/loja/vitrine_ordem.html` — app/web/loja_estoque.py:468
 - `app/templates/loja/financeiro_resultado.html` — app/web/loja_financeiro.py:102
 - `app/templates/loja/financeiro_despesas.html` — app/web/loja_financeiro.py:151
 - `app/templates/loja/integracoes.html` — app/web/loja_integracoes.py:48

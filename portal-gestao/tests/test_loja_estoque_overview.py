@@ -13,7 +13,7 @@ from app.loja.estoque_overview import (
     ContagensEstoque,
     montar_estoque_overview,
 )
-from conftest import login
+from conftest import csrf_da_resposta, login
 
 
 # ---------------------------------------------------------------------------
@@ -283,14 +283,85 @@ def test_rota_visao_erro_api(client, shell_on, estoque_fake):
     assert "prontos para venda" not in resp.text
 
 
-def test_rota_veiculos_renderiza_lista_no_shell(client, shell_on, estoque_fake):
+def test_rota_veiculos_renderiza_lista_no_shell(client, monkeypatch, estoque_fake):
+    monkeypatch.setenv("REVY_LOJA_SHELL_ENABLED", "1")
+    monkeypatch.setenv("REVY_LOJA_ENTITLEMENTS_ENABLED", "0")
     login(client)
     resp = client.get("/app/loja/estoque/veiculos")
     assert resp.status_code == 200
     assert "Honda Civic" in resp.text
     # Filtros e ações continuam na própria rota; sem redirect ao legado.
     assert '<form class="filter-bar" method="get">' in resp.text
-    assert 'href="/app/estoque/novo"' in resp.text
+    assert 'href="/app/loja/estoque/veiculos/novo"' in resp.text
+
+
+def test_rota_veiculo_novo_renderiza_form_no_shell(client, monkeypatch, estoque_fake):
+    monkeypatch.setenv("REVY_LOJA_SHELL_ENABLED", "1")
+    monkeypatch.setenv("REVY_LOJA_ENTITLEMENTS_ENABLED", "0")
+    login(client)
+    resp = client.get("/app/loja/estoque/veiculos/novo")
+    assert resp.status_code == 200
+    assert "Adicionar foto" in resp.text
+    assert 'name="ano_modelo"' in resp.text
+    # Voltar/Cancelar saem do legado e apontam para a lista do shell.
+    assert 'href="/app/loja/estoque/veiculos"' in resp.text
+
+
+def test_rota_veiculo_novo_flag_off_redireciona_legado(client, monkeypatch, estoque_fake):
+    login(client)
+    monkeypatch.setattr("app.web.loja_estoque._shell_ativo", lambda: False)
+    resp = client.get("/app/loja/estoque/veiculos/novo", follow_redirects=False)
+    assert resp.status_code == 303
+    assert resp.headers["location"] == "/app/estoque/novo"
+
+
+def test_rota_veiculo_criar_redireciona_lista_shell(client, shell_on, estoque_fake):
+    login(client)
+    pagina = client.get("/app/loja/estoque/veiculos/novo")
+    resp = client.post(
+        "/app/loja/estoque/veiculos/novo",
+        data={
+            "csrf": csrf_da_resposta(pagina), "tipo": "carro", "marca": "Toyota",
+            "modelo": "Corolla", "versao": "GLi", "ano_modelo": "2023", "cor": "Prata",
+            "km": "12000", "preco": "129900.50", "custo": "110000",
+            "codigo_interno": "T01", "placa": "ABC1D23",
+        },
+        follow_redirects=False,
+    )
+    assert resp.status_code == 303
+    assert resp.headers["location"] == "/app/loja/estoque/veiculos?ok=criado"
+    assert estoque_fake.criados[0]["modelo"] == "Corolla"
+
+
+def test_rota_veiculo_editar_no_shell(client, monkeypatch, estoque_fake):
+    monkeypatch.setenv("REVY_LOJA_SHELL_ENABLED", "1")
+    monkeypatch.setenv("REVY_LOJA_ENTITLEMENTS_ENABLED", "0")
+    login(client)
+    resp = client.get("/app/loja/estoque/veiculos/v1")
+    assert resp.status_code == 200
+    assert 'value="Civic"' in resp.text
+    # v1 está publicado: a barra de situação oferece despublicar, não publicar.
+    assert "/app/loja/estoque/veiculos/v1/despublicar" in resp.text
+
+
+def test_rota_veiculo_acao_no_shell(client, shell_on, estoque_fake):
+    login(client)
+    pagina = client.get("/app/loja/estoque/veiculos/v1")
+    resp = client.post(
+        "/app/loja/estoque/veiculos/v1/reservar",
+        data={"csrf": csrf_da_resposta(pagina)},
+        follow_redirects=False,
+    )
+    assert resp.status_code == 303
+    assert resp.headers["location"] == "/app/loja/estoque/veiculos?ok=reservar"
+    assert estoque_fake.acoes == [("v1", "reservar")]
+
+
+def test_rota_veiculo_novo_vendedor_redireciona_lista(client, shell_on, estoque_fake):
+    login(client, papel="vendedor")
+    resp = client.get("/app/loja/estoque/veiculos/novo", follow_redirects=False)
+    assert resp.status_code == 303
+    assert resp.headers["location"] == "/app/loja/estoque/veiculos"
 
 
 def test_rota_veiculos_filtra_no_shell(client, shell_on, estoque_fake):

@@ -4828,3 +4828,100 @@ form[data-periodo-melhorado] { position: relative; }
     text-align: left;
   }
 }
+
+/* --- Formulário de veículo (ficha): direção aprovada em 11/09 ---
+   Foto decide, o resto confirma: caixa de upload com estado vazio próprio,
+   Identificação e Comercial numa ficha só separadas por fio, preço com peso
+   de dado e barra de situação/ações no topo. Só tokens existentes. */
+.vef-corpo {
+  display: grid;
+  grid-template-columns: minmax(260px, 320px) minmax(0, 1fr);
+  gap: var(--space-4);
+  align-items: start;
+}
+.vef-corpo > .panel { margin-bottom: 0; }
+.vef-foto-card {
+  padding: var(--space-5);
+  display: grid;
+  gap: var(--space-4);
+}
+.vef-foto-caixa {
+  position: relative;
+  display: grid;
+  place-items: center;
+  min-height: 208px;
+  overflow: hidden;
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--radius-srf);
+  background: var(--surface-soft);
+  cursor: pointer;
+}
+.vef-foto-caixa:focus-within { outline: 2px solid var(--ink); outline-offset: 2px; }
+.vef-foto-caixa.tem-foto { border-style: solid; border-color: var(--line); }
+.vef-foto-caixa img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.vef-foto-caixa input[type="file"] {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+.vef-foto-vazia {
+  display: grid;
+  gap: 2px;
+  justify-items: center;
+  padding: var(--space-6) var(--space-4);
+  text-align: center;
+}
+.vef-foto-vazia strong { font-size: var(--text-base); }
+.vef-foto-vazia span { color: var(--ink-muted); font-size: var(--text-xs); }
+.vef-foto-trocar {
+  position: absolute;
+  right: var(--space-3);
+  bottom: var(--space-3);
+  padding: 5px 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-ctl);
+  background: var(--surface);
+  color: var(--ink);
+  font-size: var(--text-xs);
+  font-weight: 600;
+}
+.vef-foto-caixa:hover .vef-foto-trocar { border-color: var(--ink); }
+.vef-ficha { padding: var(--space-6); }
+.vef-secao--fio {
+  margin-top: var(--space-5);
+  padding-top: var(--space-5);
+  border-top: 1px solid var(--line);
+}
+.vef-comercial .vef-preco input {
+  font-size: var(--text-lg);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.vef-acoes {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  margin-top: var(--space-6);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--line);
+}
+.vef-situacao {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3) var(--space-5);
+  padding: var(--space-3) var(--space-5);
+}
+.vef-situacao-estado {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-4);
+}
+@media (max-width: 960px) {
+  .vef-corpo { grid-template-columns: 1fr; }
+}
