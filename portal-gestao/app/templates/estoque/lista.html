@@ -46,9 +46,15 @@
   <ul class="vei-lista">
     {% for v in veiculos %}
     <li class="vei-ficha">
-      <span class="vehicle-photo vei-foto">{% if v.foto_url %}<img src="{{ v.foto_url }}{% if '/public/v1/media/' in v.foto_url %}?w=240{% endif %}" alt="" loading="lazy" decoding="async">{% else %}<span>{{ v.marca[:1] }}</span>{% endif %}</span>
+      {# A inicial fica SEMPRE no DOM, atrás da foto: `foto_url` é URL digitada à
+         mão (main.py) e uma que responde 404 deixava o ícone de imagem quebrada
+         na lista. Com o onerror a <img> sai e a inicial aparece. #}
+      <span class="vehicle-photo vei-foto">
+        <span>{{ v.marca[:1] }}</span>
+        {% if v.foto_url %}<img src="{{ v.foto_url }}{% if '/public/v1/media/' in v.foto_url %}?w=480{% endif %}" alt="" loading="lazy" decoding="async" onerror="this.remove()">{% endif %}
+      </span>
       <div class="vei-ident">
-        <strong class="vei-nome">{{ v.marca }} {{ v.modelo }}</strong>
+        <a class="vei-nome vei-nome-link" href="{{ base_veiculo }}{{ v.id }}">{{ v.marca }} {{ v.modelo }}</a>
         <span class="vei-meta">{{ v.ano_modelo }}{% if v.versao %} · {{ v.versao }}{% endif %} · {{ "{:,.0f}".format(v.km).replace(',', '.') }} km</span>
         <span class="vei-selos">
           <span class="status {{ v.status }}">{{ rotulos.get(v.status, v.status) }}</span>
@@ -56,10 +62,10 @@
           {% if v.placa %}<span class="mono-inline">{{ v.placa }}</span>{% endif %}
         </span>
       </div>
+      {# "custo —" era ruído em toda linha sem custo: some em vez de virar traço. #}
       <div class="vei-lado">
         <strong class="vei-preco">{{ brl(v.preco) }}</strong>
-        {% if pode_custo %}<span class="vei-custo">{% if v.custo is not none %}custo {{ brl(v.custo) }}{% else %}custo —{% endif %}</span>{% endif %}
-        <a class="table-action" href="{{ base_veiculo }}{{ v.id }}">Abrir</a>
+        {% if pode_custo and v.custo is not none %}<span class="vei-custo">custo {{ brl(v.custo) }}</span>{% endif %}
       </div>
     </li>
     {% endfor %}

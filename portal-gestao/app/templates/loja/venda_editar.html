@@ -54,18 +54,26 @@
           <label>Referência do veículo<input name="veiculo_ref" value="{{ venda.veiculo_ref or '' }}"></label>
           {% endif %}
         </div>
-        {% if confirmada %}
-        <p class="muted">
-          Lead: <strong>{{ venda.lead_ref or '—' }}</strong> ·
-          Veículo: <strong>{{ venda.veiculo_ref or '—' }}</strong> — fixos desde a confirmação.
-        </p>
+        {# Os refs são UUID ("10071317-407c-…"): ninguém lê isso, e a moto já é o
+           <h1> da página. O vínculo vira consulta sob demanda, não ruído fixo. #}
+        {% if confirmada and (venda.lead_ref or venda.veiculo_ref) %}
+        <details class="vnd-vinculos">
+          <summary>Vínculos desta venda</summary>
+          <dl>
+            <div><dt>Lead</dt><dd>{{ venda.lead_ref or '—' }}</dd></div>
+            <div><dt>Veículo</dt><dd>{{ venda.veiculo_ref or '—' }}</dd></div>
+          </dl>
+          <p class="muted">Fixos desde a confirmação: viraram origem de campanha e baixa de estoque.</p>
+        </details>
         {% endif %}
       </div>
+      {# Dentro do painel: flutuando entre as duas colunas, Salvar ficava longe
+         dos campos que ele salva. #}
+      <div class="vnd-form-acoes">
+        <a class="button ghost" href="/app/loja/vendas/lista">Cancelar</a>
+        <button class="button primary" type="submit">Salvar alterações</button>
+      </div>
     </section>
-    <div class="vnd-form-acoes">
-      <a class="button ghost" href="/app/loja/vendas/lista">Cancelar</a>
-      <button class="button primary" type="submit">Salvar alterações</button>
-    </div>
   </form>
 
   <section class="panel" aria-labelledby="bloco-custos">
@@ -89,12 +97,14 @@
       {% endfor %}
     </ul>
     {% else %}
-    <div class="empty">
+    <div class="empty empty-frase">
       <strong>Nenhum custo direto lançado.</strong>
       <p>Frete, documentação e comissão entram aqui e saem da margem desta moto.</p>
     </div>
     {% endif %}
-    <details class="vnd-custo-novo"{% if not venda.custos_diretos %} open{% endif %}>
+    {# Sem `open`: com a coluna vazia, o formulário já aberto punha dois pesos na
+       mesma coluna — a frase do vazio e três campos disputando o olho. #}
+    <details class="vnd-custo-novo">
       <summary>Lançar custo</summary>
       <form method="post" action="/app/loja/vendas/{{ venda.id }}/custos" class="form-grid">
         <input type="hidden" name="csrf" value="{{ csrf }}">
@@ -117,21 +127,19 @@
     <div><span class="mono-label">Excluir</span><h2 id="bloco-excluir">Apagar esta venda</h2></div>
   </div>
   <div class="panel-body">
+    {# Três parágrafos corridos para um botão: os mesmos fatos em duas linhas. #}
     <p>
-      Use isto quando a venda foi <strong>registrada por engano</strong>. Ela some das listas,
-      dos totais e do financeiro. Quem apagou e quando fica gravado.
+      Para venda <strong>registrada por engano</strong>. Ela some das listas, dos totais e do
+      financeiro; quem apagou e quando fica gravado.
     </p>
     <p class="muted">
-      Se o cliente desistiu de um negócio que existiu de verdade, o certo é
+      Cliente desistiu de um negócio que existiu? O certo é
       <a href="/app/loja/vendas/lista">cancelar com motivo</a> — cancelamento fica no histórico.
+      {% if confirmada %}
+      Esta venda já foi confirmada: o Revy Control zera a projeção dela, e o evento de compra
+      já enviado à Meta <strong>não volta atrás</strong> (se ainda não saiu, é cancelado).
+      {% endif %}
     </p>
-    {% if confirmada %}
-    <p class="muted">
-      Esta venda já foi confirmada: o Revy Control zera a projeção dela. O evento de
-      compra que já tiver sido enviado à Meta <strong>não volta atrás</strong> — se o envio
-      ainda não saiu, ele é cancelado.
-    </p>
-    {% endif %}
     <form method="post" action="/app/loja/vendas/{{ venda.id }}/excluir">
       <input type="hidden" name="csrf" value="{{ csrf }}">
       <button class="button ghost" type="submit">Excluir venda</button>
