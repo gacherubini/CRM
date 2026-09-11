@@ -1,25 +1,36 @@
-# Motor RPA multiloja em cloud: recomendação e alternativas
+# Motor RPA multiloja em cloud: hipóteses e alternativas
 
 **Produto:** Motor de Simulação, `motor-simulacao/`.
-**Atualizado em:** 10/09/2026.
+**Atualizado em:** 11/09/2026.
 **Status:** pesquisa e proposta arquitetural. Implementação, fornecedor, contratação e
 piloto ainda não aprovados. O diagnóstico e a correção do Bradesco estão com outro agente.
 
-## 1. Solução proposta
+## 1. Recomendação 100% cloud
 
-**Recomendo manter o Motor no Fly, com executor, credenciais, sessões e capacidade
-isolados por loja. Cada loja terá uma saída de rede estável, validada nos bancos.**
+**A melhor relação entre custo, isolamento do teste e trabalho operacional é manter o
+worker on-demand no Fly e testar um ISP estático cloud para uma loja. Primeiro, a mesma
+imagem roda no Fly atual com egress estático como controle. Se o Bradesco continuar sem
+concluir, troca-se somente a saída para o ISP. Não comprar seis IPs antes desse teste.**
+
+Hoje a operação tem **uma loja**. O desenho imediato atende essa loja e mede seu volume.
+Os números de seis lojas são apenas uma projeção de expansão, não capacidade que precisa
+ser contratada ou implementada agora.
+
+O egress estático direto tem baixa chance de resolver o Bradesco: muda o endereço, mas
+continua na rede de datacenter do Fly, onde ele nunca concluiu. O ISP cloud é a melhor
+aposta porque muda a classe/ASN da saída sem trocar o browser, a imagem e o modelo
+on-demand ao mesmo tempo. Ainda é hipótese; só o piloto cloud decide.
 
 O Motor central mantém API, fila, credenciais e resultados. Os executores continuam
 sendo parte do produto Motor, mas recebem apenas tarefas e segredos da própria loja.
 
 ```text
 Motor central no Fly
-  ├─ executor da loja A → saída fixa A → bancos
-  └─ executor da loja B → saída fixa B → bancos
+  ├─ executor da loja A → ISP cloud fixo A → bancos
+  └─ executor da loja B → ISP cloud fixo B → bancos
 
 Cada executor: sessão própria, até 2 browsers, credenciais só da sua loja.
-Saída: IP estático do Fly ou ISP brasileiro dedicado, conforme validação.
+Saída: egress estático do Fly no controle; ISP brasileiro dedicado no teste seguinte.
 ```
 
 A saída de rede, também chamada de *egress*, é o endereço que o banco vê quando o
@@ -30,30 +41,37 @@ A preferência pelo Fly aproveita a operação existente. Não há evidência de
 para uma VPS resolveria o acesso bancário. Uma VPS continua sendo alternativa de
 computação e isolamento caso custo, capacidade ou operação a justifiquem.
 
-### Ordem recomendada
+### Ordem de decisão
 
 1. O outro agente corrige e verifica lease, tentativas limitadas e resultado terminal.
-2. Observar o acesso bancário depois dessa correção, sem atribuir o loop ao IP.
-3. Validar uma saída estável no runtime cloud atual. Preferir saída direta do Fly se
-   funcionar; comparar ISP brasileiro dedicado se houver necessidade de outra rede.
-4. Após aprovação, implementar o isolamento multiloja e expandir de uma para seis lojas.
+2. Rodar uma loja no Fly atual, com a mesma imagem/configuração e egress estático.
+   Medir sessão fria e quente separadamente.
+3. Se o Bradesco continuar sem concluir, usar a mesma imagem/configuração com um único
+   ISP cloud por 24 h, após KYC e liberação escrita dos domínios.
+4. Comparar saída direta e ISP por banco. Só expandir de uma para seis lojas se o ISP
+   concluir o Bradesco e não regredir os demais.
 5. Adotar APIs oficiais gradualmente nos bancos em que houver habilitação comercial.
 
-Nenhuma loja precisa manter PC ligado. A API pública `/v1/simulacoes` permanece compatível.
+Todo teste e toda produção deste card rodam em cloud. Não usar PC residencial nem máquina
+da loja como executor ou controle. A API pública `/v1/simulacoes` permanece compatível.
 O Motrix participa da solução; sua capacidade produtiva depende da validação e do rollout.
 
-## 2. Quais opções recomendo e quais deixaria para depois
+## 2. Ranking técnico e custo-benefício
 
-| Opção | Minha avaliação | Quando faz sentido | Limitação principal |
+| Opção | Chance técnica | Custo-benefício | Evidência em uma frase |
 |---|---|---|---|
-| Fly com executores isolados e saída estática por loja | **Primeira escolha** | Bancos aceitam a saída direta e a capacidade medida atende | IP fixo continua sendo de datacenter; não garante aceitação |
-| Fly com executores isolados e ISP brasileiro estático por loja | **Alternativa de conectividade a testar** | Um piloto comprova vantagem da outra saída | Depende de exclusividade, acesso bancário permitido e aceitação real |
-| API oficial + Playwright nos bancos restantes | **Complemento recomendado** | A Revy/loja consegue credenciais e contrato adequados | Disponibilidade comercial não foi confirmada para todos os bancos |
-| VPS dedicada por loja | **Opção secundária de infraestrutura** | Custo, recursos ou operação justificam sair do Fly | Pode repetir a restrição de datacenter e cria uma frota para administrar |
-| Browser gerenciado | **Não escolheria agora** | Operar Chromium vira o principal custo e o fornecedor atende os requisitos | Restrições bancárias, IP entre sessões, retenção e acesso de terceiros aos dados |
-| Pool compartilhado com scheduler de cluster próprio | **Adiar** | Uso medido justifica a complexidade e há economia demonstrável | Compartilhar CPU não garante capacidade nem isolamento entre lojas |
-| PC na loja ou PC pessoal como produção | **Fora da solução escolhida pelo dono** | Pode servir a experimento separado, se solicitado | Depende de energia, internet e máquina ligada fora da cloud |
-| Mais workers no pool atual ou proxy rotativo | **Não recomendo para este desenho** | Não atende, sozinho, aos requisitos deste card | Mantém problemas de cota/isolamento ou troca a saída entre sessões |
+| **1. Fly on-demand + IPRoyal ISP** | **Melhor aposta** | **Melhor** | Mantém runtime conhecido e troca apenas a saída para IP ISP brasileiro dedicado; Bradesco ainda não foi provado nessa combinação |
+| **2. Browserbase + IPRoyal ISP externo** | **Plausível, mas não provada** | **Médio** | Aceita proxy externo e Context persistente, mas muda também o browser gerenciado e custa mais que Fly no volume de referência |
+| **3. Browserless + IPRoyal ISP externo** | **Plausível, mas não provada** | **Baixo em seis lojas** | Aceita proxy externo sem unidades adicionais, porém o plano para 12 browsers custa US$ 140/mês no anual antes do ISP |
+| **4. Lightsail por loja + IPRoyal ISP** | **Plausível, mas não provada** | **Baixo** | O ISP pode resolver a rede, mas a VPS não acrescenta vantagem sobre Fly + ISP e fica ligada sem nova orquestração on-demand |
+| Fly on-demand + egress estático | **Baixa chance de resolver Bradesco** | **Bom como controle** | Bradesco nunca concluiu no Fly; fixar um IP do mesmo ambiente de datacenter não corrige a classe/ASN da saída |
+| Lightsail direto, compartilhado ou por loja | **Baixa chance de resolver Bradesco** | **Médio a baixo** | Troca o ASN de cloud, mas continua em IP de datacenter e custa mais para testar a hipótese de rede |
+| API oficial + Playwright nos bancos restantes | **Melhor aposta quando houver contrato** | **Potencialmente melhor** | Remove RPA dos bancos habilitados, mas não há acesso comercial confirmado para todos |
+| ProxyEmpire | **Incompatível até autorização escrita** | **Não comparar no ranking** | Os termos permitem suspender automação, apesar do produto anunciá-la, e os preços oficiais divergem |
+| Oxylabs ISP de autosserviço | **Incompatível com a exclusividade exigida** | **Baixo** | O plano público compartilha IP com até três usuários e restringe bancos antes de aprovação |
+| Bright Data | **Incompatível** | **Nenhum** | A política proíbe informação não pública atrás de login |
+| PC residencial ou da loja | **Incompatível com a direção do dono** | **Fora do escopo** | Não é cloud; não entra em piloto nem produção |
+| Proxy rotativo | **Incompatível** | **Nenhum** | Troca a identidade de rede entre sessões e não entrega IP exclusivo por loja |
 
 A recomendação cloud não significa deixar todos os tenants no mesmo processo.
 Machines/VMs separadas são uma forma de isolar executores. Compartilhar hosts físicos
@@ -62,13 +80,14 @@ não protege as credenciais de outra loja contra comprometimento do executor.
 
 ## 3. O que sabemos e o que ainda é hipótese
 
-### Três questões diferentes
+### Quatro questões diferentes
 
 | Questão | Evidência disponível | Consequência |
 |---|---|---|
 | Capacidade multiloja | Código usa fila e teto globais, com reserva por banco | Precisa de cotas e seleção de tarefas por loja |
 | Loop do Bradesco | Outro agente relatou expiração de lease e descarte do resultado | Correção de software vem antes da avaliação de infraestrutura |
-| Aceitação da rede pelo banco | Há histórico de falhas cloud e sucesso residencial, em condições diferentes | Ainda não prova causa por IP nem valida fornecedor substituto |
+| Aceitação da rede pelo banco | Bradesco passou em rede residencial e nunca concluiu no Fly | Sustenta testar outra saída cloud, mas não prova que qualquer ISP será aceito |
+| Sessão quente do Bradesco em cloud | O driver só salva `storage_state` depois de receber ofertas; esse ponto nunca foi atingido no Fly | Não atribuir ao modo quente um benefício ainda não observado nesse banco |
 
 ### Diagnóstico recebido do outro agente
 
@@ -90,6 +109,12 @@ O reCAPTCHA considera sinais de IP, navegador e TLS. Sessão persistente reduz a
 necessidade de login, mas não há garantia de que fará o score subir.
 [Google, avaliação de acessos web](https://docs.cloud.google.com/recaptcha/docs/create-assessment-website).
 
+A sessão quente está ligada por padrão. O estado é separado por cliente/provedor e
+carregado no browser, mas cookies e tokens podem expirar ou ser invalidados pelo portal.
+O banco também pode vincular a sessão ao IP, ASN ou localização. Portanto, sessão quente
+não corrige reputação de rede, e trocar a saída pode invalidar o estado salvo. No piloto,
+sessão fria e quente são séries distintas; não misturar seus resultados.
+
 ### O que outras empresas demonstram
 
 A UiPath documenta saída estática para permitir integração com sistemas que aceitam
@@ -101,7 +126,7 @@ corporativas. É uso real em uma fintech, sem ser teste de login bancário brasi
 [Caso Ramp](https://www.browserbase.com/blog/case-study-ramp).
 
 **Não encontramos nas fontes primárias consultadas uma operação equivalente que
-comprove os cinco portais funcionando continuamente com um fornecedor específico.**
+comprove os seis portais funcionando continuamente com um fornecedor específico.**
 
 ## 4. Como escolher a saída de rede
 
@@ -137,34 +162,58 @@ de uma conexão doméstica. [Definição da Oxylabs](https://oxylabs.io/pricing/
 
 ### Fornecedores pesquisados
 
-Condições consultadas em 10/09/2026. Cobertura anunciada não equivale a estoque
+Condições consultadas em 11/09/2026. Cobertura anunciada não equivale a estoque
 contratável nem a aceitação pelos bancos.
 
 | Fornecedor | Evidência útil | O que impede escolher agora |
 |---|---|---|
-| IPRoyal ISP | Anuncia Brasil, IP exclusivo e manutenção estática; documenta verificação de identidade para acesso bancário | Confirmar domínios, uso multiloja, estoque, ASN, renovação e preço final |
-| Oxylabs ISP | Documenta restrições bancárias e consulta antes da compra | Oferta de autosserviço permite compartilhamento com até três usuários; exigir oferta dedicada e confirmar Brasil |
-| Browserbase | Contexts persistentes e proxy externo | Proxies integrados restringem instituições financeiras; sem garantia identificada de IP permanente por loja |
-| Browserless | Playwright, estado persistente, proxy externo e país `br` | Sticky vale durante a sessão; não comprova IP exclusivo permanente nem liberação dos bancos |
+| IPRoyal ISP | Publica Brasil, IP dedicado durante a assinatura, plano de 24 h e 30 dias; banco libera somente após verificação de identidade | Confirmar por escrito os seis domínios, estoque/ASN brasileiro, manutenção na renovação, preço final e acesso após KYC |
+| ProxyEmpire static residential | Publica Brasil, IP exclusivo durante a assinatura, tráfego sujeito a soft cap de 100 GB/IP e planos mensais | Termos permitem suspender uso automatizado e negar domínios financeiros; páginas oficiais divergem sobre preço e cobrança de tráfego |
+| Oxylabs ISP | Publica plano mínimo de 10 IPs por US$ 16/mês, tráfego sujeito a uso justo e consulta pré-compra para bancos | Autosserviço compartilha IP com até três usuários e a página de preço não confirma Brasil; não atende exclusividade comprovada |
+| Bright Data | Tem rede residencial, mas sua política oficial proíbe coletar informação não pública, inclusive atrás de login | Incompatível com os portais autenticados deste card; retirar da seleção |
+| Browserbase | Contexts persistentes, 200+ países e proxy externo | Proxy integrado declara acesso bancário menos confiável e variável por fornecedor; browser e proxy continuam sem IP exclusivo comprovado |
+| Browserless | Playwright, estado persistente e proxy externo | Proxy próprio é sticky só durante a sessão; não comprova IP exclusivo permanente nem liberação dos bancos |
 
 **IPRoyal é o primeiro candidato para confirmação comercial se precisarmos testar ISP.**
-Sua página lista Brasil e preço inicial de US$ 2,70/IP por 30 dias, sem cotação específica
-para este uso. A ajuda exige verificação de identidade para acessar bancos. O guia
-informa franquia de 100 GB/mês/IP com redução de velocidade após o limite.
+Sua página lista Brasil e preços iniciais de US$ 1,80/IP por 24 horas e US$ 2,70/IP
+por 30 dias, sem cotação específica para IP brasileiro ou este uso. A ajuda informa
+que bancos são bloqueados por padrão e exige verificação de identidade para acesso.
+O guia informa 100 GB/mês/IP antes da redução de velocidade e permite manter o IP
+ao estender a assinatura, desde que o endereço específico seja renovado.
 [Produto ISP](https://iproyal.com/isp-proxies/),
 [restrições bancárias](https://help.iproyal.com/en/articles/7222117-are-there-any-blocked-sites-or-ports-on-isp-proxies),
 [preços](https://iproyal.com/pricing/static-residential-proxies/),
 [franquia](https://iproyal.com/quick-start-guides/static-residential-proxies/).
 
-Para Oxylabs, consultar oferta dedicada em vez de presumir exclusividade no plano ISP
-de autosserviço. [Produto e preços](https://oxylabs.io/pricing/isp-proxies),
-[restrições](https://developers.oxylabs.io/documentation/pt-br/proxies/isp-proxies/restricted-targets).
+**ProxyEmpire fica fora do ranking e pendente de autorização escrita.** A página do
+produto publica Brasil entre os países disponíveis, IP exclusivo,
+soft cap de 100 GB/IP e US$ 3,50/mês para um IP; mostra US$ 15 por cinco e US$ 29 por
+dez. A tabela geral, porém, ainda publica US$ 2/IP mais custo de GB. Portanto não há
+preço público coerente para seis IPs: usar no máximo US$ 29 como referência de compra
+do pacote publicado de dez, não como cotação de seis. Os termos permitem que o
+fornecedor peça identificação e aprove ou negue, a seu critério, acesso a domínios
+financeiros. Também permitem suspender a conta por uso de robô ou processo automatizado,
+apesar de a página do produto anunciar automação empresarial; o piloto exige autorização
+escrita para este RPA. As vendas são finais e qualquer reembolso é discricionário.
+[Produto e preços por pacote](https://proxyempire.io/static-residential-proxies/),
+[tabela geral divergente](https://proxyempire.io/pricing-table/),
+[Brasil](https://proxyempire.io/brazil-web-proxy/),
+[termos, itens 4.4 e 8](https://proxyempire.io/terms-of-service/).
+
+Oxylabs e Bright Data não entram no piloto atual. Na Oxylabs, consultar uma oferta
+dedicada seria necessário em vez de presumir exclusividade no plano compartilhado;
+bancos constam entre os alvos restritos. A política da Bright Data exclui informação
+atrás de login, independentemente de preço.
+[Oxylabs, produto e preços](https://oxylabs.io/pricing/isp-proxies),
+[Oxylabs, restrições](https://developers.oxylabs.io/products/proxies/isp-proxies/restricted-targets),
+[Bright Data, uso aceitável](https://brightdata.com/acceptable-use-policy).
 
 ### Confirmações antes de qualquer compra
 
 Informar ao fornecedor os domínios dos portais e o uso de RPA autorizado pelos lojistas.
 Confirmar exclusividade, localização/ASN, manutenção do IP na renovação, permissão dos
-domínios após verificação, tráfego, preço e possibilidade de teste curto. Não enviar
+domínios após verificação, tráfego, preço, cancelamento e possibilidade de teste curto.
+Guardar a resposta comercial e os termos vigentes usados na aprovação. Não enviar
 senha, CPF, cookies ou prints para cotação. Nenhum fornecedor foi contatado nesta pesquisa.
 
 Se nenhuma saída testada for aceita, buscar acesso reconhecido pelo banco, integração
@@ -176,10 +225,13 @@ oficial ou outra conectividade autorizada. Não multiplicar VPSs sem resolver es
 e persistência de resultado terminal. O piloto de infraestrutura não deve contar
 reexecuções do mesmo job como falhas independentes de IP.
 
+**O piloto é 100% cloud.** Usar uma loja, uma imagem e a mesma configuração de browser.
+Não executar em PC residencial nem usar o resultado residencial como braço do teste.
+
 | Etapa | O que validar | Critério de avanço |
 |---|---|---|
-| Uma loja no runtime cloud atual | Saída real, IPv4/IPv6, sessões persistentes e resultado terminal | Execução observável sem loop; avaliar se outra saída é necessária |
-| Comparação de saída, se necessária | Mesmo runtime/configuração; saída direta versus ISP autorizado | Diferença reproduzível por banco, sem confundir troca de rede com mudança de driver |
+| Controle no Fly atual | Após correção do loop, egress estático, saída real, mesma imagem/configuração e resultado terminal | Registrar cada banco em sessão fria e quente; não alterar driver durante a comparação |
+| IPRoyal cloud por 24 h | KYC e seis domínios aprovados antes da compra; mesma imagem/configuração do controle | Repetir separadamente sessão fria e quente; diferença reproduzível atribuível à saída |
 | Estabilidade | Um browser antes de dois; sessões frias/quentes e retomada após reinício | Gate operacional abaixo, sem desativar contas |
 | Isolamento implementado | Seis lojas concorrentes com mocks, crash e perda de rede | Cotas, credenciais, suspensão e recuperação corretas |
 | Expansão real | Uma, depois seis lojas; Motrix incluído | Métricas por loja/banco dentro dos objetivos antes de ampliar |
@@ -187,6 +239,10 @@ reexecuções do mesmo job como falhas independentes de IP.
 O piloto usa dados autorizados, sessões separadas por saída e artefatos protegidos.
 Evitar logins simultâneos da mesma conta. Parar diante de senha recusada, captcha ou
 bloqueio; não produzir carga de login apenas para atingir uma amostra.
+
+O teste de 24 h responde apenas se vale iniciar a etapa de estabilidade. Não autoriza
+comprar seis IPs. Se o ISP não fizer o Bradesco concluir sob a mesma configuração, parar
+a hipótese de rede antes de migrar runtime ou multiplicar VMs.
 
 Gate operacional proposto: pelo menos cinco dias úteis e 50 execuções por banco,
 reaproveitando sessões e respeitando uso real. Se o uso for menor, estender o período.
@@ -199,7 +255,7 @@ resposta sem oferta não comprova o parser do painel de ofertas aprovadas.
 ### Objetivos de serviço, ainda sem SLA contratado
 
 - p95 até 30 s da aceitação ao início de uma rodada sem rodada anterior na fila.
-- p95 até 8 min para resultado terminal dos cinco bancos, com resultados parciais
+- p95 até 8 min para resultado terminal dos seis bancos, com resultados parciais
   disponibilizados assim que persistidos.
 - Medir espera por tarefa separadamente: os últimos bancos não começam em 30 s.
 - Testar espera total sob dez rodadas/h por loja antes de oferecer esse volume.
@@ -210,78 +266,148 @@ resposta sem oferta não comprova o parser do painel de ofertas aprovadas.
 
 ## 6. Capacidade e custos
 
-A referência local de 04/09 foi Fontecred 48 s, Pan 35 s, Bradesco 55 s,
-Santander 136 s e Motrix 48 s: **322 browser-segundos por rodada**.
+A referência combina a rodada de 04/09, Fontecred 48 s, Pan 35 s, Bradesco 55 s,
+Santander 136 s e Motrix 48 s, com a Omni em cerca de 120 s em 10/09. São
+**442 browser-segundos por rodada de seis bancos**. É referência de custo, não requisito
+nem p95. Volume real continua desconhecido.
 
-Seis lojas geram 30 tarefas. Com dois browsers globais, o limite inferior para esvaziar
-o lote é 1.932 / 2 = 966 s, aproximadamente 16 min, antes de boot, retries e timeouts.
+### Volumes transparentes
 
-Com dois browsers reservados por loja, o limite inferior é 161 s por rodada.
-Uma distribuição possível soma 171 s em um slot e 151 s no outro; sugere aproximadamente
-três minutos sem overhead, sem prever p95. O teto aritmético é 22,4 rodadas/h por loja.
-Santander, com uma execução por conta e 136 s, teria teto de 26,5/h nessa amostra.
+Para `d` rodadas/dia/loja e 22 dias:
 
-Dimensionar inicialmente para até dez rodadas/h por loja, uma rodada ativa e as
-demais em fila. Esses valores são hipóteses de capacidade a medir. Manter até dois
-browsers por loja/IP e um por conta; não tratar esse teto como limite publicado dos bancos.
+```text
+rodadas_mês_loja = d × 22
+browser_horas_loja = rodadas_mês_loja × 442 / 3.600
+```
 
-### Cenários de custo mensal
-
-USD, antes de impostos. Valores de saída Fly são só egress; valores de VPS incluem
-o plano indicado. **As colunas não são orçamentos equivalentes de solução completa.**
-
-| Lojas | Browsers reservados no pico | Só egress Fly, a US$ 3,60/loja | VPS 4 GB, a US$ 24/loja | VPS 8 GB, a US$ 44/loja |
+| Referência | Rodadas/dia/loja | Rodadas/mês/loja | Browser-h/mês, 1 loja | Browser-h/mês, 6 lojas |
 |---|---:|---:|---:|---:|
-| 1 | 2 | US$ 3,60 | US$ 24 | US$ 44 |
-| 6 | 12 | US$ 21,60 | US$ 144 | US$ 264 |
-| 25 | 50 | US$ 90 | US$ 600 | US$ 1.100 |
-| 100 | 200 | US$ 360 | US$ 2.400 | US$ 4.400 |
+| Baixo | 2 | 44 | 5,40 | 32,41 |
+| Base | 10 | 220 | 27,01 | 162,07 |
+| Alto | 30 | 660 | 81,03 | 486,20 |
 
-Fontes: [egress Fly](https://fly.io/docs/networking/egress-ips/) e
-[planos Lightsail](https://docs.aws.amazon.com/lightsail/latest/userguide/amazon-lightsail-bundles.html).
+Com dois browsers reservados por loja, a soma de 442 s tem limite inferior de 221 s
+por rodada. A distribuição real entre os dois slots ainda não foi medida com a Omni.
+Isso sugere pelo menos 3 min 41 s sem boot, retries ou espera, mas não prevê p95.
 
-O total Fly depende das Machines, tempo ligado, RAM/CPU, volumes e tráfego medidos.
-O total com ISP acrescenta IP exclusivo, tráfego/franquia e eventual plano mínimo.
-Não foi obtida cotação válida de ISP brasileiro para os bancos da Revy. Proxy externo
-pode substituir a saída estática Fly para o tráfego bancário; não somar ambos automaticamente.
+### Preços e regras usados
 
-Lightsail é referência de VPS, disponível em São Paulo desde junho de 2026. O plano
-Linux/IPv4 de 4 GB tem 2 vCPU; medir pico de RAM, swap e CPU com dois Chromiums antes
-de escolhê-lo. Associar static IP explicitamente; ele pode ser transferido para instância
-substituta. Em São Paulo, a franquia de tráfego é metade da tabela geral.
-[Região](https://aws.amazon.com/about-aws/whats-new/2026/06/amazon-lightsail-aws-regions/),
-[rede](https://docs.aws.amazon.com/lightsail/latest/userguide/amazon-lightsail-faq-networking.html),
-[franquia](https://docs.aws.amazon.com/lightsail/latest/userguide/amazon-lightsail-faq-data-transfer-allowance.html).
+O runtime Fly atual usa `shared-cpu-2x`, 2 GB, `gru`, on-demand e idle stop de 60 s.
+Na tabela oficial interativa, selecionando São Paulo (`gru`), essa Machine custa
+US$ 0,0256/h, ou no máximo US$ 18,40 por 30 dias iniciada. A cobrança iniciada é por
+segundo. Para representar a topologia atual por provedor com seis slots por rodada:
 
-Todos os cenários precisam incluir Motor/DB centrais, backup, monitoramento, suporte,
-operação, câmbio, impostos e excedentes. Conferir cotas e disponibilidade de VMs/IPs antes
-da expansão. Para 25 e 100 lojas, os recursos reservados crescem para 50 e 200 browsers;
-compartilhar hosts não elimina esse custo no pico simultâneo.
+```text
+machine_horas_loja = rodadas_mês_loja × (442 + 6 × 60) / 3.600
+compute_Fly_loja = machine_horas_loja × US$ 0,0256
+```
 
-### Custos e limitações de browsers gerenciados
+O termo `6 × 60` soma o idle dos seis workers. Boot, retries e timeouts não estão
+medidos, então o compute real será maior. Se o desenho futuro consolidar bancos em
+menos Machines, refazer a fórmula em vez de transportar este custo.
 
-Com dez rodadas/dia por loja em 22 dias, a referência consome aproximadamente
-19,7 browser-horas/mês/loja: 118 h para seis, 492 h para 25 e 1.968 h para 100.
-Além das horas, contratar concorrência, tráfego, estado persistente e saída adequada.
+| Referência | Machine-h Fly, 1 loja | Compute Fly, 1 loja | Machine-h Fly, 6 lojas | Compute Fly, 6 lojas |
+|---|---:|---:|---:|---:|
+| Baixo | 9,80 | US$ 0,25 | 58,81 | US$ 1,51 |
+| Base | 49,01 | US$ 1,25 | 294,07 | US$ 7,53 |
+| Alto | 147,03 | US$ 3,76 | 882,20 | US$ 22,58 |
 
-| Serviço | Preços consultados | Ressalva |
-|---|---|---|
-| Browserbase Developer / Startup | US$ 20 / 99 por mês; 100 / 500 h; 25 / 100 browsers; 1 / 5 GB de proxy | Excedentes: US$ 0,12 / 0,10 por hora e US$ 12 / 10 por GB; proxy integrado tem restrições bancárias |
-| Browserless Prototyping / Starter / Scale | US$ 25 / 140 / 350 por mês, cobrados anualmente; 20 mil / 180 mil / 500 mil unidades; 10 / 40 / 100 browsers | Unidade de até 30 s por conexão; proxy residencial acrescenta 6 unidades/MB |
+Custos fixos e excedentes:
 
-Fontes: [Browserbase](https://www.browserbase.com/pricing) e
-[Browserless](https://www.browserless.io/pricing). No Browserless, arredondar por conexão;
-arredondar apenas os 322 s totais subestima várias conexões curtas.
+- Fly static egress: US$ 3,60/mês por app/loja, cobrado por hora. Tráfego público saindo
+  da América do Sul: US$ 0,04/GB. Um ISP externo substitui o static egress; não somar
+  os dois.
+- Fly parado: US$ 0,15/GB-mês de rootfs, proporcional ao tempo parado. O tamanho da
+  rootfs usada por Machine não foi medido. Na topologia por provedor com seis Machines
+  por loja, adicionar
+  `6 × lojas × rootfs_GB × US$ 0,15 × fração_parada`.
+- Fly Volume: US$ 0,15/GB-mês mesmo com a Machine parada. Se o desenho usar um volume
+  de 1 GB por provedor para sessão, adicionar US$ 0,75/loja, ou US$ 4,50 para seis.
+  Snapshots custam US$ 0,08/GB-mês após os primeiros 10 GB mensais gratuitos; contam
+  dados gravados, não capacidade provisionada.
+- IPRoyal ISP: preço inicial de US$ 1,80/IP por 24 h ou US$ 2,70/IP por 30 dias;
+  100 GB/mês/IP antes de redução de velocidade. Brasil, KYC e bancos ainda precisam
+  de confirmação. Todos os subtotais com ISP abaixo usam US$ 2,70/loja/mês.
+- Browserbase Developer: mínimo de US$ 20/mês, 100 browser-h, 25 concorrentes e
+  excedente de US$ 0,12/browser-h. A cobrança arredonda cada sessão por minuto; as
+  seis durações de referência viram 9 minutos faturáveis por rodada, não 442 s.
+  Há 1 GB de proxy e excedente de US$ 12/GB. A documentação não separa claramente
+  essa medição para proxy externo; se ele for medido, adicionar
+  `máx(0, proxy_GB - 1) × US$ 12` e confirmar antes da compra.
+- Browserless: Prototyping custa US$ 25/mês no anual, inclui 20 mil unidades e dez
+  browsers; Starter custa US$ 140/mês no anual, inclui 180 mil unidades e 40 browsers.
+  As seis durações consomem `2 + 2 + 2 + 5 + 2 + 4 = 17` unidades por rodada. Proxy
+  externo não consome unidades de proxy.
+- Lightsail Linux/IPv4: 4 GB/2 vCPU custa até US$ 24/mês; 32 GB/8 vCPU, até
+  US$ 164/mês. A cobrança é horária até esse teto. O plano inclui SSD e IPv4 público;
+  é preciso criar e associar o IPv4 estático, sem custo adicional enquanto associado.
+  Em São Paulo, a franquia é metade da tabela: 2 TB no plano de 4 GB e 3,5 TB no de
+  32 GB. Excedente de saída custa US$ 0,15/GB.
+
+Fontes: [Fly, preços de compute, rootfs, volumes, snapshots e rede](https://fly.io/docs/about/pricing/),
+[Fly, cobrança de Machines](https://fly.io/docs/about/billing/#machine-billing),
+[Fly, static egress](https://fly.io/docs/networking/egress-ips/),
+[IPRoyal](https://iproyal.com/pricing/static-residential-proxies/),
+[Lightsail, planos](https://docs.aws.amazon.com/lightsail/latest/userguide/amazon-lightsail-bundles.html),
+[Lightsail, IP estático](https://docs.aws.amazon.com/lightsail/latest/userguide/understanding-static-ip-addresses-in-amazon-lightsail.html),
+[Lightsail, tráfego regional](https://docs.aws.amazon.com/lightsail/latest/userguide/amazon-lightsail-faq-data-transfer-allowance.html),
+[Browserbase](https://docs.browserbase.com/account/billing/plans) e
+[Browserless](https://www.browserless.io/pricing).
+
+### Subtotais mensais calculáveis
+
+USD, antes de impostos. Não somam Motor/API/DB centrais, pois já existem e são comuns
+a todas as opções. Fly inclui compute da fórmula e static egress **ou** ISP. Browserbase
+e Browserless incluem o plano mínimo aplicável e um ISP por loja. Lightsail assume
+instância ligada o mês inteiro porque não existe hoje orquestração on-demand fora do Fly;
+com parada controlada, aplicar a cobrança horária até o teto.
+
+| 1 loja | Baixo | Base | Alto | Chance de resolver Bradesco |
+|---|---:|---:|---:|---|
+| Fly on-demand + static egress | US$ 3,85 | US$ 4,85 | US$ 7,36 | **Baixa** |
+| Fly on-demand + ISP | a partir de US$ 2,95 | a partir de US$ 3,95 | a partir de US$ 6,46 | **Melhor aposta, não provada** |
+| Browserbase Developer + ISP | a partir de US$ 22,70 | a partir de US$ 22,70 | a partir de US$ 22,70 | **Plausível, não provada** |
+| Browserless Prototyping + ISP | a partir de US$ 27,70 | a partir de US$ 27,70 | a partir de US$ 27,70 | **Plausível, não provada** |
+| Lightsail 4 GB direto | US$ 24,00 | US$ 24,00 | US$ 24,00 | **Baixa** |
+| Lightsail 4 GB + ISP | a partir de US$ 26,70 | a partir de US$ 26,70 | a partir de US$ 26,70 | **Plausível, não provada** |
+
+| 6 lojas | Baixo | Base | Alto | Chance de resolver Bradesco |
+|---|---:|---:|---:|---|
+| Fly on-demand + static egress | US$ 23,11 | US$ 29,13 | US$ 44,18 | **Baixa** |
+| Fly on-demand + ISP | a partir de US$ 17,71 | a partir de US$ 23,73 | a partir de US$ 38,78 | **Melhor aposta, não provada** |
+| Browserbase Developer + 6 ISP | a partir de US$ 36,20 | a partir de US$ 47,96 | a partir de US$ 95,48 | **Plausível, não provada** |
+| Browserless Starter + 6 ISP | a partir de US$ 156,20 | a partir de US$ 156,20 | a partir de US$ 156,20 | **Plausível, não provada** |
+| Lightsail compartilhado 32 GB direto, 1 IP para 6 lojas | US$ 164,00 | US$ 164,00 | US$ 164,00 | **Baixa; não atende IP por loja** |
+| Lightsail compartilhado 32 GB + 6 ISP | a partir de US$ 180,20 | a partir de US$ 180,20 | a partir de US$ 180,20 | **Plausível, não provada** |
+| 6 Lightsail de 4 GB diretos | US$ 144,00 | US$ 144,00 | US$ 144,00 | **Baixa** |
+| 6 Lightsail de 4 GB + 6 ISP | a partir de US$ 160,20 | a partir de US$ 160,20 | a partir de US$ 160,20 | **Plausível, não provada** |
+
+Nos valores Browserbase para seis lojas, os tempos faturáveis são 39,6 h, 198 h e
+594 h; as duas últimas colunas incluem overage acima de 100 h. No Browserless, os
+volumes usam 4.488, 22.440 e 67.320 unidades, todos dentro do Starter. O Starter é
+necessário para reservar 12 browsers; o Prototyping para em dez.
+
+Os subtotais Fly não incluem rootfs, volume nem bytes de egress porque esses três
+tamanhos não foram medidos. Adicionar as fórmulas acima. Os subtotais Browserbase
+não incluem eventual cobrança de GB do proxy externo. Os valores ISP são preços
+iniciais públicos, não cotação brasileira nem garantia de acesso bancário. O preço
+do Lightsail compartilhado usa 32 GB para preservar a referência de 4 GB por dois
+browsers; 16 GB custaria US$ 84/mês, mas a capacidade de CPU/RAM de nenhum dos dois
+planos para 12 browsers foi medida. O cenário compartilhado direto é apenas comparativo:
+seu único IP não satisfaz a saída fixa por loja.
+
+### Sessão persistente nos runtimes gerenciados
 
 Browserbase preserva Contexts até exclusão/invalidação; um Context por loja/site/login,
-sem uso simultâneo. Desligar replay não desliga Live View nem impede processamento dos
-dados pelo fornecedor. [Contexts](https://docs.browserbase.com/platform/browser/core-features/contexts),
+sem uso simultâneo. O portal ainda pode expirar cookies ou rejeitar mudança de rede.
+Desligar replay não desliga Live View nem impede processamento dos dados pelo fornecedor.
+[Contexts](https://docs.browserbase.com/platform/browser/core-features/contexts),
 [replay](https://docs.browserbase.com/platform/browser/observability/session-replay),
 [proxies e restrições](https://docs.browserbase.com/platform/identity/proxies).
 
-Browserless oferece persistência de até 7/30/90 dias nesses planos; exclusão/expiração
-remove o estado e replay vem desligado por padrão. URLs de sessão contêm token.
-Sticky vale durante a sessão, sem comprovação de IP permanente por loja.
+Browserless persiste estado por até 7 dias no Prototyping e 30 no Starter; ao expirar,
+remove os dados. URLs de sessão contêm token. O proxy externo mantém a saída escolhida,
+mas estado persistente não torna um IP aceitável nem impede vínculo da sessão à rede.
 [Estado e retenção](https://docs.browserless.io/baas/session-management/persisting-state),
 [proxies](https://docs.browserless.io/baas/bot-detection/proxies).
 
@@ -407,7 +533,7 @@ Não assumir que esse snapshot continua atual após a atuação do outro agente.
 
 ### Aceite da implementação futura
 
-- Seis lojas iniciam cinco bancos sem cruzar dados, credenciais ou sessões.
+- Seis lojas iniciam seis bancos sem cruzar dados, credenciais ou sessões.
 - A carga de uma loja não consome a capacidade reservada das outras.
 - Limites de browser/IP/conta e reserva são aplicados atomicamente.
 - Falha de executor, perda de rede e resultado atrasado não geram execução concorrente.
@@ -427,9 +553,9 @@ Verificação quando houver implementação:
 
 | Decisão | Proposta para avaliação |
 |---|---|
-| Hospedagem | Manter Fly; reconsiderar VPS com custo/capacidade medidos |
-| Saída de rede | Direta estática se aceita; ISP dedicado somente se necessário e validado |
-| Piloto | Uma loja, após correção do lease, antes de contratar a expansão |
+| Hospedagem | Manter Fly on-demand; reconsiderar VPS só com vantagem de custo/capacidade medida |
+| Saída de rede | Egress estático como controle; IPRoyal ISP só se o piloto provar ganho e o uso for autorizado |
+| Piloto | Uma loja, controle Fly e depois um ISP por 24 h; nunca PC residencial ou da loja |
 | Volume e orçamento | Confirmar rodadas por hora no pico e custo máximo por loja |
 | Acesso bancário | Confirmar políticas de RPA, APIs e eventual allowlisting com os bancos |
 | Suporte | Definir responsável por captcha/MFA, recuperação e retenção de artefatos |
@@ -438,3 +564,56 @@ Verificação quando houver implementação:
 Este documento autoriza a continuidade da discussão arquitetural. Não registra aprovação
 de gasto, fornecedor, login de piloto, deploy ou implementação. A correção do Bradesco
 permanece com o outro agente.
+
+## 10. Checkpoint da discussão de 11/09
+
+Decisões confirmadas pelo dono nesta conversa:
+
+- A operação atual tem uma loja. Seis lojas são cenário futuro para comparação, não o
+  tamanho do piloto nem uma necessidade atual de doze browsers.
+- Piloto e produção serão 100% cloud. PC residencial ou da loja não entra nem como controle.
+- Confiabilidade bancária vem antes do menor preço, mas a escolha precisa ter bom
+  custo-benefício.
+- O volume por loja ainda é desconhecido. Os cenários de 2, 10 e 30 rodadas/dia são apenas
+  referências para comparar preços.
+- O Bradesco concluiu localmente em rede residencial e nunca concluiu no Fly. Isso sustenta
+  a hipótese de rede, mas ainda não prova que um ISP cloud será aceito.
+- A comparação precisa mostrar o custo total separando runtime, saída de rede, persistência,
+  tráfego e excedentes. Preço de proxy sozinho não é preço da solução.
+
+Estado da análise:
+
+- Melhor aposta atual: Fly on-demand com um ISP brasileiro estático e dedicado por loja.
+- Controle cloud: Fly com static egress. É barato e necessário para comparação, mas tem
+  baixa chance de resolver o Bradesco porque continua em rede de datacenter.
+- Primeiro fornecedor a consultar: IPRoyal. O preço público parte de US$ 1,80 por 24 h e
+  US$ 2,70 por 30 dias, mas Brasil, estoque, KYC, preço final e os seis domínios precisam
+  de confirmação escrita.
+- Browserbase com ISP externo é a segunda arquitetura a manter se operar o Chromium no Fly
+  ficar difícil. Custa mais e acrescenta outro fornecedor processando as sessões bancárias.
+- Browserless a US$ 25/mês aceita dez browsers concorrentes. Reservar doze browsers para
+  seis lojas empurra a comparação para o plano de US$ 140/mês. Essa concorrência precisa
+  ser confirmada depois de medir o volume real.
+- VPS por loja não resolve reputação de rede: seis Lightsail de 4 GB custam US$ 144/mês
+  diretamente ou pelo menos US$ 160,20 com seis ISPs.
+- ProxyEmpire, Oxylabs de autosserviço, Bright Data, proxy rotativo e PC residencial ficam
+  fora do ranking atual pelos motivos registrados na seção 2.
+
+Conclusão sobre sessão quente:
+
+- `MOTOR_WARM_SESSION` vem ligado por padrão.
+- O Motor separa o `storage_state` por loja/provedor e o carrega no browser.
+- O Bradesco reconhece uma página já autenticada e não preenche CPF/senha novamente.
+- O Bradesco só salva o `storage_state` depois de receber e interpretar as ofertas. Como
+  nunca concluiu na cloud, não há prova ao vivo de que sua sessão quente funcione lá.
+- O piloto deve medir sessões frias e quentes separadamente. Trocar a saída pode invalidar
+  uma sessão existente se o banco vincular cookies ou tokens à rede.
+
+Próximo objetivo:
+
+1. Confirmar a correção de lease, retry e resultado terminal antes de medir infraestrutura.
+2. Obter a cotação real da IPRoyal e a permissão escrita para os seis domínios bancários.
+3. Rodar uma loja na cloud como controle, com static egress do Fly.
+4. Rodar a mesma imagem e configuração com um ISP cloud durante 24 horas.
+5. Só depois de aprovação técnica, medir cinco dias úteis e decidir a expansão para seis
+   lojas.
