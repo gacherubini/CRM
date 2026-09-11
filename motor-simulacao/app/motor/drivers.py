@@ -136,7 +136,7 @@ REAL_DRIVERS: dict[str, Driver] = {}
 # Nomes canônicos dos drivers reais. Estava escrito à mão em dois lugares (o guard
 # do registro e o filtro de `resolver_drivers`); acrescentar banco e esquecer o
 # segundo fazia o provedor ser descartado em silêncio, sem erro. Uma constante só.
-NOMES_REAIS = frozenset({"santander", "pan", "fontecred", "bradesco", "motrix"})
+NOMES_REAIS = frozenset({"santander", "pan", "fontecred", "bradesco", "motrix", "omni"})
 
 
 def _registrar_drivers_reais() -> None:
@@ -148,6 +148,7 @@ def _registrar_drivers_reais() -> None:
     from app.motor.fontecred import fabrica_fontecred
     from app.motor.bradesco import fabrica_bradesco
     from app.motor.motrix import fabrica_motrix
+    from app.motor.omni import fabrica_omni
 
     driver = fabrica_santander()
     # Registrado apenas em minúsculo ("santander"): é o nome canônico usado para
@@ -165,6 +166,8 @@ def _registrar_drivers_reais() -> None:
     REAL_DRIVERS["bradesco"] = fabrica_bradesco()
     # Motrix (plataforma joinbank): banco novo, sem homônimo mock.
     REAL_DRIVERS["motrix"] = fabrica_motrix()
+    # Omni (Omni+ motocicletas): banco novo, sem homônimo mock.
+    REAL_DRIVERS["omni"] = fabrica_omni()
 
 
 def _pan_dispatch(

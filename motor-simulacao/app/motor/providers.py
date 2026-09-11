@@ -69,6 +69,19 @@ PROVEDORES_REAIS: dict[str, dict[str, Any]] = {
             {"nome": "senha", "rotulo": "Senha do portal", "secreto": True},
         ],
     },
+    "omni": {
+        "nome": "omni",
+        "rotulo": "Omni",
+        "habilitado": True,
+        "real": True,
+        # Omni+ (financiamento de motocicletas). Playwright direto, sem WAF
+        # observado em 10/09/2026 — ver o docstring de app/motor/omni.py.
+        "modo": "playwright",
+        "campos_credencial": [
+            {"nome": "usuario", "rotulo": "Usuário do portal Omni+", "secreto": False},
+            {"nome": "senha", "rotulo": "Senha do portal", "secreto": True},
+        ],
+    },
 }
 
 

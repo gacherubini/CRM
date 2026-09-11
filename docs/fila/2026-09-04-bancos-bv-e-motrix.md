@@ -38,6 +38,31 @@
 > - Rodada dos cinco em 04/09 17:06: Fontecred 48s OK, Pan 35s OK, Bradesco 55s OK,
 >   Santander 136s OK, Motrix 48s RECUSA. Suíte 275 verdes (eram 253).
 
+## 10/09/2026 — BV: diagnóstico anti-bot, RPA inviável por enquanto
+
+Tentativas com credencial válida (provada no navegador do dono no mesmo dia):
+
+- Vanilla/headless-shell: `ERR_HTTP2_PROTOCOL_ERROR` (shell) ou recusa explícita
+  "usuário ou senha inválidos… solicite a ativação do login" — 1 tentativa por
+  rodada, sem insistir.
+- Stealth (fingerprint anti-Akamai do Santander) + digitação humana com ritmo
+  irregular: sem recusa explícita, mas o backend nunca responde (spinner 40s+).
+
+Captura de rede da página de login, **sem logar** (prova, não hipótese):
+
+- Sensor Akamai BM carrega e reporta (`/akam/13/…`, beacon, cookies
+  `_abck`/`bm_sz`/`bm_sv` emitidos); reCAPTCHA Enterprise invisível ativo.
+- `GET …/ppar-base-dealer-simulador-rs/api-security/user` → **403** para o
+  Chromium automatizado. O gate é por score de bot, não por credencial — e o
+  Angular não trata a falha (spinner eterno).
+
+Decisão: **não insistir no login-robô** (cada tentativa contamina o score e
+ameaça o acesso manual da loja). Opções restantes: sessão morna (dono loga,
+robô reusa — experimento incerto, pois as APIs negam por score) ou **API de
+parceiro F&I com o gerente** (caminho definitivo). Roteiro do que pedir ao
+gerente em `docs/referencia-viva/planos/2026-07-13-plano1a-task12-bancos-reconhecimento.md`
+(seção "Roteiro para o gerente").
+
 ## Objetivo
 
 Colocar **BV** e **Motrix** de pé no Motor, cada um verificado ao vivo pelo
