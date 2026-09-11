@@ -320,6 +320,10 @@ a.avatar[aria-current="page"] {
   padding-inline: var(--page-inline);
   padding-block: var(--space-7) var(--space-9);
 }
+/* Shell: em tela cheia o conteúdo não estica até a borda. Alinhado à
+   esquerda, junto da barra lateral — centralizar deslocaria o cabeçalho
+   para longe do contexto da página no topo. */
+.app-shell-loja .content { max-width: 76rem; }
 
 h1, h2, h3, p { margin-top: 0; }
 h1, h2, h3 { letter-spacing: -.025em; font-weight: 600; }
@@ -918,7 +922,9 @@ fieldset > legend {
   accent-color: var(--ink);
 }
 
-.table-wrap { overflow-x: auto; }
+/* relative: ancora os .sr-only (position:absolute) dos <th> — sem isso o
+   span da última coluna escapa do scroller e estica a página no mobile. */
+.table-wrap { position: relative; overflow-x: auto; }
 table {
   width: 100%;
   border-collapse: collapse;
