@@ -1,5 +1,5 @@
 {
- "sha": "3fb18c9",
+ "sha": "279284e",
  "inventario": {
   "chatbot-api": [
    {
@@ -2505,31 +2505,45 @@
    },
    {
     "secao": "rota",
+    "chave": "GET /app/loja/vendas/lista/demo",
+    "simbolo": "/app/loja/vendas/lista/demo",
+    "arquivo": "prototype_atendimento.py",
+    "linha": 334
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /app/loja/vendas/editar/demo",
+    "simbolo": "/app/loja/vendas/editar/demo",
+    "arquivo": "prototype_atendimento.py",
+    "linha": 377
+   },
+   {
+    "secao": "rota",
     "chave": "GET /app/loja/financeiro/demo",
     "simbolo": "/app/loja/financeiro/demo",
     "arquivo": "prototype_atendimento.py",
-    "linha": 334
+    "linha": 410
    },
    {
     "secao": "rota",
     "chave": "GET /app/loja/estoque/veiculos/demo",
     "simbolo": "/app/loja/estoque/veiculos/demo",
     "arquivo": "prototype_atendimento.py",
-    "linha": 433
+    "linha": 509
    },
    {
     "secao": "rota",
     "chave": "GET /app/loja/estoque/veiculos/form/demo",
     "simbolo": "/app/loja/estoque/veiculos/form/demo",
     "arquivo": "prototype_atendimento.py",
-    "linha": 450
+    "linha": 526
    },
    {
     "secao": "rota",
     "chave": "GET /app/loja/financeiro/despesas/demo",
     "simbolo": "/app/loja/financeiro/despesas/demo",
     "arquivo": "prototype_atendimento.py",
-    "linha": 472
+    "linha": 548
    },
    {
     "secao": "template",

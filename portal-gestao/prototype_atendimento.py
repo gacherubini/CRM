@@ -331,6 +331,82 @@ async def vendas_demo(request: Request):
     return HTMLResponse(html)
 
 
+@app.get('/app/loja/vendas/lista/demo', response_class=HTMLResponse)
+async def vendas_lista_demo(request: Request):
+    # Lista redesenhada em 11/09: livro-caixa com valor à direita, ações na
+    # linha e cancelamento em disclosure. Cenário com os três estados.
+    def formatar_brl(valor):
+        try:
+            numero = float(valor)
+        except (TypeError, ValueError):
+            return '—'
+        texto = f'{numero:,.2f}'.replace(',', '_').replace('.', ',').replace('_', '.')
+        return f'R$ {texto}'
+
+    def formatar_data(iso):
+        if not iso:
+            return ''
+        try:
+            return date.fromisoformat(str(iso)[:10]).strftime('%d/%m/%Y')
+        except ValueError:
+            return str(iso)
+
+    vendas = [
+        NS(id='v1', descricao='Honda CG 160 Titan 2022', preco_venda=14900.0,
+           criada_em='2026-09-09', vendedor_email='rafael@example.invalid',
+           status='registrada', motivo_cancelamento=None),
+        NS(id='v2', descricao='Yamaha Fazer FZ25 2023 — Marina', preco_venda=21500.0,
+           criada_em='2026-09-08', vendedor_email='rafael@example.invalid',
+           status='confirmada', motivo_cancelamento=None),
+        NS(id='v3', descricao='Honda Biz 125 2021', preco_venda=11500.0,
+           criada_em='2026-09-05', vendedor_email='barbara@example.invalid',
+           status='cancelada', motivo_cancelamento='Cliente desistiu — entrada não aprovada'),
+    ]
+    context = _shell_demo(request)
+    context.update(
+        nav_item_is_active=lambda item, path: item.href == '/app/loja/vendas/lista',
+        vendas=vendas, escopo_proprio=False, pode_agir=True, pode_registrar=True,
+        pode_editar=True, aviso_ok=None, aviso_erro=None, csrf='demonstracao',
+        formatar_brl=formatar_brl, formatar_data=formatar_data,
+    )
+    html = env.get_template('loja/vendas_lista.html').render(**context)
+    html = re.sub(r'<link\b[^>]*https://fonts\.(?:googleapis|gstatic)\.com[^>]*>', '', html)
+    return HTMLResponse(html)
+
+
+@app.get('/app/loja/vendas/editar/demo', response_class=HTMLResponse)
+async def venda_editar_demo(request: Request):
+    # Ficha de edição redesenhada em 11/09: venda confirmada (só valores
+    # editáveis) com custos diretos lançados. Sem persistência.
+    def formatar_brl(valor):
+        try:
+            numero = float(valor)
+        except (TypeError, ValueError):
+            return '—'
+        texto = f'{numero:,.2f}'.replace(',', '_').replace('.', ',').replace('_', '.')
+        return f'R$ {texto}'
+
+    venda = NS(
+        id='v2', descricao='Yamaha Fazer FZ25 2023 — Marina', status='confirmada',
+        preco_venda=21500.0, custo_veiculo=17200.0,
+        lead_ref='lead_marina', veiculo_ref='v9',
+        custos_diretos=[
+            NS(id='c1', categoria='documentacao', valor=450.0),
+            NS(id='c2', categoria='frete', valor=300.0),
+        ],
+    )
+    context = _shell_demo(request)
+    context.update(
+        nav_item_is_active=lambda item, path: item.href == '/app/loja/vendas/lista',
+        venda=venda, campos=('preco_venda', 'custo_veiculo'),
+        categorias=['documentacao', 'frete', 'comissao'],
+        aviso_erro=None, csrf='demonstracao', formatar_brl=formatar_brl,
+    )
+    html = env.get_template('loja/venda_editar.html').render(**context)
+    html = re.sub(r'<link\b[^>]*https://fonts\.(?:googleapis|gstatic)\.com[^>]*>', '', html)
+    return HTMLResponse(html)
+
+
 @app.get('/app/loja/financeiro/demo', response_class=HTMLResponse)
 async def financeiro_demo(request: Request):
     # Task 8 (direcao "fechamento"): rende o template real com dados ficticios

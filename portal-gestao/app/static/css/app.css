@@ -4925,3 +4925,173 @@ form[data-periodo-melhorado] { position: relative; }
 @media (max-width: 960px) {
   .vef-corpo { grid-template-columns: 1fr; }
 }
+
+/* --- Vendas: livro de fechamento (redesign de 11/09) ---
+   O dia é o capítulo (rail de data com fio) e o valor é a espinha, na voz da
+   marca. Identidade à esquerda, valor e estado à direita, ações na linha e
+   cancelamento em disclosure quieto. Somente tokens existentes; sem :root novo. */
+.vnd-lista { margin: 0; list-style: none; }
+/* O dia é o capítulo do livro: rail com fio, sem reordenar as linhas. */
+.vnd-dia {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-5) var(--space-5) var(--space-2);
+  color: var(--ink-muted);
+  font-size: var(--text-xs);
+  font-weight: 600;
+}
+.vnd-dia::after { content: ""; flex: 1; height: 1px; background: var(--line); }
+.vnd-ficha {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3) var(--space-5);
+  padding: var(--space-4) var(--space-5);
+}
+.vnd-ficha + .vnd-ficha { border-top: 1px solid var(--line); }
+.vnd-ficha:hover { background: var(--surface-soft); }
+/* Terminal não disputa atenção (mesma regra do .status.cancelada): a linha
+   apagada continua legível, mas some do primeiro plano. */
+.vnd-ficha--terminal .vnd-nome { color: var(--ink-soft); font-weight: 500; }
+.vnd-ficha--terminal .vnd-valor { color: var(--ink-muted); }
+.vnd-quem { flex: 1 1 240px; min-width: 0; display: grid; gap: 3px; }
+.vnd-nome { font-size: var(--text-base); letter-spacing: -.01em; }
+.vnd-meta { color: var(--ink-muted); font-size: var(--text-xs); }
+.vnd-lado {
+  margin-left: auto;
+  display: grid;
+  gap: var(--space-1);
+  justify-items: end;
+  text-align: right;
+}
+/* Valor no mesmo caminho dos outros livros-caixa (.despesa-valor-mes,
+   .vei-preco): Hanken 600 tabular. A Newsreader fica reservada ao display
+   (manifestos), como manda a fonte única dos tokens. */
+.vnd-valor {
+  font-size: var(--text-lg);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.vnd-acoes {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
+.vnd-ficha .button { min-height: 34px; padding: 0 12px; font-size: var(--text-xs); }
+
+/* Cancelamento: ação destrutiva recolhida — o motivo é campo, não diálogo. */
+.vnd-cancelar { display: grid; gap: var(--space-2); justify-items: end; }
+.vnd-cancelar > summary {
+  list-style: none;
+  cursor: pointer;
+  color: var(--ink-soft);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.vnd-cancelar > summary::-webkit-details-marker { display: none; }
+.vnd-cancelar > summary::marker { content: ""; }
+.vnd-cancelar > summary:hover { color: var(--ink); }
+.vnd-cancelar > form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
+.vnd-cancelar input[type="text"] { width: min(18rem, 60vw); min-height: 34px; }
+
+@media (max-width: 720px) {
+  .vnd-dia { padding-top: var(--space-4); }
+  .vnd-ficha { align-items: flex-start; }
+  .vnd-lado { margin-left: 0; justify-items: start; text-align: left; }
+  .vnd-cancelar { justify-items: start; }
+  .vnd-cancelar > form { justify-content: flex-start; }
+}
+
+/* Ficha de edição: valores à esquerda, livro de custos à direita — a mesma
+   composição do formulário de veículo, sem foto. */
+.vnd-corpo {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, .85fr);
+  gap: var(--space-4);
+  align-items: start;
+}
+.vnd-corpo > .panel,
+.vnd-corpo form > .panel { margin-bottom: 0; }
+
+/* Fecho do formulário: Salvar separado do painel por fio, no mesmo padrão do
+   formulário de veículo. */
+.vnd-form-acoes {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  margin-top: var(--space-4);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--line);
+}
+
+/* Custos diretos: linha de livro-caixa + lançamento em disclosure. */
+.vnd-custos {
+  margin: 0;
+  padding: 0 var(--space-5);
+  display: grid;
+  list-style: none;
+}
+.vnd-custos > li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid var(--line);
+}
+.vnd-custos > li:last-child { border-bottom: 0; }
+.vnd-custos strong { font-size: var(--text-sm); font-weight: 600; }
+.vnd-custo-valor {
+  margin-left: auto;
+  color: var(--ink);
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+}
+.vnd-remover {
+  background: none;
+  border: 0;
+  padding: 0;
+  color: var(--ink-muted);
+  font-size: var(--text-xs);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+.vnd-remover:hover { color: var(--ink); }
+
+.vnd-custo-novo { padding: 0 var(--space-5) var(--space-5); }
+.vnd-custo-novo > summary {
+  padding-top: var(--space-3);
+  list-style: none;
+  cursor: pointer;
+  color: var(--ink-soft);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.vnd-custo-novo > summary::-webkit-details-marker { display: none; }
+.vnd-custo-novo > summary::marker { content: ""; }
+.vnd-custo-novo > summary:hover { color: var(--ink); }
+.vnd-custo-novo .form-grid { padding-top: var(--space-4); max-width: 44rem; }
+.vnd-custo-acao { margin-top: var(--space-1); }
+
+@media (max-width: 960px) {
+  .vnd-corpo { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 720px) {
+  .vnd-custos { padding: 0 var(--space-4); }
+  .vnd-custo-novo { padding: 0 var(--space-4) var(--space-4); }
+}
