@@ -287,3 +287,39 @@ def test_criar_chama_acordar_quando_flags(db, monkeypatch):
     sim, _ = servico.criar_simulacao(db, _sol(["santander"]), "c1")
     res = acordar_workers(db, simulacao_id=sim.id, lifecycle=fake)
     assert res["acordados"] == 1
+
+
+def test_banco_sem_worker_encerra_a_tarefa_em_vez_de_ficar_na_fila(db, monkeypatch):
+    """Motrix de 12/09: sem slot Fly, a tarefa ficava `recebida` para sempre, o job
+    nunca fechava e cada tick gravava mais um aviso (mais de mil eventos)."""
+    from app.models_db import SimulacaoEventoORM, SimulacaoORM
+
+    monkeypatch.setattr(config, "FANOUT_ENABLED", True)
+    monkeypatch.setattr(config, "FLY_AUTOSCALE_ENABLED", True)
+    monkeypatch.setattr(config, "MAX_BROWSER_WORKERS", 4)
+    upsert_slot(db, provedor="santander", fly_machine_id="fly-sant-1", tipo_driver="playwright")
+
+    sim, _ = servico.criar_simulacao(db, _sol(["santander", "bradesco"]), "c1")
+    fake = FakeLifecycle()
+    for _ in range(3):
+        acordar_workers(db, simulacao_id=sim.id, lifecycle=fake)
+
+    brad = db.query(SimulacaoProvedorORM).filter_by(simulacao_id=sim.id, provedor="bradesco").one()
+    assert brad.status == "falhou"
+    assert brad.codigo_erro == "worker_indisponivel"
+    avisos = (
+        db.query(SimulacaoEventoORM)
+        .filter_by(simulacao_id=sim.id, provedor="bradesco", etapa="worker_indisponivel")
+        .count()
+    )
+    assert avisos == 1
+    # O banco com worker segue normalmente.
+    sant = db.query(SimulacaoProvedorORM).filter_by(simulacao_id=sim.id, provedor="santander").one()
+    assert sant.status in {"acordando_worker", "processando"}
+
+    so_sem_worker, _ = servico.criar_simulacao(db, _sol(["bradesco"]), "c1")
+    acordar_workers(db, simulacao_id=so_sem_worker.id, lifecycle=fake)
+    db.expire_all()
+    job = db.get(SimulacaoORM, so_sem_worker.id)
+    assert job.status == "falhou"
+    assert [r.codigo_erro for r in job.resultados] == ["worker_indisponivel"]

@@ -62,6 +62,60 @@ def _rewake_stale(slot: WorkerSlotORM) -> bool:
     return (_agora() - ultimo).total_seconds() >= config.WORKER_REWAKE_SECONDS
 
 
+def _encerrar_sem_worker(
+    db: Session, tarefas: list[SimulacaoProvedorORM], provedor: str
+) -> None:
+    """Banco sem slot Fly nunca vai ser atendido: encerra em vez de deixar na fila.
+
+    Antes a tarefa ficava ``recebida`` para sempre, o job nunca fechava e cada
+    tick gravava mais um aviso (Motrix, 12/09: mais de mil eventos).
+    """
+    from app.models_db import ResultadoORM, SimulacaoORM
+    from app.processamento import agregar_status_job_pai
+
+    agora = _agora()
+    sims: set[str] = set()
+    for t in tarefas:
+        linhas = (
+            db.query(SimulacaoProvedorORM)
+            .filter(
+                SimulacaoProvedorORM.id == t.id,
+                SimulacaoProvedorORM.status.in_(STATUS_PENDENTES),
+            )
+            .update(
+                {
+                    "status": "falhou",
+                    "codigo_erro": "worker_indisponivel",
+                    "finalizada_em": agora,
+                    "atualizada_em": agora,
+                },
+                synchronize_session=False,
+            )
+        )
+        if linhas != 1 or db.get(SimulacaoORM, t.simulacao_id) is None:
+            continue
+        db.add(
+            ResultadoORM(
+                simulacao_id=t.simulacao_id,
+                provedor=provedor,
+                status="erro",
+                codigo_erro="worker_indisponivel",
+            )
+        )
+        _registrar_evento_sim(
+            db,
+            t.simulacao_id,
+            "worker_indisponivel",
+            f"{provedor} não tem worker no Fly; o banco ficou fora desta simulação.",
+            "erro",
+            provedor=provedor,
+        )
+        sims.add(t.simulacao_id)
+    db.commit()
+    for sim_id in sims:
+        agregar_status_job_pai(db, sim_id)
+
+
 def slots_para_provedor(db: Session, provedor: str) -> list[WorkerSlotORM]:
     return (
         db.query(WorkerSlotORM)
@@ -133,15 +187,7 @@ def acordar_workers(
         slots = slots_para_provedor(db, provedor)
         if not slots:
             resultado["sem_slot"] += len(lista)
-            for t in lista:
-                _registrar_evento_sim(
-                    db,
-                    t.simulacao_id,
-                    "worker_indisponivel",
-                    f"Sem slot Fly configurado para {provedor}; tarefa fica na fila.",
-                    "aviso",
-                    provedor=provedor,
-                )
+            _encerrar_sem_worker(db, lista, provedor)
             continue
         slot = slots[0]
         if slot.fly_machine_id not in allow:
