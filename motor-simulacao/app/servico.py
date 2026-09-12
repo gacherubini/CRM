@@ -351,4 +351,10 @@ def para_pydantic(sim: SimulacaoORM) -> Simulacao:
             sim.prazos_meses
             or ([sim.prazo_meses] if sim.prazo_meses is not None else [])
         ),
+        categoria=sim.categoria,
+        valor=_num(sim.valor),
+        entrada=_num(sim.entrada),
+        uf_licenciamento=sim.uf_licenciamento,
+        ano_modelo=sim.ano_modelo,
+        zero_km=sim.zero_km,
     )

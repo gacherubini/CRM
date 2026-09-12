@@ -87,3 +87,9 @@ class Simulacao(BaseModel):
     # Metadados não sensíveis para o Portal (histórico/reabertura do resultado).
     placa: Optional[str] = None
     prazos_meses: List[int] = []
+    categoria: Optional[str] = None
+    valor: Optional[float] = None
+    entrada: Optional[float] = None
+    uf_licenciamento: Optional[str] = None
+    ano_modelo: Optional[int] = None
+    zero_km: Optional[bool] = None

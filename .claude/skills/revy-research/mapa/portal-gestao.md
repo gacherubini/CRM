@@ -1,6 +1,6 @@
 # portal-gestao · 177 rotas · 26 modelos · 6 workers · 35 flags · 26 migrations · 63 templates
 
-Gerado de `bbe2544`. NAO editar a mao — saida de `gerar_mapa.py`.
+Gerado de `4e34855`. NAO editar a mao — saida de `gerar_mapa.py`.
 Migration head: `0026_copiloto_sinal_destinatario`
 
 ## Rotas
@@ -141,10 +141,10 @@ Migration head: `0026_copiloto_sinal_destinatario`
 - `POST /senha/redefinir` — app/web/password_reset.py:100
 - `GET /app/simulacoes` — app/web/simulacoes.py:248
 - `POST /app/simulacoes` — app/web/simulacoes.py:278
-- `GET /app/simulacoes/job/{sim_id}` — app/web/simulacoes.py:502
-- `GET /app/simulacoes/historico` — app/web/simulacoes.py:612
-- `GET /app/simulacoes/{sim_id}/registros` — app/web/simulacoes.py:733
-- `GET /app/simulacoes/{sim_id}/registros/{evento_id}/print` — app/web/simulacoes.py:770
+- `GET /app/simulacoes/job/{sim_id}` — app/web/simulacoes.py:521
+- `GET /app/simulacoes/historico` — app/web/simulacoes.py:638
+- `GET /app/simulacoes/{sim_id}/registros` — app/web/simulacoes.py:759
+- `GET /app/simulacoes/{sim_id}/registros/{evento_id}/print` — app/web/simulacoes.py:796
 - `GET /app/campanhas` — app/web/trafego.py:116
 - `GET /app/campanhas/nova` — app/web/trafego.py:177
 - `POST /app/campanhas/nova` — app/web/trafego.py:195
@@ -341,10 +341,10 @@ Migration head: `0026_copiloto_sinal_destinatario`
 - `app/templates/senha_esqueci.html` — app/web/password_reset.py:33
 - `app/templates/senha_redefinir.html` — app/web/password_reset.py:95
 - `app/templates/simulacoes/form.html` — app/web/simulacoes.py:267
-- `app/templates/simulacoes/resultado.html` — app/web/simulacoes.py:577
-- `app/templates/simulacoes/progresso.html` — app/web/simulacoes.py:591
-- `app/templates/simulacoes/historico.html` — app/web/simulacoes.py:658
-- `app/templates/simulacoes/registros.html` — app/web/simulacoes.py:754
+- `app/templates/simulacoes/resultado.html` — app/web/simulacoes.py:597
+- `app/templates/simulacoes/progresso.html` — app/web/simulacoes.py:617
+- `app/templates/simulacoes/historico.html` — app/web/simulacoes.py:684
+- `app/templates/simulacoes/registros.html` — app/web/simulacoes.py:780
 - `app/templates/campanhas/lista.html` — app/web/trafego.py:150
 - `app/templates/campanhas/form.html` — app/web/trafego.py:185
 - `app/templates/campanhas/gastos_lote.html` — app/web/trafego.py:274

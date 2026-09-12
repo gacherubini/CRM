@@ -1,5 +1,5 @@
 {
- "sha": "bbe2544",
+ "sha": "4e34855",
  "inventario": {
   "chatbot-api": [
    {
@@ -2263,28 +2263,28 @@
     "chave": "GET /app/simulacoes/job/{sim_id}",
     "simbolo": "/app/simulacoes/job/{sim_id}",
     "arquivo": "app/web/simulacoes.py",
-    "linha": 502
+    "linha": 521
    },
    {
     "secao": "rota",
     "chave": "GET /app/simulacoes/historico",
     "simbolo": "/app/simulacoes/historico",
     "arquivo": "app/web/simulacoes.py",
-    "linha": 612
+    "linha": 638
    },
    {
     "secao": "rota",
     "chave": "GET /app/simulacoes/{sim_id}/registros",
     "simbolo": "/app/simulacoes/{sim_id}/registros",
     "arquivo": "app/web/simulacoes.py",
-    "linha": 733
+    "linha": 759
    },
    {
     "secao": "rota",
     "chave": "GET /app/simulacoes/{sim_id}/registros/{evento_id}/print",
     "simbolo": "/app/simulacoes/{sim_id}/registros/{evento_id}/print",
     "arquivo": "app/web/simulacoes.py",
-    "linha": 770
+    "linha": 796
    },
    {
     "secao": "rota",
@@ -2914,28 +2914,28 @@
     "chave": "app/templates/simulacoes/historico.html",
     "simbolo": "simulacoes/historico.html",
     "arquivo": "app/web/simulacoes.py",
-    "linha": 658
+    "linha": 684
    },
    {
     "secao": "template",
     "chave": "app/templates/simulacoes/progresso.html",
     "simbolo": "simulacoes/progresso.html",
     "arquivo": "app/web/simulacoes.py",
-    "linha": 591
+    "linha": 617
    },
    {
     "secao": "template",
     "chave": "app/templates/simulacoes/registros.html",
     "simbolo": "simulacoes/registros.html",
     "arquivo": "app/web/simulacoes.py",
-    "linha": 754
+    "linha": 780
    },
    {
     "secao": "template",
     "chave": "app/templates/simulacoes/resultado.html",
     "simbolo": "simulacoes/resultado.html",
     "arquivo": "app/web/simulacoes.py",
-    "linha": 577
+    "linha": 597
    },
    {
     "secao": "template",

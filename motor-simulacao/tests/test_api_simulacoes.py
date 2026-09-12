@@ -63,3 +63,18 @@ def test_consultar_simulacao_inexistente_retorna_404(client):
     r = client.get("/v1/simulacoes/nao-existe")
     assert r.status_code == 404
     assert r.json()["erro"]["code"] == "nao_encontrada"
+
+
+def test_consulta_devolve_parametros_para_reabrir_o_resultado(client):
+    """A Loja reabre o resultado pelo histórico sem a sessão de quem simulou."""
+    payload = _payload()
+    payload["veiculo"].update({"placa": "ABC1D23", "uf_licenciamento": "SP", "zero_km": False})
+    criada = client.post("/v1/simulacoes", json=payload).json()
+    body = client.get(f"/v1/simulacoes/{criada['id']}").json()
+    assert body["categoria"] == "moto"
+    assert body["valor"] == 20000
+    assert body["entrada"] == 5000
+    assert body["uf_licenciamento"] == "SP"
+    assert body["zero_km"] is False
+    # CPF só vai cifrado no banco; a consulta não o devolve.
+    assert "529" not in str(body)
