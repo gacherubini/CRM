@@ -4634,16 +4634,15 @@ a.metric-link:focus-visible { outline: 2px solid var(--brand); outline-offset: 2
   max-width: 24ch;
 }
 .res-lede strong { color: var(--brand); font-weight: 600; }
-/* Rótulo e número juntos SEM cortar o painel: o teto mora na coluna do rótulo,
-   não no bloco. `max-width: 64rem` no `.res-index` inteiro resolvia a distância
-   (11/09) mas parava a hairline em 1024px dentro de um painel de 1688px, e o
-   painel lia como cortado. Aqui a linha enche a largura e o número senta logo
-   depois do rótulo, alinhado entre as linhas porque a coluna 1 é fixa. */
+/* Rótulo na esquerda, número na BORDA DIREITA, linha esticada: decisão do dono
+   em 11/09 olhando a tela em produção. Duas tentativas anteriores morreram aqui
+   — `max-width: 64rem` no bloco (cortava o painel ao meio em 1920) e coluna de
+   rótulo fixa (colava o número no rótulo). Ele quer o número na borda. */
 .res-index { list-style: none; margin: var(--space-4) 0 0; padding: 0; }
 .res-index li {
-  display: grid;
-  grid-template-columns: minmax(0, 22rem) auto;
+  display: flex;
   align-items: baseline;
+  justify-content: space-between;
   gap: var(--space-4);
   padding: var(--space-3) 0;
   border-top: 1px solid var(--line);
@@ -4652,8 +4651,7 @@ a.metric-link:focus-visible { outline: 2px solid var(--brand); outline-offset: 2
 .res-index li:last-child { border-bottom: 1px solid var(--line); }
 .res-index span { color: var(--ink-soft); }
 .res-index strong { font-size: var(--text-lg); font-variant-numeric: tabular-nums; }
-/* A nota é uma frase só: ocupa a linha inteira em vez de caber na coluna do rótulo. */
-.res-index .res-note { grid-template-columns: 1fr; padding: var(--space-1) 0 var(--space-3); border-top: 0; }
+.res-index .res-note { padding: var(--space-1) 0 var(--space-3); border-top: 0; }
 .res-index .res-note:last-child { border-bottom: 0; }
 .res-index .res-note span { font-size: var(--text-sm); }
 .res-flow {
@@ -4689,9 +4687,6 @@ a.metric-link:focus-visible { outline: 2px solid var(--brand); outline-offset: 2
 .res-flow small { color: var(--ink-soft); font-size: var(--text-sm); }
 .res-taxas strong { color: var(--ink); font-variant-numeric: tabular-nums; }
 @media (max-width: 640px) {
-  /* Em 390px a coluna de 22rem não cabe junto do número: volta a rótulo na
-     esquerda, número na direita — que é o certo quando a linha é estreita. */
-  .res-index li { display: flex; justify-content: space-between; }
   .res-flow { flex-direction: column; gap: var(--space-3); }
   .res-flow li + li { padding-left: 0; padding-top: var(--space-4); }
   .res-flow li + li::before { left: 4px; top: 2px; transform: rotate(135deg); }
@@ -4861,6 +4856,10 @@ form[data-periodo-melhorado] { position: relative; }
    lidera a ficha, e o resto confirma. A inicial da marca (fallback) cresce
    junto — nos 15px de `.vehicle-photo` ela ficava boiando na caixa grande. */
 .vei-foto { width: 200px; height: 140px; border-radius: var(--radius-nav); font-size: 44px; }
+/* A foto do lojista quase sempre e do ambiente da loja, com a moto na metade de
+   baixo do quadro. O recorte centrado do `object-fit: cover` mostrava teto e
+   parede; a janela desce para onde a moto esta. Decisao do dono em 11/09. */
+.vei-foto img { object-position: 50% 68%; }
 .vei-ident { min-width: 0; }
 .vei-nome {
   display: block;

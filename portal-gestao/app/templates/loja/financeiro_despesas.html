@@ -47,10 +47,12 @@
     <p class="muted">É o que a loja paga mesmo sem vender nenhuma moto.</p>
   </div>
 
+  {# Sem a frase "Nenhuma despesa fixa cadastrada" (dono, 11/09): o lede acima ja
+     diz R$ 0,00 de custo fixo em tamanho display, e a frase repetia o mesmo fato
+     no mesmo peso. Fica so a consequencia, que e o que o lojista ainda nao sabe. #}
   {% if not itens %}
   <div class="empty empty-frase">
-    <strong>Nenhuma despesa fixa cadastrada.</strong>
-    <p>Sem ela o lucro operacional do mês fica igual ao lucro bruto, e não dá para saber quantas motos pagam a casa.</p>
+    <p>Sem despesa fixa cadastrada o lucro operacional do mês fica igual ao lucro bruto, e não dá para saber quantas motos pagam a casa.</p>
   </div>
   {% else %}
   {# Livro-caixa (Task 9b): a linha mostra o valor do mês; o editor (ajuste +
