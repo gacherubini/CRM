@@ -6,15 +6,16 @@ aguardando_intervencao). ``cancelada`` é terminal e nunca é reservada.
 from __future__ import annotations
 
 import json
+import logging
 import signal
 import threading
 import time
 import uuid
 from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
-from typing import Optional
+from typing import Callable, Optional
 
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, sessionmaker
 
 from app import config, cripto
 from app.fanout import STATUS_TERMINAIS_TAREFA, marcar_tarefa, obter_tarefa
@@ -37,11 +38,113 @@ from app.motor.drivers import (
 )
 from app.sessao_browser import path_storage_state_gravacao, sessao_parece_quente
 
+log = logging.getLogger("motor-processamento")
+
 MAX_TENTATIVAS_DRIVER = 2
 
 
 class DriverDeadlineExceeded(TimeoutError):
     pass
+
+
+class _PossePerdida(Exception):
+    """O lease foi tomado por outro worker no meio da execução.
+
+    Sinal interno: quem recebe faz rollback e NÃO persiste nada — o novo
+    dono (ou a fila, via reencaminhamento) decide o destino da tarefa.
+    """
+
+
+def _renovar_lease_tarefa(
+    sessao: Session, tarefa_id: str, token: str, segundos: int
+) -> bool:
+    """Renova `reservada_ate` só se este worker ainda for o dono.
+
+    UPDATE condicional a (id, token, status): True se renovou, False se a
+    posse foi perdida (tarefa reencaminhada ou tomada por outro worker).
+    """
+    instante = _agora()
+    linhas = (
+        sessao.query(SimulacaoProvedorORM)
+        .filter(
+            SimulacaoProvedorORM.id == tarefa_id,
+            SimulacaoProvedorORM.reserva_token == token,
+            SimulacaoProvedorORM.status == "processando",
+        )
+        .update(
+            {
+                "reservada_ate": instante + timedelta(seconds=segundos),
+                "atualizada_em": instante,
+            },
+            synchronize_session=False,
+        )
+    )
+    sessao.commit()
+    return linhas == 1
+
+
+@contextmanager
+def _heartbeat_tarefa(db: Session, *, tarefa_id: str, token: str):
+    """Renova o lease da tarefa em thread própria durante o driver bloqueante.
+
+    O driver pode ocupar a thread por até DRIVER_TIMEOUT_SECONDS por tentativa
+    (bem além do lease); sem renovação, `reencaminhar_tarefas_expiradas`
+    devolve a tarefa à fila no meio da execução e outro worker duplica o
+    trabalho — com o guarda de token descartando um dos resultados em loop.
+    Usa sessão própria (mesmo engine) para não disputar a Session do driver.
+    Best-effort: falha de renovação tenta de novo no próximo ciclo; só a
+    perda confirmada de posse (0 linhas no UPDATE condicional) aborta — e
+    abortar aqui significa *não persistir*, nunca *sumir sem rastro* (o novo
+    dono persiste o resultado terminal).
+    """
+    lease = max(1, int(config.TASK_LEASE_SECONDS))
+    try:
+        intervalo_cfg = float(config.TASK_HEARTBEAT_SECONDS)
+    except (TypeError, ValueError):
+        intervalo_cfg = 20.0
+    parar = threading.Event()
+    perdeu_posse = threading.Event()
+    bind = db.get_bind()
+    if not token or intervalo_cfg <= 0 or bind is None:
+        yield perdeu_posse.is_set
+        return
+    # Garante ~3 renovações por janela de lease mesmo com env fora do
+    # previsto — sem isso um intervalo >= lease fingiria proteção.
+    intervalo = max(0.01, min(intervalo_cfg, lease / 3))
+    Fabrica = sessionmaker(bind=bind)
+
+    def _loop() -> None:
+        sessao = Fabrica()
+        try:
+            while not parar.wait(intervalo):
+                try:
+                    dono = _renovar_lease_tarefa(sessao, tarefa_id, token, lease)
+                except Exception as exc:
+                    # Sem rollback a transação abortada do Postgres faz todo tick
+                    # seguinte falhar e o lease vence sem rastro.
+                    try:
+                        sessao.rollback()
+                    except Exception:
+                        pass
+                    log.warning(
+                        "heartbeat da tarefa %s falhou (%s); tenta no próximo ciclo",
+                        tarefa_id,
+                        type(exc).__name__,
+                    )
+                    continue
+                if not dono:
+                    perdeu_posse.set()
+                    return
+        finally:
+            sessao.close()
+
+    fio = threading.Thread(target=_loop, name="motor-lease-heartbeat", daemon=True)
+    fio.start()
+    try:
+        yield perdeu_posse.is_set
+    finally:
+        parar.set()
+        fio.join(timeout=min(intervalo + 5.0, 30.0))
 
 
 @contextmanager
@@ -282,6 +385,34 @@ def _registrar_evento(
     db.commit()
 
 
+def _orcamento_estourado(
+    db: Session,
+    sim: SimulacaoORM,
+    nome: str,
+    prazo: int | None,
+    tentativa: int,
+    inicio_total: float,
+    ctx: DriverContext | None,
+) -> list[ResultadoDriver]:
+    """Orçamento total estourado: registra onde parou + duração, terminal."""
+    dur_total_s = int(time.monotonic() - inicio_total)
+    _registrar_tentativa(
+        db, sim.id, nome, tentativa, 0, "erro", "orcamento_tempo_estourado"
+    )
+    if ctx is not None:
+        ctx.registrar_evento(
+            "orcamento_tempo_estourado",
+            f"Orçamento total da tarefa estourado após {dur_total_s}s "
+            f"(tentativa {tentativa}/{MAX_TENTATIVAS_DRIVER}); execução encerrada.",
+            "erro",
+        )
+    return [
+        ResultadoDriver(
+            nome, "erro", prazo_meses=prazo, codigo_erro="orcamento_tempo_estourado"
+        )
+    ]
+
+
 def _executar_driver(
     db: Session,
     sim: SimulacaoORM,
@@ -289,18 +420,44 @@ def _executar_driver(
     driver: Driver,
     sol: SolicitacaoSimulacao,
     ctx: DriverContext | None = None,
+    *,
+    orcamento_segundos: float | None = None,
+    deve_abortar: Callable[[], bool] | None = None,
 ) -> list[ResultadoDriver]:
-    """Roda um provedor com retry; devolve lista (normaliza único → lista)."""
+    """Roda um provedor com retry; devolve lista (normaliza único → lista).
+
+    `orcamento_segundos` limita o tempo TOTAL (tentativas + esperas):
+    estourou = para e devolve resultado terminal `erro/orcamento_tempo_-
+    estourado` com onde parou + duração — nunca roda infinito, nunca some
+    sem rastro. `deve_abortar` (heartbeat) levanta `_PossePerdida` quando o
+    lease foi perdido no meio da execução: o chamador faz rollback sem
+    persistir, em vez de brigar com o novo dono.
+    """
     prazo = sol.condicoes.prazo_meses
+    inicio_total = time.monotonic()
     for tentativa in range(1, MAX_TENTATIVAS_DRIVER + 1):
+        if tentativa > 1 and deve_abortar is not None and deve_abortar():
+            raise _PossePerdida(
+                f"lease perdido antes da tentativa {tentativa} de {nome}"
+            )
+        teto_tentativa = config.DRIVER_TIMEOUT_SECONDS
+        if orcamento_segundos:
+            restante = orcamento_segundos - (time.monotonic() - inicio_total)
+            if restante <= 0:
+                return _orcamento_estourado(
+                    db, sim, nome, prazo, tentativa, inicio_total, ctx
+                )
+            teto_tentativa = max(1, min(teto_tentativa, int(restante)))
         inicio = time.perf_counter()
         try:
-            res = _invocar_driver_com_deadline(
-                driver, sol, ctx, config.DRIVER_TIMEOUT_SECONDS
-            )
+            res = _invocar_driver_com_deadline(driver, sol, ctx, teto_tentativa)
+            if deve_abortar is not None and deve_abortar():
+                raise _PossePerdida(f"lease de {nome} perdido durante a execução")
             dur = int((time.perf_counter() - inicio) * 1000)
             _registrar_tentativa(db, sim.id, nome, tentativa, dur, "concluida", None)
             return res if isinstance(res, list) else [res]
+        except _PossePerdida:
+            raise
         except DriverDeadlineExceeded:
             dur = int((time.perf_counter() - inicio) * 1000)
             _registrar_tentativa(
@@ -309,7 +466,8 @@ def _executar_driver(
             if ctx is not None:
                 ctx.registrar_evento(
                     "timeout_driver",
-                    "O banco excedeu o tempo máximo e a execução foi encerrada.",
+                    f"O banco excedeu o tempo máximo ({dur // 1000}s, tentativa "
+                    f"{tentativa}/{MAX_TENTATIVAS_DRIVER}) e a execução foi encerrada.",
                     "erro",
                 )
             return [
@@ -611,15 +769,84 @@ STATUS_TAREFA_FILA = frozenset({"recebida", "acordando_worker"})
 STATUS_TAREFA_EM_VOO = frozenset({"reservada", "processando", "acordando_worker"})
 
 
+def _encerrar_tarefas_esgotadas(db: Session, instante: datetime, teto: int) -> None:
+    """Lease vencido pela (teto+1)ª vez: resultado terminal em vez de nova volta."""
+    candidatas = (
+        db.query(SimulacaoProvedorORM.id)
+        .filter(
+            SimulacaoProvedorORM.status.in_(("reservada", "processando")),
+            SimulacaoProvedorORM.reservada_ate.is_not(None),
+            SimulacaoProvedorORM.reservada_ate < instante,
+            SimulacaoProvedorORM.tentativa > teto,
+        )
+        .all()
+    )
+    for (tarefa_id,) in candidatas:
+        # Condicional de novo: um heartbeat pode ter renovado entre o SELECT e aqui.
+        linhas = (
+            db.query(SimulacaoProvedorORM)
+            .filter(
+                SimulacaoProvedorORM.id == tarefa_id,
+                SimulacaoProvedorORM.status.in_(("reservada", "processando")),
+                SimulacaoProvedorORM.reservada_ate < instante,
+            )
+            .update(
+                {
+                    "status": "falhou",
+                    "codigo_erro": "tentativas_esgotadas",
+                    "reserva_token": None,
+                    "reservada_ate": None,
+                    "finalizada_em": instante,
+                    "atualizada_em": instante,
+                },
+                synchronize_session=False,
+            )
+        )
+        db.commit()
+        if linhas != 1:
+            continue
+        tarefa = db.get(SimulacaoProvedorORM, tarefa_id)
+        db.refresh(tarefa)
+        sim = db.get(SimulacaoORM, tarefa.simulacao_id)
+        if sim is None:
+            continue
+        db.add(
+            ResultadoORM(
+                simulacao_id=sim.id,
+                provedor=tarefa.provedor,
+                status="erro",
+                codigo_erro="tentativas_esgotadas",
+            )
+        )
+        db.commit()
+        _registrar_evento(
+            db,
+            sim,
+            "tentativas_esgotadas",
+            f"{tarefa.provedor} parou de responder em {tarefa.tentativa} execuções "
+            "seguidas; a tarefa foi encerrada sem nova tentativa.",
+            "erro",
+            provedor=tarefa.provedor,
+        )
+        agregar_status_job_pai(db, sim.id)
+
+
 def reencaminhar_tarefas_expiradas(db: Session, agora: datetime | None = None) -> int:
-    """Devolve à fila tarefas cujo lease expirou (crash do worker)."""
+    """Devolve à fila tarefas cujo lease expirou (crash do worker).
+
+    Depois de ``TASK_MAX_REQUEUES`` voltas a tarefa encerra como
+    ``falhou``/``tentativas_esgotadas`` em vez de voltar de novo.
+    """
     instante = agora or _agora()
+    teto = max(0, int(config.TASK_MAX_REQUEUES))
+    _encerrar_tarefas_esgotadas(db, instante, teto)
     linhas = (
         db.query(SimulacaoProvedorORM)
         .filter(
             SimulacaoProvedorORM.status.in_(("reservada", "processando")),
             SimulacaoProvedorORM.reservada_ate.is_not(None),
             SimulacaoProvedorORM.reservada_ate < instante,
+            SimulacaoProvedorORM.tentativa <= teto,
         )
         .update(
             {
@@ -927,7 +1154,25 @@ def processar_tarefa_provedor(
             f"Conector {nome} iniciado (tentativas limitadas).",
             provedor=nome,
         )
-        res_lista = _executar_driver(db, sim, nome, driver, sol, ctx)
+        try:
+            with _heartbeat_tarefa(db, tarefa_id=tarefa.id, token=token) as abortar:
+                res_lista = _executar_driver(
+                    db,
+                    sim,
+                    nome,
+                    driver,
+                    sol,
+                    ctx,
+                    orcamento_segundos=config.TASK_BUDGET_SECONDS,
+                    deve_abortar=abortar,
+                )
+        except _PossePerdida:
+            # Outro worker é dono agora (ou a tarefa voltou à fila): não
+            # persiste nada — o guarda de token abaixo confirmaria o mesmo,
+            # e o novo dono registra o resultado terminal.
+            db.rollback()
+            db.refresh(tarefa)
+            return tarefa
         db.refresh(tarefa)
         if tarefa.reserva_token != token or tarefa.status != "processando":
             db.rollback()

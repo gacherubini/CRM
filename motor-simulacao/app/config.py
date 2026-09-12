@@ -145,6 +145,23 @@ WORKER_TIPOS: frozenset[str] | None = (
 TASK_LEASE_SECONDS = int(
     os.getenv("MOTOR_TASK_LEASE_SECONDS") or os.getenv("MOTOR_JOB_LEASE_SECONDS", "300")
 )
+# Heartbeat de posse durante a execução do driver (plano 2026-09-10 §7):
+# a cada TASK_HEARTBEAT_SECONDS o worker renova `reservada_ate` com UPDATE
+# condicional ao token — só quem ainda é dono renova. Default 20s, bem abaixo
+# do lease: worker vivo nunca perde a tarefa no meio do driver; worker morto
+# de verdade continua tendo o lease expirado e recuperado em ~TASK_LEASE_SECONDS.
+TASK_HEARTBEAT_SECONDS = float(os.getenv("MOTOR_TASK_HEARTBEAT_SECONDS", "20"))
+# Orçamento total finito por tarefa, incluindo tentativas e esperas
+# (plano 2026-09-10 §7). Estourou = para e persiste resultado terminal com
+# onde parou + duração. Default cobre 2 tentativas de DRIVER_TIMEOUT_SECONDS
+# com folga — não mascara a recuperação de crash (que continua pelo lease).
+TASK_BUDGET_SECONDS = float(
+    os.getenv("MOTOR_TASK_BUDGET_SECONDS", str(2 * DRIVER_TIMEOUT_SECONDS + 180))
+)
+# Quantas vezes uma tarefa com lease vencido (worker morto) volta à fila.
+# Estourou = `falhou` / `tentativas_esgotadas`: crash repetido não vira loop
+# nem login repetido no portal do banco.
+TASK_MAX_REQUEUES = int(os.getenv("MOTOR_TASK_MAX_REQUEUES", "2"))
 
 # Fly Machines API (orquestrador na API — nunca no worker on-demand).
 FLY_API_BASE = (os.getenv("FLY_API_BASE") or "https://api.machines.dev").rstrip("/")

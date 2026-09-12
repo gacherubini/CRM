@@ -84,6 +84,11 @@ Estado dos bancos e mapa de campos por provedor:
 A criação responde `202` com `status: recebida`; o worker executa e atualiza. Resultados
 parciais são normais (um banco responde, outro falha).
 
+Cada tarefa por banco tem lease (`MOTOR_TASK_LEASE_SECONDS`, 300 s) renovado por heartbeat
+a cada `MOTOR_TASK_HEARTBEAT_SECONDS` enquanto o driver roda. Lease vencido = worker morto:
+a tarefa volta à fila no máximo `MOTOR_TASK_MAX_REQUEUES` vezes (2) e depois encerra
+`falhou` / `tentativas_esgotadas`, sem novo login no portal.
+
 ## Rodar e testar
 
 ```bash
