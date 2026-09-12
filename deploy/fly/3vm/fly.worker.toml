@@ -43,6 +43,7 @@ kill_timeout = 30
   MOTOR_BROWSER_TIMEOUT_MS = "90000"
   # Bradesco fica em "Analisando dados" (SCR) alem de 240s no Fly: 360s de espera
   # + ~75s de login/form cabem no driver de 480s. O heartbeat segura o lease.
+  # Este [env] NAO chega nos motor-worker-<banco>: la vai por `fly machine update --env`.
   MOTOR_OFERTAS_TIMEOUT_MS = "360000"
   MOTOR_DRIVER_TIMEOUT_SECONDS = "480"
   MOTOR_JOB_LEASE_SECONDS = "480"

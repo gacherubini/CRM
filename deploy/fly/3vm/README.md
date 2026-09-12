@@ -77,6 +77,12 @@ fly deploy . -a motor2037 -c deploy/fly/3vm/fly.worker.toml --ha=false
 fly deploy . -a motor2037 -c deploy/fly/3vm/fly.worker.toml --build-only
 ```
 
+> **O deploy do `motor2037` não atualiza os workers de banco** (`motor-worker-bradesco`,
+> `-santander`, `-fontecred`, `-pan`): foram criados pela Machines API, sem process group, e
+> o `[env]` do `fly.worker.toml` não chega neles. Depois do deploy, em cada um:
+> `fly machine update <id> -a motor2037 --image <tag nova de fly image show> --env ... --skip-start -y`.
+> Detalhe e verificação: `.claude/skills/revy-research/learnings/2026-09-12-fly-deploy-nao-atualiza-worker-por-banco.md`.
+
 O deploy usa a **árvore local**, não o commit — commite antes, senão prod e repo divergem.
 O bundle roda todas as migrações (fail-fast) antes de iniciar os serviços.
 

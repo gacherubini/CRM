@@ -617,3 +617,58 @@ Próximo objetivo:
 4. Rodar a mesma imagem e configuração com um ISP cloud durante 24 horas.
 5. Só depois de aprovação técnica, medir cinco dias úteis e decidir a expansão para seis
    lojas.
+
+## 11. Checkpoint de 12/09: o que foi feito e descoberto
+
+### No ar (app2037 em `bbe2544`, motor2037 com os cinco workers na imagem nova)
+
+- **Lease com heartbeat** (`ff87808`). O worker renova `reservada_ate` a cada
+  `MOTOR_TASK_HEARTBEAT_SECONDS` (20 s) numa sessão própria enquanto o driver roda. Falha de
+  banco no heartbeat faz rollback e loga. Tarefa de worker morto volta à fila no máximo
+  `MOTOR_TASK_MAX_REQUEUES` vezes — **2, decisão do dono** — e depois encerra
+  `falhou`/`tentativas_esgotadas`, com resultado `erro` e evento.
+- **Proxy de saída do browser, desligado** (`3368160`). `MOTOR_PROXY_URL`
+  (`http://usuario:senha@host:porta`) vai para o `chromium.launch` e restringe o WebRTC a
+  UDP via proxy. `MOTOR_PROXY_EXPECTED_IP` abre `api.ipify.org` pelo browser antes do portal;
+  IP diferente ou sem resposta para como `aguardando_intervencao`, sem retry. SOCKS5 com
+  senha é recusado. Provado com Chromium real contra proxy local com senha.
+- **Espera do Bradesco** (`bbe2544`). Workers de banco com `MOTOR_OFERTAS_TIMEOUT_MS=360000`,
+  `MOTOR_DRIVER_TIMEOUT_SECONDS=480` e `MOTOR_TASK_LEASE_SECONDS=480`.
+- Suite do Motor: 329 testes verdes.
+
+### Descobertas
+
+- **Os workers de banco nunca receberam o `[env]` do `fly.worker.toml`** e o `fly deploy` não
+  os atualiza (sem process group). O Bradesco rodava com lease **300 s** (default do código),
+  não os 480 s do toml. Parte do loop de 10/09 era config, não só código. Procedimento em
+  `.claude/skills/revy-research/learnings/2026-09-12-fly-deploy-nao-atualiza-worker-por-banco.md`.
+- **Revisão do fix de lease** (agente revisor): continuam em aberto a vida sem teto do
+  heartbeat se a thread principal travar, o browser que segue rodando depois de perder a
+  posse, e testes num SQLite de conexão única (`StaticPool`) que não exercitam lock de Postgres.
+  Só 4 dos 12 testes originais falhavam no código antigo.
+- **IPRoyal na prática:** a verificação de identidade só libera depois de **US$ 10 gastos**.
+  O onboarding empurra o Residential por GB (rotativo, errado para nós). O pedido certo é
+  `dashboard.iproyal.com/me/products/static-residential-proxies/create-order` → Dedicated.
+  Preços vistos para 1 IP dedicado: 24 h US$ 2,00; 30 dias US$ 4,00; 60 dias US$ 7,60;
+  90 dias US$ 10,80 (os três primeiros lidos com a página atualizando). Com país escolhido
+  aparece "fraud score": Premium custa +35% e só garante score zero num provedor (IPQS,
+  Scamalytics, IP Data), sem garantia sobre reCAPTCHA ou WAF do banco.
+- **Outros fornecedores (12/09):** Decodo não tem ISP no Brasil e só libera banco no
+  residencial rotativo — fora. Webshare não lista Brasil no ISP — fora. Proxy-Seller vende
+  ISP com IP exclusivo e reembolso/troca nas primeiras 24 h, termos sem bloqueio explícito a
+  banco, mas não confirma operadora nem preço do Brasil — candidato barato, perguntar no chat.
+  SpyderProxy ISP BR US$ 3,90/dia, sem informação sobre banco.
+- **Como o mercado resolve:** FANDI (integra Itaú, Bradesco, Santander, Safra e bancos de
+  montadora) e Autoconf ("integração direta via API") usam integração oficial com o banco,
+  não RPA de portal. Santander tem portal de parceiros (`developer.santander.com.br/parceiros`,
+  403 sem login). Não foi encontrada API pública do Bradesco Financiamentos.
+
+### Próximos passos
+
+1. **Rodada de controle, US$ 0:** uma simulação do Bradesco no Fly sem proxy, com a espera
+   de 360 s. Concluiu → proxy desnecessário. Travou de novo → IP vira o suspeito principal.
+2. Só se travar: proxy barato e curto (Proxy-Seller dentro das 24 h de reembolso, após
+   perguntar no chat) ou IPRoyal Standard 90 dias (US$ 10,80, libera a verificação).
+   Não comprar nada antes da rodada de controle.
+3. Em paralelo, a via definitiva: pedir API/integração ao comercial de cada banco da loja e
+   cotação ao FANDI e ao Autoconf. RPA com proxy fica como ponte, não como destino.
