@@ -1,22 +1,22 @@
 {% extends "base.html" %}
 {% block title %}Registros da simulação — Gestão{% endblock %}
-{% block head %}{% if auto_refresh %}<meta http-equiv="refresh" content="3">{% endif %}{% endblock %}
 {% block content %}
 <div class="page-heading">
   <div>
     <a class="back-link" href="/app/simulacoes/historico">← Histórico</a>
     <span class="eyebrow"><i></i> Diagnóstico</span>
     <h1>Registros da simulação</h1>
-    <p>Job <code class="mono-inline">{{ sim_id }}</code> · <span class="status {{ status }}">{{ status_label }}</span></p>
+    <p>Job <code class="mono-inline">{{ sim_id }}</code> · <span class="status {{ status }}" id="sim-registros-status">{{ status_label }}</span>{% if auto_refresh %} <span class="muted" id="sim-registros-aovivo">· atualizando sozinha</span>{% endif %}</p>
   </div>
-  {% if auto_refresh %}<a class="button secondary" href="/app/simulacoes/{{ sim_id }}/registros">Atualizar agora</a>{% endif %}
+  <a class="button secondary" href="/app/simulacoes/job/{{ sim_id }}">Ver parcelas</a>
 </div>
 
 {% if erro %}<div class="alert error">{{ erro }}</div>{% endif %}
 
+<div id="sim-registros" data-auto-refresh="{{ '1' if auto_refresh else '0' }}">
 {% if grupos_eventos %}
   {% for grupo in grupos_eventos %}
-  <section class="panel form-section">
+  <section class="panel form-section" data-provedor="{{ grupo.provedor }}">
     <div class="section-title">
       <span>{{ '%02d'|format(loop.index) }}</span>
       <div>
@@ -26,14 +26,14 @@
             Eventos do job (orquestração, fila).
           {% else %}
             Timeline do banco <code class="mono-inline">{{ grupo.provedor }}</code>
-            · {{ grupo.eventos | length }} evento(s)
+            · <span data-contagem>{{ grupo.eventos | length }}</span> evento(s)
           {% endif %}
         </p>
       </div>
     </div>
     <ol class="sim-steps">
       {% for evento in grupo.eventos %}
-      <li class="sim-step {{ 'fail' if evento.nivel == 'erro' else ('done' if evento.nivel == 'sucesso' else 'active') }}">
+      <li data-evento-id="{{ evento.id }}" class="sim-step {{ 'fail' if evento.nivel == 'erro' else ('done' if evento.nivel == 'sucesso' else 'active') }}">
         <span class="sim-step-num" aria-hidden="true">{{ loop.index }}</span>
         <div>
           <strong>{{ evento.etapa | replace('_', ' ') | title }}</strong>
@@ -80,10 +80,74 @@
     </ol>
   </section>
 {% else %}
-<section class="panel form-section">
+<section class="panel form-section" data-vazio>
   <div class="empty"><strong>Ainda não há registros.</strong><p>Se o job estiver na fila, aguarde o worker reservá-lo.</p></div>
 </section>
 {% endif %}
+</div>
 
 <div class="alert warning">Os prints podem conter dados pessoais da tela bancária. Não compartilhe nem deixe armazenados além do necessário para diagnóstico.</div>
+{% if auto_refresh %}
+<script>
+  // Atualiza sem recarregar: o <meta refresh> jogava a rolagem para o topo a
+  // cada ciclo e baixava os prints de novo. Aqui só entram os eventos novos, no
+  // fim de cada banco; o que já está na tela não se mexe.
+  (function () {
+    var raiz = document.getElementById("sim-registros");
+    if (!raiz) return;
+    var intervalo = 3000;
+
+    function mesclar(nova) {
+      if (raiz.querySelector("[data-vazio]") && !nova.querySelector("[data-vazio]")) {
+        raiz.innerHTML = nova.innerHTML;
+        return;
+      }
+      nova.querySelectorAll("section[data-provedor]").forEach(function (secao) {
+        var chave = secao.getAttribute("data-provedor");
+        var atual = raiz.querySelector('section[data-provedor="' + chave + '"]');
+        if (!atual) {
+          raiz.appendChild(document.importNode(secao, true));
+          return;
+        }
+        var lista = atual.querySelector("ol");
+        secao.querySelectorAll("li[data-evento-id]").forEach(function (item) {
+          var id = item.getAttribute("data-evento-id");
+          if (!lista.querySelector('li[data-evento-id="' + id + '"]')) {
+            lista.appendChild(document.importNode(item, true));
+          }
+        });
+        var contagem = atual.querySelector("[data-contagem]");
+        var novaContagem = secao.querySelector("[data-contagem]");
+        if (contagem && novaContagem) contagem.textContent = novaContagem.textContent;
+      });
+    }
+
+    function ciclo() {
+      if (document.hidden) return setTimeout(ciclo, intervalo);
+      fetch(window.location.href, { cache: "no-store", credentials: "same-origin" })
+        .then(function (r) { return r.ok ? r.text() : Promise.reject(r.status); })
+        .then(function (html) {
+          var doc = new DOMParser().parseFromString(html, "text/html");
+          var nova = doc.getElementById("sim-registros");
+          if (!nova) return setTimeout(ciclo, intervalo);
+          mesclar(nova);
+          var status = doc.getElementById("sim-registros-status");
+          var statusAtual = document.getElementById("sim-registros-status");
+          if (status && statusAtual) {
+            statusAtual.className = status.className;
+            statusAtual.textContent = status.textContent;
+          }
+          if (nova.getAttribute("data-auto-refresh") === "1") {
+            setTimeout(ciclo, intervalo);
+          } else {
+            var aviso = document.getElementById("sim-registros-aovivo");
+            if (aviso) aviso.remove();
+          }
+        })
+        .catch(function () { setTimeout(ciclo, intervalo * 2); });
+    }
+    setTimeout(ciclo, intervalo);
+  })();
+</script>
+{% endif %}
 {% endblock %}

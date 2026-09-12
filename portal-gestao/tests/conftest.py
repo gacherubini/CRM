@@ -758,6 +758,8 @@ class MotorFake:
                 for p in provedores
             ],
             "resultados": resultados,
+            # Parâmetros que o Motor guarda em coluna (reabrir pelo histórico).
+            **(getattr(self, "parametros_retorno", None) or {}),
         }
 
     def listar_eventos(self, sim_id, ator=None):

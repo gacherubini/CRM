@@ -1,11 +1,7 @@
 {% extends "base.html" %}
 {% block title %}Simulação em andamento — Gestão{% endblock %}
-{% block head %}
-{% if auto_refresh %}
-<meta http-equiv="refresh" content="{{ refresh_segundos | default(3) }}">
-{% endif %}
-{% endblock %}
 {% block content %}
+<div id="sim-ao-vivo" data-atualizacao="{{ refresh_segundos | default(3) if auto_refresh else 0 }}">
 <div class="page-heading">
   <div>
     <a class="back-link" href="/app/simulacoes">← Nova simulação</a>
@@ -131,4 +127,38 @@
   <a class="button secondary" href="/app/simulacoes/{{ sim_id }}/registros">Ver registros e prints</a>
   <a class="button primary" href="/app/simulacoes/job/{{ sim_id }}">Atualizar agora</a>
 </div>
+</div>
+{% if auto_refresh %}
+<script>
+  // Atualiza sem recarregar a página, para a rolagem não voltar ao topo a cada
+  // ciclo. Quando o job encerra, o servidor devolve a tela de parcelas e ela
+  // entra no lugar desta.
+  (function () {
+    var segundos = parseInt(document.getElementById("sim-ao-vivo").getAttribute("data-atualizacao"), 10) || 3;
+    function ciclo() {
+      if (document.hidden) return setTimeout(ciclo, segundos * 1000);
+      fetch(window.location.href, { cache: "no-store", credentials: "same-origin" })
+        .then(function (r) { return r.text(); })
+        .then(function (html) {
+          var doc = new DOMParser().parseFromString(html, "text/html");
+          var novo = doc.getElementById("conteudo");
+          var atual = document.getElementById("conteudo");
+          if (!novo || !atual) return setTimeout(ciclo, segundos * 1000);
+          var rolagem = window.scrollY;
+          atual.innerHTML = novo.innerHTML;
+          document.title = doc.title;
+          window.scrollTo(0, rolagem);
+          var vivo = document.getElementById("sim-ao-vivo");
+          var proximo = vivo ? parseInt(vivo.getAttribute("data-atualizacao"), 10) : 0;
+          if (proximo > 0) {
+            segundos = proximo;
+            setTimeout(ciclo, segundos * 1000);
+          }
+        })
+        .catch(function () { setTimeout(ciclo, segundos * 2000); });
+    }
+    setTimeout(ciclo, segundos * 1000);
+  })();
+</script>
+{% endif %}
 {% endblock %}

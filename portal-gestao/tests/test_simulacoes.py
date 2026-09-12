@@ -187,7 +187,9 @@ def test_job_em_processamento_mostra_progresso(client, chatbot_fake, motor_fake)
         or "Consultando" in job.text
         or "Por banco" in job.text
     )
-    assert 'http-equiv="refresh"' in job.text
+    # Atualiza por fetch, sem recarregar a página e jogar a rolagem para o topo.
+    assert 'http-equiv="refresh"' not in job.text
+    assert 'data-atualizacao="3"' in job.text
     assert "FUV7G58" in job.text
     assert "52998224725" not in job.text
 
@@ -204,7 +206,20 @@ def test_registros_mostram_timeline_e_link_de_print_para_dono(
     assert "Santander" in resposta.text
     assert "Bradesco" in resposta.text
     assert "Abrir print" in resposta.text or "print" in resposta.text.lower()
-    assert 'http-equiv="refresh"' in resposta.text
+    # Sem meta refresh: a página não pode voltar ao topo enquanto o dono lê um print.
+    assert 'http-equiv="refresh"' not in resposta.text
+    assert 'data-auto-refresh="1"' in resposta.text
+    assert 'data-evento-id="1"' in resposta.text
+    # Botão próprio para as parcelas, separado dos registros.
+    assert 'href="/app/simulacoes/job/sim-motor-1"' in resposta.text
+    assert "Ver parcelas" in resposta.text
+
+
+def test_registros_de_job_encerrado_nao_se_atualizam(client, chatbot_fake, motor_fake):
+    motor_fake.status_retorno = "concluida"
+    login(client, papel="dono")
+    resposta = client.get("/app/simulacoes/sim-motor-1/registros")
+    assert 'data-auto-refresh="0"' in resposta.text
 
 
 def test_vendedor_ve_timeline_mas_nao_abre_print(client, chatbot_fake, motor_fake):
@@ -238,3 +253,47 @@ def test_job_na_fila_mostra_etapa_enfileirada(client, chatbot_fake, motor_fake):
     job = client.get(post.headers["location"])
     assert job.status_code == 200
     assert "Na fila" in job.text or "enfileirada" in job.text.lower()
+
+
+def test_resultado_reaberto_pelo_historico_mostra_parametros_do_motor(
+    client, chatbot_fake, motor_fake
+):
+    motor_fake.status_retorno = "aguardando_intervencao"
+    motor_fake.parametros_retorno = {
+        "placa": "TJK2I60",
+        "prazos_meses": [12, 24, 36, 48],
+        "categoria": "moto",
+        "valor": 21900.0,
+        "entrada": 1500.0,
+        "uf_licenciamento": "RS",
+        "zero_km": False,
+    }
+    login(client, papel="dono")
+    # Sem POST antes: a sessão não tem os parâmetros, só o Motor.
+    resposta = client.get("/app/simulacoes/job/sim-historico-1")
+    assert resposta.status_code == 200
+    assert "Parcelas simuladas" in resposta.text
+    assert "21.900,00" in resposta.text
+    assert "1.500,00" in resposta.text
+    assert "Moto" in resposta.text
+    assert "RS" in resposta.text
+    assert 'href="/app/simulacoes/sim-historico-1/registros"' in resposta.text
+
+
+def test_resultado_mostra_cpf_inteiro_para_dono(client, chatbot_fake, motor_fake):
+    login(client, papel="dono")
+    post = client.post(
+        "/app/simulacoes", data=_dados_motor(_csrf_do_form(client)), follow_redirects=False
+    )
+    job = client.get(post.headers["location"])
+    assert "529.982.247-25" in job.text
+
+
+def test_resultado_mascara_cpf_para_vendedor(client, chatbot_fake, motor_fake):
+    login(client, papel="vendedor", email="vend@loja.test")
+    post = client.post(
+        "/app/simulacoes", data=_dados_motor(_csrf_do_form(client)), follow_redirects=False
+    )
+    job = client.get(post.headers["location"])
+    assert "529.982.247-25" not in job.text
+    assert "52998224725" not in job.text

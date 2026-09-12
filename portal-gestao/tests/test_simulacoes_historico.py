@@ -31,6 +31,14 @@ def test_historico_tem_atalho_para_o_job(client, motor_fake):
     assert "/app/simulacoes/job/sim-dono-1" in resposta.text
 
 
+def test_historico_separa_parcelas_de_registros(client, motor_fake):
+    login(client, papel="dono")
+    resposta = client.get("/app/simulacoes/historico")
+    assert "Ver parcelas" in resposta.text
+    assert "Registros e prints" in resposta.text
+    assert "/app/simulacoes/sim-dono-1/registros" in resposta.text
+
+
 def test_historico_vendedor_escopo_forcado_para_minhas(client, motor_fake):
     login(client, papel="vendedor", email="vend@loja.test")
     # Mesmo pedindo escopo=loja, vendedor só vê as próprias.

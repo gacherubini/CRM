@@ -345,6 +345,25 @@ async def simulacoes_simular(
     return RedirectResponse(f"/app/simulacoes/job/{sim_id}", status_code=303)
 
 
+# Parâmetros que o Motor devolve no GET do job, para reabrir o resultado.
+_PARAMETROS_DO_MOTOR = (
+    "placa",
+    "prazos_meses",
+    "provedores",
+    "categoria",
+    "valor",
+    "entrada",
+    "uf_licenciamento",
+)
+
+
+def _formatar_cpf(cpf: str) -> str:
+    digitos = "".join(c for c in cpf if c.isdigit())
+    if len(digitos) != 11:
+        return mascarar_cpf(cpf)
+    return f"{digitos[:3]}.{digitos[3:6]}.{digitos[6:9]}-{digitos[9:]}"
+
+
 # Estados do job no Motor (worker Playwright).
 _SIM_STATUS_TERMINAIS = frozenset(
     {"concluida", "parcial", "falhou", "aguardando_intervencao", "cancelada"}
@@ -566,12 +585,13 @@ def simulacoes_job(
         if not pode_ver_custo(usuario):
             resultado = simulacao_sem_dados_sensiveis(resultado)
         # Histórico sem sessão: completa parâmetros a partir do job no Motor.
-        if not valores.get("placa") and resultado.get("placa"):
-            valores = {**valores, "placa": resultado.get("placa")}
-        if not valores.get("prazos_meses") and resultado.get("prazos_meses"):
-            valores = {**valores, "prazos_meses": resultado.get("prazos_meses")}
-        if not valores.get("provedores") and resultado.get("provedores"):
-            valores = {**valores, "provedores": resultado.get("provedores")}
+        for campo in _PARAMETROS_DO_MOTOR:
+            if valores.get(campo) in (None, "", []) and resultado.get(campo) not in (
+                None,
+                "",
+                [],
+            ):
+                valores = {**valores, campo: resultado.get(campo)}
         resultados_lista = resultado.get("resultados") or []
         return templates.TemplateResponse(
             "simulacoes/resultado.html",
@@ -581,7 +601,13 @@ def simulacoes_job(
                 valores=valores,
                 resultado=resultado,
                 grupos_resultados=_grupos_resultados_por_banco(resultados_lista),
-                cpf_mascarado=mascarar_cpf(cpf),
+                # Dono/gerente digitaram o CPF e veem inteiro; vendedor vê mascarado.
+                # Reaberto pelo histórico não há CPF: o Motor só o guarda cifrado.
+                cpf_mascarado=(
+                    _formatar_cpf(cpf) if pode_ver_custo(usuario) else mascarar_cpf(cpf)
+                )
+                if cpf
+                else "",
             ),
         )
 

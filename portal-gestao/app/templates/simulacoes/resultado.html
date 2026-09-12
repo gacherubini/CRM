@@ -2,20 +2,21 @@
 {% block title %}Resultado da simulação — Gestão{% endblock %}
 {% block content %}
 <div class="page-heading">
-  <div><a class="back-link" href="/app/simulacoes">← Nova simulação</a><h1>Parcelas simuladas</h1><p>Valores retornados pelos bancos parceiros. Nada foi salvo.</p></div>
+  <div><a class="back-link" href="/app/simulacoes/historico">← Histórico</a><h1>Parcelas simuladas</h1><p>Valores retornados pelos bancos parceiros. Nada foi salvo.</p></div>
+  {% if resultado and resultado.id %}<a class="button secondary" href="/app/simulacoes/{{ resultado.id }}/registros">Registros e prints</a>{% endif %}
 </div>
 
 <section class="panel form-section">
   <div class="section-title"><span>01</span><div><h2>Parâmetros</h2><p>Base usada nesta consulta.</p></div></div>
   <dl class="integration-stats">
     <div><dt>Modo</dt><dd>{{ valores.modo or 'mock' }}{% if resultado and resultado.status %} · {{ resultado.status }}{% endif %}</dd></div>
-    <div><dt>CPF</dt><dd>{{ cpf_mascarado }}</dd></div>
+    <div><dt>CPF</dt><dd>{% if cpf_mascarado %}{{ cpf_mascarado }}{% else %}<span class="muted">Não fica guardado: só aparece na sessão em que foi simulado</span>{% endif %}</dd></div>
     {% if valores.placa %}<div><dt>Placa</dt><dd>{{ valores.placa }}</dd></div>{% endif %}
     {% if valores.uf_licenciamento %}<div><dt>UF</dt><dd>{{ valores.uf_licenciamento }}</dd></div>{% endif %}
     <div><dt>Valor do bem</dt><dd>{% if valores.valor %}{{ formatar_brl(valores.valor) }}{% else %}<span class="muted">—</span>{% endif %}</dd></div>
-    <div><dt>Entrada informada</dt><dd>{{ formatar_brl(valores.entrada or 0) }}<br><span class="muted">no Santander a entrada é calculada pelo banco (coluna Entrada)</span></dd></div>
-    <div><dt>Prazos</dt><dd>{% if valores.prazos_meses %}{{ valores.prazos_meses }}{% else %}{{ valores.prazo_meses }} meses{% endif %}</dd></div>
-    <div><dt>Categoria</dt><dd>{{ valores.categoria | capitalize }}</dd></div>
+    <div><dt>Entrada informada</dt><dd>{% if valores.entrada is not none %}{{ formatar_brl(valores.entrada) }}{% else %}<span class="muted">—</span>{% endif %}<br><span class="muted">no Santander a entrada é calculada pelo banco (coluna Entrada)</span></dd></div>
+    <div><dt>Prazos</dt><dd>{% if valores.prazos_meses %}{% if valores.prazos_meses is string %}{{ valores.prazos_meses }}{% else %}{{ valores.prazos_meses | join(', ') }}{% endif %} meses{% elif valores.prazo_meses %}{{ valores.prazo_meses }} meses{% else %}<span class="muted">—</span>{% endif %}</dd></div>
+    <div><dt>Categoria</dt><dd>{% if valores.categoria %}{{ valores.categoria | capitalize }}{% else %}<span class="muted">—</span>{% endif %}</dd></div>
     {% if valores.provedores %}<div><dt>Bancos</dt><dd>{{ valores.provedores | join(', ') }}</dd></div>{% endif %}
   </dl>
   {% if resultado and resultado.mensagem %}<p class="muted">{{ resultado.mensagem }}</p>{% endif %}
