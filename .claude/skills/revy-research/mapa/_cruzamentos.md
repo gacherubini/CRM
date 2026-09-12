@@ -61,6 +61,20 @@ So a lista: qual arquivo aponta para qual app. Quais desses apps
 ainda existem e conhecimento humano que muda com o tempo — ver
 `AGENTS.md` secao 5. Deploy so por `deploy/fly/3vm/`.
 
+- `.claude/worktrees/loja-ui-quatro-telas/catalogo-publico/fly.toml` -> `catalogo2037`
+- `.claude/worktrees/loja-ui-quatro-telas/chatbot-api/fly.toml` -> `chatbot2037`
+- `.claude/worktrees/loja-ui-quatro-telas/deploy/fly/evolution/fly.toml` -> `evolution2037`
+- `.claude/worktrees/loja-ui-quatro-telas/deploy/fly/n8n/fly.toml` -> `n8n2037`
+- `.claude/worktrees/loja-ui-quatro-telas/estoque-api/fly.toml` -> `estoque2037`
+- `.claude/worktrees/loja-ui-quatro-telas/motor-simulacao/fly.toml` -> `motor2037`
+- `.claude/worktrees/loja-ui-quatro-telas/portal-gestao/fly.toml` -> `portal2037`
+- `.claude/worktrees/motor-lease-heartbeat/catalogo-publico/fly.toml` -> `catalogo2037`
+- `.claude/worktrees/motor-lease-heartbeat/chatbot-api/fly.toml` -> `chatbot2037`
+- `.claude/worktrees/motor-lease-heartbeat/deploy/fly/evolution/fly.toml` -> `evolution2037`
+- `.claude/worktrees/motor-lease-heartbeat/deploy/fly/n8n/fly.toml` -> `n8n2037`
+- `.claude/worktrees/motor-lease-heartbeat/estoque-api/fly.toml` -> `estoque2037`
+- `.claude/worktrees/motor-lease-heartbeat/motor-simulacao/fly.toml` -> `motor2037`
+- `.claude/worktrees/motor-lease-heartbeat/portal-gestao/fly.toml` -> `portal2037`
 - `catalogo-publico/fly.toml` -> `catalogo2037`
 - `chatbot-api/fly.toml` -> `chatbot2037`
 - `deploy/fly/evolution/fly.toml` -> `evolution2037`
