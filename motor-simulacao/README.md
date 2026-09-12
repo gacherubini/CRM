@@ -202,6 +202,24 @@ A **API** roda no bundle `app2037` (`127.0.0.1:8004`) com `MOTOR_ORCHESTRATOR_ON
 `stopped` no idle, acordados pela Machines API. Detalhes:
 [`../deploy/fly/3vm/README.md`](../deploy/fly/3vm/README.md).
 
+## Saída do browser por proxy ISP
+
+Hipótese do card [`docs/fila/2026-09-10-motor-rpa-multiloja-cloud.md`](../docs/fila/2026-09-10-motor-rpa-multiloja-cloud.md):
+o browser segue no Fly e só o IP que o banco vê muda. Vale para os drivers Playwright
+(`_launch_browser`); os drivers de API (httpx) e a Machines API **não** passam pelo proxy.
+
+| Secret (`motor2037`) | Valor | Efeito |
+|---|---|---|
+| `MOTOR_PROXY_URL` | `http://usuario:senha@host:porta` (senha com URL-encoding) | Chromium sai pelo proxy e o WebRTC não abre UDP direto |
+| `MOTOR_PROXY_EXPECTED_IP` | o IP contratado | antes do portal, abre `api.ipify.org` pelo browser; diferente ou sem resposta → `saida_de_rede_divergente` / `proxy_indisponivel` (`aguardando_intervencao`, sem retry) |
+
+- Vazios = comportamento de antes. Ligue os **dois** juntos: sem o esperado, secret
+  esquecido vira login no banco pelo IP do Fly sem ninguém ver.
+- SOCKS5 com senha é recusado na partida: o Chromium não autentica SOCKS5.
+- Proxy de ISP bloqueia banco até a verificação de identidade no fornecedor (IPRoyal: KYC).
+  Antes dela, a conferência passa e o portal falha — não é bug do driver.
+- Trocar a saída pode invalidar o `storage_state` salvo. Meça sessão fria e quente separadas.
+
 ## Worker em IP residencial — PLANEJADO, não implementado
 
 > **Status (2026-08-13): design aprovado, sem código de orquestração PC×Fly.**

@@ -133,6 +133,42 @@ def browser_headless_padrao() -> bool:
     return raw in ("1", "true", "yes", "on")
 
 
+# Serviço que devolve só o IP público em texto; não é portal de banco.
+_URL_CONFERE_IP = "https://api.ipify.org"
+
+# Sem isto o WebRTC abre UDP direto e o reCAPTCHA pode ver o IP do Fly além do proxy.
+_ARGS_WEBRTC_SO_PROXY = ["--force-webrtc-ip-handling-policy=disable_non_proxied_udp"]
+
+
+def proxy_padrao() -> dict | None:
+    """Proxy de saída do browser a partir de ``MOTOR_PROXY_URL``; ``None`` se vazio.
+
+    Formato: ``http://usuario:senha@host:porta`` (senha com URL-encoding).
+    SOCKS5 com senha é recusado: o Chromium não autentica SOCKS5.
+    A mensagem de erro nunca inclui a URL, que carrega a senha.
+    """
+    from urllib.parse import unquote, urlsplit
+
+    raw = (os.getenv("MOTOR_PROXY_URL") or "").strip()
+    if not raw:
+        return None
+    try:
+        partes = urlsplit(raw)
+        porta = partes.port
+    except ValueError:
+        raise ValueError("MOTOR_PROXY_URL inválida (porta)") from None
+    esquema = (partes.scheme or "").lower()
+    if esquema not in ("http", "https", "socks5") or not partes.hostname or not porta:
+        raise ValueError("MOTOR_PROXY_URL inválida: use http://usuario:senha@host:porta")
+    if esquema == "socks5" and (partes.username or partes.password):
+        raise ValueError("MOTOR_PROXY_URL: Chromium não autentica SOCKS5; use http://")
+    proxy: dict = {"server": f"{esquema}://{partes.hostname}:{porta}"}
+    if partes.username:
+        proxy["username"] = unquote(partes.username)
+        proxy["password"] = unquote(partes.password or "")
+    return proxy
+
+
 class PlaywrightBankDriver(ABC):
     """Base para bancos sem API: browser + sessão + screenshots.
 
@@ -222,11 +258,59 @@ class PlaywrightBankDriver(ABC):
         """Abre Chromium evitando headless_shell e flags de automação."""
         # Headless shell é o que o Akamai mais bloqueia; headed (Xvfb) usa Chromium completo.
         # Se headless for obrigatório, desliga o headless_shell via env no compose.
-        return playwright.chromium.launch(
-            headless=self.headless,
-            args=list(_LAUNCH_ARGS),
-            ignore_default_args=list(_IGNORE_DEFAULT_ARGS),
-            chromium_sandbox=False,
+        kwargs: dict = {
+            "headless": self.headless,
+            "args": list(_LAUNCH_ARGS),
+            "ignore_default_args": list(_IGNORE_DEFAULT_ARGS),
+            "chromium_sandbox": False,
+        }
+        proxy = proxy_padrao()
+        if proxy is not None:
+            kwargs["proxy"] = proxy
+            kwargs["args"] += _ARGS_WEBRTC_SO_PROXY
+        browser = playwright.chromium.launch(**kwargs)
+        esperado = (os.getenv("MOTOR_PROXY_EXPECTED_IP") or "").strip()
+        if esperado:
+            self._conferir_ip_de_saida(browser, esperado)
+        return browser
+
+    def _conferir_ip_de_saida(self, browser, esperado: str) -> None:
+        """Para antes do portal se o IP visto de fora não for o contratado.
+
+        Vira ``aguardando_intervencao`` (sem retry): proxy caído ou secret esquecido
+        não pode virar login no banco pelo IP do Fly.
+        """
+        visto = ""
+        erro: str | None = None
+        contexto = None
+        try:
+            contexto = browser.new_context()
+            page = contexto.new_page()
+            page.goto(_URL_CONFERE_IP, timeout=20_000)
+            visto = (page.inner_text("body") or "").strip()
+        except Exception as exc:  # noqa: BLE001 - qualquer falha de rede para aqui
+            erro = type(exc).__name__
+        finally:
+            if contexto is not None:
+                try:
+                    contexto.close()
+                except Exception:
+                    pass
+        if erro is None and visto == esperado:
+            return
+        try:
+            browser.close()
+        except Exception:
+            pass
+        if erro is not None:
+            raise IntervencaoNecessaria(
+                "proxy_indisponivel",
+                f"Não deu para conferir o IP de saída ({erro}); {self.provedor} não foi aberto.",
+            )
+        raise IntervencaoNecessaria(
+            "saida_de_rede_divergente",
+            f"IP de saída {visto!r} diferente do esperado {esperado!r}; "
+            f"{self.provedor} não foi aberto.",
         )
 
     def _new_context(self, browser, ctx: DriverContext | None = None):
