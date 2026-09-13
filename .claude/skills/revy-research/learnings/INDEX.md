@@ -67,3 +67,4 @@ escrever migration com `batch_alter_table`.
 | banco cai em captcha/login frio logo depois de uma rodada recusada, ou a sessão quente não é reusada | `2026-09-12-sessao-quente-so-existia-se-chegasse-as-ofertas.md` |
 | sessão quente não é reusada entre jobs nos workers Playwright do Fly, ou banco pede captcha em todo login | `2026-09-13-storage-state-morre-no-rootfs-efemero-do-fly.md` |
 | portal bancário recusa fora de horário comercial, ou mostra produto desabilitado após o login | `2026-09-13-bv-produto-veiculos-so-em-horario-comercial.md` |
+| pintar fundo de estado ativo no escuro e o texto sumir | `2026-09-13-data-theme-vence-classe-nova.md` |
