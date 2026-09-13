@@ -48,7 +48,9 @@ def carregar_env_local(caminho: Path) -> int:
             continue
         chave, _, valor = linha.partition("=")
         chave = chave.strip()
-        valor = valor.strip().strip('"').strip("'")
+        # Comentário de fim de linha (" # ..."); sem isso um placeholder como
+        # `PROBE_VALOR=  # ex.: 21900` virava valor e quebrava float().
+        valor = valor.split(" #", 1)[0].strip().strip('"').strip("'")
         if chave and chave not in os.environ:
             os.environ[chave] = valor
             carregadas += 1
@@ -56,7 +58,10 @@ def carregar_env_local(caminho: Path) -> int:
 
 
 _ENV_LOCAL = RAIZ / ".env.local"
-_N_ENV = carregar_env_local(_ENV_LOCAL)
+# Segredos podem morar no .env.local da RAIZ do repo (compartilhado);
+# o da pasta do produto vence quando os dois definem a mesma chave.
+_ENV_RAIZ = RAIZ.parent / ".env.local"
+_N_ENV = carregar_env_local(_ENV_RAIZ) + carregar_env_local(_ENV_LOCAL)
 
 
 def _template_preenchido() -> bool:
@@ -169,6 +174,7 @@ def montar_solicitacao(banco: str) -> SolicitacaoSimulacao:
             cpf=dado("CPF"),
             nascimento=dado("NASC"),
             celular=dado("CELULAR"),
+            sexo=dado("SEXO") or None,
         ),
         veiculo=Veiculo(
             placa=dado("PLACA"),
@@ -212,20 +218,20 @@ def rodar_banco(banco: str, saida_dir: Path, headless: bool) -> Relato:
 
     sol = montar_solicitacao(banco)
     faltando = [
-        nome
-        for nome, valor in (
-            ("cpf", sol.pessoa.cpf),
-            ("nascimento", sol.pessoa.nascimento),
-            ("celular", sol.pessoa.celular),
-            ("placa", sol.veiculo.placa),
+        var
+        for var, valor in (
+            ("CPF", sol.pessoa.cpf),
+            ("NASC", sol.pessoa.nascimento),
+            ("CELULAR", sol.pessoa.celular),
+            ("PLACA", sol.veiculo.placa),
         )
         if not valor
     ]
     if faltando or not sol.veiculo.valor:
         if not sol.veiculo.valor:
-            faltando.append("valor")
+            faltando.append("VALOR")
         rel.status = "SEM DADOS"
-        rel.detalhe = "faltam PROBE_" + ", PROBE_".join(f.upper() for f in faltando)
+        rel.detalhe = "faltam PROBE_" + ", PROBE_".join(faltando)
         return rel
 
     modulo = __import__(str(meta["modulo"]), fromlist=[str(meta["fabrica"])])
