@@ -90,12 +90,14 @@ UFS_BR = [
 
 
 # Bancos reais do Motor; "todos" consulta os que tiverem credencial.
-_PROVEDORES_REAIS = frozenset({"santander", "pan", "fontecred", "bradesco"})
+_PROVEDORES_REAIS = frozenset({"santander", "pan", "fontecred", "bradesco", "motrix", "omni"})
 _ROTULOS_BANCO = {
     "santander": "Santander",
     "pan": "Banco PAN",
     "fontecred": "Fontecred",
     "bradesco": "Bradesco",
+    "motrix": "Motrix",
+    "omni": "Omni",
 }
 
 

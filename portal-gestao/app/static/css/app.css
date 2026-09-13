@@ -1056,6 +1056,29 @@ tr:hover td { background: var(--surface-soft); }
   padding: 8px 0 20px;
 }
 
+/* Simulação manual: barra de atalhos e chips de banco. Saiu de style inline
+   (inline não acompanha os dois temas); somente tokens existentes, sem :root. */
+.sim-bank-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+  margin: 10px 0 6px;
+  align-items: center;
+}
+.sim-bank-bar .button { padding: 6px 12px; font-size: 0.85rem; }
+.sim-bank-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.sim-bank-chips li { margin: 0; }
+.sim-bank-chip { margin: 0; cursor: pointer; user-select: none; }
+.sim-bank-chips input[type="checkbox"] { margin: 0; }
+.sim-bank-hint { margin-top: 10px; }
+
 .action-panel {
   margin-top: 20px;
   padding: 22px;

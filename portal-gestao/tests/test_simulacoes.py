@@ -87,6 +87,47 @@ def test_form_lista_bancos_prontos(client, chatbot_fake, motor_fake):
     assert "Banco PAN" in resposta.text or "pan" in resposta.text.lower()
 
 
+def test_form_mostra_omni_quando_credencial_pronta(client, chatbot_fake, motor_fake):
+    """Omni aparece sozinho quando o Motor expõe a credencial (sem hardcode)."""
+    motor_fake.credenciais.append({
+        "provedor": "omni",
+        "usuario": "lojista",
+        "senha_configurada": True,
+        "senha_mascara": "****",
+        "habilitado": True,
+        "atualizado_em": "2026-09-12T12:00:00+00:00",
+        "ultimo_sucesso_em": None,
+        "ultimo_erro_sanitizado": None,
+        "falhas_login": 0,
+    })
+    motor_fake.provedores.append({
+        "nome": "omni", "rotulo": "Omni", "habilitado": True,
+        "real": True, "modo": "playwright",
+        "campos_credencial": [],
+    })
+    login(client)
+    resposta = client.get("/app/simulacoes")
+    assert resposta.status_code == 200
+    assert 'value="omni"' in resposta.text
+    assert "Omni" in resposta.text
+
+
+def test_rotulos_conhecem_motrix_e_omni():
+    from app.web.simulacoes import _PROVEDORES_REAIS, _ROTULOS_BANCO
+    assert {"motrix", "omni"} <= set(_PROVEDORES_REAIS)
+    assert _ROTULOS_BANCO["motrix"] == "Motrix"
+    assert _ROTULOS_BANCO["omni"] == "Omni"
+
+
+def test_form_bancos_sem_inline_style(client, chatbot_fake, motor_fake):
+    login(client)
+    resposta = client.get("/app/simulacoes")
+    assert "sim-bank-chips" in resposta.text
+    assert "sim-bank-bar" in resposta.text
+    assert 'sim-bank-chips" style=' not in resposta.text
+    assert "display:flex;flex-wrap:wrap;gap:10px" not in resposta.text
+
+
 def test_simular_banco_unico_escolhido(client, chatbot_fake, motor_fake):
     """Checkbox permite testar 1 banco por vez."""
     motor_fake.credenciais[1]["senha_configurada"] = True

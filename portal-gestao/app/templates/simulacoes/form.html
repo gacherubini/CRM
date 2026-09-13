@@ -14,29 +14,28 @@
   <section class="panel form-section">
     <div class="section-title"><span>00</span><div><h2>Bancos</h2><p>Marque só o que quiser testar (1 por vez reduz timeout e carga no portal).</p></div></div>
     {% if bancos_prontos %}
-    <div style="display:flex;flex-wrap:wrap;gap:10px 16px;margin:10px 0 6px;align-items:center">
-      <button type="button" class="button ghost" id="bancos-todos" style="padding:6px 12px;font-size:0.85rem">Marcar todos</button>
-      <button type="button" class="button ghost" id="bancos-nenhum" style="padding:6px 12px;font-size:0.85rem">Desmarcar todos</button>
+    <div class="sim-bank-bar">
+      <button type="button" class="button ghost" id="bancos-todos">Marcar todos</button>
+      <button type="button" class="button ghost" id="bancos-nenhum">Desmarcar todos</button>
     </div>
-    <ul class="sim-bank-chips" style="display:flex;flex-wrap:wrap;gap:10px;margin:8px 0 0;padding:0;list-style:none">
+    <ul class="sim-bank-chips">
       {% for b in bancos_prontos %}
       {% set nome = (b.provedor or '')|lower %}
       {% set marcado = (not valores.provedores) or (nome in valores.provedores) %}
-      <li style="margin:0">
-        <label class="status-chip" style="margin:0;cursor:pointer;display:inline-flex;align-items:center;gap:6px;user-select:none">
+      <li>
+        <label class="status-chip sim-bank-chip">
           <input type="checkbox" name="provedores" value="{{ nome }}"
-            {% if marcado %}checked{% endif %}
-            style="margin:0">
+            {% if marcado %}checked{% endif %}>
           <i></i>{{ b.rotulo or b.provedor }}
         </label>
       </li>
       {% endfor %}
     </ul>
-    <p class="muted" style="margin-top:10px">Só aparecem bancos com login em <a href="/app/financeiras">Acessos dos bancos</a>.</p>
+    <p class="muted sim-bank-hint">Só aparecem bancos com login em <a href="/app/financeiras">Acessos dos bancos</a>.</p>
     {% else %}
     <p class="muted">
       Nenhum banco com credencial ainda.
-      Cadastre em <a href="/app/financeiras">Acessos dos bancos</a> (Santander, Fontecred, Bradesco, PAN…).
+      Cadastre em <a href="/app/financeiras">Acessos dos bancos</a>.
     </p>
     {% endif %}
   </section>
