@@ -65,3 +65,4 @@ escrever migration com `batch_alter_table`.
 | rodar comando com aspas, parenteses, pipe ou redirect via fly ssh console no Windows | `2026-09-12-fly-ssh-console-comando-complexo-via-stdin.md` |
 | tela de recusa de crédito cai em erro técnico genérico em vez de RejeicaoNegocio | `2026-09-12-recusa-antes-do-erro-generico-na-espera.md` |
 | banco cai em captcha/login frio logo depois de uma rodada recusada, ou a sessão quente não é reusada | `2026-09-12-sessao-quente-so-existia-se-chegasse-as-ofertas.md` |
+| sessão quente não é reusada entre jobs nos workers Playwright do Fly, ou banco pede captcha em todo login | `2026-09-13-storage-state-morre-no-rootfs-efemero-do-fly.md` |
