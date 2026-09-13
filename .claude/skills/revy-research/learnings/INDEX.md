@@ -62,3 +62,5 @@ escrever migration com `batch_alter_table`.
 | escrever teste de read-model do portal que le dicionario vindo de outro produto | `2026-08-29-dicionario-sintetico-no-teste-esconde-contrato.md` |
 | conferir uma tela da Loja em largura estreita (390px) no navegador | `2026-09-11-largura-estreita-nao-se-confere-por-resize.md` |
 | deployar o motor2037 ou mudar env/timeout de um worker de banco | `2026-09-12-fly-deploy-nao-atualiza-worker-por-banco.md` |
+| rodar comando com aspas, parenteses, pipe ou redirect via fly ssh console no Windows | `2026-09-12-fly-ssh-console-comando-complexo-via-stdin.md` |
+| tela de recusa de crédito cai em erro técnico genérico em vez de RejeicaoNegocio | `2026-09-12-recusa-antes-do-erro-generico-na-espera.md` |
