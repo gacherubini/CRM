@@ -55,6 +55,13 @@
           <option value="nao" {{ 'selected' if valores.cnh == 'nao' }}>Não</option>
         </select>
       </label>
+      <label>Sexo
+        <select name="sexo">
+          <option value="" {{ 'selected' if not valores.sexo }}>Selecionar…</option>
+          <option value="Masculino" {{ 'selected' if valores.sexo == 'Masculino' }}>Masculino</option>
+          <option value="Feminino" {{ 'selected' if valores.sexo == 'Feminino' }}>Feminino</option>
+        </select>
+      </label>
     </div>
     <p class="muted">Celular é obrigatório em Fontecred, Bradesco e PAN (portal). Informe DDD + número, só dígitos.</p>
   </section>

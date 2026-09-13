@@ -180,6 +180,7 @@ def _valores_form_simulacao(form) -> dict:
         "nascimento": form.get("nascimento", ""),
         "celular": form.get("celular") or "",
         "cnh": form.get("cnh") or "sim",
+        "sexo": form.get("sexo") or "",
         "valor": form.get("valor", ""),
         "prazos_meses": form.get("prazos_meses", ""),
         "entrada": form.get("entrada", ""),
@@ -265,6 +266,7 @@ def dados_simulacao_motor(
     # Portais (Fontecred/Bradesco/PAN) costumam mascarar DDD+número no mesmo campo.
     # APIs (PAN) usam ddd e celular separados — enviamos os dois formatos úteis.
     celular_completo = f"{ddd}{celular}"
+    sexo = (form.get("sexo") or "").strip() or None
     return {
         "pessoa": {
             "cpf": cpf,
@@ -272,6 +274,7 @@ def dados_simulacao_motor(
             "cnh": cnh,
             "ddd": ddd,
             "celular": celular_completo,
+            "sexo": sexo,
         },
         "veiculo": {
             "categoria": form.get("categoria") or "moto",

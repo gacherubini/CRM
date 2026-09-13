@@ -338,3 +338,28 @@ def test_resultado_mascara_cpf_para_vendedor(client, chatbot_fake, motor_fake):
     job = client.get(post.headers["location"])
     assert "529.982.247-25" not in job.text
     assert "52998224725" not in job.text
+
+
+def test_form_tem_campo_sexo(client, chatbot_fake, motor_fake):
+    login(client)
+    resposta = client.get("/app/simulacoes")
+    assert resposta.status_code == 200
+    assert 'name="sexo"' in resposta.text
+    assert "Masculino" in resposta.text
+    assert "Feminino" in resposta.text
+
+
+def test_sexo_vai_no_payload_do_motor(client, chatbot_fake, motor_fake):
+    login(client, papel="vendedor")
+    dados = _dados_motor(_csrf_do_form(client), sexo="Feminino")
+    resposta = client.post("/app/simulacoes", data=dados, follow_redirects=False)
+    assert resposta.status_code == 303
+    assert motor_fake.simulacoes[-1]["pessoa"]["sexo"] == "Feminino"
+
+
+def test_sem_sexo_payload_vai_nulo(client, chatbot_fake, motor_fake):
+    login(client, papel="vendedor")
+    dados = _dados_motor(_csrf_do_form(client))
+    resposta = client.post("/app/simulacoes", data=dados, follow_redirects=False)
+    assert resposta.status_code == 303
+    assert motor_fake.simulacoes[-1]["pessoa"]["sexo"] is None
