@@ -42,6 +42,15 @@ WARM_SESSION = (os.getenv("MOTOR_WARM_SESSION") or "1").strip().lower() in (
     "yes",
     "on",
 )
+# Geolocalizacao do contexto Playwright (default OFF = comportamento de antes:
+# o site pergunta e, sem humano, fica sem resposta). Quando as duas estao
+# preenchidas, o contexto concede `geolocation` e informa a posicao — o portal
+# Turbo do Bradesco pede localizacao e a analise de credito destrava em segundos
+# com o sinal (13/09/2026, probe local com Allow clicado: ofertas em 10s apos
+# 9 travas de 600s). Coordenadas da operacao (loja), nunca inventadas: o motor
+# de risco cruza com o geo do IP de saida.
+GEO_LATITUDE = (os.getenv("MOTOR_GEO_LATITUDE") or "").strip()
+GEO_LONGITUDE = (os.getenv("MOTOR_GEO_LONGITUDE") or "").strip()
 # Headless=1 usa chromium headless_shell (muito bloqueado por Akamai).
 # Padrão 0 = headed; no Docker o worker sobe com Xvfb (display virtual).
 BROWSER_HEADLESS = (os.getenv("MOTOR_BROWSER_HEADLESS") or "0").strip().lower() in (

@@ -15,6 +15,7 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Optional
 
+from app import config
 from app.motor.base import SolicitacaoSimulacao
 from app.motor.drivers import (
     DriverContext,
@@ -55,6 +56,41 @@ def capturar_print_evento(
         return str(destino), bytes(dados)
     except Exception:
         return None, None
+
+
+def geolocalizacao_configurada() -> tuple[float, float] | None:
+    """Devolve (lat, lon) se MOTOR_GEO_LATITUDE/LONGITUDE validos; senao None.
+
+    Default OFF: sem as duas variaveis o contexto nem toca em permissoes.
+    """
+    try:
+        lat = float((config.GEO_LATITUDE or "").replace(",", "."))
+        lon = float((config.GEO_LONGITUDE or "").replace(",", "."))
+    except (TypeError, ValueError):
+        return None
+    if not (-90.0 <= lat <= 90.0 and -180.0 <= lon <= 180.0):
+        return None
+    return lat, lon
+
+
+def aplicar_geolocalizacao(browser_ctx) -> bool:
+    """Concede `geolocation` e informa a posicao (equivale ao Allow clicado).
+
+    O Turbo do Bradesco pede localizacao e a analise destrava com o sinal;
+    sem humano o prompt fica pendente e a analise morre no timeout. Nunca
+    levanta: contexto sem geo continua funcionando como antes.
+    """
+    pos = geolocalizacao_configurada()
+    if pos is None or browser_ctx is None:
+        return False
+    try:
+        browser_ctx.grant_permissions(["geolocation"])
+        browser_ctx.set_geolocation(
+            {"latitude": pos[0], "longitude": pos[1], "accuracy": 100}
+        )
+        return True
+    except Exception:
+        return False
 
 # Chrome 131 desktop Windows — alinhado ao build do Playwright.
 _CHROME_MAJOR = "131"
@@ -345,6 +381,7 @@ class PlaywrightBankDriver(ABC):
             kwargs["storage_state"] = str(storage)
         browser_ctx = browser.new_context(**kwargs)
         browser_ctx.add_init_script(_STEALTH_INIT)
+        aplicar_geolocalizacao(browser_ctx)
         return browser_ctx
 
     def _new_context_vanilla(self, browser, ctx: DriverContext | None = None):
@@ -360,7 +397,9 @@ class PlaywrightBankDriver(ABC):
         storage = self._storage_path_efetivo(ctx)
         if storage is not None and storage.is_file():
             kwargs["storage_state"] = str(storage)
-        return browser.new_context(**kwargs)
+        browser_ctx = browser.new_context(**kwargs)
+        aplicar_geolocalizacao(browser_ctx)
+        return browser_ctx
 
     def _assert_portal_acessivel(self, page) -> None:
         """Detecta WAF/Akamai Access Denied e falha com código legível."""
