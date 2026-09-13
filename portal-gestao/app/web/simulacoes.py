@@ -379,12 +379,19 @@ async def simulacoes_simular(
     valores_job["modo"] = "selecionados" if len(provedores) == 1 else "multi"
     valores_job["provedores"] = list(provedores)
     jobs = request.session.get("sim_jobs") or {}
+    jobs.pop(sim_id, None)
     jobs[sim_id] = {
         "valores": valores_job,
         "cpf": payload_motor["pessoa"]["cpf"],
         "criada_em": criada.get("criada_em") or "",
         "provedores": list(provedores),
     }
+    # Sessão é cookie assinado: sem teto, cada sim engorda o Set-Cookie até o
+    # nginx devolver 502 "upstream sent too big header" no 303 (13/09/2026).
+    # A tela do job já completa parâmetros pelo Motor (_PARAMETROS_DO_MOTOR),
+    # então descartar os mais antigos é seguro.
+    while len(jobs) > 5:
+        jobs.pop(next(iter(jobs)))
     request.session["sim_jobs"] = jobs
     return RedirectResponse(f"/app/simulacoes/job/{sim_id}", status_code=303)
 
