@@ -11,6 +11,7 @@ from sqlalchemy import (
     ForeignKey,
     Index,
     Integer,
+    LargeBinary,
     Numeric,
     String,
     Text,
@@ -51,6 +52,12 @@ class Usuario(Base):
     loja_slug: Mapped[str] = mapped_column(String(120), index=True)
     ativo: Mapped[bool] = mapped_column(Boolean, default=True)
     criado_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=agora)
+    # Avatar da pessoa: OU preset (slug em AVATAR_PRESETS) OU foto própria
+    # (bytes no banco — disco local não persiste no Fly). NULL/NULL = inicial
+    # do nome, o comportamento de antes. Mutuamente exclusivos: escolher um
+    # lado limpa o outro (ver app/web/loja_perfil.py).
+    avatar_key: Mapped[Optional[str]] = mapped_column(String(40), nullable=True)
+    foto_perfil: Mapped[Optional[bytes]] = mapped_column(LargeBinary, nullable=True)
 
 
 class ConviteAcessoLoja(Base):

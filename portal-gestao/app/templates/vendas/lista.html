@@ -51,8 +51,8 @@
       </td>{% endif %}
     </tr>{% endfor %}</tbody>
   </table></div>
-  {% elif filtros.status %}<div class="empty"><strong>Nenhuma venda para esse filtro.</strong><p>Ajuste o status ou o período selecionado.</p></div>
-  {% else %}<div class="empty"><strong>Nenhuma venda no período.</strong><p>Registre a primeira venda para começar a acompanhar o comercial.</p></div>{% endif %}
+  {% elif filtros.status %}<div class="empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="9" r="5"/><path d="M9 13l-2 8 5-3 5 3-2-8"/></svg><strong>Nenhuma venda para esse filtro.</strong><p>Ajuste o status ou o período selecionado.</p></div>
+  {% else %}<div class="empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="9" r="5"/><path d="M9 13l-2 8 5-3 5 3-2-8"/></svg><strong>Nenhuma venda no período.</strong><p>Registre a primeira venda para começar a acompanhar o comercial.</p></div>{% endif %}
 </section>
 {# Date-picker próprio em pt-BR (resultado_periodo.js): enhancement
    progressivo — sem JS os <input type="date"> acima seguem nativos. #}

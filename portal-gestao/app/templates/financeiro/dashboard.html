@@ -35,7 +35,7 @@
 </section>
 {% else %}
 <section class="panel flush">
-  <div class="empty"><strong>Nenhuma venda confirmada no período.</strong><p>Assim que uma venda for confirmada, os totais reais aparecem aqui.</p></div>
+  <div class="empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="9" r="5"/><path d="M9 13l-2 8 5-3 5 3-2-8"/></svg><strong>Nenhuma venda confirmada no período.</strong><p>Assim que uma venda for confirmada, os totais reais aparecem aqui.</p></div>
 </section>
 {% endif %}
 
@@ -60,7 +60,7 @@
     {% endfor %}
   </div>
   {% else %}
-  <div class="empty"><strong>Nenhuma meta da loja para o período.</strong><p><a href="/app/metas">Cadastre metas</a> de quantidade, faturamento ou lucro bruto para acompanhar o atingimento.</p></div>
+  <div class="empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.2"/></svg><strong>Nenhuma meta da loja para o período.</strong><a class="button secondary" href="/app/metas">Cadastrar metas</a></div>
 {% endif %}
 </section>
 
@@ -73,7 +73,7 @@
     <div class="metric accent"><span>Vendas vinculadas</span><strong>{{ funil.vendas_vinculadas }}</strong><small>vendas confirmadas no período com lead_ref elegível</small></div>
   </div>
   {% else %}
-  <div class="empty"><strong>Funil indisponível.</strong><p>{{ funil.erro or 'Os dados atuais não permitem uma contagem confiável.' }}</p></div>
+  <div class="empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 4h18l-7 8v7l-4 2v-9L3 4Z"/></svg><strong>Funil indisponível.</strong><p>{{ funil.erro or 'Os dados atuais não permitem uma contagem confiável.' }}</p></div>
   {% endif %}
   <p class="muted">Handoffs externos ou anteriores ao histórico local do Portal permanecem indisponíveis e não são convertidos em zero. As etapas não representam atribuição causal de venda.</p>
 </section>

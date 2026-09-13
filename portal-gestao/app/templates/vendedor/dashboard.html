@@ -31,7 +31,7 @@
     <div class="meta-bar" role="progressbar" aria-valuenow="{{ meta.pct }}" aria-valuemin="0" aria-valuemax="100"><span style="display:block;height:100%;width:{{ meta.pct_barra }}%;background:currentColor"></span></div>
     {% endif %}
   </div>{% endfor %}</div>
-  {% else %}<div class="empty"><strong>Nenhuma meta individual aplicável.</strong><p>Metas de lucro não são exibidas ao vendedor. O dono ou gerente pode definir metas individuais em um incremento futuro.</p></div>{% endif %}
+  {% else %}<div class="empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.2"/></svg><strong>Nenhuma meta individual aplicável.</strong><p>Metas de lucro não são exibidas ao vendedor. O dono ou gerente pode definir metas individuais em um incremento futuro.</p></div>{% endif %}
 </section>
 
 {% if integracao_erro %}<div class="alert warning" role="alert"><strong>Chatbot desconectado.</strong> Os atendimentos estão indisponíveis agora. {{ integracao_erro }}</div>{% endif %}
@@ -42,14 +42,14 @@
       <div><strong>{{ lead.nome or 'Contato' }}</strong><small>{{ mascarar_telefone(lead.telefone) }}{% if lead.origem %} · origem declarada: {{ lead.origem }}{% endif %}{% if lead.utm_campaign %} · campanha: {{ lead.utm_campaign }}{% endif %}</small></div>
       <span class="status {{ lead.etapa }}">{{ lead.etapa | replace('_', ' ') }}</span>
     </a>{% endfor %}</div>
-    {% elif not integracao_erro %}<div class="empty"><strong>Nenhum lead assumido identificado.</strong><p>Somente handoffs feitos com sucesso pelo Portal aparecem aqui.</p></div>{% endif %}
+    {% elif not integracao_erro %}<div class="empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.2"/><path d="M2.5 20c.8-3.6 3.4-5.5 6.5-5.5s5.7 1.9 6.5 5.5M16 5.4a3.2 3.2 0 010 5.6M18.5 14.9c2 .7 3.2 2.3 3.6 4.6"/></svg><strong>Nenhum lead assumido identificado.</strong><p>Somente handoffs feitos com sucesso pelo Portal aparecem aqui.</p></div>{% endif %}
   </article>
   <article class="panel">
     <div class="panel-heading"><div><span class="mono-label">CONVERSAS IDENTIFICADAS</span><h2>Conversas sob minha responsabilidade</h2></div></div>
     {% if conversas %}<div class="vehicle-list compact">{% for conversa in conversas %}<a class="vehicle-row" href="/app/conversas/{{ conversa.telefone }}">
       <div><strong>{{ mascarar_telefone(conversa.telefone) }}</strong><small>{{ conversa.status | replace('_', ' ') }} · {{ formatar_horario(conversa.atualizada_em) }}</small></div>
     </a>{% endfor %}</div>
-    {% elif not integracao_erro %}<div class="empty"><strong>Nenhuma conversa assumida identificada.</strong><p>Atendimentos externos sem identidade confiável não são atribuídos a você.</p></div>{% endif %}
+    {% elif not integracao_erro %}<div class="empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h16v11H9l-5 4z"/></svg><strong>Nenhuma conversa assumida identificada.</strong><p>Atendimentos externos sem identidade confiável não são atribuídos a você.</p></div>{% endif %}
   </article>
 </section>
 <p class="muted">Identidade baseada somente no histórico HMAC de handoffs executados neste Portal. Histórico externo ou anterior está indisponível; o Portal não presume responsável.</p>
@@ -59,7 +59,7 @@
   {% if vendas %}<div class="table-wrap"><table><thead><tr><th>Venda</th><th>Status</th><th>Preço</th></tr></thead><tbody>{% for venda in vendas %}<tr>
     <td><strong>{{ venda.descricao }}</strong></td><td><span class="status {{ venda.status }}">{{ venda.status }}</span></td><td>{{ formatar_brl(venda.preco_venda) }}</td>
   </tr>{% endfor %}</tbody></table></div>
-  {% else %}<div class="empty"><strong>Nenhuma venda sua no período.</strong><p>Vendas de outros vendedores nunca aparecem neste painel.</p></div>{% endif %}
+  {% else %}<div class="empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="9" r="5"/><path d="M9 13l-2 8 5-3 5 3-2-8"/></svg><strong>Nenhuma venda sua no período.</strong><p>Vendas de outros vendedores nunca aparecem neste painel.</p></div>{% endif %}
 </section>
 {# Date-picker próprio em pt-BR (resultado_periodo.js): enhancement
    progressivo — sem JS os <input type="date"> acima seguem nativos. #}

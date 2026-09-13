@@ -115,14 +115,6 @@ class MotorClient:
             json=corpo,
         )
 
-    def testar_login(self, nome: str, ator: str) -> dict:
-        return self._request(
-            "POST",
-            f"/v1/provedores/{nome}/testar-login",
-            ator=ator,
-            erro_404=CredencialNaoEncontrada,
-        )
-
     def criar_simulacao(
         self,
         payload: dict,

@@ -1,5 +1,5 @@
 {
- "sha": "d29cd44",
+ "sha": "3843a5c",
  "inventario": {
   "chatbot-api": [
    {
@@ -1430,21 +1430,14 @@
     "chave": "POST /app/financeiras/{nome}",
     "simbolo": "/app/financeiras/{nome}",
     "arquivo": "app/main.py",
-    "linha": 2393
-   },
-   {
-    "secao": "rota",
-    "chave": "POST /app/financeiras/{nome}/testar",
-    "simbolo": "/app/financeiras/{nome}/testar",
-    "arquivo": "app/main.py",
-    "linha": 2496
+    "linha": 2392
    },
    {
     "secao": "rota",
     "chave": "GET /app/configuracoes",
     "simbolo": "/app/configuracoes",
     "arquivo": "app/main.py",
-    "linha": 2607
+    "linha": 2506
    },
    {
     "secao": "worker",
@@ -1479,182 +1472,182 @@
     "chave": "usuarios",
     "simbolo": "usuarios",
     "arquivo": "app/models.py",
-    "linha": 44
+    "linha": 45
    },
    {
     "secao": "modelo",
     "chave": "convites_acesso_loja",
     "simbolo": "convites_acesso_loja",
     "arquivo": "app/models.py",
-    "linha": 57
+    "linha": 64
    },
    {
     "secao": "modelo",
     "chave": "redefinicoes_senha",
     "simbolo": "redefinicoes_senha",
     "arquivo": "app/models.py",
-    "linha": 74
+    "linha": 81
    },
    {
     "secao": "modelo",
     "chave": "loja_operacional_projecao",
     "simbolo": "loja_operacional_projecao",
     "arquivo": "app/models.py",
-    "linha": 96
+    "linha": 103
    },
    {
     "secao": "modelo",
     "chave": "vendas",
     "simbolo": "vendas",
     "arquivo": "app/models.py",
-    "linha": 109
+    "linha": 116
    },
    {
     "secao": "modelo",
     "chave": "venda_custos_diretos",
     "simbolo": "venda_custos_diretos",
     "arquivo": "app/models.py",
-    "linha": 143
+    "linha": 150
    },
    {
     "secao": "modelo",
     "chave": "despesa_fixa_loja",
     "simbolo": "despesa_fixa_loja",
     "arquivo": "app/models.py",
-    "linha": 168
+    "linha": 175
    },
    {
     "secao": "modelo",
     "chave": "despesa_fixa_ajuste",
     "simbolo": "despesa_fixa_ajuste",
     "arquivo": "app/models.py",
-    "linha": 191
+    "linha": 198
    },
    {
     "secao": "modelo",
     "chave": "metas",
     "simbolo": "metas",
     "arquivo": "app/models.py",
-    "linha": 210
+    "linha": 217
    },
    {
     "secao": "modelo",
     "chave": "atendimento_atribuicoes",
     "simbolo": "atendimento_atribuicoes",
     "arquivo": "app/models.py",
-    "linha": 224
+    "linha": 231
    },
    {
     "secao": "modelo",
     "chave": "loja_operacao_auditoria",
     "simbolo": "loja_operacao_auditoria",
     "arquivo": "app/models.py",
-    "linha": 242
+    "linha": 249
    },
    {
     "secao": "modelo",
     "chave": "copiloto_acao",
     "simbolo": "copiloto_acao",
     "arquivo": "app/models.py",
-    "linha": 298
+    "linha": 305
    },
    {
     "secao": "modelo",
     "chave": "funil_eventos",
     "simbolo": "funil_eventos",
     "arquivo": "app/models.py",
-    "linha": 334
+    "linha": 341
    },
    {
     "secao": "modelo",
     "chave": "meta_pixel_config",
     "simbolo": "meta_pixel_config",
     "arquivo": "app/models.py",
-    "linha": 375
+    "linha": 382
    },
    {
     "secao": "modelo",
     "chave": "meta_ads_config",
     "simbolo": "meta_ads_config",
     "arquivo": "app/models.py",
-    "linha": 393
+    "linha": 400
    },
    {
     "secao": "modelo",
     "chave": "pixel_capi_auditoria",
     "simbolo": "pixel_capi_auditoria",
     "arquivo": "app/models.py",
-    "linha": 411
+    "linha": 418
    },
    {
     "secao": "modelo",
     "chave": "meta_capi_outbox",
     "simbolo": "meta_capi_outbox",
     "arquivo": "app/models.py",
-    "linha": 441
+    "linha": 448
    },
    {
     "secao": "modelo",
     "chave": "revy_trafego_event_outbox",
     "simbolo": "revy_trafego_event_outbox",
     "arquivo": "app/models.py",
-    "linha": 461
+    "linha": 468
    },
    {
     "secao": "modelo",
     "chave": "campanhas",
     "simbolo": "campanhas",
     "arquivo": "app/models.py",
-    "linha": 482
+    "linha": 489
    },
    {
     "secao": "modelo",
     "chave": "campanha_gastos",
     "simbolo": "campanha_gastos",
     "arquivo": "app/models.py",
-    "linha": 512
+    "linha": 519
    },
    {
     "secao": "modelo",
     "chave": "pessoa_revy_projetada",
     "simbolo": "pessoa_revy_projetada",
     "arquivo": "app/models.py",
-    "linha": 534
+    "linha": 541
    },
    {
     "secao": "modelo",
     "chave": "vinculo_loja_pessoa",
     "simbolo": "vinculo_loja_pessoa",
     "arquivo": "app/models.py",
-    "linha": 548
+    "linha": 555
    },
    {
     "secao": "modelo",
     "chave": "copiloto_sinal",
     "simbolo": "copiloto_sinal",
     "arquivo": "app/models.py",
-    "linha": 603
+    "linha": 610
    },
    {
     "secao": "modelo",
     "chave": "copiloto_sinal_visto",
     "simbolo": "copiloto_sinal_visto",
     "arquivo": "app/models.py",
-    "linha": 674
+    "linha": 681
    },
    {
     "secao": "modelo",
     "chave": "copiloto_conversa",
     "simbolo": "copiloto_conversa",
     "arquivo": "app/models.py",
-    "linha": 699
+    "linha": 706
    },
    {
     "secao": "modelo",
     "chave": "copiloto_turno",
     "simbolo": "copiloto_turno",
     "arquivo": "app/models.py",
-    "linha": 734
+    "linha": 741
    },
    {
     "secao": "rota",
@@ -1962,14 +1955,35 @@
     "chave": "GET /app/loja/perfil",
     "simbolo": "_TELA",
     "arquivo": "app/web/loja_perfil.py",
-    "linha": 82
+    "linha": 258
    },
    {
     "secao": "rota",
     "chave": "POST /app/loja/perfil/senha",
     "simbolo": "_POST_SENHA",
     "arquivo": "app/web/loja_perfil.py",
-    "linha": 90
+    "linha": 266
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /app/loja/perfil/avatar",
+    "simbolo": "_POST_AVATAR",
+    "arquivo": "app/web/loja_perfil.py",
+    "linha": 300
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /app/loja/perfil/foto",
+    "simbolo": "_POST_FOTO",
+    "arquivo": "app/web/loja_perfil.py",
+    "linha": 340
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /app/loja/perfil/foto/{usuario_id}",
+    "simbolo": "/app/loja/perfil/foto/{usuario_id}",
+    "arquivo": "app/web/loja_perfil.py",
+    "linha": 381
    },
    {
     "secao": "rota",
@@ -2585,7 +2599,7 @@
     "chave": "app/templates/configuracoes/index.html",
     "simbolo": "configuracoes/index.html",
     "arquivo": "app/main.py",
-    "linha": 2647
+    "linha": 2546
    },
    {
     "secao": "template",
@@ -2788,7 +2802,7 @@
     "chave": "app/templates/loja/perfil.html",
     "simbolo": "loja/perfil.html",
     "arquivo": "app/web/loja_perfil.py",
-    "linha": 69
+    "linha": 233
    },
    {
     "secao": "template",
@@ -3166,6 +3180,13 @@
     "chave": "0026_copiloto_sinal_destinatario",
     "simbolo": "0026_copiloto_sinal_destinatario",
     "arquivo": "alembic/versions/0026_copiloto_sinal_destinatario.py",
+    "linha": 0
+   },
+   {
+    "secao": "migration",
+    "chave": "0027_perfil_avatar_foto",
+    "simbolo": "0027_perfil_avatar_foto",
+    "arquivo": "alembic/versions/0027_perfil_avatar_foto.py",
     "linha": 0
    }
   ],

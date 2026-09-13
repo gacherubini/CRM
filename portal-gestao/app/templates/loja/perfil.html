@@ -22,6 +22,16 @@
       </div>
     </div>
     <div class="panel-body">
+      <div class="perfil-conta-topo perfil-hero">
+        {# Mesma técnica de estoque/lista.html: a inicial fica atrás e a <img>
+           sai sozinha (onerror) quando não há foto nem bichinho (404). #}
+        <span class="avatar perfil-foto" aria-hidden="true" data-perfil-hero>{{ usuario.nome[:1] | upper }}<img src="/app/loja/perfil/foto/{{ usuario.id }}" alt="" loading="eager" decoding="async" onerror="this.remove()" data-perfil-hero-img></span>
+        <div class="perfil-conta-ident">
+          <strong>{{ usuario.nome }}</strong>
+          <span class="muted">{{ papel_rotulo }} · {{ usuario.loja_slug }}</span>
+          <span class="perfil-estado" data-perfil-estado>{% if tem_foto %}Com foto própria{% elif avatar_atual %}{% for avatar in avatares %}{% if avatar_atual == avatar.key %}Bichinho {{ avatar.rotulo }}{% endif %}{% endfor %}{% else %}Letra inicial{% endif %}</span>
+        </div>
+      </div>
       <dl class="meta-list">
         <dt>Nome</dt>
         <dd>{{ usuario.nome }}</dd>
@@ -32,6 +42,46 @@
         <dt>Loja</dt>
         <dd>{{ usuario.loja_slug }}</dd>
       </dl>
+      <form method="post" action="/app/loja/perfil/foto" enctype="multipart/form-data" class="stack-form perfil-foto-form" data-perfil-foto-form>
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <span class="perfil-foto-rotulo" id="perfil-foto-rotulo">Foto de perfil
+          <small>JPG, PNG ou WEBP de até 2 MB. A foto substitui o bichinho.</small>
+        </span>
+        <div class="perfil-foto-linha">
+          <span class="perfil-previa" aria-hidden="true" data-perfil-previa><img alt="" hidden data-perfil-previa-img></span>
+          <span class="perfil-arquivo-nome muted" data-perfil-arquivo-nome>Nenhuma foto escolhida</span>
+          {# Input fora da vista mas focável: o botão visível é o <label>
+             abaixo — nada de "Choose File / No file chosen" nativo. #}
+          <input id="perfil-foto-arquivo" class="perfil-arquivo-oculto" type="file" name="foto" accept="image/jpeg,image/png,image/webp" required aria-describedby="perfil-foto-rotulo" data-perfil-arquivo>
+          <label class="button secondary" for="perfil-foto-arquivo">Escolher foto…</label>
+          <button class="button primary" type="submit">Enviar foto</button>
+        </div>
+        <p class="perfil-foto-erro" role="alert" hidden data-perfil-foto-erro></p>
+      </form>
+      <form method="post" action="/app/loja/perfil/avatar" class="stack-form perfil-avatar-form">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <fieldset class="perfil-avatar-fieldset" id="avatar-escolha" tabindex="-1">
+          <legend>Escolha um avatar</legend>
+          <p class="muted perfil-hint">O bichinho aparece no topo e na equipe. Enviar uma foto substitui o bichinho.</p>
+          <div class="avatar-grade" data-avatar-grade>
+            <label class="avatar-opcao" data-avatar-opcao>
+              <input type="radio" name="avatar_key" value="" {% if not avatar_atual and not tem_foto %}checked{% endif %} data-avatar-radio>
+              <span class="avatar avatar-grade-thumb" aria-hidden="true" data-avatar-arte>{{ usuario.nome[:1] | upper }}</span>
+              <span class="avatar-opcao-rotulo">Inicial</span>
+            </label>
+            {% for avatar in avatares %}
+            <label class="avatar-opcao" data-avatar-opcao data-avatar-key="{{ avatar.key }}">
+              <input type="radio" name="avatar_key" value="{{ avatar.key }}" {% if avatar_atual == avatar.key %}checked{% endif %} data-avatar-radio>
+              <span class="avatar-grade-thumb" aria-hidden="true" data-avatar-arte>{{ avatar.svg | safe }}</span>
+              <span class="avatar-opcao-rotulo">{{ avatar.rotulo }}</span>
+            </label>
+            {% endfor %}
+          </div>
+        </fieldset>
+        <div class="form-actions">
+          <button class="button secondary" type="submit">Salvar avatar</button>
+        </div>
+      </form>
     </div>
   </section>
 
@@ -57,9 +107,19 @@
         <label>Confirmar nova senha
           <input type="password" name="senha_confirmacao" minlength="12" maxlength="256" autocomplete="new-password" required>
         </label>
-        <button class="button primary" type="submit">Salvar senha</button>
+        <div class="form-actions">
+          <button class="button primary" type="submit">Salvar senha</button>
+        </div>
       </form>
     </div>
   </section>
 </div>
+
+{# Mascote flutuante: o bichinho atual como companhia no canto, arrastável
+   (estilo DeepSeek). Clique leva à escolha de avatar; duplo-clique volta ao
+   canto. Posição em localStorage — ver perfil_mascote.js. #}
+<button type="button" class="mascote-arrastavel" data-mascote data-mascote-destino="avatar-escolha" aria-label="Seu avatar. Ativar para escolher o avatar. Arraste para mover." title="Arraste para mover · clique para escolher o avatar">
+  <span class="mascote-arte" aria-hidden="true" data-mascote-arte>{% if tem_foto %}<img src="/app/loja/perfil/foto/{{ usuario.id }}" alt="">{% elif avatar_atual %}{% for avatar in avatares %}{% if avatar_atual == avatar.key %}{{ avatar.svg | safe }}{% endif %}{% endfor %}{% else %}{{ usuario.nome[:1] | upper }}{% endif %}</span>
+</button>
+<script src="/static/js/perfil_mascote.js" defer></script>
 {% endblock %}

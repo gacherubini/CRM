@@ -34,18 +34,21 @@
     </tr>{% endfor %}</tbody>
   </table></div>
   {% elif integracao_erro %}
-  <div class="empty">
+  <div class="empty empty--erro">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.2"/><path d="M2.5 20c.8-3.6 3.4-5.5 6.5-5.5s5.7 1.9 6.5 5.5M16 5.4a3.2 3.2 0 010 5.6M18.5 14.9c2 .7 3.2 2.3 3.6 4.6"/></svg>
     <strong>Não foi possível carregar os leads</strong>
     <p>Tente de novo em instantes.</p>
   </div>
   {% elif filtros.etapa or filtros.busca %}
   <div class="empty">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.2"/><path d="M2.5 20c.8-3.6 3.4-5.5 6.5-5.5s5.7 1.9 6.5 5.5M16 5.4a3.2 3.2 0 010 5.6M18.5 14.9c2 .7 3.2 2.3 3.6 4.6"/></svg>
     <strong>Nenhum lead com esse filtro</strong>
     <p>Ajuste a busca ou a etapa.</p>
     <a class="button secondary" href="/app/leads">Limpar filtros</a>
   </div>
   {% else %}
   <div class="empty">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.2"/><path d="M2.5 20c.8-3.6 3.4-5.5 6.5-5.5s5.7 1.9 6.5 5.5M16 5.4a3.2 3.2 0 010 5.6M18.5 14.9c2 .7 3.2 2.3 3.6 4.6"/></svg>
     <strong>Nenhum lead ainda</strong>
     <p>Quando o chatbot registrar contatos, eles aparecem aqui.</p>
   </div>

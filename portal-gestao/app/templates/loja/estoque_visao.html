@@ -16,7 +16,8 @@
 
 {% if overview.status == 'erro' %}
 <section class="panel flush" aria-labelledby="estoque-erro-titulo">
-  <div class="empty" role="alert">
+  <div class="empty empty--erro" role="alert">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9zM12 12l8-4.5M12 12L4 7.5M12 12v9"/></svg>
     <strong id="estoque-erro-titulo">Estoque indisponível</strong>
     <p>{{ overview.erro or 'Não foi possível carregar o estoque agora. Tente novamente em instantes.' }}</p>
     <p class="muted">Nenhum indicador é exibido enquanto a integração estiver offline. Contagens zeradas não seriam confiáveis.</p>
@@ -27,6 +28,7 @@
 {% elif overview.status == 'vazio' %}
 <section class="panel flush" aria-labelledby="estoque-vazio-titulo">
   <div class="empty">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9zM12 12l8-4.5M12 12L4 7.5M12 12v9"/></svg>
     <strong id="estoque-vazio-titulo">Nenhum veículo cadastrado</strong>
     <p>Quando houver veículos na loja, os totais por disponibilidade aparecem aqui.</p>
     {% if pode_gerir %}

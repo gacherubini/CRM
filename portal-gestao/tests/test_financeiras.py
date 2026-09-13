@@ -88,7 +88,15 @@ def test_vendedor_nao_faz_upsert(client, motor_fake):
     assert motor_fake.upserts == []
 
 
-def test_testar_login_chama_motor(client, motor_fake):
+def test_lista_sem_botao_testar_login(client, motor_fake):
+    login(client)
+    resposta = client.get("/app/financeiras")
+    assert resposta.status_code == 200
+    assert "Testar login" not in resposta.text
+    assert "/testar" not in resposta.text
+
+
+def test_rota_testar_removida(client, motor_fake):
     login(client)
     pagina = client.get("/app/financeiras")
     csrf = csrf_da_resposta(pagina)
@@ -97,9 +105,27 @@ def test_testar_login_chama_motor(client, motor_fake):
         data={"csrf": csrf},
         follow_redirects=False,
     )
-    assert resposta.status_code == 303
-    assert "teste=placeholder" in resposta.headers["location"]
-    assert motor_fake.testes == [{"nome": "Pan", "ator": "dono@loja.test"}]
+    assert resposta.status_code in (404, 405)
+
+
+def test_saude_login_com_cores(client, motor_fake):
+    login(client)
+    resposta = client.get("/app/financeiras")
+    assert resposta.status_code == 200
+    assert "integ-pill ok" in resposta.text
+    assert "integ-pill off" in resposta.text
+
+
+def test_lista_abre_edicao_em_popup(client, motor_fake):
+    login(client)
+    resposta = client.get("/app/financeiras")
+    assert resposta.status_code == 200
+    assert "<dialog" in resposta.text
+    assert 'data-dialog="dlg-pan"' in resposta.text
+    assert 'id="dlg-santander"' in resposta.text
+    # form continua postando na mesma rota, fora da linha da tabela
+    assert 'action="/app/financeiras/pan"' in resposta.text
+    assert "<details" not in resposta.text
 
 
 def test_motor_indisponivel_mensagem_amigavel(client, motor_fake):

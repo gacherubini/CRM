@@ -41,9 +41,9 @@
       <td><div class="row-actions"><a class="button secondary" href="/app/simulacoes/job/{{ s.id }}">Ver parcelas</a><a class="button secondary" href="/app/simulacoes/{{ s.id }}/registros">Registros e prints</a></div></td>
     </tr>{% endfor %}</tbody>
   </table></div>
-  {% elif integracao_erro %}<div class="empty"><strong>Não foi possível carregar o histórico.</strong><p>Tente novamente em instantes.</p></div>
-  {% elif status_filtro %}<div class="empty"><strong>Nenhuma simulação com esse status.</strong><p>Ajuste o filtro acima.</p></div>
-  {% else %}<div class="empty"><strong>Nenhuma simulação ainda.</strong><p>As simulações que você fizer aparecem aqui.</p></div>{% endif %}
+  {% elif integracao_erro %}<div class="empty empty--erro"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="6" y="3" width="12" height="18" rx="2"/><path d="M9 7h6M9.5 12h.5M12 12h.5M14.5 12h.5M9.5 15.5h.5M12 15.5h.5M14.5 15.5h.5"/></svg><strong>Não foi possível carregar o histórico.</strong><p>Tente novamente em instantes.</p></div>
+  {% elif status_filtro %}<div class="empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="6" y="3" width="12" height="18" rx="2"/><path d="M9 7h6M9.5 12h.5M12 12h.5M14.5 12h.5M9.5 15.5h.5M12 15.5h.5M14.5 15.5h.5"/></svg><strong>Nenhuma simulação com esse status.</strong><p>Ajuste o filtro acima.</p></div>
+  {% else %}<div class="empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="6" y="3" width="12" height="18" rx="2"/><path d="M9 7h6M9.5 12h.5M12 12h.5M14.5 12h.5M9.5 15.5h.5M12 15.5h.5M14.5 15.5h.5"/></svg><strong>Nenhuma simulação ainda.</strong><p>As simulações que você fizer aparecem aqui.</p></div>{% endif %}
 </section>
 
 {% if total > limite or offset > 0 %}

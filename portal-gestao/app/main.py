@@ -130,7 +130,7 @@ from app.clients.estoque import (
     EstoqueIndisponivel,
     VeiculoNaoEncontrado,
 )
-from app.clients.motor import CredencialNaoEncontrada, MotorClient, MotorIndisponivel
+from app.clients.motor import MotorClient, MotorIndisponivel
 from app.db import SessionLocal, get_db
 from app.password_rules import SenhaInvalida, validar_nova_senha  # reexport / equipe
 from app.financeiro_calc import (
@@ -2383,7 +2383,6 @@ def financeiras_lista(
             integracao_erro=integracao_erro,
             motor_configurado=motor_configurado,
             ok=request.query_params.get("ok"),
-            teste=request.query_params.get("teste"),
             provedor_ok=request.query_params.get("provedor"),
             erro_query=request.query_params.get("erro"),
         ),
@@ -2490,106 +2489,6 @@ async def financeiras_upsert(
 
     return RedirectResponse(
         f"/app/financeiras?ok=salvo&provedor={nome}", status_code=303
-    )
-
-
-@app.post("/app/financeiras/{nome}/testar")
-async def financeiras_testar(
-    nome: str,
-    request: Request,
-    db: Session = Depends(get_db),
-    motor: MotorClient = Depends(get_motor_client),
-):
-    usuario = usuario_atual(request, db)
-    if not usuario:
-        return redirecionar_login()
-    if not pode_gerir_financeiras(usuario):
-        return templates.TemplateResponse(
-            "erro.html",
-            contexto(
-                request,
-                usuario,
-                erro="Você não tem permissão para gerenciar acessos das financeiras.",
-            ),
-            status_code=403,
-        )
-
-    form = await request.form()
-    if not csrf_valido(request, form.get("csrf")):
-        return RedirectResponse("/app/financeiras?erro=csrf", status_code=303)
-
-    from app.loja_operacao_auditoria import registrar_auditoria_financeira
-
-    if not motor.configurado:
-        try:
-            registrar_auditoria_financeira(
-                db,
-                loja_slug=usuario.loja_slug,
-                acao="testar",
-                ator_email=usuario.email,
-                provedor=nome,
-                success=False,
-                error_code="motor_nao_configurado",
-                commit=True,
-            )
-        except Exception:
-            db.rollback()
-        return RedirectResponse("/app/financeiras?erro=motor", status_code=303)
-
-    try:
-        resultado = motor.testar_login(nome, ator=usuario.email)
-    except CredencialNaoEncontrada:
-        try:
-            registrar_auditoria_financeira(
-                db,
-                loja_slug=usuario.loja_slug,
-                acao="testar",
-                ator_email=usuario.email,
-                provedor=nome,
-                success=False,
-                error_code="sem_credencial",
-                commit=True,
-            )
-        except Exception:
-            db.rollback()
-        return RedirectResponse(
-            f"/app/financeiras?erro=sem_credencial&provedor={nome}", status_code=303
-        )
-    except MotorIndisponivel:
-        try:
-            registrar_auditoria_financeira(
-                db,
-                loja_slug=usuario.loja_slug,
-                acao="testar",
-                ator_email=usuario.email,
-                provedor=nome,
-                success=False,
-                error_code="motor_indisponivel",
-                commit=True,
-            )
-        except Exception:
-            db.rollback()
-        return RedirectResponse("/app/financeiras?erro=motor", status_code=303)
-
-    status_teste = resultado.get("status") or "ok"
-    sucesso = status_teste in {"ok", "sucesso", "success", "placeholder"}
-    try:
-        registrar_auditoria_financeira(
-            db,
-            loja_slug=usuario.loja_slug,
-            acao="testar",
-            ator_email=usuario.email,
-            provedor=nome,
-            success=sucesso,
-            error_code=None if sucesso else str(status_teste)[:80],
-            commit=True,
-        )
-    except Exception:
-        db.rollback()
-        logger.exception("falha ao auditar teste financeira provedor=%s", nome)
-
-    return RedirectResponse(
-        f"/app/financeiras?teste={status_teste}&provedor={nome}", status_code=303
     )
 
 

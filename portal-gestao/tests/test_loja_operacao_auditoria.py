@@ -192,34 +192,6 @@ def test_upsert_financeira_cria_auditoria_sem_segredo(client, motor_fake):
         db.close()
 
 
-def test_testar_financeira_cria_auditoria(client, motor_fake):
-    login(client)
-    pagina = client.get("/app/financeiras")
-    csrf = csrf_da_resposta(pagina)
-    resposta = client.post(
-        "/app/financeiras/Pan/testar",
-        data={"csrf": csrf},
-        follow_redirects=False,
-    )
-    assert resposta.status_code == 303
-
-    db = SessionLocal()
-    try:
-        row = (
-            db.query(LojaOperacaoAuditoria)
-            .filter(
-                LojaOperacaoAuditoria.dominio == DOMINIO_FINANCEIRA,
-                LojaOperacaoAuditoria.acao == "testar",
-            )
-            .one()
-        )
-        assert row.provedor == "Pan"
-        assert row.success is True
-        assert row.ator_email == "dono@loja.test"
-    finally:
-        db.close()
-
-
 def test_upsert_financeira_falha_motor_ainda_audita(client, motor_fake):
     motor_fake.indisponivel = True
     login(client)
