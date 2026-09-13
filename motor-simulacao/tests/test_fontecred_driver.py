@@ -540,3 +540,62 @@ def test_modal_de_placa_nao_gasta_10s_esperando_janela_que_nao_fecha():
     assert max(esperas_hidden) <= 2_000, (
         f"ainda bloqueia {max(esperas_hidden)}ms na janela em vez de olhar o produto"
     )
+
+
+# --- recusa de crédito (tela real de 12/09) -------------------------------------
+
+
+FIXTURE_RECUSA = Path(__file__).parent / "fixtures" / "fontecred" / "recusa_credito.html"
+
+
+def _page_recusa(texto):
+    """MagicMock de page: get_by_text conta 1 quando o padrão acha o texto."""
+    page = MagicMock()
+
+    def by_text(rx):
+        m = MagicMock()
+        try:
+            m.count.return_value = 1 if rx.search(texto) else 0
+        except Exception:
+            m.count.return_value = 0
+        return m
+
+    page.get_by_text.side_effect = by_text
+    return page
+
+
+def test_recusa_de_credito_vira_rejeicao_sem_retry():
+    """Modal real de política de crédito (12/09): `credito_recusado`, sem retry."""
+    d = FontecredDriver(html_simulacao=FIXTURE_RECUSA.read_text(encoding="utf-8"))
+    with pytest.raises(RejeicaoNegocio) as ei:
+        d(_sol())
+    assert ei.value.codigo == "credito_recusado"
+
+
+def test_tela_de_oferta_nao_e_lida_como_recusa():
+    """Guarda contra falso positivo: aprovado continua retornando ofertas."""
+    from app.motor.fontecred import RECUSA_CREDITO
+
+    assert not RECUSA_CREDITO.search(FIXTURE.read_text(encoding="utf-8"))
+
+
+def test_espera_aborta_na_recusa_sem_queimar_o_timeout():
+    """A espera antiga só conhecia "Ocorreu um erro|falha" e o modal de recusa
+    caía no genérico `portal_simulacao_erro` (sim 20260912-205103, 46s)."""
+    import time as _time
+
+    driver = FontecredDriver(timeout_ms=20_000)
+    page = _page_recusa(FIXTURE_RECUSA.read_text(encoding="utf-8"))
+    inicio = _time.monotonic()
+    with pytest.raises(RejeicaoNegocio) as ei:
+        driver._passo_aguardar_resultado(page)
+    assert ei.value.codigo == "credito_recusado"
+    assert _time.monotonic() - inicio < 10
+
+
+def test_sonda_de_recusa_ignora_pagina_quebrada():
+    """Página quebrada não é recusa: a sonda nunca levanta por conta própria."""
+    driver = FontecredDriver(timeout_ms=20_000)
+    page = MagicMock()
+    page.get_by_text.side_effect = RuntimeError("pagina fechada")
+    driver._levantar_se_recusado(page)

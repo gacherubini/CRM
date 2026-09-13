@@ -1,4 +1,5 @@
 from decimal import Decimal
+from pathlib import Path
 from unittest.mock import MagicMock
 
 import pytest
@@ -131,7 +132,17 @@ def test_driver_sem_oferta_rejeita():
     driver = OmniDriver(html_simulacao="Não há oferta de crédito para este cliente")
     with pytest.raises(RejeicaoNegocio) as exc:
         driver.simular(_sol(), None)
-    assert exc.value.codigo == "omni_sem_oferta"
+    assert exc.value.codigo == "credito_recusado"
+
+
+FIXTURE_RECUSA = Path(__file__).parent / "fixtures" / "omni" / "recusa_credito.html"
+
+
+def test_recusa_real_vira_credito_recusado():
+    driver = OmniDriver(html_simulacao=FIXTURE_RECUSA.read_text(encoding="utf-8"))
+    with pytest.raises(RejeicaoNegocio) as exc:
+        driver.simular(_sol(), None)
+    assert exc.value.codigo == "credito_recusado"
 
 
 def test_driver_painel_ilegivei_pede_intervencao():

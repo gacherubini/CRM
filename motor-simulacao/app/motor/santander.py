@@ -92,6 +92,12 @@ _RE_ENTRADA = re.compile(
     re.IGNORECASE,
 )
 
+# Recusa de credito observada ao vivo (12/09, sim 20260912-205521): faixa
+# "Não encontramos ofertas" com link "Saiba mais", sem cards. A espera antiga
+# so conhecia cards e queimava os 240s no skeleton (274s de falha tecnica).
+# Só vale como recusa com a faixa VISÍVEL — ausência transitória de cards não é.
+RECUSA_CREDITO = re.compile(r"N[ãa]o\s+encontramos\s+ofertas", re.I)
+
 
 def _texto_plano_portal(texto: str) -> str:
     """Normaliza HTML/texto do portal para parsing (tags e quebras viram espaço)."""
@@ -249,6 +255,10 @@ class SantanderDriver(PlaywrightBankDriver):
     def _resultados_de_html(
         self, html: str, sol: SolicitacaoSimulacao
     ) -> list[ResultadoDriver]:
+        if RECUSA_CREDITO.search(html or ""):
+            raise RejeicaoNegocio(
+                "credito_recusado", "Santander sem ofertas para este cliente"
+            )
         pares = parse_parcelas_texto(html)
         if not pares:
             raise IntervencaoNecessaria(
@@ -867,6 +877,22 @@ class SantanderDriver(PlaywrightBankDriver):
         except Exception:
             pass
 
+    def _levantar_se_recusado(self, page) -> None:
+        """Se a faixa de recusa estiver na tela, sai como negócio recusado.
+
+        Sonda barata (um get_by_text). Nunca levanta por conta própria:
+        página quebrada não é recusa, e quem chamou tem erro próprio para isso.
+        """
+        try:
+            if page.get_by_text(RECUSA_CREDITO).count() > 0:
+                raise RejeicaoNegocio(
+                    "credito_recusado", "Santander sem ofertas para este cliente"
+                )
+        except RejeicaoNegocio:
+            raise
+        except Exception:
+            pass
+
     def _passo_aguardar_simulacao(self, page) -> None:
         """Espera os CARDS de parcela carregarem — nao so o titulo/skeleton.
 
@@ -893,7 +919,20 @@ class SantanderDriver(PlaywrightBankDriver):
         except Exception:
             pass
         estavel = 0
+        # Faixa "Não encontramos ofertas": só é recusa com a faixa VISÍVEL em
+        # 2 leituras seguidas — ausência transitória de cards (skeleton) não é.
+        recusa_vista = 0
         while time.monotonic() < prazo_fim:
+            # Recusa primeiro: a faixa divide a tela com o link "Saiba mais",
+            # que o ramo de erro abaixo clicaria antes de classificar.
+            if page.get_by_text(RECUSA_CREDITO).count() > 0:
+                recusa_vista += 1
+                if recusa_vista >= 2:
+                    raise RejeicaoNegocio(
+                        "credito_recusado", "Santander sem ofertas para este cliente"
+                    )
+            else:
+                recusa_vista = 0
             # Erro do portal no passo 2 (banner vermelho).
             if page.get_by_text(re.compile(r"Ocorreu um erro", re.I)).count() > 0:
                 detalhe = "ocorreu um erro na simulação do portal"

@@ -43,11 +43,13 @@ PROVEDOR = "omni"
 
 CONTINUAR = re.compile(r"Continuar com a proposta", re.I)
 NOVA_SIMULACAO = re.compile(r"Nova Simula", re.I)
-# Recusa de negócio (nenhuma observada até 10/09: o cliente de teste aprovou).
-# Se o portal negar, estas frases caem em RejeicaoNegocio em vez de quebrar o parser.
+# Recusa de negócio (primeira observada em 12/09: "não temos uma oferta" +
+# "critérios mínimos"). Se o portal negar, estas frases caem em RejeicaoNegocio
+# com o código padrão de recusa em vez de quebrar o parser.
 SEM_OFERTA = re.compile(
     r"N[ãa]o h[áa] (oferta|cr[ée]dito)|sem oferta|proposta (recusada|negada|reprovada)|"
-    r"cr[ée]dito n[ãa]o aprovado|CPF inv[áa]lido",
+    r"cr[ée]dito n[ãa]o aprovado|CPF inv[áa]lido|"
+    r"n[ãa]o temos uma oferta|crit[ée]rios m[íi]nimos",
     re.I,
 )
 
@@ -205,7 +207,7 @@ class OmniDriver(PlaywrightBankDriver):
     ) -> list[ResultadoDriver]:
         if SEM_OFERTA.search(texto or "") and not parse_ofertas(texto):
             raise RejeicaoNegocio(
-                "omni_sem_oferta", "Omni não ofertou crédito para este cliente"
+                "credito_recusado", "Omni não aprovou crédito para este cliente"
             )
         ofertas = parse_ofertas(texto)
         if not ofertas:

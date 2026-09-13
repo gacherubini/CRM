@@ -1,6 +1,6 @@
 # portal-gestao · 177 rotas · 26 modelos · 6 workers · 35 flags · 26 migrations · 63 templates
 
-Gerado de `2c04c48`. NAO editar a mao — saida de `gerar_mapa.py`.
+Gerado de `597c653`. NAO editar a mao — saida de `gerar_mapa.py`.
 Migration head: `0026_copiloto_sinal_destinatario`
 
 ## Rotas
@@ -139,12 +139,12 @@ Migration head: `0026_copiloto_sinal_destinatario`
 - `POST /senha/esqueci` — app/web/password_reset.py:38
 - `GET /senha/redefinir` — app/web/password_reset.py:89
 - `POST /senha/redefinir` — app/web/password_reset.py:100
-- `GET /app/simulacoes` — app/web/simulacoes.py:248
-- `POST /app/simulacoes` — app/web/simulacoes.py:278
-- `GET /app/simulacoes/job/{sim_id}` — app/web/simulacoes.py:521
-- `GET /app/simulacoes/historico` — app/web/simulacoes.py:638
-- `GET /app/simulacoes/{sim_id}/registros` — app/web/simulacoes.py:759
-- `GET /app/simulacoes/{sim_id}/registros/{evento_id}/print` — app/web/simulacoes.py:796
+- `GET /app/simulacoes` — app/web/simulacoes.py:250
+- `POST /app/simulacoes` — app/web/simulacoes.py:280
+- `GET /app/simulacoes/job/{sim_id}` — app/web/simulacoes.py:523
+- `GET /app/simulacoes/historico` — app/web/simulacoes.py:640
+- `GET /app/simulacoes/{sim_id}/registros` — app/web/simulacoes.py:761
+- `GET /app/simulacoes/{sim_id}/registros/{evento_id}/print` — app/web/simulacoes.py:798
 - `GET /app/campanhas` — app/web/trafego.py:116
 - `GET /app/campanhas/nova` — app/web/trafego.py:177
 - `POST /app/campanhas/nova` — app/web/trafego.py:195
@@ -340,11 +340,11 @@ Migration head: `0026_copiloto_sinal_destinatario`
 - `app/templates/convite_aceitar.html` — app/web/owner_invitations.py:129
 - `app/templates/senha_esqueci.html` — app/web/password_reset.py:33
 - `app/templates/senha_redefinir.html` — app/web/password_reset.py:95
-- `app/templates/simulacoes/form.html` — app/web/simulacoes.py:267
-- `app/templates/simulacoes/resultado.html` — app/web/simulacoes.py:597
-- `app/templates/simulacoes/progresso.html` — app/web/simulacoes.py:617
-- `app/templates/simulacoes/historico.html` — app/web/simulacoes.py:684
-- `app/templates/simulacoes/registros.html` — app/web/simulacoes.py:780
+- `app/templates/simulacoes/form.html` — app/web/simulacoes.py:269
+- `app/templates/simulacoes/resultado.html` — app/web/simulacoes.py:599
+- `app/templates/simulacoes/progresso.html` — app/web/simulacoes.py:619
+- `app/templates/simulacoes/historico.html` — app/web/simulacoes.py:686
+- `app/templates/simulacoes/registros.html` — app/web/simulacoes.py:782
 - `app/templates/campanhas/lista.html` — app/web/trafego.py:150
 - `app/templates/campanhas/form.html` — app/web/trafego.py:185
 - `app/templates/campanhas/gastos_lote.html` — app/web/trafego.py:274

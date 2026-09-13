@@ -102,6 +102,16 @@ _RE_FINANCIADO = re.compile(
     re.IGNORECASE,
 )
 
+# Recusa de credito observada ao vivo (12/09, sim 20260912-205103): modal apos
+# o Simular — "Este CPF não atende aos critérios mínimos...". A espera antiga
+# so conhecia "Ocorreu um erro|falha" e a recusa caia no generico
+# `portal_simulacao_erro` (46s de falha tecnica).
+RECUSA_CREDITO = re.compile(
+    r"n[ãa]o\s+atende\s+aos\s+crit[ée]rios\s+m[íi]nimos\s+para\s+ser\s+aprovado|"
+    r"n[ãa]o\s+conseguimos\s+seguir\s+com\s+an[áa]lise\s+do\s+financiamento",
+    re.I,
+)
+
 
 def _texto_plano(texto: str) -> str:
     """Normaliza HTML/texto para parsing (tags e quebras viram espaço)."""
@@ -247,6 +257,11 @@ class FontecredDriver(PlaywrightBankDriver):
     def _resultados_de_html(
         self, html: str, sol: SolicitacaoSimulacao
     ) -> list[ResultadoDriver]:
+        if RECUSA_CREDITO.search(html or ""):
+            raise RejeicaoNegocio(
+                "credito_recusado",
+                "Fontecred recusou: CPF fora da política de crédito",
+            )
         pares = parse_parcelas_texto(html)
         if not pares:
             raise IntervencaoNecessaria(
@@ -995,6 +1010,23 @@ class FontecredDriver(PlaywrightBankDriver):
         except Exception:
             pass
 
+    def _levantar_se_recusado(self, page) -> None:
+        """Se o modal de recusa estiver na tela, sai como negócio recusado.
+
+        Sonda barata (um get_by_text). Nunca levanta por conta própria:
+        página quebrada não é recusa, e quem chamou tem erro próprio para isso.
+        """
+        try:
+            if page.get_by_text(RECUSA_CREDITO).count() > 0:
+                raise RejeicaoNegocio(
+                    "credito_recusado",
+                    "Fontecred recusou: CPF fora da política de crédito",
+                )
+        except RejeicaoNegocio:
+            raise
+        except Exception:
+            pass
+
     def _passo_aguardar_resultado(self, page) -> None:
         """Espera os cards de parcela (dado real), não o container (lição #11)."""
         timeout = max(self.timeout_ms, 60_000)
@@ -1002,6 +1034,9 @@ class FontecredDriver(PlaywrightBankDriver):
         cards = re.compile(r"\d+\s*x\b", re.I)
         estavel = 0
         while time.monotonic() < prazo_fim:
+            # Recusa primeiro: o modal divide a tela com textos que casam o
+            # erro genérico abaixo, e ele vencia a corrida (sim 20260912-205103).
+            self._levantar_se_recusado(page)
             if page.get_by_text(re.compile(r"Ocorreu um erro|falha", re.I)).count() > 0:
                 raise ErroTransitorio(
                     "portal_simulacao_erro", "erro exibido na tela de simulação"

@@ -55,6 +55,14 @@ _RE_PARCELA = re.compile(
     re.IGNORECASE,
 )
 
+# Recusa de credito observada ao vivo (12/09, sim 20260912-205201): modal
+# "Cliente não elegível para simulação de crédito." com botão "Ir pra home".
+# O modal cobre o Avançar e a espera antiga queimava ~90s até estourar
+# TimeoutError genérico (186s de falha técnica no total).
+RECUSA_CREDITO = re.compile(
+    r"n[ãa]o\s+eleg[íi]vel\s+para\s+simula[çc][ãa]o\s+de\s+cr[ée]dito", re.I
+)
+
 
 def _texto_plano(texto: str) -> str:
     """Normaliza HTML/texto para parsing (tags e quebras viram espaco)."""
@@ -189,6 +197,10 @@ class BradescoDriver(PlaywrightBankDriver):
     def _resultados_de_html(
         self, html: str, sol: SolicitacaoSimulacao
     ) -> list[ResultadoDriver]:
+        if RECUSA_CREDITO.search(html or ""):
+            raise RejeicaoNegocio(
+                "credito_recusado", "Bradesco recusou: cliente não elegível"
+            )
         pares = parse_parcelas_bradesco(html)
         if not pares:
             raise IntervencaoNecessaria(
@@ -794,7 +806,27 @@ class BradescoDriver(PlaywrightBankDriver):
         except Exception:
             pass
 
+    def _levantar_se_recusado(self, page) -> None:
+        """Se o modal de recusa estiver na tela, sai como negócio recusado.
+
+        Sonda barata (um get_by_text). Nunca levanta por conta própria:
+        página quebrada não é recusa, e quem chamou tem erro próprio para isso.
+        """
+        try:
+            if page.get_by_text(RECUSA_CREDITO).count() > 0:
+                raise RejeicaoNegocio(
+                    "credito_recusado", "Bradesco recusou: cliente não elegível"
+                )
+        except RejeicaoNegocio:
+            raise
+        except Exception:
+            pass
+
     def _clicar_avancar(self, page) -> None:
+        # A pré-análise/valores pode responder com o modal de inelegibilidade:
+        # sem a sonda, o clique atrás do modal queima o timeout inteiro e sai
+        # como falha técnica (sim 20260912-205201).
+        self._levantar_se_recusado(page)
         btn = page.get_by_role("button", name=re.compile(r"^Avan[çc]ar$", re.I)).first
         btn.wait_for(state="visible", timeout=self.timeout_ms)
         habilitado = False
@@ -820,7 +852,14 @@ class BradescoDriver(PlaywrightBankDriver):
                 "Botao 'Avancar' segue desabilitado apos preencher os campos; "
                 "provavel campo obrigatorio vazio (UF/placa/modelo do veiculo).",
             )
-        btn.click()
+        try:
+            btn.click()
+        except Exception:
+            # O modal pode ter subido entre a sonda e o clique, cobrindo o botão.
+            self._levantar_se_recusado(page)
+            raise
+        # ... ou como resposta ao próprio Avançar.
+        self._levantar_se_recusado(page)
         self._aguardar_dom_pronto(page, 10_000)
 
     def _clicar_confirmar(self, page) -> None:
@@ -849,6 +888,7 @@ class BradescoDriver(PlaywrightBankDriver):
         estavel = 0
         analisando_visto = False
         while time.monotonic() < prazo_fim:
+            self._levantar_se_recusado(page)
             if page.get_by_text(
                 re.compile(r"Ocorreu um erro|indispon[ií]vel|falha", re.I)
             ).count() > 0:

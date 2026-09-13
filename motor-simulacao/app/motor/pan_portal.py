@@ -50,6 +50,13 @@ MODAL_AGENTE_TITULO = re.compile(r"Configure seu agente", re.I)
 # o modal auto-abrir nao e (ver `_modal_agente_aberto`).
 MODAL_AGENTE_BOTAO = re.compile(r"Agente e operador", re.I)
 
+# Recusa de credito observada ao vivo (12/09, sim 20260912-204931): modal
+# "CLIENTE NÃO ELEGÍVEL" logo apos o CPF, ainda na tela de Nova proposta.
+# Nao tem parcelas nem "Aprovad|Reprovad|Negad", entao a espera de ofertas
+# nunca concluia; e o Celular do passo seguinte, atras do modal, morria em
+# `campo_nao_encontrado` culpando o campo errado (32s de falha tecnica).
+RECUSA_CREDITO = re.compile(r"CLIENTE\s+N[ÃA]O\s+ELEG[ÍI]VEL", re.I)
+
 # UF -> nome por extenso (o dropdown pode listar sigla ou nome completo).
 _UF_NOME: dict[str, str] = {
     "AC": "ACRE", "AL": "ALAGOAS", "AP": "AMAPÁ", "AM": "AMAZONAS",
@@ -209,6 +216,10 @@ class PanPortalDriver(PlaywrightBankDriver):
     def _resultados_de_html(
         self, html: str, sol: SolicitacaoSimulacao
     ) -> list[ResultadoDriver]:
+        if RECUSA_CREDITO.search(html or ""):
+            raise RejeicaoNegocio(
+                "credito_recusado", "Pan recusou o cliente (não elegível)"
+            )
         pares = parse_parcelas_pan_portal(html)
         if not pares:
             raise RejeicaoNegocio("pan_sem_oferta")
@@ -737,6 +748,22 @@ class PanPortalDriver(PlaywrightBankDriver):
         except Exception:
             pass
 
+    def _levantar_se_recusado(self, page) -> None:
+        """Se o modal de recusa estiver na tela, sai como negócio recusado.
+
+        Sonda barata (um get_by_text). Nunca levanta por conta própria:
+        página quebrada não é recusa, e quem chamou tem erro próprio para isso.
+        """
+        try:
+            if page.get_by_text(RECUSA_CREDITO).count() > 0:
+                raise RejeicaoNegocio(
+                    "credito_recusado", "Pan recusou o cliente (não elegível)"
+                )
+        except RejeicaoNegocio:
+            raise
+        except Exception:
+            pass
+
     def _passo_cliente(self, page, sol: SolicitacaoSimulacao) -> None:
         self._fechar_got_it(page)  # cookies podem cobrir os campos
         cpf = re.sub(r"\D", "", sol.pessoa.cpf or "")
@@ -758,6 +785,10 @@ class PanPortalDriver(PlaywrightBankDriver):
             except Exception:
                 continue
         page.wait_for_timeout(300)
+        # Elegibilidade imediata: o portal pode recusar o CPF aqui, com o modal
+        # sobre a tela — sem a sonda, o Celular do passo seguinte morre em
+        # `campo_nao_encontrado` (sim 20260912-204931).
+        self._levantar_se_recusado(page)
 
     def _campo_cpf(self, page):
         """CPF do cliente (pan-mahoe, mascara '000.000.000-00').
@@ -1012,6 +1043,7 @@ class PanPortalDriver(PlaywrightBankDriver):
         erro = re.compile(r"Ocorreu um erro|indispon[ií]vel|falha", re.I)
         anterior = None
         while time.monotonic() < prazo_fim:
+            self._levantar_se_recusado(page)
             if page.get_by_text(erro).count() > 0:
                 raise ErroTransitorio(
                     "portal_simulacao_erro", "erro exibido na tela de ofertas"

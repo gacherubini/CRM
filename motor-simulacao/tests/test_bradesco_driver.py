@@ -441,3 +441,62 @@ def test_login_do_bradesco_nao_bloqueia_em_networkidle():
     esperas = [c.kwargs.get("wait_until") for c in page.goto.call_args_list]
     assert esperas, "o login nem navegou"
     assert "networkidle" not in esperas
+
+
+# --- recusa de crédito (tela real de 12/09) -------------------------------------
+
+
+FIXTURE_RECUSA = Path(__file__).parent / "fixtures" / "bradesco" / "recusa_credito.html"
+
+
+def _page_recusa(texto):
+    """MagicMock de page: get_by_text conta 1 quando o padrão acha o texto."""
+    page = MagicMock()
+
+    def by_text(rx):
+        m = MagicMock()
+        try:
+            m.count.return_value = 1 if rx.search(texto) else 0
+        except Exception:
+            m.count.return_value = 0
+        return m
+
+    page.get_by_text.side_effect = by_text
+    return page
+
+
+def test_recusa_de_credito_vira_rejeicao_sem_retry():
+    """Modal real "Cliente não elegível" (12/09): `credito_recusado`, sem retry."""
+    d = BradescoDriver(html_simulacao=FIXTURE_RECUSA.read_text(encoding="utf-8"))
+    with pytest.raises(RejeicaoNegocio) as ei:
+        d(_sol())
+    assert ei.value.codigo == "credito_recusado"
+
+
+def test_tela_de_oferta_nao_e_lida_como_recusa():
+    """Guarda contra falso positivo: aprovado continua retornando ofertas."""
+    from app.motor.bradesco import RECUSA_CREDITO
+
+    assert not RECUSA_CREDITO.search(FIXTURE.read_text(encoding="utf-8"))
+
+
+def test_espera_aborta_na_recusa_sem_queimar_o_timeout():
+    """O modal cobre o Avançar e a espera antiga queimava ~90s até estourar
+    TimeoutError genérico (sim 20260912-205201, 186s no total)."""
+    import time as _time
+
+    driver = BradescoDriver(timeout_ms=20_000)
+    page = _page_recusa(FIXTURE_RECUSA.read_text(encoding="utf-8"))
+    inicio = _time.monotonic()
+    with pytest.raises(RejeicaoNegocio) as ei:
+        driver._passo_aguardar_ofertas(page)
+    assert ei.value.codigo == "credito_recusado"
+    assert _time.monotonic() - inicio < 10
+
+
+def test_sonda_de_recusa_ignora_pagina_quebrada():
+    """Página quebrada não é recusa: a sonda nunca levanta por conta própria."""
+    driver = BradescoDriver(timeout_ms=20_000)
+    page = MagicMock()
+    page.get_by_text.side_effect = RuntimeError("pagina fechada")
+    driver._levantar_se_recusado(page)
