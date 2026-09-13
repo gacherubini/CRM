@@ -606,7 +606,7 @@ def test_simulacao_recusada_ainda_persiste_a_sessao_do_login(tmp_path, monkeypat
     ):
         setattr(driver, passo, lambda *a, **k: None)
 
-    def _recusa(page):
+    def _recusa(page, ctx=None):
         raise RejeicaoNegocio("credito_recusado", "cliente não elegível")
 
     driver._passo_aguardar_ofertas = _recusa

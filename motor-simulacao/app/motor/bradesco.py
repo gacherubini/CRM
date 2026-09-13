@@ -328,7 +328,7 @@ class BradescoDriver(PlaywrightBankDriver):
                 self._evento(
                     ctx, "simulacao_enviada", "Consulta enviada; aguardando ofertas."
                 )
-                self._passo_aguardar_ofertas(page)
+                self._passo_aguardar_ofertas(page, ctx)
                 self._evento(
                     ctx, "ofertas_recebidas", "Ofertas carregadas na tela.", page, True
                 )
@@ -1030,22 +1030,45 @@ class BradescoDriver(PlaywrightBankDriver):
         except Exception:
             pass
 
-    def _passo_aguardar_ofertas(self, page) -> None:
+    def _passo_aguardar_ofertas(self, page, ctx=None) -> None:
         """Espera os botoes de prazo ("Nx de R$") aparecerem de fato.
 
         O Bradesco mostra "Analisando dados..." (analise de credito SCR/Bacen)
         que costuma passar dos 90s do browser; por isso a espera aqui e maior
         (config.OFERTAS_TIMEOUT_MS). Enquanto o spinner de analise aparece, o
         portal esta saudavel — nao e falha.
+
+        Emite 4 eventos com print durante a espera (1/4, 2/4, 3/4, 4/4) para
+        provar no timeline que o driver segue na mesma tela e não travou sem
+        sinal — antes havia 10min de silencio entre `simulacao_enviada` e o
+        timeout (sim de 13/09 05:31→05:41).
         """
         timeout = max(self.timeout_ms, config.OFERTAS_TIMEOUT_MS)
-        prazo_fim = time.monotonic() + (timeout / 1000.0)
+        total_s = timeout / 1000.0
+        prazo_fim = time.monotonic() + total_s
+        inicio = time.monotonic()
+        # 4 marcos interiores (20/40/60/80% do orçamento): o 100% é o próprio
+        # timeout, que já gera `ofertas_demoraram`/`portal_falhou` com print.
+        marcos = [total_s * f for f in (0.2, 0.4, 0.6, 0.8)]
+        proximo_marco = 0
         cards = re.compile(r"\d+\s*x\s*de\s*R\$", re.I)
         analisando_re = re.compile(r"Analisando dados|Aguarde|processando", re.I)
         estavel = 0
         analisando_visto = False
         while time.monotonic() < prazo_fim:
             self._levantar_se_recusado(page)
+            decorrido = time.monotonic() - inicio
+            if proximo_marco < len(marcos) and decorrido >= marcos[proximo_marco]:
+                etapa = f"aguardando_ofertas_{proximo_marco + 1}_4"
+                self._evento(
+                    ctx,
+                    etapa,
+                    f"Aguardando ofertas ({int(decorrido)}s de "
+                    f"{int(total_s)}s); análise em curso.",
+                    page,
+                    True,
+                )
+                proximo_marco += 1
             if page.get_by_text(
                 re.compile(r"Ocorreu um erro|indispon[ií]vel|falha", re.I)
             ).count() > 0:
