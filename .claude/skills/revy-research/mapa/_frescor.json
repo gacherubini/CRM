@@ -1,5 +1,5 @@
 {
- "sha": "9a9a98a",
+ "sha": "bda0218",
  "inventario": {
   "chatbot-api": [
    {
@@ -2249,42 +2249,42 @@
     "chave": "GET /app/simulacoes",
     "simbolo": "/app/simulacoes",
     "arquivo": "app/web/simulacoes.py",
-    "linha": 250
+    "linha": 289
    },
    {
     "secao": "rota",
     "chave": "POST /app/simulacoes",
     "simbolo": "/app/simulacoes",
     "arquivo": "app/web/simulacoes.py",
-    "linha": 280
+    "linha": 319
    },
    {
     "secao": "rota",
     "chave": "GET /app/simulacoes/job/{sim_id}",
     "simbolo": "/app/simulacoes/job/{sim_id}",
     "arquivo": "app/web/simulacoes.py",
-    "linha": 523
+    "linha": 585
    },
    {
     "secao": "rota",
     "chave": "GET /app/simulacoes/historico",
     "simbolo": "/app/simulacoes/historico",
     "arquivo": "app/web/simulacoes.py",
-    "linha": 640
+    "linha": 704
    },
    {
     "secao": "rota",
     "chave": "GET /app/simulacoes/{sim_id}/registros",
     "simbolo": "/app/simulacoes/{sim_id}/registros",
     "arquivo": "app/web/simulacoes.py",
-    "linha": 761
+    "linha": 858
    },
    {
     "secao": "rota",
     "chave": "GET /app/simulacoes/{sim_id}/registros/{evento_id}/print",
     "simbolo": "/app/simulacoes/{sim_id}/registros/{evento_id}/print",
     "arquivo": "app/web/simulacoes.py",
-    "linha": 798
+    "linha": 895
    },
    {
     "secao": "rota",
@@ -2907,35 +2907,35 @@
     "chave": "app/templates/simulacoes/form.html",
     "simbolo": "simulacoes/form.html",
     "arquivo": "app/web/simulacoes.py",
-    "linha": 269
+    "linha": 308
    },
    {
     "secao": "template",
     "chave": "app/templates/simulacoes/historico.html",
     "simbolo": "simulacoes/historico.html",
     "arquivo": "app/web/simulacoes.py",
-    "linha": 686
+    "linha": 750
    },
    {
     "secao": "template",
     "chave": "app/templates/simulacoes/progresso.html",
     "simbolo": "simulacoes/progresso.html",
     "arquivo": "app/web/simulacoes.py",
-    "linha": 619
+    "linha": 683
    },
    {
     "secao": "template",
     "chave": "app/templates/simulacoes/registros.html",
     "simbolo": "simulacoes/registros.html",
     "arquivo": "app/web/simulacoes.py",
-    "linha": 782
+    "linha": 879
    },
    {
     "secao": "template",
     "chave": "app/templates/simulacoes/resultado.html",
     "simbolo": "simulacoes/resultado.html",
     "arquivo": "app/web/simulacoes.py",
-    "linha": 599
+    "linha": 662
    },
    {
     "secao": "template",

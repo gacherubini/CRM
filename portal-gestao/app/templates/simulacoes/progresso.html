@@ -51,17 +51,29 @@
     <span>01</span>
     <div><h2>Por banco</h2><p>Cada provedor responde no seu tempo.</p></div>
   </div>
-  <div class="sim-bank-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px">
+  <p class="sim-legenda"><span class="sim-legenda-item is-ok"><i aria-hidden="true">✓</i> Com oferta</span><span class="sim-legenda-item is-bad"><i aria-hidden="true">✕</i> Sem oferta</span><span class="sim-legenda-item is-warn"><i aria-hidden="true">⏱</i> Timeout</span></p>
+  <div class="sim-bank-grid">
     {% for card in cards_bancos %}
-    <div class="sim-bank-card status-{{ card.status }}" style="border:1px solid var(--border);border-radius:12px;padding:14px 16px">
-      <strong>{{ card.rotulo }}</strong>
-      <p class="muted" style="margin:6px 0 0">{{ card.status_label }}</p>
+    {% set veredito = card.veredito if card.veredito is defined else 'fila' %}
+    {% set vrotulo = card.veredito_rotulo if card.veredito_rotulo is defined else card.status_label %}
+    <div class="sim-bank-card status-{{ card.status }} is-{{ veredito }}">
+      <div class="sim-bank-top">
+        <strong>{{ card.rotulo }}</strong>
+        <span class="sim-pill is-{{ veredito }} sim-pill-sm">{{ vrotulo }}</span>
+      </div>
       {% if card.parcela_exemplo is not none %}
-      <p style="margin:8px 0 0"><strong>{{ formatar_brl(card.parcela_exemplo) }}</strong> <span class="muted">parcela</span></p>
+      <p class="sim-bank-valor"><strong>{{ formatar_brl(card.parcela_exemplo) }}</strong> <span class="muted">parcela</span></p>
       {% elif card.ofertas %}
-      <p class="muted" style="margin:8px 0 0">{{ card.ofertas }} oferta(s)</p>
+      <p class="muted sim-bank-valor">{{ card.ofertas }} oferta(s)</p>
+      {% else %}
+      <p class="muted sim-bank-valor">
+        {% if veredito == 'timeout' %}Aguardando além do limite
+        {% elif veredito in ('recusado', 'falha') %}Sem retorno deste banco
+        {% elif veredito == 'andamento' %}Consultando o portal
+        {% else %}Na fila do worker{% endif %}
+      </p>
       {% endif %}
-      {% if card.codigo_erro %}<p class="muted" style="margin:6px 0 0"><code>{{ card.codigo_erro }}</code></p>{% endif %}
+      {% if card.codigo_erro %}<p class="muted sim-bank-erro"><code>{{ card.codigo_erro }}</code></p>{% endif %}
     </div>
     {% endfor %}
   </div>
@@ -114,7 +126,11 @@
         <td><strong>{{ r.provedor or '—' }}</strong></td>
         <td>{% if r.valor_parcela is not none %}{{ formatar_brl(r.valor_parcela) }}{% else %}—{% endif %}</td>
         <td>{% if r.prazo_meses %}{{ r.prazo_meses }}x{% else %}—{% endif %}</td>
-        <td><span class="status">{{ r.status or '—' }}</span></td>
+        <td>
+          {% if r.codigo_erro %}<span class="sim-row-status is-falha">{{ r.codigo_erro }}</span>
+          {% elif (r.status or '').lower() == 'concluida' %}<span class="sim-row-status is-ok">Aprovada</span>
+          {% else %}<span class="status">{{ r.status or '—' }}</span>{% endif %}
+        </td>
       </tr>
       {% endfor %}
     </tbody>

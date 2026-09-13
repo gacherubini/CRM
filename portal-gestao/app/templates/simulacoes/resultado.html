@@ -6,73 +6,130 @@
   {% if resultado and resultado.id %}<a class="button secondary" href="/app/simulacoes/{{ resultado.id }}/registros">Registros e prints</a>{% endif %}
 </div>
 
-<section class="panel form-section">
-  <div class="section-title"><span>01</span><div><h2>Parâmetros</h2><p>Base usada nesta consulta.</p></div></div>
-  <dl class="integration-stats">
-    <div><dt>Modo</dt><dd>{{ valores.modo or 'mock' }}{% if resultado and resultado.status %} · {{ resultado.status }}{% endif %}</dd></div>
-    <div><dt>CPF</dt><dd>{% if cpf_mascarado %}{{ cpf_mascarado }}{% else %}<span class="muted">Não fica guardado: só aparece na sessão em que foi simulado</span>{% endif %}</dd></div>
-    {% if valores.placa %}<div><dt>Placa</dt><dd>{{ valores.placa }}</dd></div>{% endif %}
-    {% if valores.uf_licenciamento %}<div><dt>UF</dt><dd>{{ valores.uf_licenciamento }}</dd></div>{% endif %}
-    <div><dt>Valor do bem</dt><dd>{% if valores.valor %}{{ formatar_brl(valores.valor) }}{% else %}<span class="muted">—</span>{% endif %}</dd></div>
-    <div><dt>Entrada informada</dt><dd>{% if valores.entrada is not none %}{{ formatar_brl(valores.entrada) }}{% else %}<span class="muted">—</span>{% endif %}<br><span class="muted">no Santander a entrada é calculada pelo banco (coluna Entrada)</span></dd></div>
-    <div><dt>Prazos</dt><dd>{% if valores.prazos_meses %}{% if valores.prazos_meses is string %}{{ valores.prazos_meses }}{% else %}{{ valores.prazos_meses | join(', ') }}{% endif %} meses{% elif valores.prazo_meses %}{{ valores.prazo_meses }} meses{% else %}<span class="muted">—</span>{% endif %}</dd></div>
-    <div><dt>Categoria</dt><dd>{% if valores.categoria %}{{ valores.categoria | capitalize }}{% else %}<span class="muted">—</span>{% endif %}</dd></div>
-    {% if valores.provedores %}<div><dt>Bancos</dt><dd>{{ valores.provedores | join(', ') }}</dd></div>{% endif %}
-  </dl>
-  {% if resultado and resultado.mensagem %}<p class="muted">{{ resultado.mensagem }}</p>{% endif %}
-  {% if resultado and resultado.status in ['falhou', 'parcial', 'aguardando_intervencao'] %}
-  <div class="alert {% if resultado.status == 'falhou' %}error{% else %}warning{% endif %}" role="alert" style="margin-top:14px">
-    {% if resultado.status == 'falhou' %}
-      A simulação <strong>falhou</strong>. Código na tabela:
-      <code>portal_bloqueado</code> = WAF/Akamai;
-      <code>portal_falhou</code> = erro no fluxo do portal;
-      <code>display_ausente</code> = browser headed sem Xvfb (reinicie o worker);
-      <code>browser_ausente</code> = Chromium não instalado;
-      <code>sem_credencial</code> = falta login em Acessos bancos;
-      <code>worker_indisponivel</code> = esse banco ainda não tem robô no ar (desabilite-o em Acessos bancos);
-      <code>celular_obrigatorio</code> = informe celular (alguns bancos exigem);
-      <code>erro_inesperado</code> = falha interna (veja logs do worker).
-    {% elif resultado.status == 'aguardando_intervencao' %}
-      O portal pediu intervenção (captcha, 2FA ou bloqueio). Atualize a senha em Acessos bancos ou tente mais tarde.
-    {% else %}
-      Resultado <strong>parcial</strong>: alguns bancos/prazos ok, outros falharam.
-    {% endif %}
-  </div>
-  {% endif %}
-</section>
-
 {% set grupos = grupos_resultados if grupos_resultados is defined else [] %}
+{% set resumo = resumo_bancos if resumo_bancos is defined else None %}
+
+{% if grupos and resumo %}
+<div class="sim-resumo" role="status" aria-label="Resumo por banco">
+  <div class="sim-resumo-item is-ok">
+    <span class="sim-resumo-num">{{ resumo.ok }}</span>
+    <span class="sim-resumo-label"><i aria-hidden="true">✓</i> Com oferta</span>
+  </div>
+  <div class="sim-resumo-item is-bad">
+    <span class="sim-resumo-num">{{ resumo.recusados }}</span>
+    <span class="sim-resumo-label"><i aria-hidden="true">✕</i> Sem oferta</span>
+  </div>
+  <div class="sim-resumo-item is-warn">
+    <span class="sim-resumo-num">{{ resumo.timeouts }}</span>
+    <span class="sim-resumo-label"><i aria-hidden="true">⏱</i> Timeout</span>
+  </div>
+  <p class="sim-resumo-total">{{ resumo.total }} banco(s) consultado(s)</p>
+</div>
+{% endif %}
+
+{% if resultado and resultado.mensagem %}<p class="muted">{{ resultado.mensagem }}</p>{% endif %}
+{% if resultado and resultado.status in ['falhou', 'parcial', 'aguardando_intervencao'] %}
+<div class="alert {% if resultado.status == 'falhou' %}error{% else %}warning{% endif %}" role="alert" style="margin-top:14px">
+  {% if resultado.status == 'falhou' %}
+    A simulação <strong>falhou</strong>. Código na tabela:
+    <code>portal_bloqueado</code> = WAF/Akamai;
+    <code>portal_falhou</code> = erro no fluxo do portal;
+    <code>display_ausente</code> = browser headed sem Xvfb (reinicie o worker);
+    <code>browser_ausente</code> = Chromium não instalado;
+    <code>sem_credencial</code> = falta login em Acessos bancos;
+    <code>worker_indisponivel</code> = esse banco ainda não tem robô no ar (desabilite-o em Acessos bancos);
+    <code>celular_obrigatorio</code> = informe celular (alguns bancos exigem);
+    <code>erro_inesperado</code> = falha interna (veja logs do worker).
+  {% elif resultado.status == 'aguardando_intervencao' %}
+    O portal pediu intervenção (captcha, 2FA ou bloqueio). Atualize a senha em Acessos bancos ou tente mais tarde.
+  {% else %}
+    Resultado <strong>parcial</strong>: alguns bancos/prazos ok, outros falharam.
+  {% endif %}
+</div>
+{% endif %}
+
 {% if grupos %}
   {% for grupo in grupos %}
-  <section class="panel form-section">
-    <div class="section-title">
-      <span>{{ '%02d'|format(loop.index + 1) }}</span>
-      <div>
+  {% set veredito = grupo.veredito if grupo.veredito is defined else ('ok' if grupo.ofertas_ok else 'sem_oferta') %}
+  {% set pill_rotulo = grupo.veredito_rotulo if grupo.veredito_rotulo is defined else (grupo.ofertas_ok|string + ' oferta(s) retornada(s)' if grupo.ofertas_ok else 'Sem oferta') %}
+  <section class="panel sim-banco is-{{ veredito }}" aria-label="{{ grupo.rotulo }}: {{ pill_rotulo }}">
+    <div class="sim-banco-head">
+      <div class="sim-banco-title">
         <h2>{{ grupo.rotulo }}</h2>
-        <p>
-          {% if grupo.ofertas_ok %}
-            {{ grupo.ofertas_ok }} oferta(s) retornada(s)
+        <p class="sim-banco-sub">
+          {% if veredito == 'ok' %}
+            {{ grupo.ofertas_ok }} oferta(s) retornada(s){% if grupo.melhor_oferta and grupo.melhor_oferta.valor_parcela is not none %} · menor parcela <strong>{{ formatar_brl(grupo.melhor_oferta.valor_parcela) }}</strong>{% endif %}
           {% else %}
             Sem oferta{% if grupo.codigo_erro %} · <code>{{ grupo.codigo_erro }}</code>{% endif %}
           {% endif %}
         </p>
       </div>
+      <span class="sim-pill is-{{ veredito }}">
+        {% if veredito == 'ok' %}<i aria-hidden="true">✓</i> Com oferta
+        {% elif veredito == 'recusado' %}<i aria-hidden="true">✕</i> Crédito recusado
+        {% elif veredito == 'timeout' %}<i aria-hidden="true">⏱</i> Timeout
+        {% elif veredito == 'falha' %}<i aria-hidden="true">!</i> Falhou
+        {% else %}<i aria-hidden="true">–</i> Sem oferta
+        {% endif %}
+      </span>
     </div>
+
+    {% if veredito == 'ok' %}
+    {% if grupo.melhor_oferta and grupo.melhor_oferta.valor_parcela is not none %}
+    <div class="sim-destaque">
+      <div>
+        <span class="sim-destaque-rotulo">Menor parcela neste banco</span>
+        <strong class="sim-destaque-valor">{{ formatar_brl(grupo.melhor_oferta.valor_parcela) }}</strong>
+        <span class="sim-destaque-detalhe">
+          {% if grupo.melhor_oferta.prazo_meses %}{{ grupo.melhor_oferta.prazo_meses }}x{% endif %}{% if grupo.melhor_oferta.taxa_am is not none %} · {{ grupo.melhor_oferta.taxa_am }}% a.m.{% endif %}{% if grupo.melhor_oferta.entrada is defined and grupo.melhor_oferta.entrada is not none %} · entrada {{ formatar_brl(grupo.melhor_oferta.entrada) }}{% endif %}
+        </span>
+      </div>
+    </div>
+    {% endif %}
     <div class="table-wrap"><table>
       <thead><tr><th>Parcela</th><th>Taxa a.m.</th><th>Prazo</th><th>Entrada</th><th>Financiado</th><th>Situação</th></tr></thead>
       <tbody>
         {% for r in grupo.linhas %}
-        <tr>
+        {% set linha_ok = (r.status or '').lower() == 'concluida' and r.valor_parcela is not none %}
+        <tr class="{% if linha_ok %}is-best{% elif r.codigo_erro %}is-erro{% endif %}">
           <td>{% if r.valor_parcela is not none %}<strong>{{ formatar_brl(r.valor_parcela) }}</strong>{% else %}<span class="muted">—</span>{% endif %}</td>
           <td>{% if r.taxa_am is not none %}{{ r.taxa_am }}%{% else %}<span class="muted">—</span>{% endif %}</td>
           <td>{% if r.prazo_meses %}{{ r.prazo_meses }}x{% else %}<span class="muted">—</span>{% endif %}</td>
           <td>{% if r.entrada is defined and r.entrada is not none %}{{ formatar_brl(r.entrada) }}{% else %}<span class="muted">—</span>{% endif %}</td>
           <td>{% if r.valor_financiado is not none %}{{ formatar_brl(r.valor_financiado) }}{% else %}<span class="muted">—</span>{% endif %}</td>
-          <td>{% if r.codigo_erro %}<span class="status perdido">{{ r.codigo_erro }}</span>{% else %}<span class="status {{ r.status or 'novo' }}">{{ r.status | replace('_', ' ') if r.status else 'ok' }}</span>{% endif %}</td>
+          <td>
+            {% if r.codigo_erro %}
+              <span class="sim-row-status is-{{ veredito }}">{{ pill_rotulo }} · <code>{{ r.codigo_erro }}</code></span>
+            {% elif linha_ok %}
+              <span class="sim-row-status is-ok">Aprovada</span>
+            {% else %}
+              <span class="status {{ r.status or 'novo' }}">{{ r.status | replace('_', ' ') if r.status else 'ok' }}</span>
+            {% endif %}
+          </td>
         </tr>
         {% endfor %}
       </tbody>
     </table></div>
+    {% else %}
+    <div class="sim-banco-vazio">
+      {% if veredito == 'recusado' %}
+        <p><strong>O banco analisou e não aprovou crédito para esses parâmetros.</strong></p>
+        <p class="muted">Não é erro técnico. Vale tentar outro prazo ou entrada, ou consultar outro banco.</p>
+      {% elif veredito == 'timeout' %}
+        <p><strong>O portal do banco demorou além do limite e a consulta foi interrompida.</strong></p>
+        <p class="muted">Tente de novo. Se repetir, consulte um banco por vez para reduzir a carga no portal.</p>
+      {% elif veredito == 'falha' %}
+        <p><strong>A consulta falhou por motivo técnico.</strong></p>
+        <p class="muted">Confira o acesso em Acessos bancos e veja o detalhe em Registros.{% if grupo.codigo_erro %} Código: <code>{{ grupo.codigo_erro }}</code>.{% endif %}</p>
+      {% else %}
+        <p><strong>Sem oferta para esses parâmetros.</strong></p>
+        <p class="muted">Os bancos não devolveram propostas. Ajuste prazo ou entrada e tente de novo.</p>
+      {% endif %}
+      {% if resultado and resultado.id %}
+      <p class="sim-banco-acoes"><a class="button secondary" href="/app/simulacoes/{{ resultado.id }}/registros">Ver registros deste banco</a></p>
+      {% endif %}
+    </div>
+    {% endif %}
   </section>
   {% endfor %}
 {% else %}
@@ -90,6 +147,21 @@
   </div>
 </section>
 {% endif %}
+
+<section class="panel form-section sim-parametros">
+  <div class="section-title"><span>01</span><div><h2>Parâmetros</h2><p>Base usada nesta consulta.</p></div></div>
+  <dl class="integration-stats">
+    <div><dt>Modo</dt><dd>{{ valores.modo or 'mock' }}{% if resultado and resultado.status %} · {{ resultado.status }}{% endif %}</dd></div>
+    <div><dt>CPF</dt><dd>{% if cpf_mascarado %}{{ cpf_mascarado }}{% else %}<span class="muted">Não fica guardado: só aparece na sessão em que foi simulado</span>{% endif %}</dd></div>
+    {% if valores.placa %}<div><dt>Placa</dt><dd>{{ valores.placa }}</dd></div>{% endif %}
+    {% if valores.uf_licenciamento %}<div><dt>UF</dt><dd>{{ valores.uf_licenciamento }}</dd></div>{% endif %}
+    <div><dt>Valor do bem</dt><dd>{% if valores.valor %}{{ formatar_brl(valores.valor) }}{% else %}<span class="muted">—</span>{% endif %}</dd></div>
+    <div><dt>Entrada informada</dt><dd>{% if valores.entrada is not none %}{{ formatar_brl(valores.entrada) }}{% else %}<span class="muted">—</span>{% endif %}<br><span class="muted">no Santander a entrada é calculada pelo banco (coluna Entrada)</span></dd></div>
+    <div><dt>Prazos</dt><dd>{% if valores.prazos_meses %}{% if valores.prazos_meses is string %}{{ valores.prazos_meses }}{% else %}{{ valores.prazos_meses | join(', ') }}{% endif %} meses{% elif valores.prazo_meses %}{{ valores.prazo_meses }} meses{% else %}<span class="muted">—</span>{% endif %}</dd></div>
+    <div><dt>Categoria</dt><dd>{% if valores.categoria %}{{ valores.categoria | capitalize }}{% else %}<span class="muted">—</span>{% endif %}</dd></div>
+    {% if valores.provedores %}<div><dt>Bancos</dt><dd>{{ valores.provedores | join(', ') }}</dd></div>{% endif %}
+  </dl>
+</section>
 
 <div class="form-actions">{% if resultado and resultado.id %}<a class="button secondary" href="/app/simulacoes/{{ resultado.id }}/registros">Ver registros e prints</a>{% endif %}<a class="button primary" href="/app/simulacoes">Fazer outra simulação</a></div>
 {% endblock %}
