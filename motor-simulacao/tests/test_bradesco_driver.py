@@ -500,3 +500,117 @@ def test_sonda_de_recusa_ignora_pagina_quebrada():
     page = MagicMock()
     page.get_by_text.side_effect = RuntimeError("pagina fechada")
     driver._levantar_se_recusado(page)
+
+
+# --- sessão quente: persistir no login, não só nas ofertas --------------------
+
+
+def test_persistir_sessao_grava_quando_portal_autenticado():
+    driver = BradescoDriver(timeout_ms=20_000)
+    page = MagicMock()
+    browser_ctx = MagicMock()
+    driver._portal_autenticado = MagicMock(return_value=True)
+    driver._salvar_storage = MagicMock()
+
+    driver._persistir_sessao(page, browser_ctx, None)
+
+    driver._salvar_storage.assert_called_once_with(browser_ctx, None)
+
+
+def test_persistir_sessao_nao_grava_fora_do_login():
+    """Falha antes do login não pode sobrescrever a sessão quente com lixo."""
+    driver = BradescoDriver(timeout_ms=20_000)
+    driver._portal_autenticado = MagicMock(return_value=False)
+    driver._salvar_storage = MagicMock()
+
+    driver._persistir_sessao(MagicMock(), MagicMock(), None)
+
+    driver._salvar_storage.assert_not_called()
+
+
+def test_persistir_sessao_engole_erro_de_leitura_da_pagina():
+    driver = BradescoDriver(timeout_ms=20_000)
+    driver._portal_autenticado = MagicMock(side_effect=RuntimeError("page caiu"))
+    driver._salvar_storage = MagicMock()
+
+    driver._persistir_sessao(MagicMock(), MagicMock(), None)  # não levanta
+
+    driver._salvar_storage.assert_not_called()
+
+
+class _FakeBrowserCtx:
+    """Contexto fake que grava de verdade o arquivo de storage_state."""
+
+    def __init__(self):
+        self.saved: list[str] = []
+
+    def new_page(self):
+        return MagicMock()
+
+    def storage_state(self, path=None, **kwargs):
+        self.saved.append(path)
+        if path:
+            destino = Path(path)
+            destino.parent.mkdir(parents=True, exist_ok=True)
+            destino.write_text("{}", encoding="utf-8")
+
+    def close(self):
+        pass
+
+
+class _FakeBrowser:
+    def close(self):
+        pass
+
+
+def _fake_sync_playwright():
+    class _PW:
+        def __enter__(self):
+            return object()
+
+        def __exit__(self, *exc):
+            return False
+
+    return _PW()
+
+
+def test_simulacao_recusada_ainda_persiste_a_sessao_do_login(tmp_path, monkeypatch):
+    """Recusa de crédito depois do login não pode descartar a sessão quente.
+
+    O storage só era gravado no fim das ofertas (`bradesco.py:312`); a recusa
+    estourava antes e a próxima rodada caía em login frio — onde nasce o
+    reCAPTCHA. Regressão do teste de 12/09.
+    """
+    monkeypatch.setattr("playwright.sync_api.sync_playwright", _fake_sync_playwright)
+    driver = BradescoDriver(
+        timeout_ms=20_000,
+        storage_state_path=str(tmp_path / "bradesco.json"),
+    )
+    browser_ctx = _FakeBrowserCtx()
+    browser = _FakeBrowser()
+    driver._credencial = lambda ctx: ("12345678900", "senha")
+    driver._launch_browser = lambda p: browser
+    driver._new_context = lambda b, ctx: browser_ctx
+    driver._portal_autenticado = lambda page: True
+    driver._screenshot_falha = lambda *a, **k: None
+    for passo in (
+        "_passo_login",
+        "_pular_troca_senha",
+        "_passo_nova_proposta",
+        "_passo_pessoa",
+        "_passo_veiculo",
+        "_passo_valores",
+        "_passo_simular_e_modais",
+    ):
+        setattr(driver, passo, lambda *a, **k: None)
+
+    def _recusa(page):
+        raise RejeicaoNegocio("credito_recusado", "cliente não elegível")
+
+    driver._passo_aguardar_ofertas = _recusa
+
+    with pytest.raises(RejeicaoNegocio):
+        driver._simular_playwright(_sol(), None)
+
+    assert browser_ctx.saved, "a sessão do login não foi persistida"
+    assert (tmp_path / "bradesco.json").is_file()

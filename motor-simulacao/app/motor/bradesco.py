@@ -274,6 +274,10 @@ class BradescoDriver(PlaywrightBankDriver):
                     ctx, "login_confirmado", "Login confirmado pelo portal.", page, True
                 )
                 self._pular_troca_senha(page)
+                # Persiste a sessão já autenticada: uma recusa de crédito ou
+                # timeout depois não pode descartar o login e forçar captcha
+                # na próxima rodada.
+                self._persistir_sessao(page, browser_ctx, ctx)
                 self._passo_nova_proposta(page)
                 self._evento(
                     ctx, "proposta_aberta", "Tela de nova proposta carregada.", page, True
@@ -318,6 +322,7 @@ class BradescoDriver(PlaywrightBankDriver):
                 )
                 return resultados
             except (RejeicaoNegocio, IntervencaoNecessaria, ErroTransitorio):
+                self._persistir_sessao(page, browser_ctx, ctx)
                 self._evento(
                     ctx,
                     "falha_portal",
@@ -329,6 +334,7 @@ class BradescoDriver(PlaywrightBankDriver):
                 self._screenshot_falha(page, "erro")
                 raise
             except Exception as exc:
+                self._persistir_sessao(page, browser_ctx, ctx)
                 tipo_erro = type(exc).__name__
                 self._evento(
                     ctx,
@@ -921,6 +927,25 @@ class BradescoDriver(PlaywrightBankDriver):
 
     def _salvar_storage(self, browser_ctx, ctx=None) -> None:
         self._salvar_storage_state(browser_ctx, ctx)
+
+    def _persistir_sessao(self, page, browser_ctx, ctx=None) -> None:
+        """Grava o storage_state assim que o portal está autenticado.
+
+        Até 12/09 o Bradesco só persistia a sessão ao fim das ofertas
+        (`_simular_playwright`). Uma recusa de crédito ou timeout depois do
+        login descartava a sessão quente e a próxima rodada refazia login frio —
+        onde o reCAPTCHA é sorteado. Por isso também é chamado no caminho de
+        falha. Fora do login (página ainda não autenticada) não grava: seria
+        sobrescrever uma sessão boa com lixo.
+        """
+        if page is None or browser_ctx is None:
+            return
+        try:
+            if not self._portal_autenticado(page):
+                return
+        except Exception:
+            return
+        self._salvar_storage(browser_ctx, ctx)
 
 
 def fabrica_bradesco() -> BradescoDriver:

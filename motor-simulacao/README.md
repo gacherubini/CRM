@@ -50,6 +50,11 @@ aqui** — cifradas — e em nenhum outro produto.
   ativação do login"* — com a mesma credencial que tinha acabado de funcionar. Todo
   script de diagnóstico grava `storage_state` e reusa. **Senha recusada = pare**, não
   tente de novo: a segunda tentativa é que desativa.
+- **Sessão quente só existe se alguém gravar o `storage_state`.** Até 12/09/2026 o
+  Bradesco só gravava no fim das ofertas; rodada que fez login e terminou em recusa ou
+  timeout não deixava sessão, e a próxima refazia login frio — onde o reCAPTCHA é
+  sorteado. `_persistir_sessao` (`app/motor/bradesco.py`) grava logo após o login e
+  também no caminho de falha, só se `_portal_autenticado` for verdadeiro.
 - **`mat-input-N` não é seletor.** Em portal Angular Material o id é sequencial por
   sessão: no Motrix o CPF nasce `mat-input-0` e vira `mat-input-1` assim que o campo
   Celular aparece. Ancore no rótulo visível do `mat-form-field`.
