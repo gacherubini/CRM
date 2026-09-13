@@ -15,6 +15,8 @@ from app.motor.drivers import (
 from app.motor.bradesco import (
     PROVEDOR,
     BradescoDriver,
+    _formatar_nascimento_br,
+    _normalizar_sexo,
     corpo_indica_recaptcha_falhou,
     parse_moeda_br,
     parse_parcelas_bradesco,
@@ -614,3 +616,71 @@ def test_simulacao_recusada_ainda_persiste_a_sessao_do_login(tmp_path, monkeypat
 
     assert browser_ctx.saved, "a sessão do login não foi persistida"
     assert (tmp_path / "bradesco.json").is_file()
+
+
+# --- modal "Precisamos de mais informações" (13/09/2026, sim 340423aa) --------
+
+
+def test_formatar_nascimento_br():
+    assert _formatar_nascimento_br("2002-12-13") == "13/12/2002"
+    assert _formatar_nascimento_br("13/12/2002") == "13/12/2002"
+    assert _formatar_nascimento_br("13122002") == "13/12/2002"
+    assert _formatar_nascimento_br("") == ""
+
+
+def test_normalizar_sexo():
+    assert _normalizar_sexo("Masculino") == "Masculino"
+    assert _normalizar_sexo("M") == "Masculino"
+    assert _normalizar_sexo("feminino") == "Feminino"
+    assert _normalizar_sexo("F") == "Feminino"
+    assert _normalizar_sexo(None) is None
+    assert _normalizar_sexo("") is None
+    assert _normalizar_sexo("X") is None
+
+
+def test_pessoa_sexo_e_opcional():
+    sem = Pessoa(cpf="52998224725", nascimento="2002-12-13")
+    assert sem.sexo is None
+    com = Pessoa(cpf="52998224725", nascimento="2002-12-13", sexo="F")
+    assert com.sexo == "F"
+
+
+def _page_sem_modal():
+    page = MagicMock()
+    page.get_by_text.return_value.count.return_value = 0
+    return page
+
+
+def test_modal_ausente_segue_como_antes():
+    driver = BradescoDriver(timeout_ms=20_000)
+    page = _page_sem_modal()
+    assert driver._resolver_modal_dados_cliente(page, _sol()) is None
+    page.get_by_role.assert_not_called()
+
+
+def _page_com_modal(nasc_lido):
+    page = MagicMock()
+    page.get_by_text.return_value.count.return_value = 1
+    box = MagicMock()
+    box.input_value.return_value = nasc_lido
+    page.get_by_role.return_value.first = box
+    return page, box
+
+
+def test_modal_sem_sexo_aborta_com_codigo_claro():
+    """Sem pessoa.sexo o driver não tem como passar: erro estável, sem retry cego."""
+    driver = BradescoDriver(timeout_ms=20_000)
+    page, box = _page_com_modal("13/12/2002")
+    with pytest.raises(IntervencaoNecessaria) as ei:
+        driver._resolver_modal_dados_cliente(page, _sol())
+    assert ei.value.codigo == "sexo_nao_informado"
+    box.type.assert_called_once_with("13/12/2002", delay=30)
+
+
+def test_modal_com_nascimento_divergente_falha_rapido():
+    """Toda escrita lê de volta: campo não fixou = codigo próprio, não timeout."""
+    driver = BradescoDriver(timeout_ms=20_000)
+    page, _box = _page_com_modal("01/01/2000")
+    with pytest.raises(ErroTransitorio) as ei:
+        driver._resolver_modal_dados_cliente(page, _sol())
+    assert ei.value.codigo == "nascimento_nao_confirmado"

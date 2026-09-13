@@ -107,6 +107,31 @@ def _formatar_moeda_input(valor: float) -> str:
     return f"{valor:,.2f}".replace(",", "_").replace(".", ",").replace("_", ".")
 
 
+def _formatar_nascimento_br(nasc: str) -> str:
+    """Modal 'mais informações' usa texto com máscara DD/MM/AAAA (não type=date)."""
+    s = (nasc or "").strip()
+    m = re.match(r"^(\d{4})-(\d{2})-(\d{2})", s)
+    if m:
+        return f"{m.group(3)}/{m.group(2)}/{m.group(1)}"
+    m = re.match(r"^(\d{2})/(\d{2})/(\d{4})", s)
+    if m:
+        return f"{m.group(1)}/{m.group(2)}/{m.group(3)}"
+    digitos = re.sub(r"\D", "", s)
+    if len(digitos) == 8:
+        return f"{digitos[:2]}/{digitos[2:4]}/{digitos[4:]}"
+    return s
+
+
+def _normalizar_sexo(valor: str | None) -> str | None:
+    """Normaliza para o rótulo do portal ('Masculino'/'Feminino'); None = sem dado."""
+    s = (valor or "").strip().lower()
+    if s in ("m", "masc", "masculino", "male", "homem"):
+        return "Masculino"
+    if s in ("f", "fem", "feminino", "female", "mulher"):
+        return "Feminino"
+    return None
+
+
 def corpo_indica_recaptcha_falhou(texto: str) -> bool:
     """Detecta falha de verificacao reCAPTCHA na tela de login do Turbo.
 
@@ -642,6 +667,105 @@ class BradescoDriver(PlaywrightBankDriver):
         # ".mat-checkbox-inner-container" do codegen e fragil (fallback).
         self._marcar_aceite(page)
         self._clicar_avancar(page)
+        self._resolver_modal_dados_cliente(page, sol)
+
+    def _resolver_modal_dados_cliente(self, page, sol: SolicitacaoSimulacao) -> None:
+        """Modal 'Precisamos de mais informações' (13/09/2026, sim 340423aa):
+        o portal passou a exigir Data de Nascimento + Sexo após o Avançar dos
+        dados do cliente. Sonda barata; ausente = segue como antes."""
+        try:
+            if (
+                page.get_by_text(
+                    re.compile(r"Precisamos de mais informa", re.I)
+                ).count()
+                == 0
+            ):
+                return
+        except Exception:
+            return
+        nasc = _formatar_nascimento_br(sol.pessoa.nascimento)
+        try:
+            nasc_box = page.get_by_role(
+                "textbox", name=re.compile(r"Nascimento", re.I)
+            ).first
+            nasc_box.wait_for(state="visible", timeout=min(self.timeout_ms, 10_000))
+            nasc_box.click()
+            nasc_box.fill("")
+            nasc_box.type(nasc, delay=30)
+            nasc_box.blur()
+        except Exception as exc:
+            raise ErroTransitorio(
+                "nascimento_nao_preenchido",
+                "Modal de dados do cliente não aceitou a Data de Nascimento.",
+            ) from exc
+        try:
+            lido = (nasc_box.input_value() or "").strip()
+        except Exception:
+            lido = ""
+        if re.sub(r"\D", "", lido) != re.sub(r"\D", "", nasc):
+            raise ErroTransitorio(
+                "nascimento_nao_confirmado",
+                "Data de Nascimento não fixou no modal do Bradesco.",
+            )
+        sexo = _normalizar_sexo(getattr(sol.pessoa, "sexo", None))
+        if sexo is None:
+            raise IntervencaoNecessaria(
+                "sexo_nao_informado",
+                "Bradesco passou a exigir o Sexo do cliente; reenvie a "
+                "simulação informando pessoa.sexo (Masculino/Feminino).",
+            )
+        try:
+            self._selecionar_sexo_modal(page, sexo)
+        except IntervencaoNecessaria:
+            raise
+        except Exception as exc:
+            raise ErroTransitorio(
+                "sexo_nao_selecionado",
+                "Não foi possível selecionar o Sexo no modal do Bradesco.",
+            ) from exc
+        try:
+            page.get_by_role(
+                "button", name=re.compile(r"^Confirmar$", re.I)
+            ).first.click(timeout=min(self.timeout_ms, 10_000))
+        except Exception as exc:
+            raise ErroTransitorio(
+                "modal_nao_confirmou",
+                "Botão Confirmar do modal de dados não respondeu "
+                "(provável campo obrigatório ainda vazio).",
+            ) from exc
+        try:
+            page.wait_for_function(
+                """(txt) => !document.body.innerText.match(new RegExp(txt, 'i'))""",
+                arg="Precisamos de mais informa",
+                timeout=min(self.timeout_ms, 10_000),
+            )
+        except Exception as exc:
+            raise ErroTransitorio(
+                "modal_nao_fechou",
+                "Modal de dados do cliente seguiu aberto após Confirmar.",
+            ) from exc
+
+    def _selecionar_sexo_modal(self, page, sexo: str) -> None:
+        """Seleciona Masculino/Feminino no dropdown do modal (nativo ou Material)."""
+        rotulo = re.compile(r"Sexo", re.I)
+        opcao = re.compile(rf"^{sexo}$", re.I)
+        try:
+            combo = page.get_by_role("combobox", name=rotulo).first
+            combo.wait_for(state="visible", timeout=3_000)
+            try:
+                combo.select_option(label=sexo)
+                return
+            except Exception:
+                pass
+            combo.click(timeout=3_000)
+            page.get_by_role("option", name=opcao).first.click(timeout=5_000)
+            return
+        except Exception:
+            pass
+        campo = page.get_by_text(re.compile(r"^Sexo", re.I)).first
+        campo.wait_for(state="visible", timeout=3_000)
+        campo.click(timeout=3_000)
+        page.get_by_role("option", name=opcao).first.click(timeout=5_000)
 
     def _marcar_aceite(self, page) -> None:
         try:

@@ -9,7 +9,9 @@ Uso (PowerShell):
   cd motor-simulacao
   $env:MOTOR_BRADESCO_CPF_LOJISTA = "000.000.000-00"   # CPF do LOJISTA (login)
   $env:MOTOR_BRADESCO_SENHA       = "sua-senha"
-  $env:BRADESCO_CPF               = "000.000.000-00"   # CPF do CLIENTE
+   $env:BRADESCO_CPF               = "000.000.000-00"   # CPF do CLIENTE
+   $env:BRADESCO_NASC              = "2002-12-13"        # nascimento do CLIENTE
+   $env:BRADESCO_SEXO              = "Masculino"         # exigido no modal "Precisamos de mais informações"
   $env:BRADESCO_CELULAR           = "(51) 90000-0000"
   $env:BRADESCO_PLACA             = "ABC1D23"          # opcional no portal
   $env:BRADESCO_VALOR             = "21900"
@@ -59,6 +61,7 @@ def main() -> None:
             cpf=os.getenv("BRADESCO_CPF", ""),
             nascimento=os.getenv("BRADESCO_NASC", ""),
             celular=os.getenv("BRADESCO_CELULAR", ""),
+            sexo=(os.getenv("BRADESCO_SEXO") or "").strip() or None,
         ),
         veiculo=Veiculo(
             placa=os.getenv("BRADESCO_PLACA", ""),

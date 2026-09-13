@@ -12,6 +12,11 @@ class Pessoa(BaseModel):
     ddd: Optional[str] = None
     celular: Optional[str] = None
     codigo_natureza_ocupacao: Optional[str] = None
+    # Sexo do cliente ("Masculino"/"Feminino"; aceita "M"/"F"). O Bradesco
+    # passou a exigir no modal "Precisamos de mais informações" (13/09/2026).
+    # Opcional para não quebrar quem chama sem o dado: o driver aborta com
+    # codigo claro (sexo_nao_informado) em vez de morrer genérico.
+    sexo: Optional[str] = None
 
 
 class Veiculo(BaseModel):
