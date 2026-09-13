@@ -22,7 +22,7 @@
 {% if motor_configurado and credenciais %}
 <section class="panel flush">
   <div class="table-wrap">
-    <table>
+    <table class="fin-tabela">
       <thead>
         <tr>
           <th scope="col">Financeira</th>
@@ -131,6 +131,7 @@
 {% elif motor_configurado and not integracao_erro %}
 <section class="panel">
   <div class="empty">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 9l9-6 9 6M4 9v10M20 9v10M8 12v5M12 12v5M16 12v5M2 19h20"/></svg>
     <strong>Nenhum provedor retornado pelo Motor.</strong>
     <p>Quando o Motor listar financeiras, elas aparecerão aqui para configurar acesso.</p>
   </div>

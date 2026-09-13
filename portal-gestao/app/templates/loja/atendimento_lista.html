@@ -92,18 +92,21 @@
     </tbody>
   </table></div>
   {% elif integracao_erro %}
-  <div class="empty">
+  <div class="empty empty--erro">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h16v11H9l-5 4z"/></svg>
     <strong>Não foi possível carregar o atendimento</strong>
     <p>Tente de novo em instantes. As telas de Leads e Conversas continuam disponíveis.</p>
   </div>
   {% elif filtros.estado or filtros.busca or filtros.canal_id %}
   <div class="empty">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h16v11H9l-5 4z"/></svg>
     <strong>Nenhum atendimento com esse filtro</strong>
     <p>Ajuste a busca, o estado ou o canal.</p>
     <a class="button secondary" href="/app/loja/atendimento">Limpar filtros</a>
   </div>
   {% else %}
   <div class="empty">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h16v11H9l-5 4z"/></svg>
     <strong>Nenhum atendimento ainda</strong>
     <p>Quando o agente registrar contatos ou conversas, eles aparecem aqui.</p>
   </div>

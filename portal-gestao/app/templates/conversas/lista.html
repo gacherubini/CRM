@@ -24,8 +24,8 @@
       <td><a class="table-action" href="/app/conversas/{{ c.telefone }}">Abrir</a></td>
     </tr>{% endfor %}</tbody>
   </table></div>
-  {% elif integracao_erro %}<div class="empty"><strong>Não foi possível carregar as conversas.</strong><p>Tente novamente em instantes.</p></div>
-  {% elif filtros.busca %}<div class="empty"><strong>Nenhuma conversa para essa busca.</strong><p>Ajuste o telefone pesquisado.</p></div>
-  {% else %}<div class="empty"><strong>Nenhuma conversa ainda.</strong><p>Assim que o chatbot receber mensagens, elas aparecem aqui.</p></div>{% endif %}
+  {% elif integracao_erro %}<div class="empty empty--erro"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h16v11H9l-5 4z"/></svg><strong>Não foi possível carregar as conversas.</strong><p>Tente novamente em instantes.</p></div>
+  {% elif filtros.busca %}<div class="empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h16v11H9l-5 4z"/></svg><strong>Nenhuma conversa para essa busca.</strong><p>Ajuste o telefone pesquisado.</p></div>
+  {% else %}<div class="empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h16v11H9l-5 4z"/></svg><strong>Nenhuma conversa ainda.</strong><p>Assim que o chatbot receber mensagens, elas aparecem aqui.</p></div>{% endif %}
 </section>
 {% endblock %}

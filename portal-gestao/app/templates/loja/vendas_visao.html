@@ -43,6 +43,7 @@
     <div><span class="mono-label">Resultado</span><h2 id="bloco-resultado">Receita e vendas</h2></div>
   </div>
   <div class="empty empty-compacto">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="9" r="5"/><path d="M9 13l-2 8 5-3 5 3-2-8"/></svg>
     <strong>Nenhuma venda confirmada no período.</strong>
     <p>Quando houver vendas confirmadas, os totais reais aparecem aqui.</p>
   </div>
@@ -82,11 +83,11 @@
     <div><span class="mono-label">Funil</span><h2 id="bloco-funil">Leads e conversão</h2></div>
   </div>
   {% if overview.funil_status == 'erro' %}
-  <div class="empty empty-compacto"><strong>Funil indisponível.</strong><p>Não foi possível agregar os eventos do período.</p></div>
+  <div class="empty empty-compacto empty--erro"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 4h18l-7 8v7l-4 2v-9L3 4Z"/></svg><strong>Funil indisponível.</strong><p>Não foi possível agregar os eventos do período.</p></div>
   {% elif overview.funil_status == 'indisponivel' %}
-  <div class="empty empty-compacto"><strong>Funil indisponível.</strong><p>Sem base de eventos para este escopo.</p></div>
+  <div class="empty empty-compacto"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 4h18l-7 8v7l-4 2v-9L3 4Z"/></svg><strong>Funil indisponível.</strong><p>Sem base de eventos para este escopo.</p></div>
   {% elif overview.funil_status == 'vazio' and not overview.leads_count %}
-  <div class="empty empty-compacto"><strong>Nenhum lead no período.</strong><p>Novos contatos aparecem aqui assim que entrarem no funil.</p></div>
+  <div class="empty empty-compacto"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 4h18l-7 8v7l-4 2v-9L3 4Z"/></svg><strong>Nenhum lead no período.</strong><p>Novos contatos aparecem aqui assim que entrarem no funil.</p></div>
   {% else %}
   <div class="panel-body res">
     <ol class="res-flow">
@@ -128,6 +129,7 @@
   {% set aq = overview.aquisicao %}
   {% if not aq or overview.aquisicao_status == 'indisponivel' %}
   <div class="empty empty-compacto">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 20v-7M11 20V5M17 20v-4M3 20h18"/></svg>
     <strong>Aquisição indisponível.</strong>
     <p>{{ (aq.mensagem if aq and aq.mensagem else 'Sem dados de mídia confiáveis no período.') }} Google Ads permanece indisponível — não contamos como zero.</p>
   </div>

@@ -28,6 +28,6 @@
       </div>{% else %}<span class="muted">—</span>{% endif %}</td>{% endif %}
     </tr>{% endfor %}</tbody>
   </table></div>
-  {% else %}<div class="empty"><strong>Nenhuma meta cadastrada.</strong><p>{% if pode_gerir %}Cadastre a primeira meta para acompanhar o atingimento no Financeiro.{% else %}O dono ou gerente ainda não cadastrou metas para a loja.{% endif %}</p></div>{% endif %}
+  {% else %}<div class="empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.2"/></svg><strong>Nenhuma meta cadastrada.</strong><p>{% if pode_gerir %}Cadastre a primeira meta para acompanhar o atingimento no Financeiro.{% else %}O dono ou gerente ainda não cadastrou metas para a loja.{% endif %}</p></div>{% endif %}
 </section>
 {% endblock %}

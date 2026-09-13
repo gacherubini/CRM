@@ -13,7 +13,7 @@
   </header>
 
   {% if not resultados_view.tem_campanhas %}
-  <div class="empty"><strong>Ainda sem campanhas no período.</strong><p>A equipe Revy configura a medição e as campanhas. Os números aparecem aqui quando houver dados.</p></div>
+  <div class="empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 20v-7M11 20V5M17 20v-4M3 20h18"/></svg><strong>Ainda sem campanhas no período.</strong><p>A equipe Revy configura a medição e as campanhas. Os números aparecem aqui quando houver dados.</p></div>
   {% else %}
   <div class="revy-results__hero">
     <article class="revy-results__kpi"><span>Gasto</span><strong>{{ formatar_brl(resultados_view.totais.gasto) }}</strong><small>lançado no Revy</small></article>

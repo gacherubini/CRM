@@ -47,7 +47,10 @@ _FOTO_MAX_BYTES = 2 * 1024 * 1024
 # (fundo chapado vívido por bicho + rosto geométrico em alto contraste),
 # mesma caixa (64x64 com cantos arredondados). Fonte única — os três lugares
 # que mostram avatar (topbar, Perfil, Equipe) servem daqui via /foto/{id}.
-_AVATAR_ATRIBUTOS = 'viewBox="0 0 64 64" aria-hidden="true"'
+# xmlns obrigatório: o mesmo SVG sai inline na grade E como image/svg+xml em
+# /foto/{id} (herói do Perfil, topbar, Equipe) — sem namespace o <img> não
+# renderiza e o onerror remove a imagem, caindo para a inicial em silêncio.
+_AVATAR_ATRIBUTOS = 'viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"'
 _AVATAR_CORPOS = {
     "gato": (
         '<rect width="64" height="64" rx="14" fill="#EA580C"/>'
