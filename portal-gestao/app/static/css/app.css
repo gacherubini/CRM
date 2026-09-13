@@ -5246,3 +5246,198 @@ form[data-periodo-melhorado] { position: relative; }
   .vnd-custos { padding: 0 var(--space-4); }
   .vnd-custo-novo { padding: 0 var(--space-4) var(--space-4); }
 }
+
+/* Simulação por banco — veredito à primeira vista.
+   Exceção escopada à regra 08/08 (terminal sem cor): aqui o terminal É a
+   informação — o lojista precisa ver de longe qual banco aprovou. Vale só
+   para .sim-*, o .status global continua neutro. Cor nunca anda sozinha:
+   todo veredito tem ícone + palavra. */
+.sim-resumo {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) auto;
+  align-items: stretch;
+  gap: var(--space-3);
+  margin: 0 0 var(--space-4);
+  padding: var(--space-4) var(--space-5);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-srf);
+  background: var(--surface);
+}
+.sim-resumo-item {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  padding-left: var(--space-3);
+  border-left: 3px solid var(--line-strong);
+}
+.sim-resumo-item.is-ok { border-left-color: var(--ok); }
+.sim-resumo-item.is-bad { border-left-color: var(--danger); }
+.sim-resumo-item.is-warn { border-left-color: var(--warn); }
+.sim-resumo-num {
+  font-size: var(--text-display-sm);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -.02em;
+}
+.sim-resumo-item.is-ok .sim-resumo-num { color: var(--ok); }
+.sim-resumo-item.is-bad .sim-resumo-num { color: var(--danger); }
+.sim-resumo-item.is-warn .sim-resumo-num { color: var(--warn); }
+.sim-resumo-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--ink-soft);
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+.sim-resumo-total {
+  align-self: center;
+  margin: 0;
+  color: var(--ink-muted);
+  font-size: var(--text-xs);
+  white-space: nowrap;
+}
+
+.sim-banco {
+  border-left: 3px solid var(--line-strong);
+  overflow: hidden;
+}
+.sim-banco.is-ok {
+  border-left-color: var(--ok);
+  background: color-mix(in srgb, var(--ok) 4%, var(--surface));
+}
+.sim-banco.is-recusado,
+.sim-banco.is-falha {
+  border-left-color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 4%, var(--surface));
+}
+.sim-banco.is-timeout {
+  border-left-color: var(--warn);
+  background: color-mix(in srgb, var(--warn) 9%, var(--surface));
+}
+.sim-banco.is-sem_oferta { border-left-color: var(--line-strong); }
+.sim-banco-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: var(--space-5) var(--space-5) var(--space-3);
+}
+.sim-banco-title h2 { margin: 0; font-size: var(--text-xl); letter-spacing: -.02em; }
+.sim-banco-sub { margin: 4px 0 0; color: var(--ink-soft); font-size: var(--text-sm); }
+.sim-banco-sub code { font-family: var(--font-data); font-size: var(--text-xs); }
+
+.sim-pill {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border-radius: var(--radius-ctl);
+  border: 1px solid var(--line-strong);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  white-space: nowrap;
+}
+.sim-pill i { font-style: normal; font-weight: 700; }
+.sim-pill.is-ok {
+  border-color: color-mix(in srgb, var(--ok) 45%, var(--line));
+  background: color-mix(in srgb, var(--ok) 12%, var(--surface));
+  color: var(--ok);
+}
+.sim-pill.is-recusado,
+.sim-pill.is-falha {
+  border-color: color-mix(in srgb, var(--danger) 45%, var(--line));
+  background: color-mix(in srgb, var(--danger) 10%, var(--surface));
+  color: var(--danger);
+}
+.sim-pill.is-timeout {
+  border-color: color-mix(in srgb, var(--warn) 50%, var(--line));
+  background: color-mix(in srgb, var(--warn) 16%, var(--surface));
+  color: var(--st-wait);
+}
+.sim-pill.is-sem_oferta,
+.sim-pill.is-fila,
+.sim-pill.is-andamento {
+  background: var(--surface-soft);
+  color: var(--ink-soft);
+}
+.sim-pill-sm { padding: 3px 8px; }
+
+.sim-destaque {
+  margin: 0 var(--space-5) var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border: 1px dashed color-mix(in srgb, var(--ok) 40%, var(--line));
+  border-radius: var(--radius-srf);
+  background: color-mix(in srgb, var(--ok) 7%, var(--surface));
+}
+.sim-destaque-rotulo { display: block; color: var(--ink-soft); font-size: var(--text-xs); font-weight: 600; }
+.sim-destaque-valor {
+  display: block;
+  font-size: var(--text-display-sm);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -.02em;
+}
+.sim-destaque-detalhe { color: var(--ink-soft); font-size: var(--text-sm); }
+
+.sim-banco .table-wrap { margin: 0 var(--space-5) var(--space-5); }
+.sim-banco tr.is-best td:first-child { box-shadow: inset 3px 0 0 var(--ok); }
+.sim-row-status { display: inline-flex; align-items: center; gap: 6px; font-size: var(--text-xs); font-weight: 600; }
+.sim-row-status::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--ink-muted); }
+.sim-row-status.is-ok { color: var(--ok); }
+.sim-row-status.is-ok::before { background: var(--ok); }
+.sim-row-status.is-recusado::before,
+.sim-row-status.is-falha::before { background: var(--danger); }
+.sim-row-status.is-recusado,
+.sim-row-status.is-falha { color: var(--danger); }
+.sim-row-status.is-timeout { color: var(--st-wait); }
+.sim-row-status.is-timeout::before { background: var(--warn); }
+.sim-row-status code { font-family: var(--font-data); font-weight: 400; }
+
+.sim-banco-vazio { padding: 0 var(--space-5) var(--space-5); }
+.sim-banco-vazio p { margin: 0 0 var(--space-2); max-width: 70ch; }
+.sim-banco-acoes { margin-top: var(--space-3); }
+
+.sim-parametros { margin-top: var(--space-4); }
+
+.sim-legenda { display: flex; flex-wrap: wrap; gap: var(--space-3); margin: 0 0 var(--space-3); }
+.sim-legenda-item { display: inline-flex; align-items: center; gap: 6px; font-size: var(--text-xs); font-weight: 600; color: var(--ink-soft); }
+.sim-legenda-item i {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 18px; height: 18px; border-radius: 50%;
+  font-style: normal; font-size: 11px; font-weight: 700;
+}
+.sim-legenda-item.is-ok i { background: color-mix(in srgb, var(--ok) 14%, var(--surface)); color: var(--ok); }
+.sim-legenda-item.is-bad i { background: color-mix(in srgb, var(--danger) 12%, var(--surface)); color: var(--danger); }
+.sim-legenda-item.is-warn i { background: color-mix(in srgb, var(--warn) 18%, var(--surface)); color: var(--st-wait); }
+
+.sim-bank-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: var(--space-3); }
+.sim-bank-card {
+  border: 1px solid var(--line);
+  border-top-width: 3px;
+  border-radius: var(--radius-srf);
+  padding: var(--space-4);
+  background: var(--surface);
+}
+.sim-bank-card.is-ok { border-top-color: var(--ok); background: color-mix(in srgb, var(--ok) 5%, var(--surface)); }
+.sim-bank-card.is-recusado,
+.sim-bank-card.is-falha { border-top-color: var(--danger); }
+.sim-bank-card.is-timeout { border-top-color: var(--warn); background: color-mix(in srgb, var(--warn) 8%, var(--surface)); }
+.sim-bank-card.is-andamento { border-top-color: var(--st-live); }
+.sim-bank-card.is-fila { border-top-color: var(--line-strong); }
+.sim-bank-top { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-2); }
+.sim-bank-valor { margin: var(--space-2) 0 0; }
+.sim-bank-valor strong { font-variant-numeric: tabular-nums; }
+.sim-bank-erro { margin: 6px 0 0; }
+.sim-bank-erro code { font-family: var(--font-data); }
+
+@media (max-width: 720px) {
+  .sim-resumo { grid-template-columns: 1fr 1fr 1fr; padding: var(--space-3) var(--space-4); }
+  .sim-resumo-total { grid-column: 1 / -1; }
+  .sim-banco-head { flex-direction: column; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sim-pulse { animation: none; }
+}

@@ -100,6 +100,45 @@ _ROTULOS_BANCO = {
     "omni": "Omni",
 }
 
+# Classificação do veredito por banco para a tela de resultado/progresso.
+# Mantém 3 cores pedidas pelo lojista: verde = com oferta, vermelho = sem
+# oferta (recusado ou falha técnica), amarelo = timeout. Cor nunca anda
+# sozinha: cada veredito tem rótulo e explicação próprios no template.
+_CODIGOS_TIMEOUT = frozenset(
+    {"timeout_driver", "orcamento_tempo_estourado", "timeout"}
+)
+_VEREDITO_ROTULOS = {
+    "ok": "Com oferta",
+    "recusado": "Crédito recusado",
+    "timeout": "Timeout",
+    "falha": "Falhou",
+    "andamento": "Consultando",
+    "fila": "Na fila",
+    "sem_oferta": "Sem oferta",
+}
+# Ordem de exibição: aprovados primeiro, depois recusas, falhas e timeouts.
+_VEREDITO_ORDEM = {"ok": 0, "recusado": 1, "falha": 2, "timeout": 3, "sem_oferta": 4}
+
+
+def _veredito_do_codigo(codigo_erro: str | None) -> str:
+    """Mapeia codigo_erro do Motor para veredito de tela."""
+    codigo = (codigo_erro or "").strip().lower()
+    if not codigo:
+        return "sem_oferta"
+    if codigo == "credito_recusado":
+        return "recusado"
+    if codigo in _CODIGOS_TIMEOUT:
+        return "timeout"
+    return "falha"
+
+
+def _resumo_grupos(grupos: list[dict]) -> dict:
+    """Contadores para a faixa-resumo do topo (verde/vermelho/amarelo)."""
+    ok = sum(1 for g in grupos if g.get("veredito") == "ok")
+    recusados = sum(1 for g in grupos if g.get("veredito") in ("recusado", "falha", "sem_oferta"))
+    timeouts = sum(1 for g in grupos if g.get("veredito") == "timeout")
+    return {"ok": ok, "recusados": recusados, "timeouts": timeouts, "total": len(grupos)}
+
 
 def _parse_celular_form(raw: str | None) -> tuple[str | None, str | None]:
     """Extrai (ddd, celular) de um campo livre com DDD.
@@ -434,6 +473,28 @@ def _cards_bancos_progresso(
             ),
             None,
         )
+        codigo_erro = (tarefa or {}).get("codigo_erro") or next(
+            (r.get("codigo_erro") for r in linhas if r.get("codigo_erro")), None
+        )
+        # Veredito visual: verde = com oferta, amarelo = timeout, vermelho = resto.
+        # Em andamento o veredito segue o status do job; terminal sem oferta
+        # usa o codigo_erro. Mantém status/status_label antigos para compat.
+        if ofertas_ok:
+            veredito = "ok"
+        elif st in ("recebida", "reservada", "acordando_worker"):
+            veredito = "fila"
+        elif st in ("processando", "parcial"):
+            veredito = "andamento" if not codigo_erro else _veredito_do_codigo(codigo_erro)
+            if st == "parcial" and not codigo_erro and not ofertas_ok:
+                veredito = "andamento"
+        elif codigo_erro:
+            veredito = _veredito_do_codigo(codigo_erro)
+        elif st in ("concluida",):
+            veredito = "ok" if ofertas_ok else "sem_oferta"
+        elif st in ("falhou", "rejeitada", "cancelada"):
+            veredito = "falha"
+        else:
+            veredito = "fila"
         label_status = {
             "recebida": "Na fila",
             "acordando_worker": "Acordando worker",
@@ -453,8 +514,9 @@ def _cards_bancos_progresso(
                 "status_label": label_status,
                 "ofertas": ofertas_ok,
                 "parcela_exemplo": parcela_exemplo,
-                "codigo_erro": (tarefa or {}).get("codigo_erro")
-                or next((r.get("codigo_erro") for r in linhas if r.get("codigo_erro")), None),
+                "codigo_erro": codigo_erro,
+                "veredito": veredito,
+                "veredito_rotulo": _VEREDITO_ROTULOS.get(veredito, label_status),
             }
         )
     return cards
@@ -595,6 +657,7 @@ def simulacoes_job(
             ):
                 valores = {**valores, campo: resultado.get(campo)}
         resultados_lista = resultado.get("resultados") or []
+        grupos = _grupos_resultados_por_banco(resultados_lista)
         return templates.TemplateResponse(
             "simulacoes/resultado.html",
             contexto(
@@ -602,7 +665,8 @@ def simulacoes_job(
                 usuario,
                 valores=valores,
                 resultado=resultado,
-                grupos_resultados=_grupos_resultados_por_banco(resultados_lista),
+                grupos_resultados=grupos,
+                resumo_bancos=_resumo_grupos(grupos),
                 # Dono/gerente digitaram o CPF e veem inteiro; vendedor vê mascarado.
                 # Reaberto pelo histórico não há CPF: o Motor só o guarda cifrado.
                 cpf_mascarado=(
@@ -722,7 +786,12 @@ def _grupos_eventos_por_banco(eventos: list[dict]) -> list[dict]:
 
 
 def _grupos_resultados_por_banco(resultados: list[dict] | None) -> list[dict]:
-    """Agrupa ofertas por provedor para a tela de resultado multi-banco."""
+    """Agrupa ofertas por provedor para a tela de resultado multi-banco.
+
+    Devolve por grupo: veredito (ok/recusado/timeout/falha/sem_oferta),
+    rótulo do veredito e melhor oferta (menor parcela). Ordena aprovados
+    primeiro para leitura rápida. Mantém ofertas_ok/codigo_erro antigos.
+    """
     ordem: list[str] = []
     buckets: dict[str, list[dict]] = {}
     for r in resultados or []:
@@ -746,15 +815,43 @@ def _grupos_resultados_por_banco(resultados: list[dict] | None) -> list[dict]:
             (r.get("codigo_erro") for r in linhas if r.get("codigo_erro")),
             None,
         )
+        if ofertas_ok:
+            veredito = "ok"
+        elif codigo_erro:
+            veredito = _veredito_do_codigo(codigo_erro)
+        else:
+            veredito = "sem_oferta"
+        concluidas = [
+            r
+            for r in linhas
+            if (r.get("status") or "").lower() == "concluida"
+            and isinstance(r.get("valor_parcela"), (int, float))
+        ]
+        melhor = min(concluidas, key=lambda r: r["valor_parcela"]) if concluidas else None
         grupos.append(
             {
                 "provedor": chave,
                 "rotulo": _ROTULOS_BANCO.get(chave, chave.replace("_", " ").title()),
-                "linhas": linhas,
+                "linhas": sorted(
+                    linhas,
+                    key=lambda r: (
+                        0
+                        if (r.get("status") or "").lower() == "concluida"
+                        and r.get("valor_parcela") is not None
+                        else 1,
+                        r.get("valor_parcela")
+                        if isinstance(r.get("valor_parcela"), (int, float))
+                        else 10**12,
+                    ),
+                ),
                 "ofertas_ok": ofertas_ok,
                 "codigo_erro": codigo_erro,
+                "veredito": veredito,
+                "veredito_rotulo": _VEREDITO_ROTULOS.get(veredito, veredito),
+                "melhor_oferta": melhor,
             }
         )
+    grupos.sort(key=lambda g: (_VEREDITO_ORDEM.get(g["veredito"], 9), g["rotulo"]))
     return grupos
 
 
