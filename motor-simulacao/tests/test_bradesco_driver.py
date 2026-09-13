@@ -648,6 +648,8 @@ def test_pessoa_sexo_e_opcional():
 def _page_sem_modal():
     page = MagicMock()
     page.get_by_text.return_value.count.return_value = 0
+    # Navegou para a etapa de veículo: o resolver volta sem tocar no form.
+    page.get_by_role.return_value.count.return_value = 1
     return page
 
 
@@ -655,7 +657,24 @@ def test_modal_ausente_segue_como_antes():
     driver = BradescoDriver(timeout_ms=20_000)
     page = _page_sem_modal()
     assert driver._resolver_modal_dados_cliente(page, _sol()) is None
-    page.get_by_role.assert_not_called()
+    page.get_by_role.assert_called_once()
+
+
+def test_modal_atrasado_e_detectado_no_poll():
+    """O portal demora segundos para abrir o modal após o Avançar (sims
+    8f20054a/b355006f): sonda única perdia, o driver marchava na tela errada
+    e morria minutos depois com TimeoutError genérico em valores."""
+    driver = BradescoDriver(timeout_ms=20_000)
+    page = MagicMock()
+    page.get_by_text.return_value.count.side_effect = [0, 0, 1]
+    box = MagicMock()
+    box.input_value.return_value = "13/12/2002"
+    page.get_by_role.return_value.first = box
+    page.get_by_role.return_value.count.return_value = 0
+    with pytest.raises(IntervencaoNecessaria) as ei:
+        driver._resolver_modal_dados_cliente(page, _sol())
+    assert ei.value.codigo == "sexo_nao_informado"
+    assert page.get_by_text.return_value.count.call_count == 3
 
 
 def _page_com_modal(nasc_lido):

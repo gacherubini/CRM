@@ -669,19 +669,46 @@ class BradescoDriver(PlaywrightBankDriver):
         self._clicar_avancar(page)
         self._resolver_modal_dados_cliente(page, sol)
 
-    def _resolver_modal_dados_cliente(self, page, sol: SolicitacaoSimulacao) -> None:
+    def _resolver_modal_dados_cliente(
+        self, page, sol: SolicitacaoSimulacao, espera_s: float = 20
+    ) -> None:
         """Modal 'Precisamos de mais informações' (13/09/2026, sim 340423aa):
         o portal passou a exigir Data de Nascimento + Sexo após o Avançar dos
-        dados do cliente. Sonda barata; ausente = segue como antes."""
-        try:
-            if (
-                page.get_by_text(
-                    re.compile(r"Precisamos de mais informa", re.I)
-                ).count()
-                == 0
-            ):
-                return
-        except Exception:
+        dados do cliente. Sonda barata; ausente = segue como antes.
+
+        O portal demora segundos para responder ao Avançar: sondar uma vez só
+        perde o modal, o driver marcha na tela errada (tudo engolido por
+        try/except) e morre minutos depois no Avançar de valores com
+        TimeoutError genérico (sims 8f20054a/b355006f). Por isso espera até
+        `espera_s` pelo modal OU pela navegação (campo de UF/placa/valor).
+        """
+        modal = False
+        prazo_fim = time.monotonic() + max(0, espera_s)
+        while time.monotonic() < prazo_fim:
+            try:
+                if (
+                    page.get_by_text(
+                        re.compile(r"Precisamos de mais informa", re.I)
+                    ).count()
+                    > 0
+                ):
+                    modal = True
+                    break
+            except Exception:
+                pass
+            try:
+                if (
+                    page.get_by_role(
+                        "textbox",
+                        name=re.compile(r"UF|Placa|Valor do ve", re.I),
+                    ).count()
+                    > 0
+                ):
+                    break
+            except Exception:
+                pass
+            page.wait_for_timeout(500)
+        if not modal:
             return
         nasc = _formatar_nascimento_br(sol.pessoa.nascimento)
         try:
