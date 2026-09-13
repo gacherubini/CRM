@@ -29,6 +29,11 @@
 </form>
 <p class="mono-label">Período de {{ formatar_data(periodo.inicio) }} a {{ formatar_data(periodo.fim) }}</p>
 
+{# Distribuição enxuta: 2 colunas no largo (resultado+funil | aquisição+campanhas).
+   Mesmos números, estados, links e textos — só o grid. #}
+<div class="res-grid">
+<div class="res-col">
+
 {# --- Vendas / resultado --- #}
 {# Direção "balanço" (Task 7): resumo em frase-manifesto + índice em linhas,
    no vocabulário do Estoque "pátio". Mesmos números, estados e textos. #}
@@ -37,7 +42,7 @@
   <div class="panel-heading">
     <div><span class="mono-label">Resultado</span><h2 id="bloco-resultado">Receita e vendas</h2></div>
   </div>
-  <div class="empty">
+  <div class="empty empty-compacto">
     <strong>Nenhuma venda confirmada no período.</strong>
     <p>Quando houver vendas confirmadas, os totais reais aparecem aqui.</p>
   </div>
@@ -77,11 +82,11 @@
     <div><span class="mono-label">Funil</span><h2 id="bloco-funil">Leads e conversão</h2></div>
   </div>
   {% if overview.funil_status == 'erro' %}
-  <div class="empty"><strong>Funil indisponível.</strong><p>Não foi possível agregar os eventos do período.</p></div>
+  <div class="empty empty-compacto"><strong>Funil indisponível.</strong><p>Não foi possível agregar os eventos do período.</p></div>
   {% elif overview.funil_status == 'indisponivel' %}
-  <div class="empty"><strong>Funil indisponível.</strong><p>Sem base de eventos para este escopo.</p></div>
+  <div class="empty empty-compacto"><strong>Funil indisponível.</strong><p>Sem base de eventos para este escopo.</p></div>
   {% elif overview.funil_status == 'vazio' and not overview.leads_count %}
-  <div class="empty"><strong>Nenhum lead no período.</strong><p>Novos contatos aparecem aqui assim que entrarem no funil.</p></div>
+  <div class="empty empty-compacto"><strong>Nenhum lead no período.</strong><p>Novos contatos aparecem aqui assim que entrarem no funil.</p></div>
   {% else %}
   <div class="panel-body res">
     <ol class="res-flow">
@@ -111,16 +116,18 @@
   </div>
   {% endif %}
 </section>
+</div>
 
 {# --- Aquisição (dono/gerente) --- #}
 {% if pode_ver_aquisicao %}
+<div class="res-col">
 <section class="panel" aria-labelledby="bloco-aquisicao">
   <div class="panel-heading">
     <div><span class="mono-label">Aquisição</span><h2 id="bloco-aquisicao">Investimento e retorno</h2></div>
   </div>
   {% set aq = overview.aquisicao %}
   {% if not aq or overview.aquisicao_status == 'indisponivel' %}
-  <div class="empty">
+  <div class="empty empty-compacto">
     <strong>Aquisição indisponível.</strong>
     <p>{{ (aq.mensagem if aq and aq.mensagem else 'Sem dados de mídia confiáveis no período.') }} Google Ads permanece indisponível — não contamos como zero.</p>
   </div>
@@ -249,7 +256,9 @@
   {% endif %}
 </section>
 {% endif %}
+</div>
 {% endif %}
+</div>
 
 {# Pendências/"Ações do período" saiu daqui em 2026-08-16 por decisão do dono:
    o que precisa de atenção vive no sino do Copiloto, não numa segunda lista. #}

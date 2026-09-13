@@ -326,3 +326,18 @@ def test_fila_nao_acende_junto_com_numeros_de_whatsapp():
     assert nav_item_is_active(numeros, "/app/loja/whatsapp/fila") is False
     assert nav_item_is_active(fila, "/app/loja/whatsapp/fila") is True
     assert nav_item_is_active(fila, "/app/loja/whatsapp") is False
+
+
+def test_shell_nav_clara_busca_recolher_e_grupos(client, monkeypatch):
+    """Navbar Clara: busca, recolher persistido e seções em grupo."""
+    monkeypatch.setenv("REVY_LOJA_SHELL_ENABLED", "1")
+    monkeypatch.setenv("REVY_LOJA_ENTITLEMENTS_ENABLED", "0")
+    login(client)
+    r = client.get("/app")
+    assert r.status_code == 200
+    assert 'id="nav-filter"' in r.text
+    assert 'id="nav-collapse"' in r.text
+    assert 'class="nav-group"' in r.text
+    assert 'data-section="Ajustes"' in r.text
+    assert "revy-nav-collapsed" in r.text
+    assert 'title="Atendimento"' in r.text

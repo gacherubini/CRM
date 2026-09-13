@@ -1,6 +1,8 @@
 ﻿{% extends "base.html" %}
 {% block title %}Acessos dos bancos — Revy{% endblock %}
 {% block content %}
+{# Estilos: .fin-* em app.css. Lista corrida + edição em popup (<dialog>):
+   o form nunca mora na linha da tabela, então nada estoura ao abrir. #}
 <div class="page-heading">
   <div>
     <span class="eyebrow">Administração</span>
@@ -12,13 +14,9 @@
 {% if ok == 'salvo' %}
 <div class="alert success">Credencial de <strong>{{ provedor_ok or 'provedor' }}</strong> salva. Configurado agora — a senha não é exibida.</div>
 {% endif %}
-{% if teste %}
-<div class="alert success">Teste de login em <strong>{{ provedor_ok or 'provedor' }}</strong>: {{ teste }}{% if teste == 'placeholder' %} (driver real ainda em evolução no Motor){% endif %}.</div>
-{% endif %}
 {% if erro_query == 'csrf' %}<div class="alert error">Sessão expirada. Recarregue a página e tente de novo.</div>{% endif %}
 {% if erro_query == 'campos' %}<div class="alert error">Informe usuário e senha para salvar a credencial{% if provedor_ok %} de {{ provedor_ok }}{% endif %}.</div>{% endif %}
 {% if erro_query == 'motor' %}<div class="alert error">Não foi possível falar com o Motor de Simulação. Tente mais tarde.</div>{% endif %}
-{% if erro_query == 'sem_credencial' %}<div class="alert warning">Não há credencial configurada{% if provedor_ok %} para {{ provedor_ok }}{% endif %} para testar.</div>{% endif %}
 {% if integracao_erro %}<div class="alert warning">{{ integracao_erro }}</div>{% endif %}
 
 {% if motor_configurado and credenciais %}
@@ -27,11 +25,11 @@
     <table>
       <thead>
         <tr>
-          <th>Financeira</th>
-          <th>Modo</th>
-          <th>Status</th>
-          <th>Última atualização</th>
-          <th>Saúde do login</th>
+          <th scope="col">Financeira</th>
+          <th scope="col">Modo</th>
+          <th scope="col">Status</th>
+          <th scope="col">Última atualização</th>
+          <th scope="col">Saúde do login</th>
           <th><span class="sr-only">Ações</span></th>
         </tr>
       </thead>
@@ -42,14 +40,14 @@
             <strong>{{ c.rotulo or c.provedor }}</strong>
             {% if c.usuario %}<small class="muted">Usuário: {{ c.usuario }}</small>{% endif %}
           </td>
-          <td><span class="status-chip muted">{{ c.modo or '—' }}</span></td>
+          <td><span class="canal-badge">{{ c.modo or '—' }}</span></td>
           <td>
             {% if c.senha_configurada %}
-              <span class="status disponivel">Configurado</span>
+              <span class="status conectado">Configurado</span>
               {% if c.senha_mascara %}<span class="muted">{{ c.senha_mascara }}</span>{% endif %}
               {% if c.senha_antiga %}<span class="status reservado">Senha antiga (&gt;14 dias)</span>{% endif %}
             {% else %}
-              <span class="muted">Não configurado</span>
+              <span class="status pendente">Não configurado</span>
             {% endif %}
           </td>
           <td class="muted">
@@ -58,48 +56,16 @@
             {% else %}—{% endif %}
           </td>
           <td>
-            {% if c.ultimo_sucesso_em %}
-              <span class="published">OK {{ formatar_horario(c.ultimo_sucesso_em) }}</span>
-            {% endif %}
             {% if c.ultimo_erro_sanitizado %}
-              <span class="status indisponivel">{{ c.ultimo_erro_sanitizado }}</span>
-            {% endif %}
-            {% if c.falhas_login and c.falhas_login > 0 %}
-              <small class="muted">{{ c.falhas_login }} falha(s)</small>
-            {% endif %}
-            {% if not c.ultimo_sucesso_em and not c.ultimo_erro_sanitizado %}
-              <span class="muted">—</span>
+              <span class="integ-pill err"><span class="integ-dot"></span>{{ c.ultimo_erro_sanitizado }}{% if c.falhas_login and c.falhas_login > 0 %} · {{ c.falhas_login }} falha(s){% endif %}</span>
+            {% elif c.ultimo_sucesso_em %}
+              <span class="integ-pill ok"><span class="integ-dot"></span>Login OK · {{ formatar_horario(c.ultimo_sucesso_em) }}</span>
+            {% else %}
+              <span class="integ-pill off"><span class="integ-dot"></span>Sem sinal ainda</span>
             {% endif %}
           </td>
-          <td>
-            <details class="cred-form">
-              <summary class="table-action">Atualizar acesso</summary>
-              <form method="post" action="/app/financeiras/{{ c.provedor }}" class="stack-form" autocomplete="off">
-                <input type="hidden" name="csrf" value="{{ csrf }}">
-                {% if c.campos_credencial %}
-                  {% for campo in c.campos_credencial %}
-                  <label>{{ campo.rotulo }}
-                    <input type="{{ 'password' if campo.secreto else 'text' }}" name="campo__{{ campo.nome }}" value="" placeholder="{{ '••••••••' if campo.secreto else campo.rotulo }}" required autocomplete="off">
-                  </label>
-                  {% endfor %}
-                {% else %}
-                  <label>Usuário do portal
-                    <input type="text" name="usuario" value="" placeholder="{% if c.usuario %}atual: {{ c.usuario }}{% else %}usuário{% endif %}" required autocomplete="off">
-                  </label>
-                  <label>Senha do portal
-                    <input type="password" name="senha" value="" placeholder="••••••••" required autocomplete="new-password">
-                  </label>
-                {% endif %}
-                <p class="muted" style="font-size:11px;margin:0">Os segredos atuais nunca são exibidos. Informe todos os campos para cadastrar ou rotacionar o acesso.</p>
-                <button class="button primary" type="submit">Salvar</button>
-              </form>
-              {% if c.senha_configurada %}
-              <form method="post" action="/app/financeiras/{{ c.provedor }}/testar" style="margin-top:10px">
-                <input type="hidden" name="csrf" value="{{ csrf }}">
-                <button class="button secondary" type="submit">Testar login</button>
-              </form>
-              {% endif %}
-            </details>
+          <td class="fin-acoes-col">
+            <button class="button secondary table-action-btn" type="button" data-dialog="dlg-{{ c.provedor }}">Atualizar acesso</button>
           </td>
         </tr>
         {% endfor %}
@@ -107,6 +73,61 @@
     </table>
   </div>
 </section>
+
+{% for c in credenciais %}
+<dialog class="fin-dialog" id="dlg-{{ c.provedor }}" aria-labelledby="dlg-titulo-{{ c.provedor }}">
+  <div class="fin-dialog-head">
+    <div>
+      <span class="status {{ 'conectado' if c.senha_configurada else 'pendente' }}">{{ 'Configurado' if c.senha_configurada else 'Não configurado' }}</span>
+      <h2 id="dlg-titulo-{{ c.provedor }}">{{ c.rotulo or c.provedor }}</h2>
+    </div>
+    <button type="button" class="fin-x" data-close aria-label="Fechar">×</button>
+  </div>
+  <dl class="fin-meta">
+    <div><dt>Usuário no portal</dt><dd>{{ c.usuario or '—' }}</dd></div>
+    <div><dt>Modo</dt><dd><span class="canal-badge">{{ c.modo or '—' }}</span></dd></div>
+    <div><dt>Última atualização</dt><dd>{% if c.atualizado_em %}{{ formatar_horario(c.atualizado_em) }}{% else %}—{% endif %}</dd></div>
+  </dl>
+  {% if c.senha_antiga %}<div class="alert warning">Senha antiga (mais de 14 dias). Rotacione abaixo para não travar a simulação.</div>{% endif %}
+  <form method="post" action="/app/financeiras/{{ c.provedor }}" class="form-layout" autocomplete="off">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    {% if c.campos_credencial %}
+      {% for campo in c.campos_credencial %}
+      <label>{{ campo.rotulo }}
+        <input type="{{ 'password' if campo.secreto else 'text' }}" name="campo__{{ campo.nome }}" value="" placeholder="{{ '••••••••' if campo.secreto else campo.rotulo }}" required autocomplete="off">
+      </label>
+      {% endfor %}
+    {% else %}
+    <label>Usuário do portal
+      <input type="text" name="usuario" value="" placeholder="{% if c.usuario %}atual: {{ c.usuario }}{% else %}usuário{% endif %}" required autocomplete="off">
+    </label>
+    <label>Senha do portal
+      <input type="password" name="senha" value="" placeholder="••••••••" required autocomplete="new-password">
+    </label>
+    {% endif %}
+    <p class="muted">Os segredos atuais nunca são exibidos. Informe todos os campos para cadastrar ou rotacionar o acesso.</p>
+    <div class="fin-acoes">
+      <button class="button ghost" type="button" data-close>Cancelar</button>
+      <button class="button primary" type="submit">Salvar acesso</button>
+    </div>
+  </form>
+</dialog>
+{% endfor %}
+<script>
+  (function () {
+    document.querySelectorAll("[data-dialog]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var dlg = document.getElementById(btn.dataset.dialog);
+        if (dlg && dlg.showModal) dlg.showModal();
+      });
+    });
+    document.querySelectorAll(".fin-dialog").forEach(function (dlg) {
+      dlg.addEventListener("click", function (e) {
+        if (e.target === dlg || e.target.closest("[data-close]")) dlg.close();
+      });
+    });
+  })();
+</script>
 {% elif motor_configurado and not integracao_erro %}
 <section class="panel">
   <div class="empty">

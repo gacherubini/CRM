@@ -135,7 +135,8 @@ button, .button, a { -webkit-tap-highlight-color: transparent; }
   margin: 14px 12px 4px;
   color: var(--ink-muted);
   font-size: var(--text-xs);
-  font-weight: 500;
+  font-weight: 700;
+  letter-spacing: .08em;
 }
 
 .sidebar-footer {
@@ -2359,8 +2360,8 @@ tr.roi-sem-campanha td { color: var(--ink-soft); }
 }
 /* Hover tambem no item ativo (mesmo padrao visual dos demais) */
 .nav-link.active:hover {
-  background: var(--surface-soft);
-  color: var(--ink);
+  background: var(--brand-strong);
+  color: var(--brand-ink);
 }
 
 /* Icones na navegacao lateral — todos os itens (incl. Veículos) herdam currentColor */
@@ -2375,6 +2376,41 @@ tr.roi-sem-campanha td { color: var(--ink-soft); }
 .nav-link:hover svg { opacity: 1; color: inherit; }
 .nav-link.active svg { color: var(--brand); opacity: 1; }
 .nav-link.active:hover svg { color: var(--brand); opacity: 1; }
+.nav { display: flex; flex-direction: column; gap: 2px; flex: 1 1 auto; min-height: 0; }
+.nav-group { display: flex; flex-direction: column; gap: 2px; }
+.nav-group[data-section="Ajustes"] { margin-top: auto; }
+.nav-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nav-search { padding: 10px 12px 2px; }
+#nav-filter { width: 100%; padding: 8px 10px; border: 1px solid var(--line); border-radius: var(--radius-ctl); background: var(--surface); color: var(--ink); font-size: 13px; }
+#nav-filter::placeholder { color: var(--ink-muted); }
+.nav-link[hidden], .nav-group[hidden], .nav-section[hidden] { display: none; }
+.nav-link.active { background: var(--brand); color: var(--brand-ink); border-color: transparent; font-weight: 600; }
+/* No escuro a regra antiga [data-theme="dark"] .nav-link.active tem
+   especificidade maior (atributo + 2 classes) e pintava o texto da mesma cor
+   do fundo — por isso o html[data-theme] aqui para vencer dela. */
+html[data-theme="dark"] .nav-link.active { background: var(--brand); color: var(--brand-ink); border-color: transparent; }
+.nav-link.active::before { display: none; }
+.nav-link.active svg { color: inherit; }
+.nav-link.active:hover svg { color: inherit; }
+.nav-collapse { margin-left: auto; border: 1px solid var(--line); background: transparent; color: var(--ink-soft); border-radius: var(--radius-ctl); font-size: 13px; font-weight: 700; padding: 3px 9px; cursor: pointer; }
+.nav-collapse:hover { background: var(--surface-soft); color: var(--ink); }
+@media (min-width: 861px) {
+  .nav-collapsed .app-shell { grid-template-columns: 76px minmax(0, 1fr); }
+  .nav-collapsed .sidebar { padding: 0 8px 14px; overflow-x: hidden; }
+  .nav-collapsed .sidebar-brand-row { justify-content: center; padding: 0; }
+  .nav-collapsed .brand { justify-content: center; }
+  .nav-collapsed .brand > span:last-child { display: none; }
+  .nav-collapsed .nav-collapse { margin-left: 0; }
+  .nav-collapsed .nav-search, .nav-collapsed .nav-section, .nav-collapsed .nav-label, .nav-collapsed .nav-loja-switch, .nav-collapsed .sidebar-assinatura, .nav-collapsed .theme-toggle-label { display: none; }
+  .nav-collapsed .nav-link { justify-content: center; padding: 0; margin: 2px 6px; min-height: 40px; font-size: 0; gap: 0; }
+  .nav-collapsed .nav-link svg { width: 20px; height: 20px; }
+  .nav-collapsed .sidebar-footer { flex-direction: column; align-items: center; }
+  /* Marca menor no trilho: o R de 27px brigava com os ícones de 20px. */
+  .nav-collapsed .brand-mark svg { height: 18px; }
+}
+@media (max-width: 860px) {
+  .nav-collapse { display: none; }
+}
 
 /* Aba do Control ativa: sublinhado na cor da marca */
 .control-tab.is-active { color: var(--brand); box-shadow: inset 0 -2px 0 var(--brand); }
@@ -2434,13 +2470,27 @@ tr.roi-sem-campanha td { color: var(--ink-soft); }
   gap: 8px;
   justify-items: center;
 }
+/* Estado vazio B sem textinho (dono, 09/2026): sem a caixinha em tudo — só
+   bolinha + frase. O parágrafo de apoio some, exceto em .large (erro e módulo
+   futuro: ali o texto É o conteúdo) e .empty-frase (que já é só frase).
+   Botões de ação continuam sempre visíveis. */
 .empty::before {
+  content: none;
+}
+.empty:not(.large):not(.empty-frase) p { display: none; }
+.empty:not(.large):not(.empty-frase) strong {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+.empty:not(.large):not(.empty-frase) strong::before {
   content: "";
-  width: 40px; height: 40px;
+  width: 9px;
+  height: 9px;
+  flex: none;
+  border-radius: 50%;
   background: var(--brand);
-  opacity: .9;
-  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M22 12h-6l-2 3h-4l-2-3H2'/%3E%3Cpath d='M5.5 5.5 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.5-6.5A2 2 0 0 0 16.8 4H7.2a2 2 0 0 0-1.7 1.5Z'/%3E%3C/svg%3E") center / contain no-repeat;
-  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M22 12h-6l-2 3h-4l-2-3H2'/%3E%3Cpath d='M5.5 5.5 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.5-6.5A2 2 0 0 0 16.8 4H7.2a2 2 0 0 0-1.7 1.5Z'/%3E%3C/svg%3E") center / contain no-repeat;
 }
 .empty strong { font-size: 15px; font-weight: 600; }
 .empty p {
@@ -4104,6 +4154,25 @@ a.metric-link:focus-visible { outline: 2px solid var(--brand); outline-offset: 2
   font-size: var(--text-sm);
 }
 .wx-vazio strong { color: var(--ink); }
+/* Acessos dos bancos: lista corrida + popup de edição (<dialog> nativo: Esc,
+   clique no fundo e foco presos vêm de graça). O form nunca mora na tabela,
+   então a linha não estoura — o bug do print. Só tokens, sem :root. */
+.fin-acoes-col { text-align: right; white-space: nowrap; }
+.fin-dialog { border: 1px solid var(--line); border-radius: var(--radius-srf); background: var(--surface); color: var(--ink); padding: 0; width: min(560px, 92vw); box-shadow: var(--shadow); }
+.fin-dialog::backdrop { background: rgba(10, 10, 10, .55); }
+.fin-dialog-head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-3); padding: var(--space-5) var(--space-5) 0; }
+.fin-dialog-head h2 { margin: var(--space-1) 0 0; font-size: var(--text-lg); overflow-wrap: anywhere; }
+.fin-x { border: 0; background: transparent; color: var(--ink-soft); font-size: 22px; line-height: 1; padding: 4px 8px; cursor: pointer; }
+.fin-x:hover { color: var(--ink); }
+.fin-meta { margin: var(--space-3) 0 0; padding: 0 var(--space-5); display: grid; gap: var(--space-2); }
+.fin-meta > div { display: grid; grid-template-columns: 140px minmax(0, 1fr); gap: var(--space-2); align-items: baseline; }
+.fin-meta dt { color: var(--ink-muted); font-size: var(--text-xs); font-weight: 600; }
+.fin-meta dd { margin: 0; color: var(--ink); font-size: var(--text-sm); overflow-wrap: anywhere; }
+.fin-meta dd small { display: block; }
+.fin-dialog .alert { margin: var(--space-3) var(--space-5) 0; }
+.fin-dialog .form-layout { padding: 0 var(--space-5) var(--space-5); margin-top: var(--space-4); }
+.fin-acoes { display: flex; justify-content: flex-end; gap: var(--space-2); }
+@media (max-width: 640px) { .fin-meta > div { grid-template-columns: 1fr; gap: 2px; } }
 
 /* QR: o codigo e o passo a passo lado a lado. Sozinho no meio do painel, o
    dono nao sabia em qual celular ler. */
@@ -4714,6 +4783,24 @@ a.metric-link:focus-visible { outline: 2px solid var(--brand); outline-offset: 2
   .res-flow li + li { padding-left: 0; padding-top: var(--space-4); }
   .res-flow li + li::before { left: 4px; top: 2px; transform: rotate(135deg); }
 }
+
+/* Resultado enxuto (dono, 09/2026): os painéis liam gigantes porque cada bloco
+   era full-width + vazios de 48px + lede de até 2.75rem. Distribuição em 2
+   colunas no largo (resultado+funil | aquisição+campanhas), vazios compactos e
+   números menores. Mesmos números, estados, links e textos — só densidade.
+   Sem :root novo; sem max-width no conteúdo (decisão 11/09: o shell enche a tela). */
+.res-grid { display: grid; gap: var(--space-4); align-items: start; }
+.res-col { display: grid; gap: var(--space-4); align-content: start; min-width: 0; }
+@media (min-width: 1100px) {
+  .res-grid { grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); }
+}
+/* Modificador do .empty global: o ícone de 40px segue nas outras 30+ telas. */
+.empty-compacto { padding: 28px 20px; }
+.empty-compacto::before { width: 28px; height: 28px; }
+.res-lede { margin-top: var(--space-3); font-size: clamp(1.375rem, 2.5vw, 1.875rem); }
+.res-index li { padding-top: var(--space-2); padding-bottom: var(--space-2); }
+.res-flow { margin-top: var(--space-3); }
+.res-flow strong { font-size: var(--text-lg); }
 
 /* Date-picker próprio do período (resultado_periodo.js): Resultado + filtros
    legados com o par inicio/fim. Só existe com JS: sem ele os
@@ -5440,4 +5527,99 @@ form[data-periodo-melhorado] { position: relative; }
 
 @media (prefers-reduced-motion: reduce) {
   .sim-pulse { animation: none; }
+}
+
+/* ---------------------------------------------------------------------------
+   Avatar da pessoa (Perfil / topbar / Equipe)
+   A inicial fica atrás; a <img> (foto ou bichinho, via /foto/{id}) cobre a
+   célula e sai sozinha por onerror quando não há imagem (404) — mesma
+   técnica de .vehicle-photo. Somente tokens existentes, sem :root novo.
+   --------------------------------------------------------------------------- */
+.avatar { position: relative; overflow: hidden; }
+.avatar img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.avatar-xs { width: 28px; height: 28px; font-size: 11px; flex-shrink: 0; }
+.membro-cell { display: flex; align-items: center; gap: var(--space-3); }
+.perfil-conta-topo { display: flex; align-items: center; gap: var(--space-4); }
+.perfil-foto { width: 72px; height: 72px; font-size: 24px; flex-shrink: 0; }
+.perfil-conta-ident { display: grid; gap: 2px; min-width: 0; }
+.perfil-conta-ident strong { font-size: var(--text-lg); letter-spacing: -.02em; }
+.avatar-grade {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+.avatar-opcao {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-1);
+  padding: var(--space-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-srf);
+  background: var(--surface);
+  color: var(--ink-soft);
+  font-size: var(--text-xs);
+  text-align: center;
+  cursor: pointer;
+}
+.avatar-opcao:hover { border-color: var(--line-strong); }
+.avatar-opcao:has(input:checked) { border-color: var(--ink); color: var(--ink); }
+.avatar-opcao input { margin: 0; accent-color: var(--ink); }
+.avatar-grade-thumb {
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-nav);
+  background: var(--surface-soft);
+  color: var(--ink-soft);
+  font-weight: 600;
+}
+.avatar-grade-thumb svg { width: 36px; height: 36px; }
+.avatar-opcao-rotulo { font-weight: 600; }
+.perfil-foto-form input[type="file"] { padding: var(--space-2) var(--space-3); }
+
+/* ---------------------------------------------------------------------------
+   Perfil: galeria 4 colunas + topo compacto + upload enxuto.
+   A arte de cada tile carrega o próprio fundo vívido (hex no SVG); aqui só
+   chrome com tokens existentes: bordas, anel de seleção e espaçamentos.
+   --------------------------------------------------------------------------- */
+.perfil-conta-topo { gap: var(--space-3); }
+.perfil-foto { width: 56px; height: 56px; font-size: 20px; }
+.avatar-grade { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.avatar-opcao { padding: var(--space-1); }
+.avatar-opcao:has(input:checked) {
+  border-color: var(--ink);
+  color: var(--ink);
+  box-shadow: 0 0 0 1px var(--surface), 0 0 0 3px var(--ink);
+}
+.avatar-opcao:has(input:focus-visible) { outline: 2px solid var(--ink); outline-offset: 2px; }
+.avatar-grade-thumb {
+  width: 100%;
+  max-width: 64px;
+  height: auto;
+  aspect-ratio: 1 / 1;
+  margin-inline: auto;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font-size: var(--text-lg);
+}
+.avatar-grade-thumb svg { width: 100%; height: 100%; display: block; border-radius: var(--radius-nav); }
+.perfil-foto-rotulo { display: grid; gap: 2px; font-weight: 600; }
+.perfil-foto-rotulo small { font-weight: 400; color: var(--ink-soft); }
+.perfil-foto-linha { display: flex; gap: var(--space-2); align-items: center; }
+.perfil-foto-linha input[type="file"] { flex: 1 1 auto; min-width: 0; }
+.perfil-foto-linha .button { flex-shrink: 0; }
+@media (max-width: 520px) {
+  .avatar-grade { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .perfil-foto-linha { flex-wrap: wrap; }
 }

@@ -22,6 +22,15 @@
       </div>
     </div>
     <div class="panel-body">
+      <div class="perfil-conta-topo">
+        {# Mesma técnica de estoque/lista.html: a inicial fica atrás e a <img>
+           sai sozinha (onerror) quando não há foto nem bichinho (404). #}
+        <span class="avatar perfil-foto" aria-hidden="true">{{ usuario.nome[:1] | upper }}<img src="/app/loja/perfil/foto/{{ usuario.id }}" alt="" loading="lazy" decoding="async" onerror="this.remove()"></span>
+        <div class="perfil-conta-ident">
+          <strong>{{ usuario.nome }}</strong>
+          <span class="muted">{{ papel_rotulo }} · {{ usuario.loja_slug }}</span>
+        </div>
+      </div>
       <dl class="meta-list">
         <dt>Nome</dt>
         <dd>{{ usuario.nome }}</dd>
@@ -32,6 +41,39 @@
         <dt>Loja</dt>
         <dd>{{ usuario.loja_slug }}</dd>
       </dl>
+      <form method="post" action="/app/loja/perfil/foto" enctype="multipart/form-data" class="stack-form perfil-foto-form">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <label class="perfil-foto-rotulo" for="perfil-foto-arquivo">Foto de perfil
+          <small>JPG, PNG ou WEBP de até 2 MB. A foto substitui o bichinho.</small>
+        </label>
+        <div class="perfil-foto-linha">
+          <input id="perfil-foto-arquivo" type="file" name="foto" accept="image/jpeg,image/png,image/webp" required>
+          <button class="button secondary" type="submit">Enviar foto</button>
+        </div>
+      </form>
+      <form method="post" action="/app/loja/perfil/avatar" class="stack-form perfil-avatar-form">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <fieldset class="perfil-avatar-fieldset">
+          <legend>Escolha um avatar</legend>
+          <div class="avatar-grade">
+            <label class="avatar-opcao">
+              <input type="radio" name="avatar_key" value="" {% if not avatar_atual and not tem_foto %}checked{% endif %}>
+              <span class="avatar avatar-grade-thumb" aria-hidden="true">{{ usuario.nome[:1] | upper }}</span>
+              <span class="avatar-opcao-rotulo">Inicial</span>
+            </label>
+            {% for avatar in avatares %}
+            <label class="avatar-opcao">
+              <input type="radio" name="avatar_key" value="{{ avatar.key }}" {% if avatar_atual == avatar.key %}checked{% endif %}>
+              <span class="avatar-grade-thumb" aria-hidden="true">{{ avatar.svg | safe }}</span>
+              <span class="avatar-opcao-rotulo">{{ avatar.rotulo }}</span>
+            </label>
+            {% endfor %}
+          </div>
+        </fieldset>
+        <div class="form-actions">
+          <button class="button secondary" type="submit">Salvar avatar</button>
+        </div>
+      </form>
     </div>
   </section>
 
@@ -57,7 +99,9 @@
         <label>Confirmar nova senha
           <input type="password" name="senha_confirmacao" minlength="12" maxlength="256" autocomplete="new-password" required>
         </label>
-        <button class="button primary" type="submit">Salvar senha</button>
+        <div class="form-actions">
+          <button class="button primary" type="submit">Salvar senha</button>
+        </div>
       </form>
     </div>
   </section>

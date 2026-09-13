@@ -41,7 +41,7 @@
     <tbody>
       {% for membro in membros %}
       <tr>
-        <td><div class="cell-stack"><strong>{{ membro.nome }}{% if membro.id == usuario.id %} <span class="muted">(você)</span>{% endif %}</strong>{% if not equipe_somente_leitura %}<small>{{ membro.email }}</small>{% endif %}</div></td>
+        <td><div class="membro-cell"><span class="avatar avatar-xs" aria-hidden="true">{{ membro.nome[:1] | upper }}<img src="/app/loja/perfil/foto/{{ membro.id }}" alt="" loading="lazy" decoding="async" onerror="this.remove()"></span><div class="cell-stack"><strong>{{ membro.nome }}{% if membro.id == usuario.id %} <span class="muted">(você)</span>{% endif %}</strong>{% if not equipe_somente_leitura %}<small>{{ membro.email }}</small>{% endif %}</div></div></td>
         <td><span class="status">{{ papeis_rotulo.get(membro.papel, membro.papel) }}</span></td>
         <td><span class="status {{ 'disponivel' if membro.ativo else 'indisponivel' }}">{{ 'Ativo' if membro.ativo else 'Inativo' }}</span></td>
         {% if not equipe_somente_leitura %}

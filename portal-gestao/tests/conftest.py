@@ -35,7 +35,7 @@ from app.clients.estoque import (  # noqa: E402
     EstoqueIndisponivel,
     VeiculoNaoEncontrado,
 )
-from app.clients.motor import CredencialNaoEncontrada, MotorIndisponivel  # noqa: E402
+from app.clients.motor import MotorIndisponivel  # noqa: E402
 from app.db import Base, SessionLocal, engine  # noqa: E402
 from app.loja.copiloto import notificacoes as copiloto_notificacoes  # noqa: E402
 from app.loja.copiloto.cache import cache_overview  # noqa: E402
@@ -509,7 +509,6 @@ class MotorFake:
         self._configurado = configurado
         self.indisponivel = False
         self.upserts = []
-        self.testes = []
         self.atores = []
         self.credenciais = [
             {
@@ -680,20 +679,6 @@ class MotorFake:
         }
         self.credenciais.append(novo)
         return dict(novo)
-
-    def testar_login(self, nome, ator):
-        if self.indisponivel:
-            raise MotorIndisponivel("Não foi possível acessar o Motor de Simulação agora")
-        self.testes.append({"nome": nome, "ator": ator})
-        self.atores.append(("testar", ator))
-        for item in self.credenciais:
-            if item["provedor"].lower() == nome.lower() and item.get("senha_configurada"):
-                return {
-                    "provedor": nome,
-                    "status": "placeholder",
-                    "detalhe": "Teste real de login disponível a partir do driver da Task 12.",
-                }
-        raise CredencialNaoEncontrada("credencial não configurada")
 
     def criar_simulacao(self, payload, ator=None, idempotency_key=None):
         if self.indisponivel:

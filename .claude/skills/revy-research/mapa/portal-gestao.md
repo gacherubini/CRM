@@ -1,7 +1,7 @@
-# portal-gestao · 177 rotas · 26 modelos · 6 workers · 35 flags · 26 migrations · 63 templates
+# portal-gestao · 179 rotas · 26 modelos · 6 workers · 35 flags · 27 migrations · 63 templates
 
-Gerado de `d29cd44`. NAO editar a mao — saida de `gerar_mapa.py`.
-Migration head: `0026_copiloto_sinal_destinatario`
+Gerado de `3843a5c`. NAO editar a mao — saida de `gerar_mapa.py`.
+Migration head: `0027_perfil_avatar_foto`
 
 ## Rotas
 
@@ -53,9 +53,8 @@ Migration head: `0026_copiloto_sinal_destinatario`
 - `GET /app/funil/dados` — app/main.py:2222
 - `GET /app/financeiro` — app/main.py:2259
 - `GET /app/financeiras` — app/main.py:2336
-- `POST /app/financeiras/{nome}` — app/main.py:2393
-- `POST /app/financeiras/{nome}/testar` — app/main.py:2496
-- `GET /app/configuracoes` — app/main.py:2607
+- `POST /app/financeiras/{nome}` — app/main.py:2392
+- `GET /app/configuracoes` — app/main.py:2506
 - `GET /app/relatorios` — app/relatorios.py:66
 - `GET /app/relatorios/vendas.csv` — app/relatorios.py:112
 - `GET /app/relatorios/metas.csv` — app/relatorios.py:157
@@ -98,8 +97,11 @@ Migration head: `0026_copiloto_sinal_destinatario`
 - `POST /app/loja/financeiro/despesas/{despesa_id}/encerrar` — app/web/loja_financeiro.py:263
 - `GET /app/loja/integracoes` — app/web/loja_integracoes.py:38
 - `GET /app/loja/integracoes/health` — app/web/loja_integracoes.py:54
-- `GET /app/loja/perfil` — app/web/loja_perfil.py:82
-- `POST /app/loja/perfil/senha` — app/web/loja_perfil.py:90
+- `GET /app/loja/perfil` — app/web/loja_perfil.py:258
+- `POST /app/loja/perfil/senha` — app/web/loja_perfil.py:266
+- `POST /app/loja/perfil/avatar` — app/web/loja_perfil.py:300
+- `POST /app/loja/perfil/foto` — app/web/loja_perfil.py:340
+- `GET /app/loja/perfil/foto/{usuario_id}` — app/web/loja_perfil.py:381
 - `POST /app/loja/selecionar` — app/web/loja_shell.py:378
 - `GET /app/loja/vendas` — app/web/loja_vendas.py:126
 - `GET /app/loja/vendas/dados` — app/web/loja_vendas.py:162
@@ -185,32 +187,32 @@ Migration head: `0026_copiloto_sinal_destinatario`
 
 ## Modelos
 
-- `usuarios` — app/models.py:44
-- `convites_acesso_loja` — app/models.py:57
-- `redefinicoes_senha` — app/models.py:74
-- `loja_operacional_projecao` — app/models.py:96
-- `vendas` — app/models.py:109
-- `venda_custos_diretos` — app/models.py:143
-- `despesa_fixa_loja` — app/models.py:168
-- `despesa_fixa_ajuste` — app/models.py:191
-- `metas` — app/models.py:210
-- `atendimento_atribuicoes` — app/models.py:224
-- `loja_operacao_auditoria` — app/models.py:242
-- `copiloto_acao` — app/models.py:298
-- `funil_eventos` — app/models.py:334
-- `meta_pixel_config` — app/models.py:375
-- `meta_ads_config` — app/models.py:393
-- `pixel_capi_auditoria` — app/models.py:411
-- `meta_capi_outbox` — app/models.py:441
-- `revy_trafego_event_outbox` — app/models.py:461
-- `campanhas` — app/models.py:482
-- `campanha_gastos` — app/models.py:512
-- `pessoa_revy_projetada` — app/models.py:534
-- `vinculo_loja_pessoa` — app/models.py:548
-- `copiloto_sinal` — app/models.py:603
-- `copiloto_sinal_visto` — app/models.py:674
-- `copiloto_conversa` — app/models.py:699
-- `copiloto_turno` — app/models.py:734
+- `usuarios` — app/models.py:45
+- `convites_acesso_loja` — app/models.py:64
+- `redefinicoes_senha` — app/models.py:81
+- `loja_operacional_projecao` — app/models.py:103
+- `vendas` — app/models.py:116
+- `venda_custos_diretos` — app/models.py:150
+- `despesa_fixa_loja` — app/models.py:175
+- `despesa_fixa_ajuste` — app/models.py:198
+- `metas` — app/models.py:217
+- `atendimento_atribuicoes` — app/models.py:231
+- `loja_operacao_auditoria` — app/models.py:249
+- `copiloto_acao` — app/models.py:305
+- `funil_eventos` — app/models.py:341
+- `meta_pixel_config` — app/models.py:382
+- `meta_ads_config` — app/models.py:400
+- `pixel_capi_auditoria` — app/models.py:418
+- `meta_capi_outbox` — app/models.py:448
+- `revy_trafego_event_outbox` — app/models.py:468
+- `campanhas` — app/models.py:489
+- `campanha_gastos` — app/models.py:519
+- `pessoa_revy_projetada` — app/models.py:541
+- `vinculo_loja_pessoa` — app/models.py:555
+- `copiloto_sinal` — app/models.py:610
+- `copiloto_sinal_visto` — app/models.py:681
+- `copiloto_conversa` — app/models.py:706
+- `copiloto_turno` — app/models.py:741
 
 ## Workers
 
@@ -287,6 +289,7 @@ Migration head: `0026_copiloto_sinal_destinatario`
 - `0024_venda_excluida` — alembic/versions/0024_venda_excluida.py
 - `0025_despesas_fixas_loja` — alembic/versions/0025_despesas_fixas_loja.py
 - `0026_copiloto_sinal_destinatario` — alembic/versions/0026_copiloto_sinal_destinatario.py
+- `0027_perfil_avatar_foto` — alembic/versions/0027_perfil_avatar_foto.py
 
 ## Templates
 
@@ -310,7 +313,7 @@ Migration head: `0026_copiloto_sinal_destinatario`
 - `app/templates/funil/index.html` — app/main.py:2209
 - `app/templates/financeiro/dashboard.html` — app/main.py:2315
 - `app/templates/financeiras/lista.html` — app/main.py:2378
-- `app/templates/configuracoes/index.html` — app/main.py:2647
+- `app/templates/configuracoes/index.html` — app/main.py:2546
 - `app/templates/relatorios/index.html` — app/relatorios.py:99
 - `app/templates/base.html` — app/templates/base.html
 - `app/templates/conta_senha.html` — app/templates/conta_senha.html
@@ -328,7 +331,7 @@ Migration head: `0026_copiloto_sinal_destinatario`
 - `app/templates/loja/financeiro_resultado.html` — app/web/loja_financeiro.py:102
 - `app/templates/loja/financeiro_despesas.html` — app/web/loja_financeiro.py:151
 - `app/templates/loja/integracoes.html` — app/web/loja_integracoes.py:48
-- `app/templates/loja/perfil.html` — app/web/loja_perfil.py:69
+- `app/templates/loja/perfil.html` — app/web/loja_perfil.py:233
 - `app/templates/loja/vendas_visao.html` — app/web/loja_vendas.py:146
 - `app/templates/loja/vendas_lista.html` — app/web/loja_vendas.py:216
 - `app/templates/loja/venda_editar.html` — app/web/loja_vendas.py:315
