@@ -1,26 +1,27 @@
-# motor-simulacao · 16 rotas · 12 modelos · 1 workers · 2 flags · 14 migrations
+# motor-simulacao · 17 rotas · 12 modelos · 1 workers · 2 flags · 14 migrations
 
-Gerado de `3843a5c`. NAO editar a mao — saida de `gerar_mapa.py`.
+Gerado de `8ef1d52`. NAO editar a mao — saida de `gerar_mapa.py`.
 Migration head: `0014`
 
 ## Rotas
 
-- `GET /health/live` — app/main.py:28
-- `GET /health/ready` — app/main.py:33
-- `GET /version` — app/main.py:38
-- `GET /metrics` — app/main.py:43
-- `GET /v1/provedores` — app/main.py:66
-- `GET /v1/provedores/credenciais` — app/main.py:83
-- `GET /v1/provedores/{nome}/credenciais` — app/main.py:95
-- `PUT /v1/provedores/{nome}/credenciais` — app/main.py:112
-- `POST /v1/provedores/{nome}/testar-login` — app/main.py:127
-- `POST /v1/internal/provisioning/state` — app/main.py:159
-- `POST /v1/simulacoes` — app/main.py:181
-- `GET /v1/simulacoes` — app/main.py:215
-- `GET /v1/simulacoes/{sim_id}` — app/main.py:254
-- `GET /v1/simulacoes/{sim_id}/eventos` — app/main.py:271
-- `GET /v1/simulacoes/{sim_id}/eventos/{evento_id}/print` — app/main.py:292
-- `POST /v1/simulacoes/{sim_id}/cancelar` — app/main.py:345
+- `GET /health/live` — app/main.py:32
+- `GET /health/ready` — app/main.py:37
+- `GET /version` — app/main.py:42
+- `GET /metrics` — app/main.py:47
+- `GET /v1/provedores` — app/main.py:70
+- `GET /v1/provedores/credenciais` — app/main.py:87
+- `GET /v1/provedores/{nome}/credenciais` — app/main.py:99
+- `PUT /v1/provedores/{nome}/credenciais` — app/main.py:116
+- `POST /v1/provedores/{nome}/testar-login` — app/main.py:131
+- `POST /v1/internal/provisioning/ensure-cliente` — app/main.py:174
+- `POST /v1/internal/provisioning/state` — app/main.py:241
+- `POST /v1/simulacoes` — app/main.py:263
+- `GET /v1/simulacoes` — app/main.py:297
+- `GET /v1/simulacoes/{sim_id}` — app/main.py:336
+- `GET /v1/simulacoes/{sim_id}/eventos` — app/main.py:353
+- `GET /v1/simulacoes/{sim_id}/eventos/{evento_id}/print` — app/main.py:374
+- `POST /v1/simulacoes/{sim_id}/cancelar` — app/main.py:427
 
 ## Modelos
 
@@ -43,8 +44,8 @@ Migration head: `0014`
 
 ## Flags
 
-- `MOTOR_FANOUT_ENABLED (default: 0)` — app/config.py:113
-- `MOTOR_FLY_AUTOSCALE_ENABLED (default: 0)` — app/config.py:114
+- `MOTOR_FANOUT_ENABLED (default: 0)` — app/config.py:126
+- `MOTOR_FLY_AUTOSCALE_ENABLED (default: 0)` — app/config.py:127
 
 ## Migrations
 

@@ -146,6 +146,15 @@ class Settings:
     motor_token: str = (
         os.getenv("MOTOR_TOKEN") or os.getenv("MOTOR_API_TOKEN", "")
     )
+    # Multi-loja num deploy só: o que o `chatbot_tokens_json` acima protege
+    # para o chatbot, este mapa resolve para o Motor. Mesmo formato do
+    # Control: JSON `loja_slug -> token`. Cada token mapeia um cliente_id no
+    # Motor, então cada loja opera só sobre as próprias credenciais
+    # bancárias. Criar os clientes/tokens extras é ops (CLI
+    # criar-credencial do Motor), fora do código.
+    motor_tokens_json: str = os.getenv(
+        "MOTOR_TOKENS_JSON", os.getenv("MOTOR_API_TOKENS_JSON", "")
+    )
     request_timeout: float = float(os.getenv("PORTAL_HTTP_TIMEOUT", "5"))
     request_retries: int = int(os.getenv("PORTAL_HTTP_RETRIES", "1"))
     request_retry_backoff: float = float(
@@ -335,6 +344,40 @@ class Settings:
         if self.chatbot_loja_slug:
             return self.chatbot_token if self.chatbot_loja_slug == slug else ""
         return self.chatbot_token
+
+    def motor_token_para(self, loja_slug: str | None) -> str:
+        """Credencial do Motor para ESTA loja. Falha fechado quando ambíguo.
+
+        O Motor resolve o tenant (cliente_id) **pelo token**, então um token
+        só num deploy multi-loja faz toda loja enxergar, testar e alterar as
+        credenciais bancárias da mesma conta — o mesmo vazamento que o
+        ``chatbot_token_para`` acima existe para estancar no chatbot.
+
+        Dois modos, do mais explícito ao legado:
+
+        1. `motor_tokens_json` — mapa `slug -> token`. Slug fora do mapa
+           devolve `""`: preferimos a tela dizer "desligada" a ela operar,
+           com confiança, sobre a conta de outra loja. **Nunca** cai no
+           token global como fallback silencioso.
+        2. Nada configurado — devolve o token global, que é o contrato de
+           "deploy de uma loja só". **Não** falha fechado aqui, ao contrário
+           do modo 1: fazer isso derrubaria toda instalação existente no
+           primeiro deploy. O corolário é que este código sozinho não estanca
+           o vazamento — ele torna o conserto possível, e quem configura o
+           mapa é quem o aplica.
+        """
+        slug = (loja_slug or "").strip()
+        if self.motor_tokens_json and self.motor_tokens_json.strip():
+            if not slug:
+                return ""
+            try:
+                tokens = json.loads(self.motor_tokens_json)
+            except (TypeError, ValueError):
+                return ""
+            if not isinstance(tokens, dict):
+                return ""
+            return str(tokens.get(slug) or "").strip()
+        return self.motor_token
 
 
 settings = Settings()

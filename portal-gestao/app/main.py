@@ -439,8 +439,33 @@ def get_chatbot_client(request: Request) -> ChatbotClient:
     )
 
 
-def get_motor_client() -> MotorClient:
-    return MotorClient(settings.motor_url, settings.motor_token, settings.request_timeout)
+def get_motor_client(request: Request) -> MotorClient:
+    """Cliente do Motor **da loja da sessão**, não de uma conta fixa.
+
+    O Motor resolve o tenant (cliente_id) **pelo token**, então sem saber
+    qual loja está selecionada toda loja enxergaria e alteraria as
+    credenciais bancárias da mesma conta — o mesmo vazamento já visto no
+    chatbot, onde a `teste` exibiu os 1104 atendimentos da `moto-center`.
+    Recebe o ``Request`` pelo mesmo motivo que ``get_chatbot_client``;
+    **não** volte a montá-lo sem ele, e não chame o ``MotorClient`` direto
+    passando ``settings.motor_token``.
+
+    Sem token para a loja (mapa configurado e slug ausente ou fora dele),
+    o cliente fica ``configurado = False`` e as chamadas levantam
+    ``MotorIndisponivel`` — que as telas já tratam como integração
+    desligada. É o resultado desejado: melhor a tela não dizer nada do que
+    operar, com confiança, sobre a conta de outra loja.
+    """
+    try:
+        sessao = request.session
+    except (AssertionError, AttributeError):  # sem SessionMiddleware (testes)
+        sessao = None
+    slug = loja_identity.session_loja_slug(sessao)
+    return MotorClient(
+        settings.motor_url,
+        settings.motor_token_para(slug),
+        settings.request_timeout,
+    )
 
 
 # Aviso de senha antiga: portais lojistas costumam rotacionar a cada ~2 semanas.
@@ -2357,12 +2382,20 @@ def financeiras_lista(
     integracao_erro = None
     motor_configurado = motor.configurado
     if not motor_configurado:
-        integracao_erro = (
-            "Integração com o Motor de Simulação desligada. "
-            "Configure MOTOR_URL e MOTOR_TOKEN no servidor do Portal para "
-            "gerenciar acessos dos portais bancários. Nenhuma senha é "
-            "armazenada neste portal."
-        )
+        if settings.motor_tokens_json and settings.motor_tokens_json.strip():
+            integracao_erro = (
+                "Integração com o Motor de Simulação desligada para esta loja. "
+                "Cadastre o token desta loja em MOTOR_TOKENS_JSON no servidor "
+                "do Portal para gerenciar acessos dos portais bancários. "
+                "Nenhuma senha é armazenada neste portal."
+            )
+        else:
+            integracao_erro = (
+                "Integração com o Motor de Simulação desligada. "
+                "Configure MOTOR_URL e MOTOR_TOKEN no servidor do Portal para "
+                "gerenciar acessos dos portais bancários. Nenhuma senha é "
+                "armazenada neste portal."
+            )
     else:
         try:
             raw = motor.listar_credenciais(ator=usuario.email)
@@ -2432,11 +2465,19 @@ async def financeiras_upsert(
 
     from app.loja_operacao_auditoria import registrar_auditoria_financeira
 
+    # Audita a loja que o token resolveu (a da sessão); o campo legado
+    # do usuário é só fallback — vide o GET acima.
+    try:
+        _sessao_upsert = request.session
+    except (AssertionError, AttributeError):  # sem SessionMiddleware (testes)
+        _sessao_upsert = None
+    loja_efetiva = loja_identity.session_loja_slug(_sessao_upsert) or usuario.loja_slug
+
     if not motor.configurado:
         try:
             registrar_auditoria_financeira(
                 db,
-                loja_slug=usuario.loja_slug,
+                loja_slug=loja_efetiva,
                 acao="upsert",
                 ator_email=usuario.email,
                 provedor=nome,
@@ -2461,7 +2502,7 @@ async def financeiras_upsert(
         try:
             registrar_auditoria_financeira(
                 db,
-                loja_slug=usuario.loja_slug,
+                loja_slug=loja_efetiva,
                 acao="upsert",
                 ator_email=usuario.email,
                 provedor=nome,
@@ -2476,7 +2517,7 @@ async def financeiras_upsert(
     try:
         registrar_auditoria_financeira(
             db,
-            loja_slug=usuario.loja_slug,
+            loja_slug=loja_efetiva,
             acao="upsert",
             ator_email=usuario.email,
             provedor=nome,

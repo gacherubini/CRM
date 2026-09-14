@@ -1,5 +1,5 @@
 {
- "sha": "3843a5c",
+ "sha": "8ef1d52",
  "inventario": {
   "chatbot-api": [
    {
@@ -905,147 +905,147 @@
     "chave": "REVY_TRAFEGO_SMTP_PASSWORD (default: '')",
     "simbolo": "REVY_TRAFEGO_SMTP_PASSWORD",
     "arquivo": "app/config.py",
-    "linha": 218
+    "linha": 227
    },
    {
     "secao": "flag",
     "chave": "REVY_LOJA_COPILOTO_LLM_TIMEOUT (default: 40)",
     "simbolo": "REVY_LOJA_COPILOTO_LLM_TIMEOUT",
     "arquivo": "app/config.py",
-    "linha": 256
+    "linha": 265
    },
    {
     "secao": "flag",
     "chave": "REVY_LOJA_COPILOTO_LLM_RETRIES (default: 1)",
     "simbolo": "REVY_LOJA_COPILOTO_LLM_RETRIES",
     "arquivo": "app/config.py",
-    "linha": 258
+    "linha": 267
    },
    {
     "secao": "flag",
     "chave": "REVY_LOJA_COPILOTO_HISTORICO_TOKENS (default: 2000)",
     "simbolo": "REVY_LOJA_COPILOTO_HISTORICO_TOKENS",
     "arquivo": "app/config.py",
-    "linha": 263
+    "linha": 272
    },
    {
     "secao": "flag",
     "chave": "REVY_LOJA_COPILOTO_FIPE_TIMEOUT (default: 8)",
     "simbolo": "REVY_LOJA_COPILOTO_FIPE_TIMEOUT",
     "arquivo": "app/config.py",
-    "linha": 278
+    "linha": 287
    },
    {
     "secao": "flag",
     "chave": "REVY_LOJA_COPILOTO_FIPE_CACHE_SEGUNDOS (default: 21600)",
     "simbolo": "REVY_LOJA_COPILOTO_FIPE_CACHE_SEGUNDOS",
     "arquivo": "app/config.py",
-    "linha": 282
+    "linha": 291
    },
    {
     "secao": "flag",
     "chave": "REVY_TRAFEGO_SERVICE_TOKEN (default: '')",
     "simbolo": "REVY_TRAFEGO_SERVICE_TOKEN",
     "arquivo": "app/config.py",
-    "linha": 176
+    "linha": 185
    },
    {
     "secao": "flag",
     "chave": "REVY_TRAFEGO_SMTP_PORT (default: 587)",
     "simbolo": "REVY_TRAFEGO_SMTP_PORT",
     "arquivo": "app/config.py",
-    "linha": 212
+    "linha": 221
    },
    {
     "secao": "flag",
     "chave": "REVY_LOJA_COPILOTO_LLM_KEY (default: '')",
     "simbolo": "REVY_LOJA_COPILOTO_LLM_KEY",
     "arquivo": "app/config.py",
-    "linha": 251
+    "linha": 260
    },
    {
     "secao": "flag",
     "chave": "REVY_LOJA_COPILOTO_LLM_MODEL (default: DeepSeek-V4-Flash-0731)",
     "simbolo": "REVY_LOJA_COPILOTO_LLM_MODEL",
     "arquivo": "app/config.py",
-    "linha": 253
+    "linha": 262
    },
    {
     "secao": "flag",
     "chave": "REVY_TRAFEGO_EMAIL_FROM (default: no-reply@revy.local)",
     "simbolo": "REVY_TRAFEGO_EMAIL_FROM",
     "arquivo": "app/config.py",
-    "linha": 202
+    "linha": 211
    },
    {
     "secao": "flag",
     "chave": "REVY_TRAFEGO_EMAIL_FROM_NAME (default: Revy)",
     "simbolo": "REVY_TRAFEGO_EMAIL_FROM_NAME",
     "arquivo": "app/config.py",
-    "linha": 206
+    "linha": 215
    },
    {
     "secao": "flag",
     "chave": "REVY_TRAFEGO_SMTP_HOST (default: '')",
     "simbolo": "REVY_TRAFEGO_SMTP_HOST",
     "arquivo": "app/config.py",
-    "linha": 209
+    "linha": 218
    },
    {
     "secao": "flag",
     "chave": "REVY_TRAFEGO_SMTP_USERNAME (default: '')",
     "simbolo": "REVY_TRAFEGO_SMTP_USERNAME",
     "arquivo": "app/config.py",
-    "linha": 215
+    "linha": 224
    },
    {
     "secao": "flag",
     "chave": "REVY_LOJA_COPILOTO_LLM_URL (default: https://api.deepseek.com)",
     "simbolo": "REVY_LOJA_COPILOTO_LLM_URL",
     "arquivo": "app/config.py",
-    "linha": 249
+    "linha": 258
    },
    {
     "secao": "flag",
     "chave": "REVY_LOJA_COPILOTO_FIPE_URL (default: https://parallelum.com.br/fipe/api/v1)",
     "simbolo": "REVY_LOJA_COPILOTO_FIPE_URL",
     "arquivo": "app/config.py",
-    "linha": 275
+    "linha": 284
    },
    {
     "secao": "flag",
     "chave": "PORTAL_META_SPEND_SYNC_ENABLED (default: 1)",
     "simbolo": "PORTAL_META_SPEND_SYNC_ENABLED",
     "arquivo": "app/config.py",
-    "linha": 158
+    "linha": 167
    },
    {
     "secao": "flag",
     "chave": "REVY_TRAFEGO_URL",
     "simbolo": "REVY_TRAFEGO_URL",
     "arquivo": "app/config.py",
-    "linha": 173
+    "linha": 182
    },
    {
     "secao": "flag",
     "chave": "REVY_TRAFEGO_EMAIL_BACKEND (default: console)",
     "simbolo": "REVY_TRAFEGO_EMAIL_BACKEND",
     "arquivo": "app/config.py",
-    "linha": 198
+    "linha": 207
    },
    {
     "secao": "flag",
     "chave": "REVY_TRAFEGO_PUBLIC_BASE_URL (default: '')",
     "simbolo": "REVY_TRAFEGO_PUBLIC_BASE_URL",
     "arquivo": "app/config.py",
-    "linha": 225
+    "linha": 234
    },
    {
     "secao": "flag",
     "chave": "REVY_TRAFEGO_SMTP_USE_TLS (default: 1)",
     "simbolo": "REVY_TRAFEGO_SMTP_USE_TLS",
     "arquivo": "app/config.py",
-    "linha": 221
+    "linha": 230
    },
    {
     "secao": "worker",
@@ -1178,266 +1178,266 @@
     "chave": "GET /health/live",
     "simbolo": "/health/live",
     "arquivo": "app/main.py",
-    "linha": 539
+    "linha": 564
    },
    {
     "secao": "rota",
     "chave": "GET /health/ready",
     "simbolo": "/health/ready",
     "arquivo": "app/main.py",
-    "linha": 544
+    "linha": 569
    },
    {
     "secao": "rota",
     "chave": "GET /public/v1/lojas/{loja_slug}/pixel",
     "simbolo": "/public/v1/lojas/{loja_slug}/pixel",
     "arquivo": "app/main.py",
-    "linha": 553
+    "linha": 578
    },
    {
     "secao": "rota",
     "chave": "GET /",
     "simbolo": "/",
     "arquivo": "app/main.py",
-    "linha": 588
+    "linha": 613
    },
    {
     "secao": "rota",
     "chave": "GET /login",
     "simbolo": "/login",
     "arquivo": "app/main.py",
-    "linha": 593
+    "linha": 618
    },
    {
     "secao": "rota",
     "chave": "POST /login",
     "simbolo": "/login",
     "arquivo": "app/main.py",
-    "linha": 600
+    "linha": 625
    },
    {
     "secao": "rota",
     "chave": "POST /logout",
     "simbolo": "/logout",
     "arquivo": "app/main.py",
-    "linha": 621
+    "linha": 646
    },
    {
     "secao": "rota",
     "chave": "GET /conta/senha",
     "simbolo": "/conta/senha",
     "arquivo": "app/main.py",
-    "linha": 628
+    "linha": 653
    },
    {
     "secao": "rota",
     "chave": "POST /conta/senha",
     "simbolo": "/conta/senha",
     "arquivo": "app/main.py",
-    "linha": 637
+    "linha": 662
    },
    {
     "secao": "rota",
     "chave": "GET /app",
     "simbolo": "/app",
     "arquivo": "app/main.py",
-    "linha": 674
+    "linha": 699
    },
    {
     "secao": "rota",
     "chave": "GET /app/estoque",
     "simbolo": "/app/estoque",
     "arquivo": "app/main.py",
-    "linha": 803
+    "linha": 828
    },
    {
     "secao": "rota",
     "chave": "GET /app/estoque/novo",
     "simbolo": "/app/estoque/novo",
     "arquivo": "app/main.py",
-    "linha": 842
+    "linha": 867
    },
    {
     "secao": "rota",
     "chave": "GET /app/operacao/numeros",
     "simbolo": "/app/operacao/numeros",
     "arquivo": "app/main.py",
-    "linha": 942
+    "linha": 967
    },
    {
     "secao": "rota",
     "chave": "POST /app/operacao/grupo",
     "simbolo": "/app/operacao/grupo",
     "arquivo": "app/main.py",
-    "linha": 975
+    "linha": 1000
    },
    {
     "secao": "rota",
     "chave": "POST /app/operacao/numeros",
     "simbolo": "/app/operacao/numeros",
     "arquivo": "app/main.py",
-    "linha": 1003
+    "linha": 1028
    },
    {
     "secao": "rota",
     "chave": "POST /app/operacao/numeros/remover",
     "simbolo": "/app/operacao/numeros/remover",
     "arquivo": "app/main.py",
-    "linha": 1030
+    "linha": 1055
    },
    {
     "secao": "rota",
     "chave": "POST /app/estoque/novo",
     "simbolo": "/app/estoque/novo",
     "arquivo": "app/main.py",
-    "linha": 1056
+    "linha": 1081
    },
    {
     "secao": "rota",
     "chave": "GET /app/estoque/{veiculo_id}",
     "simbolo": "/app/estoque/{veiculo_id}",
     "arquivo": "app/main.py",
-    "linha": 1083
+    "linha": 1108
    },
    {
     "secao": "rota",
     "chave": "POST /app/estoque/{veiculo_id}",
     "simbolo": "/app/estoque/{veiculo_id}",
     "arquivo": "app/main.py",
-    "linha": 1114
+    "linha": 1139
    },
    {
     "secao": "rota",
     "chave": "POST /app/estoque/{veiculo_id}/{acao}",
     "simbolo": "/app/estoque/{veiculo_id}/{acao}",
     "arquivo": "app/main.py",
-    "linha": 1142
+    "linha": 1167
    },
    {
     "secao": "rota",
     "chave": "GET /app/leads",
     "simbolo": "/app/leads",
     "arquivo": "app/main.py",
-    "linha": 1189
+    "linha": 1214
    },
    {
     "secao": "rota",
     "chave": "GET /app/leads/{lead_id}",
     "simbolo": "/app/leads/{lead_id}",
     "arquivo": "app/main.py",
-    "linha": 1217
+    "linha": 1242
    },
    {
     "secao": "rota",
     "chave": "POST /app/leads/{lead_id}/etapa",
     "simbolo": "/app/leads/{lead_id}/etapa",
     "arquivo": "app/main.py",
-    "linha": 1253
+    "linha": 1278
    },
    {
     "secao": "rota",
     "chave": "GET /app/conversas",
     "simbolo": "/app/conversas",
     "arquivo": "app/main.py",
-    "linha": 1312
+    "linha": 1337
    },
    {
     "secao": "rota",
     "chave": "GET /app/conversas/{telefone}",
     "simbolo": "/app/conversas/{telefone}",
     "arquivo": "app/main.py",
-    "linha": 1339
+    "linha": 1364
    },
    {
     "secao": "rota",
     "chave": "POST /app/conversas/{telefone}/handoff",
     "simbolo": "/app/conversas/{telefone}/handoff",
     "arquivo": "app/main.py",
-    "linha": 1432
+    "linha": 1457
    },
    {
     "secao": "rota",
     "chave": "GET /app/vendas",
     "simbolo": "/app/vendas",
     "arquivo": "app/main.py",
-    "linha": 1545
+    "linha": 1570
    },
    {
     "secao": "rota",
     "chave": "GET /app/vendas/nova",
     "simbolo": "/app/vendas/nova",
     "arquivo": "app/main.py",
-    "linha": 1585
+    "linha": 1610
    },
    {
     "secao": "rota",
     "chave": "POST /app/vendas/nova",
     "simbolo": "/app/vendas/nova",
     "arquivo": "app/main.py",
-    "linha": 1602
+    "linha": 1627
    },
    {
     "secao": "rota",
     "chave": "POST /app/vendas/{venda_id}/confirmar",
     "simbolo": "/app/vendas/{venda_id}/confirmar",
     "arquivo": "app/main.py",
-    "linha": 2005
+    "linha": 2030
    },
    {
     "secao": "rota",
     "chave": "POST /app/vendas/{venda_id}/cancelar",
     "simbolo": "/app/vendas/{venda_id}/cancelar",
     "arquivo": "app/main.py",
-    "linha": 2023
+    "linha": 2048
    },
    {
     "secao": "rota",
     "chave": "GET /app/vendedor",
     "simbolo": "/app/vendedor",
     "arquivo": "app/main.py",
-    "linha": 2035
+    "linha": 2060
    },
    {
     "secao": "rota",
     "chave": "GET /app/funil",
     "simbolo": "/app/funil",
     "arquivo": "app/main.py",
-    "linha": 2146
+    "linha": 2171
    },
    {
     "secao": "rota",
     "chave": "GET /app/funil/dados",
     "simbolo": "/app/funil/dados",
     "arquivo": "app/main.py",
-    "linha": 2222
+    "linha": 2247
    },
    {
     "secao": "rota",
     "chave": "GET /app/financeiro",
     "simbolo": "/app/financeiro",
     "arquivo": "app/main.py",
-    "linha": 2259
+    "linha": 2284
    },
    {
     "secao": "rota",
     "chave": "GET /app/financeiras",
     "simbolo": "/app/financeiras",
     "arquivo": "app/main.py",
-    "linha": 2336
+    "linha": 2361
    },
    {
     "secao": "rota",
     "chave": "POST /app/financeiras/{nome}",
     "simbolo": "/app/financeiras/{nome}",
     "arquivo": "app/main.py",
-    "linha": 2392
+    "linha": 2425
    },
    {
     "secao": "rota",
     "chave": "GET /app/configuracoes",
     "simbolo": "/app/configuracoes",
     "arquivo": "app/main.py",
-    "linha": 2506
+    "linha": 2547
    },
    {
     "secao": "worker",
@@ -1955,35 +1955,35 @@
     "chave": "GET /app/loja/perfil",
     "simbolo": "_TELA",
     "arquivo": "app/web/loja_perfil.py",
-    "linha": 258
+    "linha": 261
    },
    {
     "secao": "rota",
     "chave": "POST /app/loja/perfil/senha",
     "simbolo": "_POST_SENHA",
     "arquivo": "app/web/loja_perfil.py",
-    "linha": 266
+    "linha": 269
    },
    {
     "secao": "rota",
     "chave": "POST /app/loja/perfil/avatar",
     "simbolo": "_POST_AVATAR",
     "arquivo": "app/web/loja_perfil.py",
-    "linha": 300
+    "linha": 303
    },
    {
     "secao": "rota",
     "chave": "POST /app/loja/perfil/foto",
     "simbolo": "_POST_FOTO",
     "arquivo": "app/web/loja_perfil.py",
-    "linha": 340
+    "linha": 343
    },
    {
     "secao": "rota",
     "chave": "GET /app/loja/perfil/foto/{usuario_id}",
     "simbolo": "/app/loja/perfil/foto/{usuario_id}",
     "arquivo": "app/web/loja_perfil.py",
-    "linha": 381
+    "linha": 384
    },
    {
     "secao": "rota",
@@ -2277,28 +2277,28 @@
     "chave": "GET /app/simulacoes/job/{sim_id}",
     "simbolo": "/app/simulacoes/job/{sim_id}",
     "arquivo": "app/web/simulacoes.py",
-    "linha": 588
+    "linha": 595
    },
    {
     "secao": "rota",
     "chave": "GET /app/simulacoes/historico",
     "simbolo": "/app/simulacoes/historico",
     "arquivo": "app/web/simulacoes.py",
-    "linha": 707
+    "linha": 714
    },
    {
     "secao": "rota",
     "chave": "GET /app/simulacoes/{sim_id}/registros",
     "simbolo": "/app/simulacoes/{sim_id}/registros",
     "arquivo": "app/web/simulacoes.py",
-    "linha": 861
+    "linha": 868
    },
    {
     "secao": "rota",
     "chave": "GET /app/simulacoes/{sim_id}/registros/{evento_id}/print",
     "simbolo": "/app/simulacoes/{sim_id}/registros/{evento_id}/print",
     "arquivo": "app/web/simulacoes.py",
-    "linha": 898
+    "linha": 905
    },
    {
     "secao": "rota",
@@ -2599,7 +2599,7 @@
     "chave": "app/templates/configuracoes/index.html",
     "simbolo": "configuracoes/index.html",
     "arquivo": "app/main.py",
-    "linha": 2546
+    "linha": 2587
    },
    {
     "secao": "template",
@@ -2613,14 +2613,14 @@
     "chave": "app/templates/conversas/detalhe.html",
     "simbolo": "conversas/detalhe.html",
     "arquivo": "app/main.py",
-    "linha": 1364
+    "linha": 1389
    },
    {
     "secao": "template",
     "chave": "app/templates/conversas/lista.html",
     "simbolo": "conversas/lista.html",
     "arquivo": "app/main.py",
-    "linha": 1328
+    "linha": 1353
    },
    {
     "secao": "template",
@@ -2634,7 +2634,7 @@
     "chave": "app/templates/dashboard.html",
     "simbolo": "dashboard.html",
     "arquivo": "app/main.py",
-    "linha": 784
+    "linha": 809
    },
    {
     "secao": "template",
@@ -2676,56 +2676,56 @@
     "chave": "app/templates/estoque/form.html",
     "simbolo": "estoque/form.html",
     "arquivo": "app/main.py",
-    "linha": 853
+    "linha": 878
    },
    {
     "secao": "template",
     "chave": "app/templates/estoque/lista.html",
     "simbolo": "estoque/lista.html",
     "arquivo": "app/main.py",
-    "linha": 828
+    "linha": 853
    },
    {
     "secao": "template",
     "chave": "app/templates/financeiras/lista.html",
     "simbolo": "financeiras/lista.html",
     "arquivo": "app/main.py",
-    "linha": 2378
+    "linha": 2411
    },
    {
     "secao": "template",
     "chave": "app/templates/financeiro/dashboard.html",
     "simbolo": "financeiro/dashboard.html",
     "arquivo": "app/main.py",
-    "linha": 2315
+    "linha": 2340
    },
    {
     "secao": "template",
     "chave": "app/templates/funil/index.html",
     "simbolo": "funil/index.html",
     "arquivo": "app/main.py",
-    "linha": 2209
+    "linha": 2234
    },
    {
     "secao": "template",
     "chave": "app/templates/leads/detalhe.html",
     "simbolo": "leads/detalhe.html",
     "arquivo": "app/main.py",
-    "linha": 1241
+    "linha": 1266
    },
    {
     "secao": "template",
     "chave": "app/templates/leads/lista.html",
     "simbolo": "leads/lista.html",
     "arquivo": "app/main.py",
-    "linha": 1206
+    "linha": 1231
    },
    {
     "secao": "template",
     "chave": "app/templates/login.html",
     "simbolo": "login.html",
     "arquivo": "app/main.py",
-    "linha": 597
+    "linha": 622
    },
    {
     "secao": "template",
@@ -2802,7 +2802,7 @@
     "chave": "app/templates/loja/perfil.html",
     "simbolo": "loja/perfil.html",
     "arquivo": "app/web/loja_perfil.py",
-    "linha": 233
+    "linha": 236
    },
    {
     "secao": "template",
@@ -2872,7 +2872,7 @@
     "chave": "app/templates/operacao/numeros.html",
     "simbolo": "operacao/numeros.html",
     "arquivo": "app/main.py",
-    "linha": 964
+    "linha": 989
    },
    {
     "secao": "template",
@@ -2928,28 +2928,28 @@
     "chave": "app/templates/simulacoes/historico.html",
     "simbolo": "simulacoes/historico.html",
     "arquivo": "app/web/simulacoes.py",
-    "linha": 753
+    "linha": 760
    },
    {
     "secao": "template",
     "chave": "app/templates/simulacoes/progresso.html",
     "simbolo": "simulacoes/progresso.html",
     "arquivo": "app/web/simulacoes.py",
-    "linha": 686
+    "linha": 693
    },
    {
     "secao": "template",
     "chave": "app/templates/simulacoes/registros.html",
     "simbolo": "simulacoes/registros.html",
     "arquivo": "app/web/simulacoes.py",
-    "linha": 882
+    "linha": 889
    },
    {
     "secao": "template",
     "chave": "app/templates/simulacoes/resultado.html",
     "simbolo": "simulacoes/resultado.html",
     "arquivo": "app/web/simulacoes.py",
-    "linha": 665
+    "linha": 672
    },
    {
     "secao": "template",
@@ -2984,21 +2984,21 @@
     "chave": "app/templates/vendas/form.html",
     "simbolo": "vendas/form.html",
     "arquivo": "app/main.py",
-    "linha": 1527
+    "linha": 1552
    },
    {
     "secao": "template",
     "chave": "app/templates/vendas/lista.html",
     "simbolo": "vendas/lista.html",
     "arquivo": "app/main.py",
-    "linha": 1571
+    "linha": 1596
    },
    {
     "secao": "template",
     "chave": "app/templates/vendedor/dashboard.html",
     "simbolo": "vendedor/dashboard.html",
     "arquivo": "app/main.py",
-    "linha": 2130
+    "linha": 2155
    },
    {
     "secao": "migration",
@@ -3196,126 +3196,133 @@
     "chave": "MOTOR_FANOUT_ENABLED (default: 0)",
     "simbolo": "MOTOR_FANOUT_ENABLED",
     "arquivo": "app/config.py",
-    "linha": 113
+    "linha": 126
    },
    {
     "secao": "flag",
     "chave": "MOTOR_FLY_AUTOSCALE_ENABLED (default: 0)",
     "simbolo": "MOTOR_FLY_AUTOSCALE_ENABLED",
     "arquivo": "app/config.py",
-    "linha": 114
+    "linha": 127
    },
    {
     "secao": "rota",
     "chave": "GET /health/live",
     "simbolo": "/health/live",
     "arquivo": "app/main.py",
-    "linha": 28
+    "linha": 32
    },
    {
     "secao": "rota",
     "chave": "GET /health/ready",
     "simbolo": "/health/ready",
     "arquivo": "app/main.py",
-    "linha": 33
+    "linha": 37
    },
    {
     "secao": "rota",
     "chave": "GET /version",
     "simbolo": "/version",
     "arquivo": "app/main.py",
-    "linha": 38
+    "linha": 42
    },
    {
     "secao": "rota",
     "chave": "GET /metrics",
     "simbolo": "/metrics",
     "arquivo": "app/main.py",
-    "linha": 43
+    "linha": 47
    },
    {
     "secao": "rota",
     "chave": "GET /v1/provedores",
     "simbolo": "/v1/provedores",
     "arquivo": "app/main.py",
-    "linha": 66
+    "linha": 70
    },
    {
     "secao": "rota",
     "chave": "GET /v1/provedores/credenciais",
     "simbolo": "/v1/provedores/credenciais",
     "arquivo": "app/main.py",
-    "linha": 83
+    "linha": 87
    },
    {
     "secao": "rota",
     "chave": "GET /v1/provedores/{nome}/credenciais",
     "simbolo": "/v1/provedores/{nome}/credenciais",
     "arquivo": "app/main.py",
-    "linha": 95
+    "linha": 99
    },
    {
     "secao": "rota",
     "chave": "PUT /v1/provedores/{nome}/credenciais",
     "simbolo": "/v1/provedores/{nome}/credenciais",
     "arquivo": "app/main.py",
-    "linha": 112
+    "linha": 116
    },
    {
     "secao": "rota",
     "chave": "POST /v1/provedores/{nome}/testar-login",
     "simbolo": "/v1/provedores/{nome}/testar-login",
     "arquivo": "app/main.py",
-    "linha": 127
+    "linha": 131
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /v1/internal/provisioning/ensure-cliente",
+    "simbolo": "/v1/internal/provisioning/ensure-cliente",
+    "arquivo": "app/main.py",
+    "linha": 174
    },
    {
     "secao": "rota",
     "chave": "POST /v1/internal/provisioning/state",
     "simbolo": "/v1/internal/provisioning/state",
     "arquivo": "app/main.py",
-    "linha": 159
+    "linha": 241
    },
    {
     "secao": "rota",
     "chave": "POST /v1/simulacoes",
     "simbolo": "/v1/simulacoes",
     "arquivo": "app/main.py",
-    "linha": 181
+    "linha": 263
    },
    {
     "secao": "rota",
     "chave": "GET /v1/simulacoes",
     "simbolo": "/v1/simulacoes",
     "arquivo": "app/main.py",
-    "linha": 215
+    "linha": 297
    },
    {
     "secao": "rota",
     "chave": "GET /v1/simulacoes/{sim_id}",
     "simbolo": "/v1/simulacoes/{sim_id}",
     "arquivo": "app/main.py",
-    "linha": 254
+    "linha": 336
    },
    {
     "secao": "rota",
     "chave": "GET /v1/simulacoes/{sim_id}/eventos",
     "simbolo": "/v1/simulacoes/{sim_id}/eventos",
     "arquivo": "app/main.py",
-    "linha": 271
+    "linha": 353
    },
    {
     "secao": "rota",
     "chave": "GET /v1/simulacoes/{sim_id}/eventos/{evento_id}/print",
     "simbolo": "/v1/simulacoes/{sim_id}/eventos/{evento_id}/print",
     "arquivo": "app/main.py",
-    "linha": 292
+    "linha": 374
    },
    {
     "secao": "rota",
     "chave": "POST /v1/simulacoes/{sim_id}/cancelar",
     "simbolo": "/v1/simulacoes/{sim_id}/cancelar",
     "arquivo": "app/main.py",
-    "linha": 345
+    "linha": 427
    },
    {
     "secao": "modelo",

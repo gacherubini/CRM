@@ -17,9 +17,20 @@ Tokens das APIs ficam **somente no servidor**; o navegador recebe uma sessão as
   `CHATBOT_API_TOKENS_JSON` (`{"slug": "token"}`), no formato do Control. Loja fora do
   mapa fica **sem token** de propósito: a tela diz "indisponível" em vez de mostrar,
   com confiança, o número de outra loja. Sem mapa e sem `CHATBOT_API_LOJA_SLUG`, o token
-  global vale — é o contrato de "deploy de uma loja só", e é o que mantém instalação
-  antiga de pé. Emitir o token de cada loja:
-  `python -m app.cli criar-credencial-loja --slug <loja>` no `chatbot-api`.
+   global vale — é o contrato de "deploy de uma loja só", e é o que mantém instalação
+   antiga de pé. Emitir o token de cada loja:
+   `python -m app.cli criar-credencial-loja --slug <loja>` no `chatbot-api`.
+
+- **O Portal fala com o Motor pela credencial da loja da SESSÃO, igual ao chatbot.**
+  Um `MOTOR_TOKEN` só num deploy multi-loja faz toda loja ver e editar as mesmas
+  credenciais bancárias em `/app/financeiras` — e simular com a credencial alheia.
+  `get_motor_client` (`app/main.py`) recebe o `Request` por isso; **não** volte a
+  montá-lo sem ele. O mapa é `MOTOR_TOKENS_JSON` (`{"slug": "token"}`), resolvido por
+  `motor_token_para` (`app/config.py`): loja fora do mapa fica **sem acesso** de
+  propósito, nunca cai no global. Sem mapa, o token global vale (deploy de uma loja
+  só). Emitter um cliente por loja no `motor-simulacao`:
+  `python -m app.cli criar-cliente --nome <loja>` e depois
+  `criar-credencial --cliente-id <id> --nome <loja>`; o token sai uma vez só.
 
 - **Todo erro HTTP do `ChatbotClient` vira "não foi possível acessar o chatbot agora"
   se não ganhar escape.** O `_request` (`app/clients/chatbot.py`) termina em
