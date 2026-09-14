@@ -68,4 +68,7 @@ escrever migration com `batch_alter_table`.
 | sessão quente não é reusada entre jobs nos workers Playwright do Fly, ou banco pede captcha em todo login | `2026-09-13-storage-state-morre-no-rootfs-efemero-do-fly.md` |
 | portal bancário recusa fora de horário comercial, ou mostra produto desabilitado após o login | `2026-09-13-bv-produto-veiculos-so-em-horario-comercial.md` |
 | ofertas_demoraram no Bradesco e voce vai culpar o IP, o driver ou o timeout | `2026-09-13-bradesco-trava-analise-repetida-mesmo-cpf.md` |
+| testar saída de rede alternativa (residencial, sticky, rotativo) num worker de banco | `2026-09-13-dataimpulse-sticky-egress-bradesco.md` |
+| banco cai em captcha com sessao_quente logo após troca de rede, ou worker sem volume reusando sessão | `2026-09-13-sessao-quente-arquivo-velho-rootfs.md` |
+| ver a tela da falha de um driver em prod, ou mapear as chamadas do portal sem abrir o worker | `2026-09-13-print-e-har-sem-acesso-ao-worker.md` |
 | pintar fundo de estado ativo no escuro e o texto sumir | `2026-09-13-data-theme-vence-classe-nova.md` |

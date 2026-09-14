@@ -672,3 +672,32 @@ Próximo objetivo:
    Não comprar nada antes da rodada de controle.
 3. Em paralelo, a via definitiva: pedir API/integração ao comercial de cada banco da loja e
    cotação ao FANDI e ao Autoconf. RPA com proxy fica como ponte, não como destino.
+
+## 12. Checkpoint de 13/09: teste DataImpulse residencial no Bradesco
+
+Teste executado pelo dono com acompanhamento operacional (sem código alterado).
+Proxy ligado **só** em `motor-worker-bradesco` via `machine update --env`
+(merge; `fly deploy` não encosta nos workers). Nenhum login gasto antes da hora:
+porta rotativa reprovada só com `api.ipify.org`.
+
+| Etapa | Resultado |
+|---|---|
+| Porta 823 (rotativo) | Reprovado: IP trocando por request, saída UK |
+| Porta 10000 + `__cr.br` + Brasil + intervalo 120 (sticky) | Aprovado: mesmo IP 6+ min, BR, ASN de consumo (Claro/virtua) |
+| `347a` só-Bradesco via sticky | `concluida`, 4 ofertas (~2 min) — egresso resolvido |
+| `f11b`, tarefa Bradesco de `6f1f`, rerun | `captcha_login` ~14 s após abrir o portal, mesmo IP — frequência (5+ logins/15 min), não reputação do IP |
+| Fan-out 6 bancos (`6f1f`, parcial, 14 resultados) | Santander 4, Fontecred 3, Pan 1, Omni 4 ofertas no IP direto; Motrix recusa comercial conhecida — **sem proxy nos demais** |
+| Probe local via sticky | OK 55–56 s, 3 ofertas, sem captcha (conta fria) |
+| Print da falha | "Erro ao tentar verificar o reCAPTCHA" (v3 server-side, sem puzzle — sem bypass aplicável) |
+| HAR sanitizado | SPA sobre REST same-origin, `login/captcha/validate`, Dynatrace + Akamai observando |
+
+Decisões que valem daqui em diante: sticky é ponte (janela de 120 min, pool
+compartilhada, tráfego BR x2), definitivo é 1 ISP dedicado por loja; sessão
+morna em boot zerado é arquivo velho no rootfs (sem volume, imagem não carrega
+sessão) — invalidar antes de retestar; ritmo de 1 tentativa por vez, conta fria.
+Detalhes operacionais nos learnings `2026-09-13-dataimpulse-sticky-egress-bradesco`,
+`2026-09-13-sessao-quente-arquivo-velho-rootfs` e
+`2026-09-13-print-e-har-sem-acesso-ao-worker`.
+
+Pendente: girar a senha do painel (exposta no chat), volume de 1 GB + seed manual
+em Chromium idêntico, ISP estático dedicado, rollback do sticky quando entrar.
