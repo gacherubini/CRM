@@ -72,3 +72,5 @@ escrever migration com `batch_alter_table`.
 | banco cai em captcha com sessao_quente logo após troca de rede, ou worker sem volume reusando sessão | `2026-09-13-sessao-quente-arquivo-velho-rootfs.md` |
 | ver a tela da falha de um driver em prod, ou mapear as chamadas do portal sem abrir o worker | `2026-09-13-print-e-har-sem-acesso-ao-worker.md` |
 | pintar fundo de estado ativo no escuro e o texto sumir | `2026-09-13-data-theme-vence-classe-nova.md` |
+| setar secret JSON (mapa por loja) via fly secrets no Windows | `2026-09-14-fly-secrets-json-no-windows-perde-aspa.md` |
+| fly ssh console volta vazio sem erro, ou parse de saida remota falha do nada | `2026-09-14-fly-ssh-console-vazio-pede-retry.md` |
