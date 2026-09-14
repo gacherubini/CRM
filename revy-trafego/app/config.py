@@ -23,6 +23,9 @@ class Settings:
         os.getenv("REVY_TRAFEGO_ENCRYPTION_KEY")
         or os.getenv("PORTAL_ENCRYPTION_KEY", "")
     )
+    # Cofre de tokens do Motor por loja (Fernet dedicada, NUNCA a de CAPI/Ads).
+    # Vazia = cofre fechado: leitura e emissão respondem 503 (fail-closed).
+    control_tokens_key: str = os.getenv("REVY_CONTROL_TOKENS_KEY", "").strip()
     secure_cookie: bool = os.getenv("REVY_TRAFEGO_SECURE_COOKIE", "0") == "1"
     chatbot_url: str = os.getenv("CHATBOT_API_URL", "http://chatbot-api:8000")
     chatbot_token: str = os.getenv("CHATBOT_API_TOKEN", "")
@@ -57,6 +60,9 @@ class Settings:
     ).strip()
     motor_token_loja: str = os.getenv("REVY_TRAFEGO_MOTOR_TOKEN_LOJA", "").strip()
     motor_tokens_json: str = os.getenv("REVY_TRAFEGO_MOTOR_TOKENS_JSON", "").strip()
+    # Serviço para emitir credencial no Motor sem CLI
+    # (POST /v1/internal/provisioning/ensure-cliente). Vazio = sem emissão.
+    motor_provisioning_token: str = os.getenv("MOTOR_PROVISIONING_TOKEN", "").strip()
     catalogo_url: str = os.getenv(
         "CATALOGO_PUBLIC_URL",
         os.getenv("CATALOGO_API_URL", "http://catalogo-publico:8000"),

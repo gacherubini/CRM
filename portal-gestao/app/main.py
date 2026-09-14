@@ -131,6 +131,7 @@ from app.clients.estoque import (
     VeiculoNaoEncontrado,
 )
 from app.clients.motor import MotorClient, MotorIndisponivel
+from app.clients.control import buscar_motor_token_no_control
 from app.db import SessionLocal, get_db
 from app.password_rules import SenhaInvalida, validar_nova_senha  # reexport / equipe
 from app.financeiro_calc import (
@@ -455,15 +456,33 @@ def get_motor_client(request: Request) -> MotorClient:
     ``MotorIndisponivel`` — que as telas já tratam como integração
     desligada. É o resultado desejado: melhor a tela não dizer nada do que
     operar, com confiança, sobre a conta de outra loja.
+
+    Ordem de resolução (cofre primeiro, mapa como fallback legado):
+
+    1. Cofre do Control (``GET /internal/motor-tokens/{slug}``): caminho
+       automático — loja nova funciona sem editar secret no Portal.
+    2. ``settings.motor_token_para(slug)`` (mapa ``MOTOR_TOKENS_JSON`` ou
+       token global de loja única).
+
+    Falha do Control (timeout, 4xx/5xx, sem config) nunca quebra a tela:
+    cai no passo 2 e, se também vazio, no desligado. O token vive só na
+    memória deste request — nunca em sessão, cookie, banco, log ou template.
     """
     try:
         sessao = request.session
     except (AssertionError, AttributeError):  # sem SessionMiddleware (testes)
         sessao = None
     slug = loja_identity.session_loja_slug(sessao)
+    try:
+        token = buscar_motor_token_no_control(slug) or ""
+    except Exception:
+        logger.warning("control motor-tokens falhou, usando mapa local loja=%s", slug)
+        token = ""
+    if not token:
+        token = settings.motor_token_para(slug)
     return MotorClient(
         settings.motor_url,
-        settings.motor_token_para(slug),
+        token,
         settings.request_timeout,
     )
 

@@ -18,6 +18,7 @@ from sqlalchemy.orm import Session
 from starlette.middleware.sessions import SessionMiddleware
 
 from app import meta_ads_spend_job, meta_capi_job, rotulos
+from app.control import motor_tokens
 from app.audit import registrar_audit
 from app.auth import (
     autenticar,
@@ -1489,3 +1490,85 @@ def job_google_ads_metrics_sync(
     else:
         payload = worker.run_once()
     return JSONResponse(payload)
+
+
+def _authorize_portal_bearer(authorization: str) -> JSONResponse | None:
+    """Auth do GET /internal/motor-tokens/* (Authorization: Bearer).
+
+    O portador é o Portal com o segredo compartilhado ``PORTAL_SERVICE_TOKEN``.
+    Sem segredo configurado aqui, falha fechado (503): sem como autenticar o
+    chamador, não há como servir token.
+    """
+    from app import config as config_mod
+
+    esperado = (config_mod.settings.portal_service_token or "").strip()
+    if not esperado:
+        return JSONResponse(
+            {
+                "erro": {
+                    "code": "servico_indisponivel",
+                    "message": "serviço de tokens indisponível",
+                }
+            },
+            status_code=503,
+        )
+    esquema, _, recebido = (authorization or "").partition(" ")
+    if esquema.lower() != "bearer" or not secrets.compare_digest(
+        (recebido or "").strip(), esperado
+    ):
+        return JSONResponse(
+            {"erro": {"code": "nao_autorizado", "message": "não autorizado"}},
+            status_code=401,
+        )
+    return None
+
+
+@app.get("/internal/motor-tokens/{slug}")
+def internal_motor_token_para_portal(
+    slug: str,
+    authorization: str = Header(default="", alias="Authorization"),
+    db: Session = Depends(get_db),
+):
+    """Serve ao Portal o token do Motor da loja (único lugar que expõe o claro).
+
+    Resolução: cofre cifrado → mapa em env → emissão sob demanda no Motor.
+    Slug fora do canônico, cofre vazio e Motor sem emissão caem em 404
+    ``sem_token``; sem chave de cofre, em 503. O claro sai só neste corpo:
+    nunca em log, erro ou outra rota.
+    """
+    denied = _authorize_portal_bearer(authorization)
+    if denied is not None:
+        return denied
+    canon = motor_tokens.slug_canonico(slug)
+    if canon is None:
+        return JSONResponse(
+            {"erro": {"code": "sem_token", "message": "loja sem token do Motor"}},
+            status_code=404,
+        )
+    try:
+        token = motor_tokens.token_para_portal(db, canon)
+        if not token:
+            token = motor_tokens.ensure_motor_token(db, canon)
+            db.commit()
+    except motor_tokens.CofreIndisponivel:
+        return JSONResponse(
+            {
+                "erro": {
+                    "code": "cofre_indisponivel",
+                    "message": "cofre de tokens indisponível",
+                }
+            },
+            status_code=503,
+        )
+    except Exception:
+        logger.exception("internal_motor_tokens: falha loja=%s", canon)
+        return JSONResponse(
+            {"erro": {"code": "sem_token", "message": "loja sem token do Motor"}},
+            status_code=404,
+        )
+    if not token:
+        return JSONResponse(
+            {"erro": {"code": "sem_token", "message": "loja sem token do Motor"}},
+            status_code=404,
+        )
+    return {"token": token}

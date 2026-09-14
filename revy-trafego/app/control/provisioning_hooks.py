@@ -75,3 +75,36 @@ def safe_enqueue_store_snapshot(
             "provisioning_hooks: falha ao enfileirar store=%s",
             store_ref.id or store_ref.slug,
         )
+
+
+def preaquecer_motor_token(
+    session_factory: Callable[[], Any],
+    slug: str,
+) -> None:
+    """Emite e guarda o token do Motor no nascimento da loja (best-effort).
+
+    Nunca quebra a criação: sem chave de cofre, sem token de serviço do Motor
+    ou com o Motor fora, só loga o slug (nunca o token) e segue. Chamador real:
+    ``StoreControl.create`` (cobre UI e API).
+    """
+    from app.control import motor_tokens
+
+    try:
+        with session_factory() as db:
+            motor_tokens.ensure_motor_token(db, slug)
+            db.commit()
+    except (
+        motor_tokens.CofreIndisponivel,
+        motor_tokens.MotorIndisponivel,
+        motor_tokens.SlugInvalido,
+    ) as exc:
+        logger.warning(
+            "provisioning_hooks: sem pré-aquecer token do Motor loja=%s motivo=%s",
+            slug,
+            type(exc).__name__,
+        )
+    except Exception:
+        logger.exception(
+            "provisioning_hooks: falha ao pré-aquecer token do Motor loja=%s",
+            slug,
+        )

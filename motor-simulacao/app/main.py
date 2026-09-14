@@ -3,10 +3,14 @@ from __future__ import annotations
 
 import hmac
 import os
+import re
+import secrets
+import uuid
 from pathlib import Path
 
 from fastapi import Depends, FastAPI, Query, Request, Response
 from fastapi.responses import FileResponse, JSONResponse
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app import auth, config, credenciais, models_db, observabilidade, provisioning, servico  # noqa: F401
@@ -154,6 +158,84 @@ def _exigir_cliente_operacional(db: Session, cliente_id: str) -> JSONResponse | 
             },
         )
     return None
+
+
+_SLUG_RE = re.compile(r"[a-z0-9]+(?:-[a-z0-9]+)*")
+
+
+def _slug_canonico(valor: object) -> str | None:
+    """Slug canônico do Control: strip + minúsculas, `[a-z0-9-]` com hífens internos, ≤120."""
+    slug = (valor if isinstance(valor, str) else "").strip().lower()
+    if not slug or len(slug) > 120 or not _SLUG_RE.fullmatch(slug):
+        return None
+    return slug
+
+
+@app.post("/v1/internal/provisioning/ensure-cliente", include_in_schema=False)
+def garantir_cliente_provisionamento(
+    payload: dict,
+    request: Request,
+    response: Response,
+    db: Session = Depends(get_db),
+):
+    """Emite um cliente+credencial por loja_slug (provisionamento automático, sem CLI).
+
+    Interno: auth por token de serviço dedicado (``MOTOR_PROVISIONING_TOKEN``),
+    nunca Bearer de cliente. Idempotente por ``loja_slug`` canônico amarrado em
+    ``clientes_api.nome``: cliente já existente NÃO ganha credencial nova e o
+    token NÃO é devolvido de novo (rotação continua sendo ops via CLI). O token
+    em claro aparece só no campo ``token`` da criação; no banco fica só o hash.
+    """
+    erro_auth = auth.autenticar_provisionamento(request)
+    if erro_auth is not None:
+        return erro_auth
+    slug = _slug_canonico((payload or {}).get("loja_slug"))
+    if slug is None:
+        return JSONResponse(
+            status_code=422,
+            content={"erro": {"code": "loja_slug_invalido", "message": "loja_slug inválido"}},
+        )
+    existente = db.query(models_db.ClienteApiORM).filter_by(nome=slug).one_or_none()
+    if existente is not None:
+        return {
+            "cliente_id": existente.id,
+            "loja_slug": slug,
+            "ja_existia": True,
+            "token": None,
+        }
+    token = secrets.token_urlsafe(32)
+    cliente = models_db.ClienteApiORM(id=str(uuid.uuid4()), nome=slug)
+    db.add(cliente)
+    db.add(
+        models_db.CredencialApiORM(
+            id=str(uuid.uuid4()),
+            cliente_id=cliente.id,
+            nome="provisioning",
+            token_hash=auth.hash_token(token),
+        )
+    )
+    credenciais.registrar_auditoria(db, cliente.id, "provisioning", "cliente_provisionado")
+    try:
+        db.commit()
+    except IntegrityError:
+        # Corrida entre dois ensures: o outro venceu; sem credencial nova, sem token.
+        db.rollback()
+        concorrente = db.query(models_db.ClienteApiORM).filter_by(nome=slug).one_or_none()
+        if concorrente is None:
+            raise
+        return {
+            "cliente_id": concorrente.id,
+            "loja_slug": slug,
+            "ja_existia": True,
+            "token": None,
+        }
+    response.status_code = 201
+    return {
+        "cliente_id": cliente.id,
+        "loja_slug": slug,
+        "ja_existia": False,
+        "token": token,
+    }
 
 
 @app.post("/v1/internal/provisioning/state")

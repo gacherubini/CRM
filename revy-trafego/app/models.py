@@ -1091,3 +1091,28 @@ class ReadinessAlertAcceptance(Base):
     accepted_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=agora, index=True
     )
+
+
+class MotorTokenCofre(Base):
+    """Token do Motor por loja, cifrado em repouso.
+
+    O claro existe só na resposta 1x do Motor e no corpo do endpoint interno
+    que serve ao Portal. Aqui fica só o blob Fernet (chave só em env
+    ``REVY_CONTROL_TOKENS_KEY``); sem a chave, leitura e emissão falham
+    fechado. Nunca entra em log, auditoria, erro ou outbox.
+    """
+
+    __tablename__ = "motor_tokens_cofre"
+    __table_args__ = (
+        CheckConstraint(
+            "length(loja_slug) BETWEEN 1 AND 120",
+            name="ck_motor_tokens_cofre_slug",
+        ),
+    )
+
+    loja_slug: Mapped[str] = mapped_column(String(120), primary_key=True)
+    token_ciphertext: Mapped[str] = mapped_column(Text, nullable=False)
+    criado_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=agora)
+    atualizado_em: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=agora
+    )

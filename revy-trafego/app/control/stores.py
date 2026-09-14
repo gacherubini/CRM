@@ -7,7 +7,10 @@ from typing import Any
 from sqlalchemy.exc import IntegrityError
 
 from app.control.audit import _append_event
-from app.control.provisioning_hooks import safe_enqueue_store_snapshot
+from app.control.provisioning_hooks import (
+    preaquecer_motor_token,
+    safe_enqueue_store_snapshot,
+)
 from app.control.readiness import build_readiness_report, first_failed_required
 from app import config
 from app.control.types import (
@@ -84,7 +87,10 @@ class StoreControl:
                 db.rollback()
                 raise StoreSlugConflict(f"slug de Loja já existe: {slug}") from exc
             db.refresh(store)
-            return _store_view(store)
+            view = _store_view(store)
+            # Pré-aquece o token do Motor (best-effort: nunca quebra a criação).
+            preaquecer_motor_token(self._session_factory, slug)
+            return view
 
     def update(self, actor: Actor, command: UpdateStore) -> StoreView:
         if not actor.is_admin:

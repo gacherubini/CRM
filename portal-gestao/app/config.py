@@ -185,6 +185,12 @@ class Settings:
         "REVY_TRAFEGO_SERVICE_TOKEN", ""
     ).strip()
     revy_trafego_timeout: float = float(os.getenv("PORTAL_REVY_TRAFEGO_TIMEOUT", "4"))
+    # Cofre de tokens do Motor no Control (GET /internal/motor-tokens/{slug}).
+    # Timeout curto e próprio: a consulta acontece dentro do request que monta
+    # o MotorClient, então não pode herdar timeout longo nem segurar a tela.
+    control_motor_token_timeout: float = float(
+        os.getenv("PORTAL_CONTROL_MOTOR_TOKEN_TIMEOUT", "2")
+    )
     revy_trafego_resultados_enabled: bool = (
         os.getenv("PORTAL_REVY_TRAFEGO_RESULTADOS", "0").strip().lower()
         in {"1", "true", "yes", "on"}
@@ -353,7 +359,11 @@ class Settings:
         credenciais bancárias da mesma conta — o mesmo vazamento que o
         ``chatbot_token_para`` acima existe para estancar no chatbot.
 
-        Dois modos, do mais explícito ao legado:
+        Dois modos, do mais explícito ao legado — e ambos SÃO o fallback:
+        antes deles, ``get_motor_client`` (``app/main.py``) consulta o cofre
+        do Control (``GET /internal/motor-tokens/{slug}``), que é o caminho
+        automático para loja nova. Só quando o cofre não tem o token (404,
+        falha ou sem config) é que este mapa/global decide:
 
         1. `motor_tokens_json` — mapa `slug -> token`. Slug fora do mapa
            devolve `""`: preferimos a tela dizer "desligada" a ela operar,

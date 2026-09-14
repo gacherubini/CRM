@@ -1,10 +1,12 @@
 """Autenticação das APIs do Motor por credencial Bearer de cliente."""
 import hashlib
+import hmac
 
 from fastapi import Depends, Request
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
+from app import config
 from app.db import get_db
 from app.models_db import ClienteApiORM, CredencialApiORM
 
@@ -39,3 +41,27 @@ def autenticar_cliente(request: Request, db: Session = Depends(get_db)):
     if cliente is None or not cliente.ativo:
         return _nao_autorizado()
     return cliente
+
+
+def autenticar_provisionamento(request: Request) -> JSONResponse | None:
+    """Auth do endpoint interno de provisionamento (token de serviço dedicado).
+
+    Retorna ``None`` quando autorizado; senão a resposta de erro já pronta:
+    503 fail-closed sem ``MOTOR_PROVISIONING_TOKEN`` configurado, 401 quando o
+    Bearer não confere. Nunca aceita Bearer de cliente aqui.
+    """
+    esperado = (config.PROVISIONING_TOKEN or "").strip()
+    if not esperado:
+        return JSONResponse(
+            status_code=503,
+            content={
+                "erro": {
+                    "code": "provisionamento_indisponivel",
+                    "message": "provisionamento automático indisponível",
+                }
+            },
+        )
+    recebido = request.headers.get("Authorization", "")
+    if not hmac.compare_digest(recebido, f"Bearer {esperado}"):
+        return _nao_autorizado()
+    return None

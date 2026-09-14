@@ -1,7 +1,7 @@
-# revy-trafego · 120 rotas · 31 modelos · 6 workers · 59 flags · 20 migrations · 20 templates
+# revy-trafego · 121 rotas · 32 modelos · 6 workers · 60 flags · 21 migrations · 20 templates
 
-Gerado de `8ef1d52`. NAO editar a mao — saida de `gerar_mapa.py`.
-Migration head: `0020_loja_whatsapp_modo`
+Gerado de `0574c1b`. NAO editar a mao — saida de `gerar_mapa.py`.
+Migration head: `0021_motor_tokens_cofre`
 
 ## Rotas
 
@@ -9,41 +9,42 @@ Migration head: `0020_loja_whatsapp_modo`
 - `POST /v1/lojas/{loja_slug}/eventos/venda-atualizada` — app/api_v1.py:244
 - `POST /v1/lojas/{loja_slug}/eventos/venda-confirmada` — app/api_v1.py:289
 - `GET /v1/lojas/{loja_slug}/integracoes/health` — app/api_v1.py:456
-- `GET /health/live` — app/main.py:330
-- `GET /health/ready` — app/main.py:335
-- `GET /public/v1/lojas/{loja_slug}/pixel` — app/main.py:341
-- `GET /` — app/main.py:366
-- `GET /login` — app/main.py:371
-- `POST /login` — app/main.py:381
-- `POST /logout` — app/main.py:399
-- `GET /app` — app/main.py:407
-- `POST /app/loja` — app/main.py:450
-- `GET /app/trafego` — app/main.py:524
-- `POST /app/trafego` — app/main.py:551
-- `POST /app/trafego/ads/salvar` — app/main.py:618
-- `POST /app/trafego/ads/sincronizar` — app/main.py:661
-- `POST /app/trafego/capi/retentar` — app/main.py:675
-- `GET /app/trafego/pixel-auditoria` — app/main.py:689
-- `GET /app/trafego/ctwa-auditoria` — app/main.py:704
-- `GET /app/trafego/roi` — app/main.py:738
-- `GET /app/campanhas` — app/main.py:796
-- `GET /app/campanhas/nova` — app/main.py:855
-- `POST /app/campanhas/nova` — app/main.py:868
-- `GET /app/campanhas/gastos/lote` — app/main.py:912
-- `POST /app/campanhas/gastos/lote` — app/main.py:937
-- `GET /app/campanhas/gastos/csv/modelo` — app/main.py:998
-- `POST /app/campanhas/gastos/csv` — app/main.py:1011
-- `GET /app/campanhas/{campanha_id}` — app/main.py:1066
-- `GET /app/campanhas/{campanha_id}/editar` — app/main.py:1159
-- `POST /app/campanhas/{campanha_id}/editar` — app/main.py:1192
-- `POST /app/campanhas/{campanha_id}/apagar` — app/main.py:1236
-- `POST /app/campanhas/{campanha_id}/gastos` — app/main.py:1256
-- `GET /app/diagnostico/leads` — app/main.py:1296
-- `GET /app/diagnostico/leads/{lead_id}` — app/main.py:1337
-- `GET /app/diagnostico/conversas/{telefone}` — app/main.py:1368
-- `POST /internal/jobs/meta-spend-sync` — app/main.py:1423
-- `POST /internal/jobs/google-conversions-outbox` — app/main.py:1444
-- `POST /internal/jobs/google-ads-metrics-sync` — app/main.py:1467
+- `GET /health/live` — app/main.py:331
+- `GET /health/ready` — app/main.py:336
+- `GET /public/v1/lojas/{loja_slug}/pixel` — app/main.py:342
+- `GET /` — app/main.py:367
+- `GET /login` — app/main.py:372
+- `POST /login` — app/main.py:382
+- `POST /logout` — app/main.py:400
+- `GET /app` — app/main.py:408
+- `POST /app/loja` — app/main.py:451
+- `GET /app/trafego` — app/main.py:525
+- `POST /app/trafego` — app/main.py:552
+- `POST /app/trafego/ads/salvar` — app/main.py:619
+- `POST /app/trafego/ads/sincronizar` — app/main.py:662
+- `POST /app/trafego/capi/retentar` — app/main.py:676
+- `GET /app/trafego/pixel-auditoria` — app/main.py:690
+- `GET /app/trafego/ctwa-auditoria` — app/main.py:705
+- `GET /app/trafego/roi` — app/main.py:739
+- `GET /app/campanhas` — app/main.py:797
+- `GET /app/campanhas/nova` — app/main.py:856
+- `POST /app/campanhas/nova` — app/main.py:869
+- `GET /app/campanhas/gastos/lote` — app/main.py:913
+- `POST /app/campanhas/gastos/lote` — app/main.py:938
+- `GET /app/campanhas/gastos/csv/modelo` — app/main.py:999
+- `POST /app/campanhas/gastos/csv` — app/main.py:1012
+- `GET /app/campanhas/{campanha_id}` — app/main.py:1067
+- `GET /app/campanhas/{campanha_id}/editar` — app/main.py:1160
+- `POST /app/campanhas/{campanha_id}/editar` — app/main.py:1193
+- `POST /app/campanhas/{campanha_id}/apagar` — app/main.py:1237
+- `POST /app/campanhas/{campanha_id}/gastos` — app/main.py:1257
+- `GET /app/diagnostico/leads` — app/main.py:1297
+- `GET /app/diagnostico/leads/{lead_id}` — app/main.py:1338
+- `GET /app/diagnostico/conversas/{telefone}` — app/main.py:1369
+- `POST /internal/jobs/meta-spend-sync` — app/main.py:1424
+- `POST /internal/jobs/google-conversions-outbox` — app/main.py:1445
+- `POST /internal/jobs/google-ads-metrics-sync` — app/main.py:1468
+- `GET /internal/motor-tokens/{slug}` — app/main.py:1526
 - `GET /control/v1/acessos` — app/web/control.py:437
 - `POST /control/v1/acessos/{acesso_id}/desativar` — app/web/control.py:446
 - `POST /control/v1/acessos/{acesso_id}/reativar` — app/web/control.py:458
@@ -159,6 +160,7 @@ Migration head: `0020_loja_whatsapp_modo`
 - `google_ads_conversion_outbox` — app/models.py:983
 - `google_ads_upload_attempts` — app/models.py:1032
 - `readiness_alert_acceptances` — app/models.py:1065
+- `motor_tokens_cofre` — app/models.py:1105
 
 ## Workers
 
@@ -174,45 +176,46 @@ Migration head: `0020_loja_whatsapp_modo`
 - `REVY_TRAFEGO_DATABASE_URL (default: sqlite:///./revy_trafego.db)` — app/config.py:18
 - `REVY_TRAFEGO_SESSION_SECRET (default: dev-trafego-troque)` — app/config.py:21
 - `REVY_TRAFEGO_ENCRYPTION_KEY` — app/config.py:23
-- `REVY_TRAFEGO_SECURE_COOKIE (default: 0)` — app/config.py:26
-- `REVY_TRAFEGO_CHATBOT_TOKEN_LOJA (default: '')` — app/config.py:30
-- `REVY_TRAFEGO_CHATBOT_TOKENS_JSON (default: '')` — app/config.py:33
-- `REVY_TRAFEGO_ESTOQUE_TOKEN_LOJA (default: '')` — app/config.py:38
-- `REVY_TRAFEGO_ESTOQUE_TOKENS_JSON (default: '')` — app/config.py:41
-- `REVY_TRAFEGO_MOTOR_TOKEN_LOJA (default: '')` — app/config.py:58
-- `REVY_TRAFEGO_MOTOR_TOKENS_JSON (default: '')` — app/config.py:59
-- `REVY_TRAFEGO_HTTP_TIMEOUT (default: 5)` — app/config.py:69
-- `REVY_TRAFEGO_HTTP_RETRIES (default: 1)` — app/config.py:70
-- `REVY_TRAFEGO_HTTP_RETRY_BACKOFF (default: 0.2)` — app/config.py:72
-- `REVY_TRAFEGO_TIMEZONE (default: America/Sao_Paulo)` — app/config.py:74
-- `REVY_TRAFEGO_VERSION (default: 0.1.0)` — app/config.py:75
-- `REVY_TRAFEGO_BOOTSTRAP_EMAIL (default: trafego@revy.local)` — app/config.py:77
-- `REVY_TRAFEGO_BOOTSTRAP_SENHA (default: troque-isto)` — app/config.py:79
-- `REVY_TRAFEGO_BOOTSTRAP_NOME (default: Equipe Tráfego)` — app/config.py:80
-- `REVY_TRAFEGO_META_SPEND_SYNC_ENABLED (default: 0)` — app/config.py:83
-- `REVY_TRAFEGO_CAPI_WORKER (default: 0)` — app/config.py:87
-- `REVY_CONTROL_ENABLED (default: 0)` — app/config.py:91
-- `REVY_CONTROL_RBAC_ENABLED (default: 0)` — app/config.py:95
-- `GOOGLE_ADS_SYNC_ENABLED` — app/config.py:99
-- `GOOGLE_CONVERSIONS_ENABLED` — app/config.py:102
-- `GOOGLE_ADS_METRICS_WORKER_ENABLED` — app/config.py:106
-- `MULTI_WHATSAPP_ENABLED` — app/config.py:137
-- `REVY_CONTROL_DASHBOARD_ENABLED` — app/config.py:140
-- `REVY_CONTROL_PROVISIONING_DELIVERY_ENABLED` — app/config.py:145
-- `REVY_TRAFEGO_JOB_SECRET (default: '')` — app/config.py:148
-- `REVY_TRAFEGO_SERVICE_TOKEN (default: '')` — app/config.py:150
-- `REVY_TRAFEGO_URL_PREFIX (default: '')` — app/config.py:152
-- `REVY_TRAFEGO_EMAIL_BACKEND (default: console)` — app/config.py:153
-- `REVY_TRAFEGO_EMAIL_FROM (default: no-reply@revy.local)` — app/config.py:154
-- `REVY_TRAFEGO_EMAIL_FROM_NAME (default: Revy Control)` — app/config.py:156
-- `REVY_TRAFEGO_SMTP_HOST (default: '')` — app/config.py:158
-- `REVY_TRAFEGO_SMTP_PORT (default: 587)` — app/config.py:159
-- `REVY_TRAFEGO_SMTP_USERNAME (default: '')` — app/config.py:160
-- `REVY_TRAFEGO_SMTP_PASSWORD (default: '')` — app/config.py:161
-- `REVY_TRAFEGO_SMTP_USE_TLS (default: 1)` — app/config.py:162
-- `REVY_TRAFEGO_PUBLIC_BASE_URL (default: '')` — app/config.py:168
-- `REVY_TRAFEGO_LOJAS` — app/config.py:245
-- `REVY_CONTROL_WHATSAPP_MODO2_ENABLED (default: '')` — app/config.py:256
+- `REVY_CONTROL_TOKENS_KEY (default: '')` — app/config.py:28
+- `REVY_TRAFEGO_SECURE_COOKIE (default: 0)` — app/config.py:29
+- `REVY_TRAFEGO_CHATBOT_TOKEN_LOJA (default: '')` — app/config.py:33
+- `REVY_TRAFEGO_CHATBOT_TOKENS_JSON (default: '')` — app/config.py:36
+- `REVY_TRAFEGO_ESTOQUE_TOKEN_LOJA (default: '')` — app/config.py:41
+- `REVY_TRAFEGO_ESTOQUE_TOKENS_JSON (default: '')` — app/config.py:44
+- `REVY_TRAFEGO_MOTOR_TOKEN_LOJA (default: '')` — app/config.py:61
+- `REVY_TRAFEGO_MOTOR_TOKENS_JSON (default: '')` — app/config.py:62
+- `REVY_TRAFEGO_HTTP_TIMEOUT (default: 5)` — app/config.py:75
+- `REVY_TRAFEGO_HTTP_RETRIES (default: 1)` — app/config.py:76
+- `REVY_TRAFEGO_HTTP_RETRY_BACKOFF (default: 0.2)` — app/config.py:78
+- `REVY_TRAFEGO_TIMEZONE (default: America/Sao_Paulo)` — app/config.py:80
+- `REVY_TRAFEGO_VERSION (default: 0.1.0)` — app/config.py:81
+- `REVY_TRAFEGO_BOOTSTRAP_EMAIL (default: trafego@revy.local)` — app/config.py:83
+- `REVY_TRAFEGO_BOOTSTRAP_SENHA (default: troque-isto)` — app/config.py:85
+- `REVY_TRAFEGO_BOOTSTRAP_NOME (default: Equipe Tráfego)` — app/config.py:86
+- `REVY_TRAFEGO_META_SPEND_SYNC_ENABLED (default: 0)` — app/config.py:89
+- `REVY_TRAFEGO_CAPI_WORKER (default: 0)` — app/config.py:93
+- `REVY_CONTROL_ENABLED (default: 0)` — app/config.py:97
+- `REVY_CONTROL_RBAC_ENABLED (default: 0)` — app/config.py:101
+- `GOOGLE_ADS_SYNC_ENABLED` — app/config.py:105
+- `GOOGLE_CONVERSIONS_ENABLED` — app/config.py:108
+- `GOOGLE_ADS_METRICS_WORKER_ENABLED` — app/config.py:112
+- `MULTI_WHATSAPP_ENABLED` — app/config.py:143
+- `REVY_CONTROL_DASHBOARD_ENABLED` — app/config.py:146
+- `REVY_CONTROL_PROVISIONING_DELIVERY_ENABLED` — app/config.py:151
+- `REVY_TRAFEGO_JOB_SECRET (default: '')` — app/config.py:154
+- `REVY_TRAFEGO_SERVICE_TOKEN (default: '')` — app/config.py:156
+- `REVY_TRAFEGO_URL_PREFIX (default: '')` — app/config.py:158
+- `REVY_TRAFEGO_EMAIL_BACKEND (default: console)` — app/config.py:159
+- `REVY_TRAFEGO_EMAIL_FROM (default: no-reply@revy.local)` — app/config.py:160
+- `REVY_TRAFEGO_EMAIL_FROM_NAME (default: Revy Control)` — app/config.py:162
+- `REVY_TRAFEGO_SMTP_HOST (default: '')` — app/config.py:164
+- `REVY_TRAFEGO_SMTP_PORT (default: 587)` — app/config.py:165
+- `REVY_TRAFEGO_SMTP_USERNAME (default: '')` — app/config.py:166
+- `REVY_TRAFEGO_SMTP_PASSWORD (default: '')` — app/config.py:167
+- `REVY_TRAFEGO_SMTP_USE_TLS (default: 1)` — app/config.py:168
+- `REVY_TRAFEGO_PUBLIC_BASE_URL (default: '')` — app/config.py:174
+- `REVY_TRAFEGO_LOJAS` — app/config.py:251
+- `REVY_CONTROL_WHATSAPP_MODO2_ENABLED (default: '')` — app/config.py:262
 - `GOOGLE_CONVERSIONS_ENABLED` — app/control/google_ads_conversions_job.py:42
 - `GOOGLE_CONVERSIONS_WORKER_ENABLED` — app/control/google_ads_conversions_job.py:49
 - `GOOGLE_ADS_METRICS_WORKER_ENABLED (default: False)` — app/control/google_ads_metrics_job.py:100
@@ -221,7 +224,7 @@ Migration head: `0020_loja_whatsapp_modo`
 - `REVY_TRAFEGO_ENCRYPTION_KEY` — app/cripto.py:13
 - `REVY_TRAFEGO_ENV` — app/cripto.py:18
 - `REVY_TRAFEGO_LOJAS` — app/lojas.py:24
-- `REVY_TRAFEGO_SKIP_INIT` — app/main.py:90
+- `REVY_TRAFEGO_SKIP_INIT` — app/main.py:91
 - `REVY_TRAFEGO_AD_RESOLVER_MAX_TENTATIVAS` — app/meta_ad_resolver_job.py:56
 - `REVY_TRAFEGO_AD_RESOLVER_COOLDOWN_SECONDS` — app/meta_ad_resolver_job.py:57
 - `REVY_TRAFEGO_AD_RESOLVER_MAX_POR_CICLO` — app/meta_ad_resolver_job.py:58
@@ -253,22 +256,23 @@ Migration head: `0020_loja_whatsapp_modo`
 - `0018_copiloto_modulo` — alembic/versions/0018_copiloto_modulo.py
 - `0019_financeiro_modulo` — alembic/versions/0019_financeiro_modulo.py
 - `0020_loja_whatsapp_modo` — alembic/versions/0020_loja_whatsapp_modo.py
+- `0021_motor_tokens_cofre` — alembic/versions/0021_motor_tokens_cofre.py
 
 ## Templates
 
-- `app/templates/login.html` — app/main.py:376
-- `app/templates/home.html` — app/main.py:440
-- `app/templates/trafego/form.html` — app/main.py:538
-- `app/templates/trafego/pixel_auditoria.html` — app/main.py:699
-- `app/templates/trafego/ctwa_auditoria.html` — app/main.py:726
-- `app/templates/trafego/roi.html` — app/main.py:775
-- `app/templates/campanhas/lista.html` — app/main.py:828
-- `app/templates/campanhas/form.html` — app/main.py:861
-- `app/templates/campanhas/gastos_lote.html` — app/main.py:924
-- `app/templates/campanhas/detalhe.html` — app/main.py:1136
-- `app/templates/diagnostico/leads.html` — app/main.py:1332
-- `app/templates/diagnostico/lead_detalhe.html` — app/main.py:1363
-- `app/templates/diagnostico/conversa.html` — app/main.py:1400
+- `app/templates/login.html` — app/main.py:377
+- `app/templates/home.html` — app/main.py:441
+- `app/templates/trafego/form.html` — app/main.py:539
+- `app/templates/trafego/pixel_auditoria.html` — app/main.py:700
+- `app/templates/trafego/ctwa_auditoria.html` — app/main.py:727
+- `app/templates/trafego/roi.html` — app/main.py:776
+- `app/templates/campanhas/lista.html` — app/main.py:829
+- `app/templates/campanhas/form.html` — app/main.py:862
+- `app/templates/campanhas/gastos_lote.html` — app/main.py:925
+- `app/templates/campanhas/detalhe.html` — app/main.py:1137
+- `app/templates/diagnostico/leads.html` — app/main.py:1333
+- `app/templates/diagnostico/lead_detalhe.html` — app/main.py:1364
+- `app/templates/diagnostico/conversa.html` — app/main.py:1401
 - `app/templates/base.html` — app/templates/base.html
 - `app/templates/control/convite_aceitar.html` — app/web/control_ui.py:128
 - `app/templates/control/dashboard.html` — app/web/control_ui.py:387

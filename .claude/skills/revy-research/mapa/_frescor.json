@@ -1,5 +1,5 @@
 {
- "sha": "8ef1d52",
+ "sha": "0574c1b",
  "inventario": {
   "chatbot-api": [
    {
@@ -905,42 +905,42 @@
     "chave": "REVY_TRAFEGO_SMTP_PASSWORD (default: '')",
     "simbolo": "REVY_TRAFEGO_SMTP_PASSWORD",
     "arquivo": "app/config.py",
-    "linha": 227
+    "linha": 233
    },
    {
     "secao": "flag",
     "chave": "REVY_LOJA_COPILOTO_LLM_TIMEOUT (default: 40)",
     "simbolo": "REVY_LOJA_COPILOTO_LLM_TIMEOUT",
     "arquivo": "app/config.py",
-    "linha": 265
+    "linha": 271
    },
    {
     "secao": "flag",
     "chave": "REVY_LOJA_COPILOTO_LLM_RETRIES (default: 1)",
     "simbolo": "REVY_LOJA_COPILOTO_LLM_RETRIES",
     "arquivo": "app/config.py",
-    "linha": 267
+    "linha": 273
    },
    {
     "secao": "flag",
     "chave": "REVY_LOJA_COPILOTO_HISTORICO_TOKENS (default: 2000)",
     "simbolo": "REVY_LOJA_COPILOTO_HISTORICO_TOKENS",
     "arquivo": "app/config.py",
-    "linha": 272
+    "linha": 278
    },
    {
     "secao": "flag",
     "chave": "REVY_LOJA_COPILOTO_FIPE_TIMEOUT (default: 8)",
     "simbolo": "REVY_LOJA_COPILOTO_FIPE_TIMEOUT",
     "arquivo": "app/config.py",
-    "linha": 287
+    "linha": 293
    },
    {
     "secao": "flag",
     "chave": "REVY_LOJA_COPILOTO_FIPE_CACHE_SEGUNDOS (default: 21600)",
     "simbolo": "REVY_LOJA_COPILOTO_FIPE_CACHE_SEGUNDOS",
     "arquivo": "app/config.py",
-    "linha": 291
+    "linha": 297
    },
    {
     "secao": "flag",
@@ -954,63 +954,63 @@
     "chave": "REVY_TRAFEGO_SMTP_PORT (default: 587)",
     "simbolo": "REVY_TRAFEGO_SMTP_PORT",
     "arquivo": "app/config.py",
-    "linha": 221
+    "linha": 227
    },
    {
     "secao": "flag",
     "chave": "REVY_LOJA_COPILOTO_LLM_KEY (default: '')",
     "simbolo": "REVY_LOJA_COPILOTO_LLM_KEY",
     "arquivo": "app/config.py",
-    "linha": 260
+    "linha": 266
    },
    {
     "secao": "flag",
     "chave": "REVY_LOJA_COPILOTO_LLM_MODEL (default: DeepSeek-V4-Flash-0731)",
     "simbolo": "REVY_LOJA_COPILOTO_LLM_MODEL",
     "arquivo": "app/config.py",
-    "linha": 262
+    "linha": 268
    },
    {
     "secao": "flag",
     "chave": "REVY_TRAFEGO_EMAIL_FROM (default: no-reply@revy.local)",
     "simbolo": "REVY_TRAFEGO_EMAIL_FROM",
     "arquivo": "app/config.py",
-    "linha": 211
+    "linha": 217
    },
    {
     "secao": "flag",
     "chave": "REVY_TRAFEGO_EMAIL_FROM_NAME (default: Revy)",
     "simbolo": "REVY_TRAFEGO_EMAIL_FROM_NAME",
     "arquivo": "app/config.py",
-    "linha": 215
+    "linha": 221
    },
    {
     "secao": "flag",
     "chave": "REVY_TRAFEGO_SMTP_HOST (default: '')",
     "simbolo": "REVY_TRAFEGO_SMTP_HOST",
     "arquivo": "app/config.py",
-    "linha": 218
+    "linha": 224
    },
    {
     "secao": "flag",
     "chave": "REVY_TRAFEGO_SMTP_USERNAME (default: '')",
     "simbolo": "REVY_TRAFEGO_SMTP_USERNAME",
     "arquivo": "app/config.py",
-    "linha": 224
+    "linha": 230
    },
    {
     "secao": "flag",
     "chave": "REVY_LOJA_COPILOTO_LLM_URL (default: https://api.deepseek.com)",
     "simbolo": "REVY_LOJA_COPILOTO_LLM_URL",
     "arquivo": "app/config.py",
-    "linha": 258
+    "linha": 264
    },
    {
     "secao": "flag",
     "chave": "REVY_LOJA_COPILOTO_FIPE_URL (default: https://parallelum.com.br/fipe/api/v1)",
     "simbolo": "REVY_LOJA_COPILOTO_FIPE_URL",
     "arquivo": "app/config.py",
-    "linha": 284
+    "linha": 290
    },
    {
     "secao": "flag",
@@ -1031,21 +1031,21 @@
     "chave": "REVY_TRAFEGO_EMAIL_BACKEND (default: console)",
     "simbolo": "REVY_TRAFEGO_EMAIL_BACKEND",
     "arquivo": "app/config.py",
-    "linha": 207
+    "linha": 213
    },
    {
     "secao": "flag",
     "chave": "REVY_TRAFEGO_PUBLIC_BASE_URL (default: '')",
     "simbolo": "REVY_TRAFEGO_PUBLIC_BASE_URL",
     "arquivo": "app/config.py",
-    "linha": 234
+    "linha": 240
    },
    {
     "secao": "flag",
     "chave": "REVY_TRAFEGO_SMTP_USE_TLS (default: 1)",
     "simbolo": "REVY_TRAFEGO_SMTP_USE_TLS",
     "arquivo": "app/config.py",
-    "linha": 230
+    "linha": 236
    },
    {
     "secao": "worker",
@@ -1178,266 +1178,266 @@
     "chave": "GET /health/live",
     "simbolo": "/health/live",
     "arquivo": "app/main.py",
-    "linha": 564
+    "linha": 583
    },
    {
     "secao": "rota",
     "chave": "GET /health/ready",
     "simbolo": "/health/ready",
     "arquivo": "app/main.py",
-    "linha": 569
+    "linha": 588
    },
    {
     "secao": "rota",
     "chave": "GET /public/v1/lojas/{loja_slug}/pixel",
     "simbolo": "/public/v1/lojas/{loja_slug}/pixel",
     "arquivo": "app/main.py",
-    "linha": 578
+    "linha": 597
    },
    {
     "secao": "rota",
     "chave": "GET /",
     "simbolo": "/",
     "arquivo": "app/main.py",
-    "linha": 613
+    "linha": 632
    },
    {
     "secao": "rota",
     "chave": "GET /login",
     "simbolo": "/login",
     "arquivo": "app/main.py",
-    "linha": 618
+    "linha": 637
    },
    {
     "secao": "rota",
     "chave": "POST /login",
     "simbolo": "/login",
     "arquivo": "app/main.py",
-    "linha": 625
+    "linha": 644
    },
    {
     "secao": "rota",
     "chave": "POST /logout",
     "simbolo": "/logout",
     "arquivo": "app/main.py",
-    "linha": 646
+    "linha": 665
    },
    {
     "secao": "rota",
     "chave": "GET /conta/senha",
     "simbolo": "/conta/senha",
     "arquivo": "app/main.py",
-    "linha": 653
+    "linha": 672
    },
    {
     "secao": "rota",
     "chave": "POST /conta/senha",
     "simbolo": "/conta/senha",
     "arquivo": "app/main.py",
-    "linha": 662
+    "linha": 681
    },
    {
     "secao": "rota",
     "chave": "GET /app",
     "simbolo": "/app",
     "arquivo": "app/main.py",
-    "linha": 699
+    "linha": 718
    },
    {
     "secao": "rota",
     "chave": "GET /app/estoque",
     "simbolo": "/app/estoque",
     "arquivo": "app/main.py",
-    "linha": 828
+    "linha": 847
    },
    {
     "secao": "rota",
     "chave": "GET /app/estoque/novo",
     "simbolo": "/app/estoque/novo",
     "arquivo": "app/main.py",
-    "linha": 867
+    "linha": 886
    },
    {
     "secao": "rota",
     "chave": "GET /app/operacao/numeros",
     "simbolo": "/app/operacao/numeros",
     "arquivo": "app/main.py",
-    "linha": 967
+    "linha": 986
    },
    {
     "secao": "rota",
     "chave": "POST /app/operacao/grupo",
     "simbolo": "/app/operacao/grupo",
     "arquivo": "app/main.py",
-    "linha": 1000
+    "linha": 1019
    },
    {
     "secao": "rota",
     "chave": "POST /app/operacao/numeros",
     "simbolo": "/app/operacao/numeros",
     "arquivo": "app/main.py",
-    "linha": 1028
+    "linha": 1047
    },
    {
     "secao": "rota",
     "chave": "POST /app/operacao/numeros/remover",
     "simbolo": "/app/operacao/numeros/remover",
     "arquivo": "app/main.py",
-    "linha": 1055
+    "linha": 1074
    },
    {
     "secao": "rota",
     "chave": "POST /app/estoque/novo",
     "simbolo": "/app/estoque/novo",
     "arquivo": "app/main.py",
-    "linha": 1081
+    "linha": 1100
    },
    {
     "secao": "rota",
     "chave": "GET /app/estoque/{veiculo_id}",
     "simbolo": "/app/estoque/{veiculo_id}",
     "arquivo": "app/main.py",
-    "linha": 1108
+    "linha": 1127
    },
    {
     "secao": "rota",
     "chave": "POST /app/estoque/{veiculo_id}",
     "simbolo": "/app/estoque/{veiculo_id}",
     "arquivo": "app/main.py",
-    "linha": 1139
+    "linha": 1158
    },
    {
     "secao": "rota",
     "chave": "POST /app/estoque/{veiculo_id}/{acao}",
     "simbolo": "/app/estoque/{veiculo_id}/{acao}",
     "arquivo": "app/main.py",
-    "linha": 1167
+    "linha": 1186
    },
    {
     "secao": "rota",
     "chave": "GET /app/leads",
     "simbolo": "/app/leads",
     "arquivo": "app/main.py",
-    "linha": 1214
+    "linha": 1233
    },
    {
     "secao": "rota",
     "chave": "GET /app/leads/{lead_id}",
     "simbolo": "/app/leads/{lead_id}",
     "arquivo": "app/main.py",
-    "linha": 1242
+    "linha": 1261
    },
    {
     "secao": "rota",
     "chave": "POST /app/leads/{lead_id}/etapa",
     "simbolo": "/app/leads/{lead_id}/etapa",
     "arquivo": "app/main.py",
-    "linha": 1278
+    "linha": 1297
    },
    {
     "secao": "rota",
     "chave": "GET /app/conversas",
     "simbolo": "/app/conversas",
     "arquivo": "app/main.py",
-    "linha": 1337
+    "linha": 1356
    },
    {
     "secao": "rota",
     "chave": "GET /app/conversas/{telefone}",
     "simbolo": "/app/conversas/{telefone}",
     "arquivo": "app/main.py",
-    "linha": 1364
+    "linha": 1383
    },
    {
     "secao": "rota",
     "chave": "POST /app/conversas/{telefone}/handoff",
     "simbolo": "/app/conversas/{telefone}/handoff",
     "arquivo": "app/main.py",
-    "linha": 1457
+    "linha": 1476
    },
    {
     "secao": "rota",
     "chave": "GET /app/vendas",
     "simbolo": "/app/vendas",
     "arquivo": "app/main.py",
-    "linha": 1570
+    "linha": 1589
    },
    {
     "secao": "rota",
     "chave": "GET /app/vendas/nova",
     "simbolo": "/app/vendas/nova",
     "arquivo": "app/main.py",
-    "linha": 1610
+    "linha": 1629
    },
    {
     "secao": "rota",
     "chave": "POST /app/vendas/nova",
     "simbolo": "/app/vendas/nova",
     "arquivo": "app/main.py",
-    "linha": 1627
+    "linha": 1646
    },
    {
     "secao": "rota",
     "chave": "POST /app/vendas/{venda_id}/confirmar",
     "simbolo": "/app/vendas/{venda_id}/confirmar",
     "arquivo": "app/main.py",
-    "linha": 2030
+    "linha": 2049
    },
    {
     "secao": "rota",
     "chave": "POST /app/vendas/{venda_id}/cancelar",
     "simbolo": "/app/vendas/{venda_id}/cancelar",
     "arquivo": "app/main.py",
-    "linha": 2048
+    "linha": 2067
    },
    {
     "secao": "rota",
     "chave": "GET /app/vendedor",
     "simbolo": "/app/vendedor",
     "arquivo": "app/main.py",
-    "linha": 2060
+    "linha": 2079
    },
    {
     "secao": "rota",
     "chave": "GET /app/funil",
     "simbolo": "/app/funil",
     "arquivo": "app/main.py",
-    "linha": 2171
+    "linha": 2190
    },
    {
     "secao": "rota",
     "chave": "GET /app/funil/dados",
     "simbolo": "/app/funil/dados",
     "arquivo": "app/main.py",
-    "linha": 2247
+    "linha": 2266
    },
    {
     "secao": "rota",
     "chave": "GET /app/financeiro",
     "simbolo": "/app/financeiro",
     "arquivo": "app/main.py",
-    "linha": 2284
+    "linha": 2303
    },
    {
     "secao": "rota",
     "chave": "GET /app/financeiras",
     "simbolo": "/app/financeiras",
     "arquivo": "app/main.py",
-    "linha": 2361
+    "linha": 2380
    },
    {
     "secao": "rota",
     "chave": "POST /app/financeiras/{nome}",
     "simbolo": "/app/financeiras/{nome}",
     "arquivo": "app/main.py",
-    "linha": 2425
+    "linha": 2444
    },
    {
     "secao": "rota",
     "chave": "GET /app/configuracoes",
     "simbolo": "/app/configuracoes",
     "arquivo": "app/main.py",
-    "linha": 2547
+    "linha": 2566
    },
    {
     "secao": "worker",
@@ -2599,7 +2599,7 @@
     "chave": "app/templates/configuracoes/index.html",
     "simbolo": "configuracoes/index.html",
     "arquivo": "app/main.py",
-    "linha": 2587
+    "linha": 2606
    },
    {
     "secao": "template",
@@ -2613,14 +2613,14 @@
     "chave": "app/templates/conversas/detalhe.html",
     "simbolo": "conversas/detalhe.html",
     "arquivo": "app/main.py",
-    "linha": 1389
+    "linha": 1408
    },
    {
     "secao": "template",
     "chave": "app/templates/conversas/lista.html",
     "simbolo": "conversas/lista.html",
     "arquivo": "app/main.py",
-    "linha": 1353
+    "linha": 1372
    },
    {
     "secao": "template",
@@ -2634,7 +2634,7 @@
     "chave": "app/templates/dashboard.html",
     "simbolo": "dashboard.html",
     "arquivo": "app/main.py",
-    "linha": 809
+    "linha": 828
    },
    {
     "secao": "template",
@@ -2676,56 +2676,56 @@
     "chave": "app/templates/estoque/form.html",
     "simbolo": "estoque/form.html",
     "arquivo": "app/main.py",
-    "linha": 878
+    "linha": 897
    },
    {
     "secao": "template",
     "chave": "app/templates/estoque/lista.html",
     "simbolo": "estoque/lista.html",
     "arquivo": "app/main.py",
-    "linha": 853
+    "linha": 872
    },
    {
     "secao": "template",
     "chave": "app/templates/financeiras/lista.html",
     "simbolo": "financeiras/lista.html",
     "arquivo": "app/main.py",
-    "linha": 2411
+    "linha": 2430
    },
    {
     "secao": "template",
     "chave": "app/templates/financeiro/dashboard.html",
     "simbolo": "financeiro/dashboard.html",
     "arquivo": "app/main.py",
-    "linha": 2340
+    "linha": 2359
    },
    {
     "secao": "template",
     "chave": "app/templates/funil/index.html",
     "simbolo": "funil/index.html",
     "arquivo": "app/main.py",
-    "linha": 2234
+    "linha": 2253
    },
    {
     "secao": "template",
     "chave": "app/templates/leads/detalhe.html",
     "simbolo": "leads/detalhe.html",
     "arquivo": "app/main.py",
-    "linha": 1266
+    "linha": 1285
    },
    {
     "secao": "template",
     "chave": "app/templates/leads/lista.html",
     "simbolo": "leads/lista.html",
     "arquivo": "app/main.py",
-    "linha": 1231
+    "linha": 1250
    },
    {
     "secao": "template",
     "chave": "app/templates/login.html",
     "simbolo": "login.html",
     "arquivo": "app/main.py",
-    "linha": 622
+    "linha": 641
    },
    {
     "secao": "template",
@@ -2872,7 +2872,7 @@
     "chave": "app/templates/operacao/numeros.html",
     "simbolo": "operacao/numeros.html",
     "arquivo": "app/main.py",
-    "linha": 989
+    "linha": 1008
    },
    {
     "secao": "template",
@@ -2984,21 +2984,21 @@
     "chave": "app/templates/vendas/form.html",
     "simbolo": "vendas/form.html",
     "arquivo": "app/main.py",
-    "linha": 1552
+    "linha": 1571
    },
    {
     "secao": "template",
     "chave": "app/templates/vendas/lista.html",
     "simbolo": "vendas/lista.html",
     "arquivo": "app/main.py",
-    "linha": 1596
+    "linha": 1615
    },
    {
     "secao": "template",
     "chave": "app/templates/vendedor/dashboard.html",
     "simbolo": "vendedor/dashboard.html",
     "arquivo": "app/main.py",
-    "linha": 2155
+    "linha": 2174
    },
    {
     "secao": "migration",
@@ -4033,42 +4033,42 @@
     "chave": "REVY_TRAFEGO_TIMEZONE (default: America/Sao_Paulo)",
     "simbolo": "REVY_TRAFEGO_TIMEZONE",
     "arquivo": "app/config.py",
-    "linha": 74
+    "linha": 80
    },
    {
     "secao": "flag",
     "chave": "REVY_TRAFEGO_VERSION (default: 0.1.0)",
     "simbolo": "REVY_TRAFEGO_VERSION",
     "arquivo": "app/config.py",
-    "linha": 75
+    "linha": 81
    },
    {
     "secao": "flag",
     "chave": "REVY_TRAFEGO_BOOTSTRAP_EMAIL (default: trafego@revy.local)",
     "simbolo": "REVY_TRAFEGO_BOOTSTRAP_EMAIL",
     "arquivo": "app/config.py",
-    "linha": 77
+    "linha": 83
    },
    {
     "secao": "flag",
     "chave": "REVY_TRAFEGO_BOOTSTRAP_SENHA (default: troque-isto)",
     "simbolo": "REVY_TRAFEGO_BOOTSTRAP_SENHA",
     "arquivo": "app/config.py",
-    "linha": 79
+    "linha": 85
    },
    {
     "secao": "flag",
     "chave": "REVY_TRAFEGO_BOOTSTRAP_NOME (default: Equipe Tráfego)",
     "simbolo": "REVY_TRAFEGO_BOOTSTRAP_NOME",
     "arquivo": "app/config.py",
-    "linha": 80
+    "linha": 86
    },
    {
     "secao": "flag",
     "chave": "REVY_TRAFEGO_SMTP_PASSWORD (default: '')",
     "simbolo": "REVY_TRAFEGO_SMTP_PASSWORD",
     "arquivo": "app/config.py",
-    "linha": 161
+    "linha": 167
    },
    {
     "secao": "flag",
@@ -4082,231 +4082,238 @@
     "chave": "REVY_TRAFEGO_SECURE_COOKIE (default: 0)",
     "simbolo": "REVY_TRAFEGO_SECURE_COOKIE",
     "arquivo": "app/config.py",
-    "linha": 26
+    "linha": 29
    },
    {
     "secao": "flag",
     "chave": "REVY_TRAFEGO_HTTP_TIMEOUT (default: 5)",
     "simbolo": "REVY_TRAFEGO_HTTP_TIMEOUT",
     "arquivo": "app/config.py",
-    "linha": 69
+    "linha": 75
    },
    {
     "secao": "flag",
     "chave": "REVY_TRAFEGO_HTTP_RETRIES (default: 1)",
     "simbolo": "REVY_TRAFEGO_HTTP_RETRIES",
     "arquivo": "app/config.py",
-    "linha": 70
+    "linha": 76
    },
    {
     "secao": "flag",
     "chave": "REVY_TRAFEGO_HTTP_RETRY_BACKOFF (default: 0.2)",
     "simbolo": "REVY_TRAFEGO_HTTP_RETRY_BACKOFF",
     "arquivo": "app/config.py",
-    "linha": 72
+    "linha": 78
    },
    {
     "secao": "flag",
     "chave": "REVY_TRAFEGO_SMTP_PORT (default: 587)",
     "simbolo": "REVY_TRAFEGO_SMTP_PORT",
     "arquivo": "app/config.py",
-    "linha": 159
+    "linha": 165
+   },
+   {
+    "secao": "flag",
+    "chave": "REVY_CONTROL_TOKENS_KEY (default: '')",
+    "simbolo": "REVY_CONTROL_TOKENS_KEY",
+    "arquivo": "app/config.py",
+    "linha": 28
    },
    {
     "secao": "flag",
     "chave": "REVY_TRAFEGO_CHATBOT_TOKEN_LOJA (default: '')",
     "simbolo": "REVY_TRAFEGO_CHATBOT_TOKEN_LOJA",
     "arquivo": "app/config.py",
-    "linha": 30
+    "linha": 33
    },
    {
     "secao": "flag",
     "chave": "REVY_TRAFEGO_CHATBOT_TOKENS_JSON (default: '')",
     "simbolo": "REVY_TRAFEGO_CHATBOT_TOKENS_JSON",
     "arquivo": "app/config.py",
-    "linha": 33
+    "linha": 36
    },
    {
     "secao": "flag",
     "chave": "REVY_TRAFEGO_ESTOQUE_TOKEN_LOJA (default: '')",
     "simbolo": "REVY_TRAFEGO_ESTOQUE_TOKEN_LOJA",
     "arquivo": "app/config.py",
-    "linha": 38
+    "linha": 41
    },
    {
     "secao": "flag",
     "chave": "REVY_TRAFEGO_ESTOQUE_TOKENS_JSON (default: '')",
     "simbolo": "REVY_TRAFEGO_ESTOQUE_TOKENS_JSON",
     "arquivo": "app/config.py",
-    "linha": 41
+    "linha": 44
    },
    {
     "secao": "flag",
     "chave": "REVY_TRAFEGO_MOTOR_TOKEN_LOJA (default: '')",
     "simbolo": "REVY_TRAFEGO_MOTOR_TOKEN_LOJA",
     "arquivo": "app/config.py",
-    "linha": 58
+    "linha": 61
    },
    {
     "secao": "flag",
     "chave": "REVY_TRAFEGO_MOTOR_TOKENS_JSON (default: '')",
     "simbolo": "REVY_TRAFEGO_MOTOR_TOKENS_JSON",
     "arquivo": "app/config.py",
-    "linha": 59
+    "linha": 62
    },
    {
     "secao": "flag",
     "chave": "REVY_TRAFEGO_JOB_SECRET (default: '')",
     "simbolo": "REVY_TRAFEGO_JOB_SECRET",
     "arquivo": "app/config.py",
-    "linha": 148
+    "linha": 154
    },
    {
     "secao": "flag",
     "chave": "REVY_TRAFEGO_SERVICE_TOKEN (default: '')",
     "simbolo": "REVY_TRAFEGO_SERVICE_TOKEN",
     "arquivo": "app/config.py",
-    "linha": 150
+    "linha": 156
    },
    {
     "secao": "flag",
     "chave": "REVY_TRAFEGO_URL_PREFIX (default: '')",
     "simbolo": "REVY_TRAFEGO_URL_PREFIX",
     "arquivo": "app/config.py",
-    "linha": 152
+    "linha": 158
    },
    {
     "secao": "flag",
     "chave": "REVY_TRAFEGO_EMAIL_FROM (default: no-reply@revy.local)",
     "simbolo": "REVY_TRAFEGO_EMAIL_FROM",
     "arquivo": "app/config.py",
-    "linha": 154
+    "linha": 160
    },
    {
     "secao": "flag",
     "chave": "REVY_TRAFEGO_EMAIL_FROM_NAME (default: Revy Control)",
     "simbolo": "REVY_TRAFEGO_EMAIL_FROM_NAME",
     "arquivo": "app/config.py",
-    "linha": 156
+    "linha": 162
    },
    {
     "secao": "flag",
     "chave": "REVY_TRAFEGO_SMTP_HOST (default: '')",
     "simbolo": "REVY_TRAFEGO_SMTP_HOST",
     "arquivo": "app/config.py",
-    "linha": 158
+    "linha": 164
    },
    {
     "secao": "flag",
     "chave": "REVY_TRAFEGO_SMTP_USERNAME (default: '')",
     "simbolo": "REVY_TRAFEGO_SMTP_USERNAME",
     "arquivo": "app/config.py",
-    "linha": 160
+    "linha": 166
    },
    {
     "secao": "flag",
     "chave": "REVY_TRAFEGO_PUBLIC_BASE_URL (default: '')",
     "simbolo": "REVY_TRAFEGO_PUBLIC_BASE_URL",
     "arquivo": "app/config.py",
-    "linha": 168
+    "linha": 174
    },
    {
     "secao": "flag",
     "chave": "REVY_CONTROL_WHATSAPP_MODO2_ENABLED (default: '')",
     "simbolo": "REVY_CONTROL_WHATSAPP_MODO2_ENABLED",
     "arquivo": "app/config.py",
-    "linha": 256
+    "linha": 262
    },
    {
     "secao": "flag",
     "chave": "GOOGLE_ADS_SYNC_ENABLED",
     "simbolo": "GOOGLE_ADS_SYNC_ENABLED",
     "arquivo": "app/config.py",
-    "linha": 99
+    "linha": 105
    },
    {
     "secao": "flag",
     "chave": "GOOGLE_CONVERSIONS_ENABLED",
     "simbolo": "GOOGLE_CONVERSIONS_ENABLED",
     "arquivo": "app/config.py",
-    "linha": 102
+    "linha": 108
    },
    {
     "secao": "flag",
     "chave": "GOOGLE_ADS_METRICS_WORKER_ENABLED",
     "simbolo": "GOOGLE_ADS_METRICS_WORKER_ENABLED",
     "arquivo": "app/config.py",
-    "linha": 106
+    "linha": 112
    },
    {
     "secao": "flag",
     "chave": "MULTI_WHATSAPP_ENABLED",
     "simbolo": "MULTI_WHATSAPP_ENABLED",
     "arquivo": "app/config.py",
-    "linha": 137
+    "linha": 143
    },
    {
     "secao": "flag",
     "chave": "REVY_CONTROL_DASHBOARD_ENABLED",
     "simbolo": "REVY_CONTROL_DASHBOARD_ENABLED",
     "arquivo": "app/config.py",
-    "linha": 140
+    "linha": 146
    },
    {
     "secao": "flag",
     "chave": "REVY_CONTROL_PROVISIONING_DELIVERY_ENABLED",
     "simbolo": "REVY_CONTROL_PROVISIONING_DELIVERY_ENABLED",
     "arquivo": "app/config.py",
-    "linha": 145
+    "linha": 151
    },
    {
     "secao": "flag",
     "chave": "REVY_TRAFEGO_EMAIL_BACKEND (default: console)",
     "simbolo": "REVY_TRAFEGO_EMAIL_BACKEND",
     "arquivo": "app/config.py",
-    "linha": 153
+    "linha": 159
    },
    {
     "secao": "flag",
     "chave": "REVY_TRAFEGO_META_SPEND_SYNC_ENABLED (default: 0)",
     "simbolo": "REVY_TRAFEGO_META_SPEND_SYNC_ENABLED",
     "arquivo": "app/config.py",
-    "linha": 83
+    "linha": 89
    },
    {
     "secao": "flag",
     "chave": "REVY_TRAFEGO_CAPI_WORKER (default: 0)",
     "simbolo": "REVY_TRAFEGO_CAPI_WORKER",
     "arquivo": "app/config.py",
-    "linha": 87
+    "linha": 93
    },
    {
     "secao": "flag",
     "chave": "REVY_CONTROL_ENABLED (default: 0)",
     "simbolo": "REVY_CONTROL_ENABLED",
     "arquivo": "app/config.py",
-    "linha": 91
+    "linha": 97
    },
    {
     "secao": "flag",
     "chave": "REVY_CONTROL_RBAC_ENABLED (default: 0)",
     "simbolo": "REVY_CONTROL_RBAC_ENABLED",
     "arquivo": "app/config.py",
-    "linha": 95
+    "linha": 101
    },
    {
     "secao": "flag",
     "chave": "REVY_TRAFEGO_SMTP_USE_TLS (default: 1)",
     "simbolo": "REVY_TRAFEGO_SMTP_USE_TLS",
     "arquivo": "app/config.py",
-    "linha": 162
+    "linha": 168
    },
    {
     "secao": "flag",
     "chave": "REVY_TRAFEGO_LOJAS",
     "simbolo": "REVY_TRAFEGO_LOJAS",
     "arquivo": "app/config.py",
-    "linha": 245
+    "linha": 251
    },
    {
     "secao": "worker",
@@ -4390,252 +4397,259 @@
     "chave": "GET /health/live",
     "simbolo": "/health/live",
     "arquivo": "app/main.py",
-    "linha": 330
+    "linha": 331
    },
    {
     "secao": "rota",
     "chave": "GET /health/ready",
     "simbolo": "/health/ready",
     "arquivo": "app/main.py",
-    "linha": 335
+    "linha": 336
    },
    {
     "secao": "rota",
     "chave": "GET /public/v1/lojas/{loja_slug}/pixel",
     "simbolo": "/public/v1/lojas/{loja_slug}/pixel",
     "arquivo": "app/main.py",
-    "linha": 341
+    "linha": 342
    },
    {
     "secao": "rota",
     "chave": "GET /",
     "simbolo": "/",
     "arquivo": "app/main.py",
-    "linha": 366
+    "linha": 367
    },
    {
     "secao": "rota",
     "chave": "GET /login",
     "simbolo": "/login",
     "arquivo": "app/main.py",
-    "linha": 371
+    "linha": 372
    },
    {
     "secao": "rota",
     "chave": "POST /login",
     "simbolo": "/login",
     "arquivo": "app/main.py",
-    "linha": 381
+    "linha": 382
    },
    {
     "secao": "rota",
     "chave": "POST /logout",
     "simbolo": "/logout",
     "arquivo": "app/main.py",
-    "linha": 399
+    "linha": 400
    },
    {
     "secao": "rota",
     "chave": "GET /app",
     "simbolo": "/app",
     "arquivo": "app/main.py",
-    "linha": 407
+    "linha": 408
    },
    {
     "secao": "rota",
     "chave": "POST /app/loja",
     "simbolo": "/app/loja",
     "arquivo": "app/main.py",
-    "linha": 450
+    "linha": 451
    },
    {
     "secao": "rota",
     "chave": "GET /app/trafego",
     "simbolo": "/app/trafego",
     "arquivo": "app/main.py",
-    "linha": 524
+    "linha": 525
    },
    {
     "secao": "rota",
     "chave": "POST /app/trafego",
     "simbolo": "/app/trafego",
     "arquivo": "app/main.py",
-    "linha": 551
+    "linha": 552
    },
    {
     "secao": "rota",
     "chave": "POST /app/trafego/ads/salvar",
     "simbolo": "/app/trafego/ads/salvar",
     "arquivo": "app/main.py",
-    "linha": 618
+    "linha": 619
    },
    {
     "secao": "rota",
     "chave": "POST /app/trafego/ads/sincronizar",
     "simbolo": "/app/trafego/ads/sincronizar",
     "arquivo": "app/main.py",
-    "linha": 661
+    "linha": 662
    },
    {
     "secao": "rota",
     "chave": "POST /app/trafego/capi/retentar",
     "simbolo": "/app/trafego/capi/retentar",
     "arquivo": "app/main.py",
-    "linha": 675
+    "linha": 676
    },
    {
     "secao": "rota",
     "chave": "GET /app/trafego/pixel-auditoria",
     "simbolo": "/app/trafego/pixel-auditoria",
     "arquivo": "app/main.py",
-    "linha": 689
+    "linha": 690
    },
    {
     "secao": "rota",
     "chave": "GET /app/trafego/ctwa-auditoria",
     "simbolo": "/app/trafego/ctwa-auditoria",
     "arquivo": "app/main.py",
-    "linha": 704
+    "linha": 705
    },
    {
     "secao": "rota",
     "chave": "GET /app/trafego/roi",
     "simbolo": "/app/trafego/roi",
     "arquivo": "app/main.py",
-    "linha": 738
+    "linha": 739
    },
    {
     "secao": "rota",
     "chave": "GET /app/campanhas",
     "simbolo": "/app/campanhas",
     "arquivo": "app/main.py",
-    "linha": 796
+    "linha": 797
    },
    {
     "secao": "rota",
     "chave": "GET /app/campanhas/nova",
     "simbolo": "/app/campanhas/nova",
     "arquivo": "app/main.py",
-    "linha": 855
+    "linha": 856
    },
    {
     "secao": "rota",
     "chave": "POST /app/campanhas/nova",
     "simbolo": "/app/campanhas/nova",
     "arquivo": "app/main.py",
-    "linha": 868
+    "linha": 869
    },
    {
     "secao": "rota",
     "chave": "GET /app/campanhas/gastos/lote",
     "simbolo": "/app/campanhas/gastos/lote",
     "arquivo": "app/main.py",
-    "linha": 912
+    "linha": 913
    },
    {
     "secao": "rota",
     "chave": "POST /app/campanhas/gastos/lote",
     "simbolo": "/app/campanhas/gastos/lote",
     "arquivo": "app/main.py",
-    "linha": 937
+    "linha": 938
    },
    {
     "secao": "rota",
     "chave": "GET /app/campanhas/gastos/csv/modelo",
     "simbolo": "/app/campanhas/gastos/csv/modelo",
     "arquivo": "app/main.py",
-    "linha": 998
+    "linha": 999
    },
    {
     "secao": "rota",
     "chave": "POST /app/campanhas/gastos/csv",
     "simbolo": "/app/campanhas/gastos/csv",
     "arquivo": "app/main.py",
-    "linha": 1011
+    "linha": 1012
    },
    {
     "secao": "rota",
     "chave": "GET /app/campanhas/{campanha_id}",
     "simbolo": "/app/campanhas/{campanha_id}",
     "arquivo": "app/main.py",
-    "linha": 1066
+    "linha": 1067
    },
    {
     "secao": "rota",
     "chave": "GET /app/campanhas/{campanha_id}/editar",
     "simbolo": "/app/campanhas/{campanha_id}/editar",
     "arquivo": "app/main.py",
-    "linha": 1159
+    "linha": 1160
    },
    {
     "secao": "rota",
     "chave": "POST /app/campanhas/{campanha_id}/editar",
     "simbolo": "/app/campanhas/{campanha_id}/editar",
     "arquivo": "app/main.py",
-    "linha": 1192
+    "linha": 1193
    },
    {
     "secao": "rota",
     "chave": "POST /app/campanhas/{campanha_id}/apagar",
     "simbolo": "/app/campanhas/{campanha_id}/apagar",
     "arquivo": "app/main.py",
-    "linha": 1236
+    "linha": 1237
    },
    {
     "secao": "rota",
     "chave": "POST /app/campanhas/{campanha_id}/gastos",
     "simbolo": "/app/campanhas/{campanha_id}/gastos",
     "arquivo": "app/main.py",
-    "linha": 1256
+    "linha": 1257
    },
    {
     "secao": "rota",
     "chave": "GET /app/diagnostico/leads",
     "simbolo": "/app/diagnostico/leads",
     "arquivo": "app/main.py",
-    "linha": 1296
+    "linha": 1297
    },
    {
     "secao": "rota",
     "chave": "GET /app/diagnostico/leads/{lead_id}",
     "simbolo": "/app/diagnostico/leads/{lead_id}",
     "arquivo": "app/main.py",
-    "linha": 1337
+    "linha": 1338
    },
    {
     "secao": "rota",
     "chave": "GET /app/diagnostico/conversas/{telefone}",
     "simbolo": "/app/diagnostico/conversas/{telefone}",
     "arquivo": "app/main.py",
-    "linha": 1368
+    "linha": 1369
    },
    {
     "secao": "rota",
     "chave": "POST /internal/jobs/meta-spend-sync",
     "simbolo": "/internal/jobs/meta-spend-sync",
     "arquivo": "app/main.py",
-    "linha": 1423
+    "linha": 1424
    },
    {
     "secao": "rota",
     "chave": "POST /internal/jobs/google-conversions-outbox",
     "simbolo": "/internal/jobs/google-conversions-outbox",
     "arquivo": "app/main.py",
-    "linha": 1444
+    "linha": 1445
    },
    {
     "secao": "rota",
     "chave": "POST /internal/jobs/google-ads-metrics-sync",
     "simbolo": "/internal/jobs/google-ads-metrics-sync",
     "arquivo": "app/main.py",
-    "linha": 1467
+    "linha": 1468
+   },
+   {
+    "secao": "rota",
+    "chave": "GET /internal/motor-tokens/{slug}",
+    "simbolo": "/internal/motor-tokens/{slug}",
+    "arquivo": "app/main.py",
+    "linha": 1526
    },
    {
     "secao": "flag",
     "chave": "REVY_TRAFEGO_SKIP_INIT",
     "simbolo": "REVY_TRAFEGO_SKIP_INIT",
     "arquivo": "app/main.py",
-    "linha": 90
+    "linha": 91
    },
    {
     "secao": "worker",
@@ -4930,6 +4944,13 @@
     "simbolo": "readiness_alert_acceptances",
     "arquivo": "app/models.py",
     "linha": 1065
+   },
+   {
+    "secao": "modelo",
+    "chave": "motor_tokens_cofre",
+    "simbolo": "motor_tokens_cofre",
+    "arquivo": "app/models.py",
+    "linha": 1105
    },
    {
     "secao": "rota",
@@ -5510,28 +5531,28 @@
     "chave": "app/templates/campanhas/detalhe.html",
     "simbolo": "campanhas/detalhe.html",
     "arquivo": "app/main.py",
-    "linha": 1136
+    "linha": 1137
    },
    {
     "secao": "template",
     "chave": "app/templates/campanhas/form.html",
     "simbolo": "campanhas/form.html",
     "arquivo": "app/main.py",
-    "linha": 861
+    "linha": 862
    },
    {
     "secao": "template",
     "chave": "app/templates/campanhas/gastos_lote.html",
     "simbolo": "campanhas/gastos_lote.html",
     "arquivo": "app/main.py",
-    "linha": 924
+    "linha": 925
    },
    {
     "secao": "template",
     "chave": "app/templates/campanhas/lista.html",
     "simbolo": "campanhas/lista.html",
     "arquivo": "app/main.py",
-    "linha": 828
+    "linha": 829
    },
    {
     "secao": "template",
@@ -5580,63 +5601,63 @@
     "chave": "app/templates/diagnostico/conversa.html",
     "simbolo": "diagnostico/conversa.html",
     "arquivo": "app/main.py",
-    "linha": 1400
+    "linha": 1401
    },
    {
     "secao": "template",
     "chave": "app/templates/diagnostico/lead_detalhe.html",
     "simbolo": "diagnostico/lead_detalhe.html",
     "arquivo": "app/main.py",
-    "linha": 1363
+    "linha": 1364
    },
    {
     "secao": "template",
     "chave": "app/templates/diagnostico/leads.html",
     "simbolo": "diagnostico/leads.html",
     "arquivo": "app/main.py",
-    "linha": 1332
+    "linha": 1333
    },
    {
     "secao": "template",
     "chave": "app/templates/home.html",
     "simbolo": "home.html",
     "arquivo": "app/main.py",
-    "linha": 440
+    "linha": 441
    },
    {
     "secao": "template",
     "chave": "app/templates/login.html",
     "simbolo": "login.html",
     "arquivo": "app/main.py",
-    "linha": 376
+    "linha": 377
    },
    {
     "secao": "template",
     "chave": "app/templates/trafego/ctwa_auditoria.html",
     "simbolo": "trafego/ctwa_auditoria.html",
     "arquivo": "app/main.py",
-    "linha": 726
+    "linha": 727
    },
    {
     "secao": "template",
     "chave": "app/templates/trafego/form.html",
     "simbolo": "trafego/form.html",
     "arquivo": "app/main.py",
-    "linha": 538
+    "linha": 539
    },
    {
     "secao": "template",
     "chave": "app/templates/trafego/pixel_auditoria.html",
     "simbolo": "trafego/pixel_auditoria.html",
     "arquivo": "app/main.py",
-    "linha": 699
+    "linha": 700
    },
    {
     "secao": "template",
     "chave": "app/templates/trafego/roi.html",
     "simbolo": "trafego/roi.html",
     "arquivo": "app/main.py",
-    "linha": 775
+    "linha": 776
    },
    {
     "secao": "migration",
@@ -5776,6 +5797,13 @@
     "chave": "0020_loja_whatsapp_modo",
     "simbolo": "0020_loja_whatsapp_modo",
     "arquivo": "alembic/versions/0020_loja_whatsapp_modo.py",
+    "linha": 0
+   },
+   {
+    "secao": "migration",
+    "chave": "0021_motor_tokens_cofre",
+    "simbolo": "0021_motor_tokens_cofre",
+    "arquivo": "alembic/versions/0021_motor_tokens_cofre.py",
     "linha": 0
    }
   ],

@@ -25,10 +25,14 @@ Tokens das APIs ficam **somente no servidor**; o navegador recebe uma sessão as
   Um `MOTOR_TOKEN` só num deploy multi-loja faz toda loja ver e editar as mesmas
   credenciais bancárias em `/app/financeiras` — e simular com a credencial alheia.
   `get_motor_client` (`app/main.py`) recebe o `Request` por isso; **não** volte a
-  montá-lo sem ele. O mapa é `MOTOR_TOKENS_JSON` (`{"slug": "token"}`), resolvido por
-  `motor_token_para` (`app/config.py`): loja fora do mapa fica **sem acesso** de
-  propósito, nunca cai no global. Sem mapa, o token global vale (deploy de uma loja
-  só). Emitter um cliente por loja no `motor-simulacao`:
+  montá-lo sem ele. Ordem de resolução: **cofre do Control primeiro**
+  (`GET /internal/motor-tokens/{slug}` via `app/clients/control.py`, Bearer
+  `PORTAL_SERVICE_TOKEN`, timeout curto `PORTAL_CONTROL_MOTOR_TOKEN_TIMEOUT=2s`) e
+  o mapa `MOTOR_TOKENS_JSON` (`{"slug": "token"}`, `motor_token_para` em
+  `app/config.py`) como fallback legado; ambos vazios = sem acesso, nunca o global.
+  Loja nova funciona sem editar secret no Portal. Falha do Control nunca quebra a
+  tela: cai no mapa, e loja fora do mapa fica **sem acesso** de propósito, nunca
+  cai no global. Sem mapa, o token global vale (deploy de uma loja só). Emitter um cliente por loja no `motor-simulacao`:
   `python -m app.cli criar-cliente --nome <loja>` e depois
   `criar-credencial --cliente-id <id> --nome <loja>`; o token sai uma vez só.
 

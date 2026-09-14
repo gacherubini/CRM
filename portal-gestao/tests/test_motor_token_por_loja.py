@@ -430,3 +430,294 @@ class TestIsolamentoEntreLojas:
         assert resposta.status_code == 422
         assert "Nenhum banco com acesso configurado" in resposta.text
         assert mundo_motor.chamadas == []
+
+
+class TestOrdemCofrePrimeiro:
+    """O cofre do Control resolve antes do mapa; o mapa é fallback legado.
+
+    Loja nova funciona sem editar secret no Portal: com o cofre no ar, nem
+    precisa existir entrada em ``MOTOR_TOKENS_JSON``.
+    """
+
+    @staticmethod
+    def _request(session: dict):
+        class _Req:
+            def __init__(self, s):
+                self.session = s
+
+        return _Req(session)
+
+    def _fixar(self, monkeypatch, mapa=None, cofre=None, explode=False):
+        """Mapa em ``main.settings``; cofre como fake que registra chamadas."""
+        from app import main as main_mod
+
+        chamadas: list = []
+        if mapa is None:
+            cfg = _settings(motor_token="", motor_tokens_json="")
+        else:
+            cfg = _settings(motor_tokens_json=json.dumps(mapa))
+        monkeypatch.setattr(main_mod, "settings", cfg)
+
+        def _cofre_fake(slug):
+            chamadas.append(slug)
+            if explode:
+                raise RuntimeError("control fora do ar")
+            return cofre
+
+        monkeypatch.setattr(main_mod, "buscar_motor_token_no_control", _cofre_fake)
+        return chamadas
+
+    def test_control_ganha_do_mapa(self, monkeypatch):
+        from app import main as main_mod
+
+        chamadas = self._fixar(
+            monkeypatch, mapa={"loja-a": "TOK-MAPA"}, cofre="TOK-COFRE"
+        )
+        cliente = main_mod.get_motor_client(self._request({"loja_slug": "loja-a"}))
+        assert cliente.token == "TOK-COFRE"
+        # O cofre é consultado mesmo quando o mapa resolveria sozinho.
+        assert chamadas == ["loja-a"]
+
+    def test_control_vazio_cai_no_mapa(self, monkeypatch):
+        from app import main as main_mod
+
+        chamadas = self._fixar(monkeypatch, mapa={"loja-a": "TOK-MAPA"}, cofre="")
+        cliente = main_mod.get_motor_client(self._request({"loja_slug": "loja-a"}))
+        assert cliente.token == "TOK-MAPA"
+        assert chamadas == ["loja-a"]
+
+    def test_control_quebrado_nao_quebra_a_tela_e_cai_no_mapa(self, monkeypatch):
+        """O fake do cofre nunca explode (fail-soft), mas a dependência não
+        pode confiar nisso: exceção vira fallback, nunca 500."""
+        from app import main as main_mod
+
+        self._fixar(monkeypatch, mapa={"loja-a": "TOK-MAPA"}, explode=True)
+        cliente = main_mod.get_motor_client(self._request({"loja_slug": "loja-a"}))
+        assert cliente.token == "TOK-MAPA"
+        assert cliente.configurado is True
+
+    def test_ambos_vazios_fica_desligado(self, monkeypatch):
+        from app import main as main_mod
+        from app.clients.motor import MotorIndisponivel
+
+        self._fixar(monkeypatch, mapa={"loja-a": "TOK-A"}, cofre="")
+        cliente = main_mod.get_motor_client(self._request({"loja_slug": "loja-c"}))
+        assert cliente.token == ""
+        assert cliente.configurado is False
+        try:
+            cliente.listar_credenciais(ator="dono@loja.test")
+        except MotorIndisponivel:
+            pass
+        else:  # pragma: no cover
+            raise AssertionError("deveria levantar MotorIndisponivel, nao chamar a API")
+
+    def test_loja_nova_sem_mapa_nem_global_usa_so_o_cofre(self, monkeypatch):
+        from app import main as main_mod
+
+        chamadas = self._fixar(monkeypatch, mapa=None, cofre="TOK-COFRE")
+        cliente = main_mod.get_motor_client(self._request({"loja_slug": "loja-nova"}))
+        assert cliente.token == "TOK-COFRE"
+        assert chamadas == ["loja-nova"]
+
+
+class _RespostaControlFake:
+    def __init__(self, status=200, carga=None, json_erro=False):
+        self.status_code = status
+        self._carga = carga if carga is not None else {}
+        self._json_erro = json_erro
+
+    def json(self):
+        if self._json_erro:
+            raise ValueError("corpo inválido")
+        return self._carga
+
+
+def _control_http_fake(monkeypatch, resposta_ou_erro, chamadas: list):
+    """Troca o httpx do cliente do cofre; registra base_url/timeout/headers."""
+    from types import SimpleNamespace
+
+    from app.clients import control as control_mod
+
+    def _fabrica(base_url="", headers=None, timeout=None):
+        chamadas.append({"base_url": base_url, "headers": headers, "timeout": timeout})
+
+        class _Cliente:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *args):
+                return False
+
+            def get(self, path, **kwargs):
+                chamadas.append({"path": path, "headers": kwargs.get("headers")})
+                if isinstance(resposta_ou_erro, Exception):
+                    raise resposta_ou_erro
+                return resposta_ou_erro
+
+        return _Cliente()
+
+    monkeypatch.setattr(
+        control_mod,
+        "httpx",
+        SimpleNamespace(Client=_fabrica, HTTPError=httpx.HTTPError),
+    )
+
+
+class TestBuscarMotorTokenNoControl:
+    COFRE = dict(
+        base_url="http://control-emulado",
+        service_token="SEGREDO-SERVICO",
+        timeout=2.0,
+    )
+
+    def test_200_devolve_o_token_com_bearer(self, monkeypatch):
+        from app.clients import control as control_mod
+
+        chamadas: list = []
+        _control_http_fake(
+            monkeypatch, _RespostaControlFake(200, {"token": "TOK-COFRE"}), chamadas
+        )
+        assert control_mod.buscar_motor_token_no_control("loja-a", **self.COFRE) == (
+            "TOK-COFRE"
+        )
+        assert chamadas[0]["base_url"] == "http://control-emulado"
+        assert chamadas[0]["timeout"] == 2.0
+        assert chamadas[1]["path"] == "/internal/motor-tokens/loja-a"
+        assert chamadas[1]["headers"] == {"Authorization": "Bearer SEGREDO-SERVICO"}
+
+    def test_404_devolve_vazio(self, monkeypatch):
+        from app.clients import control as control_mod
+
+        chamadas: list = []
+        _control_http_fake(
+            monkeypatch,
+            _RespostaControlFake(404, {"erro": {"code": "sem_token"}}),
+            chamadas,
+        )
+        assert control_mod.buscar_motor_token_no_control("loja-c", **self.COFRE) == ""
+
+    def test_500_devolve_vazio_e_nao_vaza_token_no_log(self, monkeypatch, caplog):
+        from app.clients import control as control_mod
+
+        chamadas: list = []
+        _control_http_fake(monkeypatch, _RespostaControlFake(503, {"erro": {}}), chamadas)
+        with caplog.at_level("WARNING", logger="app.clients.control"):
+            assert control_mod.buscar_motor_token_no_control("loja-a", **self.COFRE) == ""
+        assert "SEGREDO-SERVICO" not in caplog.text
+        assert "TOK-COFRE" not in caplog.text
+
+    def test_timeout_devolve_vazio(self, monkeypatch):
+        from app.clients import control as control_mod
+
+        chamadas: list = []
+        _control_http_fake(monkeypatch, httpx.HTTPError("tempo esgotado"), chamadas)
+        assert control_mod.buscar_motor_token_no_control("loja-a", **self.COFRE) == ""
+
+    def test_sem_config_nao_chama_http(self, monkeypatch):
+        from app.clients import control as control_mod
+
+        chamadas: list = []
+        _control_http_fake(
+            monkeypatch, _RespostaControlFake(200, {"token": "TOK-X"}), chamadas
+        )
+        sem_url = dict(self.COFRE, base_url="")
+        assert control_mod.buscar_motor_token_no_control("loja-a", **sem_url) == ""
+        sem_segredo = dict(self.COFRE, service_token="  ")
+        assert control_mod.buscar_motor_token_no_control("loja-a", **sem_segredo) == ""
+        assert control_mod.buscar_motor_token_no_control("", **self.COFRE) == ""
+        assert control_mod.buscar_motor_token_no_control(None, **self.COFRE) == ""
+        assert chamadas == []
+
+    def test_200_sem_token_devolve_vazio(self, monkeypatch):
+        from app.clients import control as control_mod
+
+        chamadas: list = []
+        _control_http_fake(monkeypatch, _RespostaControlFake(200, {}), chamadas)
+        assert control_mod.buscar_motor_token_no_control("loja-a", **self.COFRE) == ""
+        _control_http_fake(
+            monkeypatch, _RespostaControlFake(200, {"token": "   "}), chamadas
+        )
+        assert control_mod.buscar_motor_token_no_control("loja-a", **self.COFRE) == ""
+        _control_http_fake(
+            monkeypatch,
+            _RespostaControlFake(200, {"token": "x"}, json_erro=True),
+            chamadas,
+        )
+        assert control_mod.buscar_motor_token_no_control("loja-a", **self.COFRE) == ""
+
+
+class TestCofrePontaAPonta:
+    """O token do cofre chega ao Motor sem passar pelo mapa."""
+
+    def test_loja_nova_sem_mapa_lista_pelo_cofre(
+        self, client_motor_real, mundo_motor, monkeypatch
+    ):
+        from types import SimpleNamespace
+
+        from app import main as main_mod
+        from app.clients import control as control_mod
+
+        monkeypatch.setattr(
+            main_mod,
+            "settings",
+            _settings(motor_url="http://motor-emulado", motor_token=""),
+        )
+        monkeypatch.setattr(
+            control_mod,
+            "settings",
+            SimpleNamespace(
+                revy_trafego_url="http://control-emulado",
+                service_token="SEGREDO-SERVICO",
+                control_motor_token_timeout=2.0,
+            ),
+        )
+        chamadas: list = []
+        _control_http_fake(
+            monkeypatch, _RespostaControlFake(200, {"token": "TOK-A"}), chamadas
+        )
+        _login_loja(client_motor_real, "loja-nova")
+        resposta = client_motor_real.get("/app/financeiras")
+        assert resposta.status_code == 200
+        assert "LOJA-A-USER" in resposta.text
+        assert "desligada" not in resposta.text
+        assert chamadas[1]["headers"] == {"Authorization": "Bearer SEGREDO-SERVICO"}
+        assert chamadas[0]["timeout"] == 2.0
+        so_motor = [c for c in mundo_motor.chamadas if c["token"] == "TOK-A"]
+        assert so_motor, "o Motor deveria ter sido chamado com o token do cofre"
+
+    def test_cofre_404_cai_no_mapa_na_tela(
+        self, client_motor_real, mundo_motor, monkeypatch
+    ):
+        from types import SimpleNamespace
+
+        from app import main as main_mod
+        from app.clients import control as control_mod
+
+        monkeypatch.setattr(
+            main_mod,
+            "settings",
+            _settings(
+                motor_url="http://motor-emulado",
+                motor_tokens_json=json.dumps({"loja-a": "TOK-A"}),
+            ),
+        )
+        monkeypatch.setattr(
+            control_mod,
+            "settings",
+            SimpleNamespace(
+                revy_trafego_url="http://control-emulado",
+                service_token="SEGREDO-SERVICO",
+                control_motor_token_timeout=2.0,
+            ),
+        )
+        chamadas: list = []
+        _control_http_fake(
+            monkeypatch,
+            _RespostaControlFake(404, {"erro": {"code": "sem_token"}}),
+            chamadas,
+        )
+        _login_loja(client_motor_real, "loja-a")
+        resposta = client_motor_real.get("/app/financeiras")
+        assert resposta.status_code == 200
+        assert "LOJA-A-USER" in resposta.text
+        assert chamadas[1]["path"] == "/internal/motor-tokens/loja-a"
