@@ -13,7 +13,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&family=Newsreader:wght@300;400;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/static/css/revy-tokens.css?v=v12">
-  <link rel="stylesheet" href="/static/css/app.css?v=v48">
+  <link rel="stylesheet" href="/static/css/app.css?v=v49">
   <script>
     (() => {
       const saved = localStorage.getItem('revy-theme');
@@ -50,6 +50,8 @@
             <small>{% if store_context %}{{ store_context.loja_slug }}{% else %}{{ usuario.loja_slug }}{% endif %}</small>
           </span>
         </a>
+        {# O glifo « » vive no CSS (.nav-collapse::before, espelhado quando
+           recolhido); o texto fica no botão só para o caso de o CSS não carregar. #}
         <button class="nav-collapse" type="button" id="nav-collapse" aria-pressed="false" title="Recolher menu" aria-label="Recolher menu">«</button>
         <button class="drawer-close" type="button" aria-label="Fechar menu">×</button>
       </div>
@@ -148,18 +150,28 @@
         {% endif %}
       </nav>
 
+      {# O rodapé é a conta: o bloco inteiro abre o perfil (o item saiu do
+         menu quando o menu passou a ser a única zona que rola). #}
       <div class="sidebar-footer">
-        <button class="theme-toggle theme-toggle-sidebar" type="button" id="theme-toggle" aria-label="Alternar tema claro ou escuro" title="Modo claro / escuro">
-          <span class="theme-toggle-icon" aria-hidden="true">☾</span>
-          <span class="theme-toggle-label">Escuro</span>
-        </button>
-        <form action="/logout" method="post">
-          <input type="hidden" name="csrf" value="{{ csrf }}">
-          <button class="link-button" type="submit">Sair</button>
-        </form>
+        <a class="conta-link{% if path.startswith('/app/loja/perfil') %} is-active{% endif %}"
+           href="/app/loja/perfil"
+           title="{{ usuario.email }} · Abrir perfil"
+           aria-label="Abrir perfil"
+           {% if path.startswith('/app/loja/perfil') %}aria-current="page"{% endif %}>
+          <span class="avatar" aria-hidden="true">{{ usuario.nome[:1] | upper }}<img src="/app/loja/perfil/foto/{{ usuario.id }}" alt="" loading="lazy" decoding="async" onerror="this.remove()"></span>
+          <span class="conta-nome">
+            <strong>{{ usuario.nome }}</strong>
+            <small>{{ usuario.papel | replace('_', ' ') }}</small>
+          </span>
+        </a>
+        <div class="conta-icones">
+          <button class="icon-btn icon-btn-tema" type="button" id="theme-toggle" aria-label="Alternar tema claro ou escuro" title="Modo claro / escuro"></button>
+          <form action="/logout" method="post">
+            <input type="hidden" name="csrf" value="{{ csrf }}">
+            <button class="icon-btn icon-btn-sair" type="submit" aria-label="Sair" title="Sair"></button>
+          </form>
+        </div>
       </div>
-      {# O topo da barra e da loja; a plataforma assina aqui embaixo. #}
-      <div class="sidebar-assinatura">{% include "marca/revy-signature.svg" %}</div>
     </aside>
     <button class="drawer-backdrop" type="button" aria-label="Fechar menu" tabindex="-1"></button>
 

@@ -33,7 +33,7 @@ def _ents_com_copiloto(slug="loja-teste"):
 def test_nav_somente_vendas_e_estoque_com_acessos_bancarios():
     sections = build_nav(_store(), _ents(), shell_enabled=True)
     titles = [s.title for s in sections]
-    assert titles == ["Vendas", "Estoque", "Ajustes", "Conta"]
+    assert titles == ["Vendas", "Estoque", "Ajustes"]
     items = flatten_nav(sections)
     labels = [i.label for i in items]
     # WhatsApp no menu depende da flag (default off nos unit tests sem flag).
@@ -50,7 +50,6 @@ def test_nav_somente_vendas_e_estoque_com_acessos_bancarios():
         "Grupo do estoque",
         "Integrações",
         "Equipe",
-        "Perfil",
     ]
     hrefs = {i.href for i in items}
     assert "/app/loja/vendas" in hrefs
@@ -64,8 +63,8 @@ def test_nav_somente_vendas_e_estoque_com_acessos_bancarios():
     assert "/app/operacao/numeros" in hrefs
     assert "/app/loja/integracoes" in hrefs
     assert "/app/loja/equipe" in hrefs
-    assert "/app/loja/perfil" in hrefs
-    # Senha saiu de Ajustes (agora em Conta → Perfil)
+    # Perfil saiu do menu: o bloco da conta no rodape (base.html) e o atalho.
+    assert "/app/loja/perfil" not in hrefs
     assert "/conta/senha" not in hrefs
     # Sem config técnica de tráfego/campanhas
     assert not any("trafego" in i.href or "campanhas" in i.href for i in items)
@@ -85,10 +84,9 @@ def test_nav_vendedor_sem_acessos_bancarios():
     assert not any(i.href == "/app/financeiras" for i in items)
     # Vendedor simula (pode_simular inclui vendedor) → link no menu Vendas
     assert any(i.href == "/app/simulacoes" for i in items)
-    # Vendedor também vê Perfil (Conta), mas não Ajustes
-    assert any(i.href == "/app/loja/perfil" for i in items)
+    # Perfil não é item de menu: vive no bloco da conta do rodapé (base.html).
+    assert not any(i.href == "/app/loja/perfil" for i in items)
     assert "Ajustes" not in [s.title for s in sections]
-    assert "Conta" in [s.title for s in sections]
 
 
 def test_nav_shell_desligado_vazio():
@@ -341,3 +339,10 @@ def test_shell_nav_clara_busca_recolher_e_grupos(client, monkeypatch):
     assert 'data-section="Ajustes"' in r.text
     assert "revy-nav-collapsed" in r.text
     assert 'title="Atendimento"' in r.text
+    # Perfil saiu do rolamento e virou o bloco da conta no rodapé; a
+    # assinatura "// Revy" saiu de baixo.
+    assert 'class="conta-link' in r.text
+    assert 'app/loja/perfil' in r.text
+    assert 'data-section="Conta"' not in r.text
+    assert 'sidebar-assinatura' not in r.text
+    assert 'icon-btn-sair' in r.text

@@ -75,8 +75,10 @@ button, .button, a { -webkit-tap-highlight-color: transparent; }
   height: 100vh;
   display: flex;
   flex-direction: column;
-  overflow-y: auto;
-  padding: 0 12px 14px;
+  /* Quem rola e so o .nav (ver bloco Navegacao): a barra nao rola inteira
+     porque isso empurrava o rodape para fora da tela e esmagava a assinatura. */
+  overflow: hidden;
+  padding: 0 12px;
   border-right: 1px solid var(--line);
   background: var(--surface-raised);
 }
@@ -140,19 +142,76 @@ button, .button, a { -webkit-tap-highlight-color: transparent; }
 }
 
 .sidebar-footer {
-  margin-top: auto;
-  padding: 12px 8px 8px;
+  flex: 0 0 auto;
+  margin-top: 0;
+  padding: 9px 0 10px;
   display: flex;
   flex-direction: row;
   align-items: center;
-  justify-content: space-between;
-  gap: 8px;
+  gap: 6px;
   border-top: 1px solid var(--line);
 }
-.sidebar-footer form {
+
+/* Bloco da conta: o rodape inteiro e o atalho do perfil. Fica separado dos
+   controles (tema/Sair) — nome colado no "Claro" lia como se fossem a mesma
+   coisa. */
+.conta-link {
+  flex: 1 1 auto;
+  min-width: 0;
   display: flex;
   align-items: center;
-  margin: 0;
+  gap: 9px;
+  padding: 6px 8px;
+  border-radius: var(--radius-nav);
+  color: inherit;
+  text-decoration: none;
+  transition: background .15s ease;
+}
+.conta-link:hover { background: var(--surface-soft); }
+.conta-link.is-active { background: var(--brand-tint); border-color: var(--brand-line); }
+.conta-link .avatar { width: 30px; height: 30px; font-size: 12.5px; }
+.conta-nome { display: grid; min-width: 0; }
+.conta-nome strong {
+  font-size: 13px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.conta-nome small { font-size: 11px; color: var(--ink-muted); }
+
+.conta-icones { display: flex; align-items: center; gap: 2px; }
+.conta-icones form { display: flex; margin: 0; }
+
+/* Botao so-icone (tema, sair): desenho vem de mask para herdar currentColor
+   e nao precisar de dois SVGs por tema. */
+.icon-btn {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-nav);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  color: var(--ink-soft);
+  transition: background .15s ease, color .15s ease;
+}
+.icon-btn:hover { background: var(--surface-soft); color: var(--ink); }
+.icon-btn::before { content: ""; width: 16px; height: 16px; background: currentColor; }
+.icon-btn-tema::before {
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z'/%3E%3C/svg%3E") center / contain no-repeat;
+          mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+html[data-theme="dark"] .icon-btn-tema::before {
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='4'/%3E%3Cpath d='M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4'/%3E%3C/svg%3E");
+          mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='4'/%3E%3Cpath d='M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4'/%3E%3C/svg%3E");
+}
+.icon-btn-sair::before {
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4'/%3E%3Cpath d='m16 17 5-5-5-5'/%3E%3Cpath d='M21 12H9'/%3E%3C/svg%3E") center / contain no-repeat;
+          mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4'/%3E%3Cpath d='m16 17 5-5-5-5'/%3E%3Cpath d='M21 12H9'/%3E%3C/svg%3E") center / contain no-repeat;
 }
 
 .system-status {
@@ -193,10 +252,6 @@ button, .button, a { -webkit-tap-highlight-color: transparent; }
   transition: color .15s ease;
 }
 .theme-toggle:hover { color: var(--ink); }
-.theme-toggle-sidebar {
-  width: auto;
-  justify-content: flex-start;
-}
 .theme-toggle-icon {
   font-size: 12px;
   line-height: 1;
@@ -2309,14 +2364,6 @@ tr.roi-sem-campanha td { color: var(--ink-soft); }
    entra a assinatura inteira no lugar do icone. */
 .brand-mark.entrada svg { height: 24px; }
 
-/* O topo da barra lateral e da loja; a Revy assina no rodape. */
-.sidebar-assinatura {
-  padding: 12px 8px 2px;
-  border-top: 1px solid var(--line);
-  color: var(--ink-soft);
-}
-.sidebar-assinatura svg { height: 13px; width: auto; display: block; }
-
 .nav-link {
   min-height: 34px;
   display: flex;
@@ -2376,7 +2423,7 @@ tr.roi-sem-campanha td { color: var(--ink-soft); }
 .nav-link:hover svg { opacity: 1; color: inherit; }
 .nav-link.active svg { color: var(--brand); opacity: 1; }
 .nav-link.active:hover svg { color: var(--brand); opacity: 1; }
-.nav { display: flex; flex-direction: column; gap: 2px; flex: 1 1 auto; min-height: 0; }
+.nav { display: flex; flex-direction: column; gap: 2px; flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding-bottom: 8px; }
 .nav-group { display: flex; flex-direction: column; gap: 2px; }
 .nav-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .nav-search { padding: 10px 12px 2px; }
@@ -2391,21 +2438,51 @@ html[data-theme="dark"] .nav-link.active { background: var(--brand); color: var(
 .nav-link.active::before { display: none; }
 .nav-link.active svg { color: inherit; }
 .nav-link.active:hover svg { color: inherit; }
-.nav-collapse { margin-left: auto; border: 1px solid var(--line); background: transparent; color: var(--ink-soft); border-radius: var(--radius-ctl); font-size: 13px; font-weight: 700; padding: 3px 9px; cursor: pointer; }
+
+/* Cabecalho, busca e rodape nao encolhem: sem isso o .nav cede espaco e os
+   itens pintam por cima do rodape quando o menu nao cabe na altura. */
+.sidebar-brand-row, .nav-search, .sidebar-footer { flex: 0 0 auto; }
+
+/* Botao recolher/expandir: chevron desenhado por mask (o « de texto ficava
+   com cara de caixinha ao lado da marca). */
+.nav-collapse {
+  margin-left: auto; width: 32px; height: 32px; padding: 0;
+  border: 0; border-radius: var(--radius-nav); background: transparent;
+  color: var(--ink-soft); font-size: 0; cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center;
+  transition: background .15s ease, color .15s ease;
+}
 .nav-collapse:hover { background: var(--surface-soft); color: var(--ink); }
+.nav-collapse::before {
+  content: ""; width: 15px; height: 15px; background: currentColor;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m14 6-6 6 6 6'/%3E%3C/svg%3E") center / contain no-repeat;
+          mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m14 6-6 6 6 6'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+html.nav-collapsed .nav-collapse::before {
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m10 6 6 6-6 6'/%3E%3C/svg%3E");
+          mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m10 6 6 6-6 6'/%3E%3C/svg%3E");
+}
+
 @media (min-width: 861px) {
   .nav-collapsed .app-shell { grid-template-columns: 76px minmax(0, 1fr); }
-  .nav-collapsed .sidebar { padding: 0 8px 14px; overflow-x: hidden; }
-  .nav-collapsed .sidebar-brand-row { justify-content: center; padding: 0; }
+  .nav-collapsed .sidebar { padding: 0 8px; }
+  /* Marca e chevron empilhados: lado a lado os dois brigavam pelo pouco
+     espaco do trilho. */
+  .nav-collapsed .sidebar-brand-row {
+    flex-direction: column; gap: 6px; height: auto; padding: 10px 0 8px; justify-content: center;
+  }
   .nav-collapsed .brand { justify-content: center; }
   .nav-collapsed .brand > span:last-child { display: none; }
-  .nav-collapsed .nav-collapse { margin-left: 0; }
-  .nav-collapsed .nav-search, .nav-collapsed .nav-section, .nav-collapsed .nav-label, .nav-collapsed .nav-loja-switch, .nav-collapsed .sidebar-assinatura, .nav-collapsed .theme-toggle-label { display: none; }
+  .nav-collapsed .brand-mark svg { height: 26px; }
+  .nav-collapsed .nav-collapse { margin: 0; width: 42px; height: 24px; background: var(--surface-soft); }
+  .nav-collapsed .nav-search, .nav-collapsed .nav-section, .nav-collapsed .nav-label, .nav-collapsed .nav-loja-switch { display: none; }
   .nav-collapsed .nav-link { justify-content: center; padding: 0; margin: 2px 6px; min-height: 40px; font-size: 0; gap: 0; }
   .nav-collapsed .nav-link svg { width: 20px; height: 20px; }
-  .nav-collapsed .sidebar-footer { flex-direction: column; align-items: center; }
-  /* Marca menor no trilho: o R de 27px brigava com os ícones de 20px. */
-  .nav-collapsed .brand-mark svg { height: 18px; }
+  /* Rodape no trilho: avatar abre o perfil, tema e Sair viram icones um sob o outro. */
+  .nav-collapsed .sidebar-footer { flex-direction: column; gap: 6px; padding: 10px 0; }
+  .nav-collapsed .conta-link { padding: 4px; }
+  .nav-collapsed .conta-nome { display: none; }
+  .nav-collapsed .conta-icones { flex-direction: column; gap: 4px; }
 }
 @media (max-width: 860px) {
   .nav-collapse { display: none; }

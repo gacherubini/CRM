@@ -267,22 +267,8 @@ def build_nav(
         )
         sections.append(NavSection(title="Ajustes", items=tuple(ajustes)))
 
-    # Conta: perfil e troca de senha da própria conta — todos os papéis operacionais.
-    sections.append(
-        NavSection(
-            title="Conta",
-            items=(
-                NavItem(
-                    label="Perfil",
-                    href="/app/loja/perfil",
-                    section="Conta",
-                    module=None,
-                    active_prefix="/app/loja/perfil",
-                ),
-            ),
-        )
-    )
-
+    # Perfil nao entra no menu: o bloco da conta no rodape da barra lateral
+    # (base.html) e o atalho — o item repetia a mesma acao dentro do rolamento.
     return tuple(sections)
 
 
