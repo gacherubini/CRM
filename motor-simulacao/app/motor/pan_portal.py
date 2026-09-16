@@ -55,7 +55,16 @@ MODAL_AGENTE_BOTAO = re.compile(r"Agente e operador", re.I)
 # Nao tem parcelas nem "Aprovad|Reprovad|Negad", entao a espera de ofertas
 # nunca concluia; e o Celular do passo seguinte, atras do modal, morria em
 # `campo_nao_encontrado` culpando o campo errado (32s de falha tecnica).
-RECUSA_CREDITO = re.compile(r"CLIENTE\s+N[ÃA]O\s+ELEG[ÍI]VEL", re.I)
+# 16/09 18:00 mostrou uma SEGUNDA tela de recusa, depois do Simular (placa
+# TKL5E99): "Proposta recusada / Não conseguimos aprovar o crédito com as
+# condições digitadas" — sem ela na sonda, a espera queimava os 505s e o
+# resultado saiu `timeout_driver`.
+RECUSA_CREDITO = re.compile(
+    r"CLIENTE\s+N[ÃA]O\s+ELEG[ÍI]VEL"
+    r"|proposta\s+recusada"
+    r"|n[ãa]o\s+conseguimos\s+aprovar\s+o\s+cr[ée]dito",
+    re.I,
+)
 
 # UF -> nome por extenso (o dropdown pode listar sigla ou nome completo).
 _UF_NOME: dict[str, str] = {

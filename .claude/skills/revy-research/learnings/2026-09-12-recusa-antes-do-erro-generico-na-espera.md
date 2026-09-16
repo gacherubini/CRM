@@ -30,6 +30,13 @@ depois da consulta do CPF (`_passo_dados_pessoais`), no polling do produto
 (`_confirmar_produto_resolvido`). Padrão geral: **qualquer passo que espera a
 tela mudar é um passo onde a recusa pode ser a resposta**.
 
+**16/09 18:00 — a mesma recusa pode ter mais de uma frase.** O go!PAN mostrou
+uma SEGUNDA tela de recusa depois do Simular ("Proposta recusada / Não
+conseguimos aprovar o crédito com as condições digitadas") que o regex não
+conhecia: a espera queimou os 505s e saiu `timeout_driver` (sim 9c66b130, placa
+TKL5E99). O regex de recusa agora cobre as duas frases. Ao ver um banco queimar
+o timeout de ofertas, compare o print com o regex antes de culpar o portal.
+
 Primos: [[2026-09-06-motrix-recusa-sem-motivo-e-200-com-lista-vazia]] — lá a
 recusa era lista vazia sem frase; aqui a frase existe mas o erro genérico a
 encobria. E a armadilha do `motor-simulacao/README.md`: "`codigo_erro` aponta

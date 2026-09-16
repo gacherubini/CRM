@@ -539,3 +539,37 @@ def test_sonda_de_recusa_ignora_pagina_quebrada():
     page = MagicMock()
     page.get_by_text.side_effect = RuntimeError("pagina fechada")
     driver._levantar_se_recusado(page)
+
+
+# Tela real de 16/09 18:00 (sim 9c66b130), após o Simular: "Proposta recusada".
+TEXTO_PROPOSTA_RECUSADA = (
+    "Proposta recusada\n"
+    "Não conseguimos aprovar o crédito com as condições digitadas. "
+    "Você pode selecionar outro veículo, ajustar os valores ou os dados do cliente.\n"
+    "Ajustar dados  Digitar nova ficha"
+)
+
+
+def test_proposta_recusada_tambem_e_credito_recusado():
+    """A segunda tela de recusa do go!PAN não casava o regex antigo e a espera
+    queimava os 505s (`timeout_driver`) em cima de uma decisão de crédito."""
+    from app.motor.pan_portal import RECUSA_CREDITO
+
+    assert RECUSA_CREDITO.search(TEXTO_PROPOSTA_RECUSADA)
+
+    d = PanPortalDriver(html_simulacao=TEXTO_PROPOSTA_RECUSADA)
+    with pytest.raises(RejeicaoNegocio) as ei:
+        d(_sol())
+    assert ei.value.codigo == "credito_recusado"
+
+
+def test_espera_aborta_na_proposta_recusada():
+    import time as _time
+
+    driver = PanPortalDriver(timeout_ms=20_000)
+    page = _page_recusa(TEXTO_PROPOSTA_RECUSADA)
+    inicio = _time.monotonic()
+    with pytest.raises(RejeicaoNegocio) as ei:
+        driver._passo_aguardar_ofertas(page)
+    assert ei.value.codigo == "credito_recusado"
+    assert _time.monotonic() - inicio < 10
