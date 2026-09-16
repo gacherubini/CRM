@@ -1,6 +1,6 @@
 # portal-gestao · 179 rotas · 26 modelos · 6 workers · 35 flags · 27 migrations · 63 templates
 
-Gerado de `e925b83`. NAO editar a mao — saida de `gerar_mapa.py`.
+Gerado de `2b8ef38`. NAO editar a mao — saida de `gerar_mapa.py`.
 Migration head: `0027_perfil_avatar_foto`
 
 ## Rotas
@@ -60,14 +60,14 @@ Migration head: `0027_perfil_avatar_foto`
 - `GET /app/relatorios/metas.csv` — app/relatorios.py:157
 - `GET /app/relatorios/funil.csv` — app/relatorios.py:195
 - `GET /app/relatorios/roi.csv` — app/relatorios.py:254
-- `GET /app/equipe` — app/web/equipe.py:177
-- `GET /app/equipe/novo` — app/web/equipe.py:193
-- `POST /app/equipe/novo` — app/web/equipe.py:210
-- `GET /app/equipe/{membro_id}/editar` — app/web/equipe.py:279
-- `POST /app/equipe/{membro_id}/editar` — app/web/equipe.py:303
-- `GET /app/equipe/{membro_id}/senha` — app/web/equipe.py:355
-- `POST /app/equipe/{membro_id}/senha` — app/web/equipe.py:381
-- `POST /app/equipe/{membro_id}/{acao}` — app/web/equipe.py:425
+- `GET /app/equipe` — app/web/equipe.py:197
+- `GET /app/equipe/novo` — app/web/equipe.py:213
+- `POST /app/equipe/novo` — app/web/equipe.py:230
+- `GET /app/equipe/{membro_id}/editar` — app/web/equipe.py:299
+- `POST /app/equipe/{membro_id}/editar` — app/web/equipe.py:323
+- `GET /app/equipe/{membro_id}/senha` — app/web/equipe.py:375
+- `POST /app/equipe/{membro_id}/senha` — app/web/equipe.py:401
+- `POST /app/equipe/{membro_id}/{acao}` — app/web/equipe.py:445
 - `GET /app/loja/catalogo` — app/web/loja_catalogo.py:20
 - `POST /app/loja/catalogo` — app/web/loja_catalogo.py:21
 - `GET /app/loja/copiloto` — app/web/loja_copiloto.py:182
@@ -322,9 +322,9 @@ Migration head: `0027_perfil_avatar_foto`
 - `app/templates/partials/alertas_trafego.html` — app/templates/partials/alertas_trafego.html
 - `app/templates/partials/onboarding_medicao.html` — app/templates/partials/onboarding_medicao.html
 - `app/templates/partials/resultados_periodo.html` — app/templates/partials/resultados_periodo.html
-- `app/templates/equipe/lista.html` — app/web/equipe.py:133
-- `app/templates/equipe/form.html` — app/web/equipe.py:161
-- `app/templates/equipe/senha.html` — app/web/equipe.py:370
+- `app/templates/equipe/lista.html` — app/web/equipe.py:153
+- `app/templates/equipe/form.html` — app/web/equipe.py:181
+- `app/templates/equipe/senha.html` — app/web/equipe.py:390
 - `app/templates/loja/copiloto.html` — app/web/loja_copiloto.py:217
 - `app/templates/loja/estoque_visao.html` — app/web/loja_estoque.py:127
 - `app/templates/loja/vitrine_ordem.html` — app/web/loja_estoque.py:468

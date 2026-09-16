@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from fastapi import APIRouter
 
+from app.loja import identity  # noqa: E402
+
 from app.main import (  # import tardio; main registra este router no fim
     Depends,
     EMAIL_EQUIPE_RE,
@@ -31,11 +33,29 @@ from app.main import (  # import tardio; main registra este router no fim
 router = APIRouter()
 
 
-def _membro_da_loja(db: Session, usuario: Usuario, membro_id: str) -> Usuario | None:
+def _slug_ativo(request: Request, usuario: Usuario) -> str:
+    """Loja que a equipe opera: a selecionada na sessão, não a de origem do login.
+
+    A sessão só carrega loja com vínculo (``POST /app/loja/selecionar``
+    recusa sem membership), então o escopo continua seguro — e loja
+    satélite (ex.: ``teste``) finalmente consegue ter equipe: antes,
+    criar carimbava a loja do login e a fila da satélite ficava vazia
+    para sempre.
+    """
+    try:
+        sessao = request.session
+    except (AssertionError, AttributeError):  # sem SessionMiddleware (testes)
+        sessao = None
+    return identity.session_loja_slug(sessao) or (
+        getattr(usuario, "loja_slug", "") or ""
+    )
+
+
+def _membro_da_loja(db: Session, loja_slug: str, membro_id: str) -> Usuario | None:
     """Busca por id e loja na mesma consulta para impedir acesso entre tenants."""
     return (
         db.query(Usuario)
-        .filter(Usuario.id == membro_id, Usuario.loja_slug == usuario.loja_slug)
+        .filter(Usuario.id == membro_id, Usuario.loja_slug == loja_slug)
         .first()
     )
 
@@ -134,7 +154,7 @@ def _render_equipe_lista(
         contexto(
             request,
             usuario,
-            membros=_membros_da_loja(db, usuario.loja_slug),
+            membros=_membros_da_loja(db, _slug_ativo(request, usuario)),
             papeis_rotulo=PAPEIS_EQUIPE_ROTULO,
             erro=erro,
             equipe_somente_leitura=somente_leitura,
@@ -257,7 +277,7 @@ async def equipe_criar(request: Request, db: Session = Depends(get_db)):
             nome=nome,
             senha_hash=hash_senha(senha),
             papel=papel,
-            loja_slug=usuario.loja_slug,
+            loja_slug=_slug_ativo(request, usuario),
             ativo=True,
         )
     )
@@ -285,7 +305,7 @@ def equipe_editar_pagina(request: Request, membro_id: str, db: Session = Depends
         return _resposta_equipe_control_only(request, usuario)
     if not pode_gerir_equipe(usuario):
         return RedirectResponse("/app", status_code=303)
-    membro = _membro_da_loja(db, usuario, membro_id)
+    membro = _membro_da_loja(db, _slug_ativo(request, usuario), membro_id)
     if not membro:
         return RedirectResponse("/app/equipe?erro=nao-encontrado", status_code=303)
     if not _pode_editar_membro(usuario, membro):
@@ -318,7 +338,7 @@ async def equipe_editar(request: Request, membro_id: str, db: Session = Depends(
             erro="Sessão expirada. Recarregue a página e tente novamente.",
             status_code=400,
         )
-    membro = _membro_da_loja(db, usuario, membro_id)
+    membro = _membro_da_loja(db, _slug_ativo(request, usuario), membro_id)
     if not membro:
         return RedirectResponse("/app/equipe?erro=nao-encontrado", status_code=303)
     if not _pode_editar_membro(usuario, membro):
@@ -361,7 +381,7 @@ def equipe_senha_pagina(request: Request, membro_id: str, db: Session = Depends(
         return _resposta_equipe_control_only(request, usuario)
     if not pode_gerir_equipe(usuario):
         return RedirectResponse("/app", status_code=303)
-    membro = _membro_da_loja(db, usuario, membro_id)
+    membro = _membro_da_loja(db, _slug_ativo(request, usuario), membro_id)
     if not membro:
         return RedirectResponse("/app/equipe?erro=nao-encontrado", status_code=303)
     if not _pode_editar_membro(usuario, membro):
@@ -396,7 +416,7 @@ async def equipe_redefinir_senha(request: Request, membro_id: str, db: Session =
             erro="Sessão expirada. Recarregue a página e tente novamente.",
             status_code=400,
         )
-    membro = _membro_da_loja(db, usuario, membro_id)
+    membro = _membro_da_loja(db, _slug_ativo(request, usuario), membro_id)
     if not membro:
         return RedirectResponse("/app/equipe?erro=nao-encontrado", status_code=303)
     if not _pode_editar_membro(usuario, membro):
@@ -445,7 +465,7 @@ async def equipe_alterar_acesso(
             erro="Sessão expirada. Recarregue a página e tente novamente.",
             status_code=400,
         )
-    membro = _membro_da_loja(db, usuario, membro_id)
+    membro = _membro_da_loja(db, _slug_ativo(request, usuario), membro_id)
     if not membro:
         return RedirectResponse("/app/equipe?erro=nao-encontrado", status_code=303)
     if acao not in {"ativar", "desativar"}:

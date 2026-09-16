@@ -393,3 +393,58 @@ def test_dono_nao_pode_gerir_outra_conta_protegida_da_mesma_loja(client):
     assert outro_dono.ativo is True
     assert verifica_senha(outro_dono.senha_hash, "senha-do-membro")
     db.close()
+
+
+def _entrar_e_selecionar(client, monkeypatch, slug="loja-b"):
+    """Login na loja legada e troca a sessão — o seletor exige vínculo."""
+    from test_loja_identity import _selecionar, _semear_vinculos
+
+    monkeypatch.setenv("REVY_LOJA_SHELL_ENABLED", "1")
+    monkeypatch.setenv("REVY_LOJA_ENTITLEMENTS_ENABLED", "1")
+    login(client)
+    _semear_vinculos("dono@loja.test", ["loja-teste", slug])
+    resposta = _selecionar(client, slug)
+    assert resposta.headers["location"] == "/app"
+    return resposta
+
+
+def test_lista_mostra_equipe_da_loja_selecionada(client, monkeypatch):
+    """Regressão: a lista lia a loja do login, então satélite (ex.: teste)
+    mostrava a equipe da matriz — e a fila, que lê a sessão, vinha vazia."""
+    criar_membro(email="matriz@loja.test", nome="Membro Matriz")
+    criar_membro(
+        email="satelite@loja.test", nome="Membro Satelite", loja_slug="loja-b"
+    )
+    _entrar_e_selecionar(client, monkeypatch)
+
+    corpo = client.get("/app/equipe").text
+
+    assert "Membro Satelite" in corpo
+    assert "Membro Matriz" not in corpo
+
+
+def test_criar_carimba_loja_selecionada(client, monkeypatch):
+    _entrar_e_selecionar(client, monkeypatch)
+    dados = dados_novo(email="novo@loja.test")
+    dados["csrf"] = csrf_equipe(client)
+
+    client.post("/app/equipe/novo", data=dados, follow_redirects=False)
+
+    db = SessionLocal()
+    membro = db.query(Usuario).filter(Usuario.email == "novo@loja.test").one()
+    assert membro.loja_slug == "loja-b"
+    db.close()
+
+
+def test_editar_alcanca_so_membro_da_loja_selecionada(client, monkeypatch):
+    membro_b = criar_membro(
+        email="edit@loja.test", nome="Editavel", loja_slug="loja-b"
+    )
+    membro_a = criar_membro(email="matriz2@loja.test", nome="Da Matriz")
+    _entrar_e_selecionar(client, monkeypatch)
+
+    ok = client.get(f"/app/equipe/{membro_b}/editar", follow_redirects=False)
+    fora = client.get(f"/app/equipe/{membro_a}/editar", follow_redirects=False)
+
+    assert ok.status_code == 200
+    assert fora.headers["location"] == "/app/equipe?erro=nao-encontrado"

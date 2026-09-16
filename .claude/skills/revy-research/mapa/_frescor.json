@@ -1,5 +1,5 @@
 {
- "sha": "e925b83",
+ "sha": "2b8ef38",
  "inventario": {
   "chatbot-api": [
    {
@@ -1696,56 +1696,56 @@
     "chave": "GET /app/equipe",
     "simbolo": "/app/equipe",
     "arquivo": "app/web/equipe.py",
-    "linha": 177
+    "linha": 197
    },
    {
     "secao": "rota",
     "chave": "GET /app/equipe/novo",
     "simbolo": "/app/equipe/novo",
     "arquivo": "app/web/equipe.py",
-    "linha": 193
+    "linha": 213
    },
    {
     "secao": "rota",
     "chave": "POST /app/equipe/novo",
     "simbolo": "/app/equipe/novo",
     "arquivo": "app/web/equipe.py",
-    "linha": 210
+    "linha": 230
    },
    {
     "secao": "rota",
     "chave": "GET /app/equipe/{membro_id}/editar",
     "simbolo": "/app/equipe/{membro_id}/editar",
     "arquivo": "app/web/equipe.py",
-    "linha": 279
+    "linha": 299
    },
    {
     "secao": "rota",
     "chave": "POST /app/equipe/{membro_id}/editar",
     "simbolo": "/app/equipe/{membro_id}/editar",
     "arquivo": "app/web/equipe.py",
-    "linha": 303
+    "linha": 323
    },
    {
     "secao": "rota",
     "chave": "GET /app/equipe/{membro_id}/senha",
     "simbolo": "/app/equipe/{membro_id}/senha",
     "arquivo": "app/web/equipe.py",
-    "linha": 355
+    "linha": 375
    },
    {
     "secao": "rota",
     "chave": "POST /app/equipe/{membro_id}/senha",
     "simbolo": "/app/equipe/{membro_id}/senha",
     "arquivo": "app/web/equipe.py",
-    "linha": 381
+    "linha": 401
    },
    {
     "secao": "rota",
     "chave": "POST /app/equipe/{membro_id}/{acao}",
     "simbolo": "/app/equipe/{membro_id}/{acao}",
     "arquivo": "app/web/equipe.py",
-    "linha": 425
+    "linha": 445
    },
    {
     "secao": "rota",
@@ -2648,21 +2648,21 @@
     "chave": "app/templates/equipe/form.html",
     "simbolo": "equipe/form.html",
     "arquivo": "app/web/equipe.py",
-    "linha": 161
+    "linha": 181
    },
    {
     "secao": "template",
     "chave": "app/templates/equipe/lista.html",
     "simbolo": "equipe/lista.html",
     "arquivo": "app/web/equipe.py",
-    "linha": 133
+    "linha": 153
    },
    {
     "secao": "template",
     "chave": "app/templates/equipe/senha.html",
     "simbolo": "equipe/senha.html",
     "arquivo": "app/web/equipe.py",
-    "linha": 370
+    "linha": 390
    },
    {
     "secao": "template",
