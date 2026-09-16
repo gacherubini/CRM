@@ -5,6 +5,12 @@ Quadro: [`../README.md`](../README.md). Fila: [`../fila/README.md`](../fila/READ
 Vocabulário: [`../../CONTEXT.md`](../../CONTEXT.md). As-built Control/Loja:
 [`design/2026-07-30-revy-control-loja-asbuilt-e-melhorias.md`](design/2026-07-30-revy-control-loja-asbuilt-e-melhorias.md).
 
+> **Atualização 16/09 (leia o checkpoint do dia antes deste arquivo):**
+> [`handoff-contexto.md`](handoff-contexto.md) — chip novo na loja `teste` (canal
+> `1356659367525459`, `cloud_pendente`); o "Gemini caído" era **id de credencial** e ele
+> voltou como principal; fallback **GPT-5.6 Luna via OpenCode Go** em teste no cloud;
+> bancada do Go e armadilhas nos dois learnings de 16/09. O resto deste arquivo é de 29/08.
+
 ## Estado atual
 
 - **Embedded Signup / Tech Provider (29/08):** o onboarding assistido do §16.6 **estava

@@ -3,7 +3,7 @@
 Só o checkpoint. Narrativa de entrega fica no Git e em
 [`../nao-plano/historico/`](../nao-plano/historico/).
 
-O bloco **07/09** abaixo é o recente. O resto do checkpoint é de **2026-08-13** e
+O bloco **16/09** abaixo é o recente. O resto do checkpoint é de **2026-08-13** e
 envelheceu em partes — onde ele contradiz o
 [`contexto-compacto.md`](contexto-compacto.md), o contexto compacto vence.
 
@@ -12,6 +12,84 @@ Leia primeiro:
 1. [`contexto-compacto.md`](contexto-compacto.md) — estado e prioridades
 2. [`../fila/README.md`](../fila/README.md) — o que ainda é código
 3. [`design/2026-07-30-revy-control-loja-asbuilt-e-melhorias.md`](design/2026-07-30-revy-control-loja-asbuilt-e-melhorias.md) — as-built
+
+## Checkpoint de 2026-09-16 — chip na `teste`, o Gemini "caído" era credencial, fallback em teste
+
+**Produtos:** chatbot-api (loja `teste`), n8n (modelo do bot), deploy Fly.
+Git `06c2198` pushado. `app2037` e `n8n2037` no ar.
+
+### O que aconteceu, em ordem
+
+1. O dono conectou o **chip novo** na loja `teste` pelo popup do embedded signup (14:09 UTC).
+   Canal `1356659367525459`, WABA `1628109642104591`, `onboarding_elo=5`,
+   `registro_tentativas=1` (de 5), sem erro. Está **`cloud_pendente`**: falta **salvar Modo 2
+   na ficha da loja `teste` no Control** para subir a `cloud_ativo`. `template_oferta` vazio =
+   `chama_vendedor` ainda não aprovado pela Meta.
+2. O Gemini "não funcionava" e o dono pediu troca de modelo. A causa real: **a credencial foi
+   recriada no n8n com outro id e o workflow apontava para o id antigo** (`No credentials
+   found`). Chave e `gemini-3.1-flash-lite` sempre funcionaram (validado direto na API).
+   Gemini restaurado como principal em `06c2198`.
+3. A bancada do **OpenCode Go** mediu tudo — ver os dois learnings de 16/09 no índice. Resumo:
+   o Go exige header `x-opencode-session`; DeepSeek v4.1 gasta 250–550 de `reasoning_content`
+   com tools (precisa de teto ≥ ~1500 — não cabe no 250); GLM rejeita o campo `name` do
+   histórico de tools; GPT-5.6 Luna (reasoning ~0) só fala **Responses API** — o nó do n8n tem
+   o toggle *Use Responses API*; `minimax` e `luna` em `chat/completions` dão 500.
+4. **Teste em andamento:** o dono escolheu **GPT-5.6 Luna via Go como fallback** e o teste
+   está sendo feito com ele **como principal no cloud** (`wCloudMeta0001`), via ready file
+   patchado — **não está no git** (o git tem Gemini). Depois do teste: re-preparar o cloud do
+   `workflow-cloud.json` e subir (volta a Gemini); depois montar o **failover** (topologia:
+   saída de erro do `AI Agent1` → segundo agente com o Luna, memória e tools compartilhadas).
+
+### Estado da loja `teste` (conferido em prod, read-only)
+
+- Projeções `loja=ativa` e `whatsapp_modo=2` (24/08). Fila: 1 vendedor ("Vendedor Teste",
+  `5551995941020`, **sem `usuario_id`** → o sino 1:1 não toca; a oferta por WhatsApp vai).
+- `agente_config`: só rascunho (nada publicado) → o bot usa o padrão Revy.
+- **O Estoque não tem a loja `teste`** → `GET /public/v1/lojas/teste` 404 e a busca de veículo
+  volta vazia sem erro (o bot não cita moto). Pendência: criar/semear a `teste` no Estoque.
+- Conversas antigas ficaram no canal do número de teste velho; o canal novo estava zerado.
+
+### Credenciais e workflows (n8n2037)
+
+| Credencial | id | nota |
+|---|---|---|
+| Google Gemini(PaLM) Api account | `LPN7iWMwt0QTUOMN` | é a viva; o id `oO5GsnNkCBCgvYM0` do JSON antigo não existe |
+| OpenCode Go (tipo OpenAI) | `ufDVDQaC9cSxd5Q7` | baseURL `https://opencode.ai/zen/go/v1` + header `x-opencode-session: revy-whatsapp-bot` |
+
+Workflows ativos: `wAiNaoSalvos0001` (Modo 1, Gemini), `wCloudMeta0001` (cloud, **Luna em
+teste**), `wAiPreviewLoja01` (preview, Gemini).
+
+### Armadilhas do dia (detalhe nos learnings)
+
+- Credencial recriada → **conferir o id no nó** antes de culpar cota/modelo
+  (`2026-09-16-modelo-que-pensa-nao-cabe-no-teto-250`, seção Desfecho).
+- Go sem header → 400 `missing x-opencode-session`
+  (`2026-09-16-opencode-go-exige-x-opencode-session`).
+- Modelo que pensa não cabe no teto 250; `max_tokens` tem semântica diferente por provedor.
+- Import de workflow no n8n **desativa**; `publish` não reativa; `update:workflow
+  --id=... --active=true` liga; restart registra os webhooks (~40 s).
+- A **credencial de integração** do chatbot foi recriada hoje (a antiga não estava no
+  `.secrets.local` do Mac); a nova está lá (gitignored) e validada com 200.
+
+### Ops usados (Mac, sem `pwsh`)
+
+- Preparo dos workflows: replicamos o `prepare-workflow.ps1` em Python (hosts + tokens do
+  `.secrets.local`; cloud/preview usam `CHATBOT_API_TOKEN_CLOUD`).
+- Upload: `fly ssh sftp put -a n8n2037` → `fly machine exec <id> "env HOME=/home/node n8n
+  import:workflow --input=..."` → `publish:workflow --id=...` → `update:workflow --id=...
+  --active=true` → `fly apps restart n8n2037`.
+- Erro de execução do n8n: ler o SQLite **de dentro do container** (`execution_entity` +
+  `execution_data`; o `data` é string gigante — extrair `"message"`), sempre read-only.
+- Credencial decifrada: export para `/tmp` **dentro** do container, patch com node, import de
+  volta, `rm` no fim. Nunca imprimir o segredo.
+
+### Pendências, em ordem
+
+1. Terminar o teste real do Luna (WhatsApp) → restaurar o cloud do git → montar o failover.
+2. Control: salvar Modo 2 na `teste` (sobe `cloud_ativo`).
+3. Template `chama_vendedor`: aguardar aprovação (contestação de categoria MARKETING até 22/10).
+4. Estoque: criar/semear a loja `teste` com algumas motos.
+5. Loja: publicar a config do Agente da `teste` (hoje só rascunho).
 
 ## Checkpoint de 2026-09-08 — o popup abriu de verdade, e o corte do chip tem plano
 
