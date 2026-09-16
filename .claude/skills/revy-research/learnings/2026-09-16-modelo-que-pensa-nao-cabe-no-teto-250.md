@@ -45,3 +45,15 @@ Três consequências que valem além deste caso:
 O teste de aceite do fallback com o DeepSeek: com tools anexadas, os dois turnos do agente
 (aberto e followup de tool) produzem conteúdo com 370–550 de reasoning — dentro de um teto
 de 2048, fora de 250.
+
+## Adendo 16/09 (noite): Luna no `/responses` também falha — provedor instável
+
+Mesmo com a config certa pelos docs do Go (model id `gpt-5.6-luna`, endpoint
+`.../zen/go/v1/responses`, header `x-opencode-session` presente, teto 2048), o cloud
+(`wCloudMeta0001`) errou 5 execuções webhook entre 17:37–19:14 UTC com três erros
+**diferentes do provedor para o mesmo request**: 500 (`not able to process`), 400
+(`bad request`) e 503 (`service unavailable`). Request idêntico, erro diferente =
+flapping no provedor, não na nossa config. Probe sem chave nos dois endpoints volta
+401 (o caminho existe) — a falha é depois da autenticação. Consequência: o teste do
+Luna como principal trava; o failover Gemini→Luna continua válido, mas failover não
+salva principal instável — restaurar o cloud do git (Gemini) primeiro.
