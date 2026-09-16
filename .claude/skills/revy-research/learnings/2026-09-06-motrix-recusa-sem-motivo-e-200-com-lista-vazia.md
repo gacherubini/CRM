@@ -3,7 +3,7 @@ gatilho: simulacao de banco volta "sem oferta" e voce vai procurar bug no driver
 produto: motor-simulacao
 custo: o card do Motrix ficou uma sessao inteira com a causa errada escrita nele
 fonte: repo
-verificado_em: 2026-09-06
+verificado_em: 2026-09-16
 ---
 # `motrix_sem_oferta` e decisao de credito, nao defeito de robo
 
@@ -62,3 +62,12 @@ Primos: [[2026-09-04-spa-com-api-nao-e-driver-de-api]] — a mesma captura de re
 serve para trocar o Playwright por HTTP e a que responde esta pergunta em minutos; e
 [[2026-08-23-driver-playwright-engole-o-clique-que-falha]] — la o codigo de erro final
 apontava para a tela errada, aqui o card apontava para a causa errada.
+
+**16/09 — `consulta_cpf_sem_resposta` em prod nao e o driver.** Duas sims do Fly
+(`f2773195`, `9c66b130`) queimaram 120s x2 na validacao do CPF sem nenhuma das
+frases da espera aparecer. Na mesma hora, o `probe_todos --bancos motrix` do IP
+residencial do dono respondeu em **22s** com `motrix_sem_oferta` (RECUSA), driver
+correto. Nas mesmas sims o Bradesco saiu `saida_de_rede_divergente` (IP do proxy
+diferente do esperado) — a suspeita e o caminho de rede do worker, nao o
+portal: **olhe o proxy/IP de saida antes de mexer no driver**. O print do evento
+(na branch `triagem-simulacoes`) confirma a tela na proxima ocorrencia pos-deploy.
