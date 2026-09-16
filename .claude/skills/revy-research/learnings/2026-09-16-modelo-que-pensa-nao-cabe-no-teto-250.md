@@ -57,3 +57,12 @@ flapping no provedor, não na nossa config. Probe sem chave nos dois endpoints v
 401 (o caminho existe) — a falha é depois da autenticação. Consequência: o teste do
 Luna como principal trava; o failover Gemini→Luna continua válido, mas failover não
 salva principal instável — restaurar o cloud do git (Gemini) primeiro.
+
+## Adendo 16/09 (noite, 2): DeepSeek validado no teste real, virou o failover
+
+Execução 51364 no `wCloudMeta0001` (DeepSeek v4.1-flash como principal, teto 2048):
+caminho completo com sucesso até o `Responder WhatsApp1`, resposta coerente e no
+padrão da loja ("a cg 160 é o modelo que você procura, certo? ..."). Uso: 125+96
+completion tokens nos dois turnos do agente (reasoning incluso) — folga no teto.
+Failover Gemini→DeepSeek montado no git a partir daqui (saída de erro do
+`AI Agent1` → `AI Agent Failover1`, memória e tools compartilhadas).

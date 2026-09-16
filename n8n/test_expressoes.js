@@ -101,8 +101,12 @@ for (const arquivo of WORKFLOWS) {
   }
 }
 
-assert.strictEqual(comSlot, WORKFLOWS.length, 'todo workflow com agente tem que trazer o slot');
+assert.strictEqual(
+  comSlot,
+  WORKFLOWS.length * 2,
+  'todo workflow com agente tem que trazer o slot nos DOIS agentes (principal + failover)',
+);
 console.log(
-  `expressões OK: ${total} compilam no motor do n8n, e nos ${comSlot} workflows com ` +
-    'agente o prompt da loja é a última coisa da system message',
+  `expressões OK: ${total} compilam no motor do n8n, e nos ${WORKFLOWS.length} workflows com ` +
+    'agente (×2 system messages: principal + failover) o prompt da loja é a última coisa',
 );

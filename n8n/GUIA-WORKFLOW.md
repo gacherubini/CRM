@@ -70,7 +70,7 @@ Isso também separa o alvo do deploy: mudar a operação literal exige publicar 
 workflow no n8n; mudar o gerador de identidade e regras da loja exige deploy do
 `chatbot-api` (ou apenas salvar a config, quando a mudança é dado da loja).
 
-O fluxo atual tem 34 nós e trabalha com:
+O fluxo atual tem 36 nós e trabalha com:
 
 - mensagens de texto de clientes;
 - contexto de anúncios;
@@ -176,12 +176,18 @@ para um id que não existia mais depois de a credencial ser recriada (a viva era
 nó Gemini voltar a dar erro de credencial, confira o id em Credentials, não a cota. A memória
 fica em `Memoria da conversa1` e guarda as últimas 20 mensagens da sessão.
 
-**Fallback (OpenCode Go) — o que a bancada de 16/09 mediu**, caso o Gemini caia: o gateway
-exige o header `x-opencode-session` em toda chamada (400 sem ele; mora na credencial
-`OpenCode Go` → *Add Custom Header*). No mesmo gateway: DeepSeek v4.1 responde, mas gasta
-250–550 tokens de reasoning por chamada — precisa de teto ≥ ~1500 (não cabe nos 250);
-GLM recusa o campo `name` do histórico de tools (`"name" is not supported`); GPT-5.6 Luna
-só fala a Responses API (o nó do n8n tem o toggle *Use Responses API*).
+**Failover Gemini→DeepSeek (desde 16/09 à noite).** O `AI Agent1` tem
+`onError: continueErrorOutput` e a saída de erro cai no `AI Agent Failover1`, que usa o
+`DeepSeek Chat Model1` (`deepseek-v4.1-flash`, teto **2048**) e responde pelo mesmo caminho
+(atraso + envio). Memória e ferramentas são compartilhadas; a `systemMessage` é
+byte-idêntica — failover com prompt diferente vira outro bot, e o validador recusa.
+Por que DeepSeek: a bancada de 16/09 mediu 250–550 de reasoning com tools (não cabe no
+250, cabe no 2048) e o teste real no cloud respondeu certo; GLM recusa o campo `name`
+do histórico de tools; GPT-5.6 Luna flapa 500/400/503 no provedor. O texto do failover
+lê a mensagem via `$('Extrair1'/'Gate …')` em vez de `$json`, porque no ramo de erro o
+`$json` é o objeto do erro — os três nós existem nos 4 workflows (ponte no cloud/preview).
+O gateway OpenCode Go exige o header `x-opencode-session` em toda chamada (400 sem ele;
+mora na credencial `OpenCode Go` → *Add Custom Header*).
 
 ## Regras da simulação
 

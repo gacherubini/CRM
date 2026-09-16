@@ -541,9 +541,10 @@ def main() -> None:
     ), "tool de foto não está conectada ao AI Agent"
 
     nodes_by_name = {node.get("name"): node for node in data.get("nodes", [])}
-    assert len(nodes_by_name) == 34, (
-        "workflow deve ter 34 nós (inclui debounce, juiz, fallback, link catálogo, "
-        "atraso anti-ban e os dois nós da config do agente por loja)"
+    assert len(nodes_by_name) == 36, (
+        "workflow deve ter 36 nós (inclui debounce, juiz, fallback, link catálogo, "
+        "atraso anti-ban, os dois nós da config do agente por loja e os dois nós "
+        "do failover Gemini→DeepSeek)"
     )
     # Anti-ban: "Atraso anti-ban1" fica ENTRE o gerador da resposta e o envio,
     # calculando o delay (typing + throttle por instância) que a Evolution honra
@@ -661,6 +662,32 @@ def main() -> None:
     assert connections.get("AI Agent1", {}).get("main", [[]])[0][0]["node"] == (
         "Atraso anti-ban1"
     ), "AI Agent deve passar pelo atraso anti-ban antes do envio"
+    # Failover Gemini→DeepSeek: erro no agente principal cai no segundo agente,
+    # que responde pelo mesmo caminho (atraso + envio). Sem onError, o n8n
+    # aborta a execução e a saída de erro vira decoração.
+    agente = nodes_by_name.get("AI Agent1", {})
+    assert agente.get("onError") == "continueErrorOutput", (
+        "AI Agent1 sem onError: o erro aborta em vez de cair no failover"
+    )
+    assert connections.get("AI Agent1", {}).get("main", [[], []])[1][0]["node"] == (
+        "AI Agent Failover1"
+    ), "saída de erro do AI Agent1 tem que ir para o AI Agent Failover1"
+    assert connections.get("AI Agent Failover1", {}).get("main", [[]])[0][0][
+        "node"
+    ] == "Atraso anti-ban1", "failover responde pelo mesmo caminho do principal"
+    failover = nodes_by_name.get("AI Agent Failover1", {})
+    assert failover.get("parameters", {}).get("options", {}).get(
+        "systemMessage"
+    ) == agente.get("parameters", {}).get("options", {}).get("systemMessage"), (
+        "failover com systemMessage diferente do principal vira outro bot"
+    )
+    deepseek = nodes_by_name.get("DeepSeek Chat Model1", {})
+    assert deepseek.get("type") == "@n8n/n8n-nodes-langchain.lmChatOpenAi", (
+        "failover sem o nó do DeepSeek"
+    )
+    assert deepseek.get("parameters", {}).get("options", {}).get("maxTokens") == (
+        2048
+    ), "DeepSeek gasta 250-550 de reasoning com tools: teto 250 devolve vazio"
     se_ctrl = connections.get("Se resposta controle1", {}).get("main", [])
     assert se_ctrl[0][0]["node"] == "Atraso anti-ban1"
     assert se_ctrl[1][0]["node"] == "Aguardar 40s cliente1"
@@ -907,7 +934,7 @@ def main() -> None:
     )
 
     print(
-        "workflow n8n válido: 34 nós, replay >5min bloqueado, debounce pela última entrada, "
+        "workflow n8n válido: 36 nós, replay >5min bloqueado, debounce pela última entrada, "
         "fallback temporário sem fotos, multi-WA instance dinâmica, áudio ignorado, "
         "webhook seguro e resultado privado"
     )

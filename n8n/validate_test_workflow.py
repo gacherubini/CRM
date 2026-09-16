@@ -32,7 +32,7 @@ def main() -> None:
         "Aguardar 40s cliente1"
     )
     assert test["connections"] == canonical["connections"]
-    assert len(test["nodes"]) == len(canonical["nodes"]) == 34
+    assert len(test["nodes"]) == len(canonical["nodes"]) == 36
     assert [(node["name"], node["type"]) for node in test["nodes"]] == [
         (node["name"], node["type"]) for node in canonical["nodes"]
     ]

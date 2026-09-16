@@ -62,7 +62,9 @@ HERDADOS = [
     "Buscar config do agente1",
     "Gate config do agente1",
     "AI Agent1",
+    "AI Agent Failover1",
     "Google Gemini Chat Model1",
+    "DeepSeek Chat Model1",
     "Memoria da conversa1",
     "consultar_estoque1",
     "simular1",
@@ -408,16 +410,35 @@ CONEXOES = {
         "main": [[{"node": "Gate config do agente1", "type": "main", "index": 0}]]
     },
     "Gate config do agente1": {"main": [[{"node": "AI Agent1", "type": "main", "index": 0}]]},
-    "AI Agent1": {"main": [[{"node": "Atraso anti-ban1", "type": "main", "index": 0}]]},
+    "AI Agent1": {
+        "main": [
+            [{"node": "Atraso anti-ban1", "type": "main", "index": 0}],
+            [{"node": "AI Agent Failover1", "type": "main", "index": 1}],
+        ]
+    },
+    "AI Agent Failover1": {
+        "main": [[{"node": "Atraso anti-ban1", "type": "main", "index": 0}]]
+    },
     "Atraso anti-ban1": {"main": [[{"node": "Responder WhatsApp1", "type": "main", "index": 0}]]},
     "Google Gemini Chat Model1": {
         "ai_languageModel": [[{"node": "AI Agent1", "type": "ai_languageModel", "index": 0}]]
     },
+    "DeepSeek Chat Model1": {
+        "ai_languageModel": [[{"node": "AI Agent Failover1", "type": "ai_languageModel", "index": 0}]]
+    },
     "Memoria da conversa1": {
-        "ai_memory": [[{"node": "AI Agent1", "type": "ai_memory", "index": 0}]]
+        "ai_memory": [
+            [{"node": "AI Agent1", "type": "ai_memory", "index": 0}],
+            [{"node": "AI Agent Failover1", "type": "ai_memory", "index": 0}],
+        ]
     },
     **{
-        tool: {"ai_tool": [[{"node": "AI Agent1", "type": "ai_tool", "index": 0}]]}
+        tool: {
+            "ai_tool": [
+                [{"node": "AI Agent1", "type": "ai_tool", "index": 0}],
+                [{"node": "AI Agent Failover1", "type": "ai_tool", "index": 0}],
+            ]
+        }
         for tool in ("consultar_estoque1", "simular1", "solicitar_handoff1",
                      "TEMP continuar sem estoque1", "enviar_link_catalogo1")
     },
@@ -509,6 +530,11 @@ def main() -> None:
         for n in nos:
             if n["name"] == nome:
                 n["position"] = [200 + i * 165, 40]
+    for n in nos:
+        if n["name"] == "AI Agent Failover1":
+            n["position"] = [200 + 5 * 165, 300]
+        if n["name"] == "DeepSeek Chat Model1":
+            n["position"] = [200 + 6 * 165, 300]
 
     workflow = {
         "id": WORKFLOW_ID,
