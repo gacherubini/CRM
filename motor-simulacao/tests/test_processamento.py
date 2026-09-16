@@ -149,10 +149,22 @@ def test_um_falha_vira_parcial(db):
     assert por_provedor["B"].valor_parcela is None  # falha não tem parcela
 
 
-def test_todos_falham_vira_falhou(db):
+def test_todas_recusas_de_credito_nao_viram_falha(db):
+    """Recusa de crédito não é falha do Motor: os bancos responderam e disseram
+    não (13/09: 6/6 recusas terminava como `falhou` na tela)."""
     sim_id = _enfileirar(db)
     _reservar(db)
     sim = processar_job(db, sim_id, drivers=[("A", _rejeita("A")), ("B", _rejeita("B"))])
+    assert sim.status == "concluida"
+    assert all(r.status == "rejeitada" for r in sim.resultados)
+
+
+def test_recusa_com_erro_tecnico_continua_falha(db):
+    sim_id = _enfileirar(db)
+    _reservar(db)
+    sim = processar_job(
+        db, sim_id, drivers=[("A", _rejeita("A")), ("B", _transitorio_sempre("B"))]
+    )
     assert sim.status == "falhou"
 
 

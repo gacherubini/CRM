@@ -1,5 +1,12 @@
 from conftest import csrf_da_resposta, login
 
+from app.web.simulacoes import (
+    _cards_bancos_progresso,
+    _grupos_resultados_por_banco,
+    _resumo_grupos,
+    _veredito_do_codigo,
+)
+
 
 def _csrf_do_form(client):
     pagina = client.get("/app/simulacoes")
@@ -363,3 +370,71 @@ def test_sem_sexo_payload_vai_nulo(client, chatbot_fake, motor_fake):
     resposta = client.post("/app/simulacoes", data=dados, follow_redirects=False)
     assert resposta.status_code == 303
     assert motor_fake.simulacoes[-1]["pessoa"]["sexo"] is None
+
+
+# --- veredito por banco: captcha/rede não é falha -----------------------------
+
+
+def test_card_aguardando_intervencao_nao_e_falha():
+    """16/09: tarefa de captcha vinha do Motor como `aguardando_intervencao` e
+    o card dizia 'Falhou' com o job dizendo 'Aguardando intervenção'."""
+    cards = _cards_bancos_progresso(
+        ["bradesco"],
+        resultados=[],
+        tarefas=[
+            {
+                "provedor": "bradesco",
+                "status": "aguardando_intervencao",
+                "codigo_erro": "captcha_login",
+            }
+        ],
+        status_job="aguardando_intervencao",
+    )
+
+    assert cards[0]["veredito"] == "intervencao"
+    assert cards[0]["status_label"] == "Aguardando intervenção"
+
+
+def test_resultado_aguardando_intervencao_nao_e_falha():
+    """Na tela de resultado o veredito vinha só do `codigo_erro`: captcha
+    caía em 'falha' (vermelho). O status da linha manda."""
+    grupos = _grupos_resultados_por_banco(
+        [
+            {
+                "provedor": "bradesco",
+                "status": "aguardando_intervencao",
+                "codigo_erro": "captcha_login",
+                "valor_parcela": None,
+            }
+        ]
+    )
+
+    assert grupos[0]["veredito"] == "intervencao"
+    assert grupos[0]["veredito_rotulo"] == "Aguardando ação"
+
+
+def test_recusa_segue_como_recusado_e_conta_no_resumo():
+    """Guarda contra regressão: `credito_recusado` continua 'recusado' e o
+    resumo do topo não deixa banco nenhum fora da conta."""
+    grupos = _grupos_resultados_por_banco(
+        [
+            {
+                "provedor": "santander",
+                "status": "rejeitada",
+                "codigo_erro": "credito_recusado",
+                "valor_parcela": None,
+            },
+            {
+                "provedor": "bradesco",
+                "status": "aguardando_intervencao",
+                "codigo_erro": "captcha_login",
+                "valor_parcela": None,
+            },
+        ]
+    )
+
+    assert _veredito_do_codigo("credito_recusado") == "recusado"
+    resumo = _resumo_grupos(grupos)
+    assert resumo["ok"] == 0
+    assert resumo["recusados"] == 2  # recusado + intervencao contam como sem oferta
+    assert resumo["total"] == 2

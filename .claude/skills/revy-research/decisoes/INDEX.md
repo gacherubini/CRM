@@ -18,3 +18,4 @@ Escolhas do dono. Nao re-proponha o que esta aqui; leia so a linha que encosta n
 | protocolo proprio de implementar, propor ou depurar na skill | `2026-08-23-sem-protocolo-proprio-de-implementar.md` |
 | a skill editar o proprio SKILL.md | `2026-08-23-a-skill-nao-se-auto-edita.md` |
 | modelo de LLM por loja, teto de tokens por loja, cadencia de follow-up, "so lead de anuncio", persona pronta | `2026-08-25-agente-por-loja-o-que-ficou-de-fora.md` |
+| tratar simulação com todos os bancos recusando como `falhou` | `2026-09-16-recusa-de-credito-nao-e-falha.md` |

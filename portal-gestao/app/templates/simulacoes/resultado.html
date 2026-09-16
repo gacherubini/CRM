@@ -59,6 +59,8 @@
         <p class="sim-banco-sub">
           {% if veredito == 'ok' %}
             {{ grupo.ofertas_ok }} oferta(s) retornada(s){% if grupo.melhor_oferta and grupo.melhor_oferta.valor_parcela is not none %} · menor parcela <strong>{{ formatar_brl(grupo.melhor_oferta.valor_parcela) }}</strong>{% endif %}
+          {% elif veredito == 'intervencao' %}
+            Ação manual necessária{% if grupo.codigo_erro %} · <code>{{ grupo.codigo_erro }}</code>{% endif %}
           {% else %}
             Sem oferta{% if grupo.codigo_erro %} · <code>{{ grupo.codigo_erro }}</code>{% endif %}
           {% endif %}
@@ -67,6 +69,7 @@
       <span class="sim-pill is-{{ veredito }}">
         {% if veredito == 'ok' %}<i aria-hidden="true">✓</i> Com oferta
         {% elif veredito == 'recusado' %}<i aria-hidden="true">✕</i> Crédito recusado
+        {% elif veredito == 'intervencao' %}<i aria-hidden="true">⚠</i> Aguardando ação
         {% elif veredito == 'timeout' %}<i aria-hidden="true">⏱</i> Timeout
         {% elif veredito == 'falha' %}<i aria-hidden="true">!</i> Falhou
         {% else %}<i aria-hidden="true">–</i> Sem oferta
@@ -115,6 +118,9 @@
       {% if veredito == 'recusado' %}
         <p><strong>O banco analisou e não aprovou crédito para esses parâmetros.</strong></p>
         <p class="muted">Não é erro técnico. Vale tentar outro prazo ou entrada, ou consultar outro banco.</p>
+      {% elif veredito == 'intervencao' %}
+        <p><strong>O portal do banco pediu uma ação manual.</strong></p>
+        <p class="muted">Captcha, confirmação de dados ou revisão de acesso. Resolva em Acessos bancos e simule de novo; o detalhe fica em Registros.{% if grupo.codigo_erro %} Código: <code>{{ grupo.codigo_erro }}</code>.{% endif %}</p>
       {% elif veredito == 'timeout' %}
         <p><strong>O portal do banco demorou além do limite e a consulta foi interrompida.</strong></p>
         <p class="muted">Tente de novo. Se repetir, consulte um banco por vez para reduzir a carga no portal.</p>

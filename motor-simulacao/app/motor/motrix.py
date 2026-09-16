@@ -463,6 +463,16 @@ class MotrixDriver(PlaywrightBankDriver):
                 timeout=min(prazo, 120_000),
             )
         except Exception as exc:
+            # Sem print não dá para saber depois se foi lentidão do portal ou
+            # uma tela nova que a espera não conhece (16/09, sem rastro).
+            self._evento(
+                ctx,
+                "consulta_cpf_sem_resposta",
+                "Portal não respondeu à validação do CPF; tela registrada para diagnóstico.",
+                page,
+                True,
+                nivel="erro",
+            )
             raise ErroTransitorio(
                 "consulta_cpf_sem_resposta",
                 "portal não respondeu à validação do CPF",

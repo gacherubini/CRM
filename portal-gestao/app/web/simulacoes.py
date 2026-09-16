@@ -110,6 +110,7 @@ _CODIGOS_TIMEOUT = frozenset(
 _VEREDITO_ROTULOS = {
     "ok": "Com oferta",
     "recusado": "Crédito recusado",
+    "intervencao": "Aguardando ação",
     "timeout": "Timeout",
     "falha": "Falhou",
     "andamento": "Consultando",
@@ -117,7 +118,14 @@ _VEREDITO_ROTULOS = {
     "sem_oferta": "Sem oferta",
 }
 # Ordem de exibição: aprovados primeiro, depois recusas, falhas e timeouts.
-_VEREDITO_ORDEM = {"ok": 0, "recusado": 1, "falha": 2, "timeout": 3, "sem_oferta": 4}
+_VEREDITO_ORDEM = {
+    "ok": 0,
+    "recusado": 1,
+    "intervencao": 2,
+    "falha": 3,
+    "timeout": 4,
+    "sem_oferta": 5,
+}
 
 
 def _veredito_do_codigo(codigo_erro: str | None) -> str:
@@ -132,10 +140,26 @@ def _veredito_do_codigo(codigo_erro: str | None) -> str:
     return "falha"
 
 
+def _tem_linha_aguardando(linhas: list[dict]) -> bool:
+    """Alguma linha com status `aguardando_intervencao` (captcha, rede, senha).
+
+    O status vive na linha do resultado; o `codigo_erro` sozinho cairia em
+    `falha` e o card diria "Falhou" para um banco que só pede ação manual.
+    """
+    return any(
+        (r.get("status") or "").strip().lower() == "aguardando_intervencao"
+        for r in linhas
+    )
+
+
 def _resumo_grupos(grupos: list[dict]) -> dict:
     """Contadores para a faixa-resumo do topo (verde/vermelho/amarelo)."""
     ok = sum(1 for g in grupos if g.get("veredito") == "ok")
-    recusados = sum(1 for g in grupos if g.get("veredito") in ("recusado", "falha", "sem_oferta"))
+    recusados = sum(
+        1
+        for g in grupos
+        if g.get("veredito") in ("recusado", "falha", "sem_oferta", "intervencao")
+    )
     timeouts = sum(1 for g in grupos if g.get("veredito") == "timeout")
     return {"ok": ok, "recusados": recusados, "timeouts": timeouts, "total": len(grupos)}
 
@@ -497,6 +521,9 @@ def _cards_bancos_progresso(
             veredito = "andamento" if not codigo_erro else _veredito_do_codigo(codigo_erro)
             if st == "parcial" and not codigo_erro and not ofertas_ok:
                 veredito = "andamento"
+        elif st == "aguardando_intervencao":
+            # Captcha/rede/senha: o banco quer ação manual, não é falha.
+            veredito = "intervencao"
         elif codigo_erro:
             veredito = _veredito_do_codigo(codigo_erro)
         elif st in ("concluida",):
@@ -512,6 +539,7 @@ def _cards_bancos_progresso(
             "processando": "Consultando",
             "concluida": "Com oferta" if ofertas_ok else "Concluída",
             "parcial": "Parcial",
+            "aguardando_intervencao": "Aguardando intervenção",
             "falhou": "Falhou",
             "rejeitada": "Rejeitada",
             "cancelada": "Cancelada",
@@ -827,6 +855,8 @@ def _grupos_resultados_por_banco(resultados: list[dict] | None) -> list[dict]:
         )
         if ofertas_ok:
             veredito = "ok"
+        elif _tem_linha_aguardando(linhas):
+            veredito = "intervencao"
         elif codigo_erro:
             veredito = _veredito_do_codigo(codigo_erro)
         else:

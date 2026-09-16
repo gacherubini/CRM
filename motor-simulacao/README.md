@@ -37,6 +37,11 @@ aqui** — cifradas — e em nenhum outro produto.
 - **Não espere modal auto-abrir: a sessão quente muda o comportamento.** Com
   `storage_state` salvo o go!PAN não abre o modal de agente/operador; com sessão fria abre.
   Abra pelo controle fixo da tela. Vale para qualquer portal com `MOTOR_WARM_SESSION=1`.
+  E não confie no instante da checagem: em 16/09 o go!PAN abriu o modal **sozinho, tarde**,
+  já depois da checagem pós-login, e o CPF atrás do overlay saiu como `campo_nao_encontrado`.
+  O driver agora re-checa em `_primeiro_visivel`/`_passo_cliente`/`_passo_veiculo`; sem nome
+  configurado (`MOTOR_PAN_AGENTE_CERTIFICADO`/`MOTOR_PAN_OPERADOR`) ele **fecha** por Escape/X
+  (`pan_modal_agente_nao_fechou` se não conseguir), nunca clica Salvar desabilitado.
 - **Toda escrita em formulário lê de volta.** `except: pass` em passo de formulário deixa o
   driver seguir com o campo vazio e morrer minutos depois num passo inocente. Foram quatro
   casos da mesma família em 04/09; o commit `4879c47` já tinha corrigido isso no Bradesco em
@@ -87,7 +92,9 @@ Estado dos bancos e mapa de campos por provedor:
 `recebida → processando → concluida | parcial | falhou | aguardando_intervencao`
 
 A criação responde `202` com `status: recebida`; o worker executa e atualiza. Resultados
-parciais são normais (um banco responde, outro falha).
+parciais são normais (um banco responde, outro falha). Recusa de crédito **não é falha**:
+se todos os bancos recusam, a simulação fecha `concluida` com resultados `rejeitada`
+(decisão de 16/09/2026 — `_status_geral` em `app/processamento.py`).
 
 Cada tarefa por banco tem lease (`MOTOR_TASK_LEASE_SECONDS`, 300 s) renovado por heartbeat
 a cada `MOTOR_TASK_HEARTBEAT_SECONDS` enquanto o driver roda. Lease vencido = worker morto:

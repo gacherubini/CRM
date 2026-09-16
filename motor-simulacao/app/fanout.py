@@ -15,7 +15,7 @@ from app.models_db import SimulacaoORM, SimulacaoProvedorORM
 from app.motor.providers import normalizar_provedor, obter_provedor
 
 STATUS_TERMINAIS_TAREFA = frozenset(
-    {"concluida", "rejeitada", "falhou", "cancelada"}
+    {"concluida", "rejeitada", "falhou", "cancelada", "aguardando_intervencao"}
 )
 
 

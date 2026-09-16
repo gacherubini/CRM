@@ -55,7 +55,16 @@ MODAL_AGENTE_BOTAO = re.compile(r"Agente e operador", re.I)
 # Nao tem parcelas nem "Aprovad|Reprovad|Negad", entao a espera de ofertas
 # nunca concluia; e o Celular do passo seguinte, atras do modal, morria em
 # `campo_nao_encontrado` culpando o campo errado (32s de falha tecnica).
-RECUSA_CREDITO = re.compile(r"CLIENTE\s+N[ÃA]O\s+ELEG[ÍI]VEL", re.I)
+# 16/09 18:00 mostrou uma SEGUNDA tela de recusa, depois do Simular (placa
+# TKL5E99): "Proposta recusada / Não conseguimos aprovar o crédito com as
+# condições digitadas" — sem ela na sonda, a espera queimava os 505s e o
+# resultado saiu `timeout_driver`.
+RECUSA_CREDITO = re.compile(
+    r"CLIENTE\s+N[ÃA]O\s+ELEG[ÍI]VEL"
+    r"|proposta\s+recusada"
+    r"|n[ãa]o\s+conseguimos\s+aprovar\s+o\s+cr[ée]dito",
+    re.I,
+)
 
 # UF -> nome por extenso (o dropdown pode listar sigla ou nome completo).
 _UF_NOME: dict[str, str] = {
@@ -523,6 +532,26 @@ class PanPortalDriver(PlaywrightBankDriver):
     def _primeiro_visivel(self, page, candidatos, campo: str):
         """Retorna o primeiro locator visivel; senao levanta campo_nao_encontrado.
 
+        Antes de acusar campo ausente, trata o modal de agente/operador: o
+        go!PAN reabre o dialogo sozinho depois do login e o campo procurado fica
+        atras do overlay (sim 16/09: CPF "ausente" com o modal aberto na tela).
+        """
+        try:
+            return self._procurar_visivel(page, candidatos, campo)
+        except IntervencaoNecessaria as exc:
+            if exc.codigo != "campo_nao_encontrado":
+                raise
+            # Recusa pode ser a causa do campo "ausente": sonda antes de decidir
+            # (o modal de recusa tambem e um `.mahoe-modal__dialog`).
+            self._levantar_se_recusado(page)
+            if not self._modal_agente_aberto(page):
+                raise
+            self._configurar_agente_operador(page)
+            return self._procurar_visivel(page, candidatos, campo)
+
+    def _procurar_visivel(self, page, candidatos, campo: str):
+        """Algoritmo base, sem tratamento de modal — usado direto no retry.
+
         Espera curta por tentativa (2,5s): o candidato correto deste portal e
         sempre o 1o e renderiza rapido; timeout alto so faz o fallback custar
         6s cada quando o 1o nao casa. Total de 2 passadas cobre render lento.
@@ -538,7 +567,7 @@ class PanPortalDriver(PlaywrightBankDriver):
         raise self._falha_campo(campo)
 
     def _modal_agente_aberto(self, page) -> bool:
-        """Diz se o dialogo esta REALMENTE aberto, pela altura do container.
+        """Diz se o dialogo de agente/operador esta REALMENTE aberto.
 
         O go!PAN deixa o `.mahoe-modal__dialog` no DOM com `height: 0` e
         `overflow: hidden` quando fechado. O conteudo continua la, com geometria
@@ -546,13 +575,20 @@ class PanPortalDriver(PlaywrightBankDriver):
         titulo responde `is_visible() == True` com o modal fechado e o clique
         seguinte estoura o timeout sem explicacao (sim 20260904-151456). A altura
         do dialogo e o unico sinal que separa os dois estados.
+
+        Exige tambem o conteudo do modal de agente: o de recusa de credito
+        (`CLIENTE NÃO ELEGÍVEL`) usa o mesmo `.mahoe-modal__dialog`, e fecha-lo
+        aqui apagaria a recusa antes da sonda `_levantar_se_recusado`.
         """
         try:
             return bool(
                 page.evaluate(
                     """() => {
                         const d = document.querySelector('.mahoe-modal__dialog');
-                        return !!d && d.getBoundingClientRect().height > 0;
+                        if (!d || d.getBoundingClientRect().height <= 0) return false;
+                        const agente = d.querySelector('[id^="certifiedAgent"]');
+                        return !!agente
+                            || /configure\\s+seu\\s+agente/i.test(d.innerText || '');
                     }"""
                 )
             )
@@ -573,6 +609,46 @@ class PanPortalDriver(PlaywrightBankDriver):
                 "botao 'Agente e operador' nao abriu o dialogo de configuracao",
             )
 
+    def _fechar_modal_agente(self, page) -> None:
+        """Dispensa o dialogo quando a loja nao tem agente/operador configurado.
+
+        Sem nome configurado o Salvar fica desabilitado (print de 16/09) e o
+        modal aberto cobre o formulario. Em 16/09 (sim c1ba9a9a) o go!PAN abriu
+        o dialogo sozinho depois do login, o CPF ficou atras do overlay e o passo
+        seguinte morreu em `campo_nao_encontrado`.
+        """
+        if not self._modal_agente_aberto(page):
+            return
+        try:
+            page.keyboard.press("Escape")
+            page.wait_for_timeout(400)
+        except Exception:
+            pass
+        candidatos = (
+            lambda: page.locator(
+                ".mahoe-modal__dialog button[aria-label*='echar' i]"
+            ).first,
+            lambda: page.locator(
+                ".mahoe-modal__dialog button[aria-label*='lose' i]"
+            ).first,
+            lambda: page.locator(".mahoe-modal__dialog button.close").first,
+        )
+        for gerar in candidatos:
+            if not self._modal_agente_aberto(page):
+                return
+            try:
+                botao = gerar()
+                if botao.count():
+                    botao.click(timeout=min(self.timeout_ms, 5_000))
+                    page.wait_for_timeout(400)
+            except Exception:
+                continue
+        if self._modal_agente_aberto(page):
+            raise ErroTransitorio(
+                "pan_modal_agente_nao_fechou",
+                "dialogo de agente/operador continuou aberto e cobre o formulario",
+            )
+
     def _configurar_agente_operador(self, page) -> None:
         """Fixa agente certificado e operador antes de comecar a proposta.
 
@@ -583,12 +659,18 @@ class PanPortalDriver(PlaywrightBankDriver):
         Sem nome configurado so agimos se o modal estiver bloqueando a tela —
         senao o passo seguinte morre em `campo_nao_encontrado` culpando o campo
         Celular, que na verdade estava atras do overlay (sim 20260904-150259).
+        Nesse caso o modal precisa ser FECHADO: o Salvar fica desabilitado sem
+        escolha e nao da para seguir com ele por cima do formulario.
         """
         quer_definir = bool(config.PAN_AGENTE_CERTIFICADO or config.PAN_OPERADOR)
-        if not quer_definir and not self._modal_agente_aberto(page):
+        if not self._modal_agente_aberto(page):
+            if not quer_definir:
+                return
+            self._abrir_modal_agente(page)
+        elif not quer_definir:
+            self._fechar_modal_agente(page)
             return
 
-        self._abrir_modal_agente(page)
         self._escolher_no_combo(
             page, "certifiedAgent", config.PAN_AGENTE_CERTIFICADO, "agente certificado"
         )
@@ -765,6 +847,9 @@ class PanPortalDriver(PlaywrightBankDriver):
             pass
 
     def _passo_cliente(self, page, sol: SolicitacaoSimulacao) -> None:
+        # O modal de agente/operador pode ter reaberto sozinho depois da
+        # checagem pos-login; com ele por cima o CPF nem e encontrado (16/09).
+        self._configurar_agente_operador(page)
         self._fechar_got_it(page)  # cookies podem cobrir os campos
         cpf = re.sub(r"\D", "", sol.pessoa.cpf or "")
         # Tela /captura/inicio: "informe o CPF do cliente". Campo pan-mahoe com
@@ -809,6 +894,8 @@ class PanPortalDriver(PlaywrightBankDriver):
         return self._primeiro_visivel(page, candidatos, "CPF do cliente")
 
     def _passo_veiculo(self, page, sol: SolicitacaoSimulacao) -> None:
+        # Mesmo risco do passo do CPF: o dialogo pode reaparecer entre os passos.
+        self._configurar_agente_operador(page)
         # Tela /comparador: celular ("Digite o celular...") + veiculo por placa.
         self._fechar_got_it(page)
         # So digitos: a mascara insere ( ) - sozinha. Digitacao lenta com
