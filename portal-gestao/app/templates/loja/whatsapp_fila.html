@@ -91,14 +91,18 @@
   <form class="form-layout" method="post" action="/app/loja/whatsapp/fila">
     <input type="hidden" name="csrf" value="{{ csrf }}">
     <div class="form-grid">
-      <label>Pessoa da equipe
-        <select name="usuario_id" required>
-          <option value="">Escolha…</option>
+      <label>Pessoa da equipe (opcional)
+        <select name="usuario_id">
+          <option value="">Sem vínculo — só WhatsApp</option>
           {% for membro in equipe %}
           <option value="{{ membro.id }}">{{ membro.nome or membro.email }}</option>
           {% endfor %}
         </select>
-        <small>Quem não está na equipe não entra na fila.</small>
+        <small>Com vínculo, o sino da Loja toca para ele. Sem vínculo, ele só recebe a oferta no WhatsApp.</small>
+      </label>
+      <label>Nome do vendedor
+        <input name="nome" maxlength="160" placeholder="Como ele aparece na fila">
+        <small>Obrigatório quando não há pessoa da equipe escolhida.</small>
       </label>
       <label>WhatsApp do vendedor
         <input name="telefone" maxlength="20" placeholder="(11) 99999-0000" required>

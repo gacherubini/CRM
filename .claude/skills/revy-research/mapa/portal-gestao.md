@@ -1,6 +1,6 @@
 # portal-gestao · 179 rotas · 26 modelos · 6 workers · 35 flags · 27 migrations · 63 templates
 
-Gerado de `0973eb5`. NAO editar a mao — saida de `gerar_mapa.py`.
+Gerado de `e925b83`. NAO editar a mao — saida de `gerar_mapa.py`.
 Migration head: `0027_perfil_avatar_foto`
 
 ## Rotas
@@ -127,7 +127,7 @@ Migration head: `0027_perfil_avatar_foto`
 - `GET /app/loja/whatsapp/canais/{canal_id}/status` — app/web/loja_whatsapp.py:507
 - `GET /app/loja/whatsapp/fila` — app/web/loja_whatsapp.py:529
 - `POST /app/loja/whatsapp/fila` — app/web/loja_whatsapp.py:573
-- `POST /app/loja/whatsapp/fila/{vendedor_id}/remover` — app/web/loja_whatsapp.py:614
+- `POST /app/loja/whatsapp/fila/{vendedor_id}/remover` — app/web/loja_whatsapp.py:624
 - `GET /app/metas` — app/web/metas.py:135
 - `GET /app/metas/nova` — app/web/metas.py:167
 - `POST /app/metas/nova` — app/web/metas.py:177

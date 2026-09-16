@@ -1,8 +1,9 @@
 """Tela de cadastro da fila de rodízio (spec §5.8).
 
-A pessoa vem da **equipe da loja**, não de nome digitado: é assim que o
-`Usuario.id` entra no cadastro e o sino 1:1 ganha destinatário real. Sem
-vínculo, o vendedor recebe a oferta pelo WhatsApp e o sino não toca.
+O vínculo com a **equipe da loja** é opcional: com ele, o `Usuario.id`
+entra no cadastro e o sino 1:1 ganha destinatário real. Sem vínculo, o
+vendedor entra com nome digitado, recebe a oferta pelo WhatsApp e o
+sino não toca.
 """
 from conftest import criar_usuario, csrf_da_resposta, ligar_modo_2, login
 
@@ -148,3 +149,45 @@ def test_chatbot_fora_do_ar_nao_derruba_a_tela(client, chatbot_fake, monkeypatch
     resposta = client.get(TELA)
     assert resposta.status_code == 200
     assert "Fila de atendimento" in resposta.text
+
+
+def test_cadastrar_sem_vinculo_usa_nome_livre(client, chatbot_fake, monkeypatch):
+    """Sem pessoa da equipe, o vendedor entra só com número + nome digitado."""
+    _ligar(monkeypatch)
+    _entrar(client)
+    client.post(
+        TELA,
+        data={"csrf": _csrf(client), "usuario_id": "", "nome": "Zé da Esquina",
+              "telefone": "(11) 99999-0000", "ordem": "0"},
+        follow_redirects=False,
+    )
+    assert len(chatbot_fake.fila_criados) == 1
+    assert chatbot_fake.fila_criados[0]["nome"] == "Zé da Esquina"
+    assert chatbot_fake.fila_criados[0]["usuario_id"] is None
+
+
+def test_sem_membro_e_sem_nome_nao_chama_o_chatbot(client, chatbot_fake, monkeypatch):
+    _ligar(monkeypatch)
+    _entrar(client)
+    client.post(
+        TELA,
+        data={"csrf": _csrf(client), "usuario_id": "", "nome": "",
+              "telefone": "11999990000", "ordem": "0"},
+        follow_redirects=False,
+    )
+    assert chatbot_fake.fila_criados == []
+
+
+def test_membro_escolhido_ignora_nome_livre(client, chatbot_fake, monkeypatch):
+    """Com vínculo, o nome é o da pessoa da equipe, não o digitado."""
+    _ligar(monkeypatch)
+    _entrar(client)
+    membro = _membro(email="ana4@loja.test")
+    client.post(
+        TELA,
+        data={"csrf": _csrf(client), "usuario_id": membro.id, "nome": "Outro Nome",
+              "telefone": "(11) 99999-0000", "ordem": "0"},
+        follow_redirects=False,
+    )
+    assert chatbot_fake.fila_criados[0]["nome"] == membro.nome
+    assert chatbot_fake.fila_criados[0]["usuario_id"] == membro.id

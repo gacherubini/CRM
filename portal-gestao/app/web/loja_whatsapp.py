@@ -534,10 +534,10 @@ def loja_whatsapp_fila(
 ):
     """Cadastro da fila de rodízio do Modo 2 (spec §5.8).
 
-    A pessoa vem da **equipe da loja**, não de nome digitado: é assim que o
-    ``Usuario.id`` entra no cadastro e o sino 1:1 ganha destinatário real.
-    Sem vínculo o vendedor ainda recebe a oferta pelo WhatsApp, mas o sino
-    não toca para ele — a lista avisa isso na cara.
+    O vínculo com a **equipe da loja** é opcional: com ele, o ``Usuario.id``
+    entra no cadastro e o sino 1:1 ganha destinatário real; sem ele, o
+    vendedor entra com nome digitado e recebe a oferta pelo WhatsApp, mas
+    o sino não toca para ele — a lista avisa isso na cara.
     """
     usuario = usuario_atual(request, db)
     if not usuario:
@@ -584,13 +584,19 @@ async def loja_whatsapp_fila_criar(
 
     escolhido = (form.get("usuario_id") or "").strip()
     telefone = (form.get("telefone") or "").strip()
+    nome_livre = (form.get("nome") or "").strip()
     # O id vem do form: sem conferir a equipe, daria para injetar pessoa de
     # outra loja no rodízio desta.
     membro = next(
         (m for m in _equipe_para_fila(db, _slug_ativo(request, usuario)) if m.id == escolhido), None
     )
-    if membro is None:
+    if escolhido and membro is None:
         request.session["fila_erro"] = "Escolha uma pessoa da equipe da loja."
+        return _para_fila()
+    if membro is None and not nome_livre:
+        request.session["fila_erro"] = (
+            "Informe o nome do vendedor ou escolha uma pessoa da equipe."
+        )
         return _para_fila()
     if not telefone:
         request.session["fila_erro"] = "Informe o WhatsApp do vendedor."
@@ -601,11 +607,15 @@ async def loja_whatsapp_fila_criar(
     except ValueError:
         ordem = 0
 
+    nome = membro.nome if membro is not None else nome_livre
     try:
         chatbot.criar_fila_vendedor(
-            nome=membro.nome, telefone=telefone, ordem=ordem, usuario_id=membro.id
+            nome=nome,
+            telefone=telefone,
+            ordem=ordem,
+            usuario_id=membro.id if membro is not None else None,
         )
-        request.session["fila_mensagem"] = f"{membro.nome} entrou na fila."
+        request.session["fila_mensagem"] = f"{nome} entrou na fila."
     except ChatbotIndisponivel as exc:
         request.session["fila_erro"] = str(exc)
     return _para_fila()

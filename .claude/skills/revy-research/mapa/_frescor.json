@@ -1,5 +1,5 @@
 {
- "sha": "0973eb5",
+ "sha": "e925b83",
  "inventario": {
   "chatbot-api": [
    {
@@ -2165,7 +2165,7 @@
     "chave": "POST /app/loja/whatsapp/fila/{vendedor_id}/remover",
     "simbolo": "_TELA_FILA",
     "arquivo": "app/web/loja_whatsapp.py",
-    "linha": 614
+    "linha": 624
    },
    {
     "secao": "rota",
