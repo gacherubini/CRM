@@ -357,8 +357,11 @@ def test_intervencao_para_sem_retry(db, monkeypatch):
         db, tarefa.id, tarefa.reserva_token, drivers=[("bradesco", captcha)]
     )
     assert chamadas["n"] == 1
-    assert saida.status == "falhou"
+    # Captcha não é falha: a tarefa também fica aguardando ação manual, senão o
+    # card do banco no Portal dizia "Falhou" com o job dizendo "Aguardando".
+    assert saida.status == "aguardando_intervencao"
     assert saida.codigo_erro == "captcha"
+    assert db.get(SimulacaoORM, sim_id).status == "aguardando_intervencao"
     tentativas = db.query(SimulacaoTentativaORM).filter_by(simulacao_id=sim_id).all()
     assert len(tentativas) == 1
     assert tentativas[0].status == "aguardando_intervencao"

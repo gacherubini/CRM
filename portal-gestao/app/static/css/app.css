@@ -5480,7 +5480,8 @@ form[data-periodo-melhorado] { position: relative; }
   border-left-color: var(--danger);
   background: color-mix(in srgb, var(--danger) 4%, var(--surface));
 }
-.sim-banco.is-timeout {
+.sim-banco.is-timeout,
+.sim-banco.is-intervencao {
   border-left-color: var(--warn);
   background: color-mix(in srgb, var(--warn) 9%, var(--surface));
 }
@@ -5520,7 +5521,8 @@ form[data-periodo-melhorado] { position: relative; }
   background: color-mix(in srgb, var(--danger) 10%, var(--surface));
   color: var(--danger);
 }
-.sim-pill.is-timeout {
+.sim-pill.is-timeout,
+.sim-pill.is-intervencao {
   border-color: color-mix(in srgb, var(--warn) 50%, var(--line));
   background: color-mix(in srgb, var(--warn) 16%, var(--surface));
   color: var(--st-wait);
@@ -5560,8 +5562,10 @@ form[data-periodo-melhorado] { position: relative; }
 .sim-row-status.is-falha::before { background: var(--danger); }
 .sim-row-status.is-recusado,
 .sim-row-status.is-falha { color: var(--danger); }
-.sim-row-status.is-timeout { color: var(--st-wait); }
-.sim-row-status.is-timeout::before { background: var(--warn); }
+.sim-row-status.is-timeout,
+.sim-row-status.is-intervencao { color: var(--st-wait); }
+.sim-row-status.is-timeout::before,
+.sim-row-status.is-intervencao::before { background: var(--warn); }
 .sim-row-status code { font-family: var(--font-data); font-weight: 400; }
 
 .sim-banco-vazio { padding: 0 var(--space-5) var(--space-5); }
@@ -5592,7 +5596,8 @@ form[data-periodo-melhorado] { position: relative; }
 .sim-bank-card.is-ok { border-top-color: var(--ok); background: color-mix(in srgb, var(--ok) 5%, var(--surface)); }
 .sim-bank-card.is-recusado,
 .sim-bank-card.is-falha { border-top-color: var(--danger); }
-.sim-bank-card.is-timeout { border-top-color: var(--warn); background: color-mix(in srgb, var(--warn) 8%, var(--surface)); }
+.sim-bank-card.is-timeout,
+.sim-bank-card.is-intervencao { border-top-color: var(--warn); background: color-mix(in srgb, var(--warn) 8%, var(--surface)); }
 .sim-bank-card.is-andamento { border-top-color: var(--st-live); }
 .sim-bank-card.is-fila { border-top-color: var(--line-strong); }
 .sim-bank-top { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-2); }

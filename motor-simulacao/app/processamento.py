@@ -733,7 +733,10 @@ def _status_de_resultados_tarefa(
     if "concluida" in statuses:
         return "concluida", codigo
     if "aguardando_intervencao" in statuses:
-        return "falhou", codigo or "aguardando_intervencao"
+        # Captcha/rede pedem ação manual, não falha. O Portal monta o card do
+        # banco por este status: com `falhou` o card dizia "Falhou" enquanto o
+        # job-pai já dizia "Aguardando intervenção" (sins f11ba3dc e c1ba9a9a).
+        return "aguardando_intervencao", codigo or "aguardando_intervencao"
     if "rejeitada" in statuses:
         return "rejeitada", codigo
     return "falhou", codigo
