@@ -732,6 +732,9 @@ class FontecredDriver(PlaywrightBankDriver):
         cel_box.fill(sol.pessoa.celular or "")
         cel_box.blur()
         page.wait_for_timeout(500)
+        # A consulta do CPF pode terminar em recusa: sem a sonda aqui o modal
+        # fica por cima e o passo do veículo cai em `veiculo_nao_resolvido`.
+        self._levantar_se_recusado(page)
 
     def _passo_veiculo(self, page, sol: SolicitacaoSimulacao) -> None:
         # Moto usada (0KM = Não, value "0")
@@ -773,6 +776,9 @@ class FontecredDriver(PlaywrightBankDriver):
         (sim 20260904-152805).
         """
         if not self._produto_escolhido(page):
+            # Recusa primeiro: o modal da política de crédito impede o produto
+            # de resolver, e `veiculo_nao_resolvido` culparia o veículo (16/09).
+            self._levantar_se_recusado(page)
             raise ErroTransitorio(
                 "veiculo_nao_resolvido",
                 "Portal não resolveu o veículo pela placa informada.",
@@ -794,6 +800,8 @@ class FontecredDriver(PlaywrightBankDriver):
         for _ in range(max(1, int(timeout_ms // max(intervalo_ms, 1)))):
             if self._produto_escolhido(page, timeout_ms=intervalo_ms * 2):
                 return True
+            # Produto nao resolveu: pode ser o modal de recusa por cima.
+            self._levantar_se_recusado(page)
             page.wait_for_timeout(intervalo_ms)
         return False
 

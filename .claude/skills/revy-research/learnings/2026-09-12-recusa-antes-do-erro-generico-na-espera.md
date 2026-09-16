@@ -3,7 +3,7 @@ gatilho: tela de recusa de crédito cai em erro técnico genérico em vez de Rej
 produto: motor-simulacao
 custo: 4 bancos recusando o cliente de teste e os 4 saindo como FALHA técnica (32s a 274s cada)
 fonte: repo
-verificado_em: 2026-09-12
+verificado_em: 2026-09-16
 ---
 # Recusa do banco se checa ANTES do erro genérico na espera
 
@@ -20,6 +20,15 @@ Regra: em todo `_passo_aguardar_*`, a sonda de recusa (`_levantar_se_recusado`)
 vem **antes** do `Ocorreu um erro|falha`. Texto de recusa nunca aparece em
 tela de aprovado (há teste por banco garantindo), então a prioridade não gera
 falso positivo; a ordem inversa gera falso erro técnico.
+
+**16/09 — o mesmo padrão fora da espera.** O Fontecred recusou o CPF durante o
+passo do veículo: o modal ("Este CPF não atende aos critérios mínimos…") ficou
+por cima, o `select#produto` não resolveu e o resultado saiu
+`veiculo_nao_resolvido` (falha), não `credito_recusado`. A sonda agora roda
+depois da consulta do CPF (`_passo_dados_pessoais`), no polling do produto
+(`_aguardar_produto`) e imediatamente antes do erro de veículo
+(`_confirmar_produto_resolvido`). Padrão geral: **qualquer passo que espera a
+tela mudar é um passo onde a recusa pode ser a resposta**.
 
 Primos: [[2026-09-06-motrix-recusa-sem-motivo-e-200-com-lista-vazia]] — lá a
 recusa era lista vazia sem frase; aqui a frase existe mas o erro genérico a

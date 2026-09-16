@@ -64,6 +64,7 @@ escrever migration com `batch_alter_table`.
 | deployar o motor2037 ou mudar env/timeout de um worker de banco | `2026-09-12-fly-deploy-nao-atualiza-worker-por-banco.md` |
 | rodar comando com aspas, parenteses, pipe ou redirect via fly ssh console no Windows | `2026-09-12-fly-ssh-console-comando-complexo-via-stdin.md` |
 | tela de recusa de crédito cai em erro técnico genérico em vez de RejeicaoNegocio | `2026-09-12-recusa-antes-do-erro-generico-na-espera.md` |
+| go!PAN sai com campo_nao_encontrado e o print da falha mostra o modal "Configure seu agente certificado e operador" | `2026-09-16-modal-agente-go-pan-reabre-depois-do-login.md` |
 | banco cai em captcha/login frio logo depois de uma rodada recusada, ou a sessão quente não é reusada | `2026-09-12-sessao-quente-so-existia-se-chegasse-as-ofertas.md` |
 | sessão quente não é reusada entre jobs nos workers Playwright do Fly, ou banco pede captcha em todo login | `2026-09-13-storage-state-morre-no-rootfs-efemero-do-fly.md` |
 | portal bancário recusa fora de horário comercial, ou mostra produto desabilitado após o login | `2026-09-13-bv-produto-veiculos-so-em-horario-comercial.md` |

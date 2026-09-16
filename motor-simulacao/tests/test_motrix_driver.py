@@ -5,6 +5,7 @@ from pathlib import Path
 from unittest.mock import MagicMock
 
 import pytest
+from app import config
 
 from app.motor.base import Condicoes, Pessoa, SolicitacaoSimulacao, Veiculo
 from app.motor.drivers import (
@@ -302,3 +303,36 @@ def test_aguardar_condicao_ignora_excecao_da_condicao():
         return True
 
     assert driver._aguardar_condicao(page, condicao, 10_000, intervalo_ms=10) is True
+
+
+def test_consulta_cpf_sem_resposta_registra_print(monkeypatch):
+    """Em 16/09 a falha saiu sem print e nao deu para saber se foi lentidao do
+    portal ou uma tela nova que a espera nao conhece."""
+    import app.motor.playwright_base as pb
+
+    driver = MotrixDriver(timeout_ms=20_000)
+    monkeypatch.setattr(driver, "_preencher", lambda *a, **k: None)
+    monkeypatch.setattr(driver, "_aguardar_habilitado", lambda *a, **k: None)
+    monkeypatch.setattr(config, "EVENT_SCREENSHOTS", True)
+    monkeypatch.setattr(
+        pb, "capturar_print_evento", lambda *a, **k: ("print.jpg", b"jpeg")
+    )
+
+    page = MagicMock()
+    page.wait_for_function.side_effect = TimeoutError("sem resposta")
+    eventos = []
+
+    class Ctx:
+        screenshot_dir = None
+        simulacao_id = "sim-teste"
+
+        def registrar_evento(self, etapa, mensagem, nivel="info", **kw):
+            eventos.append({"etapa": etapa, "nivel": nivel, **kw})
+
+    with pytest.raises(ErroTransitorio) as ei:
+        driver._passo_consulta_cpf(page, _sol(), Ctx())
+
+    assert ei.value.codigo == "consulta_cpf_sem_resposta"
+    assert eventos[-1]["etapa"] == "consulta_cpf_sem_resposta"
+    assert eventos[-1]["nivel"] == "erro"
+    assert eventos[-1]["screenshot_conteudo"] == b"jpeg"

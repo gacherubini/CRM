@@ -372,8 +372,9 @@ def test_com_nome_configurado_abre_pelo_botao_do_cabecalho(monkeypatch):
     driver = PanPortalDriver(timeout_ms=20_000)
 
     page = MagicMock()
-    # Tres leituras do dialogo: fechado, aberto apos o clique, fechado apos Salvar.
-    page.evaluate.side_effect = [False, True, False]
+    # Quatro leituras: fechado na checagem do passo, fechado no `_abrir`,
+    # aberto apos o clique no cabecalho, fechado apos Salvar.
+    page.evaluate.side_effect = [False, False, True, False]
     opcao = MagicMock()
     opcao.inner_text.return_value = "Giovanna Reis"
     lista = MagicMock()
@@ -403,6 +404,82 @@ def test_modal_que_nao_abre_falha_com_codigo_proprio(monkeypatch):
         driver._configurar_agente_operador(page)
 
     assert ei.value.codigo == "pan_modal_agente_nao_abriu"
+
+
+def test_sem_nome_configurado_fecha_modal_que_apareceu(monkeypatch):
+    """Print de 16/09: o modal abriu sozinho depois do login; sem nome
+    configurado o Salvar fica desabilitado e o overlay derruba o preenchimento.
+    A saida e fechar pelo Escape/X, nunca clicar Salvar."""
+    monkeypatch.setattr(config, "PAN_AGENTE_CERTIFICADO", "")
+    monkeypatch.setattr(config, "PAN_OPERADOR", "")
+    driver = PanPortalDriver(timeout_ms=20_000)
+    page = MagicMock()
+    # Aberto na checagem, aberto no inicio do fechamento, fechado apos Escape.
+    page.evaluate.side_effect = [True, True, False]
+    page.locator.return_value.first.count.return_value = 0
+
+    driver._configurar_agente_operador(page)
+
+    page.keyboard.press.assert_called_once_with("Escape")
+    page.get_by_role.assert_not_called()  # nunca chega no Salvar
+
+
+def test_modal_que_nao_fecha_levanta_codigo_proprio(monkeypatch):
+    monkeypatch.setattr(config, "PAN_AGENTE_CERTIFICADO", "")
+    monkeypatch.setattr(config, "PAN_OPERADOR", "")
+    driver = PanPortalDriver(timeout_ms=20_000)
+    page = MagicMock()
+    page.evaluate.return_value = True  # continua aberto de qualquer jeito
+    page.locator.return_value.first.count.return_value = 0
+
+    with pytest.raises(ErroTransitorio) as ei:
+        driver._configurar_agente_operador(page)
+
+    assert ei.value.codigo == "pan_modal_agente_nao_fechou"
+
+
+def test_campo_ausente_com_modal_aberto_trata_o_modal_e_tenta_de_novo(monkeypatch):
+    """16/09: o dialogo reapareceu no meio do preenchimento e o campo (que
+    existia atras do overlay) saiu como `campo_nao_encontrado`."""
+    monkeypatch.setattr(config, "PAN_AGENTE_CERTIFICADO", "")
+    monkeypatch.setattr(config, "PAN_OPERADOR", "")
+    driver = PanPortalDriver(timeout_ms=20_000)
+    page = MagicMock()
+    # `_configurar_agente_operador` ve aberto; `_fechar_modal_agente` fecha.
+    page.evaluate.side_effect = [True, True, False]
+    page.locator.return_value.first.count.return_value = 0
+    page.get_by_text.return_value.count.return_value = 0  # sem modal de recusa
+
+    sentinela = object()
+    chamadas = {"n": 0}
+
+    def base_falsa(self, page_, candidatos, campo):
+        chamadas["n"] += 1
+        if chamadas["n"] == 1:
+            raise IntervencaoNecessaria("campo_nao_encontrado", f"campo {campo}")
+        return sentinela
+
+    monkeypatch.setattr(PanPortalDriver, "_procurar_visivel", base_falsa)
+
+    assert driver._primeiro_visivel(page, [], "CPF do cliente") is sentinela
+    assert chamadas["n"] == 2
+
+
+def test_campo_ausente_com_modal_de_recusa_vira_rejeicao(monkeypatch):
+    """O modal de recusa usa o mesmo `.mahoe-modal__dialog`; ele tem de ser
+    sondado antes de qualquer tratamento de agente (que fecharia a recusa)."""
+    driver = PanPortalDriver(timeout_ms=20_000)
+    page = _page_recusa(FIXTURE_RECUSA.read_text(encoding="utf-8"))
+
+    def base_falsa(self, page_, candidatos, campo):
+        raise IntervencaoNecessaria("campo_nao_encontrado", f"campo {campo}")
+
+    monkeypatch.setattr(PanPortalDriver, "_procurar_visivel", base_falsa)
+
+    with pytest.raises(RejeicaoNegocio) as ei:
+        driver._primeiro_visivel(page, [], "CPF do cliente")
+
+    assert ei.value.codigo == "credito_recusado"
 
 
 # --- recusa de crédito (tela real de 12/09) -------------------------------------

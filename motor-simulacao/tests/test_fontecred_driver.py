@@ -393,11 +393,26 @@ def test_produto_vazio_e_veiculo_nao_resolvido():
     driver = FontecredDriver(timeout_ms=20_000)
     page = MagicMock()
     page.locator.return_value.first.input_value.return_value = ""
+    page.get_by_text.return_value.count.return_value = 0  # sem modal de recusa
 
     with pytest.raises(ErroTransitorio) as ei:
         driver._confirmar_produto_resolvido(page)
 
     assert ei.value.codigo == "veiculo_nao_resolvido"
+
+
+def test_recusa_de_credito_nao_vira_veiculo_nao_resolvido():
+    """Print de 16/09: o modal "Este CPF não atende aos critérios mínimos"
+    estava na tela no passo do veículo e o produto vazio gravava
+    `veiculo_nao_resolvido` (falha técnica) em vez da recusa do banco."""
+    driver = FontecredDriver(timeout_ms=20_000)
+    page = _page_recusa(FIXTURE_RECUSA.read_text(encoding="utf-8"))
+    page.locator.return_value.first.input_value.return_value = ""
+
+    with pytest.raises(RejeicaoNegocio) as ei:
+        driver._confirmar_produto_resolvido(page)
+
+    assert ei.value.codigo == "credito_recusado"
 
 
 def test_modal_de_placa_tratado_dispensa_a_linha_com_botao():
@@ -433,6 +448,7 @@ def test_modal_que_nao_fecha_e_sem_produto_continua_falhando():
     titulo = page.get_by_text.return_value.first
     titulo.wait_for.side_effect = [None, RuntimeError("modal continuou aberto")]
     page.locator.return_value.first.input_value.return_value = ""
+    page.get_by_text.return_value.count.return_value = 0  # sem modal de recusa
 
     with pytest.raises(ErroTransitorio) as ei:
         driver._resolver_modal_placa(page)

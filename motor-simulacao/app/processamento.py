@@ -527,6 +527,10 @@ def _status_geral(resultados: list[ResultadoDriver]) -> str:
         return "parcial"
     if any(r.status == "aguardando_intervencao" for r in resultados):
         return "aguardando_intervencao"
+    if all(r.status == "rejeitada" for r in resultados):
+        # Recusa de crédito não é falha do Motor: a simulação rodou até o fim e
+        # todos os bancos disseram não (sim 13/09: 6/6 recusas virava `falhou`).
+        return "concluida"
     return "falhou"
 
 
