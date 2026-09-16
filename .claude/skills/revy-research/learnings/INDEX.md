@@ -74,3 +74,4 @@ escrever migration com `batch_alter_table`.
 | pintar fundo de estado ativo no escuro e o texto sumir | `2026-09-13-data-theme-vence-classe-nova.md` |
 | setar secret JSON (mapa por loja) via fly secrets no Windows | `2026-09-14-fly-secrets-json-no-windows-perde-aspa.md` |
 | fly ssh console volta vazio sem erro, ou parse de saida remota falha do nada | `2026-09-14-fly-ssh-console-vazio-pede-retry.md` |
+| configurar acesso read-only ao banco de producao numa maquina nova, ou psql responde "definition of service not found" | `2026-09-15-acesso-readonly-prod-fly.md` |

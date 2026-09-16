@@ -197,6 +197,43 @@ Ordem de rollout (default off): `CHATBOT_WHATSAPP_PROVIDER=evolution` +
 sem apagar instâncias na Evolution. O QR usa `Cache-Control: no-store` — não copie para
 log, ticket ou screenshot.
 
+## Acesso read-only ao banco de produção
+
+Produção vive no `suite-pg` (privado, flycast). A skill
+[`skills/prod-readonly-db`](../../../skills/prod-readonly-db/SKILL.md) consulta por
+aliases read-only. Nada de segredo no git: a **fonte de verdade é o próprio Fly**.
+
+- **Provisionamento (uma vez):** roles `chatbot_reader`, `estoque_reader`,
+  `motor_reader`, `revy_reader`, `evolution_reader` — só `SELECT`, sem ownership, sem
+  `CONNECT` fora do próprio banco, `default_transaction_read_only=on`. O `PUBLIC` foi
+  retirado (`CONNECT`/`TEMPORARY`) de todos os bancos para o preflight da skill passar.
+  A senha das roles vive no secret `PROD_READONLY_DB_PASSWORD` do `app2037`.
+- **Bootstrap por máquina:** `pwsh deploy/fly/3vm/setup-prod-readonly.ps1` (Windows) ou
+  `bash deploy/fly/3vm/setup-prod-readonly.sh` (macOS/Linux). Lê a senha do Fly, grava
+  `.pg_service.conf` + `pgpass.conf` no path do SO e exporta os `PROD_READONLY_DB_*`.
+  A única credencial necessária é `fly auth login` — não há chave para perder.
+- **Túnel (obrigatório):** `fly proxy 15432:5432 -a suite-pg` num terminal; a skill usa
+  `TRANSPORT=tunnel`. O túnel não abre sozinho.
+- **Aliases:** `revy-chatbot`, `revy-estoque`, `revy-motor`, `revy-revy` (schemas
+  `portal`+`control`), `revy-evolution`.
+- **Superusuário** só serve para provisionar role nova. Dentro do `suite-pg`:
+  `PGPASSWORD=$OPERATOR_PASSWORD /usr/lib/postgresql/18/bin/psql -h localhost -p 5433 -U postgres`
+  (o `SU_PASSWORD` **não** autentica `postgres`).
+- Windows: as variáveis de usuário só entram em shell **novo** — reabra o terminal
+  depois do bootstrap.
+
+```powershell
+# Windows
+pwsh deploy/fly/3vm/setup-prod-readonly.ps1 -Tunnel
+"SELECT current_database(), current_user" | python skills/prod-readonly-db/scripts/readonly_psql.py --alias revy-motor
+```
+
+```bash
+# macOS
+bash deploy/fly/3vm/setup-prod-readonly.sh -t
+echo 'SELECT current_database(), current_user' | python3 skills/prod-readonly-db/scripts/readonly_psql.py --alias revy-motor
+```
+
 ## Workflow n8n (sem secrets no git)
 
 1. Canônico versionado: `n8n/workflow-ai-nao-salvos.json` (placeholders
