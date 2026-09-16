@@ -25,6 +25,103 @@
 <div class="alert success" role="status">{{ acao_mensagem }}</div>
 {% endif %}
 
+{# O agora é estado vivo do motor (ofertas abertas), não cadastro. Estilos:
+   .agora-* em app.css; countdown e polling em fila_agora.js. #}
+{% if fila and not erro_fila %}
+<section class="panel" aria-labelledby="agora-titulo"
+         data-agora data-estado-url="/app/loja/whatsapp/fila/estado.json">
+  <div class="panel-heading">
+    <div>
+      <span class="mono-label">Ao vivo</span>
+      <h2 id="agora-titulo">Agora no rodízio</h2>
+    </div>
+    {% if agora.abertas %}
+    <span class="muted">{{ agora.abertas }} lead{% if agora.abertas != 1 %}s{% endif %} com vendedor</span>
+    {% endif %}
+  </div>
+  {% if erro_agora %}
+  <p class="agora-erro">Não deu para ver o agora: {{ erro_agora }}</p>
+  {% elif not agora.abertas and not agora.orfas %}
+  <p class="agora-calmo">
+    Nenhum cliente pedindo atendimento agora. Quando pedir, o primeiro da vez
+    é <strong>{{ agora.cartoes[0].vendedor.nome }}</strong>.
+  </p>
+  {% endif %}
+  {% if esperando_vendedor %}
+  <p class="agora-espera">
+    <strong>{{ esperando_vendedor }} cliente{% if esperando_vendedor != 1 %}s{% endif %}</strong>
+    rodou a fila inteira e espera um vendedor.
+    <a href="/app/loja/atendimento?estado=aguardando_vendedor">Ver no Atendimento</a>
+  </p>
+  {% endif %}
+  {% if agora.abertas or agora.orfas %}
+  <div class="agora-carrossel" role="list" aria-label="Vendedores na ordem da fila">
+    {% for cartao in agora.cartoes %}
+    <article class="agora-cartao estado-{{ cartao.estado }}" role="listitem"
+             aria-label="{{ cartao.posicao }}º: {{ cartao.vendedor.nome }}">
+      <header>
+        <span class="agora-posicao" aria-hidden="true">{{ cartao.posicao }}</span>
+        <strong>{{ cartao.vendedor.nome }}</strong>
+        {% if cartao.estado == "com_lead" %}
+        <span class="agora-pilula agora">com o lead agora</span>
+        {% elif cartao.estado == "primeiro" %}
+        <span class="agora-pilula vez">primeiro da vez</span>
+        {% else %}
+        <span class="agora-pilula">aguardando vez</span>
+        {% endif %}
+      </header>
+      {% if cartao.total > 1 %}
+      <p class="agora-total">{{ cartao.total }} leads com ele agora</p>
+      {% endif %}
+      {% for oferta in cartao.ofertas %}
+      <div class="agora-oferta" data-oferta
+           data-criado="{{ oferta.criado_em or "" }}" data-prazo="{{ oferta.prazo_em or "" }}">
+        <div class="agora-oferta-linha">
+          <span>cliente fim {{ oferta.cliente_curto or "····" }}</span>
+          <span data-decorrido>{{ oferta.decorrido }}</span>
+        </div>
+        {% if oferta.restante is not none %}
+        <p class="agora-passa">
+          {% if oferta.proximo_nome %}passa para <strong>{{ oferta.proximo_nome }}</strong> em
+          {% else %}aguarda vaga — expira em {% endif %}
+          <strong data-restante>{{ oferta.restante }}</strong>
+        </p>
+        <div class="agora-barra" aria-hidden="true"><span data-barra
+          {% if oferta.progresso_pct is not none %}style="width: {{ "%.0f"|format(oferta.progresso_pct) }}%"{% endif %}></span></div>
+        {% else %}
+        <p class="agora-passa">sem prazo do motor</p>
+        {% endif %}
+        <a class="agora-ver" href="/app/loja/atendimento?busca={{ oferta.telefone_cliente }}">Ver conversa</a>
+      </div>
+      {% endfor %}
+    </article>
+    {% endfor %}
+    {% if agora.orfas %}
+    <article class="agora-cartao estado-orfa" role="listitem" aria-label="Ofertas de quem saiu da fila">
+      <header>
+        <span class="agora-posicao" aria-hidden="true">–</span>
+        <strong>Fora da fila</strong>
+        <span class="agora-pilula">saiu da fila</span>
+      </header>
+      {% for oferta in agora.orfas %}
+      <div class="agora-oferta" data-oferta
+           data-criado="{{ oferta.criado_em or "" }}" data-prazo="{{ oferta.prazo_em or "" }}">
+        <div class="agora-oferta-linha">
+          <span>{{ oferta.vendedor_nome }} · fim {{ oferta.cliente_curto or "····" }}</span>
+          <span data-decorrido>{{ oferta.decorrido }}</span>
+        </div>
+        {% if oferta.restante is not none %}
+        <p class="agora-passa">expira em <strong data-restante>{{ oferta.restante }}</strong></p>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </article>
+    {% endif %}
+  </div>
+  {% endif %}
+</section>
+{% endif %}
+
 <section class="panel" aria-labelledby="fila-titulo">
   <div class="panel-heading">
     <div>
@@ -116,4 +213,5 @@
     <button class="button primary" type="submit">Adicionar à fila</button>
   </form>
 </section>
+<script src="/static/js/fila_agora.js?v=1" defer></script>
 {% endblock %}

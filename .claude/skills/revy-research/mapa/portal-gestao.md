@@ -1,6 +1,6 @@
-# portal-gestao · 179 rotas · 26 modelos · 6 workers · 35 flags · 27 migrations · 63 templates
+# portal-gestao · 180 rotas · 26 modelos · 6 workers · 35 flags · 27 migrations · 63 templates
 
-Gerado de `e22dd53`. NAO editar a mao — saida de `gerar_mapa.py`.
+Gerado de `5e88c79`. NAO editar a mao — saida de `gerar_mapa.py`.
 Migration head: `0027_perfil_avatar_foto`
 
 ## Rotas
@@ -115,19 +115,20 @@ Migration head: `0027_perfil_avatar_foto`
 - `POST /app/loja/vendas/{venda_id}/custos/{custo_id}/remover` — app/web/loja_vendas.py:379
 - `GET /app/loja/vendas/configuracoes-financeiras` — app/web/loja_vendas.py:395
 - `GET /app/loja/equipe` — app/web/loja_vendas.py:411
-- `GET /app/loja/whatsapp` — app/web/loja_whatsapp.py:165
-- `GET /app/loja/whatsapp/conectar` — app/web/loja_whatsapp.py:202
-- `POST /app/loja/whatsapp/catalogo` — app/web/loja_whatsapp.py:244
-- `POST /app/loja/whatsapp/conectar` — app/web/loja_whatsapp.py:315
-- `POST /app/loja/whatsapp/canais` — app/web/loja_whatsapp.py:388
-- `POST /app/loja/whatsapp/canais/{canal_id}/conectar` — app/web/loja_whatsapp.py:412
-- `POST /app/loja/whatsapp/canais/{canal_id}/desconectar` — app/web/loja_whatsapp.py:439
-- `POST /app/loja/whatsapp/canais/{canal_id}/inativar` — app/web/loja_whatsapp.py:460
-- `POST /app/loja/whatsapp/canais/{canal_id}/principal-estoque` — app/web/loja_whatsapp.py:480
-- `GET /app/loja/whatsapp/canais/{canal_id}/status` — app/web/loja_whatsapp.py:507
-- `GET /app/loja/whatsapp/fila` — app/web/loja_whatsapp.py:529
-- `POST /app/loja/whatsapp/fila` — app/web/loja_whatsapp.py:573
-- `POST /app/loja/whatsapp/fila/{vendedor_id}/remover` — app/web/loja_whatsapp.py:624
+- `GET /app/loja/whatsapp` — app/web/loja_whatsapp.py:169
+- `GET /app/loja/whatsapp/conectar` — app/web/loja_whatsapp.py:206
+- `POST /app/loja/whatsapp/catalogo` — app/web/loja_whatsapp.py:248
+- `POST /app/loja/whatsapp/conectar` — app/web/loja_whatsapp.py:319
+- `POST /app/loja/whatsapp/canais` — app/web/loja_whatsapp.py:392
+- `POST /app/loja/whatsapp/canais/{canal_id}/conectar` — app/web/loja_whatsapp.py:416
+- `POST /app/loja/whatsapp/canais/{canal_id}/desconectar` — app/web/loja_whatsapp.py:443
+- `POST /app/loja/whatsapp/canais/{canal_id}/inativar` — app/web/loja_whatsapp.py:464
+- `POST /app/loja/whatsapp/canais/{canal_id}/principal-estoque` — app/web/loja_whatsapp.py:484
+- `GET /app/loja/whatsapp/canais/{canal_id}/status` — app/web/loja_whatsapp.py:511
+- `GET /app/loja/whatsapp/fila` — app/web/loja_whatsapp.py:533
+- `GET /app/loja/whatsapp/fila/estado.json` — app/web/loja_whatsapp.py:607
+- `POST /app/loja/whatsapp/fila` — app/web/loja_whatsapp.py:640
+- `POST /app/loja/whatsapp/fila/{vendedor_id}/remover` — app/web/loja_whatsapp.py:691
 - `GET /app/metas` — app/web/metas.py:135
 - `GET /app/metas/nova` — app/web/metas.py:167
 - `POST /app/metas/nova` — app/web/metas.py:177
@@ -335,9 +336,9 @@ Migration head: `0027_perfil_avatar_foto`
 - `app/templates/loja/vendas_visao.html` — app/web/loja_vendas.py:146
 - `app/templates/loja/vendas_lista.html` — app/web/loja_vendas.py:216
 - `app/templates/loja/venda_editar.html` — app/web/loja_vendas.py:315
-- `app/templates/loja/whatsapp_canais.html` — app/web/loja_whatsapp.py:186
-- `app/templates/loja/whatsapp_decidir.html` — app/web/loja_whatsapp.py:228
-- `app/templates/loja/whatsapp_fila.html` — app/web/loja_whatsapp.py:558
+- `app/templates/loja/whatsapp_canais.html` — app/web/loja_whatsapp.py:190
+- `app/templates/loja/whatsapp_decidir.html` — app/web/loja_whatsapp.py:232
+- `app/templates/loja/whatsapp_fila.html` — app/web/loja_whatsapp.py:574
 - `app/templates/metas/form.html` — app/web/metas.py:121
 - `app/templates/metas/lista.html` — app/web/metas.py:155
 - `app/templates/convite_aceitar.html` — app/web/owner_invitations.py:129

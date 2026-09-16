@@ -4,7 +4,7 @@ Windows: .\.venv\Scripts\python.exe prototype_atendimento.py
 macOS: .venv/bin/python prototype_atendimento.py
 Não importa app/config/main, não lê .env, não conecta integrações. SQLite em memória.
 """
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from types import SimpleNamespace as NS
 import argparse
@@ -266,6 +266,65 @@ async def whatsapp_demo(request: Request):
         acao_erro=None, acao_mensagem=None,
     )
     html = env.get_template('loja/whatsapp_canais.html').render(**context)
+    html = re.sub(r'<link\b[^>]*https://fonts\.(?:googleapis|gstatic)\.com[^>]*>', '', html)
+    return HTMLResponse(html)
+
+
+@app.get('/app/loja/whatsapp/fila/demo', response_class=HTMLResponse)
+async def fila_demo(request: Request):
+    # Template real com dados ficticios e sem persistencia. ?estado=calmo mostra
+    # o rodizio parado; o default mostra um lead em andamento (o countdown corre
+    # de verdade a partir dos timestamps de exemplo).
+    agora = datetime.now(timezone.utc)
+    fila = [
+        {'id': 'f0', 'nome': 'Ana', 'telefone': '5511999990000', 'ordem': 0,
+         'ativo': True, 'usuario_id': 'u-ana'},
+        {'id': 'f1', 'nome': 'Bruno', 'telefone': '5511988887777', 'ordem': 1,
+         'ativo': True, 'usuario_id': None},
+        {'id': 'f2', 'nome': 'Carlos', 'telefone': '5511977776666', 'ordem': 2,
+         'ativo': True, 'usuario_id': 'u-carlos'},
+        {'id': 'f3', 'nome': 'Diana', 'telefone': '5511966665555', 'ordem': 3,
+         'ativo': True, 'usuario_id': 'u-diana'},
+    ]
+    if request.query_params.get('estado') == 'calmo':
+        visao = {'cartoes': [
+            {'vendedor': v, 'posicao': i + 1,
+             'estado': 'primeiro' if i == 0 else 'aguardando',
+             'ofertas': [], 'total': 0}
+            for i, v in enumerate(fila)
+        ], 'orfas': [], 'abertas': 0}
+        esperando = 0
+    else:
+        criado = agora - timedelta(minutes=5, seconds=5)
+        prazo = agora + timedelta(minutes=4, seconds=55)
+        visao = {'cartoes': [
+            {'vendedor': fila[0], 'posicao': 1, 'estado': 'com_lead', 'ofertas': [{
+                'id': 'of-1', 'telefone_cliente': '5511955554444',
+                'cliente_curto': '4444', 'criado_em': criado.isoformat(),
+                'prazo_em': prazo.isoformat(), 'decorrido_s': 305,
+                'decorrido': 'há 5 min', 'restante_s': 295,
+                'restante': '4:55', 'progresso_pct': 50.0,
+                'proximo_nome': 'Bruno',
+            }], 'total': 1},
+            {'vendedor': fila[1], 'posicao': 2, 'estado': 'aguardando',
+             'ofertas': [], 'total': 0},
+            {'vendedor': fila[2], 'posicao': 3, 'estado': 'aguardando',
+             'ofertas': [], 'total': 0},
+            {'vendedor': fila[3], 'posicao': 4, 'estado': 'aguardando',
+             'ofertas': [], 'total': 0},
+        ], 'orfas': [], 'abertas': 1}
+        esperando = 1
+    context = _shell_demo(request)
+    context.update(
+        nav_item_is_active=lambda item, path: False,
+        fila=fila, erro_fila=None, agora=visao, erro_agora=None,
+        esperando_vendedor=esperando,
+        equipe=[NS(id='u-ana', nome='Ana', email='ana@example.invalid'),
+                NS(id='u-carlos', nome='Carlos', email='carlos@example.invalid'),
+                NS(id='u-diana', nome='Diana', email='diana@example.invalid')],
+        acao_erro=None, acao_mensagem=None, csrf='demonstracao',
+    )
+    html = env.get_template('loja/whatsapp_fila.html').render(**context)
     html = re.sub(r'<link\b[^>]*https://fonts\.(?:googleapis|gstatic)\.com[^>]*>', '', html)
     return HTMLResponse(html)
 

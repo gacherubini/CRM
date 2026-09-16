@@ -4097,6 +4097,137 @@ a.metric-link:focus-visible { outline: 2px solid var(--brand); outline-offset: 2
   .rodizio > li > form { grid-column: 2; justify-self: start; }
 }
 
+/* ===========================================================================
+   Agora no rodízio — o estado vivo do motor na ordem da fila.
+   Carrossel com snap: cada cartão é um vendedor; a ordem da esquerda para a
+   direita é a ordem do rodízio. Quem está com lead mostra há quanto tempo e
+   para quem passa, com a barra correndo até o prazo real do motor.
+   =========================================================================== */
+.agora-calmo,
+.agora-erro,
+.agora-espera {
+  margin: 0;
+  padding: 0 var(--space-5) var(--space-4);
+  font-size: var(--text-sm);
+  color: var(--ink-muted);
+}
+.agora-espera {
+  border-top: 1px solid var(--line);
+  padding-top: var(--space-3);
+}
+.agora-espera a { white-space: nowrap; }
+.agora-carrossel {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(250px, 310px);
+  gap: var(--space-4);
+  overflow-x: auto;
+  scroll-snap-type: x proximity;
+  padding: 0 var(--space-5) var(--space-5);
+}
+.agora-cartao {
+  scroll-snap-align: start;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-srf);
+  background: var(--surface);
+  padding: var(--space-4);
+  display: grid;
+  gap: var(--space-3);
+  align-content: start;
+}
+.agora-cartao.estado-com_lead {
+  border-color: var(--brand-line);
+  background: var(--brand-tint);
+}
+.agora-cartao.estado-orfa { border-style: dashed; }
+.agora-cartao > header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+}
+.agora-cartao > header strong {
+  font-size: var(--text-base);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.agora-posicao {
+  flex: none;
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--ink-soft);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.estado-com_lead .agora-posicao {
+  border-color: var(--brand-line);
+  color: var(--brand);
+}
+.agora-pilula {
+  margin-left: auto;
+  flex: none;
+  font-size: var(--text-xs);
+  color: var(--ink-muted);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 2px var(--space-3);
+  background: var(--surface);
+  white-space: nowrap;
+}
+.agora-pilula.agora {
+  color: var(--brand);
+  border-color: var(--brand-line);
+}
+.agora-pilula.vez { color: var(--ink-soft); }
+.agora-total {
+  margin: 0;
+  font-size: var(--text-sm);
+  font-weight: 700;
+}
+.agora-oferta {
+  display: grid;
+  gap: var(--space-2);
+  border-top: 1px solid var(--line);
+  padding-top: var(--space-3);
+  font-size: var(--text-sm);
+}
+.agora-oferta-linha {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-3);
+  color: var(--ink-muted);
+  font-variant-numeric: tabular-nums;
+}
+.agora-passa { margin: 0; }
+.agora-passa strong { font-variant-numeric: tabular-nums; }
+.agora-oferta.apertado .agora-passa strong { color: var(--warn); }
+.agora-barra {
+  height: 4px;
+  border-radius: 999px;
+  background: var(--line);
+  overflow: hidden;
+}
+.agora-barra > span {
+  display: block;
+  height: 100%;
+  width: 0;
+  border-radius: 999px;
+  background: var(--brand);
+}
+.agora-oferta.apertado .agora-barra > span { background: var(--warn); }
+.agora-ver { font-size: var(--text-xs); justify-self: start; }
+
+@media (max-width: 640px) {
+  .agora-carrossel { grid-auto-columns: 82%; }
+}
+
 /* Campo numerico nao precisa da largura da coluna: um valor de 4 digitos numa
    caixa de 540px nao comunica o tamanho esperado do dado. */
 .form-grid input[type="number"],

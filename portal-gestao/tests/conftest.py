@@ -137,6 +137,9 @@ class ChatbotFake:
         self.fila_criados: list = []
         self.fila_removidos: list = []
         self.fila_indisponivel = False
+        # Ofertas do rodízio (estado vivo do motor para o painel ao vivo).
+        self.ofertas: list = []
+        self.ofertas_indisponivel = False
         self.leads = [
             {
                 "id": "l1", "telefone": "5511987654321", "nome": "Maria Silva",
@@ -492,6 +495,13 @@ class ChatbotFake:
         self.fila_vendedores = [
             v for v in self.fila_vendedores if v["id"] != vendedor_id
         ]
+
+    def listar_ofertas(self, estado=None):
+        if self.ofertas_indisponivel:
+            raise ChatbotIndisponivel("chatbot indisponível")
+        if estado:
+            return [o for o in self.ofertas if o.get("estado") == estado]
+        return list(self.ofertas)
 
 
 @pytest.fixture

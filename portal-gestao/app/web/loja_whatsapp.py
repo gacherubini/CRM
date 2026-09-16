@@ -10,6 +10,9 @@ independente dos canais Evolution.
 """
 from __future__ import annotations
 
+import hashlib
+import json
+from datetime import datetime, timezone
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Form, Request
@@ -29,6 +32,7 @@ from app.config import (  # noqa: E402
 )
 from app.db import get_db  # noqa: E402
 from app.loja import identity, qr_efemero  # noqa: E402
+from app.loja.rodizio_agora import montar_agora  # noqa: E402
 from app.loja.types import ROLES_GESTAO, Role  # noqa: E402
 from app.loja.whatsapp_canais import ROTULOS, montar_canais_view  # noqa: E402
 from app.loja.whatsapp_modo import MODO_CLOUD, modo_da_loja  # noqa: E402
@@ -554,6 +558,18 @@ def loja_whatsapp_fila(
         # Chatbot fora do ar não derruba a tela: some a lista, o resto renderiza.
         erro = str(exc)
 
+    # O agora é estado vivo do motor, não cadastro: ofertas abertas (quem está
+    # com lead, desde quando, com que prazo) + esgotadas (rodaram a fila toda).
+    # Uma chamada devolve as duas — o default do /v1/ofertas é aberta+esgotada.
+    ofertas, erro_agora = [], None
+    if erro is None:
+        try:
+            ofertas = list(chatbot.listar_ofertas() or [])
+        except ChatbotIndisponivel as exc:
+            erro_agora = str(exc)
+    agora = montar_agora(fila, ofertas, agora=datetime.now(timezone.utc))
+    esperando = [o for o in ofertas if o.get("estado") == "esgotada"]
+
     return templates.TemplateResponse(
         "loja/whatsapp_fila.html",
         contexto(
@@ -562,10 +578,61 @@ def loja_whatsapp_fila(
             db,
             fila=fila,
             erro_fila=erro,
+            agora=agora,
+            erro_agora=erro_agora or erro,
+            esperando_vendedor=len(esperando),
             equipe=_equipe_para_fila(db, _slug_ativo(request, usuario)),
             acao_erro=request.session.pop("fila_erro", None),
             acao_mensagem=request.session.pop("fila_mensagem", None),
         ),
+        headers={"Cache-Control": "no-store"},
+    )
+
+
+def _assinatura_agora(fila: list[dict], ofertas: list[dict]) -> str:
+    """Resumo estável do agora para o polling: mudou, a tela recarrega."""
+    corpo = json.dumps(
+        {
+            "fila": [v.get("id") for v in fila],
+            "ofertas": sorted(
+                (o.get("id"), o.get("estado"), o.get("vendedor_id"))
+                for o in ofertas
+            ),
+        },
+        sort_keys=True,
+    )
+    return hashlib.sha1(corpo.encode()).hexdigest()[:16]
+
+
+@router.get(_TELA_FILA + "/estado.json")
+def loja_whatsapp_fila_estado(
+    request: Request,
+    db: Session = Depends(get_db),
+    chatbot=Depends(get_chatbot_client),
+):
+    """Rota fina para o polling do painel ao vivo (JSON, sem redirect).
+
+    O countdown corre no navegador; esta rota só diz se o estado mudou
+    (oferta nova, assumida, expirada, fila editada) para recarregar.
+    """
+    usuario = usuario_atual(request, db)
+    if not usuario or not _habilitado() or not _autorizado(usuario):
+        return JSONResponse({"erro": "nao_autorizado"}, status_code=403)
+    if not _e_cloud(request, db, usuario):  # rodízio: Modo 2 apenas
+        return JSONResponse({"erro": "nao_autorizado"}, status_code=403)
+    try:
+        fila = chatbot.listar_fila_vendedores()
+        ofertas = list(chatbot.listar_ofertas() or [])
+    except ChatbotIndisponivel:
+        return JSONResponse({"erro": "indisponivel"}, status_code=503)
+    abertas = sum(1 for o in ofertas if o.get("estado") == "aberta")
+    esperando = sum(1 for o in ofertas if o.get("estado") == "esgotada")
+    return JSONResponse(
+        {
+            "assinatura": _assinatura_agora(fila, ofertas),
+            "abertas": abertas,
+            "esperando_vendedor": esperando,
+        },
         headers={"Cache-Control": "no-store"},
     )
 
