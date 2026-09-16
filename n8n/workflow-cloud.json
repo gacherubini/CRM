@@ -126,25 +126,24 @@
     },
     {
       "parameters": {
-        "model": "glm-5.3-flash",
+        "modelName": "models/gemini-3.1-flash-lite",
         "options": {
-          "baseURL": "https://opencode.ai/zen/go/v1",
-          "maxTokens": 250,
+          "maxOutputTokens": 250,
           "temperature": 0.3
         }
       },
       "id": "a7a2797a-92cf-4a74-8ee2-545a344c90b7",
-      "name": "GLM Chat Model1",
-      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
-      "typeVersion": 1,
+      "name": "Google Gemini Chat Model1",
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1.1,
       "position": [
         2520,
         760
       ],
       "credentials": {
-        "openAiApi": {
-          "id": "ufDVDQaC9cSxd5Q7",
-          "name": "OpenCode Go"
+        "googlePalmApi": {
+          "id": "LPN7iWMwt0QTUOMN",
+          "name": "Google Gemini(PaLM) Api account"
         }
       }
     },
@@ -624,7 +623,7 @@
         ]
       ]
     },
-    "GLM Chat Model1": {
+    "Google Gemini Chat Model1": {
       "ai_languageModel": [
         [
           {

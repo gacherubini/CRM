@@ -21,7 +21,15 @@ Medido em 16/09 com chamada direta ao OpenCode Go, prompt real da loja `teste` (
 | `deepseek-v4-flash` | 695 | 36 (cortado) | não cabe |
 | `deepseek-flash` | 1073 (sem tools) / 72 (com tools) | 0 | não cabe no turno de resposta |
 | `qwen3.8-flash` | 3756 | 72 | reasoning **não conta** no `max_tokens` (semântica varia!) |
-| **`glm-5.3-flash`** | **0** | 82–89 | **escolhido**; 2 turnos com tool call OK |
+| **`glm-5.3-flash`** | **0** | 82–89 | melhor no teto, mas o provedor recusa `name` (ver desfecho) |
+
+**Desfecho no mesmo dia:** o que derrubou o bot **não era o modelo**. A credencial do Gemini
+(o principal) tinha sido recriada no n8n com outro id e o arquivo apontava para o id antigo —
+o nó do modelo falhava com credencial não encontrada, sem nada a ver com cota. Gemini
+restaurado como principal (grátis; chave e `gemini-3.1-flash-lite` validados na API). A
+bancada vira o mapa do **fallback** (OpenCode Go): DeepSeek v4.1 responde com tools mas gasta
+250–550 de reasoning (teto ≥ ~1500), GLM está fora (rejeita `name`), GPT-5.6 Luna só fala
+Responses API. Lição: antes de culpar o modelo, confira o **vínculo da credencial** no nó.
 
 Três consequências que valem além deste caso:
 
@@ -34,5 +42,6 @@ Três consequências que valem além deste caso:
    container (`fly machine exec ... node script.js`) é barato e foi o que separou o problema
    de "modelo" do problema de "workflow".
 
-O teste de aceite do agente com o GLM: turno 1 faz `tool_call` (`consultar_estoque`), turno 2
-responde com o veículo — os dois com 0 tokens de raciocínio e dentro de 250.
+O teste de aceite do fallback com o DeepSeek: com tools anexadas, os dois turnos do agente
+(aberto e followup de tool) produzem conteúdo com 370–550 de reasoning — dentro de um teto
+de 2048, fora de 250.

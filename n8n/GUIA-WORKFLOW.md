@@ -169,20 +169,19 @@ Ferramentas conectadas:
 | `solicitar_handoff1` | Pausa o bot, avisa o vendedor ativo e envia o link do CRM quando o cliente pede uma pessoa ou ocorre uma falha real. |
 | `cadastrar_veiculo1` | Cadastra veículo quando a mensagem veio da equipe autorizada. |
 
-O modelo usado fica em `GLM Chat Model1` (GLM-5.3 Flash via OpenCode Go: o
-`model` e o `baseURL` estão no próprio nó, a chave vive na credencial `OpenCode Go` do
-n8n). A memória fica em `Memoria da conversa1` e guarda as últimas 20 mensagens da sessão.
-**O modelo tem de ser um que não gaste tokens pensando**: o teto é 250 e os DeepSeek da Go
-(v4.1-flash, v4-flash, flash) queimam 700–1900 tokens de `reasoning_content` antes do
-conteúdo — a resposta chega vazia e o `/v1/operacao/responder` devolve 422 `texto`.
+O modelo usado fica em `Google Gemini Chat Model1` (`models/gemini-3.1-flash-lite`, teto
+250). A chave vive na credencial `Google Gemini(PaLM) Api account` do n8n — e **o id da
+credencial no nó é vínculo, não enfeite**: em 16/09 o bot ficou mudo porque o JSON apontava
+para um id que não existia mais depois de a credencial ser recriada (a viva era outra). Se o
+nó Gemini voltar a dar erro de credencial, confira o id em Credentials, não a cota. A memória
+fica em `Memoria da conversa1` e guarda as últimas 20 mensagens da sessão.
 
-> **O OpenCode Go recusa chamada sem o header `x-opencode-session`** — sem ele a resposta é
-> `400 "Request is missing x-opencode-session"` e o bot fica mudo **no nó do modelo**, com o
-> resto da esteira verde. O header mora na credencial, não no workflow: `OpenCode Go` →
-> *Add Custom Header* → `x-opencode-session: revy-whatsapp-bot`. É credencial, então trocar o
-> valor **não exige redeploy** (o n8n lê a cada execução). Se o Go passar a validar a sessão
-> de verdade (o docs pede uma por conversa), o plano B é o endpoint Zen pay-as-you-go
-> (`https://opencode.ai/zen/v1`).
+**Fallback (OpenCode Go) — o que a bancada de 16/09 mediu**, caso o Gemini caia: o gateway
+exige o header `x-opencode-session` em toda chamada (400 sem ele; mora na credencial
+`OpenCode Go` → *Add Custom Header*). No mesmo gateway: DeepSeek v4.1 responde, mas gasta
+250–550 tokens de reasoning por chamada — precisa de teto ≥ ~1500 (não cabe nos 250);
+GLM recusa o campo `name` do histórico de tools (`"name" is not supported`); GPT-5.6 Luna
+só fala a Responses API (o nó do n8n tem o toggle *Use Responses API*).
 
 ## Regras da simulação
 

@@ -556,20 +556,16 @@ workflow antes de produção seria útil, mas é outro problema.
 O nó do modelo é fixo, e continua fixo:
 
 ```json
-"model": "glm-5.3-flash",
-"options": {
-  "baseURL": "https://opencode.ai/zen/go/v1",
-  "maxTokens": 250,
-  "temperature": 0.3
-}
+"modelName": "models/gemini-3.1-flash-lite",
+"options": { "maxOutputTokens": 250, "temperature": 0.3 }
 ```
 
-**Trocado em 16/09:** o nó antigo (Gemini) passou a dar erro na execução do n8n em produção,
-e o dono escolheu a OpenCode Go — endpoint compatível com OpenAI. A primeira tentativa foi o
-DeepSeek V4.1 Flash, mas os modelos DeepSeek da Go queimam 700–1900 tokens de raciocínio antes
-do conteúdo e o teto fixo de 250 devolve resposta vazia; o escolhido foi o **GLM-5.3 Flash**,
-que responde com 0 tokens de raciocínio dentro do teto (medido em 16/09, chamada direta).
-É troca de provedor, não de desenho: a decisão abaixo continua valendo inteira.
+**16/09 — o que parecia troca de modelo era vínculo de credencial.** O bot ficou mudo com
+erro no nó Gemini; a credencial tinha sido recriada no n8n com outro id, e o JSON apontava
+para o id antigo. A chave e o modelo estavam bons o tempo todo. Ficou: **Gemini como
+principal (grátis)**, com a bancada do OpenCode Go medida para um futuro fallback —
+DeepSeek v4.1 responde mas gasta 250–550 tokens de reasoning (precisa de teto ≥ ~1500);
+GLM recusa o campo `name` do histórico de tools; GPT-5.6 Luna só fala Responses API.
 
 **Decisão do dono (25/08): o modelo é global — um só para todas as lojas.** Nada de
 `modelo` em `agente_config`, nada de rota para trocá-lo, nada de tela no Control.

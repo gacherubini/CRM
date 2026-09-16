@@ -130,10 +130,8 @@ def main() -> None:
     assert por_tipo.get("@n8n/n8n-nodes-langchain.agent"), (
         "sem AI Agent: a §5.9 pede cópia do fluxo atual, não um repassador"
     )
-    modelo = por_tipo.get("@n8n/n8n-nodes-langchain.lmChatOpenAi")
-    assert modelo, "sem modelo de linguagem: o agente não responde nada"
-    assert modelo[0]["parameters"].get("model"), (
-        "nó do modelo sem `model`: o n8n importa e o bot fica mudo"
+    assert por_tipo.get("@n8n/n8n-nodes-langchain.lmChatGoogleGemini"), (
+        "sem modelo de linguagem: o agente não responde nada"
     )
     assert por_tipo.get("@n8n/n8n-nodes-langchain.memoryBufferWindow"), (
         "sem memória de conversa: o bot esquece o cliente a cada mensagem"
