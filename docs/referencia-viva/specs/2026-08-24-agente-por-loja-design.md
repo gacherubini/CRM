@@ -556,7 +556,7 @@ workflow antes de produção seria útil, mas é outro problema.
 O nó do modelo é fixo, e continua fixo:
 
 ```json
-"model": "deepseek-v4.1-flash",
+"model": "glm-5.3-flash",
 "options": {
   "baseURL": "https://opencode.ai/zen/go/v1",
   "maxTokens": 250,
@@ -565,7 +565,10 @@ O nó do modelo é fixo, e continua fixo:
 ```
 
 **Trocado em 16/09:** o nó antigo (Gemini) passou a dar erro na execução do n8n em produção,
-e o dono escolheu o **DeepSeek V4.1 Flash** do OpenCode Go — endpoint compatível com OpenAI.
+e o dono escolheu a OpenCode Go — endpoint compatível com OpenAI. A primeira tentativa foi o
+DeepSeek V4.1 Flash, mas os modelos DeepSeek da Go queimam 700–1900 tokens de raciocínio antes
+do conteúdo e o teto fixo de 250 devolve resposta vazia; o escolhido foi o **GLM-5.3 Flash**,
+que responde com 0 tokens de raciocínio dentro do teto (medido em 16/09, chamada direta).
 É troca de provedor, não de desenho: a decisão abaixo continua valendo inteira.
 
 **Decisão do dono (25/08): o modelo é global — um só para todas as lojas.** Nada de

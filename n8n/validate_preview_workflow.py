@@ -184,7 +184,7 @@ def main() -> None:
     assert sm.rstrip().endswith(
         "{{ $('Gate config do agente1').first().json.promptAgente }}"
     ), "no preview o prompt da loja deixou de ser o último bloco (o núcleo para de vencer)"
-    modelo = por_nome.get("DeepSeek Chat Model1")
+    modelo = por_nome.get("GLM Chat Model1")
     assert modelo is not None and modelo["parameters"]["options"]["maxTokens"] == 250, (
         "o preview tem que usar o mesmo modelo e o mesmo teto do bot real"
     )

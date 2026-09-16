@@ -169,17 +169,20 @@ Ferramentas conectadas:
 | `solicitar_handoff1` | Pausa o bot, avisa o vendedor ativo e envia o link do CRM quando o cliente pede uma pessoa ou ocorre uma falha real. |
 | `cadastrar_veiculo1` | Cadastra veículo quando a mensagem veio da equipe autorizada. |
 
-O modelo usado fica em `DeepSeek Chat Model1` (DeepSeek V4.1 Flash via OpenCode Go: o
+O modelo usado fica em `GLM Chat Model1` (GLM-5.3 Flash via OpenCode Go: o
 `model` e o `baseURL` estão no próprio nó, a chave vive na credencial `OpenCode Go` do
 n8n). A memória fica em `Memoria da conversa1` e guarda as últimas 20 mensagens da sessão.
+**O modelo tem de ser um que não gaste tokens pensando**: o teto é 250 e os DeepSeek da Go
+(v4.1-flash, v4-flash, flash) queimam 700–1900 tokens de `reasoning_content` antes do
+conteúdo — a resposta chega vazia e o `/v1/operacao/responder` devolve 422 `texto`.
 
 > **O OpenCode Go recusa chamada sem o header `x-opencode-session`** — sem ele a resposta é
 > `400 "Request is missing x-opencode-session"` e o bot fica mudo **no nó do modelo**, com o
 > resto da esteira verde. O header mora na credencial, não no workflow: `OpenCode Go` →
 > *Add Custom Header* → `x-opencode-session: revy-whatsapp-bot`. É credencial, então trocar o
 > valor **não exige redeploy** (o n8n lê a cada execução). Se o Go passar a validar a sessão
-> de verdade (o docs pede uma por conversa), os planos B são o endpoint Zen pay-as-you-go
-> (`https://opencode.ai/zen/v1`, `deepseek-v4-flash`) ou a API direta da DeepSeek.
+> de verdade (o docs pede uma por conversa), o plano B é o endpoint Zen pay-as-you-go
+> (`https://opencode.ai/zen/v1`).
 
 ## Regras da simulação
 

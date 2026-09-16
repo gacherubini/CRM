@@ -75,7 +75,7 @@ CHATBOT = "http://chatbot-api:8000"
 #   Registrar saida do bot1  — a conversa de teste não entra no CRM
 HERDADOS = [
     "AI Agent1",
-    "DeepSeek Chat Model1",
+    "GLM Chat Model1",
     "Memoria da conversa1",
     "consultar_estoque1",
     "enviar_link_catalogo1",
@@ -418,7 +418,7 @@ CONEXOES = {
     },
     "Gate config do agente1": {"main": [[{"node": "AI Agent1", "type": "main", "index": 0}]]},
     "AI Agent1": {"main": [[{"node": "Responder preview", "type": "main", "index": 0}]]},
-    "DeepSeek Chat Model1": {
+    "GLM Chat Model1": {
         "ai_languageModel": [[{"node": "AI Agent1", "type": "ai_languageModel", "index": 0}]]
     },
     "Memoria da conversa1": {

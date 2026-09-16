@@ -126,7 +126,7 @@
     },
     {
       "parameters": {
-        "model": "deepseek-v4.1-flash",
+        "model": "glm-5.3-flash",
         "options": {
           "baseURL": "https://opencode.ai/zen/go/v1",
           "maxTokens": 250,
@@ -134,7 +134,7 @@
         }
       },
       "id": "a7a2797a-92cf-4a74-8ee2-545a344c90b7",
-      "name": "DeepSeek Chat Model1",
+      "name": "GLM Chat Model1",
       "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
       "typeVersion": 1,
       "position": [
@@ -624,7 +624,7 @@
         ]
       ]
     },
-    "DeepSeek Chat Model1": {
+    "GLM Chat Model1": {
       "ai_languageModel": [
         [
           {
