@@ -13,6 +13,34 @@ Leia primeiro:
 2. [`../fila/README.md`](../fila/README.md) — o que ainda é código
 3. [`design/2026-07-30-revy-control-loja-asbuilt-e-melhorias.md`](design/2026-07-30-revy-control-loja-asbuilt-e-melhorias.md) — as-built
 
+## Checkpoint de 2026-09-16 (noite) — DeepSeek validado, failover no ar, fila/equipe no ar
+
+Git `806d2f2`. `app2037` em `e22dd53` (verificado). `motor2037` na imagem
+`deployment-01M2NXPMXW547V5TCAW9G6DDE5` (7/7 machines, todas stopped sob demanda).
+`n8n2037` no ar com o cloud em 25 nós.
+
+1. **Luna fora do principal:** 5 erros webhook no `wCloudMeta0001` (17:37–19:14 UTC)
+   com 3 erros diferentes do provedor (500/400/503) para o mesmo request — config
+   certa pelos docs (model id, `/responses`, header, teto 2048). Detalhe no adendo
+   do learning do teto 250.
+2. **DeepSeek validado no teste real** (exec `51364`, 19:50 UTC): caminho completo
+   até o `Responder WhatsApp1`, resposta coerente no padrão da loja, 125+96
+   completion tokens nos dois turnos — folga no teto 2048.
+3. **Failover Gemini→DeepSeek no git e no ar:** `AI Agent1` com
+   `onError=continueErrorOutput`, saída de erro → `AI Agent Failover1`
+   (systemMessage byte-idêntica, memória e tools compartilhadas). Validadores
+   guardam onError, ramo, prompt igual e teto. Cloud/preview/teste regenerados
+   (25/18/36 nós). Live conferido nó a nó.
+4. **Loja:** fila aceita vendedor sem vínculo (nome livre, `usuario_id=None`);
+   equipe passa a operar a loja da sessão — era a H1 do dropdown vazio
+   (ninguém com `loja_slug='teste'`; criar carimbava o login). Seletor já era
+   gated por membership, então o escopo continua seguro.
+5. **PR #11** mergiado (`3fa004a`) + `?v=` v50; motor-API e worker com o código novo.
+
+Pendências: mensagem real no WhatsApp da `teste` pós-failover (confirma o caminho
+Gemini principal); resto da lista da manhã (Modo 2 no Control, template, Estoque
+sem a `teste`, config do Agente) sem mudança.
+
 ## Checkpoint de 2026-09-16 — chip na `teste`, o Gemini "caído" era credencial, fallback em teste
 
 **Produtos:** chatbot-api (loja `teste`), n8n (modelo do bot), deploy Fly.
