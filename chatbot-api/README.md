@@ -419,6 +419,18 @@ mover canal daria a qualquer loja um jeito de tomar o número de outra.
 Spec e runbook do corte:
 [`../docs/referencia-viva/specs/2026-09-07-um-chip-teste-depois-loja-real-design.md`](../docs/referencia-viva/specs/2026-09-07-um-chip-teste-depois-loja-real-design.md).
 
+**Estado em 16/09 — o chip já está na `teste` e o popup rodou de verdade.** Canal
+`1356659367525459` na WABA `1628109642104591`, `onboarding_elo=5`, `registro_tentativas=1`
+(de 5) e `onboarding_erro` vazio. Ele nasceu `cloud_pendente`: **salvar Modo 2 na ficha da
+loja `teste` no Control** é o que sobe para `cloud_ativo` (§5.4 do spec) — inbound e
+outbound não checam o estado, mas é o caminho previsto e o que a tela lê. `template_oferta`
+vazio = `chama_vendedor` ainda não aprovado pela Meta; até a aprovação, oferta ao vendedor
+fora da janela de 24 h não sai. Dois buracos para o teste de ponta a ponta: a `agente_config`
+da `teste` só tem rascunho (nada publicado) e o Estoque **não tem** loja `teste` — a busca
+de veículo volta vazia sem erro, então o bot não cita moto. Áudio, texto e handoff → rodízio
+já dão para exercitar: a transcrição está ligada (Groq) e a fila da `teste` tem um vendedor
+desde 24/08.
+
 Três coisas que o script existe para não deixar você esquecer:
 
 - **Trocar `loja_id` não solta os telefones do teste.** `Conversa` é única por
