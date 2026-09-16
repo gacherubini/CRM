@@ -4,7 +4,7 @@
 A spec §5.9 é explícita: *"O `n8n-cloud` é **cópia do fluxo atual**
 (`workflow-ai-nao-salvos.json`) trocando Evolution por Graph API — não um bot
 novo"*. Um fork escrito à mão vira outro bot na primeira divergência, então o
-fork é **gerado**: o AI Agent, o Gemini, a memória e as ferramentas saem daqui
+fork é **gerado**: o AI Agent, o modelo, a memória e as ferramentas saem daqui
 byte-a-byte iguais aos do Modo 1, e mudança no Modo 1 se propaga rodando de novo.
 
 Rode da raiz do repo:
@@ -62,7 +62,7 @@ HERDADOS = [
     "Buscar config do agente1",
     "Gate config do agente1",
     "AI Agent1",
-    "Google Gemini Chat Model1",
+    "DeepSeek Chat Model1",
     "Memoria da conversa1",
     "consultar_estoque1",
     "simular1",
@@ -410,7 +410,7 @@ CONEXOES = {
     "Gate config do agente1": {"main": [[{"node": "AI Agent1", "type": "main", "index": 0}]]},
     "AI Agent1": {"main": [[{"node": "Atraso anti-ban1", "type": "main", "index": 0}]]},
     "Atraso anti-ban1": {"main": [[{"node": "Responder WhatsApp1", "type": "main", "index": 0}]]},
-    "Google Gemini Chat Model1": {
+    "DeepSeek Chat Model1": {
         "ai_languageModel": [[{"node": "AI Agent1", "type": "ai_languageModel", "index": 0}]]
     },
     "Memoria da conversa1": {

@@ -115,7 +115,8 @@ fly ssh console -a chatbot2037 -C "cd /srv && alembic upgrade head"
 - Workflow de produção esperado: **WhatsApp IA - Somente Nao Salvos** (ou id local
   `wAiNaoSalvos0001` / nome equivalente no volume).
 - Webhook de produção: `/webhook/whatsapp-ai` (confirmar path no workflow ativo).
-- Credencial **Gemini** configurada e testada no n8n (sem ela a mensagem chega e a IA não responde).
+- Credencial do provedor de LLM configurada e testada no n8n (hoje `OpenCode Go`/DeepSeek
+  V4.1 Flash, no nó `DeepSeek Chat Model1`; sem ela a mensagem chega e a IA não responde).
 - Nós HTTP Evolution: chave da instância nos nós do tipo
   “Consultar contato” / “Responder WhatsApp” (nomes podem variar com sufixo `1`).
 - Placeholders `__INSTANCE__`, `__EVOLUTION_KEY__`, `__CHATBOT_TOKEN__` e

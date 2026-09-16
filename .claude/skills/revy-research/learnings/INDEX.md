@@ -75,3 +75,4 @@ escrever migration com `batch_alter_table`.
 | setar secret JSON (mapa por loja) via fly secrets no Windows | `2026-09-14-fly-secrets-json-no-windows-perde-aspa.md` |
 | fly ssh console volta vazio sem erro, ou parse de saida remota falha do nada | `2026-09-14-fly-ssh-console-vazio-pede-retry.md` |
 | configurar acesso read-only ao banco de producao numa maquina nova, ou psql responde "definition of service not found" | `2026-09-15-acesso-readonly-prod-fly.md` |
+| chamada do modelo do bot no n8n volta 400 do OpenCode Go (missing x-opencode-session) | `2026-09-16-opencode-go-exige-x-opencode-session.md` |

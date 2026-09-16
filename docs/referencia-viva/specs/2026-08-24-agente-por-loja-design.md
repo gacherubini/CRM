@@ -556,9 +556,17 @@ workflow antes de produção seria útil, mas é outro problema.
 O nó do modelo é fixo, e continua fixo:
 
 ```json
-"modelName": "models/gemini-3.1-flash-lite",
-"options": { "maxOutputTokens": 250, "temperature": 0.3 }
+"model": "deepseek-v4.1-flash",
+"options": {
+  "baseURL": "https://opencode.ai/zen/go/v1",
+  "maxTokens": 250,
+  "temperature": 0.3
+}
 ```
+
+**Trocado em 16/09:** o nó antigo (Gemini) passou a dar erro na execução do n8n em produção,
+e o dono escolheu o **DeepSeek V4.1 Flash** do OpenCode Go — endpoint compatível com OpenAI.
+É troca de provedor, não de desenho: a decisão abaixo continua valendo inteira.
 
 **Decisão do dono (25/08): o modelo é global — um só para todas as lojas.** Nada de
 `modelo` em `agente_config`, nada de rota para trocá-lo, nada de tela no Control.
@@ -591,7 +599,7 @@ instrução é.
 
 **O que isso compra, e é o motivo da revisão:** o teto variável era a **única** peça do
 card 2 que exigia expressão em **sub-nó** do n8n — o nó do modelo
-(`@n8n/n8n-nodes-langchain.lmChatGoogleGemini`) não roda no fluxo principal, e não dá para
+(`@n8n/n8n-nodes-langchain.lmChatOpenAi`) não roda no fluxo principal, e não dá para
 saber lendo o repo se ele resolve expressão. Com o teto fixo, essa incerteza **sai do
 projeto**. O `systemMessage` também vira expressão, mas o `AI Agent` é nó **raiz**: expressão
 ali é uso padrão, sem dúvida nenhuma.
