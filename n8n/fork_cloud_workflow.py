@@ -28,6 +28,10 @@ O que muda em relação ao Modo 1, e por quê:
   é o `/webhook/cloud`; repetir aqui gravaria a mensagem duas vezes.
 - **`solicitar_handoff` reescrito**: no Modo 1 ele avisa a equipe pela Evolution;
   no Modo 2 ele abre o **rodízio** (`/v1/operacao/handoff-humano`, §5.2).
+- **Foto vira link do catálogo**: `enviar_foto_veiculo1` não existe aqui e cada
+  menção que sobrevivesse faria o agente girar até maxIterations e calar
+  (smoke e2e de 18/09). Descrições e prompt herdado são reescritos para o
+  `enviar_link_catalogo`, com asserção de texto exato.
 
 Herdado sem discussão, como manda a §5.9: debounce de 40 s (só a última
 mensagem), replay >5 min bloqueado, intake + simulação no Motor, atraso anti-ban.
@@ -499,6 +503,115 @@ def _injetar_instance(no: dict) -> None:
     no["parameters"]["jsCode"] = codigo
 
 
+# Foto no Modo 2 sai pelo link do catálogo, nunca no chat: a tool
+# `enviar_foto_veiculo1` não existe aqui (DESCARTADOS) e cada menção a ela que
+# sobreviver vira um giro do agente até maxIterations e bot mudo — provado no
+# smoke e2e de 18/09 ("manda as fotos" → failover → silêncio). Mesma filosofia
+# das injeções: troca exata com asserção, para o fork PARAR quando o Modo 1
+# mudar o texto em vez de gerar um workflow que manda chamar o que não existe.
+REESCRITAS_FOTO = {
+    "consultar_estoque1": [
+        (
+            "se retornar um resultado claro ou a melhor unidade com foto, "
+            "o Agent deve chamar enviar_foto_veiculo em seguida — não basta "
+            "listar. Uma busca específica com resultado único preserva a moto "
+            "para oferecer fotos do catálogo.",
+            "se retornar um resultado claro, liste com preço e ano e ofereça "
+            "o link do catálogo (enviar_link_catalogo1) para ver fotos — "
+            "neste canal não há envio de foto no chat, nunca prometa foto "
+            "no chat.",
+        ),
+    ],
+    "enviar_link_catalogo1": [
+        (
+            "NÃO use para fotos de uma moto já escolhida "
+            "(aí use enviar_foto_veiculo).",
+            "Para fotos de uma moto já escolhida, use esta mesma tool: "
+            "neste canal as fotos saem pelo link do catálogo.",
+        ),
+    ],
+}
+
+# Mesma reescrita no prompt de operação herdado (AI Agent1 e failover): ele
+# manda chamar enviar_foto_veiculo em 4 pontos, e descrição sem prompt não
+# segura o agente. A proibição ("não chame ... nesse caminho") fica — não
+# chamar o que não existe é o comportamento certo.
+REESCRITAS_FOTO_PROMPT = [
+    (
+        "só use enviar_foto_veiculo quando o cliente pedir.",
+        "neste canal não há envio de foto no chat: quando o cliente pedir "
+        "foto, use enviar_link_catalogo e diga que as fotos estão no catálogo.",
+    ),
+    (
+        "(mande as fotos com enviar_foto_veiculo apenas quando ele pedir)",
+        "(neste canal as fotos saem pelo link do catálogo, quando ele pedir)",
+    ),
+    (
+        "se o cliente pedir fotos (“manda as fotos” / “quero ver”), chame "
+        "enviar_foto_veiculo. a ferramenta recupera a última moto única "
+        "consultada; não peça modelo, id ou placa de novo. depois das fotos, "
+        "uma frase curta basta — sem insistir.",
+        "se o cliente pedir fotos (“manda as fotos” / “quero ver”), chame "
+        "enviar_link_catalogo e responda com a mensagem da tool (as fotos "
+        "estão no catálogo); não peça modelo, id ou placa de novo.",
+    ),
+    (
+        "enviar_foto_veiculo continua valendo para fotos de uma moto já "
+        "escolhida; o link do catálogo é o caminho para “ver o estoque/as "
+        "motos” em geral.",
+        "neste canal não há envio de foto no chat: para fotos de moto já "
+        "escolhida use enviar_link_catalogo; o link do catálogo é o caminho "
+        "para “ver o estoque/as motos” em geral.",
+    ),
+    (
+        "9. foto de veículo: depois que o cliente pedir ou aceitar as fotos, "
+        "use enviar_foto_veiculo. a ferramenta envia até 4 fotos do catálogo. "
+        "passe o id confiável retornado pela consulta quando estiver "
+        "disponível; em uma mensagem seguinte, a ferramenta recupera a última "
+        "moto única consultada. envie no próprio whatsapp e nunca forneça url "
+        "de mídia.",
+        "9. foto de veículo: neste canal não há envio de foto no chat. "
+        "depois que o cliente pedir ou aceitar as fotos, use "
+        "enviar_link_catalogo e responda com a mensagem da tool (inclui o "
+        "link). nunca prometa foto no chat nem forneça url de mídia.",
+    ),
+]
+
+_NOS_PROMPT_FOTO = ("AI Agent1", "AI Agent Failover1")
+
+
+def _reescrever_foto(no: dict) -> None:
+    """Troca o fluxo de foto do Modo 1 pelo link do catálogo (Modo 2)."""
+    trocas = REESCRITAS_FOTO.get(no["name"])
+    if trocas:
+        texto = no["parameters"].get("description", "")
+        for antigo, novo in trocas:
+            if novo in texto:
+                continue
+            if texto.count(antigo) != 1:
+                sys.exit(
+                    f"ERRO: descrição de {no['name']} mudou no Modo 1 -- "
+                    f"esperava uma ocorrencia de {antigo!r}. "
+                    "Ajuste REESCRITAS_FOTO antes de gerar."
+                )
+            texto = texto.replace(antigo, novo, 1)
+        no["parameters"]["description"] = texto
+    if no["name"] in _NOS_PROMPT_FOTO:
+        abrigo = no["parameters"].get("options", {})
+        prompt = abrigo.get("systemMessage", "")
+        for antigo, novo in REESCRITAS_FOTO_PROMPT:
+            if novo in prompt:
+                continue
+            if prompt.count(antigo) != 1:
+                sys.exit(
+                    f"ERRO: prompt de operação mudou no Modo 1 -- esperava uma "
+                    f"ocorrencia de {antigo[:60]!r} em {no['name']}. "
+                    "Ajuste REESCRITAS_FOTO_PROMPT antes de gerar."
+                )
+            prompt = prompt.replace(antigo, novo, 1)
+        abrigo["systemMessage"] = prompt
+
+
 def main() -> None:
     base = json.loads(BASE.read_text(encoding="utf-8"))
     por_nome = {n["name"]: n for n in base["nodes"]}
@@ -511,6 +624,7 @@ def main() -> None:
     for n in nos:
         if n.get("parameters", {}).get("jsCode"):
             _injetar_instance(n)
+        _reescrever_foto(n)
 
     # A única ferramenta que muda de conteúdo: no Modo 1 avisa a equipe pela
     # Evolution, aqui abre o rodízio.
