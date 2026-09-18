@@ -1038,12 +1038,16 @@ def definir_estado(
     ctx: Contexto = Depends(get_contexto),
     db: Session = Depends(get_db),
 ):
+    # Resolve antes de tudo (spec §6.2): com credencial de integração o
+    # ctx.loja_id é None e o pause caía em 404 "instância não reconhecida" —
+    # foi o que calou o handoff do Modo 2 no smoke e2e de 18/09.
+    loja_id = resolver_loja_id(db, ctx, dados.instance)
     # Reativar bot é efeito de saída/atendimento — bloqueado se loja inoperante.
     if dados.bot_ativo:
-        _exigir_loja_operacional(db, ctx.loja_id)
+        _exigir_loja_operacional(db, loja_id)
     return servico.definir_bot_ativo(
         db,
-        ctx.loja_id,
+        loja_id,
         telefone,
         dados.bot_ativo,
         instance=dados.instance,
