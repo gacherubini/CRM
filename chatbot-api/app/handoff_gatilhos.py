@@ -2,9 +2,11 @@
 from __future__ import annotations
 
 import logging
+from typing import Any
 
 from sqlalchemy.orm import Session
 
+from app import servico
 from app.cloud_canal import phone_number_id_da_loja
 from app.models_db import OfertaLead
 from app.oferta_envio import enviar_oferta
@@ -13,6 +15,35 @@ from app.rodizio import abrir_oferta
 logger = logging.getLogger("chatbot.handoff_gatilhos")
 
 MOTIVOS = frozenset({"simulacao_pronta", "simulacao_falhou", "pediu_humano"})
+
+
+def _avisar_cliente(
+    db: Session,
+    numero_central: str,
+    telefone_cliente: str,
+    texto: str,
+    outbound: Any,
+) -> None:
+    """Manda o aviso e grava a saída — igual ao /v1/operacao/responder.
+
+    Sem a gravação o Portal mostra só o lado do cliente e o histórico fica
+    pela metade: o aviso de 18/09 chegou no WhatsApp mas não existe no banco.
+    """
+    resultado = outbound.send_text(
+        instance=numero_central,
+        number=telefone_cliente,
+        text=texto,
+    )
+    wamid = ""
+    try:
+        wamid = (resultado or {}).get("messages", [{}])[0].get("id", "")
+    except (AttributeError, IndexError, TypeError):
+        pass
+    servico.registrar_mensagem(
+        db, numero_central, telefone_cliente, texto,
+        wamid or None, True, True, "texto",
+    )
+    db.commit()
 
 
 def disparar_handoff(
@@ -56,15 +87,15 @@ def disparar_handoff(
     if oferta is None:
         # Fila vazia ou esgotada: o cliente não pode ficar no vácuo (spec §5.3).
         if avisar_cliente:
-            outbound.send_text(
-                instance=numero_central,
-                number=telefone_cliente,
-                text="Já estou passando seu atendimento para um vendedor. Ele te chama em instantes.",
+            _avisar_cliente(
+                db, numero_central, telefone_cliente,
+                "Já estou passando seu atendimento para um vendedor. Ele te chama em instantes.",
+                outbound,
             )
         return "aguardando"
 
     try:
-        enviar_oferta(db, oferta, outbound=outbound)
+        envelope = enviar_oferta(db, oferta, outbound=outbound)
     except Exception:  # noqa: BLE001
         # A oferta já está aberta (abrir_oferta commita): o vendedor vê no CRM
         # e o job retoma o envio na reoferta. Derrubar aqui virava 500 com a
@@ -76,10 +107,18 @@ def disparar_handoff(
             loja_id[-8:],
             oferta.id,
         )
+    else:
+        # Oferta sem rastro de envio é "o vendedor foi chamado?" sem resposta.
+        logger.info(
+            "oferta enviada loja_sufixo=%s oferta=%s envelope=%s",
+            loja_id[-8:],
+            oferta.id,
+            envelope,
+        )
     if avisar_cliente:
-        outbound.send_text(
-            instance=numero_central,
-            number=telefone_cliente,
-            text="Já estou chamando um vendedor para falar com você.",
+        _avisar_cliente(
+            db, numero_central, telefone_cliente,
+            "Já estou chamando um vendedor para falar com você.",
+            outbound,
         )
     return "ofertado"

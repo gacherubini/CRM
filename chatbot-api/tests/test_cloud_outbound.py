@@ -1,7 +1,8 @@
 import json
 import httpx
+import pytest
 
-from app.whatsapp_outbound import CloudWhatsAppOutbound
+from app.whatsapp_outbound import CloudWhatsAppOutbound, WhatsAppOutboundError
 
 
 def _cloud(handler):
@@ -81,3 +82,33 @@ def test_digitando_vai_no_endpoint_de_messages_com_o_wamid_do_cliente():
         "message_id": "wamid.CLIENTE",
         "typing_indicator": {"type": "text"},
     }
+
+
+def test_erro_da_meta_vem_com_status_e_corpo():
+    """Sem o corpo, "template não existe" e "número inválido" são o mesmo 404."""
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(404, json={"error": {"message": "Template not found", "code": 132001}})
+
+    with pytest.raises(WhatsAppOutboundError) as exc:
+        _cloud(handler).send_template_button(
+            instance="123", number="5511999990000",
+            template="inexistente", variaveis=["Ana"], oferta_id="of-1",
+        )
+
+    assert exc.value.code == "cloud_send_failed"
+    assert "404" in str(exc.value)
+    assert "132001" in str(exc.value)
+
+
+def test_erro_da_meta_redige_sequencias_longas_de_digitos():
+    """PII ecoada no corpo (telefone, wamid numérico) não vai para o log."""
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(400, text='{"error":{"message":"to 5511999990000 invalid"}}')
+
+    with pytest.raises(WhatsAppOutboundError) as exc:
+        _cloud(handler).send_text(instance="123", number="5511999990000", text="oi")
+
+    assert "5511999990000" not in str(exc.value)
+    assert "[num]" in str(exc.value)

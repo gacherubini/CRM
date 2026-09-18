@@ -18,9 +18,11 @@ from app import config
 logger = logging.getLogger("chatbot.whatsapp_outbound")
 
 # Redige sequências longas de dígitos (CPF, telefone, nascimento, JID numérico)
-# antes de logar o corpo de erro do Evolution: o texto do alerta contém PII e o
-# provedor pode ecoá-lo no corpo da resposta.
-_DIGITOS_SENSIVEIS = re.compile(r"\d{5,}")
+# antes de logar o corpo de erro do provedor: o texto enviado contém PII e o
+# provedor pode ecoá-lo no corpo da resposta. O corte é 7 porque os códigos
+# de erro da Meta têm 6 dígitos (132001 = template não existe) e precisam
+# sobreviver — PII nossa tem 8+ (CPF 11, fone 10–13, DDMMAAAA 8).
+_DIGITOS_SENSIVEIS = re.compile(r"\d{7,}")
 
 
 def _sanitizar_corpo_erro(texto: str, api_key: str) -> str:
@@ -252,8 +254,23 @@ class CloudWhatsAppOutbound:
                 headers={"Authorization": f"Bearer {self.token}"},
             ) as cliente:
                 resposta = cliente.post(f"{self.base_url}/{instance}/messages", json=corpo)
-                resposta.raise_for_status()
+                if resposta.status_code >= 400:
+                    # O corpo da Meta distingue "template não existe" de
+                    # "número inválido" — sem ele todo 4xx vira o mesmo "404"
+                    # e o debug anda em círculos (oferta de 18/09).
+                    detalhe = _sanitizar_corpo_erro(resposta.text, self.token)
+                    logger.warning(
+                        "Cloud send falhou status=%s corpo=%s",
+                        resposta.status_code,
+                        detalhe,
+                    )
+                    raise WhatsAppOutboundError(
+                        f"Cloud recusou o envio (HTTP {resposta.status_code}): {detalhe}",
+                        code="cloud_send_failed",
+                    )
                 return resposta.json()
+        except WhatsAppOutboundError:
+            raise
         except httpx.HTTPError as exc:
             raise WhatsAppOutboundError(f"falha no envio Cloud: {exc}") from exc
 

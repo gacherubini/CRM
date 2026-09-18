@@ -1,6 +1,6 @@
-# portal-gestao · 180 rotas · 26 modelos · 6 workers · 35 flags · 27 migrations · 63 templates
+# portal-gestao · 181 rotas · 26 modelos · 6 workers · 35 flags · 27 migrations · 63 templates
 
-Gerado de `5e88c79`. NAO editar a mao — saida de `gerar_mapa.py`.
+Gerado de `95da977`. NAO editar a mao — saida de `gerar_mapa.py`.
 Migration head: `0027_perfil_avatar_foto`
 
 ## Rotas
@@ -178,13 +178,14 @@ Migration head: `0027_perfil_avatar_foto`
 - `GET /app/loja/vitrine/demo` — prototype_atendimento.py:126
 - `GET /app/loja/atendimento/{workspace_id}` — prototype_atendimento.py:159
 - `GET /app/loja/whatsapp/demo` — prototype_atendimento.py:213
-- `GET /app/loja/vendas/demo` — prototype_atendimento.py:273
-- `GET /app/loja/vendas/lista/demo` — prototype_atendimento.py:334
-- `GET /app/loja/vendas/editar/demo` — prototype_atendimento.py:377
-- `GET /app/loja/financeiro/demo` — prototype_atendimento.py:410
-- `GET /app/loja/estoque/veiculos/demo` — prototype_atendimento.py:509
-- `GET /app/loja/estoque/veiculos/form/demo` — prototype_atendimento.py:526
-- `GET /app/loja/financeiro/despesas/demo` — prototype_atendimento.py:548
+- `GET /app/loja/whatsapp/fila/demo` — prototype_atendimento.py:273
+- `GET /app/loja/vendas/demo` — prototype_atendimento.py:332
+- `GET /app/loja/vendas/lista/demo` — prototype_atendimento.py:393
+- `GET /app/loja/vendas/editar/demo` — prototype_atendimento.py:436
+- `GET /app/loja/financeiro/demo` — prototype_atendimento.py:469
+- `GET /app/loja/estoque/veiculos/demo` — prototype_atendimento.py:568
+- `GET /app/loja/estoque/veiculos/form/demo` — prototype_atendimento.py:585
+- `GET /app/loja/financeiro/despesas/demo` — prototype_atendimento.py:607
 
 ## Modelos
 

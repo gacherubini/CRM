@@ -1,10 +1,18 @@
+import uuid
 from datetime import datetime, timedelta, timezone
 
 import pytest
 
-from app.models_db import Conversa, FilaVendedor, LojaOperacionalProjecao, Mensagem
+from app.models_db import (
+    Conversa,
+    FilaVendedor,
+    LojaOperacionalProjecao,
+    Mensagem,
+    WhatsAppCanal,
+)
 from app.oferta_envio import enviar_oferta, janela_aberta
 from app.rodizio import abrir_oferta
+from app.whatsapp_provider import ESTADO_CLOUD_ATIVO
 
 
 @pytest.fixture(autouse=True)
@@ -14,6 +22,16 @@ def _modo2_on(monkeypatch, db, loja_a):
         loja_id=loja_a["loja_id"], aggregate="whatsapp_modo", version=1,
         state="2", event_id=f"e-modo-{loja_a['loja_id'][:8]}",
     ))
+    # O aviso ao cliente grava a saída na conversa: sem canal, resolver vaza 404.
+    db.add(
+        WhatsAppCanal(
+            id=f"can-oe-{loja_a['loja_id'][:8]}-{uuid.uuid4().hex[:4]}",
+            loja_id=loja_a["loja_id"], e164_or_label="central",
+            evolution_instance=f"pnid-oe-{uuid.uuid4().hex[:8]}",
+            ativo=True, estado=ESTADO_CLOUD_ATIVO,
+            waba_id=f"waba-{uuid.uuid4().hex[:8]}", template_oferta=None,
+        )
+    )
     db.commit()
 
 

@@ -19,7 +19,9 @@ from app.models_db import (
     LojaOperacionalProjecao,
     NotificacaoOperacional,
     OfertaLead,
+    WhatsAppCanal,
 )
+from app.whatsapp_provider import ESTADO_CLOUD_ATIVO
 
 SEGREDO = "app-secret-fluxo"
 
@@ -40,12 +42,21 @@ def _modo2_ligado(db, loja_a, monkeypatch):
         state="2", event_id=f"e-fluxo-{loja_a['loja_id'][:8]}",
     )
     db.add(projecao)
+    # O aviso ao cliente grava a saída: o número central precisa de canal.
+    canal = WhatsAppCanal(
+        id=f"can-fluxo-{loja_a['loja_id'][:8]}", loja_id=loja_a["loja_id"],
+        e164_or_label="central", evolution_instance="pnid-fluxo",
+        ativo=True, estado=ESTADO_CLOUD_ATIVO,
+        waba_id="waba-fluxo", template_oferta=None,
+    )
+    db.add(canal)
     db.commit()
     yield
     # Teardown obrigatório: o SQLite dos testes é StaticPool compartilhado.
     # Deixar a projeção viva jogaria os testes seguintes que usam `loja_a` no
     # Modo 2, e o alerta de grupo do Modo 1 pararia de sair — falha que só
     # aparece na suíte inteira, nunca no arquivo isolado.
+    db.delete(canal)
     db.delete(projecao)
     # O pedido de simulação cria NotificacaoOperacional antes do desvio do
     # Modo 2. Deixá-las pendentes faz o teste do drenador, que conta global,
