@@ -114,3 +114,41 @@ def test_numero_de_outro_vendedor_nao_abre_a_janela(db, loja_a):
     """A tolerância é de formato, não de identidade."""
     _inbound_do_vendedor(db, loja_a["loja_id"], "5511977776666", horas_atras=1)
     assert janela_aberta(db, loja_a["loja_id"], "5511999998888") is False
+
+
+class _OutboundQuebraNoTemplate(_OutboundFake):
+    """Graph sem template aprovado: o envio ao vendedor quebra (smoke 18/09)."""
+
+    def send_template_button(self, **kwargs):
+        raise RuntimeError("Graph 400: template inexistente")
+
+    def send_text(self, **kwargs):
+        return {"messages": [{"id": "wamid.C"}]}
+
+
+def test_falha_no_envio_nao_mata_o_handoff(db, loja_a):
+    """Template PENDING + janela fechada: a oferta abre igual, o 500 não.
+
+    Sem o guard, o POST da solicitação quebrava DEPOIS de persistir e o
+    cliente ouvia "não consegui registrar" para uma simulação registrada —
+    enquanto o vendedor não via nada nem no WhatsApp nem no CRM.
+    """
+    from app.handoff_gatilhos import disparar_handoff
+    from app.models_db import OfertaLead
+
+    _fila(db, loja_a["loja_id"])
+    resultado = disparar_handoff(
+        db, loja_a["loja_id"], "5511988887777", motivo="pediu_humano",
+        outbound=_OutboundQuebraNoTemplate(),
+    )
+
+    assert resultado == "ofertado"
+    oferta = (
+        db.query(OfertaLead)
+        .filter(
+            OfertaLead.loja_id == loja_a["loja_id"],
+            OfertaLead.telefone_cliente == "5511988887777",
+        )
+        .one()
+    )
+    assert oferta.estado == "aberta"

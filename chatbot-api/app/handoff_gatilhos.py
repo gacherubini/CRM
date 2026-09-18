@@ -1,12 +1,16 @@
 """Os três gatilhos de handoff do Modo 2 (spec §5.2 e §5.11)."""
 from __future__ import annotations
 
+import logging
+
 from sqlalchemy.orm import Session
 
 from app.cloud_canal import phone_number_id_da_loja
 from app.models_db import OfertaLead
 from app.oferta_envio import enviar_oferta
 from app.rodizio import abrir_oferta
+
+logger = logging.getLogger("chatbot.handoff_gatilhos")
 
 MOTIVOS = frozenset({"simulacao_pronta", "simulacao_falhou", "pediu_humano"})
 
@@ -59,7 +63,19 @@ def disparar_handoff(
             )
         return "aguardando"
 
-    enviar_oferta(db, oferta, outbound=outbound)
+    try:
+        enviar_oferta(db, oferta, outbound=outbound)
+    except Exception:  # noqa: BLE001
+        # A oferta já está aberta (abrir_oferta commita): o vendedor vê no CRM
+        # e o job retoma o envio na reoferta. Derrubar aqui virava 500 com a
+        # solicitação aceita — o cliente ouvia "não consegui registrar" para
+        # uma simulação registrada (smoke e2e de 18/09, template ainda PENDING).
+        # Nem telefone nem nome no log: os ids bastam para achar a linha.
+        logger.exception(
+            "falha ao enviar oferta loja_sufixo=%s oferta=%s",
+            loja_id[-8:],
+            oferta.id,
+        )
     if avisar_cliente:
         outbound.send_text(
             instance=numero_central,
