@@ -197,3 +197,9 @@ Causa: o assert procurava `oferta enviada ... envelope=` (`logger.info`) no
 template inexistente em 18/09. Defeito no oráculo do teste, não no produto.
 Fix no harness: T8-vendedor agora só reprova no rastro explícito de falha; a
 entrega é provada pelo `T8-peguei` (oferta `travada` via API).
+
+Run `run-20260919-012044` repetiu o padrão com outra cara: `T8-oferta` vermelho
+com `[]` — a oferta nasceu 04:29:43 e foi travada 04:29:51, 1s antes da
+consulta `aberta` (04:29:52). O dedo do dono venceu o oráculo por 1s. Fix:
+T8-oferta sonda `travada` antes de qualquer veredito; travada prova entrega +
+aceite e pula direto ao reset de fim.

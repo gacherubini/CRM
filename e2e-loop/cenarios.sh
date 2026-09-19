@@ -137,8 +137,31 @@ T8_simulacao() { # jornada CPF -> nascimento -> CNH -> solicitacao enfileirada
   e2e_wait_reply "$t0" "$LOG_DIR/T8-4.txt" || { falhou T8 "bot mudo apos CNH"; return 1; }
   assert_contém "$LOG_DIR/T8-4.txt" "setor|encaminh|simula|vendedor" T8-fim "bot encaminha a simulacao" || return 1
   # Modo 2: nao ha alerta de grupo — a entrega ao vendedor E a oferta.
-  # 1) oferta aberta para este cliente; 2) SEM rastro de falha no log.
-  t_api T8-oferta "api_ofertas aberta" "$GABRIEL_DIGITS" "oferta aberta ao vendedor" || return 1
+  # 1) oferta aberta para este cliente (ou JA travada: o vendedor pode tocar
+  # em Peguei antes de o oraculo consultar); 2) SEM rastro de falha no log.
+  # Sonda sem t_api de proposito: veredito sai uma vez so, depois das duas
+  # sondas — senao o FALHOU da sonda `aberta` ficaria no placar mesmo com a
+  # oferta assumida.
+  local of_json="$LOG_DIR/api-T8-oferta.json"
+  api_ofertas aberta >"$of_json" 2>>"$LOG_DIR/api.err" || true
+  if grep -q "$GABRIEL_DIGITS" "$of_json" 2>/dev/null; then
+    passou T8-oferta "oferta aberta ao vendedor"
+  elif api_ofertas travada >"$LOG_DIR/api-T8-oferta-travada.json" 2>>"$LOG_DIR/api.err" \
+    && grep -q "$GABRIEL_DIGITS" "$LOG_DIR/api-T8-oferta-travada.json"; then
+    # Corrida com o dedo do vendedor (run 20260919-012044: travada 8s apos
+    # criada, 1s antes da consulta). Travada prova entrega + aceite; punir o
+    # dedo rapido seria vermelho falso. Pula direto para o reset de fim.
+    passou T8-oferta "oferta já assumida (vendedor mais rápido que o oráculo)"
+    passou T8-vendedor "entrega provada pelo Peguei"
+    passou T8-peguei "vendedor assumiu o lead"
+    t_reset T8-fim || return 1
+    return 0
+  else
+    if [ ! -s "$of_json" ]; then
+      falhou T8-oferta "oferta aberta ao vendedor (API sem resposta)"; return 1
+    fi
+    falhou T8-oferta "oferta aberta ao vendedor (sem '$GABRIEL_DIGITS')"; return 1
+  fi
   local ofid; ofid="$("$PY" -c "
 import json
 d = json.load(open('$LOG_DIR/api-T8-oferta.json'))
