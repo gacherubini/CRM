@@ -185,3 +185,15 @@ O oráculo deixou de chamar `python3` direto: o `python3` do PATH no Windows é 
 stub da Microsoft Store, que existe, **sai 49 e imprime nada**. `config.sh`
 escolhe o interpretador testando execução (`$PY`), não presença.
 Sem áudio até o dono liberar: TODOS em `run.sh` já exclui T3/T3b/T4.
+
+### Run 19/09 01:02 — T8-vendedor era vermelho falso, não produto
+
+Placar: T1, T2, T5, T6 (+fotos), T8 até `T8-oferta` verdes; `T8-vendedor`
+vermelho com `T8-envio.log` vazio — e a oferta chegou no aparelho do dono.
+Causa: o assert procurava `oferta enviada ... envelope=` (`logger.info`) no
+`fly logs`, mas o root em produção é WARNING (uvicorn sem `--log-level`, sem
+`basicConfig` no código), então a linha do sucesso nunca é emitida. A de falha
+(`logger.exception`, ERROR) aparece — foi assim que o mesmo pipeline pegou o
+template inexistente em 18/09. Defeito no oráculo do teste, não no produto.
+Fix no harness: T8-vendedor agora só reprova no rastro explícito de falha; a
+entrega é provada pelo `T8-peguei` (oferta `travada` via API).

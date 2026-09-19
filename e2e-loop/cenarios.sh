@@ -137,7 +137,7 @@ T8_simulacao() { # jornada CPF -> nascimento -> CNH -> solicitacao enfileirada
   e2e_wait_reply "$t0" "$LOG_DIR/T8-4.txt" || { falhou T8 "bot mudo apos CNH"; return 1; }
   assert_contém "$LOG_DIR/T8-4.txt" "setor|encaminh|simula|vendedor" T8-fim "bot encaminha a simulacao" || return 1
   # Modo 2: nao ha alerta de grupo — a entrega ao vendedor E a oferta.
-  # 1) oferta aberta para este cliente; 2) rastro "oferta enviada" no log.
+  # 1) oferta aberta para este cliente; 2) SEM rastro de falha no log.
   t_api T8-oferta "api_ofertas aberta" "$GABRIEL_DIGITS" "oferta aberta ao vendedor" || return 1
   local ofid; ofid="$("$PY" -c "
 import json
@@ -155,7 +155,15 @@ print(cands[0]['id'] if cands else '')
   if grep -q "falha ao enviar oferta" "$out" 2>/dev/null; then
     falhou T8-vendedor "oferta aberta mas WhatsApp ao vendedor falhou (template PENDING? janela fechada?)"; return 1
   fi
-  assert_contém "$out" "oferta enviada.*envelope=" T8-vendedor "vendedor chamado no WhatsApp" || return 1
+  # Sem assert no rastro de SUCESSO de proposito: ele loga em logger.info
+  # ("oferta enviada ... envelope=") e o root em producao e WARNING (uvicorn
+  # sem --log-level, sem basicConfig no codigo), entao a linha nunca chega ao
+  # fly logs — o assert nela era vermelho deterministico com o produto certo
+  # (19/09: oferta aberta + WhatsApp entregue, T8-envio.log vazio). A linha de
+  # FALHA e logger.exception (ERROR) e aparece; sem ela, a entrega e provada
+  # pelo passo seguinte — sem WhatsApp nao ha Peguei.
+  e2e_log "T8-vendedor: sem rastro de falha no envio"
+  passou T8-vendedor "envio sem falha (entrega provada pelo Peguei)"
   # O vendedor da vez e o MESMO aparelho do cliente (5551980336365, ordem 0 da
   # fila): a oferta cai no mesmo fio do WhatsApp. Reset aqui apagaria a oferta
   # antes do "Peguei" — espera o vendedor responder e so entao limpa.
