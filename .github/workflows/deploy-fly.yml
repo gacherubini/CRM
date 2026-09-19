@@ -98,9 +98,35 @@ jobs:
         id: antes
         run: |
           set -euo pipefail
-          flyctl image show --app "$APP" --json > antes.json || echo '{}' > antes.json
-          REF=$(jq -r '.. | objects | (.Ref // .ref // empty)' antes.json | head -1)
-          if [ -z "$REF" ] || [ "$REF" = "null" ]; then
+          flyctl image show --app "$APP" --json > antes.json || echo '[]' > antes.json
+          # Esta versao do flyctl NAO devolve um campo `Ref`: devolve Registry,
+          # Repository, Tag e Digest separados. A primeira versao deste passo
+          # procurava `Ref`, nao achava, e o deploy seguia avisando que o
+          # rollback estava indisponivel — foi o que aconteceu no primeiro
+          # deploy de verdade, 19/09/2026. Preferimos o digest, que e imutavel.
+          cat > ref_imagem.py <<'PY'
+          import json, sys
+
+          try:
+              dados = json.load(sys.stdin)
+          except (ValueError, OSError):
+              raise SystemExit(0)
+
+          for item in (dados if isinstance(dados, list) else [dados]):
+              if not isinstance(item, dict):
+                  continue
+              if item.get("Ref"):
+                  print(item["Ref"]); break
+              registro, repo = item.get("Registry"), item.get("Repository")
+              if not (registro and repo):
+                  continue
+              if item.get("Digest"):
+                  print(f"{registro}/{repo}@{item['Digest']}"); break
+              if item.get("Tag"):
+                  print(f"{registro}/{repo}:{item['Tag']}"); break
+          PY
+          REF=$(python3 ref_imagem.py < antes.json)
+          if [ -z "$REF" ]; then
             echo "::warning::nao consegui ler a imagem atual; ROLLBACK AUTOMATICO INDISPONIVEL nesta rodada"
             echo "ref=" >> "$GITHUB_OUTPUT"
           else
