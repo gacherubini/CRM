@@ -8,6 +8,7 @@ import os
 import re
 import secrets
 import uuid
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any
 
@@ -1739,6 +1740,118 @@ def _enviar_texto_saida(
         ) from exc
 
 
+@dataclass
+class _SaidaHumanaPreparada:
+    """Estado comum a qualquer envio humano (texto ou áudio)."""
+
+    conversa: Conversa | None
+    canal_id: str | None
+    instance_envio: str
+    ja_persistida: Mensagem | None = None
+
+
+def _resolver_canal_conversa_humana(
+    db: Session,
+    loja_id: str,
+    telefone: str,
+    *,
+    instance: str | None,
+) -> str | None:
+    """Canal do envio, adotando a única conversa existente quando não há instance."""
+    canal_id = _resolver_canal_id_escopo(db, loja_id, instance=instance)
+    # Sem instance: reutiliza canal só se houver conversa única (evita .first() multi-WA).
+    if canal_id is None:
+        existentes = _listar_conversas_telefone(db, loja_id, telefone)
+        unica = _exigir_conversa_unica(existentes, canal_id=None)
+        if unica is not None:
+            canal_id = unica.canal_id
+    return canal_id
+
+
+def _preparar_saida_humana(
+    db: Session,
+    loja_id: str,
+    telefone: str,
+    *,
+    provider_message_id: str,
+    instance: str | None,
+    ator: str | None,
+) -> _SaidaHumanaPreparada:
+    """Dedupe, conversa e pausa do bot — o núcleo reusado por todo envio humano.
+
+    Já existe mensagem com a mesma chave: devolve ``ja_persistida`` sem reenviar.
+    """
+    canal_id = _resolver_canal_conversa_humana(
+        db, loja_id, telefone, instance=instance
+    )
+    existente = _mensagem_existente(
+        db, loja_id, provider_message_id, canal_id=canal_id
+    )
+    if existente is not None:
+        # Já enviada (ou persistida em tentativa anterior): não reenvia ao provedor.
+        return _SaidaHumanaPreparada(
+            conversa=db.get(Conversa, existente.conversa_id),
+            canal_id=existente.canal_id,
+            instance_envio="",
+            ja_persistida=existente,
+        )
+
+    conversa = _get_or_create_conversa(
+        db, loja_id, telefone, canal_id=canal_id
+    )
+    # Humano assume: pausa bot (mesmo contrato do from_me atendente).
+    conversa.bot_ativo = False
+    conversa.status = "handoff"
+    conversa.atualizada_em = datetime.now(timezone.utc)
+    if ator and not conversa.responsavel:
+        conversa.responsavel = ator[:120]
+    return _SaidaHumanaPreparada(
+        conversa=conversa,
+        canal_id=conversa.canal_id,
+        instance_envio=_resolver_instance_envio(db, loja_id, conversa),
+    )
+
+
+def _persistir_saida_humana(db: Session, mensagem: Mensagem) -> Mensagem | None:
+    """Persiste a saída humana. Devolve a existente se a chave colidir (dedupe)."""
+    db.add(mensagem)
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        existente = _mensagem_existente(
+            db,
+            mensagem.loja_id,
+            mensagem.provider_message_id,
+            canal_id=mensagem.canal_id,
+        )
+        if existente is None:
+            raise
+        return existente
+    return None
+
+
+def _resposta_saida_humana_duplicada(
+    db: Session,
+    existente: Mensagem,
+    *,
+    telefone: str,
+    ator: str | None,
+) -> dict:
+    conversa = db.get(Conversa, existente.conversa_id)
+    return {
+        "duplicada": True,
+        "mensagem_id": existente.id,
+        "telefone": telefone,
+        "texto": existente.texto,
+        "bot_ativo": bool(conversa.bot_ativo) if conversa else False,
+        "status": conversa.status if conversa else "handoff",
+        "enviado": True,
+        "canal_id": existente.canal_id,
+        "ator": ator,
+    }
+
+
 def enviar_mensagem_humana(
     db: Session,
     loja_id: str,
@@ -1749,13 +1862,13 @@ def enviar_mensagem_humana(
     instance: str | None = None,
     ator: str | None = None,
 ) -> dict:
-    """Persiste saída humana na conversa da loja, pausa o bot e envia via Evolution.
+    """Persiste saída humana na conversa da loja, pausa o bot e envia ao provedor.
 
     Escopo: somente a loja autenticada (token de serviço) + telefone.
     Idempotente por ``idempotency_key`` (provider_message_id = human:…).
-    Segunda chamada com a mesma chave não reenvia à Evolution (dedupe).
+    Segunda chamada com a mesma chave não reenvia ao provedor (dedupe).
 
-    Se a Evolution falhar após o commit: a mensagem permanece no histórico,
+    Se o provedor falhar após o commit: a mensagem permanece no histórico,
     o bot continua pausado (handoff) e a API responde 502 com detalhe.
     """
     from app import provisioning
@@ -1785,48 +1898,26 @@ def enviar_mensagem_humana(
         raise HTTPException(status_code=422, detail="texto inválido")
 
     provider_message_id = _provider_id_humano(idempotency_key)
-    canal_id = _resolver_canal_id_escopo(db, loja_id, instance=instance)
-
-    # Sem instance: reutiliza canal só se houver conversa única (evita .first() multi-WA).
-    if canal_id is None:
-        existentes = _listar_conversas_telefone(db, loja_id, telefone_norm)
-        unica = _exigir_conversa_unica(existentes, canal_id=None)
-        if unica is not None:
-            canal_id = unica.canal_id
-
-    existente = _mensagem_existente(
-        db, loja_id, provider_message_id, canal_id=canal_id
+    saida = _preparar_saida_humana(
+        db,
+        loja_id,
+        telefone_norm,
+        provider_message_id=provider_message_id,
+        instance=instance,
+        ator=ator,
     )
-    if existente is not None:
-        # Já enviada (ou persistida em tentativa anterior): não reenvia Evolution.
-        conversa = db.get(Conversa, existente.conversa_id)
-        return {
-            "duplicada": True,
-            "mensagem_id": existente.id,
-            "telefone": telefone_norm,
-            "texto": existente.texto,
-            "bot_ativo": bool(conversa.bot_ativo) if conversa else False,
-            "status": conversa.status if conversa else "handoff",
-            "enviado": True,
-            "canal_id": existente.canal_id,
-            "ator": ator,
-        }
+    if saida.ja_persistida is not None:
+        return _resposta_saida_humana_duplicada(
+            db, saida.ja_persistida, telefone=telefone_norm, ator=ator
+        )
 
-    conversa = _get_or_create_conversa(
-        db, loja_id, telefone_norm, canal_id=canal_id
-    )
-    # Humano assume: pausa bot (mesmo contrato do from_me atendente).
-    conversa.bot_ativo = False
-    conversa.status = "handoff"
-    conversa.atualizada_em = datetime.now(timezone.utc)
-    if ator and not conversa.responsavel:
-        conversa.responsavel = ator[:120]
-
+    conversa = saida.conversa
+    assert conversa is not None
     mensagem_id = str(uuid.uuid4())
     texto_persistido = mascarar_cpf(texto_limpo) or texto_limpo
-    instance_envio = _resolver_instance_envio(db, loja_id, conversa)
 
-    db.add(
+    existente = _persistir_saida_humana(
+        db,
         Mensagem(
             id=mensagem_id,
             loja_id=loja_id,
@@ -1835,35 +1926,18 @@ def enviar_mensagem_humana(
             direcao="saida",
             provider_message_id=provider_message_id,
             texto=texto_persistido,
-        )
+        ),
     )
-    try:
-        db.commit()
-    except IntegrityError:
-        db.rollback()
-        existente = _mensagem_existente(
-            db, loja_id, provider_message_id, canal_id=conversa.canal_id
+    if existente is not None:
+        return _resposta_saida_humana_duplicada(
+            db, existente, telefone=telefone_norm, ator=ator
         )
-        if existente is None:
-            raise
-        conversa = db.get(Conversa, existente.conversa_id)
-        return {
-            "duplicada": True,
-            "mensagem_id": existente.id,
-            "telefone": telefone_norm,
-            "texto": existente.texto,
-            "bot_ativo": bool(conversa.bot_ativo) if conversa else False,
-            "status": conversa.status if conversa else "handoff",
-            "enviado": True,
-            "canal_id": existente.canal_id,
-            "ator": ator,
-        }
 
     # Após persistir + pausar: push real. Falha → 502; não desfaz handoff.
     _enviar_texto_saida(
         db,
         loja_id,
-        instance=instance_envio,
+        instance=saida.instance_envio,
         number=telefone_norm,
         text=texto_limpo,
         mensagem_id=mensagem_id,
@@ -1880,7 +1954,7 @@ def enviar_mensagem_humana(
         "enviado": True,
         "canal_id": conversa.canal_id,
         "ator": ator,
-        "evolution_instance": instance_envio,
+        "evolution_instance": saida.instance_envio,
     }
 
 

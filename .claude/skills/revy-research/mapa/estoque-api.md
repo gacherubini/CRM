@@ -1,6 +1,6 @@
 # estoque-api · 41 rotas · 12 modelos · 1 workers · 10 migrations · 3 templates
 
-Gerado de `95da977`. NAO editar a mao — saida de `gerar_mapa.py`.
+Gerado de `6ef5fd6`. NAO editar a mao — saida de `gerar_mapa.py`.
 Migration head: `0010`
 
 ## Rotas

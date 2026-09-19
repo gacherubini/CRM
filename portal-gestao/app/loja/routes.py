@@ -5,8 +5,10 @@ Rotas legadas ``/app/leads`` e ``/app/conversas`` permanecem intactas.
 """
 from __future__ import annotations
 
+from dataclasses import dataclass
 from datetime import date, datetime, timedelta, timezone
 from types import SimpleNamespace
+from typing import Any
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, Request
@@ -666,6 +668,87 @@ def _guard_workspace_mutacao(
     return None, atr
 
 
+@dataclass
+class _ContextoEnvioAtendimento:
+    """Estado validado de uma rota de envio do Atendimento."""
+
+    usuario: Usuario
+    telefone: str
+    form: Any
+    canal_id_form: str | None
+    destino: str
+    quer_json: bool
+
+
+async def _preparar_envio_atendimento(
+    request: Request,
+    db: Session,
+    workspace_id: str,
+):
+    """Login / flag / papel / escopo / CSRF + form: guarda comum das rotas de envio.
+
+    Devolve ``(ctx, None)`` quando pode enviar, ou ``(None, resposta)`` quando a
+    rota deve parar. Preserva o duplo contrato: HTML (redirect/erro) e JSON.
+    """
+    quer_json = _quer_json(request)
+    usuario = usuario_atual(request, db)
+    if not usuario:
+        if quer_json:
+            return None, _json_erro(401, "auth", "Não autenticado")
+        return None, redirecionar_login()
+    if not atendimento_habilitado():
+        if quer_json:
+            return None, _json_erro(404, "flag", "Atendimento não habilitado")
+        return None, _flag_off_response(request, usuario)
+    if not pode_usar_atendimento(usuario):
+        if quer_json:
+            return None, _json_erro(403, "perm", "Sem permissão")
+        return None, templates.TemplateResponse(
+            "erro.html",
+            contexto(request, usuario, erro="Sem permissão para o Atendimento."),
+            status_code=403,
+        )
+
+    telefone = normalizar_telefone(workspace_id)
+    form = await request.form()
+    # canal_id do form (hidden) — só o da conversa aberta, nunca seletor livre.
+    # Ignora instance/canal arbitrário do cliente: nunca confiar em seletor UI.
+    canal_id_form = (form.get("canal_id") or "").strip() or None
+    destino = f"/app/loja/atendimento/{telefone}"
+    if canal_id_form:
+        destino = f"{destino}?canal_id={canal_id_form}"
+
+    if not csrf_valido(request, form.get("csrf")):
+        if quer_json:
+            return None, _json_erro(403, "sessao", "Sessão expirada")
+        return None, RedirectResponse(
+            _append_query(destino, erro="sessao"), status_code=303
+        )
+
+    atribuicoes = carregar_atribuicoes_ativas(db, usuario.loja_slug)
+    atr = atribuicao_para_telefone(atribuicoes, telefone)
+    if not visivel_para_usuario(usuario, atribuicao=atr):
+        if quer_json:
+            return None, _json_erro(403, "scope", "Atendimento fora do seu escopo")
+        return None, templates.TemplateResponse(
+            "erro.html",
+            contexto(request, usuario, erro="Atendimento fora do seu escopo."),
+            status_code=403,
+        )
+
+    return (
+        _ContextoEnvioAtendimento(
+            usuario=usuario,
+            telefone=telefone,
+            form=form,
+            canal_id_form=canal_id_form,
+            destino=destino,
+            quer_json=quer_json,
+        ),
+        None,
+    )
+
+
 @router.get("/app/loja/atendimento/{workspace_id}/mensagens.json")
 def atendimento_mensagens_json(
     request: Request,
@@ -783,59 +866,20 @@ async def atendimento_enviar_mensagem(
     chatbot: ChatbotClient = Depends(get_chatbot_client),
     messaging: HumanMessagingPort = Depends(get_human_messaging_port),
 ):
-    quer_json = _quer_json(request)
-    usuario = usuario_atual(request, db)
-    if not usuario:
-        if quer_json:
-            return _json_erro(401, "auth", "Não autenticado")
-        return redirecionar_login()
-    if not atendimento_habilitado():
-        if quer_json:
-            return _json_erro(404, "flag", "Atendimento não habilitado")
-        return _flag_off_response(request, usuario)
-    if not pode_usar_atendimento(usuario):
-        if quer_json:
-            return _json_erro(403, "perm", "Sem permissão")
-        return templates.TemplateResponse(
-            "erro.html",
-            contexto(request, usuario, erro="Sem permissão para o Atendimento."),
-            status_code=403,
-        )
-
-    telefone = normalizar_telefone(workspace_id)
-    form = await request.form()
-    # canal_id do form (hidden) — só o da conversa aberta, nunca seletor livre.
-    canal_id_form = (form.get("canal_id") or "").strip() or None
-    # Ignora instance/canal arbitrário do cliente: nunca confiar em seletor UI.
-    # Canal vem só do resumo da conversa no servidor.
-    destino = f"/app/loja/atendimento/{telefone}"
-    if canal_id_form:
-        destino = f"{destino}?canal_id={canal_id_form}"
+    ctx, erro = await _preparar_envio_atendimento(request, db, workspace_id)
+    if erro is not None:
+        return erro
+    usuario = ctx.usuario
+    telefone = ctx.telefone
+    form = ctx.form
+    canal_id_form = ctx.canal_id_form
+    destino = ctx.destino
+    quer_json = ctx.quer_json
 
     def _redir_erro(code: str):
         if quer_json:
             return _json_erro(400, code, code)
-        sep = "&" if "?" in destino else "?"
-        return RedirectResponse(f"{destino}{sep}erro={code}", status_code=303)
-
-    if not csrf_valido(request, form.get("csrf")):
-        if quer_json:
-            return _json_erro(403, "sessao", "Sessão expirada")
-        return RedirectResponse(
-            f"{destino}&erro=sessao" if "?" in destino else f"{destino}?erro=sessao",
-            status_code=303,
-        )
-
-    atribuicoes = carregar_atribuicoes_ativas(db, usuario.loja_slug)
-    atr = atribuicao_para_telefone(atribuicoes, telefone)
-    if not visivel_para_usuario(usuario, atribuicao=atr):
-        if quer_json:
-            return _json_erro(403, "scope", "Atendimento fora do seu escopo")
-        return templates.TemplateResponse(
-            "erro.html",
-            contexto(request, usuario, erro="Atendimento fora do seu escopo."),
-            status_code=403,
-        )
+        return RedirectResponse(_append_query(destino, erro=code), status_code=303)
 
     texto = (form.get("texto") or "").strip()
     if not texto:
