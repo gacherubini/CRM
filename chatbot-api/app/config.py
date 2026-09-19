@@ -49,6 +49,12 @@ AUDIO_DOWNLOAD_TIMEOUT = float(os.getenv("CHATBOT_AUDIO_DOWNLOAD_TIMEOUT", "10")
 # Áudio do Vendedor (saída humana): arquivo no volume, convertido para ogg/opus.
 AUDIO_MEDIA_DIR = os.getenv("CHATBOT_AUDIO_MEDIA_DIR", "/data/media/audio")
 AUDIO_TRANSCODE_TIMEOUT = float(os.getenv("CHATBOT_AUDIO_TRANSCODE_TIMEOUT", "20"))
+# Rollout do Áudio do Vendedor. Default OFF (invariante do projeto).
+AUDIO_HUMANO_ENABLED = os.getenv("CHATBOT_AUDIO_HUMANO_ENABLED", "").lower() in {
+    "1",
+    "true",
+    "yes",
+}
 AUDIO_TRANSCRIPTION_TIMEOUT = float(
     os.getenv("CHATBOT_AUDIO_TRANSCRIPTION_TIMEOUT", "15")
 )

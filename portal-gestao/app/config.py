@@ -158,6 +158,8 @@ class Settings:
     request_timeout: float = float(os.getenv("PORTAL_HTTP_TIMEOUT", "5"))
     # Áudio sobe bytes e o Chatbot ainda converte/sobe na Meta: 5s não basta.
     request_timeout_audio: float = float(os.getenv("PORTAL_HTTP_TIMEOUT_AUDIO", "60"))
+    # Rollout do Áudio do Vendedor. Default OFF (invariante do projeto).
+    revy_loja_audio_enabled: bool = os.getenv("REVY_LOJA_AUDIO_ENABLED", "0") == "1"
     # Espelha o teto do Chatbot; evita carregar arquivo gigante em memória.
     audio_max_bytes: int = int(
         os.getenv("REVY_LOJA_AUDIO_MAX_BYTES", str(8 * 1024 * 1024))

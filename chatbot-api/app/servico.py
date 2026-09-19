@@ -1986,6 +1986,12 @@ def _enviar_audio_saida(
             mime=mime,
         )
     except WhatsAppOutboundError as exc:
+        logger.warning(
+            "audio_humano_falhou loja=%s mensagem=%s code=%s",
+            loja_id,
+            mensagem_id,
+            getattr(exc, "code", None) or "cloud_media_failed",
+        )
         raise HTTPException(
             status_code=502,
             detail={
@@ -2137,6 +2143,14 @@ def enviar_audio_humano(
         mime=armazenado.mime,
         mensagem_id=mensagem_id,
         canal_id=conversa.canal_id,
+    )
+    logger.info(
+        "audio_humano_enviado loja=%s mensagem=%s bytes=%s duracao=%s canal=%s",
+        loja_id,
+        mensagem_id,
+        len(armazenado.conteudo),
+        armazenado.duracao_segundos,
+        conversa.canal_id,
     )
 
     return {

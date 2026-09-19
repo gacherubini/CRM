@@ -20,6 +20,7 @@ WEBM = b"\x1aE\xdf\xa3fake-webm-do-navegador"
 @pytest.fixture(autouse=True)
 def _modo2_on(monkeypatch):
     monkeypatch.setattr("app.rodizio.config.MODO2_ENABLED", True)
+    monkeypatch.setattr("app.config.AUDIO_HUMANO_ENABLED", True)
 
 
 class _CloudEspiao:
@@ -82,6 +83,16 @@ def _post_audio(client, headers, *, key=None, duracao="3", conteudo=WEBM):
         },
         files={"arquivo": ("voz.webm", conteudo, "audio/webm")},
     )
+
+
+def test_audio_desabilitado_404(client, db, loja_a, cloud, media, monkeypatch):
+    monkeypatch.setattr("app.config.AUDIO_HUMANO_ENABLED", False)
+    _projetar_modo2(db, loja_a["loja_id"])
+
+    r = _post_audio(client, loja_a["headers"])
+
+    assert r.status_code == 404
+    assert cloud.audios == []
 
 
 def test_envia_audio_pela_cloud_e_persiste(client, db, loja_a, cloud, media):

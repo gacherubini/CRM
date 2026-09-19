@@ -551,10 +551,15 @@ def atendimento_workspace(
     pode_papel = usuario.papel in _PAPEIS_MUTACAO_ATENDIMENTO
     pode_enviar = pode_papel and not workspace.envio_bloqueado_canal
     pode_atualizar_etapa = pode_papel and bool(lead and lead.get("id"))
-    # Áudio só em Loja Modo 2 e com a janela de atendimento aberta — checado
-    # antes de habilitar o microfone, não depois de gravar.
-    audio_motivo = _motivo_audio_indisponivel(workspace, mensagens) if pode_enviar else None
-    pode_audio = pode_enviar and audio_motivo is None
+    # Áudio só com a flag ligada, Loja Modo 2 e janela de atendimento aberta —
+    # checado antes de habilitar o microfone, não depois de gravar.
+    audio_habilitado = bool(settings.revy_loja_audio_enabled)
+    audio_motivo = (
+        _motivo_audio_indisponivel(workspace, mensagens)
+        if (pode_enviar and audio_habilitado)
+        else None
+    )
+    pode_audio = pode_enviar and audio_habilitado and audio_motivo is None
 
     return templates.TemplateResponse(
         "loja/atendimento_workspace.html",
@@ -1067,6 +1072,9 @@ async def atendimento_enviar_audio(
             return _json_erro(status, code, message)
         return RedirectResponse(_append_query(destino, erro=code), status_code=303)
 
+    if not settings.revy_loja_audio_enabled:
+        return _json_erro(404, "flag", "Áudio não habilitado")
+
     arquivo = form.get("arquivo")
     if arquivo is None or not hasattr(arquivo, "read"):
         return _erro(400, "audio", "Áudio ausente")
@@ -1186,6 +1194,9 @@ def atendimento_audio_midia(
     if not visivel_para_usuario(usuario, atribuicao=atr):
         return _json_erro(403, "scope", "Atendimento fora do seu escopo")
 
+    if not settings.revy_loja_audio_enabled:
+        return _json_erro(404, "flag", "Áudio não habilitado")
+
     try:
         midia = media.baixar(
             telefone, mensagem_id, range_header=request.headers.get("range")
@@ -1231,6 +1242,9 @@ def atendimento_transcrever_audio(
     atr = atribuicao_para_telefone(atribuicoes, telefone)
     if not visivel_para_usuario(usuario, atribuicao=atr):
         return _json_erro(403, "scope", "Atendimento fora do seu escopo")
+
+    if not settings.revy_loja_audio_enabled:
+        return _json_erro(404, "flag", "Áudio não habilitado")
 
     try:
         texto = media.transcrever(telefone, mensagem_id)

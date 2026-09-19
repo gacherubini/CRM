@@ -1124,7 +1124,18 @@ def enviar_mensagem_humana(
     )
 
 
-@app.post("/v1/conversas/{telefone}/audios")
+def _exigir_audio_humano_habilitado() -> None:
+    """Gate de rollout do Áudio do Vendedor; default OFF (invariante)."""
+    if not config.AUDIO_HUMANO_ENABLED:
+        raise HTTPException(
+            status_code=404, detail="Áudio do Vendedor não habilitado"
+        )
+
+
+@app.post(
+    "/v1/conversas/{telefone}/audios",
+    dependencies=[Depends(_exigir_audio_humano_habilitado)],
+)
 async def enviar_audio_humano(
     telefone: str,
     arquivo: UploadFile = File(...),
@@ -1166,7 +1177,10 @@ async def enviar_audio_humano(
     )
 
 
-@app.get("/v1/conversas/{telefone}/mensagens/{mensagem_id}/midia")
+@app.get(
+    "/v1/conversas/{telefone}/mensagens/{mensagem_id}/midia",
+    dependencies=[Depends(_exigir_audio_humano_habilitado)],
+)
 def baixar_midia_humana(
     telefone: str,
     mensagem_id: str,
@@ -1192,7 +1206,10 @@ def baixar_midia_humana(
     )
 
 
-@app.post("/v1/conversas/{telefone}/mensagens/{mensagem_id}/transcrever")
+@app.post(
+    "/v1/conversas/{telefone}/mensagens/{mensagem_id}/transcrever",
+    dependencies=[Depends(_exigir_audio_humano_habilitado)],
+)
 def transcrever_midia_humana(
     telefone: str,
     mensagem_id: str,

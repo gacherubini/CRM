@@ -10,6 +10,11 @@ from app.models_db import Mensagem
 TELEFONE = "5511987000301"
 
 
+@pytest.fixture(autouse=True)
+def _audio_on(monkeypatch):
+    monkeypatch.setattr("app.config.AUDIO_HUMANO_ENABLED", True)
+
+
 @pytest.fixture
 def media():
     fake = FakeAudioMedia()

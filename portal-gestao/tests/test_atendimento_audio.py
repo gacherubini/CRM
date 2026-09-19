@@ -18,7 +18,11 @@ TELEFONE = "5511987654321"
 
 @pytest.fixture
 def atendimento_on(monkeypatch):
-    enabled = replace(portal_settings, revy_loja_atendimento_enabled=True)
+    enabled = replace(
+        portal_settings,
+        revy_loja_atendimento_enabled=True,
+        revy_loja_audio_enabled=True,
+    )
     monkeypatch.setattr("app.config.settings", enabled)
     monkeypatch.setattr("app.main.settings", enabled)
     monkeypatch.setattr("app.loja.routes.settings", enabled)
@@ -262,3 +266,29 @@ def test_workspace_mostra_mic_no_modo2(client, chatbot_fake, atendimento_on):
     html = client.get(f"/app/loja/atendimento/{TELEFONE}").text
 
     assert "Gravar áudio" in html
+
+
+def test_flag_de_audio_desligada_esconde_e_bloqueia(
+    client, chatbot_fake, monkeypatch
+):
+    enabled = replace(
+        portal_settings,
+        revy_loja_atendimento_enabled=True,
+        revy_loja_audio_enabled=False,
+    )
+    monkeypatch.setattr("app.config.settings", enabled)
+    monkeypatch.setattr("app.main.settings", enabled)
+    monkeypatch.setattr("app.loja.routes.settings", enabled)
+    _tornar_modo2(chatbot_fake)
+    login(client)
+    csrf = _csrf(client)
+    html = client.get(f"/app/loja/atendimento/{TELEFONE}").text
+    assert "Gravar áudio" not in html
+
+    r = client.post(
+        f"/app/loja/atendimento/{TELEFONE}/audio",
+        data={"csrf": csrf, "idempotency_key": "x"},
+        files={"arquivo": ("voz.webm", b"webm", "audio/webm")},
+        headers={"Accept": "application/json"},
+    )
+    assert r.status_code == 404

@@ -28,6 +28,11 @@ class _Provider:
         return "bom dia, tudo certo com a moto?"
 
 
+@pytest.fixture(autouse=True)
+def _audio_on(monkeypatch):
+    monkeypatch.setattr("app.config.AUDIO_HUMANO_ENABLED", True)
+
+
 @pytest.fixture
 def media():
     fake = FakeAudioMedia()

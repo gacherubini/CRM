@@ -1,6 +1,6 @@
-# chatbot-api · 67 rotas · 19 modelos · 4 workers · 4 flags · 30 migrations
+# chatbot-api · 67 rotas · 19 modelos · 4 workers · 5 flags · 30 migrations
 
-Gerado de `730d9c5`. NAO editar a mao — saida de `gerar_mapa.py`.
+Gerado de `842dbb8`. NAO editar a mao — saida de `gerar_mapa.py`.
 Migration head: `0030_mensagem_transcricao`
 
 ## Rotas
@@ -20,58 +20,58 @@ Migration head: `0030_mensagem_transcricao`
 - `POST /v1/conversas/{telefone}/pode-responder` — app/main.py:993
 - `PATCH /v1/conversas/{telefone}/estado` — app/main.py:1039
 - `POST /v1/conversas/{telefone}/mensagens` — app/main.py:1102
-- `POST /v1/conversas/{telefone}/audios` — app/main.py:1127
-- `GET /v1/conversas/{telefone}/mensagens/{mensagem_id}/midia` — app/main.py:1169
-- `POST /v1/conversas/{telefone}/mensagens/{mensagem_id}/transcrever` — app/main.py:1195
-- `POST /v1/consentimentos` — app/main.py:1210
-- `POST /v1/leads` — app/main.py:1223
-- `POST /v1/integracoes/catalogo/interesses` — app/main.py:1234
-- `GET /v1/leads` — app/main.py:1268
-- `GET /v1/funil/eventos` — app/main.py:1278
-- `GET /v1/auditoria/ctwa` — app/main.py:1297
-- `GET /v1/atendimento/resumo` — app/main.py:1349
-- `GET /v1/leads.csv` — app/main.py:1361
-- `GET /v1/leads/{lead_id}` — app/main.py:1407
-- `PATCH /v1/leads/{lead_id}/etapa` — app/main.py:1414
-- `GET /v1/config/catalogo-bot` — app/main.py:1426
-- `GET /v1/agente/config` — app/main.py:1471
-- `GET /v1/agente/rascunho` — app/main.py:1521
-- `PUT /v1/agente/rascunho` — app/main.py:1532
-- `POST /v1/agente/publicar` — app/main.py:1547
-- `POST /v1/agente/preview` — app/main.py:1574
-- `GET /v1/agente/versoes` — app/main.py:1631
-- `POST /v1/agente/versoes/{versao_id}/restaurar` — app/main.py:1651
-- `GET /v1/estoque/buscar` — app/main.py:1669
-- `GET /v1/estoque/por-placa/{placa}` — app/main.py:1695
-- `GET /v1/estoque/veiculos/{veiculo_id}/midia-principal` — app/main.py:1712
-- `POST /v1/internal/provisioning/state` — app/main.py:1800
-- `POST /v1/simulacoes/solicitar` — app/main.py:1821
-- `POST /v1/simular` — app/main.py:1860
-- `GET /v1/whatsapp/canais` — app/main.py:1927
-- `POST /v1/whatsapp/canais` — app/main.py:1939
-- `POST /v1/whatsapp/canais/cloud/onboarding` — app/main.py:1967
-- `POST /v1/whatsapp/canais/{canal_id}/principal-estoque` — app/main.py:2011
-- `POST /v1/whatsapp/canais/{canal_id}/inativar` — app/main.py:2021
-- `POST /v1/whatsapp/canais/{canal_id}/connect` — app/main.py:2031
-- `GET /v1/whatsapp/canais/{canal_id}/status` — app/main.py:2048
-- `POST /v1/whatsapp/canais/{canal_id}/disconnect` — app/main.py:2058
-- `GET /v1/fila-vendedores` — app/main.py:2090
-- `GET /v1/ofertas` — app/main.py:2099
-- `POST /v1/ofertas/{oferta_id}/assumir` — app/main.py:2136
-- `POST /v1/fila-vendedores` — app/main.py:2157
-- `PATCH /v1/fila-vendedores/{vendedor_id}` — app/main.py:2176
-- `DELETE /v1/fila-vendedores/{vendedor_id}` — app/main.py:2207
-- `POST /v1/operacao/solicitacoes-simulacao-humana` — app/main.py:2228
-- `POST /v1/operacao/responder` — app/main.py:2268
-- `POST /v1/operacao/handoff-humano` — app/main.py:2320
-- `POST /v1/operacao/moto-escolhida` — app/main.py:2368
-- `GET /v1/operacao/grupo-estoque` — app/main.py:2396
-- `PUT /v1/operacao/grupo-estoque` — app/main.py:2415
-- `DELETE /v1/operacao/grupo-estoque` — app/main.py:2442
-- `GET /v1/operacao/numeros-autorizados` — app/main.py:2449
-- `POST /v1/operacao/numeros-autorizados` — app/main.py:2456
-- `DELETE /v1/operacao/numeros-autorizados/{telefone}` — app/main.py:2467
-- `POST /v1/operacao/veiculos` — app/main.py:2476
+- `POST /v1/conversas/{telefone}/audios` — app/main.py:1136
+- `GET /v1/conversas/{telefone}/mensagens/{mensagem_id}/midia` — app/main.py:1181
+- `POST /v1/conversas/{telefone}/mensagens/{mensagem_id}/transcrever` — app/main.py:1210
+- `POST /v1/consentimentos` — app/main.py:1227
+- `POST /v1/leads` — app/main.py:1240
+- `POST /v1/integracoes/catalogo/interesses` — app/main.py:1251
+- `GET /v1/leads` — app/main.py:1285
+- `GET /v1/funil/eventos` — app/main.py:1295
+- `GET /v1/auditoria/ctwa` — app/main.py:1314
+- `GET /v1/atendimento/resumo` — app/main.py:1366
+- `GET /v1/leads.csv` — app/main.py:1378
+- `GET /v1/leads/{lead_id}` — app/main.py:1424
+- `PATCH /v1/leads/{lead_id}/etapa` — app/main.py:1431
+- `GET /v1/config/catalogo-bot` — app/main.py:1443
+- `GET /v1/agente/config` — app/main.py:1488
+- `GET /v1/agente/rascunho` — app/main.py:1538
+- `PUT /v1/agente/rascunho` — app/main.py:1549
+- `POST /v1/agente/publicar` — app/main.py:1564
+- `POST /v1/agente/preview` — app/main.py:1591
+- `GET /v1/agente/versoes` — app/main.py:1648
+- `POST /v1/agente/versoes/{versao_id}/restaurar` — app/main.py:1668
+- `GET /v1/estoque/buscar` — app/main.py:1686
+- `GET /v1/estoque/por-placa/{placa}` — app/main.py:1712
+- `GET /v1/estoque/veiculos/{veiculo_id}/midia-principal` — app/main.py:1729
+- `POST /v1/internal/provisioning/state` — app/main.py:1817
+- `POST /v1/simulacoes/solicitar` — app/main.py:1838
+- `POST /v1/simular` — app/main.py:1877
+- `GET /v1/whatsapp/canais` — app/main.py:1944
+- `POST /v1/whatsapp/canais` — app/main.py:1956
+- `POST /v1/whatsapp/canais/cloud/onboarding` — app/main.py:1984
+- `POST /v1/whatsapp/canais/{canal_id}/principal-estoque` — app/main.py:2028
+- `POST /v1/whatsapp/canais/{canal_id}/inativar` — app/main.py:2038
+- `POST /v1/whatsapp/canais/{canal_id}/connect` — app/main.py:2048
+- `GET /v1/whatsapp/canais/{canal_id}/status` — app/main.py:2065
+- `POST /v1/whatsapp/canais/{canal_id}/disconnect` — app/main.py:2075
+- `GET /v1/fila-vendedores` — app/main.py:2107
+- `GET /v1/ofertas` — app/main.py:2116
+- `POST /v1/ofertas/{oferta_id}/assumir` — app/main.py:2153
+- `POST /v1/fila-vendedores` — app/main.py:2174
+- `PATCH /v1/fila-vendedores/{vendedor_id}` — app/main.py:2193
+- `DELETE /v1/fila-vendedores/{vendedor_id}` — app/main.py:2224
+- `POST /v1/operacao/solicitacoes-simulacao-humana` — app/main.py:2245
+- `POST /v1/operacao/responder` — app/main.py:2285
+- `POST /v1/operacao/handoff-humano` — app/main.py:2337
+- `POST /v1/operacao/moto-escolhida` — app/main.py:2385
+- `GET /v1/operacao/grupo-estoque` — app/main.py:2413
+- `PUT /v1/operacao/grupo-estoque` — app/main.py:2432
+- `DELETE /v1/operacao/grupo-estoque` — app/main.py:2459
+- `GET /v1/operacao/numeros-autorizados` — app/main.py:2466
+- `POST /v1/operacao/numeros-autorizados` — app/main.py:2473
+- `DELETE /v1/operacao/numeros-autorizados/{telefone}` — app/main.py:2484
+- `POST /v1/operacao/veiculos` — app/main.py:2493
 
 ## Modelos
 
@@ -104,8 +104,9 @@ Migration head: `0030_mensagem_transcricao`
 
 ## Flags
 
-- `CHATBOT_WHATSAPP_MODO2_ENABLED (default: '')` — app/config.py:149
-- `MULTI_WHATSAPP_ENABLED (default: 0)` — app/config.py:152
+- `CHATBOT_AUDIO_HUMANO_ENABLED (default: '')` — app/config.py:53
+- `CHATBOT_WHATSAPP_MODO2_ENABLED (default: '')` — app/config.py:155
+- `MULTI_WHATSAPP_ENABLED (default: 0)` — app/config.py:158
 - `CHATBOT_NOTIF_RETRY_ENABLED (default: 1)` — app/main.py:92
 - `CHATBOT_MODO2_WORKERS_ENABLED (default: 1)` — app/main.py:104
 
