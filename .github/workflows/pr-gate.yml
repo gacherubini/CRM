@@ -79,18 +79,25 @@ jobs:
           - produto: chatbot-api
             var: DATABASE_URL
             db: ci_chatbot
+            vtable: alembic_version
           - produto: motor-simulacao
             var: DATABASE_URL
             db: ci_motor
+            vtable: alembic_version
           - produto: estoque-api
             var: DATABASE_URL
             db: ci_estoque
+            vtable: alembic_version
           - produto: portal-gestao
             var: PORTAL_DATABASE_URL
             db: ci_portal
+            vtable: alembic_version
+          # O Control renomeia a tabela de versao em alembic/env.py. Pre-criar
+          # `alembic_version` aqui nao protegeria nada.
           - produto: revy-trafego
             var: REVY_TRAFEGO_DATABASE_URL
             db: ci_trafego
+            vtable: alembic_version_revy_trafego
     env:
       # O env.py de cada produto importa app.config; estes evitam que o import
       # morra por falta de variavel. Nenhum valor real, nenhum segredo.
@@ -115,6 +122,23 @@ jobs:
 
       - name: criar banco limpo para o produto
         run: PGPASSWORD=ci psql -h localhost -U ci -d ci -c "CREATE DATABASE ${{ matrix.db }};"
+
+      # O alembic cria a tabela de versao com version_num VARCHAR(32), largura
+      # hardcoded e sem opcao de configuracao. Nove revisions do repo passam
+      # disso; o SQLite nao impoe largura de VARCHAR e o Postgres impoe.
+      #
+      # A decisao do repo (ensaio de 16/08/2026) e pre-criar a tabela mais larga
+      # antes do primeiro upgrade — o alembic so cria se nao existir. O DDL e o
+      # de deploy/migracao-pg/README.md, e este passo existe para o CI seguir o
+      # mesmo procedimento do banco de verdade em vez de um caminho proprio.
+      # Guarda-corpo do outro lado: tests/test_alembic_version_largura.py.
+      - name: pre-criar a tabela de versao larga (procedimento de migracao-pg)
+        run: |
+          PGPASSWORD=ci psql -h localhost -U ci -d "${{ matrix.db }}" -v ON_ERROR_STOP=1 -c "
+            CREATE TABLE ${{ matrix.vtable }} (
+                version_num VARCHAR(255) NOT NULL,
+                CONSTRAINT ${{ matrix.vtable }}_pkc PRIMARY KEY (version_num)
+            );"
 
       # Duas cabecas de alembic e o classico do monorepo: dois PRs abrem
       # migration em paralelo e a conta so chega no boot da producao, que e
