@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import json
+import re
+
 from fastapi import APIRouter
 
 from app.main import (  # import tardio; main registra este router no fim
@@ -27,6 +30,9 @@ from app.main import (  # import tardio; main registra este router no fim
     usuario_atual,
     uuid,
 )
+
+from app.models import SimulacaoOrdemBancos, agora
+
 
 router = APIRouter()
 
@@ -231,13 +237,66 @@ def _credenciais_prontas_motor(motor: "MotorClient", ator: str | None) -> list[d
     ]
 
 
+def _carregar_ordem_bancos(db, loja_slug: str | None) -> list[str]:
+    """Ordem de bancos salva da loja; [] = ordem padrão (credenciais)."""
+    if not loja_slug:
+        return []
+    registro = db.get(SimulacaoOrdemBancos, loja_slug)
+    if registro is None or not registro.ordem_json:
+        return []
+    try:
+        dados = json.loads(registro.ordem_json)
+    except (TypeError, ValueError):
+        return []
+    if not isinstance(dados, list):
+        return []
+    return [str(p).strip().lower() for p in dados if str(p).strip()]
+
+
+def _salvar_ordem_bancos(db, loja_slug: str | None, ordem: list[str]) -> None:
+    if not loja_slug:
+        return
+    registro = db.get(SimulacaoOrdemBancos, loja_slug)
+    payload = json.dumps(ordem)
+    if registro is None:
+        db.add(SimulacaoOrdemBancos(loja_slug=loja_slug, ordem_json=payload))
+    else:
+        registro.ordem_json = payload
+        registro.atualizada_em = agora()
+    db.commit()
+
+
+def _ordem_do_form(form) -> list[str]:
+    """Lê o campo oculto ``ordem_bancos`` (nomes separados por vírgula)."""
+    bruto = ",".join(_lista_form(form, "ordem_bancos"))
+    ordem: list[str] = []
+    for item in bruto.split(","):
+        nome = item.strip().lower()
+        if re.fullmatch(r"[a-z0-9_]+", nome) and nome not in ordem:
+            ordem.append(nome)
+    return ordem
+
+
+def _aplicar_ordem(bancos: list[dict], ordem: list[str]) -> list[dict]:
+    """Reordena os bancos prontos pela ordem salva; desconhecidos vão ao fim."""
+    if not ordem:
+        return bancos
+    indice = {nome: i for i, nome in enumerate(ordem)}
+    return sorted(
+        bancos,
+        key=lambda b: indice.get((b.get("provedor") or "").strip().lower(), len(ordem)),
+    )
+
+
 def _provedores_da_simulacao(
     form, credenciais_prontas: list[dict]
 ) -> list[str]:
-    """Bancos escolhidos no form ∩ credencial pronta.
+    """Bancos escolhidos no form ∩ credencial pronta, na ordem da tela.
 
-    Se o form não mandar ``provedores``, mantém o comportamento antigo
-    (todos os prontos) para compatibilidade com clientes/testes legados.
+    A ordem do payload define a ordem de consulta (o fan-out acorda até 2
+    browsers por vez), então preservamos a ordem dos checkboxes — não a da
+    lista de credenciais. Sem ``provedores`` no form mantém o comportamento
+    antigo (todos os prontos) para compatibilidade com clientes/testes legados.
     """
     prontos: list[str] = []
     vistos: set[str] = set()
@@ -247,14 +306,19 @@ def _provedores_da_simulacao(
             vistos.add(nome)
             prontos.append(nome)
 
-    escolhidos = {
+    escolhidos = [
         p.strip().lower()
         for p in _lista_form(form, "provedores")
         if p and str(p).strip()
-    }
+    ]
     if not escolhidos:
         return prontos
-    return [p for p in prontos if p in escolhidos]
+    prontos_set = set(prontos)
+    resultado: list[str] = []
+    for p in escolhidos:
+        if p in prontos_set and p not in resultado:
+            resultado.append(p)
+    return resultado
 
 
 def dados_simulacao_motor(
@@ -325,7 +389,10 @@ def simulacoes_pagina(
         return redirecionar_login()
     if not pode_simular(usuario):
         return RedirectResponse("/app", status_code=303)
-    bancos_prontos = _credenciais_prontas_motor(motor, usuario.email)
+    bancos_prontos = _aplicar_ordem(
+        _credenciais_prontas_motor(motor, usuario.email),
+        _carregar_ordem_bancos(db, usuario.loja_slug),
+    )
     # Prefill opcional a partir do workspace de Atendimento (?celular=).
     celular_limpo = "".join(c for c in (celular or "") if c.isdigit())
     valores: dict = {"modo": "todos"}
@@ -359,6 +426,11 @@ async def simulacoes_simular(
         return RedirectResponse("/app/simulacoes", status_code=303)
     valores = _valores_form_simulacao(form)
     bancos_prontos = _credenciais_prontas_motor(motor, usuario.email)
+    # A ordem escolhida na tela vira padrão da loja e vale para esta rodada.
+    ordem_form = _ordem_do_form(form)
+    if ordem_form:
+        _salvar_ordem_bancos(db, usuario.loja_slug, ordem_form)
+        bancos_prontos = _aplicar_ordem(bancos_prontos, ordem_form)
 
     def _rerender(erro: str, status: int = 422):
         return templates.TemplateResponse(
@@ -383,6 +455,13 @@ async def simulacoes_simular(
     if not provedores:
         return _rerender(
             "Selecione ao menos um banco com acesso configurado para simular."
+        )
+    if "bradesco" in provedores and not (form.get("sexo") or "").strip():
+        # O Bradesco exige Sexo no modal do portal; sem ele o driver aborta com
+        # `sexo_nao_informado`. Barra aqui, antes de gastar a rodada.
+        return _rerender(
+            "O Bradesco só simula com o Sexo do cliente informado. "
+            "Selecione o Sexo e tente de novo."
         )
     try:
         payload_motor = dados_simulacao_motor(form, provedores)
@@ -418,6 +497,59 @@ async def simulacoes_simular(
         jobs.pop(next(iter(jobs)))
     request.session["sim_jobs"] = jobs
     return RedirectResponse(f"/app/simulacoes/job/{sim_id}", status_code=303)
+
+
+@router.post("/app/simulacoes/ordem-bancos")
+async def simulacoes_ordem_bancos(
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """Salva a ordem dos bancos da loja (drag-and-drop na tela de simulação).
+
+    JSON no corpo: ``{"csrf": "...", "ordem": ["pan", "santander", ...]}``.
+    A ordem vale para as próximas simulações da loja; nomes fora do padrão são
+    descartados.
+    """
+    usuario = usuario_atual(request, db)
+    if not usuario:
+        return Response(
+            content='{"erro":"nao_autenticado"}',
+            media_type="application/json",
+            status_code=401,
+        )
+    if not pode_simular(usuario):
+        return Response(
+            content='{"erro":"sem_permissao"}',
+            media_type="application/json",
+            status_code=403,
+        )
+    try:
+        corpo = await request.json()
+    except Exception:
+        corpo = None
+    if not isinstance(corpo, dict) or not csrf_valido(request, corpo.get("csrf")):
+        return Response(
+            content='{"erro":"csrf"}',
+            media_type="application/json",
+            status_code=403,
+        )
+    ordem = corpo.get("ordem")
+    if not isinstance(ordem, list):
+        return Response(
+            content='{"erro":"ordem_invalida"}',
+            media_type="application/json",
+            status_code=422,
+        )
+    limpa: list[str] = []
+    for nome in ordem:
+        item = str(nome or "").strip().lower()
+        if re.fullmatch(r"[a-z0-9_]+", item) and item not in limpa:
+            limpa.append(item)
+    _salvar_ordem_bancos(db, usuario.loja_slug, limpa)
+    return Response(
+        content=json.dumps({"ok": True, "ordem": limpa}),
+        media_type="application/json",
+    )
 
 
 # Parâmetros que o Motor devolve no GET do job, para reabrir o resultado.

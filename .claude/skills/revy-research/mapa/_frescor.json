@@ -1,5 +1,5 @@
 {
- "sha": "caab3ac",
+ "sha": "dab2d20",
  "inventario": {
   "chatbot-api": [
    {
@@ -1658,80 +1658,87 @@
    },
    {
     "secao": "modelo",
+    "chave": "simulacao_ordem_bancos",
+    "simbolo": "simulacao_ordem_bancos",
+    "arquivo": "app/models.py",
+    "linha": 424
+   },
+   {
+    "secao": "modelo",
     "chave": "pixel_capi_auditoria",
     "simbolo": "pixel_capi_auditoria",
     "arquivo": "app/models.py",
-    "linha": 418
+    "linha": 434
    },
    {
     "secao": "modelo",
     "chave": "meta_capi_outbox",
     "simbolo": "meta_capi_outbox",
     "arquivo": "app/models.py",
-    "linha": 448
+    "linha": 464
    },
    {
     "secao": "modelo",
     "chave": "revy_trafego_event_outbox",
     "simbolo": "revy_trafego_event_outbox",
     "arquivo": "app/models.py",
-    "linha": 468
+    "linha": 484
    },
    {
     "secao": "modelo",
     "chave": "campanhas",
     "simbolo": "campanhas",
     "arquivo": "app/models.py",
-    "linha": 489
+    "linha": 505
    },
    {
     "secao": "modelo",
     "chave": "campanha_gastos",
     "simbolo": "campanha_gastos",
     "arquivo": "app/models.py",
-    "linha": 519
+    "linha": 535
    },
    {
     "secao": "modelo",
     "chave": "pessoa_revy_projetada",
     "simbolo": "pessoa_revy_projetada",
     "arquivo": "app/models.py",
-    "linha": 541
+    "linha": 557
    },
    {
     "secao": "modelo",
     "chave": "vinculo_loja_pessoa",
     "simbolo": "vinculo_loja_pessoa",
     "arquivo": "app/models.py",
-    "linha": 555
+    "linha": 571
    },
    {
     "secao": "modelo",
     "chave": "copiloto_sinal",
     "simbolo": "copiloto_sinal",
     "arquivo": "app/models.py",
-    "linha": 610
+    "linha": 626
    },
    {
     "secao": "modelo",
     "chave": "copiloto_sinal_visto",
     "simbolo": "copiloto_sinal_visto",
     "arquivo": "app/models.py",
-    "linha": 681
+    "linha": 697
    },
    {
     "secao": "modelo",
     "chave": "copiloto_conversa",
     "simbolo": "copiloto_conversa",
     "arquivo": "app/models.py",
-    "linha": 706
+    "linha": 722
    },
    {
     "secao": "modelo",
     "chave": "copiloto_turno",
     "simbolo": "copiloto_turno",
     "arquivo": "app/models.py",
-    "linha": 741
+    "linha": 757
    },
    {
     "secao": "rota",
@@ -2354,42 +2361,49 @@
     "chave": "GET /app/simulacoes",
     "simbolo": "/app/simulacoes",
     "arquivo": "app/web/simulacoes.py",
-    "linha": 316
+    "linha": 380
    },
    {
     "secao": "rota",
     "chave": "POST /app/simulacoes",
     "simbolo": "/app/simulacoes",
     "arquivo": "app/web/simulacoes.py",
-    "linha": 346
+    "linha": 413
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /app/simulacoes/ordem-bancos",
+    "simbolo": "/app/simulacoes/ordem-bancos",
+    "arquivo": "app/web/simulacoes.py",
+    "linha": 502
    },
    {
     "secao": "rota",
     "chave": "GET /app/simulacoes/job/{sim_id}",
     "simbolo": "/app/simulacoes/job/{sim_id}",
     "arquivo": "app/web/simulacoes.py",
-    "linha": 631
+    "linha": 763
    },
    {
     "secao": "rota",
     "chave": "GET /app/simulacoes/historico",
     "simbolo": "/app/simulacoes/historico",
     "arquivo": "app/web/simulacoes.py",
-    "linha": 750
+    "linha": 882
    },
    {
     "secao": "rota",
     "chave": "GET /app/simulacoes/{sim_id}/registros",
     "simbolo": "/app/simulacoes/{sim_id}/registros",
     "arquivo": "app/web/simulacoes.py",
-    "linha": 911
+    "linha": 1043
    },
    {
     "secao": "rota",
     "chave": "GET /app/simulacoes/{sim_id}/registros/{evento_id}/print",
     "simbolo": "/app/simulacoes/{sim_id}/registros/{evento_id}/print",
     "arquivo": "app/web/simulacoes.py",
-    "linha": 948
+    "linha": 1080
    },
    {
     "secao": "rota",
@@ -3019,35 +3033,35 @@
     "chave": "app/templates/simulacoes/form.html",
     "simbolo": "simulacoes/form.html",
     "arquivo": "app/web/simulacoes.py",
-    "linha": 335
+    "linha": 402
    },
    {
     "secao": "template",
     "chave": "app/templates/simulacoes/historico.html",
     "simbolo": "simulacoes/historico.html",
     "arquivo": "app/web/simulacoes.py",
-    "linha": 801
+    "linha": 933
    },
    {
     "secao": "template",
     "chave": "app/templates/simulacoes/progresso.html",
     "simbolo": "simulacoes/progresso.html",
     "arquivo": "app/web/simulacoes.py",
-    "linha": 729
+    "linha": 861
    },
    {
     "secao": "template",
     "chave": "app/templates/simulacoes/registros.html",
     "simbolo": "simulacoes/registros.html",
     "arquivo": "app/web/simulacoes.py",
-    "linha": 932
+    "linha": 1064
    },
    {
     "secao": "template",
     "chave": "app/templates/simulacoes/resultado.html",
     "simbolo": "simulacoes/resultado.html",
     "arquivo": "app/web/simulacoes.py",
-    "linha": 708
+    "linha": 840
    },
    {
     "secao": "template",
@@ -3285,6 +3299,13 @@
     "chave": "0027_perfil_avatar_foto",
     "simbolo": "0027_perfil_avatar_foto",
     "arquivo": "alembic/versions/0027_perfil_avatar_foto.py",
+    "linha": 0
+   },
+   {
+    "secao": "migration",
+    "chave": "0028_simulacao_ordem_bancos",
+    "simbolo": "0028_simulacao_ordem_bancos",
+    "arquivo": "alembic/versions/0028_simulacao_ordem_bancos.py",
     "linha": 0
    }
   ],

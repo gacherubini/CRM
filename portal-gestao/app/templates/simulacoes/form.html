@@ -18,20 +18,27 @@
       <button type="button" class="button ghost" id="bancos-todos">Marcar todos</button>
       <button type="button" class="button ghost" id="bancos-nenhum">Desmarcar todos</button>
     </div>
-    <ul class="sim-bank-chips">
+    <input type="hidden" name="ordem_bancos" id="ordem-bancos"
+      value="{% for b in bancos_prontos %}{{ (b.provedor or '')|lower }}{% if not loop.last %},{% endif %}{% endfor %}">
+    {% set monogramas = {'pan': 'PA', 'santander': 'SA', 'bradesco': 'BR', 'fontecred': 'FC', 'motrix': 'MX', 'omni': 'OM', 'bv': 'BV'} %}
+    <ul class="sim-bank-chips" id="bancos-lista">
       {% for b in bancos_prontos %}
       {% set nome = (b.provedor or '')|lower %}
       {% set marcado = (not valores.provedores) or (nome in valores.provedores) %}
-      <li>
-        <label class="status-chip sim-bank-chip">
+      <li data-provedor="{{ nome }}" class="{{ 'is-on' if marcado else '' }}">
+        <span class="sim-bank-drag" draggable="true" aria-hidden="true"
+          title="Arraste para mudar a ordem de consulta">⠿</span>
+        <label class="sim-bank-chip">
           <input type="checkbox" name="provedores" value="{{ nome }}"
             {% if marcado %}checked{% endif %}>
-          <i></i>{{ b.rotulo or b.provedor }}
+          <span class="sim-bank-mono" aria-hidden="true">{{ monogramas.get(nome, nome[:2]|upper) }}</span>
+          <span class="sim-bank-nome">{{ b.rotulo or b.provedor }}</span>
+          <span class="sim-bank-ordem" aria-hidden="true"></span>
         </label>
       </li>
       {% endfor %}
     </ul>
-    <p class="muted sim-bank-hint">Só aparecem bancos com login em <a href="/app/financeiras">Acessos dos bancos</a>.</p>
+    <p class="muted sim-bank-hint">Arraste para definir a ordem de consulta (os primeiros são consultados antes). Só aparecem bancos com login em <a href="/app/financeiras">Acessos dos bancos</a>.</p>
     {% else %}
     <p class="muted">
       Nenhum banco com credencial ainda.
@@ -63,7 +70,7 @@
         </select>
       </label>
     </div>
-    <p class="muted">Celular é obrigatório em Fontecred, Bradesco e PAN (portal). Informe DDD + número, só dígitos.</p>
+    <p class="muted">Celular é obrigatório em Fontecred, Bradesco e PAN (portal). Sexo é obrigatório quando o Bradesco está selecionado. Informe DDD + número, só dígitos.</p>
   </section>
 
   <section class="panel form-section">
@@ -103,17 +110,100 @@
   var btnNenhum = document.getElementById("bancos-nenhum");
   if (btnTodos) btnTodos.addEventListener("click", function () {
     boxes().forEach(function (c) { c.checked = true; });
+    atualizarOrdem();
   });
   if (btnNenhum) btnNenhum.addEventListener("click", function () {
     boxes().forEach(function (c) { c.checked = false; });
+    atualizarOrdem();
   });
   form.addEventListener("submit", function (ev) {
-    var algum = Array.prototype.some.call(boxes(), function (c) { return c.checked; });
-    if (boxes().length && !algum) {
+    var marcados = Array.prototype.filter.call(boxes(), function (c) { return c.checked; });
+    if (boxes().length && !marcados.length) {
       ev.preventDefault();
       alert("Marque ao menos um banco para simular.");
+      return;
+    }
+    // O Bradesco exige Sexo no portal; sem ele a rodada cai em sexo_nao_informado.
+    var temBradesco = marcados.some(function (c) { return c.value === "bradesco"; });
+    var sexo = form.querySelector('select[name="sexo"]');
+    if (temBradesco && sexo && !sexo.value) {
+      ev.preventDefault();
+      sexo.focus();
+      alert("O Bradesco só simula com o Sexo do cliente informado. Selecione o Sexo.");
     }
   });
+
+  // Ordem de consulta: arrastar-e-soltar os chips. A ordem do DOM é a ordem
+  // enviada no form (getlist) e a que o Motor usa no fan-out; o POST abaixo
+  // grava a ordem como padrão da loja. O handle é o único elemento arrastável
+  // para o clique no checkbox não virar arrasto.
+  var lista = document.getElementById("bancos-lista");
+  var oculto = document.getElementById("ordem-bancos");
+  var csrfInput = form.querySelector('input[name="csrf"]');
+  if (!lista) return;
+  var arrastando = null;
+
+  function itens() { return Array.prototype.slice.call(lista.querySelectorAll("li")); }
+  function ordemAtual() {
+    return itens().map(function (li) { return li.getAttribute("data-provedor"); });
+  }
+  function sincronizar() { if (oculto) oculto.value = ordemAtual().join(","); }
+  function salvarOrdem() {
+    fetch("/app/simulacoes/ordem-bancos", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "same-origin",
+      body: JSON.stringify({ csrf: csrfInput ? csrfInput.value : "", ordem: ordemAtual() })
+    }).catch(function () {});
+  }
+  // Numera só os bancos marcados: é a ordem de consulta real (os primeiros
+  // sobem antes no fan-out). Some nos desmarcados.
+  function atualizarOrdem() {
+    var n = 0;
+    itens().forEach(function (li) {
+      var box = li.querySelector('input[name="provedores"]');
+      var num = li.querySelector(".sim-bank-ordem");
+      if (!box) return;
+      if (box.checked) {
+        n += 1;
+        li.classList.add("is-on");
+        if (num) num.textContent = n;
+      } else {
+        li.classList.remove("is-on");
+        if (num) num.textContent = "";
+      }
+    });
+  }
+  lista.addEventListener("change", atualizarOrdem);
+
+  lista.addEventListener("dragstart", function (ev) {
+    var handle = ev.target.closest ? ev.target.closest(".sim-bank-drag") : null;
+    if (!handle) { ev.preventDefault(); return; }
+    arrastando = handle.closest("li");
+    ev.dataTransfer.effectAllowed = "move";
+    try { ev.dataTransfer.setData("text/plain", arrastando.getAttribute("data-provedor")); } catch (e) {}
+    arrastando.classList.add("is-dragging");
+  });
+  lista.addEventListener("dragover", function (ev) {
+    if (!arrastando) return;
+    ev.preventDefault();
+    ev.dataTransfer.dropEffect = "move";
+    var alvo = ev.target.closest ? ev.target.closest("li") : null;
+    if (!alvo || alvo === arrastando) return;
+    var rect = alvo.getBoundingClientRect();
+    if (ev.clientX < rect.left + rect.width / 2) lista.insertBefore(arrastando, alvo);
+    else lista.insertBefore(arrastando, alvo.nextSibling);
+  });
+  lista.addEventListener("dragend", function () {
+    if (!arrastando) return;
+    arrastando.classList.remove("is-dragging");
+    arrastando = null;
+    sincronizar();
+    atualizarOrdem();
+    salvarOrdem();
+  });
+  sincronizar();
+  atualizarOrdem();
 })();
 </script>
 {% endblock %}

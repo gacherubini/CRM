@@ -1126,14 +1126,87 @@ tr:hover td { background: var(--surface-soft); }
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
-  margin: 8px 0 0;
+  margin: 10px 0 0;
   padding: 0;
   list-style: none;
 }
-.sim-bank-chips li { margin: 0; }
-.sim-bank-chip { margin: 0; cursor: pointer; user-select: none; }
-.sim-bank-chips input[type="checkbox"] { margin: 0; }
-.sim-bank-hint { margin-top: 10px; }
+/* Cada banco é um token: grip de arrasto + monograma + nome + nº da ordem. O
+   número só aparece nos marcados, porque a sequência é a ordem de consulta
+   real (o fan-out sobe até 2 browsers por vez). */
+.sim-bank-chips li {
+  margin: 0;
+  display: inline-flex;
+  align-items: stretch;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-nav);
+  background: var(--surface);
+  overflow: hidden;
+  transition: border-color .15s ease, background .15s ease;
+}
+.sim-bank-chips li:hover { border-color: var(--line-strong); }
+.sim-bank-chips li.is-dragging { opacity: .5; }
+.sim-bank-chips li:focus-within { outline: 2px solid var(--brand); outline-offset: 2px; }
+.sim-bank-drag {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  flex: 0 0 auto;
+  color: var(--ink-muted);
+  background: var(--surface-soft);
+  border-right: 1px solid var(--line);
+  font-size: 13px;
+  line-height: 1;
+  cursor: grab;
+  user-select: none;
+}
+.sim-bank-drag:active { cursor: grabbing; }
+.sim-bank-chips li:hover .sim-bank-drag { color: var(--ink); }
+.sim-bank-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 12px 7px 9px;
+  cursor: pointer;
+  user-select: none;
+}
+.sim-bank-chip input[type="checkbox"] {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+.sim-bank-mono {
+  width: 27px;
+  height: 27px;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  border-radius: 7px;
+  background: var(--surface-soft);
+  color: var(--ink-muted);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .04em;
+  transition: background .15s ease, color .15s ease;
+}
+.sim-bank-nome { font-size: 13px; font-weight: 600; color: var(--ink-soft); }
+.sim-bank-ordem {
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  display: none;
+  place-items: center;
+  border-radius: 999px;
+  background: var(--brand);
+  color: var(--brand-ink);
+  font: 700 11px/1 var(--font-ui);
+}
+.sim-bank-chips li.is-on { border-color: var(--brand-line); background: var(--brand-tint); }
+.sim-bank-chips li.is-on .sim-bank-mono { background: var(--brand); color: var(--brand-ink); }
+.sim-bank-chips li.is-on .sim-bank-nome { color: var(--ink); }
+.sim-bank-chips li.is-on .sim-bank-ordem { display: grid; }
+.sim-bank-hint { margin-top: 12px; }
 
 .action-panel {
   margin-top: 20px;

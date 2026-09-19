@@ -450,3 +450,93 @@ def test_recusa_segue_como_recusado_e_conta_no_resumo():
     assert resumo["ok"] == 0
     assert resumo["recusados"] == 2  # recusado + intervencao contam como sem oferta
     assert resumo["total"] == 2
+
+
+def test_provedores_da_simulacao_preserva_ordem_do_form():
+    from app.web.simulacoes import _provedores_da_simulacao
+
+    class _Form(dict):
+        def getlist(self, nome):
+            return self.get(nome, [])
+
+    prontos = [
+        {"provedor": "pan"},
+        {"provedor": "santander"},
+        {"provedor": "bradesco"},
+    ]
+    # A ordem da tela vence a ordem da lista de credenciais.
+    assert _provedores_da_simulacao(
+        _Form(provedores=["bradesco", "pan"]), prontos
+    ) == ["bradesco", "pan"]
+
+
+def test_ordem_bancos_salva_e_reordena_os_chips(client, motor_fake):
+    # Dois bancos prontos: o padrão é a ordem da lista de credenciais [pan, santander].
+    motor_fake.credenciais[1]["senha_configurada"] = True
+    motor_fake.credenciais[1]["habilitado"] = True
+    login(client, papel="dono")
+    pagina = client.get("/app/simulacoes")
+    assert pagina.text.index('data-provedor="pan"') < pagina.text.index(
+        'data-provedor="santander"'
+    )
+
+    resposta = client.post(
+        "/app/simulacoes/ordem-bancos",
+        json={"csrf": csrf_da_resposta(pagina), "ordem": ["santander", "pan"]},
+    )
+    assert resposta.status_code == 200
+    assert resposta.json()["ordem"] == ["santander", "pan"]
+
+    nova = client.get("/app/simulacoes")
+    assert nova.text.index('data-provedor="santander"') < nova.text.index(
+        'data-provedor="pan"'
+    )
+    # A ordem gravada também vai no campo oculto do form (ordem de consulta).
+    assert 'value="santander,pan"' in nova.text
+
+
+def test_ordem_bancos_exige_csrf(client, motor_fake):
+    login(client, papel="dono")
+    resposta = client.post(
+        "/app/simulacoes/ordem-bancos",
+        json={"csrf": "invalido", "ordem": ["pan"]},
+    )
+    assert resposta.status_code == 403
+
+
+def _tornar_bradesco_pronto(motor_fake):
+    motor_fake.credenciais.append(
+        {
+            "provedor": "bradesco",
+            "usuario": "loja",
+            "senha_configurada": True,
+            "senha_mascara": "****",
+            "habilitado": True,
+            "atualizado_em": None,
+            "ultimo_sucesso_em": None,
+            "ultimo_erro_sanitizado": None,
+            "falhas_login": 0,
+        }
+    )
+
+
+def test_bradesco_exige_sexo(client, motor_fake):
+    _tornar_bradesco_pronto(motor_fake)
+    login(client, papel="dono")
+    dados = _dados_motor(_csrf_do_form(client), provedores=["bradesco"], sexo="")
+    resposta = client.post("/app/simulacoes", data=dados)
+    assert resposta.status_code == 422
+    assert "Sexo" in resposta.text
+    # Nada foi enviado ao Motor: a validação barra antes de gastar a rodada.
+    assert not getattr(motor_fake, "simulacoes", None)
+
+
+def test_bradesco_com_sexo_passa(client, motor_fake):
+    _tornar_bradesco_pronto(motor_fake)
+    login(client, papel="dono")
+    dados = _dados_motor(
+        _csrf_do_form(client), provedores=["bradesco"], sexo="Masculino"
+    )
+    resposta = client.post("/app/simulacoes", data=dados, follow_redirects=False)
+    assert resposta.status_code == 303
+    assert motor_fake.simulacoes[0]["provedores"] == ["bradesco"]

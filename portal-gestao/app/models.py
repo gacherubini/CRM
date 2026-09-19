@@ -412,6 +412,22 @@ class MetaAdsConfig(Base):
     atualizada_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=agora)
 
 
+class SimulacaoOrdemBancos(Base):
+    """Ordem de consulta dos bancos na simulação manual, por loja.
+
+    Lista de provedores em JSON (texto). A tela reordena os chips e grava aqui;
+    ausente/vazio cai na ordem padrão (a lista de credenciais da loja). A ordem
+    importa porque o fan-out acorda no máximo 2 browsers por vez — os primeiros
+    da lista são consultados primeiro.
+    """
+
+    __tablename__ = "simulacao_ordem_bancos"
+
+    loja_slug: Mapped[str] = mapped_column(String(120), primary_key=True)
+    ordem_json: Mapped[str] = mapped_column(Text, default="[]")
+    atualizada_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=agora)
+
+
 class PixelCapiAuditoria(Base):
     """Auditoria de chaves Pixel/CAPI (flags de match, sem PII)."""
 

@@ -1,7 +1,7 @@
-# portal-gestao · 184 rotas · 26 modelos · 6 workers · 38 flags · 27 migrations · 63 templates
+# portal-gestao · 185 rotas · 27 modelos · 6 workers · 38 flags · 28 migrations · 63 templates
 
-Gerado de `caab3ac`. NAO editar a mao — saida de `gerar_mapa.py`.
-Migration head: `0027_perfil_avatar_foto`
+Gerado de `dab2d20`. NAO editar a mao — saida de `gerar_mapa.py`.
+Migration head: `0028_simulacao_ordem_bancos`
 
 ## Rotas
 
@@ -145,12 +145,13 @@ Migration head: `0027_perfil_avatar_foto`
 - `POST /senha/esqueci` — app/web/password_reset.py:38
 - `GET /senha/redefinir` — app/web/password_reset.py:89
 - `POST /senha/redefinir` — app/web/password_reset.py:100
-- `GET /app/simulacoes` — app/web/simulacoes.py:316
-- `POST /app/simulacoes` — app/web/simulacoes.py:346
-- `GET /app/simulacoes/job/{sim_id}` — app/web/simulacoes.py:631
-- `GET /app/simulacoes/historico` — app/web/simulacoes.py:750
-- `GET /app/simulacoes/{sim_id}/registros` — app/web/simulacoes.py:911
-- `GET /app/simulacoes/{sim_id}/registros/{evento_id}/print` — app/web/simulacoes.py:948
+- `GET /app/simulacoes` — app/web/simulacoes.py:380
+- `POST /app/simulacoes` — app/web/simulacoes.py:413
+- `POST /app/simulacoes/ordem-bancos` — app/web/simulacoes.py:502
+- `GET /app/simulacoes/job/{sim_id}` — app/web/simulacoes.py:763
+- `GET /app/simulacoes/historico` — app/web/simulacoes.py:882
+- `GET /app/simulacoes/{sim_id}/registros` — app/web/simulacoes.py:1043
+- `GET /app/simulacoes/{sim_id}/registros/{evento_id}/print` — app/web/simulacoes.py:1080
 - `GET /app/campanhas` — app/web/trafego.py:116
 - `GET /app/campanhas/nova` — app/web/trafego.py:177
 - `POST /app/campanhas/nova` — app/web/trafego.py:195
@@ -207,17 +208,18 @@ Migration head: `0027_perfil_avatar_foto`
 - `funil_eventos` — app/models.py:341
 - `meta_pixel_config` — app/models.py:382
 - `meta_ads_config` — app/models.py:400
-- `pixel_capi_auditoria` — app/models.py:418
-- `meta_capi_outbox` — app/models.py:448
-- `revy_trafego_event_outbox` — app/models.py:468
-- `campanhas` — app/models.py:489
-- `campanha_gastos` — app/models.py:519
-- `pessoa_revy_projetada` — app/models.py:541
-- `vinculo_loja_pessoa` — app/models.py:555
-- `copiloto_sinal` — app/models.py:610
-- `copiloto_sinal_visto` — app/models.py:681
-- `copiloto_conversa` — app/models.py:706
-- `copiloto_turno` — app/models.py:741
+- `simulacao_ordem_bancos` — app/models.py:424
+- `pixel_capi_auditoria` — app/models.py:434
+- `meta_capi_outbox` — app/models.py:464
+- `revy_trafego_event_outbox` — app/models.py:484
+- `campanhas` — app/models.py:505
+- `campanha_gastos` — app/models.py:535
+- `pessoa_revy_projetada` — app/models.py:557
+- `vinculo_loja_pessoa` — app/models.py:571
+- `copiloto_sinal` — app/models.py:626
+- `copiloto_sinal_visto` — app/models.py:697
+- `copiloto_conversa` — app/models.py:722
+- `copiloto_turno` — app/models.py:757
 
 ## Workers
 
@@ -298,6 +300,7 @@ Migration head: `0027_perfil_avatar_foto`
 - `0025_despesas_fixas_loja` — alembic/versions/0025_despesas_fixas_loja.py
 - `0026_copiloto_sinal_destinatario` — alembic/versions/0026_copiloto_sinal_destinatario.py
 - `0027_perfil_avatar_foto` — alembic/versions/0027_perfil_avatar_foto.py
+- `0028_simulacao_ordem_bancos` — alembic/versions/0028_simulacao_ordem_bancos.py
 
 ## Templates
 
@@ -351,11 +354,11 @@ Migration head: `0027_perfil_avatar_foto`
 - `app/templates/convite_aceitar.html` — app/web/owner_invitations.py:129
 - `app/templates/senha_esqueci.html` — app/web/password_reset.py:33
 - `app/templates/senha_redefinir.html` — app/web/password_reset.py:95
-- `app/templates/simulacoes/form.html` — app/web/simulacoes.py:335
-- `app/templates/simulacoes/resultado.html` — app/web/simulacoes.py:708
-- `app/templates/simulacoes/progresso.html` — app/web/simulacoes.py:729
-- `app/templates/simulacoes/historico.html` — app/web/simulacoes.py:801
-- `app/templates/simulacoes/registros.html` — app/web/simulacoes.py:932
+- `app/templates/simulacoes/form.html` — app/web/simulacoes.py:402
+- `app/templates/simulacoes/resultado.html` — app/web/simulacoes.py:840
+- `app/templates/simulacoes/progresso.html` — app/web/simulacoes.py:861
+- `app/templates/simulacoes/historico.html` — app/web/simulacoes.py:933
+- `app/templates/simulacoes/registros.html` — app/web/simulacoes.py:1064
 - `app/templates/campanhas/lista.html` — app/web/trafego.py:150
 - `app/templates/campanhas/form.html` — app/web/trafego.py:185
 - `app/templates/campanhas/gastos_lote.html` — app/web/trafego.py:274
