@@ -176,10 +176,14 @@ jobs:
 
       - uses: superfly/flyctl-actions/setup-flyctl@master
 
+      # Token proprio, escopado no motor2037. O FLY_API_TOKEN e um deploy token
+      # do app2037 e nao alcanca outro app: o primeiro deploy do motor morreu
+      # com `Error: unauthorized`. Um token de org resolveria os dois de uma vez,
+      # mas ai todo push na main rodaria com credencial larga — a troco de nada.
       - name: deploy do worker
         run: flyctl deploy . --app "$MOTOR" --config deploy/fly/3vm/fly.worker.toml --ha=false --wait-timeout 600
         env:
-          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN_MOTOR }}
 
       # As machines por banco (motor-worker-bradesco, -pan, ...) nao sao tocadas
       # por `fly deploy`: elas sao machines avulsas. Atualizar sozinho aqui

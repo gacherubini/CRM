@@ -77,7 +77,10 @@ os de banco estão na seção 4.
 
 | Secret | Usado por | Como tirar |
 |---|---|---|
-| `FLY_API_TOKEN` | `deploy-fly` | `fly tokens create deploy -a app2037 -x 8760h` |
+| `FLY_API_TOKEN` | `deploy-fly` (app2037) | `fly tokens create deploy -a app2037 -x 8760h` |
+| `FLY_API_TOKEN_MOTOR` | `deploy-fly` (motor2037) | `fly tokens create deploy -a motor2037 -x 8760h` — token de deploy não alcança outro app, e o do `app2037` devolve `unauthorized` no `motor2037` |
+| `CHATBOT_API_TOKEN` | `deploy-n8n` | de `deploy/fly/3vm/.secrets.local` |
+| `CHATBOT_API_TOKEN_CLOUD` | `deploy-n8n` nos modos `cloud`/`preview` | idem |
 | `FLY_API_TOKEN_N8N` | `deploy-n8n` | `fly tokens create org -x 8760h` — precisa de escopo maior: o job usa `ssh sftp` e `machine exec`, que token de deploy não cobre |
 | `CLOUDFLARE_API_TOKEN` | `deploy-site` | dash.cloudflare.com → My Profile → API Tokens → **Create Custom Token** com `Account` → `Cloudflare Pages` → **Edit**. O template *Edit Cloudflare Workers* não cobre Pages |
 | `CLOUDFLARE_ACCOUNT_ID` | `deploy-site` | canto direito do dashboard do Cloudflare |
